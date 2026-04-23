@@ -1,3 +1,31 @@
+Version 1.20.1
+
+[changed]
+- merged the divergent FreeBASIC 1.10.4 development line forward into the 1.20 branch, including the separate 1.10.3/1.10.4 platform and packaging work
+- adopted the GNUmakefile + mk/ modular build system and the accompanying build_scripts/ and debian/ packaging flow in place of the older monolithic 1.20 makefile-only layout
+- expanded compiler target, cpu-family, linker, and default-library handling for the platforms and architectures validated in the 1.10.4 branch, including Haiku, NetBSD rpath handling, and broader per-OS library selection
+- updated the HLC IR/backend glue so non-Intel targets do not fall through Intel-centric code paths when targeting newer cpu families
+- refreshed the Darwin graphics/audio backend set with the newer 1.10.4 driver work
+
+[added]
+- sfxlib integrated into the compiler, runtime, libraries, examples, and build system
+- OPEN TCP and OPEN TCP SERVER runtime/device support, including TCP ACCEPT and EOC handling
+- Haiku platform support across compiler target selection, rtlib, gfxlib2, sfxlib, headers, libraries, and build scripts
+- broader platform build coverage carried forward from 1.10.4 for Darwin/macOS, Linux, Windows/MinGW, Windows/Cygwin, FreeBSD, OpenBSD, NetBSD, DragonFly, Solaris, and Haiku
+- additional cpu-family support carried forward from 1.10.4, including riscv64, s390x, and loongarch64 target handling
+- Windows UTF-8 filename handling carried forward from 1.10.4, including wide-path runtime wrappers and Unicode-aware DIR() handling on MinGW
+- Solaris target-specific rtlib console support carried forward from 1.10.4, including the local termcap shim and non-ncurses console/input runtime files
+- beginner-oriented example coverage for sfxlib and OPEN TCP, including self-test examples for networking and a larger commented sfxlib showcase
+
+[fixed]
+- Linux: restrict '-m32' and '-m64' linker flags to x86/x86_64 targets instead of passing them to unrelated architectures
+- Linux/sfxlib: ensure capture backends are shut down during runtime teardown instead of only clearing the capture state buffer
+- Linux/sfxlib: avoid a PulseAudio lock stall where the Linux worker could keep the runtime lock while feeding silent output, blocking control commands such as DEVICE SELECT
+- Linux/sfxlib: make CAPTURE SAVE use the buffered capture path and actual capture format so saved recordings succeed on real hardware
+- rtlib/unix: avoid indefinite terminal query hangs when console size rechecks are attempted in sessions that do not answer the escape-sequence query
+- compatibility: replace the old 1.10.4-specific sfxlib exit registration with a 1.20-compatible atexit() based hook
+
+
 Version 1.20.0
 
 [changed]

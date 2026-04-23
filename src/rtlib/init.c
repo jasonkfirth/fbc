@@ -120,6 +120,9 @@ FBCALL void fb_Init( int argc, char **argv, int lang )
    or fb_Die() in case of assert() failure or runtime error */
 FBCALL void fb_End( int errlevel )
 {
+	if( __fb_ctx.exit_sfxlib )
+		__fb_ctx.exit_sfxlib( );
+
 	if( __fb_ctx.exit_gfxlib2 )
 		__fb_ctx.exit_gfxlib2( );
 

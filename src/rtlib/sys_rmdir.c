@@ -13,7 +13,7 @@ FBCALL int fb_RmDir( FBSTRING *path )
 	int res;
 
 #ifdef HOST_MINGW
-	res = _rmdir( path->data );
+	res = fb_hRemoveDir( path->data );
 #else
 	res = rmdir( path->data );
 #endif

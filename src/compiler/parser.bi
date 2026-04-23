@@ -831,6 +831,8 @@ declare function cMathFunct _
 declare function cPeekFunct() as ASTNODE ptr
 declare function cArrayFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 declare function cFileFunct(byval tk as FB_TOKEN) as ASTNODE ptr
+declare function cSfxStmt(byval tk as FB_TOKEN) as integer
+declare function cSfxFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 declare function cErrorFunct() as ASTNODE ptr
 declare function cIIFFunct() as ASTNODE ptr
 declare function cVAFunct() as ASTNODE ptr

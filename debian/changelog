@@ -1,0 +1,113 @@
+freebasic (1.20.1-1) jammy; urgency=medium
+
+  * Forward-port the divergent 1.10.4 line, including its separate
+    1.10.3 platform reality, into the 1.20 branch.
+  * Adopt the GNUmakefile + mk/ build system together with the
+    build_scripts/ and Debian packaging flow.
+  * Add sfxlib to the compiler, runtime, libraries, examples, and
+    package builds.
+  * Add OPEN TCP / OPEN TCP SERVER, TCP ACCEPT, and EOC support.
+  * Add Haiku support across compiler targets, rtlib, gfxlib2,
+    sfxlib, headers, libraries, and build scripts.
+  * Carry forward the broadened platform support and packaging work
+    for Darwin/macOS, Linux, Windows/MinGW, Windows/Cygwin, FreeBSD,
+    OpenBSD, NetBSD, DragonFly, Solaris, and Haiku.
+  * Carry forward newer cpu-family and linker handling, including
+    riscv64, s390x, loongarch64, and NetBSD rpath support.
+  * Restore the Windows UTF-8 filename runtime layer, including
+    Unicode-aware MinGW DIR() support and wide-path file wrappers.
+  * Add the Solaris target-specific console/runtime files and local
+    termcap shim needed on systems without usable termcap headers.
+  * Refresh the Darwin graphics driver/backend set from the 1.10.4
+    branch.
+  * Add commented sfxlib and OPEN TCP example programs.
+  * Fix Linux linker flag handling so -m32/-m64 are only passed on
+    x86/x86_64 targets.
+  * Fix Linux sfxlib shutdown and worker-lock issues found during the
+    1.20 forward-port validation work.
+  * Fix Linux sfxlib CAPTURE SAVE so buffered recordings can be written
+    successfully on real hardware.
+  * Fix Unix console query hangs that could block example output in
+    non-responding terminal sessions.
+
+ -- SJ_Zero <sj@fbxl.net>  Fri, 17 Apr 2026 12:00:00 -0400
+
+freebasic (1.10.4-1) jammy; urgency=medium
+
+  * Added OPEN TCP and OPEN TCP SERVER support alongside the existing
+    OPEN COM and OPEN LPT device commands.
+  * Added TCP ACCEPT and EOC support for TCP communication endpoints.
+  * Integrated sfxlib into the compiler, runtime, examples, and manual
+    to provide broad built-in sound support.
+  * Hardened the GNUmakefile and mk/ build system so prerequisite
+    compiler checks fail clearly, bootstrap recovery paths are explicit,
+    and cross-target configuration is more predictable.
+  * Reworked the Debian/Ubuntu package build flow so it stages from a
+    full source tree, keeps the native dpkg-buildpackage and lintian
+    path intact, honors distro Fortify settings, disables incompatible
+    LTO in package builds, and emits artifacts under out/linux by
+    distro, codename, and architecture.
+  * Extended the Linux package matrix to include Ubuntu 26.04 LTS
+    (Resolute Raccoon) as an explicit Debian/Ubuntu target.
+  * Added Darwin x86_64 and arm64 to the target matrix, limited runtime
+    C++ compilation to targets that currently require it, and corrected
+    NetBSD toolchain/thread configuration handling.
+  * Serialized the Linux Debian/Ubuntu matrix runner, switched it to
+    reuse emitted bootstrap source trees, and kept per-target build
+    output visible live while still saving docker_build.log for each
+    target.
+  * Added bootstrap-emit-matrix coverage and cleaned successful Linux
+    package builds so stage, .build-*, and src/*/obj intermediates do
+    not accumulate across matrix entries.
+  * Fixed Linux sfxlib packaging and runtime integration so Debian and
+    Ubuntu builds include ALSA/Pulse dependencies, build the sfxlib
+    libraries, install Linux arch compatibility symlinks, and link
+    Linux sfxlib programs against the required audio libraries.
+  * Fixed a recent sfxlib core regression by restoring the missing
+    rollback helper declaration needed for clean builds.
+  * Fixed Linux sfxlib playback so PulseAudio and ALSA backends keep
+    feeding audio during unattended AUDIO, STREAM, MUSIC, and SFX
+    playback instead of reporting success while producing silence.
+  * Updated the macOS CoreAudio backend to use the same explicit feed
+    model on platforms where the backend does not already own an audio
+    callback or pull loop.
+  * Added mk/ build-system documentation and tightened bootstrap archive
+    and structure tests so hidden, stage, dist, and packages trees are
+    not pulled into release artifacts.
+  * Hardened the MSYS2 and Cygwin package builders so they provision
+    their own dependencies, keep staging isolated, clean generated
+    example artifacts, and emit release outputs under out/.
+  * Updated the compiler build so fbc reports the version from
+    mk/version.mk instead of relying on stale in-source release numbers.
+
+ -- SJ_Zero <sj@fbxl.net>  Thu, 16 Apr 2026 18:00:00 +0000
+
+freebasic (1.10.3-1) jammy; urgency=medium
+
+  * Ported FreeBASIC to Haiku.
+  * Rebuilt the build environment for the 1.10.3 release.
+  * Packaged FreeBASIC for Windows/MinGW, Cygwin, Debian, Ubuntu,
+    NetBSD, FreeBSD, OpenBSD, Solaris, and DragonFly.
+
+ -- SJ_Zero <sj@fbxl.net>  Fri, 27 Feb 2026 12:53:00 +0000
+
+freebasic (1.10.2-3) jammy; urgency=medium
+
+  * All changes necessary to build on all platforms
+  * Missing files for gfxlib added to allow successful test compiles
+
+ -- SJ_Zero <sj@fbxl.net>  Thu, 26 Feb 2026 13:34:00 +0000
+
+
+freebasic (1.10.2-2) jammy; urgency=medium
+
+  * Updated build to use improved utilities backported from 1.20
+
+ -- SJ_Zero <sj@fbxl.net>  Thu, 19 Feb 2026 09:34:00 +0000
+
+
+freebasic (1.10.2-1) jammy; urgency=medium
+
+  * Initial Debian/Ubuntu packaging for FreeBASIC 1.10.2.
+
+ -- SJ_Zero <sj@fbxl.net>  Wed, 11 Feb 2026 12:50:35 +0000

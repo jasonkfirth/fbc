@@ -1,0 +1,21 @@
+# FreeBASIC source tree rsync excludes
+#
+# These patterns keep generated build, staging, packaging, and log content out
+# of isolated worktrees and bootstrap source archives. Re-importing those
+# trees can recursively copy previous staging results into new builds and
+# waste large amounts of disk space.
+
+.*
+*.install_manifest
+*.log
+*.tmp
+bin/fbc*
+bootstrap/fbc*
+dist/
+out/
+package-root/
+package-root*/
+packages/
+pkgroot/
+pkgroot*/
+stage/

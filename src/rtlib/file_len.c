@@ -7,7 +7,7 @@ fb_off_t fb_FileLenEx( const char *filename )
 	FILE *fp;
 	fb_off_t len;
 	
-	fp = fopen( filename, "rb" );	
+	fp = fb_hOpenFile( filename, "rb" );	
 	if( fp != NULL )
 	{
 		if( fseeko( fp, 0, SEEK_END ) == 0 ) 

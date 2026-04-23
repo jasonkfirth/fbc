@@ -266,7 +266,84 @@
 #define FB_RTL_FILEOPEN_SCRN            "fb_FileOpenScrn"
 #define FB_RTL_FILEOPEN_LPT             "fb_FileOpenLpt"
 #define FB_RTL_FILEOPEN_COM             "fb_FileOpenCom"
+#define FB_RTL_FILEOPEN_TCP             "fb_FileOpenTcp"
+#define FB_RTL_FILEOPEN_TCPSERVER       "fb_FileOpenTcpServer"
 #define FB_RTL_FILEOPEN_QB              "fb_FileOpenQB"
+#define FB_RTL_EOC                      "fb_Eoc"
+#define FB_RTL_TCPACCEPT                "fb_TcpAccept"
+#define FB_RTL_SFXSOUNDSTOP             "fb_sfxSoundStop"
+#define FB_RTL_SFXSOUNDSTOPCHANNEL      "fb_sfxSoundStopChannel"
+#define FB_RTL_SFXNOISESTOP             "fb_sfxNoiseStopAll"
+#define FB_RTL_SFXNOISESTOPCHANNEL      "fb_sfxNoiseStop"
+#define FB_RTL_SFXTONESTOP              "fb_sfxToneStopAll"
+#define FB_RTL_SFXTONESTOPCHANNEL       "fb_sfxToneStop"
+#define FB_RTL_SFXPLAYSTOP              "fb_sfxPlayStop"
+#define FB_RTL_SFXPLAYPAUSE             "fb_sfxPlayPause"
+#define FB_RTL_SFXPLAYRESUME            "fb_sfxPlayResume"
+#define FB_RTL_SFXPLAYSTATUS            "fb_sfxPlayStatus"
+#define FB_RTL_SFXMUSICLOAD             "fb_sfxMusicLoad"
+#define FB_RTL_SFXMUSICPLAY             "fb_sfxMusicPlayCmd"
+#define FB_RTL_SFXMUSICPLAYFILE         "fb_sfxMusicPlayFile"
+#define FB_RTL_SFXMUSICLOOP             "fb_sfxMusicLoopCmd"
+#define FB_RTL_SFXMUSICLOOPFILE         "fb_sfxMusicLoopFile"
+#define FB_RTL_SFXMUSICPAUSE            "fb_sfxMusicPause"
+#define FB_RTL_SFXMUSICPAUSEID          "fb_sfxMusicPauseId"
+#define FB_RTL_SFXMUSICRESUME           "fb_sfxMusicResume"
+#define FB_RTL_SFXMUSICRESUMEID         "fb_sfxMusicResumeId"
+#define FB_RTL_SFXMUSICSTOP             "fb_sfxMusicStop"
+#define FB_RTL_SFXMUSICSTOPID           "fb_sfxMusicStopId"
+#define FB_RTL_SFXMUSICSTATUS           "fb_sfxMusicStatus"
+#define FB_RTL_SFXMUSICCURRENT          "fb_sfxMusicCurrent"
+#define FB_RTL_SFXMUSICPOSITION         "fb_sfxMusicPosition"
+#define FB_RTL_SFXSFXLOAD               "fb_sfxSfxLoad"
+#define FB_RTL_SFXSFXPLAY               "fb_sfxSfxPlay"
+#define FB_RTL_SFXSFXPLAYCHANNEL        "fb_sfxSfxPlayChannel"
+#define FB_RTL_SFXSFXLOOP               "fb_sfxSfxLoop"
+#define FB_RTL_SFXSFXLOOPCHANNEL        "fb_sfxSfxLoopChannel"
+#define FB_RTL_SFXSFXSTOP               "fb_sfxSfxStop"
+#define FB_RTL_SFXSFXSTOPCHANNEL        "fb_sfxSfxStopChannel"
+#define FB_RTL_SFXSFXSTOPALL            "fb_sfxSfxStopAll"
+#define FB_RTL_SFXSFXPAUSE              "fb_sfxSfxPause"
+#define FB_RTL_SFXSFXPAUSECHANNEL       "fb_sfxSfxPauseChannel"
+#define FB_RTL_SFXSFXPAUSEALL           "fb_sfxSfxPauseAll"
+#define FB_RTL_SFXSFXRESUME             "fb_sfxSfxResume"
+#define FB_RTL_SFXSFXRESUMECHANNEL      "fb_sfxSfxResumeChannel"
+#define FB_RTL_SFXSFXRESUMEALL          "fb_sfxSfxResumeAll"
+#define FB_RTL_SFXSFXSTATUS             "fb_sfxSfxStatus"
+#define FB_RTL_SFXSFXSTATUSCHANNEL      "fb_sfxSfxStatusChannel"
+#define FB_RTL_SFXSFXANYACTIVE          "fb_sfxSfxAnyActive"
+#define FB_RTL_SFXAUDIOPLAY             "fb_sfxAudioPlay"
+#define FB_RTL_SFXAUDIOLOOP             "fb_sfxAudioLoop"
+#define FB_RTL_SFXAUDIOSTOP             "fb_sfxAudioStop"
+#define FB_RTL_SFXAUDIOPAUSE            "fb_sfxAudioPause"
+#define FB_RTL_SFXAUDIORESUME           "fb_sfxAudioResume"
+#define FB_RTL_SFXAUDIOSTATUS           "fb_sfxAudioStatus"
+#define FB_RTL_SFXSTREAMOPEN            "fb_sfxStreamOpen"
+#define FB_RTL_SFXSTREAMPLAY            "fb_sfxStreamPlay"
+#define FB_RTL_SFXSTREAMSTOP            "fb_sfxStreamStop"
+#define FB_RTL_SFXSTREAMPAUSE           "fb_sfxStreamPause"
+#define FB_RTL_SFXSTREAMRESUME          "fb_sfxStreamResume"
+#define FB_RTL_SFXSTREAMPOSITION        "fb_sfxStreamPosition"
+#define FB_RTL_SFXSTREAMSEEK            "fb_sfxStreamSeek"
+#define FB_RTL_SFXMIDIOPEN              "fb_sfxMidiOpen"
+#define FB_RTL_SFXMIDICLOSE             "fb_sfxMidiClose"
+#define FB_RTL_SFXMIDIPLAY              "fb_sfxMidiPlay"
+#define FB_RTL_SFXMIDISTOP              "fb_sfxMidiStop"
+#define FB_RTL_SFXMIDIPAUSE             "fb_sfxMidiPause"
+#define FB_RTL_SFXMIDIRESUME            "fb_sfxMidiResume"
+#define FB_RTL_SFXMIDISEND              "fb_sfxMidiSend"
+#define FB_RTL_SFXDEVICELIST            "fb_sfxDeviceList"
+#define FB_RTL_SFXDEVICESELECT          "fb_sfxDeviceSelect"
+#define FB_RTL_SFXDEVICEINFO            "fb_sfxDeviceInfo"
+#define FB_RTL_SFXDEVICEINFOCURRENT     "fb_sfxDeviceInfoCurrent"
+#define FB_RTL_SFXCAPTURESTART          "fb_sfxCaptureStart"
+#define FB_RTL_SFXCAPTURESTOP           "fb_sfxCaptureStop"
+#define FB_RTL_SFXCAPTUREPAUSE          "fb_sfxCapturePause"
+#define FB_RTL_SFXCAPTURERESUME         "fb_sfxCaptureResume"
+#define FB_RTL_SFXCAPTURESTATUS         "fb_sfxCaptureStatus"
+#define FB_RTL_SFXCAPTURESAVE           "fb_sfxCaptureSaveCmd"
+#define FB_RTL_SFXCAPTUREAVAILABLE      "fb_sfxCaptureAvailable"
+#define FB_RTL_SFXCAPTUREREAD           "fb_sfxCaptureReadSamples"
 #define FB_RTL_FILECLOSE                "fb_FileClose"
 #define FB_RTL_FILECLOSEALL             "fb_FileCloseAll"
 
@@ -693,6 +770,8 @@ enum FB_RTL_IDX
 	FB_RTL_IDX_FILEOPEN_SCRN
 	FB_RTL_IDX_FILEOPEN_LPT
 	FB_RTL_IDX_FILEOPEN_COM
+	FB_RTL_IDX_FILEOPEN_TCP
+	FB_RTL_IDX_FILEOPEN_TCPSERVER
 	FB_RTL_IDX_FILEOPEN_QB
 	FB_RTL_IDX_FILECLOSE
 	FB_RTL_IDX_FILECLOSEALL
@@ -760,6 +839,81 @@ enum FB_RTL_IDX
 	FB_RTL_IDX_WIDTH
 	FB_RTL_IDX_WIDTHDEV
 	FB_RTL_IDX_WIDTHFILE
+	FB_RTL_IDX_EOC
+	FB_RTL_IDX_TCPACCEPT
+	FB_RTL_IDX_SFXSOUNDSTOP
+	FB_RTL_IDX_SFXSOUNDSTOPCHANNEL
+	FB_RTL_IDX_SFXNOISESTOP
+	FB_RTL_IDX_SFXNOISESTOPCHANNEL
+	FB_RTL_IDX_SFXTONESTOP
+	FB_RTL_IDX_SFXTONESTOPCHANNEL
+	FB_RTL_IDX_SFXPLAYSTOP
+	FB_RTL_IDX_SFXPLAYPAUSE
+	FB_RTL_IDX_SFXPLAYRESUME
+	FB_RTL_IDX_SFXPLAYSTATUS
+	FB_RTL_IDX_SFXMUSICLOAD
+	FB_RTL_IDX_SFXMUSICPLAY
+	FB_RTL_IDX_SFXMUSICPLAYFILE
+	FB_RTL_IDX_SFXMUSICLOOP
+	FB_RTL_IDX_SFXMUSICLOOPFILE
+	FB_RTL_IDX_SFXMUSICPAUSE
+	FB_RTL_IDX_SFXMUSICPAUSEID
+	FB_RTL_IDX_SFXMUSICRESUME
+	FB_RTL_IDX_SFXMUSICRESUMEID
+	FB_RTL_IDX_SFXMUSICSTOP
+	FB_RTL_IDX_SFXMUSICSTOPID
+	FB_RTL_IDX_SFXMUSICSTATUS
+	FB_RTL_IDX_SFXMUSICCURRENT
+	FB_RTL_IDX_SFXMUSICPOSITION
+	FB_RTL_IDX_SFXSFXLOAD
+	FB_RTL_IDX_SFXSFXPLAY
+	FB_RTL_IDX_SFXSFXPLAYCHANNEL
+	FB_RTL_IDX_SFXSFXLOOP
+	FB_RTL_IDX_SFXSFXLOOPCHANNEL
+	FB_RTL_IDX_SFXSFXSTOP
+	FB_RTL_IDX_SFXSFXSTOPCHANNEL
+	FB_RTL_IDX_SFXSFXSTOPALL
+	FB_RTL_IDX_SFXSFXPAUSE
+	FB_RTL_IDX_SFXSFXPAUSECHANNEL
+	FB_RTL_IDX_SFXSFXPAUSEALL
+	FB_RTL_IDX_SFXSFXRESUME
+	FB_RTL_IDX_SFXSFXRESUMECHANNEL
+	FB_RTL_IDX_SFXSFXRESUMEALL
+	FB_RTL_IDX_SFXSFXSTATUS
+	FB_RTL_IDX_SFXSFXSTATUSCHANNEL
+	FB_RTL_IDX_SFXSFXANYACTIVE
+	FB_RTL_IDX_SFXAUDIOPLAY
+	FB_RTL_IDX_SFXAUDIOLOOP
+	FB_RTL_IDX_SFXAUDIOSTOP
+	FB_RTL_IDX_SFXAUDIOPAUSE
+	FB_RTL_IDX_SFXAUDIORESUME
+	FB_RTL_IDX_SFXAUDIOSTATUS
+	FB_RTL_IDX_SFXSTREAMOPEN
+	FB_RTL_IDX_SFXSTREAMPLAY
+	FB_RTL_IDX_SFXSTREAMSTOP
+	FB_RTL_IDX_SFXSTREAMPAUSE
+	FB_RTL_IDX_SFXSTREAMRESUME
+	FB_RTL_IDX_SFXSTREAMPOSITION
+	FB_RTL_IDX_SFXSTREAMSEEK
+	FB_RTL_IDX_SFXMIDIOPEN
+	FB_RTL_IDX_SFXMIDICLOSE
+	FB_RTL_IDX_SFXMIDIPLAY
+	FB_RTL_IDX_SFXMIDISTOP
+	FB_RTL_IDX_SFXMIDIPAUSE
+	FB_RTL_IDX_SFXMIDIRESUME
+	FB_RTL_IDX_SFXMIDISEND
+	FB_RTL_IDX_SFXDEVICELIST
+	FB_RTL_IDX_SFXDEVICESELECT
+	FB_RTL_IDX_SFXDEVICEINFO
+	FB_RTL_IDX_SFXDEVICEINFOCURRENT
+	FB_RTL_IDX_SFXCAPTURESTART
+	FB_RTL_IDX_SFXCAPTURESTOP
+	FB_RTL_IDX_SFXCAPTUREPAUSE
+	FB_RTL_IDX_SFXCAPTURERESUME
+	FB_RTL_IDX_SFXCAPTURESTATUS
+	FB_RTL_IDX_SFXCAPTURESAVE
+	FB_RTL_IDX_SFXCAPTUREAVAILABLE
+	FB_RTL_IDX_SFXCAPTUREREAD
 
 	FB_RTL_IDX_ERRORTHROW
 	FB_RTL_IDX_ERRORTHROWEX
@@ -1395,12 +1549,12 @@ declare function rtlWidthScreen _
 		byval isfunc as integer _
 	) as ASTNODE ptr
 
-declare function rtlWidthDev _
-	( _
-		byval device as ASTNODE ptr, _
-		byval width_arg as ASTNODE ptr, _
-		byval isfunc as integer _
-	) as ASTNODE ptr
+	declare function rtlWidthDev _
+		( _
+			byval devexpr as ASTNODE ptr, _
+			byval width_arg as ASTNODE ptr, _
+			byval isfunc as integer _
+		) as ASTNODE ptr
 
 declare function rtlWidthFile _
 	( _
@@ -1436,6 +1590,11 @@ declare function rtlFileSeek _
 	) as integer
 
 declare function rtlFileTell _
+	( _
+		byval filenum as ASTNODE ptr _
+	) as ASTNODE ptr
+
+declare function rtlTcpAccept _
 	( _
 		byval filenum as ASTNODE ptr _
 	) as ASTNODE ptr
@@ -1814,6 +1973,3 @@ const FBGFX_PUTMODE_BLEND  = 9
 ''
 
 #define PROCLOOKUP(id) rtlProcLookup( strptr( FB_RTL_##id ), FB_RTL_IDX_##id )
-
-
-

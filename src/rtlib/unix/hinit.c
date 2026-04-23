@@ -27,6 +27,9 @@
 
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#ifdef HOST_LINUX
+#include <poll.h>
+#endif
 
 FBCONSOLE __fb_con;
 
@@ -118,6 +121,25 @@ static void signal_handler(int sig)
 }
 
 #ifdef HOST_LINUX
+static int fb_hTermQueryWaitForInput(void)
+{
+	struct pollfd pfd;
+	int result;
+
+	if( isatty(STDIN_FILENO) == 0 || isatty(STDOUT_FILENO) == 0 )
+		return FALSE;
+
+	pfd.fd = STDIN_FILENO;
+	pfd.events = POLLIN;
+	pfd.revents = 0;
+
+	result = poll(&pfd, 1, 100);
+	if( result <= 0 )
+		return FALSE;
+
+	return ((pfd.revents & (POLLIN | POLLERR | POLLHUP)) != 0);
+}
+
 /* Query window size or cursor position from the terminal by sending the
    respective escape sequence to stdout and reading the answer (report) from
    stdin.
@@ -129,6 +151,12 @@ static void signal_handler(int sig)
 static int fb_hTermQuery( int code, int *val1, int *val2 )
 {
 	if( fb_hTermOut( code, 0, 0 ) == FALSE )
+		return FALSE;
+
+	/* Some terminals/sessions never answer these queries. Without a timeout,
+	   the blocking getchar()/scanf() calls below can wedge the whole program
+	   during an ordinary PRINT. */
+	if( fb_hTermQueryWaitForInput() == FALSE )
 		return FALSE;
 
 	int filled;

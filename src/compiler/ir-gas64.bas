@@ -4389,7 +4389,7 @@ private sub hloadoperandsandwritebop(byval op as integer,byval v1 as IRVREG ptr,
 
 	dim as string op1,op2,op3,op4,prefix1,prefix2,suffix,op1prev,regtempo,op1bis
 	dim as FB_DATATYPE tempodtype,tempo2dtype
-	dim as integer vrreg,vrreg2,tempo
+	dim as integer vrreg,vrreg2,tmpreg
 	dim as IRVREG ptr vrtempo
 	''========================= FIRST OPERAND ======================
 	tempodtype=typeGetDtAndPtrOnly( v1->dtype )
@@ -4451,8 +4451,8 @@ private sub hloadoperandsandwritebop(byval op as integer,byval v1 as IRVREG ptr,
 		case IR_VREGTYPE_VAR ''format varname ofs1   local/static  ofs1 could be zero
 
 			if ctx.systemv=true andalso fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB andalso (symbIsCommon(v1->sym)) then ''linux dll common shared
-				tempo=reg_findfree(999994)
-				regtempo=*regstrq(tempo)
+				tmpreg=reg_findfree(999994)
+				regtempo=*regstrq(tmpreg)
 				op3="mov "+regtempo+", "+*symbGetMangledName(v1->sym)+"@GOTPCREL[rip]"
 				op1="["+regtempo+"]"
 			else
@@ -4469,16 +4469,16 @@ private sub hloadoperandsandwritebop(byval op as integer,byval v1 as IRVREG ptr,
 	''========================= SECOND OPERAND ======================
 	select case v2->typ
 		case IR_VREGTYPE_REG
-			tempo=reg_findreal(v2->reg)
+			tmpreg=reg_findreal(v2->reg)
 			select case tempodtype
 				case FB_DATATYPE_INTEGER,FB_DATATYPE_UINT,FB_DATATYPE_LONGINT,FB_DATATYPE_ULONGINT,FB_DATATYPE_ENUM,FB_DATATYPE_DOUBLE
-					op2=*regstrq(tempo)
+					op2=*regstrq(tmpreg)
 				case FB_DATATYPE_LONG,FB_DATATYPE_ULONG,FB_DATATYPE_SINGLE
-					op2=*regstrd(tempo)
+					op2=*regstrd(tmpreg)
 				case FB_DATATYPE_SHORT,FB_DATATYPE_USHORT
-					op2=*regstrw(tempo)
+					op2=*regstrw(tmpreg)
 				case FB_DATATYPE_BYTE,FB_DATATYPE_UBYTE,FB_DATATYPE_BOOLEAN,FB_DATATYPE_CHAR
-					op2=*regstrb(tempo)
+					op2=*regstrb(tmpreg)
 				case else
 					asm_error("BOP datatype not handled 012"+typedumpToStr(v1->dtype,0))
 			end select
@@ -4511,8 +4511,8 @@ private sub hloadoperandsandwritebop(byval op as integer,byval v1 as IRVREG ptr,
 
 			if ctx.systemv=true andalso fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB andalso (symbIsCommon(v2->sym)) then
 
-				tempo=reg_findfree(999993)
-				regtempo=*regstrq(tempo)
+				tmpreg=reg_findfree(999993)
+				regtempo=*regstrq(tmpreg)
 				op4="mov "+regtempo+", "+*symbGetMangledName(v2->sym)+"@GOTPCREL[rip]"
 				op2="["+regtempo+"]"
 
@@ -4817,13 +4817,13 @@ private sub hloadoperandsandwritebop(byval op as integer,byval v1 as IRVREG ptr,
 		case AST_OP_SHL,AST_OP_SHR
 			if v2->typ<>IR_VREGTYPE_IMM then
 				if op2<>*regstrq(KREG_RCX) then
-					if reghandle(KREG_RCX)<>KREGFREE then ''as rcx is used need to transfer its contain to another register
-						tempo=reghandle(KREG_RCX)
-						reg_findfree(tempo)
-						reghandle(KREG_RCX)=KREGFREE
-						asm_info("rcx used so transfer to other register")
-						asm_code("mov "+*regstrq(reg_findreal(tempo))+", "+*regstrq(KREG_RCX))
-						if vrreg=KREG_RCX then vrreg=reg_findreal(tempo)
+						if reghandle(KREG_RCX)<>KREGFREE then ''as rcx is used need to transfer its contain to another register
+							tmpreg=reghandle(KREG_RCX)
+							reg_findfree(tmpreg)
+							reghandle(KREG_RCX)=KREGFREE
+							asm_info("rcx used so transfer to other register")
+							asm_code("mov "+*regstrq(reg_findreal(tmpreg))+", "+*regstrq(KREG_RCX))
+							if vrreg=KREG_RCX then vrreg=reg_findreal(tmpreg)
 					else
 						ctx.usedreg Or=(1 Shl KREG_RCX)
 					end if
@@ -4849,17 +4849,17 @@ private sub hloadoperandsandwritebop(byval op as integer,byval v1 as IRVREG ptr,
 		case AST_OP_MOD , AST_OP_INTDIV ''instructions use rax and rdx, to be checked carefully
 			if reghandle(KREG_RDX)<>KREGFREE then ''as rdx is used need to transfer its contain to another register
 				'if op1<>*regstrq(KREG_RDX) And op2<>*regstrq(KREG_RDX) then ''except when <> op1 and op2
-				if op1<>*regstrq(KREG_RDX) then ''if op1=rdx do nothing as it's transfered in rax
-					tempo=reghandle(KREG_RDX)
-					reg_findfree(tempo)
-					reghandle(KREG_RDX)=KREGFREE
-					asm_info("rdx used so transfer to other register="+*regstrq(reg_findreal(tempo)))
-					asm_code("mov "+*regstrq(reg_findreal(tempo))+", "+*regstrq(KREG_RDX))
-					if op2=*regstrq(KREG_RDX) then
-						op2=*regstrq(reg_findreal(tempo))
+					if op1<>*regstrq(KREG_RDX) then ''if op1=rdx do nothing as it's transfered in rax
+						tmpreg=reghandle(KREG_RDX)
+						reg_findfree(tmpreg)
+						reghandle(KREG_RDX)=KREGFREE
+						asm_info("rdx used so transfer to other register="+*regstrq(reg_findreal(tmpreg)))
+						asm_code("mov "+*regstrq(reg_findreal(tmpreg))+", "+*regstrq(KREG_RDX))
+						if op2=*regstrq(KREG_RDX) then
+							op2=*regstrq(reg_findreal(tmpreg))
+						end if
+						if vrreg=KREG_RDX then vrreg=reg_findreal(tmpreg)
 					end if
-					if vrreg=KREG_RDX then vrreg=reg_findreal(tempo)
-				end if
 			else
 				ctx.usedreg Or=(1 Shl KREG_RDX)
 			end if
@@ -5069,7 +5069,7 @@ private sub _emitbop _
 end sub
 private sub _emituop(byval op as integer,byval v1 as IRVREG ptr,byval vr as IRVREG Ptr)
 	dim as string op1,op3,prefix
-	dim as integer vrreg,tempo
+	dim as integer vrreg,tmpreg
 	dim as FB_DATATYPE tempodtype
 
 	#ifdef __GAS64_DEBUG__
@@ -5244,12 +5244,12 @@ private sub _emituop(byval op as integer,byval v1 as IRVREG ptr,byval vr as IRVR
 		asm_code("mov rax, "+op1)
 
 		if reghandle(KREG_RDX)<>KREGFREE then ''as rdx is used need to transfer its contain to another register
-			tempo=reghandle(KREG_RDX)
-			reg_findfree(tempo)
+			tmpreg=reghandle(KREG_RDX)
+			reg_findfree(tmpreg)
 			reghandle(KREG_RDX)=KREGFREE
 			asm_info("rdx used so transfer to other register")
-			asm_code("mov "+*regstrq(reg_findreal(tempo))+", "+*regstrq(KREG_RDX))
-			if vrreg=KREG_RDX then vrreg=reg_findreal(tempo)
+			asm_code("mov "+*regstrq(reg_findreal(tmpreg))+", "+*regstrq(KREG_RDX))
+			if vrreg=KREG_RDX then vrreg=reg_findreal(tmpreg)
 		else
 			ctx.usedreg Or=(1 Shl KREG_RDX)
 		end if
@@ -6043,7 +6043,7 @@ end function
 private sub _emitstore( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 
 	dim as string op1,op2,op3,op4,prefix,code1,code2,regtempo
-	dim as integer tempo
+	dim as integer tmpreg
 	dim as FB_DATATYPE dtype
 
 	asm_info("store " + vregPretty( v1 ) + " := " + vregPretty( v2 ) )
@@ -6223,11 +6223,11 @@ private sub _emitstore( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 	if v1->typ=IR_VREGTYPE_VAR And v2->typ=IR_VREGTYPE_VAR then
 
 		if ctx.systemv=true andalso fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB then
-			if symbIsCommon(v1->sym) then
+				if symbIsCommon(v1->sym) then
 
-				tempo=reg_findfree(999998)
-				regtempo=*regstrq(tempo)
-				reghandle(tempo)=KREGFREE
+					tmpreg=reg_findfree(999998)
+					regtempo=*regstrq(tmpreg)
+					reghandle(tmpreg)=KREGFREE
 				asm_code("mov "+regtempo+", "+*symbGetMangledName(v1->sym)+"@GOTPCREL[rip]")
 				op1="["+regtempo+"]"
 				'~ if v2->sym<>0 andalso (symbIsCommon(v2->sym)) then
@@ -6290,10 +6290,10 @@ private sub _emitstore( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 				case IR_VREGTYPE_VAR,IR_VREGTYPE_IDX,IR_VREGTYPE_PTR
 
 					if ctx.systemv=true andalso fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB then
-						if v1->sym<>0 andalso (symbIsCommon(v1->sym)) then
-							tempo=reg_findfree(999998)
-							regtempo=*regstrq(tempo)
-							reghandle(tempo)=KREGFREE
+							if v1->sym<>0 andalso (symbIsCommon(v1->sym)) then
+								tmpreg=reg_findfree(999998)
+								regtempo=*regstrq(tmpreg)
+								reghandle(tmpreg)=KREGFREE
 							asm_code("mov "+regtempo+", "+*symbGetMangledName(v1->sym)+"@GOTPCREL[rip]")
 							op1="["+regtempo+"]"
 						end if
@@ -6332,10 +6332,10 @@ private sub _emitstore( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 			end if
 
 			if ctx.systemv=true andalso fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB then
-				if v1->sym<>0 andalso (symbIsCommon(v1->sym)) then
-					tempo=reg_findfree(999998)
-					regtempo=*regstrq(tempo)
-					reghandle(tempo)=KREGFREE
+					if v1->sym<>0 andalso (symbIsCommon(v1->sym)) then
+						tmpreg=reg_findfree(999998)
+						regtempo=*regstrq(tmpreg)
+						reghandle(tmpreg)=KREGFREE
 					asm_code("mov "+regtempo+", "+*symbGetMangledName(v1->sym)+"@GOTPCREL[rip]")
 					op1="["+regtempo+"]"
 				end if
@@ -6346,9 +6346,9 @@ private sub _emitstore( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 
 			if ctx.systemv=true andalso fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB then
 				if v1->sym<>0 andalso (symbIsCommon(v1->sym)) then
-					'tempo=reg_findfree(999998)
-					'regtempo=*regstrq(tempo)
-					'reghandle(tempo)=KREGFREE
+						'tmpreg=reg_findfree(999998)
+						'regtempo=*regstrq(tmpreg)
+						'reghandle(tmpreg)=KREGFREE
 					'asm_code("mov "+regtempo+", "+*symbGetMangledName(v1->sym)+"@GOTPCREL[rip]")
 					asm_code("mov rax, "+*symbGetMangledName(v1->sym)+"@GOTPCREL[rip]")
 					op1="[rax]"

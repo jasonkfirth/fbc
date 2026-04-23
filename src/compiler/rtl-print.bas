@@ -1162,7 +1162,7 @@ end function
 '':::::
 function rtlWidthDev _
 	( _
-		byval device as ASTNODE ptr, _
+		byval devexpr as ASTNODE ptr, _
 		byval width_arg as ASTNODE ptr, _
 		byval isfunc as integer _
 	) as ASTNODE ptr
@@ -1178,7 +1178,7 @@ function rtlWidthDev _
 	proc = astNewCALL( PROCLOOKUP( WIDTHDEV ) )
 
 	'' device as string
-	if( astNewARG( proc, device ) = NULL ) then
+	if( astNewARG( proc, devexpr ) = NULL ) then
 		exit function
 	end if
 

@@ -135,7 +135,7 @@ int fb_DevFileOpenEncod
 	}
 
 	/* try opening */
-	fp = fopen( fname, openmask );
+	fp = fb_hOpenFile( fname, openmask );
 
 	if( handle->mode == FB_FILE_MODE_APPEND )
 	{
@@ -147,7 +147,7 @@ int fb_DevFileOpenEncod
 			/* not found? handle mode as if output was specified */
 			effective_mode = FB_FILE_MODE_OUTPUT;
 			openmask = "ab";
-			fp = fopen( fname, openmask );
+			fp = fb_hOpenFile( fname, openmask );
 		}
 		else
 		{
@@ -163,7 +163,7 @@ int fb_DevFileOpenEncod
 			{
 				/* if we have the correct BOM, then reopen the file for append */
 				openmask = "ab";
-				fp = freopen( fname, openmask, fp );
+				fp = fb_hReopenFile( fname, openmask, fp );
 			}
 		}
 	}

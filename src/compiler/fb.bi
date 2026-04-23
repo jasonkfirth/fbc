@@ -112,6 +112,7 @@ enum FB_COMPOPT
 	FB_COMPOPT_MSBITFIELDS          '' boolean: use M$'s bitfields packing?
 	FB_COMPOPT_MULTITHREADED        '' boolean: -mt
 	FB_COMPOPT_FBGFX                '' boolean: -fbgfx (whether libfbgfx should be linked)
+	FB_COMPOPT_FBSFX                '' boolean: whether libsfx should be linked
 	FB_COMPOPT_PIC                  '' boolean: -pic (whether to use position-independent code)
 	FB_COMPOPT_STACKSIZE            '' integer
 	FB_COMPOPT_OBJINFO              '' boolean: write/read .fbctinf sections etc.?
@@ -181,6 +182,9 @@ enum FB_CPUTYPE
 	FB_CPUTYPE_PPC
 	FB_CPUTYPE_PPC64
 	FB_CPUTYPE_PPC64LE
+	FB_CPUTYPE_RISCV64
+	FB_CPUTYPE_S390X
+	FB_CPUTYPE_LOONGARCH64
 	FB_CPUTYPE_ASMJS
 	FB_CPUTYPE__COUNT
 end enum
@@ -193,6 +197,9 @@ enum
 	FB_CPUFAMILY_PPC
 	FB_CPUFAMILY_PPC64
 	FB_CPUFAMILY_PPC64LE
+	FB_CPUFAMILY_RISCV64
+	FB_CPUFAMILY_S390X
+	FB_CPUFAMILY_LOONGARCH64
 	FB_CPUFAMILY_ASMJS
 	FB_CPUFAMILY__COUNT
 end enum
@@ -238,6 +245,7 @@ enum FB_COMPTARGET
 	FB_COMPTARGET_CYGWIN
 	FB_COMPTARGET_LINUX
 	FB_COMPTARGET_ANDROID
+	FB_COMPTARGET_HAIKU
 	FB_COMPTARGET_DOS
 	FB_COMPTARGET_XBOX
 	FB_COMPTARGET_FREEBSD
@@ -330,6 +338,7 @@ type FBCMMLINEOPT
 	msbitfields     as integer              '' use M$'s bitfields packing
 	multithreaded   as integer              '' link against thread-safe runtime library (default = false)
 	fbgfx           as integer              '' Link against gfx library (default = false)
+	fbsfx           as integer              '' Link against sound library (default = false)
 	pic             as integer              '' Whether to use position-independent code (default = false)
 	stacksize       as integer
 	objinfo         as integer
@@ -391,6 +400,10 @@ const FB_DEFAULT_TARGET     = FB_COMPTARGET_CYGWIN
 const FB_HOST_EXEEXT        = ""
 const FB_HOST_PATHDIV       = "/"
 const FB_DEFAULT_TARGET     = FB_COMPTARGET_LINUX
+#elseif defined(__FB_HAIKU__)
+const FB_HOST_EXEEXT        = ""
+const FB_HOST_PATHDIV       = "/"
+const FB_DEFAULT_TARGET     = FB_COMPTARGET_HAIKU
 #elseif defined(__FB_DOS__)
 const FB_HOST_EXEEXT        = ".exe"
 const FB_HOST_PATHDIV       = RSLASH
@@ -428,8 +441,16 @@ const FB_DEFAULT_TARGET     = FB_COMPTARGET_ANDROID
 #endif
 
 '' __FB_X86__ is new, so we need to support compiling with older fbc that didn't have it
-#if (not defined(__FB_X86__)) and (not defined(__FB_ARM__)) and (not defined(__FB_PPC__)) and defined(__FB_ASM__)
+#if defined(__FB_ASM__)
+	#if (not defined(__FB_X86__)) _
+	and (not defined(__FB_ARM__)) _
+	and (not defined(__FB_PPC__)) _
+	and (not defined(__FB_RISCV64__)) _
+	and (not defined(__FB_S390X__)) _
+	and (not defined(__FB_LOONGARCH64__)) _
+	and (not defined(__FB_AARCH64__))
 	#define __FB_X86__
+	#endif
 #endif
 
 '' defines set by makefile to configure default cpu types:
@@ -463,6 +484,9 @@ const FB_DEFAULT_CPUTYPE_AARCH64 = FB_CPUTYPE_AARCH64
 const FB_DEFAULT_CPUTYPE_PPC     = FB_CPUTYPE_PPC
 const FB_DEFAULT_CPUTYPE_PPC64   = FB_CPUTYPE_PPC64
 const FB_DEFAULT_CPUTYPE_PPC64LE = FB_CPUTYPE_PPC64LE
+const FB_DEFAULT_CPUTYPE_RISCV64 = FB_CPUTYPE_RISCV64
+const FB_DEFAULT_CPUTYPE_S390X   = FB_CPUTYPE_S390X
+const FB_DEFAULT_CPUTYPE_LOONGARCH64 = FB_CPUTYPE_LOONGARCH64
 const FB_DEFAULT_CPUTYPE_ASMJS   = FB_CPUTYPE_ASMJS
 
 '' default 32 and 64 bit CPU's (based on defaults above)
@@ -476,6 +500,18 @@ const FB_DEFAULT_CPUTYPE_ASMJS   = FB_CPUTYPE_ASMJS
 	#else
 		const FB_DEFAULT_CPUTYPE64 = FB_DEFAULT_CPUTYPE_PPC64LE
 	#endif
+#elseif defined(__FB_RISCV64__)
+	const FB_DEFAULT_CPUTYPE32 = FB_DEFAULT_CPUTYPE_X86
+	const FB_DEFAULT_CPUTYPE64 = FB_DEFAULT_CPUTYPE_RISCV64
+#elseif defined(__FB_S390X__)
+	const FB_DEFAULT_CPUTYPE32 = FB_DEFAULT_CPUTYPE_X86
+	const FB_DEFAULT_CPUTYPE64 = FB_DEFAULT_CPUTYPE_S390X
+#elseif defined(__FB_LOONGARCH64__)
+	const FB_DEFAULT_CPUTYPE32 = FB_DEFAULT_CPUTYPE_X86
+	const FB_DEFAULT_CPUTYPE64 = FB_DEFAULT_CPUTYPE_LOONGARCH64
+#elseif defined(__FB_ASMJS__)
+	const FB_DEFAULT_CPUTYPE32 = FB_DEFAULT_CPUTYPE_ASMJS
+	const FB_DEFAULT_CPUTYPE64 = FB_DEFAULT_CPUTYPE_ASMJS
 #elseif defined(__FB_X86__)
 	const FB_DEFAULT_CPUTYPE32 = FB_DEFAULT_CPUTYPE_X86
 	const FB_DEFAULT_CPUTYPE64 = FB_DEFAULT_CPUTYPE_X86_64

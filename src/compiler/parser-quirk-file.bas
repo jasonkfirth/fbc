@@ -854,6 +854,14 @@ private function hFileOpen _
 				lexSkipToken( LEXCHECK_POST_SUFFIX )
 				open_kind = FB_FILE_TYPE_COM
 			end if
+
+		case "TCP"
+			lexSkipToken( LEXCHECK_POST_SUFFIX )
+			if( hMatchIdOrKw( "SERVER", LEXCHECK_POST_SUFFIX ) ) then
+				open_kind = FB_FILE_TYPE_TCPSERVER
+			else
+				open_kind = FB_FILE_TYPE_TCP
+			end if
 		end select
 
 	end if
@@ -870,7 +878,8 @@ private function hFileOpen _
 
 	select case as const open_kind
 	case FB_FILE_TYPE_FILE, FB_FILE_TYPE_PIPE, FB_FILE_TYPE_LPT, _
-		FB_FILE_TYPE_COM, FB_FILE_TYPE_QB
+		FB_FILE_TYPE_COM, FB_FILE_TYPE_TCP, FB_FILE_TYPE_TCPSERVER, _
+		FB_FILE_TYPE_QB
 
 		'' a filename is only valid for some file types
 
@@ -1290,6 +1299,17 @@ function cFileFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 	case FB_TK_NAME
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 		function = hFileRename( TRUE )
+
+	case FB_TK_TCP
+		lexSkipToken( LEXCHECK_POST_SUFFIX )
+		if( hMatchIdOrKw( "ACCEPT", LEXCHECK_POST_SUFFIX ) = FALSE ) then
+			exit function
+		end if
+		hMatchLPRNT( )
+		hMatch( CHAR_SHARP )
+		hMatchFileNumberExpression( filenum, FB_DATATYPE_INTEGER )
+		hMatchRPRNT( )
+		function = rtlTcpAccept( filenum )
 
 	end select
 end function

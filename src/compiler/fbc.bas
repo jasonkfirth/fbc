@@ -189,6 +189,7 @@ declare sub fbcFindBin _
 	)
 
 declare sub hPrintVersion( byval verbose as integer )
+declare sub hAddDarwinFrameworks( byref ldcline as string )
 
 #macro safeKill(f)
 	if( kill( f ) <> 0 ) then
@@ -788,6 +789,15 @@ private function hLinkFiles( ) as integer
 		case FB_CPUFAMILY_ARM
 			ldcline += "-m armelf_linux_eabi "
 		end select
+	case FB_COMPTARGET_HAIKU
+		select case( fbGetCpuFamily( ) )
+		case FB_CPUFAMILY_X86
+			ldcline += "-m elf_i386_haiku "
+		case FB_CPUFAMILY_X86_64
+			ldcline += "-m elf_x86_64_haiku "
+		case FB_CPUFAMILY_ARM
+			ldcline += "-m armelf_linux_eabi "
+		end select
 	case FB_COMPTARGET_ANDROID
 		if( (len( fbc.sysroot ) = 0) and _
 		    (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GCC) ) then
@@ -832,15 +842,11 @@ private function hLinkFiles( ) as integer
 		'   ldcline += "-m elf_i386 "
 		' end select
 	case FB_COMPTARGET_DARWIN
-		select case( fbGetCpuFamily( ) )
-		case FB_CPUFAMILY_X86
-			ldcline += "-arch i386 "
-		case FB_CPUFAMILY_X86_64
-			ldcline += "-arch x86_64 "
-		case FB_CPUFAMILY_ARM
-			'' fixme: this is clearly too specific
-			ldcline += "-arch armv6 "
-		end select
+		'' Let the Darwin compiler driver choose the native architecture and
+		'' startup/runtime defaults instead of pushing raw ld -arch flags.
+	case FB_COMPTARGET_NETBSD
+		ldcline += " -rpath /usr/X11R7/lib/ "
+		ldcline += " -rpath /usr/pkg/lib/ "
 	end select
 
 	'' Set executable name
@@ -938,7 +944,7 @@ private function hLinkFiles( ) as integer
 			end if
 		end if
 
-	case FB_COMPTARGET_LINUX, FB_COMPTARGET_DARWIN, _
+	case FB_COMPTARGET_LINUX, FB_COMPTARGET_HAIKU, FB_COMPTARGET_DARWIN, _
 	     FB_COMPTARGET_FREEBSD, FB_COMPTARGET_OPENBSD, _
 	     FB_COMPTARGET_NETBSD, FB_COMPTARGET_DRAGONFLY, _
 	     FB_COMPTARGET_SOLARIS, FB_COMPTARGET_ANDROID
@@ -970,6 +976,8 @@ private function hLinkFiles( ) as integer
 				case FB_CPUFAMILY_AARCH64
 					ldcline += " -dynamic-linker /lib/ld-linux-aarch64.so.1"
 				end select
+			case FB_COMPTARGET_HAIKU
+				ldcline += " -shared -no-undefined"
 			case FB_COMPTARGET_NETBSD
 				ldcline += " -dynamic-linker /usr/libexec/ld.elf_so"
 			case FB_COMPTARGET_OPENBSD
@@ -1069,6 +1077,11 @@ private function hLinkFiles( ) as integer
 	case FB_COMPTARGET_XBOX
 		'' set entry point
 		ldcline += " -e _WinMainCRTStartup"
+	case FB_COMPTARGET_OPENBSD
+		'' OpenBSD executables are PIE and enter through __start.
+		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_EXECUTABLE ) then
+			ldcline += " -pie -e __start"
+		end if
 
 	end select
 
@@ -1162,7 +1175,7 @@ private function hLinkFiles( ) as integer
 			ldcline += hFindLib( "crt0.o" )
 		end if
 
-	case FB_COMPTARGET_LINUX, FB_COMPTARGET_DARWIN, _
+	case FB_COMPTARGET_LINUX, FB_COMPTARGET_HAIKU, FB_COMPTARGET_DARWIN, _
 		FB_COMPTARGET_FREEBSD, FB_COMPTARGET_OPENBSD, _
 		FB_COMPTARGET_NETBSD, FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS
 
@@ -1171,6 +1184,8 @@ private function hLinkFiles( ) as integer
 				select case as const fbGetOption( FB_COMPOPT_TARGET )
 				case FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD
 					ldcline += hFindLib( "gcrt0.o" )
+				case FB_COMPTARGET_HAIKU
+					'' no gcrt1.o on Haiku
 				case else
 					ldcline += hFindLib( "gcrt1.o" )
 				end select
@@ -1178,6 +1193,8 @@ private function hLinkFiles( ) as integer
 				select case as const fbGetOption( FB_COMPOPT_TARGET )
 				case FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD
 					ldcline += hFindLib( "crt0.o" )
+				case FB_COMPTARGET_HAIKU
+					'' no crt1.o on Haiku
 				case else
 					ldcline += hFindLib( "crt1.o" )
 				end select
@@ -1190,11 +1207,20 @@ private function hLinkFiles( ) as integer
 				ldcline += hFindLib( "crti.o" )
 			end if
 
-			if( fbGetOption( FB_COMPOPT_PIC ) ) then
-				ldcline += hFindLib( "crtbeginS.o" )
-			else
+			select case as const fbGetOption( FB_COMPOPT_TARGET )
+			case FB_COMPTARGET_OPENBSD
 				ldcline += hFindLib( "crtbegin.o" )
-			end if
+			case FB_COMPTARGET_HAIKU
+				ldcline += hFindLib( "crtbeginS.o" )
+				ldcline += hFindLib( "start_dyn.o" )
+				ldcline += hFindLib( "init_term_dyn.o" )
+			case else
+				if( fbGetOption( FB_COMPOPT_PIC ) ) then
+					ldcline += hFindLib( "crtbeginS.o" )
+				else
+					ldcline += hFindLib( "crtbegin.o" )
+				end if
+			end select
 		end if
 
 	case FB_COMPTARGET_ANDROID
@@ -1286,6 +1312,8 @@ private function hLinkFiles( ) as integer
 		wend
 	end scope
 
+	hAddDarwinFrameworks( ldcline )
+
 	if (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) then
 		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
 			'' End of lib group
@@ -1317,6 +1345,10 @@ private function hLinkFiles( ) as integer
 			ldcline += hFindLib( "crtend_so.o" )
 		end if
 
+	case FB_COMPTARGET_HAIKU
+		ldcline += hFindLib( "crtn.o" )
+		ldcline += hFindLib( "crtendS.o" )
+
 	case FB_COMPTARGET_WIN32
 		ldcline += hFindLib( "crtend.o" )
 
@@ -1330,7 +1362,7 @@ private function hLinkFiles( ) as integer
 	'' for the unwind tables to have any effect
 	'' Windows doesn't need this option
 	select case as const fbGetOption( FB_COMPOPT_TARGET )
-	case FB_COMPTARGET_LINUX, FB_COMPTARGET_FREEBSD, _
+	case FB_COMPTARGET_LINUX, FB_COMPTARGET_HAIKU, FB_COMPTARGET_FREEBSD, _
 		FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD, _
 		FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS, _
 		FB_COMPTARGET_DARWIN
@@ -1646,6 +1678,7 @@ dim shared as FBGNUOSINFO gnuosmap(0 to ...) => _
 { _
 	(@"android"    , FB_COMPTARGET_ANDROID  ), _ '' Must appear before linux
 	(@"linux"      , FB_COMPTARGET_LINUX    ), _
+	(@"haiku"      , FB_COMPTARGET_HAIKU    ), _
 	(@"mingw"      , FB_COMPTARGET_WIN32    ), _
 	(@"djgpp"      , FB_COMPTARGET_DOS      ), _
 	(@"msdosdjgpp" , FB_COMPTARGET_DOS      ), _
@@ -1681,7 +1714,10 @@ dim shared as FBGNUARCHINFO gnuarchmap(0 to ...) => _
 	(@"ppc64  "    , FB_DEFAULT_CPUTYPE_PPC64  ), _
 	(@"powerpc64"  , FB_DEFAULT_CPUTYPE_PPC64  ),  _
 	(@"ppc64le  "  , FB_DEFAULT_CPUTYPE_PPC64LE), _
-	(@"powerpc64le", FB_DEFAULT_CPUTYPE_PPC64LE)  _
+	(@"powerpc64le", FB_DEFAULT_CPUTYPE_PPC64LE), _
+	(@"riscv64"    , FB_DEFAULT_CPUTYPE_RISCV64), _
+	(@"s390x"      , FB_DEFAULT_CPUTYPE_S390X  ), _
+	(@"loongarch64", FB_DEFAULT_CPUTYPE_LOONGARCH64)  _
 }
 
 '' Identify OS (FB_COMPTARGET_*) and architecture (FB_CPUTYPE_*) in a GNU
@@ -1762,6 +1798,7 @@ dim shared as FBOSARCHINFO fbosarchmap(0 to ...) => _
 	(@"darwin" , FB_COMPTARGET_DARWIN , FB_DEFAULT_CPUTYPE       ), _
 	(@"freebsd", FB_COMPTARGET_FREEBSD, FB_DEFAULT_CPUTYPE       ), _
 	(@"linux"  , FB_COMPTARGET_LINUX  , FB_DEFAULT_CPUTYPE       ), _
+	(@"haiku"  , FB_COMPTARGET_HAIKU  , FB_DEFAULT_CPUTYPE       ), _
 	(@"android", FB_COMPTARGET_ANDROID, FB_CPUTYPE_ARMV7A        ), _
 	(@"netbsd" , FB_COMPTARGET_NETBSD , FB_DEFAULT_CPUTYPE       ), _
 	(@"openbsd", FB_COMPTARGET_OPENBSD, FB_DEFAULT_CPUTYPE       )  _
@@ -3673,10 +3710,9 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 		case FB_CPUFAMILY_X86_64
 			ln += "-m64 "
 			ism64Target = True
-		case FB_CPUFAMILY_PPC
-			ln += "-m32 "
-		case FB_CPUFAMILY_PPC64, FB_CPUFAMILY_PPC64LE
-			ln += "-m64 "
+		case FB_CPUFAMILY_AARCH64, FB_CPUFAMILY_PPC64, _
+		     FB_CPUFAMILY_PPC64LE, FB_CPUFAMILY_RISCV64, _
+		     FB_CPUFAMILY_S390X, FB_CPUFAMILY_LOONGARCH64
 			ism64Target = True
 		end select
 
@@ -4228,6 +4264,36 @@ private sub hSetDefaultLibPaths( )
 		'' Help the MinGW linker to find MinGW's lib/ dir, allowing
 		'' the C:\MinGW dir to be renamed and linking to still work.
 		fbcAddLibPathFor( "libmingw32.a" )
+	case FB_COMPTARGET_HAIKU
+		''
+		'' Haiku keeps some development-time libraries in /boot/system/develop/lib
+		'' instead of the runtime library locations that ld searches by default.
+		''
+		'' Add the directories for a few representative libraries used by the
+		'' default Haiku link set so direct ld linking can resolve -lnetwork,
+		'' -lncurses and related libraries without relying on user-local symlinks.
+		''
+		fbcAddLibPathFor( "libnetwork.so" )
+		fbcAddLibPathFor( "libncurses.so" )
+	case FB_COMPTARGET_OPENBSD
+		fbcAddLibPathFor( "libX11.a" )
+		fbcAddLibPathFor( "libm.a" )
+	case FB_COMPTARGET_NETBSD
+		fbcAddLibPathFor( "libX11.so" )
+		fbcAddLibPathFor( "libXext.so" )
+		fbcAddLibPathFor( "libXpm.so" )
+		fbcAddLibPathFor( "libXrandr.so" )
+		fbcAddLibPathFor( "libXrender.so" )
+		fbcAddLibPathFor( "libXrender.so" )
+		fbcAddLibPathFor( "libncurses.so" )
+	case FB_COMPTARGET_DRAGONFLY
+		fbcAddLibPathFor( "libX11.so" )
+		fbcAddLibPathFor( "libXext.so" )
+		fbcAddLibPathFor( "libXpm.so" )
+		fbcAddLibPathFor( "libXrandr.so" )
+		fbcAddLibPathFor( "libXrender.so" )
+		fbcAddLibPathFor( "libXrender.so" )
+		fbcAddLibPathFor( "libncurses.so" )
 	end select
 #endif
 end sub
@@ -4238,14 +4304,37 @@ end sub
 
 private function hGetFbLibNameSuffix( ) as string
 	dim s as string
+	dim as integer target = fbGetOption( FB_COMPOPT_TARGET )
 	if( fbGetOption( FB_COMPOPT_MULTITHREADED ) ) then
 		s += "mt"
 	end if
-	if( fbGetOption( FB_COMPOPT_PIC ) ) then
+	if( target = FB_COMPTARGET_OPENBSD ) then
+		s += "pic"
+	elseif( fbGetOption( FB_COMPOPT_PIC ) ) then
 		s += "pic"
 	end if
 	function = s
 end function
+
+private sub hAddDarwinFrameworks( byref ldcline as string )
+	if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN ) then
+		exit sub
+	end if
+
+	if( fbGetOption( FB_COMPOPT_FBGFX ) ) then
+		ldcline += " -lobjc"
+		ldcline += " -framework AppKit"
+		ldcline += " -framework Foundation"
+		ldcline += " -framework CoreGraphics"
+	end if
+
+	if( fbGetOption( FB_COMPOPT_FBSFX ) ) then
+		ldcline += " -framework AudioToolbox"
+		ldcline += " -framework CoreAudio"
+		ldcline += " -framework CoreFoundation"
+		ldcline += " -framework CoreMIDI"
+	end if
+end sub
 
 private sub hAddDefaultLibs( )
 	'' select the right FB rtlib
@@ -4277,6 +4366,14 @@ private sub hAddDefaultLibs( )
 				fbcAddDefLibPath( "/usr/X11R6/lib" )
 			#endif
 
+			#if defined(__FB_DRAGONFLY__)
+				fbcAddDefLibPath( "/usr/local/lib/" )
+			#endif
+
+			#if defined(__FB_NETBSD__)
+				fbcAddDefLibPath( "/usr/X11R7/lib/" )
+			#endif
+
 			#if defined(__FB_DARWIN__) and defined(ENABLE_XQUARTZ)
 				fbcAddDefLibPAth( "/opt/X11/lib" )
 			#endif
@@ -4295,6 +4392,25 @@ private sub hAddDefaultLibs( )
 		end select
 	end if
 
+	'' and the sound runtime, if sound functions were used
+	if( fbGetOption( FB_COMPOPT_FBSFX ) ) then
+		fbcAddDefLib( "sfx" + hGetFbLibNameSuffix( ) )
+
+		select case as const( fbGetOption( FB_COMPOPT_TARGET ) )
+		case FB_COMPTARGET_WIN32, FB_COMPTARGET_CYGWIN
+			fbcAddDefLib( "winmm" )
+			fbcAddDefLib( "ole32" )
+			fbcAddDefLib( "uuid" )
+		case FB_COMPTARGET_LINUX
+			fbcAddDefLib( "asound" )
+			fbcAddDefLib( "pulse-simple" )
+			fbcAddDefLib( "pulse" )
+		case FB_COMPTARGET_HAIKU
+			fbcAddDefLib( "media" )
+			fbcAddDefLib( "midi" )
+		end select
+	end if
+
 	select case as const fbGetOption( FB_COMPOPT_TARGET )
 	case FB_COMPTARGET_CYGWIN
 		fbcAddDefLib( "gcc" )
@@ -4308,10 +4424,10 @@ private sub hAddDefaultLibs( )
 		end if
 
 	case FB_COMPTARGET_DARWIN
-		fbcAddDefLib( "gcc" )
-		fbcAddDefLib( "System" )
 		fbcAddDefLib( "pthread" )
+		fbcAddDefLib( "ffi" )
 		fbcAddDefLib( "ncurses" )
+		fbcAddDefLib( "m" )
 
 	case FB_COMPTARGET_DOS
 		fbcAddDefLib( "gcc" )
@@ -4329,11 +4445,23 @@ private sub hAddDefaultLibs( )
 		fbcAddDefLib( "m" )
 		fbcAddDefLib( "ncurses" )
 
-	case FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS
+	case FB_COMPTARGET_DRAGONFLY
+		fbcAddDefLibPath( "/usr/local/lib/" )
 		fbcAddDefLib( "gcc" )
 		fbcAddDefLib( "pthread" )
 		fbcAddDefLib( "c" )
 		fbcAddDefLib( "m" )
+		fbcAddDefLib( "ncurses" )
+
+	case FB_COMPTARGET_SOLARIS
+		fbcAddDefLib( "gcc" )
+		fbcAddDefLib( "pthread" )
+		fbcAddDefLib( "c" )
+		fbcAddDefLib( "m" )
+#ifndef DISABLE_TCP
+		fbcAddDefLib( "socket" )
+		fbcAddDefLib( "nsl" )
+#endif
 		fbcAddDefLib( "ncurses" )
 
 	case FB_COMPTARGET_LINUX
@@ -4369,7 +4497,20 @@ private sub hAddDefaultLibs( )
 		end if
 		fbcAddDefLib( "c" )
 
+	case FB_COMPTARGET_HAIKU
+		fbcAddDefLib( "root" )
+		fbcAddDefLib( "bsd" )
+#ifndef DISABLE_TCP
+		fbcAddDefLib( "network" )
+#endif
+		fbcAddDefLib( "ncurses" )
+		fbcAddDefLib( "be" )
+		fbcAddDefLib( "game" )
+		fbcAddDefLib( "stdc++" )
+		fbcAddDefLib( "gcc_s" )
+
 	case FB_COMPTARGET_NETBSD
+		fbcAddDefLibPath( "/usr/pkg/lib/" )
 		fbcAddDefLib( "gcc" )
 		fbcAddDefLib( "pthread" )
 		fbcAddDefLib( "c" )
@@ -4396,6 +4537,9 @@ private sub hAddDefaultLibs( )
 		fbcAddDefLib( "msvcrt" )
 		fbcAddDefLib( "kernel32" )
 		fbcAddDefLib( "user32" )
+#ifndef DISABLE_TCP
+		fbcAddDefLib( "ws2_32" )
+#endif
 		fbcAddDefLib( "mingw32" )
 		fbcAddDefLib( "mingwex" )
 		fbcAddDefLib( "moldname" )

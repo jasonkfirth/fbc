@@ -9,19 +9,20 @@
 typedef struct {
 	int in_use;
 	int attrib;
+	int return_utf8;
 #ifdef HOST_CYGWIN
 	WIN32_FIND_DATA data;
 	HANDLE handle;
 #else
-	struct _finddata_t data;
-	intptr_t handle;
+	WIN32_FIND_DATAW data;
+	HANDLE handle;
 #endif
 } FB_DIRCTX;
 
 static void close_dir_internal ( FB_DIRCTX *ctx )
 {
 #ifdef HOST_MINGW
-	_findclose( ctx->handle );
+	FindClose( ctx->handle );
 #else
 	FindClose( ctx->handle );
 #endif
@@ -49,17 +50,21 @@ static char *find_next ( int *attrib )
 #ifdef HOST_MINGW
 	do
 	{
-		if( _findnext( ctx->handle, &ctx->data ) )
+		if( !FindNextFileW( ctx->handle, &ctx->data ) )
 		{
 			close_dir( );
 			name = NULL;
 			break;
 		}
-        name = ctx->data.name;
+		name = fb_hConvertPathFromWC( ctx->data.cFileName, ctx->return_utf8 );
+		if( name != NULL && (ctx->data.dwFileAttributes & ~ctx->attrib) ) {
+			free( name );
+			name = NULL;
+		}
 	}
-	while( ctx->data.attrib & ~ctx->attrib );
+	while( name == NULL && ctx->in_use );
 
-	*attrib = ctx->data.attrib & ~0xFFFFFF00;
+	*attrib = ctx->data.dwFileAttributes & ~0xFFFFFF00;
 
 #else
     do {
@@ -101,8 +106,19 @@ FBCALL FBSTRING *fb_Dir( FBSTRING *filespec, int attrib, int *out_attrib )
 			close_dir( );
 
 #ifdef HOST_MINGW
-        ctx->handle = _findfirst( filespec->data, &ctx->data );
-        handle_ok = ctx->handle != -1;
+		{
+			WCHAR *wfilespec;
+
+			wfilespec = fb_hConvertPathToWC( filespec->data, &ctx->return_utf8 );
+			if( wfilespec != NULL ) {
+				ctx->handle = FindFirstFileW( wfilespec, &ctx->data );
+				handle_ok = ctx->handle != INVALID_HANDLE_VALUE;
+				free( wfilespec );
+			} else {
+				ctx->handle = INVALID_HANDLE_VALUE;
+				handle_ok = FALSE;
+			}
+		}
 #else
         ctx->handle = FindFirstFile( filespec->data, &ctx->data );
         handle_ok = ctx->handle != INVALID_HANDLE_VALUE;
@@ -117,12 +133,12 @@ FBCALL FBSTRING *fb_Dir( FBSTRING *filespec, int attrib, int *out_attrib )
 				ctx->attrib |= 0x20;
 
 #ifdef HOST_MINGW
-			if( ctx->data.attrib & ~ctx->attrib )
+			if( ctx->data.dwFileAttributes & ~ctx->attrib )
 				name = find_next( out_attrib );
 			else
 			{
-                name = ctx->data.name;
-				*out_attrib = ctx->data.attrib & ~0xFFFFFF00;
+				name = fb_hConvertPathFromWC( ctx->data.cFileName, ctx->return_utf8 );
+				*out_attrib = ctx->data.dwFileAttributes & ~0xFFFFFF00;
             }
 #else
 			if( ctx->data.dwFileAttributes & ~ctx->attrib )
@@ -148,10 +164,17 @@ FBCALL FBSTRING *fb_Dir( FBSTRING *filespec, int attrib, int *out_attrib )
 	if( name ) {
 		len = strlen( name );
 		res = fb_hStrAllocTemp_NoLock( NULL, len );
-		if( res )
+		if( res ) {
 			fb_hStrCopy( res->data, name, len );
-		else
+			#ifdef HOST_MINGW
+			free( name );
+			#endif
+		} else {
+			#ifdef HOST_MINGW
+			free( name );
+			#endif
 			res = &__fb_ctx.null_desc;
+		}
 	} else {
 		res = &__fb_ctx.null_desc;
 		*out_attrib = 0;

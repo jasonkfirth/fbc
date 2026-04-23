@@ -1,0 +1,80 @@
+freebasic (1.20.1-1) jammy; urgency=medium
+
+  * Forward-port the divergent 1.10.4 line, including its separate
+    1.10.3 platform reality, into the 1.20 branch.
+  * Adopt the GNUmakefile + mk/ build system together with the
+    build_scripts/ and Debian packaging flow.
+  * Add sfxlib to the compiler, runtime, libraries, examples, and
+    package builds.
+  * Add OPEN TCP / OPEN TCP SERVER, TCP ACCEPT, and EOC support.
+  * Add Haiku support across compiler targets, rtlib, gfxlib2,
+    sfxlib, headers, libraries, and build scripts.
+  * Carry forward the broadened platform support and packaging work
+    for Darwin/macOS, Linux, Windows/MinGW, Windows/Cygwin, FreeBSD,
+    OpenBSD, NetBSD, DragonFly, Solaris, and Haiku.
+  * Carry forward newer cpu-family and linker handling, including
+    riscv64, s390x, loongarch64, and NetBSD rpath support.
+  * Refresh the Darwin graphics driver/backend set from the 1.10.4
+    branch.
+  * Add commented sfxlib and OPEN TCP example programs.
+  * Fix Linux linker flag handling so -m32/-m64 are only passed on
+    x86/x86_64 targets.
+  * Fix Linux sfxlib shutdown and worker-lock issues found during the
+    1.20 forward-port validation work.
+  * Fix Unix console query hangs that could block example output in
+    non-responding terminal sessions.
+
+ -- SJ_Zero <sj@fbxl.net>  Fri, 17 Apr 2026 12:00:00 -0400
+
+freebasic (1.10.4-1) jammy; urgency=medium
+
+  * Added OPEN TCP and OPEN TCP SERVER support alongside the existing
+    OPEN COM and OPEN LPT device commands.
+  * Added TCP ACCEPT and EOC support for TCP communication endpoints.
+  * Integrated sfxlib into the compiler, runtime, examples, and manual
+    to provide broad built-in sound support.
+  * Hardened the GNUmakefile and mk/ build system so prerequisite
+    compiler checks fail clearly, bootstrap recovery paths are explicit,
+    and cross-target configuration is more predictable.
+  * Added Darwin x86_64 and arm64 to the target matrix, limited runtime
+    C++ compilation to targets that currently require it, and corrected
+    NetBSD toolchain/thread configuration handling.
+  * Added mk/ build-system documentation and tightened bootstrap archive
+    and structure tests so hidden, stage, dist, and packages trees are
+    not pulled into release artifacts.
+  * Hardened the MSYS2 and Cygwin package builders so they provision
+    their own dependencies, keep staging isolated, clean generated
+    example artifacts, and emit release outputs under out/.
+  * Updated the compiler build so fbc reports the version from
+    mk/version.mk instead of relying on stale in-source release numbers.
+
+ -- SJ_Zero <sj@fbxl.net>  Thu, 16 Apr 2026 18:00:00 +0000
+
+freebasic (1.10.3-1) jammy; urgency=medium
+
+  * Ported FreeBASIC to Haiku.
+  * Rebuilt the build environment for the 1.10.3 release.
+  * Packaged FreeBASIC for Windows/MinGW, Cygwin, Debian, Ubuntu,
+    NetBSD, FreeBSD, OpenBSD, Solaris, and DragonFly.
+
+ -- SJ_Zero <sj@fbxl.net>  Fri, 27 Feb 2026 12:53:00 +0000
+
+freebasic (1.10.2-2.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * 
+
+ -- root <root@jay-laptop>  Fri, 20 Feb 2026 11:10:39 -0500
+
+freebasic (1.10.2-2) jammy; urgency=medium
+
+  * Updated build to use improved utilities backported from 1.20
+
+ -- SJ_Zero <sj@fbxl.net>  Wed, 19 Feb 2026 09:34:00 +0000
+
+
+freebasic (1.10.2-1) jammy; urgency=medium
+
+  * Initial Debian/Ubuntu packaging for FreeBASIC 1.10.2.
+
+ -- SJ_Zero <sj@fbxl.net>  Wed, 11 Feb 2026 12:50:35 +0000

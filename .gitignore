@@ -1,11 +1,13 @@
 *.o
 *.a
+*.d
 *.exe
 *.dll
 *.so
 /fbc
 /fbc-new
 /bin/*
+/bootstrap/*
 /lib/*/i386go32.x
 /lib/*/fbextra.x
 /lib/*/fb_rtlib.js
@@ -14,12 +16,16 @@
 /lib/freebas/*
 /lib/freebasic/*
 /lib64/freebasic/*
+/tools/*
 /config.mk
 /config-post.mk
 
 /doc/fbdoc/fbdoc
 /doc/makefbhelp/makefbhelp
 /doc/fbchkdoc/fbchkdoc.ini
+
+/out/*
+/packages/*
 
 .vscode
 

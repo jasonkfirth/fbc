@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #define FB_FILE_MODE_BINARY             0
 #define FB_FILE_MODE_RANDOM             1
 #define FB_FILE_MODE_INPUT              2
@@ -21,6 +23,8 @@
 #define FB_FILE_TYPE_VFS                4
 #define FB_FILE_TYPE_PRINTER            5
 #define FB_FILE_TYPE_SERIAL             6
+#define FB_FILE_TYPE_TCP                7
+#define FB_FILE_TYPE_TCPSERVER          8
 
 typedef enum _FB_FILE_ENCOD {
 	FB_FILE_ENCOD_ASCII,
@@ -194,6 +198,12 @@ FBCALL int          fb_FileOpenLpt      ( FBSTRING *str_filename, unsigned int m
 FBCALL int          fb_FileOpenCom      ( FBSTRING *str_filename, unsigned int mode,
                                           unsigned int access, unsigned int lock,
                                           int fnum, int len, const char *encoding );
+FBCALL int          fb_FileOpenTcp      ( FBSTRING *str_filename, unsigned int mode,
+                                          unsigned int access, unsigned int lock,
+                                          int fnum, int len, const char *encoding );
+FBCALL int          fb_FileOpenTcpServer( FBSTRING *str_filename, unsigned int mode,
+                                          unsigned int access, unsigned int lock,
+                                          int fnum, int len, const char *encoding );
 
 FBCALL int fb_FileOpenQB
 	(
@@ -249,6 +259,7 @@ FBCALL int          fb_FileGetArrayLargeIOB( int fnum, long long pos, FBARRAY *d
 
 FBCALL int          fb_FileEof          ( int fnum );
        int          fb_FileEofEx        ( FB_FILE *handle );
+FBCALL int          fb_Eoc              ( int fnum );
 FBCALL int          fb_FileSetEof       ( int fnum );
        int          fb_FileSetEofEx     ( FB_FILE *handle );
        int          fb_hFileSetEofEx    ( FILE *f );
@@ -263,6 +274,7 @@ FBCALL int          fb_FileSeekLarge    ( int fnum, long long newpos );
        int          fb_FileSeekEx       ( FB_FILE *handle, fb_off_t newpos );
 FBCALL long long    fb_FileLocation     ( int fnum );
        fb_off_t     fb_FileLocationEx   ( FB_FILE *handle );
+FBCALL int          fb_TcpAccept        ( int fnum );
 FBCALL int          fb_FileKill         ( FBSTRING *str );
 FBCALL void         fb_FileReset        ( void );
 FBCALL void         fb_FileResetEx      ( int streamno );
@@ -307,6 +319,17 @@ FBCALL int          fb_FileUnlockLarge  ( int fnum, long long inipos, long long 
        int          fb_hFileLock        ( FILE *f, fb_off_t inipos, fb_off_t size );
        int          fb_hFileUnlock      ( FILE *f, fb_off_t inipos, fb_off_t size );
        void         fb_hConvertPath     ( char *path );
+       FILE        *fb_hOpenFile        ( const char *path, const char *mode );
+       FILE        *fb_hReopenFile      ( const char *path, const char *mode, FILE *stream );
+#ifdef HOST_MINGW
+       int          fb_hStatFile        ( const char *path, struct _stat *buffer );
+       wchar_t     *fb_hConvertPathToWC ( const char *path, int *used_utf8 );
+       char        *fb_hConvertPathFromWC( const wchar_t *path, int use_utf8 );
+#endif
+       int          fb_hRemoveFile      ( const char *path );
+       int          fb_hMakeDir         ( const char *path );
+       int          fb_hChangeDir       ( const char *path );
+       int          fb_hRemoveDir       ( const char *path );
 
        FB_FILE_ENCOD fb_hFileStrToEncoding( const char *encoding );
 

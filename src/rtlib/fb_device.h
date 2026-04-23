@@ -81,3 +81,7 @@ typedef struct {
        int          fb_DevComOpen           ( FB_FILE *handle, const char *filename, size_t filename_len );
        int          fb_DevComTestProtocol   ( FB_FILE *handle, const char *filename, size_t filename_len );
        int          fb_DevComTestProtocolEx ( FB_FILE *handle, const char *filename, size_t filename_len, size_t *pPort );
+
+       /* TCP */
+       int          fb_DevTcpOpen           ( FB_FILE *handle, const char *filename, size_t filename_len );
+       int          fb_DevTcpOpenServer     ( FB_FILE *handle, const char *filename, size_t filename_len );

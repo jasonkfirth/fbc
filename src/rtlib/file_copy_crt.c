@@ -11,11 +11,11 @@ FBCALL int fb_CrtFileCopy( const char *source, const char *destination )
 	size_t bytesread;
 
 	dst = NULL;
-	src = fopen(source, "rb");
+	src = fb_hOpenFile(source, "rb");
 	if (!src)
 		goto err;
 
-	dst = fopen(destination, "wb");
+	dst = fb_hOpenFile(destination, "wb");
 	if (!dst)
 		goto err;
 

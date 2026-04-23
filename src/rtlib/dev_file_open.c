@@ -93,18 +93,18 @@ int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
     case FB_FILE_MODE_BINARY:
     case FB_FILE_MODE_RANDOM:
         /* try opening */
-        if( (fp = fopen( fname, openmask )) == NULL )
+        if( (fp = fb_hOpenFile( fname, openmask )) == NULL )
         {
             /* if file was not found and in READ/WRITE (or ANY) mode,
              * create it */
             if( handle->access == FB_FILE_ACCESS_ANY
                 || handle->access == FB_FILE_ACCESS_READWRITE )
             {
-                fp = fopen( fname,  "w+b" );
+                fp = fb_hOpenFile( fname,  "w+b" );
 
                 /* if file could not be created and in ANY mode, try opening as read-only */
                 if( (fp == NULL) && (handle->access==FB_FILE_ACCESS_ANY) ) {
-                    fp = fopen( fname,  "rb" );
+                    fp = fb_hOpenFile( fname,  "rb" );
                     if (fp != NULL) {
                         // don't forget to set the effective access mode ...
                         handle->access = FB_FILE_ACCESS_READ;
@@ -127,7 +127,7 @@ int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
        input because newlines must be converted, and EOF char (27) handled */
     case FB_FILE_MODE_INPUT:
         /* try opening in binary mode */
-        if( (fp = fopen( fname, "rb" )) == NULL )
+        if( (fp = fb_hOpenFile( fname, "rb" )) == NULL )
         {
             FB_UNLOCK();
             return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
@@ -145,7 +145,7 @@ int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
         }
 
         /* now reopen it in text-mode */
-        if( (fp = freopen( fname, openmask, fp )) == NULL )
+        if( (fp = fb_hReopenFile( fname, openmask, fp )) == NULL )
         {
             FB_UNLOCK();
             return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
@@ -160,7 +160,7 @@ int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
 
     default:
         /* try opening */
-        if( (fp = fopen( fname, openmask )) == NULL )
+        if( (fp = fb_hOpenFile( fname, openmask )) == NULL )
         {
             FB_UNLOCK();
             return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );

@@ -8,7 +8,7 @@
 #include once "lex.bi"
 #include once "rtl.bi"
 
-	dim shared as FB_RTL_PROCDEF funcdata( 0 to 71 ) = _
+	dim shared as FB_RTL_PROCDEF funcdata( 0 to 75 ) = _
 	{ _
 		/' function fb_FileOpen _
 			( _
@@ -218,6 +218,56 @@
 			) as long '/ _
 		( _
 			@FB_RTL_FILEOPEN_COM, NULL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_NONE, _
+			7, _
+			{ _
+				( typeSetIsConst( FB_DATATYPE_STRING ), FB_PARAMMODE_BYREF, FALSE ), _
+				( typeSetIsConst( FB_DATATYPE_ULONG ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeSetIsConst( FB_DATATYPE_ULONG ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeSetIsConst( FB_DATATYPE_ULONG ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( typeSetIsConst( FB_DATATYPE_CHAR ) ), FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
+		/' function fb_FileOpenTcp _
+			( _
+				byref str_filename as const string, _
+				byval mode as const ulong, _
+				byval access as const ulong, _
+				byval lock as const ulong, _
+				byval fnum as const long, _
+				byval len as const long, _
+				byval encoding as const zstring ptr _
+			) as long '/ _
+		( _
+			@FB_RTL_FILEOPEN_TCP, NULL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_NONE, _
+			7, _
+			{ _
+				( typeSetIsConst( FB_DATATYPE_STRING ), FB_PARAMMODE_BYREF, FALSE ), _
+				( typeSetIsConst( FB_DATATYPE_ULONG ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeSetIsConst( FB_DATATYPE_ULONG ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeSetIsConst( FB_DATATYPE_ULONG ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( typeSetIsConst( FB_DATATYPE_CHAR ) ), FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
+		/' function fb_FileOpenTcpServer _
+			( _
+				byref str_filename as const string, _
+				byval mode as const ulong, _
+				byval access as const ulong, _
+				byval lock as const ulong, _
+				byval fnum as const long, _
+				byval len as const long, _
+				byval encoding as const zstring ptr _
+			) as long '/ _
+		( _
+			@FB_RTL_FILEOPEN_TCPSERVER, NULL, _
 			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
 			NULL, FB_RTL_OPT_NONE, _
 			7, _
@@ -1165,6 +1215,26 @@
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
 			} _
 		), _
+		/' function eoc( byval fnum as const long ) as long '/ _
+		( _
+			@"eoc", @"fb_Eoc", _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_NONE, _
+			1, _
+			{ _
+				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
+		/' function fb_TcpAccept( byval fnum as const long ) as long '/ _
+		( _
+			@FB_RTL_TCPACCEPT, NULL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_NONE, _
+			1, _
+			{ _
+				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
 		/' EOL '/ _
 		( _
 			NULL _
@@ -1234,6 +1304,12 @@ function rtlFileOpen _
 
 	case FB_FILE_TYPE_COM
 		f = PROCLOOKUP( FILEOPEN_COM )
+
+	case FB_FILE_TYPE_TCP
+		f = PROCLOOKUP( FILEOPEN_TCP )
+
+	case FB_FILE_TYPE_TCPSERVER
+		f = PROCLOOKUP( FILEOPEN_TCPSERVER )
 
 	case else
 		assert(openkind = FB_FILE_TYPE_QB)
@@ -1438,6 +1514,26 @@ function rtlFileTell _
 	end if
 
 	''
+	function = proc
+
+end function
+
+'':::::
+function rtlTcpAccept _
+	( _
+		byval filenum as ASTNODE ptr _
+	) as ASTNODE ptr
+
+	dim as ASTNODE ptr proc = any
+
+	function = NULL
+
+	proc = astNewCALL( PROCLOOKUP( TCPACCEPT ) )
+
+	if( astNewARG( proc, filenum ) = NULL ) then
+		exit function
+	end if
+
 	function = proc
 
 end function

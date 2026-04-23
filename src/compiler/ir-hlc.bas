@@ -417,6 +417,220 @@ private sub hWriteStaticAssert( byref expr as string )
 	hWriteLine( "__FB_STATIC_ASSERT( " + expr + " );" )
 end sub
 
+private sub hAppendClobber _
+	( _
+		byref ln as string, _
+		byval regname as zstring ptr _
+	)
+	ln += ", """
+	ln += *regname
+	ln += """"
+end sub
+
+private sub hAppendProcAsmClobbers( byref ln as string )
+	select case( fbGetCpuFamily( ) )
+	case FB_CPUFAMILY_X86
+		hAppendClobber( ln, @"eax" )
+		if( env.clopt.pic = FALSE ) then
+			hAppendClobber( ln, @"ebx" )
+		end if
+		hAppendClobber( ln, @"ecx" )
+		hAppendClobber( ln, @"edx" )
+		hAppendClobber( ln, @"edi" )
+		hAppendClobber( ln, @"esi" )
+
+		if( env.clopt.fputype = FB_FPUTYPE_SSE ) then
+			hAppendClobber( ln, @"mm0" )
+			hAppendClobber( ln, @"mm1" )
+			hAppendClobber( ln, @"mm2" )
+			hAppendClobber( ln, @"mm3" )
+			hAppendClobber( ln, @"mm4" )
+			hAppendClobber( ln, @"mm5" )
+			hAppendClobber( ln, @"mm6" )
+			hAppendClobber( ln, @"mm7" )
+			hAppendClobber( ln, @"xmm0" )
+			hAppendClobber( ln, @"xmm1" )
+			hAppendClobber( ln, @"xmm2" )
+			hAppendClobber( ln, @"xmm3" )
+			hAppendClobber( ln, @"xmm4" )
+			hAppendClobber( ln, @"xmm5" )
+			hAppendClobber( ln, @"xmm6" )
+			hAppendClobber( ln, @"xmm7" )
+		end if
+
+	case FB_CPUFAMILY_X86_64
+		hAppendClobber( ln, @"rax" )
+		hAppendClobber( ln, @"rbx" )
+		hAppendClobber( ln, @"rcx" )
+		hAppendClobber( ln, @"rdx" )
+		hAppendClobber( ln, @"rdi" )
+		hAppendClobber( ln, @"rsi" )
+		hAppendClobber( ln, @"r8" )
+		hAppendClobber( ln, @"r9" )
+		hAppendClobber( ln, @"r10" )
+		hAppendClobber( ln, @"r11" )
+		hAppendClobber( ln, @"r12" )
+		hAppendClobber( ln, @"r13" )
+		hAppendClobber( ln, @"r14" )
+		hAppendClobber( ln, @"r15" )
+
+		if( env.clopt.fputype = FB_FPUTYPE_SSE ) then
+			hAppendClobber( ln, @"mm0" )
+			hAppendClobber( ln, @"mm1" )
+			hAppendClobber( ln, @"mm2" )
+			hAppendClobber( ln, @"mm3" )
+			hAppendClobber( ln, @"mm4" )
+			hAppendClobber( ln, @"mm5" )
+			hAppendClobber( ln, @"mm6" )
+			hAppendClobber( ln, @"mm7" )
+			hAppendClobber( ln, @"xmm0" )
+			hAppendClobber( ln, @"xmm1" )
+			hAppendClobber( ln, @"xmm2" )
+			hAppendClobber( ln, @"xmm3" )
+			hAppendClobber( ln, @"xmm4" )
+			hAppendClobber( ln, @"xmm5" )
+			hAppendClobber( ln, @"xmm6" )
+			hAppendClobber( ln, @"xmm7" )
+			hAppendClobber( ln, @"xmm8" )
+			hAppendClobber( ln, @"xmm9" )
+			hAppendClobber( ln, @"xmm10" )
+			hAppendClobber( ln, @"xmm11" )
+			hAppendClobber( ln, @"xmm12" )
+			hAppendClobber( ln, @"xmm13" )
+			hAppendClobber( ln, @"xmm14" )
+			hAppendClobber( ln, @"xmm15" )
+		end if
+
+	case FB_CPUFAMILY_ARM
+		hAppendClobber( ln, @"r0" )
+		hAppendClobber( ln, @"r1" )
+		hAppendClobber( ln, @"r2" )
+		hAppendClobber( ln, @"r3" )
+		hAppendClobber( ln, @"r4" )
+		hAppendClobber( ln, @"r5" )
+		hAppendClobber( ln, @"r6" )
+		hAppendClobber( ln, @"r8" )
+		hAppendClobber( ln, @"r9" )
+		hAppendClobber( ln, @"r10" )
+		hAppendClobber( ln, @"r11" )
+		hAppendClobber( ln, @"r12" )
+		hAppendClobber( ln, @"r14" )
+		hAppendClobber( ln, @"r15" )
+
+	case FB_CPUFAMILY_AARCH64
+		hAppendClobber( ln, @"x0" )
+		hAppendClobber( ln, @"x1" )
+		hAppendClobber( ln, @"x2" )
+		hAppendClobber( ln, @"x3" )
+		hAppendClobber( ln, @"x4" )
+		hAppendClobber( ln, @"x5" )
+		hAppendClobber( ln, @"x6" )
+		hAppendClobber( ln, @"x7" )
+		hAppendClobber( ln, @"x8" )
+		hAppendClobber( ln, @"x9" )
+		hAppendClobber( ln, @"x10" )
+		hAppendClobber( ln, @"x11" )
+		hAppendClobber( ln, @"x12" )
+		hAppendClobber( ln, @"x13" )
+		hAppendClobber( ln, @"x14" )
+		hAppendClobber( ln, @"x15" )
+		hAppendClobber( ln, @"x16" )
+		hAppendClobber( ln, @"x17" )
+		hAppendClobber( ln, @"x18" )
+		hAppendClobber( ln, @"x19" )
+		hAppendClobber( ln, @"x20" )
+		hAppendClobber( ln, @"x21" )
+		hAppendClobber( ln, @"x22" )
+		hAppendClobber( ln, @"x23" )
+		hAppendClobber( ln, @"x24" )
+		hAppendClobber( ln, @"x25" )
+		hAppendClobber( ln, @"x26" )
+		hAppendClobber( ln, @"x27" )
+		hAppendClobber( ln, @"x28" )
+		hAppendClobber( ln, @"x30" )
+
+	case FB_CPUFAMILY_RISCV64
+		hAppendClobber( ln, @"ra" )
+		hAppendClobber( ln, @"gp" )
+		hAppendClobber( ln, @"tp" )
+		hAppendClobber( ln, @"t0" )
+		hAppendClobber( ln, @"t1" )
+		hAppendClobber( ln, @"t2" )
+		hAppendClobber( ln, @"s0" )
+		hAppendClobber( ln, @"s1" )
+		hAppendClobber( ln, @"a0" )
+		hAppendClobber( ln, @"a1" )
+		hAppendClobber( ln, @"a2" )
+		hAppendClobber( ln, @"a3" )
+		hAppendClobber( ln, @"a4" )
+		hAppendClobber( ln, @"a5" )
+		hAppendClobber( ln, @"a6" )
+		hAppendClobber( ln, @"a7" )
+		hAppendClobber( ln, @"s2" )
+		hAppendClobber( ln, @"s3" )
+		hAppendClobber( ln, @"s4" )
+		hAppendClobber( ln, @"s5" )
+		hAppendClobber( ln, @"s6" )
+		hAppendClobber( ln, @"s7" )
+		hAppendClobber( ln, @"s8" )
+		hAppendClobber( ln, @"s9" )
+		hAppendClobber( ln, @"s10" )
+		hAppendClobber( ln, @"s11" )
+		hAppendClobber( ln, @"t3" )
+		hAppendClobber( ln, @"t4" )
+		hAppendClobber( ln, @"t5" )
+		hAppendClobber( ln, @"t6" )
+
+	case FB_CPUFAMILY_S390X
+		hAppendClobber( ln, @"r0" )
+		hAppendClobber( ln, @"r1" )
+		hAppendClobber( ln, @"r2" )
+		hAppendClobber( ln, @"r3" )
+		hAppendClobber( ln, @"r4" )
+		hAppendClobber( ln, @"r5" )
+		hAppendClobber( ln, @"r6" )
+		hAppendClobber( ln, @"r7" )
+		hAppendClobber( ln, @"r8" )
+		hAppendClobber( ln, @"r9" )
+		hAppendClobber( ln, @"r10" )
+		hAppendClobber( ln, @"r11" )
+		hAppendClobber( ln, @"r12" )
+		hAppendClobber( ln, @"r13" )
+		hAppendClobber( ln, @"r14" )
+
+	case FB_CPUFAMILY_LOONGARCH64
+		hAppendClobber( ln, @"ra" )
+		hAppendClobber( ln, @"tp" )
+		hAppendClobber( ln, @"a0" )
+		hAppendClobber( ln, @"a1" )
+		hAppendClobber( ln, @"a2" )
+		hAppendClobber( ln, @"a3" )
+		hAppendClobber( ln, @"a4" )
+		hAppendClobber( ln, @"a5" )
+		hAppendClobber( ln, @"a6" )
+		hAppendClobber( ln, @"a7" )
+		hAppendClobber( ln, @"t0" )
+		hAppendClobber( ln, @"t1" )
+		hAppendClobber( ln, @"t2" )
+		hAppendClobber( ln, @"t3" )
+		hAppendClobber( ln, @"t4" )
+		hAppendClobber( ln, @"t5" )
+		hAppendClobber( ln, @"t6" )
+		hAppendClobber( ln, @"t7" )
+		hAppendClobber( ln, @"t8" )
+		hAppendClobber( ln, @"s0" )
+		hAppendClobber( ln, @"s1" )
+		hAppendClobber( ln, @"s2" )
+		hAppendClobber( ln, @"s3" )
+		hAppendClobber( ln, @"s4" )
+		hAppendClobber( ln, @"s5" )
+		hAppendClobber( ln, @"s6" )
+		hAppendClobber( ln, @"s7" )
+		hAppendClobber( ln, @"s8" )
+		hAppendClobber( ln, @"fp" )
+	end select
+end sub
+
 ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
 enum EMITPROC_OPTIONS
@@ -3689,45 +3903,7 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 			''
 			ln += " : ""cc"", ""memory"""
 
-			select case( fbGetCpuFamily( ) )
-			case FB_CPUFAMILY_X86, FB_CPUFAMILY_X86_64
-				if( fbGetCpuFamily( ) = FB_CPUFAMILY_X86 ) then
-					if( env.clopt.pic ) then
-						'' ebx is the fixed-purpose PIC register. GCC versions before 5.0
-						'' throw an error if you declare that it is clobbered, so we don't do
-						'' that. GCC 5 has rewritten PIC register handling and can now save and
-						'' restore ebx.
-						ln += ", ""eax"", ""ecx"", ""edx"", ""edi"", ""esi"""
-					else
-						ln += ", ""eax"", ""ebx"", ""ecx"", ""edx"", ""edi"", ""esi"""
-					end if
-				else
-					ln += ", ""rax"", ""rbx"", ""rcx"", ""rdx"", ""rdi"", ""rsi"""
-					ln += ", ""r8"", ""r9"", ""r10"", ""r11"", ""r12"", ""r13"", ""r14"", ""r15"""
-				end if
-
-				'' gcc seems to only accept the mm* registers if SSE was enabled via gcc command line options
-				if( env.clopt.fputype = FB_FPUTYPE_SSE ) then
-					ln += ", ""mm0"", ""mm1"", ""mm2"", ""mm3"", ""mm4"", ""mm5"", ""mm6"", ""mm7"""
-					ln += ", ""xmm0"", ""xmm1"", ""xmm2"", ""xmm3"", ""xmm4"", ""xmm5"", ""xmm6"", ""xmm7"""
-					if( fbGetCpuFamily( ) = FB_CPUFAMILY_X86_64 ) then
-						ln += ", ""xmm8"", ""xmm9"", ""xmm10"", ""xmm11"", ""xmm12"", ""xmm13"", ""xmm14"", ""xmm15"""
-					end if
-				end if
-
-			case FB_CPUFAMILY_ARM, FB_CPUFAMILY_AARCH64
-				'' TODO
-				ln += ", ""r0"", ""r1"", ""r2"", ""r3"", ""r4"", ""r5"", ""r6"""
-				'''ln += ", ""r7""" '' not always accepted by gcc
-				ln += ", ""r8"", ""r9"", ""r10"", ""r11"", ""r12"", ""r13"", ""r14"", ""r15"""
-
-				if( fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64 ) then
-					ln += ", ""r16"", ""r17"", ""r18"", ""r19"""
-					ln += ", ""r20"", ""r21"", ""r22"", ""r23"", ""r24"", ""r25"", ""r26"", ""r27"", ""r28"""
-					''ln += ", ""r29""" '' not always accepted by gcc
-					ln += ", ""r30"""
-				end if
-			end select
+			hAppendProcAsmClobbers( ln )
 
 			if( uses_label ) then
 				ln += " : " + labellist
@@ -3912,7 +4088,9 @@ end sub
 
 private sub _emitVarIniScopeBegin( byval sym as FBSYMBOL ptr, byval is_array as integer )
 	ctx.variniscopelevel += 1
+	
 	ctx.varini += "{ "
+
 end sub
 
 private sub _emitVarIniScopeEnd( )

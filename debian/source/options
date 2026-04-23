@@ -1,0 +1,2 @@
+extend-diff-ignore = "(^|/)(\.git|\.svn|\.hg|CVS)/"
+extend-diff-ignore = "(^|/)(bin|obj|src/.*/obj|lib/freebasic/linux-.*)/"

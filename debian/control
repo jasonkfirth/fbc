@@ -1,0 +1,193 @@
+Source: freebasic
+Section: devel
+Priority: optional
+Maintainer: SJ_Zero <sj@fbxl.net>
+Build-Depends:
+ debhelper-compat (= 13),
+ binutils,
+ dos2unix,
+ git,
+ make,
+ pkgconf | pkg-config,
+ xz-utils,
+ libncurses-dev,
+ libtinfo-dev,
+ libgpm-dev,
+ libffi-dev,
+ libasound2-dev,
+ libpulse-dev,
+ libgl1-mesa-dev | libgl-dev,
+ libx11-dev,
+ libxext-dev,
+ libxrender-dev,
+ libxrandr-dev,
+ libxpm-dev
+Standards-Version: 4.6.2
+Homepage: https://freebasic.net/
+Vcs-Browser: https://github.com/freebasic/fbc
+Vcs-Git: https://github.com/freebasic/fbc.git
+Rules-Requires-Root: no
+
+Package: freebasic
+Architecture: any
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+ freebasic-runtime (= ${binary:Version})
+Recommends:
+ freebasic-dev (= ${binary:Version})
+Description: BASIC compiler compatible with QuickBASIC (fbc)
+ FreeBASIC is a free/open source BASIC compiler largely compatible with
+ Microsoft QuickBASIC.
+ .
+ This package provides the fbc compiler executable and driver, allowing
+ FreeBASIC programs to be compiled and linked on Debian-based systems.
+
+Package: freebasic-runtime
+Architecture: any
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+ libncurses6,
+ libtinfo6
+Recommends:
+ libgpm2,
+ libasound2,
+ libpulse0,
+ libx11-6,
+ libxext6,
+ libxpm4,
+ libxrandr2,
+ libxrender1,
+ libgl1,
+ libglu1-mesa
+Suggests:
+ libsdl2-2.0-0,
+ libsdl2-image-2.0-0,
+ libsdl2-mixer-2.0-0,
+ libsdl2-ttf-2.0-0,
+ libopenal1,
+ libpipewire-0.3-0,
+ libcairo2,
+ libfontconfig1,
+ libfreetype6,
+ libcurl4,
+ libsqlite3-0,
+ libpcre2-8-0,
+ libtre5,
+ libxml2,
+ libexpat1,
+ libpng16-16,
+ libjpeg62-turbo,
+ libgif7
+Description: FreeBASIC runtime libraries
+ Runtime libraries (libfb, libfbgfx) and startup objects required when linking
+ FreeBASIC programs. These files are used automatically by the compiler to
+ provide the FreeBASIC runtime environment and graphics subsystem support.
+
+Package: freebasic-dev
+Section: libdevel
+Architecture: any
+Depends:
+ ${misc:Depends},
+ freebasic-runtime (= ${binary:Version})
+Recommends:
+ pkgconf | pkg-config,
+ zlib1g-dev,
+ libbz2-dev,
+ libzip-dev,
+ libpng-dev,
+ libjpeg-dev,
+ libgif-dev,
+ libglu1-mesa-dev | libglu-dev,
+ libsdl2-dev,
+ libsdl2-image-dev,
+ libsdl2-mixer-dev,
+ libsdl2-ttf-dev,
+ libopenal-dev,
+ libasound2-dev,
+ libpulse-dev,
+ libcairo2-dev,
+ libfontconfig-dev | libfontconfig1-dev,
+ libfreetype-dev | libfreetype6-dev,
+ libcurl4-openssl-dev
+Suggests:
+ libpcre2-dev,
+ libtre-dev,
+ libxml2-dev,
+ libexpat1-dev,
+ liballegro4-dev,
+ liballegro5-dev,
+ libgtk-3-dev,
+ libglib2.0-dev,
+ libsqlite3-dev,
+ libpq-dev,
+ default-libmysqlclient-dev,
+ libgsl-dev
+Description: FreeBASIC development headers and include files
+ This package contains the FreeBASIC include files and headers needed for
+ software development using FreeBASIC.
+ .
+ It provides the standard runtime include files distributed with the compiler
+ as well as bindings for many common C libraries. Installing this package is
+ recommended for compiling most real-world FreeBASIC programs.
+
+Package: freebasic-doc
+Section: doc
+Architecture: all
+Depends:
+ ${misc:Depends}
+Suggests:
+ freebasic
+Description: FreeBASIC documentation and manual
+ This package contains the FreeBASIC documentation, including the official
+ manual, language reference, and additional text files distributed with the
+ compiler. The documentation is installed under /usr/share/doc/freebasic/.
+
+Package: freebasic-full
+Section: metapackages
+Architecture: all
+Depends:
+ freebasic (= ${binary:Version}),
+ freebasic-runtime (= ${binary:Version}),
+ freebasic-dev (= ${binary:Version}),
+ freebasic-doc (= ${binary:Version}),
+ ${misc:Depends},
+ pkgconf | pkg-config
+Recommends:
+ zlib1g-dev,
+ libbz2-dev,
+ libzip-dev,
+ libcurl4-openssl-dev,
+ libpng-dev,
+ libjpeg-dev,
+ libgif-dev,
+ libglu1-mesa-dev | libglu-dev,
+ libsdl2-dev,
+ libsdl2-image-dev,
+ libsdl2-mixer-dev,
+ libsdl2-ttf-dev,
+ libopenal-dev,
+ libasound2-dev,
+ libcairo2-dev,
+ libfontconfig-dev | libfontconfig1-dev,
+ libfreetype-dev | libfreetype6-dev
+Suggests:
+ libpcre2-dev,
+ libtre-dev,
+ libxml2-dev,
+ libexpat1-dev,
+ liballegro4-dev,
+ liballegro5-dev,
+ libgtk-3-dev,
+ libglib2.0-dev,
+ libsqlite3-dev,
+ libpq-dev,
+ default-libmysqlclient-dev,
+ libgsl-dev,
+ libpulse-dev,
+ libpipewire-0.3-dev
+Description: Full FreeBASIC installation (metapackage)
+ This metapackage installs the full FreeBASIC toolchain including compiler,
+ runtime, headers, and documentation, plus a broad set of common development
+ libraries used by FreeBASIC examples.

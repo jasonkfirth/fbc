@@ -1,0 +1,231 @@
+#!/usr/bin/make -f
+# ======================================================================
+# debian/rules
+# ======================================================================
+
+export DH_VERBOSE=1
+export DEB_BUILD_MAINT_OPTIONS=hardening=+all optimize=-lto
+
+DEB_HOST_ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
+
+# ------------------------------------------------------------
+# Parallelism
+# ------------------------------------------------------------
+
+NPROC := $(shell nproc)
+PARMAKE := $(MAKE) -j$(NPROC)
+
+# ------------------------------------------------------------
+# Debian architecture → GNU triplet mapping
+# ------------------------------------------------------------
+
+MULTILIB :=
+TARGET_TRIPLET :=
+BOOTSTRAP_DIR_KEY :=
+
+ifeq ($(DEB_HOST_ARCH),amd64)
+TARGET_TRIPLET := x86_64-linux-gnu
+BOOTSTRAP_DIR_KEY := linux-amd64
+endif
+
+ifeq ($(DEB_HOST_ARCH),i386)
+TARGET_TRIPLET := i686-linux-gnu
+MULTILIB := 32
+BOOTSTRAP_DIR_KEY := linux-i386
+endif
+
+ifeq ($(DEB_HOST_ARCH),arm64)
+TARGET_TRIPLET := aarch64-linux-gnu
+BOOTSTRAP_DIR_KEY := linux-arm64
+endif
+
+ifeq ($(DEB_HOST_ARCH),armhf)
+TARGET_TRIPLET := arm-linux-gnueabihf
+BOOTSTRAP_DIR_KEY := linux-armhf
+endif
+
+ifeq ($(DEB_HOST_ARCH),armel)
+TARGET_TRIPLET := arm-linux-gnueabi
+BOOTSTRAP_DIR_KEY := linux-armel
+endif
+
+ifeq ($(DEB_HOST_ARCH),ppc64el)
+TARGET_TRIPLET := powerpc64le-linux-gnu
+BOOTSTRAP_DIR_KEY := linux-ppc64el
+endif
+
+ifeq ($(DEB_HOST_ARCH),s390x)
+TARGET_TRIPLET := s390x-linux-gnu
+BOOTSTRAP_DIR_KEY := linux-s390x
+endif
+
+ifeq ($(DEB_HOST_ARCH),riscv64)
+TARGET_TRIPLET := riscv64-linux-gnu
+BOOTSTRAP_DIR_KEY := linux-riscv64
+endif
+
+ifeq ($(DEB_HOST_ARCH),loong64)
+TARGET_TRIPLET := loongarch64-linux-gnu
+BOOTSTRAP_DIR_KEY := linux-loongarch64
+endif
+
+ifeq ($(TARGET_TRIPLET),)
+$(error Unsupported DEB_HOST_ARCH $(DEB_HOST_ARCH))
+endif
+
+export TARGET=$(TARGET_TRIPLET)
+export FBC_TARGET=$(TARGET_TRIPLET)
+export MULTILIB
+export FBTARGET_DIR_OVERRIDE=$(BOOTSTRAP_DIR_KEY)
+
+# ------------------------------------------------------------
+# Bootstrap compiler
+# ------------------------------------------------------------
+
+FBC_BOOTSTRAP := $(CURDIR)/bin/fbc -i $(CURDIR)/inc
+
+# ------------------------------------------------------------
+# Debian hardening flags
+# ------------------------------------------------------------
+
+DPKG_CFLAGS_RAW   := $(shell dpkg-buildflags --get CFLAGS)
+DPKG_CPPFLAGS     := $(shell dpkg-buildflags --get CPPFLAGS)
+DPKG_LDFLAGS_RAW  := $(shell dpkg-buildflags --get LDFLAGS)
+
+# The FreeBASIC bootstrap/compiler build does not currently survive Debian's
+# LTO flags reliably. Keep hardening, but drop -flto/-ffat-lto-objects here.
+DPKG_CFLAGS  := $(filter-out -flto=% -ffat-lto-objects,$(DPKG_CFLAGS_RAW))
+DPKG_LDFLAGS := $(filter-out -flto=% -ffat-lto-objects,$(DPKG_LDFLAGS_RAW))
+
+# Force recursive make invocations to use the same sanitized Debian flags.
+export CPPFLAGS := $(DPKG_CPPFLAGS)
+export CFLAGS   := $(DPKG_CFLAGS)
+export CXXFLAGS := $(DPKG_CFLAGS)
+export LDFLAGS  := $(DPKG_LDFLAGS)
+
+# ------------------------------------------------------------
+# Default rule
+# ------------------------------------------------------------
+
+%:
+	dh $@
+
+# ------------------------------------------------------------
+# Clean
+# ------------------------------------------------------------
+
+override_dh_auto_clean:
+
+	rm -rf bin obj
+	rm -rf src/compiler/obj
+	rm -rf src/rtlib/obj
+	rm -rf src/fbrt/obj
+	rm -rf src/gfxlib2/obj
+	rm -rf lib/freebasic
+
+	rm -rf debian/tmp
+	rm -rf debian/.debhelper
+
+	rm -f debian/*.substvars
+	rm -f debian/files
+	rm -f debian/*.log
+	rm -f debian/debhelper-build-stamp
+
+	mkdir -p debian/source
+	echo "3.0 (quilt)" > debian/source/format
+
+# ------------------------------------------------------------
+# Build
+# ------------------------------------------------------------
+
+override_dh_auto_build:
+
+	rm -f contrib/swig/swig.exe
+
+	$(MAKE) TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
+		CPPFLAGS="$(CPPFLAGS)" \
+		CFLAGS="$(CFLAGS)" \
+		CXXFLAGS="$(CXXFLAGS)" \
+		LDFLAGS="$(LDFLAGS)" \
+		bootstrap-minimal
+
+	@test -x bin/fbc || { echo "ERROR: bootstrap compiler missing"; exit 1; }
+
+	$(PARMAKE) TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
+		rtlib fbrt gfxlib2 sfxlib \
+		FBC="$(FBC_BOOTSTRAP)" \
+		CPPFLAGS="$(CPPFLAGS)" \
+		CFLAGS="$(CFLAGS)" \
+		CXXFLAGS="$(CXXFLAGS)" \
+		LDFLAGS="$(LDFLAGS)"
+
+	$(PARMAKE) TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
+		compiler \
+		FBC="$(FBC_BOOTSTRAP)" \
+		CPPFLAGS="$(CPPFLAGS)" \
+		CFLAGS="$(CFLAGS)" \
+		CXXFLAGS="$(CXXFLAGS)" \
+		LDFLAGS="$(LDFLAGS)"
+
+# ------------------------------------------------------------
+# Install
+# ------------------------------------------------------------
+
+override_dh_auto_install:
+
+	$(PARMAKE) TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" install \
+		DESTDIR=$(CURDIR)/debian/tmp \
+		prefix=/usr \
+		FBC="$(FBC_BOOTSTRAP)"
+
+	if [ -d debian/tmp/usr/lib/freebasic ]; then \
+		cd debian/tmp/usr/lib/freebasic; \
+		case "$(DEB_HOST_ARCH)" in \
+			amd64)   ln -sfn linux-amd64 linux-x86_64 ;; \
+			i386)    ln -sfn linux-i386 linux-x86 ;; \
+			arm64)   ln -sfn linux-arm64 linux-aarch64 ;; \
+			armhf)   ln -sfn linux-armhf linux-arm ;; \
+			ppc64el) ln -sfn linux-ppc64el linux-powerpc64le ;; \
+		esac; \
+	fi
+
+# ------------------------------------------------------------
+# Cleanup packaging artifacts
+# ------------------------------------------------------------
+
+	find debian/tmp -name ".git*" -delete || true
+	find debian/tmp -name ".svn" -type d -exec rm -rf {} + || true
+	find debian/tmp -name ".hg" -type d -exec rm -rf {} + || true
+
+	rm -rf debian/tmp/usr/share/doc/freebasic/manual/cache* || true
+	rm -f debian/tmp/usr/share/freebasic/contrib/swig/swig.exe || true
+
+# ------------------------------------------------------------
+# FLTK license relocation
+# ------------------------------------------------------------
+
+	if [ -f debian/tmp/usr/include/freebasic/FLTK/LICENSE ]; then \
+		mkdir -p debian/tmp/usr/share/doc/freebasic-dev; \
+		mv debian/tmp/usr/include/freebasic/FLTK/LICENSE \
+		   debian/tmp/usr/share/doc/freebasic-dev/FLTK-LICENSE; \
+		ln -sf ../../../share/doc/freebasic-dev/FLTK-LICENSE \
+		   debian/tmp/usr/include/freebasic/FLTK/LICENSE; \
+	fi
+
+# ------------------------------------------------------------
+# Remove duplicate GPL texts
+# ------------------------------------------------------------
+
+	rm -f debian/tmp/usr/share/doc/freebasic/*/gpl.txt.gz || true
+
+# ------------------------------------------------------------
+# Tests
+# ------------------------------------------------------------
+
+override_dh_auto_test:
+	true
+
+
+# ======================================================================
+# End of debian/rules
+# ======================================================================

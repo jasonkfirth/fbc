@@ -146,6 +146,16 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		    or FB_TARGETOPT_ELF _
 	), _
 	( _
+		@"haiku", _
+		FB_DATATYPE_ULONG, _
+		FB_FUNCMODE_CDECL, _
+		FB_FUNCMODE_STDCALL_MS, _
+		0   or FB_TARGETOPT_UNIX _
+		    or FB_TARGETOPT_CALLEEPOPSHIDDENPTR _
+		    or FB_TARGETOPT_STACKALIGN16 _
+		    or FB_TARGETOPT_ELF _
+	), _
+	( _
 		@"dos", _
 		FB_DATATYPE_UBYTE, _
 		FB_FUNCMODE_CDECL, _
@@ -250,6 +260,9 @@ dim shared as FBCPUFAMILYINFO cpufamilyinfo(0 to FB_CPUFAMILY__COUNT-1) = _
 	(@"powerpc"    , FB_DEFAULT_CPUTYPE_PPC    ), _
 	(@"powerpc64"  , FB_DEFAULT_CPUTYPE_PPC64  ), _
 	(@"powerpc64le", FB_DEFAULT_CPUTYPE_PPC64LE), _
+	(@"riscv64"    , FB_DEFAULT_CPUTYPE_RISCV64), _
+	(@"s390x"      , FB_DEFAULT_CPUTYPE_S390X  ), _
+	(@"loongarch64", FB_DEFAULT_CPUTYPE_LOONGARCH64), _
 	(@"asmjs"      , FB_DEFAULT_CPUTYPE_ASMJS  )  _
 }
 
@@ -286,6 +299,9 @@ dim shared as FBCPUTYPEINFO cputypeinfo(0 to FB_CPUTYPE__COUNT-1) = _
 	( NULL       , @"powerpc"      , FB_CPUFAMILY_PPC    , 32, TRUE  ), _ '' FB_CPUTYPE_PPC
 	( NULL       , @"powerpc64"    , FB_CPUFAMILY_PPC64  , 64, TRUE  ), _ '' FB_CPUTYPE_PPC64
 	( NULL       , @"powerpc64le"  , FB_CPUFAMILY_PPC64LE, 64, FALSE ), _ '' FB_CPUTYPE_PPC64LE
+	( NULL       , @"riscv64"      , FB_CPUFAMILY_RISCV64, 64, FALSE ), _ '' FB_CPUTYPE_RISCV64
+	( NULL       , @"s390x"        , FB_CPUFAMILY_S390X  , 64, TRUE  ), _ '' FB_CPUTYPE_S390X
+	( NULL       , @"loongarch64"  , FB_CPUFAMILY_LOONGARCH64, 64, FALSE ), _ '' FB_CPUTYPE_LOONGARCH64
 	( NULL       , @"asmjs"        , FB_CPUFAMILY_ASMJS  , 32, FALSE )  _ '' FB_CPUTYPE_ASMJS
 }
 
@@ -596,6 +612,7 @@ sub fbGlobalInit()
 	env.clopt.export        = FALSE
 	env.clopt.multithreaded = FALSE
 	env.clopt.fbgfx         = FALSE
+	env.clopt.fbsfx         = FALSE
 	env.clopt.pic           = FALSE
 	env.clopt.msbitfields   = FALSE
 	env.clopt.stacksize     = 0 '' default will be set by fbSetOption() called from hParseArgs()
@@ -716,6 +733,8 @@ sub fbSetOption( byval opt as integer, byval value as integer )
 		env.clopt.multithreaded = value
 	case FB_COMPOPT_FBGFX
 		env.clopt.fbgfx = value
+	case FB_COMPOPT_FBSFX
+		env.clopt.fbsfx = value
 	case FB_COMPOPT_PIC
 		env.clopt.pic = value
 	case FB_COMPOPT_STACKSIZE
@@ -833,6 +852,8 @@ function fbGetOption( byval opt as integer ) as integer
 		function = env.clopt.multithreaded
 	case FB_COMPOPT_FBGFX
 		function = env.clopt.fbgfx
+	case FB_COMPOPT_FBSFX
+		function = env.clopt.fbsfx
 	case FB_COMPOPT_PIC
 		function = env.clopt.pic
 	case FB_COMPOPT_STACKSIZE

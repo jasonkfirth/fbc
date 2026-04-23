@@ -141,6 +141,10 @@ function cQuirkStmt _
 	end select
 
 	if( res = FALSE ) then
+		res = cSfxStmt( tk )
+	end if
+
+	if( res = FALSE ) then
 		res = cGfxStmt( tk )
 	end if
 
@@ -239,7 +243,14 @@ function cQuirkFunction(byval sym as FBSYMBOL ptr) as ASTNODE ptr
 	case FB_TK_THREADCALL
 		funcexpr = cThreadCallFunc()
 
+	case FB_TK_TCP
+		funcexpr = cFileFunct( tk )
+
 	end select
+
+	if( funcexpr = NULL ) then
+		funcexpr = cSfxFunct( tk )
+	end if
 
 	if( funcexpr = NULL ) then
 		funcexpr = cGfxFunct( tk )

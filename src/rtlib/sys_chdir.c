@@ -12,7 +12,7 @@ FBCALL int fb_ChDir( FBSTRING *path )
 	int res;
 
 #ifdef HOST_MINGW
-	res = _chdir( path->data );
+	res = fb_hChangeDir( path->data );
 #else
 	res = chdir( path->data );
 #endif

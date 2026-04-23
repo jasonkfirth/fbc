@@ -8,7 +8,7 @@ FBCALL double fb_FileDateTime( const char *filename )
 {
 #ifdef HOST_MINGW
 	struct _stat buf;
-	if( _stat( filename, &buf ) != 0 )
+	if( fb_hStatFile( filename, &buf ) != 0 )
 #else
 	struct stat buf;
 	if( stat( filename, &buf ) != 0 )

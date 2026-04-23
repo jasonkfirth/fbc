@@ -10,7 +10,7 @@ FBCALL int fb_FileKill( FBSTRING *str )
 
 	if( str->data != NULL )
 	{
-		res = remove( str->data );
+		res = fb_hRemoveFile( str->data );
 		err = errno;
 	}
 
