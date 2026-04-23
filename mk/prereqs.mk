@@ -50,6 +50,22 @@ define pr_check_hdr
 	$(call pr_error_block,Missing required header: $(1))
 endef
 
+define pr_check_no_space_path
+	case "$(1)" in \
+		*" "*) \
+			echo ""; \
+			echo "ERROR: $(2) contains whitespace:"; \
+			echo "  $(1)"; \
+			echo ""; \
+			echo "GNU make path handling in this build system does not support"; \
+			echo "source trees located under directories with spaces."; \
+			echo "Move or clone the tree to a path without spaces and retry."; \
+			echo ""; \
+			exit 1; \
+			;; \
+	esac
+endef
+
 ##############################################################################
 # Required tools
 ##############################################################################
@@ -88,9 +104,9 @@ PR_BOOTSTRAP_DONOR_CANDIDATES := $(filter-out $(PR_BOOTSTRAP_DIR),$(PR_BOOTSTRAP
 # Phony targets
 ##############################################################################
 
-.PHONY: prereqs prereqs-env prereqs-tools prereqs-libs prereqs-fbc prereqs-print
+.PHONY: prereqs prereqs-env prereqs-paths prereqs-tools prereqs-libs prereqs-fbc prereqs-print
 
-prereqs: prereqs-env prereqs-tools prereqs-libs
+prereqs: prereqs-env prereqs-paths prereqs-tools prereqs-libs
 
 ##############################################################################
 # Environment notes
@@ -111,6 +127,14 @@ endif
 ifneq ($(IS_HAIKU),)
 	@echo "Platform: Haiku (experimental)"
 endif
+
+##############################################################################
+# Path checks
+##############################################################################
+
+prereqs-paths:
+	@echo "==> Checking source tree path"
+	@$(call pr_check_no_space_path,$(CURDIR),Source tree path)
 
 ##############################################################################
 # Tool checks

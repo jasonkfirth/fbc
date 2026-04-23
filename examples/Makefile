@@ -15,12 +15,12 @@
 #
 
 OS := $(shell uname)
-ifeq ($(OS),Linux)
-    EXEEXT :=
-    DLLEXT := .so
-else
+ifeq ($(OS),win32)
     EXEEXT := .exe
     DLLEXT := .dll
+else
+    EXEEXT :=
+    DLLEXT := .so
 endif
 
 FBC := fbc$(EXEEXT)
