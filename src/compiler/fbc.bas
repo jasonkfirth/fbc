@@ -3284,7 +3284,21 @@ private sub fbcSetupCompilerPaths( )
 	else
 		fbc.binpath = fbc.prefix + "bin"     + FB_HOST_PATHDIV + fbc.targetprefix
 	end if
-	fbc.incpath = fbc.prefix + "include" + FB_HOST_PATHDIV + fbname
+
+	''
+	'' Haiku keeps development headers in /develop/headers instead of the
+	'' more typical /include tree used by the other hosted Unix targets.
+	''
+	'' Keep the compiler's built-in default include path aligned with the
+	'' install layout from mk/layout.mk, otherwise installed core headers
+	'' such as fbgfx.bi, crt.bi, vbcompat.bi, and fbthread.bi appear to be
+	'' missing even though the package installed them correctly.
+	''
+	#ifdef __FB_HAIKU__
+		fbc.incpath = fbc.prefix + "develop" + FB_HOST_PATHDIV + "headers" + FB_HOST_PATHDIV + fbname
+	#else
+		fbc.incpath = fbc.prefix + "include" + FB_HOST_PATHDIV + fbname
+	#endif
 	fbc.libpath = fbc.prefix + libdirname + FB_HOST_PATHDIV + fbname + FB_HOST_PATHDIV + targetid
 #endif
 end sub
