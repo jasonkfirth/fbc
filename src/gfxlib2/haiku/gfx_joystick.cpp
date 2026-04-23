@@ -100,7 +100,7 @@ static float normalize_axis(int value)
 /* Get joystick state                                                        */
 /* ------------------------------------------------------------------------- */
 
-FBCALL int fb_GfxGetJoystick(
+extern "C" FBCALL int fb_GfxGetJoystick(
     int id,
     ssize_t *buttons,
     float *a1,float *a2,float *a3,float *a4,
