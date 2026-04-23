@@ -1,4 +1,4 @@
-# MS-DOS Folder Guide
+# DOS Folder Guide
 
 This folder is the start of the DOS backend work.
 
@@ -34,6 +34,21 @@ Main routines:
 - `msdos_sb_write()`
 - `fb_sfxDriverSoundBlaster`
 - `__fb_sfx_drivers_list`
+
+## `sfx_driver_pcspk.c`
+
+PC speaker fallback playback driver.
+
+What it does:
+- does not require `BLASTER`
+- uses PIT channel 2 one-shot pulses as a crude PCM-style fallback
+- keeps DOS audio working when no Sound Blaster is configured
+
+Main routines:
+- `msdos_pcspk_init()`
+- `msdos_pcspk_exit()`
+- `msdos_pcspk_write()`
+- `fb_sfxDriverPcSpeaker`
 
 ## `sfx_midi_sb.c`
 

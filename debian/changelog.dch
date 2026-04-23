@@ -23,6 +23,20 @@ freebasic (1.20.1-1) jammy; urgency=medium
     1.20 forward-port validation work.
   * Fix Unix console query hangs that could block example output in
     non-responding terminal sessions.
+  * Rework the DOS package builder so build_scripts/msdos-build-freebasic.sh
+    can bootstrap the DOS toolchain on Linux, stage the distribution
+    under out/msdos, and clean successful .build-msdos intermediates by
+    default.
+  * Add an image-backed DOSBox-X validation path via
+    build_scripts/msdos-test-freebasic.sh that compiles hello-world,
+    SCREEN 13 graphics, Sound Blaster, and no-BLASTER fallback tests
+    from inside the packaged DOS distribution.
+  * Fix the DOS sfxlib integration by moving the backend sources onto
+    the normal DOS source path, restoring Sound Blaster and MPU-401
+    linkage/init, and making missing BLASTER settings fail visibly for
+    the Sound Blaster path.
+  * Add a DOS PC speaker fallback backend so sfxlib can still produce
+    audible playback when no Sound Blaster is configured.
 
  -- SJ_Zero <sj@fbxl.net>  Fri, 17 Apr 2026 12:00:00 -0400
 

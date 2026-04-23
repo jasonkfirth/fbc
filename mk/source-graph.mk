@@ -26,6 +26,11 @@ ifeq ($(TARGET_OS),cygwin)
 SOURCE_OS := win32
 endif
 
+SFX_SOURCE_OS := $(SOURCE_OS)
+ifeq ($(TARGET_OS),dos)
+SFX_SOURCE_OS := msdos
+endif
+
 ##############################################################################
 # Runtime C++ enablement
 #

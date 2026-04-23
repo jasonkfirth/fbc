@@ -4,6 +4,7 @@
 
 #ifndef DISABLE_MSDOS
 
+#include "../fb_sfx_internal.h"
 #include "fb_sfx_msdos.h"
 
 #include <string.h>
@@ -46,19 +47,28 @@ int fb_sfxMidiDriverOpen(int device)
     if (fb_sfxMsdosParseBlaster(&g_fb_sfx_midi_msdos) != 0)
         return -1;
 
-    if (g_fb_sfx_midi_msdos.mpu_port <= 0)
+    if (!g_fb_sfx_midi_msdos.have_blaster || !g_fb_sfx_midi_msdos.have_mpu_port)
+    {
+        SFX_DEBUG("msdos_midi: BLASTER is missing or does not specify an MPU-401 port");
         return -1;
+    }
 
     if (fb_sfxMsdosMpuWrite(g_fb_sfx_midi_msdos.mpu_port, 0x3F) != 0)
+    {
+        SFX_DEBUG("msdos_midi: failed to switch MPU-401 at 0x%X to UART mode",
+                  g_fb_sfx_midi_msdos.mpu_port);
         return -1;
+    }
 
     g_fb_sfx_midi_open = 1;
+    SFX_DEBUG("msdos_midi: opened MPU-401 at 0x%X", g_fb_sfx_midi_msdos.mpu_port);
     return 0;
 }
 
 void fb_sfxMidiDriverClose(void)
 {
     g_fb_sfx_midi_open = 0;
+    SFX_DEBUG("msdos_midi: closed");
 }
 
 int fb_sfxMidiDriverSend(unsigned char status,

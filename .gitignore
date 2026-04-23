@@ -22,7 +22,9 @@
 /tools/*
 /config.mk
 /config-post.mk
-
+/.build-msdos
+/.build-msdos/
+/.build-msdos/**
 /doc/fbdoc/fbdoc
 /doc/makefbhelp/makefbhelp
 /doc/fbchkdoc/fbchkdoc.ini

@@ -82,7 +82,7 @@ int fb_dos_unlock_code(const void *address, size_t size);
 /* multikey() declarations also used by gfxlib2 */
 #define END_OF_FUNCTION(proc)               void end_##proc (void) { }
 #define END_OF_STATIC_FUNCTION(proc) static void end_##proc (void) { }
-void (*__fb_dos_multikey_hook)(int scancode, int flags);
+extern void (*__fb_dos_multikey_hook)(int scancode, int flags);
 #define KB_PRESS    0x00000001
 #define KB_REPEAT   0x00000002
 #define KB_SHIFT    0x00000004

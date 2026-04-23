@@ -130,6 +130,8 @@ prereqs-libs:
 
 ifneq ($(IS_WINDOWS),)
 	@true
+else ifeq ($(CROSS_BUILD),yes)
+	@echo "Cross-build detected; skipping host library/header probes"
 else
 	@$(call pr_check_cmd,pkg-config)
 

@@ -6,6 +6,8 @@ Version 1.20.1
 - expanded compiler target, cpu-family, linker, and default-library handling for the platforms and architectures validated in the 1.10.4 branch, including Haiku, NetBSD rpath handling, and broader per-OS library selection
 - updated the HLC IR/backend glue so non-Intel targets do not fall through Intel-centric code paths when targeting newer cpu families
 - refreshed the Darwin graphics/audio backend set with the newer 1.10.4 driver work
+- Linux/MSYS2 release flow: reworked the DOS package builder so build_scripts/msdos-build-freebasic.sh can bootstrap or reuse the DJGPP toolchain, emit the DOS distribution under out/msdos, keep Linux and MSYS2 host realities separate, and clean successful .build-msdos staging artifacts by default
+- DOS test flow: replaced the earlier ad-hoc DOS sound probe helper with a fuller image-backed build_scripts/msdos-test-freebasic.sh path that provisions its own host test dependencies, boots the packaged DOS distribution under DOSBox-X, and validates console, SCREEN 13, Sound Blaster, and no-BLASTER fallback scenarios from inside the DOS image
 
 [added]
 - sfxlib integrated into the compiler, runtime, libraries, examples, and build system
@@ -16,6 +18,7 @@ Version 1.20.1
 - Windows UTF-8 filename handling carried forward from 1.10.4, including wide-path runtime wrappers and Unicode-aware DIR() handling on MinGW
 - Solaris target-specific rtlib console support carried forward from 1.10.4, including the local termcap shim and non-ncurses console/input runtime files
 - beginner-oriented example coverage for sfxlib and OPEN TCP, including self-test examples for networking and a larger commented sfxlib showcase
+- DOS/sfxlib: added a fallback PC speaker backend that uses PIT channel 2 pulses to provide audible playback when no Sound Blaster is configured and BLASTER is unset or unavailable
 
 [fixed]
 - Linux: restrict '-m32' and '-m64' linker flags to x86/x86_64 targets instead of passing them to unrelated architectures
@@ -24,6 +27,8 @@ Version 1.20.1
 - Linux/sfxlib: make CAPTURE SAVE use the buffered capture path and actual capture format so saved recordings succeed on real hardware
 - rtlib/unix: avoid indefinite terminal query hangs when console size rechecks are attempted in sessions that do not answer the escape-sequence query
 - compatibility: replace the old 1.10.4-specific sfxlib exit registration with a 1.20-compatible atexit() based hook
+- DOS/build: fixed the Linux-hosted DOS packaging and smoke-test path so the build script stages the runtime layout expected by DOS and host-side cross-linking, rebuilds the DOS compiler/runtime reliably, and packages the finished distribution from out/msdos
+- DOS/sfxlib: fixed the DOS backend integration by moving the target sources into src/sfxlib/dos, wiring them into the normal DOS build graph, correcting the Sound Blaster/MIDI linkage and runtime initialization, and making missing BLASTER settings fail visibly for the Sound Blaster path instead of silently pretending a card exists
 
 
 Version 1.20.0
