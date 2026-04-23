@@ -4,6 +4,9 @@
 *.exe
 *.dll
 *.so
+*.tar
+*.tar.xz
+*.zip
 /fbc
 /fbc-new
 /bin/*
