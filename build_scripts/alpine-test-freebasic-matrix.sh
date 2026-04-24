@@ -277,7 +277,7 @@ print "sfx-end"
 FBEOF
 
 echo "==> compiling console smoke"
-run fbc /tmp/fb-package-smoke/console.bas -x /tmp/fb-package-smoke/console
+run fbc /tmp/fb-package-smoke/console.bas -x /tmp/fb-package-smoke/console -v
 [ -x /tmp/fb-package-smoke/console ] || fail "console binary was not created"
 
 echo "==> running console smoke"
@@ -286,7 +286,7 @@ echo "$console_output"
 [ "$console_output" = "Hello world" ] || fail "unexpected console output: $console_output"
 
 echo "==> compiling gfxlib smoke"
-run fbc /tmp/fb-package-smoke/gfx.bas -x /tmp/fb-package-smoke/gfx
+run fbc /tmp/fb-package-smoke/gfx.bas -x /tmp/fb-package-smoke/gfx -v
 [ -x /tmp/fb-package-smoke/gfx ] || fail "gfx binary was not created"
 
 echo "==> running gfxlib smoke if a display is available"
@@ -306,7 +306,7 @@ else
 fi
 
 echo "==> compiling sfxlib smoke"
-run fbc /tmp/fb-package-smoke/sfx.bas -x /tmp/fb-package-smoke/sfx
+run fbc /tmp/fb-package-smoke/sfx.bas -x /tmp/fb-package-smoke/sfx -v
 [ -x /tmp/fb-package-smoke/sfx ] || fail "sfx binary was not created"
 
 echo "==> running sfxlib smoke"
