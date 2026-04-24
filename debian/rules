@@ -12,8 +12,8 @@ DEB_HOST_ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
 # Parallelism
 # ------------------------------------------------------------
 
-NPROC := $(shell nproc)
-PARMAKE := $(MAKE) -j$(NPROC)
+JOBS ?= $(shell nproc)
+PARMAKE := $(MAKE) -j$(JOBS)
 
 # ------------------------------------------------------------
 # Debian architecture → GNU triplet mapping
@@ -74,6 +74,7 @@ $(error Unsupported DEB_HOST_ARCH $(DEB_HOST_ARCH))
 endif
 
 export TARGET=$(TARGET_TRIPLET)
+export TARGET_TRIPLET
 export FBC_TARGET=$(TARGET_TRIPLET)
 export MULTILIB
 export FBTARGET_DIR_OVERRIDE=$(BOOTSTRAP_DIR_KEY)
@@ -142,7 +143,7 @@ override_dh_auto_build:
 
 	rm -f contrib/swig/swig.exe
 
-	$(MAKE) TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
+	$(MAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
 		CPPFLAGS="$(CPPFLAGS)" \
 		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CXXFLAGS)" \
@@ -151,17 +152,19 @@ override_dh_auto_build:
 
 	@test -x bin/fbc || { echo "ERROR: bootstrap compiler missing"; exit 1; }
 
-	$(PARMAKE) TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
+	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
 		rtlib fbrt gfxlib2 sfxlib \
 		FBC="$(FBC_BOOTSTRAP)" \
+		BUILD_FBC_TARGET="$(BOOTSTRAP_DIR_KEY)" \
 		CPPFLAGS="$(CPPFLAGS)" \
 		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CXXFLAGS)" \
 		LDFLAGS="$(LDFLAGS)"
 
-	$(PARMAKE) TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
+	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
 		compiler \
 		FBC="$(FBC_BOOTSTRAP)" \
+		BUILD_FBC_TARGET="$(BOOTSTRAP_DIR_KEY)" \
 		CPPFLAGS="$(CPPFLAGS)" \
 		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CXXFLAGS)" \
@@ -173,10 +176,11 @@ override_dh_auto_build:
 
 override_dh_auto_install:
 
-	$(PARMAKE) TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" install \
+	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" install \
 		DESTDIR=$(CURDIR)/debian/tmp \
 		prefix=/usr \
-		FBC="$(FBC_BOOTSTRAP)"
+		FBC="$(FBC_BOOTSTRAP)" \
+		BUILD_FBC_TARGET="$(BOOTSTRAP_DIR_KEY)"
 
 	if [ -d debian/tmp/usr/lib/freebasic ]; then \
 		cd debian/tmp/usr/lib/freebasic; \

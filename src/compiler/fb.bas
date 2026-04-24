@@ -299,7 +299,7 @@ dim shared as FBCPUTYPEINFO cputypeinfo(0 to FB_CPUTYPE__COUNT-1) = _
 	( NULL       , @"powerpc"      , FB_CPUFAMILY_PPC    , 32, TRUE  ), _ '' FB_CPUTYPE_PPC
 	( NULL       , @"powerpc64"    , FB_CPUFAMILY_PPC64  , 64, TRUE  ), _ '' FB_CPUTYPE_PPC64
 	( NULL       , @"powerpc64le"  , FB_CPUFAMILY_PPC64LE, 64, FALSE ), _ '' FB_CPUTYPE_PPC64LE
-	( NULL       , @"riscv64"      , FB_CPUFAMILY_RISCV64, 64, FALSE ), _ '' FB_CPUTYPE_RISCV64
+	( @"rv64gc"  , @"riscv64"      , FB_CPUFAMILY_RISCV64, 64, FALSE ), _ '' FB_CPUTYPE_RISCV64
 	( NULL       , @"s390x"        , FB_CPUFAMILY_S390X  , 64, TRUE  ), _ '' FB_CPUTYPE_S390X
 	( NULL       , @"loongarch64"  , FB_CPUFAMILY_LOONGARCH64, 64, FALSE ), _ '' FB_CPUTYPE_LOONGARCH64
 	( NULL       , @"asmjs"        , FB_CPUFAMILY_ASMJS  , 32, FALSE )  _ '' FB_CPUTYPE_ASMJS

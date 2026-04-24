@@ -1,0 +1,27 @@
+# Template file for 'freebasic'
+pkgname=freebasic
+version=1.20.1
+revision=1
+build_style=gnu-makefile
+short_desc="FreeBASIC compiler"
+maintainer="FreeBASIC packagers <packagers@example.invalid>"
+license="GPL-2.0-or-later, LGPL-2.1-or-later"
+homepage="https://www.freebasic.net/"
+distfiles="freebasic-${version}.tar.xz"
+checksum=SKIP
+
+hostmakedepends="pkg-config rsync dos2unix"
+makedepends="ncurses-devel gpm-devel libffi-devel alsa-lib-devel pulseaudio-devel
+ libX11-devel libXext-devel libXpm-devel libXrandr-devel libXrender-devel
+ MesaLib-devel glu-devel"
+depends="gcc binutils ncurses gpm libffi alsa-lib pulseaudio
+ libX11 libXext libXpm libXrandr libXrender MesaLib glu"
+
+do_build() {
+	make ${makejobs} bootstrap-minimal
+	make ${makejobs} all FBC=bootstrap/fbc
+}
+
+do_install() {
+	make install DESTDIR="${DESTDIR}" prefix=/usr
+}

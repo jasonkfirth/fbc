@@ -1,0 +1,43 @@
+# Maintainer: FreeBASIC packagers <packagers@example.invalid>
+
+pkgname=freebasic
+pkgver=1.20.1
+pkgrel=1
+pkgdesc='FreeBASIC compiler'
+arch=('x86_64' 'aarch64' 'armv7h' 'riscv64')
+url='https://www.freebasic.net/'
+license=('GPL-2.0-or-later' 'LGPL-2.1-or-later')
+depends=(
+  'gcc'
+  'binutils'
+  'ncurses'
+  'gpm'
+  'libffi'
+  'alsa-lib'
+  'libpulse'
+  'libx11'
+  'libxext'
+  'libxpm'
+  'libxrandr'
+  'libxrender'
+  'glu'
+)
+makedepends=(
+  'make'
+  'pkgconf'
+  'rsync'
+  'dos2unix'
+)
+source=("${pkgname}-${pkgver}.tar.xz")
+sha256sums=('SKIP')
+
+build() {
+  cd "${srcdir}/${pkgname}-${pkgver}"
+  make bootstrap-minimal
+  make all FBC=bootstrap/fbc
+}
+
+package() {
+  cd "${srcdir}/${pkgname}-${pkgver}"
+  make install DESTDIR="${pkgdir}" prefix=/usr
+}

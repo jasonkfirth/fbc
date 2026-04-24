@@ -28,10 +28,17 @@
 /doc/fbdoc/fbdoc
 /doc/makefbhelp/makefbhelp
 /doc/fbchkdoc/fbchkdoc.ini
-
+/stage
+/stage/*
+/src/compiler/*.c
+/src/compiler/*.h
+/src/compiler/*.asm
 /out/*
 /packages/*
-
+/.build-debianubuntu/*
+/.build-debianubuntu
+/.build*
+/.build*/*
 .vscode
 
 /lib/dos/libfb.dxe

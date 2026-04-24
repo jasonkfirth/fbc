@@ -200,6 +200,14 @@ fi
 [ -n "$DISTRO_ID" ] || DISTRO_ID="unknown"
 [ -n "$CODENAME" ] || CODENAME="unknown"
 
+if [ -n "${FBC_PACKAGE_DISTRO_ID:-}" ]; then
+    DISTRO_ID="$FBC_PACKAGE_DISTRO_ID"
+fi
+
+if [ -n "${FBC_PACKAGE_CODENAME:-}" ]; then
+    CODENAME="$FBC_PACKAGE_CODENAME"
+fi
+
 OUTDIR="${OUTBASE}/linux/${DISTRO_ID}/${CODENAME}/${ARCH}"
 
 mkdir -p "$WORKDIR" "$OUTDIR"
@@ -222,7 +230,7 @@ install_deps() {
     run_root apt-get install -y --no-install-recommends \
         ca-certificates \
         build-essential gcc g++ binutils make \
-        pkgconf \
+        pkgconf rsync \
         debhelper dpkg-dev devscripts fakeroot lintian \
         quilt dos2unix \
         tar xz-utils \
@@ -311,7 +319,7 @@ package_current_target() {
 
     run mkdir -p "$BUILDDIR/$srcdir"
 
-    run rsync -a \
+    run rsync -a --no-owner --no-group \
         --delete \
         --exclude '/.build-debianubuntu/' \
         --exclude '/.codex/' \
@@ -320,6 +328,7 @@ package_current_target() {
         --exclude '/bootstrap/' \
         --exclude '/lib/freebasic/' \
         --exclude '/obj/' \
+        --exclude '/src/*/obj/' \
         --exclude '/out/' \
         --exclude '/stage/' \
         --exclude '/tmp/' \
@@ -328,7 +337,7 @@ package_current_target() {
         "$ROOT/" "$BUILDDIR/$srcdir/"
 
     run mkdir -p "$BUILDDIR/$srcdir/bootstrap/$BOOTKEY"
-    run rsync -a --delete "$bootstrap_srcdir/" "$BUILDDIR/$srcdir/bootstrap/$BOOTKEY/"
+    run rsync -a --no-owner --no-group --delete "$bootstrap_srcdir/" "$BUILDDIR/$srcdir/bootstrap/$BOOTKEY/"
 
     cd "$BUILDDIR/$srcdir"
 

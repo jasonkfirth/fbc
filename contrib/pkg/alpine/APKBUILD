@@ -1,0 +1,69 @@
+# Maintainer: FreeBASIC packagers <packagers@example.invalid>
+pkgname=freebasic
+pkgver=1.20.1
+pkgrel=0
+pkgdesc="FreeBASIC compiler"
+url="https://www.freebasic.net/"
+arch="x86_64 aarch64 armv7 riscv64"
+license="GPL-2.0-or-later AND LGPL-2.1-or-later"
+depends="
+	gcc
+	binutils
+	musl-dev
+	ncurses-dev
+	alsa-lib-dev
+	pulseaudio-dev
+	libx11-dev
+	libxext-dev
+	libxpm-dev
+	libxrandr-dev
+	libxrender-dev
+	mesa-dev
+	glu-dev
+	ncurses-libs
+	gpm
+	libffi
+	alsa-lib
+	pulseaudio-libs
+	libx11
+	libxext
+	libxpm
+	libxrandr
+	libxrender
+	mesa-gl
+	glu
+	"
+makedepends="
+	build-base
+	make
+	pkgconf
+	rsync
+	dos2unix
+	ncurses-dev
+	gpm-dev
+	libffi-dev
+	alsa-lib-dev
+	pulseaudio-dev
+	libx11-dev
+	libxext-dev
+	libxpm-dev
+	libxrandr-dev
+	libxrender-dev
+	mesa-dev
+	glu-dev
+	"
+source="$pkgname-$pkgver.tar.xz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	make bootstrap-minimal
+	make all FBC=bootstrap/fbc
+}
+
+package() {
+	make install DESTDIR="$pkgdir" prefix=/usr
+}
+
+sha512sums="
+SKIP  freebasic-1.20.1.tar.xz
+"

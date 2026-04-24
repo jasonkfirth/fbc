@@ -62,6 +62,8 @@ DARWIN_BLOCKS_CFLAGS += -isysroot $(DARWIN_SDKROOT)
 endif
 BUILD_FBC_TARGET_OPT :=
 BUILD_FBC_BUILDPREFIX_OPT :=
+BUILD_FBC_COMPAT_DEFINES :=
+BUILD_FBC_COMPAT_TARGET := $(TARGET_ARCH) $(BUILD_FBC_TARGET)
 
 ifneq ($(strip $(BUILD_FBC_TARGET)),)
 BUILD_FBC_TARGET_OPT := -target $(BUILD_FBC_TARGET)
@@ -71,11 +73,24 @@ ifneq ($(strip $(BUILD_FBC_BUILDPREFIX)),)
 BUILD_FBC_BUILDPREFIX_OPT := -buildprefix $(BUILD_FBC_BUILDPREFIX)
 endif
 
+ifneq ($(filter aarch64 linux-aarch64,$(BUILD_FBC_COMPAT_TARGET)),)
+BUILD_FBC_COMPAT_DEFINES += -d __FB_AARCH64__
+endif
+ifneq ($(filter riscv64 linux-riscv64,$(BUILD_FBC_COMPAT_TARGET)),)
+BUILD_FBC_COMPAT_DEFINES += -d __FB_RISCV64__
+endif
+ifneq ($(filter s390x linux-s390x,$(BUILD_FBC_COMPAT_TARGET)),)
+BUILD_FBC_COMPAT_DEFINES += -d __FB_S390X__
+endif
+ifneq ($(filter loongarch64 linux-loongarch64,$(BUILD_FBC_COMPAT_TARGET)),)
+BUILD_FBC_COMPAT_DEFINES += -d __FB_LOONGARCH64__
+endif
+
 BUILD_FBCFLAGS ?=
 
 $(fbcobjdir)/%.o: $(srcdir)/compiler/%.bas $(FBC_BI) | $(fbcobjdir)
 	@mkdir -p "$(dir $@)"
-	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) -i $(rootdir)/inc -c $< -o $@
+	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) -i $(rootdir)/inc -c $< -o $@
 
 ##############################################################################
 # rtlib (C runtime)
