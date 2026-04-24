@@ -1,9 +1,30 @@
 #ifndef __FB_BI__
 #define __FB_BI__
 
-const FB_VER_MAJOR  = "1"
-const FB_VER_MINOR  = "20"
-const FB_VER_PATCH  = "0"
+#ifdef BUILD_FB_VER_MAJOR
+const FB_VER_MAJOR = str(BUILD_FB_VER_MAJOR)
+#else
+const FB_VER_MAJOR = "1"
+#endif
+
+#ifdef BUILD_FB_VER_MINOR
+const FB_VER_MINOR = str(BUILD_FB_VER_MINOR)
+#else
+const FB_VER_MINOR = "20"
+#endif
+
+#ifdef BUILD_FB_VER_PATCH
+const FB_VER_PATCH = str(BUILD_FB_VER_PATCH)
+#else
+const FB_VER_PATCH = "0"
+#endif
+
+#ifdef BUILD_FB_REV
+const FB_REV = BUILD_FB_REV
+#else
+const FB_REV = 0
+#endif
+
 const FB_VERSION    = FB_VER_MAJOR + "." + FB_VER_MINOR + "." + FB_VER_PATCH
 const FB_BUILD_DATE = __DATE__
 const FB_BUILD_DATE_ISO = __DATE_ISO__

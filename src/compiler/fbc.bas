@@ -4757,8 +4757,12 @@ end sub
 
 private sub hPrintVersion( byval verbose as integer )
 	dim as string config
+	dim as string version = FB_VERSION
+	if( FB_REV > 0 ) then
+		version += "-" + str(FB_REV)
+	end if
 
-	print "FreeBASIC Compiler - Version " + FB_VERSION + _
+	print "FreeBASIC Compiler - Version " + version + _
 		" (" + FB_BUILD_DATE_ISO + "), built for " + fbGetHostId( ) + " (" & fbGetHostBits( ) & "bit)"
 	print "Copyright (C) 2004-2025 The FreeBASIC development team."
 
