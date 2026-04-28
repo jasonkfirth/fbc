@@ -8,6 +8,7 @@
 #include "../fb_sfx.h"
 #include "../fb_sfx_driver.h"
 
+#include <stddef.h>
 #include <emscripten.h>
 
 EM_JS(int, fb_sfx_js_webaudio_init, (int rate, int channels, int buffer_frames), {
