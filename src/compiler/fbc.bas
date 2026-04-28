@@ -968,13 +968,53 @@ private function hLinkFiles( ) as integer
 			case FB_COMPTARGET_LINUX
 				select case( fbGetCpuFamily( ) )
 				case FB_CPUFAMILY_X86
+					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+						ldcline += " -dynamic-linker /lib/ld-musl-i386.so.1"
+					#else
 					ldcline += " -dynamic-linker /lib/ld-linux.so.2"
+					#endif
 				case FB_CPUFAMILY_X86_64
+					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+						ldcline += " -dynamic-linker /lib/ld-musl-x86_64.so.1"
+					#else
 					ldcline += " -dynamic-linker /lib64/ld-linux-x86-64.so.2"
+					#endif
 				case FB_CPUFAMILY_ARM
+					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+						ldcline += " -dynamic-linker /lib/ld-musl-armhf.so.1"
+					#else
 					ldcline += " -dynamic-linker /lib/ld-linux-armhf.so.3"
+					#endif
 				case FB_CPUFAMILY_AARCH64
+					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+						ldcline += " -dynamic-linker /lib/ld-musl-aarch64.so.1"
+					#else
 					ldcline += " -dynamic-linker /lib/ld-linux-aarch64.so.1"
+					#endif
+				case FB_CPUFAMILY_PPC
+					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+						ldcline += " -dynamic-linker /lib/ld-musl-powerpc.so.1"
+					#endif
+				case FB_CPUFAMILY_PPC64
+					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+						ldcline += " -dynamic-linker /lib/ld-musl-powerpc64.so.1"
+					#endif
+				case FB_CPUFAMILY_PPC64LE
+					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+						ldcline += " -dynamic-linker /lib/ld-musl-powerpc64le.so.1"
+					#endif
+				case FB_CPUFAMILY_RISCV64
+					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+						ldcline += " -dynamic-linker /lib/ld-musl-riscv64.so.1"
+					#endif
+				case FB_CPUFAMILY_S390X
+					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+						ldcline += " -dynamic-linker /lib/ld-musl-s390x.so.1"
+					#endif
+				case FB_CPUFAMILY_LOONGARCH64
+					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+						ldcline += " -dynamic-linker /lib/ld-musl-loongarch64.so.1"
+					#endif
 				end select
 			case FB_COMPTARGET_HAIKU
 				ldcline += " -shared -no-undefined"

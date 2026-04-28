@@ -27,6 +27,14 @@ freebasic (1.20.1-1) jammy; urgency=medium
     1.20 forward-port validation work.
   * Fix Linux sfxlib CAPTURE SAVE so buffered recordings can be written
     successfully on real hardware.
+  * Fix Alpine package smoke binaries by building musl-targeted compilers
+    that emit the musl dynamic loader path instead of glibc loader paths.
+  * Quiet ALSA library probe diagnostics during normal sfxlib backend
+    fallback while preserving them when sfxlib debug environment variables
+    are enabled.
+  * Tighten Linux package sfxlib smoke tests so they still fail on stderr
+    while reporting the active output driver, including null fallback in
+    no-audio Docker containers.
   * Fix Unix console query hangs that could block example output in
     non-responding terminal sessions.
   * Rework the DOS package builder so build_scripts/msdos-build-freebasic.sh

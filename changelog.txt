@@ -25,6 +25,10 @@ Version 1.20.1
 - Linux/sfxlib: ensure capture backends are shut down during runtime teardown instead of only clearing the capture state buffer
 - Linux/sfxlib: avoid a PulseAudio lock stall where the Linux worker could keep the runtime lock while feeding silent output, blocking control commands such as DEVICE SELECT
 - Linux/sfxlib: make CAPTURE SAVE use the buffered capture path and actual capture format so saved recordings succeed on real hardware
+- Linux/sfxlib: suppress ALSA probe diagnostics during normal backend fallback while preserving the ALSA messages when sfxlib debug environment variables are enabled
+- Linux/sfxlib: keep package smoke tests strict about stderr while reporting the active sfxlib output driver, making null-driver fallback visible in no-audio Docker containers
+- Linux/gfxlib: run package smoke-test binaries even in headless containers, accepting expected display startup failures while still failing on loader and linker errors
+- Linux/Alpine: build musl-targeted compilers so linked programs use the musl dynamic loader instead of glibc loader paths
 - rtlib/unix: avoid indefinite terminal query hangs when console size rechecks are attempted in sessions that do not answer the escape-sequence query
 - compatibility: replace the old 1.10.4-specific sfxlib exit registration with a 1.20-compatible atexit() based hook
 - DOS/build: fixed the Linux-hosted DOS packaging and smoke-test path so the build script stages the runtime layout expected by DOS and host-side cross-linking, rebuilds the DOS compiler/runtime reliably, and packages the finished distribution from out/msdos

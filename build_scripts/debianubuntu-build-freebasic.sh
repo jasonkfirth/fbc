@@ -75,6 +75,10 @@ Environment:
   BUILDROOT       Temporary build root (default: <repo>/.build-debianubuntu)
   WORKDIR         Workspace for bootstrap/package preparation
   OUTBASE         Output root (default: <repo>/out)
+  FBC_PACKAGE_OUTDIR
+                  Full package output directory override
+  FBC_PACKAGE_ARM_ARCH
+                  ARM default arch override for package builds (armv6+fp)
   JOBS            Parallel make job count for bootstrap generation
 
 Artifacts are written under:
@@ -180,6 +184,22 @@ esac
 
 BOOTSTRAP_TAR="FreeBASIC-${VERSION}-source-bootstrap-${BOOTKEY}.tar.xz"
 
+ARM_MAKE_ARGS=()
+case "${FBC_PACKAGE_ARM_ARCH:-}" in
+    "")
+        ;;
+    armv6+fp)
+        ARM_MAKE_ARGS=(
+            ARM_VER=v6
+            ARM_FLOAT_ABI=hf
+            DEFAULT_CPUTYPE_ARM=FB_CPUTYPE_ARMV6_FP
+        )
+        ;;
+    *)
+        die "unsupported FBC_PACKAGE_ARM_ARCH: $FBC_PACKAGE_ARM_ARCH"
+        ;;
+esac
+
 DISTRO_ID=""
 CODENAME=""
 if [ -f /etc/os-release ]; then
@@ -208,7 +228,7 @@ if [ -n "${FBC_PACKAGE_CODENAME:-}" ]; then
     CODENAME="$FBC_PACKAGE_CODENAME"
 fi
 
-OUTDIR="${OUTBASE}/linux/${DISTRO_ID}/${CODENAME}/${ARCH}"
+OUTDIR="${FBC_PACKAGE_OUTDIR:-${OUTBASE}/linux/${DISTRO_ID}/${CODENAME}/${ARCH}}"
 
 mkdir -p "$WORKDIR" "$OUTDIR"
 
@@ -269,6 +289,7 @@ build_bootstrap_tarball() {
     run "$MAKE_CMD" \
         FBC_TARGET="$FBC_TARGET" \
         FBTARGET_DIR_OVERRIDE="$BOOTKEY" \
+        "${ARM_MAKE_ARGS[@]}" \
         bootstrap-dist-target \
         -j"$JOBS"
 
@@ -348,6 +369,7 @@ package_current_target() {
     echo "==> package name: $pkgname"
     echo "==> upstream version: $upver"
     echo "==> output dir: $OUTDIR"
+    [ -z "${FBC_PACKAGE_ARM_ARCH:-}" ] || echo "==> ARM default arch: $FBC_PACKAGE_ARM_ARCH"
 
     cd "$BUILDDIR"
 

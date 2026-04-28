@@ -22,6 +22,7 @@ PARMAKE := $(MAKE) -j$(JOBS)
 MULTILIB :=
 TARGET_TRIPLET :=
 BOOTSTRAP_DIR_KEY :=
+ARM_CPU_MAKE_ARGS :=
 
 ifeq ($(DEB_HOST_ARCH),amd64)
 TARGET_TRIPLET := x86_64-linux-gnu
@@ -42,6 +43,12 @@ endif
 ifeq ($(DEB_HOST_ARCH),armhf)
 TARGET_TRIPLET := arm-linux-gnueabihf
 BOOTSTRAP_DIR_KEY := linux-armhf
+endif
+
+ifeq ($(DEB_HOST_ARCH),armhf)
+ifeq ($(FBC_PACKAGE_ARM_ARCH),armv6+fp)
+ARM_CPU_MAKE_ARGS := ARM_VER=v6 ARM_FLOAT_ABI=hf DEFAULT_CPUTYPE_ARM=FB_CPUTYPE_ARMV6_FP
+endif
 endif
 
 ifeq ($(DEB_HOST_ARCH),armel)
@@ -144,6 +151,7 @@ override_dh_auto_build:
 	rm -f contrib/swig/swig.exe
 
 	$(MAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
+		$(ARM_CPU_MAKE_ARGS) \
 		CPPFLAGS="$(CPPFLAGS)" \
 		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CXXFLAGS)" \
@@ -153,6 +161,7 @@ override_dh_auto_build:
 	@test -x bin/fbc || { echo "ERROR: bootstrap compiler missing"; exit 1; }
 
 	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
+		$(ARM_CPU_MAKE_ARGS) \
 		rtlib fbrt gfxlib2 sfxlib \
 		FBC="$(FBC_BOOTSTRAP)" \
 		BUILD_FBC_TARGET="$(BOOTSTRAP_DIR_KEY)" \
@@ -162,6 +171,7 @@ override_dh_auto_build:
 		LDFLAGS="$(LDFLAGS)"
 
 	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
+		$(ARM_CPU_MAKE_ARGS) \
 		compiler \
 		FBC="$(FBC_BOOTSTRAP)" \
 		BUILD_FBC_TARGET="$(BOOTSTRAP_DIR_KEY)" \
@@ -177,6 +187,7 @@ override_dh_auto_build:
 override_dh_auto_install:
 
 	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" install \
+		$(ARM_CPU_MAKE_ARGS) \
 		DESTDIR=$(CURDIR)/debian/tmp \
 		prefix=/usr \
 		FBC="$(FBC_BOOTSTRAP)" \

@@ -361,6 +361,12 @@ ifdef ENABLE_STANDALONE
 BASE_FBCFLAGS += -d ENABLE_STANDALONE
 endif
 
+ifeq ($(TARGET_OS),linux)
+  ifneq ($(findstring musl,$(TARGET_TRIPLET_LC)),)
+    BASE_FBCFLAGS += -d ENABLE_MUSL_DYNAMIC_LINKER
+  endif
+endif
+
 
 ##############################################################################
 # Toolchain quirks

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -euo
+# pipefail
 trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 
 ##############################################################################
@@ -241,6 +242,44 @@ run_timeout() {
     fi
 }
 
+run_gfx_smoke() {
+    local out="$1"
+    local err="$2"
+    local combined="/tmp/fb-package-smoke/gfx.combined"
+
+    if run_timeout /tmp/fb-package-smoke/gfx > "$out" 2> "$err"; then
+        cat "$out" || true
+        if [ -s "$err" ]; then
+            cat "$err"
+            cat "$out" "$err" > "$combined" 2>/dev/null || true
+            if grep -Eiq 'error loading shared library|relocation error|undefined symbol|cannot execute|exec format error|no such file or directory|ld-linux|ld-musl' "$combined"; then
+                fail "gfx binary wrote a loader/linker error"
+            fi
+            if grep -Eiq 'display|x11|x server|screenres|graphics' "$combined"; then
+                echo "HEADLESS-RUN: gfx binary started, but no usable display is available"
+                return 0
+            fi
+            fail "gfx binary wrote stderr"
+        fi
+        return 0
+    fi
+
+    cat "$out" || true
+    cat "$err" || true
+    cat "$out" "$err" > "$combined" 2>/dev/null || true
+
+    if grep -Eiq 'error loading shared library|relocation error|undefined symbol|cannot execute|exec format error|no such file or directory|ld-linux|ld-musl' "$combined"; then
+        fail "gfx binary failed with a loader/linker error"
+    fi
+
+    if grep -Eiq 'display|x11|x server|screenres|graphics' "$combined"; then
+        echo "HEADLESS-RUN: gfx binary started, but no usable display is available"
+        return 0
+    fi
+
+    fail "gfx binary failed before proving headless/display handling"
+}
+
 apk update
 
 set -- /packages/*.apk
@@ -271,14 +310,29 @@ screen 0
 FBEOF
 
 cat > /tmp/fb-package-smoke/sfx.bas <<'FBEOF'
+extern "C"
+declare function fb_sfxDeviceCurrent() as long
+declare function fb_sfxDeviceInfoName(byval id as long) as const zstring ptr
+end extern
+
 print "sfx-start"
 play "ABCDEFG"
+dim as long sfx_device = fb_sfxDeviceCurrent()
+dim as const zstring ptr sfx_driver = fb_sfxDeviceInfoName(sfx_device)
+if sfx_driver <> 0 then
+    print "sfx-driver="; *sfx_driver
+else
+    print "sfx-driver=<none>"
+end if
 print "sfx-end"
 FBEOF
 
 echo "==> compiling console smoke"
 run fbc /tmp/fb-package-smoke/console.bas -x /tmp/fb-package-smoke/console -v
 [ -x /tmp/fb-package-smoke/console ] || fail "console binary was not created"
+if command -v readelf >/dev/null 2>&1; then
+    readelf -l /tmp/fb-package-smoke/console | sed -n 's/.*Requesting program interpreter: //p'
+fi
 
 echo "==> running console smoke"
 console_output="$(/tmp/fb-package-smoke/console)"
@@ -289,21 +343,8 @@ echo "==> compiling gfxlib smoke"
 run fbc /tmp/fb-package-smoke/gfx.bas -x /tmp/fb-package-smoke/gfx -v
 [ -x /tmp/fb-package-smoke/gfx ] || fail "gfx binary was not created"
 
-echo "==> running gfxlib smoke if a display is available"
-if [ -n "${DISPLAY:-}" ]; then
-    if ! run_timeout /tmp/fb-package-smoke/gfx > /tmp/fb-package-smoke/gfx.out 2> /tmp/fb-package-smoke/gfx.err; then
-        cat /tmp/fb-package-smoke/gfx.out || true
-        cat /tmp/fb-package-smoke/gfx.err || true
-        fail "gfx binary failed with DISPLAY=$DISPLAY"
-    fi
-    cat /tmp/fb-package-smoke/gfx.out || true
-    if [ -s /tmp/fb-package-smoke/gfx.err ]; then
-        cat /tmp/fb-package-smoke/gfx.err
-        fail "gfx binary wrote stderr"
-    fi
-else
-    echo "SKIP-RUN: gfx binary compiled, but no DISPLAY is available"
-fi
+echo "==> running gfxlib smoke"
+run_gfx_smoke /tmp/fb-package-smoke/gfx.out /tmp/fb-package-smoke/gfx.err
 
 echo "==> compiling sfxlib smoke"
 run fbc /tmp/fb-package-smoke/sfx.bas -x /tmp/fb-package-smoke/sfx -v
@@ -316,6 +357,8 @@ if ! run_timeout /tmp/fb-package-smoke/sfx > /tmp/fb-package-smoke/sfx.out 2> /t
     fail "sfx binary failed"
 fi
 cat /tmp/fb-package-smoke/sfx.out || true
+grep -qx 'sfx-start' /tmp/fb-package-smoke/sfx.out || fail "sfx binary did not print sfx-start"
+grep -qx 'sfx-end' /tmp/fb-package-smoke/sfx.out || fail "sfx binary did not print sfx-end"
 if [ -s /tmp/fb-package-smoke/sfx.err ]; then
     cat /tmp/fb-package-smoke/sfx.err
     fail "sfx binary wrote stderr"

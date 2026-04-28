@@ -55,7 +55,7 @@ usage() {
 Usage: ./build_scripts/debianubuntu-build-freebasic-matrix.sh [options]
 
 Options:
-  --distro NAME     Limit the matrix to one distro family (for now: debian, ubuntu)
+  --distro NAME     Limit the matrix to one distro family (debian, ubuntu, raspbian)
   --arch ARCH       Limit the matrix to one Debian-style CPU arch (amd64, arm64, ...)
   --jobs N          Maximum make jobs for native Docker builds
   --keep-going      Continue after per-entry failures
@@ -64,7 +64,9 @@ Options:
   --list            Show the currently configured distro targets
   --help            Show this help text
 
-This script is the Debian/Ubuntu Linux package matrix driver.
+This script is the Debian/Ubuntu/Raspbian Linux package matrix driver.
+Raspbian-only builds can be run with:
+  ./build_scripts/debianubuntu-build-freebasic-matrix.sh --distro raspbian
 EOF
 }
 
@@ -108,6 +110,10 @@ done
 case "$MAKE_JOBS" in
     ''|*[!0-9]*|0) die "--jobs must be a positive integer" ;;
 esac
+
+if [ "$DISTRO_FILTER" = "raspbian" ] && [ -n "$ARCH_FILTER" ] && [ "$ARCH_FILTER" != "armhf" ]; then
+    die "raspbian targets are armhf only"
+fi
 
 ##############################################################################
 # Tooling
@@ -224,17 +230,38 @@ bootstrap_mapping() {
 
 build_bootstrap_for_arch() {
     local debarch="$1"
+    local arm_arch="${2:-}"
     local fbc_target
     local dir_key
     local pkg
+    local extra_make_args=()
 
     read -r fbc_target dir_key <<EOF
 $(bootstrap_mapping "$debarch")
 EOF
 
+    case "$arm_arch" in
+        "")
+            ;;
+        armv6+fp)
+            extra_make_args=(
+                ARM_VER=v6
+                ARM_FLOAT_ABI=hf
+                DEFAULT_CPUTYPE_ARM=FB_CPUTYPE_ARMV6_FP
+            )
+            ;;
+        *)
+            die "unsupported ARM bootstrap arch override: $arm_arch"
+            ;;
+    esac
+
     pkg="FreeBASIC-${VERSION}-source-bootstrap-${dir_key}.tar.xz"
 
-    msg "building source bootstrap tarball for $debarch"
+    if [ -n "$arm_arch" ]; then
+        msg "building source bootstrap tarball for $debarch ($arm_arch)"
+    else
+        msg "building source bootstrap tarball for $debarch"
+    fi
 
     rm -f "$pkg"
     rm -rf "bootstrap/${dir_key}"
@@ -243,6 +270,7 @@ EOF
     run "$MAKE_CMD" \
         FBC_TARGET="$fbc_target" \
         FBTARGET_DIR_OVERRIDE="$dir_key" \
+        "${extra_make_args[@]}" \
         bootstrap-dist-target \
         -j"$MAKE_JOBS"
 
@@ -262,16 +290,23 @@ LINUX_ARCHES=(
     riscv64
 )
 
+RASPBIAN_ARCHES=(
+    armhf
+)
+
 DISTRO_TARGETS=(
-    "ubuntu|22.04|jammy|debianubuntu-build-freebasic.sh"
-    "ubuntu|24.04|noble|debianubuntu-build-freebasic.sh"
-    "ubuntu|24.10|oracular|debianubuntu-build-freebasic.sh"
-    "ubuntu|25.04|plucky|debianubuntu-build-freebasic.sh"
-    "ubuntu|25.10|questing|debianubuntu-build-freebasic.sh"
-    "ubuntu|26.04|resolute|debianubuntu-build-freebasic.sh"
-    "debian|12|bookworm|debianubuntu-build-freebasic.sh"
-    "debian|13|trixie|debianubuntu-build-freebasic.sh"
-    "debian|sid|sid|debianubuntu-build-freebasic.sh"
+    "ubuntu|ubuntu:22.04|22.04|jammy|debianubuntu-build-freebasic.sh"
+    "ubuntu|ubuntu:24.04|24.04|noble|debianubuntu-build-freebasic.sh"
+    "ubuntu|ubuntu:24.10|24.10|oracular|debianubuntu-build-freebasic.sh"
+    "ubuntu|ubuntu:25.04|25.04|plucky|debianubuntu-build-freebasic.sh"
+    "ubuntu|ubuntu:25.10|25.10|questing|debianubuntu-build-freebasic.sh"
+    "ubuntu|ubuntu:26.04|26.04|resolute|debianubuntu-build-freebasic.sh"
+    "debian|debian:12|12|bookworm|debianubuntu-build-freebasic.sh"
+    "debian|debian:13|13|trixie|debianubuntu-build-freebasic.sh"
+    "debian|debian:sid|sid|sid|debianubuntu-build-freebasic.sh"
+    "raspbian|badaix/raspios-lite:trixie|trixie|trixie|debianubuntu-build-freebasic.sh"
+    "raspbian|badaix/raspios-lite:bookworm|bookworm|bookworm|debianubuntu-build-freebasic.sh"
+    "raspbian|badaix/raspios-buster-armhf-lite:latest|buster|buster|debianubuntu-build-freebasic.sh"
 )
 
 docker_platform_for_arch() {
@@ -323,16 +358,63 @@ make_jobs_for_platform() {
     fi
 }
 
+target_arches() {
+    local distro="$1"
+
+    case "$distro" in
+        raspbian)
+            printf '%s\n' "${RASPBIAN_ARCHES[@]}"
+            ;;
+        *)
+            printf '%s\n' "${LINUX_ARCHES[@]}"
+            ;;
+    esac
+}
+
+host_outdir_for_target() {
+    local distro="$1"
+    local codename="$2"
+    local arch="$3"
+
+    case "$distro" in
+        raspbian) echo "$ROOT/out/raspbian/${codename}/${arch}" ;;
+        *) echo "$ROOT/out/linux/${distro}/${codename}/${arch}" ;;
+    esac
+}
+
+container_outdir_for_target() {
+    local distro="$1"
+    local codename="$2"
+    local arch="$3"
+
+    case "$distro" in
+        raspbian) echo "/work/out/raspbian/${codename}/${arch}" ;;
+        *) echo "/work/out/linux/${distro}/${codename}/${arch}" ;;
+    esac
+}
+
+arm_arch_for_target() {
+    local distro="$1"
+    local arch="$2"
+
+    if [ "$distro" = "raspbian" ] && [ "$arch" = "armhf" ]; then
+        echo "armv6+fp"
+    fi
+}
+
 ##############################################################################
 # Listing
 ##############################################################################
 
 if [ "$LIST_ONLY" -eq 1 ]; then
     for entry in "${DISTRO_TARGETS[@]}"; do
-        IFS="|" read -r distro tag codename script_name <<EOF
+        IFS="|" read -r distro image tag codename script_name <<EOF
 $entry
 EOF
-        echo "${distro}|${tag}|${codename}|${script_name}"
+        if [ -n "$DISTRO_FILTER" ] && [ "$DISTRO_FILTER" != "$distro" ]; then
+            continue
+        fi
+        echo "${distro}|${image}|${tag}|${codename}|${script_name}"
     done
     exit 0
 fi
@@ -350,16 +432,28 @@ need_cmd "$MAKE_CMD"
 
 run_root docker run --rm --privileged tonistiigi/binfmt --install all
 
-mkdir -p out/linux
+mkdir -p out/linux out/raspbian
 HOST_PLATFORM="$(host_docker_platform)"
 echo "==> host Docker platform: $HOST_PLATFORM"
 echo "==> native make jobs: $MAKE_JOBS"
+
+RASPBIAN_BOOTSTRAP_READY=0
 
 if [ "$SKIP_BOOTSTRAP" -eq 0 ]; then
     ensure_host_compiler
 
     if [ -n "$ARCH_FILTER" ]; then
-        build_bootstrap_for_arch "$ARCH_FILTER"
+        if [ "$DISTRO_FILTER" = "raspbian" ]; then
+            build_bootstrap_for_arch "$ARCH_FILTER" "$(arm_arch_for_target "$DISTRO_FILTER" "$ARCH_FILTER")"
+            RASPBIAN_BOOTSTRAP_READY=1
+        else
+            build_bootstrap_for_arch "$ARCH_FILTER"
+        fi
+    elif [ "$DISTRO_FILTER" = "raspbian" ]; then
+        for debarch in "${RASPBIAN_ARCHES[@]}"; do
+            build_bootstrap_for_arch "$debarch" "$(arm_arch_for_target "$DISTRO_FILTER" "$debarch")"
+        done
+        RASPBIAN_BOOTSTRAP_READY=1
     else
         for debarch in "${LINUX_ARCHES[@]}"; do
             build_bootstrap_for_arch "$debarch"
@@ -374,16 +468,18 @@ fi
 build_one() {
     local entry="$1"
     local distro
+    local image
     local tag
     local codename
     local script_name
     local arch
     local platform
-    local image
     local outdir
+    local container_outdir
+    local arm_arch
     local build_jobs
 
-    IFS="|" read -r distro tag codename script_name arch <<EOF
+    IFS="|" read -r distro image tag codename script_name arch <<EOF
 $entry
 EOF
 
@@ -397,16 +493,23 @@ EOF
 
     platform="$(docker_platform_for_arch "$arch")"
     build_jobs="$(make_jobs_for_platform "$platform" "$HOST_PLATFORM")"
-    image="${distro}:${tag}"
-    outdir="$ROOT/out/linux/${distro}/${codename}/${arch}"
+    outdir="$(host_outdir_for_target "$distro" "$codename" "$arch")"
+    container_outdir="$(container_outdir_for_target "$distro" "$codename" "$arch")"
+    arm_arch="$(arm_arch_for_target "$distro" "$arch")"
 
     mkdir -p "$outdir"
+
+    if [ -n "$arm_arch" ] && [ "$SKIP_BOOTSTRAP" -eq 0 ] && [ "$RASPBIAN_BOOTSTRAP_READY" -eq 0 ]; then
+        build_bootstrap_for_arch "$arch" "$arm_arch"
+        RASPBIAN_BOOTSTRAP_READY=1
+    fi
 
     echo
     echo "============================================================"
     echo "Building ${distro}/${codename} (${arch})"
     echo "Docker image: ${image}"
     echo "Docker platform: ${platform}"
+    [ -z "$arm_arch" ] || echo "ARM default arch: ${arm_arch}"
     echo "Make jobs: ${build_jobs}"
     echo "Script: build_scripts/${script_name}"
     echo "============================================================"
@@ -418,6 +521,8 @@ EOF
             -e DEBIAN_FRONTEND=noninteractive \
             -e FBC_PACKAGE_DISTRO_ID="$distro" \
             -e FBC_PACKAGE_CODENAME="$codename" \
+            -e FBC_PACKAGE_OUTDIR="$container_outdir" \
+            -e FBC_PACKAGE_ARM_ARCH="$arm_arch" \
             -e BUILDROOT="/work/.build-debianubuntu/${distro}/${codename}/${arch}" \
             -e JOBS="$build_jobs" \
             -v "$ROOT:/work" \
@@ -448,7 +553,7 @@ entry_matches_filters() {
     local script_name
     local arch
 
-    IFS="|" read -r distro tag codename script_name arch <<EOF
+    IFS="|" read -r distro _ tag codename script_name arch <<EOF
 $entry
 EOF
 
@@ -466,13 +571,13 @@ EOF
 BUILD_MATRIX=()
 
 for distro_entry in "${DISTRO_TARGETS[@]}"; do
-    IFS="|" read -r distro tag codename script_name <<EOF
+    IFS="|" read -r distro image tag codename script_name <<EOF
 $distro_entry
 EOF
 
-    for arch in "${LINUX_ARCHES[@]}"; do
-        BUILD_MATRIX+=("${distro}|${tag}|${codename}|${script_name}|${arch}")
-    done
+    while IFS= read -r arch; do
+        BUILD_MATRIX+=("${distro}|${image}|${tag}|${codename}|${script_name}|${arch}")
+    done < <(target_arches "$distro")
 done
 
 failures=0
@@ -493,7 +598,7 @@ if [ "$failures" -ne 0 ]; then
     echo "============================================================"
     echo "LINUX BUILDS FINISHED WITH FAILURES: $failures"
     echo "============================================================"
-    ls -R out/linux
+    ls -R out/linux out/raspbian 2>/dev/null || true
     exit 1
 fi
 
@@ -502,4 +607,4 @@ echo "============================================================"
 echo "ALL LINUX BUILDS FINISHED"
 echo "============================================================"
 
-ls -R out/linux
+ls -R out/linux out/raspbian 2>/dev/null || true

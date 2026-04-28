@@ -24,10 +24,36 @@ static snd_pcm_t *alsa_pcm = NULL;
 static int alsa_initialized = 0;
 static int alsa_debug_write_counter = 0;
 
+static int alsa_env_enabled(const char *name)
+{
+    const char *e = getenv(name);
+    return (e && *e && *e != '0');
+}
+
 static int alsa_debug_enabled(void)
 {
-    const char *e = getenv("SFXLIB_ALSA_DEBUG");
-    return (e && *e && *e != '0');
+    return alsa_env_enabled("SFXLIB_ALSA_DEBUG");
+}
+
+static int alsa_probe_noise_enabled(void)
+{
+    return alsa_env_enabled("SFXLIB_DEBUG") ||
+           alsa_env_enabled("SFXLIB_LINUX_DEBUG") ||
+           alsa_env_enabled("SFXLIB_ALSA_DEBUG");
+}
+
+static void alsa_silent_error_handler(const char *file,
+                                      int line,
+                                      const char *function,
+                                      int err,
+                                      const char *fmt,
+                                      ...)
+{
+    (void)file;
+    (void)line;
+    (void)function;
+    (void)err;
+    (void)fmt;
 }
 
 #define ALSA_DBG(...) \
@@ -72,7 +98,9 @@ static float alsa_buffer_peak(const float *buffer, int samples)
 static int alsa_driver_init(int rate, int channels, int buffer_frames, int flags)
 {
     int err;
+    int quiet_errors;
     snd_pcm_hw_params_t *params;
+    snd_lib_error_handler_t previous_error_handler = NULL;
     unsigned int actual_rate;
     snd_pcm_uframes_t actual_buffer_frames;
     int dir = 0;
@@ -94,9 +122,18 @@ static int alsa_driver_init(int rate, int channels, int buffer_frames, int flags
 
     ALSA_DBG("initializing ALSA driver\n");
 
+    quiet_errors = !alsa_probe_noise_enabled();
+    if (quiet_errors)
+    {
+        previous_error_handler = snd_lib_error;
+        snd_lib_error_set_handler(alsa_silent_error_handler);
+    }
+
     err = snd_pcm_open(&alsa_pcm, "default", SND_PCM_STREAM_PLAYBACK, 0);
     if (err < 0)
     {
+        if (quiet_errors)
+            snd_lib_error_set_handler(previous_error_handler);
         ALSA_DBG("snd_pcm_open failed: %s\n", snd_strerror(err));
         return -1;
     }
@@ -113,6 +150,8 @@ static int alsa_driver_init(int rate, int channels, int buffer_frames, int flags
     err = snd_pcm_hw_params(alsa_pcm, params);
     if (err < 0)
     {
+        if (quiet_errors)
+            snd_lib_error_set_handler(previous_error_handler);
         ALSA_DBG("snd_pcm_hw_params failed: %s\n", snd_strerror(err));
         snd_pcm_close(alsa_pcm);
         alsa_pcm = NULL;
@@ -125,10 +164,15 @@ static int alsa_driver_init(int rate, int channels, int buffer_frames, int flags
                             fb_sfx_linux.channels,
                             (int)actual_buffer_frames) != 0)
     {
+        if (quiet_errors)
+            snd_lib_error_set_handler(previous_error_handler);
         snd_pcm_close(alsa_pcm);
         alsa_pcm = NULL;
         return -1;
     }
+
+    if (quiet_errors)
+        snd_lib_error_set_handler(previous_error_handler);
 
     alsa_initialized = 1;
     alsa_debug_write_counter = 0;
