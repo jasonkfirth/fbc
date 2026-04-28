@@ -412,53 +412,59 @@ end enum
 #if defined(__FB_WIN32__)
 const FB_HOST_EXEEXT        = ".exe"
 const FB_HOST_PATHDIV       = RSLASH
-const FB_DEFAULT_TARGET     = FB_COMPTARGET_WIN32
+const FB_HOST_DEFAULT_TARGET = FB_COMPTARGET_WIN32
 #elseif defined(__FB_CYGWIN__)
 const FB_HOST_EXEEXT        = ".exe"
 const FB_HOST_PATHDIV       = "/"
-const FB_DEFAULT_TARGET     = FB_COMPTARGET_CYGWIN
+const FB_HOST_DEFAULT_TARGET = FB_COMPTARGET_CYGWIN
 #elseif defined(__FB_LINUX__)
 const FB_HOST_EXEEXT        = ""
 const FB_HOST_PATHDIV       = "/"
-const FB_DEFAULT_TARGET     = FB_COMPTARGET_LINUX
+const FB_HOST_DEFAULT_TARGET = FB_COMPTARGET_LINUX
 #elseif defined(__FB_HAIKU__)
 const FB_HOST_EXEEXT        = ""
 const FB_HOST_PATHDIV       = "/"
-const FB_DEFAULT_TARGET     = FB_COMPTARGET_HAIKU
+const FB_HOST_DEFAULT_TARGET = FB_COMPTARGET_HAIKU
 #elseif defined(__FB_DOS__)
 const FB_HOST_EXEEXT        = ".exe"
 const FB_HOST_PATHDIV       = RSLASH
-const FB_DEFAULT_TARGET     = FB_COMPTARGET_DOS
+const FB_HOST_DEFAULT_TARGET = FB_COMPTARGET_DOS
 #elseif defined(__FB_FREEBSD__)
 const FB_HOST_EXEEXT        = ""
 const FB_HOST_PATHDIV       = "/"
-const FB_DEFAULT_TARGET     = FB_COMPTARGET_FREEBSD
+const FB_HOST_DEFAULT_TARGET = FB_COMPTARGET_FREEBSD
 #elseif defined(__FB_DRAGONFLY__)
 const FB_HOST_EXEEXT        = ""
 const FB_HOST_PATHDIV       = "/"
-const FB_DEFAULT_TARGET     = FB_COMPTARGET_DRAGONFLY
+const FB_HOST_DEFAULT_TARGET = FB_COMPTARGET_DRAGONFLY
 #elseif defined(__FB_SOLARIS__)
 const FB_HOST_EXEEXT        = ""
 const FB_HOST_PATHDIV       = "/"
-const FB_DEFAULT_TARGET     = FB_COMPTARGET_SOLARIS
+const FB_HOST_DEFAULT_TARGET = FB_COMPTARGET_SOLARIS
 #elseif defined(__FB_OPENBSD__)
 const FB_HOST_EXEEXT        = ""
 const FB_HOST_PATHDIV       = "/"
-const FB_DEFAULT_TARGET     = FB_COMPTARGET_OPENBSD
+const FB_HOST_DEFAULT_TARGET = FB_COMPTARGET_OPENBSD
 #elseif defined(__FB_DARWIN__)
 const FB_HOST_EXEEXT        = ""
 const FB_HOST_PATHDIV       = "/"
-const FB_DEFAULT_TARGET     = FB_COMPTARGET_DARWIN
+const FB_HOST_DEFAULT_TARGET = FB_COMPTARGET_DARWIN
 #elseif defined(__FB_NETBSD__)
 const FB_HOST_EXEEXT        = ""
 const FB_HOST_PATHDIV       = "/"
-const FB_DEFAULT_TARGET     = FB_COMPTARGET_NETBSD
+const FB_HOST_DEFAULT_TARGET = FB_COMPTARGET_NETBSD
 #elseif defined(__FB_ANDROID__)
 const FB_HOST_EXEEXT        = ""
 const FB_HOST_PATHDIV       = "/"
-const FB_DEFAULT_TARGET     = FB_COMPTARGET_ANDROID
+const FB_HOST_DEFAULT_TARGET = FB_COMPTARGET_ANDROID
 #else
 #error Unsupported host
+#endif
+
+#ifdef BUILD_FB_DEFAULT_TARGET
+const FB_DEFAULT_TARGET     = BUILD_FB_DEFAULT_TARGET
+#else
+const FB_DEFAULT_TARGET     = FB_HOST_DEFAULT_TARGET
 #endif
 
 '' __FB_X86__ is new, so we need to support compiling with older fbc that didn't have it
@@ -546,9 +552,18 @@ const FB_DEFAULT_CPUTYPE_ASMJS   = FB_CPUTYPE_ASMJS
 	const FB_DEFAULT_BACKEND = FB_BACKEND_GAS
 #endif
 
-#ifdef __FB_64BIT__
+#ifdef BUILD_FB_DEFAULT_CPUTYPE
+	#ifdef __FB_64BIT__
+		const FB_HOST_DEFAULT_CPUTYPE = FB_DEFAULT_CPUTYPE64
+	#else
+		const FB_HOST_DEFAULT_CPUTYPE = FB_DEFAULT_CPUTYPE32
+	#endif
+	const FB_DEFAULT_CPUTYPE = BUILD_FB_DEFAULT_CPUTYPE
+#elseif defined(__FB_64BIT__)
+	const FB_HOST_DEFAULT_CPUTYPE = FB_DEFAULT_CPUTYPE64
 	const FB_DEFAULT_CPUTYPE = FB_DEFAULT_CPUTYPE64
 #else
+	const FB_HOST_DEFAULT_CPUTYPE = FB_DEFAULT_CPUTYPE32
 	const FB_DEFAULT_CPUTYPE = FB_DEFAULT_CPUTYPE32
 #endif
 

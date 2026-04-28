@@ -27,14 +27,38 @@ INSTALL_FILE ?= install -m 644
 INSTALL_EXE  ?= install -m 755
 MKDIR_P      ?= mkdir -p
 
+FBC_INSTALL_NAME ?= fbc$(EXEEXT)
+FBC_JS_INSTALL_NAME ?= fbc-js$(EXEEXT)
+FB_JS_NAME ?= freebasic-js
+FB_JS_TARGET ?= js-asmjs
+FB_JS_RUNTIME_ASSETS := fb_shell.html fb_rtlib.js termlib_min.js
+
+prefixjsincdir ?= $(prefix)/include/$(FB_JS_NAME)
+prefixjsruntimedir ?= $(prefix)/$(libdirname)/$(FB_JS_NAME)
+FBINSTALL_JS_RUNTIME_DIR := $(prefixjsruntimedir)/$(FB_JS_TARGET)
+JS_BUILD_LIBDIR ?= $(rootdir)/$(libdirname)/freebasic/$(FB_JS_TARGET)
+
+INSTALL_STAGE_JS_INCDIR := $(prefixjsincdir)
+INSTALL_STAGE_JS_LIBDIR := $(FBINSTALL_JS_RUNTIME_DIR)
+
+ifneq ($(strip $(DESTDIR)),)
+ifneq ($(filter win32 dos,$(TARGET_OS)),)
+INSTALL_STAGE_JS_INCDIR := $(patsubst $(prefix)%,%,$(prefixjsincdir))
+INSTALL_STAGE_JS_LIBDIR := $(patsubst $(prefix)%,%,$(FBINSTALL_JS_RUNTIME_DIR))
+endif
+endif
+
+INSTALL_JS_INCDIR := $(if $(strip $(DESTDIR)),$(DESTDIR)$(INSTALL_STAGE_JS_INCDIR),$(prefixjsincdir))
+INSTALL_JS_LIBDIR := $(if $(strip $(DESTDIR)),$(DESTDIR)$(INSTALL_STAGE_JS_LIBDIR),$(FBINSTALL_JS_RUNTIME_DIR))
+
 .PHONY: install install-bin install-includes install-runtime
 install: install-bin install-includes install-runtime
 
 .PHONY: install-bin
 install-bin:
 	mkdir -p "$(INSTALL_BINDIR)"
-	install -m 755 "$(FBC_EXE)" "$(INSTALL_BINDIR)/fbc$(EXEEXT)"
-	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_BINDIR),$(prefixbindir))/fbc$(EXEEXT)" >> "$(INSTALL_MANIFEST)"
+	install -m 755 "$(FBC_EXE)" "$(INSTALL_BINDIR)/$(FBC_INSTALL_NAME)"
+	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_BINDIR),$(prefixbindir))/$(FBC_INSTALL_NAME)" >> "$(INSTALL_MANIFEST)"
 
 .PHONY: install-includes
 install-includes:
@@ -55,6 +79,40 @@ install-runtime:
 			install -m 644 "$$f" "$(INSTALL_LIBDIR)/$$b"; \
 			echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_LIBDIR),$(FBINSTALL_RUNTIME_DIR))/$$b" >> "$(INSTALL_MANIFEST)"; \
 		fi; \
+	done
+
+.PHONY: install-js install-js-bin install-js-includes install-js-runtime
+install-js: install-js-bin install-js-includes install-js-runtime
+
+.PHONY: install-js-bin
+install-js-bin:
+	mkdir -p "$(INSTALL_BINDIR)"
+	install -m 755 "$(FBC_JS_EXE)" "$(INSTALL_BINDIR)/$(FBC_JS_INSTALL_NAME)"
+	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_BINDIR),$(prefixbindir))/$(FBC_JS_INSTALL_NAME)" >> "$(INSTALL_MANIFEST)"
+
+.PHONY: install-js-includes
+install-js-includes:
+	$(MKDIR_P) "$(INSTALL_JS_INCDIR)"
+	cp -a "$(rootdir)/inc/." "$(INSTALL_JS_INCDIR)/"
+	@find "$(INSTALL_JS_INCDIR)" -type f \
+			| sed "s|^$(DESTDIR)||" \
+				>> "$(INSTALL_MANIFEST)"
+
+.PHONY: install-js-runtime
+install-js-runtime:
+	mkdir -p "$(INSTALL_JS_LIBDIR)"
+	set -e; \
+	for f in "$(JS_BUILD_LIBDIR)"/*; do \
+		[ -e "$$f" ] || continue; \
+		if [ -f "$$f" ]; then \
+			b=$$(basename "$$f"); \
+			install -m 644 "$$f" "$(INSTALL_JS_LIBDIR)/$$b"; \
+			echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_JS_LIBDIR),$(FBINSTALL_JS_RUNTIME_DIR))/$$b" >> "$(INSTALL_MANIFEST)"; \
+		fi; \
+	done; \
+	for b in $(FB_JS_RUNTIME_ASSETS); do \
+		install -m 644 "$(rootdir)/lib/$$b" "$(INSTALL_JS_LIBDIR)/$$b"; \
+		echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_JS_LIBDIR),$(FBINSTALL_JS_RUNTIME_DIR))/$$b" >> "$(INSTALL_MANIFEST)"; \
 	done
 
 .PHONY: uninstall

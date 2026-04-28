@@ -1002,7 +1002,7 @@ function fbGetTargetId( ) as string
 end function
 
 function fbGetHostId( ) as string
-	function = hGetTargetId( FB_DEFAULT_TARGET, FB_DEFAULT_CPUTYPE )
+	function = hGetTargetId( FB_HOST_DEFAULT_TARGET, FB_HOST_DEFAULT_CPUTYPE )
 end function
 
 function fbIdentifyOs( byref osid as string ) as integer
@@ -1053,7 +1053,7 @@ function fbGetBits( ) as integer
 end function
 
 function fbGetHostBits( ) as integer
-	function = cputypeinfo(FB_DEFAULT_CPUTYPE).bits
+	function = cputypeinfo(FB_HOST_DEFAULT_CPUTYPE).bits
 end function
 
 function fbGetCpuFamily( ) as integer

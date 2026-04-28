@@ -151,6 +151,10 @@ ifeq ($(CROSS_BUILD),yes)
 
 endif
 
+ifeq ($(TARGET_OS),js)
+  BUILD_PREFIX :=
+endif
+
 ##############################################################################
 # Verify cross compiler exists
 ##############################################################################
@@ -168,6 +172,14 @@ BUILD_PREFIX :=
 
 endif
 
+ifeq ($(TARGET_OS),js)
+  CC      ?= emcc
+  CXX     ?= em++
+  AR      ?= emar
+  RANLIB  ?= emranlib
+  LD      ?= emcc
+endif
+
 endif
 
 ##############################################################################
@@ -176,7 +188,9 @@ endif
 
 # C compiler
 ifneq ($(filter default file,$(origin CC)),)
-  ifeq ($(CROSS_BUILD),yes)
+  ifeq ($(TARGET_OS),js)
+    CC := emcc
+  else ifeq ($(CROSS_BUILD),yes)
     CC := $(BUILD_PREFIX)gcc
   else ifneq ($(strip $(LOCAL_GCC)),)
     CC := $(LOCAL_GCC)
@@ -192,7 +206,9 @@ endif
 
 # C++ compiler
 ifneq ($(filter default file,$(origin CXX)),)
-  ifeq ($(CROSS_BUILD),yes)
+  ifeq ($(TARGET_OS),js)
+    CXX := em++
+  else ifeq ($(CROSS_BUILD),yes)
     CXX := $(BUILD_PREFIX)g++
   else ifneq ($(strip $(LOCAL_GXX)),)
     CXX := $(LOCAL_GXX)
@@ -207,8 +223,10 @@ endif
 
 
 # Archiver
-ifeq ($(origin AR),default)
-  ifeq ($(CROSS_BUILD),yes)
+ifneq ($(filter default file,$(origin AR)),)
+  ifeq ($(TARGET_OS),js)
+    AR := emar
+  else ifeq ($(CROSS_BUILD),yes)
     AR := $(BUILD_PREFIX)ar
   else ifneq ($(strip $(LOCAL_AR)),)
     AR := $(LOCAL_AR)
@@ -221,8 +239,10 @@ endif
 
 
 # Ranlib
-ifeq ($(origin RANLIB),default)
-  ifeq ($(CROSS_BUILD),yes)
+ifneq ($(filter default file,$(origin RANLIB)),)
+  ifeq ($(TARGET_OS),js)
+    RANLIB := emranlib
+  else ifeq ($(CROSS_BUILD),yes)
     RANLIB := $(BUILD_PREFIX)ranlib
   else ifneq ($(strip $(LOCAL_RANLIB)),)
     RANLIB := $(LOCAL_RANLIB)
@@ -235,7 +255,7 @@ endif
 
 
 # Assembler
-ifeq ($(origin AS),default)
+ifneq ($(filter default file,$(origin AS)),)
   ifeq ($(CROSS_BUILD),yes)
     AS := $(BUILD_PREFIX)as
   else ifneq ($(strip $(LOCAL_AS)),)
@@ -252,9 +272,11 @@ endif
 # Linker selection
 ##############################################################################
 
-ifeq ($(origin LD),default)
+ifneq ($(filter default file,$(origin LD)),)
 
-  ifneq ($(filter linux android darwin freebsd netbsd openbsd dragonfly solaris haiku,$(TARGET_OS)),)
+  ifeq ($(TARGET_OS),js)
+    LD := emcc
+  else ifneq ($(filter linux android darwin freebsd netbsd openbsd dragonfly solaris haiku,$(TARGET_OS)),)
     LD := $(CC)
   else
     ifeq ($(CROSS_BUILD),yes)

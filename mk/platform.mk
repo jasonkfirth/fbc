@@ -75,6 +75,8 @@ endef
 
 $(eval $(call _set_os_if_token,linux,linux))
 $(eval $(call _set_os_if_token,android,android))
+$(eval $(call _set_os_if_token,emscripten,js))
+$(eval $(call _set_os_if_token,js,js))
 $(eval $(call _set_os_if_token,darwin,darwin))
 $(eval $(call _set_os_if_token,apple,darwin))
 $(eval $(call _set_os_if_token,freebsd,freebsd))
@@ -163,6 +165,11 @@ endif
 # LoongArch 64
 ifneq ($(filter loongarch64 loong64,$(TARGET_ARCH_RAW)),)
   TARGET_ARCH := loongarch64
+endif
+
+# Emscripten/JS target
+ifneq ($(filter asmjs wasm32,$(TARGET_ARCH_RAW)),)
+  TARGET_ARCH := asmjs
 endif
 
 

@@ -51,8 +51,32 @@ freebasic (1.20.1-1) jammy; urgency=medium
     the Sound Blaster path.
   * Add a DOS PC speaker fallback backend so sfxlib can still produce
     audible playback when no Sound Blaster is configured.
+  * Refactor the Debian/Ubuntu package split so the native compiler,
+    runtime, startup objects, libraries, and core headers ship together
+    in freebasic.
+  * Add freebasic-bindings for third-party header/binding files and
+    freebasic-examples for source examples, leaving freebasic-runtime
+    and freebasic-dev as transitional compatibility packages.
+  * Add a separate freebasic-js binary package that installs fbc-js,
+    JavaScript-target include files, libfb/libfbgfx/libsfx archives,
+    startup objects, and Emscripten JavaScript runtime support files
+    under a parallel freebasic-js layout.
+  * Build fbc-js as a native compiler executable that defaults to the
+    js-asmjs/Emscripten target while retaining the native host platform
+    for host-specific compiler behavior.
+  * Teach the package build to build JS-target runtime, gfxlib2, and
+    sfxlib artifacts with emcc/emar/emranlib and to depend on the
+    distro-provided emscripten and nodejs packages.
+  * Gate freebasic-js behind the nojs build profile and add
+    build_scripts/debianubuntu-build-freebasic.sh --no-js so native-only
+    Debian/Ubuntu package builds do not need Emscripten or nodejs.
+  * Add a JavaScript sfxlib backend using WebAudio in browsers with a
+    null fallback for non-browser package smoke tests.
+  * Add Debian/Ubuntu Docker smoke-test scripts for native FreeBASIC and
+    freebasic-js packages, installing the local package artifacts in
+    fresh containers with only their declared package dependencies.
 
- -- SJ_Zero <sj@fbxl.net>  Fri, 17 Apr 2026 12:00:00 -0400
+ -- SJ_Zero <sj@fbxl.net>  Tue, 28 Apr 2026 15:30:00 -0400
 
 freebasic (1.10.4-1) jammy; urgency=medium
 

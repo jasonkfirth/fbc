@@ -44,7 +44,7 @@ msg() { echo ""; echo "==> $1"; }
 assert_removable_tree() {
     local path="$1"
     [ -e "$path" ] || return 0
-    if ! find "$path" \( ! -user "$(id -u)" -o ! -writable \) -print -quit | grep -q .; then
+    if ! find "$path" ! -type l \( ! -user "$(id -u)" -o ! -writable \) -print -quit | grep -q .; then
         return 0
     fi
     die "build workspace is not writable: $path
@@ -67,6 +67,7 @@ Usage: ./build_scripts/debianubuntu-build-freebasic.sh [options]
 
 Options:
   --no-build      Reuse the existing source bootstrap tarball
+  --no-js         Build packages with DEB_BUILD_PROFILES=nojs
   --no-package    Stop after ensuring the bootstrap tarball exists
   --skip-deps     Skip apt dependency installation
   --help          Show this help text
@@ -91,12 +92,14 @@ EOF
 ##############################################################################
 
 NO_BUILD=0
+NO_JS=0
 NO_PACKAGE=0
 SKIP_DEPS=0
 
 for arg in "$@"; do
     case "$arg" in
         --no-build) NO_BUILD=1 ;;
+        --no-js) NO_JS=1 ;;
         --no-package) NO_PACKAGE=1 ;;
         --skip-deps) SKIP_DEPS=1 ;;
         -h|--help)
@@ -247,6 +250,11 @@ install_deps() {
     export DEB_BUILD_MAINT_OPTIONS="hardening=+all"
 
     run_root apt-get update -y
+    local js_deps=()
+    if [ "$NO_JS" -eq 0 ]; then
+        js_deps=(emscripten nodejs)
+    fi
+
     run_root apt-get install -y --no-install-recommends \
         ca-certificates \
         build-essential gcc g++ binutils make \
@@ -260,6 +268,7 @@ install_deps() {
         libxcb1-dev libxau-dev libxdmcp-dev \
         libxi-dev libxinerama-dev libxxf86vm-dev \
         libgl1-mesa-dev libglu1-mesa-dev \
+        "${js_deps[@]}" \
         perl python3 git
 }
 
@@ -342,6 +351,7 @@ package_current_target() {
 
     run rsync -a --no-owner --no-group \
         --delete \
+        --exclude '/.build-alpine/' \
         --exclude '/.build-debianubuntu/' \
         --exclude '/.codex/' \
         --exclude '/FreeBASIC-*-source-bootstrap-*.tar.*' \
@@ -370,6 +380,7 @@ package_current_target() {
     echo "==> upstream version: $upver"
     echo "==> output dir: $OUTDIR"
     [ -z "${FBC_PACKAGE_ARM_ARCH:-}" ] || echo "==> ARM default arch: $FBC_PACKAGE_ARM_ARCH"
+    [ "$NO_JS" -eq 0 ] || echo "==> build profile: nojs"
 
     cd "$BUILDDIR"
 
@@ -377,6 +388,7 @@ package_current_target() {
     rm -f "$origtar"
     run tar -cJf "$origtar" \
         --exclude="$srcdir/debian" \
+        --exclude="$srcdir/.build-alpine" \
         --exclude="$srcdir/.build-debianubuntu" \
         --exclude="$srcdir/out" \
         --exclude="$srcdir/stage" \
@@ -393,7 +405,11 @@ package_current_target() {
     msg "running dpkg-buildpackage"
 
     set +e
-    dpkg-buildpackage -us -uc 2>&1 | tee "$OUTDIR/build.log"
+    if [ "$NO_JS" -eq 1 ]; then
+        DEB_BUILD_PROFILES=nojs dpkg-buildpackage -us -uc 2>&1 | tee "$OUTDIR/build.log"
+    else
+        dpkg-buildpackage -us -uc 2>&1 | tee "$OUTDIR/build.log"
+    fi
     rc=${PIPESTATUS[0]}
     set -e
 
@@ -405,8 +421,16 @@ package_current_target() {
 
     msg "collecting package artifacts"
 
+    rm -f "$OUTDIR"/freebasic*.deb \
+          "$OUTDIR"/freebasic*.ddeb \
+          "$OUTDIR"/freebasic*.dsc \
+          "$OUTDIR"/freebasic*.tar.* \
+          "$OUTDIR"/freebasic*.buildinfo \
+          "$OUTDIR"/freebasic*.changes \
+          "$OUTDIR"/lintian-freebasic*.log
+
     shopt -s nullglob
-    for f in ../*.deb ../*.dsc ../*.tar.* ../*.buildinfo ../*.changes; do
+    for f in ../*.deb ../*.ddeb ../*.dsc ../*.tar.* ../*.buildinfo ../*.changes; do
         [ -e "$f" ] || continue
         cp -av "$f" "$OUTDIR/" || true
     done

@@ -154,6 +154,7 @@ endif
 libs: | maybe-prereqs
 compiler-stage: | maybe-prereqs
 compiler: | maybe-prereqs
+compiler-js: | maybe-prereqs
 rtlib: | maybe-prereqs
 fbrt: | maybe-prereqs
 gfxlib2: | maybe-prereqs
@@ -194,6 +195,7 @@ tests-test: | maybe-prereqs
 
 compiler-stage: | maybe-build-fbc
 compiler: | maybe-build-fbc
+compiler-js: | maybe-build-fbc
 fbrt: | maybe-build-fbc
 bootstrap-emit: | maybe-build-fbc
 bootstrap-emit-matrix: | maybe-build-fbc

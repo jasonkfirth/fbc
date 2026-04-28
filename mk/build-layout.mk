@@ -41,6 +41,7 @@ build_libdir := lib/$(libsubdir)
 
 FBC_EXE    := fbc$(EXEEXT)
 FBCNEW_EXE := fbc-new$(EXEEXT)
+FBC_JS_EXE := fbc-js$(EXEEXT)
 
 else
 
@@ -50,6 +51,7 @@ build_libdir := $(libdirname)/$(FBNAME)/$(libsubdir)
 
 FBC_EXE    := $(build_bindir)/fbc$(ENABLE_SUFFIX)$(EXEEXT)
 FBCNEW_EXE := $(build_bindir)/fbc$(ENABLE_SUFFIX)-new$(EXEEXT)
+FBC_JS_EXE := $(build_bindir)/fbc-js$(EXEEXT)
 
 endif
 
@@ -72,6 +74,7 @@ libdir := $(build_libdir)
 
 # Compiler objects
 fbcobjdir := src/compiler/obj/$(FBTARGET)
+fbcjsobjdir := src/compiler/obj/$(FBTARGET)-jsdriver
 
 # Runtime objects
 libfbobjdir	 := src/rtlib/obj/$(objsubdir)

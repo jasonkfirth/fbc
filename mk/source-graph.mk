@@ -85,6 +85,7 @@ SFXLIB_DIRS += $(srcdir)/sfxlib/$(SOURCE_OS)
 FBC_BI := $(wildcard $(srcdir)/compiler/*.bi)
 FBC_SRC := $(wildcard $(srcdir)/compiler/*.bas)
 FBC_OBJS := $(patsubst $(srcdir)/compiler/%.bas,$(fbcobjdir)/%.o,$(FBC_SRC))
+FBC_JS_OBJS := $(patsubst $(srcdir)/compiler/%.bas,$(fbcjsobjdir)/%.o,$(FBC_SRC))
 
 ##############################################################################
 # RTLIB sources

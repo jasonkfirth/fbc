@@ -21,7 +21,9 @@ Build-Depends:
  libxext-dev,
  libxrender-dev,
  libxrandr-dev,
- libxpm-dev
+ libxpm-dev,
+ emscripten <!nojs>,
+ nodejs <!nojs>
 Standards-Version: 4.6.2
 Homepage: https://freebasic.net/
 Vcs-Browser: https://github.com/freebasic/fbc
@@ -32,65 +34,55 @@ Package: freebasic
 Architecture: any
 Depends:
  ${shlibs:Depends},
- ${misc:Depends},
- freebasic-runtime (= ${binary:Version})
+ ${misc:Depends}
 Recommends:
- freebasic-dev (= ${binary:Version})
+ freebasic-bindings (= ${binary:Version})
+Breaks:
+ freebasic-runtime (<< ${binary:Version}),
+ freebasic-dev (<< ${binary:Version})
+Replaces:
+ freebasic-runtime (<< ${binary:Version}),
+ freebasic-dev (<< ${binary:Version})
 Description: BASIC compiler compatible with QuickBASIC (fbc)
  FreeBASIC is a free/open source BASIC compiler largely compatible with
  Microsoft QuickBASIC.
  .
- This package provides the fbc compiler executable and driver, allowing
- FreeBASIC programs to be compiled and linked on Debian-based systems.
+ This package provides the fbc compiler executable, native runtime libraries,
+ startup objects, and core include files needed to compile and link
+ FreeBASIC programs on Debian-based systems.
 
 Package: freebasic-runtime
-Architecture: any
+Section: oldlibs
+Architecture: all
 Depends:
- ${shlibs:Depends},
  ${misc:Depends},
- libncurses6,
- libtinfo6
-Recommends:
- libgpm2,
- libasound2,
- libpulse0,
- libx11-6,
- libxext6,
- libxpm4,
- libxrandr2,
- libxrender1,
- libgl1,
- libglu1-mesa
-Suggests:
- libsdl2-2.0-0,
- libsdl2-image-2.0-0,
- libsdl2-mixer-2.0-0,
- libsdl2-ttf-2.0-0,
- libopenal1,
- libpipewire-0.3-0,
- libcairo2,
- libfontconfig1,
- libfreetype6,
- libcurl4,
- libsqlite3-0,
- libpcre2-8-0,
- libtre5,
- libxml2,
- libexpat1,
- libpng16-16,
- libjpeg62-turbo,
- libgif7
-Description: FreeBASIC runtime libraries
- Runtime libraries (libfb, libfbgfx) and startup objects required when linking
- FreeBASIC programs. These files are used automatically by the compiler to
- provide the FreeBASIC runtime environment and graphics subsystem support.
+ freebasic (= ${binary:Version})
+Description: transitional package for the FreeBASIC runtime
+ This transitional package depends on freebasic, which now contains the
+ compiler, runtime libraries, startup objects, and core include files needed
+ for a usable native FreeBASIC installation.
 
 Package: freebasic-dev
-Section: libdevel
-Architecture: any
+Section: oldlibs
+Architecture: all
 Depends:
  ${misc:Depends},
- freebasic-runtime (= ${binary:Version})
+ freebasic-bindings (= ${binary:Version})
+Description: transitional package for FreeBASIC bindings
+ This transitional package depends on freebasic-bindings. The FreeBASIC base
+ compiler package now contains the core development files, while optional
+ third-party binding headers are packaged separately.
+
+Package: freebasic-bindings
+Section: libdevel
+Architecture: all
+Depends:
+ ${misc:Depends},
+ freebasic (= ${binary:Version})
+Breaks:
+ freebasic-dev (<< ${binary:Version})
+Replaces:
+ freebasic-dev (<< ${binary:Version})
 Recommends:
  pkgconf | pkg-config,
  zlib1g-dev,
@@ -124,13 +116,25 @@ Suggests:
  libpq-dev,
  default-libmysqlclient-dev,
  libgsl-dev
-Description: FreeBASIC development headers and include files
- This package contains the FreeBASIC include files and headers needed for
- software development using FreeBASIC.
+Description: third-party FreeBASIC binding headers
+ This package contains optional FreeBASIC bindings for common third-party
+ C libraries and platform APIs.
  .
- It provides the standard runtime include files distributed with the compiler
- as well as bindings for many common C libraries. Installing this package is
- recommended for compiling most real-world FreeBASIC programs.
+ Installing this package is recommended for compiling programs that use
+ external libraries such as SDL, OpenGL, zlib, curl, SQLite, GTK, or similar
+ bindings.
+
+Package: freebasic-examples
+Section: doc
+Architecture: all
+Depends:
+ ${misc:Depends}
+Suggests:
+ freebasic,
+ freebasic-bindings
+Description: FreeBASIC example source programs
+ This package contains the FreeBASIC example source tree, including console,
+ graphics, networking, sfxlib, and third-party binding examples.
 
 Package: freebasic-doc
 Section: doc
@@ -144,17 +148,31 @@ Description: FreeBASIC documentation and manual
  manual, language reference, and additional text files distributed with the
  compiler. The documentation is installed under /usr/share/doc/freebasic/.
 
+Package: freebasic-js
+Architecture: any
+Build-Profiles: <!nojs>
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+ emscripten,
+ nodejs
+Description: FreeBASIC compiler driver for Emscripten/JavaScript
+ This package provides fbc-js, a native FreeBASIC compiler executable that
+ defaults to the js-asmjs/Emscripten target, plus the target runtime libraries
+ and JavaScript support assets needed to build browser or Node.js output.
+
 Package: freebasic-full
 Section: metapackages
 Architecture: all
 Depends:
  freebasic (= ${binary:Version}),
- freebasic-runtime (= ${binary:Version}),
- freebasic-dev (= ${binary:Version}),
+ freebasic-bindings (= ${binary:Version}),
+ freebasic-examples (= ${binary:Version}),
  freebasic-doc (= ${binary:Version}),
  ${misc:Depends},
  pkgconf | pkg-config
 Recommends:
+ freebasic-js (= ${binary:Version}),
  zlib1g-dev,
  libbz2-dev,
  libzip-dev,

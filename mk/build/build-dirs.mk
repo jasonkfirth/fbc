@@ -16,6 +16,7 @@
 
 OBJDIRS := \
 	$(fbcobjdir) \
+	$(fbcjsobjdir) \
 	$(libfbobjdir) \
 	$(libfbpicobjdir) \
 	$(libfbmtobjdir) \

@@ -92,6 +92,15 @@ $(fbcobjdir)/%.o: $(srcdir)/compiler/%.bas $(FBC_BI) | $(fbcobjdir)
 	@mkdir -p "$(dir $@)"
 	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) -i $(rootdir)/inc -c $< -o $@
 
+FBC_JS_DEFINES := \
+	-d BUILD_FB_DEFAULT_TARGET=FB_COMPTARGET_JS \
+	-d BUILD_FB_DEFAULT_CPUTYPE=FB_CPUTYPE_ASMJS \
+	-d ENABLE_SUFFIX=\"-js\"
+
+$(fbcjsobjdir)/%.o: $(srcdir)/compiler/%.bas $(FBC_BI) | $(fbcjsobjdir)
+	@mkdir -p "$(dir $@)"
+	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) $(FBC_JS_DEFINES) -i $(rootdir)/inc -c $< -o $@
+
 ##############################################################################
 # rtlib (C runtime)
 ##############################################################################

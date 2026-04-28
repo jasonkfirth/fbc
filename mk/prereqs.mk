@@ -85,6 +85,21 @@ PR_COMMON_TOOLS := \
 	find \
 	rsync
 
+ifeq ($(TARGET_OS),js)
+PR_COMMON_TOOLS := \
+	make \
+	emar \
+	emranlib \
+	tar \
+	xz \
+	gzip \
+	sed \
+	awk \
+	grep \
+	find \
+	rsync
+endif
+
 # Normalize compiler command (handles CC="gcc -m32" etc)
 PR_CC_RAW := $(strip $(if $(CC),$(CC),gcc))
 PR_CC     := $(firstword $(PR_CC_RAW))

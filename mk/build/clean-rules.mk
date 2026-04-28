@@ -39,6 +39,7 @@
 
 clean-compiler:
 	@if [ -n "$(fbcobjdir)" ]; then rm -rf "$(fbcobjdir)"; fi
+	@if [ -n "$(fbcjsobjdir)" ]; then rm -rf "$(fbcjsobjdir)"; fi
 
 
 ##############################################################################
@@ -177,7 +178,7 @@ distclean: \
   clean-bootstrap
 
 	@if [ -n "$(libdir)" ]; then rm -rf "$(libdir)"; fi
-	@rm -f $(FBC_EXE)
+	@rm -f $(FBC_EXE) $(FBC_JS_EXE)
 
 
 ##############################################################################

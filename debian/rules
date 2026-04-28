@@ -5,8 +5,13 @@
 
 export DH_VERBOSE=1
 export DEB_BUILD_MAINT_OPTIONS=hardening=+all optimize=-lto
+DEB_BUILD_PROFILES ?=
 
 DEB_HOST_ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
+BUILD_JS := yes
+ifneq ($(filter nojs,$(DEB_BUILD_PROFILES)),)
+BUILD_JS := no
+endif
 
 # ------------------------------------------------------------
 # Parallelism
@@ -22,27 +27,32 @@ PARMAKE := $(MAKE) -j$(JOBS)
 MULTILIB :=
 TARGET_TRIPLET :=
 BOOTSTRAP_DIR_KEY :=
+FBC_TARGET_KEY :=
 ARM_CPU_MAKE_ARGS :=
 
 ifeq ($(DEB_HOST_ARCH),amd64)
 TARGET_TRIPLET := x86_64-linux-gnu
 BOOTSTRAP_DIR_KEY := linux-amd64
+FBC_TARGET_KEY := linux-x86_64
 endif
 
 ifeq ($(DEB_HOST_ARCH),i386)
 TARGET_TRIPLET := i686-linux-gnu
 MULTILIB := 32
 BOOTSTRAP_DIR_KEY := linux-i386
+FBC_TARGET_KEY := linux-x86
 endif
 
 ifeq ($(DEB_HOST_ARCH),arm64)
 TARGET_TRIPLET := aarch64-linux-gnu
 BOOTSTRAP_DIR_KEY := linux-arm64
+FBC_TARGET_KEY := linux-aarch64
 endif
 
 ifeq ($(DEB_HOST_ARCH),armhf)
 TARGET_TRIPLET := arm-linux-gnueabihf
 BOOTSTRAP_DIR_KEY := linux-armhf
+FBC_TARGET_KEY := linux-arm
 endif
 
 ifeq ($(DEB_HOST_ARCH),armhf)
@@ -54,26 +64,31 @@ endif
 ifeq ($(DEB_HOST_ARCH),armel)
 TARGET_TRIPLET := arm-linux-gnueabi
 BOOTSTRAP_DIR_KEY := linux-armel
+FBC_TARGET_KEY := linux-arm
 endif
 
 ifeq ($(DEB_HOST_ARCH),ppc64el)
 TARGET_TRIPLET := powerpc64le-linux-gnu
 BOOTSTRAP_DIR_KEY := linux-ppc64el
+FBC_TARGET_KEY := linux-powerpc64le
 endif
 
 ifeq ($(DEB_HOST_ARCH),s390x)
 TARGET_TRIPLET := s390x-linux-gnu
 BOOTSTRAP_DIR_KEY := linux-s390x
+FBC_TARGET_KEY := linux-s390x
 endif
 
 ifeq ($(DEB_HOST_ARCH),riscv64)
 TARGET_TRIPLET := riscv64-linux-gnu
 BOOTSTRAP_DIR_KEY := linux-riscv64
+FBC_TARGET_KEY := linux-riscv64
 endif
 
 ifeq ($(DEB_HOST_ARCH),loong64)
 TARGET_TRIPLET := loongarch64-linux-gnu
 BOOTSTRAP_DIR_KEY := linux-loongarch64
+FBC_TARGET_KEY := linux-loongarch64
 endif
 
 ifeq ($(TARGET_TRIPLET),)
@@ -164,7 +179,7 @@ override_dh_auto_build:
 		$(ARM_CPU_MAKE_ARGS) \
 		rtlib fbrt gfxlib2 sfxlib \
 		FBC="$(FBC_BOOTSTRAP)" \
-		BUILD_FBC_TARGET="$(BOOTSTRAP_DIR_KEY)" \
+		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
 		CPPFLAGS="$(CPPFLAGS)" \
 		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CXXFLAGS)" \
@@ -174,11 +189,32 @@ override_dh_auto_build:
 		$(ARM_CPU_MAKE_ARGS) \
 		compiler \
 		FBC="$(FBC_BOOTSTRAP)" \
-		BUILD_FBC_TARGET="$(BOOTSTRAP_DIR_KEY)" \
+		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
 		CPPFLAGS="$(CPPFLAGS)" \
 		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CXXFLAGS)" \
 		LDFLAGS="$(LDFLAGS)"
+
+ifeq ($(BUILD_JS),yes)
+	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
+		$(ARM_CPU_MAKE_ARGS) \
+		compiler-js \
+		FBC="$(FBC_BOOTSTRAP)" \
+		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
+		CPPFLAGS="$(CPPFLAGS)" \
+		CFLAGS="$(CFLAGS)" \
+		CXXFLAGS="$(CXXFLAGS)" \
+		LDFLAGS="$(LDFLAGS)"
+
+	$(PARMAKE) TARGET_TRIPLET="asmjs-unknown-emscripten" TARGET="asmjs-unknown-emscripten" \
+		rtlib fbrt gfxlib2 sfxlib \
+		FBC="$(FBC_BOOTSTRAP)" \
+		FBTARGET_DIR_OVERRIDE="js-asmjs" \
+		CPPFLAGS= \
+		CFLAGS= \
+		CXXFLAGS= \
+		LDFLAGS=
+endif
 
 # ------------------------------------------------------------
 # Install
@@ -191,7 +227,16 @@ override_dh_auto_install:
 		DESTDIR=$(CURDIR)/debian/tmp \
 		prefix=/usr \
 		FBC="$(FBC_BOOTSTRAP)" \
-		BUILD_FBC_TARGET="$(BOOTSTRAP_DIR_KEY)"
+		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)"
+
+ifeq ($(BUILD_JS),yes)
+	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" install-js \
+		$(ARM_CPU_MAKE_ARGS) \
+		DESTDIR=$(CURDIR)/debian/tmp \
+		prefix=/usr \
+		FBC="$(FBC_BOOTSTRAP)" \
+		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)"
+endif
 
 	if [ -d debian/tmp/usr/lib/freebasic ]; then \
 		cd debian/tmp/usr/lib/freebasic; \
@@ -214,16 +259,25 @@ override_dh_auto_install:
 
 	rm -rf debian/tmp/usr/share/doc/freebasic/manual/cache* || true
 	rm -f debian/tmp/usr/share/freebasic/contrib/swig/swig.exe || true
+	mkdir -p debian/tmp/usr/share/freebasic
+	cp -a examples debian/tmp/usr/share/freebasic/
+	find debian/tmp/usr/share/freebasic/examples -type f \
+		\( -name '*.o' -o -name '*.obj' -o -name '*.exe' -o -name '*.dll' -o -name '*.so' \) \
+		-delete
+	rm -f debian/tmp/usr/share/freebasic/examples/sfxlib/showcase
+	find debian/tmp/usr/share/freebasic/examples -type f -perm /111 \
+		! -name '*.sh' ! -name '*.ps1' ! -name '*.bat' ! -name '*.cmd' \
+		-delete
 
 # ------------------------------------------------------------
 # FLTK license relocation
 # ------------------------------------------------------------
 
 	if [ -f debian/tmp/usr/include/freebasic/FLTK/LICENSE ]; then \
-		mkdir -p debian/tmp/usr/share/doc/freebasic-dev; \
+		mkdir -p debian/tmp/usr/share/doc/freebasic-bindings; \
 		mv debian/tmp/usr/include/freebasic/FLTK/LICENSE \
-		   debian/tmp/usr/share/doc/freebasic-dev/FLTK-LICENSE; \
-		ln -sf ../../../share/doc/freebasic-dev/FLTK-LICENSE \
+		   debian/tmp/usr/share/doc/freebasic-bindings/FLTK-LICENSE; \
+		ln -sf ../../../share/doc/freebasic-bindings/FLTK-LICENSE \
 		   debian/tmp/usr/include/freebasic/FLTK/LICENSE; \
 	fi
 

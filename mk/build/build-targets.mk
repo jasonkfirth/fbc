@@ -43,6 +43,7 @@ endif
 
 .PHONY: \
 	compiler \
+	compiler-js \
 	rtlib \
 	fbrt \
 	gfxlib2 \
@@ -97,11 +98,24 @@ $(FBC_EXE): $(FBC_OBJS) | libs
 		$(THREAD_FLAGS) \
 		$(TERM_LIB)
 
+$(FBC_JS_EXE): $(FBC_JS_OBJS) | libs
+	@mkdir -p "$(dir $@)"
+	@echo "Linking JS-targeting compiler: $@"
+	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o $@ \
+		$(FBC_JS_OBJS) \
+		$(COMPILER_RT0) \
+		$(COMPILER_RTL) \
+		-lm \
+		$(THREAD_FLAGS) \
+		$(TERM_LIB)
+
 ##############################################################################
 # User-facing compiler target
 ##############################################################################
 
 compiler: $(FBC_EXE)
+
+compiler-js: $(FBC_JS_EXE)
 
 ##############################################################################
 # END build-targets.mk
