@@ -13,7 +13,7 @@ const FONTFILE 	 = "data/Vera.ttf"
 const FONTSIZE	 = 36			'' in points
 const FONTTEXT	 = "tff!"
 
-declare sub drawtext _
+declare sub putText _
 	( _
 		byval video as SDL_Surface ptr, _
 		byval x as integer, _
@@ -22,6 +22,8 @@ declare sub drawtext _
 		byref text as string, _
 		byval font as TTF_Font ptr _
 	)
+
+sub main()
 
 	dim video as SDL_Surface ptr
 	dim event as SDL_Event
@@ -62,7 +64,7 @@ declare sub drawtext _
 			clr.r = rnd*256
 			clr.g = rnd*256
 			clr.b = rnd*256
-			drawtext video, rnd*(SCR_WIDTH+w*2)-w, rnd*(SCR_HEIGHT+h*2)-h, clr, FONTTEXT, Font1
+			putText video, rnd*(SCR_WIDTH+w*2)-w, rnd*(SCR_HEIGHT+h*2)-h, clr, FONTTEXT, Font1
 		next
 
 		SDL_Flip video
@@ -72,6 +74,7 @@ declare sub drawtext _
 
 	TTF_Quit
 	SDL_Quit
+end sub
 
 sub BlitImage _
 	( _
@@ -92,7 +95,7 @@ sub BlitImage _
 
 end sub
 
-sub drawtext _
+sub putText _
 	( _
 		byval video as SDL_Surface ptr, _
 		byval x as integer, _
@@ -110,3 +113,5 @@ sub drawtext _
 	SDL_FreeSurface( surface )
 
 end sub
+
+main()

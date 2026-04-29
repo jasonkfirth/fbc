@@ -11,6 +11,7 @@ Version 1.20.1
 - Debian/Ubuntu packaging: keep the native compiler, runtime, startup objects, libraries, and core headers together in the freebasic package, split third-party bindings and examples into separate packages, and leave freebasic-runtime/freebasic-dev as transitional compatibility packages
 - JavaScript/Emscripten packaging: split the JS-target compiler and runtime into a separate fbc-js/freebasic-js install layout so it can be installed alongside the native FreeBASIC packages without changing the normal fbc defaults
 - JavaScript/Emscripten packaging: make freebasic-js opt-in for Debian/Ubuntu builds via the nojs build profile and the build script's --no-js switch so default/native package builds can skip the Emscripten dependency chain
+- Windows/MSYS2 packaging: bundle a broader set of third-party import libraries and DLLs used by the shipped examples and bindings, and add package-local import-library aliases for older binding names that differ from current MSYS2 package names
 
 [added]
 - sfxlib integrated into the compiler, runtime, libraries, examples, and build system
@@ -41,6 +42,9 @@ Version 1.20.1
 - DOS/build: fixed the Linux-hosted DOS packaging and smoke-test path so the build script stages the runtime layout expected by DOS and host-side cross-linking, rebuilds the DOS compiler/runtime reliably, and packages the finished distribution from out/msdos
 - DOS/sfxlib: fixed the DOS backend integration by moving the target sources into src/sfxlib/dos, wiring them into the normal DOS build graph, correcting the Sound Blaster/MIDI linkage and runtime initialization, and making missing BLASTER settings fail visibly for the Sound Blaster path instead of silently pretending a card exists
 - JavaScript/Emscripten builds now use emcc/emar/emranlib defaults and skip native host library/header probes when cross-building JS-target runtime libraries
+- examples: expanded the examples makefile coverage and fixed several Windows example build failures in the FreeImage/SDL, SDL_mixer, SDL_ttf, SDL mouse, TinyPTC, and CUnit examples
+- bindings: fixed FreeImage.bi so it reuses the Windows GDI bitmap declarations instead of redefining RGBQUAD/BITMAPINFO types after wingdi.bi has been included
+- bindings: make CUnit.bi link against cunit automatically, matching the behavior expected by the CUnit examples
 
 
 Version 1.20.0

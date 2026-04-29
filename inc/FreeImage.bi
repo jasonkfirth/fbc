@@ -38,6 +38,11 @@
 #include once "crt/long.bi"
 #include once "crt/wchar.bi"
 
+#ifdef __FB_WIN32__
+	#include once "win/windef.bi"
+	#include once "win/wingdi.bi"
+#endif
+
 '' The following symbols have been renamed:
 ''     constant TRUE => CTRUE
 
@@ -82,7 +87,7 @@ const SEEK_CUR = 1
 const SEEK_END = 2
 #endif
 
-#ifndef BITMAPINFO
+#ifndef _WINGDI_
 type BOOL as long
 type WORD as ushort
 type DWORD as ulong

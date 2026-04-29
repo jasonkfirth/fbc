@@ -24,6 +24,8 @@
 
 #pragma once
 
+#inclib "cunit"
+
 #include once "crt/string.bi"
 #include once "crt/math.bi"
 #include once "CUError.bi"

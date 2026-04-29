@@ -2,8 +2,8 @@
 '' The image file name is expected to be passed on the command line.
 '' Use the arrow keys to move the image, ESC to quit.
 
-#include "FreeImage.bi"
-#include "SDL/SDL.bi"
+#include once "FreeImage.bi"
+#include once "SDL/SDL.bi"
 
 const SCR_WIDTH = 800
 const SCR_HEIGHT= 600
@@ -14,6 +14,9 @@ dim shared video as SDL_Surface ptr
 declare sub blitImage( byval img as SDL_Surface ptr, byval x as integer, byval y as integer )
 declare function fibitmap2sdlsurface( byval dib as FIBITMAP Ptr ) as SDL_Surface ptr
 
+sub main()
+	dim as FIBITMAP ptr dib
+	dim as SDL_Surface ptr srcimg
 
 	dim as string filename = command( )
 	if( filename = "" )Then
@@ -80,13 +83,13 @@ declare function fibitmap2sdlsurface( byval dib as FIBITMAP Ptr ) as SDL_Surface
 	end if
 
 	'' load image
-	dim dib As FIBITMAP Ptr = FreeImage_Load( fiType, filename )
+	dib = FreeImage_Load( fiType, filename )
 
 	'' image is upside-down, flip
 	FreeImage_FlipVertical( dib )
 
 	'' create a SDL surface from the bitmap
-	dim srcimg as SDL_Surface ptr = fibitmap2sdlsurface( dib )
+	srcimg = fibitmap2sdlsurface( dib )
 	if( srcimg = NULL ) then
 		print "Couldn't create surface"
 		sleep
@@ -165,6 +168,7 @@ declare function fibitmap2sdlsurface( byval dib as FIBITMAP Ptr ) as SDL_Surface
 
 	SDL_Quit( )
 	FreeImage_Unload( dib )
+end sub
 
 sub blitImage( byval img as SDL_Surface ptr, byval x as integer, byval y as integer )
 	dim dest as SDL_Rect
@@ -213,3 +217,5 @@ function fibitmap2sdlsurface( byval dib as FIBITMAP Ptr ) as SDL_Surface ptr
 
 	function = surface
 end function
+
+main()

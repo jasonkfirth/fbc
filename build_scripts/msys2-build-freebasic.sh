@@ -133,6 +133,61 @@ copy_dir_files() {
 	find "$src" -maxdepth 1 -type f -exec cp -a {} "$dst/" \;
 }
 
+copy_library_alias() {
+	local libdir="$1"
+	local source="$2"
+	local alias="$3"
+	local source_file
+	local ext
+
+	for ext in dll.a a; do
+		source_file="$libdir/lib${source}.${ext}"
+		if [ -f "$source_file" ] && [ ! -f "$libdir/lib${alias}.${ext}" ]; then
+			cp -a "$source_file" "$libdir/lib${alias}.${ext}"
+		fi
+	done
+}
+
+create_arch_library_aliases() {
+	local libdir="$1"
+	local component
+
+	[ -d "$libdir" ] || return 0
+
+	# Current MSYS2 package names do not always match the older Windows
+	# library names used by the FreeBASIC bindings.  Keep these aliases in
+	# the packaged lib directory so example builds can use the shipped
+	# bindings without requiring users to rename archives by hand.
+	copy_library_alias "$libdir" freeimage FreeImage
+	copy_library_alias "$libdir" gd bgd
+	copy_library_alias "$libdir" gd bgd-static
+	copy_library_alias "$libdir" mysqlclient mySQL
+	copy_library_alias "$libdir" openal OpenAL32
+	copy_library_alias "$libdir" freeglut glut
+	copy_library_alias "$libdir" freeglut glut32
+	copy_library_alias "$libdir" freeglut GLUT
+	copy_library_alias "$libdir" glew32 GLEW
+	copy_library_alias "$libdir" glew32 glew
+	copy_library_alias "$libdir" glfw3 glfw3dll
+	copy_library_alias "$libdir" lua5.1 lua
+
+	for component in \
+		allegro \
+		allegro_acodec \
+		allegro_audio \
+		allegro_color \
+		allegro_dialog \
+		allegro_font \
+		allegro_image \
+		allegro_memfile \
+		allegro_physfs \
+		allegro_primitives \
+		allegro_ttf
+	do
+		copy_library_alias "$libdir" "$component" "$component-5.0.10-md"
+	done
+}
+
 sync_source_tree() {
 	local dst="$1"
 	mkdir -p "$dst"
@@ -253,6 +308,7 @@ trap cleanup EXIT
 install_dependencies() {
 	local msys_packages=(
 		base-devel
+		coreutils
 		make
 		tar
 		xz
@@ -263,21 +319,73 @@ install_dependencies() {
 		mingw-w64-x86_64-nsis
 	)
 	local mingw_suffixes=(
-		toolchain
 		binutils
 		libffi
+		SDL
+		SDL_gfx
+		SDL_image
+		SDL_mixer
+		SDL_net
+		SDL_ttf
 		SDL2
+		SDL2_gfx
+		SDL2_image
+		SDL2_mixer
 		SDL2_net
+		SDL2_ttf
+		allegro
+		aspell
+		cairo
+		cunit
+		curl
+		devil
+		expat
+		fltk
 		flac
+		freealut
+		freeglut
+		freetype
+		glfw
+		glew
+		gmp
+		gsl
+		gtk2
+		gtk3
+		gtkglext
+		goocanvas
+		libcaca
+		libffi
+		libgd
+		libglade
+		libharu
 		libjpeg-turbo
+		libmariadbclient
+		libmodplug
 		libogg
 		libpng
 		libsndfile
+		libtre
+		libtiff
 		libvorbis
+		libxml2
+		libxmp
+		libxslt
+		libzip
+		lua51
+		mxml
 		mpg123
+		openal
+		ode
 		opus
 		opusfile
+		pcre
+		pcre2
+		pdcurses
 		portaudio
+		postgresql
+		raylib
+		sqlite3
+		zeromq
 		zlib
 	)
 	local pkg
@@ -288,11 +396,26 @@ install_dependencies() {
 	msg "Installing MSYS2 packaging dependencies"
 	run pacman -S --needed --noconfirm "${msys_packages[@]}"
 
+	msg "Installing MinGW toolchain groups"
+	run pacman -S --needed --noconfirm \
+		mingw-w64-i686-toolchain \
+		mingw-w64-x86_64-toolchain
+
 	msg "Installing MinGW dependency sets"
 	for pkg in "${mingw_suffixes[@]}"; do
-		run pacman -S --needed --noconfirm \
-			"mingw-w64-i686-${pkg}" \
-			"mingw-w64-x86_64-${pkg}"
+		for arch in i686 x86_64; do
+			local fullpkg="mingw-w64-${arch}-${pkg}"
+
+			# Some optional example libraries are only published for one
+			# MSYS2 MinGW architecture.  Install every package that exists,
+			# but do not make the whole Windows package build fail because
+			# an optional binding library was dropped from one repository.
+			if pacman -Si "$fullpkg" >/dev/null 2>&1; then
+				run pacman -S --needed --noconfirm "$fullpkg"
+			else
+				echo "WARNING: optional MSYS2 package not found: $fullpkg" >&2
+			fi
+		done
 	done
 }
 
@@ -477,6 +600,7 @@ copy_arch_toolchain() {
 	fi
 
 	copy_dir_files "$mingw_root/lib" "$DISTROOT/lib/$arch"
+	create_arch_library_aliases "$DISTROOT/lib/$arch"
 }
 
 assemble_distribution() {

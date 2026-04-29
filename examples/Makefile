@@ -15,12 +15,19 @@
 #
 
 OS := $(shell uname)
-ifeq ($(OS),win32)
+# Handle MSYS2/MinGW which returns MSYS_NT-* or MINGW64_NT-*
+ifneq (,$(findstring NT,$(OS)))
     EXEEXT := .exe
     DLLEXT := .dll
+    WINDOWS := 1
+else ifeq ($(OS),win32)
+    EXEEXT := .exe
+    DLLEXT := .dll
+    WINDOWS := 1
 else
     EXEEXT :=
     DLLEXT := .so
+    WINDOWS :=
 endif
 
 FBC := fbc$(EXEEXT)
@@ -44,22 +51,23 @@ MATH		:= $(subst .bas,,$(wildcard math/*.bas math/*/*.bas))
 MISC		:= $(subst .bas,,$(wildcard misc/*/*.bas))
 NETWORK		:= $(subst .bas,,$(wildcard network/*.bas network/*/*.bas \
 			network/*/*/*.bas))
-#OPTIMIZE	:= $(subst .bas,,$(wildcard OptimizePureAbstractTypes/*.bas))
-#REGEX		:= $(subst .bas,,$(wildcard regex/*/*.bas))
+OPTIMIZE	:= $(subst .bas,,$(wildcard OptimizePureAbstractTypes/*.bas))
+REGEX		:= $(subst .bas,,$(wildcard regex/*.bas regex/*/*.bas))
+SFXLIB		:= $(subst .bas,,$(wildcard sfxlib/*.bas))
 SOUND		:= $(subst .bas,,$(wildcard sound/*.bas)) \
 			$(subst .bas,,$(wildcard sound/*/*.bas))
 THREADS		:= $(subst .bas,,$(wildcard threads/*.bas)) \
 			threads/timer-lib/libtimer$(DLLEXT) threads/timer-lib/test
 UNICODE		:= $(subst .bas,,$(wildcard unicode/*.bas))
-#WIN32 := $(subst .bas,,$(wildcard sound/*/*.bas))
+WIN32		:= $(subst .bas,,$(wildcard win32/*.bas win32/*/*.bas win32/*/*/*.bas))
 XML		:= $(subst .bas,,$(wildcard xml/*.bas))
 
 
 ALL_FILES := \
 	$(BASICS) $(COMPRESSION) $(CONSOLE) $(DATABASE) \
 	$(DLL) $(DOS) $(FILES) $(GRAPHICS) $(GUI) $(MANUAL) \
-	$(MATH) $(MISC) $(NETWORK) $(OPTIMIZE) $(SOUND) \
-	$(THREADS) $(UNICODE) $(XML)
+	$(MATH) $(MISC) $(NETWORK) $(OPTIMIZE) $(REGEX) $(SFXLIB) $(SOUND) \
+	$(THREADS) $(UNICODE) $(WIN32) $(XML)
 
 all: $(ALL_FILES)
 
@@ -78,9 +86,12 @@ misc: $(MISC)
 #network: checklib.curl checklib.CHttp .WAIT $(NETWORK)
 network: $(NETWORK)
 optimize: $(OPTIMIZE)
+regex: $(REGEX)
+sfxlib: $(SFXLIB)
 sound: $(SOUND)
 threads: $(THREADS)
 unicode: $(UNICODE)
+win32: $(WIN32)
 xml: $(XML)
 
 
@@ -95,17 +106,12 @@ dll/libmydll$(DLLEXT): dll/mydll.bas
 dll/test: dll/test.bas dll/libmydll$(DLLEXT)
 	$(FBC) -p dll dll/test.bas
 
-ifeq ($(OS),Linux)
-DOS/%: DOS/%.bas
-	@echo "SKIP $@ on Linux"
-else 
-ifeq ($(OS),Windows_NT)
+ifeq ($(WINDOWS),1)
 DOS/%: DOS/%.bas
 	@echo "SKIP $@ on Windows"
 else
 DOS/%: DOS/%.bas
 	$(FBC) $<
-endif
 endif
 
 threads/timer-lib/libtimer$(DLLEXT): threads/timer-lib/timer.bas

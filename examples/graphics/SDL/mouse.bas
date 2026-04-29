@@ -6,10 +6,11 @@
 #include  "SDL\SDL.bi"
 
 ' function used to setup a cursor with a given array of image data
-declare function loadCursor _
-   (image() as ubyte, byval w as integer, byval h as integer, _
+declare function makeCursor _
+   (image(any, any) as ubyte, byval w as integer, byval height as integer, _
    byval hotx as integer, byval hoty as integer) as SDL_Cursor ptr
 
+sub main()
 	dim as SDL_Surface ptr video 
 	dim as ubyte hand(31, 31), arrow(31, 31) 
 	dim as integer x, y 
@@ -44,8 +45,8 @@ declare function loadCursor _
 	dim handCursor as SDL_Cursor ptr, arrowCursor as SDL_Cursor ptr
 	
 	' obtain cursors corresponding to the hand and arrow images
-	handCursor = loadCursor(hand(), 32, 32, 4, 0)
-	arrowCursor = loadCursor(arrow(), 32, 32, 4, 0)
+	handCursor = makeCursor(hand(), 32, 32, 4, 0)
+	arrowCursor = makeCursor(arrow(), 32, 32, 4, 0)
 	
 	dim done as integer
 	done = 0
@@ -109,18 +110,19 @@ declare function loadCursor _
 	SDL_FreeCursor(arrowCursor)
 	SDL_FreeCursor(handCursor)
 	SDL_Quit
+end sub
 
-function loadCursor _
-   (image() as ubyte, byval w as integer, byval h as integer, _
+function makeCursor _
+   (image(any, any) as ubyte, byval w as integer, byval height as integer, _
    byval hotx as integer, byval hoty as integer) as SDL_Cursor ptr
    dim as integer i, row, col 
-   dim as ubyte dat(w * h / 8) 
-   dim as ubyte mas(w * h / 8)
+   dim as ubyte dat(w * height / 8) 
+   dim as ubyte mas(w * height / 8)
    
    ' convert the image data so that it can be used to create a cursor
    i = -1
    for row = 0 to w - 1
-      for col = 0 to h - 1
+      for col = 0 to height - 1
          if (col mod 8) then
             dat(i) = dat(i) shl 1
             mas(i) = mas(i) shl 1
@@ -139,7 +141,7 @@ function loadCursor _
       next
    next
    
-   loadCursor = SDL_CreateCursor(@dat(0), @mas(0), w, h, hotx, hoty)
+   makeCursor = SDL_CreateCursor(@dat(0), @mas(0), w, height, hotx, hoty)
 end function
 
 ' data for hand cursor
@@ -204,3 +206,4 @@ data 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 data 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 data 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 data 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+main()

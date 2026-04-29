@@ -7,17 +7,16 @@
 '
 ' Press any to start/stop the music, ESC to exit.
 
-#include  "SDL\SDL.bi"
-#include  "SDL\SDL_mixer.bi"
+#include once "SDL\SDL.bi"
+#include once "SDL\SDL_mixer.bi"
 
-	' Mix_Music actually holds the music information.
-	dim shared music as Mix_Music ptr
-
-	music = NULL
+' Mix_Music actually holds the music information.
+dim shared song as Mix_Music ptr = NULL
 
 declare sub handlekey(byval key as SDL_KeyboardEvent ptr)
 declare sub musicDone cdecl ()
 
+sub main()
 	dim video as SDL_Surface ptr
 	dim event as SDL_Event
 	dim done as integer
@@ -76,6 +75,7 @@ declare sub musicDone cdecl ()
 	' This is the cleaning up part
 	Mix_CloseAudio
 	SDL_Quit
+end sub
 
 sub handleKey (byval key as SDL_KeyboardEvent ptr)
 	dim keyEvent as SDL_KeyboardEvent
@@ -83,17 +83,17 @@ sub handleKey (byval key as SDL_KeyboardEvent ptr)
    
     ' Here we're going to have the 'm' key toggle the music on and
     ' off.  When it's on, it'll be loaded and 'music' will point to
-    ' something valid.  If it's off, music will be NULL.
+    ' something valid.  If it's off, song will be NULL.
       
-    if (music = NULL) then
+    if (song = NULL) then
 		' Actually loads up the music
-        music = Mix_LoadMUS("data/music.ogg")            
+        song = Mix_LoadMUS("data/music.ogg")            
          
         ' This begins playing the music - the first argument is a
         ' pointer to Mix_Music structure, and the second is how many
         ' times you want it to loop (use -1 for infinite, and 0 to
         ' have it just play once)
-        Mix_PlayMusic(music, 0)            
+        Mix_PlayMusic(song, 0)            
          
         ' We want to know when our music has stopped playing so we
         ' can free it up and set 'music' back to NULL.  SDL_Mixer
@@ -106,9 +106,9 @@ sub handleKey (byval key as SDL_KeyboardEvent ptr)
          
         ' Unload the music from memory, since we don't need it
         ' anymore
-        Mix_FreeMusic(music)         
+        Mix_FreeMusic(song)         
          
-        music = NULL
+        song = NULL
     end if
       
 end sub
@@ -119,6 +119,8 @@ end sub
 ' different music file might be loaded and played.
 sub musicDone cdecl ()
    	Mix_HaltMusic
-   	Mix_FreeMusic(music)
-   	music = NULL
+   	Mix_FreeMusic(song)
+   	song = NULL
 end sub
+
+main()
