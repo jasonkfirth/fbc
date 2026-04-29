@@ -1,5 +1,3 @@
-#!/usr/bin/make -f
-#
 # examples makefile - attempts to build all examples
 #
 # Several examples will not build if their libraries are not

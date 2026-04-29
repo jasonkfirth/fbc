@@ -1,0 +1,23 @@
+.TH FBC-JS 1 "2026-04-29" "FreeBASIC Compiler" "FreeBASIC Compiler"
+.SH NAME
+fbc-js \- FreeBASIC compiler driver for JavaScript/Emscripten
+.SH SYNOPSIS
+.B fbc-js
+[\fIoptions\fR] \fIprogram.bas\fR
+.SH DESCRIPTION
+.B fbc-js
+invokes the FreeBASIC compiler with defaults suitable for the packaged
+JavaScript/Emscripten target runtime.
+.PP
+Most compiler options are the same as for
+.BR fbc (1).
+.SH OPTIONS
+.TP
+.B --help
+Show wrapper/compiler help.
+.TP
+.BI -x " FILE"
+Write the output file to
+.IR FILE .
+.SH SEE ALSO
+.BR fbc (1)

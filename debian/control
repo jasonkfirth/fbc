@@ -8,7 +8,7 @@ Build-Depends:
  dos2unix,
  git,
  make,
- pkgconf | pkg-config,
+ pkgconf,
  xz-utils,
  libncurses-dev,
  libtinfo-dev,
@@ -94,7 +94,7 @@ Breaks:
 Replaces:
  freebasic-dev (<< ${binary:Version})
 Recommends:
- pkgconf | pkg-config,
+ pkgconf,
  zlib1g-dev,
  libbz2-dev,
  libzip-dev,
@@ -110,8 +110,8 @@ Recommends:
  libasound2-dev,
  libpulse-dev,
  libcairo2-dev,
- libfontconfig-dev | libfontconfig1-dev,
- libfreetype-dev | libfreetype6-dev,
+ libfontconfig-dev,
+ libfreetype-dev,
  libcurl4-openssl-dev
 Suggests:
  libpcre2-dev,
@@ -205,7 +205,7 @@ Depends:
  freebasic-examples (= ${binary:Version}),
  freebasic-doc (= ${binary:Version}),
  ${misc:Depends},
- pkgconf | pkg-config
+ pkgconf
 Recommends:
  freebasic-js (= ${binary:Version}),
  freebasic-android (= ${binary:Version}),
@@ -224,8 +224,8 @@ Recommends:
  libopenal-dev,
  libasound2-dev,
  libcairo2-dev,
- libfontconfig-dev | libfontconfig1-dev,
- libfreetype-dev | libfreetype6-dev
+ libfontconfig-dev,
+ libfreetype-dev
 Suggests:
  libpcre2-dev,
  libtre-dev,

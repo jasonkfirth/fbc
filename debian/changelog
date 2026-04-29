@@ -54,6 +54,9 @@ freebasic (1.20.1-1) jammy; urgency=medium
   * Refactor the Debian/Ubuntu package split so the native compiler,
     runtime, startup objects, libraries, and core headers ship together
     in freebasic.
+  * Reduce lintian noise by installing compiler driver manpages,
+    modernizing dependency names, cleaning generated documentation package
+    contents, and documenting intentional Android cross-target archives.
   * Add freebasic-bindings for third-party header/binding files and
     freebasic-examples for source examples, leaving freebasic-runtime
     and freebasic-dev as transitional compatibility packages.
@@ -87,7 +90,8 @@ freebasic (1.20.1-1) jammy; urgency=medium
     toggle button, and AAudio/OpenSL ES sound backends.
   * Propagate NativeActivity lifecycle and surface callbacks into Android
     gfxlib/sfxlib so rendering and audio output pause cleanly and recover
-    across Android surface recreation.
+    across Android surface recreation, and wait for stdout/stderr redirection
+    before running the FreeBASIC main program.
   * Add build_scripts/debianubuntu-test-freebasic-android.sh to build
     console, gfxlib, and sfxlib APKs in a fresh container and run them
     under an Android emulator when KVM and a system image are available.
@@ -96,8 +100,8 @@ freebasic (1.20.1-1) jammy; urgency=medium
     command-line tools, and a system image only after the package has
     already proven it can build APKs from declared dependencies, along
     with the minimal X11 runtime libraries needed to launch the emulator
-    in a slim container, and polls logcat with useful diagnostics while
-    validating APK launch markers.
+    in a slim container, and polls all logcat buffers with useful diagnostics
+    while validating APK launch markers.
   * Add an fbc-android --target-api option so APK manifests can satisfy
     modern emulator install policy even when building against an older
     distro-provided Android platform jar.

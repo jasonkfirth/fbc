@@ -46,6 +46,7 @@ typedef struct FB_ANDROID_APP
 	int looper_thread_started;
 	int program_thread_started;
 	int destroyed;
+	int stdio_ready;
 	int started;
 	int resumed;
 	int focused;
@@ -121,7 +122,7 @@ static void fb_android_set_lifecycle(FB_ANDROID_APP *app, int started, int resum
 
 static void fb_android_maybe_start_program(FB_ANDROID_APP *app)
 {
-	if (app->program_thread_started || !app->window)
+	if (app->program_thread_started || !app->window || !app->stdio_ready)
 		return;
 
 	app->program_thread_started = 1;
@@ -211,6 +212,7 @@ static void *fb_android_looper_thread(void *arg)
 		ALooper_addFd(app->looper, app->stdout_pipe[0], FB_ANDROID_LOOPER_STDOUT, ALOOPER_EVENT_INPUT, NULL, app);
 
 	pthread_mutex_lock(&app->mutex);
+	app->stdio_ready = 1;
 	fb_android_attach_input_locked(app);
 	while (!app->destroyed)
 	{

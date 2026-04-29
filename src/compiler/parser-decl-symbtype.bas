@@ -187,7 +187,7 @@ private function hGetTokenDescription( byval tk as integer ) as string
 	end select
 end function
 
-type AmbigiousSizeofInfo
+type AmbiguousSizeofInfo
 	as FBSYMBOL ptr typ, nontype
 	declare sub checkSymChain( byval chain_ as FBSYMCHAIN ptr )
 	declare sub maybeWarn( byval tk as integer, byval refers_to_type as integer )
@@ -203,7 +203,7 @@ end type
 '' address-of operation). Also, for types it looks like we only have to check
 '' structs/typedefs/fwdrefs, but not enums, because it's not allowed to declare
 '' vars with the same name as enums anyways.
-sub AmbigiousSizeofInfo.checkSymChain( byval chain_ as FBSYMCHAIN ptr )
+sub AmbiguousSizeofInfo.checkSymChain( byval chain_ as FBSYMCHAIN ptr )
 	do
 		var sym = chain_->sym
 
@@ -226,7 +226,7 @@ sub AmbigiousSizeofInfo.checkSymChain( byval chain_ as FBSYMCHAIN ptr )
 	loop while( chain_ )
 end sub
 
-sub AmbigiousSizeofInfo.maybeWarn( byval tk as integer, byval refers_to_type as integer )
+sub AmbiguousSizeofInfo.maybeWarn( byval tk as integer, byval refers_to_type as integer )
 	if( (typ = NULL) or (nontype = NULL) ) then exit sub
 
 	'' Don't warn if it's a type and a var of that type, because then the
@@ -243,7 +243,7 @@ sub AmbigiousSizeofInfo.maybeWarn( byval tk as integer, byval refers_to_type as 
 		swap sym1, sym2
 	end if
 
-	var msg = "Ambigious " + hGetTokenDescription( tk ) + "()"
+	var msg = "Ambiguous " + hGetTokenDescription( tk ) + "()"
 	msg += ", referring to " + symbDumpPrettyToStr( sym1 )
 	msg += ", instead of " + symbDumpPrettyToStr( sym2 )
 	errReportWarn( FB_WARNINGMSG_AMBIGIOUSLENSIZEOF, , , msg )
@@ -283,12 +283,12 @@ function cTypeOrExpression _
 	'' token but not the look ahead.  Only in the qb dialect could variables
 	'' possibly have periods in the name.  In all other cases (like for types)
 	'' we need to return each identifier between periods.
-	dim ambigioussizeof as AmbigiousSizeofInfo
+	dim ambiguoussizeof as AmbiguousSizeofInfo
 	if( (lexGetToken( ) = FB_TK_ID) and (lexGetLookAhead( 1, LEXCHECK_NOPERIOD ) = CHAR_RPRNT) ) then
 		var chain_ = lexGetSymChain( )
 		'' Known symbol(s)?
 		if( chain_ ) then
-			ambigioussizeof.checkSymChain( chain_ )
+			ambiguoussizeof.checkSymChain( chain_ )
 		end if
 	end if
 
@@ -323,13 +323,13 @@ function cTypeOrExpression _
 		assert( parser.nsprefix = NULL )
 		if( cSymbolType( dtype, subtype, lgt, is_fixlenstr, FB_SYMBTYPEOPT_SAVENSPREFIX ) ) then
 			'' Successful -- it's a type, not an expression
-			ambigioussizeof.maybeWarn( tk, TRUE )
+			ambiguoussizeof.maybeWarn( tk, TRUE )
 			parser.nsprefix = NULL
 			return NULL
 		end if
 	end if
 
-	ambigioussizeof.maybeWarn( tk, FALSE )
+	ambiguoussizeof.maybeWarn( tk, FALSE )
 
 	'' Parse as expression, allowing NIDXARRAYs
 	expr = cExpressionWithNIDXARRAY( TRUE )

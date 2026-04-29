@@ -338,13 +338,20 @@ endif
 # FLTK license relocation
 # ------------------------------------------------------------
 
-	if [ -f debian/tmp/usr/include/freebasic/FLTK/LICENSE ]; then \
-		mkdir -p debian/tmp/usr/share/doc/freebasic-bindings; \
-		mv debian/tmp/usr/include/freebasic/FLTK/LICENSE \
-		   debian/tmp/usr/share/doc/freebasic-bindings/FLTK-LICENSE; \
-		ln -sf ../../../share/doc/freebasic-bindings/FLTK-LICENSE \
-		   debian/tmp/usr/include/freebasic/FLTK/LICENSE; \
-	fi
+	for incroot in freebasic freebasic-js freebasic-android; do \
+		if [ -f "debian/tmp/usr/include/$$incroot/FLTK/LICENSE" ]; then \
+			docpkg=freebasic-bindings; \
+			case "$$incroot" in \
+				freebasic-js) docpkg=freebasic-js ;; \
+				freebasic-android) docpkg=freebasic-android ;; \
+			esac; \
+			mkdir -p "debian/tmp/usr/share/doc/$$docpkg"; \
+			mv "debian/tmp/usr/include/$$incroot/FLTK/LICENSE" \
+			   "debian/tmp/usr/share/doc/$$docpkg/FLTK-LICENSE"; \
+			ln -sf "../../../share/doc/$$docpkg/FLTK-LICENSE" \
+			   "debian/tmp/usr/include/$$incroot/FLTK/LICENSE"; \
+		fi; \
+	done
 
 # ------------------------------------------------------------
 # Remove duplicate GPL texts
@@ -358,6 +365,12 @@ endif
 
 override_dh_auto_test:
 	true
+
+execute_after_dh_installdocs:
+	find debian/freebasic-doc/usr/share/doc/freebasic -name ".git*" -delete || true
+	rm -rf debian/freebasic-doc/usr/share/doc/freebasic/manual/cache* || true
+	find debian/freebasic-doc/usr/share/doc/freebasic \
+		\( -name gpl.txt -o -name lgpl.txt \) -delete || true
 
 
 # ======================================================================

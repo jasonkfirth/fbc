@@ -1,0 +1,57 @@
+.TH FBC-ANDROID 1 "2026-04-29" "FreeBASIC Compiler" "FreeBASIC Compiler"
+.SH NAME
+fbc-android \- FreeBASIC compiler driver for Android APKs
+.SH SYNOPSIS
+.B fbc-android
+[\fIoptions\fR] \fIprogram.bas\fR
+.SH DESCRIPTION
+.B fbc-android
+builds a FreeBASIC source file using the packaged Android target runtime and
+produces a signed debug APK by default.
+.SH OPTIONS
+.TP
+.B --emit-apk
+Produce a signed debug APK. This is the default.
+.TP
+.B --emit-so
+Produce only the native shared library.
+.TP
+.B --emit-obj
+Produce only the compiled FreeBASIC object file.
+.TP
+.BI --api " N"
+Use Android NDK API level
+.IR N .
+.TP
+.BI --min-api " N"
+Set APK minSdkVersion to
+.IR N .
+.TP
+.BI --target-api " N"
+Set APK targetSdkVersion to
+.IR N .
+.TP
+.BI --package " NAME"
+Set the Android application package name.
+.TP
+.BI --label " TEXT"
+Set the Android application label.
+.TP
+.B --keep-temp
+Keep the temporary build directory.
+.TP
+.B --help
+Show wrapper help.
+.SH ENVIRONMENT
+.TP
+.B ANDROID_HOME, ANDROID_SDK_ROOT
+Android SDK location.
+.TP
+.B ANDROID_NDK_HOME
+Android NDK location.
+.TP
+.B FBANDROID_PREFIX
+Installation prefix used to find the packaged compiler, headers, runtime
+libraries, and APK templates.
+.SH SEE ALSO
+.BR fbc (1)

@@ -294,11 +294,12 @@ run_apk_smoke() {
     local marker="$4"
     local log_file="$5"
     local deadline
+    local next_notice
     local exit_marker="FREEBASIC_ANDROID_EXIT:0"
 
     run "$adb" install -r "$apk"
     run "$adb" shell am force-stop "$package_name" >/dev/null 2>&1 || true
-    run "$adb" logcat -c
+    run "$adb" logcat -b all -c
     if ! run "$adb" shell am start -W \
         -a android.intent.action.MAIN \
         -c android.intent.category.LAUNCHER \
@@ -308,20 +309,28 @@ run_apk_smoke() {
     fi
 
     deadline=$((SECONDS + 60))
+    next_notice=$SECONDS
     while [ "$SECONDS" -lt "$deadline" ]; do
-        "$adb" logcat -d > "$log_file"
+        "$adb" logcat -b all -d > "$log_file"
         if grep -q "$marker" "$log_file" && grep -q "$exit_marker" "$log_file"; then
             return 0
+        fi
+        if [ "$SECONDS" -ge "$next_notice" ]; then
+            echo "==> waiting for app markers from $package_name..."
+            next_notice=$((SECONDS + 10))
         fi
         sleep 2
     done
 
-    "$adb" logcat -d > "$log_file"
+    "$adb" logcat -b all -d > "$log_file"
+    echo "ERROR: app smoke high-signal logcat lines for $package_name:" >&2
+    grep -E "$package_name|FreeBASIC|FREEBASIC_ANDROID|AndroidRuntime|NativeActivity|freebasicapp|libfreebasicapp|UnsatisfiedLinkError|Fatal signal|DEBUG" "$log_file" >&2 || true
     echo "ERROR: app smoke logcat tail for $package_name:" >&2
     tail -n 200 "$log_file" >&2 || true
     echo "ERROR: app activity state for $package_name:" >&2
     "$adb" shell pidof "$package_name" >&2 || true
     "$adb" shell dumpsys activity activities | grep -F "$package_name" >&2 || true
+    "$adb" shell dumpsys package "$package_name" | grep -E 'Package \[|versionName|primaryCpuAbi|nativeLibrary|android.app.NativeActivity|android.intent.action.MAIN' >&2 || true
     grep -q "$marker" "$log_file" || fail "missing app marker '$marker' in logcat for $package_name"
     grep -q "$exit_marker" "$log_file" || fail "missing clean exit marker in logcat for $package_name"
 }
