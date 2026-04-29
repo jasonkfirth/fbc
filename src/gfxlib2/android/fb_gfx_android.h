@@ -31,6 +31,7 @@ void fb_hAndroidScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssiz
 
 void fb_hAndroidSetActivity(ANativeActivity *activity);
 void fb_hAndroidSetWindow(ANativeWindow *window);
+void fb_hAndroidGfxSetLifecycle(int started, int resumed, int focused);
 int fb_hAndroidIsGraphicsActive(void);
 void fb_hAndroidTouch(float x, float y, int action);
 void fb_hAndroidKey(int32_t keycode, int action, int unicode);

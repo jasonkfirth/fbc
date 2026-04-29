@@ -35,6 +35,11 @@ typedef struct FB_ANDROID_GFX_STATE
 	int window_width;
 	int window_height;
 	BLITTER *blitter;
+	int started;
+	int resumed;
+	int focused;
+	unsigned surface_generation;
+	int render_suspended;
 	char console[FB_ANDROID_CONSOLE_LINES][FB_ANDROID_CONSOLE_COLS];
 	int console_line;
 	int console_col;
@@ -59,6 +64,11 @@ static FB_ANDROID_GFX_STATE fb_android =
 	0,
 	0,
 	NULL,
+	1,
+	1,
+	1,
+	0,
+	1,
 	{{0}},
 	0,
 	0,
@@ -98,6 +108,37 @@ static void update_window_size_locked(void)
 		fb_android.window_width = 0;
 		fb_android.window_height = 0;
 	}
+}
+
+static int can_render_locked(void)
+{
+	return fb_android.window && fb_android.started && fb_android.resumed && !fb_android.render_suspended;
+}
+
+static int can_post_input_locked(void)
+{
+	return fb_android.active && fb_android.started && fb_android.resumed && fb_android.focused;
+}
+
+static void update_render_suspended_locked(void)
+{
+	fb_android.render_suspended = (!fb_android.window || !fb_android.started || !fb_android.resumed);
+}
+
+static void configure_window_locked(void)
+{
+	if (!fb_android.window)
+	{
+		update_window_size_locked();
+		update_render_suspended_locked();
+		return;
+	}
+
+	if (fb_android.active && fb_android.width > 0 && fb_android.height > 0)
+		ANativeWindow_setBuffersGeometry(fb_android.window, fb_android.width, fb_android.height, WINDOW_FORMAT_RGBA_8888);
+
+	update_window_size_locked();
+	update_render_suspended_locked();
 }
 
 static int keyboard_button_rect_locked(int *x0, int *y0, int *x1, int *y1)
@@ -150,12 +191,16 @@ void fb_hAndroidSetActivity(ANativeActivity *activity)
 {
 	pthread_mutex_lock(&fb_android.mutex);
 	fb_android.activity = activity;
+	if (!activity)
+		fb_android.keyboard_visible = 0;
 	pthread_mutex_unlock(&fb_android.mutex);
 }
 
 void fb_hAndroidSetWindow(ANativeWindow *window)
 {
 	ANativeWindow *old_window;
+	int redraw_active;
+	int redraw_console;
 
 	if (window)
 		ANativeWindow_acquire(window);
@@ -163,11 +208,39 @@ void fb_hAndroidSetWindow(ANativeWindow *window)
 	pthread_mutex_lock(&fb_android.mutex);
 	old_window = fb_android.window;
 	fb_android.window = window;
-	update_window_size_locked();
+	fb_android.surface_generation++;
+	configure_window_locked();
+	redraw_active = fb_android.active && can_render_locked();
+	redraw_console = !fb_android.active && can_render_locked();
 	pthread_mutex_unlock(&fb_android.mutex);
 
 	if (old_window)
 		ANativeWindow_release(old_window);
+
+	if (redraw_active)
+		fb_hAndroidUpdate();
+	else if (redraw_console)
+		fb_hAndroidConsoleRender();
+}
+
+void fb_hAndroidGfxSetLifecycle(int started, int resumed, int focused)
+{
+	int redraw_active;
+	int redraw_console;
+
+	pthread_mutex_lock(&fb_android.mutex);
+	fb_android.started = started ? 1 : 0;
+	fb_android.resumed = resumed ? 1 : 0;
+	fb_android.focused = focused ? 1 : 0;
+	update_render_suspended_locked();
+	redraw_active = fb_android.active && can_render_locked();
+	redraw_console = !fb_android.active && can_render_locked();
+	pthread_mutex_unlock(&fb_android.mutex);
+
+	if (redraw_active)
+		fb_hAndroidUpdate();
+	else if (redraw_console)
+		fb_hAndroidConsoleRender();
 }
 
 int fb_hAndroidIsGraphicsActive(void)
@@ -218,9 +291,8 @@ int fb_hAndroidInit(char *title, int w, int h, int depth, int refresh_rate, int 
 		return -1;
 	}
 
-	ANativeWindow_setBuffersGeometry(fb_android.window, w, h, WINDOW_FORMAT_RGBA_8888);
-	update_window_size_locked();
 	fb_android.active = 1;
+	configure_window_locked();
 	__fb_gfx->refresh_rate = fb_android.refresh_rate;
 
 	pthread_mutex_unlock(&fb_android.mutex);
@@ -238,6 +310,7 @@ void fb_hAndroidExit(void)
 	fb_android.height = 0;
 	fb_android.depth = 0;
 	fb_android.blitter = NULL;
+	update_render_suspended_locked();
 	pthread_mutex_unlock(&fb_android.mutex);
 }
 
@@ -454,7 +527,7 @@ void fb_hAndroidUpdate(void)
 	pthread_mutex_lock(&fb_android.mutex);
 	window = fb_android.window;
 	blitter = fb_android.blitter;
-	if (!fb_android.active || !window || !blitter || !__fb_gfx || !__fb_gfx->framebuffer)
+	if (!fb_android.active || !can_render_locked() || !window || !blitter || !__fb_gfx || !__fb_gfx->framebuffer)
 	{
 		pthread_mutex_unlock(&fb_android.mutex);
 		return;
@@ -480,7 +553,7 @@ void fb_hAndroidConsoleRender(void)
 
 	pthread_mutex_lock(&fb_android.mutex);
 	window = fb_android.window;
-	if (fb_android.active || !window)
+	if (fb_android.active || !can_render_locked() || !window)
 	{
 		pthread_mutex_unlock(&fb_android.mutex);
 		return;
@@ -566,14 +639,24 @@ void fb_hAndroidTouch(float x, float y, int action)
 {
 	EVENT e;
 	int w, h, mapped_x, mapped_y;
+	int x0, y0, x1, y1;
+	int toggle_keyboard = 0;
 
-	if (fb_hAndroidKeyboardButtonHit(x, y))
+	pthread_mutex_lock(&fb_android.mutex);
+	if (keyboard_button_rect_locked(&x0, &y0, &x1, &y1) &&
+	    (int)x >= x0 && (int)x < x1 && (int)y >= y0 && (int)y < y1)
 	{
 		if (action == AMOTION_EVENT_ACTION_DOWN)
 			fb_android.keyboard_button_down = 1;
 		else if (action == AMOTION_EVENT_ACTION_UP && fb_android.keyboard_button_down)
 		{
 			fb_android.keyboard_button_down = 0;
+			toggle_keyboard = 1;
+		}
+		pthread_mutex_unlock(&fb_android.mutex);
+
+		if (toggle_keyboard)
+		{
 			fb_hAndroidToggleKeyboard();
 			fb_hAndroidConsoleRender();
 			fb_hAndroidUpdate();
@@ -581,7 +664,6 @@ void fb_hAndroidTouch(float x, float y, int action)
 		return;
 	}
 
-	pthread_mutex_lock(&fb_android.mutex);
 	w = fb_android.window_width > 0 ? fb_android.window_width : fb_android.width;
 	h = fb_android.window_height > 0 ? fb_android.window_height : fb_android.height;
 	mapped_x = (w > 0 && fb_android.width > 0) ? (int)(x * fb_android.width / w) : (int)x;
@@ -594,7 +676,7 @@ void fb_hAndroidTouch(float x, float y, int action)
 	else if (action == AMOTION_EVENT_ACTION_UP || action == AMOTION_EVENT_ACTION_CANCEL)
 		fb_android.mouse_buttons &= ~BUTTON_LEFT;
 
-	if (!fb_android.active)
+	if (!can_post_input_locked())
 	{
 		pthread_mutex_unlock(&fb_android.mutex);
 		return;
@@ -655,7 +737,7 @@ void fb_hAndroidKey(int32_t keycode, int action, int unicode)
 	int scancode;
 
 	pthread_mutex_lock(&fb_android.mutex);
-	if (!fb_android.active)
+	if (!can_post_input_locked())
 	{
 		pthread_mutex_unlock(&fb_android.mutex);
 		return;

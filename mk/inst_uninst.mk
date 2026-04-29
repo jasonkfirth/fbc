@@ -48,7 +48,7 @@ prefixandroidsharedir ?= $(prefix)/share/$(FB_ANDROID_NAME)
 prefixandroidbindir ?= $(prefixandroidrootdir)/bin
 FBINSTALL_ANDROID_RUNTIME_DIR := $(prefixandroidrootdir)/$(FB_ANDROID_TARGET)
 ANDROID_BUILD_LIBDIR ?= $(rootdir)/$(libdirname)/freebasic/$(FB_ANDROID_TARGET)
-ANDROID_TOOLS_DIR ?= $(rootdir)/tools/android
+ANDROID_TOOLS_DIR ?= $(rootdir)/src/tools/android
 
 INSTALL_STAGE_JS_INCDIR := $(prefixjsincdir)
 INSTALL_STAGE_JS_LIBDIR := $(FBINSTALL_JS_RUNTIME_DIR)

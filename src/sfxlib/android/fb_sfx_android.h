@@ -10,6 +10,9 @@ extern "C" {
 extern const FB_SFX_DRIVER fb_sfxDriverAAudio;
 extern const FB_SFX_DRIVER fb_sfxDriverOpenSLES;
 
+void fb_hAndroidSfxSetLifecycle(int started, int resumed);
+int fb_hAndroidSfxIsRunning(void);
+
 #ifdef __cplusplus
 }
 #endif

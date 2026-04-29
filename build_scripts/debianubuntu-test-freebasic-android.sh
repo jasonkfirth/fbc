@@ -293,14 +293,37 @@ run_apk_smoke() {
     local package_name="$3"
     local marker="$4"
     local log_file="$5"
+    local deadline
+    local exit_marker="FREEBASIC_ANDROID_EXIT:0"
 
     run "$adb" install -r "$apk"
+    run "$adb" shell am force-stop "$package_name" >/dev/null 2>&1 || true
     run "$adb" logcat -c
-    run "$adb" shell monkey -p "$package_name" 1
-    sleep 8
+    if ! run "$adb" shell am start -W \
+        -a android.intent.action.MAIN \
+        -c android.intent.category.LAUNCHER \
+        -n "$package_name/android.app.NativeActivity"; then
+        echo "==> explicit activity launch failed; falling back to monkey"
+        run "$adb" shell monkey -p "$package_name" -c android.intent.category.LAUNCHER 1
+    fi
+
+    deadline=$((SECONDS + 60))
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        "$adb" logcat -d > "$log_file"
+        if grep -q "$marker" "$log_file" && grep -q "$exit_marker" "$log_file"; then
+            return 0
+        fi
+        sleep 2
+    done
+
     "$adb" logcat -d > "$log_file"
+    echo "ERROR: app smoke logcat tail for $package_name:" >&2
+    tail -n 200 "$log_file" >&2 || true
+    echo "ERROR: app activity state for $package_name:" >&2
+    "$adb" shell pidof "$package_name" >&2 || true
+    "$adb" shell dumpsys activity activities | grep -F "$package_name" >&2 || true
     grep -q "$marker" "$log_file" || fail "missing app marker '$marker' in logcat for $package_name"
-    grep -q "FREEBASIC_ANDROID_EXIT:0" "$log_file" || fail "missing clean exit marker in logcat for $package_name"
+    grep -q "$exit_marker" "$log_file" || fail "missing clean exit marker in logcat for $package_name"
 }
 
 export DEBIAN_FRONTEND=noninteractive
@@ -317,7 +340,9 @@ run apt-get update -y
 run apt-get install -y --no-install-recommends \
     adb \
     google-android-emulator-installer \
-    google-android-cmdline-tools-19.0-installer
+    google-android-cmdline-tools-19.0-installer \
+    libx11-6 \
+    libxcb1
 
 ensure_system_image "$ANDROID_SYSTEM_IMAGE_PACKAGE"
 

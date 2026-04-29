@@ -1,0 +1,393 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+die() {
+	echo "fbc-android: $*" >&2
+	exit 1
+}
+
+usage() {
+	cat <<EOF
+Usage: fbc-android [options] program.bas
+
+Options:
+  -x FILE, -o FILE       Output APK, .so, or .o path
+  --emit-apk             Produce a signed debug APK (default)
+  --emit-so              Produce libfreebasicapp.so only
+  --emit-obj             Produce the compiled FreeBASIC object only
+  --api N                NDK API level for native compilation (default: 26)
+  --min-api N            APK minSdkVersion (default: 21)
+  --target-api N         APK targetSdkVersion (default: highest installed platform)
+  --package NAME         Android application package name
+  --label TEXT           Android application label
+  --keep-temp            Keep temporary build directory
+  --help                 Show this help text
+
+Environment:
+  ANDROID_HOME / ANDROID_SDK_ROOT   Android SDK location
+  ANDROID_NDK_HOME                  Android NDK location
+  FBANDROID_PREFIX                  Install prefix (default: /usr)
+EOF
+}
+
+find_sdk() {
+	local candidate
+	for candidate in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" /usr/lib/android-sdk /opt/android-sdk "$HOME/Android/Sdk"; do
+		[ -n "$candidate" ] || continue
+		[ -d "$candidate" ] || continue
+		echo "$candidate"
+		return 0
+	done
+	return 1
+}
+
+find_ndk() {
+	local sdk="$1"
+	local candidate
+
+	shopt -s nullglob
+	for candidate in \
+		"${ANDROID_NDK_HOME:-}" \
+		"$sdk"/ndk/* \
+		"$sdk"/ndk-bundle \
+		/usr/lib/android-sdk/ndk/* \
+		/usr/lib/android-sdk/ndk-bundle \
+		/usr/lib/android-ndk* \
+		/opt/android-ndk*
+	do
+		[ -n "$candidate" ] || continue
+		[ -d "$candidate/toolchains/llvm/prebuilt" ] || continue
+		echo "$candidate"
+		shopt -u nullglob
+		return 0
+	done
+	shopt -u nullglob
+	return 1
+}
+
+find_prebuilt() {
+	local ndk="$1"
+	local candidate
+
+	case "$(uname -s)-$(uname -m)" in
+		Linux-x86_64) candidate="$ndk/toolchains/llvm/prebuilt/linux-x86_64" ;;
+		Linux-aarch64|Linux-arm64) candidate="$ndk/toolchains/llvm/prebuilt/linux-aarch64" ;;
+		Darwin-x86_64) candidate="$ndk/toolchains/llvm/prebuilt/darwin-x86_64" ;;
+		Darwin-arm64) candidate="$ndk/toolchains/llvm/prebuilt/darwin-arm64" ;;
+		*) candidate="" ;;
+	esac
+
+	if [ -n "$candidate" ] && [ -d "$candidate/bin" ]; then
+		echo "$candidate"
+		return 0
+	fi
+
+	shopt -s nullglob
+	for candidate in "$ndk"/toolchains/llvm/prebuilt/*; do
+		[ -d "$candidate/bin" ] || continue
+		echo "$candidate"
+		shopt -u nullglob
+		return 0
+	done
+	shopt -u nullglob
+	return 1
+}
+
+find_platform_jar() {
+	local sdk="$1"
+	local selected=""
+	local platform
+
+	if [ -n "${ANDROID_PLATFORM_JAR:-}" ] && [ -f "$ANDROID_PLATFORM_JAR" ]; then
+		echo "$ANDROID_PLATFORM_JAR"
+		return 0
+	fi
+
+	shopt -s nullglob
+	for platform in "$sdk"/platforms/android-*; do
+		[ -f "$platform/android.jar" ] || continue
+		selected="$platform/android.jar"
+	done
+	shopt -u nullglob
+
+	[ -n "$selected" ] || return 1
+	echo "$selected"
+}
+
+tool_or_die() {
+	local name="$1"
+	local sdk="$2"
+	local found=""
+
+	if command -v "$name" >/dev/null 2>&1; then
+		command -v "$name"
+		return 0
+	fi
+
+	shopt -s nullglob
+	for found in "$sdk"/build-tools/*/"$name" "$sdk"/cmdline-tools/latest/bin/"$name" "$sdk"/tools/bin/"$name" "$sdk"/platform-tools/"$name"; do
+		[ -x "$found" ] || continue
+		echo "$found"
+		shopt -u nullglob
+		return 0
+	done
+	shopt -u nullglob
+
+	die "required Android tool '$name' was not found"
+}
+
+sanitize_module() {
+	local value="$1"
+	value="${value##*/}"
+	value="${value%.*}"
+	value="$(printf '%s' "$value" | tr -c 'A-Za-z0-9_' '_')"
+	case "$value" in
+		""|[0-9]*) value="fb_${value}" ;;
+	esac
+	echo "$value"
+}
+
+sanitize_package() {
+	local value="$1"
+	value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9.' '.')"
+	value="${value#.}"
+	value="${value%.}"
+	[ -n "$value" ] || value="app"
+	echo "org.freebasic.$value"
+}
+
+prefix="${FBANDROID_PREFIX:-/usr}"
+libroot="${FBANDROID_LIBROOT:-$prefix/lib/freebasic-android}"
+compiler="${FBANDROID_COMPILER:-$libroot/bin/fbc-android-compiler}"
+incdir="${FBANDROID_INCDIR:-$prefix/include/freebasic-android}"
+share="${FBANDROID_SHARE:-$prefix/share/freebasic-android}"
+template="${FBANDROID_TEMPLATE:-$share/template}"
+target_key="${FBANDROID_TARGET:-android-aarch64}"
+libdir="${FBANDROID_LIBDIR:-$libroot/$target_key}"
+api="${ANDROID_API:-26}"
+min_api="${ANDROID_MIN_API:-21}"
+target_api="${ANDROID_TARGET_API:-}"
+mode="apk"
+keep_temp=0
+output=""
+package=""
+label=""
+src=""
+use_mt=0
+fbc_args=()
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--help)
+			usage
+			exit 0
+			;;
+		--emit-apk) mode="apk"; shift ;;
+		--emit-so) mode="so"; shift ;;
+		--emit-obj) mode="obj"; shift ;;
+		--api) api="$2"; shift 2 ;;
+		--min-api) min_api="$2"; shift 2 ;;
+		--target-api) target_api="$2"; shift 2 ;;
+		--package) package="$2"; shift 2 ;;
+		--label) label="$2"; shift 2 ;;
+		--keep-temp) keep_temp=1; shift ;;
+		-x|-o)
+			output="$2"
+			shift 2
+			;;
+		--)
+			shift
+			while [ $# -gt 0 ]; do
+				fbc_args+=("$1")
+				shift
+			done
+			;;
+		-*)
+			if [ "$1" = "-mt" ]; then
+				use_mt=1
+			fi
+			fbc_args+=("$1")
+			shift
+			;;
+		*)
+			if [ -z "$src" ] && [ "${1##*.}" = "bas" ]; then
+				src="$1"
+			else
+				fbc_args+=("$1")
+			fi
+			shift
+			;;
+	esac
+done
+
+for arg in "${fbc_args[@]}"; do
+	if [ "$arg" = "-mt" ]; then
+		use_mt=1
+	fi
+done
+
+[ -n "$src" ] || die "missing program.bas"
+[ -f "$src" ] || die "source file not found: $src"
+[ -x "$compiler" ] || die "Android-targeting compiler not found: $compiler"
+[ -d "$incdir" ] || die "Android include directory not found: $incdir"
+[ -d "$libdir" ] || die "Android runtime directory not found: $libdir"
+[ -f "$template/fb_android_app.c" ] || die "Android APK template not found: $template"
+
+base="${src##*/}"
+base="${base%.*}"
+module="$(sanitize_module "$src")"
+[ -n "$label" ] || label="$base"
+[ -n "$package" ] || package="$(sanitize_package "$base")"
+
+case "$mode" in
+	apk) [ -n "$output" ] || output="$base.apk" ;;
+	so) [ -n "$output" ] || output="libfreebasicapp.so" ;;
+	obj) [ -n "$output" ] || output="$base.o" ;;
+esac
+
+sdk="$(find_sdk)" || die "Android SDK not found; set ANDROID_HOME or ANDROID_SDK_ROOT"
+ndk="$(find_ndk "$sdk")" || die "Android NDK not found; set ANDROID_NDK_HOME"
+prebuilt="$(find_prebuilt "$ndk")" || die "Android NDK LLVM toolchain not found under $ndk"
+
+triple="aarch64-linux-android"
+abi="arm64-v8a"
+cc="$prebuilt/bin/${triple}${api}-clang"
+ar="$prebuilt/bin/llvm-ar"
+ranlib="$prebuilt/bin/llvm-ranlib"
+
+[ -x "$cc" ] || die "NDK compiler not found: $cc"
+[ -x "$ar" ] || die "NDK llvm-ar not found: $ar"
+[ -x "$ranlib" ] || die "NDK llvm-ranlib not found: $ranlib"
+
+tmp="${TMPDIR:-/tmp}/fbc-android.$$"
+mkdir -p "$tmp"
+cleanup() {
+	if [ "$keep_temp" -eq 0 ]; then
+		rm -rf "$tmp"
+	else
+		echo "fbc-android: kept temporary directory: $tmp" >&2
+	fi
+}
+trap cleanup EXIT
+
+cfile="$tmp/$module.c"
+objfile="$tmp/$module.o"
+appobj="$tmp/fb_android_app.o"
+sofile="$tmp/libfreebasicapp.so"
+
+env GCC="$cc" CLANG="$cc" AS="$cc" LD="$cc" AR="$ar" RANLIB="$ranlib" \
+	"$compiler" \
+	-prefix "$prefix" \
+	-target "$triple" \
+	-arch aarch64 \
+	-gen gcc \
+	-r \
+	-pic \
+	-entry fb_android_program_main \
+	-m "$module" \
+	-i "$incdir" \
+	-p "$libdir" \
+	"${fbc_args[@]}" \
+	-o "$cfile" \
+	"$src"
+
+"$cc" -fPIC -DANDROID -D__FB_ANDROID__ -I"$incdir" -Wno-unused-variable -Wno-unused-function -c "$cfile" -o "$objfile"
+
+if [ "$mode" = "obj" ]; then
+	cp "$objfile" "$output"
+	echo "$output"
+	exit 0
+fi
+
+"$cc" -fPIC -DANDROID -I"$incdir" -c "$template/fb_android_app.c" -o "$appobj"
+
+runtime=()
+if [ "$use_mt" -eq 1 ]; then
+	fb_runtime="libfbmtpic.a"
+	fbrt_runtime="libfbrtmtpic.a"
+	gfx_runtime="libfbgfxmtpic.a"
+	sfx_runtime="libsfxmtpic.a"
+else
+	fb_runtime="libfbpic.a"
+	fbrt_runtime="libfbrtpic.a"
+	gfx_runtime="libfbgfxpic.a"
+	sfx_runtime="libsfxpic.a"
+fi
+
+for required in fbrt0pic.o "$fb_runtime"; do
+	[ -f "$libdir/$required" ] || die "required Android runtime file is missing: $libdir/$required"
+	runtime+=("$libdir/$required")
+done
+for optional in "$fbrt_runtime" "$gfx_runtime" "$sfx_runtime"; do
+	if [ -f "$libdir/$optional" ]; then
+		runtime+=("$libdir/$optional")
+	fi
+done
+
+"$cc" -shared -Wl,-soname,libfreebasicapp.so -o "$sofile" \
+	"$appobj" "$objfile" \
+	-Wl,--start-group "${runtime[@]}" -Wl,--end-group \
+	-llog -landroid -lOpenSLES -ldl -lm
+
+if [ "$mode" = "so" ]; then
+	cp "$sofile" "$output"
+	echo "$output"
+	exit 0
+fi
+
+platform_jar="$(find_platform_jar "$sdk")" || die "no Android platform android.jar found under $sdk/platforms"
+target_sdk="${platform_jar%/android.jar}"
+target_sdk="${target_sdk##*/android-}"
+[ -z "$target_api" ] || target_sdk="$target_api"
+aapt="$(tool_or_die aapt "$sdk")"
+apksigner="$(tool_or_die apksigner "$sdk")"
+keytool="$(command -v keytool || true)"
+[ -n "$keytool" ] || die "keytool not found; install a JDK"
+
+mkdir -p "$tmp/apk/lib/$abi" "$tmp/res/values"
+cp "$sofile" "$tmp/apk/lib/$abi/libfreebasicapp.so"
+cp "$template/strings.xml" "$tmp/res/values/strings.xml"
+sed \
+	-e "s|@PACKAGE@|$package|g" \
+	-e "s|@MIN_SDK@|$min_api|g" \
+	-e "s|@TARGET_SDK@|$target_sdk|g" \
+	-e "s|@LABEL@|$label|g" \
+	"$template/AndroidManifest.xml.in" > "$tmp/AndroidManifest.xml"
+
+unsigned="$tmp/freebasicapp-unsigned.apk"
+unaligned="$tmp/freebasicapp-unaligned.apk"
+aligned="$tmp/freebasicapp-aligned.apk"
+
+"$aapt" package -f -M "$tmp/AndroidManifest.xml" -S "$tmp/res" -I "$platform_jar" -F "$unsigned"
+jar uf "$unsigned" -C "$tmp/apk" lib
+cp "$unsigned" "$unaligned"
+
+if command -v zipalign >/dev/null 2>&1; then
+	zipalign -f 4 "$unaligned" "$aligned"
+else
+	cp "$unaligned" "$aligned"
+fi
+
+keystore="${ANDROID_DEBUG_KEYSTORE:-$HOME/.android/debug.keystore}"
+mkdir -p "${keystore%/*}"
+if [ ! -f "$keystore" ]; then
+	"$keytool" -genkeypair \
+		-keystore "$keystore" \
+		-storepass android \
+		-keypass android \
+		-alias androiddebugkey \
+		-keyalg RSA \
+		-keysize 2048 \
+		-validity 10000 \
+		-dname "CN=Android Debug,O=Android,C=US" >/dev/null
+fi
+
+"$apksigner" sign \
+	--ks "$keystore" \
+	--ks-pass pass:android \
+	--key-pass pass:android \
+	--out "$output" \
+	"$aligned"
+
+echo "$output"

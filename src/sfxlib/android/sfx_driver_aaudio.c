@@ -6,6 +6,7 @@
 #include <aaudio/AAudio.h>
 #include <android/api-level.h>
 #include <dlfcn.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -29,6 +30,7 @@ typedef struct FB_SFX_AAUDIO_API
 
 static FB_SFX_AAUDIO_API api;
 static AAudioStream *stream = NULL;
+static pthread_mutex_t stream_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int initialized = 0;
 
 static void *load_symbol(const char *name)
@@ -75,6 +77,18 @@ static int load_api(void)
 	return 0;
 }
 
+static void close_stream_locked(void)
+{
+	if (!stream)
+		return;
+
+	if (api.requestStop)
+		api.requestStop(stream);
+	if (api.close)
+		api.close(stream);
+	stream = NULL;
+}
+
 static int aaudio_init(int rate, int channels, int buffer, int flags)
 {
 	AAudioStreamBuilder *builder = NULL;
@@ -89,9 +103,13 @@ static int aaudio_init(int rate, int channels, int buffer, int flags)
 	if (load_api() != 0)
 		return -1;
 
+	pthread_mutex_lock(&stream_mutex);
 	result = api.createStreamBuilder(&builder);
 	if (result != AAUDIO_OK || !builder)
+	{
+		pthread_mutex_unlock(&stream_mutex);
 		return -1;
+	}
 
 	api.setDirection(builder, AAUDIO_DIRECTION_OUTPUT);
 	api.setSampleRate(builder, rate > 0 ? rate : FB_SFX_DEFAULT_RATE);
@@ -105,41 +123,56 @@ static int aaudio_init(int rate, int channels, int buffer, int flags)
 	if (result != AAUDIO_OK || !stream)
 	{
 		stream = NULL;
+		pthread_mutex_unlock(&stream_mutex);
 		return -1;
 	}
 
 	result = api.requestStart(stream);
 	if (result != AAUDIO_OK)
 	{
-		api.close(stream);
-		stream = NULL;
+		close_stream_locked();
+		pthread_mutex_unlock(&stream_mutex);
 		return -1;
 	}
 
 	initialized = 1;
+	pthread_mutex_unlock(&stream_mutex);
 	return 0;
 }
 
 static void aaudio_exit(void)
 {
-	if (stream)
-	{
-		api.requestStop(stream);
-		api.close(stream);
-		stream = NULL;
-	}
+	pthread_mutex_lock(&stream_mutex);
+	close_stream_locked();
 	initialized = 0;
+	pthread_mutex_unlock(&stream_mutex);
 }
 
 static int aaudio_write(const float *samples, int frames)
 {
 	aaudio_result_t result;
 
+	if (!fb_hAndroidSfxIsRunning())
+		return 0;
+
+	pthread_mutex_lock(&stream_mutex);
 	if (!initialized || !stream || !samples || frames <= 0)
+	{
+		pthread_mutex_unlock(&stream_mutex);
 		return -1;
+	}
 
 	result = api.write(stream, samples, frames, 100000000L);
-	return result < 0 ? -1 : (int)result;
+	if (result < 0)
+	{
+		close_stream_locked();
+		initialized = 0;
+		pthread_mutex_unlock(&stream_mutex);
+		return -1;
+	}
+
+	pthread_mutex_unlock(&stream_mutex);
+	return (int)result;
 }
 
 const FB_SFX_DRIVER fb_sfxDriverAAudio =
