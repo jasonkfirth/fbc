@@ -338,6 +338,12 @@ endif
 		   -o -path '*/obj/*' -name 'deleteme.txt' \
 		   -o -path '*/COM/*' -name '*.html' \) \
 		-delete || true
+	if [ -f debian/tmp/usr/share/freebasic/examples/graphics/SDL/data/Vera.ttf ]; then \
+		rm -f debian/tmp/usr/share/freebasic/examples/graphics/SDL/data/Vera.ttf; \
+		ln -s ../../../../../fonts/truetype/ttf-bitstream-vera/Vera.ttf \
+			debian/tmp/usr/share/freebasic/examples/graphics/SDL/data/Vera.ttf; \
+	fi
+	find debian/tmp/usr/share/freebasic/examples -type d -empty -delete || true
 
 # ------------------------------------------------------------
 # FLTK license relocation
@@ -376,6 +382,16 @@ execute_after_dh_installdocs:
 	rm -rf debian/freebasic-doc/usr/share/doc/freebasic/manual/cache* || true
 	find debian/freebasic-doc/usr/share/doc/freebasic \
 		\( -name gpl.txt -o -name lgpl.txt \) -delete || true
+	if cmp -s debian/freebasic-doc/usr/share/doc/freebasic/manual/html/images/putgfx2.png \
+	         debian/freebasic-doc/usr/share/doc/freebasic/manual/html/images/sample.png; then \
+		rm -f debian/freebasic-doc/usr/share/doc/freebasic/manual/html/images/sample.png; \
+		ln -s putgfx2.png debian/freebasic-doc/usr/share/doc/freebasic/manual/html/images/sample.png; \
+	fi
+	if cmp -s debian/freebasic-doc/usr/share/doc/freebasic/manual/templates/default/code/fbhelp_doctoc.tpl.txt \
+	         debian/freebasic-doc/usr/share/doc/freebasic/manual/templates/default/code/texinfo_doctoc.tpl.texinfo; then \
+		rm -f debian/freebasic-doc/usr/share/doc/freebasic/manual/templates/default/code/texinfo_doctoc.tpl.texinfo; \
+		ln -s fbhelp_doctoc.tpl.txt debian/freebasic-doc/usr/share/doc/freebasic/manual/templates/default/code/texinfo_doctoc.tpl.texinfo; \
+	fi
 	find debian/freebasic-doc/usr/share/doc/freebasic -type d -empty -delete || true
 
 

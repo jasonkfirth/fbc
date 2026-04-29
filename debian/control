@@ -138,7 +138,8 @@ Package: freebasic-examples
 Section: doc
 Architecture: all
 Depends:
- ${misc:Depends}
+ ${misc:Depends},
+ ttf-bitstream-vera
 Suggests:
  freebasic,
  freebasic-bindings

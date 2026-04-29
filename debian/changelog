@@ -56,7 +56,8 @@ freebasic (1.20.1-1) jammy; urgency=medium
     in freebasic.
   * Reduce lintian noise by installing compiler driver manpages,
     modernizing dependency names, cleaning generated documentation package
-    contents, and documenting intentional Android cross-target archives.
+    contents, normalizing example font/encoding handling, and documenting
+    intentional cross-target archive/runtime assets.
   * Add freebasic-bindings for third-party header/binding files and
     freebasic-examples for source examples, leaving freebasic-runtime
     and freebasic-dev as transitional compatibility packages.
@@ -105,6 +106,9 @@ freebasic (1.20.1-1) jammy; urgency=medium
   * Add an fbc-android --target-api option so APK manifests can satisfy
     modern emulator install policy even when building against an older
     distro-provided Android platform jar.
+  * Wrap the generated FreeBASIC program's exit() path in fbc-android APKs
+    so NativeActivity smoke tests can report the program exit marker instead
+    of terminating the Android process from the program thread.
   * Recommend adb and Android emulator command-line tooling from the
     freebasic-android package so installed users have a local APK test path
     without making emulator infrastructure mandatory for package installs.

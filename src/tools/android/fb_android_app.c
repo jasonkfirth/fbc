@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <setjmp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +33,14 @@ void fb_hAndroidConsoleRender(void) FB_ANDROID_WEAK;
 void fb_hAndroidUpdate(void) FB_ANDROID_WEAK;
 void fb_hAndroidGfxSetLifecycle(int started, int resumed, int focused) FB_ANDROID_WEAK;
 void fb_hAndroidSfxSetLifecycle(int started, int resumed) FB_ANDROID_WEAK;
+
+/*
+ * FreeBASIC's generated entry calls fb_End(), which calls exit(). In an
+ * Android NativeActivity that would kill the whole process from the program
+ * thread before the bridge can report the program's result to logcat.
+ */
+static __thread jmp_buf *fb_android_exit_jump;
+static __thread int fb_android_exit_status;
 
 typedef struct FB_ANDROID_APP
 {
@@ -88,14 +97,32 @@ static void *fb_android_program_thread(void *arg)
 	char *argv[] = { (char *)"freebasic-android", NULL };
 	int rc;
 	char message[96];
+	jmp_buf exit_jump;
 
 	(void)app;
 
 	fb_android_log("FreeBASIC Android program starting");
-	rc = fb_android_program_main(1, argv);
+	fb_android_exit_jump = &exit_jump;
+	fb_android_exit_status = 0;
+	if (setjmp(exit_jump) == 0)
+		rc = fb_android_program_main(1, argv);
+	else
+		rc = fb_android_exit_status;
+	fb_android_exit_jump = NULL;
+
 	snprintf(message, sizeof(message), "FREEBASIC_ANDROID_EXIT:%d", rc);
 	fb_android_log(message);
 	return NULL;
+}
+
+void __wrap_exit(int status)
+{
+	if (fb_android_exit_jump)
+	{
+		fb_android_exit_status = status;
+		longjmp(*fb_android_exit_jump, 1);
+	}
+	_exit(status);
 }
 
 static void fb_android_publish_lifecycle(int started, int resumed, int focused)

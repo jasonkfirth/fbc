@@ -328,6 +328,7 @@ done
 "$cc" -shared -Wl,-soname,libfreebasicapp.so -o "$sofile" \
 	"$appobj" "$objfile" \
 	-Wl,--start-group "${runtime[@]}" -Wl,--end-group \
+	-Wl,--wrap=exit \
 	-llog -landroid -lOpenSLES -ldl -lm
 
 if [ "$mode" = "so" ]; then
