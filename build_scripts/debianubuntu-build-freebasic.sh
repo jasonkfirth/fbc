@@ -68,7 +68,8 @@ Usage: ./build_scripts/debianubuntu-build-freebasic.sh [options]
 Options:
   --no-build      Reuse the existing source bootstrap tarball
   --no-js         Build packages with DEB_BUILD_PROFILES=nojs
-  --android       Build the optional freebasic-android package
+  --no-android    Build packages without DEB_BUILD_PROFILES=android
+  --android       Build the freebasic-android package (default)
   --no-package    Stop after ensuring the bootstrap tarball exists
   --skip-deps     Skip apt dependency installation
   --help          Show this help text
@@ -94,7 +95,7 @@ EOF
 
 NO_BUILD=0
 NO_JS=0
-ANDROID=0
+ANDROID=1
 NO_PACKAGE=0
 SKIP_DEPS=0
 
@@ -102,6 +103,7 @@ for arg in "$@"; do
     case "$arg" in
         --no-build) NO_BUILD=1 ;;
         --no-js) NO_JS=1 ;;
+        --no-android) ANDROID=0 ;;
         --android) ANDROID=1 ;;
         --no-package) NO_PACKAGE=1 ;;
         --skip-deps) SKIP_DEPS=1 ;;
@@ -266,7 +268,6 @@ install_deps() {
             android-sdk-build-tools
             android-sdk-platform-23
             google-android-ndk-r28-installer
-            google-android-emulator-installer
             gradle
             aapt
             apksigner

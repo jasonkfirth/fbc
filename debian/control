@@ -30,7 +30,6 @@ Build-Depends:
  android-sdk-build-tools <android>,
  android-sdk-platform-23 <android> | google-android-platform-26-installer <android>,
  google-android-ndk-r28-installer <android>,
- google-android-emulator-installer <android>,
  aapt <android>,
  apksigner <android>,
  zip <android>,
@@ -184,11 +183,14 @@ Depends:
  android-sdk-build-tools,
  android-sdk-platform-23 | google-android-platform-26-installer,
  google-android-ndk-r28-installer,
- google-android-emulator-installer,
  aapt,
  apksigner,
  zip,
  unzip
+Recommends:
+ adb,
+ google-android-emulator-installer,
+ google-android-cmdline-tools-19.0-installer
 Description: FreeBASIC compiler driver for Android APKs
  This package provides fbc-android, a native FreeBASIC compiler driver that
  defaults to the Android/aarch64 target, plus Android runtime libraries,
