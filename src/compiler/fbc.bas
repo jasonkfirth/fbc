@@ -1049,7 +1049,7 @@ private function hLinkFiles( ) as integer
 			"CASE_INSENSITIVE_FS=1", _
 			"TOTAL_MEMORY=67108864", _
 			"ALLOW_MEMORY_GROWTH=1", _
-			"RETAIN_COMPILER_SETTINGS=1", _
+			"RETAIN_COMPILER_SETTINGS=1" _
 		}
 			'"WARN_UNALIGNED=1", _
 
