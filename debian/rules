@@ -12,6 +12,10 @@ BUILD_JS := yes
 ifneq ($(filter nojs,$(DEB_BUILD_PROFILES)),)
 BUILD_JS := no
 endif
+BUILD_ANDROID := no
+ifneq ($(filter android,$(DEB_BUILD_PROFILES)),)
+BUILD_ANDROID := yes
+endif
 
 # ------------------------------------------------------------
 # Parallelism
@@ -106,6 +110,21 @@ export FBTARGET_DIR_OVERRIDE=$(BOOTSTRAP_DIR_KEY)
 # ------------------------------------------------------------
 
 FBC_BOOTSTRAP := $(CURDIR)/bin/fbc -i $(CURDIR)/inc
+
+# ------------------------------------------------------------
+# Android target toolchain
+# ------------------------------------------------------------
+
+ANDROID_API ?= 26
+ANDROID_TARGET_TRIPLET ?= aarch64-linux-android
+ANDROID_FBTARGET_KEY ?= android-aarch64
+ANDROID_NDK_HOME ?= $(firstword $(wildcard /usr/lib/android-sdk/ndk/* /usr/lib/android-sdk/ndk-bundle /usr/lib/android-ndk* /opt/android-ndk*))
+ANDROID_TOOLCHAIN_PREBUILT ?= $(firstword $(wildcard $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/linux-x86_64 $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/*))
+ANDROID_TOOLCHAIN_BINDIR := $(ANDROID_TOOLCHAIN_PREBUILT)/bin
+ANDROID_CC := $(ANDROID_TOOLCHAIN_BINDIR)/$(ANDROID_TARGET_TRIPLET)$(ANDROID_API)-clang
+ANDROID_CXX := $(ANDROID_TOOLCHAIN_BINDIR)/$(ANDROID_TARGET_TRIPLET)$(ANDROID_API)-clang++
+ANDROID_AR := $(ANDROID_TOOLCHAIN_BINDIR)/llvm-ar
+ANDROID_RANLIB := $(ANDROID_TOOLCHAIN_BINDIR)/llvm-ranlib
 
 # ------------------------------------------------------------
 # Debian hardening flags
@@ -216,6 +235,42 @@ ifeq ($(BUILD_JS),yes)
 		LDFLAGS=
 endif
 
+ifeq ($(BUILD_ANDROID),yes)
+	@test -n "$(ANDROID_NDK_HOME)" || { echo "ERROR: Android NDK not found. Install google-android-ndk-r28-installer or set ANDROID_NDK_HOME."; exit 1; }
+	@test -x "$(ANDROID_CC)" || { echo "ERROR: Android clang not found: $(ANDROID_CC)"; exit 1; }
+	@test -x "$(ANDROID_AR)" || { echo "ERROR: Android llvm-ar not found: $(ANDROID_AR)"; exit 1; }
+	@test -x "$(ANDROID_RANLIB)" || { echo "ERROR: Android llvm-ranlib not found: $(ANDROID_RANLIB)"; exit 1; }
+
+	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
+		$(ARM_CPU_MAKE_ARGS) \
+		compiler-android \
+		FBC="$(FBC_BOOTSTRAP)" \
+		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
+		CPPFLAGS="$(CPPFLAGS)" \
+		CFLAGS="$(CFLAGS)" \
+		CXXFLAGS="$(CXXFLAGS)" \
+		LDFLAGS="$(LDFLAGS)"
+
+	$(PARMAKE) TARGET_TRIPLET="$(ANDROID_TARGET_TRIPLET)" TARGET="$(ANDROID_TARGET_TRIPLET)" MULTILIB="" \
+		FBTARGET_DIR_OVERRIDE="$(ANDROID_FBTARGET_KEY)" \
+		BUILD_PREFIX= \
+		CC="$(ANDROID_CC)" \
+		CXX="$(ANDROID_CXX)" \
+		CLANG="$(ANDROID_CC)" \
+		AS="$(ANDROID_CC)" \
+		LD="$(ANDROID_CC)" \
+		AR="$(ANDROID_AR)" \
+		RANLIB="$(ANDROID_RANLIB)" \
+		rtlib fbrt gfxlib2 sfxlib \
+		FBC="$(FBC_BOOTSTRAP)" \
+		BUILD_FBC_TARGET="$(ANDROID_FBTARGET_KEY)" \
+		BUILD_FBC_BUILDPREFIX= \
+		CPPFLAGS= \
+		CFLAGS= \
+		CXXFLAGS= \
+		LDFLAGS=
+endif
+
 # ------------------------------------------------------------
 # Install
 # ------------------------------------------------------------
@@ -236,6 +291,16 @@ ifeq ($(BUILD_JS),yes)
 		prefix=/usr \
 		FBC="$(FBC_BOOTSTRAP)" \
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)"
+endif
+
+ifeq ($(BUILD_ANDROID),yes)
+	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" install-android \
+		$(ARM_CPU_MAKE_ARGS) \
+		DESTDIR=$(CURDIR)/debian/tmp \
+		prefix=/usr \
+		FBC="$(FBC_BOOTSTRAP)" \
+		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
+		ANDROID_BUILD_LIBDIR="$(CURDIR)/lib/freebasic/$(ANDROID_FBTARGET_KEY)"
 endif
 
 	if [ -d debian/tmp/usr/lib/freebasic ]; then \

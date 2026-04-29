@@ -75,6 +75,17 @@ freebasic (1.20.1-1) jammy; urgency=medium
   * Add Debian/Ubuntu Docker smoke-test scripts for native FreeBASIC and
     freebasic-js packages, installing the local package artifacts in
     fresh containers with only their declared package dependencies.
+  * Add an opt-in freebasic-android package build profile that installs
+    fbc-android, Android/aarch64 runtime archives, Android-target headers,
+    and APK template glue separately from the native freebasic package.
+  * Add Android gfxlib and sfxlib backends, including modern/legacy gfx
+    driver records, Activity-backed console rendering with a soft-keyboard
+    toggle button, and AAudio/OpenSL ES sound backends.
+  * Add build_scripts/debianubuntu-test-freebasic-android.sh to build
+    console, gfxlib, and sfxlib APKs in a fresh container and run them
+    under an Android emulator when KVM and a system image are available.
+  * Fix Android triplet detection so aarch64-linux-android resolves to
+    TARGET_OS=android and use the NDK clang driver for Android assembly.
 
  -- SJ_Zero <sj@fbxl.net>  Tue, 28 Apr 2026 15:30:00 -0400
 

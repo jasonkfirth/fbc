@@ -154,6 +154,9 @@ endif
 ifeq ($(TARGET_OS),js)
   BUILD_PREFIX :=
 endif
+ifeq ($(TARGET_OS),android)
+  BUILD_PREFIX :=
+endif
 
 ##############################################################################
 # Verify cross compiler exists

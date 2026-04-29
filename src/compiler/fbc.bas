@@ -4033,6 +4033,10 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 
 	if( assembler = FBCTOOL_NONE ) then
 		select case fbGetOption( FB_COMPOPT_TARGET )
+		case FB_COMPTARGET_ANDROID
+			'' Current NDK toolchains are clang/LLVM based and do not provide
+			'' the old GNU as driver expected by the generic Unix path.
+			assembler = FBCTOOL_CLANG
 		case FB_COMPTARGET_JS
 			'' We will skip assemble stage, since it is
 			'' already performed by Emscripten

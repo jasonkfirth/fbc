@@ -73,8 +73,8 @@ define _set_os_if_token
   endif
 endef
 
-$(eval $(call _set_os_if_token,linux,linux))
 $(eval $(call _set_os_if_token,android,android))
+$(eval $(call _set_os_if_token,linux,linux))
 $(eval $(call _set_os_if_token,emscripten,js))
 $(eval $(call _set_os_if_token,js,js))
 $(eval $(call _set_os_if_token,darwin,darwin))
