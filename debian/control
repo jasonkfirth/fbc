@@ -23,7 +23,18 @@ Build-Depends:
  libxrandr-dev,
  libxpm-dev,
  emscripten <!nojs>,
- nodejs <!nojs>
+ nodejs <!nojs>,
+ openjdk-17-jdk-headless <android>,
+ android-sdk <android>,
+ android-sdk-platform-tools <android>,
+ android-sdk-build-tools <android>,
+ android-sdk-platform-23 <android> | google-android-platform-26-installer <android>,
+ google-android-ndk-r28-installer <android>,
+ google-android-emulator-installer <android>,
+ aapt <android>,
+ apksigner <android>,
+ zip <android>,
+ unzip <android>
 Standards-Version: 4.6.2
 Homepage: https://freebasic.net/
 Vcs-Browser: https://github.com/freebasic/fbc
@@ -161,6 +172,28 @@ Description: FreeBASIC compiler driver for Emscripten/JavaScript
  defaults to the js-asmjs/Emscripten target, plus the target runtime libraries
  and JavaScript support assets needed to build browser or Node.js output.
 
+Package: freebasic-android
+Architecture: any
+Build-Profiles: <android>
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+ openjdk-17-jdk-headless | default-jdk-headless,
+ android-sdk,
+ android-sdk-platform-tools,
+ android-sdk-build-tools,
+ android-sdk-platform-23 | google-android-platform-26-installer,
+ google-android-ndk-r28-installer,
+ google-android-emulator-installer,
+ aapt,
+ apksigner,
+ zip,
+ unzip
+Description: FreeBASIC compiler driver for Android APKs
+ This package provides fbc-android, a native FreeBASIC compiler driver that
+ defaults to the Android/aarch64 target, plus Android runtime libraries,
+ headers, and APK build templates needed to produce signed debug APK files.
+
 Package: freebasic-full
 Section: metapackages
 Architecture: all
@@ -173,6 +206,7 @@ Depends:
  pkgconf | pkg-config
 Recommends:
  freebasic-js (= ${binary:Version}),
+ freebasic-android (= ${binary:Version}),
  zlib1g-dev,
  libbz2-dev,
  libzip-dev,

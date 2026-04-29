@@ -44,6 +44,7 @@ endif
 .PHONY: \
 	compiler \
 	compiler-js \
+	compiler-android \
 	rtlib \
 	fbrt \
 	gfxlib2 \
@@ -109,6 +110,17 @@ $(FBC_JS_EXE): $(FBC_JS_OBJS) | libs
 		$(THREAD_FLAGS) \
 		$(TERM_LIB)
 
+$(FBC_ANDROID_EXE): $(FBC_ANDROID_OBJS) | libs
+	@mkdir -p "$(dir $@)"
+	@echo "Linking Android-targeting compiler: $@"
+	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o $@ \
+		$(FBC_ANDROID_OBJS) \
+		$(COMPILER_RT0) \
+		$(COMPILER_RTL) \
+		-lm \
+		$(THREAD_FLAGS) \
+		$(TERM_LIB)
+
 ##############################################################################
 # User-facing compiler target
 ##############################################################################
@@ -116,6 +128,8 @@ $(FBC_JS_EXE): $(FBC_JS_OBJS) | libs
 compiler: $(FBC_EXE)
 
 compiler-js: $(FBC_JS_EXE)
+
+compiler-android: $(FBC_ANDROID_EXE)
 
 ##############################################################################
 # END build-targets.mk

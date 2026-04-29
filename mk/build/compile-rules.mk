@@ -101,6 +101,15 @@ $(fbcjsobjdir)/%.o: $(srcdir)/compiler/%.bas $(FBC_BI) | $(fbcjsobjdir)
 	@mkdir -p "$(dir $@)"
 	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) $(FBC_JS_DEFINES) -i $(rootdir)/inc -c $< -o $@
 
+FBC_ANDROID_DEFINES := \
+	-d BUILD_FB_DEFAULT_TARGET=FB_COMPTARGET_ANDROID \
+	-d BUILD_FB_DEFAULT_CPUTYPE=FB_CPUTYPE_AARCH64 \
+	-d ENABLE_SUFFIX=\"-android\"
+
+$(fbcandroidobjdir)/%.o: $(srcdir)/compiler/%.bas $(FBC_BI) | $(fbcandroidobjdir)
+	@mkdir -p "$(dir $@)"
+	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) $(FBC_ANDROID_DEFINES) -i $(rootdir)/inc -c $< -o $@
+
 ##############################################################################
 # rtlib (C runtime)
 ##############################################################################

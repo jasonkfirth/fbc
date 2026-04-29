@@ -11,6 +11,7 @@ Version 1.20.1
 - Debian/Ubuntu packaging: keep the native compiler, runtime, startup objects, libraries, and core headers together in the freebasic package, split third-party bindings and examples into separate packages, and leave freebasic-runtime/freebasic-dev as transitional compatibility packages
 - JavaScript/Emscripten packaging: split the JS-target compiler and runtime into a separate fbc-js/freebasic-js install layout so it can be installed alongside the native FreeBASIC packages without changing the normal fbc defaults
 - JavaScript/Emscripten packaging: make freebasic-js opt-in for Debian/Ubuntu builds via the nojs build profile and the build script's --no-js switch so default/native package builds can skip the Emscripten dependency chain
+- Android packaging: add an opt-in fbc-android/freebasic-android install layout with Android-target runtime libraries, headers, APK template glue, and Debian/Ubuntu build-script support
 - Windows/MSYS2 packaging: bundle a broader set of third-party import libraries and DLLs used by the shipped examples and bindings, and add package-local import-library aliases for older binding names that differ from current MSYS2 package names
 - Windows/MSYS2 installer: add the installed FreeBASIC directory to MSYS2 login shells through profile.d as well as updating the normal Windows system PATH
 
@@ -27,6 +28,8 @@ Version 1.20.1
 - fbc-js compiler build target that defaults to js-asmjs/Emscripten while still reporting the native host platform for host-specific compiler behavior
 - Debian/Ubuntu freebasic-js package containing fbc-js, JS-target includes, libfb/libfbgfx/libsfx archives, startup objects, and the Emscripten JavaScript shell/runtime support files
 - JavaScript sfxlib backend with WebAudio output for browsers and a null fallback so sound-using programs can still link and run in non-browser smoke tests
+- Android gfxlib and sfxlib backends, including modern/legacy Android gfx drivers, AAudio/OpenSL ES sound drivers, Activity-backed console rendering, and an on-screen soft-keyboard toggle button
+- Debian/Ubuntu Docker smoke-test script for freebasic-android that builds console, gfxlib, and sfxlib APKs in a fresh container and runs them under an Android emulator when KVM and a system image are available
 - Debian/Ubuntu Docker smoke-test scripts for validating the native and JavaScript packages in fresh containers using only the package artifacts and their declared dependencies
 
 [fixed]
@@ -43,6 +46,7 @@ Version 1.20.1
 - DOS/build: fixed the Linux-hosted DOS packaging and smoke-test path so the build script stages the runtime layout expected by DOS and host-side cross-linking, rebuilds the DOS compiler/runtime reliably, and packages the finished distribution from out/msdos
 - DOS/sfxlib: fixed the DOS backend integration by moving the target sources into src/sfxlib/dos, wiring them into the normal DOS build graph, correcting the Sound Blaster/MIDI linkage and runtime initialization, and making missing BLASTER settings fail visibly for the Sound Blaster path instead of silently pretending a card exists
 - JavaScript/Emscripten builds now use emcc/emar/emranlib defaults and skip native host library/header probes when cross-building JS-target runtime libraries
+- Android target detection now recognizes aarch64-linux-android triplets as Android instead of Linux, and Android assembly uses the NDK clang driver instead of an unavailable GNU as path
 - examples: expanded the examples makefile coverage and fixed several Windows example build failures in the FreeImage/SDL, SDL_mixer, SDL_ttf, SDL mouse, TinyPTC, and CUnit examples
 - bindings: fixed FreeImage.bi so it reuses the Windows GDI bitmap declarations instead of redefining RGBQUAD/BITMAPINFO types after wingdi.bi has been included
 - bindings: make CUnit.bi link against cunit automatically, matching the behavior expected by the CUnit examples

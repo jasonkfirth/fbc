@@ -68,6 +68,7 @@ Usage: ./build_scripts/debianubuntu-build-freebasic.sh [options]
 Options:
   --no-build      Reuse the existing source bootstrap tarball
   --no-js         Build packages with DEB_BUILD_PROFILES=nojs
+  --android       Build the optional freebasic-android package
   --no-package    Stop after ensuring the bootstrap tarball exists
   --skip-deps     Skip apt dependency installation
   --help          Show this help text
@@ -93,6 +94,7 @@ EOF
 
 NO_BUILD=0
 NO_JS=0
+ANDROID=0
 NO_PACKAGE=0
 SKIP_DEPS=0
 
@@ -100,6 +102,7 @@ for arg in "$@"; do
     case "$arg" in
         --no-build) NO_BUILD=1 ;;
         --no-js) NO_JS=1 ;;
+        --android) ANDROID=1 ;;
         --no-package) NO_PACKAGE=1 ;;
         --skip-deps) SKIP_DEPS=1 ;;
         -h|--help)
@@ -254,6 +257,23 @@ install_deps() {
     if [ "$NO_JS" -eq 0 ]; then
         js_deps=(emscripten nodejs)
     fi
+    local android_deps=()
+    if [ "$ANDROID" -eq 1 ]; then
+        android_deps=(
+            openjdk-17-jdk-headless
+            android-sdk
+            android-sdk-platform-tools
+            android-sdk-build-tools
+            android-sdk-platform-23
+            google-android-ndk-r28-installer
+            google-android-emulator-installer
+            gradle
+            aapt
+            apksigner
+            zip
+            unzip
+        )
+    fi
 
     run_root apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -269,6 +289,7 @@ install_deps() {
         libxi-dev libxinerama-dev libxxf86vm-dev \
         libgl1-mesa-dev libglu1-mesa-dev \
         "${js_deps[@]}" \
+        "${android_deps[@]}" \
         perl python3 git
 }
 
@@ -381,6 +402,7 @@ package_current_target() {
     echo "==> output dir: $OUTDIR"
     [ -z "${FBC_PACKAGE_ARM_ARCH:-}" ] || echo "==> ARM default arch: $FBC_PACKAGE_ARM_ARCH"
     [ "$NO_JS" -eq 0 ] || echo "==> build profile: nojs"
+    [ "$ANDROID" -eq 0 ] || echo "==> build profile: android"
 
     cd "$BUILDDIR"
 
@@ -404,9 +426,17 @@ package_current_target() {
 
     msg "running dpkg-buildpackage"
 
-    set +e
+    local build_profiles=()
     if [ "$NO_JS" -eq 1 ]; then
-        DEB_BUILD_PROFILES=nojs dpkg-buildpackage -us -uc 2>&1 | tee "$OUTDIR/build.log"
+        build_profiles+=(nojs)
+    fi
+    if [ "$ANDROID" -eq 1 ]; then
+        build_profiles+=(android)
+    fi
+
+    set +e
+    if [ "${#build_profiles[@]}" -gt 0 ]; then
+        DEB_BUILD_PROFILES="${build_profiles[*]}" dpkg-buildpackage -us -uc 2>&1 | tee "$OUTDIR/build.log"
     else
         dpkg-buildpackage -us -uc 2>&1 | tee "$OUTDIR/build.log"
     fi

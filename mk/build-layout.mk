@@ -42,6 +42,7 @@ build_libdir := lib/$(libsubdir)
 FBC_EXE    := fbc$(EXEEXT)
 FBCNEW_EXE := fbc-new$(EXEEXT)
 FBC_JS_EXE := fbc-js$(EXEEXT)
+FBC_ANDROID_EXE := fbc-android-compiler$(EXEEXT)
 
 else
 
@@ -52,6 +53,7 @@ build_libdir := $(libdirname)/$(FBNAME)/$(libsubdir)
 FBC_EXE    := $(build_bindir)/fbc$(ENABLE_SUFFIX)$(EXEEXT)
 FBCNEW_EXE := $(build_bindir)/fbc$(ENABLE_SUFFIX)-new$(EXEEXT)
 FBC_JS_EXE := $(build_bindir)/fbc-js$(EXEEXT)
+FBC_ANDROID_EXE := $(build_bindir)/fbc-android-compiler$(EXEEXT)
 
 endif
 
@@ -75,6 +77,7 @@ libdir := $(build_libdir)
 # Compiler objects
 fbcobjdir := src/compiler/obj/$(FBTARGET)
 fbcjsobjdir := src/compiler/obj/$(FBTARGET)-jsdriver
+fbcandroidobjdir := src/compiler/obj/$(FBTARGET)-androiddriver
 
 # Runtime objects
 libfbobjdir	 := src/rtlib/obj/$(objsubdir)
