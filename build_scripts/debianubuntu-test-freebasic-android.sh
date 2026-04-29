@@ -41,19 +41,22 @@ Options:
   --package-dir DIR   Directory containing Debian package artifacts
   --image IMAGE       Docker image to use (default: ubuntu:questing)
   --docker-cmd CMD    Docker command to use (default: docker)
+  --system-image PKG  Android SDK system image package for emulator tests
+                      (default: system-images;android-35;google_apis;x86_64)
   --skip-host-deps    Skip Docker host dependency installation
   --help              Show this help text
 
-The test starts a fresh Debian/Ubuntu-style container, installs the local
-freebasic-android .deb package with only its declared dependencies, builds
-console/gfxlib/sfxlib APKs with fbc-android, then launches them in an Android
-emulator and validates logcat markers.
+The test first starts a fresh Debian/Ubuntu-style container, installs the local
+freebasic-android .deb package with only its declared dependencies, and builds
+console/gfxlib/sfxlib APKs with fbc-android. It then starts a separate emulator
+harness container to install Android test tooling and validate those APKs.
 EOF
 }
 
 PACKAGE_DIR=""
 IMAGE="${IMAGE:-ubuntu:questing}"
 DOCKER_CMD="${DOCKER_CMD:-docker}"
+SYSTEM_IMAGE_PACKAGE="${ANDROID_SYSTEM_IMAGE_PACKAGE:-system-images;android-35;google_apis;x86_64}"
 SKIP_HOST_DEPS=0
 
 while [ $# -gt 0 ]; do
@@ -61,6 +64,7 @@ while [ $# -gt 0 ]; do
         --package-dir) PACKAGE_DIR="$2"; shift 2 ;;
         --image) IMAGE="$2"; shift 2 ;;
         --docker-cmd) DOCKER_CMD="$2"; shift 2 ;;
+        --system-image) SYSTEM_IMAGE_PACKAGE="$2"; shift 2 ;;
         --skip-host-deps) SKIP_HOST_DEPS=1; shift ;;
         -h|--help)
             usage
@@ -109,14 +113,17 @@ install_host_deps() {
     die "Docker is required; install it or rerun with --skip-host-deps after installing Docker"
 }
 
-TEST_RUNNER="$(mktemp -t fb-android-deb-package-test.XXXXXX.sh)"
+BUILD_RUNNER="$(mktemp -t fb-android-deb-package-build.XXXXXX.sh)"
+EMULATOR_RUNNER="$(mktemp -t fb-android-deb-package-emulator.XXXXXX.sh)"
+APK_OUTDIR="$(mktemp -d -t fb-android-apks.XXXXXX)"
 cleanup() {
-    rm -f "$TEST_RUNNER"
+    rm -f "$BUILD_RUNNER" "$EMULATOR_RUNNER"
+    rm -rf "$APK_OUTDIR"
 }
 trap cleanup EXIT
 
-chmod 755 "$TEST_RUNNER"
-cat > "$TEST_RUNNER" <<'TEST_RUNNER_EOF'
+chmod 755 "$BUILD_RUNNER" "$EMULATOR_RUNNER"
+cat > "$BUILD_RUNNER" <<'BUILD_RUNNER_EOF'
 #!/usr/bin/env bash
 
 set -euo pipefail
@@ -129,73 +136,6 @@ run() {
 fail() {
     echo "ERROR: $*" >&2
     exit 1
-}
-
-find_tool() {
-    local name="$1"
-    local found
-
-    if command -v "$name" >/dev/null 2>&1; then
-        command -v "$name"
-        return 0
-    fi
-
-    for found in /usr/lib/android-sdk/emulator/"$name" /usr/lib/android-sdk/platform-tools/"$name" /usr/lib/android-sdk/cmdline-tools/latest/bin/"$name" /usr/lib/android-sdk/tools/bin/"$name"; do
-        [ -x "$found" ] || continue
-        echo "$found"
-        return 0
-    done
-
-    return 1
-}
-
-find_system_image_package() {
-    local image
-    image="$(find /usr/lib/android-sdk "$HOME/Android/Sdk" -path '*/system-images/android-*/*/*/system.img' -print 2>/dev/null | head -n1 || true)"
-    [ -n "$image" ] || return 1
-
-    image="${image%/system.img}"
-    local abi="${image##*/}"
-    image="${image%/*}"
-    local flavor="${image##*/}"
-    image="${image%/*}"
-    local api="${image##*/}"
-
-    echo "system-images;$api;$flavor;$abi"
-}
-
-wait_for_boot() {
-    local adb="$1"
-    local deadline
-    local booted
-    deadline=$((SECONDS + 180))
-
-    run "$adb" wait-for-device
-    while [ "$SECONDS" -lt "$deadline" ]; do
-        booted="$("$adb" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
-        if [ "$booted" = "1" ]; then
-            return 0
-        fi
-        sleep 2
-    done
-
-    return 1
-}
-
-run_apk_smoke() {
-    local adb="$1"
-    local apk="$2"
-    local package_name="$3"
-    local marker="$4"
-    local log_file="$5"
-
-    run "$adb" install -r "$apk"
-    run "$adb" logcat -c
-    run "$adb" shell monkey -p "$package_name" 1
-    sleep 8
-    "$adb" logcat -d > "$log_file"
-    grep -q "$marker" "$log_file" || fail "missing app marker '$marker' in logcat for $package_name"
-    grep -q "FREEBASIC_ANDROID_EXIT:0" "$log_file" || fail "missing clean exit marker in logcat for $package_name"
 }
 
 export DEBIAN_FRONTEND=noninteractive
@@ -231,18 +171,160 @@ sleep 1000
 EOF
 
 cd /tmp/fb-android-smoke
-run fbc-android --package org.freebasic.smoke.console --label FBConsole console.bas
-run fbc-android --package org.freebasic.smoke.gfx --label FBGfx gfx.bas
-run fbc-android --package org.freebasic.smoke.sfx --label FBSfx sfx.bas
+run fbc-android --target-api 24 --package org.freebasic.smoke.console --label FBConsole console.bas
+run fbc-android --target-api 24 --package org.freebasic.smoke.gfx --label FBGfx gfx.bas
+run fbc-android --target-api 24 --package org.freebasic.smoke.sfx --label FBSfx sfx.bas
 
 [ -f console.apk ] || fail "console.apk was not produced"
 [ -f gfx.apk ] || fail "gfx.apk was not produced"
 [ -f sfx.apk ] || fail "sfx.apk was not produced"
 
-emulator="$(find_tool emulator)" || fail "Android emulator binary is missing from package dependencies"
-adb="$(find_tool adb)" || fail "adb binary is missing from package dependencies"
+cp -av console.apk gfx.apk sfx.apk /apk-out/
+
+echo "freebasic-android package APK build test passed"
+BUILD_RUNNER_EOF
+
+cat > "$EMULATOR_RUNNER" <<'EMULATOR_RUNNER_EOF'
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+run() {
+    echo "==> $*"
+    "$@"
+}
+
+fail() {
+    echo "ERROR: $*" >&2
+    exit 1
+}
+
+find_tool() {
+    local name="$1"
+    local found
+
+    if command -v "$name" >/dev/null 2>&1; then
+        command -v "$name"
+        return 0
+    fi
+
+    for found in /usr/lib/android-sdk/emulator/"$name" /usr/lib/android-sdk/platform-tools/"$name" /usr/lib/android-sdk/cmdline-tools/latest/bin/"$name" /usr/lib/android-sdk/cmdline-tools/*/bin/"$name" /usr/lib/android-sdk/tools/bin/"$name"; do
+        [ -x "$found" ] || continue
+        echo "$found"
+        return 0
+    done
+
+    return 1
+}
+
+find_system_image_package() {
+    local image
+    image="$(find /usr/lib/android-sdk "$HOME/Android/Sdk" -path '*/system-images/android-*/*/*/system.img' -print 2>/dev/null | head -n1 || true)"
+    [ -n "$image" ] || return 1
+
+    image="${image%/system.img}"
+    local abi="${image##*/}"
+    image="${image%/*}"
+    local flavor="${image##*/}"
+    image="${image%/*}"
+    local api="${image##*/}"
+
+    echo "system-images;$api;$flavor;$abi"
+}
+
+ensure_system_image() {
+    local system_image_package="$1"
+    local sdkmanager
+
+    find_system_image_package >/dev/null 2>&1 && return 0
+
+    sdkmanager="$(find_tool sdkmanager || true)"
+    [ -n "$sdkmanager" ] || fail "sdkmanager is missing from test harness dependencies"
+
+    printf 'y\n%.0s' {1..1000} | "$sdkmanager" --licenses >/dev/null || true
+    echo "==> $sdkmanager $system_image_package"
+    printf 'y\n%.0s' {1..1000} | "$sdkmanager" "$system_image_package"
+}
+
+wait_for_boot() {
+    local adb="$1"
+    local emulator_pid="$2"
+    local deadline
+    local booted
+    local state
+    local next_notice
+    deadline=$((SECONDS + 180))
+    next_notice=$SECONDS
+
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        if ! kill -0 "$emulator_pid" >/dev/null 2>&1; then
+            echo "ERROR: Android emulator process exited before ADB became ready" >&2
+            return 1
+        fi
+
+        state="$("$adb" get-state 2>/dev/null || true)"
+        if [ "$state" != "device" ]; then
+            if [ "$SECONDS" -ge "$next_notice" ]; then
+                echo "==> waiting for Android emulator ADB device..."
+                "$adb" devices || true
+                next_notice=$((SECONDS + 15))
+            fi
+            sleep 2
+            continue
+        fi
+
+        booted="$("$adb" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+        if [ "$booted" = "1" ]; then
+            return 0
+        fi
+        if [ "$SECONDS" -ge "$next_notice" ]; then
+            echo "==> waiting for Android emulator boot_completed..."
+            next_notice=$((SECONDS + 15))
+        fi
+        sleep 2
+    done
+
+    return 1
+}
+
+run_apk_smoke() {
+    local adb="$1"
+    local apk="$2"
+    local package_name="$3"
+    local marker="$4"
+    local log_file="$5"
+
+    run "$adb" install -r "$apk"
+    run "$adb" logcat -c
+    run "$adb" shell monkey -p "$package_name" 1
+    sleep 8
+    "$adb" logcat -d > "$log_file"
+    grep -q "$marker" "$log_file" || fail "missing app marker '$marker' in logcat for $package_name"
+    grep -q "FREEBASIC_ANDROID_EXIT:0" "$log_file" || fail "missing clean exit marker in logcat for $package_name"
+}
+
+export DEBIAN_FRONTEND=noninteractive
+export ANDROID_HOME=/usr/lib/android-sdk
+export ANDROID_SDK_ROOT=/usr/lib/android-sdk
+export ANDROID_SYSTEM_IMAGE_PACKAGE="${ANDROID_SYSTEM_IMAGE_PACKAGE:-system-images;android-35;google_apis;x86_64}"
+export HOME=/root
+
+for apk in /apk/console.apk /apk/gfx.apk /apk/sfx.apk; do
+    [ -f "$apk" ] || fail "missing APK from build phase: $apk"
+done
+
+run apt-get update -y
+run apt-get install -y --no-install-recommends \
+    adb \
+    google-android-emulator-installer \
+    google-android-cmdline-tools-19.0-installer
+
+ensure_system_image "$ANDROID_SYSTEM_IMAGE_PACKAGE"
+
+emulator="$(find_tool emulator)" || fail "Android emulator binary is missing from test harness dependencies"
+adb="$(find_tool adb)" || fail "adb binary is missing from test harness dependencies"
 avdmanager="$(find_tool avdmanager || true)"
-[ -n "$avdmanager" ] || fail "avdmanager is missing; install Android command-line tools or provide an image with AVD tooling"
+[ -n "$avdmanager" ] || fail "avdmanager is missing from test harness dependencies"
 
 system_image="$(find_system_image_package || true)"
 [ -n "$system_image" ] || fail "no Android emulator system image is installed under /usr/lib/android-sdk; install a system image package or preseed one with sdkmanager"
@@ -253,21 +335,30 @@ echo no | "$avdmanager" create avd --force -n fbsmoke -k "$system_image"
 emulator_pid=$!
 trap 'kill "$emulator_pid" >/dev/null 2>&1 || true' EXIT
 
-wait_for_boot "$adb" || { cat emulator.log >&2; fail "Android emulator did not boot within 180 seconds"; }
+wait_for_boot "$adb" "$emulator_pid" || { cat emulator.log >&2; fail "Android emulator did not boot within 180 seconds"; }
 
-run_apk_smoke "$adb" console.apk org.freebasic.smoke.console FREEBASIC_ANDROID_CONSOLE_SMOKE console.log
-run_apk_smoke "$adb" gfx.apk org.freebasic.smoke.gfx FREEBASIC_ANDROID_GFX_SMOKE gfx.log
-run_apk_smoke "$adb" sfx.apk org.freebasic.smoke.sfx FREEBASIC_ANDROID_SFX_SMOKE sfx.log
+run_apk_smoke "$adb" /apk/console.apk org.freebasic.smoke.console FREEBASIC_ANDROID_CONSOLE_SMOKE console.log
+run_apk_smoke "$adb" /apk/gfx.apk org.freebasic.smoke.gfx FREEBASIC_ANDROID_GFX_SMOKE gfx.log
+run_apk_smoke "$adb" /apk/sfx.apk org.freebasic.smoke.sfx FREEBASIC_ANDROID_SFX_SMOKE sfx.log
 
 echo "freebasic-android package smoke test passed"
-TEST_RUNNER_EOF
+EMULATOR_RUNNER_EOF
 
 install_host_deps
 
-msg "testing freebasic-android package in $IMAGE"
+msg "building Android smoke APKs from freebasic-android package in $IMAGE"
+run ${DOCKER_CMD} run --rm \
+    -v "$PACKAGE_DIR:/packages:ro" \
+    -v "$APK_OUTDIR:/apk-out" \
+    -v "$BUILD_RUNNER:/tmp/build-freebasic-android-apks.sh:ro" \
+    "$IMAGE" \
+    /bin/bash /tmp/build-freebasic-android-apks.sh
+
+msg "testing Android smoke APKs in emulator harness container"
 run ${DOCKER_CMD} run --rm \
     --device /dev/kvm \
-    -v "$PACKAGE_DIR:/packages:ro" \
-    -v "$TEST_RUNNER:/tmp/test-freebasic-android.sh:ro" \
+    -e ANDROID_SYSTEM_IMAGE_PACKAGE="$SYSTEM_IMAGE_PACKAGE" \
+    -v "$APK_OUTDIR:/apk:ro" \
+    -v "$EMULATOR_RUNNER:/tmp/test-freebasic-android-apks.sh:ro" \
     "$IMAGE" \
-    /bin/bash /tmp/test-freebasic-android.sh
+    /bin/bash /tmp/test-freebasic-android-apks.sh

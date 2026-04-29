@@ -61,6 +61,7 @@ Options:
   --keep-going      Continue after per-entry failures
   --skip-host-deps  Skip host dependency installation
   --skip-bootstrap  Reuse existing source bootstrap tarballs
+  --no-android      Build packages without the freebasic-android profile
   --list            Show the currently configured distro targets
   --help            Show this help text
 
@@ -79,6 +80,7 @@ ARCH_FILTER=""
 KEEP_GOING=0
 SKIP_HOST_DEPS=0
 SKIP_BOOTSTRAP=0
+NO_ANDROID=0
 LIST_ONLY=0
 
 if command -v nproc >/dev/null 2>&1; then
@@ -96,6 +98,7 @@ while [ $# -gt 0 ]; do
         --keep-going) KEEP_GOING=1; shift ;;
         --skip-host-deps) SKIP_HOST_DEPS=1; shift ;;
         --skip-bootstrap) SKIP_BOOTSTRAP=1; shift ;;
+        --no-android) NO_ANDROID=1; shift ;;
         --list) LIST_ONLY=1; shift ;;
         -h|--help)
             usage
@@ -478,6 +481,7 @@ build_one() {
     local container_outdir
     local arm_arch
     local build_jobs
+    local android_arg
 
     IFS="|" read -r distro image tag codename script_name arch <<EOF
 $entry
@@ -496,6 +500,10 @@ EOF
     outdir="$(host_outdir_for_target "$distro" "$codename" "$arch")"
     container_outdir="$(container_outdir_for_target "$distro" "$codename" "$arch")"
     arm_arch="$(arm_arch_for_target "$distro" "$arch")"
+    android_arg=""
+    if [ "$NO_ANDROID" -eq 1 ]; then
+        android_arg=" --no-android"
+    fi
 
     mkdir -p "$outdir"
 
@@ -528,7 +536,7 @@ EOF
             -v "$ROOT:/work" \
             -w /work \
             "$image" \
-            bash -lc "/work/build_scripts/${script_name} --no-build"
+            bash -lc "/work/build_scripts/${script_name} --no-build${android_arg}"
     } &> "$outdir/docker_build.log"; then
         if log_has_missing_manifest "$outdir/docker_build.log"; then
             echo "SKIPPED: ${distro}/${codename} (${arch}) has no Docker image for ${platform}"
