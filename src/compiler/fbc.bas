@@ -1050,6 +1050,7 @@ private function hLinkFiles( ) as integer
 			"TOTAL_MEMORY=67108864", _
 			"ALLOW_MEMORY_GROWTH=1", _
 			"RETAIN_COMPILER_SETTINGS=1", _
+			"WASM=0", _
 			"ASYNCIFY=1" _
 		}
 			'"WARN_UNALIGNED=1", _
