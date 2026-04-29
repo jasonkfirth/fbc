@@ -718,6 +718,48 @@ Function AddInstallDirToPath
 	done:
 FunctionEnd
 
+Function AddInstallDirToMsys2
+	;
+	; MSYS2 login shells do not read the Windows PATH exactly as normal
+	; console programs do.  Add a small profile.d fragment so pacman,
+	; make, and test shells can find the installed FreeBASIC compiler
+	; without users editing /etc/profile by hand.
+	Call WriteMsys2ProfileFile64
+	Call WriteMsys2ProfileFile32
+FunctionEnd
+
+Function WriteMsys2ProfileFile64
+	IfFileExists "C:\\msys64\\etc\\profile.d\\*.*" 0 done
+	FileOpen \$0 "C:\\msys64\\etc\\profile.d\\freebasic.sh" w
+	IfErrors done
+	Call WriteMsys2ProfileFileContents
+	FileClose \$0
+	done:
+FunctionEnd
+
+Function WriteMsys2ProfileFile32
+	IfFileExists "C:\\msys32\\etc\\profile.d\\*.*" 0 done
+	FileOpen \$0 "C:\\msys32\\etc\\profile.d\\freebasic.sh" w
+	IfErrors done
+	Call WriteMsys2ProfileFileContents
+	FileClose \$0
+	done:
+FunctionEnd
+
+Function WriteMsys2ProfileFileContents
+	FileWrite \$0 "# FreeBASIC installer PATH setup$\r$\n"
+	FileWrite \$0 "if command -v cygpath >/dev/null 2>&1; then$\r$\n"
+	FileWrite \$0 "  _freebasic_prefix=\`cygpath -u '$INSTDIR'\`$\r$\n"
+	FileWrite \$0 "else$\r$\n"
+	FileWrite \$0 "  _freebasic_prefix=/c/FreeBASIC$\r$\n"
+	FileWrite \$0 "fi$\r$\n"
+	FileWrite \$0 "case :\$$PATH: in$\r$\n"
+	FileWrite \$0 "  *:\${_freebasic_prefix}:*) ;;$\r$\n"
+	FileWrite \$0 "  *) export PATH=\${_freebasic_prefix}:\$$PATH ;;$\r$\n"
+	FileWrite \$0 "esac$\r$\n"
+	FileWrite \$0 "unset _freebasic_prefix$\r$\n"
+FunctionEnd
+
 Function un.RemoveInstallDirFromPath
 	ReadRegStr \$0 HKLM "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" "Path"
 	StrCmp \$0 "" done
@@ -739,15 +781,22 @@ Function un.RemoveInstallDirFromPath
 	done:
 FunctionEnd
 
+Function un.RemoveInstallDirFromMsys2
+	Delete "C:\\msys64\\etc\\profile.d\\freebasic.sh"
+	Delete "C:\\msys32\\etc\\profile.d\\freebasic.sh"
+FunctionEnd
+
 Section "Install"
 	SetOutPath "\$INSTDIR"
 	File /r "$dist_win\\*"
 	WriteUninstaller "\$INSTDIR\\uninstall.exe"
 	Call AddInstallDirToPath
+	Call AddInstallDirToMsys2
 SectionEnd
 
 Section "Uninstall"
 	Call un.RemoveInstallDirFromPath
+	Call un.RemoveInstallDirFromMsys2
 	Delete "\$INSTDIR\\uninstall.exe"
 	RMDir /r "\$INSTDIR"
 SectionEnd

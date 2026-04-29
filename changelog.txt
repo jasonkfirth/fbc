@@ -12,6 +12,7 @@ Version 1.20.1
 - JavaScript/Emscripten packaging: split the JS-target compiler and runtime into a separate fbc-js/freebasic-js install layout so it can be installed alongside the native FreeBASIC packages without changing the normal fbc defaults
 - JavaScript/Emscripten packaging: make freebasic-js opt-in for Debian/Ubuntu builds via the nojs build profile and the build script's --no-js switch so default/native package builds can skip the Emscripten dependency chain
 - Windows/MSYS2 packaging: bundle a broader set of third-party import libraries and DLLs used by the shipped examples and bindings, and add package-local import-library aliases for older binding names that differ from current MSYS2 package names
+- Windows/MSYS2 installer: add the installed FreeBASIC directory to MSYS2 login shells through profile.d as well as updating the normal Windows system PATH
 
 [added]
 - sfxlib integrated into the compiler, runtime, libraries, examples, and build system
