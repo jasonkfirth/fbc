@@ -1,5 +1,3 @@
-freebasic-android: no-code-sections [usr/lib/freebasic-android/android-aarch64/libfbpic.a]
-freebasic-android: no-code-sections [usr/lib/freebasic-android/android-aarch64/libfbgfxpic.a]
-freebasic-android: no-code-sections [usr/lib/freebasic-android/android-aarch64/libsfxpic.a]
 freebasic-android: binary-from-other-architecture [usr/lib/freebasic-android/android-aarch64/fbrt*.o]
 freebasic-android: static-library-has-unneeded-sections * [usr/lib/freebasic-android/android-aarch64/*.a]
+freebasic-android: executable-in-usr-lib [usr/lib/freebasic-android/bin/fbc-android-compiler]

@@ -333,6 +333,11 @@ endif
 	find debian/tmp/usr/share/freebasic/examples -type f -perm /111 \
 		! -name '*.sh' ! -name '*.ps1' ! -name '*.bat' ! -name '*.cmd' \
 		-delete
+	find debian/tmp/usr/share/freebasic/examples -type f \
+		\( -path '*/data/*' -name '*.txt' -o -path '*/data/*' -name 'License' \
+		   -o -path '*/obj/*' -name 'deleteme.txt' \
+		   -o -path '*/COM/*' -name '*.html' \) \
+		-delete || true
 
 # ------------------------------------------------------------
 # FLTK license relocation
@@ -371,6 +376,7 @@ execute_after_dh_installdocs:
 	rm -rf debian/freebasic-doc/usr/share/doc/freebasic/manual/cache* || true
 	find debian/freebasic-doc/usr/share/doc/freebasic \
 		\( -name gpl.txt -o -name lgpl.txt \) -delete || true
+	find debian/freebasic-doc/usr/share/doc/freebasic -type d -empty -delete || true
 
 
 # ======================================================================
