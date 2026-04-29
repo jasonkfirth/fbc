@@ -779,9 +779,9 @@ EOF
 set "PATH=$package_path_win"
 if not exist "$validate_win\\emcc-temp" mkdir "$validate_win\\emcc-temp"
 set "EMCC_TEMP_DIR=$validate_win\\emcc-temp"
-"$dist_win\\fbc-js.cmd" "$validate_win\\hello.bas" -x "$validate_win\\hello.js"
+call "$dist_win\\fbc-js.cmd" "$validate_win\\hello.bas" -x "$validate_win\\hello.js"
 if errorlevel 1 exit /b %ERRORLEVEL%
-node "$validate_win\\hello.js" > "$validate_win\\output.txt"
+node "$validate_win\\hello.js" > "$validate_win\\output.txt" 2> "$validate_win\\output.err"
 exit /b %ERRORLEVEL%
 EOF
 
