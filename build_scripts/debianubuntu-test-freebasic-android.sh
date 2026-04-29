@@ -160,13 +160,17 @@ cat > /tmp/fb-android-smoke/gfx.bas <<'EOF'
 screenres 160, 120, 32
 line (0, 0)-(159, 119), rgb(0, 128, 255), bf
 line (10, 10)-(149, 109), rgb(255, 255, 255), b
-print "FREEBASIC_ANDROID_GFX_SMOKE"
+open err for output as #1
+print #1, "FREEBASIC_ANDROID_GFX_SMOKE"
+close #1
 sleep 1000
 EOF
 
 cat > /tmp/fb-android-smoke/sfx.bas <<'EOF'
 sound 440, 0.25
-print "FREEBASIC_ANDROID_SFX_SMOKE"
+open err for output as #1
+print #1, "FREEBASIC_ANDROID_SFX_SMOKE"
+close #1
 sleep 1000
 EOF
 
@@ -313,6 +317,7 @@ run_apk_smoke() {
     while [ "$SECONDS" -lt "$deadline" ]; do
         "$adb" logcat -b all -d > "$log_file"
         if grep -q "$marker" "$log_file" && grep -q "$exit_marker" "$log_file"; then
+            run "$adb" shell am force-stop "$package_name" >/dev/null 2>&1 || true
             return 0
         fi
         if [ "$SECONDS" -ge "$next_notice" ]; then

@@ -366,6 +366,7 @@ int fb_sfxAllocContext(void);
 void fb_sfxFreeContext(void);
 int fb_sfxInitCore(void);
 void fb_sfxExitCore(void);
+void fb_sfxPlatformExit(void);
 void fb_sfxUpdate(int frames);
 void fb_sfxBeep(void);
 void fb_sfxBeepEx(int frequency, float duration);

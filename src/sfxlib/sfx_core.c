@@ -59,10 +59,6 @@
 #include "fb_sfx_buffer.h"
 #include "fb_sfx_capture.h"
 
-#if defined(__linux__) && !defined(DISABLE_LINUX)
-#include "linux/fb_sfx_linux.h"
-#endif
-
 static void fb_sfxInitCoreRollbackLocked(void);
 static int fb_sfxOutputQueueInitLocked(void);
 static void fb_sfxOutputQueueShutdownLocked(void);
@@ -215,9 +211,7 @@ void fb_sfxExitCore(void)
 
     fb_sfxRuntimeLock();
 
-#if defined(__linux__) && !defined(DISABLE_LINUX)
-    fb_sfxLinuxExit();
-#endif
+    fb_sfxPlatformExit();
 
     fb_sfxCaptureShutdown();
 

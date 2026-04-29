@@ -25,6 +25,9 @@ freebasic (1.20.1-1) jammy; urgency=medium
     x86/x86_64 targets.
   * Fix Linux sfxlib shutdown and worker-lock issues found during the
     1.20 forward-port validation work.
+  * Remove the accidentally nested duplicate src/sfxlib/sfxlib source
+    tree and move shared sfxlib teardown behind per-target platform hooks
+    instead of including Linux backend headers from the generic core.
   * Fix Linux sfxlib CAPTURE SAVE so buffered recordings can be written
     successfully on real hardware.
   * Fix Alpine package smoke binaries by building musl-targeted compilers
@@ -101,7 +104,9 @@ freebasic (1.20.1-1) jammy; urgency=medium
     command-line tools, and a system image only after the package has
     already proven it can build APKs from declared dependencies, along
     with the minimal X11 runtime libraries needed to launch the emulator
-    in a slim container, and polls all logcat buffers with useful diagnostics
+    in a slim container, emits gfx/sfx markers through stderr so graphics-mode
+    PRINT redirection cannot hide them, force-stops each smoke Activity after
+    a clean marker pair, and polls all logcat buffers with useful diagnostics
     while validating APK launch markers.
   * Add an fbc-android --target-api option so APK manifests can satisfy
     modern emulator install policy even when building against an older
@@ -114,6 +119,8 @@ freebasic (1.20.1-1) jammy; urgency=medium
     without making emulator infrastructure mandatory for package installs.
   * Fix Android triplet detection so aarch64-linux-android resolves to
     TARGET_OS=android and use the NDK clang driver for Android assembly.
+  * Fix Android sfxlib archives so the generic core does not retain a
+    Linux-only fb_sfxLinuxExit reference in SFX APKs.
 
  -- SJ_Zero <sj@fbxl.net>  Tue, 28 Apr 2026 15:30:00 -0400
 

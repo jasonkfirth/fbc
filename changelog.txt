@@ -33,7 +33,7 @@ Version 1.20.1
 - Android gfxlib and sfxlib backends, including modern/legacy Android gfx drivers, AAudio/OpenSL ES sound drivers, Activity-backed console rendering, and an on-screen soft-keyboard toggle button
 - Android gfxlib/sfxlib: propagate NativeActivity lifecycle and surface callbacks so rendering and audio output pause cleanly and recover across Android surface recreation; Android APK startup now waits for stdout/stderr redirection before running the FreeBASIC main program
 - Debian/Ubuntu Docker smoke-test script for freebasic-android that builds console, gfxlib, and sfxlib APKs in a fresh container and runs them under an Android emulator when KVM and a system image are available
-- Debian/Ubuntu freebasic-android smoke testing now separates the bare package install/APK build check from emulator harness provisioning for adb, avdmanager, emulator, system images, and the emulator's minimal X11 runtime libraries; the emulator APK launch check now uses an explicit Activity start, polls all logcat buffers for smoke markers, and dumps useful diagnostics on failure
+- Debian/Ubuntu freebasic-android smoke testing now separates the bare package install/APK build check from emulator harness provisioning for adb, avdmanager, emulator, system images, and the emulator's minimal X11 runtime libraries; the emulator APK launch check now uses an explicit Activity start, emits gfx/sfx markers through stderr so graphics-mode PRINT redirection cannot hide them, force-stops each smoke Activity after a clean marker pair, polls all logcat buffers, and dumps useful diagnostics on failure
 - fbc-android --target-api option for setting APK targetSdkVersion independently from the installed Android platform jar used by aapt
 - freebasic-android now recommends adb and Android emulator command-line tooling so installed users have a local APK test path without making emulator infrastructure mandatory
 - Debian/Ubuntu Docker smoke-test scripts for validating the native and JavaScript packages in fresh containers using only the package artifacts and their declared dependencies
@@ -44,6 +44,7 @@ Version 1.20.1
 - Linux/sfxlib: avoid a PulseAudio lock stall where the Linux worker could keep the runtime lock while feeding silent output, blocking control commands such as DEVICE SELECT
 - Linux/sfxlib: make CAPTURE SAVE use the buffered capture path and actual capture format so saved recordings succeed on real hardware
 - Linux/sfxlib: suppress ALSA probe diagnostics during normal backend fallback while preserving the ALSA messages when sfxlib debug environment variables are enabled
+- sfxlib: removed an accidentally nested duplicate source tree under src/sfxlib/sfxlib and moved shared platform teardown behind per-target hooks instead of including Linux backend headers from the generic core
 - Linux/sfxlib: keep package smoke tests strict about stderr while reporting the active sfxlib output driver, making null-driver fallback visible in no-audio Docker containers
 - Linux/gfxlib: run package smoke-test binaries even in headless containers, accepting expected display startup failures while still failing on loader and linker errors
 - Linux/Alpine: build musl-targeted compilers so linked programs use the musl dynamic loader instead of glibc loader paths
@@ -54,6 +55,7 @@ Version 1.20.1
 - JavaScript/Emscripten builds now use emcc/emar/emranlib defaults and skip native host library/header probes when cross-building JS-target runtime libraries
 - Android target detection now recognizes aarch64-linux-android triplets as Android instead of Linux, and Android assembly uses the NDK clang driver instead of an unavailable GNU as path
 - fbc-android now wraps the generated FreeBASIC program's exit() path so NativeActivity APKs can log their smoke-test exit marker instead of terminating the Android process from the program thread
+- Android/sfxlib: avoid pulling the Linux-only sfxlib shutdown hook into Android runtime archives, fixing SFX APK load failures from an unresolved fb_sfxLinuxExit symbol
 - examples: expanded the examples makefile coverage and fixed several Windows example build failures in the FreeImage/SDL, SDL_mixer, SDL_ttf, SDL mouse, TinyPTC, and CUnit examples
 - bindings: fixed FreeImage.bi so it reuses the Windows GDI bitmap declarations instead of redefining RGBQUAD/BITMAPINFO types after wingdi.bi has been included
 - bindings: make CUnit.bi link against cunit automatically, matching the behavior expected by the CUnit examples
