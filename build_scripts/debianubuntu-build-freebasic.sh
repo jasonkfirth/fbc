@@ -96,6 +96,7 @@ EOF
 NO_BUILD=0
 NO_JS=0
 ANDROID=1
+ANDROID_EXPLICIT=0
 NO_PACKAGE=0
 SKIP_DEPS=0
 
@@ -103,8 +104,8 @@ for arg in "$@"; do
     case "$arg" in
         --no-build) NO_BUILD=1 ;;
         --no-js) NO_JS=1 ;;
-        --no-android) ANDROID=0 ;;
-        --android) ANDROID=1 ;;
+        --no-android) ANDROID=0; ANDROID_EXPLICIT=1 ;;
+        --android) ANDROID=1; ANDROID_EXPLICIT=1 ;;
         --no-package) NO_PACKAGE=1 ;;
         --skip-deps) SKIP_DEPS=1 ;;
         -h|--help)
@@ -189,6 +190,25 @@ case "$ARCH" in
         die "unsupported Debian architecture: $ARCH"
         ;;
 esac
+
+android_supported_for_arch() {
+    case "$1" in
+        amd64)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+if [ "$ANDROID" -eq 1 ] && ! android_supported_for_arch "$ARCH"; then
+    if [ "$ANDROID_EXPLICIT" -eq 1 ]; then
+        die "Android SDK/NDK packages are not available for Debian architecture: $ARCH"
+    fi
+    echo "==> disabling Android package profile for unsupported architecture: $ARCH"
+    ANDROID=0
+fi
 
 BOOTSTRAP_TAR="FreeBASIC-${VERSION}-source-bootstrap-${BOOTKEY}.tar.xz"
 

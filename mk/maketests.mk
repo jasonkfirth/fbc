@@ -75,7 +75,11 @@ quick-test-body: sanity \
 	example-artifact-test \
 	build-graph-test \
 	bootstrap-emit-test \
-	compiler-smoke
+	compiler-smoke \
+	compiler-riscv64-smoke \
+	compiler-s390x-smoke \
+	compiler-loongarch64-smoke \
+	compiler-ppc64le-smoke
 
 .PHONY: full-test full-test-body
 full-test: full-test-body
@@ -103,6 +107,10 @@ full-test-body: sanity \
 	uninstall-test \
 	matrix-test \
 	compiler-smoke \
+	compiler-riscv64-smoke \
+	compiler-s390x-smoke \
+	compiler-loongarch64-smoke \
+	compiler-ppc64le-smoke \
 	tests-test
 
 ##############################################################################

@@ -405,6 +405,17 @@ arm_arch_for_target() {
     fi
 }
 
+android_supported_for_arch() {
+    case "$1" in
+        amd64)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 ##############################################################################
 # Listing
 ##############################################################################
@@ -501,7 +512,7 @@ EOF
     container_outdir="$(container_outdir_for_target "$distro" "$codename" "$arch")"
     arm_arch="$(arm_arch_for_target "$distro" "$arch")"
     android_arg=""
-    if [ "$NO_ANDROID" -eq 1 ]; then
+    if [ "$NO_ANDROID" -eq 1 ] || ! android_supported_for_arch "$arch"; then
         android_arg=" --no-android"
     fi
 
