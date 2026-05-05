@@ -30,6 +30,7 @@ pointers \
 pp \
 quirk \
 scopes \
+sfx \
 string \
 structs \
 swap \

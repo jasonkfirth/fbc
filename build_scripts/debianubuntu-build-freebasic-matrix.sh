@@ -216,15 +216,15 @@ ensure_host_compiler() {
 
 bootstrap_mapping() {
     case "$1" in
-        amd64)   echo "linux-x86_64 linux-amd64" ;;
-        i386)    echo "linux-x86 linux-i386" ;;
-        arm64)   echo "linux-aarch64 linux-arm64" ;;
-        armhf)   echo "linux-arm linux-armhf" ;;
-        armel)   echo "linux-arm linux-armel" ;;
-        ppc64el) echo "linux-powerpc64le linux-ppc64el" ;;
-        s390x)   echo "linux-s390x linux-s390x" ;;
-        riscv64) echo "linux-riscv64 linux-riscv64" ;;
-        loong64) echo "linux-loongarch64 linux-loongarch64" ;;
+        amd64)   echo "linux-x86_64 linux-amd64 x86_64-linux-gnu" ;;
+        i386)    echo "linux-x86 linux-i386 i686-linux-gnu" ;;
+        arm64)   echo "linux-aarch64 linux-arm64 aarch64-linux-gnu" ;;
+        armhf)   echo "linux-arm linux-armhf arm-linux-gnueabihf" ;;
+        armel)   echo "linux-arm linux-armel arm-linux-gnueabi" ;;
+        ppc64el) echo "linux-powerpc64le linux-ppc64el powerpc64le-linux-gnu" ;;
+        s390x)   echo "linux-s390x linux-s390x s390x-linux-gnu" ;;
+        riscv64) echo "linux-riscv64 linux-riscv64 riscv64-linux-gnu" ;;
+        loong64) echo "linux-loongarch64 linux-loongarch64 loongarch64-linux-gnu" ;;
         *)
             die "unsupported bootstrap arch: $1"
             ;;
@@ -236,10 +236,11 @@ build_bootstrap_for_arch() {
     local arm_arch="${2:-}"
     local fbc_target
     local dir_key
+    local target_triplet
     local pkg
     local extra_make_args=()
 
-    read -r fbc_target dir_key <<EOF
+    read -r fbc_target dir_key target_triplet <<EOF
 $(bootstrap_mapping "$debarch")
 EOF
 
@@ -271,6 +272,7 @@ EOF
     "$MAKE_CMD" clean-bootstrap-sources >/dev/null 2>&1 || true
 
     run "$MAKE_CMD" \
+        TARGET_TRIPLET="$target_triplet" \
         FBC_TARGET="$fbc_target" \
         FBTARGET_DIR_OVERRIDE="$dir_key" \
         "${extra_make_args[@]}" \
@@ -291,6 +293,12 @@ LINUX_ARCHES=(
     ppc64el
     s390x
     riscv64
+)
+
+DEBIAN_TRIXIE_ARCHES=(
+    "${LINUX_ARCHES[@]}"
+    armel
+    loong64
 )
 
 RASPBIAN_ARCHES=(
@@ -318,7 +326,7 @@ docker_platform_for_arch() {
         i386) echo "linux/386" ;;
         arm64) echo "linux/arm64" ;;
         armhf) echo "linux/arm/v7" ;;
-        armel) echo "linux/arm/v6" ;;
+        armel) echo "linux/arm/v5" ;;
         ppc64el) echo "linux/ppc64le" ;;
         s390x) echo "linux/s390x" ;;
         riscv64) echo "linux/riscv64" ;;
@@ -363,15 +371,76 @@ make_jobs_for_platform() {
 
 target_arches() {
     local distro="$1"
+    local codename="$2"
 
     case "$distro" in
         raspbian)
             printf '%s\n' "${RASPBIAN_ARCHES[@]}"
             ;;
+        debian)
+            if [ "$codename" = "trixie" ]; then
+                printf '%s\n' "${DEBIAN_TRIXIE_ARCHES[@]}"
+            else
+                printf '%s\n' "${LINUX_ARCHES[@]}"
+            fi
+            ;;
         *)
             printf '%s\n' "${LINUX_ARCHES[@]}"
             ;;
     esac
+}
+
+docker_image_for_target() {
+    local distro="$1"
+    local codename="$2"
+    local arch="$3"
+    local default_image="$4"
+
+    case "${distro}/${codename}/${arch}" in
+        debian/trixie/armel)
+            echo "arm32v5/debian:trixie"
+            ;;
+        debian/trixie/loong64)
+            echo "ghcr.io/loong64/debian:trixie"
+            ;;
+        *)
+            echo "$default_image"
+            ;;
+    esac
+}
+
+bootstrap_arches_for_filters() {
+    local entry
+    local distro
+    local image
+    local tag
+    local codename
+    local script_name
+    local arch
+    local seen=" "
+
+    for entry in "${DISTRO_TARGETS[@]}"; do
+        IFS="|" read -r distro image tag codename script_name <<EOF
+$entry
+EOF
+        if [ -n "$DISTRO_FILTER" ] && [ "$DISTRO_FILTER" != "$distro" ]; then
+            continue
+        fi
+
+        while IFS= read -r arch; do
+            if [ -n "$ARCH_FILTER" ] && [ "$ARCH_FILTER" != "$arch" ]; then
+                continue
+            fi
+            case "$seen" in
+                *" $arch "*)
+                    ;;
+                *)
+                    seen="${seen}${arch} "
+                    printf '%s\n' "$arch"
+                    ;;
+            esac
+        done < <(target_arches "$distro" "$codename")
+    done
 }
 
 host_outdir_for_target() {
@@ -469,9 +538,9 @@ if [ "$SKIP_BOOTSTRAP" -eq 0 ]; then
         done
         RASPBIAN_BOOTSTRAP_READY=1
     else
-        for debarch in "${LINUX_ARCHES[@]}"; do
+        while IFS= read -r debarch; do
             build_bootstrap_for_arch "$debarch"
-        done
+        done < <(bootstrap_arches_for_filters)
     fi
 fi
 
@@ -506,6 +575,7 @@ EOF
         return 0
     fi
 
+    image="$(docker_image_for_target "$distro" "$codename" "$arch" "$image")"
     platform="$(docker_platform_for_arch "$arch")"
     build_jobs="$(make_jobs_for_platform "$platform" "$HOST_PLATFORM")"
     outdir="$(host_outdir_for_target "$distro" "$codename" "$arch")"
@@ -533,6 +603,10 @@ EOF
     echo "Script: build_scripts/${script_name}"
     echo "============================================================"
 
+    if ! : > "$outdir/docker_build.log"; then
+        die "cannot write build log: $outdir/docker_build.log"
+    fi
+
     if ! {
         run_root docker pull --platform "$platform" "$image" &&
         run_root docker run --rm \
@@ -548,7 +622,7 @@ EOF
             -w /work \
             "$image" \
             bash -lc "/work/build_scripts/${script_name} --no-build${android_arg}"
-    } &> "$outdir/docker_build.log"; then
+    } > "$outdir/docker_build.log" 2>&1; then
         if log_has_missing_manifest "$outdir/docker_build.log"; then
             echo "SKIPPED: ${distro}/${codename} (${arch}) has no Docker image for ${platform}"
             echo "Log: $outdir/docker_build.log"
@@ -596,7 +670,7 @@ EOF
 
     while IFS= read -r arch; do
         BUILD_MATRIX+=("${distro}|${image}|${tag}|${codename}|${script_name}|${arch}")
-    done < <(target_arches "$distro")
+    done < <(target_arches "$distro" "$codename")
 done
 
 failures=0

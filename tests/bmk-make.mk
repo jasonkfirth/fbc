@@ -98,6 +98,7 @@ all : $(RUN_TEST)
 MAINX :=
 SRCSX :=
 EXTRA_OBJSX :=
+COMPILE_AND_LINK :=
 
 ifneq ($(BMK),)
 
@@ -127,11 +128,16 @@ FBC_LFLAGS += -g
 
 OBJS := $(addsuffix .o,$(basename $(SRCSX)))
 
+ifeq ($(COMPILE_AND_LINK),1)
+$(APP) : $(SRCSX) $(EXTRA_OBJSX)
+	$(FBC) $(FBC_CFLAGS) $(SRCSX) $(EXTRA_OBJSX) -x $(APP)
+else
 $(OBJS) : %.o : %.bas
 	$(FBC) $(FBC_CFLAGS) -m $(MAIN_MODULE) -c $< -o $@
 
 $(APP) : $(OBJS) $(EXTRA_OBJSX)
 	$(FBC) $(FBC_LFLAGS) $(OBJS) $(EXTRA_OBJSX) -x $(APP)
+endif
 
 run_test_ok : $(APP)
 	@if $(APP) ; then true ; else false ; fi

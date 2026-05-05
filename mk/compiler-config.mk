@@ -279,7 +279,10 @@ ifneq ($(filter default file,$(origin LD)),)
 
   ifeq ($(TARGET_OS),js)
     LD := emcc
-  else ifneq ($(filter linux android darwin freebsd netbsd openbsd dragonfly solaris haiku,$(TARGET_OS)),)
+  else ifeq ($(TARGET_OS),darwin)
+    # fbc's Darwin linker path intentionally uses the compiler driver so it
+    # can choose native startup/runtime defaults. ELF-like targets need a real
+    # linker because fbc passes ld-style options such as "-m elf_x86_64".
     LD := $(CC)
   else
     ifeq ($(CROSS_BUILD),yes)

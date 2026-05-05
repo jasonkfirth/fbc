@@ -149,40 +149,50 @@ VERSION="$(sed -n 's/^FBVERSION[[:space:]]*:=[[:space:]]*//p' mk/version.mk | he
 ARCH="$(dpkg --print-architecture 2>/dev/null || true)"
 [ -n "$ARCH" ] || die "could not detect Debian architecture"
 
+TARGET_TRIPLET=""
 case "$ARCH" in
     amd64)
+        TARGET_TRIPLET="x86_64-linux-gnu"
         BOOTKEY="linux-amd64"
         FBC_TARGET="linux-x86_64"
         ;;
     i386)
+        TARGET_TRIPLET="i686-linux-gnu"
         BOOTKEY="linux-i386"
         FBC_TARGET="linux-x86"
         ;;
     arm64)
+        TARGET_TRIPLET="aarch64-linux-gnu"
         BOOTKEY="linux-arm64"
         FBC_TARGET="linux-aarch64"
         ;;
     armhf)
+        TARGET_TRIPLET="arm-linux-gnueabihf"
         BOOTKEY="linux-armhf"
         FBC_TARGET="linux-arm"
         ;;
     armel)
+        TARGET_TRIPLET="arm-linux-gnueabi"
         BOOTKEY="linux-armel"
         FBC_TARGET="linux-arm"
         ;;
     ppc64el)
+        TARGET_TRIPLET="powerpc64le-linux-gnu"
         BOOTKEY="linux-ppc64el"
         FBC_TARGET="linux-powerpc64le"
         ;;
     s390x)
+        TARGET_TRIPLET="s390x-linux-gnu"
         BOOTKEY="linux-s390x"
         FBC_TARGET="linux-s390x"
         ;;
     riscv64)
+        TARGET_TRIPLET="riscv64-linux-gnu"
         BOOTKEY="linux-riscv64"
         FBC_TARGET="linux-riscv64"
         ;;
     loong64)
+        TARGET_TRIPLET="loongarch64-linux-gnu"
         BOOTKEY="linux-loongarch64"
         FBC_TARGET="linux-loongarch64"
         ;;
@@ -338,6 +348,7 @@ build_bootstrap_tarball() {
     "$MAKE_CMD" clean-bootstrap-sources >/dev/null 2>&1 || true
 
     run "$MAKE_CMD" \
+        TARGET_TRIPLET="$TARGET_TRIPLET" \
         FBC_TARGET="$FBC_TARGET" \
         FBTARGET_DIR_OVERRIDE="$BOOTKEY" \
         "${ARM_MAKE_ARGS[@]}" \

@@ -10,12 +10,18 @@ Version 1.20.1
 - DOS test flow: replaced the earlier ad-hoc DOS sound probe helper with a fuller image-backed build_scripts/msdos-test-freebasic.sh path that provisions its own host test dependencies, boots the packaged DOS distribution under DOSBox-X, and validates console, SCREEN 13, Sound Blaster, and no-BLASTER fallback scenarios from inside the DOS image
 - Debian/Ubuntu packaging: keep the native compiler, runtime, startup objects, libraries, and core headers together in the freebasic package, split third-party bindings and examples into separate packages, and leave freebasic-runtime/freebasic-dev as transitional compatibility packages
 - Debian/Ubuntu packaging: reduce lintian noise by installing compiler driver manpages, modernizing dependency names, cleaning generated documentation packages, normalizing example font/encoding handling, and documenting intentional cross-target archive/runtime assets
+- Debian/Ubuntu build matrix: expanded architecture handling so the matrix can target riscv64, s390x, loong64, armel, armhf, ppc64el, and other supported Debian/Ubuntu CPU families through per-architecture Docker image/platform selection instead of assuming every architecture is available through the same base image
+- Debian/Ubuntu build matrix: changed Android package handling from a riscv64-specific exception into an architecture support gate, automatically disabling Android builds where Debian does not provide the required Android SDK/NDK dependency set and failing early if Android is explicitly requested on an unsupported architecture
+- Debian/Ubuntu bootstrap flow: pass the real GNU target triplet during bootstrap source generation so architecture-specific bootstrap builds use the intended target CPU instead of inheriting the host default
+- Debian/Ubuntu architecture policy: treat hard-to-cover architectures such as armel and loong64 as targeted Debian trixie package-build lanes, allowing at least one package build per claimed CPU architecture without requiring every architecture to build across every distro/codename row
 - JavaScript/Emscripten packaging: split the JS-target compiler and runtime into a separate fbc-js/freebasic-js install layout so it can be installed alongside the native FreeBASIC packages without changing the normal fbc defaults
 - JavaScript/Emscripten packaging: make freebasic-js opt-in for Debian/Ubuntu builds via the nojs build profile and the build script's --no-js switch so default/native package builds can skip the Emscripten dependency chain
 - Android packaging: add an fbc-android/freebasic-android install layout with Android-target runtime libraries, headers, APK template glue, and Debian/Ubuntu build-script support; Debian/Ubuntu package builds now include it by default while root make/all builds still leave it out
 - Android packaging: keep the fbc-android wrapper and APK template sources under tracked src/tools/android instead of the ignored local tools/ tree
 - Windows/MSYS2 packaging: bundle a broader set of third-party import libraries and DLLs used by the shipped examples and bindings, and add package-local import-library aliases for older binding names that differ from current MSYS2 package names
 - Windows/MSYS2 installer: add the installed FreeBASIC directory to MSYS2 login shells through profile.d as well as updating the normal Windows system PATH
+- tests: expanded the build/test harness to support compile-and-link tests that need fbc's automatic runtime library selection instead of separate compile/link steps
+- tests: refreshed warning-test expectations to match the compiler's corrected "Ambiguous" diagnostic spelling
 
 [added]
 - sfxlib integrated into the compiler, runtime, libraries, examples, and build system
@@ -23,11 +29,19 @@ Version 1.20.1
 - Haiku platform support across compiler target selection, rtlib, gfxlib2, sfxlib, headers, libraries, and build scripts
 - broader platform build coverage carried forward from 1.10.4 for Darwin/macOS, Linux, Windows/MinGW, Windows/Cygwin, FreeBSD, OpenBSD, NetBSD, DragonFly, Solaris, and Haiku
 - additional cpu-family support carried forward from 1.10.4, including riscv64, s390x, and loongarch64 target handling
+- compiler smoke-test targets for riscv64, s390x, loongarch64, and ppc64le, including checks for target C emission and expected predefined platform/CPU macros
+- riscv64 compiler smoke coverage that verifies __FB_LINUX__ and __FB_RISCV64__, emits target C, and optionally compiles a RISC-V object when a suitable cross-GCC is installed
+- s390x compiler smoke coverage that verifies __FB_LINUX__ and __FB_S390X__, emits target C, and checks the generated GCC command line for a valid s390x -march value
+- loongarch64 and ppc64le compiler smoke coverage, plus manual target-emission checks for big-endian PowerPC and PowerPC64 targets
+- predefined compiler CPU-family macros for __FB_RISCV64__, __FB_S390X__, and __FB_LOONGARCH64__
+- ELF machine-id recognition for s390x, riscv64, and loongarch64 when reading FreeBASIC object metadata
+- Debian trixie loong64 matrix coverage using a loong64-capable Debian container image and Docker's linux/loong64 platform
+- Debian trixie armel matrix coverage using an arm32v5 Debian container image and Docker's linux/arm/v5 platform
 - Windows UTF-8 filename handling carried forward from 1.10.4, including wide-path runtime wrappers and Unicode-aware DIR() handling on MinGW
 - Solaris target-specific rtlib console support carried forward from 1.10.4, including the local termcap shim and non-ncurses console/input runtime files
 - beginner-oriented example coverage for sfxlib and OPEN TCP, including self-test examples for networking and a larger commented sfxlib showcase
 - DOS/sfxlib: added a fallback PC speaker backend that uses PIT channel 2 pulses to provide audible playback when no Sound Blaster is configured and BLASTER is unset or unavailable
-- fbc-js compiler build target that defaults to js-asmjs/Emscripten while still reporting the native host platform for host-specific compiler behavior
+- fbc-js compiler build target that defaults to js-asmjs/Emscripten while still reporting the native host platform for host-specific compiler behaviour
 - Debian/Ubuntu freebasic-js package containing fbc-js, JS-target includes, libfb/libfbgfx/libsfx archives, startup objects, and the Emscripten JavaScript shell/runtime support files
 - JavaScript sfxlib backend with WebAudio output for browsers and a null fallback so sound-using programs can still link and run in non-browser smoke tests
 - Android gfxlib and sfxlib backends, including modern/legacy Android gfx drivers, AAudio/OpenSL ES sound drivers, Activity-backed console rendering, and an on-screen soft-keyboard toggle button
@@ -37,14 +51,24 @@ Version 1.20.1
 - fbc-android --target-api option for setting APK targetSdkVersion independently from the installed Android platform jar used by aapt
 - freebasic-android now recommends adb and Android emulator command-line tooling so installed users have a local APK test path without making emulator infrastructure mandatory
 - Debian/Ubuntu Docker smoke-test scripts for validating the native and JavaScript packages in fresh containers using only the package artifacts and their declared dependencies
+- tests/sfx regression coverage for sfxlib command/function syntax, invalid expression use of void sfx commands, and runtime state behaviour
+- tests/sfx runtime build coverage wired into the normal tests directory list, matching the surrounding gfxlib-style test layout
 
 [fixed]
 - Linux: restrict '-m32' and '-m64' linker flags to x86/x86_64 targets instead of passing them to unrelated architectures
+- Linux/ELF-like builds: use the real linker for fbc-driven final links instead of exporting LD=gcc, since fbc passes raw linker flags that are not compiler-driver arguments
+- rtlib/unix: build the multithreaded runtime with ENABLE_MT so libfbmt uses the correct thread-local storage path and ThreadSelf() remains stable after child threads exit
+- s390x: map the compiler's generic s390x GCC architecture selection to z900 instead of emitting -march=s390x, which Debian's s390x GCC rejects
+- armhf/bootstrap: fix bootstrap generation so armhf builds emit ARM target options such as -arch armv7-a+fp instead of accidentally inheriting the host architecture, such as x86_64
+- armel/bootstrap: ensure armel bootstrap generation uses the correct soft-float ARM GNU triplet and emits the intended ARM target architecture
+- loong64/matrix: add a non-standard but usable Debian trixie container path after the normal Debian image set reported no linux/loong64 image
+- build matrix logging: harden docker build-log handling so stale or root-owned docker_build.log files do not produce misleading success output
 - Linux/sfxlib: ensure capture backends are shut down during runtime teardown instead of only clearing the capture state buffer
 - Linux/sfxlib: avoid a PulseAudio lock stall where the Linux worker could keep the runtime lock while feeding silent output, blocking control commands such as DEVICE SELECT
 - Linux/sfxlib: make CAPTURE SAVE use the buffered capture path and actual capture format so saved recordings succeed on real hardware
 - Linux/sfxlib: suppress ALSA probe diagnostics during normal backend fallback while preserving the ALSA messages when sfxlib debug environment variables are enabled
 - sfxlib: removed an accidentally nested duplicate source tree under src/sfxlib/sfxlib and moved shared platform teardown behind per-target hooks instead of including Linux backend headers from the generic core
+- sfxlib: avoid a shutdown deadlock exposed by the new runtime state tests
 - Linux/sfxlib: keep package smoke tests strict about stderr while reporting the active sfxlib output driver, making null-driver fallback visible in no-audio Docker containers
 - Linux/gfxlib: run package smoke-test binaries even in headless containers, accepting expected display startup failures while still failing on loader and linker errors
 - Linux/Alpine: build musl-targeted compilers so linked programs use the musl dynamic loader instead of glibc loader paths
@@ -58,7 +82,8 @@ Version 1.20.1
 - Android/sfxlib: avoid pulling the Linux-only sfxlib shutdown hook into Android runtime archives, fixing SFX APK load failures from an unresolved fb_sfxLinuxExit symbol
 - examples: expanded the examples makefile coverage and fixed several Windows example build failures in the FreeImage/SDL, SDL_mixer, SDL_ttf, SDL mouse, TinyPTC, and CUnit examples
 - bindings: fixed FreeImage.bi so it reuses the Windows GDI bitmap declarations instead of redefining RGBQUAD/BITMAPINFO types after wingdi.bi has been included
-- bindings: make CUnit.bi link against cunit automatically, matching the behavior expected by the CUnit examples
+- bindings: make CUnit.bi link against cunit automatically, matching the behaviour expected by the CUnit examples
+- tests/file: made the TCP EOF check deterministic instead of depending on thread scheduling timing when running the log tests
 
 
 Version 1.20.0

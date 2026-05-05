@@ -83,6 +83,14 @@ sub server_thread( byval userdata as any ptr )
 	get #client, , client_put_recv()
 
 	server_step = 7
+	server_reply_ready = TRUE
+
+	tries = 0
+	do while( (saw_client_eof = FALSE) andalso (tries < 2000) )
+		sleep 1, 1
+		tries += 1
+	loop
+
 	print #client, "server-print"
 	write #client, 456, "server-write"
 
@@ -90,7 +98,6 @@ sub server_thread( byval userdata as any ptr )
 		payload(i) = 10 + i
 	next
 	put #client, , payload()
-	server_reply_ready = TRUE
 
 	server_step = 8
 	tries = 0

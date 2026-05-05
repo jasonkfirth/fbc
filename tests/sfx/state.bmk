@@ -1,0 +1,4 @@
+# TEST_MODE : MULTI_MODULE_OK
+
+MAIN := state.bas
+COMPILE_AND_LINK := 1

@@ -302,11 +302,11 @@ PIC_CFLAGS := -fPIC
 endif
 
 ifeq ($(THREAD_MODEL),posix)
-MT_CFLAGS := -pthread
+MT_CFLAGS := -pthread -DENABLE_MT
 endif
 
 ifeq ($(THREAD_MODEL),win32)
-MT_CFLAGS := -mthreads
+MT_CFLAGS := -mthreads -DENABLE_MT
 endif
 
 ifdef DISABLE_MT

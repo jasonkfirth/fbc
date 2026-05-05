@@ -209,9 +209,9 @@ void fb_sfxExitCore(void)
 
     fb_sfxDriverShutdown();
 
-    fb_sfxRuntimeLock();
-
     fb_sfxPlatformExit();
+
+    fb_sfxRuntimeLock();
 
     fb_sfxCaptureShutdown();
 
