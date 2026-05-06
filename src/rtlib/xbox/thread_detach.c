@@ -1,5 +1,6 @@
 #include "../fb.h"
 #include "../fb_private_thread.h"
+#include <windows.h>
 
 FBCALL void fb_ThreadDetach( FBTHREAD *thread )
 {
@@ -9,7 +10,7 @@ FBCALL void fb_ThreadDetach( FBTHREAD *thread )
 		return;
 
 	flags = fb_AtomicSetThreadFlags( &thread->flags, FBTHREAD_DETACHED );
-	NtClose( thread->id );
+	CloseHandle( thread->id );
 
 	if( flags & FBTHREAD_EXITED ) {
 		free( thread );

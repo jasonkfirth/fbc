@@ -69,7 +69,8 @@ Options:
   --no-build      Reuse the existing source bootstrap tarball
   --no-js         Build packages with DEB_BUILD_PROFILES=nojs
   --no-android    Build packages without DEB_BUILD_PROFILES=android
-  --android       Build the freebasic-android package (default)
+  --android       Build the freebasic-android package; fail if SDK packages
+                  are not available
   --no-package    Stop after ensuring the bootstrap tarball exists
   --skip-deps     Skip apt dependency installation
   --help          Show this help text
@@ -220,6 +221,54 @@ if [ "$ANDROID" -eq 1 ] && ! android_supported_for_arch "$ARCH"; then
     ANDROID=0
 fi
 
+apt_package_available() {
+    local pkg="$1"
+    local candidate
+
+    candidate="$(apt-cache policy "$pkg" 2>/dev/null | sed -n 's/^[[:space:]]*Candidate:[[:space:]]*//p' | head -n1)"
+    [ -n "$candidate" ] && [ "$candidate" != "(none)" ]
+}
+
+apt_any_package_available() {
+    local pkg
+
+    for pkg in "$@"; do
+        apt_package_available "$pkg" && return 0
+    done
+
+    return 1
+}
+
+android_sdk_packages_available() {
+    apt_package_available openjdk-17-jdk-headless || return 1
+    apt_package_available android-sdk || return 1
+    apt_package_available android-sdk-platform-tools || return 1
+    apt_package_available android-sdk-build-tools || return 1
+    apt_any_package_available android-sdk-platform-23 google-android-platform-26-installer || return 1
+    apt_package_available google-android-ndk-r28-installer || return 1
+    apt_package_available aapt || return 1
+    apt_package_available apksigner || return 1
+    apt_package_available gradle || return 1
+
+    return 0
+}
+
+disable_android_if_sdk_unavailable() {
+    [ "$SKIP_DEPS" -eq 0 ] || return 0
+    [ "$ANDROID" -eq 1 ] || return 0
+
+    if android_sdk_packages_available; then
+        return 0
+    fi
+
+    if [ "$ANDROID_EXPLICIT" -eq 1 ]; then
+        die "Android SDK/NDK packages are not available from the configured APT repositories"
+    fi
+
+    echo "==> disabling Android package profile because APT cannot install the required Android SDK/NDK packages"
+    ANDROID=0
+}
+
 BOOTSTRAP_TAR="FreeBASIC-${VERSION}-source-bootstrap-${BOOTKEY}.tar.xz"
 
 ARM_MAKE_ARGS=()
@@ -285,6 +334,8 @@ install_deps() {
     export DEB_BUILD_MAINT_OPTIONS="hardening=+all"
 
     run_root apt-get update -y
+    disable_android_if_sdk_unavailable
+
     local js_deps=()
     if [ "$NO_JS" -eq 0 ]; then
         js_deps=(emscripten nodejs)

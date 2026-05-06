@@ -3123,7 +3123,11 @@ private sub hCheckArgs()
 	'' (Apple gas assembler has such broken support for intel syntax
 	'' (see https://discussions.apple.com/message/10163960#10163960)
 	'' that it can't work for non-trivial programs, so default to -gen gcc.)
-	if( (fbGetCpuFamily( ) = FB_CPUFAMILY_X86) and _
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
+		'' nxdk is clang/LLVM based and does not provide the old xbox-as
+		'' toolchain expected by the GAS backend.
+		fbSetOption( FB_COMPOPT_BACKEND, FB_BACKEND_CLANG )
+	elseif( (fbGetCpuFamily( ) = FB_CPUFAMILY_X86) and _
 		(fbGetOption(FB_COMPOPT_TARGET) <> FB_COMPTARGET_DARWIN) ) then
 		fbSetOption( FB_COMPOPT_BACKEND, FB_BACKEND_GAS )
 	else

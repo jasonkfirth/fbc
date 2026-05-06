@@ -2,11 +2,11 @@
 
 #include "../fb.h"
 #include "../fb_private_thread.h"
-#include <xboxkrnl/xboxkrnl.h>
+#include <windows.h>
 
-static void NTAPI threadproc(void *param1, void *param2)
+static DWORD WINAPI threadproc( void *param )
 {
-	FBTHREADINFO *info = param1;
+	FBTHREADINFO *info = param;
 	FBTHREAD *thread = info->thread;
 	FBTHREADFLAGS flags;
 
@@ -25,13 +25,15 @@ static void NTAPI threadproc(void *param1, void *param2)
 	if( flags & FBTHREAD_DETACHED ) {
 		free( thread );
 	}
+
+	return 0;
 }
 
 FBCALL FBTHREAD *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack_size )
 {
-	NTSTATUS status;
 	FBTHREAD *thread;
 	FBTHREADINFO *info;
+	SIZE_T real_stack_size;
 
 	thread = (FBTHREAD *)malloc( sizeof( FBTHREAD ) );
 	if( thread == NULL ) {
@@ -48,19 +50,10 @@ FBCALL FBTHREAD *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack
 	info->param = param;
 	info->thread = thread;
 	thread->flags = 0;
+	real_stack_size = (stack_size > 0) ? (SIZE_T)stack_size : 65536;
 
-	status = PsCreateSystemThreadEx( &thread->id, /* ThreadHandle */
-	                                 0,           /* ThreadExtraSize */
-	                                 /* stack_size??? */ 65536,       /* KernelStackSize */
-	                                 0,           /* TlsDataSize */
-	                                 NULL,        /* ThreadId */
-	                                 info,        /* StartContext1 */
-	                                 NULL,        /* StartContext2 */
-	                                 FALSE,       /* CreateSuspended */
-	                                 FALSE,       /* DebugStack */
-	                                 threadproc); /* StartRoutine */
-
-	if( status != STATUS_SUCCESS ) {
+	thread->id = CreateThread( NULL, real_stack_size, threadproc, info, 0, NULL );
+	if( thread->id == NULL ) {
 		free( thread );
 		free( info );
 		return NULL;
@@ -82,7 +75,7 @@ FBCALL void fb_ThreadWait( FBTHREAD *thread )
 		return;
 	}
 
-	NTWaitForSingleObject( thread->id, FALSE, NULL );
-	NtClose( thread->id );
+	WaitForSingleObject( thread->id, INFINITE );
+	CloseHandle( thread->id );
 	free( thread );
 }
