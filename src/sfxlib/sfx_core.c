@@ -207,9 +207,9 @@ void fb_sfxExitCore(void)
 
     fb_sfxMidiStop();
 
-    fb_sfxDriverShutdown();
-
     fb_sfxPlatformExit();
+
+    fb_sfxDriverShutdown();
 
     fb_sfxRuntimeLock();
 
@@ -484,9 +484,21 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
     while (driver && driver->write)
     {
         int result;
+        const float *write_buffer;
+        int write_frames;
 
-        result = driver->write(__fb_sfx->mixbuffer + (written * channels),
-                               drained - written);
+        write_buffer = __fb_sfx->mixbuffer + (written * channels);
+        write_frames = drained - written;
+
+        /*
+            Platform writes may block while the OS audio server applies
+            backpressure.  Keep the runtime lock away from that call so
+            command-layer code can continue to queue voices.
+        */
+        fb_sfxRuntimeUnlock();
+        result = driver->write(write_buffer, write_frames);
+        fb_sfxRuntimeLock();
+
         if (result > 0)
         {
             written += result;

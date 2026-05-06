@@ -179,7 +179,10 @@ void fb_sfxLinuxExit(void)
     {
         g_linux_audio_thread_stop = 1;
         if (!pthread_equal(g_linux_audio_thread, pthread_self()))
+        {
+            pthread_cancel(g_linux_audio_thread);
             pthread_join(g_linux_audio_thread, NULL);
+        }
         g_linux_audio_thread_valid = 0;
     }
 #endif

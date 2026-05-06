@@ -37,6 +37,9 @@
         mixing logic and prevent overflow during accumulation.
 */
 
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "fb_sfx.h"
@@ -101,6 +104,145 @@ static float fb_sfxMixerVoiceSample(FB_SFXVOICE *voice)
         }
 
         return sample;
+    }
+}
+
+static int fb_sfxMixerEnvEnabled(const char *name)
+{
+    const char *value = getenv(name);
+
+    return (value && *value && *value != '0');
+}
+
+static int fb_sfxMixerDebugEnabled(void)
+{
+    static int initialized = 0;
+    static int enabled = 0;
+
+    if (!initialized)
+    {
+        initialized = 1;
+        enabled = fb_sfxMixerEnvEnabled("SFXLIB_MIXER_DEBUG");
+    }
+
+    return enabled;
+}
+
+static FILE *fb_sfxMixerDumpFile(void)
+{
+    static int initialized = 0;
+    static FILE *file = NULL;
+
+    if (!initialized)
+    {
+        const char *path = getenv("SFXLIB_MIXER_DUMP");
+
+        initialized = 1;
+
+        if (path && *path)
+            file = fopen(path, "w");
+    }
+
+    return file;
+}
+
+static int fb_sfxMixerDumpFrameLimit(void)
+{
+    static int initialized = 0;
+    static int limit = 44100;
+
+    if (!initialized)
+    {
+        const char *value = getenv("SFXLIB_MIXER_DUMP_FRAMES");
+
+        initialized = 1;
+
+        if (value && *value)
+        {
+            int parsed = atoi(value);
+
+            if (parsed > 0)
+                limit = parsed;
+        }
+    }
+
+    return limit;
+}
+
+static void fb_sfxMixerDiagnostics(const float *buffer, int frames)
+{
+    static int block_count = 0;
+    static int dumped_frames = 0;
+    FILE *dump;
+    int channels;
+    int samples;
+    int active;
+    int i;
+    float peak;
+    double sum_squares;
+
+    if (!__fb_sfx || !buffer || frames <= 0)
+        return;
+
+    channels = (__fb_sfx->output_channels > 0)
+        ? __fb_sfx->output_channels
+        : FB_SFX_DEFAULT_CHANNELS;
+    samples = frames * channels;
+
+    peak = 0.0f;
+    sum_squares = 0.0;
+
+    for (i = 0; i < samples; i++)
+    {
+        float value = buffer[i];
+        float magnitude = (value < 0.0f) ? -value : value;
+
+        if (magnitude > peak)
+            peak = magnitude;
+
+        sum_squares += (double)value * (double)value;
+    }
+
+    if (fb_sfxMixerDebugEnabled() && block_count < 32)
+    {
+        active = 0;
+        for (i = 0; i < FB_SFX_MAX_VOICES; i++)
+        {
+            if (__fb_sfx->voices[i].active)
+                active++;
+        }
+
+        fprintf(stderr,
+                "SFX_MIXER: block=%d frames=%d active=%d peak=%0.6f rms=%0.6f\n",
+                block_count,
+                frames,
+                active,
+                peak,
+                (samples > 0) ? sqrt(sum_squares / (double)samples) : 0.0);
+    }
+
+    block_count++;
+
+    dump = fb_sfxMixerDumpFile();
+    if (dump && dumped_frames < fb_sfxMixerDumpFrameLimit())
+    {
+        int remaining = fb_sfxMixerDumpFrameLimit() - dumped_frames;
+        int dump_frames = (frames < remaining) ? frames : remaining;
+
+        for (i = 0; i < dump_frames; i++)
+        {
+            float mono;
+
+            if (channels >= 2)
+                mono = (buffer[i * channels] + buffer[i * channels + 1]) * 0.5f;
+            else
+                mono = buffer[i * channels];
+
+            fprintf(dump, "%0.9f\n", mono);
+        }
+
+        dumped_frames += dump_frames;
+        fflush(dump);
     }
 }
 
@@ -405,6 +547,8 @@ void fb_sfxMixerProcess(int frames)
         buffer[frame * 2]     = left;
         buffer[frame * 2 + 1] = right;
     }
+
+    fb_sfxMixerDiagnostics(buffer, frames);
 }
 
 

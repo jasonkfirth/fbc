@@ -137,15 +137,14 @@ static void pulse_driver_exit(void)
 
     PULSE_DBG("shutting down PulseAudio driver\n");
 
+    fb_sfxLinuxDeactivate();
+
     if (pulse_stream)
     {
-        pa_simple_drain(pulse_stream, NULL);
-        pa_simple_free(pulse_stream);
         pulse_stream = NULL;
     }
 
     pulse_initialized = 0;
-    fb_sfxLinuxDeactivate();
 }
 
 static int pulse_driver_write(const float *buffer, int frames)
