@@ -33,6 +33,7 @@ TARGET_TRIPLET :=
 BOOTSTRAP_DIR_KEY :=
 FBC_TARGET_KEY :=
 ARM_CPU_MAKE_ARGS :=
+ARM_BUILD_FBCFLAGS :=
 
 ifeq ($(DEB_HOST_ARCH),amd64)
 TARGET_TRIPLET := x86_64-linux-gnu
@@ -60,8 +61,14 @@ FBC_TARGET_KEY := linux-arm
 endif
 
 ifeq ($(DEB_HOST_ARCH),armhf)
+ARM_CPU_MAKE_ARGS := ARM_VER=v7 ARM_FLOAT_ABI=hf DEFAULT_CPUTYPE_ARM=FB_CPUTYPE_ARMV7A_FP
+ARM_BUILD_FBCFLAGS := -arch armv7-a+fp
+endif
+
+ifeq ($(DEB_HOST_ARCH),armhf)
 ifeq ($(FBC_PACKAGE_ARM_ARCH),armv6+fp)
 ARM_CPU_MAKE_ARGS := ARM_VER=v6 ARM_FLOAT_ABI=hf DEFAULT_CPUTYPE_ARM=FB_CPUTYPE_ARMV6_FP
+ARM_BUILD_FBCFLAGS := -arch armv6+fp
 endif
 endif
 
@@ -199,6 +206,7 @@ override_dh_auto_build:
 		rtlib fbrt gfxlib2 sfxlib \
 		FBC="$(FBC_BOOTSTRAP)" \
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
+		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)" \
 		CPPFLAGS="$(CPPFLAGS)" \
 		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CXXFLAGS)" \
@@ -209,6 +217,7 @@ override_dh_auto_build:
 		compiler \
 		FBC="$(FBC_BOOTSTRAP)" \
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
+		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)" \
 		CPPFLAGS="$(CPPFLAGS)" \
 		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CXXFLAGS)" \
@@ -220,6 +229,7 @@ ifeq ($(BUILD_JS),yes)
 		compiler-js \
 		FBC="$(FBC_BOOTSTRAP)" \
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
+		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)" \
 		CPPFLAGS="$(CPPFLAGS)" \
 		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CXXFLAGS)" \
@@ -246,6 +256,7 @@ ifeq ($(BUILD_ANDROID),yes)
 		compiler-android \
 		FBC="$(FBC_BOOTSTRAP)" \
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
+		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)" \
 		CPPFLAGS="$(CPPFLAGS)" \
 		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CXXFLAGS)" \
@@ -282,7 +293,8 @@ override_dh_auto_install:
 		DESTDIR=$(CURDIR)/debian/tmp \
 		prefix=/usr \
 		FBC="$(FBC_BOOTSTRAP)" \
-		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)"
+		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
+		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)"
 
 ifeq ($(BUILD_JS),yes)
 	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" install-js \
@@ -290,7 +302,8 @@ ifeq ($(BUILD_JS),yes)
 		DESTDIR=$(CURDIR)/debian/tmp \
 		prefix=/usr \
 		FBC="$(FBC_BOOTSTRAP)" \
-		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)"
+		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
+		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)"
 endif
 
 ifeq ($(BUILD_ANDROID),yes)
@@ -300,6 +313,7 @@ ifeq ($(BUILD_ANDROID),yes)
 		prefix=/usr \
 		FBC="$(FBC_BOOTSTRAP)" \
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
+		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)" \
 		ANDROID_BUILD_LIBDIR="$(CURDIR)/lib/freebasic/$(ANDROID_FBTARGET_KEY)"
 endif
 

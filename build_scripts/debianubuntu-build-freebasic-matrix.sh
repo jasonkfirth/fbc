@@ -62,6 +62,7 @@ Options:
   --skip-host-deps  Skip host dependency installation
   --skip-bootstrap  Reuse existing source bootstrap tarballs
   --no-android      Build packages without the freebasic-android profile
+  --no-xbox         Do not auto-build freebasic-xbox even if nxdk is present
   --list            Show the currently configured distro targets
   --help            Show this help text
 
@@ -81,6 +82,7 @@ KEEP_GOING=0
 SKIP_HOST_DEPS=0
 SKIP_BOOTSTRAP=0
 NO_ANDROID=0
+NO_XBOX=0
 LIST_ONLY=0
 
 if command -v nproc >/dev/null 2>&1; then
@@ -99,6 +101,7 @@ while [ $# -gt 0 ]; do
         --skip-host-deps) SKIP_HOST_DEPS=1; shift ;;
         --skip-bootstrap) SKIP_BOOTSTRAP=1; shift ;;
         --no-android) NO_ANDROID=1; shift ;;
+        --no-xbox) NO_XBOX=1; shift ;;
         --list) LIST_ONLY=1; shift ;;
         -h|--help)
             usage
@@ -485,6 +488,65 @@ android_supported_for_arch() {
     esac
 }
 
+xbox_supported_for_arch() {
+    case "$1" in
+        amd64|i386)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+path_is_under_root() {
+    local path="$1"
+
+    case "$path" in
+        "$ROOT"/*|"$ROOT")
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+canonical_dir() {
+    local path="$1"
+
+    [ -d "$path" ] || return 1
+    ( cd "$path" && pwd -P )
+}
+
+find_host_nxdk() {
+    local candidate
+    local candidates=()
+
+    if [ -n "${NXDK_DIR:-}" ]; then
+        candidates+=("$NXDK_DIR")
+    fi
+
+    candidates+=(
+        "$ROOT/.build-debianubuntu-xbox/nxdk"
+        "$ROOT/nxdk"
+        "/opt/nxdk"
+        "/usr/local/share/nxdk"
+    )
+
+    for candidate in "${candidates[@]}"; do
+        [ -n "$candidate" ] || continue
+        [ -f "$candidate/bin/activate" ] || continue
+        [ -f "$candidate/bin/nxdk-cc" ] || continue
+        [ -f "$candidate/bin/nxdk-link" ] || continue
+        [ -f "$candidate/tools/cxbe/cxbe" ] || [ -f "$candidate/Makefile" ] || continue
+        canonical_dir "$candidate"
+        return 0
+    done
+
+    return 1
+}
+
 ##############################################################################
 # Listing
 ##############################################################################
@@ -521,6 +583,26 @@ echo "==> host Docker platform: $HOST_PLATFORM"
 echo "==> native make jobs: $MAKE_JOBS"
 
 RASPBIAN_BOOTSTRAP_READY=0
+XBOX_NXDK_HOST=""
+XBOX_NXDK_CONTAINER=""
+XBOX_NXDK_NEEDS_MOUNT=0
+
+if [ "$NO_XBOX" -eq 0 ]; then
+    if XBOX_NXDK_HOST="$(find_host_nxdk)"; then
+        if path_is_under_root "$XBOX_NXDK_HOST"; then
+            XBOX_NXDK_CONTAINER="/work${XBOX_NXDK_HOST#"$ROOT"}"
+        else
+            XBOX_NXDK_CONTAINER="/xbox-nxdk"
+            XBOX_NXDK_NEEDS_MOUNT=1
+        fi
+        echo "==> Xbox package auto-build: enabled when arch is supported"
+        echo "==> nxdk: $XBOX_NXDK_HOST"
+    else
+        echo "==> Xbox package auto-build: skipped (nxdk not found)"
+    fi
+else
+    echo "==> Xbox package auto-build: disabled by --no-xbox"
+fi
 
 if [ "$SKIP_BOOTSTRAP" -eq 0 ]; then
     ensure_host_compiler
@@ -562,6 +644,10 @@ build_one() {
     local arm_arch
     local build_jobs
     local android_arg
+    local native_build_cmd
+    local xbox_build_cmd
+    local xbox_enabled
+    local docker_extra_mounts=()
 
     IFS="|" read -r distro image tag codename script_name arch <<EOF
 $entry
@@ -585,6 +671,16 @@ EOF
     if [ "$NO_ANDROID" -eq 1 ] || ! android_supported_for_arch "$arch"; then
         android_arg=" --no-android"
     fi
+    native_build_cmd="/work/build_scripts/${script_name} --no-build${android_arg}"
+    xbox_build_cmd=""
+    xbox_enabled=0
+    if [ -n "$XBOX_NXDK_HOST" ] && xbox_supported_for_arch "$arch"; then
+        xbox_enabled=1
+        xbox_build_cmd=" && FBC_PACKAGE_OUTDIR=${container_outdir}/xbox BUILDROOT=/work/.build-debianubuntu-xbox/${distro}/${codename}/${arch} NXDK_DIR=${XBOX_NXDK_CONTAINER} /work/build_scripts/debianubuntu-build-freebasic-xbox.sh --nxdk-dir ${XBOX_NXDK_CONTAINER}"
+        if [ "$XBOX_NXDK_NEEDS_MOUNT" -eq 1 ]; then
+            docker_extra_mounts+=(-v "$XBOX_NXDK_HOST:$XBOX_NXDK_CONTAINER")
+        fi
+    fi
 
     mkdir -p "$outdir"
 
@@ -601,6 +697,13 @@ EOF
     [ -z "$arm_arch" ] || echo "ARM default arch: ${arm_arch}"
     echo "Make jobs: ${build_jobs}"
     echo "Script: build_scripts/${script_name}"
+    if [ "$xbox_enabled" -eq 1 ]; then
+        echo "Xbox package: enabled with nxdk at ${XBOX_NXDK_HOST}"
+    elif [ -n "$XBOX_NXDK_HOST" ]; then
+        echo "Xbox package: skipped for unsupported arch ${arch}"
+    else
+        echo "Xbox package: skipped because nxdk was not found"
+    fi
     echo "============================================================"
 
     if ! : > "$outdir/docker_build.log"; then
@@ -619,9 +722,10 @@ EOF
             -e BUILDROOT="/work/.build-debianubuntu/${distro}/${codename}/${arch}" \
             -e JOBS="$build_jobs" \
             -v "$ROOT:/work" \
+            "${docker_extra_mounts[@]}" \
             -w /work \
             "$image" \
-            bash -lc "/work/build_scripts/${script_name} --no-build${android_arg}"
+            bash -lc "${native_build_cmd}${xbox_build_cmd}"
     } > "$outdir/docker_build.log" 2>&1; then
         if log_has_missing_manifest "$outdir/docker_build.log"; then
             echo "SKIPPED: ${distro}/${codename} (${arch}) has no Docker image for ${platform}"

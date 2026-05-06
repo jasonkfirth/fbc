@@ -169,13 +169,16 @@ ensure_nxdk() {
     msg "preparing nxdk"
     mkdir -p "$(dirname "$NXDK_DIR")"
 
-    if [ ! -d "$NXDK_DIR/.git" ]; then
-        run git clone --recursive "$NXDK_REPO" "$NXDK_DIR"
-    else
+    if [ -d "$NXDK_DIR/.git" ]; then
         run git -C "$NXDK_DIR" submodule update --init --recursive
+    elif [ -f "$NXDK_DIR/bin/activate" ] && [ -f "$NXDK_DIR/bin/nxdk-cc" ]; then
+        echo "==> using installed nxdk tree: $NXDK_DIR"
+    else
+        run git clone --recursive "$NXDK_REPO" "$NXDK_DIR"
     fi
 
     if [ -n "${NXDK_REF:-}" ]; then
+        [ -d "$NXDK_DIR/.git" ] || die "NXDK_REF requires an nxdk git checkout: $NXDK_DIR"
         run git -C "$NXDK_DIR" fetch --tags origin
         run git -C "$NXDK_DIR" checkout "$NXDK_REF"
         run git -C "$NXDK_DIR" submodule update --init --recursive
@@ -238,7 +241,18 @@ build_xbox_target() {
 
 ensure_nxdk_tools() {
     msg "building nxdk host tools"
+    if [ -f "$NXDK_DIR/tools/cxbe/cxbe" ]; then
+        if [ ! -x "$NXDK_DIR/tools/cxbe/cxbe" ]; then
+            chmod 755 "$NXDK_DIR/tools/cxbe/cxbe" 2>/dev/null ||
+                die "nxdk cxbe exists but is not executable: $NXDK_DIR/tools/cxbe/cxbe"
+        fi
+        echo "==> using nxdk cxbe: $NXDK_DIR/tools/cxbe/cxbe"
+        return 0
+    fi
+
+    [ -f "$NXDK_DIR/Makefile" ] || die "nxdk cxbe is missing and nxdk Makefile was not found: $NXDK_DIR"
     run "$MAKE_CMD" -C "$NXDK_DIR" cxbe
+    [ -x "$NXDK_DIR/tools/cxbe/cxbe" ] || die "nxdk cxbe was not built: $NXDK_DIR/tools/cxbe/cxbe"
 }
 
 write_wrapper() {
@@ -294,11 +308,56 @@ package_xbox() {
 
     write_wrapper "$PKGROOT/usr/bin/fbc-xbox"
 
-    if [ -f copying.txt ]; then
-        install -m 644 copying.txt "$PKGROOT/usr/share/doc/freebasic-xbox/copyright"
+    if [ -f debian/copyright ]; then
+        install -m 644 debian/copyright "$PKGROOT/usr/share/doc/freebasic-xbox/copyright.FreeBASIC"
+    elif [ -f copying.txt ]; then
+        install -m 644 copying.txt "$PKGROOT/usr/share/doc/freebasic-xbox/copyright.FreeBASIC"
+    else
+        cat > "$PKGROOT/usr/share/doc/freebasic-xbox/copyright.FreeBASIC" <<EOF
+FreeBASIC is distributed under the GNU General Public License version 2 or
+later. On Debian systems, the full text of the GNU General Public License
+version 2 can be found in /usr/share/common-licenses/GPL-2.
+EOF
     fi
 
     nxdk_rev="$(git -C "$NXDK_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+    (
+        cd "$PKGROOT/usr/share/freebasic-xbox/nxdk"
+        find . -type f \( -iname 'LICENSE*' -o -iname 'COPYING*' -o -iname 'NOTICE*' \) -print |
+            sort |
+            sed 's#^\./#/usr/share/freebasic-xbox/nxdk/#'
+    ) > "$PKGROOT/usr/share/doc/freebasic-xbox/nxdk-license-files.txt"
+    [ -s "$PKGROOT/usr/share/doc/freebasic-xbox/nxdk-license-files.txt" ] ||
+        die "no nxdk license files found in packaged nxdk tree"
+
+    cat > "$PKGROOT/usr/share/doc/freebasic-xbox/copyright" <<EOF
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: FreeBASIC Xbox target package
+Source: https://freebasic.net/
+
+Files: *
+Copyright: FreeBASIC development team and contributors
+License: GPL-2+
+ See /usr/share/doc/freebasic-xbox/copyright.FreeBASIC for the FreeBASIC
+ license text shipped with this source tree.
+
+Files: usr/share/freebasic-xbox/nxdk/*
+Copyright: XboxDev nxdk contributors and bundled third-party component authors
+License: nxdk-mixed
+ The packaged nxdk SDK tree is a mixed-license development kit. nxdk's README
+ identifies bundled components including OpenXDK-derived code, pbkit, lwIP,
+ PDCLib, compiler-rt-derived runtime code, Mesa-derived shader tools, NVIDIA
+ SDK/Cg components, extract-xiso, SDL, zlib, libpng, libjpeg, and related
+ third-party source trees. This package ships the upstream license files found
+ in the nxdk checkout; see
+ /usr/share/doc/freebasic-xbox/nxdk-license-files.txt for the full installed
+ list and /usr/share/freebasic-xbox/nxdk/ for the corresponding texts.
+
+License: nxdk-mixed
+ This is an aggregate SDK license marker for the bundled nxdk checkout. Refer
+ to the component license files listed in nxdk-license-files.txt.
+EOF
+
     cat > "$PKGROOT/usr/share/doc/freebasic-xbox/README.Debian" <<EOF
 freebasic-xbox
 =============
@@ -321,7 +380,7 @@ EOF
     cat > "$control_dir/control" <<EOF
 Package: freebasic-xbox
 Version: $PACKAGE_VERSION
-Section: devel
+Section: non-free/devel
 Priority: optional
 Architecture: $ARCH
 Maintainer: SJ_Zero <sj@fbxl.net>
