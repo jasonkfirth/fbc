@@ -1,4 +1,26 @@
-/* LPTx device */
+/*
+    Project: FreeBASIC Runtime Library
+    ----------------------------------
+
+    File: dev_lpt.c
+
+    Purpose:
+
+        Provide the common OPEN LPT device layer used by the platform printer
+        backends.
+
+    Responsibilities:
+
+        - parse and normalize LPT device names
+        - manage shared printer device state and LPRINT redirection
+        - dispatch writes and closes through the platform printer driver
+
+    This file intentionally does NOT contain:
+
+        - Win32 spooler calls
+        - DOS parallel-port I/O
+        - Unix print-spooler command handling
+*/
 
 #include "fb.h"
 
@@ -37,6 +59,9 @@ static char *fb_DevLptMakeDeviceName( DEV_LPT_PROTOCOL *lpt_proto )
 	if( lpt_proto )
 	{
 		char * p = calloc( strlen(lpt_proto->proto) + strlen(lpt_proto->name) + 3, 1 );
+		if( p==NULL )
+			return NULL;
+
 		strcpy( p, lpt_proto->proto );
 		strcat( p, ":" );
 		strcat( p, lpt_proto->name );
@@ -82,9 +107,26 @@ int fb_DevLptOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 
     /* Determine the port number and a normalized device name */
     devInfo = (DEV_LPT_INFO*) calloc(1, sizeof(DEV_LPT_INFO));
+		if( devInfo==NULL )
+		{
+			if( lpt_proto )
+				free( lpt_proto );
+			FB_UNLOCK();
+			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+		}
+
     devInfo->uiRefCount = 1;
 		devInfo->iPort = lpt_proto->iPort;
 		devInfo->pszDevice = fb_DevLptMakeDeviceName( lpt_proto );
+		if( devInfo->pszDevice==NULL )
+		{
+			free( devInfo );
+			if( lpt_proto )
+				free( lpt_proto );
+			FB_UNLOCK();
+			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+		}
+
 		devInfo->driver_opaque = NULL;
 
     /* Test if the printer is already open. */
@@ -149,6 +191,12 @@ int fb_DevPrinterSetWidth( const char *pszDevice, int width, int default_width )
 		}
 
 		pszDev = fb_DevLptMakeDeviceName( lpt_proto );
+		if( pszDev==NULL )
+		{
+			if( lpt_proto )
+				free( lpt_proto );
+			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+		}
 
     /* Test all printers. */
 		tmp_handle = fb_DevLptFindDeviceByName( lpt_proto->iPort, pszDev, TRUE );
@@ -181,6 +229,12 @@ int fb_DevPrinterGetOffset( const char *pszDevice )
 		}
 
 		pszDev = fb_DevLptMakeDeviceName( lpt_proto );
+		if( pszDev==NULL )
+		{
+			if( lpt_proto )
+				free( lpt_proto );
+			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+		}
 
     /* Test all printers. */
 		tmp_handle = fb_DevLptFindDeviceByName( lpt_proto->iPort, pszDev, TRUE );
@@ -194,3 +248,5 @@ int fb_DevPrinterGetOffset( const char *pszDevice )
     return cur;
 
 }
+
+/* end of dev_lpt.c */

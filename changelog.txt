@@ -57,6 +57,8 @@ Version 1.20.1
 - tests/sfx runtime build coverage wired into the normal tests directory list, matching the surrounding gfxlib-style test layout
 
 [fixed]
+- Windows rtlib: hardened and validated OPEN COM serial-port support for 64-bit Windows builds by keeping the shared Win32 serial driver valid for both MinGW32 and MinGW64, improving COM device-name handling, and checking the driver with COM1/COM2 loopback coverage
+- Windows rtlib: hardened OPEN LPT/LPRINT for 64-bit Windows builds by checking Win32 printer byte-count limits, avoiding size_t truncation in WritePrinter(), and making the common LPT device setup handle allocation failures cleanly
 - Linux: restrict '-m32' and '-m64' linker flags to x86/x86_64 targets instead of passing them to unrelated architectures
 - Linux/ELF-like builds: use the real linker for fbc-driven final links instead of exporting LD=gcc, since fbc passes raw linker flags that are not compiler-driver arguments
 - rtlib/unix: build the multithreaded runtime with ENABLE_MT so libfbmt uses the correct thread-local storage path and ThreadSelf() remains stable after child threads exit

@@ -1,10 +1,39 @@
-/* printer access for Windows */
+/*
+    Project: FreeBASIC Runtime Library
+    ----------------------------------
+
+    File: win32/io_printer.c
+
+    Purpose:
+
+        Implement OPEN LPT and LPRINT printer access for native Windows
+        targets.
+
+    Responsibilities:
+
+        - map LPT devices to Windows printer names
+        - open raw spooler jobs through OpenPrinter()
+        - provide TTY/RAW emulation through a printer device context
+        - write and close printer jobs for both 32-bit and 64-bit MinGW
+
+    This file intentionally does NOT contain:
+
+        - OPEN LPT syntax parsing
+        - DOS parallel-port access
+        - Unix print-spooler command handling
+*/
 
 #include "../fb.h"
 #include "io_printer_private.h"
 #include <ctype.h>
 
 typedef BOOL (WINAPI *FnGetDefaultPrinter)(LPTSTR pszBuffer, LPDWORD pcchBuffer);
+
+#define FB_WIN32_DWORD_MAX ((size_t)((DWORD)-1))
+
+/* ------------------------------------------------------------------------- */
+/* Printer list helpers                                                      */
+/* ------------------------------------------------------------------------- */
 
 /* Entry for the list of available printers */
 typedef struct _DEV_PRINTER_DEVICE {
@@ -59,8 +88,18 @@ static DEV_PRINTER_DEVICE *
 fb_hListDevElemAlloc ( FB_LIST *list, const char *device, const char *printer_name )
 {
     DEV_PRINTER_DEVICE *node = (DEV_PRINTER_DEVICE*) calloc( 1, sizeof(DEV_PRINTER_DEVICE) );
+    if( node==NULL )
+        return NULL;
+
     node->device = strdup(device);
     node->printer_name = strdup(printer_name);
+    if( node->device==NULL || node->printer_name==NULL ) {
+        free( node->device );
+        free( node->printer_name );
+        free( node );
+        return NULL;
+    }
+
     fb_hListDynElemAdd( list, &node->elem );
     return node;
 }
@@ -229,12 +268,16 @@ static char *GetDefaultPrinterName(void)
                     
                     TCHAR *oldBuffer = buffer;
                     buffer = (TCHAR*) realloc(buffer, dwSize * sizeof(TCHAR));
-                    if (buffer == NULL)
+                    if (buffer == NULL) {
                         free(oldBuffer);
+                        break;
+                    }
                     fResult = pfnGetDefaultPrinter(buffer, &dwSize);
                 }
-                if (dwSize>1) {
+                if (fResult && dwSize>1) {
                     result = buffer;
+                } else {
+                    free(buffer);
                 }
 
             }
@@ -245,6 +288,22 @@ static char *GetDefaultPrinterName(void)
     }
     free(printers);
     return result;
+}
+
+static int fb_hPrinterBytesFitDWORD( size_t bytes )
+{
+    return bytes <= FB_WIN32_DWORD_MAX;
+}
+
+static int fb_hPrinterWstrBytes( size_t chars, DWORD *bytes )
+{
+    DBG_ASSERT( bytes!=NULL );
+
+    if( chars > FB_WIN32_DWORD_MAX / sizeof( FB_WCHAR ) )
+        return FALSE;
+
+    *bytes = (DWORD)(chars * sizeof( FB_WCHAR ));
+    return TRUE;
 }
 
 static void
@@ -577,6 +636,10 @@ static void EmuUpdateInfo( W32_PRINTER_INFO *pInfo )
     GetTextMetrics( pInfo->hDc, &tm );
     pInfo->Emu.dwFontSizeX = tm.tmMaxCharWidth;
     pInfo->Emu.dwFontSizeY = tm.tmHeight;
+    if( pInfo->Emu.dwFontSizeX==0 )
+        pInfo->Emu.dwFontSizeX = 1;
+    if( pInfo->Emu.dwFontSizeY==0 )
+        pInfo->Emu.dwFontSizeY = 1;
 }
 
 static void EmuPageStart( W32_PRINTER_INFO *pInfo )
@@ -644,6 +707,12 @@ void fb_hHookConPrinterScroll(struct _fb_ConHooks *handle,
     W32_PRINTER_INFO *pInfo = handle->Opaque;
     int page_rows = (pInfo->Emu.dwSizeY + pInfo->Emu.dwFontSizeY - 1)
         / pInfo->Emu.dwFontSizeY;
+
+    (void)x1;
+    (void)y1;
+    (void)x2;
+    (void)y2;
+
     if( !pInfo->Emu.iPageStarted ) {
         StartPage( pInfo->hDc );
     }
@@ -708,7 +777,7 @@ static void EmuPrint_TTY( W32_PRINTER_INFO *pInfo,
 
 			while( uiLength!=0 ) {
 					char chControl = 0;
-					unsigned uiLengthTTY = uiLength, ui;
+					size_t uiLengthTTY = uiLength, ui;
 					/* Check for additional control characters */
 					for( ui=0; ui!=uiLength; ++ui ) {
 							int iFound = FALSE;
@@ -748,7 +817,7 @@ static void EmuPrint_TTY( W32_PRINTER_INFO *pInfo,
 
 			while( uiLength!=0 ) {
 					char chControl = 0;
-					unsigned uiLengthTTY = uiLength, ui;
+					size_t uiLengthTTY = uiLength, ui;
 					/* Check for additional control characters */
 					for( ui=0; ui!=uiLength; ++ui ) {
 							int iFound = FALSE;
@@ -809,18 +878,27 @@ int fb_PrinterWrite( DEV_LPT_INFO *devInfo, const void *data, size_t length )
 {
 		W32_PRINTER_INFO *pInfo = (W32_PRINTER_INFO*) devInfo->driver_opaque;
     DWORD dwWritten;
+    DWORD dwLength;
 
     if( !pInfo->hPrinter ) {
         pInfo->Emu.pfnPrint( pInfo, data, length, FALSE );
+        return fb_ErrorSetNum( FB_RTERROR_OK );
+    }
 
-    } else if( !WritePrinter( pInfo->hPrinter,
+    if( !fb_hPrinterBytesFitDWORD( length ) ) {
+        return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+    }
+
+    dwLength = (DWORD)length;
+
+    if( !WritePrinter( pInfo->hPrinter,
                               (LPVOID) data,
-                       length,
+                       dwLength,
                        &dwWritten ) )
     {
         return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 
-    } else if ( dwWritten != length ) {
+    } else if ( dwWritten != dwLength ) {
         return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 
     }
@@ -832,18 +910,24 @@ int fb_PrinterWriteWstr( DEV_LPT_INFO *devInfo, const FB_WCHAR *data, size_t len
 {
 		W32_PRINTER_INFO *pInfo = (W32_PRINTER_INFO*) devInfo->driver_opaque;
     DWORD dwWritten;
+    DWORD dwLength;
 
     if( !pInfo->hPrinter ) {
         pInfo->Emu.pfnPrint( pInfo, data, length, TRUE);
+        return fb_ErrorSetNum( FB_RTERROR_OK );
+    }
+
+    if( !fb_hPrinterWstrBytes( length, &dwLength ) ) {
+        return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
     } else if( !WritePrinter( pInfo->hPrinter,
                        (LPVOID) data,
-                       length * sizeof( FB_WCHAR ),
+                       dwLength,
                        &dwWritten ) )
     {
         return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 
-    } else if ( dwWritten != length * sizeof( FB_WCHAR )) {
+    } else if ( dwWritten != dwLength ) {
         return fb_ErrorSetNum( FB_RTERROR_FILEIO );
     }
 
@@ -871,3 +955,5 @@ int fb_PrinterClose( DEV_LPT_INFO *devInfo )
 
     return fb_ErrorSetNum( FB_RTERROR_OK );
 }
+
+/* end of win32/io_printer.c */
