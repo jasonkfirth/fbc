@@ -15,7 +15,7 @@
 #ifdef __FB_UNIX__
 	#inclib "glut"
 #elseif defined(__FB_WIN32__)
-	#inclib "glut32"
+	#inclib "freeglut"
 #else
 	#inclib "GLUT"
 	#inclib "alleg"
@@ -36,7 +36,7 @@
 	#inclib "winmm"
 	#inclib "opengl32"
 	#inclib "glu32"
-	#inclib "glut32"
+	#inclib "freeglut"
 #endif
 
 const GLUT_API_VERSION = 3

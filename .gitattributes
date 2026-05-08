@@ -1,0 +1,3 @@
+# Keep generated warning-test reference output stable across host line-ending
+# settings. These files are tracked golden outputs, not disposable test logs.
+tests/warnings/r/**/*.txt text eol=lf

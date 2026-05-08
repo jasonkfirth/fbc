@@ -42,14 +42,6 @@
 #include <ctype.h>
 #include <stdlib.h>
 
-#if defined(_WIN32)
-#include <windows.h>
-#elif defined(__DJGPP__)
-#include <dos.h>
-#else
-#include <time.h>
-#endif
-
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
 
@@ -66,6 +58,7 @@ typedef struct
     int channel;
     int foreground;
     int articulation;
+    float volume;
 } FB_SFX_PLAYSTATE;
 
 #define FB_SFX_PLAY_VOLUME 0.75f
@@ -78,24 +71,6 @@ typedef struct
 #define FB_SFX_PLAY_MODE_NORMAL   0
 #define FB_SFX_PLAY_MODE_LEGATO   1
 #define FB_SFX_PLAY_MODE_STACCATO 2
-
-static void fb_sfxPlaySleepMs(unsigned long milliseconds)
-{
-    if (milliseconds == 0)
-        return;
-
-#if defined(_WIN32)
-    Sleep((DWORD)milliseconds);
-#elif defined(__DJGPP__)
-    delay((unsigned)milliseconds);
-#else
-    struct timespec req;
-
-    req.tv_sec = (time_t)(milliseconds / 1000UL);
-    req.tv_nsec = (long)((milliseconds % 1000UL) * 1000000UL);
-    nanosleep(&req, NULL);
-#endif
-}
 
 static int fb_sfxPlayDurationFrames(float duration)
 {
@@ -243,7 +218,7 @@ static void fb_sfxPlayQueueTone(FB_SFX_PLAYSTATE *st,
 
     voice->channel = st->channel;
     voice->type = FB_SFX_VOICE_PLAY;
-    voice->volume = FB_SFX_PLAY_VOLUME;
+    voice->volume = st->volume;
     voice->start_delay = start_delay;
     voice->hard_stop = 1;
 
@@ -390,51 +365,11 @@ static int fb_sfxPlayNoteNumberFrequency(int note_number)
     return fb_sfxPlayFrequency(note, octave);
 }
 
-static void fb_sfxPlayRunForeground(int frames)
-{
-    int step;
-    int tick_frames;
-    int samplerate;
-
-    if (frames <= 0)
-        return;
-
-    samplerate = (__fb_sfx && __fb_sfx->samplerate > 0)
-        ? __fb_sfx->samplerate
-        : 0;
-
-    tick_frames = (samplerate > 0)
-        ? (samplerate / 200)
-        : 220;
-
-    if (tick_frames <= 0)
-        tick_frames = 220;
-
-    while (frames > 0)
-    {
-        unsigned long milliseconds;
-
-        step = (frames > tick_frames) ? tick_frames : frames;
-        fb_sfxUpdate(step);
-
-        if (samplerate > 0)
-        {
-            milliseconds = (unsigned long)(((unsigned long long)step * 1000ULL) / (unsigned long long)samplerate);
-            if (milliseconds == 0)
-                milliseconds = 1;
-            fb_sfxPlaySleepMs(milliseconds);
-        }
-
-        frames -= step;
-    }
-}
-
-
 /* ------------------------------------------------------------------------- */
 /* PLAY string parser                                                        */
 /* ------------------------------------------------------------------------- */
 
-static void fb_sfxPlayStringImpl(int channel, const char *str, int default_foreground)
+static int fb_sfxPlayStringImpl(int channel, const char *str, int default_foreground)
 {
     FB_SFX_PLAYSTATE st;
     const char *p;
@@ -443,10 +378,10 @@ static void fb_sfxPlayStringImpl(int channel, const char *str, int default_foreg
     int total_frames;
 
     if (!fb_sfxEnsureInitialized())
-        return;
+        return 0;
 
     if (!str)
-        return;
+        return 0;
 
     resolved_channel = fb_sfxResolveChannel(channel);
 
@@ -462,6 +397,7 @@ static void fb_sfxPlayStringImpl(int channel, const char *str, int default_foreg
     if (__fb_sfx && __fb_sfx->channel_context_active)
         st.foreground = 0;
     st.articulation = FB_SFX_PLAY_MODE_NORMAL;
+    st.volume = FB_SFX_PLAY_VOLUME;
     sequence_delay = 0;
     total_frames = 0;
 
@@ -646,6 +582,27 @@ static void fb_sfxPlayStringImpl(int channel, const char *str, int default_foreg
         }
 
         /* ------------------------------------------------------------- */
+        /* Volume                                                        */
+        /* ------------------------------------------------------------- */
+
+        if (c == 'V')
+        {
+            int volume = 0;
+
+            p++;
+            if (!fb_sfxPlayParseNumber(&p, &volume))
+                continue;
+
+            if (volume < 0)
+                volume = 0;
+            if (volume > 31)
+                volume = 31;
+
+            st.volume = (float)volume / 31.0f;
+            continue;
+        }
+
+        /* ------------------------------------------------------------- */
         /* Music / execution mode                                         */
         /* ------------------------------------------------------------- */
 
@@ -688,12 +645,14 @@ static void fb_sfxPlayStringImpl(int channel, const char *str, int default_foreg
     }
 
     if (st.foreground && total_frames > 0)
-        fb_sfxPlayRunForeground(total_frames);
+        fb_sfxRunForeground(total_frames);
+
+    return total_frames;
 }
 
 void fb_sfxPlayString(int channel, const char *str)
 {
-    fb_sfxPlayStringImpl(channel, str, 0);
+    (void)fb_sfxPlayStringImpl(channel, str, 0);
 }
 
 
@@ -703,13 +662,57 @@ void fb_sfxPlayString(int channel, const char *str)
 
 void fb_sfxPlay(const char *music)
 {
-    fb_sfxPlayStringImpl(-1, music, 1);
+    (void)fb_sfxPlayStringImpl(-1, music, 1);
 }
 
 
 void fb_sfxPlayChannel(int channel, const char *music)
 {
-    fb_sfxPlayStringImpl(channel, music, 0);
+    (void)fb_sfxPlayStringImpl(channel, music, 0);
+}
+
+
+/* ------------------------------------------------------------------------- */
+/* Multi-channel PLAY                                                        */
+/* ------------------------------------------------------------------------- */
+
+static int fb_sfxPlayMaxFrames(int a, int b)
+{
+    return (a > b) ? a : b;
+}
+
+
+void fb_sfxPlay2(const char *music1, const char *music2)
+{
+    int total_frames;
+
+    total_frames = fb_sfxPlayStringImpl(0, music1, 0);
+    total_frames = fb_sfxPlayMaxFrames(
+        total_frames,
+        fb_sfxPlayStringImpl(1, music2, 0)
+    );
+
+    if (total_frames > 0)
+        fb_sfxRunForeground(total_frames);
+}
+
+
+void fb_sfxPlay3(const char *music1, const char *music2, const char *music3)
+{
+    int total_frames;
+
+    total_frames = fb_sfxPlayStringImpl(0, music1, 0);
+    total_frames = fb_sfxPlayMaxFrames(
+        total_frames,
+        fb_sfxPlayStringImpl(1, music2, 0)
+    );
+    total_frames = fb_sfxPlayMaxFrames(
+        total_frames,
+        fb_sfxPlayStringImpl(2, music3, 0)
+    );
+
+    if (total_frames > 0)
+        fb_sfxRunForeground(total_frames);
 }
 
 

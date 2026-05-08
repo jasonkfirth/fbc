@@ -15,7 +15,7 @@ dependency-test:
 "-include dep.d" \
 "dep.o: dep.c dep.h" \
 "	\$$(CC) -MMD -MP -c dep.c -o dep.o" \
-	> "$(TEST_TMP)/Makefile"
+	> "$(TEST_TMP)/GNUmakefile"
 	$(call _mt_run,$(MAKE) -C "$(TEST_TMP)" CC="$(CC)" all)
 	@cp "$(TEST_TMP)/dep.o" "$(TEST_TMP)/dep-before.o"
 	@printf "%s\n" "#define TESTVAL 1" > "$(TEST_TMP)/dep.h"

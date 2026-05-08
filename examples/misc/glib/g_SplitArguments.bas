@@ -58,8 +58,8 @@ TYPE AS GApplicationClass TestApplicationClass
 
 G_DEFINE_TYPE(TestApplication, test_application, G_TYPE_APPLICATION)
 
-SUB test_application_finalize CDECL(BYVAL object AS GObject PTR)
-  G_OBJECT_CLASS (test_application_parent_class)->finalize(object)
+SUB test_application_finalize CDECL(BYVAL gobject AS GObject PTR)
+  G_OBJECT_CLASS (test_application_parent_class)->finalize(gobject)
 END SUB
 
 SUB test_application_init CDECL(BYVAL app AS TestApplication PTR)
@@ -72,7 +72,7 @@ END SUB
 
 FUNCTION test_application_new (BYVAL application_id AS CONST gchar PTR, _
                                BYVAL flags AS GApplicationFlags) AS GApplication PTR
-  g_return_val_if_fail(g_application_id_is_valid (application_id), NULL)
+  IF g_application_id_is_valid (application_id) = 0 THEN RETURN 0
 
   g_type_init()
 

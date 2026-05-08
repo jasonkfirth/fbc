@@ -38,6 +38,7 @@
 #include "../fb_sfx.h"
 #include "../fb_sfx_internal.h"
 #include "../fb_sfx_driver.h"
+#include "../fb_sfx_driver_diag.h"
 #include "fb_sfx_win32.h"
 
 #include <windows.h>
@@ -107,6 +108,18 @@ static DWORD WINAPI winmm_audio_worker(LPVOID unused)
 
     while (InterlockedCompareExchange(&g_worker_stop, 0, 0) == 0)
     {
+        if (__fb_sfx && __fb_sfx->shutting_down)
+        {
+            Sleep(5);
+            continue;
+        }
+
+        if (fb_sfxForegroundFeedActive())
+        {
+            Sleep(5);
+            continue;
+        }
+
         if (InterlockedCompareExchange(&g_worker_running, 0, 0) == 0)
         {
             Sleep(5);
@@ -292,11 +305,19 @@ static int winmm_write(const float *buffer, int frames)
     if (samples > g_buffer_samples)
         samples = g_buffer_samples;
 
+    fb_sfxDriverDiagnostics("WinMM", buffer, samples / channels, channels);
+
     header = &g_headers[g_current_buffer];
     dst = g_buffers[g_current_buffer];
 
     while (header->dwFlags & WHDR_INQUEUE)
     {
+        if (InterlockedCompareExchange(&g_worker_stop, 0, 0) != 0 ||
+            InterlockedCompareExchange(&g_worker_running, 0, 0) == 0)
+        {
+            return -1;
+        }
+
         if (g_buffer_event)
             WaitForSingleObject(g_buffer_event, 10);
         else
@@ -350,7 +371,7 @@ static int winmm_device_select(int device_id)
 const FB_SFX_DRIVER fb_sfxDriverWinMM =
 {
     "WinMM",
-    0,
+    FB_SFX_DRIVER_CAP_BACKGROUND,
     winmm_init,
     winmm_exit,
     winmm_write,

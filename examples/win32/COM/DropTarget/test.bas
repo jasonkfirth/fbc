@@ -32,7 +32,7 @@ private function win_cb _
 		                           0, 0, 0, 0, _
 		                           hwnd, _
 		                           0, _
-		                           cast( HINSTANCE, GetWindowLong( hwnd, GWL_HINSTANCE ) ), _
+		                           cast( HINSTANCE, GetWindowLongPtr( hwnd, GWLP_HINSTANCE ) ), _
 		                           0 )
 
 		SendMessage( hwndEdit, WM_SETFONT, cast(WPARAM,GetStockObject(ANSI_FIXED_FONT)), 0)

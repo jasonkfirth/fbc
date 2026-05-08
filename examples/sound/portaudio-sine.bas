@@ -28,19 +28,19 @@ End Function
 
 Sub Play(Frequency as Single, Duration as Single)
     Dim as PaError pe
-    Dim as PaStream Ptr stream
+    Dim as PaStream Ptr pa_stream
 
     Dim as PlayPayload payload
     payload.frequency = Frequency
 
-    pe = Pa_OpenDefaultStream(@stream, 0, 1, paInt32, SampleRate, SineSamples, @PlayCallback, @payload)
+    pe = Pa_OpenDefaultStream(@pa_stream, 0, 1, paInt32, SampleRate, SineSamples, @PlayCallback, @payload)
     If pe <> paNoError Then
         Print "Error: "; *Pa_GetErrorText(pe)
         End 1
     End If
 
     Print "Playing "; Frequency; "Hz for "; Duration; "ms"
-    pe = Pa_StartStream(stream)
+    pe = Pa_StartStream(pa_stream)
     If pe <> paNoError Then
         Print "Error: "; *Pa_GetErrorText(pe)
         End 1
@@ -49,13 +49,13 @@ Sub Play(Frequency as Single, Duration as Single)
     'Sleep 2
     Pa_Sleep(Duration)
 
-    pe = Pa_StopStream(stream)
+    pe = Pa_StopStream(pa_stream)
     If pe <> paNoError Then
         Print "Error: "; *Pa_GetErrorText(pe)
         End 1
     End If
 
-    pe = Pa_CloseStream(stream)
+    pe = Pa_CloseStream(pa_stream)
     If pe <> paNoError Then
         Print "Error: "; *Pa_GetErrorText(pe)
         End 1

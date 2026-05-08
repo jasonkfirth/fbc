@@ -113,6 +113,17 @@ void fb_sfxMixerShutdown(void);
 void fb_sfxMixerProcess(int frames);
 
 
+/*
+    Run mixer diagnostics against an output buffer.
+
+    The core calls this after all live sources have been combined so
+    debug logging and sample dumps reflect the same buffer that is sent
+    to the active audio driver.
+*/
+
+void fb_sfxMixerDiagnostics(const float *buffer, int frames);
+
+
 
 /*
     Clear the mixer buffer.

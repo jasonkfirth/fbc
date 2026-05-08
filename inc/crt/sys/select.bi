@@ -11,7 +11,9 @@
 
 #include once "crt/sys/types.bi"
 
-#if defined(__FB_LINUX__)
+#if defined(__FB_LINUX__) or defined(__FB_ANDROID__)
+#include once "crt/sys/linux/select.bi"
+#elseif defined(__FB_CYGWIN__)
 #include once "crt/sys/linux/select.bi"
 #else
 #error Platform unsupported

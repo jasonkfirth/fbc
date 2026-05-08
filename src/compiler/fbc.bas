@@ -559,6 +559,40 @@ private sub fbcFindBin _
 	fbctoolSetFlags( tool, FBCTOOLFLAG_FOUND )
 end sub
 
+#if defined( __FB_CYGWIN__ )
+extern "c"
+declare function cygwin_conv_path( byval what as uinteger, byval from_path as const any ptr, byval to_path as any ptr, byval bytes as uinteger ) as integer
+end extern
+
+const CCP_POSIX_TO_WIN_A = 0
+
+private function hCygwinExecPath( byref path as string ) as string
+	dim as string result
+
+	result = path
+	hReplaceSlash( strptr( result ), asc( "/" ) )
+
+	if( left( result, 1 ) = "/" ) then
+		dim as integer bytes = cygwin_conv_path( CCP_POSIX_TO_WIN_A, strptr( result ), NULL, 0 )
+
+		if( (bytes > 0) and (bytes < 32768) ) then
+			dim as string converted = space( bytes )
+
+			if( cygwin_conv_path( CCP_POSIX_TO_WIN_A, strptr( result ), strptr( converted ), bytes ) = 0 ) then
+				dim as integer nulpos = instr( converted, chr( 0 ) )
+				if( nulpos > 0 ) then
+					converted = left( converted, nulpos - 1 )
+				end if
+				hReplaceSlash( strptr( converted ), asc( "/" ) )
+				return converted
+			end if
+		end if
+	end if
+
+	function = result
+end function
+#endif
+
 private function fbcRunBin _
 	( _
 		byval action as zstring ptr, _
@@ -570,6 +604,9 @@ private function fbcRunBin _
 	dim as string path
 
 	fbcFindBin( tool, path )
+#if defined( __FB_CYGWIN__ )
+	path = hCygwinExecPath( path )
+#endif
 
 	if( fbc.verbose ) then
 		print *action + ": ", path + " " + ln
@@ -914,7 +951,24 @@ private function hLinkFiles( ) as integer
 	end if
 
 	select case as const fbGetOption( FB_COMPOPT_TARGET )
-	case FB_COMPTARGET_CYGWIN, FB_COMPTARGET_WIN32
+	case FB_COMPTARGET_CYGWIN
+		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then
+			dllname = hStripPath( hStripExt( fbc.outname ) )
+			ldcline += " --shared -e _cygwin_dll_entry --enable-auto-image-base --dll-search-prefix=cyg"
+		else
+			'' set default subsystem mode
+			if( len( fbc.subsystem ) = 0 ) then
+				fbc.subsystem = "console"
+			else
+				if( fbc.subsystem = "gui" ) then
+					fbc.subsystem = "windows"
+				end if
+			end if
+
+			ldcline += " -subsystem " + fbc.subsystem
+		end if
+
+	case FB_COMPTARGET_WIN32
 
 		'' set default subsystem mode
 		if( len( fbc.subsystem ) = 0 ) then
@@ -1184,7 +1238,7 @@ private function hLinkFiles( ) as integer
 	select case as const fbGetOption( FB_COMPOPT_TARGET )
 	case FB_COMPTARGET_CYGWIN
 		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then
-			ldcline += hFindLib( "crt0.o" )
+			ldcline += hFindLib( "crtbeginS.o" )
 		else
 			'' TODO
 			ldcline += hFindLib( "crt0.o" )
@@ -1364,6 +1418,11 @@ private function hLinkFiles( ) as integer
 
 	'' crt end
 	select case as const fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_CYGWIN
+		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then
+			ldcline += hFindLib( "crtend.o" )
+		end if
+
 	case FB_COMPTARGET_LINUX, FB_COMPTARGET_FREEBSD, _
 		FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD, _
 		FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS
@@ -2290,7 +2349,7 @@ private sub handleOpt _
 		fbc.showhelp = TRUE
 
 	case OPT_I
-		fbAddIncludePath(pathStripDiv(arg))
+		fbAddIncludePath(arg)
 
 	case OPT_INCLUDE
 		fbAddPreInclude(arg)
@@ -2394,7 +2453,7 @@ private sub handleOpt _
 		fbSetOption( FB_COMPOPT_OPTIMIZELEVEL, value )
 
 	case OPT_P
-		strsetAdd(@fbc.libpaths, pathStripDiv(arg), FALSE)
+		strsetAdd(@fbc.libpaths, pathStripDiv( pathNormalizeHost( arg ) ), FALSE)
 
 	case OPT_PIC
 		fbSetOption( FB_COMPOPT_PIC, TRUE )
@@ -2406,7 +2465,7 @@ private sub handleOpt _
 		fbc.emitasmonly = TRUE
 
 	case OPT_PREFIX
-		fbc.prefix = pathStripDiv(arg)
+		fbc.prefix = pathStripDiv( pathNormalizeHost( arg ) )
 		hReplaceSlash( fbc.prefix, asc( FB_HOST_PATHDIV ) )
 
 	case OPT_PRINT
@@ -3242,6 +3301,8 @@ private sub fbcDeterminePrefix( )
 	else
 		fbc.prefix = pathStripDiv( fbc.prefix ) + FB_HOST_PATHDIV
 	end if
+
+	fbc.prefix = pathStripDiv( pathNormalizeHost( fbc.prefix ) ) + FB_HOST_PATHDIV
 end sub
 
 private sub fbcSetupCompilerPaths( )
@@ -3387,6 +3448,15 @@ private sub fbcDetermineMainName( )
 	end if
 end sub
 
+private function hCompileStage2DirectlyToObj( ) as integer
+	select case( fbGetOption( FB_COMPOPT_TARGET ) )
+	case FB_COMPTARGET_JS, FB_COMPTARGET_XBOX
+		function = TRUE
+	case else
+		function = FALSE
+	end select
+end function
+
 '' Build the intermediate file name for the given module and step
 private function hGetAsmName _
 	( _
@@ -3400,7 +3470,7 @@ private function hGetAsmName _
 	'' Based on the objfile name so it's also affected by -o
 	asmfile = hStripExt( *module->objfile )
 
-	if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+	if( hCompileStage2DirectlyToObj( ) = FALSE ) then
 		ext = @".asm"
 	else
 		ext = @".o"
@@ -3753,7 +3823,7 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 	'' Clean up stage 2 output (the final .asm for -gen gcc/llvm) unless
 	'' -RR was given.
 	if( (not fbc.keepfinalasm) and _
-		((fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) or _
+		((hCompileStage2DirectlyToObj( ) = FALSE) or _
 		(not fbc.keepobj)) ) then
 		fbcAddTemp( asmfile )
 	end if
@@ -3803,7 +3873,7 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 			ln += "-fPIC "
 		end if
 
-		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+		if( hCompileStage2DirectlyToObj( ) = FALSE ) then
 
 			'' Even though clang's assembly output is syntax compatible with gnu-as,
 			'' clang may produce extra directives not understood by gnu-as
@@ -3828,11 +3898,14 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 			ln += "-Wno-unused "
 
 		else
-			'' if Emscripten is used, we will skip the assembly generation and
-			'' compile directly to object code
+			'' Some clang-based targets do not have a useful external assembler
+			'' stage here.  Compile the generated C directly to object code and
+			'' skip hAssembleModule() for them.
 			ln += "-c -nostdlib -nostdinc -Wall -Wno-unused-label " + _
 				"-Wno-unused-function -Wno-unused-variable "
-			ln += "-Wno-warn-absolute-paths "
+			if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS ) then
+				ln += "-Wno-warn-absolute-paths "
+			end if
 
 		end if
 
@@ -4025,6 +4098,11 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 
 	dim as FBCTOOL assembler = FBCTOOL_NONE
 
+	if( hCompileStage2DirectlyToObj( ) ) then
+		function = TRUE
+		exit function
+	end if
+
 #ifdef ENABLE_STANDALONE
 	if( assembler = FBCTOOL_NONE ) then
 		if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG ) then
@@ -4059,6 +4137,12 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 	select case assembler
 	case FBCTOOL_CLANG
 		ln += "-c "
+		select case( fbGetCpuFamily( ) )
+		case FB_CPUFAMILY_X86, FB_CPUFAMILY_X86_64
+			if( fbGetOption( FB_COMPOPT_ASMSYNTAX ) = FB_ASMSYNTAX_INTEL ) then
+				ln += "-masm=intel "
+			end if
+		end select
 	case else
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86

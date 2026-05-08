@@ -2,6 +2,8 @@ function nearEqual( byval lhs as single, byval rhs as single ) as integer
 	function = (abs( lhs - rhs ) < 0.0001)
 end function
 
+setenviron "SFXLIB_DRIVER=null"
+
 ASSERT( tempo() = 120 )
 
 tempo 96

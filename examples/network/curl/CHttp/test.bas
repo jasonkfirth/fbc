@@ -9,11 +9,11 @@
 
 	scope
 		'' create object
-		dim as CHttpStream stream
+		dim as CHttpStream http_stream
 	
 		'' get the page
-		if( stream.receive( "http://freebasic.net/" ) ) then
-			print stream.read( )
+		if( http_stream.receive( "http://freebasic.net/" ) ) then
+			print http_stream.read( )
 		end if
 	
 		'' the stream will be closed when the object is destroyed

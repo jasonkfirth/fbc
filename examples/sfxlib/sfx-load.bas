@@ -8,3 +8,7 @@ print filename
 
 SFX LOAD 1, filename
 print "Effect 1 is ready for SFX PLAY."
+
+print "Playing the loaded effect once."
+SFX PLAY 1
+SfxExampleWait( 700 )

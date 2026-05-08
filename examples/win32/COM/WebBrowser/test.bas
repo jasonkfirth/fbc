@@ -141,9 +141,9 @@ private function toolbar_editbox_oncreate _
    						   y, _
    						   400, _
    						   h, _
-   						   cast( GetWindowLong( parent, GWL_HWNDPARENT ) ), _
+   						   cast( GetWindowLongPtr( parent, GWLP_HWNDPARENT ) ), _
    						   cast( HMENU, WIN_TOOLBAR_EDIT ), _
-   						   cast( HINSTANCE, GetWindowLong( parent, GWL_HINSTANCE ) ), _
+   						   cast( HINSTANCE, GetWindowLongPtr( parent, GWLP_HINSTANCE ) ), _
    						   NULL )
    
 	SetParent( hwnd, parent )
@@ -175,7 +175,7 @@ private function toolbar_oncreate _
                        	   CW_USEDEFAULT, _ 
                        	   parent, _
                        	   NULL, _ 
-                       	   cast( HINSTANCE, GetWindowLong( parent, GWL_HINSTANCE ) ), _
+                       	   cast( HINSTANCE, GetWindowLongPtr( parent, GWLP_HINSTANCE ) ), _
                        	   NULL ) 
               
 	if( hwnd = NULL ) then

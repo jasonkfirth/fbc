@@ -1,0 +1,177 @@
+--- libfcgi/fcgiapp.c
++++ libfcgi/fcgiapp.c
+@@ -1284,8 +1284,8 @@
+  *----------------------------------------------------------------------
+  */
+ static unsigned char *AlignPtr8(unsigned char *p) {
+-    unsigned long u = (unsigned long) p;
+-    u = ((u + 7) & (ULONG_MAX - 7)) - u;
++    uintptr_t u = (uintptr_t) p;
++    u = ((u + 7) & (~(uintptr_t)7)) - u;
+     return p + u;
+ }
+ 
+--- libfcgi/os_win32.c
++++ libfcgi/os_win32.c
+@@ -80,7 +80,7 @@
+ typedef union {
+     HANDLE fileHandle;
+     SOCKET sock;
+-    unsigned int value;
++    UINT_PTR value;
+ } DESCRIPTOR;
+ 
+ /*
+@@ -147,7 +147,7 @@
+  *
+  *--------------------------------------------------------------
+  */
+-static int Win32NewDescriptor(FILE_TYPE type, int fd, int desiredFd)
++static int Win32NewDescriptor(FILE_TYPE type, UINT_PTR fd, int desiredFd)
+ {
+     int index = -1;
+ 
+@@ -227,7 +227,7 @@
+ static void StdinThread(void * startup) 
+ {
+     int doIo = TRUE;
+-    unsigned long fd;
++    ULONG_PTR fd;
+     unsigned long bytesRead;
+     POVERLAPPED_REQUEST pOv;
+ 
+@@ -357,7 +357,7 @@
+     val = getenv(SHUTDOWN_EVENT_NAME);
+     if (val != NULL) 
+     {
+-        HANDLE shutdownEvent = (HANDLE) atoi(val);
++        HANDLE shutdownEvent = (HANDLE)(UINT_PTR)strtoull(val, NULL, 10);
+ 
+         if (_beginthread(ShutdownRequestThread, 0, shutdownEvent) == -1)
+         {
+@@ -371,7 +371,7 @@
+         val = getenv(MUTEX_VARNAME);
+         if (val != NULL) 
+         {
+-            acceptMutex = (HANDLE) atoi(val);
++            acceptMutex = (HANDLE)(UINT_PTR)strtoull(val, NULL, 10);
+         }
+     }
+ 
+@@ -461,7 +461,7 @@
+     }
+ 
+     if ((fakeFd = Win32NewDescriptor(FD_PIPE_SYNC,
+-				     (int)stdioHandles[STDIN_FILENO],
++				     (UINT_PTR)stdioHandles[STDIN_FILENO],
+ 				     STDIN_FILENO)) == -1) {
+         return -1;
+     } else {
+@@ -516,7 +516,7 @@
+     }
+ 
+     if ((fakeFd = Win32NewDescriptor(FD_PIPE_SYNC,
+-				     (int)stdioHandles[STDOUT_FILENO],
++				     (UINT_PTR)stdioHandles[STDOUT_FILENO],
+ 				     STDOUT_FILENO)) == -1) {
+         return -1;
+     } else {
+@@ -533,7 +533,7 @@
+ 	exit(99);
+     }
+     if ((fakeFd = Win32NewDescriptor(FD_PIPE_SYNC,
+-				     (int)stdioHandles[STDERR_FILENO],
++				     (UINT_PTR)stdioHandles[STDERR_FILENO],
+ 				     STDERR_FILENO)) == -1) {
+         return -1;
+     } else {
+@@ -776,7 +776,7 @@
+             return -9;
+         }
+ 
+-        pseudoFd = Win32NewDescriptor(listenType, (int) hListenPipe, -1);
++        pseudoFd = Win32NewDescriptor(listenType, (UINT_PTR) hListenPipe, -1);
+         
+         if (pseudoFd == -1) 
+         {
+@@ -893,7 +893,7 @@
+             return -1;
+         }
+ 
+-        pseudoFd = Win32NewDescriptor(FD_PIPE_ASYNC, (int) hPipe, -1);
++        pseudoFd = Win32NewDescriptor(FD_PIPE_ASYNC, (UINT_PTR) hPipe, -1);
+         
+         if (pseudoFd == -1) 
+         {
+@@ -1390,7 +1390,7 @@
+             {
+                 struct timeval tv;
+                 fd_set rfds;
+-                int sock = fdTable[fd].fid.sock;
++                SOCKET sock = fdTable[fd].fid.sock;
+                 int rv;
+                 char trash[1024];
+    
+@@ -1472,7 +1472,7 @@
+  */
+ int OS_DoIo(struct timeval *tmo)
+ {
+-    unsigned long fd;
++    ULONG_PTR fd;
+     unsigned long bytes;
+     POVERLAPPED_REQUEST pOv;
+     struct timeb tb;
+@@ -1551,18 +1551,18 @@
+                                      LPWSABUF  dc3,
+                                      LPWSABUF  dc4,
+                                      GROUP     *dc5,
+-                                     DWORD     data)
++                                     DWORD_PTR data)
+ {
+     struct sockaddr_in *sockaddr = (struct sockaddr_in *) lpCallerId->buf;
+ 
+     // Touch the args to avoid warnings
+     dc0 = NULL; dc1 = NULL; dc2 = NULL; dc3 = NULL; dc4 = NULL; dc5 = NULL;
+ 
+-    if ((void *) data == NULL) return CF_ACCEPT;
++    if ((void *)(UINT_PTR)data == NULL) return CF_ACCEPT;
+ 
+     if (sockaddr->sin_family != AF_INET) return CF_ACCEPT;
+ 
+-    return isAddrOK(sockaddr, (const char *) data) ? CF_ACCEPT : CF_REJECT;
++    return isAddrOK(sockaddr, (const char *)(UINT_PTR)data) ? CF_ACCEPT : CF_REJECT;
+ }
+ #endif
+ 
+@@ -1622,7 +1622,7 @@
+         }
+     }
+ 
+-    ipcFd = Win32NewDescriptor(FD_PIPE_SYNC, (int) hListen, -1);
++    ipcFd = Win32NewDescriptor(FD_PIPE_SYNC, (UINT_PTR) hListen, -1);
+ 	if (ipcFd == -1) 
+     {
+         DisconnectNamedPipe(hListen);
+@@ -1649,7 +1649,7 @@
+             FD_ZERO(&readfds);
+ 
+ #pragma warning( disable : 4127 ) 
+-            FD_SET((unsigned int) hListen, &readfds);
++            FD_SET((SOCKET) hListen, &readfds);
+ #pragma warning( default : 4127 ) 
+ 
+             if (select(0, &readfds, NULL, NULL, &timeout) == 0)
+@@ -1681,11 +1681,11 @@
+ 
+         closesocket(hSock);
+ #else
+-        hSock = WSAAccept((unsigned int) hListen,                    
++        hSock = WSAAccept((SOCKET) hListen,                    
+                           &sockaddr,  
+                           &sockaddrLen,               
+                           isAddrOKCallback,  
+-                          (DWORD) webServerAddrs);
++                          (DWORD_PTR) webServerAddrs);
+ 
+         if (hSock != INVALID_SOCKET)
+         {

@@ -138,7 +138,7 @@ private function toolbar_oncreate _
                        	   CW_USEDEFAULT, _ 
                        	   parent, _
                        	   NULL, _ 
-                       	   cast( HINSTANCE, GetWindowLong( parent, GWL_HINSTANCE ) ), _
+                       	   cast( HINSTANCE, GetWindowLongPtr( parent, GWLP_HINSTANCE ) ), _
                        	   NULL ) 
               
 	if( hwnd = NULL ) then

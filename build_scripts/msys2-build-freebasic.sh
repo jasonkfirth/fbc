@@ -125,6 +125,18 @@ copy_tree() {
 	fi
 }
 
+copy_examples_tree() {
+	local dst="$1"
+	mkdir -p "$dst"
+	if have rsync; then
+		run rsync -a --delete --delete-excluded --prune-empty-dirs \
+			--exclude-from "$ROOT/mk/example-copy-excludes.rsync" \
+			"$ROOT/examples/" "$dst/"
+	else
+		run cp -a "$ROOT/examples"/. "$dst/"
+	fi
+}
+
 copy_dir_files() {
 	local src="$1"
 	local dst="$2"
@@ -186,6 +198,24 @@ create_arch_library_aliases() {
 	do
 		copy_library_alias "$libdir" "$component" "$component-5.0.10-md"
 	done
+}
+
+copy_legacy_winlibs() {
+	local arch="$1"
+	local libdir="$2"
+	local bindir="$3"
+	local legacy_lib_dir="$ROOT/contrib/winlibs-legacy/lib/$arch"
+	local legacy_bin_dir="$ROOT/contrib/winlibs-legacy/bin/$arch"
+
+	if [ -d "$legacy_lib_dir" ]; then
+		msg "Bundling legacy $arch import libraries"
+		copy_dir_files "$legacy_lib_dir" "$libdir"
+	fi
+
+	if [ -d "$legacy_bin_dir" ]; then
+		msg "Bundling legacy $arch runtime DLLs"
+		copy_dir_files "$legacy_bin_dir" "$bindir"
+	fi
 }
 
 sync_source_tree() {
@@ -444,7 +474,11 @@ build_target() {
 	local dlltool="$mingw_root/bin/dlltool.exe"
 
 	msg "Preparing $target worktree"
+	PATH="$mingw_root/bin:/usr/bin:$saved_path"
+	export PATH
 	sanitize_source_tree "$target_triplet"
+	PATH="$saved_path"
+	export PATH
 	if [ "$SKIP_SOURCE_SYNC" -eq 0 ] || [ ! -d "$worktree" ]; then
 		rm -rf "$worktree"
 		sync_source_tree "$worktree"
@@ -472,15 +506,17 @@ build_target() {
 		"$ROOT/bootstrap/fbc.exe" \
 		|| true)"
 
-	if [ -d "$bootstrap_sources_dir" ] && find "$bootstrap_sources_dir" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .; then
-		msg "Bootstrap sources already present for $target"
-	elif [ -n "$host_fbc" ]; then
-		msg "Emitting $target bootstrap sources"
+	if [ -n "$host_fbc" ]; then
+		msg "Emitting fresh $target bootstrap sources"
+		rm -rf "$bootstrap_sources_dir"
 		run make -j"$JOBS" \
 			bootstrap-emit \
+			FBC_EXE="$host_fbc" \
 			BUILD_FBC="$host_fbc" \
 			TARGET_TRIPLET="$target_triplet" \
 			CC="$cc" CXX="$cxx" AR="$ar" AS="$as" LD="$ld" RANLIB="$ranlib" STRIP="$strip" DLLTOOL="$dlltool"
+	elif [ -d "$bootstrap_sources_dir" ] && find "$bootstrap_sources_dir" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .; then
+		msg "Bootstrap sources already present for $target"
 	else
 		msg "No direct bootstrap compiler available for $target; seeding from peer bootstrap sources"
 		run make -j"$JOBS" \
@@ -601,6 +637,7 @@ copy_arch_toolchain() {
 
 	copy_dir_files "$mingw_root/lib" "$DISTROOT/lib/$arch"
 	create_arch_library_aliases "$DISTROOT/lib/$arch"
+	copy_legacy_winlibs "$arch" "$DISTROOT/lib/$arch" "$DISTROOT/bin/$arch"
 }
 
 assemble_distribution() {
@@ -615,7 +652,7 @@ assemble_distribution() {
 
 	msg "Copying top-level FreeBASIC content"
 	copy_tree "$ROOT/doc" "$DISTROOT/doc"
-	copy_tree "$ROOT/examples" "$DISTROOT/examples"
+	copy_examples_tree "$DISTROOT/examples"
 	copy_tree "$ROOT/inc" "$DISTROOT/inc"
 	cp -a "$ROOT/changelog.txt" "$DISTROOT/"
 	cp -a "$ROOT/readme.txt" "$DISTROOT/"
@@ -689,7 +726,6 @@ ShowUninstDetails show
 
 
 \${Using:StrFunc} StrStr
-\${Using:StrFunc} StrRep
 \${Using:StrFunc} UnStrRep
 
 Function RefreshEnvironment
@@ -749,13 +785,13 @@ FunctionEnd
 Function WriteMsys2ProfileFileContents
 	FileWrite \$0 "# FreeBASIC installer PATH setup$\r$\n"
 	FileWrite \$0 "if command -v cygpath >/dev/null 2>&1; then$\r$\n"
-	FileWrite \$0 "  _freebasic_prefix=\`cygpath -u '$INSTDIR'\`$\r$\n"
+	FileWrite \$0 "  _freebasic_prefix=\`cygpath -u '\$INSTDIR'\`$\r$\n"
 	FileWrite \$0 "else$\r$\n"
 	FileWrite \$0 "  _freebasic_prefix=/c/FreeBASIC$\r$\n"
 	FileWrite \$0 "fi$\r$\n"
-	FileWrite \$0 "case :\$$PATH: in$\r$\n"
-	FileWrite \$0 "  *:\${_freebasic_prefix}:*) ;;$\r$\n"
-	FileWrite \$0 "  *) export PATH=\${_freebasic_prefix}:\$$PATH ;;$\r$\n"
+	FileWrite \$0 "case :\$\$PATH: in$\r$\n"
+	FileWrite \$0 "  *:\$\${_freebasic_prefix}:*) ;;$\r$\n"
+	FileWrite \$0 "  *) export PATH=\$\${_freebasic_prefix}:\$\$PATH ;;$\r$\n"
 	FileWrite \$0 "esac$\r$\n"
 	FileWrite \$0 "unset _freebasic_prefix$\r$\n"
 FunctionEnd

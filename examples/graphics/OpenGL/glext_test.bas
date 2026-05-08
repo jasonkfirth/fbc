@@ -5,11 +5,15 @@
 #include once "GL/gl.bi"
 #include once "GL/glu.bi"
 #include once "GL/glext.bi"
-#include once "GL/glfw.bi"
+#include once "GLFW/glfw3.bi"
 
 #ifndef FALSE
 #define FALSE 0
 #define TRUE (-1)
+#endif
+
+#ifndef NULL
+#define NULL 0
 #endif
 
 type MOUSECTX
@@ -41,11 +45,12 @@ declare sub shutdown ()
 
 	dim shared glActiveTextureARB_ as PFNGLACTIVETEXTUREARBPROC
 	dim shared glMultiTexCoord2iARB_ as PFNGLMULTITEXCOORD2IARBPROC
+	dim shared glfw_window as GLFWwindow ptr
 
 	main( )
 
 '':::::
-sub windowSizeCB GLFWCALL( byval w as integer, byval h as integer )
+sub windowSizeCB cdecl( byval window_handle as GLFWwindow ptr, byval w as long, byval h as long )
     
     ctx.width  = w
     ctx.height = h
@@ -57,10 +62,10 @@ sub windowSizeCB GLFWCALL( byval w as integer, byval h as integer )
 end sub
 
 '':::::
-sub mousePosCB GLFWCALL ( byval x as integer, byval y as integer )
+sub mousePosCB cdecl( byval window_handle as GLFWwindow ptr, byval x as double, byval y as double )
 
-	ctx.mouse.xpos = x
-	ctx.mouse.ypos = y
+	ctx.mouse.xpos = cint(x)
+	ctx.mouse.ypos = cint(y)
 	ctx.redraw = TRUE
 
 end sub
@@ -146,19 +151,24 @@ end sub
 sub initGLFW
 
     '' init
-    glfwInit( )
-    
-    '' create window
-    if( glfwOpenWindow( WIN_WIDTH, WIN_HEIGHT, 0,0,0,0, WIN_BPP,0, GLFW_WINDOW ) = 0 ) then
-        shutdown
+    if( glfwInit( ) = 0 ) then
+    	end 1
     end if
     
-    '' set title
-    glfwSetWindowTitle( "FreeBASIC OpenGL Extension example" )
+    '' create window
+    glfw_window = glfwCreateWindow( WIN_WIDTH, WIN_HEIGHT, _
+    	"FreeBASIC OpenGL Extension example", NULL, NULL )
+    if( glfw_window = NULL ) then
+    	glfwTerminate( )
+    	end 1
+    end if
+
+    glfwMakeContextCurrent( glfw_window )
     
     '' set callbacks
-    glfwSetWindowSizeCallback( @windowSizeCB )
-    glfwSetMousePosCallback( @mousePosCB )
+    glfwSetWindowSizeCallback( glfw_window, @windowSizeCB )
+    glfwSetCursorPosCallback( glfw_window, @mousePosCB )
+    windowSizeCB( glfw_window, WIN_WIDTH, WIN_HEIGHT )
     
 end sub
 
@@ -173,6 +183,11 @@ end sub
 
 '':::::
 sub shutdownGLFW
+
+	if( glfw_window <> NULL ) then
+		glfwDestroyWindow( glfw_window )
+		glfw_window = NULL
+	end if
 
 	glfwTerminate( )
 
@@ -266,16 +281,17 @@ sub main
         else
         
         	'' Idle process
-        	glfwSleep( 0.05 )
+        	sleep 50, 1
         	
         end if
 
         '' Swap buffers
-        glfwSwapBuffers( )
+        glfwSwapBuffers( glfw_window )
+        glfwPollEvents( )
         	
         '' Check if the ESC key was pressed or the window was closed
-        running = (glfwGetKey( GLFW_KEY_ESC ) = 0) and _
-                  (glfwGetWindowParam( GLFW_OPENED ) = 1)
+        running = (glfwGetKey( glfw_window, GLFW_KEY_ESCAPE ) = 0) and _
+                  (glfwWindowShouldClose( glfw_window ) = 0)
     loop while( running )
 
     ''
@@ -283,5 +299,3 @@ sub main
 
     
 end sub
-
-

@@ -7,8 +7,14 @@
 ''   SFXLIB_MIXER_DUMP=/tmp/sfx-mix.txt SFXLIB_MIXER_DUMP_FRAMES=44100 ./program
 ''   fbc examples/sfxlib/fastfft.bas -x /tmp/fastfft
 ''   /tmp/fastfft 44100 /tmp/sfx-mix.txt
+''
+'' Optional expected frequencies may be listed after the filename.  Each one
+'' is checked against the FFT bins and causes a non-zero exit if it is not
+'' present above the local magnitude threshold:
+''   /tmp/fastfft 48000 /tmp/sfx-mix.txt 261.63 329.63
 
 const MAX_FFT_SAMPLES as integer = 65536
+const MAX_EXPECTED_PEAKS as integer = 16
 
 declare function IsNumericArg( byref text as string ) as integer
 declare function PreviousPowerOfTwo( byval value as integer ) as integer
@@ -17,17 +23,34 @@ declare sub RunFft( real_part() as double, imag_part() as double, byval n as int
 
 dim as integer sample_rate = 44100
 dim as string filename = ""
+dim as integer expected_start_arg = 2
+dim expected_hz( 0 to MAX_EXPECTED_PEAKS - 1 ) as double
+dim as integer expected_count = 0
 
 if( command( 1 ) <> "" ) then
 	if( IsNumericArg( command( 1 ) ) ) then
 		sample_rate = valint( command( 1 ) )
 		filename = command( 2 )
+		expected_start_arg = 3
 	else
 		filename = command( 1 )
+		expected_start_arg = 2
 	end if
 end if
 
 if( sample_rate <= 0 ) then sample_rate = 44100
+
+for arg_index as integer = expected_start_arg to 64
+	dim as string text = command( arg_index )
+
+	if( text = "" ) then exit for
+	if( expected_count >= MAX_EXPECTED_PEAKS ) then exit for
+
+	expected_hz( expected_count ) = val( text )
+	if( expected_hz( expected_count ) > 0.0 ) then
+		expected_count += 1
+	end if
+next
 
 dim samples( 0 to MAX_FFT_SAMPLES - 1 ) as double
 dim as integer sample_count = 0
@@ -67,12 +90,14 @@ RunFft( real_part(), imag_part(), fft_size )
 
 dim as integer best_bin = 0
 dim as double best_mag = 0.0
+dim bin_mag( 0 to (fft_size \ 2) - 1 ) as double
 dim top_bin( 0 to 7 ) as integer
 dim top_mag( 0 to 7 ) as double
 
 for bin_index as integer = 1 to (fft_size \ 2) - 1
 	dim as double mag = sqr( real_part( bin_index ) * real_part( bin_index ) + imag_part( bin_index ) * imag_part( bin_index ) )
 	mag = mag / (fft_size * 0.25)
+	bin_mag( bin_index ) = mag
 
 	if( mag > best_mag ) then
 		best_mag = mag
@@ -113,6 +138,69 @@ for slot as integer = 0 to 7
 			top_mag( slot )
 	end if
 next
+
+if( expected_count > 0 ) then
+	dim as integer matched_count = 0
+	dim as double bin_width = sample_rate / fft_size
+	dim as double magnitude_floor = best_mag * 0.15
+
+	if( magnitude_floor < 0.000001 ) then
+		magnitude_floor = 0.000001
+	end if
+
+	print
+	print "expected peaks:"
+
+	for expected_index as integer = 0 to expected_count - 1
+		dim as double target_hz = expected_hz( expected_index )
+		dim as double tolerance_hz = bin_width * 3.0
+		dim as integer first_bin
+		dim as integer last_bin
+		dim as integer matched_bin = 0
+		dim as double matched_mag = 0.0
+		dim as double matched_hz = 0.0
+		dim as string result_text = "miss"
+
+		if( tolerance_hz < target_hz * 0.015 ) then
+			tolerance_hz = target_hz * 0.015
+		end if
+
+		first_bin = cint( (target_hz - tolerance_hz) / bin_width )
+		last_bin = cint( (target_hz + tolerance_hz) / bin_width )
+
+		if( first_bin < 1 ) then first_bin = 1
+		if( last_bin >= (fft_size \ 2) ) then last_bin = (fft_size \ 2) - 1
+
+		for bin_index as integer = first_bin to last_bin
+			if( bin_mag( bin_index ) > matched_mag ) then
+				matched_mag = bin_mag( bin_index )
+				matched_bin = bin_index
+			end if
+		next
+
+		if( matched_bin > 0 ) then
+			matched_hz = (matched_bin * sample_rate) / fft_size
+		end if
+
+		if( matched_mag >= magnitude_floor ) then
+			result_text = "ok"
+			matched_count += 1
+		end if
+
+		print using "target ########.###  matched ########.###  bin #######  mag #.######  &"; _
+			target_hz; _
+			matched_hz; _
+			matched_bin; _
+			matched_mag; _
+			result_text
+	next
+
+	print "expected peaks matched:"; matched_count; "/"; expected_count
+
+	if( matched_count <> expected_count ) then
+		end 2
+	end if
+end if
 
 function IsNumericArg( byref text as string ) as integer
 	if( len( text ) = 0 ) then return 0

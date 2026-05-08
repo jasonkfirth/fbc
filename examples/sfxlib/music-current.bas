@@ -12,4 +12,8 @@ current_id = MUSIC CURRENT()
 print "Started music id:"; music_id
 print "MUSIC CURRENT() returned:"; current_id
 
+if( music_id >= 0 ) then
+	SfxExampleWait( 1800 )
+end if
+
 MUSIC STOP

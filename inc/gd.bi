@@ -60,10 +60,10 @@
 
 #pragma once
 
-#if defined(__FB_DOS__) or defined(__FB_UNIX__)
-	#inclib "gd"
-#elseif defined(__FB_WIN32__) and defined(NONDLL)
+#if defined(__FB_WIN32__) and defined(NONDLL)
 	#inclib "bgd-static"
+#elseif defined(__FB_DOS__) or defined(__FB_UNIX__) or defined(__FB_WIN32__)
+	#inclib "gd"
 #else
 	#inclib "bgd"
 #endif
@@ -82,7 +82,7 @@
 ''     procedure Putchar => gd_Putchar
 ''     procedure gd_error => gd_error_
 
-#ifdef __FB_WIN32__
+#if defined(__FB_WIN32__) and (not defined(NONDLL))
 	extern "Windows"
 #else
 	extern "C"

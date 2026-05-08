@@ -1,0 +1,5 @@
+# TEST_MODE : MULTI_MODULE_OK
+
+MAIN := driver-null.bas
+COMPILE_AND_LINK := 1
+

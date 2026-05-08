@@ -35,7 +35,7 @@ PRINTF := printf
 CAT := cat
 
 ifndef FBC
-FBC := fbc$(EXEEXT)
+FBC := $(TESTS_DEFAULT_FBC)
 endif
 
 DIRLIST_INC := dirlist.mk
@@ -69,8 +69,8 @@ MAINEXE := fbc-tests$(TARGET_EXEEXT)
 SRCLIST += ./$(MAINBAS).bas
 
 FBCU_DIR := fbcunit
-FBCU_INC := $(FBCU_DIR)/inc
-FBCU_LIB := $(FBCU_DIR)/lib
+FBCU_INC := $(abspath $(FBCU_DIR)/inc)
+FBCU_LIB := $(abspath $(FBCU_DIR)/lib)
 FBCU_BIN := $(FBCU_LIB)/libfbcunit.a
 
 FBCU_LIBS := -l fbcunit
@@ -152,7 +152,7 @@ all : make_fbcunit $(UNIT_TESTS_OBJ_LST) build_tests run_tests
 make_fbcunit : $(FBCU_BIN)
 
 $(FBCU_BIN) :
-	cd $(FBCU_DIR) && $(MAKE) FPU=$(FPU) ARCH=$(ARCH) TARGET=$(TARGET)
+	cd $(FBCU_DIR) && $(MAKE) FBC="$(FBC)" FPU=$(FPU) ARCH=$(ARCH) TARGET=$(TARGET)
 
 # ------------------------------------------------------------------------
 # Auto-generate the file UNIT_TESTS_INC - needed by this makefile

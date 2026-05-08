@@ -54,6 +54,10 @@ static float fb_sfxMixerVoiceSample(FB_SFXVOICE *voice)
     if (voice->data)
     {
         float sample = 0.0f;
+        float next_sample = 0.0f;
+        float fraction;
+        int index;
+        int next_index;
 
         if (voice->length <= 0)
         {
@@ -61,10 +65,16 @@ static float fb_sfxMixerVoiceSample(FB_SFXVOICE *voice)
             return 0.0f;
         }
 
-        if (voice->position >= voice->length)
+        if (voice->sample_step <= 0.0f)
+            voice->sample_step = 1.0f;
+
+        if (voice->sample_pos < 0.0f)
+            voice->sample_pos = 0.0f;
+
+        while (voice->sample_pos >= (float)voice->length)
         {
             if (voice->loop)
-                voice->position = 0;
+                voice->sample_pos -= (float)voice->length;
             else
             {
                 voice->active = 0;
@@ -72,8 +82,34 @@ static float fb_sfxMixerVoiceSample(FB_SFXVOICE *voice)
             }
         }
 
-        sample = voice->data[voice->position];
-        voice->position++;
+        index = (int)voice->sample_pos;
+        next_index = index + 1;
+        fraction = voice->sample_pos - (float)index;
+
+        if (next_index >= voice->length)
+        {
+            if (voice->loop)
+                next_index = 0;
+            else
+                next_index = index;
+        }
+
+        sample = voice->data[index];
+        next_sample = voice->data[next_index];
+
+        sample += (next_sample - sample) * fraction;
+
+        voice->sample_pos += voice->sample_step;
+
+        while (voice->sample_pos >= (float)voice->length && voice->loop)
+            voice->sample_pos -= (float)voice->length;
+
+        if (voice->sample_pos >= (float)voice->length)
+            voice->position = voice->length;
+        else
+            voice->position = (int)voice->sample_pos;
+
+        voice->pos = voice->position;
 
         return sample;
     }
@@ -169,7 +205,7 @@ static int fb_sfxMixerDumpFrameLimit(void)
     return limit;
 }
 
-static void fb_sfxMixerDiagnostics(const float *buffer, int frames)
+void fb_sfxMixerDiagnostics(const float *buffer, int frames)
 {
     static int block_count = 0;
     static int dumped_frames = 0;
@@ -320,6 +356,7 @@ FB_SFXVOICE *fb_sfxMixerAllocVoice(void)
             v->active = 1;
             v->volume = 1.0f;
             v->pan = 0.0f;
+            v->sample_step = 1.0f;
 
             return v;
         }
@@ -548,7 +585,6 @@ void fb_sfxMixerProcess(int frames)
         buffer[frame * 2 + 1] = right;
     }
 
-    fb_sfxMixerDiagnostics(buffer, frames);
 }
 
 

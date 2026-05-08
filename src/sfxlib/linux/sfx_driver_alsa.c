@@ -253,7 +253,7 @@ static int alsa_driver_write(const float *buffer, int frames)
 const FB_SFX_DRIVER fb_sfxDriverAlsa =
 {
     "ALSA",
-    FB_SFX_DRIVER_CAP_CAPTURE | FB_SFX_DRIVER_CAP_MIDI,
+    FB_SFX_DRIVER_CAP_CAPTURE | FB_SFX_DRIVER_CAP_MIDI | FB_SFX_DRIVER_CAP_BACKGROUND,
     alsa_driver_init,
     alsa_driver_exit,
     alsa_driver_write,

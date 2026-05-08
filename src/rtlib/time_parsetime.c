@@ -10,7 +10,7 @@ static int fb_hCheckAMPM( const char *text, size_t *pLength )
     int result = 0;
 
     /* skip WS */
-    while ( isspace( *text ) )
+    while ( isspace( FB_CHAR_TO_INT( *text ) ) )
         ++text;
 
     switch( *text ) {
@@ -37,12 +37,12 @@ static int fb_hCheckAMPM( const char *text, size_t *pLength )
         }
     }
     if( result!=0 ) {
-        if( isalpha( *text ) )
+        if( isalpha( FB_CHAR_TO_INT( *text ) ) )
             result = 0;
     }
     if( result!=0 ) {
         /* skip WS */
-        while ( isspace( *text ) )
+        while ( isspace( FB_CHAR_TO_INT( *text ) ) )
             ++text;
         if( pLength )
             *pLength = text - text_start;
@@ -65,14 +65,14 @@ int fb_hTimeParse( const char *text, size_t text_len, int *pHour, int *pMinute, 
         int is_ampm_hour = ( hour >= 1 && hour <= 12 );
         /* skip white spaces */
         text = endptr;
-        while ( isspace( *text ) )
+        while ( isspace( FB_CHAR_TO_INT( *text ) ) )
             ++text;
         if( *text==':' ) {
             ++text;
             minute = strtol( text, &endptr, 10 );
             if( minute >= 0 && minute < 60 && endptr!=text ) {
                 text = endptr;
-                while ( isspace( *text ) )
+                while ( isspace( FB_CHAR_TO_INT( *text ) ) )
                     ++text;
 
                 result = TRUE;

@@ -27,10 +27,10 @@
 
 #pragma once
 
-#ifdef __FB_UNIX__
-	#inclib "allegro_font"
-#elseif defined(__FB_WIN32__) and defined(ALLEGRO_STATICLINK)
+#if defined(__FB_WIN32__) and defined(ALLEGRO_STATICLINK)
 	#inclib "allegro_font-5.0.10-static-md"
+#elseif defined(__FB_UNIX__) or defined(__FB_WIN32__)
+	#inclib "allegro_font"
 #else
 	#inclib "allegro_font-5.0.10-md"
 #endif

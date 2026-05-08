@@ -43,6 +43,9 @@ Environment:
   OUT                    Output directory (default: <repo>/out/msdos)
   PREFIX                 Install prefix inside the DOS package (default: /fb)
   MAKE_JOBS              Parallel make job count (default: auto-detect host cores)
+  HOST_FBC               Host compiler executable used to seed bootstrap
+  HOST_FBC_ROOT          Directory containing host fbc/fbc64 (MSYS2 default: /c/freebasic when present)
+  CURL_BIN               curl executable for host downloads (MSYS2 default: /usr/bin/curl)
   TARGET_TRIPLET         DJGPP target triplet (default: i586-pc-msdosdjgpp)
   DJGPP_CROSS_VERSION    MSYS2 prebuilt toolchain release tag (default: v3.4)
   DJGPP_CROSS_ASSET      MSYS2 prebuilt toolchain asset name
@@ -125,6 +128,14 @@ DOSBOX_TIMEOUT="${DOSBOX_TIMEOUT:-60}"
 KEEP_BUILDROOT="${KEEP_BUILDROOT:-0}"
 SKIP_DOSBOX="${SKIP_DOSBOX:-0}"
 
+if [ -z "${CURL_BIN+x}" ]; then
+	if [ "$HOST_KIND" = "msys2" ] && [ -x /usr/bin/curl ]; then
+		CURL_BIN="/usr/bin/curl"
+	else
+		CURL_BIN="curl"
+	fi
+fi
+
 DO_DEPS=1
 DO_SOURCE_COPY=1
 DO_CROSS_TOOLCHAIN=1
@@ -185,6 +196,19 @@ if [ "$SKIP_DOSBOX" = "1" ]; then
 	DO_DOSBOX_TEST=0
 fi
 
+HOST_MAKE_TOOL_ARGS=()
+if [ "$HOST_KIND" = "msys2" ]; then
+	HOST_MAKE_TOOL_ARGS=(
+		CC=gcc
+		CXX=g++
+		AR=ar
+		RANLIB=ranlib
+		AS=as
+		LD=ld
+		BOOTSTRAP_TERM_LIB=
+	)
+fi
+
 ##############################################################################
 # Version metadata
 ##############################################################################
@@ -195,7 +219,7 @@ REV="$(awk -F':=' '/^[[:space:]]*REV/ {gsub(/[[:space:]]/,"",$2); print $2}' mk/
 [ -n "$FBVERSION" ] || die "missing FBVERSION"
 [ -n "$REV" ] || die "missing REV"
 
-PKGNAME="FreeBASIC-${FBVERSION}.${REV}-dos"
+PKGNAME="FreeBASIC-${FBVERSION}-dos"
 DISTROOT="${OUT}/${PKGNAME}"
 PKGFILE="${OUT}/${PKGNAME}.zip"
 DJGPP_DOS_CACHE="${DJGPP_DOS_CACHE:-$BUILDROOT/djgpp-dos}"
@@ -231,6 +255,10 @@ find_tree_fbc() {
 	local candidate
 
 	for candidate in \
+		"$base/bin/fbc64" \
+		"$base/bin/fbc64.exe" \
+		"$base/fbc64" \
+		"$base/fbc64.exe" \
 		"$base/bin/fbc" \
 		"$base/bin/fbc.exe" \
 		"$base/fbc" \
@@ -245,13 +273,32 @@ find_tree_fbc() {
 	return 1
 }
 
+maybe_find_tree_fbc() {
+	local base="${1:-}"
+
+	[ -n "$base" ] || return 1
+
+	if [ ! -d "$base" ] && have cygpath; then
+		base="$(cygpath -u "$base" 2>/dev/null || printf '%s' "$base")"
+	fi
+
+	find_tree_fbc "$base"
+}
+
 detect_fbc() {
 	local candidate
+	local test_candidate
 
 	for candidate in "$@"; do
 		[ -n "$candidate" ] || continue
-		if [ -f "$candidate" ] && "$candidate" -version >/dev/null 2>&1; then
-			echo "$candidate"
+
+		test_candidate="$candidate"
+		if [ ! -f "$test_candidate" ] && have cygpath; then
+			test_candidate="$(cygpath -u "$candidate" 2>/dev/null || printf '%s' "$candidate")"
+		fi
+
+		if [ -f "$test_candidate" ] && "$test_candidate" -version >/dev/null 2>&1; then
+			echo "$test_candidate"
 			return 0
 		fi
 	done
@@ -262,6 +309,46 @@ detect_fbc() {
 	fi
 
 	return 1
+}
+
+detect_host_fbc() {
+	detect_fbc \
+		"${HOST_FBC:-}" \
+		"$(maybe_find_tree_fbc "${HOST_FBC_ROOT:-}" 2>/dev/null || true)" \
+		"$(maybe_find_tree_fbc /c/freebasic 2>/dev/null || true)" \
+		"$(maybe_find_tree_fbc "$HOST_WORKTREE" 2>/dev/null || true)" \
+		"$(maybe_find_tree_fbc "$ROOT" 2>/dev/null || true)"
+}
+
+download_file() {
+	local dst="$1"
+	local url="$2"
+	local tmp="${dst}.tmp"
+
+	rm -f "$tmp"
+	run "$CURL_BIN" -L --retry 3 --fail -o "$tmp" "$url"
+	mv -f "$tmp" "$dst"
+}
+
+run_timeout_checked() {
+	local status
+
+	set +e
+	run timeout "$@"
+	status=$?
+	set -e
+
+	return "$status"
+}
+
+configure_msys2_path() {
+	if [[ -d /mingw64/bin ]] && [[ ":$PATH:" != *":/mingw64/bin:"* ]]; then
+		export PATH="/mingw64/bin:$PATH"
+	fi
+
+	if [[ -d /usr/bin ]] && [[ ":$PATH:" != *":/usr/bin:"* ]]; then
+		export PATH="/usr/bin:$PATH"
+	fi
 }
 
 find_cross_bindir() {
@@ -449,31 +536,54 @@ install_linux_dependencies() {
 }
 
 install_msys2_dependencies() {
-	if [[ -d /mingw64/bin ]] && [[ ":$PATH:" != *":/mingw64/bin:"* ]]; then
-		export PATH="/mingw64/bin:$PATH"
-	fi
+	local packages
+	local dosbox_package
 
-	if [[ -d /usr/bin ]] && [[ ":$PATH:" != *":/usr/bin:"* ]]; then
-		export PATH="/usr/bin:$PATH"
-	fi
+	configure_msys2_path
 
 	msg "updating package database"
 	run pacman -Sy --noconfirm
 
-	msg "installing MSYS2 build dependencies"
-	run pacman -S --needed --noconfirm \
-		base-devel \
-		curl \
-		dos2unix \
-		git \
-		mingw-w64-x86_64-binutils \
-		mingw-w64-x86_64-dosbox-staging \
-		mingw-w64-x86_64-gcc \
-		mingw-w64-x86_64-libffi \
-		rsync \
-		unzip \
+	dosbox_package=""
+	if pacman -Si mingw-w64-x86_64-dosbox-staging >/dev/null 2>&1; then
+		dosbox_package="mingw-w64-x86_64-dosbox-staging"
+	elif pacman -Si mingw-w64-x86_64-dosbox-x >/dev/null 2>&1; then
+		dosbox_package="mingw-w64-x86_64-dosbox-x"
+	elif pacman -Si mingw-w64-x86_64-dosbox >/dev/null 2>&1; then
+		dosbox_package="mingw-w64-x86_64-dosbox"
+	fi
+
+	packages=(
+		base-devel
+		bison
+		curl
+		dos2unix
+		flex
+		git
+		make
+		mingw-w64-x86_64-binutils
+		mingw-w64-x86_64-gcc
+		mingw-w64-x86_64-libffi
+		mingw-w64-x86_64-pkgconf
+		patch
+		rsync
+		unzip
 		zip
+	)
+
+	if [ -n "$dosbox_package" ]; then
+		packages+=("$dosbox_package")
+	else
+		msg "no MSYS2 DOSBox package found; DOSBox smoke test will be skipped unless DOSBox is installed separately"
+	fi
+
+	msg "installing MSYS2 build dependencies"
+	run pacman -S --needed --noconfirm "${packages[@]}"
 }
+
+if [ "$HOST_KIND" = "msys2" ]; then
+	configure_msys2_path
+fi
 
 if [ "$DO_DEPS" = "1" ]; then
 	case "$HOST_KIND" in
@@ -528,7 +638,7 @@ if ! have "${TARGET_TRIPLET}-gcc"; then
 		msys2)
 			if [ ! -f "$CROSS_ARCHIVE" ]; then
 				msg "downloading host DJGPP cross toolchain"
-				run curl -L --retry 3 --fail -o "$CROSS_ARCHIVE" "$DJGPP_CROSS_URL"
+				download_file "$CROSS_ARCHIVE" "$DJGPP_CROSS_URL"
 			fi
 
 			msg "extracting host DJGPP cross toolchain"
@@ -574,7 +684,7 @@ if [ "$DO_DJGPP_PAYLOAD" = "1" ]; then
 		zipfile="$DOWNLOADS/$(basename "$rel")"
 		if [ ! -f "$zipfile" ]; then
 			msg "downloading $(basename "$rel")"
-			run curl -L --retry 3 --fail -o "$zipfile" "$DJGPP_BASE_URL/$rel"
+			download_file "$zipfile" "$DJGPP_BASE_URL/$rel"
 		fi
 		msg "extracting $(basename "$rel")"
 		run unzip -q -o "$zipfile" -d "$DJGPP_DOS_CACHE"
@@ -597,29 +707,30 @@ HOST_FBC=""
 if [ "$DO_HOST_BOOTSTRAP" = "1" ]; then
 	cd "$HOST_WORKTREE"
 
-	HOST_FBC="$(detect_fbc \
-		"$(find_tree_fbc "$HOST_WORKTREE" 2>/dev/null || true)" \
-		"$(find_tree_fbc "$ROOT" 2>/dev/null || true)" \
-		|| true)"
+	HOST_FBC="$(detect_host_fbc || true)"
 
 	[ -n "$HOST_FBC" ] || die "no runnable host FreeBASIC compiler found; rerun without --skip-deps or install fbc first"
 
 	msg "emitting host bootstrap sources"
-	run make bootstrap-emit
+	run make bootstrap-emit \
+		"${HOST_MAKE_TOOL_ARGS[@]}" \
+		BOOT_FBC="$HOST_FBC" \
+		BUILD_FBC="$HOST_FBC"
 
 	msg "cleaning host tree"
-	run make clean || true
+	run make clean \
+		"${HOST_MAKE_TOOL_ARGS[@]}" \
+		|| true
 
 	msg "building host bootstrap compiler"
-	run make bootstrap-minimal
+	run make bootstrap-minimal \
+		"${HOST_MAKE_TOOL_ARGS[@]}" \
+		BUILD_FBC="$HOST_FBC"
 
 	HOST_FBC="$(find_tree_fbc "$HOST_WORKTREE" || true)"
 	[ -n "$HOST_FBC" ] || die "host bootstrap compiler missing in $HOST_WORKTREE/bin"
 else
-	HOST_FBC="$(detect_fbc \
-		"$(find_tree_fbc "$HOST_WORKTREE" 2>/dev/null || true)" \
-		"$(find_tree_fbc "$ROOT" 2>/dev/null || true)" \
-		|| true)"
+	HOST_FBC="$(detect_host_fbc || true)"
 	[ -n "$HOST_FBC" ] || die "missing host bootstrap compiler; rerun without --skip-host-bootstrap"
 fi
 
@@ -636,10 +747,15 @@ if [ "$DO_DOS_BUILD" = "1" ]; then
 	run make clean TARGET_TRIPLET="$TARGET_TRIPLET" || true
 
 	msg "emitting DOS bootstrap sources"
-	run make bootstrap-emit TARGET_TRIPLET="$TARGET_TRIPLET"
+	run make bootstrap-emit \
+		TARGET_TRIPLET="$TARGET_TRIPLET" \
+		BOOT_FBC="$HOST_FBC" \
+		BUILD_FBC="$HOST_FBC"
 
 	msg "building DOS bootstrap compiler"
-	run make bootstrap-minimal TARGET_TRIPLET="$TARGET_TRIPLET"
+	run make bootstrap-minimal \
+		TARGET_TRIPLET="$TARGET_TRIPLET" \
+		BUILD_FBC="$HOST_FBC"
 
 	msg "rebuilding DOS compiler and runtime with host compiler"
 	run make compiler runtime \
@@ -701,21 +817,35 @@ run_dosbox_test() {
 	local image_file
 	local partition_start
 	local partition_offset
+	local dosbox_status
 
 	dosbox_kind=""
 	dosbox_bin="$(command -v dosbox-x || true)"
 	if [ -n "$dosbox_bin" ]; then
 		dosbox_kind="dosbox-x"
 	else
-		dosbox_bin="$(command -v dosbox || true)"
-		if [ -z "$dosbox_bin" ]; then
-			dosbox_bin="$(command -v dosbox.exe || true)"
-		fi
+		dosbox_bin="$(command -v dosbox-staging || true)"
 		if [ -n "$dosbox_bin" ]; then
 			dosbox_kind="dosbox"
+		else
+			dosbox_bin="$(command -v dosbox-staging.exe || true)"
+			if [ -n "$dosbox_bin" ]; then
+				dosbox_kind="dosbox"
+			else
+				dosbox_bin="$(command -v dosbox || true)"
+				if [ -z "$dosbox_bin" ]; then
+					dosbox_bin="$(command -v dosbox.exe || true)"
+				fi
+				if [ -n "$dosbox_bin" ]; then
+					dosbox_kind="dosbox"
+				fi
+			fi
 		fi
 	fi
-	[ -n "$dosbox_bin" ] || return 0
+	if [ -z "$dosbox_bin" ]; then
+		msg "DOSBox not found; skipping DOSBox smoke test"
+		return 0
+	fi
 
 	msg "running DOSBox smoke test"
 
@@ -758,27 +888,29 @@ echo cwsdpmi-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD.LOG C:\FB\FBC.EXE -v C:\HELLO.BAS -x C:\HELLO.EXE
 echo fbc-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 dir C:\HELLO.* >>D:\TRACE.LOG
-if exist C:\HELLO.EXE (
-	echo hello-exe-present>>D:\TRACE.LOG
-	C:\DJGPP\BIN\REDIR.EXE -eo -o D:\RUN.LOG C:\HELLO.EXE
-	echo hello-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
-) else (
-	echo hello-exe-missing>>D:\TRACE.LOG
-)
+if exist C:\HELLO.EXE goto runhello
+echo hello-exe-missing>>D:\TRACE.LOG
+goto afterhello
+:runhello
+echo hello-exe-present>>D:\TRACE.LOG
+C:\DJGPP\BIN\REDIR.EXE -eo -o D:\RUN.LOG C:\HELLO.EXE
+echo hello-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
+:afterhello
 if exist C:\RESULT.TXT copy C:\RESULT.TXT D:\RESULT.TXT >NUL
 dir C:\RESULT.TXT >>D:\TRACE.LOG
 EOF
 
 		image_file="$DOSBOX_ROOT/smoke.img"
 		rm -f "$image_file"
-		run timeout "$DOSBOX_TIMEOUT" "$dosbox_bin" \
+		run_timeout_checked "$DOSBOX_TIMEOUT" "$dosbox_bin" \
 			-fastlaunch \
 			-nogui \
 			-nomenu \
 			-exit \
 			-set "cpu cputype=ppro_slow" \
 			-c "imgmake \"$image_file\" -t hd -size 256 -fat 16" \
-			-c "exit"
+			-c "exit" \
+			|| die "DOSBox image creation failed"
 
 		partition_start="$(sfdisk -d "$image_file" | sed -n 's/.*start= *\([0-9][0-9]*\).*/\1/p' | head -n1)"
 		[ -n "$partition_start" ] || die "could not determine DOSBox image partition start"
@@ -786,7 +918,8 @@ EOF
 
 		run env MTOOLS_SKIP_CHECK=1 mcopy -i "${image_file}@@${partition_offset}" -s "$test_root"/* ::
 
-		run timeout "$DOSBOX_TIMEOUT" "$dosbox_bin" \
+		dosbox_status=0
+		run_timeout_checked "$DOSBOX_TIMEOUT" "$dosbox_bin" \
 			-fastlaunch \
 			-nogui \
 			-nomenu \
@@ -796,7 +929,8 @@ EOF
 			-c "imgmount c \"$image_file\"" \
 			-c "d:" \
 			-c "FBTEST.BAT" \
-			-c "exit"
+			-c "exit" \
+			|| dosbox_status=$?
 	else
 		cat > "$test_root/hello.bas" <<'EOF'
 open "result.txt" for output as #1
@@ -820,19 +954,21 @@ echo cwsdpmi-errorlevel=%ERRORLEVEL%>>trace.log
 C:\FB\FBC.EXE hello.bas >>trace.log
 echo fbc-errorlevel=%ERRORLEVEL%>>trace.log
 dir hello.* >>trace.log
-if exist hello.exe (
-	echo hello-exe-present>>trace.log
-	hello.exe >>trace.log
-	echo hello-errorlevel=%ERRORLEVEL%>>trace.log
-) else (
-	echo hello-exe-missing>>trace.log
-)
+if exist hello.exe goto runhello
+echo hello-exe-missing>>trace.log
+goto afterhello
+:runhello
+echo hello-exe-present>>trace.log
+hello.exe >>trace.log
+echo hello-errorlevel=%ERRORLEVEL%>>trace.log
+:afterhello
 dir >>trace.log
 EOF
 
+		dosbox_status=0
 		case "$dosbox_kind" in
 			dosbox-x)
-				run timeout "$DOSBOX_TIMEOUT" "$dosbox_bin" \
+				run_timeout_checked "$DOSBOX_TIMEOUT" "$dosbox_bin" \
 					-fastlaunch \
 					-nogui \
 					-nomenu \
@@ -841,18 +977,24 @@ EOF
 					-c "mount c \"$mount_root\"" \
 					-c "c:" \
 					-c "FBTEST.BAT" \
-					-c "exit"
+					-c "exit" \
+					|| dosbox_status=$?
 				;;
 			*)
-				run timeout "$DOSBOX_TIMEOUT" "$dosbox_bin" \
+				run_timeout_checked "$DOSBOX_TIMEOUT" "$dosbox_bin" \
 					-set "cpu cputype=pentium_pro" \
 					-exit \
 					-c "mount c \"$mount_root\"" \
 					-c "c:" \
 					-c "FBTEST.BAT" \
-					-c "exit"
+					-c "exit" \
+					|| dosbox_status=$?
 				;;
 		esac
+	fi
+
+	if [ "${dosbox_status:-0}" -ne 0 ]; then
+		msg "DOSBox exited with status ${dosbox_status}; inspecting smoke-test outputs"
 	fi
 
 	trace_log="$test_root/trace.log"

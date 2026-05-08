@@ -143,6 +143,12 @@ static void *haiku_audio_worker(void *unused)
             continue;
         }
 
+        if (fb_sfxForegroundFeedActive())
+        {
+            haiku_sleep_ms(5);
+            continue;
+        }
+
         fb_sfxUpdate(haiku_worker_frames());
     }
 
@@ -336,7 +342,7 @@ static void haiku_driver_poll(void)
 extern "C" const FB_SFX_DRIVER fb_sfxDriverHaiku =
 {
     "Haiku",
-    0,
+    FB_SFX_DRIVER_CAP_CAPTURE | FB_SFX_DRIVER_CAP_BACKGROUND,
     haiku_driver_init,
     haiku_driver_exit,
     haiku_driver_write,

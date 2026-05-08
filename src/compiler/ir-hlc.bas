@@ -1433,6 +1433,18 @@ private sub hWriteX86F2I _
 		else
 			ptype_suffix = "l"
 		end if
+	else
+		select case( typeGetSize( rtype ) )
+		case 4
+			rtype_suffix = " dword ptr"
+		case 8
+			rtype_suffix = " qword ptr"
+		end select
+		if( ptype = FB_DATATYPE_SINGLE ) then
+			ptype_suffix = " dword ptr"
+		else
+			ptype_suffix = " qword ptr"
+		end if
 	end if
 
 	hWriteLine( "", TRUE )

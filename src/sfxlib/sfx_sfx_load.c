@@ -110,6 +110,8 @@ void fb_sfxSfxLoad(int id, const char *filename)
 
     __fb_sfx->sfx[id].data = (unsigned char *)mono;
     __fb_sfx->sfx[id].size = frames * (int)sizeof(float);
+    __fb_sfx->sfx[id].frames = frames;
+    __fb_sfx->sfx[id].sample_rate = sample_rate;
     __fb_sfx->sfx[id].loaded = 1;
 
     strncpy(
@@ -157,6 +159,8 @@ void fb_sfxSfxUnload(int id)
 
     __fb_sfx->sfx[id].data = NULL;
     __fb_sfx->sfx[id].size = 0;
+    __fb_sfx->sfx[id].frames = 0;
+    __fb_sfx->sfx[id].sample_rate = 0;
     __fb_sfx->sfx[id].loaded = 0;
 
     SFX_DEBUG("sfx_sfx_load: unloaded id=%d", id);

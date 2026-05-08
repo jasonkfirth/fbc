@@ -6795,7 +6795,10 @@ declare function gtk_get_interface_age() as guint
 declare function gtk_check_version_ alias "gtk_check_version"(byval required_major as guint, byval required_minor as guint, byval required_micro as guint) as const gchar ptr
 declare function gtk_parse_args(byval argc as long ptr, byval argv as zstring ptr ptr ptr) as gboolean
 
-#ifdef __FB_UNIX__
+#ifdef __FB_CYGWIN__
+	declare sub gtk_init_ alias "gtk_init"(byval argc as long ptr, byval argv as zstring ptr ptr ptr)
+	declare function gtk_init_check_ alias "gtk_init_check"(byval argc as long ptr, byval argv as zstring ptr ptr ptr) as gboolean
+#elseif defined(__FB_UNIX__)
 	declare sub gtk_init(byval argc as long ptr, byval argv as zstring ptr ptr ptr)
 	declare function gtk_init_check(byval argc as long ptr, byval argv as zstring ptr ptr ptr) as gboolean
 #else
@@ -6806,7 +6809,7 @@ declare function gtk_parse_args(byval argc as long ptr, byval argv as zstring pt
 declare function gtk_init_with_args(byval argc as gint ptr, byval argv as gchar ptr ptr ptr, byval parameter_string as const gchar ptr, byval entries as const GOptionEntry ptr, byval translation_domain as const gchar ptr, byval error as GError ptr ptr) as gboolean
 declare function gtk_get_option_group(byval open_default_display as gboolean) as GOptionGroup ptr
 
-#ifdef __FB_WIN32__
+#if defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
 	declare sub gtk_init_abi_check(byval argc as long ptr, byval argv as zstring ptr ptr ptr, byval num_checks as long, byval sizeof_GtkWindow as uinteger, byval sizeof_GtkBox as uinteger)
 	declare function gtk_init_check_abi_check(byval argc as long ptr, byval argv as zstring ptr ptr ptr, byval num_checks as long, byval sizeof_GtkWindow as uinteger, byval sizeof_GtkBox as uinteger) as gboolean
 	#define gtk_init(argc, argv) gtk_init_abi_check(argc, argv, 2, sizeof(GtkWindow), sizeof(GtkBox))

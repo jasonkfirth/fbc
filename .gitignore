@@ -7,6 +7,17 @@
 *.tar
 *.tar.xz
 *.zip
+
+# Legacy Windows import libraries and runtime DLLs intentionally bundled for
+# examples that still depend on libraries not provided by current MSYS2.
+!/contrib/winlibs-legacy/
+!/contrib/winlibs-legacy/bin/
+!/contrib/winlibs-legacy/bin/**/
+!/contrib/winlibs-legacy/bin/**/*.dll
+!/contrib/winlibs-legacy/lib/
+!/contrib/winlibs-legacy/lib/**/
+!/contrib/winlibs-legacy/lib/**/*.a
+
 /fbc
 /fbc-new
 /bin/*

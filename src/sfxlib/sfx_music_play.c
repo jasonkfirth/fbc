@@ -58,6 +58,21 @@ static FB_SFXVOICE *fb_sfxCurrentMusicVoice(void)
     return NULL;
 }
 
+static float fb_sfxMusicSampleStep(int id)
+{
+    FB_SFX_ASSET *asset;
+
+    if (!__fb_sfx || id < 0 || id >= FB_SFX_MAX_MUSIC)
+        return 1.0f;
+
+    asset = &__fb_sfx->music[id];
+
+    if (asset->sample_rate <= 0 || __fb_sfx->samplerate <= 0)
+        return 1.0f;
+
+    return (float)asset->sample_rate / (float)__fb_sfx->samplerate;
+}
+
 static void fb_sfxStartMusicVoice(int id, int loop)
 {
     FB_SFXVOICE *voice;
@@ -75,6 +90,9 @@ static void fb_sfxStartMusicVoice(int id, int loop)
     voice->data = (const float *)__fb_sfx->music[id].data;
     voice->length = __fb_sfx->music[id].size / (int)sizeof(float);
     voice->position = 0;
+    voice->pos = 0;
+    voice->sample_pos = 0.0f;
+    voice->sample_step = fb_sfxMusicSampleStep(id);
     voice->loop = loop ? 1 : 0;
     voice->env_level = 1.0f;
     voice->env_state = FB_SFX_ENV_SUSTAIN;
@@ -174,7 +192,11 @@ void fb_sfxMusicRestart(void)
         __fb_sfx->music_pos = 0;
 
         if (voice)
+        {
             voice->position = 0;
+            voice->pos = 0;
+            voice->sample_pos = 0.0f;
+        }
     }
 
     SFX_DEBUG(

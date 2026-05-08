@@ -1,6 +1,7 @@
 /* libfb initialization for xbox */
 
 #include "../fb.h"
+#include "../fb_private_thread.h"
 
 #ifdef ENABLE_MT
 static CRITICAL_SECTION __fb_global_mutex;

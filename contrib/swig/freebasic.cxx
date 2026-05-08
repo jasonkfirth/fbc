@@ -335,9 +335,6 @@ int FREEBASIC :: emit_header( Node *n, String *name, bool ismodule )
 	Printf( ctx.outf, "'' %s -- ", name );
 	Printf( ctx.outf, "header translated with help of SWIG FB wrapper\n" );
 	Printf( ctx.outf, "''\n" );
-	Printf( ctx.outf, "'' NOTICE: This file is part of the FreeBASIC Compiler package and can't\n" );
-	Printf( ctx.outf, "''         be included in other distributions without authorization.\n" );
-	Printf( ctx.outf, "''\n" );
 	Printf( ctx.outf, "''\n" );
   	
   	Printf( defname, "__%s_bi__", name );

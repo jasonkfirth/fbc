@@ -100,6 +100,29 @@ float fb_sfxVolumeGet(void)
 
 
 /* ------------------------------------------------------------------------- */
+/* Commodore-style VOL command                                               */
+/* ------------------------------------------------------------------------- */
+
+/*
+    fb_sfxVolCmd()
+
+    The Commodore 128 and Plus/4 BASIC families use VOL 0..15 to set the
+    chip-wide sound level before SOUND or PLAY output can be heard.
+*/
+
+void fb_sfxVolCmd(int level)
+{
+    if (level < 0)
+        level = 0;
+
+    if (level > 15)
+        level = 15;
+
+    fb_sfxVolume((float)level / 15.0f);
+}
+
+
+/* ------------------------------------------------------------------------- */
 /* Channel volume                                                            */
 /* ------------------------------------------------------------------------- */
 

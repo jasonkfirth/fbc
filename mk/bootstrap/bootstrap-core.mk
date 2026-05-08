@@ -218,9 +218,17 @@ BOOTSTRAP_WARN_SUPPRESS := \
  -Wno-unused-variable \
  -Wno-unused-function
 
+BOOTSTRAP_ASM_SYNTAX_CFLAGS :=
+ifneq ($(filter x86 x86_64,$(TARGET_ARCH)),)
+ifneq ($(TARGET_OS),darwin)
+# Non-Darwin x86 bootstrap C is emitted with Intel-style inline asm.
+BOOTSTRAP_ASM_SYNTAX_CFLAGS := -masm=intel
+endif
+endif
+
 # IMPORTANT: build bootstrap objects with PIC (required for PIE on OpenBSD)
 %.o: %.c
-	$(RUN_CC) $(CPPFLAGS) $(BOOTSTRAP_CFLAGS) $(BOOTSTRAP_WARN_SUPPRESS) $(PIC_CFLAGS) -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(BOOTSTRAP_CFLAGS) $(BOOTSTRAP_WARN_SUPPRESS) $(BOOTSTRAP_ASM_SYNTAX_CFLAGS) $(PIC_CFLAGS) -c $< -o $@
 
 %.o: %.asm
 	$(AS) $(ASFLAGS) --strip-local-absolute $< -o $@

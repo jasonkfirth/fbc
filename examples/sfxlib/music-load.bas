@@ -13,5 +13,8 @@ if( music_id < 0 ) then
 	print "MUSIC LOAD failed."
 else
 	print "Loaded music id:"; music_id
-	print "This id can be passed to MUSIC PLAY or MUSIC LOOP."
+	print "Playing the loaded music id briefly."
+	MUSIC PLAY music_id
+	SfxExampleWait( 1800 )
+	MUSIC STOP music_id
 end if

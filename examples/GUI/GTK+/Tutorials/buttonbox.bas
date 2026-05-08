@@ -7,9 +7,12 @@
 '#DEFINE __USE_GTK3__
 #include once "gtk/gtk.bi"
 
+Declare Sub gtk_button_box_set_layout_widget Alias "gtk_button_box_set_layout" _
+    (Byval widget As GtkWidget Ptr, Byval layout_style As GtkButtonBoxStyle)
+
 ' Create a Button Box with the specified parameters
 Function create_bbox( Byval horizontal As gint, Byval title As Zstring Ptr, Byval spacing As gint, _
-        Byval child_w As gint, Byval child_h As gint, Byval layout As gint) As GtkWidget Ptr
+        Byval child_w As gint, Byval child_h As gint, Byval layout As GtkButtonBoxStyle) As GtkWidget Ptr
 
     Dim As GtkWidget Ptr frame
     Dim As GtkWidget Ptr bbox
@@ -27,7 +30,7 @@ Function create_bbox( Byval horizontal As gint, Byval title As Zstring Ptr, Byva
     gtk_container_add (GTK_CONTAINER (frame), bbox)
 
     ' Set the appearance of the Button Box
-    gtk_button_box_set_layout (GTK_BUTTON_BOX (bbox), layout)
+    gtk_button_box_set_layout_widget (bbox, layout)
     gtk_box_set_spacing (GTK_BOX (bbox), spacing)
 
     g_object_set_data(G_Object (bbox), "child-min-width", @child_w)

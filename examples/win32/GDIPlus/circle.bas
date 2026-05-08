@@ -27,10 +27,10 @@ private function doPaint _
 	'' create a brush
 	static as GpPoint pntTb(0 to 3) = _
 	{ _
-		GpPoint(0, 0), _
-		GpPoint(100, 0), _
-		GpPoint(100, 100), _
-		GpPoint(0, 100) _
+		type<GpPoint>(0, 0), _
+		type<GpPoint>(100, 0), _
+		type<GpPoint>(100, 100), _
+		type<GpPoint>(0, 100) _
 	}
 
 	GdipCreatePathGradientI( @pntTb(0), 4, WrapModeTile, @grad )

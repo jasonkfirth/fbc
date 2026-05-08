@@ -6,6 +6,27 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgNaked
 '' --------
 
+#if defined(__FB_64BIT__)
+
+'' Naked function for the Windows x64 calling convention.
+'' The first two integer parameters arrive in ecx and edx, and the result
+'' returns in eax.
+Function subtract_cp Naked cdecl _
+	( _
+		ByVal a As Long, _
+		ByVal b As Long _
+	) As Long
+
+	Asm
+		mov eax, ecx
+		sub eax, edx
+		ret
+	End Asm
+
+End Function
+
+#else
+
 '' Naked cdecl function (for fbc 32-bit)
 '' plus ecx register preserved in asm block by creating user stack
 Function subtract_cp Naked cdecl _      '' parameters pushed onto call stack in reverse order of declaration
@@ -30,5 +51,7 @@ Function subtract_cp Naked cdecl _      '' parameters pushed onto call stack in 
 	End Asm
    
 End Function
+
+#endif
 
 Print subtract_cp( 5, 1 ) '' 5 - 1

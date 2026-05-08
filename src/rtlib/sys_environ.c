@@ -2,6 +2,60 @@
 
 #include "fb.h"
 
+#ifndef HOST_MINGW
+static int hSetEnviron( const char *text )
+{
+#ifdef HOST_DOS
+	char *copy;
+	ssize_t len;
+	int res;
+
+	len = strlen( text ) + 1;
+	copy = (char *)malloc( len );
+	if( copy == NULL )
+		return -1;
+
+	memcpy( copy, text, len );
+
+	/*
+	 * DJGPP has putenv(), but POSIX putenv() keeps this buffer instead of
+	 * copying it.  Leave it allocated on success so getenv() can keep using
+	 * the string.
+	 */
+	res = putenv( copy );
+	if( res != 0 )
+		free( copy );
+
+	return res;
+#else
+	const char *equals;
+	char *name;
+	ssize_t name_len;
+	int res;
+
+	equals = strchr( text, '=' );
+	if( equals == NULL )
+		return unsetenv( text );
+
+	name_len = equals - text;
+	if( name_len <= 0 )
+		return -1;
+
+	name = (char *)malloc( name_len + 1 );
+	if( name == NULL )
+		return -1;
+
+	memcpy( name, text, name_len );
+	name[name_len] = '\0';
+
+	res = setenv( name, equals + 1, 1 );
+	free( name );
+
+	return res;
+#endif
+}
+#endif
+
 FBCALL FBSTRING *fb_GetEnviron ( FBSTRING *varname )
 {
 	FBSTRING 	*dst;
@@ -46,7 +100,7 @@ FBCALL int fb_SetEnviron ( FBSTRING *str )
 #ifdef HOST_MINGW
 		res = _putenv( str->data );
 #else
-		res = putenv( str->data );
+		res = hSetEnviron( str->data );
 #endif
 	}
 

@@ -21,11 +21,11 @@ sub test_success2 cdecl()
 end sub
 
 sub test_success3 cdecl()
-   CU_ASSERT_STRING_EQUAL("string #1", "string #1")
+   CU_ASSERT_STRING_EQUAL(@"string #1", @"string #1")
 end sub
 
 sub test_success4 cdecl()
-   CU_ASSERT_STRING_NOT_EQUAL("string #1", "string #2")
+   CU_ASSERT_STRING_NOT_EQUAL(@"string #1", @"string #2")
 end sub
 
 sub test_failure1 cdecl()
@@ -37,11 +37,11 @@ sub test_failure2 cdecl()
 end sub
 
 sub test_failure3 cdecl()
-   CU_ASSERT_STRING_NOT_EQUAL("string #1", "string #1")
+   CU_ASSERT_STRING_NOT_EQUAL(@"string #1", @"string #1")
 end sub
 
 sub test_failure4 cdecl()
-   CU_ASSERT_STRING_EQUAL("string #1", "string #2")
+   CU_ASSERT_STRING_EQUAL(@"string #1", @"string #2")
 end sub
 
 '' main

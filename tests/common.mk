@@ -1,76 +1,122 @@
 # common.mk
 # This file is part of the FreeBASIC test suite
 #
-# Guess HOST and TARGET_OS if not already set;
-# it would far cleaner and robust to reuse the detection code in root makefile,
-# but we our requirements here are much simpler.
-# HOST takes possible values dos|unix|win32, TARGET_OS may be dos|unix|win32|js.
-# OS has possible values DOS and Windows_NT.
-# 
+# Shared test-suite platform and tool defaults.
+#
+# HOST takes possible values dos|unix|win32.
+# TARGET_OS takes possible values dos|unix|win32|js.
+#
+# The tests can be run directly from tests/ or through the root build.  Reuse
+# the root platform/toolchain logic when it is available so BSD hosts, MinGW
+# shells, and cross-target runs see the same compiler tool names as the main
+# build.
+#
 
-HOST :=
-ifeq ($(OS),DOS)
-	HOST := dos
-else
-	ifeq ($(OS),Windows_NT)
-		HOST := win32
-	else
-		ifdef WINDIR
-			HOST := win32
-		else
-			ifdef windir
-				HOST := win32
-			else
-				ifdef HOME
-					HOST := unix
-				endif
-			endif
-		endif
-	endif
+testsdir := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+rootdir ?= $(abspath $(testsdir)/..)
+mkpath ?= $(rootdir)/mk
+
+TESTS_INPUT_TARGET := $(TARGET)
+PRESERVE_FBC := 1
+
+ifneq ($(wildcard $(mkpath)/platform.mk),)
+include $(mkpath)/platform.mk
+include $(mkpath)/cpu.mk
+include $(mkpath)/platform-features.mk
+include $(mkpath)/compiler-config.mk
 endif
 
-ifndef TARGET_OS
-	triplet := $(subst -, ,$(TARGET))
-	ifdef TARGET
-		ifneq ($(filter djgpp%,$(triplet)),)
-			TARGET_OS := dos
-		else ifneq ($(filter msdos%,$(triplet)),)
-			TARGET_OS := dos
-		else ifneq ($(filter mingw%,$(triplet)),)
-			TARGET_OS := win32
-		else ifneq ($(filter emscripten%,$(triplet)),)
-			TARGET_OS := js
-		else ifneq ($(filter js%,$(triplet)),)
-			TARGET_OS := js
-		else
-			TARGET_OS := unix
-		endif
-	else
-		ifndef HOST
-			CHECKHOST_MSG := $(error error: TARGET_OS not defined and HOST couldn't be guessed)
-		else
-			CHECKHOST_MSG :=
-		endif
-		TARGET_OS := $(HOST)
-	endif
+ifneq ($(TESTS_INPUT_TARGET),)
+TARGET := $(TESTS_INPUT_TARGET)
+endif
+
+.DEFAULT_GOAL := all
+
+TESTS_HOST_OS := $(HOST_OS)
+TESTS_TARGET_OS := $(TARGET_OS)
+
+HOST :=
+ifeq ($(TESTS_HOST_OS),dos)
+	HOST := dos
+else ifneq ($(filter win32 cygwin,$(TESTS_HOST_OS)),)
+	HOST := win32
+else ifneq ($(TESTS_HOST_OS),)
+	HOST := unix
+else ifeq ($(OS),DOS)
+	HOST := dos
+else ifeq ($(OS),Windows_NT)
+	HOST := win32
+else ifdef WINDIR
+	HOST := win32
+else ifdef windir
+	HOST := win32
+else ifdef HOME
+	HOST := unix
+endif
+
+ifndef HOST
+CHECKHOST_MSG := $(error error: HOST couldn't be guessed)
+else
+CHECKHOST_MSG :=
+endif
+
+ifeq ($(TESTS_TARGET_OS),dos)
+	TARGET_OS := dos
+else ifeq ($(TESTS_TARGET_OS),js)
+	TARGET_OS := js
+else ifneq ($(filter win32 cygwin xbox,$(TESTS_TARGET_OS)),)
+	TARGET_OS := win32
+else ifneq ($(TESTS_TARGET_OS),)
+	TARGET_OS := unix
+else
+	TARGET_OS := $(HOST)
 endif
 
 # set default command names
-# 
+#
 
 ifeq ($(HOST),unix)
-    EXEEXT :=
+	EXEEXT :=
 else
-    EXEEXT := .exe
+	EXEEXT := .exe
 endif
 ifeq ($(TARGET_OS),unix)
-    TARGET_EXEEXT :=
+	TARGET_EXEEXT :=
 else ifeq ($(TARGET_OS),js)
-    ifeq ($(NODEJS),)
-       TARGET_EXEEXT := .html
-    else
-       TARGET_EXEEXT := .js
-    endif
+	ifeq ($(NODEJS),)
+		TARGET_EXEEXT := .html
+	else
+		TARGET_EXEEXT := .js
+	endif
 else
-    TARGET_EXEEXT := .exe
+	TARGET_EXEEXT := .exe
 endif
+
+TESTS_TOOLCHAIN_BINDIR :=
+ifneq ($(findstring /,$(CC))$(findstring \,$(CC)),)
+TESTS_TOOLCHAIN_BINDIR := $(patsubst %/,%,$(dir $(CC)))
+endif
+
+ifeq ($(HOST),dos)
+TESTS_FBC_ENV :=
+else
+TESTS_FBC_ENV := env \
+	PATH='$(if $(strip $(TESTS_TOOLCHAIN_BINDIR)),$(TESTS_TOOLCHAIN_BINDIR):)'"$$PATH" \
+	AS='$(AS)' \
+	AR='$(AR)' \
+	LD='$(LD)' \
+	GCC='$(CC)' \
+	CLANG='$(CLANG)' \
+	LLC='$(LLC)' \
+	DLLTOOL='$(DLLTOOL)' \
+	WINDRES='$(WINDRES)' \
+	GORC='$(GORC)' \
+	EMAS='$(EMAS)' \
+	EMAR='$(EMAR)' \
+	EMLD='$(EMLD)' \
+	EMCC='$(EMCC)' \
+	CXBE='$(CXBE)' \
+	DXEGEN='$(DXEGEN)'
+endif
+
+TESTS_DEFAULT_FBC := $(TESTS_FBC_ENV) fbc$(EXEEXT)

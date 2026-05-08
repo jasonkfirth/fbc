@@ -305,7 +305,26 @@ type pcre32_callout_block
 	mark as const ulong ptr
 end type
 
-#if defined(__FB_WIN32__) and (not defined(PCRE_STATIC))
+#if defined(__FB_WIN32__) and defined(__FB_64BIT__) and (not defined(PCRE_STATIC))
+	extern pcre_malloc alias "__imp_pcre_malloc" as function(byval as uinteger) as any ptr
+	extern pcre_free alias "__imp_pcre_free" as sub(byval as any ptr)
+	extern pcre_stack_malloc alias "__imp_pcre_stack_malloc" as function(byval as uinteger) as any ptr
+	extern pcre_stack_free alias "__imp_pcre_stack_free" as sub(byval as any ptr)
+	extern pcre_callout alias "__imp_pcre_callout" as function(byval as pcre_callout_block ptr) as long
+	extern pcre_stack_guard alias "__imp_pcre_stack_guard" as function() as long
+	extern pcre16_malloc alias "__imp_pcre16_malloc" as function(byval as uinteger) as any ptr
+	extern pcre16_free alias "__imp_pcre16_free" as sub(byval as any ptr)
+	extern pcre16_stack_malloc alias "__imp_pcre16_stack_malloc" as function(byval as uinteger) as any ptr
+	extern pcre16_stack_free alias "__imp_pcre16_stack_free" as sub(byval as any ptr)
+	extern pcre16_callout alias "__imp_pcre16_callout" as function(byval as pcre16_callout_block ptr) as long
+	extern pcre16_stack_guard alias "__imp_pcre16_stack_guard" as function() as long
+	extern pcre32_malloc alias "__imp_pcre32_malloc" as function(byval as uinteger) as any ptr
+	extern pcre32_free alias "__imp_pcre32_free" as sub(byval as any ptr)
+	extern pcre32_stack_malloc alias "__imp_pcre32_stack_malloc" as function(byval as uinteger) as any ptr
+	extern pcre32_stack_free alias "__imp_pcre32_stack_free" as sub(byval as any ptr)
+	extern pcre32_callout alias "__imp_pcre32_callout" as function(byval as pcre32_callout_block ptr) as long
+	extern pcre32_stack_guard alias "__imp_pcre32_stack_guard" as function() as long
+#elseif defined(__FB_WIN32__) and (not defined(PCRE_STATIC))
 	extern import pcre_malloc as function(byval as uinteger) as any ptr
 	extern import pcre_free as sub(byval as any ptr)
 	extern import pcre_stack_malloc as function(byval as uinteger) as any ptr

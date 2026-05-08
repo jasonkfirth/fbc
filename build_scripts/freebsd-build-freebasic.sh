@@ -12,7 +12,10 @@ SEARCH_DIR="$START_DIR"
 ROOT=""
 
 while :; do
-    if [ -d "$SEARCH_DIR/mk" ] && { [ -f "$SEARCH_DIR/makefile" ] || [ -f "$SEARCH_DIR/Makefile" ]; }; then
+    if [ -d "$SEARCH_DIR/mk" ] &&
+       { [ -f "$SEARCH_DIR/GNUmakefile" ] ||
+         [ -f "$SEARCH_DIR/makefile" ] ||
+         [ -f "$SEARCH_DIR/Makefile" ]; }; then
         ROOT="$SEARCH_DIR"
         break
     fi
@@ -235,4 +238,3 @@ echo "==> output: $OUTPUT"
 [ "$OUTPUT" = "FreeBASIC test OK" ] || die "bad output"
 
 echo "==> SUCCESS"
-

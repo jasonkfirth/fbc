@@ -209,9 +209,9 @@ time, is substituted with '.bas'.
 Files
 -----
 
-Makefile
-   the main makefile for building tests and reporting results.  This 
-   makefile makes use of other makefile (sub-makefiles) to get the
+GNUmakefile
+   the main GNU makefile for building tests and reporting results.  This
+   makefile makes use of other makefiles (sub-makefiles) to get the
    job done.
 
 dirlist.mk

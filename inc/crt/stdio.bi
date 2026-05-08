@@ -21,7 +21,7 @@
 #define SEEK_END 2
 #endif
 
-#if defined(__FB_WIN32__)
+#if defined(__FB_WIN32__) or defined(__FB_XBOX__)
 #include once "crt/win32/stdio.bi"
 #elseif defined(__FB_DOS__)
 #include once "crt/dos/stdio.bi"
@@ -29,6 +29,8 @@
 #include once "crt/linux/stdio.bi"
 #elseif defined(__FB_ANDROID__)
 #include once "crt/android/stdio.bi"
+#elseif defined(__FB_CYGWIN__)
+#include once "crt/cygwin/stdio.bi"
 #elseif defined(__FB_FREEBSD__)
 #include once "crt/freebsd/stdio.bi"
 #elseif defined(__FB_DARWIN__)

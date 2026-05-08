@@ -52,11 +52,7 @@
 ''     procedure BZ2_bzread => BZ2_bzread_
 ''     procedure BZ2_bzwrite => BZ2_bzwrite_
 
-#ifdef __FB_WIN32__
-	extern "Windows"
-#else
-	extern "C"
-#endif
+extern "C"
 
 #define _BZLIB_H
 const BZ_RUN = 0

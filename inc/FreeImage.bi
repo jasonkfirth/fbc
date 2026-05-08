@@ -46,7 +46,7 @@
 '' The following symbols have been renamed:
 ''     constant TRUE => CTRUE
 
-#ifdef __FB_WIN32__
+#if defined(__FB_WIN32__) and (not defined(FREEIMAGE_STATICLINK))
 	extern "Windows"
 #else
 	extern "C"

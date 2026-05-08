@@ -84,6 +84,12 @@ static void *fb_sfxLinuxAudioWorker(void *unused)
             continue;
         }
 
+        if (fb_sfxForegroundFeedActive())
+        {
+            fb_sfxLinuxSleepMs(5);
+            continue;
+        }
+
         fb_sfxUpdate(fb_sfxLinuxWorkerFrames());
     }
 

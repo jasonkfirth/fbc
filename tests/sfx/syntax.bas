@@ -5,14 +5,29 @@ dim as single samples(0 to 15)
 dim as long result
 dim as single level
 
+beep 0.01, 0.0
 sound 440, 0.01
+sound 440, 18
+sound 440, 18, 127
 sound 1, 440, 0.01, 0.5
+sound 1, 4096, 60
+sound 1, 49152, 240, 1, 0, 100, 1, 0
+sound 1, -15, 53, 20
+sound 0, 100, 10, 8
+sound 1, 121, 10, 8
+sound 1000, 110, 0
+sound 500, 110, 0, 131, 0, 196, 3
 tone 1, 440, 0.01
 noise 1, 0.01, 0.5
+noise 1, 1200, 0.01, 0.5
 note "C", 4, 0.01
 note 1, "D#", 5, 0.01
 rest 0.01
 rest 1, 0.01
+play "CDE"
+play 1, "CDE"
+play "CDE", "EFG"
+play "CDE", "EFG", "GAB"
 
 tempo 120
 result = tempo()
@@ -22,6 +37,7 @@ octave 4
 result = octave()
 voice 1
 result = voice()
+vol 8
 volume 0.5
 level = volume()
 volume 1, 0.5
@@ -53,8 +69,10 @@ result = music position()
 sfx load 1, filename
 sfx play 1
 sfx play 1, 2
+sfx play 1, 2, 1.5
 sfx loop 1
 sfx loop 1, 2
+sfx loop 1, 2, 0.5
 sfx status
 sfx status()
 sfx status 1

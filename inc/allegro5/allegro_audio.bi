@@ -27,10 +27,10 @@
 
 #pragma once
 
-#ifdef __FB_UNIX__
-	#inclib "allegro_audio"
-#elseif defined(__FB_WIN32__) and defined(ALLEGRO_STATICLINK)
+#if defined(__FB_WIN32__) and defined(ALLEGRO_STATICLINK)
 	#inclib "allegro_audio-5.0.10-static-md"
+#elseif defined(__FB_UNIX__) or defined(__FB_WIN32__)
+	#inclib "allegro_audio"
 #else
 	#inclib "allegro_audio-5.0.10-md"
 #endif

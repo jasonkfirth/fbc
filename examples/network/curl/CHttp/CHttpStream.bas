@@ -71,16 +71,16 @@ private function recv_cb cdecl _
 		byval userdata as any ptr _
 	) as integer
 
-	dim as CStream ptr stream = userdata
+	dim as CStream ptr memstream = userdata
 	dim as integer bytes = size * nitems
 	
-	if( stream->pos + bytes >= stream->size ) then
-		stream->size += iif( bytes < CSTREAM_MINALLOC, CSTREAM_MINALLOC, bytes )
-		stream->buffer = reallocate( stream->buffer, stream->size + 1 )
+	if( memstream->pos + bytes >= memstream->size ) then
+		memstream->size += iif( bytes < CSTREAM_MINALLOC, CSTREAM_MINALLOC, bytes )
+		memstream->buffer = reallocate( memstream->buffer, memstream->size + 1 )
 	end if
 	
-	memcpy( stream->buffer + stream->pos, buffer, bytes )
-	stream->pos += bytes
+	memcpy( memstream->buffer + memstream->pos, buffer, bytes )
+	memstream->pos += bytes
 	
 	function = bytes
 
@@ -177,18 +177,18 @@ private function send_cb cdecl _
 		byval userdata as any ptr _
 	) as integer
 
-	dim as CStream ptr stream = userdata
+	dim as CStream ptr memstream = userdata
 	dim as integer bytes = size * nitems
 	
-	bytes = iif( bytes < stream->size, bytes, stream->size )
+	bytes = iif( bytes < memstream->size, bytes, memstream->size )
 	
 	if( bytes = 0 ) then
 		return 0
 	end if
 
-	memcpy( buffer, stream->buffer + stream->pos, bytes )
-	stream->pos += bytes
-	stream->size -= bytes
+	memcpy( buffer, memstream->buffer + memstream->pos, bytes )
+	memstream->pos += bytes
+	memstream->size -= bytes
 	
 	function = bytes
 

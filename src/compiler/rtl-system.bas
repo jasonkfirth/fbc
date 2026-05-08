@@ -784,7 +784,9 @@ private function hThreadCall_cb _
 
 	if( libsadded = FALSE ) then
 		libsAdded = TRUE
-		fbAddLib( "ffi" )
+		if( env.clopt.target <> FB_COMPTARGET_XBOX ) then
+			fbAddLib( "ffi" )
+		end if
 	end if
 
 	return hMultithread_cb( sym )
@@ -810,6 +812,5 @@ function rtlAtExit _
 	function = proc
 
 end function
-
 
 

@@ -9,11 +9,7 @@
 #ifndef __mysql_bi__
 #define __mysql_bi__
 
-#ifdef __FB_WIN32__
-# inclib "mySQL"
-#else
-# inclib "mysqlclient"
-#endif
+#inclib "mysqlclient"
 
 type my_bool as byte
 type gptr as byte ptr

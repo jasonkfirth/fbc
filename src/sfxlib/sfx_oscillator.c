@@ -58,6 +58,8 @@ void fb_sfxOscillatorReset(FB_SFXVOICE *voice)
         return;
 
     voice->phase = 0.0f;
+    voice->noise_value = 0.0f;
+    voice->noise_ready = 0;
 }
 
 
@@ -177,15 +179,50 @@ static float fb_sfxOscillatorSaw(FB_SFXVOICE *voice)
 /* Noise oscillator                                                          */
 /* ------------------------------------------------------------------------- */
 
+static float fb_sfxOscillatorRandomNoise(void)
+{
+    return ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
+}
+
 static float fb_sfxOscillatorNoise(FB_SFXVOICE *voice)
 {
-    float sample;
+    float step;
 
-    (void)voice;
+    if (!voice)
+        return 0.0f;
 
-    sample = ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
+    /*
+        A zero frequency keeps the original white-noise behavior:
+        generate a new random value for every mixed sample.
 
-    return sample;
+        A positive frequency acts as a sample-and-hold rate.  That is
+        the retro "pitched noise" behavior used for drums, crashes,
+        rumbles, and explosions.
+    */
+
+    if (voice->frequency <= 0)
+        return fb_sfxOscillatorRandomNoise();
+
+    if (!__fb_sfx || __fb_sfx->samplerate <= 0)
+        return fb_sfxOscillatorRandomNoise();
+
+    if (!voice->noise_ready)
+    {
+        voice->noise_value = fb_sfxOscillatorRandomNoise();
+        voice->noise_ready = 1;
+    }
+
+    step = fb_sfxOscillatorStep(voice);
+
+    voice->phase += step;
+
+    while (voice->phase >= 1.0f)
+    {
+        voice->phase -= 1.0f;
+        voice->noise_value = fb_sfxOscillatorRandomNoise();
+    }
+
+    return voice->noise_value;
 }
 
 

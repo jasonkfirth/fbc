@@ -25,7 +25,7 @@ doc/fbchkdoc/getindex.bas
 doc/fbchkdoc/getpage.bas
 doc/fbchkdoc/gpl.txt
 doc/fbchkdoc/insert.bas
-doc/fbchkdoc/makefile
+doc/fbchkdoc/GNUmakefile
 doc/fbchkdoc/mkerrlst.bas
 doc/fbchkdoc/mkimglst.bas
 doc/fbchkdoc/mkprntoc.bas
@@ -48,7 +48,7 @@ doc/fbchkdoc/spellit.bas
 doc/fbdoc/changelog.txt
 doc/fbdoc/fbdoc.bas
 doc/fbdoc/gpl.txt
-doc/fbdoc/makefile
+doc/fbdoc/GNUmakefile
 doc/fbdoc/readme.txt
 doc/fbhelp/changelog.txt
 doc/fbhelp/common.bas
@@ -88,7 +88,7 @@ doc/fbhelp/fbhelp_screen_win32.bas
 doc/fbhelp/fbhelp_textbuffer.bas
 doc/fbhelp/fbhelp_textbuffer.bi
 doc/fbhelp/gpl.txt
-doc/fbhelp/makefile
+doc/fbhelp/GNUmakefile
 doc/fbhelp/version.mk
 doc/fdl-1.2.txt
 doc/gpl.txt
@@ -164,14 +164,14 @@ doc/libfbdoc/hash.bas
 doc/libfbdoc/hash.bi
 doc/libfbdoc/list.bas
 doc/libfbdoc/list.bi
-doc/libfbdoc/makefile
+doc/libfbdoc/GNUmakefile
 doc/libfbdoc/printlog.bas
 doc/libfbdoc/printlog.bi
 doc/libfbdoc/todo.txt
 doc/libffi-license.txt
 doc/makefbhelp/makefbhelp.bas
-doc/makefbhelp/makefile
-doc/makefile
+doc/makefbhelp/GNUmakefile
+doc/GNUmakefile
 doc/manual/.gitignore
 doc/manual/cache.dev/.gitignore
 doc/manual/cache.web/.gitignore
@@ -1356,7 +1356,7 @@ doc/manual/html/images/sample.png
 doc/manual/html/images/trans.png
 doc/manual/html/images/window.png
 doc/manual/html/style.css
-doc/manual/makefile
+doc/manual/GNUmakefile
 doc/manual/readme.txt
 doc/manual/templates/default/code/chm_def.tpl.html
 doc/manual/templates/default/code/chm_doctoc.tpl.html
@@ -2964,7 +2964,7 @@ examples/win32/COM/DropTarget/CDropTarget.bi
 examples/win32/COM/DropTarget/test.bas
 examples/win32/COM/MoviePlayer/movctrl/CMovie.bas
 examples/win32/COM/MoviePlayer/movctrl/CMovie.bi
-examples/win32/COM/MoviePlayer/movctrl/Makefile
+examples/win32/COM/MoviePlayer/movctrl/GNUmakefile
 examples/win32/COM/MoviePlayer/movctrl/movctrl.bas
 examples/win32/COM/MoviePlayer/movctrl/movctrl.bi
 examples/win32/COM/MoviePlayer/test.bas
@@ -2980,7 +2980,7 @@ examples/win32/COM/WebBrowser/webctrl/CInPlaceFrame.bi
 examples/win32/COM/WebBrowser/webctrl/CInPlaceSite.bas
 examples/win32/COM/WebBrowser/webctrl/CInPlaceSite.bi
 examples/win32/COM/WebBrowser/webctrl/Common.bi
-examples/win32/COM/WebBrowser/webctrl/Makefile
+examples/win32/COM/WebBrowser/webctrl/GNUmakefile
 examples/win32/COM/WebBrowser/webctrl/webctrl.bas
 examples/win32/COM/WebBrowser/webctrl/webctrl.bi
 examples/win32/GDIPlus/circle.bas
@@ -2993,7 +2993,7 @@ examples/win32/ddrawtest.bas
 examples/win32/desktop_shortcut.bas
 examples/win32/lineprt.bas
 examples/win32/printer_select.bas
-examples/win32/variants/libvariant/Makefile
+examples/win32/variants/libvariant/GNUmakefile
 examples/win32/variants/libvariant/intern.bi
 examples/win32/variants/libvariant/variant-add-inv.bas
 examples/win32/variants/libvariant/variant-add-self.bas

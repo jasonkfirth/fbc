@@ -52,22 +52,23 @@
 
 
 /* ------------------------------------------------------------------------- */
-/* NOISE channel, duration, volume                                           */
+/* NOISE channel, frequency, duration, volume                                */
 /* ------------------------------------------------------------------------- */
 
 /*
-    fb_sfxNoise()
+    fb_sfxNoisePitch()
 
     Generate a noise burst on the specified channel.
 
     Parameters:
 
         channel   channel index
+        frequency noise update rate in Hz, or 0 for white noise
         duration  noise duration in seconds
         volume    output amplitude (0.0 – 1.0)
 */
 
-void fb_sfxNoise(int channel, float duration, float volume)
+void fb_sfxNoisePitch(int channel, int frequency, float duration, float volume)
 {
     FB_SFXVOICE *voice;
 
@@ -79,6 +80,9 @@ void fb_sfxNoise(int channel, float duration, float volume)
 
     if (channel < 0 || channel >= FB_SFX_MAX_CHANNELS)
         channel = 0;
+
+    if (frequency < 0)
+        frequency = 0;
 
     if (volume < 0.0f)
         volume = 0.0f;
@@ -100,11 +104,12 @@ void fb_sfxNoise(int channel, float duration, float volume)
     fb_sfxVoiceSetWaveform(voice, FB_SFX_WAVE_NOISE);
 
     /*
-        Noise oscillators do not use frequency in the
-        traditional sense. The field is left unused.
+        The frequency field is a sample-and-hold update rate for
+        pitched noise.  A value of zero keeps the original white
+        noise behavior.
     */
 
-    voice->frequency = 0;
+    voice->frequency = frequency;
 
     /* compute duration in samples */
 
@@ -121,11 +126,29 @@ void fb_sfxNoise(int channel, float duration, float volume)
     fb_sfxVoiceSetEnvelope(voice, 0);
 
     SFX_DEBUG(
-        "sfx_noise: channel=%d duration=%f volume=%f",
+        "sfx_noise: channel=%d frequency=%d duration=%f volume=%f",
         channel,
+        frequency,
         duration,
         volume
     );
+}
+
+
+/* ------------------------------------------------------------------------- */
+/* NOISE channel, duration, volume                                           */
+/* ------------------------------------------------------------------------- */
+
+/*
+    fb_sfxNoise()
+
+    Preserve the original three-argument command form by requesting
+    white noise from the pitched-noise implementation.
+*/
+
+void fb_sfxNoise(int channel, float duration, float volume)
+{
+    fb_sfxNoisePitch(channel, 0, duration, volume);
 }
 
 

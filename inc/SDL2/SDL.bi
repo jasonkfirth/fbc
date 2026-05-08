@@ -30,7 +30,7 @@
 #include once "crt/long.bi"
 #include once "crt/stdarg.bi"
 
-#ifdef __FB_UNIX__
+#if defined(__FB_UNIX__) or defined(__FB_XBOX__)
 	#include once "crt/stdio.bi"
 	#include once "crt/string.bi"
 	#include once "crt/ctype.bi"
@@ -585,7 +585,7 @@ union SDL_RWops_hidden
 		windowsio as SDL_RWops_hidden_windowsio
 	#endif
 
-	#ifdef __FB_UNIX__
+	#if defined(__FB_UNIX__) or defined(__FB_XBOX__)
 		stdio as SDL_RWops_hidden_stdio
 	#else
 		windowsio as SDL_RWops_hidden_windowsio

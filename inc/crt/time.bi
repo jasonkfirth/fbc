@@ -12,12 +12,14 @@
 #include once "crt/stddef.bi"
 #include once "crt/sys/types.bi"
 
-#if defined(__FB_WIN32__)
+#if defined(__FB_WIN32__) or defined(__FB_XBOX__)
 #include once "crt/win32/time.bi"
 #elseif defined(__FB_DOS__)
 #include once "crt/dos/time.bi"
 #elseif defined(__FB_LINUX__) or defined(__FB_ANDROID__)
 #include once "crt/linux/time.bi"
+#elseif defined(__FB_CYGWIN__)
+#include once "crt/cygwin/time.bi"
 #elseif defined(__FB_FREEBSD__)
 #include once "crt/freebsd/time.bi"
 #elseif defined(__FB_DARWIN__)

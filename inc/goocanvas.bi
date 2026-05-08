@@ -30,7 +30,11 @@
 #ENDIF
 
 #IFDEF __USE_GTK3__
+#IFDEF __FB_WIN32__
+#INCLIB "goocanvas-3.0"
+#ELSE
 #INCLIB "goocanvas-2.0"
+#ENDIF
 #ELSE
 #INCLIB "goocanvas"
 #ENDIF

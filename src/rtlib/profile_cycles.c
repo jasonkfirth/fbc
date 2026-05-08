@@ -16,10 +16,10 @@
 	#include <windows.h>
 #endif
 
-/* choose a suitable size_t printf specifier */
+/* choose a suitable ssize_t printf specifier */
 #if !defined(fmtsizet)
 	#if defined(HOST_CYGWIN)
-		#define fmtsizet "%18Iu"
+		#define fmtsizet "%18zd"
 	#elif defined(HOST_WIN32)
 		#if defined(_UCRT) || __USE_MINGW_ANSI_STDIO
 			#define fmtsizet "%18zu"

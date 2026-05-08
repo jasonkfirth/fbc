@@ -100,7 +100,7 @@ end function
 sub doRendering
 	static seed as long = &h12345
 	dim dst as SCR_TYPE ptr
-	dim noise as long, carry as long
+	dim noise_value as long, carry as long
 	dim x as long, y as long
 
 	'' lock the back buffer before start drawing on it
@@ -114,11 +114,11 @@ sub doRendering
 	'' draw some static (code from ptc_test)
 	for y = 0 to SCR_HEIGHT-1
 		for x = 0 to SCR_WIDTH-1
-			noise = (seed shr 3) xor seed
-			carry = noise and 1
+			noise_value = (seed shr 3) xor seed
+			carry = noise_value and 1
 			seed = (seed shr 1) or (carry shl 30)
-			noise = (noise shr 1) and &hFF
-			*dst = VAL2RGB(noise)
+			noise_value = (noise_value shr 1) and &hFF
+			*dst = VAL2RGB(noise_value)
 			dst += 1
 		next x
 		'' advance to next scanline
@@ -291,4 +291,3 @@ function WinMain _
 	function = msg.wParam
 
 end function
-

@@ -153,6 +153,11 @@ function hFileExists _
 		byval filename as zstring ptr _
 	) as integer static
 	dim f as integer
+#if defined( __FB_CYGWIN__ )
+	dim as string normalized
+	normalized = pathNormalizeHost( *filename )
+	filename = strptr( normalized )
+#endif
 
 	f = freefile
 
@@ -354,6 +359,37 @@ sub hReplaceSlash( byval s as zstring ptr, byval char as integer )
 	next
 end sub
 
+function pathNormalizeHost( byref path as string ) as string
+#if defined( __FB_CYGWIN__ )
+	dim as string normalized
+
+	normalized = path
+
+	hReplaceSlash( strptr( normalized ), asc( "/" ) )
+
+	if( len( normalized ) >= 2 ) then
+		if( normalized[1] = asc( ":" ) ) then
+			dim as integer drive = normalized[0]
+
+			if( ((drive >= asc( "A" )) and (drive <= asc( "Z" ))) or _
+			    ((drive >= asc( "a" )) and (drive <= asc( "z" ))) ) then
+				if( len( normalized ) = 2 ) then
+					function = "/cygdrive/" + lcase( chr( drive ) )
+					exit function
+				elseif( normalized[2] = asc( "/" ) ) then
+					function = "/cygdrive/" + lcase( chr( drive ) ) + mid( normalized, 3 )
+					exit function
+				end if
+			end if
+		end if
+	end if
+
+	function = normalized
+#else
+	function = path
+#endif
+end function
+
 function pathStripDiv( byref path as string ) as string
 	dim as integer length = len( path )
 	if( length > 0 ) then
@@ -430,6 +466,10 @@ function hCheckFileFormat( byval f as integer ) as integer
 		case FBFILE_FORMAT_UTF16LE, _
 			 FBFILE_FORMAT_UTF16BE
 			seek #f, 1+2
+
+		case FBFILE_FORMAT_UTF32LE, _
+			 FBFILE_FORMAT_UTF32BE
+			seek #f, 1+4
 		end select
 	end if
 
@@ -440,7 +480,7 @@ function hCurDir( ) as string
 	'' curdir() usually won't be terminated with a path separator,
 	'' except when it points to the file system root, instead of
 	'' some directory (e.g. C:\ on Win32 or / on Unix).
-	function = pathStripDiv( curdir( ) )
+	function = pathStripDiv( pathNormalizeHost( curdir( ) ) )
 end function
 
 function pathStripCurdir( byref path as string ) as string

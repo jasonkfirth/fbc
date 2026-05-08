@@ -39,6 +39,7 @@
 #include "../fb_sfx.h"
 #include "../fb_sfx_internal.h"
 #include "../fb_sfx_driver.h"
+#include "../fb_sfx_driver_diag.h"
 #include "fb_sfx_win32.h"
 
 #include <windows.h>
@@ -148,6 +149,18 @@ static DWORD WINAPI wasapi_audio_worker(LPVOID unused)
 
     while (InterlockedCompareExchange(&g_worker_stop, 0, 0) == 0)
     {
+        if (__fb_sfx && __fb_sfx->shutting_down)
+        {
+            Sleep(5);
+            continue;
+        }
+
+        if (fb_sfxForegroundFeedActive())
+        {
+            Sleep(5);
+            continue;
+        }
+
         if (!g_wasapi_running)
         {
             Sleep(5);
@@ -466,8 +479,16 @@ static int wasapi_write(const float *buffer, int frames)
         ? __fb_sfx->output_channels
         : FB_SFX_DEFAULT_CHANNELS;
 
+    fb_sfxDriverDiagnostics("WASAPI", buffer, frames, src_channels);
+
     while (total_written < frames)
     {
+        if (InterlockedCompareExchange(&g_worker_stop, 0, 0) != 0 ||
+            !g_wasapi_running)
+        {
+            return (total_written > 0) ? total_written : -1;
+        }
+
         hr = g_audio->lpVtbl->GetCurrentPadding(g_audio, &padding);
         if (FAILED(hr))
             return (total_written > 0) ? total_written : -1;
@@ -518,7 +539,7 @@ static int wasapi_write(const float *buffer, int frames)
 const FB_SFX_DRIVER fb_sfxDriverWASAPI =
 {
     "WASAPI",
-    0,
+    FB_SFX_DRIVER_CAP_BACKGROUND,
     wasapi_init,
     wasapi_exit,
     wasapi_write,

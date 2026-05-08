@@ -37,7 +37,12 @@ declare function __caca0_create_bitmap(byval as ulong, byval as ulong, byval as 
 declare sub __caca0_free_bitmap(byval as caca_dither_t ptr)
 declare function __caca0_get_color_name(byval as ubyte) as const zstring ptr
 
-#ifdef __FB_WIN32__
+#if defined(__FB_WIN32__) and defined(__FB_64BIT__)
+	extern __caca0_cv alias "__imp___caca0_cv" as caca_canvas_t ptr
+	extern __caca0_dp alias "__imp___caca0_dp" as caca_display_t ptr
+	extern __caca0_fg alias "__imp___caca0_fg" as ubyte
+	extern __caca0_bg alias "__imp___caca0_bg" as ubyte
+#elseif defined(__FB_WIN32__)
 	extern import __caca0_cv as caca_canvas_t ptr
 	extern import __caca0_dp as caca_display_t ptr
 	extern import __caca0_fg as ubyte

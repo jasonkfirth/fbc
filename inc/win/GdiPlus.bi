@@ -8,9 +8,18 @@
 '' C API in the same namespace, allowing lots of existing code to work.
 '' The namespace doesn't hurt the function name mangling because everything
 '' is inside an Extern block anyways.
+#include once "crt/stddef.bi"
+#include once "crt/math.bi"
+#include once "windef.bi"
+#include once "wingdi.bi"
+#include once "basetyps.bi"
+#include once "ddraw.bi"
+
 namespace Gdiplus
 
+#define __FB_GDIPLUS_C_NO_INCLUDES__
 #include "gdiplus-c.bi"
+#undef __FB_GDIPLUS_C_NO_INCLUDES__
 
 end namespace
 

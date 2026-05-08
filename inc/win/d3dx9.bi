@@ -23,6 +23,7 @@
 #pragma once
 
 #inclib "dxguid"
+#inclib "d3dx9"
 
 #include once "crt/limits.bi"
 #include once "d3d9.bi"

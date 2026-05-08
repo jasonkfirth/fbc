@@ -118,6 +118,12 @@ static void *fb_sfxBsdAudioWorker(void *unused)
             continue;
         }
 
+        if (fb_sfxForegroundFeedActive())
+        {
+            fb_sfxBsdSleepMs(5);
+            continue;
+        }
+
         fb_sfxUpdate(fb_sfxBsdWorkerFrames());
     }
 

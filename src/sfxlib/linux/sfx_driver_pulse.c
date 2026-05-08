@@ -189,7 +189,7 @@ static int pulse_driver_write(const float *buffer, int frames)
 const FB_SFX_DRIVER fb_sfxDriverPulse =
 {
     "PulseAudio",
-    0,
+    FB_SFX_DRIVER_CAP_BACKGROUND,
     pulse_driver_init,
     pulse_driver_exit,
     pulse_driver_write,

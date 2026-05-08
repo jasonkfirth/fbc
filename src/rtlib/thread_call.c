@@ -204,7 +204,7 @@ static FBCALL void threadproc( void *param )
     /* check calling convention */
     if( info->abi == FB_THREADCALL_CDECL )
         abi = FFI_SYSV;
-#ifdef HOST_WIN32
+#if defined( HOST_WIN32 ) || defined( HOST_XBOX )
     else if( info->abi == FB_THREADCALL_STDCALL )
         abi = FFI_STDCALL;
 #endif

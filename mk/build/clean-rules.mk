@@ -97,7 +97,7 @@ clean-build:
 define _find_example_artifacts
 if [ -d "$(rootdir)/examples" ]; then \
 	find "$(rootdir)/examples" -type f \
-		\( -name '*.asm' -o -name '*.c' -o -name '*.o' -o -name '*.obj' -o -name '*.exe' -o -name '*.stdout.txt' -o -name '*.stderr.txt' \) \
+		\( -name '*.asm' -o -name '*.c' -o -name '*.o' -o -name '*.obj' -o -name '*.a' -o -name '*.exe' -o -name '*.dll' -o -name '*.stdout.txt' -o -name '*.stderr.txt' \) \
 		-print | while IFS= read -r f; do \
 			case "$$f" in \
 				*.stdout.txt) stem="$${f%.stdout.txt}" ;; \
@@ -117,6 +117,10 @@ list-example-artifacts:
 
 .PHONY: clean-example-artifacts
 clean-example-artifacts:
+	@if [ -f "$(rootdir)/examples/GNUmakefile" ]; then \
+		$(MAKE) --no-print-directory -C "$(rootdir)/examples" clean >/dev/null; \
+	fi
+	@rm -f "examples/manual/proguide/hello.txt" "$(rootdir)/examples/manual/proguide/hello.txt"
 	@$(MAKE) --no-print-directory -s list-example-artifacts | while IFS= read -r f; do \
 		[ -n "$$f" ] || continue; \
 		echo "==> Removing $$f"; \

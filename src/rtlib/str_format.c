@@ -244,16 +244,20 @@ int fb_hProcessMask
 	int do_num_frac = FALSE, last_was_comma = FALSE, was_k_div = FALSE;
 	int do_output = dst!=NULL;
 	int do_add = FALSE;
-	ssize_t LenOut;
 	char *pszOut;
 	ssize_t i;
+#ifdef DEBUG
+	ssize_t LenOut;
+#endif
 
 	DBG_ASSERT( pInfo!=NULL );
 
 	if( !do_output ) {
 		memset( pInfo, 0, sizeof(FormatMaskInfo) );
 		pszOut = NULL;
+#ifdef DEBUG
 		LenOut = 0;
+#endif
 	} else {
 		if( pInfo->mask_type==eMT_Number ) {
 			if( pInfo->has_percent )
@@ -261,7 +265,9 @@ int fb_hProcessMask
 			value /= pow( 10.0, pInfo->num_digits_omit );
 		}
 		pszOut = dst->data;
+#ifdef DEBUG
 		LenOut = FB_STRSIZE( dst );
+#endif
 	}
 
 	if( value != 0.0 ) {
@@ -1101,7 +1107,9 @@ int fb_hProcessMask
 			DBG_ASSERT(LenOut>=LenAdd);
 			FB_MEMCPY( pszOut, pszAdd, LenAdd );
 			pszOut += LenAdd;
+#ifdef DEBUG
 			LenOut -= LenAdd;
+#endif
 			if( pszAddFree!=NULL ) {
 				free( pszAddFree );
 			}

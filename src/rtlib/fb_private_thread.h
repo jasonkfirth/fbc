@@ -1,3 +1,7 @@
+#if defined HOST_CYGWIN
+	#include <pthread.h>
+#endif
+
 #if defined HOST_UNIX
 	#include <pthread.h>
 	struct _FBMUTEX {
@@ -12,6 +16,11 @@
 	#include <windows.h>
 	struct _FBMUTEX {
 		HANDLE id;
+	};
+#elif defined HOST_XBOX
+	#include <windows.h>
+	struct _FBMUTEX {
+		CRITICAL_SECTION id;
 	};
 #endif
 
@@ -58,6 +67,8 @@ struct _FBTHREAD {
 	void *opaque;
 #elif defined HOST_UNIX
 	pthread_t id;
+#elif defined HOST_CYGWIN
+	pthread_t id;
 #elif defined HOST_WIN32
 	HANDLE id;
 #elif defined HOST_XBOX
@@ -89,4 +100,3 @@ FBTHREADFLAGS fb_AtomicSetThreadFlags( volatile FBTHREADFLAGS *flags, FBTHREADFL
 #ifdef ENABLE_MT
 void          fb_CloseAtomicFBThreadFlagMutex( void );
 #endif
-

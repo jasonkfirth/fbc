@@ -33,6 +33,10 @@
 #include once "crt/longdouble.bi"
 #include once "glibconfig.bi"
 #include once "crt/time.bi"
+
+#ifndef __func__
+#define __func__ __FUNCTION__
+#endif
 #include once "crt/stdarg.bi"
 
 #ifdef __FB_UNIX__

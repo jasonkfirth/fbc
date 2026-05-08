@@ -147,7 +147,7 @@ int fb_hDateParse( const char *text, size_t text_len,
     }
 
     /* skip white spaces */
-    while ( isspace( *text ) )
+    while ( isspace( FB_CHAR_TO_INT( *text ) ) )
         ++text;
     len = text_len - (text - text_start);
 
@@ -161,7 +161,7 @@ int fb_hDateParse( const char *text, size_t text_len,
 
             /* skip white spaces */
             text = endptr;
-            while ( isspace( *text ) )
+            while ( isspace( FB_CHAR_TO_INT( *text ) ) )
                 ++text;
 
             if( *text==',' ) {
@@ -199,7 +199,7 @@ int fb_hDateParse( const char *text, size_t text_len,
 
             /* skip white spaces */
             text = endptr;
-            while ( isspace( *text ) )
+            while ( isspace( FB_CHAR_TO_INT( *text ) ) )
                 ++text;
 
             /* read month and additional dividers */
@@ -208,7 +208,7 @@ int fb_hDateParse( const char *text, size_t text_len,
             if( chDivider=='.' ) {
                 ++text;
                 /* skip white spaces */
-                while ( isspace( *text ) )
+                while ( isspace( FB_CHAR_TO_INT( *text ) ) )
                     ++text;
                 len = text_len - (text - text_start);
                 month = fb_hFindMonth( text, len, &end_month );
@@ -224,14 +224,14 @@ int fb_hDateParse( const char *text, size_t text_len,
             if( is_short_form ) {
                 /* short date */
                 /* skip white spaces */
-                while ( isspace( *text ) )
+                while ( isspace( FB_CHAR_TO_INT( *text ) ) )
                     ++text;
                 month = strtol( text, &endptr, 10 );
                 month_size = endptr - text;
                 if( month_size ) {
                     text = endptr;
                     /* skip white spaces */
-                    while ( isspace( *text ) )
+                    while ( isspace( FB_CHAR_TO_INT( *text ) ) )
                         ++text;
                     if( *text==chDivider ) {
                         ++text;
@@ -245,7 +245,7 @@ int fb_hDateParse( const char *text, size_t text_len,
                 if( month != 0 ) {
                     text = end_month;
                     /* skip white spaces */
-                    while ( isspace( *text ) )
+                    while ( isspace( FB_CHAR_TO_INT( *text ) ) )
                         ++text;
                     /* this comma is optional */
                     if( *text==',' ) {
@@ -258,7 +258,7 @@ int fb_hDateParse( const char *text, size_t text_len,
             if( result ) {
                 size_t year_size;
                 /* skip white spaces */
-                while ( isspace( *text ) )
+                while ( isspace( FB_CHAR_TO_INT( *text ) ) )
                     ++text;
                 year = strtol( text, &endptr, 10 );
                 year_size = endptr - text;

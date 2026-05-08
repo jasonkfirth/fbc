@@ -62,8 +62,22 @@
 #pragma once
 
 #inclib "cl"
+#if defined(__FB_WIN32__) and defined(CRYPTLIB_STATICLINK)
+	#inclib "advapi32"
+	#inclib "comctl32"
+	#inclib "mpr"
+	#inclib "netapi32"
+	#inclib "odbc32"
+	#inclib "psapi"
+	#inclib "setupapi"
+	#inclib "shell32"
+	#inclib "shfolder"
+	#inclib "winhttp"
+	#inclib "ws2_32"
+	#inclib "wsock32"
+#endif
 
-#ifdef __FB_WIN32__
+#if defined(__FB_WIN32__) and (not defined(CRYPTLIB_STATICLINK))
 	#include once "windows.bi"
 
 	extern "Windows"

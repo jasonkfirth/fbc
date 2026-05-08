@@ -40,6 +40,16 @@
         mixer → buffer → driver
 */
 
+#include <math.h>
+
+#if defined(_WIN32)
+#include <windows.h>
+#elif defined(__DJGPP__)
+#include <dos.h>
+#else
+#include <time.h>
+#endif
+
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
 
@@ -51,6 +61,120 @@
 #define FB_SFX_BEEP_FREQ     880
 #define FB_SFX_BEEP_DURATION 0.15f
 #define FB_SFX_BEEP_VOLUME   0.8f
+#define FB_SFX_BEEP_MIDDLE_C 261.6255653005986
+#define FB_SFX_BEEP_MIN_FREQ 1
+#define FB_SFX_BEEP_MAX_FREQ 20000
+
+
+/* ------------------------------------------------------------------------- */
+/* Foreground timing helpers                                                 */
+/* ------------------------------------------------------------------------- */
+
+static void fb_sfxBeepSleepMs(unsigned long milliseconds)
+{
+    if (milliseconds == 0)
+        return;
+
+#if defined(_WIN32)
+    Sleep((DWORD)milliseconds);
+#elif defined(__DJGPP__)
+    delay((unsigned)milliseconds);
+#else
+    {
+        struct timespec req;
+
+        req.tv_sec = (time_t)(milliseconds / 1000UL);
+        req.tv_nsec = (long)((milliseconds % 1000UL) * 1000000UL);
+        nanosleep(&req, NULL);
+    }
+#endif
+}
+
+static int fb_sfxBeepDurationFrames(float duration)
+{
+    int frames;
+
+    if (!__fb_sfx || __fb_sfx->samplerate <= 0 || duration <= 0.0f)
+        return 0;
+
+    frames = (int)(duration * (float)__fb_sfx->samplerate + 0.5f);
+    if (frames <= 0)
+        frames = 1;
+
+    return frames;
+}
+
+static void fb_sfxBeepRunForeground(float duration)
+{
+    int frames;
+    int tick_frames;
+    int samplerate;
+
+    frames = fb_sfxBeepDurationFrames(duration);
+    if (frames <= 0)
+        return;
+
+    samplerate = (__fb_sfx && __fb_sfx->samplerate > 0)
+        ? __fb_sfx->samplerate
+        : 0;
+
+    tick_frames = (samplerate > 0)
+        ? (samplerate / 20)
+        : 220;
+
+    if (tick_frames <= 0)
+        tick_frames = 220;
+
+    fb_sfxForegroundFeedBegin();
+
+    while (frames > 0)
+    {
+        unsigned long milliseconds;
+        int step;
+
+        step = (frames > tick_frames) ? tick_frames : frames;
+
+        fb_sfxUpdate(step);
+
+        if (samplerate > 0)
+        {
+            milliseconds = (unsigned long)(((unsigned long long)step * 1000ULL) / (unsigned long long)samplerate);
+            if (milliseconds == 0)
+                milliseconds = 1;
+            fb_sfxBeepSleepMs(milliseconds);
+        }
+
+        frames -= step;
+    }
+
+    fb_sfxForegroundFeedEnd();
+}
+
+
+/* ------------------------------------------------------------------------- */
+/* Historical pitch conversion                                               */
+/* ------------------------------------------------------------------------- */
+
+static int fb_sfxBeepPitchToFrequency(float pitch)
+{
+    double frequency;
+
+    /*
+        Sinclair ZX Spectrum BASIC defines BEEP pitch as semitones above
+        middle C.  Fractional pitch values are valid, so pow() is used here
+        instead of a small integer note table.
+    */
+
+    frequency = FB_SFX_BEEP_MIDDLE_C * pow(2.0, (double)pitch / 12.0);
+
+    if (frequency < (double)FB_SFX_BEEP_MIN_FREQ)
+        return FB_SFX_BEEP_MIN_FREQ;
+
+    if (frequency > (double)FB_SFX_BEEP_MAX_FREQ)
+        return FB_SFX_BEEP_MAX_FREQ;
+
+    return (int)(frequency + 0.5);
+}
 
 
 /* ------------------------------------------------------------------------- */
@@ -123,6 +247,43 @@ void fb_sfxBeepEx(int frequency, float duration)
 
     SFX_DEBUG(
         "sfx_beep: freq=%d duration=%f",
+        frequency,
+        duration
+    );
+}
+
+
+/* ------------------------------------------------------------------------- */
+/* Spectrum-style BEEP                                                       */
+/* ------------------------------------------------------------------------- */
+
+/*
+    fb_sfxBeepPitch()
+
+    Implements the historical two-argument BEEP form used by Sinclair
+    ZX Spectrum BASIC:
+
+        BEEP duration, pitch
+
+    duration is measured in seconds, and pitch is measured in semitones
+    above middle C.  The command is foreground because Spectrum BASIC
+    programs depend on consecutive BEEP statements playing in sequence.
+*/
+
+void fb_sfxBeepPitch(float duration, float pitch)
+{
+    int frequency;
+
+    if (duration <= 0.0f)
+        return;
+
+    frequency = fb_sfxBeepPitchToFrequency(pitch);
+    fb_sfxBeepEx(frequency, duration);
+    fb_sfxBeepRunForeground(duration);
+
+    SFX_DEBUG(
+        "sfx_beep: pitch=%f freq=%d duration=%f",
+        pitch,
         frequency,
         duration
     );

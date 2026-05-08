@@ -1,0 +1,33 @@
+--- tinyptc.h
++++ tinyptc.h
+@@ -7,10 +7,17 @@
+ #define __TINYPTC_WINDOWS_H
+ 
+ 
+-// integer types
+-typedef unsigned __int32 int32;
+-typedef unsigned __int16 short16;
+-typedef unsigned __int8 char8;
++// integer types
++#ifdef __GNUC__
++#include <stdint.h>
++typedef uint32_t int32;
++typedef uint16_t short16;
++typedef uint8_t char8;
++#else
++typedef unsigned __int32 int32;
++typedef unsigned __int16 short16;
++typedef unsigned __int8 char8;
++#endif
+ 
+ // tinyptc api
+ extern int ptc_open(char *title,int width,int height);
+@@ -46,7 +53,7 @@
+ #define __PTC_LITTLE_ENDIAN__
+ 
+ // optimization
+-#define __PTC_MMX__
++// #define __PTC_MMX__
+ #define __PTC_MEMCPY__
+ 
+ // linker configuration

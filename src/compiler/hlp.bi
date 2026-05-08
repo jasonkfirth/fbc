@@ -58,6 +58,7 @@ declare function hGetFileExt _
 
 declare sub hReplaceSlash( byval s as zstring ptr, byval char as integer )
 
+declare function pathNormalizeHost( byref path as string ) as string
 declare function pathStripDiv( byref path as string ) as string
 declare function pathIsAbsolute( byval path as zstring ptr ) as integer
 

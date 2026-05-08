@@ -12,8 +12,10 @@
 #include once "crt/stddef.bi"
 #include once "crt/sys/types.bi"
 
-#if defined(__FB_LINUX__)
+#if defined(__FB_LINUX__) or defined(__FB_ANDROID__)
 #include once "crt/sys/linux/socket.bi"
+#elseif defined(__FB_CYGWIN__)
+#include once "crt/sys/cygwin/socket.bi"
 #else
 #error Platform unsupported
 #endif

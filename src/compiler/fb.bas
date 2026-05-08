@@ -512,6 +512,20 @@ sub fbInit _
 		env.wcharconv = FB_WCHARCONV_NEVER
 	end if
 
+	'' Android and Xbox both use 32-bit target wchar data.  On Win32 hosts,
+	'' compiler wstring data is UTF-16, but the literal symbols still store
+	'' code points and the emitters write them using the target wchar size.
+	'' Keeping conversion enabled here lets constant wstr() expressions fold
+	'' while preserving the target-side storage layout.
+	if( env.wcharconv = FB_WCHARCONV_NEVER ) then
+		select case( env.clopt.target )
+		case FB_COMPTARGET_ANDROID, FB_COMPTARGET_XBOX
+			if( typeGetSize( env.target.wchar ) = 4 ) then
+				env.wcharconv = FB_WCHARCONV_WARNING
+			end if
+		end select
+	end if
+
 #if ( __FB_DEBUG__ <> 0 ) andalso defined( __FB_WIN32__ )
 	select case( env.clopt.target )
 	case FB_COMPTARGET_JS
@@ -637,7 +651,7 @@ sub fbGlobalInit()
 end sub
 
 sub fbAddIncludePath(byref path as string)
-	strlistAppend(@env.includepaths, path)
+	strlistAppend(@env.includepaths, pathStripDiv( pathNormalizeHost( path ) ) )
 end sub
 
 sub fbAddPreDefine(byref def as string)
@@ -1187,7 +1201,7 @@ sub fbAddLib(byval libname as zstring ptr)
 end sub
 
 sub fbAddLibPath(byval path as zstring ptr)
-	strsetAdd(@env.libpaths, pathStripDiv(*path), FALSE)
+	strsetAdd(@env.libpaths, pathStripDiv( pathNormalizeHost( *path ) ), FALSE)
 end sub
 
 private sub fbParsePreDefines()
@@ -1309,7 +1323,7 @@ sub fbCompile _
 		byval ismain as integer _
 	)
 
-	env.inf.name = *infname
+	env.inf.name = pathNormalizeHost( *infname )
 	hReplaceSlash( env.inf.name, asc( FB_HOST_PATHDIV ) )
 	env.inf.incfile = hAddIncFile( NULL, @env.filenamehash, env.inf.name )
 	env.inf.ismain = ismain
@@ -1318,20 +1332,20 @@ sub fbCompile _
 	env.outf.ismain = ismain
 
 	'' open source file
-	if( hFileExists( *infname ) = FALSE ) then
-		errReportEx( FB_ERRMSG_FILENOTFOUND, infname, -1 )
+	if( hFileExists( env.inf.name ) = FALSE ) then
+		errReportEx( FB_ERRMSG_FILENOTFOUND, env.inf.name, -1 )
 		exit sub
 	end if
 
 	env.inf.num = freefile
-	if( open( *infname, for binary, access read, as #env.inf.num ) <> 0 ) then
-		errReportEx( FB_ERRMSG_FILEACCESSERROR, infname, -1 )
+	if( open( env.inf.name, for binary, access read, as #env.inf.num ) <> 0 ) then
+		errReportEx( FB_ERRMSG_FILEACCESSERROR, env.inf.name, -1 )
 		exit sub
 	end if
 
 	if( env.clopt.showincludes ) then
 		'' Toplevel file
-		hShowInclude( 0, pathStripCurdir( *infname ) )
+		hShowInclude( 0, pathStripCurdir( env.inf.name ) )
 	end if
 
 	env.inf.format = hCheckFileFormat( env.inf.num )
@@ -1658,6 +1672,8 @@ sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer)
 		end if
 	end if
 
+	incfile = pathNormalizeHost( incfile )
+
 	'' if this isn't a root path, make it one.
 	if( is_rootpath( incfile ) = FALSE ) then
 		incfile = hCurDir( ) + FB_HOST_PATHDIV + incfile
@@ -1779,7 +1795,7 @@ function fbGetBackendValistType _
 
 		case FB_CPUFAMILY_X86_64
 			select case env.clopt.target
-			case FB_COMPTARGET_WIN32
+			case FB_COMPTARGET_WIN32, FB_COMPTARGET_CYGWIN
 				typedef = FB_CVA_LIST_BUILTIN_POINTER
 			case else
 				typedef = FB_CVA_LIST_BUILTIN_C_STD
@@ -1812,7 +1828,7 @@ function fbGetBackendValistType _
 	case FB_BACKEND_GAS64
 		'typedef = FB_CVA_LIST_BUILTIN_POINTER
 		select case env.clopt.target
-		case FB_COMPTARGET_WIN32
+		case FB_COMPTARGET_WIN32, FB_COMPTARGET_CYGWIN
 			typedef = FB_CVA_LIST_BUILTIN_POINTER
 		case else
 			typedef = FB_CVA_LIST_BUILTIN_C_STD

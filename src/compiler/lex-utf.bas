@@ -530,7 +530,7 @@ end sub
 
 '':::::
 private function hUTF32LEToChar( ) as integer static
-	dim as uinteger c
+	dim as ulong c
 	dim as ubyte ptr dst
 	dim as integer chars
 
@@ -561,7 +561,7 @@ end function
 
 '':::::
 private function hUTF32LEToUTF16LE( ) as integer static
-	dim as uinteger c
+	dim as ulong c
 	dim as ushort ptr dst
 	dim as integer chars
 
@@ -612,7 +612,7 @@ end function
 '':::::
 private function hUTF32LEToUTF32BE( ) as integer static
 	dim as ulong ptr dst
-	dim as uinteger c
+	dim as ulong c
 	dim as integer i, chars
 
 	chars = hUTF32LEToUTF32LE( )
@@ -655,7 +655,7 @@ end sub
 
 '':::::
 private function hUTF32BEToChar( ) as integer static
-	dim as uinteger c
+	dim as ulong c
 	dim as ubyte ptr dst
 	dim as integer chars
 
@@ -688,7 +688,7 @@ end function
 
 '':::::
 private function hUTF32BEToUTF16LE( ) as integer static
-	dim as uinteger c
+	dim as ulong c
 	dim as ushort ptr dst
 	dim as integer chars
 
@@ -729,7 +729,7 @@ end function
 '':::::
 private function hUTF32BEToUTF32LE( ) as integer static
 	dim as ulong ptr dst
-	dim as uinteger c
+	dim as ulong c
 	dim as integer i, chars
 
 	chars = hUTF32LEToUTF32LE( )
@@ -772,4 +772,3 @@ sub lexReadUTF32BE( )
 	lex.ctx->buffptrw = @lex.ctx->buffw
 
 end sub
-

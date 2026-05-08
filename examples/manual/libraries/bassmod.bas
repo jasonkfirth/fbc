@@ -20,7 +20,7 @@ If (BASSMOD_Init(-1, 44100, 0) = 0) Then
 	End 1
 End If
 
-If (BASSMOD_MusicLoad(False, SOUND_FILE, 0, 0, BASS_MUSIC_LOOP) = 0) Then
+If (BASSMOD_MusicLoad(False, StrPtr(SOUND_FILE), 0, 0, BASS_MUSIC_LOOP) = 0) Then
 	Print "BASSMOD could not load '" & SOUND_FILE & "'"
 	BASSMOD_Free()
 	End 1

@@ -19,12 +19,14 @@
 
 #pragma once
 
+#ifndef __FB_GDIPLUS_C_NO_INCLUDES__
 #include once "crt/stddef.bi"
 #include once "crt/math.bi"
 #include once "windef.bi"
 #include once "wingdi.bi"
 #include once "basetyps.bi"
 #include once "ddraw.bi"
+#endif
 
 '' The following symbols have been renamed:
 ''     struct Size => Size_

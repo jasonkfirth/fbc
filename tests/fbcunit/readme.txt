@@ -91,7 +91,7 @@ Files & Directories
 
 	./changelog.txt      changelog for fbcunit
 
-	./makefile           simple makefile for the library and tests
+	./GNUmakefile        simple GNU makefile for the library and tests
 
 	./src/*.bas          source files
 
@@ -103,4 +103,3 @@ Files & Directories
 	./tests/fbcu_*.bas   unit test modules
 
 	./examples/*.bas     usage examples
-

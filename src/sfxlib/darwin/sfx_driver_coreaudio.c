@@ -149,6 +149,12 @@ static void *fb_sfxDarwinAudioWorker(void *unused)
             continue;
         }
 
+        if (fb_sfxForegroundFeedActive())
+        {
+            fb_sfxDarwinSleepMs(5);
+            continue;
+        }
+
         fb_sfxUpdate(fb_sfxDarwinWorkerFrames());
     }
 
@@ -430,7 +436,7 @@ static int darwin_write(const float *samples, int frames)
 const FB_SFX_DRIVER fb_sfxDriverCoreAudio =
 {
     "CoreAudio",
-    0,
+    FB_SFX_DRIVER_CAP_BACKGROUND,
     darwin_init,
     darwin_exit,
     darwin_write,

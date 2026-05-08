@@ -34,7 +34,11 @@ type ptrdiff_t as integer
 #endif
 
 #ifndef wint_t
+#if defined( __FB_CYGWIN__ )
+	type wint_t as ulong
+#else
 	type wint_t as wchar_t
+#endif
 #endif
 
 #ifndef NULL

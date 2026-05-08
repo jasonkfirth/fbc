@@ -265,13 +265,13 @@ private function hConstBop _
 		case AST_OP_GE  : l->val.i = l->val.f >= r->val.f
 		case AST_OP_ATAN2 : l->val.f = atan2( l->val.f, r->val.f )
 		case AST_OP_ANDALSO
-			if( l->val.f ) then
+			if( l->val.f <> 0.0 ) then
 				l->val.i = (r->val.f <> 0)
 			else
 				l->val.i = 0
 			end if
 		case AST_OP_ORELSE
-			if( l->val.f ) then
+			if( l->val.f <> 0.0 ) then
 				l->val.i = -1
 			else
 				l->val.i = (r->val.f <> 0)

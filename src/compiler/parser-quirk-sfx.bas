@@ -289,7 +289,7 @@ private function hParseSfx _
 	) as ASTNODE ptr
 
 	dim as integer had_parens
-	dim as ASTNODE ptr expr1, expr2
+	dim as ASTNODE ptr expr1, expr2, expr3
 
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
 
@@ -307,6 +307,11 @@ private function hParseSfx _
 		hMatchExpressionEx( expr1, FB_DATATYPE_LONG )
 		if( hMatch( CHAR_COMMA ) ) then
 			hMatchExpressionEx( expr2, FB_DATATYPE_LONG )
+			if( hMatch( CHAR_COMMA ) ) then
+				hMatchExpressionEx( expr3, FB_DATATYPE_SINGLE )
+				hSfxOptEndArgs( had_parens )
+				return hSfxCall3( PROCLOOKUP( SFXSFXPLAYCHANNELPITCH ), expr1, expr2, expr3 )
+			end if
 			hSfxOptEndArgs( had_parens )
 			return hSfxCall2( PROCLOOKUP( SFXSFXPLAYCHANNEL ), expr1, expr2 )
 		end if
@@ -319,6 +324,11 @@ private function hParseSfx _
 		hMatchExpressionEx( expr1, FB_DATATYPE_LONG )
 		if( hMatch( CHAR_COMMA ) ) then
 			hMatchExpressionEx( expr2, FB_DATATYPE_LONG )
+			if( hMatch( CHAR_COMMA ) ) then
+				hMatchExpressionEx( expr3, FB_DATATYPE_SINGLE )
+				hSfxOptEndArgs( had_parens )
+				return hSfxCall3( PROCLOOKUP( SFXSFXLOOPCHANNELPITCH ), expr1, expr2, expr3 )
+			end if
 			hSfxOptEndArgs( had_parens )
 			return hSfxCall2( PROCLOOKUP( SFXSFXLOOPCHANNEL ), expr1, expr2 )
 		end if

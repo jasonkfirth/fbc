@@ -306,7 +306,11 @@ MT_CFLAGS := -pthread -DENABLE_MT
 endif
 
 ifeq ($(THREAD_MODEL),win32)
+ifeq ($(TARGET_OS),xbox)
+MT_CFLAGS := -DENABLE_MT
+else
 MT_CFLAGS := -mthreads -DENABLE_MT
+endif
 endif
 
 ifdef DISABLE_MT
@@ -382,6 +386,14 @@ TOOLCHAIN_FBCFLAGS += -Wc -Wno-builtin-declaration-mismatch
 TOOLCHAIN_FBLFLAGS :=
 TOOLCHAIN_FBRTCFLAGS :=
 TOOLCHAIN_FBRTLFLAGS :=
+
+ifneq ($(filter cygwin win32 win64,$(TARGET_OS)),)
+  # Newer GCC range analysis is noisy on fbc-generated compiler C code.
+  # Keep this scoped to the fbc driver so C runtime and library warnings
+  # remain visible.
+  TOOLCHAIN_FBCFLAGS += -Wc -Wno-maybe-uninitialized
+  TOOLCHAIN_FBCFLAGS += -Wc -Wno-type-limits
+endif
 
 
 ifeq ($(TARGET_OS),win32)

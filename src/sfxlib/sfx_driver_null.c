@@ -27,6 +27,7 @@
 
 #include "fb_sfx.h"
 #include "fb_sfx_driver.h"
+#include "fb_sfx_driver_diag.h"
 #include "fb_sfx_internal.h"
 
 
@@ -35,6 +36,7 @@
 /* ------------------------------------------------------------------------- */
 
 static int null_initialized = 0;
+static int null_channels = FB_SFX_DEFAULT_CHANNELS;
 
 
 /* ------------------------------------------------------------------------- */
@@ -44,10 +46,10 @@ static int null_initialized = 0;
 static int null_driver_init(int rate, int channels, int buffer_size, int flags)
 {
     (void)rate;
-    (void)channels;
     (void)buffer_size;
     (void)flags;
 
+    null_channels = (channels > 0) ? channels : FB_SFX_DEFAULT_CHANNELS;
     null_initialized = 1;
 
     SFX_DEBUG("sfx_driver_null: initialized");
@@ -63,6 +65,7 @@ static int null_driver_init(int rate, int channels, int buffer_size, int flags)
 static void null_driver_shutdown(void)
 {
     null_initialized = 0;
+    null_channels = FB_SFX_DEFAULT_CHANNELS;
 
     SFX_DEBUG("sfx_driver_null: shutdown");
 }
@@ -81,11 +84,10 @@ static void null_driver_shutdown(void)
 
 static int null_driver_write(const float *buffer, int frames)
 {
-    (void)buffer;
-    (void)frames;
-
     if (!null_initialized)
         return -1;
+
+    fb_sfxDriverDiagnostics("null", buffer, frames, null_channels);
 
     /* intentionally discard audio */
 

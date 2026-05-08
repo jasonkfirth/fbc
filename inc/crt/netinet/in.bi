@@ -203,6 +203,8 @@ end type
 
 #if defined(__FB_LINUX__)
 #include once "crt/netinet/linux/in.bi"
+#elseif defined(__FB_CYGWIN__)
+#include once "crt/netinet/cygwin/in.bi"
 #else
 #error Platform unsupported
 #endif

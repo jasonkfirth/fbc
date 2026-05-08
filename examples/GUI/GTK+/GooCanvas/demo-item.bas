@@ -54,7 +54,9 @@ FUNCTION goo_demo_item_new CDECL( _
   BYVAL y AS gdouble, _
   BYVAL width_ AS gdouble, _
   BYVAL height AS gdouble, _
-  ...) AS GooCanvasItem PTR
+  BYVAL first_property AS ZSTRING PTR = NULL, _
+  BYVAL fill_value AS ZSTRING PTR = NULL, _
+  BYVAL terminator AS ANY PTR = NULL) AS GooCanvasItem PTR
 
   VAR item = g_object_new (GOO_TYPE_DEMO_ITEM, NULL)
 
@@ -64,9 +66,8 @@ FUNCTION goo_demo_item_new CDECL( _
   demo_item->width = width_
   demo_item->height = height
 
-  VAR va = VA_FIRST(), first_property = VA_ARG(va, ZSTRING PTR)
   IF first_property THEN _
-    g_object_set_valist (CAST(GObject PTR, item), first_property, VA_NEXT(va, ZSTRING PTR))
+    g_object_set (CAST(GObject PTR, item), first_property, fill_value, NULL)
 
   IF parent THEN
     goo_canvas_item_add_child (parent, item, -1)

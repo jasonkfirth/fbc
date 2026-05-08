@@ -3,6 +3,7 @@ Version 1.20.1
 [changed]
 - merged the divergent FreeBASIC 1.10.4 development line forward into the 1.20 branch, including the separate 1.10.3/1.10.4 platform and packaging work
 - adopted the GNUmakefile + mk/ modular build system and the accompanying build_scripts/ and debian/ packaging flow in place of the older monolithic 1.20 makefile-only layout
+- build system: renamed the remaining checked-in Makefile/makefile entry points to GNUmakefile and shared the source/example rsync exclude rules across package scripts so generated artifacts stay out of isolated build trees
 - expanded compiler target, cpu-family, linker, and default-library handling for the platforms and architectures validated in the 1.10.4 branch, including Haiku, NetBSD rpath handling, and broader per-OS library selection
 - updated the HLC IR/backend glue so non-Intel targets do not fall through Intel-centric code paths when targeting newer cpu families
 - refreshed the Darwin graphics/audio backend set with the newer 1.10.4 driver work
@@ -20,8 +21,12 @@ Version 1.20.1
 - JavaScript/Emscripten packaging: make freebasic-js opt-in for Debian/Ubuntu builds via the nojs build profile and the build script's --no-js switch so default/native package builds can skip the Emscripten dependency chain
 - Android packaging: add an fbc-android/freebasic-android install layout with Android-target runtime libraries, headers, APK template glue, and Debian/Ubuntu build-script support; Debian/Ubuntu package builds now include it by default while root make/all builds still leave it out
 - Android packaging: keep the fbc-android wrapper and APK template sources under tracked src/tools/android instead of the ignored local tools/ tree
-- Windows/MSYS2 packaging: bundle a broader set of third-party import libraries and DLLs used by the shipped examples and bindings, and add package-local import-library aliases for older binding names that differ from current MSYS2 package names
+- Android and Xbox packaging: added MSYS2 build scripts that create isolated freebasic-android and freebasic-xbox distribution trees, zip archives, NSIS installers, and package validation checks, matching the self-contained installer approach used by the MinGW port
+- Windows/MSYS2 packaging: bundle a broader set of third-party import libraries and DLLs used by the shipped examples and bindings, including selected legacy FreeBASIC winlibs, official upstream FreeImage/IUP/SDL packages, archived MSYS2 win32 GTK packages, and source-built win64 archives for QuickLZ, SQLite 2, big_int, DispHelper, FastCGI, GDSL, and TinyPTC; add package-local import-library aliases for older binding names that differ from current MSYS2 package names
 - Windows/MSYS2 installer: add the installed FreeBASIC directory to MSYS2 login shells through profile.d as well as updating the normal Windows system PATH
+- examples: documented a full JS, Android, and Xbox compile sweep in examples/cross-target-notes.md, recording which examples currently compile for each package and which failures are platform, backend, or binding limitations
+- examples: documented the Windows win32/win64 compile sweeps in examples/windows-example-notes.md, including the remaining old third-party library families that need a clean redistributable library set or later pruning
+- examples: documented the Cygwin compile sweep in examples/cygwin-example-notes.md, noting that the core examples compile and the remaining out-of-box failures are optional external-library link gaps
 - tests: expanded the build/test harness to support compile-and-link tests that need fbc's automatic runtime library selection instead of separate compile/link steps
 - tests: refreshed warning-test expectations to match the compiler's corrected "Ambiguous" diagnostic spelling
 
@@ -56,12 +61,37 @@ Version 1.20.1
 - Debian/Ubuntu Docker smoke-test scripts for validating the native and JavaScript packages in fresh containers using only the package artifacts and their declared dependencies
 - tests/sfx regression coverage for sfxlib command/function syntax, invalid expression use of void sfx commands, and runtime state behaviour
 - tests/sfx runtime build coverage wired into the normal tests directory list, matching the surrounding gfxlib-style test layout
+- sfxlib: added SFXLIB_DRIVER_DUMP diagnostics for recording the float stream handed to platform audio drivers before device-format conversion
+- sfxlib: added SFXLIB_DRIVER environment selection so tests and demos can request a backend such as "null" before the first sound command initializes audio
+- tests/sfx: added null-driver signal-analysis runtime coverage for rendered tone duration, two-frequency polyphony peaks, pitched noise update rate, sample-rate-corrected playback, SFX pitch shifting, and driver-edge sample dumps
+- sfxlib: added two- and three-string PLAY overloads so MSX-style multi-channel PLAY listings can run directly as concurrent sfxlib voices
+- sfxlib: added pitched NOISE support via NOISE channel, frequency, duration, volume while preserving the original white-noise command form
+- sfxlib: added pitched SFX sample playback via SFX PLAY channel, id, pitch and SFX LOOP channel, id, pitch, with loaded samples advanced at their source sample rate
+- sfxlib examples: added focused noise-pitch and sample-pitch demos, and expanded the waveform demo to call out square, triangle, sawtooth, and noise waveforms
+- sfxlib: added a two-argument BEEP duration,pitch overload matching Sinclair ZX Spectrum BASIC's semitone-from-middle-C form
+- sfxlib: added PLAY-string V volume handling for Tandy Extended Color BASIC style music strings
+- sfxlib: added legacy BASIC SOUND/VOL compatibility for Microsoft PC BASIC tick-duration SOUND, Amiga BASIC SOUND, Commodore 128 BASIC 7.0 VOL/SOUND, BBC BASIC SOUND, Atari BASIC SOUND, and TI-99/4A Extended BASIC CALL SOUND, with IBM PC BASIC taking priority for the ambiguous SOUND a,b form
+- sfxlib examples: added source-anchored historical BASIC sound listings for QuickBASIC PLAY and MSX BASIC multi-channel PLAY
+- sfxlib examples: added source-anchored historical BASIC sound listings for ZX Spectrum BEEP and Tandy Extended Color BASIC PLAY
+- sfxlib examples: added source-anchored historical SOUND examples for GW-BASIC/QBasic, Amiga BASIC, Commodore 128 BASIC 7.0, BBC BASIC, TI-99/4A Extended BASIC, and a documented TRS-80 Color Computer pitch-code-to-hertz conversion
+- sfxlib examples: added a beginner-oriented basics series and README covering generated sounds, PLAY strings, channels, mix controls, instruments, and classic BASIC compatibility forms
+- sfxlib examples: made load, open, select, current, parameter, and MIDI open/close demos play short audible confirmations where that makes the command easier to understand
+- sfxlib examples: extended fastfft.bas with optional expected-frequency checks for validating that captured audio contains the intended spectral peaks
+- Xbox/nxdk: enabled multithreaded runtime builds using the Win32-style thread model and Xbox CriticalSection/TLS primitives, while keeping ThreadCall on the rtlib fallback because nxdk does not currently provide target libffi
+- Android/Xbox headers: extended selected CRT and SDL bindings so more examples compile against the Android and Xbox package headers without depending on unavailable desktop window-system types
 
 [fixed]
 - Windows rtlib: hardened and validated OPEN COM serial-port support for 64-bit Windows builds by keeping the shared Win32 serial driver valid for both MinGW32 and MinGW64, improving COM device-name handling, and checking the driver with COM1/COM2 loopback coverage
 - Windows rtlib: hardened OPEN LPT/LPRINT for 64-bit Windows builds by checking Win32 printer byte-count limits, avoiding size_t truncation in WritePrinter(), and making the common LPT device setup handle allocation failures cleanly
 - Linux: restrict '-m32' and '-m64' linker flags to x86/x86_64 targets instead of passing them to unrelated architectures
 - Linux/ELF-like builds: use the real linker for fbc-driven final links instead of exporting LD=gcc, since fbc passes raw linker flags that are not compiler-driver arguments
+- Cygwin packaging: regenerate bootstrap sources with a native Cygwin fbc when available, and validate the staged package through the normal installed compiler layout without copying a partial GCC into the package prefix
+- Cygwin packaging: use the shared source/example copy excludes when creating isolated worktrees and staged examples, keeping generated examples, test outputs, and unrelated bootstrap trees out of package archives
+- Cygwin packaging: discard bootstrap-minimal runtime objects before the full package build so the shipped rtlib archives are rebuilt with normal dependencies such as libffi instead of inheriting bootstrap-only feature disables
+- Cygwin builds: cleaned up rtlib ctype, profiler format, and process-handle cast warnings, and quieted GCC's noisy generated-C range-analysis warnings for Cygwin compiler objects
+- Cygwin rtlib/tests: use pthread thread handles for ThreadCreate/ThreadWait/ThreadDetach, preserve POSIX environment storage for SETENVIRON, and align argv and wstring test expectations with Cygwin behaviour
+- Cygwin compiler/examples: build dynamic libraries with the Cygwin DLL entry point and startup objects instead of the MinGW CRT startup path, fixing DLL-building examples such as manual/procs/mydll and threads/timer-lib
+- Cygwin headers/bindings: add Cygwin socket, netdb, select, time, and unistd coverage and avoid duplicate GTK ABI declarations, allowing the core network and GTK examples to compile when their external libraries are installed
 - rtlib/unix: build the multithreaded runtime with ENABLE_MT so libfbmt uses the correct thread-local storage path and ThreadSelf() remains stable after child threads exit
 - s390x: map the compiler's generic s390x GCC architecture selection to z900 instead of emitting -march=s390x, which Debian's s390x GCC rejects
 - armhf/bootstrap: fix bootstrap generation so armhf builds emit ARM target options such as -arch armv7-a+fp instead of accidentally inheriting the host architecture, such as x86_64
@@ -74,23 +104,42 @@ Version 1.20.1
 - Linux/sfxlib: suppress ALSA probe diagnostics during normal backend fallback while preserving the ALSA messages when sfxlib debug environment variables are enabled
 - sfxlib: removed an accidentally nested duplicate source tree under src/sfxlib/sfxlib and moved shared platform teardown behind per-target hooks instead of including Linux backend headers from the generic core
 - sfxlib: avoid a shutdown deadlock exposed by the new runtime state tests
+- Windows/sfxlib: avoid shutdown deadlocks and duplicate fallback-driver initialization when worker-thread output fails during teardown
+- Windows/sfxlib: let WASAPI and WinMM output writes abort promptly once shutdown has been requested, preventing short examples from leaving audio worker threads stuck
+- sfxlib: make mixer diagnostics and SFXLIB_MIXER_DUMP capture the final mixed output buffer, including decoded audio and stream sources, instead of only the synthesized voice pass
+- sfxlib: make the null output driver participate in SFXLIB_DRIVER_DUMP diagnostics so CI tests can inspect the stream at the driver-write boundary without opening a real audio device
+- sfxlib: process large fb_sfxUpdate() requests in mix-buffer-sized chunks and clamp output queue drains so long diagnostic updates cannot overwrite the runtime mix buffer
+- sfxlib: serialize platform driver writes and pause background feeder threads during foreground PLAY/BEEP waits, preventing Windows WASAPI/WinMM foreground examples from falling back or truncating near-device output
+- sfxlib: use coarser foreground wait chunks so Windows timer granularity does not stretch short PLAY/BEEP notes into much longer tones
+- sfxlib: clear queued output before foreground sound drains so WASAPI and WinMM do not spend part of short foreground demos playing stale silence after driver changes
 - Linux/sfxlib: keep package smoke tests strict about stderr while reporting the active sfxlib output driver, making null-driver fallback visible in no-audio Docker containers
 - Linux/gfxlib: run package smoke-test binaries even in headless containers, accepting expected display startup failures while still failing on loader and linker errors
 - Linux/Alpine: build musl-targeted compilers so linked programs use the musl dynamic loader instead of glibc loader paths
 - rtlib/unix: avoid indefinite terminal query hangs when console size rechecks are attempted in sessions that do not answer the escape-sequence query
 - compatibility: replace the old 1.10.4-specific sfxlib exit registration with a 1.20-compatible atexit() based hook
 - DOS/build: fixed the Linux-hosted DOS packaging and smoke-test path so the build script stages the runtime layout expected by DOS and host-side cross-linking, rebuilds the DOS compiler/runtime reliably, and packages the finished distribution from out/msdos
+- DOS/MSYS2 build: fixed the MSYS2-hosted DOS package builder so it prefers the MSYS curl for downloads, uses unprefixed MSYS host tools during bootstrap, keeps the MinGW tool path visible for DOSBox smoke tests, and reports DOSBox-staging's lack of 686 CPU emulation as an explicit smoke-test skip
 - DOS/sfxlib: fixed the DOS backend integration by moving the target sources into src/sfxlib/dos, wiring them into the normal DOS build graph, correcting the Sound Blaster/MIDI linkage and runtime initialization, and making missing BLASTER settings fail visibly for the Sound Blaster path instead of silently pretending a card exists
 - JavaScript/Emscripten builds now use emcc/emar/emranlib defaults and skip native host library/header probes when cross-building JS-target runtime libraries
+- JavaScript and Xbox clang-target builds now compile the generated C directly to object files when the target does not have a useful standalone assembler stage, matching the Emscripten path and avoiding invalid intermediate assembly handling
+- clang assembler invocation now preserves Intel assembly syntax for x86/x86_64 targets when a separate clang assembly step is used
 - Android target detection now recognizes aarch64-linux-android triplets as Android instead of Linux, and Android assembly uses the NDK clang driver instead of an unavailable GNU as path
+- Android fbc-android wrapper now locates Windows-hosted SDK/NDK tools with .exe/.bat suffixes, handles Windows-style source paths when deriving APK module names, and accepts .exe suffixed NDK clang/ar/ranlib tools
 - fbc-android now wraps the generated FreeBASIC program's exit() path so NativeActivity APKs can log their smoke-test exit marker instead of terminating the Android process from the program thread
 - Android/sfxlib: avoid pulling the Linux-only sfxlib shutdown hook into Android runtime archives, fixing SFX APK load failures from an unresolved fb_sfxLinuxExit symbol
+- Android and Xbox wstring constant folding now keeps conversion enabled when the target wchar layout is 32-bit even if the host compiler wchar representation differs
 - Xbox/nxdk: revived the Xbox target build far enough to produce rtlib, gfxlib2, and sfxlib archives with nxdk by adding Xbox-local CRT, filesystem, threading, graphics, and sfx decode compatibility shims; joystick and file decoding remain stubbed for the experimental package
+- Xbox/nxdk: fixed Win32-compatible calling-convention, alignment, mutex, TLS, and startup declarations so multithreaded rtlib, gfxlib2, and sfxlib archives build for Xbox without depending on unsupported OpenGL or libffi pieces
 - Xbox/nxdk packaging: include the executable nxdk wrapper tools and cxbe converter needed by fbc-xbox, classify the bundled SDK package as non-free/devel, and ship a generated list of nxdk license files alongside the package copyright metadata
 - examples: expanded the examples makefile coverage and fixed several Windows example build failures in the FreeImage/SDL, SDL_mixer, SDL_ttf, SDL mouse, TinyPTC, and CUnit examples
+- examples: fixed Windows and Win64 example compile failures by teaching the examples makefile about target-specific GD/ODE handling, adding win64-safe naked-call assembly for the manual procedure example, and staging source-built win64 QuickLZ, SQLite 2, big_int, DispHelper, FastCGI, GDSL, and TinyPTC archives
+- examples: fixed the GTK buttonbox tutorial's local GTK function redeclaration so Win32 uses GTK's C ABI symbol and Win64 avoids the decorated-cast path that produced invalid HLC alignment checks
 - bindings: fixed FreeImage.bi so it reuses the Windows GDI bitmap declarations instead of redefining RGBQUAD/BITMAPINFO types after wingdi.bi has been included
 - bindings: make CUnit.bi link against cunit automatically, matching the behaviour expected by the CUnit examples
+- generated bindings: stopped the SWIG FreeBASIC header generator from emitting stale "can't be included in other distributions without authorization" boilerplate in newly generated files
 - tests/file: made the TCP EOF check deterministic instead of depending on thread scheduling timing when running the log tests
+- tests: pass the selected FBC through to the fbcunit build so cross-target or packaged test builds do not accidentally use a different compiler
+- rtlib/gfxlib2: fixed MinGW32/MinGW64 build warnings from debug-only format-mask bookkeeping, transposed calloc() arguments, and ambiguous 32-bit inline-assembly movsd spelling
 
 
 Version 1.20.0

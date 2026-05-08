@@ -78,6 +78,8 @@
 
 void fb_sfxExit(void)
 {
+    int should_exit_core;
+
     fb_sfxRuntimeLock();
 
     if (__fb_sfx == NULL)
@@ -86,12 +88,18 @@ void fb_sfxExit(void)
         return;
     }
 
-    if (__fb_sfx->initialized)
+    should_exit_core = __fb_sfx->initialized;
+    if (should_exit_core)
     {
+        __fb_sfx->shutting_down = 1;
         SFX_DEBUG("sfx_shutdown: shutting down sound subsystem");
-        fb_sfxExitCore();
     }
+    fb_sfxRuntimeUnlock();
 
+    if (should_exit_core)
+        fb_sfxExitCore();
+
+    fb_sfxRuntimeLock();
     fb_sfxFreeContext();
 
     SFX_DEBUG("sfx_shutdown: sound subsystem shutdown complete");
@@ -124,6 +132,7 @@ void fb_sfxAbort(void)
     }
 
     SFX_DEBUG("sfx_shutdown: emergency shutdown");
+    __fb_sfx->shutting_down = 1;
     fb_sfxRuntimeUnlock();
 
     fb_sfxMidiStop();

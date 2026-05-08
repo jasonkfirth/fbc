@@ -30,7 +30,7 @@ ECHO := echo
 
 CC := gcc
 ifndef FBC
-FBC := fbc$(EXEEXT)
+FBC := $(TESTS_DEFAULT_FBC)
 endif
 
 ifeq ($(TEST_MODE),COMPILE_AND_RUN_OK)

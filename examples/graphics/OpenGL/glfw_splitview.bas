@@ -11,13 +11,19 @@
 
 #include once "GL/gl.bi"
 #include once "GL/glu.bi"
-#include once "GL/glfw.bi"
+#include once "GLFW/glfw3.bi"
 
+#ifndef FALSE
 #define FALSE 0
 #define TRUE (-1)
+#endif
 
 #ifndef PI
 #define PI 3.14159265358979323846
+#endif
+
+#ifndef NULL
+#define NULL 0
 #endif
 
 ''========================================================================
@@ -32,6 +38,7 @@ dim shared as integer xpos, ypos
 
 '' Window size
 dim shared as integer width_, height
+dim shared as GLFWwindow ptr glfw_window
 
 '' Active view: 0 = none, 1 = upper left, 2 = upper right, 3 = lower left,
 '' 4 = lower right
@@ -341,7 +348,7 @@ end sub
 '' WindowSizeFun() - Window size callback function
 ''========================================================================
 
-sub WindowSizeFun GLFWCALL( byval w as integer, byval h as integer )
+sub WindowSizeFun cdecl( byval window_handle as GLFWwindow ptr, byval w as long, byval h as long )
     width_  = w
     height = iif( h > 0, h, 1 )
     
@@ -352,25 +359,28 @@ end sub
 '' MousePosFun() - Mouse position callback function
 ''========================================================================
 
-sub MousePosFun GLFWCALL ( byval x as integer, byval y as integer )
+sub MousePosFun cdecl( byval window_handle as GLFWwindow ptr, byval x as double, byval y as double )
+	dim as integer mouse_x = cint( x )
+	dim as integer mouse_y = cint( y )
+
     '' Depending on which view was selected, rotate around different axes
     select case active_view
         case 1
-            rot_x += y - ypos
-            rot_z += x - xpos
+            rot_x += mouse_y - ypos
+            rot_z += mouse_x - xpos
         case 3
-            rot_x += y - ypos
-            rot_y += x - xpos
+            rot_x += mouse_y - ypos
+            rot_y += mouse_x - xpos
         case 4
-            rot_y += x - xpos
-            rot_z += y - ypos
+            rot_y += mouse_x - xpos
+            rot_z += mouse_y - ypos
         case else
             '' Do nothing for perspective view, or if no view is selected
     end select
 
     '' Remember mouse position
-    xpos = x
-    ypos = y
+    xpos = mouse_x
+    ypos = mouse_y
     
     if( active_view <> 0 ) then
     	doredraw = TRUE
@@ -382,7 +392,7 @@ end sub
 '' MouseButtonFun() - Mouse button callback function
 ''========================================================================
 
-sub MouseButtonFun GLFWCALL ( byval button as integer, byval action as integer )
+sub MouseButtonFun cdecl( byval window_handle as GLFWwindow ptr, byval button as long, byval action as long, byval mods as long )
     
     '' Button clicked?
     select case button
@@ -418,27 +428,30 @@ end sub
     dim as integer running
 
     '' Initialise GLFW
-    glfwInit( )
+    if( glfwInit( ) = 0 ) then
+    	end 1
+    end if
 
     '' Open OpenGL window
-    if( glfwOpenWindow( 500, 500, 0,0,0,0, 16,0, GLFW_WINDOW ) = 0 ) then
+    glfw_window = glfwCreateWindow( 500, 500, "Split view demo", NULL, NULL )
+    if( glfw_window = NULL ) then
         glfwTerminate()
     	end 0
     end if
 
-    '' Set window title
-    glfwSetWindowTitle( "Split view demo" )
+    glfwMakeContextCurrent( glfw_window )
 
     '' Enable sticky keys
-    glfwEnable( GLFW_STICKY_KEYS )
+    glfwSetInputMode( glfw_window, GLFW_STICKY_KEYS, GL_TRUE )
 
     '' Enable mouse cursor (only needed for fullscreen mode)
-    glfwEnable( GLFW_MOUSE_CURSOR )
+    glfwSetInputMode( glfw_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL )
 
     '' Set callback functions
-    glfwSetWindowSizeCallback( @WindowSizeFun )
-    glfwSetMousePosCallback( @MousePosFun )
-    glfwSetMouseButtonCallback( @MouseButtonFun )
+    glfwSetWindowSizeCallback( glfw_window, @WindowSizeFun )
+    glfwSetCursorPosCallback( glfw_window, @MousePosFun )
+    glfwSetMouseButtonCallback( glfw_window, @MouseButtonFun )
+    WindowSizeFun( glfw_window, 500, 500 )
 
     '' Main loop
     doredraw = TRUE
@@ -453,19 +466,21 @@ end sub
         else
         
         	'' Idle process
-        	glfwSleep( 0.025 )
+        	sleep 25, 1
         	
         end if
 
         '' Swap buffers
-        glfwSwapBuffers( )
+        glfwSwapBuffers( glfw_window )
+        glfwPollEvents( )
         	
         '' Check if the ESC key was pressed or the window was closed
-        running = (glfwGetKey( GLFW_KEY_ESC ) = 0) and _
-                  (glfwGetWindowParam( GLFW_OPENED ) = 1)
+        running = (glfwGetKey( glfw_window, GLFW_KEY_ESCAPE ) = 0) and _
+                  (glfwWindowShouldClose( glfw_window ) = 0)
     loop while( running )
 
     '' Close OpenGL window and terminate GLFW
+    glfwDestroyWindow( glfw_window )
     glfwTerminate( )
 
 	end 0

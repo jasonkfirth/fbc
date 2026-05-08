@@ -5,6 +5,7 @@
 #ifdef __FB_WIN32__
 #include once "win/winsock2.bi"
 #else
+#include once "crt/stdio.bi"
 #include once "crt/netdb.bi"
 #include once "crt/sys/socket.bi"
 #include once "crt/netinet/in.bi"

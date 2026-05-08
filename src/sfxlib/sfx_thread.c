@@ -22,6 +22,7 @@
 #include <windows.h>
 
 static CRITICAL_SECTION g_fb_sfx_runtime_lock;
+static CRITICAL_SECTION g_fb_sfx_driver_io_lock;
 static volatile LONG g_fb_sfx_runtime_lock_ready = 0;
 
 static void fb_sfxRuntimeEnsureLock(void)
@@ -32,6 +33,7 @@ static void fb_sfxRuntimeEnsureLock(void)
     if (state == 0)
     {
         InitializeCriticalSection(&g_fb_sfx_runtime_lock);
+        InitializeCriticalSection(&g_fb_sfx_driver_io_lock);
         InterlockedExchange(&g_fb_sfx_runtime_lock_ready, 2);
         return;
     }
@@ -45,6 +47,7 @@ static void fb_sfxRuntimeEnsureLock(void)
 #include <pthread.h>
 
 static pthread_mutex_t g_fb_sfx_runtime_lock;
+static pthread_mutex_t g_fb_sfx_driver_io_lock;
 static pthread_once_t g_fb_sfx_runtime_lock_once = PTHREAD_ONCE_INIT;
 
 static void fb_sfxRuntimeLockCreate(void)
@@ -54,6 +57,7 @@ static void fb_sfxRuntimeLockCreate(void)
     pthread_mutexattr_init(&attr);
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
     pthread_mutex_init(&g_fb_sfx_runtime_lock, &attr);
+    pthread_mutex_init(&g_fb_sfx_driver_io_lock, &attr);
     pthread_mutexattr_destroy(&attr);
 }
 
@@ -94,6 +98,27 @@ void fb_sfxRuntimeUnlock(void)
 #endif
 }
 
+void fb_sfxDriverIoLock(void)
+{
+    fb_sfxRuntimeEnsureLock();
+
+#if defined(_WIN32)
+    EnterCriticalSection(&g_fb_sfx_driver_io_lock);
+#else
+    pthread_mutex_lock(&g_fb_sfx_driver_io_lock);
+#endif
+}
+
+void fb_sfxDriverIoUnlock(void)
+{
+#if defined(_WIN32)
+    if (InterlockedCompareExchange(&g_fb_sfx_runtime_lock_ready, 2, 2) == 2)
+        LeaveCriticalSection(&g_fb_sfx_driver_io_lock);
+#else
+    pthread_mutex_unlock(&g_fb_sfx_driver_io_lock);
+#endif
+}
+
 #else
 
 void fb_sfxRuntimeLockInit(void)
@@ -109,6 +134,14 @@ void fb_sfxRuntimeLock(void)
 }
 
 void fb_sfxRuntimeUnlock(void)
+{
+}
+
+void fb_sfxDriverIoLock(void)
+{
+}
+
+void fb_sfxDriverIoUnlock(void)
 {
 }
 

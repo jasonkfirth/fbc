@@ -124,7 +124,7 @@
 	#define alloca(x) __builtin_alloca(x)
 #endif
 
-#if defined ENABLE_MT && !defined HOST_DOS && !defined HOST_XBOX
+#if defined ENABLE_MT && !defined HOST_DOS
 	FBCALL void fb_Lock( void );
 	FBCALL void fb_Unlock( void );
 	FBCALL void fb_StrLock( void );
@@ -196,7 +196,7 @@
                " pushl %%ecx      \n"
                " shrl $2,%%ecx    \n"
                " rep              \n"
-               " movsd            \n"
+               " movsl            \n"
                " popl %%ecx       \n"
                " andl $3,%%ecx    \n"
                " rep              \n"
@@ -220,7 +220,7 @@
                " pushl %%ecx      \n"
                " shrl $2,%%ecx    \n"
                " rep              \n"
-               " movsd            \n"
+               " movsl            \n"
                " popl %%ecx       \n"
                " andl $3,%%ecx    \n"
                " rep              \n"

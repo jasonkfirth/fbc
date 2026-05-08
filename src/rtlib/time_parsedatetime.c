@@ -26,7 +26,7 @@ FBCALL int fb_DateTimeParse( FBSTRING *s,
         text_len -= length;
 
         /* skip WS */
-        while( isspace( *text ) )
+        while( isspace( FB_CHAR_TO_INT( *text ) ) )
             ++text, --text_len;
         /* skip optional comma */
         if( *text==',' )
@@ -44,7 +44,7 @@ FBCALL int fb_DateTimeParse( FBSTRING *s,
         text_len -= length;
 
         /* skip WS */
-        while( isspace( *text ) )
+        while( isspace( FB_CHAR_TO_INT( *text ) ) )
             ++text, --text_len;
         /* skip optional comma */
         if( *text==',' )
@@ -62,7 +62,7 @@ FBCALL int fb_DateTimeParse( FBSTRING *s,
     if( result ) {
         /* the rest of the text must consist of white spaces */
         while( *text ) {
-            if( !isspace( *text++ ) ) {
+            if( !isspace( FB_CHAR_TO_INT( *text++ ) ) ) {
                 result = FALSE;
                 break;
             }

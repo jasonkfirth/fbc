@@ -120,6 +120,8 @@ int fb_sfxMusicLoad(const char *filename)
 
     __fb_sfx->music[id].data = (unsigned char *)mono;
     __fb_sfx->music[id].size = frames * (int)sizeof(float);
+    __fb_sfx->music[id].frames = frames;
+    __fb_sfx->music[id].sample_rate = sample_rate;
     __fb_sfx->music[id].loaded = 1;
 
     strncpy(
@@ -161,6 +163,8 @@ void fb_sfxMusicUnload(int id)
 
     __fb_sfx->music[id].data = NULL;
     __fb_sfx->music[id].size = 0;
+    __fb_sfx->music[id].frames = 0;
+    __fb_sfx->music[id].sample_rate = 0;
     __fb_sfx->music[id].loaded = 0;
 
     SFX_DEBUG("sfx_music_load: unloaded id=%d", id);

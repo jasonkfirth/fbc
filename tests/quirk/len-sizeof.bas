@@ -2,7 +2,7 @@
 
 SUITE( fbc_tests.quirk.len_sizeof )
 
-	#if defined( __FB_WIN32__ )
+	#if defined( __FB_WIN32__ ) or defined( __FB_CYGWIN__ )
 	CONST WCHAR_SIZE = 2
 	#elseif defined( __FB_DOS__ ) or defined( __FB_ANDROID__ )
 	CONST WCHAR_SIZE = 1

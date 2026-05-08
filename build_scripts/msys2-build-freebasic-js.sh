@@ -123,6 +123,18 @@ copy_tree() {
 	fi
 }
 
+copy_examples_tree() {
+	local dst="$1"
+	mkdir -p "$dst"
+	if have rsync; then
+		run rsync -a --delete --delete-excluded --prune-empty-dirs \
+			--exclude-from "$ROOT/mk/example-copy-excludes.rsync" \
+			"$ROOT/examples/" "$dst/"
+	else
+		run cp -a "$ROOT/examples"/. "$dst/"
+	fi
+}
+
 copy_dir_files() {
 	local src="$1"
 	local dst="$2"
@@ -551,7 +563,7 @@ assemble_distribution() {
 
 	msg "Copying top-level documentation and examples"
 	copy_tree "$ROOT/doc" "$DISTROOT/doc"
-	copy_tree "$ROOT/examples" "$DISTROOT/examples"
+	copy_examples_tree "$DISTROOT/examples"
 	cp -a "$ROOT/changelog.txt" "$DISTROOT/"
 	cp -a "$ROOT/readme.txt" "$DISTROOT/"
 

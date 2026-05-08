@@ -315,8 +315,13 @@ LOCAL_FBC := $(firstword $(wildcard $(FBC_EXE)))
 SYSTEM_FBC := $(strip $(shell command -v fbc 2>/dev/null))
 AVAILABLE_FBC := $(strip $(or $(LOCAL_FBC),$(SYSTEM_FBC)))
 
-# Keep FBC pointing at the in-tree compiler path for install/test flows.
+# Keep FBC pointing at the in-tree compiler path for root build/install flows.
+# Standalone test-suite makefiles include this tool-selection layer too, but
+# they must preserve the caller's FBC command because it may carry wrappers,
+# include paths, or package-local environment variables.
+ifndef PRESERVE_FBC
 FBC := $(FBC_EXE)
+endif
 
 # Compiler that is executed during the build. In cross-builds this may need to
 # stay host-runnable even while FBC_EXE is being produced for the target.

@@ -84,7 +84,7 @@ static void fb_sfxWaveAdvance(FB_SFXVOICE *v)
 
     v->phase += step;
 
-    if (v->phase >= 1.0f)
+    while (v->phase >= 1.0f)
         v->phase -= 1.0f;
 }
 
@@ -165,15 +165,34 @@ static float fb_sfxWaveSaw(FB_SFXVOICE *v)
 /* Noise generator                                                           */
 /* ------------------------------------------------------------------------- */
 
+static float fb_sfxWaveRandomNoise(void)
+{
+    return ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
+}
+
 static float fb_sfxWaveNoise(FB_SFXVOICE *v)
 {
-    float sample;
+    if (!v)
+        return 0.0f;
 
-    sample = ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
+    if (v->frequency <= 0)
+        return fb_sfxWaveRandomNoise();
 
-    (void)v;
+    if (!__fb_sfx || __fb_sfx->samplerate <= 0)
+        return fb_sfxWaveRandomNoise();
 
-    return sample;
+    if (!v->noise_ready)
+    {
+        v->noise_value = fb_sfxWaveRandomNoise();
+        v->noise_ready = 1;
+    }
+
+    fb_sfxWaveAdvance(v);
+
+    if (v->phase < ((float)v->frequency / (float)__fb_sfx->samplerate))
+        v->noise_value = fb_sfxWaveRandomNoise();
+
+    return v->noise_value;
 }
 
 

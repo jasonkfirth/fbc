@@ -1,0 +1,19 @@
+# FreeBASIC examples rsync excludes
+#
+# Example packages should ship sources and data, not binaries left behind by
+# local compile sweeps.  The source tree clean rule removes known generated
+# targets first; these patterns catch platform-specific leftovers that do not
+# have a stable make target name.
+
+*.a
+*.asm
+*.dll
+*.dylib
+*.exe
+*.o
+*.obj
+*.so
+*.stderr.txt
+*.stdout.txt
+manual/proguide/hello.txt
+obj/

@@ -168,13 +168,32 @@ copy_tree() {
 	fi
 }
 
+copy_examples_tree() {
+	local dst="$1"
+	mkdir -p "$dst"
+	if have rsync; then
+		run rsync -a --delete --delete-excluded --prune-empty-dirs \
+			--exclude-from "$ROOT/mk/example-copy-excludes.rsync" \
+			"$ROOT/examples/" "$dst/"
+	else
+		run cp -a "$ROOT/examples"/. "$dst/"
+	fi
+}
+
 sync_source_tree() {
 	local dst="$1"
 	mkdir -p "$dst"
 	if have rsync; then
 		run rsync -a --delete --delete-excluded --prune-empty-dirs \
 			--exclude-from "$ROOT/mk/source-copy-excludes.rsync" \
+			--exclude 'bootstrap/*/' \
 			"$ROOT/" "$dst/"
+		if [ -d "$ROOT/bootstrap/$CYGWIN_BOOTSTRAP_DIR" ]; then
+			mkdir -p "$dst/bootstrap/$CYGWIN_BOOTSTRAP_DIR"
+			run rsync -a --delete \
+				"$ROOT/bootstrap/$CYGWIN_BOOTSTRAP_DIR/" \
+				"$dst/bootstrap/$CYGWIN_BOOTSTRAP_DIR/"
+		fi
 	else
 		fail "rsync is required to create isolated worktrees"
 	fi
@@ -269,6 +288,7 @@ OUT="${OUT:-$ROOT/out/cygwin}"
 CYGWIN_MIRROR="${CYGWIN_MIRROR:-https://mirrors.kernel.org/sourceware/cygwin/}"
 SETUP_EXE="${SETUP_EXE:-}"
 TARGET_TRIPLET="${TARGET_TRIPLET:-x86_64-pc-cygwin}"
+CYGWIN_BOOTSTRAP_DIR="cygwin-x86_64"
 HOST_FBC_ROOT="${HOST_FBC_ROOT:-}"
 PREFIX="/usr"
 PACKAGE_NAME="freebasic"
@@ -396,14 +416,15 @@ build_freebasic() {
 		host_fbc=""
 	fi
 
-	if [ -d "$bootstrap_sources_dir" ] && find "$bootstrap_sources_dir" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .; then
-		msg "Bootstrap sources already present for cygwin"
-	elif [ -n "$host_fbc" ]; then
+	if [ -n "$host_fbc" ]; then
 		msg "Emitting cygwin bootstrap sources"
+		rm -rf "$bootstrap_sources_dir"
 		run make -j"$JOBS" \
 			bootstrap-emit \
 			BUILD_FBC="$host_fbc" \
 			TARGET_TRIPLET="$TARGET_TRIPLET"
+	elif [ -d "$bootstrap_sources_dir" ] && find "$bootstrap_sources_dir" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .; then
+		msg "Bootstrap sources already present for cygwin"
 	else
 		msg "No direct bootstrap compiler available for cygwin; seeding from peer bootstrap sources"
 		run make -j"$JOBS" bootstrap-seed-peer TARGET_TRIPLET="$TARGET_TRIPLET"
@@ -417,6 +438,9 @@ build_freebasic() {
 	bootstrap_fbc="$(find_fbc "$WORKTREE/bootstrap/fbc")" || fail "bootstrap compiler not found"
 	build_fbc="$(find_fbc "$WORKTREE/bin/fbc")" || fail "bootstrap-minimal did not install bin/fbc"
 	is_cygwin_fbc "$build_fbc" || fail "bootstrap-minimal did not produce a native Cygwin compiler"
+
+	msg "Cleaning bootstrap-minimal runtime objects"
+	run make clean-libs TARGET_TRIPLET="$TARGET_TRIPLET"
 
 	msg "Building Cygwin compiler and runtime ($JOBS threads)"
 	run make -j"$JOBS" all BUILD_FBC="$build_fbc" TARGET_TRIPLET="$TARGET_TRIPLET"
@@ -432,7 +456,7 @@ build_freebasic() {
 	mkdir -p "$STAGE/usr/share/freebasic"
 	mkdir -p "$STAGE/usr/share/man/man1"
 	copy_tree "$ROOT/doc" "$STAGE/usr/share/doc/freebasic/doc"
-	copy_tree "$ROOT/examples" "$STAGE/usr/share/freebasic/examples"
+	copy_examples_tree "$STAGE/usr/share/freebasic/examples"
 	cp -a "$ROOT/readme.txt" "$ROOT/changelog.txt" "$STAGE/usr/share/doc/freebasic/"
 	cp -a "$ROOT/doc/fbc.1" "$STAGE/usr/share/man/man1/"
 
@@ -482,6 +506,7 @@ package_repository() {
 	mkdir -p "$OUT"
 	rm -f "$OUT/$PACKAGE_FILE" "$OUT/$HINT_FILE" "$OUT/setup.ini"
 
+	remove_staged_validation_tools
 	run tar -C "$STAGE" -cJf "$OUT/$PACKAGE_FILE" .
 	generate_metadata
 }
@@ -537,6 +562,14 @@ EOF
 # Validation
 ##############################################################################
 
+remove_staged_validation_tools() {
+	local tool
+
+	for tool in gcc g++ as ld ar ranlib; do
+		rm -f "$STAGE/usr/bin/$tool.exe" "$STAGE/usr/bin/$tool"
+	done
+}
+
 validate_staged_compiler() {
 	local fbc_bin
 	local test_dir="$BUILDROOT/validate"
@@ -556,11 +589,19 @@ validate_staged_compiler() {
 	# The Cygwin package depends on the host Cygwin toolchain packages instead
 	# of bundling GCC/binutils into the FreeBASIC archive.
 	#
-	# For staged validation we therefore expose the host tools at the staged
-	# prefix so the packaged compiler can exercise its normal prefix-based tool
-	# lookup without inflating the package contents.
+	# For staged validation we exercise the staged compiler in its natural
+	# installed layout, letting fbc derive its prefix from its own executable
+	# path.  This gives the compiler a Windows-style Cygwin path such as
+	# C:\cygwin64\tmp\... for the staged prefix, matching the path form used
+	# after installing under /usr.
 	#
-	for tool in gcc g++ as ld ar ranlib; do
+	# Copying gcc.exe alone is not enough because GCC then loses its libexec
+	# helpers such as cc1.  Keep GCC on the host PATH, and only expose the
+	# binutils tools at the staged prefix so assembler/linker lookup still
+	# covers the packaged prefix path.
+	#
+	remove_staged_validation_tools
+	for tool in as ld ar ranlib; do
 		if [ -x "/usr/bin/$tool.exe" ]; then
 			rm -f "$STAGE/usr/bin/$tool.exe" "$STAGE/usr/bin/$tool"
 			cp -f "/usr/bin/$tool.exe" "$STAGE/usr/bin/$tool.exe"
@@ -576,10 +617,11 @@ EOF
 
 	PATH="/usr/bin:/bin"
 	export PATH
-	run "$fbc_bin" -prefix "$STAGE/usr" "$test_src" -x "$test_bin"
+	run "$fbc_bin" "$test_src" -x "$test_bin"
 	output="$("$test_bin")"
 	PATH="$saved_path"
 	export PATH
+	remove_staged_validation_tools
 	output="${output%$'\r'}"
 	[ "$output" = "FreeBASIC Cygwin package test OK" ] || fail "staged compiler produced bad output"
 }

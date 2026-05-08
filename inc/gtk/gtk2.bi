@@ -7649,7 +7649,10 @@ type GtkKeySnoopFunc as function(byval grab_widget as GtkWidget ptr, byval event
 declare function gtk_check_version_ alias "gtk_check_version"(byval required_major as guint, byval required_minor as guint, byval required_micro as guint) as const gchar ptr
 declare function gtk_parse_args(byval argc as long ptr, byval argv as zstring ptr ptr ptr) as gboolean
 
-#ifdef __FB_UNIX__
+#ifdef __FB_CYGWIN__
+	declare sub gtk_init_ alias "gtk_init"(byval argc as long ptr, byval argv as zstring ptr ptr ptr)
+	declare function gtk_init_check_ alias "gtk_init_check"(byval argc as long ptr, byval argv as zstring ptr ptr ptr) as gboolean
+#elseif defined(__FB_UNIX__)
 	declare sub gtk_init(byval argc as long ptr, byval argv as zstring ptr ptr ptr)
 	declare function gtk_init_check(byval argc as long ptr, byval argv as zstring ptr ptr ptr) as gboolean
 #else

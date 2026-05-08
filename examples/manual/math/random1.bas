@@ -22,7 +22,8 @@ Open "testfile" For Random As #1 Len = SizeOf(Entry)
 '' Write out 9 records with predefined data
 For i As Integer = 1 To 9
 	Read s
-	u = Type( Len(s), s )
+	u.slen = Len(s)
+	u.sdata = s
 	Put #1, i, u
 Next
 

@@ -1,0 +1,5 @@
+# TEST_MODE : MULTI_MODULE_OK
+
+MAIN := render-polyphony.bas
+COMPILE_AND_LINK := 1
+

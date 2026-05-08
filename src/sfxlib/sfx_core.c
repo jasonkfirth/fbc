@@ -52,6 +52,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(_WIN32)
+#include <windows.h>
+#elif defined(__DJGPP__)
+#include <dos.h>
+#else
+#include <time.h>
+#endif
+
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
 #include "fb_sfx_driver.h"
@@ -64,6 +72,10 @@ static int fb_sfxOutputQueueInitLocked(void);
 static void fb_sfxOutputQueueShutdownLocked(void);
 static int fb_sfxOutputQueueFillLocked(int frames);
 static int fb_sfxOutputQueueDrainLocked(int frames);
+static void fb_sfxSleepMs(unsigned long milliseconds);
+static int fb_sfxDriverNameEquals(const char *a, const char *b);
+static int fb_sfxDriverTryByName(const char *name);
+static int g_foreground_feed_count = 0;
 
 
 /* ------------------------------------------------------------------------- */
@@ -116,6 +128,8 @@ int fb_sfxInitCore(void)
         fb_sfxRuntimeUnlock();
         return 0;
     }
+
+    __fb_sfx->shutting_down = 0;
 
     SFX_DEBUG("sfx_core: initializing sound subsystem");
 
@@ -196,6 +210,7 @@ void fb_sfxExitCore(void)
     }
 
     SFX_DEBUG("sfx_core: shutting down sound subsystem");
+    __fb_sfx->shutting_down = 1;
     fb_sfxRuntimeUnlock();
 
     /*
@@ -270,6 +285,9 @@ static void fb_sfxInitCoreRollbackLocked(void)
 
 void fb_sfxUpdate(int frames)
 {
+    int chunk;
+    int chunk_limit;
+    int remaining;
     int written;
 
     if (!fb_sfxEnsureInitialized())
@@ -289,22 +307,157 @@ void fb_sfxUpdate(int frames)
         return;
     }
 
-    if (fb_sfxOutputQueueFillLocked(frames) != 0)
+    chunk_limit = (__fb_sfx->buffer_frames > 0)
+        ? __fb_sfx->buffer_frames
+        : FB_SFX_DEFAULT_BUFFER;
+
+    if (chunk_limit <= 0)
     {
         fb_sfxRuntimeUnlock();
         return;
     }
 
-    written = fb_sfxOutputQueueDrainLocked(frames);
-    (void)written;
+    /*
+        The mix buffer is sized for one device-sized block.  A caller may ask
+        for a larger update, especially in tests and foreground commands, so
+        large updates are delivered as a series of bounded blocks.
+    */
+
+    remaining = frames;
+
+    while (remaining > 0)
+    {
+        chunk = (remaining > chunk_limit) ? chunk_limit : remaining;
+
+        if (fb_sfxOutputQueueFillLocked(chunk) != 0)
+            break;
+
+        written = fb_sfxOutputQueueDrainLocked(chunk);
+        if (written <= 0)
+            break;
+
+        remaining -= written;
+
+        if (written < chunk)
+            break;
+    }
 
     fb_sfxRuntimeUnlock();
+}
+
+/* ------------------------------------------------------------------------- */
+/* Foreground audio delivery                                                 */
+/* ------------------------------------------------------------------------- */
+
+/*
+    Some classic BASIC sound statements are foreground operations from the
+    programmer's point of view.  They must not return to a short demo program
+    before the requested tone has reached the platform driver.
+
+    Background drivers pause their worker feed while this helper is active, so
+    the command thread can write the exact number of frames it is responsible
+    for without racing the driver thread.
+*/
+
+void fb_sfxRunForeground(int frames)
+{
+    int step;
+    int tick_frames;
+    int samplerate;
+
+    if (frames <= 0)
+        return;
+
+    samplerate = (__fb_sfx && __fb_sfx->samplerate > 0)
+        ? __fb_sfx->samplerate
+        : 0;
+
+    tick_frames = (samplerate > 0)
+        ? (samplerate / 20)
+        : 220;
+
+    if (tick_frames <= 0)
+        tick_frames = 220;
+
+    fb_sfxForegroundFeedBegin();
+
+    fb_sfxRuntimeLock();
+    if (g_output_queue_initialized)
+        fb_sfxRingBufferClear(&g_output_queue);
+    fb_sfxRuntimeUnlock();
+
+    while (frames > 0)
+    {
+        unsigned long milliseconds;
+
+        step = (frames > tick_frames) ? tick_frames : frames;
+
+        fb_sfxUpdate(step);
+
+        if (samplerate > 0)
+        {
+            milliseconds = (unsigned long)(((unsigned long long)step * 1000ULL) / (unsigned long long)samplerate);
+            if (milliseconds == 0)
+                milliseconds = 1;
+            fb_sfxSleepMs(milliseconds);
+        }
+
+        frames -= step;
+    }
+
+    fb_sfxForegroundFeedEnd();
+}
+
+static void fb_sfxSleepMs(unsigned long milliseconds)
+{
+    if (milliseconds == 0)
+        return;
+
+#if defined(_WIN32)
+    Sleep((DWORD)milliseconds);
+#elif defined(__DJGPP__)
+    delay((unsigned)milliseconds);
+#else
+    {
+        struct timespec req;
+
+        req.tv_sec = (time_t)(milliseconds / 1000UL);
+        req.tv_nsec = (long)((milliseconds % 1000UL) * 1000000UL);
+        nanosleep(&req, NULL);
+    }
+#endif
 }
 
 
 /* ------------------------------------------------------------------------- */
 /* Driver selection                                                          */
 /* ------------------------------------------------------------------------- */
+
+static int fb_sfxDriverNameEquals(const char *a, const char *b)
+{
+    if (!a || !b)
+        return 0;
+
+    while (*a && *b)
+    {
+        char ca = *a;
+        char cb = *b;
+
+        if (ca >= 'A' && ca <= 'Z')
+            ca = (char)(ca - 'A' + 'a');
+
+        if (cb >= 'A' && cb <= 'Z')
+            cb = (char)(cb - 'A' + 'a');
+
+        if (ca != cb)
+            return 0;
+
+        a++;
+        b++;
+    }
+
+    return (*a == '\0' && *b == '\0');
+}
 
 static int fb_sfxDriverIndexOf(const SFXDRIVER *driver)
 {
@@ -439,6 +592,8 @@ static int fb_sfxOutputQueueFillLocked(int frames)
         fb_sfxMixFeedSource(frames_this_pass, fb_sfxAudioFeed);
         fb_sfxMixFeedSource(frames_this_pass, fb_sfxStreamFeed);
 
+        fb_sfxMixerDiagnostics(__fb_sfx->mixbuffer, frames_this_pass);
+
         written = fb_sfxRingBufferWrite(&g_output_queue,
                                         __fb_sfx->mixbuffer,
                                         frames_this_pass);
@@ -460,6 +615,9 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
     if (!__fb_sfx || !__fb_sfx->mixbuffer || frames <= 0)
         return 0;
 
+    if (__fb_sfx->shutting_down)
+        return 0;
+
     if (!g_output_queue_initialized)
         return 0;
 
@@ -469,6 +627,9 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
 
     if (frames > queued)
         frames = queued;
+
+    if (__fb_sfx->buffer_frames > 0 && frames > __fb_sfx->buffer_frames)
+        frames = __fb_sfx->buffer_frames;
 
     drained = fb_sfxRingBufferRead(&g_output_queue, __fb_sfx->mixbuffer, frames);
     if (drained <= 0)
@@ -494,10 +655,28 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
             Platform writes may block while the OS audio server applies
             backpressure.  Keep the runtime lock away from that call so
             command-layer code can continue to queue voices.
+
+            The separate driver-I/O lock prevents foreground commands and
+            driver feeder threads from entering the same platform audio API at
+            the same time.  WASAPI and WinMM both treat overlapping writes as
+            a real driver error, so the active driver is rechecked after the
+            I/O lock is acquired.
         */
+        fb_sfxRuntimeUnlock();
+        fb_sfxDriverIoLock();
+        fb_sfxRuntimeLock();
+
+        if (!__fb_sfx || __fb_sfx->driver != driver || __fb_sfx->shutting_down)
+        {
+            fb_sfxDriverIoUnlock();
+            driver = (__fb_sfx) ? __fb_sfx->driver : NULL;
+            continue;
+        }
+
         fb_sfxRuntimeUnlock();
         result = driver->write(write_buffer, write_frames);
         fb_sfxRuntimeLock();
+        fb_sfxDriverIoUnlock();
 
         if (result > 0)
         {
@@ -556,6 +735,47 @@ static int fb_sfxDriverTryFromIndex(int start_index)
     return -1;
 }
 
+static int fb_sfxDriverTryByName(const char *name)
+{
+    int i;
+
+    if (!__fb_sfx || !name || !*name)
+        return -1;
+
+    for (i = 0; __fb_sfx_drivers_list[i]; ++i)
+    {
+        const SFXDRIVER *driver = __fb_sfx_drivers_list[i];
+
+        if (!driver || !driver->name || !driver->init)
+            continue;
+
+        if (!fb_sfxDriverNameEquals(driver->name, name))
+            continue;
+
+        SFX_DEBUG("sfx_core: attempting requested driver '%s'", driver->name);
+
+        if (driver->init(
+                __fb_sfx->samplerate,
+                __fb_sfx->output_channels,
+                __fb_sfx->buffer_size,
+                FB_SFX_INIT_DEFAULT) == 0)
+        {
+            __fb_sfx->driver = driver;
+
+            SFX_DEBUG("sfx_core: requested driver '%s' initialized",
+                      driver->name);
+
+            return 0;
+        }
+
+        SFX_DEBUG("sfx_core: requested driver '%s' failed", driver->name);
+        return -1;
+    }
+
+    SFX_DEBUG("sfx_core: requested driver '%s' was not found", name);
+    return -1;
+}
+
 static int fb_sfxDriverFallback(const SFXDRIVER *failed_driver)
 {
     const SFXDRIVER *driver_to_exit;
@@ -564,11 +784,17 @@ static int fb_sfxDriverFallback(const SFXDRIVER *failed_driver)
     if (!__fb_sfx || !failed_driver)
         return -1;
 
+    if (__fb_sfx->shutting_down)
+        return -1;
+
     next_index = fb_sfxDriverIndexOf(failed_driver);
     if (next_index < 0)
         return -1;
 
     driver_to_exit = fb_sfxDriverDetachLocked(failed_driver);
+    if (!driver_to_exit)
+        return -1;
+
     fb_sfxRuntimeUnlock();
     fb_sfxDriverExitUnlocked(driver_to_exit);
     fb_sfxRuntimeLock();
@@ -589,9 +815,31 @@ static int fb_sfxDriverFallback(const SFXDRIVER *failed_driver)
 
 int fb_sfxDriverInit(void)
 {
+    const char *requested_driver;
     int result;
 
     fb_sfxRuntimeLock();
+
+    /*
+        SFXLIB_DRIVER gives tests and demos a way to choose a backend before
+        the first sound command initializes the subsystem.  This is especially
+        useful for "null" diagnostic runs that should not open the user's real
+        audio device.
+    */
+
+    requested_driver = getenv("SFXLIB_DRIVER");
+    if (requested_driver &&
+        *requested_driver &&
+        !fb_sfxDriverNameEquals(requested_driver, "default"))
+    {
+        result = fb_sfxDriverTryByName(requested_driver);
+        if (result == 0)
+        {
+            fb_sfxRuntimeUnlock();
+            return 0;
+        }
+    }
+
     result = fb_sfxDriverTryFromIndex(0);
     fb_sfxRuntimeUnlock();
 
@@ -623,6 +871,53 @@ void fb_sfxDriverShutdown(void)
     fb_sfxDriverExitUnlocked(driver);
 }
 
+int fb_sfxDriverFeedsAudio(void)
+{
+    int result;
+
+    result = 0;
+
+    fb_sfxRuntimeLock();
+
+    if (__fb_sfx && __fb_sfx->driver &&
+        (__fb_sfx->driver->capabilities & FB_SFX_DRIVER_CAP_BACKGROUND))
+    {
+        result = 1;
+    }
+
+    fb_sfxRuntimeUnlock();
+
+    return result;
+}
+
+void fb_sfxForegroundFeedBegin(void)
+{
+    fb_sfxRuntimeLock();
+    g_foreground_feed_count++;
+    fb_sfxRuntimeUnlock();
+}
+
+void fb_sfxForegroundFeedEnd(void)
+{
+    fb_sfxRuntimeLock();
+
+    if (g_foreground_feed_count > 0)
+        g_foreground_feed_count--;
+
+    fb_sfxRuntimeUnlock();
+}
+
+int fb_sfxForegroundFeedActive(void)
+{
+    int result;
+
+    fb_sfxRuntimeLock();
+    result = (g_foreground_feed_count > 0);
+    fb_sfxRuntimeUnlock();
+
+    return result;
+}
+
 const SFXDRIVER *fb_sfxDriverDetachLocked(const SFXDRIVER *expected_driver)
 {
     const SFXDRIVER *driver;
@@ -644,7 +939,11 @@ const SFXDRIVER *fb_sfxDriverDetachLocked(const SFXDRIVER *expected_driver)
 void fb_sfxDriverExitUnlocked(const SFXDRIVER *driver)
 {
     if (driver && driver->exit)
+    {
+        fb_sfxDriverIoLock();
         driver->exit();
+        fb_sfxDriverIoUnlock();
+    }
 }
 
 

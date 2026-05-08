@@ -298,8 +298,10 @@
 #define FB_RTL_SFXSFXLOAD               "fb_sfxSfxLoad"
 #define FB_RTL_SFXSFXPLAY               "fb_sfxSfxPlay"
 #define FB_RTL_SFXSFXPLAYCHANNEL        "fb_sfxSfxPlayChannel"
+#define FB_RTL_SFXSFXPLAYCHANNELPITCH   "fb_sfxSfxPlayChannelPitch"
 #define FB_RTL_SFXSFXLOOP               "fb_sfxSfxLoop"
 #define FB_RTL_SFXSFXLOOPCHANNEL        "fb_sfxSfxLoopChannel"
+#define FB_RTL_SFXSFXLOOPCHANNELPITCH   "fb_sfxSfxLoopChannelPitch"
 #define FB_RTL_SFXSFXSTOP               "fb_sfxSfxStop"
 #define FB_RTL_SFXSFXSTOPCHANNEL        "fb_sfxSfxStopChannel"
 #define FB_RTL_SFXSFXSTOPALL            "fb_sfxSfxStopAll"
@@ -868,8 +870,10 @@ enum FB_RTL_IDX
 	FB_RTL_IDX_SFXSFXLOAD
 	FB_RTL_IDX_SFXSFXPLAY
 	FB_RTL_IDX_SFXSFXPLAYCHANNEL
+	FB_RTL_IDX_SFXSFXPLAYCHANNELPITCH
 	FB_RTL_IDX_SFXSFXLOOP
 	FB_RTL_IDX_SFXSFXLOOPCHANNEL
+	FB_RTL_IDX_SFXSFXLOOPCHANNELPITCH
 	FB_RTL_IDX_SFXSFXSTOP
 	FB_RTL_IDX_SFXSFXSTOPCHANNEL
 	FB_RTL_IDX_SFXSFXSTOPALL

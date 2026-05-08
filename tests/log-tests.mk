@@ -24,7 +24,7 @@ PRINTF := printf
 TAIL := tail
 
 ifndef FBC
-FBC := fbc$(EXEEXT)
+FBC := $(TESTS_DEFAULT_FBC)
 endif
 
 # verify the FB_LANG option

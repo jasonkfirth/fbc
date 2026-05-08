@@ -161,6 +161,8 @@ typedef struct FB_SFX_ASSET
 {
     unsigned char *data;
     int size;
+    int frames;
+    int sample_rate;
     int loaded;
     char name[260];
 } FB_SFX_ASSET;
@@ -201,6 +203,8 @@ typedef struct FB_SFXVOICE
 
     int position;
     int pos;
+    float sample_pos;
+    float sample_step;
     int length;
     int start_delay;
     int hard_stop;
@@ -208,6 +212,8 @@ typedef struct FB_SFXVOICE
     int env_state;
     float env_level;
     int env_time;
+    float noise_value;
+    int noise_ready;
 
     const float *data;
 
@@ -321,6 +327,7 @@ typedef struct FB_SFXCTX
     /* Platform driver                                                    */
     /* ------------------------------------------------------------------ */
 
+    int shutting_down;
     const struct SFXDRIVER *driver;
 
 } FB_SFXCTX;

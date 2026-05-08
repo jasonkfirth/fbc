@@ -81,9 +81,13 @@ void fb_sfxVoiceInit(FB_SFXVOICE *v)
 
     v->position = 0;
     v->pos = 0;
+    v->sample_pos = 0.0f;
+    v->sample_step = 1.0f;
     v->length = 0;
     v->start_delay = 0;
     v->hard_stop = 0;
+    v->noise_value = 0.0f;
+    v->noise_ready = 0;
 
     v->data = NULL;
 }

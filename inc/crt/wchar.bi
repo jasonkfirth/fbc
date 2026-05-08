@@ -16,10 +16,12 @@
 #include once "crt/sys/types.bi"
 #include once "crt/stddef.bi"
 
-#if defined(__FB_WIN32__)
+#if defined(__FB_WIN32__) or defined(__FB_XBOX__)
 #include once "crt/win32/wchar.bi"
 #elseif defined(__FB_LINUX__) or defined(__FB_ANDROID__)
 #include once "crt/linux/wchar.bi"
+#elseif defined(__FB_CYGWIN__)
+#include once "crt/cygwin/wchar.bi"
 #elseif defined(__FB_FREEBSD__)
 #include once "crt/freebsd/wchar.bi"
 #elseif defined(__FB_DOS__)

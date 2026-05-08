@@ -92,7 +92,7 @@ FBCALL int fb_ExecEx( FBSTRING *program, FBSTRING *args, int do_fork )
                 }
                 CloseHandle( ProcessInfo.hProcess );
             } else {
-                res = (int) ProcessInfo.hProcess;
+                res = (int)(intptr_t)ProcessInfo.hProcess;
             }
         }
 #endif

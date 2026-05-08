@@ -83,7 +83,7 @@ int fb_DevLptParseProtocol
 
 	while( *p )
 	{
-		if( isspace( *p ) || ( *p == ',' ))
+		if( isspace( FB_CHAR_TO_INT( *p ) ) || ( *p == ',' ))
 			p++;
 
 		else
@@ -104,11 +104,11 @@ int fb_DevLptParseProtocol
 			{
 				/* remove spaces before '=' */
 				pt = pe - 1;
-				while( isspace( *pt )) *pt-- = '\0';
+				while( isspace( FB_CHAR_TO_INT( *pt ) )) *pt-- = '\0';
 
 				/* remove spaces after '=' or end*/
 				*pe++ = '\0';
-				while( isspace( *pe )) *pe++ = '\0';
+				while( isspace( FB_CHAR_TO_INT( *pe ) )) *pe++ = '\0';
 
 				if( strcasecmp( p, "EMU" ) == 0)
 				{
@@ -124,7 +124,7 @@ int fb_DevLptParseProtocol
 			/* remove spaces before ',' or end*/
 			pt = pc ? pc : ptail;
 			pt--;
-			while( isspace( *pt )) *pt-- = '\0';
+			while( isspace( FB_CHAR_TO_INT( *pt ) )) *pt-- = '\0';
 
 			if( pc )
 			{

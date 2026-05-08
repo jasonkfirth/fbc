@@ -1,0 +1,91 @@
+arch	file	size	sha256	source
+win32	liballeg.dll.a	936030	1e2dbdbbfee4c148c361fba6dadd36a51b47655e7708e8768e718bc9ac5a4eab	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-allegro-4.1.zip
+win32	libbass.dll.a	67944	4a4827621f9c58472a609dd6b7ad8bae2bfc8defee44792231a6d63c2d4330ee	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-bass-2.4.8.zip
+win32	libbassmod.dll.a	20346	400b8e4a66134bc5c4ad6999ad0e67bc089a86243e1f116b2e3b3977289cc441	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-bassmod-2.0.zip
+win32	libbig_int.a	56314	8c3f5c2024ffd9744ad15435ad85f1920430bf67e0f054be5018a5c187540666	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-big_int-1.0.7.zip
+win32	libbgd-static.a	331172	41c003bda34348595f9941755852867c0c468519c5b3a1849632386ffa32ec30	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-gd-73cab5d8af96.zip
+win32	libcgui.dll.a	159180	be5f898954e0d57bf1f591261b7375d37c5878716d3fe5256cf55f8ff412c46d	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-cgui-2.0.1.zip
+win32	libcl.a	1957228	6abe19d755a9767946bc9a230c8726c7ef1cecd6ef6fd54b3f269d5387c4d819	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-cryptlib-3.4.2.zip
+win32	libdisphelper.a	27850	ed64cfca6218a88a6c0139fe25e33a58cd4d60ceb4c0cfa19378d9739bff099f	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-disphelper-0.81.zip
+win32	libfcgi.dll.a	64610	7133f03fe1bd460181359f32cd065b615cb1ef6b3c69875e53c3e304632c6a84	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-fastcgi-2005.zip
+win32	libfmod.dll.a	180458	d33dae9c3a19fb66e3d57505ca238312d2db8109741d1e5209bd1b17ff31361b	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-fmod-3.74.zip
+win32	libFreeImage.a	4950568	1542e95c6cd6347b70fcc1a5fc7807677f21fe7bc908b9d311d10f71fc655522	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-freeimage-3.15.4.zip
+win32	libFreeImage.dll.a	237194	2be0ad24f82686cd76f61cd655ae5e064b5a498bb1541f50929bb0b577c8fe08	generated from FreeImage SourceForge Binary Distribution/3.18.0/FreeImage3180Win32Win64.zip
+win32	libgd.a	331172	41c003bda34348595f9941755852867c0c468519c5b3a1849632386ffa32ec30	derived alias for libbgd-static.a
+win32	libgdsl.a	91494	24fc597ef4de4be7eb67bc868d8c9e45094798ab97f2f46a348778b52ccc0a20	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-gdsl-1.6.zip
+win32	libgrx20.a	473434	f9439e181fe009b2afdaa74c522ec61aa0897f649afd867df99dfc7faf8b2e16	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-grx-2.4.9.zip
+win32	libgsl.a	2558068	aee90c8997a25338e8ad1ff4dc7224a3cef96bb48491449f1cc977af46d68cdf	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-gsl-1.15.zip
+win32	libgslcblas.a	273216	a3f878da53bcd8e28a05c3b510d3b42a3b1f751e2347944ee52e93c15a80f38f	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-gsl-1.15.zip
+win32	libimagequant.a	47082	26c7048ef742c037a4d92411bd5f33d37927dc819a6fea800926f24fe36e98ed	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-gd-73cab5d8af96.zip
+win32	libiup.a	469102	0279d5bcc12c856ab1459f35a8c90198fe4c2dd46b55a4cd95ab8d9301168b59	IUP SourceForge 3.32 Windows Libraries/Dynamic/iup-3.32_Win32_dllw6_lib.zip
+win32	libjs.dll.a	319202	c03f0e78ce4b1486daca854aec20d32c9ad40b0ad5f0343ff7ff0b435092436b	FreeBASIC SourceForge 0.18.5/FreeBASIC-v0.18.5b-win32.exe
+win32	libmySQL.dll.a	66834	5ce86edcb4e200d08d24dec222020eaec80fd78f3e8107d527a86bade9f1adef	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-mysql-4.0.17.zip
+win32	libmysqlclient.dll.a	66834	5ce86edcb4e200d08d24dec222020eaec80fd78f3e8107d527a86bade9f1adef	derived alias for libmySQL.dll.a
+win32	libNewton.dll.a	184096	b4be1461151d764d4cb432a84e5ce0df996e959faabffc67115c1808c8ee9c0b	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-newton-2005.zip
+win32	libode_single.dll.a	446882	bb8feccbece2776764519c7a8cb0b9fe062855808a17df2a15a80639e06673f9	MSYS2 mingw-w64-i686-ode 0.16.6-1 package
+win32	libpanel.a	127906	f5f88443570e6cf913da7adc7041b3d0b39e398e7fbdedfc943a3093125cb4d1	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-pdcurses-3.4.zip
+win32	libpcre.a	284392	f6d22f9d83d94beaac4e29ea139b9183b663ba061bd3fa086620270f889a8f40	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-pcre-8.32.zip
+win32	libpcre16.a	264946	7d2e903b553aca8547a67d94fdd3d2a9a71e767ea00aaec324b49bdc8fb8a6fd	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-pcre-8.32.zip
+win32	libpcre32.a	253296	f58830751c7533d8137ff5d06f31dceb6e466c0d3128a3fb7fd1ce951234aec8	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-pcre-8.32.zip
+win32	libpcreposix.a	3318	27e02b6dfbd008b2706611a2ace4a1ddd3ec723fd15ffa4cbfd0220f53335b66	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-pcre-8.32.zip
+win32	libpdcurses.a	127906	f5f88443570e6cf913da7adc7041b3d0b39e398e7fbdedfc943a3093125cb4d1	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-pdcurses-3.4.zip
+win32	libpdf.a	359970	f3fbb47bd2790eef3109d581e212bce1e4e2cba40a67d0359023bcad5f98a3ce	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-pdflib-4.0.2.zip
+win32	libpq.dll.a	92164	3d73541e0b35462b295ee9465c26cd1c0959e36505eb5d661b30e6fd7887e688	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-postgresql-2006.zip
+win32	libquicklz.a	2848	f25fb155391b9195c61bb97f54f4ba78819c1c9ad9868ae09261c4f3032104b4	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-quicklz-1.5.0.zip
+win32	libSDL2_image.dll.a	39544	31c06f07281b71bacce8fcdb272de93e74fa8e86e67be20efba9a6cc35250e5b	SDL_image 2.8.5 official MinGW development package/SDL2_image-devel-2.8.5-mingw.zip
+win32	libSDL_mixer.dll.a	65824	718b565c4e8119f2ffb739b4ff35c9b03cd30063c3f586ad814424c7243f97c5	generated from SDL_mixer 1.2.12 official Win32 binary package/SDL_mixer-1.2.12-win32.zip
+win32	libsqlite.dll.a	34412	383fa1e77c473463d549fc9734211bd3d7196e3e4bd2ad966d87a4738c9631c2	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-sqlite-3071601.zip
+win32	libtinyptc.a	12260	2a35b4f88478de2b0aeaaac98c2668dc165698cbb999d749472df8392a5c3254	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-tinyptc-0.8.zip
+win32	libtinyptc-win.a	13004	552a962312f822e1dde3c35a25b8eac658e2490ca59fca9d87ad8ce7525195a9	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-tinyptc-0.8.zip
+win32	libwx-c-0-9-0-2.dll.a	3531526	aaba57eb25dae8c059a1a256034391997b6ded5f388f798f821d467328fc0d80	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-wx-c-0.9.0.2.zip
+win32	bin/win32/FreeImage.dll	6018560	f5914cf345f20177203e72987eca4a442ddd50934eb6273aa433c177e9640a41	FreeImage SourceForge Binary Distribution/3.18.0/FreeImage3180Win32Win64.zip
+win32	bin/win32/iup.dll	1534857	b29701beeb8378377cbedbcfc890d370908ca380e33a4171d51384564a64a222	IUP SourceForge 3.32 Windows Libraries/Dynamic/iup-3.32_Win32_dllw6_lib.zip
+win32	bin/win32/libode_single.dll	1001835	f75c34ac581eb1812baba46b1ce50c669c2edbb1feb2984dacf7e65752a14b8a	MSYS2 mingw-w64-i686-ode 0.16.6-1 package
+win32	bin/win32/libFLAC-8.dll	328192	493e080e502089504b7ae28e0cbdefe04d5b1761839195daf2cae7c0c9a4143c	SDL_mixer 1.2.12 official Win32 binary package/SDL_mixer-1.2.12-win32.zip
+win32	bin/win32/libmikmod-2.dll	263168	b834b437e77e0a288f454b15729c1dffad08208fa9e9d6beedcd6ad93f2c89a4	SDL_mixer 1.2.12 official Win32 binary package/SDL_mixer-1.2.12-win32.zip
+win32	bin/win32/libogg-0.dll	24064	f96475cd53f87ea279ed6425aa52a53af8b1d0999c521cd78441bcc9e842d3a1	SDL_mixer 1.2.12 official Win32 binary package/SDL_mixer-1.2.12-win32.zip
+win32	bin/win32/libvorbis-0.dll	163840	bd5cc577eda0197ea32551cb118ae382b0c72bd8f24daafe536f2f1504ccdbb4	SDL_mixer 1.2.12 official Win32 binary package/SDL_mixer-1.2.12-win32.zip
+win32	bin/win32/libvorbisfile-3.dll	36352	8a61aa0127df00e31ac0a24029ca6bd8024057ca7432b82d87d7bb612910c294	SDL_mixer 1.2.12 official Win32 binary package/SDL_mixer-1.2.12-win32.zip
+win32	bin/win32/SDL2_image.dll	177664	4ba631bb58bd31ce328cb8c71f21e6da83fd10843e67d51deba6ce153ebb3e44	SDL_image 2.8.5 official MinGW development package/SDL2_image-devel-2.8.5-mingw.zip
+win32	bin/win32/SDL_mixer.dll	160256	04997292dfb89be611f074699224992d4618f258b49e31d91dfbc76a9fd0e714	SDL_mixer 1.2.12 official Win32 binary package/SDL_mixer-1.2.12-win32.zip
+win32	bin/win32/smpeg.dll	209408	86e81a2c58b6cd757909c9719d567ef445d887da326fbdb5388c85fd118cf467	SDL_mixer 1.2.12 official Win32 binary package/SDL_mixer-1.2.12-win32.zip
+win64	libiup.a	457194	d18447cc1e20bac632fef287ba30884a00d0a202caea27b7248b8caf5e8afbf1	IUP SourceForge 3.32 Windows Libraries/Dynamic/iup-3.32_Win64_dllw6_lib.zip
+win64	libbig_int.a	67520	7d9d829af60dd53e2eee4f298acdd563f1f3b236fb688989cd58199d305d53f9	PECL big_int-1.0.7 libbig_int source, built with MSYS2 x86_64-w64-mingw32-gcc
+win64	libdisphelper.a	28270	7f71c259be4d51f34fcde360073b85b26ea082df5815b92eb30a78bca08e5133	DispHelper SourceForge 0.81 single_file_source, built with MSYS2 x86_64-w64-mingw32-gcc
+win64	libfcgi.a	53294	d7d8ed01511126b74f3b84c0bc67a4e24a129d61af093e0453e4369a49449bf7	FastCGI.com archived fcgi-2.4.1-SNAP-0910052249 source, built static with MSYS2 x86_64-w64-mingw32-gcc and contrib/winlibs-legacy/patches/fcgi-2.4.1-win64-pointer-sized-handles.patch
+win64	libgdsl.a	123484	6dc38b74fcb69e19bae1766de03fbb03d8f926309020cd9851a83bcbd09dd211	SourceForge GDSL 1.8 source, built static with MSYS2 x86_64-w64-mingw32-gcc using CFLAGS=-std=gnu89 -O2
+win64	libquicklz.a	3638	fcb64202f5a4092ba1084d47ee74f7f1af0edcbe6ee2e802f61b04778f31692c	QuickLZ 1.5.0 source from Hackage quicklz-1.5.0.3, built with MSYS2 x86_64-w64-mingw32-gcc
+win64	libsqlite.a	490194	28ca1425346cb15e986adba7c3866ec1f955caac61cf3dae4e59a328d35ff8c3	SQLite Fossil tarball version-2.8.17, built static with MSYS2 x86_64-w64-mingw32-gcc
+win64	libtinyptc.a	11030	c242e85e8121f34bf60adf77f2648a11be24f8f59c4f5e95734a296447669819	SourceForge TinyPTC Windows 0.8 source, built static with MSYS2 x86_64-w64-mingw32-gcc and contrib/winlibs-legacy/patches/tinyptc-0.8-win64-gcc-types-no-mmx.patch
+win64	libtinyptc-win.a	11030	c242e85e8121f34bf60adf77f2648a11be24f8f59c4f5e95734a296447669819	Alias archive for win64 TinyPTC windowed examples, same build as libtinyptc.a
+win64	bin/win64/iup.dll	1382392	474b0153b35c6b103c8da2f91295e3205729c82cb3ef42b03a3883693da1fc80	IUP SourceForge 3.32 Windows Libraries/Dynamic/iup-3.32_Win64_dllw6_lib.zip
+win32	libatk-1.0.dll.a	215486	10aed324cf169f5b384facadd6fffbe629eb018d126e8e5b7fdd6d8dae2d3e7f	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-atk-2.60.2-1-any.pkg.tar.zst
+win32	libgdk_pixbuf-2.0.dll.a	101918	e3b856b96e5d4647be2162471da5a568fcba20d241becbbb9875f9e62fecefd4	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-gdk-pixbuf2-2.44.6-1-any.pkg.tar.zst
+win32	libgdk-3.dll.a	480294	c79d082ad5ba399ce4234e242eb5a0afe2e6a5f23179ceb15e12465a9cf48e35	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-gtk3-3.24.51-2-any.pkg.tar.zst
+win32	libgdkglext-win32-1.0.dll.a	1048330	c7bf77fd964709b22d89644aa33b5ada20b17b5f3e88f867defe3bfb74a7e52e	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-gtkglext-1.2.0-4-any.pkg.tar.zst
+win32	libgdk-win32-2.0.dll.a	527726	ac6bc33a22313947b9a5be64fe63a4c3c0abc2dd9c8cbb7bceea0108d03311d6	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-gtk2-2.24.33-6-any.pkg.tar.zst
+win32	libglade-2.0.dll.a	26802	925158a1d9d65024f7cb96ac909556077bb114d48b8f77a0ee21a1e629e59101	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-libglade-2.6.4-6-any.pkg.tar.zst
+win32	libgoocanvas-3.0.dll.a	203546	4705d04f36555451eaf963e8aafe229f767d56242c01d968981fdbcb47972b75	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-goocanvas-3.0.0-4-any.pkg.tar.zst
+win32	libgtk-3.dll.a	3225166	5c25cdbdda37a54b539fc678484ecf078f8dfcb73100ef9941be3b7fbcda2735	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-gtk3-3.24.51-2-any.pkg.tar.zst
+win32	libgtkglext-win32-1.0.dll.a	11870	a24c4f97ef050e6bc3d83ba7fee8167de626a7015b5d9d687e91d5668bb4d4e5	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-gtkglext-1.2.0-4-any.pkg.tar.zst
+win32	libgtk-win32-2.0.dll.a	2831874	1783832dc279c23e6b6f0e7d783c4eff75039ce3cc5b7eeb7b817bff1ca94365	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-gtk2-2.24.33-6-any.pkg.tar.zst
+win32	libpango-1.0.dll.a	366418	424b97d76fb0d565bf6885dfba26a113e81c386360b379214ef246bad347f99c	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-pango-1.56.4-3-any.pkg.tar.zst
+win32	libpangocairo-1.0.dll.a	26824	312dc4e5e99c9501831552c76930e33eac1d7e9e0bdde3c9f1dbd9c116627d56	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-pango-1.56.4-3-any.pkg.tar.zst
+win32	libpangoft2-1.0.dll.a	72464	fab6fe5e2fe35bb737d6945ae57b1b0c56ff13cbddbf5d57b6f5b4f30b3f79c2	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-pango-1.56.4-3-any.pkg.tar.zst
+win32	libpangowin32-1.0.dll.a	27410	a01f56859e14dd078214680ef2ec3fc6042ceb86ebdde0e89c7e2294075abe93	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-pango-1.56.4-3-any.pkg.tar.zst
+win32	bin/win32/libatk-1.0-0.dll	189669	951a5bde6aa669773320d4e3ee9edeebe844225e27050ffa7034ccebed668cc4	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-atk-2.60.2-1-any.pkg.tar.zst
+win32	bin/win32/libepoxy-0.dll	2101488	7a5668f984b04c5b78467131629c8bd6ced270187009ada58518277c60f291c6	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-libepoxy-1.5.10-7-any.pkg.tar.zst
+win32	bin/win32/libfribidi-0.dll	163838	6f4978bd5c428fa8268c076cbfcc479b35ab95c4af0fc521d2e6a67a3a4468cd	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-fribidi-1.0.16-1-any.pkg.tar.zst
+win32	bin/win32/libgdk_pixbuf-2.0-0.dll	382428	803fcea6039ece1c2c39d4caab28ba7e917d3c19fa2b028dccaf1af5026ae427	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-gdk-pixbuf2-2.44.6-1-any.pkg.tar.zst
+win32	bin/win32/libgdk-3-0.dll	1440239	4449ff048f87dcc2c2733447bf794760d42409c0a2a56976a2118ddfa4eded78	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-gtk3-3.24.51-2-any.pkg.tar.zst
+win32	bin/win32/libgdkglext-win32-1.0-0.dll	377698	77c5217f7395b4a86496f1af9d74a9601d52019f90d252f4a68abc8344354ac8	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-gtkglext-1.2.0-4-any.pkg.tar.zst
+win32	bin/win32/libgdk-win32-2.0-0.dll	846681	d20026a95e6692bbcabb0c52de81309bea708e93a72ec6c66aae97565a9385a8	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-gtk2-2.24.33-6-any.pkg.tar.zst
+win32	bin/win32/libglade-2.0-0.dll	116996	9567e2d4249802c145d4df601504d05bbc6d7be0637b8bcbe0f2cd62fae4c329	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-libglade-2.6.4-6-any.pkg.tar.zst
+win32	bin/win32/libgoocanvas-3.0-9.dll	310804	15ea7c9486f0990632cbd2531046e0ad674e4f09bd4c34f66d7d7a313cdb10d4	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-goocanvas-3.0.0-4-any.pkg.tar.zst
+win32	bin/win32/libgtk-3-0.dll	7799104	cd86ff1bdffc792e0b5aaffa6c6a7bdeabe095af1f03b53dbc8b2d6398f3bbf1	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-gtk3-3.24.51-2-any.pkg.tar.zst
+win32	bin/win32/libgtkglext-win32-1.0-0.dll	23031	391462cbdc319872d1efad54a9abdab3065c4bb901cf1ea8be8f92888ac97168	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-gtkglext-1.2.0-4-any.pkg.tar.zst
+win32	bin/win32/libgtk-win32-2.0-0.dll	4484837	c9c216711026a7713420a07c89dbadf1e689bacc2ba2082dc75908e636e0993c	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-gtk2-2.24.33-6-any.pkg.tar.zst
+win32	bin/win32/libpango-1.0-0.dll	444061	f89968a4891961d23e8da387769aaa83fdc0dff3ae326e644e2e5c2cfa1c038f	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-pango-1.56.4-3-any.pkg.tar.zst
+win32	bin/win32/libpangocairo-1.0-0.dll	78363	621f1ed7d4a885ecc0ac20d8fb811dc230dda6d8555890056160f3e3bbe8e354	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-pango-1.56.4-3-any.pkg.tar.zst
+win32	bin/win32/libpangoft2-1.0-0.dll	117028	79b198dcebc7efa791ee249d073fe347a9849738a08cfeb386679eb4aa805d54	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-pango-1.56.4-3-any.pkg.tar.zst
+win32	bin/win32/libpangowin32-1.0-0.dll	118170	e128baa4817220ade616d4cb1d398c26e20e033bda178fe7e4572a86f59e0dd0	MSYS2 repo.msys2.org mingw/i686/mingw-w64-i686-pango-1.56.4-3-any.pkg.tar.zst

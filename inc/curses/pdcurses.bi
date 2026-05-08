@@ -19,6 +19,9 @@
 #pragma once
 
 #inclib "pdcurses"
+#ifdef __FB_WIN32__
+	#inclib "advapi32"
+#endif
 
 #include once "crt/long.bi"
 #include once "crt/stdarg.bi"
@@ -656,7 +659,11 @@ declare function doupdate() as long
 declare function dupwin(byval as WINDOW_ ptr) as WINDOW_ ptr
 declare function echochar(byval as const chtype) as long
 declare function echo() as long
+#if defined(__FB_WIN32__) and defined(__FB_64BIT__)
+declare function endwin alias "endwin_u64_4400"() as long
+#else
 declare function endwin() as long
+#endif
 declare function erasechar() as byte
 declare function erase_ alias "erase"() as long
 declare sub filter()

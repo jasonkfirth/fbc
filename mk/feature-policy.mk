@@ -73,6 +73,20 @@ ifeq ($(TARGET_OS),android)
 endif
 
 # ---------------------------------------------------------------------------
+# Xbox
+#
+# nxdk does not currently ship a target libffi.  ThreadCreate/ThreadWait are
+# still built through the Win32-style thread model, but ThreadCall must keep
+# using the rtlib fallback until an Xbox libffi port is available.
+# ---------------------------------------------------------------------------
+
+ifeq ($(TARGET_OS),xbox)
+  ALLCFLAGS += \
+    -DDISABLE_FFI \
+    -DDISABLE_OPENGL
+endif
+
+# ---------------------------------------------------------------------------
 # JavaScript backend
 # ---------------------------------------------------------------------------
 

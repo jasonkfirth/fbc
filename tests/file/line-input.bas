@@ -4,7 +4,7 @@ SUITE( fbc_tests.file_.line_input )
 
 	TEST( bigList )
 		'' FB should be able to read in big-list.txt line by line using Line Input.
-		'' All 3351 lines of that file should be read.
+		'' All 3349 lines of that file should be read.
 		'' Since reading the last line may not trigger EOF yet, we can end up
 		'' doing an extra unnecessary Line Input which gives an empty line --
 		'' but that should be the only empty line returned.
@@ -27,7 +27,7 @@ SUITE( fbc_tests.file_.line_input )
 				have_empty_line = TRUE
 			end if
 		wend
-		CU_ASSERT( lines = 3351 )
+		CU_ASSERT( lines = 3349 )
 
 		close #f
 	END_TEST

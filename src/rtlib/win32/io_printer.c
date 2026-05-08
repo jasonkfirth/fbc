@@ -331,7 +331,7 @@ fb_hPrinterBuildListLocal( FB_LIST *list )
                 }
 
                 pPortName = pFoundPos + 1;
-                while( isspace( *pPortName ) )
+                while( isspace( FB_CHAR_TO_INT( *pPortName ) ) )
                     ++pPortName;
                 pFoundPos = strchr(pPortName, ',');
             }

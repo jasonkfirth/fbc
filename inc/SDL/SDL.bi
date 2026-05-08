@@ -41,10 +41,18 @@
 #include once "crt/string.bi"
 #include once "crt/ctype.bi"
 
-#ifdef __FB_UNIX__
+#if defined(__FB_ANDROID__) or defined(__FB_XBOX__)
+	#define __FB_SDL_OPAQUE_SYSWM__
+#endif
+
+#ifdef __FB_ANDROID__
+	#include once "crt/stdarg.bi"
+#elseif defined(__FB_UNIX__)
 	#include once "crt/iconv.bi"
 	#include once "X11/Xlib.bi"
 	#include once "X11/Xatom.bi"
+#elseif defined(__FB_XBOX__)
+	#include once "crt/stdarg.bi"
 #else
 	#include once "crt/stdarg.bi"
 	#include once "windows.bi"
@@ -206,7 +214,7 @@ declare function SDL_ulltoa(byval value as Uint64, byval string as zstring ptr, 
 
 #define SDL_sscanf sscanf
 
-#ifdef __FB_UNIX__
+#if defined(__FB_UNIX__) and not defined(__FB_ANDROID__)
 	#define SDL_snprintf snprintf
 	#define SDL_vsnprintf vsnprintf
 #else
@@ -219,7 +227,7 @@ const SDL_ICONV_E2BIG = cuint(-2)
 const SDL_ICONV_EILSEQ = cuint(-3)
 const SDL_ICONV_EINVAL = cuint(-4)
 
-#ifdef __FB_UNIX__
+#if defined(__FB_UNIX__) and not defined(__FB_ANDROID__)
 	#define SDL_iconv_t iconv_t
 	#define SDL_iconv_open iconv_open
 	#define SDL_iconv_close iconv_close
@@ -1552,7 +1560,16 @@ declare sub SDL_Quit()
 	#undef Cursor
 #endif
 
-#ifdef __FB_UNIX__
+#ifdef __FB_SDL_OPAQUE_SYSWM__
+	type SDL_SYSWM_TYPE as long
+	enum
+		SDL_SYSWM_UNKNOWN
+	end enum
+
+	union SDL_SysWMmsg_event
+		dummy as any ptr
+	end union
+#elseif defined(__FB_UNIX__)
 	type SDL_SYSWM_TYPE as long
 	enum
 		SDL_SYSWM_X11
@@ -1568,7 +1585,7 @@ declare sub SDL_Quit()
 type SDL_SysWMmsg_
 	version as SDL_version
 
-	#ifdef __FB_UNIX__
+	#if defined(__FB_UNIX__) or defined(__FB_SDL_OPAQUE_SYSWM__)
 		subsystem as SDL_SYSWM_TYPE
 		event as SDL_SysWMmsg_event
 	#else
@@ -1579,7 +1596,11 @@ type SDL_SysWMmsg_
 	#endif
 end type
 
-#ifdef __FB_UNIX__
+#ifdef __FB_SDL_OPAQUE_SYSWM__
+	union SDL_SysWMinfo_info
+		dummy as any ptr
+	end union
+#elseif defined(__FB_UNIX__)
 	type SDL_SysWMinfo_info_x11
 		display as Display ptr
 		window as Window
@@ -1598,7 +1619,7 @@ end type
 type SDL_SysWMinfo
 	version as SDL_version
 
-	#ifdef __FB_UNIX__
+	#if defined(__FB_UNIX__) or defined(__FB_SDL_OPAQUE_SYSWM__)
 		subsystem as SDL_SYSWM_TYPE
 		info as SDL_SysWMinfo_info
 	#else

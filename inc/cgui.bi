@@ -606,7 +606,7 @@ end enum
 EXTERNVAR cgui_colors(0 to NR_OF_CGUI_COLORS - 1) as long
 declare function CguiSetColor(byval color_name as long, byval r as long, byval g as long, byval b as long) as long
 declare sub NameCase(byval text as zstring ptr)
-declare sub Sound(byval freq as long, byval duration as long)
+declare sub CguiSound alias "Sound"(byval freq as long, byval duration as long)
 declare function AddClock(byval x as long, byval y as long, byval options as long) as long
 
 const CGUI_CLOCK_SHOW_SECONDS = 1

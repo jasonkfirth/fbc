@@ -70,18 +70,18 @@ function CHttp.post _
 		return ""
 	end if
 	
-	dim as CHttpStream ptr stream = new CHttpStream( @this )
+	dim as CHttpStream ptr http_stream = new CHttpStream( @this )
 
     curl_easy_reset( ctx->curl )
     
     curl_easy_setopt( ctx->curl, CURLOPT_HTTPHEADER, ctx->headerlist )
     curl_easy_setopt( ctx->curl, CURLOPT_HTTPPOST, form->getHandle( ) )
 
-    if( stream->receive( url, NULL, FALSE ) ) then
-    	function = stream->read( is_binary )
+    if( http_stream->receive( url, NULL, FALSE ) ) then
+    	function = http_stream->read( is_binary )
     end if
     
-    delete stream
+    delete http_stream
     
 end function
 

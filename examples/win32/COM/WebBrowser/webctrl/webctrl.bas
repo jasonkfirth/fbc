@@ -27,7 +27,7 @@ private function win_cb _
 
 	dim as webctrl ptr _this 
 	
-	_this = cast( webctrl ptr, GetWindowLong( hwnd, GWL_USERDATA ) )
+	_this = cast( webctrl ptr, GetWindowLongPtr( hwnd, GWLP_USERDATA ) )
 	
 	if( _this <> NULL ) then
 		if( _this->ctx->browser <> NULL ) then
@@ -92,7 +92,7 @@ constructor webctrl _
 	dim as WNDCLASSEX ptr wc
 	dim as HINSTANCE hInstance
 	
-	hInstance = cast( .HINSTANCE, GetWindowLong( parent, GWL_HINSTANCE ) )
+	hInstance = cast( .HINSTANCE, GetWindowLongPtr( parent, GWLP_HINSTANCE ) )
 	
 	wc = webctrl_GetRegClass( hInstance )
 	
@@ -111,7 +111,7 @@ constructor webctrl _
 						   		hInstance, _
 						   		NULL )
 	
-	SetWindowLong( ctx->hwnd, GWL_USERDATA, cast( LONG, @this ) )
+	SetWindowLongPtr( ctx->hwnd, GWLP_USERDATA, cast( LONG_PTR, @this ) )
 
 	ctx->flags = flags
 
@@ -132,7 +132,7 @@ destructor webctrl _
 	)
 
 	if( ctx->hwnd <> NULL ) then
-		SetWindowLong( ctx->hwnd, GWL_USERDATA, cast( LONG, NULL ) )
+		SetWindowLongPtr( ctx->hwnd, GWLP_USERDATA, cast( LONG_PTR, NULL ) )
 		DestroyWindow( ctx->hwnd )
 		ctx->hwnd = NULL
 	end if

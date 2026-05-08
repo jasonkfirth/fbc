@@ -126,8 +126,21 @@ tool_or_die() {
 	fi
 
 	shopt -s nullglob
-	for found in "$sdk"/build-tools/*/"$name" "$sdk"/cmdline-tools/latest/bin/"$name" "$sdk"/tools/bin/"$name" "$sdk"/platform-tools/"$name"; do
-		[ -x "$found" ] || continue
+	for found in \
+		"$sdk"/build-tools/*/"$name" \
+		"$sdk"/build-tools/*/"$name.exe" \
+		"$sdk"/build-tools/*/"$name.bat" \
+		"$sdk"/cmdline-tools/latest/bin/"$name" \
+		"$sdk"/cmdline-tools/latest/bin/"$name.exe" \
+		"$sdk"/cmdline-tools/latest/bin/"$name.bat" \
+		"$sdk"/tools/bin/"$name" \
+		"$sdk"/tools/bin/"$name.exe" \
+		"$sdk"/tools/bin/"$name.bat" \
+		"$sdk"/platform-tools/"$name" \
+		"$sdk"/platform-tools/"$name.exe" \
+		"$sdk"/platform-tools/"$name.bat"
+	do
+		[ -f "$found" ] || continue
 		echo "$found"
 		shopt -u nullglob
 		return 0
@@ -234,9 +247,10 @@ done
 [ -d "$libdir" ] || die "Android runtime directory not found: $libdir"
 [ -f "$template/fb_android_app.c" ] || die "Android APK template not found: $template"
 
-base="${src##*/}"
+src_name="${src//\\//}"
+base="${src_name##*/}"
 base="${base%.*}"
-module="$(sanitize_module "$src")"
+module="$(sanitize_module "$src_name")"
 [ -n "$label" ] || label="$base"
 [ -n "$package" ] || package="$(sanitize_package "$base")"
 
@@ -255,6 +269,10 @@ abi="arm64-v8a"
 cc="$prebuilt/bin/${triple}${api}-clang"
 ar="$prebuilt/bin/llvm-ar"
 ranlib="$prebuilt/bin/llvm-ranlib"
+
+[ -x "$cc" ] || cc="$cc.exe"
+[ -x "$ar" ] || ar="$ar.exe"
+[ -x "$ranlib" ] || ranlib="$ranlib.exe"
 
 [ -x "$cc" ] || die "NDK compiler not found: $cc"
 [ -x "$ar" ] || die "NDK llvm-ar not found: $ar"
