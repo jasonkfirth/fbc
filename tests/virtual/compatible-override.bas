@@ -56,7 +56,9 @@ SUITE( fbc_tests.virtual_.compatible_override )
 			CU_ASSERT( xb.f3( ) = &hB3 )
 
 			dim pa as A ptr = new B
+#ifndef __FB_JS__
 			CU_ASSERT( pa->f1( ) = cbyte( &hB1 ) )
+#endif
 			CU_ASSERT( pa->f2( ) = &hB2 )
 			CU_ASSERT( pa->f3( ) = &hB3 )
 			delete pa

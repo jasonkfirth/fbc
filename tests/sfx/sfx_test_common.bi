@@ -26,9 +26,9 @@
 #ifndef __SFX_TEST_COMMON_BI__
 #define __SFX_TEST_COMMON_BI__
 
-declare sub fb_sfxUpdate alias "fb_sfxUpdate" ( byval frames as integer )
-declare function fb_sfxDeviceCurrent alias "fb_sfxDeviceCurrent" ( ) as integer
-declare function fb_sfxDeviceName alias "fb_sfxDeviceName" ( byval id as integer ) as zstring ptr
+declare sub fb_sfxUpdate cdecl alias "fb_sfxUpdate" ( byval frames as integer )
+declare function fb_sfxDeviceCurrent cdecl alias "fb_sfxDeviceCurrent" ( ) as integer
+declare function fb_sfxDeviceName cdecl alias "fb_sfxDeviceName" ( byval id as integer ) as zstring ptr
 
 const SFX_TEST_SAMPLE_RATE = 44100.0
 const SFX_TEST_PI = 3.1415926535897932384626433832795

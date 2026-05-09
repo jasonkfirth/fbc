@@ -2,7 +2,7 @@
 
 #include "fb.h"
 
-#if !defined( HOST_DOS ) && !defined( HOST_ANDROID )
+#if !defined( HOST_DOS ) && !defined( HOST_ANDROID ) && !defined( HOST_JS )
 
 static ssize_t fb_wstr_ConvFromA_nomultibyte(FB_WCHAR *dst, ssize_t dst_chars, const char *src)
 {
@@ -45,11 +45,12 @@ ssize_t fb_wstr_ConvFromA(FB_WCHAR *dst, ssize_t dst_chars, const char *src)
 	/* ensure that the null terminator is written, string may have been truncated */
 	dst[chars] = '\0';
 	return chars;
-#elif defined HOST_ANDROID
+#elif defined HOST_ANDROID || defined HOST_JS
 	/*
-	 * Android application strings are UTF-8.  Do not depend on the process
-	 * locale here: NativeActivity startup and test APKs can begin in the C
-	 * locale before user code has had any chance to adjust it.
+	 * Android application strings and JavaScript strings are UTF-8.  Do not
+	 * depend on the process locale here: NativeActivity startup, test APKs,
+	 * and Node-based JavaScript tests can begin in the C locale before user
+	 * code has had any chance to adjust it.
 	 */
 	ssize_t chars = dst_chars + 1;
 	fb_UTFToWChar( FB_FILE_ENCOD_UTF8, src, dst, &chars );
@@ -94,10 +95,11 @@ FBCALL FB_WCHAR *fb_StrToWstr( const char *src )
 	/* on DOS, mbstowcs() simply calls memcpy() and won't compute
 	length  see fb_unicode.h */
 	chars = strlen( src );
-#elif defined HOST_ANDROID
+#elif defined HOST_ANDROID || defined HOST_JS
 	/*
-	 * See fb_wstr_ConvFromA(): Android program text is UTF-8, and relying
-	 * on mbsrtowcs() makes conversion depend on early process locale state.
+	 * See fb_wstr_ConvFromA(): Android and JavaScript program text is
+	 * UTF-8, and relying on mbsrtowcs() makes conversion depend on early
+	 * process locale state.
 	 */
 	chars = 0;
 	dst = fb_UTFToWChar( FB_FILE_ENCOD_UTF8, src, NULL, &chars );

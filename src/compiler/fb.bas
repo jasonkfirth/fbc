@@ -512,30 +512,14 @@ sub fbInit _
 		env.wcharconv = FB_WCHARCONV_NEVER
 	end if
 
-	'' Android and Xbox use 32-bit target wchar data.  On Win32 hosts,
-	'' compiler wstring data is UTF-16, but the literal symbols still store
-	'' code points and the emitters write them using the target wchar size.
-	'' Keeping conversion enabled here lets constant wstr() expressions fold
-	'' while preserving the target-side storage layout.
-	if( env.wcharconv = FB_WCHARCONV_NEVER ) then
-		select case( env.clopt.target )
-		case FB_COMPTARGET_ANDROID, FB_COMPTARGET_XBOX
-			if( typeGetSize( env.target.wchar ) = 4 ) then
-				env.wcharconv = FB_WCHARCONV_WARNING
-			end if
-		end select
-	end if
-
-#if ( __FB_DEBUG__ <> 0 ) andalso defined( __FB_WIN32__ )
-	select case( env.clopt.target )
-	case FB_COMPTARGET_JS
-		'' !!!TODO!!! - FB_WCHARCONV_WARNING needs to show warnings on conversions
-		'' !!!TODO!!! - FB_WCHARCONV_WARNING probably not correct to force a value
-		''              but setting it helps with development and testing
-		''              where sizeof(host-wstring) <> sizeof(target-wstring)
+	'' Some targets use UTF-32 wchar data even when the compiler is running
+	'' on a UTF-16 host. Literal symbols still store Unicode code points, and
+	'' the emitters write them using the target wchar size. Keeping conversion
+	'' enabled lets constant wstr() expressions fold without teaching every
+	'' caller about each UTF-32 target.
+	if( (env.wcharconv = FB_WCHARCONV_NEVER) and fbTargetWcharIsUtf32( ) ) then
 		env.wcharconv = FB_WCHARCONV_WARNING
-	end select
-#endif
+	end if
 
 	hashInit( @env.filenamehash, FB_INITINCFILES )
 	hashInit( @env.incfilehash, FB_INITINCFILES, FALSE )
@@ -1135,6 +1119,14 @@ function fbIdentifyFbcArch( byref fbcarch as string ) as integer
 	case else
 		function = -1
 	end select
+end function
+
+function fbGetTargetWcharSize( ) as integer
+	return typeGetSize( env.target.wchar )
+end function
+
+function fbTargetWcharIsUtf32( ) as integer
+	return (fbGetTargetWcharSize( ) = 4)
 end function
 
 function fbTargetSupportsELF( ) as integer

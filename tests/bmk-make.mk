@@ -118,6 +118,13 @@ endif
 
 MAIN_MODULE := $(basename $(MAINX))
 APP := $(MAIN_MODULE)$(TARGET_EXEEXT)
+RUN_APP := $(APP)
+
+ifeq ($(TARGET_OS),js)
+ifneq ($(NODEJS),)
+RUN_APP := $(NODEJS) $(APP)
+endif
+endif
 
 ifeq ($(MAIN_MODULE),)
 $(error main module not specified)
@@ -140,10 +147,10 @@ $(APP) : $(OBJS) $(EXTRA_OBJSX)
 endif
 
 run_test_ok : $(APP)
-	@if $(APP) ; then true ; else false ; fi
+	@if $(RUN_APP) ; then true ; else false ; fi
 
 run_test_fail : $(APP)
-	@if $(APP) ; then false ; else true ; fi
+	@if $(RUN_APP) ; then false ; else true ; fi
 
 .PHONY : clean
 clean:

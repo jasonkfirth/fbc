@@ -2545,12 +2545,7 @@ private sub hBuildWstrLit _
 
 	'' (ditto)
 
-	select case( env.clopt.target )
-	case FB_COMPTARGET_ANDROID, FB_COMPTARGET_XBOX
-		wcharsize = 4
-	case else
-		wcharsize = typeGetSize( env.target.wchar )
-	end select
+	wcharsize = fbGetTargetWcharSize( )
 	'' On targets with 1-byte wstring data, C wide strings/chars are too
 	'' wide, so don't use them.
 	if( wcharsize = 1 ) then
@@ -2696,12 +2691,11 @@ private sub hSym2Text( byref s as string, byval sym as FBSYMBOL ptr )
 	'' String literal?
 	if( symbGetIsLiteral( sym ) ) then
 		if( symbGetType( sym ) = FB_DATATYPE_WCHAR ) then
-			select case( env.clopt.target )
-			case FB_COMPTARGET_ANDROID, FB_COMPTARGET_XBOX
+			if( fbTargetWcharIsUtf32( ) ) then
 				hBuildWstrLit( s, symbGetVarLitTextW( sym ), symbGetWstrLength( sym ) + 1 )
-			case else
+			else
 				hBuildWstrLit( s, hUnescapeW( symbGetVarLitTextW( sym ) ), symbGetWstrLength( sym ) + 1 )
-			end select
+			end if
 		else
 			hBuildStrLit( s, hUnescape( symbGetVarLitText( sym ) ), symbGetStrLength( sym ) + 1, 0 )
 		end if
@@ -4154,13 +4148,10 @@ private sub _emitVarIniWstr _
 	''    unsigned int mywstring[] = { L'f', L'o', L'o' }
 
 	ctx.varini += "{ "
-	select case( env.clopt.target )
-	case FB_COMPTARGET_ANDROID, FB_COMPTARGET_XBOX
-		wcharsize = 4
-	case else
-		wcharsize = typeGetSize( env.target.wchar )
+	wcharsize = fbGetTargetWcharSize( )
+	if( not fbTargetWcharIsUtf32( ) ) then
 		literal = hUnescapeW( literal )
-	end select
+	end if
 
 	'' String literal too long?
 	if( litlength > varlength ) then

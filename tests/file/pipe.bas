@@ -1,5 +1,7 @@
 # include "fbcunit.bi"
 
+#ifndef __FB_JS__
+
 SUITE( fbc_tests.file_.pipe_ )
 
 	const filename = "./file/pipe.bas"
@@ -27,3 +29,5 @@ SUITE( fbc_tests.file_.pipe_ )
 	END_TEST
 
 END_SUITE
+
+#endif

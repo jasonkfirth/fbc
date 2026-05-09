@@ -4334,7 +4334,9 @@ private function hArchiveFiles( ) as integer
 
 	dim as string ln = "-rsc " + QUOTE + fbc.outname + (QUOTE + " ")
 
-	if( fbGetOption( FB_COMPOPT_OBJINFO ) and (not fbIsCrossComp( )) ) then
+	if( fbGetOption( FB_COMPOPT_OBJINFO ) and _
+		(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
+		(not fbIsCrossComp( )) ) then
 		if( hCompileFbctinf( ) ) then
 			'' The objinfo reader expects the fbctinf object to be
 			'' the first object file in libraries, so it must be
@@ -5070,7 +5072,9 @@ end sub
 	'' Scan objects and libraries for more libraries and paths,
 	'' before adding the default libs, which don't need to be searched,
 	'' because they don't contain objinfo anyways.
-	if( fbGetOption( FB_COMPOPT_OBJINFO ) and (not fbIsCrossComp( )) ) then
+	if( fbGetOption( FB_COMPOPT_OBJINFO ) and _
+		(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
+		(not fbIsCrossComp( )) ) then
 		hCollectObjinfo( )
 	end if
 

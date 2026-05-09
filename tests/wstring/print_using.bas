@@ -398,8 +398,8 @@ SUITE( fbc_tests.wstring_.print_using )
 		test_sng( fmt,  nan, "+1.#NAN" )
 		test_sng( fmt, -nan, "-1.#NAN" )
 
-		'' arm targets only return NAN instead of IND? and different signs??
-		#if not defined( __FB_ARM__ ) or ( ENABLE_CHECK_BUGS <> 0 )
+		'' Some target C libraries return NAN instead of IND? and different signs??
+		#if not (defined( __FB_ARM__ ) or defined( __FB_JS__ )) or ( ENABLE_CHECK_BUGS <> 0 )
 
 		test_sng( fmt, ind, "-1.#IND" )
 

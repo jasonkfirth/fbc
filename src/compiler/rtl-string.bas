@@ -3006,7 +3006,7 @@ function rtlToWstr _
 		litsym = astGetStrLitSymbol( expr )
 		if( (litsym <> NULL) and _
 		    ((allow_litconst <> FALSE) or _
-		     (env.clopt.target <> FB_COMPTARGET_ANDROID)) ) then
+		     (not fbTargetWcharIsUtf32( ))) ) then
 			if( env.wcharconv <> FB_WCHARCONV_NEVER ) then
 				litsym = symbAllocWstrConst( wstr( *symbGetVarLitText( litsym ) ), _
 				                             symbGetStrLength( litsym ) )

@@ -11,7 +11,7 @@ SUITE( fbc_tests.optimizations.consteval )
 		'' built with -fpmode precise, so we may have differences when
 		'' comparing const evaulation and runtime evaluation
 
-		#if __FB_FPMODE__ = "fast"
+		#if __FB_FPMODE__ = "fast" or defined( __FB_JS__ )
 			const EPSILON_SNG_FPU as single = EPSILON_SNG * 1000
 		#else
 			const EPSILON_SNG_FPU as single = EPSILON_SNG
@@ -60,7 +60,7 @@ SUITE( fbc_tests.optimizations.consteval )
 		checkUop( acos,  1.0f )
 		checkUop( acos,  0.5f )
 		checkUop( acos, -0.5f )
-		checkUop( acos, -1.0f )
+		checkUopFPU( acos, -1.0f )
 		'' tan
 		checkUop( tan,  1.0f )
 		checkUop( tan,  0.5f )

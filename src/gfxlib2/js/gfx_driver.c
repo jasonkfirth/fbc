@@ -189,7 +189,7 @@ static void driver_unlock(void)
 static void driver_wait_vsync(void)
 {
 	/* !!!WRITEME!!! */
-	emscripten_sleep(1000/GFX_JS_FPS);
+	fb_Delay(1000/GFX_JS_FPS);
 }
 
 static void WGL_Flip(void)

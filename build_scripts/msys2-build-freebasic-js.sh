@@ -263,7 +263,6 @@ install_dependencies() {
 		unzip \
 		zip \
 		mingw-w64-ucrt-x86_64-binutils \
-		mingw-w64-ucrt-x86_64-binaryen \
 		mingw-w64-ucrt-x86_64-emscripten \
 		mingw-w64-ucrt-x86_64-gcc \
 		mingw-w64-ucrt-x86_64-nodejs \
@@ -505,14 +504,15 @@ echo fbc-js: %FBJS_ROOT%bin\fbc-js.exe
 cmd /k
 EOF
 
-	cat > "$DISTROOT/freebasic-js-env.sh" <<'EOF'
+cat > "$DISTROOT/freebasic-js-env.sh" <<'EOF'
 #!/usr/bin/env sh
 
-_fbjs_root=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
-PATH="${_fbjs_root}/toolchain/ucrt64/bin:${_fbjs_root}:${PATH}"
+_fbjs_script=${BASH_SOURCE:-$0}
+_fbjs_root=$(CDPATH= cd -- "$(dirname "$_fbjs_script")" && pwd)
+PATH="${_fbjs_root}/toolchain/ucrt64/bin:${_fbjs_root}/bin:${_fbjs_root}:${PATH}"
 PATH="${_fbjs_root}/toolchain/ucrt64/lib/emscripten:${PATH}"
 export PATH
-unset _fbjs_root
+unset _fbjs_script _fbjs_root
 EOF
 
 	chmod 755 "$DISTROOT/freebasic-js-env.sh"

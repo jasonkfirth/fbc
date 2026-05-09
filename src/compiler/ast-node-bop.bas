@@ -870,7 +870,7 @@ function astNewBOP _
 					'' ok to convert at compile-time?
 					if( (typeGetDtAndPtrOnly( ldtype ) = typeGetDtAndPtrOnly( rdtype )) or _
 					    ((env.wcharconv <> FB_WCHARCONV_NEVER) and _
-					     (env.clopt.target <> FB_COMPTARGET_ANDROID)) ) then
+					     (not fbTargetWcharIsUtf32( ))) ) then
 						return hWstrLiteralConcat( l, r )
 					end if
 				end if
@@ -895,7 +895,7 @@ function astNewBOP _
 				'' both literals?
 				if( litsym <> NULL ) then
 					if( (typeGetDtAndPtrOnly( ldtype ) = typeGetDtAndPtrOnly( rdtype )) or _
-					    (env.clopt.target <> FB_COMPTARGET_ANDROID) ) then
+					    (not fbTargetWcharIsUtf32( )) ) then
 						return hWstrLiteralCompare( op, l, r )
 					end if
 				end if

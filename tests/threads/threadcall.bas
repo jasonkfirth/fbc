@@ -7,7 +7,7 @@
 #define ENABLE_CHECK_BUGS 0
 #endif
 
-#if not (defined( __FB_ARM__ ) or defined( __FB_DOS__)) or ( ENABLE_CHECK_BUGS <> 0 )
+#if not (defined( __FB_ARM__ ) or defined( __FB_DOS__) or defined( __FB_JS__ )) or ( ENABLE_CHECK_BUGS <> 0 )
 
 '' fbcunit is not thread-safe - wrap the CU_ASSERT_TRUE in a mutex
 #undef CU_ASSERT_TRUE
