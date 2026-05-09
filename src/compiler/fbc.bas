@@ -958,7 +958,11 @@ private function hLinkFiles( ) as integer
 		else
 			'' set default subsystem mode
 			if( len( fbc.subsystem ) = 0 ) then
-				fbc.subsystem = "console"
+				if( fbGetOption( FB_COMPOPT_MODEVIEW ) = FB_MODEVIEW_GUI ) then
+					fbc.subsystem = "windows"
+				else
+					fbc.subsystem = "console"
+				end if
 			else
 				if( fbc.subsystem = "gui" ) then
 					fbc.subsystem = "windows"
@@ -972,7 +976,11 @@ private function hLinkFiles( ) as integer
 
 		'' set default subsystem mode
 		if( len( fbc.subsystem ) = 0 ) then
-			fbc.subsystem = "console"
+			if( fbGetOption( FB_COMPOPT_MODEVIEW ) = FB_MODEVIEW_GUI ) then
+				fbc.subsystem = "windows"
+			else
+				fbc.subsystem = "console"
+			end if
 		else
 			if( fbc.subsystem = "gui" ) then
 				fbc.subsystem = "windows"
@@ -1114,7 +1122,8 @@ private function hLinkFiles( ) as integer
 
 		ldcline += " --shell-file" + hFindLib("fb_shell.html")
 		ldcline += " --post-js" + hFindLib("fb_rtlib.js")
-		if( len(fbc.subsystem) = 0 ) then
+		if( ((len(fbc.subsystem) = 0) and (fbGetOption( FB_COMPOPT_MODEVIEW ) = FB_MODEVIEW_CONSOLE)) or _
+		    (fbc.subsystem = "console") ) then
 			ldcline += " --post-js" + hFindLib("termlib_min.js")
 		end if
 
@@ -2516,9 +2525,11 @@ private sub handleOpt _
 
 	case OPT_S
 		fbc.subsystem = arg
-		select case( arg )
-		case "gui"
+		select case lcase( arg )
+		case "gui", "windows"
 			fbSetOption( FB_COMPOPT_MODEVIEW, FB_MODEVIEW_GUI )
+		case "console"
+			fbSetOption( FB_COMPOPT_MODEVIEW, FB_MODEVIEW_CONSOLE )
 
 		end select
 
@@ -4829,7 +4840,7 @@ private sub hPrintOptions( byval verbose as integer )
 	print "  -rr              Write out the final .asm only"
 	print "  -R               Preserve temporary .asm/.c/.ll/.def files"
 	print "  -RR              Preserve the final .asm file"
-	print "  -s console|gui   Select win32 subsystem"
+	print "  -s console|gui   Select application subsystem"
 	print "  -showincludes    Display a tree of file names of #included files"
 	print "  -static          Prefer static libraries over dynamic ones when linking"
 	print "  -strip           Omit all symbol information from the output file"

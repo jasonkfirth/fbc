@@ -35,6 +35,7 @@ void fb_hAndroidGfxSetLifecycle(int started, int resumed, int focused);
 int fb_hAndroidIsGraphicsActive(void);
 void fb_hAndroidTouch(float x, float y, int action);
 void fb_hAndroidKey(int32_t keycode, int action, int unicode);
+void fb_hAndroidSetConsoleEnabled(int enabled);
 void fb_hAndroidConsoleWrite(const char *text, size_t length);
 void fb_hAndroidConsoleRender(void);
 int fb_hAndroidKeyboardButtonHit(float x, float y);

@@ -35,11 +35,14 @@ typedef struct FB_ANDROID_GFX_STATE
 	int window_width;
 	int window_height;
 	BLITTER *blitter;
+	unsigned char *scale_buffer;
+	size_t scale_buffer_size;
 	int started;
 	int resumed;
 	int focused;
 	unsigned surface_generation;
 	int render_suspended;
+	int console_enabled;
 	char console[FB_ANDROID_CONSOLE_LINES][FB_ANDROID_CONSOLE_COLS];
 	int console_line;
 	int console_col;
@@ -64,10 +67,13 @@ static FB_ANDROID_GFX_STATE fb_android =
 	0,
 	0,
 	NULL,
+	NULL,
+	0,
 	1,
 	1,
 	1,
 	0,
+	1,
 	1,
 	{{0}},
 	0,
@@ -134,8 +140,7 @@ static void configure_window_locked(void)
 		return;
 	}
 
-	if (fb_android.active && fb_android.width > 0 && fb_android.height > 0)
-		ANativeWindow_setBuffersGeometry(fb_android.window, fb_android.width, fb_android.height, WINDOW_FORMAT_RGBA_8888);
+	ANativeWindow_setBuffersGeometry(fb_android.window, 0, 0, WINDOW_FORMAT_RGBA_8888);
 
 	update_window_size_locked();
 	update_render_suspended_locked();
@@ -211,7 +216,7 @@ void fb_hAndroidSetWindow(ANativeWindow *window)
 	fb_android.surface_generation++;
 	configure_window_locked();
 	redraw_active = fb_android.active && can_render_locked();
-	redraw_console = !fb_android.active && can_render_locked();
+	redraw_console = fb_android.console_enabled && !fb_android.active && can_render_locked();
 	pthread_mutex_unlock(&fb_android.mutex);
 
 	if (old_window)
@@ -234,7 +239,7 @@ void fb_hAndroidGfxSetLifecycle(int started, int resumed, int focused)
 	fb_android.focused = focused ? 1 : 0;
 	update_render_suspended_locked();
 	redraw_active = fb_android.active && can_render_locked();
-	redraw_console = !fb_android.active && can_render_locked();
+	redraw_console = fb_android.console_enabled && !fb_android.active && can_render_locked();
 	pthread_mutex_unlock(&fb_android.mutex);
 
 	if (redraw_active)
@@ -310,6 +315,9 @@ void fb_hAndroidExit(void)
 	fb_android.height = 0;
 	fb_android.depth = 0;
 	fb_android.blitter = NULL;
+	free(fb_android.scale_buffer);
+	fb_android.scale_buffer = NULL;
+	fb_android.scale_buffer_size = 0;
 	update_render_suspended_locked();
 	pthread_mutex_unlock(&fb_android.mutex);
 }
@@ -412,6 +420,187 @@ static void draw_rect(ANativeWindow_Buffer *buffer, int x0, int y0, int x1, int 
 		uint32_t *row = (uint32_t *)buffer->bits + (y * buffer->stride);
 		for (x = x0; x < x1; ++x)
 			row[x] = color;
+	}
+}
+
+static int ensure_scale_buffer_locked(size_t bytes)
+{
+	unsigned char *new_buffer;
+
+	if (bytes == 0)
+		return 0;
+
+	if (fb_android.scale_buffer_size >= bytes)
+		return 1;
+
+	new_buffer = (unsigned char *)realloc(fb_android.scale_buffer, bytes);
+	if (!new_buffer)
+	{
+		free(fb_android.scale_buffer);
+		fb_android.scale_buffer = NULL;
+		fb_android.scale_buffer_size = 0;
+		return 0;
+	}
+
+	fb_android.scale_buffer = new_buffer;
+	fb_android.scale_buffer_size = bytes;
+	return 1;
+}
+
+static int divide_round_up(int value, int divisor)
+{
+	if (divisor <= 0)
+		return value;
+	return (value + divisor - 1) / divisor;
+}
+
+static int framebuffer_viewport_locked(int dst_w, int dst_h, int *scale, int *skip,
+	int *out_w, int *out_h, int *off_x, int *off_y)
+{
+	int src_w = fb_android.width;
+	int src_h = fb_android.height;
+	int local_scale;
+	int local_skip;
+
+	if (src_w <= 0 || src_h <= 0 || dst_w <= 0 || dst_h <= 0)
+		return 0;
+
+	local_scale = dst_w / src_w;
+	if (dst_h / src_h < local_scale)
+		local_scale = dst_h / src_h;
+
+	if (local_scale >= 1)
+	{
+		*scale = local_scale;
+		*skip = 1;
+		*out_w = src_w * local_scale;
+		*out_h = src_h * local_scale;
+		*off_x = (dst_w - *out_w) / 2;
+		*off_y = (dst_h - *out_h) / 2;
+		return 1;
+	}
+
+	local_skip = divide_round_up(src_w, dst_w);
+	if (divide_round_up(src_h, dst_h) > local_skip)
+		local_skip = divide_round_up(src_h, dst_h);
+	if (local_skip < 1)
+		local_skip = 1;
+
+	*scale = 0;
+	*skip = local_skip;
+	*out_w = divide_round_up(src_w, local_skip);
+	*out_h = divide_round_up(src_h, local_skip);
+	if (*out_w > dst_w)
+		*out_w = dst_w;
+	if (*out_h > dst_h)
+		*out_h = dst_h;
+	*off_x = (dst_w - *out_w) / 2;
+	*off_y = (dst_h - *out_h) / 2;
+	return 1;
+}
+
+static int clamp_framebuffer_x_locked(int x)
+{
+	if (x < 0)
+		return 0;
+	if (x >= fb_android.width)
+		return fb_android.width - 1;
+	return x;
+}
+
+static int clamp_framebuffer_y_locked(int y)
+{
+	if (y < 0)
+		return 0;
+	if (y >= fb_android.height)
+		return fb_android.height - 1;
+	return y;
+}
+
+static void map_window_to_framebuffer_locked(float x, float y, int *mapped_x, int *mapped_y)
+{
+	int win_w = fb_android.window_width > 0 ? fb_android.window_width : fb_android.width;
+	int win_h = fb_android.window_height > 0 ? fb_android.window_height : fb_android.height;
+	int scale, skip, out_w, out_h, off_x, off_y;
+	int local_x, local_y;
+
+	if (!framebuffer_viewport_locked(win_w, win_h, &scale, &skip, &out_w, &out_h, &off_x, &off_y))
+	{
+		*mapped_x = (int)x;
+		*mapped_y = (int)y;
+		return;
+	}
+
+	local_x = (int)x - off_x;
+	local_y = (int)y - off_y;
+
+	if (scale >= 1)
+	{
+		*mapped_x = clamp_framebuffer_x_locked(local_x / scale);
+		*mapped_y = clamp_framebuffer_y_locked(local_y / scale);
+		return;
+	}
+
+	*mapped_x = clamp_framebuffer_x_locked(local_x * skip);
+	*mapped_y = clamp_framebuffer_y_locked(local_y * skip);
+}
+
+static void draw_scaled_framebuffer_locked(ANativeWindow_Buffer *buffer)
+{
+	int src_w = fb_android.width;
+	int src_h = fb_android.height;
+	int src_pitch;
+	int scale;
+	int skip;
+	int out_w;
+	int out_h;
+	int off_x;
+	int off_y;
+	int x, y;
+	size_t bytes;
+	uint32_t *src32;
+
+	if (!buffer || !fb_android.blitter || src_w <= 0 || src_h <= 0 ||
+	    buffer->width <= 0 || buffer->height <= 0)
+		return;
+
+	if ((size_t)src_w > (SIZE_MAX / 4u) / (size_t)src_h)
+		return;
+
+	bytes = (size_t)src_w * (size_t)src_h * 4u;
+	if (!ensure_scale_buffer_locked(bytes))
+		return;
+
+	src_pitch = src_w * 4;
+	fb_android.blitter(fb_android.scale_buffer, src_pitch);
+	src32 = (uint32_t *)fb_android.scale_buffer;
+
+	draw_rect(buffer, 0, 0, buffer->width, buffer->height, rgba(0, 0, 0));
+
+	if (!framebuffer_viewport_locked(buffer->width, buffer->height, &scale, &skip,
+	    &out_w, &out_h, &off_x, &off_y))
+		return;
+
+	if (scale >= 1)
+	{
+		for (y = 0; y < out_h; ++y)
+		{
+			uint32_t *dst = (uint32_t *)buffer->bits + ((off_y + y) * buffer->stride) + off_x;
+			uint32_t *src = src32 + ((y / scale) * src_w);
+
+			for (x = 0; x < out_w; ++x)
+				dst[x] = src[x / scale];
+		}
+		return;
+	}
+
+	for (y = 0; y < out_h; ++y)
+	{
+		uint32_t *dst = (uint32_t *)buffer->bits + ((off_y + y) * buffer->stride) + off_x;
+		uint32_t *src = src32 + ((y * skip) * src_w);
+
+		for (x = 0; x < out_w; ++x)
+			dst[x] = src[x * skip];
 	}
 }
 
@@ -522,12 +711,10 @@ void fb_hAndroidUpdate(void)
 {
 	ANativeWindow_Buffer buffer;
 	ANativeWindow *window;
-	BLITTER *blitter;
 
 	pthread_mutex_lock(&fb_android.mutex);
 	window = fb_android.window;
-	blitter = fb_android.blitter;
-	if (!fb_android.active || !can_render_locked() || !window || !blitter || !__fb_gfx || !__fb_gfx->framebuffer)
+	if (!fb_android.active || !can_render_locked() || !window || !fb_android.blitter || !__fb_gfx || !__fb_gfx->framebuffer)
 	{
 		pthread_mutex_unlock(&fb_android.mutex);
 		return;
@@ -539,10 +726,23 @@ void fb_hAndroidUpdate(void)
 		return;
 	}
 
-	blitter((unsigned char *)buffer.bits, buffer.stride * 4);
+	draw_scaled_framebuffer_locked(&buffer);
 	draw_keyboard_button_locked(&buffer);
 	ANativeWindow_unlockAndPost(window);
 	pthread_mutex_unlock(&fb_android.mutex);
+}
+
+void fb_hAndroidSetConsoleEnabled(int enabled)
+{
+	int redraw_console;
+
+	pthread_mutex_lock(&fb_android.mutex);
+	fb_android.console_enabled = enabled ? 1 : 0;
+	redraw_console = fb_android.console_enabled && !fb_android.active && can_render_locked();
+	pthread_mutex_unlock(&fb_android.mutex);
+
+	if (redraw_console)
+		fb_hAndroidConsoleRender();
 }
 
 void fb_hAndroidConsoleRender(void)
@@ -553,7 +753,7 @@ void fb_hAndroidConsoleRender(void)
 
 	pthread_mutex_lock(&fb_android.mutex);
 	window = fb_android.window;
-	if (fb_android.active || !can_render_locked() || !window)
+	if (!fb_android.console_enabled || fb_android.active || !can_render_locked() || !window)
 	{
 		pthread_mutex_unlock(&fb_android.mutex);
 		return;
@@ -598,6 +798,12 @@ void fb_hAndroidConsoleWrite(const char *text, size_t length)
 		return;
 
 	pthread_mutex_lock(&fb_android.mutex);
+	if (!fb_android.console_enabled)
+	{
+		pthread_mutex_unlock(&fb_android.mutex);
+		return;
+	}
+
 	for (i = 0; i < length; ++i)
 	{
 		unsigned char ch = (unsigned char)text[i];
@@ -638,7 +844,7 @@ void fb_hAndroidConsoleWrite(const char *text, size_t length)
 void fb_hAndroidTouch(float x, float y, int action)
 {
 	EVENT e;
-	int w, h, mapped_x, mapped_y;
+	int mapped_x, mapped_y;
 	int x0, y0, x1, y1;
 	int toggle_keyboard = 0;
 
@@ -664,10 +870,7 @@ void fb_hAndroidTouch(float x, float y, int action)
 		return;
 	}
 
-	w = fb_android.window_width > 0 ? fb_android.window_width : fb_android.width;
-	h = fb_android.window_height > 0 ? fb_android.window_height : fb_android.height;
-	mapped_x = (w > 0 && fb_android.width > 0) ? (int)(x * fb_android.width / w) : (int)x;
-	mapped_y = (h > 0 && fb_android.height > 0) ? (int)(y * fb_android.height / h) : (int)y;
+	map_window_to_framebuffer_locked(x, y, &mapped_x, &mapped_y);
 	fb_android.mouse_x = mapped_x;
 	fb_android.mouse_y = mapped_y;
 
@@ -770,4 +973,14 @@ void fb_hAndroidScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssiz
 	*depth = 32;
 	*refresh = 60;
 	pthread_mutex_unlock(&fb_android.mutex);
+}
+
+ssize_t fb_hGetWindowHandle(void)
+{
+	return 0;
+}
+
+ssize_t fb_hGetDisplayHandle(void)
+{
+	return 0;
 }

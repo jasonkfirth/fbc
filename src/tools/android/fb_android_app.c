@@ -1,4 +1,5 @@
 #include <android/input.h>
+#include <android/asset_manager.h>
 #include <android/log.h>
 #include <android/looper.h>
 #include <android/native_activity.h>
@@ -11,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #define FB_ANDROID_LOG_TAG "FreeBASIC"
@@ -24,10 +26,13 @@
 #endif
 
 int fb_android_program_main(int argc, char **argv);
+extern const int __fb_app_mode_gui_enabled FB_ANDROID_WEAK;
+void fb_AllocateMainFBThread(void) FB_ANDROID_WEAK;
 void fb_hAndroidSetActivity(ANativeActivity *activity) FB_ANDROID_WEAK;
 void fb_hAndroidSetWindow(ANativeWindow *window) FB_ANDROID_WEAK;
 void fb_hAndroidTouch(float x, float y, int action) FB_ANDROID_WEAK;
 void fb_hAndroidKey(int32_t keycode, int action, int unicode) FB_ANDROID_WEAK;
+void fb_hAndroidSetConsoleEnabled(int enabled) FB_ANDROID_WEAK;
 void fb_hAndroidConsoleWrite(const char *text, size_t length) FB_ANDROID_WEAK;
 void fb_hAndroidConsoleRender(void) FB_ANDROID_WEAK;
 void fb_hAndroidUpdate(void) FB_ANDROID_WEAK;
@@ -68,6 +73,238 @@ static void fb_android_log(const char *text)
 		__android_log_write(ANDROID_LOG_INFO, FB_ANDROID_LOG_TAG, text);
 }
 
+static int fb_android_console_enabled(void)
+{
+	return &__fb_app_mode_gui_enabled ? 0 : 1;
+}
+
+static void fb_android_apply_app_mode(void)
+{
+	if (fb_hAndroidSetConsoleEnabled)
+		fb_hAndroidSetConsoleEnabled(fb_android_console_enabled());
+}
+
+static void fb_android_render_console_if_enabled(void)
+{
+	if (fb_android_console_enabled() && fb_hAndroidConsoleRender)
+		fb_hAndroidConsoleRender();
+}
+
+static int fb_android_mkdir_p(const char *path)
+{
+	char buffer[1024];
+	size_t len;
+	char *p;
+
+	if (!path || !*path)
+		return -1;
+
+	len = strlen(path);
+	if (len >= sizeof(buffer))
+		return -1;
+
+	memcpy(buffer, path, len + 1);
+	for (p = buffer + 1; *p; ++p)
+	{
+		if (*p != '/')
+			continue;
+		*p = '\0';
+		if (mkdir(buffer, 0700) != 0 && errno != EEXIST)
+			return -1;
+		*p = '/';
+	}
+
+	if (mkdir(buffer, 0700) != 0 && errno != EEXIST)
+		return -1;
+
+	return 0;
+}
+
+static int fb_android_join_path(char *dst, size_t dst_len, const char *left, const char *right)
+{
+	int written;
+
+	if (!dst || !left || !right)
+		return -1;
+
+	if (*right == '\0')
+		written = snprintf(dst, dst_len, "%s", left);
+	else if (*left == '\0')
+		written = snprintf(dst, dst_len, "%s", right);
+	else
+		written = snprintf(dst, dst_len, "%s/%s", left, right);
+
+	if (written < 0 || (size_t)written >= dst_len)
+		return -1;
+
+	return 0;
+}
+
+static int fb_android_extract_asset_file(AAssetManager *assets, const char *asset_name, const char *dst_name)
+{
+	AAsset *asset;
+	FILE *out;
+	char parent[1024];
+	char *slash;
+	char buffer[4096];
+	int ok = 1;
+
+	asset = AAssetManager_open(assets, asset_name, AASSET_MODE_STREAMING);
+	if (!asset)
+		return 0;
+
+	if (strlen(dst_name) >= sizeof(parent))
+	{
+		AAsset_close(asset);
+		return -1;
+	}
+
+	strcpy(parent, dst_name);
+	slash = strrchr(parent, '/');
+	if (slash)
+	{
+		*slash = '\0';
+		if (fb_android_mkdir_p(parent) != 0)
+		{
+			AAsset_close(asset);
+			return -1;
+		}
+	}
+
+	out = fopen(dst_name, "wb");
+	if (!out)
+	{
+		AAsset_close(asset);
+		return -1;
+	}
+
+	for (;;)
+	{
+		int got = AAsset_read(asset, buffer, sizeof(buffer));
+		if (got > 0)
+		{
+			if (fwrite(buffer, 1, (size_t)got, out) != (size_t)got)
+			{
+				ok = 0;
+				break;
+			}
+			continue;
+		}
+		if (got < 0)
+			ok = 0;
+		break;
+	}
+
+	fclose(out);
+	AAsset_close(asset);
+	return ok ? 1 : -1;
+}
+
+static void fb_android_extract_asset_tree(AAssetManager *assets, const char *asset_dir, const char *dst_dir)
+{
+	AAssetDir *dir;
+	const char *entry;
+
+	dir = AAssetManager_openDir(assets, asset_dir);
+	if (!dir)
+		return;
+
+	while ((entry = AAssetDir_getNextFileName(dir)) != NULL)
+	{
+		char child_asset[1024];
+		char child_dst[1024];
+		int extracted;
+
+		if (fb_android_join_path(child_asset, sizeof(child_asset), asset_dir, entry) != 0)
+			continue;
+		if (fb_android_join_path(child_dst, sizeof(child_dst), dst_dir, entry) != 0)
+			continue;
+
+		extracted = fb_android_extract_asset_file(assets, child_asset, child_dst);
+		if (extracted == 0)
+		{
+			if (fb_android_mkdir_p(child_dst) == 0)
+				fb_android_extract_asset_tree(assets, child_asset, child_dst);
+		}
+	}
+
+	AAssetDir_close(dir);
+}
+
+static void fb_android_extract_asset_manifest(AAssetManager *assets, const char *dst_dir)
+{
+	AAsset *manifest;
+	char line[1024];
+	size_t used = 0;
+	char ch;
+
+	manifest = AAssetManager_open(assets, "_freebasic_asset_manifest.txt", AASSET_MODE_STREAMING);
+	if (!manifest)
+	{
+		fb_android_extract_asset_tree(assets, "", dst_dir);
+		return;
+	}
+
+	while (AAsset_read(manifest, &ch, 1) == 1)
+	{
+		if (ch == '\r')
+			continue;
+
+		if (ch != '\n')
+		{
+			if (used + 1 < sizeof(line))
+				line[used++] = ch;
+			continue;
+		}
+
+		if (used > 0)
+		{
+			char dst_name[1024];
+			line[used] = '\0';
+			if (fb_android_join_path(dst_name, sizeof(dst_name), dst_dir, line) == 0)
+				fb_android_extract_asset_file(assets, line, dst_name);
+			used = 0;
+		}
+	}
+
+	if (used > 0)
+	{
+		char dst_name[1024];
+		line[used] = '\0';
+		if (fb_android_join_path(dst_name, sizeof(dst_name), dst_dir, line) == 0)
+			fb_android_extract_asset_file(assets, line, dst_name);
+	}
+
+	AAsset_close(manifest);
+}
+
+static void fb_android_prepare_files_dir(FB_ANDROID_APP *app)
+{
+	const char *files_dir;
+
+	if (!app || !app->activity)
+		return;
+
+	files_dir = app->activity->internalDataPath;
+	if (!files_dir || !*files_dir)
+		return;
+
+	if (fb_android_mkdir_p(files_dir) != 0)
+	{
+		fb_android_log("FreeBASIC Android could not create internal files directory");
+		return;
+	}
+
+	if (chdir(files_dir) != 0)
+	{
+		fb_android_log("FreeBASIC Android could not enter internal files directory");
+		return;
+	}
+
+	if (app->activity->assetManager)
+		fb_android_extract_asset_manifest(app->activity->assetManager, files_dir);
+}
+
 static void fb_android_set_nonblock(int fd)
 {
 	int flags = fcntl(fd, F_GETFL, 0);
@@ -102,6 +339,9 @@ static void *fb_android_program_thread(void *arg)
 	(void)app;
 
 	fb_android_log("FreeBASIC Android program starting");
+	fb_android_prepare_files_dir(app);
+	if (fb_AllocateMainFBThread)
+		fb_AllocateMainFBThread();
 	fb_android_exit_jump = &exit_jump;
 	fb_android_exit_status = 0;
 	if (setjmp(exit_jump) == 0)
@@ -211,7 +451,7 @@ static void fb_android_handle_stdout(FB_ANDROID_APP *app)
 			memcpy(logbuf, buffer, copy);
 			logbuf[copy] = '\0';
 			fb_android_log(logbuf);
-			if (fb_hAndroidConsoleWrite)
+			if (fb_android_console_enabled() && fb_hAndroidConsoleWrite)
 				fb_hAndroidConsoleWrite(buffer, (size_t)got);
 			continue;
 		}
@@ -250,8 +490,7 @@ static void *fb_android_looper_thread(void *arg)
 	fb_android_maybe_start_program(app);
 	pthread_mutex_unlock(&app->mutex);
 
-	if (fb_hAndroidConsoleRender)
-		fb_hAndroidConsoleRender();
+	fb_android_render_console_if_enabled();
 
 	while (!app->destroyed)
 	{
@@ -360,8 +599,7 @@ static void fb_android_on_native_window_created(ANativeActivity *activity, ANati
 
 	if (fb_hAndroidSetWindow)
 		fb_hAndroidSetWindow(window);
-	if (fb_hAndroidConsoleRender)
-		fb_hAndroidConsoleRender();
+	fb_android_render_console_if_enabled();
 	if (fb_hAndroidUpdate)
 		fb_hAndroidUpdate();
 }
@@ -379,8 +617,7 @@ static void fb_android_on_native_window_resized(ANativeActivity *activity, ANati
 
 	if (fb_hAndroidSetWindow)
 		fb_hAndroidSetWindow(window);
-	if (fb_hAndroidConsoleRender)
-		fb_hAndroidConsoleRender();
+	fb_android_render_console_if_enabled();
 	if (fb_hAndroidUpdate)
 		fb_hAndroidUpdate();
 }
@@ -390,8 +627,7 @@ static void fb_android_on_native_window_redraw_needed(ANativeActivity *activity,
 	(void)activity;
 	(void)window;
 
-	if (fb_hAndroidConsoleRender)
-		fb_hAndroidConsoleRender();
+	fb_android_render_console_if_enabled();
 	if (fb_hAndroidUpdate)
 		fb_hAndroidUpdate();
 }
@@ -470,6 +706,7 @@ void ANativeActivity_onCreate(ANativeActivity *activity, void *saved_state, size
 
 	if (fb_hAndroidSetActivity)
 		fb_hAndroidSetActivity(activity);
+	fb_android_apply_app_mode();
 	fb_android_publish_lifecycle(0, 0, 0);
 	if (pthread_create(&app->looper_thread, NULL, fb_android_looper_thread, app) == 0)
 		app->looper_thread_started = 1;

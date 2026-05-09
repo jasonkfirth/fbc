@@ -16,6 +16,7 @@ Options:
   --emit-apk             Produce a signed debug APK (default)
   --emit-so              Produce libfreebasicapp.so only
   --emit-obj             Produce the compiled FreeBASIC object only
+  --no-entry             Do not rename the source main procedure
   --api N                NDK API level for native compilation (default: 26)
   --min-api N            APK minSdkVersion (default: 21)
   --target-api N         APK targetSdkVersion (default: highest installed platform)
@@ -188,6 +189,7 @@ package=""
 label=""
 src=""
 use_mt=0
+use_entry=1
 fbc_args=()
 
 while [ $# -gt 0 ]; do
@@ -199,6 +201,7 @@ while [ $# -gt 0 ]; do
 		--emit-apk) mode="apk"; shift ;;
 		--emit-so) mode="so"; shift ;;
 		--emit-obj) mode="obj"; shift ;;
+		--no-entry) use_entry=0; shift ;;
 		--api) api="$2"; shift 2 ;;
 		--min-api) min_api="$2"; shift 2 ;;
 		--target-api) target_api="$2"; shift 2 ;;
@@ -293,6 +296,14 @@ cfile="$tmp/$module.c"
 objfile="$tmp/$module.o"
 appobj="$tmp/fb_android_app.o"
 sofile="$tmp/libfreebasicapp.so"
+entry_args=()
+module_args=()
+
+if [ "$use_entry" -eq 1 ]; then
+	entry_args=(-entry fb_android_program_main)
+else
+	module_args=(-m "$module")
+fi
 
 env GCC="$cc" CLANG="$cc" AS="$cc" LD="$cc" AR="$ar" RANLIB="$ranlib" \
 	"$compiler" \
@@ -302,8 +313,8 @@ env GCC="$cc" CLANG="$cc" AS="$cc" LD="$cc" AR="$ar" RANLIB="$ranlib" \
 	-gen gcc \
 	-r \
 	-pic \
-	-entry fb_android_program_main \
-	-m "$module" \
+	"${entry_args[@]}" \
+	"${module_args[@]}" \
 	-i "$incdir" \
 	-p "$libdir" \
 	"${fbc_args[@]}" \

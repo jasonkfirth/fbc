@@ -145,8 +145,8 @@ private function hLenSizeof( byval tk as integer, byval isasm as integer ) as AS
 				lgt -= typeGetSize( FB_DATATYPE_CHAR )
 				lgt /= typeGetSize( FB_DATATYPE_CHAR )
 			case FB_DATATYPE_WCHAR
-				lgt -= typeGetSize( FB_DATATYPE_WCHAR )
-				lgt /= typeGetSize( FB_DATATYPE_WCHAR )
+				lgt -= typeGetSize( env.target.wchar )
+				lgt /= typeGetSize( env.target.wchar )
 			end select
 		end if
 	end if

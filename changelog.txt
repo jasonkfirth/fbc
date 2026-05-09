@@ -22,6 +22,7 @@ Version 1.20.1
 - Android packaging: add an fbc-android/freebasic-android install layout with Android-target runtime libraries, headers, APK template glue, and Debian/Ubuntu build-script support; Debian/Ubuntu package builds now include it by default while root make/all builds still leave it out
 - Android packaging: keep the fbc-android wrapper and APK template sources under tracked src/tools/android instead of the ignored local tools/ tree
 - Android and Xbox packaging: added MSYS2 build scripts that create isolated freebasic-android and freebasic-xbox distribution trees, zip archives, NSIS installers, and package validation checks, matching the self-contained installer approach used by the MinGW port
+- Android/MSYS2 packaging: keep Google Android SDK/NDK assets out of the NSIS installer by default, add an installer terms notice plus a package-local setup step that downloads the SDK/NDK from Google's servers after acceptance, and leave SDK bundling as an explicit zip-only build option for local packaging
 - Windows/MSYS2 packaging: bundle a broader set of third-party import libraries and DLLs used by the shipped examples and bindings, including selected legacy FreeBASIC winlibs, official upstream FreeImage/IUP/SDL packages, archived MSYS2 win32 GTK packages, and source-built win64 archives for QuickLZ, SQLite 2, big_int, DispHelper, FastCGI, GDSL, and TinyPTC; add package-local import-library aliases for older binding names that differ from current MSYS2 package names
 - Windows/MSYS2 installer: add the installed FreeBASIC directory to MSYS2 login shells through profile.d as well as updating the normal Windows system PATH
 - examples: documented a full JS, Android, and Xbox compile sweep in examples/cross-target-notes.md, recording which examples currently compile for each package and which failures are platform, backend, or binding limitations
@@ -32,6 +33,8 @@ Version 1.20.1
 
 [added]
 - sfxlib integrated into the compiler, runtime, libraries, examples, and build system
+- compiler: added FB_NO_GFXLIB and FB_NO_SFXLIB opt-out defines so gfxlib-only and sfxlib-only quirk command words can be used as normal identifiers in serious-development code that does not want those legacy command surfaces
+- compiler: added #pragma gui / #pragma gui = 0 for source-level GUI vs console application mode selection, matching the existing -s gui/console mode view without requiring hidden command-line options
 - OPEN TCP and OPEN TCP SERVER runtime/device support, including TCP ACCEPT and EOC handling
 - Haiku platform support across compiler target selection, rtlib, gfxlib2, sfxlib, headers, libraries, and build scripts
 - broader platform build coverage carried forward from 1.10.4 for Darwin/macOS, Linux, Windows/MinGW, Windows/Cygwin, FreeBSD, OpenBSD, NetBSD, DragonFly, Solaris, and Haiku
@@ -53,8 +56,10 @@ Version 1.20.1
 - JavaScript sfxlib backend with WebAudio output for browsers and a null fallback so sound-using programs can still link and run in non-browser smoke tests
 - Android gfxlib and sfxlib backends, including modern/legacy Android gfx drivers, AAudio/OpenSL ES sound drivers, Activity-backed console rendering, and an on-screen soft-keyboard toggle button
 - Android gfxlib/sfxlib: propagate NativeActivity lifecycle and surface callbacks so rendering and audio output pause cleanly and recover across Android surface recreation; Android APK startup now waits for stdout/stderr redirection before running the FreeBASIC main program
+- Android NativeActivity/gfxlib: honour source or command-line GUI app mode by suppressing the text console surface until graphics are explicitly opened with SCREEN, while console-mode APKs keep the existing PRINT-to-screen behaviour
 - Debian/Ubuntu Docker smoke-test script for freebasic-android that builds console, gfxlib, and sfxlib APKs in a fresh container and runs them under an Android emulator when KVM and a system image are available
 - Debian/Ubuntu freebasic-android smoke testing now separates the bare package install/APK build check from emulator harness provisioning for adb, avdmanager, emulator, system images, and the emulator's minimal X11 runtime libraries; the emulator APK launch check now uses an explicit Activity start, emits gfx/sfx markers through stderr so graphics-mode PRINT redirection cannot hide them, force-stops each smoke Activity after a clean marker pair, polls all logcat buffers, and dumps useful diagnostics on failure
+- MSYS2 Android fbcunit runner that builds the fbcunit tests as a NativeActivity APK using the packaged fbc-android distribution, stages test data as APK assets, boots the bundled Android emulator, and reports pass/fail from logcat
 - fbc-android --target-api option for setting APK targetSdkVersion independently from the installed Android platform jar used by aapt
 - freebasic-android now recommends adb and Android emulator command-line tooling so installed users have a local APK test path without making emulator infrastructure mandatory
 - experimental Debian/Ubuntu freebasic-xbox package builder using nxdk, including an fbc-xbox wrapper, Xbox target runtime archives, and packaged nxdk toolchain assets
@@ -126,8 +131,11 @@ Version 1.20.1
 - Android target detection now recognizes aarch64-linux-android triplets as Android instead of Linux, and Android assembly uses the NDK clang driver instead of an unavailable GNU as path
 - Android fbc-android wrapper now locates Windows-hosted SDK/NDK tools with .exe/.bat suffixes, handles Windows-style source paths when deriving APK module names, and accepts .exe suffixed NDK clang/ar/ranlib tools
 - fbc-android now wraps the generated FreeBASIC program's exit() path so NativeActivity APKs can log their smoke-test exit marker instead of terminating the Android process from the program thread
+- Android NativeActivity startup now binds both compiler-generated and custom no-entry program threads as FreeBASIC main threads, fixing ThreadSelf(), ThreadWait(), and ThreadDetach() behaviour in Android APKs and the Android fbcunit runner
 - Android/sfxlib: avoid pulling the Linux-only sfxlib shutdown hook into Android runtime archives, fixing SFX APK load failures from an unresolved fb_sfxLinuxExit symbol
 - Android and Xbox wstring constant folding now keeps conversion enabled when the target wchar layout is 32-bit even if the host compiler wchar representation differs
+- Android/wstring: use the target wchar size for WSTRING/WCHAR parsing, HLC literal emission, file I/O, and runtime conversion paths, fixing UTF-8 strings, high-codepoint WCHR()/CHR() cases, PRINT USING with empty WSTRING values, and the Android wstring fbcunit coverage
+- Android fbcunit harness now treats a zero-failure fbcunit summary plus FREEBASIC_ANDROID_EXIT:0 as a pass, avoiding false failures when a test exits cleanly before the wrapper emits its own pass marker
 - Xbox/nxdk: revived the Xbox target build far enough to produce rtlib, gfxlib2, and sfxlib archives with nxdk by adding Xbox-local CRT, filesystem, threading, graphics, and sfx decode compatibility shims; joystick and file decoding remain stubbed for the experimental package
 - Xbox/nxdk: fixed Win32-compatible calling-convention, alignment, mutex, TLS, and startup declarations so multithreaded rtlib, gfxlib2, and sfxlib archives build for Xbox without depending on unsupported OpenGL or libffi pieces
 - Xbox/nxdk packaging: include the executable nxdk wrapper tools and cxbe converter needed by fbc-xbox, classify the bundled SDK package as non-free/devel, and ship a generated list of nxdk license files alongside the package copyright metadata

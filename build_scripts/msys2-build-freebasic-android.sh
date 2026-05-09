@@ -6,13 +6,14 @@ trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 ##############################################################################
 # msys2-build-freebasic-android.sh
 #
-# Build a self-contained Windows FreeBASIC Android distribution from MSYS2.
+# Build a Windows FreeBASIC Android distribution from MSYS2.
 # Produces a freebasic-android package tree, a .zip archive, and an NSIS
 # installer that installs into C:\freebasic-android.
 #
 # The package contains the fbc-android driver, the Android/aarch64 FreeBASIC
-# runtime, Android SDK command line tools, build tools, platform files, and the
-# Android NDK used by the build.
+# runtime, a small MSYS2 shell runtime, a Java runtime, and setup scripts that
+# download the Android SDK/NDK from Google after the user accepts Google's
+# Android SDK terms.
 ##############################################################################
 
 SELF_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
@@ -47,6 +48,8 @@ SKIP_PACKAGE=0
 SKIP_INSTALLER=0
 SKIP_VALIDATE=0
 KEEP_BUILDROOT=0
+WITH_EMULATOR_TOOLS=0
+BUNDLE_ANDROID_SDK=0
 
 usage() {
 	cat <<EOF
@@ -60,6 +63,11 @@ Options:
   --skip-package      Skip distribution tree assembly and zip creation
   --skip-installer    Skip NSIS installer creation
   --skip-validate     Skip packaged fbc-android validation
+  --with-emulator-tools
+                      Install Android emulator tools and a system image in the build cache
+  --bundle-android-sdk
+                      Also bundle the Android SDK/NDK in the zip package
+                      (the NSIS installer still downloads them from Google)
   --keep-buildroot    Keep the build root on failure or success
   --help              Show this help text
 
@@ -74,6 +82,12 @@ Environment:
   ANDROID_PLATFORM    SDK platform package (default: platforms;android-35)
   ANDROID_BUILDTOOLS  SDK build-tools package (default: build-tools;35.0.1)
   ANDROID_NDK_PACKAGE SDK NDK package (default: ndk;28.0.13004108)
+  ANDROID_EMULATOR_PACKAGE
+                      SDK emulator package used with --with-emulator-tools
+                      (default: emulator)
+  ANDROID_SYSTEM_IMAGE_PACKAGE
+                      SDK system image used with --with-emulator-tools
+                      (default: system-images;android-35;google_apis;x86_64)
   ANDROID_CMDLINE_TOOLS_URL
                       Android command line tools zip URL
   JAVA_RUNTIME_URL    Portable Windows JDK zip URL
@@ -89,6 +103,8 @@ for arg in "$@"; do
 		--skip-package) SKIP_PACKAGE=1 ;;
 		--skip-installer) SKIP_INSTALLER=1 ;;
 		--skip-validate) SKIP_VALIDATE=1 ;;
+		--with-emulator-tools) WITH_EMULATOR_TOOLS=1 ;;
+		--bundle-android-sdk) BUNDLE_ANDROID_SDK=1 ;;
 		--keep-buildroot) KEEP_BUILDROOT=1 ;;
 		--help)
 			usage
@@ -277,6 +293,8 @@ ANDROID_API="${ANDROID_API:-26}"
 ANDROID_PLATFORM="${ANDROID_PLATFORM:-platforms;android-35}"
 ANDROID_BUILDTOOLS="${ANDROID_BUILDTOOLS:-build-tools;35.0.1}"
 ANDROID_NDK_PACKAGE="${ANDROID_NDK_PACKAGE:-ndk;28.0.13004108}"
+ANDROID_EMULATOR_PACKAGE="${ANDROID_EMULATOR_PACKAGE:-emulator}"
+ANDROID_SYSTEM_IMAGE_PACKAGE="${ANDROID_SYSTEM_IMAGE_PACKAGE:-system-images;android-35;google_apis;x86_64}"
 ANDROID_CMDLINE_TOOLS_URL="${ANDROID_CMDLINE_TOOLS_URL:-https://dl.google.com/android/repository/commandlinetools-win-13114758_latest.zip}"
 JAVA_RUNTIME_URL="${JAVA_RUNTIME_URL:-https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jdk/hotspot/normal/eclipse}"
 ANDROID_TARGET_TRIPLET="${ANDROID_TARGET_TRIPLET:-aarch64-linux-android}"
@@ -366,9 +384,15 @@ ensure_java_runtime() {
 
 ensure_commandline_tools() {
 	local zipfile="$BUILDROOT/commandlinetools-win.zip"
+	local duplicate
 
 	[ "$SKIP_SDK" -eq 0 ] || return 0
 	if [ -f "$CMDLINE_ROOT/bin/sdkmanager.bat" ]; then
+		for duplicate in "$SDKROOT"/cmdline-tools/latest-*; do
+			[ -d "$duplicate" ] || continue
+			msg "Removing duplicate Android command line tools cache: $duplicate"
+			rm -rf "$duplicate"
+		done
 		return 0
 	fi
 
@@ -386,6 +410,9 @@ ensure_commandline_tools() {
 }
 
 ensure_android_sdk() {
+	local java_home_win
+	local sdk_packages
+
 	ensure_java_runtime
 	ensure_commandline_tools
 
@@ -398,16 +425,27 @@ ensure_android_sdk() {
 	fi
 
 	msg "Installing Android SDK/NDK packages"
-	export JAVA_HOME="$JAVA_ROOT"
+	java_home_win="$(cygpath -aw "$JAVA_ROOT")"
+	export JAVA_HOME="$java_home_win"
 	export ANDROID_HOME="$SDKROOT"
 	export ANDROID_SDK_ROOT="$SDKROOT"
 	printf 'y\n%.0s' {1..1000} | "$SDKMANAGER" --sdk_root="$SDKROOT" --licenses >/dev/null || true
-	run "$SDKMANAGER" --sdk_root="$SDKROOT" \
-		"cmdline-tools;latest" \
+
+	sdk_packages=(
 		"platform-tools" \
 		"$ANDROID_PLATFORM" \
 		"$ANDROID_BUILDTOOLS" \
 		"$ANDROID_NDK_PACKAGE"
+	)
+
+	if [ "$WITH_EMULATOR_TOOLS" -eq 1 ]; then
+		sdk_packages+=(
+			"$ANDROID_EMULATOR_PACKAGE"
+			"$ANDROID_SYSTEM_IMAGE_PACKAGE"
+		)
+	fi
+
+	run "$SDKMANAGER" --sdk_root="$SDKROOT" "${sdk_packages[@]}"
 }
 
 find_ndk_root() {
@@ -484,12 +522,16 @@ build_android_target() {
 
 	seed_fbc="$(detect_fbc \
 		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/fbc64.exe}" \
+		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/fbc.exe}" \
 		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/bin/fbc.exe}" \
 		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/bin/fbc}" \
 		"$WORKTREE/bin/fbc.exe" \
 		"$WORKTREE/bootstrap/fbc.exe" \
 		"$ROOT/bin/fbc.exe" \
 		"$ROOT/bootstrap/fbc.exe" \
+		"$ROOT/fbc.exe" \
+		"/c/FreeBASIC/fbc.exe" \
+		"/c/freebasic/fbc.exe" \
 		|| true)"
 
 	if [ -n "$seed_fbc" ]; then
@@ -594,15 +636,20 @@ build_android_target() {
 ##############################################################################
 
 copy_toolchain() {
-	msg "Bundling Android SDK/NDK"
 	mkdir -p "$DISTROOT/toolchain"
-	if have rsync; then
-		run rsync -a --delete \
-			--exclude '/.android/' \
-			--exclude '/cache/' \
-			"$SDKROOT/" "$DISTROOT/toolchain/android-sdk/"
+
+	if [ "$BUNDLE_ANDROID_SDK" -eq 1 ]; then
+		msg "Bundling Android SDK/NDK for zip package"
+		if have rsync; then
+			run rsync -a --delete \
+				--exclude '/.android/' \
+				--exclude '/cache/' \
+				"$SDKROOT/" "$DISTROOT/toolchain/android-sdk/"
+		else
+			copy_tree "$SDKROOT" "$DISTROOT/toolchain/android-sdk"
+		fi
 	else
-		copy_tree "$SDKROOT" "$DISTROOT/toolchain/android-sdk"
+		msg "Leaving Android SDK/NDK out of the package"
 	fi
 
 	msg "Bundling Java runtime"
@@ -650,6 +697,13 @@ FBANDROID_SHARE="$root/share/freebasic-android"
 export PATH JAVA_HOME ANDROID_HOME ANDROID_SDK_ROOT
 export FBANDROID_PREFIX FBANDROID_LIBROOT FBANDROID_COMPILER FBANDROID_INCDIR FBANDROID_SHARE
 
+if [ ! -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat" ] || \
+	{ [ ! -d "$ANDROID_HOME/ndk" ] && [ ! -d "$ANDROID_HOME/ndk-bundle" ]; }; then
+	echo "Android SDK/NDK is not installed in this package." >&2
+	echo "Run setup-android-sdk.cmd, review Google's Android SDK terms, and try again." >&2
+	exit 1
+fi
+
 exec "$root/fbc-android.exe" "$@"
 EOF
 	chmod 755 "$DISTROOT/fbc-android-package.sh"
@@ -661,6 +715,164 @@ set "FBANDROID_ROOT=%~dp0"
 set "PATH=%FBANDROID_ROOT%toolchain\msys2\usr\bin;%PATH%"
 "%FBANDROID_ROOT%toolchain\msys2\usr\bin\bash.exe" "%FBANDROID_ROOT%fbc-android-package.sh" %*
 exit /b %ERRORLEVEL%
+EOF
+
+	cat > "$DISTROOT/setup-android-sdk.cmd" <<EOF
+@echo off
+setlocal
+set "FBANDROID_ROOT=%~dp0"
+set "ANDROID_CMDLINE_TOOLS_URL=${ANDROID_CMDLINE_TOOLS_URL}"
+set "ANDROID_PLATFORM_PACKAGE=${ANDROID_PLATFORM}"
+set "ANDROID_BUILDTOOLS_PACKAGE=${ANDROID_BUILDTOOLS}"
+set "ANDROID_NDK_PACKAGE=${ANDROID_NDK_PACKAGE}"
+set "ANDROID_EMULATOR_PACKAGE=${ANDROID_EMULATOR_PACKAGE}"
+set "ANDROID_SYSTEM_IMAGE_PACKAGE=${ANDROID_SYSTEM_IMAGE_PACKAGE}"
+set "ANDROID_WITH_EMULATOR_TOOLS=${WITH_EMULATOR_TOOLS}"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%FBANDROID_ROOT%setup-android-sdk.ps1" %*
+exit /b %ERRORLEVEL%
+EOF
+
+	cat > "$DISTROOT/setup-android-sdk.sh" <<EOF
+#!/usr/bin/env sh
+
+_fbandroid_root=\$(CDPATH= cd -- "\$(dirname "\$0")" && pwd)
+export ANDROID_CMDLINE_TOOLS_URL='${ANDROID_CMDLINE_TOOLS_URL}'
+export ANDROID_PLATFORM_PACKAGE='${ANDROID_PLATFORM}'
+export ANDROID_BUILDTOOLS_PACKAGE='${ANDROID_BUILDTOOLS}'
+export ANDROID_NDK_PACKAGE='${ANDROID_NDK_PACKAGE}'
+export ANDROID_EMULATOR_PACKAGE='${ANDROID_EMULATOR_PACKAGE}'
+export ANDROID_SYSTEM_IMAGE_PACKAGE='${ANDROID_SYSTEM_IMAGE_PACKAGE}'
+export ANDROID_WITH_EMULATOR_TOOLS='${WITH_EMULATOR_TOOLS}'
+
+if command -v powershell.exe >/dev/null 2>&1; then
+	exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File "\$_fbandroid_root/setup-android-sdk.ps1" "\$@"
+fi
+
+echo "powershell.exe is required to install the Android SDK packages." >&2
+exit 1
+EOF
+	chmod 755 "$DISTROOT/setup-android-sdk.sh"
+
+	cat > "$DISTROOT/setup-android-sdk.ps1" <<'EOF'
+Set-StrictMode -Version 2.0
+$ErrorActionPreference = "Stop"
+
+function Die {
+	param([string] $message)
+	Write-Error $message
+	exit 1
+}
+
+function EnvOrDefault {
+	param([string] $name, [string] $defaultValue)
+
+	$value = [Environment]::GetEnvironmentVariable($name)
+	if ([string]::IsNullOrWhiteSpace($value)) {
+		return $defaultValue
+	}
+
+	return $value
+}
+
+$acceptTerms = $false
+foreach ($arg in $args) {
+	if ($arg -eq "--accept-google-android-sdk-terms") {
+		$acceptTerms = $true
+	} elseif (($arg -eq "--help") -or ($arg -eq "-h") -or ($arg -eq "/?")) {
+		Write-Host "Usage: setup-android-sdk.cmd [--accept-google-android-sdk-terms]"
+		exit 0
+	} else {
+		Die "Unknown option: $arg"
+	}
+}
+
+$root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$termsUrl = "https://developer.android.com/studio/terms"
+
+if (-not $acceptTerms) {
+	Write-Host ""
+	Write-Host "This setup downloads Android SDK components from Google."
+	Write-Host "Review Google's Android SDK terms before continuing:"
+	Write-Host "  $termsUrl"
+	Write-Host ""
+	$answer = Read-Host "Type YES if you have reviewed and agree to those terms"
+	if ($answer -ne "YES") {
+		Write-Host "Android SDK setup cancelled."
+		exit 2
+	}
+}
+
+$androidHome = Join-Path $root "toolchain\android-sdk"
+$cmdlineTools = Join-Path $androidHome "cmdline-tools"
+$cmdlineRoot = Join-Path $cmdlineTools "latest"
+$sdkmanager = Join-Path $cmdlineRoot "bin\sdkmanager.bat"
+$javaHome = Join-Path $root "toolchain\java"
+$javaExe = Join-Path $javaHome "bin\java.exe"
+
+if (-not (Test-Path -LiteralPath $javaExe)) {
+	Die "Java runtime is missing: $javaHome"
+}
+
+$downloadUrl = EnvOrDefault "ANDROID_CMDLINE_TOOLS_URL" "https://dl.google.com/android/repository/commandlinetools-win-13114758_latest.zip"
+New-Item -ItemType Directory -Force -Path $androidHome | Out-Null
+
+if (-not (Test-Path -LiteralPath $sdkmanager)) {
+	$tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("fbc-android-sdk-" + [guid]::NewGuid().ToString("N"))
+	New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+
+	try {
+		$zipFile = Join-Path $tempRoot "commandlinetools-win.zip"
+		Write-Host "Downloading Android command line tools from Google..."
+		[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+		Invoke-WebRequest -UseBasicParsing -Uri $downloadUrl -OutFile $zipFile
+
+		Remove-Item -Recurse -Force -ErrorAction SilentlyContinue -LiteralPath $cmdlineTools
+		New-Item -ItemType Directory -Force -Path $cmdlineTools | Out-Null
+		Expand-Archive -Force -Path $zipFile -DestinationPath $cmdlineTools
+
+		$innerRoot = Join-Path $cmdlineTools "cmdline-tools"
+		if (Test-Path -LiteralPath $innerRoot) {
+			Move-Item -Force -LiteralPath $innerRoot -Destination $cmdlineRoot
+		}
+	} finally {
+		Remove-Item -Recurse -Force -ErrorAction SilentlyContinue -LiteralPath $tempRoot
+	}
+}
+
+if (-not (Test-Path -LiteralPath $sdkmanager)) {
+	Die "sdkmanager.bat was not installed correctly: $sdkmanager"
+}
+
+$env:JAVA_HOME = $javaHome
+$env:ANDROID_HOME = $androidHome
+$env:ANDROID_SDK_ROOT = $androidHome
+$env:PATH = "$javaHome\bin;$cmdlineRoot\bin;$androidHome\platform-tools;$env:PATH"
+
+$packages = New-Object System.Collections.Generic.List[string]
+$packages.Add("platform-tools")
+$packages.Add((EnvOrDefault "ANDROID_PLATFORM_PACKAGE" "platforms;android-35"))
+$packages.Add((EnvOrDefault "ANDROID_BUILDTOOLS_PACKAGE" "build-tools;35.0.1"))
+$packages.Add((EnvOrDefault "ANDROID_NDK_PACKAGE" "ndk;28.0.13004108"))
+
+if ((EnvOrDefault "ANDROID_WITH_EMULATOR_TOOLS" "0") -eq "1") {
+	$packages.Add((EnvOrDefault "ANDROID_EMULATOR_PACKAGE" "emulator"))
+	$packages.Add((EnvOrDefault "ANDROID_SYSTEM_IMAGE_PACKAGE" "system-images;android-35;google_apis;x86_64"))
+}
+
+Write-Host "Accepting Android SDK package licenses with sdkmanager..."
+$licenseInput = ("y`n" * 1000)
+$licenseInput | & $sdkmanager "--sdk_root=$androidHome" "--licenses"
+if ($LASTEXITCODE -ne 0) {
+	exit $LASTEXITCODE
+}
+
+Write-Host "Installing Android SDK packages..."
+& $sdkmanager "--sdk_root=$androidHome" @packages
+if ($LASTEXITCODE -ne 0) {
+	exit $LASTEXITCODE
+}
+
+Write-Host "Android SDK setup complete: $androidHome"
 EOF
 
 	cat > "$DISTROOT/freebasic-android-env.cmd" <<'EOF'
@@ -706,20 +918,29 @@ write_distribution_notes() {
 	cat > "$DISTROOT/readme-fbc-android.txt" <<EOF
 FreeBASIC Android ${FBVERSION}
 
-This package is intended to run without a separate Android SDK, Android NDK, or
-MSYS2 installation.
+This package contains the FreeBASIC Android driver, Android/aarch64 runtime
+libraries, a small MSYS2 shell runtime, and a Java runtime.
 
 The installer adds this directory to the Windows system PATH:
 
     ${INSTALL_DIR_WIN}
 
+Before first use from the zip package, run:
+
+    setup-android-sdk.cmd
+
+That setup downloads Android command line tools, platform-tools, build-tools,
+platform files, and the Android NDK from Google's servers after you review and
+accept Google's Android SDK terms:
+
+    https://developer.android.com/studio/terms
+
 Use fbc-android.cmd from cmd.exe or PowerShell:
 
     fbc-android.cmd --target-api 35 --package org.example.hello hello.bas
 
-The toolchain directory contains the Android SDK and NDK packages installed by
-this build script.  The package also includes a small MSYS2 shell runtime
-because the tracked fbc-android driver is a shell script.
+The installer runs setup-android-sdk.cmd during installation after its Android
+SDK terms page is accepted.
 EOF
 }
 
@@ -772,8 +993,10 @@ create_installer() {
 	local installer_nsi="$BUILDROOT/${DISTNAME}.nsi"
 	local installer_exe="$OUT/${DISTNAME}-setup.exe"
 	local nsis_src="${NSIS_SRCROOT:-/tmp/fba}"
+	local terms_notice="$BUILDROOT/android-sdk-terms-notice.txt"
 	local dist_win
 	local out_win
+	local terms_notice_win
 
 	[ "$SKIP_INSTALLER" -eq 0 ] || return 0
 	[ "$SKIP_PACKAGE" -eq 0 ] || return 0
@@ -783,9 +1006,31 @@ create_installer() {
 	msg "Preparing short NSIS source path"
 	rm -rf "$nsis_src"
 	copy_tree "$DISTROOT" "$nsis_src"
+	rm -rf "$nsis_src/toolchain/android-sdk"
+
+	cat > "$terms_notice" <<EOF
+FreeBASIC Android SDK Setup
+
+The FreeBASIC Android installer does not include Google's Android SDK, Android
+NDK, emulator, platform files, platform-tools, or build-tools.
+
+During installation, FreeBASIC Android will download the required Android SDK
+command line tools from Google's servers, then sdkmanager will download and
+install the required Android SDK and NDK packages.
+
+Those Android SDK components are provided by Google and are governed by
+Google's Android SDK terms and the package licenses accepted by sdkmanager.
+
+Review Google's current Android SDK terms here before continuing:
+
+    https://developer.android.com/studio/terms
+
+Continue only if you have reviewed and accept those terms and licenses.
+EOF
 
 	dist_win="$(cygpath -aw "$nsis_src")"
 	out_win="$(cygpath -aw "$installer_exe")"
+	terms_notice_win="$(cygpath -aw "$terms_notice")"
 
 	msg "Generating NSIS installer script"
 	cat > "$installer_nsi" <<EOF
@@ -803,6 +1048,8 @@ ShowUninstDetails show
 !include "StrFunc.nsh"
 !include "WinMessages.nsh"
 
+!define MUI_LICENSEPAGE_CHECKBOX
+!insertmacro MUI_PAGE_LICENSE "$terms_notice_win"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -873,6 +1120,13 @@ FunctionEnd
 Section "Install"
 	SetOutPath "\$INSTDIR"
 	File /r "$dist_win\\*"
+	DetailPrint "Downloading Android SDK/NDK packages from Google"
+	nsExec::ExecToLog '"\$INSTDIR\\setup-android-sdk.cmd" --accept-google-android-sdk-terms'
+	Pop \$0
+	StrCmp \$0 "0" sdk_done
+		MessageBox MB_ICONSTOP "Android SDK setup failed with exit code \$0. The install directory was left in place so setup-android-sdk.cmd can be rerun after fixing the download or network problem."
+		Abort
+	sdk_done:
 	WriteUninstaller "\$INSTDIR\\uninstall.exe"
 	Call AddInstallDirToPath
 SectionEnd
@@ -894,6 +1148,7 @@ EOF
 
 validate_distribution() {
 	local validate_dir="$BUILDROOT/validate"
+	local package_dir="$validate_dir/package"
 	local dist_win
 	local validate_win
 	local validate_cmd
@@ -904,17 +1159,20 @@ validate_distribution() {
 	msg "Validating packaged fbc-android"
 	rm -rf "$validate_dir"
 	mkdir -p "$validate_dir"
+	copy_tree "$DISTROOT" "$package_dir"
 
 	cat > "$validate_dir/hello.bas" <<'EOF'
 print "freebasic-android package test OK"
 EOF
 
-	dist_win="$(cygpath -aw "$DISTROOT")"
+	dist_win="$(cygpath -aw "$package_dir")"
 	validate_win="$(cygpath -aw "$validate_dir")"
 	validate_cmd="$validate_dir/validate.cmd"
 
 	cat > "$validate_cmd" <<EOF
 @echo off
+call "$dist_win\\setup-android-sdk.cmd" --accept-google-android-sdk-terms
+if errorlevel 1 exit /b %ERRORLEVEL%
 call "$dist_win\\fbc-android.cmd" --target-api 35 --package org.freebasic.validate "$validate_win\\hello.bas" -x "$validate_win\\hello.apk"
 exit /b %ERRORLEVEL%
 EOF

@@ -217,6 +217,18 @@ private function cStrCHR(byval is_wstr as integer) as ASTNODE ptr
 		end if
 	next
 
+	if( isconst and is_wstr ) then
+		if( sizeof( wstring ) <> typeGetSize( env.target.wchar ) ) then
+			for i = 0 to cnt-1
+				dim as longint value = astConstGetAsInt64( exprtb(i) )
+				if( (value < 0) or (value > &hFFFFll) ) then
+					isconst = FALSE
+					exit for
+				end if
+			next
+		end if
+	end if
+
 	if( isconst ) then
 		if( is_wstr = FALSE ) then
 			zs = ""

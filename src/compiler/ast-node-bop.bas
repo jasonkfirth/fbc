@@ -869,7 +869,8 @@ function astNewBOP _
 				if( litsym <> NULL ) then
 					'' ok to convert at compile-time?
 					if( (typeGetDtAndPtrOnly( ldtype ) = typeGetDtAndPtrOnly( rdtype )) or _
-					    (env.wcharconv <> FB_WCHARCONV_NEVER) ) then
+					    ((env.wcharconv <> FB_WCHARCONV_NEVER) and _
+					     (env.clopt.target <> FB_COMPTARGET_ANDROID)) ) then
 						return hWstrLiteralConcat( l, r )
 					end if
 				end if
@@ -893,7 +894,10 @@ function astNewBOP _
 			elseif( astOpIsRelational( op ) ) then
 				'' both literals?
 				if( litsym <> NULL ) then
-					return hWstrLiteralCompare( op, l, r )
+					if( (typeGetDtAndPtrOnly( ldtype ) = typeGetDtAndPtrOnly( rdtype )) or _
+					    (env.clopt.target <> FB_COMPTARGET_ANDROID) ) then
+						return hWstrLiteralCompare( op, l, r )
+					end if
 				end if
 
 				'' convert to: wstrcmp(l,r) op 0

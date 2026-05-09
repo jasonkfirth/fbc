@@ -5,8 +5,9 @@
 int fb_DevFileReadWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
 {
     FILE *fp;
-    size_t chars;
+    size_t chars, read_chars, converted_chars;
     char *buffer;
+    FB_WCHAR *wbuffer;
 
     FB_LOCK();
 
@@ -30,6 +31,7 @@ int fb_DevFileReadWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
 	if( chars < FB_LOCALBUFF_MAXLEN )
 	{
 		buffer = alloca( chars + 1 );
+		wbuffer = alloca( (chars + 1) * sizeof( FB_WCHAR ) );
 		/* note: if out of memory on alloca, it's a stack exception */
 	}
 	else
@@ -40,24 +42,39 @@ int fb_DevFileReadWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
 			FB_UNLOCK();
 			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 		}
+
+		wbuffer = malloc( (chars + 1) * sizeof( FB_WCHAR ) );
+		if( wbuffer == NULL )
+		{
+			free( buffer );
+			FB_UNLOCK();
+			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+		}
 	}
 
 	/* do read */
-	chars = fread( buffer, 1, chars, fp );
-	buffer[chars] = '\0';
+	read_chars = fread( buffer, 1, chars, fp );
+	buffer[read_chars] = '\0';
 
 	/* convert to wchar, file should be opened with the ENCODING option
 	   to allow UTF characters to be read */
-	fb_wstr_ConvFromA( dst, chars, buffer );
+	converted_chars = fb_wstr_ConvFromA( wbuffer, read_chars, buffer );
+	if( converted_chars > chars )
+		converted_chars = chars;
+
+	memcpy( dst, wbuffer, converted_chars * sizeof( FB_WCHAR ) );
 
 	if( *pchars >= FB_LOCALBUFF_MAXLEN )
+	{
 		free( buffer );
+		free( wbuffer );
+	}
 
 	/* fill with nulls if at eof */
-	if( chars != *pchars )
-        memset( (void *)&dst[chars], 0, (*pchars - chars) * sizeof( FB_WCHAR ) );
+	if( converted_chars != *pchars )
+        memset( (void *)&dst[converted_chars], 0, (*pchars - converted_chars) * sizeof( FB_WCHAR ) );
 
-    *pchars = chars;
+    *pchars = converted_chars;
 
 	FB_UNLOCK();
 

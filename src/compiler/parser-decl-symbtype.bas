@@ -879,7 +879,7 @@ function cSymbolType _
 			''       always use symbGetWstrLen( ) to retrieve the
 			''       len in characters, not the bytes
 			if( typeGet( dtype ) = FB_DATATYPE_WCHAR ) then
-				lgt *= typeGetSize( FB_DATATYPE_WCHAR )
+				lgt *= typeGetSize( env.target.wchar )
 			end if
 
 		case else

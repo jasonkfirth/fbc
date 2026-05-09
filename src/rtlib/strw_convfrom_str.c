@@ -2,7 +2,7 @@
 
 #include "fb.h"
 
-#if !defined( HOST_DOS )
+#if !defined( HOST_DOS ) && !defined( HOST_ANDROID )
 
 static ssize_t fb_wstr_ConvFromA_nomultibyte(FB_WCHAR *dst, ssize_t dst_chars, const char *src)
 {
@@ -45,6 +45,19 @@ ssize_t fb_wstr_ConvFromA(FB_WCHAR *dst, ssize_t dst_chars, const char *src)
 	/* ensure that the null terminator is written, string may have been truncated */
 	dst[chars] = '\0';
 	return chars;
+#elif defined HOST_ANDROID
+	/*
+	 * Android application strings are UTF-8.  Do not depend on the process
+	 * locale here: NativeActivity startup and test APKs can begin in the C
+	 * locale before user code has had any chance to adjust it.
+	 */
+	ssize_t chars = dst_chars + 1;
+	fb_UTFToWChar( FB_FILE_ENCOD_UTF8, src, dst, &chars );
+	if (chars > dst_chars) {
+		dst[dst_chars] = _LC('\0');
+		return dst_chars;
+	}
+	return chars;
 #else
 	/* plus the null-term (note: "n" in chars, not bytes!) */
 	ssize_t chars = mbstowcs(dst, src, dst_chars + 1);
@@ -81,6 +94,18 @@ FBCALL FB_WCHAR *fb_StrToWstr( const char *src )
 	/* on DOS, mbstowcs() simply calls memcpy() and won't compute
 	length  see fb_unicode.h */
 	chars = strlen( src );
+#elif defined HOST_ANDROID
+	/*
+	 * See fb_wstr_ConvFromA(): Android program text is UTF-8, and relying
+	 * on mbsrtowcs() makes conversion depend on early process locale state.
+	 */
+	chars = 0;
+	dst = fb_UTFToWChar( FB_FILE_ENCOD_UTF8, src, NULL, &chars );
+	if( chars == 0 ) {
+		fb_wstr_Del( dst );
+		return NULL;
+	}
+	return dst;
 #else
 	chars = mbstowcs( NULL, src, 0 );
 

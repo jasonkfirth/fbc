@@ -512,7 +512,7 @@ sub fbInit _
 		env.wcharconv = FB_WCHARCONV_NEVER
 	end if
 
-	'' Android and Xbox both use 32-bit target wchar data.  On Win32 hosts,
+	'' Android and Xbox use 32-bit target wchar data.  On Win32 hosts,
 	'' compiler wstring data is UTF-16, but the literal symbols still store
 	'' code points and the emitters write them using the target wchar size.
 	'' Keeping conversion enabled here lets constant wstr() expressions fold
@@ -897,6 +897,20 @@ sub fbChangeOption(byval opt as integer, byval value as integer)
 	select case as const opt
 	case FB_COMPOPT_MSBITFIELDS
 		fbSetOption( opt, value )
+
+	case FB_COMPOPT_MODEVIEW
+		value = iif( value <> 0, FB_MODEVIEW_GUI, FB_MODEVIEW_CONSOLE )
+		if( value <> fbGetOption( opt ) ) then
+			if( parser.scope <> FB_MAINSCOPE ) then
+				if( fbIsModLevel( ) = FALSE ) then
+					errReport( FB_ERRMSG_ILLEGALINSIDEASUB )
+				else
+					errReport( FB_ERRMSG_ILLEGALINSIDEASCOPE )
+				end if
+			else
+				fbSetOption( opt, value )
+			end if
+		end if
 
 	case FB_COMPOPT_LANG
 		'' If not yet in the desired mode

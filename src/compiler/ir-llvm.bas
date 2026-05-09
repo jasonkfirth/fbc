@@ -571,7 +571,7 @@ private sub hBuildWstrLit _
 	''    [20 x i8] c"a\00\00\00\00\00\00\00\5C\00\00\00\0A\00\00\00\00\00\00\00", align 4
 	'' (with Linux 4-byte wchar_t)
 
-	wcharsize = typeGetSize( FB_DATATYPE_WCHAR )
+	wcharsize = typeGetSize( env.target.wchar )
 
 	'' String literal too long?
 	if( length > wantedlength ) then

@@ -2984,7 +2984,8 @@ end function
 '':::::
 function rtlToWstr _
 	( _
-		byval expr as ASTNODE ptr _
+		byval expr as ASTNODE ptr, _
+		byval allow_litconst as integer _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr proc = any
@@ -3003,7 +3004,9 @@ function rtlToWstr _
 	'' string literal? convert to unicode at compile-time
 	if( dtype = FB_DATATYPE_CHAR ) then
 		litsym = astGetStrLitSymbol( expr )
-		if( litsym <> NULL ) then
+		if( (litsym <> NULL) and _
+		    ((allow_litconst <> FALSE) or _
+		     (env.clopt.target <> FB_COMPTARGET_ANDROID)) ) then
 			if( env.wcharconv <> FB_WCHARCONV_NEVER ) then
 				litsym = symbAllocWstrConst( wstr( *symbGetVarLitText( litsym ) ), _
 				                             symbGetStrLength( litsym ) )

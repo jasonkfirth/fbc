@@ -1180,7 +1180,8 @@ declare function rtlToStr _
 
 declare function rtlToWstr _
 	( _
-		byval expr as ASTNODE ptr _
+		byval expr as ASTNODE ptr, _
+		byval allow_litconst as integer = TRUE _
 	) as ASTNODE ptr
 
 declare function rtlStrToVal _

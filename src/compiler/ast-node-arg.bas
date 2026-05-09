@@ -946,7 +946,7 @@ private function hCheckParam _
 		case typeAddrOf( FB_DATATYPE_WCHAR ), FB_DATATYPE_WCHAR
 			'' if it's not a wstring param, convert..
 			if( arg_dtype <> FB_DATATYPE_WCHAR ) then
-				n->l = rtlToWstr( n->l )
+				n->l = rtlToWstr( n->l, FALSE )
 			end if
 
 		case else

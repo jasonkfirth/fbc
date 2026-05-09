@@ -453,7 +453,7 @@ FBCALL int fb_PrintUsingWstr( int fnum, FB_WCHAR *s, int mask )
 	fb_PrintUsingFmtStr( fnum );
 
 	strchars = -1;
-	length = fb_wstr_Len( s );
+	length = (s != NULL) ? fb_wstr_Len( s ) : 0;
 
 	if( ctx->ptr == NULL )
 		ctx->chars = 0;

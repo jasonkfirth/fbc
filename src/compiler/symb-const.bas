@@ -266,7 +266,7 @@ function symbAllocWStrConst _
 	id_alias = *symbUniqueId( )
 
 	'' it must be declare as SHARED, see symbAllocFloatConst()
-	var strsize = (strlength + 1) * typeGetSize( FB_DATATYPE_WCHAR )
+	var strsize = (strlength + 1) * typeGetSize( env.target.wchar )
 	s = symbAddVar( @id, @id_alias, FB_DATATYPE_WCHAR, NULL, strsize, 0, dTB(), _
 	                FB_SYMBATTRIB_SHARED or FB_SYMBATTRIB_CONST or FB_SYMBATTRIB_LITERAL, _
 	                FB_SYMBOPT_MOVETOGLOB or FB_SYMBOPT_PRESERVECASE or FB_SYMBOPT_NODUPCHECK )

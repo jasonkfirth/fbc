@@ -110,6 +110,17 @@ FBCALL void fb_Init( int argc, char **argv, int lang )
 	__fb_ctx.argv = argv;
 	__fb_ctx.lang = lang;
 
+#ifdef HOST_ANDROID
+	/*
+	 * Android loads the shared object and runs its constructors on the
+	 * activity thread, while the FreeBASIC program itself runs on the
+	 * NativeActivity program thread.  Bind that program thread as the
+	 * FreeBASIC main thread so ThreadSelf(), ThreadWait() and ThreadDetach()
+	 * see the same model as normal executable targets.
+	 */
+	fb_AllocateMainFBThread();
+#endif
+
 #ifdef HOST_JS
     // global constructors and destructors are not supported by emscripten
     fb_hRtInit();

@@ -234,6 +234,45 @@ end sub
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 '':::::
+private function hIsDefineSet _
+	( _
+		byval id as const zstring ptr _
+	) as integer
+
+	dim as FBHASHTB ptr hashtb = @symbGetGlobalHashTb( )
+	dim as FBSYMBOL ptr sym = hashLookupEx( @hashtb->tb, id, hashHash( id ) )
+
+	while( sym )
+		if( sym->class = FB_SYMBCLASS_DEFINE ) then
+			return TRUE
+		end if
+		sym = sym->hash.next
+	wend
+
+	function = FALSE
+end function
+
+private function hIsDisabledCommandKeyword _
+	( _
+		byval tk as FB_TOKEN _
+	) as integer
+
+	select case as const tk
+	case FB_TK_PSET, FB_TK_PRESET, FB_TK_POINT, FB_TK_CIRCLE, _
+	     FB_TK_WINDOW, FB_TK_PALETTE, FB_TK_SCREEN, FB_TK_SCREENQB, _
+	     FB_TK_PAINT, FB_TK_DRAW, FB_TK_IMAGECREATE
+		function = hIsDefineSet( @"FB_NO_GFXLIB" )
+
+	case FB_TK_MUSIC, FB_TK_SFX, FB_TK_AUDIO, FB_TK_STREAM, _
+	     FB_TK_MIDI, FB_TK_DEVICE, FB_TK_CAPTURE
+		function = hIsDefineSet( @"FB_NO_SFXLIB" )
+
+	case else
+		function = FALSE
+	end select
+end function
+
+'':::::
 function symbCanDuplicate _
 	( _
 		byval head_sym as FBSYMBOL ptr, _
@@ -312,6 +351,13 @@ function symbCanDuplicate _
 
 			'' only if the keyword or the rtl-proc has a string suffix
 			case FB_SYMBCLASS_KEYWORD, FB_SYMBCLASS_PROC
+				if( head_sym->class = FB_SYMBCLASS_KEYWORD ) then
+					if( hIsDisabledCommandKeyword( head_sym->key.id ) ) then
+						head_sym = head_sym->hash.next
+						continue do
+					end if
+				end if
+
 				if( env.clopt.lang <> FB_LANG_QB ) then
 					exit function
 				end if
@@ -364,6 +410,13 @@ function symbCanDuplicate _
 
 			'' only if the keyword or the rtl-proc has a string suffix
 			case FB_SYMBCLASS_KEYWORD, FB_SYMBCLASS_PROC
+				if( head_sym->class = FB_SYMBCLASS_KEYWORD ) then
+					if( hIsDisabledCommandKeyword( head_sym->key.id ) ) then
+						head_sym = head_sym->hash.next
+						continue do
+					end if
+				end if
+
 				if( env.clopt.lang <> FB_LANG_QB ) then
 					exit function
 				end if
@@ -1161,12 +1214,14 @@ function symbLookup _
 		dim as FBSYMBOL ptr sym = hashLookupEx( @hashtb->tb, id, index )
 		while( sym )
 			if( sym->class = FB_SYMBCLASS_KEYWORD ) then
-				tk = sym->key.id
-				tk_class = sym->key.tkclass
-				'' return if it's a KEYWORD or a OPERATOR token, they
-				'' can't never be redefined, even inside namespaces
-				if( tk_class <> FB_TKCLASS_QUIRKWD ) then
-					return symbNewChainpool( sym )
+				if( hIsDisabledCommandKeyword( sym->key.id ) = FALSE ) then
+					tk = sym->key.id
+					tk_class = sym->key.tkclass
+					'' return if it's a KEYWORD or a OPERATOR token, they
+					'' can't never be redefined, even inside namespaces
+					if( tk_class <> FB_TKCLASS_QUIRKWD ) then
+						return symbNewChainpool( sym )
+					end if
 				end if
 			end if
 			sym = sym->hash.next
@@ -1850,7 +1905,7 @@ function symbGetStrLength( byval sym as FBSYMBOL ptr ) as longint
 	case FB_DATATYPE_CHAR
 		function = (sym)->lgt - 1
 	case FB_DATATYPE_WCHAR
-		function = ((sym)->lgt \ typeGetSize( FB_DATATYPE_WCHAR )) - 1
+		function = ((sym)->lgt \ typeGetSize( env.target.wchar )) - 1
 	case FB_DATATYPE_STRING
 		function = (sym)->lgt
 	case FB_DATATYPE_FIXSTR
@@ -1860,7 +1915,7 @@ end function
 
 function symbGetWstrLength( byval sym as FBSYMBOL ptr ) as longint
 	assert( symbGetType( sym ) = FB_DATATYPE_WCHAR )
-	function = ((sym)->lgt \ typeGetSize( FB_DATATYPE_WCHAR )) - 1
+	function = ((sym)->lgt \ typeGetSize( env.target.wchar )) - 1
 end function
 
 '':::::
@@ -1954,7 +2009,7 @@ function symbTypeToStr _
 			select case( dtypeonly )
 			case FB_DATATYPE_WCHAR
 				'' Convert bytes back to chars
-				length \= typeGetSize( FB_DATATYPE_WCHAR )
+				length \= typeGetSize( env.target.wchar )
 			end select
 			s += " * " + str( length )
 		end if

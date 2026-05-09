@@ -861,7 +861,7 @@ private sub _emitVarIniWstr _
 	end if
 
 	''
-	wclen = typeGetSize( FB_DATATYPE_WCHAR )
+	wclen = typeGetSize( env.target.wchar )
 
 	emitVARINIWSTR( s )
 

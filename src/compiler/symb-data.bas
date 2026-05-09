@@ -105,7 +105,9 @@ sub symbDataInit( )
 	symb_dtypeTB(FB_DATATYPE_WCHAR).class     = symb_dtypeTB(env.target.wchar).class
 	symb_dtypeTB(FB_DATATYPE_WCHAR).size      = symb_dtypeTB(env.target.wchar).size
 	symb_dtypeTB(FB_DATATYPE_WCHAR).signed    = symb_dtypeTB(env.target.wchar).signed
+	symb_dtypeTB(FB_DATATYPE_WCHAR).intrank   = symb_dtypeTB(env.target.wchar).intrank
 	symb_dtypeTB(FB_DATATYPE_WCHAR).remaptype = symb_dtypeTB(env.target.wchar).remaptype
+	symb_dtypeTB(FB_DATATYPE_WCHAR).sizetype  = symb_dtypeTB(env.target.wchar).sizetype
 
 
 	'' Create symb_dtypeMatchTB(), used to score overload resolutions

@@ -1187,7 +1187,12 @@ function hEscapeW _
 
 	'' convert the internal escape sequences to GAS format
 
-	wcharlen = typeGetSize( FB_DATATYPE_WCHAR )
+	select case( env.clopt.target )
+	case FB_COMPTARGET_ANDROID, FB_COMPTARGET_XBOX
+		wcharlen = 4
+	case else
+		wcharlen = typeGetSize( env.target.wchar )
+	end select
 	n = 0
 
 	'' up to (4 * wcharlen) ascii chars can be used per unicode char

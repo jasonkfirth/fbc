@@ -1,6 +1,7 @@
 #include "../fb_sfx.h"
 #include "../fb_sfx_internal.h"
 #include "../fb_sfx_driver.h"
+#include "../fb_sfx_driver_diag.h"
 #include "fb_sfx_android.h"
 
 #include <SLES/OpenSLES.h>
@@ -216,9 +217,15 @@ static int opensl_init(int rate, int channels, int buffer, int flags)
 		goto fail;
 
 	initialized = 1;
+	if (fb_hAndroidSfxActivate(rate, channels_active, buffer_frames_active) != 0)
+		goto fail;
+
 	return 0;
 
 fail:
+	initialized = 0;
+	fb_hAndroidSfxDeactivate();
+
 	if (player_object)
 	{
 		(*player_object)->Destroy(player_object);
@@ -243,6 +250,8 @@ fail:
 
 static void opensl_exit(void)
 {
+	fb_hAndroidSfxDeactivate();
+
 	pthread_mutex_lock(&buffer_mutex);
 	shutting_down = 1;
 	initialized = 0;
@@ -319,6 +328,8 @@ static int opensl_write(const float *samples, int frames)
 	if (frames > buffer_frames_active)
 		frames = buffer_frames_active;
 
+	fb_sfxDriverDiagnostics("OpenSL ES", samples, frames, channels_active);
+
 	buffer = wait_for_buffer(&paused);
 	if (!buffer)
 		return paused ? 0 : -1;
@@ -350,7 +361,7 @@ static int opensl_write(const float *samples, int frames)
 const FB_SFX_DRIVER fb_sfxDriverOpenSLES =
 {
 	"OpenSL ES",
-	0,
+	FB_SFX_DRIVER_CAP_BACKGROUND,
 	opensl_init,
 	opensl_exit,
 	opensl_write,

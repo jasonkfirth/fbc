@@ -1580,6 +1580,14 @@ private sub _emitEnd( )
 	'' Switch to header section temporarily
 	section = sectionGosub( 0 )
 
+	if( fbGetOption( FB_COMPOPT_MODEVIEW ) = FB_MODEVIEW_GUI ) then
+		hWriteLine( "#if defined(__GNUC__)", TRUE )
+		hWriteLine( "__attribute__((weak)) const int __fb_app_mode_gui_enabled = 1;", TRUE )
+		hWriteLine( "#else", TRUE )
+		hWriteLine( "const int __fb_app_mode_gui_enabled = 1;", TRUE )
+		hWriteLine( "#endif", TRUE )
+	end if
+
 	if( ctx.usedbuiltins and BUILTIN_F2I  ) then hWriteF2I( "F2I" , FB_DATATYPE_LONG    , FB_DATATYPE_SINGLE )
 	if( ctx.usedbuiltins and BUILTIN_F2L  ) then hWriteF2I( "F2L" , FB_DATATYPE_LONGINT , FB_DATATYPE_SINGLE )
 	if( ctx.usedbuiltins and BUILTIN_F2UL ) then hWriteF2I( "F2UL", FB_DATATYPE_ULONGINT, FB_DATATYPE_SINGLE )
@@ -2447,6 +2455,82 @@ private sub hBuildStrLit _
 	ln += """"
 end sub
 
+private function hReadWstrChar _
+	( _
+		byref src as const wstring ptr, _
+		byval src_end as const wstring ptr _
+	) as uinteger
+
+	dim as uinteger ch = any
+	dim as integer digits = any
+
+	ch = *src
+	src += 1
+
+	if( ch <> FB_INTSCAPECHAR ) then
+		return ch
+	end if
+
+	if( src >= src_end ) then
+		return FB_INTSCAPECHAR
+	end if
+
+	ch = *src
+	src += 1
+
+	if( (ch >= 1) and (ch <= 11) ) then
+		digits = ch
+		ch = 0
+		while( (digits > 0) and (src < src_end) )
+			ch = (ch * 8) + (*src - CHAR_0)
+			src += 1
+			digits -= 1
+		wend
+		return ch
+	end if
+
+	select case as const ch
+	case asc( "u" )
+		digits = 4
+	case asc( "U" )
+		digits = 8
+	case asc( "r" )
+		return CHAR_CR
+	case asc( "l" ), asc( "n" )
+		return CHAR_LF
+	case asc( "t" )
+		return CHAR_TAB
+	case asc( "b" )
+		return CHAR_BKSPC
+	case asc( "a" )
+		return CHAR_BELL
+	case asc( "f" )
+		return CHAR_FORMFEED
+	case asc( "v" )
+		return CHAR_VTAB
+	case else
+		return ch
+	end select
+
+	ch = 0
+	while( (digits > 0) and (src < src_end) )
+		dim as uinteger nibble = *src
+		src += 1
+
+		if( nibble > CHAR_9 ) then
+			nibble -= (CHAR_AUPP - CHAR_9 - 1)
+		end if
+		if( nibble > 16 ) then
+			nibble -= (CHAR_ALOW - CHAR_AUPP)
+		end if
+
+		ch = (ch shl 4) or (nibble and &hF)
+		digits -= 1
+	wend
+
+	function = ch
+end function
+
 private sub hBuildWstrLit _
 	( _
 		byref ln as string, _
@@ -2454,14 +2538,21 @@ private sub hBuildWstrLit _
 		byval length as longint _  '' including null terminator
 	)
 
-	dim as integer ch = any
+	dim as uinteger ch = any
 	dim as integer wcharsize = any
+	dim as const wstring ptr src = any, src_end = any
 	dim as zstring ptr strstart = any
 
 	'' (ditto)
 
-	wcharsize = typeGetSize( FB_DATATYPE_WCHAR )
-	'' On android wstring is 1 byte but C wide strings/chars are 4 bytes, so don't use them
+	select case( env.clopt.target )
+	case FB_COMPTARGET_ANDROID, FB_COMPTARGET_XBOX
+		wcharsize = 4
+	case else
+		wcharsize = typeGetSize( env.target.wchar )
+	end select
+	'' On targets with 1-byte wstring data, C wide strings/chars are too
+	'' wide, so don't use them.
 	if( wcharsize = 1 ) then
 		strstart = @""""
 	else
@@ -2472,23 +2563,26 @@ private sub hBuildWstrLit _
 
 	'' Don't bother emitting the null terminator explicitly - gcc will add
 	'' it automatically already
+	src = w
+	src_end = w + len( *w )
 	for i as integer = 0 to length - 2
-		ch = (*w)[i]
+		if( src >= src_end ) then
+			exit for
+		end if
+
+		ch = hReadWstrChar( src, src_end )
 
 		if( hCharNeedsEscaping( ch, asc( """" ) ) ) then
 			ln += $"\x" + hex( ch, wcharsize * 2 )
-			if( hIsValidHexDigit( (*w)[i+1] ) ) then
-				ln += """ " + *strstart
-			end if
+			ln += chr( 34 ) + " " + *strstart
 		elseif( ch = asc( "?" ) ) then
 			ln += "?"
-			if( (*w)[i+1] = asc( "?" ) ) then
-				assert( (i+2) < length )  '' null terminator not yet reached
-				select case( (*w)[i+2] )
+			if( (src < src_end) andalso (*src = asc( "?" )) ) then
+				select case( cint( src[1] ) )
 				case asc( "=" ), asc( "/" ), asc( "'" ), _
 				     asc( "(" ), asc( ")" ), asc( "!" ), _
 				     asc( "<" ), asc( ">" ), asc( "-" )
-					ln += """ " + *strstart
+					ln += chr( 34 ) + " " + *strstart
 				end select
 			end if
 		else
@@ -2602,7 +2696,12 @@ private sub hSym2Text( byref s as string, byval sym as FBSYMBOL ptr )
 	'' String literal?
 	if( symbGetIsLiteral( sym ) ) then
 		if( symbGetType( sym ) = FB_DATATYPE_WCHAR ) then
-			hBuildWstrLit( s, hUnescapeW( symbGetVarLitTextW( sym ) ), symbGetWstrLength( sym ) + 1 )
+			select case( env.clopt.target )
+			case FB_COMPTARGET_ANDROID, FB_COMPTARGET_XBOX
+				hBuildWstrLit( s, symbGetVarLitTextW( sym ), symbGetWstrLength( sym ) + 1 )
+			case else
+				hBuildWstrLit( s, hUnescapeW( symbGetVarLitTextW( sym ) ), symbGetWstrLength( sym ) + 1 )
+			end select
 		else
 			hBuildStrLit( s, hUnescape( symbGetVarLitText( sym ) ), symbGetStrLength( sym ) + 1, 0 )
 		end if
@@ -4046,6 +4145,7 @@ private sub _emitVarIniWstr _
 
 	dim as uinteger ch = any
 	dim as integer wcharsize = any
+	dim as const wstring ptr src = any, src_end = any
 
 	'' In Linux GCC, wchar_t and thus L"..." expressions use signed int,
 	'' but FB uses unsigned integers. But GCC will show an error when doing
@@ -4054,8 +4154,13 @@ private sub _emitVarIniWstr _
 	''    unsigned int mywstring[] = { L'f', L'o', L'o' }
 
 	ctx.varini += "{ "
-	literal = hUnescapeW( literal )
-	wcharsize = typeGetSize( FB_DATATYPE_WCHAR )
+	select case( env.clopt.target )
+	case FB_COMPTARGET_ANDROID, FB_COMPTARGET_XBOX
+		wcharsize = 4
+	case else
+		wcharsize = typeGetSize( env.target.wchar )
+		literal = hUnescapeW( literal )
+	end select
 
 	'' String literal too long?
 	if( litlength > varlength ) then
@@ -4063,19 +4168,26 @@ private sub _emitVarIniWstr _
 		litlength = varlength
 	end if
 
+	src = literal
+	src_end = literal + len( *literal )
 	for i as integer = 0 to litlength - 1
+		if( src >= src_end ) then
+			exit for
+		end if
+
 		if( i > 0 ) then
 			ctx.varini += ", "
 		end if
 
-		'' On android wstring is 1 byte but C wide strings/chars are 4 bytes, so don't use them
+		'' On targets with 1-byte wstring data, C wide strings/chars are too
+		'' wide, so don't use them.
 		if( wcharsize = 1 ) then
 			ctx.varini += "'"
 		else
 			ctx.varini += "L'"
 		end if
 
-		ch = (*literal)[i]
+		ch = hReadWstrChar( src, src_end )
 
 		if( hCharNeedsEscaping( ch, asc( "'" ) ) ) then
 			ctx.varini += $"\x" + hex( ch, wcharsize * 2 )

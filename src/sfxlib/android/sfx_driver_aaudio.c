@@ -1,6 +1,7 @@
 #include "../fb_sfx.h"
 #include "../fb_sfx_internal.h"
 #include "../fb_sfx_driver.h"
+#include "../fb_sfx_driver_diag.h"
 #include "fb_sfx_android.h"
 
 #include <aaudio/AAudio.h>
@@ -32,6 +33,7 @@ static FB_SFX_AAUDIO_API api;
 static AAudioStream *stream = NULL;
 static pthread_mutex_t stream_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int initialized = 0;
+static int channels_active = FB_SFX_DEFAULT_CHANNELS;
 
 static void *load_symbol(const char *name)
 {
@@ -113,7 +115,8 @@ static int aaudio_init(int rate, int channels, int buffer, int flags)
 
 	api.setDirection(builder, AAUDIO_DIRECTION_OUTPUT);
 	api.setSampleRate(builder, rate > 0 ? rate : FB_SFX_DEFAULT_RATE);
-	api.setChannelCount(builder, channels > 0 ? channels : FB_SFX_DEFAULT_CHANNELS);
+	channels_active = channels > 0 ? channels : FB_SFX_DEFAULT_CHANNELS;
+	api.setChannelCount(builder, channels_active);
 	api.setFormat(builder, AAUDIO_FORMAT_PCM_FLOAT);
 	api.setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
 	api.setSharingMode(builder, AAUDIO_SHARING_MODE_SHARED);
@@ -136,12 +139,20 @@ static int aaudio_init(int rate, int channels, int buffer, int flags)
 	}
 
 	initialized = 1;
+	if (fb_hAndroidSfxActivate(rate, channels_active, buffer) != 0)
+	{
+		close_stream_locked();
+		initialized = 0;
+		pthread_mutex_unlock(&stream_mutex);
+		return -1;
+	}
 	pthread_mutex_unlock(&stream_mutex);
 	return 0;
 }
 
 static void aaudio_exit(void)
 {
+	fb_hAndroidSfxDeactivate();
 	pthread_mutex_lock(&stream_mutex);
 	close_stream_locked();
 	initialized = 0;
@@ -154,6 +165,8 @@ static int aaudio_write(const float *samples, int frames)
 
 	if (!fb_hAndroidSfxIsRunning())
 		return 0;
+
+	fb_sfxDriverDiagnostics("AAudio", samples, frames, channels_active);
 
 	pthread_mutex_lock(&stream_mutex);
 	if (!initialized || !stream || !samples || frames <= 0)
@@ -178,7 +191,7 @@ static int aaudio_write(const float *samples, int frames)
 const FB_SFX_DRIVER fb_sfxDriverAAudio =
 {
 	"AAudio",
-	0,
+	FB_SFX_DRIVER_CAP_BACKGROUND,
 	aaudio_init,
 	aaudio_exit,
 	aaudio_write,

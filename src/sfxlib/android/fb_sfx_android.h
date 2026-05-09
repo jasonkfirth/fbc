@@ -12,6 +12,9 @@ extern const FB_SFX_DRIVER fb_sfxDriverOpenSLES;
 
 void fb_hAndroidSfxSetLifecycle(int started, int resumed);
 int fb_hAndroidSfxIsRunning(void);
+int fb_hAndroidSfxActivate(int rate, int channels, int buffer_frames);
+void fb_hAndroidSfxDeactivate(void);
+void fb_hAndroidSfxExit(void);
 
 #ifdef __cplusplus
 }

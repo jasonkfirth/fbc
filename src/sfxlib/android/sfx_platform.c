@@ -13,6 +13,7 @@
 
 void fb_sfxPlatformExit(void)
 {
+    fb_hAndroidSfxExit();
     fb_hAndroidSfxSetLifecycle(0, 0);
 }
 
