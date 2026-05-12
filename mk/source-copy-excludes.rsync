@@ -10,6 +10,8 @@
 *.log
 *.tmp
 .maketests-tmp/
+xbox_emulator/
+xbox_emulator_xemu/
 bin/fbc*
 bootstrap/fbc*
 dist/

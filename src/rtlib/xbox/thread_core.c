@@ -4,6 +4,9 @@
 #include "../fb_private_thread.h"
 #include <windows.h>
 
+#define FB_XBOX_DEFAULT_THREAD_STACK_SIZE (128 * 1024)
+#define FB_XBOX_RETRY_THREAD_STACK_SIZE   (64 * 1024)
+
 static DWORD WINAPI threadproc( void *param )
 {
 	FBTHREADINFO *info = param;
@@ -50,9 +53,19 @@ FBCALL FBTHREAD *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack
 	info->param = param;
 	info->thread = thread;
 	thread->flags = 0;
-	real_stack_size = (stack_size > 0) ? (SIZE_T)stack_size : 65536;
+	/*
+		Xbox has much less memory than desktop Win32, and nxdk commits the
+		stack reserve eagerly enough that creating many 1 MiB stacks can fail
+		before user code runs.  Keep an explicit user stack size intact, but
+		use a smaller default so ordinary ThreadCreate() fan-out still works.
+	*/
+	real_stack_size = (stack_size > 0) ? (SIZE_T)stack_size : FB_XBOX_DEFAULT_THREAD_STACK_SIZE;
 
 	thread->id = CreateThread( NULL, real_stack_size, threadproc, info, 0, NULL );
+	if( (thread->id == NULL) && (stack_size <= 0) ) {
+		thread->id = CreateThread( NULL, FB_XBOX_RETRY_THREAD_STACK_SIZE, threadproc, info, 0, NULL );
+	}
+
 	if( thread->id == NULL ) {
 		free( thread );
 		free( info );

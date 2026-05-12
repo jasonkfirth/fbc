@@ -2531,6 +2531,46 @@ private function hReadWstrChar _
 	function = ch
 end function
 
+private function hUseNumericWstrLit( ) as integer
+	'' Some COFF targets, currently Xbox via nxdk/clang, use a 32-bit
+	'' FreeBASIC WCHAR while the C compiler's L"..." literals are not
+	'' 32-bit wchar_t strings.  Emit numeric target-WCHAR arrays there so
+	'' WSTRING literals are described by FreeBASIC's target table instead
+	'' of the host C wide-character ABI.
+	function = fbTargetWcharIsUtf32( ) and fbTargetSupportsCOFF( )
+end function
+
+private sub hBuildNumericWstrLit _
+	( _
+		byref ln as string, _
+		byval w as wstring ptr, _
+		byval length as longint _  '' including null terminator
+	)
+
+	dim as uinteger ch = any
+	dim as const wstring ptr src = any, src_end = any
+
+	ln += "(" + hEmitType( env.target.wchar, NULL ) + "[]){ "
+
+	src = w
+	src_end = w + len( *w )
+	for i as longint = 0 to length - 1
+		if( i > 0 ) then
+			ln += ", "
+		end if
+
+		if( src < src_end ) then
+			ch = hReadWstrChar( src, src_end )
+		else
+			ch = 0
+		end if
+
+		ln += hEmitInt( env.target.wchar, ch )
+	next
+
+	ln += " }"
+end sub
+
 private sub hBuildWstrLit _
 	( _
 		byref ln as string, _
@@ -2544,6 +2584,11 @@ private sub hBuildWstrLit _
 	dim as zstring ptr strstart = any
 
 	'' (ditto)
+
+	if( hUseNumericWstrLit( ) ) then
+		hBuildNumericWstrLit( ln, w, length )
+		exit sub
+	end if
 
 	wcharsize = fbGetTargetWcharSize( )
 	'' On targets with 1-byte wstring data, C wide strings/chars are too
@@ -3839,6 +3884,40 @@ private function hFindLabelInSeenList( _
 	return index
 end function
 
+private function hStripSimpleAsmPlaceholderBrackets( byref asmcode as string ) as string
+	dim as string result
+	dim as integer i = 1, length = len( asmcode )
+
+	while( i <= length )
+		dim as integer matched = FALSE
+
+		if( (i + 3 <= length) andalso (mid( asmcode, i, 2 ) = "[%") ) then
+			dim as integer j = i + 2
+
+			while( j <= length )
+				dim as integer ch = asmcode[j - 1]
+				if( (ch < asc( "0" )) orelse (ch > asc( "9" )) ) then
+					exit while
+				end if
+				j += 1
+			wend
+
+			if( (j > i + 2) andalso (j <= length) andalso (asmcode[j - 1] = asc( "]" )) ) then
+				result += mid( asmcode, i + 1, j - i - 1 )
+				i = j + 1
+				matched = TRUE
+			end if
+		end if
+
+		if( matched = FALSE ) then
+			result += mid( asmcode, i, 1 )
+			i += 1
+		end if
+	wend
+
+	function = result
+end function
+
 private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 	'' 1st pass to count some stats (no emitting yet)
 	dim as integer uses_label, labelindex, labelindexbase
@@ -3973,6 +4052,10 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 	listEnd( @seenlabellist )
 
 	if( env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
+		if( env.clopt.backend = FB_BACKEND_CLANG ) then
+			asmcode = hStripSimpleAsmPlaceholderBrackets( asmcode )
+		end if
+
 		''
 		'' Escape double quotes, backslashes, etc. in the asm text,
 		'' for example to emit .ascii directives correctly:
@@ -4139,6 +4222,7 @@ private sub _emitVarIniWstr _
 
 	dim as uinteger ch = any
 	dim as integer wcharsize = any
+	dim as integer use_numeric = any
 	dim as const wstring ptr src = any, src_end = any
 
 	'' In Linux GCC, wchar_t and thus L"..." expressions use signed int,
@@ -4149,6 +4233,7 @@ private sub _emitVarIniWstr _
 
 	ctx.varini += "{ "
 	wcharsize = fbGetTargetWcharSize( )
+	use_numeric = hUseNumericWstrLit( )
 	if( not fbTargetWcharIsUtf32( ) ) then
 		literal = hUnescapeW( literal )
 	end if
@@ -4170,23 +4255,27 @@ private sub _emitVarIniWstr _
 			ctx.varini += ", "
 		end if
 
-		'' On targets with 1-byte wstring data, C wide strings/chars are too
-		'' wide, so don't use them.
-		if( wcharsize = 1 ) then
-			ctx.varini += "'"
-		else
-			ctx.varini += "L'"
-		end if
-
 		ch = hReadWstrChar( src, src_end )
 
-		if( hCharNeedsEscaping( ch, asc( "'" ) ) ) then
-			ctx.varini += $"\x" + hex( ch, wcharsize * 2 )
+		if( use_numeric ) then
+			ctx.varini += hEmitInt( env.target.wchar, ch )
 		else
-			ctx.varini += chr( ch )
-		end if
+			'' On targets with 1-byte wstring data, C wide strings/chars are too
+			'' wide, so don't use them.
+			if( wcharsize = 1 ) then
+				ctx.varini += "'"
+			else
+				ctx.varini += "L'"
+			end if
 
-		ctx.varini += "'"
+			if( hCharNeedsEscaping( ch, asc( "'" ) ) ) then
+				ctx.varini += $"\x" + hex( ch, wcharsize * 2 )
+			else
+				ctx.varini += chr( ch )
+			end if
+
+			ctx.varini += "'"
+		end if
 	next
 
 	ctx.varini += " }"

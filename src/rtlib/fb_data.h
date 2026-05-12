@@ -1,3 +1,7 @@
+#ifndef FB_DATADESC_PACKED
+#define FB_DATADESC_PACKED FBPACKED
+#endif
+
 struct _FB_DATADESC {
 	short 					len;
 	union {
@@ -6,7 +10,7 @@ struct _FB_DATADESC {
 		void   				*ofs;
 		struct _FB_DATADESC *next;
 	};
-} FBPACKED;
+} FB_DATADESC_PACKED;
 
 typedef struct _FB_DATADESC FB_DATADESC;
 

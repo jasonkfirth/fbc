@@ -1,46 +1,191 @@
-/* xbox fbgfx driver */
+/*
+    FreeBASIC gfxlib2 Xbox backend
+    ------------------------------
+
+    File: gfx_driver.c
+
+    Purpose:
+
+        Present the gfxlib framebuffer through nxdk's XVideo framebuffer.
+
+    Responsibilities:
+
+        - open a real Xbox video mode
+        - convert gfxlib's framebuffer to 32-bit pixels
+        - present lower-resolution gfxlib modes with integer scaling
+        - fall back to integer pixel skipping when the requested buffer is
+          larger than the selected video mode
+
+    This file intentionally does NOT contain:
+
+        - input handling
+        - window management
+        - audio or lifecycle handling
+*/
 
 #include "../fb_gfx.h"
 #include <hal/xbox.h>
 #include <hal/video.h>
+#include <stdint.h>
 
 #define SCREENLIST(w, h) ((h) | (w) << 16)
+#define XBOX_DEFAULT_W 640
+#define XBOX_DEFAULT_H 480
 
 static BLITTER *blitter;
 static void *framebuffer;
+static uint32_t *scale_buffer;
+static size_t scale_buffer_size;
+static int video_w;
+static int video_h;
 static volatile int quitting;
+
+static int ensure_scale_buffer(size_t pixels)
+{
+	uint32_t *new_buffer;
+
+	if (scale_buffer_size >= pixels)
+		return TRUE;
+
+	if (pixels > (SIZE_MAX / sizeof(uint32_t)))
+		return FALSE;
+
+	new_buffer = (uint32_t *)realloc(scale_buffer, pixels * sizeof(uint32_t));
+	if (!new_buffer) {
+		free(scale_buffer);
+		scale_buffer = NULL;
+		scale_buffer_size = 0;
+		return FALSE;
+	}
+
+	scale_buffer = new_buffer;
+	scale_buffer_size = pixels;
+	return TRUE;
+}
+
+static void choose_video_mode(int src_w, int src_h, int *out_w, int *out_h)
+{
+	VIDEO_MODE vm;
+	void *p = NULL;
+	int best_area = 0;
+
+	*out_w = XBOX_DEFAULT_W;
+	*out_h = XBOX_DEFAULT_H;
+
+	while (XVideoListModes(&vm, 32, 0, &p)) {
+		int area;
+
+		if ((vm.width < src_w) || (vm.height < src_h))
+			continue;
+
+		area = vm.width * vm.height;
+		if ((best_area == 0) || (area < best_area)) {
+			*out_w = vm.width;
+			*out_h = vm.height;
+			best_area = area;
+		}
+	}
+}
+
+static void get_viewport(int *scale, int *skip, int *out_w, int *out_h, int *off_x, int *off_y)
+{
+	int src_w = __fb_gfx->w;
+	int src_h = __fb_gfx->h;
+	int local_scale;
+	int local_skip;
+
+	local_scale = video_w / src_w;
+	if ((video_h / src_h) < local_scale)
+		local_scale = video_h / src_h;
+
+	if (local_scale >= 1) {
+		*scale = local_scale;
+		*skip = 1;
+		*out_w = src_w * local_scale;
+		*out_h = src_h * local_scale;
+	} else {
+		*scale = 0;
+		local_skip = (src_w + video_w - 1) / video_w;
+		if (((src_h + video_h - 1) / video_h) > local_skip)
+			local_skip = (src_h + video_h - 1) / video_h;
+		if (local_skip < 1)
+			local_skip = 1;
+		*skip = local_skip;
+		*out_w = src_w / local_skip;
+		*out_h = src_h / local_skip;
+	}
+
+	*off_x = (video_w - *out_w) / 2;
+	*off_y = (video_h - *out_h) / 2;
+	if (*off_x < 0)
+		*off_x = 0;
+	if (*off_y < 0)
+		*off_y = 0;
+}
 
 static void driver_update_framebuffer(void)
 {
-	if (!__fb_gfx || !framebuffer)
+	int src_w, src_h, src_pitch;
+	int scale, skip, out_w, out_h, off_x, off_y;
+	int x, y;
+
+	if (!__fb_gfx || !framebuffer || !blitter)
 		return;
 
-	if (blitter)
-		blitter(framebuffer, __fb_gfx->w);
-	else
-		memcpy(framebuffer, __fb_gfx->framebuffer, __fb_gfx->pitch * __fb_gfx->h);
+	src_w = __fb_gfx->w;
+	src_h = __fb_gfx->h;
+	src_pitch = src_w * (int)sizeof(uint32_t);
+
+	if (!ensure_scale_buffer((size_t)src_w * (size_t)src_h))
+		return;
+
+	blitter((unsigned char *)scale_buffer, src_pitch);
+	get_viewport(&scale, &skip, &out_w, &out_h, &off_x, &off_y);
+
+	memset(framebuffer, 0, (size_t)video_w * (size_t)video_h * sizeof(uint32_t));
+
+	for (y = 0; y < out_h; ++y) {
+		uint32_t *dst = ((uint32_t *)framebuffer) + ((off_y + y) * video_w) + off_x;
+		uint32_t *src;
+
+		if (scale >= 1)
+			src = scale_buffer + ((y / scale) * src_w);
+		else
+			src = scale_buffer + ((y * skip) * src_w);
+
+		for (x = 0; x < out_w; ++x) {
+			if (scale >= 1)
+				dst[x] = src[x / scale];
+			else
+				dst[x] = src[x * skip];
+		}
+	}
 
 	XVideoFlushFB();
 }
 
 static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rate, int flags)
 {
-	int depth = MAX(8, depth_arg);
+	int mode_w, mode_h;
+	VIDEO_MODE vm;
 
-	if (depth == 8) {
-		depth = 24;
-		blitter = fb_hGetBlitter(32, FALSE);
-	} else {
-		blitter = NULL;
-	}
+	(void)title;
+	(void)depth_arg;
 
 	if (flags & DRIVER_OPENGL)
 		return -1;
 
-	if (!XVideoSetMode(w, h, depth == 32 ? 24 : depth, refresh_rate))
+	choose_video_mode(w, h, &mode_w, &mode_h);
+	if (!XVideoSetMode(mode_w, mode_h, 32, refresh_rate))
 		return -1;
 
+	vm = XVideoGetMode();
+	video_w = vm.width;
+	video_h = vm.height;
 	framebuffer = XVideoGetFB();
+	blitter = fb_hGetBlitter(32, FALSE);
+	if (!framebuffer || !blitter)
+		return -1;
 
 	quitting = FALSE;
 
@@ -52,6 +197,13 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 static void driver_exit(void)
 {
 	quitting = TRUE;
+	framebuffer = NULL;
+	blitter = NULL;
+	video_w = 0;
+	video_h = 0;
+	free(scale_buffer);
+	scale_buffer = NULL;
+	scale_buffer_size = 0;
 
 	//XInput_Quit();
 

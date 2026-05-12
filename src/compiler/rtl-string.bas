@@ -2982,6 +2982,132 @@ function rtlToStr _
 end function
 
 '':::::
+private sub hAppendTargetWstrChar _
+	( _
+		byval buffer as wstring ptr, _
+		byref internalchars as integer, _
+		byref textchars as integer, _
+		byval codepoint as ulong _
+	)
+
+	if( (codepoint < CHAR_SPACE) or (codepoint > 127ul) ) then
+		dim as string digits = oct( codepoint )
+
+		buffer[internalchars] = wchr( FB_INTSCAPECHAR )
+		internalchars += 1
+		buffer[internalchars] = wchr( len( digits ) )
+		internalchars += 1
+
+		for i as integer = 1 to len( digits )
+			buffer[internalchars] = wchr( asc( mid( digits, i, 1 ) ) )
+			internalchars += 1
+		next
+	else
+		buffer[internalchars] = wchr( codepoint )
+		internalchars += 1
+	end if
+
+	textchars += 1
+end sub
+
+private function hDecodeUtf8Char _
+	( _
+		byval bytes as const ubyte ptr, _
+		byval textlen as integer, _
+		byref index as integer _
+	) as ulong
+
+	dim as ulong c = bytes[index]
+	dim as ulong codepoint = any
+
+	if( c < &h80ul ) then
+		index += 1
+		return c
+	end if
+
+	if( (c >= &hC2ul) and (c <= &hDFul) and _
+	    ((index + 1) < textlen) and _
+	    ((bytes[index + 1] and &hC0u) = &h80u) ) then
+		codepoint = ((c and &h1Ful) shl 6) or (bytes[index + 1] and &h3Fu)
+		index += 2
+		function = codepoint
+		exit function
+	end if
+
+	if( (c >= &hE0ul) and (c <= &hEFul) and _
+	    ((index + 2) < textlen) and _
+	    ((bytes[index + 1] and &hC0u) = &h80u) and _
+	    ((bytes[index + 2] and &hC0u) = &h80u) ) then
+		codepoint = ((c and &h0Ful) shl 12) or _
+		            ((bytes[index + 1] and &h3Fu) shl 6) or _
+		            (bytes[index + 2] and &h3Fu)
+
+		if( (codepoint >= &h800ul) and _
+		    ((codepoint < &hD800ul) or (codepoint > &hDFFFul)) ) then
+			index += 3
+			function = codepoint
+			exit function
+		end if
+	end if
+
+	if( (c >= &hF0ul) and (c <= &hF4ul) and _
+	    ((index + 3) < textlen) and _
+	    ((bytes[index + 1] and &hC0u) = &h80u) and _
+	    ((bytes[index + 2] and &hC0u) = &h80u) and _
+	    ((bytes[index + 3] and &hC0u) = &h80u) ) then
+		codepoint = ((c and &h07ul) shl 18) or _
+		            ((bytes[index + 1] and &h3Fu) shl 12) or _
+		            ((bytes[index + 2] and &h3Fu) shl 6) or _
+		            (bytes[index + 3] and &h3Fu)
+
+		if( (codepoint >= &h10000ul) and (codepoint <= &h10FFFFul) ) then
+			index += 4
+			function = codepoint
+			exit function
+		end if
+	end if
+
+	'' Escaped byte literals such as !"\255" reach here as raw bytes after
+	'' hUnescape().  Preserve such bytes while still decoding valid UTF-8.
+	index += 1
+	function = c
+end function
+
+private function hAllocTargetWstrConstFromStrLit _
+	( _
+		byval litsym as FBSYMBOL ptr _
+	) as FBSYMBOL ptr
+
+	dim as zstring ptr text = any
+	dim as integer textlen = any
+	dim as wstring ptr wtext = any
+	dim as integer i, internalchars, textchars
+
+	if( env.clopt.target <> FB_COMPTARGET_XBOX ) then
+		return symbAllocWstrConst( wstr( *symbGetVarLitText( litsym ) ), _
+		                           symbGetStrLength( litsym ) )
+	end if
+
+	text = hUnescape( symbGetVarLitText( litsym ), textlen )
+	wtext = callocate( (textlen * 12) + 1, sizeof( wstring ) )
+	if( wtext = NULL ) then
+		return NULL
+	end if
+
+	i = 0
+	internalchars = 0
+	textchars = 0
+	while( i < textlen )
+		hAppendTargetWstrChar( wtext, internalchars, textchars, _
+		                       hDecodeUtf8Char( cptr( const ubyte ptr, text ), textlen, i ) )
+	wend
+	wtext[internalchars] = 0
+
+	function = symbAllocWstrConst( wtext, textchars )
+	deallocate( wtext )
+end function
+
+'':::::
 function rtlToWstr _
 	( _
 		byval expr as ASTNODE ptr, _
@@ -3004,13 +3130,17 @@ function rtlToWstr _
 	'' string literal? convert to unicode at compile-time
 	if( dtype = FB_DATATYPE_CHAR ) then
 		litsym = astGetStrLitSymbol( expr )
-		if( (litsym <> NULL) and _
-		    ((allow_litconst <> FALSE) or _
-		     (not fbTargetWcharIsUtf32( ))) ) then
-			if( env.wcharconv <> FB_WCHARCONV_NEVER ) then
-				litsym = symbAllocWstrConst( wstr( *symbGetVarLitText( litsym ) ), _
-				                             symbGetStrLength( litsym ) )
-				return astNewVAR( litsym )
+		if( litsym <> NULL ) then
+			if( fbTargetCanFoldStrLitTextToWstr( symbGetVarLitText( litsym ), _
+			                                     symbGetStrLength( litsym ), _
+			                                     allow_litconst ) ) then
+				if( env.wcharconv <> FB_WCHARCONV_NEVER ) then
+					litsym = hAllocTargetWstrConstFromStrLit( litsym )
+					if( litsym = NULL ) then
+						exit function
+					end if
+					return astNewVAR( litsym )
+				end if
 			end if
 		end if
 	end if

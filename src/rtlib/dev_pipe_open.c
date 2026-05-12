@@ -2,7 +2,7 @@
 
 #include "fb.h"
 
-#if defined(HOST_XBOX) || defined(HOST_JS)
+#if defined(HOST_JS)
 
 int fb_DevPipeOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 {

@@ -8,7 +8,7 @@ SUITE( fbc_tests.structs.anon_align )
 	'' the same as on MinGW)
 	''
 	'' On 64bit, doubles/longints are aligned to 8 everywhere.
-	#if defined( __FB_64BIT__ ) or defined( __FB_WIN32__ ) or defined( __FB_ARM__ ) or defined( __FB_JS__ )
+	#if defined( __FB_64BIT__ ) or defined( __FB_WIN32__ ) or defined( __FB_ARM__ ) or defined( __FB_JS__ ) or defined( __FB_XBOX__ )
 		#define QWORD_ALIGN 8
 	#else
 		#define QWORD_ALIGN 4

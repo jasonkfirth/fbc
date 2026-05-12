@@ -218,6 +218,7 @@ copy_runtime_dlls() {
 	local exe="$1"
 	local dst="$2"
 	local dep
+	local found
 
 	[ -x "$exe" ] || return 0
 	mkdir -p "$dst"
@@ -228,8 +229,21 @@ copy_runtime_dlls() {
 			/ucrt64/*|/mingw64/*|/usr/bin/*)
 				[ -f "$dep" ] && cp -a "$dep" "$dst/"
 				;;
+			*.dll)
+				for found in \
+					"$MINGW64_ROOT/bin/$dep" \
+					"/ucrt64/bin/$dep" \
+					"/usr/bin/$dep"
+				do
+					if [ -f "$found" ]; then
+						cp -a "$found" "$dst/"
+						break
+					fi
+				done
+				;;
 		esac
-	done < <(ldd "$exe" | awk '
+	done < <(PATH="$MINGW64_ROOT/bin:/usr/bin:$PATH" ldd "$exe" | awk '
+		/=> not found/ { print $1; next }
 		/=>/ { print $(NF - 1); next }
 		/^\// { print $1; next }
 	')
@@ -331,16 +345,55 @@ ensure_nxdk() {
 ensure_nxdk_tools() {
 	msg "Checking nxdk host tools"
 
-	if [ -f "$NXDK_DIR/tools/cxbe/cxbe.exe" ] || [ -f "$NXDK_DIR/tools/cxbe/cxbe" ]; then
-		return 0
+	if [ ! -f "$NXDK_DIR/tools/cxbe/cxbe.exe" ] && [ ! -f "$NXDK_DIR/tools/cxbe/cxbe" ]; then
+		[ -f "$NXDK_DIR/Makefile" ] || fail "nxdk cxbe is missing and nxdk Makefile was not found: $NXDK_DIR"
+		run env MSYSTEM=MINGW64 PATH="$MINGW64_ROOT/bin:/usr/bin:$PATH" make -C "$NXDK_DIR" cxbe
 	fi
-
-	[ -f "$NXDK_DIR/Makefile" ] || fail "nxdk cxbe is missing and nxdk Makefile was not found: $NXDK_DIR"
-	run env MSYSTEM=MINGW64 PATH="$MINGW64_ROOT/bin:/usr/bin:$PATH" make -C "$NXDK_DIR" cxbe
 
 	if [ ! -f "$NXDK_DIR/tools/cxbe/cxbe.exe" ] && [ ! -f "$NXDK_DIR/tools/cxbe/cxbe" ]; then
 		fail "nxdk cxbe was not built"
 	fi
+
+	if [ ! -f "$NXDK_DIR/tools/extract-xiso/build/extract-xiso.exe" ] && \
+	   [ ! -f "$NXDK_DIR/tools/extract-xiso/build/extract-xiso" ]; then
+		[ -f "$NXDK_DIR/Makefile" ] || fail "nxdk extract-xiso is missing and nxdk Makefile was not found: $NXDK_DIR"
+		run env MSYSTEM=MINGW64 PATH="$MINGW64_ROOT/bin:/usr/bin:$PATH" make -C "$NXDK_DIR" extract-xiso
+	fi
+
+	if [ ! -f "$NXDK_DIR/tools/extract-xiso/build/extract-xiso.exe" ] && \
+	   [ ! -f "$NXDK_DIR/tools/extract-xiso/build/extract-xiso" ]; then
+		fail "nxdk extract-xiso was not built"
+	fi
+}
+
+build_nxdk_runtime_libs() {
+	local clang_resource=""
+	local cflags=""
+
+	[ "$SKIP_BUILD" -eq 0 ] || return 0
+
+	msg "Building nxdk runtime support libraries"
+	eval "$("$NXDK_DIR/bin/activate" -s)"
+
+	if have clang; then
+		clang_resource="$(clang -print-resource-dir 2>/dev/null || true)"
+		if [ -n "$clang_resource" ] && [ -d "$clang_resource/include" ]; then
+			cflags="-isystem $clang_resource/include"
+		fi
+	fi
+
+	run env \
+		MSYSTEM=MINGW64 \
+		NXDK_DIR="$NXDK_DIR" \
+		PATH="/usr/bin:$MINGW64_ROOT/bin:$NXDK_DIR/bin:$PATH" \
+		make -C "$NXDK_DIR" \
+		NXDK_ONLY=1 \
+		CFLAGS="$cflags" \
+		main.exe \
+		-j"$JOBS"
+
+	[ -f "$NXDK_DIR/lib/libpdclib.lib" ] || fail "nxdk libpdclib.lib was not built"
+	[ -f "$NXDK_DIR/lib/libwinapi.lib" ] || fail "nxdk libwinapi.lib was not built"
 }
 
 ##############################################################################
@@ -395,8 +448,6 @@ build_xbox_target() {
 	host_fbc="$HOST_FBC"
 
 	# nxdk exposes nxdk-cc/nxdk-cxx/nxdk-link/nxdk-lib after activation.
-	# The FreeBASIC Xbox target still carries OpenXDK-era assumptions, so this
-	# remains an experimental build path just like the Debian/Ubuntu script.
 	eval "$("$NXDK_DIR/bin/activate" -s)"
 	export PATH="$NXDK_DIR/bin:$PATH"
 
@@ -446,7 +497,13 @@ write_launchers() {
 
 set -euo pipefail
 
-root="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+script_path="${0//\\//}"
+case "$script_path" in
+	*/*) script_dir="${script_path%/*}" ;;
+	*) script_dir="." ;;
+esac
+
+root="$(CDPATH= cd -- "$script_dir" && pwd)"
 NXDK_DIR="$root/nxdk"
 PATH="$root/toolchain/msys2/usr/bin:$root/bin:$NXDK_DIR/bin:$PATH"
 CLANG="$NXDK_DIR/bin/nxdk-cc"
@@ -514,11 +571,13 @@ Use fbc-xbox.cmd from cmd.exe or PowerShell:
 
     fbc-xbox.cmd program.bas -x program.xbe
 
+The bundled nxdk tools also include extract-xiso. This can be used to pack a
+directory containing default.xbe into the XISO disc-image format expected by
+full-system Xbox emulators such as xemu.
+
 This is an experimental nxdk-based revival path for the existing FreeBASIC
 Xbox target. The package validation checks that the compiler can invoke the
-bundled nxdk clang toolchain and produce an Xbox object file. Full XBE linking
-still depends on the old Xbox target linker path matching the current nxdk
-toolchain.
+bundled nxdk clang/link/cxbe toolchain and produce an Xbox XBE file.
 
 The packaged nxdk checkout revision is:
 
@@ -563,6 +622,7 @@ assemble_distribution() {
 		find "$DISTROOT/nxdk" -name .git -type d -prune -exec rm -rf {} + || true
 	fi
 
+	copy_nxdk_host_tool_runtimes
 	build_nxdk_tool_shims
 
 	msg "Copying top-level documentation and examples"
@@ -628,6 +688,7 @@ copy_msys_runtime() {
 		sed \
 		tr \
 		mkdir \
+		make \
 		cp \
 		rm \
 		find \
@@ -639,6 +700,38 @@ copy_msys_runtime() {
 	do
 		copy_tool_exe "$tool" "$bindir"
 	done
+
+	copy_clang_resource_dir
+}
+
+copy_nxdk_host_tool_runtimes() {
+	local tool
+	local dir
+
+	for tool in \
+		"$DISTROOT/nxdk/tools/cxbe/cxbe.exe" \
+		"$DISTROOT/nxdk/tools/extract-xiso/build/extract-xiso.exe"
+	do
+		[ -x "$tool" ] || continue
+		dir="$(dirname "$tool")"
+		copy_runtime_dlls "$tool" "$dir"
+	done
+}
+
+copy_clang_resource_dir() {
+	local src
+	local dst
+
+	src="$(clang -print-resource-dir 2>/dev/null || true)"
+	if [ -z "$src" ] || [ ! -d "$src" ]; then
+		return 0
+	fi
+
+	dst="$DISTROOT/toolchain/msys2/usr/lib/clang/$(basename "$src")"
+	msg "Copying bundled clang resource headers"
+	rm -rf "$dst"
+	mkdir -p "$(dirname "$dst")"
+	copy_tree "$src" "$dst"
 }
 
 build_nxdk_tool_shims() {
@@ -885,15 +978,16 @@ EOF
 
 	cat > "$validate_cmd" <<EOF
 @echo off
+set "PATH=%SystemRoot%\\System32;%SystemRoot%;%SystemRoot%\\System32\\Wbem"
 pushd "$validate_win"
-call "$dist_win\\fbc-xbox.cmd" hello.bas -c
+call "$dist_win\\fbc-xbox.cmd" hello.bas -x hello.xbe
 set "FBC_XBOX_STATUS=%ERRORLEVEL%"
 popd
 exit /b %FBC_XBOX_STATUS%
 EOF
 
 	run cmd.exe //C "$(cygpath -aw "$validate_cmd")"
-	[ -f "$validate_dir/hello.o" ] || fail "packaged fbc-xbox did not produce hello.o"
+	[ -f "$validate_dir/hello.xbe" ] || fail "packaged fbc-xbox did not produce hello.xbe"
 }
 
 ##############################################################################
@@ -906,6 +1000,7 @@ fi
 
 ensure_nxdk
 ensure_nxdk_tools
+build_nxdk_runtime_libs
 prepare_worktree
 build_xbox_target
 assemble_distribution

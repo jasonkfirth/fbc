@@ -870,7 +870,7 @@ function astNewBOP _
 					'' ok to convert at compile-time?
 					if( (typeGetDtAndPtrOnly( ldtype ) = typeGetDtAndPtrOnly( rdtype )) or _
 					    ((env.wcharconv <> FB_WCHARCONV_NEVER) and _
-					     (not fbTargetWcharIsUtf32( ))) ) then
+					     fbTargetCanFoldStrLitToWstr( FALSE )) ) then
 						return hWstrLiteralConcat( l, r )
 					end if
 				end if
@@ -895,7 +895,7 @@ function astNewBOP _
 				'' both literals?
 				if( litsym <> NULL ) then
 					if( (typeGetDtAndPtrOnly( ldtype ) = typeGetDtAndPtrOnly( rdtype )) or _
-					    (not fbTargetWcharIsUtf32( )) ) then
+					    fbTargetCanFoldStrLitToWstr( FALSE ) ) then
 						return hWstrLiteralCompare( op, l, r )
 					end if
 				end if
@@ -1330,14 +1330,27 @@ function astNewBOP _
 	'' BOPs are already converted to "str + fb_IntToStr(int)".
 
 	if( astIsCONST( l ) and astIsCONST( r ) ) then
-		l = hConstBop( op, dtype, subtype, l, r )
+		'' Xbox pow() comes from the target runtime, while constant folding here
+		'' would use the host compiler's math library.  Leave fractional
+		'' floating point ^ expressions for the Xbox code generator so literals
+		'' and variables use the same target libm semantics.  Integer exponents
+		'' must keep folding because tests and user code rely on values such as
+		'' 2^32 being accepted as constant expressions.
+		if( (op = AST_OP_POW) andalso _
+		    (env.clopt.target = FB_COMPTARGET_XBOX) andalso _
+		    (typeGetClass( l->dtype ) = FB_DATACLASS_FPOINT) andalso _
+		    (frac( r->val.f ) <> 0.0) ) then
+			'' fall through and build the BOP node
+		else
+			l = hConstBop( op, dtype, subtype, l, r )
 
-		astGetFullType( l ) = dtype
-		l->subtype = subtype
+			astGetFullType( l ) = dtype
+			l->subtype = subtype
 
-		astDelNode( r )
+			astDelNode( r )
 
-		return l
+			return l
+		end if
 	end if
 
 	'' CONST + x  =>  x + CONST

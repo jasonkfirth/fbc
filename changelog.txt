@@ -25,6 +25,8 @@ Version 1.20.1
 - Android packaging: keep the fbc-android wrapper and APK template sources under tracked src/tools/android instead of the ignored local tools/ tree
 - Android and Xbox packaging: added MSYS2 build scripts that create isolated freebasic-android and freebasic-xbox distribution trees, zip archives, NSIS installers, and package validation checks, matching the self-contained installer approach used by the MinGW port
 - Android/MSYS2 packaging: keep Google Android SDK/NDK assets out of the NSIS installer by default, add an installer terms notice plus a package-local setup step that downloads the SDK/NDK from Google's servers after acceptance, and leave SDK bundling as an explicit zip-only build option for local packaging
+- Xbox/MSYS2 packaging: build and package the nxdk runtime libraries, bundled make, clang resource headers, and cxbe host DLLs needed by fbc-xbox, keep nxdk-specific linker helpers in a separate compiler include, and validate the package under a minimal Windows PATH by producing a real XBE through lld-link and cxbe
+- Windows/MSYS2 packaging: bundle the MinGW CRT include trees under each packaged GCC target triplet so helper C sources and mixed C/FreeBASIC tests can compile from the standalone package without a live MSYS2 /mingw32 or /mingw64 install
 - Windows/MSYS2 packaging: bundle a broader set of third-party import libraries and DLLs used by the shipped examples and bindings, including selected legacy FreeBASIC winlibs, official upstream FreeImage/IUP/SDL packages, archived MSYS2 win32 GTK packages, and source-built win64 archives for QuickLZ, SQLite 2, big_int, DispHelper, FastCGI, GDSL, and TinyPTC; add package-local import-library aliases for older binding names that differ from current MSYS2 package names
 - Windows/MSYS2 installer: add the installed FreeBASIC directory to MSYS2 login shells through profile.d as well as updating the normal Windows system PATH
 - examples: documented a full JS, Android, and Xbox compile sweep in examples/cross-target-notes.md, recording which examples currently compile for each package and which failures are platform, backend, or binding limitations
@@ -58,6 +60,7 @@ Version 1.20.1
 - JavaScript sfxlib backend with WebAudio output for browsers and a null fallback so sound-using programs can still link and run in non-browser smoke tests
 - JavaScript test coverage: build and run the fbcunit suite and all four log-test dialect lanes through the packaged fbc-js distribution, with JS-specific exclusions for unsupported host shell pipes, COMMON symbols, pthread-style ThreadCall coverage, and platform libc/wasm ABI differences
 - MSYS2 freebasic-js browser validation that compiles console, gfxlib SCREEN/SCREENSET, and sfxlib WebAudio programs, drives them through Edge/Chrome, checks canvas pixel colors, and verifies captured browser audio for expected tone content and continuity
+- MSYS2 native package test script that runs the packaged win32 and win64 compilers through fbcunit and all four log-test dialect lanes from isolated copied test trees
 - Android gfxlib and sfxlib backends, including modern/legacy Android gfx drivers, AAudio/OpenSL ES sound drivers, Activity-backed console rendering, and an on-screen soft-keyboard toggle button
 - Android gfxlib/sfxlib: propagate NativeActivity lifecycle and surface callbacks so rendering and audio output pause cleanly and recover across Android surface recreation; Android APK startup now waits for stdout/stderr redirection before running the FreeBASIC main program
 - Android NativeActivity/gfxlib: honour source or command-line GUI app mode by suppressing the text console surface until graphics are explicitly opened with SCREEN, while console-mode APKs keep the existing PRINT-to-screen behaviour
@@ -67,6 +70,10 @@ Version 1.20.1
 - fbc-android --target-api option for setting APK targetSdkVersion independently from the installed Android platform jar used by aapt
 - freebasic-android now recommends adb and Android emulator command-line tooling so installed users have a local APK test path without making emulator infrastructure mandatory
 - experimental Debian/Ubuntu freebasic-xbox package builder using nxdk, including an fbc-xbox wrapper, Xbox target runtime archives, and packaged nxdk toolchain assets
+- MSYS2 Xbox/Cxbx smoke-test script that builds console, gfxlib SCREEN/SCREENSET, sfxlib, and file I/O XBEs from the packaged fbc-xbox distribution, stages them beside Cxbx-Reloaded for reliable /load handling, and launches selected XBEs under the emulator
+- MSYS2 Xbox/xemu smoke-test path that builds the same fbc-xbox programs, packs them as XISO disc images with the bundled nxdk extract-xiso tool, and launches them under a separately configured xemu install when legal Xbox boot assets are available
+- MSYS2 Xbox tests/ compile-link sweep that validates all four log-test dialect lanes and the aggregate fbcunit XBE against the packaged fbc-xbox distribution
+- MSYS2 Xbox/xemu fbcunit runtime runner that shards the aggregate fbcunit XBE across isolated xemu instances and validates the supported Xbox assert coverage from guest-written result files
 - Debian/Ubuntu Docker smoke-test scripts for validating the native and JavaScript packages in fresh containers using only the package artifacts and their declared dependencies
 - tests/sfx regression coverage for sfxlib command/function syntax, invalid expression use of void sfx commands, and runtime state behaviour
 - tests/sfx runtime build coverage wired into the normal tests directory list, matching the surrounding gfxlib-style test layout
@@ -87,6 +94,8 @@ Version 1.20.1
 - sfxlib examples: made load, open, select, current, parameter, and MIDI open/close demos play short audible confirmations where that makes the command easier to understand
 - sfxlib examples: extended fastfft.bas with optional expected-frequency checks for validating that captured audio contains the intended spectral peaks
 - Xbox/nxdk: enabled multithreaded runtime builds using the Win32-style thread model and Xbox CriticalSection/TLS primitives, while keeping ThreadCall on the rtlib fallback because nxdk does not currently provide target libffi
+- Xbox/gfxlib: present gfxlib framebuffers through a real 32-bit Xbox video mode with integer scaling for low-resolution modes such as SCREEN 13 and pixel skipping when the requested framebuffer is larger than the selected output mode
+- Xbox/sfxlib: added an nxdk XAudio/AC97 output driver so the Xbox package can link and run sfxlib programs, with the null output driver still available for non-audio diagnostics
 - Android/Xbox headers: extended selected CRT and SDL bindings so more examples compile against the Android and Xbox package headers without depending on unavailable desktop window-system types
 
 [fixed]
@@ -141,6 +150,12 @@ Version 1.20.1
 - Android and Xbox wstring constant folding now keeps conversion enabled when the target wchar layout is 32-bit even if the host compiler wchar representation differs
 - Android/wstring: use the target wchar size for WSTRING/WCHAR parsing, HLC literal emission, file I/O, and runtime conversion paths, fixing UTF-8 strings, high-codepoint WCHR()/CHR() cases, PRINT USING with empty WSTRING values, and the Android wstring fbcunit coverage
 - Android fbcunit harness now treats a zero-failure fbcunit summary plus FREEBASIC_ANDROID_EXIT:0 as a pass, avoiding false failures when a test exits cleanly before the wrapper emits its own pass marker
+- Xbox compiler/package flow: switch fbc-xbox to the nxdk lld-link/cxbe path, emit the normal main entry for HLC output, resolve FreeBASIC and nxdk libraries as concrete linker inputs, and keep requested .xbe outputs distinct from the intermediate executable
+- Xbox/MSYS2 launcher and Cxbx smoke flow: handle Windows backslash script paths, stage launched XBEs into the emulator directory, run Cxbx-Reloaded through cxbxr-ldr.exe so the emulator receives /load correctly, and retain emulator stdout/stderr logs for diagnosing loader failures
+- Xbox C++ interop: provide the small GCC C++ ABI shim set needed by the existing extern "c++" tests without pulling a host libsupc++ into the nxdk runtime
+- Xbox rtlib: provide the file open, reopen, remove, and directory wrappers expected by the common file runtime so packaged Xbox programs using ordinary file I/O can link
+- Xbox rtlib/tests: reduce the default ThreadCreate stack reserve for Xbox's smaller memory budget, retry with a smaller stack when needed, and recognize Xbox's 2-byte WCHAR and 8-byte qword alignment in the shared fbcunit expectations
+- Xbox rtlib/sfxlib: mount the writable E: volume during runtime startup, route relative writes away from the read-only XISO launch media, provide process-local SETENVIRON/getenv support, and prime the nxdk XAudio descriptor ring deeply enough for continuous xemu playback
 - Xbox/nxdk: revived the Xbox target build far enough to produce rtlib, gfxlib2, and sfxlib archives with nxdk by adding Xbox-local CRT, filesystem, threading, graphics, and sfx decode compatibility shims; joystick and file decoding remain stubbed for the experimental package
 - Xbox/nxdk: fixed Win32-compatible calling-convention, alignment, mutex, TLS, and startup declarations so multithreaded rtlib, gfxlib2, and sfxlib archives build for Xbox without depending on unsupported OpenGL or libffi pieces
 - Xbox/nxdk packaging: include the executable nxdk wrapper tools and cxbe converter needed by fbc-xbox, classify the bundled SDK package as non-free/devel, and ship a generated list of nxdk license files alongside the package copyright metadata

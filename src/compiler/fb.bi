@@ -655,6 +655,16 @@ declare function fbIsHostBigEndian( ) as integer
 declare function fbIdentifyFbcArch( byref fbcarch as string ) as integer
 declare function fbGetTargetWcharSize( ) as integer
 declare function fbTargetWcharIsUtf32( ) as integer
+declare function fbTargetCanFoldStrLitToWstr _
+	( _
+		byval allow_litconst as integer = TRUE _
+	) as integer
+declare function fbTargetCanFoldStrLitTextToWstr _
+	( _
+		byval text as const zstring ptr, _
+		byval text_len as integer, _
+		byval allow_litconst as integer = TRUE _
+	) as integer
 declare function fbTargetSupportsELF( ) as integer
 declare function fbTargetSupportsCOFF( ) as integer
 declare function fbTargetSupportsMachO( ) as integer

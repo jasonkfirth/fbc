@@ -266,9 +266,18 @@ end function
 
 private sub hCreateDataDesc( )
 	static as FBARRAYDIM dTB(0)
+	dim as integer pack = 1
 
 	'' Using FIELD = 1, to pack it as done by the rtlib
-	ast.data.desc = symbStructBegin( NULL, NULL, NULL, "__FB_DATADESC$", NULL, FALSE, 1, FALSE, 0, 0 )
+	''
+	'' Xbox XBEs are produced through COFF and cxbe.  Keep the descriptor
+	'' pointers naturally aligned there so DATA link-pointer relocations stay
+	'' visible to the toolchain.
+	if( env.clopt.target = FB_COMPTARGET_XBOX ) then
+		pack = 4
+	end if
+
+	ast.data.desc = symbStructBegin( NULL, NULL, NULL, "__FB_DATADESC$", NULL, FALSE, pack, FALSE, 0, 0 )
 
 	'' type as short
 	symbAddField( ast.data.desc, "type", 0, dTB(), _

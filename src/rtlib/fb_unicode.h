@@ -109,6 +109,10 @@ typedef uint8_t  UTF_8;
 #endif
 #endif
 
+#ifdef HOST_XBOX
+#include "xbox/fb_unicode_xbox.h"
+#endif
+
 #ifndef FB_WSTR_FROM_INT
 #define FB_WSTR_FROM_INT( buffer, num ) \
     swprintf( buffer, sizeof( int ) * 3 + 1, _LC("%d"), (int) (num) )

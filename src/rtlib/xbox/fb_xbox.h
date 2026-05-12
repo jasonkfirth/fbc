@@ -5,6 +5,7 @@
 #include <hal/xbox.h>
 #include <hal/fileio.h>
 #include <stdio.h>
+#include <string.h>
 #include <wchar.h>
 
 #define FBCALL __stdcall
@@ -19,6 +20,12 @@
 #define FB_LL_FMTMOD "ll"
 #define FB_CONSOLE_MAXPAGES 1
 #define FB_DYLIB HANDLE
+/*
+ * DATA records are emitted by the compiler as ordinary C structs for Xbox.
+ * Leaving this descriptor unpacked keeps the runtime view aligned with that
+ * generated layout.
+ */
+#define FB_DATADESC_PACKED
 
 typedef long fb_off_t;
 typedef long ssize_t;
@@ -37,7 +44,24 @@ int _strnicmp(const char *s1, const char *s2, size_t n);
 
 static __inline__ size_t __xbox_mbstowcs(wchar_t *dst, const char *src, size_t count)
 {
-	return mbsrtowcs(dst, &src, count, NULL);
+	size_t i;
+
+	if( src == NULL )
+		return (size_t)-1;
+
+	if( dst == NULL )
+		return strlen( src );
+
+	for( i = 0; i < count; i++ ) {
+		unsigned char c = src[i];
+		if( c == '\0' ) {
+			dst[i] = L'\0';
+			return i;
+		}
+		dst[i] = (c <= 127) ? c : L'?';
+	}
+
+	return i;
 }
 
 static __inline__ size_t __xbox_wcstombs(char *dst, const wchar_t *src, size_t count)

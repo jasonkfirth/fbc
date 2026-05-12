@@ -607,6 +607,17 @@ copy_arch_toolchain() {
 	msg "Bundling $arch MinGW toolchain"
 	copy_tool_bins "$mingw_root/bin" "$DISTROOT/bin/$arch"
 
+	# The bundled GCC driver is relocated under bin/$arch.  Its built-in
+	# search path resolves the MinGW CRT headers through bin/$triplet/include,
+	# so copy the headers there instead of depending on a live /mingw32 or
+	# /mingw64 tree being present on the user's machine.
+	if [ -d "$mingw_root/include" ]; then
+		copy_tree "$mingw_root/include" "$DISTROOT/bin/$triplet/include"
+	fi
+	if [ -d "$mingw_root/$triplet/include" ]; then
+		copy_tree "$mingw_root/$triplet/include" "$DISTROOT/bin/$triplet/include"
+	fi
+
 	if [ -d "$gcc_libdir" ]; then
 		copy_tree "$gcc_libdir" "$gcc_support_dir"
 		for dll in \

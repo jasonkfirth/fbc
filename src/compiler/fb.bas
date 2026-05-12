@@ -165,7 +165,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 	), _
 	( _
 		@"xbox", _
-		FB_DATATYPE_ULONG, _
+		FB_DATATYPE_USHORT, _   '' wchar, matching nxdk's win32-style wchar_t
 		FB_FUNCMODE_STDCALL, _
 		FB_FUNCMODE_STDCALL, _
 		0   or FB_TARGETOPT_RETURNINREGS _
@@ -1127,6 +1127,32 @@ end function
 
 function fbTargetWcharIsUtf32( ) as integer
 	return (fbGetTargetWcharSize( ) = 4)
+end function
+
+function fbTargetCanFoldStrLitToWstr( byval allow_litconst as integer ) as integer
+	if( env.clopt.target = FB_COMPTARGET_XBOX ) then
+		return FALSE
+	end if
+
+	return ((allow_litconst <> FALSE) or (not fbTargetWcharIsUtf32( )))
+end function
+
+function fbTargetCanFoldStrLitTextToWstr _
+	( _
+		byval text as const zstring ptr, _
+		byval text_len as integer, _
+		byval allow_litconst as integer _
+	) as integer
+
+	'' Xbox program strings are UTF-8 at runtime.  The compiler has to use
+	'' the same rule when it creates an addressable WSTRING literal for
+	'' WSTR("..."), otherwise @WSTR(...) cannot be represented as a runtime
+	'' conversion call.
+	if( env.clopt.target = FB_COMPTARGET_XBOX ) then
+		return TRUE
+	end if
+
+	return fbTargetCanFoldStrLitToWstr( allow_litconst )
 end function
 
 function fbTargetSupportsELF( ) as integer

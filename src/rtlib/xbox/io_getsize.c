@@ -2,6 +2,8 @@
 
 FBCALL void fb_ConsoleGetSize( int *cols, int *rows )
 {
-	*cols = 80;
-	*rows = 25;
+	if( cols != NULL )
+		*cols = 80;
+	if( rows != NULL )
+		*rows = 25;
 }

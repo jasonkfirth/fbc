@@ -4,14 +4,6 @@
 
 void fb_ConsoleSleep( int msecs )
 {
-#if defined( HOST_XBOX )
-    /* NOTE: No need to test for input keys because sleep will be hooked
-     *       when the application is switched to graphics mode and the
-     *       console implementations for keyboard handling are only dummy
-     *       functions.
-     */
-	fb_Delay( msecs );
-#else
 	/* infinite? wait until any key is pressed */
 	if( msecs == -1 ) {
 		while( !fb_hConsoleInputBufferChanged( ) )
@@ -33,5 +25,4 @@ void fb_ConsoleSleep( int msecs )
 
 	if( msecs >= 0 )
 		fb_Delay( msecs );
-#endif
 }

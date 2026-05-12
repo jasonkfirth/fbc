@@ -2,5 +2,5 @@
 
 int fb_ConsoleGetX( void )
 {
-	return 0;
+	return 1;
 }

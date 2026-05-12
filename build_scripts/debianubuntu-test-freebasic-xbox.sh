@@ -321,7 +321,11 @@ sleep 1000
 EOF
 
 cat > /tmp/fb-xbox-smoke/sfx.bas <<'EOF'
-sound 440, 0.25
+declare sub fb_sfxUpdate cdecl alias "fb_sfxUpdate" ( byval frames as integer )
+
+sound 0, 440, 0.25, 0.70
+fb_sfxUpdate( 12000 )
+
 open err for output as #1
 print #1, "FREEBASIC_XBOX_SFX_SMOKE"
 close #1

@@ -209,6 +209,8 @@ if [ "$HOST_KIND" = "msys2" ]; then
 	)
 fi
 
+CROSS_MAKE_TOOL_ARGS=()
+
 ##############################################################################
 # Version metadata
 ##############################################################################
@@ -362,9 +364,48 @@ configure_cross_toolchain_env() {
 
 	cross_gcc_path="$(find_cross_bindir)"
 	if [ -n "$cross_gcc_path" ]; then
-		cross_bindir="$(dirname "$cross_gcc_path")"
+		cross_bindir="$(cd "$(dirname "$cross_gcc_path")" && pwd -P)"
 		export PATH="$cross_bindir:$PATH"
 	fi
+}
+
+find_cross_tool() {
+	command -v "${TARGET_TRIPLET}-$1"
+}
+
+host_path_for_tool() {
+	local tool_path="$1"
+
+	if [ "$HOST_KIND" = "msys2" ]; then
+		cygpath -m "$tool_path"
+	else
+		printf '%s\n' "$tool_path"
+	fi
+}
+
+configure_cross_make_tool_args() {
+	local cross_cc
+	local cross_cxx
+	local cross_ar
+	local cross_ranlib
+	local cross_as
+	local cross_ld
+
+	cross_cc="$(host_path_for_tool "$(find_cross_tool gcc)")"
+	cross_cxx="$(host_path_for_tool "$(find_cross_tool g++)")"
+	cross_ar="$(host_path_for_tool "$(find_cross_tool ar)")"
+	cross_ranlib="$(host_path_for_tool "$(find_cross_tool ranlib)")"
+	cross_as="$(host_path_for_tool "$(find_cross_tool as)")"
+	cross_ld="$(host_path_for_tool "$(find_cross_tool ld)")"
+
+	CROSS_MAKE_TOOL_ARGS=(
+		CC="$cross_cc"
+		CXX="$cross_cxx"
+		AR="$cross_ar"
+		RANLIB="$cross_ranlib"
+		AS="$cross_as"
+		LD="$cross_ld"
+	)
 }
 
 detect_make_jobs() {
@@ -665,6 +706,8 @@ fi
 
 require_cross_toolchain
 
+configure_cross_make_tool_args
+
 ##############################################################################
 # Acquire DOS-side DJGPP payload cache
 ##############################################################################
@@ -744,22 +787,25 @@ if [ "$DO_DOS_BUILD" = "1" ]; then
 	export PATH="$(dirname "$HOST_FBC"):$PATH"
 
 	msg "cleaning DOS cross-build tree"
-	run make clean TARGET_TRIPLET="$TARGET_TRIPLET" || true
+	run make clean TARGET_TRIPLET="$TARGET_TRIPLET" "${CROSS_MAKE_TOOL_ARGS[@]}" || true
 
 	msg "emitting DOS bootstrap sources"
 	run make bootstrap-emit \
 		TARGET_TRIPLET="$TARGET_TRIPLET" \
+		"${CROSS_MAKE_TOOL_ARGS[@]}" \
 		BOOT_FBC="$HOST_FBC" \
 		BUILD_FBC="$HOST_FBC"
 
 	msg "building DOS bootstrap compiler"
 	run make bootstrap-minimal \
 		TARGET_TRIPLET="$TARGET_TRIPLET" \
+		"${CROSS_MAKE_TOOL_ARGS[@]}" \
 		BUILD_FBC="$HOST_FBC"
 
 	msg "rebuilding DOS compiler and runtime with host compiler"
 	run make compiler runtime \
 		TARGET_TRIPLET="$TARGET_TRIPLET" \
+		"${CROSS_MAKE_TOOL_ARGS[@]}" \
 		BUILD_FBC="$HOST_FBC"
 else
 	[ -x "$DOS_WORKTREE/bin/fbc.exe" ] || die "missing DOS compiler: $DOS_WORKTREE/bin/fbc.exe"
@@ -780,6 +826,7 @@ if [ "$DO_STAGE_INSTALL" = "1" ]; then
 		DESTDIR="$DISTROOT" \
 		prefix="$PREFIX" \
 		TARGET_TRIPLET="$TARGET_TRIPLET" \
+		"${CROSS_MAKE_TOOL_ARGS[@]}" \
 		BUILD_FBC="$HOST_FBC"
 
 	run rsync -a "$DJGPP_DOS_CACHE"/ "$DISTROOT/djgpp"/

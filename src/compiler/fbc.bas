@@ -780,6 +780,8 @@ private function hFindLib( byval file as zstring ptr ) as string
 	end if
 end function
 
+#include once "fbc-xbox-link.bi"
+
 private function fbcLinkerIsGold( ) as integer
 	'' This is needed otherwise it will wrongly pass --version into the linker on Solaris
 	'' caused the linker version to be printed everytime we compile with fbc
@@ -804,10 +806,18 @@ end function
 
 private function hLinkFiles( ) as integer
 	dim as string ldcline, dllname, deffile
+	dim as string xbox_xbe_outname
 
 	function = FALSE
 
 	hSetOutName( )
+
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
+		if( lcase( right( fbc.outname, 4 ) ) = ".xbe" ) then
+			xbox_xbe_outname = fbc.outname
+			fbc.outname = hStripExt( fbc.outname ) + ".exe"
+		end if
+	end if
 
 	select case( fbGetOption( FB_COMPOPT_TARGET ) )
 	case FB_COMPTARGET_WIN32
@@ -887,7 +897,11 @@ private function hLinkFiles( ) as integer
 	end select
 
 	'' Set executable name
-	ldcline += "-o " + QUOTE + fbc.outname + QUOTE
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
+		ldcline += "-out:" + QUOTE + fbc.outname + QUOTE
+	else
+		ldcline += "-o " + QUOTE + fbc.outname + QUOTE
+	end if
 
 	'' dll dos targets need to run DXE3GEN
 	if (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_DOS) and _
@@ -1101,7 +1115,12 @@ private function hLinkFiles( ) as integer
 		end if
 
 	case FB_COMPTARGET_XBOX
-		ldcline += " -nostdlib --file-alignment 0x20 --section-alignment 0x20 -shared"
+		'' nxdk-link is lld's MSVC-compatible linker frontend.  The common
+		'' GNU ld flags used by the old OpenXDK path are not accepted here.
+		'' automount_d only contains startup registration, so force its symbol
+		'' in exactly as nxdk's own makefiles do.
+		ldcline += " -safeseh:no"
+		ldcline += " -include:_automount_d_drive"
 
 	case FB_COMPTARGET_JS
 		ldcline += " -O" + str( fbGetOption( FB_COMPOPT_OPTIMIZELEVEL ) )
@@ -1152,6 +1171,7 @@ private function hLinkFiles( ) as integer
 			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) and _
 			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_SOLARIS) and _
 			( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) and _
+			( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX ) and _
 			(not fbcIsUsingGoldLinker( )) ) then
 			ldcline += " -T """ + fbc.libpath + (FB_HOST_PATHDIV + "fbextra.x""")
 		end if
@@ -1178,7 +1198,11 @@ private function hLinkFiles( ) as integer
 
 	case FB_COMPTARGET_XBOX
 		'' set entry point
-		ldcline += " -e _WinMainCRTStartup"
+		ldcline += " -entry:WinMainCRTStartup"
+		'' nxdk-link supplies a small 64 KiB default.  Pass fbc's stack
+		'' setting after the wrapper defaults so fbcunit and programs with
+		'' large local buffers use the same default reserve as Win32.
+		ldcline += " -stack:" + str( fbGetOption( FB_COMPOPT_STACKSIZE ) )
 	case FB_COMPTARGET_OPENBSD
 		'' OpenBSD executables are PIE and enter through __start.
 		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_EXECUTABLE ) then
@@ -1187,11 +1211,11 @@ private function hLinkFiles( ) as integer
 
 	end select
 
-	if (fbc.staticlink) then
+	if (fbc.staticlink) and (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) then
 		ldcline += " -Bstatic"
 	end if
 
-	if( fbGetOption( FB_COMPOPT_PIC ) ) then
+	if( fbGetOption( FB_COMPOPT_PIC ) and (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
 		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_EXECUTABLE ) then
 			'' NOTE: For android 4.0-, user will need to pass in '-Wl -no-pie'
 			''       to override this default.
@@ -1206,7 +1230,11 @@ private function hLinkFiles( ) as integer
 	end if
 
 	if( len( fbc.mapfile ) > 0) then
-		ldcline += " -Map " + fbc.mapfile
+		if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
+			ldcline += " -map:" + fbc.mapfile
+		else
+			ldcline += " -Map " + fbc.mapfile
+		end if
 	end if
 
 	if( fbGetOption( FB_COMPOPT_DEBUGINFO ) = FALSE ) then
@@ -1214,7 +1242,7 @@ private function hLinkFiles( ) as integer
 			if(( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN ) and _
 				( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS )) then
 
-				if( fbc.stripsymbols ) then
+				if( fbc.stripsymbols and (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
 					ldcline += " -s"
 				end if
 			end if
@@ -1232,10 +1260,12 @@ private function hLinkFiles( ) as integer
 			L = " -L"""
 		end if
 
-		while (i)
-			ldcline += L + i->s + """"
-			i = listGetNext(i)
-		wend
+		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX ) then
+			while (i)
+				ldcline += L + i->s + """"
+				i = listGetNext(i)
+			wend
+		end if
 	end scope
 
 	'' And the sysroot
@@ -1338,8 +1368,7 @@ private function hLinkFiles( ) as integer
 		end if
 
 	case FB_COMPTARGET_XBOX
-		'' link with crt0.o (C runtime init)
-		ldcline += hFindLib( "crt0.o" )
+		'' nxdk's CRT startup object is provided by libpdclib.lib below.
 
 	end select
 
@@ -1384,7 +1413,8 @@ private function hLinkFiles( ) as integer
 	'' All libraries are passed inside -( -) so we don't need to worry as
 	'' much about their order and/or listing them repeatedly. (Not supported by Darwin ld)
 	if ( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN ) then
-		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+		if( (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
+		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
 			ldcline += " ""-("""
 		end if
 	end if
@@ -1408,20 +1438,30 @@ private function hLinkFiles( ) as integer
 			'' or .so's against themselves (ld will fail to read in
 			'' its output file...)
 			if ((checkdllname = FALSE) orelse (i->s <> dllname)) then
-				ldcline += " -l" + i->s
+				if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
+					hAddXboxLibArchive( ldcline, i->s )
+				else
+					ldcline += " -l" + i->s
+				end if
 			end if
 			i = listGetNext(i)
 		wend
 	end scope
 
 	hAddDarwinFrameworks( ldcline )
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
+		hAddXboxNxdkLibs( ldcline )
+	end if
 
 	if (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) then
-		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+		if( (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
+		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
 			'' End of lib group
 			ldcline += " ""-)"""
 		else
-			ldcline += " -lfb"
+			if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS ) then
+				ldcline += " -lfb"
+			end if
 		end if
 	end if
 
@@ -1580,19 +1620,23 @@ private function hLinkFiles( ) as integer
 		dim as string cxbepath, cxbecline
 		dim as integer res = any
 
+		if( len( xbox_xbe_outname ) = 0 ) then
+			xbox_xbe_outname = hStripExt( fbc.outname ) + ".xbe"
+		end if
+
 		'' xbe title
 		if( len(fbc.xbe_title) = 0 ) then
-			fbc.xbe_title = hStripExt(fbc.outname)
+			fbc.xbe_title = hStripPath( hStripExt( xbox_xbe_outname ) )
 		end if
 
 		cxbecline = "-TITLE:" + QUOTE + fbc.xbe_title + (QUOTE + " ")
 
 		if( fbGetOption( FB_COMPOPT_DEBUGINFO ) ) then
-			cxbecline += "-DUMPINFO:" + QUOTE + hStripExt(fbc.outname) + (".cxbe" + QUOTE)
+			cxbecline += "-DUMPINFO:" + QUOTE + hStripExt(xbox_xbe_outname) + (".cxbe" + QUOTE)
 		end if
 
 		'' output xbe filename
-		cxbecline += " -OUT:" + QUOTE + hStripExt(fbc.outname) + ".xbe" + QUOTE
+		cxbecline += " -OUT:" + QUOTE + xbox_xbe_outname + QUOTE
 
 		'' input exe filename
 		cxbecline += " " + QUOTE + fbc.outname + QUOTE
@@ -4715,14 +4759,9 @@ private sub hAddDefaultLibs( )
 		end if
 
 	case FB_COMPTARGET_XBOX
-		fbcAddDefLib( "gcc" )
-		fbcAddDefLib( "fbgfx" )
-		fbcAddDefLib( "openxdk" )
-		fbcAddDefLib( "hal" )
-		fbcAddDefLib( "c" )
-		fbcAddDefLib( "usb" )
-		fbcAddDefLib( "xboxkrnl" )
-		fbcAddDefLib( "m" )
+		'' nxdk libraries are added as concrete .lib files in hLinkFiles()
+		'' because nxdk-link uses the MSVC-style linker frontend instead of
+		'' GNU ld's -L/-l archive lookup.
 
 		'' profiling?
 		if( fbGetOption( FB_COMPOPT_PROFILE ) = FB_PROFILE_OPT_GMON ) then
@@ -4847,7 +4886,7 @@ private sub hPrintOptions( byval verbose as integer )
 	print "  -static          Prefer static libraries over dynamic ones when linking"
 	print "  -strip           Omit all symbol information from the output file"
 	print "  -sysroot <path>  Linker sysroot, needed by some cross-compiling toolchains"
-	print "  -t <value>       Set .exe stack size in kbytes, default: 1024 (win32/dos)"
+	print "  -t <value>       Set .exe stack size in kbytes, default: 1024 (win32/dos/xbox)"
 	if( verbose ) then
 	'' !!!TODO!!! provide more examples of available targets
 	print "  -target <name>   Set cross-compilation target"

@@ -38,7 +38,7 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 
 #include <limits.h>
 
-#if !defined(HOST_DOS) && !defined(HOST_JS) && !defined(HOST_XBOX)
+#if !defined(HOST_DOS) && !defined(HOST_JS)
 	#if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
 		#include <ws2tcpip.h>
 	#else
@@ -54,7 +54,7 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#endif
 #endif
 
-#if defined(HOST_DOS) || defined(HOST_JS) || defined(HOST_XBOX)
+#if defined(HOST_DOS) || defined(HOST_JS)
 	#define FB_TCP_CLOSESOCKET(s) (0)
 	#define FB_TCP_ERRNO() 0
 	#define FB_TCP_WOULDBLOCK(err) FALSE
@@ -184,7 +184,7 @@ static DEV_TCP_INFO *fb_hDevTcpAllocInfo( FB_TCP_SOCKET hSocket, const char *psz
 
 static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int timeout )
 {
-#if defined(HOST_DOS) || defined(HOST_JS) || defined(HOST_XBOX)
+#if defined(HOST_DOS) || defined(HOST_JS)
 	(void)hSocket;
 	(void)timeout;
 	return FB_RTERROR_ILLEGALFUNCTIONCALL;
@@ -218,7 +218,7 @@ static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int tim
 
 static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOCKET *hSocketOut )
 {
-#if defined(HOST_DOS) || defined(HOST_JS) || defined(HOST_XBOX)
+#if defined(HOST_DOS) || defined(HOST_JS)
 	(void)tcp_proto;
 	(void)hSocketOut;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
@@ -263,7 +263,7 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 
 static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOCKET *hSocketOut )
 {
-#if defined(HOST_DOS) || defined(HOST_JS) || defined(HOST_XBOX)
+#if defined(HOST_DOS) || defined(HOST_JS)
 	(void)tcp_proto;
 	(void)hSocketOut;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
@@ -319,7 +319,7 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 
 static int fb_hDevTcpPeekState( DEV_TCP_INFO *info )
 {
-#if defined(HOST_DOS) || defined(HOST_JS) || defined(HOST_XBOX)
+#if defined(HOST_DOS) || defined(HOST_JS)
 	(void)info;
 	return -1;
 #else
@@ -372,7 +372,7 @@ static int fb_hDevTcpPeekState( DEV_TCP_INFO *info )
 
 static int fb_hDevTcpSendAll( DEV_TCP_INFO *info, const char *buffer, size_t length )
 {
-#if defined(HOST_DOS) || defined(HOST_JS) || defined(HOST_XBOX)
+#if defined(HOST_DOS) || defined(HOST_JS)
 	(void)info;
 	(void)buffer;
 	(void)length;
@@ -404,7 +404,7 @@ static int fb_hDevTcpSendAll( DEV_TCP_INFO *info, const char *buffer, size_t len
 
 static void fb_hDevTcpShutdownConnectedSocket( DEV_TCP_INFO *info )
 {
-#if defined(HOST_DOS) || defined(HOST_JS) || defined(HOST_XBOX)
+#if defined(HOST_DOS) || defined(HOST_JS)
 	(void)info;
 #else
 	unsigned int timeout = 1000;
@@ -510,7 +510,7 @@ static int fb_DevTcpRead( FB_FILE *handle, void *value, size_t *pValuelen )
 		return FB_RTERROR_OK;
 	}
 
-#if defined(HOST_DOS) || defined(HOST_JS) || defined(HOST_XBOX)
+#if defined(HOST_DOS) || defined(HOST_JS)
 	*pValuelen = 0;
 	res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 #else
@@ -555,7 +555,7 @@ static int fb_DevTcpTell( FB_FILE *handle, fb_off_t *pOffset )
 	if( info == NULL ) {
 		res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	} else {
-#if defined(HOST_DOS) || defined(HOST_JS) || defined(HOST_XBOX)
+#if defined(HOST_DOS) || defined(HOST_JS)
 		*pOffset = 0;
 		res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 #elif defined(HOST_WIN32) && !defined(HOST_CYGWIN)
@@ -722,7 +722,7 @@ static int fb_hDevTcpOpenCommon( FB_FILE *handle, const char *filename, size_t f
 
 int fb_DevTcpOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 {
-#if defined(HOST_DOS) || defined(HOST_JS) || defined(HOST_XBOX)
+#if defined(HOST_DOS) || defined(HOST_JS)
 	(void)handle;
 	(void)filename;
 	(void)filename_len;
@@ -734,7 +734,7 @@ int fb_DevTcpOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 
 int fb_DevTcpOpenServer( FB_FILE *handle, const char *filename, size_t filename_len )
 {
-#if defined(HOST_DOS) || defined(HOST_JS) || defined(HOST_XBOX)
+#if defined(HOST_DOS) || defined(HOST_JS)
 	(void)handle;
 	(void)filename;
 	(void)filename_len;
@@ -746,7 +746,7 @@ int fb_DevTcpOpenServer( FB_FILE *handle, const char *filename, size_t filename_
 
 int fb_DevTcpAcceptHandle( FB_FILE *server_handle, FB_FILE *client_handle )
 {
-#if defined(HOST_DOS) || defined(HOST_JS) || defined(HOST_XBOX)
+#if defined(HOST_DOS) || defined(HOST_JS)
 	(void)server_handle;
 	(void)client_handle;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
