@@ -570,8 +570,8 @@ EOF
     bundled_ncurses="@executable_path/../toolchain/ncurses/lib/libncursesw.6.dylib"
     if command -v install_name_tool >/dev/null 2>&1 && [ -f "${bundle_root}/ncurses/lib/libncursesw.6.dylib" ]; then
         echo "==> install_name_tool -change $old_ncurses $bundled_ncurses $real_fbc"
-        if ! install_name_tool -change "$old_ncurses" "$bundled_ncurses" "$real_fbc"; then
-            echo "WARNING: could not rewrite fbc-real's ncurses load path; the public fbc wrapper will use the bundled ncurses via DYLD_LIBRARY_PATH" >&2
+        if ! install_name_tool -change "$old_ncurses" "$bundled_ncurses" "$real_fbc" 2>"${BUILDROOT}/install_name_tool-fbc-real.log"; then
+            echo "NOTE: install_name_tool could not rewrite fbc-real's ncurses load path; the public fbc wrapper will use the bundled ncurses via DYLD_LIBRARY_PATH" >&2
         fi
     fi
 }

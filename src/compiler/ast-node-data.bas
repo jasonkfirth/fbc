@@ -276,6 +276,12 @@ private sub hCreateDataDesc( )
 	if( env.clopt.target = FB_COMPTARGET_XBOX ) then
 		pack = 4
 	end if
+	''
+	'' Darwin/Mach-O linkers warn about pointer relocations that are not
+	'' naturally aligned.  The runtime uses the same Darwin-only layout.
+	if( env.clopt.target = FB_COMPTARGET_DARWIN ) then
+		pack = 0
+	end if
 
 	ast.data.desc = symbStructBegin( NULL, NULL, NULL, "__FB_DATADESC$", NULL, FALSE, pack, FALSE, 0, 0 )
 

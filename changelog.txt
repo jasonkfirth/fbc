@@ -7,7 +7,11 @@ Version 1.20.1
 - expanded compiler target, cpu-family, linker, and default-library handling for the platforms and architectures validated in the 1.10.4 branch, including Haiku, NetBSD rpath handling, and broader per-OS library selection
 - updated the HLC IR/backend glue so non-Intel targets do not fall through Intel-centric code paths when targeting newer cpu families
 - refreshed the Darwin graphics/audio backend set with the newer 1.10.4 driver work
+- macOS/Darwin gfxlib: completed the native CoreGraphics framebuffer path with multi-depth blitting, palette refresh, lock-aware redraws, vsync pacing, fullscreen/no-frame/topmost window handling, position query semantics, and cursor warping without moving platform behavior into the generic gfxlib code
+- macOS/Darwin sfxlib: completed the native CoreAudio backend with output device enumeration/selection, low-latency buffer handling, driver-edge diagnostics, and AudioQueue input capture feeding the shared sfxlib capture ring
 - macOS/Darwin build flow: moved SDK discovery, deployment-target defaults, Homebrew ncurses/libffi pkg-config flags, and compiler-environment propagation into mk/ so build_scripts/macos-build-freebasic.sh can focus on tool selection, environment setup, staging, and packaging
+- macOS/Darwin build flow: propagate the deployment target into fbc-generated C and assembler stages, default Intel builds to macOS 10.5 while raising the floor when Homebrew dylibs require a newer macOS, bake the selected default into the built compiler, quiet generated-C compiler noise without hiding handwritten C warnings, and keep Darwin metadata/override-only archive members from producing ranlib warnings
+- macOS/Darwin tests: align the test runner's Intel deployment target with the main build, keep known C-backend edge-case unit tests from flooding the log with Apple clang warnings, and expand gfx smoke coverage across SCREEN 0 through SCREEN 13 with framebuffer pixel checks
 - macOS packaging: build the installer .pkg directly when pkgbuild is available, keep the bundled compiler wrapper responsible for package-local toolchain libraries, and treat install_name_tool dependency rewrites as best-effort because some GCC-linked Mach-O layouts cannot be rewritten by Apple's tool
 - Linux/MSYS2 release flow: reworked the DOS package builder so build_scripts/msdos-build-freebasic.sh can bootstrap or reuse the DJGPP toolchain, emit the DOS distribution under out/msdos, keep Linux and MSYS2 host realities separate, and clean successful .build-msdos staging artifacts by default
 - DOS test flow: replaced the earlier ad-hoc DOS sound probe helper with a fuller image-backed build_scripts/msdos-test-freebasic.sh path that provisions its own host test dependencies on Linux or MSYS2/Windows, boots the packaged DOS distribution under DOSBox-X, validates console and SCREEN 13 from inside the DOS image, and captures isolated Sound Blaster and no-BLASTER PC speaker single/dual-tone WAVs for FFT, continuity, and spectral-noise checks
@@ -48,6 +52,7 @@ Version 1.20.1
 - OPEN TCP and OPEN TCP SERVER runtime/device support, including TCP ACCEPT and EOC handling
 - Haiku platform support across compiler target selection, rtlib, gfxlib2, sfxlib, headers, libraries, and build scripts
 - broader platform build coverage carried forward from 1.10.4 for Darwin/macOS, Linux, Windows/MinGW, Windows/Cygwin, FreeBSD, OpenBSD, NetBSD, DragonFly, Solaris, and Haiku
+- macOS smoke-test runner for the native Darwin gfxlib/sfxlib drivers, including framebuffer dump checks for paletted, truecolor, and legacy SCREEN modes, RGB channel-order verification, CoreAudio playback sample verification, and capture probing when an input device is available
 - additional cpu-family support carried forward from 1.10.4, including riscv64, s390x, and loongarch64 target handling
 - compiler smoke-test targets for riscv64, s390x, loongarch64, and ppc64le, including checks for target C emission and expected predefined platform/CPU macros
 - riscv64 compiler smoke coverage that verifies __FB_LINUX__ and __FB_RISCV64__, emits target C, and optionally compiles a RISC-V object when a suitable cross-GCC is installed
@@ -121,6 +126,8 @@ Version 1.20.1
 - Cygwin compiler/examples: build dynamic libraries with the Cygwin DLL entry point and startup objects instead of the MinGW CRT startup path, fixing DLL-building examples such as manual/procs/mydll and threads/timer-lib
 - Cygwin headers/bindings: add Cygwin socket, netdb, select, time, and unistd coverage and avoid duplicate GTK ABI declarations, allowing the core network and GTK examples to compile when their external libraries are installed
 - rtlib/unix: build the multithreaded runtime with ENABLE_MT so libfbmt uses the correct thread-local storage path and ThreadSelf() remains stable after child threads exit
+- rtlib/ThreadCall: read compiler-emitted vararg type tags at pointer-sized width, fixing ThreadCall on Darwin/x86_64 and keeping the libffi path suitable for 64-bit non-x86 targets such as aarch64
+- rtlib/Darwin: use a naturally aligned internal DATA descriptor layout on Mach-O so DATA tables with pointer links do not produce unaligned relocation warnings during final links
 - s390x: map the compiler's generic s390x GCC architecture selection to z900 instead of emitting -march=s390x, which Debian's s390x GCC rejects
 - armhf/bootstrap: fix bootstrap generation so armhf builds emit ARM target options such as -arch armv7-a+fp instead of accidentally inheriting the host architecture, such as x86_64
 - armel/bootstrap: ensure armel bootstrap generation uses the correct soft-float ARM GNU triplet and emits the intended ARM target architecture

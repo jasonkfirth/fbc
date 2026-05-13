@@ -10,6 +10,8 @@
 ''
 '' Responsibilities:
 ''
+''     - choose the compiler driver for Darwin link jobs
+''     - add Darwin compiler/assembler options
 ''     - add Darwin gfx library dependencies
 ''     - add Darwin compiler-driver linker options
 ''     - add Darwin framework linker options
@@ -25,12 +27,30 @@
 #ifndef __FBC_DARWIN_PLATFORM_BI__
 #define __FBC_DARWIN_PLATFORM_BI__
 
+#ifndef FB_DARWIN_DEFAULT_DEPLOYMENT_TARGET
+#define FB_DARWIN_DEFAULT_DEPLOYMENT_TARGET ""
+#endif
+
 ''
 '' Target selection
 ''
 
 private function fbcDarwinPlatformIsSelected( ) as integer
 	function = (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_DARWIN)
+end function
+
+private function fbcDarwinPlatformGetLinkerTool( ) as integer
+	if( fbcDarwinPlatformIsSelected( ) = FALSE ) then
+		function = FBCTOOL_LD
+		exit function
+	end if
+
+	''
+	'' Darwin link lines use compiler-driver options such as
+	'' -mmacosx-version-min=... and depend on the driver for the platform
+	'' runtime defaults.  Apple ld64 does not accept those options directly.
+	''
+	function = FBCTOOL_GCC
 end function
 
 ''
@@ -45,6 +65,17 @@ private function fbcDarwinPlatformGetDeploymentTarget( ) as string
 		exit function
 	end if
 
+	version = FB_DARWIN_DEFAULT_DEPLOYMENT_TARGET
+	if( len( version ) > 0 ) then
+		''
+		'' The makefiles may raise the default deployment target when the
+		'' compiler is linked against Homebrew dylibs built for a newer macOS.
+		'' User-supplied MACOSX_DEPLOYMENT_TARGET still wins above.
+		''
+		function = version
+		exit function
+	end if
+
 	''
 	'' Apple Silicon first shipped with macOS 11.  Older deployment targets
 	'' are valid for Intel builds, but arm64 objects cannot be linked for the
@@ -54,9 +85,50 @@ private function fbcDarwinPlatformGetDeploymentTarget( ) as string
 	case FB_CPUFAMILY_AARCH64
 		function = "11.0"
 	case else
-		function = "10.4"
+		''
+		'' macOS 10.5 keeps Intel builds on an old deployment floor without
+		'' tripping modern ld64 warnings about pre-10.5 dynamic symbol flags.
+		''
+		function = "10.5"
 	end select
 end function
+
+private sub fbcDarwinPlatformAddCCompilerOptions( byref ccline as string )
+	if( fbcDarwinPlatformIsSelected( ) = FALSE ) then
+		exit sub
+	end if
+
+	dim as string version = fbcDarwinPlatformGetDeploymentTarget( )
+	if( len( version ) > 0 ) then
+		ccline += "-mmacosx-version-min=" + version + " "
+	end if
+
+	''
+	'' The C backend emits prototypes for a few C runtime entry points because
+	'' the generated C is compiled with -nostdinc.  Apple clang still knows
+	'' about C library builtins and can warn when FreeBASIC declarations are
+	'' not textually identical to the SDK typedefs.
+	''
+	ccline += "-fno-builtin "
+end sub
+
+private sub fbcDarwinPlatformAddAssemblerOptions( byref ascline as string )
+	if( fbcDarwinPlatformIsSelected( ) = FALSE ) then
+		exit sub
+	end if
+
+	dim as string version = fbcDarwinPlatformGetDeploymentTarget( )
+	if( len( version ) = 0 ) then
+		exit sub
+	end if
+
+	''
+	'' Assembly produced by the C compiler normally carries its own minimum
+	'' version directive. This option covers direct GAS output and keeps object
+	'' metadata aligned with the final link target.
+	''
+	ascline += "-mmacosx-version-min=" + version + " "
+end sub
 
 private sub fbcDarwinPlatformAddDeploymentTarget( byref ldcline as string )
 	if( fbcDarwinPlatformIsSelected( ) = FALSE ) then

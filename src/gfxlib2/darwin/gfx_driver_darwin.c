@@ -7,17 +7,22 @@
 #include <CoreGraphics/CGContext.h>
 #include <CoreGraphics/CGDataProvider.h>
 #include <CoreGraphics/CGDirectDisplay.h>
+#include <CoreGraphics/CGEvent.h>
 #include <CoreGraphics/CGGeometry.h>
 #include <CoreGraphics/CGImage.h>
 #include <limits.h>
 #include <objc/message.h>
 #include <objc/runtime.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define FB_DARWIN_STYLE_MASK 15UL
+#define FB_DARWIN_BORDERLESS_STYLE_MASK 0UL
 #define FB_DARWIN_BACKING_BUFFERED 2UL
 #define FB_DARWIN_ACTIVATION_POLICY_REGULAR 0L
+#define FB_DARWIN_FLOATING_WINDOW_LEVEL 3L
 
 #define FB_DARWIN_EVENT_LEFT_MOUSE_DOWN    1
 #define FB_DARWIN_EVENT_LEFT_MOUSE_UP      2
@@ -73,11 +78,6 @@ static id fb_msg_id_cstr(id obj, const char *sel_name, const char *arg)
 static id fb_msg_id_rect(id obj, const char *sel_name, CGRect rect)
 {
 	return ((id (*)(id, SEL, CGRect))objc_msgSend)(obj, fb_sel(sel_name), rect);
-}
-
-static id fb_msg_id_cgimage_size(id obj, const char *sel_name, CGImageRef image, CGSize size)
-{
-	return ((id (*)(id, SEL, CGImageRef, CGSize))objc_msgSend)(obj, fb_sel(sel_name), image, size);
 }
 
 static id fb_msg_id_rect_ulong_ulong_bool(id obj, const char *sel_name, CGRect rect, unsigned long style, unsigned long backing, BOOL defer_flag)
@@ -140,19 +140,9 @@ static void fb_msg_void_long(id obj, const char *sel_name, long arg)
 	((void (*)(id, SEL, long))objc_msgSend)(obj, fb_sel(sel_name), arg);
 }
 
-static void fb_msg_void_ulong(id obj, const char *sel_name, unsigned long arg)
-{
-	((void (*)(id, SEL, unsigned long))objc_msgSend)(obj, fb_sel(sel_name), arg);
-}
-
 static void fb_msg_void_point(id obj, const char *sel_name, CGPoint pt)
 {
 	((void (*)(id, SEL, CGPoint))objc_msgSend)(obj, fb_sel(sel_name), pt);
-}
-
-static void fb_msg_void_rect(id obj, const char *sel_name, CGRect rect)
-{
-	((void (*)(id, SEL, CGRect))objc_msgSend)(obj, fb_sel(sel_name), rect);
 }
 
 static void fb_msg_void_size(id obj, const char *sel_name, CGSize size)
@@ -195,6 +185,11 @@ static CGPoint fb_msg_point_point_id(id obj, const char *sel_name, CGPoint pt, i
 	return ((CGPoint (*)(id, SEL, CGPoint, id))objc_msgSend)(obj, fb_sel(sel_name), pt, view);
 }
 
+static CGPoint fb_msg_point_point(id obj, const char *sel_name, CGPoint pt)
+{
+	return ((CGPoint (*)(id, SEL, CGPoint))objc_msgSend)(obj, fb_sel(sel_name), pt);
+}
+
 static CGRect fb_msg_rect(id obj, const char *sel_name)
 {
 	CGRect rect;
@@ -216,20 +211,6 @@ static id fb_hDarwinMakeString(const char *text)
 		text = "FreeBASIC";
 
 	return fb_msg_id_cstr((id)NSStringClass, "stringWithUTF8String:", text);
-}
-
-static int fb_hDarwinMouseMaskToButtons(unsigned long mask)
-{
-	int buttons = 0;
-
-	if (mask & 0x1UL)
-		buttons |= BUTTON_LEFT;
-	if (mask & 0x2UL)
-		buttons |= BUTTON_RIGHT;
-	if (mask & 0x4UL)
-		buttons |= BUTTON_MIDDLE;
-
-	return buttons;
 }
 
 static int fb_hDarwinButtonNumberToMask(int button_number)
@@ -476,6 +457,115 @@ static void fb_hDarwinQueryDesktop(void)
 
 	fb_darwin.desktop_width = (int)CGDisplayPixelsWide(display_id);
 	fb_darwin.desktop_height = (int)CGDisplayPixelsHigh(display_id);
+}
+
+static int fb_hDarwinQueryRefreshRate(void)
+{
+	CGDisplayModeRef mode;
+	double refresh;
+
+	mode = CGDisplayCopyDisplayMode(CGMainDisplayID());
+	if (!mode)
+		return 0;
+
+	refresh = CGDisplayModeGetRefreshRate(mode);
+	CGDisplayModeRelease(mode);
+
+	if (refresh <= 0.0)
+		return 0;
+
+	return (int)(refresh + 0.5);
+}
+
+static int fb_hDarwinEffectiveRefreshRate(void)
+{
+	int refresh_rate;
+
+	refresh_rate = fb_darwin.refresh_rate;
+	if (refresh_rate <= 0)
+		refresh_rate = fb_hDarwinQueryRefreshRate();
+	if (refresh_rate <= 0)
+		refresh_rate = 60;
+
+	return refresh_rate;
+}
+
+static int fb_hDarwinDepthSupported(int depth)
+{
+	switch (depth) {
+	case 1:
+	case 2:
+	case 4:
+	case 8:
+	case 15:
+	case 16:
+	case 24:
+	case 32:
+		return TRUE;
+	default:
+		return FALSE;
+	}
+}
+
+static unsigned long fb_hDarwinStyleMaskForFlags(int flags)
+{
+	if (flags & (DRIVER_FULLSCREEN | DRIVER_NO_FRAME))
+		return FB_DARWIN_BORDERLESS_STYLE_MASK;
+
+	return FB_DARWIN_STYLE_MASK;
+}
+
+static CGRect fb_hDarwinWindowFrameForMode(int w, int h, int flags)
+{
+	CGRect frame;
+
+	if (flags & DRIVER_FULLSCREEN) {
+		frame = CGDisplayBounds(CGMainDisplayID());
+		if (frame.size.width > 0.0 && frame.size.height > 0.0)
+			return frame;
+	}
+
+	return CGRectMake(0.0, 0.0, (CGFloat)w, (CGFloat)h);
+}
+
+static void fb_hDarwinFreeDisplayBuffer(void)
+{
+	if (fb_darwin.display_buffer) {
+		free(fb_darwin.display_buffer);
+		fb_darwin.display_buffer = NULL;
+	}
+
+	fb_darwin.display_pitch = 0;
+	fb_darwin.display_size = 0;
+	fb_darwin.blitter = NULL;
+}
+
+static int fb_hDarwinAllocDisplayBuffer(int w, int h)
+{
+	size_t pitch;
+	size_t size;
+
+	if (w <= 0 || h <= 0)
+		return -1;
+
+	pitch = (size_t)w * 4U;
+	size = pitch * (size_t)h;
+	if (pitch / 4U != (size_t)w || size / pitch != (size_t)h)
+		return -1;
+
+	fb_darwin.display_buffer = (unsigned char *)calloc(1, size);
+	if (!fb_darwin.display_buffer)
+		return -1;
+
+	fb_darwin.display_pitch = (int)pitch;
+	fb_darwin.display_size = size;
+	fb_darwin.blitter = fb_hGetBlitter(32, FALSE);
+	if (!fb_darwin.blitter) {
+		fb_hDarwinFreeDisplayBuffer();
+		return -1;
+	}
+
+	return 0;
 }
 
 static void fb_hDarwinRefreshLayout(void)
@@ -831,6 +921,49 @@ static void fb_hDarwinPumpEvents(void)
 	}
 }
 
+static void fb_hDarwinDumpDisplayBuffer(void)
+{
+	const char *path;
+	FILE *fp;
+	const unsigned int *line;
+	unsigned int pixel;
+	int x;
+	int y;
+
+	path = getenv("FBGFX_DARWIN_DUMP");
+	if (!path || !*path || !fb_darwin.display_buffer)
+		return;
+
+	fp = fopen(path, "wb");
+	if (!fp)
+		return;
+
+	fprintf(fp, "P6\n%d %d\n255\n", fb_darwin.width, fb_darwin.height);
+	for (y = 0; y < fb_darwin.height; ++y) {
+		line = (const unsigned int *)(fb_darwin.display_buffer + ((size_t)y * (size_t)fb_darwin.display_pitch));
+		for (x = 0; x < fb_darwin.width; ++x) {
+			pixel = line[x];
+			fputc((pixel >> 16) & 0xFF, fp);
+			fputc((pixel >> 8) & 0xFF, fp);
+			fputc(pixel & 0xFF, fp);
+		}
+	}
+
+	fclose(fp);
+}
+
+static void fb_hDarwinBlitDisplayBuffer(void)
+{
+	if (!__fb_gfx || !__fb_gfx->framebuffer || !__fb_gfx->dirty)
+		return;
+	if (!fb_darwin.display_buffer || !fb_darwin.blitter)
+		return;
+
+	fb_darwin.blitter(fb_darwin.display_buffer, fb_darwin.display_pitch);
+	fb_hMemSet(__fb_gfx->dirty, FALSE, __fb_gfx->h);
+	fb_hDarwinDumpDisplayBuffer();
+}
+
 static void fb_hDarwinDrawCurrentFramebuffer(CGContextRef ctx, CGRect bounds)
 {
 	CGColorSpaceRef color_space;
@@ -847,10 +980,15 @@ static void fb_hDarwinDrawCurrentFramebuffer(CGContextRef ctx, CGRect bounds)
 		return;
 
 	fb_hDarwinRefreshLayout();
+	if (fb_darwin.lock_count <= 0)
+		fb_hDarwinBlitDisplayBuffer();
 
-	data_size = (size_t)__fb_gfx->pitch * (size_t)__fb_gfx->h;
+	if (!fb_darwin.display_buffer || fb_darwin.display_pitch <= 0)
+		return;
+
+	data_size = fb_darwin.display_size;
 	color_space = CGColorSpaceCreateDeviceRGB();
-	provider = CGDataProviderCreateWithData(NULL, __fb_gfx->framebuffer, data_size, NULL);
+	provider = CGDataProviderCreateWithData(NULL, fb_darwin.display_buffer, data_size, NULL);
 	if (!color_space || !provider) {
 		if (provider)
 			CGDataProviderRelease(provider);
@@ -860,11 +998,11 @@ static void fb_hDarwinDrawCurrentFramebuffer(CGContextRef ctx, CGRect bounds)
 	}
 
 	image = CGImageCreate(
-		(size_t)__fb_gfx->w,
-		(size_t)__fb_gfx->h,
+		(size_t)fb_darwin.width,
+		(size_t)fb_darwin.height,
 		8,
 		32,
-		(size_t)__fb_gfx->pitch,
+		(size_t)fb_darwin.display_pitch,
 		color_space,
 		kCGBitmapByteOrder32Little | kCGImageAlphaNoneSkipFirst,
 		provider,
@@ -1034,32 +1172,44 @@ int fb_hDarwinInit(char *title, int w, int h, int depth, int refresh_rate, int f
 	Class NSApplicationClass;
 	Class NSWindowClass;
 	CGRect frame;
+	CGRect view_frame;
 	CGSize min_size;
 	id app;
 	id window;
 	id view;
+	unsigned long style_mask;
 
 	if (flags & DRIVER_OPENGL)
 		return -1;
 
-	if (depth != 32)
+	if (!fb_hDarwinDepthSupported(depth))
 		return -1;
 
 	if (fb_darwin.initialized)
 		fb_hDarwinExit();
 
 	memset(&fb_darwin, 0, sizeof(fb_darwin));
+	fb_darwin.width = w;
+	fb_darwin.height = h;
+	fb_darwin.depth = depth;
+	fb_darwin.refresh_rate = refresh_rate;
+	fb_darwin.flags = flags;
+	fb_darwin.mouse_cursor = 1;
+
+	if (fb_hDarwinAllocDisplayBuffer(w, h) != 0)
+		return -1;
+
 	fb_hDarwinQueryDesktop();
 	fb_hDarwinEnsureClasses();
 
 	NSApplicationClass = objc_getClass("NSApplication");
 	NSWindowClass = objc_getClass("NSWindow");
 	if (!NSApplicationClass || !NSWindowClass || fb_darwin_view_class == Nil)
-		return -1;
+		goto fail;
 
 	app = fb_msg_id((id)NSApplicationClass, "sharedApplication");
 	if (!app)
-		return -1;
+		goto fail;
 
 	fb_darwin.app = app;
 	fb_darwin.run_loop_mode = fb_hDarwinMakeString("kCFRunLoopDefaultMode");
@@ -1068,25 +1218,28 @@ int fb_hDarwinInit(char *title, int w, int h, int depth, int refresh_rate, int f
 	fb_hDarwinEnsureMenu(title);
 	fb_msg_void(app, "finishLaunching");
 
-	frame = CGRectMake(0.0, 0.0, (CGFloat)w, (CGFloat)h);
+	frame = fb_hDarwinWindowFrameForMode(w, h, flags);
+	view_frame = CGRectMake(0.0, 0.0, frame.size.width, frame.size.height);
+	style_mask = fb_hDarwinStyleMaskForFlags(flags);
 
 	window = fb_msg_id((id)NSWindowClass, "alloc");
 	window = fb_msg_id_rect_ulong_ulong_bool(
 		window,
 		"initWithContentRect:styleMask:backing:defer:",
 		frame,
-		FB_DARWIN_STYLE_MASK,
+		style_mask,
 		FB_DARWIN_BACKING_BUFFERED,
 		NO
 	);
 	if (!window)
-		return -1;
+		goto fail;
 
 	view = fb_msg_id((id)fb_darwin_view_class, "alloc");
-	view = fb_msg_id_rect(view, "initWithFrame:", frame);
+	view = fb_msg_id_rect(view, "initWithFrame:", view_frame);
 	if (!view) {
 		fb_msg_void(window, "close");
-		return -1;
+		fb_msg_void(window, "release");
+		goto fail;
 	}
 
 	min_size.width = (CGFloat)w;
@@ -1094,9 +1247,13 @@ int fb_hDarwinInit(char *title, int w, int h, int depth, int refresh_rate, int f
 
 	fb_msg_void_id(window, "setContentView:", view);
 	fb_msg_void_bool(window, "setReleasedWhenClosed:", NO);
-	fb_msg_void_size(window, "setContentMinSize:", min_size);
+	if (!(flags & (DRIVER_FULLSCREEN | DRIVER_NO_FRAME)))
+		fb_msg_void_size(window, "setContentMinSize:", min_size);
 	fb_msg_void_id(window, "setTitle:", fb_hDarwinMakeString(title));
-	fb_msg_void(window, "center");
+	if (flags & DRIVER_ALWAYS_ON_TOP)
+		fb_msg_void_long(window, "setLevel:", FB_DARWIN_FLOATING_WINDOW_LEVEL);
+	if (!(flags & DRIVER_FULLSCREEN))
+		fb_msg_void(window, "center");
 	fb_msg_void_id(window, "makeKeyAndOrderFront:", nil);
 	fb_msg_void_bool(window, "setAcceptsMouseMovedEvents:", YES);
 	fb_msg_bool_id(window, "makeFirstResponder:", view);
@@ -1104,22 +1261,22 @@ int fb_hDarwinInit(char *title, int w, int h, int depth, int refresh_rate, int f
 
 	fb_darwin.window = window;
 	fb_darwin.view = view;
-	fb_darwin.width = w;
-	fb_darwin.height = h;
-	fb_darwin.depth = depth;
-	fb_darwin.refresh_rate = refresh_rate;
-	fb_darwin.flags = flags;
-	fb_darwin.mouse_cursor = 1;
 	fb_darwin.initialized = TRUE;
 
 	fb_hDarwinRefreshLayout();
 	fb_hDarwinPumpEvents();
 
 	return 0;
+
+fail:
+	fb_hDarwinExit();
+	return -1;
 }
 
 void fb_hDarwinExit(void)
 {
+	fb_hDarwinFreeDisplayBuffer();
+
 	if (fb_darwin.view) {
 		fb_msg_void((id)fb_darwin.view, "release");
 		fb_darwin.view = NULL;
@@ -1138,8 +1295,11 @@ void fb_hDarwinUpdate(void)
 {
 	if (!fb_darwin.initialized || !fb_darwin.view)
 		return;
+	if (fb_darwin.lock_count > 0)
+		return;
 
 	fb_hDarwinRefreshLayout();
+	fb_hDarwinBlitDisplayBuffer();
 	fb_msg_void_bool((id)fb_darwin.view, "setNeedsDisplay:", YES);
 	fb_hDarwinPumpEvents();
 }
@@ -1151,11 +1311,17 @@ void fb_hDarwinPollEvents(void)
 
 void fb_hDarwinLock(void)
 {
+	if (fb_darwin.initialized)
+		fb_darwin.lock_count++;
 }
 
 void fb_hDarwinUnlock(void)
 {
-	fb_hDarwinUpdate();
+	if (fb_darwin.lock_count > 0)
+		fb_darwin.lock_count--;
+
+	if (fb_darwin.lock_count == 0)
+		fb_hDarwinUpdate();
 }
 
 void fb_hDarwinSetPalette(int index, int r, int g, int b)
@@ -1164,10 +1330,29 @@ void fb_hDarwinSetPalette(int index, int r, int g, int b)
 	(void)r;
 	(void)b;
 	(void)g;
+
+	if (__fb_gfx && __fb_gfx->dirty)
+		fb_hMemSet(__fb_gfx->dirty, TRUE, __fb_gfx->h);
+
+	if (fb_darwin.lock_count == 0)
+		fb_hDarwinUpdate();
 }
 
 void fb_hDarwinWaitVSync(void)
 {
+	struct timespec req;
+	int refresh_rate;
+
+	if (fb_darwin.initialized)
+		fb_hDarwinUpdate();
+
+	refresh_rate = fb_hDarwinEffectiveRefreshRate();
+	req.tv_sec = 0;
+	req.tv_nsec = 1000000000L / refresh_rate;
+	nanosleep(&req, NULL);
+
+	if (fb_darwin.initialized)
+		fb_hDarwinPumpEvents();
 }
 
 int fb_hDarwinGetMouse(int *x, int *y, int *z, int *buttons, int *clip)
@@ -1186,20 +1371,67 @@ int fb_hDarwinGetMouse(int *x, int *y, int *z, int *buttons, int *clip)
 	return 0;
 }
 
+static void fb_hDarwinWarpMouse(int x, int y)
+{
+	CGPoint view_pt;
+	CGPoint window_pt;
+	CGPoint screen_pt;
+	CGPoint warp_pt;
+	CGRect display_bounds;
+
+	if (!fb_darwin.window || !fb_darwin.view || x == INT_MIN || y == INT_MIN)
+		return;
+
+	fb_hDarwinRefreshLayout();
+
+	x = MID(0, x, fb_darwin.width - 1);
+	y = MID(0, y, fb_darwin.height - 1);
+
+	view_pt.x = (CGFloat)(fb_darwin.draw_offset_x + (x * fb_darwin.scale) + (fb_darwin.scale / 2));
+	view_pt.y = (CGFloat)(fb_darwin.draw_offset_y + (y * fb_darwin.scale) + (fb_darwin.scale / 2));
+	window_pt = fb_msg_point_point_id((id)fb_darwin.view, "convertPoint:toView:", view_pt, nil);
+	screen_pt = fb_msg_point_point((id)fb_darwin.window, "convertBaseToScreen:", window_pt);
+	display_bounds = CGDisplayBounds(CGMainDisplayID());
+
+	warp_pt.x = screen_pt.x;
+	warp_pt.y = display_bounds.size.height - screen_pt.y;
+	CGWarpMouseCursorPosition(warp_pt);
+}
+
 void fb_hDarwinSetMouse(int x, int y, int cursor, int clip)
 {
-	fb_darwin.mouse_x = x;
-	fb_darwin.mouse_y = y;
-	fb_darwin.mouse_clip = clip;
+	if (x != INT_MIN || y != INT_MIN) {
+		if (x == INT_MIN)
+			x = fb_darwin.mouse_x;
+		if (y == INT_MIN)
+			y = fb_darwin.mouse_y;
 
-	if (fb_darwin.mouse_cursor != cursor) {
+		x = MID(0, x, fb_darwin.width - 1);
+		y = MID(0, y, fb_darwin.height - 1);
+
+		fb_darwin.mouse_x = x;
+		fb_darwin.mouse_y = y;
+		fb_hDarwinWarpMouse(x, y);
+	}
+
+	/*
+		AppKit does not provide an XGrabPointer-style window-local
+		confinement API.  Keep the documented gfxlib state and clamp all
+		logical coordinates that enter the driver.
+	*/
+	if (clip == 0)
+		fb_darwin.mouse_clip = FALSE;
+	else if (clip > 0)
+		fb_darwin.mouse_clip = TRUE;
+
+	if (cursor >= 0 && fb_darwin.mouse_cursor != cursor) {
 		if (cursor)
 			fb_msg_void((id)objc_getClass("NSCursor"), "unhide");
 		else
 			fb_msg_void((id)objc_getClass("NSCursor"), "hide");
-	}
 
-	fb_darwin.mouse_cursor = cursor;
+		fb_darwin.mouse_cursor = cursor;
+	}
 }
 
 void fb_hDarwinSetWindowTitle(char *title)
@@ -1213,15 +1445,27 @@ void fb_hDarwinSetWindowTitle(char *title)
 int fb_hDarwinSetWindowPos(int x, int y)
 {
 	CGPoint pt;
+	CGRect frame;
+	int old_x;
+	int old_y;
 
 	if (!fb_darwin.window)
 		return -1;
 
-	pt.x = (CGFloat)x;
-	pt.y = (CGFloat)y;
-	fb_msg_void_point((id)fb_darwin.window, "setFrameOrigin:", pt);
+	if (fb_darwin.flags & DRIVER_FULLSCREEN)
+		return 0;
 
-	return 0;
+	frame = fb_msg_rect((id)fb_darwin.window, "frame");
+	old_x = (int)frame.origin.x;
+	old_y = (int)frame.origin.y;
+
+	if (x != INT_MIN || y != INT_MIN) {
+		pt.x = (CGFloat)((x == INT_MIN) ? old_x : x);
+		pt.y = (CGFloat)((y == INT_MIN) ? old_y : y);
+		fb_msg_void_point((id)fb_darwin.window, "setFrameOrigin:", pt);
+	}
+
+	return (old_x & 0xFFFF) | (old_y << 16);
 }
 
 static int fb_hDarwinModeExists(const int *modes, int count, int packed)
@@ -1260,12 +1504,13 @@ int *fb_hDarwinFetchModes(int depth, int *size)
 	int count = 0;
 	int capacity = 32;
 
-	(void)depth;
-
 	if (!size)
 		return NULL;
 
 	*size = 0;
+	if (!fb_hDarwinDepthSupported(depth))
+		return NULL;
+
 	modes = (int *)calloc((size_t)capacity, sizeof(int));
 	if (!modes)
 		return NULL;
@@ -1305,7 +1550,7 @@ int fb_hDarwinScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_
 	if (depth)
 		*depth = 32;
 	if (refresh)
-		*refresh = 0;
+		*refresh = fb_hDarwinQueryRefreshRate();
 
 	return (fb_darwin.desktop_width > 0 && fb_darwin.desktop_height > 0) ? 1 : 0;
 }

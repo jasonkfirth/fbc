@@ -1593,10 +1593,7 @@ private function hLinkFiles( ) as integer
 	#endif
 
 	'' invoke ld
-	var ld = FBCTOOL_LD
-	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS ) then
-		ld = FBCTOOL_EMLD
-	end if
+	var ld = fbcPlatformGetLinkerTool( )
 
 	if( fbcRunBin( "linking", ld, ldcline ) = FALSE ) then
 		exit function
@@ -3965,6 +3962,8 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 			ln += "-mfloat-abi=softfp -mfpu=vfpv3-d16 "
 		end if
 
+		fbcDarwinPlatformAddCCompilerOptions( ln )
+
 		if( fbGetOption( FB_COMPOPT_PIC ) ) then
 			ln += "-fPIC "
 		end if
@@ -4264,6 +4263,8 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 		end if
 	end select
 
+	fbcDarwinPlatformAddAssemblerOptions( ln )
+
 	ln += """" + hGetAsmName( module, 2 ) + """ "
 	ln += "-o """ + *module->objfile + """"
 	ln += fbc.extopt.gas
@@ -4377,6 +4378,18 @@ private sub hAssembleXpm( )
 	end if
 end sub
 
+private function hGetFbctinfAnchorName( ) as string
+	dim as ulongint hash = 2166136261ull
+
+	for i as integer = 1 to len( fbc.outname )
+		hash xor= culngint( asc( mid( fbc.outname, i, 1 ) ) )
+		hash *= 16777619ull
+		hash and= &hFFFFFFFFull
+	next
+
+	function = "__fb_ctinf_anchor_" + lcase( hex( cuint( hash ), 8 ) )
+end function
+
 private function hCompileFbctinf( ) as integer
 	dim as FBCIOFILE fbctinf
 	dim as string objfile
@@ -4396,6 +4409,15 @@ private function hCompileFbctinf( ) as integer
 	fo = freefile( )
 	if( open( fbctinf.srcfile, for output, as #fo ) ) then
 		exit function
+	end if
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_DARWIN ) then
+		''
+		'' Apple ar/ranlib warns about archive members with no symbols.
+		'' The objinfo member is intentionally metadata-only, so add a
+		'' unique, unreferenced symbol to keep Darwin archives quiet.
+		''
+		print #fo, "sub " + hGetFbctinfAnchorName( ) + "()"
+		print #fo, "end sub"
 	end if
 	close #fo
 

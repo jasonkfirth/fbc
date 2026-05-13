@@ -113,6 +113,9 @@
 	#include "dos/fb_dos.h"
 #elif defined HOST_UNIX
 	#include "unix/fb_unix.h"
+	#if defined HOST_DARWIN
+		#include "darwin/fb_darwin.h"
+	#endif
 #elif defined HOST_WIN32
 	#include "win32/fb_win32.h"
 #elif defined HOST_XBOX

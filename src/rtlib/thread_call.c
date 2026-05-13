@@ -21,7 +21,7 @@
 
 #include "fb.h"
 
-#if defined DISABLE_FFI || (!defined HOST_X86 && !defined HOST_X86_64)
+#if defined DISABLE_FFI || (!defined HOST_X86 && !defined HOST_64BIT)
 
 FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, ... )
 {
@@ -84,20 +84,51 @@ static void freeStruct( ffi_type *arg )
     free( arg );
 }
 
+static void freeThreadCall( FBTHREADCALL *info )
+{
+    int i;
+
+    if( info == NULL )
+        return;
+
+    for( i=0; i<info->num_args; i++ )
+    {
+        if( info->ffi_arg_types[i]->type == FFI_TYPE_STRUCT )
+            freeStruct( info->ffi_arg_types[i] );
+    }
+
+    free( info->values );
+    free( info->ffi_arg_types );
+    free( info );
+}
+
 static ffi_type *getArgument( va_list *args_list );
 
 static ffi_type *getStruct( va_list *args_list )
 {
-    int num_elems = va_arg( (*args_list), int );
+    ssize_t elem_count = va_arg( (*args_list), ssize_t );
+    int num_elems;
     int i, j;
+
+    if( (elem_count < 0) || (elem_count > FB_THREADCALL_MAX_ELEMS) )
+        return NULL;
+    num_elems = (int)elem_count;
 
     /* prepare type */
     ffi_type *ffi_arg = (ffi_type *)malloc( sizeof( ffi_type ) );
+    if( ffi_arg == NULL )
+        return NULL;
+
     ffi_arg->size = 0;
     ffi_arg->alignment = 0;
     ffi_arg->type = FFI_TYPE_STRUCT;
     ffi_arg->elements = 
         (ffi_type **)malloc( sizeof( ffi_type * ) * ( num_elems + 1 ) );
+    if( ffi_arg->elements == NULL )
+    {
+        free( ffi_arg );
+        return NULL;
+    }
     ffi_arg->elements[num_elems] = NULL;
     
     /* scan elements */
@@ -110,7 +141,7 @@ static ffi_type *getStruct( va_list *args_list )
             for( j=0; j<i; j++ )
             {
                 if( ffi_arg->elements[j]->type == FFI_TYPE_STRUCT )
-                    freeStruct( ffi_arg );
+                    freeStruct( ffi_arg->elements[j] );
             }
             free( ffi_arg->elements );
             free( ffi_arg );
@@ -123,7 +154,8 @@ static ffi_type *getStruct( va_list *args_list )
 
 static ffi_type *getArgument( va_list *args_list )
 {
-    int arg_type = va_arg( (*args_list), int );
+    ssize_t arg_type = va_arg( (*args_list), ssize_t );
+
     switch( arg_type )
     {
         case FB_THREADCALL_INT8:    return &ffi_type_sint8;
@@ -150,11 +182,27 @@ FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, 
     ffi_type     **ffi_args;
     void         **values;
     FBTHREADCALL  *param;
+    FBTHREAD     *thread;
     int i, j;
+
+    if( (proc == NULL) || (num_args < 0) || (num_args > FB_THREADCALL_MAX_ELEMS) )
+        return NULL;
     
     /* initialize lists and arrays */
-    ffi_args = (ffi_type **)malloc( sizeof( ffi_type * ) * num_args );
-    values = (void **)malloc( sizeof( void * ) * num_args );
+    ffi_args = NULL;
+    values = NULL;
+    if( num_args > 0 )
+    {
+        ffi_args = (ffi_type **)malloc( sizeof( ffi_type * ) * num_args );
+        values = (void **)malloc( sizeof( void * ) * num_args );
+        if( (ffi_args == NULL) || (values == NULL) )
+        {
+            free( values );
+            free( ffi_args );
+            return NULL;
+        }
+    }
+
     va_list args_list; 
     va_start(args_list, num_args);
     
@@ -165,6 +213,7 @@ FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, 
         if( ffi_args[i] == NULL )
         {
             /* error, free all memory allocated up to this point */
+            va_end( args_list );
             for( j=0; j<i; j++ )
             {
                 if( ffi_args[j]->type == FFI_TYPE_STRUCT )
@@ -180,6 +229,17 @@ FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, 
     
     /* pack into thread parameter */
     param = malloc( sizeof( FBTHREADCALL ) );
+    if( param == NULL )
+    {
+        for( j=0; j<num_args; j++ )
+        {
+            if( ffi_args[j]->type == FFI_TYPE_STRUCT )
+                freeStruct( ffi_args[j] );
+        }
+        free(values);
+        free(ffi_args);
+        return NULL;
+    }
     param->proc = proc;
     param->abi = abi;
     param->num_args = num_args;
@@ -187,7 +247,11 @@ FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, 
     param->values = values;
     
     /* actually start thread */
-    return fb_ThreadCreate( threadproc, (void *)param, stack_size );
+    thread = fb_ThreadCreate( threadproc, (void *)param, stack_size );
+    if( thread == NULL )
+        freeThreadCall( param );
+
+    return thread;
 }
 
 static FBCALL void threadproc( void *param )
@@ -196,11 +260,8 @@ static FBCALL void threadproc( void *param )
     ffi_status status = FFI_OK;
     ffi_abi abi = -1;
     ffi_cif cif;
-    int i;
 
-#ifdef HOST_X86_64
-    abi = FFI_DEFAULT_ABI;
-#else
+#if defined HOST_X86 && !defined HOST_64BIT
     /* check calling convention */
     if( info->abi == FB_THREADCALL_CDECL )
         abi = FFI_SYSV;
@@ -213,10 +274,23 @@ static FBCALL void threadproc( void *param )
 
     /* prep FFI call interface */
     if( status == FFI_OK )
+#else
+    /*
+     * libffi exposes the native platform ABI as FFI_DEFAULT_ABI on 64-bit
+     * and non-x86 targets. 32-bit x86 remains special because CDECL and
+     * STDCALL are separate ABIs there.
+     */
+    if( (info->abi == FB_THREADCALL_CDECL) ||
+        (info->abi == FB_THREADCALL_STDCALL) )
+        abi = FFI_DEFAULT_ABI;
+    else
+        status = ~FFI_OK;
+
+    if( status == FFI_OK )
 #endif
         status = ffi_prep_cif( 
             &cif,               // handle
-            abi,                // ABI (CDECL or STDCALL on x86, host default on x86_64)
+            abi,                // ABI (CDECL or STDCALL on x86, host default otherwise)
             info->num_args,     // number of arguments
             &ffi_type_void,     // return type
             info->ffi_arg_types // argument types
@@ -228,14 +302,7 @@ static FBCALL void threadproc( void *param )
     
 
     /* free memory and exit */
-    for( i=0; i<info->num_args; i++ )
-    {
-        if( info->ffi_arg_types[i]->type == FFI_TYPE_STRUCT )
-            freeStruct( info->ffi_arg_types[i] );
-    }
-    free( info->values );
-    free( info->ffi_arg_types );
-    free( info );
+    freeThreadCall( info );
 }
 
 #endif

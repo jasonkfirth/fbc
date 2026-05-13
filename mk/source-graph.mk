@@ -236,6 +236,16 @@ $(addprefix $(srcdir)/sfxlib/,$(SFX_BASE_UNIX)) \
 $(addprefix $(srcdir)/sfxlib/,$(SFX_BASE_TARGET)), \
 $(SFX_SRC_GENERIC))
 
+ifeq ($(TARGET_OS),darwin)
+  # These Darwin files are override markers.  Their filenames reserve the
+  # shared Unix slots above, but they intentionally do not contribute code.
+  # Keeping them out of the archive avoids ranlib "has no symbols" warnings.
+  SFX_SRC_TARGET := $(filter-out \
+    $(srcdir)/sfxlib/darwin/sfx_midi_bsd.c \
+    $(srcdir)/sfxlib/darwin/sfx_unix.c, \
+    $(SFX_SRC_TARGET))
+endif
+
 SFX_SRC := $(SFX_SRC_GENERIC) $(SFX_SRC_UNIX) $(SFX_SRC_TARGET)
 
 ##############################################################################

@@ -27,7 +27,8 @@ SUITE( fbc_tests.functions.void_param )
 	end sub
 
 	sub test_str( byref p as zstring ptr )
-		CU_ASSERT_EQUAL( @p, @"abcd" )
+		dim expected as zstring ptr = @"abcd"
+		CU_ASSERT_EQUAL( @p, expected )
 	end sub
 
 END_SUITE

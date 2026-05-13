@@ -151,6 +151,11 @@ endif
 
 OBJLIST := $(SRCLIST:%.bas=%.o)
 
+ifeq ($(TESTS_HOST_OS),darwin)
+./functions/var_args-gcc.o functions/var_args-gcc.o: FBC_CFLAGS += -Wc -Wno-varargs
+./optimizations/consteval.o optimizations/consteval.o: FBC_CFLAGS += -Wc -Wno-absolute-value
+endif
+
 #
 #: rules
 #

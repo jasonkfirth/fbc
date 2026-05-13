@@ -22,11 +22,12 @@ Main routines and data:
 - `fb_sfxDarwinRunning()`
 
 ### `sfx_driver_coreaudio.c`
-Basic CoreAudio playback driver.
+CoreAudio playback driver.
 
 Job:
 - opens a CoreAudio output queue
 - creates a few rotating buffers
+- enumerates and selects CoreAudio output devices
 - accepts mixed float samples from sfxlib
 - sends those samples to macOS for playback
 
@@ -36,10 +37,26 @@ Main routines:
 - `fb_sfxDarwinDeactivate()` stops that background feed worker
 - `fb_sfxDarwinExit()` shuts it down and frees buffers
 - `fb_sfxDarwinWrite()` copies frames into the next queue buffer
+- `darwin_device_list()` reports CoreAudio output endpoints
+- `darwin_device_select()` rebuilds the queue on the requested endpoint
 - `fb_sfxDriverCoreAudio` exports the driver record
 
 Design note:
 - CoreAudio queue buffers do not pull fresh mixed audio on their own in this backend, so a small worker thread now calls `fb_sfxUpdate()` for unattended playback in the same spirit as the Linux fix
+
+### `sfx_capture_coreaudio.c`
+CoreAudio capture driver.
+
+Job:
+- opens the default CoreAudio input queue
+- receives native interleaved 16-bit PCM buffers
+- writes captured frames into the shared sfxlib capture ring
+- treats missing devices or denied microphone permission as a normal start failure
+
+Main routines:
+- `fb_sfxPlatformCaptureStart()`
+- `fb_sfxPlatformCaptureStop()`
+- `fb_sfxPlatformCaptureRead()`
 
 ### `sfx_midi_coremidi.c`
 CoreMIDI backend.
@@ -56,7 +73,5 @@ Main routines:
 
 ## Good Starter Tasks Here
 
-- add device enumeration
-- add input/capture support
 - tighten timing and latency control
 - add an AudioUnit path later if we want a more advanced driver

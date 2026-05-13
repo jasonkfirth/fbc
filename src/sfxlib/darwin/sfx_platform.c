@@ -16,6 +16,7 @@
 void fb_sfxPlatformExit(void)
 {
 #ifndef DISABLE_DARWIN
+    fb_sfxPlatformCaptureStop();
     fb_sfxDarwinExit();
 #endif
 }

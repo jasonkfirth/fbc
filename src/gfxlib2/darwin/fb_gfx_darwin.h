@@ -31,6 +31,11 @@ typedef struct FB_DARWIN_STATE {
 	int draw_offset_y;
 	int draw_width;
 	int draw_height;
+	int display_pitch;
+	size_t display_size;
+	unsigned char *display_buffer;
+	BLITTER *blitter;
+	int lock_count;
 	void *app;
 	void *window;
 	void *view;

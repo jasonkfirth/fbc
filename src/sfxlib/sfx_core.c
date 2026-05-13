@@ -75,8 +75,10 @@ static int fb_sfxOutputQueueDrainLocked(int frames);
 static void fb_sfxSleepMs(unsigned long milliseconds);
 static int fb_sfxCurrentDriverBlocksLocked(void);
 static int fb_sfxCurrentDriverBlocks(void);
+#if defined(__DJGPP__)
 static int fb_sfxCurrentDriverIsNull(void);
 static int fb_sfxUpdateDelayFrames(int msecs, int return_after_update);
+#endif
 static int fb_sfxDriverNameEquals(const char *a, const char *b);
 static int fb_sfxDriverTryByName(const char *name);
 static int g_foreground_feed_count = 0;
@@ -502,6 +504,7 @@ static int fb_sfxCurrentDriverBlocks(void)
     return result;
 }
 
+#if defined(__DJGPP__)
 static int fb_sfxCurrentDriverIsNull(void)
 {
     int result;
@@ -565,6 +568,7 @@ static int fb_sfxUpdateDelayFrames(int msecs, int return_after_update)
 
     return return_after_update;
 }
+#endif
 
 
 /* ------------------------------------------------------------------------- */

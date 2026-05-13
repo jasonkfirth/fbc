@@ -388,12 +388,16 @@ TOOLCHAIN_FBRTCFLAGS :=
 TOOLCHAIN_FBRTLFLAGS :=
 TOOLCHAIN_FBC_ENV :=
 
-ifneq ($(filter cygwin win32 win64,$(TARGET_OS)),)
-  # Newer GCC range analysis is noisy on fbc-generated compiler C code.
-  # Keep this scoped to the fbc driver so C runtime and library warnings
-  # remain visible.
+ifneq ($(filter cygwin darwin win32 win64,$(TARGET_OS)),)
+  # Newer GCC range analysis is noisy on fbc-generated C code.  Keep this
+  # scoped to generated compiler/runtime C so handwritten C warnings remain
+  # visible.
   TOOLCHAIN_FBCFLAGS += -Wc -Wno-maybe-uninitialized
   TOOLCHAIN_FBCFLAGS += -Wc -Wno-type-limits
+  TOOLCHAIN_FBRTCFLAGS += -Wc -Wno-maybe-uninitialized
+  TOOLCHAIN_FBRTCFLAGS += -Wc -Wno-type-limits
+  TOOLCHAIN_FBRTLFLAGS += -Wc -Wno-maybe-uninitialized
+  TOOLCHAIN_FBRTLFLAGS += -Wc -Wno-type-limits
 endif
 
 
@@ -424,13 +428,38 @@ DARWIN_CC_IS_CLANG := $(strip $(shell $(CC) -dM -E -x c /dev/null 2>/dev/null | 
 DARWIN_NCURSES_CFLAGS := $(strip $(shell pkg-config --cflags ncurses 2>/dev/null))
 DARWIN_LIBFFI_CFLAGS := $(strip $(shell pkg-config --cflags libffi 2>/dev/null))
 DARWIN_PKG_LDFLAGS := $(strip $(shell pkg-config --libs-only-L ncurses libffi 2>/dev/null))
+
+#
+# Homebrew dylibs are often built with a newer minimum macOS version than
+# FreeBASIC's baseline target.  When the compiler links against those dylibs,
+# the resulting binary cannot run below their own minimum anyway.  Raise the
+# default deployment target to match the linked dependency floor instead of
+# letting ld64 print a misleading "built for newer version" warning.
+#
+DARWIN_PKG_LIBDIRS := $(patsubst -L%,%,$(filter -L%,$(DARWIN_PKG_LDFLAGS)))
+DARWIN_PKG_MIN_DEPLOYMENT_TARGET := $(strip $(shell \
+  printf '%s\n' $(DARWIN_PKG_LIBDIRS) \
+  | while IFS= read -r d; do \
+      [ -n "$$d" ] || continue; \
+      for f in "$$d"/libncurses*.dylib "$$d"/libffi*.dylib; do \
+        [ -f "$$f" ] || continue; \
+        otool -l "$$f" 2>/dev/null \
+        | awk '/LC_BUILD_VERSION/{inbuild=1; next} inbuild && /minos/{print $$2; exit} /^Load command/{inbuild=0}'; \
+      done; \
+    done \
+  | awk -F. 'NF { major=$$1+0; minor=$$2+0; patch=$$3+0; if ((major > best_major) || (major == best_major && minor > best_minor) || (major == best_major && minor == best_minor && patch > best_patch)) { best=$$0; best_major=major; best_minor=minor; best_patch=patch; } } END { if (best != "") print best; }' \
+))
 DARWIN_DEPLOYMENT_TARGET ?= $(MACOSX_DEPLOYMENT_TARGET)
 ifeq ($(strip $(DARWIN_DEPLOYMENT_TARGET)),)
   ifeq ($(TARGET_ARCH),aarch64)
-    DARWIN_DEPLOYMENT_TARGET := 11.0
+    DARWIN_BASE_DEPLOYMENT_TARGET := 11.0
   else
-    DARWIN_DEPLOYMENT_TARGET := 10.4
+    DARWIN_BASE_DEPLOYMENT_TARGET := 10.5
   endif
+  DARWIN_DEPLOYMENT_TARGET := $(strip $(shell \
+    printf '%s\n%s\n' '$(DARWIN_BASE_DEPLOYMENT_TARGET)' '$(DARWIN_PKG_MIN_DEPLOYMENT_TARGET)' \
+    | awk -F. 'NF { major=$$1+0; minor=$$2+0; patch=$$3+0; if ((major > best_major) || (major == best_major && minor > best_minor) || (major == best_major && minor == best_minor && patch > best_patch)) { best=$$0; best_major=major; best_minor=minor; best_patch=patch; } } END { print best; }' \
+  ))
 endif
 
 TOOLCHAIN_CFLAGS   += $(DARWIN_NCURSES_CFLAGS) $(DARWIN_LIBFFI_CFLAGS)
@@ -458,7 +487,23 @@ ifneq ($(strip $(DARWIN_DEPLOYMENT_TARGET)),)
   TOOLCHAIN_CFLAGS   += -mmacosx-version-min=$(DARWIN_DEPLOYMENT_TARGET)
   TOOLCHAIN_CXXFLAGS += -mmacosx-version-min=$(DARWIN_DEPLOYMENT_TARGET)
   TOOLCHAIN_LDFLAGS  += -mmacosx-version-min=$(DARWIN_DEPLOYMENT_TARGET)
+  TOOLCHAIN_FBCFLAGS += -d FB_DARWIN_DEFAULT_DEPLOYMENT_TARGET=\"$(DARWIN_DEPLOYMENT_TARGET)\"
   TOOLCHAIN_FBC_ENV  += MACOSX_DEPLOYMENT_TARGET='$(DARWIN_DEPLOYMENT_TARGET)'
+
+  #
+  # fbc-driven build steps need the same deployment target at the generated-C
+  # and assembler stages. Without this, modern clang emits object metadata for
+  # the SDK version and ld64 warns when the final executable targets older
+  # macOS. The builtin control is scoped to generated compiler/runtime C:
+  # fbc compiles with -nostdinc and declares C runtime entry points itself.
+  #
+  DARWIN_FBC_STAGE_FLAGS := \
+    -Wc -mmacosx-version-min=$(DARWIN_DEPLOYMENT_TARGET) \
+    -Wa -mmacosx-version-min=$(DARWIN_DEPLOYMENT_TARGET) \
+    -Wc -fno-builtin
+  TOOLCHAIN_FBCFLAGS   += $(DARWIN_FBC_STAGE_FLAGS)
+  TOOLCHAIN_FBRTCFLAGS += $(DARWIN_FBC_STAGE_FLAGS)
+  TOOLCHAIN_FBRTLFLAGS += $(DARWIN_FBC_STAGE_FLAGS)
 endif
 
 ifneq ($(strip $(DARWIN_SDKROOT)),)

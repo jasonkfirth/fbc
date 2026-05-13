@@ -11,6 +11,7 @@
 '' Responsibilities:
 ''
 ''     - provide standard platform hooks for the JS target
+''     - choose Emscripten's linker driver
 ''     - reserve a clear place for future Emscripten link/library behavior
 ''
 '' This file intentionally does NOT contain:
@@ -25,6 +26,15 @@
 
 private function fbcJsPlatformIsSelected( ) as integer
 	function = (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS)
+end function
+
+private function fbcJsPlatformGetLinkerTool( ) as integer
+	if( fbcJsPlatformIsSelected( ) = FALSE ) then
+		function = FBCTOOL_LD
+		exit function
+	end if
+
+	function = FBCTOOL_EMLD
 end function
 
 private sub fbcJsPlatformAddDefaultLibPaths( )

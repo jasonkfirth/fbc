@@ -39,7 +39,7 @@ SUITE( fbc_tests.overload_.bop_coercion2 )
 
 	#macro hGenTest( tp )
 		function func overload ( byval v as tp ) as TEST_RES
-			CU_ASSERT_EQUAL( v, TEST_L_VAL + TEST_R_VAL )
+			CU_ASSERT_EQUAL( v, cast( tp, TEST_L_VAL + TEST_R_VAL ) )
 			function = TEST_RES_##tp
 		end function
 	#endmacro
