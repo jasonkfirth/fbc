@@ -6,6 +6,7 @@
 # waste large amounts of disk space.
 
 .*
+FreeBASIC-*-source-bootstrap-*.tar.*
 *.install_manifest
 *.log
 *.tmp

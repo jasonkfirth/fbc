@@ -143,9 +143,11 @@ BUILDROOT="${BUILDROOT:-$ROOT/.build-debianubuntu}"
 WORKDIR="${WORKDIR:-$BUILDROOT/work}"
 OUTBASE="${OUTBASE:-$ROOT/out}"
 BUILDDIR="${BUILDDIR:-$WORKDIR/package}"
+SOURCE_COPY_EXCLUDES="$ROOT/mk/source-copy-excludes.rsync"
 
 VERSION="$(sed -n 's/^FBVERSION[[:space:]]*:=[[:space:]]*//p' mk/version.mk | head -n1)"
 [ -n "$VERSION" ] || die "could not determine FBVERSION"
+[ -f "$SOURCE_COPY_EXCLUDES" ] || die "missing source copy excludes: $SOURCE_COPY_EXCLUDES"
 
 ARCH="$(dpkg --print-architecture 2>/dev/null || true)"
 [ -n "$ARCH" ] || die "could not detect Debian architecture"
@@ -267,6 +269,29 @@ disable_android_if_sdk_unavailable() {
 
     echo "==> disabling Android package profile because APT cannot install the required Android SDK/NDK packages"
     ANDROID=0
+}
+
+assert_orig_tarball_clean() {
+    local archive="$1"
+    local bad_entry
+
+    bad_entry="$(
+        tar -tJf "$archive" |
+        awk '
+            $0 ~ /^[^/]+\/(\.build-alpine|\.build-debianubuntu|\.codex|\.git|bin|dist|lib\/freebasic|obj|out|package-root[^/]*|packages|pkgroot[^/]*|stage|tmp)(\/|$)/ {
+                print
+                exit
+            }
+            $0 ~ /^([^/]+\/)+obj\// {
+                print
+                exit
+            }
+        '
+    )"
+
+    if [ -n "$bad_entry" ]; then
+        die "orig tarball contains generated build content: $bad_entry"
+    fi
 }
 
 BOOTSTRAP_TAR="FreeBASIC-${VERSION}-source-bootstrap-${BOOTKEY}.tar.xz"
@@ -454,21 +479,9 @@ package_current_target() {
     run mkdir -p "$BUILDDIR/$srcdir"
 
     run rsync -a --no-owner --no-group \
-        --delete \
-        --exclude '/.build-alpine/' \
-        --exclude '/.build-debianubuntu/' \
-        --exclude '/.codex/' \
-        --exclude '/FreeBASIC-*-source-bootstrap-*.tar.*' \
-        --exclude '/bin/' \
-        --exclude '/bootstrap/' \
-        --exclude '/lib/freebasic/' \
-        --exclude '/obj/' \
-        --exclude '/src/*/obj/' \
-        --exclude '/out/' \
-        --exclude '/stage/' \
-        --exclude '/tmp/' \
-        --exclude '/tests/*.log' \
-        --exclude '/tests/*.tmp' \
+        --delete --delete-excluded --prune-empty-dirs \
+        --exclude-from "$SOURCE_COPY_EXCLUDES" \
+        --exclude '/bootstrap/*/' \
         "$ROOT/" "$BUILDDIR/$srcdir/"
 
     run mkdir -p "$BUILDDIR/$srcdir/bootstrap/$BOOTKEY"
@@ -493,11 +506,9 @@ package_current_target() {
     rm -f "$origtar"
     run tar -cJf "$origtar" \
         --exclude="$srcdir/debian" \
-        --exclude="$srcdir/.build-alpine" \
-        --exclude="$srcdir/.build-debianubuntu" \
-        --exclude="$srcdir/out" \
-        --exclude="$srcdir/stage" \
         "$srcdir"
+
+    assert_orig_tarball_clean "$origtar"
 
     cd "$srcdir"
 
