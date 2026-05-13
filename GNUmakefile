@@ -163,8 +163,6 @@ sfxlib: | maybe-prereqs
 
 bootstrap: | maybe-prereqs
 bootstrap-minimal: | maybe-prereqs
-bootstrap-emit: | maybe-prereqs
-bootstrap-emit-matrix: | maybe-prereqs
 bootstrap-dist-target: | maybe-prereqs
 bootstrap-dist: | maybe-prereqs
 bootstrap-dist-arm: | maybe-prereqs
@@ -199,6 +197,9 @@ compiler: | maybe-build-fbc
 compiler-js: | maybe-build-fbc
 compiler-android: | maybe-build-fbc
 fbrt: | maybe-build-fbc
+
+# Source emission only needs a runnable FreeBASIC compiler.  The emitted C is
+# written for the requested target, but no target C compiler is invoked here.
 bootstrap-emit: | maybe-build-fbc
 bootstrap-emit-matrix: | maybe-build-fbc
 unit-tests: | maybe-build-fbc

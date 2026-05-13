@@ -155,14 +155,16 @@ GFX_TRUECOLOR="$OUT_DIR/gfx-darwin-truecolor-smoke"
 GFX_SCREEN_MODES="$OUT_DIR/gfx-darwin-screen-modes-smoke"
 SFX_PLAYBACK="$OUT_DIR/sfx-coreaudio-smoke"
 SFX_CAPTURE="$OUT_DIR/sfx-capture-smoke"
+SFX_DUMMY="$OUT_DIR/sfx-dummy-smoke"
 
 compile_smoke "$ROOT_DIR/tests/macos/gfx-darwin-paletted-smoke.bas" "$GFX_PALETTED"
 compile_smoke "$ROOT_DIR/tests/macos/gfx-darwin-truecolor-smoke.bas" "$GFX_TRUECOLOR"
 compile_smoke "$ROOT_DIR/tests/macos/gfx-darwin-screen-modes-smoke.bas" "$GFX_SCREEN_MODES"
 compile_smoke "$ROOT_DIR/tests/macos/sfx-coreaudio-smoke.bas" "$SFX_PLAYBACK"
 compile_smoke "$ROOT_DIR/tests/macos/sfx-capture-smoke.bas" "$SFX_CAPTURE"
+compile_smoke "$ROOT_DIR/tests/macos/sfx-dummy-smoke.bas" "$SFX_DUMMY"
 
-rm -f "$OUT_DIR"/gfx-screen-*.ppm "$OUT_DIR/gfx-paletted.ppm" "$OUT_DIR/gfx-truecolor.ppm" "$OUT_DIR/sfx-coreaudio.txt"
+rm -f "$OUT_DIR"/gfx-screen-*.ppm "$OUT_DIR/gfx-paletted.ppm" "$OUT_DIR/gfx-truecolor.ppm" "$OUT_DIR/sfx-coreaudio.txt" "$OUT_DIR/sfx-dummy.txt"
 
 run_smoke "gfx paletted" env FBGFX=Darwin FBGFX_DARWIN_DUMP="$OUT_DIR/gfx-paletted.ppm" "$GFX_PALETTED"
 if [[ "$SMOKE_RESULT" == "passed" ]]; then
@@ -209,6 +211,14 @@ if [[ "$SMOKE_RESULT" == "passed" ]]; then
     check_audio_dump "$OUT_DIR/sfx-coreaudio.txt"
 fi
 
+run_smoke "sfx dummy playback" \
+    env SFXLIB_DRIVER_DUMP="$OUT_DIR/sfx-dummy.txt" SFXLIB_DRIVER_DUMP_FRAMES=4096 "$SFX_DUMMY"
+if [[ "$SMOKE_RESULT" == "passed" ]]; then
+    check_audio_dump "$OUT_DIR/sfx-dummy.txt"
+fi
+
 run_smoke "sfx CoreAudio capture" env SFXLIB_DRIVER=CoreAudio "$SFX_CAPTURE"
 
 echo "macos-smoke: all runnable smoke tests passed"
+
+# end of macos-smoke-freebasic.sh

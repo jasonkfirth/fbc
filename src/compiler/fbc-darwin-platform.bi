@@ -54,8 +54,45 @@ private function fbcDarwinPlatformGetLinkerTool( ) as integer
 end function
 
 ''
-'' Compiler-driver linker options
+'' Compiler-driver options
 ''
+
+private function fbcDarwinPlatformGetSdkRoot( ) as string
+	dim as string sdkroot = environ( "SDKROOT" )
+
+	if( len( sdkroot ) = 0 ) then
+		exit function
+	end if
+
+	function = sdkroot
+end function
+
+private sub fbcDarwinPlatformAddSdkRoot( byref ldcline as string )
+	if( fbcDarwinPlatformIsSelected( ) = FALSE ) then
+		exit sub
+	end if
+
+	if( len( fbc.sysroot ) > 0 ) then
+		''
+		'' An explicit -sysroot from the user is already emitted by the shared
+		'' linker path.  Do not also inject the package/default SDK.
+		''
+		exit sub
+	end if
+
+	dim as string sdkroot = fbcDarwinPlatformGetSdkRoot( )
+	if( len( sdkroot ) = 0 ) then
+		exit sub
+	end if
+
+	''
+	'' Packaged macOS builds carry an SDK because Homebrew GCC does not know
+	'' where Apple's .tbd stubs live.  The SDK is only a compile/link-time
+	'' search root; linked binaries still record normal /usr/lib and /System
+	'' framework install names.
+	''
+	ldcline += " -Wl,-syslibroot," + QUOTE + sdkroot + QUOTE
+end sub
 
 private function fbcDarwinPlatformGetDeploymentTarget( ) as string
 	dim as string version = environ( "MACOSX_DEPLOYMENT_TARGET" )
@@ -130,10 +167,12 @@ private sub fbcDarwinPlatformAddAssemblerOptions( byref ascline as string )
 	ascline += "-mmacosx-version-min=" + version + " "
 end sub
 
-private sub fbcDarwinPlatformAddDeploymentTarget( byref ldcline as string )
+private sub fbcDarwinPlatformAddCompilerDriverLinkerOptions( byref ldcline as string )
 	if( fbcDarwinPlatformIsSelected( ) = FALSE ) then
 		exit sub
 	end if
+
+	fbcDarwinPlatformAddSdkRoot( ldcline )
 
 	dim as string version = fbcDarwinPlatformGetDeploymentTarget( )
 	if( len( version ) = 0 ) then

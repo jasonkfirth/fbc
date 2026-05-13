@@ -1513,7 +1513,7 @@ private function hLinkFiles( ) as integer
 
 	end select
 
-	fbcDarwinPlatformAddDeploymentTarget( ldcline )
+	fbcDarwinPlatformAddCompilerDriverLinkerOptions( ldcline )
 
 	'' This is required for 64-bit modules on *nix-y platforms
 	'' for the unwind tables to have any effect

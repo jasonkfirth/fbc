@@ -43,6 +43,8 @@ Main routines:
 
 Design note:
 - CoreAudio queue buffers do not pull fresh mixed audio on their own in this backend, so a small worker thread now calls `fb_sfxUpdate()` for unattended playback in the same spirit as the Linux fix
+- The Darwin driver registry also exposes the shared null driver, giving tests
+  and headless/QEMU runs a deterministic audio path without opening CoreAudio
 
 ### `sfx_capture_coreaudio.c`
 CoreAudio capture driver.

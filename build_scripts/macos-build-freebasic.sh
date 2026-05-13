@@ -241,6 +241,21 @@ ensure_clt() {
     die "Apple Command Line Tools are required before continuing"
 }
 
+find_macos_sdkroot() {
+    local sdkroot
+
+    sdkroot="$(
+        xcrun --sdk macosx --show-sdk-path 2>/dev/null \
+            || xcrun --show-sdk-path 2>/dev/null \
+            || true
+    )"
+
+    [ -n "$sdkroot" ] || return 1
+    [ -d "$sdkroot/usr/lib" ] || return 1
+
+    printf '%s\n' "$sdkroot"
+}
+
 ensure_clt
 BREW_PREFIX=""
 LIBFFI_PREFIX=""
@@ -482,7 +497,7 @@ bootstrap_if_needed() {
 ##############################################################################
 
 bundle_toolchain_into_stage() {
-    local stage_prefix stage_libexec bundle_root gcc_root libffi_root ncurses_root
+    local stage_prefix stage_libexec bundle_root gcc_root libffi_root ncurses_root sdk_root
     local real_fbc wrapper_fbc helper_script old_ncurses bundled_ncurses
 
     stage_prefix="${STAGE}${PREFIX}"
@@ -497,19 +512,23 @@ bundle_toolchain_into_stage() {
     gcc_root="$(cd "$(brew --prefix gcc)" && pwd -P)"
     libffi_root="$(cd "$LIBFFI_PREFIX" && pwd -P)"
     ncurses_root="$(cd "$NCURSES_PREFIX" && pwd -P)"
+    sdk_root="$(find_macos_sdkroot)" || die "macOS SDK not found through xcrun"
 
     msg "bundling macOS toolchain into staged package"
     run rm -rf "$bundle_root"
     copy_tree_preserve "$gcc_root" "${bundle_root}/gcc"
     copy_tree_preserve "$libffi_root" "${bundle_root}/libffi"
     copy_tree_preserve "$ncurses_root" "${bundle_root}/ncurses"
+    copy_tree_preserve "$sdk_root" "${bundle_root}/sdk/MacOSX.sdk"
 
     real_fbc="${stage_libexec}/fbc-real"
     wrapper_fbc="${stage_prefix}/bin/fbc"
     helper_script="${stage_prefix}/bin/fbc-setup-darwin"
 
     run mkdir -p "$stage_libexec"
-    run mv "$wrapper_fbc" "$real_fbc"
+    if [ ! -x "$real_fbc" ] || ! sed -n '1p' "$wrapper_fbc" 2>/dev/null | grep -q '^#!/usr/bin/env bash'; then
+        run mv "$wrapper_fbc" "$real_fbc"
+    fi
 
     cat > "$wrapper_fbc" <<EOF
 #!/usr/bin/env bash
@@ -520,15 +539,21 @@ PREFIX_ROOT="\$(cd "\$SELF_DIR/.." && pwd)"
 FBROOT="\$PREFIX_ROOT/lib/freebasic"
 TOOLCHAIN_ROOT="\$FBROOT/toolchain"
 GCC_ROOT="\$TOOLCHAIN_ROOT/gcc"
-LIBFFI_ROOT="\$TOOLCHAIN_ROOT/libffi"
 NCURSES_ROOT="\$TOOLCHAIN_ROOT/ncurses"
+SDK_ROOT="\$TOOLCHAIN_ROOT/sdk/MacOSX.sdk"
 
 export PATH="\$GCC_ROOT/bin:\$PATH"
 export GCC="\$GCC_ROOT/bin/$(basename "$TOOL_CC")"
-export LIBRARY_PATH="\$LIBFFI_ROOT/lib:\$NCURSES_ROOT/lib\${LIBRARY_PATH:+:\$LIBRARY_PATH}"
-export CPATH="\$LIBFFI_ROOT/include:\$NCURSES_ROOT/include\${CPATH:+:\$CPATH}"
-export PKG_CONFIG_PATH="\$LIBFFI_ROOT/lib/pkgconfig:\$NCURSES_ROOT/lib/pkgconfig\${PKG_CONFIG_PATH:+:\$PKG_CONFIG_PATH}"
 export DYLD_LIBRARY_PATH="\$NCURSES_ROOT/lib\${DYLD_LIBRARY_PATH:+:\$DYLD_LIBRARY_PATH}"
+
+if [ -d "\$SDK_ROOT/usr/lib" ]; then
+    export SDKROOT="\$SDK_ROOT"
+elif command -v xcrun >/dev/null 2>&1; then
+    SDKROOT_CANDIDATE="\$(xcrun --sdk macosx --show-sdk-path 2>/dev/null || xcrun --show-sdk-path 2>/dev/null || true)"
+    if [ -n "\$SDKROOT_CANDIDATE" ] && [ -d "\$SDKROOT_CANDIDATE/usr/lib" ]; then
+        export SDKROOT="\$SDKROOT_CANDIDATE"
+    fi
+fi
 
 exec "\$FBROOT/libexec/fbc-real" -prefix "\$PREFIX_ROOT" "\$@"
 EOF
@@ -651,7 +676,9 @@ fi
 if [ "$DO_PACKAGE" -eq 1 ]; then
     [ -x "$STAGE$PREFIX/bin/fbc" ] || die "staged compiler missing: $STAGE$PREFIX/bin/fbc"
 
-    if [ ! -x "$STAGE$PREFIX/lib/freebasic/libexec/fbc-real" ] || [ ! -d "$STAGE$PREFIX/lib/freebasic/toolchain" ]; then
+    if [ ! -x "$STAGE$PREFIX/lib/freebasic/libexec/fbc-real" ] || \
+        [ ! -d "$STAGE$PREFIX/lib/freebasic/toolchain" ] || \
+        [ ! -d "$STAGE$PREFIX/lib/freebasic/toolchain/sdk/MacOSX.sdk/usr/lib" ]; then
         bundle_toolchain_into_stage
     fi
 

@@ -162,13 +162,18 @@ endif
 # Verify cross compiler exists
 ##############################################################################
 
+BOOTSTRAP_EMIT_GOALS := bootstrap-emit bootstrap-emit-matrix bootstrap-emit-source-response
+BOOTSTRAP_EMIT_GOAL  := $(filter $(BOOTSTRAP_EMIT_GOALS),$(MAKECMDGOALS))
+
 ifneq ($(strip $(BUILD_PREFIX)),)
 
 PREFIXED_GCC := $(BUILD_PREFIX)gcc
 
 ifeq ($(shell command -v $(PREFIXED_GCC) 2>/dev/null),)
 
+ifeq ($(strip $(BOOTSTRAP_EMIT_GOAL)),)
 $(warning Requested cross toolchain '$(PREFIXED_GCC)' not found)
+endif
 
 # fallback to host compiler
 BUILD_PREFIX :=

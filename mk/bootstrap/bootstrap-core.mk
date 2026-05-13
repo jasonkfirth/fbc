@@ -17,6 +17,7 @@ BOOTSTRAP_FBC := bootstrap/fbc$(EXEEXT)
  bootstrap-minimal \
  bootstrap-seed-peer \
  bootstrap-emit \
+ clean-bootstrap-minimal-runtime \
  clean-bootstrap \
  clean-bootstrap-sources
 
@@ -123,6 +124,25 @@ bootstrap-minimal:
 	mv -f $(FBC_EXE).new $(FBC_EXE)
 
 	mkdir -p "$(libdir)"
+
+	@echo "==> Removing bootstrap-minimal runtime byproducts"
+
+	$(MAKE) clean-bootstrap-minimal-runtime
+
+#
+# bootstrap-minimal deliberately builds a stripped runtime so the compiler can
+# be constructed with the smallest possible host dependency set.
+#
+# Those runtime objects are written to the normal target object/archive paths.
+# Since make does not track command-line feature-policy changes, leaving them
+# in place can cause a later full build to reuse objects compiled with
+# DISABLE_FFI, DISABLE_GFX, DISABLE_SFX, or similar bootstrap-only flags.
+#
+# Remove the minimal runtime artifacts immediately after the bootstrap compiler
+# is installed.  The compiler remains available, and any later all/libs build
+# will rebuild the runtime with the ordinary feature policy.
+#
+clean-bootstrap-minimal-runtime: clean-libs
 
 ##############################################################################
 # Last-resort peer bootstrap seeding
