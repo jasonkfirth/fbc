@@ -46,6 +46,19 @@ static int g_capture_running = 0;
 
 void fb_sfxPlatformCaptureStop(void);
 
+void fb_sfxDarwinCaptureEnsureLinked(void)
+{
+    /*
+        Darwin links sfxlib as a static archive.  The generic capture ring
+        object also provides weak fallback capture hooks, so a program that
+        uses capture can otherwise satisfy those symbols before the archive
+        loader has a reason to pull in this CoreAudio object.
+
+        The playback driver references this no-op helper to keep the Darwin
+        capture implementation attached to the Darwin backend.
+    */
+}
+
 static int fb_sfxDarwinCaptureDebugEnabled(void)
 {
     const char *env = getenv("SFXLIB_DARWIN_DEBUG");

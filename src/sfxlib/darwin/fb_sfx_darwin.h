@@ -31,6 +31,7 @@ int fb_sfxDarwinWrite(float *buffer, int frames);
 int fb_sfxDarwinRunning(void);
 int fb_sfxDarwinActivate(int rate, int channels, int buffer_frames);
 void fb_sfxDarwinDeactivate(void);
+void fb_sfxDarwinCaptureEnsureLinked(void);
 void fb_sfxPlatformCaptureStop(void);
 
 #ifdef __cplusplus

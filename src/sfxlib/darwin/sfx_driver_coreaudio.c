@@ -406,6 +406,8 @@ int fb_sfxDarwinInit(void)
     if (fb_sfx_darwin.initialized)
         return 0;
 
+    fb_sfxDarwinCaptureEnsureLinked();
+
     if (!fb_sfxDarwinHasOutputDevice())
         return -1;
 
