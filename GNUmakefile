@@ -64,13 +64,13 @@ include $(mkpath)/platform-features.mk
 include $(mkpath)/feature-policy.mk
 
 ##############################################################################
-# Toolchain realization
+# Toolchain selection and realization
 ##############################################################################
 
+include $(mkpath)/compiler-config.mk
 include $(mkpath)/toolchain-flags.mk
 include $(mkpath)/host-tools.mk
 include $(mkpath)/os-flags.mk
-include $(mkpath)/compiler-config.mk
 
 ##############################################################################
 # Naming + layout

@@ -46,7 +46,7 @@ define pr_check_pc
 endef
 
 define pr_check_hdr
-	printf "%s\n" "#include <$(1)>" | $(PR_CC) -E - >/dev/null 2>&1 || \
+	printf "%s\n" "#include <$(1)>" | $(PR_CC_RAW) $(CPPFLAGS) $(ALLCFLAGS) -E - >/dev/null 2>&1 || \
 	$(call pr_error_block,Missing required header: $(1))
 endef
 

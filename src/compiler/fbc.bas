@@ -1021,7 +1021,12 @@ private function hLinkFiles( ) as integer
 			end if
 		end if
 
-	case FB_COMPTARGET_LINUX, FB_COMPTARGET_HAIKU, FB_COMPTARGET_DARWIN, _
+	case FB_COMPTARGET_DARWIN
+		if( fbcDarwinPlatformAddDynamicLibOptions( ldcline, dllname ) = FALSE ) then
+			exit function
+		end if
+
+	case FB_COMPTARGET_LINUX, FB_COMPTARGET_HAIKU, _
 	     FB_COMPTARGET_FREEBSD, FB_COMPTARGET_OPENBSD, _
 	     FB_COMPTARGET_NETBSD, FB_COMPTARGET_DRAGONFLY, _
 	     FB_COMPTARGET_SOLARIS, FB_COMPTARGET_ANDROID
@@ -1111,9 +1116,11 @@ private function hLinkFiles( ) as integer
 		'' But able to have shared library generated successfully afterward
 		if( (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB) or _
 			fbGetOption( FB_COMPOPT_EXPORT ) ) and _
-			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_SOLARIS) then
+			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_SOLARIS) and _
+			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) then
 			ldcline += " --export-dynamic"
 		end if
+		fbcDarwinPlatformAddExportDynamic( ldcline )
 
 	case FB_COMPTARGET_XBOX
 		'' nxdk-link is lld's MSVC-compatible linker frontend.  The common
@@ -1313,22 +1320,26 @@ private function hLinkFiles( ) as integer
 		FB_COMPTARGET_NETBSD, FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS
 
 		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_EXECUTABLE) then
-			if( fbGetOption( FB_COMPOPT_PROFILE ) ) then
-				select case as const fbGetOption( FB_COMPOPT_TARGET )
-				case FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD
-					ldcline += hFindLib( "gcrt0.o" )
-				case FB_COMPTARGET_HAIKU
-					'' no gcrt1.o on Haiku
-				case else
+				if( fbGetOption( FB_COMPOPT_PROFILE ) ) then
+					select case as const fbGetOption( FB_COMPOPT_TARGET )
+					case FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD
+						ldcline += hFindLib( "gcrt0.o" )
+					case FB_COMPTARGET_DARWIN
+						'' Darwin's compiler driver supplies the startup objects.
+					case FB_COMPTARGET_HAIKU
+						'' no gcrt1.o on Haiku
+					case else
 					ldcline += hFindLib( "gcrt1.o" )
 				end select
-			else
-				select case as const fbGetOption( FB_COMPOPT_TARGET )
-				case FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD
-					ldcline += hFindLib( "crt0.o" )
-				case FB_COMPTARGET_HAIKU
-					'' no crt1.o on Haiku
-				case else
+				else
+					select case as const fbGetOption( FB_COMPOPT_TARGET )
+					case FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD
+						ldcline += hFindLib( "crt0.o" )
+					case FB_COMPTARGET_DARWIN
+						'' Darwin's compiler driver supplies the startup objects.
+					case FB_COMPTARGET_HAIKU
+						'' no crt1.o on Haiku
+					case else
 					ldcline += hFindLib( "crt1.o" )
 				end select
 			end if
@@ -1502,9 +1513,7 @@ private function hLinkFiles( ) as integer
 
 	end select
 
-	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_DARWIN ) then
-		ldcline += " -macosx_version_min 10.4"
-	end if
+	fbcDarwinPlatformAddDeploymentTarget( ldcline )
 
 	'' This is required for 64-bit modules on *nix-y platforms
 	'' for the unwind tables to have any effect
@@ -1512,8 +1521,7 @@ private function hLinkFiles( ) as integer
 	select case as const fbGetOption( FB_COMPOPT_TARGET )
 	case FB_COMPTARGET_LINUX, FB_COMPTARGET_HAIKU, FB_COMPTARGET_FREEBSD, _
 		FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD, _
-		FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS, _
-		FB_COMPTARGET_DARWIN
+		FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS
 		dim as long outtype = fbGetOption( FB_COMPOPT_OUTTYPE )
 		if outtype = FB_OUTTYPE_EXECUTABLE OrElse outtype = FB_OUTTYPE_DYNAMICLIB Then
 			dim as long cpufamily = fbGetCpuFamily( )
@@ -3510,6 +3518,22 @@ private sub fbcDetermineMainName( )
 	end if
 end sub
 
+private function hGetTempFileTag( ) as string
+	static as string tag
+
+	if( len( tag ) = 0 ) then
+		''
+		'' Intermediate backend files are deleted automatically unless the user
+		'' asked to keep them.  Keep their names away from normal source names
+		'' such as foo.c so a compile in the source directory cannot overwrite
+		'' and then delete an existing file.
+		''
+		tag = ".fbc-" + hex( cuint( timer( ) * 1000.0 ), 8 )
+	end if
+
+	function = tag
+end function
+
 private function hCompileStage2DirectlyToObj( ) as integer
 	select case( fbGetOption( FB_COMPOPT_TARGET ) )
 	case FB_COMPTARGET_JS, FB_COMPTARGET_XBOX
@@ -3531,6 +3555,16 @@ private function hGetAsmName _
 
 	'' Based on the objfile name so it's also affected by -o
 	asmfile = hStripExt( *module->objfile )
+
+	if( stage = 1 ) then
+		if( (fbc.keepasm = FALSE) and (fbc.emitasmonly = FALSE) ) then
+			asmfile += hGetTempFileTag( )
+		end if
+	elseif( hCompileStage2DirectlyToObj( ) = FALSE ) then
+		if( (fbc.keepfinalasm = FALSE) and (fbc.emitfinalasmonly = FALSE) ) then
+			asmfile += hGetTempFileTag( )
+		end if
+	end if
 
 	if( hCompileStage2DirectlyToObj( ) = FALSE ) then
 		ext = @".asm"

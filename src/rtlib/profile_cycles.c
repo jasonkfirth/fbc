@@ -31,9 +31,22 @@
 	#endif
 #endif
 
+#if defined(HOST_DARWIN)
+/*
+	Darwin's Mach-O assembler requires section names in "segment,section"
+	form, and section names are limited to 16 bytes.  It also exposes section
+	bounds through section$start/section$end symbols instead of the ELF
+	__start_/__stop_ symbols used by GNU ld.
+*/
+#define FB_PROFILE_CYCLE_SECTION "__DATA,fb_profcycdata"
+extern char __start_fb_profilecycledata[] __asm("section$start$__DATA$fb_profcycdata");
+extern char __stop_fb_profilecycledata[] __asm("section$end$__DATA$fb_profcycdata");
+#else
 /* profile section data */
+#define FB_PROFILE_CYCLE_SECTION "fb_profilecycledata"
 extern char __start_fb_profilecycledata[];
-extern char __stop_fb_profilecycledata;
+extern char __stop_fb_profilecycledata[];
+#endif
 
 /* profiler record ids - these indicate what the record is */
 enum FB_PROFILE_REDORD_ID
@@ -102,7 +115,7 @@ typedef struct _FB_PROFILER_CYCLES
 /* make sure there is at least one record in the profile data section */
 static FB_PROFILE_RECORD_VERSION
 __attribute__ ((aligned (16))) prof_data_version
-__attribute__((section("fb_profilecycledata"), used)) =
+__attribute__((section(FB_PROFILE_CYCLE_SECTION), used)) =
 	{
 		sizeof( FB_PROFILE_RECORD_VERSION ),
 		FB_PROFILE_RECORD_VERSION_ID,
@@ -302,7 +315,7 @@ static void hProfilerWriteReport( FB_PROFILER_CYCLES *prof )
 	}
 
 	data = (unsigned char *)&__start_fb_profilecycledata[0];
-	length = (ssize_t)&__stop_fb_profilecycledata - (ssize_t)&__start_fb_profilecycledata[0];
+	length = (ssize_t)&__stop_fb_profilecycledata[0] - (ssize_t)&__start_fb_profilecycledata[0];
 
 	count = hProfilerCountProcs( data, length );
 	if( count ) {

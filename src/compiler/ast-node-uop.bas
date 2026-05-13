@@ -108,6 +108,39 @@ private function hFloatConstFloor( byval f as double ) as double
 	#endif
 end function
 
+private sub hApplyFloatConstResultType( byval dtype as integer, byref f as double )
+	if( typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_SINGLE ) then
+		'' Float constants are stored as DOUBLE, but a folded SINGLE
+		'' operation must still match the runtime SINGLE helper.
+		dim as single s = f
+		f = s
+	end if
+end sub
+
+private function hFloatConstUopSingleMath _
+	( _
+		byval op as integer, _
+		byval f as single _
+	) as double
+
+	dim as single s = 0.0f
+
+	select case as const( op )
+	case AST_OP_SIN   : s =  sin( f )
+	case AST_OP_ASIN  : s = asin( f )
+	case AST_OP_COS   : s =  cos( f )
+	case AST_OP_ACOS  : s = acos( f )
+	case AST_OP_TAN   : s =  tan( f )
+	case AST_OP_ATAN  : s =  atn( f )
+	case AST_OP_SQRT  : s =  sqr( f )
+	case AST_OP_LOG   : s =  log( f )
+	case AST_OP_EXP   : s =  exp( f )
+	case else         : assert( FALSE )
+	end select
+
+	function = s
+end function
+
 private function hConstUop _
 	( _
 		byval op as integer, _
@@ -124,25 +157,46 @@ private function hConstUop _
 
 		d = l->val.f
 		dim as integer hadfrac = any
-		select case as const( op )
-		case AST_OP_NEG   : d =      -d
-		case AST_OP_ABS   : d =  abs( d )
-		case AST_OP_SGN   : d =  hFloatConstSgn( d )
-		case AST_OP_SIN   : d =  sin( d )
-		case AST_OP_ASIN  : d = asin( d )
-		case AST_OP_COS   : d =  cos( d )
-		case AST_OP_ACOS  : d = acos( d )
-		case AST_OP_TAN   : d =  tan( d )
-		case AST_OP_ATAN  : d =  atn( d )
-		case AST_OP_SQRT  : d =  sqr( d )
-		case AST_OP_LOG   : d =  log( d )
-		case AST_OP_EXP   : d =  exp( d )
-		case AST_OP_FLOOR : d =  hFloatConstFloor( d )
-		case AST_OP_FIX
-			d = hFloatConstFix( d, hadfrac )
-		case AST_OP_FRAC  : d = frac( d )
-		case else         : assert( FALSE )
-		end select
+		if( typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_SINGLE ) then
+			select case as const( op )
+			case AST_OP_SIN, AST_OP_ASIN, AST_OP_COS, AST_OP_ACOS, _
+			     AST_OP_TAN, AST_OP_ATAN, AST_OP_SQRT, AST_OP_LOG, _
+			     AST_OP_EXP
+				d = hFloatConstUopSingleMath( op, d )
+			case else
+				select case as const( op )
+				case AST_OP_NEG   : d =      -d
+				case AST_OP_ABS   : d =  abs( d )
+				case AST_OP_SGN   : d =  hFloatConstSgn( d )
+				case AST_OP_FLOOR : d =  hFloatConstFloor( d )
+				case AST_OP_FIX
+					d = hFloatConstFix( d, hadfrac )
+				case AST_OP_FRAC  : d = frac( d )
+				case else         : assert( FALSE )
+				end select
+			end select
+		else
+			select case as const( op )
+			case AST_OP_NEG   : d =      -d
+			case AST_OP_ABS   : d =  abs( d )
+			case AST_OP_SGN   : d =  hFloatConstSgn( d )
+			case AST_OP_SIN   : d =  sin( d )
+			case AST_OP_ASIN  : d = asin( d )
+			case AST_OP_COS   : d =  cos( d )
+			case AST_OP_ACOS  : d = acos( d )
+			case AST_OP_TAN   : d =  tan( d )
+			case AST_OP_ATAN  : d =  atn( d )
+			case AST_OP_SQRT  : d =  sqr( d )
+			case AST_OP_LOG   : d =  log( d )
+			case AST_OP_EXP   : d =  exp( d )
+			case AST_OP_FLOOR : d =  hFloatConstFloor( d )
+			case AST_OP_FIX
+				d = hFloatConstFix( d, hadfrac )
+			case AST_OP_FRAC  : d = frac( d )
+			case else         : assert( FALSE )
+			end select
+		end if
+		hApplyFloatConstResultType( dtype, d )
 		l->val.f = d
 	else
 		i = l->val.i

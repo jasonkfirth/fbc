@@ -97,10 +97,30 @@ ifneq ($(findstring /,$(CC))$(findstring \,$(CC)),)
 TESTS_TOOLCHAIN_BINDIR := $(patsubst %/,%,$(dir $(CC)))
 endif
 
+TESTS_FBC_ENV_EXTRA :=
+ifeq ($(TESTS_HOST_OS),darwin)
+TESTS_DARWIN_SDKROOT := $(strip $(shell xcrun --sdk macosx --show-sdk-path 2>/dev/null || xcrun --show-sdk-path 2>/dev/null))
+TESTS_DARWIN_DEPLOYMENT_TARGET ?= $(MACOSX_DEPLOYMENT_TARGET)
+ifeq ($(strip $(TESTS_DARWIN_DEPLOYMENT_TARGET)),)
+  ifeq ($(TARGET_ARCH),aarch64)
+    TESTS_DARWIN_DEPLOYMENT_TARGET := 11.0
+  else
+    TESTS_DARWIN_DEPLOYMENT_TARGET := 10.4
+  endif
+endif
+ifneq ($(strip $(TESTS_DARWIN_DEPLOYMENT_TARGET)),)
+TESTS_FBC_ENV_EXTRA += MACOSX_DEPLOYMENT_TARGET='$(TESTS_DARWIN_DEPLOYMENT_TARGET)'
+endif
+ifneq ($(strip $(TESTS_DARWIN_SDKROOT)),)
+TESTS_FBC_ENV_EXTRA += SDKROOT='$(TESTS_DARWIN_SDKROOT)'
+endif
+endif
+
 ifeq ($(HOST),dos)
 TESTS_FBC_ENV :=
 else
 TESTS_FBC_ENV := env \
+	$(TESTS_FBC_ENV_EXTRA) \
 	PATH='$(if $(strip $(TESTS_TOOLCHAIN_BINDIR)),$(TESTS_TOOLCHAIN_BINDIR):)'"$$PATH" \
 	AS='$(AS)' \
 	AR='$(AR)' \

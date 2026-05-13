@@ -12,6 +12,7 @@ ifneq ($(findstring /,$(CC))$(findstring \,$(CC)),)
 TESTS_TOOLCHAIN_BINDIR := $(patsubst %/,%,$(dir $(CC)))
 endif
 TESTS_FBC_ENV := env \
+	$(TOOLCHAIN_FBC_ENV) \
 	PATH='$(if $(strip $(TESTS_TOOLCHAIN_BINDIR)),$(TESTS_TOOLCHAIN_BINDIR):)'"$$PATH" \
 	AS='$(AS)' \
 	AR='$(AR)' \

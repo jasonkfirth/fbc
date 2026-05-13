@@ -35,6 +35,7 @@ ifneq ($(strip $(TOOLCHAIN_BINDIR)),)
 TOOLCHAIN_PATH_ENV := env PATH='$(TOOLCHAIN_BINDIR):'$$PATH
 endif
 FBC_TOOL_ENV := env \
+	$(TOOLCHAIN_FBC_ENV) \
 	PATH='$(if $(strip $(TOOLCHAIN_BINDIR)),$(TOOLCHAIN_BINDIR):)'"$$PATH" \
 	AS='$(AS)' \
 	AR='$(AR)' \

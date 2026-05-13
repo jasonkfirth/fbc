@@ -242,8 +242,6 @@ ensure_clt() {
 }
 
 ensure_clt
-SDK_PATH="$(xcrun --sdk macosx --show-sdk-path 2>/dev/null || true)"
-
 BREW_PREFIX=""
 LIBFFI_PREFIX=""
 NCURSES_PREFIX=""
@@ -318,7 +316,6 @@ resolve_cross_gcc_toolchain() {
 }
 
 refresh_make_vars() {
-    local cc_basename cxx_basename
 
     BREW_PREFIX=""
     LIBFFI_PREFIX=""
@@ -330,36 +327,13 @@ refresh_make_vars() {
         NCURSES_PREFIX="$(brew --prefix ncurses 2>/dev/null || true)"
     fi
 
-    BASE_CPPFLAGS=""
-    BASE_CFLAGS=""
-    BASE_CXXFLAGS=""
-    BASE_LDFLAGS=""
     BASE_PKG_CONFIG_PATH=""
 
-    cc_basename="$(basename "$TOOL_CC" 2>/dev/null || printf '%s' "$TOOL_CC")"
-    cxx_basename="$(basename "$TOOL_CXX" 2>/dev/null || printf '%s' "$TOOL_CXX")"
-
-    # Homebrew GCC already carries a configured macOS sysroot. Passing an
-    # extra -isysroot here breaks Apple headers during rtlib/bootstrap builds.
-    if [ -n "$SDK_PATH" ] && [[ ! "$cc_basename" =~ ^gcc(-[0-9]+)?$ ]] && [[ ! "$cxx_basename" =~ ^g\+\+(-[0-9]+)?$ ]]; then
-        BASE_CFLAGS="${BASE_CFLAGS} -isysroot ${SDK_PATH}"
-        BASE_CXXFLAGS="${BASE_CXXFLAGS} -isysroot ${SDK_PATH}"
-        BASE_LDFLAGS="${BASE_LDFLAGS} -isysroot ${SDK_PATH}"
-    fi
-
     if [ -n "$LIBFFI_PREFIX" ]; then
-        BASE_CPPFLAGS="${BASE_CPPFLAGS} -I${LIBFFI_PREFIX}/include"
-        BASE_CFLAGS="${BASE_CFLAGS} -I${LIBFFI_PREFIX}/include"
-        BASE_CXXFLAGS="${BASE_CXXFLAGS} -I${LIBFFI_PREFIX}/include"
-        BASE_LDFLAGS="${BASE_LDFLAGS} -L${LIBFFI_PREFIX}/lib"
         BASE_PKG_CONFIG_PATH="${LIBFFI_PREFIX}/lib/pkgconfig"
     fi
 
     if [ -n "$NCURSES_PREFIX" ]; then
-        BASE_CPPFLAGS="${BASE_CPPFLAGS} -I${NCURSES_PREFIX}/include"
-        BASE_CFLAGS="${BASE_CFLAGS} -I${NCURSES_PREFIX}/include"
-        BASE_CXXFLAGS="${BASE_CXXFLAGS} -I${NCURSES_PREFIX}/include"
-        BASE_LDFLAGS="${BASE_LDFLAGS} -L${NCURSES_PREFIX}/lib"
         if [ -n "$BASE_PKG_CONFIG_PATH" ]; then
             BASE_PKG_CONFIG_PATH="${BASE_PKG_CONFIG_PATH}:"
         fi
@@ -369,10 +343,6 @@ refresh_make_vars() {
     MAKE_VARS=(
         "CC=${TOOL_CC}"
         "CXX=${TOOL_CXX}"
-        "CPPFLAGS=${BASE_CPPFLAGS}"
-        "CFLAGS=${BASE_CFLAGS}"
-        "CXXFLAGS=${BASE_CXXFLAGS}"
-        "LDFLAGS=${BASE_LDFLAGS}"
     )
 
     if [ "$TARGET_ARCH" = "$HOST_ARCH" ]; then
@@ -599,7 +569,10 @@ EOF
     old_ncurses="${NCURSES_PREFIX}/lib/libncursesw.6.dylib"
     bundled_ncurses="@executable_path/../toolchain/ncurses/lib/libncursesw.6.dylib"
     if command -v install_name_tool >/dev/null 2>&1 && [ -f "${bundle_root}/ncurses/lib/libncursesw.6.dylib" ]; then
-        run install_name_tool -change "$old_ncurses" "$bundled_ncurses" "$real_fbc"
+        echo "==> install_name_tool -change $old_ncurses $bundled_ncurses $real_fbc"
+        if ! install_name_tool -change "$old_ncurses" "$bundled_ncurses" "$real_fbc"; then
+            echo "WARNING: could not rewrite fbc-real's ncurses load path; the public fbc wrapper will use the bundled ncurses via DYLD_LIBRARY_PATH" >&2
+        fi
     fi
 }
 
@@ -686,10 +659,8 @@ if [ "$DO_PACKAGE" -eq 1 ]; then
     PKG_FILE="$OUTBASE/${PKG_BASENAME}.pkg"
     INSTALL_SH="$OUTBASE/install.sh"
 
-    msg "creating tar.xz package"
-    run tar -C "$STAGE" -cJf "$TAR_FILE" .
-
     if command -v pkgbuild >/dev/null 2>&1; then
+        run rm -f "$TAR_FILE"
         msg "creating macOS installer package"
         run rm -rf "$PKGROOT"
         run mkdir -p "$PKGROOT"
@@ -719,10 +690,9 @@ PKG_FILE="\$SCRIPT_DIR/${PKG_BASENAME}.pkg"
 exec sudo installer -pkg "\$PKG_FILE" -target /
 EOF
         run chmod 755 "$INSTALL_SH"
-
-        msg "removing redundant tar.xz package"
-        run rm -f "$TAR_FILE"
     else
+        msg "creating tar.xz package"
+        run tar -C "$STAGE" -cJf "$TAR_FILE" .
         echo "WARNING: pkgbuild not found; skipped .pkg creation"
     fi
 

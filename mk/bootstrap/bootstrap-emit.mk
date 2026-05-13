@@ -30,6 +30,7 @@ ifneq ($(findstring /,$(CC))$(findstring \,$(CC)),)
 BOOT_TOOLCHAIN_BINDIR := $(patsubst %/,%,$(dir $(CC)))
 endif
 BOOT_FBC_TOOL_ENV := env \
+	$(TOOLCHAIN_FBC_ENV) \
 	PATH='$(if $(strip $(BOOT_TOOLCHAIN_BINDIR)),$(BOOT_TOOLCHAIN_BINDIR):)'"$$PATH" \
 	AS='$(AS)' \
 	AR='$(AR)' \

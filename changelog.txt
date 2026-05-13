@@ -7,6 +7,8 @@ Version 1.20.1
 - expanded compiler target, cpu-family, linker, and default-library handling for the platforms and architectures validated in the 1.10.4 branch, including Haiku, NetBSD rpath handling, and broader per-OS library selection
 - updated the HLC IR/backend glue so non-Intel targets do not fall through Intel-centric code paths when targeting newer cpu families
 - refreshed the Darwin graphics/audio backend set with the newer 1.10.4 driver work
+- macOS/Darwin build flow: moved SDK discovery, deployment-target defaults, Homebrew ncurses/libffi pkg-config flags, and compiler-environment propagation into mk/ so build_scripts/macos-build-freebasic.sh can focus on tool selection, environment setup, staging, and packaging
+- macOS packaging: build the installer .pkg directly when pkgbuild is available, keep the bundled compiler wrapper responsible for package-local toolchain libraries, and treat install_name_tool dependency rewrites as best-effort because some GCC-linked Mach-O layouts cannot be rewritten by Apple's tool
 - Linux/MSYS2 release flow: reworked the DOS package builder so build_scripts/msdos-build-freebasic.sh can bootstrap or reuse the DJGPP toolchain, emit the DOS distribution under out/msdos, keep Linux and MSYS2 host realities separate, and clean successful .build-msdos staging artifacts by default
 - DOS test flow: replaced the earlier ad-hoc DOS sound probe helper with a fuller image-backed build_scripts/msdos-test-freebasic.sh path that provisions its own host test dependencies on Linux or MSYS2/Windows, boots the packaged DOS distribution under DOSBox-X, validates console and SCREEN 13 from inside the DOS image, and captures isolated Sound Blaster and no-BLASTER PC speaker single/dual-tone WAVs for FFT, continuity, and spectral-noise checks
 - DOS test flow: expanded sfxlib capture validation across BEEP, SOUND, NOTE, PLAY, NOISE, SFX, MUSIC, AUDIO, and STREAM, including WAV/MP3 file playback and sample-rate-sensitive FFT checks
@@ -100,6 +102,7 @@ Version 1.20.1
 - Xbox/nxdk: enabled multithreaded runtime builds using the Win32-style thread model and Xbox CriticalSection/TLS primitives, while keeping ThreadCall on the rtlib fallback because nxdk does not currently provide target libffi
 - Xbox/gfxlib: present gfxlib framebuffers through a real 32-bit Xbox video mode with integer scaling for low-resolution modes such as SCREEN 13 and pixel skipping when the requested framebuffer is larger than the selected output mode
 - gfxlib2: add GETXPAD for Xbox-style controller polling, including connection status, button masks, sticks, triggers, and d-pad state on Windows XInput, Linux joystick devices, JavaScript Gamepad API, and Xbox/nxdk XID pads
+- gfxlib2/Darwin: add a platform-local GETXPAD backend using macOS GameController through the Objective-C runtime, avoiding a hard link-time framework dependency while keeping the generic gfx_xpad implementation untouched
 - examples/xpad: add GETXPAD examples for first-pad polling, active controller-state monitoring, and visual stick/button inspection
 - tests/compound: add DOS select_const2 shards so DOS validates the same generated SELECT AS CONST range coverage without requiring the DJGPP assembler to process one very large assembly file
 - Xbox/sfxlib: added an nxdk XAudio/AC97 output driver so the Xbox package can link and run sfxlib programs, with the null output driver still available for non-audio diagnostics
@@ -158,6 +161,13 @@ Version 1.20.1
 - gfxlib2/DOS: implement BIOS EGA/CGA palette handling, preserve requested VESA refresh rates with a 60 Hz fallback, fix VESA palette buffer sizing, and remove dead unfinished protected-mode palette code
 - gfxlib2: fix endian and unaligned-access assumptions in BLOAD and image row conversion paths
 - JavaScript/Emscripten builds now use emcc/emar/emranlib defaults and skip native host library/header probes when cross-building JS-target runtime libraries
+- macOS/Darwin builds: link through the compiler driver with the correct -mmacosx-version-min form, stop injecting ELF startup/linker options such as crt1.o and --eh-frame-hdr, and use Darwin dylib/export options for dynamic library builds
+- macOS/Darwin profiling: emit and read profiler cycle records through valid Mach-O sections and section$start/section$end symbols
+- macOS/Darwin threading: classify Darwin as a POSIX-threaded target so the multithreaded runtime is built with the correct thread model
+- macOS/Darwin tests/bootstrap: propagate SDKROOT and MACOSX_DEPLOYMENT_TARGET into fbc-driven test and bootstrap emission paths, and make clean-tests remove generated fbcunit/log-test artifacts through the test makefiles
+- compiler: keep automatically deleted intermediate backend files away from ordinary source names so compiling in the source tree cannot overwrite and then delete existing .c or .asm files with the same basename
+- compiler: fold SINGLE transcendental constant expressions through SINGLE precision so constant evaluation matches the target runtime math helper results
+- tests: fix fbcunit parallel build and clean dependencies so the test runner does not race library construction or leave stale generated object lists
 - JavaScript and Xbox clang-target builds now compile the generated C directly to object files when the target does not have a useful standalone assembler stage, matching the Emscripten path and avoiding invalid intermediate assembly handling
 - JavaScript runtime and WSTRING handling: removed the Asyncify dependency from the delay/vsync path, skipped FreeBASIC object-info archive metadata that Emscripten's ar cannot carry, emitted 32-bit target WSTRING literals consistently from Windows hosts, and treated JavaScript program strings as UTF-8 during zstring-to-wstring conversion
 - clang assembler invocation now preserves Intel assembly syntax for x86/x86_64 targets when a separate clang assembly step is used

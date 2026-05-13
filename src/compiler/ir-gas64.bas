@@ -255,6 +255,8 @@ end enum
 
 #define FB_PROFILE_SECT_DATA       "fb_profilecycledata"
 #define FB_PROFILE_SECT_STRS       "fb_profilestrings"
+#define FB_PROFILE_DARWIN_SECT_DATA "__DATA,fb_profcycdata"
+#define FB_PROFILE_DARWIN_SECT_STRS "__TEXT,fb_profstrs"
 #define FB_PROFILE_DATA_NAME       "Lfbprfdat$"
 #define FB_PROFILE_PROC_NAME       "Lfbprfprc$"
 #define FB_PROFILE_MODULE_NAME     "Lfbprfmod$"
@@ -3000,7 +3002,9 @@ private sub hProfileEmitSections()
 	dim as integer previous_section = ctx.section
 
 	ctx.section = SECTION_PROFILE_STRINGS
-	if ctx.systemv then
+	if ctx.target = FB_COMPTARGET_DARWIN then
+		asm_code(".section "+FB_PROFILE_DARWIN_SECT_STRS)
+	elseif ctx.systemv then
 		asm_code(".section "+FB_PROFILE_SECT_STRS+",""a""")
 	else
 		asm_code(".section "+FB_PROFILE_SECT_STRS+",""dr""")
@@ -3008,7 +3012,9 @@ private sub hProfileEmitSections()
 	asm_code(".align 16")
 
 	ctx.section = SECTION_PROFILE_DATA
-	if ctx.systemv then
+	if ctx.target = FB_COMPTARGET_DARWIN then
+		asm_code(".section "+FB_PROFILE_DARWIN_SECT_DATA)
+	elseif ctx.systemv then
 		asm_code(".section "+FB_PROFILE_SECT_DATA+",""a""")
 	else
 		asm_code(".section "+FB_PROFILE_SECT_DATA+",""dw""")

@@ -202,7 +202,7 @@ $(if $(filter dos,$(TARGET_OS)),-e '/^\.\/interactive\//d' -e '/^\.\/threads\//d
 # ------------------------------------------------------------------------
 
 .PHONY: build_tests
-build_tests : ./$(MAINBAS).o $(OBJLIST) $(UNIT_TESTS_OBJ_LST)
+build_tests : $(FBCU_BIN) ./$(MAINBAS).o $(OBJLIST) $(UNIT_TESTS_OBJ_LST)
 	$(FBC) $(FBC_LFLAGS) @$(UNIT_TESTS_OBJ_LST) ./$(MAINBAS).o
 
 .PHONY: run_tests
@@ -226,7 +226,7 @@ clean_main_exe :
 	$(RM) $(MAINEXE)
 
 .PHONY: clean_tests
-clean_tests :
+clean_tests : $(UNIT_TESTS_OBJ_LST)
 	@$(ECHO) Cleaning unit-tests files ...
 	@$(RM) ./$(MAINBAS).o
 	@if [ -s $(UNIT_TESTS_OBJ_LST) ]; then $(CAT) $(UNIT_TESTS_OBJ_LST) | $(XARGS) $(RM) ; fi
@@ -236,5 +236,5 @@ clean_fbcu :
 	cd $(FBCU_DIR) && $(MAKE) clean
 
 .PHONY: clean_include
-clean_include :
+clean_include : clean_tests
 	$(RM) $(UNIT_TESTS_INC) $(UNIT_TESTS_OBJ_LST)

@@ -132,6 +132,11 @@ clean-tests:
 	@rm -rf maketests-log
 	@rm -rf test-run-log
 	@$(MAKE) --no-print-directory clean-example-artifacts
+	@cd tests && $(MAKE) --no-print-directory -f unit-tests.mk clean
+	@cd tests && $(MAKE) --no-print-directory -f log-tests.mk FB_LANG=fb clean
+	@cd tests && $(MAKE) --no-print-directory -f log-tests.mk FB_LANG=fblite clean
+	@cd tests && $(MAKE) --no-print-directory -f log-tests.mk FB_LANG=qb clean
+	@cd tests && $(MAKE) --no-print-directory -f log-tests.mk FB_LANG=deprecated clean
 
 
 ##############################################################################

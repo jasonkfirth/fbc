@@ -145,7 +145,7 @@ else ifeq ($(TARGET_OS),xbox)
   THREAD_MODEL := win32
 else ifeq ($(TARGET_OS),cygwin)
   THREAD_MODEL := posix
-else ifneq ($(filter linux android freebsd netbsd openbsd dragonfly solaris haiku,$(TARGET_OS)),)
+else ifneq ($(filter linux android darwin freebsd netbsd openbsd dragonfly solaris haiku,$(TARGET_OS)),)
   THREAD_MODEL := posix
 endif
 

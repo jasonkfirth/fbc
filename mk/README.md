@@ -72,14 +72,15 @@ The order is not arbitrary:
    layer.
 4. `platform-features.mk` and `feature-policy.mk` translate identity into
    feature toggles.
-5. `toolchain-flags.mk`, `host-tools.mk`, `os-flags.mk`, and
-   `compiler-config.mk` turn those toggles into concrete tools and flags.
-6. `naming.mk`, `layout.mk`, `build-layout.mk`, and `multilib.mk` derive the
+5. `compiler-config.mk` chooses the concrete C/C++/binutils tools.
+6. `toolchain-flags.mk`, `host-tools.mk`, and `os-flags.mk` turn those tools
+   and policy toggles into concrete flags and command behavior.
+7. `naming.mk`, `layout.mk`, `build-layout.mk`, and `multilib.mk` derive the
    names and paths used by the rest of the tree.
-7. `prereqs.mk` exposes environment checks but does not own the build graph.
-8. `source-graph.mk` and `archives.mk` define the artifact graph.
-9. `mk/build/*.mk` attach the concrete rules.
-10. `mk/bootstrap/*.mk`, `dist.mk`, `tests.mk`, `maketests.mk`, and
+8. `prereqs.mk` exposes environment checks but does not own the build graph.
+9. `source-graph.mk` and `archives.mk` define the artifact graph.
+10. `mk/build/*.mk` attach the concrete rules.
+11. `mk/bootstrap/*.mk`, `dist.mk`, `tests.mk`, `maketests.mk`, and
     `inst_uninst.mk` add specialized workflows on top.
 
 Because the later layers depend on the earlier ones, debugging almost always

@@ -386,6 +386,7 @@ TOOLCHAIN_FBCFLAGS += -Wc -Wno-builtin-declaration-mismatch
 TOOLCHAIN_FBLFLAGS :=
 TOOLCHAIN_FBRTCFLAGS :=
 TOOLCHAIN_FBRTLFLAGS :=
+TOOLCHAIN_FBC_ENV :=
 
 ifneq ($(filter cygwin win32 win64,$(TARGET_OS)),)
   # Newer GCC range analysis is noisy on fbc-generated compiler C code.
@@ -401,6 +402,79 @@ ifeq ($(TARGET_OS),win32)
 TOOLCHAIN_CFLAGS   += -mconsole
 TOOLCHAIN_CXXFLAGS += -mconsole
 TOOLCHAIN_LDFLAGS  += -mconsole
+
+endif
+
+ifeq ($(TARGET_OS),darwin)
+
+#
+# Darwin SDK handling
+#
+# Modern macOS installations keep system headers inside the Command Line Tools
+# SDK instead of /usr/include.
+#
+# Apple clang understands -isysroot and uses the SDK headers normally. Real GCC
+# from Homebrew also needs the SDK, but feeding it -isysroot makes it prefer
+# GCC's include-fixed copies of Apple headers. Those fixed headers can be
+# incomplete against newer SDKs, so GCC gets explicit SDK include/framework
+# search paths plus a linker syslibroot instead.
+#
+DARWIN_SDKROOT := $(strip $(shell xcrun --sdk macosx --show-sdk-path 2>/dev/null || xcrun --show-sdk-path 2>/dev/null))
+DARWIN_CC_IS_CLANG := $(strip $(shell $(CC) -dM -E -x c /dev/null 2>/dev/null | grep -q __clang__ && echo yes || true))
+DARWIN_NCURSES_CFLAGS := $(strip $(shell pkg-config --cflags ncurses 2>/dev/null))
+DARWIN_LIBFFI_CFLAGS := $(strip $(shell pkg-config --cflags libffi 2>/dev/null))
+DARWIN_PKG_LDFLAGS := $(strip $(shell pkg-config --libs-only-L ncurses libffi 2>/dev/null))
+DARWIN_DEPLOYMENT_TARGET ?= $(MACOSX_DEPLOYMENT_TARGET)
+ifeq ($(strip $(DARWIN_DEPLOYMENT_TARGET)),)
+  ifeq ($(TARGET_ARCH),aarch64)
+    DARWIN_DEPLOYMENT_TARGET := 11.0
+  else
+    DARWIN_DEPLOYMENT_TARGET := 10.4
+  endif
+endif
+
+TOOLCHAIN_CFLAGS   += $(DARWIN_NCURSES_CFLAGS) $(DARWIN_LIBFFI_CFLAGS)
+TOOLCHAIN_CXXFLAGS += $(DARWIN_NCURSES_CFLAGS) $(DARWIN_LIBFFI_CFLAGS)
+TOOLCHAIN_LDFLAGS  += $(DARWIN_PKG_LDFLAGS)
+
+#
+# macOS package staging rewrites the compiler's dependent library paths after
+# installation so the bundled toolchain can live under FreeBASIC's prefix.
+# ld64 must reserve enough load-command space at link time for those later
+# install_name_tool edits.
+#
+TOOLCHAIN_LDFLAGS  += -Wl,-headerpad_max_install_names
+
+#
+# Some Darwin linker paths can emit optional __LINKEDIT metadata load commands
+# after the symbol-table load command even though their data appears earlier in
+# the file. Older install_name_tool builds reject that command/data ordering
+# when rewriting dependencies.
+#
+TOOLCHAIN_LDFLAGS  += -Wl,-no_function_starts
+TOOLCHAIN_LDFLAGS  += -Wl,-no_data_in_code_info
+
+ifneq ($(strip $(DARWIN_DEPLOYMENT_TARGET)),)
+  TOOLCHAIN_CFLAGS   += -mmacosx-version-min=$(DARWIN_DEPLOYMENT_TARGET)
+  TOOLCHAIN_CXXFLAGS += -mmacosx-version-min=$(DARWIN_DEPLOYMENT_TARGET)
+  TOOLCHAIN_LDFLAGS  += -mmacosx-version-min=$(DARWIN_DEPLOYMENT_TARGET)
+  TOOLCHAIN_FBC_ENV  += MACOSX_DEPLOYMENT_TARGET='$(DARWIN_DEPLOYMENT_TARGET)'
+endif
+
+ifneq ($(strip $(DARWIN_SDKROOT)),)
+  TOOLCHAIN_FBC_ENV += SDKROOT='$(DARWIN_SDKROOT)'
+  ifeq ($(DARWIN_CC_IS_CLANG),yes)
+    TOOLCHAIN_CFLAGS   += -isysroot $(DARWIN_SDKROOT)
+    TOOLCHAIN_CXXFLAGS += -isysroot $(DARWIN_SDKROOT)
+    TOOLCHAIN_LDFLAGS  += -isysroot $(DARWIN_SDKROOT)
+  else
+    TOOLCHAIN_CFLAGS   += -isystem $(DARWIN_SDKROOT)/usr/include
+    TOOLCHAIN_CFLAGS   += -iframework $(DARWIN_SDKROOT)/System/Library/Frameworks
+    TOOLCHAIN_CXXFLAGS += -isystem $(DARWIN_SDKROOT)/usr/include
+    TOOLCHAIN_CXXFLAGS += -iframework $(DARWIN_SDKROOT)/System/Library/Frameworks
+    TOOLCHAIN_LDFLAGS  += -Wl,-syslibroot,$(DARWIN_SDKROOT)
+  endif
+endif
 
 endif
 
