@@ -79,6 +79,17 @@ declare function _getTypeString( byval dtype as integer ) as const zstring ptr
 		( 3, "xmmword ptr" ) _ '' 128-bit
 	}
 
+private function hUse686FpuOps( ) as integer
+	if( env.clopt.target = FB_COMPTARGET_DOS ) then
+		'' DJGPP/DPMI DOS runs have shown unreliable results with the
+		'' operandless fcomip emission.  Keep DOS on the older x87
+		'' status-word path even when the selected CPU is 686.
+		function = FALSE
+	else
+		function = (env.clopt.cputype >= FB_CPUTYPE_686)
+	end if
+end function
+
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 '' helper functions
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -2252,7 +2263,7 @@ private sub _emitLOADF2L _
 
 		outp "sub esp, 8"
 		outp "mov dword ptr [esp], 0x5F000000" '' 2^63
-		if( env.clopt.cputype >= FB_CPUTYPE_686 ) then
+		if( hUse686FpuOps( ) ) then
 			outp "fld dword ptr [esp]"
 			outp "fcomip"
 			hBRANCH( "jbe", label_geq )
@@ -4709,7 +4720,7 @@ private sub hCMPF _
 	'' But this is complicated enough, ...
 
 	'' do comp
-	if( env.clopt.cputype >= FB_CPUTYPE_686 ) then
+	if( hUse686FpuOps( ) ) then
 
 		'' use instructions to directly set CF, PF, ZF
 		if( svreg->typ = IR_VREGTYPE_REG ) then
@@ -5441,7 +5452,7 @@ private sub _emitSGNF( byval dvreg as IRVREG ptr )
 
 	label = *symbUniqueLabel( )
 
-	if( env.clopt.cputype >= FB_CPUTYPE_686 ) then
+	if( hUse686FpuOps( ) ) then
 		outp "fldz"
 		outp "fxch"
 		outp "fcomip"
@@ -5736,7 +5747,7 @@ private sub _emitFLOOR( byval dvreg as IRVREG ptr )
 
 	ASSERT_PROC_DECL( EMIT_UOPCB )
 
-	if( env.clopt.cputype >= FB_CPUTYPE_686 ) then
+	if( hUse686FpuOps( ) ) then
 		hEmitFloat_Int_686(dvreg)
 	else
 		hEmitFloatFunc( 1 )
@@ -5747,7 +5758,7 @@ private sub _emitFIX( byval dvreg as IRVREG ptr )
 
 	ASSERT_PROC_DECL( EMIT_UOPCB )
 
-	if( env.clopt.cputype >= FB_CPUTYPE_686 ) then
+	if( hUse686FpuOps( ) ) then
 		hEmitFloat_fix_686( dvreg )
 	else
 		hEmitFloatFunc( 2 )
@@ -6988,7 +6999,7 @@ private sub _emitLOADF2B( byval dvreg as IRVREG ptr, byval svreg as IRVREG ptr )
 		outp "push eax"
 	end if
 
-	if( env.clopt.cputype >= FB_CPUTYPE_686 ) then
+	if( hUse686FpuOps( ) ) then
 		outp "fldz"
 		outp "fcomip"
 	else

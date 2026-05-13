@@ -172,6 +172,8 @@ int fb_dos_vesa_set_mode( int w, int h, int depth, int linear )
 	int tries;
 	int good_bpp;
 	int success = 0;
+	int palette_bytes;
+	int palette_paragraphs;
 	
 	if( depth == 15 ) depth = 16;
 	if( depth == 24 ) depth = 32;
@@ -232,7 +234,9 @@ int fb_dos_vesa_set_mode( int w, int h, int depth, int linear )
 	
 	if( success )
 	{
-		fb_dos.palbuf_seg = __dpmi_allocate_dos_memory( (256 * 4) >> 4, &fb_dos.palbuf_sel ); // FIXME
+		palette_bytes = 256 * 4;
+		palette_paragraphs = (palette_bytes + 15) >> 4;
+		fb_dos.palbuf_seg = __dpmi_allocate_dos_memory( palette_paragraphs, &fb_dos.palbuf_sel );
 		if( fb_dos.palbuf_seg == -1 )
 		{
 			fb_dos.palbuf_seg = fb_dos.palbuf_sel = 0;
@@ -304,43 +308,6 @@ static void fb_dos_vesa_set_palette_int10(void)
 	fb_dos.pal_last = 0;
 	fb_dos.pal_first = 256;
 }
-
-#if 0
-/* !!!FIXME!!! */
-
-static void fb_dos_vesa_set_palette_pm(void)
-{
-	int color_count;
-	unsigned short data_sel;
-	
-	data_sel = fb_dos.vesa_mmio_sel ? fb_dos.vesa_mmio_sel : _my_ds();
-	
-	color_count = MIN( (1 << fb_dos.depth), fb_dos.pal_last - fb_dos.pal_first + 1 );
-	
-	__asm__ __volatile__ (
-		"pushw %%ds \n\t"
-		"movw %1, %%ds \n\t"
-		"call *%0 \n\t"
-		"popw %%ds \n\t"
-		:
-		: "r"(fb_dos_vesa_pm_set_palette),
-		  "m"(data_sel),
-		  "a"(VBE_SETGETPAL),                /* ax = 4F09h (set/get palette data) */
-		  "b"(fb_dos.vesa_info.capabilities & VIB_BLANK
-		      ? VBE_SETGETPAL_SET_BLANK
-		      : VBE_SETGETPAL_SET),          /* bl = 00h (set) or 80h (wait for blank and set) */
-		  "c"(color_count),                  /* cx = number of entries to update */
-		  "d"(fb_dos.pal_first),             /* dx = first entry to update */
-		  "D"(fb_dos.pal + fb_dos.pal_first) /* edi = table of palette values */
-		: "cc"
-	);
-
-	fb_dos.pal_dirty = FALSE;
-	fb_dos.pal_last = 0;
-	fb_dos.pal_first = 256;
-}
-
-#endif
 
 void fb_dos_vesa_set_palette( void )
 {

@@ -12,11 +12,33 @@
 #define BI_BITFIELDS    3
 #endif
 
+static inline uint16_t host_from_le16(uint16_t value)
+{
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+	return (uint16_t)((value >> 8) | (value << 8));
+#else
+	return value;
+#endif
+}
+
+static inline uint32_t host_from_le32(uint32_t value)
+{
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+	return ((value & 0x000000FFu) << 24) |
+	       ((value & 0x0000FF00u) <<  8) |
+	       ((value & 0x00FF0000u) >>  8) |
+	       ((value & 0xFF000000u) >> 24);
+#else
+	return value;
+#endif
+}
+
 static inline int fread_16_le(uint16_t *buf, FILE *f)
 {
 	int rc;
 	rc = fread(buf, sizeof(*buf), 1, f);
-	/* TODO: byteswap on BE */
+	if (rc == 1)
+		*buf = host_from_le16(*buf);
 	return rc;
 }
 
@@ -24,7 +46,8 @@ static inline int fread_32_le(uint32_t *buf, FILE *f)
 {
 	int rc;
 	rc = fread(buf, sizeof(*buf), 1, f);
-	/* TODO: byteswap on BE */
+	if (rc == 1)
+		*buf = host_from_le32(*buf);
 	return rc;
 }
 

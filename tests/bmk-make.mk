@@ -21,11 +21,6 @@
 
 include common.mk
 
-ifeq ($(HOST),dos)
-SHELL = /bin/sh
-else
-SHELL := $(SHELL)
-endif
 ECHO := echo
 
 CC := gcc

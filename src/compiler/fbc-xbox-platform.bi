@@ -1,17 +1,19 @@
 ''
 '' FreeBASIC compiler driver
+'' -------------------------
 ''
-'' File: fbc-xbox-link.bi
+'' File: fbc-xbox-platform.bi
 ''
 '' Purpose:
 ''
-''     Keep the nxdk-specific Xbox link command helpers out of fbc.bas.
+''     Keep Xbox target driver behavior out of fbc.bas.
 ''
 '' Responsibilities:
 ''
 ''     - add FreeBASIC Xbox archives as concrete linker input files
 ''     - locate the package-local nxdk tree
 ''     - add the nxdk import/static libraries expected by nxdk-link
+''     - add Xbox default library metadata
 ''
 '' This file intentionally does NOT contain:
 ''
@@ -19,6 +21,13 @@
 ''     - generic linker command construction
 ''     - cxbe invocation
 ''
+
+#ifndef __FBC_XBOX_PLATFORM_BI__
+#define __FBC_XBOX_PLATFORM_BI__
+
+private function fbcXboxPlatformIsSelected( ) as integer
+	function = (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX)
+end function
 
 private sub hAddXboxLinkFile( byref ldcline as string, byref file as string )
 	ldcline += " " + QUOTE + file + QUOTE
@@ -72,4 +81,45 @@ private sub hAddXboxNxdkLibs( byref ldcline as string )
 	hAddXboxNxdkLib( ldcline, nxdkdir, @"lib/xboxkrnl/libxboxkrnl.lib" )
 end sub
 
-'' end of fbc-xbox-link.bi
+private sub fbcXboxPlatformAddDefaultLibPaths( )
+	if( fbcXboxPlatformIsSelected( ) = FALSE ) then
+		exit sub
+	end if
+end sub
+
+private sub fbcXboxPlatformAddGfxLibs( )
+	if( fbcXboxPlatformIsSelected( ) = FALSE ) then
+		exit sub
+	end if
+end sub
+
+private sub fbcXboxPlatformAddSfxLibs( )
+	if( fbcXboxPlatformIsSelected( ) = FALSE ) then
+		exit sub
+	end if
+end sub
+
+private sub fbcXboxPlatformAddDefaultLibs( )
+	if( fbcXboxPlatformIsSelected( ) = FALSE ) then
+		exit sub
+	end if
+
+	'' nxdk libraries are added as concrete .lib files in hLinkFiles()
+	'' because nxdk-link uses the MSVC-style linker frontend instead of
+	'' GNU ld's -L/-l archive lookup.
+
+	'' profiling?
+	if( fbGetOption( FB_COMPOPT_PROFILE ) = FB_PROFILE_OPT_GMON ) then
+		fbcAddDefLib( "gmon" )
+	end if
+end sub
+
+private sub fbcXboxPlatformAddLinkerFrameworks( byref ldcline as string )
+	if( fbcXboxPlatformIsSelected( ) = FALSE ) then
+		exit sub
+	end if
+end sub
+
+#endif
+
+'' end of fbc-xbox-platform.bi

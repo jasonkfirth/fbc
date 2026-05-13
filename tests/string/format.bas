@@ -7,14 +7,14 @@
 	#define B2 1
 #else
 	'' inhibit some checks on win 64bit (typically mingw64)
-	#if defined(__FB_WIN32__) and defined(__FB_64BIT__)
+	#if (defined(__FB_WIN32__) and defined(__FB_64BIT__)) or defined(__FB_DOS__)
 		#define B1 0
 	#else
 		#define B1 1
 	#endif
 	'' inhibit some checks on mingw-org, however, we can't
 	'' tell the difference between mingw32 and mingw-org
-	#if defined(__FB_WIN32__)
+	#if defined(__FB_WIN32__) or defined(__FB_DOS__)
 		#define B2 0
 	#else
 		#define B2 1

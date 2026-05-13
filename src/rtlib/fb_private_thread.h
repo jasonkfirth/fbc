@@ -7,11 +7,6 @@
 	struct _FBMUTEX {
 		pthread_mutex_t id;
 	};
-#elif defined HOST_DOS && defined ENABLE_MT
-	#include <pthread.h>
-	struct _FBMUTEX {
-		pthread_mutex_t id;
-	};
 #elif defined HOST_WIN32
 	#include <windows.h>
 	struct _FBMUTEX {
@@ -60,9 +55,7 @@ typedef enum _FBTHREADFLAGS
 } FBTHREADFLAGS;
 
 struct _FBTHREAD {
-#if defined HOST_DOS && defined ENABLE_MT
-	pthread_t id;
-#elif defined HOST_DOS && !defined ENABLE_MT
+#if defined HOST_DOS
 	int id;
 	void *opaque;
 #elif defined HOST_UNIX

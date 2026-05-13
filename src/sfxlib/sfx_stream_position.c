@@ -41,6 +41,7 @@
 extern FILE *g_stream_file;
 extern int   g_stream_open;
 extern int   g_stream_position;
+extern float g_stream_sample_pos;
 
 
 /* ------------------------------------------------------------------------- */
@@ -99,6 +100,7 @@ int fb_sfxStreamRewind(void)
     }
 
     g_stream_position = 0;
+    g_stream_sample_pos = 0.0f;
     fb_sfxRuntimeUnlock();
 
     return 0;

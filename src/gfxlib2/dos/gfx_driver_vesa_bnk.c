@@ -64,7 +64,8 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 	else
 		fb_dos_vesa_set_bank = fb_dos_vesa_set_bank_int;
 	
-	refresh_rate = 60; /* FIXME */
+	if (refresh_rate <= 0)
+		refresh_rate = 60;
 	
 	is_rgb = (depth > 8) && (fb_dos.vesa_mode_info.RedFieldPosition == 0);
 	

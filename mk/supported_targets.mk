@@ -1,84 +1,116 @@
 ##############################################################################
 # supported_targets.mk
 #
-# Canonical FreeBASIC supported bootstrap targets
+# Canonical FreeBASIC supported bootstrap emission matrix
 #
+# Matrix entries are defined as:
 #
-# Targets are defined as:
+#   fbc-target:bootstrap-dir:target-triplet
 #
-#   GENERAL_TARGETS = (GENERAL_OS × GENERAL_ARCH)
-#   FINAL_TARGETS   = GENERAL_TARGETS + SPECIAL_TARGETS − INVALID_TARGETS
-#
-# This avoids generating a large hand-maintained matrix while still allowing
-# explicit special-case targets such as DOS.
+# The fbc target is the value passed to `fbc -target`. The bootstrap directory
+# is where emitted C/ASM sources are staged. The target triplet feeds the build
+# identity layer so each matrix entry emits with the intended CPU family.
 ##############################################################################
 
 ##############################################################################
-# General operating systems (cross-product)
+# CPU family helpers
 ##############################################################################
 
-GENERAL_OS := \
-	linux \
-	freebsd \
-	netbsd \
-	openbsd \
-	dragonfly \
-	haiku \
-	mingw \
-	cygwin
-
-
-##############################################################################
-# General architectures (cross-product)
-##############################################################################
-
-GENERAL_ARCH := \
-	amd64 \
-	i386 \
-	arm64 \
-	armhf \
-	armel \
+BOOTSTRAP_CPU_FAMILIES := \
+	x86 \
+	x86_64 \
+	arm \
+	aarch64 \
 	powerpc \
 	powerpc64 \
-	ppc64el \
+	powerpc64le \
 	riscv64 \
 	s390x \
 	loongarch64
 
-
-##############################################################################
-# Special targets that do not participate in the cross product
-##############################################################################
-
-SPECIAL_TARGETS := \
-	darwin-x86_64 \
-	darwin-aarch64 \
-	dos
-
-
-##############################################################################
-# Known invalid combinations
-##############################################################################
-
-INVALID_TARGETS :=
-
-
-##############################################################################
-# Cartesian product expansion
-##############################################################################
-
-define _fb_target_product
-$(foreach os,$(GENERAL_OS),$(foreach arch,$(GENERAL_ARCH),$(os)-$(arch)))
+define _fb_triplet_arch
+$(if $(filter x86,$(1)),i686,$(1))
 endef
 
-GENERAL_TARGET_MATRIX := $(call _fb_target_product)
+define _fb_bootstrap_spec
+$(1):$(2):$(3)
+endef
 
+define _fb_os_arch_specs
+$(foreach arch,$(BOOTSTRAP_CPU_FAMILIES),$(call _fb_bootstrap_spec,$(1)-$(arch),$(1)-$(arch),$(call _fb_triplet_arch,$(arch))-unknown-$(1)))
+endef
+
+##############################################################################
+# Linux
+##############################################################################
+
+LINUX_BOOTSTRAP_TARGETS := \
+	$(call _fb_bootstrap_spec,linux-x86,linux-x86,i686-linux-gnu) \
+	$(call _fb_bootstrap_spec,linux-x86_64,linux-x86_64,x86_64-linux-gnu) \
+	$(call _fb_bootstrap_spec,linux-arm,linux-arm,arm-linux-gnueabi) \
+	$(call _fb_bootstrap_spec,linux-aarch64,linux-aarch64,aarch64-linux-gnu) \
+	$(call _fb_bootstrap_spec,linux-powerpc,linux-powerpc,powerpc-linux-gnu) \
+	$(call _fb_bootstrap_spec,linux-powerpc64,linux-powerpc64,powerpc64-linux-gnu) \
+	$(call _fb_bootstrap_spec,linux-powerpc64le,linux-powerpc64le,powerpc64le-linux-gnu) \
+	$(call _fb_bootstrap_spec,linux-riscv64,linux-riscv64,riscv64-linux-gnu) \
+	$(call _fb_bootstrap_spec,linux-s390x,linux-s390x,s390x-linux-gnu) \
+	$(call _fb_bootstrap_spec,linux-loongarch64,linux-loongarch64,loongarch64-linux-gnu)
+
+##############################################################################
+# BSD family and Haiku
+##############################################################################
+
+BSD_BOOTSTRAP_TARGETS := \
+	$(call _fb_os_arch_specs,freebsd) \
+	$(call _fb_os_arch_specs,netbsd) \
+	$(call _fb_os_arch_specs,openbsd) \
+	$(call _fb_os_arch_specs,dragonfly)
+
+HAIKU_BOOTSTRAP_TARGETS := \
+	$(call _fb_os_arch_specs,haiku)
+
+##############################################################################
+# Windows
+##############################################################################
+
+WINDOWS_BOOTSTRAP_TARGETS := \
+	$(call _fb_bootstrap_spec,win32,win32,i686-w64-mingw32) \
+	$(call _fb_bootstrap_spec,win64,win64,x86_64-w64-mingw32) \
+	$(call _fb_bootstrap_spec,win32-aarch64,win32-aarch64,aarch64-w64-mingw32)
+
+##############################################################################
+# Other operating systems
+##############################################################################
+
+CYGWIN_BOOTSTRAP_TARGETS := \
+	$(call _fb_bootstrap_spec,cygwin-x86,cygwin-x86,i686-pc-cygwin) \
+	$(call _fb_bootstrap_spec,cygwin-x86_64,cygwin-x86_64,x86_64-pc-cygwin)
+
+DARWIN_BOOTSTRAP_TARGETS := \
+	$(call _fb_bootstrap_spec,darwin-x86_64,darwin-x86_64,x86_64-apple-darwin) \
+	$(call _fb_bootstrap_spec,darwin-aarch64,darwin-aarch64,aarch64-apple-darwin)
+
+SOLARIS_BOOTSTRAP_TARGETS := \
+	$(call _fb_bootstrap_spec,solaris-x86_64,solaris-x86_64,x86_64-pc-solaris)
+
+DOS_BOOTSTRAP_TARGETS := \
+	$(call _fb_bootstrap_spec,dos,dos,i586-pc-msdosdjgpp)
 
 ##############################################################################
 # Final supported bootstrap targets
 ##############################################################################
 
-SUPPORTED_BOOTSTRAP_TARGETS := $(filter-out $(INVALID_TARGETS),$(GENERAL_TARGET_MATRIX) $(SPECIAL_TARGETS))
+SUPPORTED_BOOTSTRAP_TARGETS := \
+	$(LINUX_BOOTSTRAP_TARGETS) \
+	$(BSD_BOOTSTRAP_TARGETS) \
+	$(HAIKU_BOOTSTRAP_TARGETS) \
+	$(WINDOWS_BOOTSTRAP_TARGETS) \
+	$(CYGWIN_BOOTSTRAP_TARGETS) \
+	$(DARWIN_BOOTSTRAP_TARGETS) \
+	$(SOLARIS_BOOTSTRAP_TARGETS) \
+	$(DOS_BOOTSTRAP_TARGETS)
+
+SUPPORTED_BOOTSTRAP_DIRS := $(foreach spec,$(SUPPORTED_BOOTSTRAP_TARGETS),$(word 2,$(subst :, ,$(spec))))
 
 
 ##############################################################################

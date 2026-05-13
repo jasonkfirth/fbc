@@ -189,8 +189,6 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 
 	quitting = FALSE;
 
-	//XInput_Init();
-
 	return 0;
 }
 
@@ -204,15 +202,14 @@ static void driver_exit(void)
 	free(scale_buffer);
 	scale_buffer = NULL;
 	scale_buffer_size = 0;
-
-	//XInput_Quit();
-
-	/* !!!FIXME!!! */
 }
 
 static void driver_lock(void)
 {
-	/* !!!WRITEME!!! */
+	/*
+		The Xbox presenter is driven by SCREENUNLOCK and explicit page updates.
+		There is no separate window thread to suspend here.
+	*/
 }
 
 static void driver_unlock(void)
@@ -223,17 +220,26 @@ static void driver_unlock(void)
 
 static void driver_set_palette(int index, int r, int g, int b)
 {
-	/* !!!WRITEME!!! */
+	(void)index;
+	(void)r;
+	(void)g;
+	(void)b;
+
+	if (!quitting)
+		driver_update_framebuffer();
 }
 
 static void driver_wait_vsync(void)
 {
-	/* !!!WRITEME!!! */
+	XVideoWaitForVBlank();
 }
 
 static int driver_get_mouse(int *x, int *y, int *z, int *buttons, int *clip)
 {
-	/* !!!WRITEME!!! */
+	/*
+		The stock Xbox controller ports do not provide a mouse cursor device.
+		Controller state is exposed separately through GETXPAD.
+	*/
 	if (x) *x = -1;
 	if (y) *y = -1;
 	if (z) *z = -1;
@@ -244,7 +250,10 @@ static int driver_get_mouse(int *x, int *y, int *z, int *buttons, int *clip)
 
 static void driver_set_mouse(int x, int y, int cursor, int clip)
 {
-	/* !!!WRITEME!!! */
+	(void)x;
+	(void)y;
+	(void)cursor;
+	(void)clip;
 }
 
 static int *driver_fetch_modes(int depth, int *size)
@@ -272,7 +281,10 @@ static int *driver_fetch_modes(int depth, int *size)
 
 static void driver_poll_events(void)
 {
-	/* !!!WRITEME!!! */
+	/*
+		This backend has no window manager event source.  Controller input is a
+		polled device API and is handled by fb_GfxGetXPad().
+	*/
 }
 
 /* GFXDRIVER */
@@ -302,7 +314,6 @@ const GFXDRIVER *__fb_gfx_drivers_list[] = {
 
 void fb_hScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *refresh)
 {
-	/* !!!FIXME!!! */
 	VIDEO_MODE vm;
 
 	vm = XVideoGetMode();
@@ -315,12 +326,37 @@ void fb_hScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *re
 
 FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, float *a3, float *a4, float *a5, float *a6, float *a7, float *a8)
 {
-	(void)id;
-	FB_GRAPHICS_LOCK( );
+	ssize_t xpad_buttons;
+	ssize_t dpad;
+	float lx, ly, rx, ry, lt, rt;
+	int status;
 
-	*buttons = -1;
-	*a1 = *a2 = *a3 = *a4 = *a5 = *a6 = *a7 = *a8 = -1000.0;
+	if (buttons) *buttons = -1;
+	if (a1) *a1 = -1000.0f;
+	if (a2) *a2 = -1000.0f;
+	if (a3) *a3 = -1000.0f;
+	if (a4) *a4 = -1000.0f;
+	if (a5) *a5 = -1000.0f;
+	if (a6) *a6 = -1000.0f;
+	if (a7) *a7 = -1000.0f;
+	if (a8) *a8 = -1000.0f;
 
-	FB_GRAPHICS_UNLOCK( );
-	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+	if ((id < 0) || (id >= 4))
+		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+
+	status = fb_GfxGetXPad(id, &xpad_buttons, &lx, &ly, &rx, &ry, &lt, &rt, &dpad);
+	if (status != XPAD_STATUS_CONNECTED)
+		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+
+	if (buttons) *buttons = xpad_buttons;
+	if (a1) *a1 = lx;
+	if (a2) *a2 = ly;
+	if (a3) *a3 = lt;
+	if (a4) *a4 = rx;
+	if (a5) *a5 = ry;
+	if (a6) *a6 = rt;
+	if (a7) *a7 = (dpad & XPAD_DPAD_RIGHT) ? 1.0f : ((dpad & XPAD_DPAD_LEFT) ? -1.0f : 0.0f);
+	if (a8) *a8 = (dpad & XPAD_DPAD_DOWN) ? 1.0f : ((dpad & XPAD_DPAD_UP) ? -1.0f : 0.0f);
+
+	return fb_ErrorSetNum(FB_RTERROR_OK);
 }

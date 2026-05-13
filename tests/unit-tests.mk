@@ -20,12 +20,6 @@ ifndef ENABLE_CONSOLE_OUTPUT
 ENABLE_CONSOLE_OUTPUT :=
 endif
 
-ifeq ($(HOST),dos)
-SHELL = /bin/sh
-else
-SHELL := $(SHELL)
-endif
-
 FIND := find
 XARGS := xargs
 GREP := grep
@@ -38,10 +32,13 @@ ifndef FBC
 FBC := $(TESTS_DEFAULT_FBC)
 endif
 
-DIRLIST_INC := dirlist.mk
+DIRLIST_INC ?= dirlist.mk
 
 include $(DIRLIST_INC)
 DIRLIST := $(DIRLIST_FB)
+ifeq ($(TARGET_OS),dos)
+DIRLIST := $(filter-out interactive threads,$(DIRLIST))
+endif
 
 ifeq ($(DIRLIST),)
 $(error No directories specified in $(DIRLIST_INC))
@@ -60,6 +57,16 @@ include $(UNIT_TESTS_INC)
 endif
 SRCLIST := $(sort $(SRCLIST))
 SRCLIST := $(patsubst .bmk,.bas,$(SRCLIST))
+SRCLIST_DOS_FILTER_OUT :=
+ifeq ($(TARGET_OS),dos)
+# The monolithic select_const2 test produces a huge DOS assembly unit.
+# DOS runs the same coverage through smaller select_const2-dos-*.bas shards.
+SRCLIST_DOS_FILTER_OUT := \
+./interactive/% interactive/% \
+./threads/% threads/% \
+./compound/select_const2.bas compound/select_const2.bas
+SRCLIST := $(filter-out $(SRCLIST_DOS_FILTER_OUT),$(SRCLIST))
+endif
 
 # ------------------------------------------------------------------------
 
@@ -72,6 +79,10 @@ FBCU_DIR := fbcunit
 FBCU_INC := $(abspath $(FBCU_DIR)/inc)
 FBCU_LIB := $(abspath $(FBCU_DIR)/lib)
 FBCU_BIN := $(FBCU_LIB)/libfbcunit.a
+FBCU_MAKE := $(MAKE)
+ifeq ($(HOST),dos)
+	FBCU_MAKE := make.exe
+endif
 
 FBCU_LIBS := -l fbcunit
 
@@ -79,7 +90,13 @@ ifeq ($(TARGET_OS),win32)
     FBCU_LIBS += -l user32
 endif
 
-FBC_CFLAGS := -c -w 3 -Wc -Wno-tautological-compare -i $(FBCU_INC) -m $(MAINBAS)
+FBC_CFLAGS := -c -w 3 -i $(FBCU_INC) -m $(MAINBAS)
+ifeq ($(TARGET_OS),dos)
+	FBC_CFLAGS += -i $(abspath ../inc)
+endif
+ifneq ($(TARGET_OS),dos)
+	FBC_CFLAGS += -Wc -Wno-tautological-compare
+endif
 ifneq ($(TARGET_OS),dos)
 	FBC_CFLAGS += -mt
 endif
@@ -152,7 +169,7 @@ all : make_fbcunit $(UNIT_TESTS_OBJ_LST) build_tests run_tests
 make_fbcunit : $(FBCU_BIN)
 
 $(FBCU_BIN) :
-	cd $(FBCU_DIR) && $(MAKE) FBC="$(FBC)" FPU=$(FPU) ARCH=$(ARCH) TARGET=$(TARGET)
+	$(FBCU_MAKE) -C $(FBCU_DIR) FBC="$(FBC)" FPU=$(FPU) ARCH=$(ARCH) TARGET=$(TARGET)
 
 # ------------------------------------------------------------------------
 # Auto-generate the file UNIT_TESTS_INC - needed by this makefile
@@ -179,6 +196,7 @@ $(UNIT_TESTS_INC) : $(DIRLIST_INC)
 $(UNIT_TESTS_OBJ_LST) : $(UNIT_TESTS_INC)
 	@$(GREP) $(UNIT_TESTS_INC) -i -e 'SRCLIST +=' \
 | $(SED) 's/^SRCLIST += \(.*\)\(\.b.*\)/\1\.o/g' \
+$(if $(filter dos,$(TARGET_OS)),-e '/^\.\/interactive\//d' -e '/^\.\/threads\//d' -e '/^\.\/compound\/select_const2\.o/d') \
 > $(UNIT_TESTS_OBJ_LST)
 
 # ------------------------------------------------------------------------
@@ -189,7 +207,9 @@ build_tests : ./$(MAINBAS).o $(OBJLIST) $(UNIT_TESTS_OBJ_LST)
 
 .PHONY: run_tests
 run_tests : build_tests
-ifneq ($(TARGET_OS),js)
+ifeq ($(HOST),dos)
+	$(MAINEXE) $(UNITTEST_RUN_ARGS)
+else ifneq ($(TARGET_OS),js)
 	./$(MAINEXE) $(UNITTEST_RUN_ARGS)
 else ifneq ($(NODEJS),)
 	$(NODEJS) ./$(MAINEXE) $(UNITTEST_RUN_ARGS)

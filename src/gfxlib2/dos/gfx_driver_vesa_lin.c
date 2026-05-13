@@ -58,7 +58,8 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 	if (fb_dos_vesa_set_mode(w, h, depth, TRUE))
 		return -1;
 	
-	refresh_rate = 60; /* FIXME */
+	if (refresh_rate <= 0)
+		refresh_rate = 60;
 	
 	fb_dos_lock_data(&video, sizeof(video));
 	fb_dos_lock_data(&blitter, sizeof(blitter));

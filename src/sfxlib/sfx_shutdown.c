@@ -50,6 +50,7 @@
 
 #include <stdio.h>
 
+#include "../rtlib/fb.h"
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
 #include "fb_sfx_driver.h"
@@ -81,6 +82,12 @@ void fb_sfxExit(void)
     int should_exit_core;
 
     fb_sfxRuntimeLock();
+
+    if (__fb_ctx.idle_sfxlib == fb_sfxCooperativeDelay)
+        __fb_ctx.idle_sfxlib = NULL;
+
+    if (__fb_ctx.exit_sfxlib == fb_sfxExit)
+        __fb_ctx.exit_sfxlib = NULL;
 
     if (__fb_sfx == NULL)
     {
@@ -124,6 +131,12 @@ void fb_sfxExit(void)
 void fb_sfxAbort(void)
 {
     fb_sfxRuntimeLock();
+
+    if (__fb_ctx.idle_sfxlib == fb_sfxCooperativeDelay)
+        __fb_ctx.idle_sfxlib = NULL;
+
+    if (__fb_ctx.exit_sfxlib == fb_sfxExit)
+        __fb_ctx.exit_sfxlib = NULL;
 
     if (!__fb_sfx)
     {

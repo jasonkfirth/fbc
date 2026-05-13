@@ -42,14 +42,6 @@
 
 #include <math.h>
 
-#if defined(_WIN32)
-#include <windows.h>
-#elif defined(__DJGPP__)
-#include <dos.h>
-#else
-#include <time.h>
-#endif
-
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
 
@@ -65,30 +57,6 @@
 #define FB_SFX_BEEP_MIN_FREQ 1
 #define FB_SFX_BEEP_MAX_FREQ 20000
 
-
-/* ------------------------------------------------------------------------- */
-/* Foreground timing helpers                                                 */
-/* ------------------------------------------------------------------------- */
-
-static void fb_sfxBeepSleepMs(unsigned long milliseconds)
-{
-    if (milliseconds == 0)
-        return;
-
-#if defined(_WIN32)
-    Sleep((DWORD)milliseconds);
-#elif defined(__DJGPP__)
-    delay((unsigned)milliseconds);
-#else
-    {
-        struct timespec req;
-
-        req.tv_sec = (time_t)(milliseconds / 1000UL);
-        req.tv_nsec = (long)((milliseconds % 1000UL) * 1000000UL);
-        nanosleep(&req, NULL);
-    }
-#endif
-}
 
 static int fb_sfxBeepDurationFrames(float duration)
 {
@@ -107,47 +75,12 @@ static int fb_sfxBeepDurationFrames(float duration)
 static void fb_sfxBeepRunForeground(float duration)
 {
     int frames;
-    int tick_frames;
-    int samplerate;
 
     frames = fb_sfxBeepDurationFrames(duration);
     if (frames <= 0)
         return;
 
-    samplerate = (__fb_sfx && __fb_sfx->samplerate > 0)
-        ? __fb_sfx->samplerate
-        : 0;
-
-    tick_frames = (samplerate > 0)
-        ? (samplerate / 20)
-        : 220;
-
-    if (tick_frames <= 0)
-        tick_frames = 220;
-
-    fb_sfxForegroundFeedBegin();
-
-    while (frames > 0)
-    {
-        unsigned long milliseconds;
-        int step;
-
-        step = (frames > tick_frames) ? tick_frames : frames;
-
-        fb_sfxUpdate(step);
-
-        if (samplerate > 0)
-        {
-            milliseconds = (unsigned long)(((unsigned long long)step * 1000ULL) / (unsigned long long)samplerate);
-            if (milliseconds == 0)
-                milliseconds = 1;
-            fb_sfxBeepSleepMs(milliseconds);
-        }
-
-        frames -= step;
-    }
-
-    fb_sfxForegroundFeedEnd();
+    fb_sfxRunForeground(frames);
 }
 
 
@@ -214,8 +147,6 @@ void fb_sfxBeep(void)
 
 void fb_sfxBeepEx(int frequency, float duration)
 {
-    FB_SFXVOICE *voice;
-
     if (!fb_sfxEnsureInitialized())
         return;
 
@@ -225,25 +156,12 @@ void fb_sfxBeepEx(int frequency, float duration)
     if (duration <= 0.0f)
         duration = FB_SFX_BEEP_DURATION;
 
-    voice = fb_sfxVoiceAlloc();
-
-    if (!voice)
-        return;
-
-    voice->channel = 0;
-
-    fb_sfxVoiceSetWaveform(voice, FB_SFX_WAVE_SQUARE);
-    fb_sfxVoiceSetFrequency(voice, frequency);
-
-    voice->volume = FB_SFX_BEEP_VOLUME;
-    voice->length = 0;
-
-    if (__fb_sfx->samplerate > 0)
-        voice->length = (int)(duration * (float)__fb_sfx->samplerate);
-
-    voice->position = 0;
-
-    fb_sfxVoiceSetEnvelope(voice, 0);
+    fb_sfxSoundQueue(0,
+                     frequency,
+                     duration,
+                     FB_SFX_BEEP_VOLUME,
+                     FB_SFX_WAVE_SQUARE,
+                     0);
 
     SFX_DEBUG(
         "sfx_beep: freq=%d duration=%f",

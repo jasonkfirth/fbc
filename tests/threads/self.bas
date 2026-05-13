@@ -5,7 +5,9 @@
 #define ENABLE_CHECK_BUGS 0
 #endif
 
-#if defined( __FB_JS__ )
+#if defined( __FB_DOS__ )
+#define ENABLE_TEST 0
+#elseif defined( __FB_JS__ )
 #define ENABLE_TEST ENABLE_CHECK_BUGS
 #else
 #define ENABLE_TEST 1

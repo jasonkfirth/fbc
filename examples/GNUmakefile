@@ -66,6 +66,7 @@ THREADS		:= $(subst .bas,,$(wildcard threads/*.bas)) \
 			threads/timer-lib/libtimer$(DLLEXT) threads/timer-lib/test
 UNICODE		:= $(subst .bas,,$(wildcard unicode/*.bas))
 WIN32		:= $(subst .bas,,$(wildcard win32/*.bas win32/*/*.bas win32/*/*/*.bas))
+XPAD		:= $(subst .bas,,$(wildcard xpad/*.bas))
 XML		:= $(subst .bas,,$(wildcard xml/*.bas))
 
 LOCAL_MODULES := \
@@ -110,7 +111,7 @@ ALL_FILES := \
 	$(BASICS) $(COMPRESSION) $(CONSOLE) $(DATABASE) \
 	$(DLL) $(DOS) $(FILES) $(GRAPHICS) $(GUI) $(MANUAL) \
 	$(MATH) $(MISC) $(NETWORK) $(OPTIMIZE) $(REGEX) $(SFXLIB) $(SOUND) \
-	$(THREADS) $(UNICODE) $(WIN32) $(XML) $(LOCAL_LIBS)
+	$(THREADS) $(UNICODE) $(WIN32) $(XPAD) $(XML) $(LOCAL_LIBS)
 
 all: $(ALL_FILES)
 
@@ -135,6 +136,7 @@ sound: $(SOUND)
 threads: $(THREADS)
 unicode: $(UNICODE)
 win32: $(WIN32)
+xpad: $(XPAD)
 xml: $(XML)
 
 

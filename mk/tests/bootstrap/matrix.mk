@@ -30,6 +30,16 @@ BOOTSTRAP_TEST_ARCHES := \
 	mingw-x86_64 \
 	mingw-x86
 
+BOOTSTRAP_REQUIRED_EMIT_MATRIX := \
+	win64:win64:x86_64-w64-mingw32 \
+	win32-aarch64:win32-aarch64:aarch64-w64-mingw32 \
+	darwin-aarch64:darwin-aarch64:aarch64-apple-darwin \
+	freebsd-aarch64:freebsd-aarch64:aarch64-unknown-freebsd \
+	netbsd-aarch64:netbsd-aarch64:aarch64-unknown-netbsd \
+	openbsd-aarch64:openbsd-aarch64:aarch64-unknown-openbsd \
+	dragonfly-aarch64:dragonfly-aarch64:aarch64-unknown-dragonfly \
+	haiku-aarch64:haiku-aarch64:aarch64-unknown-haiku
+
 .PHONY: bootstrap-dist-matrix-test
 bootstrap-dist-matrix-test:
 	$(call _mt_echo,Testing bootstrap distribution matrix)
@@ -73,6 +83,13 @@ bootstrap-dist-matrix-test:
 .PHONY: bootstrap-emit-matrix-test
 bootstrap-emit-matrix-test:
 	$(call _mt_echo,Testing bootstrap emission matrix)
+	@set -e; \
+	for spec in $(BOOTSTRAP_REQUIRED_EMIT_MATRIX); do \
+		case " $(BOOTSTRAP_MATRIX) " in \
+		*" $$spec "*) ;; \
+		*) echo "ERROR: bootstrap emit matrix missing $$spec"; exit 1 ;; \
+		esac; \
+	done
 	@rm -rf bootstrap/linux-emit-matrix-a
 	$(call _mt_run,$(MAKE) bootstrap-emit-matrix BOOTSTRAP_MATRIX='linux-emit-matrix-a')
 	@test -d bootstrap/linux-emit-matrix-a || { echo "ERROR: bootstrap/linux-emit-matrix-a missing"; exit 1; }

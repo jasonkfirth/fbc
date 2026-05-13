@@ -110,6 +110,9 @@ int fb_sfxInit(void)
         return -1;
     }
 
+    if (__fb_ctx.idle_sfxlib == NULL)
+        __fb_ctx.idle_sfxlib = fb_sfxCooperativeDelay;
+
     SFX_DEBUG("sfx_init: sound subsystem ready");
 
     fb_sfxRuntimeUnlock();

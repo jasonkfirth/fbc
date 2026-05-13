@@ -21,11 +21,11 @@ What it does:
 - reads the `BLASTER` environment string
 - pulls out the base port, IRQ, DMA channels, MPU port, and card type
 - resets the DSP
-- sends mixed audio out through a simple direct-DAC playback path
+- sends mixed audio out through a simple single-cycle DMA playback path
 - exports the DOS driver list
 
 Current limitation:
-- this direct-DAC path is synchronous and does not yet provide a background pump for unattended streaming commands; future DOS work should move to a DMA/IRQ-driven feed model instead of copying the threaded Unix/macOS approach
+- this playback path is synchronous; unattended streaming commands advance while DOS programs are waiting in `SLEEP`/`DELAY`, but a future IRQ-driven or threaded feed model would be a better fit for true background playback during CPU-bound BASIC code
 
 Main routines:
 - `fb_sfxMsdosParseBlaster()`

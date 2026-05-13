@@ -760,6 +760,11 @@ private function hMultithread_cb _
 		byval sym as FBSYMBOL ptr _
 	) as integer
 
+	if( env.clopt.target = FB_COMPTARGET_DOS ) then
+		errReport( FB_ERRMSG_UNSUPPORTEDFUNCTION )
+		return FALSE
+	end if
+
 	if( env.clopt.multithreaded = FALSE ) then
 		'' restart the parser so __FB_MT__ can be checked on the next pass
 		if( ( env.restart_status and FB_RESTART_PARSER_MT ) = 0 ) then
@@ -782,6 +787,10 @@ private function hThreadCall_cb _
 	'' minor optimization to avoid having to lookup env.libs hash
 	fbRestartableStaticVariable( integer, libsAdded, FALSE )
 
+	if( hMultithread_cb( sym ) = FALSE ) then
+		return FALSE
+	end if
+
 	if( libsadded = FALSE ) then
 		libsAdded = TRUE
 		if( env.clopt.target <> FB_COMPTARGET_XBOX ) then
@@ -789,7 +798,7 @@ private function hThreadCall_cb _
 		end if
 	end if
 
-	return hMultithread_cb( sym )
+	return TRUE
 end function
 
 '':::::

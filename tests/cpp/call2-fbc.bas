@@ -7,7 +7,7 @@
 	#inclib "c++"
 #else
 	#ifdef __FB_DOS__
-		#inclib "stdcx"
+		#inclib "stdcxx"
 	#else
 		#inclib "stdc++"
 	#endif

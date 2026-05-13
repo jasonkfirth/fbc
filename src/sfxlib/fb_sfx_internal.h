@@ -126,6 +126,7 @@ void fb_sfxDriverIoLock(void);
 void fb_sfxDriverIoUnlock(void);
 int fb_sfxDriverFeedsAudio(void);
 void fb_sfxRunForeground(int frames);
+int fb_sfxCooperativeDelay(int msecs);
 void fb_sfxForegroundFeedBegin(void);
 void fb_sfxForegroundFeedEnd(void);
 int fb_sfxForegroundFeedActive(void);
@@ -379,6 +380,12 @@ void fb_sfxUpdate(int frames);
 void fb_sfxBeep(void);
 void fb_sfxBeepEx(int frequency, float duration);
 void fb_sfxBeepPitch(float duration, float pitch);
+void fb_sfxSoundQueue(int channel,
+                      int frequency,
+                      float duration,
+                      float volume,
+                      int waveform,
+                      int start_delay);
 void fb_sfxSound(int frequency, float duration);
 void fb_sfxSoundChannel(int channel, int frequency, float duration, float volume);
 void fb_sfxSoundLegacy2(int a, int b);

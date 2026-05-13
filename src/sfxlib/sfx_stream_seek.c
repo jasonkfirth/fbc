@@ -44,6 +44,7 @@ extern FILE *g_stream_file;
 extern int   g_stream_frames;
 extern int   g_stream_open;
 extern int   g_stream_position;
+extern float g_stream_sample_pos;
 
 
 /* ------------------------------------------------------------------------- */
@@ -87,6 +88,7 @@ int fb_sfxStreamSeek(long position)
     }
 
     g_stream_position = (int)position;
+    g_stream_sample_pos = (float)g_stream_position;
     fb_sfxRuntimeUnlock();
 
     return 0;

@@ -20,6 +20,15 @@ include $(mkpath)/supported_targets.mk
 BOOTSTRAP_DIR := $(if $(strip $(FBTARGET_DIR_OVERRIDE)),$(FBTARGET_DIR_OVERRIDE),$(FBTARGET))
 BOOTSTRAP_MATRIX := $(SUPPORTED_BOOTSTRAP_TARGETS)
 
+#
+# BOOTSTRAP_MATRIX accepts either modern matrix entries:
+#
+#   fbc-target:bootstrap-dir:target-triplet
+#
+# or a legacy bare bootstrap directory name. The bare form is kept for local
+# one-off testing and older scripts that override BOOTSTRAP_MATRIX directly.
+#
+
 ##############################################################################
 # Distribution tools
 ##############################################################################
@@ -88,9 +97,34 @@ bootstrap-dist-target: bootstrap-check bootstrap-emit
 ##############################################################################
 
 bootstrap-emit-matrix:
-	@for d in $(BOOTSTRAP_MATRIX); do \
-		echo "==> Generating bootstrap sources for $$d"; \
-		$(MAKE) bootstrap-emit FBTARGET_DIR_OVERRIDE=$$d; \
+	@set -e; \
+	for spec in $(BOOTSTRAP_MATRIX); do \
+		fbc_target=; \
+		dir=; \
+		target_triplet=; \
+		case "$$spec" in \
+		*:*:*) \
+			fbc_target=$${spec%%:*}; \
+			rest=$${spec#*:}; \
+			dir=$${rest%%:*}; \
+			target_triplet=$${rest#*:}; \
+			;; \
+		*:*) \
+			fbc_target=$${spec%%:*}; \
+			dir=$${spec#*:}; \
+			;; \
+		*) \
+			dir=$$spec; \
+			;; \
+		esac; \
+		test -n "$$dir" || { echo "ERROR: empty bootstrap matrix directory in '$$spec'"; exit 1; }; \
+		echo "==> Generating bootstrap sources for $$dir"; \
+		test -z "$$fbc_target" || echo "==> fbc target: $$fbc_target"; \
+		test -z "$$target_triplet" || echo "==> target triplet: $$target_triplet"; \
+		make_args="FBTARGET_DIR_OVERRIDE=$$dir"; \
+		test -z "$$fbc_target" || make_args="$$make_args FBC_TARGET=$$fbc_target"; \
+		test -z "$$target_triplet" || make_args="$$make_args TARGET_TRIPLET=$$target_triplet"; \
+		$(MAKE) bootstrap-emit $$make_args; \
 	done
 
 ##############################################################################
@@ -104,9 +138,20 @@ bootstrap-dist: bootstrap-dist-target
 ##############################################################################
 
 bootstrap-dist-arm:
-	@for d in linux-armel linux-armhf linux-arm64; do \
-		echo "==> Generating bootstrap archive for $$d"; \
-		$(MAKE) bootstrap-dist-target FBTARGET_DIR_OVERRIDE=$$d; \
+	@set -e; \
+	for spec in \
+		linux-arm:linux-armel:arm-linux-gnueabi \
+		linux-arm:linux-armhf:arm-linux-gnueabihf \
+		linux-aarch64:linux-arm64:aarch64-linux-gnu; do \
+		fbc_target=$${spec%%:*}; \
+		rest=$${spec#*:}; \
+		dir=$${rest%%:*}; \
+		target_triplet=$${rest#*:}; \
+		echo "==> Generating bootstrap archive for $$dir"; \
+		$(MAKE) bootstrap-dist-target \
+			FBC_TARGET="$$fbc_target" \
+			FBTARGET_DIR_OVERRIDE="$$dir" \
+			TARGET_TRIPLET="$$target_triplet"; \
 	done
 
 ##############################################################################
@@ -114,9 +159,34 @@ bootstrap-dist-arm:
 ##############################################################################
 
 bootstrap-dist-all:
-	@for d in $(BOOTSTRAP_MATRIX); do \
-		echo "==> Generating bootstrap archive for $$d"; \
-		$(MAKE) bootstrap-dist-target FBTARGET_DIR_OVERRIDE=$$d; \
+	@set -e; \
+	for spec in $(BOOTSTRAP_MATRIX); do \
+		fbc_target=; \
+		dir=; \
+		target_triplet=; \
+		case "$$spec" in \
+		*:*:*) \
+			fbc_target=$${spec%%:*}; \
+			rest=$${spec#*:}; \
+			dir=$${rest%%:*}; \
+			target_triplet=$${rest#*:}; \
+			;; \
+		*:*) \
+			fbc_target=$${spec%%:*}; \
+			dir=$${spec#*:}; \
+			;; \
+		*) \
+			dir=$$spec; \
+			;; \
+		esac; \
+		test -n "$$dir" || { echo "ERROR: empty bootstrap matrix directory in '$$spec'"; exit 1; }; \
+		echo "==> Generating bootstrap archive for $$dir"; \
+		test -z "$$fbc_target" || echo "==> fbc target: $$fbc_target"; \
+		test -z "$$target_triplet" || echo "==> target triplet: $$target_triplet"; \
+		make_args="FBTARGET_DIR_OVERRIDE=$$dir"; \
+		test -z "$$fbc_target" || make_args="$$make_args FBC_TARGET=$$fbc_target"; \
+		test -z "$$target_triplet" || make_args="$$make_args TARGET_TRIPLET=$$target_triplet"; \
+		$(MAKE) bootstrap-dist-target $$make_args; \
 	done
 
 ##############################################################################

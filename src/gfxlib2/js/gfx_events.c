@@ -41,7 +41,7 @@ void fb_js_events_check(void)
                 EVENT e =
                 {
                     .type = EVENT_MOUSE_BUTTON_PRESS,
-                    .button = fb_js_sdl_buttons_to_fb_buttons(event.button.button),
+                    .button = fb_js_sdl_button_to_fb_button(event.button.button),
                 };
 
                 fb_hPostEvent(&e);
@@ -53,7 +53,7 @@ void fb_js_events_check(void)
                 EVENT e =
                 {
                     .type = EVENT_MOUSE_BUTTON_RELEASE,
-                    .button = fb_js_sdl_buttons_to_fb_buttons(event.button.button),
+                    .button = fb_js_sdl_button_to_fb_button(event.button.button),
                 };
 
                 fb_hPostEvent(&e);

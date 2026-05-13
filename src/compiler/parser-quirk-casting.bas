@@ -8,6 +8,17 @@
 #include once "parser.bi"
 #include once "ast.bi"
 
+private function hFloatConstIsZero( byval expr as ASTNODE ptr ) as integer
+	assert( astIsCONST( expr ) )
+
+	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
+		dim as ulongint bits = *cptr( ulongint ptr, @expr->val.f )
+		function = ((bits and &h7FFFFFFFFFFFFFFFull) = 0)
+	#else
+		function = (expr->val.f = 0.0)
+	#endif
+end function
+
 '':::::
 ''TypeConvExpr      =    (C### '(' expression ')') .
 ''
@@ -115,14 +126,31 @@ function cTypeConvExpr _
 		dtype = typeToUnsigned( astGetFullType( expr ) )
 	end select
 
-	expr = astNewCONV( dtype, NULL, expr, AST_CONVOPT_CHECKSTR or AST_CONVOPT_EXACT_CAST, @errmsg )
-	if( expr = NULL ) then
-		if( errmsg = FB_ERRMSG_OK ) then
-			errmsg = FB_ERRMSG_TYPEMISMATCH
-		end if
-		errReport( errmsg, TRUE )
+	dim as integer conv_done = FALSE
 
-		expr = astNewCONSTi( 0 )
+	if( (tk = FB_TK_CBOOL) andalso astIsCONST( expr ) ) then
+		if( typeGetClass( astGetFullType( expr ) ) = FB_DATACLASS_FPOINT ) then
+			if( hFloatConstIsZero( expr ) ) then
+				astDelNode( expr )
+				expr = astNewCONSTi( 0, FB_DATATYPE_BOOLEAN )
+			else
+				astDelNode( expr )
+				expr = astNewCONSTi( -1, FB_DATATYPE_BOOLEAN )
+			end if
+			conv_done = TRUE
+		end if
+	end if
+
+	if( conv_done = FALSE ) then
+		expr = astNewCONV( dtype, NULL, expr, AST_CONVOPT_CHECKSTR or AST_CONVOPT_EXACT_CAST, @errmsg )
+		if( expr = NULL ) then
+			if( errmsg = FB_ERRMSG_OK ) then
+				errmsg = FB_ERRMSG_TYPEMISMATCH
+			end if
+			errReport( errmsg, TRUE )
+
+			expr = astNewCONSTi( 0 )
+		end if
 	end if
 
 	'' ')'

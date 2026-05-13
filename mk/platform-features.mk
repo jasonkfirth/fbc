@@ -154,7 +154,7 @@ ifeq ($(TARGET_OS),js)
   THREAD_MODEL :=
 endif
 
-# DOS stays single-threaded unless explicitly extended elsewhere
+# DOS has no runtime provider for parallel threads.
 ifeq ($(TARGET_OS),dos)
   DISABLE_MT := YesPlease
   THREAD_MODEL :=

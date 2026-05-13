@@ -32,8 +32,8 @@ SUITE( fbc_tests.expressions.int_only_bops )
 			end scope
 		#endmacro
 
-		testBop( 1230000000000ll, \, 10 ^ 10, 123 )
-		testBop( (10 ^ 10) * 123, \, 10000000000ll, 123 )
+		testBop( 1230000000000ll, \, 10000000000.0, 123 )
+		testBop( 10000000000.0 * 123, \, 10000000000ll, 123 )
 	END_TEST
 
 END_SUITE

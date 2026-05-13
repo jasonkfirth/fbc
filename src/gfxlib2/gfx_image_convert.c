@@ -2,8 +2,6 @@
 
 #include "fb_gfx.h"
 
-/* !!!FIXME!!! little-endian only */
-
 /* Caller is expected to hold FB_GRAPHICS_LOCK() */
 void fb_image_convert_8to8(const unsigned char *src, unsigned char *dest, int w)
 {
@@ -64,12 +62,12 @@ void fb_image_convert_24to32(const unsigned char *src, unsigned char *dest, int 
 void fb_image_convert_32to16(const unsigned char *src, unsigned char *dest, int w)
 {
 	unsigned short *d = (unsigned short *)dest;
-	unsigned int c;
 
 	for (; w; w--)
 	{
-		c = *(unsigned int *)src & 0x00FFFFFF;
-		*d++ = (unsigned short)((c >> (16+3)) | ((c >> 5) & 0x07E0) | ((c << 8) & 0xF800));
+		*d++ = (unsigned short)((((unsigned short)src[0] << 8) & 0xF800) |
+		                        (((unsigned short)src[1] << 3) & 0x07E0) |
+		                        ((unsigned short)src[2] >> 3));
 		src += sizeof( unsigned int );
 	}
 }
@@ -77,12 +75,13 @@ void fb_image_convert_32to16(const unsigned char *src, unsigned char *dest, int 
 void fb_image_convert_32to32(const unsigned char *src, unsigned char *dest, int w)
 {
 	unsigned int *d = (unsigned int *)dest;
-	unsigned int c;
 
 	for (; w; w--)
 	{
-		c = *(unsigned int *)src;
-		*d++ = (c >> 16) | (c & 0xFF00FF00) | (c << 16);
+		*d++ = ((unsigned int)src[3] << 24) |
+		       ((unsigned int)src[0] << 16) |
+		       ((unsigned int)src[1] << 8) |
+		       ((unsigned int)src[2]);
 		src += sizeof( unsigned int );
 	}
 }
@@ -101,7 +100,7 @@ void fb_image_convert_24bgrto32(const unsigned char *src, unsigned char *dest, i
 	unsigned int *d = (unsigned int *)dest;
 
 	for (; w; w--) {
-		*d++ = 0xFF000000 | (*(unsigned int *)src & 0xFFFFFF);
+		*d++ = 0xFF000000 | ((unsigned int)src[2] << 16) | ((unsigned int)src[1] << 8) | ((unsigned int)src[0]);
 		src += 3;
 	}
 }
@@ -109,17 +108,26 @@ void fb_image_convert_24bgrto32(const unsigned char *src, unsigned char *dest, i
 void fb_image_convert_32bgrto16(const unsigned char *src, unsigned char *dest, int w)
 {
 	unsigned short *d = (unsigned short *)dest;
-	const unsigned int *s = (const unsigned int *)src;
 
 	for (; w; w--) {
-		*d++ = (unsigned short)(((*s & 0xFF) >> 3) | ((*s >> 5) & 0x07E0) | ((*s >> 8) & 0xF800));
-		s++;
+		*d++ = (unsigned short)(((unsigned short)src[0] >> 3) |
+		                        (((unsigned short)src[1] << 3) & 0x07E0) |
+		                        (((unsigned short)src[2] << 8) & 0xF800));
+		src += sizeof( unsigned int );
 	}
 }
 
 void fb_image_convert_32bgrto32(const unsigned char *src, unsigned char *dest, int w)
 {
-	fb_hMemCpy(dest, src, w << 2);
+	unsigned int *d = (unsigned int *)dest;
+
+	for (; w; w--) {
+		*d++ = ((unsigned int)src[3] << 24) |
+		       ((unsigned int)src[2] << 16) |
+		       ((unsigned int)src[1] << 8) |
+		       ((unsigned int)src[0]);
+		src += sizeof( unsigned int );
+	}
 }
 
 FBCALL void fb_GfxImageConvertRow( const unsigned char *src, int src_bpp,

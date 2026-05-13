@@ -1,7 +1,4 @@
 #include "../fb.h"
-#if defined ENABLE_MT
-	#include "../fb_private_thread.h"
-#endif
 #include <unistd.h>
 #include <time.h>
 #include <dpmi.h>
@@ -21,8 +18,6 @@
 
 extern unsigned int __fb_dos_no_dpmi_yield;
 unsigned int __fb_dos_no_dpmi_yield = 0;
-
-#if !defined(ENABLE_MT)
 
 /* usleep() copied from djgpp libc implementation */
 static unsigned int usleep_private(unsigned int _useconds)
@@ -45,13 +40,12 @@ static unsigned int usleep_private(unsigned int _useconds)
 	}
 	return 0;
 }
-#endif /* !defined(ENABLE_MT) */
 
 FBCALL void fb_Delay( int msecs )
 {
-#if defined ENABLE_MT
-	__pthread_usleep(msecs * 1000);
-#else
+	if( msecs > 0 && __fb_ctx.idle_sfxlib && __fb_ctx.idle_sfxlib( msecs ) )
+		return;
+
 	if( __fb_dos_no_dpmi_yield )
 	{
 		usleep_private(msecs * 1000);
@@ -60,5 +54,4 @@ FBCALL void fb_Delay( int msecs )
 	{
 		usleep(msecs * 1000);
 	}
-#endif
 }

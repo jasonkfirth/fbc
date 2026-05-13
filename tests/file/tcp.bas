@@ -2,7 +2,7 @@
 
 #if defined(__FB_DOS__) or defined(__FB_JS__) or defined(__FB_XBOX__)
 	end 0
-#endif
+#else
 
 const TEST_PORT = 19091
 
@@ -249,3 +249,5 @@ ASSERT( server_put_recv(0) = 10 )
 ASSERT( server_put_recv(1) = 11 )
 ASSERT( server_put_recv(2) = 12 )
 ASSERT( server_put_recv(3) = 13 )
+
+#endif

@@ -73,6 +73,10 @@ static void fb_sfxOutputQueueShutdownLocked(void);
 static int fb_sfxOutputQueueFillLocked(int frames);
 static int fb_sfxOutputQueueDrainLocked(int frames);
 static void fb_sfxSleepMs(unsigned long milliseconds);
+static int fb_sfxCurrentDriverBlocksLocked(void);
+static int fb_sfxCurrentDriverBlocks(void);
+static int fb_sfxCurrentDriverIsNull(void);
+static int fb_sfxUpdateDelayFrames(int msecs, int return_after_update);
 static int fb_sfxDriverNameEquals(const char *a, const char *b);
 static int fb_sfxDriverTryByName(const char *name);
 static int g_foreground_feed_count = 0;
@@ -361,6 +365,7 @@ void fb_sfxUpdate(int frames)
 
 void fb_sfxRunForeground(int frames)
 {
+    int driver_blocks_audio;
     int step;
     int tick_frames;
     int samplerate;
@@ -375,6 +380,18 @@ void fb_sfxRunForeground(int frames)
     tick_frames = (samplerate > 0)
         ? (samplerate / 20)
         : 220;
+
+    driver_blocks_audio = fb_sfxCurrentDriverBlocks();
+
+    /*
+        DOS Sound Blaster and PC speaker writes consume wall-clock time while
+        the caller is inside driver->write().  Sleeping again after those
+        writes creates audible gaps between chunks.  Worker-driven and null
+        drivers still need the explicit delay to preserve foreground command
+        timing.
+    */
+    if (driver_blocks_audio && __fb_sfx && __fb_sfx->buffer_frames > 0)
+        tick_frames = __fb_sfx->buffer_frames;
 
     if (tick_frames <= 0)
         tick_frames = 220;
@@ -394,7 +411,7 @@ void fb_sfxRunForeground(int frames)
 
         fb_sfxUpdate(step);
 
-        if (samplerate > 0)
+        if (samplerate > 0 && !driver_blocks_audio)
         {
             milliseconds = (unsigned long)(((unsigned long long)step * 1000ULL) / (unsigned long long)samplerate);
             if (milliseconds == 0)
@@ -406,6 +423,38 @@ void fb_sfxRunForeground(int frames)
     }
 
     fb_sfxForegroundFeedEnd();
+}
+
+/*
+    DOS cooperative delay
+
+    The DOS drivers are synchronous and do not own a worker thread.  Background
+    sound commands still need time to advance while a program is waiting in
+    SLEEP/DELAY.  fb_Delay() calls this hook before entering the normal DOS
+    sleep path, allowing sfxlib to turn that wait time into generated audio.
+
+    Drivers that block in write() consume the wait themselves and return 1 so
+    fb_Delay() does not sleep a second time.  The null driver is pumped for
+    diagnostics but returns 0 so the caller still observes the requested delay.
+*/
+
+int fb_sfxCooperativeDelay(int msecs)
+{
+#if defined(__DJGPP__)
+    if (msecs <= 0)
+        return 0;
+
+    if (fb_sfxCurrentDriverBlocks())
+        return fb_sfxUpdateDelayFrames(msecs, 1);
+
+    if (fb_sfxCurrentDriverIsNull())
+        (void)fb_sfxUpdateDelayFrames(msecs, 0);
+
+    return 0;
+#else
+    (void)msecs;
+    return 0;
+#endif
 }
 
 static void fb_sfxSleepMs(unsigned long milliseconds)
@@ -426,6 +475,95 @@ static void fb_sfxSleepMs(unsigned long milliseconds)
         nanosleep(&req, NULL);
     }
 #endif
+}
+
+static int fb_sfxCurrentDriverBlocksLocked(void)
+{
+    const SFXDRIVER *driver;
+
+    if (!__fb_sfx || __fb_sfx->shutting_down)
+        return 0;
+
+    driver = __fb_sfx->driver;
+    if (!driver)
+        return 0;
+
+    return ((driver->capabilities & FB_SFX_DRIVER_CAP_BLOCKING) != 0);
+}
+
+static int fb_sfxCurrentDriverBlocks(void)
+{
+    int result;
+
+    fb_sfxRuntimeLock();
+    result = fb_sfxCurrentDriverBlocksLocked();
+    fb_sfxRuntimeUnlock();
+
+    return result;
+}
+
+static int fb_sfxCurrentDriverIsNull(void)
+{
+    int result;
+
+    result = 0;
+
+    fb_sfxRuntimeLock();
+
+    if (__fb_sfx && __fb_sfx->driver && !__fb_sfx->shutting_down)
+        result = fb_sfxDriverNameEquals(__fb_sfx->driver->name, "null");
+
+    fb_sfxRuntimeUnlock();
+
+    return result;
+}
+
+static int fb_sfxUpdateDelayFrames(int msecs, int return_after_update)
+{
+    long long frames_left;
+    int buffer_frames;
+    int samplerate;
+    int step_frames;
+
+    fb_sfxRuntimeLock();
+
+    samplerate = (__fb_sfx && __fb_sfx->samplerate > 0)
+        ? __fb_sfx->samplerate
+        : 0;
+
+    buffer_frames = (__fb_sfx && __fb_sfx->buffer_frames > 0)
+        ? __fb_sfx->buffer_frames
+        : 0;
+
+    fb_sfxRuntimeUnlock();
+
+    if (samplerate <= 0)
+        return 0;
+
+    frames_left = (((long long)msecs * (long long)samplerate) + 999LL) / 1000LL;
+    if (frames_left <= 0)
+        frames_left = 1;
+
+    step_frames = (buffer_frames > 0)
+        ? buffer_frames
+        : (samplerate / 20);
+
+    if (step_frames <= 0)
+        step_frames = 220;
+
+    while (frames_left > 0)
+    {
+        int step;
+
+        step = (frames_left > (long long)step_frames)
+            ? step_frames
+            : (int)frames_left;
+
+        fb_sfxUpdate(step);
+        frames_left -= step;
+    }
+
+    return return_after_update;
 }
 
 

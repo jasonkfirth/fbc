@@ -384,6 +384,7 @@ typedef struct FB_RTLIB_CTX_ {
 	int             do_file_reset;
 	int             lang;
 	void          (*exit_sfxlib)(void);
+	int           (*idle_sfxlib)(int msecs);
 	void          (*exit_gfxlib2)(void);
 } FB_RTLIB_CTX;
 

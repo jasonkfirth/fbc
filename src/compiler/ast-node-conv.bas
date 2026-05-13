@@ -9,6 +9,52 @@
 #include once "rtl.bi"
 #include once "ast.bi"
 
+private function hConstCastFloatToULongint( byval f as double ) as ulongint
+	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
+		dim as ulongint bits = *cptr( ulongint ptr, @f )
+		dim as integer rawexp = (bits shr 52) and &h7FF
+		dim as integer expnt = rawexp - 1023
+
+		'' DJGPP's direct DOUBLE -> ULONGINT conversion does not match
+		'' FreeBASIC's round-to-nearest rules on all DOS hosts.  For
+		'' positive finite constants, round the IEEE mantissa directly.
+		if( ((bits and &h8000000000000000ull) = 0) andalso _
+		    (rawexp <> 0) andalso (rawexp <> &h7FF) ) then
+			dim as ulongint mant = (bits and &h000FFFFFFFFFFFFFull) or &h0010000000000000ull
+
+			if( expnt < -1 ) then
+				function = 0
+			elseif( expnt = -1 ) then
+				if( mant > &h0010000000000000ull ) then
+					function = 1
+				else
+					function = 0
+				end if
+			elseif( expnt < 52 ) then
+				dim as integer shift = 52 - expnt
+				dim as ulongint result = mant shr shift
+				dim as ulongint remainder = mant and ((1ull shl shift) - 1ull)
+				dim as ulongint half = 1ull shl (shift - 1)
+
+				if( (remainder > half) or _
+				    ((remainder = half) andalso ((result and 1ull) <> 0)) ) then
+					result += 1
+				end if
+
+				function = result
+			elseif( expnt <= 63 ) then
+				function = mant shl (expnt - 52)
+			else
+				function = 0
+			end if
+		else
+			function = hCastFloatToULongint( f )
+		end if
+	#else
+		function = hCastFloatToULongint( f )
+	#endif
+end function
+
 private sub hConstConv( byval todtype as integer, byval l as ASTNODE ptr )
 	dim as integer ldtype = any
 
@@ -31,7 +77,11 @@ private sub hConstConv( byval todtype as integer, byval l as ASTNODE ptr )
 			'' SINGLE/DOUBLE -> DOUBLE:
 			'' Nothing to do, since float constants are stored as DOUBLE
 		case FB_SIZETYPE_BOOLEAN
-			l->val.i = cbool( l->val.f )
+			if( astConstEqZero( l ) ) then
+				l->val.i = 0
+			else
+				l->val.i = -1
+			end if
 		case FB_SIZETYPE_INT8
 			l->val.i = cbyte( l->val.f )
 		case FB_SIZETYPE_UINT8
@@ -47,7 +97,7 @@ private sub hConstConv( byval todtype as integer, byval l as ASTNODE ptr )
 		case FB_SIZETYPE_INT64
 			l->val.i = clngint( l->val.f )
 		case FB_SIZETYPE_UINT64
-			l->val.i = hCastFloatToULongint( l->val.f )
+			l->val.i = hConstCastFloatToULongint( l->val.f )
 		end select
 	elseif( typeIsSigned( ldtype ) ) then
 		select case as const( typeGetSizeType( todtype ) )

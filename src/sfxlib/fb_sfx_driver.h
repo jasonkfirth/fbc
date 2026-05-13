@@ -56,6 +56,11 @@ extern "C" {
 
     The runtime may adjust behavior depending on the features
     available from the backend.
+
+    BLOCKING means driver.write() consumes the corresponding playback time
+    before returning.  Synchronous DOS hardware paths use this so foreground
+    commands and DOS delay pumping do not sleep a second time after audio has
+    already been emitted.
 */
 
 #define FB_SFX_DRIVER_CAP_CAPTURE     0x0001
@@ -63,6 +68,7 @@ extern "C" {
 #define FB_SFX_DRIVER_CAP_STREAM      0x0004
 #define FB_SFX_DRIVER_CAP_LOOPBACK    0x0008
 #define FB_SFX_DRIVER_CAP_BACKGROUND  0x0010
+#define FB_SFX_DRIVER_CAP_BLOCKING    0x0020
 
 
 

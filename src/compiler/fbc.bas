@@ -190,6 +190,7 @@ declare sub fbcFindBin _
 
 declare sub hPrintVersion( byval verbose as integer )
 declare sub hAddDarwinFrameworks( byref ldcline as string )
+declare sub fbcAddDefLib(byval libname as zstring ptr)
 
 #macro safeKill(f)
 	if( kill( f ) <> 0 ) then
@@ -780,7 +781,7 @@ private function hFindLib( byval file as zstring ptr ) as string
 	end if
 end function
 
-#include once "fbc-xbox-link.bi"
+#include once "fbc-platform.bi"
 
 private function fbcLinkerIsGold( ) as integer
 	'' This is needed otherwise it will wrongly pass --version into the linker on Solaris
@@ -3210,6 +3211,12 @@ private sub hCheckArgs()
 		fbcEnd( 1 )
 	end if
 
+	if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_DOS) and _
+		fbGetOption( FB_COMPOPT_MULTITHREADED ) ) then
+		errReportEx( FB_ERRMSG_INVALIDCMDOPTION, "-mt", -1 )
+		fbcEnd( 1 )
+	end if
+
 	'' 4.5. Enable -pic automatically when building a Unix shared library
 	''      or Android executable (required on Android 5+)
 	if( (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB) or _
@@ -4448,55 +4455,14 @@ private sub hSetDefaultLibPaths( )
 			case FB_COMPTARGET_FREEBSD
 				fbcAddLibPathFor( "libc++.so" )
 			case FB_COMPTARGET_DOS
-				fbcAddLibPathFor( "libstdcx.a" )
+				fbcAddLibPathFor( "libstdcxx.a" )
 			case else
 				fbcAddLibPathFor( "libstdc++.so" )
 			end select
 		#endif
 	end select
 
-	select case( fbGetOption( FB_COMPOPT_TARGET ) )
-	case FB_COMPTARGET_DOS
-		'' Help out the DJGPP linker to find DJGPP's lib/ dir.
-		'' It doesn't seem to add it by default like on other systems.
-		'' Note: Can't use libc here, we have a fixed copy of that in
-		'' the compiler's lib/ dir.
-		fbcAddLibPathFor( "libm.a" )
-	case FB_COMPTARGET_WIN32
-		'' Help the MinGW linker to find MinGW's lib/ dir, allowing
-		'' the C:\MinGW dir to be renamed and linking to still work.
-		fbcAddLibPathFor( "libmingw32.a" )
-	case FB_COMPTARGET_HAIKU
-		''
-		'' Haiku keeps some development-time libraries in /boot/system/develop/lib
-		'' instead of the runtime library locations that ld searches by default.
-		''
-		'' Add the directories for a few representative libraries used by the
-		'' default Haiku link set so direct ld linking can resolve -lnetwork,
-		'' -lncurses and related libraries without relying on user-local symlinks.
-		''
-		fbcAddLibPathFor( "libnetwork.so" )
-		fbcAddLibPathFor( "libncurses.so" )
-	case FB_COMPTARGET_OPENBSD
-		fbcAddLibPathFor( "libX11.a" )
-		fbcAddLibPathFor( "libm.a" )
-	case FB_COMPTARGET_NETBSD
-		fbcAddLibPathFor( "libX11.so" )
-		fbcAddLibPathFor( "libXext.so" )
-		fbcAddLibPathFor( "libXpm.so" )
-		fbcAddLibPathFor( "libXrandr.so" )
-		fbcAddLibPathFor( "libXrender.so" )
-		fbcAddLibPathFor( "libXrender.so" )
-		fbcAddLibPathFor( "libncurses.so" )
-	case FB_COMPTARGET_DRAGONFLY
-		fbcAddLibPathFor( "libX11.so" )
-		fbcAddLibPathFor( "libXext.so" )
-		fbcAddLibPathFor( "libXpm.so" )
-		fbcAddLibPathFor( "libXrandr.so" )
-		fbcAddLibPathFor( "libXrender.so" )
-		fbcAddLibPathFor( "libXrender.so" )
-		fbcAddLibPathFor( "libncurses.so" )
-	end select
+	fbcPlatformAddDefaultLibPaths( )
 #endif
 end sub
 
@@ -4519,23 +4485,7 @@ private function hGetFbLibNameSuffix( ) as string
 end function
 
 private sub hAddDarwinFrameworks( byref ldcline as string )
-	if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN ) then
-		exit sub
-	end if
-
-	if( fbGetOption( FB_COMPOPT_FBGFX ) ) then
-		ldcline += " -lobjc"
-		ldcline += " -framework AppKit"
-		ldcline += " -framework Foundation"
-		ldcline += " -framework CoreGraphics"
-	end if
-
-	if( fbGetOption( FB_COMPOPT_FBSFX ) ) then
-		ldcline += " -framework AudioToolbox"
-		ldcline += " -framework CoreAudio"
-		ldcline += " -framework CoreFoundation"
-		ldcline += " -framework CoreMIDI"
-	end if
+	fbcPlatformAddLinkerFrameworks( ldcline )
 end sub
 
 private sub hAddDefaultLibs( )
@@ -4549,226 +4499,16 @@ private sub hAddDefaultLibs( )
 	'' and the gfxlib, if gfx functions were used
 	if( fbGetOption( FB_COMPOPT_FBGFX ) ) then
 		fbcAddDefLib( "fbgfx" + hGetFbLibNameSuffix( ) )
-
-		select case as const( fbGetOption( FB_COMPOPT_TARGET ) )
-		case FB_COMPTARGET_WIN32, FB_COMPTARGET_CYGWIN
-			fbcAddDefLib( "gdi32" )
-			fbcAddDefLib( "winmm" )
-
-		case FB_COMPTARGET_LINUX, FB_COMPTARGET_FREEBSD, _
-			FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD, _
-			FB_COMPTARGET_DARWIN, FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS
-
-			#if defined(__FB_LINUX__) or _
-				defined(__FB_FREEBSD__) or _
-				defined(__FB_DRAGONFLY__) or _
-				defined(__FB_SOLARIS__) or _
-				defined(__FB_OPENBSD__) or _
-				defined(__FB_NETBSD__)
-				fbcAddDefLibPath( "/usr/X11R6/lib" )
-			#endif
-
-			#if defined(__FB_DRAGONFLY__)
-				fbcAddDefLibPath( "/usr/local/lib/" )
-			#endif
-
-			#if defined(__FB_NETBSD__)
-				fbcAddDefLibPath( "/usr/X11R7/lib/" )
-			#endif
-
-			#if defined(__FB_DARWIN__) and defined(ENABLE_XQUARTZ)
-				fbcAddDefLibPAth( "/opt/X11/lib" )
-			#endif
-
-			#if (not defined(__FB_DARWIN__)) or defined(ENABLE_XQUARTZ)
-				fbcAddDefLib( "X11" )
-				fbcAddDefLib( "Xext" )
-				fbcAddDefLib( "Xpm" )
-				fbcAddDefLib( "Xrandr" )
-				fbcAddDefLib( "Xrender" )
-			#endif
-
-		case FB_COMPTARGET_ANDROID
-			errReportEx( FB_ERRMSG_GFXLIBNOTSUPPORTEDFORTARGET, "", -1 )
-
-		end select
+		fbcPlatformAddGfxLibs( )
 	end if
 
 	'' and the sound runtime, if sound functions were used
 	if( fbGetOption( FB_COMPOPT_FBSFX ) ) then
 		fbcAddDefLib( "sfx" + hGetFbLibNameSuffix( ) )
-
-		select case as const( fbGetOption( FB_COMPOPT_TARGET ) )
-		case FB_COMPTARGET_WIN32, FB_COMPTARGET_CYGWIN
-			fbcAddDefLib( "winmm" )
-			fbcAddDefLib( "ole32" )
-			fbcAddDefLib( "uuid" )
-		case FB_COMPTARGET_LINUX
-			fbcAddDefLib( "asound" )
-			fbcAddDefLib( "pulse-simple" )
-			fbcAddDefLib( "pulse" )
-		case FB_COMPTARGET_HAIKU
-			fbcAddDefLib( "media" )
-			fbcAddDefLib( "midi" )
-		end select
+		fbcPlatformAddSfxLibs( )
 	end if
 
-	select case as const fbGetOption( FB_COMPOPT_TARGET )
-	case FB_COMPTARGET_CYGWIN
-		fbcAddDefLib( "gcc" )
-		fbcAddDefLib( "cygwin" )
-		fbcAddDefLib( "kernel32" )
-		fbcAddDefLib( "user32" )
-
-		'' profiling?
-		if( fbGetOption( FB_COMPOPT_PROFILE ) = FB_PROFILE_OPT_GMON ) then
-			fbcAddDefLib( "gmon" )
-		end if
-
-	case FB_COMPTARGET_DARWIN
-		fbcAddDefLib( "pthread" )
-		fbcAddDefLib( "ffi" )
-		fbcAddDefLib( "ncurses" )
-		fbcAddDefLib( "m" )
-
-	case FB_COMPTARGET_DOS
-		fbcAddDefLib( "gcc" )
-		fbcAddDefLib( "c" )
-		fbcAddDefLib( "m" )
-		if( fbGetOption( FB_COMPOPT_MULTITHREADED ) ) then
-			fbcAddDefLib( "pthread" )
-			fbcAddDefLib( "socket" )
-		end if
-
-	case FB_COMPTARGET_FREEBSD
-		fbcAddDefLib( "gcc" )
-		fbcAddDefLib( "pthread" )
-		fbcAddDefLib( "c" )
-		fbcAddDefLib( "m" )
-		fbcAddDefLib( "ncurses" )
-
-	case FB_COMPTARGET_DRAGONFLY
-		fbcAddDefLibPath( "/usr/local/lib/" )
-		fbcAddDefLib( "gcc" )
-		fbcAddDefLib( "pthread" )
-		fbcAddDefLib( "c" )
-		fbcAddDefLib( "m" )
-		fbcAddDefLib( "ncurses" )
-
-	case FB_COMPTARGET_SOLARIS
-		fbcAddDefLib( "gcc" )
-		fbcAddDefLib( "pthread" )
-		fbcAddDefLib( "c" )
-		fbcAddDefLib( "m" )
-#ifndef DISABLE_TCP
-		fbcAddDefLib( "socket" )
-		fbcAddDefLib( "nsl" )
-#endif
-		fbcAddDefLib( "ncurses" )
-
-	case FB_COMPTARGET_LINUX
-		''
-		'' Notes:
-		''
-		'' When linking statically, -lpthread apparently should be
-		'' linked before -lc. Otherwise there can be errors due to
-		'' -lpthread/-lc containing overlapping symbols (but the pthread
-		'' ones should be used). This is confirmed by minimal testing,
-		'' searching the web and 'gcc -pthread' behavior.
-		''
-		'' libncurses and libtinfo: FB's rtlib depends on the libtinfo
-		'' part of ncurses, which sometimes is included in libncurses
-		'' and sometimes separate (depending on how ncurses was built).
-
-		'' Prefer libtinfo over libncurses
-		if( (len( fbcFindLibFile( "libtinfo.a"  ) ) > 0) or _
-			(len( fbcFindLibFile( "libtinfo.so" ) ) > 0) ) then
-			fbcAddDefLib( "tinfo" )
-		else
-			fbcAddDefLib( "ncurses" )
-		end if
-
-		fbcAddDefLib( "m" )
-		fbcAddDefLib( "dl" )
-		fbcAddDefLib( "pthread" )
-		fbcAddDefLib( "gcc" )
-		'' Link libgcc_eh if it exists (it depends on the gcc build)
-		if( (len( fbcFindLibFile( "libgcc_eh.a"  ) ) > 0) or _
-			(len( fbcFindLibFile( "libgcc_eh.so" ) ) > 0) ) then
-			fbcAddDefLib( "gcc_eh" )
-		end if
-		fbcAddDefLib( "c" )
-
-	case FB_COMPTARGET_HAIKU
-		fbcAddDefLib( "root" )
-		fbcAddDefLib( "bsd" )
-#ifndef DISABLE_TCP
-		fbcAddDefLib( "network" )
-#endif
-		fbcAddDefLib( "ncurses" )
-		fbcAddDefLib( "be" )
-		fbcAddDefLib( "game" )
-		fbcAddDefLib( "stdc++" )
-		fbcAddDefLib( "gcc_s" )
-
-	case FB_COMPTARGET_NETBSD
-		fbcAddDefLibPath( "/usr/pkg/lib/" )
-		fbcAddDefLib( "gcc" )
-		fbcAddDefLib( "pthread" )
-		fbcAddDefLib( "c" )
-		fbcAddDefLib( "m" )
-		fbcAddDefLib( "ncurses" )
-
-	case FB_COMPTARGET_OPENBSD
-		fbcAddDefLib( "gcc" )
-		fbcAddDefLib( "pthread" )
-		fbcAddDefLib( "c" )
-		fbcAddDefLib( "m" )
-		fbcAddDefLib( "ncurses" )
-
-	case FB_COMPTARGET_ANDROID
-		fbcAddDefLib( "m" )
-		fbcAddDefLib( "dl" )
-		fbcAddDefLib( "c" )
-		'' On Android we don't even know what the runtime support library
-		'' is called (it won't be libgcc when compiling with clang, unlike
-		'' on Linux); we query gcc/clang for it later in hLinkFiles.
-
-	case FB_COMPTARGET_WIN32
-		fbcAddDefLib( "gcc" )
-		fbcAddDefLib( "msvcrt" )
-		fbcAddDefLib( "kernel32" )
-		fbcAddDefLib( "user32" )
-#ifndef DISABLE_TCP
-		fbcAddDefLib( "ws2_32" )
-#endif
-		fbcAddDefLib( "mingw32" )
-		fbcAddDefLib( "mingwex" )
-		fbcAddDefLib( "moldname" )
-
-		'' Link libgcc_eh if it exists
-		if( (len( fbcFindLibFile( "libgcc_eh.a"     ) ) > 0) or _
-			(len( fbcFindLibFile( "libgcc_eh.dll.a" ) ) > 0) ) then
-			'' Needed by mingw.org toolchain, but not TDM-GCC
-			fbcAddDefLib( "gcc_eh" )
-		end if
-
-		'' profiling?
-		if( fbGetOption( FB_COMPOPT_PROFILE ) = FB_PROFILE_OPT_GMON ) then
-			fbcAddDefLib( "gmon" )
-		end if
-
-	case FB_COMPTARGET_XBOX
-		'' nxdk libraries are added as concrete .lib files in hLinkFiles()
-		'' because nxdk-link uses the MSVC-style linker frontend instead of
-		'' GNU ld's -L/-l archive lookup.
-
-		'' profiling?
-		if( fbGetOption( FB_COMPOPT_PROFILE ) = FB_PROFILE_OPT_GMON ) then
-			fbcAddDefLib( "gmon" )
-		end if
-
-	end select
+	fbcPlatformAddDefaultLibs( )
 
 end sub
 

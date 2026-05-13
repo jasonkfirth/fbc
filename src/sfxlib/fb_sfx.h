@@ -67,7 +67,18 @@ typedef SFXDRIVER FB_SFX_DRIVER;
 
 #define FB_SFX_DEFAULT_RATE      44100
 #define FB_SFX_DEFAULT_CHANNELS  2
+
+/*
+    DOS Sound Blaster playback currently uses single-cycle DMA.  A larger
+    default block keeps normal short foreground sounds and cooperative-delay
+    background tones inside one DMA transfer, avoiding gaps between reprogrammed
+    blocks.
+*/
+#if defined(__DJGPP__)
+#define FB_SFX_DEFAULT_BUFFER    32768
+#else
 #define FB_SFX_DEFAULT_BUFFER    8192
+#endif
 
 
 /* ------------------------------------------------------------------------- */

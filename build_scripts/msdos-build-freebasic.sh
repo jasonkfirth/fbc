@@ -54,6 +54,11 @@ Environment:
   DJGPP_BUILD_REPO_REF   Linux build-djgpp branch or tag (default: master)
   DJGPP_BUILD_GCC_VER    Linux build-djgpp GCC version (default: 12.2.0)
   DJGPP_BASE_URL         DOS-side DJGPP archive base URL
+  DOSBOX_BIN             DOSBox-X executable used by the smoke test
+  DOSBOX_X_RELEASE_TAG   DOSBox-X release tag for the portable Windows build
+  DOSBOX_X_ASSET         DOSBox-X portable asset name
+  DOSBOX_X_URL           DOSBox-X portable asset URL
+  DOSBOX_X_ROOT          DOSBox-X download/cache directory
   DOSBOX_TIMEOUT         DOSBox timeout in seconds (default: 60)
   SKIP_DOSBOX            Set to 1 to skip DOSBox even without --skip-dosbox
 EOF
@@ -123,6 +128,10 @@ DJGPP_BUILD_REPO_URL="${DJGPP_BUILD_REPO_URL:-https://github.com/andrewwutw/buil
 DJGPP_BUILD_REPO_REF="${DJGPP_BUILD_REPO_REF:-master}"
 DJGPP_BUILD_GCC_VER="${DJGPP_BUILD_GCC_VER:-12.2.0}"
 DJGPP_BASE_URL="${DJGPP_BASE_URL:-https://www.delorie.com/pub/djgpp/current}"
+DOSBOX_X_RELEASE_TAG="${DOSBOX_X_RELEASE_TAG:-dosbox-x-v2026.05.02-osfree}"
+DOSBOX_X_ASSET="${DOSBOX_X_ASSET:-dosbox-x-mingw64-${DOSBOX_X_RELEASE_TAG}-portable.zip}"
+DOSBOX_X_URL="${DOSBOX_X_URL:-https://github.com/joncampbell123/dosbox-x/releases/download/${DOSBOX_X_RELEASE_TAG}/${DOSBOX_X_ASSET}}"
+DOSBOX_X_ROOT="${DOSBOX_X_ROOT:-$ROOT/.build-msdos/dosbox-x}"
 
 DOSBOX_TIMEOUT="${DOSBOX_TIMEOUT:-60}"
 KEEP_BUILDROOT="${KEEP_BUILDROOT:-0}"
@@ -330,6 +339,70 @@ download_file() {
 	rm -f "$tmp"
 	run "$CURL_BIN" -L --retry 3 --fail -o "$tmp" "$url"
 	mv -f "$tmp" "$dst"
+}
+
+normalize_program_path() {
+	local path="$1"
+
+	if [ "$HOST_KIND" = "msys2" ] && have cygpath; then
+		case "$path" in
+			[A-Za-z]:[\\/]*)
+				cygpath -u "$path"
+				return 0
+				;;
+		esac
+	fi
+
+	printf '%s\n' "$path"
+}
+
+find_portable_dosbox_x() {
+	local root="$1"
+	local candidate
+
+	for candidate in \
+		"$root/portable/mingw-build/mingw/dosbox-x.exe" \
+		"$root/portable/mingw-build/mingw-sdl2/dosbox-x.exe" \
+		"$root/portable/dosbox-x.exe"
+	do
+		if [ -x "$candidate" ]; then
+			printf '%s\n' "$candidate"
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+prepare_portable_dosbox_x() {
+	local archive
+	local exe
+
+	[ "$HOST_KIND" = "msys2" ] || return 1
+
+	if exe="$(find_portable_dosbox_x "$DOSBOX_X_ROOT")"; then
+		printf '%s\n' "$exe"
+		return 0
+	fi
+
+	have unzip || die "unzip is required to unpack portable DOSBox-X"
+	have "$CURL_BIN" || die "curl is required to download portable DOSBox-X"
+
+	archive="$DOSBOX_X_ROOT/$DOSBOX_X_ASSET"
+	mkdir -p "$DOSBOX_X_ROOT"
+
+	if [ ! -f "$archive" ]; then
+		msg "downloading portable DOSBox-X" >&2
+		download_file "$archive" "$DOSBOX_X_URL" >&2
+	fi
+
+	rm -rf "$DOSBOX_X_ROOT/portable"
+	mkdir -p "$DOSBOX_X_ROOT/portable"
+	msg "unpacking portable DOSBox-X" >&2
+	run unzip -q -o "$archive" -d "$DOSBOX_X_ROOT/portable" >&2
+
+	exe="$(find_portable_dosbox_x "$DOSBOX_X_ROOT")" || die "portable DOSBox-X archive did not contain dosbox-x.exe"
+	printf '%s\n' "$exe"
 }
 
 run_timeout_checked() {
@@ -554,7 +627,6 @@ install_linux_dependencies() {
 		bison \
 		curl \
 		dos2unix \
-		dosbox \
 		dosbox-x \
 		flex \
 		freebasic \
@@ -578,21 +650,11 @@ install_linux_dependencies() {
 
 install_msys2_dependencies() {
 	local packages
-	local dosbox_package
 
 	configure_msys2_path
 
 	msg "updating package database"
 	run pacman -Sy --noconfirm
-
-	dosbox_package=""
-	if pacman -Si mingw-w64-x86_64-dosbox-staging >/dev/null 2>&1; then
-		dosbox_package="mingw-w64-x86_64-dosbox-staging"
-	elif pacman -Si mingw-w64-x86_64-dosbox-x >/dev/null 2>&1; then
-		dosbox_package="mingw-w64-x86_64-dosbox-x"
-	elif pacman -Si mingw-w64-x86_64-dosbox >/dev/null 2>&1; then
-		dosbox_package="mingw-w64-x86_64-dosbox"
-	fi
 
 	packages=(
 		base-devel
@@ -605,18 +667,13 @@ install_msys2_dependencies() {
 		mingw-w64-x86_64-binutils
 		mingw-w64-x86_64-gcc
 		mingw-w64-x86_64-libffi
+		mingw-w64-x86_64-mtools
 		mingw-w64-x86_64-pkgconf
 		patch
 		rsync
 		unzip
 		zip
 	)
-
-	if [ -n "$dosbox_package" ]; then
-		packages+=("$dosbox_package")
-	else
-		msg "no MSYS2 DOSBox package found; DOSBox smoke test will be skipped unless DOSBox is installed separately"
-	fi
 
 	msg "installing MSYS2 build dependencies"
 	run pacman -S --needed --noconfirm "${packages[@]}"
@@ -745,7 +802,7 @@ fi
 # Host bootstrap compiler
 ##############################################################################
 
-HOST_FBC=""
+HOST_FBC="${HOST_FBC:-}"
 
 if [ "$DO_HOST_BOOTSTRAP" = "1" ]; then
 	cd "$HOST_WORKTREE"
@@ -862,44 +919,50 @@ run_dosbox_test() {
 	local result_txt
 	local build_log
 	local image_file
+	local mtools_source_paths
 	local partition_start
 	local partition_offset
+	local source_path
 	local dosbox_status
+	local used_image
 
 	dosbox_kind=""
-	dosbox_bin="$(command -v dosbox-x || true)"
-	if [ -n "$dosbox_bin" ]; then
+	used_image=0
+	if [ -n "${DOSBOX_BIN:-}" ]; then
+		dosbox_bin="$(normalize_program_path "$DOSBOX_BIN")"
+		case "$(basename "$dosbox_bin" | tr '[:upper:]' '[:lower:]')" in
+			dosbox-x*)
+				dosbox_kind="dosbox-x"
+				;;
+			*)
+				die "DOSBOX_BIN must point to dosbox-x, not $(basename "$dosbox_bin")"
+				;;
+		esac
+	elif dosbox_bin="$(prepare_portable_dosbox_x)"; then
 		dosbox_kind="dosbox-x"
 	else
-		dosbox_bin="$(command -v dosbox-staging || true)"
+		dosbox_bin="$(command -v dosbox-x || true)"
 		if [ -n "$dosbox_bin" ]; then
-			dosbox_kind="dosbox"
+			dosbox_kind="dosbox-x"
 		else
-			dosbox_bin="$(command -v dosbox-staging.exe || true)"
+			dosbox_bin="$(command -v dosbox-x.exe || true)"
 			if [ -n "$dosbox_bin" ]; then
-				dosbox_kind="dosbox"
-			else
-				dosbox_bin="$(command -v dosbox || true)"
-				if [ -z "$dosbox_bin" ]; then
-					dosbox_bin="$(command -v dosbox.exe || true)"
-				fi
-				if [ -n "$dosbox_bin" ]; then
-					dosbox_kind="dosbox"
-				fi
+				dosbox_kind="dosbox-x"
 			fi
 		fi
 	fi
+
 	if [ -z "$dosbox_bin" ]; then
-		msg "DOSBox not found; skipping DOSBox smoke test"
+		msg "DOSBox-X not found; skipping DOSBox smoke test"
 		return 0
 	fi
 
-	msg "running DOSBox smoke test"
+	msg "running DOSBox-X smoke test"
 
 	test_root="$DOSBOX_ROOT/root"
 	mount_root="$test_root"
 	if have cygpath; then
-		mount_root="$(cygpath -w "$test_root")"
+		mount_root="$(cygpath -m "$test_root")"
 	fi
 
 	rm -rf "$test_root"
@@ -912,7 +975,10 @@ run_dosbox_test() {
 		mv -f "$test_root/fbc.exe" "$test_root/fb/fbc.exe"
 	fi
 
-	if [ "$dosbox_kind" = "dosbox-x" ] && [ "$HOST_KIND" = "linux" ] && have mcopy && have sfdisk; then
+	if [ "$dosbox_kind" = "dosbox-x" ] && have mcopy && have sfdisk; then
+		local dosbox_image_file
+		local mtools_image_file
+
 		cat > "$test_root/hello.bas" <<'EOF'
 open "C:\RESULT.TXT" for output as #1
 print #1, "FreeBASIC DOS OK"
@@ -948,6 +1014,12 @@ dir C:\RESULT.TXT >>D:\TRACE.LOG
 EOF
 
 		image_file="$DOSBOX_ROOT/smoke.img"
+		dosbox_image_file="$image_file"
+		mtools_image_file="$image_file"
+		if have cygpath; then
+			dosbox_image_file="$(cygpath -m "$image_file")"
+			mtools_image_file="$dosbox_image_file"
+		fi
 		rm -f "$image_file"
 		run_timeout_checked "$DOSBOX_TIMEOUT" "$dosbox_bin" \
 			-fastlaunch \
@@ -955,7 +1027,7 @@ EOF
 			-nomenu \
 			-exit \
 			-set "cpu cputype=ppro_slow" \
-			-c "imgmake \"$image_file\" -t hd -size 256 -fat 16" \
+			-c "imgmake \"$dosbox_image_file\" -t hd -size 256 -fat 16" \
 			-c "exit" \
 			|| die "DOSBox image creation failed"
 
@@ -963,7 +1035,14 @@ EOF
 		[ -n "$partition_start" ] || die "could not determine DOSBox image partition start"
 		partition_offset="$((partition_start * 512))"
 
-		run env MTOOLS_SKIP_CHECK=1 mcopy -i "${image_file}@@${partition_offset}" -s "$test_root"/* ::
+		mtools_source_paths=("$test_root"/*)
+		if have cygpath; then
+			mtools_source_paths=()
+			for source_path in "$test_root"/*; do
+				mtools_source_paths+=("$(cygpath -m "$source_path")")
+			done
+		fi
+		run env MTOOLS_SKIP_CHECK=1 mcopy -i "${mtools_image_file}@@${partition_offset}" -s "${mtools_source_paths[@]}" ::
 
 		dosbox_status=0
 		run_timeout_checked "$DOSBOX_TIMEOUT" "$dosbox_bin" \
@@ -973,12 +1052,17 @@ EOF
 			-exit \
 			-set "cpu cputype=ppro_slow" \
 			-c "mount d \"$mount_root\"" \
-			-c "imgmount c \"$image_file\"" \
+			-c "imgmount c \"$dosbox_image_file\"" \
 			-c "d:" \
 			-c "FBTEST.BAT" \
 			-c "exit" \
 			|| dosbox_status=$?
-	else
+		used_image=1
+	elif [ "$HOST_KIND" = "linux" ]; then
+		msg "DOSBox-X image path needs mcopy and sfdisk; falling back to mounted-directory smoke test"
+	fi
+
+	if [ "$used_image" != "1" ]; then
 		cat > "$test_root/hello.bas" <<'EOF'
 open "result.txt" for output as #1
 print #1, "FreeBASIC DOS OK"

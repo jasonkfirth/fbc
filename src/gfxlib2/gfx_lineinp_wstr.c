@@ -13,7 +13,10 @@ int fb_GfxLineInputWstr
 {
     FBSTRING *tmp_result;
 
-    /* !!!FIXME!!! no support for unicode input */
+    /*
+        Console input is collected through the normal byte-oriented console
+        path, then converted into the runtime wide string representation.
+    */
 
     FB_LOCK();
 

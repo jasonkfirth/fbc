@@ -1099,6 +1099,12 @@
 		chk = procptr( getjoystick )
 	end scope
 
+	ID( function getxpad alias "fb_GfxGetXPad" )
+	scope
+		dim chk as function fbcall ( byval as const long, byref as integer = 0, byref as single = 0, byref as single = 0, byref as single = 0, byref as single = 0, byref as single = 0, byref as single = 0, byref as integer = 0 ) as long
+		chk = procptr( getxpad )
+	end scope
+
 #if __FB_LANG__ = "qb"
 	ID( function stick alias "fb_GfxStickQB" )
 	scope
@@ -3454,4 +3460,3 @@
 		dim chk as function fbcall ( byref as any, byref as any ) as long
 		chk = procptr( fb_IsTypeOf )
 	end scope
-

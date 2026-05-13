@@ -6,12 +6,6 @@
 
 include common.mk
 
-ifeq ($(HOST),dos)
-SHELL = /bin/sh
-else
-SHELL := $(SHELL)
-endif
-
 FIND := find
 XARGS := xargs
 GREP := grep

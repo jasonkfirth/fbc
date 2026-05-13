@@ -59,7 +59,7 @@
 #define FB_SFX_TI_MILLISECONDS_PER_SECOND 1000.0f
 #define FB_SFX_ATARI_CLOCK 31960.0f
 
-static void fb_sfxSoundQueue(
+void fb_sfxSoundQueue(
     int channel,
     int frequency,
     float duration,
@@ -274,7 +274,7 @@ void fb_sfxSoundLegacy8(int a, int b, int c, int d, int e, int f, int g, int h)
 /* Legacy BASIC helpers                                                      */
 /* ------------------------------------------------------------------------- */
 
-static void fb_sfxSoundQueue(
+void fb_sfxSoundQueue(
     int channel,
     int frequency,
     float duration,

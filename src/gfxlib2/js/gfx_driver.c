@@ -178,17 +178,23 @@ static void WGL_exit(void)
 
 static void driver_lock(void)
 {
-	/* !!!WRITEME!!! */
+	__fb_js_ctx.blitting = TRUE;
 }
 
 static void driver_unlock(void)
 {
-	/* !!!WRITEME!!! */
+	if( __fb_js_ctx.inited && __fb_js_ctx.canvas != NULL && __fb_gfx != NULL && __fb_gfx->framebuffer != NULL )
+	{
+		driver_blit();
+		__fb_js_ctx.updated = TRUE;
+	}
+
+	__fb_js_ctx.blitting = FALSE;
 }
 
 static void driver_wait_vsync(void)
 {
-	/* !!!WRITEME!!! */
+	/* The browser owns real presentation timing; use the driver's frame cadence. */
 	fb_Delay(1000/GFX_JS_FPS);
 }
 
@@ -215,6 +221,20 @@ int fb_js_sdl_buttons_to_fb_buttons(int sdl_buttons)
     return fb_buttons;
 }
 
+int fb_js_sdl_button_to_fb_button(int sdl_button)
+{
+	switch( sdl_button )
+	{
+		case SDL_BUTTON_LEFT:   return BUTTON_LEFT;
+		case SDL_BUTTON_MIDDLE: return BUTTON_MIDDLE;
+		case SDL_BUTTON_RIGHT:  return BUTTON_RIGHT;
+		case SDL_BUTTON_X1:     return BUTTON_X1;
+		case SDL_BUTTON_X2:     return BUTTON_X2;
+	}
+
+	return 0;
+}
+
 static int driver_get_mouse(int *x, int *y, int *z, int *buttons, int *clip)
 {
 	SDL_PumpEvents();
@@ -229,7 +249,14 @@ static int driver_get_mouse(int *x, int *y, int *z, int *buttons, int *clip)
 
 static void driver_set_mouse(int x, int y, int cursor, int clip)
 {
-	//SDL_WarpMouseInWindow(NULL, x, y);
+	if( x >= 0 && y >= 0 )
+		SDL_WarpMouse(x, y);
+
+	if( cursor >= 0 )
+		SDL_ShowCursor(cursor ? SDL_ENABLE : SDL_DISABLE);
+
+	/* SDL 1.2 under Emscripten does not expose cursor clipping. */
+	(void)clip;
 }
 
 static int modes[] = {
@@ -315,16 +342,37 @@ void fb_hScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *re
 
 FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, float *a3, float *a4, float *a5, float *a6, float *a7, float *a8)
 {
-	FB_GRAPHICS_LOCK( );
+	ssize_t xpad_buttons;
+	ssize_t dpad;
+	float lx, ly, rx, ry, lt, rt;
+	int status;
 
-	*buttons = -1;
-	*a1 = *a2 = *a3 = *a4 = *a5 = *a6 = *a7 = *a8 = -1000.0f;
+	if (buttons) *buttons = -1;
+	if (a1) *a1 = -1000.0f;
+	if (a2) *a2 = -1000.0f;
+	if (a3) *a3 = -1000.0f;
+	if (a4) *a4 = -1000.0f;
+	if (a5) *a5 = -1000.0f;
+	if (a6) *a6 = -1000.0f;
+	if (a7) *a7 = -1000.0f;
+	if (a8) *a8 = -1000.0f;
 
-	if ((id < 0) || (id >= 4)) {
-		FB_GRAPHICS_UNLOCK( );
+	if ((id < 0) || (id >= 4))
 		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
-	}
 
-	FB_GRAPHICS_UNLOCK( );
-	return fb_ErrorSetNum( FB_RTERROR_OK );
+	status = fb_GfxGetXPad(id, &xpad_buttons, &lx, &ly, &rx, &ry, &lt, &rt, &dpad);
+	if (status != XPAD_STATUS_CONNECTED)
+		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+
+	if (buttons) *buttons = xpad_buttons;
+	if (a1) *a1 = lx;
+	if (a2) *a2 = ly;
+	if (a3) *a3 = lt;
+	if (a4) *a4 = rx;
+	if (a5) *a5 = ry;
+	if (a6) *a6 = rt;
+	if (a7) *a7 = (dpad & XPAD_DPAD_RIGHT) ? 1.0f : ((dpad & XPAD_DPAD_LEFT) ? -1.0f : 0.0f);
+	if (a8) *a8 = (dpad & XPAD_DPAD_DOWN) ? 1.0f : ((dpad & XPAD_DPAD_UP) ? -1.0f : 0.0f);
+
+	return fb_ErrorSetNum(FB_RTERROR_OK);
 }

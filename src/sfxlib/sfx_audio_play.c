@@ -53,6 +53,8 @@ int   g_audio_frames = 0;
 int   g_audio_channels = 0;
 int   g_audio_samplerate = 0;
 int   g_audio_position = 0;
+float g_audio_sample_pos = 0.0f;
+float g_audio_sample_step = 1.0f;
 int   g_audio_loop = 0;
 int   g_audio_playing = 0;
 int   g_audio_paused = 0;
@@ -63,6 +65,63 @@ int   g_audio_paused = 0;
 /* ------------------------------------------------------------------------- */
 
 extern void fb_sfxAudioStopInternal(void);
+
+
+/* ------------------------------------------------------------------------- */
+/* Sample-rate stepping                                                       */
+/* ------------------------------------------------------------------------- */
+
+static float fb_sfxAudioSampleStep(int source_rate)
+{
+    if (source_rate > 0 && __fb_sfx && __fb_sfx->samplerate > 0)
+        return (float)source_rate / (float)__fb_sfx->samplerate;
+
+    return 1.0f;
+}
+
+static void fb_sfxAudioReadFrame(float sample_pos, float *left, float *right)
+{
+    const float *src;
+    const float *next;
+    float fraction;
+    float next_left;
+    float next_right;
+    int index;
+    int next_index;
+
+    if (!g_audio_data || g_audio_frames <= 0 || g_audio_channels <= 0)
+    {
+        *left = 0.0f;
+        *right = 0.0f;
+        return;
+    }
+
+    index = (int)sample_pos;
+    if (index < 0)
+        index = 0;
+    if (index >= g_audio_frames)
+        index = g_audio_frames - 1;
+
+    next_index = index + 1;
+    if (next_index >= g_audio_frames)
+        next_index = g_audio_loop ? 0 : index;
+
+    fraction = sample_pos - (float)index;
+    if (fraction < 0.0f)
+        fraction = 0.0f;
+
+    src = g_audio_data + (index * g_audio_channels);
+    next = g_audio_data + (next_index * g_audio_channels);
+
+    *left = src[0];
+    *right = (g_audio_channels > 1) ? src[1] : src[0];
+
+    next_left = next[0];
+    next_right = (g_audio_channels > 1) ? next[1] : next[0];
+
+    *left += (next_left - *left) * fraction;
+    *right += (next_right - *right) * fraction;
+}
 
 
 /* ------------------------------------------------------------------------- */
@@ -118,6 +177,8 @@ int fb_sfxAudioPlay(const char *filename)
     g_audio_channels = channels;
     g_audio_samplerate = sample_rate;
     g_audio_position = 0;
+    g_audio_sample_pos = 0.0f;
+    g_audio_sample_step = fb_sfxAudioSampleStep(sample_rate);
 
     g_audio_loop = 0;
     g_audio_playing = 1;
@@ -180,7 +241,11 @@ int fb_sfxAudioFeed(float *buffer, int frames)
         return 0;
 
     fb_sfxRuntimeLock();
-    if (!g_audio_playing || !g_audio_data || g_audio_paused)
+    if (!g_audio_playing ||
+        !g_audio_data ||
+        g_audio_paused ||
+        g_audio_frames <= 0 ||
+        g_audio_channels <= 0)
     {
         fb_sfxRuntimeUnlock();
         return 0;
@@ -190,35 +255,27 @@ int fb_sfxAudioFeed(float *buffer, int frames)
 
     while (produced < frames)
     {
-        const float *src;
         float left;
         float right;
 
-        if (g_audio_position >= g_audio_frames)
+        if (g_audio_sample_step <= 0.0f)
+            g_audio_sample_step = 1.0f;
+
+        while (g_audio_sample_pos >= (float)g_audio_frames)
         {
             if (g_audio_loop)
             {
-                g_audio_position = 0;
+                g_audio_sample_pos -= (float)g_audio_frames;
             }
             else
             {
                 fb_sfxAudioStopInternal();
-                break;
+                fb_sfxRuntimeUnlock();
+                return produced;
             }
         }
 
-        src = g_audio_data + (g_audio_position * g_audio_channels);
-
-        if (g_audio_channels == 1)
-        {
-            left = src[0];
-            right = src[0];
-        }
-        else
-        {
-            left = src[0];
-            right = src[1];
-        }
+        fb_sfxAudioReadFrame(g_audio_sample_pos, &left, &right);
 
         if (out_channels == 1)
         {
@@ -230,7 +287,11 @@ int fb_sfxAudioFeed(float *buffer, int frames)
             buffer[(produced * out_channels) + 1] = right;
         }
 
-        g_audio_position++;
+        g_audio_sample_pos += g_audio_sample_step;
+        if (g_audio_sample_pos >= (float)g_audio_frames)
+            g_audio_position = g_audio_frames;
+        else
+            g_audio_position = (int)g_audio_sample_pos;
         produced++;
     }
 

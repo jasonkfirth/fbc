@@ -8,12 +8,6 @@
 
 include common.mk
 
-ifeq ($(HOST),dos)
-SHELL = /bin/sh
-else
-SHELL := $(SHELL)
-endif
-
 FIND := find
 XARGS := xargs
 GREP := grep
@@ -43,7 +37,7 @@ endif
 endif
 endif
 
-DIRLIST_INC := dirlist.mk
+DIRLIST_INC ?= dirlist.mk
 include $(DIRLIST_INC)
 
 ifeq ($(FB_LANG),fb)
@@ -60,6 +54,10 @@ endif
 
 ifeq ($(FB_LANG),deprecated)
 DIRLIST := $(DIRLIST_DEPRECATED)
+endif
+
+ifeq ($(TARGET_OS),dos)
+DIRLIST := $(filter-out threads,$(DIRLIST))
 endif
 
 ifeq ($(DIRLIST),)
@@ -113,6 +111,15 @@ include $(LOG_TESTS_INC)
 endif
 endif
 
+ifeq ($(TARGET_OS),dos)
+SRCLIST_COMPILE_ONLY_OK := $(filter-out ./threads/% threads/%,$(SRCLIST_COMPILE_ONLY_OK))
+SRCLIST_COMPILE_ONLY_FAIL := $(filter-out ./threads/% threads/%,$(SRCLIST_COMPILE_ONLY_FAIL))
+SRCLIST_COMPILE_AND_RUN_OK := $(filter-out ./threads/% threads/%,$(SRCLIST_COMPILE_AND_RUN_OK))
+SRCLIST_COMPILE_AND_RUN_FAIL := $(filter-out ./threads/% threads/%,$(SRCLIST_COMPILE_AND_RUN_FAIL))
+SRCLIST_MULTI_MODULE_OK := $(filter-out ./threads/% threads/%,$(SRCLIST_MULTI_MODULE_OK))
+SRCLIST_MULTI_MODULE_FAIL := $(filter-out ./threads/% threads/%,$(SRCLIST_MULTI_MODULE_FAIL))
+endif
+
 # COMPILE_ONLY_OK
 SRCLIST_COMPILE_ONLY_OK := $(filter %.bas,$(patsubst %.bmk,%.bas,$(SRCLIST_COMPILE_ONLY_OK)))
 OBJLIST_COMPILE_ONLY_OK := $(addsuffix .o,$(basename $(SRCLIST_COMPILE_ONLY_OK)))
@@ -163,7 +170,13 @@ $(OBJLIST_COMPILE_AND_RUN_FAIL) \
 # set ABORT_CMD := false to abort on failed tests, true to continue anyway
 ABORT_CMD := true
 
-FBC_CFLAGS := -w 3 -Wc -Wno-tautological-compare
+FBC_CFLAGS := -w 3
+ifeq ($(TARGET_OS),dos)
+	FBC_CFLAGS += -i $(abspath ../inc)
+endif
+ifneq ($(TARGET_OS),dos)
+	FBC_CFLAGS += -Wc -Wno-tautological-compare
+endif
 ifdef DEBUG
 	FBC_CFLAGS += -g
 endif

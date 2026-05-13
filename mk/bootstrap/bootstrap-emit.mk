@@ -2,7 +2,7 @@
 # bootstrap-emit.mk
 ##############################################################################
 
-.PHONY: bootstrap-emit
+.PHONY: bootstrap-emit bootstrap-emit-source-response
 
 ##############################################################################
 # Bootstrap directory identity
@@ -11,6 +11,7 @@
 BOOTSTRAP_DIR := $(if $(strip $(FBTARGET_DIR_OVERRIDE)),$(FBTARGET_DIR_OVERRIDE),$(FBTARGET))
 
 BOOTSTRAP_OUT := bootstrap/$(BOOTSTRAP_DIR)
+BOOTSTRAP_SRC_RSP := $(BOOTSTRAP_OUT)/.compiler-sources.rsp
 
 ##############################################################################
 # Stage0 compiler selection
@@ -59,6 +60,23 @@ endif
 BOOTSTRAP_ARCH := $(TARGET_ARCH)
 
 #
+# Matrix entries may provide FBC_TARGET directly. In that case derive the
+# bootstrap CPU family from the explicit compiler target instead of inheriting
+# the host architecture.
+#
+ifneq ($(filter command% environment%,$(origin FBC_TARGET)),)
+BOOTSTRAP_TARGET_ARCH := $(word 2,$(subst -, ,$(FBC_TARGET)))
+ifeq ($(FBC_TARGET),win64)
+BOOTSTRAP_TARGET_ARCH := x86_64
+else ifneq ($(filter win32 dos xbox,$(FBC_TARGET)),)
+BOOTSTRAP_TARGET_ARCH := x86
+endif
+ifneq ($(strip $(BOOTSTRAP_TARGET_ARCH)),)
+BOOTSTRAP_ARCH := $(BOOTSTRAP_TARGET_ARCH)
+endif
+endif
+
+#
 # The bootstrap emitter forwards this value directly to `fbc -arch`.
 # The normalized build identity uses `x86`, but the compiler expects a
 # concrete 32-bit sub-architecture such as 386/486/586/686 here.
@@ -95,16 +113,16 @@ endif
 # Seed those defines here so bootstrap emission remains compatible.
 #
 BOOTSTRAP_COMPAT_DEFINES :=
-ifeq ($(TARGET_ARCH),aarch64)
+ifeq ($(BOOTSTRAP_ARCH),aarch64)
 BOOTSTRAP_COMPAT_DEFINES += -d __FB_AARCH64__
 endif
-ifeq ($(TARGET_ARCH),riscv64)
+ifeq ($(BOOTSTRAP_ARCH),riscv64)
 BOOTSTRAP_COMPAT_DEFINES += -d __FB_RISCV64__
 endif
-ifeq ($(TARGET_ARCH),s390x)
+ifeq ($(BOOTSTRAP_ARCH),s390x)
 BOOTSTRAP_COMPAT_DEFINES += -d __FB_S390X__
 endif
-ifeq ($(TARGET_ARCH),loongarch64)
+ifeq ($(BOOTSTRAP_ARCH),loongarch64)
 BOOTSTRAP_COMPAT_DEFINES += -d __FB_LOONGARCH64__
 endif
 
@@ -114,15 +132,41 @@ endif
 
 BOOT_EMIT_TARGET := $(BOOTSTRAP_OS)
 
+#
+# Only an explicit FBC_TARGET should override the directory-derived OS.
+# The platform layer also computes FBC_TARGET for the host, and treating that
+# computed value as explicit would break legacy BOOTSTRAP_MATRIX overrides that
+# contain just a bootstrap directory name.
+#
+ifneq ($(filter command% environment%,$(origin FBC_TARGET)),)
+BOOT_EMIT_TARGET := $(strip $(firstword $(subst -, ,$(FBC_TARGET))))
+endif
+
+ifeq ($(BOOT_EMIT_TARGET),mingw)
+BOOT_EMIT_TARGET := win32
+endif
+
 ##############################################################################
 # Compiler sources
 ##############################################################################
 
 BOOTSTRAP_COMPILER_SRC := $(FBC_SRC)
+BOOTSTRAP_INC_DIR := $(rootdir)/inc
+ifneq ($(filter MSYS% MINGW%,$(shell uname -s 2>/dev/null)),)
+BOOTSTRAP_COMPILER_SRC := $(foreach f,$(BOOTSTRAP_COMPILER_SRC),$(shell cygpath -m "$(f)"))
+BOOTSTRAP_INC_DIR := $(shell cygpath -m "$(BOOTSTRAP_INC_DIR)")
+endif
 
 ##############################################################################
 # Bootstrap emission
 ##############################################################################
+
+bootstrap-emit-source-response: | $(BOOTSTRAP_OUT)
+	@: $(file >$(BOOTSTRAP_SRC_RSP),$(foreach f,$(BOOTSTRAP_COMPILER_SRC),-b $(f)))
+	@test -s "$(BOOTSTRAP_SRC_RSP)" || { \
+		echo "ERROR: no compiler sources found for bootstrap emission"; \
+		exit 1; \
+	}
 
 bootstrap-emit: bootstrap-check
 	@echo "==> Emitting bootstrap sources"
@@ -139,18 +183,21 @@ bootstrap-emit: bootstrap-check
 	mkdir -p "$(BOOTSTRAP_OUT)"
 
 	@echo "==> Cleaning previous bootstrap output"
-	rm -f "$(BOOTSTRAP_OUT)"/*.c "$(BOOTSTRAP_OUT)"/*.asm
+	rm -f "$(BOOTSTRAP_OUT)"/*.c "$(BOOTSTRAP_OUT)"/*.asm "$(BOOTSTRAP_SRC_RSP)"
 
 	@echo "==> Clearing temporary compiler emission"
 	rm -f "$(srcdir)/compiler/"*.c "$(srcdir)/compiler/"*.asm
 
-	$(BOOT_FBC_TOOL_ENV) $(BOOT_FBC) $(BOOT_FBC_PREFIX_OPT) $(BOOTSTRAP_COMPILER_SRC) \
+	@echo "==> Writing bootstrap source response file"
+	@$(MAKE) bootstrap-emit-source-response
+
+	$(BOOT_FBC_TOOL_ENV) $(BOOT_FBC) $(BOOT_FBC_PREFIX_OPT) @"$(BOOTSTRAP_SRC_RSP)" \
 		-m fbc \
 		-gen gcc \
 		-target $(BOOT_EMIT_TARGET) \
 		$(if $(BOOTSTRAP_ARCH),-arch $(BOOTSTRAP_ARCH)) \
 		$(BOOTSTRAP_COMPAT_DEFINES) \
-		-i $(rootdir)/inc \
+		-i $(BOOTSTRAP_INC_DIR) \
 		-e -r -v \
 		$(BOOTFBCFLAGS)
 
@@ -168,6 +215,8 @@ bootstrap-emit: bootstrap-check
 		echo "ERROR: bootstrap emission produced no sources"; \
 		exit 1; \
 	fi
+
+	rm -f "$(BOOTSTRAP_SRC_RSP)"
 
 	@dos2unix "$(BOOTSTRAP_OUT)"/* >/dev/null 2>&1 || true
 

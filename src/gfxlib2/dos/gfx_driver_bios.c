@@ -13,6 +13,8 @@ static void driver_update_bpp2(void);
 static void driver_update_bpp4(void);
 static void end_of_driver_update(void);
 static int *driver_fetch_modes(int depth, int *size);
+static void fb_dos_ega_set_palette(void);
+static void fb_dos_cga_set_palette(void);
 
 /* GFXDRIVER */
 const GFXDRIVER fb_gfxDriverBIOS =
@@ -144,17 +146,153 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
         /* 16 or 256 colors out of 64*64*64 (262144) */
         fb_dos.set_palette = fb_dos_vga_set_palette;
     } else if( fb_dos.bios_mode >= 0x0D ) {
-        /* FIXME: Implement setting the palette for EGA cards.
-         *        (2 or 16 out of 64) */
-        fb_dos.set_palette = NULL;
+        /* EGA exposes 16 palette registers selected from a 64 color set. */
+        fb_dos.set_palette = fb_dos_ega_set_palette;
     } else {
-        /* FIXME: Implement setting the palette for CGA cards.
-         *        Two sets of four colors. */
-        fb_dos.set_palette = NULL;
+        /* CGA can only choose the background and one of its fixed palettes. */
+        fb_dos.set_palette = fb_dos_cga_set_palette;
     }
 
 	return fb_dos_init(title, w, h, depth, refresh_rate, flags);
 
+}
+
+static unsigned char fb_dos_ega_quantize(int component)
+{
+	int level;
+
+	level = (component + 10) / 21;
+	if (level < 0)
+		level = 0;
+	if (level > 3)
+		level = 3;
+
+	return (unsigned char)level;
+}
+
+static unsigned char fb_dos_ega_color(int r, int g, int b)
+{
+	unsigned char rr, gg, bb;
+
+	rr = fb_dos_ega_quantize(r);
+	gg = fb_dos_ega_quantize(g);
+	bb = fb_dos_ega_quantize(b);
+
+	return (unsigned char)(((bb & 1) << 0) |
+	                       ((gg & 1) << 1) |
+	                       ((rr & 1) << 2) |
+	                       ((bb & 2) << 2) |
+	                       ((gg & 2) << 3) |
+	                       ((rr & 2) << 4));
+}
+
+static void fb_dos_ega_set_palette(void)
+{
+	int i, color_count;
+
+	color_count = MIN( (1 << fb_dos.depth), fb_dos.pal_last + 1 );
+	color_count = MIN( color_count, 16 );
+
+	for (i = fb_dos.pal_first; i < color_count; i++) {
+		fb_dos.regs.x.ax = 0x1000;
+		fb_dos.regs.h.bl = (unsigned char)i;
+		fb_dos.regs.h.bh = fb_dos_ega_color(fb_dos.pal[i].r, fb_dos.pal[i].g, fb_dos.pal[i].b);
+		__dpmi_int(0x10, &fb_dos.regs);
+	}
+
+	fb_dos.pal_dirty = FALSE;
+	fb_dos.pal_last = 0;
+	fb_dos.pal_first = 256;
+}
+
+static const unsigned char cga_rgb[16][3] = {
+	{  0,  0,  0 }, {  0,  0, 42 }, {  0, 42,  0 }, {  0, 42, 42 },
+	{ 42,  0,  0 }, { 42,  0, 42 }, { 42, 21,  0 }, { 42, 42, 42 },
+	{ 21, 21, 21 }, { 21, 21, 63 }, { 21, 63, 21 }, { 21, 63, 63 },
+	{ 63, 21, 21 }, { 63, 21, 63 }, { 63, 63, 21 }, { 63, 63, 63 }
+};
+
+static const unsigned char cga_palettes[4][3] = {
+	{  2,  4,  6 },
+	{ 10, 12, 14 },
+	{  3,  5,  7 },
+	{ 11, 13, 15 }
+};
+
+static int fb_dos_cga_color_distance(int pal_index, int cga_index)
+{
+	int dr, dg, db;
+
+	dr = fb_dos.pal[pal_index].r - cga_rgb[cga_index][0];
+	dg = fb_dos.pal[pal_index].g - cga_rgb[cga_index][1];
+	db = fb_dos.pal[pal_index].b - cga_rgb[cga_index][2];
+
+	return (dr * dr) + (dg * dg) + (db * db);
+}
+
+static unsigned char fb_dos_cga_nearest_color(int pal_index)
+{
+	int i, best, best_distance, distance;
+
+	best = 0;
+	best_distance = fb_dos_cga_color_distance(pal_index, 0);
+
+	for (i = 1; i < 16; ++i) {
+		distance = fb_dos_cga_color_distance(pal_index, i);
+		if (distance < best_distance) {
+			best = i;
+			best_distance = distance;
+		}
+	}
+
+	return (unsigned char)best;
+}
+
+static unsigned char fb_dos_cga_best_palette(void)
+{
+	int pal, color, score, best, best_score;
+
+	best = 0;
+	best_score = 0x7FFFFFFF;
+
+	for (pal = 0; pal < 4; ++pal) {
+		score = 0;
+		for (color = 1; color < 4; ++color)
+			score += fb_dos_cga_color_distance(color, cga_palettes[pal][color - 1]);
+		if (score < best_score) {
+			best = pal;
+			best_score = score;
+		}
+	}
+
+	return (unsigned char)best;
+}
+
+static void fb_dos_cga_set_palette(void)
+{
+	unsigned char background;
+	unsigned char palette;
+	unsigned char control;
+
+	background = fb_dos_cga_nearest_color(0);
+	palette = fb_dos_cga_best_palette();
+	control = (unsigned char)((palette >= 2) ? 1 : 0);
+	if (palette & 1)
+		control |= 0x10;
+
+	fb_dos.regs.h.ah = 0x0B;
+	fb_dos.regs.h.bh = 0x00;
+	fb_dos.regs.h.bl = background;
+	__dpmi_int(0x10, &fb_dos.regs);
+
+	fb_dos.regs.h.ah = 0x0B;
+	fb_dos.regs.h.bh = 0x01;
+	fb_dos.regs.h.bl = control;
+	__dpmi_int(0x10, &fb_dos.regs);
+
+	fb_dos.pal_dirty = FALSE;
+	fb_dos.pal_last = 0;
+	fb_dos.pal_first = 256;
 }
 
 static void init_planar_access( void )
@@ -364,8 +502,6 @@ static void driver_update_bpp2(void)
 
 static void driver_update_bpp4(void)
 {
-    /* FIXME: This has to be implemented soon (to support SCREEN 12
-     * and others) */
     if( fb_dos.bios_mode >= 0x10 ) {
         driver_update_planar_ega_vga( 4 );
     }

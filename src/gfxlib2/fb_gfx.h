@@ -136,6 +136,29 @@ OPENGL_SUPPORT          0x20000000    no   yes  no   yes  yes
 #define MASK_G_16			0x07E0
 #define MASK_B_16			0x001F
 
+#define XPAD_STATUS_MISSING        0
+#define XPAD_STATUS_CONNECTED      1
+#define XPAD_STATUS_DISCONNECTED   2
+
+#define XPAD_BUTTON_A              0x00000001
+#define XPAD_BUTTON_B              0x00000002
+#define XPAD_BUTTON_X              0x00000004
+#define XPAD_BUTTON_Y              0x00000008
+#define XPAD_BUTTON_L1             0x00000010
+#define XPAD_BUTTON_R1             0x00000020
+#define XPAD_BUTTON_L3             0x00000040
+#define XPAD_BUTTON_R3             0x00000080
+#define XPAD_BUTTON_START          0x00000100
+#define XPAD_BUTTON_SELECT         0x00000200
+#define XPAD_BUTTON_GUIDE          0x00000400
+#define XPAD_BUTTON_L2             0x00000800
+#define XPAD_BUTTON_R2             0x00001000
+
+#define XPAD_DPAD_UP               0x00000001
+#define XPAD_DPAD_RIGHT            0x00000002
+#define XPAD_DPAD_DOWN             0x00000004
+#define XPAD_DPAD_LEFT             0x00000008
+
 #define PUT_HEADER_NEW		0x7
 
 #define WINDOW_TITLE_SIZE	128
@@ -556,6 +579,7 @@ extern "C" FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, flo
 #else
 extern FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, float *a3, float *a4, float *a5, float *a6, float *a7, float *a8);
 #endif
+extern FBCALL int fb_GfxGetXPad(int id, ssize_t *buttons, float *lstick_x, float *lstick_y, float *rstick_x, float *rstick_y, float *ltrigger, float *rtrigger, ssize_t *dpad);
 extern FBCALL int fb_GfxEvent(EVENT *event);
 extern FBCALL void fb_GfxControl_s(int what, FBSTRING *param);
 extern FBCALL void fb_GfxControl_i(int what, ssize_t *param1, ssize_t *param2, ssize_t *param3, ssize_t *param4);

@@ -269,6 +269,35 @@ namespace FB
 		BUTTON_X2                   = &h10
 
 
+	'' GETXPAD status, button, and d-pad constants
+	''
+	const as integer _
+		XPAD_STATUS_MISSING         = 0, _
+		XPAD_STATUS_CONNECTED       = 1, _
+		XPAD_STATUS_DISCONNECTED    = 2
+
+	const as integer _
+		XPAD_BUTTON_A               = &h00000001, _
+		XPAD_BUTTON_B               = &h00000002, _
+		XPAD_BUTTON_X               = &h00000004, _
+		XPAD_BUTTON_Y               = &h00000008, _
+		XPAD_BUTTON_L1              = &h00000010, _
+		XPAD_BUTTON_R1              = &h00000020, _
+		XPAD_BUTTON_L3              = &h00000040, _
+		XPAD_BUTTON_R3              = &h00000080, _
+		XPAD_BUTTON_START           = &h00000100, _
+		XPAD_BUTTON_SELECT          = &h00000200, _
+		XPAD_BUTTON_GUIDE           = &h00000400, _
+		XPAD_BUTTON_L2              = &h00000800, _
+		XPAD_BUTTON_R2              = &h00001000
+
+	const as integer _
+		XPAD_DPAD_UP                = &h00000001, _
+		XPAD_DPAD_RIGHT             = &h00000002, _
+		XPAD_DPAD_DOWN              = &h00000004, _
+		XPAD_DPAD_LEFT              = &h00000008
+
+
 	'' Keyboard scancodes returned by MULTIKEY
 	''
 	enum

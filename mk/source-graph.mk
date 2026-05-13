@@ -12,7 +12,7 @@
 # Win32 host with Cygwin compatibility shims, not as a HOST_UNIX target.
 #
 # Object architecture:
-#   canonical object list  derived PIC/MT variants
+#   canonical object list -> derived PIC/MT variants
 ##############################################################################
 
 ##############################################################################

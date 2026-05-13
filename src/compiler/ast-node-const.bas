@@ -8,11 +8,40 @@
 #include once "ir.bi"
 #include once "ast.bi"
 
+private function hFloatConstEqZero( byval f as double ) as integer
+	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
+		dim as ulongint bits = *cptr( ulongint ptr, @f )
+		function = ((bits and &h7FFFFFFFFFFFFFFFull) = 0)
+	#else
+		function = (f = 0.0)
+	#endif
+end function
+
+private function hFloatConstGeZero( byval f as double ) as integer
+	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
+		dim as ulongint bits = *cptr( ulongint ptr, @f )
+		dim as integer isnan = any
+
+		isnan = ((bits and &h7FF0000000000000ull) = &h7FF0000000000000ull) andalso _
+		        ((bits and &h000FFFFFFFFFFFFFull) <> 0)
+
+		if( isnan ) then
+			function = FALSE
+		elseif( (bits and &h7FFFFFFFFFFFFFFFull) = 0 ) then
+			function = TRUE
+		else
+			function = ((bits and &h8000000000000000ull) = 0)
+		end if
+	#else
+		function = (f >= 0.0)
+	#endif
+end function
+
 '' const = 0?
 function astConstEqZero( byval n as ASTNODE ptr ) as integer
 	assert( astIsCONST( n ) )
 	if( typeGetClass( n->dtype ) = FB_DATACLASS_FPOINT ) then
-		function = (n->val.f = 0.0)
+		function = hFloatConstEqZero( n->val.f )
 	else
 		function = (n->val.i = 0)
 	end if
@@ -22,7 +51,7 @@ end function
 function astConstGeZero( byval n as ASTNODE ptr ) as integer
 	assert( astIsCONST( n ) )
 	if( typeGetClass( n->dtype ) = FB_DATACLASS_FPOINT ) then
-		function = (n->val.f >= 0.0)
+		function = hFloatConstGeZero( n->val.f )
 	elseif( typeIsSigned( n->dtype ) ) then
 		function = (n->val.i >= 0)
 	else

@@ -27,3 +27,4 @@ extern void fb_js_events_init(void);
 extern void fb_js_events_exit(void);
 extern void fb_js_events_check(void);
 extern int fb_js_sdl_buttons_to_fb_buttons(int sdl_buttons);
+extern int fb_js_sdl_button_to_fb_button(int sdl_button);

@@ -22,6 +22,92 @@ private function hSgnLongInt( byval x as longint ) as longint
 	end if
 end function
 
+private sub hResetDosFpuStack( )
+	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
+		'' DJGPP/DPMI can leave stale x87 stack entries between helper calls.
+		asm
+			fninit
+		end asm
+	#endif
+end sub
+
+private function hFloatConstSgn( byval f as double ) as double
+	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
+		dim as ulongint bits = *cptr( ulongint ptr, @f )
+
+		if( (bits and &h7FFFFFFFFFFFFFFFull) = 0 ) then
+			function = 0.0
+		elseif( (bits and &h8000000000000000ull) <> 0 ) then
+			function = -1.0
+		else
+			function = 1.0
+		end if
+	#else
+		function = sgn( f )
+	#endif
+end function
+
+private function hFloatConstFix _
+	( _
+		byval f as double, _
+		byref hadfrac as integer _
+	) as double
+
+	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
+		dim as ulongint bits = *cptr( ulongint ptr, @f )
+		dim as ulongint signbit = bits and &h8000000000000000ull
+		dim as integer expraw = (bits shr 52) and &h7FF
+		dim as integer expnt = expraw - 1023
+
+		hadfrac = FALSE
+
+		if( expraw = &h7FF ) then
+			return f
+		end if
+
+		if( expnt < 0 ) then
+			hadfrac = ((bits and &h7FFFFFFFFFFFFFFFull) <> 0)
+			bits = signbit
+			return *cptr( double ptr, @bits )
+		end if
+
+		if( expnt >= 52 ) then
+			return f
+		end if
+
+		dim as ulongint mant = (bits and &h000FFFFFFFFFFFFFull) or &h0010000000000000ull
+		dim as ulongint fracmask = (1ull shl (52 - expnt)) - 1
+
+		hadfrac = ((mant and fracmask) <> 0)
+		if( hadfrac ) then
+			mant and= not fracmask
+			bits = signbit or (culngint( expraw ) shl 52) or (mant and &h000FFFFFFFFFFFFFull)
+			function = *cptr( double ptr, @bits )
+		else
+			function = f
+		end if
+	#else
+		hadfrac = (frac( f ) <> 0.0)
+		function = fix( f )
+	#endif
+end function
+
+private function hFloatConstFloor( byval f as double ) as double
+	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
+		dim as integer hadfrac = any
+		dim as double d = hFloatConstFix( f, hadfrac )
+		dim as ulongint bits = *cptr( ulongint ptr, @f )
+
+		if( hadfrac andalso ((bits and &h8000000000000000ull) <> 0) ) then
+			d -= 1.0
+		end if
+
+		function = d
+	#else
+		function = int( f )
+	#endif
+end function
+
 private function hConstUop _
 	( _
 		byval op as integer, _
@@ -34,11 +120,14 @@ private function hConstUop _
 	dim as longint i = any
 
 	if( typeGetClass( l->dtype ) = FB_DATACLASS_FPOINT ) then
+		hResetDosFpuStack( )
+
 		d = l->val.f
+		dim as integer hadfrac = any
 		select case as const( op )
 		case AST_OP_NEG   : d =      -d
 		case AST_OP_ABS   : d =  abs( d )
-		case AST_OP_SGN   : d =  sgn( d )
+		case AST_OP_SGN   : d =  hFloatConstSgn( d )
 		case AST_OP_SIN   : d =  sin( d )
 		case AST_OP_ASIN  : d = asin( d )
 		case AST_OP_COS   : d =  cos( d )
@@ -48,8 +137,9 @@ private function hConstUop _
 		case AST_OP_SQRT  : d =  sqr( d )
 		case AST_OP_LOG   : d =  log( d )
 		case AST_OP_EXP   : d =  exp( d )
-		case AST_OP_FLOOR : d =  int( d )
-		case AST_OP_FIX   : d =  fix( d )
+		case AST_OP_FLOOR : d =  hFloatConstFloor( d )
+		case AST_OP_FIX
+			d = hFloatConstFix( d, hadfrac )
 		case AST_OP_FRAC  : d = frac( d )
 		case else         : assert( FALSE )
 		end select
@@ -363,4 +453,3 @@ function astLoadUOP _
 	function = vr
 
 end function
-

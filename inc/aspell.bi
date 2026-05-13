@@ -21,7 +21,7 @@
 #ifdef __FB_WIN32__
 	#inclib "pthread"
 #elseif defined(__FB_DOS__)
-	#inclib "stdcx"
+	#inclib "stdcxx"
 #endif
 
 extern "C"

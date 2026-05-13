@@ -810,6 +810,35 @@ declare function hPorts_cb _
 				( FB_DATATYPE_SINGLE, FB_PARAMMODE_BYREF, TRUE, 0 ) _
 			} _
 		), _
+		/' function getxpad _
+			( _
+				byval id as const long, _
+				byref buttons as integer = 0, _
+				byref lstick_x as single = 0, _
+				byref lstick_y as single = 0, _
+				byref rstick_x as single = 0, _
+				byref rstick_y as single = 0, _
+				byref ltrigger as single = 0, _
+				byref rtrigger as single = 0, _
+				byref dpad as integer = 0 _
+			) as long '/ _
+		( _
+			@"getxpad", @"fb_GfxGetXPad", _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
+			@hGfxlib_cb, FB_RTL_OPT_NOQB, _
+			9, _
+			{ _
+				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE, 0 ), _
+				( FB_DATATYPE_INTEGER, FB_PARAMMODE_BYREF, TRUE, 0 ), _
+				( FB_DATATYPE_SINGLE, FB_PARAMMODE_BYREF, TRUE, 0 ), _
+				( FB_DATATYPE_SINGLE, FB_PARAMMODE_BYREF, TRUE, 0 ), _
+				( FB_DATATYPE_SINGLE, FB_PARAMMODE_BYREF, TRUE, 0 ), _
+				( FB_DATATYPE_SINGLE, FB_PARAMMODE_BYREF, TRUE, 0 ), _
+				( FB_DATATYPE_SINGLE, FB_PARAMMODE_BYREF, TRUE, 0 ), _
+				( FB_DATATYPE_SINGLE, FB_PARAMMODE_BYREF, TRUE, 0 ), _
+				( FB_DATATYPE_INTEGER, FB_PARAMMODE_BYREF, TRUE, 0 ) _
+			} _
+		), _
 		/' function stick( byval n as const long ) as long '/ _
 		( _
 			@"stick", @"fb_GfxStickQB", _

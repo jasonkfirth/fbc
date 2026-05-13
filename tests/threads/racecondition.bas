@@ -1,7 +1,5 @@
 #include "fbcunit.bi"
 
-'' !!! TODO !!! does dos port support threads or no?
-
 #ifndef __FB_DOS__
 
 SUITE( fbc_tests.threads.racecondition )

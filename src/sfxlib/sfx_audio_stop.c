@@ -53,6 +53,8 @@ extern int   g_audio_frames;
 extern int   g_audio_channels;
 extern int   g_audio_samplerate;
 extern int   g_audio_position;
+extern float g_audio_sample_pos;
+extern float g_audio_sample_step;
 extern int   g_audio_playing;
 extern int   g_audio_paused;
 extern int   g_audio_loop;
@@ -96,6 +98,8 @@ void fb_sfxAudioStop(void)
     g_audio_channels = 0;
     g_audio_samplerate = 0;
     g_audio_position = 0;
+    g_audio_sample_pos = 0.0f;
+    g_audio_sample_step = 1.0f;
     g_audio_playing = 0;
     g_audio_paused = 0;
     g_audio_loop = 0;

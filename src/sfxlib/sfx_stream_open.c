@@ -65,6 +65,8 @@ int   g_stream_channels = 0;
 int   g_stream_samplerate = 0;
 int   g_stream_open = 0;
 int   g_stream_position = 0;
+float g_stream_sample_pos = 0.0f;
+float g_stream_sample_step = 1.0f;
 
 
 /* ------------------------------------------------------------------------- */
@@ -90,6 +92,8 @@ static void fb_sfxStreamCloseInternal(void)
     g_stream_samplerate = 0;
     g_stream_open = 0;
     g_stream_position = 0;
+    g_stream_sample_pos = 0.0f;
+    g_stream_sample_step = 1.0f;
 }
 
 
@@ -142,6 +146,11 @@ int fb_sfxStreamOpen(const char *filename)
     g_stream_samplerate = sample_rate;
     g_stream_open = 1;
     g_stream_position = 0;
+    g_stream_sample_pos = 0.0f;
+    if (sample_rate > 0 && __fb_sfx && __fb_sfx->samplerate > 0)
+        g_stream_sample_step = (float)sample_rate / (float)__fb_sfx->samplerate;
+    else
+        g_stream_sample_step = 1.0f;
 
     fb_sfxRuntimeUnlock();
     return 0;

@@ -2882,11 +2882,7 @@ function rtlToStr _
 
 		else
 			if( pad ) then
-				if( typeIsSigned( astGetDataType( expr ) ) ) then
-					if astConstGetAsDouble( expr ) >= 0 then
-						s = " "
-					end if
-				else
+				if( astConstGeZero( expr ) ) then
 					s = " "
 				end if
 			end if

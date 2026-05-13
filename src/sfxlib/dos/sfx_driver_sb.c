@@ -296,6 +296,7 @@ static void fb_sfxMsdosFreeDmaBuffer(void)
 static int fb_sfxMsdosSetSampleRate(int base_port, int rate)
 {
     int clamped_rate;
+    int divisor;
     int time_constant;
 
     clamped_rate = rate;
@@ -315,7 +316,11 @@ static int fb_sfxMsdosSetSampleRate(int base_port, int rate)
     if (fb_sfxMsdosDspWrite(base_port, (unsigned char)time_constant) != 0)
         return -1;
 
-    g_fb_sfx_msdos_rate = clamped_rate;
+    divisor = 256 - time_constant;
+    if (divisor <= 0)
+        return -1;
+
+    g_fb_sfx_msdos_rate = 1000000 / divisor;
     return 0;
 }
 
@@ -474,6 +479,9 @@ static int msdos_sb_init(int rate, int channels, int buffer, int flags)
         return -1;
     }
 
+    if (__fb_sfx && g_fb_sfx_msdos_rate > 0)
+        __fb_sfx->samplerate = g_fb_sfx_msdos_rate;
+
     g_fb_sfx_msdos_dma_channel = dma_channel;
     g_fb_sfx_msdos_dma_buffer_frames = dma_frames;
     g_fb_sfx_msdos_dma_buffer_bytes = dma_bytes;
@@ -598,7 +606,7 @@ static int msdos_sb_write(const float *samples, int frames)
 const FB_SFX_DRIVER fb_sfxDriverSoundBlaster =
 {
     "SoundBlaster",
-    0,
+    FB_SFX_DRIVER_CAP_BLOCKING,
     msdos_sb_init,
     msdos_sb_exit,
     msdos_sb_write,
