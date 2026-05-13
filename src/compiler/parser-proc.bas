@@ -1789,48 +1789,6 @@ function cProcHeader _
 	function = proc
 end function
 
-sub hDisallowStaticAttrib( byref attrib as FB_SYMBATTRIB, byref pattrib as FB_PROCATTRIB )
-	if( (attrib and FB_SYMBATTRIB_STATIC) <> 0 ) then
-		errReport( FB_ERRMSG_MEMBERCANTBESTATIC )
-		attrib and= not FB_SYMBATTRIB_STATIC
-	end if
-end sub
-
-sub hDisallowVirtualCtor( byref attrib as FB_SYMBATTRIB, byref pattrib as FB_PROCATTRIB )
-	'' Constructors cannot be virtual (they initialize the vptr
-	'' needed for virtual calls, chicken-egg problem)
-	if( pattrib and (FB_PROCATTRIB_ABSTRACT or FB_PROCATTRIB_VIRTUAL) ) then
-		if( pattrib and FB_PROCATTRIB_ABSTRACT ) then
-			errReport( FB_ERRMSG_ABSTRACTCTOR )
-		else
-			errReport( FB_ERRMSG_VIRTUALCTOR )
-		end if
-		pattrib and= not (FB_PROCATTRIB_ABSTRACT or FB_ERRMSG_VIRTUALCTOR)
-	end if
-end sub
-
-sub hDisallowAbstractDtor( byref attrib as FB_SYMBATTRIB, byref pattrib as FB_PROCATTRIB )
-	'' Destructors cannot be abstract; they need to have a body to ensure
-	'' that base and field destructors are called.
-	if( pattrib and FB_PROCATTRIB_ABSTRACT ) then
-		errReport( FB_ERRMSG_ABSTRACTDTOR )
-		pattrib and= not FB_PROCATTRIB_ABSTRACT
-	end if
-end sub
-
-sub hDisallowConstCtorDtor( byval tk as integer, byref attrib as FB_SYMBATTRIB, byref pattrib as FB_PROCATTRIB )
-	'' It doesn't make sense for ctors/dtors to be CONST. It's a ctor's
-	'' purpose to initialize an object and it couldn't do that if it used
-	'' a CONST This. And as for dtors, they need to be able to destroy all
-	'' objects, CONST or not. It doesn't matter whether the dtor modifies
-	'' the object in the process since it's dead afterwards anyways.
-	if( attrib and FB_SYMBATTRIB_CONST ) then
-		errReport( iif( tk = FB_TK_CONSTRUCTOR, _
-			FB_ERRMSG_CONSTCTOR, FB_ERRMSG_CONSTDTOR ) )
-		attrib and= not FB_SYMBATTRIB_CONST
-	end if
-end sub
-
 '' ProcStmtBegin  =  (PRIVATE|PUBLIC)? (STATIC? | CONST? VIRTUAL?)
 ''                   (SUB|FUNCTION|CONSTRUCTOR|DESTRUCTOR|OPERATOR) ProcHeader .
 sub cProcStmtBegin( byval attrib as FB_SYMBATTRIB, byval pattrib as FB_PROCATTRIB )

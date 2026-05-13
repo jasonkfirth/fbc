@@ -919,6 +919,13 @@ declare sub hSymbolType _
 		byval is_extends as integer = FALSE _
 	)
 
+declare sub hMaybeComplainTypeUsage _
+	( _
+		byref dtype as integer, _
+		byref subtype as FBSYMBOL ptr, _
+		byref lgt as longint _
+	)
+
 declare function hCheckForDefiniteTypes _
 	( _
 		_
