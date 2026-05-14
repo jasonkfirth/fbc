@@ -802,7 +802,7 @@ Function WriteMsys2ProfileFileContents
 	FileWrite \$0 "fi$\r$\n"
 	FileWrite \$0 "case :\$\$PATH: in$\r$\n"
 	FileWrite \$0 "  *:\$\${_freebasic_prefix}:*) ;;$\r$\n"
-	FileWrite \$0 "  *) export PATH=\$\${_freebasic_prefix}:\$\$PATH ;;$\r$\n"
+	FileWrite \$0 "  *) export PATH=\$\"\$\${_freebasic_prefix}:\$\$PATH\$\" ;;$\r$\n"
 	FileWrite \$0 "esac$\r$\n"
 	FileWrite \$0 "unset _freebasic_prefix$\r$\n"
 FunctionEnd

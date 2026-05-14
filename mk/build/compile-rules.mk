@@ -32,7 +32,10 @@ TOOLCHAIN_BINDIR := $(patsubst %/,%,$(dir $(CC)))
 endif
 TOOLCHAIN_PATH_ENV :=
 ifneq ($(strip $(TOOLCHAIN_BINDIR)),)
-TOOLCHAIN_PATH_ENV := env PATH='$(TOOLCHAIN_BINDIR):'$$PATH
+# Quote the runtime PATH separately. Some macOS applications install PATH
+# entries containing spaces, and an unquoted $$PATH makes env treat the split
+# path fragment as the command to execute.
+TOOLCHAIN_PATH_ENV := env PATH='$(TOOLCHAIN_BINDIR):'"$$PATH"
 endif
 FBC_TOOL_ENV := env \
 	$(TOOLCHAIN_FBC_ENV) \
