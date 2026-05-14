@@ -1,0 +1,26 @@
+{{fbdoc item="title" value="STREAM"}}----
+Opens and controls the sfxlib streaming-audio interface.
+
+{{fbdoc item="syntax"}}##
+	//result// = **Stream Open**( //filename// )
+	//result// = **Stream Play**()
+	**Stream Pause**
+	**Stream Resume**
+	**Stream Stop**
+	//position// = **Stream Position**()
+	//result// = **Stream Seek**( //position// )
+##
+{{fbdoc item="desc"}}
+	##**Stream**## provides explicit control over a streaming audio source.  Open a file with ##Stream Open##, start it with ##Stream Play##, and use ##Stream Seek## and ##Stream Position## to reposition or query playback.
+
+{{fbdoc item="ex"}}
+	See ##examples/sfxlib/stream-open.bas##, ##examples/sfxlib/stream-play.bas##, ##examples/sfxlib/stream-seek.bas##, and ##examples/sfxlib/showcase.bas##.
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgAudio|Audio]]##
+	- ##[[KeyPgMusic|Music]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

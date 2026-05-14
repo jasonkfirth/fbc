@@ -16,6 +16,7 @@ xbox_emulator_xemu/
 bin/fbc*
 bootstrap/fbc*
 dist/
+/lib/freebasic/
 examples/**/*.a
 examples/**/*.asm
 examples/**/*.dll
@@ -42,6 +43,7 @@ tests/**/*.exe
 tests/**/*.log
 tests/**/*.o
 tests/**/*.obj
+tests/warnings/r/**/*.txt
 tests/**/*.tmp
 tests/*.log
 tests/*.tmp

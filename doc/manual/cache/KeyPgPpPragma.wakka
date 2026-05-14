@@ -11,7 +11,7 @@ Preprocessor directive
 {{fbdoc item="param"}}
 	Possible values for ##//option//## and related ##//value//##s:
 	
-	{{table columns="3" cellpadding="1" cells="Option; Value; Description; msbitfields; false; Use bitfields compatible with gcc (default); msbitfields; true ; Use bitfields compatible with those used in Microsoft C compilers; once; N/A; cause the source file in which the pragma ppears to behave as though it was included with #include once ...; constness; false; disable 'CONST qualifier discarded' warning in current source; constness; true; enable 'CONST qualifier discarded' warning in current source; lookup108; false; use normal symbol lookups for unqualified symbol names; lookup108; true; use fbc-1.08.x or earlier symbol lookups for unqualified symbol names; private; false; allow procedures in sources to be compiled as separate modules with public linkage; private; true; allow procedures in sources to be compiled as privately included with minimal overhead for changing desired linkage; profile; false; profiling code is not generated; profile; true; profiling code is generated"}}
+	{{table columns="3" cellpadding="1" cells="Option; Value; Description; msbitfields; false; Use bitfields compatible with gcc (default); msbitfields; true ; Use bitfields compatible with those used in Microsoft C compilers; once; N/A; cause the source file in which the pragma appears to behave as though it was included with #include once ...; constness; false; disable 'CONST qualifier discarded' warning in current source; constness; true; enable 'CONST qualifier discarded' warning in current source; lookup108; false; use normal symbol lookups for unqualified symbol names; lookup108; true; use fbc-1.08.x or earlier symbol lookups for unqualified symbol names; gui; false; compile in console subsystem mode; gui; true; compile in GUI subsystem mode; private; false; allow procedures in sources to be compiled as separate modules with public linkage; private; true; allow procedures in sources to be compiled as privately included with minimal overhead for changing desired linkage; profile; false; profiling code is not generated; profile; true; profiling code is generated"}}
 	If //value// is not given, the compiler assumes //True// (//-1//).  A zero (//0//) value may be used in place of //False//.  A non-zero (for example, //-1//) value may be used in place of //True//.
 
 {{fbdoc item="desc"}}
@@ -19,6 +19,8 @@ Preprocessor directive
 	
 	**Push** saves the current value of the //option// onto a stack, then assigns the new //value// (or //True//) to it. **Pop** restores the //option// to its previous value, and removes it from the stack. This mechanism allows options to be changed for a certain part of source code, regardless of the setting used by the context, which is especially useful inside #include header files.
 	
+	**##gui##** sets the same GUI/console subsystem mode represented by the [[CompilerOpts|-s]] compiler option and ##[[KeyPgDdfbgui|__FB_GUI__]]##.  This pragma must be used at module level.
+
 	**##constness##** pragma is added for testing fbc compiler.  It will be removed in future at should not be relied upon.
 
 {{fbdoc item="ex"}}
@@ -32,6 +34,7 @@ Preprocessor directive
 #pragma pop(msbitfields)
 %%
 {{fbdoc item="ver"}}
+	- //#pragma gui// added in version 1.20.1
 	- //#pragma private// and //#pragma profile// added in version 1.20.0
 	- //#pragma lookup108// added in version 1.09.0, and to be removed in next minor release
 
@@ -40,6 +43,8 @@ Preprocessor directive
 
 {{fbdoc item="see"}}
 	- ##[[KeyPgPpPragmaReserve|#pragma reserve]]##
+	- ##[[KeyPgDdfbgui|__FB_GUI__]]##
+	- [[CompilerOpts|Compiler Option: -s]]
 	- ##[[KeyPgInclude|#include]]##
 	- ##[[KeyPgPpcmdline|#cmdline]]##
 	- [[ProPgPreprocessor|Preprocessor Overview]]

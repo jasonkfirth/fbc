@@ -1,0 +1,39 @@
+{{fbdoc item="title" value="FB_NO_SFXLIB"}}----
+User-defined compiler control symbol
+
+{{fbdoc item="syntax"}}##
+	#define FB_NO_SFXLIB
+##
+{{fbdoc item="desc"}}
+	Defining ##FB_NO_SFXLIB## tells the compiler not to treat selected sound-library command words as built-in sfxlib command keywords.
+	
+	This is useful in larger programs or libraries that do not use the sound command surface and need names such as ##Music##, ##Stream##, or ##Device## to be available as normal identifiers.
+	
+	The affected sfxlib command words are ##MUSIC##, ##SFX##, ##AUDIO##, ##STREAM##, ##MIDI##, ##DEVICE##, and ##CAPTURE##.
+	
+	##FB_NO_SFXLIB## affects parsing only after the symbol has been defined.  It does not remove libraries that are explicitly requested through other code, and it does not change the behavior of already-parsed source.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#define FB_NO_SFXLIB
+
+type Stream
+	as integer id
+end type
+
+dim as Stream output_stream
+output_stream.id = 1
+%%
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.1
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC""
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgPpdefine|#define]]##
+	- ##[[CompilerOptd|Compiler Option: -d]]##
+	- [[CatPgSfx|Sound Library Reference]]
+
+{{fbdoc item="back" value="CatPgPreProcess|Preprocessor"}}

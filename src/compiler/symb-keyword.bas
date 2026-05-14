@@ -442,6 +442,15 @@ sub symbKeywordTypeInit( )
 	''                  as any ptr reg_save_area
 	''              end type
 	''              type cva_list as __va_list_tag alias "__builtin_va_list[]"
+	''          #elseif defined( __FB_PPC__ )
+	''              type __va_list_tag alias "__va_list_tag"
+	''                  as ubyte gpr
+	''                  as ubyte fpr
+	''                  as ushort reserved
+	''                  as any ptr overflow_arg_area
+	''                  as any ptr reg_save_area
+	''              end type
+	''              type cva_list as __va_list_tag alias "__builtin_va_list[]"
 	''          #endif
 	''      #else
 	''          #if defined( __FB_ARM__ )
@@ -468,7 +477,7 @@ sub symbKeywordTypeInit( )
 	'' add the default cva_list type based on target options
 
 	select case fbGetBackendValistType()
-	case FB_CVA_LIST_BUILTIN_POINTER
+	case FB_CVA_LIST_BUILTIN_POINTER, FB_CVA_LIST_BUILTIN_VOID_POINTER
 		'' cva_list as any alias "__builtin_va_list" ptr (built-in pointer expression)
 		dtype = typeSetMangleDt( typeAddrOf( FB_DATATYPE_VOID ), FB_DATATYPE_VA_LIST )
 		symbAddTypedef( pid, dtype, NULL, typeGetSize( typeAddrOf( FB_DATATYPE_VOID ) ) )
@@ -503,6 +512,68 @@ sub symbKeywordTypeInit( )
 		'' don't clone struct, back patch the original only, see note in cMangleModifier()
 		'' TODO: s = symbCloneSymbol( s )
 		symbSetUdtValistType( s, FB_CVA_LIST_BUILTIN_C_STD )
+
+		'' type cva_list as __va_list_tag alias "__builtin_va_list[]"
+		symbAddTypedef( pid, typeSetMangleDt( symbGetType( s ), FB_DATATYPE_VA_LIST ), s, symbGetSizeOf( s ) )
+
+	case FB_CVA_LIST_BUILTIN_PPC
+		'' 32bit PowerPC exposes __builtin_va_list as a one-element
+		'' struct array.  The two byte counters are followed by a
+		'' reserved halfword so the pointer fields stay naturally aligned.
+
+		s = symbStructBegin( NULL, NULL, NULL, "__va_list_tag", "__va_list_tag", FALSE, 0, FALSE, 0, 0 )
+
+		'' gpr as ubyte
+		symbAddField( s, "gpr", 0, dTB(), FB_DATATYPE_UBYTE, NULL, 0, 0, 0 )
+
+		'' fpr as ubyte
+		symbAddField( s, "fpr", 0, dTB(), FB_DATATYPE_UBYTE, NULL, 0, 0, 0 )
+
+		'' reserved as ushort
+		symbAddField( s, "reserved", 0, dTB(), FB_DATATYPE_USHORT, NULL, 0, 0, 0 )
+
+		'' overflow_arg_area as any ptr
+		symbAddField( s, "overflow_arg_area", 0, dTB(), typeAddrOf( FB_DATATYPE_VOID ), NULL, 0, 0, 0 )
+
+		'' reg_save_area as any ptr
+		symbAddField( s, "reg_save_area", 0, dTB(), typeAddrOf( FB_DATATYPE_VOID ), NULL, 0, 0, 0 )
+
+		'' end type
+		symbStructEnd( s )
+
+		'' subtype mangle modifier
+		'' don't clone struct, back patch the original only, see note in cMangleModifier()
+		'' TODO: s = symbCloneSymbol( s )
+		symbSetUdtValistType( s, FB_CVA_LIST_BUILTIN_PPC )
+
+		'' type cva_list as __va_list_tag alias "__builtin_va_list[]"
+		symbAddTypedef( pid, typeSetMangleDt( symbGetType( s ), FB_DATATYPE_VA_LIST ), s, symbGetSizeOf( s ) )
+
+	case FB_CVA_LIST_BUILTIN_S390X
+		'' s390x also exposes __builtin_va_list as an array type, but its
+		'' struct uses native long-sized register offsets.
+
+		s = symbStructBegin( NULL, NULL, NULL, "__va_list_tag", "__va_list_tag", FALSE, 0, FALSE, 0, 0 )
+
+		'' __gpr as longint
+		symbAddField( s, "__gpr", 0, dTB(), FB_DATATYPE_LONGINT, NULL, 0, 0, 0 )
+
+		'' __fpr as longint
+		symbAddField( s, "__fpr", 0, dTB(), FB_DATATYPE_LONGINT, NULL, 0, 0, 0 )
+
+		'' __overflow_arg_area as any ptr
+		symbAddField( s, "__overflow_arg_area", 0, dTB(), typeAddrOf( FB_DATATYPE_VOID ), NULL, 0, 0, 0 )
+
+		'' __reg_save_area as any ptr
+		symbAddField( s, "__reg_save_area", 0, dTB(), typeAddrOf( FB_DATATYPE_VOID ), NULL, 0, 0, 0 )
+
+		'' end type
+		symbStructEnd( s )
+
+		'' subtype mangle modifier
+		'' don't clone struct, back patch the original only, see note in cMangleModifier()
+		'' TODO: s = symbCloneSymbol( s )
+		symbSetUdtValistType( s, FB_CVA_LIST_BUILTIN_S390X )
 
 		'' type cva_list as __va_list_tag alias "__builtin_va_list[]"
 		symbAddTypedef( pid, typeSetMangleDt( symbGetType( s ), FB_DATATYPE_VA_LIST ), s, symbGetSizeOf( s ) )

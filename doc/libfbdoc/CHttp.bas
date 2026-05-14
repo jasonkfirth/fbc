@@ -107,17 +107,17 @@ namespace fb
 			exit function
 		end if
 		
-		dim as CHttpStream ptr stream = new CHttpStream( @this )
+		dim as CHttpStream ptr http_stream = new CHttpStream( @this )
 
 		curl_easy_reset( ctx->curl )
 		curl_easy_setopt( ctx->curl, CURLOPT_HTTPHEADER, ctx->headerlist )
 		curl_easy_setopt( ctx->curl, CURLOPT_HTTPPOST, form->GetHandle() )
 
-		if( stream->Receive( url, FALSE, ca_file ) ) then
-    		function = stream->Read()
+		if( http_stream->Receive( url, FALSE, ca_file ) ) then
+			function = http_stream->Read()
 		end if
     
-		delete stream
+		delete http_stream
     
 	end function
 

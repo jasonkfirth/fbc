@@ -5,9 +5,9 @@ Intrinsic define (macro value) set by the compiler
 	""__FB_GUI__""
 ##
 {{fbdoc item="desc"}}
-	##""__FB_GUI__""## indicates if the executable subsystem option '-s gui' was specified on the command line at the time of compilation.
+	##""__FB_GUI__""## indicates whether GUI subsystem mode is active at the current point in compilation.
 	
-	Returns non-zero (-1) if the executable subsystem option '-s gui' was specified. Returns zero (0) otherwise (no executable subsystem option specified, or executable subsystem option '-s console' specified).
+	Returns non-zero (-1) if the executable subsystem option ##-s gui## was specified, or if ##[[KeyPgPpPragma|#pragma gui]]## is active. Returns zero (0) otherwise.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/defines/fbgui.bas"}}%%(freebasic)
@@ -21,12 +21,14 @@ Intrinsic define (macro value) set by the compiler
 	- Since fbc 1.06.0
 
 {{fbdoc item="target"}}
-	- Supported on Windows and Cygwin only.
+	- On Windows and Cygwin, this controls the linker subsystem.
+	- Other targets may use the same mode value for target-specific startup or runtime behavior.
 
 {{fbdoc item="diff"}}
 	- New to ""FreeBASIC""
 
 {{fbdoc item="see"}}
 	- [[CompilerOpts|Compiler Option: -s]]
+	- ##[[KeyPgPpPragma|#pragma]]##
 
 {{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

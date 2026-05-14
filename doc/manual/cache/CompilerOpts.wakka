@@ -11,13 +11,15 @@ Sets the executable subsystem
 {{fbdoc item="desc"}}
 	The ##-s## compiler option specifies the executable subsystem. Allowed subsystems are ##gui## and ##console## (by default, ##console## is used). Specifying a ##gui## subsystem prevents the console window from appearing behind the program window.
 	
-	The intrinsic macro ##[[KeyPgDdfbgui|__FB_GUI__]]## is set to non-zero (-1) if the option with ##gui## as subsystem was specified, and set to zero (0) otherwise.
+	The intrinsic macro ##[[KeyPgDdfbgui|__FB_GUI__]]## is set to non-zero (-1) if GUI subsystem mode is active, and set to zero (0) otherwise.  ##[[KeyPgPpPragma|#pragma gui]]## and ##[[KeyPgPpPragma|#pragma gui = 0]]## provide the source-level form of the same setting.
 
 {{fbdoc item="target"}}
-	- Supported on Windows and Cygwin only.
+	- On Windows and Cygwin, this controls the linker subsystem.
+	- Other targets may use the same mode value for target-specific startup or runtime behavior.
 
 {{fbdoc item="see"}}
 	- ##[[KeyPgDdfbgui|__FB_GUI__]]##
+	- ##[[KeyPgPpPragma|#pragma]]##
 	- [[CompilerCmdLine|Using the Command Line]]
 
 {{fbdoc item="back" value="CatPgCompOpt|Compiler Options"}}

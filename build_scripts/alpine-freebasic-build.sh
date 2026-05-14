@@ -125,6 +125,7 @@ STAGE="${STAGE:-$BUILDROOT/stage}"
 PKGROOT="${PKGROOT:-$BUILDROOT/pkgroot}"
 APKBUILDDIR="${APKBUILDDIR:-$BUILDROOT/apkbuild}"
 PREFIX="${PREFIX:-/usr}"
+SOURCE_COPY_EXCLUDES="$ROOT/mk/source-copy-excludes.rsync"
 
 VERSION="$(sed -n 's/^FBVERSION[[:space:]]*:=[[:space:]]*//p' mk/version.mk | head -n1)"
 REV="$(sed -n 's/^REV[[:space:]]*:=[[:space:]]*//p' mk/version.mk | head -n1)"
@@ -275,6 +276,8 @@ build_bootstrap_tarball() {
 stage_source_tree() {
     local bootstrap_srcdir
 
+    [ -f "$SOURCE_COPY_EXCLUDES" ] || die "missing source copy excludes: $SOURCE_COPY_EXCLUDES"
+
     rm -rf "$BUILDDIR" "$WORKDIR/bootstrap-from-tar"
     mkdir -p "$BUILDDIR"
 
@@ -289,20 +292,9 @@ stage_source_tree() {
 
     run rsync -a --no-owner --no-group \
         --delete \
-        --exclude '/.build-alpine/' \
-        --exclude '/.build-debianubuntu/' \
-        --exclude '/.codex/' \
-        --exclude '/FreeBASIC-*-source-bootstrap-*.tar.*' \
+        --exclude-from="$SOURCE_COPY_EXCLUDES" \
         --exclude '/bin/' \
         --exclude '/bootstrap/' \
-        --exclude '/lib/freebasic/' \
-        --exclude '/obj/' \
-        --exclude '/src/*/obj/' \
-        --exclude '/out/' \
-        --exclude '/stage/' \
-        --exclude '/tmp/' \
-        --exclude '/tests/*.log' \
-        --exclude '/tests/*.tmp' \
         "$ROOT/" "$BUILDDIR/"
 
     mkdir -p "$BUILDDIR/bootstrap/$BOOTKEY"
@@ -423,6 +415,8 @@ write_apkbuild() {
         echo '		done < "$builddir/.package-smoke/so-depends"'
         echo '	fi'
         echo "	make install DESTDIR=\"\$pkgdir\" prefix=\"$PREFIX\" FBC=bootstrap/fbc BUILD_FBC_TARGET=\"$FBC_TARGET\" FBTARGET_DIR_OVERRIDE=\"$BOOTKEY\""
+        echo '	mkdir -p "$pkgdir/usr/share/freebasic/examples"'
+        echo '	cp -a "$builddir/examples/." "$pkgdir/usr/share/freebasic/examples/"'
         echo '}'
         echo
         echo 'sha512sums="'

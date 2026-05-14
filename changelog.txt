@@ -29,9 +29,25 @@ Version 1.20.1
 - Debian/Ubuntu build matrix: automatically builds the experimental freebasic-xbox package on Xbox-capable host package architectures when an nxdk checkout is already installed, with a --no-xbox switch to disable the optional package lane
 - Debian/Ubuntu bootstrap flow: pass the real GNU target triplet during bootstrap source generation so architecture-specific bootstrap builds use the intended target CPU instead of inheriting the host default
 - Debian/Ubuntu architecture policy: treat hard-to-cover architectures such as armel and loong64 as targeted Debian trixie package-build lanes, allowing at least one package build per claimed CPU architecture without requiring every architecture to build across every distro/codename row
+- PowerPC/Linux support: tightened big-endian powerpc and ppc64 target handling, GNU triplet mapping, GCC __builtin_va_list modelling, 32-bit PowerPC qword alignment, and libffi-backed ThreadCall runtime coverage so the compiler and runtime match the platform ABI instead of relying on generic fallbacks
+- Linux package factory: moved the older binfmt/native-emulation matrix drivers under build_scripts/emulated-native-matrix while keeping the top-level wrapper names available for validation workflows
+- Linux package factory: added a native-container cross-build graph for Debian/Ubuntu/Raspbian, Alpine/postmarketOS, RPM-family, and Slackware package outputs under out/linux/<distro>/<release>/<arch>
+- Linux package factory: added build_scripts/linux-cross-build-freebasic-matrix.sh as the one-shot dispatcher above the Debian-family, APK-family, RPM-family, and Slackware package builders, with distro/release/architecture filters, --keep-going support, and default parallel make jobs based on the host CPU count
+- Debian/Ubuntu package builds: add package-host architecture selection, Ubuntu cross-architecture APT source setup, cross-toolchain dependency installation, and a build-compiler/host-compiler split so package builds can produce non-host CPU packages from a native distro container
+- Debian/Ubuntu cross-build matrix: enable the cutting-edge target-port package lanes only on selected newer distro/architecture pairs, covering JS/Android/Xbox on Ubuntu questing/resolute amd64, JS/Android on Ubuntu questing/resolute arm64, JS/Xbox on Debian trixie amd64, and JS on Debian trixie arm64
+- Debian/Ubuntu Android packaging: allow arm64 Ubuntu package builds to include freebasic-android while keeping Debian matrix builds Android-free by default because Debian's Android SDK/NDK installer packages are outside the default main-only container repositories
+- RPM and Slackware packaging: added clean-container package builders that install the distro build dependencies, create package artifacts under out/linux, and run the same console, gfxlib SCREEN/SCREENSET, SCREEN 13, sfxlib, and sfxlib showcase compile/link smoke checks before packaging succeeds
+- Alpine/postmarketOS packaging: kept the APK-family path wired into the package factory, installed examples into the package layout, and reused the shared source-copy excludes so isolated package worktrees do not absorb generated build artifacts
+- Debian Ports packaging: added Debian sid powerpc and ppc64 package build/test lanes, including forced package reinstall during validation and procfs/devpts chroot mounting checks so preserved test roots do not accidentally validate stale packages or partial runtime state
+- Debian Ports packaging: added Debian sid loong64 package build/test coverage from amd64-hosted cross builds, including package smoke tests and a full fbctests run under QEMU/binfmt
+- Debian armel packaging: added Debian trixie armel package validation using official Debian armel packages, installed the linux-arm compatibility link to the linux-armel runtime directory, selected the soft-float ARM dynamic linker on armel, and validated console/gfxlib/sfxlib smokes plus a full fbctests run under qemu-arm
+- Linux package validation: extend the Docker package test matrix with optional full fbctests runs and stronger package smoke coverage for console, gfxlib, SCREEN 13/SCREENSET, sfxlib, and the installed sfxlib showcase example
 - JavaScript/Emscripten packaging: split the JS-target compiler and runtime into a separate fbc-js/freebasic-js install layout so it can be installed alongside the native FreeBASIC packages without changing the normal fbc defaults
 - JavaScript/Emscripten packaging: make freebasic-js opt-in for Debian/Ubuntu builds via the nojs build profile and the build script's --no-js switch so default/native package builds can skip the Emscripten dependency chain
+- JavaScript/Emscripten runtime: make SLEEP 0 and tight INKEY polling yield through Asyncify instead of busy-waiting or returning as a no-op, so browser-hosted programs can keep input, timers, and canvas presentation moving
+- JavaScript/Emscripten gfxlib: keep browser-only SDL initialization out of Node.js, clean up failed graphics mode setup instead of leaving partial gfx state behind, clear dirty lines after canvas blits, and add cooperative yield points around browser graphics presentation, visible-page flips, and long immediate-mode drawing batches
 - JavaScript/MSYS2 packaging: avoid installing conflicting standalone Binaryen packages alongside MSYS2 Emscripten, make the packaged shell environment script work when sourced, and validate the bundled fbc-js toolchain through the Windows launcher path
+- JavaScript/Emscripten browser validation: add a Debian/Ubuntu package test script that builds the aggregate fbcunit tests with fbc-js, serves the generated HTML/wasm/data bundle in a Playwright Chromium container, captures Module output through the DevTools protocol, and requires a zero-failure fbcunit exit
 - compiler: split compiler-driver platform library and linker-framework defaults into fbc-[target]-platform.bi hook files so per-target link policy has a clear home outside fbc.bas
 - compiler: centralized target WCHAR sizing and UTF-32 literal handling through the existing target information table so Android, Xbox, JavaScript, and future UTF-32 WCHAR targets share the same WSTRING emission policy instead of needing per-target special cases
 - build system: make bootstrap source emission depend only on a runnable FreeBASIC compiler, so bootstrap-emit and bootstrap-emit-matrix no longer require target C compilers or cross-toolchain prerequisite checks
@@ -63,6 +79,7 @@ Version 1.20.1
 - riscv64 compiler smoke coverage that verifies __FB_LINUX__ and __FB_RISCV64__, emits target C, and optionally compiles a RISC-V object when a suitable cross-GCC is installed
 - s390x compiler smoke coverage that verifies __FB_LINUX__ and __FB_S390X__, emits target C, and checks the generated GCC command line for a valid s390x -march value
 - loongarch64 and ppc64le compiler smoke coverage, plus manual target-emission checks for big-endian PowerPC and PowerPC64 targets
+- big-endian powerpc and ppc64 compiler smoke coverage and Debian sid package validation, including full fbctests plus console, gfxlib, SCREEN 13/SCREENSET, sfxlib, and sfx showcase smoke checks under binfmt/QEMU
 - predefined compiler CPU-family macros for __FB_RISCV64__, __FB_S390X__, and __FB_LOONGARCH64__
 - ELF machine-id recognition for s390x, riscv64, and loongarch64 when reading FreeBASIC object metadata
 - Debian trixie loong64 matrix coverage using a loong64-capable Debian container image and Docker's linux/loong64 platform
@@ -76,6 +93,8 @@ Version 1.20.1
 - JavaScript sfxlib backend with WebAudio output for browsers and a null fallback so sound-using programs can still link and run in non-browser smoke tests
 - JavaScript test coverage: build and run the fbcunit suite and all four log-test dialect lanes through the packaged fbc-js distribution, with JS-specific exclusions for unsupported host shell pipes, COMMON symbols, pthread-style ThreadCall coverage, and platform libc/wasm ABI differences
 - MSYS2 freebasic-js browser validation that compiles console, gfxlib SCREEN/SCREENSET, and sfxlib WebAudio programs, drives them through Edge/Chrome, checks canvas pixel colors, and verifies captured browser audio for expected tone content and continuity
+- Debian/Ubuntu freebasic-js browser smoke testing that installs the packaged fbc-js toolchain in a Chromium-capable Docker image, compiles SCREEN 0 plus the supported legacy SCREEN 1-13 modes and SCREENRES/SCREENSET programs, drives INKEY/SLEEP 0 through the browser event loop, and validates text output plus RGB/mono canvas pixels through the DevTools protocol
+- Debian/Ubuntu freebasic-js browser fbcunit validation for compiling tests/fbc-tests.html from a clean copied tests/ tree and running the aggregate suite under Playwright Chromium
 - MSYS2 native package test script that runs the packaged win32 and win64 compilers through fbcunit and all four log-test dialect lanes from isolated copied test trees
 - Android gfxlib and sfxlib backends, including modern/legacy Android gfx drivers, AAudio/OpenSL ES sound drivers, Activity-backed console rendering, and an on-screen soft-keyboard toggle button
 - Android gfxlib/sfxlib: propagate NativeActivity lifecycle and surface callbacks so rendering and audio output pause cleanly and recover across Android surface recreation; Android APK startup now waits for stdout/stderr redirection before running the FreeBASIC main program
@@ -119,6 +138,7 @@ Version 1.20.1
 - Android/Xbox headers: extended selected CRT and SDL bindings so more examples compile against the Android and Xbox package headers without depending on unavailable desktop window-system types
 
 [fixed]
+- compiler: model LoongArch64 GCC __builtin_va_list as a void pointer type so C++ symbol mangling agrees with g++ for cva_list parameters
 - Windows rtlib: hardened and validated OPEN COM serial-port support for 64-bit Windows builds by keeping the shared Win32 serial driver valid for both MinGW32 and MinGW64, improving COM device-name handling, and checking the driver with COM1/COM2 loopback coverage
 - Windows rtlib: hardened OPEN LPT/LPRINT for 64-bit Windows builds by checking Win32 printer byte-count limits, avoiding size_t truncation in WritePrinter(), and making the common LPT device setup handle allocation failures cleanly
 - Linux: restrict '-m32' and '-m64' linker flags to x86/x86_64 targets instead of passing them to unrelated architectures
@@ -135,6 +155,11 @@ Version 1.20.1
 - rtlib/Darwin: use a naturally aligned internal DATA descriptor layout on Mach-O so DATA tables with pointer links do not produce unaligned relocation warnings during final links
 - s390x: map the compiler's generic s390x GCC architecture selection to z900 instead of emitting -march=s390x, which Debian's s390x GCC rejects
 - armhf/bootstrap: fix bootstrap generation so armhf builds emit ARM target options such as -arch armv7-a+fp instead of accidentally inheriting the host architecture, such as x86_64
+- armhf packaging: default Debian and Ubuntu armhf packages to hard-float ARMv7 with an explicit Raspbian armv6+fp override path
+- Linux/fbc: add glibc dynamic-linker paths for PowerPC, PowerPC64, PowerPC64LE, riscv64, and s390x package targets, and preserve whitespace when reading compiler-driver probe output
+- C backend: handle strict-alignment targets by emitting memcpy-backed scalar accesses for unaligned packed-field loads and stores
+- C backend: keep runtime-managed STRING and dynamic-array descriptor fields naturally aligned even when FIELD=N lowers the surrounding structure alignment
+- C backend/varargs: model riscv64 and s390x GCC __builtin_va_list ABI details so generated C and C++ mangling match the target compiler
 - armel/bootstrap: ensure armel bootstrap generation uses the correct soft-float ARM GNU triplet and emits the intended ARM target architecture
 - loong64/matrix: add a non-standard but usable Debian trixie container path after the normal Debian image set reported no linux/loong64 image
 - build matrix logging: harden docker build-log handling so stale or root-owned docker_build.log files do not produce misleading success output
@@ -200,6 +225,7 @@ Version 1.20.1
 - Xbox/nxdk: revived the Xbox target build far enough to produce rtlib, gfxlib2, and sfxlib archives with nxdk by adding Xbox-local CRT, filesystem, threading, graphics, controller input, and sfx decode compatibility shims; file decoding remains stubbed for the experimental package
 - Xbox/nxdk: fixed Win32-compatible calling-convention, alignment, mutex, TLS, and startup declarations so multithreaded rtlib, gfxlib2, and sfxlib archives build for Xbox without depending on unsupported OpenGL or libffi pieces
 - Xbox/nxdk packaging: include the executable nxdk wrapper tools and cxbe converter needed by fbc-xbox, classify the bundled SDK package as non-free/devel, and ship a generated list of nxdk license files alongside the package copyright metadata
+- Xbox/nxdk packaging: clean stale target output and dependency directories before Docker sidecar builds so package runs do not inherit host-absolute .d paths from earlier local builds
 - examples: expanded the examples makefile coverage and fixed several Windows example build failures in the FreeImage/SDL, SDL_mixer, SDL_ttf, SDL mouse, TinyPTC, and CUnit examples
 - examples: fixed Windows and Win64 example compile failures by teaching the examples makefile about target-specific GD/ODE handling, adding win64-safe naked-call assembly for the manual procedure example, and staging source-built win64 QuickLZ, SQLite 2, big_int, DispHelper, FastCGI, GDSL, and TinyPTC archives
 - examples: fixed the GTK buttonbox tutorial's local GTK function redeclaration so Win32 uses GTK's C ABI symbol and Win64 avoids the decorated-cast path that produced invalid HLC alignment checks
@@ -208,6 +234,7 @@ Version 1.20.1
 - generated bindings: stopped the SWIG FreeBASIC header generator from emitting stale "can't be included in other distributions without authorization" boilerplate in newly generated files
 - tests/file: made the TCP EOF check deterministic instead of depending on thread scheduling timing when running the log tests
 - tests: pass the selected FBC through to the fbcunit build so cross-target or packaged test builds do not accidentally use a different compiler
+- tests: make floating-point infinity/NaN bit checks endian-safe and avoid assuming one target C library's NaN/IND spelling in PRINT USING tests
 - rtlib/gfxlib2: fixed MinGW32/MinGW64 build warnings from debug-only format-mask bookkeeping, transposed calloc() arguments, and ambiguous 32-bit inline-assembly movsd spelling
 
 

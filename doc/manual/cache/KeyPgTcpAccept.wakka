@@ -1,0 +1,34 @@
+{{fbdoc item="title" value="TCP ACCEPT"}}----
+Accepts a connection from an ##Open Tcp Server## file number.
+
+{{fbdoc item="syntax"}}##
+	[[KeyPgDeclare|declare]] [[KeyPgFunction|function]] **Tcp Accept** ( [**#**]//serverfilenum// [[KeyPgAs|as]] [[KeyPgLong|long]] ) [[KeyPgAs|as]] [[KeyPgLong|long]]
+##
+{{fbdoc item="usage"}}##
+	//clientfilenum// = **Tcp Accept**( [**#**]//serverfilenum// )
+##
+{{fbdoc item="param"}}
+	##//serverfilenum//##
+		A file number previously opened with ##[[KeyPgOpenTcpServer|Open Tcp Server]]##.
+
+{{fbdoc item="ret"}}
+	Returns a new client file number on success, or zero (##0##) on failure.
+
+{{fbdoc item="desc"}}
+	##**Tcp Accept**## waits for the next incoming connection on a TCP server file number.  It chooses a free file number for the accepted client and returns it to the program.  The returned file number should be closed with ##[[KeyPgClose|Close]]## when the connection is no longer needed.
+
+	The server file number remains open and may be passed to ##**Tcp Accept**## again to accept another connection.
+
+{{fbdoc item="ex"}}
+	See ##examples/network/opentcp/http-server.bas## and ##examples/network/opentcp/two-connections-selftest.bas##.
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgOpenTcpServer|Open Tcp Server]]##
+	- ##[[KeyPgOpenTcp|Open Tcp]]##
+	- ##[[KeyPgEoc|Eoc]]##
+	- ##[[KeyPgFreefile|Freefile]]##
+
+{{fbdoc item="back" value="CatPgFile|File I/O Functions"}}

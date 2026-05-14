@@ -11,7 +11,11 @@ SUITE( fbc_tests.pointers.casting2 )
 
 		cptr(short ptr, pt) += 1
 
+#if defined( __FB_BIGENDIAN__ )
+		CU_ASSERT_EQUAL( *pt, (array(1) and &hffff) shl 16 or (array(2) shr 16) )
+#else
 		CU_ASSERT_EQUAL( *pt, (array(2) and &hffff) shl 16 or (array(1) shr 16) )
+#endif
 	END_TEST
 
 END_SUITE

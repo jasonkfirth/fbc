@@ -1727,7 +1727,10 @@ declare function symbIsString _
 	) as integer
 
 declare function symbGetValistType( byval dtype as integer, byval subtype as FBSYMBOL ptr ) as FB_CVA_LIST_TYPEDEF
-#define symbIsValistStructArray( dtype, subtype ) (symbGetValistType( dtype, subtype ) = FB_CVA_LIST_BUILTIN_C_STD)
+#define symbIsValistStructArray( dtype, subtype ) _
+	((symbGetValistType( dtype, subtype ) = FB_CVA_LIST_BUILTIN_C_STD) or _
+	 (symbGetValistType( dtype, subtype ) = FB_CVA_LIST_BUILTIN_PPC) or _
+	 (symbGetValistType( dtype, subtype ) = FB_CVA_LIST_BUILTIN_S390X))
 #define symbIsBuiltinVaListType( dtype, subtype ) (symbGetValistType( dtype, subtype ) > FB_CVA_LIST_POINTER)
 
 declare function symbGetVarHasCtor _

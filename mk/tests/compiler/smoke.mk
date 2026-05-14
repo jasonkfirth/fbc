@@ -4,7 +4,7 @@
 # Compiler smoke test
 ##############################################################################
 
-.PHONY: compiler-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-ppc64le-smoke
+.PHONY: compiler-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-ppc-smoke compiler-ppc64-smoke compiler-ppc64le-smoke
 compiler-smoke: libs
 	$(call _mt_echo,Compiler smoke test)
 	@mkdir -p "$(TEST_TMP)"
@@ -97,6 +97,65 @@ compiler-loongarch64-smoke:
 		echo "==> LOONGARCH64 OBJECT OK"; \
 	else \
 		echo "==> SKIP: loongarch64-linux-gnu-gcc not found; target C emission only"; \
+	fi
+	@rm -rf "$(TEST_TMP)" "$(LOG_DIR)"
+
+compiler-ppc-smoke:
+	@test -n "$(TEST_FBC)" || { echo "ERROR: no usable fbc found"; exit 1; }
+	$(call _mt_echo,PowerPC compiler target smoke test)
+	@mkdir -p "$(TEST_TMP)"
+	@printf "%s\n" \
+		'#if not defined(__FB_LINUX__)' \
+		'#error expected linux target' \
+		'#endif' \
+		'#if not defined(__FB_PPC__)' \
+		'#error expected ppc target' \
+		'#endif' \
+		'#if not defined(__FB_BIGENDIAN__)' \
+		'#error expected big-endian target' \
+		'#endif' \
+		'print "ppc ok"' \
+		> "$(TEST_TMP)/ppc-smoke.bas"
+	$(call _mt_run,$(TEST_FBC_CMD) -target powerpc-linux-gnu -r "$(TEST_TMP)/ppc-smoke.bas" -x "$(TEST_TMP)/ppc-smoke")
+	@test -s "$(TEST_TMP)/ppc-smoke.c" || { echo "ERROR: ppc C output was not produced"; exit 1; }
+	@if command -v powerpc-linux-gnu-gcc >/dev/null 2>&1; then \
+		echo "==> powerpc-linux-gnu-gcc found; compiling ppc object"; \
+		$(TEST_FBC_CMD) -target powerpc-linux-gnu -c "$(TEST_TMP)/ppc-smoke.bas" -o "$(TEST_TMP)/ppc-smoke.o"; \
+		readelf -h "$(TEST_TMP)/ppc-smoke.o" | grep -q 'Machine:.*PowerPC' || { echo "ERROR: object is not PowerPC"; exit 1; }; \
+		echo "==> PPC OBJECT OK"; \
+	else \
+		echo "==> SKIP: powerpc-linux-gnu-gcc not found; target C emission only"; \
+	fi
+	@rm -rf "$(TEST_TMP)" "$(LOG_DIR)"
+
+compiler-ppc64-smoke:
+	@test -n "$(TEST_FBC)" || { echo "ERROR: no usable fbc found"; exit 1; }
+	$(call _mt_echo,PowerPC64 compiler target smoke test)
+	@mkdir -p "$(TEST_TMP)"
+	@printf "%s\n" \
+		'#if not defined(__FB_LINUX__)' \
+		'#error expected linux target' \
+		'#endif' \
+		'#if not defined(__FB_PPC__)' \
+		'#error expected ppc target' \
+		'#endif' \
+		'#if not defined(__FB_64BIT__)' \
+		'#error expected 64-bit target' \
+		'#endif' \
+		'#if not defined(__FB_BIGENDIAN__)' \
+		'#error expected big-endian target' \
+		'#endif' \
+		'print "ppc64 ok"' \
+		> "$(TEST_TMP)/ppc64-smoke.bas"
+	$(call _mt_run,$(TEST_FBC_CMD) -target powerpc64-linux-gnu -r "$(TEST_TMP)/ppc64-smoke.bas" -x "$(TEST_TMP)/ppc64-smoke")
+	@test -s "$(TEST_TMP)/ppc64-smoke.c" || { echo "ERROR: ppc64 C output was not produced"; exit 1; }
+	@if command -v powerpc64-linux-gnu-gcc >/dev/null 2>&1; then \
+		echo "==> powerpc64-linux-gnu-gcc found; compiling ppc64 object"; \
+		$(TEST_FBC_CMD) -target powerpc64-linux-gnu -c "$(TEST_TMP)/ppc64-smoke.bas" -o "$(TEST_TMP)/ppc64-smoke.o"; \
+		readelf -h "$(TEST_TMP)/ppc64-smoke.o" | grep -q 'Machine:.*PowerPC64' || { echo "ERROR: object is not PowerPC64"; exit 1; }; \
+		echo "==> PPC64 OBJECT OK"; \
+	else \
+		echo "==> SKIP: powerpc64-linux-gnu-gcc not found; target C emission only"; \
 	fi
 	@rm -rf "$(TEST_TMP)" "$(LOG_DIR)"
 

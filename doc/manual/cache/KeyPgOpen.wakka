@@ -121,7 +121,7 @@ End If
 	- If you try to open a directory on Linux, the ##**Open**## command will succeed.
 
 {{fbdoc item="diff"}}
-	- Using MS-DOS device names to open streams or hardware devices (##"LPT:"##, ##"SCR:"##, etc.) is supported only in the //[[CompilerOptlang|-lang qb]]// dialect; for other modes ""FreeBASIC's"" new composite keywords must be used: see ##[[KeyPgOpenCom|Open Com]]##,  ##[[KeyPgOpenCons|Open Cons]]##,  ##[[KeyPgOpenErr|Open Err]]##,  ##[[KeyPgOpenPipe|Open Pipe]]##,  ##[[KeyPgOpenLpt|Open Lpt]]##,  ##[[KeyPgOpenScrn|Open Scrn]]##.
+	- Using MS-DOS device names to open streams or hardware devices (##"LPT:"##, ##"SCR:"##, etc.) is supported only in the //[[CompilerOptlang|-lang qb]]// dialect; for other modes ""FreeBASIC's"" new composite keywords must be used: see ##[[KeyPgOpenCom|Open Com]]##,  ##[[KeyPgOpenCons|Open Cons]]##,  ##[[KeyPgOpenErr|Open Err]]##,  ##[[KeyPgOpenPipe|Open Pipe]]##,  ##[[KeyPgOpenLpt|Open Lpt]]##,  ##[[KeyPgOpenScrn|Open Scrn]]##, ##[[KeyPgOpenTcp|Open Tcp]]##, and ##[[KeyPgOpenTcpServer|Open Tcp Server]]##.
 	- ##**Open**## can be called as a function that returns an error code.
 
 {{fbdoc item="lang"}}
@@ -131,6 +131,6 @@ End If
 	- ##[[KeyPgErr|Err]]## (and [[TblRuntimeErrors|a list of error codes]])
 	- ##[[KeyPgClose|Close]]##
 	- ##[[KeyPgFreefile|Freefile]]##
-	- ##[[KeyPgOpenCons|Open Cons]]##, ##[[KeyPgOpenErr|Open Err]]##, ##[[KeyPgOpenPipe|Open Pipe]]##, ##[[KeyPgOpenLpt|Open Lpt]]##, ##[[KeyPgOpenCom|Open Com]]##, ##[[KeyPgOpenScrn|Open Scrn]]##
+	- ##[[KeyPgOpenCons|Open Cons]]##, ##[[KeyPgOpenErr|Open Err]]##, ##[[KeyPgOpenPipe|Open Pipe]]##, ##[[KeyPgOpenLpt|Open Lpt]]##, ##[[KeyPgOpenCom|Open Com]]##, ##[[KeyPgOpenScrn|Open Scrn]]##, ##[[KeyPgOpenTcp|Open Tcp]]##, ##[[KeyPgOpenTcpServer|Open Tcp Server]]##
 
 {{fbdoc item="back" value="CatPgFile|File I/O Functions"}}

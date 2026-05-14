@@ -3,12 +3,22 @@ Produces a beep sound.
 
 {{fbdoc item="syntax"}}##
 	[[KeyPgDeclare|declare]] [[KeyPgSub|sub]] **Beep** ( )
+	[[KeyPgDeclare|declare]] [[KeyPgSub|sub]] **Beep** ( [[KeyPgByval|byval]] //duration// [[KeyPgAs|as]] [[KeyPgSingle|single]], [[KeyPgByval|byval]] //pitch// [[KeyPgAs|as]] [[KeyPgSingle|single]] )
 ##
 {{fbdoc item="usage"}}##
 	Beep
+	Beep //duration//, //pitch//
 ##
+{{fbdoc item="param"}}
+	##//duration//##
+		Duration in seconds.
+	##//pitch//##
+		Pitch as semitones from middle C, matching the sfxlib pitch form.
+
 {{fbdoc item="desc"}}
-	##Beep## tells the system to sound a beep noise. Note that this might not work on some platforms. Since this command is not reliable and there is no way to specify the frequency and duration, you might want to avoid it in favor of other / better solutions, for example: [[http://www.freebasic.net/forum/viewtopic.php?p=20441#20441]] by yetifoot.
+	##Beep## tells the system to sound a beep noise.  The no-argument form keeps the traditional console behavior.  The two-argument form uses sfxlib and produces a generated note with an explicit duration and pitch.
+
+	For more control over generated sound, use the sfxlib commands such as ##[[KeyPgSfxGenerated|Sound]]##, ##[[KeyPgSfxGenerated|Tone]]##, ##[[KeyPgSfxGenerated|Note]]##, and ##[[KeyPgSfxGenerated|Play]]##.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/system/beep.bas"}}%%(freebasic)
@@ -20,5 +30,7 @@ Beep
 
 {{fbdoc item="see"}}
 	- ##[[KeyPgOut|Out]]## - producing sound using CPU ports
+	- ##[[CatPgSfx|Sound Library Reference]]##
+	- ##[[KeyPgSfxGenerated|Generated sound commands]]##
 
 {{fbdoc item="back" value="CatPgMisc|Miscellaneous"}}

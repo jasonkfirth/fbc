@@ -159,6 +159,7 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgBsave|BSAVE"}}
 	- {{fbdoc item="keyword" value="KeyPgClose|CLOSE"}}
 	- {{fbdoc item="keyword" value="KeyPgEncoding|ENCODING"}}
+	- {{fbdoc item="keyword" value="KeyPgEoc|EOC"}}
 	- {{fbdoc item="keyword" value="KeyPgEof|EOF"}}
 	- {{fbdoc item="keyword" value="KeyPgFreefile|FREEFILE"}}
 	- {{fbdoc item="keyword" value="KeyPgGetfileio|GET # (File I/O)"}}
@@ -169,6 +170,8 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgLock|LOCK"}}
 	- {{fbdoc item="keyword" value="KeyPgLof|LOF"}}
 	- {{fbdoc item="keyword" value="KeyPgOpen|OPEN"}}
+	- {{fbdoc item="keyword" value="KeyPgOpenTcp|OPEN TCP"}}
+	- {{fbdoc item="keyword" value="KeyPgOpenTcpServer|OPEN TCP SERVER"}}
 	- {{fbdoc item="keyword" value="KeyPgOutput|OUTPUT"}}
 	- {{fbdoc item="keyword" value="KeyPgPrintPp|PRINT #"}}
 	- {{fbdoc item="keyword" value="KeyPgPutfileio|PUT # (File I/O)"}}
@@ -178,6 +181,7 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgReset|RESET"}}	
 	- {{fbdoc item="keyword" value="KeyPgSeekset|SEEK (Statement)"}}
 	- {{fbdoc item="keyword" value="KeyPgSeekreturn|SEEK (Function)"}}
+	- {{fbdoc item="keyword" value="KeyPgTcpAccept|TCP ACCEPT"}}
 	- {{fbdoc item="keyword" value="KeyPgUnlock|UNLOCK"}}
 	- {{fbdoc item="keyword" value="KeyPgWritePp|WRITE #"}}
 	- {{fbdoc item="keyword" value="KeyPgWriteFile|WRITE (File Access)"}}	
@@ -196,6 +200,7 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgFlip|FLIP"}}
 	- {{fbdoc item="keyword" value="KeyPgGetgraphics|GET (Graphics)"}}
 	- {{fbdoc item="keyword" value="KeyPgImageConvertRow|IMAGECONVERTROW"}}
+	- {{fbdoc item="keyword" value="KeyPgGetxpad|GETXPAD"}}
 	- {{fbdoc item="keyword" value="KeyPgImagecreate|IMAGECREATE"}}
 	- {{fbdoc item="keyword" value="KeyPgImageDestroy|IMAGEDESTROY"}}
 	- {{fbdoc item="keyword" value="KeyPgImageInfo|IMAGEINFO"}}
@@ -230,6 +235,34 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgViewgraphics|VIEW (Graphics)"}}
 	- {{fbdoc item="keyword" value="KeyPgWindow|WINDOW"}}
 	- {{fbdoc item="keyword" value="KeyPgXorGfx|XOR (Graphics PUT)"}}
+
+{{fbdoc item="section" value="Sound"}}
+	- {{fbdoc item="keyword" value="KeyPgAudio|AUDIO"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|BALANCE"}}
+	- {{fbdoc item="keyword" value="KeyPgBeep|BEEP"}}
+	- {{fbdoc item="keyword" value="KeyPgCapture|CAPTURE"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|CHANNEL"}}
+	- {{fbdoc item="keyword" value="KeyPgDevice|DEVICE"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|ENVELOPE"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|Generated sound commands"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|INSTRUMENT"}}
+	- {{fbdoc item="keyword" value="KeyPgMidi|MIDI"}}
+	- {{fbdoc item="keyword" value="KeyPgMusic|MUSIC"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|NOISE"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|NOTE"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|OCTAVE"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|PAN"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|PLAY"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|REST"}}
+	- {{fbdoc item="keyword" value="KeyPgSfx|SFX"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|SOUND"}}
+	- {{fbdoc item="keyword" value="KeyPgStream|STREAM"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|TEMPO"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|TONE"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|VOICE"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|VOL"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|VOLUME"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|WAVE"}}
 
 {{fbdoc item="section" value="Hardware access"}}
 	- {{fbdoc item="keyword" value="KeyPgInp|INP"}}
@@ -442,6 +475,7 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgDdfbjs|__FB_JS__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfblang|__FB_LANG__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfblinux|__FB_LINUX__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbloongarch64|__FB_LOONGARCH64__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdFBMain|__FB_MAIN__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdFBMinVersion|__FB_MIN_VERSION__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbmt|__FB_MT__"}}
@@ -464,6 +498,8 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgDdfbprofile|__FB_PROFILE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbquerysymbol|__FB_QUERY_SYMBOL__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbquote|__FB_QUOTE__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbriscv64|__FB_RISCV64__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbs390x|__FB_S390X__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbsignature|__FB_SIGNATURE__"}} 
 	- {{fbdoc item="keyword" value="KeyPgDdfbsse|__FB_SSE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbuniqueid|__FB_UNIQUEID__"}}
@@ -493,6 +529,8 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgPpassert|#ASSERT"}}
 	- {{fbdoc item="keyword" value="KeyPgPpcmdline|#CMDLINE"}}
 	- {{fbdoc item="keyword" value="KeyPgPpdefine|#DEFINE"}}
+	- {{fbdoc item="keyword" value="KeyPgFbNoGfxlib|FB_NO_GFXLIB"}}
+	- {{fbdoc item="keyword" value="KeyPgFbNoSfxlib|FB_NO_SFXLIB"}}
 	- {{fbdoc item="keyword" value="KeyPgPpelse|#ELSE"}}
 	- {{fbdoc item="keyword" value="KeyPgPpelseif|#ELSEIF"}}
 	- {{fbdoc item="keyword" value="KeyPgPpelseifdef|#ELSEIFDEF"}}

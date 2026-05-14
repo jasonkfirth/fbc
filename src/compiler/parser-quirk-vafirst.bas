@@ -146,11 +146,13 @@ private sub hSolveValistType _
 	if( typeGetMangleDt( n->dtype ) = FB_DATATYPE_VA_LIST ) then
 
 		select case symbGetValistType( n->dtype, n->subtype )
-		case FB_CVA_LIST_POINTER, FB_CVA_LIST_BUILTIN_POINTER
+		case FB_CVA_LIST_POINTER, FB_CVA_LIST_BUILTIN_POINTER, _
+		     FB_CVA_LIST_BUILTIN_VOID_POINTER
 			'' cast( __builtin_va_list, *expr )
 			n->dtype = typeJoinDtOnly( typeDeref( n->dtype ) , FB_DATATYPE_VA_LIST )
 
-		case FB_CVA_LIST_BUILTIN_C_STD
+		case FB_CVA_LIST_BUILTIN_C_STD, FB_CVA_LIST_BUILTIN_PPC, _
+		     FB_CVA_LIST_BUILTIN_S390X
 			if( astIsVAR( n ) ) then
 				if( symbIsParamVarByval( astGetSymbol( n ) ) ) then
 

@@ -16,17 +16,48 @@ JS_GFXDRIVER_CTX __fb_js_ctx =
 
 static void driver_exit(void);
 
+static int driver_has_dirty_lines(void)
+{
+	int y;
+
+	if( __fb_gfx == NULL || __fb_gfx->dirty == NULL )
+		return FALSE;
+
+	for( y = 0; y < __fb_gfx->h; y++ )
+	{
+		if( __fb_gfx->dirty[y] )
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+static int js_has_browser_window(void)
+{
+	return EM_ASM_INT({
+		return (typeof window !== 'undefined') &&
+		       (typeof document !== 'undefined');
+	});
+}
+
 static void driver_blit()
 {
+	int copied = FALSE;
+
+	if( !driver_has_dirty_lines() )
+		return;
 
     if(SDL_LockSurface(__fb_js_ctx.canvas) == 0)
     {
         __fb_js_ctx.blit(__fb_js_ctx.canvas->pixels, __fb_js_ctx.canvas->pitch);
 
         SDL_UnlockSurface(__fb_js_ctx.canvas);
+		copied = TRUE;
     }
 
 	SDL_Flip(__fb_js_ctx.canvas);
+	if( copied )
+		fb_hMemSet(__fb_gfx->dirty, FALSE, __fb_gfx->h);
 
 }
 
@@ -60,6 +91,9 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 		return 0;
 
 	if (flags & DRIVER_OPENGL)
+		return -1;
+
+	if( !js_has_browser_window() )
 		return -1;
 
 	__fb_js_ctx.changingScreen = TRUE;
@@ -98,6 +132,9 @@ static int WGL_init(char *title, int w, int h, int depth_arg, int refresh_rate, 
 		return 0;
 
 	if (!(flags & DRIVER_OPENGL))
+		return -1;
+
+	if( !js_has_browser_window() )
 		return -1;
 
 	__fb_js_ctx.changingScreen = TRUE;

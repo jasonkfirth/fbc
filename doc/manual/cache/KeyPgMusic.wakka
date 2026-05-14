@@ -1,0 +1,33 @@
+{{fbdoc item="title" value="MUSIC"}}----
+Loads and controls music assets through sfxlib.
+
+{{fbdoc item="syntax"}}##
+	//id// = **Music Load**( //filename// )
+	//result// = **Music Play**( //id// )
+	//result// = **Music Play**( //filename// )
+	//result// = **Music Loop**( //id// )
+	//result// = **Music Loop**( //filename// )
+	**Music Pause** [ //id// ]
+	**Music Resume** [ //id// ]
+	**Music Stop** [ //id// ]
+	//status// = **Music Status**()
+	//id// = **Music Current**()
+	//position// = **Music Position**()
+##
+{{fbdoc item="desc"}}
+	##**Music**## is the long-form music playback interface.  ##Music Load## loads a file into a music slot and returns the slot id.  ##Music Play## and ##Music Loop## can play either a loaded id or a filename directly.  ##Music Pause##, ##Music Resume##, and ##Music Stop## act on all music when no id is supplied, or on the supplied id.
+
+	##Music Status## returns ##0## for stopped, ##1## for playing, and ##2## for paused.  ##Music Current## returns the current music id, or ##-1## when none is active.  ##Music Position## returns the current playback position in frames.
+
+{{fbdoc item="ex"}}
+	See ##examples/sfxlib/music-load.bas##, ##examples/sfxlib/music-play.bas##, ##examples/sfxlib/music-loop.bas##, and ##examples/sfxlib/showcase.bas##.
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgAudio|Audio]]##
+	- ##[[KeyPgStream|Stream]]##
+	- ##[[KeyPgSfx|Sfx]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

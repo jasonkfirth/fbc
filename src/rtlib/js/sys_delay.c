@@ -3,14 +3,14 @@
 
 FBCALL void fb_Delay( int msecs )
 {
-	double until;
+	if( msecs < 0 )
+		msecs = 0;
 
-	if( msecs <= 0 )
-		return;
-
-	until = emscripten_get_now() + msecs;
-
-	while( emscripten_get_now() < until )
-	{
-	}
+	/*
+	 * JavaScript runs FreeBASIC code, event dispatch, timers, audio, and
+	 * canvas presentation on the same browser thread.  SLEEP must therefore
+	 * yield to the host event loop instead of busy waiting, especially for
+	 * old game loops that use SLEEP 0 once per frame.
+	 */
+	emscripten_sleep( msecs );
 }

@@ -165,7 +165,8 @@ private function hCalcPadding _
 		byval ofs as longint, _
 		byval align as integer, _
 		byval dtype as integer, _
-		byval subtype as FBSYMBOL ptr _
+		byval subtype as FBSYMBOL ptr, _
+		byval attrib as FB_SYMBATTRIB = FB_SYMBATTRIB_NONE _
 	) as integer
 
 	dim as integer natalign = any
@@ -181,6 +182,15 @@ private function hCalcPadding _
 		'' Then the field's alignment takes precedence, i.e. FIELD=N can
 		'' only decrease the alignment but not increase it.
 		if( align > natalign ) then
+			align = natalign
+		end if
+
+		'' Var-len STRINGs and dynamic array descriptors are managed by the
+		'' runtime through descriptor pointers.  Those runtime entry points
+		'' expect naturally aligned descriptors, so FIELD=N must not place
+		'' them at byte offsets that can fault on strict-alignment CPUs.
+		if( (typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_STRING) or _
+		    ((attrib and FB_SYMBATTRIB_DESCRIPTOR) <> 0) ) then
 			align = natalign
 		end if
 	end if
@@ -209,6 +219,69 @@ private function hCheckUDTSize _
 	else
 		function = TRUE
 	end if
+end function
+
+private function hBitfieldPaddingContainer _
+	( _
+		byval bits as integer, _
+		byval pad as integer _
+	) as integer
+
+	if( (bits <= 8) and (pad >= 1) ) then
+		return 1
+	end if
+
+	if( (bits <= 16) and (pad >= 2) ) then
+		return 2
+	end if
+
+	if( (bits <= 32) and (pad >= 4) ) then
+		return 4
+	end if
+
+	if( (bits <= 64) and (pad >= 8) ) then
+		return 8
+	end if
+
+end function
+
+private function hBitfieldContainerType _
+	( _
+		byval dtype as integer, _
+		byval lgt as integer _
+	) as integer
+
+	select case lgt
+	case 1
+		if( typeIsSigned( dtype ) ) then
+			return FB_DATATYPE_BYTE
+		else
+			return FB_DATATYPE_UBYTE
+		end if
+
+	case 2
+		if( typeIsSigned( dtype ) ) then
+			return FB_DATATYPE_SHORT
+		else
+			return FB_DATATYPE_USHORT
+		end if
+
+	case 4
+		if( typeIsSigned( dtype ) ) then
+			return FB_DATATYPE_LONG
+		else
+			return FB_DATATYPE_ULONG
+		end if
+
+	case 8
+		if( typeIsSigned( dtype ) ) then
+			return FB_DATATYPE_LONGINT
+		else
+			return FB_DATATYPE_ULONGINT
+		end if
+	end select
+
+	function = dtype
 end function
 
 '':::::
@@ -369,41 +442,23 @@ function symbAddField _
 
 	'' Add padding for normal fields (neither bitfield nor fake array)
 	if( alloc_field ) then
-		pad = hCalcPadding( offset, parent->udt.align, dtype, subtype )
+		pad = hCalcPadding( offset, parent->udt.align, dtype, subtype, attrib )
 		if( pad > 0 ) then
 
 			'' bitfield?
-			if( bits > 0 ) then
-				'' not M$-way?
-				if( env.clopt.msbitfields = FALSE ) then
-					'' follow the GCC ABI..
-					if( bits <= pad * 8 ) then
-						lgt = pad
-						pad = 0
-
-						'' remap type
-						select case lgt
-						case 1
-							if( typeIsSigned( dtype ) ) then
-								dtype = FB_DATATYPE_BYTE
-							else
-								dtype = FB_DATATYPE_UBYTE
-							end if
-						case 2
-							if( typeIsSigned( dtype ) ) then
-								dtype = FB_DATATYPE_SHORT
-							else
-								dtype = FB_DATATYPE_USHORT
-							end if
-
-						'' padding won't be >= sizeof(int) because only
-						'' integers can be used as bitfields
-						end select
+				if( bits > 0 ) then
+					'' not M$-way?
+					if( env.clopt.msbitfields = FALSE ) then
+						'' follow the GCC ABI..
+						var bitfieldpad = hBitfieldPaddingContainer( bits, pad )
+						if( bitfieldpad > 0 ) then
+							lgt = bitfieldpad
+							pad = 0
+							dtype = hBitfieldContainerType( dtype, lgt )
+						end if
 
 					end if
-
 				end if
-			end if
 		end if
 
 		'' Check whether adding this field would make the UDT be too big

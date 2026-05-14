@@ -9,6 +9,12 @@
 #define TRUE (-1)
 
 SUITE( fbc_tests.boolean_.boolean_bitfield )
+	#if defined( __FB_BIGENDIAN__ )
+		#define LONG_UNION_BIT( n ) ((n) shl ((sizeof(long) - 1) * 8))
+	#else
+		#define LONG_UNION_BIT( n ) (n)
+	#endif
+
 	type T1
 		union
 			type
@@ -240,35 +246,35 @@ SUITE( fbc_tests.boolean_.boolean_bitfield )
 			CU_ASSERT_EQUAL( b->b##bitno, cint(cbool(bvalue0)) )
 		#endmacro
 
-		for i as long = 0 to 15
-			n1 = &h7FFFFF00L or i
+			for i as long = 0 to 15
+				n1 = &h7FFFFF00L or i
 
-			toggle_bit( 0, 1, 0, 1 )
-			toggle_bit( 1, 2, 0, 1  )
-			toggle_bit( 2, 4, 0, 1  )
-			toggle_bit( 3, 8, 0, 1  )
+				toggle_bit( 0, LONG_UNION_BIT( 1 ), 0, 1 )
+				toggle_bit( 1, LONG_UNION_BIT( 2 ), 0, 1  )
+				toggle_bit( 2, LONG_UNION_BIT( 4 ), 0, 1  )
+				toggle_bit( 3, LONG_UNION_BIT( 8 ), 0, 1  )
 
-			toggle_bit( 0, 1, 0, -1 )
-			toggle_bit( 1, 2, 0, -1 )
-			toggle_bit( 2, 4, 0, -1 )
-			toggle_bit( 3, 8, 0, -1 )
+				toggle_bit( 0, LONG_UNION_BIT( 1 ), 0, -1 )
+				toggle_bit( 1, LONG_UNION_BIT( 2 ), 0, -1 )
+				toggle_bit( 2, LONG_UNION_BIT( 4 ), 0, -1 )
+				toggle_bit( 3, LONG_UNION_BIT( 8 ), 0, -1 )
 
-			toggle_bit( 0, 1, 0, 1L  )
-			toggle_bit( 1, 2, 0, 1L  )
-			toggle_bit( 2, 4, 0, 1L  )
-			toggle_bit( 3, 8, 0, 1L  )
+				toggle_bit( 0, LONG_UNION_BIT( 1 ), 0, 1L  )
+				toggle_bit( 1, LONG_UNION_BIT( 2 ), 0, 1L  )
+				toggle_bit( 2, LONG_UNION_BIT( 4 ), 0, 1L  )
+				toggle_bit( 3, LONG_UNION_BIT( 8 ), 0, 1L  )
 
-			toggle_bit( 0, 1, 0, 1U  )
-			toggle_bit( 1, 2, 0, 1U  )
-			toggle_bit( 2, 4, 0, 1U  )
-			toggle_bit( 3, 8, 0, 1U  )
+				toggle_bit( 0, LONG_UNION_BIT( 1 ), 0, 1U  )
+				toggle_bit( 1, LONG_UNION_BIT( 2 ), 0, 1U  )
+				toggle_bit( 2, LONG_UNION_BIT( 4 ), 0, 1U  )
+				toggle_bit( 3, LONG_UNION_BIT( 8 ), 0, 1U  )
 
-			toggle_bit( 0, 1, false, true )
-			toggle_bit( 1, 2, false, true )
-			toggle_bit( 2, 4, false, true )
-			toggle_bit( 3, 8, false, true )
-		next
+				toggle_bit( 0, LONG_UNION_BIT( 1 ), false, true )
+				toggle_bit( 1, LONG_UNION_BIT( 2 ), false, true )
+				toggle_bit( 2, LONG_UNION_BIT( 4 ), false, true )
+				toggle_bit( 3, LONG_UNION_BIT( 8 ), false, true )
+			next
 
-	END_TEST
+		END_TEST
 
 END_SUITE

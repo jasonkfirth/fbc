@@ -119,10 +119,16 @@ ARCH="$(dpkg --print-architecture 2>/dev/null || true)"
 DISTRO_ID="unknown"
 CODENAME="unknown"
 if [ -f /etc/os-release ]; then
-    # shellcheck disable=SC1091
-    . /etc/os-release
-    DISTRO_ID="${ID:-unknown}"
-    CODENAME="${VERSION_CODENAME:-unknown}"
+    DISTRO_ID="$(
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        printf '%s' "${ID:-unknown}"
+    )"
+    CODENAME="$(
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        printf '%s' "${VERSION_CODENAME:-unknown}"
+    )"
 fi
 
 if [ -n "${FBC_PACKAGE_DISTRO_ID:-}" ]; then
@@ -197,10 +203,22 @@ ensure_host_compiler() {
     [ -x "./bin/fbc" ] || die "host compiler not available"
 }
 
+clean_xbox_target_outputs() {
+    msg "cleaning stale Xbox target outputs"
+
+    rm -rf \
+        "lib/freebasic/$XBOX_TARGET_KEY" \
+        "src/rtlib/obj/$XBOX_TARGET_KEY" \
+        "src/fbrt/obj/$XBOX_TARGET_KEY" \
+        "src/gfxlib2/obj/$XBOX_TARGET_KEY" \
+        "src/sfxlib/obj/$XBOX_TARGET_KEY"
+}
+
 build_xbox_target() {
     msg "building FreeBASIC Xbox target with nxdk"
 
     ensure_host_compiler
+    clean_xbox_target_outputs
 
     # nxdk exposes nxdk-cc/nxdk-cxx/nxdk-link/nxdk-lib after activation.
     # The existing FreeBASIC Xbox sources still carry OpenXDK-era assumptions,

@@ -1,0 +1,31 @@
+{{fbdoc item="title" value="__FB_S390X__"}}----
+Intrinsic define set by the compiler
+
+{{fbdoc item="syntax"}}##
+	""__FB_S390X__""
+##
+{{fbdoc item="desc"}}
+	Define created at compile time if the compilation target uses the s390x CPU architecture, otherwise undefined.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#IFDEF __FB_S390X__
+  '...instructions for s390x targets...
+#ELSE
+  '...instructions for other targets...
+#ENDIF
+%%
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.1
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC""
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDdFBBigEndian|__FB_BIGENDIAN__]]##
+	- ##[[KeyPgDdfb64bit|__FB_64BIT__]]##
+	- ##[[KeyPgDdfblinux|__FB_LINUX__]]##
+	- [[CompilerOpttarget|Compiler Option: -target]]
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

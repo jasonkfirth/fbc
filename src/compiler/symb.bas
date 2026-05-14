@@ -1950,7 +1950,12 @@ function symbGetValistType _
 		select case typeGetDtOnly( dtype )
 		case FB_DATATYPE_VOID
 			if( typeIsPtr( dtype ) ) then
-				function = FB_CVA_LIST_BUILTIN_POINTER
+				select case fbGetBackendValistType()
+				case FB_CVA_LIST_BUILTIN_VOID_POINTER
+					function = FB_CVA_LIST_BUILTIN_VOID_POINTER
+				case else
+					function = FB_CVA_LIST_BUILTIN_POINTER
+				end select
 			end if
 
 		case FB_DATATYPE_STRUCT

@@ -26,6 +26,6 @@ void fb_GfxSleep ( int msecs )
 			msecs -= 50;
 		}
 
-	if( msecs > 0 )
+	if( msecs >= 0 )
 		fb_Delay( msecs );
 }

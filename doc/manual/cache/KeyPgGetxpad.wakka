@@ -1,0 +1,47 @@
+{{fbdoc item="title" value="GETXPAD"}}----
+Reads Xbox-style controller state from the graphics library.
+
+{{fbdoc item="syntax"}}##
+	[[KeyPgDeclare|declare]] [[KeyPgFunction|function]] **Getxpad** ( [[KeyPgByval|byval]] //id// [[KeyPgAs|as]] [[KeyPgLong|long]], [[KeyPgByref|byref]] //buttons// [[KeyPgAs|as]] [[KeyPgInteger|integer]] = 0, [[KeyPgByref|byref]] //leftx// [[KeyPgAs|as]] [[KeyPgSingle|single]] = 0, [[KeyPgByref|byref]] //lefty// [[KeyPgAs|as]] [[KeyPgSingle|single]] = 0, [[KeyPgByref|byref]] //rightx// [[KeyPgAs|as]] [[KeyPgSingle|single]] = 0, [[KeyPgByref|byref]] //righty// [[KeyPgAs|as]] [[KeyPgSingle|single]] = 0, [[KeyPgByref|byref]] //lefttrigger// [[KeyPgAs|as]] [[KeyPgSingle|single]] = 0, [[KeyPgByref|byref]] //righttrigger// [[KeyPgAs|as]] [[KeyPgSingle|single]] = 0, [[KeyPgByref|byref]] //dpad// [[KeyPgAs|as]] [[KeyPgInteger|integer]] = 0 ) [[KeyPgAs|as]] [[KeyPgLong|long]]
+##
+{{fbdoc item="usage"}}##
+	//status// = **Getxpad**( //id//[, //buttons//[, //leftx//[, //lefty//[, //rightx//[, //righty//[, //lefttrigger//[, //righttrigger//[, //dpad//]]]]]]]] )
+##
+{{fbdoc item="param"}}
+	##//id//##
+		The controller number to query.  The valid range is platform dependent.
+	##//buttons//##
+		A bit mask of ##XPAD_BUTTON_*## values.
+	##//leftx//##, ##//lefty//##, ##//rightx//##, ##//righty//##
+		Analog stick positions in the range ##-1.0## to ##1.0##.
+	##//lefttrigger//##, ##//righttrigger//##
+		Trigger positions in the range ##0.0## to ##1.0##.
+	##//dpad//##
+		A bit mask of ##XPAD_DPAD_*## values.
+
+{{fbdoc item="ret"}}
+	Returns one of the ##XPAD_STATUS_*## constants from ##fbgfx.bi##:
+		- ##XPAD_STATUS_MISSING## (0)
+		- ##XPAD_STATUS_CONNECTED## (1)
+		- ##XPAD_STATUS_DISCONNECTED## (2)
+
+{{fbdoc item="desc"}}
+	##**Getxpad**## provides a stable Xbox-style controller layout across supported backends.  It is separate from ##[[KeyPgGetjoystick|Getjoystick]]## because modern gamepads have a conventional button, trigger, stick, and d-pad shape that maps poorly to a generic axis list.
+
+	The named ##XPAD_BUTTON_*##, ##XPAD_DPAD_*##, and ##XPAD_STATUS_*## constants are declared in ##fbgfx.bi## under the ##FB## namespace.  The function itself is an intrinsic and does not require an include file to call.
+
+{{fbdoc item="ex"}}
+	See ##examples/xpad/first-pad.bas##, ##examples/xpad/active-state.bas##, and ##examples/xpad/stick-view.bas##.
+
+{{fbdoc item="lang"}}
+	- Not available in the //[[CompilerOptlang|-lang qb]]// dialect unless referenced with the alias ##**""__Getxpad""**##.
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgGetjoystick|Getjoystick]]##
+	- ##[[KeyPgMultikey|Multikey]]##
+	- ##[[KeyPgGetmouse|Getmouse]]##
+
+{{fbdoc item="back" value="CatPgGfxInput|User Input Functions"}}

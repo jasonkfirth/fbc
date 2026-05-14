@@ -8,6 +8,8 @@ Commands that control the preprocessor.
 	Commands that allow for branches in compilation based on conditions.
 **{{anchor name="TEXTREPLACE|Text Replacement"}}**
 	Commands that create text-replacement macros.
+**{{anchor name="FEATUREDEFINES|Feature-control Defines"}}**
+	User-defined symbols that affect how selected compiler features are parsed.
 **{{anchor name="FILE|File Directives"}}**
 	Commands that indicate to the compiler how other files relate to the source file.
 **{{anchor name="CONTROL|Control Directives"}}**
@@ -50,6 +52,11 @@ Commands that control the preprocessor.
 		Indicates string literal immediately following must be processed for escape sequences.
 	=={{fbdoc item="keyword" value="KeyPgOpPpNoescape|$ Non-Escaped String Literal"}}==
 		Indicates string literal immediately following must not be processed for escape sequences.
+{{anchor name="FEATUREDEFINES"}}{{fbdoc item="section" value="Feature-control Defines"}}
+	=={{fbdoc item="keyword" value="KeyPgFbNoGfxlib|FB_NO_GFXLIB"}}==
+		Allows selected graphics-library command words to be used as normal identifiers.
+	=={{fbdoc item="keyword" value="KeyPgFbNoSfxlib|FB_NO_SFXLIB"}}==
+		Allows selected sound-library command words to be used as normal identifiers.
 <<>>{{anchor name="FILE"}}{{fbdoc item="section" value="File Directives"}}
 	=={{fbdoc item="keyword" value="KeyPgInclude|#INCLUDE"}}==
 		Inserts text from a file.

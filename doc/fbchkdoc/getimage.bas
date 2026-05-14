@@ -43,8 +43,8 @@ dim shared NumImageFiles as integer = 0
 '' --------------------------------------------------------
 
 '':::::
-function writeFunction cdecl ( byval buf as any ptr, byval size as size_t, byval nmemb as size_t , byval stream as any ptr) as size_t
-	fwrite( buf, size, nmemb, stream )
+function writeFunction cdecl ( byval buf as any ptr, byval size as size_t, byval nmemb as size_t , byval out_file as any ptr) as size_t
+	fwrite( buf, size, nmemb, out_file )
 	function = nmemb * size										    
 end function
 

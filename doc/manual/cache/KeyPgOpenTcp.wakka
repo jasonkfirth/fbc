@@ -1,0 +1,47 @@
+{{fbdoc item="title" value="OPEN TCP"}}----
+Opens a TCP client connection and binds it to a file number.
+
+{{fbdoc item="syntax"}}##
+	[[KeyPgDeclare|declare]] [[KeyPgFunction|function]] **Open Tcp** ( //options// [[KeyPgAs|as]] [[KeyPgString|string]], **As** [**#**]//filenumber// [[KeyPgAs|as]] [[KeyPgLong|long]] ) [[KeyPgAs|as]] [[KeyPgLong|long]]
+##
+{{fbdoc item="usage"}}##
+	//result// = **Open Tcp**( //options//[,] **As** [**#**]//filenumber// )
+	**Open Tcp** //options// **As** [**#**]//filenumber//
+##
+{{fbdoc item="param"}}
+	##//options//##
+		A comma-separated string describing the connection.
+	##//filenumber//##
+		The file number to bind to the connected socket.
+
+{{fbdoc item="ret"}}
+	Returns zero (##0##) on success, or a non-zero error code on failure.
+
+{{fbdoc item="desc"}}
+	##**Open Tcp**## connects to a TCP server and exposes the socket through FreeBASIC's normal file I/O statements.  Once opened, the file number can be used with ##[[KeyPgPrintPp|Print #]]##, ##[[KeyPgLineinputPp|Line Input #]]##, ##[[KeyPgInputnum|Input()]]##, ##[[KeyPgGetfileio|Get #]]##, and ##[[KeyPgPutfileio|Put #]]##.
+
+	The options string accepts:
+		- ##host=//name-or-address//##, required for client connections
+		- ##port=//number//##, required
+		- ##timeout=//milliseconds//##, optional socket timeout
+
+	Unknown options are ignored so that future TCP options can be added without breaking existing programs.
+
+	For sockets, ##[[KeyPgEof|Eof]]## means that no byte is currently available to read.  Use ##[[KeyPgEoc|Eoc]]## to test whether the peer has closed the connection.
+
+{{fbdoc item="ex"}}
+	See ##examples/network/opentcp/http-get.bas##.
+
+{{fbdoc item="target"}}
+	- TCP support is not available on all targets.  Programs that need to be portable should use target defines such as ##__FB_DOS__##, ##__FB_JS__##, and ##__FB_XBOX__## where appropriate.
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgOpenTcpServer|Open Tcp Server]]##
+	- ##[[KeyPgTcpAccept|Tcp Accept]]##
+	- ##[[KeyPgEoc|Eoc]]##
+	- ##[[KeyPgOpen|Open]]##
+
+{{fbdoc item="back" value="CatPgFile|File I/O Functions"}}

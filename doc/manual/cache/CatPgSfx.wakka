@@ -1,0 +1,75 @@
+{{fbdoc item="title" value="Sound Library Reference"}}----
+Procedures and command families for FreeBASIC's built-in sound library.
+
+{{fbdoc item="desc"}}
+	The sound library, or ##sfxlib##, provides generated tones, PLAY-string music, sample playback, streaming audio, MIDI control, audio device selection, and capture support.  Programs that use these commands link the sound library automatically.
+	
+	If a program intentionally does not use the sound command surface and needs selected sfxlib command words as normal identifiers, define ##[[KeyPgFbNoSfxlib|FB_NO_SFXLIB]]## before those names are parsed.
+
+**{{anchor name="GENERATED|Generated Sound"}}**
+	Commands for tones, notes, PLAY strings, generated waveforms, and mix state.
+**{{anchor name="MEDIA|Digital Audio and MIDI"}}**
+	Commands for loaded samples, music, streams, and MIDI.
+**{{anchor name="DEVICE|Devices and Capture"}}**
+	Commands for selecting output drivers and recording input.
+
+<<{{anchor name="GENERATED"}}{{fbdoc item="section" value="Generated Sound"}}
+	=={{fbdoc item="keyword" value="KeyPgBeep|BEEP"}}==
+		Produces a beep or a short pitched note.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|Generated sound commands"}}==
+		Documents ##SOUND##, ##TONE##, ##NOISE##, ##NOTE##, ##REST##, ##PLAY##, ##TEMPO##, ##CHANNEL##, ##OCTAVE##, ##VOICE##, ##VOL##, ##VOLUME##, ##BALANCE##, ##PAN##, ##WAVE##, ##ENVELOPE##, and ##INSTRUMENT##.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|SOUND"}}==
+		Plays a generated tone.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|TONE"}}==
+		Plays a generated tone on a channel.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|NOISE"}}==
+		Plays generated noise on a channel.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|NOTE"}}==
+		Plays a named note.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|REST"}}==
+		Waits for generated-sound playback timing.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|PLAY"}}==
+		Plays BASIC PLAY strings.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|TEMPO"}}==
+		Sets or returns the generated-sound tempo.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|CHANNEL"}}==
+		Sets or returns the generated-sound channel.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|OCTAVE"}}==
+		Sets or returns the default note octave.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|VOICE"}}==
+		Sets or returns the default instrument.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|VOL"}}==
+		Sets the master volume.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|VOLUME"}}==
+		Sets or returns master or channel volume.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|BALANCE"}}==
+		Sets or returns the master stereo balance.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|PAN"}}==
+		Sets or returns channel stereo pan.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|WAVE"}}==
+		Defines a generated waveform.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|ENVELOPE"}}==
+		Defines an ADSR envelope.
+	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|INSTRUMENT"}}==
+		Defines or assigns an instrument.
+
+{{fbdoc item="section" value="Digital Audio and MIDI"}}
+	=={{fbdoc item="keyword" value="KeyPgMusic|MUSIC"}}==
+		Loads, plays, loops, pauses, resumes, stops, and queries music assets.
+	=={{fbdoc item="keyword" value="KeyPgSfx|SFX"}}==
+		Loads and controls short sound effects by id or channel.
+	=={{fbdoc item="keyword" value="KeyPgAudio|AUDIO"}}==
+		Plays or loops an audio file through the simple one-stream interface.
+	=={{fbdoc item="keyword" value="KeyPgStream|STREAM"}}==
+		Opens, plays, seeks, and stops the streaming-audio interface.
+	=={{fbdoc item="keyword" value="KeyPgMidi|MIDI"}}==
+		Opens MIDI output, plays MIDI files, and sends MIDI messages.
+
+{{fbdoc item="section" value="Devices and Capture"}}
+	=={{fbdoc item="keyword" value="KeyPgDevice|DEVICE"}}==
+		Lists, selects, and queries sfxlib output devices.
+	=={{fbdoc item="keyword" value="KeyPgCapture|CAPTURE"}}==
+		Starts, pauses, resumes, stops, reads, and saves audio capture.
+>>::c::
+
+{{fbdoc item="back" value="DocToc|Table of Contents"}}

@@ -1,0 +1,33 @@
+{{fbdoc item="title" value="EOC"}}----
+Checks whether a TCP connection has been closed by the peer.
+
+{{fbdoc item="syntax"}}##
+	[[KeyPgDeclare|declare]] [[KeyPgFunction|function]] **Eoc** ( [[KeyPgByval|byval]] //filenum// [[KeyPgAs|as]] [[KeyPgLong|long]] ) [[KeyPgAs|as]] [[KeyPgLong|long]]
+##
+{{fbdoc item="usage"}}##
+	//result// = **Eoc**( //filenum// )
+##
+{{fbdoc item="param"}}
+	##//filenum//##
+		A file number bound to an ##[[KeyPgOpenTcp|Open Tcp]]## connection or an accepted TCP client.
+
+{{fbdoc item="ret"}}
+	Returns true (-1) if the connection has ended, zero (0) otherwise.
+
+{{fbdoc item="desc"}}
+	##**Eoc**## means "end of connection".  It is intended for TCP file numbers, where ##[[KeyPgEof|Eof]]## only says that no byte is immediately available to read.  A TCP program can poll ##Eof## to decide whether a read is ready and ##Eoc## to decide whether the remote endpoint has closed the socket.
+
+	Calling ##**Eoc**## on a non-TCP file number is an illegal function call.
+
+{{fbdoc item="ex"}}
+	See ##examples/network/opentcp/http-get.bas##.
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgOpenTcp|Open Tcp]]##
+	- ##[[KeyPgTcpAccept|Tcp Accept]]##
+	- ##[[KeyPgEof|Eof]]##
+
+{{fbdoc item="back" value="CatPgFile|File I/O Functions"}}

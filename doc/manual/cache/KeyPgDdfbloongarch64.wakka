@@ -1,0 +1,30 @@
+{{fbdoc item="title" value="__FB_LOONGARCH64__"}}----
+Intrinsic define set by the compiler
+
+{{fbdoc item="syntax"}}##
+	""__FB_LOONGARCH64__""
+##
+{{fbdoc item="desc"}}
+	Define created at compile time if the compilation target uses the 64-bit LoongArch CPU architecture, otherwise undefined.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#IFDEF __FB_LOONGARCH64__
+  '...instructions for 64-bit LoongArch targets...
+#ELSE
+  '...instructions for other targets...
+#ENDIF
+%%
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.1
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC""
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDdfb64bit|__FB_64BIT__]]##
+	- ##[[KeyPgDdfblinux|__FB_LINUX__]]##
+	- [[CompilerOpttarget|Compiler Option: -target]]
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

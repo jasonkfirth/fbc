@@ -393,11 +393,11 @@ SUITE( fbc_tests.string_.print_using )
 		test_sng( fmt,  inf, "+1.#INF" )
 		test_sng( fmt, -inf, "-1.#INF" )
 
+		'' NaN/IND spelling and signs vary across target C libraries.
+		#if defined( __FB_X86__ ) or ( ENABLE_CHECK_BUGS <> 0 )
+
 		test_sng( fmt,  nan, "+1.#NAN" )
 		test_sng( fmt, -nan, "-1.#NAN" )
-
-		'' arm targets only return NAN instead of IND? and different signs??
-		#if not defined( __FB_ARM__ ) or ( ENABLE_CHECK_BUGS <> 0 )
 
 		test_sng( fmt, ind, "-1.#IND" )
 

@@ -49,6 +49,7 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgDdfbjs|__FB_JS__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfblang|__FB_LANG__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfblinux|__FB_LINUX__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbloongarch64|__FB_LOONGARCH64__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdFBMain|__FB_MAIN__"}} 
 	- {{fbdoc item="keyword" value="KeyPgDdFBMinVersion|__FB_MIN_VERSION__"}} 
 	- {{fbdoc item="keyword" value="KeyPgDdfbmt|__FB_MT__"}}
@@ -71,6 +72,8 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgDdfbprofile|__FB_PROFILE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbquerysymbol|__FB_QUERY_SYMBOL__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbquote|__FB_QUOTE__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbriscv64|__FB_RISCV64__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbs390x|__FB_S390X__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbsignature|__FB_SIGNATURE__"}} 
 	- {{fbdoc item="keyword" value="KeyPgDdfbsse|__FB_SSE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbuniqueid|__FB_UNIQUEID__"}}
@@ -156,8 +159,10 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgAssertwarn|ASSERTWARN"}}
 	- {{fbdoc item="keyword" value="KeyPgAtan2|ATAN2"}}
 	- {{fbdoc item="keyword" value="KeyPgAtn|ATN"}}
+	- {{fbdoc item="keyword" value="KeyPgAudio|AUDIO"}}
 
 {{fbdoc item="section" value="B"}}{{anchor name="b"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|BALANCE"}}
 	- {{fbdoc item="keyword" value="KeyPgBaseInit|BASE (initializer)"}}
 	- {{fbdoc item="keyword" value="KeyPgBase|BASE (member access)"}}
 	- {{fbdoc item="keyword" value="KeyPgBeep|BEEP"}}
@@ -180,11 +185,13 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgCallocate|CALLOCATE"}}
 	- {{fbdoc item="keyword" value="KeyPgCase|CASE"}}
 	- {{fbdoc item="keyword" value="KeyPgCast|CAST"}}
+	- {{fbdoc item="keyword" value="KeyPgCapture|CAPTURE"}}
 	- {{fbdoc item="keyword" value="KeyPgCbool|CBOOL"}}
 	- {{fbdoc item="keyword" value="KeyPgCbyte|CBYTE"}}
 	- {{fbdoc item="keyword" value="KeyPgCdbl|CDBL"}}
 	- {{fbdoc item="keyword" value="KeyPgCdecl|CDECL"}}
 	- {{fbdoc item="keyword" value="KeyPgChain|CHAIN"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|CHANNEL"}}
 	- {{fbdoc item="keyword" value="KeyPgChdir|CHDIR"}}
 	- {{fbdoc item="keyword" value="KeyPgChr|CHR"}}
 	- {{fbdoc item="keyword" value="KeyPgCint|CINT"}}
@@ -262,6 +269,7 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgOpDelete|DELETE (Statement)"}}
 	- {{fbdoc item="keyword" value="KeyPgDestructor|DESTRUCTOR"}}
 	- {{fbdoc item="keyword" value="KeyPgModuleDestructor|DESTRUCTOR (Module)"}}
+	- {{fbdoc item="keyword" value="KeyPgDevice|DEVICE"}}
 	- {{fbdoc item="keyword" value="KeyPgDim|DIM"}}
 	- {{fbdoc item="keyword" value="KeyPgDir|DIR"}}
 	- {{fbdoc item="keyword" value="KeyPgDo|DO"}}
@@ -283,6 +291,8 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgEnum|ENUM"}}
 	- {{fbdoc item="keyword" value="KeyPgSetenviron|ENVIRON statement"}}
 	- {{fbdoc item="keyword" value="KeyPgEnviron|ENVIRON"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|ENVELOPE"}}
+	- {{fbdoc item="keyword" value="KeyPgEoc|EOC"}}
 	- {{fbdoc item="keyword" value="KeyPgEof|EOF"}}
 	- {{fbdoc item="keyword" value="KeyPgOpEqv|EQV"}}
 	- {{fbdoc item="keyword" value="KeyPgOpCombineEqv|EQV="}}
@@ -311,6 +321,8 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgFBMemcopyclear|FB_MEMCOPYCLEAR"}}
 	- {{fbdoc item="keyword" value="KeyPgFBMemmove|FB_MEMMOVE"}}
 	- {{fbdoc item="keyword" value="KeyPgFBArray|FBARRAY (array descriptor structure and access)"}}
+	- {{fbdoc item="keyword" value="KeyPgFbNoGfxlib|FB_NO_GFXLIB"}}
+	- {{fbdoc item="keyword" value="KeyPgFbNoSfxlib|FB_NO_SFXLIB"}}
 	- {{fbdoc item="keyword" value="KeyPgField|FIELD"}}
 	- {{fbdoc item="keyword" value="KeyPgFileattr|FILEATTR"}}
 	- {{fbdoc item="keyword" value="KeyPgFilecopy|FILECOPY"}}
@@ -337,6 +349,8 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgGetjoystick|GETJOYSTICK"}}
 	- {{fbdoc item="keyword" value="KeyPgGetkey|GETKEY"}}
 	- {{fbdoc item="keyword" value="KeyPgGetmouse|GETMOUSE"}}
+	- {{fbdoc item="keyword" value="KeyPgGetxpad|GETXPAD"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|Generated sound commands"}}
 	- {{fbdoc item="keyword" value="KeyPgGosub|GOSUB"}}
 	- {{fbdoc item="keyword" value="KeyPgGoto|GOTO"}}
 
@@ -363,6 +377,7 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgInputfilemode|INPUT (File I/O)"}}
 	- {{fbdoc item="keyword" value="KeyPgInputPp|INPUT #"}}
 	- {{fbdoc item="keyword" value="KeyPgInputnum|INPUT()"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|INSTRUMENT"}}
 	- {{fbdoc item="keyword" value="KeyPgInstr|INSTR"}}
 	- {{fbdoc item="keyword" value="KeyPgInstrrev|INSTRREV"}}
 	- {{fbdoc item="keyword" value="KeyPgInt|INT"}}
@@ -404,6 +419,7 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgLtrim|LTRIM"}}
 
 {{fbdoc item="section" value="M"}}{{anchor name="m"}}
+	- {{fbdoc item="keyword" value="KeyPgMidi|MIDI"}}
 	- {{fbdoc item="keyword" value="KeyPgMidstatement|MID (Statement)"}}
 	- {{fbdoc item="keyword" value="KeyPgMidfunction|MID (Function)"}}
 	- {{fbdoc item="keyword" value="KeyPgMinute|MINUTE"}}
@@ -418,6 +434,7 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgOpCombineModulus|MOD="}}
 	- {{fbdoc item="keyword" value="KeyPgMonth|MONTH"}}
 	- {{fbdoc item="keyword" value="KeyPgMonthname|MONTHNAME"}}
+	- {{fbdoc item="keyword" value="KeyPgMusic|MUSIC"}}
 	- {{fbdoc item="keyword" value="KeyPgMultikey|MULTIKEY"}}
 	- {{fbdoc item="keyword" value="KeyPgMutexCreate|MUTEXCREATE"}}
 	- {{fbdoc item="keyword" value="KeyPgMutexDestroy|MUTEXDESTROY"}}
@@ -432,12 +449,15 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgOpPlacementNew|NEW (Placement)"}}
 	- {{fbdoc item="keyword" value="KeyPgNext|NEXT"}}
 	- {{fbdoc item="keyword" value="KeyPgResumenext|NEXT (RESUME)"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|NOISE"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|NOTE"}}
 	- {{fbdoc item="keyword" value="KeyPgOpNot|NOT"}}
 	- {{fbdoc item="keyword" value="KeyPgNow|NOW"}}
 
 {{fbdoc item="section" value="O"}}{{anchor name="o"}}
 	- {{fbdoc item="keyword" value="KeyPgObject|OBJECT"}}
 	- {{fbdoc item="keyword" value="KeyPgOct|OCT"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|OCTAVE"}}
 	- {{fbdoc item="keyword" value="KeyPgOffsetof|OFFSETOF"}}
 	- {{fbdoc item="keyword" value="KeyPgOnerror|ON ERROR"}}
 	- {{fbdoc item="keyword" value="KeyPgOngosub|ON...GOSUB"}}
@@ -450,6 +470,8 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgOpenLpt|OPEN LPT"}}
 	- {{fbdoc item="keyword" value="KeyPgOpenPipe|OPEN PIPE"}}
 	- {{fbdoc item="keyword" value="KeyPgOpenScrn|OPEN SCRN"}}
+	- {{fbdoc item="keyword" value="KeyPgOpenTcp|OPEN TCP"}}
+	- {{fbdoc item="keyword" value="KeyPgOpenTcpServer|OPEN TCP SERVER"}}
 	- {{fbdoc item="keyword" value="KeyPgOperator|OPERATOR"}}
 	- {{fbdoc item="keyword" value="KeyPgOption|OPTION()"}}
 	- {{fbdoc item="keyword" value="KeyPgOptionbase|OPTION BASE"}}
@@ -474,9 +496,11 @@ Alphabetical listing of keywords, macros and procedures.
 {{fbdoc item="section" value="P"}}{{anchor name="p"}}
 	- {{fbdoc item="keyword" value="KeyPgPaint|PAINT"}}
 	- {{fbdoc item="keyword" value="KeyPgPalette|PALETTE"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|PAN"}}
 	- {{fbdoc item="keyword" value="KeyPgPascal|PASCAL"}}
 	- {{fbdoc item="keyword" value="KeyPgPcopy|PCOPY"}}
 	- {{fbdoc item="keyword" value="KeyPgPeek|PEEK"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|PLAY"}}
 	- {{fbdoc item="keyword" value="KeyPgPmap|PMAP"}}
 	- {{fbdoc item="keyword" value="KeyPgPoint|POINT"}}
 	- {{fbdoc item="keyword" value="KeyPgPointCoord|POINTCOORD"}}
@@ -511,6 +535,7 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgRedim|REDIM"}}
 	- {{fbdoc item="keyword" value="KeyPgRem|REM"}}
 	- {{fbdoc item="keyword" value="KeyPgReset|RESET"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|REST"}}
 	- {{fbdoc item="keyword" value="KeyPgRestore|RESTORE"}}
 	- {{fbdoc item="keyword" value="KeyPgResume|RESUME"}}
 	- {{fbdoc item="keyword" value="KeyPgResumenext|RESUME NEXT"}}
@@ -551,6 +576,7 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgSetmouse|SETMOUSE"}}
 	- {{fbdoc item="keyword" value="KeyPgSettime|SETTIME"}}
 	- {{fbdoc item="keyword" value="KeyPgSgn|SGN"}}
+	- {{fbdoc item="keyword" value="KeyPgSfx|SFX"}}
 	- {{fbdoc item="keyword" value="KeyPgShared|SHARED"}}
 	- {{fbdoc item="keyword" value="KeyPgShell|SHELL"}}
 	- {{fbdoc item="keyword" value="KeyPgOpShiftLeft|SHL"}}
@@ -562,6 +588,7 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgSingle|SINGLE"}}
 	- {{fbdoc item="keyword" value="KeyPgSizeof|SIZEOF"}}
 	- {{fbdoc item="keyword" value="KeyPgSleep|SLEEP"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|SOUND"}}
 	- {{fbdoc item="keyword" value="KeyPgSpace|SPACE"}}
 	- {{fbdoc item="keyword" value="KeyPgSpc|SPC"}}
 	- {{fbdoc item="keyword" value="KeyPgSqr|SQR"}}
@@ -573,6 +600,7 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgStop|STOP"}}
 	- {{fbdoc item="keyword" value="KeyPgStr|STR"}}
 	- {{fbdoc item="keyword" value="KeyPgStrig|STRIG"}}
+	- {{fbdoc item="keyword" value="KeyPgStream|STREAM"}}
 	- {{fbdoc item="keyword" value="KeyPgStringFunction|STRING (Function)"}}
 	- {{fbdoc item="keyword" value="KeyPgString|STRING"}}
 	- {{fbdoc item="keyword" value="KeyPgOpStrptr|STRPTR"}}
@@ -585,6 +613,8 @@ Alphabetical listing of keywords, macros and procedures.
 {{fbdoc item="section" value="T"}}{{anchor name="t"}}
 	- {{fbdoc item="keyword" value="KeyPgTab|TAB"}}
 	- {{fbdoc item="keyword" value="KeyPgTan|TAN"}}
+	- {{fbdoc item="keyword" value="KeyPgTcpAccept|TCP ACCEPT"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|TEMPO"}}
 	- {{fbdoc item="keyword" value="KeyPgThen|THEN"}}
 	- {{fbdoc item="keyword" value="KeyPgThis|THIS"}}
 	- {{fbdoc item="keyword" value="KeyPgThiscall|THISCALL"}}
@@ -598,6 +628,7 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgTimeserial|TIMESERIAL"}}
 	- {{fbdoc item="keyword" value="KeyPgTimeValue|TIMEVALUE"}}
 	- {{fbdoc item="keyword" value="KeyPgTo|TO"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|TONE"}}
 	- {{fbdoc item="keyword" value="KeyPgTransGfx|TRANS (Graphics PUT)"}}
 	- {{fbdoc item="keyword" value="KeyPgTrim|TRIM"}}
 	- {{fbdoc item="keyword" value="KeyPgTrue|TRUE"}}
@@ -635,9 +666,13 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgViewtext|VIEW PRINT"}}
 	- {{fbdoc item="keyword" value="KeyPgViewgraphics|VIEW (Graphics)"}}
 	- {{fbdoc item="keyword" value="KeyPgVirtual|VIRTUAL (member)"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|VOICE"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|VOL"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|VOLUME"}}
 
 {{fbdoc item="section" value="W"}}{{anchor name="w"}}
 	- {{fbdoc item="keyword" value="KeyPgWait|WAIT"}}
+	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|WAVE"}}
 	- {{fbdoc item="keyword" value="KeyPgWbin|WBIN"}}
 	- {{fbdoc item="keyword" value="KeyPgWchr|WCHR"}}
 	- {{fbdoc item="keyword" value="KeyPgWeekday|WEEKDAY"}}

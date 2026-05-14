@@ -2,6 +2,11 @@
 
 #include "fb_gfx.h"
 
+#ifdef HOST_JS
+#define JS_UNLOCKS_PER_YIELD 4096
+static int js_unlocks_before_yield = JS_UNLOCKS_PER_YIELD;
+#endif
+
 FBCALL void fb_GfxLock(void)
 {
 	FB_GRAPHICS_LOCK( );
@@ -18,6 +23,9 @@ FBCALL void fb_GfxLock(void)
 FBCALL void fb_GfxUnlock(int start_line, int end_line)
 {
 	FB_GFXCTX *context = fb_hGetContext();
+#ifdef HOST_JS
+	int do_yield = FALSE;
+#endif
 
 	if (!__fb_gfx) {
 		FB_GRAPHICS_UNLOCK( );
@@ -34,10 +42,33 @@ FBCALL void fb_GfxUnlock(int start_line, int end_line)
 	if (__fb_gfx->lock_count != 0) {
 		--__fb_gfx->lock_count;
 		if (__fb_gfx->lock_count == 0)
+		{
 			__fb_gfx->driver->unlock();
+#ifdef HOST_JS
+			do_yield = TRUE;
+#endif
+		}
 	}
 
 	FB_GRAPHICS_UNLOCK( );
+
+#ifdef HOST_JS
+	/*
+	 * Browser builds are cooperative: long runs of software rendering can
+	 * otherwise block input, timers, and canvas presentation until the whole
+	 * frame finishes.  Yield occasionally at completed graphics unlocks, but
+	 * not on every primitive, to keep old immediate-mode drawing code usable.
+	 */
+	if( do_yield )
+	{
+		js_unlocks_before_yield--;
+		if( js_unlocks_before_yield <= 0 )
+		{
+			js_unlocks_before_yield = JS_UNLOCKS_PER_YIELD;
+			fb_Delay( 0 );
+		}
+	}
+#endif
 }
 
 FBCALL void *fb_GfxScreenPtr(void)

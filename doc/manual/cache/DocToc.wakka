@@ -43,6 +43,7 @@
 	{{fbdoc item="keyword" value="CatPgMath|Mathematical Functions"}}
 	{{fbdoc item="keyword" value="CatPgMemory|Memory Functions"}}
 	{{fbdoc item="keyword" value="CatPgOpsys|Operating System Functions"}}
+	{{fbdoc item="keyword" value="CatPgSfx|Sound Library Reference"}}
 	{{fbdoc item="keyword" value="CatPgString|String Functions"}}
 	{{fbdoc item="keyword" value="CatPgThreading|Threading Support Functions"}}
 	{{fbdoc item="keyword" value="CatPgInput|User Input Functions"}}

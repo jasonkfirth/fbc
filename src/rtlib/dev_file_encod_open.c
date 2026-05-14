@@ -21,65 +21,61 @@ static FB_FILE_HOOKS hooks_dev_file = {
 
 static int hCheckBOM( FILE *fp, FB_FILE_ENCOD encod )
 {
-	int res, bom = 0;
+	unsigned char bom[4];
 
 	switch( encod )
 	{
 	case FB_FILE_ENCOD_UTF8:
-		if( fread( &bom, 3, 1, fp ) != 1 )
+		if( fread( bom, 1, 3, fp ) != 3 )
 			return 0;
 
-		res = (bom == 0x00BFBBEF);
-		break;
+		return (bom[0] == 0xEF) && (bom[1] == 0xBB) && (bom[2] == 0xBF);
 
 	case FB_FILE_ENCOD_UTF16:
-		if( fread( &bom, sizeof( UTF_16 ), 1, fp ) != 1 )
+		if( fread( bom, 1, sizeof( UTF_16 ), fp ) != sizeof( UTF_16 ) )
 			return 0;
 
-		/* !!!FIXME!!! only litle-endian supported */
-		res = (bom == 0x0000FEFF);
-		break;
+		return (bom[0] == 0xFF) && (bom[1] == 0xFE);
 
 	case FB_FILE_ENCOD_UTF32:
 
-		if( fread( &bom, sizeof( UTF_32 ), 1, fp ) != 1 )
+		if( fread( bom, 1, sizeof( UTF_32 ), fp ) != sizeof( UTF_32 ) )
 			return 0;
 
-		/* !!!FIXME!!! only litle-endian supported */
-		res = (bom == 0x0000FEFF);
-		break;
+		return (bom[0] == 0xFF) && (bom[1] == 0xFE) &&
+		       (bom[2] == 0x00) && (bom[3] == 0x00);
 
 	default:
-		res = 0;
+		return 0;
 	}
-
-	return res;
 }
 
 static int hWriteBOM( FILE *fp, FB_FILE_ENCOD encod )
 {
-	int bom;
-
 	switch( encod )
 	{
 	case FB_FILE_ENCOD_UTF8:
-		bom = 0x00BFBBEF;
-		if( fwrite( &bom, 3, 1, fp ) != 1 )
-			return 0;
+		{
+			static const unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
+			if( fwrite( bom, 1, sizeof( bom ), fp ) != sizeof( bom ) )
+				return 0;
+		}
 		break;
 
 	case FB_FILE_ENCOD_UTF16:
-		/* !!!FIXME!!! only litle-endian supported */
-		bom = 0x0000FEFF;
-		if( fwrite( &bom, sizeof( UTF_16 ), 1, fp ) != 1 )
-			return 0;
+		{
+			static const unsigned char bom[] = { 0xFF, 0xFE };
+			if( fwrite( bom, 1, sizeof( bom ), fp ) != sizeof( bom ) )
+				return 0;
+		}
 		break;
 
 	case FB_FILE_ENCOD_UTF32:
-		/* !!!FIXME!!! only litle-endian supported */
-		bom = 0x0000FEFF;
-		if( fwrite( &bom, sizeof( UTF_32 ), 1, fp ) != 1 )
-			return 0;
+		{
+			static const unsigned char bom[] = { 0xFF, 0xFE, 0x00, 0x00 };
+			if( fwrite( bom, 1, sizeof( bom ), fp ) != sizeof( bom ) )
+				return 0;
+		}
 		break;
 
 	default:

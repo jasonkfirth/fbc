@@ -29,10 +29,27 @@ bootstrap-stage-test:
 	if cmp -s "$$STAGE_DIR/stage2-fbc" "$$STAGE_DIR/stage3-fbc"; then \
 	        echo "==> Bootstrap comparison PASSED"; \
 	else \
-	        echo ""; \
-	        echo "ERROR: bootstrap comparison FAILED"; \
-	        echo "stage2 and stage3 compilers differ"; \
-	        exit 1; \
+	        strip_tool="$${STRIP:-strip}"; \
+	        stripped_stage2="$$STAGE_DIR/stage2-fbc.stripped"; \
+	        stripped_stage3="$$STAGE_DIR/stage3-fbc.stripped"; \
+	        cp "$$STAGE_DIR/stage2-fbc" "$$stripped_stage2"; \
+	        cp "$$STAGE_DIR/stage3-fbc" "$$stripped_stage3"; \
+	        if ! "$$strip_tool" --strip-all "$$stripped_stage2" "$$stripped_stage3"; then \
+	                echo ""; \
+	                echo "ERROR: bootstrap comparison could not normalize compiler binaries"; \
+	                echo "strip tool failed: $$strip_tool"; \
+	                exit 1; \
+	        fi; \
+	        if cmp -s "$$stripped_stage2" "$$stripped_stage3"; then \
+	                echo "==> Bootstrap comparison PASSED"; \
+	                echo "==> Non-runtime symbol metadata differs"; \
+	                echo "==> Stripped compiler images match"; \
+	        else \
+	                echo ""; \
+	                echo "ERROR: bootstrap comparison FAILED"; \
+	                echo "stage2 and stage3 compilers differ"; \
+	                exit 1; \
+	        fi; \
 	fi
 	$(call _mt_cleanup_success)
 

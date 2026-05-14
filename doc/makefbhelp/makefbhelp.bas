@@ -70,7 +70,7 @@ type head_t field=1
     reserved as INTEGER32
 end type
 
-type item_t field=1
+type item_t
     filename as string
     filesize as INTEGER32
     fileposn as INTEGER32

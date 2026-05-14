@@ -71,6 +71,7 @@ Options:
   --no-android    Build packages without DEB_BUILD_PROFILES=android
   --android       Build the freebasic-android package; fail if SDK packages
                   are not available
+  --host-arch A   Build a package for Debian architecture A
   --no-package    Stop after ensuring the bootstrap tarball exists
   --skip-deps     Skip apt dependency installation
   --help          Show this help text
@@ -81,6 +82,11 @@ Environment:
   OUTBASE         Output root (default: <repo>/out)
   FBC_PACKAGE_OUTDIR
                   Full package output directory override
+  FBC_PACKAGE_HOST_ARCH
+                  Debian architecture to package for when cross-building
+  FBC_PACKAGE_CONFIGURE_CROSS_APT
+                  Set to 1 to let the script rewrite Ubuntu APT sources for
+                  cross-architecture package indexes
   FBC_PACKAGE_ARM_ARCH
                   ARM default arch override for package builds (armv6+fp)
   JOBS            Parallel make job count for bootstrap generation
@@ -100,21 +106,27 @@ ANDROID=1
 ANDROID_EXPLICIT=0
 NO_PACKAGE=0
 SKIP_DEPS=0
+HOST_ARCH_OPT="${FBC_PACKAGE_HOST_ARCH:-}"
 
-for arg in "$@"; do
-    case "$arg" in
-        --no-build) NO_BUILD=1 ;;
-        --no-js) NO_JS=1 ;;
-        --no-android) ANDROID=0; ANDROID_EXPLICIT=1 ;;
-        --android) ANDROID=1; ANDROID_EXPLICIT=1 ;;
-        --no-package) NO_PACKAGE=1 ;;
-        --skip-deps) SKIP_DEPS=1 ;;
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --no-build) NO_BUILD=1; shift ;;
+        --no-js) NO_JS=1; shift ;;
+        --no-android) ANDROID=0; ANDROID_EXPLICIT=1; shift ;;
+        --android) ANDROID=1; ANDROID_EXPLICIT=1; shift ;;
+        --host-arch)
+            [ $# -ge 2 ] || die "--host-arch requires an architecture"
+            HOST_ARCH_OPT="$2"
+            shift 2
+            ;;
+        --no-package) NO_PACKAGE=1; shift ;;
+        --skip-deps) SKIP_DEPS=1; shift ;;
         -h|--help)
             usage
             exit 0
             ;;
         *)
-            die "unknown option: $arg"
+            die "unknown option: $1"
             ;;
     esac
 done
@@ -149,64 +161,99 @@ VERSION="$(sed -n 's/^FBVERSION[[:space:]]*:=[[:space:]]*//p' mk/version.mk | he
 [ -n "$VERSION" ] || die "could not determine FBVERSION"
 [ -f "$SOURCE_COPY_EXCLUDES" ] || die "missing source copy excludes: $SOURCE_COPY_EXCLUDES"
 
-ARCH="$(dpkg --print-architecture 2>/dev/null || true)"
-[ -n "$ARCH" ] || die "could not detect Debian architecture"
+BUILD_ARCH="$(dpkg --print-architecture 2>/dev/null || true)"
+[ -n "$BUILD_ARCH" ] || die "could not detect Debian architecture"
 
-TARGET_TRIPLET=""
-case "$ARCH" in
+HOST_ARCH="${HOST_ARCH_OPT:-$BUILD_ARCH}"
+ARCH="$HOST_ARCH"
+
+map_debian_arch() {
+    local arch="$1"
+
+    MAP_TARGET_TRIPLET=""
+    MAP_BOOTKEY=""
+    MAP_FBC_TARGET=""
+
+    case "$arch" in
     amd64)
-        TARGET_TRIPLET="x86_64-linux-gnu"
-        BOOTKEY="linux-amd64"
-        FBC_TARGET="linux-x86_64"
+        MAP_TARGET_TRIPLET="x86_64-linux-gnu"
+        MAP_BOOTKEY="linux-amd64"
+        MAP_FBC_TARGET="linux-x86_64"
         ;;
     i386)
-        TARGET_TRIPLET="i686-linux-gnu"
-        BOOTKEY="linux-i386"
-        FBC_TARGET="linux-x86"
+        MAP_TARGET_TRIPLET="i686-linux-gnu"
+        MAP_BOOTKEY="linux-i386"
+        MAP_FBC_TARGET="linux-x86"
         ;;
     arm64)
-        TARGET_TRIPLET="aarch64-linux-gnu"
-        BOOTKEY="linux-arm64"
-        FBC_TARGET="linux-aarch64"
+        MAP_TARGET_TRIPLET="aarch64-linux-gnu"
+        MAP_BOOTKEY="linux-arm64"
+        MAP_FBC_TARGET="linux-aarch64"
         ;;
     armhf)
-        TARGET_TRIPLET="arm-linux-gnueabihf"
-        BOOTKEY="linux-armhf"
-        FBC_TARGET="linux-arm"
+        MAP_TARGET_TRIPLET="arm-linux-gnueabihf"
+        MAP_BOOTKEY="linux-armhf"
+        MAP_FBC_TARGET="linux-arm"
         ;;
     armel)
-        TARGET_TRIPLET="arm-linux-gnueabi"
-        BOOTKEY="linux-armel"
-        FBC_TARGET="linux-arm"
+        MAP_TARGET_TRIPLET="arm-linux-gnueabi"
+        MAP_BOOTKEY="linux-armel"
+        MAP_FBC_TARGET="linux-arm"
+        ;;
+    powerpc)
+        MAP_TARGET_TRIPLET="powerpc-linux-gnu"
+        MAP_BOOTKEY="linux-powerpc"
+        MAP_FBC_TARGET="linux-powerpc"
+        ;;
+    ppc64)
+        MAP_TARGET_TRIPLET="powerpc64-linux-gnu"
+        MAP_BOOTKEY="linux-powerpc64"
+        MAP_FBC_TARGET="linux-powerpc64"
         ;;
     ppc64el)
-        TARGET_TRIPLET="powerpc64le-linux-gnu"
-        BOOTKEY="linux-ppc64el"
-        FBC_TARGET="linux-powerpc64le"
+        MAP_TARGET_TRIPLET="powerpc64le-linux-gnu"
+        MAP_BOOTKEY="linux-ppc64el"
+        MAP_FBC_TARGET="linux-powerpc64le"
         ;;
     s390x)
-        TARGET_TRIPLET="s390x-linux-gnu"
-        BOOTKEY="linux-s390x"
-        FBC_TARGET="linux-s390x"
+        MAP_TARGET_TRIPLET="s390x-linux-gnu"
+        MAP_BOOTKEY="linux-s390x"
+        MAP_FBC_TARGET="linux-s390x"
         ;;
     riscv64)
-        TARGET_TRIPLET="riscv64-linux-gnu"
-        BOOTKEY="linux-riscv64"
-        FBC_TARGET="linux-riscv64"
+        MAP_TARGET_TRIPLET="riscv64-linux-gnu"
+        MAP_BOOTKEY="linux-riscv64"
+        MAP_FBC_TARGET="linux-riscv64"
         ;;
     loong64)
-        TARGET_TRIPLET="loongarch64-linux-gnu"
-        BOOTKEY="linux-loongarch64"
-        FBC_TARGET="linux-loongarch64"
+        MAP_TARGET_TRIPLET="loongarch64-linux-gnu"
+        MAP_BOOTKEY="linux-loongarch64"
+        MAP_FBC_TARGET="linux-loongarch64"
         ;;
     *)
-        die "unsupported Debian architecture: $ARCH"
+        die "unsupported Debian architecture: $arch"
         ;;
-esac
+    esac
+}
+
+map_debian_arch "$HOST_ARCH"
+TARGET_TRIPLET="$MAP_TARGET_TRIPLET"
+BOOTKEY="$MAP_BOOTKEY"
+FBC_TARGET="$MAP_FBC_TARGET"
+
+map_debian_arch "$BUILD_ARCH"
+BUILD_TARGET_TRIPLET="$MAP_TARGET_TRIPLET"
+BUILD_BOOTKEY="$MAP_BOOTKEY"
+BUILD_FBC_TARGET="$MAP_FBC_TARGET"
+
+CROSS_PACKAGE_BUILD=0
+if [ "$BUILD_ARCH" != "$HOST_ARCH" ]; then
+    CROSS_PACKAGE_BUILD=1
+fi
 
 android_supported_for_arch() {
     case "$1" in
-        amd64)
+        amd64|arm64)
             return 0
             ;;
         *)
@@ -271,6 +318,122 @@ disable_android_if_sdk_unavailable() {
     ANDROID=0
 }
 
+configure_ubuntu_cross_apt_sources() {
+    local tmp_sources
+    local disabled_dir
+    local f
+
+    [ "$CROSS_PACKAGE_BUILD" -eq 1 ] || return 0
+    [ "$DISTRO_ID" = "ubuntu" ] || return 0
+    [ -n "$CODENAME" ] || return 0
+    [ "$CODENAME" != "unknown" ] || return 0
+
+    if [ "${FBC_PACKAGE_CONFIGURE_CROSS_APT:-0}" != "1" ]; then
+        echo "==> leaving Ubuntu apt sources unchanged; set FBC_PACKAGE_CONFIGURE_CROSS_APT=1 to enable cross-source rewriting"
+        return 0
+    fi
+
+    msg "configuring Ubuntu apt sources for cross architecture: $HOST_ARCH"
+
+    disabled_dir="/etc/apt/sources.list.d/fbc-cross-disabled"
+    tmp_sources="$(mktemp)"
+
+    cat > "$tmp_sources" <<EOF
+Types: deb
+URIs: http://archive.ubuntu.com/ubuntu
+Suites: ${CODENAME} ${CODENAME}-updates ${CODENAME}-backports
+Components: main restricted universe multiverse
+Architectures: ${BUILD_ARCH}
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb
+URIs: http://security.ubuntu.com/ubuntu
+Suites: ${CODENAME}-security
+Components: main restricted universe multiverse
+Architectures: ${BUILD_ARCH}
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb
+URIs: http://ports.ubuntu.com/ubuntu-ports
+Suites: ${CODENAME} ${CODENAME}-updates ${CODENAME}-backports ${CODENAME}-security
+Components: main restricted universe multiverse
+Architectures: ${HOST_ARCH}
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+EOF
+
+    run_root mkdir -p "$disabled_dir"
+
+    for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.sources /etc/apt/sources.list.d/*.list; do
+        [ -e "$f" ] || continue
+        case "$f" in
+            */fbc-cross.sources)
+                continue
+                ;;
+        esac
+        run_root mv "$f" "$disabled_dir/$(basename "$f")"
+    done
+
+    run_root install -m 644 "$tmp_sources" /etc/apt/sources.list.d/fbc-cross.sources
+    rm -f "$tmp_sources"
+}
+
+needs_debian_ports_cross_apt() {
+    [ "$CROSS_PACKAGE_BUILD" -eq 1 ] || return 1
+    [ "$DISTRO_ID" = "debian" ] || return 1
+    [ "$CODENAME" = "sid" ] || return 1
+
+    case "$HOST_ARCH" in
+    powerpc|ppc64|loong64)
+        return 0
+        ;;
+    *)
+        return 1
+        ;;
+    esac
+}
+
+install_debian_ports_cross_keyring() {
+    needs_debian_ports_cross_apt || return 0
+
+    if [ "${FBC_PACKAGE_CONFIGURE_CROSS_APT:-0}" != "1" ]; then
+        return 0
+    fi
+
+    msg "installing Debian Ports archive keyring"
+
+    run_root apt-get update -y
+    run_root apt-get install -y --no-install-recommends \
+        ca-certificates \
+        debian-ports-archive-keyring
+}
+
+configure_debian_ports_cross_apt_sources() {
+    local tmp_sources
+
+    needs_debian_ports_cross_apt || return 0
+
+    if [ "${FBC_PACKAGE_CONFIGURE_CROSS_APT:-0}" != "1" ]; then
+        echo "==> leaving Debian Ports apt sources unchanged; set FBC_PACKAGE_CONFIGURE_CROSS_APT=1 to enable cross-source setup"
+        return 0
+    fi
+
+    msg "configuring Debian Ports apt sources for cross architecture: $HOST_ARCH"
+
+    tmp_sources="$(mktemp)"
+
+    cat > "$tmp_sources" <<EOF
+Types: deb
+URIs: http://ftp.ports.debian.org/debian-ports
+Suites: sid unreleased
+Components: main
+Architectures: ${HOST_ARCH}
+Signed-By: /usr/share/keyrings/debian-ports-archive-keyring.gpg
+EOF
+
+    run_root install -m 644 "$tmp_sources" /etc/apt/sources.list.d/fbc-debian-ports.sources
+    rm -f "$tmp_sources"
+}
+
 assert_orig_tarball_clean() {
     local archive="$1"
     local bad_entry
@@ -278,13 +441,13 @@ assert_orig_tarball_clean() {
     bad_entry="$(
         tar -tJf "$archive" |
         awk '
-            $0 ~ /^[^/]+\/(\.build-alpine|\.build-debianubuntu|\.codex|\.git|bin|dist|lib\/freebasic|obj|out|package-root[^/]*|packages|pkgroot[^/]*|stage|tmp)(\/|$)/ {
+            !found && $0 ~ /^[^/]+\/(\.build-alpine|\.build-debianubuntu[^/]*|\.codex|\.git|bin|dist|lib\/freebasic|obj|out|package-root[^/]*|packages|pkgroot[^/]*|stage|tmp)(\/|$)/ {
                 print
-                exit
+                found = 1
             }
-            $0 ~ /^([^/]+\/)+obj\// {
+            !found && $0 ~ /^([^/]+\/)+obj\// {
                 print
-                exit
+                found = 1
             }
         '
     )"
@@ -294,7 +457,7 @@ assert_orig_tarball_clean() {
     fi
 }
 
-BOOTSTRAP_TAR="FreeBASIC-${VERSION}-source-bootstrap-${BOOTKEY}.tar.xz"
+BOOTSTRAP_TAR="$ROOT/FreeBASIC-${VERSION}-source-bootstrap-${BUILD_BOOTKEY}.tar.xz"
 
 ARM_MAKE_ARGS=()
 case "${FBC_PACKAGE_ARM_ARCH:-}" in
@@ -315,10 +478,16 @@ esac
 DISTRO_ID=""
 CODENAME=""
 if [ -f /etc/os-release ]; then
-    # shellcheck disable=SC1091
-    . /etc/os-release
-    DISTRO_ID="${ID:-}"
-    CODENAME="${VERSION_CODENAME:-}"
+    DISTRO_ID="$(
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        printf '%s' "${ID:-}"
+    )"
+    CODENAME="$(
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        printf '%s' "${VERSION_CODENAME:-}"
+    )"
 fi
 
 if [ -z "$DISTRO_ID" ] && command -v lsb_release >/dev/null 2>&1; then
@@ -358,6 +527,13 @@ install_deps() {
     export NCURSES_NO_UTF8_ACS=1
     export DEB_BUILD_MAINT_OPTIONS="hardening=+all"
 
+    if [ "$CROSS_PACKAGE_BUILD" -eq 1 ]; then
+        install_debian_ports_cross_keyring
+        run_root dpkg --add-architecture "$HOST_ARCH"
+        configure_ubuntu_cross_apt_sources
+        configure_debian_ports_cross_apt_sources
+    fi
+
     run_root apt-get update -y
     disable_android_if_sdk_unavailable
 
@@ -381,6 +557,74 @@ install_deps() {
             unzip
         )
     fi
+    local cross_deps=()
+    local native_library_deps=()
+    local target_deps=()
+    if [ "$CROSS_PACKAGE_BUILD" -eq 1 ]; then
+        native_library_deps=(
+            libncurses-dev
+            libtinfo-dev
+        )
+    else
+        native_library_deps=(
+            libncurses-dev
+            libtinfo-dev
+            libgpm-dev
+            libffi-dev
+            libasound2-dev
+            libpulse-dev
+            libx11-dev
+            libxpm-dev
+            libxext-dev
+            libxrandr-dev
+            libxrender-dev
+            libxcb1-dev
+            libxau-dev
+            libxdmcp-dev
+            libxi-dev
+            libxinerama-dev
+            libxxf86vm-dev
+            libgl1-mesa-dev
+            libglu1-mesa-dev
+        )
+    fi
+    if [ "$CROSS_PACKAGE_BUILD" -eq 1 ]; then
+        cross_deps=()
+        case "$HOST_ARCH" in
+        ppc64|loong64)
+            ;;
+        *)
+            cross_deps+=("crossbuild-essential-${HOST_ARCH}")
+            ;;
+        esac
+        cross_deps+=(
+            "binutils-${TARGET_TRIPLET}"
+            "gcc-${TARGET_TRIPLET}"
+            "g++-${TARGET_TRIPLET}"
+        )
+
+        target_deps=(
+            "libncurses-dev:${HOST_ARCH}"
+            "libtinfo-dev:${HOST_ARCH}"
+            "libgpm-dev:${HOST_ARCH}"
+            "libffi-dev:${HOST_ARCH}"
+            "libasound2-dev:${HOST_ARCH}"
+            "libpulse-dev:${HOST_ARCH}"
+            "libx11-dev:${HOST_ARCH}"
+            "libxpm-dev:${HOST_ARCH}"
+            "libxext-dev:${HOST_ARCH}"
+            "libxrandr-dev:${HOST_ARCH}"
+            "libxrender-dev:${HOST_ARCH}"
+            "libxcb1-dev:${HOST_ARCH}"
+            "libxau-dev:${HOST_ARCH}"
+            "libxdmcp-dev:${HOST_ARCH}"
+            "libxi-dev:${HOST_ARCH}"
+            "libxinerama-dev:${HOST_ARCH}"
+            "libxxf86vm-dev:${HOST_ARCH}"
+            "libgl1-mesa-dev:${HOST_ARCH}"
+            "libglu1-mesa-dev:${HOST_ARCH}"
+        )
+    fi
 
     run_root apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -389,12 +633,9 @@ install_deps() {
         debhelper dpkg-dev devscripts fakeroot lintian \
         quilt dos2unix \
         tar xz-utils \
-        libncurses-dev libtinfo-dev libgpm-dev libffi-dev \
-        libasound2-dev libpulse-dev \
-        libx11-dev libxpm-dev libxext-dev libxrandr-dev libxrender-dev \
-        libxcb1-dev libxau-dev libxdmcp-dev \
-        libxi-dev libxinerama-dev libxxf86vm-dev \
-        libgl1-mesa-dev libglu1-mesa-dev \
+        "${native_library_deps[@]}" \
+        "${cross_deps[@]}" \
+        "${target_deps[@]}" \
         "${js_deps[@]}" \
         "${android_deps[@]}" \
         perl python3 git
@@ -420,13 +661,13 @@ build_bootstrap_tarball() {
     ensure_host_compiler
 
     rm -f "$BOOTSTRAP_TAR"
-    rm -rf "bootstrap/${BOOTKEY}"
+    rm -rf "bootstrap/${BUILD_BOOTKEY}"
     "$MAKE_CMD" clean-bootstrap-sources >/dev/null 2>&1 || true
 
     run "$MAKE_CMD" \
-        TARGET_TRIPLET="$TARGET_TRIPLET" \
-        FBC_TARGET="$FBC_TARGET" \
-        FBTARGET_DIR_OVERRIDE="$BOOTKEY" \
+        TARGET_TRIPLET="$BUILD_TARGET_TRIPLET" \
+        FBC_TARGET="$BUILD_FBC_TARGET" \
+        FBTARGET_DIR_OVERRIDE="$BUILD_BOOTKEY" \
         "${ARM_MAKE_ARGS[@]}" \
         bootstrap-dist-target \
         -j"$JOBS"
@@ -446,6 +687,7 @@ package_current_target() {
     local origtar
     local rc
     local bootstrap_srcdir
+    local deb_build_options
 
     msg "preparing Debian package build"
 
@@ -463,7 +705,7 @@ package_current_target() {
 
     upver="${fullver%%-*}"
     srcdir="${pkgname}-${upver}"
-    bootstrap_srcdir="$ROOT/bootstrap/$BOOTKEY"
+    bootstrap_srcdir="$ROOT/bootstrap/$BUILD_BOOTKEY"
 
     msg "staging Debian source tree"
 
@@ -472,8 +714,8 @@ package_current_target() {
         assert_removable_tree "$WORKDIR/bootstrap-from-tar"
         run mkdir -p "$WORKDIR/bootstrap-from-tar"
         run tar -xJf "$BOOTSTRAP_TAR" -C "$WORKDIR/bootstrap-from-tar" \
-            "FreeBASIC-${VERSION}-source-bootstrap-${BOOTKEY}/bootstrap/${BOOTKEY}"
-        bootstrap_srcdir="$WORKDIR/bootstrap-from-tar/FreeBASIC-${VERSION}-source-bootstrap-${BOOTKEY}/bootstrap/${BOOTKEY}"
+            "FreeBASIC-${VERSION}-source-bootstrap-${BUILD_BOOTKEY}/bootstrap/${BUILD_BOOTKEY}"
+        bootstrap_srcdir="$WORKDIR/bootstrap-from-tar/FreeBASIC-${VERSION}-source-bootstrap-${BUILD_BOOTKEY}/bootstrap/${BUILD_BOOTKEY}"
     fi
 
     run mkdir -p "$BUILDDIR/$srcdir"
@@ -484,8 +726,8 @@ package_current_target() {
         --exclude '/bootstrap/*/' \
         "$ROOT/" "$BUILDDIR/$srcdir/"
 
-    run mkdir -p "$BUILDDIR/$srcdir/bootstrap/$BOOTKEY"
-    run rsync -a --no-owner --no-group --delete "$bootstrap_srcdir/" "$BUILDDIR/$srcdir/bootstrap/$BOOTKEY/"
+    run mkdir -p "$BUILDDIR/$srcdir/bootstrap/$BUILD_BOOTKEY"
+    run rsync -a --no-owner --no-group --delete "$bootstrap_srcdir/" "$BUILDDIR/$srcdir/bootstrap/$BUILD_BOOTKEY/"
 
     cd "$BUILDDIR/$srcdir"
 
@@ -495,7 +737,10 @@ package_current_target() {
 
     echo "==> package name: $pkgname"
     echo "==> upstream version: $upver"
+    echo "==> build arch: $BUILD_ARCH"
+    echo "==> host arch: $HOST_ARCH"
     echo "==> output dir: $OUTDIR"
+    echo "==> build jobs: $JOBS"
     [ -z "${FBC_PACKAGE_ARM_ARCH:-}" ] || echo "==> ARM default arch: $FBC_PACKAGE_ARM_ARCH"
     [ "$NO_JS" -eq 0 ] || echo "==> build profile: nojs"
     [ "$ANDROID" -eq 0 ] || echo "==> build profile: android"
@@ -528,11 +773,25 @@ package_current_target() {
         build_profiles+=(android)
     fi
 
+    deb_build_options="${DEB_BUILD_OPTIONS:-}"
+    case " $deb_build_options " in
+        *" parallel="*)
+            ;;
+        *)
+            deb_build_options="${deb_build_options:+$deb_build_options }parallel=$JOBS"
+            ;;
+    esac
+
     set +e
+    local dpkg_args=(-us -uc)
+    if [ "$CROSS_PACKAGE_BUILD" -eq 1 ]; then
+        dpkg_args=(-a "$HOST_ARCH" -d "${dpkg_args[@]}")
+    fi
+
     if [ "${#build_profiles[@]}" -gt 0 ]; then
-        DEB_BUILD_PROFILES="${build_profiles[*]}" dpkg-buildpackage -us -uc 2>&1 | tee "$OUTDIR/build.log"
+        DEB_BUILD_OPTIONS="$deb_build_options" DEB_BUILD_PROFILES="${build_profiles[*]}" dpkg-buildpackage "${dpkg_args[@]}" 2>&1 | tee "$OUTDIR/build.log"
     else
-        dpkg-buildpackage -us -uc 2>&1 | tee "$OUTDIR/build.log"
+        DEB_BUILD_OPTIONS="$deb_build_options" dpkg-buildpackage "${dpkg_args[@]}" 2>&1 | tee "$OUTDIR/build.log"
     fi
     rc=${PIPESTATUS[0]}
     set -e

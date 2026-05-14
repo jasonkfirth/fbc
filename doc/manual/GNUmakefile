@@ -1,4 +1,4 @@
-include ../../version.mk
+include ../../mk/version.mk
 
 HHC := hhc
 FBDOC := ../fbdoc/fbdoc

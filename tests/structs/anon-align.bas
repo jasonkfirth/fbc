@@ -2,13 +2,14 @@
 
 SUITE( fbc_tests.structs.anon_align )
 
-	'' On 32bit Win32/MinGW, doubles/longints are aligned to 8, but on
-	'' 32bit Linux and others, doubles/longints are aligned to 4.
+	'' On 32bit Win32/MinGW, ARM, JS/wasm, Xbox and PowerPC,
+	'' doubles/longints are aligned to 8, but on 32bit x86 Linux, BSD
+	'' and DOS, doubles/longints are aligned to 4.
 	'' (This often results in tighter packing, and only few cases are
 	'' the same as on MinGW)
 	''
 	'' On 64bit, doubles/longints are aligned to 8 everywhere.
-	#if defined( __FB_64BIT__ ) or defined( __FB_WIN32__ ) or defined( __FB_ARM__ ) or defined( __FB_JS__ ) or defined( __FB_XBOX__ )
+	#if defined( __FB_64BIT__ ) or defined( __FB_WIN32__ ) or defined( __FB_ARM__ ) or defined( __FB_JS__ ) or defined( __FB_XBOX__ ) or defined( __FB_PPC__ )
 		#define QWORD_ALIGN 8
 	#else
 		#define QWORD_ALIGN 4

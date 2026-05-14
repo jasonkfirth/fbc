@@ -44,7 +44,10 @@ Package: freebasic
 Architecture: any
 Depends:
  ${shlibs:Depends},
- ${misc:Depends}
+ ${misc:Depends},
+ gcc,
+ libc-dev,
+ libncurses-dev
 Recommends:
  freebasic-bindings (= ${binary:Version})
 Breaks:
@@ -101,6 +104,11 @@ Recommends:
  libpng-dev,
  libjpeg-dev,
  libgif-dev,
+ libx11-dev,
+ libxext-dev,
+ libxpm-dev,
+ libxrandr-dev,
+ libxrender-dev,
  libglu1-mesa-dev | libglu-dev,
  libsdl2-dev,
  libsdl2-image-dev,
@@ -217,6 +225,11 @@ Recommends:
  libpng-dev,
  libjpeg-dev,
  libgif-dev,
+ libx11-dev,
+ libxext-dev,
+ libxpm-dev,
+ libxrandr-dev,
+ libxrender-dev,
  libglu1-mesa-dev | libglu-dev,
  libsdl2-dev,
  libsdl2-image-dev,

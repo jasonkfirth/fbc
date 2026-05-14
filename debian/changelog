@@ -82,6 +82,40 @@ freebasic (1.20.1-1) jammy; urgency=medium
   * Add Debian/Ubuntu Docker smoke-test scripts for native FreeBASIC and
     freebasic-js packages, installing the local package artifacts in
     fresh containers with only their declared package dependencies.
+  * Add the replacement Linux package-factory scaffold for building one
+    native Docker container per distro release, cross-building CPU packages
+    inside that packaging environment, and keeping the older binfmt/native
+    matrix scripts available as validation wrappers.
+  * Add build_scripts/linux-cross-build-freebasic-matrix.sh as the one-shot
+    dispatcher above the Debian-family, APK-family, RPM-family, and
+    Slackware package builders, with distro/release/architecture filters,
+    --keep-going support, and default parallel make jobs based on the host
+    CPU count.
+  * Teach the Debian/Ubuntu package build to cross-build for a selected
+    host architecture via --host-arch, using a build-architecture bootstrap
+    compiler, target cross toolchains, and target development packages.
+  * Add RPM and Slackware clean-container package builders that install the
+    distro build dependencies, write package artifacts under out/linux, and
+    run console, gfxlib SCREEN/SCREENSET, SCREEN 13, sfxlib, and sfxlib
+    showcase compile/link smoke checks before packaging succeeds.
+  * Keep the APK-family path wired into the package factory, install examples
+    into the package layout, and reuse the shared source-copy excludes so
+    isolated package worktrees do not absorb generated build artifacts.
+  * Extend Linux package validation with optional full fbctests runs plus
+    console, gfxlib, SCREEN 13/SCREENSET, sfxlib, and installed sfxlib
+    showcase smoke coverage in clean target-architecture containers.
+  * Fix Linux non-x86 package links by emitting glibc dynamic-linker paths
+    for PowerPC, PowerPC64, PowerPC64LE, riscv64, and s390x targets, and
+    preserve whitespace when reading compiler-driver probe output.
+  * Fix strict-alignment targets by using memcpy-backed scalar loads/stores
+    for unaligned packed-field access and keeping runtime-managed STRING
+    and dynamic-array descriptors naturally aligned.
+  * Fix riscv64 and s390x C/C++ varargs interop by modelling GCC's target
+    __builtin_va_list ABI and mangling those types correctly.
+  * Default Debian/Ubuntu armhf packages to ARMv7 hard-float while retaining
+    an explicit armv6+fp override for Raspbian package builds.
+  * Make floating-point and PRINT USING tests tolerate target-endian and
+    target C-library NaN/IND differences.
   * Add a freebasic-android package build profile that installs
     fbc-android, Android/aarch64 runtime archives, Android-target headers,
     and APK template glue separately from the native freebasic package,
@@ -122,7 +156,7 @@ freebasic (1.20.1-1) jammy; urgency=medium
   * Fix Android sfxlib archives so the generic core does not retain a
     Linux-only fb_sfxLinuxExit reference in SFX APKs.
 
- -- SJ_Zero <sj@fbxl.net>  Tue, 28 Apr 2026 15:30:00 -0400
+ -- SJ_Zero <sj@fbxl.net>  Thu, 14 May 2026 06:43:30 -0400
 
 freebasic (1.10.4-1) jammy; urgency=medium
 

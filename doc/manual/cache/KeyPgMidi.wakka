@@ -1,0 +1,28 @@
+{{fbdoc item="title" value="MIDI"}}----
+Controls MIDI output through sfxlib.
+
+{{fbdoc item="syntax"}}##
+	//result// = **Midi Open**( //device// )
+	//result// = **Midi Close**()
+	//result// = **Midi Play**( //filename// )
+	//result// = **Midi Stop**()
+	//result// = **Midi Pause**()
+	//result// = **Midi Resume**()
+	//result// = **Midi Send**( //status//, //data1//, //data2// )
+##
+{{fbdoc item="desc"}}
+	##**Midi**## opens a MIDI output device, plays MIDI files where supported, and sends raw three-byte MIDI messages through ##Midi Send##.
+
+	MIDI support depends on the target and the active sfxlib backend.  Programs should be prepared for a MIDI device or MIDI file playback to be unavailable.
+
+{{fbdoc item="ex"}}
+	See ##examples/sfxlib/midi-open.bas##, ##examples/sfxlib/midi-send.bas##, ##examples/sfxlib/midi-play.bas##, and ##examples/sfxlib/showcase.bas##.
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDevice|Device]]##
+	- ##[[KeyPgMusic|Music]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

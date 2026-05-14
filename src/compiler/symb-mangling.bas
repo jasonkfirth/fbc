@@ -521,12 +521,20 @@ sub symbMangleType _
 
 	'' pointer?
 	if( typeIsPtr( dtype ) ) then
+		dim as integer ptrdtype = dtype
+
 		mangled += "P"
 
-		symbMangleType( mangled, typeDeref( dtype ), subtype, _
+		if( symbGetValistType( dtype, subtype ) = FB_CVA_LIST_BUILTIN_VOID_POINTER ) then
+			dtype = typeSetMangleDt( typeDeref( dtype ), 0 )
+		else
+			dtype = typeDeref( dtype )
+		end if
+
+		symbMangleType( mangled, dtype, subtype, _
 		                options or FB_MANGLEOPT_HASPTR or FB_MANGLEOPT_KEEPTOPCONST )
 
-		hAbbrevAdd( dtype, subtype )
+		hAbbrevAdd( ptrdtype, subtype )
 		exit sub
 	end if
 
@@ -537,7 +545,8 @@ sub symbMangleType _
 			if( typeGetMangleDt( dtype ) = FB_DATATYPE_VA_LIST ) then
 
 				select case symbGetValistType( dtype, subtype )
-				case FB_CVA_LIST_BUILTIN_C_STD
+				case FB_CVA_LIST_BUILTIN_C_STD, FB_CVA_LIST_BUILTIN_PPC, _
+				     FB_CVA_LIST_BUILTIN_S390X
 					'' if the type was passed as byval ptr or byref
 					'' need to mangle in "A1_" to indicate the array type, but
 					'' not on aarch64, __va_list is a plain struct, it doesn't

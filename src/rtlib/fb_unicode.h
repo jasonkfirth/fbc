@@ -16,6 +16,33 @@ typedef uint8_t  UTF_8;
 #define UTF16_HALFBASE           ((UTF_32)0x0010000UL)
 #define UTF16_HALFMASK           ((UTF_32)0x3FFUL)
 
+static __inline__ UTF_16 fb_UTF16FromLE( const unsigned char *src )
+{
+	return (UTF_16)((UTF_16)src[0] | ((UTF_16)src[1] << 8));
+}
+
+static __inline__ UTF_32 fb_UTF32FromLE( const unsigned char *src )
+{
+	return ((UTF_32)src[0]) |
+	       ((UTF_32)src[1] << 8) |
+	       ((UTF_32)src[2] << 16) |
+	       ((UTF_32)src[3] << 24);
+}
+
+static __inline__ void fb_UTF16ToLE( unsigned char *dst, UTF_16 c )
+{
+	dst[0] = (unsigned char)(c & 0x00FF);
+	dst[1] = (unsigned char)((c >> 8) & 0x00FF);
+}
+
+static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
+{
+	dst[0] = (unsigned char)(c & 0x000000FF);
+	dst[1] = (unsigned char)((c >> 8) & 0x000000FF);
+	dst[2] = (unsigned char)((c >> 16) & 0x000000FF);
+	dst[3] = (unsigned char)((c >> 24) & 0x000000FF);
+}
+
 #ifdef DISABLE_WCHAR
 #	include <ctype.h>
 #	define FB_WCHAR char

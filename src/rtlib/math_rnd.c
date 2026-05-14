@@ -53,6 +53,21 @@ static FB_RNDSTATE ctx = {
  */
 static double last_num = 0.0;
 
+typedef union {
+	double d;
+	uint64_t i;
+} FB_DOUBLE_BITS;
+
+STATIC_ASSERT( sizeof( double ) == sizeof( uint64_t ) );
+
+static uint64_t hDoubleToBits( double value )
+{
+	FB_DOUBLE_BITS bits;
+
+	bits.d = value;
+	return bits.i;
+}
+
 /* FB_RND_CRT */
 static uint32_t hRnd_CRT32 ( void )
 {
@@ -304,10 +319,7 @@ static int getAlogrithm( int algorithm )
 /* declare sub randomize alias "fb_Randomize" ( byval seed as double = -1.0, byval algorithm as long = FB.FB_RND_AUTO ) */
 FBCALL void fb_Randomize ( double seed, int algorithm )
 {
-	union {
-		double d;
-		uint32_t i[2];
-	} dtoi;
+	uint64_t seedbits;
 
 	FB_MATH_LOCK();
 
@@ -317,8 +329,8 @@ FBCALL void fb_Randomize ( double seed, int algorithm )
 		algorithms (with the exception of the QB one) take the integer value
 		of the seed, so make a value that will change more than once a second */
 
-		dtoi.d = fb_Timer();
-		seed = (double)(dtoi.i[0] ^ dtoi.i[1]);
+		seedbits = hDoubleToBits( fb_Timer() );
+		seed = (double)( (uint32_t)seedbits ^ (uint32_t)( seedbits >> 32 ) );
 	}
 
 	ctx.algorithm = getAlogrithm( algorithm );
@@ -334,8 +346,8 @@ FBCALL void fb_Randomize ( double seed, int algorithm )
 		break;
 
 	case FB_RND_QB:
-		dtoi.d = seed;
-		uint32_t s = dtoi.i[1];
+		seedbits = hDoubleToBits( seed );
+		uint32_t s = (uint32_t)( seedbits >> 32 );
 		s ^= ( s >> 16 );
 		s = ( ( s & 0xFFFF ) << 8 ) | ( ctx.iseed32 & 0xFF );
 		hRndCtxInitQB32( (uint32_t)s );

@@ -21,7 +21,7 @@
 
 #include "fb.h"
 
-#if defined DISABLE_FFI || (!defined HOST_X86 && !defined HOST_64BIT)
+#if defined DISABLE_FFI
 
 FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, ... )
 {
@@ -276,9 +276,9 @@ static FBCALL void threadproc( void *param )
     if( status == FFI_OK )
 #else
     /*
-     * libffi exposes the native platform ABI as FFI_DEFAULT_ABI on 64-bit
-     * and non-x86 targets. 32-bit x86 remains special because CDECL and
-     * STDCALL are separate ABIs there.
+     * libffi exposes the native platform ABI as FFI_DEFAULT_ABI on non-x86
+     * targets. 32-bit x86 remains special because CDECL and STDCALL are
+     * separate ABIs there.
      */
     if( (info->abi == FB_THREADCALL_CDECL) ||
         (info->abi == FB_THREADCALL_STDCALL) )

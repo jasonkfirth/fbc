@@ -1,0 +1,39 @@
+{{fbdoc item="title" value="FB_NO_GFXLIB"}}----
+User-defined compiler control symbol
+
+{{fbdoc item="syntax"}}##
+	#define FB_NO_GFXLIB
+##
+{{fbdoc item="desc"}}
+	Defining ##FB_NO_GFXLIB## tells the compiler not to treat selected graphics-library command words as built-in gfxlib command keywords.
+	
+	This is useful in larger programs or libraries that do not use the legacy graphics command surface and need names such as ##Screen##, ##Paint##, or ##Window## to be available as normal identifiers.
+	
+	The affected gfxlib command words are ##PSET##, ##PRESET##, ##POINT##, ##CIRCLE##, ##WINDOW##, ##PALETTE##, ##SCREEN##, ##SCREENQB##, ##PAINT##, ##DRAW##, and ##IMAGECREATE##.
+	
+	##FB_NO_GFXLIB## affects parsing only after the symbol has been defined.  It does not remove libraries that are explicitly requested through other code, and it does not change the behavior of already-parsed source.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#define FB_NO_GFXLIB
+
+type Window
+	as integer id
+end type
+
+dim as Window main_window
+main_window.id = 1
+%%
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.1
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC""
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgPpdefine|#define]]##
+	- ##[[CompilerOptd|Compiler Option: -d]]##
+	- [[CatPgGfx|Graphics Keyword List]]
+
+{{fbdoc item="back" value="CatPgPreProcess|Preprocessor"}}

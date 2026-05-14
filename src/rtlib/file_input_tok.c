@@ -7,13 +7,14 @@ static int hReadChar( FB_INPUTCTX *ctx )
     /* device? */
     if( FB_HANDLE_USED(ctx->handle) )
     {
-		int res, c;
+		int res;
+		unsigned char c;
 		size_t len;
         res = fb_FileGetDataEx( ctx->handle, 0, &c, 1, &len, FALSE, FALSE );
         if( (res != FB_RTERROR_OK) || (len == 0) )
             return EOF;
 
-        return c & 0x000000FF;
+        return c;
     }
     /* console.. */
     else
@@ -30,7 +31,8 @@ static int hUnreadChar( FB_INPUTCTX *ctx, int c )
     /* device? */
     if( FB_HANDLE_USED(ctx->handle) )
     {
-        return fb_FilePutBackEx( ctx->handle, &c, 1 );
+		unsigned char ch = (unsigned char)c;
+        return fb_FilePutBackEx( ctx->handle, &ch, 1 );
     }
     /* console .. */
     else

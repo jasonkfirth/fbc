@@ -307,7 +307,7 @@ private function hGet1stOutputLineFromCommand( byref cmd as string ) as string
 	end if
 
 	dim ln as string
-	input #f, ln
+	line input #f, ln
 
 	close f
 	return ln
@@ -346,7 +346,7 @@ private function fbcQueryCC( byref options as string ) as string
 	end if
 
 	dim ret as string
-	input #ff, ret
+	line input #ff, ret
 
 	close ff
 
@@ -805,6 +805,25 @@ private function fbcIsUsingGoldLinker( ) as integer
 	return FALSE
 end function
 
+private function hArmLinuxUsesHardFloatAbi( ) as integer
+#ifndef ENABLE_STANDALONE
+	'' GNU ARM triplets encode the floating-point ABI in the OS suffix:
+	'' gnueabihf is hard-float, while plain gnueabi is soft-float.
+	if( instr( lcase( fbc.target ), "gnueabihf" ) > 0 ) then
+		return TRUE
+	elseif( instr( lcase( fbc.target ), "gnueabi" ) > 0 ) then
+		return FALSE
+	end if
+#endif
+
+	select case as const FB_DEFAULT_CPUTYPE_ARM
+	case FB_CPUTYPE_ARMV6_FP, FB_CPUTYPE_ARMV7A_FP
+		return TRUE
+	case else
+		return FALSE
+	end select
+end function
+
 private function hLinkFiles( ) as integer
 	dim as string ldcline, dllname, deffile
 	dim as string xbox_xbe_outname
@@ -1063,9 +1082,17 @@ private function hLinkFiles( ) as integer
 					#endif
 				case FB_CPUFAMILY_ARM
 					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
-						ldcline += " -dynamic-linker /lib/ld-musl-armhf.so.1"
+						if( hArmLinuxUsesHardFloatAbi( ) ) then
+							ldcline += " -dynamic-linker /lib/ld-musl-armhf.so.1"
+						else
+							ldcline += " -dynamic-linker /lib/ld-musl-arm.so.1"
+						end if
 					#else
-					ldcline += " -dynamic-linker /lib/ld-linux-armhf.so.3"
+						if( hArmLinuxUsesHardFloatAbi( ) ) then
+							ldcline += " -dynamic-linker /lib/ld-linux-armhf.so.3"
+						else
+							ldcline += " -dynamic-linker /lib/ld-linux.so.3"
+						end if
 					#endif
 				case FB_CPUFAMILY_AARCH64
 					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
@@ -1076,26 +1103,38 @@ private function hLinkFiles( ) as integer
 				case FB_CPUFAMILY_PPC
 					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
 						ldcline += " -dynamic-linker /lib/ld-musl-powerpc.so.1"
+					#else
+						ldcline += " -dynamic-linker /lib/ld.so.1"
 					#endif
 				case FB_CPUFAMILY_PPC64
 					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
 						ldcline += " -dynamic-linker /lib/ld-musl-powerpc64.so.1"
+					#else
+						ldcline += " -dynamic-linker /lib64/ld64.so.1"
 					#endif
 				case FB_CPUFAMILY_PPC64LE
 					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
 						ldcline += " -dynamic-linker /lib/ld-musl-powerpc64le.so.1"
+					#else
+						ldcline += " -dynamic-linker /lib64/ld64.so.2"
 					#endif
 				case FB_CPUFAMILY_RISCV64
 					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
 						ldcline += " -dynamic-linker /lib/ld-musl-riscv64.so.1"
+					#else
+						ldcline += " -dynamic-linker /lib/ld-linux-riscv64-lp64d.so.1"
 					#endif
 				case FB_CPUFAMILY_S390X
 					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
 						ldcline += " -dynamic-linker /lib/ld-musl-s390x.so.1"
+					#else
+						ldcline += " -dynamic-linker /lib/ld64.so.1"
 					#endif
 				case FB_CPUFAMILY_LOONGARCH64
 					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
 						ldcline += " -dynamic-linker /lib/ld-musl-loongarch64.so.1"
+					#else
+						ldcline += " -dynamic-linker /lib64/ld-linux-loongarch-lp64d.so.1"
 					#endif
 				end select
 			case FB_COMPTARGET_HAIKU
@@ -1135,6 +1174,8 @@ private function hLinkFiles( ) as integer
 
 		static as zstring*32 emscripten_options(...) = _
 		{ _
+			"ASYNCIFY=1", _
+			"ASYNCIFY_STACK_SIZE=65536", _
 			"CASE_INSENSITIVE_FS=1", _
 			"TOTAL_MEMORY=67108864", _
 			"ALLOW_MEMORY_GROWTH=1", _
@@ -1868,9 +1909,9 @@ dim shared as FBGNUARCHINFO gnuarchmap(0 to ...) => _
 	(@"aarch64"    , FB_DEFAULT_CPUTYPE_AARCH64), _
 	(@"ppc"        , FB_DEFAULT_CPUTYPE_PPC    ), _
 	(@"powerpc"    , FB_DEFAULT_CPUTYPE_PPC    ), _
-	(@"ppc64  "    , FB_DEFAULT_CPUTYPE_PPC64  ), _
+	(@"ppc64"      , FB_DEFAULT_CPUTYPE_PPC64  ), _
 	(@"powerpc64"  , FB_DEFAULT_CPUTYPE_PPC64  ),  _
-	(@"ppc64le  "  , FB_DEFAULT_CPUTYPE_PPC64LE), _
+	(@"ppc64le"    , FB_DEFAULT_CPUTYPE_PPC64LE), _
 	(@"powerpc64le", FB_DEFAULT_CPUTYPE_PPC64LE), _
 	(@"riscv64"    , FB_DEFAULT_CPUTYPE_RISCV64), _
 	(@"s390x"      , FB_DEFAULT_CPUTYPE_S390X  ), _

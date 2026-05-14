@@ -1,0 +1,45 @@
+{{fbdoc item="title" value="OPEN TCP SERVER"}}----
+Opens a listening TCP server socket and binds it to a file number.
+
+{{fbdoc item="syntax"}}##
+	[[KeyPgDeclare|declare]] [[KeyPgFunction|function]] **Open Tcp Server** ( //options// [[KeyPgAs|as]] [[KeyPgString|string]], **As** [**#**]//filenumber// [[KeyPgAs|as]] [[KeyPgLong|long]] ) [[KeyPgAs|as]] [[KeyPgLong|long]]
+##
+{{fbdoc item="usage"}}##
+	//result// = **Open Tcp Server**( //options//[,] **As** [**#**]//filenumber// )
+	**Open Tcp Server** //options// **As** [**#**]//filenumber//
+##
+{{fbdoc item="param"}}
+	##//options//##
+		A comma-separated string describing the listening socket.
+	##//filenumber//##
+		The file number to bind to the server socket.
+
+{{fbdoc item="ret"}}
+	Returns zero (##0##) on success, or a non-zero error code on failure.
+
+{{fbdoc item="desc"}}
+	##**Open Tcp Server**## creates a listening TCP socket.  The server file number is passed to ##[[KeyPgTcpAccept|Tcp Accept]]## to accept incoming connections.  The accepted client receives its own file number and can then be read from or written to using normal file I/O statements.
+
+	The options string accepts:
+		- ##host=//name-or-address//##, optional bind address
+		- ##port=//number//##, required
+		- ##backlog=//count//##, optional listen backlog, default ##16##
+		- ##timeout=//milliseconds//##, optional socket timeout
+
+	Server file numbers are not used for data transfer.  Use ##[[KeyPgTcpAccept|Tcp Accept]]## and then read or write the returned client file number.
+
+{{fbdoc item="ex"}}
+	See ##examples/network/opentcp/http-server.bas## and ##examples/network/opentcp/two-connections-selftest.bas##.
+
+{{fbdoc item="target"}}
+	- TCP support is not available on all targets.  Programs that need to be portable should use target defines such as ##__FB_DOS__##, ##__FB_JS__##, and ##__FB_XBOX__## where appropriate.
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgOpenTcp|Open Tcp]]##
+	- ##[[KeyPgTcpAccept|Tcp Accept]]##
+	- ##[[KeyPgClose|Close]]##
+
+{{fbdoc item="back" value="CatPgFile|File I/O Functions"}}

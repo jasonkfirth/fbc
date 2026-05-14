@@ -16,6 +16,8 @@ Procedures (from graphics library) for working with mice, gaming devices and key
 		Sets position and visibility of the mouse cursor.
 	=={{fbdoc item="keyword" value="KeyPgGetjoystick|GETJOYSTICK"}}==
 		Gets button and axis information for gaming devices.
+	=={{fbdoc item="keyword" value="KeyPgGetxpad|GETXPAD"}}==
+		Gets Xbox-style controller state for gaming devices.
 	=={{fbdoc item="keyword" value="KeyPgStick|STICK"}}==
 		Gets axis position for gaming devices.
 	=={{fbdoc item="keyword" value="KeyPgStrig|STRIG"}}==

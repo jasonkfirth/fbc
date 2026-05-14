@@ -1,0 +1,24 @@
+{{fbdoc item="title" value="DEVICE"}}----
+Lists, selects, and queries sfxlib output devices.
+
+{{fbdoc item="syntax"}}##
+	**Device List**
+	//result// = **Device Select**( //device// )
+	**Device Info** [ //device// ]
+##
+{{fbdoc item="desc"}}
+	##**Device List**## asks sfxlib to enumerate the output drivers compiled into the runtime.  ##Device Select## selects a device by index.  ##Device Info## prints diagnostic information for the current device or for the supplied device index.
+
+	Device availability is platform dependent.  The null output driver may be selected for headless tests and diagnostics.
+
+{{fbdoc item="ex"}}
+	See ##examples/sfxlib/device-list.bas##, ##examples/sfxlib/device-select.bas##, and ##examples/sfxlib/device-info.bas##.
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgAudio|Audio]]##
+	- ##[[KeyPgCapture|Capture]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

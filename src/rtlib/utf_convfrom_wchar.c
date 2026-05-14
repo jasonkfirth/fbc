@@ -181,7 +181,8 @@ static UTF_16 *hUTF32ToUTF16( const FB_WCHAR *src, ssize_t chars, UTF_16 *dst, s
 
 static char *hToUTF16( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *bytes )
 {
-	/* !!!FIXME!!! only litle-endian supported */
+	/* UTF16/UTF32 conversion APIs expose native typed code units.
+	   Encoded file output normalizes these units to little endian. */
 
 	*bytes = chars * sizeof( UTF_16 );
 
@@ -246,7 +247,8 @@ static void hUTF16ToUTF32( const FB_WCHAR *src, ssize_t chars, UTF_32 *dst, ssiz
 
 static char *hToUTF32( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *bytes )
 {
-	/* !!!FIXME!!! only litle-endian supported */
+	/* UTF16/UTF32 conversion APIs expose native typed code units.
+	   Encoded file output normalizes these units to little endian. */
 
 	*bytes = chars * sizeof( UTF_32 );
 

@@ -50,6 +50,12 @@ Preprocessor symbols defined by the compiler.
 		Defined if compiling for the ARM architecture.
 	=={{fbdoc item="keyword" value="KeyPgDdfbppc|__FB_PPC__"}}==
 		Defined if compiling for the ""PowerPC"" architecture.
+	=={{fbdoc item="keyword" value="KeyPgDdfbriscv64|__FB_RISCV64__"}}==
+		Defined if compiling for the 64-bit RISC-V architecture.
+	=={{fbdoc item="keyword" value="KeyPgDdfbs390x|__FB_S390X__"}}==
+		Defined if compiling for the s390x architecture.
+	=={{fbdoc item="keyword" value="KeyPgDdfbloongarch64|__FB_LOONGARCH64__"}}==
+		Defined if compiling for the 64-bit LoongArch architecture.
 	=={{fbdoc item="keyword" value="KeyPgDdfbx86|__FB_X86__"}}==
 		Defined if compiling for the X86 / X86_64 architecture.
 	=={{fbdoc item="keyword" value="KeyPgDdfbjs|__FB_JS__"}}==
@@ -89,7 +95,7 @@ Preprocessor symbols defined by the compiler.
 	=={{fbdoc item="keyword" value="KeyPgDdfboptimize|__FB_OPTIMIZE__"}}==
 		Defined to the optimization level depending on [[CompilerOptoptimization|-O]].
 	=={{fbdoc item="keyword" value="KeyPgDdfbgui|__FB_GUI__"}}==
-		True (##-1##) if the ##"-s gui"## switch was used, false (##0##) otherwise.
+		True (##-1##) if GUI subsystem mode is active, false (##0##) otherwise.
 	=={{fbdoc item="keyword" value="KeyPgDdFBMain|__FB_MAIN__"}}==
 		Defined if compiling a module with an entry point.
 	=={{fbdoc item="keyword" value="KeyPgDdfbdebug|__FB_DEBUG__"}}==

@@ -25,9 +25,10 @@ SUITE( fbc_tests.file_.get_ )
 		dim z6 as zstring * 6
 		dim w6 as wstring * 6
 		dim pz6 as zstring ptr = callocate( 6 * sizeof( zstring ) )
-		dim pw6 as wstring ptr = callocate( 6 * sizeof( wstring ) )
-		dim array4b(0 to 3) as byte
-		dim array4l(0 to 3) as long
+			dim pw6 as wstring ptr = callocate( 6 * sizeof( wstring ) )
+			dim array4b(0 to 3) as byte
+			dim array4l(0 to 3) as long
+			dim as long partial4 = cvl( "90" + chr( 0 ) + chr( 0 ) )
 
 		''
 		'' Expecting TESTFILE to contain this ASCII text: 1234567890
@@ -65,13 +66,13 @@ SUITE( fbc_tests.file_.get_ )
 			CU_ASSERT( w6[2] = cvshort( "56" ) )
 			CU_ASSERT( w6[3] = cvshort( "78" ) )
 			CU_ASSERT( w6[4] = cvshort( "90" ) )
-		#elseif sizeof(wstring) = 4
-			CU_ASSERT( w6[0] = cvl( "1234" ) )
-			CU_ASSERT( w6[1] = cvl( "5678" ) )
-			CU_ASSERT( w6[2] = cvshort( "90" ) )
-			CU_ASSERT( w6[3] = 0 )
-			CU_ASSERT( w6[4] = 0 )
-		#endif
+			#elseif sizeof(wstring) = 4
+				CU_ASSERT( w6[0] = cvl( "1234" ) )
+				CU_ASSERT( w6[1] = cvl( "5678" ) )
+				CU_ASSERT( w6[2] = partial4 )
+				CU_ASSERT( w6[3] = 0 )
+				CU_ASSERT( w6[4] = 0 )
+			#endif
 		CU_ASSERT( w6[5] = 0 )
 
 		*pz6 = "00000"
@@ -88,13 +89,13 @@ SUITE( fbc_tests.file_.get_ )
 			CU_ASSERT( (*pw6)[2] = cvshort( "56" ) )
 			CU_ASSERT( (*pw6)[3] = cvshort( "78" ) )
 			CU_ASSERT( (*pw6)[4] = cvshort( "90" ) )
-		#elseif sizeof(wstring) = 4
-			CU_ASSERT( (*pw6)[0] = cvl( "1234" ) )
-			CU_ASSERT( (*pw6)[1] = cvl( "5678" ) )
-			CU_ASSERT( (*pw6)[2] = cvshort( "90" ) )
-			CU_ASSERT( (*pw6)[3] = 0 )
-			CU_ASSERT( (*pw6)[4] = 0 )
-		#endif
+			#elseif sizeof(wstring) = 4
+				CU_ASSERT( (*pw6)[0] = cvl( "1234" ) )
+				CU_ASSERT( (*pw6)[1] = cvl( "5678" ) )
+				CU_ASSERT( (*pw6)[2] = partial4 )
+				CU_ASSERT( (*pw6)[3] = 0 )
+				CU_ASSERT( (*pw6)[4] = 0 )
+			#endif
 		CU_ASSERT( (*pw6)[5] = 0 )
 
 		CU_ASSERT( get( #f, 1, array4b() ) = 0 )
@@ -103,11 +104,11 @@ SUITE( fbc_tests.file_.get_ )
 		CU_ASSERT( array4b(2) = asc( "3" ) )
 		CU_ASSERT( array4b(3) = asc( "4" ) )
 
-		CU_ASSERT( get( #f, 1, array4l() ) = 0 )
-		CU_ASSERT( array4l(0) = cvl( "1234" ) )
-		CU_ASSERT( array4l(1) = cvl( "5678" ) )
-		CU_ASSERT( array4l(2) = cvshort( "90" ) )
-		CU_ASSERT( array4l(3) = 0 )
+			CU_ASSERT( get( #f, 1, array4l() ) = 0 )
+			CU_ASSERT( array4l(0) = cvl( "1234" ) )
+			CU_ASSERT( array4l(1) = cvl( "5678" ) )
+			CU_ASSERT( array4l(2) = partial4 )
+			CU_ASSERT( array4l(3) = 0 )
 
 		''
 		'' Same again, but with bytesread variable given
@@ -175,13 +176,13 @@ SUITE( fbc_tests.file_.get_ )
 			CU_ASSERT( w6[3] = cvshort( "78" ) )
 			CU_ASSERT( w6[4] = cvshort( "90" ) )
 			CU_ASSERT( bytesread = 10 )
-		#elseif sizeof(wstring) = 4
-			CU_ASSERT( w6[0] = cvl( "1234" ) )
-			CU_ASSERT( w6[1] = cvl( "5678" ) )
-			CU_ASSERT( w6[2] = cvshort( "90" ) )
-			CU_ASSERT( w6[3] = 0 )
-			CU_ASSERT( w6[4] = 0 )
-			CU_ASSERT( bytesread = 10 )
+			#elseif sizeof(wstring) = 4
+				CU_ASSERT( w6[0] = cvl( "1234" ) )
+				CU_ASSERT( w6[1] = cvl( "5678" ) )
+				CU_ASSERT( w6[2] = partial4 )
+				CU_ASSERT( w6[3] = 0 )
+				CU_ASSERT( w6[4] = 0 )
+				CU_ASSERT( bytesread = 10 )
 		#endif
 		CU_ASSERT( w6[5] = 0 )
 
@@ -204,13 +205,13 @@ SUITE( fbc_tests.file_.get_ )
 			CU_ASSERT( (*pw6)[3] = cvshort( "78" ) )
 			CU_ASSERT( (*pw6)[4] = cvshort( "90" ) )
 			CU_ASSERT( bytesread = 10 )
-		#elseif sizeof(wstring) = 4
-			CU_ASSERT( (*pw6)[0] = cvl( "1234" ) )
-			CU_ASSERT( (*pw6)[1] = cvl( "5678" ) )
-			CU_ASSERT( (*pw6)[2] = cvshort( "90" ) )
-			CU_ASSERT( (*pw6)[3] = 0 )
-			CU_ASSERT( (*pw6)[4] = 0 )
-			CU_ASSERT( bytesread = 10 )
+			#elseif sizeof(wstring) = 4
+				CU_ASSERT( (*pw6)[0] = cvl( "1234" ) )
+				CU_ASSERT( (*pw6)[1] = cvl( "5678" ) )
+				CU_ASSERT( (*pw6)[2] = partial4 )
+				CU_ASSERT( (*pw6)[3] = 0 )
+				CU_ASSERT( (*pw6)[4] = 0 )
+				CU_ASSERT( bytesread = 10 )
 		#endif
 		CU_ASSERT( (*pw6)[5] = 0 )
 
@@ -223,12 +224,12 @@ SUITE( fbc_tests.file_.get_ )
 		CU_ASSERT( bytesread = 4 )
 
 		bytesread = 0
-		CU_ASSERT( get( #f, 1, array4l(), , bytesread ) = 0 )
-		CU_ASSERT( array4l(0) = cvl( "1234" ) )
-		CU_ASSERT( array4l(1) = cvl( "5678" ) )
-		CU_ASSERT( array4l(2) = cvshort( "90" ) )
-		CU_ASSERT( array4l(3) = 0 )
-		CU_ASSERT( bytesread = 10 )
+			CU_ASSERT( get( #f, 1, array4l(), , bytesread ) = 0 )
+			CU_ASSERT( array4l(0) = cvl( "1234" ) )
+			CU_ASSERT( array4l(1) = cvl( "5678" ) )
+			CU_ASSERT( array4l(2) = partial4 )
+			CU_ASSERT( array4l(3) = 0 )
+			CU_ASSERT( bytesread = 10 )
 
 		''
 		'' LONGINT offset
@@ -288,13 +289,13 @@ SUITE( fbc_tests.file_.get_ )
 			CU_ASSERT( w6[2] = cvshort( "56" ) )
 			CU_ASSERT( w6[3] = cvshort( "78" ) )
 			CU_ASSERT( w6[4] = cvshort( "90" ) )
-		#elseif sizeof(wstring) = 4
-			CU_ASSERT( w6[0] = cvl( "1234" ) )
-			CU_ASSERT( w6[1] = cvl( "5678" ) )
-			CU_ASSERT( w6[2] = cvshort( "90" ) )
-			CU_ASSERT( w6[3] = 0 )
-			CU_ASSERT( w6[4] = 0 )
-		#endif
+			#elseif sizeof(wstring) = 4
+				CU_ASSERT( w6[0] = cvl( "1234" ) )
+				CU_ASSERT( w6[1] = cvl( "5678" ) )
+				CU_ASSERT( w6[2] = partial4 )
+				CU_ASSERT( w6[3] = 0 )
+				CU_ASSERT( w6[4] = 0 )
+			#endif
 		CU_ASSERT( w6[5] = 0 )
 
 		*pz6 = "00000"
@@ -311,13 +312,13 @@ SUITE( fbc_tests.file_.get_ )
 			CU_ASSERT( (*pw6)[2] = cvshort( "56" ) )
 			CU_ASSERT( (*pw6)[3] = cvshort( "78" ) )
 			CU_ASSERT( (*pw6)[4] = cvshort( "90" ) )
-		#elseif sizeof(wstring) = 4
-			CU_ASSERT( (*pw6)[0] = cvl( "1234" ) )
-			CU_ASSERT( (*pw6)[1] = cvl( "5678" ) )
-			CU_ASSERT( (*pw6)[2] = cvshort( "90" ) )
-			CU_ASSERT( (*pw6)[3] = 0 )
-			CU_ASSERT( (*pw6)[4] = 0 )
-		#endif
+			#elseif sizeof(wstring) = 4
+				CU_ASSERT( (*pw6)[0] = cvl( "1234" ) )
+				CU_ASSERT( (*pw6)[1] = cvl( "5678" ) )
+				CU_ASSERT( (*pw6)[2] = partial4 )
+				CU_ASSERT( (*pw6)[3] = 0 )
+				CU_ASSERT( (*pw6)[4] = 0 )
+			#endif
 		CU_ASSERT( (*pw6)[5] = 0 )
 
 		CU_ASSERT( get( #f, 1ll, array4b() ) = 0 )
@@ -326,11 +327,11 @@ SUITE( fbc_tests.file_.get_ )
 		CU_ASSERT( array4b(2) = asc( "3" ) )
 		CU_ASSERT( array4b(3) = asc( "4" ) )
 
-		CU_ASSERT( get( #f, 1ll, array4l() ) = 0 )
-		CU_ASSERT( array4l(0) = cvl( "1234" ) )
-		CU_ASSERT( array4l(1) = cvl( "5678" ) )
-		CU_ASSERT( array4l(2) = cvshort( "90" ) )
-		CU_ASSERT( array4l(3) = 0 )
+			CU_ASSERT( get( #f, 1ll, array4l() ) = 0 )
+			CU_ASSERT( array4l(0) = cvl( "1234" ) )
+			CU_ASSERT( array4l(1) = cvl( "5678" ) )
+			CU_ASSERT( array4l(2) = partial4 )
+			CU_ASSERT( array4l(3) = 0 )
 
 		''
 		'' LONGINT offset + bytesread
@@ -397,13 +398,13 @@ SUITE( fbc_tests.file_.get_ )
 			CU_ASSERT( w6[3] = cvshort( "78" ) )
 			CU_ASSERT( w6[4] = cvshort( "90" ) )
 			CU_ASSERT( bytesread = 10 )
-		#elseif sizeof(wstring) = 4
-			CU_ASSERT( w6[0] = cvl( "1234" ) )
-			CU_ASSERT( w6[1] = cvl( "5678" ) )
-			CU_ASSERT( w6[2] = cvshort( "90" ) )
-			CU_ASSERT( w6[3] = 0 )
-			CU_ASSERT( w6[4] = 0 )
-			CU_ASSERT( bytesread = 10 )
+			#elseif sizeof(wstring) = 4
+				CU_ASSERT( w6[0] = cvl( "1234" ) )
+				CU_ASSERT( w6[1] = cvl( "5678" ) )
+				CU_ASSERT( w6[2] = partial4 )
+				CU_ASSERT( w6[3] = 0 )
+				CU_ASSERT( w6[4] = 0 )
+				CU_ASSERT( bytesread = 10 )
 		#endif
 		CU_ASSERT( w6[5] = 0 )
 
@@ -426,13 +427,13 @@ SUITE( fbc_tests.file_.get_ )
 			CU_ASSERT( (*pw6)[3] = cvshort( "78" ) )
 			CU_ASSERT( (*pw6)[4] = cvshort( "90" ) )
 			CU_ASSERT( bytesread = 10 )
-		#elseif sizeof(wstring) = 4
-			CU_ASSERT( (*pw6)[0] = cvl( "1234" ) )
-			CU_ASSERT( (*pw6)[1] = cvl( "5678" ) )
-			CU_ASSERT( (*pw6)[2] = cvshort( "90" ) )
-			CU_ASSERT( (*pw6)[3] = 0 )
-			CU_ASSERT( (*pw6)[4] = 0 )
-			CU_ASSERT( bytesread = 10 )
+			#elseif sizeof(wstring) = 4
+				CU_ASSERT( (*pw6)[0] = cvl( "1234" ) )
+				CU_ASSERT( (*pw6)[1] = cvl( "5678" ) )
+				CU_ASSERT( (*pw6)[2] = partial4 )
+				CU_ASSERT( (*pw6)[3] = 0 )
+				CU_ASSERT( (*pw6)[4] = 0 )
+				CU_ASSERT( bytesread = 10 )
 		#endif
 		CU_ASSERT( (*pw6)[5] = 0 )
 
@@ -445,12 +446,12 @@ SUITE( fbc_tests.file_.get_ )
 		CU_ASSERT( bytesread = 4 )
 
 		bytesread = 0
-		CU_ASSERT( get( #f, 1ll, array4l(), , bytesread ) = 0 )
-		CU_ASSERT( array4l(0) = cvl( "1234" ) )
-		CU_ASSERT( array4l(1) = cvl( "5678" ) )
-		CU_ASSERT( array4l(2) = cvshort( "90" ) )
-		CU_ASSERT( array4l(3) = 0 )
-		CU_ASSERT( bytesread = 10 )
+			CU_ASSERT( get( #f, 1ll, array4l(), , bytesread ) = 0 )
+			CU_ASSERT( array4l(0) = cvl( "1234" ) )
+			CU_ASSERT( array4l(1) = cvl( "5678" ) )
+			CU_ASSERT( array4l(2) = partial4 )
+			CU_ASSERT( array4l(3) = 0 )
+			CU_ASSERT( bytesread = 10 )
 
 		deallocate( pw6 )
 		deallocate( pz6 )

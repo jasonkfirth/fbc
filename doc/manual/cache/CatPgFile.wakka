@@ -28,6 +28,10 @@ Statements and procedures for working with files and devices.
 		Binds a file number to the input and output streams of a process.
 	=={{fbdoc item="keyword" value="KeyPgOpenScrn|OPEN SCRN"}}==
 		Binds a file number directly to the console.
+	=={{fbdoc item="keyword" value="KeyPgOpenTcp|OPEN TCP"}}==
+		Binds a file number to a TCP client connection.
+	=={{fbdoc item="keyword" value="KeyPgOpenTcpServer|OPEN TCP SERVER"}}==
+		Binds a file number to a listening TCP server socket.
 	=={{fbdoc item="keyword" value="KeyPgClose|CLOSE"}}==
 		Unbinds a file number from a file or device.
 	=={{fbdoc item="keyword" value="KeyPgReset|RESET"}}==
@@ -76,6 +80,8 @@ Statements and procedures for working with files and devices.
 		Writes arbitrary data to a file or device.
 	=={{fbdoc item="keyword" value="KeyPgGetfileio|GET #"}}==
 		Reads arbitrary data from a file or device.
+	=={{fbdoc item="keyword" value="KeyPgTcpAccept|TCP ACCEPT"}}==
+		Accepts a TCP client from a server file number.
 		
 {{anchor name="FILEPOS"}}{{fbdoc item="section" value="File Position and other Info"}}
 	=={{fbdoc item="keyword" value="KeyPgLof|LOF"}}==
@@ -84,6 +90,8 @@ Statements and procedures for working with files and devices.
 		Gets the file position of the last read or write operation.
 	=={{fbdoc item="keyword" value="KeyPgEof|EOF"}}==
 		Returns true if all of the data has been read from a file.
+	=={{fbdoc item="keyword" value="KeyPgEoc|EOC"}}==
+		Returns true if a TCP connection has been closed by the peer.
 	=={{fbdoc item="keyword" value="KeyPgSeekset|SEEK (Statement)"}}==
 		Sets the file position of the next read or write operation.
 	=={{fbdoc item="keyword" value="KeyPgSeekreturn|SEEK (Function)"}}==

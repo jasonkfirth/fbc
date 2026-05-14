@@ -7,6 +7,7 @@ export DH_VERBOSE=1
 export DEB_BUILD_MAINT_OPTIONS=hardening=+all optimize=-lto
 DEB_BUILD_PROFILES ?=
 
+DEB_BUILD_ARCH := $(shell dpkg-architecture -qDEB_BUILD_ARCH)
 DEB_HOST_ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
 BUILD_JS := yes
 ifneq ($(filter nojs,$(DEB_BUILD_PROFILES)),)
@@ -32,6 +33,9 @@ MULTILIB :=
 TARGET_TRIPLET :=
 BOOTSTRAP_DIR_KEY :=
 FBC_TARGET_KEY :=
+BUILD_TARGET_TRIPLET :=
+BUILD_BOOTSTRAP_DIR_KEY :=
+BUILD_FBC_TARGET_KEY :=
 ARM_CPU_MAKE_ARGS :=
 ARM_BUILD_FBCFLAGS :=
 
@@ -78,6 +82,18 @@ BOOTSTRAP_DIR_KEY := linux-armel
 FBC_TARGET_KEY := linux-arm
 endif
 
+ifeq ($(DEB_HOST_ARCH),powerpc)
+TARGET_TRIPLET := powerpc-linux-gnu
+BOOTSTRAP_DIR_KEY := linux-powerpc
+FBC_TARGET_KEY := linux-powerpc
+endif
+
+ifeq ($(DEB_HOST_ARCH),ppc64)
+TARGET_TRIPLET := powerpc64-linux-gnu
+BOOTSTRAP_DIR_KEY := linux-powerpc64
+FBC_TARGET_KEY := linux-powerpc64
+endif
+
 ifeq ($(DEB_HOST_ARCH),ppc64el)
 TARGET_TRIPLET := powerpc64le-linux-gnu
 BOOTSTRAP_DIR_KEY := linux-ppc64el
@@ -106,6 +122,81 @@ ifeq ($(TARGET_TRIPLET),)
 $(error Unsupported DEB_HOST_ARCH $(DEB_HOST_ARCH))
 endif
 
+ifeq ($(DEB_BUILD_ARCH),amd64)
+BUILD_TARGET_TRIPLET := x86_64-linux-gnu
+BUILD_BOOTSTRAP_DIR_KEY := linux-amd64
+BUILD_FBC_TARGET_KEY := linux-x86_64
+endif
+
+ifeq ($(DEB_BUILD_ARCH),i386)
+BUILD_TARGET_TRIPLET := i686-linux-gnu
+BUILD_BOOTSTRAP_DIR_KEY := linux-i386
+BUILD_FBC_TARGET_KEY := linux-x86
+endif
+
+ifeq ($(DEB_BUILD_ARCH),arm64)
+BUILD_TARGET_TRIPLET := aarch64-linux-gnu
+BUILD_BOOTSTRAP_DIR_KEY := linux-arm64
+BUILD_FBC_TARGET_KEY := linux-aarch64
+endif
+
+ifeq ($(DEB_BUILD_ARCH),armhf)
+BUILD_TARGET_TRIPLET := arm-linux-gnueabihf
+BUILD_BOOTSTRAP_DIR_KEY := linux-armhf
+BUILD_FBC_TARGET_KEY := linux-arm
+endif
+
+ifeq ($(DEB_BUILD_ARCH),armel)
+BUILD_TARGET_TRIPLET := arm-linux-gnueabi
+BUILD_BOOTSTRAP_DIR_KEY := linux-armel
+BUILD_FBC_TARGET_KEY := linux-arm
+endif
+
+ifeq ($(DEB_BUILD_ARCH),powerpc)
+BUILD_TARGET_TRIPLET := powerpc-linux-gnu
+BUILD_BOOTSTRAP_DIR_KEY := linux-powerpc
+BUILD_FBC_TARGET_KEY := linux-powerpc
+endif
+
+ifeq ($(DEB_BUILD_ARCH),ppc64)
+BUILD_TARGET_TRIPLET := powerpc64-linux-gnu
+BUILD_BOOTSTRAP_DIR_KEY := linux-powerpc64
+BUILD_FBC_TARGET_KEY := linux-powerpc64
+endif
+
+ifeq ($(DEB_BUILD_ARCH),ppc64el)
+BUILD_TARGET_TRIPLET := powerpc64le-linux-gnu
+BUILD_BOOTSTRAP_DIR_KEY := linux-ppc64el
+BUILD_FBC_TARGET_KEY := linux-powerpc64le
+endif
+
+ifeq ($(DEB_BUILD_ARCH),s390x)
+BUILD_TARGET_TRIPLET := s390x-linux-gnu
+BUILD_BOOTSTRAP_DIR_KEY := linux-s390x
+BUILD_FBC_TARGET_KEY := linux-s390x
+endif
+
+ifeq ($(DEB_BUILD_ARCH),riscv64)
+BUILD_TARGET_TRIPLET := riscv64-linux-gnu
+BUILD_BOOTSTRAP_DIR_KEY := linux-riscv64
+BUILD_FBC_TARGET_KEY := linux-riscv64
+endif
+
+ifeq ($(DEB_BUILD_ARCH),loong64)
+BUILD_TARGET_TRIPLET := loongarch64-linux-gnu
+BUILD_BOOTSTRAP_DIR_KEY := linux-loongarch64
+BUILD_FBC_TARGET_KEY := linux-loongarch64
+endif
+
+ifeq ($(BUILD_TARGET_TRIPLET),)
+$(error Unsupported DEB_BUILD_ARCH $(DEB_BUILD_ARCH))
+endif
+
+CROSS_PACKAGE_BUILD := no
+ifneq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
+CROSS_PACKAGE_BUILD := yes
+endif
+
 export TARGET=$(TARGET_TRIPLET)
 export TARGET_TRIPLET
 export FBC_TARGET=$(TARGET_TRIPLET)
@@ -116,7 +207,18 @@ export FBTARGET_DIR_OVERRIDE=$(BOOTSTRAP_DIR_KEY)
 # Bootstrap compiler
 # ------------------------------------------------------------
 
-FBC_BOOTSTRAP := $(CURDIR)/bin/fbc -i $(CURDIR)/inc
+TARGET_FBC_BOOTSTRAP := $(CURDIR)/bin/fbc -i $(CURDIR)/inc
+TARGET_BUILD_FBC := $(CURDIR)/bin/fbc
+BUILD_FBC_EXE := $(CURDIR)/debian/fbc-build/bin/fbc
+BUILD_FBC_BOOTSTRAP := $(BUILD_FBC_EXE) -i $(CURDIR)/inc
+
+ifeq ($(CROSS_PACKAGE_BUILD),yes)
+PACKAGE_FBC := $(BUILD_FBC_BOOTSTRAP)
+PACKAGE_BUILD_FBC := $(BUILD_FBC_EXE)
+else
+PACKAGE_FBC := $(TARGET_FBC_BOOTSTRAP)
+PACKAGE_BUILD_FBC := $(TARGET_BUILD_FBC)
+endif
 
 # ------------------------------------------------------------
 # Android target toolchain
@@ -140,11 +242,16 @@ ANDROID_RANLIB := $(ANDROID_TOOLCHAIN_BINDIR)/llvm-ranlib
 DPKG_CFLAGS_RAW   := $(shell dpkg-buildflags --get CFLAGS)
 DPKG_CPPFLAGS     := $(shell dpkg-buildflags --get CPPFLAGS)
 DPKG_LDFLAGS_RAW  := $(shell dpkg-buildflags --get LDFLAGS)
+DPKG_BUILD_CFLAGS_RAW   := $(shell DEB_HOST_ARCH=$(DEB_BUILD_ARCH) dpkg-buildflags --get CFLAGS)
+DPKG_BUILD_CPPFLAGS     := $(shell DEB_HOST_ARCH=$(DEB_BUILD_ARCH) dpkg-buildflags --get CPPFLAGS)
+DPKG_BUILD_LDFLAGS_RAW  := $(shell DEB_HOST_ARCH=$(DEB_BUILD_ARCH) dpkg-buildflags --get LDFLAGS)
 
 # The FreeBASIC bootstrap/compiler build does not currently survive Debian's
 # LTO flags reliably. Keep hardening, but drop -flto/-ffat-lto-objects here.
 DPKG_CFLAGS  := $(filter-out -flto=% -ffat-lto-objects,$(DPKG_CFLAGS_RAW))
 DPKG_LDFLAGS := $(filter-out -flto=% -ffat-lto-objects,$(DPKG_LDFLAGS_RAW))
+DPKG_BUILD_CFLAGS  := $(filter-out -flto=% -ffat-lto-objects,$(DPKG_BUILD_CFLAGS_RAW))
+DPKG_BUILD_LDFLAGS := $(filter-out -flto=% -ffat-lto-objects,$(DPKG_BUILD_LDFLAGS_RAW))
 
 # Force recursive make invocations to use the same sanitized Debian flags.
 export CPPFLAGS := $(DPKG_CPPFLAGS)
@@ -174,6 +281,7 @@ override_dh_auto_clean:
 
 	rm -rf debian/tmp
 	rm -rf debian/.debhelper
+	rm -rf debian/fbc-build
 
 	rm -f debian/*.substvars
 	rm -f debian/files
@@ -191,7 +299,22 @@ override_dh_auto_build:
 
 	rm -f contrib/swig/swig.exe
 
-	$(MAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
+ifeq ($(CROSS_PACKAGE_BUILD),yes)
+	rm -rf debian/fbc-build
+
+	$(PARMAKE) TARGET_TRIPLET="$(BUILD_TARGET_TRIPLET)" TARGET="$(BUILD_TARGET_TRIPLET)" MULTILIB="" \
+		FBTARGET_DIR_OVERRIDE="$(BUILD_BOOTSTRAP_DIR_KEY)" \
+		FBC_EXE="$(BUILD_FBC_EXE)" \
+		BUILD_FBC_TARGET="$(BUILD_FBC_TARGET_KEY)" \
+		CPPFLAGS="$(DPKG_BUILD_CPPFLAGS)" \
+		CFLAGS="$(DPKG_BUILD_CFLAGS)" \
+		CXXFLAGS="$(DPKG_BUILD_CFLAGS)" \
+		LDFLAGS="$(DPKG_BUILD_LDFLAGS)" \
+		bootstrap-minimal
+
+	@test -x "$(BUILD_FBC_EXE)" || { echo "ERROR: build compiler missing"; exit 1; }
+else
+	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
 		$(ARM_CPU_MAKE_ARGS) \
 		CPPFLAGS="$(CPPFLAGS)" \
 		CFLAGS="$(CFLAGS)" \
@@ -200,11 +323,13 @@ override_dh_auto_build:
 		bootstrap-minimal
 
 	@test -x bin/fbc || { echo "ERROR: bootstrap compiler missing"; exit 1; }
+endif
 
 	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
 		$(ARM_CPU_MAKE_ARGS) \
 		rtlib fbrt gfxlib2 sfxlib \
-		FBC="$(FBC_BOOTSTRAP)" \
+		FBC="$(PACKAGE_FBC)" \
+		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
 		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)" \
 		CPPFLAGS="$(CPPFLAGS)" \
@@ -215,7 +340,8 @@ override_dh_auto_build:
 	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
 		$(ARM_CPU_MAKE_ARGS) \
 		compiler \
-		FBC="$(FBC_BOOTSTRAP)" \
+		FBC="$(PACKAGE_FBC)" \
+		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
 		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)" \
 		CPPFLAGS="$(CPPFLAGS)" \
@@ -227,7 +353,8 @@ ifeq ($(BUILD_JS),yes)
 	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
 		$(ARM_CPU_MAKE_ARGS) \
 		compiler-js \
-		FBC="$(FBC_BOOTSTRAP)" \
+		FBC="$(PACKAGE_FBC)" \
+		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
 		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)" \
 		CPPFLAGS="$(CPPFLAGS)" \
@@ -237,7 +364,8 @@ ifeq ($(BUILD_JS),yes)
 
 	$(PARMAKE) TARGET_TRIPLET="asmjs-unknown-emscripten" TARGET="asmjs-unknown-emscripten" \
 		rtlib fbrt gfxlib2 sfxlib \
-		FBC="$(FBC_BOOTSTRAP)" \
+		FBC="$(PACKAGE_FBC)" \
+		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
 		FBTARGET_DIR_OVERRIDE="js-asmjs" \
 		CPPFLAGS= \
 		CFLAGS= \
@@ -254,7 +382,8 @@ ifeq ($(BUILD_ANDROID),yes)
 	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
 		$(ARM_CPU_MAKE_ARGS) \
 		compiler-android \
-		FBC="$(FBC_BOOTSTRAP)" \
+		FBC="$(PACKAGE_FBC)" \
+		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
 		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)" \
 		CPPFLAGS="$(CPPFLAGS)" \
@@ -273,7 +402,8 @@ ifeq ($(BUILD_ANDROID),yes)
 		AR="$(ANDROID_AR)" \
 		RANLIB="$(ANDROID_RANLIB)" \
 		rtlib fbrt gfxlib2 sfxlib \
-		FBC="$(FBC_BOOTSTRAP)" \
+		FBC="$(PACKAGE_FBC)" \
+		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
 		BUILD_FBC_TARGET="$(ANDROID_FBTARGET_KEY)" \
 		BUILD_FBC_BUILDPREFIX= \
 		CPPFLAGS= \
@@ -292,7 +422,8 @@ override_dh_auto_install:
 		$(ARM_CPU_MAKE_ARGS) \
 		DESTDIR=$(CURDIR)/debian/tmp \
 		prefix=/usr \
-		FBC="$(FBC_BOOTSTRAP)" \
+		FBC="$(PACKAGE_FBC)" \
+		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
 		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)"
 
@@ -301,7 +432,8 @@ ifeq ($(BUILD_JS),yes)
 		$(ARM_CPU_MAKE_ARGS) \
 		DESTDIR=$(CURDIR)/debian/tmp \
 		prefix=/usr \
-		FBC="$(FBC_BOOTSTRAP)" \
+		FBC="$(PACKAGE_FBC)" \
+		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
 		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)"
 endif
@@ -311,7 +443,8 @@ ifeq ($(BUILD_ANDROID),yes)
 		$(ARM_CPU_MAKE_ARGS) \
 		DESTDIR=$(CURDIR)/debian/tmp \
 		prefix=/usr \
-		FBC="$(FBC_BOOTSTRAP)" \
+		FBC="$(PACKAGE_FBC)" \
+		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
 		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)" \
 		ANDROID_BUILD_LIBDIR="$(CURDIR)/lib/freebasic/$(ANDROID_FBTARGET_KEY)"
@@ -323,6 +456,7 @@ endif
 			amd64)   ln -sfn linux-amd64 linux-x86_64 ;; \
 			i386)    ln -sfn linux-i386 linux-x86 ;; \
 			arm64)   ln -sfn linux-arm64 linux-aarch64 ;; \
+			armel)   ln -sfn linux-armel linux-arm ;; \
 			armhf)   ln -sfn linux-armhf linux-arm ;; \
 			ppc64el) ln -sfn linux-ppc64el linux-powerpc64le ;; \
 		esac; \

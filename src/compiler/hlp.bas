@@ -57,8 +57,7 @@ function hFloatToHex _
 		byval dtype as integer _
 	) as string
 
-	'' Emit the raw bytes that make up the float
-	'' x86 little-endian assumption
+	'' Emit the raw bits that make up the float
 	if( typeGet( dtype ) = FB_DATATYPE_DOUBLE ) then
 		function = "0x" + hex( *cptr( ulongint ptr, @value ), 16 )
 	else
@@ -427,30 +426,30 @@ function pathIsAbsolute( byval path as zstring ptr ) as integer
 end function
 
 function hCheckFileFormat( byval f as integer ) as integer
-	dim as ulong BOM
+	dim as ubyte BOM(0 to 3)
 	dim as FBFILE_FORMAT fmt
 
-	'' little-endian assumptions
 	fmt = FBFILE_FORMAT_ASCII
 
-	if( get( #f, 0, BOM ) = 0 ) then
-		if( BOM = &hFFFE0000 ) then
+	if( get( #f, 0, BOM() ) = 0 ) then
+		if( (BOM(0) = &h00) andalso (BOM(1) = &h00) andalso _
+		    (BOM(2) = &hFE) andalso (BOM(3) = &hFF) ) then
 			fmt = FBFILE_FORMAT_UTF32BE
 
-		elseif( BOM = &h0000FEFF ) then
+		elseif( (BOM(0) = &hFF) andalso (BOM(1) = &hFE) andalso _
+		        (BOM(2) = &h00) andalso (BOM(3) = &h00) ) then
 		    fmt = FBFILE_FORMAT_UTF32LE
 
 		else
-			BOM and= &h00FFFFFF
-			if( BOM = &h00BFBBEF ) then
+			if( (BOM(0) = &hEF) andalso (BOM(1) = &hBB) andalso _
+			    (BOM(2) = &hBF) ) then
 				fmt = FBFILE_FORMAT_UTF8
 
 			else
-				BOM and= &h0000FFFF
-				if( BOM = &h0000FEFF ) then
+				if( (BOM(0) = &hFF) andalso (BOM(1) = &hFE) ) then
 					fmt = FBFILE_FORMAT_UTF16LE
 
-				elseif( BOM = &h0000FFFE ) then
+				elseif( (BOM(0) = &hFE) andalso (BOM(1) = &hFF) ) then
 					fmt = FBFILE_FORMAT_UTF16BE
 				end if
 			end if

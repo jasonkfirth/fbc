@@ -20,6 +20,8 @@ Preprocessor directive to define a macro
 	
 	##//Identifier//##s can be checked for with ##[[KeyPgPpifdef|#ifdef]]## and others, which can be used to hide parts of code from the compiler (conditional compiling).
 	
+	Some user-defined symbols are recognized by the compiler itself.  For example, ##[[KeyPgFbNoGfxlib|FB_NO_GFXLIB]]## and ##[[KeyPgFbNoSfxlib|FB_NO_SFXLIB]]## change how selected library command words are parsed.
+
 	The result of macro expansion can be checked by using the [[CompilerOptpp|-pp]] compiler option.
 	
 	##**#define**##s are often used to declare constants. The ##[[KeyPgConst|Const]]## statement is a type-safe alternative.
@@ -76,5 +78,7 @@ end namespace
 	- ##[[KeyPgPpundef|#undef]]##
 	- ##[[KeyPgConst|Const]]##
 	- ##[[KeyPgDots|...]]##
+	- ##[[KeyPgFbNoGfxlib|FB_NO_GFXLIB]]##
+	- ##[[KeyPgFbNoSfxlib|FB_NO_SFXLIB]]##
 
 {{fbdoc item="back" value="CatPgPreProcess|Preprocessor"}}

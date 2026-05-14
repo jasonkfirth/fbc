@@ -346,7 +346,11 @@ static int set_mode
         }
 
         if (!driver) {
+#ifdef HOST_JS
+            set_mode( 0, 0, 0, 0, 0, 1, 0, 0, 0, SCREEN_EXIT, 0.0, 0, 0 );
+#else
             exit_proc();
+#endif
             return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
         }
         __fb_gfx->driver = driver;

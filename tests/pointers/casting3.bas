@@ -19,7 +19,11 @@ SUITE( fbc_tests.pointers.casting3 )
 
 		*cast( byte ptr, @bar->l ) = 0
 
+#if defined( __FB_BIGENDIAN__ )
+		CU_ASSERT_EQUAL( bar->l, (TEST_VAL and &h00ffffffffffffff) )
+#else
 		CU_ASSERT_EQUAL( bar->l, (TEST_VAL and not 255) )
+#endif
 
 		'' free bar otherwise is considered memory leak
 		deallocate bar

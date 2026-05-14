@@ -1572,7 +1572,7 @@ dim as string lname, ln=ln2
 end sub
 private function hfloattohex_asm64(byval value as double,byval dtype as Integer,ByVal full as Byte=1) as string
 
-	'' Emit the raw bytes that make up the float / x86 little-endian assumption
+	'' Emit the raw bits that make up the float
 	dim as string rawbytes
 	dim as single singlevalue = value
 

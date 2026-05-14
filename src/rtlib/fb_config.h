@@ -68,7 +68,15 @@
 	#ifdef __LP64__
 		#define HOST_64BIT
 	#endif
-#elif defined __ppc64__
+#elif defined __ppc64__ || defined __powerpc64__ || defined _ARCH_PPC64
+	#define HOST_64BIT
+#elif defined __riscv
+	#if __riscv_xlen == 64
+		#define HOST_64BIT
+	#endif
+#elif defined __s390x__
+	#define HOST_64BIT
+#elif defined __loongarch64
 	#define HOST_64BIT
 #elif defined __aarch64__
 	#define HOST_64BIT

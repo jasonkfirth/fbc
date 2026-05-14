@@ -356,7 +356,6 @@ private function hUnicodeHexToCodePointW _
 	dim as uinteger char, c
 	dim as integer i
 
-	'' x86 little-endian assumption
 	char = 0
 
 	for i = 1 to digits
@@ -392,8 +391,12 @@ private sub hUnicodeCodePointCharToHex _
 		*dst = CHAR_RSLASH
 		dst += 1
 
-		'' x86 little-endian assumption
-		c = char and 255
+		if( fbIsHostBigEndian( ) ) then
+			c = (char shr ((wcharlen - i) * 8)) and 255
+		else
+			c = (char shr ((i - 1) * 8)) and 255
+		end if
+
 		if( c < 8 ) then
 			dst[0] = CHAR_0 + c
 			dst += 1
@@ -409,8 +412,6 @@ private sub hUnicodeCodePointCharToHex _
 			dst[2] = CHAR_0 + (c and 7)
 			dst += 3
 		end if
-
-		char shr= 8
 	next
 
 end sub

@@ -115,11 +115,11 @@ namespace fb.fbdoc
 	end function
 
 	function CWikiConUrlCtx.queryCsrfTokenString( ) as string
-		dim stream as CHttpStream = CHttpStream( http )
-		if( stream.Receive( build_url( @this, wakka_loginpage ), TRUE, ca_file ) = FALSE ) then
+		dim http_stream as CHttpStream = CHttpStream( http )
+		if( http_stream.Receive( build_url( @this, wakka_loginpage ), TRUE, ca_file ) = FALSE ) then
 			return ""
 		end if
-		return extractCsrfToken( stream.Read() )
+		return extractCsrfToken( http_stream.Read() )
 	end function
 
 	function CWikiConUrlCtx.queryCsrfToken( byval force as boolean = TRUE ) as boolean
@@ -490,23 +490,23 @@ namespace fb.fbdoc
 			byval ctx as CWikiConUrlCtx ptr _
 		) as integer
 
-		dim as CHttpStream ptr stream
+		dim as CHttpStream ptr http_stream
 
 		function = -1
 
-		stream = new CHttpStream( ctx->http )
-		if( stream = NULL ) then
+		http_stream = new CHttpStream( ctx->http )
+		if( http_stream = NULL ) then
 			exit function
 		end if
 
 		dim as string body, URL
 		URL = build_url( ctx, NULL, wakka_getid )
 
-		if( stream->Receive( URL, TRUE, ctx->ca_file ) ) then
-			body = stream->Read()
+		if( http_stream->Receive( URL, TRUE, ctx->ca_file ) ) then
+			body = http_stream->Read()
 		end if
 
-		delete stream
+		delete http_stream
 
 		if( check_iserror( body ) = FALSE ) then
 			remove_http_headers( body )
@@ -532,22 +532,22 @@ namespace fb.fbdoc
 		ZSet @ctx->pagename, pagename
 		ctx->pageid = -1
 
-		dim as CHttpStream ptr stream
+		dim as CHttpStream ptr http_stream
 
-		stream = new CHttpStream( ctx->http )
-		if( stream = NULL ) then
+		http_stream = new CHttpStream( ctx->http )
+		if( http_stream = NULL ) then
 			exit function
 		end if
 
 		dim URL as string
 		URL = build_url( ctx, NULL, @wakka_raw )
 
-		if( stream->Receive( URL, TRUE, ctx->ca_file ) ) then
-			body = stream->Read()
+		if( http_stream->Receive( URL, TRUE, ctx->ca_file ) ) then
+			body = http_stream->Read()
 			remove_http_headers( body )
 		end if
 
-		delete stream
+		delete http_stream
 
 		ctx->pageid = get_pageid( ctx )
 
@@ -575,10 +575,10 @@ namespace fb.fbdoc
 		ZSet @ctx->pagename, page
 		ctx->pageid = -1
 		
-		dim as CHttpStream ptr stream
+		dim as CHttpStream ptr http_stream
 		
-		stream = new CHttpStream( ctx->http )
-		if( stream = NULL ) then
+		http_stream = new CHttpStream( ctx->http )
+		if( http_stream = NULL ) then
 			exit function
 		end if
 
@@ -607,13 +607,13 @@ namespace fb.fbdoc
 			URL = build_url( ctx, NULL, wakka_rawlist_index )
 
 		case else
-			delete stream
+			delete http_stream
 			exit function
 
 		end select
 
-		if( stream->Receive( URL, TRUE, ctx->ca_file ) ) then
-			body = stream->Read()
+		if( http_stream->Receive( URL, TRUE, ctx->ca_file ) ) then
+			body = http_stream->Read()
 			remove_http_headers( body )
 			if( isHTML ) then
 				remove_html_tags(  body )
@@ -622,7 +622,7 @@ namespace fb.fbdoc
 			function = TRUE
 		end if
 
-		delete stream
+		delete http_stream
 
 		ctx->pageid = -1
 

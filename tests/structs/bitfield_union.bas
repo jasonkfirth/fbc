@@ -5,6 +5,18 @@ SUITE( fbc_tests.structs.bitfield_union )
 	const TEST_NUM_1 = &b1
 	const TEST_NUM_9 = &b100000001
 	const TEST_NUM_17 = &b10000000000000001
+
+	#if defined( __FB_BIGENDIAN__ )
+		#define SHORT_AS_INTEGER( n ) ((n) shl ((sizeof(integer) - sizeof(short)) * 8))
+		#define SHORT_AS_INT17( n ) (SHORT_AS_INTEGER( n ) and &h1ffff)
+		#define INTEGER_AS_SHORT1( n ) (((n) shr ((sizeof(integer) - sizeof(short)) * 8)) and TEST_NUM_1)
+		#define INTEGER_AS_SHORT9( n ) (((n) shr ((sizeof(integer) - sizeof(short)) * 8)) and &h1ff)
+	#else
+		#define SHORT_AS_INTEGER( n ) (n)
+		#define SHORT_AS_INT17( n ) (n)
+		#define INTEGER_AS_SHORT1( n ) ((n) and TEST_NUM_1)
+		#define INTEGER_AS_SHORT9( n ) ((n) and &h1ff)
+	#endif
 		
 	union foo field=1 
 		as short                a:1
@@ -35,8 +47,8 @@ SUITE( fbc_tests.structs.bitfield_union )
 
 		CU_ASSERT_EQUAL( f.a, TEST_NUM_1 )
 		CU_ASSERT_EQUAL( f.b, TEST_NUM_1 )
-		CU_ASSERT_EQUAL( f.c, TEST_NUM_1 )
-		CU_ASSERT_EQUAL( f.d, TEST_NUM_1 )
+		CU_ASSERT_EQUAL( f.c, SHORT_AS_INT17( TEST_NUM_1 ) )
+		CU_ASSERT_EQUAL( f.d, SHORT_AS_INTEGER( TEST_NUM_1 ) )
 
 	END_TEST
 
@@ -49,8 +61,8 @@ SUITE( fbc_tests.structs.bitfield_union )
 
 		CU_ASSERT_EQUAL( f.a, TEST_NUM_1 )
 		CU_ASSERT_EQUAL( f.b, TEST_NUM_9 )
-		CU_ASSERT_EQUAL( f.c, TEST_NUM_9 )
-		CU_ASSERT_EQUAL( f.d, TEST_NUM_9 )
+		CU_ASSERT_EQUAL( f.c, SHORT_AS_INT17( TEST_NUM_9 ) )
+		CU_ASSERT_EQUAL( f.d, SHORT_AS_INTEGER( TEST_NUM_9 ) )
 
 	END_TEST
 
@@ -61,8 +73,8 @@ SUITE( fbc_tests.structs.bitfield_union )
 		f.d = 0
 		f.c = TEST_NUM_17
 
-		CU_ASSERT_EQUAL( f.a, TEST_NUM_1 )
-		CU_ASSERT_EQUAL( f.b, TEST_NUM_1 )
+		CU_ASSERT_EQUAL( f.a, INTEGER_AS_SHORT1( TEST_NUM_17 ) )
+		CU_ASSERT_EQUAL( f.b, INTEGER_AS_SHORT9( TEST_NUM_17 ) )
 		CU_ASSERT_EQUAL( f.c, TEST_NUM_17 )
 		CU_ASSERT_EQUAL( f.d, TEST_NUM_17 )
 

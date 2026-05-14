@@ -25,7 +25,8 @@ static char *hToUTF16( const char *src, ssize_t chars, char *dst, ssize_t *bytes
 {
 	UTF_16 *p;
 
-	/* !!!FIXME!!! only litle-endian supported */
+	/* UTF16/UTF32 conversion APIs expose native typed code units.
+	   Encoded file output normalizes these units to little endian. */
 
 	*bytes = chars * sizeof( UTF_16 );
 
@@ -53,7 +54,8 @@ static char *hToUTF32( const char *src, ssize_t chars, char *dst, ssize_t *bytes
 {
 	UTF_32 *p;
 
-	/* !!!FIXME!!! only litle-endian supported */
+	/* UTF16/UTF32 conversion APIs expose native typed code units.
+	   Encoded file output normalizes these units to little endian. */
 
 	*bytes = chars * sizeof( UTF_32 );
 

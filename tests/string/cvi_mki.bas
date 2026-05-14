@@ -2,11 +2,15 @@
 
 SUITE( fbc_tests.string_.cvi_mki )
 
-	const as double  cv_d  = 1.646488698019057e+098
-	const as single  cv_s  = 3.629605e+012         
-	const as long    cv_l  = 1414743380            
-	const as short   cv_sh = 17748                 
-	const as longint cv_li = 6076276550747243860   
+	#if defined( __FB_BIGENDIAN__ )
+		const as long    cv_l  = &h54455354
+		const as short   cv_sh = &h5445
+		const as longint cv_li = &h5445535454455354
+	#else
+		const as long    cv_l  = &h54534554
+		const as short   cv_sh = &h4554
+		const as longint cv_li = &h5453455454534554
+	#endif
 	#ifdef __FB_64BIT__
 		const as integer cv_i = cv_li
 	#else
@@ -15,6 +19,8 @@ SUITE( fbc_tests.string_.cvi_mki )
 
 	TEST( CVX )
 
+		dim as double cv_d = cvd( cv_li )
+		dim as single cv_s = cvs( cv_l )
 		dim as double d = cvd("TESTTEST")
 		dim as single s = cvs("TESTTEST")
 		CU_ASSERT_DOUBLE_EQUAL( cv_d, d, cv_d / 1e15 )

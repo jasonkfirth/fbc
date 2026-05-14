@@ -79,6 +79,8 @@ quick-test-body: sanity \
 	compiler-riscv64-smoke \
 	compiler-s390x-smoke \
 	compiler-loongarch64-smoke \
+	compiler-ppc-smoke \
+	compiler-ppc64-smoke \
 	compiler-ppc64le-smoke
 
 .PHONY: full-test full-test-body
@@ -110,6 +112,8 @@ full-test-body: sanity \
 	compiler-riscv64-smoke \
 	compiler-s390x-smoke \
 	compiler-loongarch64-smoke \
+	compiler-ppc-smoke \
+	compiler-ppc64-smoke \
 	compiler-ppc64le-smoke \
 	tests-test
 

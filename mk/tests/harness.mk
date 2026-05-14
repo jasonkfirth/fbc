@@ -66,7 +66,7 @@ endef
 ##############################################################################
 
 define _mt_find_new_archives
-	@tmpdir="$(SRC_ROOT)/$(TEST_TMP)"; \
+	tmpdir="$(SRC_ROOT)/$(TEST_TMP)"; \
 	mkdir -p "$$tmpdir"; \
 	before="$$tmpdir/archives.before"; \
 	after="$$tmpdir/archives.after"; \
@@ -77,13 +77,13 @@ define _mt_find_new_archives
 	comm -13 "$$before" "$$after" >"$$new" || true; \
 	ARCHIVE=$$(head -n1 "$$new"); \
 	if [ -z "$$ARCHIVE" ]; then \
-	        echo ""; \
-	        echo "ERROR: no new FreeBASIC-*.tar.xz produced"; \
-	        echo ""; \
-	        ls -1; \
+	        echo "" >&2; \
+	        echo "ERROR: no new FreeBASIC-*.tar.xz produced" >&2; \
+	        echo "" >&2; \
+	        ls -1 >&2; \
 	        exit 1; \
 	fi; \
-	echo "$$ARCHIVE"
+	printf '%s\n' "$$ARCHIVE"
 endef
 
 ##############################################################################

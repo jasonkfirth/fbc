@@ -1,0 +1,29 @@
+{{fbdoc item="title" value="CAPTURE"}}----
+Controls sfxlib audio capture.
+
+{{fbdoc item="syntax"}}##
+	//result// = **Capture Start**()
+	**Capture Pause**
+	**Capture Resume**
+	**Capture Stop**
+	//status// = **Capture Status**()
+	//frames// = **Capture Available**()
+	//result// = **Capture Save**( //filename// )
+	//frames// = **Capture Read**( //samples//, //frames// )
+##
+{{fbdoc item="desc"}}
+	##**Capture**## records audio input when the active backend supports capture.  ##Capture Start## begins recording, pause/resume/stop control the capture state, ##Capture Available## reports how many frames can be read, ##Capture Read## copies captured samples into a ##Single## buffer, and ##Capture Save## writes the buffered capture data to a file.
+
+	##Capture Status## returns ##0## for stopped, ##1## for running, and ##2## for paused.
+
+{{fbdoc item="ex"}}
+	See ##examples/sfxlib/capture-start.bas##, ##examples/sfxlib/capture-read.bas##, ##examples/sfxlib/capture-save.bas##, and ##examples/sfxlib/showcase.bas##.
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDevice|Device]]##
+	- ##[[KeyPgAudio|Audio]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

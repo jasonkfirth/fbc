@@ -897,7 +897,9 @@ private function hGetUdtId( byval sym as FBSYMBOL ptr ) as string
 	if( typeGetMangleDt( symbGetFullType( sym ) ) = FB_DATATYPE_VA_LIST ) then
 		'' gcc's __builtin_va_list needs an exact name
 		select case symbGetValistType( symbGetFullType( sym ), symbGetSubtype( sym ) )
-		case FB_CVA_LIST_BUILTIN_C_STD, FB_CVA_LIST_BUILTIN_AARCH64, FB_CVA_LIST_BUILTIN_ARM
+		case FB_CVA_LIST_BUILTIN_C_STD, FB_CVA_LIST_BUILTIN_PPC, _
+		     FB_CVA_LIST_BUILTIN_AARCH64, FB_CVA_LIST_BUILTIN_ARM, _
+		     FB_CVA_LIST_BUILTIN_S390X
 				function = *sym->id.alias
 				exit function
 		end select
@@ -1230,6 +1232,22 @@ private sub hPopAnonParents( byval anonnode as FBSYMBOL ptr ptr )
 	wend
 end sub
 
+private function hFieldNeedsRuntimeAlignment _
+	( _
+		byval fld as FBSYMBOL ptr _
+	) as integer
+
+	if( typeGetDtAndPtrOnly( symbGetType( fld ) ) = FB_DATATYPE_STRING ) then
+		return TRUE
+	end if
+
+	if( (symbGetAttrib( fld ) and FB_SYMBATTRIB_DESCRIPTOR) <> 0 ) then
+		return TRUE
+	end if
+
+	function = FALSE
+end function
+
 private sub hEmitStructWithFields( byval s as FBSYMBOL ptr )
 	dim as integer skip = any, dtype = any, align = any
 	dim as FBSYMBOL ptr subtype = any, fld = any
@@ -1280,6 +1298,7 @@ private sub hEmitStructWithFields( byval s as FBSYMBOL ptr )
 				'' together with packed it decreases it.
 				'' FIELD = N in FB only decreases alignment, but never increases it.
 				skip = (align >= typeCalcNaturalAlign( dtype, subtype ))
+				skip or= hFieldNeedsRuntimeAlignment( fld )
 
 				'' Don't add unnecessary attributes on nested structures
 				'' that are already packed to the same alignment,
@@ -1812,7 +1831,7 @@ private function hEmitType _
 	'' the mangle modifier was given
 	if( symbIsBuiltinVaListType( dtype, subtype ) ) then
 		select case symbGetValistType( dtype, subtype )
-		case FB_CVA_LIST_BUILTIN_POINTER
+		case FB_CVA_LIST_BUILTIN_POINTER, FB_CVA_LIST_BUILTIN_VOID_POINTER
 			dtype = typeJoinDtOnly( typeDeref(dtype), FB_DATATYPE_VA_LIST )
 		case else
 			dtype = typeJoinDtOnly( dtype, FB_DATATYPE_VA_LIST )
@@ -2341,8 +2360,7 @@ private function hEmitFloat _
 	dim as string s
 	dim as ulong expval = any
 
-	'' x86 little-endian assumption
-	expval = cast( ulong ptr, @value )[1]
+	expval = (*cast( ulongint ptr, @value )) shr 32
 
 	select case( expval )
 	'' +/- infinity?
@@ -2978,6 +2996,169 @@ private function exprNewOFFSET _
 	function = l
 end function
 
+private function hIsScalarLoadType _
+	( _
+		byval dtype as integer _
+	) as integer
+
+	select case as const( typeGetClass( dtype ) )
+	case FB_DATACLASS_INTEGER, FB_DATACLASS_FPOINT
+		function = TRUE
+	case else
+		function = FALSE
+	end select
+
+end function
+
+private function hNormalizeOffsetMod _
+	( _
+		byval ofs as longint, _
+		byval align as integer _
+	) as integer
+
+	dim as integer n = any
+
+	n = ofs mod align
+	if( n < 0 ) then
+		n += align
+	end if
+
+	function = n
+end function
+
+private function hExprConstOffsetMod _
+	( _
+		byval n as EXPRNODE ptr, _
+		byval align as integer _
+	) as integer
+
+	select case as const( n->class )
+	case EXPRCLASS_IMM
+		function = hNormalizeOffsetMod( n->val.i, align )
+
+	case EXPRCLASS_CAST, EXPRCLASS_UOP
+		function = hExprConstOffsetMod( n->l, align )
+
+	case EXPRCLASS_BOP
+		select case as const( n->op )
+		case AST_OP_ADD
+			function = hNormalizeOffsetMod( hExprConstOffsetMod( n->l, align ) + _
+			                                hExprConstOffsetMod( n->r, align ), align )
+		case AST_OP_SUB
+			function = hNormalizeOffsetMod( hExprConstOffsetMod( n->l, align ) - _
+			                                hExprConstOffsetMod( n->r, align ), align )
+		end select
+	end select
+end function
+
+private function hSymBaseMayBeUnaligned _
+	( _
+		byval sym as FBSYMBOL ptr _
+	) as integer
+
+	if( sym = NULL ) then
+		return FALSE
+	end if
+
+	'' BYREF symbols are emitted as pointers.  The pointer can come from a
+	'' packed field, so scalar accesses through it cannot assume natural
+	'' alignment even when the byte offset itself looks aligned.
+	if( symbIsRef( sym ) ) then
+		return TRUE
+	end if
+
+	if( symbGetClass( sym ) = FB_SYMBCLASS_PARAM ) then
+		select case symbGetParamMode( sym )
+		case FB_PARAMMODE_BYREF, FB_PARAMMODE_BYDESC
+			return TRUE
+		end select
+	end if
+
+	if( typeGet( symbGetFullType( sym ) ) <> FB_DATATYPE_STRUCT ) then
+		return FALSE
+	end if
+
+	if( symbGetSubType( sym ) = NULL ) then
+		return FALSE
+	end if
+
+	if( symbGetUDTAlign( symbGetSubType( sym ) ) = 0 ) then
+		return FALSE
+	end if
+
+	function = (symbGetUDTAlign( symbGetSubType( sym ) ) < symbGetSubType( sym )->udt.natalign)
+end function
+
+private function hVregBaseMayBeUnaligned _
+	( _
+		byval vreg as IRVREG ptr _
+	) as integer
+
+	if( vreg = NULL ) then
+		return FALSE
+	end if
+
+	if( vreg->sym = NULL ) then
+		return hVregBaseMayBeUnaligned( vreg->vidx )
+	end if
+
+	function = hSymBaseMayBeUnaligned( vreg->sym )
+end function
+
+private function hAddrNeedsUnalignedAccess _
+	( _
+		byval dtype as integer, _
+		byval subtype as FBSYMBOL ptr, _
+		byval addr as EXPRNODE ptr, _
+		byval base_may_be_unaligned as integer = FALSE _
+	) as integer
+
+	dim as integer align = any
+
+	if( hIsScalarLoadType( dtype ) = FALSE ) then
+		return FALSE
+	end if
+
+	align = typeCalcNaturalAlign( dtype, subtype )
+	if( align <= 1 ) then
+		return FALSE
+	end if
+
+	if( base_may_be_unaligned ) then
+		return TRUE
+	end if
+
+	function = (hExprConstOffsetMod( addr, align ) <> 0)
+end function
+
+private function exprNewUnalignedLoad _
+	( _
+		byval dtype as integer, _
+		byval subtype as FBSYMBOL ptr, _
+		byval addr as EXPRNODE ptr _
+	) as EXPRNODE ptr
+
+	dim as string typename
+	dim as string addrtext
+	dim as string s
+
+	typename = hEmitType( typeUnsetIsConst( dtype ), subtype )
+	addrtext = exprFlush( addr )
+
+	'' Packed fields can be reached through byte offsets that are not aligned
+	'' for their declared type.  memcpy lets the C compiler choose an access
+	'' sequence that is valid on targets where unaligned scalar loads fault.
+	s = "__extension__ ({ "
+	s += typename + " __fb_unaligned; "
+	s += "__builtin_memcpy( &__fb_unaligned, (void const*)("
+	s += addrtext
+	s += "), sizeof( __fb_unaligned ) ); "
+	s += "__fb_unaligned; })"
+
+	function = exprNewTEXT( dtype, subtype, s )
+
+end function
+
 private function exprNewVREG _
 	( _
 		byval vreg as IRVREG ptr, _
@@ -3012,8 +3193,13 @@ private function exprNewVREG _
 				l = exprNewIMMi( vreg->ofs )
 			end if
 
-			l = exprNewCAST( typeAddrOf( vreg->dtype ), vreg->subtype, l )
-			l = exprNewUOP( AST_OP_DEREF, l )
+			if( (is_lvalue = FALSE) andalso _
+			    hAddrNeedsUnalignedAccess( vreg->dtype, vreg->subtype, l, hVregBaseMayBeUnaligned( vreg ) ) ) then
+				l = exprNewUnalignedLoad( vreg->dtype, vreg->subtype, l )
+			else
+				l = exprNewCAST( typeAddrOf( vreg->dtype ), vreg->subtype, l )
+				l = exprNewUOP( AST_OP_DEREF, l )
+			end if
 			exit select
 		end if
 
@@ -3129,11 +3315,16 @@ private function exprNewVREG _
 			end if
 		end if
 
-		'' cast to vregdtype*
-		l = exprNewCAST( typeAddrOf( vreg->dtype ), vreg->subtype, l )
+		if( (is_lvalue = FALSE) andalso _
+		    hAddrNeedsUnalignedAccess( vreg->dtype, vreg->subtype, l, hVregBaseMayBeUnaligned( vreg ) ) ) then
+			l = exprNewUnalignedLoad( vreg->dtype, vreg->subtype, l )
+		else
+			'' cast to vregdtype*
+			l = exprNewCAST( typeAddrOf( vreg->dtype ), vreg->subtype, l )
 
-		'' deref to get vregdtype
-		l = exprNewUOP( AST_OP_DEREF, l )
+			'' deref to get vregdtype
+			l = exprNewUOP( AST_OP_DEREF, l )
+		end if
 
 	case IR_VREGTYPE_OFS
 		'' Accessing a global, including string literals and function
@@ -3180,6 +3371,116 @@ private function exprNewVREG _
 	function = l
 end function
 
+private function exprNewVREGAddr _
+	( _
+		byval vreg as IRVREG ptr _
+	) as EXPRNODE ptr
+
+	dim as EXPRNODE ptr l = any
+
+	select case as const( vreg->typ )
+	case IR_VREGTYPE_VAR, IR_VREGTYPE_IDX, IR_VREGTYPE_PTR
+		if( vreg->sym = NULL ) then
+			if( vreg->vidx ) then
+				l = exprNewVREG( vreg->vidx )
+
+				if( vreg->ofs <> 0 ) then
+					l = exprNewCAST( typeAddrOf( FB_DATATYPE_UBYTE ), NULL, l )
+					l = exprNewBOP( AST_OP_ADD, l, exprNewIMMi( vreg->ofs ) )
+				end if
+			else
+				l = exprNewIMMi( vreg->ofs )
+			end if
+
+			function = l
+			exit function
+		end if
+
+		var is_c_array = symbIsCArray( vreg->sym )
+		var have_offset = ((vreg->ofs <> 0) or (vreg->vidx <> NULL))
+
+		l = exprNewSYM( vreg->sym )
+
+		if( is_c_array = FALSE ) then
+			l = exprNewUOP( AST_OP_ADDROF, l )
+		end if
+
+		if( have_offset ) then
+			if( ( is_c_array ) andalso ( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) ) then
+				l = exprNewCAST( FB_DATATYPE_INTEGER, NULL, l )
+			else
+				l = exprNewCAST( typeAddrOf( FB_DATATYPE_UBYTE ), NULL, l )
+			end if
+			if( vreg->vidx <> NULL ) then
+				l = exprNewBOP( AST_OP_ADD, l, exprNewVREG( vreg->vidx ) )
+			end if
+			if( vreg->ofs <> 0 ) then
+				l = exprNewBOP( AST_OP_ADD, l, exprNewIMMi( vreg->ofs ) )
+			end if
+		end if
+
+	case IR_VREGTYPE_OFS
+		l = exprNewOFFSET( vreg->sym, vreg->ofs )
+
+	case else
+		assert( FALSE )
+		l = exprNewIMMi( 0 )
+	end select
+
+	function = l
+end function
+
+private function hGetUnalignedLvalueAddr _
+	( _
+		byval vreg as IRVREG ptr, _
+		byval lvalue as EXPRNODE ptr _
+	) as EXPRNODE ptr
+
+	if( lvalue = NULL ) then
+		return NULL
+	end if
+
+	if( lvalue->class <> EXPRCLASS_UOP ) then
+		return NULL
+	end if
+
+	if( lvalue->op <> AST_OP_DEREF ) then
+		return NULL
+	end if
+
+	if( hAddrNeedsUnalignedAccess( vreg->dtype, vreg->subtype, lvalue->l, hVregBaseMayBeUnaligned( vreg ) ) ) then
+		function = lvalue->l
+	else
+		function = NULL
+	end if
+end function
+
+private sub hEmitUnalignedStore _
+	( _
+		byval vreg as IRVREG ptr, _
+		byval addr as EXPRNODE ptr, _
+		byval r as EXPRNODE ptr _
+	)
+
+	dim as string typename
+	dim as string addrtext
+	dim as string valuetext
+	dim as string s
+
+	typename = hEmitType( typeUnsetIsConst( vreg->dtype ), vreg->subtype )
+	addrtext = exprFlush( addr )
+	valuetext = exprFlush( r )
+
+	s = "__extension__ ({ "
+	s += typename + " __fb_unaligned = "
+	s += valuetext
+	s += "; __builtin_memcpy( (void*)("
+	s += addrtext
+	s += "), &__fb_unaligned, sizeof( __fb_unaligned ) ); });"
+
+	hWriteLine( s )
+end sub
+
 private sub _emitLabel( byval label as FBSYMBOL ptr )
 	'' Only when inside normal procedures
 	'' (NAKED procedures don't increase the indentation)
@@ -3197,7 +3498,8 @@ private sub exprSTORE _
 	)
 
 	static as string ln, tempvar
-	dim as EXPRNODE ptr l = any
+	dim as EXPRNODE ptr l = NULL
+	dim as EXPRNODE ptr addr = NULL
 
 	if( irIsREG( vr ) ) then
 		if( has_sidefx ) then
@@ -3240,10 +3542,15 @@ private sub exprSTORE _
 		'' FB allows noconv casts (no data class/size change) on the
 		'' lhs, but C does not, the rhs should be casted here instead,
 		'' although it probably doesn't matter much either way.
-		l = exprNewVREG( vr, TRUE )
-
 		'' 1st to the desired vreg type
 		r = exprNewCAST( vr->dtype, vr->subtype, r )
+
+		l = exprNewVREG( vr, TRUE )
+		addr = hGetUnalignedLvalueAddr( vr, l )
+		if( addr <> NULL ) then
+			hEmitUnalignedStore( vr, addr, r )
+			exit sub
+		end if
 
 		if( typeIsPtr( l->dtype ) or typeIsPtr( r->dtype ) ) then
 			'' 2nd to void* to avoid gcc ptr warnings

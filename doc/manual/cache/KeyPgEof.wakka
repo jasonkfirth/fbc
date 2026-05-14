@@ -19,6 +19,8 @@ Checks to see if the end of an open file has been reached
 	
 	For file numbers bound to files opened for ##[[KeyPgOutput|Output]]##, EOF always returns 0.
 
+	For TCP file numbers opened by ##[[KeyPgOpenTcp|Open Tcp]]## or returned by ##[[KeyPgTcpAccept|Tcp Accept]]##, EOF indicates whether a byte is immediately available to read.  Use ##[[KeyPgEoc|Eoc]]## to test whether the remote endpoint has closed the connection.
+
 {{fbdoc item="ex"}}
 	{{fbdoc item="filename" value="examples/manual/fileio/eof.bas"}}%%(freebasic)
 '' This code finds a free file number to use and attempts to open the file
@@ -56,5 +58,6 @@ end 0
 	- ##[[KeyPgLof|Lof]]##
 	- ##[[KeyPgLoc|Loc]]##
 	- ##[[KeyPgFreefile|Freefile]]##
+	- ##[[KeyPgEoc|Eoc]]##
 
 {{fbdoc item="back" value="CatPgFile|File I/O Functions"}}

@@ -3,6 +3,20 @@
 #include "fb_gfx.h"
 #include "fb_gfx_gl.h"
 
+#ifdef HOST_JS
+static void fb_hGfxJsFrameYield(void)
+{
+	/*
+	 * Browser builds run the program, input dispatch, timers, and canvas
+	 * presentation on one JavaScript thread.  Page copies and visible-page
+	 * changes are the closest thing many graphics loops have to frame
+	 * boundaries, so yield here even if the user program never reaches its
+	 * own SLEEP 0 path.
+	 */
+	fb_Delay( 0 );
+}
+#endif
+
 FBCALL int fb_GfxFlip(int from_page, int to_page)
 {
 	FB_GFXCTX *context;
@@ -26,6 +40,9 @@ FBCALL int fb_GfxFlip(int from_page, int to_page)
 		if (__fb_gfx->driver->poll_events)
 			__fb_gfx->driver->poll_events();
 		FB_GRAPHICS_UNLOCK( );
+#ifdef HOST_JS
+		fb_hGfxJsFrameYield();
+#endif
 		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 	}
 
@@ -83,6 +100,9 @@ FBCALL int fb_GfxFlip(int from_page, int to_page)
 	}
 
 	FB_GRAPHICS_UNLOCK( );
+#ifdef HOST_JS
+	fb_hGfxJsFrameYield();
+#endif
 	return fb_ErrorSetNum(FB_RTERROR_OK);
 }
 
@@ -95,6 +115,9 @@ int fb_GfxPageSet(int work_page, int visible_page)
 {
 	FB_GFXCTX *context;
 	int res;
+#ifdef HOST_JS
+	int visible_changed = FALSE;
+#endif
 
 	FB_GRAPHICS_LOCK( );
 
@@ -124,8 +147,15 @@ int fb_GfxPageSet(int work_page, int visible_page)
 		__fb_gfx->visible_page = visible_page;
 		fb_hMemSet(__fb_gfx->dirty, TRUE, __fb_gfx->h);
 		DRIVER_UNLOCK();
+#ifdef HOST_JS
+		visible_changed = TRUE;
+#endif
 	}
 
 	FB_GRAPHICS_UNLOCK( );
+#ifdef HOST_JS
+	if( visible_changed )
+		fb_hGfxJsFrameYield();
+#endif
 	return res;
 }

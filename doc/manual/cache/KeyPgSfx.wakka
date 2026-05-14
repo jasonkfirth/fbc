@@ -1,0 +1,36 @@
+{{fbdoc item="title" value="SFX"}}----
+Loads and controls short sound effects through sfxlib.
+
+{{fbdoc item="syntax"}}##
+	**Sfx Load** //id//, //filename//
+	**Sfx Play** //id//
+	**Sfx Play** //channel//, //id//[, //pitch//]
+	**Sfx Loop** //id//
+	**Sfx Loop** //channel//, //id//[, //pitch//]
+	**Sfx Stop** [ //id// ]
+	**Sfx Stop Channel**, //channel//
+	**Sfx Pause** [ //id// ]
+	**Sfx Pause Channel**, //channel//
+	**Sfx Resume** [ //id// ]
+	**Sfx Resume Channel**, //channel//
+	//status// = **Sfx Status**()
+	//status// = **Sfx Status**( //id// )
+	//status// = **Sfx Status**( **Channel**, //channel// )
+##
+{{fbdoc item="desc"}}
+	##**Sfx**## handles short reusable samples.  ##Sfx Load## places a decoded sample in an id slot.  ##Sfx Play## plays it once, while ##Sfx Loop## repeats it.  The channel forms use the channel number first and the loaded effect id second.  The optional pitch argument scales playback speed.
+
+	With no argument, ##Sfx Stop##, ##Sfx Pause##, and ##Sfx Resume## affect all active sound effects.  ##Sfx Status## returns ##0## for stopped, ##1## for playing, and ##2## for paused.
+
+{{fbdoc item="ex"}}
+	See ##examples/sfxlib/sfx-load.bas##, ##examples/sfxlib/sfx-play.bas##, ##examples/sfxlib/sfx-loop.bas##, ##examples/sfxlib/sfx-pitch.bas##, and ##examples/sfxlib/showcase.bas##.
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgMusic|Music]]##
+	- ##[[KeyPgAudio|Audio]]##
+	- ##[[KeyPgSfxGenerated|Generated sound commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

@@ -453,7 +453,8 @@ sub cProcRetType _
 			'' __builtin_va_list on ARM fails translation in C backend
 			if( subtype ) then
 				select case symbGetUdtValistType( subtype )
-				case FB_CVA_LIST_BUILTIN_C_STD, FB_CVA_LIST_BUILTIN_ARM
+				case FB_CVA_LIST_BUILTIN_C_STD, FB_CVA_LIST_BUILTIN_PPC, _
+				     FB_CVA_LIST_BUILTIN_ARM, FB_CVA_LIST_BUILTIN_S390X
 					if( ((pattrib and FB_PROCATTRIB_RETURNBYREF) = 0) and _
 						typeIsPtr( dtype ) = FALSE ) then
 						errReport( FB_ERRMSG_INVALIDDATATYPES )

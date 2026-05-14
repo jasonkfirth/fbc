@@ -350,6 +350,11 @@ help:
 	@echo "Package build scripts:"
 	@echo "  build_scripts/debianubuntu-build-freebasic.sh [--no-js] [--no-android]"
 	@echo "  build_scripts/debianubuntu-build-freebasic-matrix.sh [--distro NAME] [--arch ARCH]"
+	@echo "  build_scripts/linux-cross-build-freebasic-matrix.sh [--list]"
+	@echo "  build_scripts/debianubuntu-cross-build-freebasic-matrix.sh [--list]"
+	@echo "  build_scripts/apk-cross-build-freebasic-matrix.sh [--list]"
+	@echo "  build_scripts/rpm-cross-build-freebasic-matrix.sh [--list]"
+	@echo "  build_scripts/slackware-cross-build-freebasic-matrix.sh [--list]"
 
 ###################
 # End of Makefile #

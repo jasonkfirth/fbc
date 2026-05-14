@@ -1,5 +1,35 @@
 #include "fbcunit.bi"
 
+private function hReadSingleBits( byref f as single ) as ulong
+	dim as ubyte ptr p = cptr( ubyte ptr, @f )
+	dim as ulong bits = 0
+
+#if defined( __FB_BIGENDIAN__ )
+	for i as integer = 0 to 3
+#else
+	for i as integer = 3 to 0 step -1
+#endif
+		bits = (bits shl 8) or p[i]
+	next
+
+	function = bits
+end function
+
+private function hReadDoubleBits( byref d as double ) as ulongint
+	dim as ubyte ptr p = cptr( ubyte ptr, @d )
+	dim as ulongint bits = 0
+
+#if defined( __FB_BIGENDIAN__ )
+	for i as integer = 0 to 7
+#else
+	for i as integer = 7 to 0 step -1
+#endif
+		bits = (bits shl 8) or p[i]
+	next
+
+	function = bits
+end function
+
 SUITE( fbc_tests.numbers.infnan )
 
 	TEST( double_ )
@@ -14,17 +44,12 @@ SUITE( fbc_tests.numbers.infnan )
 
 		#macro checkD( d, x )
 			'' The sign bit for NaN results is unspecified by IEEE754,
-			'' and x86 and ARM differ in its selection.
-			'' Appears to be ditto for emscripten
-			'' Little-endian assumption casting double ptr to ulongint ptr
-			#if defined( __FB_ARM__ ) or defined( __FB_JS__ )
-				#if( (x = NEGNAND) or (x = POSNAND) )
-					CU_ASSERT( ((*cptr( ulongint ptr, @d )) and SGNMASK) = POSNAND )
-				#else
-					CU_ASSERT( *cptr( ulongint ptr, @d ) = x )
-				#endif
+			'' and targets differ in its selection.  The helper reads
+			'' bytes explicitly to avoid unaligned pointer loads on ARM.
+			#if( (x = NEGNAND) or (x = POSNAND) )
+				CU_ASSERT( (hReadDoubleBits( d ) and SGNMASK) = POSNAND )
 			#else
-				CU_ASSERT( *cptr( ulongint ptr, @d ) = x )
+				CU_ASSERT( hReadDoubleBits( d ) = x )
 			#endif
 		#endmacro
 
@@ -122,17 +147,12 @@ SUITE( fbc_tests.numbers.infnan )
 
 		#macro checkF( f, x )
 			'' The sign bit for NaN results is unspecified by IEEE754,
-			'' and x86 and ARM differ in its selection.
-			'' Appears to be ditto for emscripten
-			'' Little-endian assumption casting double ptr to ulongint ptr
-			#if defined( __FB_ARM__ ) or defined( __FB_JS__ )
-				#if( (x = NEGNANF) or (x = POSNANF) )
-					CU_ASSERT( ((*cptr( ulong ptr, @f )) and SGNMASK) = POSNANF )
-				#else
-					CU_ASSERT( *cptr( ulong ptr, @f ) = x )
-				#endif
+			'' and targets differ in its selection.  The helper reads
+			'' bytes explicitly to avoid unaligned pointer loads on ARM.
+			#if( (x = NEGNANF) or (x = POSNANF) )
+				CU_ASSERT( (hReadSingleBits( f ) and SGNMASK) = POSNANF )
 			#else
-				CU_ASSERT( *cptr( ulong ptr, @f ) = x )
+				CU_ASSERT( hReadSingleBits( f ) = x )
 			#endif
 		#endmacro
 

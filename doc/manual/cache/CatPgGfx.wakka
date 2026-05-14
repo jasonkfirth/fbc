@@ -1,6 +1,9 @@
 {{fbdoc item="title" value="Graphics Keyword List"}}----
 A list of the keywords and procedures of ""FreeBASIC""'s graphics library.
 
+{{fbdoc item="desc"}}
+	If a program intentionally does not use the graphics command surface and needs selected gfxlib command words as normal identifiers, define ##[[KeyPgFbNoGfxlib|FB_NO_GFXLIB]]## before those names are parsed.
+
 <<
 	- {{fbdoc item="keyword" value="KeyPgAddGfx|ADD"}}
 	- {{fbdoc item="keyword" value="KeyPgAlphaGfx|ALPHA"}}
@@ -21,6 +24,7 @@ A list of the keywords and procedures of ""FreeBASIC""'s graphics library.
 	- {{fbdoc item="keyword" value="KeyPgGetgraphics|GET (GRAPHICS)"}}
 	- {{fbdoc item="keyword" value="KeyPgGetjoystick|GETJOYSTICK"}}
 	- {{fbdoc item="keyword" value="KeyPgGetmouse|GETMOUSE"}}
+	- {{fbdoc item="keyword" value="KeyPgGetxpad|GETXPAD"}}
 	- {{fbdoc item="keyword" value="KeyPgInp|INP"}}
 	- {{fbdoc item="keyword" value="KeyPgLinegraphics|LINE (GRAPHICS)"}}
 	- {{fbdoc item="keyword" value="KeyPgMultikey|MULTIKEY"}}

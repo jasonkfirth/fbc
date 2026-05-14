@@ -8,6 +8,14 @@ FBSTRING *fb_ConsoleInkey( void )
 {
 	FBSTRING *res = &__fb_ctx.null_desc;
 
+	/*
+	 * Browser-hosted programs often poll INKEY in loops that relied on the
+	 * native OS scheduler for preemption.  Yield here so pending browser
+	 * keyboard, timer, and canvas callbacks can run before the poll result is
+	 * reported.
+	 */
+	fb_Delay( 0 );
+
 	if( fb_ConsoleKeyHit( ) != 0 )
 	{
         res = fb_hMakeInkeyStr( fb_ConsoleGetkey( ) );

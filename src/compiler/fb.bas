@@ -1840,10 +1840,19 @@ function fbGetBackendValistType _
 			typedef = FB_CVA_LIST_BUILTIN_AARCH64
 
 		case FB_CPUFAMILY_PPC
-			typedef = FB_CVA_LIST_BUILTIN_POINTER
+			typedef = FB_CVA_LIST_BUILTIN_PPC
 
 		case FB_CPUFAMILY_PPC64, FB_CPUFAMILY_PPC64LE
 			typedef = FB_CVA_LIST_BUILTIN_POINTER
+
+		case FB_CPUFAMILY_RISCV64
+			typedef = FB_CVA_LIST_BUILTIN_VOID_POINTER
+
+		case FB_CPUFAMILY_LOONGARCH64
+			typedef = FB_CVA_LIST_BUILTIN_VOID_POINTER
+
+		case FB_CPUFAMILY_S390X
+			typedef = FB_CVA_LIST_BUILTIN_S390X
 
 		case else
 			typedef = FB_CVA_LIST_BUILTIN_POINTER
@@ -1880,7 +1889,8 @@ function fbGetBackendValistType _
 	'' -z valist-as-ptr to force use of pointer expressions
 	'' instead of builtins even though gcc is backend.
 
-	if( typedef = FB_CVA_LIST_BUILTIN_POINTER ) then
+	if( (typedef = FB_CVA_LIST_BUILTIN_POINTER) or _
+	    (typedef = FB_CVA_LIST_BUILTIN_VOID_POINTER) ) then
 		if( fbGetOption( FB_COMPOPT_VALISTASPTR ) ) then
 			typedef = FB_CVA_LIST_POINTER
 		endif
