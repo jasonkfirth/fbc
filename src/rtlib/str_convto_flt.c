@@ -19,7 +19,8 @@ FBCALL FBSTRING *fb_FloatToStr ( float num )
 		size_t tmp_len;
 
 		/* convert */
-		sprintf( dst->data, "%.7g", num );
+		if( snprintf( dst->data, (size_t)dst->size + 1, "%.7g", num ) < 0 )
+			dst->data[0] = '\0';
 
 		tmp_len = strlen( dst->data );				/* fake len */
 
@@ -52,7 +53,8 @@ FBCALL FBSTRING *fb_DoubleToStr ( double num )
 		size_t tmp_len;
 
 		/* convert */
-		sprintf( dst->data, "%.16g", num );
+		if( snprintf( dst->data, (size_t)dst->size + 1, "%.16g", num ) < 0 )
+			dst->data[0] = '\0';
 
 		tmp_len = strlen( dst->data );				/* fake len */
 

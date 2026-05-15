@@ -27,11 +27,13 @@ fi
 
 NOBUILD=0
 NOPACKAGE=0
+NOINSTALL=0
 
 for arg in "$@"; do
 	case "$arg" in
 		--nobuild) NOBUILD=1 ;;
 		--nopackage) NOPACKAGE=1 ;;
+		--noinstall) NOINSTALL=1 ;;
 		*) echo "Unknown option: $arg"; exit 1 ;;
 	esac
 done
@@ -65,13 +67,23 @@ if [ "$NOBUILD" -eq 0 ]; then
 	rm -f ./*.install_manifest package-root.install_manifest
 
 	msg "Ensuring build tools"
-	pkgman install -y haiku_devel make gcc binutils rsync libffi_devel ||true
+	pkgman install -y haiku_devel make gcc binutils pkgconf rsync libffi_devel zstd ||true
 	pkgman install -y  ncurses6 ncurses6_devel || true
 
 	CPU_COUNT=$(sysinfo -cpu 2>/dev/null | grep -c "^CPU #" || true)
 	[ -z "$CPU_COUNT" ] && CPU_COUNT=1
 	[ "$CPU_COUNT" -lt 1 ] && CPU_COUNT=1
 	JOBS=$((CPU_COUNT + 1))
+
+	if [ -x bin/fbc ] && ! bin/fbc -version >/dev/null 2>&1; then
+		msg "Removing unusable in-tree compiler"
+		rm -f bin/fbc bin/fbc-js
+	fi
+
+	if [ ! -x bin/fbc ]; then
+		msg "Building bootstrap compiler ($JOBS threads)"
+		make -j"$JOBS" bootstrap-minimal
+	fi
 
 	msg "Building FreeBASIC ($JOBS threads)"
 	make -j"$JOBS"
@@ -90,6 +102,15 @@ if [ "$NOPACKAGE" -eq 0 ]; then
 	rm -rf "$STAGE"
 
 	make install DESTDIR="$STAGE"
+
+	msg "Staging examples"
+	mkdir -p "$STAGE/data/freebasic"
+	cp -R examples "$STAGE/data/freebasic/"
+	find "$STAGE/data/freebasic/examples" -type f \
+		\( -name '*.o' -o -name '*.obj' -o -name '*.exe' \
+		   -o -name '*.dll' -o -name '*.so' \) \
+		-exec rm -f {} +
+	rm -f "$STAGE/data/freebasic/examples/sfxlib/showcase"
 
 ##############################################################################
 # Package metadata
@@ -139,6 +160,8 @@ META
 		package create "../$HPKG"
 	)
 
+	if [ "$NOINSTALL" -eq 0 ]; then
+
 ##############################################################################
 # Remove existing installation
 ##############################################################################
@@ -162,6 +185,8 @@ META
 		fbc -version
 	else
 		fail "Installed compiler not found in PATH"
+	fi
+
 	fi
 
 ##############################################################################

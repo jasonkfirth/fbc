@@ -11,7 +11,7 @@ int fb_DrvIntlGetTimeFormat( char *buffer, size_t len )
     char *pszOutput = buffer;
     char achAddBuffer[2] = { 0 };
     const char *pszAdd = NULL;
-    size_t remaining = len - 1, add_len = 0;
+    size_t remaining = 0, add_len = 0;
 #ifdef DISABLE_LANGINFO
     const char *pszCurrent = "%H:%M:%S";
 #else
@@ -19,6 +19,13 @@ int fb_DrvIntlGetTimeFormat( char *buffer, size_t len )
 #endif
 
     DBG_ASSERT(buffer!=NULL);
+
+    if( len == 0 ) {
+        return FALSE;
+    }
+
+    buffer[0] = '\0';
+    remaining = len - 1;
 
     while ( *pszCurrent!=0 ) {
         char ch = *pszCurrent;
@@ -103,8 +110,9 @@ int fb_DrvIntlGetTimeFormat( char *buffer, size_t len )
             if( remaining < add_len ) {
                 return FALSE;
             }
-            strcpy( pszOutput, pszAdd );
+            memcpy( pszOutput, pszAdd, add_len );
             pszOutput += add_len;
+            *pszOutput = '\0';
             remaining -= add_len;
             add_len = 0;
         }

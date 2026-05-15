@@ -21,6 +21,10 @@
 #include once "crt/sys/cygwin/types.bi"
 #elseif defined(__FB_FREEBSD__)
 #include once "crt/sys/freebsd/types.bi"
+#elseif defined(__FB_OPENBSD__)
+#include once "crt/sys/openbsd/types.bi"
+#elseif defined(__FB_HAIKU__)
+#include once "crt/sys/haiku/types.bi"
 #elseif defined(__FB_DARWIN__)
 '' May not be correct
 #include once "crt/sys/linux/types.bi"

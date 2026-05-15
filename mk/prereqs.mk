@@ -111,8 +111,14 @@ PR_BOOTSTRAP_BSD_DIRS := openbsd-$(TARGET_ARCH) netbsd-$(TARGET_ARCH) freebsd-$(
 PR_BOOTSTRAP_FAMILY_DONORS :=
 ifneq ($(filter $(TARGET_OS),openbsd netbsd freebsd dragonfly),)
 PR_BOOTSTRAP_FAMILY_DONORS := $(filter $(PR_BOOTSTRAP_BSD_DIRS),$(PR_BOOTSTRAP_DIRS))
+ifeq ($(TARGET_ARCH),x86_64)
+PR_BOOTSTRAP_FAMILY_DONORS += $(filter openbsd-amd64 netbsd-amd64 freebsd-amd64 dragonfly-amd64,$(PR_BOOTSTRAP_DIRS))
+endif
 endif
 PR_BOOTSTRAP_SAME_ARCH_DONORS := $(filter %-$(TARGET_ARCH),$(PR_BOOTSTRAP_DIRS))
+ifeq ($(TARGET_ARCH),x86_64)
+PR_BOOTSTRAP_SAME_ARCH_DONORS += $(filter %-amd64,$(PR_BOOTSTRAP_DIRS))
+endif
 PR_BOOTSTRAP_DONOR_CANDIDATES := $(filter-out $(PR_BOOTSTRAP_DIR),$(PR_BOOTSTRAP_FAMILY_DONORS) $(filter-out $(PR_BOOTSTRAP_FAMILY_DONORS),$(PR_BOOTSTRAP_SAME_ARCH_DONORS)))
 
 ##############################################################################
@@ -196,7 +202,7 @@ prereqs-fbc:
 		echo "Using local compiler: $(LOCAL_FBC)"; \
 	elif [ -n "$(SYSTEM_FBC)" ]; then \
 		echo "Using system compiler: $(SYSTEM_FBC)"; \
-	elif [ -d "$(PR_BOOTSTRAP_PATH)" ] && find "$(PR_BOOTSTRAP_PATH)" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .; then \
+	elif [ -d "$(PR_BOOTSTRAP_PATH)" ] && find "$(PR_BOOTSTRAP_PATH)" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print | sed -n '1p' | grep -q .; then \
 		echo ""; \
 		echo "ERROR: no usable FreeBASIC compiler found."; \
 		echo "Bootstrap sources are available for $(PR_BOOTSTRAP_DIR)."; \

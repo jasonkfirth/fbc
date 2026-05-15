@@ -85,7 +85,7 @@ $(BOOTSTRAP_PATH):
 
 bootstrap-check:
 	@echo "==> Verifying bootstrap capability"
-	@if [ -d "$(BOOTSTRAP_PATH)" ] && find "$(BOOTSTRAP_PATH)" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .; then \
+	@if [ -d "$(BOOTSTRAP_PATH)" ] && find "$(BOOTSTRAP_PATH)" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print | sed -n '1p' | grep -q .; then \
 		echo "==> Bootstrap sources detected"; \
 	elif [ -n "$(BOOT_FBC)" ]; then \
 		echo "==> Using available compiler: $(BOOT_FBC)"; \
@@ -105,7 +105,7 @@ bootstrap-minimal:
 
 	@echo "==> Checking bootstrap sources"
 
-	@if ! [ -d "$(BOOTSTRAP_PATH)" ] || ! find "$(BOOTSTRAP_PATH)" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .; then \
+	@if ! [ -d "$(BOOTSTRAP_PATH)" ] || ! find "$(BOOTSTRAP_PATH)" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print | sed -n '1p' | grep -q .; then \
 		echo ""; \
 		echo "ERROR: bootstrap sources missing"; \
 		echo "Run: make bootstrap-emit"; \
@@ -150,17 +150,23 @@ clean-bootstrap-minimal-runtime: clean-libs
 
 BOOTSTRAP_DIRS := $(patsubst bootstrap/%/,%,$(wildcard bootstrap/*/))
 BOOTSTRAP_BSD_DONORS := $(filter openbsd-$(TARGET_ARCH) netbsd-$(TARGET_ARCH) freebsd-$(TARGET_ARCH) dragonfly-$(TARGET_ARCH),$(BOOTSTRAP_DIRS))
+ifeq ($(TARGET_ARCH),x86_64)
+BOOTSTRAP_BSD_DONORS += $(filter openbsd-amd64 netbsd-amd64 freebsd-amd64 dragonfly-amd64,$(BOOTSTRAP_DIRS))
+endif
 BOOTSTRAP_PREFERRED_DONORS :=
 ifneq ($(filter $(TARGET_OS),openbsd netbsd freebsd dragonfly),)
 BOOTSTRAP_PREFERRED_DONORS := $(BOOTSTRAP_BSD_DONORS)
 endif
 BOOTSTRAP_SAME_ARCH_DONORS := $(filter %-$(TARGET_ARCH),$(BOOTSTRAP_DIRS))
+ifeq ($(TARGET_ARCH),x86_64)
+BOOTSTRAP_SAME_ARCH_DONORS += $(filter %-amd64,$(BOOTSTRAP_DIRS))
+endif
 BOOTSTRAP_DONOR_CANDIDATES := $(filter-out $(BOOTSTRAP_DIR),$(BOOTSTRAP_PREFERRED_DONORS) $(filter-out $(BOOTSTRAP_PREFERRED_DONORS),$(BOOTSTRAP_SAME_ARCH_DONORS)))
 
 bootstrap-seed-peer:
 	@echo "==> Last-resort bootstrap seeding for $(BOOTSTRAP_DIR)"
 	@set -e; \
-	if [ -d "$(BOOTSTRAP_PATH)" ] && find "$(BOOTSTRAP_PATH)" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .; then \
+	if [ -d "$(BOOTSTRAP_PATH)" ] && find "$(BOOTSTRAP_PATH)" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print | sed -n '1p' | grep -q .; then \
 		echo ""; \
 		echo "ERROR: bootstrap sources already exist for $(BOOTSTRAP_DIR)"; \
 		echo "Refusing to overwrite existing sources."; \
@@ -169,7 +175,7 @@ bootstrap-seed-peer:
 	fi; \
 	donor=""; \
 	for cand in $(BOOTSTRAP_DONOR_CANDIDATES); do \
-		if find "bootstrap/$$cand" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .; then \
+		if [ -d "bootstrap/$$cand" ] && find "bootstrap/$$cand" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print | sed -n '1p' | grep -q .; then \
 			donor="$$cand"; \
 			break; \
 		fi; \

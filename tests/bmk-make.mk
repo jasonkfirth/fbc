@@ -23,7 +23,7 @@ include common.mk
 
 ECHO := echo
 
-CC := gcc
+CC ?= gcc
 ifndef FBC
 FBC := $(TESTS_DEFAULT_FBC)
 endif

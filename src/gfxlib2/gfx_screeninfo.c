@@ -14,6 +14,7 @@ FBCALL void fb_GfxScreenInfo
 	)
 {
 	char *name;
+	size_t name_len;
 
 	FB_GRAPHICS_LOCK( );
 
@@ -32,8 +33,9 @@ FBCALL void fb_GfxScreenInfo
 	}
 
 	if (fb_hStrDelTemp(driver)) {
-		fb_hStrRealloc(driver, strlen(name), FB_FALSE);
-		strcpy(driver->data, name);
+		name_len = strlen(name);
+		fb_hStrRealloc(driver, name_len, FB_FALSE);
+		memcpy(driver->data, name, name_len + 1);
 	}
 
 	FB_GRAPHICS_UNLOCK( );

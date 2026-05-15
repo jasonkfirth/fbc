@@ -84,6 +84,7 @@ static int fb_DevTcpWriteWstr( FB_FILE *handle, const FB_WCHAR *value, size_t va
 static int fb_DevTcpTell( FB_FILE *handle, fb_off_t *pOffset );
 static int fb_DevTcpEof( FB_FILE *handle );
 static int fb_DevTcpServerEof( FB_FILE *handle );
+static void fb_hDevTcpFormatService( char *service, size_t service_len, unsigned int port );
 
 static FB_FILE_HOOKS hooks_dev_tcp = {
 	fb_DevTcpEof,
@@ -216,6 +217,62 @@ static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int tim
 #endif
 }
 
+static void fb_hDevTcpFormatService( char *service, size_t service_len, unsigned int port )
+{
+	char tmp[16];
+	size_t used = 0;
+
+	if( service_len == 0 )
+		return;
+
+	do {
+		tmp[used++] = (char)( '0' + ( port % 10 ) );
+		port /= 10;
+	} while( (port != 0) && (used < sizeof( tmp )) );
+
+	if( used >= service_len )
+		used = service_len - 1;
+
+	for( size_t i = 0; i < used; i++ )
+		service[i] = tmp[used - i - 1];
+
+	service[used] = '\0';
+}
+
+#if !defined(HOST_DOS) && !defined(HOST_JS)
+/*
+	TCP device hooks are called by the generic file layer while FB_LOCK()
+	is held.  Blocking socket syscalls must not keep that lock, because a
+	thread waiting for TCP input can otherwise prevent another FB thread in
+	the same process from writing the data it is waiting for.
+*/
+static int fb_hDevTcpRecvUnlocked( DEV_TCP_INFO *info, void *buffer, size_t length, int flags, int *err )
+{
+	FB_TCP_SOCKET hSocket = info->hSocket;
+	int bytes;
+
+	FB_UNLOCK();
+	bytes = recv( hSocket, buffer, (int)MIN( length, (size_t)INT_MAX ), flags );
+	*err = FB_TCP_ERRNO();
+	FB_LOCK();
+
+	return bytes;
+}
+
+static int fb_hDevTcpSendUnlocked( DEV_TCP_INFO *info, const char *buffer, size_t length, int flags, int *err )
+{
+	FB_TCP_SOCKET hSocket = info->hSocket;
+	int bytes;
+
+	FB_UNLOCK();
+	bytes = send( hSocket, buffer, (int)MIN( length, (size_t)INT_MAX ), flags );
+	*err = FB_TCP_ERRNO();
+	FB_LOCK();
+
+	return bytes;
+}
+#endif
+
 static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOCKET *hSocketOut )
 {
 #if defined(HOST_DOS) || defined(HOST_JS)
@@ -234,7 +291,7 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_family = AF_UNSPEC;
 
-	snprintf( service, sizeof( service ), "%u", tcp_proto->port );
+	fb_hDevTcpFormatService( service, sizeof( service ), tcp_proto->port );
 	res = getaddrinfo( tcp_proto->host, service, &hints, &result );
 	if( res != 0 )
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
@@ -280,7 +337,7 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_flags = AI_PASSIVE;
 
-	snprintf( service, sizeof( service ), "%u", tcp_proto->port );
+	fb_hDevTcpFormatService( service, sizeof( service ), tcp_proto->port );
 	res = getaddrinfo( (*tcp_proto->host != '\0') ? tcp_proto->host : NULL, service, &hints, &result );
 	if( res != 0 )
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
@@ -326,6 +383,7 @@ static int fb_hDevTcpPeekState( DEV_TCP_INFO *info )
 	fd_set set;
 	struct timeval tv;
 	int res;
+	int err = 0;
 	char ch;
 
 	if( info == NULL || info->hSocket == FB_TCP_INVALID_SOCKET )
@@ -340,20 +398,28 @@ static int fb_hDevTcpPeekState( DEV_TCP_INFO *info )
 	tv.tv_usec = 0;
 
 	#if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
+		FB_UNLOCK();
 		res = select( 0, &set, NULL, NULL, &tv );
 	#else
+		FB_UNLOCK();
 		res = select( info->hSocket + 1, &set, NULL, NULL, &tv );
 	#endif
 
 	if( res < 0 ) {
+		FB_LOCK();
 		info->is_closed = TRUE;
 		return -1;
 	}
 
-	if( res == 0 )
+	if( res == 0 ) {
+		FB_LOCK();
 		return 0;
+	}
 
 	res = recv( info->hSocket, &ch, 1, MSG_PEEK );
+	err = FB_TCP_ERRNO();
+	FB_LOCK();
+
 	if( res > 0 )
 		return 1;
 
@@ -362,7 +428,7 @@ static int fb_hDevTcpPeekState( DEV_TCP_INFO *info )
 		return -1;
 	}
 
-	if( FB_TCP_WOULDBLOCK( FB_TCP_ERRNO() ) )
+	if( FB_TCP_WOULDBLOCK( err ) )
 		return 0;
 
 	info->is_closed = TRUE;
@@ -383,13 +449,14 @@ static int fb_hDevTcpSendAll( DEV_TCP_INFO *info, const char *buffer, size_t len
 	while( total < length ) {
 		int chunk = (int)MIN( length - total, (size_t)INT_MAX );
 		int sent;
+		int err;
 		int flags = 0;
 
 		#if defined(MSG_NOSIGNAL)
 			flags = MSG_NOSIGNAL;
 		#endif
 
-		sent = send( info->hSocket, buffer + total, chunk, flags );
+		sent = fb_hDevTcpSendUnlocked( info, buffer + total, chunk, flags, &err );
 		if( sent <= 0 ) {
 			info->is_closed = TRUE;
 			return fb_ErrorSetNum( FB_RTERROR_FILEIO );
@@ -416,7 +483,9 @@ static void fb_hDevTcpShutdownConnectedSocket( DEV_TCP_INFO *info )
 	if( info->timeout != 0 )
 		timeout = info->timeout;
 
+	FB_UNLOCK();
 	shutdown( info->hSocket, FB_TCP_SHUT_WR );
+	FB_LOCK();
 
 	while( timeout > 0 ) {
 		fd_set set;
@@ -430,15 +499,20 @@ static void fb_hDevTcpShutdownConnectedSocket( DEV_TCP_INFO *info )
 		tv.tv_usec = (slice % 1000) * 1000;
 
 		#if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
+			FB_UNLOCK();
 			res = select( 0, &set, NULL, NULL, &tv );
 		#else
+			FB_UNLOCK();
 			res = select( info->hSocket + 1, &set, NULL, NULL, &tv );
 		#endif
 
-		if( res <= 0 )
+		if( res <= 0 ) {
+			FB_LOCK();
 			break;
+		}
 
 		res = recv( info->hSocket, buffer, sizeof( buffer ), 0 );
+		FB_LOCK();
 		if( res <= 0 )
 			break;
 
@@ -452,13 +526,16 @@ static int fb_DevTcpClose( FB_FILE *handle )
 	int res = FB_RTERROR_OK;
 	DEV_TCP_INFO *info;
 
-	FB_LOCK();
-
 	info = (DEV_TCP_INFO*)handle->opaque;
 	if( info != NULL ) {
 		if( info->hSocket != FB_TCP_INVALID_SOCKET ) {
+			int close_res;
+
 			fb_hDevTcpShutdownConnectedSocket( info );
-			if( FB_TCP_CLOSESOCKET( info->hSocket ) != 0 )
+			FB_UNLOCK();
+			close_res = FB_TCP_CLOSESOCKET( info->hSocket );
+			FB_LOCK();
+			if( close_res != 0 )
 				res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		}
 
@@ -468,8 +545,6 @@ static int fb_DevTcpClose( FB_FILE *handle )
 		}
 	}
 
-	FB_UNLOCK();
-
 	return res;
 }
 
@@ -478,11 +553,12 @@ static int fb_DevTcpWrite( FB_FILE *handle, const void *value, size_t valuelen )
 	int res;
 	DEV_TCP_INFO *info;
 
-	FB_LOCK();
 	info = (DEV_TCP_INFO*)handle->opaque;
-	res = fb_hDevTcpSendAll( info, (const char *)value, valuelen );
-	FB_UNLOCK();
+	if( info == NULL || info->is_closed ) {
+		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+	}
 
+	res = fb_hDevTcpSendAll( info, (const char *)value, valuelen );
 	return res;
 }
 
@@ -496,17 +572,13 @@ static int fb_DevTcpRead( FB_FILE *handle, void *value, size_t *pValuelen )
 	int res = FB_RTERROR_OK;
 	DEV_TCP_INFO *info;
 
-	FB_LOCK();
-
 	info = (DEV_TCP_INFO*)handle->opaque;
 	if( info == NULL || pValuelen == NULL ) {
-		FB_UNLOCK();
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}
 
 	if( info->is_closed ) {
 		*pValuelen = 0;
-		FB_UNLOCK();
 		return FB_RTERROR_OK;
 	}
 
@@ -515,13 +587,14 @@ static int fb_DevTcpRead( FB_FILE *handle, void *value, size_t *pValuelen )
 	res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 #else
 	{
-		int bytes = recv( info->hSocket, value, (int)MIN( *pValuelen, (size_t)INT_MAX ), 0 );
+		int err = 0;
+		int bytes = fb_hDevTcpRecvUnlocked( info, value, *pValuelen, 0, &err );
 		if( bytes > 0 ) {
 			*pValuelen = bytes;
 		} else if( bytes == 0 ) {
 			info->is_closed = TRUE;
 			*pValuelen = 0;
-		} else if( FB_TCP_WOULDBLOCK( FB_TCP_ERRNO() ) ) {
+		} else if( FB_TCP_WOULDBLOCK( err ) ) {
 			*pValuelen = 0;
 		} else {
 			info->is_closed = TRUE;
@@ -530,8 +603,6 @@ static int fb_DevTcpRead( FB_FILE *handle, void *value, size_t *pValuelen )
 		}
 	}
 #endif
-
-	FB_UNLOCK();
 
 	return res;
 }
@@ -548,8 +619,6 @@ static int fb_DevTcpTell( FB_FILE *handle, fb_off_t *pOffset )
 	DEV_TCP_INFO *info;
 
 	DBG_ASSERT( pOffset != NULL );
-
-	FB_LOCK();
 
 	info = (DEV_TCP_INFO*)handle->opaque;
 	if( info == NULL ) {
@@ -573,8 +642,6 @@ static int fb_DevTcpTell( FB_FILE *handle, fb_off_t *pOffset )
 #endif
 	}
 
-	FB_UNLOCK();
-
 	return res;
 }
 
@@ -583,10 +650,8 @@ static int fb_DevTcpEof( FB_FILE *handle )
 	int res;
 	DEV_TCP_INFO *info;
 
-	FB_LOCK();
 	info = (DEV_TCP_INFO*)handle->opaque;
 	res = (fb_hDevTcpPeekState( info ) == 1 ? FB_FALSE : FB_TRUE);
-	FB_UNLOCK();
 
 	return res;
 }
@@ -595,6 +660,69 @@ static int fb_DevTcpServerEof( FB_FILE *handle )
 {
 	(void)handle;
 	return FB_TRUE;
+}
+
+static int fb_hDevTcpReadPutbackByte( FB_FILE *handle, char *ch )
+{
+	size_t bytes;
+
+	if( handle->putback_size == 0 )
+		return FALSE;
+
+	if( handle->encod == FB_FILE_ENCOD_ASCII || handle->putback_size < sizeof( FB_WCHAR ) ) {
+		*ch = handle->putback_buffer[0];
+		bytes = 1;
+	} else {
+		FB_WCHAR wc;
+
+		memcpy( &wc, handle->putback_buffer, sizeof( wc ) );
+		*ch = (char)wc;
+		bytes = sizeof( wc );
+	}
+
+	handle->putback_size -= bytes;
+	if( handle->putback_size != 0 ) {
+		memmove( handle->putback_buffer,
+		         handle->putback_buffer + bytes,
+		         handle->putback_size );
+	}
+
+	return TRUE;
+}
+
+static int fb_hDevTcpReadByte( FB_FILE *handle, DEV_TCP_INFO *info, char *ch, size_t *read_len )
+{
+	*read_len = 0;
+
+	if( fb_hDevTcpReadPutbackByte( handle, ch ) ) {
+		*read_len = 1;
+		return FB_RTERROR_OK;
+	}
+
+	if( info->is_closed )
+		return FB_RTERROR_OK;
+
+#if defined(HOST_DOS) || defined(HOST_JS)
+	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+#else
+	{
+		int err = 0;
+		int bytes = fb_hDevTcpRecvUnlocked( info, ch, 1, 0, &err );
+
+		if( bytes > 0 ) {
+			*read_len = 1;
+		} else if( bytes == 0 ) {
+			info->is_closed = TRUE;
+		} else if( FB_TCP_WOULDBLOCK( err ) ) {
+			*read_len = 0;
+		} else {
+			info->is_closed = TRUE;
+			return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+		}
+	}
+#endif
+
+	return FB_RTERROR_OK;
 }
 
 static void fb_hDevTcpAppendChunk( FBSTRING *dst, const char *buffer, ssize_t len )
@@ -614,22 +742,26 @@ static void fb_hDevTcpAppendChunk( FBSTRING *dst, const char *buffer, ssize_t le
 
 static int fb_DevTcpReadLine( FB_FILE *handle, FBSTRING *dst )
 {
+	DEV_TCP_INFO *info = (DEV_TCP_INFO*)handle->opaque;
 	char buffer[1024];
 	ssize_t len = 0;
 	int res = FB_RTERROR_OK;
 
 	fb_StrDelete( dst );
 
+	if( info == NULL )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
 	do {
 		char ch;
 		size_t read_len = 0;
 
-		res = fb_FileGetDataEx( handle, 0, &ch, 1, &read_len, FALSE, FALSE );
+		res = fb_hDevTcpReadByte( handle, info, &ch, &read_len );
 		if( res != FB_RTERROR_OK || read_len == 0 )
 			break;
 
 		if( ch == '\r' ) {
-			res = fb_FileGetDataEx( handle, 0, &ch, 1, &read_len, FALSE, FALSE );
+			res = fb_hDevTcpReadByte( handle, info, &ch, &read_len );
 			if( res == FB_RTERROR_OK && read_len == 1 ) {
 				if( ch != '\n' )
 					fb_FilePutBackEx( handle, &ch, 1 );

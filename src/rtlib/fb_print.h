@@ -38,23 +38,30 @@ static __inline__ int FB_PRINT_CONVERT_BIN_NEWLINE(int mask)
 #define FB_PRINTNUM_EX(handle, val, mask, fmt, type)                          \
     do {                                                                      \
         char buffer[80];                                                      \
+        int written;                                                          \
         size_t len;                                                           \
                                                                               \
         if( mask & FB_PRINT_APPEND_SPACE ) {                                  \
             if( mask & FB_PRINT_BIN_NEWLINE )                                 \
-                len = sprintf( buffer, fmt type " " FB_BINARY_NEWLINE, val ); \
+                written = snprintf( buffer, sizeof( buffer ), fmt type " " FB_BINARY_NEWLINE, val ); \
             else if( mask & FB_PRINT_NEWLINE )                                \
-                len = sprintf( buffer, fmt type " " FB_NEWLINE, val );        \
+                written = snprintf( buffer, sizeof( buffer ), fmt type " " FB_NEWLINE, val ); \
             else                                                              \
-                len = sprintf( buffer, fmt type " ", val );                   \
+                written = snprintf( buffer, sizeof( buffer ), fmt type " ", val ); \
         } else {                                                              \
             if( mask & FB_PRINT_BIN_NEWLINE )                                 \
-                len = sprintf( buffer, fmt type FB_BINARY_NEWLINE, val );     \
+                written = snprintf( buffer, sizeof( buffer ), fmt type FB_BINARY_NEWLINE, val ); \
             else if( mask & FB_PRINT_NEWLINE )                                \
-                len = sprintf( buffer, fmt type FB_NEWLINE, val );            \
+                written = snprintf( buffer, sizeof( buffer ), fmt type FB_NEWLINE, val ); \
             else                                                              \
-                len = sprintf( buffer, fmt type, val );                       \
+                written = snprintf( buffer, sizeof( buffer ), fmt type, val ); \
         }                                                                     \
+        if( written < 0 )                                                      \
+            len = 0;                                                          \
+        else if( (size_t)written >= sizeof( buffer ) )                        \
+            len = sizeof( buffer ) - 1;                                       \
+        else                                                                  \
+            len = (size_t)written;                                            \
                                                                               \
         FB_PRINT_EX( handle, buffer, len, mask );                             \
                                                                               \
@@ -69,14 +76,21 @@ static __inline__ int FB_PRINT_CONVERT_BIN_NEWLINE(int mask)
 #define FB_WRITENUM_EX(handle, val, mask, type )                      \
     do {                                                              \
         char buffer[80];									          \
+        int written;                                                  \
         size_t len;                                                   \
                                                                       \
         if( mask & FB_PRINT_BIN_NEWLINE )           		          \
-            len = sprintf( buffer, type FB_BINARY_NEWLINE, val );     \
+            written = snprintf( buffer, sizeof( buffer ), type FB_BINARY_NEWLINE, val ); \
         else if( mask & FB_PRINT_NEWLINE )           		          \
-            len = sprintf( buffer, type FB_NEWLINE, val );            \
+            written = snprintf( buffer, sizeof( buffer ), type FB_NEWLINE, val ); \
         else												          \
-            len = sprintf( buffer, type ",", val );                   \
+            written = snprintf( buffer, sizeof( buffer ), type ",", val ); \
+        if( written < 0 )                                             \
+            len = 0;                                                  \
+        else if( (size_t)written >= sizeof( buffer ) )                \
+            len = sizeof( buffer ) - 1;                               \
+        else                                                          \
+            len = (size_t)written;                                    \
                                                                       \
         fb_hFilePrintBufferEx( handle, buffer, len );	              \
     } while (0)

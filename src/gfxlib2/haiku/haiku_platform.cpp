@@ -54,7 +54,7 @@ void fb_hHaikuResetState(void)
 /* Query desktop size                                                        */
 /* ------------------------------------------------------------------------- */
 
-void fb_hHaikuQueryDesktop(void)
+extern "C" void fb_hHaikuQueryDesktop(void)
 {
     BScreen screen;
 

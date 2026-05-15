@@ -35,6 +35,10 @@
 #include once "crt/cygwin/stdio.bi"
 #elseif defined(__FB_FREEBSD__)
 #include once "crt/freebsd/stdio.bi"
+#elseif defined(__FB_OPENBSD__)
+#include once "crt/openbsd/stdio.bi"
+#elseif defined(__FB_HAIKU__)
+#include once "crt/haiku/stdio.bi"
 #elseif defined(__FB_DARWIN__)
 #include once "crt/darwin/stdio.bi"
 #elseif defined(__FB_UNIX__)

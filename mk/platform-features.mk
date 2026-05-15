@@ -363,8 +363,12 @@ endif
 # ---------------------------------------------------------------------------
 
 # CET is meaningful on x86-family hosted targets where supported.
+#
+# Haiku's runtime_loader does not currently handle the GNU property program
+# header emitted by GCC for -fcf-protection.  Keep CET out of Haiku builds so
+# the freshly built bootstrap compiler can run while building the real one.
 ifneq ($(filter x86 x86_64,$(TARGET_ARCH)),)
-  ifneq ($(filter linux freebsd netbsd openbsd dragonfly solaris haiku,$(TARGET_OS)),)
+  ifneq ($(filter linux freebsd netbsd openbsd dragonfly solaris,$(TARGET_OS)),)
     ENABLE_CET := YesPlease
   endif
 endif

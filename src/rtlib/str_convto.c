@@ -20,7 +20,8 @@ FBCALL FBSTRING *fb_IntToStr ( int num )
 #ifdef HOST_MINGW
 		_itoa( num, dst->data, 10 );
 #else
-		sprintf( dst->data, "%d", num );
+		if( snprintf( dst->data, (size_t)dst->size + 1, "%d", num ) < 0 )
+			dst->data[0] = '\0';
 #endif
 		fb_hStrSetLength( dst, strlen( dst->data ) );
 	}
@@ -43,7 +44,8 @@ FBCALL FBSTRING *fb_UIntToStr ( unsigned int num )
 #ifdef HOST_MINGW
 		_ultoa( num, dst->data, 10 );
 #else
-		sprintf( dst->data, "%u", num );
+		if( snprintf( dst->data, (size_t)dst->size + 1, "%u", num ) < 0 )
+			dst->data[0] = '\0';
 #endif
 		fb_hStrSetLength( dst, strlen( dst->data ) );
 	}

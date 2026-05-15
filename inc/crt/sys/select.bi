@@ -15,6 +15,8 @@
 #include once "crt/sys/linux/select.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/sys/linux/select.bi"
+#elseif defined(__FB_OPENBSD__)
+#include once "crt/sys/openbsd/select.bi"
 #else
 #error Platform unsupported
 #endif
@@ -24,7 +26,9 @@ type sigset_t as __sigset_t
 #include once "crt/sys/time.bi"
 #include once "crt/long.bi"
 
+#ifndef suseconds_t
 type suseconds_t as __suseconds_t
+#endif
 
 type __fd_mask as clong
 

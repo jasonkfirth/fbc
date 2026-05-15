@@ -386,13 +386,13 @@ $(LOG_TESTS_INC) :
 # very long and some shells (like cmd.exe) won't handle it.
 
 	@$(PRINTF) "."
-	@$(GREP) $(LOG_TESTS_INC) -i -e ".*+=.*\.b.*" \
+	@$(GREP) -i -e ".*+=.*\.b.*" $(LOG_TESTS_INC) \
 | $(SED) 's/^.* += \(.*\)\(\.b.*\)/\1\.o/g' \
 > $(LOG_TESTS_OBJ_LST)
 
 $(LOG_TESTS_LOG_LST) : $(LOG_TESTS_INC)
 	@$(PRINTF) "."
-	@$(GREP) $(LOG_TESTS_INC) -i -e "^.*+=.*\.b.*" \
+	@$(GREP) -i -e "^.*+=.*\.b.*" $(LOG_TESTS_INC) \
 | $(SED) 's/^.* += \(.*\)\(\.b.*\)/\1\.log/g' \
 > $(LOG_TESTS_LOG_LST)
 

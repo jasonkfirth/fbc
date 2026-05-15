@@ -2,6 +2,7 @@
 
 #include "fb.h"
 #include <math.h>
+#include <stdarg.h>
 
 typedef enum _eMaskType {
 	eMT_Unknown = 0,
@@ -32,6 +33,29 @@ typedef struct _FormatMaskInfo {
 
 #define FB_MAXFIXLEN 19 /* floor( log10( pow( 2.0, 64 ) ) ) */
 
+static ssize_t hSnprintf( char *buffer, size_t size, const char *format, ... )
+{
+	va_list args;
+	int written;
+
+	if( size == 0 )
+		return 0;
+
+	va_start( args, format );
+	written = vsnprintf( buffer, size, format, args );
+	va_end( args );
+
+	if( written < 0 ) {
+		buffer[0] = '\0';
+		return 0;
+	}
+
+	if( (size_t)written >= size )
+		return (ssize_t)size - 1;
+
+	return (ssize_t)written;
+}
+
 /** Splits a number into its fixed and fractional part.
  *
  * precision        info
@@ -44,8 +68,10 @@ void fb_hGetNumberParts
 	(
 		double number,
 		char *pachFixPart,
+		size_t fix_part_size,
 		ssize_t *pcchLenFix,
 		char *pachFracPart,
+		size_t frac_part_size,
 		ssize_t *pcchLenFrac,
 		char *pchSign,
 		char chDecimalPoint,
@@ -65,7 +91,7 @@ void fb_hGetNumberParts
 		dblFrac = -dblFrac;
 
 	/* Store fractional part of number into buffer */
-	len_frac = sprintf( pachFracPart, "%.*f", precision, dblFrac );
+	len_frac = hSnprintf( pachFracPart, frac_part_size, "%.*f", precision, dblFrac );
 
 	/* Remove trailing zeroes and - if it completely consists of zeroes -
 	 * also remove the decimal point */
@@ -107,7 +133,7 @@ void fb_hGetNumberParts
 		} else {
 			chSign = '\0';
 		}
-		len_fix = sprintf( pachFixPart, "%" FB_LL_FMTMOD "u", ullFix );
+		len_fix = hSnprintf( pachFixPart, fix_part_size, "%" FB_LL_FMTMOD "u", ullFix );
 	}
 
 	if( pcchLenFix!=NULL )
@@ -131,8 +157,8 @@ FBSTRING *fb_hBuildDouble
 	FBSTRING *dst;
 
 	fb_hGetNumberParts( num,
-	                    FixPart, &LenFix,
-	                    FracPart, &LenFrac,
+	                    FixPart, sizeof( FixPart ), &LenFix,
+	                    FracPart, sizeof( FracPart ), &LenFrac,
 	                    &chSign,
 	                    '.',
 	                    11 );
@@ -313,7 +339,7 @@ int fb_hProcessMask
 					ExpValue += 1;
 				}
 
-				LenExp = sprintf( ExpPart, "%d", (int)ExpValue );
+				LenExp = hSnprintf( ExpPart, sizeof( ExpPart ), "%d", (int)ExpValue );
 
 				if( ExpValue < 0 )
 					IndexExp = ExpAdjust = 1;
@@ -364,7 +390,7 @@ int fb_hProcessMask
 			{
 				value /= 10.0;
 				ExpValue += 1;
-				LenExp = sprintf( ExpPart, "%d", (int)ExpValue );
+				LenExp = hSnprintf( ExpPart, sizeof( ExpPart ), "%d", (int)ExpValue );
 				if( ExpValue < 0 )
 					IndexExp = ExpAdjust = 1;
 				else
@@ -374,8 +400,8 @@ int fb_hProcessMask
 			}
 
 			fb_hGetNumberParts( value,
-			                    FixPart, &LenFix,
-			                    FracPart, &LenFrac,
+			                    FixPart, sizeof( FixPart ), &LenFix,
+			                    FracPart, sizeof( FracPart ), &LenFrac,
 			                    &chSign,
 			                    '.',
 			                    pInfo->num_digits_frac );
@@ -837,7 +863,7 @@ int fb_hProcessMask
 								++pInfo->length_min;
 								++pInfo->length_opt;
 							} else {
-								LenAdd = sprintf( ((pszAdd = FixPart), FixPart),
+								LenAdd = hSnprintf( ((pszAdd = FixPart), FixPart), sizeof( FixPart ),
 								                  "%d",
 								                  fb_Day( value ) );
 								do_add = TRUE;
@@ -847,7 +873,7 @@ int fb_hProcessMask
 							if( !do_output ) {
 								pInfo->length_min += 2;
 							} else {
-								LenAdd = sprintf( ((pszAdd = FixPart), FixPart),
+								LenAdd = hSnprintf( ((pszAdd = FixPart), FixPart), sizeof( FixPart ),
 								                  "%02d",
 								                  fb_Day( value ) );
 								do_add = TRUE;
@@ -870,7 +896,7 @@ int fb_hProcessMask
 								++pInfo->length_min;
 								++pInfo->length_opt;
 							} else {
-								LenAdd = sprintf( ((pszAdd = FixPart), FixPart),
+								LenAdd = hSnprintf( ((pszAdd = FixPart), FixPart), sizeof( FixPart ),
 								                  "%d",
 								                  fb_Minute( value ) );
 								do_add = TRUE;
@@ -880,7 +906,7 @@ int fb_hProcessMask
 							if( !do_output ) {
 								pInfo->length_min += 2;
 							} else {
-								LenAdd = sprintf( ((pszAdd = FixPart), FixPart),
+								LenAdd = hSnprintf( ((pszAdd = FixPart), FixPart), sizeof( FixPart ),
 								                  "%02d",
 								                  fb_Minute( value ) );
 								do_add = TRUE;
@@ -899,7 +925,7 @@ int fb_hProcessMask
 										hour += 12;
 									}
 								}
-								LenAdd = sprintf( ((pszAdd = FixPart), FixPart),
+								LenAdd = hSnprintf( ((pszAdd = FixPart), FixPart), sizeof( FixPart ),
 								                  "%d",
 								                  hour );
 								do_add = TRUE;
@@ -918,7 +944,7 @@ int fb_hProcessMask
 										hour += 12;
 									}
 								}
-								LenAdd = sprintf( ((pszAdd = FixPart), FixPart),
+								LenAdd = hSnprintf( ((pszAdd = FixPart), FixPart), sizeof( FixPart ),
 								                  "%02d",
 								                  hour );
 								do_add = TRUE;
@@ -930,7 +956,7 @@ int fb_hProcessMask
 								++pInfo->length_min;
 								++pInfo->length_opt;
 							} else {
-								LenAdd = sprintf( ((pszAdd = FixPart), FixPart),
+								LenAdd = hSnprintf( ((pszAdd = FixPart), FixPart), sizeof( FixPart ),
 								                  "%d",
 								                  fb_Second( value ) );
 								do_add = TRUE;
@@ -940,7 +966,7 @@ int fb_hProcessMask
 							if( !do_output ) {
 								pInfo->length_min += 2;
 							} else {
-								LenAdd = sprintf( ((pszAdd = FixPart), FixPart),
+								LenAdd = hSnprintf( ((pszAdd = FixPart), FixPart), sizeof( FixPart ),
 								                  "%02d",
 								                  fb_Second( value ) );
 								do_add = TRUE;
@@ -951,7 +977,7 @@ int fb_hProcessMask
 								++pInfo->length_min;
 								++pInfo->length_opt;
 							} else {
-								LenAdd = sprintf( ((pszAdd = FixPart), FixPart),
+								LenAdd = hSnprintf( ((pszAdd = FixPart), FixPart), sizeof( FixPart ),
 								                  "%d",
 								                  fb_Month( value ) );
 								do_add = TRUE;
@@ -961,7 +987,7 @@ int fb_hProcessMask
 							if( !do_output ) {
 								pInfo->length_min += 2;
 							} else {
-								LenAdd = sprintf( ((pszAdd = FixPart), FixPart),
+								LenAdd = hSnprintf( ((pszAdd = FixPart), FixPart), sizeof( FixPart ),
 								                  "%02d",
 								                  fb_Month( value ) );
 								do_add = TRUE;
@@ -983,7 +1009,7 @@ int fb_hProcessMask
 							if( !do_output ) {
 								pInfo->length_min += 2;
 							} else {
-								LenAdd = sprintf( ((pszAdd = FixPart), FixPart),
+								LenAdd = hSnprintf( ((pszAdd = FixPart), FixPart), sizeof( FixPart ),
 								                  "%02d",
 								                  fb_Year( value ) % 100);
 								do_add = TRUE;
@@ -993,7 +1019,7 @@ int fb_hProcessMask
 							if( !do_output ) {
 								pInfo->length_min += 4;
 							} else {
-								LenAdd = sprintf( ((pszAdd = FixPart), FixPart),
+								LenAdd = hSnprintf( ((pszAdd = FixPart), FixPart), sizeof( FixPart ),
 								                  "%04d",
 								                  fb_Year( value ));
 								do_add = TRUE;

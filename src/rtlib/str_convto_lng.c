@@ -20,7 +20,8 @@ FBCALL FBSTRING *fb_LongintToStr ( long long num )
 #ifdef HOST_MINGW
 		_i64toa( num, dst->data, 10 );
 #else
-		sprintf( dst->data, "%lld", num );
+		if( snprintf( dst->data, (size_t)dst->size + 1, "%lld", num ) < 0 )
+			dst->data[0] = '\0';
 #endif
 
 		fb_hStrSetLength( dst, strlen( dst->data ) );
@@ -44,7 +45,8 @@ FBCALL FBSTRING *fb_ULongintToStr ( unsigned long long num )
 #ifdef HOST_MINGW
 		_ui64toa( num, dst->data, 10 );
 #else
-		sprintf( dst->data, "%llu", num );
+		if( snprintf( dst->data, (size_t)dst->size + 1, "%llu", num ) < 0 )
+			dst->data[0] = '\0';
 #endif
 
 		fb_hStrSetLength( dst, strlen( dst->data ) );

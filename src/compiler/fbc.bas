@@ -1138,7 +1138,10 @@ private function hLinkFiles( ) as integer
 					#endif
 				end select
 			case FB_COMPTARGET_HAIKU
-				ldcline += " -shared -no-undefined"
+				'' Haiku executables are linked through the shared-object path.
+				'' Bind definitions within the executable so RIP-relative inline
+				'' assembly references to local FB symbols remain linkable.
+				ldcline += " -shared -no-undefined -Bsymbolic"
 			case FB_COMPTARGET_NETBSD
 				ldcline += " -dynamic-linker /usr/libexec/ld.elf_so"
 			case FB_COMPTARGET_OPENBSD
@@ -1494,7 +1497,13 @@ private function hLinkFiles( ) as integer
 				if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
 					hAddXboxLibArchive( ldcline, i->s )
 				else
-					ldcline += " -l" + i->s
+					dim as string libname = i->s
+					if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_OPENBSD ) then
+						if( libname = "stdc++" ) then
+							libname = "estdc++"
+						end if
+					end if
+					ldcline += " -l" + libname
 				end if
 			end if
 			i = listGetNext(i)
@@ -3170,10 +3179,14 @@ end sub
 '' but Android <4.1 didn't support PIE executables. We assume 4.1+.)
 private function hTargetNeedsPIC( ) as integer
 	function = FALSE
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_OPENBSD ) then
+		function = TRUE
+		exit function
+	end if
 	if( fbGetCpuFamily( ) <> FB_CPUFAMILY_X86 ) then
 		select case as const( fbGetOption( FB_COMPOPT_TARGET ) )
 		case FB_COMPTARGET_LINUX, FB_COMPTARGET_FREEBSD, _
-		     FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD, _
+		     FB_COMPTARGET_NETBSD, _
 		     FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS, _
 		     FB_COMPTARGET_ANDROID
 			function = TRUE
@@ -3263,9 +3276,10 @@ private sub hCheckArgs()
 		fbcEnd( 1 )
 	end if
 
-	'' 4.5. Enable -pic automatically when building a Unix shared library
-	''      or Android executable (required on Android 5+)
+	'' 4.5. Enable -pic automatically when building a Unix shared library,
+	''      an OpenBSD executable, or an Android executable.
 	if( (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB) or _
+	    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_OPENBSD) or _
 	    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_ANDROID) ) then
 		if( hTargetNeedsPIC( ) ) then
 			fbSetOption( FB_COMPOPT_PIC, TRUE )
@@ -3464,6 +3478,16 @@ private sub fbcSetupCompilerPaths( )
 	'' libraries would be a different matter, so in future maybe change this.
 
 	dim as string targetid = fbGetTargetId( )
+
+	#if defined( __FB_OPENBSD__ )
+		#ifndef ENABLE_STANDALONE
+			if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_OPENBSD) and _
+				(len( fbc.targetprefix ) = 0) and _
+				(len( fbc.buildprefix ) = 0) ) then
+				fbctoolTB(FBCTOOL_GCC).name = "egcc"
+			end if
+		#endif
+	#endif
 
 #ifdef ENABLE_STANDALONE
 	'' Use default target name

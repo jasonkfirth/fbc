@@ -179,7 +179,16 @@ int fb_hInitScancodes(void);
 /* Platform helpers                                                          */
 /* ------------------------------------------------------------------------- */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void fb_hHaikuQueryDesktop(void);
+
+#ifdef __cplusplus
+}
+#endif
+
 void fb_hHaikuResetState(void);
 
 int  fb_hHaikuCreateStateSync(void);

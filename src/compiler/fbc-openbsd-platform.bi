@@ -34,6 +34,7 @@ private sub fbcOpenbsdPlatformAddDefaultLibPaths( )
 	end if
 
 #ifndef ENABLE_STANDALONE
+	fbcAddDefLibPath( "/usr/local/lib/" )
 	fbcAddLibPathFor( "libX11.a" )
 	fbcAddLibPathFor( "libm.a" )
 #endif

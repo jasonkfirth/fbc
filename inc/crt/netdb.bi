@@ -16,6 +16,8 @@
 #include once "crt/linux/netdb.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/linux/netdb.bi"
+#elseif defined(__FB_OPENBSD__)
+#include once "crt/openbsd/netdb.bi"
 #else
 #error Unsupported platform
 #endif
@@ -28,6 +30,8 @@
 #define _PATH_SERVICES "/etc/services"
 
 #if defined(__FB_CYGWIN__)
+extern h_errno alias "h_errno" as long
+#elseif defined(__FB_OPENBSD__)
 extern h_errno alias "h_errno" as long
 #else
 #define h_errno *__h_errno_location()
@@ -96,6 +100,25 @@ const AI_V4MAPPED = &h0800
 #define EAI_BADHINTS 12
 #define EAI_PROTOCOL 13
 #define EAI_OVERFLOW 14
+#elseif defined(__FB_OPENBSD__)
+const AI_PASSIVE = &h0001
+const AI_CANONNAME = &h0002
+const AI_NUMERICHOST = &h0004
+const AI_NUMERICSERV = &h0010
+#define EAI_BADFLAGS -1
+#define EAI_NONAME -2
+#define EAI_AGAIN -3
+#define EAI_FAIL -4
+#define EAI_NODATA -5
+#define EAI_FAMILY -6
+#define EAI_SOCKTYPE -7
+#define EAI_SERVICE -8
+#define EAI_ADDRFAMILY -9
+#define EAI_MEMORY -10
+#define EAI_SYSTEM -11
+#define EAI_BADHINTS -12
+#define EAI_PROTOCOL -13
+#define EAI_OVERFLOW -14
 #else
 const AI_PASSIVE = &h0001
 const AI_CANONNAME = &h0002
@@ -117,7 +140,12 @@ const AI_NUMERICSERV = &h0400
 #define EAI_SYSTEM -11
 #define EAI_OVERFLOW -12
 #endif
+
+#if defined(__FB_OPENBSD__)
+#define NI_MAXHOST 256
+#else
 #define NI_MAXHOST 1025
+#endif
 #define NI_MAXSERV 32
 #if defined(__FB_CYGWIN__)
 #define NI_NOFQDN 1

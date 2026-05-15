@@ -143,20 +143,39 @@ extern in6addr_loopback alias "in6addr_loopback" as in6_addr
 
 #include once "crt/sys/socket.bi"
 
-type sockaddr_in
-	sin_family as sa_family_t
-	sin_port as in_port_t
-	sin_addr as in_addr
-	sin_zero(0 to len(sockaddr)-(len(ushort)) -len(in_port_t)-len(in_addr)-1) as ubyte
-end type
+#if defined(__FB_OPENBSD__)
+	type sockaddr_in
+		sin_len as ubyte
+		sin_family as sa_family_t
+		sin_port as in_port_t
+		sin_addr as in_addr
+		sin_zero(0 to 8-1) as ubyte
+	end type
 
-type sockaddr_in6
-	sin6_family as sa_family_t
-	sin6_port as in_port_t
-	sin6_flowinfo as uint32_t
-	sin6_addr as in6_addr
-	sin6_scope_id as uint32_t
-end type
+	type sockaddr_in6
+		sin6_len as ubyte
+		sin6_family as sa_family_t
+		sin6_port as in_port_t
+		sin6_flowinfo as uint32_t
+		sin6_addr as in6_addr
+		sin6_scope_id as uint32_t
+	end type
+#else
+	type sockaddr_in
+		sin_family as sa_family_t
+		sin_port as in_port_t
+		sin_addr as in_addr
+		sin_zero(0 to len(sockaddr)-(len(ushort)) -len(in_port_t)-len(in_addr)-1) as ubyte
+	end type
+
+	type sockaddr_in6
+		sin6_family as sa_family_t
+		sin6_port as in_port_t
+		sin6_flowinfo as uint32_t
+		sin6_addr as in6_addr
+		sin6_scope_id as uint32_t
+	end type
+#endif
 
 type ip_mreq
 	imr_multiaddr as in_addr
@@ -205,6 +224,8 @@ end type
 #include once "crt/netinet/linux/in.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/netinet/cygwin/in.bi"
+#elseif defined(__FB_OPENBSD__)
+#include once "crt/netinet/openbsd/in.bi"
 #else
 #error Platform unsupported
 #endif

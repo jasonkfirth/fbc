@@ -22,6 +22,10 @@
 #include once "crt/cygwin/time.bi"
 #elseif defined(__FB_FREEBSD__)
 #include once "crt/freebsd/time.bi"
+#elseif defined(__FB_OPENBSD__)
+#include once "crt/openbsd/time.bi"
+#elseif defined(__FB_HAIKU__)
+#include once "crt/haiku/time.bi"
 #elseif defined(__FB_DARWIN__)
 '' FIXME: may be wrong
 #include once "crt/linux/time.bi"

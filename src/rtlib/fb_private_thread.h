@@ -24,13 +24,14 @@
 	#define PTHREAD_STACK_MIN 8192
 #endif
 
-/* phtreads will crash freebsd when stack size is too small
-// The default of 2048 KiB is too small.as tested on freebsd-13.0-i386
-// 8192 KiB seems about alright (jeffm) 
+/* pthreads will crash some BSD targets when stack size is too small.
+// The default of 2048 KiB is too small as tested on freebsd-13.0-i386.
+// OpenBSD's PTHREAD_STACK_MIN is also too small for libc resolver paths
+// reached from threaded TCP programs. 8192 KiB seems about alright (jeffm)
 // see https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=234775
 */
-#ifdef HOST_FREEBSD
-	#define FBTHREAD_STACK_MIN 8192
+#if defined( HOST_FREEBSD ) || defined( HOST_OPENBSD )
+	#define FBTHREAD_STACK_MIN (8192 * 1024)
 #else
 	#define FBTHREAD_STACK_MIN PTHREAD_STACK_MIN
 #endif
