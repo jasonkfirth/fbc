@@ -23,7 +23,7 @@ typedef struct NODE
 
 typedef struct KEY_DATA
 {
-	char *cap;
+	const char *cap;
 	int code;
 } KEY_DATA;
 
@@ -59,7 +59,7 @@ static const KEY_DATA key_data[] = {
 static int key_buffer[KEY_BUFFER_LEN], key_head = 0, key_tail = 0, key_buffer_changed = FALSE;
 static NODE *root_node = NULL;
 
-static void add_key(NODE **node, char *key, short code)
+static void add_key(NODE **node, const char *key, short code)
 {
 	NODE *n;
 
@@ -101,10 +101,10 @@ static void add_key(NODE **node, char *key, short code)
 
 static void init_keys(void)
 {
-	KEY_DATA *data;
+	const KEY_DATA *data;
 	char *key;
 
-	for (data = (KEY_DATA *)key_data; data->cap; data++) {
+	for (data = key_data; data->cap; data++) {
 		/**
 		 * Lookup the terminal escape sequences (termcap database
 		 * entries) corresponding to the id strings defined in the

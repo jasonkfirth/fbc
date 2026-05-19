@@ -4,7 +4,7 @@
 
 #include "fb.h"
 
-extern const char __fb_utf8_trailingTb[256];
+extern const unsigned char __fb_utf8_trailingTb[256];
 extern const UTF_32 __fb_utf8_offsetsTb[6];
 
 char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars );
@@ -280,14 +280,14 @@ static FB_WCHAR *hUTF16ToUTF16( const UTF_16 *src, FB_WCHAR *dst, ssize_t *chars
 	if( dst == NULL ) {
 		while( src[len] )
 			len++;
-		dst = malloc( (len + 1) * sizeof( UTF_16 ) );
+		dst = malloc( (len + 1) * sizeof( FB_WCHAR ) );
 		if( dst == NULL )
 			return NULL;
-		memcpy( dst, src, (len + 1) * sizeof( UTF_16 ) );
+		memcpy( dst, src, (len + 1) * sizeof( FB_WCHAR ) );
 	} else {
-		while( src[len] && len < *chars )
+		while( (len < *chars) && src[len] )
 			len++;
-		memcpy( dst, src, len * sizeof( UTF_16 ) );
+		memcpy( dst, src, len * sizeof( FB_WCHAR ) );
 		if (len < *chars)
 			/* The input buffer has a trailing NUL character, copy it */
 			dst[len] = 0;
@@ -473,14 +473,14 @@ static FB_WCHAR *hUTF32ToUTF32( const UTF_32 *src, FB_WCHAR *dst, ssize_t *chars
 	if( dst == NULL ) {
 		while( src[len] )
 			len++;
-		dst = malloc( (len + 1) * sizeof( UTF_32 ) );
+		dst = malloc( (len + 1) * sizeof( FB_WCHAR ) );
 		if( dst == NULL )
 			return NULL;
-		memcpy( dst, src, (len + 1) * sizeof( UTF_32 ) );
+		memcpy( dst, src, (len + 1) * sizeof( FB_WCHAR ) );
 	} else {
-		while( src[len] && len < *chars )
+		while( (len < *chars) && src[len] )
 			len++;
-		memcpy( dst, src, len * sizeof( UTF_32 ) );
+		memcpy( dst, src, len * sizeof( FB_WCHAR ) );
 		/* Can't copy trailing NUL character if dst is too small */
 		if (len < *chars)
 			dst[len] = 0;

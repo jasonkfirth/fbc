@@ -17,6 +17,20 @@
 #define FB_ANDROID_FONT_H 8
 #define FB_ANDROID_KEYBOARD_BUTTON_W 56
 #define FB_ANDROID_KEYBOARD_BUTTON_H 40
+#define FB_ANDROID_GAMEPAD_MAX 16
+#define FB_ANDROID_GAMEPAD_TRIGGER_BUTTON_THRESHOLD 0.20f
+#define FB_ANDROID_GAMEPAD_HAT_THRESHOLD 0.50f
+
+typedef struct FB_ANDROID_GAMEPAD_STATE
+{
+	int device_id;
+	int seen;
+	ssize_t buttons;
+	ssize_t dpad;
+	float axis[8];
+	float left_trigger;
+	float right_trigger;
+} FB_ANDROID_GAMEPAD_STATE;
 
 typedef struct FB_ANDROID_GFX_STATE
 {
@@ -48,6 +62,7 @@ typedef struct FB_ANDROID_GFX_STATE
 	int console_col;
 	int keyboard_button_down;
 	int keyboard_visible;
+	FB_ANDROID_GAMEPAD_STATE gamepad[FB_ANDROID_GAMEPAD_MAX];
 } FB_ANDROID_GFX_STATE;
 
 static FB_ANDROID_GFX_STATE fb_android =
@@ -79,7 +94,8 @@ static FB_ANDROID_GFX_STATE fb_android =
 	0,
 	0,
 	0,
-	0
+	0,
+	{{0}}
 };
 
 static void android_log(const char *text)
@@ -189,6 +205,176 @@ void fb_hAndroidToggleKeyboard(void)
 			fb_android.keyboard_visible = 1;
 		}
 	}
+	pthread_mutex_unlock(&fb_android.mutex);
+}
+
+static float gamepad_clamp_axis(float value)
+{
+	if (value < -1.0f)
+		return -1.0f;
+	if (value > 1.0f)
+		return 1.0f;
+	return value;
+}
+
+static float gamepad_clamp_trigger(float value)
+{
+	if (value < 0.0f)
+		return 0.0f;
+	if (value > 1.0f)
+		return 1.0f;
+	return value;
+}
+
+static FB_ANDROID_GAMEPAD_STATE *gamepad_slot_locked(int device_id, int create)
+{
+	FB_ANDROID_GAMEPAD_STATE *free_slot = NULL;
+	int i;
+
+	if (device_id < 0)
+		return NULL;
+
+	for (i = 0; i < FB_ANDROID_GAMEPAD_MAX; ++i)
+	{
+		if (fb_android.gamepad[i].seen &&
+		    fb_android.gamepad[i].device_id == device_id)
+			return &fb_android.gamepad[i];
+
+		if (!fb_android.gamepad[i].seen && !free_slot)
+			free_slot = &fb_android.gamepad[i];
+	}
+
+	if (!create || !free_slot)
+		return NULL;
+
+	free_slot->seen = 1;
+	free_slot->device_id = device_id;
+	free_slot->buttons = 0;
+	free_slot->dpad = 0;
+	free_slot->left_trigger = 0.0f;
+	free_slot->right_trigger = 0.0f;
+	memset(free_slot->axis, 0, sizeof(free_slot->axis));
+	return free_slot;
+}
+
+static ssize_t gamepad_key_button(int32_t keycode)
+{
+	switch (keycode)
+	{
+	case AKEYCODE_BUTTON_A: return XPAD_BUTTON_A;
+	case AKEYCODE_BUTTON_B: return XPAD_BUTTON_B;
+	case AKEYCODE_BUTTON_X: return XPAD_BUTTON_X;
+	case AKEYCODE_BUTTON_Y: return XPAD_BUTTON_Y;
+	case AKEYCODE_BUTTON_L1: return XPAD_BUTTON_L1;
+	case AKEYCODE_BUTTON_R1: return XPAD_BUTTON_R1;
+	case AKEYCODE_BUTTON_THUMBL: return XPAD_BUTTON_L3;
+	case AKEYCODE_BUTTON_THUMBR: return XPAD_BUTTON_R3;
+	case AKEYCODE_BUTTON_START: return XPAD_BUTTON_START;
+	case AKEYCODE_BUTTON_SELECT: return XPAD_BUTTON_SELECT;
+	case AKEYCODE_BUTTON_MODE: return XPAD_BUTTON_GUIDE;
+	default: return 0;
+	}
+}
+
+static ssize_t gamepad_key_dpad(int32_t keycode)
+{
+	switch (keycode)
+	{
+	case AKEYCODE_DPAD_UP: return XPAD_DPAD_UP;
+	case AKEYCODE_DPAD_RIGHT: return XPAD_DPAD_RIGHT;
+	case AKEYCODE_DPAD_DOWN: return XPAD_DPAD_DOWN;
+	case AKEYCODE_DPAD_LEFT: return XPAD_DPAD_LEFT;
+	default: return 0;
+	}
+}
+
+void fb_hAndroidGamepadMotion(const AInputEvent *event)
+{
+	FB_ANDROID_GAMEPAD_STATE *pad;
+	float hat_x;
+	float hat_y;
+
+	if (!event)
+		return;
+
+	pthread_mutex_lock(&fb_android.mutex);
+	pad = gamepad_slot_locked(AInputEvent_getDeviceId(event), TRUE);
+	if (!pad)
+	{
+		pthread_mutex_unlock(&fb_android.mutex);
+		return;
+	}
+
+	pad->axis[0] = gamepad_clamp_axis(AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_X, 0));
+	pad->axis[1] = gamepad_clamp_axis(AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Y, 0));
+	pad->axis[2] = gamepad_clamp_axis(AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Z, 0));
+	pad->axis[3] = gamepad_clamp_axis(AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RZ, 0));
+	pad->axis[4] = gamepad_clamp_axis(AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RX, 0));
+	pad->axis[5] = gamepad_clamp_axis(AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RY, 0));
+	pad->axis[6] = gamepad_clamp_axis(AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_BRAKE, 0));
+	pad->axis[7] = gamepad_clamp_axis(AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_GAS, 0));
+	pad->left_trigger = gamepad_clamp_trigger(AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_LTRIGGER, 0));
+	pad->right_trigger = gamepad_clamp_trigger(AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RTRIGGER, 0));
+
+	hat_x = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_HAT_X, 0);
+	hat_y = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_HAT_Y, 0);
+	pad->dpad = 0;
+	if (hat_y < -FB_ANDROID_GAMEPAD_HAT_THRESHOLD)
+		pad->dpad |= XPAD_DPAD_UP;
+	if (hat_y > FB_ANDROID_GAMEPAD_HAT_THRESHOLD)
+		pad->dpad |= XPAD_DPAD_DOWN;
+	if (hat_x < -FB_ANDROID_GAMEPAD_HAT_THRESHOLD)
+		pad->dpad |= XPAD_DPAD_LEFT;
+	if (hat_x > FB_ANDROID_GAMEPAD_HAT_THRESHOLD)
+		pad->dpad |= XPAD_DPAD_RIGHT;
+
+	pthread_mutex_unlock(&fb_android.mutex);
+}
+
+void fb_hAndroidGamepadKey(const AInputEvent *event)
+{
+	FB_ANDROID_GAMEPAD_STATE *pad;
+	ssize_t button;
+	ssize_t dpad;
+	int action;
+	int pressed;
+
+	if (!event)
+		return;
+
+	action = AKeyEvent_getAction(event);
+	if (action != AKEY_EVENT_ACTION_DOWN &&
+	    action != AKEY_EVENT_ACTION_UP)
+		return;
+
+	pressed = (action == AKEY_EVENT_ACTION_DOWN);
+	button = gamepad_key_button(AKeyEvent_getKeyCode(event));
+	dpad = gamepad_key_dpad(AKeyEvent_getKeyCode(event));
+	if (!button && !dpad)
+		return;
+
+	pthread_mutex_lock(&fb_android.mutex);
+	pad = gamepad_slot_locked(AInputEvent_getDeviceId(event), TRUE);
+	if (!pad)
+	{
+		pthread_mutex_unlock(&fb_android.mutex);
+		return;
+	}
+
+	if (button) {
+		if (pressed)
+			pad->buttons |= button;
+		else
+			pad->buttons &= ~button;
+	}
+
+	if (dpad) {
+		if (pressed)
+			pad->dpad |= dpad;
+		else
+			pad->dpad &= ~dpad;
+	}
+
 	pthread_mutex_unlock(&fb_android.mutex);
 }
 
@@ -645,8 +831,39 @@ static unsigned glyph_row(char c, int row)
 		g = letters[c - 'A'];
 	else if (c >= '0' && c <= '9')
 	{
-		static const unsigned *digits[10] = {zero, one, two, three, four, five, six, seven, eight, nine};
-		g = digits[c - '0'];
+		switch (c)
+		{
+		case '0':
+			g = zero;
+			break;
+		case '1':
+			g = one;
+			break;
+		case '2':
+			g = two;
+			break;
+		case '3':
+			g = three;
+			break;
+		case '4':
+			g = four;
+			break;
+		case '5':
+			g = five;
+			break;
+		case '6':
+			g = six;
+			break;
+		case '7':
+			g = seven;
+			break;
+		case '8':
+			g = eight;
+			break;
+		default:
+			g = nine;
+			break;
+		}
 	}
 	else if (c == '-')
 		g = dash;
@@ -962,6 +1179,93 @@ void fb_hAndroidKey(int32_t keycode, int action, int unicode)
 	e.scancode = scancode;
 	e.ascii = (unicode >= 32 && unicode < 127) ? unicode : 0;
 	fb_hPostEvent(&e);
+}
+
+int fb_hAndroidGetJoystick(int id, ssize_t *buttons,
+						   float *a1, float *a2,
+						   float *a3, float *a4,
+						   float *a5, float *a6,
+						   float *a7, float *a8)
+{
+	FB_ANDROID_GAMEPAD_STATE *pad;
+
+	if ((id < 0) || (id >= FB_ANDROID_GAMEPAD_MAX))
+		return FALSE;
+
+	pthread_mutex_lock(&fb_android.mutex);
+	pad = &fb_android.gamepad[id];
+	if (!pad->seen)
+	{
+		pthread_mutex_unlock(&fb_android.mutex);
+		return FALSE;
+	}
+
+	if (buttons)
+		*buttons = pad->buttons;
+	if (a1)
+		*a1 = pad->axis[0];
+	if (a2)
+		*a2 = pad->axis[1];
+	if (a3)
+		*a3 = pad->axis[2];
+	if (a4)
+		*a4 = pad->axis[3];
+	if (a5)
+		*a5 = pad->axis[4];
+	if (a6)
+		*a6 = pad->axis[5];
+	if (a7)
+		*a7 = pad->axis[6];
+	if (a8)
+		*a8 = pad->axis[7];
+
+	pthread_mutex_unlock(&fb_android.mutex);
+	return TRUE;
+}
+
+int fb_hAndroidGetXPad(int id, ssize_t *buttons,
+					   float *lstick_x, float *lstick_y,
+					   float *rstick_x, float *rstick_y,
+					   float *ltrigger, float *rtrigger,
+					   ssize_t *dpad)
+{
+	FB_ANDROID_GAMEPAD_STATE *pad;
+
+	if ((id < 0) || (id >= FB_ANDROID_GAMEPAD_MAX))
+		return XPAD_STATUS_MISSING;
+
+	pthread_mutex_lock(&fb_android.mutex);
+	pad = &fb_android.gamepad[id];
+	if (!pad->seen)
+	{
+		pthread_mutex_unlock(&fb_android.mutex);
+		return XPAD_STATUS_MISSING;
+	}
+
+	if (buttons) {
+		*buttons = pad->buttons;
+		if (pad->left_trigger > FB_ANDROID_GAMEPAD_TRIGGER_BUTTON_THRESHOLD)
+			*buttons |= XPAD_BUTTON_L2;
+		if (pad->right_trigger > FB_ANDROID_GAMEPAD_TRIGGER_BUTTON_THRESHOLD)
+			*buttons |= XPAD_BUTTON_R2;
+	}
+	if (lstick_x)
+		*lstick_x = pad->axis[0];
+	if (lstick_y)
+		*lstick_y = pad->axis[1];
+	if (rstick_x)
+		*rstick_x = pad->axis[2];
+	if (rstick_y)
+		*rstick_y = pad->axis[3];
+	if (ltrigger)
+		*ltrigger = pad->left_trigger;
+	if (rtrigger)
+		*rtrigger = pad->right_trigger;
+	if (dpad)
+		*dpad = pad->dpad;
+
+	pthread_mutex_unlock(&fb_android.mutex);
+	return XPAD_STATUS_CONNECTED;
 }
 
 void fb_hAndroidScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *refresh)

@@ -30,7 +30,7 @@ void fb_hSetFileBufSize( FILE *fp )
 int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
 {
     FILE *fp = NULL;
-    char *openmask;
+    const char *openmask;
     char *fname;
 
     FB_LOCK();

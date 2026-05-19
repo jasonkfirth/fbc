@@ -17,7 +17,6 @@ typedef struct {
        int          fb_DevLptParseProtocol( DEV_LPT_PROTOCOL ** lpt_proto_out, const char * proto_raw, size_t proto_raw_len, int substprn );
        int          fb_DevLptTestProtocol( FB_FILE *handle, const char *filename, size_t filename_len );
 
-       int          fb_DevLptOpen       ( FB_FILE *handle, const char *filename, size_t filename_len );
        int          fb_DevLptWrite      ( FB_FILE *handle, const void* value, size_t valuelen );
        int          fb_DevLptWriteWstr  ( FB_FILE *handle, const FB_WCHAR* value, size_t valuelen );
        int          fb_DevLptClose      ( FB_FILE *handle );

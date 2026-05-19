@@ -87,7 +87,7 @@ static void fb_sfxStartMusicVoice(int id, int loop)
     voice->sfx_id = id;
     voice->channel = 0;
     voice->volume = 1.0f;
-    voice->data = (const float *)__fb_sfx->music[id].data;
+    voice->data = __fb_sfx->music[id].data;
     voice->length = __fb_sfx->music[id].size / (int)sizeof(float);
     voice->position = 0;
     voice->pos = 0;

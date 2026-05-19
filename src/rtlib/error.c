@@ -25,6 +25,33 @@ static const char *messages[] = {
 	"wrong number of dimensions"            /* FB_RTERROR_WRONGDIMENSIONS */
 };
 
+static void hAppendErrorMsg( int *pos, const char *fmt, ... )
+{
+	va_list args;
+	int remaining;
+	int written;
+
+	if( *pos >= FB_ERRMSG_SIZE )
+		return;
+
+	remaining = FB_ERRMSG_SIZE - *pos;
+
+	va_start( args, fmt );
+	written = vsnprintf( &__fb_errmsg[*pos], remaining, fmt, args );
+	va_end( args );
+
+	if( written < 0 )
+	{
+		__fb_errmsg[*pos] = '\0';
+		return;
+	}
+
+	if( written >= remaining )
+		*pos = FB_ERRMSG_SIZE - 1;
+	else
+		*pos += written;
+}
+
 static void fb_Die
 	(
 		int err_num,
@@ -33,39 +60,36 @@ static void fb_Die
 		const char *fun_name,
 		const char *msg
 	)
-{
-	int pos = 0;
+	{
+		int pos = 0;
 
-	pos += snprintf( &__fb_errmsg[pos], FB_ERRMSG_SIZE - pos,
-	                 "\nAborting due to runtime error %d", err_num );
+		hAppendErrorMsg( &pos, "\nAborting due to runtime error %d", err_num );
 
-	if( (err_num >= 0) && (err_num < FB_RTERROR_MAX) ) {
-		pos += snprintf( &__fb_errmsg[pos], FB_ERRMSG_SIZE - pos,
-						 " (%s)", messages[err_num] );
-	}
-
-	if( line_num > 0 ) {
-		pos += snprintf( &__fb_errmsg[pos], FB_ERRMSG_SIZE - pos,
-						 " at line %d", line_num );
-	}
-
-	if( mod_name != NULL ) {
-		if( fun_name != NULL ) {
-			pos += snprintf( &__fb_errmsg[pos], FB_ERRMSG_SIZE - pos,
-			                 " %s %s::%s()", (char *)(line_num > 0? &"of" : &"in"),
-			                 (char *)mod_name, (char *)fun_name );
-		} else {
-			pos += snprintf( &__fb_errmsg[pos], FB_ERRMSG_SIZE - pos,
-			                 " %s %s()", (char *)(line_num > 0? &"of" : &"in"),
-			                 (char *)mod_name );
+		if( (err_num >= 0) && (err_num < FB_RTERROR_MAX) ) {
+			hAppendErrorMsg( &pos, " (%s)", messages[err_num] );
 		}
-	}
 
-	if( msg != NULL ) {
-		pos += snprintf( &__fb_errmsg[pos], FB_ERRMSG_SIZE - pos, ", %s", msg );
-	}
+		if( line_num > 0 ) {
+			hAppendErrorMsg( &pos, " at line %d", line_num );
+		}
 
-	pos += snprintf( &__fb_errmsg[pos], FB_ERRMSG_SIZE - pos, "\n\n" );
+		if( mod_name != NULL ) {
+			if( fun_name != NULL ) {
+				hAppendErrorMsg( &pos, " %s %s::%s()",
+				                 (line_num > 0 ? "of" : "in"),
+				                 mod_name, fun_name );
+			} else {
+				hAppendErrorMsg( &pos, " %s %s()",
+				                 (line_num > 0 ? "of" : "in"),
+				                 mod_name );
+			}
+		}
+
+		if( msg != NULL ) {
+			hAppendErrorMsg( &pos, ", %s", msg );
+		}
+
+		hAppendErrorMsg( &pos, "\n\n" );
 
 	__fb_errmsg[FB_ERRMSG_SIZE-1] = '\0';
 

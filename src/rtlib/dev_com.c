@@ -125,6 +125,7 @@ int fb_DevComOpen( FB_FILE *handle, const char *filename, size_t filename_len )
     const char *pchPos;
     char *pchPosTmp;
     size_t i, port, uiOption;
+    int written;
     int iStopBits = -1;
     int res = FB_RTERROR_OK;
 
@@ -133,11 +134,16 @@ int fb_DevComOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 
     if( port > 0 )
     {
-    	i = sprintf( achDev, "COM%u:", (int)port );
+        written = snprintf( achDev, sizeof( achDev ), "COM%zu:", port );
+        if( (written < 0) || ((size_t)written >= sizeof( achDev )) )
+            return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+        i = (size_t) written;
     }
     else
     {
     	i = (strchr( filename, ':' ) - filename);
+        if( i >= sizeof( achDev ) )
+            return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
     	strncpy( achDev, filename, i );
     }
     achDev[i] = 0;
@@ -151,8 +157,18 @@ int fb_DevComOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 
     /* Determine the port number and a normalized device name */
     info = (DEV_COM_INFO*) calloc(1, sizeof(DEV_COM_INFO));
+    if( info==NULL ) {
+        FB_UNLOCK();
+        return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+    }
+
     info->iPort = port;
     info->pszDevice = strdup( achDev );
+    if( info->pszDevice==NULL ) {
+        free( info );
+        FB_UNLOCK();
+        return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+    }
 
     /* Set defaults */
     info->Options.uiSpeed = 300;
@@ -204,6 +220,10 @@ int fb_DevComOpen( FB_FILE *handle, const char *filename, size_t filename_len )
         /* copy option to temporary buffer */
         uiOptionLength = pchPosEnd - pchPos;
         pszOption = malloc( uiOptionLength + 1 );
+        if( pszOption==NULL ) {
+            res = fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+            break;
+        }
         memcpy( pszOption, pchPos, uiOptionLength );
         pszOption[uiOptionLength] = 0;
 
@@ -370,11 +390,15 @@ int fb_DevSerialSetWidth( const char *pszDevice, int width, int default_width )
     int cur = ((default_width==-1) ? 0 : default_width);
     size_t i, port;
     char achDev[128];
+    int written;
 
     if( !fb_DevComTestProtocolEx( NULL, pszDevice, strlen(pszDevice), &port ) )
         return 0;
 
-    i = sprintf( achDev, "COM%u:", (int)port );
+    written = snprintf( achDev, sizeof( achDev ), "COM%zu:", port );
+    if( (written < 0) || ((size_t)written >= sizeof( achDev )) )
+        return 0;
+    i = (size_t) written;
     achDev[i] = 0;
 
     /* Test all printers. */

@@ -9,5 +9,6 @@ int fb_hFileResetEx( int streamno )
 	else 
 		f = freopen( "/dev/tty", "w", stdout );
 
+	// cppcheck-suppress resourceLeak
 	return (f != NULL);
 }

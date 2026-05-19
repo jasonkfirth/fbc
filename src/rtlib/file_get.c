@@ -81,7 +81,7 @@ int fb_FileGetDataEx
                 {
                     size_t len = buffer_chars;
                     FB_WCHAR *wcp = (FB_WCHAR *)pachData;
-                    char *cp = handle->putback_buffer;
+                    unsigned char *cp = (unsigned char *)handle->putback_buffer;
 
                     while( len-- > 0 )
                         *wcp++ = *cp++;

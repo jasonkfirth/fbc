@@ -6,29 +6,20 @@ char *fb_hFloat2Str( double val, char *buffer, int digits, int mask )
 {
 	ssize_t len, maxlen;
 	char *p;
-	char fmtstr[16], *fstr;
+
+	if( digits < 0 ) {
+		buffer[0] = '\0';
+		return NULL;
+	}
 
 	if( mask & FB_F2A_ADDBLANK )
 		p = &buffer[1];
 	else
 		p = buffer;
 
-	switch( digits )
-	{
-	case 7:
-		fstr = (char *)&"%.7g";
-		break;
-	case 16:
-		fstr = (char *)&"%.16g";
-		break;
-	default:
-		sprintf( fmtstr, "%%.%dg", digits );
-		fstr = &fmtstr[0];
-	}
-
 	maxlen = 1+digits+6+1;
 
-	len = snprintf( p, maxlen, fstr, val );
+	len = snprintf( p, maxlen, "%.*g", digits, val );
 
 	if( len <= 0 || len >= maxlen )
 	{
@@ -39,9 +30,8 @@ char *fb_hFloat2Str( double val, char *buffer, int digits, int mask )
 	if( len > 0 )
 	{
 		/* skip the dot at end if any */
-		if( len > 0 )
-			if( p[len-1] == '.' )
-				p[len-1] = '\0';
+		if( p[len-1] == '.' )
+			p[len-1] = '\0';
 	}
 
 	/* */

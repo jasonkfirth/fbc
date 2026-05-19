@@ -32,6 +32,8 @@ void fb_hAndroidSetActivity(ANativeActivity *activity) FB_ANDROID_WEAK;
 void fb_hAndroidSetWindow(ANativeWindow *window) FB_ANDROID_WEAK;
 void fb_hAndroidTouch(float x, float y, int action) FB_ANDROID_WEAK;
 void fb_hAndroidKey(int32_t keycode, int action, int unicode) FB_ANDROID_WEAK;
+void fb_hAndroidGamepadMotion(const AInputEvent *event) FB_ANDROID_WEAK;
+void fb_hAndroidGamepadKey(const AInputEvent *event) FB_ANDROID_WEAK;
 void fb_hAndroidSetConsoleEnabled(int enabled) FB_ANDROID_WEAK;
 void fb_hAndroidConsoleWrite(const char *text, size_t length) FB_ANDROID_WEAK;
 void fb_hAndroidConsoleRender(void) FB_ANDROID_WEAK;
@@ -414,19 +416,41 @@ static int fb_android_handle_input(FB_ANDROID_APP *app)
 		type = AInputEvent_getType(event);
 		if (type == AINPUT_EVENT_TYPE_MOTION)
 		{
-			int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
-			float x = AMotionEvent_getX(event, 0);
-			float y = AMotionEvent_getY(event, 0);
-			if (fb_hAndroidTouch)
-				fb_hAndroidTouch(x, y, action);
+			int32_t source = AInputEvent_getSource(event);
+
+			if ((source & AINPUT_SOURCE_JOYSTICK) == AINPUT_SOURCE_JOYSTICK)
+			{
+				if (fb_hAndroidGamepadMotion)
+					fb_hAndroidGamepadMotion(event);
+			}
+			else
+			{
+				int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
+				float x = AMotionEvent_getX(event, 0);
+				float y = AMotionEvent_getY(event, 0);
+				if (fb_hAndroidTouch)
+					fb_hAndroidTouch(x, y, action);
+			}
 			handled = 1;
 		}
 		else if (type == AINPUT_EVENT_TYPE_KEY)
 		{
-			int32_t keycode = AKeyEvent_getKeyCode(event);
-			int action = AKeyEvent_getAction(event);
-			if (fb_hAndroidKey)
-				fb_hAndroidKey(keycode, action, 0);
+			int32_t source = AInputEvent_getSource(event);
+
+			if ((source & (AINPUT_SOURCE_GAMEPAD |
+			               AINPUT_SOURCE_DPAD |
+			               AINPUT_SOURCE_JOYSTICK)) != 0)
+			{
+				if (fb_hAndroidGamepadKey)
+					fb_hAndroidGamepadKey(event);
+			}
+			else
+			{
+				int32_t keycode = AKeyEvent_getKeyCode(event);
+				int action = AKeyEvent_getAction(event);
+				if (fb_hAndroidKey)
+					fb_hAndroidKey(keycode, action, 0);
+			}
 			handled = 1;
 		}
 

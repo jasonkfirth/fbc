@@ -6,6 +6,7 @@ int fb_DevScrnReadWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
 {
 	size_t chars, copy_chars;
 	DEV_SCRN_INFO *info;
+	FB_FILE *real_handle;
 
 	/* !!!FIXME!!! no unicode input supported */
 
@@ -13,7 +14,14 @@ int fb_DevScrnReadWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
 
 	chars = *pchars;
 
-	info = (DEV_SCRN_INFO*) FB_HANDLE_DEREF(handle)->opaque;
+	real_handle = FB_HANDLE_DEREF( handle );
+	if( (real_handle == NULL) || (real_handle->opaque == NULL) ) {
+		FB_UNLOCK();
+		*pchars = 0;
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+	}
+
+	info = (DEV_SCRN_INFO*) real_handle->opaque;
 
 	while( chars > 0 )
 	{

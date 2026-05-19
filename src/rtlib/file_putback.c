@@ -35,16 +35,16 @@ int fb_FilePutBackEx( FB_FILE *handle, const void *src, size_t chars )
                      handle->putback_size );
         }
 
-        if( handle->encod == FB_FILE_ENCOD_ASCII )
-        	memcpy( handle->putback_buffer, src, bytes );
-        else
-        {
-    		/* char to wchar */
-    		FB_WCHAR *dst = (FB_WCHAR *)handle->putback_buffer;
-    		const char *patch = (const char *)src;
-        	while( chars-- > 0 )
-        		*dst++ = *patch++;
-        }
+	        if( handle->encod == FB_FILE_ENCOD_ASCII )
+				memcpy( handle->putback_buffer, src, bytes );
+	        else
+			{
+				/* char to wchar */
+				FB_WCHAR *dst = (FB_WCHAR *)handle->putback_buffer;
+				const unsigned char *patch = (const unsigned char *)src;
+				while( chars-- > 0 )
+					*dst++ = *patch++;
+			}
 
         handle->putback_size += bytes;
     }

@@ -11,6 +11,6 @@ int fb_IntlGetTimeFormat( char *buffer, size_t len, int disallow_localized )
     }
     if( len < 9 )
         return FALSE;
-    strcpy(buffer, "HH:mm:ss");
+    memcpy( buffer, "HH:mm:ss", sizeof( "HH:mm:ss" ) );
     return TRUE;
 }

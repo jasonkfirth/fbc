@@ -23,7 +23,13 @@ static void            fb_hListDevInit      ( FB_LIST *list )
 static DEV_INFO_WIDTH *fb_hListDevElemAlloc ( FB_LIST *list, const char *device, int width )
 {
     DEV_INFO_WIDTH *node = (DEV_INFO_WIDTH*) calloc( 1, sizeof(DEV_INFO_WIDTH) );
+    if( node==NULL )
+        return NULL;
     node->device = strdup(device);
+    if( node->device==NULL ) {
+        free( node );
+        return NULL;
+    }
     node->width = width;
     fb_hListDynElemAdd( list, &node->elem );
     return node;
@@ -57,6 +63,10 @@ FBCALL int fb_WidthDev( FBSTRING *dev, int width )
     /* create list of device info nodes (if not created yet) */
     if( dev_info_widths==NULL ) {
         dev_info_widths = malloc( sizeof(FB_LIST) );
+        if( dev_info_widths==NULL ) {
+            FB_UNLOCK();
+            return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+        }
         fb_hListDevInit( dev_info_widths );
     }
 
@@ -91,6 +101,10 @@ FBCALL int fb_WidthDev( FBSTRING *dev, int width )
         if( node == NULL ) {
             /* Allocate a new list node if device name not found */
             node = fb_hListDevElemAlloc ( dev_info_widths, device, width );
+            if( node==NULL ) {
+                FB_UNLOCK();
+                return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+            }
         } else {
             /* Set device width */
             node->width = width;

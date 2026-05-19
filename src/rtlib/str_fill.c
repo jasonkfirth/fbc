@@ -32,7 +32,7 @@ FBCALL FBSTRING *fb_StrFill2( ssize_t cnt, FBSTRING *src )
 	int fchar;
 
 	if( (cnt > 0) && (src != NULL) && (src->data != NULL) && (FB_STRSIZE( src ) > 0) ) {
-		fchar = src->data[0];
+		fchar = FB_CHAR_TO_INT( src->data[0] );
 		dst = fb_StrFill1( cnt, fchar );
 	}
 	else

@@ -59,6 +59,8 @@ void fb_PrintPadWstrEx
     fb_DevScrnInit_WriteWstr( );
 
     tmp_handle = FB_HANDLE_DEREF(handle);
+    if( tmp_handle == NULL )
+        return;
 
     old_x = tmp_handle->line_length + 1;
     new_x = old_x + FB_TAB_WIDTH - 1;

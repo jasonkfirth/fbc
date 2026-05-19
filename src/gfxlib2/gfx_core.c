@@ -35,7 +35,7 @@ void fb_hPostEvent_code_end(void) { }
 void fb_GFXCTX_Destructor(void* data)
 {
 	FB_GFXCTX *context = (FB_GFXCTX *)data;
-	free( context->line );
+	free( (void *)context->line );
 }
 
 /* Caller is expected to hold FB_GRAPHICS_LOCK() */
@@ -46,12 +46,14 @@ FB_GFXCTX *fb_hGetContext(void)
 	if ((__fb_gfx) && (context->id != __fb_gfx->id)) {
 		/* context has to be initialized; default to screen */
 		if (context->line)
-			free(context->line);
+			free((void *)context->line);
 		fb_hMemSet(context, 0, sizeof(FB_GFXCTX));
 		context->id = __fb_gfx->id;
 		context->old_view_w = __fb_gfx->w;
 		context->old_view_h = context->max_h = __fb_gfx->h;
 		context->line = (unsigned char **)malloc(__fb_gfx->h * sizeof(unsigned char *));
+		if (!context->line)
+			return context;
         if ((__fb_gfx->depth > 4) && (__fb_gfx->depth <= 8))
             context->fg_color = 15;
         else
@@ -95,7 +97,11 @@ void fb_hPrepareTarget(FB_GFXCTX *context, void *target)
 				data = (unsigned char *)target + 4;
 			}
 			if (h > context->max_h) {
-				context->line = (unsigned char **)realloc(context->line, h * sizeof(unsigned char *));
+				unsigned char **new_line;
+				new_line = (unsigned char **)realloc((void *)context->line, h * sizeof(unsigned char *));
+				if (!new_line)
+					return;
+				context->line = new_line;
 				context->max_h = h;
 			}
 			for (i = 0; i < h; i++)

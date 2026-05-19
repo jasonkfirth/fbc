@@ -59,13 +59,6 @@
 #define FB_SFX_TI_MILLISECONDS_PER_SECOND 1000.0f
 #define FB_SFX_ATARI_CLOCK 31960.0f
 
-void fb_sfxSoundQueue(
-    int channel,
-    int frequency,
-    float duration,
-    float volume,
-    int waveform,
-    int start_delay);
 static int fb_sfxSoundDurationFrames(float duration);
 static int fb_sfxSoundClampInt(int value, int min_value, int max_value);
 static float fb_sfxSoundClampVolume(float volume);

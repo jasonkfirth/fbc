@@ -195,6 +195,10 @@ static int gdi_init(void)
 	__fb_gfx->refresh_rate = GetDeviceCaps(hdc, VREFRESH);
 
 	lp = (LOGPALETTE *)malloc(sizeof(LOGPALETTE) + (sizeof(PALETTEENTRY) * 256));
+	if (!lp) {
+		ReleaseDC(fb_win32.wnd, hdc);
+		return -1;
+	}
 	lp->palNumEntries = 256;
 	lp->palVersion = 0x300;
 	fb_hMemCpy(lp->palPalEntry, fb_win32.palette, sizeof(PALETTEENTRY) * 256);

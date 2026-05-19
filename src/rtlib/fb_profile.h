@@ -176,11 +176,11 @@ FBCALL int fb_EndProfileCycles( int errorlevel );
 
 /* global profiler */
 
-FBCALL FB_PROFILER_GLOBAL *fb_ProfileGetGlobalProfiler();
+FBCALL FB_PROFILER_GLOBAL *fb_ProfileGetGlobalProfiler( void );
 
 FBCALL int                 fb_ProfileSetFileName( const char *filename );
 FBCALL int                 fb_ProfileGetFileName( char *filename, int length );
-FBCALL int                 fb_ProfileGetOptions();
+FBCALL int                 fb_ProfileGetOptions( void );
 FBCALL int                 fb_ProfileSetOptions( int options );
 FBCALL void                fb_ProfileIgnore( const char * procname );
 FBCALL void                fb_ProfileGetMetrics( FB_PROFILER_METRICS *metrics );

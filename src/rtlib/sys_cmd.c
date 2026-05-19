@@ -10,6 +10,8 @@ FBCALL FBSTRING *fb_Command ( int arg )
 	/* return all arguments? */
 	if( arg < 0 )
 	{
+		char *p;
+
 		/* no args? */
 		if( __fb_ctx.argc <= 1 )
 			return &__fb_ctx.null_desc;
@@ -24,14 +26,18 @@ FBCALL FBSTRING *fb_Command ( int arg )
 			return &__fb_ctx.null_desc;
 
 		dst->data[0] = '\0';
+		p = dst->data;
 		for( i = 1; i < __fb_ctx.argc; i++ )
 		{
-			strcat( dst->data, __fb_ctx.argv[i] );
+			size_t arg_len = strlen( __fb_ctx.argv[i] );
+			memcpy( p, __fb_ctx.argv[i], arg_len );
+			p += arg_len;
 			if( i != __fb_ctx.argc-1 )
-				strcat( dst->data, " " );
-    	}
+				*p++ = ' ';
+		}
+		*p = '\0';
 
-    	return dst;
+		return dst;
 	}
 
     /* return just one argument */
@@ -43,7 +49,7 @@ FBCALL FBSTRING *fb_Command ( int arg )
 	if( dst == NULL )
 		return &__fb_ctx.null_desc;
 
-	strcpy( dst->data, __fb_ctx.argv[arg] );
+	memcpy( dst->data, __fb_ctx.argv[arg], len + 1 );
 
 #ifdef HOST_DOS
 	if( arg == 0 )

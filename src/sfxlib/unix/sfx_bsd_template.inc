@@ -62,6 +62,12 @@
 extern const FB_SFX_DRIVER FB_SFX_BSD_DRIVER_NAME;
 extern const FB_SFX_DRIVER __fb_sfxDriverNull;
 
+#if defined(__GNUC__) || defined(__clang__)
+#define FB_SFX_BSD_WEAK __attribute__((weak))
+#else
+#define FB_SFX_BSD_WEAK
+#endif
+
 FB_SFX_BSD_STATE FB_SFX_BSD_STATE_NAME =
 {
     0,
@@ -164,7 +170,12 @@ static int fb_sfxBsdDebugEnabled(void)
 }
 
 #define BSD_DBG(...) \
-    do { if (fb_sfxBsdDebugEnabled()) fprintf(stderr, "SFX_%s: " __VA_ARGS__, FB_SFX_BSD_LABEL); } while (0)
+    do { \
+        if (fb_sfxBsdDebugEnabled()) { \
+            fprintf(stderr, "SFX_%s: ", FB_SFX_BSD_LABEL); \
+            fprintf(stderr, __VA_ARGS__); \
+        } \
+    } while (0)
 
 int FB_SFX_BSD_INIT_FN(void)
 {
@@ -243,16 +254,16 @@ int FB_SFX_BSD_RUNNING_FN(void)
     return FB_SFX_BSD_STATE_NAME.running;
 }
 
-int fb_sfxPlatformCaptureStart(void)
+int FB_SFX_BSD_WEAK fb_sfxPlatformCaptureStart(void)
 {
     return -1;
 }
 
-void fb_sfxPlatformCaptureStop(void)
+void FB_SFX_BSD_WEAK fb_sfxPlatformCaptureStop(void)
 {
 }
 
-int fb_sfxPlatformCaptureRead(float *buffer, int frames)
+int FB_SFX_BSD_WEAK fb_sfxPlatformCaptureRead(float *buffer, int frames)
 {
     (void)buffer;
     (void)frames;
@@ -267,3 +278,4 @@ const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
 };
 
 #undef BSD_DBG
+#undef FB_SFX_BSD_WEAK

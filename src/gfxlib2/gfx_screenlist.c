@@ -6,10 +6,12 @@ static int *list = NULL, list_size, current;
 
 static void add_mode(int mode)
 {
-	int i;
+	int i, *new_list;
 
 	if (!list) {
 		list = malloc(sizeof(int) * 2);
+		if (!list)
+			return;
 		list[0] = mode;
 		list[1] = 0;
 		list_size = 1;
@@ -18,7 +20,10 @@ static void add_mode(int mode)
 			if (list[i] == mode)
 				return;
 		}
-		list = (int *)realloc(list, sizeof(int) * (list_size + 1));
+		new_list = (int *)realloc(list, sizeof(int) * (list_size + 1));
+		if (!new_list)
+			return;
+		list = new_list;
 		list[list_size] = mode;
 		list_size++;
 	}

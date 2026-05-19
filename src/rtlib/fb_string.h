@@ -166,7 +166,7 @@ FBCALL void        *fb_StrConcatAssign  ( void *dst, ssize_t dst_size, void *src
 FBCALL void        *fb_StrConcatByref   ( void *dst, ssize_t dst_size, void *src, ssize_t src_size, int fillrem );
 FBCALL int          fb_StrCompare       ( void *str1, ssize_t str1_size, void *str2, ssize_t str2_size );
 FBCALL FBSTRING    *fb_StrAllocTempResult ( FBSTRING *src );
-FBCALL FBSTRING    *fb_StrAllocTempDescF( char *str, ssize_t str_size );
+FBCALL FBSTRING    *fb_StrAllocTempDescF( const char *str, ssize_t str_size );
 FBCALL FBSTRING    *fb_StrAllocTempDescV( FBSTRING *str );
 FBCALL FBSTRING    *fb_StrAllocTempDescZEx( const char *str, ssize_t len );
 FBCALL FBSTRING    *fb_StrAllocTempDescZ( const char *str );

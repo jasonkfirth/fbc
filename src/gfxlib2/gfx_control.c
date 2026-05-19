@@ -60,7 +60,10 @@ FBCALL void fb_GfxControl_i( int what, ssize_t *param1, ssize_t *param2, ssize_t
 	FB_GFXCTX *context;
 	int res = 0;
 	ssize_t res1 = 0, res2 = 0, res3 = 0, res4 = 0;
-	ssize_t temp1, temp2, temp3, temp4;
+	ssize_t temp1 = (ssize_t)0x80000000;
+	ssize_t temp2 = (ssize_t)0x80000000;
+	ssize_t temp3 = (ssize_t)0x80000000;
+	ssize_t temp4 = (ssize_t)0x80000000;
 
 	if (!param1) param1 = &temp1;
 	if (!param2) param2 = &temp2;
@@ -359,7 +362,10 @@ FBCALL void fb_GfxControl_i( int what, ssize_t *param1, ssize_t *param2, ssize_t
 
 FBCALL void fb_GfxControl_i32( int what, int *param1, int *param2, int *param3, int *param4 )
 {
-	ssize_t p1, p2, p3, p4;
+	ssize_t p1 = (ssize_t)0x80000000;
+	ssize_t p2 = (ssize_t)0x80000000;
+	ssize_t p3 = (ssize_t)0x80000000;
+	ssize_t p4 = (ssize_t)0x80000000;
 	if( param1 ) p1 = (ssize_t)*param1;
 	if( param2 ) p2 = (ssize_t)*param2;
 	if( param3 ) p3 = (ssize_t)*param3;
@@ -373,7 +379,10 @@ FBCALL void fb_GfxControl_i32( int what, int *param1, int *param2, int *param3, 
 
 FBCALL void fb_GfxControl_i64( int what, long long *param1, long long *param2, long long *param3, long long *param4 )
 {
-	ssize_t p1, p2, p3, p4;
+	ssize_t p1 = (ssize_t)0x80000000;
+	ssize_t p2 = (ssize_t)0x80000000;
+	ssize_t p3 = (ssize_t)0x80000000;
+	ssize_t p4 = (ssize_t)0x80000000;
 	if( param1 ) p1 = (ssize_t)*param1;
 	if( param2 ) p2 = (ssize_t)*param2;
 	if( param3 ) p3 = (ssize_t)*param3;

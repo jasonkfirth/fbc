@@ -6,6 +6,23 @@
 
 static char lp_buf[256];
 
+static int append_lp_cmd( char *dst, size_t dst_len, const char *fmt, ... )
+{
+	va_list args;
+	size_t len;
+	int written;
+
+	len = strlen( dst );
+	if( len >= dst_len )
+		return FALSE;
+
+	va_start( args, fmt );
+	written = vsnprintf( dst + len, dst_len - len, fmt, args );
+	va_end( args );
+
+	return (written >= 0) && ((size_t)written < (dst_len - len));
+}
+
 static int exec_lp_cmd( const char *cmd, int test_default )
 {
 	int have_default = TRUE; // Assume a default printer
@@ -37,13 +54,15 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDeviceRaw )
 	char *filename = NULL;
 	FILE *fp;
 
-	DEV_LPT_PROTOCOL *lpt_proto;
+	DEV_LPT_PROTOCOL *lpt_proto = NULL;
 	if ( !fb_DevLptParseProtocol( &lpt_proto, pszDeviceRaw, strlen(pszDeviceRaw), TRUE ) )
 	{
 		if( lpt_proto!=NULL )
 			free(lpt_proto);
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}
+	if( lpt_proto==NULL )
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 
 	devInfo->iPort = iPort;
 
@@ -51,65 +70,107 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDeviceRaw )
 		/* Use spooler */
 
 		/* create a buffer for our commands */
-		filename = alloca( strlen(pszDeviceRaw) + 64 );
-
-		/* set destination, if not default */
-		if( lpt_proto->name && *lpt_proto->name )	
 		{
-			/* does printer exist */
-			strcpy(filename, "lpstat -v \"");
-			strcat(filename, lpt_proto->name);
-			strcat(filename, "\" 2>&1 ");	
-			if( exec_lp_cmd( filename, FALSE ) != 0 )
+			size_t name_len = strlen( lpt_proto->name );
+			size_t title_len = strlen( lpt_proto->title );
+			size_t filename_len;
+
+			if( name_len > ((size_t)-1) - title_len - 128 )
 			{
-				if( lpt_proto!=NULL )
-					free(lpt_proto);
-				return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
+				free(lpt_proto);
+				return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 			}
 
-			/* build command for spooler */
-			strcpy(filename, "lp ");
-			strcat(filename, "-d \"");	
-			strcat(filename, lpt_proto->name);
-			strcat(filename, "\" ");	
-		}
-		else
-		{
-			/* is there a default printer */
-			strcpy(filename, "lpstat -d 2>&1");
-			if( exec_lp_cmd( filename, TRUE ) != 0 )
+			filename_len = name_len + title_len + 128;
+			filename = alloca( filename_len );
+			filename[0] = '\0';
+
+			/* set destination, if not default */
+			if( lpt_proto->name && *lpt_proto->name )
 			{
-				if( lpt_proto!=NULL )
+				/* does printer exist */
+				if( !append_lp_cmd( filename, filename_len,
+					"lpstat -v \"%s\" 2>&1 ", lpt_proto->name ) )
+				{
 					free(lpt_proto);
-				return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
+					return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+				}
+				if( exec_lp_cmd( filename, FALSE ) != 0 )
+				{
+					free(lpt_proto);
+					return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
+				}
+
+				/* build command for spooler */
+				filename[0] = '\0';
+				if( !append_lp_cmd( filename, filename_len,
+					"lp -d \"%s\" ", lpt_proto->name ) )
+				{
+					free(lpt_proto);
+					return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+				}
 			}
-			/* build command for spooler */
-			strcpy(filename, "lp ");
-		}
+			else
+			{
+				/* is there a default printer */
+				if( !append_lp_cmd( filename, filename_len, "lpstat -d 2>&1" ) )
+				{
+					free(lpt_proto);
+					return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+				}
+				if( exec_lp_cmd( filename, TRUE ) != 0 )
+				{
+					free(lpt_proto);
+					return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
+				}
+				/* build command for spooler */
+				filename[0] = '\0';
+				if( !append_lp_cmd( filename, filename_len, "lp " ) )
+				{
+					free(lpt_proto);
+					return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+				}
+			}
 
-		/* set title, if not default */
-		if( *lpt_proto->title )
-		{
-			strcat(filename, "-t \"");	
-			strcat(filename, lpt_proto->title);
-			strcat(filename, "\"");	
-		}
-		else
-		{
-			strcat(filename, "-t \"FreeBASIC document\"");
-		}
+			/* set title, if not default */
+			if( *lpt_proto->title )
+			{
+				if( !append_lp_cmd( filename, filename_len,
+					"-t \"%s\"", lpt_proto->title ) )
+				{
+					free(lpt_proto);
+					return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+				}
+			}
+			else
+			{
+				if( !append_lp_cmd( filename, filename_len, "-t \"FreeBASIC document\"" ) )
+				{
+					free(lpt_proto);
+					return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+				}
+			}
 
-		/* do not print job id */
-		strcat(filename, " -s -");
+			/* do not print job id */
+			if( !append_lp_cmd( filename, filename_len, " -s -" ) )
+			{
+				free(lpt_proto);
+				return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+			}
 
-		{
-			char *ptr = filename;
-			while ((ptr = strpbrk(ptr, "`&;|>^$\\")) != NULL)
-				*ptr = '_';
+			{
+				char *ptr = filename;
+				while ((ptr = strpbrk(ptr, "`&;|>^$\\")) != NULL)
+					*ptr = '_';
+			}
+
+			/* do not print error messages */
+			if( !append_lp_cmd( filename, filename_len, " &> /dev/null" ) )
+			{
+				free(lpt_proto);
+				return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+			}
 		}
-
-		/* do not print error messages */
-		strcat(filename, " &> /dev/null");
 
 		fp = popen( filename, "w" );
 		if(fp == NULL )
@@ -126,7 +187,11 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDeviceRaw )
 	} else {
 		/* use direct port io */
 		filename = alloca( 7 + 11 + 1 );
-		sprintf(filename, "/dev/lp%d", (devInfo->iPort-1));
+		if( snprintf(filename, 7 + 11 + 1, "/dev/lp%d", (devInfo->iPort-1)) >= 7 + 11 + 1 )
+		{
+			free(lpt_proto);
+			return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+		}
 		fp = fopen(filename, "wb");
 
 		if( fp==NULL ) {

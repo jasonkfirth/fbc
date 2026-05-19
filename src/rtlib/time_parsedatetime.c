@@ -32,10 +32,9 @@ FBCALL int fb_DateTimeParse( FBSTRING *s,
         if( *text==',' )
             ++text, --text_len;
 
-        if( fb_hTimeParse( text, text_len, pHour, pMinute, pSecond, &length ) ) {
-            text += length;
-            text_len -= length;
-            result = TRUE;
+	        if( fb_hTimeParse( text, text_len, pHour, pMinute, pSecond, &length ) ) {
+	            text += length;
+	            result = TRUE;
         } else if( !want_time ) {
             result = TRUE;
         }
@@ -50,10 +49,9 @@ FBCALL int fb_DateTimeParse( FBSTRING *s,
         if( *text==',' )
             ++text, --text_len;
 
-        if( fb_hDateParse( text, text_len, pDay, pMonth, pYear, &length ) ) {
-            text += length;
-            text_len -= length;
-            result = TRUE;
+	        if( fb_hDateParse( text, text_len, pDay, pMonth, pYear, &length ) ) {
+	            text += length;
+	            result = TRUE;
         } else if( !want_date ) {
             result = TRUE;
         }

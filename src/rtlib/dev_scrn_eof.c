@@ -27,10 +27,17 @@ void fb_DevScrnFillInput( DEV_SCRN_INFO *info )
 int fb_DevScrnEof( FB_FILE *handle )
 {
     DEV_SCRN_INFO *info;
+    FB_FILE *real_handle;
     int       got_data;
 
     FB_LOCK();
-    info = (DEV_SCRN_INFO*) FB_HANDLE_DEREF(handle)->opaque;
+    real_handle = FB_HANDLE_DEREF( handle );
+    if( (real_handle == NULL) || (real_handle->opaque == NULL) ) {
+        FB_UNLOCK();
+        return FB_TRUE;
+    }
+
+    info = (DEV_SCRN_INFO*) real_handle->opaque;
     got_data = info->length!=0;
     FB_UNLOCK();
     if( !got_data ) {

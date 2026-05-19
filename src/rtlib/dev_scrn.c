@@ -28,6 +28,11 @@ int fb_DevScrnOpen( FB_FILE *handle, const char *filename, size_t filename_len )
         /* Duplicate and copy the DEV_SCRN_INFO from FB_HANDLE_SCREEN */
         DEV_SCRN_INFO *screeninfo = (DEV_SCRN_INFO*) FB_HANDLE_SCREEN->opaque;
         DEV_SCRN_INFO *info = malloc(sizeof(DEV_SCRN_INFO));
+        if( info==NULL )
+        {
+            FB_UNLOCK();
+            return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+        }
         memcpy(info, screeninfo, sizeof(DEV_SCRN_INFO));
         handle->opaque = info;
 

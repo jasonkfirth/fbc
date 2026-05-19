@@ -12,6 +12,8 @@ static unsigned char *decode_string(unsigned char *buffer, int code)
 	int index = 0;
 
 	while (code > 255) {
+		if (code >= MAX_CODE)
+			return NULL;
 		*buffer++ = fb_lzw_entry[code].value;
 		code = fb_lzw_entry[code].prefix;
 		if (index++ >= MAX_CODE - 1)

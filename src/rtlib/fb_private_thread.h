@@ -24,13 +24,14 @@
 	#define PTHREAD_STACK_MIN 8192
 #endif
 
-/* pthreads will crash some BSD targets when stack size is too small.
+/* pthreads will crash some targets when stack size is too small.
 // The default of 2048 KiB is too small as tested on freebsd-13.0-i386.
 // OpenBSD's PTHREAD_STACK_MIN is also too small for libc resolver paths
-// reached from threaded TCP programs. 8192 KiB seems about alright (jeffm)
+// reached from threaded TCP programs. Haiku's PTHREAD_STACK_MIN is likewise
+// too small for threaded TCP INPUT paths. 8192 KiB seems about alright (jeffm)
 // see https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=234775
 */
-#if defined( HOST_FREEBSD ) || defined( HOST_OPENBSD )
+#if defined( HOST_FREEBSD ) || defined( HOST_OPENBSD ) || defined( HOST_HAIKU )
 	#define FBTHREAD_STACK_MIN (8192 * 1024)
 #else
 	#define FBTHREAD_STACK_MIN PTHREAD_STACK_MIN
@@ -50,6 +51,7 @@
 
 typedef enum _FBTHREADFLAGS
 {
+	FBTHREAD_NONE = 0,
 	FBTHREAD_MAIN = 1,
 	FBTHREAD_EXITED = 2,
 	FBTHREAD_DETACHED = 4

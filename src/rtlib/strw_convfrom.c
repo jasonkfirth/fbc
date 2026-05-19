@@ -20,7 +20,6 @@ FBCALL double fb_WstrToDouble( const FB_WCHAR *src, ssize_t len )
 	r = p;
 	if( (len >= 2) && (*r++ == L'&') )
 	{
-		radix = 0;
 		switch( *r++ )
 		{
 			case L'h':
@@ -42,8 +41,7 @@ FBCALL double fb_WstrToDouble( const FB_WCHAR *src, ssize_t len )
 				break;
 		}
 
-		if( radix != 0 )
-			return (double)fb_WstrRadix2Longint( r, len - fb_wstr_CalcDiff( p, r ), radix );
+		return (double)fb_WstrRadix2Longint( r, len - fb_wstr_CalcDiff( p, r ), radix );
 	}
 
 	/* Workaround: wcstod() does not allow 'd' as an exponent specifier on 
@@ -51,6 +49,8 @@ FBCALL double fb_WstrToDouble( const FB_WCHAR *src, ssize_t len )
 	 * 'd's with 'e'
 	 */
 	q = malloc( (len + 1) * sizeof(FB_WCHAR) );
+	if( q == NULL )
+		return 0.0;
 	for( i = 0; i < len; i++ )
 	{
 		c = p[i];

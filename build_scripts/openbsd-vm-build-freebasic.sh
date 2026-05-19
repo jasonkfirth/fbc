@@ -377,6 +377,7 @@ start_vm() {
 	local vm_dir="$RUN_DIR/$name"
 	local disk="$vm_dir/openbsd.qcow2"
 	local base_disk="$RUN_DIR/base/openbsd-base.qcow2"
+	local audio_wav="$vm_dir/freebasic-openbsd-audio.wav"
 
 	rm -rf "$vm_dir"
 	mkdir -p "$vm_dir"
@@ -390,6 +391,8 @@ start_vm() {
 		-drive "file=$disk,if=virtio,format=qcow2" \
 		-netdev "user,id=net0,hostname=fbc-openbsd,hostfwd=tcp:127.0.0.1:$port-:22" \
 		-device e1000,netdev=net0 \
+		-audiodev "wav,id=audio0,path=$audio_wav" \
+		-device ES1370,audiodev=audio0 \
 		-display none \
 		-serial "file:$vm_dir/serial.log" \
 		-pidfile "$vm_dir/qemu.pid" \
@@ -398,9 +401,23 @@ start_vm() {
 
 stop_vm() {
 	local vm_dir="$1"
+	local pid
 
 	if [ -f "$vm_dir/qemu.pid" ]; then
-		kill "$(cat "$vm_dir/qemu.pid")" 2>/dev/null || true
+		pid="$(cat "$vm_dir/qemu.pid")"
+		kill "$pid" 2>/dev/null || true
+
+		for _ in $(seq 1 30); do
+			if ! kill -0 "$pid" 2>/dev/null; then
+				break
+			fi
+			sleep 1
+		done
+
+		if kill -0 "$pid" 2>/dev/null; then
+			kill -KILL "$pid" 2>/dev/null || true
+		fi
+
 		rm -f "$vm_dir/qemu.pid"
 	fi
 }
@@ -719,10 +736,28 @@ run_fbctests() {
 trap stop_xvfb EXIT
 
 export PATH=/usr/local/bin:/usr/local/sbin:/usr/X11R6/bin:/bin:/sbin:/usr/bin:/usr/sbin:$PATH
-export SFXLIB_DRIVER="${SFXLIB_DRIVER:-null}"
 export CC="${CC:-egcc}"
 export CXX="${CXX:-eg++}"
 export PKG_PATH="${PKG_PATH:-https://cdn.openbsd.org/pub/OpenBSD/7.8/packages/amd64}"
+export SFXLIB_OPENBSD_SNDIO_DEVICE="${SFXLIB_OPENBSD_SNDIO_DEVICE:-rsnd/0}"
+
+prepare_audio_device() {
+	echo "==> preparing OpenBSD audio device"
+	audioctl -a || true
+	mixerctl -a || true
+	case "$SFXLIB_OPENBSD_SNDIO_DEVICE" in
+		rsnd/*)
+			echo "using raw sndio device: $SFXLIB_OPENBSD_SNDIO_DEVICE"
+			;;
+		*)
+			pkill sndiod >/dev/null 2>&1 || true
+			sndiod >/tmp/freebasic-sndiod.log 2>&1 &
+			echo $! > /tmp/freebasic-sndiod.pid
+			sleep 1
+			cat /tmp/freebasic-sndiod.log || true
+			;;
+	esac
+}
 
 echo "==> installing package test dependencies"
 pkg_add -I \
@@ -900,14 +935,21 @@ declare function fb_sfxDeviceInfoName(byval id as long) as const zstring ptr
 end extern
 
 print "sfx-start"
-play "ABCDEFG"
 dim as long sfx_device = fb_sfxDeviceCurrent()
 dim as const zstring ptr sfx_driver = fb_sfxDeviceInfoName(sfx_device)
 if sfx_driver <> 0 then
 	print "sfx-driver="; *sfx_driver
+	if instr(lcase(*sfx_driver), "null") > 0 then
+		print "sfx-driver-null"
+		end 2
+	end if
 else
 	print "sfx-driver=<none>"
+	end 3
 end if
+sound 440, 0.75
+play "L4 CDEFGAB"
+sleep 1600, 1
 print "sfx-end"
 FBEOF
 
@@ -948,8 +990,10 @@ cp -R /usr/local/share/freebasic/examples/sfxlib/. /home/fbc/work/smoke/sfxlib-s
 )
 [ -x /home/fbc/work/smoke/sfx-showcase ] || fail "sfxlib showcase binary was not created"
 
-echo "==> running sfxlib smoke"
-SFXLIB_DRIVER=null timeout 20 /home/fbc/work/smoke/sfx > /home/fbc/work/smoke/sfx.out 2> /home/fbc/work/smoke/sfx.err || {
+prepare_audio_device
+
+echo "==> running sfxlib real audio smoke"
+SFXLIB_DRIVER="OpenBSD sndio" timeout 20 /home/fbc/work/smoke/sfx > /home/fbc/work/smoke/sfx.out 2> /home/fbc/work/smoke/sfx.err || {
 	cat /home/fbc/work/smoke/sfx.out || true
 	cat /home/fbc/work/smoke/sfx.err || true
 	fail "sfx smoke failed"
@@ -957,6 +1001,7 @@ SFXLIB_DRIVER=null timeout 20 /home/fbc/work/smoke/sfx > /home/fbc/work/smoke/sf
 cat /home/fbc/work/smoke/sfx.out || true
 grep -qx 'sfx-start' /home/fbc/work/smoke/sfx.out || fail "sfx smoke did not start"
 grep -qx 'sfx-end' /home/fbc/work/smoke/sfx.out || fail "sfx smoke did not finish"
+grep -q '^sfx-driver=OpenBSD sndio' /home/fbc/work/smoke/sfx.out || fail "sfx smoke did not use OpenBSD sndio"
 [ ! -s /home/fbc/work/smoke/sfx.err ] || {
 	cat /home/fbc/work/smoke/sfx.err
 	fail "sfx smoke wrote stderr"
@@ -1019,6 +1064,76 @@ EOF
 	scp_from_guest "$key" "$port" "/home/fbc/work/freebasic-openbsd-test.log" "$LOG_DIR/"
 }
 
+verify_audio_capture() {
+	local wav="$1"
+	local log="$2"
+
+	msg "Verifying OpenBSD QEMU audio capture"
+	python3 - "$wav" "$log" <<'PY'
+import math
+import struct
+import sys
+import time
+import wave
+
+wav_path = sys.argv[1]
+log_path = sys.argv[2]
+
+try:
+    last_error = None
+    for _ in range(20):
+        try:
+            with wave.open(wav_path, "rb") as w:
+                channels = w.getnchannels()
+                width = w.getsampwidth()
+                rate = w.getframerate()
+                frames = w.getnframes()
+                data = w.readframes(frames)
+            break
+        except Exception as ex:
+            last_error = ex
+            time.sleep(0.5)
+    else:
+        raise last_error
+except Exception as ex:
+    raise SystemExit(f"failed to read audio capture: {ex}")
+
+if width != 2:
+    raise SystemExit(f"unexpected sample width: {width}")
+
+sample_count = len(data) // 2
+if sample_count <= 0:
+    raise SystemExit("audio capture contains no samples")
+
+samples = struct.unpack("<%dh" % sample_count, data)
+peak = max(abs(sample) for sample in samples)
+rms = math.sqrt(sum(sample * sample for sample in samples) / float(sample_count))
+active = sum(1 for sample in samples if abs(sample) > 500)
+
+with open(log_path, "w", encoding="utf-8") as f:
+    f.write(f"file={wav_path}\n")
+    f.write(f"rate={rate}\n")
+    f.write(f"channels={channels}\n")
+    f.write(f"frames={frames}\n")
+    f.write(f"samples={sample_count}\n")
+    f.write(f"peak={peak}\n")
+    f.write(f"rms={rms:.2f}\n")
+    f.write(f"active_samples={active}\n")
+
+if frames < rate // 4:
+    raise SystemExit("audio capture is too short")
+if peak < 1000:
+    raise SystemExit("audio capture peak is too low")
+if rms < 50.0:
+    raise SystemExit("audio capture RMS is too low")
+if active < rate // 20:
+    raise SystemExit("audio capture has too few active samples")
+
+with open(log_path, "a", encoding="utf-8") as f:
+    f.write("result=PASS\n")
+PY
+}
+
 archive_results() {
 	local pkg="$1"
 	local base
@@ -1030,6 +1145,10 @@ archive_results() {
 		[ -f "$log" ] || continue
 		cp -f "$log" "$ARCHIVE_DIR/"
 	done
+
+	if [ -f "$RUN_DIR/test/freebasic-openbsd-audio.wav" ]; then
+		cp -f "$RUN_DIR/test/freebasic-openbsd-audio.wav" "$ARCHIVE_DIR/"
+	fi
 
 	base="$(basename "$pkg")"
 	(
@@ -1075,8 +1194,9 @@ main() {
 	SSH_PORT="$(find_free_port 12022)"
 	test_dir="$(prepare_vm test "$SSH_PORT")"
 	test_package_in_vm "$test_dir" "$SSH_PORT" "$pkg"
-	archive_results "$pkg"
 	stop_vm "$test_dir"
+	verify_audio_capture "$test_dir/freebasic-openbsd-audio.wav" "$LOG_DIR/freebasic-openbsd-audio.log"
+	archive_results "$pkg"
 
 	if [ "$KEEP_VMS" -eq 0 ]; then
 		rm -rf "$RUN_DIR"
@@ -1087,6 +1207,7 @@ main() {
 	echo "Install log: $ARCHIVE_DIR/freebasic-openbsd-install.log"
 	echo "Build log:   $ARCHIVE_DIR/freebasic-openbsd-build.log"
 	echo "Test log:    $ARCHIVE_DIR/freebasic-openbsd-test.log"
+	echo "Audio log:   $ARCHIVE_DIR/freebasic-openbsd-audio.log"
 }
 
 main "$@"

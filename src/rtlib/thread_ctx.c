@@ -6,9 +6,21 @@
 #if defined ENABLE_MT && defined HOST_UNIX
 	#define FB_TLSENTRY           pthread_key_t
 	#define FB_TLSALLOC(key)      pthread_key_create( &(key), NULL )
-	#define FB_TLSFREE(key)       pthread_key_delete( (key) )
 	#define FB_TLSSET(key,value)  pthread_setspecific( (key), (const void *)(value) )
 	#define FB_TLSGET(key)        pthread_getspecific( (key) )
+	#ifdef HOST_NETBSD
+		/*
+		   NetBSD libpthread asserts if pthread_setspecific() is used after
+		   pthread_key_delete() has released a key.  FreeBASIC can still see
+		   late TLS access during process teardown, for example from global
+		   destructors or threads finishing as the runtime exits.  Keep the
+		   small process-lifetime key table valid and free the actual TLS
+		   contexts through fb_TlsFreeCtxTb().
+		*/
+		#define FB_TLSFREE(key)   (void)(key)
+	#else
+		#define FB_TLSFREE(key)   pthread_key_delete( (key) )
+	#endif
 #elif defined ENABLE_MT && ( defined HOST_WIN32 || defined HOST_XBOX )
 	#define FB_TLSENTRY           DWORD
 	#define FB_TLSALLOC(key)      key = TlsAlloc( )
@@ -38,10 +50,27 @@ FBCALL void *fb_TlsGetCtx( int index, size_t len, FB_TLS_DESTRUCTOR destructorFn
 		if( ctxHeader != NULL ) {
 			ctxHeader->destructor = destructorFn;
 			ctx = FB_TLS_HEADER_TO_DATA( ctxHeader );
-			FB_TLSSET( __fb_tls_ctxtb[index], ctx );
-			
-                }
 
+			#if defined ENABLE_MT && defined HOST_UNIX
+				if( FB_TLSSET( __fb_tls_ctxtb[index], ctx ) != 0 ) {
+					free( ctxHeader );
+					ctx = NULL;
+				}
+			#elif defined ENABLE_MT && ( defined HOST_WIN32 || defined HOST_XBOX )
+				if( FB_TLSSET( __fb_tls_ctxtb[index], ctx ) == 0 ) {
+					free( ctxHeader );
+					ctx = NULL;
+				}
+			#else
+				FB_TLSSET( __fb_tls_ctxtb[index], ctx );
+			#endif
+		}
+
+		/*
+		   ctxHeader is now either freed or owned by platform TLS.  cppcheck
+		   does not model the ownership transfer through pthread_setspecific().
+		*/
+		/* cppcheck-suppress memleak */
 	}
 #ifdef DEBUG
 	else {

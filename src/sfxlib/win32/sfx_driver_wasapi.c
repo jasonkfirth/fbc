@@ -56,7 +56,6 @@
 /* ------------------------------------------------------------------------- */
 
 extern const FB_SFX_DRIVER fb_sfxDriverWinMM;
-extern const FB_SFX_DRIVER __fb_sfxDriverNull;
 
 static IMMDeviceEnumerator *g_device_enum = NULL;
 static IMMDevice *g_device = NULL;

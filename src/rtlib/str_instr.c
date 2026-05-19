@@ -88,6 +88,11 @@ static ssize_t fb_hFindBM
 
 	bm_gc = (ssize_t*) malloc(sizeof(ssize_t) * (len_pattern + 1));
 	suffixes = (ssize_t*) malloc(sizeof(ssize_t) * (len_pattern + 1));
+	if( (bm_gc == NULL) || (suffixes == NULL) ) {
+		free( bm_gc );
+		free( suffixes );
+		return 0;
+	}
 
 	memset( bm_gc, 0, sizeof(ssize_t) * (len_pattern+1) );
 	memset( suffixes, 0, sizeof(ssize_t) * (len_pattern+1) );

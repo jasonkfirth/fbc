@@ -25,6 +25,8 @@ static SPAN *add_span(FB_GFXCTX *context, SPAN **span, int *x, int y, unsigned i
 			return NULL;
 	}
 	s = (SPAN *)malloc(sizeof(SPAN));
+	if (!s)
+		return NULL;
 	s->x1 = x1;
 	s->x2 = x2;
 	s->y = y;
@@ -88,7 +90,11 @@ FBCALL void fb_GfxPaint(void *target, float fx, float fy, unsigned int color, un
 
 	size = sizeof(SPAN *) * (context->view_y + context->view_h);
 	span = (SPAN **)malloc(size);
-	fb_hMemSet(span, 0, size);
+	if (!span) {
+		FB_GRAPHICS_UNLOCK( );
+		return;
+	}
+	fb_hMemSet((void *)span, 0, size);
 
 	tail = head = add_span(context, span, &x, y, border_color);
 
@@ -152,7 +158,7 @@ FBCALL void fb_GfxPaint(void *target, float fx, float fy, unsigned int color, un
 				__fb_gfx->dirty[y] = TRUE;
 		}
 	}
-	free(span);
+	free((void *)span);
 
 	DRIVER_UNLOCK();
 	FB_GRAPHICS_UNLOCK( );

@@ -41,8 +41,11 @@ static void (*gfx_save)(void);
 static void (*gfx_restore)(void);
 static void (*gfx_key_handler)(int, int, int, int);
 
-static const char pad_numlock_ascii[NUM_PAD_KEYS] = "0123456789+-*/\r,.";
-static const char pad_ascii[NUM_PAD_KEYS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '+', '-', '*', '/', '\r', 0, 0 };
+static const unsigned char pad_numlock_ascii[NUM_PAD_KEYS] = {
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+	'+', '-', '*', '/', '\r', ',', '.'
+};
+static const unsigned char pad_ascii[NUM_PAD_KEYS] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '+', '-', '*', '/', '\r', 0, 0 };
 
 static const unsigned char kernel_to_scancode[] = {
 	0,				SC_ESCAPE,		SC_1,			SC_2,

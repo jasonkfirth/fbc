@@ -34,7 +34,7 @@ static char *hToUTF16( const char *src, ssize_t chars, char *dst, ssize_t *bytes
 	{
 		if( dst == NULL )
 		{
-			dst = malloc( chars * sizeof( UTF_16 ) );
+			dst = malloc( (size_t)*bytes );
 			if( dst == NULL )
 				return NULL;
 		}
@@ -63,7 +63,7 @@ static char *hToUTF32( const char *src, ssize_t chars, char *dst, ssize_t *bytes
 	{
 		if( dst == NULL )
 		{
-			dst = malloc( chars * sizeof( UTF_32 ) );
+			dst = malloc( (size_t)*bytes );
 			if( dst == NULL )
 				return NULL;
 		}

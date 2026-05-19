@@ -69,7 +69,7 @@ static void release_gfx_mem(void)
             for (i = 0; i < __fb_gfx->num_pages; i++) {
                 free(((void **)(__fb_gfx->page[i]))[-1]);
             }
-            free(__fb_gfx->page);
+            free((void *)__fb_gfx->page);
 		}
 		if (__fb_gfx->device_palette)
 			free(__fb_gfx->device_palette);
@@ -119,7 +119,7 @@ void fb_hResetCharCells(FB_GFXCTX *context, int do_alloc)
             for (i = 0; i < __fb_gfx->num_pages; i++) {
                 free(__fb_gfx->con_pages[i]);
             }
-            free(__fb_gfx->con_pages);
+            free((void *)__fb_gfx->con_pages);
         }
 
         if( do_alloc ) {
@@ -278,13 +278,13 @@ static int set_mode
         /* dirty lines array may be bigger than needed; this is to please the
          gfx driver which is not aware of the scanline size */
         __fb_gfx->dirty = (char *)calloc(1, __fb_gfx->h * __fb_gfx->scanline_size);
-        __fb_gfx->device_palette = (unsigned int *)calloc(1, sizeof(int) * 256);
-        __fb_gfx->palette = (unsigned int *)calloc(1, sizeof(int) * 256);
+        __fb_gfx->device_palette = (unsigned int *)calloc(1, sizeof(unsigned int) * 256);
+        __fb_gfx->palette = (unsigned int *)calloc(1, sizeof(unsigned int) * 256);
         __fb_gfx->color_association = (unsigned char *)malloc(16);
         __fb_gfx->key = (char *)calloc(1, 128);
         __fb_gfx->event_queue = (EVENT *)malloc(sizeof(EVENT) * MAX_EVENTS);
         __fb_gfx->event_mutex = fb_MutexCreate();
-        __fb_color_conv_16to32 = (unsigned int *)malloc(sizeof(int) * 512);
+        __fb_color_conv_16to32 = (unsigned int *)malloc(sizeof(unsigned int) * 512);
 
 		if (flags != DRIVER_NULL) {
 			if (flags & DRIVER_ALPHA_PRIMITIVES) {
@@ -325,7 +325,7 @@ static int set_mode
             for (try_count = (driver_name ? 4 : 2); try_count; try_count--) {
                 for (i = 0; __fb_gfx_drivers_list[i >> 1]; i++) {
                     driver = __fb_gfx_drivers_list[i >> 1];
-                    if ((driver_name) && !(try_count & 0x1) && (strcasecmp(driver_name, driver->name))) {
+                    if ((driver_name) && !(try_count & 0x1) && (strcasecmp(driver_name, driver->name) != 0)) {
                         driver = NULL;
                         continue;
 					}

@@ -118,7 +118,7 @@ int fb_sfxMusicLoad(const char *filename)
         return -1;
     }
 
-    __fb_sfx->music[id].data = (unsigned char *)mono;
+    __fb_sfx->music[id].data = mono;
     __fb_sfx->music[id].size = frames * (int)sizeof(float);
     __fb_sfx->music[id].frames = frames;
     __fb_sfx->music[id].sample_rate = sample_rate;

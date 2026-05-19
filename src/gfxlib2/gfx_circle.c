@@ -91,8 +91,8 @@ static void get_arc_point(float angle, float a, float b, int *x, int *y)
 {
 	float c, s;
 
-	c = cos(angle) * a;
-	s = sin(angle) * b;
+	c = cosf(angle) * a;
+	s = sinf(angle) * b;
 	*x = CINT(c);
 	*y = CINT(s);
 }
@@ -166,7 +166,7 @@ FBCALL void fb_GfxEllipse(void *target, float fx, float fy, float radius, unsign
 		while (end - start > 2 * PI)
 			start += 2 * PI;
 
-		increment = 1 / (sqrt(a) * sqrt(b) * 1.5);
+		increment = 1.0f / (sqrtf(a) * sqrtf(b) * 1.5f);
 
 		DRIVER_LOCK();
 

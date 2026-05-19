@@ -1,11 +1,26 @@
-/* joystick handling, freebsd */
+/*
+    FreeBASIC gfxlib2 DragonFly joystick backend
+    --------------------------------------------
+
+    File: gfx_joystick.c
+
+    Purpose:
+
+        Provide GETJOYSTICK support on DragonFly systems that expose the
+        Linux joydev-compatible /dev/input/jsN interface.
+
+    Responsibilities:
+
+        - select the shared Unix joydev implementation for DragonFly builds
+
+    This file intentionally does NOT contain:
+
+        - HID descriptor parsing
+        - Xbox semantic controller mapping
+        - force feedback or rumble support
+*/
 
 #include "../fb_gfx.h"
+#include "../unix/gfx_joydev_common.inc"
 
-FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, float *a3, float *a4, float *a5, float *a6, float *a7, float *a8)
-{
-	*buttons = -1;
-	*a1 = *a2 = *a3 = *a4 = *a5 = *a6 = *a7 = *a8 = -1000.0;
-
-	return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
-}
+/* end of gfx_joystick.c */

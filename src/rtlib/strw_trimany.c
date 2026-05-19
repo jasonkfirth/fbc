@@ -12,7 +12,6 @@ FBCALL FB_WCHAR *fb_WstrTrimAny ( const FB_WCHAR *src, const FB_WCHAR *pattern )
 		return NULL;
 	}
 
-	len = 0;
 	{
 		ssize_t len_pattern = fb_wstr_Len( pattern );
 		pachText = src;

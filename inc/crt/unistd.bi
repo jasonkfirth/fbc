@@ -15,6 +15,8 @@
 #include once "crt/dos/unistd.bi"
 #elseif defined(__FB_LINUX__)
 #include once "crt/linux/unistd.bi"
+#elseif defined(__FB_DRAGONFLY__)
+#include once "crt/dragonfly/unistd.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/linux/unistd.bi"
 #else

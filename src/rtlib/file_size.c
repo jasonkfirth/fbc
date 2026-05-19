@@ -20,12 +20,14 @@ fb_off_t fb_FileSizeEx( FB_FILE *handle )
 			/* move to end of file */
 			result = handle->hooks->pfnSeek(handle, 0, SEEK_END);
 		}
-		if (result==0) {
-			/* get size */
-			result = handle->hooks->pfnTell(handle, &res);
-			/* restore old position*/
-			handle->hooks->pfnSeek(handle, old_pos, SEEK_SET);
-		}
+			if (result==0) {
+				/* get size */
+				result = handle->hooks->pfnTell(handle, &res);
+				if (result!=0)
+					res = 0;
+				/* restore old position*/
+				handle->hooks->pfnSeek(handle, old_pos, SEEK_SET);
+			}
 	}
 
 	FB_UNLOCK();

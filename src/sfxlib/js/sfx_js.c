@@ -10,10 +10,10 @@
 */
 
 #include "../fb_sfx.h"
+#include "../fb_sfx_driver.h"
 
 #include <stddef.h>
 
-extern const FB_SFX_DRIVER __fb_sfxDriverNull;
 extern const FB_SFX_DRIVER fb_sfxDriverWebAudio;
 
 const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =

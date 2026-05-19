@@ -113,7 +113,7 @@ static char *find_next ( int *attrib )
 	struct dirent *entry;
 	char buffer[MAX_PATH];
 
-	do
+	for( ;; )
 	{
 		entry = readdir( ctx->dir );
 		if( !entry )
@@ -131,10 +131,9 @@ static char *find_next ( int *attrib )
 			continue;
 
 		*attrib = get_attrib( name, &info );
+		if( ( ( *attrib & ~ctx->attrib ) == 0 ) && match_spec( name ) )
+			return name;
 	}
-	while( ( *attrib & ~ctx->attrib ) || !match_spec( name ) );
-
-	return name;
 }
 
 FBCALL FBSTRING *fb_Dir( FBSTRING *filespec, int attrib, int *out_attrib )
@@ -176,16 +175,19 @@ FBCALL FBSTRING *fb_Dir( FBSTRING *filespec, int attrib, int *out_attrib )
 				memcpy( ctx->dirname, filespec->data, len );
 				ctx->dirname[len] = '\0';
 			}
-			else
-			{
-				strncpy( ctx->filespec, filespec->data, MAX_PATH );
-				ctx->filespec[MAX_PATH-1] = '\0';
-				strcpy( ctx->dirname, "./");
-			}
+				else
+				{
+					strncpy( ctx->filespec, filespec->data, MAX_PATH );
+					ctx->filespec[MAX_PATH-1] = '\0';
+					memcpy( ctx->dirname, "./", sizeof( "./" ) );
+				}
 
-			/* Make sure these patterns work just like on Win32/DOS */
-			if( (!strcmp( ctx->filespec, "*.*" )) || (!strcmp( ctx->filespec, "*." )) )
-				strcpy( ctx->filespec, "*" );
+				/* Make sure these patterns work just like on Win32/DOS */
+				if( (!strcmp( ctx->filespec, "*.*" )) || (!strcmp( ctx->filespec, "*." )) )
+				{
+					ctx->filespec[0] = '*';
+					ctx->filespec[1] = '\0';
+				}
 
 			if( (attrib & 0x10) == 0 )
 				attrib |= 0x20;

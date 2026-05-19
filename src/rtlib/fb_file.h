@@ -400,10 +400,11 @@ FBCALL int          fb_CrtFileCopy      ( const char *source, const char *destin
 static __inline__ size_t FB_FREAD_LARGE( void *ptr, size_t nbytes, FILE *stream )
 {
    size_t total = 0, nread;
+   unsigned char *bytes = (unsigned char *)ptr;
 
    while (nbytes > FREAD_CHUNK_SIZE) {
       /* read chunk */
-      nread = fread( ptr, 1, FREAD_CHUNK_SIZE, stream );
+      nread = fread( bytes, 1, FREAD_CHUNK_SIZE, stream );
       total += nread;
 
       /* stop early if too few items read */
@@ -411,13 +412,13 @@ static __inline__ size_t FB_FREAD_LARGE( void *ptr, size_t nbytes, FILE *stream 
          return total;
       }
 
-      ptr += FREAD_CHUNK_SIZE;
+      bytes += FREAD_CHUNK_SIZE;
       nbytes -= FREAD_CHUNK_SIZE;
    }
 
    if (nbytes > 0) {
       /* read last chunk */
-      nread = fread( ptr, 1, nbytes, stream );
+      nread = fread( bytes, 1, nbytes, stream );
       total += nread;
    }
 
@@ -427,10 +428,11 @@ static __inline__ size_t FB_FREAD_LARGE( void *ptr, size_t nbytes, FILE *stream 
 static __inline__ size_t FB_FWRITE_LARGE( const void *ptr, size_t nbytes, FILE *stream )
 {
    size_t total = 0, nwritten;
+   const unsigned char *bytes = (const unsigned char *)ptr;
 
    while (nbytes > FWRITE_CHUNK_SIZE) {
       /* write chunk */
-      nwritten = fwrite( ptr, 1, FWRITE_CHUNK_SIZE, stream );
+      nwritten = fwrite( bytes, 1, FWRITE_CHUNK_SIZE, stream );
       total += nwritten;
 
       /* stop early if too few items written */
@@ -438,13 +440,13 @@ static __inline__ size_t FB_FWRITE_LARGE( const void *ptr, size_t nbytes, FILE *
          return total;
       }
 
-      ptr += FWRITE_CHUNK_SIZE;
+      bytes += FWRITE_CHUNK_SIZE;
       nbytes -= FWRITE_CHUNK_SIZE;
    }
 
    if (nbytes > 0) {
       /* write last chunk */
-      nwritten = fwrite( ptr, 1, nbytes, stream );
+      nwritten = fwrite( bytes, 1, nbytes, stream );
       total += nwritten;
    }
 

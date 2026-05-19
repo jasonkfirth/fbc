@@ -55,22 +55,6 @@
 
 
 /* ------------------------------------------------------------------------- */
-/* External MIDI state                                                       */
-/* ------------------------------------------------------------------------- */
-
-extern int fb_sfxMidiIsOpen(void);
-
-
-/* ------------------------------------------------------------------------- */
-/* Platform driver entry                                                     */
-/* ------------------------------------------------------------------------- */
-
-extern int fb_sfxMidiDriverSend(unsigned char status,
-                                unsigned char data1,
-                                unsigned char data2);
-
-
-/* ------------------------------------------------------------------------- */
 /* MIDI playback state                                                       */
 /* ------------------------------------------------------------------------- */
 
@@ -415,10 +399,16 @@ static int fb_sfxMidiPlayBuffer(const unsigned char *data, size_t size)
         unsigned long track_size;
 
         if (offset + 8 > size)
+        {
+            free(tracks);
             return -1;
+        }
 
         if (memcmp(data + offset, "MTrk", 4) != 0)
+        {
+            free(tracks);
             return -1;
+        }
 
         track_size = fb_sfxReadBe32(data + offset + 4);
         offset += 8;

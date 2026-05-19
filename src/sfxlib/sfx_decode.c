@@ -1,9 +1,48 @@
+/*
+    FreeBASIC Sound Library (sfxlib)
+    --------------------------------
+
+    File: sfx_decode.c
+
+    Purpose:
+
+        Decode audio files into floating-point PCM samples for sfxlib.
+
+    Responsibilities:
+
+        • dispatch supported file extensions to bundled decoders
+        • copy decoder-owned buffers into sfxlib-owned memory
+        • normalize integer decoded samples into mixer-ready floats
+
+    This file intentionally does NOT contain:
+
+        • playback scheduling
+        • mixer state
+        • platform audio driver code
+        • streaming I/O policy
+*/
+
 #define DR_WAV_IMPLEMENTATION
 #define DR_MP3_IMPLEMENTATION
 
 #include "third_party/dr_wav.h"
 #include "third_party/dr_mp3.h"
+
+/*
+    stb_vorbis is a bundled third-party decoder.  Clang correctly warns about
+    one defensive pointer-wrap check inside that file when strict diagnostics
+    are enabled.  Keep the diagnostic boundary around the vendored include so
+    FreeBASIC-owned code remains covered by the normal warning profile.
+*/
+
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#endif
 #include "third_party/stb_vorbis.c"
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -61,7 +100,11 @@ static int fb_sfxDecodeWav(const char *filename,
                                                       &frame_count,
                                                       NULL);
     if (!decoded || frame_count == 0 || local_channels == 0)
+    {
+        if (decoded)
+            drwav_free(decoded, NULL);
         return -1;
+    }
 
     sample_count = (size_t)frame_count * (size_t)local_channels;
     copy = (float *)malloc(sample_count * sizeof(float));
@@ -98,7 +141,11 @@ static int fb_sfxDecodeMp3(const char *filename,
                                                       &frame_count,
                                                       NULL);
     if (!decoded || frame_count == 0 || config.channels == 0)
+    {
+        if (decoded)
+            drmp3_free(decoded, NULL);
         return -1;
+    }
 
     sample_count = (size_t)frame_count * (size_t)config.channels;
     copy = (float *)malloc(sample_count * sizeof(float));
@@ -137,7 +184,10 @@ static int fb_sfxDecodeOgg(const char *filename,
                                              &local_rate,
                                              &decoded);
     if (frame_count <= 0 || local_channels <= 0 || !decoded)
+    {
+        free(decoded);
         return -1;
+    }
 
     sample_count = (size_t)frame_count * (size_t)local_channels;
     copy = (float *)malloc(sample_count * sizeof(float));
@@ -190,3 +240,5 @@ int fb_sfxDecodeFile(const char *filename,
 
     return -1;
 }
+
+/* end of sfx_decode.c */

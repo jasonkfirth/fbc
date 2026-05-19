@@ -16,7 +16,6 @@ FBCALL int fb_hStr2Int( char *src, ssize_t len )
 
 	else if( (len >= 2) && (p[0] == '&') )
 	{
-		radix = 0;
 		skip = 2;
 		switch( p[1] )
 		{

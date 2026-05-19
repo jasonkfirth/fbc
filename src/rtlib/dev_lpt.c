@@ -58,13 +58,29 @@ static char *fb_DevLptMakeDeviceName( DEV_LPT_PROTOCOL *lpt_proto )
 {
 	if( lpt_proto )
 	{
-		char * p = calloc( strlen(lpt_proto->proto) + strlen(lpt_proto->name) + 3, 1 );
+		size_t proto_len = strlen( lpt_proto->proto );
+		size_t name_len = strlen( lpt_proto->name );
+		size_t path_len;
+		int written;
+		char *p;
+
+		if( name_len > ((size_t)-1) - 2 )
+			return NULL;
+		if( proto_len > ((size_t)-1) - name_len - 2 )
+			return NULL;
+
+		path_len = proto_len + name_len + 2;
+		p = calloc( path_len, 1 );
 		if( p==NULL )
 			return NULL;
 
-		strcpy( p, lpt_proto->proto );
-		strcat( p, ":" );
-		strcat( p, lpt_proto->name );
+		written = snprintf( p, path_len, "%s:%s", lpt_proto->proto, lpt_proto->name );
+		if( (written < 0) || ((size_t)written >= path_len) )
+		{
+			free( p );
+			return NULL;
+		}
+
 		return p;
 	}
 	return NULL;
@@ -90,7 +106,7 @@ static FB_FILE_HOOKS hooks_dev_lpt = {
 /*:::::*/
 int fb_DevLptOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 {
-		DEV_LPT_PROTOCOL *lpt_proto;
+		DEV_LPT_PROTOCOL *lpt_proto = NULL;
     DEV_LPT_INFO *devInfo;
     FB_FILE *redir_handle = NULL;
 		FB_FILE *tmp_handle = NULL;
@@ -102,6 +118,8 @@ int fb_DevLptOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 				free( lpt_proto );
 			return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 		}
+		if( lpt_proto==NULL )
+			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 
     FB_LOCK();
 
@@ -109,8 +127,7 @@ int fb_DevLptOpen( FB_FILE *handle, const char *filename, size_t filename_len )
     devInfo = (DEV_LPT_INFO*) calloc(1, sizeof(DEV_LPT_INFO));
 		if( devInfo==NULL )
 		{
-			if( lpt_proto )
-				free( lpt_proto );
+			free( lpt_proto );
 			FB_UNLOCK();
 			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 		}
@@ -121,8 +138,7 @@ int fb_DevLptOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 		if( devInfo->pszDevice==NULL )
 		{
 			free( devInfo );
-			if( lpt_proto )
-				free( lpt_proto );
+			free( lpt_proto );
 			FB_UNLOCK();
 			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 		}
@@ -168,8 +184,7 @@ int fb_DevLptOpen( FB_FILE *handle, const char *filename, size_t filename_len )
         free( devInfo );
     }
 
-		if( lpt_proto )
-			free( lpt_proto );
+		free( lpt_proto );
 
     FB_UNLOCK();
 
@@ -181,7 +196,7 @@ int fb_DevPrinterSetWidth( const char *pszDevice, int width, int default_width )
 		FB_FILE *tmp_handle = NULL;
     int cur = ((default_width==-1) ? 80 : default_width);
     char *pszDev;
-		DEV_LPT_PROTOCOL *lpt_proto;
+		DEV_LPT_PROTOCOL *lpt_proto = NULL;
 
     if (!fb_DevLptParseProtocol( &lpt_proto, pszDevice, strlen(pszDevice), TRUE) )
 		{
@@ -189,12 +204,13 @@ int fb_DevPrinterSetWidth( const char *pszDevice, int width, int default_width )
 				free( lpt_proto );
 			return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 		}
+		if( lpt_proto==NULL )
+			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 
 		pszDev = fb_DevLptMakeDeviceName( lpt_proto );
 		if( pszDev==NULL )
 		{
-			if( lpt_proto )
-				free( lpt_proto );
+			free( lpt_proto );
 			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 		}
 
@@ -207,8 +223,7 @@ int fb_DevPrinterSetWidth( const char *pszDevice, int width, int default_width )
       cur = tmp_handle->width;
 		}
 
-		if( lpt_proto )
-			free( lpt_proto );
+		free( lpt_proto );
     free(pszDev);
 
     return cur;
@@ -219,7 +234,7 @@ int fb_DevPrinterGetOffset( const char *pszDevice )
 		FB_FILE *tmp_handle = NULL;
     int cur = 0;
     char *pszDev;
-		DEV_LPT_PROTOCOL *lpt_proto;
+		DEV_LPT_PROTOCOL *lpt_proto = NULL;
 
     if (!fb_DevLptParseProtocol( &lpt_proto, pszDevice, strlen(pszDevice), TRUE) )
 		{
@@ -227,12 +242,13 @@ int fb_DevPrinterGetOffset( const char *pszDevice )
 				free( lpt_proto );
 			return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 		}
+		if( lpt_proto==NULL )
+			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 
 		pszDev = fb_DevLptMakeDeviceName( lpt_proto );
 		if( pszDev==NULL )
 		{
-			if( lpt_proto )
-				free( lpt_proto );
+			free( lpt_proto );
 			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 		}
 
@@ -241,8 +257,7 @@ int fb_DevPrinterGetOffset( const char *pszDevice )
 		if( tmp_handle )
       cur = tmp_handle->line_length;
 
-		if( lpt_proto )
-			free( lpt_proto );
+		free( lpt_proto );
     free(pszDev);
 
     return cur;

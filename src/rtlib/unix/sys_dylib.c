@@ -6,23 +6,29 @@
 
 FBCALL void *fb_DylibLoad( FBSTRING *library )
 {
+	typedef struct {
+		const char *prefix;
+		const char *suffix;
+	} LIBNAME_FORMAT;
+
 	void *res = NULL;
 	int i;
 	char libname[MAX_PATH];
 	// Sometimes you will see .so files on Darwin too
-	char *libnameformat[] = { "%s",
-							  "lib%s",
+	static const LIBNAME_FORMAT libnameformat[] = {
+							  { "", "" },
+							  { "lib", "" },
 #ifdef HOST_DARWIN
-							  "lib%s.dylib",
+							  { "lib", ".dylib" },
 #endif
-							  "lib%s.so",
-							  "./%s",
-							  "./lib%s",
+							  { "lib", ".so" },
+							  { "./", "" },
+							  { "./lib", "" },
 #ifdef HOST_DARWIN
-							  "./lib%s.dylib",
+							  { "./lib", ".dylib" },
 #endif
-							  "./lib%s.so",
-							  NULL };
+							  { "./lib", ".so" },
+							  { NULL, NULL } };
 
 	// Just in case the shared lib is an FB one, temporarily reset the
 	// terminal, to let the 2nd rtlib capture the original terminal state.
@@ -33,10 +39,16 @@ FBCALL void *fb_DylibLoad( FBSTRING *library )
 	fb_hExitConsole();
 	FB_UNLOCK( );
 
-	libname[MAX_PATH-1] = '\0';
 	if( (library) && (library->data) ) {
-		for( i = 0; libnameformat[i]; i++ ) {
-			snprintf( libname, MAX_PATH-1, libnameformat[i], library->data );
+		for( i = 0; libnameformat[i].prefix; i++ ) {
+			int written = snprintf( libname,
+									sizeof( libname ),
+									"%s%s%s",
+									libnameformat[i].prefix,
+									library->data,
+									libnameformat[i].suffix );
+			if( (written < 0) || ((size_t)written >= sizeof( libname )) )
+				continue;
 			fb_hConvertPath( libname );
 			res = dlopen( libname, RTLD_LAZY );
 			if( res )

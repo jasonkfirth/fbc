@@ -93,7 +93,7 @@ int fb_DevFileOpenEncod
 	)
 {
 	FILE *fp = NULL;
-	char *openmask;
+	const char *openmask;
 	char *fname;
 	int effective_mode;
 

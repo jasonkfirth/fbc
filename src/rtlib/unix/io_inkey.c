@@ -25,7 +25,7 @@ typedef struct NODE
 #ifndef DISABLE_NCURSES
 typedef struct KEY_DATA
 {
-	char *cap;
+	const char *cap;
 	int code;
 } KEY_DATA;
 
@@ -63,7 +63,7 @@ static int key_buffer[KEY_BUFFER_LEN], key_head = 0, key_tail = 0, key_buffer_ch
 static NODE *root_node = NULL;
 
 #ifndef DISABLE_NCURSES
-static void add_key(NODE **node, char *key, short code)
+static void add_key(NODE **node, const char *key, short code)
 {
 	NODE *n;
 
@@ -91,6 +91,8 @@ static void add_key(NODE **node, char *key, short code)
 		}
 	}
 	n = malloc(sizeof(NODE));
+	if( n == NULL )
+		return;
 	n->child = NULL;
 	n->next = *node;
 	n->key = *key;
@@ -107,10 +109,10 @@ static void add_key(NODE **node, char *key, short code)
 static void init_keys(void)
 {
 #ifndef DISABLE_NCURSES
-	KEY_DATA *data;
+	const KEY_DATA *data;
 	char *key;
 
-	for (data = (KEY_DATA *)key_data; data->cap; data++) {
+	for (data = key_data; data->cap; data++) {
 		/**
 		 * Lookup the terminal escape sequences (termcap database
 		 * entries) corresponding to the id strings defined in the

@@ -56,6 +56,8 @@ private sub fbcNetbsdPlatformAddSfxLibs( )
 	if( fbcNetbsdPlatformIsSelected( ) = FALSE ) then
 		exit sub
 	end if
+
+	fbcAddDefLib( "ossaudio" )
 end sub
 
 private sub fbcNetbsdPlatformAddDefaultLibs( )

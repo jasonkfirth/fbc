@@ -50,12 +50,12 @@ int fb_DevLptParseProtocol
 
 	/* "PRN:" */
 
-	if( strcasecmp( p, "PRN:" ) == 0)
-	{
-		if( subst_prn )
-			strcpy( p, "LPT1:" );
+		if( strcasecmp( p, "PRN:" ) == 0)
+		{
+			if( subst_prn )
+				memcpy( p, "LPT1:", sizeof( "LPT1:" ) );
 
-		lpt_proto->proto = p;
+			lpt_proto->proto = p;
 		lpt_proto->iPort = 1;
 		return TRUE;
 	}
@@ -103,8 +103,12 @@ int fb_DevLptParseProtocol
 			else
 			{
 				/* remove spaces before '=' */
-				pt = pe - 1;
-				while( isspace( FB_CHAR_TO_INT( *pt ) )) *pt-- = '\0';
+				pt = pe;
+				while( (pt > p) && isspace( FB_CHAR_TO_INT( *(pt - 1) ) ) )
+				{
+					--pt;
+					*pt = '\0';
+				}
 
 				/* remove spaces after '=' or end*/
 				*pe++ = '\0';
@@ -123,8 +127,11 @@ int fb_DevLptParseProtocol
 
 			/* remove spaces before ',' or end*/
 			pt = pc ? pc : ptail;
-			pt--;
-			while( isspace( FB_CHAR_TO_INT( *pt ) )) *pt-- = '\0';
+			while( (pt > p) && isspace( FB_CHAR_TO_INT( *(pt - 1) ) ) )
+			{
+				--pt;
+				*pt = '\0';
+			}
 
 			if( pc )
 			{
@@ -143,7 +150,7 @@ int fb_DevLptParseProtocol
 
 int fb_DevLptTestProtocol( FB_FILE *handle, const char *filename, size_t filename_len )
 {
-	DEV_LPT_PROTOCOL *lpt_proto;
+	DEV_LPT_PROTOCOL *lpt_proto = NULL;
 	int ret = fb_DevLptParseProtocol( &lpt_proto, filename, filename_len, FALSE );
 	if( lpt_proto )
 		free( lpt_proto );

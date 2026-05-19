@@ -21,8 +21,6 @@
 
 #define FB_SFX_DARWIN_QUEUE_BUFFERS 3
 
-extern const FB_SFX_DRIVER __fb_sfxDriverNull;
-
 typedef struct FB_SFX_DARWIN_QUEUE_BUFFER
 {
     AudioQueueBufferRef ref;

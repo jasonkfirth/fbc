@@ -19,7 +19,7 @@ static float dsin(int angle)
 	case 90: 	return 1.0;
 	case 180:	return 0.0;
 	case 270:	return -1.0;
-	default: 	return sin((float)angle * PI / 180.0);
+	default: 	return sinf((float)angle * PI / 180.0f);
 	}
 }
 
@@ -32,7 +32,7 @@ static float dcos(int angle)
 	case 90: 	return 0.0;
 	case 180:	return -1.0;
 	case 270:	return 0.0;
-	default: 	return cos((float)angle * PI / 180.0);
+	default: 	return cosf((float)angle * PI / 180.0f);
 	}
 }
 

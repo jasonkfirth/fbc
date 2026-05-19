@@ -6,6 +6,7 @@ int fb_DevScrnRead( FB_FILE *handle, void* value, size_t *pLength )
 {
     size_t length, copy_length;
     DEV_SCRN_INFO *info;
+    FB_FILE *real_handle;
     char *pachBuffer = (char*) value;
 
     FB_LOCK();
@@ -13,7 +14,14 @@ int fb_DevScrnRead( FB_FILE *handle, void* value, size_t *pLength )
     DBG_ASSERT(pLength!=NULL);
     length = *pLength;
 
-    info = (DEV_SCRN_INFO*) FB_HANDLE_DEREF(handle)->opaque;
+    real_handle = FB_HANDLE_DEREF( handle );
+    if( (real_handle == NULL) || (real_handle->opaque == NULL) ) {
+        FB_UNLOCK();
+        *pLength = 0;
+        return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+    }
+
+    info = (DEV_SCRN_INFO*) real_handle->opaque;
 
     while( length > 0 ) {
         copy_length = (length > info->length) ? info->length : length;

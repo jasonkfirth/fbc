@@ -17,8 +17,8 @@ int fb_hArrayRealloc
 	size_t i, elements, size;
 	ssize_t diff;
 	FBARRAYDIM *dim;
-	ssize_t lbTB[FB_MAXDIMENSIONS];
-	ssize_t ubTB[FB_MAXDIMENSIONS];
+	ssize_t lbTB[FB_MAXDIMENSIONS] = {0};
+	ssize_t ubTB[FB_MAXDIMENSIONS] = {0};
 	unsigned char *this_;
 	void *reallocTemp;
 

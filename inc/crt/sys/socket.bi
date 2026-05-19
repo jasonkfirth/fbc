@@ -16,8 +16,12 @@
 #include once "crt/sys/linux/socket.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/sys/cygwin/socket.bi"
+#elseif defined(__FB_DRAGONFLY__)
+#include once "crt/sys/dragonfly/socket.bi"
 #elseif defined(__FB_OPENBSD__)
 #include once "crt/sys/openbsd/socket.bi"
+#elseif defined(__FB_NETBSD__)
+#include once "crt/sys/netbsd/socket.bi"
 #else
 #error Platform unsupported
 #endif

@@ -22,7 +22,6 @@
 
 extern const FB_SFX_DRIVER fb_sfxDriverAlsa;
 extern const FB_SFX_DRIVER fb_sfxDriverPulse;
-extern const FB_SFX_DRIVER __fb_sfxDriverNull;
 
 int fb_sfxCaptureAlsaStart(void);
 void fb_sfxCaptureAlsaStop(void);

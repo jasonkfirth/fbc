@@ -25,11 +25,16 @@
 #include "fb_gfx.h"
 #include <stdint.h>
 
+#if defined(HOST_LINUX) || defined(HOST_FREEBSD) || defined(HOST_NETBSD) || \
+	defined(HOST_DRAGONFLY)
+#define FB_XPAD_HAS_JOYDEV
+#endif
+
 #if defined(HOST_WIN32)
 #include <windows.h>
 #endif
 
-#if defined(HOST_LINUX)
+#if defined(FB_XPAD_HAS_JOYDEV)
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -247,7 +252,7 @@ static int xpad_win32_get(int id, ssize_t *buttons,
 
 #endif
 
-#if defined(HOST_LINUX) || defined(HOST_JS)
+#if defined(FB_XPAD_HAS_JOYDEV) || defined(HOST_JS)
 
 static float xpad_clamp_unit(float value)
 {
@@ -260,7 +265,7 @@ static float xpad_clamp_unit(float value)
 
 #endif
 
-#if defined(HOST_LINUX)
+#if defined(FB_XPAD_HAS_JOYDEV)
 
 #define JS_EVENT_BUTTON         0x01
 #define JS_EVENT_AXIS           0x02
@@ -274,50 +279,50 @@ typedef struct FB_JS_EVENT_ {
 	unsigned char number;
 } FB_JS_EVENT;
 
-typedef struct FB_LINUX_XPAD_ {
+typedef struct FB_JOYDEV_XPAD_ {
 	int fd;
 	int seen;
 	float axis[8];
 	unsigned char axis_seen[8];
 	uint32_t buttons;
-} FB_LINUX_XPAD;
+} FB_JOYDEV_XPAD;
 
-static FB_LINUX_XPAD linux_xpad[XPAD_MAX_DEVICES];
-static int linux_xpad_inited;
+static FB_JOYDEV_XPAD joydev_xpad[XPAD_MAX_DEVICES];
+static int joydev_xpad_inited;
 
-static void xpad_linux_init(void)
+static void xpad_joydev_init(void)
 {
 	int i;
 
-	if (linux_xpad_inited)
+	if (joydev_xpad_inited)
 		return;
 
-	memset(linux_xpad, 0, sizeof(linux_xpad));
+	memset(joydev_xpad, 0, sizeof(joydev_xpad));
 	for (i = 0; i < XPAD_MAX_DEVICES; ++i)
-		linux_xpad[i].fd = -1;
+		joydev_xpad[i].fd = -1;
 
-	linux_xpad_inited = TRUE;
+	joydev_xpad_inited = TRUE;
 }
 
-static int xpad_linux_open(int id)
+static int xpad_joydev_open(int id)
 {
 	static const char *const device_path[] = {
 		"/dev/input/js",
 		"/dev/js",
 		NULL
 	};
-	FB_LINUX_XPAD *pad;
+	FB_JOYDEV_XPAD *pad;
 	char device_name[32];
 	unsigned int version;
 	int i;
 
-	pad = &linux_xpad[id];
+	pad = &joydev_xpad[id];
 	if (pad->fd >= 0)
 		return TRUE;
 
 	for (i = 0; device_path[i]; ++i) {
 		snprintf(device_name, sizeof(device_name), "%s%d", device_path[i], id);
-		pad->fd = open(device_name, O_NONBLOCK);
+		pad->fd = open(device_name, O_RDONLY | O_NONBLOCK);
 		if (pad->fd < 0)
 			continue;
 
@@ -338,7 +343,7 @@ static int xpad_linux_open(int id)
 	return FALSE;
 }
 
-static void xpad_linux_close(FB_LINUX_XPAD *pad)
+static void xpad_joydev_close(FB_JOYDEV_XPAD *pad)
 {
 	if (pad->fd >= 0)
 		close(pad->fd);
@@ -348,7 +353,7 @@ static void xpad_linux_close(FB_LINUX_XPAD *pad)
 	memset(pad->axis_seen, 0, sizeof(pad->axis_seen));
 }
 
-static int xpad_linux_poll(FB_LINUX_XPAD *pad)
+static int xpad_joydev_poll(FB_JOYDEV_XPAD *pad)
 {
 	FB_JS_EVENT event;
 	ssize_t bytes;
@@ -370,18 +375,22 @@ static int xpad_linux_poll(FB_LINUX_XPAD *pad)
 					pad->buttons &= ~(1u << event.number);
 			}
 			break;
+
+		default:
+			break;
 		}
 	}
 
-	if ((bytes < 0) && ((errno == ENODEV) || (errno == EIO))) {
-		xpad_linux_close(pad);
+	if ((bytes < 0) &&
+		((errno == ENODEV) || (errno == ENXIO) || (errno == EIO))) {
+		xpad_joydev_close(pad);
 		return FALSE;
 	}
 
 	return TRUE;
 }
 
-static float xpad_linux_trigger(FB_LINUX_XPAD *pad, int axis)
+static float xpad_joydev_trigger(FB_JOYDEV_XPAD *pad, int axis)
 {
 	if ((axis < 0) || (axis >= 8) || !pad->axis_seen[axis])
 		return 0.0f;
@@ -389,7 +398,7 @@ static float xpad_linux_trigger(FB_LINUX_XPAD *pad, int axis)
 	return xpad_clamp_unit((pad->axis[axis] + 1.0f) * 0.5f);
 }
 
-static ssize_t xpad_linux_buttons(FB_LINUX_XPAD *pad)
+static ssize_t xpad_joydev_buttons(FB_JOYDEV_XPAD *pad)
 {
 	ssize_t buttons = 0;
 	float left_trigger;
@@ -418,8 +427,8 @@ static ssize_t xpad_linux_buttons(FB_LINUX_XPAD *pad)
 	if (pad->buttons & (1u << 10))
 		buttons |= XPAD_BUTTON_R3;
 
-	left_trigger = xpad_linux_trigger(pad, 2);
-	right_trigger = xpad_linux_trigger(pad, 5);
+	left_trigger = xpad_joydev_trigger(pad, 2);
+	right_trigger = xpad_joydev_trigger(pad, 5);
 	if (left_trigger > XPAD_TRIGGER_DIGITAL_THRESHOLD)
 		buttons |= XPAD_BUTTON_L2;
 	if (right_trigger > XPAD_TRIGGER_DIGITAL_THRESHOLD)
@@ -428,7 +437,7 @@ static ssize_t xpad_linux_buttons(FB_LINUX_XPAD *pad)
 	return buttons;
 }
 
-static ssize_t xpad_linux_dpad(FB_LINUX_XPAD *pad)
+static ssize_t xpad_joydev_dpad(FB_JOYDEV_XPAD *pad)
 {
 	ssize_t dpad = 0;
 
@@ -449,28 +458,28 @@ static ssize_t xpad_linux_dpad(FB_LINUX_XPAD *pad)
 	return dpad;
 }
 
-static int xpad_linux_get(int id, ssize_t *buttons,
+static int xpad_joydev_get(int id, ssize_t *buttons,
 						  float *lstick_x, float *lstick_y,
 						  float *rstick_x, float *rstick_y,
 						  float *ltrigger, float *rtrigger,
 						  ssize_t *dpad)
 {
-	FB_LINUX_XPAD *pad;
+	FB_JOYDEV_XPAD *pad;
 
 	if ((id < 0) || (id >= XPAD_MAX_DEVICES))
 		return XPAD_STATUS_MISSING;
 
-	xpad_linux_init();
-	pad = &linux_xpad[id];
+	xpad_joydev_init();
+	pad = &joydev_xpad[id];
 
-	if (!xpad_linux_open(id))
+	if (!xpad_joydev_open(id))
 		return pad->seen ? XPAD_STATUS_DISCONNECTED : XPAD_STATUS_MISSING;
 
-	if (!xpad_linux_poll(pad))
+	if (!xpad_joydev_poll(pad))
 		return XPAD_STATUS_DISCONNECTED;
 
 	if (buttons)
-		*buttons = xpad_linux_buttons(pad);
+		*buttons = xpad_joydev_buttons(pad);
 	if (lstick_x)
 		*lstick_x = pad->axis_seen[0] ? pad->axis[0] : 0.0f;
 	if (lstick_y)
@@ -480,11 +489,11 @@ static int xpad_linux_get(int id, ssize_t *buttons,
 	if (rstick_y)
 		*rstick_y = pad->axis_seen[4] ? pad->axis[4] : 0.0f;
 	if (ltrigger)
-		*ltrigger = xpad_linux_trigger(pad, 2);
+		*ltrigger = xpad_joydev_trigger(pad, 2);
 	if (rtrigger)
-		*rtrigger = xpad_linux_trigger(pad, 5);
+		*rtrigger = xpad_joydev_trigger(pad, 5);
 	if (dpad)
-		*dpad = xpad_linux_dpad(pad);
+		*dpad = xpad_joydev_dpad(pad);
 
 	return XPAD_STATUS_CONNECTED;
 }
@@ -923,8 +932,8 @@ static int xpad_platform_get(int id, ssize_t *buttons,
 {
 #if defined(HOST_WIN32)
 	return xpad_win32_get(id, buttons, lstick_x, lstick_y, rstick_x, rstick_y, ltrigger, rtrigger, dpad);
-#elif defined(HOST_LINUX)
-	return xpad_linux_get(id, buttons, lstick_x, lstick_y, rstick_x, rstick_y, ltrigger, rtrigger, dpad);
+#elif defined(FB_XPAD_HAS_JOYDEV)
+	return xpad_joydev_get(id, buttons, lstick_x, lstick_y, rstick_x, rstick_y, ltrigger, rtrigger, dpad);
 #elif defined(HOST_XBOX)
 	return xpad_xbox_get(id, buttons, lstick_x, lstick_y, rstick_x, rstick_y, ltrigger, rtrigger, dpad);
 #elif defined(HOST_JS)

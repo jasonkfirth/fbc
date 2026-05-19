@@ -531,49 +531,51 @@ int fb_hProcessMask
 			}
 
 			if( !do_add ) {
-				switch( chCurrent ) {
-				case '%':
-				case ',':
-				case '#':
-				case '0':
-				case '+':
-				case 'E':
-				case 'e':
-					if( pInfo->mask_type==eMT_Unknown ) {
-						pInfo->mask_type = eMT_Number;
+				if( !do_output ) {
+					switch( chCurrent ) {
+					case '%':
+					case ',':
+					case '#':
+					case '0':
+					case '+':
+					case 'E':
+					case 'e':
+						if( pInfo->mask_type==eMT_Unknown ) {
+							pInfo->mask_type = eMT_Number;
 #if 0
-					} else if( pInfo->mask_type!=eMT_Number ) {
-						fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
-						return FALSE;
+						} else if( pInfo->mask_type!=eMT_Number ) {
+							fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+							return FALSE;
 #endif
-					}
-					break;
-				case '-':
-				case '.':
-					if( pInfo->mask_type==eMT_Unknown ) {
-						pInfo->mask_type = eMT_Number;
-					}
-					break;
-				case 'd':
-				case 'n':
-				case 'm':
-				case 'M':
-				case 'y':
-				case 'h':
-				case 'H':
-				case 's':
-				case 't':
-				case ':':
-				case '/':
-					if( pInfo->mask_type==eMT_Unknown ) {
-						pInfo->mask_type = eMT_DateTime;
+						}
+						break;
+					case '-':
+					case '.':
+						if( pInfo->mask_type==eMT_Unknown ) {
+							pInfo->mask_type = eMT_Number;
+						}
+						break;
+					case 'd':
+					case 'n':
+					case 'm':
+					case 'M':
+					case 'y':
+					case 'h':
+					case 'H':
+					case 's':
+					case 't':
+					case ':':
+					case '/':
+						if( pInfo->mask_type==eMT_Unknown ) {
+							pInfo->mask_type = eMT_DateTime;
 #if 0
-					} else if( pInfo->mask_type!=eMT_DateTime ) {
-						fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
-						return FALSE;
+						} else if( pInfo->mask_type!=eMT_DateTime ) {
+							fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+							return FALSE;
 #endif
+						}
+						break;
 					}
-					break;
 				}
 
 

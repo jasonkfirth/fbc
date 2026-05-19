@@ -29,19 +29,17 @@ static FB_FILE_HOOKS hooks_dev_pipe = {
 };
 
 int fb_DevPipeOpen( FB_FILE *handle, const char *filename, size_t filename_len )
-{
-    int res = fb_ErrorSetNum( FB_RTERROR_OK );
-    FILE *fp = NULL;
-    char openmask[16];
+	{
+	    int res = fb_ErrorSetNum( FB_RTERROR_OK );
+	    FILE *fp = NULL;
+	    const char *openmask = NULL;
 
     FB_LOCK();
 
     handle->hooks = &hooks_dev_pipe;
 
-    openmask[0] = 0;
-
-    switch( handle->mode )
-    {
+	    switch( handle->mode )
+	    {
     case FB_FILE_MODE_INPUT:
         if ( handle->access == FB_FILE_ACCESS_ANY)
             handle->access = FB_FILE_ACCESS_READ;
@@ -49,8 +47,8 @@ int fb_DevPipeOpen( FB_FILE *handle, const char *filename, size_t filename_len )
         if( handle->access != FB_FILE_ACCESS_READ )
             res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
-        strcpy( openmask, "r" );
-        break;
+	        openmask = "r";
+	        break;
 
     case FB_FILE_MODE_OUTPUT:
         if ( handle->access == FB_FILE_ACCESS_ANY)
@@ -59,14 +57,14 @@ int fb_DevPipeOpen( FB_FILE *handle, const char *filename, size_t filename_len )
         if( handle->access != FB_FILE_ACCESS_WRITE )
             res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
-        strcpy( openmask, "w" );
-        break;
+	        openmask = "w";
+	        break;
 
     case FB_FILE_MODE_BINARY:
         if ( handle->access == FB_FILE_ACCESS_ANY)
             handle->access = FB_FILE_ACCESS_WRITE;
 
-		strcpy( openmask, (handle->access == FB_FILE_ACCESS_WRITE? "wb" : "rb") );
+			openmask = (handle->access == FB_FILE_ACCESS_WRITE? "wb" : "rb");
 
         break;
 
@@ -74,7 +72,10 @@ int fb_DevPipeOpen( FB_FILE *handle, const char *filename, size_t filename_len )
     	res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
     }
 
-    if( res == FB_RTERROR_OK )
+	    if( openmask == NULL )
+			res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+	    if( (res == FB_RTERROR_OK) && (openmask != NULL) )
     {
         /* try to open/create pipe */
 #ifdef HOST_MINGW

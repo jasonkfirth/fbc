@@ -42,6 +42,14 @@ FBCALL void *fb_StrConcatByref
 	/* dst should always be var-len string */
 	DBG_ASSERT( dst_size == FB_STRSIZEVARLEN );
 
+	if( dst == NULL )
+	{
+		if( src_size == FB_STRSIZEVARLEN )
+			fb_hStrDelTemp( (FBSTRING *)src );
+
+		return dst;
+	}
+
 	/* dst */
 	FB_STRSETUP_FIX( dst, dst_size, dst_ptr, dst_len );
 
@@ -52,20 +60,18 @@ FBCALL void *fb_StrConcatByref
 	if( dst == src || dst_ptr == src_ptr )
 	{
 		FBSTRING *str = dst;
+		ssize_t old_dst_len = dst_len;
+		ssize_t old_src_len = src_len;
 
 		FB_STRLOCK();
 		
-		if( fb_hStrRealloc( str, dst_len + src_len, FB_TRUE ) )
+		if( fb_hStrRealloc( str, old_dst_len + old_src_len, FB_TRUE ) )
 		{
-			/* recalculate dst */
-			FB_STRSETUP_FIX( str, dst_size, dst_ptr, dst_len );
-
 			/* copy start of dst to second half */
-			FB_MEMCPYX( dst_ptr + dst_len, dst, dst_len );
+			if( old_src_len > 0 )
+				FB_MEMCPYX( str->data + old_dst_len, str->data, old_src_len );
 
-			fb_hStrSetLength( str, dst_len + dst_len );
-
-			str->data[dst_len + dst_len] = '\0';
+			str->data[old_dst_len + old_src_len] = '\0';
 		}
 
 		/* delete temps? */

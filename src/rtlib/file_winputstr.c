@@ -66,8 +66,11 @@ FBCALL FB_WCHAR *fb_FileWstrInput( ssize_t chars, int fnum )
 	}
 	else
 	{
-		res = FB_RTERROR_OUTOFMEM;
+		res = fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 	}
+
+	if( res != FB_RTERROR_OK )
+		dst = NULL;
 
 	FB_UNLOCK();
 

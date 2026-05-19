@@ -147,20 +147,25 @@ int fb_SerialOpen
 
 	DeviceName[0] = '\0';
 
-    if( iPort == 0 )
+	if( iPort == 0 )
 	{
+		int written;
 		if( strcasecmp(pszDevice, "COM") == 0 )
 		{
-			strcpy( DeviceName, "/dev/modem" );
+			written = snprintf( DeviceName, sizeof( DeviceName ), "%s", "/dev/modem" );
 		}
 		else
 		{
-			strcpy( DeviceName, pszDevice );
+			written = snprintf( DeviceName, sizeof( DeviceName ), "%s", pszDevice );
 		}
+		if( (written < 0) || ((size_t)written >= sizeof( DeviceName )) )
+			return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}
 	else
 	{
-		sprintf(DeviceName, "/dev/ttyS%d", (iPort-1));
+		int written = snprintf(DeviceName, sizeof( DeviceName ), "/dev/ttyS%d", (iPort-1));
+		if( (written < 0) || ((size_t)written >= sizeof( DeviceName )) )
+			return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}
 
     /* Setting speed baud line */
@@ -373,6 +378,14 @@ int fb_SerialOpen
     else
     {
 	    LINUX_SERIAL_INFO *pInfo = (LINUX_SERIAL_INFO *) calloc( 1, sizeof(LINUX_SERIAL_INFO) );
+	    if( pInfo==NULL ) {
+#ifdef HAS_LOCKDEV
+			dev_unlock(DeviceName, plckid);
+#endif
+		        tcsetattr( SerialFD, TCSAFLUSH, &oldserp);
+			close(SerialFD);
+			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+	    }
 	    DBG_ASSERT( ppvHandle!=NULL );
 	    *ppvHandle = pInfo;
 	    pInfo->sfd = SerialFD;

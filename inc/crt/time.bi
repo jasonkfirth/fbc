@@ -22,8 +22,12 @@
 #include once "crt/cygwin/time.bi"
 #elseif defined(__FB_FREEBSD__)
 #include once "crt/freebsd/time.bi"
+#elseif defined(__FB_DRAGONFLY__)
+#include once "crt/dragonfly/time.bi"
 #elseif defined(__FB_OPENBSD__)
 #include once "crt/openbsd/time.bi"
+#elseif defined(__FB_NETBSD__)
+#include once "crt/netbsd/time.bi"
 #elseif defined(__FB_HAIKU__)
 #include once "crt/haiku/time.bi"
 #elseif defined(__FB_DARWIN__)
@@ -35,6 +39,15 @@
 
 extern "c"
 declare function clock () as clock_t
+#if defined(__FB_NETBSD__)
+declare function time_ alias "__time50" (byval as time_t ptr = NULL) as time_t
+declare function difftime alias "__difftime50" (byval as time_t, byval as time_t) as double
+declare function mktime alias "__mktime50" (byval as tm ptr) as time_t
+declare function asctime (byval as tm ptr) as zstring ptr
+declare function ctime alias "__ctime50" (byval as time_t ptr) as zstring ptr
+declare function gmtime alias "__gmtime50" (byval as time_t ptr) as tm ptr
+declare function localtime alias "__locatime50" (byval as time_t ptr) as tm ptr
+#else
 declare function time_ alias "time" (byval as time_t ptr = NULL) as time_t
 declare function difftime (byval as time_t, byval as time_t) as double
 declare function mktime (byval as tm ptr) as time_t
@@ -42,6 +55,7 @@ declare function asctime (byval as tm ptr) as zstring ptr
 declare function ctime (byval as time_t ptr) as zstring ptr
 declare function gmtime (byval as time_t ptr) as tm ptr
 declare function localtime (byval as time_t ptr) as tm ptr
+#endif
 declare function strftime (byval as zstring ptr, byval as size_t, byval as zstring ptr, byval as tm ptr) as size_t
 declare function wcsftime (byval as wchar_t ptr, byval as size_t, byval as wchar_t ptr, byval as tm ptr) as size_t
 end extern

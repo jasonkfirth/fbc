@@ -3,7 +3,6 @@
 #include "fb_gfx.h"
 
 extern void fb_hPutTrans1C(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param);
-extern void fb_hPutTrans(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param);
 
 #ifdef HOST_X86
 #include "x86/fb_gfx_mmx.h"

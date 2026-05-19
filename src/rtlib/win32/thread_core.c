@@ -52,7 +52,7 @@ FBCALL FBTHREAD *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack
 	info->proc = proc;
 	info->param = param;
 	info->thread = thread;
-	thread->flags = 0;
+	thread->flags = FBTHREAD_NONE;
 
 	if( pthread_attr_init( &tattr ) ) {
 		free( thread );
@@ -143,7 +143,7 @@ FBCALL FBTHREAD *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack
 	info->proc = proc;
 	info->param = param;
 	info->thread = thread;
-	thread->flags = 0;
+	thread->flags = FBTHREAD_NONE;
 
 #ifdef HOST_MINGW
 	/* Note: _beginthreadex()'s last parameter cannot be NULL,

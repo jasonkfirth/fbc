@@ -17,8 +17,12 @@
 #include once "crt/sys/linux/time.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/sys/linux/time.bi"
+#elseif defined(__FB_DRAGONFLY__)
+#include once "crt/sys/dragonfly/time.bi"
 #elseif defined(__FB_OPENBSD__)
 #include once "crt/sys/openbsd/time.bi"
+#elseif defined(__FB_NETBSD__)
+#include once "crt/sys/netbsd/time.bi"
 #elseif defined(__FB_DOS__)
 #include once "crt/dos/time.bi"
 #else

@@ -82,11 +82,7 @@ FBCALL void fb_StrSwap( void *str1, ssize_t size1, int fillrem1,
 			size2 = size;
 		}
 
-		{
-			int fillrem = fillrem1;
-			fillrem1 = fillrem2;
-			fillrem2 = fillrem;
-		}
+		fillrem2 = fillrem1;
 	}
 
 	/* MemSwap as much as possible (i.e. the smaller length) */

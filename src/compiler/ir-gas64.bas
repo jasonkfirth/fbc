@@ -3058,7 +3058,7 @@ private sub hProfileProcEpilog()
 	asm_code("rdtsc",KNOFREE)
 	asm_code("shl rdx,32",KNOFREE)
 	asm_code("or rdx,rax",KNOFREE)
-	asm_code("mov rcx, rdx,KNOFREE",KNOFREE)
+	asm_code("mov rcx, rdx",KNOFREE)
 	asm_code("mov rax, QWORD PTR "+PROFILE_REC_INIT0,KNOFREE) ''init0
 	asm_code("sub rcx, rax",KNOFREE)
 	asm_code("add QWORD PTR "+PROFILE_REC_GRANT_TOTAL+", rcx",KNOFREE) ''grand total

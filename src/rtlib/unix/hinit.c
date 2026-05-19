@@ -61,12 +61,21 @@ static const char *seq[] = {
 static pthread_t __fb_bg_thread;
 static int bgthread_inited = FALSE;
 static pthread_mutex_t __fb_bg_mutex;
+
+/*
+ * Fatal signal shutdown
+ *
+ * The Unix console backend restores terminal state before re-raising fatal
+ * signals. That teardown path necessarily uses the normal rtlib console
+ * cleanup code, including pthread, stdio, and termcap calls. Those APIs are
+ * not async-signal-safe, but skipping this cleanup would commonly leave the
+ * user's terminal in raw/noncanonical mode after a crash.
+ */
+/* NOLINTBEGIN(bugprone-signal-handler) */
 FBCALL void fb_BgLock   ( void ) { pthread_mutex_lock  ( &__fb_bg_mutex     ); }
 FBCALL void fb_BgUnlock ( void ) { pthread_mutex_unlock( &__fb_bg_mutex     ); }
 
 #ifdef ENABLE_MT
-extern int pthread_mutexattr_settype(pthread_mutexattr_t *attr, int kind);
-
 static pthread_mutex_t __fb_global_mutex;
 static pthread_mutex_t __fb_string_mutex;
 static pthread_mutex_t __fb_graphics_mutex;
@@ -185,13 +194,10 @@ static int fb_hTermQuery( int code, int *val1, int *val2 )
 			fb_hAddCh( c );
 		} while (1);
 
-		const char *format;
 		if( code == SEQ_QUERY_WINDOW )
-			format = "8;%d;%dt";
+			filled = scanf( "8;%d;%dt", val1, val2 );
 		else /* SEQ_QUERY_CURSOR */
-			format = "%d;%dR";
-
-		filled = scanf( format, val1, val2 );
+			filled = scanf( "%d;%dR", val1, val2 );
 	} while (filled != 2);
 
 	return TRUE;
@@ -271,6 +277,8 @@ void fb_hRecheckConsoleSize( int requery_cursorpos )
 	}
 
 	unsigned char *char_buffer = calloc(1, win.ws_row * win.ws_col * 2);
+	if( char_buffer == NULL )
+		return;
 	unsigned char *attr_buffer = char_buffer + (win.ws_row * win.ws_col);
 	if (__fb_con.char_buffer) {
 		int h = (__fb_con.h < win.ws_row) ? __fb_con.h : win.ws_row;
@@ -332,7 +340,8 @@ int fb_hTermOut( int code, int param1, int param2 )
 	if (!__fb_con.inited)
 		return FALSE;
 
-	if (code > SEQ_MAX) {
+	if (code >= SEQ_EXTRA) {
+		int extra_index = code - SEQ_EXTRA;
 
 		/* Is use of the VT100 escape sequences disallowed? */
 		if (!__fb_enable_vt100_escapes)
@@ -344,11 +353,16 @@ int fb_hTermOut( int code, int param1, int param2 )
 				return FALSE;
 			break;
 		default:
-			if( fputs( extra_seq[code - SEQ_EXTRA], stdout ) == EOF )
+			if( (extra_index < 0) ||
+			    (extra_index >= (int)(sizeof(extra_seq) / sizeof(extra_seq[0]))) )
+				return FALSE;
+			if( fputs( extra_seq[extra_index], stdout ) == EOF )
 				return FALSE;
 			break;
 		}
 	} else {
+		if( (code < 0) || (code >= SEQ_MAX) )
+			return FALSE;
 #ifdef DISABLE_NCURSES
 		/* if (code == SEQ_FG_COLOR) */
 		/* 	puts() */
@@ -741,3 +755,4 @@ void fb_hEnd( int unused )
 	pthread_mutex_destroy(&__fb_profile_mutex);
 #endif
 }
+/* NOLINTEND(bugprone-signal-handler) */

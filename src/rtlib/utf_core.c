@@ -9,7 +9,7 @@ const UTF_8 __fb_utf8_bmarkTb[7] =
 		0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC	
 	};
 
-const char __fb_utf8_trailingTb[256] =
+const unsigned char __fb_utf8_trailingTb[256] =
 	{
 		0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 		0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,

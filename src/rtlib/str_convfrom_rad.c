@@ -12,7 +12,7 @@ FBCALL int fb_hStrRadix2Int( char *src, ssize_t len, int radix )
 		case 16:
 			while( --len >= 0 )
 			{
-				c = *src++;
+				c = FB_CHAR_TO_INT( *src++ );
 				if( (c >= 97) && (c <= 102) )
 					c -= 87;
 				else if( (c >= 65) && (c <= 70) )
@@ -29,7 +29,7 @@ FBCALL int fb_hStrRadix2Int( char *src, ssize_t len, int radix )
 		/* oct */
 		case 8:
 			while( --len >= 0 ) {
-				c = *src++;
+				c = FB_CHAR_TO_INT( *src++ );
 				if( (c >= 48) && (c <= 55) )
 					v = (v * 8) + (c - 48);
 				else
@@ -40,7 +40,7 @@ FBCALL int fb_hStrRadix2Int( char *src, ssize_t len, int radix )
 		/* bin */
 		case 2:
 			while( --len >= 0 ) {
-				c = *src++;
+				c = FB_CHAR_TO_INT( *src++ );
 				if( (c >= 48) && (c <= 49) )
 					v = (v * 2) + (c - 48);
 				else

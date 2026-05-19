@@ -24,8 +24,12 @@
 #include once "crt/cygwin/wchar.bi"
 #elseif defined(__FB_FREEBSD__)
 #include once "crt/freebsd/wchar.bi"
+#elseif defined(__FB_DRAGONFLY__)
+#include once "crt/dragonfly/wchar.bi"
 #elseif defined(__FB_OPENBSD__)
 #include once "crt/openbsd/wchar.bi"
+#elseif defined(__FB_NETBSD__)
+#include once "crt/netbsd/wchar.bi"
 #elseif defined(__FB_HAIKU__)
 #include once "crt/haiku/wchar.bi"
 #elseif defined(__FB_DOS__)

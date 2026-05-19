@@ -3,7 +3,7 @@
 #include "../fb.h"
 #include "fb_private_console.h"
 
-#define CTRL_ALWAYS 0x0800D101
+#define CTRL_ALWAYS 0x0800D101u
 #define ENTER_UTF8  "\e%G"
 #define EXIT_UTF8   "\e%@"
 

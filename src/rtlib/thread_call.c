@@ -80,8 +80,8 @@ static void freeStruct( ffi_type *arg )
         i++;
     }
     
-    free( arg->elements );
-    free( arg );
+	    free( (void *)arg->elements );
+	    free( arg );
 }
 
 static void freeThreadCall( FBTHREADCALL *info )
@@ -97,9 +97,9 @@ static void freeThreadCall( FBTHREADCALL *info )
             freeStruct( info->ffi_arg_types[i] );
     }
 
-    free( info->values );
-    free( info->ffi_arg_types );
-    free( info );
+	    free( (void *)info->values );
+	    free( (void *)info->ffi_arg_types );
+	    free( info );
 }
 
 static ffi_type *getArgument( va_list *args_list );
@@ -143,8 +143,8 @@ static ffi_type *getStruct( va_list *args_list )
                 if( ffi_arg->elements[j]->type == FFI_TYPE_STRUCT )
                     freeStruct( ffi_arg->elements[j] );
             }
-            free( ffi_arg->elements );
-            free( ffi_arg );
+	            free( (void *)ffi_arg->elements );
+	            free( ffi_arg );
             return NULL;
         }
     }
@@ -193,39 +193,40 @@ FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, 
     values = NULL;
     if( num_args > 0 )
     {
+        va_list args_list;
+
         ffi_args = (ffi_type **)malloc( sizeof( ffi_type * ) * num_args );
         values = (void **)malloc( sizeof( void * ) * num_args );
         if( (ffi_args == NULL) || (values == NULL) )
         {
-            free( values );
-            free( ffi_args );
+            free( (void *)values );
+            free( (void *)ffi_args );
             return NULL;
         }
-    }
 
-    va_list args_list; 
-    va_start(args_list, num_args);
-    
-    /* scan arguments and values from var_args */
-    for( i=0; i<num_args; i++ )
-    {
-        ffi_args[i] = getArgument( &args_list );
-        if( ffi_args[i] == NULL )
+        va_start(args_list, num_args);
+
+        /* scan arguments and values from var_args */
+        for( i=0; i<num_args; i++ )
         {
-            /* error, free all memory allocated up to this point */
-            va_end( args_list );
-            for( j=0; j<i; j++ )
+            ffi_args[i] = getArgument( &args_list );
+            if( ffi_args[i] == NULL )
             {
-                if( ffi_args[j]->type == FFI_TYPE_STRUCT )
-                    freeStruct( ffi_args[j] );
+                /* error, free all memory allocated up to this point */
+                va_end( args_list );
+                for( j=0; j<i; j++ )
+                {
+                    if( ffi_args[j]->type == FFI_TYPE_STRUCT )
+                        freeStruct( ffi_args[j] );
+                }
+                free( (void *)values );
+                free( (void *)ffi_args );
+                return NULL;
             }
-            free(values);
-            free(ffi_args);
-            return NULL;
+            values[i] = va_arg( args_list, void * );
         }
-        values[i] = va_arg( args_list, void * );
+        va_end( args_list );
     }
-    va_end( args_list );
     
     /* pack into thread parameter */
     param = malloc( sizeof( FBTHREADCALL ) );
@@ -236,8 +237,8 @@ FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, 
             if( ffi_args[j]->type == FFI_TYPE_STRUCT )
                 freeStruct( ffi_args[j] );
         }
-        free(values);
-        free(ffi_args);
+        free( (void *)values );
+        free( (void *)ffi_args );
         return NULL;
     }
     param->proc = proc;
@@ -258,7 +259,7 @@ static FBCALL void threadproc( void *param )
 {
     FBTHREADCALL *info = ( FBTHREADCALL * )param;
     ffi_status status = FFI_OK;
-    ffi_abi abi = -1;
+    ffi_abi abi = FFI_DEFAULT_ABI;
     ffi_cif cif;
 
 #if defined HOST_X86 && !defined HOST_64BIT
@@ -270,7 +271,7 @@ static FBCALL void threadproc( void *param )
         abi = FFI_STDCALL;
 #endif
     else
-        status = ~FFI_OK;
+        status = FFI_BAD_ABI;
 
     /* prep FFI call interface */
     if( status == FFI_OK )
@@ -284,7 +285,7 @@ static FBCALL void threadproc( void *param )
         (info->abi == FB_THREADCALL_STDCALL) )
         abi = FFI_DEFAULT_ABI;
     else
-        status = ~FFI_OK;
+        status = FFI_BAD_ABI;
 
     if( status == FFI_OK )
 #endif

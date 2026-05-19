@@ -13,7 +13,7 @@ FBCALL void fb_GfxScreenInfo
 		FBSTRING *driver
 	)
 {
-	char *name;
+	const char *name;
 	size_t name_len;
 
 	FB_GRAPHICS_LOCK( );

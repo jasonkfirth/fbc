@@ -532,6 +532,8 @@ got_mode:
 	}
 
 	palette = (unsigned short *)malloc(sizeof(unsigned short) * 1536);
+	if (!palette)
+		return -1;
 	orig_cmap.start = 0;
 	orig_cmap.len = palette_len;
 	orig_cmap.transp = NULL;
@@ -704,8 +706,11 @@ static int *driver_fetch_modes(int depth, int *size)
 		mode.xres = mode.xres_virtual = standard_mode[i].w;
 		mode.yres = mode.yres_virtual = standard_mode[i].h;
 		if (ioctl(fd, FBIOPUT_VSCREENINFO, &mode) == 0) {
+			int *new_sizes = realloc(sizes, (num_sizes + 1) * sizeof(int));
+			if (!new_sizes)
+				break;
+			sizes = new_sizes;
 			num_sizes++;
-			sizes = realloc(sizes, num_sizes * sizeof(int));
 			sizes[num_sizes - 1] = (mode.xres << 16) | mode.yres;
 		}
 	}

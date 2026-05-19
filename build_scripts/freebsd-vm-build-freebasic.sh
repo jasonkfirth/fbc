@@ -289,6 +289,7 @@ start_vm() {
 	local vnc_display="$3"
 	local disk="$vm_dir/freebsd.qcow2"
 	local seed_iso="$vm_dir/seed.iso"
+	local audio_wav="$vm_dir/freebasic-freebsd-audio.wav"
 
 	qemu-system-x86_64 \
 		-enable-kvm \
@@ -299,6 +300,9 @@ start_vm() {
 		-drive "file=$seed_iso,format=raw,media=cdrom,readonly=on" \
 		-netdev "user,id=net0,hostfwd=tcp:127.0.0.1:$ssh_port-:22" \
 		-device virtio-net-pci,netdev=net0 \
+		-audiodev "wav,id=audio0,path=$audio_wav" \
+		-device intel-hda \
+		-device hda-output,audiodev=audio0 \
 		-vga std \
 		-display "vnc=127.0.0.1:$vnc_display" \
 		-serial "file:$vm_dir/serial.log" \
@@ -308,9 +312,23 @@ start_vm() {
 
 stop_vm() {
 	local vm_dir="$1"
+	local pid
 
 	if [ -f "$vm_dir/qemu.pid" ]; then
-		kill "$(cat "$vm_dir/qemu.pid")" 2>/dev/null || true
+		pid="$(cat "$vm_dir/qemu.pid")"
+		kill "$pid" 2>/dev/null || true
+
+		for _ in $(seq 1 30); do
+			if ! kill -0 "$pid" 2>/dev/null; then
+				break
+			fi
+			sleep 1
+		done
+
+		if kill -0 "$pid" 2>/dev/null; then
+			kill -KILL "$pid" 2>/dev/null || true
+		fi
+
 		rm -f "$vm_dir/qemu.pid"
 	fi
 }
@@ -667,8 +685,15 @@ run_fbctests() {
 trap stop_xvfb EXIT
 
 export PATH=/usr/local/bin:/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin:$PATH
-export SFXLIB_DRIVER="${SFXLIB_DRIVER:-null}"
 export CXX="${CXX:-$(resolve_gnu_cxx)}"
+
+prepare_audio_device() {
+	echo "==> preparing FreeBSD audio device"
+	su -m root -c 'kldload snd_hda >/dev/null 2>&1 || kldload snd_driver >/dev/null 2>&1 || true'
+	su -m root -c 'sysctl hw.snd.default_unit=0 >/dev/null 2>&1 || true'
+	cat /dev/sndstat || true
+	ls -l /dev/dsp* || true
+}
 
 echo "==> installing package test dependencies"
 export ASSUME_ALWAYS_YES=yes
@@ -864,14 +889,21 @@ declare function fb_sfxDeviceInfoName(byval id as long) as const zstring ptr
 end extern
 
 print "sfx-start"
-play "ABCDEFG"
 dim as long sfx_device = fb_sfxDeviceCurrent()
 dim as const zstring ptr sfx_driver = fb_sfxDeviceInfoName(sfx_device)
 if sfx_driver <> 0 then
 	print "sfx-driver="; *sfx_driver
+	if instr(lcase(*sfx_driver), "null") > 0 then
+		print "sfx-driver-null"
+		end 2
+	end if
 else
 	print "sfx-driver=<none>"
+	end 3
 end if
+sound 440, 0.75
+play "L4 CDEFGAB"
+sleep 1600, 1
 print "sfx-end"
 FBEOF
 
@@ -912,8 +944,10 @@ cp -R /usr/local/share/freebasic/examples/sfxlib/. /work/smoke/sfxlib-showcase/
 )
 [ -x /work/smoke/sfx-showcase ] || fail "sfxlib showcase binary was not created"
 
-echo "==> running sfxlib smoke"
-SFXLIB_DRIVER=null timeout 20 /work/smoke/sfx > /work/smoke/sfx.out 2> /work/smoke/sfx.err || {
+prepare_audio_device
+
+echo "==> running sfxlib real audio smoke"
+SFXLIB_DRIVER="FreeBSD OSS" timeout 20 /work/smoke/sfx > /work/smoke/sfx.out 2> /work/smoke/sfx.err || {
 	cat /work/smoke/sfx.out || true
 	cat /work/smoke/sfx.err || true
 	fail "sfx smoke failed"
@@ -921,6 +955,7 @@ SFXLIB_DRIVER=null timeout 20 /work/smoke/sfx > /work/smoke/sfx.out 2> /work/smo
 cat /work/smoke/sfx.out || true
 grep -qx 'sfx-start' /work/smoke/sfx.out || fail "sfx smoke did not start"
 grep -qx 'sfx-end' /work/smoke/sfx.out || fail "sfx smoke did not finish"
+grep -qi '^sfx-driver=freebsd oss' /work/smoke/sfx.out || fail "sfx smoke did not use FreeBSD OSS"
 [ ! -s /work/smoke/sfx.err ] || {
 	cat /work/smoke/sfx.err
 	fail "sfx smoke wrote stderr"
@@ -982,6 +1017,76 @@ EOF
 	scp_from_guest "$key" "$port" "/work/freebasic-freebsd-test.log" "$LOG_DIR/"
 }
 
+verify_audio_capture() {
+	local wav="$1"
+	local log="$2"
+
+	msg "Verifying FreeBSD QEMU audio capture"
+	python3 - "$wav" "$log" <<'PY'
+import math
+import struct
+import sys
+import time
+import wave
+
+wav_path = sys.argv[1]
+log_path = sys.argv[2]
+
+try:
+    last_error = None
+    for _ in range(20):
+        try:
+            with wave.open(wav_path, "rb") as w:
+                channels = w.getnchannels()
+                width = w.getsampwidth()
+                rate = w.getframerate()
+                frames = w.getnframes()
+                data = w.readframes(frames)
+            break
+        except Exception as ex:
+            last_error = ex
+            time.sleep(0.5)
+    else:
+        raise last_error
+except Exception as ex:
+    raise SystemExit(f"failed to read audio capture: {ex}")
+
+if width != 2:
+    raise SystemExit(f"unexpected sample width: {width}")
+
+sample_count = len(data) // 2
+if sample_count <= 0:
+    raise SystemExit("audio capture contains no samples")
+
+samples = struct.unpack("<%dh" % sample_count, data)
+peak = max(abs(sample) for sample in samples)
+rms = math.sqrt(sum(sample * sample for sample in samples) / float(sample_count))
+active = sum(1 for sample in samples if abs(sample) > 500)
+
+with open(log_path, "w", encoding="utf-8") as f:
+    f.write(f"file={wav_path}\n")
+    f.write(f"rate={rate}\n")
+    f.write(f"channels={channels}\n")
+    f.write(f"frames={frames}\n")
+    f.write(f"samples={sample_count}\n")
+    f.write(f"peak={peak}\n")
+    f.write(f"rms={rms:.2f}\n")
+    f.write(f"active_samples={active}\n")
+
+if frames < rate // 4:
+    raise SystemExit("audio capture is too short")
+if peak < 1000:
+    raise SystemExit("audio capture peak is too low")
+if rms < 50.0:
+    raise SystemExit("audio capture RMS is too low")
+if active < rate // 20:
+    raise SystemExit("audio capture has too few active samples")
+
+with open(log_path, "a", encoding="utf-8") as f:
+    f.write("result=PASS\n")
+PY
+}
+
 archive_results() {
 	local pkg="$1"
 	local base
@@ -993,6 +1098,10 @@ archive_results() {
 		[ -f "$log" ] || continue
 		cp -f "$log" "$ARCHIVE_DIR/"
 	done
+
+	if [ -f "$RUN_DIR/freebsd/freebasic-freebsd-audio.wav" ]; then
+		cp -f "$RUN_DIR/freebsd/freebasic-freebsd-audio.wav" "$ARCHIVE_DIR/"
+	fi
 
 	base="$(basename "$pkg")"
 	(
@@ -1034,9 +1143,9 @@ main() {
 	fi
 
 	test_package_in_vm "$vm_dir" "$SSH_PORT" "$pkg"
-	archive_results "$pkg"
-
 	stop_vm "$vm_dir"
+	verify_audio_capture "$vm_dir/freebasic-freebsd-audio.wav" "$LOG_DIR/freebasic-freebsd-audio.log"
+	archive_results "$pkg"
 
 	if [ "$KEEP_VM" -eq 0 ]; then
 		rm -rf "$RUN_DIR"
@@ -1047,6 +1156,7 @@ main() {
 	echo "Archive: $ARCHIVE_DIR"
 	echo "Build log: $LOG_DIR/freebasic-freebsd-build.log"
 	echo "Test log:  $LOG_DIR/freebasic-freebsd-test.log"
+	echo "Audio log: $LOG_DIR/freebasic-freebsd-audio.log"
 }
 
 main "$@"

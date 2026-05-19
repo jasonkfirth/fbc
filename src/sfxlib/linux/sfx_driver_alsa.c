@@ -118,7 +118,7 @@ static int alsa_driver_init(int rate, int channels, int buffer_frames, int flags
     fb_sfx_linux.buffer_frames = (buffer_frames > 0) ? buffer_frames : FB_SFX_DEFAULT_BUFFER;
 
     actual_rate = (unsigned int)fb_sfx_linux.sample_rate;
-    actual_buffer_frames = (snd_pcm_uframes_t)(fb_sfx_linux.buffer_frames * 4);
+    actual_buffer_frames = (snd_pcm_uframes_t)fb_sfx_linux.buffer_frames * 4;
 
     ALSA_DBG("initializing ALSA driver\n");
 

@@ -190,7 +190,7 @@ static char *hToUTF16( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *b
 	{
 		if( dst == NULL )
 		{
-			dst = malloc( chars * sizeof( UTF_16 ) );
+			dst = malloc( (size_t)*bytes );
 			if( dst == NULL )
 				return NULL;
 		}
@@ -256,7 +256,7 @@ static char *hToUTF32( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *b
 	{
 		if( dst == NULL )
 		{
-			dst = malloc( chars * sizeof( UTF_32 ) );
+			dst = malloc( (size_t)*bytes );
 			if( dst == NULL )
 				return NULL;
 		}

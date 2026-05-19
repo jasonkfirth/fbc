@@ -17,17 +17,17 @@
 #endif
 
 /* choose a suitable ssize_t printf specifier */
-#if !defined(fmtsizet)
+#if !defined(fmtssizet)
 	#if defined(HOST_CYGWIN)
-		#define fmtsizet "%18zd"
+		#define fmtssizet "%18zd"
 	#elif defined(HOST_WIN32)
 		#if defined(_UCRT) || __USE_MINGW_ANSI_STDIO
-			#define fmtsizet "%18zu"
+			#define fmtssizet "%18zd"
 		#else
-			#define fmtsizet "%18Iu"
+			#define fmtssizet "%18Id"
 		#endif
 	#else
-		#define fmtsizet "%18zu"
+		#define fmtssizet "%18zd"
 	#endif
 #endif
 
@@ -232,7 +232,7 @@ static int name_sorter( const void *e1, const void *e2 )
 
 static void hProfilerSortArray( FB_PROFILE_RECORD_DATA **array, ssize_t count )
 {
-	qsort( array, count, sizeof(FB_PROFILE_RECORD_DATA *), name_sorter );
+	qsort( (void *)array, count, sizeof(FB_PROFILE_RECORD_DATA *), name_sorter );
 }
 
 static void hProfilerBuildArray (
@@ -283,7 +283,7 @@ static void hProfilerReport (
 		}
 
 		fprintf( f, "        %s\n", rec->proc_name );
-		fprintf( f, "                " fmtsizet " " fmtsizet " " fmtsizet "\n",
+		fprintf( f, "                " fmtssizet " " fmtssizet " " fmtssizet "\n",
 			rec->grand_total,
 			rec->internal_total,
 			rec->call_count
@@ -302,6 +302,8 @@ static void hProfilerWriteReport( FB_PROFILER_CYCLES *prof )
 	fb_ProfileGetFileName( filename, PROFILER_MAX_PATH );
 
 	f = fopen( filename, "w" );
+	if( f == NULL )
+		return;
 
 	if( (prof->global->options & PROFILE_OPTION_HIDE_HEADER) == 0 )
 	{
@@ -319,12 +321,12 @@ static void hProfilerWriteReport( FB_PROFILER_CYCLES *prof )
 
 	count = hProfilerCountProcs( data, length );
 	if( count ) {
-		array = PROFILER_malloc( sizeof(FB_PROFILE_RECORD_DATA*) * count );
+		array = (FB_PROFILE_RECORD_DATA **)PROFILER_malloc( sizeof(FB_PROFILE_RECORD_DATA*) * count );
 		if( array ) {
 			hProfilerBuildArray( array, count, data, length );
 			hProfilerSortArray( array, count );
 			hProfilerReport( prof, f, array, count );
-			PROFILER_free( array );
+			PROFILER_free( (void *)array );
 		}
 	}
 
@@ -356,7 +358,7 @@ FBCALL int fb_EndProfileCycles( int errorlevel )
 }
 
 /*:::::*/
-FBCALL FB_PROFILER_CYCLES *fb_ProfileGetCyclesProfiler()
+FBCALL FB_PROFILER_CYCLES *fb_ProfileGetCyclesProfiler( void )
 {
 	return fb_profiler;
 }

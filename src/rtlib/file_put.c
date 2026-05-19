@@ -107,18 +107,18 @@ int fb_FilePutDataEx
         	}
 
 	       	handle = FB_HANDLE_DEREF(handle);
-        	++i;
-        	if (i==0)
-	            handle->line_length += length;
-    	    else
-        	    handle->line_length = length - i;
+			if( handle != NULL )
+			{
+				++i;
+				if (i==0)
+					handle->line_length += length;
+				else
+					handle->line_length = length - i;
 
-        	{
-            	int iWidth = FB_HANDLE_DEREF(handle)->width;
-            	if( iWidth!=0 ) {
-                	handle->line_length %= iWidth;
-            	}
-        	}
+				if( handle->width!=0 ) {
+					handle->line_length %= handle->width;
+				}
+			}
     	}
 #endif
 

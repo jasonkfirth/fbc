@@ -19,9 +19,8 @@ FB_WCHAR *fb_FloatExToWstr( double val, FB_WCHAR *buffer, int digits, int mask )
 	if( len > 0 )
 	{
 		/* skip the dot at end if any */
-		if( len > 0 )
-			if( p[len-1] == _LC('.') )
-				p[len-1] = _LC('\0');
+		if( p[len-1] == _LC('.') )
+			p[len-1] = _LC('\0');
 	}
 
 	/* */

@@ -46,12 +46,15 @@ private sub fbcOpenbsdPlatformAddGfxLibs( )
 	end if
 
 	fbcPlatformAddX11GfxLibs( )
+	fbcAddDefLib( "usbhid" )
 end sub
 
 private sub fbcOpenbsdPlatformAddSfxLibs( )
 	if( fbcOpenbsdPlatformIsSelected( ) = FALSE ) then
 		exit sub
 	end if
+
+	fbcAddDefLib( "sndio" )
 end sub
 
 private sub fbcOpenbsdPlatformAddDefaultLibs( )

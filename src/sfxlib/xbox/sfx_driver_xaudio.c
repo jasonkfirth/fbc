@@ -382,8 +382,6 @@ static const FB_SFX_DRIVER fb_sfxDriverXboxXAudio =
     NULL
 };
 
-extern const FB_SFX_DRIVER __fb_sfxDriverNull;
-
 const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
 {
     &fb_sfxDriverXboxXAudio,

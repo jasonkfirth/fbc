@@ -57,11 +57,14 @@ static void gen_handler( int sig )
 	}
 
 	/* call user handler if any defined */
+	/* The rtlib intentionally maps fatal signals through ON ERROR machinery. */
+	// NOLINTNEXTLINE(bugprone-signal-handler)
 	handler = fb_ErrorThrowEx( sigTb[sig].errnum, -1, NULL, NULL, NULL );
 	if( handler != NULL )
 		handler( );
 
 	/* if the user handler returned, exit */
+	// NOLINTNEXTLINE(bugprone-signal-handler)
 	fb_End( sigTb[sig].errnum );
 }
 

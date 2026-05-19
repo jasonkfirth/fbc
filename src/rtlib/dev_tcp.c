@@ -310,7 +310,6 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 		}
 
 		FB_TCP_CLOSESOCKET( hSocket );
-		hSocket = FB_TCP_INVALID_SOCKET;
 	}
 
 	freeaddrinfo( result );
@@ -354,13 +353,11 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 
 		if( bind( hSocket, it->ai_addr, (int)it->ai_addrlen ) != 0 ) {
 			FB_TCP_CLOSESOCKET( hSocket );
-			hSocket = FB_TCP_INVALID_SOCKET;
 			continue;
 		}
 
 		if( listen( hSocket, (int)tcp_proto->backlog ) != 0 ) {
 			FB_TCP_CLOSESOCKET( hSocket );
-			hSocket = FB_TCP_INVALID_SOCKET;
 			continue;
 		}
 

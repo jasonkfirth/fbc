@@ -6,6 +6,7 @@
 FBCALL int fb_ExecEx( FBSTRING *program, FBSTRING *args, int do_fork )
 {
 	char buffer[MAX_PATH], *arguments, **argv, *p;
+	char empty_arguments[] = "";
 	int i, argc = 0, res = -1, status;
 	ssize_t len_arguments;
 	pid_t pid;
@@ -23,7 +24,7 @@ FBCALL int fb_ExecEx( FBSTRING *program, FBSTRING *args, int do_fork )
 	fb_hConvertPath( buffer );
 
 	if( args==NULL ) {
-		arguments = "";
+		arguments = empty_arguments;
 	} else {
 		len_arguments = FB_STRSIZE( args );
 		arguments = alloca( len_arguments + 1 );

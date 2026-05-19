@@ -170,7 +170,7 @@ typedef struct FB_SFX_INSTRUMENT
 
 typedef struct FB_SFX_ASSET
 {
-    unsigned char *data;
+    float *data;
     int size;
     int frames;
     int sample_rate;
@@ -364,13 +364,6 @@ void fb_sfxExit(void);
 /* ------------------------------------------------------------------------- */
 
 void fb_sfxMixFrame(float *buffer, int frames);
-
-
-/* ------------------------------------------------------------------------- */
-/* Driver list                                                               */
-/* ------------------------------------------------------------------------- */
-
-extern const SFXDRIVER *__fb_sfx_drivers_list[];
 
 
 #ifdef __cplusplus

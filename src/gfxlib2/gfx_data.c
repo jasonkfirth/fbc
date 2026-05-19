@@ -24,7 +24,7 @@ const PALETTE __fb_palette[FB_PALETTE_COUNT] =
 };
 
 /* Caller is expected to hold FB_GRAPHICS_LOCK() */
-void fb_hSetupData()
+void fb_hSetupData(void)
 {
 	static int inited = FALSE;
 

@@ -4,6 +4,8 @@
 
 FBCALL void fb_DataReadWstr( FB_WCHAR *dst, ssize_t dst_size )
 {
+	FB_WCHAR empty_string[] = _LC("");
+
 	FB_LOCK();
 
 	if( __fb_data_ptr ) {
@@ -16,7 +18,7 @@ FBCALL void fb_DataReadWstr( FB_WCHAR *dst, ssize_t dst_size )
 		}
 	} else {
 		/* no more DATA, return empty string */
-		fb_WstrAssign( dst, dst_size, _LC("") );
+		fb_WstrAssign( dst, dst_size, empty_string );
 	}
 
 	fb_DataNext( );

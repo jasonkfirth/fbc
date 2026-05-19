@@ -94,7 +94,7 @@ static int translate_key(XEvent *event, int scancode)
 	return k;
 }
 
-static void hOnAltEnter( )
+static void hOnAltEnter( void )
 {
 	fb_x11.exit();
 	fb_x11.flags ^= DRIVER_FULLSCREEN;
@@ -842,8 +842,12 @@ int *fb_hX11FetchModes(int depth, int *size)
 	rr_sizes = XRRConfigSizes(cfg, size);
 	if ((rr_sizes) && (*size > 0)) {
 		sizes = (int *)malloc(*size * sizeof(int));
-		for (i = 0; i < *size; i++)
-			sizes[i] = (rr_sizes[i].width << 16) | (rr_sizes[i].height);
+		if (sizes) {
+			for (i = 0; i < *size; i++)
+				sizes[i] = (rr_sizes[i].width << 16) | (rr_sizes[i].height);
+		} else {
+			*size = 0;
+		}
 	}
 	if (!fb_x11.config)
 		XRRFreeScreenConfigInfo(cfg);

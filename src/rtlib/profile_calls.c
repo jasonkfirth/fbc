@@ -154,6 +154,8 @@ static FB_PROCINFO *FB_PROCINFO_TB_alloc_proc( FB_PROCINFO_TB **proc_tb )
 
 	if ( ( !(*proc_tb) ) || ( (*proc_tb)->next_free >= PROC_INFO_TB_SIZE ) ) {
 		tb = (FB_PROCINFO_TB *)PROFILER_calloc( 1, sizeof(FB_PROCINFO_TB) );
+		if( tb == NULL )
+			return NULL;
 		tb->next = (*proc_tb);
 		tb->proc_tb_id = ((*proc_tb) ? (*proc_tb)->proc_tb_id : 0 ) + 1;
 		(*proc_tb) = tb;
@@ -186,7 +188,7 @@ static void PROCARRAY_constructor( FB_PROCARRAY *list, STRING_HASH_TABLE *string
 static void PROCARRAY_destructor( FB_PROCARRAY *list )
 {
 	STRING_HASH_destructor( &list->hash );
-	PROFILER_free( list->array );
+	PROFILER_free( (void *)list->array );
 	list->array = NULL;
 	list->size = 0;
 	list->length = 0;
@@ -211,7 +213,7 @@ static int PROCARRAY_name_sorter( const void *e1, const void *e2 )
 
 static void PROCARRAY_sort_by_name( FB_PROCARRAY *list )
 {
-	qsort( list->array, list->length, sizeof(FB_PROCINFO *), PROCARRAY_name_sorter );
+	qsort( (void *)list->array, list->length, sizeof(FB_PROCINFO *), PROCARRAY_name_sorter );
 }
 
 static int PROCARRAY_time_sorter( const void *e1, const void *e2 )
@@ -230,7 +232,7 @@ static int PROCARRAY_time_sorter( const void *e1, const void *e2 )
 
 static void PROCARRAY_sort_by_time( FB_PROCARRAY *list )
 {
-	qsort( list->array, list->length, sizeof(FB_PROCINFO *), PROCARRAY_time_sorter );
+	qsort( (void *)list->array, list->length, sizeof(FB_PROCINFO *), PROCARRAY_time_sorter );
 }
 
 static void PROCARRAY_add( FB_PROCARRAY *list, FB_PROCINFO *proc )
@@ -243,7 +245,7 @@ static void PROCARRAY_add( FB_PROCARRAY *list, FB_PROCINFO *proc )
 		new_array = (FB_PROCINFO **)PROFILER_malloc( s * sizeof(FB_PROCINFO *) );
 	} else if ( list->length == s ) {
 		s *= 2;
-		new_array = (FB_PROCINFO **)PROFILER_realloc( list->array, s * sizeof(FB_PROCINFO *) );
+		new_array = (FB_PROCINFO **)PROFILER_realloc( (void *)list->array, s * sizeof(FB_PROCINFO *) );
 	} else {
 		new_array = list->array;
 	}
@@ -487,6 +489,9 @@ static void hProfilerReportCallsProc (
 	FB_PROCARRAY proc_list;
 	int j, len;
 
+	if( parent_proc == NULL )
+		return;
+
 	PROCARRAY_constructor( &proc_list, &prof->global->strings_hash, &prof->global->ignores_hash );
 
 	for ( proc = parent_proc; proc; proc = proc->next ) {
@@ -676,7 +681,7 @@ static void hProfilerReportCallsGlobals (
 			len = 14 - fprintf( f, "%10.5f", proc->local_time );
 			pad_spaces( f, len );
 
-			len = 10 - fprintf( f, "%6.2f%%", ( proc->local_time * 100.0 ) / ctx->thread_entry->local_time );
+			fprintf( f, "%6.2f%%", ( proc->local_time * 100.0 ) / ctx->thread_entry->local_time );
 		}
 
 		fprintf( f, "\n" );
@@ -1080,6 +1085,8 @@ static void hProfilerWriteReport( FB_PROFILER_CALLS *prof )
 	fb_ProfileGetFileName( filename, PROFILER_MAX_PATH );
 
 	f = fopen( filename, "w" );
+	if( f == NULL )
+		return;
 
 	if( (prof->global->options & PROFILE_OPTION_HIDE_HEADER) == 0 )
 	{
@@ -1357,7 +1364,7 @@ FBCALL void fb_ProfileGetCallsMetrics( FB_PROFILER_METRICS *metrics )
 }
 
 /*:::::*/
-FBCALL FB_PROFILER_CALLS *fb_ProfileGetCallsProfiler()
+FBCALL FB_PROFILER_CALLS *fb_ProfileGetCallsProfiler( void )
 {
 	return fb_profiler;
 }

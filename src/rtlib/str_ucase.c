@@ -30,14 +30,14 @@ FBCALL FBSTRING *fb_StrUcase2( FBSTRING *src, int mode )
 
 		if( mode == 1 ) {
 			for( i = 0; i < len; i++ ) {
-				c = *s++;
+				c = FB_CHAR_TO_INT( *s++ );
 				if( (c >= 97) && (c <= 122) )
 					c -= 97 - 65;
 				*d++ = c;
 			}
 		} else {
 			for( i = 0; i < len; i++ ) {
-				c = *s++;
+				c = FB_CHAR_TO_INT( *s++ );
 				if( islower( c ) )
 					c = toupper( c );
 				*d++ = c;

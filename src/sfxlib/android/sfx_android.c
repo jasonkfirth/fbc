@@ -7,8 +7,6 @@
 #include <pthread.h>
 #include <time.h>
 
-extern const FB_SFX_DRIVER __fb_sfxDriverNull;
-
 static pthread_mutex_t lifecycle_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int lifecycle_started = 1;
 static int lifecycle_resumed = 1;

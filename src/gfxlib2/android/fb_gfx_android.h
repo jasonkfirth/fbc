@@ -40,6 +40,18 @@ void fb_hAndroidConsoleWrite(const char *text, size_t length);
 void fb_hAndroidConsoleRender(void);
 int fb_hAndroidKeyboardButtonHit(float x, float y);
 void fb_hAndroidToggleKeyboard(void);
+void fb_hAndroidGamepadMotion(const AInputEvent *event);
+void fb_hAndroidGamepadKey(const AInputEvent *event);
+int fb_hAndroidGetJoystick(int id, ssize_t *buttons,
+                           float *a1, float *a2,
+                           float *a3, float *a4,
+                           float *a5, float *a6,
+                           float *a7, float *a8);
+int fb_hAndroidGetXPad(int id, ssize_t *buttons,
+                       float *lstick_x, float *lstick_y,
+                       float *rstick_x, float *rstick_y,
+                       float *ltrigger, float *rtrigger,
+                       ssize_t *dpad);
 
 #ifdef __cplusplus
 }

@@ -105,13 +105,10 @@ FBCALL void *fb_WstrAssignToAEx
 		ssize_t writtenchars = 0;
 		dst_chars &= FB_STRSIZEMSK;
 
-		if( src_chars > 0 )
-		{
-			if( dst_chars < src_chars )
-				src_chars = dst_chars;
-
-			writtenchars = fb_wstr_ConvToA( (char *)dst, dst_chars, src );
-		}
+			if( src_chars > 0 )
+			{
+				writtenchars = fb_wstr_ConvToA( (char *)dst, dst_chars, src );
+			}
 
 		if( dst_chars - writtenchars > 0 )
 		{

@@ -46,11 +46,7 @@ FBCALL void fb_WstrSwap( FB_WCHAR *str1, ssize_t size1, FB_WCHAR *str2, ssize_t 
 			len2 = len;
 		}
 
-		{
-			ssize_t size = size1;
-			size1 = size2;
-			size2 = size;
-		}
+		size1 = size2;
 	}
 
 	/* MemSwap as much as possible (i.e. the smaller length) */

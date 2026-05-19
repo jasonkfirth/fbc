@@ -63,6 +63,7 @@ Version 1.20.1
 - examples: documented a full JS, Android, and Xbox compile sweep in examples/cross-target-notes.md, recording which examples currently compile for each package and which failures are platform, backend, or binding limitations
 - examples: documented the Windows win32/win64 compile sweeps in examples/windows-example-notes.md, including the remaining old third-party library families that need a clean redistributable library set or later pruning
 - examples: documented the Cygwin compile sweep in examples/cygwin-example-notes.md, noting that the core examples compile and the remaining out-of-box failures are optional external-library link gaps
+- examples: added build_scripts/exampleageddon-freebasic.py to compile the full examples tree, classify external/platform/helper/interactive cases, run unattended self-contained examples from isolated out/ working directories, and write CSV/Markdown reports for future sweeps
 - tests: expanded the build/test harness to support compile-and-link tests that need fbc's automatic runtime library selection instead of separate compile/link steps
 - tests: refreshed warning-test expectations to match the compiler's corrected "Ambiguous" diagnostic spelling
 
@@ -86,6 +87,9 @@ Version 1.20.1
 - Debian trixie armel matrix coverage using an arm32v5 Debian container image and Docker's linux/arm/v5 platform
 - Windows UTF-8 filename handling carried forward from 1.10.4, including wide-path runtime wrappers and Unicode-aware DIR() handling on MinGW
 - Solaris target-specific rtlib console support carried forward from 1.10.4, including the local termcap shim and non-ncurses console/input runtime files
+- FreeBSD/OpenBSD/NetBSD/DragonFly/Haiku VM package validation scripts for x86_64 package builds, clean package installs, console/gfxlib/sfxlib smoke tests, full fbctests runs, and archived package/log/WAV evidence under out/<os>/x86-64
+- BSD and Haiku sfxlib package validation through real QEMU audio devices, covering FreeBSD OSS, OpenBSD sndio, NetBSD OSS, DragonFly OSS, and Haiku output drivers with WAV capture checks for non-silent playback
+- rtlib/gfxlib2/sfxlib strict diagnostics runner for building the core, graphics, and sound libraries in isolated object trees with clang/gcc warning-heavy flags, cppcheck and clang-tidy passes, optional cppcheck addon/style/exhaustive audits, and warning-as-error enforcement
 - beginner-oriented example coverage for sfxlib and OPEN TCP, including self-test examples for networking and a larger commented sfxlib showcase
 - DOS/sfxlib: added a fallback PC speaker backend that drives the direct speaker data line to provide audible playback when no Sound Blaster is configured and BLASTER is unset or unavailable
 - fbc-js compiler build target that defaults to js-asmjs/Emscripten while still reporting the native host platform for host-specific compiler behaviour
@@ -132,6 +136,8 @@ Version 1.20.1
 - Xbox/gfxlib: present gfxlib framebuffers through a real 32-bit Xbox video mode with integer scaling for low-resolution modes such as SCREEN 13 and pixel skipping when the requested framebuffer is larger than the selected output mode
 - gfxlib2: add GETXPAD for Xbox-style controller polling, including connection status, button masks, sticks, triggers, and d-pad state on Windows XInput, Linux joystick devices, JavaScript Gamepad API, and Xbox/nxdk XID pads
 - gfxlib2/Darwin: add a platform-local GETXPAD backend using macOS GameController through the Objective-C runtime, avoiding a hard link-time framework dependency while keeping the generic gfx_xpad implementation untouched
+- gfxlib2/BSD: add shared joydev-backed GETJOYSTICK support for FreeBSD, NetBSD, and DragonFly, extend GETXPAD over the same joydev path, and add OpenBSD ujoy/usbhid GETJOYSTICK plus GETXPAD mapping
+- gfxlib2/Android: add NativeActivity gamepad motion/key state collection, GETJOYSTICK support, and Android-local GETXPAD support for buttons, sticks, triggers, and d-pad state
 - examples/xpad: add GETXPAD examples for first-pad polling, active controller-state monitoring, and visual stick/button inspection
 - tests/compound: add DOS select_const2 shards so DOS validates the same generated SELECT AS CONST range coverage without requiring the DJGPP assembler to process one very large assembly file
 - Xbox/sfxlib: added an nxdk XAudio/AC97 output driver so the Xbox package can link and run sfxlib programs, with the null output driver still available for non-audio diagnostics
@@ -139,6 +145,18 @@ Version 1.20.1
 
 [fixed]
 - compiler: model LoongArch64 GCC __builtin_va_list as a void pointer type so C++ symbol mangling agrees with g++ for cva_list parameters
+- compiler/gas64: fix cycle-profiler epilog assembly emission so -profgen cycles no longer emits a malformed "mov rcx, rdx,KNOFREE" instruction
+- Haiku rtlib: raise the FreeBASIC-created pthread stack floor to 8 MiB so threaded TCP INPUT paths do not crash on Haiku's small PTHREAD_STACK_MIN
+- Haiku package validation: use image-specific anyboot extraction, make latest-nightly selection pipefail-safe, run the real Haiku sfxlib driver instead of the null driver, verify QEMU HDA WAV capture after VM shutdown, and archive the .hpkg, logs, SHA256SUMS, and audio WAV under out/haiku/x86-64
+- OpenBSD sfxlib: replace the preliminary OSS placeholder with a real sndio backend, including bounded setup/diagnostic paths that avoid OpenBSD's unsafe sprintf warning class
+- BSD sfxlib: replace shared capture placeholders with real OSS capture support for FreeBSD, NetBSD, and DragonFly and add sndio capture support for OpenBSD
+- tests/gfx: promote GETJOYSTICK and GETXPAD coverage from syntax-only checks to hardware-neutral runtime checks for sane disconnected/default values and connected value ranges
+- gfxlib2/sfxlib: clean up strict-linter findings in first-party code, including byte-wise pointer arithmetic, checked allocations/reallocations, malformed BLOAD/read paths, LZW code bounds, deterministic NULL GFX CONTROL parameters, typed sfx sample storage, MIDI track cleanup, and ALSA buffer-frame widening
+- gfxlib2/sfxlib/rtlib: make the strict diagnostics build pass with both GCC and Clang by removing redundant local and umbrella declarations, keeping sfxlib driver/buffer/capture/mixer prototypes in their owning headers, and cleaning stale graphics/printer prototypes
+- gfxlib2/rtlib: clean up cppcheck addon findings by keeping Android wide-character conversion wrappers on caller-local mbstate_t state, removing an unnecessary Android gfxlib local static digit table, and renaming misleading local "time" fields/parameters that were not time_t storage
+- rtlib: clean up clang-tidy findings exposed by adding rtlib to the strict diagnostics pass, including signed-byte-safe string/radix/case conversion, zero-length/null wide-string copy guards, FORMAT mask output-pass initialization, UTF buffer allocation sizing, ThreadCall argument allocation and libffi enum handling, explicit no-flags thread state, and documented Unix fatal-signal console teardown
+- rtlib: harden file/device/profile/console helper paths with checked allocation, bounded append/copy/formatting helpers, unsigned byte widening for file putback/get paths, and clearer ownership transfer around TLS and profiler buffers
+- BSD/Haiku CRT headers: route DragonFly and NetBSD through platform stdio headers and add/verify snprintf and vsnprintf declarations for OpenBSD, NetBSD, DragonFly, and Haiku
 - Windows rtlib: hardened and validated OPEN COM serial-port support for 64-bit Windows builds by keeping the shared Win32 serial driver valid for both MinGW32 and MinGW64, improving COM device-name handling, and checking the driver with COM1/COM2 loopback coverage
 - Windows rtlib: hardened OPEN LPT/LPRINT for 64-bit Windows builds by checking Win32 printer byte-count limits, avoiding size_t truncation in WritePrinter(), and making the common LPT device setup handle allocation failures cleanly
 - Linux: restrict '-m32' and '-m64' linker flags to x86/x86_64 targets instead of passing them to unrelated architectures

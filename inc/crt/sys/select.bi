@@ -15,8 +15,12 @@
 #include once "crt/sys/linux/select.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/sys/linux/select.bi"
+#elseif defined(__FB_DRAGONFLY__)
+#include once "crt/sys/dragonfly/select.bi"
 #elseif defined(__FB_OPENBSD__)
 #include once "crt/sys/openbsd/select.bi"
+#elseif defined(__FB_NETBSD__)
+#include once "crt/sys/netbsd/select.bi"
 #else
 #error Platform unsupported
 #endif

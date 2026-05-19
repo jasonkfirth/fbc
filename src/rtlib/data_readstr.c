@@ -4,6 +4,8 @@
 
 FBCALL void fb_DataReadStr( void *dst, ssize_t dst_size, int fillrem )
 {
+	char empty_string[] = "";
+
 	FB_LOCK();
 
 	if( __fb_data_ptr ) {
@@ -16,7 +18,7 @@ FBCALL void fb_DataReadStr( void *dst, ssize_t dst_size, int fillrem )
 		}
 	} else {
 		/* no more DATA, return empty string */
-		fb_StrAssign( dst, dst_size, "", 0, fillrem );
+		fb_StrAssign( dst, dst_size, empty_string, 0, fillrem );
 	}
 
 	fb_DataNext( );

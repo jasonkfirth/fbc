@@ -52,7 +52,7 @@ FBCALL FBTHREAD *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack
 	info->proc = proc;
 	info->param = param;
 	info->thread = thread;
-	thread->flags = 0;
+	thread->flags = FBTHREAD_NONE;
 	/*
 		Xbox has much less memory than desktop Win32, and nxdk commits the
 		stack reserve eagerly enough that creating many 1 MiB stacks can fail

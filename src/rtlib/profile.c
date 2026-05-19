@@ -395,10 +395,13 @@ FB_PROFILER_GLOBAL *PROFILER_GLOBAL_create( void ) {
 
 		time( &rawtime );
 		ptm = localtime( &rawtime );
-		snprintf( fb_profiler->launch_time, sizeof(fb_profiler->launch_time),
-		         "%02d-%02d-%04d, %02d:%02d:%02d",
-		         (int)(1+ptm->tm_mon)%100u, (int)(ptm->tm_mday)%100u, (int)(1900+ptm->tm_year)%10000u,
-		         (int)ptm->tm_hour%100u, (int)ptm->tm_min%100u, (int)ptm->tm_sec%100u );
+		if( ptm != NULL ) {
+			snprintf( fb_profiler->launch_time, sizeof(fb_profiler->launch_time),
+			         "%02d-%02d-%04d, %02d:%02d:%02d",
+			         (ptm->tm_mon + 1) % 100, ptm->tm_mday % 100,
+			         (1900 + ptm->tm_year) % 10000, ptm->tm_hour % 100,
+			         ptm->tm_min % 100, ptm->tm_sec % 100 );
+		}
 		fb_profiler->launch_time[sizeof(fb_profiler->launch_time)-1] = '\0';
 	}
 	return fb_profiler;
@@ -465,18 +468,29 @@ FBCALL int fb_ProfileGetFileName( char *filename, int length )
 	FB_PROFILE_LOCK();
 
 	if( fb_profiler && filename && (length > 0) ) {
-		char buffer[PROFILER_MAX_PATH], *fname;
-		if( fb_profiler->filename[0] ) {
-			fname = fb_profiler->filename;
-		} else {
-			fname = fb_hGetExeName( buffer, PROFILER_MAX_PATH-1 );
-			if( fname ) {
-				strcat( buffer, DEFAULT_PROFILE_EXT );
-				fname = buffer;
+		char buffer[PROFILER_MAX_PATH];
+			const char *fname;
+			if( fb_profiler->filename[0] ) {
+				fname = fb_profiler->filename;
 			} else {
-				fname = DEFAULT_PROFILE_FILE;
+				fname = fb_hGetExeName( buffer, PROFILER_MAX_PATH-1 );
+				if( fname ) {
+					size_t exe_len = strlen( buffer );
+					if( exe_len < PROFILER_MAX_PATH ) {
+						int written = snprintf( buffer + exe_len,
+							PROFILER_MAX_PATH - exe_len,
+							"%s", DEFAULT_PROFILE_EXT );
+						if( (written >= 0) && ((size_t)written < (PROFILER_MAX_PATH - exe_len)) )
+							fname = buffer;
+						else
+							fname = DEFAULT_PROFILE_FILE;
+					} else {
+						fname = DEFAULT_PROFILE_FILE;
+					}
+				} else {
+					fname = DEFAULT_PROFILE_FILE;
+				}
 			}
-		}
 		ret = hProfileCopyFilename( filename, fname, length );
 	} else {
 		ret = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
@@ -488,7 +502,7 @@ FBCALL int fb_ProfileGetFileName( char *filename, int length )
 }
 
 /*:::::*/
-FBCALL int fb_ProfileGetOptions()
+FBCALL int fb_ProfileGetOptions( void )
 {
 	int options = 0;
 
@@ -535,7 +549,7 @@ FBCALL void fb_ProfileIgnore( const char * procname )
 }
 
 /*:::::*/
-FBCALL FB_PROFILER_GLOBAL *fb_ProfileGetGlobalProfiler()
+FBCALL FB_PROFILER_GLOBAL *fb_ProfileGetGlobalProfiler( void )
 {
 	return fb_profiler;
 }

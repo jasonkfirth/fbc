@@ -15,7 +15,7 @@
 #   * patch the live image so it starts sshd on first boot
 #   * build FreeBASIC inside a Haiku QEMU VM using haiku-build-freebasic.sh
 #   * install the resulting .hpkg in a separate clean Haiku VM
-#   * run console, gfxlib, sfxlib, and fbctests checks
+#   * run console, gfxlib, sfxlib, fbctests, and exampleageddon checks
 #
 # This script intentionally does NOT contain:
 #
@@ -51,6 +51,9 @@ HTTP_PORT=""
 VNC_DISPLAY=""
 FBCTESTS_JOBS="$JOBS"
 FBCTESTS_UNIT_ARGS=""
+EXAMPLEAGEDDON_JOBS="$JOBS"
+EXAMPLEAGEDDON_COMPILE_TIMEOUT="120"
+EXAMPLEAGEDDON_RUN_TIMEOUT="10"
 BOOT_SCRIPT_BYTES=884
 
 NIGHTLY_INDEX_URL="https://download.haiku-os.org/nightly-images/x86_64/"
@@ -79,6 +82,11 @@ Options:
   --vnc-display N          VNC display number. Default: auto
   --fbctests-jobs N        fbctests make jobs. Default: --jobs value
   --fbctests-unit-args S   Extra UNITTEST_RUN_ARGS for fbctests.
+  --exampleageddon-jobs N  exampleageddon jobs. Default: --jobs value
+  --exampleageddon-compile-timeout N
+                           Per-example compile timeout. Default: 120
+  --exampleageddon-run-timeout N
+                           Per-example run timeout. Default: 10
   --keep-vms               Do not delete VM run directories on success.
   -h, --help               Show this help.
 
@@ -101,7 +109,7 @@ while [ "$#" -gt 0 ]; do
 			shift 2
 			;;
 		--archive-dir) ARCHIVE_DIR="$2"; shift 2 ;;
-		--jobs) JOBS="$2"; CPUS="$2"; FBCTESTS_JOBS="$2"; shift 2 ;;
+		--jobs) JOBS="$2"; CPUS="$2"; FBCTESTS_JOBS="$2"; EXAMPLEAGEDDON_JOBS="$2"; shift 2 ;;
 		--cpus) CPUS="$2"; shift 2 ;;
 		--memory) MEMORY="$2"; shift 2 ;;
 		--work-disk-size) WORK_DISK_SIZE="$2"; shift 2 ;;
@@ -110,6 +118,9 @@ while [ "$#" -gt 0 ]; do
 		--vnc-display) VNC_DISPLAY="$2"; shift 2 ;;
 		--fbctests-jobs) FBCTESTS_JOBS="$2"; shift 2 ;;
 		--fbctests-unit-args) FBCTESTS_UNIT_ARGS="$2"; shift 2 ;;
+		--exampleageddon-jobs) EXAMPLEAGEDDON_JOBS="$2"; shift 2 ;;
+		--exampleageddon-compile-timeout) EXAMPLEAGEDDON_COMPILE_TIMEOUT="$2"; shift 2 ;;
+		--exampleageddon-run-timeout) EXAMPLEAGEDDON_RUN_TIMEOUT="$2"; shift 2 ;;
 		--keep-vms) KEEP_VMS=1; shift ;;
 		-h|--help) usage; exit 0 ;;
 		*) die "unknown option: $1" ;;
@@ -124,6 +135,9 @@ esac
 case "$JOBS" in ''|*[!0-9]*|0) die "--jobs must be a positive integer" ;; esac
 case "$CPUS" in ''|*[!0-9]*|0) die "--cpus must be a positive integer" ;; esac
 case "$FBCTESTS_JOBS" in ''|*[!0-9]*|0) die "--fbctests-jobs must be a positive integer" ;; esac
+case "$EXAMPLEAGEDDON_JOBS" in ''|*[!0-9]*|0) die "--exampleageddon-jobs must be a positive integer" ;; esac
+case "$EXAMPLEAGEDDON_COMPILE_TIMEOUT" in ''|*[!0-9]*|0) die "--exampleageddon-compile-timeout must be a positive integer" ;; esac
+case "$EXAMPLEAGEDDON_RUN_TIMEOUT" in ''|*[!0-9]*|0) die "--exampleageddon-run-timeout must be a positive integer" ;; esac
 
 if [ "$TEST_ONLY" -eq 1 ] && [ -z "$PACKAGE_FILE" ]; then
 	die "--test-only requires --package"
@@ -175,7 +189,6 @@ check_host_tools() {
 	require_tool curl
 	require_tool python3
 	require_tool qemu-system-x86_64
-	require_tool rsync
 	require_tool ssh
 	require_tool scp
 	require_tool tar
@@ -189,7 +202,7 @@ check_host_tools() {
 latest_haiku_url() {
 	curl -fsSL "$NIGHTLY_INDEX_URL" |
 		sed -n 's/.*href="\([^"]*x86_64-anyboot\.zip\)".*/\1/p' |
-		head -n 1
+		awk 'NF && !found { print; found = 1 }'
 }
 
 download_image() {
@@ -237,7 +250,10 @@ extract_iso() {
 		return 0
 	fi
 
-	local extract_dir="$CACHE_DIR/extracted"
+	local image_base extract_dir
+	image_base="$(basename "$IMAGE_FILE")"
+	image_base="${image_base%.*}"
+	extract_dir="$CACHE_DIR/extracted/$image_base"
 	mkdir -p "$extract_dir"
 
 	ISO_FILE="$(find "$extract_dir" -maxdepth 1 -type f -name '*x86_64*anyboot*.iso' | head -n 1)"
@@ -280,6 +296,18 @@ archive_results() {
 		[ -f "$log" ] || continue
 		cp -f "$log" "$ARCHIVE_DIR/"
 	done
+
+	if [ -f "$RUN_DIR/test/exampleageddon-report.md" ]; then
+		cp -f "$RUN_DIR/test/exampleageddon-report.md" "$ARCHIVE_DIR/"
+	fi
+
+	if [ -f "$RUN_DIR/test/exampleageddon-results.csv" ]; then
+		cp -f "$RUN_DIR/test/exampleageddon-results.csv" "$ARCHIVE_DIR/"
+	fi
+
+	if [ -f "$RUN_DIR/test/freebasic-haiku-audio.wav" ]; then
+		cp -f "$RUN_DIR/test/freebasic-haiku-audio.wav" "$ARCHIVE_DIR/"
+	fi
 
 	base="$(basename "$hpkg")"
 	(
@@ -400,30 +428,62 @@ start_vm() {
 	local vm_dir="$1"
 	local ssh_port="$2"
 	local vnc_display="$3"
+	local audio_wav="${4:-}"
 	local boot_image="$vm_dir/haiku-boot.raw"
 	local work_disk="$vm_dir/work.raw"
+	local qemu_args
 
-	qemu-system-x86_64 \
-		-enable-kvm \
-		-cpu host \
-		-m "$MEMORY" \
-		-smp "$CPUS" \
-		-drive "file=$boot_image,format=raw,if=ide,index=0" \
-		-drive "file=$work_disk,format=raw,if=ide,index=1" \
-		-netdev "user,id=net0,hostfwd=tcp:127.0.0.1:$ssh_port-:22" \
-		-device e1000,netdev=net0 \
+	qemu_args=(
+		qemu-system-x86_64
+		-enable-kvm
+		-cpu host
+		-m "$MEMORY"
+		-smp "$CPUS"
+		-drive "file=$boot_image,format=raw,if=ide,index=0"
+		-drive "file=$work_disk,format=raw,if=ide,index=1"
+		-netdev "user,id=net0,hostfwd=tcp:127.0.0.1:$ssh_port-:22"
+		-device e1000,netdev=net0
+	)
+
+	if [ -n "$audio_wav" ]; then
+		rm -f "$audio_wav"
+		qemu_args+=(
+			-audiodev "wav,id=audio0,path=$audio_wav"
+			-device intel-hda
+			-device hda-duplex,audiodev=audio0
+		)
+	fi
+
+	qemu_args+=(
 		-vga std \
 		-display "vnc=127.0.0.1:$vnc_display" \
 		-serial "file:$vm_dir/serial.log" \
 		-pidfile "$vm_dir/qemu.pid" \
 		-daemonize
+	)
+
+	"${qemu_args[@]}"
 }
 
 stop_vm() {
 	local vm_dir="$1"
+	local pid
 
 	if [ -f "$vm_dir/qemu.pid" ]; then
-		kill "$(cat "$vm_dir/qemu.pid")" 2>/dev/null || true
+		pid="$(cat "$vm_dir/qemu.pid")"
+		kill "$pid" 2>/dev/null || true
+
+		for _ in $(seq 1 30); do
+			if ! kill -0 "$pid" 2>/dev/null; then
+				break
+			fi
+			sleep 1
+		done
+
+		if kill -0 "$pid" 2>/dev/null; then
+			kill -KILL "$pid" 2>/dev/null || true
+		fi
+
 		rm -f "$vm_dir/qemu.pid"
 	fi
 
@@ -494,14 +554,6 @@ ssh_guest() {
 	ssh $(ssh_opts "$key" "$port") user@127.0.0.1 "$@"
 }
 
-rsync_ssh() {
-	local key="$1"
-	local port="$2"
-
-	printf 'ssh -i %s -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -p %s' \
-		"$key" "$port"
-}
-
 scp_to_guest() {
 	local key="$1"
 	local port="$2"
@@ -520,6 +572,21 @@ scp_from_guest() {
 	scp $(scp_opts "$key" "$port") "user@127.0.0.1:$source" "$target"
 }
 
+tar_directory_to_guest() {
+	local key="$1"
+	local port="$2"
+	local source="$3"
+	local target="$4"
+	shift 4
+
+	ssh_guest "$key" "$port" "rm -rf '$target' && mkdir -p '$target'"
+
+	(
+		cd "$source"
+		tar "$@" -cf - .
+	) | ssh_guest "$key" "$port" "cd '$target' && tar -xf -"
+}
+
 prepare_vm() {
 	local name="$1"
 	local vm_dir="$RUN_DIR/$name"
@@ -527,6 +594,7 @@ prepare_vm() {
 	local ssh_port="$2"
 	local http_port="$3"
 	local vnc_display="$4"
+	local audio_wav="${5:-}"
 
 	rm -rf "$vm_dir"
 	mkdir -p "$vm_dir"
@@ -536,7 +604,7 @@ prepare_vm() {
 	patch_boot_image "$vm_dir"
 	create_blank_work_disk "$vm_dir"
 	start_http_server "$vm_dir" "$http_port"
-	start_vm "$vm_dir" "$ssh_port" "$vnc_display"
+	start_vm "$vm_dir" "$ssh_port" "$vnc_display" "$audio_wav"
 	if ! wait_for_ssh "$key" "$ssh_port" "$vm_dir" 45 >&2; then
 		warn "first Haiku boot did not reach SSH; restarting the warmed image" >&2
 		if [ -f "$vm_dir/qemu.pid" ]; then
@@ -545,7 +613,7 @@ prepare_vm() {
 		fi
 		sleep 2
 		mv "$vm_dir/serial.log" "$vm_dir/serial-first-boot.log" 2>/dev/null || true
-		start_vm "$vm_dir" "$ssh_port" "$vnc_display"
+		start_vm "$vm_dir" "$ssh_port" "$vnc_display" "$audio_wav"
 		if ! wait_for_ssh "$key" "$ssh_port" "$vm_dir" 120 >&2; then
 			print_vm_failure_logs "$vm_dir"
 			die "timed out waiting for Haiku SSH"
@@ -561,7 +629,7 @@ format_and_mount_work() {
 
 ssh_guest "$key" "$port" 'bash -s' <<'EOF'
 set -e
-export PATH=/boot/system/bin:/bin:$PATH
+export PATH=/Work/tools:/boot/system/bin:/bin:$PATH
 
 mkfs -t bfs -q /dev/disk/ata/0/slave/raw Work
 rmdir /Work >/dev/null 2>&1 || true
@@ -587,29 +655,77 @@ install_build_dependencies() {
 
 ssh_guest "$key" "$port" 'bash -s' <<'EOF'
 set -e
-export PATH=/boot/system/bin:/bin:$PATH
+export PATH=/Work/tools:/boot/system/bin:/bin:$PATH
 
-pkgman_install_retry() {
-	for n in 1 2 3 4 5; do
-		pkgman install -y "$@" && return 0
-		echo "pkgman install failed; retrying ($n/5)" >&2
-		sleep 10
+run_limited() {
+	limit="$1"
+	shift
+
+	"$@" &
+	pid=$!
+	elapsed=0
+
+	while kill -0 "$pid" >/dev/null 2>&1; do
+		if [ "$elapsed" -ge "$limit" ]; then
+			kill "$pid" >/dev/null 2>&1 || true
+			wait "$pid" >/dev/null 2>&1 || true
+			return 124
+		fi
+
+		sleep 1
+		elapsed=$((elapsed + 1))
 	done
 
-	return 1
+	wait "$pid"
 }
 
-pkgman_install_retry \
+install_image_package() {
+	name="$1"
+	package_file="$(find /boot/_packages_ -maxdepth 1 -type f -name "$name-*.hpkg" 2>/dev/null | sort | tail -n 1)"
+
+	if [ -z "$package_file" ]; then
+		return 1
+	fi
+
+	if [ -e "/boot/system/packages/$(basename "$package_file")" ]; then
+		return 0
+	fi
+
+	echo "==> installing image package $package_file"
+	pkgman install -y "$package_file"
+}
+
+install_image_packages() {
+	for package_name in "$@"; do
+		install_image_package "$package_name" || true
+	done
+}
+
+install_optional_network_packages() {
+	run_limited 300 pkgman install -y "$@" || {
+		echo "WARNING: optional pkgman install failed or timed out: $*" >&2
+		return 0
+	}
+}
+
+cleanup_package_states() {
+	find /boot/system/packages/administrative -maxdepth 1 -type d -name 'state_*' -exec rm -rf {} + 2>/dev/null || true
+}
+
+install_image_packages \
 	haiku_devel \
 	make \
-	gcc \
 	binutils \
-	pkgconf \
-	rsync \
-	libffi_devel \
-	zstd \
-	ncurses6 \
-	ncurses6_devel
+	mpc \
+	mpfr \
+	gcc \
+	pkgconfig \
+	zstd_devel
+
+cleanup_package_states
+
+install_optional_network_packages libffi_devel ncurses6_devel
+cleanup_package_states
 
 df -h
 command -v gcc
@@ -625,18 +741,61 @@ install_test_staging_dependencies() {
 ssh_guest "$key" "$port" 'bash -s' <<'EOF'
 set -e
 export PATH=/boot/system/bin:/bin:$PATH
-
-pkgman_install_retry() {
-	for n in 1 2 3 4 5; do
-		pkgman install -y "$@" && return 0
-		echo "pkgman install failed; retrying ($n/5)" >&2
-		sleep 10
-	done
-
-	return 1
+command -v tar
+EOF
 }
 
-pkgman_install_retry rsync
+install_python3_dependency() {
+	local key="$1"
+	local port="$2"
+
+ssh_guest "$key" "$port" 'bash -s' <<'EOF'
+set -e
+export PATH=/boot/system/bin:/bin:$PATH
+
+if command -v python3 >/dev/null 2>&1; then
+	exit 0
+fi
+
+run_limited() {
+	limit="$1"
+	shift
+
+	"$@" &
+	pid=$!
+	elapsed=0
+
+	while kill -0 "$pid" >/dev/null 2>&1; do
+		if [ "$elapsed" -ge "$limit" ]; then
+			kill "$pid" >/dev/null 2>&1 || true
+			wait "$pid" >/dev/null 2>&1 || true
+			return 124
+		fi
+
+		sleep 1
+		elapsed=$((elapsed + 1))
+	done
+
+	wait "$pid"
+}
+
+for package in python3 python312 python311 python310; do
+	if run_limited 300 pkgman install -y "$package"; then
+		break
+	fi
+done
+
+if ! command -v python3 >/dev/null 2>&1; then
+	for exe in python3.12 python3.11 python3.10; do
+		if command -v "$exe" >/dev/null 2>&1; then
+			mkdir -p /Work/tools
+			ln -sf "$(command -v "$exe")" /Work/tools/python3
+			break
+		fi
+	done
+fi
+
+PATH=/Work/tools:$PATH command -v python3
 EOF
 }
 
@@ -646,31 +805,28 @@ send_source_tree() {
 	local target="$3"
 
 	msg "Copying source tree to Haiku"
-	ssh_guest "$key" "$port" "rm -rf '$target' && mkdir -p '$target'"
-
-	rsync -a --delete \
-		--exclude='.git/' \
-		--exclude='out/' \
-		--exclude='.build*/' \
-		--exclude='package-root/' \
-		--exclude='*.hpkg' \
-		--exclude='*.deb' \
-		--exclude='*.ddeb' \
-		--exclude='*.rpm' \
-		--exclude='*.txz' \
-		--exclude='*.tar' \
-		--exclude='*.tar.gz' \
-		--exclude='*.tar.xz' \
-		--exclude='*.zip' \
-		--exclude='*.install_manifest' \
-		--exclude='package-root.install_manifest' \
-		--exclude='bin/fbc*' \
-		--exclude='bootstrap/fbc*' \
-		--exclude='*/obj/' \
-		--exclude='*.o' \
-		--exclude='*.a' \
-		-e "$(rsync_ssh "$key" "$port")" \
-		"$ROOT/" "user@127.0.0.1:$target/"
+	tar_directory_to_guest "$key" "$port" "$ROOT" "$target" \
+		--exclude='./.git' \
+		--exclude='./out' \
+		--exclude='./.build*' \
+		--exclude='./package-root' \
+		--exclude='./package-root*' \
+		--exclude='./*.hpkg' \
+		--exclude='./*.deb' \
+		--exclude='./*.ddeb' \
+		--exclude='./*.rpm' \
+		--exclude='./*.txz' \
+		--exclude='./*.tar' \
+		--exclude='./*.tar.gz' \
+		--exclude='./*.tar.xz' \
+		--exclude='./*.zip' \
+		--exclude='./*.install_manifest' \
+		--exclude='./package-root.install_manifest' \
+		--exclude='./bin/fbc*' \
+		--exclude='./bootstrap/fbc*' \
+		--exclude='./*/obj' \
+		--exclude='./*.o' \
+		--exclude='./*.a'
 }
 
 send_tests_tree() {
@@ -678,24 +834,43 @@ send_tests_tree() {
 	local port="$2"
 
 	msg "Copying fbctests source to Haiku"
-	ssh_guest "$key" "$port" "rm -rf /Work/fbctests-source && mkdir -p /Work/fbctests-source/tests /Work/fbctests-source/inc"
+	ssh_guest "$key" "$port" "rm -rf /Work/fbctests-source && mkdir -p /Work/fbctests-source"
 
-	rsync -a --delete \
-		--exclude='*.o' \
-		--exclude='*.a' \
-		--exclude='fbc-tests' \
-		--exclude='unit-tests.inc' \
-		--exclude='unit-tests-obj.lst' \
-		--exclude='log-tests-*.inc' \
-		--exclude='failed-log-tests-*.inc' \
-		--exclude='log-tests-*.lst' \
-		--exclude='log-tests-results-*.log' \
-		-e "$(rsync_ssh "$key" "$port")" \
-		"$ROOT/tests/" "user@127.0.0.1:/Work/fbctests-source/tests/"
+	tar_directory_to_guest "$key" "$port" "$ROOT/tests" "/Work/fbctests-source/tests" \
+		--exclude='./*.o' \
+		--exclude='./*.a' \
+		--exclude='./fbc-tests' \
+		--exclude='./unit-tests.inc' \
+		--exclude='./unit-tests-obj.lst' \
+		--exclude='./log-tests-*.inc' \
+		--exclude='./failed-log-tests-*.inc' \
+		--exclude='./log-tests-*.lst' \
+		--exclude='./log-tests-results-*.log'
 
-	rsync -a --delete \
-		-e "$(rsync_ssh "$key" "$port")" \
-		"$ROOT/inc/" "user@127.0.0.1:/Work/fbctests-source/inc/"
+	tar_directory_to_guest "$key" "$port" "$ROOT/inc" "/Work/fbctests-source/inc"
+}
+
+send_exampleageddon_tree() {
+	local key="$1"
+	local port="$2"
+
+	msg "Copying exampleageddon source to Haiku"
+	ssh_guest "$key" "$port" \
+		"rm -rf /Work/exampleageddon-source && mkdir -p /Work/exampleageddon-source/build_scripts /Work/exampleageddon-source/examples /Work/exampleageddon-source/inc"
+
+	scp_to_guest "$key" "$port" \
+		"$ROOT/build_scripts/exampleageddon-freebasic.py" \
+		"/Work/exampleageddon-source/build_scripts/exampleageddon-freebasic.py"
+
+	tar_directory_to_guest "$key" "$port" "$ROOT/examples" "/Work/exampleageddon-source/examples" \
+		--exclude='./*.o' \
+		--exclude='./*.obj' \
+		--exclude='./*.asm' \
+		--exclude='./*.exe' \
+		--exclude='./gmon.out' \
+		--exclude='./prof-*.txt'
+
+	tar_directory_to_guest "$key" "$port" "$ROOT/inc" "/Work/exampleageddon-source/inc"
 }
 
 build_package_in_vm() {
@@ -718,7 +893,7 @@ log=/Work/freebasic-haiku-build.log
 cd "$SOURCE_DIR"
 rm -f "$log"
 
-./build_scripts/haiku-build-freebasic.sh --noinstall > "$log" 2>&1 &
+HAIKU_SKIP_DEPS=1 HAIKU_SKIP_NET_DEPS=1 ./build_scripts/haiku-build-freebasic.sh --noinstall > "$log" 2>&1 &
 pid=$!
 
 while kill -0 "$pid" 2>/dev/null; do
@@ -771,19 +946,99 @@ fail() {
 }
 
 pkgman_install() {
-	for n in 1 2 3 4 5; do
-		pkgman install -y "$@" && return 0
-		echo "pkgman install failed; retrying ($n/5)" >&2
-		sleep 10
+	run_limited 300 pkgman install -y "$@"
+}
+
+run_limited() {
+	limit="$1"
+	shift
+
+	"$@" &
+	pid=$!
+	elapsed=0
+
+	while kill -0 "$pid" >/dev/null 2>&1; do
+		if [ "$elapsed" -ge "$limit" ]; then
+			kill "$pid" >/dev/null 2>&1 || true
+			wait "$pid" >/dev/null 2>&1 || true
+			return 124
+		fi
+
+		sleep 1
+		elapsed=$((elapsed + 1))
 	done
 
-	return 1
+	wait "$pid"
+}
+
+install_image_package() {
+	name="$1"
+	package_file="$(find /boot/_packages_ -maxdepth 1 -type f -name "$name-*.hpkg" 2>/dev/null | sort | tail -n 1)"
+
+	if [ -z "$package_file" ]; then
+		return 1
+	fi
+
+	if [ -e "/boot/system/packages/$(basename "$package_file")" ]; then
+		return 0
+	fi
+
+	echo "==> installing image package $package_file"
+	pkgman install -y "$package_file"
+}
+
+install_image_packages() {
+	for package_name in "$@"; do
+		install_image_package "$package_name" || true
+	done
+}
+
+install_optional_packages() {
+	pkgman_install "$@" || {
+		echo "WARNING: optional pkgman install failed or timed out: $*" >&2
+		return 0
+	}
+}
+
+cleanup_package_states() {
+	find /boot/system/packages/administrative -maxdepth 1 -type d -name 'state_*' -exec rm -rf {} + 2>/dev/null || true
+}
+
+ensure_python3() {
+	if command -v python3 >/dev/null 2>&1; then
+		return 0
+	fi
+
+	for package in python3.11 python3.10 python3.9 python3.12 python3; do
+		if run_limited 600 pkgman install -y "$package"; then
+			break
+		fi
+	done
+
+	if ! command -v python3 >/dev/null 2>&1; then
+		for exe in python3.12 python3.11 python3.10 python3.9; do
+			if command -v "$exe" >/dev/null 2>&1; then
+				mkdir -p /Work/tools
+				ln -sf "$(command -v "$exe")" /Work/tools/python3
+				break
+			fi
+		done
+	fi
+
+	PATH=/Work/tools:$PATH command -v python3
 }
 
 fbctests_jobs() {
 	case "${FBCTESTS_JOBS:-}" in
 		''|*[!0-9]*|0) echo 1 ;;
 		*) echo "$FBCTESTS_JOBS" ;;
+	esac
+}
+
+exampleageddon_jobs() {
+	case "${EXAMPLEAGEDDON_JOBS:-}" in
+		''|*[!0-9]*|0) echo 1 ;;
+		*) echo "$EXAMPLEAGEDDON_JOBS" ;;
 	esac
 }
 
@@ -837,23 +1092,58 @@ run_fbctests() {
 	echo "==> fbctests passed"
 }
 
-export PATH=/boot/system/bin:/bin:$PATH
+run_exampleageddon() {
+	jobs="$(exampleageddon_jobs)"
+
+	[ -d /Work/exampleageddon-source/examples ] || fail "examples source was not staged"
+	[ -d /Work/exampleageddon-source/inc ] || fail "inc source was not staged for exampleageddon"
+	[ -f /Work/exampleageddon-source/build_scripts/exampleageddon-freebasic.py ] ||
+		fail "exampleageddon runner was not staged"
+
+	rm -rf /Work/exampleageddon
+
+	echo "==> running exampleageddon with ${jobs} job(s)"
+	run python3 /Work/exampleageddon-source/build_scripts/exampleageddon-freebasic.py \
+		--root /Work/exampleageddon-source \
+		--prefix /boot/system \
+		--include-dir /Work/exampleageddon-source/inc \
+		--outdir /Work/exampleageddon \
+		--fbc fbc \
+		--jobs "$jobs" \
+		--compile-timeout "${EXAMPLEAGEDDON_COMPILE_TIMEOUT:-120}" \
+		--run-timeout "${EXAMPLEAGEDDON_RUN_TIMEOUT:-10}"
+
+	[ -f /Work/exampleageddon/report.md ] || fail "exampleageddon report was not created"
+	[ -f /Work/exampleageddon/results.csv ] || fail "exampleageddon results CSV was not created"
+
+	if ! grep -qx -- '- Self-contained problems: 0' /Work/exampleageddon/report.md; then
+		sed -n '1,80p' /Work/exampleageddon/report.md
+		fail "exampleageddon reported self-contained example problems"
+	fi
+
+	echo "==> exampleageddon passed"
+}
+
+export PATH=/Work/tools:/boot/system/bin:/bin:$PATH
 export FBGFX="${FBGFX:-}"
 export FB_GFX_DRIVER="${FB_GFX_DRIVER:-}"
-export SFXLIB_DRIVER="${SFXLIB_DRIVER:-null}"
+export SFXLIB_DRIVER="${SFXLIB_DRIVER:-default}"
 
 echo "==> installing package test dependencies"
-run pkgman_install \
+install_image_packages \
 	haiku_devel \
 	make \
-	gcc \
 	binutils \
-	pkgconf \
-	rsync \
-	libffi_devel \
-	zstd \
-	ncurses6 \
-	ncurses6_devel
+	mpc \
+	mpfr \
+	gcc \
+	pkgconfig \
+	zstd_devel
+
+cleanup_package_states
+
+run install_optional_packages libffi_devel ncurses6_devel
+cleanup_package_states
 
 echo "==> installing FreeBASIC package"
 pkgman uninstall -y freebasic >/dev/null 2>&1 || true
@@ -1025,14 +1315,21 @@ declare function fb_sfxDeviceInfoName(byval id as long) as const zstring ptr
 end extern
 
 print "sfx-start"
-play "ABCDEFG"
 dim as long sfx_device = fb_sfxDeviceCurrent()
 dim as const zstring ptr sfx_driver = fb_sfxDeviceInfoName(sfx_device)
 if sfx_driver <> 0 then
 	print "sfx-driver="; *sfx_driver
+	if instr(lcase(*sfx_driver), "null") > 0 then
+		print "sfx-driver-null"
+		end 2
+	end if
 else
 	print "sfx-driver=<none>"
+	end 3
 end if
+sound 440, 0.75
+play "t120 o4 l4 c e g > c"
+sleep 1600, 1
 print "sfx-end"
 FBEOF
 
@@ -1071,8 +1368,8 @@ cp -R /boot/system/data/freebasic/examples/sfxlib/. /Work/smoke/sfxlib-showcase/
 )
 [ -x /Work/smoke/sfx-showcase ] || fail "sfxlib showcase binary was not created"
 
-echo "==> running sfxlib smoke"
-SFXLIB_DRIVER=null timeout 20 /Work/smoke/sfx > /Work/smoke/sfx.out 2> /Work/smoke/sfx.err || {
+echo "==> running sfxlib real audio smoke"
+SFXLIB_DRIVER=Haiku timeout 20 /Work/smoke/sfx > /Work/smoke/sfx.out 2> /Work/smoke/sfx.err || {
 	cat /Work/smoke/sfx.out || true
 	cat /Work/smoke/sfx.err || true
 	fail "sfx smoke failed"
@@ -1080,6 +1377,7 @@ SFXLIB_DRIVER=null timeout 20 /Work/smoke/sfx > /Work/smoke/sfx.out 2> /Work/smo
 cat /Work/smoke/sfx.out || true
 grep -qx 'sfx-start' /Work/smoke/sfx.out || fail "sfx smoke did not start"
 grep -qx 'sfx-end' /Work/smoke/sfx.out || fail "sfx smoke did not finish"
+grep -qi '^sfx-driver=haiku' /Work/smoke/sfx.out || fail "sfx smoke did not use Haiku"
 [ ! -s /Work/smoke/sfx.err ] || {
 	cat /Work/smoke/sfx.err
 	fail "sfx smoke wrote stderr"
@@ -1088,6 +1386,8 @@ grep -qx 'sfx-end' /Work/smoke/sfx.out || fail "sfx smoke did not finish"
 echo "==> sfxlib smoke passed"
 
 run_fbctests
+run ensure_python3
+run_exampleageddon
 
 echo "==> TEST PASSED"
 EOF
@@ -1108,13 +1408,14 @@ test_package_in_vm() {
 	ssh_guest "$key" "$port" "mkdir -p /Work/package"
 	scp_to_guest "$key" "$port" "$hpkg" "/Work/package/"
 	send_tests_tree "$key" "$port"
+	send_exampleageddon_tree "$key" "$port"
 
 	write_test_runner "$runner"
 	scp_to_guest "$key" "$port" "$runner" "/Work/test-freebasic-haiku.sh"
 
-	msg "Running Haiku package smoke tests and fbctests"
+	msg "Running Haiku package smoke tests, fbctests, and exampleageddon"
 	if ! ssh_guest "$key" "$port" \
-			"FBCTESTS_JOBS='$FBCTESTS_JOBS' FBCTESTS_UNIT_ARGS='$FBCTESTS_UNIT_ARGS' /bin/sh -s" <<'EOF'
+			"FBCTESTS_JOBS='$FBCTESTS_JOBS' FBCTESTS_UNIT_ARGS='$FBCTESTS_UNIT_ARGS' EXAMPLEAGEDDON_JOBS='$EXAMPLEAGEDDON_JOBS' EXAMPLEAGEDDON_COMPILE_TIMEOUT='$EXAMPLEAGEDDON_COMPILE_TIMEOUT' EXAMPLEAGEDDON_RUN_TIMEOUT='$EXAMPLEAGEDDON_RUN_TIMEOUT' /bin/sh -s" <<'EOF'
 set -e
 
 log=/Work/freebasic-haiku-test.log
@@ -1136,12 +1437,86 @@ EOF
 	then
 		rm -f "$LOG_DIR/freebasic-haiku-test.log"
 		scp_from_guest "$key" "$port" "/Work/freebasic-haiku-test.log" "$LOG_DIR/" || true
+		scp_from_guest "$key" "$port" "/Work/exampleageddon/report.md" "$vm_dir/exampleageddon-report.md" || true
+		scp_from_guest "$key" "$port" "/Work/exampleageddon/results.csv" "$vm_dir/exampleageddon-results.csv" || true
 		tail -n 160 "$LOG_DIR/freebasic-haiku-test.log" >&2 || true
-		die "Haiku package smoke tests or fbctests failed"
+		die "Haiku package smoke tests, fbctests, or exampleageddon failed"
 	fi
 
 	rm -f "$LOG_DIR/freebasic-haiku-test.log"
 	scp_from_guest "$key" "$port" "/Work/freebasic-haiku-test.log" "$LOG_DIR/"
+	scp_from_guest "$key" "$port" "/Work/exampleageddon/report.md" "$vm_dir/exampleageddon-report.md"
+	scp_from_guest "$key" "$port" "/Work/exampleageddon/results.csv" "$vm_dir/exampleageddon-results.csv"
+}
+
+verify_audio_capture() {
+	local wav="$1"
+	local log="$2"
+
+	msg "Verifying Haiku QEMU audio capture"
+	python3 - "$wav" "$log" <<'PY'
+import math
+import struct
+import sys
+import time
+import wave
+
+wav_path = sys.argv[1]
+log_path = sys.argv[2]
+
+try:
+    last_error = None
+    for _ in range(20):
+        try:
+            with wave.open(wav_path, "rb") as w:
+                channels = w.getnchannels()
+                width = w.getsampwidth()
+                rate = w.getframerate()
+                frames = w.getnframes()
+                data = w.readframes(frames)
+            break
+        except Exception as ex:
+            last_error = ex
+            time.sleep(0.5)
+    else:
+        raise last_error
+except Exception as ex:
+    raise SystemExit(f"failed to read audio capture: {ex}")
+
+if width != 2:
+    raise SystemExit(f"unexpected sample width: {width}")
+
+sample_count = len(data) // 2
+if sample_count <= 0:
+    raise SystemExit("audio capture contains no samples")
+
+samples = struct.unpack("<%dh" % sample_count, data)
+peak = max(abs(sample) for sample in samples)
+rms = math.sqrt(sum(sample * sample for sample in samples) / float(sample_count))
+active = sum(1 for sample in samples if abs(sample) > 500)
+
+with open(log_path, "w", encoding="utf-8") as f:
+    f.write(f"file={wav_path}\n")
+    f.write(f"rate={rate}\n")
+    f.write(f"channels={channels}\n")
+    f.write(f"frames={frames}\n")
+    f.write(f"samples={sample_count}\n")
+    f.write(f"peak={peak}\n")
+    f.write(f"rms={rms:.2f}\n")
+    f.write(f"active_samples={active}\n")
+
+if frames < rate // 4:
+    raise SystemExit("audio capture is too short")
+if peak < 1000:
+    raise SystemExit("audio capture peak is too low")
+if rms < 50.0:
+    raise SystemExit("audio capture RMS is too low")
+if active < rate // 20:
+    raise SystemExit("audio capture has too few active samples")
+
+with open(log_path, "a", encoding="utf-8") as f:
+    f.write("result=PASS\n")
+PY
 }
 
 cleanup() {
@@ -1183,21 +1558,22 @@ main() {
 	HTTP_PORT="$(find_free_port 18080)"
 	VNC_DISPLAY="$(find_free_vnc_display)"
 
-	test_dir="$(prepare_vm test "$SSH_PORT" "$HTTP_PORT" "$VNC_DISPLAY")"
+	test_dir="$(prepare_vm test "$SSH_PORT" "$HTTP_PORT" "$VNC_DISPLAY" "$RUN_DIR/test/freebasic-haiku-audio.wav")"
 	test_package_in_vm "$test_dir" "$SSH_PORT" "$hpkg"
 	stop_vm "$test_dir"
+	verify_audio_capture "$test_dir/freebasic-haiku-audio.wav" "$LOG_DIR/freebasic-haiku-audio.log"
+	archive_results "$hpkg"
 
 	if [ "$KEEP_VMS" -eq 0 ]; then
 		rm -rf "$RUN_DIR"
 	fi
 
-	archive_results "$hpkg"
-
-	msg "Haiku package build and fbctests completed"
+	msg "Haiku package build, fbctests, and exampleageddon completed"
 	echo "Package: $hpkg"
 	echo "Archive: $ARCHIVE_DIR"
 	echo "Build log: $LOG_DIR/freebasic-haiku-build.log"
 	echo "Test log:  $LOG_DIR/freebasic-haiku-test.log"
+	echo "Audio log: $LOG_DIR/freebasic-haiku-audio.log"
 }
 
 main "$@"

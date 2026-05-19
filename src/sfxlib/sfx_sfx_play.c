@@ -138,7 +138,7 @@ static void fb_sfxSfxStart(int channel, int id, float pitch, int loop)
     __fb_sfx->voices[voice].channel = channel;
     __fb_sfx->voices[voice].volume = 1.0f;
     __fb_sfx->voices[voice].loop = loop ? 1 : 0;
-    __fb_sfx->voices[voice].data = (const float *)asset->data;
+    __fb_sfx->voices[voice].data = asset->data;
     __fb_sfx->voices[voice].length = asset->size / (int)sizeof(float);
     __fb_sfx->voices[voice].env_level = 1.0f;
     __fb_sfx->voices[voice].env_state = FB_SFX_ENV_SUSTAIN;

@@ -108,7 +108,7 @@ void fb_sfxSfxLoad(int id, const char *filename)
     if (__fb_sfx->sfx[id].loaded)
         free(__fb_sfx->sfx[id].data);
 
-    __fb_sfx->sfx[id].data = (unsigned char *)mono;
+    __fb_sfx->sfx[id].data = mono;
     __fb_sfx->sfx[id].size = frames * (int)sizeof(float);
     __fb_sfx->sfx[id].frames = frames;
     __fb_sfx->sfx[id].sample_rate = sample_rate;

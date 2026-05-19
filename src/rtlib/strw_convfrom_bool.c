@@ -51,7 +51,7 @@ FBCALL char fb_WstrToBool( const FB_WCHAR *src, ssize_t len )
 FBCALL char fb_WstrValBool( const FB_WCHAR *str )
 {
 	ssize_t len;
-	int val;
+	char val;
 
 	if( str == NULL )
 	    return 0;

@@ -279,7 +279,7 @@ typedef struct GFXDRIVER
 	 *
 	 * This string must also be human-readable.
 	 */
-	char *name;
+	const char *name;
 
 	/** Driver initialization function pointer.
 	 *

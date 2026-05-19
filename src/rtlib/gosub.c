@@ -31,6 +31,8 @@ typedef struct {
 FBCALL void * fb_GosubPush( GOSUBCTX * ctx )
 {
 	GOSUBNODE *node = malloc( sizeof( GOSUBNODE ) );
+	if( node == NULL )
+		return NULL;
 	node->next = ctx->top;
 	ctx->top = node;
 
@@ -65,7 +67,8 @@ FBCALL int fb_GosubReturn( GOSUBCTX * ctx )
 		/* TODO: with a different stack allocation strategy, this
 		 * temporary copy won't be needed */
 		jmp_buf buf;
-		FB_MEMCPY( buf, ctx->top->buf, sizeof(jmp_buf));
+		memset( &buf, 0, sizeof( buf ) );
+		memcpy( buf, ctx->top->buf, sizeof( buf ) );
 
 		free(ctx->top);
 		ctx->top = node;

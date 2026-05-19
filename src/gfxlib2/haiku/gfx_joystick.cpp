@@ -33,6 +33,20 @@
 
         The FreeBASIC graphics API expects a polling interface that
         returns button state and up to eight axes.
+
+        GETXPAD is layered on the same Haiku device state.  BJoystick does
+        not promise an Xbox-specific semantic layout, so the XPAD mapper uses
+        the same common Linux joystick ordering used by many Xbox-compatible
+        gamepads:
+
+            axis 0/1  left stick
+            axis 2    left trigger
+            axis 3/4  right stick
+            axis 5    right trigger
+            axis 6/7  d-pad
+
+        Devices that expose a different HID layout still remain available
+        through GETJOYSTICK with their raw axis and button ordering.
 */
 
 #ifndef DISABLE_HAIKU
@@ -47,6 +61,7 @@
 /* ------------------------------------------------------------------------- */
 
 #define MAX_JOYSTICKS 16
+#define XPAD_TRIGGER_DIGITAL_THRESHOLD (30.0f / 255.0f)
 
 
 /* ------------------------------------------------------------------------- */
@@ -92,29 +107,37 @@ static int inited = FALSE;
 
 static float normalize_axis(int value)
 {
+    if (value <= -32768)
+        return -1.0f;
+
+    if (value >= 32767)
+        return 1.0f;
+
     return ((float)value) / 32767.0f;
+}
+
+static float clamp_unit(float value)
+{
+    if (value < 0.0f)
+        return 0.0f;
+
+    if (value > 1.0f)
+        return 1.0f;
+
+    return value;
 }
 
 
 /* ------------------------------------------------------------------------- */
-/* Get joystick state                                                        */
+/* Shared polling helpers                                                    */
 /* ------------------------------------------------------------------------- */
 
-extern "C" FBCALL int fb_GfxGetJoystick(
-    int id,
+static void clear_joystick_outputs(
     ssize_t *buttons,
     float *a1,float *a2,float *a3,float *a4,
     float *a5,float *a6,float *a7,float *a8
 )
 {
-    JOYDATA *j;
-
-    FB_GRAPHICS_LOCK();
-
-    /*
-        Initialize outputs to safe default values.
-    */
-
     if (buttons) *buttons = -1;
 
     if (a1) *a1 = -1000.0f;
@@ -125,33 +148,30 @@ extern "C" FBCALL int fb_GfxGetJoystick(
     if (a6) *a6 = -1000.0f;
     if (a7) *a7 = -1000.0f;
     if (a8) *a8 = -1000.0f;
+}
 
-    /*
-        Initialize joystick table on first use.
-    */
+static void ensure_joystick_table(void)
+{
+    if (inited)
+        return;
 
-    if (!inited)
-    {
-        fb_hMemSet(joy,0,sizeof(joy));
-        inited = TRUE;
-    }
+    fb_hMemSet(joy,0,sizeof(joy));
+    inited = TRUE;
+}
 
-    /*
-        Validate requested joystick id.
-    */
+static int get_joystick(int id, JOYDATA **out)
+{
+    JOYDATA *j;
+
+    if (out)
+        *out = NULL;
+
+    ensure_joystick_table();
 
     if (id < 0 || id >= MAX_JOYSTICKS)
-    {
-        FB_GRAPHICS_UNLOCK();
-        return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
-    }
+        return FALSE;
 
     j = &joy[id];
-
-
-    /* --------------------------------------------------------------------- */
-    /* Device detection                                                      */
-    /* --------------------------------------------------------------------- */
 
     if (!j->detected)
     {
@@ -173,12 +193,53 @@ extern "C" FBCALL int fb_GfxGetJoystick(
         }
     }
 
-
-    /* --------------------------------------------------------------------- */
-    /* Device availability check                                             */
-    /* --------------------------------------------------------------------- */
-
     if (!j->available)
+        return FALSE;
+
+    if (out)
+        *out = j;
+
+    return TRUE;
+}
+
+static void read_axes(BJoystick *js, int16 *axis_values, int max_axes)
+{
+    memset(axis_values,0,(size_t)max_axes * sizeof(axis_values[0]));
+    js->GetAxisValues(axis_values,max_axes);
+}
+
+static float axis_value(const int16 *axis_values, int axes, int axis)
+{
+    if (axis < 0 || axis >= axes)
+        return 0.0f;
+
+    return normalize_axis(axis_values[axis]);
+}
+
+static float trigger_value(const int16 *axis_values, int axes, int axis)
+{
+    return clamp_unit((axis_value(axis_values,axes,axis) + 1.0f) * 0.5f);
+}
+
+
+/* ------------------------------------------------------------------------- */
+/* Get joystick state                                                        */
+/* ------------------------------------------------------------------------- */
+
+extern "C" FBCALL int fb_GfxGetJoystick(
+    int id,
+    ssize_t *buttons,
+    float *a1,float *a2,float *a3,float *a4,
+    float *a5,float *a6,float *a7,float *a8
+)
+{
+    JOYDATA *j;
+
+    FB_GRAPHICS_LOCK();
+
+    clear_joystick_outputs(buttons,a1,a2,a3,a4,a5,a6,a7,a8);
+
+    if (!get_joystick(id,&j))
     {
         FB_GRAPHICS_UNLOCK();
         return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
@@ -199,18 +260,16 @@ extern "C" FBCALL int fb_GfxGetJoystick(
     int axes = j->js.CountAxes();
 
     int16 axis_values[8];
-    memset(axis_values,0,sizeof(axis_values));
+    read_axes(&j->js,axis_values,8);
 
-    j->js.GetAxisValues(axis_values,8);
-
-    if (axes > 0 && a1) *a1 = normalize_axis(axis_values[0]);
-    if (axes > 1 && a2) *a2 = normalize_axis(axis_values[1]);
-    if (axes > 2 && a3) *a3 = normalize_axis(axis_values[2]);
-    if (axes > 3 && a4) *a4 = normalize_axis(axis_values[3]);
-    if (axes > 4 && a5) *a5 = normalize_axis(axis_values[4]);
-    if (axes > 5 && a6) *a6 = normalize_axis(axis_values[5]);
-    if (axes > 6 && a7) *a7 = normalize_axis(axis_values[6]);
-    if (axes > 7 && a8) *a8 = normalize_axis(axis_values[7]);
+    if (axes > 0 && a1) *a1 = axis_value(axis_values,axes,0);
+    if (axes > 1 && a2) *a2 = axis_value(axis_values,axes,1);
+    if (axes > 2 && a3) *a3 = axis_value(axis_values,axes,2);
+    if (axes > 3 && a4) *a4 = axis_value(axis_values,axes,3);
+    if (axes > 4 && a5) *a5 = axis_value(axis_values,axes,4);
+    if (axes > 5 && a6) *a6 = axis_value(axis_values,axes,5);
+    if (axes > 6 && a7) *a7 = axis_value(axis_values,axes,6);
+    if (axes > 7 && a8) *a8 = axis_value(axis_values,axes,7);
 
 
     /* --------------------------------------------------------------------- */
@@ -227,6 +286,116 @@ extern "C" FBCALL int fb_GfxGetJoystick(
     FB_GRAPHICS_UNLOCK();
 
     return fb_ErrorSetNum(FB_RTERROR_OK);
+}
+
+
+/* ------------------------------------------------------------------------- */
+/* GETXPAD bridge                                                            */
+/* ------------------------------------------------------------------------- */
+
+static ssize_t xpad_buttons(uint32 mask, float left_trigger, float right_trigger)
+{
+    ssize_t buttons = 0;
+
+    if (mask & (1u << 0))
+        buttons |= XPAD_BUTTON_A;
+    if (mask & (1u << 1))
+        buttons |= XPAD_BUTTON_B;
+    if (mask & (1u << 2))
+        buttons |= XPAD_BUTTON_X;
+    if (mask & (1u << 3))
+        buttons |= XPAD_BUTTON_Y;
+    if (mask & (1u << 4))
+        buttons |= XPAD_BUTTON_L1;
+    if (mask & (1u << 5))
+        buttons |= XPAD_BUTTON_R1;
+    if (mask & (1u << 6))
+        buttons |= XPAD_BUTTON_SELECT;
+    if (mask & (1u << 7))
+        buttons |= XPAD_BUTTON_START;
+    if (mask & (1u << 8))
+        buttons |= XPAD_BUTTON_GUIDE;
+    if (mask & (1u << 9))
+        buttons |= XPAD_BUTTON_L3;
+    if (mask & (1u << 10))
+        buttons |= XPAD_BUTTON_R3;
+
+    if (left_trigger > XPAD_TRIGGER_DIGITAL_THRESHOLD)
+        buttons |= XPAD_BUTTON_L2;
+    if (right_trigger > XPAD_TRIGGER_DIGITAL_THRESHOLD)
+        buttons |= XPAD_BUTTON_R2;
+
+    return buttons;
+}
+
+static ssize_t xpad_dpad(const int16 *axis_values, int axes)
+{
+    ssize_t dpad = 0;
+    float x;
+    float y;
+
+    x = axis_value(axis_values,axes,6);
+    y = axis_value(axis_values,axes,7);
+
+    if (x < -0.5f)
+        dpad |= XPAD_DPAD_LEFT;
+    else if (x > 0.5f)
+        dpad |= XPAD_DPAD_RIGHT;
+
+    if (y < -0.5f)
+        dpad |= XPAD_DPAD_UP;
+    else if (y > 0.5f)
+        dpad |= XPAD_DPAD_DOWN;
+
+    return dpad;
+}
+
+extern "C" int fb_hGfxHaikuGetXPad(
+    int id,
+    ssize_t *buttons,
+    float *lstick_x,float *lstick_y,
+    float *rstick_x,float *rstick_y,
+    float *ltrigger,float *rtrigger,
+    ssize_t *dpad
+)
+{
+    JOYDATA *j;
+    int axes;
+    int16 axis_values[8];
+    float left_trigger;
+    float right_trigger;
+    uint32 mask;
+
+    if (!get_joystick(id,&j))
+        return XPAD_STATUS_MISSING;
+
+    j->js.Update();
+
+    axes = j->js.CountAxes();
+    read_axes(&j->js,axis_values,8);
+
+    left_trigger = trigger_value(axis_values,axes,2);
+    right_trigger = trigger_value(axis_values,axes,5);
+    mask = j->js.ButtonValues();
+
+    if (buttons)
+        *buttons = xpad_buttons(mask,left_trigger,right_trigger);
+    if (lstick_x)
+        *lstick_x = axis_value(axis_values,axes,0);
+    if (lstick_y)
+        *lstick_y = axis_value(axis_values,axes,1);
+    if (rstick_x)
+        *rstick_x = axis_value(axis_values,axes,3);
+    if (rstick_y)
+        *rstick_y = axis_value(axis_values,axes,4);
+    if (ltrigger)
+        *ltrigger = left_trigger;
+    if (rtrigger)
+        *rtrigger = right_trigger;
+    if (dpad)
+        *dpad = xpad_dpad(axis_values,axes);
+
+    return XPAD_STATUS_CONNECTED;
 }
 
 #endif

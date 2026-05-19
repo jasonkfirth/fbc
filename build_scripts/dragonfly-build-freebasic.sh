@@ -106,7 +106,7 @@ if [ "$NO_BUILD" -eq 0 ]; then
     run pkg update -f
 
     run pkg install -y \
-        gmake gcc git \
+        gmake gcc git rsync pkgconf \
         ncurses libffi \
         mesa-libs libglvnd \
         xorgproto \
@@ -147,16 +147,37 @@ if [ "$NO_BUILD" -eq 0 ]; then
     mkdir -p "$STAGE" "$OUT"
 
     run gmake -f "$GNUMAKEFILE" clean || true
-    run gmake -f "$GNUMAKEFILE" bootstrap-minimal
+
+    PRINT_CONFIG="$BUILDROOT/print-config.txt"
+    run gmake -s -f "$GNUMAKEFILE" print-config > "$PRINT_CONFIG"
+    BOOTSTRAP_DIR="$(awk -F= '$1 == "FBTARGET" { print $2; exit }' "$PRINT_CONFIG")"
+    [ -n "$BOOTSTRAP_DIR" ] || die "could not determine bootstrap directory"
+
+    if [ -d "bootstrap/$BOOTSTRAP_DIR" ] &&
+       find "bootstrap/$BOOTSTRAP_DIR" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print |
+       sed -n '1p' | grep -q .; then
+        run gmake -j "$JOBS" -f "$GNUMAKEFILE" bootstrap-minimal
+    else
+        run gmake -j "$JOBS" -f "$GNUMAKEFILE" bootstrap-seed-peer
+    fi
     [ -f bootstrap/fbc ] || die "bootstrap failed"
 
-    run gmake -f "$GNUMAKEFILE" all FBC=bootstrap/fbc
+    run gmake -j "$JOBS" -f "$GNUMAKEFILE" all FBC=bootstrap/fbc
     run gmake -f "$GNUMAKEFILE" install DESTDIR="$STAGE" prefix="$PREFIX"
 
+    mkdir -p "$STAGE$PREFIX/share/freebasic/examples"
+    rsync -a --delete \
+        --exclude-from "$ROOT/mk/example-copy-excludes.rsync" \
+        "$ROOT/examples/" "$STAGE$PREFIX/share/freebasic/examples/"
+
     require_staged_tree
+    [ -f "$STAGE$PREFIX/share/freebasic/examples/sfxlib/showcase.bas" ] ||
+        die "staged sfxlib showcase example missing after install"
 else
     echo "==> skipping build"
     require_staged_tree
+    [ -f "$STAGE$PREFIX/share/freebasic/examples/sfxlib/showcase.bas" ] ||
+        die "staged sfxlib showcase example missing; run without --no-build first"
 fi
 
 [ "$NO_PACKAGE" -eq 1 ] && exit 0

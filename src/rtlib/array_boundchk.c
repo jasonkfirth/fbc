@@ -2,6 +2,39 @@
 
 #include "fb.h"
 
+static void hAppendMsg
+	(
+		char *msg,
+		int *pos,
+		const char *fmt,
+		...
+	)
+{
+	va_list args;
+	int written;
+	int remaining;
+
+	if( *pos >= FB_ERRMSG_SIZE )
+		return;
+
+	remaining = FB_ERRMSG_SIZE - *pos;
+
+	va_start( args, fmt );
+	written = vsnprintf( &msg[*pos], remaining, fmt, args );
+	va_end( args );
+
+	if( written < 0 )
+	{
+		msg[*pos] = '\0';
+		return;
+	}
+
+	if( written >= remaining )
+		*pos = FB_ERRMSG_SIZE - 1;
+	else
+		*pos += written;
+}
+
 static void *hThrowError
 	(
 		int errnum,
@@ -16,25 +49,23 @@ static void *hThrowError
 	int pos = 0;
 	char msg[FB_ERRMSG_SIZE];
 
-	pos += snprintf( &msg[pos], FB_ERRMSG_SIZE - pos, "\n" );
+	hAppendMsg( msg, &pos, "\n" );
 
 	if( variablename ) {
-		pos += snprintf( &msg[pos], FB_ERRMSG_SIZE - pos,
-			"'%s' ", variablename );
+		hAppendMsg( msg, &pos, "'%s' ", variablename );
 	} else {
-		pos += snprintf( &msg[pos], FB_ERRMSG_SIZE - pos,
-			"array " );
+		hAppendMsg( msg, &pos, "array " );
 	}
 
 	if( errnum == FB_RTERROR_NOTDIMENSIONED ) {
-		pos += snprintf( &msg[pos], FB_ERRMSG_SIZE - pos,
+		hAppendMsg( msg, &pos,
 			"not dimensioned and array elements are not allocated" );
 	} else if( errnum == FB_RTERROR_WRONGDIMENSIONS ) {
-		pos += snprintf( &msg[pos], FB_ERRMSG_SIZE - pos,
+		hAppendMsg( msg, &pos,
 			"accessed with wrong number of dimensions, %" FB_LL_FMTMOD "d given but expected %" FB_LL_FMTMOD "d",
 			(long long int)idx, (long long int)ubound);
 	} else {
-		pos += snprintf( &msg[pos], FB_ERRMSG_SIZE - pos,
+		hAppendMsg( msg, &pos,
 			"accessed with invalid index = %" FB_LL_FMTMOD "d, must be between %" FB_LL_FMTMOD "d and %" FB_LL_FMTMOD "d",
 			(long long int)idx, (long long int)lbound, (long long int)ubound);
 	}

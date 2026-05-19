@@ -21,8 +21,12 @@
 #include once "crt/sys/cygwin/types.bi"
 #elseif defined(__FB_FREEBSD__)
 #include once "crt/sys/freebsd/types.bi"
+#elseif defined(__FB_DRAGONFLY__)
+#include once "crt/sys/dragonfly/types.bi"
 #elseif defined(__FB_OPENBSD__)
 #include once "crt/sys/openbsd/types.bi"
+#elseif defined(__FB_NETBSD__)
+#include once "crt/sys/netbsd/types.bi"
 #elseif defined(__FB_HAIKU__)
 #include once "crt/sys/haiku/types.bi"
 #elseif defined(__FB_DARWIN__)

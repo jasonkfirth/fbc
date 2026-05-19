@@ -43,6 +43,22 @@
 extern "C" {
 #endif
 
+/*
+    Compiler diagnostics
+
+    Debug logging follows printf-style formatting.  The attribute lets
+    compilers validate SFX_DEBUG() call sites and also documents that the
+    format string is intentionally passed through vfprintf() inside the
+    logger implementation.
+*/
+
+#if defined(__GNUC__) || defined(__clang__)
+#define FB_SFX_PRINTF_FORMAT(format_index, first_arg) \
+    __attribute__((format(printf, format_index, first_arg)))
+#else
+#define FB_SFX_PRINTF_FORMAT(format_index, first_arg)
+#endif
+
 
 /* ------------------------------------------------------------------------- */
 /* Debug system                                                              */
@@ -59,7 +75,7 @@ extern "C" {
 
 void fb_sfxDebugInit(void);
 int  fb_sfxDebugEnabled(void);
-void fb_sfxDebugLog(const char *fmt, ...);
+void fb_sfxDebugLog(const char *fmt, ...) FB_SFX_PRINTF_FORMAT(1, 2);
 
 
 /*
@@ -151,17 +167,6 @@ void fb_sfxDriverExitUnlocked(const FB_SFX_DRIVER *driver);
     the resulting samples to the operating system audio API.
 */
 
-void fb_sfxMixerInit(void);
-void fb_sfxMixerShutdown(void);
-void fb_sfxMixerProcess(int frames);
-void fb_sfxMixerStopChannel(int channel);
-void fb_sfxMixerStopAll(void);
-
-
-/*
-    Voice management
-*/
-
 FB_SFXVOICE *fb_sfxVoiceAlloc(void);
 void fb_sfxVoiceFree(FB_SFXVOICE *voice);
 
@@ -226,40 +231,6 @@ int  fb_sfxBufferFrames(void);
 int  fb_sfxBufferSamples(void);
 void fb_sfxBufferWrite(int index, float value);
 float fb_sfxBufferRead(int index);
-
-
-
-/* ------------------------------------------------------------------------- */
-/* Ring buffer helpers                                                       */
-/* ------------------------------------------------------------------------- */
-
-int fb_sfxRingBufferAvailable(const FB_SFX_RINGBUFFER *rb);
-int fb_sfxRingBufferFree(const FB_SFX_RINGBUFFER *rb);
-
-
-
-/* ------------------------------------------------------------------------- */
-/* Capture subsystem                                                         */
-/* ------------------------------------------------------------------------- */
-
-/*
-    Audio capture
-
-    The capture subsystem allows recording audio from:
-
-        • microphone input
-        • line input
-        • system mixer (loopback)
-
-    Captured samples are stored in a runtime-owned buffer so
-    that BASIC programs can read them deterministically.
-*/
-
-void fb_sfxCaptureInit(void);
-void fb_sfxCaptureShutdown(void);
-
-int fb_sfxCaptureWrite(const short *samples, int frames);
-int fb_sfxCaptureRead(float *samples, int frames);
 
 
 
@@ -362,10 +333,6 @@ void fb_sfxInstrumentAssign(int channel, int instrument_id);
 int fb_sfxInstrumentDefined(int id);
 void fb_sfxInstrumentReset(void);
 void fb_sfxInstrumentApply(FB_SFXVOICE *voice, int channel, int default_wave, int default_env);
-void fb_sfxMixBufferInit(void);
-void fb_sfxMixBufferShutdown(void);
-int fb_sfxMixBufferWrite(const float *samples, int frames);
-int fb_sfxMixBufferRead(float *samples, int frames);
 int fb_sfxDecodeFile(const char *filename,
                      float **samples,
                      int *frames,
@@ -503,14 +470,7 @@ int fb_sfxMidiDriverSend(unsigned char status,
 int fb_sfxMidiSend(unsigned char status,
                    unsigned char data1,
                    unsigned char data2);
-int fb_sfxCaptureStart(void);
-void fb_sfxCaptureStop(void);
-void fb_sfxCapturePause(void);
-void fb_sfxCaptureResume(void);
-int fb_sfxCaptureStatus(void);
-int fb_sfxCaptureAvailable(void);
 int fb_sfxCaptureReadSamples(float *buffer, int frames);
-int fb_sfxCaptureSave(const char *filename, int seconds);
 int fb_sfxCaptureSaveCmd(const char *filename);
 int fb_sfxDeviceCount(void);
 const char *fb_sfxDeviceName(int id);

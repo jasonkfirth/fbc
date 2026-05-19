@@ -63,8 +63,6 @@ FBCALL void fb_BgLock   ( void ) { pthread_mutex_lock  ( &__fb_bg_mutex     ); }
 FBCALL void fb_BgUnlock ( void ) { pthread_mutex_unlock( &__fb_bg_mutex     ); }
 
 #ifdef ENABLE_MT
-extern int pthread_mutexattr_settype(pthread_mutexattr_t *attr, int kind);
-
 static pthread_mutex_t __fb_global_mutex;
 static pthread_mutex_t __fb_string_mutex;
 static pthread_mutex_t __fb_graphics_mutex;
@@ -158,13 +156,10 @@ static int fb_hTermQuery( int code, int *val1, int *val2 )
 			fb_hAddCh( c );
 		} while (1);
 
-		const char *format;
 		if( code == SEQ_QUERY_WINDOW )
-			format = "8;%d;%dt";
+			filled = scanf( "8;%d;%dt", val1, val2 );
 		else /* SEQ_QUERY_CURSOR */
-			format = "%d;%dR";
-
-		filled = scanf( format, val1, val2 );
+			filled = scanf( "%d;%dR", val1, val2 );
 	} while (filled != 2);
 
 	return TRUE;

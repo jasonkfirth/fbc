@@ -2,7 +2,7 @@
 
 #include "fb.h"
 
-FBCALL FBSTRING *fb_StrAllocTempDescF( char *str, ssize_t str_size )
+FBCALL FBSTRING *fb_StrAllocTempDescF( const char *str, ssize_t str_size )
 {
 	FBSTRING *dsc;
 
@@ -16,7 +16,7 @@ FBCALL FBSTRING *fb_StrAllocTempDescF( char *str, ssize_t str_size )
     if( dsc == NULL )
         return &__fb_ctx.null_desc;
 
-    dsc->data = str;
+    dsc->data = (char *)str;
 
 	/* can't use strlen() if the size is known */
 	if( str_size > 0 )

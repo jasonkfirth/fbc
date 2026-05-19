@@ -42,6 +42,67 @@ msg(){ echo ""; echo "==> $1"; }
 fail(){ echo ""; echo "ERROR: $1"; exit 1; }
 
 ##############################################################################
+# Haiku package helpers
+##############################################################################
+
+run_limited() {
+	limit="$1"
+	shift
+
+	"$@" &
+	pid=$!
+	elapsed=0
+
+	while kill -0 "$pid" >/dev/null 2>&1; do
+		if [ "$elapsed" -ge "$limit" ]; then
+			kill "$pid" >/dev/null 2>&1 || true
+			wait "$pid" >/dev/null 2>&1 || true
+			return 124
+		fi
+
+		sleep 1
+		elapsed=$((elapsed + 1))
+	done
+
+	wait "$pid"
+}
+
+install_image_package() {
+	name="$1"
+	package_file="$(find /boot/_packages_ -maxdepth 1 -type f -name "$name-*.hpkg" 2>/dev/null | sort | tail -n 1)"
+
+	if [ -z "$package_file" ]; then
+		return 1
+	fi
+
+	if [ -e "/boot/system/packages/$(basename "$package_file")" ]; then
+		return 0
+	fi
+
+	echo "==> installing image package $package_file"
+	pkgman install -y "$package_file"
+}
+
+install_image_packages() {
+	for package_name in "$@"; do
+		install_image_package "$package_name" || true
+	done
+}
+
+install_optional_network_packages() {
+	[ "${HAIKU_SKIP_NET_DEPS:-0}" = "1" ] && return 0
+
+	run_limited 300 pkgman install -y "$@" || {
+		echo "WARNING: optional pkgman install failed or timed out: $*" >&2
+		return 0
+	}
+}
+
+cleanup_package_states() {
+	find /boot/system/packages/administrative -maxdepth 1 -type d -name 'state_*' -exec rm -rf {} + 2>/dev/null || true
+}
+
+##############################################################################
 # Version extraction
 ##############################################################################
 
@@ -66,9 +127,21 @@ if [ "$NOBUILD" -eq 0 ]; then
 	rm -f ./*.hpkg
 	rm -f ./*.install_manifest package-root.install_manifest
 
-	msg "Ensuring build tools"
-	pkgman install -y haiku_devel make gcc binutils pkgconf rsync libffi_devel zstd ||true
-	pkgman install -y  ncurses6 ncurses6_devel || true
+	if [ "${HAIKU_SKIP_DEPS:-0}" != "1" ]; then
+		msg "Ensuring build tools"
+		install_image_packages \
+			haiku_devel \
+			make \
+			binutils \
+			mpc \
+			mpfr \
+			gcc \
+			pkgconfig \
+			zstd_devel
+		cleanup_package_states
+		install_optional_network_packages libffi_devel ncurses6_devel
+		cleanup_package_states
+	fi
 
 	CPU_COUNT=$(sysinfo -cpu 2>/dev/null | grep -c "^CPU #" || true)
 	[ -z "$CPU_COUNT" ] && CPU_COUNT=1
@@ -82,11 +155,11 @@ if [ "$NOBUILD" -eq 0 ]; then
 
 	if [ ! -x bin/fbc ]; then
 		msg "Building bootstrap compiler ($JOBS threads)"
-		make -j"$JOBS" bootstrap-minimal
+		make -j"$JOBS" HAVE_PREREQS_MK= bootstrap-minimal
 	fi
 
 	msg "Building FreeBASIC ($JOBS threads)"
-	make -j"$JOBS"
+	make -j"$JOBS" HAVE_PREREQS_MK=
 
 fi
 
@@ -101,7 +174,7 @@ if [ "$NOPACKAGE" -eq 0 ]; then
 	msg "Preparing staging directory"
 	rm -rf "$STAGE"
 
-	make install DESTDIR="$STAGE"
+	make HAVE_PREREQS_MK= install DESTDIR="$STAGE"
 
 	msg "Staging examples"
 	mkdir -p "$STAGE/data/freebasic"

@@ -1,6 +1,6 @@
 FBCALL double       fb_Timer            ( void );
 FBCALL FBSTRING    *fb_Time             ( void );
-FBCALL int          fb_SetTime          ( FBSTRING *time );
+FBCALL int          fb_SetTime          ( FBSTRING *timestr );
 FBCALL FBSTRING    *fb_Date             ( void );
 FBCALL int          fb_SetDate          ( FBSTRING *date );
 

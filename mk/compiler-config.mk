@@ -30,8 +30,9 @@ MSYS_RANLIB := $(firstword $(wildcard /mingw64/bin/ranlib.exe /ucrt64/bin/ranlib
 MSYS_AS := $(firstword $(wildcard /mingw64/bin/as.exe /ucrt64/bin/as.exe /clang64/bin/as.exe))
 MSYS_LD := $(firstword $(wildcard /mingw64/bin/ld.exe /ucrt64/bin/ld.exe /clang64/bin/ld.exe))
 
-HOMEBREW_GCC := $(strip $(shell find /opt/homebrew/bin /usr/local/bin -maxdepth 1 \( -type f -o -type l \) -name 'gcc-*' 2>/dev/null | grep -E '/gcc-[0-9]+$$' | sort -V | tail -n1))
-HOMEBREW_GXX := $(strip $(shell find /opt/homebrew/bin /usr/local/bin -maxdepth 1 \( -type f -o -type l \) -name 'g++-*' 2>/dev/null | grep -E '/g[+][+]-[0-9]+$$' | sort -V | tail -n1))
+HOST_VERSION_SORT := $(strip $(shell if printf '2\n10\n' | sort -V >/dev/null 2>&1; then echo 'sort -V'; else echo sort; fi))
+HOMEBREW_GCC := $(strip $(shell find /opt/homebrew/bin /usr/local/bin -maxdepth 1 \( -type f -o -type l \) -name 'gcc-*' 2>/dev/null | grep -E '/gcc-[0-9]+$$' | $(HOST_VERSION_SORT) | tail -n1))
+HOMEBREW_GXX := $(strip $(shell find /opt/homebrew/bin /usr/local/bin -maxdepth 1 \( -type f -o -type l \) -name 'g++-*' 2>/dev/null | grep -E '/g[+][+]-[0-9]+$$' | $(HOST_VERSION_SORT) | tail -n1))
 
 HOST_CC_FOR_PROBE := $(strip $(or $(LOCAL_GCC),$(MSYS_GCC),$(HOMEBREW_GCC),$(CC),gcc))
 HOST_TRIPLET := $(shell $(HOST_CC_FOR_PROBE) -dumpmachine 2>/dev/null || echo unknown)

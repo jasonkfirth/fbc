@@ -28,8 +28,6 @@ typedef struct {
 } DEV_TCP_INFO;
 
 int fb_DevTcpParseProtocol( DEV_TCP_PROTOCOL **tcp_proto_out, const char *proto_raw, size_t proto_raw_len, int is_server );
-int fb_DevTcpOpen( FB_FILE *handle, const char *filename, size_t filename_len );
-int fb_DevTcpOpenServer( FB_FILE *handle, const char *filename, size_t filename_len );
 int fb_DevTcpAcceptHandle( FB_FILE *server_handle, FB_FILE *client_handle );
 int fb_DevTcpEocEx( FB_FILE *handle );
 

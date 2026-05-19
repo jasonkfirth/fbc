@@ -143,7 +143,7 @@ extern in6addr_loopback alias "in6addr_loopback" as in6_addr
 
 #include once "crt/sys/socket.bi"
 
-#if defined(__FB_OPENBSD__)
+#if defined(__FB_DRAGONFLY__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)
 	type sockaddr_in
 		sin_len as ubyte
 		sin_family as sa_family_t
@@ -224,8 +224,12 @@ end type
 #include once "crt/netinet/linux/in.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/netinet/cygwin/in.bi"
+#elseif defined(__FB_DRAGONFLY__)
+#include once "crt/netinet/dragonfly/in.bi"
 #elseif defined(__FB_OPENBSD__)
 #include once "crt/netinet/openbsd/in.bi"
+#elseif defined(__FB_NETBSD__)
+#include once "crt/netinet/netbsd/in.bi"
 #else
 #error Platform unsupported
 #endif

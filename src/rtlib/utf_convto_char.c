@@ -4,7 +4,7 @@
 
 #include "fb.h"
 
-extern const char __fb_utf8_trailingTb[256];
+extern const unsigned char __fb_utf8_trailingTb[256];
 extern const UTF_32 __fb_utf8_offsetsTb[6];
 
 /*

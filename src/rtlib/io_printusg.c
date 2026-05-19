@@ -234,9 +234,9 @@ static int fb_PrintUsingFmtStr( int fnum )
 
 	while( (ctx->chars > 0) && (len < BUFFERLEN) )
 	{
-		c = *ctx->ptr;
-		nc = ( ctx->chars > 1? ctx->ptr[1] : -1 );
-		nnc = ( ctx->chars > 2? ctx->ptr[2] : -1 );
+		c = FB_CHAR_TO_INT( *ctx->ptr );
+		nc = ( ctx->chars > 1? FB_CHAR_TO_INT( ctx->ptr[1] ) : -1 );
+		nnc = ( ctx->chars > 2? FB_CHAR_TO_INT( ctx->ptr[2] ) : -1 );
 
 		doexit = FALSE;
 		switch( c )
@@ -334,8 +334,8 @@ FBCALL int fb_PrintUsingStr( int fnum, FBSTRING *s, int mask )
 
 	while( ctx->chars > 0 )
     {
-		c = *ctx->ptr;
-        nc = ( ctx->chars > 1? ctx->ptr[1] : -1 );
+		c = FB_CHAR_TO_INT( *ctx->ptr );
+        nc = ( ctx->chars > 1? FB_CHAR_TO_INT( ctx->ptr[1] ) : -1 );
 
 		doexit = TRUE;
 		switch( c )
@@ -459,8 +459,8 @@ FBCALL int fb_PrintUsingWstr( int fnum, FB_WCHAR *s, int mask )
 		ctx->chars = 0;
 
 	while( ctx->chars > 0 ) {
-		c = *ctx->ptr;
-		nc = ctx->chars > 1 ? ctx->ptr[1] : -1;
+		c = FB_CHAR_TO_INT( *ctx->ptr );
+		nc = ctx->chars > 1 ? FB_CHAR_TO_INT( ctx->ptr[1] ) : -1;
 
 		doexit = TRUE;
 		switch( c ) {
@@ -608,9 +608,9 @@ static int hPrintNumber
 			break;
 		}
 
-		c = *ctx->ptr;
+		c = FB_CHAR_TO_INT( *ctx->ptr );
 #ifdef DEBUG
-		nc = ( ctx->chars > 1? *(ctx->ptr+1): -1 );
+		nc = ( ctx->chars > 1? FB_CHAR_TO_INT( *(ctx->ptr+1) ): -1 );
 #endif
 		doexit = FALSE;
 		switch( c )
@@ -1126,13 +1126,17 @@ static int hPrintNumber
 			ADD_CHAR( CHAR_ZERO + val_exp );
 		}
 
+#ifdef DEBUG
 		expdigs -= 1;
+#endif
 
 		/* expdigs == 2 */
 		ADD_CHAR( expsignchar );
 		ADD_CHAR( CHAR_EXP_SINGLE ); /* QB would use 'D' for doubles */
 
+#ifdef DEBUG
 		expdigs -= 2;
+#endif
 	}
 
 
@@ -1463,7 +1467,7 @@ FBCALL int fb_PrintUsingSingle( int fnum, float value_f, int mask )
 	}
 	else if( hIsFinite( value_f ) )
 	{
-		value_f = fabs( value_f );
+		value_f = fabsf( value_f );
 		val_ull = hScaleDoubleToULL( value_f, &val_exp );
 	}
 	else

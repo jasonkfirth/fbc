@@ -11,8 +11,10 @@ static __inline__ void fb_hStrConcat
 		ssize_t len2
 	)
 {
-    dst = (char *) FB_MEMCPYX( dst, str1, len1 );
-    dst = (char *) FB_MEMCPYX( dst, str2, len2 );
+	if( len1 > 0 )
+		dst = (char *) FB_MEMCPYX( dst, str1, len1 );
+	if( len2 > 0 )
+		dst = (char *) FB_MEMCPYX( dst, str2, len2 );
 	*dst = '\0';
 }
 
@@ -59,4 +61,3 @@ FBCALL FBSTRING *fb_StrConcat
 
 	return dst;
 }
-

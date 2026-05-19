@@ -35,20 +35,88 @@ static inline uint32_t host_from_le32(uint32_t value)
 
 static inline int fread_16_le(uint16_t *buf, FILE *f)
 {
-	int rc;
+	size_t rc;
 	rc = fread(buf, sizeof(*buf), 1, f);
 	if (rc == 1)
 		*buf = host_from_le16(*buf);
-	return rc;
+	return (rc == 1);
 }
 
 static inline int fread_32_le(uint32_t *buf, FILE *f)
 {
-	int rc;
+	size_t rc;
 	rc = fread(buf, sizeof(*buf), 1, f);
 	if (rc == 1)
 		*buf = host_from_le32(*buf);
-	return rc;
+	return (rc == 1);
+}
+
+static inline int read_byte(FILE *f, unsigned int *value)
+{
+	int ch = fgetc(f);
+
+	if (ch < 0)
+		return FALSE;
+
+	*value = (unsigned int)ch;
+	return TRUE;
+}
+
+static int read_le16_bytes(FILE *f, unsigned int *value)
+{
+	unsigned int b0, b1;
+
+	if (!read_byte(f, &b0) || !read_byte(f, &b1))
+		return FALSE;
+
+	*value = b0 | (b1 << 8);
+	return TRUE;
+}
+
+static int read_le24_bytes(FILE *f, unsigned int *value)
+{
+	unsigned int b0, b1, b2;
+
+	if (!read_byte(f, &b0) || !read_byte(f, &b1) || !read_byte(f, &b2))
+		return FALSE;
+
+	*value = b0 | (b1 << 8) | (b2 << 16);
+	return TRUE;
+}
+
+static int read_bgr24_color(FILE *f, unsigned int *value)
+{
+	unsigned int b, g, r;
+
+	if (!read_byte(f, &b) || !read_byte(f, &g) || !read_byte(f, &r))
+		return FALSE;
+
+	*value = (b << 16) | (g << 8) | r;
+	return TRUE;
+}
+
+static int read_le32_bytes(FILE *f, unsigned int *value)
+{
+	unsigned int b0, b1, b2, b3;
+
+	if (!read_byte(f, &b0) || !read_byte(f, &b1) ||
+	    !read_byte(f, &b2) || !read_byte(f, &b3))
+		return FALSE;
+
+	*value = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
+	return TRUE;
+}
+
+static int skip_bytes(FILE *f, int count)
+{
+	unsigned int value;
+
+	while (count-- > 0) {
+		if (!read_byte(f, &value))
+			return FALSE;
+	}
+
+	return TRUE;
 }
 
 typedef void (*FBGFX_BLOAD_IMAGE_CONVERT)(const unsigned char *src, unsigned char *dest, int w, const uint32_t *masks, const int *shifts, const int *bits);
@@ -70,8 +138,8 @@ static void convert_8to32(const unsigned char *src, unsigned char *dest, int w, 
 
 #define CONVERT_DEPTH(c, from, to) \
 	((from) <= (to) ? \
-		((c) << (to - from)) | (c >> (from - (to - from))) \
-		: (c) >> (from - to))
+		((c) << ((to) - (from))) | ((c) >> ((from) - ((to) - (from)))) \
+		: ((c) >> ((from) - (to))))
 
 static void convert_bf_16to16(const unsigned char *src, unsigned char *dest, int w, const uint32_t *masks, const int *shifts, const int *bits)
 {
@@ -264,7 +332,7 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 
 				if (biSize >= 56) {
 					/* Windows V3 (BITMAPV3HEADER) or later */
-					if ((fseek(f, 4*4, SEEK_CUR)) ||
+					if ((fseek(f, 16L, SEEK_CUR)) ||
 					    (!fread_32_le(&rgba[0], f)) ||
 					    (!fread_32_le(&rgba[1], f)) ||
 					    (!fread_32_le(&rgba[2], f)) ||
@@ -301,13 +369,17 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 	if (biBitCount <= 8) {
 		/* OS/2 palette entries are 3 bytes; others are 4 bytes */
 		int pal_entry_size = (biSize == 12 ? 3 : 4);
+		unsigned int palette_color;
 		palette_entries = 1 << biBitCount;
 		for (i = 0; i < palette_entries; i++) {
-			palette[i] = (fgetc(f) << 16) | (fgetc(f) << 8) | fgetc(f);
+			if (!read_bgr24_color(f, &palette_color))
+				return FB_RTERROR_FILEIO;
+			palette[i] = (int)palette_color;
 			if (pal)
 				palette[i] = (palette[i] >> 2) & 0x3F3F3F;
 			if (pal_entry_size == 4) {
-				fgetc(f);
+				if (!skip_bytes(f, 1))
+					return FB_RTERROR_FILEIO;
 			}
 		}
 	}
@@ -436,6 +508,10 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 		fb_hRestorePalette();
 	size = ((biWidth * BYTES_PER_PIXEL(biBitCount)) + 3) & ~0x3;
 	buffer = (unsigned char *)malloc(size + 1);
+	if (!buffer) {
+		result = FB_RTERROR_OUTOFMEM;
+		goto exit_error;
+	}
 	switch (expand) {
 		case 1: padding = 4 - (((biWidth + 7) >> 3) & 0x3); break;
 		case 4: padding = 4 - (((biWidth + 1) >> 1) & 0x3); break;
@@ -451,16 +527,20 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 			color = 0;
 			for (j = 0; j < biWidth; j++) {
 				if (j % (8 / expand) == 0) {
-					if ((color = fgetc(f)) < 0) {
+					unsigned int byte;
+					if (!read_byte(f, &byte)) {
 						result = FB_RTERROR_FILEIO;
 						goto exit_error;
 					}
+					color = (int)byte;
 				}
 				buffer[j] = color >> (8 - expand);
 				color = (color << expand) & 0xFF;
 			}
-			for (j = 0; j < padding; j++)
-				fgetc(f);
+			if (!skip_bytes(f, padding)) {
+				result = FB_RTERROR_FILEIO;
+				goto exit_error;
+			}
 		}
 		else if (!fread(buffer, size, 1, f)) {
 			result = FB_RTERROR_FILEIO;
@@ -483,7 +563,7 @@ static int gfx_bload(FBSTRING *filename, void *dest, void *pal, int usenewheader
 {
 	FILE *f;
 	FB_GFXCTX *context;
-	unsigned char id;
+	int id;
 	unsigned int color, *palette = pal, size = 0;
 	char buffer[MAX_PATH];
 	int i, result = fb_ErrorSetNum( FB_RTERROR_OK );
@@ -513,22 +593,28 @@ static int gfx_bload(FBSTRING *filename, void *dest, void *pal, int usenewheader
 	fb_hSetPixelTransfer(context, MASK_A_32);
 
 	id = fgetc(f);
+	if (id < 0)
+		result = FB_RTERROR_FILEIO;
 	switch (id) {
 
 		case 0xFD:
 			/* QB BSAVEd block */
-			fgetc(f); fgetc(f); fgetc(f); fgetc(f);
-			size = fgetc(f) | (fgetc(f) << 8);
+			if (!skip_bytes(f, 4) || !read_le16_bytes(f, &size))
+				result = FB_RTERROR_FILEIO;
 			break;
 
 		case 0xFE:
 			/* FB BSAVEd block */
-			size = fgetc(f) | (fgetc(f) << 8) | (fgetc(f) << 16) | (fgetc(f) << 24);
+			if (!read_le32_bytes(f, &size))
+				result = FB_RTERROR_FILEIO;
 			break;
 
 		case 'B':
 			/* Can be a BMP */
-			rewind(f);
+			if (fseek(f, 0L, SEEK_SET) != 0) {
+				result = FB_RTERROR_FILEIO;
+				break;
+			}
 			result = load_bmp(context, f, dest, pal, usenewheader);
 			fclose(f);
 			fb_hStrDelTemp(filename);
@@ -542,27 +628,35 @@ static int gfx_bload(FBSTRING *filename, void *dest, void *pal, int usenewheader
 
 	if (result == FB_RTERROR_OK) {
 		if (!dest) {
+			size_t blocks;
 			DRIVER_LOCK();
 			size = MIN(size, (unsigned int)(__fb_gfx->pitch * __fb_gfx->h));
-			if ((!fread(context->line[0], size, 1, f)) && (!feof(f)))
+			blocks = fread(context->line[0], size, 1, f);
+			if ((blocks != 1) && ferror(f))
 				result = FB_RTERROR_FILEIO;
 			SET_DIRTY(context, 0, __fb_gfx->h);
-			if (!feof(f)) {
+			if ((result == FB_RTERROR_OK) && (blocks == 1)) {
 				if (!pal)
 					palette = __fb_gfx->device_palette;
 				for (i = 0; i < (1 << __fb_gfx->depth); i++) {
-					color = fgetc(f) | (fgetc(f) << 8) | (fgetc(f) << 16);
+					if (!read_le24_bytes(f, &color)) {
+						if (ferror(f))
+							result = FB_RTERROR_FILEIO;
+						break;
+					}
 					if (!pal)
 						color = (color << 2) & 0xFCFCFC;
 					palette[i] = color;
 				}
-				if (!pal)
+				if ((!pal) && (result == FB_RTERROR_OK))
 					fb_hRestorePalette();
 			}
 			DRIVER_UNLOCK();
 		}
 		else {
-			if ((!fread(dest, size, 1, f)) && (!feof(f)))
+			size_t blocks;
+			blocks = fread(dest, size, 1, f);
+			if ((blocks != 1) && ferror(f))
 				result = FB_RTERROR_FILEIO;
 		}
 	}

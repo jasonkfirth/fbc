@@ -127,11 +127,15 @@ static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
 #	define wcstombs __android_wcstombs
 	static __inline__ size_t __android_mbstowcs(FB_WCHAR *dst, const char *src, size_t count)
 	{
-		return mbsrtowcs(dst, &src, count, NULL);
+		mbstate_t state = { 0 };
+
+		return mbsrtowcs(dst, &src, count, &state);
 	}
 	static __inline__ size_t __android_wcstombs(char *dst, const FB_WCHAR *src, size_t count)
 	{
-		return wcsrtombs(dst, &src, count, NULL);
+		mbstate_t state = { 0 };
+
+		return wcsrtombs(dst, &src, count, &state);
 	}
 #endif
 #endif
@@ -240,7 +244,10 @@ static __inline__ void fb_wstr_Copy( FB_WCHAR *dst, const FB_WCHAR *src, ssize_t
 /* Copy n characters from A to B. */
 static __inline__ FB_WCHAR *fb_wstr_Move( FB_WCHAR *dst, const FB_WCHAR *src, ssize_t chars )
 {
-	return (FB_WCHAR *) FB_MEMCPYX( dst, src, chars * sizeof( FB_WCHAR ) );
+	if( chars > 0 )
+		dst = (FB_WCHAR *) FB_MEMCPYX( dst, src, chars * sizeof( FB_WCHAR ) );
+
+	return dst;
 }
 
 static __inline__ void fb_wstr_Fill( FB_WCHAR *dst, FB_WCHAR c, ssize_t chars )

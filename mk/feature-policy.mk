@@ -92,6 +92,8 @@ endif
 
 ifeq ($(TARGET_OS),js)
   DISABLE_MT := YesPlease
+  ALLCFLAGS += \
+    -DDISABLE_FFI
 endif
 
 # ---------------------------------------------------------------------------

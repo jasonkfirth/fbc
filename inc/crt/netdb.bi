@@ -16,8 +16,12 @@
 #include once "crt/linux/netdb.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/linux/netdb.bi"
+#elseif defined(__FB_DRAGONFLY__)
+#include once "crt/dragonfly/netdb.bi"
 #elseif defined(__FB_OPENBSD__)
 #include once "crt/openbsd/netdb.bi"
+#elseif defined(__FB_NETBSD__)
+#include once "crt/netbsd/netdb.bi"
 #else
 #error Unsupported platform
 #endif
@@ -33,6 +37,8 @@
 extern h_errno alias "h_errno" as long
 #elseif defined(__FB_OPENBSD__)
 extern h_errno alias "h_errno" as long
+#elseif defined(__FB_DRAGONFLY__) or defined(__FB_NETBSD__)
+#define h_errno *__h_errno()
 #else
 #define h_errno *__h_errno_location()
 #endif
@@ -73,12 +79,17 @@ type addrinfo
 	ai_socktype as long
 	ai_protocol as long
 	ai_addrlen as socklen_t
+#if defined(__FB_DRAGONFLY__) or defined(__FB_NETBSD__)
+	ai_canonname as zstring ptr
+	ai_addr as sockaddr ptr
+#else
 	ai_addr as sockaddr ptr
 	ai_canonname as zstring ptr
+#endif
 	ai_next as addrinfo ptr
 end type
 
-#if defined(__FB_CYGWIN__)
+#if defined(__FB_CYGWIN__) or defined(__FB_DRAGONFLY__) or defined(__FB_NETBSD__)
 const AI_PASSIVE = &h0001
 const AI_CANONNAME = &h0002
 const AI_NUMERICHOST = &h0004
@@ -147,7 +158,7 @@ const AI_NUMERICSERV = &h0400
 #define NI_MAXHOST 1025
 #endif
 #define NI_MAXSERV 32
-#if defined(__FB_CYGWIN__)
+#if defined(__FB_CYGWIN__) or defined(__FB_DRAGONFLY__) or defined(__FB_NETBSD__)
 #define NI_NOFQDN 1
 #define NI_NUMERICHOST 2
 #define NI_NAMEREQD 4
@@ -162,7 +173,11 @@ const AI_NUMERICSERV = &h0400
 
 extern "c"
 
+#if defined(__FB_DRAGONFLY__) or defined(__FB_NETBSD__)
+declare function __h_errno () as long ptr
+#else
 declare function __h_errno_location () as long ptr
+#endif
 declare sub herror (byval __str as zstring ptr)
 declare function hstrerror (byval __err_num as long) as zstring ptr
 declare sub sethostent (byval __stay_open as long)

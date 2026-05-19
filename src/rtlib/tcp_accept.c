@@ -33,6 +33,12 @@ FBCALL int fb_TcpAccept( int fnum )
 	}
 
 	client_handle = FB_FILE_TO_HANDLE( client_fnum );
+	if( client_handle == NULL ) {
+		FB_UNLOCK();
+		fb_ErrorSetNum( FB_RTERROR_FILEIO );
+		return 0;
+	}
+
 	memset( client_handle, 0, sizeof( FB_FILE ) );
 	client_handle->hooks = &hooks_dev_tcp_accept_reserved;
 	FB_UNLOCK();
