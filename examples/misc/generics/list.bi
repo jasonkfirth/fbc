@@ -31,13 +31,13 @@
 	destructor list_##T()
 		do while head <> 0
 			var next_ = head->next_
-			deallocate(head)
+			delete head
 			head = next_
 		loop
 	end destructor
 	
 	sub list_##T.add(v as T)
-		dim as list_item_##T ptr node = allocate(len(list_item_##T))
+		dim as list_item_##T ptr node = new list_item_##T
 		node->value = v
 		if tail <> 0 then
 			tail->next_ = node

@@ -88,6 +88,13 @@ Options:
   --fbctests-jobs N Parallel jobs for --fbctests
   --fbctests-unit-args ARGS
                     Extra arguments passed to the fbc-tests binary
+  --exampleageddon  Compile examples/ and run self-contained examples
+  --exampleageddon-jobs N
+                    Parallel jobs for --exampleageddon
+  --exampleageddon-compile-timeout N
+                    Per-example compile timeout in seconds
+  --exampleageddon-run-timeout N
+                    Per-example runtime timeout in seconds
   --skip-host-deps  Skip host dependency installation
   --help            Show this help text
 
@@ -108,6 +115,10 @@ KEEP_ROOT=0
 RUN_FBCTESTS=0
 FBCTESTS_JOBS="$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
 FBCTESTS_UNIT_ARGS=""
+RUN_EXAMPLEAGEDDON=0
+EXAMPLEAGEDDON_JOBS="$FBCTESTS_JOBS"
+EXAMPLEAGEDDON_COMPILE_TIMEOUT=180
+EXAMPLEAGEDDON_RUN_TIMEOUT=10
 SKIP_HOST_DEPS=0
 PORTS_MIRROR="${DEBIAN_PORTS_MIRROR:-http://ftp.ports.debian.org/debian-ports}"
 DEBIAN_MAIN_MIRROR="${DEBIAN_MAIN_MIRROR:-http://deb.debian.org/debian}"
@@ -123,6 +134,10 @@ while [ $# -gt 0 ]; do
         --fbctests) RUN_FBCTESTS=1; shift ;;
         --fbctests-jobs) FBCTESTS_JOBS="$2"; shift 2 ;;
         --fbctests-unit-args) FBCTESTS_UNIT_ARGS="$2"; shift 2 ;;
+        --exampleageddon) RUN_EXAMPLEAGEDDON=1; shift ;;
+        --exampleageddon-jobs) EXAMPLEAGEDDON_JOBS="$2"; shift 2 ;;
+        --exampleageddon-compile-timeout) EXAMPLEAGEDDON_COMPILE_TIMEOUT="$2"; shift 2 ;;
+        --exampleageddon-run-timeout) EXAMPLEAGEDDON_RUN_TIMEOUT="$2"; shift 2 ;;
         --skip-host-deps) SKIP_HOST_DEPS=1; shift ;;
         -h|--help)
             usage
@@ -138,6 +153,18 @@ done
 
 case "$FBCTESTS_JOBS" in
     ''|*[!0-9]*|0) die "--fbctests-jobs must be a positive integer" ;;
+esac
+
+case "$EXAMPLEAGEDDON_JOBS" in
+    ''|*[!0-9]*|0) die "--exampleageddon-jobs must be a positive integer" ;;
+esac
+
+case "$EXAMPLEAGEDDON_COMPILE_TIMEOUT" in
+    ''|*[!0-9]*|0) die "--exampleageddon-compile-timeout must be a positive integer" ;;
+esac
+
+case "$EXAMPLEAGEDDON_RUN_TIMEOUT" in
+    ''|*[!0-9]*|0) die "--exampleageddon-run-timeout must be a positive integer" ;;
 esac
 
 case "$ARCH" in
@@ -465,6 +492,22 @@ stage_sources_for_fbctests() {
     root_cmd rsync -a --delete "$ROOT/inc/" "$ROOTFS/source-inc/"
 }
 
+stage_sources_for_exampleageddon() {
+    [ "$RUN_EXAMPLEAGEDDON" -eq 1 ] || return 0
+
+    msg "staging exampleageddon source"
+    run_root rm -rf "$ROOTFS/source-root" "$ROOTFS/exampleageddon-freebasic.py"
+    run_root mkdir -p "$ROOTFS/source-root/examples"
+
+    root_cmd rsync -a --delete "$ROOT/examples/" "$ROOTFS/source-root/examples/"
+    root_cmd install -m 644 \
+        "$ROOT/build_scripts/exampleageddon-freebasic.py" \
+        "$ROOTFS/exampleageddon-freebasic.py"
+
+    run_root mkdir -p "$ROOTFS/results"
+    mount_one "$PACKAGES_DIR" "$ROOTFS/results" bind
+}
+
 write_test_runner() {
     local runner="$ROOTFS/test-freebasic-packages.sh"
 
@@ -530,6 +573,20 @@ fbctests_jobs() {
     esac
 }
 
+exampleageddon_jobs() {
+    case "${EXAMPLEAGEDDON_JOBS:-}" in
+        ''|*[!0-9]*)
+            getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1
+            ;;
+        0)
+            echo 1
+            ;;
+        *)
+            echo "$EXAMPLEAGEDDON_JOBS"
+            ;;
+    esac
+}
+
 run_fbctests() {
     local jobs
     local failed_log
@@ -583,6 +640,40 @@ run_fbctests() {
     done
 
     echo "==> fbctests passed"
+}
+
+run_exampleageddon() {
+    local jobs
+    local compile_timeout
+    local run_timeout
+
+    [ -d /source-root/examples ] || fail "examples/ tree was not staged at /source-root/examples"
+    [ -f /exampleageddon-freebasic.py ] || fail "exampleageddon runner was not staged"
+    [ -d /results ] || fail "results directory was not mounted at /results"
+
+    jobs="$(exampleageddon_jobs)"
+    compile_timeout="${EXAMPLEAGEDDON_COMPILE_TIMEOUT:-180}"
+    run_timeout="${EXAMPLEAGEDDON_RUN_TIMEOUT:-10}"
+
+    case "$compile_timeout" in ''|*[!0-9]*|0) compile_timeout=180 ;; esac
+    case "$run_timeout" in ''|*[!0-9]*|0) run_timeout=10 ;; esac
+
+    echo "==> installing exampleageddon dependencies"
+    run apt-get install -y --no-install-recommends python3
+
+    echo "==> running exampleageddon with ${jobs} job(s)"
+    rm -rf /results/exampleageddon
+    mkdir -p /results/exampleageddon
+    run python3 /exampleageddon-freebasic.py \
+        --root /source-root \
+        --outdir /results/exampleageddon \
+        --prefix /usr \
+        --include-dir /usr/include/freebasic \
+        --fbc fbc \
+        --jobs "$jobs" \
+        --compile-timeout "$compile_timeout" \
+        --run-timeout "$run_timeout" \
+        --fail-on-self-contained
 }
 
 export DEBIAN_FRONTEND=noninteractive
@@ -702,6 +793,10 @@ if [ "${RUN_FBCTESTS:-0}" = "1" ]; then
     run_fbctests
 fi
 
+if [ "${RUN_EXAMPLEAGEDDON:-0}" = "1" ]; then
+    run_exampleageddon
+fi
+
 echo "==> TEST PASSED"
 TEST_RUNNER_EOF
 
@@ -716,6 +811,7 @@ install_host_deps
 prepare_chroot
 stage_packages
 stage_sources_for_fbctests
+stage_sources_for_exampleageddon
 write_test_runner
 
 msg "running Debian package tests for $ARCH on $SUITE"
@@ -723,6 +819,10 @@ chroot_run /usr/bin/env \
     RUN_FBCTESTS="$RUN_FBCTESTS" \
     FBCTESTS_JOBS="$FBCTESTS_JOBS" \
     FBCTESTS_UNIT_ARGS="$FBCTESTS_UNIT_ARGS" \
+    RUN_EXAMPLEAGEDDON="$RUN_EXAMPLEAGEDDON" \
+    EXAMPLEAGEDDON_JOBS="$EXAMPLEAGEDDON_JOBS" \
+    EXAMPLEAGEDDON_COMPILE_TIMEOUT="$EXAMPLEAGEDDON_COMPILE_TIMEOUT" \
+    EXAMPLEAGEDDON_RUN_TIMEOUT="$EXAMPLEAGEDDON_RUN_TIMEOUT" \
     bash /test-freebasic-packages.sh
 
 msg "Debian package tests passed for $ARCH on $SUITE"

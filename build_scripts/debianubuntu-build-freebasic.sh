@@ -318,10 +318,98 @@ disable_android_if_sdk_unavailable() {
     ANDROID=0
 }
 
+ubuntu_uses_old_releases() {
+    [ "$DISTRO_ID" = "ubuntu" ] || return 1
+
+    case "$CODENAME" in
+    oracular)
+        return 0
+        ;;
+    *)
+        return 1
+        ;;
+    esac
+}
+
+raspbian_uses_legacy_archive() {
+    [ "$DISTRO_ID" = "raspbian" ] || return 1
+
+    case "$CODENAME" in
+    buster)
+        return 0
+        ;;
+    *)
+        return 1
+        ;;
+    esac
+}
+
+disable_existing_apt_sources() {
+    local disabled_dir="$1"
+    local f
+
+    run_root mkdir -p "$disabled_dir"
+
+    for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.sources /etc/apt/sources.list.d/*.list; do
+        [ -e "$f" ] || continue
+        case "$f" in
+            */fbc-cross.sources|*/fbc-ubuntu-archive.sources|*/fbc-debian-ports.sources)
+                continue
+                ;;
+        esac
+        run_root mv "$f" "$disabled_dir/$(basename "$f")"
+    done
+}
+
+configure_ubuntu_archived_apt_sources() {
+    local tmp_sources
+    local disabled_dir
+
+    [ "$CROSS_PACKAGE_BUILD" -eq 0 ] || return 0
+    ubuntu_uses_old_releases || return 0
+
+    msg "configuring Ubuntu old-releases apt sources for archived release: $CODENAME"
+
+    disabled_dir="/etc/apt/sources.list.d/fbc-archive-disabled"
+    tmp_sources="$(mktemp)"
+
+    cat > "$tmp_sources" <<EOF
+Types: deb
+URIs: http://old-releases.ubuntu.com/ubuntu
+Suites: ${CODENAME} ${CODENAME}-updates ${CODENAME}-backports ${CODENAME}-security
+Components: main restricted universe multiverse
+Architectures: ${BUILD_ARCH}
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+EOF
+
+    disable_existing_apt_sources "$disabled_dir"
+    run_root install -m 644 "$tmp_sources" /etc/apt/sources.list.d/fbc-ubuntu-archive.sources
+    rm -f "$tmp_sources"
+}
+
+configure_raspbian_legacy_apt_sources() {
+    local f
+
+    raspbian_uses_legacy_archive || return 0
+
+    msg "configuring Raspbian legacy apt mirror for archived release: $CODENAME"
+
+    # The Raspberry Pi OS buster image still points at the live Raspbian
+    # mirror, but buster has moved to legacy.raspbian.org.  Keep the
+    # Raspberry Pi Foundation package source unchanged; only the Raspbian
+    # distro archive has moved.
+    for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do
+        [ -e "$f" ] || continue
+        run_root sed -i \
+            -e 's|http://raspbian.raspberrypi.org/raspbian/?|http://legacy.raspbian.org/raspbian/|g' \
+            -e 's|http://raspbian.raspberrypi.org/raspbian|http://legacy.raspbian.org/raspbian|g' \
+            "$f"
+    done
+}
+
 configure_ubuntu_cross_apt_sources() {
     local tmp_sources
     local disabled_dir
-    local f
 
     [ "$CROSS_PACKAGE_BUILD" -eq 1 ] || return 0
     [ "$DISTRO_ID" = "ubuntu" ] || return 0
@@ -338,7 +426,17 @@ configure_ubuntu_cross_apt_sources() {
     disabled_dir="/etc/apt/sources.list.d/fbc-cross-disabled"
     tmp_sources="$(mktemp)"
 
-    cat > "$tmp_sources" <<EOF
+    if ubuntu_uses_old_releases; then
+        cat > "$tmp_sources" <<EOF
+Types: deb
+URIs: http://old-releases.ubuntu.com/ubuntu
+Suites: ${CODENAME} ${CODENAME}-updates ${CODENAME}-backports ${CODENAME}-security
+Components: main restricted universe multiverse
+Architectures: ${BUILD_ARCH} ${HOST_ARCH}
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+EOF
+    else
+        cat > "$tmp_sources" <<EOF
 Types: deb
 URIs: http://archive.ubuntu.com/ubuntu
 Suites: ${CODENAME} ${CODENAME}-updates ${CODENAME}-backports
@@ -360,19 +458,9 @@ Components: main restricted universe multiverse
 Architectures: ${HOST_ARCH}
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 EOF
+    fi
 
-    run_root mkdir -p "$disabled_dir"
-
-    for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.sources /etc/apt/sources.list.d/*.list; do
-        [ -e "$f" ] || continue
-        case "$f" in
-            */fbc-cross.sources)
-                continue
-                ;;
-        esac
-        run_root mv "$f" "$disabled_dir/$(basename "$f")"
-    done
-
+    disable_existing_apt_sources "$disabled_dir"
     run_root install -m 644 "$tmp_sources" /etc/apt/sources.list.d/fbc-cross.sources
     rm -f "$tmp_sources"
 }
@@ -440,16 +528,28 @@ assert_orig_tarball_clean() {
 
     bad_entry="$(
         tar -tJf "$archive" |
-        awk '
-            !found && $0 ~ /^[^/]+\/(\.build-alpine|\.build-debianubuntu[^/]*|\.codex|\.git|bin|dist|lib\/freebasic|obj|out|package-root[^/]*|packages|pkgroot[^/]*|stage|tmp)(\/|$)/ {
-                print
-                found = 1
-            }
-            !found && $0 ~ /^([^/]+\/)+obj\// {
-                print
-                found = 1
-            }
-        '
+        while IFS= read -r entry; do
+            rel="${entry#*/}"
+            case "$rel" in
+                */obj/*|\
+                .build-alpine/*|\
+                .build-debianubuntu*/*|\
+                .codex/*|\
+                .git/*|\
+                bin/*|\
+                dist/*|\
+                lib/freebasic/*|\
+                out/*|\
+                package-root*/*|\
+                packages/*|\
+                pkgroot*/*|\
+                stage/*|\
+                tmp/*)
+                    printf '%s\n' "$entry"
+                    break
+                    ;;
+            esac
+        done
     )"
 
     if [ -n "$bad_entry" ]; then
@@ -532,6 +632,10 @@ install_deps() {
         run_root dpkg --add-architecture "$HOST_ARCH"
         configure_ubuntu_cross_apt_sources
         configure_debian_ports_cross_apt_sources
+        configure_raspbian_legacy_apt_sources
+    else
+        configure_ubuntu_archived_apt_sources
+        configure_raspbian_legacy_apt_sources
     fi
 
     run_root apt-get update -y

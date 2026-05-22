@@ -21,6 +21,7 @@
 /fbc
 /fbc-new
 /bin/*
+/include/freebasic-android/
 /bootstrap/*
 /lib/*/i386go32.x
 /lib/*/fbextra.x
@@ -67,3 +68,6 @@
 /tests/warnings/r/linux-x86_64/*.txt
 /tests/warnings/r/win32/*.txt
 /tests/warnings/r/win64/*.txt
+.install_manifest
+*.apk.idsig
+*.apk

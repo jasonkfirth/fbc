@@ -531,9 +531,16 @@ private function hLoadMacroW _
 	dim as LEXPP_ARGTB ptr argtb = any
 	dim as integer prntcnt = any, lgt = any, num = any, reached_vararg = any, is_variadic = any
 	dim as wstring ptr argtext = any
-	static as DWSTRING text
+	static as DWSTRING text, quotew, quotequotew, dollarquotew
 
 	function = -1
+	if( quotew.data = NULL ) then
+		DWstrAssignA( quotew, QUOTE )
+		DWstrAssignA( quotequotew, QUOTE )
+		DWstrConcatAssignA( quotequotew, QUOTE )
+		DWstrAssignA( dollarquotew, "$" )
+		DWstrConcatAssignA( dollarquotew, QUOTE )
+	end if
 
 	var hasParens = FALSE
 	var hasWhitespace = lexEatWhitespace( )
@@ -843,12 +850,12 @@ private function hLoadMacroW _
 					'' Only if not empty ("..." param can be empty)
 					if( argtext <> NULL ) then
 						'' don't escape, preserve the sequencies as-is
-						DWstrConcatAssign( text, "$" + QUOTE )
-						DWstrConcatAssign( text, *hReplaceW( argtext, QUOTE, QUOTE + QUOTE ) )
-						DWstrConcatAssign( text, QUOTE )
+						DWstrConcatAssign( text, dollarquotew.data )
+						DWstrConcatAssign( text, hReplaceW( argtext, quotew.data, quotequotew.data ) )
+						DWstrConcatAssign( text, quotew.data )
 					else
 						'' If it's empty, produce an empty string ("")
-						DWstrConcatAssign( text, QUOTE + QUOTE )
+						DWstrConcatAssign( text, quotequotew.data )
 					end if
 
 				'' ordinary text..
@@ -896,10 +903,15 @@ private function hLoadDefineW _
 		byval s as FBSYMBOL ptr _
 	) as integer
 
-	static as DWSTRING text
+	static as DWSTRING text, quotew, dollarquotew
 	dim as integer lgt = any
 
 	function = FALSE
+	if( quotew.data = NULL ) then
+		DWstrAssignA( quotew, QUOTE )
+		DWstrAssignA( dollarquotew, "$" )
+		DWstrConcatAssignA( dollarquotew, QUOTE )
+	end if
 
 	'' define has args?
 	if( symbGetDefineParams( s ) > 0 ) then
@@ -916,7 +928,9 @@ private function hLoadDefineW _
 		if( symbGetDefineCallback( s ) <> NULL ) then
 			'' call function
 			if( symbGetDefineFlags( s ) and FB_DEFINE_FLAGS_STR ) then
-				DWstrAssignA( text, "$" + QUOTE + symbGetDefineCallback( s )( ) + QUOTE )
+				DWstrAssign( text, dollarquotew.data )
+				DWstrConcatAssignA( text, symbGetDefineCallback( s )( ) )
+				DWstrConcatAssign( text, quotew.data )
 			else
 				DWstrAssignA( text, symbGetDefineCallback( s )( ) )
 			end if

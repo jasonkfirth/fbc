@@ -797,7 +797,7 @@ private function hDefArgListExpandW_cb( byval argtb as LEXPP_ARGTB ptr, byval er
 	'' Retuns empty string on invalid index, rather than compile error
 
 	static res as DWSTRING
-	DWstrAssign(res, "")
+	DWstrAssign(res, NULL)
 	dim as DWSTRING MacroNameStr
 	DWstrAssign(MacroNameStr, hMacro_getArgW( argtb, 0 ))
 	var numStr = hMacro_getArgW( argtb, 1 )
@@ -811,41 +811,43 @@ private function hDefArgListExpandW_cb( byval argtb as LEXPP_ARGTB ptr, byval er
 			if numVarArgs>0 then
 				dim as Wstring ptr argStr = hMacro_getArgW( argtb, 2 )
 				if ArgCount = 0 then
-					DWstrAssign(res, *MacroNameStr.data )
-					DWstrConcatAssign(res, "(" & *argStr & ")" )
+					DWstrAssign(res, MacroNameStr.data )
+					DWstrConcatAssignA(res, "(" )
+					DWstrConcatAssign(res, argStr )
+					DWstrConcatAssignA(res, ")" )
 				else
 					dim varArgs() as DWSTRING
 					numVarArgs = hWStr2Args( argStr, varArgs() ) - 1
 					if ArgCount < 0 then ' Is Negate ?
 						for index = 0 to numVarArgs step -ArgCount
 							if( index > 0 ) then
-								DWstrConcatAssign(res, NEWLINE )
+								DWstrConcatAssignA(res, NEWLINE )
 							end if
-							DWstrConcatAssign(res, *MacroNameStr.data )
-							DWstrConcatAssign(res, "(" )
+							DWstrConcatAssign(res, MacroNameStr.data )
+							DWstrConcatAssignA(res, "(" )
 							for index2 = index to numVarArgs
 								DWstrConcatAssign(res, varArgs(index2).data )
 								if index2 <> numVarArgs then
-									DWstrConcatAssign(res,  "," )
+									DWstrConcatAssignA(res,  "," )
 								end if
 							next
-							DWstrConcatAssign(res, ")" )
+							DWstrConcatAssignA(res, ")" )
 						next
 					else
 						for index = 0 to numVarArgs step ArgCount
 							if( index > 0 ) then
-								DWstrConcatAssign(res, NEWLINE )
+								DWstrConcatAssignA(res, NEWLINE )
 							end if
-							DWstrConcatAssign(res, *MacroNameStr.data )
-							DWstrConcatAssign(res, "(" )
+							DWstrConcatAssign(res, MacroNameStr.data )
+							DWstrConcatAssignA(res, "(" )
 							MaxVarArgs = iif(ArgCount>numVarArgs-index,numVarArgs,index+ArgCount-1)
 							for index2 = index to MaxVarArgs
 								DWstrConcatAssign(res, varArgs(index2).data )
 								if index2 <> MaxVarArgs then
-									DWstrConcatAssign(res,  "," )
+									DWstrConcatAssignA(res,  "," )
 								end if
 							next
-							DWstrConcatAssign(res, ")" )
+							DWstrConcatAssignA(res, ")" )
 						next
 					end if
 				end if
@@ -977,15 +979,15 @@ private function hDefJoinW_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum as i
 
 	'' __FB_JOIN__( L, R )
 
-	var l = hMacro_getArgW( argtb, 0 )
-	var r = hMacro_getArgW( argtb, 1 )
-	static as DWSTRING res
+	static as DWSTRING res, l, r
 
 	DWstrAssign( res, NULL )
+	DWstrAssign( l, hMacro_getArgW( argtb, 0 ) )
+	DWstrAssign( r, hMacro_getArgW( argtb, 1 ) )
 
-	if( (l <> NULL) and (r <> NULL) ) then
-		DWstrConcatAssign( res, l )
-		DWstrConcatAssign( res, r )
+	if( (l.data <> NULL) and (r.data <> NULL) ) then
+		DWstrConcatAssign( res, l.data )
+		DWstrConcatAssign( res, r.data )
 	else
 		*errnum = FB_ERRMSG_ARGCNTMISMATCH
 	end if
@@ -1022,19 +1024,26 @@ private function hDefQuoteW_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum as 
 	'' __FB_QUOTE__( arg )
 
 	var arg = hMacro_getArgW( argtb, 0 )
-	static as DWSTRING res
+	static as DWSTRING res, quotew, quotequotew, dollarquotew
 
 	DWstrAssign( res, NULL )
+	if( quotew.data = NULL ) then
+		DWstrAssignA( quotew, QUOTE )
+		DWstrAssignA( quotequotew, QUOTE )
+		DWstrConcatAssignA( quotequotew, QUOTE )
+		DWstrAssignA( dollarquotew, "$" )
+		DWstrConcatAssignA( dollarquotew, QUOTE )
+	end if
 
 	'' Only if not empty ("..." param can be empty)
 	if( arg <> NULL ) then
 		'' don't escape, preserve the sequences as-is
-		DWstrConcatAssign( res, "$" + QUOTE )
-		DWstrConcatAssign( res, *hReplaceW( arg, QUOTE, QUOTE + QUOTE ) )
-		DWstrConcatAssign( res, QUOTE )
+		DWstrConcatAssign( res, dollarquotew.data )
+		DWstrConcatAssign( res, hReplaceW( arg, quotew.data, quotequotew.data ) )
+		DWstrConcatAssign( res, quotew.data )
 	else
 		'' If it's empty, produce an empty string ("")
-		DWstrConcatAssign( res, QUOTE + QUOTE )
+		DWstrConcatAssign( res, quotequotew.data )
 	end if
 
 	function = res.data
@@ -1080,9 +1089,14 @@ private function hDefUnquoteW_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum a
 	'' __FB_UNQUOTE__( arg )
 
 	var arg = hMacro_getArgW( argtb, 0 )
-	static as DWSTRING res
+	static as DWSTRING res, quotew, quotequotew
 
 	DWstrAssign( res, NULL )
+	if( quotew.data = NULL ) then
+		DWstrAssignA( quotew, QUOTE )
+		DWstrAssignA( quotequotew, QUOTE )
+		DWstrConcatAssignA( quotequotew, QUOTE )
+	end if
 
 	'' arg must be of the form [$]"[text]"
 	if( arg <> NULL ) then
@@ -1092,12 +1106,12 @@ private function hDefUnquoteW_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum a
 
 		'' $"[text]"?
 		if( (length >= 3) andalso ((arg[0] = asc( "$" )) and (arg[1] = asc(QUOTE)) and (arg[length-1] = asc(QUOTE))) ) then
-			DWstrAssign( res, hReplaceW( mid( *arg, 3, length-3 ), QUOTE + QUOTE, QUOTE ) )
+			DWstrAssign( res, hReplaceW( mid( *arg, 3, length-3 ), quotequotew.data, quotew.data ) )
 
 		'' "[text]"?
 		elseif( (length >= 2) andalso ((arg[0] = asc(QUOTE)) and (arg[length-1] = asc(QUOTE))) ) then
 			'' !!!FIXME!!! check env.opt.escapestr
-			DWstrAssign( res, hReplaceW( mid( *arg, 2, length-2 ), QUOTE + QUOTE, QUOTE ) )
+			DWstrAssign( res, hReplaceW( mid( *arg, 2, length-2 ), quotequotew.data, quotew.data ) )
 
 		'' anything else, return as-is
 		else
@@ -1172,16 +1186,20 @@ private function hDefIifW_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum as in
 
 	static res as DWSTRING
 	static wvarstr as DWSTRING
-	var cexpr = hMacro_getArgW( argtb, 0 )  '' comparison
-	var texpr = hMacro_getArgW( argtb, 1 )  '' true-expression
-	var fexpr = hMacro_getArgW( argtb, 2 )  '' false-expression
+	static cexpr as DWSTRING  '' comparison
+	static texpr as DWSTRING  '' true-expression
+	static fexpr as DWSTRING  '' false-expression
 
-	if( (cexpr <> NULL) and (texpr <> NULL) and (fexpr <> NULL) ) then
+	DWstrAssign( cexpr, hMacro_getArgW( argtb, 0 ) )
+	DWstrAssign( texpr, hMacro_getArgW( argtb, 1 ) )
+	DWstrAssign( fexpr, hMacro_getArgW( argtb, 2 ) )
+
+	if( (cexpr.data <> NULL) and (texpr.data <> NULL) and (fexpr.data <> NULL) ) then
 		dim as long value = 0
 		dim as string varstr
-		DWstrAssign( wvarstr, hMacro_EvalW( cexpr, errnum ) )
+		DWstrAssign( wvarstr, hMacro_EvalW( cexpr.data, errnum ) )
 		varstr = str( wvarstr.data )
-		DWstrAssign( res, iif( cbool( varstr ), *texpr, *fexpr ) )
+		DWstrAssign( res, iif( cbool( varstr ), *texpr.data, *fexpr.data ) )
 	else
 		*errnum = FB_ERRMSG_ARGCNTMISMATCH
 	end if
@@ -1930,4 +1948,3 @@ function symbDelDefine _
 	function = TRUE
 
 end function
-

@@ -525,6 +525,18 @@ endif
 override_dh_auto_test:
 	true
 
+override_dh_strip:
+
+	# Ubuntu jammy's debugedit has been observed to segfault while creating
+	# automatic dbgsym packages for cross-built s390x fbc binaries. Keep the
+	# package strip step, but avoid letting that host tool crash block the
+	# target package build.
+ifeq ($(DEB_HOST_ARCH),s390x)
+	dh_strip --no-automatic-dbgsym
+else
+	dh_strip
+endif
+
 execute_after_dh_installdocs:
 	find debian/freebasic-doc/usr/share/doc/freebasic -name ".git*" -delete || true
 	rm -rf debian/freebasic-doc/usr/share/doc/freebasic/manual/cache* || true

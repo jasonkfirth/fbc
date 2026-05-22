@@ -3015,7 +3015,7 @@ private sub hProfileEmitSections()
 	if ctx.target = FB_COMPTARGET_DARWIN then
 		asm_code(".section "+FB_PROFILE_DARWIN_SECT_DATA)
 	elseif ctx.systemv then
-		asm_code(".section "+FB_PROFILE_SECT_DATA+",""a""")
+		asm_code(".section "+FB_PROFILE_SECT_DATA+",""aw""")
 	else
 		asm_code(".section "+FB_PROFILE_SECT_DATA+",""dw""")
 	end if
@@ -3149,7 +3149,7 @@ private function _emitbegin( ) as integer
 	ctx.roundfloat=false
 	ctx.target=fbgetoption(FB_COMPOPT_TARGET) ''linux or windows
 	select case ctx.target
-	case FB_COMPTARGET_LINUX, FB_COMPTARGET_FREEBSD
+	case FB_COMPTARGET_LINUX, FB_COMPTARGET_FREEBSD, FB_COMPTARGET_HAIKU
 		ctx.systemv = true
 	case else
 		ctx.systemv = false

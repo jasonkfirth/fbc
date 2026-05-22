@@ -19,6 +19,7 @@ int fb_hAndroidInit(char *title, int w, int h, int depth, int refresh_rate, int 
 void fb_hAndroidExit(void);
 void fb_hAndroidLock(void);
 void fb_hAndroidUnlock(void);
+void fb_hAndroidSetPalette(int index, int r, int g, int b);
 void fb_hAndroidWaitVSync(void);
 int fb_hAndroidGetMouse(int *x, int *y, int *z, int *buttons, int *clip);
 void fb_hAndroidSetMouse(int x, int y, int cursor, int clip);
@@ -30,6 +31,7 @@ void fb_hAndroidUpdate(void);
 void fb_hAndroidScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *refresh);
 
 void fb_hAndroidSetActivity(ANativeActivity *activity);
+void fb_hAndroidSetKeyboardEnabled(int enabled);
 void fb_hAndroidSetWindow(ANativeWindow *window);
 void fb_hAndroidGfxSetLifecycle(int started, int resumed, int focused);
 int fb_hAndroidIsGraphicsActive(void);

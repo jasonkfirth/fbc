@@ -24,6 +24,8 @@
 static pa_simple *pulse_stream = NULL;
 static int pulse_initialized = 0;
 static int pulse_debug_write_counter = 0;
+static short *pulse_pcm_buffer = NULL;
+static int pulse_pcm_capacity = 0;
 
 static int pulse_debug_enabled(void)
 {
@@ -49,6 +51,32 @@ static void convert_float_to_s16(const float *in, short *out, int samples)
 
         out[i] = (short)(v * 32767.0f);
     }
+}
+
+static int pulse_ensure_pcm_buffer(int samples)
+{
+    int next_capacity;
+    short *next_buffer;
+
+    if (samples <= pulse_pcm_capacity)
+        return 0;
+
+    if (samples <= 0)
+        return 0;
+
+    next_capacity = pulse_pcm_capacity > 0 ? pulse_pcm_capacity : 1024;
+    while (next_capacity < samples)
+        next_capacity <<= 1;
+
+    next_buffer = (short *)realloc(pulse_pcm_buffer,
+                                  (size_t)next_capacity * sizeof(short));
+    if (!next_buffer)
+        return -1;
+
+    pulse_pcm_buffer = next_buffer;
+    pulse_pcm_capacity = next_capacity;
+
+    return 0;
 }
 
 static float pulse_buffer_peak(const float *buffer, int samples)
@@ -141,7 +169,15 @@ static void pulse_driver_exit(void)
 
     if (pulse_stream)
     {
+        pa_simple_free(pulse_stream);
         pulse_stream = NULL;
+    }
+
+    if (pulse_pcm_buffer)
+    {
+        free(pulse_pcm_buffer);
+        pulse_pcm_buffer = NULL;
+        pulse_pcm_capacity = 0;
     }
 
     pulse_initialized = 0;
@@ -152,7 +188,6 @@ static int pulse_driver_write(const float *buffer, int frames)
     int error;
     int channels;
     int samples;
-    short *pcm;
 
     if (!pulse_stream || !buffer || frames <= 0)
         return -1;
@@ -169,20 +204,20 @@ static int pulse_driver_write(const float *buffer, int frames)
         pulse_debug_write_counter++;
     }
 
-    pcm = (short *)malloc((size_t)samples * sizeof(short));
-    if (!pcm)
+    if (pulse_ensure_pcm_buffer(samples) != 0)
         return -1;
 
-    convert_float_to_s16(buffer, pcm, samples);
+    convert_float_to_s16(buffer, pulse_pcm_buffer, samples);
 
-    if (pa_simple_write(pulse_stream, pcm, (size_t)samples * sizeof(short), &error) < 0)
+    if (pa_simple_write(pulse_stream,
+                        pulse_pcm_buffer,
+                        (size_t)samples * sizeof(short),
+                        &error) < 0)
     {
         PULSE_DBG("write failed: %s\n", pa_strerror(error));
-        free(pcm);
         return -1;
     }
 
-    free(pcm);
     return frames;
 }
 

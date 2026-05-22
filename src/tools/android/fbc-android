@@ -22,13 +22,23 @@ Options:
   --target-api N         APK targetSdkVersion (default: highest installed platform)
   --package NAME         Android application package name
   --label TEXT           Android application label
+  --hideKeyboardButton   Disable the on-screen keyboard toggle button and IME
+  --landscape            Request landscape orientation for the Activity
   --keep-temp            Keep temporary build directory
+  --runOnPhone           Install and launch the APK on the current adb device
   --help                 Show this help text
 
 Environment:
   ANDROID_HOME / ANDROID_SDK_ROOT   Android SDK location
   ANDROID_NDK_HOME                  Android NDK location
+  ANDROID_D8_JAR / D8_JAR           R8/D8 jar to use when no d8/dx tool exists
   FBANDROID_PREFIX                  Install prefix (default: /usr)
+
+Source defines:
+  #define FB_ANDROID_HIDE_KEYBOARD_BUTTON
+                                  Disable the on-screen keyboard toggle button and IME
+  #define FB_ANDROID_LANDSCAPE
+                                  Request landscape orientation for the Activity
 EOF
 }
 
@@ -151,6 +161,35 @@ tool_or_die() {
 	die "required Android tool '$name' was not found"
 }
 
+launch_on_phone() {
+	local adb="$1"
+	local pkg="$2"
+	local activity="org.freebasic.android.FreeBasicNativeActivity"
+	local attached_devices
+
+	attached_devices=$("$adb" devices | awk '$2 == "device" {count++} END {print count+0}')
+	if [ "$attached_devices" -eq 0 ]; then
+		die "no connected adb device found"
+	fi
+	if [ "$attached_devices" -gt 1 ]; then
+		echo "fbc-android: multiple devices detected; using the first adb device" >&2
+		"$adb" devices >&2
+	fi
+
+	echo "fbc-android: installing ${output}" >&2
+	"$adb" install -r "$output"
+	"$adb" shell am force-stop "$pkg" >/dev/null 2>&1 || true
+	"$adb" logcat -b all -c || true
+
+	if ! "$adb" shell am start -W \
+		-a android.intent.action.MAIN \
+		-c android.intent.category.LAUNCHER \
+		-n "$pkg/$activity"; then
+		echo "fbc-android: explicit launch failed, trying launcher fallback" >&2
+		"$adb" shell monkey -p "$pkg" -c android.intent.category.LAUNCHER 1
+	fi
+}
+
 sanitize_module() {
 	local value="$1"
 	value="${value##*/}"
@@ -174,9 +213,22 @@ sanitize_package() {
 prefix="${FBANDROID_PREFIX:-/usr}"
 libroot="${FBANDROID_LIBROOT:-$prefix/lib/freebasic-android}"
 compiler="${FBANDROID_COMPILER:-$libroot/bin/fbc-android-compiler}"
-incdir="${FBANDROID_INCDIR:-$prefix/include/freebasic-android}"
+incdir="${FBANDROID_INCDIR:-}"
 share="${FBANDROID_SHARE:-$prefix/share/freebasic-android}"
 template="${FBANDROID_TEMPLATE:-$share/template}"
+if [ -z "${FBANDROID_TEMPLATE:-}" ] && \
+	[ -f "${BASH_SOURCE[0]%/*}/fb_android_app.c" ] && \
+	[ -f "${BASH_SOURCE[0]%/*}/strings.xml" ] && \
+	[ -f "${BASH_SOURCE[0]%/*}/AndroidManifest.xml.in" ]; then
+	template="${BASH_SOURCE[0]%/*}"
+fi
+if [ -z "$incdir" ]; then
+	if [ -f "$prefix/inc/fbgfx.bi" ]; then
+		incdir="$prefix/inc"
+	else
+		incdir="$prefix/include/freebasic-android"
+	fi
+fi
 target_key="${FBANDROID_TARGET:-android-aarch64}"
 libdir="${FBANDROID_LIBDIR:-$libroot/$target_key}"
 api="${ANDROID_API:-26}"
@@ -190,6 +242,9 @@ label=""
 src=""
 use_mt=0
 use_entry=1
+run_on_phone=0
+keyboard_button="true"
+screen_orientation="unspecified"
 fbc_args=()
 
 while [ $# -gt 0 ]; do
@@ -207,6 +262,9 @@ while [ $# -gt 0 ]; do
 		--target-api) target_api="$2"; shift 2 ;;
 		--package) package="$2"; shift 2 ;;
 		--label) label="$2"; shift 2 ;;
+		--hideKeyboardButton) keyboard_button="false"; shift ;;
+		--landscape) screen_orientation="landscape"; shift ;;
+		--runOnPhone) run_on_phone=1; shift ;;
 		--keep-temp) keep_temp=1; shift ;;
 		-x|-o)
 			output="$2"
@@ -243,12 +301,58 @@ for arg in "${fbc_args[@]}"; do
 	fi
 done
 
+[ "$run_on_phone" -eq 0 ] || [ "$mode" = "apk" ] || die "--runOnPhone only applies to APK output"
+
 [ -n "$src" ] || die "missing program.bas"
 [ -f "$src" ] || die "source file not found: $src"
 [ -x "$compiler" ] || die "Android-targeting compiler not found: $compiler"
 [ -d "$incdir" ] || die "Android include directory not found: $incdir"
 [ -d "$libdir" ] || die "Android runtime directory not found: $libdir"
 [ -f "$template/fb_android_app.c" ] || die "Android APK template not found: $template"
+[ -f "$template/FreeBasicNativeActivity.java" ] || die "Android Java activity template not found: $template"
+[ -f "$template/FreeBasicInputBridge.java" ] || die "Android Java input bridge template not found: $template"
+[ -f "$template/FreeBasicInputView.java" ] || die "Android Java input-view template not found: $template"
+
+if [ "$keyboard_button" = "true" ] && \
+   grep -Eiq '^[[:space:]]*#[[:space:]]*(define|DEFINE)[[:space:]]+FB_ANDROID_HIDE_KEYBOARD_BUTTON([[:space:]]|$)' "$src"; then
+	keyboard_button="false"
+fi
+
+if [ "$screen_orientation" = "unspecified" ] && \
+   grep -Eiq '^[[:space:]]*#[[:space:]]*(define|DEFINE)[[:space:]]+FB_ANDROID_LANDSCAPE([[:space:]]|$)' "$src"; then
+	screen_orientation="landscape"
+fi
+
+for ((i = 0; i < ${#fbc_args[@]}; ++i)); do
+	case "${fbc_args[$i]}" in
+		-dFB_ANDROID_HIDE_KEYBOARD_BUTTON|-dFB_ANDROID_HIDE_KEYBOARD_BUTTON=*)
+			keyboard_button="false"
+			;;
+		-dFB_ANDROID_LANDSCAPE|-dFB_ANDROID_LANDSCAPE=*)
+			screen_orientation="landscape"
+			;;
+		-d)
+			if [ $((i + 1)) -lt ${#fbc_args[@]} ]; then
+				case "${fbc_args[$((i + 1))]}" in
+					FB_ANDROID_HIDE_KEYBOARD_BUTTON|FB_ANDROID_HIDE_KEYBOARD_BUTTON=*)
+						keyboard_button="false"
+						;;
+					FB_ANDROID_LANDSCAPE|FB_ANDROID_LANDSCAPE=*)
+						screen_orientation="landscape"
+						;;
+				esac
+			fi
+			;;
+	esac
+done
+
+if [ "$keyboard_button" = "true" ]; then
+	keyboard_enabled_define=1
+	soft_input_mode="stateUnspecified|adjustResize"
+else
+	keyboard_enabled_define=0
+	soft_input_mode="stateAlwaysHidden|adjustResize"
+fi
 
 src_name="${src//\\//}"
 base="${src_name##*/}"
@@ -310,6 +414,7 @@ env GCC="$cc" CLANG="$cc" AS="$cc" LD="$cc" AR="$ar" RANLIB="$ranlib" \
 	-prefix "$prefix" \
 	-target "$triple" \
 	-arch aarch64 \
+	-d __FB_ANDROID__ \
 	-gen gcc \
 	-r \
 	-pic \
@@ -329,7 +434,7 @@ if [ "$mode" = "obj" ]; then
 	exit 0
 fi
 
-"$cc" -fPIC -DANDROID -I"$incdir" -c "$template/fb_android_app.c" -o "$appobj"
+"$cc" -fPIC -DANDROID -DFB_ANDROID_KEYBOARD_ENABLED="$keyboard_enabled_define" -I"$incdir" -c "$template/fb_android_app.c" -o "$appobj"
 
 runtime=()
 if [ "$use_mt" -eq 1 ]; then
@@ -374,6 +479,42 @@ aapt="$(tool_or_die aapt "$sdk")"
 apksigner="$(tool_or_die apksigner "$sdk")"
 keytool="$(command -v keytool || true)"
 [ -n "$keytool" ] || die "keytool not found; install a JDK"
+javac="$(command -v javac || true)"
+[ -n "$javac" ] || die "javac not found; install a JDK"
+d8=""
+dx=""
+d8_jar="${ANDROID_D8_JAR:-${D8_JAR:-}}"
+java_tool=""
+if command -v d8 >/dev/null 2>&1; then
+	d8="$(command -v d8)"
+else
+	shopt -s nullglob
+	for found in "$sdk"/build-tools/*/d8 "$sdk"/build-tools/*/d8.exe; do
+		[ -f "$found" ] || continue
+		d8="$found"
+		break
+	done
+	shopt -u nullglob
+fi
+if [ -z "$d8" ]; then
+	if command -v dx >/dev/null 2>&1; then
+		dx="$(command -v dx)"
+	else
+		shopt -s nullglob
+		for found in "$sdk"/build-tools/*/dx "$sdk"/build-tools/*/dx.exe; do
+			[ -f "$found" ] || continue
+			dx="$found"
+			break
+		done
+		shopt -u nullglob
+	fi
+fi
+if [ -z "$d8" ] && [ -z "$dx" ] && [ -n "$d8_jar" ]; then
+	[ -f "$d8_jar" ] || die "D8 jar was specified but not found: $d8_jar"
+	java_tool="$(command -v java || true)"
+	[ -n "$java_tool" ] || die "java not found; install a JRE or provide d8/dx"
+fi
+[ -n "$d8" ] || [ -n "$dx" ] || [ -n "$java_tool" ] || die "no dexer found; install Android build-tools with d8, the dalvik-exchange package for dx, or set ANDROID_D8_JAR"
 
 mkdir -p "$tmp/apk/lib/$abi" "$tmp/res/values"
 cp "$sofile" "$tmp/apk/lib/$abi/libfreebasicapp.so"
@@ -383,6 +524,9 @@ sed \
 	-e "s|@MIN_SDK@|$min_api|g" \
 	-e "s|@TARGET_SDK@|$target_sdk|g" \
 	-e "s|@LABEL@|$label|g" \
+	-e "s|@KEYBOARD_BUTTON@|$keyboard_button|g" \
+	-e "s|@SCREEN_ORIENTATION@|$screen_orientation|g" \
+	-e "s#@SOFT_INPUT_MODE@#$soft_input_mode#g" \
 	"$template/AndroidManifest.xml.in" > "$tmp/AndroidManifest.xml"
 
 unsigned="$tmp/freebasicapp-unsigned.apk"
@@ -390,6 +534,32 @@ unaligned="$tmp/freebasicapp-unaligned.apk"
 aligned="$tmp/freebasicapp-aligned.apk"
 
 "$aapt" package -f -M "$tmp/AndroidManifest.xml" -S "$tmp/res" -I "$platform_jar" -F "$unsigned"
+
+mkdir -p "$tmp/java/org/freebasic/android" "$tmp/classes" "$tmp/dex"
+cp "$template/FreeBasicNativeActivity.java" "$tmp/java/org/freebasic/android/FreeBasicNativeActivity.java"
+cp "$template/FreeBasicInputBridge.java" "$tmp/java/org/freebasic/android/FreeBasicInputBridge.java"
+cp "$template/FreeBasicInputView.java" "$tmp/java/org/freebasic/android/FreeBasicInputView.java"
+"$javac" -source 8 -target 8 -bootclasspath "$platform_jar" \
+	-d "$tmp/classes" \
+	"$tmp/java/org/freebasic/android/FreeBasicNativeActivity.java" \
+	"$tmp/java/org/freebasic/android/FreeBasicInputBridge.java" \
+	"$tmp/java/org/freebasic/android/FreeBasicInputView.java"
+mapfile -d '' class_files < <(find "$tmp/classes" -name '*.class' -print0 | sort -z)
+[ "${#class_files[@]}" -gt 0 ] || die "javac produced no Android Java class files"
+if [ -n "$d8" ]; then
+	"$d8" --min-api "$min_api" --classpath "$platform_jar" \
+		--output "$tmp/dex" \
+		"${class_files[@]}"
+elif [ -n "$java_tool" ]; then
+	"$java_tool" -cp "$d8_jar" com.android.tools.r8.D8 \
+		--min-api "$min_api" \
+		--classpath "$platform_jar" \
+		--output "$tmp/dex" \
+		"${class_files[@]}"
+else
+	"$dx" --dex --output="$tmp/dex/classes.dex" "$tmp/classes"
+fi
+jar uf "$unsigned" -C "$tmp/dex" classes.dex
 jar uf "$unsigned" -C "$tmp/apk" lib
 cp "$unsigned" "$unaligned"
 
@@ -419,5 +589,10 @@ fi
 	--key-pass pass:android \
 	--out "$output" \
 	"$aligned"
+
+if [ "$run_on_phone" -eq 1 ]; then
+	adb="$(tool_or_die adb "$sdk")"
+	launch_on_phone "$adb" "$package"
+fi
 
 echo "$output"

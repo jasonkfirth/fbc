@@ -17,6 +17,12 @@ static void fb_hGfxJsFrameYield(void)
 }
 #endif
 
+static void poll_events(void)
+{
+	if ((__fb_gfx) && (__fb_gfx->driver->poll_events))
+		__fb_gfx->driver->poll_events();
+}
+
 FBCALL int fb_GfxFlip(int from_page, int to_page)
 {
 	FB_GFXCTX *context;
@@ -37,14 +43,15 @@ FBCALL int fb_GfxFlip(int from_page, int to_page)
 	if (__fb_gfx->driver->flip) {
 #endif
 		__fb_gfx->driver->flip();
-		if (__fb_gfx->driver->poll_events)
-			__fb_gfx->driver->poll_events();
+		poll_events();
 		FB_GRAPHICS_UNLOCK( );
 #ifdef HOST_JS
 		fb_hGfxJsFrameYield();
 #endif
 		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 	}
+
+	poll_events();
 
 	context = fb_hGetContext( );
 	fb_hPrepareTarget(context, NULL);
@@ -125,6 +132,8 @@ int fb_GfxPageSet(int work_page, int visible_page)
 		FB_GRAPHICS_UNLOCK( );
 		return -1;
 	}
+
+	poll_events();
 
 	context = fb_hGetContext();
 	res = context->work_page | (__fb_gfx->visible_page << 8);

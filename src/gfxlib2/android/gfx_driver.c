@@ -18,7 +18,7 @@ const GFXDRIVER fb_gfxDriverAndroidModern =
 	fb_hAndroidExit,
 	fb_hAndroidLock,
 	fb_hAndroidUnlock,
-	NULL,
+	fb_hAndroidSetPalette,
 	fb_hAndroidWaitVSync,
 	fb_hAndroidGetMouse,
 	fb_hAndroidSetMouse,
@@ -37,7 +37,7 @@ const GFXDRIVER fb_gfxDriverAndroidLegacy =
 	fb_hAndroidExit,
 	fb_hAndroidLock,
 	fb_hAndroidUnlock,
-	NULL,
+	fb_hAndroidSetPalette,
 	fb_hAndroidWaitVSync,
 	fb_hAndroidGetMouse,
 	fb_hAndroidSetMouse,
@@ -53,7 +53,6 @@ const GFXDRIVER *__fb_gfx_drivers_list[] =
 {
 	&fb_gfxDriverAndroidModern,
 	&fb_gfxDriverAndroidLegacy,
-	&__fb_gfxDriverNull,
 	NULL
 };
 

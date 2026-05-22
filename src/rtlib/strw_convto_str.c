@@ -69,24 +69,35 @@ FBCALL FBSTRING *fb_WstrToStr( const FB_WCHAR *src )
 	FBSTRING *dst;
 	ssize_t chars;
 
-    if( src == NULL )
-        return &__fb_ctx.null_desc;
+	if( src == NULL )
+		return &__fb_ctx.null_desc;
 
 #if defined HOST_DOS
-    /* on DOS, wcstombs() simply calls memcpy() and won't compute
-       length  see fb_unicode.h */
-    chars = fb_wstr_Len( src );
+	/* on DOS, wcstombs() simply calls memcpy() and won't compute
+	   length, see fb_unicode.h */
+	chars = fb_wstr_Len( src );
 #else
-    chars = wcstombs( NULL, src, 0 );
+	chars = wcstombs( NULL, src, 0 );
+	if( chars < 0 )
+	{
+		/*
+		   If the active C locale cannot represent a WSTRING character,
+		   wcstombs() reports failure instead of a byte count. The actual
+		   conversion helper already has an ASCII/'?' fallback path for
+		   that case, so allocate enough space for one fallback byte per
+		   wide character and let fb_wstr_ConvToA() do the conversion.
+		 */
+		chars = fb_wstr_Len( src );
+	}
 #endif
-    if( chars == 0 )
-        return &__fb_ctx.null_desc;
+	if( chars == 0 )
+		return &__fb_ctx.null_desc;
 
-    dst = fb_hStrAllocTemp( NULL, chars );
-    if( dst == NULL )
-        return &__fb_ctx.null_desc;
+	dst = fb_hStrAllocTemp( NULL, chars );
+	if( dst == NULL )
+		return &__fb_ctx.null_desc;
 
-    fb_wstr_ConvToA( dst->data, chars, src );
+	fb_wstr_ConvToA( dst->data, chars, src );
 
-    return dst;
+	return dst;
 }

@@ -23,6 +23,8 @@
 static snd_pcm_t *alsa_pcm = NULL;
 static int alsa_initialized = 0;
 static int alsa_debug_write_counter = 0;
+static short *alsa_pcm_buffer = NULL;
+static int alsa_pcm_capacity = 0;
 
 static int alsa_env_enabled(const char *name)
 {
@@ -74,6 +76,32 @@ static void convert_float_to_s16(const float *in, short *out, int samples)
 
         out[i] = (short)(v * 32767.0f);
     }
+}
+
+static int alsa_ensure_pcm_buffer(int samples)
+{
+    int next_capacity;
+    short *next_buffer;
+
+    if (samples <= alsa_pcm_capacity)
+        return 0;
+
+    if (samples <= 0)
+        return 0;
+
+    next_capacity = alsa_pcm_capacity > 0 ? alsa_pcm_capacity : 1024;
+    while (next_capacity < samples)
+        next_capacity <<= 1;
+
+    next_buffer = (short *)realloc(alsa_pcm_buffer,
+                                  (size_t)next_capacity * sizeof(short));
+    if (!next_buffer)
+        return -1;
+
+    alsa_pcm_buffer = next_buffer;
+    alsa_pcm_capacity = next_capacity;
+
+    return 0;
 }
 
 static float alsa_buffer_peak(const float *buffer, int samples)
@@ -199,16 +227,23 @@ static void alsa_driver_exit(void)
         alsa_pcm = NULL;
     }
 
+    if (alsa_pcm_buffer)
+    {
+        free(alsa_pcm_buffer);
+        alsa_pcm_buffer = NULL;
+        alsa_pcm_capacity = 0;
+    }
+
     fb_sfxLinuxDeactivate();
     alsa_initialized = 0;
 }
 
 static int alsa_driver_write(const float *buffer, int frames)
 {
-    short *pcm;
     int channels;
     int samples;
     int err;
+    int retry;
 
     if (!alsa_pcm || !buffer || frames <= 0)
         return -1;
@@ -225,20 +260,29 @@ static int alsa_driver_write(const float *buffer, int frames)
         alsa_debug_write_counter++;
     }
 
-    pcm = (short *)malloc((size_t)samples * sizeof(short));
-    if (!pcm)
+    if (alsa_ensure_pcm_buffer(samples) != 0)
         return -1;
 
-    convert_float_to_s16(buffer, pcm, samples);
+    convert_float_to_s16(buffer, alsa_pcm_buffer, samples);
 
-    err = (int)snd_pcm_writei(alsa_pcm, pcm, (snd_pcm_uframes_t)frames);
-    free(pcm);
+    retry = 0;
+
+retry_write:
+    err = (int)snd_pcm_writei(alsa_pcm,
+                              alsa_pcm_buffer,
+                              (snd_pcm_uframes_t)frames);
 
     if (err == -EPIPE)
     {
         ALSA_DBG("underrun detected\n");
-        snd_pcm_prepare(alsa_pcm);
-        return 0;
+
+        if (retry == 0 && snd_pcm_prepare(alsa_pcm) >= 0)
+        {
+            retry = 1;
+            goto retry_write;
+        }
+
+        return -1;
     }
 
     if (err < 0)

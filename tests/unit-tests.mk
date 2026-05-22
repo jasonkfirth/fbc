@@ -48,6 +48,13 @@ endif
 
 UNIT_TESTS_INC := unit-tests.inc
 UNIT_TESTS_OBJ_LST := unit-tests-obj.lst
+UNIT_TESTS_EXPLICIT_SRCS := \
+./pp/macro-arg-listexpand-utf16le.bas \
+./pp/macro-eval-str-utf16le.bas \
+./pp/quote-utf16be.bas \
+./pp/quote-utf16le.bas \
+./string/asc-utf16le.bas
+UNIT_TESTS_EXPLICIT_OBJS := $(UNIT_TESTS_EXPLICIT_SRCS:%.bas=%.o)
 
 SRCLIST :=
 ifeq ($(MAKECMDGOALS),mostlyclean)
@@ -55,6 +62,7 @@ ifeq ($(MAKECMDGOALS),mostlyclean)
 else
 include $(UNIT_TESTS_INC)
 endif
+SRCLIST += $(UNIT_TESTS_EXPLICIT_SRCS)
 SRCLIST := $(sort $(SRCLIST))
 SRCLIST := $(patsubst .bmk,.bas,$(SRCLIST))
 SRCLIST_DOS_FILTER_OUT :=
@@ -203,6 +211,7 @@ $(UNIT_TESTS_OBJ_LST) : $(UNIT_TESTS_INC)
 | $(SED) 's/^SRCLIST += \(.*\)\(\.b.*\)/\1\.o/g' \
 $(if $(filter dos,$(TARGET_OS)),-e '/^\.\/interactive\//d' -e '/^\.\/threads\//d' -e '/^\.\/compound\/select_const2\.o/d') \
 > $(UNIT_TESTS_OBJ_LST)
+	@$(PRINTF) '%s\n' $(UNIT_TESTS_EXPLICIT_OBJS) >> $(UNIT_TESTS_OBJ_LST)
 
 # ------------------------------------------------------------------------
 

@@ -4,13 +4,25 @@
 
 int fb_hGfxInputBufferChanged( void );
 
+static void poll_events(void)
+{
+	FB_GRAPHICS_LOCK( );
+
+	if ((__fb_gfx) && (__fb_gfx->driver->poll_events))
+		__fb_gfx->driver->poll_events();
+
+	FB_GRAPHICS_UNLOCK( );
+}
+
 void fb_GfxSleep ( int msecs )
 {
 	/* infinite? wait until any key is pressed */
 	if( msecs == -1 )
 	{
-		while( !fb_hGfxInputBufferChanged( ) )
+		while( !fb_hGfxInputBufferChanged( ) ) {
+			poll_events( );
 			fb_Delay( 50 );
+		}
 		return;
 	}
 
@@ -19,6 +31,8 @@ void fb_GfxSleep ( int msecs )
 	if( msecs >= 100 )
 		while( msecs > 50 )
 		{
+			poll_events( );
+
 			if( fb_hGfxInputBufferChanged( ) )
 				return;
 

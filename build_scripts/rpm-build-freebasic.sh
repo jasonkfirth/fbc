@@ -203,6 +203,18 @@ fi
 [ -n "$DISTRO_ID" ] || DISTRO_ID="rpm"
 [ -n "$CODENAME" ] || CODENAME="unknown"
 
+USE_GPM=1
+case "$DISTRO_ID/$CODENAME" in
+    almalinux/10)
+        # AlmaLinux 10 does not currently ship gpm-devel in the default
+        # BaseOS/AppStream/CRB repository set.  The Linux console mouse path
+        # is optional and already has a build-time DISABLE_GPM switch, so keep
+        # the package buildable there without pretending that dependency
+        # exists.
+        USE_GPM=0
+        ;;
+esac
+
 OUTDIR="${OUTBASE}/linux/${DISTRO_ID}/${CODENAME}/${ARCH}"
 mkdir -p "$WORKDIR" "$OUTDIR"
 
@@ -214,50 +226,81 @@ install_deps() {
     [ "$SKIP_DEPS" -eq 0 ] || return 0
 
     if command -v dnf >/dev/null 2>&1; then
+        local deps
+
         msg "installing RPM build dependencies via dnf"
         if [ "$DISTRO_ID" = "fedora" ]; then
+            local fedora_repo_root
+
+            fedora_repo_root="https://dl.fedoraproject.org/pub/fedora/linux"
+            case "$ARCH" in
+                ppc64le|s390x)
+                    fedora_repo_root="https://dl.fedoraproject.org/pub/fedora-secondary"
+                    ;;
+            esac
+
             run sed -i -e 's/^enabled=1/enabled=0/' /etc/yum.repos.d/fedora-cisco-openh264.repo
             run sed -i \
                 -e 's|^metalink=|#metalink=|' \
-                -e 's|^#baseurl=http://download.example/pub/fedora/linux|baseurl=https://dl.fedoraproject.org/pub/fedora/linux|' \
+                -e "s|^#baseurl=http://download.example/pub/fedora/linux|baseurl=${fedora_repo_root}|" \
                 /etc/yum.repos.d/fedora.repo \
                 /etc/yum.repos.d/fedora-updates.repo \
                 /etc/yum.repos.d/fedora-updates-testing.repo
         fi
         run dnf clean all
-        run dnf --refresh --setopt=install_weak_deps=False install -y \
+        deps=(
             rpm-build redhat-rpm-config \
             gcc gcc-c++ make pkgconf-pkg-config rsync tar xz gzip \
             findutils file dos2unix diffutils which \
-            ncurses-devel gpm-devel libffi-devel \
+            ncurses-devel libffi-devel \
             alsa-lib-devel pulseaudio-libs-devel \
             libX11-devel libXext-devel libXpm-devel libXrandr-devel \
             libXrender-devel mesa-libGL-devel mesa-libGLU-devel
+        )
+        if [ "$USE_GPM" -ne 0 ]; then
+            deps+=(gpm-devel)
+        fi
+        run dnf --refresh --setopt=install_weak_deps=False install -y \
+            "${deps[@]}"
         return 0
     fi
 
     if command -v yum >/dev/null 2>&1; then
+        local deps
+
         msg "installing RPM build dependencies via yum"
-        run yum install -y \
+        deps=(
             rpm-build redhat-rpm-config \
             gcc gcc-c++ make pkgconfig rsync tar xz gzip \
             findutils file dos2unix diffutils which \
-            ncurses-devel gpm-devel libffi-devel \
+            ncurses-devel libffi-devel \
             alsa-lib-devel pulseaudio-libs-devel \
             libX11-devel libXext-devel libXpm-devel libXrandr-devel \
             libXrender-devel mesa-libGL-devel mesa-libGLU-devel
+        )
+        if [ "$USE_GPM" -ne 0 ]; then
+            deps+=(gpm-devel)
+        fi
+        run yum install -y "${deps[@]}"
         return 0
     fi
 
     if command -v zypper >/dev/null 2>&1; then
+        local deps
+
         msg "installing RPM build dependencies via zypper"
-        run zypper --non-interactive install -y \
+        deps=(
             rpm-build gcc gcc-c++ make pkgconf-pkg-config rsync tar xz gzip \
             findutils file dos2unix diffutils which \
-            ncurses-devel gpm-devel libffi-devel \
+            ncurses-devel libffi-devel \
             alsa-devel libpulse-devel \
             libX11-devel libXext-devel libXpm-devel libXrandr-devel \
             libXrender-devel Mesa-libGL-devel Mesa-libGLU-devel
+        )
+        if [ "$USE_GPM" -ne 0 ]; then
+            deps+=(gpm-devel)
+        fi
+        run zypper --non-interactive install -y "${deps[@]}"
         return 0
     fi
 
@@ -338,7 +381,11 @@ Requires:       gcc
 Requires:       binutils
 Requires:       glibc-devel
 Requires:       ncurses-devel
-Requires:       gpm-devel
+EOF
+            if [ "$USE_GPM" -ne 0 ]; then
+                echo "Requires:       gpm-devel"
+            fi
+            cat <<'EOF'
 Requires:       libffi-devel
 Requires:       alsa-devel
 Requires:       libpulse-devel
@@ -357,7 +404,11 @@ Requires:       gcc
 Requires:       binutils
 Requires:       glibc-devel
 Requires:       ncurses-devel
-Requires:       gpm-devel
+EOF
+            if [ "$USE_GPM" -ne 0 ]; then
+                echo "Requires:       gpm-devel"
+            fi
+            cat <<'EOF'
 Requires:       libffi-devel
 Requires:       alsa-lib-devel
 Requires:       pulseaudio-libs-devel
@@ -375,8 +426,13 @@ EOF
 
 write_spec() {
     local spec="$RPMTOP/SPECS/freebasic.spec"
+    local rpm_make_args
 
     mkdir -p "$RPMTOP/SPECS"
+    rpm_make_args='ALLCFLAGS+=-O2'
+    if [ "$USE_GPM" -eq 0 ]; then
+        rpm_make_args="$rpm_make_args ALLCFLAGS+=-DDISABLE_GPM"
+    fi
 
     {
         cat <<EOF
@@ -400,7 +456,11 @@ BuildRequires:  pkgconfig
 BuildRequires:  rsync
 BuildRequires:  dos2unix
 BuildRequires:  ncurses-devel
-BuildRequires:  gpm-devel
+EOF
+        if [ "$USE_GPM" -ne 0 ]; then
+            echo "BuildRequires:  gpm-devel"
+        fi
+        cat <<'EOF'
 BuildRequires:  libffi-devel
 EOF
         if [ "$DISTRO_ID" = "opensuse" ]; then
@@ -449,8 +509,8 @@ export FCFLAGS=
 export LDFLAGS=
 export RPM_OPT_FLAGS=
 
-$MAKE_CMD TARGET_TRIPLET="$TARGET_TRIPLET" FBC_TARGET="$FBC_TARGET" FBTARGET_DIR_OVERRIDE="$BOOTKEY" CFLAGS= CXXFLAGS= CPPFLAGS= LDFLAGS= bootstrap-minimal -j"$JOBS"
-$MAKE_CMD TARGET_TRIPLET="$TARGET_TRIPLET" FBC_TARGET="$FBC_TARGET" FBTARGET_DIR_OVERRIDE="$BOOTKEY" CFLAGS= CXXFLAGS= CPPFLAGS= LDFLAGS= all FBC=bootstrap/fbc BUILD_FBC_TARGET="$FBC_TARGET" -j"$JOBS"
+$MAKE_CMD TARGET_TRIPLET="$TARGET_TRIPLET" FBC_TARGET="$FBC_TARGET" FBTARGET_DIR_OVERRIDE="$BOOTKEY" CFLAGS= CXXFLAGS= CPPFLAGS= LDFLAGS= $rpm_make_args bootstrap-minimal -j"$JOBS"
+$MAKE_CMD TARGET_TRIPLET="$TARGET_TRIPLET" FBC_TARGET="$FBC_TARGET" FBTARGET_DIR_OVERRIDE="$BOOTKEY" CFLAGS= CXXFLAGS= CPPFLAGS= LDFLAGS= $rpm_make_args all FBC=bootstrap/fbc BUILD_FBC_TARGET="$FBC_TARGET" -j"$JOBS"
 
 mkdir -p .package-smoke
 cat > .package-smoke/console.bas <<'SMOKEEOF'

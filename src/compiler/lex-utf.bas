@@ -23,6 +23,21 @@
 #define U32_SWAP(c) (((c) shr 24) or (((c) shl 8) and &h00FF0000) or _
 					(((c) shr 8) and &h0000FF00) or ((c) shl 24))
 
+'' Source files have explicit byte order, but lex.ctx->buffw is native WSTRING
+'' storage.  Swap values while reading from the file, not after writing them
+'' through a typed WSTRING buffer pointer.
+#ifdef __FB_BIGENDIAN__
+	#define U16_FROM_LE(c) U16_SWAP( c )
+	#define U16_FROM_BE(c) (c)
+	#define U32_FROM_LE(c) U32_SWAP( c )
+	#define U32_FROM_BE(c) (c)
+#else
+	#define U16_FROM_LE(c) (c)
+	#define U16_FROM_BE(c) U16_SWAP( c )
+	#define U32_FROM_LE(c) (c)
+	#define U32_FROM_BE(c) U32_SWAP( c )
+#endif
+
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 '' UTF-8
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -240,11 +255,7 @@ sub lexReadUTF8( )
 	elseif sizeof(wstring) = 2 then
 		chars = hUTF8ToUTF16LE( )
 	else
-#ifdef __FB_BIGENDIAN__
-		chars = hUTF8ToUTF32BE( )
-#else
 		chars = hUTF8ToUTF32LE( )
-#endif
 	end if
 
 	lex.ctx->bufflen = chars
@@ -274,6 +285,8 @@ private function hUTF16LEToChar( ) as integer static
 			exit do
 		end if
 
+		c = U16_FROM_LE( c )
+
 		if( c > 255 ) then
 			'' surrogate?
 			if( c >= UTF16_SUR_HIGH_START ) then
@@ -299,12 +312,37 @@ end function
 '':::::
 private function hUTF16LEToUTF16LE( ) as integer static
 
+#ifdef __FB_BIGENDIAN__
+	dim as ushort ptr dst
+	dim as ushort c
+	dim as integer chars
+
+	dst = cast( ushort ptr, @lex.ctx->buffw )
+	chars = 0
+
+	do while( chars < LEX_MAXBUFFCHARS )
+		if( eof( env.inf.num ) ) then
+			exit do
+		end if
+
+		if( get( #env.inf.num, , c ) <> 0 ) then
+			exit do
+		end if
+
+		*dst = U16_FROM_LE( c )
+		dst += 1
+		chars += 1
+	loop
+
+	function = chars
+#else
 	if( get( #env.inf.num, , lex.ctx->buffw ) = 0 ) then
 		lex.ctx->physfilepos = seek( env.inf.num )
 		function = cunsg(lex.ctx->physfilepos - lex.ctx->filepos) \ len( ushort )
 	else
 		function = 0
 	end if
+#endif
 
 end function
 
@@ -327,6 +365,7 @@ private function hUTF16LEToUTF32LE( ) as integer static
 			exit do
 		end if
 
+		c = U16_FROM_LE( c )
 		wc = c
 		'' surrogate?
 		if( wc >= UTF16_SUR_HIGH_START ) then
@@ -335,6 +374,7 @@ private function hUTF16LEToUTF32LE( ) as integer static
 					exit do
 				end if
 
+				c = U16_FROM_LE( c )
 				wc = ((wc - UTF16_SUR_HIGH_START) shl UTF16_HALFSHIFT) + _
 				      (cuint( c ) - UTF16_SUR_LOW_START) + UTF16_HALFBASE
 			end if
@@ -377,11 +417,7 @@ sub lexReadUTF16LE( ) static
 	elseif sizeof(wstring) = 2 then
 		chars = hUTF16LEToUTF16LE( )
 	else
-#ifdef __FB_BIGENDIAN__
-		chars = hUTF16LEToUTF32BE( )
-#else
 		chars = hUTF16LEToUTF32LE( )
-#endif
 	end if
 
 	lex.ctx->bufflen = chars
@@ -411,7 +447,7 @@ private function hUTF16BEToChar( ) as integer static
 			exit do
 		end if
 
-		c = U16_SWAP( c )
+		c = U16_FROM_BE( c )
 
 		if( c > 255 ) then
 			'' surrogate?
@@ -439,16 +475,24 @@ end function
 private function hUTF16BEToUTF16LE( ) as integer static
 	dim as ushort ptr dst
 	dim as ushort c
-	dim as integer i, chars
-
-	chars = hUTF16LEToUTF16LE( )
+	dim as integer chars
 
 	dst = cast( ushort ptr, @lex.ctx->buffw )
-	for i = 1 to chars
-		c = *dst
-		*dst = U16_SWAP( c )
+	chars = 0
+
+	do while( chars < LEX_MAXBUFFCHARS )
+		if( eof( env.inf.num ) ) then
+			exit do
+		end if
+
+		if( get( #env.inf.num, , c ) <> 0 ) then
+			exit do
+		end if
+
+		*dst = U16_FROM_BE( c )
 		dst += 1
-	next
+		chars += 1
+	loop
 
 	function = chars
 
@@ -473,7 +517,7 @@ private function hUTF16BEToUTF32LE( ) as integer static
 			exit do
 		end if
 
-		wc = U16_SWAP( c )
+		wc = U16_FROM_BE( c )
 
 		'' surrogate?
 		if( wc >= UTF16_SUR_HIGH_START ) then
@@ -483,7 +527,7 @@ private function hUTF16BEToUTF32LE( ) as integer static
 				end if
 
 				wc = ((wc - UTF16_SUR_HIGH_START) shl UTF16_HALFSHIFT) + _
-				      (cuint( U16_SWAP( c ) ) - UTF16_SUR_LOW_START) + UTF16_HALFBASE
+				      (cuint( U16_FROM_BE( c ) ) - UTF16_SUR_LOW_START) + UTF16_HALFBASE
 			end if
 		end if
 
@@ -499,7 +543,7 @@ end function
 '':::::
 private function hUTF16BEToUTF32BE( ) as integer static
 
-	function = hUTF16LEToUTF32LE( )
+	function = hUTF16BEToUTF32LE( )
 
 end function
 
@@ -512,11 +556,7 @@ sub lexReadUTF16BE( ) static
 	elseif sizeof(wstring) = 2 then
 		chars = hUTF16BEToUTF16LE( )
 	else
-#ifdef __FB_BIGENDIAN__
-		chars = hUTF16BEToUTF32BE( )
-#else
 		chars = hUTF16BEToUTF32LE( )
-#endif
 	end if
 
 	lex.ctx->bufflen = chars
@@ -545,6 +585,8 @@ private function hUTF32LEToChar( ) as integer static
 		if( get( #env.inf.num, , c ) <> 0 ) then
 			exit do
 		end if
+
+		c = U32_FROM_LE( c )
 
 		if( c > 255 ) then
 			c = asc( "?" )
@@ -577,6 +619,8 @@ private function hUTF32LEToUTF16LE( ) as integer static
 			exit do
 		end if
 
+		c = U32_FROM_LE( c )
+
 		'' create surrogate?
 		if( c > UTF16_MAX_BMP ) then
 			if( chars < LEX_MAXBUFFCHARS-1 ) then
@@ -600,31 +644,44 @@ end function
 '':::::
 private function hUTF32LEToUTF32LE( ) as integer static
 
+#ifdef __FB_BIGENDIAN__
+	dim as ulong ptr dst
+	dim as ulong c
+	dim as integer chars
+
+	dst = cast( ulong ptr, @lex.ctx->buffw )
+	chars = 0
+
+	do while( chars < LEX_MAXBUFFCHARS )
+		if( eof( env.inf.num ) ) then
+			exit do
+		end if
+
+		if( get( #env.inf.num, , c ) <> 0 ) then
+			exit do
+		end if
+
+		*dst = U32_FROM_LE( c )
+		dst += 1
+		chars += 1
+	loop
+
+	function = chars
+#else
 	if( get( #env.inf.num, , lex.ctx->buffw ) = 0 ) then
 		lex.ctx->physfilepos = seek( env.inf.num )
 		function = cunsg(lex.ctx->physfilepos - lex.ctx->filepos) \ sizeof( ulong )
 	else
 		function = 0
 	end if
+#endif
 
 end function
 
 '':::::
 private function hUTF32LEToUTF32BE( ) as integer static
-	dim as ulong ptr dst
-	dim as ulong c
-	dim as integer i, chars
 
-	chars = hUTF32LEToUTF32LE( )
-
-	dst = cast( ulong ptr, @lex.ctx->buffw )
-	for i = 1 to chars
-		c = *dst
-		*dst = U32_SWAP( c )
-		dst += 1
-	next
-
-	function = chars
+	function = hUTF32LEToUTF32LE( )
 
 end function
 
@@ -637,11 +694,7 @@ sub lexReadUTF32LE( )
 	elseif sizeof(wstring) = 2 then
 		chars = hUTF32LEToUTF16LE( )
 	else
-#ifdef __FB_BIGENDIAN__
-		chars = hUTF32LEToUTF32BE( )
-#else
 		chars = hUTF32LEToUTF32LE( )
-#endif
 	end if
 
 	lex.ctx->bufflen = chars
@@ -671,7 +724,7 @@ private function hUTF32BEToChar( ) as integer static
 			exit do
 		end if
 
-		c = U32_SWAP( c )
+		c = U32_FROM_BE( c )
 
 		if( c > 255 ) then
 			c = asc( "?" )
@@ -704,7 +757,7 @@ private function hUTF32BEToUTF16LE( ) as integer static
 			exit do
 		end if
 
-		c = U32_SWAP( c )
+		c = U32_FROM_BE( c )
 
 		'' create surrogate?
 		if( c > UTF16_MAX_BMP ) then
@@ -730,16 +783,24 @@ end function
 private function hUTF32BEToUTF32LE( ) as integer static
 	dim as ulong ptr dst
 	dim as ulong c
-	dim as integer i, chars
-
-	chars = hUTF32LEToUTF32LE( )
+	dim as integer chars
 
 	dst = cast( ulong ptr, @lex.ctx->buffw )
-	for i = 1 to chars
-		c = *dst
-		*dst = U32_SWAP( c )
+	chars = 0
+
+	do while( chars < LEX_MAXBUFFCHARS )
+		if( eof( env.inf.num ) ) then
+			exit do
+		end if
+
+		if( get( #env.inf.num, , c ) <> 0 ) then
+			exit do
+		end if
+
+		*dst = U32_FROM_BE( c )
 		dst += 1
-	next
+		chars += 1
+	loop
 
 	function = chars
 
@@ -748,7 +809,7 @@ end function
 '':::::
 private function hUTF32BEToUTF32BE( ) as integer static
 
-	function = hUTF32LEToUTF32LE( )
+	function = hUTF32BEToUTF32LE( )
 
 end function
 
@@ -761,11 +822,7 @@ sub lexReadUTF32BE( )
 	elseif sizeof(wstring) = 2 then
 		chars = hUTF32BEToUTF16LE( )
 	else
-#ifdef __FB_BIGENDIAN__
-		chars = hUTF32BEToUTF32BE( )
-#else
 		chars = hUTF32BEToUTF32LE( )
-#endif
 	end if
 
 	lex.ctx->bufflen = chars

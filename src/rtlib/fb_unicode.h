@@ -298,7 +298,14 @@ static __inline__ const FB_WCHAR *fb_wstr_SkipCharRev( const FB_WCHAR *s, ssize_
 
 static __inline__ FB_WCHAR *fb_wstr_Instr( const FB_WCHAR *s, const FB_WCHAR *patt )
 {
-	return wcsstr( s, patt );
+	/*
+	   Some C libraries keep the historic C signature for wcsstr(), returning
+	   a non-const pointer even when the input is const. Others expose a
+	   const-preserving builtin. The runtime wrapper keeps FreeBASIC's older
+	   mutable return type, matching INSTR-style callers that only use the
+	   pointer position.
+	 */
+	return (FB_WCHAR *)wcsstr( s, patt );
 }
 
 static __inline__ size_t fb_wstr_InstrAny( const FB_WCHAR *s, const FB_WCHAR *sset )

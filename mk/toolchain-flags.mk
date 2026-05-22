@@ -392,7 +392,7 @@ TOOLCHAIN_FBRTCFLAGS :=
 TOOLCHAIN_FBRTLFLAGS :=
 TOOLCHAIN_FBC_ENV :=
 
-ifneq ($(filter cygwin darwin win32 win64,$(TARGET_OS)),)
+ifneq ($(filter linux cygwin darwin win32 win64,$(TARGET_OS)),)
   # Newer GCC range analysis is noisy on fbc-generated C code.  Keep this
   # scoped to generated compiler/runtime C so handwritten C warnings remain
   # visible.

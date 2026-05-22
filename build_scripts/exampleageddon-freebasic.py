@@ -118,6 +118,7 @@ EXTERNAL_TEXT_MARKERS = (
 PLATFORM_PATH_MARKERS = (
     "/dos/",
     "/win32/",
+    "/manual/hardware/",
     "/network/win32/",
 )
 
@@ -165,7 +166,11 @@ INTENTIONAL_FAILURES = {
 }
 
 PLATFORM_SOURCES = {
+    "examples/manual/defines/fbasm.bas",
+    "examples/manual/misc/asm.bas",
     "examples/manual/procs/naked1.bas",
+    "examples/manual/procs/naked2.bas",
+    "examples/manual/proguide/binaries/simple-fb-profiling-cycles.bas",
     "examples/manual/proguide/libs/libs3.bas",
     "examples/manual/proguide/libs/libs4.bas",
 }
@@ -551,6 +556,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--run-timeout", type=int, default=5)
     parser.add_argument("--no-run", action="store_true")
     parser.add_argument("--run-all", action="store_true", help="Run compiled non-external/non-platform examples even if classified interactive")
+    parser.add_argument("--fail-on-self-contained", action="store_true", help="Exit non-zero if self-contained examples fail to compile or run")
 
     args = parser.parse_args(argv)
     args.root = args.root.resolve()
@@ -605,12 +611,22 @@ def main(argv: list[str]) -> int:
         if result.compile_status == "pass"
         and (result.run_status.startswith("fail") or result.run_status == "timeout")
     )
+    self_contained_failures = sum(
+        1
+        for result in results
+        if result.group == "self-contained"
+        and (result.compile_status != "pass" or result.run_status != "pass")
+    )
 
     print()
     print(f"Report: {args.outdir / 'report.md'}")
     print(f"CSV:    {args.outdir / 'results.csv'}")
     print(f"Compile failures/timeouts: {compile_failures}")
     print(f"Run failures/timeouts:     {run_failures}")
+    print(f"Self-contained failures:   {self_contained_failures}")
+
+    if args.fail_on_self_contained and self_contained_failures:
+        return 1
 
     return 0
 

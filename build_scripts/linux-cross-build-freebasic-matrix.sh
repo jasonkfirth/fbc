@@ -228,6 +228,9 @@ arches_for_target() {
     local release="$3"
 
     case "$family/$distro/$release" in
+        deb/raspbian/bookworm)
+            printf '%s\n' armhf arm64
+            ;;
         deb/debian/trixie)
             printf '%s\n' "${DEB_EXTENDED_ARCHES[@]}"
             ;;

@@ -40,6 +40,7 @@ IMAGE_URL=""
 IMAGE_FILE=""
 ISO_FILE=""
 PACKAGE_FILE=""
+PYTHON_HPKG=""
 TEST_ONLY=0
 JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
 CPUS="$JOBS"
@@ -54,6 +55,7 @@ FBCTESTS_UNIT_ARGS=""
 EXAMPLEAGEDDON_JOBS="$JOBS"
 EXAMPLEAGEDDON_COMPILE_TIMEOUT="120"
 EXAMPLEAGEDDON_RUN_TIMEOUT="10"
+PYTHON_INSTALL_TIMEOUT="1800"
 BOOT_SCRIPT_BYTES=884
 
 NIGHTLY_INDEX_URL="https://download.haiku-os.org/nightly-images/x86_64/"
@@ -87,6 +89,10 @@ Options:
                            Per-example compile timeout. Default: 120
   --exampleageddon-run-timeout N
                            Per-example run timeout. Default: 10
+  --python-hpkg FILE       Optional local Haiku python3*.hpkg to stage for
+                           exampleageddon.
+  --python-install-timeout N
+                           Python pkgman install timeout. Default: 1800
   --keep-vms               Do not delete VM run directories on success.
   -h, --help               Show this help.
 
@@ -99,6 +105,7 @@ while [ "$#" -gt 0 ]; do
 		--image-url) IMAGE_URL="$2"; shift 2 ;;
 		--image) IMAGE_FILE="$2"; shift 2 ;;
 		--package) PACKAGE_FILE="$2"; shift 2 ;;
+		--python-hpkg) PYTHON_HPKG="$2"; shift 2 ;;
 		--test-only) TEST_ONLY=1; shift ;;
 		--workroot)
 			WORKROOT="$2"
@@ -121,6 +128,7 @@ while [ "$#" -gt 0 ]; do
 		--exampleageddon-jobs) EXAMPLEAGEDDON_JOBS="$2"; shift 2 ;;
 		--exampleageddon-compile-timeout) EXAMPLEAGEDDON_COMPILE_TIMEOUT="$2"; shift 2 ;;
 		--exampleageddon-run-timeout) EXAMPLEAGEDDON_RUN_TIMEOUT="$2"; shift 2 ;;
+		--python-install-timeout) PYTHON_INSTALL_TIMEOUT="$2"; shift 2 ;;
 		--keep-vms) KEEP_VMS=1; shift ;;
 		-h|--help) usage; exit 0 ;;
 		*) die "unknown option: $1" ;;
@@ -138,9 +146,15 @@ case "$FBCTESTS_JOBS" in ''|*[!0-9]*|0) die "--fbctests-jobs must be a positive 
 case "$EXAMPLEAGEDDON_JOBS" in ''|*[!0-9]*|0) die "--exampleageddon-jobs must be a positive integer" ;; esac
 case "$EXAMPLEAGEDDON_COMPILE_TIMEOUT" in ''|*[!0-9]*|0) die "--exampleageddon-compile-timeout must be a positive integer" ;; esac
 case "$EXAMPLEAGEDDON_RUN_TIMEOUT" in ''|*[!0-9]*|0) die "--exampleageddon-run-timeout must be a positive integer" ;; esac
+case "$PYTHON_INSTALL_TIMEOUT" in ''|*[!0-9]*|0) die "--python-install-timeout must be a positive integer" ;; esac
 
 if [ "$TEST_ONLY" -eq 1 ] && [ -z "$PACKAGE_FILE" ]; then
 	die "--test-only requires --package"
+fi
+
+if [ -n "$PYTHON_HPKG" ]; then
+	[ -f "$PYTHON_HPKG" ] || die "Python package not found: $PYTHON_HPKG"
+	PYTHON_HPKG="$(cd "$(dirname "$PYTHON_HPKG")" && pwd)/$(basename "$PYTHON_HPKG")"
 fi
 
 require_tool() {
@@ -1009,8 +1023,19 @@ ensure_python3() {
 		return 0
 	fi
 
+	for package_file in /Work/package/python3*.hpkg; do
+		[ -f "$package_file" ] || continue
+		if run_limited "${PYTHON_INSTALL_TIMEOUT:-1800}" pkgman install -y "$package_file"; then
+			break
+		fi
+	done
+
+	if command -v python3 >/dev/null 2>&1; then
+		return 0
+	fi
+
 	for package in python3.11 python3.10 python3.9 python3.12 python3; do
-		if run_limited 600 pkgman install -y "$package"; then
+		if run_limited "${PYTHON_INSTALL_TIMEOUT:-1800}" pkgman install -y "$package"; then
 			break
 		fi
 	done
@@ -1407,6 +1432,9 @@ test_package_in_vm() {
 	install_test_staging_dependencies "$key" "$port"
 	ssh_guest "$key" "$port" "mkdir -p /Work/package"
 	scp_to_guest "$key" "$port" "$hpkg" "/Work/package/"
+	if [ -n "$PYTHON_HPKG" ]; then
+		scp_to_guest "$key" "$port" "$PYTHON_HPKG" "/Work/package/"
+	fi
 	send_tests_tree "$key" "$port"
 	send_exampleageddon_tree "$key" "$port"
 
@@ -1415,7 +1443,7 @@ test_package_in_vm() {
 
 	msg "Running Haiku package smoke tests, fbctests, and exampleageddon"
 	if ! ssh_guest "$key" "$port" \
-			"FBCTESTS_JOBS='$FBCTESTS_JOBS' FBCTESTS_UNIT_ARGS='$FBCTESTS_UNIT_ARGS' EXAMPLEAGEDDON_JOBS='$EXAMPLEAGEDDON_JOBS' EXAMPLEAGEDDON_COMPILE_TIMEOUT='$EXAMPLEAGEDDON_COMPILE_TIMEOUT' EXAMPLEAGEDDON_RUN_TIMEOUT='$EXAMPLEAGEDDON_RUN_TIMEOUT' /bin/sh -s" <<'EOF'
+			"FBCTESTS_JOBS='$FBCTESTS_JOBS' FBCTESTS_UNIT_ARGS='$FBCTESTS_UNIT_ARGS' EXAMPLEAGEDDON_JOBS='$EXAMPLEAGEDDON_JOBS' EXAMPLEAGEDDON_COMPILE_TIMEOUT='$EXAMPLEAGEDDON_COMPILE_TIMEOUT' EXAMPLEAGEDDON_RUN_TIMEOUT='$EXAMPLEAGEDDON_RUN_TIMEOUT' PYTHON_INSTALL_TIMEOUT='$PYTHON_INSTALL_TIMEOUT' /bin/sh -s" <<'EOF'
 set -e
 
 log=/Work/freebasic-haiku-test.log

@@ -37,7 +37,8 @@ static int orig_rate, target_rate;
 static Rotation orig_rotation;
 static Cursor blank_cursor, arrow_cursor = None;
 static int is_running = FALSE, has_focus, cursor_shown, xlib_inited = FALSE;
-static int mouse_x, mouse_y, mouse_wheel, mouse_hwheel, mouse_buttons, mouse_on;
+/* Keep a one-shot latch of press events in case polling misses a short click. */
+static int mouse_x, mouse_y, mouse_wheel, mouse_hwheel, mouse_buttons, mouse_latched_buttons, mouse_on;
 static int mouse_x_root, mouse_y_root;
 
 static int calc_comp_height( int h )
@@ -156,10 +157,9 @@ static void *window_thread(void *arg)
 					break;
 
 				case EnterNotify:
-					if (has_focus) {
-						mouse_on = TRUE;
-						e.type = EVENT_MOUSE_ENTER;
-					}
+					has_focus = TRUE;
+					mouse_on = TRUE;
+					e.type = EVENT_MOUSE_ENTER;
 					break;
 
 				case LeaveNotify:
@@ -194,10 +194,16 @@ static void *window_thread(void *arg)
 					break;
 
 				case ButtonPress:
+					mouse_x = event.xbutton.x;
+					mouse_y = event.xbutton.y - fb_x11.display_offset;
+					mouse_x_root = event.xbutton.x_root;
+					mouse_y_root = event.xbutton.y_root;
+					mouse_on = ((mouse_x >= 0) && (mouse_x < fb_x11.w) && (mouse_y >= 0) && (mouse_y < fb_x11.h));
+					has_focus = TRUE;
 					switch (event.xbutton.button) {
-					case Button1: mouse_buttons |= BUTTON_LEFT  ; e.button = BUTTON_LEFT  ; break;
-					case Button3: mouse_buttons |= BUTTON_RIGHT ; e.button = BUTTON_RIGHT ; break;
-					case Button2: mouse_buttons |= BUTTON_MIDDLE; e.button = BUTTON_MIDDLE; break;
+					case Button1: mouse_buttons |= BUTTON_LEFT; mouse_latched_buttons |= BUTTON_LEFT; e.button = BUTTON_LEFT; break;
+					case Button3: mouse_buttons |= BUTTON_RIGHT; mouse_latched_buttons |= BUTTON_RIGHT; e.button = BUTTON_RIGHT; break;
+					case Button2: mouse_buttons |= BUTTON_MIDDLE; mouse_latched_buttons |= BUTTON_MIDDLE; e.button = BUTTON_MIDDLE; break;
 					case Button4: e.z = mouse_wheel++; break;
 					case Button5: e.z = mouse_wheel--; break;
 					case Button6: e.w = mouse_hwheel--; break;
@@ -227,8 +233,8 @@ static void *window_thread(void *arg)
 				case ButtonRelease:
 					e.type = EVENT_MOUSE_BUTTON_RELEASE;
 					switch (event.xbutton.button) {
-						case Button1:	mouse_buttons &= ~BUTTON_LEFT  ; e.button = BUTTON_LEFT  ; break;
-						case Button3:	mouse_buttons &= ~BUTTON_RIGHT ; e.button = BUTTON_RIGHT ; break;
+						case Button1:	mouse_buttons &= ~BUTTON_LEFT; e.button = BUTTON_LEFT; break;
+						case Button3:	mouse_buttons &= ~BUTTON_RIGHT; e.button = BUTTON_RIGHT; break;
 						case Button2:	mouse_buttons &= ~BUTTON_MIDDLE; e.button = BUTTON_MIDDLE; break;
 						default:		e.type = 0; break;
 					}
@@ -588,13 +594,15 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	fb_hInitX11KeycodeToScancodeTb( fb_x11.display, XDisplayKeycodes, XGetKeyboardMapping, XFree );
 
 	if (flags & DRIVER_FULLSCREEN) {
+		has_focus = TRUE;
 		mouse_on = TRUE;
 		mouse_x = fb_x11.w >> 1;
 		mouse_y = fb_x11.h >> 1;
 	} else {
+		has_focus = FALSE;
 		mouse_on = FALSE;
 	}
-	mouse_buttons = mouse_wheel = 0;
+	mouse_buttons = mouse_latched_buttons = mouse_wheel = 0;
 
 	pthread_mutex_init(&mutex, NULL);
 	pthread_cond_init(&cond, NULL);
@@ -695,12 +703,21 @@ int fb_hX11GetMouse(int *x, int *y, int *z, int *buttons, int *clip)
 	Window root, child;
 	int root_x, root_y, win_x, win_y;
 	unsigned int buttons_mask;
+	const int invalid_coord = -1;
 
-	if ((!mouse_on) || (!has_focus))
-		return -1;
+	if (x)
+		*x = invalid_coord;
+	if (y)
+		*y = invalid_coord;
+	if (buttons)
+		*buttons = 0;
 
 	/* prefer XQueryPointer to have a more responsive mouse position retrieval */
 	if (z) *z = mouse_wheel;
+	/* Keep a short-press visible once even if polling sees pointer outside. */
+	if ((!mouse_on) && (!mouse_latched_buttons) && (buttons == NULL))
+		return 0;
+
 	if (XQueryPointer(fb_x11.display, fb_x11.window, &root, &child, &root_x, &root_y, &win_x, &win_y, &buttons_mask)) {
 		if (x) *x = win_x;
 		if (y) *y = win_y;
@@ -708,11 +725,15 @@ int fb_hX11GetMouse(int *x, int *y, int *z, int *buttons, int *clip)
 			*buttons = (buttons_mask & Button1Mask ? 0x1 : 0) |
 				   (buttons_mask & Button3Mask ? 0x2 : 0) |
 				   (buttons_mask & Button2Mask ? 0x4 : 0);
+			*buttons |= mouse_latched_buttons;
 		}
 	} else {
 		if (x) *x = mouse_x;
 		if (y) *y = mouse_y;
-		if (buttons) *buttons = mouse_buttons;
+		if (buttons) *buttons = mouse_buttons | mouse_latched_buttons;
+	}
+	if (buttons) {
+		mouse_latched_buttons = 0;
 	}
 
 	if (clip) *clip = fb_x11.mouse_clip;

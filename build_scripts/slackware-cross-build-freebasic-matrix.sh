@@ -59,7 +59,7 @@ log_has_missing_manifest() {
     local log="$1"
 
     [ -f "$log" ] || return 1
-    grep -Eq 'no matching manifest|manifest unknown|not found: manifest|no match for platform' "$log"
+    grep -Eq 'no matching manifest|manifest unknown|not found: manifest|no match for platform|platform \(linux/amd64\) does not match the specified platform' "$log"
 }
 
 run_root() {

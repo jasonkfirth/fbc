@@ -19,16 +19,22 @@
 #define FB_ANDROID_LOOPER_INPUT 1
 #define FB_ANDROID_LOOPER_STDOUT 2
 
+#ifndef FB_ANDROID_KEYBOARD_ENABLED
+#define FB_ANDROID_KEYBOARD_ENABLED 1
+#endif
+
 #if defined(__GNUC__)
 #define FB_ANDROID_WEAK __attribute__((weak))
 #else
 #define FB_ANDROID_WEAK
 #endif
 
-int fb_android_program_main(int argc, char **argv);
+int fb_android_program_main(int argc, char **argv) FB_ANDROID_WEAK;
+int FB_ANDROID_PROGRAM_MAIN(int argc, char **argv) FB_ANDROID_WEAK;
 extern const int __fb_app_mode_gui_enabled FB_ANDROID_WEAK;
 void fb_AllocateMainFBThread(void) FB_ANDROID_WEAK;
 void fb_hAndroidSetActivity(ANativeActivity *activity) FB_ANDROID_WEAK;
+void fb_hAndroidSetKeyboardEnabled(int enabled) FB_ANDROID_WEAK;
 void fb_hAndroidSetWindow(ANativeWindow *window) FB_ANDROID_WEAK;
 void fb_hAndroidTouch(float x, float y, int action) FB_ANDROID_WEAK;
 void fb_hAndroidKey(int32_t keycode, int action, int unicode) FB_ANDROID_WEAK;
@@ -337,6 +343,7 @@ static void *fb_android_program_thread(void *arg)
 	int rc;
 	char message[96];
 	jmp_buf exit_jump;
+	int (*entry_fn)(int, char **) = NULL;
 
 	(void)app;
 
@@ -346,8 +353,13 @@ static void *fb_android_program_thread(void *arg)
 		fb_AllocateMainFBThread();
 	fb_android_exit_jump = &exit_jump;
 	fb_android_exit_status = 0;
+	if (fb_android_program_main)
+		entry_fn = fb_android_program_main;
+	else if (FB_ANDROID_PROGRAM_MAIN)
+		entry_fn = FB_ANDROID_PROGRAM_MAIN;
+
 	if (setjmp(exit_jump) == 0)
-		rc = fb_android_program_main(1, argv);
+		rc = entry_fn != NULL ? entry_fn(1, argv) : -1;
 	else
 		rc = fb_android_exit_status;
 	fb_android_exit_jump = NULL;
@@ -617,12 +629,17 @@ static void fb_android_on_native_window_created(ANativeActivity *activity, ANati
 
 	pthread_mutex_lock(&app->mutex);
 	app->window = window;
-	fb_android_maybe_start_program(app);
 	pthread_cond_broadcast(&app->cond);
 	pthread_mutex_unlock(&app->mutex);
 
 	if (fb_hAndroidSetWindow)
 		fb_hAndroidSetWindow(window);
+
+	pthread_mutex_lock(&app->mutex);
+	fb_android_maybe_start_program(app);
+	pthread_cond_broadcast(&app->cond);
+	pthread_mutex_unlock(&app->mutex);
+
 	fb_android_render_console_if_enabled();
 	if (fb_hAndroidUpdate)
 		fb_hAndroidUpdate();
@@ -728,6 +745,8 @@ void ANativeActivity_onCreate(ANativeActivity *activity, void *saved_state, size
 	activity->callbacks->onInputQueueCreated = fb_android_on_input_queue_created;
 	activity->callbacks->onInputQueueDestroyed = fb_android_on_input_queue_destroyed;
 
+	if (fb_hAndroidSetKeyboardEnabled)
+		fb_hAndroidSetKeyboardEnabled(FB_ANDROID_KEYBOARD_ENABLED);
 	if (fb_hAndroidSetActivity)
 		fb_hAndroidSetActivity(activity);
 	fb_android_apply_app_mode();

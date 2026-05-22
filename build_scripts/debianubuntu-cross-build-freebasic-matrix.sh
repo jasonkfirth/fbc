@@ -150,7 +150,6 @@ LINUX_ARCHES=(
 DEBIAN_TRIXIE_ARCHES=(
     "${LINUX_ARCHES[@]}"
     armel
-    loong64
 )
 
 DEBIAN_SID_ARCHES=(
@@ -180,6 +179,12 @@ target_arches() {
     local codename="$2"
 
     case "$distro/$codename" in
+        debian/bookworm)
+            printf '%s\n' amd64 arm64 armhf ppc64el s390x
+            ;;
+        raspbian/bookworm)
+            printf '%s\n' armhf arm64
+            ;;
         debian/trixie)
             printf '%s\n' "${DEBIAN_TRIXIE_ARCHES[@]}"
             ;;
@@ -268,6 +273,46 @@ host_outdir_for_target() {
     local arch="$3"
 
     echo "$ROOT/out/linux/${distro}/${codename}/${arch}"
+}
+
+docker_platform_for_target() {
+    local distro="$1"
+    local codename="$2"
+    local arch="$3"
+
+    case "$distro/$arch" in
+        raspbian/armhf)
+            case "$codename" in
+                bookworm)
+                    echo "linux/arm/v8"
+                    ;;
+                buster)
+                    echo ""
+                    ;;
+                *)
+                    echo "linux/arm/v7"
+                    ;;
+            esac
+            ;;
+        raspbian/arm64)
+            echo "linux/arm64"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+arm_arch_for_target() {
+    local distro="$1"
+    local arch="$2"
+
+    if [ "$distro" = "raspbian" ] && [ "$arch" = "armhf" ]; then
+        echo "armv6+fp"
+        return 0
+    fi
+
+    echo ""
 }
 
 ##############################################################################
@@ -414,6 +459,10 @@ build_one() {
     local buildroot
     local docker_log
     local build_args
+    local docker_platform
+    local docker_platform_args=()
+    local docker_env_args=()
+    local arm_arch
     local xbox_args
     local build_cmd
     local xbox_cmd
@@ -428,7 +477,17 @@ EOF
     container_outdir="/work/out/linux/${distro}/${codename}/${arch}"
     buildroot="/work/.build-debianubuntu-cross/${distro}/${codename}/${arch}"
     docker_log="$outdir/docker_build.log"
+    docker_platform="$(docker_platform_for_target "$distro" "$codename" "$arch")"
+    arm_arch="$(arm_arch_for_target "$distro" "$arch")"
     mkdir -p "$outdir"
+
+    if [ -n "$docker_platform" ]; then
+        docker_platform_args=(--platform "$docker_platform")
+    fi
+
+    if [ -n "$arm_arch" ]; then
+        docker_env_args+=(-e FBC_PACKAGE_ARM_ARCH="$arm_arch")
+    fi
 
     js_enabled=0
     android_enabled=0
@@ -468,8 +527,10 @@ EOF
     echo "============================================================"
     echo "Cross-building ${distro}/${codename} (${arch})"
     echo "Docker image: ${image}"
+    [ -z "$docker_platform" ] || echo "Docker platform: ${docker_platform}"
     echo "Make jobs: ${MAKE_JOBS}"
     echo "Output: ${outdir}"
+    [ -z "$arm_arch" ] || echo "ARM default arch: ${arm_arch}"
     if [ "$js_enabled" -eq 1 ] || [ "$android_enabled" -eq 1 ] || [ "$xbox_enabled" -eq 1 ]; then
         echo -n "Extra ports:"
         [ "$js_enabled" -eq 0 ] || echo -n " js"
@@ -482,8 +543,9 @@ EOF
     echo "============================================================"
 
     if ! {
-        run_root docker pull "$image" &&
+        run_root docker pull "${docker_platform_args[@]}" "$image" &&
         run_root docker run --rm \
+            "${docker_platform_args[@]}" \
             -e DEBIAN_FRONTEND=noninteractive \
             -e FBC_PACKAGE_DISTRO_ID="$distro" \
             -e FBC_PACKAGE_CODENAME="$codename" \
@@ -491,6 +553,7 @@ EOF
             -e FBC_PACKAGE_CONFIGURE_CROSS_APT=1 \
             -e BUILDROOT="$buildroot" \
             -e JOBS="$MAKE_JOBS" \
+            "${docker_env_args[@]}" \
             -v "$ROOT:/work" \
             -w /work \
             "$image" \

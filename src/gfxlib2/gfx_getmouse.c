@@ -2,11 +2,19 @@
 
 #include "fb_gfx.h"
 
+static void poll_events(void)
+{
+	if ((__fb_gfx) && (__fb_gfx->driver->poll_events))
+		__fb_gfx->driver->poll_events();
+}
+
 int fb_GfxGetMouse(int *x, int *y, int *z, int *buttons, int *clip)
 {
 	int failure = TRUE;
 
 	FB_GRAPHICS_LOCK( );
+
+	poll_events( );
 
 	if ((__fb_gfx) && (__fb_gfx->driver->get_mouse)) {
 		DRIVER_LOCK();

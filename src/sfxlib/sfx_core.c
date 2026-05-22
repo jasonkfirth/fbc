@@ -72,6 +72,8 @@ static int fb_sfxOutputQueueInitLocked(void);
 static void fb_sfxOutputQueueShutdownLocked(void);
 static int fb_sfxOutputQueueFillLocked(int frames);
 static int fb_sfxOutputQueueDrainLocked(int frames);
+static int fb_sfxMixFeedScratchEnsureLocked(int frames, int channels);
+static void fb_sfxMixFeedScratchShutdownLocked(void);
 static void fb_sfxSleepMs(unsigned long milliseconds);
 static int fb_sfxCurrentDriverBlocksLocked(void);
 static int fb_sfxCurrentDriverBlocks(void);
@@ -82,6 +84,8 @@ static int fb_sfxUpdateDelayFrames(int msecs, int return_after_update);
 static int fb_sfxDriverNameEquals(const char *a, const char *b);
 static int fb_sfxDriverTryByName(const char *name);
 static int g_foreground_feed_count = 0;
+static float *g_fb_sfx_mix_feed_scratch = NULL;
+static int g_fb_sfx_mix_feed_capacity = 0;
 
 
 /* ------------------------------------------------------------------------- */
@@ -239,6 +243,7 @@ void fb_sfxExitCore(void)
     fb_sfxMixBufferShutdown();
     fb_sfxOutputQueueShutdownLocked();
     fb_sfxCaptureBufferShutdown();
+    fb_sfxMixFeedScratchShutdownLocked();
 
     fb_sfxMixerShutdown();
 
@@ -272,7 +277,49 @@ static void fb_sfxInitCoreRollbackLocked(void)
     fb_sfxMixBufferShutdown();
     fb_sfxOutputQueueShutdownLocked();
     fb_sfxCaptureBufferShutdown();
+    fb_sfxMixFeedScratchShutdownLocked();
     fb_sfxMixerShutdown();
+}
+
+static int fb_sfxMixFeedScratchEnsureLocked(int frames, int channels)
+{
+    int required_samples;
+    int next_capacity;
+    float *next_scratch;
+
+    if (frames <= 0 || channels <= 0)
+        return -1;
+
+    required_samples = frames * channels;
+    if (required_samples <= g_fb_sfx_mix_feed_capacity)
+        return 0;
+
+    next_capacity = g_fb_sfx_mix_feed_capacity > 0
+        ? g_fb_sfx_mix_feed_capacity
+        : 1024;
+
+    while (next_capacity < required_samples)
+        next_capacity <<= 1;
+
+    next_scratch = (float *)realloc(g_fb_sfx_mix_feed_scratch,
+                                   (size_t)next_capacity * sizeof(float));
+    if (!next_scratch)
+        return -1;
+
+    g_fb_sfx_mix_feed_scratch = next_scratch;
+    g_fb_sfx_mix_feed_capacity = next_capacity;
+
+    return 0;
+}
+
+static void fb_sfxMixFeedScratchShutdownLocked(void)
+{
+    if (g_fb_sfx_mix_feed_scratch)
+    {
+        free(g_fb_sfx_mix_feed_scratch);
+        g_fb_sfx_mix_feed_scratch = NULL;
+        g_fb_sfx_mix_feed_capacity = 0;
+    }
 }
 
 
@@ -340,7 +387,16 @@ void fb_sfxUpdate(int frames)
 
         written = fb_sfxOutputQueueDrainLocked(chunk);
         if (written <= 0)
+        {
+            /*
+                If playback cannot make progress, keep the worker from
+                spinning at full speed by yielding briefly.
+            */
+            fb_sfxRuntimeUnlock();
+            fb_sfxSleepMs(1);
+            fb_sfxRuntimeLock();
             break;
+        }
 
         remaining -= written;
 
@@ -621,6 +677,7 @@ static void fb_sfxMixFeedSource(int frames, int (*feed_fn)(float *buffer, int fr
 {
     float *scratch;
     int channels;
+    int samples;
     int produced;
     int i;
 
@@ -631,18 +688,18 @@ static void fb_sfxMixFeedSource(int frames, int (*feed_fn)(float *buffer, int fr
         ? __fb_sfx->output_channels
         : FB_SFX_DEFAULT_CHANNELS;
 
-    scratch = (float *)calloc((size_t)frames * (size_t)channels, sizeof(float));
-    if (!scratch)
+    if (fb_sfxMixFeedScratchEnsureLocked(frames, channels) != 0)
         return;
 
+    samples = frames * channels;
+    scratch = g_fb_sfx_mix_feed_scratch;
+    memset(scratch, 0, (size_t)samples * sizeof(float));
     produced = feed_fn(scratch, frames);
     if (produced > frames)
         produced = frames;
 
     for (i = 0; i < produced * channels; ++i)
         __fb_sfx->mixbuffer[i] = fb_sfxCoreClampSample(__fb_sfx->mixbuffer[i] + scratch[i]);
-
-    free(scratch);
 }
 
 static int fb_sfxOutputQueueInitLocked(void)
@@ -753,6 +810,8 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
     int queued;
     int drained;
     int written;
+    int zero_retry_count;
+    int zero_retry_limit;
 
     if (!__fb_sfx || !__fb_sfx->mixbuffer || frames <= 0)
         return 0;
@@ -783,12 +842,23 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
 
     driver = __fb_sfx->driver;
     written = 0;
+    zero_retry_count = 0;
+    zero_retry_limit = 4;
 
     while (driver && driver->write)
     {
         int result;
         const float *write_buffer;
         int write_frames;
+
+        if (!__fb_sfx ||
+            __fb_sfx->driver != driver ||
+            __fb_sfx->shutting_down ||
+            !__fb_sfx->mixbuffer)
+        {
+            driver = (__fb_sfx) ? __fb_sfx->driver : NULL;
+            continue;
+        }
 
         write_buffer = __fb_sfx->mixbuffer + (written * channels);
         write_frames = drained - written;
@@ -823,6 +893,7 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
         if (result > 0)
         {
             written += result;
+            zero_retry_count = 0;
 
             if (written >= drained)
                 return written;
@@ -831,13 +902,37 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
         }
         else if (result == 0)
         {
-            return written;
+            if (zero_retry_count < zero_retry_limit)
+            {
+                ++zero_retry_count;
+
+                /*
+                    Treat transient zero-progress writes as backpressure and
+                    retry after a short delay before switching drivers.
+                */
+                fb_sfxRuntimeUnlock();
+                fb_sfxSleepMs(1);
+                fb_sfxRuntimeLock();
+
+                continue;
+            }
+
+            SFX_DEBUG("sfx_core: driver '%s' returned 0 for %d retries, trying fallback",
+                      (driver && driver->name) ? driver->name : "(null)",
+                      zero_retry_count);
+
+            if (fb_sfxDriverFallback(driver) != 0)
+                break;
+
+            driver = (__fb_sfx) ? __fb_sfx->driver : NULL;
+            zero_retry_count = 0;
+            continue;
         }
 
         if (fb_sfxDriverFallback(driver) != 0)
             break;
 
-        driver = __fb_sfx->driver;
+        driver = (__fb_sfx) ? __fb_sfx->driver : NULL;
     }
 
     return written;
