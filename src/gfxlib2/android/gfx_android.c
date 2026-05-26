@@ -2583,12 +2583,28 @@ static int android_key_to_scancode(int32_t keycode)
 
 static int android_key_to_ascii(int32_t keycode)
 {
+	if (keycode >= AKEYCODE_A && keycode <= AKEYCODE_Z)
+		return 'a' + (keycode - AKEYCODE_A);
+	if (keycode >= AKEYCODE_0 && keycode <= AKEYCODE_9)
+		return '0' + (keycode - AKEYCODE_0);
+
 	switch (keycode)
 	{
 	case AKEYCODE_DEL: return KEY_BACKSPACE;
 	case AKEYCODE_TAB: return KEY_TAB;
 	case AKEYCODE_ENTER: return '\r';
 	case AKEYCODE_SPACE: return ' ';
+	case AKEYCODE_MINUS: return '-';
+	case AKEYCODE_EQUALS: return '=';
+	case AKEYCODE_COMMA: return ',';
+	case AKEYCODE_PERIOD: return '.';
+	case AKEYCODE_GRAVE: return '`';
+	case AKEYCODE_LEFT_BRACKET: return '[';
+	case AKEYCODE_RIGHT_BRACKET: return ']';
+	case AKEYCODE_BACKSLASH: return '\\';
+	case AKEYCODE_SEMICOLON: return ';';
+	case AKEYCODE_APOSTROPHE: return '\'';
+	case AKEYCODE_SLASH: return '/';
 	default: return 0;
 	}
 }
@@ -2636,7 +2652,7 @@ void fb_hAndroidKey(int32_t keycode, int action, int unicode)
 		return;
 
 	e.scancode = scancode;
-	e.ascii = (unicode >= 32 && unicode < 127) ? unicode : 0;
+	e.ascii = (key >= 32 && key < 127) ? key : 0;
 	fb_hPostEvent(&e);
 }
 

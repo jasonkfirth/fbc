@@ -80,6 +80,36 @@ public class FreeBasicInputView extends EditText {
         return true;
     }
 
+    private static boolean dispatchCommittedText(CharSequence text) {
+        int i;
+        char ch;
+        boolean handled = false;
+
+        if (text == null) {
+            return false;
+        }
+
+        try {
+            for (i = 0; i < text.length(); ++i) {
+                ch = text.charAt(i);
+
+                if (ch == '\n') {
+                    ch = '\r';
+                }
+
+                if (ch == '\t' || ch == '\r' || (ch >= 32 && ch < 127)) {
+                    FreeBasicNativeActivity.dispatchImeKey(0, KeyEvent.ACTION_DOWN, ch);
+                    FreeBasicNativeActivity.dispatchImeKey(0, KeyEvent.ACTION_UP, ch);
+                    handled = true;
+                }
+            }
+        } catch (UnsatisfiedLinkError error) {
+            return false;
+        }
+
+        return handled;
+    }
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         /*
@@ -121,6 +151,15 @@ public class FreeBasicInputView extends EditText {
                 }
 
                 return super.deleteSurroundingText(beforeLength, afterLength);
+            }
+
+            @Override
+            public boolean commitText(CharSequence text, int newCursorPosition) {
+                if (dispatchCommittedText(text)) {
+                    return true;
+                }
+
+                return super.commitText(text, newCursorPosition);
             }
         };
     }
