@@ -28,7 +28,7 @@
 #define FB_DATADESC_PACKED
 
 typedef long fb_off_t;
-typedef long ssize_t;
+typedef int ssize_t;
 int _stricmp(const char *s1, const char *s2);
 int _strnicmp(const char *s1, const char *s2, size_t n);
 #define strcasecmp  _stricmp
