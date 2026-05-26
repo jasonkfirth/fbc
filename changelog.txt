@@ -15,6 +15,14 @@ Version 1.20.1
 - tools/Android: updated FreeBasicNativeActivity.java to work with the new input view for better soft keyboard integration
 - fbc-android: added --assets option and FBANDROID_ASSETS environment variable support to include arbitrary directories as APK assets, allowing data files and resources to be packaged with applications
 - fbc-android: added automatic threading detection that enables the multithreaded runtime when source code uses ThreadCreate, ThreadWait, MutexCreate, MutexLock, or MutexUnlock functions
+- rtlib: added GCC/Clang printf format attributes to array bounds checking, error message, string formatting, and I/O functions so printf-style format/argument mismatches trigger compiler warnings during strict linting
+- rtlib: added array dimension bounds checking with diagnostic formatting for array operations to help catch dimension mismatches during runtime
+- gfxlib2: corrected floating-point loop iterations in gfx_circle.c ellipse rendering to use integer loop counters with computed step counts, fixing linter warnings and potential floating-point accumulation errors
+- gfxlib2: fixed printf-style format argument handling in control and circle drawing code to pass linter format-attribute checks
+- sfxlib: added printf format attributes to diagnostics and mixer functions, and corrected format argument handling in capture and core mixer code to satisfy strict linting
+- compiler/macOS: corrected QB DATA descriptor alignment on macOS to satisfy strict compiler checking and fixed generated C patterns that Apple clang rejects
+- compiler/Darwin: added SDK discovery through SDKROOT and xcrun during compiler-driven builds to work around macOS toolchain variations
+- gfxlib2/Darwin: added GETJOYSTICK backend by mapping existing GameController-backed GETXPAD state onto the older joystick ABI, fixing STICK/STRIG and GETJOYSTICK links on macOS
 - build system: added first-class Wii target wiring across GNUmakefile and mk/, including compiler-wii, install-wii, devkitPPC/libogc toolchain flags, elf2dol propagation, target feature policy, and Wii runtime library installation layout
 - compiler: added the Wii/powerpc target to the target table, GNU target mapping, help output, per-target platform hook set, and linker flow; Wii builds now link through the devkitPPC GCC driver, produce an intermediate ELF, and convert it to a bootable DOL with elf2dol
 - compiler: keep target-specific library and framework policy in platform hook files, including Wii default library ordering and Xbox linkage against nxdk's network library
