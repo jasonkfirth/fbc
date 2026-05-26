@@ -211,14 +211,12 @@ FBCALL FBSTRING *fb_ConReadLine( int soft_cursor )
         }
 
         if( add_char ) {
-            tmp_buffer[tmp_buffer_len] = 0;
-        }
-
-        if( add_char ) {
             int old_x = current_x, old_y = current_y;
-            FBSTRING *str_add = fb_StrAllocTempDescF( tmp_buffer, tmp_buffer_len + 1 );
+            FBSTRING *str_add;
             FBSTRING *str_left = fb_StrMid( &result, 1, pos );
             FBSTRING *str_right = fb_StrMid( &result, pos + 1, len - pos);
+            tmp_buffer[tmp_buffer_len] = 0;
+            str_add = fb_StrAllocTempDescF( tmp_buffer, tmp_buffer_len + 1 );
             fb_StrAssign( &result, -1, str_left, -1, FALSE );
             fb_StrConcatAssign( &result, -1, str_add, -1, FALSE );
             fb_StrConcatAssign( &result, -1, str_right, -1, FALSE );

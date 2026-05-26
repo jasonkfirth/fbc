@@ -52,6 +52,24 @@ FBCALL void *fb_ArrayDimensionChk
 		const char *variablename
 	);
 
+/* Legacy entry points kept for debug runtimes built by older compilers. */
+FBCALL void *fb_ArrayBoundChk
+	(
+		ssize_t idx,
+		ssize_t lbound,
+		ssize_t ubound,
+		int linenum,
+		const char *filename
+	);
+
+FBCALL void *fb_ArraySngBoundChk
+	(
+		size_t idx,
+		size_t ubound,
+		int linenum,
+		const char *filename
+	);
+
 FBCALL size_t     fb_ArrayLen          ( FBARRAY *array );
 FBCALL size_t     fb_ArraySize         ( FBARRAY *array );
        void       fb_hArrayCtorObj     ( FBARRAY *array, FB_DEFCTOR ctor );

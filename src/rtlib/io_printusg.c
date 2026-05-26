@@ -67,7 +67,7 @@ typedef struct {
  * TODO: use a proper implementation: most/all platforms       *
  * have specific functions built-in for this                   */
 
-static long long hDoubleToLongBits(double d)
+static unsigned long long hDoubleToLongBits(double d)
 {
 	union{ double d; unsigned long long ll; } dtoll;
 	dtoll.d = d;
@@ -76,27 +76,27 @@ static long long hDoubleToLongBits(double d)
 
 static int hIsNeg(double d)
 {
-	return hDoubleToLongBits(d) < 0ll;
+	return (hDoubleToLongBits(d) & 0x8000000000000000ull) != 0ull;
 }
 
 static int hIsZero(double d)
 {
-	return (hDoubleToLongBits(d) & 0x7fffffffffffffffll) == 0ll;
+	return (hDoubleToLongBits(d) & 0x7fffffffffffffffull) == 0ull;
 }
 
 static int hIsFinite(double d)
 {
-	return (hDoubleToLongBits(d) & 0x7ff0000000000000ll) < 0x7ff0000000000000ll;
+	return (hDoubleToLongBits(d) & 0x7ff0000000000000ull) < 0x7ff0000000000000ull;
 }
 
 static int hIsInf(double d)
 {
-	return (hDoubleToLongBits(d) & 0x7fffffffffffffffll) == 0x7ff0000000000000ll;
+	return (hDoubleToLongBits(d) & 0x7fffffffffffffffull) == 0x7ff0000000000000ull;
 }
 
 static int hIsInd(double d)
 {
-	return (hDoubleToLongBits(d) == (long long)0xfff8000000000000ll);
+	return hDoubleToLongBits(d) == 0xfff8000000000000ull;
 }
 
 static int hIsNan(double d)

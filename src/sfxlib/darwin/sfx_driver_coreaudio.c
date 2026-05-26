@@ -211,13 +211,13 @@ static CFStringRef fb_sfxDarwinCopyDeviceUID(AudioDeviceID device)
     addr.mElement = kAudioObjectPropertyElementMain;
 
     uid = NULL;
-    size = (UInt32)sizeof(uid);
+    size = (UInt32)sizeof(CFStringRef);
     status = AudioObjectGetPropertyData(device,
                                         &addr,
                                         0,
                                         NULL,
                                         &size,
-                                        &uid);
+                                        (void *)&uid);
     if (status != noErr || !uid)
     {
         fb_sfxDarwinLogStatus("AudioObjectGetPropertyData(device uid)", status);
@@ -248,8 +248,8 @@ static int fb_sfxDarwinApplySelectedOutputDevice(void)
 
     status = AudioQueueSetProperty(g_audio_queue,
                                    kAudioQueueProperty_CurrentDevice,
-                                   &uid,
-                                   (UInt32)sizeof(uid));
+                                   (const void *)&uid,
+                                   (UInt32)sizeof(CFStringRef));
     CFRelease(uid);
 
     if (status != noErr)

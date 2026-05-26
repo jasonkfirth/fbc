@@ -1388,8 +1388,8 @@ static void fb_hDarwinWarpMouse(int x, int y)
 	x = MID(0, x, fb_darwin.width - 1);
 	y = MID(0, y, fb_darwin.height - 1);
 
-	view_pt.x = (CGFloat)(fb_darwin.draw_offset_x + (x * fb_darwin.scale) + (fb_darwin.scale / 2));
-	view_pt.y = (CGFloat)(fb_darwin.draw_offset_y + (y * fb_darwin.scale) + (fb_darwin.scale / 2));
+	view_pt.x = (CGFloat)(fb_darwin.draw_offset_x + (x * fb_darwin.scale)) + ((CGFloat)fb_darwin.scale / 2.0);
+	view_pt.y = (CGFloat)(fb_darwin.draw_offset_y + (y * fb_darwin.scale)) + ((CGFloat)fb_darwin.scale / 2.0);
 	window_pt = fb_msg_point_point_id((id)fb_darwin.view, "convertPoint:toView:", view_pt, nil);
 	screen_pt = fb_msg_point_point((id)fb_darwin.window, "convertBaseToScreen:", window_pt);
 	display_bounds = CGDisplayBounds(CGMainDisplayID());

@@ -854,7 +854,9 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
         if (!__fb_sfx ||
             __fb_sfx->driver != driver ||
             __fb_sfx->shutting_down ||
-            !__fb_sfx->mixbuffer)
+            !__fb_sfx->mixbuffer ||
+            !driver ||
+            !driver->write)
         {
             driver = (__fb_sfx) ? __fb_sfx->driver : NULL;
             continue;
@@ -878,7 +880,11 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
         fb_sfxDriverIoLock();
         fb_sfxRuntimeLock();
 
-        if (!__fb_sfx || __fb_sfx->driver != driver || __fb_sfx->shutting_down)
+        if (!__fb_sfx ||
+            __fb_sfx->driver != driver ||
+            __fb_sfx->shutting_down ||
+            !driver ||
+            !driver->write)
         {
             fb_sfxDriverIoUnlock();
             driver = (__fb_sfx) ? __fb_sfx->driver : NULL;

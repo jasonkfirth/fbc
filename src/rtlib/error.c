@@ -2,6 +2,13 @@
 
 #include "fb.h"
 
+#if defined(__GNUC__) || defined(__clang__)
+#define FB_ERROR_PRINTF_FORMAT( format_index, first_arg ) \
+	__attribute__((format(printf, format_index, first_arg)))
+#else
+#define FB_ERROR_PRINTF_FORMAT( format_index, first_arg )
+#endif
+
 static const char *messages[] = {
 	"",                                     /* FB_RTERROR_OK */
 	"illegal function call",                /* FB_RTERROR_ILLEGALFUNCTIONCALL */
@@ -24,6 +31,9 @@ static const char *messages[] = {
 	"array not dimensioned",                /* FB_RTERROR_NOTDIMENSIONED */
 	"wrong number of dimensions"            /* FB_RTERROR_WRONGDIMENSIONS */
 };
+
+static void hAppendErrorMsg( int *pos, const char *fmt, ... )
+	FB_ERROR_PRINTF_FORMAT( 2, 3 );
 
 static void hAppendErrorMsg( int *pos, const char *fmt, ... )
 {

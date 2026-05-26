@@ -4,7 +4,17 @@
 
 /* DEV_LPT_INFO->driver_opaque := (FILE *) file_handle */
 
+#if defined(__GNUC__) || defined(__clang__)
+#define FB_LP_PRINTF_FORMAT( format_index, first_arg ) \
+	__attribute__((format(printf, format_index, first_arg)))
+#else
+#define FB_LP_PRINTF_FORMAT( format_index, first_arg )
+#endif
+
 static char lp_buf[256];
+
+static int append_lp_cmd( char *dst, size_t dst_len, const char *fmt, ... )
+	FB_LP_PRINTF_FORMAT( 3, 4 );
 
 static int append_lp_cmd( char *dst, size_t dst_len, const char *fmt, ... )
 {

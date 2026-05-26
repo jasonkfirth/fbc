@@ -30,10 +30,9 @@ FBCALL void fb_GfxControl_s( int what, FBSTRING *param )
 		break;
 
 	case GET_GL_EXTENSIONS:
-		if ((!__fb_gfx) || (!(__fb_gfx->flags & OPENGL_SUPPORT)))
-			src = &__fb_ctx.null_desc;
+		src = &__fb_ctx.null_desc;
 #ifndef DISABLE_OPENGL
-		else
+		if ((__fb_gfx) && (__fb_gfx->flags & OPENGL_SUPPORT))
 			src = fb_StrAllocTempDescF( __fb_gl.extensions, strlen(__fb_gl.extensions) + 1 );
 #endif
 		fb_StrAssign( param, -1, src, -1, FB_FALSE );

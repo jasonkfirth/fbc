@@ -4,6 +4,13 @@
 #include <math.h>
 #include <stdarg.h>
 
+#if defined(__GNUC__) || defined(__clang__)
+#define FB_FORMAT_PRINTF_FORMAT( format_index, first_arg ) \
+	__attribute__((format(printf, format_index, first_arg)))
+#else
+#define FB_FORMAT_PRINTF_FORMAT( format_index, first_arg )
+#endif
+
 typedef enum _eMaskType {
 	eMT_Unknown = 0,
 	eMT_Number,
@@ -141,6 +148,9 @@ static double fb_wii_truncate_unreliable_digits( double value, int digits )
 		return ceil( value / scale ) * scale;
 }
 #endif
+
+static ssize_t hSnprintf( char *buffer, size_t size, const char *format, ... )
+	FB_FORMAT_PRINTF_FORMAT( 3, 4 );
 
 static ssize_t hSnprintf( char *buffer, size_t size, const char *format, ... )
 {

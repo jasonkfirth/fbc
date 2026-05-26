@@ -5,6 +5,7 @@
 #ifndef DISABLE_OPENGL
 
 #include <dlfcn.h>
+#include <stddef.h>
 
 static void *fb_darwin_opengl_lib = NULL;
 static int fb_darwin_opengl_tried = 0;

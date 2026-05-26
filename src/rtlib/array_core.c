@@ -32,7 +32,7 @@ ssize_t fb_hArrayCalcDiff
 	size_t i, elements;
 	ssize_t diff = 0;
 
-	if( dimensions <= 0 )
+	if( dimensions == 0 )
 		return 0;
 
 	for( i = 0; i < dimensions-1; i++ )

@@ -28,6 +28,8 @@
         with the same fastfft.bas helper used for mixer dumps.
 */
 
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -68,10 +70,17 @@ static int fb_sfxDriverDumpFrameLimit(void)
 
         if (value && *value)
         {
-            int parsed = atoi(value);
+            char *endptr;
+            long parsed;
 
-            if (parsed > 0)
-                limit = parsed;
+            errno = 0;
+            parsed = strtol(value, &endptr, 10);
+
+            if ((errno == 0) && (endptr != value) && (*endptr == '\0') &&
+                (parsed > 0) && (parsed <= INT_MAX))
+            {
+                limit = (int)parsed;
+            }
         }
     }
 

@@ -9,6 +9,12 @@
 #include <signal.h>
 #ifndef DISABLE_NCURSES
 #include <termcap.h>
+
+/*
+ * Some termcap headers, including Apple's ncurses 6.0 termcap.h, declare
+ * capability id arguments as char * even though the functions only read them.
+ */
+#define FB_TERMCAP_ID( id ) ((char *)(id))
 #endif
 
 #if defined HOST_LINUX && (defined HOST_X86 || defined HOST_X86_64)
@@ -658,15 +664,15 @@ static void hInit( void )
 	if ((!term) || (tgetent(buffer, term) <= 0))
 		return;
 	BC = UP = 0;
-	p = tgetstr("pc", NULL);
+	p = tgetstr(FB_TERMCAP_ID( "pc" ), NULL);
 	PC = p ? *p : 0;
 	if (tcgetattr(1, &tty))
 		return;
 	ospeed = cfgetospeed(&tty);
-	if (!tgetflag("am"))
+	if (!tgetflag(FB_TERMCAP_ID( "am" )))
 		return;
 	for (i = 0; i < SEQ_MAX; i++)
-		__fb_con.seq[i] = tgetstr((char*)seq[i], NULL);
+		__fb_con.seq[i] = tgetstr(FB_TERMCAP_ID( seq[i] ), NULL);
 #endif
 
 	/* !!!TODO!!! detect other OS consoles? (freebsd: 'cons25', etc?) */

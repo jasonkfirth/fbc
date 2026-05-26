@@ -171,18 +171,25 @@ FBCALL void fb_GfxEllipse(void *target, float fx, float fy, float radius, unsign
 		DRIVER_LOCK();
 
 		top = bottom = y;
-		for (; start < end + (increment / 2); start += increment) {
-			get_arc_point(start, a, b, &x1, &y1);
-			x1 = x + x1;
-			y1 = y - y1;
-			if ((x1 < context->view_x) || (x1 >= context->view_x + context->view_w) ||
-			    (y1 < context->view_y) || (y1 >= context->view_y + context->view_h))
-				continue;
-			context->put_pixel(context, x1, y1, color);
-			if (y1 > bottom)
-				bottom = y1;
-			if (y1 < top)
-				top = y1;
+		{
+			int i;
+			int steps = (int)((end - start) / increment + 0.5f);
+
+			for (i = 0; i <= steps; i++) {
+				float angle = start + (i * increment);
+
+				get_arc_point(angle, a, b, &x1, &y1);
+				x1 = x + x1;
+				y1 = y - y1;
+				if ((x1 < context->view_x) || (x1 >= context->view_x + context->view_w) ||
+				    (y1 < context->view_y) || (y1 >= context->view_y + context->view_h))
+					continue;
+				context->put_pixel(context, x1, y1, color);
+				if (y1 > bottom)
+					bottom = y1;
+				if (y1 < top)
+					top = y1;
+			}
 		}
 	} else {
 		DRIVER_LOCK();

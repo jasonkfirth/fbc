@@ -2,6 +2,21 @@
 
 #include "fb.h"
 
+#if defined(__GNUC__) || defined(__clang__)
+#define FB_ARRAY_PRINTF_FORMAT( format_index, first_arg ) \
+	__attribute__((format(printf, format_index, first_arg)))
+#else
+#define FB_ARRAY_PRINTF_FORMAT( format_index, first_arg )
+#endif
+
+static void hAppendMsg
+	(
+		char *msg,
+		int *pos,
+		const char *fmt,
+		...
+	) FB_ARRAY_PRINTF_FORMAT( 3, 4 );
+
 static void hAppendMsg
 	(
 		char *msg,

@@ -30,6 +30,15 @@ FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, 
 
 #else
 
+/*
+ * Some Darwin SDK libffi headers test FFI_GO_CLOSURES without defining it
+ * first.  Define it to the value the preprocessor would otherwise use so
+ * strict -Wundef builds can include the system header cleanly.
+ */
+#ifndef FFI_GO_CLOSURES
+#define FFI_GO_CLOSURES 0
+#endif
+
 #include <ffi.h>
 
 #define FB_THREADCALL_MAX_ELEMS 1024

@@ -104,6 +104,9 @@ Version 1.20.1
 - examples: documented the Windows win32/win64 compile sweeps in examples/windows-example-notes.md, including the remaining old third-party library families that need a clean redistributable library set or later pruning
 - examples: documented the Cygwin compile sweep in examples/cygwin-example-notes.md, noting that the core examples compile and the remaining out-of-box failures are optional external-library link gaps
 - examples: added build_scripts/exampleageddon-freebasic.py to compile the full examples tree, classify external/platform/helper/interactive cases, run unattended self-contained examples from isolated out/ working directories, and write CSV/Markdown reports for future sweeps
+- examples/macOS: hardened the Exampleageddon runner around multi-file examples, timeout handling, and source-tree copying so the installed Darwin compiler can repeatedly compile and run self-contained examples from isolated work directories
+- macOS packaging: make build_scripts/macos-build-freebasic.sh work more consistently on Intel and Apple Silicon hosts by discovering Homebrew from either common prefix, accepting the aarch64 arch spelling, checking the selected GCC driver, using a portable version sort, and verifying the expected tar.xz/.pkg outputs
+- macOS tests: added gfxlib and sfxlib command-sweep programs that compile and run every compiler-registered graphics and sound command surface available on the platform, including null-driver gfx/sfx coverage and QB-only STICK/STRIG linkage coverage
 - tests: expanded the build/test harness to support compile-and-link tests that need fbc's automatic runtime library selection instead of separate compile/link steps
 - tests: refreshed warning-test expectations to match the compiler's corrected "Ambiguous" diagnostic spelling
 
@@ -200,6 +203,8 @@ Version 1.20.1
 - compiler: model LoongArch64 GCC __builtin_va_list as a void pointer type so C++ symbol mangling agrees with g++ for cva_list parameters
 - compiler/gas64: fix cycle-profiler epilog assembly emission so -profgen cycles no longer emits a malformed "mov rcx, rdx,KNOFREE" instruction
 - compiler/gas64: treat Haiku x86_64 as a System V assembler target for profiling sections, fixing Haiku cycle-profiling example builds under exampleageddon
+- compiler/Darwin: locate the macOS SDK through SDKROOT or xcrun during compiler-driven builds, fix QB DATA descriptor alignment on Darwin, and keep Apple clang from seeing computed-goto patterns that it rejects in generated C
+- gfxlib2/Darwin: provide the missing GETJOYSTICK backend by mapping the existing GameController-backed GETXPAD state onto the older joystick ABI, fixing STICK/STRIG and GETJOYSTICK links on macOS
 - Haiku rtlib: raise the FreeBASIC-created pthread stack floor to 8 MiB so threaded TCP INPUT paths do not crash on Haiku's small PTHREAD_STACK_MIN
 - Haiku package validation: use image-specific anyboot extraction, make latest-nightly selection pipefail-safe, run the real Haiku sfxlib driver instead of the null driver, verify QEMU HDA WAV capture after VM shutdown, and archive the .hpkg, logs, SHA256SUMS, and audio WAV under out/haiku/x86-64
 - Haiku package validation: add exampleageddon to the VM package test pass, support staging a cached python3 .hpkg for the example sweep, and lengthen Python package activation timeouts so slow mirrors do not leave partial packages behind

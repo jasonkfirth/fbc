@@ -4,6 +4,12 @@
 #include "fb_private_console.h"
 #ifndef DISABLE_NCURSES
 #include <termcap.h>
+
+/*
+ * Some termcap headers, including Apple's ncurses 6.0 termcap.h, declare
+ * capability id arguments as char * even though the functions only read them.
+ */
+#define FB_TERMCAP_ID( id ) ((char *)(id))
 #endif
 
 /*#define DEBUG_TGETSTR*/
@@ -126,7 +132,7 @@ static void init_keys(void)
 		 * TERM=xterm vs. TERM=linux) and perhaps depend on other
 		 * factors aswell.
 		 */
-		key = tgetstr(data->cap, NULL);
+		key = tgetstr(FB_TERMCAP_ID( data->cap ), NULL);
 
 #ifdef DEBUG_TGETSTR
 		fprintf(stderr, "tgetstr( %s ) =", data->cap);
