@@ -60,7 +60,24 @@ end function
 private function fbcDarwinPlatformGetSdkRoot( ) as string
 	dim as string sdkroot = environ( "SDKROOT" )
 
+	if( len( sdkroot ) > 0 ) then
+		function = sdkroot
+		exit function
+	end if
+
+	''
+	'' Modern macOS systems usually keep startup objects such as crt1.10.5.o
+	'' inside the Command Line Tools SDK instead of a default linker search
+	'' directory.  Query xcrun here so an in-tree compiler behaves like the
+	'' packaged wrapper even when SDKROOT was not exported by the shell.
+	''
+	sdkroot = hGet1stOutputLineFromCommand( "xcrun --sdk macosx --show-sdk-path 2>/dev/null" )
 	if( len( sdkroot ) = 0 ) then
+		exit function
+	end if
+
+	if( hFileExists( sdkroot + FB_HOST_PATHDIV + "usr" + FB_HOST_PATHDIV + _
+		"lib" + FB_HOST_PATHDIV + "crt1.o" ) = FALSE ) then
 		exit function
 	end if
 

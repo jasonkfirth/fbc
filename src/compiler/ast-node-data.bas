@@ -278,9 +278,12 @@ private sub hCreateDataDesc( )
 	end if
 	''
 	'' Darwin/Mach-O linkers warn about pointer relocations that are not
-	'' naturally aligned.  The runtime uses the same Darwin-only layout.
+	'' naturally aligned.  Make the compiler-private DATA descriptor
+	'' explicitly pointer-aligned here; align=0 is not enough because
+	'' symbStructBegin() intentionally maps it to FIELD=1 under -lang qb.
+	'' The runtime uses the same Darwin-only layout.
 	if( env.clopt.target = FB_COMPTARGET_DARWIN ) then
-		pack = 0
+		pack = env.pointersize
 	end if
 
 	ast.data.desc = symbStructBegin( NULL, NULL, NULL, "__FB_DATADESC$", NULL, FALSE, pack, FALSE, 0, 0 )

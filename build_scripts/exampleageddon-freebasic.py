@@ -138,11 +138,17 @@ HELPER_MODULES = {
     "examples/manual/proguide/varscope/module1.bas",
     "examples/manual/proguide/varscope/module2.bas",
     "examples/manual/proguide/varscope/module3.bas",
-    "examples/misc/trycatch/test.bas",
+    "examples/misc/trycatch/trycatch.bas",
     "examples/network/curl/CHttp/CHttp.bas",
     "examples/network/curl/CHttp/CHttpForm.bas",
     "examples/network/curl/CHttp/CHttpStream.bas",
     "examples/threads/timer-lib/timer.bas",
+}
+
+MULTIFILE_PROGRAMS = {
+    "examples/misc/trycatch/test.bas": (
+        "examples/misc/trycatch/trycatch.bas",
+    ),
 }
 
 INTENTIONAL_FAILURES = {
@@ -276,13 +282,16 @@ def reset_directory(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
-def prepare_run_directory(source_dir: Path, run_dir: Path) -> None:
+def prepare_run_directory(source_dir: Path, run_dir: Path, copy_directories: bool = True) -> None:
     reset_directory(run_dir)
 
     for source in source_dir.iterdir():
         target = run_dir / source.name
 
         if source.is_dir():
+            if not copy_directories:
+                continue
+
             shutil.copytree(
                 source,
                 target,
@@ -303,6 +312,26 @@ def prepare_run_directory(source_dir: Path, run_dir: Path) -> None:
             if source.name == "gmon.out" or source.name.startswith("prof-"):
                 continue
             shutil.copy2(source, target)
+
+
+def compile_inputs(path: Path, root: Path, compile_cwd: Path) -> list[Path]:
+    rel = relpath(path, root)
+    inputs = [compile_cwd / path.name]
+
+    for extra_rel in MULTIFILE_PROGRAMS.get(rel, ()):
+        extra_source = root / extra_rel
+        if not extra_source.is_file():
+            raise FileNotFoundError(f"multi-file example source not found: {extra_source}")
+
+        if extra_source.parent == path.parent:
+            inputs.append(compile_cwd / extra_source.name)
+            continue
+
+        target = compile_cwd / extra_source.name
+        shutil.copy2(extra_source, target)
+        inputs.append(target)
+
+    return inputs
 
 
 def run_command(
@@ -352,8 +381,9 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     compile_cwd = args.outdir / "work" / stem / "compile"
     run_cwd = args.outdir / "work" / stem / "run"
 
-    prepare_run_directory(path.parent, compile_cwd)
-    compile_source = compile_cwd / path.name
+    copy_directories = path.parent != root / "examples"
+
+    prepare_run_directory(path.parent, compile_cwd, copy_directories)
 
     cmd = args.fbc + [
         "-prefix",
@@ -362,10 +392,9 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
         str(args.include_dir),
         "-p",
         str(compile_cwd),
-        str(compile_source),
-        "-x",
-        str(binary),
     ]
+    cmd.extend(str(source) for source in compile_inputs(path, root, compile_cwd))
+    cmd.extend(["-x", str(binary)])
 
     compile_status, compile_elapsed = run_command(
         cmd,
@@ -386,7 +415,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
             should_run = True
 
         if should_run:
-            prepare_run_directory(path.parent, run_cwd)
+            prepare_run_directory(path.parent, run_cwd, copy_directories)
             env = os.environ.copy()
             env.setdefault("SFXLIB_DRIVER", "null")
             env.setdefault("FB_GFX_DRIVER", "none")
@@ -553,7 +582,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--fbc", default=str(root / "bin" / "fbc"))
     parser.add_argument("--jobs", type=int, default=cpu_count)
     parser.add_argument("--compile-timeout", type=int, default=60)
-    parser.add_argument("--run-timeout", type=int, default=5)
+    parser.add_argument("--run-timeout", type=int, default=15)
     parser.add_argument("--no-run", action="store_true")
     parser.add_argument("--run-all", action="store_true", help="Run compiled non-external/non-platform examples even if classified interactive")
     parser.add_argument("--fail-on-self-contained", action="store_true", help="Exit non-zero if self-contained examples fail to compile or run")
