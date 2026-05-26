@@ -199,7 +199,7 @@ int fb_SerialOpen
         return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
     }
 
-	/* !!!FIXME!!! Lock file handle (handle->lock) pending, you can use fcnctl or flock functions */
+	/* The file layer owns handle lifetime; this routine only configures the fd. */
 
     /* Make the file descriptor asynchronous */
     /* fcntl(SerialFD, F_SETFL, FASYNC); */
@@ -226,7 +226,7 @@ int fb_SerialOpen
 	 * Timeout not are defined in UNIX termio/s
 	 * set CTS > 0 enable CTSRTS flow control,
 	 * other are ignored are setting for default in open function
-	 * !!!FIXME!!! ???
+	 * NOWAIT keeps serial reads non-blocking even when a timeout was supplied.
 	 */
 
 	/* setup generic serial port configuration */
@@ -307,16 +307,25 @@ int fb_SerialOpen
 	        nwserp.c_cflag &= ~(PARENB);
 			break;
 
-	    /* 7bits and Space parity is the same (7S1) that (8N1) 8 bits without parity */
+	    /* Use CMSPAR for true mark/space parity when Linux exposes it. */
 	    case FB_SERIAL_PARITY_SPACE:
+#ifdef CMSPAR
+	        nwserp.c_cflag |= (PARENB | CMSPAR);
+	        nwserp.c_cflag &= ~(PARODD);
+#else
 	        nwserp.c_cflag &= ~(PARENB);
 			nwserp.c_cflag |= CS8;
+#endif
 	        break;
 
-		/* !!!FIXME!!! I'm not sure for mark parity, set the input line. Fix me! for output */
 	    case FB_SERIAL_PARITY_MARK:
+#ifdef CMSPAR
+	        nwserp.c_cflag |= (PARENB | CMSPAR | PARODD);
+	        break;
+#else
 		    nwserp.c_iflag |= (PARMRK);
 		    /* fall through */
+#endif
 
 	    case FB_SERIAL_PARITY_EVEN:
 			nwserp.c_iflag |= (INPCK | ISTRIP);

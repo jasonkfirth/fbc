@@ -1,5 +1,7 @@
 #include "../fb.h"
 #include "fb_private_console.h"
+#include <errno.h>
+#include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -66,29 +68,59 @@ FBCALL int fb_ExecEx( FBSTRING *program, FBSTRING *args, int do_fork )
 	FB_UNLOCK( );
 
 	if( do_fork ) {
+		int exec_status_pipe[2] = { -1, -1 };
+
+		if( pipe( exec_status_pipe ) != 0 ) {
+			exec_status_pipe[0] = -1;
+			exec_status_pipe[1] = -1;
+		} else {
+			fcntl( exec_status_pipe[0], F_SETFD, FD_CLOEXEC );
+			fcntl( exec_status_pipe[1], F_SETFD, FD_CLOEXEC );
+		}
+
 		pid = fork();
 		if( pid != -1 ) {
 			if (pid == 0) {
+				if( exec_status_pipe[0] != -1 )
+					close( exec_status_pipe[0] );
+
 				/* execvp() only returns if it failed */
 				execvp( buffer, argv );
-				/* HACK: execvp() failed, this must be communiated to the parent process *somehow*,
-				   so fb_ExecEx() can return -1 there */
+
+				if( exec_status_pipe[1] != -1 ) {
+					int exec_errno = errno;
+					write( exec_status_pipe[1], &exec_errno, sizeof( exec_errno ) );
+					close( exec_status_pipe[1] );
+				}
+
 				/* Using _exit() instead of exit() to prevent the child from flusing file I/O and
 				   running global destructors (especially the rtlib's own cleanup), which may try
 				   to wait on threads to finish (e.g. hinit.c::bg_thread()), but fork() doesn't
 				   duplicate other threads besides the current one, so their pthread handles will be
 				   invalid here in the child process. */
 				_exit( 255 );
-				/* FIXME: won't be able to tell the difference if the exec'ed program returned 255.
-				   Maybe a pipe could be used instead of the 255 exit code? Unless that's too slow/has side-effects */
 			} else if( (waitpid(pid, &status, 0) > 0) && WIFEXITED(status) ) {
-				res = WEXITSTATUS(status);
-				if( res == 255 ) {
-					/* See the HACK above */
+				int exec_errno = 0;
+				ssize_t exec_errno_size = 0;
+
+				if( exec_status_pipe[1] != -1 )
+					close( exec_status_pipe[1] );
+				exec_status_pipe[1] = -1;
+
+				if( exec_status_pipe[0] != -1 )
+					exec_errno_size = read( exec_status_pipe[0], &exec_errno, sizeof( exec_errno ) );
+
+				if( exec_errno_size == sizeof( exec_errno ) )
 					res = -1;
-				}
+				else
+					res = WEXITSTATUS(status);
 			}
 		}
+
+		if( exec_status_pipe[0] != -1 )
+			close( exec_status_pipe[0] );
+		if( exec_status_pipe[1] != -1 )
+			close( exec_status_pipe[1] );
 	} else {
 		res = execvp( buffer, argv );
 	}

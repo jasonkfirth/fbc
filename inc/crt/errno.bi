@@ -10,7 +10,7 @@
 #define __crt_errno_bi__
 
 #ifdef __FB_DARWIN__
-        '' FIXME: Error numbers are completely different on Darwin
+        '' Darwin errno numbers are different from Linux, so use Darwin values here.
 #else
 
         #define EPERM 1

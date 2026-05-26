@@ -85,6 +85,32 @@ private constructor SizeF (byval w as REAL, byval h as REAL)
 	this.height = h
 end constructor
 
+private operator SizeF.+= (byref sz as SizeF)
+	this.Width += sz.Width
+	this.Height += sz.Height
+end operator
+
+private operator SizeF.-= (byref sz as SizeF)
+	this.Width -= sz.Width
+	this.Height -= sz.Height
+end operator
+
+private function SizeF.Equals (byref sz as SizeF) as BOOL
+	return (this.Width = sz.Width) and (this.Height = sz.Height)
+end function
+
+private function SizeF.Empty () as BOOL
+	return (this.Width = 0) and (this.Height = 0)
+end function
+
+private operator + (byref lhs as SizeF, byref sz as SizeF) as SizeF
+	return SizeF( lhs.Width + sz.Width, lhs.Height + sz.Height )
+end operator
+
+private operator - (byref lhs as SizeF, byref sz as SizeF) as SizeF
+	return SizeF( lhs.Width - sz.Width, lhs.Height - sz.Height )
+end operator
+
 type Size
     declare constructor ()
     declare constructor (byref sz as Size)
@@ -115,6 +141,32 @@ private constructor Size (byval w as INT_, byval h as INT_)
 	this.width = w
 	this.height = h
 end constructor
+
+private operator Size.+= (byref sz as Size)
+	this.Width += sz.Width
+	this.Height += sz.Height
+end operator
+
+private operator Size.-= (byref sz as Size)
+	this.Width -= sz.Width
+	this.Height -= sz.Height
+end operator
+
+private function Size.Equals (byref sz as Size) as BOOL
+	return (this.Width = sz.Width) and (this.Height = sz.Height)
+end function
+
+private function Size.Empty () as BOOL
+	return (this.Width = 0) and (this.Height = 0)
+end function
+
+private operator + (byref lhs as Size, byref sz as Size) as Size
+	return Size( lhs.Width + sz.Width, lhs.Height + sz.Height )
+end operator
+
+private operator - (byref lhs as Size, byref sz as Size) as Size
+	return Size( lhs.Width - sz.Width, lhs.Height - sz.Height )
+end operator
 
 type PointF
     declare constructor ()
@@ -152,6 +204,28 @@ private constructor PointF (byval x as REAL, byval y as REAL)
 	this.y = y
 end constructor
 
+private operator PointF.+= (byref pt as PointF)
+	this.X += pt.X
+	this.Y += pt.Y
+end operator
+
+private operator PointF.-= (byref pt as PointF)
+	this.X -= pt.X
+	this.Y -= pt.Y
+end operator
+
+private function PointF.Equals (byref pt as PointF) as BOOL
+	return (this.X = pt.X) and (this.Y = pt.Y)
+end function
+
+private operator + (byref lhs as PointF, byref pt as PointF) as PointF
+	return PointF( lhs.X + pt.X, lhs.Y + pt.Y )
+end operator
+
+private operator - (byref lhs as PointF, byref pt as PointF) as PointF
+	return PointF( lhs.X - pt.X, lhs.Y - pt.Y )
+end operator
+
 type Point
     declare constructor ()
     declare constructor (byref pt as Point)
@@ -187,6 +261,28 @@ private constructor Point (byval x as INT_, byval y as INT_)
 	this.x = x
 	this.y = y
 end constructor
+
+private operator Point.+= (byref pt as Point)
+	this.X += pt.X
+	this.Y += pt.Y
+end operator
+
+private operator Point.-= (byref pt as Point)
+	this.X -= pt.X
+	this.Y -= pt.Y
+end operator
+
+private function Point.Equals (byref pt as Point) as BOOL
+	return (this.X = pt.X) and (this.Y = pt.Y)
+end function
+
+private operator + (byref lhs as Point, byref pt as Point) as Point
+	return Point( lhs.X + pt.X, lhs.Y + pt.Y )
+end operator
+
+private operator - (byref lhs as Point, byref pt as Point) as Point
+	return Point( lhs.X - pt.X, lhs.Y - pt.Y )
+end operator
 
 type RectF
    	declare constructor ()
@@ -241,6 +337,147 @@ private constructor RectF (byref location as PointF, byref sz as SizeF)
 	this.Height = sz.height
 end constructor
 
+private function RectF.Clone () as RectF ptr
+	return new RectF( this.X, this.Y, this.Width, this.Height )
+end function
+
+private sub RectF.GetLocation (byval pt as PointF ptr)
+	if( pt <> NULL ) then
+		pt->X = this.X
+		pt->Y = this.Y
+	end if
+end sub
+
+private sub RectF.GetSize (byval sz as SizeF ptr)
+	if( sz <> NULL ) then
+		sz->Width = this.Width
+		sz->Height = this.Height
+	end if
+end sub
+
+private sub RectF.GetBounds (byval rect as RectF ptr)
+	if( rect <> NULL ) then
+		rect->X = this.X
+		rect->Y = this.Y
+		rect->Width = this.Width
+		rect->Height = this.Height
+	end if
+end sub
+
+private function RectF.GetLeft () as REAL
+	return this.X
+end function
+
+private function RectF.GetTop () as REAL
+	return this.Y
+end function
+
+private function RectF.GetRight () as REAL
+	return this.X + this.Width
+end function
+
+private function RectF.GetBottom () as REAL
+	return this.Y + this.Height
+end function
+
+private function RectF.IsEmptyArea () as BOOL
+	return (this.Width <= 0) or (this.Height <= 0)
+end function
+
+private function RectF.Equals (byref rect as RectF) as BOOL
+	return (this.X = rect.X) and (this.Y = rect.Y) and _
+	       (this.Width = rect.Width) and (this.Height = rect.Height)
+end function
+
+private function RectF.Contains (byval x as REAL, byval y as REAL) as BOOL
+	return (x >= this.GetLeft()) and (x < this.GetRight()) and _
+	       (y >= this.GetTop()) and (y < this.GetBottom())
+end function
+
+private function RectF.Contains (byref pt as PointF) as BOOL
+	return this.Contains( pt.X, pt.Y )
+end function
+
+private function RectF.Contains (byref rect as RectF) as BOOL
+	return (rect.GetLeft() >= this.GetLeft()) and (rect.GetRight() <= this.GetRight()) and _
+	       (rect.GetTop() >= this.GetTop()) and (rect.GetBottom() <= this.GetBottom())
+end function
+
+private sub RectF.Inflate (byval dx as REAL, byval dy as REAL)
+	this.X -= dx
+	this.Y -= dy
+	this.Width += dx * 2
+	this.Height += dy * 2
+end sub
+
+private sub RectF.Inflate (byref pt as PointF)
+	this.Inflate( pt.X, pt.Y )
+end sub
+
+private function RectF.Intersect (byref rect as RectF) as BOOL
+	dim result as RectF
+
+	if( this.Intersect( result, this, rect ) ) then
+		this = result
+		return TRUE
+	end if
+
+	this.X = 0
+	this.Y = 0
+	this.Width = 0
+	this.Height = 0
+	return FALSE
+end function
+
+private function RectF.Intersect (byref c as RectF, byref a as RectF, byref b as RectF) as BOOL
+	dim left_ as REAL = a.GetLeft()
+	dim top_ as REAL = a.GetTop()
+	dim right_ as REAL = a.GetRight()
+	dim bottom_ as REAL = a.GetBottom()
+
+	if( b.GetLeft() > left_ ) then left_ = b.GetLeft()
+	if( b.GetTop() > top_ ) then top_ = b.GetTop()
+	if( b.GetRight() < right_ ) then right_ = b.GetRight()
+	if( b.GetBottom() < bottom_ ) then bottom_ = b.GetBottom()
+
+	if( (right_ > left_) and (bottom_ > top_) ) then
+		c = RectF( left_, top_, right_ - left_, bottom_ - top_ )
+		return TRUE
+	end if
+
+	c = RectF()
+	return FALSE
+end function
+
+private function RectF.IntersectsWith (byval rect as RectF) as BOOL
+	return (rect.GetLeft() < this.GetRight()) and (this.GetLeft() < rect.GetRight()) and _
+	       (rect.GetTop() < this.GetBottom()) and (this.GetTop() < rect.GetBottom())
+end function
+
+private function RectF.Union_ (byref c as RectF, byref a as RectF, byref b as RectF) as BOOL
+	dim left_ as REAL = a.GetLeft()
+	dim top_ as REAL = a.GetTop()
+	dim right_ as REAL = a.GetRight()
+	dim bottom_ as REAL = a.GetBottom()
+
+	if( b.GetLeft() < left_ ) then left_ = b.GetLeft()
+	if( b.GetTop() < top_ ) then top_ = b.GetTop()
+	if( b.GetRight() > right_ ) then right_ = b.GetRight()
+	if( b.GetBottom() > bottom_ ) then bottom_ = b.GetBottom()
+
+	c = RectF( left_, top_, right_ - left_, bottom_ - top_ )
+	return TRUE
+end function
+
+private sub RectF.Offset (byref pt as PointF)
+	this.Offset( pt.X, pt.Y )
+end sub
+
+private sub RectF.Offset (byval dx as REAL, byval dy as REAL)
+	this.X += dx
+	this.Y += dy
+end sub
+
 type Rect
    	declare constructor ()
    	declare constructor (byval x as INT_, byval y as INT_, byval width as INT_, byval height as INT_)
@@ -294,6 +531,147 @@ private constructor Rect (byref location as Point, byref sz as Size)
 	this.Height = sz.height
 end constructor
 
+private function Rect.Clone () as Rect ptr
+	return new Rect( this.X, this.Y, this.Width, this.Height )
+end function
+
+private sub Rect.GetLocation (byval pt as Point ptr)
+	if( pt <> NULL ) then
+		pt->X = this.X
+		pt->Y = this.Y
+	end if
+end sub
+
+private sub Rect.GetSize (byval sz as Size ptr)
+	if( sz <> NULL ) then
+		sz->Width = this.Width
+		sz->Height = this.Height
+	end if
+end sub
+
+private sub Rect.GetBounds (byval rect as Rect ptr)
+	if( rect <> NULL ) then
+		rect->X = this.X
+		rect->Y = this.Y
+		rect->Width = this.Width
+		rect->Height = this.Height
+	end if
+end sub
+
+private function Rect.GetLeft () as INT_
+	return this.X
+end function
+
+private function Rect.GetTop () as INT_
+	return this.Y
+end function
+
+private function Rect.GetRight () as INT_
+	return this.X + this.Width
+end function
+
+private function Rect.GetBottom () as INT_
+	return this.Y + this.Height
+end function
+
+private function Rect.IsEmptyArea () as BOOL
+	return (this.Width <= 0) or (this.Height <= 0)
+end function
+
+private function Rect.Equals (byref rect as Rect) as BOOL
+	return (this.X = rect.X) and (this.Y = rect.Y) and _
+	       (this.Width = rect.Width) and (this.Height = rect.Height)
+end function
+
+private function Rect.Contains (byval x as INT_, byval y as INT_) as BOOL
+	return (x >= this.GetLeft()) and (x < this.GetRight()) and _
+	       (y >= this.GetTop()) and (y < this.GetBottom())
+end function
+
+private function Rect.Contains (byref pt as Point) as BOOL
+	return this.Contains( pt.X, pt.Y )
+end function
+
+private function Rect.Contains (byref rect as Rect) as BOOL
+	return (rect.GetLeft() >= this.GetLeft()) and (rect.GetRight() <= this.GetRight()) and _
+	       (rect.GetTop() >= this.GetTop()) and (rect.GetBottom() <= this.GetBottom())
+end function
+
+private sub Rect.Inflate (byval dx as INT_, byval dy as INT_)
+	this.X -= dx
+	this.Y -= dy
+	this.Width += dx * 2
+	this.Height += dy * 2
+end sub
+
+private sub Rect.Inflate (byref pt as Point)
+	this.Inflate( pt.X, pt.Y )
+end sub
+
+private function Rect.Intersect (byref rect as Rect) as BOOL
+	dim result as Rect
+
+	if( this.Intersect( result, this, rect ) ) then
+		this = result
+		return TRUE
+	end if
+
+	this.X = 0
+	this.Y = 0
+	this.Width = 0
+	this.Height = 0
+	return FALSE
+end function
+
+private function Rect.Intersect (byref c as Rect, byref a as Rect, byref b as Rect) as BOOL
+	dim left_ as INT_ = a.GetLeft()
+	dim top_ as INT_ = a.GetTop()
+	dim right_ as INT_ = a.GetRight()
+	dim bottom_ as INT_ = a.GetBottom()
+
+	if( b.GetLeft() > left_ ) then left_ = b.GetLeft()
+	if( b.GetTop() > top_ ) then top_ = b.GetTop()
+	if( b.GetRight() < right_ ) then right_ = b.GetRight()
+	if( b.GetBottom() < bottom_ ) then bottom_ = b.GetBottom()
+
+	if( (right_ > left_) and (bottom_ > top_) ) then
+		c = Rect( left_, top_, right_ - left_, bottom_ - top_ )
+		return TRUE
+	end if
+
+	c = Rect()
+	return FALSE
+end function
+
+private function Rect.IntersectsWith (byval rect as Rect) as BOOL
+	return (rect.GetLeft() < this.GetRight()) and (this.GetLeft() < rect.GetRight()) and _
+	       (rect.GetTop() < this.GetBottom()) and (this.GetTop() < rect.GetBottom())
+end function
+
+private function Rect.Union_ (byref c as Rect, byref a as Rect, byref b as Rect) as BOOL
+	dim left_ as INT_ = a.GetLeft()
+	dim top_ as INT_ = a.GetTop()
+	dim right_ as INT_ = a.GetRight()
+	dim bottom_ as INT_ = a.GetBottom()
+
+	if( b.GetLeft() < left_ ) then left_ = b.GetLeft()
+	if( b.GetTop() < top_ ) then top_ = b.GetTop()
+	if( b.GetRight() > right_ ) then right_ = b.GetRight()
+	if( b.GetBottom() > bottom_ ) then bottom_ = b.GetBottom()
+
+	c = Rect( left_, top_, right_ - left_, bottom_ - top_ )
+	return TRUE
+end function
+
+private sub Rect.Offset (byref pt as Point)
+	this.Offset( pt.X, pt.Y )
+end sub
+
+private sub Rect.Offset (byval dx as INT_, byval dy as INT_)
+	this.X += dx
+	this.Y += dy
+end sub
+
 type PathData
 	declare constructor ()
 	declare destructor ()
@@ -334,8 +712,5 @@ private constructor CharacterRange ()
 	this.First = 0
 	this.Length = 0
 end constructor
-
-
-'' !!!WRITEME!!! the SizeF, Size, PointF, Point, RectF, Rect, PathData and CharacterRange methods
 
 #endif

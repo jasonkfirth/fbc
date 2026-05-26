@@ -42,7 +42,10 @@ int fb_PrinterWrite( DEV_LPT_INFO *devInfo, const void *data, size_t length )
 
 int fb_PrinterWriteWstr( DEV_LPT_INFO *devInfo, const FB_WCHAR *data, size_t length )
 {
-    /* !!!FIXME!!! no support for unicode output */
+    /*
+    	DOS printer output is byte-oriented.  Convert through the runtime narrow
+    	string path before sending bytes to the LPT device.
+    */
 
     char *temp = alloca( length + 1 );
 

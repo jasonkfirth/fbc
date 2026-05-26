@@ -5,7 +5,10 @@
 
 void fb_ConsolePrintBufferWstrEx( const FB_WCHAR *buffer, size_t len, int mask )
 {
-    /* !!!FIXME!!! no support for unicode output */
+    /*
+    	DOS console output is byte-oriented.  Convert through the runtime narrow
+    	string path before handing the buffer to the existing console writer.
+    */
 
     char *temp = alloca( len + 1 );
 

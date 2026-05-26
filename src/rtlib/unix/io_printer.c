@@ -223,7 +223,7 @@ int fb_PrinterWriteWstr( DEV_LPT_INFO *devInfo, const FB_WCHAR *buffer, size_t c
 {
 	FILE *fp = (FILE *) devInfo->driver_opaque;
 
-	/* !!!FIXME!!! is this ok? */
+	/* Convert WSTRING printer output to UTF-8 bytes for the pipe backend. */
 	ssize_t bytes;
 	char *temp = alloca( chars * 4 + 1 );
 

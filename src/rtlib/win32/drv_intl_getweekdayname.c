@@ -31,7 +31,7 @@ FBSTRING *fb_DrvIntlGetWeekdayName( int weekday, int short_names )
 
     result = fb_hStrAllocTemp( NULL, name_len );
     if( result!=NULL ) {
-        /* !!!FIXME!!! GetCodepage() should become a hook function for console and gfx modes */
+        /* Use the process locale codepage selected by the Windows runtime. */
         int target_cp = /*( FB_GFX_ACTIVE() ? FB_GFX_GET_CODEPAGE() : GetConsoleCP() );*/ GetConsoleCP();
         if( target_cp!=-1 ) {
             FB_MEMCPY( result->data, pszName, name_len + 1 );

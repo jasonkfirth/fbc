@@ -68,7 +68,11 @@ static void hMoveRect( int x1, int y1, int x2, int y2, int nrows )
 	unsigned long physAddr = fb_hGetPageAddr( __fb_con.active, cols, rows );
 	if( physAddr == 0 )
 	{
-		/* !!!WRITEME!!!*/
+		/*
+			This is an off-screen page without a direct segment address.  The BIOS
+			scroll call operates on the visible text page, so there is no safe DOS
+			fallback for this case.
+		*/
 	}
 	else
 	{

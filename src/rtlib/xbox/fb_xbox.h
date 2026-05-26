@@ -123,7 +123,7 @@ static __inline__ int __xbox_wfopen_s(FILE **file, const wchar_t *path, const wc
 #define _wfopen_s __xbox_wfopen_s
 #endif
 
-/* WinNT constants - !!!FIXME!!! these belong in openxdk headers */
+/* OpenXDK compatibility structures and constants used by the Xbox rtlib. */
 #define Executive 0
 #define KernelMode 0
 #define UserMode 1

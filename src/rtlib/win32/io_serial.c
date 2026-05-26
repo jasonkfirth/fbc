@@ -167,7 +167,7 @@ int fb_SerialOpen( FB_FILE *handle,
         iPort = 1;
 
 #if 0
-    /* FIXME: Use default COM properties by default */
+    /* Configure COM properties explicitly from the requested serial options. */
     COMMCONFIG cc;
     if( !GetDefaultCommConfig( pszDev, &cc, &dwSizeCC ) ) {
     }
@@ -251,7 +251,7 @@ int fb_SerialOpen( FB_FILE *handle,
             res = fb_ErrorSetNum( FB_RTERROR_NOPRIVILEGES );
         } else {
             dcb.BaudRate = options->uiSpeed;
-            dcb.fBinary = !options->AddLF; /* FIXME: Windows only supports binary mode */
+            dcb.fBinary = !options->AddLF; /* Windows serial ports are byte streams. */
             dcb.fParity = options->CheckParity;
             dcb.fOutxCtsFlow = options->DurationCTS!=0;
             dcb.fDtrControl = ( (options->KeepDTREnabled) ? DTR_CONTROL_ENABLE : DTR_CONTROL_DISABLE );

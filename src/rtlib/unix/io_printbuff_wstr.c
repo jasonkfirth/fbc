@@ -13,8 +13,11 @@ void fb_ConsolePrintBufferWstrEx( const FB_WCHAR *buffer, size_t chars, int mask
 
 	if( !__fb_con.inited )
 	{
-		/* !!!FIXME!!! is this ok or should it be converted to UTF-8 too? */
-		fwrite( buffer, sizeof( FB_WCHAR ), chars, stdout );
+		ssize_t bytes;
+		temp = alloca( chars * 4 + 1 );
+		fb_WCharToUTF( FB_FILE_ENCOD_UTF8, buffer, chars, temp, &bytes );
+		temp[bytes] = '\0';
+		fwrite( temp, 1, bytes, stdout );
 		fflush( stdout );
 		return;
 	}
@@ -31,8 +34,10 @@ void fb_ConsolePrintBufferWstrEx( const FB_WCHAR *buffer, size_t chars, int mask
 	if (avail < avail_len)
 		avail_len = avail;
 
-	/* !!!FIXME!!! to support unicode the char_buffer would have to be a wchar_t,
-				   slowing down non-unicode printing.. */
+	/*
+		The console shadow buffer is byte-oriented, so it intentionally stores a
+		narrow approximation while the terminal receives UTF-8 below.
+	*/
 	fb_wstr_ConvToA( temp, avail_len, buffer );
 
 	memcpy( __fb_con.char_buffer + ((__fb_con.cur_y - 1) * __fb_con.w) + __fb_con.cur_x - 1,

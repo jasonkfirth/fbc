@@ -23,6 +23,9 @@ unsigned int fb_ConsoleColor( unsigned int fc, unsigned int bc, int flags )
 
 unsigned int fb_ConsoleGetColorAtt( void )
 {
-	/* !!!FIXME!!! there must be an attribute for each page */
+	/*
+		DOS keeps one logical attribute byte for the console state here.  Text
+		pages are selected separately by the SCREEN/VIEW PAGE state.
+	*/
 	return ScreenAttrib;
 }

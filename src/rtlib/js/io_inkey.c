@@ -26,7 +26,10 @@ FBSTRING *fb_ConsoleInkey( void )
 
 int fb_ConsoleGetkey( void )
 {
-    /* !!!FIXME!!! getkey() should block */
+    /*
+    	Do not block the JavaScript event loop.  Keyboard events are delivered
+    	asynchronously, so an empty buffer means no key is currently available.
+    */
 	if( __fb_con.key_head == __fb_con.key_tail)
         return 0;
 

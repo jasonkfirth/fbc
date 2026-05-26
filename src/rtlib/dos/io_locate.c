@@ -42,7 +42,11 @@ int fb_ConsoleLocate_BIOS( int row, int col, int cursor )
     else
         y = (usShapePos >> 8) & 0xFF;
 
-    /* !!!FIXME!!! is this really needed? */
+    /*
+    	Keep the BIOS cursor position synchronized before changing the visible
+    	hardware cursor shape.  Some DOS targets use the BIOS cursor state as
+    	the authoritative location when pages are switched.
+    */
     regs.x.ax = 0x0200;
     regs.x.bx = __fb_con.active;
     regs.h.dh = (unsigned char) y;

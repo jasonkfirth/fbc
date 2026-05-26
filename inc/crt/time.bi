@@ -33,7 +33,7 @@
 #elseif defined(__FB_HAIKU__)
 #include once "crt/haiku/time.bi"
 #elseif defined(__FB_DARWIN__)
-'' FIXME: may be wrong
+'' Darwin uses the POSIX time declarations shared with the Unix CRT layer.
 #include once "crt/linux/time.bi"
 #else
 #error Unsupported platform

@@ -9,8 +9,8 @@ void fb_ConsolePrintBufferWstrEx
 		int mask
 	)
 {
-	/* !!!FIXME!!! should print only buffer[0 .. chars-1] */
-	wprintf( L"%ls", buffer );
+	while( chars-- > 0 )
+		wprintf( L"%lc", *buffer++ );
 }
 
 void fb_ConsolePrintBufferWstr

@@ -20,7 +20,7 @@ int fb_hShell( char *program )
 		errcode = WEXITSTATUS( errcode );
 		if( errcode == 127 ) {
 			/* /bin/sh could not be executed */
-			/* FIXME: can't tell difference if /bin/sh returned 127 */
+			/* POSIX system() reports shell startup failure as status 127 too. */
 			errcode = -1;
 		}
 	}

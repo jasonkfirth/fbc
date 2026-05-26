@@ -74,30 +74,14 @@ o ABI
     mangling [yet].
     [ ] refactor cProcCallingConv() usage and target specific checks
     - FB can probably support __fastcall with C/LLVM backends pretty easily
-    [x] add the __fastcall keyword
-    [x] add '-z no-fastcall' to ignore "fastcall" calling convention
-    [x] allow defining and calling __fastcall procedures in gas 32
-    [x] only allow integral data types
     [ ] testing on other arch / targets (arm, freebsd, dos, etc)
     [ ] preserve EDX in nested calls - it could get trashed and currently
         we don't have a defined way to preserve
     - FB can probably support __thiscall with C/LLVM backends pretty easily
-    [x] use __thiscall calling by default for mingw gcc 32-bit,
-        currently, users must manage this explicitly, recommend using a 
-        #define thiscall __thiscall depending on target platform
-    [x] only allow integral data types
     [ ] more tests and documentation for mangling/calling conventions, not every
         calling convention is tested or documented completely - also hard to test
-    [x] allow defining and calling __thiscall procedures in gas 32
-    [x] silently ignore on 64-bit, but warn if declare & procedure is different
-    [x] implement in -gen gas 32-bit. Hard to do, AST/IR/EMIT currently doesn't
-        have enough information or implementation for passing arguments in registers.
-    [x] add the __thiscall keyword
-    [x] add '-z no-thiscall' to ignore "thiscall" and revert to default calling
-        convention
 
 o static member vars
-  - allow STATIC IMPORT, like EXTERN IMPORT (extract common code from cVariableDecl())
   - the varexpr used to access (if any) is discarded since it's a static access
     for which no specific instance is needed; currently this will even discard
     function calls with side effects, this should be fixed, the same happens
@@ -117,16 +101,6 @@ o static member vars
 
 	print f( ).i
 
-o If parsing namespace prefixes (cIdentifier()), it should be possible to save
-  it into the parser context, so it could be restored and re-used by the next
-  parsing function that tries to make sense of the input.
-  - needed to fix #404: cSymbolType (using cIdentifier) will eat namespace prefixes,
-    and should "restore" them if it fails (i.e. if it's not a type), so then the
-    expression parsing can retry, with the proper namespace prefix.
-    This only really matters for len/sizeof.
-  - needed to show FB_WARNINGMSG_AMBIGIOUSLENSIZEOF for namespaced symbols
-  - alternative: lexSkip backwards, but that seems harder to implement
-
 o Allow typeless DIMs to implement EXTERNs:
     extern a as integer
     dim a
@@ -137,7 +111,6 @@ o ThreadCall
     so they cannot safely be referenced from the thread...
 
 o -exx should catch...
-  - out-of-bounds dimension argument given to lbound()/ubound()
   - add an -exx aka -eboolean check to detect illegal boolean values on read?
   - expand on -elocation option to provide full location information or if not
     given (or implied) optimize out calls to fb_ErrorSetFuncName() and 
@@ -165,7 +138,6 @@ o -exx should catch...
 [ ] quirks:
     [ ] OPEN ... FOR is not checking for mode
     	- does QB allow that? CONS won't work without INPUT or OUTPUT
-    [X] GET and PUT shouldn't allow strings when the number of items is passed
     [ ] -exx is giving suspicious ptr assignment when module/name are been restored inside ns'
 
 [ ] add the -lang (qb|fb) cmd-line option:
@@ -187,47 +159,14 @@ o -exx should catch...
       	  [ ] on uevent
           - the other events are seldom, if ever, used..
       [ ] add "qb" mangling
-          [x] symbols with same name but different sufixes than keywords
           [ ] arrays with same name as scalars (most spaghetti-code won't compile w/o this)
           [ ] labels with the same name as procs:
               declare sub foo \n foo: \n goto foo \n call foo
-      [x] suffixes not optional in keywords (ie: it's always STR$, not STR)
-      [x] data type remapping
-      	  [x] INTEGER is 16-bit wide
-      	  [x] LONG is 32-bit wide
-          [x] CVI should take a short in -lang qb mode
-      [x] move all variables to function-level, implicit or explict (see no SCOPE)
-      [x] GOSUB and RETURN in subroutines (so RETURN can't be used as a shortcut to EXIT FUNCTION)
-      	  - implement it using setjmp/longjmp later in the rtlib
-      [x] periods in symbol names
-      [x] numeric labels
-      [x] params passed by reference by default
-      [x] DEF### (ie: explicit types required)
-      [x] implicit variables
-      [x] suffixes % & ! # $
-      [x] '$dynamic, '$static, '$include
-      [x] LET
-      [x] ON .. GOTO|GOSUB
-      [x] ON ERROR, RESUME
-      [x] OPTION's
-      [x] DEFSNG by default
-      [x] OPEN should be compatible with QB (ie: OPEN "DEVICE:"), the bloat doesn't
-          matter in -lang qb mode, just implement a fb_OpenDev or so in the rtlib doing
-          the parsing that will call any supported fb_hFileOpen###'s (COM, LPT, CONS, etc)
-      [x] CALL: support undefined functions as in QB, all params BYREF as ANY
       [ ] DEF - neither a macro nor function will work.  The statements inside the DEF FN...
           need module level scope except for the parameters which shadow module level
           vars.  Would be like a module level GOSUB but callable from any scope, taking
           parameters and returning a value.  Very messy.  Also, it will make any symbol
           called Fn... invalid because it allows forward refs.
-
-      [x] no SCOPE
-      [x] no NAMESPACE
-      [x] no CLASS (and exception handling)
-      [x] no op and function overloading
-      [x] no EXTERN (periods and suffixes screw mangling)
-      [x] no multi-threading - not thread*, mutex*, cond*
-      [x] no keyword not present in QB (prefixed with '__')
 
     - "fb" - the inverse of "qb", but show deprecated messages by now for:
       [ ] without ON ERROR, all stmts returning rt errors should be allowed to
@@ -239,8 +178,6 @@ o -exx should catch...
 
 [ ] PP:
     [ ] add #pragma cmdline="-foo bar -baz"
-        [x] added as '#cmdline "args..."'
-        [x] don't allow #cmdline if any line was parsed already that emits backend code
         [ ] clean-up the lang compatibility options in fbc source,
             the restart logic and option tracking is difficult to
             follow (even with the comments and well named symbols).
@@ -252,17 +189,6 @@ o -exx should catch...
                #if( sizeof(integer) = 4 ) )
                   #print "this shouldn't happen, but will"
                #endif
-        [x] default to -lang FB
-        [x] allow '-lang' to override '-lang' on real command line
-        [x] allow '-forcelang' to override '-lang' on real command line
-        [x] don't allow '-lang' to override '-forcelang' on the command line
-        [x] #lang directive applies to current module only
-        [x] '-forcelang' on real command line overrides #lang directives.
-        [x] '#cmdline "-lang"' should apply to all modules and can overide real command line
-        [x] '#cmdline "-forcelang ..."' should apply to all modules and can overide real command line '-lang' but not '-forcelang'
-        [X] add '-z nocmdline' to ignore #cmdline directives
-        [X] reset parser for command line options that require it
-        [X] reset fbc for command line options that require it (-target, -arch, -lib, etc)
     - macro expansion: won't work for inner macros
     - support default arguments?
 
@@ -308,15 +234,6 @@ o -exx should catch...
       - := must be a new token because the "foo bar : baz" ambiguity
 
 [ ] method pointers / delegates
-  [x] extend PROCPTR( id [, signature] ) to allow pointers to methods
-  [x] fbc handles method pointers fairly well even though the syntax is not symmetrical
-      with invoking a method on a TYPE (class).  We should probably be ok with this since
-      at a low level methods are just procedures and allowing this syntax at the very
-      least avoids extra procedure calls (i.e. non-static member calls static member 
-      to call non-static member hack) and we would prefer to just call the non-static
-      member directly. 
-  [x] var x = procptr( T.method ) returns a method pointer and can be invoked with 
-      x( instance, [params]... ) - see above
   [ ] safe-ish delegates would need to aggregate the instance and method pointer which will
       likely requre a new built-in type to handle by the compiler.  It's possible that we
       could build a delegate in user code, but would have to sacrifice some type safety
@@ -337,10 +254,6 @@ o -exx should catch...
           memory leaks (e.g. returned from DLL)
     - no more STR_LOCK's
     - no more checks for temp descriptors in all rtlib procs taking STRINGs
-
-[x] fixed-len strings compatible with QB:
-    - no null-term, temporaries always created when passing to functions
-    - probably will need their own assign and concat functions
 
 [ ] proc def:
     - when checking the prototype, the access modifiers must be checked too: PUBLIC, PRIVATE

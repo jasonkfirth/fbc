@@ -79,6 +79,77 @@ type MetafileHeader
 	declare function GetEmfHeader () as ENHMETAHEADER3 ptr
 end type
 
-'' !!!WRITEME!!! the MetafileHeader methods
+private function MetafileHeader.GetType () as MetafileType
+	return this.Type_
+end function
+
+private function MetafileHeader.GetMetafileSize () as UINT
+	return this.Size
+end function
+
+private function MetafileHeader.GetVersion () as UINT
+	return this.Version
+end function
+
+private function MetafileHeader.GetEmfPlusFlags () as UINT
+	return this.EmfPlusFlags
+end function
+
+private function MetafileHeader.GetDpiX () as REAL
+	return this.DpiX
+end function
+
+private function MetafileHeader.GetDpiY () as REAL
+	return this.DpiY
+end function
+
+private sub MetafileHeader.GetBounds (byval rect as Rect ptr)
+	if( rect <> NULL ) then
+		rect->X = this.X
+		rect->Y = this.Y
+		rect->Width = this.Width
+		rect->Height = this.Height
+	end if
+end sub
+
+private function MetafileHeader.IsWmf () as BOOL
+	return (this.Type_ = MetafileTypeWmf) or (this.Type_ = MetafileTypeWmfPlaceable)
+end function
+
+private function MetafileHeader.IsWmfPlaceable () as BOOL
+	return this.Type_ = MetafileTypeWmfPlaceable
+end function
+
+private function MetafileHeader.IsEmf () as BOOL
+	return this.Type_ = MetafileTypeEmf
+end function
+
+private function MetafileHeader.IsEmfOrEmfPlus () as BOOL
+	return (this.Type_ = MetafileTypeEmf) or this.IsEmfPlus()
+end function
+
+private function MetafileHeader.IsEmfPlus () as BOOL
+	return (this.Type_ = MetafileTypeEmfPlusOnly) or (this.Type_ = MetafileTypeEmfPlusDual)
+end function
+
+private function MetafileHeader.IsEmfPlusDual () as BOOL
+	return this.Type_ = MetafileTypeEmfPlusDual
+end function
+
+private function MetafileHeader.IsEmfPlusOnly () as BOOL
+	return this.Type_ = MetafileTypeEmfPlusOnly
+end function
+
+private function MetafileHeader.IsDisplay () as BOOL
+	return (this.EmfPlusFlags and GDIP_EMFPLUSFLAGS_DISPLAY) <> 0
+end function
+
+private function MetafileHeader.GetWmfHeader () as METAHEADER ptr
+	return NULL
+end function
+
+private function MetafileHeader.GetEmfHeader () as ENHMETAHEADER3 ptr
+	return NULL
+end function
 
 #endif
