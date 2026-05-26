@@ -6,6 +6,8 @@
         android:minSdkVersion="@MIN_SDK@"
         android:targetSdkVersion="@TARGET_SDK@" />
 
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:debuggable="true"
         android:hasCode="true"

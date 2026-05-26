@@ -20,6 +20,7 @@ Options:
   --api N                NDK API level for native compilation (default: 26)
   --min-api N            APK minSdkVersion (default: 21)
   --target-api N         APK targetSdkVersion (default: highest installed platform)
+  --assets DIR           Add all files from DIR as APK assets
   --package NAME         Android application package name
   --label TEXT           Android application label
   --hideKeyboardButton   Disable the on-screen keyboard toggle button and IME
@@ -33,6 +34,7 @@ Environment:
   ANDROID_NDK_HOME                  Android NDK location
   ANDROID_D8_JAR / D8_JAR           R8/D8 jar to use when no d8/dx tool exists
   FBANDROID_PREFIX                  Install prefix (default: /usr)
+  FBANDROID_ASSETS                  Directory to include as APK assets
 
 Source defines:
   #define FB_ANDROID_HIDE_KEYBOARD_BUTTON
@@ -83,6 +85,30 @@ source_uses_landscape_screen() {
 				found = 1
 				exit
 			}
+		}
+	}
+
+	END {
+		if (found)
+			exit 0
+
+		exit 1
+	}
+	' "$source_file"
+}
+
+source_uses_threading() {
+	local source_file="$1"
+
+	awk '
+	{
+		line = tolower($0)
+		sub(/\047.*/, "", line)
+
+		if (line ~ /(^|[^a-z0-9_])(threadcreate|threadwait|mutexcreate|mutexlock|mutexunlock)([^a-z0-9_]|$)/)
+		{
+			found = 1
+			exit
 		}
 	}
 
@@ -293,6 +319,7 @@ output=""
 package=""
 label=""
 src=""
+asset_dir="${FBANDROID_ASSETS:-}"
 use_mt=0
 use_entry=1
 run_on_phone=0
@@ -317,6 +344,10 @@ while [ $# -gt 0 ]; do
 		--label) label="$2"; shift 2 ;;
 		--hideKeyboardButton) keyboard_button="false"; shift ;;
 		--landscape) screen_orientation="landscape"; shift ;;
+		--assets)
+			asset_dir="$2"
+			shift 2
+			;;
 		--runOnPhone) run_on_phone=1; shift ;;
 		--keep-temp) keep_temp=1; shift ;;
 		-x|-o)
@@ -380,6 +411,10 @@ if [ "$screen_orientation" = "unspecified" ] && source_uses_landscape_screen "$s
 	screen_orientation="landscape"
 fi
 
+if [ "$use_mt" -eq 0 ] && source_uses_threading "$src"; then
+	use_mt=1
+fi
+
 for ((i = 0; i < ${#fbc_args[@]}; ++i)); do
 	case "${fbc_args[$i]}" in
 		-dFB_ANDROID_HIDE_KEYBOARD_BUTTON|-dFB_ANDROID_HIDE_KEYBOARD_BUTTON=*)
@@ -417,6 +452,7 @@ base="${base%.*}"
 module="$(sanitize_module "$src_name")"
 [ -n "$label" ] || label="$base"
 [ -n "$package" ] || package="$(sanitize_package "$base")"
+[ -z "$asset_dir" ] || [ -d "$asset_dir" ] || die "assets directory not found: $asset_dir"
 
 case "$mode" in
 	apk) [ -n "$output" ] || output="$base.apk" ;;
@@ -572,7 +608,18 @@ if [ -z "$d8" ] && [ -z "$dx" ] && [ -n "$d8_jar" ]; then
 fi
 [ -n "$d8" ] || [ -n "$dx" ] || [ -n "$java_tool" ] || die "no dexer found; install Android build-tools with d8, the dalvik-exchange package for dx, or set ANDROID_D8_JAR"
 
-mkdir -p "$tmp/apk/lib/$abi" "$tmp/res/values"
+asset_root="$tmp/assets"
+mkdir -p "$tmp/assets" "$tmp/apk/lib/$abi" "$tmp/res/values"
+if [ -n "$asset_dir" ]; then
+	cp -a "$asset_dir/." "$asset_root"/
+	(
+		cd "$asset_root"
+		find . -type f -print \
+			| sed -e 's#^\./##' \
+			| grep -v '^_freebasic_asset_manifest.txt$' \
+			| sort > "_freebasic_asset_manifest.txt"
+	)
+fi
 cp "$sofile" "$tmp/apk/lib/$abi/libfreebasicapp.so"
 cp "$template/strings.xml" "$tmp/res/values/strings.xml"
 sed \
@@ -589,7 +636,7 @@ unsigned="$tmp/freebasicapp-unsigned.apk"
 unaligned="$tmp/freebasicapp-unaligned.apk"
 aligned="$tmp/freebasicapp-aligned.apk"
 
-"$aapt" package -f -M "$tmp/AndroidManifest.xml" -S "$tmp/res" -I "$platform_jar" -F "$unsigned"
+"$aapt" package -f -M "$tmp/AndroidManifest.xml" -S "$tmp/res" -A "$asset_root" -I "$platform_jar" -F "$unsigned"
 
 mkdir -p "$tmp/java/org/freebasic/android" "$tmp/classes" "$tmp/dex"
 cp "$template/FreeBasicNativeActivity.java" "$tmp/java/org/freebasic/android/FreeBasicNativeActivity.java"

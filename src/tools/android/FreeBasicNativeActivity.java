@@ -28,7 +28,6 @@ import android.app.NativeActivity;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.KeyEvent;
 
 public class FreeBasicNativeActivity extends NativeActivity {
@@ -41,6 +40,11 @@ public class FreeBasicNativeActivity extends NativeActivity {
 
     static boolean dispatchImeKey(int keyCode, int action, int unicodeChar) {
         return nativeDispatchImeKey(keyCode, action, unicodeChar);
+    }
+
+    private static boolean isPrintableUnicode(int unicodeChar) {
+        return unicodeChar == '\t' || unicodeChar == '\r' || unicodeChar == '\n' ||
+            (unicodeChar >= 32 && unicodeChar < 127);
     }
 
     private boolean readKeyboardButtonVisible() {
@@ -92,13 +96,12 @@ public class FreeBasicNativeActivity extends NativeActivity {
         keyCode = event.getKeyCode();
 
         /*
-            Gboard sends Backspace with dispatchKeyEventFromInputMethod().
-            That path does not reliably reach the NDK input queue, so the
-            native driver would never see KEYCODE_DEL.  Normal printable
-            characters still flow through the hidden EditText bridge.
+            Some keyboards deliver printable keys through the Java dispatch
+            path instead of committing text to the hidden EditText.  Forward
+            those keys with Android's translated Unicode character so the
+            native driver does not have to guess from raw keycodes.
         */
-        if (keyCode == KeyEvent.KEYCODE_DEL) {
-            Log.i("FreeBASIC", "activity dispatch KEYCODE_DEL action=" + event.getAction());
+        if (keyCode == KeyEvent.KEYCODE_DEL || isPrintableUnicode(event.getUnicodeChar())) {
             try {
                 if (nativeDispatchImeKey(keyCode, event.getAction(), event.getUnicodeChar())) {
                     return true;
