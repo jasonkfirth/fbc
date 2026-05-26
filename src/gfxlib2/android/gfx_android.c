@@ -103,6 +103,7 @@ typedef struct FB_ANDROID_GFX_STATE
 	int keyboard_enabled;
 	int keyboard_visible;
 	int pending_keyboard_visible;
+	int display_locked;
 	jobject input_view;
 	char *input_text;
 	FB_ANDROID_GAMEPAD_STATE gamepad[FB_ANDROID_GAMEPAD_MAX];
@@ -142,6 +143,7 @@ static FB_ANDROID_GFX_STATE fb_android =
 	.keyboard_enabled = 1,
 	.keyboard_visible = 0,
 	.pending_keyboard_visible = -1,
+	.display_locked = 0,
 	.input_view = NULL,
 	.input_text = NULL,
 	.gamepad = {{0}},
@@ -585,11 +587,15 @@ static jobject android_install_input_view_jni(ANativeActivity *activity)
 		goto cleanup;
 	}
 
-	request_focus = (*env)->GetMethodID(env, view_class, "requestFocus", "()Z");
-	if (request_focus)
-		(*env)->CallBooleanMethod(env, edit_text, request_focus);
-	if ((*env)->ExceptionCheck(env))
-		(*env)->ExceptionClear(env);
+	/*
+	 * The hidden EditText is only a keyboard/input bridge.  It must not take
+	 * focus during activity startup, because Android may interpret that as a
+	 * request to show the IME or handwriting/stylus UI over a graphics
+	 * program before the program has asked for text input.
+	 *
+	 * android_toggle_soft_input_jni() focuses the view explicitly when the
+	 * on-screen keyboard is requested.
+	 */
 
 	result = (*env)->NewGlobalRef(env, edit_text);
 
@@ -1480,6 +1486,8 @@ void fb_hAndroidExit(void)
 void fb_hAndroidLock(void)
 {
 	pthread_mutex_lock(&fb_android.mutex);
+	fb_android.display_locked++;
+	pthread_mutex_unlock(&fb_android.mutex);
 }
 
 void fb_hAndroidUnlock(void)
@@ -1494,6 +1502,10 @@ void fb_hAndroidUnlock(void)
 		release the driver lock here; otherwise page-flipped programs end up
 		posting the NativeWindow once per primitive.
 	*/
+	pthread_mutex_lock(&fb_android.mutex);
+	if (fb_android.display_locked > 0)
+		fb_android.display_locked--;
+
 	if (__fb_gfx && __fb_gfx->dirty)
 	{
 		int y;
@@ -2302,7 +2314,8 @@ void fb_hAndroidUpdate(void)
 
 	pthread_mutex_lock(&fb_android.mutex);
 	window = fb_android.window;
-	if (!fb_android.active || !can_render_locked() || !window || !fb_android.blitter || !__fb_gfx || !__fb_gfx->framebuffer)
+	if (fb_android.display_locked || !fb_android.active || !can_render_locked() ||
+	    !window || !fb_android.blitter || !__fb_gfx || !__fb_gfx->framebuffer)
 	{
 		pthread_mutex_unlock(&fb_android.mutex);
 		return;

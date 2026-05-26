@@ -36,6 +36,7 @@ CXX     ?= g++
 AR      ?= ar
 ARFLAGS ?= rcs
 RANLIB  ?= ranlib
+ELF2DOL ?= elf2dol
 
 # OpenBSD requires GCC (clang incompatible with fbc output)
 ifeq ($(TARGET_OS),openbsd)
@@ -313,6 +314,10 @@ MT_CFLAGS := -mthreads -DENABLE_MT
 endif
 endif
 
+ifeq ($(THREAD_MODEL),wii)
+MT_CFLAGS := -DENABLE_MT
+endif
+
 ifdef DISABLE_MT
 MT_CFLAGS :=
 endif
@@ -410,6 +415,40 @@ ifeq ($(TARGET_OS),win32)
 TOOLCHAIN_CFLAGS   += -mconsole
 TOOLCHAIN_CXXFLAGS += -mconsole
 TOOLCHAIN_LDFLAGS  += -mconsole
+
+endif
+
+ifeq ($(TARGET_OS),wii)
+
+DEVKITPRO ?= /opt/devkitpro
+DEVKITPPC ?= $(DEVKITPRO)/devkitPPC
+WII_LIBOGC_INC ?= $(DEVKITPRO)/libogc/include
+WII_LIBOGC_LIB ?= $(DEVKITPRO)/libogc/lib/wii
+ELF2DOL ?= $(DEVKITPRO)/tools/bin/elf2dol
+
+WII_MACHDEP := -DGEKKO -mrvl -mcpu=750 -meabi -mhard-float
+
+CPPFLAGS += -I$(WII_LIBOGC_INC)
+TOOLCHAIN_CFLAGS   += $(WII_MACHDEP)
+TOOLCHAIN_CXXFLAGS += $(WII_MACHDEP)
+TOOLCHAIN_LDFLAGS  += -mrvl -mcpu=750 -meabi -mhard-float -L$(WII_LIBOGC_LIB)
+
+WII_FBC_STAGE_FLAGS := \
+  -Wc -DGEKKO \
+  -Wc -I$(WII_LIBOGC_INC) \
+  -Wc -mrvl \
+  -Wc -mcpu=750 \
+  -Wc -meabi \
+  -Wc -mhard-float \
+  -Wa -mrvl \
+  -Wa -mcpu=750 \
+  -Wa -meabi \
+  -Wa -mhard-float
+
+TOOLCHAIN_FBCFLAGS   += $(WII_FBC_STAGE_FLAGS)
+TOOLCHAIN_FBRTCFLAGS += $(WII_FBC_STAGE_FLAGS)
+TOOLCHAIN_FBRTLFLAGS += $(WII_FBC_STAGE_FLAGS)
+TOOLCHAIN_FBC_ENV += DEVKITPRO='$(DEVKITPRO)' DEVKITPPC='$(DEVKITPPC)' ELF2DOL='$(ELF2DOL)'
 
 endif
 

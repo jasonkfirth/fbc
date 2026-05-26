@@ -16,6 +16,19 @@ dim opt_xml_report as boolean = false
 dim opt_xml_filename as string = ""
 dim opt_no_error as boolean = false
 
+#if defined( __FB_WII__ )
+	''
+	'' Standalone Wii DOL launches do not have the same command-line
+	'' argument path as desktop test runners.  Leave a report on the current
+	'' FAT filesystem by default so emulator and hardware runs can be checked
+	'' after the program exits.
+	''
+	opt_brief_summary = true
+	opt_hide_cases = true
+	opt_xml_report = true
+	opt_xml_filename = "fbctests-wii.xml"
+#endif
+
 dim i as integer = 1
 
 while command(i) > ""

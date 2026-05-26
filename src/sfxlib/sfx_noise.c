@@ -90,10 +90,15 @@ void fb_sfxNoisePitch(int channel, int frequency, float duration, float volume)
     if (volume > 1.0f)
         volume = 1.0f;
 
-    voice = fb_sfxVoiceAlloc();
+    fb_sfxRuntimeLock();
+
+    voice = fb_sfxVoiceAllocLocked();
 
     if (!voice)
+    {
+        fb_sfxRuntimeUnlock();
         return;
+    }
 
     voice->type = FB_SFX_VOICE_NOISE;
     voice->channel = channel;
@@ -124,6 +129,9 @@ void fb_sfxNoisePitch(int channel, int frequency, float duration, float volume)
     /* assign default envelope */
 
     fb_sfxVoiceSetEnvelope(voice, 0);
+
+    fb_sfxVoiceActivateLocked(voice);
+    fb_sfxRuntimeUnlock();
 
     SFX_DEBUG(
         "sfx_noise: channel=%d frequency=%d duration=%f volume=%f",

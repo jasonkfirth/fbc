@@ -77,6 +77,7 @@ $(eval $(call _set_os_if_token,android,android))
 $(eval $(call _set_os_if_token,linux,linux))
 $(eval $(call _set_os_if_token,emscripten,js))
 $(eval $(call _set_os_if_token,js,js))
+$(eval $(call _set_os_if_token,wii,wii))
 $(eval $(call _set_os_if_token,darwin,darwin))
 $(eval $(call _set_os_if_token,apple,darwin))
 $(eval $(call _set_os_if_token,freebsd,freebsd))
@@ -138,6 +139,10 @@ endif
 
 # PowerPC 32
 ifneq ($(filter ppc powerpc,$(TARGET_ARCH_RAW)),)
+  TARGET_ARCH := powerpc
+endif
+
+ifeq ($(TARGET_OS),wii)
   TARGET_ARCH := powerpc
 endif
 
@@ -244,7 +249,7 @@ ifdef FBC_TARGET
   else ifneq ($(filter 3 4 5 6,$(_fbc_target_ntok)),)
     # If it’s multi-token and not a known fbc target family, treat as suspicious
     # (this catches powerpc64le-linux-gnu, arm-linux-gnueabihf, etc.)
-    ifeq ($(filter win32 win64 dos cygwin,$(FBC_TARGET)),)
+    ifeq ($(filter win32 win64 dos cygwin wii,$(FBC_TARGET)),)
       override FBC_TARGET :=
     endif
   endif
@@ -259,6 +264,8 @@ ifndef FBC_TARGET
     endif
   else ifeq ($(TARGET_OS),dos)
     FBC_TARGET := dos
+  else ifeq ($(TARGET_OS),wii)
+    FBC_TARGET := wii
   else
     FBC_TARGET := $(TARGET_OS)-$(TARGET_ARCH)
   endif

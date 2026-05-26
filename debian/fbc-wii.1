@@ -1,0 +1,41 @@
+.TH FBC-WII 1 "May 2026" "FreeBASIC" "FreeBASIC Manual"
+.SH NAME
+fbc-wii \- FreeBASIC compiler driver for Nintendo Wii homebrew
+.SH SYNOPSIS
+.B fbc-wii
+.RI [ options ] " file.bas"
+.SH DESCRIPTION
+.B fbc-wii
+is a wrapper around the FreeBASIC compiler configured for the Nintendo Wii
+homebrew target.  It selects the Wii target, the PowerPC GCC backend, the
+FreeBASIC Wii headers and libraries, and the libogc/devkitPPC toolchain.
+.PP
+The driver produces Wii homebrew output using the normal FreeBASIC command
+line interface.  It expects devkitPro's Wii toolchain and libogc to be
+installed on the build system.
+.SH ENVIRONMENT
+.TP
+.B DEVKITPRO
+Root of the devkitPro installation.  Defaults to
+.IR /opt/devkitpro .
+.TP
+.B DEVKITPPC
+Root of the devkitPPC toolchain.  Defaults to
+.IR $DEVKITPRO/devkitPPC .
+.TP
+.B FBWII_PREFIX
+Installation prefix containing the FreeBASIC Wii files.  Defaults to
+.IR /usr .
+.TP
+.B FBWII_COMPILER
+Path to the target-specific compiler executable.
+.TP
+.B FBWII_INCDIR
+Path to the FreeBASIC Wii include directory.
+.TP
+.B FBWII_LIBDIR
+Path to the FreeBASIC Wii runtime library directory.
+.SH SEE ALSO
+.BR fbc (1)
+.
+.\" end of fbc-wii.1

@@ -31,11 +31,15 @@ FBC_INSTALL_NAME ?= fbc$(EXEEXT)
 FBC_JS_INSTALL_NAME ?= fbc-js$(EXEEXT)
 FBC_ANDROID_INSTALL_NAME ?= fbc-android$(EXEEXT)
 FBC_ANDROID_COMPILER_INSTALL_NAME ?= fbc-android-compiler$(EXEEXT)
+FBC_WII_INSTALL_NAME ?= fbc-wii$(EXEEXT)
+FBC_WII_COMPILER_INSTALL_NAME ?= fbc-wii-compiler$(EXEEXT)
 FB_JS_NAME ?= freebasic-js
 FB_JS_TARGET ?= js-asmjs
 FB_JS_RUNTIME_ASSETS := fb_shell.html fb_rtlib.js termlib_min.js
 FB_ANDROID_NAME ?= freebasic-android
 FB_ANDROID_TARGET ?= android-aarch64
+FB_WII_NAME ?= freebasic-wii
+FB_WII_TARGET ?= wii-powerpc
 
 prefixjsincdir ?= $(prefix)/include/$(FB_JS_NAME)
 prefixjsruntimedir ?= $(prefix)/$(libdirname)/$(FB_JS_NAME)
@@ -50,6 +54,13 @@ FBINSTALL_ANDROID_RUNTIME_DIR := $(prefixandroidrootdir)/$(FB_ANDROID_TARGET)
 ANDROID_BUILD_LIBDIR ?= $(rootdir)/$(libdirname)/freebasic/$(FB_ANDROID_TARGET)
 ANDROID_TOOLS_DIR ?= $(rootdir)/src/tools/android
 
+prefixwiiincdir ?= $(prefix)/include/$(FB_WII_NAME)
+prefixwiirootdir ?= $(prefix)/$(libdirname)/$(FB_WII_NAME)
+prefixwiibindir ?= $(prefixwiirootdir)/bin
+FBINSTALL_WII_RUNTIME_DIR := $(prefixwiirootdir)/$(FB_WII_TARGET)
+WII_BUILD_LIBDIR ?= $(rootdir)/$(libdirname)/freebasic/wii
+WII_TOOLS_DIR ?= $(rootdir)/src/tools/wii
+
 INSTALL_STAGE_JS_INCDIR := $(prefixjsincdir)
 INSTALL_STAGE_JS_LIBDIR := $(FBINSTALL_JS_RUNTIME_DIR)
 INSTALL_STAGE_ANDROID_INCDIR := $(prefixandroidincdir)
@@ -57,6 +68,10 @@ INSTALL_STAGE_ANDROID_ROOTDIR := $(prefixandroidrootdir)
 INSTALL_STAGE_ANDROID_BINDIR := $(prefixandroidbindir)
 INSTALL_STAGE_ANDROID_LIBDIR := $(FBINSTALL_ANDROID_RUNTIME_DIR)
 INSTALL_STAGE_ANDROID_SHAREDIR := $(prefixandroidsharedir)
+INSTALL_STAGE_WII_INCDIR := $(prefixwiiincdir)
+INSTALL_STAGE_WII_ROOTDIR := $(prefixwiirootdir)
+INSTALL_STAGE_WII_BINDIR := $(prefixwiibindir)
+INSTALL_STAGE_WII_LIBDIR := $(FBINSTALL_WII_RUNTIME_DIR)
 
 ifneq ($(strip $(DESTDIR)),)
 ifneq ($(filter win32 dos,$(TARGET_OS)),)
@@ -67,6 +82,10 @@ INSTALL_STAGE_ANDROID_ROOTDIR := $(patsubst $(prefix)%,%,$(prefixandroidrootdir)
 INSTALL_STAGE_ANDROID_BINDIR := $(patsubst $(prefix)%,%,$(prefixandroidbindir))
 INSTALL_STAGE_ANDROID_LIBDIR := $(patsubst $(prefix)%,%,$(FBINSTALL_ANDROID_RUNTIME_DIR))
 INSTALL_STAGE_ANDROID_SHAREDIR := $(patsubst $(prefix)%,%,$(prefixandroidsharedir))
+INSTALL_STAGE_WII_INCDIR := $(patsubst $(prefix)%,%,$(prefixwiiincdir))
+INSTALL_STAGE_WII_ROOTDIR := $(patsubst $(prefix)%,%,$(prefixwiirootdir))
+INSTALL_STAGE_WII_BINDIR := $(patsubst $(prefix)%,%,$(prefixwiibindir))
+INSTALL_STAGE_WII_LIBDIR := $(patsubst $(prefix)%,%,$(FBINSTALL_WII_RUNTIME_DIR))
 endif
 endif
 
@@ -77,6 +96,10 @@ INSTALL_ANDROID_ROOTDIR := $(if $(strip $(DESTDIR)),$(DESTDIR)$(INSTALL_STAGE_AN
 INSTALL_ANDROID_BINDIR := $(if $(strip $(DESTDIR)),$(DESTDIR)$(INSTALL_STAGE_ANDROID_BINDIR),$(prefixandroidbindir))
 INSTALL_ANDROID_LIBDIR := $(if $(strip $(DESTDIR)),$(DESTDIR)$(INSTALL_STAGE_ANDROID_LIBDIR),$(FBINSTALL_ANDROID_RUNTIME_DIR))
 INSTALL_ANDROID_SHAREDIR := $(if $(strip $(DESTDIR)),$(DESTDIR)$(INSTALL_STAGE_ANDROID_SHAREDIR),$(prefixandroidsharedir))
+INSTALL_WII_INCDIR := $(if $(strip $(DESTDIR)),$(DESTDIR)$(INSTALL_STAGE_WII_INCDIR),$(prefixwiiincdir))
+INSTALL_WII_ROOTDIR := $(if $(strip $(DESTDIR)),$(DESTDIR)$(INSTALL_STAGE_WII_ROOTDIR),$(prefixwiirootdir))
+INSTALL_WII_BINDIR := $(if $(strip $(DESTDIR)),$(DESTDIR)$(INSTALL_STAGE_WII_BINDIR),$(prefixwiibindir))
+INSTALL_WII_LIBDIR := $(if $(strip $(DESTDIR)),$(DESTDIR)$(INSTALL_STAGE_WII_LIBDIR),$(FBINSTALL_WII_RUNTIME_DIR))
 
 .PHONY: install install-bin install-includes install-runtime
 install: install-bin install-includes install-runtime
@@ -184,6 +207,39 @@ install-android-tools:
 	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_ANDROID_SHAREDIR),$(prefixandroidsharedir))/template/fb_android_app.c" >> "$(INSTALL_MANIFEST)"
 	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_ANDROID_SHAREDIR),$(prefixandroidsharedir))/template/AndroidManifest.xml.in" >> "$(INSTALL_MANIFEST)"
 	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_ANDROID_SHAREDIR),$(prefixandroidsharedir))/template/strings.xml" >> "$(INSTALL_MANIFEST)"
+
+.PHONY: install-wii install-wii-bin install-wii-includes install-wii-runtime
+install-wii: install-wii-bin install-wii-includes install-wii-runtime
+
+.PHONY: install-wii-bin
+install-wii-bin:
+	mkdir -p "$(INSTALL_BINDIR)" "$(INSTALL_WII_BINDIR)"
+	install -m 755 "$(FBC_WII_EXE)" "$(INSTALL_WII_BINDIR)/$(FBC_WII_COMPILER_INSTALL_NAME)"
+	install -m 755 "$(WII_TOOLS_DIR)/fbc-wii" "$(INSTALL_BINDIR)/$(FBC_WII_INSTALL_NAME)"
+	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_WII_BINDIR),$(prefixwiibindir))/$(FBC_WII_COMPILER_INSTALL_NAME)" >> "$(INSTALL_MANIFEST)"
+	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_BINDIR),$(prefixbindir))/$(FBC_WII_INSTALL_NAME)" >> "$(INSTALL_MANIFEST)"
+
+.PHONY: install-wii-includes
+install-wii-includes:
+	$(MKDIR_P) "$(INSTALL_WII_INCDIR)"
+	cp -a "$(rootdir)/inc/." "$(INSTALL_WII_INCDIR)/"
+	@find "$(INSTALL_WII_INCDIR)" -type f \
+			| sed "s|^$(DESTDIR)||" \
+				>> "$(INSTALL_MANIFEST)"
+
+.PHONY: install-wii-runtime
+install-wii-runtime:
+	@test -d "$(WII_BUILD_LIBDIR)" || { echo "ERROR: Wii runtime build directory missing: $(WII_BUILD_LIBDIR)"; exit 1; }
+	mkdir -p "$(INSTALL_WII_LIBDIR)"
+	set -e; \
+	for f in "$(WII_BUILD_LIBDIR)"/*; do \
+		[ -e "$$f" ] || continue; \
+		if [ -f "$$f" ]; then \
+			b=$$(basename "$$f"); \
+			install -m 644 "$$f" "$(INSTALL_WII_LIBDIR)/$$b"; \
+			echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_WII_LIBDIR),$(FBINSTALL_WII_RUNTIME_DIR))/$$b" >> "$(INSTALL_MANIFEST)"; \
+		fi; \
+	done
 
 .PHONY: uninstall
 uninstall:

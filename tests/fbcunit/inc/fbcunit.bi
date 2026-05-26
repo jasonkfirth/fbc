@@ -15,7 +15,9 @@
 #define FBCU_VER_MAJOR 1
 #define FBCU_VER_MINOR 0
 
+#ifndef FBCU_NO_INCLIB
 #inclib "fbcunit"
+#endif
 
 /'------------------------------------
 | compile time configuration options |

@@ -63,9 +63,10 @@
 /* Max length to allocated for a temporary buffer on stack */
 #define FB_LOCALBUFF_MAXLEN   32768
 
-#ifndef HOST_WIN32
-	/* Maximum path length for Non-Win32 targets. For Win32 targets, this
-	   value will be set automatically by windows.h. */
+#if !defined( HOST_WIN32 ) && !defined( HOST_XBOX )
+	/* Maximum path length for targets that do not provide MAX_PATH through
+	   their platform headers.  Xbox uses nxdk's WinAPI-compatible headers,
+	   which define MAX_PATH the same way Windows does. */
 	#define MAX_PATH    1024
 #endif
 
@@ -120,6 +121,8 @@
 	#include "win32/fb_win32.h"
 #elif defined HOST_XBOX
 	#include "xbox/fb_xbox.h"
+#elif defined HOST_WII
+	#include "wii/fb_wii.h"
 #endif
 
 #if defined HOST_SOLARIS

@@ -33,7 +33,10 @@ Build-Depends:
  aapt <android>,
  apksigner <android>,
  zip <android>,
- unzip <android>
+ unzip <android>,
+ devkitppc <wii>,
+ libogc <wii>,
+ gamecube-tools <wii>
 Standards-Version: 4.6.2
 Homepage: https://freebasic.net/
 Vcs-Browser: https://github.com/freebasic/fbc
@@ -205,6 +208,23 @@ Description: FreeBASIC compiler driver for Android APKs
  defaults to the Android/aarch64 target, plus Android runtime libraries,
  headers, and APK build templates needed to produce signed debug APK files.
 
+Package: freebasic-wii
+Architecture: any
+Build-Profiles: <wii>
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+ bash,
+ devkitppc,
+ libogc,
+ gamecube-tools
+Recommends:
+ dolphin-emu
+Description: FreeBASIC compiler driver for Nintendo Wii homebrew
+ This package provides fbc-wii, a native FreeBASIC compiler driver that
+ defaults to the Nintendo Wii/powerpc target, plus Wii runtime libraries
+ and headers needed to build libogc homebrew programs.
+
 Package: freebasic-full
 Section: metapackages
 Architecture: all
@@ -218,6 +238,7 @@ Depends:
 Recommends:
  freebasic-js (= ${binary:Version}),
  freebasic-android (= ${binary:Version}),
+ freebasic-wii (= ${binary:Version}),
  zlib1g-dev,
  libbz2-dev,
  libzip-dev,

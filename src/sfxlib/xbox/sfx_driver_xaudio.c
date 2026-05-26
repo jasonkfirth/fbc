@@ -51,10 +51,9 @@
 
 #define FB_SFX_XBOX_RATE          48000
 #define FB_SFX_XBOX_CHANNELS      2
-#define FB_SFX_XBOX_BUFFER_COUNT  32
-#define FB_SFX_XBOX_MIN_FRAMES    512
-#define FB_SFX_XBOX_MAX_FRAMES    2048
-#define FB_SFX_XBOX_START_BUFFERS 4
+#define FB_SFX_XBOX_BUFFER_COUNT  4
+#define FB_SFX_XBOX_MIN_FRAMES    256
+#define FB_SFX_XBOX_MAX_FRAMES    1024
 
 /*
     The nxdk xaudio sample uses this upper allocation bound for contiguous
@@ -76,7 +75,9 @@ static int g_xbox_buffer_bytes = 0;
 static int g_xbox_next_buffer = 0;
 static int g_xbox_initialized = 0;
 static int g_xbox_playing = 0;
-static int g_xbox_queued_before_play = 0;
+static HANDLE g_xbox_worker_thread = NULL;
+static DWORD g_xbox_worker_thread_id = 0;
+static volatile LONG g_xbox_worker_stop = 0;
 
 
 /* ------------------------------------------------------------------------- */
@@ -155,37 +156,101 @@ static int xbox_take_free_buffer(int timeout_ms)
     return (wait_result == WAIT_OBJECT_0) ? 0 : -1;
 }
 
-static int xbox_queue_silence_buffer(void)
+static int xbox_worker_frames(void)
 {
-    int index;
+    int frames;
 
-    if (xbox_take_free_buffer(0) != 0)
-        return -1;
+    frames = g_xbox_buffer_frames;
 
-    index = g_xbox_next_buffer;
-    g_xbox_next_buffer = (g_xbox_next_buffer + 1) % FB_SFX_XBOX_BUFFER_COUNT;
+    if (frames <= 0)
+        frames = FB_SFX_XBOX_MIN_FRAMES;
 
-    memset(g_xbox_buffers[index], 0, (size_t)g_xbox_buffer_bytes);
-    XAudioProvideSamples(g_xbox_buffers[index],
-                         (unsigned short)g_xbox_buffer_bytes,
-                         FALSE);
+    if (frames < 256)
+        frames = 256;
+    else if (frames > FB_SFX_XBOX_MAX_FRAMES)
+        frames = FB_SFX_XBOX_MAX_FRAMES;
 
-    if (!g_xbox_playing)
-        g_xbox_queued_before_play++;
+    return frames;
+}
+
+static DWORD WINAPI xbox_audio_worker(LPVOID unused)
+{
+    (void)unused;
+
+    while (InterlockedCompareExchange(&g_xbox_worker_stop, 0, 0) == 0)
+    {
+        if (__fb_sfx && __fb_sfx->shutting_down)
+        {
+            Sleep(5);
+            continue;
+        }
+
+        if (fb_sfxForegroundFeedActive())
+        {
+            Sleep(5);
+            continue;
+        }
+
+        if (!g_xbox_initialized)
+        {
+            Sleep(5);
+            continue;
+        }
+
+        fb_sfxUpdate(xbox_worker_frames());
+    }
 
     return 0;
 }
 
-static void xbox_start_playback_if_ready(void)
+static int xbox_ensure_worker(void)
 {
-    if (g_xbox_playing)
+    if (g_xbox_worker_thread)
+        return 0;
+
+    InterlockedExchange(&g_xbox_worker_stop, 0);
+
+    g_xbox_worker_thread = CreateThread(NULL, 0, xbox_audio_worker, NULL, 0,
+                                       &g_xbox_worker_thread_id);
+    if (!g_xbox_worker_thread)
+        return -1;
+
+    return 0;
+}
+
+static void xbox_stop_worker(void)
+{
+    if (!g_xbox_worker_thread)
         return;
 
-    if (g_xbox_queued_before_play < FB_SFX_XBOX_START_BUFFERS)
-        return;
+    InterlockedExchange(&g_xbox_worker_stop, 1);
+    WaitForSingleObject(g_xbox_worker_thread, INFINITE);
+    CloseHandle(g_xbox_worker_thread);
 
-    XAudioPlay();
-    g_xbox_playing = 1;
+    g_xbox_worker_thread = NULL;
+    g_xbox_worker_thread_id = 0;
+}
+
+static void xbox_queue_startup_silence(void)
+{
+    int i;
+
+    /*
+        Match nxdk's SDL backend: keep buffer 0 free for the first real
+        writer and queue the remaining buffers as silence.  The AC97 callback
+        releases one token each time hardware consumes a descriptor, allowing
+        the worker thread to refill that buffer.
+    */
+
+    for (i = 1; i < FB_SFX_XBOX_BUFFER_COUNT; ++i)
+    {
+        memset(g_xbox_buffers[i], 0, (size_t)g_xbox_buffer_bytes);
+        XAudioProvideSamples(g_xbox_buffers[i],
+                             (unsigned short)g_xbox_buffer_bytes,
+                             FALSE);
+    }
+
+    g_xbox_next_buffer = 0;
 }
 
 
@@ -225,9 +290,15 @@ static int xbox_driver_init(int rate, int channels, int buffer_frames, int flags
     g_xbox_buffer_frames = xbox_clamp_buffer_frames(buffer_frames);
     g_xbox_buffer_bytes = g_xbox_buffer_frames * FB_SFX_XBOX_CHANNELS * (int)sizeof(short);
     g_xbox_next_buffer = 0;
-    g_xbox_queued_before_play = 0;
 
-    g_xbox_free_buffers = CreateSemaphore(NULL, FB_SFX_XBOX_BUFFER_COUNT,
+    /*
+        Buffer 0 is intentionally not queued as startup silence, so the worker
+        must see one free-buffer token immediately.  Without this initial token
+        the driver can sit forever on prequeued silence if no callback is
+        delivered before the first real write.
+    */
+
+    g_xbox_free_buffers = CreateSemaphore(NULL, 1,
                                           FB_SFX_XBOX_BUFFER_COUNT, NULL);
     if (!g_xbox_free_buffers)
         return -1;
@@ -249,8 +320,23 @@ static int xbox_driver_init(int rate, int channels, int buffer_frames, int flags
         __fb_sfx->buffer_frames = g_xbox_buffer_frames;
     }
 
+    xbox_queue_startup_silence();
+    XAudioPlay();
+
     g_xbox_initialized = 1;
-    g_xbox_playing = 0;
+    g_xbox_playing = 1;
+
+    if (xbox_ensure_worker() != 0)
+    {
+        g_xbox_initialized = 0;
+        XAudioPause();
+        XAudioInit(16, FB_SFX_XBOX_CHANNELS, NULL, NULL);
+        xbox_clear_buffers();
+        CloseHandle(g_xbox_free_buffers);
+        g_xbox_free_buffers = NULL;
+        return -1;
+    }
+
     return 0;
 }
 
@@ -258,6 +344,8 @@ static void xbox_driver_exit(void)
 {
     if (!g_xbox_initialized && !g_xbox_free_buffers)
         return;
+
+    xbox_stop_worker();
 
     XAudioPause();
     XAudioInit(16, FB_SFX_XBOX_CHANNELS, NULL, NULL);
@@ -275,7 +363,6 @@ static void xbox_driver_exit(void)
     g_xbox_next_buffer = 0;
     g_xbox_initialized = 0;
     g_xbox_playing = 0;
-    g_xbox_queued_before_play = 0;
 }
 
 
@@ -289,8 +376,15 @@ static int xbox_driver_write_chunk(const float *samples, int frames)
     int i;
     int index;
 
-    if (xbox_take_free_buffer(1000) != 0)
-        return -1;
+    /*
+        This driver is fed by a background worker.  If all AC97 descriptors are
+        busy, the worker must not block the program behind the driver I/O lock.
+        Returning zero lets the core yield and try again on the next worker
+        pass while BASIC code continues to run.
+    */
+
+    if (xbox_take_free_buffer(0) != 0)
+        return 0;
 
     index = g_xbox_next_buffer;
     g_xbox_next_buffer = (g_xbox_next_buffer + 1) % FB_SFX_XBOX_BUFFER_COUNT;
@@ -309,22 +403,6 @@ static int xbox_driver_write_chunk(const float *samples, int frames)
     XAudioProvideSamples(g_xbox_buffers[index],
                          (unsigned short)g_xbox_buffer_bytes,
                          FALSE);
-
-    if (!g_xbox_playing)
-        g_xbox_queued_before_play++;
-
-    /*
-        nxdk's AC97 path expects active descriptors before playback starts.
-        Queue at least two descriptors so the hardware has a real range to
-        consume.  Very short first writes get one silent descriptor rather
-        than falling back to the empty-ring startup path.
-    */
-    if (!g_xbox_playing &&
-        g_xbox_queued_before_play < FB_SFX_XBOX_START_BUFFERS &&
-        frames < g_xbox_buffer_frames)
-        (void)xbox_queue_silence_buffer();
-
-    xbox_start_playback_if_ready();
 
     return frames;
 }
@@ -372,7 +450,7 @@ static int xbox_driver_write(const float *samples, int frames)
 static const FB_SFX_DRIVER fb_sfxDriverXboxXAudio =
 {
     "xaudio",
-    0,
+    FB_SFX_DRIVER_CAP_BACKGROUND,
     xbox_driver_init,
     xbox_driver_exit,
     xbox_driver_write,

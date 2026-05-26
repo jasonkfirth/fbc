@@ -95,6 +95,7 @@ BSD_OS      := freebsd netbsd openbsd dragonfly
 WINDOWS_OS  := win32 cygwin xbox
 DOS_OS      := dos
 JS_OS       := js
+CONSOLE_OS  := wii
 
 # ---------------------------------------------------------------------------
 # PIC policy
@@ -117,7 +118,7 @@ else
   ENABLE_NONPIC := YesPlease
 endif
 
-ifneq ($(filter $(WINDOWS_OS) $(DOS_OS) $(JS_OS),$(TARGET_OS)),)
+ifneq ($(filter $(WINDOWS_OS) $(DOS_OS) $(JS_OS) $(CONSOLE_OS),$(TARGET_OS)),)
   ENABLE_PIC    :=
   ENABLE_NONPIC := YesPlease
 endif
@@ -152,6 +153,10 @@ endif
 ifeq ($(TARGET_OS),js)
   DISABLE_MT := YesPlease
   THREAD_MODEL :=
+endif
+
+ifeq ($(TARGET_OS),wii)
+  THREAD_MODEL := wii
 endif
 
 # DOS has no runtime provider for parallel threads.
@@ -215,8 +220,17 @@ ifeq ($(TARGET_OS),js)
   DISABLE_TCP := YesPlease
 endif
 
-# DOS / Xbox -> no hosted sockets in the current runtime
-ifneq ($(filter dos xbox,$(TARGET_OS)),)
+# Wii -> libogc backend, not a hosted desktop stack
+ifeq ($(TARGET_OS),wii)
+  ENABLE_X11 :=
+  ENABLE_SDL :=
+  DISABLE_X11 := YesPlease
+  DISABLE_OPENGL := YesPlease
+  DISABLE_FBDEV := YesPlease
+endif
+
+# DOS -> no hosted sockets in the current runtime
+ifeq ($(TARGET_OS),dos)
   DISABLE_TCP := YesPlease
 endif
 
@@ -344,7 +358,7 @@ endif
 # ---- DOS / JavaScript ----
 #
 # No modern native hardening defaults here.
-ifneq ($(filter dos js,$(TARGET_OS)),)
+ifneq ($(filter dos js wii,$(TARGET_OS)),)
 
   ENABLE_STACK_PROTECTOR :=
   ENABLE_FORTIFY         :=
@@ -386,7 +400,7 @@ ifneq ($(filter linux freebsd solaris haiku,$(TARGET_OS)),)
 endif
 
 # DOS / JS / Windows-family should never advertise CET / no-plt / auto-init.
-ifneq ($(filter dos js win32 cygwin xbox android,$(TARGET_OS)),)
+ifneq ($(filter dos js win32 cygwin xbox android wii,$(TARGET_OS)),)
   ENABLE_CET           :=
   ENABLE_NO_PLT        :=
   ENABLE_AUTO_VAR_INIT :=

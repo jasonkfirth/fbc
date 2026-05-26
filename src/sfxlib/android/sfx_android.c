@@ -1,3 +1,27 @@
+/*
+    FreeBASIC Sound Library (sfxlib)
+    --------------------------------
+
+    File: sfx_android.c
+
+    Purpose:
+
+        Provide Android shared sound-library lifecycle support and
+        register the available Android audio output drivers.
+
+    Responsibilities:
+
+        - track Android activity start/resume state for the audio worker
+        - keep the background audio feeder alive while sound is active
+        - expose the Android driver list in the order preferred by sfxlib
+
+    This file intentionally does NOT contain:
+
+        - OpenSL ES device setup
+        - AAudio device setup
+        - sound synthesis or mixer code
+*/
+
 #include "../fb_sfx.h"
 #include "../fb_sfx_internal.h"
 #include "../fb_sfx_driver.h"
@@ -116,6 +140,15 @@ int fb_hAndroidSfxIsRunning(void)
 	return running;
 }
 
+int fb_hAndroidSfxInWorker(void)
+{
+#if FB_SFX_MT_ENABLED
+	return audio_thread_valid && pthread_equal(audio_thread, pthread_self());
+#else
+	return 0;
+#endif
+}
+
 int fb_hAndroidSfxActivate(int rate, int channels, int buffer_frames)
 {
 	(void)rate;
@@ -161,8 +194,15 @@ void fb_hAndroidSfxExit(void)
 
 const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
 {
-	&fb_sfxDriverAAudio,
+	/*
+		OpenSL ES is the older Android API, but its SimpleBufferQueue path
+		has more predictable startup and resume latency for short BASIC
+		tone commands. AAudio remains available as the fallback backend.
+	*/
 	&fb_sfxDriverOpenSLES,
+	&fb_sfxDriverAAudio,
 	&__fb_sfxDriverNull,
 	NULL
 };
+
+/* end of sfx_android.c */

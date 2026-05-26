@@ -15,6 +15,7 @@ int fb_hAndroidSfxIsRunning(void);
 int fb_hAndroidSfxActivate(int rate, int channels, int buffer_frames);
 void fb_hAndroidSfxDeactivate(void);
 void fb_hAndroidSfxExit(void);
+int fb_hAndroidSfxInWorker(void);
 
 #ifdef __cplusplus
 }

@@ -30,31 +30,78 @@ TOOLCHAIN_BINDIR :=
 ifneq ($(findstring /,$(CC))$(findstring \,$(CC)),)
 TOOLCHAIN_BINDIR := $(patsubst %/,%,$(dir $(CC)))
 endif
+FBC_ENV_TOOLCHAIN_BINDIR := $(TOOLCHAIN_BINDIR)
+FBC_ENV_PATH := $$PATH
+FBC_ENV_PATH_SEP := :
+FBC_ENV_AS := $(AS)
+FBC_ENV_AR := $(AR)
+FBC_ENV_LD := $(LD)
+FBC_ENV_CC := $(CC)
+FBC_ENV_CLANG := $(CLANG)
+FBC_ENV_LLC := $(LLC)
+FBC_ENV_DLLTOOL := $(DLLTOOL)
+FBC_ENV_WINDRES := $(WINDRES)
+FBC_ENV_GORC := $(GORC)
+FBC_ENV_EMAS := $(EMAS)
+FBC_ENV_EMAR := $(EMAR)
+FBC_ENV_EMLD := $(EMLD)
+FBC_ENV_EMCC := $(EMCC)
+FBC_ENV_CXBE := $(CXBE)
+FBC_ENV_DXEGEN := $(DXEGEN)
+FBC_ENV_ELF2DOL := $(ELF2DOL)
+ifneq ($(filter MSYS% MINGW%,$(shell uname -s 2>/dev/null)),)
+#
+# BUILD_FBC is often a native Windows executable even when make is running
+# from MSYS2.  fbc consults tool-specific environment variables such as GCC
+# and AS directly, so convert those to absolute Windows-style paths.  Keep PATH
+# in the shell's native POSIX form because Cygwin tools expect that environment
+# after fbc launches them.
+#
+fbc_msys_tool = $(strip $(if $(strip $(1)),$(shell tool='$(1)'; if command -v "$$tool" >/dev/null 2>&1; then cygpath -m "$$(command -v "$$tool")"; else cygpath -m "$$tool" 2>/dev/null || printf '%s' "$$tool"; fi)))
+FBC_ENV_AS := $(call fbc_msys_tool,$(AS))
+FBC_ENV_AR := $(call fbc_msys_tool,$(AR))
+FBC_ENV_LD := $(call fbc_msys_tool,$(LD))
+FBC_ENV_CC := $(call fbc_msys_tool,$(CC))
+FBC_ENV_CLANG := $(call fbc_msys_tool,$(CLANG))
+FBC_ENV_LLC := $(call fbc_msys_tool,$(LLC))
+FBC_ENV_DLLTOOL := $(call fbc_msys_tool,$(DLLTOOL))
+FBC_ENV_WINDRES := $(call fbc_msys_tool,$(WINDRES))
+FBC_ENV_GORC := $(call fbc_msys_tool,$(GORC))
+FBC_ENV_EMAS := $(call fbc_msys_tool,$(EMAS))
+FBC_ENV_EMAR := $(call fbc_msys_tool,$(EMAR))
+FBC_ENV_EMLD := $(call fbc_msys_tool,$(EMLD))
+FBC_ENV_EMCC := $(call fbc_msys_tool,$(EMCC))
+FBC_ENV_CXBE := $(call fbc_msys_tool,$(CXBE))
+FBC_ENV_DXEGEN := $(call fbc_msys_tool,$(DXEGEN))
+FBC_ENV_ELF2DOL := $(call fbc_msys_tool,$(ELF2DOL))
+endif
+FBC_TOOL_PATH_ENV := $(if $(strip $(FBC_ENV_TOOLCHAIN_BINDIR)),$(FBC_ENV_TOOLCHAIN_BINDIR)$(FBC_ENV_PATH_SEP),)$(FBC_ENV_PATH)
 TOOLCHAIN_PATH_ENV :=
 ifneq ($(strip $(TOOLCHAIN_BINDIR)),)
 # Quote the runtime PATH separately. Some macOS applications install PATH
 # entries containing spaces, and an unquoted $$PATH makes env treat the split
 # path fragment as the command to execute.
-TOOLCHAIN_PATH_ENV := env PATH='$(TOOLCHAIN_BINDIR):'"$$PATH"
+TOOLCHAIN_PATH_ENV := env PATH="$(TOOLCHAIN_BINDIR):$$PATH"
 endif
 FBC_TOOL_ENV := env \
 	$(TOOLCHAIN_FBC_ENV) \
-	PATH='$(if $(strip $(TOOLCHAIN_BINDIR)),$(TOOLCHAIN_BINDIR):)'"$$PATH" \
-	AS='$(AS)' \
-	AR='$(AR)' \
-	LD='$(LD)' \
-	GCC='$(CC)' \
-	CLANG='$(CLANG)' \
-	LLC='$(LLC)' \
-	DLLTOOL='$(DLLTOOL)' \
-	WINDRES='$(WINDRES)' \
-	GORC='$(GORC)' \
-	EMAS='$(EMAS)' \
-	EMAR='$(EMAR)' \
-	EMLD='$(EMLD)' \
-	EMCC='$(EMCC)' \
-	CXBE='$(CXBE)' \
-	DXEGEN='$(DXEGEN)'
+	PATH="$(FBC_TOOL_PATH_ENV)" \
+	AS='$(FBC_ENV_AS)' \
+	AR='$(FBC_ENV_AR)' \
+	LD='$(FBC_ENV_LD)' \
+	GCC='$(FBC_ENV_CC)' \
+	CLANG='$(FBC_ENV_CLANG)' \
+	LLC='$(FBC_ENV_LLC)' \
+	DLLTOOL='$(FBC_ENV_DLLTOOL)' \
+	WINDRES='$(FBC_ENV_WINDRES)' \
+	GORC='$(FBC_ENV_GORC)' \
+	EMAS='$(FBC_ENV_EMAS)' \
+	EMAR='$(FBC_ENV_EMAR)' \
+	EMLD='$(FBC_ENV_EMLD)' \
+	EMCC='$(FBC_ENV_EMCC)' \
+	CXBE='$(FBC_ENV_CXBE)' \
+	DXEGEN='$(FBC_ENV_DXEGEN)' \
+	ELF2DOL='$(FBC_ENV_ELF2DOL)'
 RUN_CC := $(TOOLCHAIN_PATH_ENV) $(CC)
 RUN_CXX := $(TOOLCHAIN_PATH_ENV) $(CXX)
 DARWIN_CLANG ?= $(strip $(shell xcrun --find clang 2>/dev/null || command -v clang 2>/dev/null || echo clang))
@@ -113,6 +160,15 @@ FBC_ANDROID_DEFINES := \
 $(fbcandroidobjdir)/%.o: $(srcdir)/compiler/%.bas $(FBC_BI) | $(fbcandroidobjdir)
 	@mkdir -p "$(dir $@)"
 	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) $(FBC_ANDROID_DEFINES) -i $(rootdir)/inc -c $< -o $@
+
+FBC_WII_DEFINES := \
+	-d BUILD_FB_DEFAULT_TARGET=FB_COMPTARGET_WII \
+	-d BUILD_FB_DEFAULT_CPUTYPE=FB_CPUTYPE_PPC \
+	-d ENABLE_SUFFIX=\"-wii\"
+
+$(fbcwiiobjdir)/%.o: $(srcdir)/compiler/%.bas $(FBC_BI) | $(fbcwiiobjdir)
+	@mkdir -p "$(dir $@)"
+	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) $(FBC_WII_DEFINES) -i $(rootdir)/inc -c $< -o $@
 
 ##############################################################################
 # rtlib (C runtime)

@@ -9,6 +9,46 @@
 #include once "rtl.bi"
 #include once "ast.bi"
 
+private function hCVIntConst _
+	( _
+		byval text as zstring ptr, _
+		byval bytes as integer _
+	) as longint
+
+	dim as ulongint value = 0
+
+	assert( text <> NULL )
+	assert( bytes > 0 )
+	assert( bytes <= 8 )
+
+	''
+	'' CV*() interprets the bytes in the string exactly as they would appear
+	'' in the target program's memory.  When the compiler is cross-building,
+	'' using the host's own CV* helpers here gives the wrong answer for
+	'' big-endian targets such as the Wii.
+	''
+	if( fbIsHostBigEndian( ) ) then
+		for i as integer = 0 to bytes - 1
+			value = (value shl 8) or culngint( (*text)[i] )
+		next
+	else
+		for i as integer = bytes - 1 to 0 step -1
+			value = (value shl 8) or culngint( (*text)[i] )
+		next
+	end if
+
+	'' Preserve the signed result that the runtime CV* function would return.
+	var bits = bytes * 8
+	if( bits < 64 ) then
+		var signbit = 1ull shl (bits - 1)
+		if( (value and signbit) <> 0 ) then
+			value or= (not 0ull) shl bits
+		end if
+	end if
+
+	function = cast( longint, value )
+end function
+
 '' MidStmt  =  MID '(' Expression{str}, Expression{int} (',' Expression{int}) ')' '=' Expression{str} .
 function cMidStmt( ) as integer
 	dim as ASTNODE ptr expr1 = any, expr2 = any, expr3 = any, expr4 = any
@@ -471,11 +511,11 @@ function cCVXFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 			case else
 				select case( typeGetSize( functype ) )
 				case 2
-					funcexpr = astNewCONSTi( cvshort( *zs ), FB_DATATYPE_SHORT )
+					funcexpr = astNewCONSTi( hCVIntConst( zs, 2 ), FB_DATATYPE_SHORT )
 				case 4
-					funcexpr = astNewCONSTi( cvl( *zs ), functype )
+					funcexpr = astNewCONSTi( hCVIntConst( zs, 4 ), functype )
 				case else
-					funcexpr = astNewCONSTi( cvlongint( *zs ), functype )
+					funcexpr = astNewCONSTi( hCVIntConst( zs, 8 ), functype )
 				end select
 			end select
 			astDelNode( expr1 )

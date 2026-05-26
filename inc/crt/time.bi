@@ -12,7 +12,9 @@
 #include once "crt/stddef.bi"
 #include once "crt/sys/types.bi"
 
-#if defined(__FB_WIN32__) or defined(__FB_XBOX__)
+#if defined(__FB_WII__)
+#include once "crt/wii/time.bi"
+#elseif defined(__FB_WIN32__) or defined(__FB_XBOX__)
 #include once "crt/win32/time.bi"
 #elseif defined(__FB_DOS__)
 #include once "crt/dos/time.bi"

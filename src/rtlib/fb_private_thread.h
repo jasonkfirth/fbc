@@ -17,6 +17,12 @@
 	struct _FBMUTEX {
 		CRITICAL_SECTION id;
 	};
+#elif defined HOST_WII
+	#include <ogc/lwp.h>
+	#include <ogc/mutex.h>
+	struct _FBMUTEX {
+		mutex_t id;
+	};
 #endif
 
 /* Solaris pthread.h does not define PTHREAD_STACK_MIN */
@@ -69,6 +75,8 @@ struct _FBTHREAD {
 	HANDLE id;
 #elif defined HOST_XBOX
 	HANDLE id;
+#elif defined HOST_WII
+	lwp_t id;
 #else
 #error Unexpected target
 #endif

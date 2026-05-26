@@ -14,6 +14,10 @@
 
 TERM_LIB := -lncurses
 
+ifneq ($(strip $(DISABLE_NCURSES)),)
+TERM_LIB :=
+endif
+
 ifeq ($(TARGET_OS),haiku)
 #
 # Haiku may provide the wide-character ncurses runtime as versioned shared
@@ -45,6 +49,7 @@ endif
 	compiler \
 	compiler-js \
 	compiler-android \
+	compiler-wii \
 	rtlib \
 	fbrt \
 	gfxlib2 \
@@ -121,6 +126,17 @@ $(FBC_ANDROID_EXE): $(FBC_ANDROID_OBJS) | libs
 		$(THREAD_FLAGS) \
 		$(TERM_LIB)
 
+$(FBC_WII_EXE): $(FBC_WII_OBJS) | libs
+	@mkdir -p "$(dir $@)"
+	@echo "Linking Wii-targeting compiler: $@"
+	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o $@ \
+		$(FBC_WII_OBJS) \
+		$(COMPILER_RT0) \
+		$(COMPILER_RTL) \
+		-lm \
+		$(THREAD_FLAGS) \
+		$(TERM_LIB)
+
 ##############################################################################
 # User-facing compiler target
 ##############################################################################
@@ -130,6 +146,8 @@ compiler: $(FBC_EXE)
 compiler-js: $(FBC_JS_EXE)
 
 compiler-android: $(FBC_ANDROID_EXE)
+
+compiler-wii: $(FBC_WII_EXE)
 
 ##############################################################################
 # END build-targets.mk

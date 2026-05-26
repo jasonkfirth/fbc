@@ -44,5 +44,6 @@ extern FB_CONSOLE_CTX __fb_con;
 
 extern EM_BOOL fb_hKeyEventHandler(int eventType, const EmscriptenKeyboardEvent *keyEvent, void *userData);
 extern EM_BOOL fb_hMouseEventHandler(int eventType, const EmscriptenMouseEvent *mouseEvent, void *userData);
+extern EM_BOOL fb_hTouchEventHandler(int eventType, const EmscriptenTouchEvent *touchEvent, void *userData);
 extern EM_BOOL fb_hMouseWheelEventHandler(int eventType, const EmscriptenWheelEvent *wheelEvent, void *userData);
-
+extern int fb_hJsGetTouchMouse(int *x, int *y, int *buttons);

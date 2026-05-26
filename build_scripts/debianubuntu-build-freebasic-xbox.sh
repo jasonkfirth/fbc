@@ -247,8 +247,8 @@ build_xbox_target() {
         FBC="./bin/fbc -i $ROOT/inc" \
         BUILD_FBC_TARGET=xbox \
         BUILD_FBC_BUILDPREFIX= \
-		CPPFLAGS="-DHOST_XBOX -DDISABLE_FFI -DDISABLE_OPENGL -I$NXDK_DIR/lib" \
-		CFLAGS="-DHOST_XBOX -DDISABLE_FFI -DDISABLE_OPENGL -I$NXDK_DIR/lib" \
+		CPPFLAGS="-DHOST_XBOX -DDISABLE_FFI -DDISABLE_OPENGL -I$NXDK_DIR/lib -I$NXDK_DIR/lib/net/lwip/src/include -I$NXDK_DIR/lib/net/nforceif/include -I$NXDK_DIR/lib/net/nvnetdrv" \
+		CFLAGS="-DHOST_XBOX -DDISABLE_FFI -DDISABLE_OPENGL -I$NXDK_DIR/lib -I$NXDK_DIR/lib/net/lwip/src/include -I$NXDK_DIR/lib/net/nforceif/include -I$NXDK_DIR/lib/net/nvnetdrv" \
         CXXFLAGS= \
         LDFLAGS= \
         rtlib fbrt gfxlib2 sfxlib \
@@ -271,6 +271,21 @@ ensure_nxdk_tools() {
     [ -f "$NXDK_DIR/Makefile" ] || die "nxdk cxbe is missing and nxdk Makefile was not found: $NXDK_DIR"
     run "$MAKE_CMD" -C "$NXDK_DIR" cxbe
     [ -x "$NXDK_DIR/tools/cxbe/cxbe" ] || die "nxdk cxbe was not built: $NXDK_DIR/tools/cxbe/cxbe"
+}
+
+ensure_nxdk_runtime_libs() {
+    msg "building nxdk runtime support libraries"
+
+    eval "$("$NXDK_DIR/bin/activate" -s)"
+    run "$MAKE_CMD" -C "$NXDK_DIR" \
+        NXDK_ONLY=1 \
+        NXDK_NET=y \
+        main.exe \
+        -j"$JOBS"
+
+    [ -f "$NXDK_DIR/lib/libpdclib.lib" ] || die "nxdk libpdclib.lib was not built"
+    [ -f "$NXDK_DIR/lib/libwinapi.lib" ] || die "nxdk libwinapi.lib was not built"
+    [ -f "$NXDK_DIR/lib/libnxdk_net.lib" ] || die "nxdk libnxdk_net.lib was not built"
 }
 
 write_wrapper() {
@@ -433,6 +448,7 @@ install_deps
 ensure_nxdk
 
 if [ "$NO_BUILD" -eq 0 ]; then
+    ensure_nxdk_runtime_libs
     build_xbox_target
 fi
 

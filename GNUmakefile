@@ -156,6 +156,7 @@ compiler-stage: | maybe-prereqs
 compiler: | maybe-prereqs
 compiler-js: | maybe-prereqs
 compiler-android: | maybe-prereqs
+compiler-wii: | maybe-prereqs
 rtlib: | maybe-prereqs
 fbrt: | maybe-prereqs
 gfxlib2: | maybe-prereqs
@@ -196,6 +197,7 @@ compiler-stage: | maybe-build-fbc
 compiler: | maybe-build-fbc
 compiler-js: | maybe-build-fbc
 compiler-android: | maybe-build-fbc
+compiler-wii: | maybe-build-fbc
 fbrt: | maybe-build-fbc
 
 # Source emission only needs a runnable FreeBASIC compiler.  The emitted C is
@@ -224,6 +226,11 @@ compiler-stage: rtlib compiler
 ##############################################################################
 
 all: libs compiler-stage
+
+.PHONY: wii
+wii:
+	$(MAKE) -f "$(rootdir)/GNUmakefile" DISABLE_FFI=YesPlease DISABLE_NCURSES=YesPlease BUILD_PREFIX= AS=as AR=ar LD=ld compiler-wii
+	$(MAKE) -f "$(rootdir)/GNUmakefile" TARGET_OS=wii TARGET_TRIPLET=powerpc-eabi BUILD_PREFIX=powerpc-eabi- libs
 
 ##############################################################################
 # Debug configuration
@@ -277,6 +284,8 @@ help:
 	@echo "  compiler                Build native fbc"
 	@echo "  compiler-js             Build fbc-js driver/compiler"
 	@echo "  compiler-android        Build fbc-android compiler backend"
+	@echo "  compiler-wii            Build fbc-wii compiler backend"
+	@echo "  wii                     Build fbc-wii and Wii runtime libraries"
 	@echo ""
 	@echo "Libraries:"
 	@echo "  rtlib                   Build core runtime library"
@@ -305,6 +314,7 @@ help:
 	@echo "  install                 Install native compiler, headers, and runtime"
 	@echo "  install-js              Install fbc-js, JS headers, runtime, and assets"
 	@echo "  install-android         Install fbc-android, Android headers, runtime, and templates"
+	@echo "  install-wii             Install fbc-wii, Wii headers, runtime, and wrapper"
 	@echo "  uninstall               Remove installed files"
 	@echo ""
 	@echo "Testing:"

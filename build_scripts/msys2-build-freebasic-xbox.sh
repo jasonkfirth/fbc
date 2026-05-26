@@ -385,6 +385,7 @@ build_nxdk_runtime_libs() {
 	run env \
 		MSYSTEM=MINGW64 \
 		NXDK_DIR="$NXDK_DIR" \
+		NXDK_NET=y \
 		PATH="/usr/bin:$MINGW64_ROOT/bin:$NXDK_DIR/bin:$PATH" \
 		make -C "$NXDK_DIR" \
 		NXDK_ONLY=1 \
@@ -394,6 +395,7 @@ build_nxdk_runtime_libs() {
 
 	[ -f "$NXDK_DIR/lib/libpdclib.lib" ] || fail "nxdk libpdclib.lib was not built"
 	[ -f "$NXDK_DIR/lib/libwinapi.lib" ] || fail "nxdk libwinapi.lib was not built"
+	[ -f "$NXDK_DIR/lib/libnxdk_net.lib" ] || fail "nxdk libnxdk_net.lib was not built"
 }
 
 ##############################################################################
@@ -475,8 +477,8 @@ build_xbox_target() {
 		BUILD_FBC="$host_fbc" \
 		BUILD_FBC_TARGET=xbox \
 		BUILD_FBC_BUILDPREFIX= \
-		CPPFLAGS="-DHOST_XBOX -DDISABLE_FFI -DDISABLE_OPENGL -I$NXDK_DIR/lib" \
-		CFLAGS="-DHOST_XBOX -DDISABLE_FFI -DDISABLE_OPENGL -I$NXDK_DIR/lib" \
+		CPPFLAGS="-DHOST_XBOX -DDISABLE_FFI -DDISABLE_OPENGL -I$NXDK_DIR/lib -I$NXDK_DIR/lib/net/lwip/src/include -I$NXDK_DIR/lib/net/nforceif/include -I$NXDK_DIR/lib/net/nvnetdrv" \
+		CFLAGS="-DHOST_XBOX -DDISABLE_FFI -DDISABLE_OPENGL -I$NXDK_DIR/lib -I$NXDK_DIR/lib/net/lwip/src/include -I$NXDK_DIR/lib/net/nforceif/include -I$NXDK_DIR/lib/net/nvnetdrv" \
 		CXXFLAGS= \
 		LDFLAGS= \
 		rtlib fbrt gfxlib2 sfxlib \
@@ -542,11 +544,66 @@ set "GCC=%NXDK_DIR%\bin\nxdk-cc"
 set "AS=%NXDK_DIR%\bin\nxdk-cc"
 set "LD=%NXDK_DIR%\bin\nxdk-link"
 set "AR=%FBXBOX_ROOT%\toolchain\msys2\usr\bin\llvm-ar.exe"
+set "RANLIB=%FBXBOX_ROOT%\toolchain\msys2\usr\bin\llvm-ranlib.exe"
 if exist "%NXDK_DIR%\tools\cxbe\cxbe.exe" set "CXBE=%NXDK_DIR%\tools\cxbe\cxbe.exe"
 if not defined CXBE set "CXBE=%NXDK_DIR%\tools\cxbe\cxbe"
 echo FreeBASIC Xbox environment ready.
 echo fbc-xbox: %FBXBOX_ROOT%fbc-xbox.cmd
 cmd /k
+EOF
+
+	cat > "$DISTROOT/fbc-xbox-xiso.cmd" <<'EOF'
+@echo off
+setlocal
+set "FBXBOX_ROOT=%~dp0"
+if "%FBXBOX_ROOT:~-1%"=="\" set "FBXBOX_ROOT=%FBXBOX_ROOT:~0,-1%"
+
+if "%~1"=="" goto usage
+if not exist "%~1" (
+	echo XBE not found: %~1 1>&2
+	exit /b 1
+)
+
+set "EXTRACT_XISO=%FBXBOX_ROOT%\nxdk\tools\extract-xiso\build\extract-xiso.exe"
+if not exist "%EXTRACT_XISO%" set "EXTRACT_XISO=%FBXBOX_ROOT%\nxdk\tools\extract-xiso\build\extract-xiso"
+if not exist "%EXTRACT_XISO%" (
+	echo extract-xiso was not found under %FBXBOX_ROOT%\nxdk\tools\extract-xiso\build 1>&2
+	exit /b 1
+)
+
+for %%I in ("%~1") do set "XBE_PATH=%%~fI"
+if "%~2"=="" (
+	for %%I in ("%~dpn1.iso") do set "ISO_PATH=%%~fI"
+) else (
+	for %%I in ("%~2") do set "ISO_PATH=%%~fI"
+)
+
+set "STAGE=%TEMP%\fbc-xbox-xiso-%RANDOM%%RANDOM%"
+mkdir "%STAGE%" >nul 2>nul
+if errorlevel 1 (
+	echo Could not create temporary XISO staging directory: %STAGE% 1>&2
+	exit /b 1
+)
+
+copy /Y "%XBE_PATH%" "%STAGE%\default.xbe" >nul
+if errorlevel 1 (
+	rmdir /S /Q "%STAGE%" >nul 2>nul
+	echo Could not stage default.xbe 1>&2
+	exit /b 1
+)
+
+if exist "%ISO_PATH%" del /F /Q "%ISO_PATH%" >nul 2>nul
+"%EXTRACT_XISO%" -q -c "%STAGE%" "%ISO_PATH%"
+set "STATUS=%ERRORLEVEL%"
+rmdir /S /Q "%STAGE%" >nul 2>nul
+if not "%STATUS%"=="0" exit /b %STATUS%
+
+echo Wrote %ISO_PATH%
+exit /b 0
+
+:usage
+echo Usage: fbc-xbox-xiso.cmd program.xbe [program.iso]
+exit /b 2
 EOF
 }
 
@@ -571,9 +628,14 @@ Use fbc-xbox.cmd from cmd.exe or PowerShell:
 
     fbc-xbox.cmd program.bas -x program.xbe
 
-The bundled nxdk tools also include extract-xiso. This can be used to pack a
-directory containing default.xbe into the XISO disc-image format expected by
-full-system Xbox emulators such as xemu.
+The package also includes fbc-xbox-xiso.cmd.  It stages an XBE as default.xbe
+and packs the XISO disc-image format expected by full-system Xbox emulators
+such as xemu:
+
+    fbc-xbox-xiso.cmd program.xbe program.iso
+
+The bundled nxdk tools still include extract-xiso for lower-level packaging
+workflows.
 
 This is an experimental nxdk-based revival path for the existing FreeBASIC
 Xbox target. The package validation checks that the compiler can invoke the

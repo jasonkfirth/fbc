@@ -43,6 +43,7 @@ FBC_EXE    := fbc$(EXEEXT)
 FBCNEW_EXE := fbc-new$(EXEEXT)
 FBC_JS_EXE := fbc-js$(EXEEXT)
 FBC_ANDROID_EXE := fbc-android-compiler$(EXEEXT)
+FBC_WII_EXE := fbc-wii-compiler$(EXEEXT)
 
 else
 
@@ -54,6 +55,7 @@ FBC_EXE    := $(build_bindir)/fbc$(ENABLE_SUFFIX)$(EXEEXT)
 FBCNEW_EXE := $(build_bindir)/fbc$(ENABLE_SUFFIX)-new$(EXEEXT)
 FBC_JS_EXE := $(build_bindir)/fbc-js$(EXEEXT)
 FBC_ANDROID_EXE := $(build_bindir)/fbc-android-compiler$(EXEEXT)
+FBC_WII_EXE := $(build_bindir)/fbc-wii-compiler$(EXEEXT)
 
 endif
 
@@ -78,6 +80,7 @@ libdir := $(build_libdir)
 fbcobjdir := src/compiler/obj/$(FBTARGET)
 fbcjsobjdir := src/compiler/obj/$(FBTARGET)-jsdriver
 fbcandroidobjdir := src/compiler/obj/$(FBTARGET)-androiddriver
+fbcwiiobjdir := src/compiler/obj/$(FBTARGET)-wiidriver
 
 # Runtime objects
 libfbobjdir	 := src/rtlib/obj/$(objsubdir)

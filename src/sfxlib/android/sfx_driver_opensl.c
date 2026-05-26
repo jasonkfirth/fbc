@@ -282,8 +282,11 @@ static void opensl_exit(void)
 static FB_SFX_OPENSL_BUFFER *wait_for_buffer(int *paused)
 {
 	int i;
+	int may_wait;
 
 	*paused = 0;
+	may_wait = fb_hAndroidSfxInWorker();
+
 	pthread_mutex_lock(&buffer_mutex);
 	while (!shutting_down)
 	{
@@ -305,8 +308,27 @@ static FB_SFX_OPENSL_BUFFER *wait_for_buffer(int *paused)
 				return &buffers[i];
 			}
 		}
+
+		/*
+			Only the Android audio worker may wait for OpenSL ES queue space.
+			Foreground BASIC code can reach the driver through sound commands
+			or cooperative delay pumping, and waiting here would show up as a
+			gameplay hitch. If the queue is already full on a foreground call,
+			the safest behavior is to drop this short block and let the next
+			audio tick try again.
+		*/
+		if (!may_wait)
+		{
+			pthread_mutex_unlock(&buffer_mutex);
+			return NULL;
+		}
+
 		make_buffer_wait_timeout(&timeout);
-		pthread_cond_timedwait(&buffer_cond, &buffer_mutex, &timeout);
+		if (pthread_cond_timedwait(&buffer_cond, &buffer_mutex, &timeout) != 0)
+		{
+			pthread_mutex_unlock(&buffer_mutex);
+			return NULL;
+		}
 	}
 	pthread_mutex_unlock(&buffer_mutex);
 	return NULL;
@@ -319,10 +341,15 @@ static int opensl_write(const float *samples, int frames)
 	int paused = 0;
 	SLresult result;
 
-	if (!fb_hAndroidSfxIsRunning())
+	if (frames <= 0)
 		return 0;
+	if (!samples)
+		return -1;
 
-	if (!initialized || !queue || !samples || frames <= 0)
+	if (!fb_hAndroidSfxIsRunning())
+		return frames;
+
+	if (!initialized || !queue)
 		return -1;
 
 	if (frames > buffer_frames_active)
@@ -332,7 +359,7 @@ static int opensl_write(const float *samples, int frames)
 
 	buffer = wait_for_buffer(&paused);
 	if (!buffer)
-		return paused ? 0 : -1;
+		return frames;
 
 	total = frames * channels_active;
 	for (i = 0; i < total; ++i)

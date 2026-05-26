@@ -249,9 +249,12 @@ function symbAllocWStrConst _
 		strlength = internalstrlen
 	end if
 
-	'' hEscapeW() can use up to (4 * sizeof(wchar)) ascii chars per unicode char
-	'' (up to one '\ooo' per byte of wchar)
-	if( internalstrlen * ((1+3) * sizeof( wstring )) <= FB_MAXNAMELEN-6 ) then
+	'' hEscapeW() writes bytes in the target wchar layout, not the host
+	'' compiler's WSTRING layout.  Cross-compilers to 32-bit wchar targets
+	'' must use the target width here, otherwise long ASCII literals can be
+	'' given truncated lookup keys and different literals may be re-used as
+	'' the same symbol.
+	if( internalstrlen * ((1+3) * fbGetTargetWcharSize( )) <= FB_MAXNAMELEN-6 ) then
 		id = "{fbwc}"
 		id += *hEscapeW( sname )
 	else

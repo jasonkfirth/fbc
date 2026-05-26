@@ -274,10 +274,20 @@ int fb_js_sdl_button_to_fb_button(int sdl_button)
 
 static int driver_get_mouse(int *x, int *y, int *z, int *buttons, int *clip)
 {
+	int touch_x;
+	int touch_y;
+	int touch_buttons;
 	SDL_PumpEvents();
 
 	uint32_t state = SDL_GetMouseState(x, y);
 	if (buttons) *buttons = fb_js_sdl_buttons_to_fb_buttons(state);
+
+	if (fb_hJsGetTouchMouse(&touch_x, &touch_y, &touch_buttons)) {
+		if (x) *x = touch_x;
+		if (y) *y = touch_y;
+		if (buttons) *buttons = touch_buttons;
+	}
+
 	if (z) *z = 0;
 	if (clip) *clip = 0;
 

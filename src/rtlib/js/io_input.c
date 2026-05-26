@@ -380,6 +380,60 @@ EM_BOOL fb_hKeyEventHandler(int eventType, const EmscriptenKeyboardEvent *keyEve
 	}
 }
 
+static int touch_valid = 0;
+static int touch_x = 0;
+static int touch_y = 0;
+static int touch_buttons = 0;
+
+static void update_touch_mouse(const EmscriptenTouchEvent *touchEvent, int buttons)
+{
+	int index;
+	int selected = -1;
+
+	if( touchEvent == NULL )
+		return;
+
+	for( index = 0; index < touchEvent->numTouches; index++ )
+	{
+		const EmscriptenTouchPoint *touch = &touchEvent->touches[index];
+
+		if( touch->isChanged ) {
+			selected = index;
+			break;
+		}
+	}
+
+	if( selected < 0 && touchEvent->numTouches > 0 )
+		selected = 0;
+
+	if( selected >= 0 ) {
+		const EmscriptenTouchPoint *touch = &touchEvent->touches[selected];
+
+		touch_valid = 1;
+		touch_x = touch->canvasX;
+		touch_y = touch->canvasY;
+	}
+
+	touch_buttons = buttons;
+}
+
+int fb_hJsGetTouchMouse(int *x, int *y, int *buttons)
+{
+    if( !touch_valid )
+        return 0;
+
+    if( x != NULL )
+        *x = touch_x;
+
+    if( y != NULL )
+        *y = touch_y;
+
+    if( buttons != NULL )
+        *buttons = touch_buttons;
+
+    return 1;
+}
+
 EM_BOOL fb_hMouseEventHandler(int eventType, const EmscriptenMouseEvent *mouseEvent, void *userData)
 {
     switch( eventType )
@@ -401,8 +455,32 @@ EM_BOOL fb_hMouseEventHandler(int eventType, const EmscriptenMouseEvent *mouseEv
     return 0;
 }
 
+EM_BOOL fb_hTouchEventHandler(int eventType, const EmscriptenTouchEvent *touchEvent, void *userData)
+{
+    switch( eventType )
+    {
+        case EMSCRIPTEN_EVENT_TOUCHSTART:
+        case EMSCRIPTEN_EVENT_TOUCHMOVE:
+        {
+            update_touch_mouse(touchEvent, BUTTON_LEFT);
+            return 1;
+        }
+
+        case EMSCRIPTEN_EVENT_TOUCHEND:
+        case EMSCRIPTEN_EVENT_TOUCHCANCEL:
+        {
+            update_touch_mouse(touchEvent, 0);
+            return 1;
+        }
+
+        default:
+        {
+            return 0;
+        }
+    }
+}
+
 int fb_hConsoleInputBufferChanged( void )
 {
     return fb_ConsoleKeyHit();
 }
-

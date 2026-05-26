@@ -68,8 +68,9 @@ FBCFLAGS += -g
 ifeq ($(TARGET),dos)
 FBCFLAGS += -i ../../inc -i inc
 else
-FBCFLAGS += -i $(abspath inc)
+FBCFLAGS += -i inc
 endif
+FBCFLAGS += -i src
 
 .SUFFIXES: .bas
 
@@ -110,13 +111,13 @@ examples: $(EXAMPLES)
 
 $(LIBRARY): $(SRCS) $(HDRS)
 ifeq ($(TARGET),dos)
-	$(FBC) $(FBCFLAGS) -c src/fbcunit.bas -o src/fbcunit.o
-	$(FBC) $(FBCFLAGS) -c src/fbcunit_qb.bas -o src/fbcunit_qb.o
-	$(FBC) $(FBCFLAGS) -c src/fbcunit_console.bas -o src/fbcunit_console.o
-	$(FBC) $(FBCFLAGS) -c src/fbcunit_report.bas -o src/fbcunit_report.o
+	$(FBC) $(FBCFLAGS) -d FBCU_NO_INCLIB -c src/fbcunit.bas -o src/fbcunit.o
+	$(FBC) $(FBCFLAGS) -d FBCU_NO_INCLIB -c src/fbcunit_qb.bas -o src/fbcunit_qb.o
+	$(FBC) $(FBCFLAGS) -d FBCU_NO_INCLIB -c src/fbcunit_console.bas -o src/fbcunit_console.o
+	$(FBC) $(FBCFLAGS) -d FBCU_NO_INCLIB -c src/fbcunit_report.bas -o src/fbcunit_report.o
 	ar rcs $@ $(LIBRARY_OBJS)
 else
-	$(FBC) $(FBCFLAGS) -lib $(SRCS) -x $@
+	$(FBC) $(FBCFLAGS) -d FBCU_NO_INCLIB -lib $(SRCS) -x $@
 endif
 
 tests/%.o: tests/%.bas $(HDRS)

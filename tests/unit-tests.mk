@@ -27,6 +27,7 @@ SED := sed
 ECHO := echo
 PRINTF := printf
 CAT := cat
+AR ?= ar
 
 ifndef FBC
 FBC := $(TESTS_DEFAULT_FBC)
@@ -48,6 +49,7 @@ endif
 
 UNIT_TESTS_INC := unit-tests.inc
 UNIT_TESTS_OBJ_LST := unit-tests-obj.lst
+UNIT_TESTS_OBJ_LIB := unit-tests-obj.a
 UNIT_TESTS_EXPLICIT_SRCS := \
 ./pp/macro-arg-listexpand-utf16le.bas \
 ./pp/macro-eval-str-utf16le.bas \
@@ -84,8 +86,8 @@ MAINEXE := fbc-tests$(TARGET_EXEEXT)
 SRCLIST += ./$(MAINBAS).bas
 
 FBCU_DIR := fbcunit
-FBCU_INC := $(abspath $(FBCU_DIR)/inc)
-FBCU_LIB := $(abspath $(FBCU_DIR)/lib)
+FBCU_INC := $(FBCU_DIR)/inc
+FBCU_LIB := $(FBCU_DIR)/lib
 FBCU_BIN := $(FBCU_LIB)/libfbcunit.a
 FBCU_MAKE := $(MAKE)
 ifeq ($(HOST),dos)
@@ -148,6 +150,20 @@ endif
 ifeq ($(TARGET_OS),js)
 # Copy the file/ and data/ directories into the in-memory FS
 	FBC_LFLAGS += -Wl -sEXIT_RUNTIME -Wl --preload-file,boolean,--preload-file,data,--preload-file,file,--preload-file,wstring
+endif
+ifeq ($(TARGET_OS),wii)
+	AR := powerpc-eabi-ar
+	WII_CC ?= powerpc-eabi-gcc
+	WII_ELF2DOL ?= elf2dol
+	WII_DEVKITPRO ?= $(DEVKITPRO)
+	WII_FB_PREFIX ?= $(FBWII_PREFIX)
+	ifeq ($(WII_DEVKITPRO),)
+		WII_DEVKITPRO := /opt/devkitpro
+	endif
+	ifeq ($(WII_FB_PREFIX),)
+		WII_FB_PREFIX := ../build/wii-sdk
+	endif
+	WII_FB_LIBDIR := $(WII_FB_PREFIX)/lib/freebasic-wii/wii-powerpc
 endif
 
 ifeq ($(ENABLE_CHECK_BUGS),1)
@@ -216,8 +232,18 @@ $(if $(filter dos,$(TARGET_OS)),-e '/^\.\/interactive\//d' -e '/^\.\/threads\//d
 # ------------------------------------------------------------------------
 
 .PHONY: build_tests
+ifeq ($(TARGET_OS),wii)
+build_tests : $(FBCU_BIN) ./$(MAINBAS).o $(OBJLIST) $(UNIT_TESTS_OBJ_LST) $(UNIT_TESTS_OBJ_LIB)
+	$(WII_CC) -o $(MAINBAS).elf -L "$(WII_FB_LIBDIR)" -L "$(FBCU_LIB)" -L "." -L "$(WII_DEVKITPRO)/libogc/lib/wii" "$(WII_FB_LIBDIR)/fbrt0.o" ./$(MAINBAS).o -Wl,--whole-archive $(UNIT_TESTS_OBJ_LIB) -Wl,--no-whole-archive -Wl,--start-group -lfbcunit -lfbmt -lfbgfx -lfat -lwiiuse -lbte -lasnd -logc -lm -lc -lgcc -Wl,--end-group -mrvl -mcpu=750 -meabi -mhard-float
+	$(WII_ELF2DOL) $(MAINBAS).elf $(MAINEXE)
+else
 build_tests : $(FBCU_BIN) ./$(MAINBAS).o $(OBJLIST) $(UNIT_TESTS_OBJ_LST)
 	$(FBC) $(FBC_LFLAGS) @$(UNIT_TESTS_OBJ_LST) ./$(MAINBAS).o
+endif
+
+$(UNIT_TESTS_OBJ_LIB) : $(UNIT_TESTS_OBJ_LST) $(OBJLIST)
+	$(RM) $@
+	$(CAT) $(UNIT_TESTS_OBJ_LST) | $(XARGS) $(AR) rcs $@
 
 .PHONY: run_tests
 run_tests : build_tests
@@ -237,12 +263,12 @@ mostlyclean : clean_main_exe clean_tests clean_fbcu
 
 .PHONY: clean_main_exe
 clean_main_exe :
-	$(RM) $(MAINEXE)
+	$(RM) $(MAINEXE) $(MAINBAS).elf
 
 .PHONY: clean_tests
 clean_tests : $(UNIT_TESTS_OBJ_LST)
 	@$(ECHO) Cleaning unit-tests files ...
-	@$(RM) ./$(MAINBAS).o
+	@$(RM) ./$(MAINBAS).o $(UNIT_TESTS_OBJ_LIB)
 	@if [ -s $(UNIT_TESTS_OBJ_LST) ]; then $(CAT) $(UNIT_TESTS_OBJ_LST) | $(XARGS) $(RM) ; fi
 
 .PHONY: clean_fbcu

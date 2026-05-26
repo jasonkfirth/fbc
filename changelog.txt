@@ -1,6 +1,38 @@
 Version 1.20.1
 
 [changed]
+- rtlib/Android: return TIMER from CLOCK_MONOTONIC relative to runtime startup instead of wall-clock epoch time, preserving frame-scale timing precision when programs store TIMER values in SINGLE variables
+- sfxlib/Android: warm up the selected sound backend during NativeActivity startup, prefer the OpenSL ES backend before AAudio for current packaged builds, and keep foreground audio writes non-blocking so SOUND/BEEP-heavy programs do not stall the main loop when Android audio buffers are full or paused
+- fbc-android: infer landscape Activity orientation from common SCREEN and SCREENRES source usage, reducing the need for Android-specific source defines in ordinary graphics programs and avoiding surface churn during launch/resume
+- rtlib/gfxlib2 JavaScript: map browser touch events into the normal FreeBASIC GetMouse path so touch screens can drive mouse-style controls without JavaScript-specific application code
+- rtlib/JavaScript: return TIMER from Emscripten's monotonic runtime clock instead of wall-clock epoch time, preserving sub-frame timing precision when programs store TIMER values in SINGLE variables
+- rtlib/JavaScript: route SLEEP through Emscripten's async sleep path and keep SLEEP 0 as a cooperative event-pump point so browser-hosted programs can yield without turning tight polling loops into busy-waits
+- gfxlib2/JavaScript: removed automatic browser yields from low-level graphics unlock and page-selection paths, avoiding recursive update scheduling and browser hang detection while leaving presentation under explicit SLEEP/SCREENCOPY/FLIP control
+- gfxlib2/Android: suppress visible framebuffer updates while SCREENLOCK is active, then present on SCREENUNLOCK when needed, so Android apps do not expose partially drawn frames from locked drawing batches
+- gfxlib2/Android: prevent the hidden keyboard input view from taking focus during graphics startup, keeping the on-screen keyboard or handwriting overlay from covering graphics programs until keyboard input is explicitly requested
+- build system: added first-class Wii target wiring across GNUmakefile and mk/, including compiler-wii, install-wii, devkitPPC/libogc toolchain flags, elf2dol propagation, target feature policy, and Wii runtime library installation layout
+- compiler: added the Wii/powerpc target to the target table, GNU target mapping, help output, per-target platform hook set, and linker flow; Wii builds now link through the devkitPPC GCC driver, produce an intermediate ELF, and convert it to a bootable DOL with elf2dol
+- compiler: keep target-specific library and framework policy in platform hook files, including Wii default library ordering and Xbox linkage against nxdk's network library
+- compiler: default Xbox package builds to the thread-safe runtime because the Xbox graphics, input, sound, and networking backends use worker or callback paths internally
+- compiler/MSYS2/Cygwin: make host path normalization use the correct Windows drive-prefix style when the Cygwin-targeting compiler is run from an MSYS2 environment, and pass package-local tool paths to fbc-generated compile/link stages more consistently
+- rtlib: extended the shared OPEN TCP and OPEN TCP SERVER device implementation to Xbox and Wii, including lazy nxdk/libogc network initialization, platform socket/select/ioctl wrappers, Wii address lookup, TCP ACCEPT support, and safe behavior where a platform cannot report pending byte counts
+- rtlib/Wii: added libogc-backed thread, mutex, TLS, console, time, filesystem, pipe-stub, and internationalization support, plus Wii/newlib-specific FORMAT() handling for cases where target libc floating-point formatting differs from the host compiler's expectations
+- gfxlib2: present explicit visible-page updates through the driver update hook after SCREENSET/SCREENCOPY/FLIP instead of relying on per-primitive driver unlock behavior
+- gfxlib2/Xbox: update only dirty visible framebuffer lines, avoid clearing the full framebuffer for every copy, and defer presentation until explicit page operations so page-flipped programs no longer expose partially drawn hidden pages
+- gfxlib2: corrected PSET handling for off-screen and inactive image contexts so antialiased coordinate paths do not rely on visible-window translation state
+- gfxlib2/Xbox input: keep controller interrupt transfers queued from the completion callback so GETXPAD receives continuous button and axis state instead of stalling after transient USB timing gaps
+- gfxlib2/Wii input: expose Wiimote, Nunchuk, Classic Controller, and GameCube controller state through GETXPAD, including D-pad-as-stick fallback, trigger mapping, and loose motion/shake reporting for portable controller polling
+- gfxlib2/Wii mouse: expose Wiimote IR pointing through the normal FreeBASIC mouse path and map the Wii Home button into the graphics keyboard state as Escape for programs that use MULTIKEY(SC_ESCAPE)
+- sfxlib: enabled the multithreaded sound path for Xbox and Wii, made voice allocation/activation atomic under the runtime lock, and kept tone/noise/music/playback command setup from racing the mixer thread
+- sfxlib/Xbox: reworked the XAudio backend around a background feeder, smaller AC97 buffer ring, startup silence, non-blocking buffer submission, and clean worker shutdown so sound playback does not stall the main program loop
+- sfxlib/JavaScript: added an async WebAudio mixer pump so browser programs that only issue sound commands still advance audio without needing explicit foreground feeding
+- tests: taught the fbcunit aggregate build path how to produce Wii DOL test images, defaulted standalone Wii fbc-tests runs to an XML report on the mounted filesystem, and adjusted platform-sensitive pipe, ThreadCall, FORMAT(), and floating-point constant-evaluation expectations for Wii/newlib behavior
+- tests: removed generated sfx .tmp render dumps from the tracked tree and kept generated Wii/fbcunit test byproducts out of normal source packaging paths
+- packaging/MSYS2: remove stale libmsvcrt*.dll.a import libraries from MinGW win32/win64 distributions so legacy winlibs cannot override the active toolchain CRT import libraries
+- packaging/MSYS2 JavaScript: make the standalone fbc-js package more relocatable by writing a package-local Emscripten config, moving cache/temp files into per-user directories, overlaying official Node.js/Binaryen Windows tools, and validating package builds with a timeout wrapper
+- packaging/MSYS2 Android: make SDK setup instructions explicit about accepting Google's Android SDK terms and add an opt-in emulator-tools install path for packages that will run APK validation
+- packaging/MSYS2 Xbox: build nxdk network libraries, include the network headers and libnxdk_net in the packaged target, set package-local ranlib, and add an fbc-xbox-xiso helper for producing emulator-ready XISO images from XBE outputs
+- packaging/Debian/Ubuntu Xbox: build nxdk with network support and include the nxdk lwIP/nforce network headers so the packaged Xbox target can compile OPEN TCP programs
 - merged the divergent FreeBASIC 1.10.4 development line forward into the 1.20 branch, including the separate 1.10.3/1.10.4 platform and packaging work
 - adopted the GNUmakefile + mk/ modular build system and the accompanying build_scripts/ and debian/ packaging flow in place of the older monolithic 1.20 makefile-only layout
 - build system: renamed the remaining checked-in Makefile/makefile entry points to GNUmakefile and shared the source/example rsync exclude rules across package scripts so generated artifacts stay out of isolated build trees
@@ -76,6 +108,14 @@ Version 1.20.1
 - tests: refreshed warning-test expectations to match the compiler's corrected "Ambiguous" diagnostic spelling
 
 [added]
+- Nintendo Wii homebrew target support, including fbc-wii, powerpc-eabi/devkitPPC target selection, libogc headers/runtime libraries, DOL output generation, Wii CRT binding shims, and package-local compiler driver tooling
+- Wii gfxlib2 backend with legacy SCREEN mode coverage, truecolor framebuffer presentation, SCREENSET/SCREENCOPY support, dirty presentation, Wiimote IR mouse support, and normal FreeBASIC graphics input integration
+- Wii sfxlib backend using libogc ASND output, with blocking and non-blocking command coverage through the shared sfxlib mixer
+- Wii rtlib support for libogc console output, FAT-backed filesystem hooks, time, thread/mutex/TLS services, and OPEN TCP / OPEN TCP SERVER networking through the Wii network stack
+- Debian/Ubuntu freebasic-wii package profile with devkitppc/libogc/gamecube-tools build dependencies, runtime/header installation, fbc-wii manual page integration, and optional Dolphin recommendation
+- MSYS2 Wii build and validation scripts for producing a standalone Windows Wii-targeting package and running fbcunit, exampleageddon, and gfxlib/sfxlib smoke checks against the packaged compiler
+- Wii smoke tests covering SCREEN 0 through SCREEN 13, RGB framebuffer color checks, mode switching, SCREENSET behavior, controller/mouse input, and sfxlib blocking/non-blocking playback
+- Xbox smoke tests for page copying, primitive presentation stress, SCREEN 13 to SCREENRES/SCREENSET transitions, GETXPAD controller polling, and sfxlib playback under the emulator-oriented package flow
 - sfxlib integrated into the compiler, runtime, libraries, examples, and build system
 - compiler: added FB_NO_GFXLIB and FB_NO_SFXLIB opt-out defines so gfxlib-only and sfxlib-only quirk command words can be used as normal identifiers in serious-development code that does not want those legacy command surfaces
 - compiler: added #pragma gui / #pragma gui = 0 for source-level GUI vs console application mode selection, matching the existing -s gui/console mode view without requiring hidden command-line options

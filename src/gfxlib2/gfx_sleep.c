@@ -14,6 +14,12 @@ static void poll_events(void)
 	FB_GRAPHICS_UNLOCK( );
 }
 
+static void update_display(void)
+{
+	if ((__fb_gfx) && (__fb_gfx->driver->update))
+		__fb_gfx->driver->update();
+}
+
 void fb_GfxSleep ( int msecs )
 {
 	/* infinite? wait until any key is pressed */
@@ -39,6 +45,20 @@ void fb_GfxSleep ( int msecs )
 			fb_Delay( 50 );
 			msecs -= 50;
 		}
+
+	if( msecs == 0 )
+	{
+		poll_events( );
+		/*
+			The JavaScript driver uses its update hook as a timer callback that
+			schedules the next browser update.  Calling it from every SLEEP 0
+			would create a growing number of update timers instead of a single
+			presentation request.
+		*/
+#ifndef HOST_JS
+		update_display( );
+#endif
+	}
 
 	if( msecs >= 0 )
 		fb_Delay( msecs );

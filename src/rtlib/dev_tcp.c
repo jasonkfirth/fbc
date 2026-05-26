@@ -41,6 +41,14 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 #if !defined(HOST_DOS) && !defined(HOST_JS)
 	#if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
 		#include <ws2tcpip.h>
+	#elif defined(HOST_XBOX)
+		#include <errno.h>
+		#include <lwip/netdb.h>
+		#include <lwip/sockets.h>
+		#include <nxdk/net.h>
+	#elif defined(HOST_WII)
+		#include <errno.h>
+		#include <network.h>
 	#else
 		#include <errno.h>
 		#include <netdb.h>
@@ -56,22 +64,43 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 
 #if defined(HOST_DOS) || defined(HOST_JS)
 	#define FB_TCP_CLOSESOCKET(s) (0)
+	#define FB_TCP_SOCKET_ERROR(s) TRUE
 	#define FB_TCP_ERRNO() 0
 	#define FB_TCP_WOULDBLOCK(err) FALSE
 	#define FB_TCP_SHUT_WR 1
 	#define FB_TCP_SHUT_RDWR 2
 #elif defined(HOST_WIN32) && !defined(HOST_CYGWIN)
 	#define FB_TCP_CLOSESOCKET(s) closesocket( s )
+	#define FB_TCP_SOCKET_ERROR(s) ((s) == FB_TCP_INVALID_SOCKET)
 	#define FB_TCP_ERRNO() WSAGetLastError( )
 	#define FB_TCP_WOULDBLOCK(err) ((err) == WSAEWOULDBLOCK)
 	#define FB_TCP_SHUT_WR SD_SEND
 	#define FB_TCP_SHUT_RDWR SD_BOTH
+	#define FB_TCP_SELECT(n, r, w, e, t) select( 0, r, w, e, t )
+	#define FB_TCP_IOCTL(s, cmd, argp) ioctlsocket( s, cmd, argp )
+	#define FB_TCP_CAN_QUERY_BYTES TRUE
+#elif defined(HOST_WII)
+	#define FB_TCP_CLOSESOCKET(s) net_close( s )
+	#define FB_TCP_SOCKET_ERROR(s) ((s) < 0)
+	#define FB_TCP_ERRNO() errno
+	#define FB_TCP_WOULDBLOCK(err) \
+		((err) == EAGAIN || (err) == EWOULDBLOCK || \
+		 (err) == -EAGAIN || (err) == -EWOULDBLOCK)
+	#define FB_TCP_SHUT_WR SHUT_WR
+	#define FB_TCP_SHUT_RDWR SHUT_RDWR
+	#define FB_TCP_SELECT(n, r, w, e, t) net_select( n, r, w, e, t )
+	#define FB_TCP_IOCTL(s, cmd, argp) net_ioctl( s, cmd, argp )
+	#define FB_TCP_CAN_QUERY_BYTES FALSE
 #else
 	#define FB_TCP_CLOSESOCKET(s) close( s )
+	#define FB_TCP_SOCKET_ERROR(s) ((s) == FB_TCP_INVALID_SOCKET)
 	#define FB_TCP_ERRNO() errno
 	#define FB_TCP_WOULDBLOCK(err) ((err) == EAGAIN || (err) == EWOULDBLOCK)
 	#define FB_TCP_SHUT_WR SHUT_WR
 	#define FB_TCP_SHUT_RDWR SHUT_RDWR
+	#define FB_TCP_SELECT(n, r, w, e, t) select( n, r, w, e, t )
+	#define FB_TCP_IOCTL(s, cmd, argp) ioctl( s, cmd, argp )
+	#define FB_TCP_CAN_QUERY_BYTES TRUE
 #endif
 
 static int fb_DevTcpClose( FB_FILE *handle );
@@ -141,6 +170,79 @@ static int fb_hDevTcpInit( void )
 			init_result = fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		} else {
 			atexit( fb_hDevTcpShutdownWinsock );
+		}
+		is_init = TRUE;
+	}
+	FB_UNLOCK();
+
+	return init_result;
+}
+#elif defined(HOST_XBOX)
+static void fb_hDevTcpShutdownXbox( void )
+{
+	nxNetShutdown();
+}
+
+static int fb_hDevTcpInit( void )
+{
+	static int is_init = FALSE;
+	static int init_result = FB_RTERROR_OK;
+
+	if( is_init )
+		return init_result;
+
+	FB_LOCK();
+	if( is_init == FALSE ) {
+		/*
+			nxdk keeps TCP/IP in its optional lwIP network library.  Programs
+			do not need to opt in manually; the FreeBASIC TCP device starts it
+			the first time OPEN TCP or OPEN TCP SERVER is used.
+		*/
+		if( nxNetInit( NULL ) < 0 ) {
+			init_result = fb_ErrorSetNum( FB_RTERROR_FILEIO );
+		} else {
+			atexit( fb_hDevTcpShutdownXbox );
+		}
+		is_init = TRUE;
+	}
+	FB_UNLOCK();
+
+	return init_result;
+}
+#elif defined(HOST_WII)
+static void fb_hDevTcpShutdownWii( void )
+{
+	net_deinit();
+}
+
+static int fb_hDevTcpInit( void )
+{
+	static int is_init = FALSE;
+	static int init_result = FB_RTERROR_OK;
+
+	if( is_init )
+		return init_result;
+
+	FB_LOCK();
+	if( is_init == FALSE ) {
+		char local_ip[16];
+		char netmask[16];
+		char gateway[16];
+
+		/*
+			libogc exposes the Wii network stack through network.h.  Its
+			BSD-style socket wrappers are present, but the stack is not ready
+			until if_config() has brought IOS networking up and obtained an
+			address.  Keep that startup lazy so ordinary console/graphics
+			programs do not block on DHCP.
+		*/
+		memset( local_ip, 0, sizeof( local_ip ) );
+		memset( netmask, 0, sizeof( netmask ) );
+		memset( gateway, 0, sizeof( gateway ) );
+		if( if_config( local_ip, netmask, gateway, TRUE, 20 ) < 0 ) {
+			init_result = fb_ErrorSetNum( FB_RTERROR_FILEIO );
+		} else {
+			atexit( fb_hDevTcpShutdownWii );
 		}
 		is_init = TRUE;
 	}
@@ -239,6 +341,54 @@ static void fb_hDevTcpFormatService( char *service, size_t service_len, unsigned
 	service[used] = '\0';
 }
 
+#if defined(HOST_WII)
+static int fb_hDevTcpBuildWiiAddress( const char *host, unsigned int port, int passive, struct sockaddr_in *addr )
+{
+	u32 raw_addr;
+	struct hostent *hostent;
+
+	if( addr == NULL )
+		return FALSE;
+
+	memset( addr, 0, sizeof( *addr ) );
+	addr->sin_len = sizeof( *addr );
+	addr->sin_family = AF_INET;
+	addr->sin_port = htons( (uint16_t)port );
+
+	if( host == NULL || *host == '\0' ) {
+		addr->sin_addr.s_addr = htonl( passive ? INADDR_ANY : INADDR_LOOPBACK );
+		return TRUE;
+	}
+
+	if( strcasecmp( host, "localhost" ) == 0 ) {
+		addr->sin_addr.s_addr = htonl( INADDR_LOOPBACK );
+		return TRUE;
+	}
+
+	raw_addr = inet_addr( host );
+	if( raw_addr != INADDR_NONE || strcmp( host, "255.255.255.255" ) == 0 ) {
+		addr->sin_addr.s_addr = raw_addr;
+		return TRUE;
+	}
+
+	hostent = net_gethostbyname( host );
+	if( hostent == NULL )
+		return FALSE;
+
+	if( hostent->h_addrtype != AF_INET )
+		return FALSE;
+
+	if( hostent->h_length != (int)sizeof( struct in_addr ) )
+		return FALSE;
+
+	if( hostent->h_addr_list == NULL || hostent->h_addr_list[0] == NULL )
+		return FALSE;
+
+	memcpy( &addr->sin_addr, hostent->h_addr_list[0], sizeof( struct in_addr ) );
+	return TRUE;
+}
+#endif
+
 #if !defined(HOST_DOS) && !defined(HOST_JS)
 /*
 	TCP device hooks are called by the generic file layer while FB_LOCK()
@@ -279,6 +429,26 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 	(void)tcp_proto;
 	(void)hSocketOut;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+#elif defined(HOST_WII)
+	struct sockaddr_in addr;
+	FB_TCP_SOCKET hSocket;
+
+	if( fb_hDevTcpBuildWiiAddress( tcp_proto->host, tcp_proto->port, FALSE, &addr ) == FALSE )
+		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+
+	hSocket = (FB_TCP_SOCKET)socket( AF_INET, SOCK_STREAM, IPPROTO_TCP );
+	if( FB_TCP_SOCKET_ERROR( hSocket ) )
+		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+
+	fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout );
+
+	if( connect( hSocket, (struct sockaddr *)&addr, sizeof( addr ) ) == 0 ) {
+		*hSocketOut = hSocket;
+		return FB_RTERROR_OK;
+	}
+
+	FB_TCP_CLOSESOCKET( hSocket );
+	return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 #else
 	struct addrinfo hints;
 	struct addrinfo *result;
@@ -298,7 +468,7 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 
 	for( it = result; it != NULL; it = it->ai_next ) {
 		hSocket = (FB_TCP_SOCKET)socket( it->ai_family, it->ai_socktype, it->ai_protocol );
-		if( hSocket == FB_TCP_INVALID_SOCKET )
+		if( FB_TCP_SOCKET_ERROR( hSocket ) )
 			continue;
 
 		fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout );
@@ -323,6 +493,33 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 	(void)tcp_proto;
 	(void)hSocketOut;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+#elif defined(HOST_WII)
+	struct sockaddr_in addr;
+	FB_TCP_SOCKET hSocket;
+	int yes = 1;
+
+	if( fb_hDevTcpBuildWiiAddress( tcp_proto->host, tcp_proto->port, TRUE, &addr ) == FALSE )
+		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+
+	hSocket = (FB_TCP_SOCKET)socket( AF_INET, SOCK_STREAM, IPPROTO_TCP );
+	if( FB_TCP_SOCKET_ERROR( hSocket ) )
+		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+
+	setsockopt( hSocket, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof( yes ) );
+	fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout );
+
+	if( bind( hSocket, (struct sockaddr *)&addr, sizeof( addr ) ) != 0 ) {
+		FB_TCP_CLOSESOCKET( hSocket );
+		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+	}
+
+	if( listen( hSocket, (int)tcp_proto->backlog ) != 0 ) {
+		FB_TCP_CLOSESOCKET( hSocket );
+		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+	}
+
+	*hSocketOut = hSocket;
+	return FB_RTERROR_OK;
 #else
 	struct addrinfo hints;
 	struct addrinfo *result;
@@ -345,7 +542,7 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 		int yes = 1;
 
 		hSocket = (FB_TCP_SOCKET)socket( it->ai_family, it->ai_socktype, it->ai_protocol );
-		if( hSocket == FB_TCP_INVALID_SOCKET )
+		if( FB_TCP_SOCKET_ERROR( hSocket ) )
 			continue;
 
 		setsockopt( hSocket, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof( yes ) );
@@ -383,7 +580,7 @@ static int fb_hDevTcpPeekState( DEV_TCP_INFO *info )
 	int err = 0;
 	char ch;
 
-	if( info == NULL || info->hSocket == FB_TCP_INVALID_SOCKET )
+	if( info == NULL || FB_TCP_SOCKET_ERROR( info->hSocket ) )
 		return -1;
 
 	if( info->is_closed )
@@ -394,13 +591,8 @@ static int fb_hDevTcpPeekState( DEV_TCP_INFO *info )
 	tv.tv_sec = 0;
 	tv.tv_usec = 0;
 
-	#if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
-		FB_UNLOCK();
-		res = select( 0, &set, NULL, NULL, &tv );
-	#else
-		FB_UNLOCK();
-		res = select( info->hSocket + 1, &set, NULL, NULL, &tv );
-	#endif
+	FB_UNLOCK();
+	res = FB_TCP_SELECT( info->hSocket + 1, &set, NULL, NULL, &tv );
 
 	if( res < 0 ) {
 		FB_LOCK();
@@ -474,7 +666,7 @@ static void fb_hDevTcpShutdownConnectedSocket( DEV_TCP_INFO *info )
 	unsigned int timeout = 1000;
 	char buffer[256];
 
-	if( info == NULL || info->is_server || info->hSocket == FB_TCP_INVALID_SOCKET )
+	if( info == NULL || info->is_server || FB_TCP_SOCKET_ERROR( info->hSocket ) )
 		return;
 
 	if( info->timeout != 0 )
@@ -495,13 +687,8 @@ static void fb_hDevTcpShutdownConnectedSocket( DEV_TCP_INFO *info )
 		tv.tv_sec = slice / 1000;
 		tv.tv_usec = (slice % 1000) * 1000;
 
-		#if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
-			FB_UNLOCK();
-			res = select( 0, &set, NULL, NULL, &tv );
-		#else
-			FB_UNLOCK();
-			res = select( info->hSocket + 1, &set, NULL, NULL, &tv );
-		#endif
+		FB_UNLOCK();
+		res = FB_TCP_SELECT( info->hSocket + 1, &set, NULL, NULL, &tv );
 
 		if( res <= 0 ) {
 			FB_LOCK();
@@ -525,7 +712,7 @@ static int fb_DevTcpClose( FB_FILE *handle )
 
 	info = (DEV_TCP_INFO*)handle->opaque;
 	if( info != NULL ) {
-		if( info->hSocket != FB_TCP_INVALID_SOCKET ) {
+		if( FB_TCP_SOCKET_ERROR( info->hSocket ) == FALSE ) {
 			int close_res;
 
 			fb_hDevTcpShutdownConnectedSocket( info );
@@ -624,15 +811,23 @@ static int fb_DevTcpTell( FB_FILE *handle, fb_off_t *pOffset )
 #if defined(HOST_DOS) || defined(HOST_JS)
 		*pOffset = 0;
 		res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+#elif FB_TCP_CAN_QUERY_BYTES == FALSE
+		/*
+			libogc exposes net_ioctl(), but currently only FIONBIO is wired
+			through to IOS.  LOC() on a Wii TCP handle therefore cannot report
+			buffered bytes without consuming data.  Returning zero is safer
+			than pretending FIONREAD worked.
+		*/
+		*pOffset = 0;
 #elif defined(HOST_WIN32) && !defined(HOST_CYGWIN)
 		u_long bytes = 0;
-		if( ioctlsocket( info->hSocket, FIONREAD, &bytes ) != 0 ) {
+		if( FB_TCP_IOCTL( info->hSocket, FIONREAD, &bytes ) != 0 ) {
 			res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		}
 		*pOffset = bytes;
 #else
 		int bytes = 0;
-		if( ioctl( info->hSocket, FIONREAD, &bytes ) != 0 ) {
+		if( FB_TCP_IOCTL( info->hSocket, FIONREAD, &bytes ) != 0 ) {
 			res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		}
 		*pOffset = bytes;
@@ -891,8 +1086,17 @@ int fb_DevTcpAcceptHandle( FB_FILE *server_handle, FB_FILE *client_handle )
 	if( server_info == NULL || server_handle->type != FB_FILE_TYPE_TCPSERVER )
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
+	#if defined(HOST_WII)
+	{
+		struct sockaddr_in addr;
+		socklen_t addrlen = sizeof( addr );
+		memset( &addr, 0, sizeof( addr ) );
+		hSocket = (FB_TCP_SOCKET)accept( server_info->hSocket, (struct sockaddr *)&addr, &addrlen );
+	}
+	#else
 	hSocket = (FB_TCP_SOCKET)accept( server_info->hSocket, NULL, NULL );
-	if( hSocket == FB_TCP_INVALID_SOCKET )
+	#endif
+	if( FB_TCP_SOCKET_ERROR( hSocket ) )
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 
 	res = fb_hDevTcpApplySocketOptions( hSocket, server_info->timeout );

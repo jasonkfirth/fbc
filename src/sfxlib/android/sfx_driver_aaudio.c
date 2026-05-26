@@ -162,20 +162,38 @@ static void aaudio_exit(void)
 static int aaudio_write(const float *samples, int frames)
 {
 	aaudio_result_t result;
+	int64_t timeout_nanoseconds;
+
+	if (frames <= 0)
+		return 0;
+	if (!samples)
+		return -1;
 
 	if (!fb_hAndroidSfxIsRunning())
-		return 0;
+		return frames;
 
 	fb_sfxDriverDiagnostics("AAudio", samples, frames, channels_active);
 
 	pthread_mutex_lock(&stream_mutex);
-	if (!initialized || !stream || !samples || frames <= 0)
+	if (!initialized || !stream)
 	{
 		pthread_mutex_unlock(&stream_mutex);
 		return -1;
 	}
 
-	result = api.write(stream, samples, frames, 100000000L);
+	/*
+		AAudio writes may block for the requested timeout.  The Android
+		background audio worker can afford a short wait because that wait
+		paces the mixer.  Foreground BASIC code must not wait here, otherwise
+		a tiny SOUND or BEEP command can become a visible gameplay pause.
+	*/
+	timeout_nanoseconds = fb_hAndroidSfxInWorker() ? 50000000L : 0;
+	result = api.write(stream, samples, frames, timeout_nanoseconds);
+	if (result == 0)
+	{
+		pthread_mutex_unlock(&stream_mutex);
+		return frames;
+	}
 	if (result < 0)
 	{
 		close_stream_locked();

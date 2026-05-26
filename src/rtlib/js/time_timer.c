@@ -1,12 +1,17 @@
 /* timer() function */
 
 #include "../fb.h"
-#include <time.h>
-#include <sys/time.h>
+#include <emscripten.h>
 
 FBCALL double fb_Timer( void )
 {
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	return (((double)tv.tv_sec * 1000000.0) + (double)tv.tv_usec) * 0.000001;
+	/*
+		FreeBASIC programs commonly store TIMER in SINGLE variables and
+		compare it against small frame intervals.  Returning Unix epoch seconds
+		loses those small intervals once the value is rounded to SINGLE.
+
+		Emscripten's monotonic clock is relative to the page/runtime lifetime,
+		which keeps the value small and preserves sub-frame precision.
+	*/
+	return emscripten_get_now() * 0.001;
 }

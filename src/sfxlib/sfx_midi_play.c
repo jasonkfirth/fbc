@@ -45,11 +45,14 @@
 #include <windows.h>
 #elif defined(__DJGPP__)
 #include <dos.h>
+#elif defined(HOST_WII)
+#include <ogc/lwp.h>
+#include <unistd.h>
 #else
 #include <time.h>
 #endif
 
-#if FB_SFX_MT_ENABLED && !defined(_WIN32)
+#if FB_SFX_MT_ENABLED && !defined(_WIN32) && !defined(HOST_WII)
 #include <pthread.h>
 #endif
 
@@ -64,6 +67,8 @@ int   g_midi_playing = 0;
 #if FB_SFX_MT_ENABLED
 #if defined(_WIN32)
 static HANDLE g_midi_thread = NULL;
+#elif defined(HOST_WII)
+static lwp_t g_midi_thread = LWP_THREAD_NULL;
 #else
 static pthread_t g_midi_thread;
 #endif
@@ -95,6 +100,8 @@ static void fb_sfxMidiSleepMs(unsigned long milliseconds)
     Sleep((DWORD)milliseconds);
 #elif defined(__DJGPP__)
     delay((unsigned)milliseconds);
+#elif defined(HOST_WII)
+    usleep((useconds_t)(milliseconds * 1000UL));
 #else
     struct timespec req;
 
@@ -501,6 +508,8 @@ static int fb_sfxMidiPlayBuffer(const unsigned char *data, size_t size)
 #if FB_SFX_MT_ENABLED
 #if defined(_WIN32)
 static DWORD WINAPI fb_sfxMidiWorkerEntry(LPVOID param)
+#elif defined(HOST_WII)
+static void *fb_sfxMidiWorkerEntry(void *param)
 #else
 static void *fb_sfxMidiWorkerEntry(void *param)
 #endif
@@ -524,6 +533,8 @@ static void *fb_sfxMidiWorkerEntry(void *param)
 
 #if defined(_WIN32)
     return 0;
+#elif defined(HOST_WII)
+    return NULL;
 #else
     return NULL;
 #endif
@@ -551,6 +562,8 @@ void fb_sfxMidiJoinWorker(void)
 #if FB_SFX_MT_ENABLED
 #if defined(_WIN32)
     HANDLE thread = NULL;
+#elif defined(HOST_WII)
+    lwp_t thread = LWP_THREAD_NULL;
 #else
     pthread_t thread;
 #endif
@@ -571,6 +584,8 @@ void fb_sfxMidiJoinWorker(void)
 #if defined(_WIN32)
     WaitForSingleObject(thread, INFINITE);
     CloseHandle(thread);
+#elif defined(HOST_WII)
+    LWP_JoinThread(thread, NULL);
 #else
     pthread_join(thread, NULL);
 #endif
@@ -591,6 +606,8 @@ int fb_sfxMidiPlay(const char *filename)
     FB_SFX_MIDI_PLAYDATA *playdata;
 #if defined(_WIN32)
     HANDLE thread;
+#elif defined(HOST_WII)
+    lwp_t thread;
 #else
     pthread_t thread;
 #endif
@@ -682,6 +699,9 @@ int fb_sfxMidiPlay(const char *filename)
 #if defined(_WIN32)
     thread = CreateThread(NULL, 0, fb_sfxMidiWorkerEntry, playdata, 0, NULL);
     if (!thread)
+#elif defined(HOST_WII)
+    if (LWP_CreateThread(&thread, fb_sfxMidiWorkerEntry, playdata,
+                         NULL, 0, 80) != 0)
 #else
     if (pthread_create(&thread, NULL, fb_sfxMidiWorkerEntry, playdata) != 0)
 #endif

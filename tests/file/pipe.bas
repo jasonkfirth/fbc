@@ -1,6 +1,6 @@
 # include "fbcunit.bi"
 
-#ifndef __FB_JS__
+#if (not defined( __FB_JS__ )) and (not defined( __FB_WII__ ))
 
 SUITE( fbc_tests.file_.pipe_ )
 

@@ -59,6 +59,12 @@ static void fb_fs_init_console(void)
 		emscripten_set_mouseup_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 1, fb_hMouseEventHandler );
 		emscripten_set_dblclick_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 1, fb_hMouseEventHandler );
 		//emscripten_set_wheel_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 1, fb_hMouseWheelEventHandler );
+
+		// touch
+		emscripten_set_touchstart_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 1, fb_hTouchEventHandler );
+		emscripten_set_touchmove_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 1, fb_hTouchEventHandler );
+		emscripten_set_touchend_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 1, fb_hTouchEventHandler );
+		emscripten_set_touchcancel_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 1, fb_hTouchEventHandler );
 	}
 }
 
@@ -70,4 +76,3 @@ void fb_hInit( void )
 void fb_hEnd( int unused )
 {
 }
-

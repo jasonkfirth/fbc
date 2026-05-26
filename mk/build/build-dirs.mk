@@ -18,6 +18,7 @@ OBJDIRS := \
 	$(fbcobjdir) \
 	$(fbcjsobjdir) \
 	$(fbcandroidobjdir) \
+	$(fbcwiiobjdir) \
 	$(libfbobjdir) \
 	$(libfbpicobjdir) \
 	$(libfbmtobjdir) \

@@ -45,6 +45,22 @@ ifneq ($(strip $(filter bootstrap-minimal,$(MAKECMDGOALS)) $(BOOTSTRAP_MINIMAL))
 endif
 
 # ---------------------------------------------------------------------------
+# User-requested feature switches
+#
+# Cross-target helper compilers do not always need the full host runtime
+# feature set.  Allow package targets to turn off optional libraries without
+# pretending the host operating system lacks them globally.
+# ---------------------------------------------------------------------------
+
+ifneq ($(strip $(DISABLE_FFI)),)
+  ALLCFLAGS += -DDISABLE_FFI
+endif
+
+ifneq ($(strip $(DISABLE_NCURSES)),)
+  ALLCFLAGS += -DDISABLE_NCURSES
+endif
+
+# ---------------------------------------------------------------------------
 # DOS (djgpp)
 # ---------------------------------------------------------------------------
 
@@ -94,6 +110,24 @@ ifeq ($(TARGET_OS),js)
   DISABLE_MT := YesPlease
   ALLCFLAGS += \
     -DDISABLE_FFI
+endif
+
+# ---------------------------------------------------------------------------
+# Wii
+#
+# libogc is a console SDK, not a hosted POSIX desktop environment.  Keep the
+# optional hosted integrations out of the target build and let the Wii-specific
+# gfx/sfx/runtime files provide the supported surface.
+# ---------------------------------------------------------------------------
+
+ifeq ($(TARGET_OS),wii)
+  ALLCFLAGS += \
+    -DDISABLE_FFI \
+    -DDISABLE_X11 \
+    -DDISABLE_OPENGL \
+    -DDISABLE_NCURSES \
+    -DDISABLE_LANGINFO \
+    -DDISABLE_GPM
 endif
 
 # ---------------------------------------------------------------------------

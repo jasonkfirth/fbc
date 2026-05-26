@@ -79,9 +79,14 @@ static void fb_sfxStartMusicVoice(int id, int loop)
 
     fb_sfxMusicStop();
 
-    voice = fb_sfxVoiceAlloc();
+    fb_sfxRuntimeLock();
+
+    voice = fb_sfxVoiceAllocLocked();
     if (!voice)
+    {
+        fb_sfxRuntimeUnlock();
         return;
+    }
 
     voice->type = FB_SFX_VOICE_MUSIC;
     voice->sfx_id = id;
@@ -101,6 +106,9 @@ static void fb_sfxStartMusicVoice(int id, int loop)
     __fb_sfx->music_paused = 0;
     __fb_sfx->music_loop = loop ? 1 : 0;
     __fb_sfx->music_pos = 0;
+
+    fb_sfxVoiceActivateLocked(voice);
+    fb_sfxRuntimeUnlock();
 }
 
 

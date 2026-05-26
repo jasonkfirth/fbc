@@ -45,6 +45,23 @@
 #include <emscripten/emscripten.h>
 #endif
 
+#if defined(HOST_WII)
+#include <ogc/pad.h>
+#include <wiiuse/wpad.h>
+
+/*
+	GameCube controller polling on Wii goes through libogc's PAD subsystem.
+	Dolphin currently trips an instruction-storage exception when this path is
+	polled from the generic GETXPAD hook before a real GC controller is active.
+
+	Keep the Wii GETXPAD path on WPAD for now.  Wiimote, Nunchuk, and Classic
+	Controller input still travel through WPAD, and avoiding PAD_ScanPads()
+	keeps ordinary BASIC code from crashing just because it asks for a portable
+	controller state.
+*/
+#define FB_WII_ENABLE_GC_PAD 0
+#endif
+
 #define XPAD_MAX_DEVICES 16
 #define XPAD_TRIGGER_DIGITAL_THRESHOLD (30.0f / 255.0f)
 
@@ -80,6 +97,19 @@ static float xpad_normalize_axis(int value)
 		return 1.0f;
 	return (float)value / 32767.0f;
 }
+
+#if defined(FB_XPAD_HAS_JOYDEV) || defined(HOST_JS) || defined(HOST_WII)
+
+static float xpad_clamp_unit(float value)
+{
+	if (value < 0.0f)
+		return 0.0f;
+	if (value > 1.0f)
+		return 1.0f;
+	return value;
+}
+
+#endif
 
 #if defined(HOST_WIN32)
 
@@ -248,19 +278,6 @@ static int xpad_win32_get(int id, ssize_t *buttons,
 		*dpad = xpad_win32_dpad(&state.Gamepad);
 
 	return XPAD_STATUS_CONNECTED;
-}
-
-#endif
-
-#if defined(FB_XPAD_HAS_JOYDEV) || defined(HOST_JS)
-
-static float xpad_clamp_unit(float value)
-{
-	if (value < 0.0f)
-		return 0.0f;
-	if (value > 1.0f)
-		return 1.0f;
-	return value;
 }
 
 #endif
@@ -583,6 +600,7 @@ extern int usbh_pooling_hubs(void);
 extern void usbh_xid_init(void);
 extern FB_XID_DEV *usbh_xid_get_device_list(void);
 extern int32_t usbh_xid_read(FB_XID_DEV *xid_dev, uint8_t ep_addr, void *rx_complete_callback);
+extern int usbh_int_xfer(FB_XBOX_UTR *utr);
 
 static int xbox_usb_inited;
 static FB_XBOX_XPAD_SLOT xbox_xpad[4];
@@ -596,29 +614,81 @@ static void xpad_xbox_copy_packet(FB_XID_GAMEPAD_IN *dst, const uint8_t *src, ui
 		memcpy(dst, src, bytes);
 }
 
-static void xpad_xbox_read_callback(FB_XBOX_UTR *utr)
+static FB_XBOX_XPAD_SLOT *xpad_xbox_find_slot(FB_XID_DEV *dev)
 {
-	FB_XID_DEV *dev;
 	uint32_t uid;
 	int i;
 
-	if (!utr || (utr->status < 0) || !utr->buff)
-		return;
-
-	dev = (FB_XID_DEV *)utr->context;
 	if (!dev)
-		return;
+		return NULL;
 
 	uid = dev->uid;
 
 	for (i = 0; i < 4; ++i) {
-		if ((xbox_xpad[i].dev == dev) || (xbox_xpad[i].uid == uid)) {
-			xpad_xbox_copy_packet(&xbox_xpad[i].state, utr->buff, utr->xfer_len);
-			xbox_xpad[i].has_state = TRUE;
-			xbox_xpad[i].read_running = FALSE;
-			return;
-		}
+		if ((xbox_xpad[i].dev == dev) || (xbox_xpad[i].uid == uid))
+			return &xbox_xpad[i];
 	}
+
+	return NULL;
+}
+
+static void xpad_xbox_requeue_read(FB_XBOX_XPAD_SLOT *slot, FB_XBOX_UTR *utr)
+{
+	int result;
+
+	if (!slot || !utr)
+		return;
+
+	/*
+		The NXDK USB stack is designed for interrupt transfers to be kept
+		alive from their completion callback.  Reusing the completed UTR is
+		also how NXDK's SDL joystick backend tracks Xbox controllers.
+
+		Waiting for the next GETXPAD call to allocate a replacement transfer
+		can leave us dependent on queue cleanup timing.  Keeping the transfer
+		running here gives the backend a continuous stream of controller
+		reports while the program polls the last completed state.
+	*/
+	utr->xfer_len = 0;
+	utr->bIsTransferDone = 0;
+
+	result = usbh_int_xfer(utr);
+	slot->read_running = (result == FB_USBH_OK);
+}
+
+static void xpad_xbox_read_callback(FB_XBOX_UTR *utr)
+{
+	FB_XID_DEV *dev;
+	FB_XBOX_XPAD_SLOT *slot;
+
+	if (!utr)
+		return;
+
+	dev = (FB_XID_DEV *)utr->context;
+	slot = xpad_xbox_find_slot(dev);
+	if (!slot)
+		return;
+
+	/*
+		A completed transfer must always release the slot, even when the USB
+		stack reports an error.  Leaving read_running set after an error turns
+		a transient interrupt-transfer failure into a permanent input stall:
+		GETXPAD will continue to report a connected controller, but no future
+		read will be queued and the button/axis state will stay at zero.
+	*/
+	slot->read_running = FALSE;
+
+	if ((utr->status < 0) || !utr->buff) {
+		slot->has_state = FALSE;
+		return;
+	}
+
+	if (utr->xfer_len > 0) {
+		xpad_xbox_copy_packet(&slot->state, utr->buff, utr->xfer_len);
+		slot->has_state = TRUE;
+	}
+
+	xpad_xbox_requeue_read(slot, utr);
 }
 
 static void xpad_xbox_init(void)
@@ -771,6 +841,10 @@ static int xpad_xbox_get(int id, ssize_t *buttons,
 
 #if defined(HOST_JS)
 
+#define FB_JS_ENABLE_GAMEPAD_API 0
+
+#if FB_JS_ENABLE_GAMEPAD_API
+
 static int js_xpad_seen[XPAD_MAX_DEVICES];
 
 static int xpad_js_connected(int id)
@@ -922,6 +996,330 @@ static int xpad_js_get(int id, ssize_t *buttons,
 	return XPAD_STATUS_CONNECTED;
 }
 
+#else
+
+static int xpad_js_get(int id, ssize_t *buttons,
+					   float *lstick_x, float *lstick_y,
+					   float *rstick_x, float *rstick_y,
+					   float *ltrigger, float *rtrigger,
+					   ssize_t *dpad)
+{
+	(void)id;
+	(void)buttons;
+	(void)lstick_x;
+	(void)lstick_y;
+	(void)rstick_x;
+	(void)rstick_y;
+	(void)ltrigger;
+	(void)rtrigger;
+	(void)dpad;
+
+	/*
+		The browser Gamepad API is only exposed after user activation, and the
+		current EM_ASM bridge can trap inside wasm on hard validation programs
+		when it is polled before a browser has made a pad visible.
+
+		Keep GETXPAD safe for portable programs by reporting "missing" instead
+		of crashing.  Keyboard and mouse input remain available on JS, and this
+		backend can be re-enabled once it has a non-trapping Gamepad bridge.
+	*/
+	return XPAD_STATUS_MISSING;
+}
+
+#endif
+
+#endif
+
+#if defined(HOST_WII)
+
+static int wii_xpad_seen[4];
+static gforce_t wii_xpad_last_gforce[4];
+static int wii_xpad_have_gforce[4];
+
+static float xpad_wii_gc_axis(s8 value)
+{
+	return xpad_normalize_axis((int)value * 256);
+}
+
+static float xpad_wii_absf(float value)
+{
+	return (value < 0.0f) ? -value : value;
+}
+
+static float xpad_wii_signed_unit(float value)
+{
+	if (value < -1.0f)
+		return -1.0f;
+	if (value > 1.0f)
+		return 1.0f;
+	return value;
+}
+
+static void xpad_wii_dpad_as_stick(ssize_t dpad, float *x, float *y)
+{
+	if (x) {
+		if (dpad & XPAD_DPAD_LEFT)
+			*x = -1.0f;
+		else if (dpad & XPAD_DPAD_RIGHT)
+			*x = 1.0f;
+		else
+			*x = 0.0f;
+	}
+
+	if (y) {
+		if (dpad & XPAD_DPAD_UP)
+			*y = 1.0f;
+		else if (dpad & XPAD_DPAD_DOWN)
+			*y = -1.0f;
+		else
+			*y = 0.0f;
+	}
+}
+
+static ssize_t xpad_wii_motion(int id, float *x, float *y)
+{
+	gforce_t gforce;
+	float change;
+	ssize_t buttons = 0;
+
+	gforce.x = 0.0f;
+	gforce.y = 0.0f;
+	gforce.z = 0.0f;
+	WPAD_GForce(id, &gforce);
+
+	/*
+		There is no standard Xbox-style motion control, but exposing Wiimote
+		tilt on the right stick and shake on the thumb buttons gives portable
+		BASIC programs a simple way to notice "waggling" through GETXPAD.
+		The thresholds are intentionally loose because real controllers, bars,
+		and emulators all report slightly different accelerometer noise.
+	*/
+	if (x)
+		*x = xpad_wii_signed_unit(gforce.x * 0.5f);
+	if (y)
+		*y = xpad_wii_signed_unit(-gforce.y * 0.5f);
+
+	if (wii_xpad_have_gforce[id]) {
+		change = xpad_wii_absf(gforce.x - wii_xpad_last_gforce[id].x);
+		change += xpad_wii_absf(gforce.y - wii_xpad_last_gforce[id].y);
+		change += xpad_wii_absf(gforce.z - wii_xpad_last_gforce[id].z);
+
+		if (change > 0.75f)
+			buttons |= XPAD_BUTTON_L3;
+		if (change > 1.50f)
+			buttons |= XPAD_BUTTON_R3;
+	}
+
+	wii_xpad_last_gforce[id] = gforce;
+	wii_xpad_have_gforce[id] = TRUE;
+	return buttons;
+}
+
+static int xpad_wii_connected(int id)
+{
+	u32 wpad_type;
+	u32 gc_mask = 0;
+
+	if ((id < 0) || (id >= 4))
+		return FALSE;
+
+#if FB_WII_ENABLE_GC_PAD
+	gc_mask = PAD_ScanPads();
+#endif
+	if (gc_mask & (PAD_CHAN0_BIT >> id))
+		return TRUE;
+
+	return (WPAD_Probe(id, &wpad_type) == WPAD_ERR_NONE);
+}
+
+static ssize_t xpad_wii_buttons(int id)
+{
+	ssize_t buttons = 0;
+	u32 wpad_buttons = WPAD_ButtonsHeld(id);
+	u16 gc_buttons = 0;
+
+#if FB_WII_ENABLE_GC_PAD
+	gc_buttons = PAD_ButtonsHeld(id);
+#endif
+
+	if (wpad_buttons & WPAD_BUTTON_A)
+		buttons |= XPAD_BUTTON_A;
+	if (wpad_buttons & WPAD_BUTTON_B)
+		buttons |= XPAD_BUTTON_B;
+	if (wpad_buttons & WPAD_BUTTON_1)
+		buttons |= XPAD_BUTTON_X;
+	if (wpad_buttons & WPAD_BUTTON_2)
+		buttons |= XPAD_BUTTON_Y;
+	if (wpad_buttons & WPAD_BUTTON_PLUS)
+		buttons |= XPAD_BUTTON_START;
+	if (wpad_buttons & WPAD_BUTTON_MINUS)
+		buttons |= XPAD_BUTTON_SELECT;
+	if (wpad_buttons & WPAD_BUTTON_HOME)
+		buttons |= XPAD_BUTTON_GUIDE;
+	if (wpad_buttons & WPAD_NUNCHUK_BUTTON_C)
+		buttons |= XPAD_BUTTON_L1;
+	if (wpad_buttons & WPAD_NUNCHUK_BUTTON_Z)
+		buttons |= XPAD_BUTTON_R1;
+
+#ifdef WPAD_CLASSIC_BUTTON_A
+	if (wpad_buttons & WPAD_CLASSIC_BUTTON_A)
+		buttons |= XPAD_BUTTON_A;
+	if (wpad_buttons & WPAD_CLASSIC_BUTTON_B)
+		buttons |= XPAD_BUTTON_B;
+	if (wpad_buttons & WPAD_CLASSIC_BUTTON_X)
+		buttons |= XPAD_BUTTON_X;
+	if (wpad_buttons & WPAD_CLASSIC_BUTTON_Y)
+		buttons |= XPAD_BUTTON_Y;
+	if (wpad_buttons & WPAD_CLASSIC_BUTTON_ZL)
+		buttons |= XPAD_BUTTON_L2;
+	if (wpad_buttons & WPAD_CLASSIC_BUTTON_ZR)
+		buttons |= XPAD_BUTTON_R2;
+#endif
+
+	if (gc_buttons & PAD_BUTTON_A)
+		buttons |= XPAD_BUTTON_A;
+	if (gc_buttons & PAD_BUTTON_B)
+		buttons |= XPAD_BUTTON_B;
+	if (gc_buttons & PAD_BUTTON_X)
+		buttons |= XPAD_BUTTON_X;
+	if (gc_buttons & PAD_BUTTON_Y)
+		buttons |= XPAD_BUTTON_Y;
+	if (gc_buttons & PAD_BUTTON_START)
+		buttons |= XPAD_BUTTON_START;
+	if (gc_buttons & PAD_TRIGGER_L)
+		buttons |= XPAD_BUTTON_L1;
+	if (gc_buttons & PAD_TRIGGER_R)
+		buttons |= XPAD_BUTTON_R1;
+	if (gc_buttons & PAD_TRIGGER_Z)
+		buttons |= XPAD_BUTTON_R2;
+
+#if FB_WII_ENABLE_GC_PAD
+	if (((float)PAD_TriggerL(id) / 255.0f) > XPAD_TRIGGER_DIGITAL_THRESHOLD)
+		buttons |= XPAD_BUTTON_L2;
+	if (((float)PAD_TriggerR(id) / 255.0f) > XPAD_TRIGGER_DIGITAL_THRESHOLD)
+		buttons |= XPAD_BUTTON_R2;
+#endif
+
+	return buttons;
+}
+
+static ssize_t xpad_wii_dpad(int id)
+{
+	ssize_t dpad = 0;
+	u32 wpad_buttons = WPAD_ButtonsHeld(id);
+	u16 gc_buttons = 0;
+
+#if FB_WII_ENABLE_GC_PAD
+	gc_buttons = PAD_ButtonsHeld(id);
+#endif
+
+	if ((wpad_buttons & WPAD_BUTTON_UP) || (gc_buttons & PAD_BUTTON_UP))
+		dpad |= XPAD_DPAD_UP;
+	if ((wpad_buttons & WPAD_BUTTON_RIGHT) || (gc_buttons & PAD_BUTTON_RIGHT))
+		dpad |= XPAD_DPAD_RIGHT;
+	if ((wpad_buttons & WPAD_BUTTON_DOWN) || (gc_buttons & PAD_BUTTON_DOWN))
+		dpad |= XPAD_DPAD_DOWN;
+	if ((wpad_buttons & WPAD_BUTTON_LEFT) || (gc_buttons & PAD_BUTTON_LEFT))
+		dpad |= XPAD_DPAD_LEFT;
+
+#ifdef WPAD_CLASSIC_BUTTON_UP
+	if (wpad_buttons & WPAD_CLASSIC_BUTTON_UP)
+		dpad |= XPAD_DPAD_UP;
+	if (wpad_buttons & WPAD_CLASSIC_BUTTON_RIGHT)
+		dpad |= XPAD_DPAD_RIGHT;
+	if (wpad_buttons & WPAD_CLASSIC_BUTTON_DOWN)
+		dpad |= XPAD_DPAD_DOWN;
+	if (wpad_buttons & WPAD_CLASSIC_BUTTON_LEFT)
+		dpad |= XPAD_DPAD_LEFT;
+#endif
+
+	return dpad;
+}
+
+static int xpad_wii_get(int id, ssize_t *buttons,
+					   float *lstick_x, float *lstick_y,
+					   float *rstick_x, float *rstick_y,
+					   float *ltrigger, float *rtrigger,
+					   ssize_t *dpad)
+{
+	int gc_connected;
+	int wpad_connected;
+	u32 wpad_type;
+	u32 wpad_buttons;
+	ssize_t button_value;
+	ssize_t dpad_value;
+	ssize_t motion_buttons;
+	float motion_x;
+	float motion_y;
+	float left_trigger;
+	float right_trigger;
+
+	if ((id < 0) || (id >= 4))
+		return XPAD_STATUS_MISSING;
+
+	WPAD_ScanPads();
+
+	if (!xpad_wii_connected(id)) {
+		wii_xpad_have_gforce[id] = FALSE;
+		return wii_xpad_seen[id] ? XPAD_STATUS_DISCONNECTED : XPAD_STATUS_MISSING;
+	}
+
+	wii_xpad_seen[id] = TRUE;
+
+	gc_connected = FALSE;
+#if FB_WII_ENABLE_GC_PAD
+	gc_connected = ((PAD_ScanPads() & (PAD_CHAN0_BIT >> id)) != 0);
+#endif
+	wpad_connected = (WPAD_Probe(id, &wpad_type) == WPAD_ERR_NONE);
+	if (!wpad_connected)
+		wii_xpad_have_gforce[id] = FALSE;
+	wpad_buttons = wpad_connected ? WPAD_ButtonsHeld(id) : 0;
+	dpad_value = xpad_wii_dpad(id);
+	button_value = xpad_wii_buttons(id);
+	motion_x = 0.0f;
+	motion_y = 0.0f;
+	motion_buttons = wpad_connected ? xpad_wii_motion(id, &motion_x, &motion_y) : 0;
+	button_value |= motion_buttons;
+
+	if (buttons)
+		*buttons = button_value;
+
+	if (gc_connected) {
+		if (lstick_x)
+			*lstick_x = xpad_wii_gc_axis(PAD_StickX(id));
+		if (lstick_y)
+			*lstick_y = xpad_wii_gc_axis(PAD_StickY(id));
+		if (rstick_x)
+			*rstick_x = xpad_wii_gc_axis(PAD_SubStickX(id));
+		if (rstick_y)
+			*rstick_y = xpad_wii_gc_axis(PAD_SubStickY(id));
+		left_trigger = xpad_clamp_unit((float)PAD_TriggerL(id) / 255.0f);
+		right_trigger = xpad_clamp_unit((float)PAD_TriggerR(id) / 255.0f);
+	} else {
+		xpad_wii_dpad_as_stick(dpad_value, lstick_x, lstick_y);
+		if (rstick_x)
+			*rstick_x = motion_x;
+		if (rstick_y)
+			*rstick_y = motion_y;
+		left_trigger = 0.0f;
+		right_trigger = 0.0f;
+	}
+
+	if (wpad_buttons & WPAD_BUTTON_B)
+		left_trigger = 1.0f;
+	if (wpad_buttons & WPAD_BUTTON_A)
+		right_trigger = 1.0f;
+
+	if (ltrigger)
+		*ltrigger = left_trigger;
+	if (rtrigger)
+		*rtrigger = right_trigger;
+	if (dpad)
+		*dpad = dpad_value;
+
+	return XPAD_STATUS_CONNECTED;
+}
+
 #endif
 
 static int xpad_platform_get(int id, ssize_t *buttons,
@@ -938,6 +1336,8 @@ static int xpad_platform_get(int id, ssize_t *buttons,
 	return xpad_xbox_get(id, buttons, lstick_x, lstick_y, rstick_x, rstick_y, ltrigger, rtrigger, dpad);
 #elif defined(HOST_JS)
 	return xpad_js_get(id, buttons, lstick_x, lstick_y, rstick_x, rstick_y, ltrigger, rtrigger, dpad);
+#elif defined(HOST_WII)
+	return xpad_wii_get(id, buttons, lstick_x, lstick_y, rstick_x, rstick_y, ltrigger, rtrigger, dpad);
 #else
 	(void)id;
 	(void)buttons;

@@ -1,0 +1,264 @@
+#!/usr/bin/env bash
+#
+# FreeBASIC Wii package wrapper
+# -----------------------------
+#
+# File: fbc-wii
+#
+# Purpose:
+#
+#     Invoke the Wii-targeting FreeBASIC compiler with the devkitPPC/libogc
+#     toolchain environment needed to produce Wii ELF/DOL binaries.
+#
+# Responsibilities:
+#
+#     - locate devkitPro, devkitPPC, and elf2dol
+#     - point fbc at the Wii include/runtime directories
+#     - pass the devkitPPC machine flags used by official Wii make rules
+#     - keep package layout details out of user command lines
+#
+# This file intentionally does NOT contain:
+#
+#     - emulator launch logic
+#     - game-specific build steps
+#     - Android, JavaScript, or Xbox package behavior
+#
+
+set -euo pipefail
+
+die() {
+	echo "fbc-wii: $*" >&2
+	exit 1
+}
+
+usage() {
+	cat <<EOF
+Usage: fbc-wii [options] program.bas
+
+Environment:
+  DEVKITPRO        devkitPro root (default: /opt/devkitpro)
+  DEVKITPPC        devkitPPC root (default: \$DEVKITPRO/devkitPPC)
+  FBWII_PREFIX     FreeBASIC Wii install prefix (default: /usr)
+  FBWII_COMPILER   fbc-wii-compiler path
+  FBWII_INCDIR     FreeBASIC include directory
+  FBWII_LIBDIR     FreeBASIC Wii runtime directory
+EOF
+}
+
+find_tool() {
+	local name="$1"
+	local candidate
+
+	for candidate in \
+		"${DEVKITPPC:-}/bin/$name" \
+		"${DEVKITPPC:-}/bin/$name.exe" \
+		"${DEVKITPRO:-}/tools/bin/$name" \
+		"${DEVKITPRO:-}/tools/bin/$name.exe"
+	do
+		[ -n "$candidate" ] || continue
+		[ -x "$candidate" ] || continue
+		echo "$candidate"
+		return 0
+	done
+
+	if command -v "$name" >/dev/null 2>&1; then
+		command -v "$name"
+		return 0
+	fi
+
+	return 1
+}
+
+case "${1:-}" in
+	--help|-help|-h)
+		usage
+		exit 0
+		;;
+esac
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$script_dir/../../.." 2>/dev/null && pwd || true)"
+
+prefix="${FBWII_PREFIX:-/usr}"
+libroot="${FBWII_LIBROOT:-$prefix/lib/freebasic-wii}"
+compiler="${FBWII_COMPILER:-$libroot/bin/fbc-wii-compiler}"
+incdir="${FBWII_INCDIR:-$prefix/include/freebasic-wii}"
+libdir="${FBWII_LIBDIR:-$libroot/wii-powerpc}"
+repo_layout=0
+
+if [ ! -x "$compiler" ] && [ -n "$repo_root" ]; then
+	if [ -x "$repo_root/bin/fbc-wii-compiler" ]; then
+		compiler="$repo_root/bin/fbc-wii-compiler"
+	elif [ -x "$repo_root/bin/fbc-wii-compiler.exe" ]; then
+		compiler="$repo_root/bin/fbc-wii-compiler.exe"
+	fi
+fi
+
+if [ ! -d "$incdir" ] && [ -n "$repo_root" ] && [ -f "$repo_root/inc/fbgfx.bi" ]; then
+	incdir="$repo_root/inc"
+	repo_layout=1
+fi
+
+if { [ ! -d "$libdir" ] || [ ! -f "$libdir/fbrt0.o" ] || [ ! -f "$libdir/libfb.a" ]; } &&
+	[ -n "$repo_root" ] && [ -d "$repo_root/lib/freebasic/wii" ]; then
+	libdir="$repo_root/lib/freebasic/wii"
+	repo_layout=1
+fi
+
+export DEVKITPRO="${DEVKITPRO:-/opt/devkitpro}"
+export DEVKITPPC="${DEVKITPPC:-$DEVKITPRO/devkitPPC}"
+
+[ -x "$compiler" ] || die "Wii-targeting compiler not found: $compiler"
+[ -d "$incdir" ] || die "FreeBASIC include directory not found: $incdir"
+[ -d "$libdir" ] || die "Wii runtime directory not found: $libdir"
+[ -d "$DEVKITPRO/libogc/include" ] || die "libogc headers not found under $DEVKITPRO"
+[ -d "$DEVKITPRO/libogc/lib/wii" ] || die "libogc Wii libraries not found under $DEVKITPRO"
+
+cc="$(find_tool powerpc-eabi-gcc)" || die "powerpc-eabi-gcc not found"
+as="$(find_tool powerpc-eabi-as)" || die "powerpc-eabi-as not found"
+ar="$(find_tool powerpc-eabi-ar)" || die "powerpc-eabi-ar not found"
+ranlib="$(find_tool powerpc-eabi-ranlib)" || die "powerpc-eabi-ranlib not found"
+elf2dol="$(find_tool elf2dol)" || die "elf2dol not found"
+
+export PATH="$DEVKITPPC/bin:$DEVKITPRO/tools/bin:$PATH"
+
+tmpdir="${FBWII_TMPDIR:-$PWD/.fbwii-tmp}"
+mkdir -p "$tmpdir"
+
+host_prefix="$prefix"
+host_incdir="$incdir"
+host_libdir="$libdir"
+host_devkitpro="$DEVKITPRO"
+host_devkitppc="$DEVKITPPC"
+fbc_gcc="$cc"
+fbc_ld="$cc"
+fbc_ar="$ar"
+fbc_ranlib="$ranlib"
+fbc_args=()
+
+if [ "$repo_layout" -eq 0 ] && command -v realpath >/dev/null 2>&1; then
+	relative_prefix="$(realpath --relative-to="$PWD" "$prefix" 2>/dev/null || true)"
+	if [ -n "$relative_prefix" ]; then
+		case "$relative_prefix" in
+			/*|../*) ;;
+			*)
+				host_prefix="$relative_prefix"
+				host_incdir="$relative_prefix/include/freebasic-wii"
+				host_libdir="$relative_prefix/lib/freebasic-wii/wii-powerpc"
+				;;
+		esac
+	fi
+fi
+
+case "$(uname -s)" in
+	CYGWIN*|MSYS*|MINGW*)
+		if command -v cygpath >/dev/null 2>&1; then
+			native_tmpdir="$(cygpath -am "$tmpdir")"
+			export TMP="$native_tmpdir"
+			export TEMP="$native_tmpdir"
+			export TMPDIR="$native_tmpdir"
+			case "$host_prefix" in
+				/*) host_prefix="$(cygpath -am "$host_prefix")" ;;
+			esac
+			case "$host_incdir" in
+				/*) host_incdir="$(cygpath -am "$host_incdir")" ;;
+			esac
+			case "$host_libdir" in
+				/*) host_libdir="$(cygpath -am "$host_libdir")" ;;
+			esac
+			host_devkitpro="$(cygpath -am "$DEVKITPRO")"
+			host_devkitppc="$(cygpath -am "$DEVKITPPC")"
+			native_bash="$(cygpath -am "$(command -v bash)")"
+			gcc_trampoline="$tmpdir/fbc-wii-gcc.cmd"
+			native_gcc="$(cygpath -am "$cc")"
+			native_gcc_trampoline="$(cygpath -am "$gcc_trampoline")"
+			cat > "$gcc_trampoline" <<EOF
+@echo off
+set TMP=$native_tmpdir
+set TEMP=$native_tmpdir
+set TMPDIR=$native_tmpdir
+"$native_gcc" %*
+EOF
+			fbc_gcc="$native_gcc_trampoline"
+			fbc_ld="$native_gcc_trampoline"
+			ar_script="$tmpdir/fbc-wii-ar.sh"
+			ar_trampoline="$tmpdir/fbc-wii-ar.cmd"
+			native_ar_script="$(cygpath -am "$ar_script")"
+			native_ar_trampoline="$(cygpath -am "$ar_trampoline")"
+			cat > "$ar_script" <<EOF
+#!/usr/bin/env bash
+exec "$ar" "\$@"
+EOF
+			chmod +x "$ar_script"
+			cat > "$ar_trampoline" <<EOF
+@echo off
+"$native_bash" "$native_ar_script" %*
+EOF
+			fbc_ar="$native_ar_trampoline"
+			ranlib_script="$tmpdir/fbc-wii-ranlib.sh"
+			ranlib_trampoline="$tmpdir/fbc-wii-ranlib.cmd"
+			native_ranlib_script="$(cygpath -am "$ranlib_script")"
+			native_ranlib_trampoline="$(cygpath -am "$ranlib_trampoline")"
+			cat > "$ranlib_script" <<EOF
+#!/usr/bin/env bash
+exec "$ranlib" "\$@"
+EOF
+			chmod +x "$ranlib_script"
+			cat > "$ranlib_trampoline" <<EOF
+@echo off
+"$native_bash" "$native_ranlib_script" %*
+EOF
+			fbc_ranlib="$native_ranlib_trampoline"
+		else
+			export TMP="$tmpdir"
+			export TEMP="$tmpdir"
+			export TMPDIR="$tmpdir"
+		fi
+		;;
+	*)
+		export TMP="$tmpdir"
+		export TEMP="$tmpdir"
+		export TMPDIR="$tmpdir"
+		;;
+esac
+
+if command -v cygpath >/dev/null 2>&1; then
+	for arg in "$@"; do
+		case "$arg" in
+			/*)
+				fbc_args+=("$(cygpath -am "$arg")")
+				;;
+			*)
+				fbc_args+=("$arg")
+				;;
+		esac
+	done
+else
+	fbc_args=("$@")
+fi
+
+env \
+	DEVKITPRO="$host_devkitpro" \
+	DEVKITPPC="$host_devkitppc" \
+	GCC="$fbc_gcc" \
+	AS="$as" \
+	AR="$fbc_ar" \
+	RANLIB="$fbc_ranlib" \
+	LD="$fbc_ld" \
+	ELF2DOL="$elf2dol" \
+	"$compiler" \
+	-prefix "$host_prefix" \
+	-target wii \
+	-arch powerpc \
+	-gen gcc \
+	-i "$host_incdir" \
+	-p "$host_libdir" \
+	-Wc -DGEKKO \
+	-Wc -I"$host_devkitpro/libogc/include" \
+	-Wc -mrvl \
+	-Wc -mcpu=750 \
+	-Wc -meabi \
+	-Wc -mhard-float \
+	"${fbc_args[@]}"
+
+# end of fbc-wii

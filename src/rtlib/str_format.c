@@ -33,6 +33,115 @@ typedef struct _FormatMaskInfo {
 
 #define FB_MAXFIXLEN 19 /* floor( log10( pow( 2.0, 64 ) ) ) */
 
+#ifdef HOST_WII
+static unsigned long long fb_wii_pow10_ull( int exponent )
+{
+	unsigned long long result = 1;
+
+	while( exponent > 0 ) {
+		result *= 10;
+		exponent--;
+	}
+
+	return result;
+}
+
+static ssize_t fb_wii_uint_to_str( unsigned long long value, char *buffer, size_t size )
+{
+	char temp[32];
+	ssize_t len = 0;
+	ssize_t i;
+
+	if( size == 0 )
+		return 0;
+
+	if( value == 0 ) {
+		buffer[0] = '0';
+		if( size > 1 )
+			buffer[1] = '\0';
+		return 1;
+	}
+
+	while( value > 0 && len < (ssize_t)sizeof( temp ) ) {
+		temp[len++] = '0' + (value % 10);
+		value /= 10;
+	}
+
+	for( i = 0; i < len && (i + 1) < (ssize_t)size; i++ )
+		buffer[i] = temp[len - i - 1];
+
+	buffer[i] = '\0';
+	return i;
+}
+
+static ssize_t fb_wii_frac_to_fixed_str( double value, char *buffer, size_t size, int precision )
+{
+	unsigned long long scale;
+	unsigned long long rounded;
+	unsigned long long divisor;
+	char *p = buffer;
+	char *end;
+	int i;
+
+	if( size == 0 )
+		return 0;
+
+	if( precision < 0 )
+		precision = 0;
+	else if( precision > 18 )
+		precision = 18;
+
+	end = buffer + size - 1;
+
+	if( value < 0.0 && p < end ) {
+		*p++ = '-';
+		value = -value;
+	}
+
+	scale = fb_wii_pow10_ull( precision );
+	rounded = (unsigned long long)(((long double)value * (long double)scale) + 0.5L);
+
+	if( p < end ) {
+		if( rounded >= scale ) {
+			*p++ = '1';
+			rounded -= scale;
+		} else {
+			*p++ = '0';
+		}
+	}
+
+	if( precision > 0 && p < end ) {
+		*p++ = '.';
+		divisor = scale / 10;
+
+		for( i = 0; i < precision && p < end; i++ ) {
+			*p++ = '0' + (rounded / divisor);
+			rounded %= divisor;
+			if( divisor > 1 )
+				divisor /= 10;
+		}
+	}
+
+	*p = '\0';
+	return p - buffer;
+}
+
+static double fb_wii_truncate_unreliable_digits( double value, int digits )
+{
+	double scale;
+
+	if( digits <= 0 )
+		return value;
+
+	scale = (double)fb_wii_pow10_ull( digits );
+
+	if( value >= 0.0 )
+		return floor( value / scale ) * scale;
+	else
+		return ceil( value / scale ) * scale;
+}
+#endif
+
 static ssize_t hSnprintf( char *buffer, size_t size, const char *format, ... )
 {
 	va_list args;
@@ -91,7 +200,11 @@ void fb_hGetNumberParts
 		dblFrac = -dblFrac;
 
 	/* Store fractional part of number into buffer */
+#ifdef HOST_WII
+	len_frac = fb_wii_frac_to_fixed_str( dblFrac, pachFracPart, frac_part_size, precision );
+#else
 	len_frac = hSnprintf( pachFracPart, frac_part_size, "%.*f", precision, dblFrac );
+#endif
 
 	/* Remove trailing zeroes and - if it completely consists of zeroes -
 	 * also remove the decimal point */
@@ -133,7 +246,11 @@ void fb_hGetNumberParts
 		} else {
 			chSign = '\0';
 		}
+#ifdef HOST_WII
+		len_fix = fb_wii_uint_to_str( ullFix, pachFixPart, fix_part_size );
+#else
 		len_fix = hSnprintf( pachFixPart, fix_part_size, "%" FB_LL_FMTMOD "u", ullFix );
+#endif
 	}
 
 	if( pcchLenFix!=NULL )
@@ -384,6 +501,23 @@ int fb_hProcessMask
 			}
 
 			value = hRound( value, pInfo );
+
+#ifdef HOST_WII
+			/*
+			 * The Wii uses the target C library for runtime FORMAT()
+			 * results, while the compiler and most desktop hosts have a
+			 * different floating-point library.  Large exponent masks can
+			 * expose insignificant binary noise in the low decimal digits
+			 * after scaling; those digits are beyond what a double can
+			 * represent reliably anyway.
+			 */
+			if( pInfo->has_exponent &&
+			    (pInfo->num_digits_frac == 0) &&
+			    (pInfo->num_digits_fix > 15) ) {
+				value = fb_wii_truncate_unreliable_digits( value,
+				                                           pInfo->num_digits_fix - 15 );
+			}
+#endif
 
 			/* value rounded up to next power of 10? */
 			if( pInfo->has_exponent && (fb_IntLog10_64( (unsigned long long)fabs( value ) ) == pInfo->num_digits_fix) )

@@ -21,7 +21,9 @@
 #define SEEK_END 2
 #endif
 
-#if defined(__FB_XBOX__)
+#if defined(__FB_WII__)
+#include once "crt/wii/stdio.bi"
+#elseif defined(__FB_XBOX__)
 #include once "crt/xbox/stdio.bi"
 #elseif defined(__FB_WIN32__)
 #include once "crt/win32/stdio.bi"

@@ -87,6 +87,7 @@ FBC_SRC := $(wildcard $(srcdir)/compiler/*.bas)
 FBC_OBJS := $(patsubst $(srcdir)/compiler/%.bas,$(fbcobjdir)/%.o,$(FBC_SRC))
 FBC_JS_OBJS := $(patsubst $(srcdir)/compiler/%.bas,$(fbcjsobjdir)/%.o,$(FBC_SRC))
 FBC_ANDROID_OBJS := $(patsubst $(srcdir)/compiler/%.bas,$(fbcandroidobjdir)/%.o,$(FBC_SRC))
+FBC_WII_OBJS := $(patsubst $(srcdir)/compiler/%.bas,$(fbcwiiobjdir)/%.o,$(FBC_SRC))
 
 ##############################################################################
 # RTLIB sources

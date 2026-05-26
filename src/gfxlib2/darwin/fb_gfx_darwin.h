@@ -61,6 +61,8 @@ int *fb_hDarwinFetchModes(int depth, int *size);
 void fb_hDarwinPollEvents(void);
 void fb_hDarwinUpdate(void);
 int fb_hDarwinScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *refresh);
+ssize_t fb_hGetWindowHandle(void);
+ssize_t fb_hGetDisplayHandle(void);
 
 #ifdef __cplusplus
 }

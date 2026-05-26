@@ -277,9 +277,14 @@ void fb_sfxSoundQueue(
 {
     FB_SFXVOICE *voice;
 
-    voice = fb_sfxVoiceAlloc();
+    fb_sfxRuntimeLock();
+
+    voice = fb_sfxVoiceAllocLocked();
     if (!voice)
+    {
+        fb_sfxRuntimeUnlock();
         return;
+    }
 
     voice->type = FB_SFX_VOICE_SOUND;
     voice->channel = channel;
@@ -292,6 +297,9 @@ void fb_sfxSoundQueue(
 
     voice->length = fb_sfxSoundDurationFrames(duration);
     voice->position = 0;
+
+    fb_sfxVoiceActivateLocked(voice);
+    fb_sfxRuntimeUnlock();
 }
 
 static int fb_sfxSoundDurationFrames(float duration)

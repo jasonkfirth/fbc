@@ -111,6 +111,7 @@ end sub
 #include once "fbc-darwin-platform.bi"
 #include once "fbc-netbsd-platform.bi"
 #include once "fbc-js-platform.bi"
+#include once "fbc-wii-platform.bi"
 
 '' must be same order as enum FB_COMPTARGET
 static shared as FBC_PLATFORM_HOOKS fbcplatforms(0 to FB_COMPTARGETS-1) = _
@@ -128,7 +129,8 @@ static shared as FBC_PLATFORM_HOOKS fbcplatforms(0 to FB_COMPTARGETS-1) = _
 	( @fbcPlatformGetDefaultLinkerTool, @fbcOpenbsdPlatformAddDefaultLibPaths,   @fbcOpenbsdPlatformAddGfxLibs,   @fbcOpenbsdPlatformAddSfxLibs,   @fbcOpenbsdPlatformAddDefaultLibs,   @fbcOpenbsdPlatformAddLinkerFrameworks   ), _
 	( @fbcDarwinPlatformGetLinkerTool,  @fbcDarwinPlatformAddDefaultLibPaths,    @fbcDarwinPlatformAddGfxLibs,    @fbcDarwinPlatformAddSfxLibs,    @fbcDarwinPlatformAddDefaultLibs,    @fbcDarwinPlatformAddLinkerFrameworks    ), _
 	( @fbcPlatformGetDefaultLinkerTool, @fbcNetbsdPlatformAddDefaultLibPaths,    @fbcNetbsdPlatformAddGfxLibs,    @fbcNetbsdPlatformAddSfxLibs,    @fbcNetbsdPlatformAddDefaultLibs,    @fbcNetbsdPlatformAddLinkerFrameworks    ), _
-	( @fbcJsPlatformGetLinkerTool,      @fbcJsPlatformAddDefaultLibPaths,        @fbcJsPlatformAddGfxLibs,        @fbcJsPlatformAddSfxLibs,        @fbcJsPlatformAddDefaultLibs,        @fbcJsPlatformAddLinkerFrameworks        )  _
+	( @fbcJsPlatformGetLinkerTool,      @fbcJsPlatformAddDefaultLibPaths,        @fbcJsPlatformAddGfxLibs,        @fbcJsPlatformAddSfxLibs,        @fbcJsPlatformAddDefaultLibs,        @fbcJsPlatformAddLinkerFrameworks        ), _
+	( @fbcWiiPlatformGetLinkerTool,     @fbcWiiPlatformAddDefaultLibPaths,       @fbcWiiPlatformAddGfxLibs,       @fbcWiiPlatformAddSfxLibs,       @fbcWiiPlatformAddDefaultLibs,       @fbcWiiPlatformAddLinkerFrameworks       )  _
 }
 
 private function fbcPlatformGetLinkerTool( ) as integer

@@ -17,13 +17,17 @@
 
 #if FB_SFX_MT_ENABLED
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(HOST_XBOX)
 
 #include <windows.h>
 
 static CRITICAL_SECTION g_fb_sfx_runtime_lock;
 static CRITICAL_SECTION g_fb_sfx_driver_io_lock;
 static volatile LONG g_fb_sfx_runtime_lock_ready = 0;
+static volatile DWORD g_fb_sfx_runtime_lock_owner = 0;
+static volatile DWORD g_fb_sfx_driver_io_lock_owner = 0;
+static int g_fb_sfx_runtime_lock_depth = 0;
+static int g_fb_sfx_driver_io_lock_depth = 0;
 
 static void fb_sfxRuntimeEnsureLock(void)
 {
@@ -40,6 +44,86 @@ static void fb_sfxRuntimeEnsureLock(void)
 
     while (InterlockedCompareExchange(&g_fb_sfx_runtime_lock_ready, 2, 2) != 2)
         Sleep(0);
+}
+
+static void fb_sfxEnterRecursiveCriticalSection(CRITICAL_SECTION *lock,
+                                                volatile DWORD *owner,
+                                                int *depth)
+{
+    DWORD thread_id;
+
+    thread_id = GetCurrentThreadId();
+    if (*owner == thread_id)
+    {
+        ++(*depth);
+        return;
+    }
+
+    EnterCriticalSection(lock);
+    *owner = thread_id;
+    *depth = 1;
+}
+
+static void fb_sfxLeaveRecursiveCriticalSection(CRITICAL_SECTION *lock,
+                                                volatile DWORD *owner,
+                                                int *depth)
+{
+    DWORD thread_id;
+
+    thread_id = GetCurrentThreadId();
+    if (*owner != thread_id || *depth <= 0)
+        return;
+
+    --(*depth);
+    if (*depth > 0)
+        return;
+
+    *owner = 0;
+    LeaveCriticalSection(lock);
+}
+
+#elif defined(HOST_WII)
+
+#include <ogc/mutex.h>
+
+static mutex_t g_fb_sfx_runtime_lock = LWP_MUTEX_NULL;
+static mutex_t g_fb_sfx_driver_io_lock = LWP_MUTEX_NULL;
+static int g_fb_sfx_runtime_lock_ready = 0;
+
+static void fb_sfxRuntimeEnsureLock(void)
+{
+    mutex_t runtime_lock;
+    mutex_t driver_io_lock;
+
+    if (g_fb_sfx_runtime_lock_ready)
+        return;
+
+    /*
+        libogc mutexes can be recursive.  sfxlib relies on that behavior
+        because command handlers may call helpers that also take the runtime
+        lock while preserving the same high-level operation.
+
+        The first lock initialization happens before the Wii audio worker is
+        started, so a simple readiness flag is enough here.  If either mutex
+        cannot be created, leave the handles null and let the lock/unlock
+        wrappers behave as no-ops instead of crashing during startup.
+    */
+
+    runtime_lock = LWP_MUTEX_NULL;
+    driver_io_lock = LWP_MUTEX_NULL;
+
+    if (LWP_MutexInit(&runtime_lock, 1) != 0)
+        return;
+
+    if (LWP_MutexInit(&driver_io_lock, 1) != 0)
+    {
+        LWP_MutexDestroy(runtime_lock);
+        return;
+    }
+
+    g_fb_sfx_runtime_lock = runtime_lock;
+    g_fb_sfx_driver_io_lock = driver_io_lock;
+    g_fb_sfx_runtime_lock_ready = 1;
 }
 
 #else
@@ -81,8 +165,13 @@ void fb_sfxRuntimeLock(void)
 {
     fb_sfxRuntimeEnsureLock();
 
-#if defined(_WIN32)
-    EnterCriticalSection(&g_fb_sfx_runtime_lock);
+#if defined(_WIN32) || defined(HOST_XBOX)
+    fb_sfxEnterRecursiveCriticalSection(&g_fb_sfx_runtime_lock,
+                                        &g_fb_sfx_runtime_lock_owner,
+                                        &g_fb_sfx_runtime_lock_depth);
+#elif defined(HOST_WII)
+    if (g_fb_sfx_runtime_lock != LWP_MUTEX_NULL)
+        LWP_MutexLock(g_fb_sfx_runtime_lock);
 #else
     pthread_mutex_lock(&g_fb_sfx_runtime_lock);
 #endif
@@ -90,9 +179,14 @@ void fb_sfxRuntimeLock(void)
 
 void fb_sfxRuntimeUnlock(void)
 {
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(HOST_XBOX)
     if (InterlockedCompareExchange(&g_fb_sfx_runtime_lock_ready, 2, 2) == 2)
-        LeaveCriticalSection(&g_fb_sfx_runtime_lock);
+        fb_sfxLeaveRecursiveCriticalSection(&g_fb_sfx_runtime_lock,
+                                            &g_fb_sfx_runtime_lock_owner,
+                                            &g_fb_sfx_runtime_lock_depth);
+#elif defined(HOST_WII)
+    if (g_fb_sfx_runtime_lock != LWP_MUTEX_NULL)
+        LWP_MutexUnlock(g_fb_sfx_runtime_lock);
 #else
     pthread_mutex_unlock(&g_fb_sfx_runtime_lock);
 #endif
@@ -102,8 +196,13 @@ void fb_sfxDriverIoLock(void)
 {
     fb_sfxRuntimeEnsureLock();
 
-#if defined(_WIN32)
-    EnterCriticalSection(&g_fb_sfx_driver_io_lock);
+#if defined(_WIN32) || defined(HOST_XBOX)
+    fb_sfxEnterRecursiveCriticalSection(&g_fb_sfx_driver_io_lock,
+                                        &g_fb_sfx_driver_io_lock_owner,
+                                        &g_fb_sfx_driver_io_lock_depth);
+#elif defined(HOST_WII)
+    if (g_fb_sfx_driver_io_lock != LWP_MUTEX_NULL)
+        LWP_MutexLock(g_fb_sfx_driver_io_lock);
 #else
     pthread_mutex_lock(&g_fb_sfx_driver_io_lock);
 #endif
@@ -111,9 +210,14 @@ void fb_sfxDriverIoLock(void)
 
 void fb_sfxDriverIoUnlock(void)
 {
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(HOST_XBOX)
     if (InterlockedCompareExchange(&g_fb_sfx_runtime_lock_ready, 2, 2) == 2)
-        LeaveCriticalSection(&g_fb_sfx_driver_io_lock);
+        fb_sfxLeaveRecursiveCriticalSection(&g_fb_sfx_driver_io_lock,
+                                            &g_fb_sfx_driver_io_lock_owner,
+                                            &g_fb_sfx_driver_io_lock_depth);
+#elif defined(HOST_WII)
+    if (g_fb_sfx_driver_io_lock != LWP_MUTEX_NULL)
+        LWP_MutexUnlock(g_fb_sfx_driver_io_lock);
 #else
     pthread_mutex_unlock(&g_fb_sfx_driver_io_lock);
 #endif

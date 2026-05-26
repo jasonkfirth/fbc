@@ -11,7 +11,9 @@
 
 #include once "crt/stddef.bi"
 
-#if defined(__FB_WIN32__) or defined(__FB_XBOX__)
+#if defined(__FB_WII__)
+#include once "crt/sys/wii/types.bi"
+#elseif defined(__FB_WIN32__) or defined(__FB_XBOX__)
 #include once "crt/sys/win32/types.bi"
 #elseif defined(__FB_DOS__)
 #include once "crt/sys/dos/types.bi"

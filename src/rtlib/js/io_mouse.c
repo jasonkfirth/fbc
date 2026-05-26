@@ -7,6 +7,18 @@
 int fb_ConsoleGetMouse( int *x, int *y, int *z, int *buttons, int *clip )
 {
 	EmscriptenMouseEvent mouseState;
+	int touch_x;
+	int touch_y;
+	int touch_buttons;
+
+	if( fb_hJsGetTouchMouse( &touch_x, &touch_y, &touch_buttons ) ) {
+		if( x ) *x = touch_x;
+		if( y ) *y = touch_y;
+		if( z ) *z = 0;
+		if( buttons ) *buttons = touch_buttons;
+		if( clip ) *clip = 0;
+		return fb_ErrorSetNum( FB_RTERROR_OK );
+	}
 
 	if( emscripten_get_mouse_status( &mouseState ) != EMSCRIPTEN_RESULT_SUCCESS ) {
 		if (x) *x = -1;

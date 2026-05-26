@@ -145,6 +145,29 @@ copy_dir_files() {
 	find "$src" -maxdepth 1 -type f -exec cp -a {} "$dst/" \;
 }
 
+remove_stale_crt_import_libs() {
+	local libdir="$1"
+
+	[ -d "$libdir" ] || return 0
+
+	# The MinGW package must use the CRT import libraries supplied by the
+	# active toolchain.  Old libmsvcrt*.dll.a files copied from legacy
+	# winlibs can override the current toolchain files and break otherwise
+	# valid builds.
+	rm -f "$libdir"/libmsvcrt*.dll.a
+}
+
+assert_no_stale_crt_import_libs() {
+	local libdir="$1"
+
+	[ -d "$libdir" ] || return 0
+
+	if find "$libdir" -maxdepth 1 -type f -name 'libmsvcrt*.dll.a' -print -quit | grep -q .; then
+		find "$libdir" -maxdepth 1 -type f -name 'libmsvcrt*.dll.a' -print >&2
+		fail "stale CRT import libraries were packaged in $libdir"
+	fi
+}
+
 copy_library_alias() {
 	local libdir="$1"
 	local source="$2"
@@ -649,6 +672,8 @@ copy_arch_toolchain() {
 	copy_dir_files "$mingw_root/lib" "$DISTROOT/lib/$arch"
 	create_arch_library_aliases "$DISTROOT/lib/$arch"
 	copy_legacy_winlibs "$arch" "$DISTROOT/lib/$arch" "$DISTROOT/bin/$arch"
+	remove_stale_crt_import_libs "$DISTROOT/lib/$arch"
+	assert_no_stale_crt_import_libs "$DISTROOT/lib/$arch"
 }
 
 assemble_distribution() {
@@ -684,6 +709,10 @@ assemble_distribution() {
 	msg "Merging staged FreeBASIC runtime libraries"
 	copy_dir_files "$win32_stage/lib/win32" "$DISTROOT/lib/win32"
 	copy_dir_files "$win64_stage/lib/win64" "$DISTROOT/lib/win64"
+	remove_stale_crt_import_libs "$DISTROOT/lib/win32"
+	remove_stale_crt_import_libs "$DISTROOT/lib/win64"
+	assert_no_stale_crt_import_libs "$DISTROOT/lib/win32"
+	assert_no_stale_crt_import_libs "$DISTROOT/lib/win64"
 }
 
 ##############################################################################

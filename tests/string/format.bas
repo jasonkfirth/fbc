@@ -14,7 +14,10 @@
 	#endif
 	'' inhibit some checks on mingw-org, however, we can't
 	'' tell the difference between mingw32 and mingw-org
-	#if defined(__FB_WIN32__) or defined(__FB_DOS__)
+	''
+	'' Wii/newlib also rounds "4.9e-324" down to zero in strtod(),
+	'' so val() cannot feed FORMAT() the minimum double subnormal.
+	#if defined(__FB_WIN32__) or defined(__FB_DOS__) or defined(__FB_WII__)
 		#define B2 0
 	#else
 		#define B2 1

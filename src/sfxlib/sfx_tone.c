@@ -80,10 +80,15 @@ void fb_sfxTone(int channel, int frequency, float duration)
     if (channel < 0 || channel >= FB_SFX_MAX_CHANNELS)
         channel = 0;
 
-    voice = fb_sfxVoiceAlloc();
+    fb_sfxRuntimeLock();
+
+    voice = fb_sfxVoiceAllocLocked();
 
     if (!voice)
+    {
+        fb_sfxRuntimeUnlock();
         return;
+    }
 
     voice->type = FB_SFX_VOICE_TONE;
     voice->channel = channel;
@@ -99,6 +104,9 @@ void fb_sfxTone(int channel, int frequency, float duration)
     }
 
     voice->position = 0;
+
+    fb_sfxVoiceActivateLocked(voice);
+    fb_sfxRuntimeUnlock();
 
     SFX_DEBUG(
         "sfx_tone: channel=%d freq=%d dur=%f",

@@ -26,19 +26,71 @@
 #include "../fb_gfx.h"
 #include <hal/xbox.h>
 #include <hal/video.h>
+#include <winapi/handleapi.h>
+#include <winapi/processthreadsapi.h>
+#ifdef WAIT_TIMEOUT
+#undef WAIT_TIMEOUT
+#endif
+#include <winapi/synchapi.h>
+#include <winapi/sysinfoapi.h>
 #include <stdint.h>
 
 #define SCREENLIST(w, h) ((h) | (w) << 16)
 #define XBOX_DEFAULT_W 640
 #define XBOX_DEFAULT_H 480
+#define XBOX_CRTC_STATUS 0x006013DA
+#define XBOX_CRTC_STATUS_VBLANK 0x08
+#define XBOX_VBLANK_TIMEOUT_MS 50
+#define XBOX_PRESENT_INTERVAL_MS 10
+
+/*
+	Xbox scanout must never be used as a work surface.
+
+	Copying into the framebuffer currently being scanned can create a black
+	tear that only exists for a fraction of a frame.  The backend therefore
+	composes into normal memory, copies the completed image into a non-visible
+	hardware framebuffer, then switches scanout during vblank.
+*/
+#define XBOX_SCAN_BUFFERS 3
 
 static BLITTER *blitter;
 static void *framebuffer;
 static uint32_t *scale_buffer;
 static size_t scale_buffer_size;
+static uint32_t *present_buffer;
+static size_t present_buffer_size;
+static uint32_t *scan_buffer[XBOX_SCAN_BUFFERS];
+static int front_scan_buffer;
+static size_t video_framebuffer_size;
+static CRITICAL_SECTION update_lock;
+static HANDLE presenter_thread;
+static int update_lock_ready;
 static int video_w;
 static int video_h;
 static volatile int quitting;
+
+static void wait_for_vblank_edge(void)
+{
+	DWORD start;
+
+	/*
+		XVideoWaitForVBlank() waits through an interrupt event.  That is fine
+		for throttling, but a delayed wakeup can put XVideoSetFB() just after
+		the blanking interval.  Poll the CRT status bit here so framebuffer
+		address changes happen at the start of vertical blanking.
+	*/
+	start = GetTickCount();
+	while (VIDEOREG8(XBOX_CRTC_STATUS) & XBOX_CRTC_STATUS_VBLANK) {
+		if ((DWORD)(GetTickCount() - start) > XBOX_VBLANK_TIMEOUT_MS)
+			return;
+	}
+
+	start = GetTickCount();
+	while (!(VIDEOREG8(XBOX_CRTC_STATUS) & XBOX_CRTC_STATUS_VBLANK)) {
+		if ((DWORD)(GetTickCount() - start) > XBOX_VBLANK_TIMEOUT_MS)
+			return;
+	}
+}
 
 static int ensure_scale_buffer(size_t pixels)
 {
@@ -61,6 +113,37 @@ static int ensure_scale_buffer(size_t pixels)
 	scale_buffer = new_buffer;
 	scale_buffer_size = pixels;
 	return TRUE;
+}
+
+static int ensure_present_buffer(size_t pixels)
+{
+	uint32_t *new_buffer;
+
+	if (present_buffer_size >= pixels)
+		return TRUE;
+
+	new_buffer = realloc(present_buffer, pixels * sizeof(uint32_t));
+	if (!new_buffer)
+		return FALSE;
+
+	present_buffer = new_buffer;
+	present_buffer_size = pixels;
+	return TRUE;
+}
+
+static int count_dirty_lines(void)
+{
+	int y, count = 0;
+
+	if (!__fb_gfx || !__fb_gfx->dirty)
+		return 0;
+
+	for (y = 0; y < __fb_gfx->h; ++y) {
+		if (__fb_gfx->dirty[y])
+			++count;
+	}
+
+	return count;
 }
 
 static void choose_video_mode(int src_w, int src_h, int *out_w, int *out_h)
@@ -127,9 +210,15 @@ static void driver_update_framebuffer(void)
 {
 	int src_w, src_h, src_pitch;
 	int scale, skip, out_w, out_h, off_x, off_y;
+	int back_scan_buffer;
+	int dirty_lines;
 	int x, y;
 
-	if (!__fb_gfx || !framebuffer || !blitter)
+	if (!__fb_gfx || !framebuffer || !blitter || !scan_buffer[0])
+		return;
+
+	dirty_lines = count_dirty_lines();
+	if (dirty_lines == 0)
 		return;
 
 	src_w = __fb_gfx->w;
@@ -139,19 +228,29 @@ static void driver_update_framebuffer(void)
 	if (!ensure_scale_buffer((size_t)src_w * (size_t)src_h))
 		return;
 
+	if (!ensure_present_buffer((size_t)video_w * (size_t)video_h))
+		return;
+
 	blitter((unsigned char *)scale_buffer, src_pitch);
 	get_viewport(&scale, &skip, &out_w, &out_h, &off_x, &off_y);
 
-	memset(framebuffer, 0, (size_t)video_w * (size_t)video_h * sizeof(uint32_t));
-
 	for (y = 0; y < out_h; ++y) {
-		uint32_t *dst = ((uint32_t *)framebuffer) + ((off_y + y) * video_w) + off_x;
+		uint32_t *dst = present_buffer + ((off_y + y) * video_w) + off_x;
 		uint32_t *src;
+		int src_y;
 
-		if (scale >= 1)
-			src = scale_buffer + ((y / scale) * src_w);
-		else
-			src = scale_buffer + ((y * skip) * src_w);
+		if (scale >= 1) {
+			src_y = y / scale;
+		} else {
+			src_y = y * skip;
+			if (src_y >= src_h)
+				src_y = src_h - 1;
+		}
+
+		if (!__fb_gfx->dirty[src_y])
+			continue;
+
+		src = scale_buffer + (src_y * src_w);
 
 		for (x = 0; x < out_w; ++x) {
 			if (scale >= 1)
@@ -161,12 +260,62 @@ static void driver_update_framebuffer(void)
 		}
 	}
 
+	/*
+		Xbox video framebuffers are scanout surfaces.  Updating the currently
+		visible surface can expose a partially redrawn BASIC frame, which
+		looks like a black/text/black flash in programs that redraw with CLS
+		followed by many primitives.
+
+		Keep the scaled image in normal memory, copy one complete composed
+		frame to the non-visible hardware framebuffer, and then switch scanout
+		during vblank.  This is not gfxlib page flipping; it is only a backend
+		scanout buffer swap that keeps the display from seeing the middle of a
+		software redraw.
+	*/
+	back_scan_buffer = front_scan_buffer + 1;
+	if (back_scan_buffer >= XBOX_SCAN_BUFFERS)
+		back_scan_buffer = 0;
+
+	fb_hMemCpy(scan_buffer[back_scan_buffer], present_buffer, video_framebuffer_size);
 	XVideoFlushFB();
+	wait_for_vblank_edge();
+	XVideoSetFB((unsigned char *)scan_buffer[back_scan_buffer]);
+
+	/*
+		Some video hardware latches the CRTC start address at vblank.  Wait
+		one more blanking interval before allowing the previous scanout buffer
+		to become the writable back buffer again.  Without this, a fast
+		visible-page redraw can reuse a buffer that the TV is still scanning,
+		which appears as black tearing between frames.
+	*/
+	wait_for_vblank_edge();
+	front_scan_buffer = back_scan_buffer;
+	fb_hMemSet(__fb_gfx->dirty, FALSE, __fb_gfx->h);
+}
+
+static DWORD WINAPI presenter_thread_proc(LPVOID param)
+{
+	(void)param;
+
+	while (!quitting) {
+		Sleep(XBOX_PRESENT_INTERVAL_MS);
+
+		if (quitting)
+			break;
+
+		EnterCriticalSection(&update_lock);
+		if (!quitting)
+			driver_update_framebuffer();
+		LeaveCriticalSection(&update_lock);
+	}
+
+	return 0;
 }
 
 static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rate, int flags)
 {
 	int mode_w, mode_h;
+	int i;
 	VIDEO_MODE vm;
 
 	(void)title;
@@ -182,40 +331,121 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 	vm = XVideoGetMode();
 	video_w = vm.width;
 	video_h = vm.height;
+	video_framebuffer_size = (size_t)video_w * (size_t)video_h * sizeof(uint32_t);
 	framebuffer = XVideoGetFB();
 	blitter = fb_hGetBlitter(32, FALSE);
 	if (!framebuffer || !blitter)
 		return -1;
 
+	for (i = 0; i < XBOX_SCAN_BUFFERS; ++i) {
+		scan_buffer[i] = (uint32_t *)MmAllocateContiguousMemoryEx(video_framebuffer_size,
+		                                                          0x00000000,
+		                                                          0x7FFFFFFF,
+		                                                          0x1000,
+		                                                          PAGE_READWRITE | PAGE_WRITECOMBINE);
+		if (!scan_buffer[i]) {
+			while (i > 0) {
+				--i;
+				MmFreeContiguousMemory(scan_buffer[i]);
+				scan_buffer[i] = NULL;
+			}
+			return -1;
+		}
+	}
+	front_scan_buffer = 0;
+
+	if (!ensure_present_buffer((size_t)video_w * (size_t)video_h)) {
+		for (i = 0; i < XBOX_SCAN_BUFFERS; ++i) {
+			MmFreeContiguousMemory(scan_buffer[i]);
+			scan_buffer[i] = NULL;
+		}
+		return -1;
+	}
+
+	memset(present_buffer, 0, video_framebuffer_size);
+	for (i = 0; i < XBOX_SCAN_BUFFERS; ++i)
+		memset(scan_buffer[i], 0, video_framebuffer_size);
+	XVideoFlushFB();
+	XVideoSetFB((unsigned char *)scan_buffer[front_scan_buffer]);
+
+	InitializeCriticalSection(&update_lock);
+	update_lock_ready = TRUE;
 	quitting = FALSE;
+	presenter_thread = CreateThread(NULL, 0, presenter_thread_proc, NULL, 0, NULL);
+	if (!presenter_thread) {
+		quitting = TRUE;
+		DeleteCriticalSection(&update_lock);
+		update_lock_ready = FALSE;
+		return -1;
+	}
 
 	return 0;
 }
 
 static void driver_exit(void)
 {
+	int i;
+
 	quitting = TRUE;
+	if (presenter_thread) {
+		WaitForSingleObject(presenter_thread, INFINITE);
+		CloseHandle(presenter_thread);
+		presenter_thread = NULL;
+	}
+	if (update_lock_ready) {
+		DeleteCriticalSection(&update_lock);
+		update_lock_ready = FALSE;
+	}
+	if (framebuffer)
+		XVideoSetFB((unsigned char *)framebuffer);
 	framebuffer = NULL;
 	blitter = NULL;
 	video_w = 0;
 	video_h = 0;
+	video_framebuffer_size = 0;
 	free(scale_buffer);
 	scale_buffer = NULL;
 	scale_buffer_size = 0;
+	free(present_buffer);
+	present_buffer = NULL;
+	present_buffer_size = 0;
+	for (i = 0; i < XBOX_SCAN_BUFFERS; ++i) {
+		if (scan_buffer[i])
+			MmFreeContiguousMemory(scan_buffer[i]);
+		scan_buffer[i] = NULL;
+	}
+	front_scan_buffer = 0;
 }
 
 static void driver_lock(void)
 {
 	/*
-		The Xbox presenter is driven by SCREENUNLOCK and explicit page updates.
-		There is no separate window thread to suspend here.
+		Match the Win32 drivers: primitive drawing and presentation share a
+		driver-owned update lock.  This prevents the presenter thread from
+		copying a framebuffer line while a primitive is modifying it.
 	*/
+	if (update_lock_ready)
+		EnterCriticalSection(&update_lock);
 }
 
 static void driver_unlock(void)
 {
-	if (!quitting)
-		driver_update_framebuffer();
+	/*
+		Unlock only releases the presenter.  It does not publish a frame.
+		Win32 follows the same split: drawing unlocks synchronization, and the
+		driver's paint/update path decides when the display surface changes.
+	*/
+	if (update_lock_ready)
+		LeaveCriticalSection(&update_lock);
+}
+
+static void driver_update(void)
+{
+	/*
+		The presenter thread polls dirty state at display cadence.  Keeping
+		this hook passive avoids turning tight SLEEP 1 loops into hundreds of
+		synchronous presents per second.
+	*/
 }
 
 static void driver_set_palette(int index, int r, int g, int b)
@@ -224,14 +454,11 @@ static void driver_set_palette(int index, int r, int g, int b)
 	(void)r;
 	(void)g;
 	(void)b;
-
-	if (!quitting)
-		driver_update_framebuffer();
 }
 
 static void driver_wait_vsync(void)
 {
-	XVideoWaitForVBlank();
+	wait_for_vblank_edge();
 }
 
 static int driver_get_mouse(int *x, int *y, int *z, int *buttons, int *clip)
@@ -304,7 +531,7 @@ static const GFXDRIVER fb_gfxDriverXbox =
 	driver_fetch_modes,      /* int *(*fetch_modes)(int depth, int *size); */
 	NULL,                    /* void (*flip)(void); */
 	driver_poll_events,      /* void (*poll_events)(void); */
-	NULL                     /* void (*update)(void); */
+	driver_update            /* void (*update)(void); */
 };
 
 const GFXDRIVER *__fb_gfx_drivers_list[] = {

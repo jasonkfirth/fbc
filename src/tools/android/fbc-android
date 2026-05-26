@@ -38,8 +38,61 @@ Source defines:
   #define FB_ANDROID_HIDE_KEYBOARD_BUTTON
                                   Disable the on-screen keyboard toggle button and IME
   #define FB_ANDROID_LANDSCAPE
-                                  Request landscape orientation for the Activity
+                                  Request landscape orientation for the Activity.
+                                  Landscape is also inferred from common
+                                  SCREEN/SCREENRES source usage.
 EOF
+}
+
+source_uses_landscape_screen() {
+	local source_file="$1"
+
+	awk '
+	BEGIN {
+		found = 0
+	}
+
+	{
+		line = $0
+		sub(/\047.*/, "", line)
+		sub(/^[ \t]+/, "", line)
+		gsub(/[,()]/, " ", line)
+
+		fields = split(line, field, /[ \t]+/)
+		if (fields < 2)
+			next
+
+		command = tolower(field[1])
+
+		if (command == "screenres" && fields >= 3) {
+			width = field[2] + 0
+			height = field[3] + 0
+
+			if (width > height && height > 0)
+			{
+				found = 1
+				exit
+			}
+		}
+
+		if (command == "screen" && fields >= 2) {
+			mode = field[2] + 0
+
+			if (mode >= 1 && mode <= 13)
+			{
+				found = 1
+				exit
+			}
+		}
+	}
+
+	END {
+		if (found)
+			exit 0
+
+		exit 1
+	}
+	' "$source_file"
 }
 
 find_sdk() {
@@ -323,6 +376,10 @@ if [ "$screen_orientation" = "unspecified" ] && \
 	screen_orientation="landscape"
 fi
 
+if [ "$screen_orientation" = "unspecified" ] && source_uses_landscape_screen "$src"; then
+	screen_orientation="landscape"
+fi
+
 for ((i = 0; i < ${#fbc_args[@]}; ++i)); do
 	case "${fbc_args[$i]}" in
 		-dFB_ANDROID_HIDE_KEYBOARD_BUTTON|-dFB_ANDROID_HIDE_KEYBOARD_BUTTON=*)
@@ -405,9 +462,8 @@ module_args=()
 
 if [ "$use_entry" -eq 1 ]; then
 	entry_args=(-entry fb_android_program_main)
-else
-	module_args=(-m "$module")
 fi
+module_args=(-m "$module")
 
 env GCC="$cc" CLANG="$cc" AS="$cc" LD="$cc" AR="$ar" RANLIB="$ranlib" \
 	"$compiler" \
@@ -489,7 +545,7 @@ if command -v d8 >/dev/null 2>&1; then
 	d8="$(command -v d8)"
 else
 	shopt -s nullglob
-	for found in "$sdk"/build-tools/*/d8 "$sdk"/build-tools/*/d8.exe; do
+	for found in "$sdk"/build-tools/*/d8 "$sdk"/build-tools/*/d8.exe "$sdk"/build-tools/*/d8.bat; do
 		[ -f "$found" ] || continue
 		d8="$found"
 		break
@@ -501,7 +557,7 @@ if [ -z "$d8" ]; then
 		dx="$(command -v dx)"
 	else
 		shopt -s nullglob
-		for found in "$sdk"/build-tools/*/dx "$sdk"/build-tools/*/dx.exe; do
+		for found in "$sdk"/build-tools/*/dx "$sdk"/build-tools/*/dx.exe "$sdk"/build-tools/*/dx.bat; do
 			[ -f "$found" ] || continue
 			dx="$found"
 			break

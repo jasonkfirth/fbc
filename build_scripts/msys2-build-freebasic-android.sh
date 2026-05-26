@@ -662,7 +662,11 @@ copy_msys_runtime() {
 	msg "Bundling minimal MSYS2 shell runtime"
 	mkdir -p "$dst"
 	copy_msys_tool bash "$dst"
+	copy_msys_tool cat "$dst"
+	copy_msys_tool grep "$dst"
+	copy_msys_tool awk "$dst"
 	copy_msys_tool sed "$dst"
+	copy_msys_tool sort "$dst"
 	copy_msys_tool tr "$dst"
 	copy_msys_tool mkdir "$dst"
 	copy_msys_tool dirname "$dst"
@@ -700,7 +704,9 @@ export FBANDROID_PREFIX FBANDROID_LIBROOT FBANDROID_COMPILER FBANDROID_INCDIR FB
 if [ ! -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat" ] || \
 	{ [ ! -d "$ANDROID_HOME/ndk" ] && [ ! -d "$ANDROID_HOME/ndk-bundle" ]; }; then
 	echo "Android SDK/NDK is not installed in this package." >&2
-	echo "Run setup-android-sdk.cmd, review Google's Android SDK terms, and try again." >&2
+	echo "Review Google's Android SDK terms, then run:" >&2
+	echo "  setup-android-sdk.cmd --accept-google-android-sdk-terms" >&2
+	echo "Use --with-emulator-tools too if this package will run APKs in an emulator." >&2
 	exit 1
 fi
 
@@ -775,11 +781,14 @@ function EnvOrDefault {
 }
 
 $acceptTerms = $false
+$withEmulatorTools = $false
 foreach ($arg in $args) {
 	if ($arg -eq "--accept-google-android-sdk-terms") {
 		$acceptTerms = $true
+	} elseif ($arg -eq "--with-emulator-tools") {
+		$withEmulatorTools = $true
 	} elseif (($arg -eq "--help") -or ($arg -eq "-h") -or ($arg -eq "/?")) {
-		Write-Host "Usage: setup-android-sdk.cmd [--accept-google-android-sdk-terms]"
+		Write-Host "Usage: setup-android-sdk.cmd [--accept-google-android-sdk-terms] [--with-emulator-tools]"
 		exit 0
 	} else {
 		Die "Unknown option: $arg"
@@ -854,6 +863,10 @@ $packages.Add((EnvOrDefault "ANDROID_PLATFORM_PACKAGE" "platforms;android-35"))
 $packages.Add((EnvOrDefault "ANDROID_BUILDTOOLS_PACKAGE" "build-tools;35.0.1"))
 $packages.Add((EnvOrDefault "ANDROID_NDK_PACKAGE" "ndk;28.0.13004108"))
 
+if ($withEmulatorTools) {
+	$env:ANDROID_WITH_EMULATOR_TOOLS = "1"
+}
+
 if ((EnvOrDefault "ANDROID_WITH_EMULATOR_TOOLS" "0") -eq "1") {
 	$packages.Add((EnvOrDefault "ANDROID_EMULATOR_PACKAGE" "emulator"))
 	$packages.Add((EnvOrDefault "ANDROID_SYSTEM_IMAGE_PACKAGE" "system-images;android-35;google_apis;x86_64"))
@@ -927,13 +940,18 @@ The installer adds this directory to the Windows system PATH:
 
 Before first use from the zip package, run:
 
-    setup-android-sdk.cmd
+    setup-android-sdk.cmd --accept-google-android-sdk-terms
 
 That setup downloads Android command line tools, platform-tools, build-tools,
 platform files, and the Android NDK from Google's servers after you review and
 accept Google's Android SDK terms:
 
     https://developer.android.com/studio/terms
+
+If the package will be used to launch and validate APKs in an emulator, install
+the Android emulator and configured system image too:
+
+    setup-android-sdk.cmd --accept-google-android-sdk-terms --with-emulator-tools
 
 Use fbc-android.cmd from cmd.exe or PowerShell:
 

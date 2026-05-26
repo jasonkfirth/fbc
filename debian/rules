@@ -17,6 +17,10 @@ BUILD_ANDROID := no
 ifneq ($(filter android,$(DEB_BUILD_PROFILES)),)
 BUILD_ANDROID := yes
 endif
+BUILD_WII := no
+ifneq ($(filter wii,$(DEB_BUILD_PROFILES)),)
+BUILD_WII := yes
+endif
 
 # ------------------------------------------------------------
 # Parallelism
@@ -236,6 +240,21 @@ ANDROID_AR := $(ANDROID_TOOLCHAIN_BINDIR)/llvm-ar
 ANDROID_RANLIB := $(ANDROID_TOOLCHAIN_BINDIR)/llvm-ranlib
 
 # ------------------------------------------------------------
+# Wii target toolchain
+# ------------------------------------------------------------
+
+WII_DEVKITPRO ?= $(or $(DEVKITPRO),/opt/devkitpro)
+WII_DEVKITPPC ?= $(or $(DEVKITPPC),$(WII_DEVKITPRO)/devkitPPC)
+WII_TARGET_TRIPLET ?= powerpc-eabi
+WII_FBTARGET_KEY ?= wii-powerpc
+WII_CC := $(WII_DEVKITPPC)/bin/powerpc-eabi-gcc
+WII_CXX := $(WII_DEVKITPPC)/bin/powerpc-eabi-g++
+WII_AS := $(WII_DEVKITPPC)/bin/powerpc-eabi-as
+WII_AR := $(WII_DEVKITPPC)/bin/powerpc-eabi-ar
+WII_RANLIB := $(WII_DEVKITPPC)/bin/powerpc-eabi-ranlib
+WII_ELF2DOL := $(WII_DEVKITPRO)/tools/bin/elf2dol
+
+# ------------------------------------------------------------
 # Debian hardening flags
 # ------------------------------------------------------------
 
@@ -412,6 +431,50 @@ ifeq ($(BUILD_ANDROID),yes)
 		LDFLAGS=
 endif
 
+ifeq ($(BUILD_WII),yes)
+	@test -d "$(WII_DEVKITPRO)" || { echo "ERROR: devkitPro not found: $(WII_DEVKITPRO). Install devkitppc/libogc or set DEVKITPRO."; exit 1; }
+	@test -x "$(WII_CC)" || { echo "ERROR: Wii powerpc-eabi-gcc not found: $(WII_CC)"; exit 1; }
+	@test -x "$(WII_AR)" || { echo "ERROR: Wii powerpc-eabi-ar not found: $(WII_AR)"; exit 1; }
+	@test -x "$(WII_RANLIB)" || { echo "ERROR: Wii powerpc-eabi-ranlib not found: $(WII_RANLIB)"; exit 1; }
+	@test -x "$(WII_ELF2DOL)" || { echo "ERROR: Wii elf2dol not found: $(WII_ELF2DOL)"; exit 1; }
+	@test -d "$(WII_DEVKITPRO)/libogc/include" || { echo "ERROR: libogc headers not found under $(WII_DEVKITPRO)/libogc/include"; exit 1; }
+	@test -d "$(WII_DEVKITPRO)/libogc/lib/wii" || { echo "ERROR: libogc Wii libraries not found under $(WII_DEVKITPRO)/libogc/lib/wii"; exit 1; }
+
+	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
+		$(ARM_CPU_MAKE_ARGS) \
+		compiler-wii \
+		FBC="$(PACKAGE_FBC)" \
+		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
+		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
+		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)" \
+		CPPFLAGS="$(CPPFLAGS)" \
+		CFLAGS="$(CFLAGS)" \
+		CXXFLAGS="$(CXXFLAGS)" \
+		LDFLAGS="$(LDFLAGS)"
+
+	$(PARMAKE) TARGET_OS=wii TARGET_TRIPLET="$(WII_TARGET_TRIPLET)" TARGET="$(WII_TARGET_TRIPLET)" MULTILIB="" \
+		FBTARGET_DIR_OVERRIDE="$(WII_FBTARGET_KEY)" \
+		BUILD_PREFIX=powerpc-eabi- \
+		DEVKITPRO="$(WII_DEVKITPRO)" \
+		DEVKITPPC="$(WII_DEVKITPPC)" \
+		ELF2DOL="$(WII_ELF2DOL)" \
+		CC="$(WII_CC)" \
+		CXX="$(WII_CXX)" \
+		AS="$(WII_AS)" \
+		LD="$(WII_CC)" \
+		AR="$(WII_AR)" \
+		RANLIB="$(WII_RANLIB)" \
+		rtlib fbrt gfxlib2 sfxlib \
+		FBC="$(PACKAGE_FBC)" \
+		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
+		BUILD_FBC_TARGET="$(WII_FBTARGET_KEY)" \
+		BUILD_FBC_BUILDPREFIX= \
+		CPPFLAGS= \
+		CFLAGS= \
+		CXXFLAGS= \
+		LDFLAGS=
+endif
+
 # ------------------------------------------------------------
 # Install
 # ------------------------------------------------------------
@@ -448,6 +511,18 @@ ifeq ($(BUILD_ANDROID),yes)
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
 		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)" \
 		ANDROID_BUILD_LIBDIR="$(CURDIR)/lib/freebasic/$(ANDROID_FBTARGET_KEY)"
+endif
+
+ifeq ($(BUILD_WII),yes)
+	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" install-wii \
+		$(ARM_CPU_MAKE_ARGS) \
+		DESTDIR=$(CURDIR)/debian/tmp \
+		prefix=/usr \
+		FBC="$(PACKAGE_FBC)" \
+		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
+		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
+		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)" \
+		WII_BUILD_LIBDIR="$(CURDIR)/lib/freebasic/$(WII_FBTARGET_KEY)"
 endif
 
 	if [ -d debian/tmp/usr/lib/freebasic ]; then \
@@ -497,12 +572,13 @@ endif
 # FLTK license relocation
 # ------------------------------------------------------------
 
-	for incroot in freebasic freebasic-js freebasic-android; do \
+	for incroot in freebasic freebasic-js freebasic-android freebasic-wii; do \
 		if [ -f "debian/tmp/usr/include/$$incroot/FLTK/LICENSE" ]; then \
 			docpkg=freebasic-bindings; \
 			case "$$incroot" in \
 				freebasic-js) docpkg=freebasic-js ;; \
 				freebasic-android) docpkg=freebasic-android ;; \
+				freebasic-wii) docpkg=freebasic-wii ;; \
 			esac; \
 			mkdir -p "debian/tmp/usr/share/doc/$$docpkg"; \
 			mv "debian/tmp/usr/include/$$incroot/FLTK/LICENSE" \

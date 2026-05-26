@@ -358,6 +358,36 @@ sub hReplaceSlash( byval s as zstring ptr, byval char as integer )
 	next
 end sub
 
+#if defined( __FB_CYGWIN__ )
+private function hCygwinDrivePrefix( ) as string
+	static as integer initialized = FALSE
+	static as string prefix
+
+	if( initialized = FALSE ) then
+		/'
+			Cygwin uses /cygdrive/c/... for Win32 drive paths, but
+			MSYS2 uses /c/...
+
+			The compiler can be run from either shell when building
+			cross packages on Windows.  If we always normalize C:
+			paths to /cygdrive/c under MSYS2, hFileExists() can find
+			a relative include first, then the later absolute open()
+			fails after the path has been rewritten to a mount point
+			that does not exist in that process environment.
+		'/
+		if( len( environ( "MSYSTEM" ) ) > 0 ) then
+			prefix = "/"
+		else
+			prefix = "/cygdrive/"
+		end if
+
+		initialized = TRUE
+	end if
+
+	function = prefix
+end function
+#endif
+
 function pathNormalizeHost( byref path as string ) as string
 #if defined( __FB_CYGWIN__ )
 	dim as string normalized
@@ -372,11 +402,13 @@ function pathNormalizeHost( byref path as string ) as string
 
 			if( ((drive >= asc( "A" )) and (drive <= asc( "Z" ))) or _
 			    ((drive >= asc( "a" )) and (drive <= asc( "z" ))) ) then
+				dim as string drivepath = hCygwinDrivePrefix( ) + lcase( chr( drive ) )
+
 				if( len( normalized ) = 2 ) then
-					function = "/cygdrive/" + lcase( chr( drive ) )
+					function = drivepath
 					exit function
 				elseif( normalized[2] = asc( "/" ) ) then
-					function = "/cygdrive/" + lcase( chr( drive ) ) + mid( normalized, 3 )
+					function = drivepath + mid( normalized, 3 )
 					exit function
 				end if
 			end if

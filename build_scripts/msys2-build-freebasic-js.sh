@@ -63,6 +63,12 @@ Environment:
   HOST_FBC_ROOT       Optional existing FreeBASIC install used as host compiler fallback
   UCRT64_ROOT         UCRT64 root used for Emscripten/Node (default: /ucrt64)
   NSIS_EXE            Explicit makensis path (default: /mingw64/bin/makensis.exe)
+  BINARYEN_OVERLAY    Overlay official Binaryen Windows tools (default: 1)
+  BINARYEN_RELEASE    Official Binaryen release to overlay (default: version_129)
+  BINARYEN_SHA256     Expected SHA256 for the Binaryen archive
+  NODE_OVERLAY        Overlay official Node.js Windows executable (default: 1)
+  NODE_RELEASE        Official Node.js release to overlay (default: v24.14.1)
+  NODE_SHA256         Expected SHA256 for the Node.js archive
   JOBS                Parallel make job count (default: detected CPU core count)
 EOF
 }
@@ -229,6 +235,17 @@ INSTALL_DIR_WIN="${INSTALL_DIR_WIN:-C:\\freebasic-js}"
 INSTALL_SUBDIR="${INSTALL_SUBDIR:-freebasic-js}"
 UCRT64_ROOT="${UCRT64_ROOT:-/ucrt64}"
 NSIS_EXE="${NSIS_EXE:-/mingw64/bin/makensis.exe}"
+BINARYEN_OVERLAY="${BINARYEN_OVERLAY:-1}"
+BINARYEN_RELEASE="${BINARYEN_RELEASE:-version_129}"
+BINARYEN_ARCHIVE="${BINARYEN_ARCHIVE:-binaryen-${BINARYEN_RELEASE}-x86_64-windows.tar.gz}"
+BINARYEN_URL="${BINARYEN_URL:-https://github.com/WebAssembly/binaryen/releases/download/${BINARYEN_RELEASE}/${BINARYEN_ARCHIVE}}"
+BINARYEN_SHA256="${BINARYEN_SHA256:-1405d2f51377859ccf5fcd2c59c0a8c5756373e691ca0eeb5219f646b743e3aa}"
+NODE_OVERLAY="${NODE_OVERLAY:-1}"
+NODE_RELEASE="${NODE_RELEASE:-v24.14.1}"
+NODE_VERSION="${NODE_RELEASE#v}"
+NODE_ARCHIVE="${NODE_ARCHIVE:-node-${NODE_RELEASE}-win-x64.zip}"
+NODE_URL="${NODE_URL:-https://nodejs.org/dist/${NODE_RELEASE}/${NODE_ARCHIVE}}"
+NODE_SHA256="${NODE_SHA256:-6e50ce5498c0cebc20fd39ab3ff5df836ed2f8a31aa093cecad8497cff126d70}"
 JOBS="${JOBS:-$(max_jobs)}"
 
 HOST_TRIPLET="$("$UCRT64_ROOT/bin/gcc" -dumpmachine 2>/dev/null || true)"
@@ -481,15 +498,137 @@ copy_ucrt64_toolchain() {
 	fi
 }
 
+write_emscripten_config() {
+	local config="$DISTROOT/toolchain/ucrt64/lib/emscripten/.emscripten"
+
+	msg "Writing relocatable Emscripten configuration"
+
+	[ -d "$(dirname "$config")" ] || fail "Emscripten directory was not bundled"
+
+	cat > "$config" <<'EOF'
+# .emscripten file for the FreeBASIC fbc-js package.
+#
+# MSYS2 writes absolute paths into this file.  The standalone package is
+# relocatable, so keep the paths relative to this config file instead.
+
+import os
+
+_CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
+_UCRT64_ROOT = os.path.abspath(os.path.join(_CONFIG_DIR, '..', '..'))
+_TOOLCHAIN_ROOT = os.path.abspath(os.path.join(_UCRT64_ROOT, '..'))
+
+def _emscripten_path(*parts):
+    return os.path.join(_UCRT64_ROOT, *parts).replace(os.sep, '/')
+
+_OFFICIAL_NODE_JS = os.path.join(_TOOLCHAIN_ROOT, 'official-node', 'node.exe')
+
+LLVM_ROOT = _emscripten_path('opt', 'emscripten-llvm', 'bin')
+if os.path.exists(_OFFICIAL_NODE_JS):
+    NODE_JS = _OFFICIAL_NODE_JS.replace(os.sep, '/')
+else:
+    NODE_JS = _emscripten_path('bin', 'node.exe')
+BINARYEN_ROOT = _emscripten_path()
+EOF
+}
+
+overlay_official_node() {
+	local cache="$BUILDROOT/downloads"
+	local archive="$cache/$NODE_ARCHIVE"
+	local extract="$BUILDROOT/node-official"
+	local nodesrc="$extract/node-${NODE_RELEASE}-win-x64/node.exe"
+	local nodedst="$DISTROOT/toolchain/official-node/node.exe"
+
+	[ "$NODE_OVERLAY" -ne 0 ] || return 0
+	have curl || fail "curl is required to download the official Node.js executable"
+	have sha256sum || fail "sha256sum is required to verify the official Node.js archive"
+	have unzip || fail "unzip is required to extract the official Node.js archive"
+
+	msg "Overlaying official Node.js Windows executable"
+
+	mkdir -p "$cache"
+	if [ ! -f "$archive" ]; then
+		run curl -L --fail -o "$archive" "$NODE_URL"
+	fi
+
+	printf '%s  %s\n' "$NODE_SHA256" "$archive" | sha256sum -c -
+
+	rm -rf "$extract"
+	mkdir -p "$extract"
+	run unzip -q "$archive" -d "$extract"
+
+	[ -f "$nodesrc" ] || fail "official Node.js executable was not found"
+	mkdir -p "$(dirname "$nodedst")"
+	cp -f "$nodesrc" "$nodedst"
+}
+
+overlay_official_binaryen() {
+	local bindst="$DISTROOT/toolchain/ucrt64/bin"
+	local cache="$BUILDROOT/downloads"
+	local archive="$cache/$BINARYEN_ARCHIVE"
+	local extract="$BUILDROOT/binaryen-official"
+	local binsrc
+
+	[ "$BINARYEN_OVERLAY" -ne 0 ] || return 0
+	[ -d "$bindst" ] || fail "UCRT64 bin directory was not bundled"
+	have curl || fail "curl is required to download the official Binaryen tools"
+	have sha256sum || fail "sha256sum is required to verify the official Binaryen archive"
+
+	msg "Overlaying official Binaryen Windows tools"
+
+	mkdir -p "$cache"
+	if [ ! -f "$archive" ]; then
+		run curl -L --fail -o "$archive" "$BINARYEN_URL"
+	fi
+
+	printf '%s  %s\n' "$BINARYEN_SHA256" "$archive" | sha256sum -c -
+
+	rm -rf "$extract"
+	mkdir -p "$extract"
+	run tar -xf "$archive" -C "$extract"
+
+	binsrc="$extract/binaryen-${BINARYEN_RELEASE}/bin"
+	[ -d "$binsrc" ] || fail "official Binaryen bin directory was not found"
+
+	for tool in \
+		wasm-as.exe \
+		wasm-ctor-eval.exe \
+		wasm-dis.exe \
+		wasm-emscripten-finalize.exe \
+		wasm-merge.exe \
+		wasm-metadce.exe \
+		wasm-opt.exe \
+		wasm-reduce.exe \
+		wasm-shell.exe \
+		wasm-split.exe \
+		wasm2js.exe
+	do
+		[ -f "$binsrc/$tool" ] || fail "official Binaryen tool is missing: $tool"
+		cp -f "$binsrc/$tool" "$bindst/$tool"
+	done
+}
+
 write_launchers() {
 	msg "Writing fbc-js launcher scripts"
 
-	cat > "$DISTROOT/fbc-js.cmd" <<'EOF'
+cat > "$DISTROOT/fbc-js.cmd" <<'EOF'
 @echo off
 setlocal
 set "FBJS_ROOT=%~dp0"
 set "PATH=%FBJS_ROOT%toolchain\ucrt64\bin;%FBJS_ROOT%;%PATH%"
 set "PATH=%FBJS_ROOT%toolchain\ucrt64\lib\emscripten;%PATH%"
+if not defined EM_CONFIG set "EM_CONFIG=%FBJS_ROOT%toolchain\ucrt64\lib\emscripten\.emscripten"
+if not defined FBJS_CACHE_ROOT (
+	if defined LOCALAPPDATA (
+		set "FBJS_CACHE_ROOT=%LOCALAPPDATA%\FreeBASIC\fbc-js"
+	) else (
+		set "FBJS_CACHE_ROOT=%TEMP%\FreeBASIC\fbc-js"
+	)
+)
+if not defined EMCC_TEMP_DIR set "EMCC_TEMP_DIR=%FBJS_CACHE_ROOT%\emcc-temp"
+if not defined EM_CACHE set "EM_CACHE=%FBJS_CACHE_ROOT%\em-cache"
+if not defined BINARYEN_CORES set "BINARYEN_CORES=1"
+if not exist "%EMCC_TEMP_DIR%" mkdir "%EMCC_TEMP_DIR%" >nul 2>nul
+if not exist "%EM_CACHE%" mkdir "%EM_CACHE%" >nul 2>nul
 "%FBJS_ROOT%bin\fbc-js.exe" %*
 exit /b %ERRORLEVEL%
 EOF
@@ -499,8 +638,22 @@ EOF
 set "FBJS_ROOT=%~dp0"
 set "PATH=%FBJS_ROOT%toolchain\ucrt64\bin;%FBJS_ROOT%;%PATH%"
 set "PATH=%FBJS_ROOT%toolchain\ucrt64\lib\emscripten;%PATH%"
+if not defined EM_CONFIG set "EM_CONFIG=%FBJS_ROOT%toolchain\ucrt64\lib\emscripten\.emscripten"
+if not defined FBJS_CACHE_ROOT (
+	if defined LOCALAPPDATA (
+		set "FBJS_CACHE_ROOT=%LOCALAPPDATA%\FreeBASIC\fbc-js"
+	) else (
+		set "FBJS_CACHE_ROOT=%TEMP%\FreeBASIC\fbc-js"
+	)
+)
+if not defined EMCC_TEMP_DIR set "EMCC_TEMP_DIR=%FBJS_CACHE_ROOT%\emcc-temp"
+if not defined EM_CACHE set "EM_CACHE=%FBJS_CACHE_ROOT%\em-cache"
+if not defined BINARYEN_CORES set "BINARYEN_CORES=1"
+if not exist "%EMCC_TEMP_DIR%" mkdir "%EMCC_TEMP_DIR%" >nul 2>nul
+if not exist "%EM_CACHE%" mkdir "%EM_CACHE%" >nul 2>nul
 echo FreeBASIC JS environment ready.
 echo fbc-js: %FBJS_ROOT%bin\fbc-js.exe
+echo emcc temp: %EMCC_TEMP_DIR%
 cmd /k
 EOF
 
@@ -511,7 +664,13 @@ _fbjs_script=${BASH_SOURCE:-$0}
 _fbjs_root=$(CDPATH= cd -- "$(dirname "$_fbjs_script")" && pwd)
 PATH="${_fbjs_root}/toolchain/ucrt64/bin:${_fbjs_root}/bin:${_fbjs_root}:${PATH}"
 PATH="${_fbjs_root}/toolchain/ucrt64/lib/emscripten:${PATH}"
-export PATH
+: "${EM_CONFIG:=${_fbjs_root}/toolchain/ucrt64/lib/emscripten/.emscripten}"
+: "${FBJS_CACHE_ROOT:=${XDG_CACHE_HOME:-${TMPDIR:-/tmp}/freebasic-js}/fbc-js}"
+: "${EMCC_TEMP_DIR:=${FBJS_CACHE_ROOT}/emcc-temp}"
+: "${EM_CACHE:=${FBJS_CACHE_ROOT}/em-cache}"
+: "${BINARYEN_CORES:=1}"
+mkdir -p "$EMCC_TEMP_DIR" "$EM_CACHE" 2>/dev/null || true
+export PATH EM_CONFIG FBJS_CACHE_ROOT EMCC_TEMP_DIR EM_CACHE BINARYEN_CORES
 unset _fbjs_script _fbjs_root
 EOF
 
@@ -536,6 +695,18 @@ The toolchain directory contains the UCRT64 Emscripten environment used by
 fbc-js, including emcc, emar, Node.js, Python, Binaryen, Clang/LLVM, runtime
 DLLs, headers, libraries, and supporting data files installed by the MSYS2
 packages this build script uses.
+
+The Binaryen command-line tools and Node.js executable are overlaid from the
+official upstream Windows releases.  This keeps the standalone package on the
+same release levels while avoiding Windows hangs and crashes seen in the
+MSYS2-built tool executables.
+
+fbc-js.cmd creates a per-user Emscripten cache/temp area under:
+
+    %LOCALAPPDATA%\\FreeBASIC\\fbc-js
+
+This keeps generated object, cache, and temporary files out of the install
+directory, which may not be writable for non-admin users.
 
 If MSYS2 is present, the installer also writes:
 
@@ -569,6 +740,9 @@ assemble_distribution() {
 
 	copy_runtime_dlls "$DISTROOT/bin/fbc-js.exe" "$DISTROOT/bin"
 	copy_ucrt64_toolchain
+	overlay_official_binaryen
+	overlay_official_node
+	write_emscripten_config
 	write_launchers
 	write_distribution_notes
 }
@@ -772,6 +946,7 @@ validate_distribution() {
 	local validate_win
 	local package_path_win
 	local validate_cmd
+	local validate_ps1
 
 	msg "Validating packaged fbc-js"
 	rm -rf "$validate_dir"
@@ -785,19 +960,60 @@ EOF
 	validate_win="$(cygpath -aw "$validate_dir")"
 	package_path_win="$dist_win\\toolchain\\ucrt64\\lib\\emscripten;$dist_win\\toolchain\\ucrt64\\bin;$dist_win;%PATH%"
 	validate_cmd="$validate_dir/validate.cmd"
+	validate_ps1="$validate_dir/run-with-timeout.ps1"
 
 	cat > "$validate_cmd" <<EOF
 @echo off
 set "PATH=$package_path_win"
 if not exist "$validate_win\\emcc-temp" mkdir "$validate_win\\emcc-temp"
+if not exist "$validate_win\\em-cache" mkdir "$validate_win\\em-cache"
 set "EMCC_TEMP_DIR=$validate_win\\emcc-temp"
-call "$dist_win\\fbc-js.cmd" "$validate_win\\hello.bas" -x "$validate_win\\hello.js"
+set "EM_CACHE=$validate_win\\em-cache"
+set "BINARYEN_CORES=1"
+call "$dist_win\\fbc-js.cmd" "$validate_win\\hello.bas" -x "$validate_win\\hello.js" > "$validate_win\\compile.out" 2> "$validate_win\\compile.err"
 if errorlevel 1 exit /b %ERRORLEVEL%
 node "$validate_win\\hello.js" > "$validate_win\\output.txt" 2> "$validate_win\\output.err"
 exit /b %ERRORLEVEL%
 EOF
 
-	run cmd.exe //C "$(cygpath -aw "$validate_cmd")"
+	cat > "$validate_ps1" <<'EOF'
+param(
+	[string] $CommandPath,
+	[int] $TimeoutSeconds
+)
+
+$ErrorActionPreference = "Stop"
+
+function Stop-ProcessTree {
+	param([int] $ProcessId)
+
+	$children = Get-CimInstance Win32_Process -Filter "ParentProcessId = $ProcessId"
+	foreach ($child in $children) {
+		Stop-ProcessTree -ProcessId $child.ProcessId
+	}
+
+	Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+}
+
+$process = Start-Process `
+	-FilePath "cmd.exe" `
+	-ArgumentList @("/C", $CommandPath) `
+	-PassThru `
+	-WindowStyle Hidden
+
+if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+	Stop-ProcessTree -ProcessId $process.Id
+	Write-Error "fbc-js package validation timed out after $TimeoutSeconds seconds"
+	exit 124
+}
+
+exit $process.ExitCode
+EOF
+
+	run powershell.exe -NoProfile -ExecutionPolicy Bypass \
+		-File "$(cygpath -aw "$validate_ps1")" \
+		-CommandPath "$(cygpath -aw "$validate_cmd")" \
+		-TimeoutSeconds 180
 	[ -f "$validate_dir/hello.js" ] || fail "packaged fbc-js did not produce hello.js"
 	grep -q "freebasic-js package test OK" "$validate_dir/output.txt" || fail "generated JavaScript output was wrong"
 }

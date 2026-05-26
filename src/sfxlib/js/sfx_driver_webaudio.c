@@ -7,9 +7,70 @@
 
 #include "../fb_sfx.h"
 #include "../fb_sfx_driver.h"
+#include "../fb_sfx_internal.h"
 
 #include <stddef.h>
 #include <emscripten.h>
+
+static int g_webaudio_worker_running = 0;
+static int g_webaudio_worker_buffer_frames = FB_SFX_DEFAULT_BUFFER;
+
+static int webaudio_worker_frames(void)
+{
+    int frames;
+
+    frames = (g_webaudio_worker_buffer_frames > 0)
+        ? (g_webaudio_worker_buffer_frames / 4)
+        : (FB_SFX_DEFAULT_BUFFER / 4);
+
+    if (frames < 256)
+        frames = 256;
+    else if (frames > 2048)
+        frames = 2048;
+
+    return frames;
+}
+
+static void webaudio_worker_tick(void *unused)
+{
+    (void)unused;
+
+    if (!g_webaudio_worker_running)
+        return;
+
+    /*
+        WebAudio pulls from a JavaScript queue, but the common sfxlib mixer is
+        still C code.  Native backends keep that mixer moving from an audio
+        worker thread.  JavaScript is single-threaded here, so use an
+        Emscripten async callback to provide the same background pump for
+        ordinary BASIC programs that only call SOUND.
+    */
+
+    if (!fb_sfxForegroundFeedActive())
+        fb_sfxUpdate(webaudio_worker_frames());
+
+    if (g_webaudio_worker_running)
+        emscripten_async_call(webaudio_worker_tick, NULL, 5);
+}
+
+static void webaudio_worker_start(int buffer_frames)
+{
+    if (buffer_frames <= 0)
+        buffer_frames = FB_SFX_DEFAULT_BUFFER;
+
+    g_webaudio_worker_buffer_frames = buffer_frames;
+
+    if (g_webaudio_worker_running)
+        return;
+
+    g_webaudio_worker_running = 1;
+    emscripten_async_call(webaudio_worker_tick, NULL, 1);
+}
+
+static void webaudio_worker_stop(void)
+{
+    g_webaudio_worker_running = 0;
+}
 
 EM_JS(int, fb_sfx_js_webaudio_init, (int rate, int channels, int buffer_frames), {
     if (typeof window === 'undefined')
@@ -131,12 +192,20 @@ EM_JS(int, fb_sfx_js_webaudio_write, (const float *samples, int frames, int chan
 
 static int webaudio_driver_init(int rate, int channels, int buffer_frames, int flags)
 {
+    int result;
+
     (void)flags;
-    return fb_sfx_js_webaudio_init(rate, channels, buffer_frames);
+
+    result = fb_sfx_js_webaudio_init(rate, channels, buffer_frames);
+    if (result == 0)
+        webaudio_worker_start(buffer_frames);
+
+    return result;
 }
 
 static void webaudio_driver_exit(void)
 {
+    webaudio_worker_stop();
     fb_sfx_js_webaudio_exit();
 }
 

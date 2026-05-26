@@ -10,6 +10,7 @@
 #include <CoreGraphics/CGEvent.h>
 #include <CoreGraphics/CGGeometry.h>
 #include <CoreGraphics/CGImage.h>
+#include <stdint.h>
 #include <limits.h>
 #include <objc/message.h>
 #include <objc/runtime.h>
@@ -1553,6 +1554,29 @@ int fb_hDarwinScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_
 		*refresh = fb_hDarwinQueryRefreshRate();
 
 	return (fb_darwin.desktop_width > 0 && fb_darwin.desktop_height > 0) ? 1 : 0;
+}
+
+/*
+	On most platforms the runtime reports both a window handle and a display
+	backend handle for compatibility with ScreenControl GET_WINDOW_HANDLE.
+
+	The Darwin backend maps these to the Cocoa NSWindow object and the active
+	display identifier; both may be unavailable before SCREEN has been opened.
+*/
+ssize_t fb_hGetWindowHandle(void)
+{
+	if (!fb_darwin.window)
+		return 0;
+
+	return (ssize_t)(intptr_t)fb_darwin.window;
+}
+
+ssize_t fb_hGetDisplayHandle(void)
+{
+	if (!fb_darwin.window)
+		return 0;
+
+	return (ssize_t)(intptr_t)CGMainDisplayID();
 }
 
 #endif

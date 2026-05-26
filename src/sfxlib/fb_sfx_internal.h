@@ -128,7 +128,9 @@ int fb_sfxEnsureInit(void);
     defined(__OpenBSD__) || \
     defined(__DragonFly__) || \
     defined(__sun) || \
-    defined(__HAIKU__)
+    defined(__HAIKU__) || \
+    defined(HOST_XBOX) || \
+    defined(HOST_WII)
 #define FB_SFX_MT_ENABLED 1
 #else
 #define FB_SFX_MT_ENABLED 0
@@ -168,6 +170,8 @@ void fb_sfxDriverExitUnlocked(const FB_SFX_DRIVER *driver);
 */
 
 FB_SFXVOICE *fb_sfxVoiceAlloc(void);
+FB_SFXVOICE *fb_sfxVoiceAllocLocked(void);
+void fb_sfxVoiceActivateLocked(FB_SFXVOICE *voice);
 void fb_sfxVoiceFree(FB_SFXVOICE *voice);
 
 void fb_sfxVoiceStopChannel(int channel);

@@ -137,6 +137,7 @@ enum FBCTOOL
 	FBCTOOL_EMAR
 	FBCTOOL_EMLD
 	FBCTOOL_EMCC
+	FBCTOOL_ELF2DOL
 	FBCTOOL__COUNT
 end enum
 
@@ -179,7 +180,8 @@ static shared as FBCTOOLINFO fbctoolTB(0 to FBCTOOL__COUNT-1) = _
 	/' FBCTOOL_EMAS    '/ ( "emcc"   , "EMAS"   , FBCTOOLFLAG_DEFAULT  ), _
 	/' FBCTOOL_EMAR    '/ ( "emar"   , "EMAR"   , FBCTOOLFLAG_DEFAULT  ), _
 	/' FBCTOOL_EMLD    '/ ( "emcc"   , "EMLD"   , FBCTOOLFLAG_DEFAULT  ), _
-	/' FBCTOOL_EMCC    '/ ( "emcc"   , "EMCC"   , FBCTOOLFLAG_DEFAULT  )  _
+	/' FBCTOOL_EMCC    '/ ( "emcc"   , "EMCC"   , FBCTOOLFLAG_DEFAULT  ), _
+	/' FBCTOOL_ELF2DOL '/ ( "elf2dol", "ELF2DOL", FBCTOOLFLAG_DEFAULT  )  _
 }
 
 declare sub fbcFindBin _
@@ -255,6 +257,8 @@ private sub hSetOutName( )
 			fbc.outname += ".exe"
 		case FB_COMPTARGET_JS
 			fbc.outname += ".html"
+		case FB_COMPTARGET_WII
+			fbc.outname += ".dol"
 		end select
 	case FB_OUTTYPE_DYNAMICLIB
 		select case( fbGetOption( FB_COMPOPT_TARGET ) )
@@ -827,6 +831,7 @@ end function
 private function hLinkFiles( ) as integer
 	dim as string ldcline, dllname, deffile
 	dim as string xbox_xbe_outname
+	dim as string wii_dol_outname
 
 	function = FALSE
 
@@ -836,6 +841,13 @@ private function hLinkFiles( ) as integer
 		if( lcase( right( fbc.outname, 4 ) ) = ".xbe" ) then
 			xbox_xbe_outname = fbc.outname
 			fbc.outname = hStripExt( fbc.outname ) + ".exe"
+		end if
+	end if
+
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII ) then
+		if( lcase( right( fbc.outname, 4 ) ) = ".dol" ) then
+			wii_dol_outname = fbc.outname
+			fbc.outname = hStripExt( fbc.outname ) + ".elf"
 		end if
 	end if
 
@@ -911,6 +923,8 @@ private function hLinkFiles( ) as integer
 	case FB_COMPTARGET_DARWIN
 		'' Let the Darwin compiler driver choose the native architecture and
 		'' startup/runtime defaults instead of pushing raw ld -arch flags.
+	case FB_COMPTARGET_WII
+		'' Let the devkitPPC GCC driver choose newlib/libgcc startup support.
 	case FB_COMPTARGET_NETBSD
 		ldcline += " -rpath /usr/X11R7/lib/ "
 		ldcline += " -rpath /usr/pkg/lib/ "
@@ -1173,16 +1187,27 @@ private function hLinkFiles( ) as integer
 		ldcline += " -include:_automount_d_drive"
 
 	case FB_COMPTARGET_JS
-		ldcline += " -O" + str( fbGetOption( FB_COMPOPT_OPTIMIZELEVEL ) )
+		dim as integer js_link_optimize = fbGetOption( FB_COMPOPT_OPTIMIZELEVEL )
+		if( js_link_optimize < 2 ) then
+			''
+			'' Asyncify keeps SLEEP and old input loops cooperative in the
+			'' browser, but it also rewrites reachable control flow.  At -O0
+			'' large QB-era programs can exceed browser wasm function limits
+			'' after that rewrite.  Keep the final Emscripten link at O2 or
+			'' better even when the BASIC compiler itself is not optimizing.
+			''
+			js_link_optimize = 2
+		end if
+		ldcline += " -O" + str( js_link_optimize )
 
 		static as zstring*32 emscripten_options(...) = _
 		{ _
-			"ASYNCIFY=1", _
-			"ASYNCIFY_STACK_SIZE=65536", _
 			"CASE_INSENSITIVE_FS=1", _
 			"TOTAL_MEMORY=67108864", _
 			"ALLOW_MEMORY_GROWTH=1", _
-			"RETAIN_COMPILER_SETTINGS=1" _
+			"RETAIN_COMPILER_SETTINGS=1", _
+			"ASYNCIFY=1", _
+			"ASYNCIFY_STACK_SIZE=65536" _
 		}
 			'"WARN_UNALIGNED=1", _
 
@@ -1224,6 +1249,7 @@ private function hLinkFiles( ) as integer
 			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_SOLARIS) and _
 			( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) and _
 			( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX ) and _
+			( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_WII ) and _
 			(not fbcIsUsingGoldLinker( )) ) then
 			ldcline += " -T """ + fbc.libpath + (FB_HOST_PATHDIV + "fbextra.x""")
 		end if
@@ -1284,6 +1310,8 @@ private function hLinkFiles( ) as integer
 	if( len( fbc.mapfile ) > 0) then
 		if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
 			ldcline += " -map:" + fbc.mapfile
+		elseif( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII ) then
+			ldcline += " -Wl,-Map," + fbc.mapfile
 		else
 			ldcline += " -Map " + fbc.mapfile
 		end if
@@ -1471,7 +1499,11 @@ private function hLinkFiles( ) as integer
 	if ( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN ) then
 		if( (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
 		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
-			ldcline += " ""-("""
+			if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII ) then
+				ldcline += " -Wl,--start-group"
+			else
+				ldcline += " ""-("""
+			end if
 		end if
 	end if
 
@@ -1519,7 +1551,11 @@ private function hLinkFiles( ) as integer
 		if( (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
 		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
 			'' End of lib group
-			ldcline += " ""-)"""
+			if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII ) then
+				ldcline += " -Wl,--end-group"
+			else
+				ldcline += " ""-)"""
+			end if
 		else
 			if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS ) then
 				ldcline += " -lfb"
@@ -1721,6 +1757,18 @@ private function hLinkFiles( ) as integer
 		'' remove .exe
 		kill fbc.outname
 
+	case FB_COMPTARGET_WII
+		'' Turn the linked ELF into a bootable DOL image.
+		if( len( wii_dol_outname ) = 0 ) then
+			wii_dol_outname = hStripExt( fbc.outname ) + ".dol"
+		end if
+
+		if( fbcRunBin( "making DOL", FBCTOOL_ELF2DOL, QUOTE + fbc.outname + QUOTE + " " + QUOTE + wii_dol_outname + QUOTE ) = FALSE ) then
+			exit function
+		end if
+
+		kill fbc.outname
+
 	end select
 
 	function = TRUE
@@ -1896,7 +1944,8 @@ dim shared as FBGNUOSINFO gnuosmap(0 to ...) => _
 	(@"solaris"    , FB_COMPTARGET_SOLARIS  ), _
 	(@"netbsd"     , FB_COMPTARGET_NETBSD   ), _
 	(@"openbsd"    , FB_COMPTARGET_OPENBSD  ), _
-	(@"xbox"       , FB_COMPTARGET_XBOX     )  _
+	(@"xbox"       , FB_COMPTARGET_XBOX     ), _
+	(@"wii"        , FB_COMPTARGET_WII      )  _
 }
 
 '' Architectures recognized when parsing GNU triplets (-target option)
@@ -2008,7 +2057,8 @@ dim shared as FBOSARCHINFO fbosarchmap(0 to ...) => _
 	(@"haiku"  , FB_COMPTARGET_HAIKU  , FB_DEFAULT_CPUTYPE       ), _
 	(@"android", FB_COMPTARGET_ANDROID, FB_CPUTYPE_ARMV7A        ), _
 	(@"netbsd" , FB_COMPTARGET_NETBSD , FB_DEFAULT_CPUTYPE       ), _
-	(@"openbsd", FB_COMPTARGET_OPENBSD, FB_DEFAULT_CPUTYPE       )  _
+	(@"openbsd", FB_COMPTARGET_OPENBSD, FB_DEFAULT_CPUTYPE       ), _
+	(@"wii"    , FB_COMPTARGET_WII    , FB_DEFAULT_CPUTYPE_PPC   )  _
 }
 
 ''
@@ -3274,6 +3324,15 @@ private sub hCheckArgs()
 		fbGetOption( FB_COMPOPT_MULTITHREADED ) ) then
 		errReportEx( FB_ERRMSG_INVALIDCMDOPTION, "-mt", -1 )
 		fbcEnd( 1 )
+	end if
+
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
+		'' The nxdk Xbox package uses worker-backed graphics and sound
+		'' services.  Prefer the thread-safe runtime by default so Xbox
+		'' programs do not need to pass -mt just to use the normal package
+		'' backends safely.
+		fbSetOption( FB_COMPOPT_MULTITHREADED, TRUE )
+		fbc.objinf.mt = TRUE
 	end if
 
 	'' 4.5. Enable -pic automatically when building a Unix shared library,

@@ -46,6 +46,7 @@ void fb_hAndroidConsoleRender(void) FB_ANDROID_WEAK;
 void fb_hAndroidUpdate(void) FB_ANDROID_WEAK;
 void fb_hAndroidGfxSetLifecycle(int started, int resumed, int focused) FB_ANDROID_WEAK;
 void fb_hAndroidSfxSetLifecycle(int started, int resumed) FB_ANDROID_WEAK;
+int fb_sfxEnsureInit(void) FB_ANDROID_WEAK;
 
 /*
  * FreeBASIC's generated entry calls fb_End(), which calls exit(). In an
@@ -351,6 +352,28 @@ static void *fb_android_program_thread(void *arg)
 	fb_android_prepare_files_dir(app);
 	if (fb_AllocateMainFBThread)
 		fb_AllocateMainFBThread();
+
+	/*
+		Android audio warmup
+
+		Traditional BASIC sound commands are often used as tiny gameplay
+		effects. If the first SOUND or BEEP has to create the Android audio
+		stream, the program appears to freeze at exactly the moment the user
+		presses a button or fires a shot.
+
+		When sfxlib is linked, initialize it before entering the BASIC main
+		program. This keeps audio device startup out of menu/gameplay input
+		paths while preserving normal no-sfx builds through the weak symbol.
+	*/
+	if (fb_sfxEnsureInit)
+	{
+		fb_android_log("FreeBASIC Android sfx warmup starting");
+		if (fb_sfxEnsureInit() == 0)
+			fb_android_log("FreeBASIC Android sfx warmup complete");
+		else
+			fb_android_log("FreeBASIC Android sfx warmup failed");
+	}
+
 	fb_android_exit_jump = &exit_jump;
 	fb_android_exit_status = 0;
 	if (fb_android_program_main)

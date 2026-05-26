@@ -108,15 +108,10 @@ void fb_sfxVoiceInit(FB_SFXVOICE *v)
         NULL if no voices are available
 */
 
-FB_SFXVOICE *fb_sfxVoiceAlloc(void)
+static FB_SFXVOICE *fb_sfxVoiceAllocSlotLocked(void)
 {
     int i;
     FB_SFXVOICE *result = NULL;
-
-    if (!fb_sfxEnsureInitialized())
-        return NULL;
-
-    fb_sfxRuntimeLock();
 
     for (i = 0; i < FB_SFX_MAX_VOICES; i++)
     {
@@ -125,8 +120,6 @@ FB_SFXVOICE *fb_sfxVoiceAlloc(void)
         if (!v->active)
         {
             fb_sfxVoiceInit(v);
-
-            v->active = 1;
 
             SFX_DEBUG("sfx_voice: allocated voice %d", i);
 
@@ -137,6 +130,35 @@ FB_SFXVOICE *fb_sfxVoiceAlloc(void)
 
     if (!result)
         SFX_DEBUG("sfx_voice: no free voices available");
+
+    return result;
+}
+
+FB_SFXVOICE *fb_sfxVoiceAllocLocked(void)
+{
+    if (!__fb_sfx || !__fb_sfx->initialized)
+        return NULL;
+
+    return fb_sfxVoiceAllocSlotLocked();
+}
+
+void fb_sfxVoiceActivateLocked(FB_SFXVOICE *voice)
+{
+    if (voice)
+        voice->active = 1;
+}
+
+FB_SFXVOICE *fb_sfxVoiceAlloc(void)
+{
+    FB_SFXVOICE *result;
+
+    if (!fb_sfxEnsureInitialized())
+        return NULL;
+
+    fb_sfxRuntimeLock();
+
+    result = fb_sfxVoiceAllocSlotLocked();
+    fb_sfxVoiceActivateLocked(result);
 
     fb_sfxRuntimeUnlock();
     return result;

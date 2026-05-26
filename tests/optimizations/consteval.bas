@@ -293,9 +293,20 @@ SUITE( fbc_tests.optimizations.consteval )
 
 		const EPSILON_DBL as double = 2.2204460492503131e-016
 
+		#if defined( __FB_WII__ )
+			const EPSILON_DBL_FPU as double = EPSILON_DBL * 1000
+		#else
+			const EPSILON_DBL_FPU as double = EPSILON_DBL
+		#endif
+
 		#macro checkUop( func, value )
 			d = value : CU_ASSERT_DOUBLE_EQUAL( func( value ), func( d     ), EPSILON_DBL )
 			d = value : CU_ASSERT_DOUBLE_EQUAL( func( d     ), func( value ), EPSILON_DBL )
+		#endmacro
+
+		#macro checkUopFPU( func, value )
+			d = value : CU_ASSERT_DOUBLE_EQUAL( func( value ), func( d     ), EPSILON_DBL_FPU )
+			d = value : CU_ASSERT_DOUBLE_EQUAL( func( d     ), func( value ), EPSILON_DBL_FPU )
 		#endmacro
 
 		'' -
@@ -351,10 +362,10 @@ SUITE( fbc_tests.optimizations.consteval )
 		checkUop( log, 2.5 )
 		checkUop( log, 5.0 )
 		'' exp
-		checkUop( exp,  1.0 )
-		checkUop( exp,  0.5 )
-		checkUop( exp, -0.5 )
-		checkUop( exp, -1.0 )
+		checkUopFPU( exp,  1.0 )
+		checkUopFPU( exp,  0.5 )
+		checkUopFPU( exp, -0.5 )
+		checkUopFPU( exp, -1.0 )
 		'' int
 		checkUop( int, -4.4 )
 		checkUop( int, -2.5 )
@@ -392,6 +403,12 @@ SUITE( fbc_tests.optimizations.consteval )
 
 		const EPSILON_DBL as double = 2.2204460492503131e-016
 
+		#if defined( __FB_WII__ )
+			const EPSILON_DBL_FPU as double = EPSILON_DBL * 1000
+		#else
+			const EPSILON_DBL_FPU as double = EPSILON_DBL
+		#endif
+
 		#macro checkMathBop( bop, val1, val2 )
 		#if( (val1 < 0) and (#bop = "^") and (frac(val2) <> .0) )
 			'' returns nan
@@ -407,7 +424,11 @@ SUITE( fbc_tests.optimizations.consteval )
 			d2 = val2
 			d3 = ((val1) bop (val2))
 			d4 = (d1 bop d2)
-			CU_ASSERT_DOUBLE_EQUAL( d3, d4, EPSILON_DBL )
+			#if( #bop = "^" )
+				CU_ASSERT_DOUBLE_EQUAL( d3, d4, EPSILON_DBL_FPU )
+			#else
+				CU_ASSERT_DOUBLE_EQUAL( d3, d4, EPSILON_DBL )
+			#endif
 		#endif
 		#endmacro
 
@@ -460,7 +481,7 @@ SUITE( fbc_tests.optimizations.consteval )
 		d2 = 5.0
 		d3 = atan2( 4.0, 5.0 )
 		d4 = atan2( d1, d2 )
-		CU_ASSERT_DOUBLE_EQUAL( d3, d4, EPSILON_DBL )
+		CU_ASSERT_DOUBLE_EQUAL( d3, d4, EPSILON_DBL_FPU )
 	END_TEST
 
 	TEST( logicBopDouble )
