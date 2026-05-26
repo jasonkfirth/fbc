@@ -64,12 +64,40 @@ run_root() {
     fi
 }
 
+activate_homebrew() {
+    local brew_cmd
+
+    if command -v brew >/dev/null 2>&1; then
+        return 0
+    fi
+
+    for brew_cmd in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        if [ -x "$brew_cmd" ]; then
+            eval "$("$brew_cmd" shellenv)"
+            command -v brew >/dev/null 2>&1 && return 0
+        fi
+    done
+
+    return 1
+}
+
+version_sort() {
+    if printf '2\n10\n' | sort -V >/dev/null 2>&1; then
+        sort -V
+    elif command -v gsort >/dev/null 2>&1 && printf '2\n10\n' | gsort -V >/dev/null 2>&1; then
+        gsort -V
+    else
+        sort
+    fi
+}
+
 usage() {
     cat <<EOF
 Usage: ./build_scripts/macos-build-freebasic.sh [options]
 
 Options:
-  --arch <arm64|x86_64|native>  Build architecture (default: native host arch)
+  --arch <arm64|aarch64|x86_64|native>
+                                Build architecture (default: native host arch)
   --skip-deps                   Skip Command Line Tools/Homebrew dependency installation
   --no-build                    Skip compilation and reuse staged artifacts
   --no-package                  Skip package creation
@@ -140,7 +168,8 @@ if [ "$TARGET_ARCH" = "native" ]; then
 fi
 
 case "$TARGET_ARCH" in
-    arm64)
+    arm64|aarch64)
+        TARGET_ARCH="arm64"
         FBC_TARGET="darwin-aarch64"
         TARGET_TRIPLET="aarch64-apple-darwin"
         CLANG_ARCH="arm64"
@@ -272,11 +301,11 @@ resolve_gcc_toolchain() {
     gcc_bin=""
     gxx_bin=""
 
-    if command -v brew >/dev/null 2>&1; then
+    if activate_homebrew; then
         brew_bin="$(brew --prefix 2>/dev/null || true)/bin"
         if [ -d "$brew_bin" ]; then
-            gcc_bin="$(find "$brew_bin" -maxdepth 1 \( -type f -o -type l \) -name 'gcc-*' | grep -E '/gcc-[0-9]+$' | sort -V | tail -n1 || true)"
-            gxx_bin="$(find "$brew_bin" -maxdepth 1 \( -type f -o -type l \) -name 'g++-*' | grep -E '/g[+][+]-[0-9]+$' | sort -V | tail -n1 || true)"
+            gcc_bin="$(find "$brew_bin" -maxdepth 1 \( -type f -o -type l \) -name 'gcc-*' | grep -E '/gcc-[0-9]+$' | version_sort | tail -n1 || true)"
+            gxx_bin="$(find "$brew_bin" -maxdepth 1 \( -type f -o -type l \) -name 'g++-*' | grep -E '/g[+][+]-[0-9]+$' | version_sort | tail -n1 || true)"
         fi
     fi
 
@@ -336,7 +365,7 @@ refresh_make_vars() {
     LIBFFI_PREFIX=""
     NCURSES_PREFIX=""
 
-    if command -v brew >/dev/null 2>&1; then
+    if activate_homebrew; then
         BREW_PREFIX="$(brew --prefix 2>/dev/null || true)"
         LIBFFI_PREFIX="$(brew --prefix libffi 2>/dev/null || true)"
         NCURSES_PREFIX="$(brew --prefix ncurses 2>/dev/null || true)"
@@ -385,7 +414,7 @@ refresh_make_vars
 ##############################################################################
 
 ensure_homebrew() {
-    if command -v brew >/dev/null 2>&1; then
+    if activate_homebrew; then
         return 0
     fi
 
@@ -419,6 +448,7 @@ install_deps() {
         MAKE_CMD="gmake"
     fi
 
+    activate_homebrew || die "Homebrew was installed but is not available on PATH"
     resolve_gcc_toolchain || die "Homebrew GCC toolchain was not installed correctly"
     refresh_make_vars
 }
@@ -515,6 +545,7 @@ bundle_toolchain_into_stage() {
     sdk_root="$(find_macos_sdkroot)" || die "macOS SDK not found through xcrun"
 
     msg "bundling macOS toolchain into staged package"
+    [ -x "${gcc_root}/bin/$(basename "$TOOL_CC")" ] || die "packaged GCC driver missing: ${gcc_root}/bin/$(basename "$TOOL_CC")"
     run rm -rf "$bundle_root"
     copy_tree_preserve "$gcc_root" "${bundle_root}/gcc"
     copy_tree_preserve "$libffi_root" "${bundle_root}/libffi"
@@ -687,8 +718,13 @@ if [ "$DO_PACKAGE" -eq 1 ]; then
     INSTALL_SH="$OUTBASE/install.sh"
 
     if command -v pkgbuild >/dev/null 2>&1; then
+        msg "creating tar.xz package"
         run rm -f "$TAR_FILE"
+        run tar -C "$STAGE" -cJf "$TAR_FILE" .
+        [ -f "$TAR_FILE" ] || die "tar package was not created: $TAR_FILE"
+
         msg "creating macOS installer package"
+        run rm -f "$PKG_FILE"
         run rm -rf "$PKGROOT"
         run mkdir -p "$PKGROOT"
         run cp -R "$STAGE"/. "$PKGROOT"/
@@ -700,6 +736,7 @@ if [ "$DO_PACKAGE" -eq 1 ]; then
             --version "$VERSION_FULL" \
             --install-location "/" \
             "$PKG_FILE"
+        [ -f "$PKG_FILE" ] || die "macOS installer package was not created: $PKG_FILE"
 
         msg "writing installer helper script"
         cat > "$INSTALL_SH" <<EOF
@@ -720,6 +757,7 @@ EOF
     else
         msg "creating tar.xz package"
         run tar -C "$STAGE" -cJf "$TAR_FILE" .
+        [ -f "$TAR_FILE" ] || die "tar package was not created: $TAR_FILE"
         echo "WARNING: pkgbuild not found; skipped .pkg creation"
     fi
 
