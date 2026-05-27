@@ -38,6 +38,37 @@ run() { echo "==> $*"; "$@"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
 msg() { echo ""; echo "==> $1"; }
 
+SUDO_EXPLANATION_SHOWN=0
+
+print_command_quoted() {
+    local arg
+
+    for arg in "$@"; do
+        printf ' %q' "$arg"
+    done
+    printf '\n'
+}
+
+explain_sudo_before_first_use() {
+    [ "$SUDO_EXPLANATION_SHOWN" -eq 0 ] || return 0
+    SUDO_EXPLANATION_SHOWN=1
+
+    echo ""
+    echo "==> Administrator privileges required"
+    echo "This script is about to run the following command with sudo:"
+    printf '    sudo'
+    print_command_quoted "$@"
+    echo ""
+    echo "The macOS build script uses sudo only for system setup steps that"
+    echo "macOS itself requires to be administrator-controlled, such as:"
+    echo "  - installing Apple Command Line Tools with softwareupdate"
+    echo "  - switching xcode-select to /Library/Developer/CommandLineTools"
+    echo ""
+    echo "The FreeBASIC build, staging tree, tarball creation, and pkgbuild"
+    echo "packaging steps run as your normal user."
+    echo ""
+}
+
 copy_tree_preserve() {
     local src="$1"
     local dst="$2"
@@ -58,6 +89,7 @@ run_root() {
     if [ "$(id -u)" -eq 0 ]; then
         run "$@"
     elif command -v sudo >/dev/null 2>&1; then
+        explain_sudo_before_first_use "$@"
         run sudo "$@"
     else
         die "this step requires administrator privileges; rerun as root or install sudo"
@@ -729,13 +761,15 @@ if [ "$DO_PACKAGE" -eq 1 ]; then
         run mkdir -p "$PKGROOT"
         run cp -R "$STAGE"/. "$PKGROOT"/
         create_pkg_scripts
-        run pkgbuild \
-            --root "$PKGROOT" \
-            --scripts "$PKGSCRIPTS" \
-            --identifier "org.freebasic.compiler" \
-            --version "$VERSION_FULL" \
-            --install-location "/" \
+        PKGBUILD_ARGS=(
+            --root "$PKGROOT"
+            --scripts "$PKGSCRIPTS"
+            --identifier "org.freebasic.compiler"
+            --version "$VERSION_FULL"
+            --install-location "/"
             "$PKG_FILE"
+        )
+        run pkgbuild "${PKGBUILD_ARGS[@]}"
         [ -f "$PKG_FILE" ] || die "macOS installer package was not created: $PKG_FILE"
 
         msg "writing installer helper script"
@@ -750,6 +784,14 @@ PKG_FILE="\$SCRIPT_DIR/${PKG_BASENAME}.pkg"
     echo "ERROR: package not found: \$PKG_FILE" >&2
     exit 1
 }
+
+echo "This helper is about to run the following command with sudo:"
+echo "    sudo installer -pkg \"\$PKG_FILE\" -target /"
+echo ""
+echo "That installs the FreeBASIC macOS package into the package's"
+echo "declared system install location. It does not rebuild FreeBASIC"
+echo "or modify the package artifact."
+echo ""
 
 exec sudo installer -pkg "\$PKG_FILE" -target /
 EOF
