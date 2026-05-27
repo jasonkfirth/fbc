@@ -101,9 +101,7 @@ ifeq ($(TARGET_OS),win32)
 endif
 
 FBC_CFLAGS := -c -w 3 -i $(FBCU_INC) -m $(MAINBAS)
-ifeq ($(TARGET_OS),dos)
-	FBC_CFLAGS += -i $(abspath ../inc)
-endif
+FBC_CFLAGS += -i $(abspath ../inc)
 ifneq ($(TARGET_OS),dos)
 	FBC_CFLAGS += -Wc -Wno-tautological-compare
 endif

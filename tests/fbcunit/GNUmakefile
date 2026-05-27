@@ -65,11 +65,7 @@ ifneq ($(TARGET),dos)
 FBCFLAGS += -mt
 endif
 FBCFLAGS += -g
-ifeq ($(TARGET),dos)
 FBCFLAGS += -i ../../inc -i inc
-else
-FBCFLAGS += -i inc
-endif
 FBCFLAGS += -i src
 
 .SUFFIXES: .bas

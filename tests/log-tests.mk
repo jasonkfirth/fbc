@@ -171,9 +171,7 @@ $(OBJLIST_COMPILE_AND_RUN_FAIL) \
 ABORT_CMD := true
 
 FBC_CFLAGS := -w 3
-ifeq ($(TARGET_OS),dos)
-	FBC_CFLAGS += -i $(abspath ../inc)
-endif
+FBC_CFLAGS += -i $(abspath ../inc)
 ifneq ($(TARGET_OS),dos)
 	FBC_CFLAGS += -Wc -Wno-tautological-compare
 endif

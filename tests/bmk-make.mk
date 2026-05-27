@@ -24,6 +24,12 @@ include common.mk
 ECHO := echo
 
 CC ?= gcc
+TESTS_BMK_CC := $(CC)
+ifneq ($(strip $(TESTS_FBC_ENV_EXTRA)),)
+TESTS_BMK_CC := env $(TESTS_FBC_ENV_EXTRA) $(TESTS_BMK_CC)
+endif
+CC := $(TESTS_BMK_CC)
+
 ifndef FBC
 FBC := $(TESTS_DEFAULT_FBC)
 endif
