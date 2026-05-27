@@ -7,6 +7,8 @@
 extern const unsigned char __fb_utf8_trailingTb[256];
 extern const UTF_32 __fb_utf8_offsetsTb[6];
 
+#define FB_UTF8_MAX_TRAILING_BYTES 5
+
 /*::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*
  * to char                                                                              *
  *::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
@@ -15,7 +17,8 @@ static ssize_t hReadUTF8ToChar( FILE *fp, char *dst, ssize_t max_chars )
 {
 	UTF_32 wc;
 	unsigned char c[7], *p;
-	ssize_t chars, extbytes;
+	ssize_t chars;
+	unsigned int extbytes;
 
 	chars = max_chars;
     while( chars > 0 )
@@ -24,6 +27,12 @@ static ssize_t hReadUTF8ToChar( FILE *fp, char *dst, ssize_t max_chars )
 			break;
 
 		extbytes = __fb_utf8_trailingTb[c[0]];
+
+		if( extbytes > FB_UTF8_MAX_TRAILING_BYTES ) {
+			*dst++ = '?';
+			--chars;
+			continue;
+		}
 
 		if( extbytes > 0 )
 			if( fread( &c[1], extbytes, 1, fp ) != 1 )
@@ -149,7 +158,8 @@ static ssize_t hUTF8ToUTF16( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 {
 	UTF_32 wc;
 	unsigned char c[7], *p;
-	ssize_t chars, extbytes;
+	ssize_t chars;
+	unsigned int extbytes;
 
 	chars = max_chars;
     while( chars > 0 )
@@ -158,6 +168,12 @@ static ssize_t hUTF8ToUTF16( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 			break;
 
 		extbytes = __fb_utf8_trailingTb[c[0]];
+
+		if( extbytes > FB_UTF8_MAX_TRAILING_BYTES ) {
+			*dst++ = '?';
+			--chars;
+			continue;
+		}
 
 		if( extbytes > 0 )
 			if( fread( &c[1], extbytes, 1, fp ) != 1 )
@@ -218,7 +234,8 @@ static ssize_t hUTF8ToUTF32( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 {
 	UTF_32 wc;
 	unsigned char c[7], *p;
-	ssize_t chars, extbytes;
+	ssize_t chars;
+	unsigned int extbytes;
 
 	chars = max_chars;
     while( chars > 0 )
@@ -227,6 +244,12 @@ static ssize_t hUTF8ToUTF32( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 			break;
 
 		extbytes = __fb_utf8_trailingTb[c[0]];
+
+		if( extbytes > FB_UTF8_MAX_TRAILING_BYTES ) {
+			*dst++ = '?';
+			--chars;
+			continue;
+		}
 
 		if( extbytes > 0 )
 			if( fread( &c[1], extbytes, 1, fp ) != 1 )

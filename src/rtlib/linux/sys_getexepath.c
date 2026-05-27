@@ -7,11 +7,16 @@ char *fb_hGetExePath( char *dst, ssize_t maxlen )
 {
 	char *p;
 	struct stat finfo;
-	ssize_t len;
 
-	if ((stat("/proc/self/exe", &finfo) == 0) && ((len = readlink("/proc/self/exe", dst, maxlen - 1)) > -1)) {
+	if( maxlen <= 0 )
+		return NULL;
+
+	memset( dst, 0, (size_t)maxlen );
+	if( maxlen == 1 )
+		return NULL;
+
+	if ((stat("/proc/self/exe", &finfo) == 0) && (readlink("/proc/self/exe", dst, maxlen - 1) > -1)) {
 		/* Linux-like proc fs is available */
-		dst[len] = '\0';
 		p = strrchr(dst, '/');
 		if (p == dst) /* keep the "/" rather than returning "" */
 			*(p + 1) = '\0';

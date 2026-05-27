@@ -29,6 +29,9 @@ typedef BOOL (WINAPI *FLASHWINDOWEX)(PFB_FLASHWINFO pwfi);
 typedef BOOL (WINAPI *_TRACKMOUSEEVENT)(TRACKMOUSEEVENT *);
 typedef BOOL (WINAPI *GETMONITORINFO)(HMONITOR hMonitor, LPMONITORINFO lpmi);
 typedef LONG (WINAPI *CHANGEDISPLAYSETTINGSEX)(LPCTSTR lpszDeviceName, LPDEVMODE lpDevMode, HWND hwnd, DWORD dwflags, LPVOID lParam);
+typedef BOOL (WINAPI *REGISTERTOUCHWINDOW)(HWND hwnd, ULONG flags);
+typedef BOOL (WINAPI *GETTOUCHINPUTINFO)(HANDLE hTouchInput, UINT cInputs, void *pInputs, int cbSize);
+typedef BOOL (WINAPI *CLOSETOUCHINPUTHANDLE)(HANDLE hTouchInput);
 
 typedef struct {
 	int version;
@@ -61,6 +64,9 @@ typedef struct {
 	_TRACKMOUSEEVENT TrackMouseEvent;
 	GETMONITORINFO GetMonitorInfo;
 	CHANGEDISPLAYSETTINGSEX ChangeDisplaySettingsEx;
+	REGISTERTOUCHWINDOW RegisterTouchWindow;
+	GETTOUCHINPUTINFO GetTouchInputInfo;
+	CLOSETOUCHINPUTHANDLE CloseTouchInputHandle;
 } WIN32DRIVER;
 
 extern WIN32DRIVER fb_win32;
@@ -81,6 +87,8 @@ extern void fb_hWin32Unlock(void);
 extern void fb_hWin32SetPalette(int index, int r, int g, int b);
 extern void fb_hWin32WaitVSync(void);
 extern int fb_hWin32GetMouse(int *x, int *y, int *z, int *buttons, int *clip);
+extern int fb_hWin32GetTouchCount(void);
+extern int fb_hWin32GetTouch(int index, int *x, int *y, int *id);
 extern void fb_hWin32SetMouse(int x, int y, int cursor, int clip);
 extern void fb_hWin32SetWindowTitle(char *title);
 extern int fb_hWin32SetWindowPos(int x, int y);

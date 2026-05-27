@@ -20,14 +20,18 @@
 #if !defined(fmtssizet)
 	#if defined(HOST_CYGWIN)
 		#define fmtssizet "%18zd"
+		#define fmtssizetarg(value) ((ssize_t)(value))
 	#elif defined(HOST_WIN32)
 		#if defined(_UCRT) || __USE_MINGW_ANSI_STDIO
 			#define fmtssizet "%18zd"
+			#define fmtssizetarg(value) ((ssize_t)(value))
 		#else
 			#define fmtssizet "%18Id"
+			#define fmtssizetarg(value) ((ptrdiff_t)(value))
 		#endif
 	#else
 		#define fmtssizet "%18zd"
+		#define fmtssizetarg(value) ((ssize_t)(value))
 	#endif
 #endif
 
@@ -284,9 +288,9 @@ static void hProfilerReport (
 
 		fprintf( f, "        %s\n", rec->proc_name );
 		fprintf( f, "                " fmtssizet " " fmtssizet " " fmtssizet "\n",
-			rec->grand_total,
-			rec->internal_total,
-			rec->call_count
+			fmtssizetarg(rec->grand_total),
+			fmtssizetarg(rec->internal_total),
+			fmtssizetarg(rec->call_count)
 		);
 	}
 }

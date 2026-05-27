@@ -4,6 +4,7 @@ Version 1.20.1
 - rtlib/Android: return TIMER from CLOCK_MONOTONIC relative to runtime startup instead of wall-clock epoch time, preserving frame-scale timing precision when programs store TIMER values in SINGLE variables
 - sfxlib/Android: warm up the selected sound backend during NativeActivity startup, prefer the OpenSL ES backend before AAudio for current packaged builds, and keep foreground audio writes non-blocking so SOUND/BEEP-heavy programs do not stall the main loop when Android audio buffers are full or paused
 - fbc-android: infer landscape Activity orientation from common SCREEN and SCREENRES source usage, reducing the need for Android-specific source defines in ordinary graphics programs and avoiding surface churn during launch/resume
+- fbc-android: discover Debian/Ubuntu dalvik-exchange dx.jar installations when no d8/dx executable is present, and include dalvik-exchange in Android package dependencies so APK builds have a dexer out of the box
 - rtlib/gfxlib2 JavaScript: map browser touch events into the normal FreeBASIC GetMouse path so touch screens can drive mouse-style controls without JavaScript-specific application code
 - rtlib/JavaScript: return TIMER from Emscripten's monotonic runtime clock instead of wall-clock epoch time, preserving sub-frame timing precision when programs store TIMER values in SINGLE variables
 - rtlib/JavaScript: route SLEEP through Emscripten's async sleep path and keep SLEEP 0 as a cooperative event-pump point so browser-hosted programs can yield without turning tight polling loops into busy-waits
@@ -124,6 +125,7 @@ Version 1.20.1
 - tests: refreshed warning-test expectations to match the compiler's corrected "Ambiguous" diagnostic spelling
 
 [added]
+- gfxlib2: added GetTouchCount(), GetTouch(), and GetTouchHit() commands for logical-coordinate touch polling, with rectangular/circular hit testing, mouse-button fallback on drivers without native touch state, and native active-contact support on Android, JavaScript, and Windows
 - Nintendo Wii homebrew target support, including fbc-wii, powerpc-eabi/devkitPPC target selection, libogc headers/runtime libraries, DOL output generation, Wii CRT binding shims, and package-local compiler driver tooling
 - Wii gfxlib2 backend with legacy SCREEN mode coverage, truecolor framebuffer presentation, SCREENSET/SCREENCOPY support, dirty presentation, Wiimote IR mouse support, and normal FreeBASIC graphics input integration
 - Wii sfxlib backend using libogc ASND output, with blocking and non-blocking command coverage through the shared sfxlib mixer

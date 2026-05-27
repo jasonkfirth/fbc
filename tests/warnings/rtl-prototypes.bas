@@ -1105,6 +1105,30 @@
 		chk = procptr( getxpad )
 	end scope
 
+	ID( function gettouchcount alias "fb_GfxGetTouchCount" )
+	scope
+		dim chk as function fbcall ( ) as integer
+		chk = procptr( gettouchcount )
+	end scope
+
+	ID( function gettouch alias "fb_GfxGetTouch" )
+	scope
+		dim chk as function fbcall ( byval as const integer, byref as integer, byref as integer, byref as integer = 0 ) as integer
+		chk = procptr( gettouch )
+	end scope
+
+	ID( function gettouchhit alias "fb_GfxGetTouchHit" )
+	scope
+		dim chk as function fbcall ( byval as const integer, byval as const integer, byval as const integer, byval as const integer ) as integer
+		chk = procptr( gettouchhit )
+	end scope
+
+	ID( function gettouchhit alias "fb_GfxGetTouchHitCircle" )
+	scope
+		dim chk as function fbcall ( byval as const integer, byval as const integer, byval as const integer ) as integer
+		chk = procptr( gettouchhit )
+	end scope
+
 #if __FB_LANG__ = "qb"
 	ID( function stick alias "fb_GfxStickQB" )
 	scope

@@ -29,3 +29,5 @@ extern void fb_js_events_check(void);
 extern int fb_js_sdl_buttons_to_fb_buttons(int sdl_buttons);
 extern int fb_js_sdl_button_to_fb_button(int sdl_button);
 extern int fb_hJsGetTouchMouse(int *x, int *y, int *buttons);
+extern int fb_hJsGetTouchCount(void);
+extern int fb_hJsGetTouch(int index, int *x, int *y, int *id);

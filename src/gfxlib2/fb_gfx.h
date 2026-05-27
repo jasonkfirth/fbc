@@ -367,6 +367,34 @@ typedef struct GFXDRIVER
 	 */
 	int (*get_mouse)(int *x, int *y, int *z, int *buttons, int *clip);
 
+	/** Driver get touch count function pointer.
+	 *
+	 * Native touch backends should report currently active contacts.  Drivers that
+	 * only have mouse input can leave this NULL; gfx_touch.c will expose the left
+	 * mouse button as a single fallback contact.
+	 *
+	 * Can be NULL if the driver cannot get native touch state.
+	 *
+	 * \return active touch contact count
+	 */
+	int (*get_touch_count)(void);
+
+	/** Driver get touch state function pointer.
+	 *
+	 * The driver should fill the parameters with contact coordinates in the same
+	 * coordinate space as get_mouse.  gfx_touch.c applies the normal scanline
+	 * adjustment before returning values to the program.
+	 *
+	 * Can be NULL if the driver cannot get native touch state.
+	 *
+	 * \param[in] index zero-based active contact index
+	 * \param[out] x x position in pixels relative to the graphics drawing area
+	 * \param[out] y y position in pixels relative to the graphics drawing area
+	 * \param[out] id stable platform contact id if available
+	 * \return 0 on success; -1 on failure
+	 */
+	int (*get_touch)(int index, int *x, int *y, int *id);
+
 	/** Driver set mouse state function pointer.
 	 *
 	 * Can be NULL if the driver cannot set the mouse state.
@@ -580,6 +608,10 @@ extern "C" FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, flo
 extern FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, float *a3, float *a4, float *a5, float *a6, float *a7, float *a8);
 #endif
 extern FBCALL int fb_GfxGetXPad(int id, ssize_t *buttons, float *lstick_x, float *lstick_y, float *rstick_x, float *rstick_y, float *ltrigger, float *rtrigger, ssize_t *dpad);
+extern FBCALL ssize_t fb_GfxGetTouchCount(void);
+extern FBCALL ssize_t fb_GfxGetTouch(ssize_t index, ssize_t *x, ssize_t *y, ssize_t *id);
+extern FBCALL ssize_t fb_GfxGetTouchHit(ssize_t x1, ssize_t y1, ssize_t x2, ssize_t y2);
+extern FBCALL ssize_t fb_GfxGetTouchHitCircle(ssize_t x, ssize_t y, ssize_t radius);
 extern FBCALL int fb_GfxEvent(EVENT *event);
 extern FBCALL void fb_GfxControl_s(int what, FBSTRING *param);
 extern FBCALL void fb_GfxControl_i(int what, ssize_t *param1, ssize_t *param2, ssize_t *param3, ssize_t *param4);

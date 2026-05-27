@@ -839,6 +839,68 @@ declare function hPorts_cb _
 				( FB_DATATYPE_INTEGER, FB_PARAMMODE_BYREF, TRUE, 0 ) _
 			} _
 		), _
+		/' function gettouchcount( ) as integer '/ _
+		( _
+			@"gettouchcount", @"fb_GfxGetTouchCount", _
+			FB_DATATYPE_INTEGER, FB_FUNCMODE_FBCALL, _
+			@hGfxlib_cb, FB_RTL_OPT_NOQB, _
+			0 _
+		), _
+		/' function gettouch _
+			( _
+				byval index as const integer, _
+				byref x as integer, _
+				byref y as integer, _
+				byref id as integer = 0 _
+			) as integer '/ _
+		( _
+			@"gettouch", @"fb_GfxGetTouch", _
+			FB_DATATYPE_INTEGER, FB_FUNCMODE_FBCALL, _
+			@hGfxlib_cb, FB_RTL_OPT_NOQB, _
+			4, _
+			{ _
+				( typeSetIsConst( FB_DATATYPE_INTEGER ), FB_PARAMMODE_BYVAL, FALSE, 0 ), _
+				( FB_DATATYPE_INTEGER, FB_PARAMMODE_BYREF, FALSE, 0 ), _
+				( FB_DATATYPE_INTEGER, FB_PARAMMODE_BYREF, FALSE, 0 ), _
+				( FB_DATATYPE_INTEGER, FB_PARAMMODE_BYREF, TRUE, 0 ) _
+			} _
+		), _
+		/' function gettouchhit overload _
+			( _
+				byval x1 as const integer, _
+				byval y1 as const integer, _
+				byval x2 as const integer, _
+				byval y2 as const integer _
+			) as integer '/ _
+		( _
+			@"gettouchhit", @"fb_GfxGetTouchHit", _
+			FB_DATATYPE_INTEGER, FB_FUNCMODE_FBCALL, _
+			@hGfxlib_cb, FB_RTL_OPT_OVER or FB_RTL_OPT_NOQB, _
+			4, _
+			{ _
+				( typeSetIsConst( FB_DATATYPE_INTEGER ), FB_PARAMMODE_BYVAL, FALSE, 0 ), _
+				( typeSetIsConst( FB_DATATYPE_INTEGER ), FB_PARAMMODE_BYVAL, FALSE, 0 ), _
+				( typeSetIsConst( FB_DATATYPE_INTEGER ), FB_PARAMMODE_BYVAL, FALSE, 0 ), _
+				( typeSetIsConst( FB_DATATYPE_INTEGER ), FB_PARAMMODE_BYVAL, FALSE, 0 ) _
+			} _
+		), _
+		/' function gettouchhit overload _
+			( _
+				byval x as const integer, _
+				byval y as const integer, _
+				byval radius as const integer _
+			) as integer '/ _
+		( _
+			@"gettouchhit", @"fb_GfxGetTouchHitCircle", _
+			FB_DATATYPE_INTEGER, FB_FUNCMODE_FBCALL, _
+			@hGfxlib_cb, FB_RTL_OPT_OVER or FB_RTL_OPT_NOQB, _
+			3, _
+			{ _
+				( typeSetIsConst( FB_DATATYPE_INTEGER ), FB_PARAMMODE_BYVAL, FALSE, 0 ), _
+				( typeSetIsConst( FB_DATATYPE_INTEGER ), FB_PARAMMODE_BYVAL, FALSE, 0 ), _
+				( typeSetIsConst( FB_DATATYPE_INTEGER ), FB_PARAMMODE_BYVAL, FALSE, 0 ) _
+			} _
+		), _
 		/' function stick( byval n as const long ) as long '/ _
 		( _
 			@"stick", @"fb_GfxStickQB", _

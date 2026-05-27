@@ -181,6 +181,10 @@ function getmouse alias "fb_GetMouse64"
 function setmouse alias "fb_SetMouse"
 function getjoystick alias "fb_GfxGetJoystick"
 function getxpad alias "fb_GfxGetXPad"
+function gettouchcount alias "fb_GfxGetTouchCount"
+function gettouch alias "fb_GfxGetTouch"
+function gettouchhit alias "fb_GfxGetTouchHit"
+function gettouchhit alias "fb_GfxGetTouchHitCircle"
 sub screeninfo alias "fb_GfxScreenInfo32"
 sub screeninfo alias "fb_GfxScreenInfo64"
 function screenlist alias "fb_GfxScreenList"
@@ -504,8 +508,11 @@ function dir alias "fb_Dir64"
 function settime alias "fb_SetTime"
 function setdate alias "fb_SetDate"
 function threadcreate alias "fb_ThreadCreate"
+rtl-prototypes.bas(3309) error 288: Unsupported function, found ')' in 'chk = procptr( threadcreate )'
 sub threadwait alias "fb_ThreadWait"
+rtl-prototypes.bas(3315) error 288: Unsupported function, found ')' in 'chk = procptr( threadwait )'
 function fb_ThreadCall
+rtl-prototypes.bas(3321) error 288: Unsupported function, found ')' in 'chk = procptr( fb_ThreadCall )'
 function mutexcreate alias "fb_MutexCreate"
 sub mutexdestroy alias "fb_MutexDestroy"
 sub mutexlock alias "fb_MutexLock"

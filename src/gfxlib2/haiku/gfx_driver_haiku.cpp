@@ -80,6 +80,8 @@ extern "C" const GFXDRIVER fb_gfxDriverHaiku =
     fb_hHaikuWaitVSync,
 
     fb_hHaikuGetMouse,
+    fb_hHaikuGetTouchCount,
+    fb_hHaikuGetTouch,
     fb_hHaikuSetMouse,
 
     fb_hHaikuSetWindowTitle,

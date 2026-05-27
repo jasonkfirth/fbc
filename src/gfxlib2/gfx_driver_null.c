@@ -15,6 +15,8 @@ const GFXDRIVER __fb_gfxDriverNull =
 	NULL,           /* void (*set_palette)(int index, int r, int g, int b); */
 	NULL,           /* void (*wait_vsync)(void); */
 	NULL,           /* int (*get_mouse)(int *x, int *y, int *z, int *buttons); */
+	NULL,           /* int (*get_touch_count)(void); */
+	NULL,           /* int (*get_touch)(int index, int *x, int *y, int *id); */
 	NULL,           /* void (*set_mouse)(int x, int y, int cursor); */
 	NULL,           /* void (*set_window_title)(char *title); */
 	NULL,           /* int (*set_window_pos)(int x, int y); */

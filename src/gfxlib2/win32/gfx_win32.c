@@ -26,6 +26,46 @@
 #define MONITOR_DEFAULTTONEAREST 0x00000002
 #endif
 
+#ifndef WM_TOUCH
+#define WM_TOUCH 0x0240
+#endif
+
+#ifndef TOUCHEVENTF_MOVE
+#define TOUCHEVENTF_MOVE 0x0001
+#define TOUCHEVENTF_DOWN 0x0002
+#define TOUCHEVENTF_UP   0x0004
+#endif
+
+#ifndef TWF_FINETOUCH
+#define TWF_FINETOUCH 0x00000001
+#endif
+
+#ifndef TOUCH_COORD_TO_PIXEL
+#define TOUCH_COORD_TO_PIXEL(x) ((x) / 100)
+#endif
+
+#define FB_WIN32_TOUCH_MAX 16
+
+typedef struct FB_WIN32_TOUCHINPUT_ {
+	LONG x;
+	LONG y;
+	HANDLE hSource;
+	DWORD dwID;
+	DWORD dwFlags;
+	DWORD dwMask;
+	DWORD dwTime;
+	ULONG_PTR dwExtraInfo;
+	DWORD cxContact;
+	DWORD cyContact;
+} FB_WIN32_TOUCHINPUT;
+
+typedef struct FB_WIN32_TOUCH_STATE_ {
+	int active;
+	int id;
+	int x;
+	int y;
+} FB_WIN32_TOUCH_STATE;
+
 WIN32DRIVER fb_win32;
 
 const GFXDRIVER *__fb_gfx_drivers_list[] = {
@@ -47,7 +87,10 @@ static const struct { const char *name; FARPROC *proc; } user32_procs[] = {
 	{"FlashWindowEx",              (FARPROC *)&fb_win32.FlashWindowEx             },
 	{"TrackMouseEvent",            (FARPROC *)&fb_win32.TrackMouseEvent           },
 	{"GetMonitorInfoA",            (FARPROC *)&fb_win32.GetMonitorInfo            },
-	{"ChangeDisplaySettingsExA",   (FARPROC *)&fb_win32.ChangeDisplaySettingsEx   }
+	{"ChangeDisplaySettingsExA",   (FARPROC *)&fb_win32.ChangeDisplaySettingsEx   },
+	{"RegisterTouchWindow",        (FARPROC *)&fb_win32.RegisterTouchWindow       },
+	{"GetTouchInputInfo",          (FARPROC *)&fb_win32.GetTouchInputInfo         },
+	{"CloseTouchInputHandle",      (FARPROC *)&fb_win32.CloseTouchInputHandle     }
 };
 
 static CRITICAL_SECTION update_lock;
@@ -56,6 +99,7 @@ static BOOL screensaver_active, cursor_shown, has_focus = FALSE;
 static int last_mouse_buttons, mouse_buttons;
 static int mouse_wheel, mouse_hwheel, mouse_x, mouse_y, mouse_on;
 static POINT last_mouse_pos;
+static FB_WIN32_TOUCH_STATE touch[FB_WIN32_TOUCH_MAX];
 
 struct keyconvinfo {
 	union {
@@ -150,6 +194,144 @@ static BOOL WINAPI fb_hTrackMouseEvent(TRACKMOUSEEVENT *e)
 	return FALSE;
 }
 
+static int touch_find_slot(int id)
+{
+	int i;
+
+	for (i = 0; i < FB_WIN32_TOUCH_MAX; ++i) {
+		if (touch[i].active && (touch[i].id == id))
+			return i;
+	}
+
+	return -1;
+}
+
+static int touch_find_free_slot(void)
+{
+	int i;
+
+	for (i = 0; i < FB_WIN32_TOUCH_MAX; ++i) {
+		if (!touch[i].active)
+			return i;
+	}
+
+	return -1;
+}
+
+static void touch_set(int id, int x, int y)
+{
+	int slot;
+
+	slot = touch_find_slot(id);
+	if (slot < 0)
+		slot = touch_find_free_slot();
+	if (slot < 0)
+		return;
+
+	touch[slot].active = TRUE;
+	touch[slot].id = id;
+	touch[slot].x = x;
+	touch[slot].y = y;
+}
+
+static void touch_clear(int id)
+{
+	int slot = touch_find_slot(id);
+
+	if (slot >= 0)
+		memset(&touch[slot], 0, sizeof(touch[slot]));
+}
+
+static void touch_clear_all(void)
+{
+	memset(touch, 0, sizeof(touch));
+}
+
+static int touch_count(void)
+{
+	int i;
+	int count = 0;
+
+	for (i = 0; i < FB_WIN32_TOUCH_MAX; ++i) {
+		if (touch[i].active)
+			count++;
+	}
+
+	return count;
+}
+
+static void touch_input_to_client(const FB_WIN32_TOUCHINPUT *input, int *x, int *y)
+{
+	POINT point;
+
+	point.x = TOUCH_COORD_TO_PIXEL(input->x);
+	point.y = TOUCH_COORD_TO_PIXEL(input->y);
+	ScreenToClient(fb_win32.wnd, &point);
+
+	*x = point.x;
+	*y = point.y;
+}
+
+static LRESULT handle_touch_message(WPARAM wParam, LPARAM lParam)
+{
+	FB_WIN32_TOUCHINPUT small_inputs[FB_WIN32_TOUCH_MAX];
+	FB_WIN32_TOUCHINPUT *inputs = small_inputs;
+	UINT input_count = LOWORD(wParam);
+	UINT i;
+
+	if (!fb_win32.GetTouchInputInfo || !fb_win32.CloseTouchInputHandle)
+		return 0;
+
+	if (input_count == 0)
+	{
+		fb_win32.CloseTouchInputHandle((HANDLE)lParam);
+		return 0;
+	}
+
+	if (input_count > 256)
+	{
+		fb_win32.CloseTouchInputHandle((HANDLE)lParam);
+		return 0;
+	}
+
+	/*
+		WM_TOUCH reports contacts in screen coordinates scaled by 100.
+		Storing client-area pixels here keeps the touch path consistent
+		with GETMOUSE; gfx_touch.c applies legacy scanline adjustment at
+		the public API boundary.
+	*/
+	if (input_count > FB_WIN32_TOUCH_MAX)
+		inputs = calloc(input_count, sizeof(*inputs));
+	if (!inputs)
+	{
+		fb_win32.CloseTouchInputHandle((HANDLE)lParam);
+		return 0;
+	}
+
+	if (fb_win32.GetTouchInputInfo((HANDLE)lParam, input_count, inputs, sizeof(*inputs)))
+	{
+		for (i = 0; i < input_count; ++i)
+		{
+			int x;
+			int y;
+
+			touch_input_to_client(&inputs[i], &x, &y);
+
+			if (inputs[i].dwFlags & TOUCHEVENTF_UP)
+				touch_clear((int)inputs[i].dwID);
+			else if (inputs[i].dwFlags & (TOUCHEVENTF_DOWN | TOUCHEVENTF_MOVE))
+				touch_set((int)inputs[i].dwID, x, y);
+		}
+	}
+
+	fb_win32.CloseTouchInputHandle((HANDLE)lParam);
+
+	if (inputs != small_inputs)
+		free(inputs);
+
+	return 0;
+}
+
 LRESULT CALLBACK fb_hWin32WinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	BYTE key_state[256];
@@ -190,6 +372,7 @@ LRESULT CALLBACK fb_hWin32WinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 
 			fb_hMemSet(__fb_gfx->key, FALSE, 128);
 			mouse_buttons = 0;
+			touch_clear_all();
 			fb_hMemSet(__fb_gfx->dirty, TRUE, fb_win32.h);
 			if ((!fb_win32.is_active) && (has_focus)) {
 				e.type = EVENT_MOUSE_EXIT;
@@ -219,6 +402,9 @@ LRESULT CALLBACK fb_hWin32WinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			else
 				SetCursor(LoadCursor(NULL, IDC_ARROW));
 			return TRUE;
+
+		case WM_TOUCH:
+			return handle_touch_message(wParam, lParam);
 
 		case WM_MOUSEMOVE:
 			e.type = EVENT_MOUSE_MOVE;
@@ -546,6 +732,9 @@ int fb_hInitWindow(DWORD style, DWORD ex_style, int x, int y, int w, int h)
 	if (!fb_win32.wnd)
 		return -1;
 
+	if (fb_win32.RegisterTouchWindow)
+		fb_win32.RegisterTouchWindow(fb_win32.wnd, TWF_FINETOUCH);
+
 	if (fb_win32.flags & DRIVER_ALWAYS_ON_TOP)
 		SetWindowPos(fb_win32.wnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOSENDCHANGING);
 
@@ -613,6 +802,7 @@ int fb_hWin32Init(char *title, int w, int h, int depth, int refresh_rate, int fl
 	RegisterClass(&fb_win32.wndclass);
 
 	mouse_buttons = mouse_wheel = 0;
+	touch_clear_all();
 	fb_win32.is_running = TRUE;
 
 	keyconv_clear( &keyconv1 );
@@ -724,6 +914,41 @@ int fb_hWin32GetMouse(int *x, int *y, int *z, int *buttons, int *clip)
 	if (clip) *clip = fb_win32.mouse_clip;
 
 	return 0;
+}
+
+int fb_hWin32GetTouchCount(void)
+{
+	return touch_count();
+}
+
+int fb_hWin32GetTouch(int index, int *x, int *y, int *id)
+{
+	int i;
+	int seen = 0;
+
+	if (index < 0)
+		return -1;
+
+	for (i = 0; i < FB_WIN32_TOUCH_MAX; ++i)
+	{
+		if (!touch[i].active)
+			continue;
+
+		if (seen == index)
+		{
+			if (x)
+				*x = touch[i].x;
+			if (y)
+				*y = touch[i].y;
+			if (id)
+				*id = touch[i].id;
+			return 0;
+		}
+
+		seen++;
+	}
+
+	return -1;
 }
 
 void fb_hWin32SetMouse(int x, int y, int cursor, int clip)

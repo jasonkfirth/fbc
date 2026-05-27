@@ -47,3 +47,5 @@ extern EM_BOOL fb_hMouseEventHandler(int eventType, const EmscriptenMouseEvent *
 extern EM_BOOL fb_hTouchEventHandler(int eventType, const EmscriptenTouchEvent *touchEvent, void *userData);
 extern EM_BOOL fb_hMouseWheelEventHandler(int eventType, const EmscriptenWheelEvent *wheelEvent, void *userData);
 extern int fb_hJsGetTouchMouse(int *x, int *y, int *buttons);
+extern int fb_hJsGetTouchCount(void);
+extern int fb_hJsGetTouch(int index, int *x, int *y, int *id);

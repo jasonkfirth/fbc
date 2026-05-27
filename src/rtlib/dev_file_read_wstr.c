@@ -26,7 +26,14 @@ int fb_DevFileReadWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
         }
     }
 
-    chars = *pchars;
+	chars = *pchars;
+
+	if( (chars > (((size_t)-1) - 1)) ||
+	    (chars > ((((size_t)-1) / sizeof( FB_WCHAR )) - 1)) )
+	{
+		FB_UNLOCK();
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+	}
 
 	if( chars < FB_LOCALBUFF_MAXLEN )
 	{
@@ -52,9 +59,12 @@ int fb_DevFileReadWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
 		}
 	}
 
+	memset( buffer, 0, chars + 1 );
+
 	/* do read */
 	read_chars = fread( buffer, 1, chars, fp );
-	buffer[read_chars] = '\0';
+	if( read_chars > chars )
+		read_chars = chars;
 
 	/* convert to wchar, file should be opened with the ENCODING option
 	   to allow UTF characters to be read */

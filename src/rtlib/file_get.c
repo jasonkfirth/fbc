@@ -41,6 +41,12 @@ int fb_FileGetDataEx
     {
         size_t buffer_chars, bytes;
 
+        if( handle->putback_size > sizeof( handle->putback_buffer ) )
+        {
+            FB_UNLOCK();
+            return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+        }
+
         if( handle->encod != FB_FILE_ENCOD_ASCII )
             buffer_chars = handle->putback_size / sizeof( FB_WCHAR );
         else
@@ -58,17 +64,21 @@ int fb_FileGetDataEx
             if( !is_unicode )
             {
                 if( handle->encod == FB_FILE_ENCOD_ASCII )
-                {
                     memcpy( pachData, handle->putback_buffer, bytes );
-                }
+
                 else
                 {
-                    size_t len = buffer_chars;
+                    size_t i;
                     char *cp = pachData;
-                    FB_WCHAR *wcp = (FB_WCHAR *)handle->putback_buffer;
 
-                    while( len-- > 0 )
-                        *cp++ = *wcp++;
+                    for( i = 0; i < buffer_chars; ++i )
+                    {
+                        FB_WCHAR wc;
+                        memcpy( &wc,
+                                handle->putback_buffer + (i * sizeof( FB_WCHAR )),
+                                sizeof( wc ) );
+                        *cp++ = (char)wc;
+                    }
                 }
             }
             else

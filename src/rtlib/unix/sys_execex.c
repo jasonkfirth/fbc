@@ -89,7 +89,19 @@ FBCALL int fb_ExecEx( FBSTRING *program, FBSTRING *args, int do_fork )
 
 				if( exec_status_pipe[1] != -1 ) {
 					int exec_errno = errno;
-					write( exec_status_pipe[1], &exec_errno, sizeof( exec_errno ) );
+					const char *p = (const char *)&exec_errno;
+					size_t bytes_left = sizeof( exec_errno );
+					while( bytes_left > 0 ) {
+						ssize_t bytes_written = write( exec_status_pipe[1], p, bytes_left );
+						if( bytes_written > 0 ) {
+							p += bytes_written;
+							bytes_left -= bytes_written;
+						} else if( (bytes_written == -1) && (errno == EINTR) ) {
+							continue;
+						} else {
+							break;
+						}
+					}
 					close( exec_status_pipe[1] );
 				}
 

@@ -39,16 +39,6 @@ FBCALL FBSTRING *fb_hStrAllocTempDesc( void )
 	return &dsc->desc;
 }
 
-static void fb_hStrFreeTmpDesc( FB_STR_TMPDESC *dsc )
-{
-	fb_hListFreeElem( &tmpdsList,  &dsc->elem );
-
-	/*  */
-	dsc->desc.data = NULL;
-	dsc->desc.len  = 0;
-	dsc->desc.size = 0;
-}
-
 FBCALL int fb_hStrDelTempDesc( FBSTRING *str )
 {
 	FB_STR_TMPDESC *item =
@@ -59,7 +49,13 @@ FBCALL int fb_hStrDelTempDesc( FBSTRING *str )
 		(item > fb_tmpdsTB+FB_STR_TMPDESCRIPTORS-1) )
 		return -1;
 
-	fb_hStrFreeTmpDesc( item );
+	fb_hListFreeElem( &tmpdsList, (FB_LISTELEM *)item );
+
+	/*  */
+	str->data = NULL;
+	str->len  = 0;
+	str->size = 0;
+
 	return 0;
 }
 

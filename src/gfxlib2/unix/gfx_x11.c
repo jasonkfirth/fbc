@@ -1,5 +1,6 @@
 /* x11 window management code shared by x11 and opengl drivers */
 
+#include <stdint.h>
 #include <sys/types.h>
 
 #ifndef DISABLE_X11
@@ -917,7 +918,9 @@ ssize_t fb_hGetWindowHandle(void)
 
 ssize_t fb_hGetDisplayHandle(void)
 {
-	return (ssize_t)fb_x11.display;
+	/* SCREENCONTROL exposes platform handles through integer-sized slots. */
+	/* cppcheck-suppress CastAddressToIntegerAtReturn */
+	return (ssize_t)(intptr_t)fb_x11.display;
 }
 
 #else

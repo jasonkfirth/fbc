@@ -33,6 +33,7 @@ Environment:
   ANDROID_HOME / ANDROID_SDK_ROOT   Android SDK location
   ANDROID_NDK_HOME                  Android NDK location
   ANDROID_D8_JAR / D8_JAR           R8/D8 jar to use when no d8/dx tool exists
+  ANDROID_DX_JAR / DX_JAR           dx jar to use when no d8/dx tool exists
   FBANDROID_PREFIX                  Install prefix (default: /usr)
   FBANDROID_ASSETS                  Directory to include as APK assets
 
@@ -576,6 +577,7 @@ javac="$(command -v javac || true)"
 d8=""
 dx=""
 d8_jar="${ANDROID_D8_JAR:-${D8_JAR:-}}"
+dx_jar="${ANDROID_DX_JAR:-${DX_JAR:-}}"
 java_tool=""
 if command -v d8 >/dev/null 2>&1; then
 	d8="$(command -v d8)"
@@ -601,12 +603,31 @@ if [ -z "$d8" ]; then
 		shopt -u nullglob
 	fi
 fi
+if [ -z "$d8" ] && [ -z "$dx" ] && [ -z "$d8_jar" ] && [ -z "$dx_jar" ]; then
+	shopt -s nullglob
+	for found in \
+		"$sdk"/build-tools/*/lib/dx.jar \
+		"$sdk"/build-tools/*/dx.jar \
+		/usr/share/java/com.android.dx.jar \
+		/usr/share/java/com.android.dx-*.jar
+	do
+		[ -f "$found" ] || continue
+		dx_jar="$found"
+		break
+	done
+	shopt -u nullglob
+fi
 if [ -z "$d8" ] && [ -z "$dx" ] && [ -n "$d8_jar" ]; then
 	[ -f "$d8_jar" ] || die "D8 jar was specified but not found: $d8_jar"
 	java_tool="$(command -v java || true)"
 	[ -n "$java_tool" ] || die "java not found; install a JRE or provide d8/dx"
 fi
-[ -n "$d8" ] || [ -n "$dx" ] || [ -n "$java_tool" ] || die "no dexer found; install Android build-tools with d8, the dalvik-exchange package for dx, or set ANDROID_D8_JAR"
+if [ -z "$d8" ] && [ -z "$dx" ] && [ -z "$java_tool" ] && [ -n "$dx_jar" ]; then
+	[ -f "$dx_jar" ] || die "dx jar was specified but not found: $dx_jar"
+	java_tool="$(command -v java || true)"
+	[ -n "$java_tool" ] || die "java not found; install a JRE or provide d8/dx"
+fi
+[ -n "$d8" ] || [ -n "$dx" ] || [ -n "$java_tool" ] || die "no dexer found; install Android build-tools with d8, the dalvik-exchange package for dx, or set ANDROID_D8_JAR/ANDROID_DX_JAR"
 
 asset_root="$tmp/assets"
 mkdir -p "$tmp/assets" "$tmp/apk/lib/$abi" "$tmp/res/values"
@@ -654,11 +675,15 @@ if [ -n "$d8" ]; then
 		--output "$tmp/dex" \
 		"${class_files[@]}"
 elif [ -n "$java_tool" ]; then
-	"$java_tool" -cp "$d8_jar" com.android.tools.r8.D8 \
-		--min-api "$min_api" \
-		--classpath "$platform_jar" \
-		--output "$tmp/dex" \
-		"${class_files[@]}"
+	if [ -n "$d8_jar" ]; then
+		"$java_tool" -cp "$d8_jar" com.android.tools.r8.D8 \
+			--min-api "$min_api" \
+			--classpath "$platform_jar" \
+			--output "$tmp/dex" \
+			"${class_files[@]}"
+	else
+		"$java_tool" -jar "$dx_jar" --dex --output="$tmp/dex/classes.dex" "$tmp/classes"
+	fi
 else
 	"$dx" --dex --output="$tmp/dex/classes.dex" "$tmp/classes"
 fi

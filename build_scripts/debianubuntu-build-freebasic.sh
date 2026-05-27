@@ -293,6 +293,7 @@ android_sdk_packages_available() {
     apt_package_available android-sdk || return 1
     apt_package_available android-sdk-platform-tools || return 1
     apt_package_available android-sdk-build-tools || return 1
+    apt_package_available dalvik-exchange || return 1
     apt_any_package_available android-sdk-platform-23 google-android-platform-26-installer || return 1
     apt_package_available google-android-ndk-r28-installer || return 1
     apt_package_available aapt || return 1
@@ -652,6 +653,7 @@ install_deps() {
             android-sdk
             android-sdk-platform-tools
             android-sdk-build-tools
+            dalvik-exchange
             android-sdk-platform-23
             google-android-ndk-r28-installer
             gradle

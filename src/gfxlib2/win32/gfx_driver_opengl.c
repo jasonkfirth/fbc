@@ -85,6 +85,8 @@ const GFXDRIVER fb_gfxDriverOpenGL =
 	fb_hGL_SetPalette,      /* void (*set_palette)(int index, int r, int g, int b); */
 	fb_hWin32WaitVSync,     /* void (*wait_vsync)(void); */
 	fb_hWin32GetMouse,      /* int (*get_mouse)(int *x, int *y, int *z, int *buttons, int *clip); */
+	fb_hWin32GetTouchCount, /* int (*get_touch_count)(void); */
+	fb_hWin32GetTouch,      /* int (*get_touch)(int index, int *x, int *y, int *id); */
 	fb_hWin32SetMouse,      /* void (*set_mouse)(int x, int y, int cursor, int clip); */
 	fb_hWin32SetWindowTitle,/* void (*set_window_title)(char *title); */
 	fb_hWin32SetWindowPos,  /* int (*set_window_pos)(int x, int y); */
@@ -553,4 +555,3 @@ static int *driver_fetch_modes(int depth, int *size)
 }
 
 #endif /* DISABLE_OPENGL */
-

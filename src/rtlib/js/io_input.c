@@ -3,6 +3,7 @@
 #include "../fb.h"
 #include "fb_private_console.h"
 #include <math.h>
+#include <string.h>
 
 // QB key codes that are processed by keydown
 static const unsigned short js_keycode_to_qb_key_tb[128] =
@@ -380,10 +381,142 @@ EM_BOOL fb_hKeyEventHandler(int eventType, const EmscriptenKeyboardEvent *keyEve
 	}
 }
 
+#define JS_TOUCH_MAX 16
+
+typedef struct JS_TOUCH_STATE
+{
+	int active;
+	int id;
+	int x;
+	int y;
+} JS_TOUCH_STATE;
+
+static JS_TOUCH_STATE js_touch[JS_TOUCH_MAX];
 static int touch_valid = 0;
 static int touch_x = 0;
 static int touch_y = 0;
 static int touch_buttons = 0;
+
+static int js_touch_find_slot(int id)
+{
+	int index;
+
+	for( index = 0; index < JS_TOUCH_MAX; index++ )
+	{
+		if( js_touch[index].active && js_touch[index].id == id )
+			return index;
+	}
+
+	return -1;
+}
+
+static int js_touch_find_free_slot(void)
+{
+	int index;
+
+	for( index = 0; index < JS_TOUCH_MAX; index++ )
+	{
+		if( !js_touch[index].active )
+			return index;
+	}
+
+	return -1;
+}
+
+static void js_touch_set(int id, int x, int y)
+{
+	int slot = js_touch_find_slot(id);
+
+	if( slot < 0 )
+		slot = js_touch_find_free_slot();
+	if( slot < 0 )
+		return;
+
+	js_touch[slot].active = 1;
+	js_touch[slot].id = id;
+	js_touch[slot].x = x;
+	js_touch[slot].y = y;
+}
+
+static void js_touch_clear(int id)
+{
+	int slot = js_touch_find_slot(id);
+
+	if( slot >= 0 )
+		memset(&js_touch[slot], 0, sizeof(js_touch[slot]));
+}
+
+static void js_touch_clear_all(void)
+{
+	memset(js_touch, 0, sizeof(js_touch));
+}
+
+static int js_touch_count(void)
+{
+	int index;
+	int count = 0;
+
+	for( index = 0; index < JS_TOUCH_MAX; index++ )
+	{
+		if( js_touch[index].active )
+			count++;
+	}
+
+	return count;
+}
+
+static int js_touch_first(int *x, int *y)
+{
+	int index;
+
+	for( index = 0; index < JS_TOUCH_MAX; index++ )
+	{
+		if( js_touch[index].active )
+		{
+			if( x != NULL )
+				*x = js_touch[index].x;
+			if( y != NULL )
+				*y = js_touch[index].y;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+static void update_touch_contacts(const EmscriptenTouchEvent *touchEvent, int buttons)
+{
+	int index;
+
+	if( touchEvent == NULL )
+		return;
+
+	if( buttons != 0 )
+	{
+		for( index = 0; index < touchEvent->numTouches; index++ )
+		{
+			const EmscriptenTouchPoint *touch = &touchEvent->touches[index];
+			js_touch_set(touch->identifier, touch->canvasX, touch->canvasY);
+		}
+	}
+	else
+	{
+		for( index = 0; index < touchEvent->numTouches; index++ )
+		{
+			const EmscriptenTouchPoint *touch = &touchEvent->touches[index];
+			if( touch->isChanged )
+				js_touch_clear(touch->identifier);
+		}
+
+		if( touchEvent->numTouches == 0 )
+			js_touch_clear_all();
+	}
+
+	if( js_touch_first(&touch_x, &touch_y) )
+		touch_valid = 1;
+
+	touch_buttons = (js_touch_count() > 0) ? BUTTON_LEFT : 0;
+}
 
 static void update_touch_mouse(const EmscriptenTouchEvent *touchEvent, int buttons)
 {
@@ -414,7 +547,7 @@ static void update_touch_mouse(const EmscriptenTouchEvent *touchEvent, int butto
 		touch_y = touch->canvasY;
 	}
 
-	touch_buttons = buttons;
+	update_touch_contacts(touchEvent, buttons);
 }
 
 int fb_hJsGetTouchMouse(int *x, int *y, int *buttons)
@@ -432,6 +565,41 @@ int fb_hJsGetTouchMouse(int *x, int *y, int *buttons)
         *buttons = touch_buttons;
 
     return 1;
+}
+
+int fb_hJsGetTouchCount(void)
+{
+	return js_touch_count();
+}
+
+int fb_hJsGetTouch(int index, int *x, int *y, int *id)
+{
+	int slot;
+	int seen = 0;
+
+	if( index < 0 )
+		return -1;
+
+	for( slot = 0; slot < JS_TOUCH_MAX; slot++ )
+	{
+		if( !js_touch[slot].active )
+			continue;
+
+		if( seen == index )
+		{
+			if( x != NULL )
+				*x = js_touch[slot].x;
+			if( y != NULL )
+				*y = js_touch[slot].y;
+			if( id != NULL )
+				*id = js_touch[slot].id;
+			return 0;
+		}
+
+		seen++;
+	}
+
+	return -1;
 }
 
 EM_BOOL fb_hMouseEventHandler(int eventType, const EmscriptenMouseEvent *mouseEvent, void *userData)

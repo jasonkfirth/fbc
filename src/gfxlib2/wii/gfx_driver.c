@@ -772,6 +772,8 @@ static const GFXDRIVER fb_gfxDriverWii =
 	driver_set_palette,
 	driver_wait_vsync,
 	driver_get_mouse,
+	NULL,
+	NULL,
 	driver_set_mouse,
 	NULL,
 	NULL,

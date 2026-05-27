@@ -6,6 +6,7 @@
 /* thread proxy to user's thread proc */
 static void *threadproc( void *param )
 {
+	static int thread_result;
 	FBTHREADINFO *info = param;
 	FBTHREAD *thread = info->thread;
 	FBTHREADFLAGS threadFlags;
@@ -26,7 +27,7 @@ static void *threadproc( void *param )
 	}
 
 	/* don't return NULL or exit() will be called */
-	return (void *)1;
+	return &thread_result;
 }
 
 FBCALL FBTHREAD *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack_size )

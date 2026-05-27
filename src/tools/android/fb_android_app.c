@@ -37,6 +37,7 @@ void fb_hAndroidSetActivity(ANativeActivity *activity) FB_ANDROID_WEAK;
 void fb_hAndroidSetKeyboardEnabled(int enabled) FB_ANDROID_WEAK;
 void fb_hAndroidSetWindow(ANativeWindow *window) FB_ANDROID_WEAK;
 void fb_hAndroidTouch(float x, float y, int action) FB_ANDROID_WEAK;
+void fb_hAndroidTouchEvent(const AInputEvent *event) FB_ANDROID_WEAK;
 void fb_hAndroidKey(int32_t keycode, int action, int unicode) FB_ANDROID_WEAK;
 void fb_hAndroidGamepadMotion(const AInputEvent *event) FB_ANDROID_WEAK;
 void fb_hAndroidGamepadKey(const AInputEvent *event) FB_ANDROID_WEAK;
@@ -460,11 +461,15 @@ static int fb_android_handle_input(FB_ANDROID_APP *app)
 			}
 			else
 			{
-				int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
-				float x = AMotionEvent_getX(event, 0);
-				float y = AMotionEvent_getY(event, 0);
-				if (fb_hAndroidTouch)
+				if (fb_hAndroidTouchEvent)
+					fb_hAndroidTouchEvent(event);
+				else if (fb_hAndroidTouch)
+				{
+					int action = AMotionEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
+					float x = AMotionEvent_getX(event, 0);
+					float y = AMotionEvent_getY(event, 0);
 					fb_hAndroidTouch(x, y, action);
+				}
 			}
 			handled = 1;
 		}

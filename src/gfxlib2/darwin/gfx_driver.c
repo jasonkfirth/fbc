@@ -17,6 +17,8 @@ const GFXDRIVER fb_gfxDriverDarwin = {
 	fb_hDarwinSetPalette,
 	fb_hDarwinWaitVSync,
 	fb_hDarwinGetMouse,
+	NULL,
+	NULL,
 	fb_hDarwinSetMouse,
 	fb_hDarwinSetWindowTitle,
 	fb_hDarwinSetWindowPos,

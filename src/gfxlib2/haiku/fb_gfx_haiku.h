@@ -143,6 +143,8 @@ void fb_hHaikuLock(void);
 void fb_hHaikuUnlock(void);
 
 int  fb_hHaikuGetMouse(int *x, int *y, int *z, int *buttons, int *clip);
+int  fb_hHaikuGetTouchCount(void);
+int  fb_hHaikuGetTouch(int index, int *x, int *y, int *id);
 void fb_hHaikuSetMouse(int x, int y, int cursor, int clip);
 
 int *fb_hHaikuFetchModes(int depth, int *size);

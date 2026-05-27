@@ -850,6 +850,7 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
         int result;
         const float *write_buffer;
         int write_frames;
+        int (*write_proc)(const float *samples, int frames);
 
         if (!__fb_sfx ||
             __fb_sfx->driver != driver ||
@@ -890,9 +891,10 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
             driver = (__fb_sfx) ? __fb_sfx->driver : NULL;
             continue;
         }
+        write_proc = driver->write;
 
         fb_sfxRuntimeUnlock();
-        result = driver->write(write_buffer, write_frames);
+        result = write_proc(write_buffer, write_frames);
         fb_sfxRuntimeLock();
         fb_sfxDriverIoUnlock();
 
@@ -924,7 +926,7 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
             }
 
             SFX_DEBUG("sfx_core: driver '%s' returned 0 for %d retries, trying fallback",
-                      (driver && driver->name) ? driver->name : "(null)",
+                      driver->name ? driver->name : "(null)",
                       zero_retry_count);
 
             if (fb_sfxDriverFallback(driver) != 0)

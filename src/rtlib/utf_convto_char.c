@@ -7,6 +7,8 @@
 extern const unsigned char __fb_utf8_trailingTb[256];
 extern const UTF_32 __fb_utf8_offsetsTb[6];
 
+#define FB_UTF8_MAX_TRAILING_BYTES 5
+
 /*
 char * fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
 char * fb_hUTF16ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
@@ -70,7 +72,8 @@ if 'dst' is not null
 char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
 {
 	UTF_32 c;
-	ssize_t extbytes, charsleft;
+	ssize_t charsleft;
+	unsigned int extbytes;
 	char *buffer = dst;
 	
     if( dst == NULL )
@@ -82,7 +85,12 @@ char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
 			extbytes = __fb_utf8_trailingTb[(unsigned int)*src];
 	
 			c = 0;
-			switch( extbytes )
+			if( extbytes > FB_UTF8_MAX_TRAILING_BYTES )
+			{
+				++src;
+				c = '?';
+			}
+			else switch( extbytes )
 			{
 				case 5:
 					c += *src++; c <<= 6;
@@ -102,8 +110,9 @@ char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
 				case 0:
 					c += *src++;
 			}
-	
-			c -= __fb_utf8_offsetsTb[extbytes];
+
+			if( extbytes <= FB_UTF8_MAX_TRAILING_BYTES )
+				c -= __fb_utf8_offsetsTb[extbytes];
 	
 			if( c > 255 )
 				c = '?';
@@ -140,7 +149,12 @@ char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
 			extbytes = __fb_utf8_trailingTb[*src];
 	
 			c = 0;
-			switch( extbytes )
+			if( extbytes > FB_UTF8_MAX_TRAILING_BYTES )
+			{
+				++src;
+				c = '?';
+			}
+			else switch( extbytes )
 			{
 				case 5:
 					c += *src++; c <<= 6;
@@ -160,8 +174,9 @@ char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
 				case 0:
 					c += *src++;
 			}
-	
-			c -= __fb_utf8_offsetsTb[extbytes];
+
+			if( extbytes <= FB_UTF8_MAX_TRAILING_BYTES )
+				c -= __fb_utf8_offsetsTb[extbytes];
 
 			if( c > 255 )
 				c = '?';

@@ -525,6 +525,8 @@ static const GFXDRIVER fb_gfxDriverXbox =
 	driver_set_palette,      /* void (*set_palette)(int index, int r, int g, int b); */
 	driver_wait_vsync,       /* void (*wait_vsync)(void); */
 	driver_get_mouse,        /* int (*get_mouse)(int *x, int *y, int *z, int *buttons, int *clip); */
+	NULL,                    /* int (*get_touch_count)(void); */
+	NULL,                    /* int (*get_touch)(int index, int *x, int *y, int *id); */
 	driver_set_mouse,        /* void (*set_mouse)(int x, int y, int cursor, int clip); */
 	NULL,                    /* void (*set_window_title)(char *title); */
 	NULL,                    /* int (*set_window_pos)(int x, int y); */

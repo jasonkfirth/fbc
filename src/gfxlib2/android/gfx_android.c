@@ -20,6 +20,7 @@
 #define FB_ANDROID_FONT_H 8
 #define FB_ANDROID_KEYBOARD_BUTTON_W 56
 #define FB_ANDROID_KEYBOARD_BUTTON_H 40
+#define FB_ANDROID_TOUCH_MAX 16
 #define FB_ANDROID_GAMEPAD_MAX 16
 #define FB_ANDROID_GAMEPAD_TRIGGER_BUTTON_THRESHOLD 0.20f
 #define FB_ANDROID_GAMEPAD_HAT_THRESHOLD 0.50f
@@ -48,6 +49,14 @@
 #define INPUT_METHOD_MANAGER_HIDE_NOT_ALWAYS 0x00000002
 #endif
 
+#ifndef AMOTION_EVENT_ACTION_POINTER_INDEX_MASK
+#define AMOTION_EVENT_ACTION_POINTER_INDEX_MASK 0x0000ff00
+#endif
+
+#ifndef AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT
+#define AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT 8
+#endif
+
 #define ANDROID_R_ID_CONTENT 0x01020002
 #define FB_ANDROID_INPUT_VIEW_ID 0x0fb60001
 #define FB_ANDROID_INPUT_TYPE_TEXT 0x00000001
@@ -68,6 +77,14 @@ typedef struct FB_ANDROID_GAMEPAD_STATE
 	float left_trigger;
 	float right_trigger;
 } FB_ANDROID_GAMEPAD_STATE;
+
+typedef struct FB_ANDROID_TOUCH_STATE
+{
+	int active;
+	int id;
+	int x;
+	int y;
+} FB_ANDROID_TOUCH_STATE;
 
 typedef struct FB_ANDROID_GFX_STATE
 {
@@ -106,6 +123,7 @@ typedef struct FB_ANDROID_GFX_STATE
 	int display_locked;
 	jobject input_view;
 	char *input_text;
+	FB_ANDROID_TOUCH_STATE touch[FB_ANDROID_TOUCH_MAX];
 	FB_ANDROID_GAMEPAD_STATE gamepad[FB_ANDROID_GAMEPAD_MAX];
 } FB_ANDROID_GFX_STATE;
 
@@ -146,6 +164,7 @@ static FB_ANDROID_GFX_STATE fb_android =
 	.display_locked = 0,
 	.input_view = NULL,
 	.input_text = NULL,
+	.touch = {{0}},
 	.gamepad = {{0}},
 };
 
@@ -1449,6 +1468,7 @@ int fb_hAndroidInit(char *title, int w, int h, int depth, int refresh_rate, int 
 	fb_android.mouse_z = 0;
 	fb_android.mouse_buttons = 0;
 	fb_android.mouse_latched_buttons = 0;
+	memset(fb_android.touch, 0, sizeof(fb_android.touch));
 	fb_android.blitter = fb_hGetBlitter(32, TRUE);
 
 	if (!fb_android.blitter)
@@ -1490,35 +1510,45 @@ void fb_hAndroidLock(void)
 	pthread_mutex_unlock(&fb_android.mutex);
 }
 
+static int android_has_dirty_lines_locked(void)
+{
+	int y;
+
+	if (!__fb_gfx || !__fb_gfx->dirty)
+		return 0;
+
+	for (y = 0; y < __fb_gfx->h; y++)
+	{
+		if (__fb_gfx->dirty[y])
+			return 1;
+	}
+
+	return 0;
+}
+
 void fb_hAndroidUnlock(void)
 {
+	FB_GFXCTX *context;
 	int needs_update = 0;
 
 	/*
-		Android window posts are much more expensive than normal software
-		framebuffer writes.  The gfx core marks dirty lines only when the
-		visible framebuffer changed, such as during SCREENCOPY or a visible
-		page switch.  Drawing into a hidden work page must therefore only
-		release the driver lock here; otherwise page-flipped programs end up
-		posting the NativeWindow once per primitive.
+		Android window posts are much more expensive than ordinary software
+		framebuffer writes.  Hidden work-page drawing does not change the
+		visible framebuffer, so unlock must not scan the dirty table or post
+		the NativeWindow for every primitive drawn there.
+
+		SCREENCOPY and visible-page changes still reach fb_hAndroidUpdate()
+		through the driver's explicit update hook after the gfx core has
+		copied or selected the visible framebuffer.
 	*/
 	pthread_mutex_lock(&fb_android.mutex);
 	if (fb_android.display_locked > 0)
 		fb_android.display_locked--;
 
-	if (__fb_gfx && __fb_gfx->dirty)
-	{
-		int y;
-
-		for (y = 0; y < __fb_gfx->h; y++)
-		{
-			if (__fb_gfx->dirty[y])
-			{
-				needs_update = 1;
-				break;
-			}
-		}
-	}
+	context = __fb_gfx ? fb_hGetContext() : NULL;
+	if (__fb_gfx && __fb_gfx->dirty && context &&
+	    (__fb_gfx->visible_page == context->work_page))
+		needs_update = android_has_dirty_lines_locked();
 
 	pthread_mutex_unlock(&fb_android.mutex);
 
@@ -1907,21 +1937,20 @@ void fb_hAndroidPollEvents(void)
 	int redraw_active;
 	int redraw_console;
 	int keyboard_changed;
+	int framebuffer_changed;
 
 	keyboard_changed = fb_hAndroidApplyPendingKeyboardVisibility();
 	fb_hAndroidPollTextInput();
 
-	if (!keyboard_changed)
-		return;
-
 	pthread_mutex_lock(&fb_android.mutex);
+	framebuffer_changed = android_has_dirty_lines_locked();
 	redraw_active = fb_android.active && can_render_locked();
 	redraw_console = fb_android.console_enabled && !fb_android.active && can_render_locked();
 	pthread_mutex_unlock(&fb_android.mutex);
 
-	if (redraw_active)
+	if (redraw_active && (keyboard_changed || framebuffer_changed))
 		fb_hAndroidUpdate();
-	else if (redraw_console)
+	else if (redraw_console && keyboard_changed)
 		fb_hAndroidConsoleRender();
 }
 
@@ -2103,6 +2132,141 @@ static void map_window_to_framebuffer_locked(float x, float y, int *mapped_x, in
 
 	*mapped_x = clamp_framebuffer_x_locked(local_x * skip);
 	*mapped_y = clamp_framebuffer_y_locked(local_y * skip);
+}
+
+static int touch_find_slot_locked(int id)
+{
+	int i;
+
+	for (i = 0; i < FB_ANDROID_TOUCH_MAX; ++i)
+	{
+		if (fb_android.touch[i].active && fb_android.touch[i].id == id)
+			return i;
+	}
+
+	return -1;
+}
+
+static int touch_find_free_slot_locked(void)
+{
+	int i;
+
+	for (i = 0; i < FB_ANDROID_TOUCH_MAX; ++i)
+	{
+		if (!fb_android.touch[i].active)
+			return i;
+	}
+
+	return -1;
+}
+
+static void touch_set_locked(int id, int x, int y)
+{
+	int slot;
+
+	if ((x < 0) || (y < 0))
+		return;
+
+	slot = touch_find_slot_locked(id);
+	if (slot < 0)
+		slot = touch_find_free_slot_locked();
+	if (slot < 0)
+		return;
+
+	fb_android.touch[slot].active = 1;
+	fb_android.touch[slot].id = id;
+	fb_android.touch[slot].x = x;
+	fb_android.touch[slot].y = y;
+}
+
+static void touch_clear_locked(int id)
+{
+	int slot = touch_find_slot_locked(id);
+
+	if (slot >= 0)
+		memset(&fb_android.touch[slot], 0, sizeof(fb_android.touch[slot]));
+}
+
+static void touch_clear_all_locked(void)
+{
+	memset(fb_android.touch, 0, sizeof(fb_android.touch));
+}
+
+static int touch_count_locked(void)
+{
+	int i;
+	int count = 0;
+
+	for (i = 0; i < FB_ANDROID_TOUCH_MAX; ++i)
+	{
+		if (fb_android.touch[i].active)
+			count++;
+	}
+
+	return count;
+}
+
+static int touch_first_locked(int *x, int *y)
+{
+	int i;
+
+	for (i = 0; i < FB_ANDROID_TOUCH_MAX; ++i)
+	{
+		if (fb_android.touch[i].active)
+		{
+			if (x)
+				*x = fb_android.touch[i].x;
+			if (y)
+				*y = fb_android.touch[i].y;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+int fb_hAndroidGetTouchCount(void)
+{
+	int count;
+
+	pthread_mutex_lock(&fb_android.mutex);
+	count = touch_count_locked();
+	pthread_mutex_unlock(&fb_android.mutex);
+
+	return count;
+}
+
+int fb_hAndroidGetTouch(int index, int *x, int *y, int *id)
+{
+	int i;
+	int seen = 0;
+
+	if (index < 0)
+		return -1;
+
+	pthread_mutex_lock(&fb_android.mutex);
+	for (i = 0; i < FB_ANDROID_TOUCH_MAX; ++i)
+	{
+		if (!fb_android.touch[i].active)
+			continue;
+
+		if (seen == index)
+		{
+			if (x)
+				*x = fb_android.touch[i].x;
+			if (y)
+				*y = fb_android.touch[i].y;
+			if (id)
+				*id = fb_android.touch[i].id;
+			pthread_mutex_unlock(&fb_android.mutex);
+			return 0;
+		}
+
+		seen++;
+	}
+	pthread_mutex_unlock(&fb_android.mutex);
+
+	return -1;
 }
 
 static void draw_scaled_framebuffer_locked(ANativeWindow_Buffer *buffer)
@@ -2500,6 +2664,7 @@ void fb_hAndroidTouch(float x, float y, int action)
 	map_window_to_framebuffer_locked(x, y, &mapped_x, &mapped_y);
 	if ((mapped_x < 0) || (mapped_y < 0))
 	{
+		touch_clear_all_locked();
 		fb_android.mouse_buttons &= ~BUTTON_LEFT;
 		pthread_mutex_unlock(&fb_android.mutex);
 		return;
@@ -2510,15 +2675,18 @@ void fb_hAndroidTouch(float x, float y, int action)
 
 	if (action == AMOTION_EVENT_ACTION_DOWN)
 	{
+		touch_set_locked(0, mapped_x, mapped_y);
 		fb_android.mouse_buttons |= BUTTON_LEFT;
 		fb_android.mouse_latched_buttons |= BUTTON_LEFT;
 	}
 	else if (action == AMOTION_EVENT_ACTION_MOVE)
 	{
+		touch_set_locked(0, mapped_x, mapped_y);
 		fb_android.mouse_buttons |= BUTTON_LEFT;
 	}
 	else if (action == AMOTION_EVENT_ACTION_UP || action == AMOTION_EVENT_ACTION_CANCEL)
 	{
+		touch_clear_locked(0);
 		fb_android.mouse_buttons &= ~BUTTON_LEFT;
 	}
 
@@ -2555,6 +2723,158 @@ void fb_hAndroidTouch(float x, float y, int action)
 	fb_hPostEvent(&e);
 }
 
+void fb_hAndroidTouchEvent(const AInputEvent *event)
+{
+	EVENT e;
+	int action_full;
+	int action;
+	int action_index;
+	int pointer_count;
+	int action_id = 0;
+	int action_x = -1;
+	int action_y = -1;
+	int x0, y0, x1, y1;
+	int i;
+	int count_before;
+	int count_after;
+	int can_post;
+	int event_type = 0;
+
+	if (!event)
+		return;
+
+	action_full = AMotionEvent_getAction(event);
+	action = action_full & AMOTION_EVENT_ACTION_MASK;
+	action_index = (action_full & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >>
+		AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
+	pointer_count = (int)AMotionEvent_getPointerCount(event);
+
+	if (pointer_count <= 0)
+		return;
+	if ((action_index < 0) || (action_index >= pointer_count))
+		action_index = 0;
+
+	pthread_mutex_lock(&fb_android.mutex);
+	if (keyboard_button_rect_locked(&x0, &y0, &x1, &y1))
+	{
+		float raw_x = AMotionEvent_getX(event, action_index);
+		float raw_y = AMotionEvent_getY(event, action_index);
+		int keyboard_action = action;
+
+		if ((keyboard_action == AMOTION_EVENT_ACTION_POINTER_DOWN) ||
+		    (keyboard_action == AMOTION_EVENT_ACTION_POINTER_UP))
+		{
+			keyboard_action = (keyboard_action == AMOTION_EVENT_ACTION_POINTER_DOWN) ?
+				AMOTION_EVENT_ACTION_DOWN : AMOTION_EVENT_ACTION_UP;
+		}
+
+		if (fb_android.keyboard_button_down ||
+		    ((int)raw_x >= x0 && (int)raw_x < x1 && (int)raw_y >= y0 && (int)raw_y < y1))
+		{
+			pthread_mutex_unlock(&fb_android.mutex);
+			fb_hAndroidTouch(raw_x, raw_y, keyboard_action);
+			return;
+		}
+	}
+
+	count_before = touch_count_locked();
+
+	if (action == AMOTION_EVENT_ACTION_CANCEL)
+	{
+		touch_clear_all_locked();
+		fb_android.mouse_buttons &= ~BUTTON_LEFT;
+		pthread_mutex_unlock(&fb_android.mutex);
+		return;
+	}
+
+	action_id = (int)AMotionEvent_getPointerId(event, action_index);
+
+	for (i = 0; i < pointer_count; ++i)
+	{
+		int id = (int)AMotionEvent_getPointerId(event, i);
+		int mapped_x;
+		int mapped_y;
+
+		map_window_to_framebuffer_locked(AMotionEvent_getX(event, i),
+			AMotionEvent_getY(event, i), &mapped_x, &mapped_y);
+
+		if (i == action_index)
+		{
+			action_x = mapped_x;
+			action_y = mapped_y;
+		}
+
+		if (((action == AMOTION_EVENT_ACTION_UP) ||
+		     (action == AMOTION_EVENT_ACTION_POINTER_UP)) &&
+		    (i == action_index))
+		{
+			continue;
+		}
+
+		if ((mapped_x >= 0) && (mapped_y >= 0))
+			touch_set_locked(id, mapped_x, mapped_y);
+		else
+			touch_clear_locked(id);
+	}
+
+	if ((action == AMOTION_EVENT_ACTION_UP) ||
+	    (action == AMOTION_EVENT_ACTION_POINTER_UP))
+	{
+		touch_clear_locked(action_id);
+	}
+
+	count_after = touch_count_locked();
+
+	if (count_after > 0)
+	{
+		int first_x;
+		int first_y;
+
+		if (touch_first_locked(&first_x, &first_y))
+		{
+			fb_android.mouse_x = first_x;
+			fb_android.mouse_y = first_y;
+		}
+		fb_android.mouse_buttons |= BUTTON_LEFT;
+	}
+	else
+	{
+		fb_android.mouse_buttons &= ~BUTTON_LEFT;
+	}
+
+	if ((action == AMOTION_EVENT_ACTION_DOWN) ||
+	    (action == AMOTION_EVENT_ACTION_POINTER_DOWN))
+	{
+		fb_android.mouse_latched_buttons |= BUTTON_LEFT;
+	}
+
+	if (count_before == 0 && count_after > 0)
+		event_type = EVENT_MOUSE_BUTTON_PRESS;
+	else if (count_before > 0 && count_after == 0)
+		event_type = EVENT_MOUSE_BUTTON_RELEASE;
+	else if (count_after > 0)
+		event_type = EVENT_MOUSE_MOVE;
+
+	can_post = can_post_input_locked();
+	if ((action_x < 0) || (action_y < 0))
+		touch_first_locked(&action_x, &action_y);
+	pthread_mutex_unlock(&fb_android.mutex);
+
+	if (!can_post || !event_type || (action_x < 0) || (action_y < 0))
+		return;
+
+	memset(&e, 0, sizeof(e));
+	e.type = event_type;
+	e.x = action_x;
+	e.y = action_y;
+	if ((event_type == EVENT_MOUSE_BUTTON_PRESS) ||
+	    (event_type == EVENT_MOUSE_BUTTON_RELEASE))
+	{
+		e.button = BUTTON_LEFT;
+	}
+	fb_hPostEvent(&e);
+}
+
 static int android_key_to_scancode(int32_t keycode)
 {
 	if (keycode >= AKEYCODE_A && keycode <= AKEYCODE_Z)
@@ -2573,6 +2893,15 @@ static int android_key_to_scancode(int32_t keycode)
 	case AKEYCODE_SPACE: return SC_SPACE;
 	case AKEYCODE_MINUS: return SC_MINUS;
 	case AKEYCODE_EQUALS: return SC_EQUALS;
+	case AKEYCODE_COMMA: return SC_COMMA;
+	case AKEYCODE_PERIOD: return SC_PERIOD;
+	case AKEYCODE_GRAVE: return SC_TILDE;
+	case AKEYCODE_LEFT_BRACKET: return SC_LEFTBRACKET;
+	case AKEYCODE_RIGHT_BRACKET: return SC_RIGHTBRACKET;
+	case AKEYCODE_BACKSLASH: return SC_BACKSLASH;
+	case AKEYCODE_SEMICOLON: return SC_SEMICOLON;
+	case AKEYCODE_APOSTROPHE: return SC_QUOTE;
+	case AKEYCODE_SLASH: return SC_SLASH;
 	case AKEYCODE_DPAD_LEFT: return SC_LEFT;
 	case AKEYCODE_DPAD_RIGHT: return SC_RIGHT;
 	case AKEYCODE_DPAD_UP: return SC_UP;
@@ -2609,6 +2938,12 @@ static int android_key_to_ascii(int32_t keycode)
 	}
 }
 
+static void android_set_gfx_key_state(int code, int pressed)
+{
+	if (__fb_gfx && code > 0 && code < 128)
+		__fb_gfx->key[code] = pressed ? TRUE : FALSE;
+}
+
 void fb_hAndroidKey(int32_t keycode, int action, int unicode)
 {
 	EVENT e;
@@ -2639,15 +2974,23 @@ void fb_hAndroidKey(int32_t keycode, int action, int unicode)
 	if (action == AKEY_EVENT_ACTION_DOWN)
 	{
 		e.type = EVENT_KEY_PRESS;
+		DRIVER_LOCK();
+		android_set_gfx_key_state(scancode, TRUE);
+		if (key == '`')
+			android_set_gfx_key_state(key, TRUE);
 		if (key > 0)
-		{
-			DRIVER_LOCK();
 			fb_hPostKey(key);
-			DRIVER_UNLOCK();
-		}
+		DRIVER_UNLOCK();
 	}
 	else if (action == AKEY_EVENT_ACTION_UP)
+	{
 		e.type = EVENT_KEY_RELEASE;
+		DRIVER_LOCK();
+		android_set_gfx_key_state(scancode, FALSE);
+		if (key == '`')
+			android_set_gfx_key_state(key, FALSE);
+		DRIVER_UNLOCK();
+	}
 	else
 		return;
 

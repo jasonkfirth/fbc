@@ -885,6 +885,7 @@ none expected
 2 warnings expected
 	Suffix ignored in 'threadcall%'
 	Suffix ignored in 'thread%'
+suffix-fb.bas(1204) error 288: Unsupported function in 'dim thrptr as any ptr = threadcall% thread%()'
 ---- parser-quirk-vafirst.bas ----
 warning expected
 	Suffix ignored in 'cva_start%'
