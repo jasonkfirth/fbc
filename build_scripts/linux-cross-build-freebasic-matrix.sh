@@ -69,7 +69,7 @@ Options:
   --distro NAME     Limit to one distro name
   --release NAME    Limit to one release/codename
   --arch ARCH       Limit to one package architecture
-  --family NAME     Limit to one package family (deb, apk, rpm, slackware)
+  --family NAME     Limit to one package family (deb, apk, rpm, slackware, vm)
   --jobs N          Parallel make jobs for package builds
   --keep-going      Continue after package-family failures
   --skip-host-deps  Skip host dependency installation in family builders
@@ -189,6 +189,10 @@ SLACKWARE_ARCHES=(
     aarch64
 )
 
+VM_ARCHES=(
+    x86_64
+)
+
 ##############################################################################
 # Distro/release matrix
 ##############################################################################
@@ -220,6 +224,12 @@ TARGETS=(
     "rpm|opensuse|opensuse/tumbleweed|tumbleweed|rpm-cross-build-freebasic-matrix.sh"
     "slackware|slackware|vbatts/slackware:15.0|15.0|slackware-cross-build-freebasic-matrix.sh"
     "slackware|slackware|vbatts/slackware:current|current|slackware-cross-build-freebasic-matrix.sh"
+    "vm|haiku||x86-64|haiku-vm-build-freebasic.sh"
+    "vm|haiku||i386|haiku-vm-build-freebasic.sh"
+    "vm|netbsd||x86-64|netbsd-vm-build-freebasic.sh"
+    "vm|openbsd||x86-64|openbsd-vm-build-freebasic.sh"
+    "vm|freebsd||x86-64|freebsd-vm-build-freebasic.sh"
+    "vm|dragonfly||x86-64|dragonfly-vm-build-freebasic.sh"
 )
 
 arches_for_target() {
@@ -255,8 +265,33 @@ arches_for_target() {
         slackware/*)
             printf '%s\n' "${SLACKWARE_ARCHES[@]}"
             ;;
+        vm/haiku/x86-64)
+            printf '%s\n' x86_64
+            ;;
+        vm/haiku/i386)
+            printf '%s\n' i386
+            ;;
+        vm/*)
+            printf '%s\n' x86_64
+            ;;
         *)
             die "unsupported package family: $family"
+            ;;
+    esac
+}
+
+outdir_for_target() {
+    local family="$1"
+    local distro="$2"
+    local release="$3"
+    local arch="$4"
+
+    case "$family" in
+        vm)
+            echo "$ROOT/out/$distro/$release"
+            ;;
+        *)
+            echo "$ROOT/out/linux/${distro}/${release}/${arch}"
             ;;
     esac
 }
@@ -284,14 +319,6 @@ target_matches_filters() {
     fi
 
     return 0
-}
-
-outdir_for_target() {
-    local distro="$1"
-    local release="$2"
-    local arch="$3"
-
-    echo "$ROOT/out/linux/${distro}/${release}/${arch}"
 }
 
 ##############################################################################
@@ -383,7 +410,7 @@ EOF
 
         while IFS= read -r arch; do
             target_matches_filters "$family" "$distro" "$release" "$arch" || continue
-            outdir="$(outdir_for_target "$distro" "$release" "$arch")"
+            outdir="$(outdir_for_target "$family" "$distro" "$release" "$arch")"
             printf '%s|%s|%s|%s|%s|%s|%s\n' \
                 "$family" "$distro" "$release" "$arch" "$image" "$script" "$outdir"
         done < <(arches_for_target "$family" "$distro" "$release")
@@ -429,6 +456,11 @@ execute_plan() {
             slackware)
                 [ "$DISTRO_FILTER" = "slackware" ] && return 0
                 ;;
+            vm)
+                case "$DISTRO_FILTER" in
+                    haiku|netbsd|openbsd|freebsd|dragonfly) return 0 ;;
+                esac
+                ;;
         esac
 
         return 1
@@ -455,6 +487,41 @@ execute_plan() {
         family_has_selected_targets "$family" || return 0
 
         args+=(--execute)
+
+        if [ "$family" = vm ]; then
+            local plan_family plan_distro plan_release plan_arch plan_image plan_script plan_outdir
+
+            while IFS="|" read -r plan_family plan_distro plan_release plan_arch plan_image plan_script plan_outdir; do
+                [ "$plan_family" = "$family" ] || continue
+                [ "$plan_script" = "$script" ] || continue
+                target_matches_filters "$plan_family" "$plan_distro" "$plan_release" "$plan_arch" || continue
+
+                args=(--execute)
+                args+=(--arch "$plan_arch")
+                args+=(--archive-dir "$plan_outdir")
+                args+=(--workroot "$ROOT/out/${plan_distro}-vm/$plan_arch")
+                args+=(--jobs "$MAKE_JOBS")
+
+                echo
+                echo "============================================================"
+                echo "Dispatching package family: $family"
+                echo "Script: build_scripts/$script"
+                echo "Target: $plan_distro / $plan_release / $plan_arch"
+                echo "Archive: $plan_outdir"
+                echo "Workroot: $ROOT/out/${plan_distro}-vm/$plan_arch"
+                echo "============================================================"
+
+                ran=$((ran + 1))
+                if ! JOBS="$MAKE_JOBS" "$ROOT/build_scripts/$script" "${args[@]}"; then
+                    failures=$((failures + 1))
+                    if [ "$KEEP_GOING" -eq 0 ]; then
+                        return 1
+                    fi
+                fi
+            done < <(list_plan)
+
+            return 0
+        fi
 
         if [ -n "$DISTRO_FILTER" ]; then
             args+=(--distro "$DISTRO_FILTER")
@@ -518,6 +585,11 @@ execute_plan() {
     fi
 
     run_family slackware slackware-cross-build-freebasic-matrix.sh || true
+    if [ "$KEEP_GOING" -eq 0 ] && [ "$failures" -ne 0 ]; then
+        exit 1
+    fi
+
+    run_family vm haiku-vm-build-freebasic.sh || true
 
     [ "$ran" -gt 0 ] || die "no package family matched the selected filters"
 

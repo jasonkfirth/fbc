@@ -369,7 +369,7 @@ install_host_deps() {
     if command -v apt-get >/dev/null 2>&1; then
         run_root apt-get update -y
         run_root apt-get install -y --no-install-recommends \
-            docker.io qemu-user-static binfmt-support ca-certificates \
+            docker.io qemu-user-binfmt  binfmt-support ca-certificates \
             dpkg-dev
         return 0
     fi

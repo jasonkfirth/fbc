@@ -6,12 +6,12 @@
 #
 # Purpose:
 #
-#   Build and test the Haiku x86_64 FreeBASIC package from a Debian/Ubuntu
-#   Linux host.
+#   Build and test the Haiku x86_64 or x86 (i386) FreeBASIC package from a
+#   Debian/Ubuntu Linux host.
 #
 # Responsibilities:
 #
-#   * download or reuse an official Haiku x86_64 anyboot image
+#   * download or reuse an official Haiku x86 or x86_64 anyboot image
 #   * patch the live image so it starts sshd on first boot
 #   * build FreeBASIC inside a Haiku QEMU VM using haiku-build-freebasic.sh
 #   * install the resulting .hpkg in a separate clean Haiku VM
@@ -19,7 +19,6 @@
 #
 # This script intentionally does NOT contain:
 #
-#   * non-x86_64 Haiku support
 #   * cross-compilation into Haiku packages
 #   * GUI automation of the Haiku installer
 #
@@ -33,9 +32,9 @@ CACHE_DIR="$WORKROOT/cache"
 RUN_DIR="$WORKROOT/run"
 PACKAGE_DIR="$WORKROOT/packages"
 LOG_DIR="$WORKROOT/logs"
-ARCHIVE_DIR="$ROOT/out/haiku/x86-64"
-
 ARCH="x86_64"
+TARGET_ARCH=""
+ARCHIVE_DIR=""
 IMAGE_URL=""
 IMAGE_FILE=""
 ISO_FILE=""
@@ -69,12 +68,13 @@ usage() {
 Usage: ./build_scripts/haiku-vm-build-freebasic.sh [options]
 
 Options:
-  --image-url URL          Haiku x86_64 anyboot .zip or .iso URL.
-  --image FILE             Existing Haiku x86_64 anyboot .zip or .iso.
+  --image-url URL          Haiku x86_64 or x86 anyboot .zip or .iso URL.
+  --image FILE             Existing Haiku x86_64 or x86 anyboot .zip or .iso.
   --package FILE           Existing .hpkg to test.
+  --arch ARCH              Haiku architecture: x86_64, x86, or i386.
   --test-only              Test --package without rebuilding FreeBASIC.
   --workroot DIR           Work directory. Default: out/haiku-vm
-  --archive-dir DIR        Final archive directory. Default: out/haiku/x86-64
+  --archive-dir DIR        Final archive directory. Default: out/haiku/$ARCH
   --jobs N                 Build jobs inside Haiku. Default: host CPU count
   --cpus N                 QEMU CPU count. Default: --jobs value
   --memory MB              QEMU memory in MB. Default: 4096
@@ -96,7 +96,7 @@ Options:
   --keep-vms               Do not delete VM run directories on success.
   -h, --help               Show this help.
 
-The script builds x86_64 only.  A fresh Haiku VM is used for package testing.
+The script builds x86_64 and x86 (i386) Haiku VMs. A fresh Haiku VM is used for package testing.
 EOF
 }
 
@@ -116,6 +116,7 @@ while [ "$#" -gt 0 ]; do
 			shift 2
 			;;
 		--archive-dir) ARCHIVE_DIR="$2"; shift 2 ;;
+		--arch) TARGET_ARCH="$2"; shift 2 ;;
 		--jobs) JOBS="$2"; CPUS="$2"; FBCTESTS_JOBS="$2"; EXAMPLEAGEDDON_JOBS="$2"; shift 2 ;;
 		--cpus) CPUS="$2"; shift 2 ;;
 		--memory) MEMORY="$2"; shift 2 ;;
@@ -135,10 +136,40 @@ while [ "$#" -gt 0 ]; do
 	esac
 done
 
+if [ -n "$TARGET_ARCH" ]; then
+    case "$TARGET_ARCH" in
+        x86_64|amd64)
+            ARCH="x86_64"
+            ;;
+        x86|i386)
+            ARCH="x86"
+            ;;
+        *)
+            die "unsupported Haiku architecture: $TARGET_ARCH"
+            ;;
+    esac
+fi
+
 case "$ARCH" in
-	x86_64) ;;
-	*) die "only x86_64 is supported by this script" ;;
+	x86_64|x86) ;;
+	*) die "only x86_64 and x86 (i386) are supported by this script" ;;
 esac
+
+QEMU_BIN=""
+case "$ARCH" in
+	x86_64)
+		QEMU_BIN="qemu-system-x86_64"
+		;;
+	x86)
+		QEMU_BIN="qemu-system-i386"
+		;;
+esac
+
+NIGHTLY_INDEX_URL="https://download.haiku-os.org/nightly-images/$ARCH/"
+
+if [ -z "$ARCHIVE_DIR" ]; then
+    ARCHIVE_DIR="$ROOT/out/haiku/$ARCH"
+fi
 
 case "$JOBS" in ''|*[!0-9]*|0) die "--jobs must be a positive integer" ;; esac
 case "$CPUS" in ''|*[!0-9]*|0) die "--cpus must be a positive integer" ;; esac
@@ -202,7 +233,7 @@ check_host_tools() {
 	require_tool bash
 	require_tool curl
 	require_tool python3
-	require_tool qemu-system-x86_64
+	require_tool "$QEMU_BIN"
 	require_tool ssh
 	require_tool scp
 	require_tool tar
@@ -215,7 +246,7 @@ check_host_tools() {
 
 latest_haiku_url() {
 	curl -fsSL "$NIGHTLY_INDEX_URL" |
-		sed -n 's/.*href="\([^"]*x86_64-anyboot\.zip\)".*/\1/p' |
+		sed -n "s/.*href=\"\([^\"]*${ARCH}-anyboot\.zip\)\".*/\1/p" |
 		awk 'NF && !found { print; found = 1 }'
 }
 
@@ -230,7 +261,7 @@ download_image() {
 	fi
 
 	if [ -z "$IMAGE_URL" ]; then
-		msg "Resolving latest Haiku x86_64 nightly"
+		msg "Resolving latest Haiku $ARCH nightly"
 		IMAGE_URL="$(latest_haiku_url)"
 		[ -n "$IMAGE_URL" ] || die "could not locate latest Haiku nightly image"
 	fi
