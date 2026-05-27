@@ -163,7 +163,10 @@ endif
 ##############################################################################
 
 bootstrap-emit-source-response: | $(BOOTSTRAP_OUT)
-	@: $(file >$(BOOTSTRAP_SRC_RSP),$(foreach f,$(BOOTSTRAP_COMPILER_SRC),-b $(f)))
+	@rm -f "$(BOOTSTRAP_SRC_RSP)"
+	@for f in $(BOOTSTRAP_COMPILER_SRC); do \
+		printf '%s\n' "-b $$f" >> "$(BOOTSTRAP_SRC_RSP)"; \
+	done
 	@test -s "$(BOOTSTRAP_SRC_RSP)" || { \
 		echo "ERROR: no compiler sources found for bootstrap emission"; \
 		exit 1; \
