@@ -40,6 +40,7 @@
 #
 # Legacy compile-time feature macros:
 #   DISABLE_X11
+#   DISABLE_XPM
 #   DISABLE_OPENGL
 #   DISABLE_FBDEV
 #   DISABLE_D3D10
@@ -60,6 +61,7 @@ ENABLE_X11     :=
 ENABLE_SDL     :=
 
 DISABLE_X11    :=
+DISABLE_XPM    :=
 DISABLE_OPENGL :=
 DISABLE_FBDEV  :=
 DISABLE_D3D10  :=
@@ -90,7 +92,7 @@ endif
 # Platform families
 # ---------------------------------------------------------------------------
 
-ELF_UNIX_OS := linux freebsd netbsd openbsd dragonfly solaris haiku android
+ELF_UNIX_OS := linux freebsd netbsd openbsd dragonfly solaris illumos haiku android
 BSD_OS      := freebsd netbsd openbsd dragonfly
 WINDOWS_OS  := win32 cygwin xbox
 DOS_OS      := dos
@@ -146,7 +148,7 @@ else ifeq ($(TARGET_OS),xbox)
   THREAD_MODEL := win32
 else ifeq ($(TARGET_OS),cygwin)
   THREAD_MODEL := posix
-else ifneq ($(filter linux android darwin freebsd netbsd openbsd dragonfly solaris haiku,$(TARGET_OS)),)
+else ifneq ($(filter linux android darwin freebsd netbsd openbsd dragonfly solaris illumos haiku,$(TARGET_OS)),)
   THREAD_MODEL := posix
 endif
 
@@ -170,8 +172,18 @@ endif
 # ---------------------------------------------------------------------------
 
 # Linux / BSD / Solaris / Cygwin -> X11-oriented builds
-ifneq ($(filter linux freebsd netbsd openbsd dragonfly solaris cygwin,$(TARGET_OS)),)
+ifneq ($(filter linux freebsd netbsd openbsd dragonfly solaris illumos cygwin,$(TARGET_OS)),)
   ENABLE_X11 := YesPlease
+endif
+
+# OmniOS r151058 ships the X11 client libraries in the OOCE repository, but
+# does not provide libGL/Mesa or libXpm packages in the IPS repositories used
+# by the illumos VM build.  Keep the normal X11 gfx backend enabled and leave
+# those optional pieces out of the default illumos build instead of probing for
+# libraries that are not available on the reference platform.
+ifeq ($(TARGET_OS),illumos)
+  DISABLE_XPM := YesPlease
+  DISABLE_OPENGL := YesPlease
 endif
 
 # Haiku -> native Haiku backend
@@ -297,8 +309,8 @@ ifneq ($(filter dragonfly,$(TARGET_OS)),)
 
 endif
 
-# ---- Solaris Specific Flags ----
-ifneq ($(filter solaris,$(TARGET_OS)),)
+# ---- Solaris / illumos Specific Flags ----
+ifneq ($(filter solaris illumos,$(TARGET_OS)),)
 
   ENABLE_STACK_PROTECTOR :=
   ENABLE_FORTIFY         :=
@@ -382,20 +394,20 @@ endif
 # header emitted by GCC for -fcf-protection.  Keep CET out of Haiku builds so
 # the freshly built bootstrap compiler can run while building the real one.
 ifneq ($(filter x86 x86_64,$(TARGET_ARCH)),)
-  ifneq ($(filter linux freebsd netbsd openbsd dragonfly solaris,$(TARGET_OS)),)
+  ifneq ($(filter linux freebsd netbsd openbsd dragonfly solaris illumos,$(TARGET_OS)),)
     ENABLE_CET := YesPlease
   endif
 endif
 
 # -fno-plt is an ELF-centric optimization/hardening knob.
 # Keep it enabled for mainstream hosted ELF platforms, but not Android.
-ifneq ($(filter linux freebsd netbsd openbsd dragonfly solaris haiku,$(TARGET_OS)),)
+ifneq ($(filter linux freebsd netbsd openbsd dragonfly solaris illumos haiku,$(TARGET_OS)),)
   ENABLE_NO_PLT := YesPlease
 endif
 
 # Auto var init is valuable but somewhat more toolchain-sensitive.
 # Restrict to mainstream hosted ELF targets; packagers can disable if needed.
-ifneq ($(filter linux freebsd solaris haiku,$(TARGET_OS)),)
+ifneq ($(filter linux freebsd solaris illumos haiku,$(TARGET_OS)),)
   ENABLE_AUTO_VAR_INIT := YesPlease
 endif
 
@@ -412,6 +424,11 @@ endif
 
 ifdef DISABLE_X11
   ALLCFLAGS += -DDISABLE_X11
+endif
+
+ifdef DISABLE_XPM
+  ALLCFLAGS += -DDISABLE_XPM
+  FBFLAGS += -d DISABLE_XPM
 endif
 
 ifdef DISABLE_OPENGL

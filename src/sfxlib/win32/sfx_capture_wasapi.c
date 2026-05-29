@@ -60,6 +60,22 @@ static const GUID sfx_capture_float_guid =
     { 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 }
 };
 
+static int wasapi_capture_supported_platform(void)
+{
+    OSVERSIONINFO ver_info;
+
+    memset(&ver_info, 0, sizeof(ver_info));
+    ver_info.dwOSVersionInfoSize = sizeof(ver_info);
+
+    if (!GetVersionEx(&ver_info))
+        return FALSE;
+
+    if (ver_info.dwPlatformId != VER_PLATFORM_WIN32_NT)
+        return FALSE;
+
+    return ver_info.dwMajorVersion >= 6;
+}
+
 
 /* ------------------------------------------------------------------------- */
 /* Debug helper                                                              */
@@ -208,6 +224,9 @@ int fb_sfxPlatformCaptureStart(void)
 {
     HRESULT hr;
     REFERENCE_TIME buffer_duration = 1000000;
+
+    if (!wasapi_capture_supported_platform())
+        return -1;
 
     capture_release_interfaces();
     g_capture_active = 0;

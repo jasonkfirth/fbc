@@ -94,7 +94,7 @@ HOST_DUMPMACHINE := $(shell $(CC) -dumpmachine 2>/dev/null || echo)
 
 CROSS_BUILD := $(and $(strip $(TARGET_TRIPLET)),$(filter-out $(strip $(TARGET_TRIPLET)),$(strip $(HOST_DUMPMACHINE))))
 
-RUNNABLE_OS := linux darwin freebsd netbsd openbsd dragonfly solaris win32 cygwin dos
+RUNNABLE_OS := linux darwin freebsd netbsd openbsd dragonfly solaris illumos win32 cygwin dos
 CAN_RUN := $(and $(filter $(TARGET_OS),$(RUNNABLE_OS)),$(if $(CROSS_BUILD),,yes))
 
 ##############################################################################

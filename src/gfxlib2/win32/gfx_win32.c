@@ -44,7 +44,16 @@
 #define TOUCH_COORD_TO_PIXEL(x) ((x) / 100)
 #endif
 
+#ifndef PROCESS_DPI_UNAWARE
+#define PROCESS_DPI_UNAWARE 0
+#define PROCESS_SYSTEM_DPI_AWARE 1
+#define PROCESS_PER_MONITOR_DPI_AWARE 2
+#endif
+
 #define FB_WIN32_TOUCH_MAX 16
+
+typedef HRESULT (WINAPI *SETPROCESSDPIAWARENESS)(int);
+typedef BOOL (WINAPI *SETPROCESSDPIAWARE)(void);
 
 typedef struct FB_WIN32_TOUCHINPUT_ {
 	LONG x;
@@ -100,6 +109,7 @@ static int last_mouse_buttons, mouse_buttons;
 static int mouse_wheel, mouse_hwheel, mouse_x, mouse_y, mouse_on;
 static POINT last_mouse_pos;
 static FB_WIN32_TOUCH_STATE touch[FB_WIN32_TOUCH_MAX];
+static BOOL fb_dpi_awareness_set = FALSE;
 
 struct keyconvinfo {
 	union {
@@ -245,6 +255,49 @@ static void touch_clear(int id)
 static void touch_clear_all(void)
 {
 	memset(touch, 0, sizeof(touch));
+}
+
+static void fb_hEnableDPIAwareness(int os_major_version)
+{
+	HMODULE shcore;
+	HMODULE user32;
+	SETPROCESSDPIAWARENESS set_process_dpi_awareness;
+	SETPROCESSDPIAWARE set_process_dpi_aware;
+	HRESULT ret;
+
+	if (fb_dpi_awareness_set) {
+		return;
+	}
+	fb_dpi_awareness_set = TRUE;
+
+	/* XP/2000 are pre-DPI-awareness.
+	   Keep them untouched so they can continue with legacy behavior. */
+	if ((os_major_version != 0) && (os_major_version < 6)) {
+		return;
+	}
+
+	shcore = LoadLibrary("shcore");
+	if (shcore) {
+		set_process_dpi_awareness = (SETPROCESSDPIAWARENESS)GetProcAddress(shcore, "SetProcessDpiAwareness");
+		if (set_process_dpi_awareness) {
+			ret = set_process_dpi_awareness(PROCESS_PER_MONITOR_DPI_AWARE);
+			FreeLibrary(shcore);
+			if ((ret == S_OK) || (ret == E_ACCESSDENIED)) {
+				return;
+			}
+		} else {
+			FreeLibrary(shcore);
+		}
+	}
+
+	user32 = GetModuleHandle("USER32");
+	if (!user32) {
+		return;
+	}
+	set_process_dpi_aware = (SETPROCESSDPIAWARE)GetProcAddress(user32, "SetProcessDPIAware");
+	if (set_process_dpi_aware) {
+		set_process_dpi_aware();
+	}
 }
 
 static int touch_count(void)
@@ -749,10 +802,18 @@ int fb_hWin32Init(char *title, int w, int h, int depth, int refresh_rate, int fl
 	HANDLE events[2];
 	long result;
 	int i;
+	int os_major_version;
 
 	info.dwOSVersionInfoSize = sizeof(info);
-	GetVersionEx(&info);
-	fb_win32.version = (info.dwMajorVersion << 8) | info.dwMinorVersion;
+	if (GetVersionEx(&info)) {
+		fb_win32.version = (info.dwMajorVersion << 8) | info.dwMinorVersion;
+		os_major_version = (int)info.dwMajorVersion;
+	} else {
+		fb_win32.version = 0;
+		os_major_version = 0;
+	}
+
+	fb_hEnableDPIAwareness(os_major_version);
 
 	module = GetModuleHandle("USER32");
 	for (i = 0; i < ((int)sizeof(user32_procs)) / ((int)sizeof(user32_procs[0])); i++) {

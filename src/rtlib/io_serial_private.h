@@ -5,7 +5,7 @@
 		int iPort;
 		FB_SERIAL_OPTIONS *pOptions;
 	} W32_SERIAL_INFO;
-#elif defined HOST_LINUX || defined HOST_ANDROID
+#elif defined HOST_LINUX || defined HOST_ANDROID || defined HOST_SOLARIS
 	/* Uncomment HAS_LOCKDEV to active lock file funcionality, not forget
 	 * compile whith -llockdev
 	 */

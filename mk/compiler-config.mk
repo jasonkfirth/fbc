@@ -37,6 +37,7 @@ HOMEBREW_GXX := $(strip $(shell find /opt/homebrew/bin /usr/local/bin -maxdepth 
 HOST_CC_FOR_PROBE := $(strip $(or $(LOCAL_GCC),$(MSYS_GCC),$(HOMEBREW_GCC),$(CC),gcc))
 HOST_TRIPLET := $(shell $(HOST_CC_FOR_PROBE) -dumpmachine 2>/dev/null || echo unknown)
 HOST_TRIPLET_LC := $(strip $(shell printf '%s' "$(HOST_TRIPLET)" | tr 'A-Z' 'a-z'))
+HOST_UNAME_OS := $(strip $(shell uname -o 2>/dev/null | tr 'A-Z' 'a-z'))
 HOST_TRIPLET_TOKENS := $(subst -, ,$(HOST_TRIPLET_LC))
 HOST_ARCH_RAW := $(word 1,$(HOST_TRIPLET_TOKENS))
 HOST_ARCH := $(HOST_ARCH_RAW)
@@ -109,8 +110,13 @@ endif
 ifneq ($(findstring haiku,$(HOST_TRIPLET_LC)),)
   HOST_OS := haiku
 endif
-ifneq ($(or $(findstring solaris,$(HOST_TRIPLET_LC)),$(findstring sunos,$(HOST_TRIPLET_LC)),$(findstring illumos,$(HOST_TRIPLET_LC))),)
-  HOST_OS := solaris
+ifneq ($(or $(findstring illumos,$(HOST_TRIPLET_LC)),$(findstring illumos,$(HOST_UNAME_OS))),)
+  HOST_OS := illumos
+endif
+ifeq ($(strip $(HOST_OS)),)
+  ifneq ($(or $(findstring solaris,$(HOST_TRIPLET_LC)),$(findstring sunos,$(HOST_TRIPLET_LC))),)
+    HOST_OS := solaris
+  endif
 endif
 ifneq ($(findstring cygwin,$(HOST_TRIPLET_LC)),)
   HOST_OS := cygwin

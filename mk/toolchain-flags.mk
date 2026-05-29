@@ -89,6 +89,25 @@ ifeq ($(TARGET_OS),netbsd)
 #  LDFLAGS  += -lexecinfo
 endif
 
+##############################################################################
+# illumos exception
+##############################################################################
+
+ifeq ($(TARGET_OS),illumos)
+
+  # OmniOS OOCE
+  ifeq ($(TARGET_ARCH),x86_64)
+    ILLUMOS_OOCE_LIBDIR := /opt/ooce/lib/amd64
+  else
+    ILLUMOS_OOCE_LIBDIR := /opt/ooce/lib
+  endif
+
+  CPPFLAGS += -I/opt/ooce/include
+  CFLAGS   += -I/opt/ooce/include
+  LDFLAGS  += -L$(ILLUMOS_OOCE_LIBDIR)
+  LDFLAGS  += -Wl,-R$(ILLUMOS_OOCE_LIBDIR)
+endif
+
  
 
 ##############################################################################

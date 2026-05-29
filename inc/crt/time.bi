@@ -32,6 +32,8 @@
 #include once "crt/netbsd/time.bi"
 #elseif defined(__FB_HAIKU__)
 #include once "crt/haiku/time.bi"
+#elseif defined(__FB_SOLARIS__)
+#include once "crt/solaris/time.bi"
 #elseif defined(__FB_DARWIN__)
 '' Darwin uses the POSIX time declarations shared with the Unix CRT layer.
 #include once "crt/linux/time.bi"

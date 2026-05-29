@@ -47,6 +47,8 @@
 #include once "crt/haiku/stdio.bi"
 #elseif defined(__FB_DARWIN__)
 #include once "crt/darwin/stdio.bi"
+#elseif defined(__FB_SOLARIS__)
+#include once "crt/solaris/stdio.bi"
 #elseif defined(__FB_UNIX__)
 '' Other Unices are likely to be BSD variants. stdio.bi is the most important
 '' crt header, so try to make FB work on other OSes.

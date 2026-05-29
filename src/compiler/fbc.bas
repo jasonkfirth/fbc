@@ -267,7 +267,8 @@ private sub hSetOutName( )
 		case FB_COMPTARGET_LINUX, FB_COMPTARGET_DARWIN, _
 		     FB_COMPTARGET_FREEBSD, FB_COMPTARGET_OPENBSD, _
 		     FB_COMPTARGET_NETBSD, FB_COMPTARGET_DRAGONFLY, _
-		     FB_COMPTARGET_SOLARIS, FB_COMPTARGET_ANDROID
+		     FB_COMPTARGET_SOLARIS, FB_COMPTARGET_ILLUMOS, _
+		     FB_COMPTARGET_ANDROID
 			fbc.outname = hStripFilename( fbc.outname ) + _
 				"lib" + hStripPath( fbc.outname ) + ".so"
 		case FB_COMPTARGET_DOS
@@ -790,7 +791,8 @@ end function
 private function fbcLinkerIsGold( ) as integer
 	'' This is needed otherwise it will wrongly pass --version into the linker on Solaris
 	'' caused the linker version to be printed everytime we compile with fbc
-	if(fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_SOLARIS) then
+	if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_SOLARIS) or _
+	    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_ILLUMOS) ) then
 		return FALSE
 	else
 		dim ldcmd as string
@@ -1062,7 +1064,8 @@ private function hLinkFiles( ) as integer
 	case FB_COMPTARGET_LINUX, FB_COMPTARGET_HAIKU, _
 	     FB_COMPTARGET_FREEBSD, FB_COMPTARGET_OPENBSD, _
 	     FB_COMPTARGET_NETBSD, FB_COMPTARGET_DRAGONFLY, _
-	     FB_COMPTARGET_SOLARIS, FB_COMPTARGET_ANDROID
+	     FB_COMPTARGET_SOLARIS, FB_COMPTARGET_ILLUMOS, _
+	     FB_COMPTARGET_ANDROID
 
 		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then
 			dllname = hStripPath( hStripExt( fbc.outname ) )
@@ -1079,7 +1082,17 @@ private function hLinkFiles( ) as integer
 			case FB_COMPTARGET_DRAGONFLY
 				ldcline += " -dynamic-linker /libexec/ld-elf.so.2"
 			case FB_COMPTARGET_SOLARIS
-				ldcline += " --dynamic-linker /lib/64/ld.so.1"
+				if( fbGetCpuFamily( ) = FB_CPUFAMILY_X86_64 ) then
+					ldcline += " -I /lib/64/ld.so.1"
+				else
+					ldcline += " -I /lib/ld.so.1"
+				end if
+			case FB_COMPTARGET_ILLUMOS
+				if( fbGetCpuFamily( ) = FB_CPUFAMILY_X86_64 ) then
+					ldcline += " -I /lib/64/ld.so.1"
+				else
+					ldcline += " -I /lib/ld.so.1"
+				end if
 			case FB_COMPTARGET_LINUX
 				select case( fbGetCpuFamily( ) )
 				case FB_CPUFAMILY_X86
@@ -1173,6 +1186,7 @@ private function hLinkFiles( ) as integer
 		if( (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB) or _
 			fbGetOption( FB_COMPOPT_EXPORT ) ) and _
 			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_SOLARIS) and _
+			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_ILLUMOS) and _
 			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) then
 			ldcline += " --export-dynamic"
 		end if
@@ -1247,6 +1261,7 @@ private function hLinkFiles( ) as integer
 		if( fbGetOption( FB_COMPOPT_OBJINFO ) and _
 			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) and _
 			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_SOLARIS) and _
+			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_ILLUMOS) and _
 			( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) and _
 			( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX ) and _
 			( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_WII ) and _
@@ -1389,7 +1404,8 @@ private function hLinkFiles( ) as integer
 
 	case FB_COMPTARGET_LINUX, FB_COMPTARGET_HAIKU, FB_COMPTARGET_DARWIN, _
 		FB_COMPTARGET_FREEBSD, FB_COMPTARGET_OPENBSD, _
-		FB_COMPTARGET_NETBSD, FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS
+		FB_COMPTARGET_NETBSD, FB_COMPTARGET_DRAGONFLY, _
+		FB_COMPTARGET_SOLARIS, FB_COMPTARGET_ILLUMOS
 
 		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_EXECUTABLE) then
 				if( fbGetOption( FB_COMPOPT_PROFILE ) ) then
@@ -1572,7 +1588,8 @@ private function hLinkFiles( ) as integer
 
 	case FB_COMPTARGET_LINUX, FB_COMPTARGET_FREEBSD, _
 		FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD, _
-		FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS
+		FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS, _
+		FB_COMPTARGET_ILLUMOS
 		if( fbGetOption( FB_COMPOPT_PIC ) ) then
 			ldcline += hFindLib( "crtendS.o" )
 		else
@@ -1607,7 +1624,7 @@ private function hLinkFiles( ) as integer
 	select case as const fbGetOption( FB_COMPOPT_TARGET )
 	case FB_COMPTARGET_LINUX, FB_COMPTARGET_HAIKU, FB_COMPTARGET_FREEBSD, _
 		FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD, _
-		FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS
+		FB_COMPTARGET_DRAGONFLY
 		dim as long outtype = fbGetOption( FB_COMPOPT_OUTTYPE )
 		if outtype = FB_OUTTYPE_EXECUTABLE OrElse outtype = FB_OUTTYPE_DYNAMICLIB Then
 			dim as long cpufamily = fbGetCpuFamily( )
@@ -1942,6 +1959,8 @@ dim shared as FBGNUOSINFO gnuosmap(0 to ...) => _
 	(@"freebsd"    , FB_COMPTARGET_FREEBSD  ), _
 	(@"dragonfly"  , FB_COMPTARGET_DRAGONFLY), _
 	(@"solaris"    , FB_COMPTARGET_SOLARIS  ), _
+	(@"illumos"    , FB_COMPTARGET_ILLUMOS  ), _
+	(@"sunos"      , FB_COMPTARGET_ILLUMOS  ), _
 	(@"netbsd"     , FB_COMPTARGET_NETBSD   ), _
 	(@"openbsd"    , FB_COMPTARGET_OPENBSD  ), _
 	(@"xbox"       , FB_COMPTARGET_XBOX     ), _
@@ -2042,6 +2061,8 @@ dim shared as FBOSARCHINFO fbosarchmap(0 to ...) => _
 	(@"dragonfly", FB_COMPTARGET_DRAGONFLY, FB_DEFAULT_CPUTYPE_X86_64), _
 	_ '' solaris is 64 bit only
 	(@"solaris", FB_COMPTARGET_SOLARIS, FB_DEFAULT_CPUTYPE_X86_64), _
+	_ '' illumos is 64 bit only
+	(@"illumos", FB_COMPTARGET_ILLUMOS, FB_DEFAULT_CPUTYPE_X86_64), _
 	_
 	_ '' OS given without arch, using the default arch, except for dos/xbox
 	_ ''  which only work with x86, so we can always default to x86 for them.
@@ -3238,6 +3259,7 @@ private function hTargetNeedsPIC( ) as integer
 		case FB_COMPTARGET_LINUX, FB_COMPTARGET_FREEBSD, _
 		     FB_COMPTARGET_NETBSD, _
 		     FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS, _
+		     FB_COMPTARGET_ILLUMOS, _
 		     FB_COMPTARGET_ANDROID
 			function = TRUE
 		end select
@@ -3418,7 +3440,8 @@ private sub hCheckArgs()
 	select case as const (fbGetOption(FB_COMPOPT_TARGET))
 	case FB_COMPTARGET_LINUX, FB_COMPTARGET_DARWIN, _
 		FB_COMPTARGET_FREEBSD, FB_COMPTARGET_OPENBSD, _
-		FB_COMPTARGET_NETBSD, FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS
+		FB_COMPTARGET_NETBSD, FB_COMPTARGET_DRAGONFLY, _
+		FB_COMPTARGET_SOLARIS, FB_COMPTARGET_ILLUMOS
 
 	case else
 		if (len(fbc.xpm.srcfile) > 0) then

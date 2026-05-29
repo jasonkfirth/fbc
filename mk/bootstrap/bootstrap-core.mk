@@ -157,6 +157,12 @@ BOOTSTRAP_PREFERRED_DONORS :=
 ifneq ($(filter $(TARGET_OS),openbsd netbsd freebsd dragonfly),)
 BOOTSTRAP_PREFERRED_DONORS := $(BOOTSTRAP_BSD_DONORS)
 endif
+ifneq ($(filter $(TARGET_OS),solaris illumos),)
+BOOTSTRAP_PREFERRED_DONORS := $(filter linux-$(TARGET_ARCH),$(BOOTSTRAP_DIRS))
+ifeq ($(TARGET_ARCH),x86_64)
+BOOTSTRAP_PREFERRED_DONORS += $(filter linux-amd64,$(BOOTSTRAP_DIRS))
+endif
+endif
 BOOTSTRAP_SAME_ARCH_DONORS := $(filter %-$(TARGET_ARCH),$(BOOTSTRAP_DIRS))
 ifeq ($(TARGET_ARCH),x86_64)
 BOOTSTRAP_SAME_ARCH_DONORS += $(filter %-amd64,$(BOOTSTRAP_DIRS))

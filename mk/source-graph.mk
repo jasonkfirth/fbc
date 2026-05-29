@@ -19,9 +19,12 @@
 # Search directories
 ##############################################################################
 
-UNIX_LAYER_OS := linux android darwin freebsd netbsd openbsd dragonfly solaris haiku
+UNIX_LAYER_OS := linux android darwin freebsd netbsd openbsd dragonfly solaris illumos haiku
 
 SOURCE_OS := $(TARGET_OS)
+ifeq ($(TARGET_OS),illumos)
+SOURCE_OS := solaris
+endif
 ifeq ($(TARGET_OS),cygwin)
 SOURCE_OS := win32
 endif

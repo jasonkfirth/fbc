@@ -71,6 +71,7 @@ private sub fbcPlatformAddX11GfxLibs( )
 		defined(__FB_FREEBSD__) or _
 		defined(__FB_DRAGONFLY__) or _
 		defined(__FB_SOLARIS__) or _
+		defined(__FB_ILLUMOS__) or _
 		defined(__FB_OPENBSD__) or _
 		defined(__FB_NETBSD__)
 		fbcAddDefLibPath( "/usr/X11R6/lib" )
@@ -91,7 +92,9 @@ private sub fbcPlatformAddX11GfxLibs( )
 	#if (not defined(__FB_DARWIN__)) or defined(ENABLE_XQUARTZ)
 		fbcAddDefLib( "X11" )
 		fbcAddDefLib( "Xext" )
+#ifndef DISABLE_XPM
 		fbcAddDefLib( "Xpm" )
+#endif
 		fbcAddDefLib( "Xrandr" )
 		fbcAddDefLib( "Xrender" )
 	#endif
@@ -107,6 +110,7 @@ end sub
 #include once "fbc-freebsd-platform.bi"
 #include once "fbc-dragonfly-platform.bi"
 #include once "fbc-solaris-platform.bi"
+#include once "fbc-illumos-platform.bi"
 #include once "fbc-openbsd-platform.bi"
 #include once "fbc-darwin-platform.bi"
 #include once "fbc-netbsd-platform.bi"
@@ -126,6 +130,7 @@ static shared as FBC_PLATFORM_HOOKS fbcplatforms(0 to FB_COMPTARGETS-1) = _
 	( @fbcPlatformGetDefaultLinkerTool, @fbcFreebsdPlatformAddDefaultLibPaths,   @fbcFreebsdPlatformAddGfxLibs,   @fbcFreebsdPlatformAddSfxLibs,   @fbcFreebsdPlatformAddDefaultLibs,   @fbcFreebsdPlatformAddLinkerFrameworks   ), _
 	( @fbcPlatformGetDefaultLinkerTool, @fbcDragonflyPlatformAddDefaultLibPaths, @fbcDragonflyPlatformAddGfxLibs, @fbcDragonflyPlatformAddSfxLibs, @fbcDragonflyPlatformAddDefaultLibs, @fbcDragonflyPlatformAddLinkerFrameworks ), _
 	( @fbcPlatformGetDefaultLinkerTool, @fbcSolarisPlatformAddDefaultLibPaths,   @fbcSolarisPlatformAddGfxLibs,   @fbcSolarisPlatformAddSfxLibs,   @fbcSolarisPlatformAddDefaultLibs,   @fbcSolarisPlatformAddLinkerFrameworks   ), _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcIllumosPlatformAddDefaultLibPaths,   @fbcIllumosPlatformAddGfxLibs,   @fbcIllumosPlatformAddSfxLibs,   @fbcIllumosPlatformAddDefaultLibs,   @fbcIllumosPlatformAddLinkerFrameworks   ), _
 	( @fbcPlatformGetDefaultLinkerTool, @fbcOpenbsdPlatformAddDefaultLibPaths,   @fbcOpenbsdPlatformAddGfxLibs,   @fbcOpenbsdPlatformAddSfxLibs,   @fbcOpenbsdPlatformAddDefaultLibs,   @fbcOpenbsdPlatformAddLinkerFrameworks   ), _
 	( @fbcDarwinPlatformGetLinkerTool,  @fbcDarwinPlatformAddDefaultLibPaths,    @fbcDarwinPlatformAddGfxLibs,    @fbcDarwinPlatformAddSfxLibs,    @fbcDarwinPlatformAddDefaultLibs,    @fbcDarwinPlatformAddLinkerFrameworks    ), _
 	( @fbcPlatformGetDefaultLinkerTool, @fbcNetbsdPlatformAddDefaultLibPaths,    @fbcNetbsdPlatformAddGfxLibs,    @fbcNetbsdPlatformAddSfxLibs,    @fbcNetbsdPlatformAddDefaultLibs,    @fbcNetbsdPlatformAddLinkerFrameworks    ), _

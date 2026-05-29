@@ -422,7 +422,9 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	XPixmapFormatValues *format;
 	XSetWindowAttributes attribs;
 	XWMHints hints;
+#ifndef DISABLE_XPM
 	XpmAttributes xpm_attribs;
+#endif
 	XSizeHints *size;
 	Pixmap pixmap;
 	XColor color;
@@ -494,12 +496,14 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	if (!fb_x11.window)
 		return -1;
 	fb_hX11SetWindowTitle( title );
+#ifndef DISABLE_XPM
 	if (fb_program_icon) {
 		hints.flags = IconPixmapHint | IconMaskHint;
 		xpm_attribs.valuemask = XpmReturnAllocPixels | XpmReturnExtensions;
 		XpmCreatePixmapFromData(fb_x11.display, fb_x11.window, fb_program_icon, &hints.icon_pixmap, &hints.icon_mask, &xpm_attribs);
 		XSetWMHints(fb_x11.display, fb_x11.wmwindow, &hints);
 	}
+#endif
 
 	size = XAllocSizeHints();
 	size->flags = PBaseSize | PMinSize | PMaxSize | PResizeInc;

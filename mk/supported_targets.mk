@@ -93,6 +93,9 @@ DARWIN_BOOTSTRAP_TARGETS := \
 SOLARIS_BOOTSTRAP_TARGETS := \
 	$(call _fb_bootstrap_spec,solaris-x86_64,solaris-x86_64,x86_64-pc-solaris)
 
+ILLUMOS_BOOTSTRAP_TARGETS := \
+	$(call _fb_bootstrap_spec,illumos-x86_64,illumos-x86_64,x86_64-pc-illumos)
+
 DOS_BOOTSTRAP_TARGETS := \
 	$(call _fb_bootstrap_spec,dos,dos,i586-pc-msdosdjgpp)
 
@@ -108,6 +111,7 @@ SUPPORTED_BOOTSTRAP_TARGETS := \
 	$(CYGWIN_BOOTSTRAP_TARGETS) \
 	$(DARWIN_BOOTSTRAP_TARGETS) \
 	$(SOLARIS_BOOTSTRAP_TARGETS) \
+	$(ILLUMOS_BOOTSTRAP_TARGETS) \
 	$(DOS_BOOTSTRAP_TARGETS)
 
 SUPPORTED_BOOTSTRAP_DIRS := $(foreach spec,$(SUPPORTED_BOOTSTRAP_TARGETS),$(word 2,$(subst :, ,$(spec))))

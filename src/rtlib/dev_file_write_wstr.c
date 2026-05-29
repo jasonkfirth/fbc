@@ -6,6 +6,7 @@ int fb_DevFileWriteWstr( FB_FILE *handle, const FB_WCHAR* src, size_t chars )
 {
     FILE *fp;
     char *buffer;
+    ssize_t bytes;
     int res;
 
     FB_LOCK();
@@ -34,10 +35,10 @@ int fb_DevFileWriteWstr( FB_FILE *handle, const FB_WCHAR* src, size_t chars )
 
 	/* convert to ascii, file should be opened with the ENCODING option
 	   to allow UTF characters to be written */
-	fb_wstr_ConvToA( buffer, chars, src );
+	bytes = fb_wstr_ConvToA( buffer, chars, src );
 
 	/* do write */
-	res = fwrite( (void *)buffer, 1, chars, fp ) == chars;
+	res = fwrite( (void *)buffer, 1, bytes, fp ) == (size_t)bytes;
 
 	if( chars >= FB_LOCALBUFF_MAXLEN )
 		free( buffer );

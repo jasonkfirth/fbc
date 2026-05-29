@@ -188,7 +188,7 @@ static int directx_init(void)
 	DDPIXELFORMAT format;
 	HRESULT res;
 	DWORD style;
-	int i, depth, is_rgb = FALSE, height, flags;
+	int i, depth, is_rgb = FALSE, height, flags, refresh_rate;
 	DEVENUMDATA dev_enum_data;
 
 	lpDD = NULL;
@@ -233,6 +233,10 @@ static int directx_init(void)
 	rect.bottom = fb_win32.h;
 
 	if (fb_win32.flags & DRIVER_FULLSCREEN) {
+		refresh_rate = fb_win32.refresh_rate;
+		if (fb_win32.version < 0x500)
+			refresh_rate = 0;
+
 		if (fb_hInitWindow(WS_POPUP, 0, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)))
 			return -1;
 		if (IDirectDraw2_SetCooperativeLevel(lpDD, fb_win32.wnd, DDSCL_ALLOWREBOOT | DDSCL_FULLSCREEN | DDSCL_EXCLUSIVE) != DD_OK)
@@ -243,7 +247,7 @@ static int directx_init(void)
 		{
 			flags = ((fb_win32.w == 320) && (height == 200) && (fb_win32.depth == 8)) ? DDSDM_STANDARDVGAMODE : 0;
 
-			if (IDirectDraw2_SetDisplayMode(lpDD, fb_win32.w, height, fb_win32.depth, fb_win32.refresh_rate, flags) == DD_OK)
+			if (IDirectDraw2_SetDisplayMode(lpDD, fb_win32.w, height, fb_win32.depth, refresh_rate, flags) == DD_OK)
 				break;
 
 			depth = fb_win32.depth;
@@ -255,7 +259,7 @@ static int directx_init(void)
 				case 32: depth = 24; break;
 			}
 
-			if ((depth == fb_win32.depth) || (IDirectDraw2_SetDisplayMode(lpDD, fb_win32.w, height, depth, fb_win32.refresh_rate, flags) != DD_OK))
+			if ((depth == fb_win32.depth) || (IDirectDraw2_SetDisplayMode(lpDD, fb_win32.w, height, depth, refresh_rate, flags) != DD_OK))
 			{
 				height = calc_comp_height( height );
 				if( height == 0 )

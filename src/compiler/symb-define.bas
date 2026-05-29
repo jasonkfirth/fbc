@@ -1558,6 +1558,9 @@ sub symbDefineInit _
 
 	'' Add __FB_<target>__ define
 	symbAddDefine( "__FB_" + ucase( *env.target.id ) + "__", NULL, 0 )
+	if( env.clopt.target = FB_COMPTARGET_ILLUMOS ) then
+		symbAddDefine( @"__FB_SOLARIS__", NULL, 0 )
+	end if
 	if( env.clopt.target = FB_COMPTARGET_JS ) then
 		symbAddDefine( @"__FB_LINUX__", NULL, 0 )
 	end if

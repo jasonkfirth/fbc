@@ -77,3 +77,5 @@
 /tests/.fbwii-tmp
 /build
 OMA
+*/__pycache__/*
+*.pyc

@@ -53,6 +53,9 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 		#include <errno.h>
 		#include <netdb.h>
 		#include <sys/ioctl.h>
+		#ifdef HOST_SOLARIS
+			#include <sys/filio.h>
+		#endif
 		#include <sys/select.h>
 		#include <sys/socket.h>
 		#include <sys/types.h>

@@ -108,8 +108,11 @@ static int gdi_init(void)
 		mode.dmPelsWidth = fb_win32.w;
 		mode.dmPelsHeight = fb_win32.h;
 		mode.dmBitsPerPel = fb_win32.depth;
-		mode.dmDisplayFrequency = fb_win32.refresh_rate;
-		mode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL | DM_DISPLAYFREQUENCY;
+		mode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL;
+		if (fb_win32.version >= 0x500) {
+			mode.dmDisplayFrequency = fb_win32.refresh_rate;
+			mode.dmFields |= DM_DISPLAYFREQUENCY;
+		}
 		
 		if (fb_win32.ChangeDisplaySettingsEx) {
 			if (fb_win32.ChangeDisplaySettingsEx(devname, &mode, NULL, CDS_FULLSCREEN, NULL) != DISP_CHANGE_SUCCESSFUL)

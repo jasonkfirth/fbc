@@ -74,6 +74,22 @@ static const GUID sfx_wasapi_float_guid =
     { 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 }
 };
 
+static int wasapi_supported_platform(void)
+{
+    OSVERSIONINFO ver_info;
+
+    memset(&ver_info, 0, sizeof(ver_info));
+    ver_info.dwOSVersionInfoSize = sizeof(ver_info);
+
+    if (!GetVersionEx(&ver_info))
+        return FALSE;
+
+    if (ver_info.dwPlatformId != VER_PLATFORM_WIN32_NT)
+        return FALSE;
+
+    return ver_info.dwMajorVersion >= 6;
+}
+
 
 /* ------------------------------------------------------------------------- */
 /* Debug helper                                                              */
@@ -289,6 +305,9 @@ static int wasapi_init(int rate, int channels, int buffer_size, int flags)
     REFERENCE_TIME buffer_duration;
 
     (void)flags;
+
+    if (!wasapi_supported_platform())
+        return -1;
 
     WASAPI_DBG("Initializing WASAPI driver\n");
 
