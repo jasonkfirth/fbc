@@ -138,22 +138,6 @@ static int bsd_oss_native_s16_format(void)
 #endif
 }
 
-static float bsd_oss_s16_to_float(short value)
-{
-    if (value <= -32768)
-        return -1.0f;
-
-    return (float)value / 32767.0f;
-}
-
-static void bsd_oss_convert_s16_to_float(const short *src, float *dst, int samples)
-{
-    int i;
-
-    for (i = 0; i < samples; ++i)
-        dst[i] = bsd_oss_s16_to_float(src[i]);
-}
-
 static void bsd_oss_close_device(void)
 {
     if (bsd_oss_fd < 0)
@@ -483,7 +467,7 @@ int fb_sfxPlatformCaptureRead(float *buffer, int frames)
     bytes_read -= bytes_read % frame_bytes;
     frames_read = bytes_read / frame_bytes;
     samples_read = frames_read * bsd_oss_capture_channels;
-    bsd_oss_convert_s16_to_float(pcm, buffer, samples_read);
+    fb_sfxConvertS16ToFloat(pcm, buffer, samples_read);
     free(pcm);
 
     return frames_read;

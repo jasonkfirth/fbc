@@ -170,7 +170,7 @@ static int aaudio_write(const float *samples, int frames)
 		return -1;
 
 	if (!fb_hAndroidSfxIsRunning())
-		return frames;
+		return 0;
 
 	fb_sfxDriverDiagnostics("AAudio", samples, frames, channels_active);
 
@@ -192,7 +192,7 @@ static int aaudio_write(const float *samples, int frames)
 	if (result == 0)
 	{
 		pthread_mutex_unlock(&stream_mutex);
-		return frames;
+		return 0;
 	}
 	if (result < 0)
 	{

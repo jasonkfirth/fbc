@@ -294,11 +294,18 @@ static int solaris_audio_write(const float *buffer, int frames)
 
             if (errno == EAGAIN || errno == EWOULDBLOCK)
             {
+                int accepted_frames;
+
                 SOLARIS_AUDIO_DBG("device backpressure, dropping %d bytes\n",
                                   bytes_total - bytes_written);
+
+                accepted_frames = bytes_written / frame_bytes;
                 free(pcm);
-                solaris_audio_sleep_for_frames(frames);
-                return frames;
+
+                if (accepted_frames > 0)
+                    solaris_audio_sleep_for_frames(accepted_frames);
+
+                return accepted_frames;
             }
 
             SOLARIS_AUDIO_DBG("write failed: %s\n", strerror(errno));

@@ -372,7 +372,7 @@ static int opensl_write(const float *samples, int frames)
 		return -1;
 
 	if (!fb_hAndroidSfxIsRunning())
-		return frames;
+		return 0;
 
 	if (!initialized || !queue)
 		return -1;
@@ -384,7 +384,7 @@ static int opensl_write(const float *samples, int frames)
 
 	buffer = wait_for_buffer(&paused);
 	if (!buffer)
-		return frames;
+		return 0;
 
 	total = frames * channels_active;
 	fb_sfxConvertFloatToS16(samples, (short *)buffer->samples, total);

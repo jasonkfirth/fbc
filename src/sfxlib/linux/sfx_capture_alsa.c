@@ -63,21 +63,6 @@ static int capture_debug_enabled(void)
 
 
 /* ------------------------------------------------------------------------- */
-/* Float conversion                                                          */
-/* ------------------------------------------------------------------------- */
-
-static void convert_s16_to_float(short *in, float *out, int samples)
-{
-    int i;
-
-    for (i = 0; i < samples; i++)
-    {
-        out[i] = (float)in[i] / 32768.0f;
-    }
-}
-
-
-/* ------------------------------------------------------------------------- */
 /* Capture initialization                                                    */
 /* ------------------------------------------------------------------------- */
 
@@ -262,7 +247,7 @@ int fb_sfxCaptureAlsaRead(float *buffer, int frames)
         return -1;
     }
 
-    convert_s16_to_float(pcm, buffer, samples);
+    fb_sfxConvertS16ToFloat(pcm, buffer, samples);
 
     free(pcm);
 

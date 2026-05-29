@@ -14,6 +14,7 @@
 #include "../fb_sfx.h"
 #include "../fb_sfx_internal.h"
 #include "../fb_sfx_driver.h"
+#include "../fb_sfx_driver_diag.h"
 #include "fb_sfx_linux.h"
 
 #include <alsa/asoundlib.h>
@@ -117,6 +118,27 @@ static float alsa_buffer_peak(const float *buffer, int samples)
     return peak;
 }
 
+static void alsa_close_pcm(void)
+{
+    int err;
+
+    if (!alsa_pcm)
+        return;
+
+    /*
+        Shutdown must be bounded.  ALSA drain() can wait for a wedged or very
+        deep device buffer, so the driver asks for a non-blocking drain and
+        drops queued frames if the device cannot complete immediately.
+    */
+    snd_pcm_nonblock(alsa_pcm, 1);
+    err = snd_pcm_drain(alsa_pcm);
+    if (err == -EAGAIN || err == -EINTR)
+        snd_pcm_drop(alsa_pcm);
+
+    snd_pcm_close(alsa_pcm);
+    alsa_pcm = NULL;
+}
+
 static int alsa_driver_init(int rate, int channels, int buffer_frames, int flags)
 {
     int err;
@@ -217,11 +239,7 @@ static void alsa_driver_exit(void)
     ALSA_DBG("shutting down ALSA driver\n");
 
     if (alsa_pcm)
-    {
-        snd_pcm_drain(alsa_pcm);
-        snd_pcm_close(alsa_pcm);
-        alsa_pcm = NULL;
-    }
+        alsa_close_pcm();
 
     if (alsa_pcm_buffer)
     {
@@ -297,9 +315,11 @@ static int alsa_driver_write(const float *buffer, int frames)
         if (err == -EPIPE)
         {
             ALSA_DBG("underrun detected\n");
+            fb_sfxDriverStatsRecordUnderrun("ALSA");
 
             if (retry == 0 && snd_pcm_prepare(alsa_pcm) >= 0)
             {
+                fb_sfxDriverStatsRecordRecovery("ALSA");
                 retry = 1;
                 continue;
             }

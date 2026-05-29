@@ -33,8 +33,21 @@ declare sub fb_sfxConvertFloatToS16 cdecl alias "fb_sfxConvertFloatToS16" _
 		byval samples as integer _
 	)
 
+declare sub fb_sfxConvertS16ToFloat cdecl alias "fb_sfxConvertS16ToFloat" _
+	( _
+		byval src as short ptr, _
+		byval dst as single ptr, _
+		byval samples as integer _
+	)
+
+function near_equal( byval lhs as single, byval rhs as single ) as integer
+	function = ( abs( lhs - rhs ) < 0.00001f )
+end function
+
 dim src(0 to 9) as single
 dim dst(0 to 9) as short
+dim pcm(0 to 4) as short
+dim restored(0 to 4) as single
 
 src(0) = -2.0f
 src(1) = -1.0f
@@ -59,5 +72,19 @@ ASSERT( dst(6) = 32767 )
 ASSERT( dst(7) = 0 )
 ASSERT( dst(8) = 32767 )
 ASSERT( dst(9) = -32767 )
+
+pcm(0) = -32768
+pcm(1) = -32767
+pcm(2) = 0
+pcm(3) = 32766
+pcm(4) = 32767
+
+fb_sfxConvertS16ToFloat( @pcm(0), @restored(0), 5 )
+
+ASSERT( near_equal( restored(0), -1.0f ) )
+ASSERT( near_equal( restored(1), -32767.0f / 32768.0f ) )
+ASSERT( near_equal( restored(2), 0.0f ) )
+ASSERT( near_equal( restored(3), 32766.0f / 32768.0f ) )
+ASSERT( near_equal( restored(4), 1.0f ) )
 
 '' end of convert-float-s16.bas

@@ -39,6 +39,7 @@
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
 #include "fb_sfx_driver.h"
+#include "fb_sfx_driver_diag.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -230,6 +231,7 @@ int fb_sfxDeviceSelect(int id)
     g_current_driver = drv;
     g_current_device_id = id;
     __fb_sfx->driver = drv;
+    fb_sfxDriverStatsReset(drv->name);
 
     SFX_DEBUG("sfx_device_select: audio device selected: %s", drv->name);
 

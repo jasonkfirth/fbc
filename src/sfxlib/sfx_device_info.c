@@ -38,6 +38,7 @@
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
 #include "fb_sfx_driver.h"
+#include "fb_sfx_driver_diag.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,7 +58,9 @@
 void fb_sfxDeviceInfo(int id)
 {
     const FB_SFX_DRIVER *drv;
+    FB_SFX_DRIVER_STATS stats;
     int current;
+    int i;
 
     if (id < 0)
     {
@@ -75,7 +78,18 @@ void fb_sfxDeviceInfo(int id)
         return;
     }
 
-    current = fb_sfxDeviceCurrent();
+    current = -1;
+    if (__fb_sfx && __fb_sfx->driver)
+    {
+        for (i = 0; __fb_sfx_drivers_list[i]; ++i)
+        {
+            if (__fb_sfx_drivers_list[i] == __fb_sfx->driver)
+            {
+                current = i;
+                break;
+            }
+        }
+    }
 
     SFX_DEBUG("sfx_device_info: audio device information");
     SFX_DEBUG("sfx_device_info: index: %d", id);
@@ -85,6 +99,41 @@ void fb_sfxDeviceInfo(int id)
         SFX_DEBUG("sfx_device_info: status: active");
     else
         SFX_DEBUG("sfx_device_info: status: available");
+
+    SFX_DEBUG("sfx_device_info: capabilities: output%s%s%s%s",
+              (drv->capabilities & FB_SFX_DRIVER_CAP_CAPTURE) ? " capture" : "",
+              (drv->capabilities & FB_SFX_DRIVER_CAP_MIDI) ? " midi" : "",
+              (drv->capabilities & FB_SFX_DRIVER_CAP_BACKGROUND) ? " background" : "",
+              (drv->capabilities & FB_SFX_DRIVER_CAP_BLOCKING) ? " blocking" : "");
+
+    if (current == id && __fb_sfx)
+    {
+        SFX_DEBUG("sfx_device_info: format: rate=%d channels=%d buffer=%d",
+                  __fb_sfx->samplerate,
+                  __fb_sfx->output_channels,
+                  __fb_sfx->buffer_size);
+    }
+
+    if (fb_sfxDriverStatsSnapshot(drv->name, &stats) == 0)
+    {
+        SFX_DEBUG("sfx_device_info: stats: writes=%llu requested=%llu accepted=%llu dropped=%llu",
+                  stats.write_calls,
+                  stats.frames_requested,
+                  stats.frames_accepted,
+                  stats.frames_dropped);
+        SFX_DEBUG("sfx_device_info: stats: short=%llu zero=%llu errors=%llu underruns=%llu overruns=%llu recoveries=%llu",
+                  stats.short_writes,
+                  stats.zero_writes,
+                  stats.errors,
+                  stats.underruns,
+                  stats.overruns,
+                  stats.recoveries);
+        SFX_DEBUG("sfx_device_info: stats: queue=%d max_queue=%d last_error=%d",
+                  stats.current_queue_fill,
+                  stats.max_queue_fill,
+                  stats.last_error);
+    }
+
     fb_sfxRuntimeUnlock();
 }
 

@@ -185,7 +185,7 @@ static void capture_convert_to_float(const BYTE *src,
             {
                 short pcm;
                 memcpy(&pcm, sample_ptr, sizeof(pcm));
-                sample = (float)pcm / 32768.0f;
+                sample = fb_sfxS16ToFloat(pcm);
             }
             else if (!use_float && bytes_per_sample == 4)
             {

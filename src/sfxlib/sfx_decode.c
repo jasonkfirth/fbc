@@ -45,6 +45,7 @@
 #endif
 
 #include <ctype.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -177,7 +178,6 @@ static int fb_sfxDecodeOgg(const char *filename,
     int frame_count;
     size_t sample_count;
     float *copy;
-    size_t i;
 
     frame_count = stb_vorbis_decode_filename(filename,
                                              &local_channels,
@@ -190,6 +190,12 @@ static int fb_sfxDecodeOgg(const char *filename,
     }
 
     sample_count = (size_t)frame_count * (size_t)local_channels;
+    if (sample_count > (size_t)INT_MAX)
+    {
+        free(decoded);
+        return -1;
+    }
+
     copy = (float *)malloc(sample_count * sizeof(float));
     if (!copy)
     {
@@ -197,8 +203,7 @@ static int fb_sfxDecodeOgg(const char *filename,
         return -1;
     }
 
-    for (i = 0; i < sample_count; ++i)
-        copy[i] = (float)decoded[i] / 32768.0f;
+    fb_sfxConvertS16ToFloat(decoded, copy, (int)sample_count);
 
     free(decoded);
 

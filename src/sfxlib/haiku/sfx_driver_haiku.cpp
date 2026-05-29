@@ -62,17 +62,100 @@ FB_SFX_HAIKU_STATE fb_sfx_haiku =
 static float *rb_data = NULL;
 static int rb_size = 0;
 static int rb_count = 0;
-static volatile int rb_write = 0;
-static volatile int rb_read = 0;
+static int rb_write = 0;
+static int rb_read = 0;
 
 #if FB_SFX_MT_ENABLED
+static pthread_mutex_t g_ring_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t g_worker_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_t g_audio_thread;
 static int g_audio_thread_valid = 0;
-static volatile int g_audio_thread_stop = 0;
+static int g_audio_thread_stop = 0;
 #endif
+
+/*
+    Ring synchronization
+
+    BSoundPlayer invokes audio_callback() from Haiku's media thread.  That
+    callback must never wait behind a producer thread that happens to be
+    holding the generic driver I/O lock.  The producer side therefore uses a
+    small ring-only mutex, while the callback uses trylock and outputs silence
+    if the ring is momentarily busy.
+*/
+
+static void rb_lock(void)
+{
+#if FB_SFX_MT_ENABLED
+    pthread_mutex_lock(&g_ring_mutex);
+#endif
+}
+
+static void rb_unlock(void)
+{
+#if FB_SFX_MT_ENABLED
+    pthread_mutex_unlock(&g_ring_mutex);
+#endif
+}
+
+static int rb_try_lock(void)
+{
+#if FB_SFX_MT_ENABLED
+    return pthread_mutex_trylock(&g_ring_mutex) == 0;
+#else
+    return 1;
+#endif
+}
+
+#if FB_SFX_MT_ENABLED
+static void haiku_worker_stop_set(int value)
+{
+    pthread_mutex_lock(&g_worker_mutex);
+    g_audio_thread_stop = value;
+    pthread_mutex_unlock(&g_worker_mutex);
+}
+
+static int haiku_worker_stop_requested(void)
+{
+    int result;
+
+    pthread_mutex_lock(&g_worker_mutex);
+    result = g_audio_thread_stop;
+    pthread_mutex_unlock(&g_worker_mutex);
+
+    return result;
+}
+#endif
+
+static void haiku_running_set(int value)
+{
+#if FB_SFX_MT_ENABLED
+    pthread_mutex_lock(&g_worker_mutex);
+#endif
+    fb_sfx_haiku.running = value;
+#if FB_SFX_MT_ENABLED
+    pthread_mutex_unlock(&g_worker_mutex);
+#endif
+}
+
+static int haiku_running_get(void)
+{
+    int result;
+
+#if FB_SFX_MT_ENABLED
+    pthread_mutex_lock(&g_worker_mutex);
+#endif
+    result = fb_sfx_haiku.running;
+#if FB_SFX_MT_ENABLED
+    pthread_mutex_unlock(&g_worker_mutex);
+#endif
+
+    return result;
+}
 
 static void rb_shutdown(void)
 {
+    rb_lock();
+
     if (rb_data)
     {
         free(rb_data);
@@ -83,22 +166,58 @@ static void rb_shutdown(void)
     rb_count = 0;
     rb_write = 0;
     rb_read = 0;
+
+    rb_unlock();
 }
 
 static int rb_init(int frames, int channels)
 {
+    int result;
+
     if (frames <= 0 || channels <= 0)
         return -1;
 
     if (frames > INT_MAX / channels || (frames * channels) > INT_MAX / 4)
         return -1;
 
+    result = 0;
+    rb_lock();
+
+    if (rb_data)
+    {
+        free(rb_data);
+        rb_data = NULL;
+    }
+
     rb_size = frames * channels * 4; /* extra slack */
     rb_data = (float*)malloc(rb_size * sizeof(float));
-    if (!rb_data) return -1;
+    if (!rb_data)
+    {
+        rb_size = 0;
+        rb_count = 0;
+        rb_write = 0;
+        rb_read = 0;
+        result = -1;
+    }
+    else
+    {
+        rb_count = 0;
+        rb_write = rb_read = 0;
+    }
+
+    rb_unlock();
+    return result;
+}
+
+static void rb_clear(void)
+{
+    rb_lock();
+
     rb_count = 0;
-    rb_write = rb_read = 0;
-    return 0;
+    rb_write = 0;
+    rb_read = 0;
+
+    rb_unlock();
 }
 
 static int rb_free(void)
@@ -194,12 +313,12 @@ static int rb_push(const float *in, int count)
 {
     int accepted;
 
-    if (!fb_sfx_haiku.running || count <= 0)
+    if (!haiku_running_get() || count <= 0)
         return 0;
 
-    fb_sfxDriverIoLock();
+    rb_lock();
     accepted = rb_push_locked(in, count);
-    fb_sfxDriverIoUnlock();
+    rb_unlock();
 
     return accepted;
 }
@@ -208,16 +327,15 @@ static int rb_pop(float *out, int count)
 {
     int read;
 
-    if (!fb_sfx_haiku.running)
+    if (!rb_try_lock())
     {
         if (out && count > 0)
             memset(out, 0, (size_t)count * sizeof(float));
         return 0;
     }
 
-    fb_sfxDriverIoLock();
     read = rb_pop_locked(out, count);
-    fb_sfxDriverIoUnlock();
+    rb_unlock();
 
     return read;
 }
@@ -256,9 +374,9 @@ static void *haiku_audio_worker(void *unused)
 {
     (void)unused;
 
-    while (!g_audio_thread_stop)
+    while (!haiku_worker_stop_requested())
     {
-        if (!fb_sfx_haiku.running)
+        if (!haiku_running_get())
         {
             haiku_sleep_ms(5);
             continue;
@@ -281,7 +399,7 @@ static int haiku_ensure_worker(void)
     if (g_audio_thread_valid)
         return 0;
 
-    g_audio_thread_stop = 0;
+    haiku_worker_stop_set(0);
 
     if (pthread_create(&g_audio_thread, NULL, haiku_audio_worker, NULL) != 0)
         return -1;
@@ -312,7 +430,7 @@ static void audio_callback(void *cookie, void *buffer, size_t size, const media_
     (void)cookie;
     (void)fmt;
 
-    if (!__fb_sfx || !fb_sfx_haiku.running)
+    if (!__fb_sfx)
     {
         memset(buffer, 0, size);
         return;
@@ -351,7 +469,7 @@ static int haiku_driver_init(int rate, int channels, int buffer, int flags)
 
     (void)flags;
 
-    if (fb_sfx_haiku.running)
+    if (haiku_running_get())
         return 0;
 
     fb_sfx_haiku.sample_rate = rate > 0 ? rate : 44100;
@@ -406,20 +524,21 @@ static int haiku_driver_init(int rate, int channels, int buffer, int flags)
 #endif
 
     fb_sfx_haiku.initialized = 1;
-    fb_sfx_haiku.running = 1;
+    haiku_running_set(1);
 
     return 0;
 }
 
 static void haiku_driver_exit(void)
 {
-    fb_sfx_haiku.running = 0;
+    haiku_running_set(0);
     fb_sfx_haiku.initialized = 0;
+    rb_clear();
 
 #if FB_SFX_MT_ENABLED
     if (g_audio_thread_valid)
     {
-        g_audio_thread_stop = 1;
+        haiku_worker_stop_set(1);
         if (!pthread_equal(g_audio_thread, pthread_self()))
             pthread_join(g_audio_thread, NULL);
         g_audio_thread_valid = 0;
@@ -435,7 +554,7 @@ static int haiku_driver_write(const float *buffer, int frames)
     int count;
     int accepted;
 
-    if (!fb_sfx_haiku.running || !buffer || frames <= 0)
+    if (!haiku_running_get() || !buffer || frames <= 0)
         return 0;
 
     if (fb_sfx_haiku.channels <= 0)

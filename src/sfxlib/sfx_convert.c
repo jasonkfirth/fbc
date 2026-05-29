@@ -14,6 +14,7 @@
         - clamp internal float PCM samples to the valid audio range
         - define NaN and infinity handling for driver conversion
         - convert float samples to signed 16-bit and signed 32-bit PCM
+        - convert signed 16-bit PCM back to float samples
         - keep platform drivers from carrying subtly different clipping code
 
     This file intentionally does NOT contain:
@@ -94,6 +95,17 @@ int fb_sfxFloatToS32(float value)
     return (int)scaled;
 }
 
+float fb_sfxS16ToFloat(short value)
+{
+    if (value <= -32768)
+        return -1.0f;
+
+    if (value >= 32767)
+        return 1.0f;
+
+    return (float)value / 32768.0f;
+}
+
 
 /* ------------------------------------------------------------------------- */
 /* Buffer conversion helpers                                                 */
@@ -119,6 +131,17 @@ void fb_sfxConvertFloatToS32(const float *src, int *dst, int samples)
 
     for (i = 0; i < samples; ++i)
         dst[i] = fb_sfxFloatToS32(src[i]);
+}
+
+void fb_sfxConvertS16ToFloat(const short *src, float *dst, int samples)
+{
+    int i;
+
+    if (!src || !dst || samples <= 0)
+        return;
+
+    for (i = 0; i < samples; ++i)
+        dst[i] = fb_sfxS16ToFloat(src[i]);
 }
 
 

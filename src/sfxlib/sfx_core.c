@@ -63,6 +63,7 @@
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
 #include "fb_sfx_driver.h"
+#include "fb_sfx_driver_diag.h"
 #include "fb_sfx_mixer.h"
 #include "fb_sfx_buffer.h"
 #include "fb_sfx_capture.h"
@@ -795,6 +796,7 @@ static int fb_sfxOutputQueueFillLocked(int frames)
 static int fb_sfxOutputQueueDrainLocked(int frames)
 {
     const SFXDRIVER *driver;
+    const char *last_driver_name;
     int channels;
     int queued;
     int drained;
@@ -830,6 +832,13 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
         : FB_SFX_DEFAULT_CHANNELS;
 
     driver = __fb_sfx->driver;
+    if (driver && driver->name)
+    {
+        fb_sfxDriverStatsRecordQueueFill(driver->name, queued);
+        fb_sfxDriverStatsRecordQueueFill(driver->name, queued - drained);
+    }
+
+    last_driver_name = driver ? driver->name : NULL;
     written = 0;
     zero_retry_count = 0;
     zero_retry_limit = 4;
@@ -854,6 +863,7 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
 
         write_buffer = __fb_sfx->mixbuffer + (written * channels);
         write_frames = drained - written;
+        last_driver_name = driver->name;
 
         /*
             Platform writes may block while the OS audio server applies
@@ -886,6 +896,8 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
         result = write_proc(write_buffer, write_frames);
         fb_sfxRuntimeLock();
         fb_sfxDriverIoUnlock();
+
+        fb_sfxDriverStatsRecordWrite(driver->name, write_frames, result);
 
         if (result > 0)
         {
@@ -935,7 +947,12 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
             break;
 
         driver = (__fb_sfx) ? __fb_sfx->driver : NULL;
+        if (driver)
+            last_driver_name = driver->name;
     }
+
+    if (written < drained && last_driver_name)
+        fb_sfxDriverStatsRecordDrop(last_driver_name, drained - written);
 
     return written;
 }
@@ -969,6 +986,7 @@ static int fb_sfxDriverTryFromIndex(int start_index)
                 FB_SFX_INIT_DEFAULT) == 0)
         {
             __fb_sfx->driver = driver;
+            fb_sfxDriverStatsReset(driver->name);
 
             SFX_DEBUG("sfx_core: driver '%s' initialized", driver->name);
 
@@ -1048,6 +1066,7 @@ static int fb_sfxDriverTryByName(const char *name)
                 FB_SFX_INIT_DEFAULT) == 0)
         {
             __fb_sfx->driver = driver;
+            fb_sfxDriverStatsReset(driver->name);
 
             SFX_DEBUG("sfx_core: requested driver '%s' initialized",
                       driver->name);

@@ -285,9 +285,11 @@ void  fb_sfxFree(void *ptr);
 
 short fb_sfxFloatToS16(float value);
 int fb_sfxFloatToS32(float value);
+float fb_sfxS16ToFloat(short value);
 
 void fb_sfxConvertFloatToS16(const float *src, short *dst, int samples);
 void fb_sfxConvertFloatToS32(const float *src, int *dst, int samples);
+void fb_sfxConvertS16ToFloat(const short *src, float *dst, int samples);
 
 
 

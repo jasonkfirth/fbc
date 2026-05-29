@@ -411,7 +411,7 @@ static int wii_driver_write_chunk(const float *samples, int frames)
 
     index = wii_find_free_buffer();
     if (index < 0)
-        return frames;
+        return 0;
 
     pcm = g_wii_buffers[index];
     samples_to_copy = frames * FB_SFX_WII_CHANNELS;
@@ -437,7 +437,7 @@ static int wii_driver_write_chunk(const float *samples, int frames)
         return -1;
 
     if (submit_result > 0)
-        return frames;
+        return 0;
 
     g_wii_next_buffer = (index + 1) % FB_SFX_WII_BUFFER_COUNT;
     return frames;

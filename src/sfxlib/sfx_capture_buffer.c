@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "fb_sfx.h"
+#include "fb_sfx_internal.h"
 #include "fb_sfx_buffer.h"
 #include "fb_sfx_capture.h"
 
@@ -172,7 +173,7 @@ int fb_sfxCaptureRead(float *samples, int frames)
     frames_to_read = total_samples / channels;
 
     for (i = 0; i < total_samples; ++i) {
-        samples[i] = (float)cap->buffer[cap->read_pos] / 32768.0f;
+        samples[i] = fb_sfxS16ToFloat(cap->buffer[cap->read_pos]);
         cap->read_pos = (cap->read_pos + 1) % FB_SFX_CAPTURE_BUFFER;
     }
 
