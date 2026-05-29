@@ -43,6 +43,8 @@ PKG_PROXY_PORT=""
 PKG_PROXY_ENABLED=0
 PKG_REPO_URL="https://pkg.omnios.org"
 PKG_REPO_FALLBACK_URL="http://pkg.omnios.org"
+PKG_INSTALL_ATTEMPTS=3
+PKG_INSTALL_RETRY_DELAY=6
 IMAGE_URL=""
 IMAGE_FILE=""
 WORKROOT_PACKAGE="$ROOT/out/illumos/x86-64"
@@ -95,6 +97,8 @@ Options:
   --exampleageddon-run-timeout N Example run timeout.
   --skip-package-install Skip package installation in guest.
   --pkg-install-timeout N  Seconds per package install attempt. Default: 1200.
+  --pkg-install-attempts N  Number of attempts per package install. Default: 3.
+  --pkg-install-retry-delay N  Delay in seconds between package retries. Default: 6.
   --keep-vm             Keep VM artifacts after success.
   -h, --help            Show this help text.
 EOF
@@ -131,6 +135,8 @@ while [ "$#" -gt 0 ]; do
 		--exampleageddon-jobs) EXAMPLEAGEDDON_JOBS="$2"; shift 2 ;;
 		--exampleageddon-compile-timeout) EXAMPLEAGEDDON_COMPILE_TIMEOUT="$2"; shift 2 ;;
 		--exampleageddon-run-timeout) EXAMPLEAGEDDON_RUN_TIMEOUT="$2"; shift 2 ;;
+		--pkg-install-attempts) PKG_INSTALL_ATTEMPTS="$2"; shift 2 ;;
+		--pkg-install-retry-delay) PKG_INSTALL_RETRY_DELAY="$2"; shift 2 ;;
 		--pkg-install-timeout) PKG_INSTALL_TIMEOUT="$2"; shift 2 ;;
 		--skip-package-install) SKIP_PACKAGE_INSTALL=1; shift ;;
 		--keep-vm) KEEP_VM=1; shift ;;
@@ -438,6 +444,15 @@ scp_from_illumos() {
 		"$@"
 }
 
+copy_if_exists_in_guest() {
+	local remote_path="$1"
+	local local_path="$2"
+
+	if ssh_illumos "[ -f \"$remote_path\" ]" >/dev/null 2>&1; then
+		scp_from_illumos "root@127.0.0.1:$remote_path" "$local_path"
+	fi
+}
+
 resolve_repo_dir() {
 	local candidate="$1"
 	local found
@@ -528,6 +543,7 @@ install_pkg_candidates() {
 	local log
 	local had_timeout
 	local attempts
+	local delay_s
 	local attempt
 	local pkg_timeouted
 	log="/tmp/illumos-vm-pkg-install.log"
@@ -539,7 +555,14 @@ install_pkg_candidates() {
 	esac
 	command -v timeout >/dev/null 2>&1 || timeout_s=""
 
-	attempts=2
+	case "${PKG_INSTALL_ATTEMPTS:-3}" in
+		''|*[!0-9]*|0) attempts=3 ;;
+		*) attempts="$PKG_INSTALL_ATTEMPTS" ;;
+	esac
+	case "${PKG_INSTALL_RETRY_DELAY:-6}" in
+		''|*[!0-9]*|0) delay_s=6 ;;
+		*) delay_s="$PKG_INSTALL_RETRY_DELAY" ;;
+	esac
 	for pkg in "$@"; do
 		attempt=1
 		while [ "$attempt" -le "$attempts" ]; do
@@ -574,7 +597,7 @@ install_pkg_candidates() {
 			if [ "$pkg_timeouted" -eq 0 ] || [ "$attempt" -eq "$attempts" ]; then
 				break
 			fi
-			sleep 3
+			sleep "$delay_s"
 			attempt=$((attempt + 1))
 		done
 	done
@@ -770,7 +793,7 @@ run_main_tests() {
 			fail "gnu-make package unavailable in OmniOS repositories"
 	fi
 
-	if ! find_cmd_or_path gcc cc /usr/gnu/bin/gcc /usr/bin/cc >/dev/null 2>&1; then
+	if ! find_cmd_or_path gcc cc clang /usr/gnu/bin/gcc /usr/gnu/bin/cc /usr/bin/cc /usr/local/bin/cc /usr/bin/clang /usr/local/bin/clang >/dev/null 2>&1; then
 		PKG_INSTALL_HAD_TIMEOUT=0
 		if ! install_pkg_candidates developer/gcc15 developer/gcc14 developer/gcc13 developer/gcc10; then
 			if [ "$PKG_INSTALL_HAD_TIMEOUT" -ne 0 ] && [ -n "${PKG_PROXY_PORT:-}" ]; then
@@ -790,7 +813,7 @@ run_main_tests() {
 		fi
 	fi
 
-	CC_PATH="$(find_cmd_or_path gcc cc /usr/gnu/bin/gcc /usr/bin/gcc /usr/local/bin/gcc /usr/gnu/bin/cc /usr/bin/cc /usr/local/bin/cc)"
+	CC_PATH="$(find_cmd_or_path gcc cc clang /usr/gnu/bin/gcc /usr/bin/gcc /usr/local/bin/gcc /usr/gnu/bin/clang /usr/bin/clang /usr/local/bin/clang /usr/gnu/bin/cc /usr/bin/cc /usr/local/bin/cc)"
 	if [ -z "${CC_PATH:-}" ]; then
 		fail "no compiler toolchain found after package/install attempts"
 	fi
@@ -800,7 +823,7 @@ run_main_tests() {
 	esac
 	echo "==> using CC=$CC"
 
-	CXX_PATH="$(find_cmd_or_path g++ c++ /usr/gnu/bin/g++ /usr/bin/g++ /usr/local/bin/g++ /usr/gnu/bin/c++ /usr/bin/c++)"
+	CXX_PATH="$(find_cmd_or_path g++ c++ clang++ /usr/gnu/bin/g++ /usr/bin/g++ /usr/local/bin/g++ /usr/gnu/bin/c++ /usr/bin/c++ /usr/gnu/bin/clang++ /usr/bin/clang++)"
 	if [ -n "${CXX_PATH:-}" ]; then
 		export CXX="$CXX_PATH"
 		case "$CXX_PATH" in
@@ -854,7 +877,7 @@ chmod +x "$RUN_DIR/illumos-vm-test-runner.sh"
 }
 
 run_test_in_guest() {
-	local runner="/work/freebasic-vm-test-runner.sh"
+	local runner="/work/illumos-vm-test-runner.sh"
 	local host_log="$ARCHIVE_RESULTS/freebasic-illumos-vm-test.log"
 	local guest_log="/work/freebasic-illumos-vm-test.log"
 	local escaped_unit_args
@@ -869,7 +892,7 @@ run_test_in_guest() {
 
 	msg "starting fbctests/exampleageddon run in guest"
 	escaped_unit_args="$(printf '%q' "$FBCTESTS_UNIT_ARGS")"
-if ssh_illumos \
+	if ssh_illumos \
 		"SKIP_PACKAGE_INSTALL=$SKIP_PACKAGE_INSTALL \
 FBCTESTS_JOBS=${FBCTESTS_JOBS:-} \
 FBCTESTS_UNIT_ARGS=$escaped_unit_args \
@@ -881,6 +904,8 @@ PKG_OSREL=$pkg_osrel \
 PKG_REV=$pkg_rev \
 PKG_PROXY_PORT=$proxy_port \
 PKG_INSTALL_TIMEOUT=$PKG_INSTALL_TIMEOUT \
+PKG_INSTALL_ATTEMPTS=$PKG_INSTALL_ATTEMPTS \
+PKG_INSTALL_RETRY_DELAY=$PKG_INSTALL_RETRY_DELAY \
 PKG_REPO_URL=$PKG_REPO_URL \
 PKG_REPO_FALLBACK_URL=$PKG_REPO_FALLBACK_URL \
 PKG_REPO_DIR=$PKG_CACHE_DIR/repo \
@@ -889,19 +914,15 @@ bash $runner > '$guest_log' 2>&1"
 		msg "guest tests passed"
 	else
 		scp_from_illumos "root@127.0.0.1:$guest_log" "$host_log" || true
-		ssh_illumos '[ -f /work/freebasic-test/exampleageddon/report.md ]' >/dev/null 2>&1 &&
-			scp_from_illumos "root@127.0.0.1:/work/freebasic-test/exampleageddon/report.md" "$ARCHIVE_RESULTS/exampleageddon-report.md" || true
-		ssh_illumos '[ -f /work/freebasic-test/exampleageddon/results.csv ]' >/dev/null 2>&1 &&
-			scp_from_illumos "root@127.0.0.1:/work/freebasic-test/exampleageddon/results.csv" "$ARCHIVE_RESULTS/exampleageddon-results.csv" || true
+		copy_if_exists_in_guest /work/freebasic-test/exampleageddon/report.md "$ARCHIVE_RESULTS/exampleageddon-report.md"
+		copy_if_exists_in_guest /work/freebasic-test/exampleageddon/results.csv "$ARCHIVE_RESULTS/exampleageddon-results.csv"
 		tail -n 120 "$host_log" >&2 || true
 		die "illumos VM test run failed"
 	fi
 
 	scp_from_illumos "root@127.0.0.1:$guest_log" "$host_log"
-	ssh_illumos '[ -f /work/freebasic-test/exampleageddon/report.md ]' >/dev/null 2>&1 &&
-		scp_from_illumos "root@127.0.0.1:/work/freebasic-test/exampleageddon/report.md" "$ARCHIVE_RESULTS/exampleageddon-report.md" || true
-	ssh_illumos '[ -f /work/freebasic-test/exampleageddon/results.csv ]' >/dev/null 2>&1 &&
-		scp_from_illumos "root@127.0.0.1:/work/freebasic-test/exampleageddon/results.csv" "$ARCHIVE_RESULTS/exampleageddon-results.csv" || true
+	copy_if_exists_in_guest /work/freebasic-test/exampleageddon/report.md "$ARCHIVE_RESULTS/exampleageddon-report.md"
+	copy_if_exists_in_guest /work/freebasic-test/exampleageddon/results.csv "$ARCHIVE_RESULTS/exampleageddon-results.csv"
 }
 
 main() {

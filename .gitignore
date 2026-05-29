@@ -69,6 +69,13 @@
 /tests/warnings/r/linux-x86_64/*.txt
 /tests/warnings/r/win32/*.txt
 /tests/warnings/r/win64/*.txt
+
+# Ignore compiled extensionless test artifacts produced by running tests.
+/tests/**
+!/tests/**
+!/tests/**/*.*
+!/tests/GNUmakefile
+!/tests/**/GNUmakefile
 .install_manifest
 *.apk.idsig
 *.apk
