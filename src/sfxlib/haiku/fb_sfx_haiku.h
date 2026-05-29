@@ -1,3 +1,28 @@
+/*
+    FreeBASIC Sound Library (sfxlib)
+    --------------------------------
+
+    File: fb_sfx_haiku.h
+
+    Purpose:
+
+        Declare the shared Haiku backend state and helper entry points.
+
+    Responsibilities:
+
+        - expose Haiku playback state
+        - declare Haiku playback lifecycle helpers
+        - declare Haiku capture lifecycle helpers
+        - keep platform declarations out of generic sfxlib headers
+
+    This file intentionally does NOT contain:
+
+        - playback implementation
+        - capture implementation
+        - mixer logic
+        - BASIC command declarations
+*/
+
 #ifndef __FB_SFX_HAIKU_H__
 #define __FB_SFX_HAIKU_H__
 
@@ -28,7 +53,7 @@ int fb_sfxHaikuWrite(const float *buffer, int frames);
 int  fb_sfxHaikuCaptureInit(void);
 int  fb_sfxHaikuCaptureStart(void);
 void fb_sfxHaikuCaptureStop(void);
-int  fb_sfxHaikuCaptureRead(short *buffer, int frames);
+int  fb_sfxHaikuCaptureRead(float *buffer, int frames);
 
 int fb_sfxHaikuRunning(void);
 
@@ -41,3 +66,5 @@ int  fb_sfxHaikuDebugEnabled(void);
 
 #endif
 #endif
+
+/* end of fb_sfx_haiku.h */

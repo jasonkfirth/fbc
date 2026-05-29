@@ -118,20 +118,6 @@ static int wii_clamp_buffer_frames(int frames)
     return frames;
 }
 
-static short wii_float_to_pcm16(float sample)
-{
-    if (sample >= 1.0f)
-        return 32767;
-
-    if (sample <= -1.0f)
-        return -32768;
-
-    if (sample >= 0.0f)
-        return (short)(sample * 32767.0f);
-
-    return (short)(sample * 32768.0f);
-}
-
 static void wii_clear_buffers(void)
 {
     int i;
@@ -419,7 +405,6 @@ static int wii_driver_submit(int index)
 static int wii_driver_write_chunk(const float *samples, int frames)
 {
     short *pcm;
-    int i;
     int index;
     int samples_to_copy;
     int submit_result;
@@ -431,8 +416,7 @@ static int wii_driver_write_chunk(const float *samples, int frames)
     pcm = g_wii_buffers[index];
     samples_to_copy = frames * FB_SFX_WII_CHANNELS;
 
-    for (i = 0; i < samples_to_copy; ++i)
-        pcm[i] = wii_float_to_pcm16(samples[i]);
+    fb_sfxConvertFloatToS16(samples, pcm, samples_to_copy);
 
     if (frames < g_wii_buffer_frames)
     {

@@ -1,0 +1,6 @@
+# TEST_MODE : MULTI_MODULE_OK
+
+MAIN := play-64-voice-smoke.bas
+COMPILE_AND_LINK := 1
+
+# end of play-64-voice-smoke.bmk

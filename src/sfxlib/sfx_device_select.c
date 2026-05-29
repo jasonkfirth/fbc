@@ -156,6 +156,14 @@ int fb_sfxDeviceSelect(int id)
         return -1;
     }
 
+    if (fb_sfxDriverValidate(drv) != 0)
+    {
+        SFX_DEBUG("sfx_device_select: invalid driver capability table: %s",
+                  drv->name ? drv->name : "(null)");
+        fb_sfxRuntimeUnlock();
+        return -1;
+    }
+
     fb_sfxSyncCurrentDriverLocked();
     current = g_current_driver;
     samplerate = __fb_sfx ? __fb_sfx->samplerate : FB_SFX_DEFAULT_RATE;

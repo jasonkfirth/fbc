@@ -1,0 +1,27 @@
+# TEST_MODE : MULTI_MODULE_OK
+
+#
+# FreeBASIC sfxlib tests
+# ----------------------
+#
+# File: convert-float-s16.bmk
+#
+# Purpose:
+#
+#     Build the shared float-to-signed-16 conversion test.
+#
+# Responsibilities:
+#
+#     - identify the test main module
+#     - request compile-and-link test execution
+#
+# This file intentionally does NOT contain:
+#
+#     - test assertions
+#     - platform driver configuration
+#
+
+MAIN := convert-float-s16.bas
+COMPILE_AND_LINK := 1
+
+# end of convert-float-s16.bmk

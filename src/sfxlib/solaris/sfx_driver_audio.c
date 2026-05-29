@@ -88,16 +88,6 @@ static const char *solaris_audio_device_path(void)
     return "/dev/audio";
 }
 
-static short solaris_audio_float_to_s16(float value)
-{
-    if (value > 1.0f)
-        value = 1.0f;
-    else if (value < -1.0f)
-        value = -1.0f;
-
-    return (short)(value * 32767.0f);
-}
-
 static void solaris_audio_sleep_for_frames(int frames)
 {
     struct timespec req;
@@ -124,14 +114,6 @@ static void solaris_audio_sleep_for_frames(int frames)
 
     while (nanosleep(&req, &req) != 0 && errno == EINTR)
         ;
-}
-
-static void solaris_audio_convert_float_to_s16(const float *src, short *dst, int samples)
-{
-    int i;
-
-    for (i = 0; i < samples; ++i)
-        dst[i] = solaris_audio_float_to_s16(src[i]);
 }
 
 static void solaris_audio_close(void)
@@ -279,7 +261,7 @@ static int solaris_audio_write(const float *buffer, int frames)
                             buffer,
                             frames,
                             solaris_audio_channels);
-    solaris_audio_convert_float_to_s16(buffer, pcm, samples);
+    fb_sfxConvertFloatToS16(buffer, pcm, samples);
 
     bytes_written = 0;
     while (bytes_written < bytes_total)

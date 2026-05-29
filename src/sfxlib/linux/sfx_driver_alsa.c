@@ -12,6 +12,7 @@
 #ifndef DISABLE_LINUX
 
 #include "../fb_sfx.h"
+#include "../fb_sfx_internal.h"
 #include "../fb_sfx_driver.h"
 #include "fb_sfx_linux.h"
 
@@ -19,6 +20,16 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+#include <limits.h>
+
+#ifndef ALSA_WRITE_RETRIES
+#define ALSA_WRITE_RETRIES 512
+#endif
+
+#ifndef ALSA_WRITE_WAIT_MS
+#define ALSA_WRITE_WAIT_MS 5
+#endif
 
 static snd_pcm_t *alsa_pcm = NULL;
 static int alsa_initialized = 0;
@@ -60,23 +71,6 @@ static void alsa_silent_error_handler(const char *file,
 
 #define ALSA_DBG(...) \
     do { if (alsa_debug_enabled()) fprintf(stderr, "SFX_ALSA: " __VA_ARGS__); } while (0)
-
-static void convert_float_to_s16(const float *in, short *out, int samples)
-{
-    int i;
-
-    for (i = 0; i < samples; ++i)
-    {
-        float v = in[i];
-
-        if (v > 1.0f)
-            v = 1.0f;
-        else if (v < -1.0f)
-            v = -1.0f;
-
-        out[i] = (short)(v * 32767.0f);
-    }
-}
 
 static int alsa_ensure_pcm_buffer(int samples)
 {
@@ -186,6 +180,8 @@ static int alsa_driver_init(int rate, int channels, int buffer_frames, int flags
         return -1;
     }
 
+    snd_pcm_nonblock(alsa_pcm, 1);
+
     snd_pcm_prepare(alsa_pcm);
 
     if (fb_sfxLinuxActivate((int)actual_rate,
@@ -244,6 +240,10 @@ static int alsa_driver_write(const float *buffer, int frames)
     int samples;
     int err;
     int retry;
+    int retry_count;
+    snd_pcm_sframes_t remaining;
+    snd_pcm_sframes_t written;
+    snd_pcm_sframes_t total_frames;
 
     if (!alsa_pcm || !buffer || frames <= 0)
         return -1;
@@ -263,41 +263,81 @@ static int alsa_driver_write(const float *buffer, int frames)
     if (alsa_ensure_pcm_buffer(samples) != 0)
         return -1;
 
-    convert_float_to_s16(buffer, alsa_pcm_buffer, samples);
+    fb_sfxConvertFloatToS16(buffer, alsa_pcm_buffer, samples);
 
     retry = 0;
+    total_frames = (snd_pcm_sframes_t)frames;
+    written = 0;
+    remaining = total_frames;
+    retry_count = 0;
 
-retry_write:
-    err = (int)snd_pcm_writei(alsa_pcm,
-                              alsa_pcm_buffer,
-                              (snd_pcm_uframes_t)frames);
-
-    if (err == -EPIPE)
+    while (remaining > 0)
     {
-        ALSA_DBG("underrun detected\n");
+        snd_pcm_sframes_t pending;
+        snd_pcm_uframes_t samples_to_write;
 
-        if (retry == 0 && snd_pcm_prepare(alsa_pcm) >= 0)
+        pending = remaining;
+        if (pending > (snd_pcm_sframes_t)INT_MAX)
+            pending = INT_MAX;
+
+        samples_to_write = (snd_pcm_uframes_t)pending;
+        err = (int)snd_pcm_writei(alsa_pcm,
+                                  alsa_pcm_buffer + (written * channels),
+                                  samples_to_write);
+
+        if (err > 0)
         {
-            retry = 1;
-            goto retry_write;
+            written += err;
+            remaining -= err;
+            retry_count = 0;
+            retry = 0;
+            continue;
         }
 
-        return -1;
+        if (err == -EPIPE)
+        {
+            ALSA_DBG("underrun detected\n");
+
+            if (retry == 0 && snd_pcm_prepare(alsa_pcm) >= 0)
+            {
+                retry = 1;
+                continue;
+            }
+
+            return (written > 0) ? (int)written : -1;
+        }
+
+        if (err == -EAGAIN || err == -EINTR)
+        {
+            struct timespec req;
+
+            if (retry_count >= ALSA_WRITE_RETRIES)
+                return (written > 0) ? (int)written : 0;
+
+            ++retry_count;
+
+            req.tv_sec = 0;
+            req.tv_nsec = (long)ALSA_WRITE_WAIT_MS * 1000000L;
+            nanosleep(&req, NULL);
+            snd_pcm_wait(alsa_pcm, ALSA_WRITE_WAIT_MS);
+
+            continue;
+        }
+
+        if (err < 0)
+        {
+            ALSA_DBG("write error: %s\n", snd_strerror(err));
+            return (written > 0) ? (int)written : -1;
+        }
     }
 
-    if (err < 0)
-    {
-        ALSA_DBG("write error: %s\n", snd_strerror(err));
-        return -1;
-    }
-
-    return err;
+    return (int)written;
 }
 
 const FB_SFX_DRIVER fb_sfxDriverAlsa =
 {
     "ALSA",
-    FB_SFX_DRIVER_CAP_CAPTURE | FB_SFX_DRIVER_CAP_MIDI | FB_SFX_DRIVER_CAP_BACKGROUND,
+    FB_SFX_DRIVER_CAP_BACKGROUND,
     alsa_driver_init,
     alsa_driver_exit,
     alsa_driver_write,

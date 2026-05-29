@@ -138,30 +138,12 @@ static int bsd_oss_native_s16_format(void)
 #endif
 }
 
-static short bsd_oss_float_to_s16(float value)
-{
-    if (value > 1.0f)
-        value = 1.0f;
-    else if (value < -1.0f)
-        value = -1.0f;
-
-    return (short)(value * 32767.0f);
-}
-
 static float bsd_oss_s16_to_float(short value)
 {
     if (value <= -32768)
         return -1.0f;
 
     return (float)value / 32767.0f;
-}
-
-static void bsd_oss_convert_float_to_s16(const float *src, short *dst, int samples)
-{
-    int i;
-
-    for (i = 0; i < samples; ++i)
-        dst[i] = bsd_oss_float_to_s16(src[i]);
 }
 
 static void bsd_oss_convert_s16_to_float(const short *src, float *dst, int samples)
@@ -330,7 +312,7 @@ static int bsd_oss_write(const float *buffer, int frames)
                             buffer,
                             frames,
                             bsd_oss_channels);
-    bsd_oss_convert_float_to_s16(buffer, pcm, samples);
+    fb_sfxConvertFloatToS16(buffer, pcm, samples);
 
     bytes_written = 0;
     while (bytes_written < bytes_total)

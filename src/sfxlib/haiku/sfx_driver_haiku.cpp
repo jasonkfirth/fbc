@@ -1,3 +1,28 @@
+/*
+    FreeBASIC Sound Library (sfxlib)
+    --------------------------------
+
+    File: sfx_driver_haiku.cpp
+
+    Purpose:
+
+        Implement the Haiku playback driver using BSoundPlayer.
+
+    Responsibilities:
+
+        - initialize and shut down Haiku playback
+        - queue mixed float samples for the audio callback
+        - convert callback output to signed 16-bit PCM
+        - run the background feeder thread when threading is available
+
+    This file intentionally does NOT contain:
+
+        - Haiku capture buffering
+        - MIDI routing
+        - mixer or synthesis logic
+        - BASIC command parsing
+*/
+
 #ifndef DISABLE_HAIKU
 
 #include "fb_sfx_haiku.h"
@@ -7,10 +32,10 @@
 #include "../fb_sfx_internal.h"
 
 #include <SoundPlayer.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 #include <time.h>
 
 #if FB_SFX_MT_ENABLED
@@ -36,6 +61,7 @@ FB_SFX_HAIKU_STATE fb_sfx_haiku =
 
 static float *rb_data = NULL;
 static int rb_size = 0;
+static int rb_count = 0;
 static volatile int rb_write = 0;
 static volatile int rb_read = 0;
 
@@ -54,51 +80,146 @@ static void rb_shutdown(void)
     }
 
     rb_size = 0;
+    rb_count = 0;
     rb_write = 0;
     rb_read = 0;
 }
 
 static int rb_init(int frames, int channels)
 {
+    if (frames <= 0 || channels <= 0)
+        return -1;
+
+    if (frames > INT_MAX / channels || (frames * channels) > INT_MAX / 4)
+        return -1;
+
     rb_size = frames * channels * 4; /* extra slack */
     rb_data = (float*)malloc(rb_size * sizeof(float));
     if (!rb_data) return -1;
+    rb_count = 0;
     rb_write = rb_read = 0;
     return 0;
 }
 
-static int rb_available(void)
+static int rb_free(void)
 {
-    int w = rb_write;
-    int r = rb_read;
-    return (w >= r) ? (w - r) : (rb_size - (r - w));
+    if (rb_size <= 0)
+        return 0;
+
+    return rb_size - rb_count;
 }
 
-static void rb_push(const float *in, int count)
+static int rb_push_locked(const float *in, int count)
 {
-    for (int i = 0; i < count; i++)
+    int accepted;
+    int first;
+    int second;
+
+    if (!in || count <= 0 || rb_size <= 0)
+        return 0;
+
+    accepted = count;
+    if (accepted > rb_free())
+        accepted = rb_free();
+
+    if (accepted <= 0)
+        return 0;
+
+    first = rb_size - rb_write;
+    if (first > accepted)
+        first = accepted;
+
+    memcpy(rb_data + rb_write, in, (size_t)first * sizeof(float));
+
+    rb_write += first;
+    if (rb_write >= rb_size)
+        rb_write = 0;
+
+    second = accepted - first;
+    if (second > 0)
     {
-        rb_data[rb_write] = in[i];
-        rb_write = (rb_write + 1) % rb_size;
-        if (rb_write == rb_read) /* overwrite oldest */
-            rb_read = (rb_read + 1) % rb_size;
+        memcpy(rb_data, in + first, (size_t)second * sizeof(float));
+        rb_write = second;
     }
+
+    rb_count += accepted;
+    return accepted;
 }
 
-static void rb_pop(float *out, int count)
+static int rb_pop_locked(float *out, int count)
 {
-    for (int i = 0; i < count; i++)
+    int actual;
+    int first;
+    int second;
+
+    if (!out || count <= 0)
+        return 0;
+
+    if (rb_size <= 0 || rb_count <= 0)
     {
-        if (rb_read == rb_write)
-        {
-            out[i] = 0.0f;
-        }
-        else
-        {
-            out[i] = rb_data[rb_read];
-            rb_read = (rb_read + 1) % rb_size;
-        }
+        memset(out, 0, (size_t)count * sizeof(float));
+        return 0;
     }
+
+    actual = count;
+    if (actual > rb_count)
+        actual = rb_count;
+
+    first = rb_size - rb_read;
+    if (first > actual)
+        first = actual;
+
+    memcpy(out, rb_data + rb_read, (size_t)first * sizeof(float));
+
+    rb_read += first;
+    if (rb_read >= rb_size)
+        rb_read = 0;
+
+    second = actual - first;
+    if (second > 0)
+    {
+        memcpy(out + first, rb_data, (size_t)second * sizeof(float));
+        rb_read = second;
+    }
+
+    rb_count -= actual;
+
+    if (actual < count)
+        memset(out + actual, 0, (size_t)(count - actual) * sizeof(float));
+
+    return actual;
+}
+
+static int rb_push(const float *in, int count)
+{
+    int accepted;
+
+    if (!fb_sfx_haiku.running || count <= 0)
+        return 0;
+
+    fb_sfxDriverIoLock();
+    accepted = rb_push_locked(in, count);
+    fb_sfxDriverIoUnlock();
+
+    return accepted;
+}
+
+static int rb_pop(float *out, int count)
+{
+    int read;
+
+    if (!fb_sfx_haiku.running)
+    {
+        if (out && count > 0)
+            memset(out, 0, (size_t)count * sizeof(float));
+        return 0;
+    }
+
+    fb_sfxDriverIoLock();
+    read = rb_pop_locked(out, count);
+    fb_sfxDriverIoUnlock();
+
+    return read;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -191,8 +312,14 @@ static void audio_callback(void *cookie, void *buffer, size_t size, const media_
     (void)cookie;
     (void)fmt;
 
-    int samples = size / sizeof(int16_t);
-    int16_t *out = (int16_t*)buffer;
+    if (!__fb_sfx || !fb_sfx_haiku.running)
+    {
+        memset(buffer, 0, size);
+        return;
+    }
+
+    int samples = size / sizeof(short);
+    short *out = (short*)buffer;
     int remaining = samples;
     int offset = 0;
     float temp[2048];
@@ -206,17 +333,7 @@ static void audio_callback(void *cookie, void *buffer, size_t size, const media_
 
         rb_pop(temp, chunk);
 
-        for (int i = 0; i < chunk; i++)
-        {
-            float v = temp[i];
-
-            if (v > 1.0f)
-                v = 1.0f;
-            else if (v < -1.0f)
-                v = -1.0f;
-
-            out[offset + i] = (int16_t)(v * 32767.0f);
-        }
+        fb_sfxConvertFloatToS16(temp, out + offset, chunk);
 
         offset += chunk;
         remaining -= chunk;
@@ -250,7 +367,7 @@ static int haiku_driver_init(int rate, int channels, int buffer, int flags)
     fmt.channel_count = fb_sfx_haiku.channels;
     fmt.format = media_raw_audio_format::B_AUDIO_SHORT;
     fmt.byte_order = B_MEDIA_LITTLE_ENDIAN;
-    bytes_per_sample = (int)sizeof(int16_t);
+    bytes_per_sample = (int)sizeof(short);
     fmt.buffer_size = fb_sfx_haiku.buffer_frames *
                       fb_sfx_haiku.channels *
                       bytes_per_sample;
@@ -315,20 +432,22 @@ static void haiku_driver_exit(void)
 
 static int haiku_driver_write(const float *buffer, int frames)
 {
+    int count;
+    int accepted;
+
     if (!fb_sfx_haiku.running || !buffer || frames <= 0)
         return 0;
 
-    int count = frames * fb_sfx_haiku.channels;
-    rb_push(buffer, count);
+    if (fb_sfx_haiku.channels <= 0)
+        return -1;
 
-    return frames;
-}
+    if (frames > INT_MAX / fb_sfx_haiku.channels)
+        return -1;
 
-static int haiku_driver_capture_read(short *buffer, int frames)
-{
-    (void)buffer;
-    (void)frames;
-    return 0;
+    count = frames * fb_sfx_haiku.channels;
+    accepted = rb_push(buffer, count);
+
+    return accepted / fb_sfx_haiku.channels;
 }
 
 static void haiku_driver_poll(void)
@@ -342,14 +461,16 @@ static void haiku_driver_poll(void)
 extern "C" const FB_SFX_DRIVER fb_sfxDriverHaiku =
 {
     "Haiku",
-    FB_SFX_DRIVER_CAP_CAPTURE | FB_SFX_DRIVER_CAP_BACKGROUND,
+    FB_SFX_DRIVER_CAP_BACKGROUND,
     haiku_driver_init,
     haiku_driver_exit,
     haiku_driver_write,
-    haiku_driver_capture_read,
+    NULL,
     haiku_driver_poll,
     NULL,
     NULL
 };
 
 #endif
+
+/* end of sfx_driver_haiku.cpp */

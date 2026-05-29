@@ -597,7 +597,17 @@ Writes captured audio to a WAV file.
 
 Main routines:
 - `fb_sfxCaptureSave()`
-- `fb_sfxFloatToPCM16()` helper for sample conversion
+- shared conversion helpers from `sfx_convert.c`
+
+### `sfx_convert.c`
+Defines shared sample conversion policy for platform drivers and WAV output.
+
+Main routines:
+- `fb_sfxClampSample()`
+- `fb_sfxFloatToS16()`
+- `fb_sfxConvertFloatToS16()`
+- `fb_sfxFloatToS32()`
+- `fb_sfxConvertFloatToS32()`
 
 ### `sfx_device_list.c`
 Lists available audio drivers/devices.

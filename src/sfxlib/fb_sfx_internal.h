@@ -143,6 +143,7 @@ void fb_sfxRuntimeUnlock(void);
 void fb_sfxDriverIoLock(void);
 void fb_sfxDriverIoUnlock(void);
 int fb_sfxDriverFeedsAudio(void);
+int fb_sfxDriverValidate(const FB_SFX_DRIVER *driver);
 void fb_sfxRunForeground(int frames);
 int fb_sfxCooperativeDelay(int msecs);
 void fb_sfxForegroundFeedBegin(void);
@@ -282,17 +283,11 @@ void  fb_sfxFree(void *ptr);
     platform-friendly formats.
 */
 
-void fb_sfxConvertFloatToS16(
-    const float *src,
-    short *dst,
-    int frames
-);
+short fb_sfxFloatToS16(float value);
+int fb_sfxFloatToS32(float value);
 
-void fb_sfxConvertFloatToS32(
-    const float *src,
-    int *dst,
-    int frames
-);
+void fb_sfxConvertFloatToS16(const float *src, short *dst, int samples);
+void fb_sfxConvertFloatToS32(const float *src, int *dst, int samples);
 
 
 

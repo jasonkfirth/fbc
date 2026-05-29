@@ -102,30 +102,12 @@ static const char *openbsd_sndio_capture_device_name(void)
     return openbsd_sndio_device_name();
 }
 
-static short openbsd_sndio_float_to_s16(float value)
-{
-    if (value > 1.0f)
-        value = 1.0f;
-    else if (value < -1.0f)
-        value = -1.0f;
-
-    return (short)(value * 32767.0f);
-}
-
 static float openbsd_sndio_s16_to_float(short value)
 {
     if (value <= -32768)
         return -1.0f;
 
     return (float)value / 32767.0f;
-}
-
-static void openbsd_sndio_convert_float_to_s16(const float *src, short *dst, int samples)
-{
-    int i;
-
-    for (i = 0; i < samples; ++i)
-        dst[i] = openbsd_sndio_float_to_s16(src[i]);
 }
 
 static void openbsd_sndio_convert_s16_to_float(const short *src, float *dst, int samples)
@@ -255,7 +237,7 @@ static int openbsd_sndio_write(const float *buffer, int frames)
                             buffer,
                             frames,
                             openbsd_sndio_channels);
-    openbsd_sndio_convert_float_to_s16(buffer, pcm, samples);
+    fb_sfxConvertFloatToS16(buffer, pcm, samples);
 
     bytes_written = 0;
     while (bytes_written < bytes_total)

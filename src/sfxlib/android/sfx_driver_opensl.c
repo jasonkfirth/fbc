@@ -1,3 +1,28 @@
+/*
+    FreeBASIC Sound Library (sfxlib)
+    --------------------------------
+
+    File: sfx_driver_opensl.c
+
+    Purpose:
+
+        Implement the Android OpenSL ES playback driver.
+
+    Responsibilities:
+
+        - initialize and shut down the OpenSL ES playback objects
+        - manage queued signed 16-bit PCM buffers
+        - convert mixed float samples for OpenSL ES output
+        - coordinate playback with the Android sound worker
+
+    This file intentionally does NOT contain:
+
+        - AAudio support
+        - mixer or synthesis logic
+        - Java or activity lifecycle code
+        - BASIC command parsing
+*/
+
 #include "../fb_sfx.h"
 #include "../fb_sfx_internal.h"
 #include "../fb_sfx_driver.h"
@@ -337,7 +362,7 @@ static FB_SFX_OPENSL_BUFFER *wait_for_buffer(int *paused)
 static int opensl_write(const float *samples, int frames)
 {
 	FB_SFX_OPENSL_BUFFER *buffer;
-	int total, i;
+	int total;
 	int paused = 0;
 	SLresult result;
 
@@ -362,15 +387,7 @@ static int opensl_write(const float *samples, int frames)
 		return frames;
 
 	total = frames * channels_active;
-	for (i = 0; i < total; ++i)
-	{
-		float s = samples[i];
-		if (s > 1.0f)
-			s = 1.0f;
-		else if (s < -1.0f)
-			s = -1.0f;
-		buffer->samples[i] = (int16_t)(s * 32767.0f);
-	}
+	fb_sfxConvertFloatToS16(samples, (short *)buffer->samples, total);
 
 	result = (*queue)->Enqueue(queue, buffer->samples, (SLuint32)(total * (int)sizeof(int16_t)));
 	if (result != SL_RESULT_SUCCESS)
@@ -397,3 +414,5 @@ const FB_SFX_DRIVER fb_sfxDriverOpenSLES =
 	NULL,
 	NULL
 };
+
+/* end of sfx_driver_opensl.c */

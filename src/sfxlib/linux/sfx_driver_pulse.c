@@ -12,6 +12,7 @@
 #ifndef DISABLE_LINUX
 
 #include "../fb_sfx.h"
+#include "../fb_sfx_internal.h"
 #include "../fb_sfx_driver.h"
 #include "fb_sfx_linux.h"
 
@@ -35,23 +36,6 @@ static int pulse_debug_enabled(void)
 
 #define PULSE_DBG(...) \
     do { if (pulse_debug_enabled()) fprintf(stderr,"SFX_PULSE: " __VA_ARGS__); } while (0)
-
-static void convert_float_to_s16(const float *in, short *out, int samples)
-{
-    int i;
-
-    for (i = 0; i < samples; ++i)
-    {
-        float v = in[i];
-
-        if (v > 1.0f)
-            v = 1.0f;
-        else if (v < -1.0f)
-            v = -1.0f;
-
-        out[i] = (short)(v * 32767.0f);
-    }
-}
 
 static int pulse_ensure_pcm_buffer(int samples)
 {
@@ -207,7 +191,7 @@ static int pulse_driver_write(const float *buffer, int frames)
     if (pulse_ensure_pcm_buffer(samples) != 0)
         return -1;
 
-    convert_float_to_s16(buffer, pulse_pcm_buffer, samples);
+    fb_sfxConvertFloatToS16(buffer, pulse_pcm_buffer, samples);
 
     if (pa_simple_write(pulse_stream,
                         pulse_pcm_buffer,

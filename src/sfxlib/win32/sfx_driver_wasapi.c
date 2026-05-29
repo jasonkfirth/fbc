@@ -267,10 +267,7 @@ static void wasapi_convert_float_to_device(const float *src,
             else
                 sample = 0.0f;
 
-            if (sample > 1.0f)
-                sample = 1.0f;
-            if (sample < -1.0f)
-                sample = -1.0f;
+            sample = fb_sfxClampSample(sample);
 
             if (use_float && bytes_per_sample == (int)sizeof(float))
             {
@@ -278,12 +275,12 @@ static void wasapi_convert_float_to_device(const float *src,
             }
             else if (!use_float && bytes_per_sample == 2)
             {
-                short pcm = (short)(sample * 32767.0f);
+                short pcm = fb_sfxFloatToS16(sample);
                 memcpy(out, &pcm, sizeof(pcm));
             }
             else if (!use_float && bytes_per_sample == 4)
             {
-                int pcm = (int)(sample * 2147483647.0f);
+                int pcm = fb_sfxFloatToS32(sample);
                 memcpy(out, &pcm, sizeof(pcm));
             }
             else

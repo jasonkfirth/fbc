@@ -254,17 +254,6 @@ void fb_sfxExitCore(void)
 static int fb_sfxDriverFallback(const SFXDRIVER *failed_driver);
 static void fb_sfxMixFeedSource(int frames, int (*feed_fn)(float *buffer, int frames));
 
-static float fb_sfxCoreClampSample(float v)
-{
-    if (v > 1.0f)
-        return 1.0f;
-
-    if (v < -1.0f)
-        return -1.0f;
-
-    return v;
-}
-
 static void fb_sfxInitCoreRollbackLocked(void)
 {
     if (!__fb_sfx)
@@ -699,7 +688,7 @@ static void fb_sfxMixFeedSource(int frames, int (*feed_fn)(float *buffer, int fr
         produced = frames;
 
     for (i = 0; i < produced * channels; ++i)
-        __fb_sfx->mixbuffer[i] = fb_sfxCoreClampSample(__fb_sfx->mixbuffer[i] + scratch[i]);
+        __fb_sfx->mixbuffer[i] = fb_sfxClampSample(__fb_sfx->mixbuffer[i] + scratch[i]);
 }
 
 static int fb_sfxOutputQueueInitLocked(void)
@@ -900,6 +889,15 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
 
         if (result > 0)
         {
+            if (result > write_frames)
+            {
+                SFX_DEBUG("sfx_core: driver '%s' over-reported write (%d > %d)",
+                          driver->name ? driver->name : "(null)",
+                          result,
+                          write_frames);
+                result = write_frames;
+            }
+
             written += result;
             zero_retry_count = 0;
 
@@ -916,7 +914,8 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
 
                 /*
                     Treat transient zero-progress writes as backpressure and
-                    retry after a short delay before switching drivers.
+                    retry after a short delay.  A zero return is
+                    backpressure, not a fatal driver-lost signal.
                 */
                 fb_sfxRuntimeUnlock();
                 fb_sfxSleepMs(1);
@@ -925,16 +924,11 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
                 continue;
             }
 
-            SFX_DEBUG("sfx_core: driver '%s' returned 0 for %d retries, trying fallback",
+            SFX_DEBUG("sfx_core: driver '%s' accepted no frames after %d retries",
                       driver->name ? driver->name : "(null)",
                       zero_retry_count);
 
-            if (fb_sfxDriverFallback(driver) != 0)
-                break;
-
-            driver = (__fb_sfx) ? __fb_sfx->driver : NULL;
-            zero_retry_count = 0;
-            continue;
+            break;
         }
 
         if (fb_sfxDriverFallback(driver) != 0)
@@ -953,11 +947,17 @@ static int fb_sfxDriverTryFromIndex(int start_index)
     if (!__fb_sfx)
         return -1;
 
+    if (start_index < 0)
+        start_index = 0;
+
     for (i = start_index; __fb_sfx_drivers_list[i]; ++i)
     {
         const SFXDRIVER *driver = __fb_sfx_drivers_list[i];
 
         if (!driver || !driver->init)
+            continue;
+
+        if (fb_sfxDriverValidate(driver) != 0)
             continue;
 
         SFX_DEBUG("sfx_core: attempting driver '%s'", driver->name);
@@ -980,6 +980,41 @@ static int fb_sfxDriverTryFromIndex(int start_index)
     return -1;
 }
 
+int fb_sfxDriverValidate(const SFXDRIVER *driver)
+{
+    if (!driver)
+        return -1;
+
+    if (!driver->name || !driver->init || !driver->exit || !driver->write)
+    {
+        SFX_DEBUG("sfx_core: driver has an incomplete lifecycle/write table");
+        return -1;
+    }
+
+    if ((driver->capabilities & FB_SFX_DRIVER_CAP_CAPTURE) &&
+        !driver->capture_read)
+    {
+        SFX_DEBUG("sfx_core: driver '%s' advertises capture without capture_read",
+                  driver->name);
+        return -1;
+    }
+
+    if (driver->capabilities & FB_SFX_DRIVER_CAP_MIDI)
+    {
+        /*
+            MIDI is currently routed through the separate platform MIDI
+            subsystem, not through SFXDRIVER callbacks.  Reject this flag here
+            so the driver table cannot describe a hook that the interface does
+            not actually expose.
+        */
+        SFX_DEBUG("sfx_core: driver '%s' advertises MIDI through SFXDRIVER without MIDI hooks",
+                  driver->name);
+        return -1;
+    }
+
+    return 0;
+}
+
 static int fb_sfxDriverTryByName(const char *name)
 {
     int i;
@@ -996,6 +1031,13 @@ static int fb_sfxDriverTryByName(const char *name)
 
         if (!fb_sfxDriverNameEquals(driver->name, name))
             continue;
+
+        if (fb_sfxDriverValidate(driver) != 0)
+        {
+            SFX_DEBUG("sfx_core: requested driver '%s' has invalid capabilities",
+                      driver->name);
+            return -1;
+        }
 
         SFX_DEBUG("sfx_core: attempting requested driver '%s'", driver->name);
 

@@ -95,20 +95,6 @@ static int xbox_clamp_buffer_frames(int frames)
     return frames;
 }
 
-static short xbox_float_to_pcm16(float sample)
-{
-    if (sample >= 1.0f)
-        return 32767;
-
-    if (sample <= -1.0f)
-        return -32768;
-
-    if (sample >= 0.0f)
-        return (short)(sample * 32767.0f);
-
-    return (short)(sample * 32768.0f);
-}
-
 static void xbox_clear_buffers(void)
 {
     int i;
@@ -373,7 +359,6 @@ static void xbox_driver_exit(void)
 static int xbox_driver_write_chunk(const float *samples, int frames)
 {
     short *pcm;
-    int i;
     int index;
 
     /*
@@ -390,8 +375,7 @@ static int xbox_driver_write_chunk(const float *samples, int frames)
     g_xbox_next_buffer = (g_xbox_next_buffer + 1) % FB_SFX_XBOX_BUFFER_COUNT;
 
     pcm = (short *)g_xbox_buffers[index];
-    for (i = 0; i < frames * FB_SFX_XBOX_CHANNELS; ++i)
-        pcm[i] = xbox_float_to_pcm16(samples[i]);
+    fb_sfxConvertFloatToS16(samples, pcm, frames * FB_SFX_XBOX_CHANNELS);
 
     if (frames < g_xbox_buffer_frames)
     {

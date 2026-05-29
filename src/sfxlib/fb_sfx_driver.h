@@ -57,6 +57,20 @@ extern "C" {
     The runtime may adjust behavior depending on the features
     available from the backend.
 
+    CAP_CAPTURE means the driver object exposes a working capture_read()
+    callback.  Platform capture code that is wired outside SFXDRIVER should
+    not set this flag until the capability model is extended to describe
+    that path explicitly.
+
+    CAP_MIDI is reserved for driver-owned MIDI hooks.  The current driver
+    object does not yet carry those hooks, so output drivers should not set
+    this flag for platform MIDI code that is reached through the separate
+    MIDI subsystem.
+
+    BACKGROUND means the backend has a worker, callback, or platform queue
+    that can keep ordinary playback moving without the BASIC program calling
+    foreground sound commands.
+
     BLOCKING means driver.write() consumes the corresponding playback time
     before returning.  Synchronous DOS hardware paths use this so foreground
     commands and DOS delay pumping do not sleep a second time after audio has
@@ -173,12 +187,24 @@ typedef struct SFXDRIVER
     /* ------------------------------------------------------------------ */
 
     /*
-        Write audio samples to the device.
+        Write audio samples to the backend queue or device.
 
-        Samples are provided in the internal mixer format.
+        Samples are provided in the internal mixer format: interleaved
+        floating point PCM in the range [-1.0, 1.0].  Drivers may convert
+        samples to the format required by the operating system audio API.
 
-        Drivers may convert samples to the format required by the
-        operating system audio API.
+        Return value contract:
+
+            > 0     number of frames accepted by the backend queue/device
+            0       no frames accepted; this is backpressure, not by itself
+                    a fatal driver failure
+            < 0     fatal driver error or lost backend
+
+        "Accepted" means the backend has taken responsibility for those
+        frames.  For queued and callback drivers this usually means queued,
+        not necessarily played by the physical device.  For BLOCKING drivers,
+        accepted frames may have consumed real playback time before write()
+        returns.
     */
 
     int (*write)(

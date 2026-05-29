@@ -71,22 +71,6 @@ typedef struct WAV_HEADER
 
 
 /* ------------------------------------------------------------------------- */
-/* Float → PCM conversion                                                    */
-/* ------------------------------------------------------------------------- */
-
-static short fb_sfxFloatToPCM16(float v)
-{
-    if (v > 1.0f)
-        v = 1.0f;
-
-    if (v < -1.0f)
-        v = -1.0f;
-
-    return (short)(v * 32767.0f);
-}
-
-
-/* ------------------------------------------------------------------------- */
 /* CAPTURE SAVE                                                              */
 /* ------------------------------------------------------------------------- */
 
@@ -97,7 +81,6 @@ int fb_sfxCaptureSave(const char *filename, int seconds)
     int channels = 2;
     int frames;
     int total_frames;
-    int i;
 
     float *buffer;
     short *pcm;
@@ -149,8 +132,7 @@ int fb_sfxCaptureSave(const char *filename, int seconds)
         Convert to PCM
     */
 
-    for (i = 0; i < frames * channels; i++)
-        pcm[i] = fb_sfxFloatToPCM16(buffer[i]);
+    fb_sfxConvertFloatToS16(buffer, pcm, frames * channels);
 
     /*
         Prepare WAV header

@@ -42,6 +42,7 @@ static AudioStreamBasicDescription g_format;
 static FB_SFX_DARWIN_QUEUE_BUFFER g_buffers[FB_SFX_DARWIN_QUEUE_BUFFERS];
 static int g_buffer_bytes = 0;
 static int g_current_buffer = 0;
+static pthread_mutex_t g_darwin_coreaudio_lock = PTHREAD_MUTEX_INITIALIZER;
 static int g_write_debug_count = 0;
 static int g_done_debug_count = 0;
 static int g_darwin_debug_initialized = 0;
@@ -377,6 +378,10 @@ static void fb_sfxDarwinBufferDone(void *user_data,
 
     (void)queue;
 
+    if (!fb_sfx_darwin.running)
+        return;
+
+    pthread_mutex_lock(&g_darwin_coreaudio_lock);
     for (i = 0; i < FB_SFX_DARWIN_QUEUE_BUFFERS; ++i)
     {
         if (buffers[i].ref == buffer)
@@ -392,6 +397,7 @@ static void fb_sfxDarwinBufferDone(void *user_data,
             break;
         }
     }
+    pthread_mutex_unlock(&g_darwin_coreaudio_lock);
 }
 
 int fb_sfxDarwinInit(void)
@@ -525,8 +531,6 @@ void fb_sfxDarwinDeactivate(void)
 
 void fb_sfxDarwinExit(void)
 {
-    int i;
-
     fb_sfx_darwin.running = 0;
 
 #if FB_SFX_MT_ENABLED
@@ -541,20 +545,25 @@ void fb_sfxDarwinExit(void)
 
     if (g_audio_queue)
     {
+        int j;
+
         AudioQueueStop(g_audio_queue, true);
 
-        for (i = 0; i < FB_SFX_DARWIN_QUEUE_BUFFERS; ++i)
+        pthread_mutex_lock(&g_darwin_coreaudio_lock);
+        for (j = 0; j < FB_SFX_DARWIN_QUEUE_BUFFERS; ++j)
         {
-            if (g_buffers[i].ref)
+            if (g_buffers[j].ref)
             {
-                AudioQueueFreeBuffer(g_audio_queue, g_buffers[i].ref);
-                g_buffers[i].ref = NULL;
-                g_buffers[i].in_use = 0;
+                AudioQueueFreeBuffer(g_audio_queue, g_buffers[j].ref);
+                g_buffers[j].ref = NULL;
+                g_buffers[j].in_use = 0;
             }
         }
+        pthread_mutex_unlock(&g_darwin_coreaudio_lock);
 
         AudioQueueDispose(g_audio_queue, true);
         g_audio_queue = NULL;
+        g_current_buffer = 0;
     }
 
     fb_sfx_darwin.initialized = 0;
@@ -568,8 +577,9 @@ int fb_sfxDarwinWrite(float *buffer, int frames)
 {
     FB_SFX_DARWIN_QUEUE_BUFFER *slot;
     size_t bytes;
+    int current_buffer;
 
-    if (!g_audio_queue || !buffer || frames <= 0)
+    if (!g_audio_queue || !buffer || frames <= 0 || !fb_sfx_darwin.running)
         return -1;
 
     fb_sfxDriverDiagnostics("CoreAudio",
@@ -577,10 +587,23 @@ int fb_sfxDarwinWrite(float *buffer, int frames)
                             frames,
                             fb_sfx_darwin.channels);
 
-    slot = &g_buffers[g_current_buffer];
+    for (;;)
+    {
+        pthread_mutex_lock(&g_darwin_coreaudio_lock);
+        if (!fb_sfx_darwin.running)
+        {
+            pthread_mutex_unlock(&g_darwin_coreaudio_lock);
+            return -1;
+        }
 
-    while (slot->in_use)
+        current_buffer = g_current_buffer;
+        slot = &g_buffers[current_buffer];
+        if (slot->ref && !slot->in_use)
+            break;
+
+        pthread_mutex_unlock(&g_darwin_coreaudio_lock);
         CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.001, false);
+    }
 
     bytes = (size_t)frames * (size_t)g_format.mBytesPerFrame;
     if (bytes > (size_t)g_buffer_bytes)
@@ -589,23 +612,29 @@ int fb_sfxDarwinWrite(float *buffer, int frames)
     memcpy(slot->ref->mAudioData, buffer, bytes);
     slot->ref->mAudioDataByteSize = (UInt32)bytes;
     slot->in_use = 1;
+    pthread_mutex_unlock(&g_darwin_coreaudio_lock);
 
     if (AudioQueueEnqueueBuffer(g_audio_queue, slot->ref, 0, NULL) != noErr)
     {
+        pthread_mutex_lock(&g_darwin_coreaudio_lock);
         slot->in_use = 0;
+        pthread_mutex_unlock(&g_darwin_coreaudio_lock);
         return -1;
     }
 
     if (g_write_debug_count < 8)
     {
         DARWIN_DBG("enqueue: slot=%d frames=%d bytes=%zu\n",
-                   g_current_buffer,
+                   current_buffer,
                    frames,
                    bytes);
         g_write_debug_count++;
     }
 
-    g_current_buffer = (g_current_buffer + 1) % FB_SFX_DARWIN_QUEUE_BUFFERS;
+    pthread_mutex_lock(&g_darwin_coreaudio_lock);
+    g_current_buffer = (current_buffer + 1) % FB_SFX_DARWIN_QUEUE_BUFFERS;
+    pthread_mutex_unlock(&g_darwin_coreaudio_lock);
+
     return (int)(bytes / g_format.mBytesPerFrame);
 }
 
@@ -678,7 +707,7 @@ static int darwin_device_select(int device)
 const FB_SFX_DRIVER fb_sfxDriverCoreAudio =
 {
     "CoreAudio",
-    FB_SFX_DRIVER_CAP_CAPTURE | FB_SFX_DRIVER_CAP_MIDI | FB_SFX_DRIVER_CAP_BACKGROUND,
+    FB_SFX_DRIVER_CAP_BACKGROUND,
     darwin_init,
     darwin_exit,
     darwin_write,

@@ -292,14 +292,13 @@ static void winmm_exit(void)
 
 static int winmm_write(const float *buffer, int frames)
 {
-    int i;
     int channels = g_format.nChannels > 0 ? g_format.nChannels : 2;
     int samples = frames * channels;
     WAVEHDR *header;
     short *dst;
     MMRESULT res;
 
-    if (!g_waveout || !buffer || frames <= 0)
+    if (!buffer || frames <= 0)
         return -1;
 
     if (samples > g_buffer_samples)
@@ -307,32 +306,44 @@ static int winmm_write(const float *buffer, int frames)
 
     fb_sfxDriverDiagnostics("WinMM", buffer, samples / channels, channels);
 
-    header = &g_headers[g_current_buffer];
-    dst = g_buffers[g_current_buffer];
-
-    while (header->dwFlags & WHDR_INQUEUE)
+    for (;;)
     {
-        if (InterlockedCompareExchange(&g_worker_stop, 0, 0) != 0 ||
-            InterlockedCompareExchange(&g_worker_running, 0, 0) == 0)
+        fb_sfxDriverIoLock();
+        if (!g_waveout || !g_buffer_bytes)
         {
+            fb_sfxDriverIoUnlock();
             return -1;
         }
 
+        header = &g_headers[g_current_buffer];
+        dst = g_buffers[g_current_buffer];
+        if (!dst)
+        {
+            fb_sfxDriverIoUnlock();
+            return -1;
+        }
+
+        if (!(header->dwFlags & WHDR_INQUEUE))
+            break;
+
+        if (InterlockedCompareExchange(&g_worker_stop, 0, 0) != 0 ||
+            InterlockedCompareExchange(&g_worker_running, 0, 0) == 0)
+        {
+            fb_sfxDriverIoUnlock();
+            return -1;
+        }
+
+        fb_sfxDriverIoUnlock();
         if (g_buffer_event)
             WaitForSingleObject(g_buffer_event, 10);
         else
             Sleep(1);
     }
 
-    for (i = 0; i < samples; i++)
-    {
-        float s = buffer[i];
+    if (samples > g_buffer_samples)
+        samples = g_buffer_samples;
 
-        if (s > 1.0f)  s = 1.0f;
-        if (s < -1.0f) s = -1.0f;
-
-        dst[i] = (short)(s * 32767.0f);
-    }
+    fb_sfxConvertFloatToS16(buffer, dst, samples);
 
     header->lpData = (LPSTR)dst;
     header->dwBufferLength = (DWORD)(samples * (int)sizeof(short));
@@ -340,9 +351,13 @@ static int winmm_write(const float *buffer, int frames)
 
     res = waveOutWrite(g_waveout, header, sizeof(WAVEHDR));
     if (res != MMSYSERR_NOERROR)
+    {
+        fb_sfxDriverIoUnlock();
         return -1;
+    }
 
     g_current_buffer = (g_current_buffer + 1) % FB_SFX_WINMM_BUFFER_COUNT;
+    fb_sfxDriverIoUnlock();
 
     return samples / channels;
 }
