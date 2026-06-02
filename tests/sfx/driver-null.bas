@@ -2,28 +2,6 @@
 
 #include once "sfx_test_common.bi"
 
-type FB_SFX_DRIVER_STATS
-	as ulongint write_calls
-	as ulongint frames_requested
-	as ulongint frames_accepted
-	as ulongint frames_dropped
-	as ulongint underruns
-	as ulongint overruns
-	as ulongint short_writes
-	as ulongint zero_writes
-	as ulongint errors
-	as ulongint recoveries
-	as integer current_queue_fill
-	as integer max_queue_fill
-	as integer last_error
-end type
-
-declare function fb_sfxDriverStatsSnapshot cdecl alias "fb_sfxDriverStatsSnapshot" _
-	( _
-		byval driver_name as zstring ptr, _
-		byval stats as FB_SFX_DRIVER_STATS ptr _
-	) as integer
-
 SfxTestUseNullDriver()
 
 device list

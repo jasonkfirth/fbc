@@ -10,6 +10,12 @@
 	#define FB_TCP_INVALID_SOCKET (-1)
 #endif
 
+#define FB_TCP_WII_RECV_BUFFER_SIZE 16384
+
+#if defined(HOST_WII)
+typedef struct FB_WII_TCP_PUMP FB_WII_TCP_PUMP;
+#endif
+
 typedef struct {
 	char *host;
 	unsigned int port;
@@ -25,10 +31,20 @@ typedef struct {
 	unsigned int timeout;
 	int is_server;
 	int is_closed;
+#if defined(HOST_WII)
+	FB_WII_TCP_PUMP *wii_pump;
+#endif
 } DEV_TCP_INFO;
 
 int fb_DevTcpParseProtocol( DEV_TCP_PROTOCOL **tcp_proto_out, const char *proto_raw, size_t proto_raw_len, int is_server );
 int fb_DevTcpAcceptHandle( FB_FILE *server_handle, FB_FILE *client_handle );
 int fb_DevTcpEocEx( FB_FILE *handle );
+
+#if defined(HOST_WII)
+FB_WII_TCP_PUMP *fb_WiiTcpPumpCreate( FB_TCP_SOCKET hSocket );
+void fb_WiiTcpPumpDestroy( FB_WII_TCP_PUMP *pump );
+int fb_WiiTcpPumpPeekState( FB_WII_TCP_PUMP *pump );
+size_t fb_WiiTcpPumpRead( FB_WII_TCP_PUMP *pump, void *buffer, size_t length, int wait );
+#endif
 
 #endif

@@ -760,7 +760,8 @@ private function hMultithread_cb _
 		byval sym as FBSYMBOL ptr _
 	) as integer
 
-	if( env.clopt.target = FB_COMPTARGET_DOS ) then
+	if( (env.clopt.target = FB_COMPTARGET_DOS) or _
+		(env.clopt.target = FB_COMPTARGET_JS) ) then
 		errReport( FB_ERRMSG_UNSUPPORTEDFUNCTION )
 		return FALSE
 	end if

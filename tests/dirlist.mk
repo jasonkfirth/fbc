@@ -8,6 +8,7 @@ DIRLIST_FB := \
 pretest \
 boolean \
 comments \
+command-sweep \
 compound \
 console \
 const \

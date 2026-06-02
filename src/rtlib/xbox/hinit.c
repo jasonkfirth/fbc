@@ -9,6 +9,10 @@
 #define FB_XBOX_WRITABLE_DEVICE "\\Device\\Harddisk0\\Partition1\\"
 #define FB_XBOX_DISC_DRIVE      'D'
 
+__attribute__((weak)) void fb_XboxApplyPackageEnv( void )
+{
+}
+
 static void fb_XboxMountWritableDrive( void )
 {
 	if( !nxIsDriveMounted( FB_XBOX_WRITABLE_DRIVE ) )
@@ -121,6 +125,7 @@ void fb_hInit( void )
 
 	fb_XboxMountWritableDrive();
 	fb_XboxMountDiscDrive();
+	fb_XboxApplyPackageEnv();
 
 	/* Get FPU control word */
 	__asm__ __volatile__( "fstcw %0" : "=m" (control_word) : );

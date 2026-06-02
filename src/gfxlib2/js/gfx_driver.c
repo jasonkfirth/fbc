@@ -391,6 +391,37 @@ void fb_hScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *re
 	*refresh = GFX_JS_FPS;
 }
 
+ssize_t fb_hGetWindowHandle(void)
+{
+	/*
+		The browser canvas is not exposed to BASIC as an integer handle.
+		Return zero to match the other backends that cannot provide a
+		native window object.
+	*/
+	return 0;
+}
+
+ssize_t fb_hGetDisplayHandle(void)
+{
+	/*
+		There is no process-wide display connection in the Emscripten
+		backend.  Keeping this hook linkable lets SCREENCONTROL queries
+		work while still reporting "not available" to the caller.
+	*/
+	return 0;
+}
+
+void *fb_hGL_GetProcAddress(const char *proc)
+{
+	/*
+		WebGL entry points are mediated by Emscripten's GL layer and are
+		not available as native function pointers.  Returning NULL is the
+		same observable result used when no GL context is active.
+	*/
+	(void)proc;
+	return NULL;
+}
+
 FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, float *a3, float *a4, float *a5, float *a6, float *a7, float *a8)
 {
 	ssize_t xpad_buttons;

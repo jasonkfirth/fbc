@@ -22,28 +22,6 @@ extern BView   *g_view;
 #define FB_HAIKU_REDRAW_MSG 'fbrd'
 
 /* ------------------------------------------------------------------------- */
-/* Copy helpers                                                              */
-/* ------------------------------------------------------------------------- */
-
-static void fb_hHaikuCopy32To32(
-    const uint8_t *src,
-    int src_pitch,
-    uint8_t *dst,
-    int dst_pitch,
-    int width,
-    int height)
-{
-    int row_bytes = width * 4;
-
-    for (int y = 0; y < height; y++)
-    {
-        memcpy(dst, src, row_bytes);
-        src += src_pitch;
-        dst += dst_pitch;
-    }
-}
-
-/* ------------------------------------------------------------------------- */
 /* Framebuffer copy                                                          */
 /* ------------------------------------------------------------------------- */
 
@@ -52,20 +30,24 @@ static void fb_hHaikuCopyFramebuffer(void)
     if (!__fb_gfx || !g_bmp)
         return;
 
-    uint8_t *src = (uint8_t*)__fb_gfx->framebuffer;
     uint8_t *dst = (uint8_t*)g_bmp->Bits();
+    BLITTER *blitter;
 
-    if (!src || !dst)
+    if (!dst)
         return;
 
-    int src_pitch = __fb_gfx->pitch;
-    int dst_pitch = g_bmp->BytesPerRow();
+    blitter = fb_hGetBlitter(32, FALSE);
 
-    int w = __fb_gfx->w;
-    int h = __fb_gfx->h;
+    if (!blitter)
+        return;
 
-    /* For now assume 32-bit (your test case uses 32bpp) */
-    fb_hHaikuCopy32To32(src, src_pitch, dst, dst_pitch, w, h);
+    /*
+        Haiku presents through a 32-bit BBitmap, while the gfxlib framebuffer
+        can still be an old 1, 2, 4, or 8-bit SCREEN mode.  Use the shared
+        blitter so palette modes are expanded safely instead of treating every
+        source row as 32-bit pixels.
+    */
+    blitter(dst, g_bmp->BytesPerRow());
 }
 
 /* ------------------------------------------------------------------------- */

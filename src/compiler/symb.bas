@@ -252,19 +252,16 @@ private function hIsDefineSet _
 	function = FALSE
 end function
 
-private function hIsDisabledCommandKeyword _
+function symbKeywordIsDisabledCommand _
 	( _
-		byval tk as FB_TOKEN _
+		byval tk as integer _
 	) as integer
 
-	select case as const tk
-	case FB_TK_PSET, FB_TK_PRESET, FB_TK_POINT, FB_TK_CIRCLE, _
-	     FB_TK_WINDOW, FB_TK_PALETTE, FB_TK_SCREEN, FB_TK_SCREENQB, _
-	     FB_TK_PAINT, FB_TK_DRAW, FB_TK_IMAGECREATE
+	select case as const symbKeywordGetIllegalRedefErr( tk )
+	case FB_ERRMSG_ILLEGALGFXLIBCOMMANDREDEF
 		function = hIsDefineSet( @"FB_NO_GFXLIB" )
 
-	case FB_TK_MUSIC, FB_TK_SFX, FB_TK_AUDIO, FB_TK_STREAM, _
-	     FB_TK_MIDI, FB_TK_DEVICE, FB_TK_CAPTURE
+	case FB_ERRMSG_ILLEGALSFXLIBCOMMANDREDEF
 		function = hIsDefineSet( @"FB_NO_SFXLIB" )
 
 	case else
@@ -282,10 +279,22 @@ function symbCanDuplicate _
 	function = FALSE
 
 	select case as const s->class
-	'' adding a define, keyword, namespace, class or field?
-	case FB_SYMBCLASS_DEFINE, FB_SYMBCLASS_KEYWORD, _
-	     FB_SYMBCLASS_NAMESPACE, FB_SYMBCLASS_CLASS, _
-	     FB_SYMBCLASS_FIELD
+	'' adding a define?
+	case FB_SYMBCLASS_DEFINE
+		do
+			if( head_sym->class = FB_SYMBCLASS_KEYWORD ) then
+				if( symbKeywordIsDisabledCommand( head_sym->key.id ) ) then
+					head_sym = head_sym->hash.next
+					continue do
+				end if
+			end if
+
+			exit function
+		loop while( head_sym <> NULL )
+
+	'' adding a keyword, namespace, class or field?
+	case FB_SYMBCLASS_KEYWORD, FB_SYMBCLASS_NAMESPACE, _
+	     FB_SYMBCLASS_CLASS, FB_SYMBCLASS_FIELD
 
 		'' no dups allowed
 		exit function
@@ -352,7 +361,7 @@ function symbCanDuplicate _
 			'' only if the keyword or the rtl-proc has a string suffix
 			case FB_SYMBCLASS_KEYWORD, FB_SYMBCLASS_PROC
 				if( head_sym->class = FB_SYMBCLASS_KEYWORD ) then
-					if( hIsDisabledCommandKeyword( head_sym->key.id ) ) then
+					if( symbKeywordIsDisabledCommand( head_sym->key.id ) ) then
 						head_sym = head_sym->hash.next
 						continue do
 					end if
@@ -411,7 +420,7 @@ function symbCanDuplicate _
 			'' only if the keyword or the rtl-proc has a string suffix
 			case FB_SYMBCLASS_KEYWORD, FB_SYMBCLASS_PROC
 				if( head_sym->class = FB_SYMBCLASS_KEYWORD ) then
-					if( hIsDisabledCommandKeyword( head_sym->key.id ) ) then
+					if( symbKeywordIsDisabledCommand( head_sym->key.id ) ) then
 						head_sym = head_sym->hash.next
 						continue do
 					end if
@@ -1214,7 +1223,7 @@ function symbLookup _
 		dim as FBSYMBOL ptr sym = hashLookupEx( @hashtb->tb, id, index )
 		while( sym )
 			if( sym->class = FB_SYMBCLASS_KEYWORD ) then
-				if( hIsDisabledCommandKeyword( sym->key.id ) = FALSE ) then
+				if( symbKeywordIsDisabledCommand( sym->key.id ) = FALSE ) then
 					tk = sym->key.id
 					tk_class = sym->key.tkclass
 					'' return if it's a KEYWORD or a OPERATOR token, they

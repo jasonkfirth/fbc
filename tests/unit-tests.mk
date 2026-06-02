@@ -136,6 +136,9 @@ ifneq ($(GEN),)
 endif
 
 FBC_LFLAGS := $(FBCU_LIBS) -p $(FBCU_LIB) -fbgfx -x $(MAINEXE) -v
+ifneq ($(TARGET_OS),dos)
+	FBC_LFLAGS += -mt
+endif
 ifdef DEBUG
 	FBC_LFLAGS += -g
 endif
@@ -196,7 +199,7 @@ all : make_fbcunit $(UNIT_TESTS_OBJ_LST) build_tests run_tests
 make_fbcunit : $(FBCU_BIN)
 
 $(FBCU_BIN) :
-	$(FBCU_MAKE) -C $(FBCU_DIR) FBC="$(FBC)" FPU=$(FPU) ARCH=$(ARCH) TARGET=$(TARGET)
+	+$(FBCU_MAKE) -C $(FBCU_DIR) FBC="$(FBC)" FPU=$(FPU) ARCH=$(ARCH) TARGET=$(TARGET)
 
 # ------------------------------------------------------------------------
 # Auto-generate the file UNIT_TESTS_INC - needed by this makefile

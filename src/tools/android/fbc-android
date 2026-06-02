@@ -20,7 +20,8 @@ Options:
   --api N                NDK API level for native compilation (default: 26)
   --min-api N            APK minSdkVersion (default: 21)
   --target-api N         APK targetSdkVersion (default: highest installed platform)
-  --assets DIR           Add all files from DIR as APK assets
+  --assets DIR           Add all files from DIR as current-directory APK assets
+  --env NAME=VALUE       Set an environment variable before the program starts
   --package NAME         Android application package name
   --label TEXT           Android application label
   --hideKeyboardButton   Disable the on-screen keyboard toggle button and IME
@@ -35,7 +36,7 @@ Environment:
   ANDROID_D8_JAR / D8_JAR           R8/D8 jar to use when no d8/dx tool exists
   ANDROID_DX_JAR / DX_JAR           dx jar to use when no d8/dx tool exists
   FBANDROID_PREFIX                  Install prefix (default: /usr)
-  FBANDROID_ASSETS                  Directory to include as APK assets
+  FBANDROID_ASSETS                  Directory to include as current-directory APK assets
 
 Source defines:
   #define FB_ANDROID_HIDE_KEYBOARD_BUTTON
@@ -131,6 +132,15 @@ find_sdk() {
 		return 0
 	done
 	return 1
+}
+
+c_string() {
+	local value="$1"
+
+	value="${value//\\/\\\\}"
+	value="${value//\"/\\\"}"
+	value="${value//$'\n'/\\n}"
+	printf '"%s"' "$value"
 }
 
 find_ndk() {
@@ -321,6 +331,7 @@ package=""
 label=""
 src=""
 asset_dir="${FBANDROID_ASSETS:-}"
+env_defs=()
 use_mt=0
 use_entry=1
 run_on_phone=0
@@ -347,6 +358,10 @@ while [ $# -gt 0 ]; do
 		--landscape) screen_orientation="landscape"; shift ;;
 		--assets)
 			asset_dir="$2"
+			shift 2
+			;;
+		--env)
+			env_defs+=("$2")
 			shift 2
 			;;
 		--runOnPhone) run_on_phone=1; shift ;;
@@ -454,6 +469,15 @@ module="$(sanitize_module "$src_name")"
 [ -n "$label" ] || label="$base"
 [ -n "$package" ] || package="$(sanitize_package "$base")"
 [ -z "$asset_dir" ] || [ -d "$asset_dir" ] || die "assets directory not found: $asset_dir"
+for env_def in "${env_defs[@]}"; do
+	case "$env_def" in
+		*=*) ;;
+		*) die "--env expects NAME=VALUE: $env_def" ;;
+	esac
+
+	env_name="${env_def%%=*}"
+	[[ "$env_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || die "invalid --env variable name: $env_name"
+done
 
 case "$mode" in
 	apk) [ -n "$output" ] || output="$base.apk" ;;
@@ -529,6 +553,26 @@ fi
 
 "$cc" -fPIC -DANDROID -DFB_ANDROID_KEYBOARD_ENABLED="$keyboard_enabled_define" -I"$incdir" -c "$template/fb_android_app.c" -o "$appobj"
 
+envobj=""
+if [ "${#env_defs[@]}" -gt 0 ]; then
+	envc="$tmp/fb_android_env.c"
+	envobj="$tmp/fb_android_env.o"
+	{
+		echo '#include <stdlib.h>'
+		echo ''
+		echo 'static void __attribute__((constructor)) fb_android_set_package_env(void)'
+		echo '{'
+		for env_def in "${env_defs[@]}"; do
+			env_name="${env_def%%=*}"
+			env_value="${env_def#*=}"
+			printf '\tsetenv(%s, %s, 1);\n' "$(c_string "$env_name")" "$(c_string "$env_value")"
+		done
+		echo '}'
+	} > "$envc"
+	"$cc" -fPIC -DANDROID -c "$envc" -o "$envobj"
+fi
+
+startup="$libdir/fbrt0pic.o"
 runtime=()
 if [ "$use_mt" -eq 1 ]; then
 	fb_runtime="libfbmtpic.a"
@@ -542,18 +586,21 @@ else
 	sfx_runtime="libsfxpic.a"
 fi
 
-for required in fbrt0pic.o "$fb_runtime"; do
-	[ -f "$libdir/$required" ] || die "required Android runtime file is missing: $libdir/$required"
-	runtime+=("$libdir/$required")
-done
+[ -f "$startup" ] || die "required Android runtime file is missing: $startup"
+[ -f "$libdir/$fb_runtime" ] || die "required Android runtime file is missing: $libdir/$fb_runtime"
+runtime+=("$libdir/$fb_runtime")
 for optional in "$fbrt_runtime" "$gfx_runtime" "$sfx_runtime"; do
 	if [ -f "$libdir/$optional" ]; then
 		runtime+=("$libdir/$optional")
 	fi
 done
 
+link_objects=("$appobj")
+[ -z "$envobj" ] || link_objects+=("$envobj")
+link_objects+=("$startup" "$objfile")
+
 "$cc" -shared -Wl,-soname,libfreebasicapp.so -o "$sofile" \
-	"$appobj" "$objfile" \
+	"${link_objects[@]}" \
 	-Wl,--start-group "${runtime[@]}" -Wl,--end-group \
 	-Wl,--wrap=exit \
 	-llog -landroid -lOpenSLES -ldl -lm

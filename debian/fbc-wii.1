@@ -13,6 +13,32 @@ FreeBASIC Wii headers and libraries, and the libogc/devkitPPC toolchain.
 The driver produces Wii homebrew output using the normal FreeBASIC command
 line interface.  It expects devkitPro's Wii toolchain and libogc to be
 installed on the build system.
+.PP
+For games that load files from the current directory,
+.B fbc-wii
+can also stage a homebrew folder and copy asset files beside the DOL.
+.SH OPTIONS
+.TP
+.BI "--bundle " DIR
+Create
+.IR DIR
+and, unless an explicit output path is given, write
+.IR DIR/boot.dol .
+.TP
+.BI "--assets " DIR
+Copy the contents of
+.IR DIR
+beside the DOL after a successful build.
+.TP
+.BI "-x " FILE
+.TQ
+.BI "-o " FILE
+Forward the FreeBASIC output path.  When
+.B --assets
+is used without
+.B --bundle ,
+assets are copied beside
+.IR FILE .
 .SH ENVIRONMENT
 .TP
 .B DEVKITPRO

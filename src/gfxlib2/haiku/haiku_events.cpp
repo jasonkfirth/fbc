@@ -73,6 +73,7 @@ void fb_hHaikuHandleMouseDown(BView*, int x, int y, int buttons)
 
     /* buttons represents full button state */
     fb_haiku.mouse_buttons = buttons;
+    fb_haiku.mouse_latched_buttons |= buttons;
 }
 
 

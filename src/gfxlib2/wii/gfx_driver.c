@@ -11,10 +11,11 @@
     Responsibilities:
 
         - open a Wii VI framebuffer mode
-        - convert gfxlib's 32-bit RGB framebuffer into the Wii YUYV XFB format
+        - convert gfxlib's framebuffer into the Wii YUYV XFB format
         - scale lower-resolution gfxlib modes into the TV framebuffer
         - present from explicit update calls and input polling boundaries
         - expose Wiimote IR pointing as the gfxlib mouse
+        - expose a small Wii/GC controller-to-keyboard compatibility bridge
 
     This file intentionally does NOT contain:
 
@@ -25,14 +26,15 @@
     Platform notes:
 
         libogc's external framebuffer is not RGB.  It is a packed YUYV buffer
-        using one chroma pair for every two horizontal pixels.  The conversion
-        here keeps the rest of gfxlib working in its normal 32-bit RGB buffer
-        and performs the hardware-format conversion only when a frame is
-        actually presented.  Old visible-page BASIC programs often draw a
-        complete frame and then wait for input without calling SCREENSET or
-        SCREENCOPY.  The Wii backend treats input polling as a safe boundary
-        for those programs: it presents the completed dirty frame there, but
-        still avoids presenting from every primitive unlock.
+        using one chroma pair for every two horizontal pixels.  Most modes use
+        gfxlib's normal blitter to build a 32-bit RGB staging buffer before
+        conversion.  The 16-bit path samples the gfxlib 565 pixels directly so
+        it does not depend on word packing in the shared blitter on big-endian
+        PowerPC.  Old visible-page BASIC programs often draw a complete frame
+        and then wait for input without calling SCREENSET or SCREENCOPY.  The
+        Wii backend treats input polling as a safe boundary for those programs:
+        it presents the completed dirty frame there, but still avoids
+        presenting from every primitive unlock.
 */
 
 #include "../fb_gfx.h"
@@ -46,7 +48,6 @@
 #define SCREENLIST(w, h) ((h) | (w) << 16)
 #define WII_XFB_COUNT 2
 #define WII_MOUSE_KEEP ((int)0x80000000)
-#define WII_SC_ESCAPE 1
 
 static BLITTER *blitter;
 static uint32_t *rgb_buffer;
@@ -65,6 +66,8 @@ static int mouse_latched_buttons;
 static int mouse_clip;
 static int mouse_cursor;
 static int keyboard_escape_down;
+static u32 keyboard_buttons;
+static u32 keyboard_dpad;
 
 static int ensure_rgb_buffer(size_t pixels)
 {
@@ -162,6 +165,30 @@ static int wii_wpad_is_connected(int channel)
 	return WPAD_Probe(channel, &type) == WPAD_ERR_NONE;
 }
 
+static void wii_move_mouse_with_dpad(u32 dpad)
+{
+	int width;
+	int height;
+	int dx = 0;
+	int dy = 0;
+
+	if (dpad & WPAD_BUTTON_LEFT)
+		dx -= 2;
+	if (dpad & WPAD_BUTTON_RIGHT)
+		dx += 2;
+	if (dpad & WPAD_BUTTON_UP)
+		dy -= 2;
+	if (dpad & WPAD_BUTTON_DOWN)
+		dy += 2;
+
+	if ((dx == 0) && (dy == 0))
+		return;
+
+	wii_get_mouse_bounds(&width, &height);
+	mouse_x = wii_clamp_int(mouse_x + dx, 0, width - 1);
+	mouse_y = wii_clamp_int(mouse_y + dy, 0, height - 1);
+}
+
 static int wii_find_pointer_channel(ir_t *ir, int *channel)
 {
 	int i;
@@ -194,41 +221,151 @@ static int wii_find_pointer_channel(ir_t *ir, int *channel)
 	return FALSE;
 }
 
+static void wii_set_key_state(int scancode, int down)
+{
+	if (__fb_gfx && __fb_gfx->key && (scancode >= 0) && (scancode < 128))
+		__fb_gfx->key[scancode] = down ? TRUE : FALSE;
+}
+
+static void wii_post_key_on_press(int down, int was_down, int key)
+{
+	if (down && !was_down)
+		fb_hPostKey(key);
+}
+
 static void wii_update_keyboard(void)
 {
 	int i;
-	int escape_down;
+	u32 buttons = 0;
+	u32 dpad = 0;
 
-	escape_down = FALSE;
+	PAD_ScanPads();
+	WPAD_ScanPads();
+
+	for (i = PAD_CHAN0; i < PAD_CHANMAX; ++i) {
+		u16 held = PAD_ButtonsHeld(i);
+
+		if (held & PAD_BUTTON_A)
+			buttons |= WPAD_BUTTON_A;
+		if (held & PAD_BUTTON_B)
+			buttons |= WPAD_BUTTON_B;
+		if (held & PAD_BUTTON_START)
+			buttons |= WPAD_BUTTON_PLUS;
+		if (held & PAD_BUTTON_X)
+			buttons |= WPAD_BUTTON_1;
+		if (held & PAD_BUTTON_Y)
+			buttons |= WPAD_BUTTON_2;
+		if (held & PAD_TRIGGER_Z)
+			buttons |= WPAD_BUTTON_MINUS;
+
+		if (held & PAD_BUTTON_UP)
+			dpad |= WPAD_BUTTON_UP;
+		if (held & PAD_BUTTON_RIGHT)
+			dpad |= WPAD_BUTTON_RIGHT;
+		if (held & PAD_BUTTON_DOWN)
+			dpad |= WPAD_BUTTON_DOWN;
+		if (held & PAD_BUTTON_LEFT)
+			dpad |= WPAD_BUTTON_LEFT;
+	}
 
 	for (i = WPAD_CHAN_0; i <= WPAD_CHAN_3; ++i) {
 		u32 type;
+		u32 held;
 
 		if (WPAD_Probe(i, &type) != WPAD_ERR_NONE)
 			continue;
 
-		if (WPAD_ButtonsHeld(i) & WPAD_BUTTON_HOME) {
-			escape_down = TRUE;
-			break;
-		}
+		held = WPAD_ButtonsHeld(i);
+		buttons |= held;
+
+		if (held & WPAD_BUTTON_UP)
+			dpad |= WPAD_BUTTON_UP;
+		if (held & WPAD_BUTTON_RIGHT)
+			dpad |= WPAD_BUTTON_RIGHT;
+		if (held & WPAD_BUTTON_DOWN)
+			dpad |= WPAD_BUTTON_DOWN;
+		if (held & WPAD_BUTTON_LEFT)
+			dpad |= WPAD_BUTTON_LEFT;
+
+#ifdef WPAD_CLASSIC_BUTTON_UP
+		if (held & WPAD_CLASSIC_BUTTON_UP)
+			dpad |= WPAD_BUTTON_UP;
+		if (held & WPAD_CLASSIC_BUTTON_RIGHT)
+			dpad |= WPAD_BUTTON_RIGHT;
+		if (held & WPAD_CLASSIC_BUTTON_DOWN)
+			dpad |= WPAD_BUTTON_DOWN;
+		if (held & WPAD_CLASSIC_BUTTON_LEFT)
+			dpad |= WPAD_BUTTON_LEFT;
+#endif
+
+#ifdef WPAD_CLASSIC_BUTTON_A
+		if (held & WPAD_CLASSIC_BUTTON_A)
+			buttons |= WPAD_BUTTON_A;
+		if (held & WPAD_CLASSIC_BUTTON_B)
+			buttons |= WPAD_BUTTON_B;
+#endif
 	}
 
 	/*
-		The Wii has no PC keyboard by default, but a lot of old FreeBASIC
-		programs already use MULTIKEY(SC_ESCAPE) as their universal "leave the
-		game" path.  Treat the Wiimote Home button as that escape key so the
-		generic keyboard path continues to work without Wii-specific game code.
-
-		Do not post a queued key event here.  Some programs poll input while
-		the graphics runtime is still unwinding a draw/update path, and pushing
-		into the keyboard queue from that path can re-enter runtime code that is
-		not part of Wii input handling.  MULTIKEY-style polling still sees the
-		state bit below, which is the behavior old games most often need.
+		The Wii has no PC keyboard by default, but many old FreeBASIC games use
+		INKEY$, GETKEY, SLEEP, or MULTIKEY for title screens and first-player
+		movement.  Keep the mapping small and conventional: A is Space, +/Start
+		is a start/confirm button that also queues "1" for numbered menus,
+		B/-/Home are Escape, and the d-pad is the cursor keys.  Programs that
+		need exact controller state can still use GETXPAD.
 	*/
-	if (__fb_gfx && __fb_gfx->key)
-		__fb_gfx->key[WII_SC_ESCAPE] = escape_down ? TRUE : FALSE;
+	DRIVER_LOCK();
 
-	keyboard_escape_down = escape_down;
+	wii_post_key_on_press(buttons & WPAD_BUTTON_A,
+	                      keyboard_buttons & WPAD_BUTTON_A,
+	                      ' ');
+	wii_post_key_on_press(buttons & WPAD_BUTTON_PLUS,
+	                      keyboard_buttons & WPAD_BUTTON_PLUS,
+	                      '1');
+	wii_post_key_on_press(buttons & WPAD_BUTTON_PLUS,
+	                      keyboard_buttons & WPAD_BUTTON_PLUS,
+	                      '\r');
+	wii_post_key_on_press(buttons & WPAD_BUTTON_1,
+	                      keyboard_buttons & WPAD_BUTTON_1,
+	                      '1');
+	wii_post_key_on_press(buttons & WPAD_BUTTON_2,
+	                      keyboard_buttons & WPAD_BUTTON_2,
+	                      '2');
+	wii_post_key_on_press(buttons & (WPAD_BUTTON_B | WPAD_BUTTON_MINUS |
+	                      WPAD_BUTTON_HOME),
+	                      keyboard_buttons & (WPAD_BUTTON_B |
+	                      WPAD_BUTTON_MINUS | WPAD_BUTTON_HOME),
+	                      27);
+	wii_post_key_on_press(dpad & WPAD_BUTTON_LEFT,
+	                      keyboard_dpad & WPAD_BUTTON_LEFT,
+	                      fb_hScancodeToExtendedKey(SC_LEFT));
+	wii_post_key_on_press(dpad & WPAD_BUTTON_RIGHT,
+	                      keyboard_dpad & WPAD_BUTTON_RIGHT,
+	                      fb_hScancodeToExtendedKey(SC_RIGHT));
+	wii_post_key_on_press(dpad & WPAD_BUTTON_UP,
+	                      keyboard_dpad & WPAD_BUTTON_UP,
+	                      fb_hScancodeToExtendedKey(SC_UP));
+	wii_post_key_on_press(dpad & WPAD_BUTTON_DOWN,
+	                      keyboard_dpad & WPAD_BUTTON_DOWN,
+	                      fb_hScancodeToExtendedKey(SC_DOWN));
+
+	wii_set_key_state(SC_1, buttons & (WPAD_BUTTON_1 | WPAD_BUTTON_PLUS));
+	wii_set_key_state(SC_2, buttons & WPAD_BUTTON_2);
+	wii_set_key_state(SC_SPACE, buttons & (WPAD_BUTTON_A | WPAD_BUTTON_PLUS));
+	wii_set_key_state(SC_ENTER, buttons & WPAD_BUTTON_PLUS);
+	wii_set_key_state(SC_ESCAPE, buttons & (WPAD_BUTTON_B |
+	                  WPAD_BUTTON_MINUS | WPAD_BUTTON_HOME));
+	wii_set_key_state(SC_LEFT, dpad & WPAD_BUTTON_LEFT);
+	wii_set_key_state(SC_RIGHT, dpad & WPAD_BUTTON_RIGHT);
+	wii_set_key_state(SC_UP, dpad & WPAD_BUTTON_UP);
+	wii_set_key_state(SC_DOWN, dpad & WPAD_BUTTON_DOWN);
+
+	keyboard_escape_down = (buttons & (WPAD_BUTTON_B | WPAD_BUTTON_MINUS |
+	                       WPAD_BUTTON_HOME)) ? TRUE : FALSE;
+	keyboard_buttons = buttons;
+	keyboard_dpad = dpad;
+
+	DRIVER_UNLOCK();
 }
 
 static void wii_update_mouse(void)
@@ -240,19 +377,22 @@ static void wii_update_mouse(void)
 	u32 held;
 	u32 down;
 
-	WPAD_ScanPads();
 	wii_update_keyboard();
 
 	if (!wii_find_pointer_channel(&ir, &channel)) {
-		mouse_buttons = 0;
-		mouse_latched_buttons = 0;
+		wii_move_mouse_with_dpad(keyboard_dpad);
+		mouse_buttons = wii_mouse_buttons_from_wpad(keyboard_buttons);
+		if (mouse_buttons == 0)
+			mouse_latched_buttons = 0;
 		return;
 	}
 
-	if (ir.valid) {
+	if (ir.valid && !keyboard_dpad) {
 		wii_get_mouse_bounds(&width, &height);
 		mouse_x = wii_clamp_int((int)(ir.x + 0.5f), 0, width - 1);
 		mouse_y = wii_clamp_int((int)(ir.y + 0.5f), 0, height - 1);
+	} else {
+		wii_move_mouse_with_dpad(keyboard_dpad);
 	}
 
 	if (!wii_wpad_is_connected(channel)) {
@@ -317,6 +457,28 @@ static void write_yuyv_pair(unsigned char *dst, uint32_t left, uint32_t right)
 	*((uint32_t *)dst) = packed;
 }
 
+static uint32_t sample_16bpp_pixel(int x, int y)
+{
+	unsigned char *row;
+	uint16_t pixel;
+	uint32_t r;
+	uint32_t g;
+	uint32_t b;
+
+	row = __fb_gfx->framebuffer + (y * __fb_gfx->pitch);
+	pixel = ((uint16_t *)row)[x];
+
+	r = (uint32_t)((pixel & MASK_R_16) >> 11);
+	g = (uint32_t)((pixel & MASK_G_16) >> 5);
+	b = (uint32_t)(pixel & MASK_B_16);
+
+	r = (r << 3) | (r >> 2);
+	g = (g << 2) | (g >> 4);
+	b = (b << 3) | (b >> 2);
+
+	return (r << 16) | (g << 8) | b;
+}
+
 static uint32_t sample_source_pixel(int dst_x, int dst_y)
 {
 	int src_x;
@@ -334,6 +496,9 @@ static uint32_t sample_source_pixel(int dst_x, int dst_y)
 		src_y = 0;
 	else if (src_y >= __fb_gfx->h)
 		src_y = __fb_gfx->h - 1;
+
+	if (__fb_gfx->depth == 16)
+		return sample_16bpp_pixel(src_x, src_y);
 
 	return rgb_buffer[(src_y * __fb_gfx->w) + src_x];
 }
@@ -542,10 +707,13 @@ static void driver_present_framebuffer(void)
 	if (!has_dirty_lines())
 		return;
 
-	if (!ensure_rgb_buffer((size_t)__fb_gfx->w * (size_t)__fb_gfx->h))
-		return;
+	if (__fb_gfx->depth != 16) {
+		if (!ensure_rgb_buffer((size_t)__fb_gfx->w * (size_t)__fb_gfx->h))
+			return;
 
-	blitter((unsigned char *)rgb_buffer, __fb_gfx->w * (int)sizeof(uint32_t));
+		blitter((unsigned char *)rgb_buffer,
+			__fb_gfx->w * (int)sizeof(uint32_t));
+	}
 
 	back = visible_xfb ^ 1;
 	dst = (unsigned char *)xfb[back];
@@ -599,6 +767,8 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 	mouse_clip = FALSE;
 	mouse_cursor = TRUE;
 	keyboard_escape_down = FALSE;
+	keyboard_buttons = 0;
+	keyboard_dpad = 0;
 
 	/*
 		Enable the Wiimote reports needed by both pointer mouse support and
@@ -756,9 +926,10 @@ static void driver_poll_events(void)
 	/*
 		A visible-page BASIC program can draw a complete frame and then wait for
 		input without calling SCREENSET or SCREENCOPY.  Poll-events is a safe
-		place to expose that completed frame, but it must not force a Wiimote
-		scan.  Mouse and controller state are sampled by their own entry points.
+		place to expose that completed frame, and it is also where INKEY$,
+		GETKEY, SLEEP, and MULTIKEY see the controller-to-keyboard bridge.
 	*/
+	wii_update_keyboard();
 	driver_present_framebuffer();
 }
 
@@ -796,6 +967,27 @@ void fb_hScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *re
 	*height = info ? info->xfbHeight : 480;
 	*depth = 32;
 	*refresh = 60;
+}
+
+ssize_t fb_hGetWindowHandle(void)
+{
+	/*
+		SCREENCONTROL can expose a host window/display handle on desktop
+		targets.  Wii homebrew renders directly through GX/XFB state, so there
+		is no native handle that can be handed to user code.
+	*/
+	return 0;
+}
+
+ssize_t fb_hGetDisplayHandle(void)
+{
+	return 0;
+}
+
+void *fb_hGL_GetProcAddress(const char *proc)
+{
+	(void)proc;
+	return NULL;
 }
 
 FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, float *a3, float *a4, float *a5, float *a6, float *a7, float *a8)

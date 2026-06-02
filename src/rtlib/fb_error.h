@@ -39,6 +39,10 @@ typedef struct _FB_ERRORCTX {
 #define FB_ERRMSG_SIZE 1024
 extern char __fb_errmsg[FB_ERRMSG_SIZE];
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 FBCALL void          fb_Assert          ( char *filename, int linenum, char *funcname, char *expression );
 FBCALL void          fb_AssertWarn      ( char *filename, int linenum, char *funcname, char *expression );
 FBCALL void          fb_AssertW         ( char *filename, int linenum, char *funcname, FB_WCHAR *expression );
@@ -59,3 +63,7 @@ FBCALL const char   *fb_ErrorGetModName ( void );
 FBCALL const char   *fb_ErrorSetModName ( const char *mod_name );
 FBCALL const char   *fb_ErrorGetFuncName( void );
 FBCALL const char   *fb_ErrorSetFuncName( const char *fun_name );
+
+#ifdef __cplusplus
+}
+#endif

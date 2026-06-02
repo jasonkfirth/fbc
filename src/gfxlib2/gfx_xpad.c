@@ -500,11 +500,11 @@ static int xpad_joydev_get(int id, ssize_t *buttons,
 	if (lstick_x)
 		*lstick_x = pad->axis_seen[0] ? pad->axis[0] : 0.0f;
 	if (lstick_y)
-		*lstick_y = pad->axis_seen[1] ? pad->axis[1] : 0.0f;
+		*lstick_y = pad->axis_seen[1] ? -pad->axis[1] : 0.0f;
 	if (rstick_x)
 		*rstick_x = pad->axis_seen[3] ? pad->axis[3] : 0.0f;
 	if (rstick_y)
-		*rstick_y = pad->axis_seen[4] ? pad->axis[4] : 0.0f;
+		*rstick_y = pad->axis_seen[4] ? -pad->axis[4] : 0.0f;
 	if (ltrigger)
 		*ltrigger = xpad_joydev_trigger(pad, 2);
 	if (rtrigger)
@@ -981,11 +981,11 @@ static int xpad_js_get(int id, ssize_t *buttons,
 	if (lstick_x)
 		*lstick_x = xpad_js_axis(id, 0);
 	if (lstick_y)
-		*lstick_y = xpad_js_axis(id, 1);
+		*lstick_y = -xpad_js_axis(id, 1);
 	if (rstick_x)
 		*rstick_x = xpad_js_axis(id, 2);
 	if (rstick_y)
-		*rstick_y = xpad_js_axis(id, 3);
+		*rstick_y = -xpad_js_axis(id, 3);
 	if (ltrigger)
 		*ltrigger = xpad_clamp_unit(xpad_js_button_value(id, 6));
 	if (rtrigger)
@@ -1053,6 +1053,58 @@ static float xpad_wii_signed_unit(float value)
 	if (value > 1.0f)
 		return 1.0f;
 	return value;
+}
+
+static float xpad_wii_nunchuk_axis(int pos, int center, int min, int max)
+{
+	int distance;
+	int range;
+	float value;
+
+	if (pos >= center) {
+		distance = pos - center;
+		range = max - center;
+		if (range <= 0)
+			return 0.0f;
+		value = (float)distance / (float)range;
+	} else {
+		distance = center - pos;
+		range = center - min;
+		if (range <= 0)
+			return 0.0f;
+		value = -(float)distance / (float)range;
+	}
+
+	return xpad_wii_signed_unit(value);
+}
+
+static int xpad_wii_nunchuk_stick(int id, float *x, float *y)
+{
+	expansion_t exp;
+
+	memset(&exp, 0, sizeof(exp));
+	WPAD_Expansion(id, &exp);
+	if (exp.type != WPAD_EXP_NUNCHUK)
+		return FALSE;
+
+	/*
+		libogc calibrates the Nunchuk joystick and exposes raw, centre, min,
+		and max samples.  Normalizing those fields here keeps the public
+		GETXPAD contract the same as Xbox and XInput: X is negative on the
+		left side, and Y is positive when the stick is pushed up.
+	*/
+	if (x)
+		*x = xpad_wii_nunchuk_axis(exp.nunchuk.js.pos.x,
+								   exp.nunchuk.js.center.x,
+								   exp.nunchuk.js.min.x,
+								   exp.nunchuk.js.max.x);
+	if (y)
+		*y = xpad_wii_nunchuk_axis(exp.nunchuk.js.pos.y,
+								   exp.nunchuk.js.center.y,
+								   exp.nunchuk.js.min.y,
+								   exp.nunchuk.js.max.y);
+
+	return TRUE;
 }
 
 static void xpad_wii_dpad_as_stick(ssize_t dpad, float *x, float *y)
@@ -1296,7 +1348,8 @@ static int xpad_wii_get(int id, ssize_t *buttons,
 		left_trigger = xpad_clamp_unit((float)PAD_TriggerL(id) / 255.0f);
 		right_trigger = xpad_clamp_unit((float)PAD_TriggerR(id) / 255.0f);
 	} else {
-		xpad_wii_dpad_as_stick(dpad_value, lstick_x, lstick_y);
+		if (!wpad_connected || !xpad_wii_nunchuk_stick(id, lstick_x, lstick_y))
+			xpad_wii_dpad_as_stick(dpad_value, lstick_x, lstick_y);
 		if (rstick_x)
 			*rstick_x = motion_x;
 		if (rstick_y)

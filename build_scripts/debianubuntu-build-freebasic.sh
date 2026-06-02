@@ -25,15 +25,6 @@ done
 cd "$ROOT"
 
 ##############################################################################
-# Ensure Debian / Ubuntu style environment
-##############################################################################
-
-if ! command -v apt-get >/dev/null 2>&1; then
-    echo "ERROR: this script requires an APT-based distribution (Debian/Ubuntu)"
-    exit 1
-fi
-
-##############################################################################
 # Helpers
 ##############################################################################
 
@@ -71,6 +62,9 @@ Options:
   --no-android    Build packages without DEB_BUILD_PROFILES=android
   --android       Build the freebasic-android package; fail if SDK packages
                   are not available
+  --wii           Build the freebasic-wii package; fail if devkitPro packages
+                  are not available
+  --no-wii        Build packages without DEB_BUILD_PROFILES=wii
   --host-arch A   Build a package for Debian architecture A
   --no-package    Stop after ensuring the bootstrap tarball exists
   --skip-deps     Skip apt dependency installation
@@ -104,6 +98,8 @@ NO_BUILD=0
 NO_JS=0
 ANDROID=1
 ANDROID_EXPLICIT=0
+WII=0
+WII_EXPLICIT=0
 NO_PACKAGE=0
 SKIP_DEPS=0
 HOST_ARCH_OPT="${FBC_PACKAGE_HOST_ARCH:-}"
@@ -114,6 +110,8 @@ while [ $# -gt 0 ]; do
         --no-js) NO_JS=1; shift ;;
         --no-android) ANDROID=0; ANDROID_EXPLICIT=1; shift ;;
         --android) ANDROID=1; ANDROID_EXPLICIT=1; shift ;;
+        --wii) WII=1; WII_EXPLICIT=1; shift ;;
+        --no-wii) WII=0; WII_EXPLICIT=1; shift ;;
         --host-arch)
             [ $# -ge 2 ] || die "--host-arch requires an architecture"
             HOST_ARCH_OPT="$2"
@@ -130,6 +128,15 @@ while [ $# -gt 0 ]; do
             ;;
     esac
 done
+
+##############################################################################
+# Ensure Debian / Ubuntu style environment
+##############################################################################
+
+if ! command -v apt-get >/dev/null 2>&1; then
+    echo "ERROR: this script requires an APT-based distribution (Debian/Ubuntu)"
+    exit 1
+fi
 
 ##############################################################################
 # Tooling
@@ -303,6 +310,14 @@ android_sdk_packages_available() {
     return 0
 }
 
+wii_sdk_packages_available() {
+    apt_package_available devkitppc || return 1
+    apt_package_available libogc || return 1
+    apt_package_available gamecube-tools || return 1
+
+    return 0
+}
+
 disable_android_if_sdk_unavailable() {
     [ "$SKIP_DEPS" -eq 0 ] || return 0
     [ "$ANDROID" -eq 1 ] || return 0
@@ -317,6 +332,22 @@ disable_android_if_sdk_unavailable() {
 
     echo "==> disabling Android package profile because APT cannot install the required Android SDK/NDK packages"
     ANDROID=0
+}
+
+disable_wii_if_sdk_unavailable() {
+    [ "$SKIP_DEPS" -eq 0 ] || return 0
+    [ "$WII" -eq 1 ] || return 0
+
+    if wii_sdk_packages_available; then
+        return 0
+    fi
+
+    if [ "$WII_EXPLICIT" -eq 1 ]; then
+        die "Wii devkitPro packages are not available from the configured APT repositories"
+    fi
+
+    echo "==> disabling Wii package profile because APT cannot install devkitppc/libogc/gamecube-tools"
+    WII=0
 }
 
 ubuntu_uses_old_releases() {
@@ -641,6 +672,7 @@ install_deps() {
 
     run_root apt-get update -y
     disable_android_if_sdk_unavailable
+    disable_wii_if_sdk_unavailable
 
     local js_deps=()
     if [ "$NO_JS" -eq 0 ]; then
@@ -661,6 +693,14 @@ install_deps() {
             apksigner
             zip
             unzip
+        )
+    fi
+    local wii_deps=()
+    if [ "$WII" -eq 1 ]; then
+        wii_deps=(
+            devkitppc
+            libogc
+            gamecube-tools
         )
     fi
     local cross_deps=()
@@ -744,6 +784,7 @@ install_deps() {
         "${target_deps[@]}" \
         "${js_deps[@]}" \
         "${android_deps[@]}" \
+        "${wii_deps[@]}" \
         perl python3 git
 }
 
@@ -840,6 +881,15 @@ package_current_target() {
     [ -f debian/control ] || die "missing debian/control"
     [ -f debian/changelog ] || die "missing debian/changelog"
     [ -f GNUmakefile ] || [ -f makefile ] || [ -f Makefile ] || die "missing GNUmakefile/makefile/Makefile"
+    if [ "$NO_JS" -eq 0 ]; then
+        [ -f src/tools/js/fbc-js-app ] || die "missing JS app helper: src/tools/js/fbc-js-app"
+    fi
+    if [ "$ANDROID" -eq 1 ]; then
+        [ -f src/tools/android/fbc-android ] || die "missing Android package helper: src/tools/android/fbc-android"
+    fi
+    if [ "$WII" -eq 1 ]; then
+        [ -f src/tools/wii/fbc-wii ] || die "missing Wii package helper: src/tools/wii/fbc-wii"
+    fi
 
     echo "==> package name: $pkgname"
     echo "==> upstream version: $upver"
@@ -850,6 +900,7 @@ package_current_target() {
     [ -z "${FBC_PACKAGE_ARM_ARCH:-}" ] || echo "==> ARM default arch: $FBC_PACKAGE_ARM_ARCH"
     [ "$NO_JS" -eq 0 ] || echo "==> build profile: nojs"
     [ "$ANDROID" -eq 0 ] || echo "==> build profile: android"
+    [ "$WII" -eq 0 ] || echo "==> build profile: wii"
 
     cd "$BUILDDIR"
 
@@ -877,6 +928,9 @@ package_current_target() {
     fi
     if [ "$ANDROID" -eq 1 ]; then
         build_profiles+=(android)
+    fi
+    if [ "$WII" -eq 1 ]; then
+        build_profiles+=(wii)
     fi
 
     deb_build_options="${DEB_BUILD_OPTIONS:-}"

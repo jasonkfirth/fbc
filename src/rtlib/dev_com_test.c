@@ -1,6 +1,7 @@
 /* COMx device */
 
 #include "fb.h"
+#include <limits.h>
 
 int fb_DevComTestProtocolEx
 	(
@@ -11,7 +12,7 @@ int fb_DevComTestProtocolEx
 	)
 {
     char ch;
-    size_t i, port;
+    size_t i, port, digit;
 
     if( pPort ) {
         *pPort = 0;
@@ -33,7 +34,10 @@ int fb_DevComTestProtocolEx
     i = 3;
     ch = filename[i];
     while( ch>='0' && ch<='9' ) {
-        port = port * 10 + (ch - '0');
+        digit = ch - '0';
+        if( port > ((size_t)INT_MAX - digit) / 10 )
+            return FALSE;
+        port = port * 10 + digit;
         ch = filename[++i];
     }
 

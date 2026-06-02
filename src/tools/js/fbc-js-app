@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+#
+# FreeBASIC JavaScript app helper
+# --------------------------------
+#
+# File: fbc-js-app
+#
+# Purpose:
+#
+#     Build a browser-facing FreeBASIC program into a small output directory
+#     using the packaged Emscripten target.
+#
+# Responsibilities:
+#
+#     - choose a practical index.html output path
+#     - pass optional game assets through Emscripten's preload-file mechanism
+#     - keep current-directory asset setup out of hand-written command lines
+#
+# This file intentionally does NOT contain:
+#
+#     - an HTTP server
+#     - browser automation
+#     - JavaScript runtime implementation details
+#
+
+set -euo pipefail
+
+die() {
+	echo "fbc-js-app: $*" >&2
+	exit 1
+}
+
+usage() {
+	cat <<EOF
+Usage: fbc-js-app [options] program.bas [fbc-js options]
+
+Options:
+  -o DIR, --out DIR   Output directory (default: <program>-js)
+  --assets DIR        Preload DIR at the browser program's current directory
+  --help              Show this help text
+
+Environment:
+  FBC_JS              fbc-js compiler path (default: fbc-js)
+  FBJS_ASSETS         Directory to preload when --assets is not given
+EOF
+}
+
+source_basename() {
+	local path="$1"
+	local base
+
+	base="${path##*/}"
+	base="${base##*\\}"
+	case "$base" in
+		*.*)
+			printf '%s\n' "${base%.*}"
+			;;
+		*)
+			printf '%s\n' "$base"
+			;;
+	esac
+}
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [ -n "${FBC_JS:-}" ]; then
+	compiler="$FBC_JS"
+elif [ -x "$script_dir/fbc-js" ]; then
+	compiler="$script_dir/fbc-js"
+elif [ -x "$script_dir/fbc-js.exe" ]; then
+	compiler="$script_dir/fbc-js.exe"
+else
+	compiler="fbc-js"
+fi
+
+out_dir=""
+asset_dir="${FBJS_ASSETS:-}"
+program=""
+compiler_args=()
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--help|-h|-help)
+			usage
+			exit 0
+			;;
+		-o|--out)
+			[ $# -ge 2 ] || die "$1 requires a directory"
+			out_dir="$2"
+			shift 2
+			;;
+		--out=*)
+			out_dir="${1#--out=}"
+			shift
+			;;
+		--assets)
+			[ $# -ge 2 ] || die "--assets requires a directory"
+			asset_dir="$2"
+			shift 2
+			;;
+		--assets=*)
+			asset_dir="${1#--assets=}"
+			shift
+			;;
+		--)
+			shift
+			while [ $# -gt 0 ]; do
+				case "$1" in
+					*.bas|*.BAS|*.Bas)
+						[ -n "$program" ] || program="$1"
+						;;
+				esac
+				compiler_args+=("$1")
+				shift
+			done
+			;;
+		*)
+			case "$1" in
+				*.bas|*.BAS|*.Bas)
+					[ -n "$program" ] || program="$1"
+					;;
+			esac
+			compiler_args+=("$1")
+			shift
+			;;
+	esac
+done
+
+[ -n "$program" ] || die "no .bas source file was given"
+
+if [ -z "$out_dir" ]; then
+	out_dir="$(source_basename "$program")-js"
+fi
+
+if [ -n "$asset_dir" ]; then
+	[ -d "$asset_dir" ] || die "assets directory not found: $asset_dir"
+fi
+
+mkdir -p "$out_dir"
+output_file="$out_dir/index.html"
+
+if [ -n "$asset_dir" ]; then
+	exec "$compiler" -x "$output_file" -Wl --preload-file -Wl "$asset_dir@/" "${compiler_args[@]}"
+else
+	exec "$compiler" -x "$output_file" "${compiler_args[@]}"
+fi
+
+# end of fbc-js-app

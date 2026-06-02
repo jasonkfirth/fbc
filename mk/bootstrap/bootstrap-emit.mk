@@ -12,6 +12,7 @@ BOOTSTRAP_DIR := $(if $(strip $(FBTARGET_DIR_OVERRIDE)),$(FBTARGET_DIR_OVERRIDE)
 
 BOOTSTRAP_OUT := bootstrap/$(BOOTSTRAP_DIR)
 BOOTSTRAP_SRC_RSP := $(BOOTSTRAP_OUT)/.compiler-sources.rsp
+BOOTFBCGEN ?= gcc
 
 ##############################################################################
 # Stage0 compiler selection
@@ -197,7 +198,7 @@ bootstrap-emit: bootstrap-check
 
 	$(BOOT_FBC_TOOL_ENV) $(BOOT_FBC) $(BOOT_FBC_PREFIX_OPT) @"$(BOOTSTRAP_SRC_RSP)" \
 		-m fbc \
-		-gen gcc \
+		-gen $(BOOTFBCGEN) \
 		-target $(BOOT_EMIT_TARGET) \
 		$(if $(BOOTSTRAP_ARCH),-arch $(BOOTSTRAP_ARCH)) \
 		$(BOOTSTRAP_COMPAT_DEFINES) \

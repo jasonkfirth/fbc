@@ -433,6 +433,9 @@ declare function hMakeParamDesc _
 		/'FB_ERRMSG_SSEREQUIRESX86                     '/ @"-fpu sse option can only be used on x86 and x86_64 architectures", _
 		/'FB_ERRMSG_NEONREQUIRESARM                    '/ @"-fpu neon option can only be used on arm architectures", _
 		/'FB_ERRMSG_UNDEFINEDBUILTINSYMBOL             '/ @"Undefined built-in symbol", _
+		/'FB_ERRMSG_ILLEGALRTLIBCOMMANDREDEF           '/ @"Illegal redefinition of rtlib command", _
+		/'FB_ERRMSG_ILLEGALGFXLIBCOMMANDREDEF          '/ @"Illegal redefinition of gfxlib command. If gfxlib is not used, define FB_NO_GFXLIB before using this name", _
+		/'FB_ERRMSG_ILLEGALSFXLIBCOMMANDREDEF          '/ @"Illegal redefinition of sfxlib command. If sfxlib is not used, define FB_NO_SFXLIB before using this name", _
 		/'FB_ERRMSGS                                   '/ @"FB_ERRMSGS"  _
 	}
 

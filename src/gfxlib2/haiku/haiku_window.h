@@ -14,6 +14,7 @@ public:
 
     FBHaikuWindow(BRect frame, const char *title);
 
+    virtual void MessageReceived(BMessage *msg);
     virtual bool QuitRequested();
 };
 

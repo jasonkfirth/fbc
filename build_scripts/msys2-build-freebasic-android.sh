@@ -80,8 +80,8 @@ Environment:
   JOBS                Parallel make job count (default: detected CPU core count)
   ANDROID_API         NDK API level used for runtime build (default: 26)
   ANDROID_PLATFORM    SDK platform package (default: platforms;android-35)
-  ANDROID_BUILDTOOLS  SDK build-tools package (default: build-tools;35.0.1)
-  ANDROID_NDK_PACKAGE SDK NDK package (default: ndk;28.0.13004108)
+  ANDROID_BUILDTOOLS  SDK build-tools package (default: build-tools;35.0.0)
+  ANDROID_NDK_PACKAGE SDK NDK package (default: ndk;27.2.12479018)
   ANDROID_EMULATOR_PACKAGE
                       SDK emulator package used with --with-emulator-tools
                       (default: emulator)
@@ -291,8 +291,8 @@ JOBS="${JOBS:-$(max_jobs)}"
 
 ANDROID_API="${ANDROID_API:-26}"
 ANDROID_PLATFORM="${ANDROID_PLATFORM:-platforms;android-35}"
-ANDROID_BUILDTOOLS="${ANDROID_BUILDTOOLS:-build-tools;35.0.1}"
-ANDROID_NDK_PACKAGE="${ANDROID_NDK_PACKAGE:-ndk;28.0.13004108}"
+ANDROID_BUILDTOOLS="${ANDROID_BUILDTOOLS:-build-tools;35.0.0}"
+ANDROID_NDK_PACKAGE="${ANDROID_NDK_PACKAGE:-ndk;27.2.12479018}"
 ANDROID_EMULATOR_PACKAGE="${ANDROID_EMULATOR_PACKAGE:-emulator}"
 ANDROID_SYSTEM_IMAGE_PACKAGE="${ANDROID_SYSTEM_IMAGE_PACKAGE:-system-images;android-35;google_apis;x86_64}"
 ANDROID_CMDLINE_TOOLS_URL="${ANDROID_CMDLINE_TOOLS_URL:-https://dl.google.com/android/repository/commandlinetools-win-13114758_latest.zip}"
@@ -693,12 +693,24 @@ PATH="$root/toolchain/msys2/usr/bin:$root/toolchain/java/bin:$root/toolchain/and
 JAVA_HOME="$root/toolchain/java"
 ANDROID_HOME="$root/toolchain/android-sdk"
 ANDROID_SDK_ROOT="$ANDROID_HOME"
+ANDROID_NDK_HOME=""
 FBANDROID_PREFIX="$root"
 FBANDROID_LIBROOT="$root/lib/freebasic-android"
 FBANDROID_COMPILER="$root/lib/freebasic-android/bin/fbc-android-compiler.exe"
 FBANDROID_INCDIR="$root/include/freebasic-android"
 FBANDROID_SHARE="$root/share/freebasic-android"
-export PATH JAVA_HOME ANDROID_HOME ANDROID_SDK_ROOT
+for path_entry in "$ANDROID_HOME"/cmdline-tools/latest/bin "$ANDROID_HOME"/build-tools/* "$ANDROID_HOME"/emulator; do
+	if [ -d "$path_entry" ]; then
+		PATH="$path_entry:$PATH"
+	fi
+done
+for ndk_entry in "$ANDROID_HOME"/ndk/* "$ANDROID_HOME"/ndk-bundle; do
+	if [ -d "$ndk_entry/toolchains/llvm/prebuilt" ]; then
+		ANDROID_NDK_HOME="$ndk_entry"
+		break
+	fi
+done
+export PATH JAVA_HOME ANDROID_HOME ANDROID_SDK_ROOT ANDROID_NDK_HOME
 export FBANDROID_PREFIX FBANDROID_LIBROOT FBANDROID_COMPILER FBANDROID_INCDIR FBANDROID_SHARE
 
 if [ ! -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat" ] || \
@@ -860,8 +872,8 @@ $env:PATH = "$javaHome\bin;$cmdlineRoot\bin;$androidHome\platform-tools;$env:PAT
 $packages = New-Object System.Collections.Generic.List[string]
 $packages.Add("platform-tools")
 $packages.Add((EnvOrDefault "ANDROID_PLATFORM_PACKAGE" "platforms;android-35"))
-$packages.Add((EnvOrDefault "ANDROID_BUILDTOOLS_PACKAGE" "build-tools;35.0.1"))
-$packages.Add((EnvOrDefault "ANDROID_NDK_PACKAGE" "ndk;28.0.13004108"))
+$packages.Add((EnvOrDefault "ANDROID_BUILDTOOLS_PACKAGE" "build-tools;35.0.0"))
+$packages.Add((EnvOrDefault "ANDROID_NDK_PACKAGE" "ndk;27.2.12479018"))
 
 if ($withEmulatorTools) {
 	$env:ANDROID_WITH_EMULATOR_TOOLS = "1"
@@ -885,16 +897,37 @@ if ($LASTEXITCODE -ne 0) {
 	exit $LASTEXITCODE
 }
 
+$aapt = Get-ChildItem -Path (Join-Path $androidHome "build-tools") -Recurse -Filter "aapt.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+$d8 = Get-ChildItem -Path (Join-Path $androidHome "build-tools") -Recurse -Filter "d8.bat" -ErrorAction SilentlyContinue | Select-Object -First 1
+$clang = Get-ChildItem -Path (Join-Path $androidHome "ndk") -Recurse -Filter "aarch64-linux-android26-clang.cmd" -ErrorAction SilentlyContinue | Select-Object -First 1
+$androidJar = Get-ChildItem -Path (Join-Path $androidHome "platforms") -Recurse -Filter "android.jar" -ErrorAction SilentlyContinue | Select-Object -First 1
+
+if ($null -eq $aapt) {
+	Die "Android build-tools did not install aapt.exe"
+}
+if ($null -eq $d8) {
+	Die "Android build-tools did not install d8.bat"
+}
+if ($null -eq $clang) {
+	Die "Android NDK did not install aarch64-linux-android26-clang.cmd"
+}
+if ($null -eq $androidJar) {
+	Die "Android platform package did not install android.jar"
+}
+
 Write-Host "Android SDK setup complete: $androidHome"
 EOF
 
 	cat > "$DISTROOT/freebasic-android-env.cmd" <<'EOF'
 @echo off
 set "FBANDROID_ROOT=%~dp0"
-set "PATH=%FBANDROID_ROOT%toolchain\msys2\usr\bin;%FBANDROID_ROOT%toolchain\java\bin;%FBANDROID_ROOT%toolchain\android-sdk\platform-tools;%PATH%"
+set "PATH=%FBANDROID_ROOT%toolchain\msys2\usr\bin;%FBANDROID_ROOT%toolchain\java\bin;%FBANDROID_ROOT%toolchain\android-sdk\cmdline-tools\latest\bin;%FBANDROID_ROOT%toolchain\android-sdk\platform-tools;%FBANDROID_ROOT%toolchain\android-sdk\emulator;%PATH%"
 set "JAVA_HOME=%FBANDROID_ROOT%toolchain\java"
 set "ANDROID_HOME=%FBANDROID_ROOT%toolchain\android-sdk"
 set "ANDROID_SDK_ROOT=%FBANDROID_ROOT%toolchain\android-sdk"
+set "ANDROID_NDK_HOME="
+for /d %%D in ("%ANDROID_HOME%\ndk\*") do if not defined ANDROID_NDK_HOME set "ANDROID_NDK_HOME=%%~fD"
+if not defined ANDROID_NDK_HOME if exist "%ANDROID_HOME%\ndk-bundle" set "ANDROID_NDK_HOME=%ANDROID_HOME%\ndk-bundle"
 set "FBANDROID_PREFIX=%FBANDROID_ROOT%"
 set "FBANDROID_LIBROOT=%FBANDROID_ROOT%lib\freebasic-android"
 set "FBANDROID_COMPILER=%FBANDROID_ROOT%lib\freebasic-android\bin\fbc-android-compiler.exe"
@@ -909,18 +942,25 @@ EOF
 #!/usr/bin/env sh
 
 _fbandroid_root=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
-PATH="${_fbandroid_root}/toolchain/msys2/usr/bin:${_fbandroid_root}/toolchain/java/bin:${_fbandroid_root}/toolchain/android-sdk/platform-tools:${PATH}"
+PATH="${_fbandroid_root}/toolchain/msys2/usr/bin:${_fbandroid_root}/toolchain/java/bin:${_fbandroid_root}/toolchain/android-sdk/cmdline-tools/latest/bin:${_fbandroid_root}/toolchain/android-sdk/platform-tools:${_fbandroid_root}/toolchain/android-sdk/emulator:${PATH}"
 JAVA_HOME="${_fbandroid_root}/toolchain/java"
 ANDROID_HOME="${_fbandroid_root}/toolchain/android-sdk"
 ANDROID_SDK_ROOT="${ANDROID_HOME}"
+ANDROID_NDK_HOME=""
+for ndk_entry in "${ANDROID_HOME}"/ndk/* "${ANDROID_HOME}"/ndk-bundle; do
+	if [ -d "$ndk_entry/toolchains/llvm/prebuilt" ]; then
+		ANDROID_NDK_HOME="$ndk_entry"
+		break
+	fi
+done
 FBANDROID_PREFIX="${_fbandroid_root}"
 FBANDROID_LIBROOT="${_fbandroid_root}/lib/freebasic-android"
 FBANDROID_COMPILER="${_fbandroid_root}/lib/freebasic-android/bin/fbc-android-compiler.exe"
 FBANDROID_INCDIR="${_fbandroid_root}/include/freebasic-android"
 FBANDROID_SHARE="${_fbandroid_root}/share/freebasic-android"
-export PATH JAVA_HOME ANDROID_HOME ANDROID_SDK_ROOT
+export PATH JAVA_HOME ANDROID_HOME ANDROID_SDK_ROOT ANDROID_NDK_HOME
 export FBANDROID_PREFIX FBANDROID_LIBROOT FBANDROID_COMPILER FBANDROID_INCDIR FBANDROID_SHARE
-unset _fbandroid_root
+unset _fbandroid_root ndk_entry
 EOF
 	chmod 755 "$DISTROOT/freebasic-android-env.sh"
 }
@@ -948,6 +988,11 @@ accept Google's Android SDK terms:
 
     https://developer.android.com/studio/terms
 
+By default the package setup installs the same Android platform, build-tools,
+and NDK versions used by this build script.  Override ANDROID_PLATFORM_PACKAGE,
+ANDROID_BUILDTOOLS_PACKAGE, or ANDROID_NDK_PACKAGE only when deliberately
+testing a newer Android toolchain.
+
 If the package will be used to launch and validate APKs in an emulator, install
 the Android emulator and configured system image too:
 
@@ -956,6 +1001,12 @@ the Android emulator and configured system image too:
 Use fbc-android.cmd from cmd.exe or PowerShell:
 
     fbc-android.cmd --target-api 35 --package org.example.hello hello.bas
+
+For games that load files from the current directory, add the game folder as
+APK assets.  The Android launcher exposes those files at the program's working
+directory when the app starts:
+
+    fbc-android.cmd --assets game-folder --package org.example.mygame game.bas
 
 The installer runs setup-android-sdk.cmd during installation after its Android
 SDK terms page is accepted.
@@ -1177,11 +1228,13 @@ validate_distribution() {
 	msg "Validating packaged fbc-android"
 	rm -rf "$validate_dir"
 	mkdir -p "$validate_dir"
+	mkdir -p "$validate_dir/assets"
 	copy_tree "$DISTROOT" "$package_dir"
 
 	cat > "$validate_dir/hello.bas" <<'EOF'
 print "freebasic-android package test OK"
 EOF
+	printf 'asset smoke\n' > "$validate_dir/assets/readme.txt"
 
 	dist_win="$(cygpath -aw "$package_dir")"
 	validate_win="$(cygpath -aw "$validate_dir")"
@@ -1191,7 +1244,7 @@ EOF
 @echo off
 call "$dist_win\\setup-android-sdk.cmd" --accept-google-android-sdk-terms
 if errorlevel 1 exit /b %ERRORLEVEL%
-call "$dist_win\\fbc-android.cmd" --target-api 35 --package org.freebasic.validate "$validate_win\\hello.bas" -x "$validate_win\\hello.apk"
+call "$dist_win\\fbc-android.cmd" --target-api 35 --assets "$validate_win\\assets" --package org.freebasic.validate "$validate_win\\hello.bas" -x "$validate_win\\hello.apk"
 exit /b %ERRORLEVEL%
 EOF
 

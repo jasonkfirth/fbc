@@ -15,6 +15,19 @@ static void update_driver(void)
 		__fb_gfx->driver->update();
 }
 
+static void yield_host(void)
+{
+#ifdef HOST_JS
+	/*
+		Browser-hosted graphics programs often use SCREENCOPY or SCREENSET as
+		their frame boundary.  Yield after presentation so pending browser
+		timers, input, and canvas callbacks can run even if the program's main
+		loop is otherwise CPU-bound.
+	*/
+	fb_Delay( 0 );
+#endif
+}
+
 FBCALL int fb_GfxFlip(int from_page, int to_page)
 {
 	FB_GFXCTX *context;
@@ -37,6 +50,7 @@ FBCALL int fb_GfxFlip(int from_page, int to_page)
 		__fb_gfx->driver->flip();
 		poll_events();
 		FB_GRAPHICS_UNLOCK( );
+		yield_host();
 		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 	}
 
@@ -97,6 +111,7 @@ FBCALL int fb_GfxFlip(int from_page, int to_page)
 	}
 
 	FB_GRAPHICS_UNLOCK( );
+	yield_host();
 	return fb_ErrorSetNum(FB_RTERROR_OK);
 }
 
@@ -144,5 +159,6 @@ int fb_GfxPageSet(int work_page, int visible_page)
 	}
 
 	FB_GRAPHICS_UNLOCK( );
+	yield_host();
 	return res;
 }

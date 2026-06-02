@@ -352,6 +352,10 @@ skip_boot_anim = true
 [general.updates]
 check = false
 
+[net]
+enable = true
+backend = 'nat'
+
 [sys.files]
 bootrom_path = '$bootrom_win'
 flashrom_path = '$flashrom_win'
@@ -531,7 +535,10 @@ if (!(Test-Path -LiteralPath $IsoPath)) {
 	throw "XISO image was not found: $IsoPath"
 }
 
-$arguments = @("-snapshot", "-dvd_path", $IsoPath)
+$arguments = @(
+	"-snapshot",
+	"-dvd_path", $IsoPath
+)
 if ($ConfigPath.Length -gt 0) {
 	if (!(Test-Path -LiteralPath $ConfigPath)) {
 		throw "xemu config was not found: $ConfigPath"
@@ -704,7 +711,11 @@ if (Test-Path -LiteralPath $WavPath) {
 	Remove-Item -LiteralPath $WavPath -Force
 }
 
-$arguments = @("-snapshot", "-audio", "wav,path=$WavPath", "-dvd_path", $IsoPath)
+$arguments = @(
+	"-snapshot",
+	"-audio", "wav,path=$WavPath",
+	"-dvd_path", $IsoPath
+)
 if ($ConfigPath.Length -gt 0) {
 	if (!(Test-Path -LiteralPath $ConfigPath)) {
 		throw "xemu config was not found: $ConfigPath"

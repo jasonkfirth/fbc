@@ -31,12 +31,60 @@
         synthesis → mixer → intermediate buffer → driver → OS audio
 */
 
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
 #include "fb_sfx_buffer.h"
+
+
+/* ------------------------------------------------------------------------- */
+/* Buffer size helpers                                                       */
+/* ------------------------------------------------------------------------- */
+
+/*
+    Buffer sizes are exposed as int sample counts elsewhere in sfxlib.
+    Keep the overflow checks here so every buffer path uses the same limits.
+*/
+
+static int fb_sfxBufferSampleCount(int frames, int channels, int *samples)
+{
+    if (!samples)
+        return -1;
+
+    *samples = 0;
+
+    if (frames <= 0 || channels <= 0)
+        return -1;
+
+    if (frames > INT_MAX / channels)
+        return -1;
+
+    *samples = frames * channels;
+    return 0;
+}
+
+
+static int fb_sfxBufferByteSize(int frames, int channels, size_t *size)
+{
+    int samples;
+
+    if (!size)
+        return -1;
+
+    *size = 0;
+
+    if (fb_sfxBufferSampleCount(frames, channels, &samples) != 0)
+        return -1;
+
+    if ((size_t)samples > ((size_t)-1) / sizeof(float))
+        return -1;
+
+    *size = (size_t)samples * sizeof(float);
+    return 0;
+}
 
 
 /* ------------------------------------------------------------------------- */
@@ -51,17 +99,13 @@
 
 int fb_sfxBufferInit(int frames)
 {
-    int samples;
     size_t size;
 
     if (!__fb_sfx)
         return -1;
 
-    if (frames <= 0)
+    if (fb_sfxBufferByteSize(frames, __fb_sfx->output_channels, &size) != 0)
         return -1;
-
-    samples = frames * __fb_sfx->output_channels;
-    size = samples * sizeof(float);
 
     __fb_sfx->mixbuffer = (float*)malloc(size);
 
@@ -72,8 +116,8 @@ int fb_sfxBufferInit(int frames)
 
     __fb_sfx->buffer_frames = frames;
 
-    SFX_DEBUG("sfx_buffer: allocated %d frames (%zu bytes)",
-              frames, size);
+    SFX_DEBUG("sfx_buffer: allocated %d frames (%llu bytes)",
+              frames, (unsigned long long)size);
 
     return 0;
 }
@@ -126,9 +170,10 @@ void fb_sfxBufferClear(void)
     if (!__fb_sfx->mixbuffer)
         return;
 
-    size = __fb_sfx->buffer_frames *
-           __fb_sfx->output_channels *
-           sizeof(float);
+    if (fb_sfxBufferByteSize(__fb_sfx->buffer_frames,
+                             __fb_sfx->output_channels,
+                             &size) != 0)
+        return;
 
     memset(__fb_sfx->mixbuffer, 0, size);
 }
@@ -178,10 +223,17 @@ int fb_sfxBufferFrames(void)
 
 int fb_sfxBufferSamples(void)
 {
+    int samples;
+
     if (!__fb_sfx)
         return 0;
 
-    return __fb_sfx->buffer_frames * __fb_sfx->output_channels;
+    if (fb_sfxBufferSampleCount(__fb_sfx->buffer_frames,
+                                __fb_sfx->output_channels,
+                                &samples) != 0)
+        return 0;
+
+    return samples;
 }
 
 
@@ -208,7 +260,10 @@ void fb_sfxBufferWrite(int index, float value)
     if (!__fb_sfx->mixbuffer)
         return;
 
-    samples = __fb_sfx->buffer_frames * __fb_sfx->output_channels;
+    if (fb_sfxBufferSampleCount(__fb_sfx->buffer_frames,
+                                __fb_sfx->output_channels,
+                                &samples) != 0)
+        return;
 
     if (index < 0 || index >= samples)
         return;
@@ -240,7 +295,10 @@ float fb_sfxBufferRead(int index)
     if (!__fb_sfx->mixbuffer)
         return 0.0f;
 
-    samples = __fb_sfx->buffer_frames * __fb_sfx->output_channels;
+    if (fb_sfxBufferSampleCount(__fb_sfx->buffer_frames,
+                                __fb_sfx->output_channels,
+                                &samples) != 0)
+        return 0.0f;
 
     if (index < 0 || index >= samples)
         return 0.0f;
@@ -266,13 +324,16 @@ void fb_sfxMixBufferShutdown(void)
 
 int fb_sfxMixBufferWrite(const float *samples, int frames)
 {
+    int channels;
     int total;
     int i;
 
     if (!samples || frames <= 0)
         return 0;
 
-    total = frames * (__fb_sfx ? __fb_sfx->output_channels : FB_SFX_DEFAULT_CHANNELS);
+    channels = (__fb_sfx ? __fb_sfx->output_channels : FB_SFX_DEFAULT_CHANNELS);
+    if (fb_sfxBufferSampleCount(frames, channels, &total) != 0)
+        return 0;
 
     for (i = 0; i < total; ++i)
         fb_sfxBufferWrite(i, samples[i]);
@@ -283,13 +344,16 @@ int fb_sfxMixBufferWrite(const float *samples, int frames)
 
 int fb_sfxMixBufferRead(float *samples, int frames)
 {
+    int channels;
     int total;
     int i;
 
     if (!samples || frames <= 0)
         return 0;
 
-    total = frames * (__fb_sfx ? __fb_sfx->output_channels : FB_SFX_DEFAULT_CHANNELS);
+    channels = (__fb_sfx ? __fb_sfx->output_channels : FB_SFX_DEFAULT_CHANNELS);
+    if (fb_sfxBufferSampleCount(frames, channels, &total) != 0)
+        return 0;
 
     for (i = 0; i < total; ++i)
         samples[i] = fb_sfxBufferRead(i);

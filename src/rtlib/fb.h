@@ -131,6 +131,9 @@
 #endif
 
 #if defined ENABLE_MT && !defined HOST_DOS
+#ifdef __cplusplus
+extern "C" {
+#endif
 	FBCALL void fb_Lock( void );
 	FBCALL void fb_Unlock( void );
 	FBCALL void fb_StrLock( void );
@@ -141,6 +144,9 @@
 	FBCALL void fb_MathUnlock( void );
 	FBCALL void fb_ProfileLock( void );
 	FBCALL void fb_ProfileUnlock( void );
+#ifdef __cplusplus
+}
+#endif
 	/* NOTE: if both locks are acquired, FB_LOCK() must be called before
            FB_STRLOCK() in order to avoid deadlocking */
 	#define FB_LOCK()      fb_Lock()

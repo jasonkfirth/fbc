@@ -7,6 +7,7 @@
 *.tar
 *.tar.xz
 *.zip
+*.log
 
 # Legacy Windows import libraries and runtime DLLs intentionally bundled for
 # examples that still depend on libraries not provided by current MSYS2.
@@ -62,7 +63,6 @@
 /xbox_emulator_xemu/*
 /stderr.txt
 /stdout.txt
-/behold_autosmoke.log
 /tests/warnings/*.txt
 /tests/warnings/r/dos/*.txt
 /tests/warnings/r/linux-x86/*.txt
@@ -99,3 +99,9 @@ OMA
 */__pycache__/*
 *.pyc
 *.tmp
+remote_probe_temp
+tests/syntax/r/win32/*.txt
+tests/syntax/r/win64/*.txt
+tests/syntax/r/linux-x86/*.txt
+tests/syntax/r/linux-x86_64/*.txt
+tests/syntax/r/dos/*.txt

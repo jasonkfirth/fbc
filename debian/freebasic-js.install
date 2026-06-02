@@ -1,4 +1,5 @@
 usr/bin/fbc-js
+usr/bin/fbc-js-app
 usr/include/freebasic-js/*
 usr/lib/freebasic-js/*
 usr/share/doc/freebasic-js/FLTK-LICENSE

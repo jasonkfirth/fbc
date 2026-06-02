@@ -29,6 +29,7 @@ MKDIR_P      ?= mkdir -p
 
 FBC_INSTALL_NAME ?= fbc$(EXEEXT)
 FBC_JS_INSTALL_NAME ?= fbc-js$(EXEEXT)
+FBC_JS_APP_INSTALL_NAME ?= fbc-js-app
 FBC_ANDROID_INSTALL_NAME ?= fbc-android$(EXEEXT)
 FBC_ANDROID_COMPILER_INSTALL_NAME ?= fbc-android-compiler$(EXEEXT)
 FBC_WII_INSTALL_NAME ?= fbc-wii$(EXEEXT)
@@ -36,6 +37,7 @@ FBC_WII_COMPILER_INSTALL_NAME ?= fbc-wii-compiler$(EXEEXT)
 FB_JS_NAME ?= freebasic-js
 FB_JS_TARGET ?= js-asmjs
 FB_JS_RUNTIME_ASSETS := fb_shell.html fb_rtlib.js termlib_min.js
+JS_TOOLS_DIR ?= $(rootdir)/src/tools/js
 FB_ANDROID_NAME ?= freebasic-android
 FB_ANDROID_TARGET ?= android-aarch64
 FB_WII_NAME ?= freebasic-wii
@@ -138,7 +140,9 @@ install-js: install-js-bin install-js-includes install-js-runtime
 install-js-bin:
 	mkdir -p "$(INSTALL_BINDIR)"
 	install -m 755 "$(FBC_JS_EXE)" "$(INSTALL_BINDIR)/$(FBC_JS_INSTALL_NAME)"
+	install -m 755 "$(JS_TOOLS_DIR)/fbc-js-app" "$(INSTALL_BINDIR)/$(FBC_JS_APP_INSTALL_NAME)"
 	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_BINDIR),$(prefixbindir))/$(FBC_JS_INSTALL_NAME)" >> "$(INSTALL_MANIFEST)"
+	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_BINDIR),$(prefixbindir))/$(FBC_JS_APP_INSTALL_NAME)" >> "$(INSTALL_MANIFEST)"
 
 .PHONY: install-js-includes
 install-js-includes:
@@ -202,9 +206,15 @@ install-android-runtime:
 install-android-tools:
 	mkdir -p "$(INSTALL_ANDROID_SHAREDIR)/template"
 	install -m 644 "$(ANDROID_TOOLS_DIR)/fb_android_app.c" "$(INSTALL_ANDROID_SHAREDIR)/template/fb_android_app.c"
+	install -m 644 "$(ANDROID_TOOLS_DIR)/FreeBasicNativeActivity.java" "$(INSTALL_ANDROID_SHAREDIR)/template/FreeBasicNativeActivity.java"
+	install -m 644 "$(ANDROID_TOOLS_DIR)/FreeBasicInputBridge.java" "$(INSTALL_ANDROID_SHAREDIR)/template/FreeBasicInputBridge.java"
+	install -m 644 "$(ANDROID_TOOLS_DIR)/FreeBasicInputView.java" "$(INSTALL_ANDROID_SHAREDIR)/template/FreeBasicInputView.java"
 	install -m 644 "$(ANDROID_TOOLS_DIR)/AndroidManifest.xml.in" "$(INSTALL_ANDROID_SHAREDIR)/template/AndroidManifest.xml.in"
 	install -m 644 "$(ANDROID_TOOLS_DIR)/strings.xml" "$(INSTALL_ANDROID_SHAREDIR)/template/strings.xml"
 	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_ANDROID_SHAREDIR),$(prefixandroidsharedir))/template/fb_android_app.c" >> "$(INSTALL_MANIFEST)"
+	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_ANDROID_SHAREDIR),$(prefixandroidsharedir))/template/FreeBasicNativeActivity.java" >> "$(INSTALL_MANIFEST)"
+	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_ANDROID_SHAREDIR),$(prefixandroidsharedir))/template/FreeBasicInputBridge.java" >> "$(INSTALL_MANIFEST)"
+	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_ANDROID_SHAREDIR),$(prefixandroidsharedir))/template/FreeBasicInputView.java" >> "$(INSTALL_MANIFEST)"
 	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_ANDROID_SHAREDIR),$(prefixandroidsharedir))/template/AndroidManifest.xml.in" >> "$(INSTALL_MANIFEST)"
 	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_ANDROID_SHAREDIR),$(prefixandroidsharedir))/template/strings.xml" >> "$(INSTALL_MANIFEST)"
 

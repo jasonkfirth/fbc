@@ -28,7 +28,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-FBVERSION="$(sed -n 's/^#define[[:space:]][[:space:]]*FB_VERSION[[:space:]][[:space:]]*"\(.*\)"/\1/p' "${ROOT_DIR}/src/compiler/version.bi" | head -n 1)"
+FBVERSION="$({ sed -n 's/^FBVERSION[[:space:]]*:=[[:space:]]*//p' "${ROOT_DIR}/mk/version.mk" 2>/dev/null || true; } | head -n 1)"
 if [ -z "${FBVERSION}" ]; then
     FBVERSION="unknown"
 fi

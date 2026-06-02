@@ -1,7 +1,28 @@
-/* Wii thread local context storage */
+/*
+    FreeBASIC runtime Wii thread local storage
+    ------------------------------------------
 
-#include "fb.h"
-#include "fb_private_thread.h"
+    File: thread_ctx.c
+
+    Purpose:
+
+        Adapt FreeBASIC's runtime TLS hooks to libogc LWP threads.
+
+    Responsibilities:
+
+        - allocate per-thread FreeBASIC TLS contexts
+        - run TLS destructors when thread contexts are released
+        - keep the single-threaded fallback available for non-MT builds
+
+    This file intentionally does NOT contain:
+
+        - thread creation
+        - mutex implementation
+        - scheduler policy
+*/
+
+#include "../fb.h"
+#include "../fb_private_thread.h"
 
 #define FB_TLS_DATA_TO_HEADER( data ) ( ( ( FB_TLS_CTX_HEADER *)data ) - 1 )
 #define FB_TLS_HEADER_TO_DATA( header ) ( ( void *) ( header + 1 ) )

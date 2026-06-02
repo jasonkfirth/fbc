@@ -1,0 +1,125 @@
+#!/usr/bin/env sh
+#
+# FreeBASIC Xbox XISO helper
+# --------------------------
+#
+# File: fbc-xbox-xiso
+#
+# Purpose:
+#
+#     Stage an Xbox XBE as default.xbe and pack an XISO image using the
+#     nxdk extract-xiso tool shipped with the FreeBASIC Xbox port package.
+#
+# Responsibilities:
+#
+#     - locate the packaged nxdk extract-xiso executable
+#     - copy optional current-directory game assets into the image root
+#     - keep emulator and hardware launch packaging out of user build scripts
+#
+# This file intentionally does NOT contain:
+#
+#     - FreeBASIC compilation logic
+#     - emulator launch logic
+#     - Xbox runtime or nxdk build steps
+#
+
+set -eu
+
+usage() {
+	echo "Usage: fbc-xbox-xiso program.xbe [program.iso] [--assets dir]" >&2
+}
+
+die() {
+	echo "fbc-xbox-xiso: $*" >&2
+	exit 1
+}
+
+script_path=$0
+case "$script_path" in
+	*\\*) script_path=$(printf '%s\n' "$script_path" | sed 's#\\#/#g') ;;
+esac
+
+case "$script_path" in
+	*/*) script_dir=${script_path%/*} ;;
+	*) script_dir=. ;;
+esac
+
+script_dir=$(CDPATH= cd -- "$script_dir" && pwd)
+
+if [ -d "$script_dir/nxdk" ]; then
+	prefix=$script_dir
+else
+	prefix=${FBXBOX_PREFIX:-/usr/share/freebasic-xbox}
+fi
+
+nxdk=${NXDK_DIR:-$prefix/nxdk}
+extract_xiso=$nxdk/tools/extract-xiso/build/extract-xiso
+
+case "${1:-}" in
+	--help|-h|-help)
+		usage
+		exit 0
+		;;
+esac
+
+[ $# -ge 1 ] || {
+	usage
+	exit 2
+}
+
+xbe_path=$1
+shift
+
+[ -f "$xbe_path" ] || die "XBE not found: $xbe_path"
+
+iso_path=${xbe_path%.*}.iso
+asset_dir=${FBXBOX_ASSETS:-}
+iso_seen=0
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--assets)
+			[ $# -ge 2 ] || die "--assets requires a directory"
+			asset_dir=$2
+			shift 2
+			;;
+		--assets=*)
+			asset_dir=${1#--assets=}
+			shift
+			;;
+		-*)
+			usage
+			die "unexpected option: $1"
+			;;
+		*)
+			[ "$iso_seen" -eq 0 ] || die "unexpected argument: $1"
+			iso_path=$1
+			iso_seen=1
+			shift
+			;;
+	esac
+done
+
+if [ -n "$asset_dir" ] && [ ! -d "$asset_dir" ]; then
+	die "assets directory not found: $asset_dir"
+fi
+
+if [ ! -x "$extract_xiso" ] && [ -x "$extract_xiso.exe" ]; then
+	extract_xiso=$extract_xiso.exe
+fi
+
+[ -x "$extract_xiso" ] || die "extract-xiso was not found under $nxdk/tools/extract-xiso/build"
+
+stage=$(mktemp -d "${TMPDIR:-/tmp}/fbc-xbox-xiso.XXXXXX")
+trap 'rm -rf "$stage"' EXIT HUP INT TERM
+
+if [ -n "$asset_dir" ]; then
+	cp -a "$asset_dir"/. "$stage"/
+fi
+
+cp "$xbe_path" "$stage/default.xbe"
+rm -f "$iso_path"
+"$extract_xiso" -q -c "$stage" "$iso_path"
+echo "Wrote $iso_path"
+
+# end of fbc-xbox-xiso

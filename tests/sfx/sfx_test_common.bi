@@ -26,9 +26,31 @@
 #ifndef __SFX_TEST_COMMON_BI__
 #define __SFX_TEST_COMMON_BI__
 
-declare sub fb_sfxUpdate cdecl alias "fb_sfxUpdate" ( byval frames as integer )
-declare function fb_sfxDeviceCurrent cdecl alias "fb_sfxDeviceCurrent" ( ) as integer
-declare function fb_sfxDeviceName cdecl alias "fb_sfxDeviceName" ( byval id as integer ) as zstring ptr
+declare sub fb_sfxUpdate cdecl alias "fb_sfxUpdate" ( byval frames as long )
+declare function fb_sfxDeviceCurrent cdecl alias "fb_sfxDeviceCurrent" ( ) as long
+declare function fb_sfxDeviceName cdecl alias "fb_sfxDeviceName" ( byval id as long ) as zstring ptr
+
+type FB_SFX_DRIVER_STATS
+	as ulongint write_calls
+	as ulongint frames_requested
+	as ulongint frames_accepted
+	as ulongint frames_dropped
+	as ulongint underruns
+	as ulongint overruns
+	as ulongint short_writes
+	as ulongint zero_writes
+	as ulongint errors
+	as ulongint recoveries
+	as long current_queue_fill
+	as long max_queue_fill
+	as long last_error
+end type
+
+declare function fb_sfxDriverStatsSnapshot cdecl alias "fb_sfxDriverStatsSnapshot" _
+	( _
+		byval driver_name as zstring ptr, _
+		byval stats as FB_SFX_DRIVER_STATS ptr _
+	) as long
 
 const SFX_TEST_SAMPLE_RATE = 44100.0
 const SFX_TEST_PI = 3.1415926535897932384626433832795

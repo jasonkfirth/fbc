@@ -210,6 +210,14 @@ make_xemu_config() {
 	[ -n "$XEMU_HDD" ] && [ -f "$XEMU_HDD" ] || return 1
 
 	cat > "$config" <<EOF
+[general]
+show_welcome = false
+skip_boot_anim = true
+
+[net]
+enable = true
+backend = 'nat'
+
 [sys.files]
 bootrom_path = '$XEMU_MCPX'
 flashrom_path = '$XEMU_BIOS'
@@ -226,7 +234,11 @@ run_xemu_iso() {
 
 	msg "running $name XISO in xemu"
 	set +e
-	timeout "$XEMU_TIMEOUT" sh -c 'exec "$@"' sh $XEMU_CMD -config_path "$config" -dvd_path "$iso" -snapshot -machine xbox,short-animation=on > "$log" 2>&1
+	timeout "$XEMU_TIMEOUT" sh -c 'exec "$@"' sh $XEMU_CMD \
+		-config_path "$config" \
+		-dvd_path "$iso" \
+		-snapshot \
+		-machine xbox,short-animation=on > "$log" 2>&1
 	status=$?
 	set -e
 
@@ -301,9 +313,11 @@ run apt-get install -y --no-install-recommends "${DEBS[@]}"
 
 command -v fbc >/dev/null 2>&1 || fail "fbc was not installed"
 command -v fbc-xbox >/dev/null 2>&1 || fail "fbc-xbox was not installed"
+command -v fbc-xbox-xiso >/dev/null 2>&1 || fail "fbc-xbox-xiso was not installed"
 command -v clang >/dev/null 2>&1 || fail "clang dependency was not installed"
 
-mkdir -p /tmp/fb-xbox-smoke /tmp/fb-xbox-xiso-tool /xbe-out
+mkdir -p /tmp/fb-xbox-smoke/assets /xbe-out
+printf 'asset smoke\n' > /tmp/fb-xbox-smoke/assets/readme.txt
 
 cat > /tmp/fb-xbox-smoke/console.bas <<'EOF'
 print "FREEBASIC_XBOX_CONSOLE_SMOKE"
@@ -346,20 +360,12 @@ print text
 sleep 1000
 EOF
 
-if [ -f /usr/share/freebasic-xbox/nxdk/tools/extract-xiso/extract-xiso.c ]; then
-	run clang -D__LINUX__ -D_LARGEFILE64_SOURCE /usr/share/freebasic-xbox/nxdk/tools/extract-xiso/extract-xiso.c -o /tmp/fb-xbox-xiso-tool/extract-xiso
-else
-	fail "extract-xiso source was not installed with freebasic-xbox"
-fi
-
 cd /tmp/fb-xbox-smoke
 for name in console gfx sfx fileio; do
 	run fbc-xbox "$name.bas" -x "$name.xbe" -v
 	[ -f "$name.xbe" ] || fail "$name.xbe was not produced"
 
-	mkdir -p "/tmp/fb-xbox-smoke/$name-disc"
-	cp -av "$name.xbe" "/tmp/fb-xbox-smoke/$name-disc/default.xbe"
-	run /tmp/fb-xbox-xiso-tool/extract-xiso -c "/tmp/fb-xbox-smoke/$name-disc" "/xbe-out/$name.iso"
+	run fbc-xbox-xiso "$name.xbe" "/xbe-out/$name.iso" --assets /tmp/fb-xbox-smoke/assets
 	cp -av "$name.xbe" "/xbe-out/$name.xbe"
 	[ -f "/xbe-out/$name.iso" ] || fail "$name.iso was not produced"
 done

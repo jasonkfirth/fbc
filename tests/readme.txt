@@ -179,6 +179,13 @@ Files are scanned for these tags to build of list of tests to perform,
 the method to use when performing the test and the expected result.
 Files that do not have one of the tags present may not get tested.
 
+Command sweep tests are broad smoke tests for language, runtime, gfxlib,
+and sfxlib command families. They are intended to check that a group of
+related commands still compiles, links, and enters the expected runtime
+paths in a normal program. They should stay broad but shallow; detailed
+edge cases should still be covered by focused tests in the appropriate
+subdirectory.
+
 
 Mutli-module tests and encoded files
 ------------------------------------

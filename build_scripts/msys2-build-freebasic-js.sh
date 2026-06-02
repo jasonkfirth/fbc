@@ -276,6 +276,7 @@ install_dependencies() {
 	run pacman -Syu --needed --noconfirm
 	run pacman -S --needed --noconfirm \
 		base-devel \
+		curl \
 		rsync \
 		unzip \
 		zip \
@@ -285,6 +286,16 @@ install_dependencies() {
 		mingw-w64-ucrt-x86_64-nodejs \
 		mingw-w64-ucrt-x86_64-python \
 		mingw-w64-x86_64-nsis
+}
+
+ensure_emscripten_toolchain() {
+	local tool
+
+	for tool in emcc em++ emar emranlib node python; do
+		have "$tool" || fail "$tool not found after loading the UCRT64 Emscripten environment"
+	done
+
+	emcc -v >/dev/null 2>&1 || fail "emcc is present but could not start"
 }
 
 ##############################################################################
@@ -426,14 +437,19 @@ EOF
 		# shellcheck disable=SC1090
 		. "$UCRT64_ROOT/etc/profile.d/emscripten.sh"
 	fi
-	have emcc || fail "emcc not found after loading the UCRT64 Emscripten profile"
+	ensure_emscripten_toolchain
 
 	run make -j"$JOBS" \
 		rtlib fbrt gfxlib2 sfxlib \
 		FBC="$build_fbc" \
 		TARGET_TRIPLET="asmjs-unknown-emscripten" \
 		TARGET="asmjs-unknown-emscripten" \
-		FBTARGET_DIR_OVERRIDE="js-asmjs"
+		FBTARGET_DIR_OVERRIDE="js-asmjs" \
+		CC=emcc \
+		CXX=em++ \
+		LD=emcc \
+		AR=emar \
+		RANLIB=emranlib
 
 	msg "Installing fbc-js into staging"
 	run make install-js \
@@ -446,6 +462,7 @@ EOF
 		CC="$cc" CXX="$cxx" AR="$ar" AS="$as" LD="$ld" RANLIB="$ranlib" STRIP="$strip" DLLTOOL="$dlltool"
 
 	[ -f "$stagedir/fbc-js.exe" ] || fail "staged fbc-js.exe is missing"
+	[ -f "$stagedir/fbc-js-app" ] || fail "staged fbc-js-app is missing"
 	[ -d "$stagedir/lib/freebasic-js/js-asmjs" ] || fail "staged js-asmjs runtime is missing"
 
 	cd "$ROOT"
@@ -633,6 +650,130 @@ if not exist "%EM_CACHE%" mkdir "%EM_CACHE%" >nul 2>nul
 exit /b %ERRORLEVEL%
 EOF
 
+	cat > "$DISTROOT/fbc-js-app.cmd" <<'EOF'
+@echo off
+setlocal
+set "FBJS_ROOT=%~dp0"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%FBJS_ROOT%fbc-js-app.ps1" %*
+exit /b %ERRORLEVEL%
+EOF
+
+	cat > "$DISTROOT/fbc-js-app.ps1" <<'EOF'
+param(
+	[Parameter(ValueFromRemainingArguments = $true)]
+	[string[]] $AppArgs
+)
+
+$ErrorActionPreference = "Stop"
+
+function Show-Usage {
+	Write-Host "Usage: fbc-js-app.cmd [options] program.bas [fbc-js options]"
+	Write-Host ""
+	Write-Host "Options:"
+	Write-Host "  -o DIR, --out DIR   Output directory (default: <program>-js)"
+	Write-Host "  --assets DIR        Preload DIR at the browser program current directory"
+}
+
+$Root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$env:PATH = "$Root\toolchain\ucrt64\bin;$Root;$($env:PATH)"
+$env:PATH = "$Root\toolchain\ucrt64\lib\emscripten;$($env:PATH)"
+
+if (-not $env:EM_CONFIG) {
+	$env:EM_CONFIG = "$Root\toolchain\ucrt64\lib\emscripten\.emscripten"
+}
+
+if (-not $env:FBJS_CACHE_ROOT) {
+	if ($env:LOCALAPPDATA) {
+		$env:FBJS_CACHE_ROOT = "$env:LOCALAPPDATA\FreeBASIC\fbc-js"
+	} else {
+		$env:FBJS_CACHE_ROOT = "$env:TEMP\FreeBASIC\fbc-js"
+	}
+}
+
+if (-not $env:EMCC_TEMP_DIR) {
+	$env:EMCC_TEMP_DIR = "$env:FBJS_CACHE_ROOT\emcc-temp"
+}
+
+if (-not $env:EM_CACHE) {
+	$env:EM_CACHE = "$env:FBJS_CACHE_ROOT\em-cache"
+}
+
+if (-not $env:BINARYEN_CORES) {
+	$env:BINARYEN_CORES = "1"
+}
+
+New-Item -ItemType Directory -Force -Path $env:EMCC_TEMP_DIR, $env:EM_CACHE | Out-Null
+
+$outDir = $null
+$assetDir = $env:FBJS_ASSETS
+$program = $null
+$compilerArgs = New-Object System.Collections.Generic.List[string]
+
+for ($i = 0; $i -lt $AppArgs.Count; $i++) {
+	$arg = $AppArgs[$i]
+
+	switch -Regex ($arg) {
+		'^(--help|-h|-help)$' {
+			Show-Usage
+			exit 0
+		}
+		'^(-o|--out)$' {
+			$i++
+			if ($i -ge $AppArgs.Count) {
+				throw "$arg requires a directory"
+			}
+			$outDir = $AppArgs[$i]
+			continue
+		}
+		'^--out=' {
+			$outDir = $arg.Substring(6)
+			continue
+		}
+		'^--assets$' {
+			$i++
+			if ($i -ge $AppArgs.Count) {
+				throw "--assets requires a directory"
+			}
+			$assetDir = $AppArgs[$i]
+			continue
+		}
+		'^--assets=' {
+			$assetDir = $arg.Substring(9)
+			continue
+		}
+		default {
+			if (-not $program -and [System.IO.Path]::GetExtension($arg).Equals(".bas", [System.StringComparison]::OrdinalIgnoreCase)) {
+				$program = $arg
+			}
+			$compilerArgs.Add($arg)
+		}
+	}
+}
+
+if (-not $program) {
+	throw "no .bas source file was given"
+}
+
+if (-not $outDir) {
+	$outDir = [System.IO.Path]::GetFileNameWithoutExtension($program) + "-js"
+}
+
+New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+$outputFile = Join-Path $outDir "index.html"
+
+$linkArgs = @()
+if ($assetDir) {
+	if (-not (Test-Path -LiteralPath $assetDir -PathType Container)) {
+		throw "assets directory not found: $assetDir"
+	}
+	$assetFull = (Resolve-Path -LiteralPath $assetDir).ProviderPath
+	$linkArgs = @("-Wl", "--preload-file", "-Wl", "$assetFull@/")
+}
+
+& "$Root\fbc-js.cmd" "-x" $outputFile @linkArgs @compilerArgs
+exit $LASTEXITCODE
+EOF
+
 	cat > "$DISTROOT/freebasic-js-env.cmd" <<'EOF'
 @echo off
 set "FBJS_ROOT=%~dp0"
@@ -696,6 +837,11 @@ fbc-js, including emcc, emar, Node.js, Python, Binaryen, Clang/LLVM, runtime
 DLLs, headers, libraries, and supporting data files installed by the MSYS2
 packages this build script uses.
 
+The build script validates emcc, em++, emar, emranlib, Node.js, and Python
+before compiling the JavaScript runtime libraries, and passes those tools
+explicitly to make so a plain MSYS2 shell on a new Windows PC follows the same
+path as this package build.
+
 The Binaryen command-line tools and Node.js executable are overlaid from the
 official upstream Windows releases.  This keeps the standalone package on the
 same release levels while avoiding Windows hangs and crashes seen in the
@@ -707,6 +853,12 @@ fbc-js.cmd creates a per-user Emscripten cache/temp area under:
 
 This keeps generated object, cache, and temporary files out of the install
 directory, which may not be writable for non-admin users.
+
+For browser games with relative-path assets, use fbc-js-app.cmd.  It writes an
+app directory containing index.html and preloads the selected asset folder at
+the program's virtual current directory:
+
+    fbc-js-app.cmd --out build\\mygame --assets game-folder game.bas
 
 If MSYS2 is present, the installer also writes:
 
@@ -730,6 +882,10 @@ assemble_distribution() {
 	mkdir -p "$DISTROOT/bin"
 	if [ -f "$DISTROOT/fbc-js.exe" ]; then
 		mv "$DISTROOT/fbc-js.exe" "$DISTROOT/bin/fbc-js.exe"
+	fi
+	if [ -f "$DISTROOT/fbc-js-app" ]; then
+		mv "$DISTROOT/fbc-js-app" "$DISTROOT/bin/fbc-js-app"
+		chmod 755 "$DISTROOT/bin/fbc-js-app"
 	fi
 
 	msg "Copying top-level documentation and examples"
@@ -955,6 +1111,8 @@ validate_distribution() {
 	cat > "$validate_dir/hello.bas" <<'EOF'
 print "freebasic-js package test OK"
 EOF
+	mkdir -p "$validate_dir/assets"
+	printf 'asset smoke\n' > "$validate_dir/assets/readme.txt"
 
 	dist_win="$(cygpath -aw "$DISTROOT")"
 	validate_win="$(cygpath -aw "$validate_dir")"
@@ -973,6 +1131,8 @@ set "BINARYEN_CORES=1"
 call "$dist_win\\fbc-js.cmd" "$validate_win\\hello.bas" -x "$validate_win\\hello.js" > "$validate_win\\compile.out" 2> "$validate_win\\compile.err"
 if errorlevel 1 exit /b %ERRORLEVEL%
 node "$validate_win\\hello.js" > "$validate_win\\output.txt" 2> "$validate_win\\output.err"
+if errorlevel 1 exit /b %ERRORLEVEL%
+call "$dist_win\\fbc-js-app.cmd" --out "$validate_win\\app" --assets "$validate_win\\assets" "$validate_win\\hello.bas" > "$validate_win\\app-compile.out" 2> "$validate_win\\app-compile.err"
 exit /b %ERRORLEVEL%
 EOF
 
@@ -1015,6 +1175,7 @@ EOF
 		-CommandPath "$(cygpath -aw "$validate_cmd")" \
 		-TimeoutSeconds 180
 	[ -f "$validate_dir/hello.js" ] || fail "packaged fbc-js did not produce hello.js"
+	[ -f "$validate_dir/app/index.html" ] || fail "packaged fbc-js-app did not produce app/index.html"
 	grep -q "freebasic-js package test OK" "$validate_dir/output.txt" || fail "generated JavaScript output was wrong"
 }
 

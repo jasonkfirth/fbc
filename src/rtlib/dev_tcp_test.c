@@ -4,6 +4,8 @@
 #include "dev_tcp_private.h"
 
 #include <ctype.h>
+#include <errno.h>
+#include <limits.h>
 
 static char *fb_hDevTcpTrim( char *p )
 {
@@ -31,8 +33,16 @@ static int fb_hDevTcpParseUInt( const char *text, unsigned int *value )
 	if( text == NULL || *text == '\0' )
 		return FALSE;
 
+	if( isdigit( (unsigned char)*text ) == 0 )
+		return FALSE;
+
+	errno = 0;
 	parsed = strtoul( text, &end, 10 );
 	if( *end != '\0' )
+		return FALSE;
+	if( errno == ERANGE )
+		return FALSE;
+	if( parsed > UINT_MAX )
 		return FALSE;
 
 	*value = (unsigned int)parsed;

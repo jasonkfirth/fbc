@@ -15,6 +15,7 @@ xbox_emulator/
 xbox_emulator_xemu/
 bin/fbc*
 bootstrap/fbc*
+/build/
 dist/
 /lib/freebasic/
 examples/**/*.a

@@ -278,7 +278,7 @@ static void fb_hEnableDPIAwareness(int os_major_version)
 
 	shcore = LoadLibrary("shcore");
 	if (shcore) {
-		set_process_dpi_awareness = (SETPROCESSDPIAWARENESS)GetProcAddress(shcore, "SetProcessDpiAwareness");
+		set_process_dpi_awareness = (SETPROCESSDPIAWARENESS)(void*)GetProcAddress(shcore, "SetProcessDpiAwareness");
 		if (set_process_dpi_awareness) {
 			ret = set_process_dpi_awareness(PROCESS_PER_MONITOR_DPI_AWARE);
 			FreeLibrary(shcore);
@@ -294,7 +294,7 @@ static void fb_hEnableDPIAwareness(int os_major_version)
 	if (!user32) {
 		return;
 	}
-	set_process_dpi_aware = (SETPROCESSDPIAWARE)GetProcAddress(user32, "SetProcessDPIAware");
+	set_process_dpi_aware = (SETPROCESSDPIAWARE)(void*)GetProcAddress(user32, "SetProcessDPIAware");
 	if (set_process_dpi_aware) {
 		set_process_dpi_aware();
 	}

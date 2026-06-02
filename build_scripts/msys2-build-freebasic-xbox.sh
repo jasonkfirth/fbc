@@ -559,10 +559,17 @@ set "FBXBOX_ROOT=%~dp0"
 if "%FBXBOX_ROOT:~-1%"=="\" set "FBXBOX_ROOT=%FBXBOX_ROOT:~0,-1%"
 
 if "%~1"=="" goto usage
+if /I "%~1"=="--help" goto usage
+if /I "%~1"=="-h" goto usage
+if /I "%~1"=="-help" goto usage
 if not exist "%~1" (
 	echo XBE not found: %~1 1>&2
 	exit /b 1
 )
+for %%I in ("%~1") do set "XBE_PATH=%%~fI"
+for %%I in ("%~dpn1.iso") do set "ISO_PATH=%%~fI"
+set "ASSET_DIR=%FBXBOX_ASSETS%"
+shift
 
 set "EXTRACT_XISO=%FBXBOX_ROOT%\nxdk\tools\extract-xiso\build\extract-xiso.exe"
 if not exist "%EXTRACT_XISO%" set "EXTRACT_XISO=%FBXBOX_ROOT%\nxdk\tools\extract-xiso\build\extract-xiso"
@@ -571,11 +578,31 @@ if not exist "%EXTRACT_XISO%" (
 	exit /b 1
 )
 
-for %%I in ("%~1") do set "XBE_PATH=%%~fI"
-if "%~2"=="" (
-	for %%I in ("%~dpn1.iso") do set "ISO_PATH=%%~fI"
-) else (
-	for %%I in ("%~2") do set "ISO_PATH=%%~fI"
+:parse_args
+if "%~1"=="" goto parsed_args
+if /I "%~1"=="--assets" (
+	if "%~2"=="" (
+		echo --assets requires a directory 1>&2
+		exit /b 2
+	)
+	for %%I in ("%~2") do set "ASSET_DIR=%%~fI"
+	shift
+	shift
+	goto parse_args
+)
+if defined ISO_WAS_SET (
+	echo Unexpected argument: %~1 1>&2
+	exit /b 2
+)
+for %%I in ("%~1") do set "ISO_PATH=%%~fI"
+set "ISO_WAS_SET=1"
+shift
+goto parse_args
+
+:parsed_args
+if defined ASSET_DIR if not exist "%ASSET_DIR%\" (
+	echo Assets directory not found: %ASSET_DIR% 1>&2
+	exit /b 1
 )
 
 set "STAGE=%TEMP%\fbc-xbox-xiso-%RANDOM%%RANDOM%"
@@ -583,6 +610,15 @@ mkdir "%STAGE%" >nul 2>nul
 if errorlevel 1 (
 	echo Could not create temporary XISO staging directory: %STAGE% 1>&2
 	exit /b 1
+)
+
+if defined ASSET_DIR (
+	xcopy /E /I /Y "%ASSET_DIR%\*" "%STAGE%\" >nul
+	if errorlevel 4 (
+		rmdir /S /Q "%STAGE%" >nul 2>nul
+		echo Could not stage assets from %ASSET_DIR% 1>&2
+		exit /b 1
+	)
 )
 
 copy /Y "%XBE_PATH%" "%STAGE%\default.xbe" >nul
@@ -602,9 +638,12 @@ echo Wrote %ISO_PATH%
 exit /b 0
 
 :usage
-echo Usage: fbc-xbox-xiso.cmd program.xbe [program.iso]
+echo Usage: fbc-xbox-xiso.cmd program.xbe [program.iso] [--assets dir]
 exit /b 2
 EOF
+
+	install -m 755 "$ROOT/src/tools/xbox/fbc-xbox-xiso" "$DISTROOT/fbc-xbox-xiso.sh"
+	chmod 755 "$DISTROOT/fbc-xbox-xiso.sh"
 }
 
 write_distribution_notes() {
@@ -628,11 +667,16 @@ Use fbc-xbox.cmd from cmd.exe or PowerShell:
 
     fbc-xbox.cmd program.bas -x program.xbe
 
-The package also includes fbc-xbox-xiso.cmd.  It stages an XBE as default.xbe
-and packs the XISO disc-image format expected by full-system Xbox emulators
-such as xemu:
+The package also includes fbc-xbox-xiso.cmd and fbc-xbox-xiso.sh.  They stage
+an XBE as default.xbe and pack the XISO disc-image format expected by
+full-system Xbox emulators such as xemu:
 
     fbc-xbox-xiso.cmd program.xbe program.iso
+
+Programs that need a current-directory asset tree can stage one into the XISO:
+
+    fbc-xbox-xiso.cmd program.xbe program.iso --assets game-folder
+    ./fbc-xbox-xiso.sh program.xbe program.iso --assets game-folder
 
 The bundled nxdk tools still include extract-xiso for lower-level packaging
 workflows.
@@ -750,6 +794,7 @@ copy_msys_runtime() {
 		sed \
 		tr \
 		mkdir \
+		mktemp \
 		make \
 		cp \
 		rm \
@@ -1029,10 +1074,12 @@ validate_distribution() {
 	msg "Validating packaged fbc-xbox"
 	rm -rf "$validate_dir"
 	mkdir -p "$validate_dir"
+	mkdir -p "$validate_dir/assets"
 
 	cat > "$validate_dir/hello.bas" <<'EOF'
 print "freebasic-xbox package test OK"
 EOF
+	printf 'asset smoke\n' > "$validate_dir/assets/readme.txt"
 
 	dist_win="$(cygpath -aw "$DISTROOT")"
 	validate_win="$(cygpath -aw "$validate_dir")"
@@ -1044,12 +1091,15 @@ set "PATH=%SystemRoot%\\System32;%SystemRoot%;%SystemRoot%\\System32\\Wbem"
 pushd "$validate_win"
 call "$dist_win\\fbc-xbox.cmd" hello.bas -x hello.xbe
 set "FBC_XBOX_STATUS=%ERRORLEVEL%"
+if "%FBC_XBOX_STATUS%"=="0" call "$dist_win\\fbc-xbox-xiso.cmd" hello.xbe hello.iso --assets "$validate_win\\assets"
+if "%FBC_XBOX_STATUS%"=="0" set "FBC_XBOX_STATUS=%ERRORLEVEL%"
 popd
 exit /b %FBC_XBOX_STATUS%
 EOF
 
 	run cmd.exe //C "$(cygpath -aw "$validate_cmd")"
 	[ -f "$validate_dir/hello.xbe" ] || fail "packaged fbc-xbox did not produce hello.xbe"
+	[ -f "$validate_dir/hello.iso" ] || fail "packaged fbc-xbox-xiso did not produce hello.iso"
 }
 
 ##############################################################################

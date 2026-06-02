@@ -30,7 +30,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-FBVERSION="$(sed -n 's/^#define[[:space:]][[:space:]]*FB_VERSION[[:space:]][[:space:]]*"\(.*\)"/\1/p' "${ROOT_DIR}/src/compiler/version.bi" | head -n 1)"
+FBVERSION="$({ sed -n 's/^FBVERSION[[:space:]]*:=[[:space:]]*//p' "${ROOT_DIR}/mk/version.mk" 2>/dev/null || true; } | head -n 1)"
 if [ -z "${FBVERSION}" ]; then
     FBVERSION="unknown"
 fi
@@ -230,7 +230,12 @@ copy_tool()
     local path
 
     path="$(command -v "${tool}" 2>/dev/null || true)"
-    if [ -z "${path}" ]; then
+    case "${path}" in
+        /*) ;;
+        *) return 0 ;;
+    esac
+
+    if [ ! -f "${path}" ]; then
         return 0
     fi
 
@@ -521,7 +526,7 @@ build_wii_freebasic()
             FBC="${build_fbc}" \
             BUILD_FBC="${build_fbc}" \
             BUILD_FBC_TARGET="${HOST_FBC_TARGET}" \
-            WII_BUILD_LIBDIR="${WORKTREE}/lib/freebasic/${WII_TARGET_KEY}" \
+            WII_BUILD_LIBDIR="${WORKTREE}/lib/freebasic/wii" \
             install-wii
     )
 }
@@ -554,6 +559,10 @@ export FBWII_COMPILER="${SCRIPT_DIR}/lib/freebasic-wii/bin/fbc-wii-compiler.exe"
 export FBWII_INCDIR="${SCRIPT_DIR}/include/freebasic-wii"
 export FBWII_LIBDIR="${SCRIPT_DIR}/lib/freebasic-wii/wii-powerpc"
 export PATH="${SCRIPT_DIR}/toolchain/msys2/usr/bin:${DEVKITPPC}/bin:${DEVKITPRO}/tools/bin:${PATH}"
+
+if [ -x "${SCRIPT_DIR}/fbc-wii.exe" ]; then
+    exec "${SCRIPT_DIR}/fbc-wii.exe" "$@"
+fi
 
 exec "${SCRIPT_DIR}/bin/fbc-wii" "$@"
 EOF
@@ -605,6 +614,32 @@ EOF
     chmod +x "${root}/fbc-wii-package.sh" "${root}/freebasic-wii-env.sh"
 }
 
+write_distribution_notes()
+{
+    local root="$1"
+
+    msg "Writing fbc-wii package notes"
+
+    cat > "${root}/readme-fbc-wii.txt" <<EOF
+FreeBASIC Wii ${FBVERSION}
+
+Use fbc-wii.cmd from cmd.exe or PowerShell:
+
+    fbc-wii.cmd program.bas -x program.dol
+
+For games that load files from the current directory, build a homebrew folder
+instead.  The wrapper writes boot.dol and copies the selected asset tree beside
+it, which is the layout Dolphin, SD-card launchers, and the Homebrew Channel
+expect:
+
+    fbc-wii.cmd --bundle build\\mygame --assets game-folder game.bas
+
+The bundled fbc-wii driver still accepts normal FreeBASIC compiler options.
+The --bundle and --assets options are only packaging conveniences; they do not
+change the FreeBASIC language or runtime API.
+EOF
+}
+
 copy_msys2_runtime()
 {
     local root="$1"
@@ -651,7 +686,7 @@ copy_optional_tree()
 
 assemble_package()
 {
-    local stage_prefix="${STAGEDIR}/${INSTALL_SUBDIR}"
+    local stage_prefix="${STAGEDIR}"
 
     if [ "${DO_PACKAGE}" -eq 0 ]; then
         return 0
@@ -683,6 +718,7 @@ assemble_package()
     copy_msys2_runtime "${PACKAGE_ROOT}"
     copy_devkitpro_tree "${PACKAGE_ROOT}"
     write_launchers "${PACKAGE_ROOT}"
+    write_distribution_notes "${PACKAGE_ROOT}"
 }
 
 # ---------------------------------------------------------------------------
@@ -694,6 +730,8 @@ validate_package()
     local testdir="${BUILDROOT}/validate"
     local src="${testdir}/hello.bas"
     local out="${testdir}/hello.dol"
+    local assetdir="${testdir}/assets"
+    local bundledir="${testdir}/bundle"
 
     if [ "${DO_VALIDATE}" -eq 0 ]; then
         return 0
@@ -715,6 +753,22 @@ EOF
 
     if [ ! -f "${out}" ]; then
         fail "packaged fbc-wii did not produce ${out}"
+    fi
+
+    mkdir -p "${assetdir}"
+    printf 'asset smoke\n' > "${assetdir}/readme.txt"
+
+    run cmd.exe //C "$(windows_path "${PACKAGE_ROOT}/fbc-wii.cmd")" \
+        --bundle "$(windows_path "${bundledir}")" \
+        --assets "$(windows_path "${assetdir}")" \
+        "$(windows_path "${src}")"
+
+    if [ ! -f "${bundledir}/boot.dol" ]; then
+        fail "packaged fbc-wii --bundle did not produce ${bundledir}/boot.dol"
+    fi
+
+    if [ ! -f "${bundledir}/readme.txt" ]; then
+        fail "packaged fbc-wii --assets did not copy ${bundledir}/readme.txt"
     fi
 }
 

@@ -181,6 +181,30 @@ char *getenv( const char *name )
 	return (entry != NULL) ? entry->value : NULL;
 }
 
+int setenv( const char *name, const char *value, int overwrite )
+{
+	if( (name == NULL) || (name[0] == '\0') || (strchr( name, '=' ) != NULL) ||
+	    (value == NULL) ) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if( (overwrite == 0) && (hFindEnv( name, strlen( name ) ) != NULL) )
+		return 0;
+
+	return hSetEnvPair( name, strlen( name ), value );
+}
+
+int unsetenv( const char *name )
+{
+	if( (name == NULL) || (name[0] == '\0') || (strchr( name, '=' ) != NULL) ) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	return hUnsetEnvName( name, strlen( name ) );
+}
+
 /* ------------------------------------------------------------------------- */
 /* FreeBASIC runtime API                                                     */
 /* ------------------------------------------------------------------------- */

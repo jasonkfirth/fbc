@@ -53,6 +53,7 @@
 
 #include "../fb_gfx.h"
 
+#include <stdint.h>
 #include <Joystick.h>
 #include <string.h>
 
@@ -102,7 +103,9 @@ static int inited = FALSE;
 /*
     Convert raw axis value to the range [-1.0, 1.0].
 
-    Haiku joystick axis values are signed 16-bit integers.
+    Haiku's BJoystick API delivers axis samples as signed 16-bit integers.
+    The polling helper widens them to 32-bit storage so the joystick and
+    XPAD paths can share the same normalization code.
 */
 
 static float normalize_axis(int value)
@@ -202,13 +205,30 @@ static int get_joystick(int id, JOYDATA **out)
     return TRUE;
 }
 
-static void read_axes(BJoystick *js, int16 *axis_values, int max_axes)
+static void read_axes(BJoystick *js, int32_t *axis_values, int max_axes)
 {
+    int axis_count;
+    int16_t axis_values_16[8];
+
     memset(axis_values,0,(size_t)max_axes * sizeof(axis_values[0]));
-    js->GetAxisValues(axis_values,max_axes);
+
+    if (max_axes <= 0)
+        return;
+
+    axis_count = max_axes;
+    if (axis_count > 8)
+        axis_count = 8;
+
+    memset(axis_values_16,0,(size_t)axis_count * sizeof(axis_values_16[0]));
+    js->GetAxisValues(axis_values_16,axis_count);
+
+    for (int i = 0; i < axis_count; i++)
+    {
+        axis_values[i] = (int32_t)axis_values_16[i];
+    }
 }
 
-static float axis_value(const int16 *axis_values, int axes, int axis)
+static float axis_value(const int32_t *axis_values, int axes, int axis)
 {
     if (axis < 0 || axis >= axes)
         return 0.0f;
@@ -216,7 +236,7 @@ static float axis_value(const int16 *axis_values, int axes, int axis)
     return normalize_axis(axis_values[axis]);
 }
 
-static float trigger_value(const int16 *axis_values, int axes, int axis)
+static float trigger_value(const int32_t *axis_values, int axes, int axis)
 {
     return clamp_unit((axis_value(axis_values,axes,axis) + 1.0f) * 0.5f);
 }
@@ -259,7 +279,7 @@ extern "C" FBCALL int fb_GfxGetJoystick(
 
     int axes = j->js.CountAxes();
 
-    int16 axis_values[8];
+    int32_t axis_values[8];
     read_axes(&j->js,axis_values,8);
 
     if (axes > 0 && a1) *a1 = axis_value(axis_values,axes,0);
@@ -328,7 +348,7 @@ static ssize_t xpad_buttons(uint32 mask, float left_trigger, float right_trigger
     return buttons;
 }
 
-static ssize_t xpad_dpad(const int16 *axis_values, int axes)
+static ssize_t xpad_dpad(const int32_t *axis_values, int axes)
 {
     ssize_t dpad = 0;
     float x;
@@ -361,7 +381,7 @@ extern "C" int fb_hGfxHaikuGetXPad(
 {
     JOYDATA *j;
     int axes;
-    int16 axis_values[8];
+    int32_t axis_values[8];
     float left_trigger;
     float right_trigger;
     uint32 mask;
@@ -383,11 +403,11 @@ extern "C" int fb_hGfxHaikuGetXPad(
     if (lstick_x)
         *lstick_x = axis_value(axis_values,axes,0);
     if (lstick_y)
-        *lstick_y = axis_value(axis_values,axes,1);
+        *lstick_y = -axis_value(axis_values,axes,1);
     if (rstick_x)
         *rstick_x = axis_value(axis_values,axes,3);
     if (rstick_y)
-        *rstick_y = axis_value(axis_values,axes,4);
+        *rstick_y = -axis_value(axis_values,axes,4);
     if (ltrigger)
         *ltrigger = left_trigger;
     if (rtrigger)

@@ -22,21 +22,6 @@ extern thread_id fb_haiku_event_thread;
 
 static BApplication *fb_app = NULL;
 
-#define FB_HAIKU_FORCE_EXIT_DELAY_US 500000
-
-/* ------------------------------------------------------------------------- */
-/* Force process exit fallback                                               */
-/* ------------------------------------------------------------------------- */
-
-static int32 fb_hHaikuForceExit(void*)
-{
-    snooze(FB_HAIKU_FORCE_EXIT_DELAY_US);
-    exit(0);
-    return 0;
-}
-
-/* ------------------------------------------------------------------------- */
-
 static int32 fb_hHaikuInitFail(void)
 {
     fb_hHaikuLockState();
@@ -237,7 +222,6 @@ int fb_hHaikuInit(char *title, int w, int h, int depth, int refresh, int flags)
 void fb_hHaikuExit(void)
 {
     thread_id tid = fb_haiku_event_thread;
-    thread_id killer;
 
     fb_haiku.quitting = 1;
 
@@ -247,17 +231,12 @@ void fb_hHaikuExit(void)
     if (fb_app)
         fb_app->PostMessage(B_QUIT_REQUESTED);
 
-    /* fallback: force process exit if runtime does not shut down */
-    killer = spawn_thread(
-        fb_hHaikuForceExit,
-        "fb_haiku_force_exit",
-        B_NORMAL_PRIORITY,
-        NULL
-    );
-
-    if (killer >= B_OK)
-        resume_thread(killer);
-
+    /*
+        fb_hHaikuExit() is also used for normal gfx mode changes.  Do not
+        force the process to exit here, or old programs that switch from
+        SCREEN 13 to SCREENRES during startup will be killed by their own
+        mode switch.
+    */
     if (tid >= B_OK && find_thread(NULL) != tid)
     {
         if (fb_haiku.gui_exit_sem >= B_OK)

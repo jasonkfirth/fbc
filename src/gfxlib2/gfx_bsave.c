@@ -229,7 +229,12 @@ FBCALL int fb_GfxBsaveEx(FBSTRING *filename, void *src, unsigned int size, void 
 	buffer[MAX_PATH-1] = '\0';
 	fb_hConvertPath(buffer);
 
-	f = fopen(buffer, "wb");
+	/*
+		Use the rtlib path layer instead of raw fopen().  Targets such as
+		Xbox redirect relative writes to writable storage instead of the
+		read-only disc mount.
+	*/
+	f = fb_hOpenFile(buffer, "wb");
 	if (!f) {
 		fb_hStrDelTemp(filename);
 		FB_GRAPHICS_UNLOCK( );

@@ -41,7 +41,10 @@ int fb_hHaikuGetMouse(int *x, int *y, int *z, int *buttons, int *clip)
         *z = fb_haiku.mouse_z;
 
     if (buttons)
-        *buttons = fb_haiku.mouse_buttons;
+    {
+        *buttons = fb_haiku.mouse_buttons | fb_haiku.mouse_latched_buttons;
+        fb_haiku.mouse_latched_buttons = 0;
+    }
 
     if (clip)
         *clip = fb_haiku.mouse_clip;
@@ -61,7 +64,7 @@ int fb_hHaikuGetTouchCount(void)
         code can be used and tested on Haiku even without a separate native
         multi-contact path.
     */
-    if (fb_haiku.mouse_buttons & BUTTON_LEFT)
+    if ((fb_haiku.mouse_buttons | fb_haiku.mouse_latched_buttons) & BUTTON_LEFT)
         return 1;
 
     return 0;
@@ -69,7 +72,9 @@ int fb_hHaikuGetTouchCount(void)
 
 int fb_hHaikuGetTouch(int index, int *x, int *y, int *id)
 {
-    if ((index != 0) || ((fb_haiku.mouse_buttons & BUTTON_LEFT) == 0))
+    if ((index != 0) ||
+        (((fb_haiku.mouse_buttons | fb_haiku.mouse_latched_buttons) &
+        BUTTON_LEFT) == 0))
         return -1;
 
     if (x)

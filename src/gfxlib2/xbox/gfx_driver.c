@@ -18,9 +18,17 @@
 
     This file intentionally does NOT contain:
 
-        - input handling
         - window management
         - audio or lifecycle handling
+        - controller-to-keyboard input synthesis
+
+    Platform notes:
+
+        The original Xbox does not have a PC keyboard in the normal console
+        setup.  Controller state is reported through GETXPAD so applications
+        can decide how a pad should interact with their own menus and game
+        controls.  The graphics driver deliberately does not write into the
+        keyboard state or queue synthetic INKEY$ events.
 */
 
 #include "../fb_gfx.h"
@@ -59,8 +67,15 @@ static uint32_t *scale_buffer;
 static size_t scale_buffer_size;
 static uint32_t *present_buffer;
 static size_t present_buffer_size;
+/*
+	XVideoSetFB() programs the CRTC start register.  The buffers below are
+	normal kernel virtual addresses for CPU writes, but the register needs
+	the corresponding low physical address returned by MmGetPhysicalAddress().
+*/
 static uint32_t *scan_buffer[XBOX_SCAN_BUFFERS];
+static uintptr_t scan_buffer_physical[XBOX_SCAN_BUFFERS];
 static int front_scan_buffer;
+static uintptr_t framebuffer_physical;
 static size_t video_framebuffer_size;
 static CRITICAL_SECTION update_lock;
 static HANDLE presenter_thread;
@@ -279,7 +294,7 @@ static void driver_update_framebuffer(void)
 	fb_hMemCpy(scan_buffer[back_scan_buffer], present_buffer, video_framebuffer_size);
 	XVideoFlushFB();
 	wait_for_vblank_edge();
-	XVideoSetFB((unsigned char *)scan_buffer[back_scan_buffer]);
+	XVideoSetFB((unsigned char *)scan_buffer_physical[back_scan_buffer]);
 
 	/*
 		Some video hardware latches the CRTC start address at vblank.  Wait
@@ -336,6 +351,7 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 	blitter = fb_hGetBlitter(32, FALSE);
 	if (!framebuffer || !blitter)
 		return -1;
+	framebuffer_physical = MmGetPhysicalAddress(framebuffer);
 
 	for (i = 0; i < XBOX_SCAN_BUFFERS; ++i) {
 		scan_buffer[i] = (uint32_t *)MmAllocateContiguousMemoryEx(video_framebuffer_size,
@@ -351,6 +367,8 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 			}
 			return -1;
 		}
+
+		scan_buffer_physical[i] = MmGetPhysicalAddress(scan_buffer[i]);
 	}
 	front_scan_buffer = 0;
 
@@ -366,7 +384,7 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 	for (i = 0; i < XBOX_SCAN_BUFFERS; ++i)
 		memset(scan_buffer[i], 0, video_framebuffer_size);
 	XVideoFlushFB();
-	XVideoSetFB((unsigned char *)scan_buffer[front_scan_buffer]);
+	XVideoSetFB((unsigned char *)scan_buffer_physical[front_scan_buffer]);
 
 	InitializeCriticalSection(&update_lock);
 	update_lock_ready = TRUE;
@@ -397,8 +415,9 @@ static void driver_exit(void)
 		update_lock_ready = FALSE;
 	}
 	if (framebuffer)
-		XVideoSetFB((unsigned char *)framebuffer);
+		XVideoSetFB((unsigned char *)framebuffer_physical);
 	framebuffer = NULL;
+	framebuffer_physical = 0;
 	blitter = NULL;
 	video_w = 0;
 	video_h = 0;
@@ -413,6 +432,7 @@ static void driver_exit(void)
 		if (scan_buffer[i])
 			MmFreeContiguousMemory(scan_buffer[i]);
 		scan_buffer[i] = NULL;
+		scan_buffer_physical[i] = 0;
 	}
 	front_scan_buffer = 0;
 }
@@ -506,14 +526,6 @@ static int *driver_fetch_modes(int depth, int *size)
 	return modes;
 }
 
-static void driver_poll_events(void)
-{
-	/*
-		This backend has no window manager event source.  Controller input is a
-		polled device API and is handled by fb_GfxGetXPad().
-	*/
-}
-
 /* GFXDRIVER */
 static const GFXDRIVER fb_gfxDriverXbox =
 {
@@ -532,7 +544,7 @@ static const GFXDRIVER fb_gfxDriverXbox =
 	NULL,                    /* int (*set_window_pos)(int x, int y); */
 	driver_fetch_modes,      /* int *(*fetch_modes)(int depth, int *size); */
 	NULL,                    /* void (*flip)(void); */
-	driver_poll_events,      /* void (*poll_events)(void); */
+	NULL,                    /* void (*poll_events)(void); */
 	driver_update            /* void (*update)(void); */
 };
 
@@ -551,6 +563,28 @@ void fb_hScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *re
 	*height = vm.height;
 	*depth = vm.bpp;
 	*refresh = vm.refresh;
+}
+
+ssize_t fb_hGetWindowHandle(void)
+{
+	/*
+		SCREENCONTROL exposes native window/display handles on targets that
+		actually have a host window system.  The Xbox backend owns the video
+		framebuffer directly through nxdk, so there is no stable handle that a
+		FreeBASIC program could use outside gfxlib.
+	*/
+	return 0;
+}
+
+ssize_t fb_hGetDisplayHandle(void)
+{
+	return 0;
+}
+
+void *fb_hGL_GetProcAddress(const char *proc)
+{
+	(void)proc;
+	return NULL;
 }
 
 FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, float *a3, float *a4, float *a5, float *a6, float *a7, float *a8)
@@ -589,3 +623,5 @@ FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, flo
 
 	return fb_ErrorSetNum(FB_RTERROR_OK);
 }
+
+/* end of gfx_driver.c */

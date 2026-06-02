@@ -279,6 +279,113 @@ private sub hCheckAttribs _
 
 end sub
 
+private function hFindDuplicatePrototype _
+	( _
+		byval head_proc as FBSYMBOL ptr, _
+		byval proc as FBSYMBOL ptr, _
+		byval palias as zstring ptr, _
+		byval proc_dtype as integer, _
+		byval proc_subtype as FBSYMBOL ptr, _
+		byval pattrib as FB_PROCATTRIB, _
+		byval mode as integer, _
+		byval is_get as integer _
+	) as FBSYMBOL ptr
+
+	dim as FBSYMBOL ptr proto = any
+	dim as FBSYMBOL ptr param = any, proto_param = any
+	dim as integer params = any, proto_params = any
+
+	function = NULL
+
+	'' Legacy BASIC code often repeats identical DECLARE lines in split
+	'' modules.  Accept only exact prototype matches, and only before a
+	'' body has been parsed, so mismatched declarations still fail.
+	if( env.clopt.lang = FB_LANG_FB ) then
+		exit function
+	end if
+
+	if( (head_proc = NULL) or (proc = NULL) ) then
+		exit function
+	end if
+
+	proto = symbFindOverloadProc( head_proc, proc, _
+		iif( is_get, FB_SYMBFINDOPT_PROPGET, FB_SYMBFINDOPT_NONE ) )
+	if( proto = NULL ) then
+		exit function
+	end if
+
+	if( symbGetIsDeclared( proto ) ) then
+		exit function
+	end if
+
+	if( (symbGetFullType( proto ) <> proc_dtype) or _
+	    (symbGetSubtype( proto ) <> proc_subtype) ) then
+		exit function
+	end if
+
+	if( symbGetProcMode( proto ) <> mode ) then
+		exit function
+	end if
+
+	if( symbIsReturnByRef( proto ) <> ((pattrib and FB_PROCATTRIB_RETURNBYREF) <> 0) ) then
+		exit function
+	end if
+
+	if( palias <> NULL ) then
+		if( (proto->stats and FB_SYMBSTATS_HASALIAS) = 0 ) then
+			exit function
+		end if
+
+		if( *palias <> *proto->id.alias ) then
+			exit function
+		end if
+	end if
+
+	param = symbGetProcHeadParam( proc )
+	params = symbGetProcParams( proc )
+	if( symbIsMethod( proc ) ) then
+		params -= 1
+		param = param->next
+	end if
+
+	proto_param = symbGetProcHeadParam( proto )
+	proto_params = symbGetProcParams( proto )
+	if( symbIsMethod( proto ) ) then
+		proto_params -= 1
+		proto_param = proto_param->next
+	end if
+
+	if( proto_params <> params ) then
+		exit function
+	end if
+
+	while( (proto_param <> NULL) and (param <> NULL) )
+		if( proto_param->param.mode <> param->param.mode ) then
+			exit function
+		end if
+
+		if( proto_param->param.bydescdimensions <> param->param.bydescdimensions ) then
+			exit function
+		end if
+
+		if( symbParamIsOptional( proto_param ) <> symbParamIsOptional( param ) ) then
+			exit function
+		end if
+
+		if( symbParamIsOptional( proto_param ) ) then
+			if( astIsEqualParamInit( proto_param->param.optexpr, param->param.optexpr ) = FALSE ) then
+				exit function
+			end if
+		end if
+
+		proto_param = proto_param->next
+		param = param->next
+	wend
+
+	function = proto
+
+end function
+
 private function hCheckIdToken( byval has_parent as integer ) as integer
 	function = FALSE
 
@@ -297,14 +404,14 @@ private function hCheckIdToken( byval has_parent as integer ) as integer
 		if( env.clopt.lang <> FB_LANG_QB ) then
 			'' only if inside a ns and if not local
 			if( (not has_parent) or (parser.scope > FB_MAINSCOPE) ) then
-				errReport( FB_ERRMSG_DUPDEFINITION )
+				errReport( symbKeywordGetIllegalRedefErr( lexGetToken( ) ) )
 				exit function
 			end if
 		end if
 
 	case FB_TKCLASS_KEYWORD, FB_TKCLASS_OPERATOR
 		if( env.clopt.lang <> FB_LANG_QB ) then
-			errReport( FB_ERRMSG_DUPDEFINITION )
+			errReport( symbKeywordGetIllegalRedefErr( lexGetToken( ) ) )
 			exit function
 		end if
 
@@ -1511,6 +1618,8 @@ function cProcHeader _
 
 	'' Prototype?
 	if( options and FB_PROCOPT_ISPROTO ) then
+		dim as FBSYMBOL ptr parsed_proc = proc
+
 		select case( tk )
 		case FB_TK_CONSTRUCTOR, FB_TK_DESTRUCTOR
 			proc = symbAddCtor( proc, palias, attrib, pattrib, mode )
@@ -1519,6 +1628,14 @@ function cProcHeader _
 		case else
 			proc = symbAddProc( proc, @id, palias, dtype, subtype, attrib, pattrib, mode, FB_SYMBOPT_NONE )
 		end select
+
+		if( proc = NULL ) then
+			select case( tk )
+			case FB_TK_SUB, FB_TK_FUNCTION, FB_TK_PROPERTY
+				proc = hFindDuplicatePrototype( head_proc, parsed_proc, palias, dtype, subtype, _
+				                                 pattrib, mode, is_get )
+			end select
+		end if
 
 		if( proc = NULL ) then
 			errReport( FB_ERRMSG_DUPDEFINITION )

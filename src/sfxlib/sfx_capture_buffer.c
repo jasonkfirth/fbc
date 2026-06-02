@@ -24,6 +24,17 @@ static int fb_sfxCaptureFreeSamples(const FB_SFXCAPTURE *cap)
     return (FB_SFX_CAPTURE_BUFFER - 1) - fb_sfxCaptureStoredSamples(cap);
 }
 
+static int fb_sfxCaptureFramesFromSamples(int samples, int frames, int channels)
+{
+    int available_frames;
+
+    available_frames = samples / channels;
+    if (available_frames > frames)
+        available_frames = frames;
+
+    return available_frames;
+}
+
 void fb_sfxCaptureInit(void)
 {
     if (!__fb_sfx)
@@ -90,16 +101,13 @@ int fb_sfxCaptureBufferWrite(const short *samples, int frames)
 
     cap = &__fb_sfx->capture;
     channels = cap->channels > 0 ? cap->channels : FB_SFX_DEFAULT_CHANNELS;
-    total_samples = frames * channels;
     writable_samples = fb_sfxCaptureFreeSamples(cap);
 
     if (writable_samples <= 0)
         return 0;
 
-    if (total_samples > writable_samples)
-        total_samples = writable_samples - (writable_samples % channels);
-
-    frames_to_write = total_samples / channels;
+    frames_to_write = fb_sfxCaptureFramesFromSamples(writable_samples, frames, channels);
+    total_samples = frames_to_write * channels;
 
     for (i = 0; i < total_samples; ++i) {
         cap->buffer[cap->write_pos] = samples[i];
@@ -123,16 +131,13 @@ int fb_sfxCaptureBufferRead(short *samples, int frames)
 
     cap = &__fb_sfx->capture;
     channels = cap->channels > 0 ? cap->channels : FB_SFX_DEFAULT_CHANNELS;
-    total_samples = frames * channels;
     readable_samples = fb_sfxCaptureStoredSamples(cap);
 
     if (readable_samples <= 0)
         return 0;
 
-    if (total_samples > readable_samples)
-        total_samples = readable_samples - (readable_samples % channels);
-
-    frames_to_read = total_samples / channels;
+    frames_to_read = fb_sfxCaptureFramesFromSamples(readable_samples, frames, channels);
+    total_samples = frames_to_read * channels;
 
     for (i = 0; i < total_samples; ++i) {
         samples[i] = cap->buffer[cap->read_pos];
@@ -161,16 +166,13 @@ int fb_sfxCaptureRead(float *samples, int frames)
 
     cap = &__fb_sfx->capture;
     channels = cap->channels > 0 ? cap->channels : FB_SFX_DEFAULT_CHANNELS;
-    total_samples = frames * channels;
     readable_samples = fb_sfxCaptureStoredSamples(cap);
 
     if (readable_samples <= 0)
         return 0;
 
-    if (total_samples > readable_samples)
-        total_samples = readable_samples - (readable_samples % channels);
-
-    frames_to_read = total_samples / channels;
+    frames_to_read = fb_sfxCaptureFramesFromSamples(readable_samples, frames, channels);
+    total_samples = frames_to_read * channels;
 
     for (i = 0; i < total_samples; ++i) {
         samples[i] = fb_sfxS16ToFloat(cap->buffer[cap->read_pos]);

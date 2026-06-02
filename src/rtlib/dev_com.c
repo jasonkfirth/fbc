@@ -134,7 +134,7 @@ int fb_DevComOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 
     if( port > 0 )
     {
-        written = snprintf( achDev, sizeof( achDev ), "COM%zu:", port );
+        written = snprintf( achDev, sizeof( achDev ), "COM%d:", (int)port );
         if( (written < 0) || ((size_t)written >= sizeof( achDev )) )
             return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
         i = (size_t) written;
@@ -162,7 +162,7 @@ int fb_DevComOpen( FB_FILE *handle, const char *filename, size_t filename_len )
         return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
     }
 
-    info->iPort = port;
+    info->iPort = (int)port;
     info->pszDevice = strdup( achDev );
     if( info->pszDevice==NULL ) {
         free( info );
@@ -395,7 +395,7 @@ int fb_DevSerialSetWidth( const char *pszDevice, int width, int default_width )
     if( !fb_DevComTestProtocolEx( NULL, pszDevice, strlen(pszDevice), &port ) )
         return 0;
 
-    written = snprintf( achDev, sizeof( achDev ), "COM%zu:", port );
+    written = snprintf( achDev, sizeof( achDev ), "COM%d:", (int)port );
     if( (written < 0) || ((size_t)written >= sizeof( achDev )) )
         return 0;
     i = (size_t) written;

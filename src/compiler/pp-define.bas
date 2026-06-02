@@ -1266,6 +1266,66 @@ private function hReadMacroText _
 
 end function
 
+private function hGetRedefinitionErr _
+	( _
+		byval sym as FBSYMBOL ptr _
+	) as FB_ERRMSG
+
+	if( sym <> NULL ) then
+		if( symbIsKeyword( sym ) ) then
+			return symbKeywordGetIllegalRedefErr( sym->key.id )
+		end if
+	end if
+
+	function = FB_ERRMSG_DUPDEFINITION
+end function
+
+private function hLookupRedefinition _
+	( _
+		byval defname as zstring ptr _
+	) as FBSYMBOL ptr
+
+	dim as FB_TOKEN tk = any
+	dim as FB_TKCLASS tk_class = any
+	dim as FBSYMCHAIN ptr chain_ = any
+
+	chain_ = symbLookup( defname, tk, tk_class )
+	if( chain_ <> NULL ) then
+		return chain_->sym
+	end if
+
+	function = NULL
+end function
+
+private sub hReportRedefinition _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byval defname as zstring ptr _
+	)
+
+	if( sym = NULL ) then
+		sym = hLookupRedefinition( defname )
+	end if
+
+	errReportEx( hGetRedefinitionErr( sym ), defname )
+end sub
+
+private function hFindDisabledCommandDefine _
+	( _
+		byval sym as FBSYMBOL ptr _
+	) as FBSYMBOL ptr
+
+	while( sym <> NULL )
+		if( symbIsDefine( sym ) ) then
+			return sym
+		end if
+
+		sym = sym->hash.next
+	wend
+
+	function = NULL
+end function
+
 '':::::
 private sub hReadDefineText _
 	( _
@@ -1292,7 +1352,9 @@ private sub hReadDefineText _
 				errReportEx( FB_ERRMSG_DUPDEFINITION, defname )
 			end if
 		else
-			symbAddDefine( defname, text, len( *text ), isargless, , flags )
+			if( symbAddDefine( defname, text, len( *text ), isargless, , flags ) = NULL ) then
+				hReportRedefinition( NULL, defname )
+			end if
 		end if
 
 	'' unicode..
@@ -1309,7 +1371,9 @@ private sub hReadDefineText _
 				errReportEx( FB_ERRMSG_DUPDEFINITION, defname )
 			end if
 		else
-			symbAddDefineW( defname, textw, len( *textw ), isargless, , flags )
+			if( symbAddDefineW( defname, textw, len( *textw ), isargless, , flags ) = NULL ) then
+				hReportRedefinition( NULL, defname )
+			end if
 		end if
 
 	end if
@@ -1375,7 +1439,12 @@ sub ppDefine( byval ismultiline as integer )
 
 	if( chain_ <> NULL ) then
 		sym = chain_->sym
-		if( symbIsDefine( sym ) = FALSE ) then
+		if( symbIsKeyword( sym ) ) then
+			if( symbKeywordIsDisabledCommand( sym->key.id ) ) then
+				sym = hFindDisabledCommandDefine( sym )
+			end if
+		end if
+		if( (sym <> NULL) andalso (symbIsDefine( sym ) = FALSE) ) then
 			'' defines have no dups or respect namespaces
 			if( symbGetCanRedef( sym ) ) then
 				errReportWarn( FB_WARNINGMSG_REDEFINITIONOFINTRINSIC )
@@ -1384,7 +1453,7 @@ sub ppDefine( byval ismultiline as integer )
 				symbDelFromHash( sym )
 				sym = NULL
 			else
-				errReportEx( FB_ERRMSG_DUPDEFINITION, @defname )
+				hReportRedefinition( sym, @defname )
 				'' error recovery: fake an id
 				defname = *symbUniqueLabel( )
 			end if
@@ -1491,6 +1560,8 @@ sub ppDefine( byval ismultiline as integer )
 		errReportEx( FB_ERRMSG_DUPDEFINITION, defname )
 	else
 		tokhead = hReadMacroText( params, paramhead, ismultiline )
-		symbAddDefineMacro( @defname, tokhead, params, paramhead, define_flags )
+		if( symbAddDefineMacro( @defname, tokhead, params, paramhead, define_flags ) = NULL ) then
+			hReportRedefinition( NULL, @defname )
+		end if
 	end if
 end sub

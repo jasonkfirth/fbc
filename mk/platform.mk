@@ -259,6 +259,8 @@ ifndef FBC_TARGET
   ifeq ($(TARGET_OS),win32)
     ifeq ($(TARGET_ARCH),x86_64)
       FBC_TARGET := win64
+    else ifeq ($(TARGET_ARCH),aarch64)
+      FBC_TARGET := win32-aarch64
     else
       FBC_TARGET := win32
     endif
@@ -330,6 +332,8 @@ else ifeq ($(TARGET_OS),win32)
 
   ifeq ($(TARGET_ARCH),x86_64)
     FBPACK_DIR := mingw-x86_64
+  else ifeq ($(TARGET_ARCH),aarch64)
+    FBPACK_DIR := mingw-aarch64
   else
     FBPACK_DIR := mingw-x86
   endif

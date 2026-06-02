@@ -1065,7 +1065,14 @@ private sub hEmitVarDecl _
 	'' name mangling.
 
 	if( symbIsCommon( sym ) and (not use_extern) ) then
-		ln += " __attribute__((common))"
+		'' WebAssembly object files do not support C COMMON symbols.
+		'' Weak zero-initialized definitions preserve the one-definition
+		'' behavior needed by BASIC COMMON blocks without tripping clang.
+		if( env.clopt.target = FB_COMPTARGET_JS ) then
+			ln += " __attribute__((weak))"
+		else
+			ln += " __attribute__((common))"
+		end if
 	end if
 
 	if( varini ) then
@@ -3285,24 +3292,26 @@ private function exprNewVREG _
 			l = exprNewUOP( AST_OP_ADDROF, l )
 		end if
 		if( have_offset ) then
-			if( ( is_c_array ) andalso ( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) ) then
-				'' Cast to intptr_t to work around gcc out side of array bounds
+			if( is_c_array ) then
+				'' Cast to uintptr_t to work around gcc outside-of-array-bounds
 				'' warnings if we are casting from FBSTRING array to pointer.
-				'' fbc uses a kind of virtual pointer for the array's @(0,..)
-				'' index ptr; technically this is undefinded behaviour in C and
-				'' is impossible to cast away even when using pointer only casts
-				'' in the same expression.  Some gcc's/compiler's cause a
-				'' a warning when setting a pointer for the array's virtual
-				'' index location.
+				'' fbc uses a virtual pointer for the array's @(0,..) index
+				'' location; technically this is undefined behaviour in C and
+				'' is impossible to cast away even when using pointer-only casts
+				'' in the same expression.  Some compilers warn when setting a
+				'' pointer for the array's virtual index location.
 				''
-				'' However, this also seems to cause other issuse with
-				'' emscripten target, so don't when targeting asm.js
+				'' Emscripten's wasm backend needs this too.  If the generated C
+				'' keeps the base as a byte pointer, LLVM may lower the constant
+				'' array diff into the wasm load offset and leave a negative
+				'' dynamic index in front of it.  That can trap even though the
+				'' final address is inside the array object.
 				''
 				'' To fix this for compliant C code, should fix the design
 				'' and rewrite the array descriptor to contain only the
 				'' offset value from actual memory pointer and compute the
 				'' array access fully on each array element access.
-				l = exprNewCAST( FB_DATATYPE_INTEGER, NULL, l )
+				l = exprNewCAST( FB_DATATYPE_UINT, NULL, l )
 			else
 				'' Cast to ubyte ptr to work around C's pointer arithmetic
 				l = exprNewCAST( typeAddrOf( FB_DATATYPE_UBYTE ), NULL, l )
@@ -3406,8 +3415,8 @@ private function exprNewVREGAddr _
 		end if
 
 		if( have_offset ) then
-			if( ( is_c_array ) andalso ( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) ) then
-				l = exprNewCAST( FB_DATATYPE_INTEGER, NULL, l )
+			if( is_c_array ) then
+				l = exprNewCAST( FB_DATATYPE_UINT, NULL, l )
 			else
 				l = exprNewCAST( typeAddrOf( FB_DATATYPE_UBYTE ), NULL, l )
 			end if

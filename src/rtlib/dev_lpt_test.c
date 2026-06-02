@@ -2,6 +2,47 @@
 
 #include "fb.h"
 #include <ctype.h>
+#include <limits.h>
+
+static int fb_hDevLptParsePort( const char *proto, int *port )
+{
+	const char *digits;
+	int value;
+
+	if( port == NULL )
+		return FALSE;
+
+	*port = 0;
+
+	if( strncasecmp( proto, "LPT", 3 ) != 0 )
+		return FALSE;
+
+	digits = proto + 3;
+	if( *digits == '\0' )
+		return TRUE;
+
+	value = 0;
+	while( *digits )
+	{
+		int digit;
+
+		if( ( *digits < '0' ) || ( *digits > '9' ) )
+			return FALSE;
+
+		digit = *digits - '0';
+		if( value > (INT_MAX - digit) / 10 )
+			return FALSE;
+
+		value = (value * 10) + digit;
+		++digits;
+	}
+
+	if( value <= 0 )
+		return FALSE;
+
+	*port = value;
+	return TRUE;
+}
 
 /** Tests for the right file name for LPT access.
  *
@@ -71,13 +112,11 @@ int fb_DevLptParseProtocol
 
 	lpt_proto->proto = p;
 	p = pc + 1;
-	*pc-- = '\0';
+	*pc = '\0';
 
 	/* Get port number if any */
-	while( ( *pc >= '0' ) && ( *pc <= '9' ))
-		pc--;
-	pc++;
-	lpt_proto->iPort = atoi( pc );
+	if( fb_hDevLptParsePort( lpt_proto->proto, &lpt_proto->iPort ) == FALSE )
+		return FALSE;
 
 	/* Name, TITLE=?, EMU=? */
 
@@ -93,7 +132,7 @@ int fb_DevLptParseProtocol
 			pe = strchr(p, '=');
 			pc = strchr(p, ',');
 
-			if( pc && pe > pc )
+			if( pc && pe && pe > pc )
 				pe = NULL;
 
 			if( !pe )

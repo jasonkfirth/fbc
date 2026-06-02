@@ -994,6 +994,7 @@ private function hGetTargetId _
 	''    dos
 	''    win32
 	''    win64
+	''    win32-aarch64
 	''    xbox
 	''    linux-x86
 	''    linux-x86_64
@@ -1049,6 +1050,9 @@ function fbIdentifyCpuFamily( byref cpufamilyid as string ) as integer
 			return i
 		end if
 	next
+	if( cpufamilyid = "arm64" ) then
+		return FB_CPUFAMILY_AARCH64
+	end if
 	function = -1
 end function
 
@@ -1133,6 +1137,8 @@ function fbIdentifyFbcArch( byref fbcarch as string ) as integer
 		function = FB_CPUTYPE_ARMV5TE
 	case "armeabi-v7a", "armv7a", "armv7"
 		function = FB_CPUTYPE_ARMV7A
+	case "arm64"
+		function = FB_CPUTYPE_AARCH64
 	case else
 		function = -1
 	end select

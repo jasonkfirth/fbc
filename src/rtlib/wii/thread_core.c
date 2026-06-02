@@ -26,6 +26,9 @@
 #include "../fb.h"
 #include "../fb_private_thread.h"
 
+#define FB_WII_DEFAULT_THREAD_STACK_SIZE (128 * 1024)
+#define FB_WII_RETRY_THREAD_STACK_SIZE   (64 * 1024)
+
 static void *threadproc(void *param)
 {
 	FBTHREADINFO *info = (FBTHREADINFO *)param;
@@ -50,6 +53,7 @@ FBCALL FBTHREAD *fb_ThreadCreate(FB_THREADPROC proc, void *param, ssize_t stack_
 {
 	FBTHREAD *thread;
 	FBTHREADINFO *info;
+	u32 real_stack_size;
 
 	thread = (FBTHREAD *)malloc(sizeof(FBTHREAD));
 	if (thread == NULL)
@@ -66,10 +70,29 @@ FBCALL FBTHREAD *fb_ThreadCreate(FB_THREADPROC proc, void *param, ssize_t stack_
 	info->thread = thread;
 	thread->flags = FBTHREAD_NONE;
 
-	if (stack_size < (ssize_t)FBTHREAD_STACK_MIN)
-		stack_size = (ssize_t)FBTHREAD_STACK_MIN;
+	if (stack_size > 0) {
+		real_stack_size = (u32)stack_size;
+		if (real_stack_size < (u32)FBTHREAD_STACK_MIN)
+			real_stack_size = (u32)FBTHREAD_STACK_MIN;
+	} else {
+		/*
+			libogc exposes an 8 KiB minimum stack, but FreeBASIC threads often
+			enter file, string, TCP, and graphics runtime paths.  That minimum
+			is too small for ordinary threaded programs.
 
-	if (LWP_CreateThread(&thread->id, threadproc, info, NULL, (u32)stack_size, 64) < 0) {
+			The default still has to respect the Wii memory budget.  A stack
+			large enough for one TCP worker becomes destructive when a program
+			creates many short-lived workers, so keep the default moderate and
+			let programs request a larger stack explicitly when they need one.
+		*/
+		real_stack_size = FB_WII_DEFAULT_THREAD_STACK_SIZE;
+	}
+
+	if (LWP_CreateThread(&thread->id, threadproc, info, NULL, real_stack_size, 64) < 0) {
+		if ((stack_size <= 0) &&
+		    (LWP_CreateThread(&thread->id, threadproc, info, NULL, FB_WII_RETRY_THREAD_STACK_SIZE, 64) >= 0)) {
+			return thread;
+		}
 		free(info);
 		free(thread);
 		return NULL;

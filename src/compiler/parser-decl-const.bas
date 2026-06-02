@@ -69,7 +69,7 @@ private sub cConstAssign _
 		if( env.clopt.lang <> FB_LANG_QB ) then
 			'' only if inside a ns and if not local
 			if( (symbIsGlobalNamespc( )) or (parser.scope > FB_MAINSCOPE) ) then
-				errReport( FB_ERRMSG_DUPDEFINITION )
+				errReport( symbKeywordGetIllegalRedefErr( lexGetToken( ) ) )
 				'' error recovery: skip until next stmt or const decl
 				hSkipUntil( FB_TK_DECLSEPCHAR )
 				exit sub
@@ -78,7 +78,7 @@ private sub cConstAssign _
 
 	case FB_TKCLASS_KEYWORD, FB_TKCLASS_OPERATOR
 		if( env.clopt.lang <> FB_LANG_QB ) then
-			errReport( FB_ERRMSG_DUPDEFINITION )
+			errReport( symbKeywordGetIllegalRedefErr( lexGetToken( ) ) )
 			'' error recovery: skip until next stmt or const decl
 			hSkipUntil( FB_TK_DECLSEPCHAR )
 			exit sub

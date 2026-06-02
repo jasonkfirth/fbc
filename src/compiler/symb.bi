@@ -1138,6 +1138,8 @@ declare function symbAddKeyword _
 	) as FBSYMBOL ptr
 
 declare function symbKeywordGetText( byval tk as integer ) as const zstring ptr
+declare function symbKeywordGetIllegalRedefErr( byval tk as integer ) as FB_ERRMSG
+declare function symbKeywordIsDisabledCommand( byval tk as integer ) as integer
 
 declare function symbAddDefine _
 	( _

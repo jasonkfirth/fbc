@@ -1,0 +1,45 @@
+.TH FBC-JS-APP 1 "June 2026" "FreeBASIC" "FreeBASIC Manual"
+.SH NAME
+fbc-js-app \- build a browser FreeBASIC app directory
+.SH SYNOPSIS
+.B fbc-js-app
+.RI [ options ] " file.bas"
+.SH DESCRIPTION
+.B fbc-js-app
+is a convenience wrapper around
+.BR fbc-js (1).
+It writes browser output to an application directory, normally as
+.IR index.html ,
+and can preload an asset directory at the program's virtual current directory.
+.PP
+This is useful for older graphics games that expect files loaded with relative
+paths to sit beside the executable.
+.SH OPTIONS
+.TP
+.BI "-o " DIR
+.TQ
+.BI "--out " DIR
+Write generated browser files under
+.IR DIR .
+The default is the source file name followed by
+.IR -js .
+.TP
+.BI "--assets " DIR
+Preload the contents of
+.IR DIR
+at the browser program's current directory.
+.SH ENVIRONMENT
+.TP
+.B FBC_JS
+Compiler driver to run.  Defaults to
+.IR fbc-js .
+.TP
+.B FBJS_ASSETS
+Asset directory to preload when
+.B --assets
+is not given.
+.SH SEE ALSO
+.BR fbc-js (1),
+.BR fbc (1)
+.
+.\" end of fbc-js-app.1

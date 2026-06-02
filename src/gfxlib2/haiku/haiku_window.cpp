@@ -10,6 +10,7 @@
 #include <Message.h>
 #include <Alert.h>
 #include <OS.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 extern BBitmap *g_bmp;
@@ -38,6 +39,66 @@ static int32 fb_hHaikuForceExit(void*)
 FBHaikuWindow::FBHaikuWindow(BRect frame, const char *title)
     : BWindow(frame, title, B_TITLED_WINDOW, 0)
 {
+}
+
+void FBHaikuWindow::MessageReceived(BMessage *msg)
+{
+    int32 key = 0;
+    const char *bytes = "";
+    int32 x = 0;
+    int32 y = 0;
+    int32 buttons = 0;
+
+    switch (msg->what)
+    {
+        case B_KEY_DOWN:
+        case B_KEY_UP:
+            /*
+                Normally Haiku delivers key events directly to the focused
+                BView.  Remote smoke tests can only post flattened messages to
+                the public window token, so accept that path too and feed the
+                event into the same backend handlers used by FBHaikuView.
+            */
+            msg->FindInt32("key", &key);
+            msg->FindString("bytes", &bytes);
+
+            if (msg->what == B_KEY_DOWN)
+                fb_hHaikuHandleKeyDown(g_view, bytes, key);
+            else
+                fb_hHaikuHandleKeyUp(g_view, bytes, key);
+            return;
+
+        case B_MOUSE_MOVED:
+            if (msg->FindInt32("fb:x", &x) == B_OK &&
+                msg->FindInt32("fb:y", &y) == B_OK)
+            {
+                fb_hHaikuHandleMouseMoved(g_view, x, y);
+                return;
+            }
+            break;
+
+        case B_MOUSE_DOWN:
+            if (msg->FindInt32("fb:x", &x) == B_OK &&
+                msg->FindInt32("fb:y", &y) == B_OK &&
+                msg->FindInt32("fb:buttons", &buttons) == B_OK)
+            {
+                fb_hHaikuHandleMouseDown(g_view, x, y, buttons);
+                return;
+            }
+            break;
+
+        case B_MOUSE_UP:
+            if (msg->FindInt32("fb:x", &x) == B_OK &&
+                msg->FindInt32("fb:y", &y) == B_OK &&
+                msg->FindInt32("fb:buttons", &buttons) == B_OK)
+            {
+                fb_hHaikuHandleMouseUp(g_view, x, y, buttons);
+                return;
+            }
+            break;
+    }
+
+    BWindow::MessageReceived(msg);
 }
 
 bool FBHaikuWindow::QuitRequested()
@@ -316,6 +377,29 @@ int fb_hHaikuSetWindowPos(int x, int y)
         g_win->Unlock();
     }
 
+    return 0;
+}
+
+/*
+    ScreenControl handle compatibility
+
+    The shared gfx control layer asks every backend for a window handle and a
+    display handle.  Haiku has a real native window object, so expose the active
+    BWindow pointer through the integer-sized API slot.  Haiku does not expose
+    an X11-style display connection to applications, so the display handle is
+    intentionally reported as zero.
+*/
+
+extern "C" ssize_t fb_hGetWindowHandle(void)
+{
+    if (!g_win)
+        return 0;
+
+    return (ssize_t)(intptr_t)g_win;
+}
+
+extern "C" ssize_t fb_hGetDisplayHandle(void)
+{
     return 0;
 }
 

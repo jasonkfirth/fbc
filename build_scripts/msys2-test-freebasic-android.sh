@@ -433,13 +433,15 @@ link_shared_library() {
 	local runtime=()
 	local appobj="$BUILDROOT_TEST/fb_android_app.o"
 	local rsp="$BUILDROOT_TEST/android-test-objects.rsp"
+	local startup="$LIBDIR/fbrt0pic.o"
 	local required
 	local optional
 
 	msg "Linking Android test-suite shared library"
 	run "$CC" -fPIC -DANDROID -I"$INCDIR" -c "$ROOT/src/tools/android/fb_android_app.c" -o "$appobj"
 
-	for required in fbrt0pic.o libfbmtpic.a; do
+	[ -f "$startup" ] || fail "required Android runtime file is missing: $startup"
+	for required in libfbmtpic.a; do
 		[ -f "$LIBDIR/$required" ] || fail "required Android runtime file is missing: $LIBDIR/$required"
 		runtime+=("$LIBDIR/$required")
 	done
@@ -457,7 +459,7 @@ link_shared_library() {
 	} > "$rsp"
 
 	run "$CC" -shared -Wl,-soname,libfreebasicapp.so -o "$SOFILE" \
-		"$appobj" @"$rsp" \
+		"$appobj" "$startup" @"$rsp" \
 		-Wl,--start-group "$FBCU_LIB" "${runtime[@]}" -Wl,--end-group \
 		-Wl,--wrap=exit \
 		-llog -landroid -lOpenSLES -ldl -lm
@@ -487,6 +489,11 @@ package_apk() {
 		-e "s|@MIN_SDK@|$MIN_API|g" \
 		-e "s|@TARGET_SDK@|$target_sdk|g" \
 		-e "s|@LABEL@|$APP_LABEL|g" \
+		-e "s|@SCREEN_ORIENTATION@|unspecified|g" \
+		-e "s#@SOFT_INPUT_MODE@#stateUnspecified|adjustResize#g" \
+		-e "s|@KEYBOARD_BUTTON@|true|g" \
+		-e 's|android:hasCode="true"|android:hasCode="false"|g' \
+		-e 's|org.freebasic.android.FreeBasicNativeActivity|android.app.NativeActivity|g' \
 		"$ROOT/src/tools/android/AndroidManifest.xml.in" > "$manifest"
 
 	run "$AAPT" package -f -M "$manifest" -S "$resroot" -A "$ASSETROOT" -I "$platform_jar" -F "$unsigned"

@@ -2537,6 +2537,10 @@ void fb_hAndroidConsoleRender(void)
 	rows = buffer.height / FB_ANDROID_FONT_H;
 	if (cols > FB_ANDROID_CONSOLE_COLS - 1)
 		cols = FB_ANDROID_CONSOLE_COLS - 1;
+	if (rows > FB_ANDROID_CONSOLE_LINES)
+		rows = FB_ANDROID_CONSOLE_LINES;
+	if (rows < 1)
+		rows = 1;
 
 	first_line = fb_android.console_line - rows + 2;
 	if (first_line < 0)
@@ -3099,11 +3103,11 @@ int fb_hAndroidGetXPad(int id, ssize_t *buttons,
 	if (lstick_x)
 		*lstick_x = pad->axis[0];
 	if (lstick_y)
-		*lstick_y = pad->axis[1];
+		*lstick_y = -pad->axis[1];
 	if (rstick_x)
 		*rstick_x = pad->axis[2];
 	if (rstick_y)
-		*rstick_y = pad->axis[3];
+		*rstick_y = -pad->axis[3];
 	if (ltrigger)
 		*ltrigger = pad->left_trigger;
 	if (rtrigger)

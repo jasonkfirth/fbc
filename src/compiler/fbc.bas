@@ -318,6 +318,20 @@ private function hGet1stOutputLineFromCommand( byref cmd as string ) as string
 	return ln
 end function
 
+private function hGetClangTargetOption( ) as string
+	if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32) and _
+		(fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64) ) then
+		''
+		'' The MSYS2 Windows ARM64 package uses a host-runnable clang with
+		'' an ARM64 MinGW sysroot.  The compiler executable name does not
+		'' encode that target, so pass the triple explicitly.
+		''
+		function = "--target=aarch64-w64-mingw32 "
+	else
+		function = ""
+	end if
+end function
+
 '' Pass some arguments to gcc/clang and read the results. Returns an empty string on
 '' an error.
 private function fbcQueryCC( byref options as string ) as string
@@ -342,6 +356,10 @@ private function fbcQueryCC( byref options as string ) as string
 	case FB_CPUFAMILY_PPC64, FB_CPUFAMILY_PPC64LE
 		path += " -m64"
 	end select
+
+	if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG ) then
+		path += " " + hGetClangTargetOption( )
+	end if
 
 	path += options
 
@@ -860,6 +878,8 @@ private function hLinkFiles( ) as integer
 			ldcline += "-m i386pe "
 		case FB_CPUFAMILY_X86_64
 			ldcline += "-m i386pep "
+		case FB_CPUFAMILY_AARCH64
+			ldcline += "-m arm64pe "
 		end select
 	case FB_COMPTARGET_LINUX
 		select case( fbGetCpuFamily( ) )
@@ -1635,6 +1655,17 @@ private function hLinkFiles( ) as integer
 		end if
 	end select
 
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS ) then
+		''
+		'' Keep the wasm link optimized, but do not ask Emscripten to run
+		'' its optional HTML/JavaScript minifier afterwards.  On Windows,
+		'' the Node-based html-minifier wrapper can crash after the wasm
+		'' output has already been produced, turning a good link into a
+		'' failed build for browser programs.
+		''
+		ldcline += " --minify 0"
+	end if
+
 	'' extra options
 	ldcline += " " + fbc.extopt.ld
 
@@ -1984,6 +2015,7 @@ dim shared as FBGNUARCHINFO gnuarchmap(0 to ...) => _
 	(@"armv7a+fp"  , FB_CPUTYPE_ARMV7A_FP      ), _
 	(@"arm"        , FB_DEFAULT_CPUTYPE_ARM    ), _
 	(@"aarch64"    , FB_DEFAULT_CPUTYPE_AARCH64), _
+	(@"arm64"      , FB_DEFAULT_CPUTYPE_AARCH64), _
 	(@"ppc"        , FB_DEFAULT_CPUTYPE_PPC    ), _
 	(@"powerpc"    , FB_DEFAULT_CPUTYPE_PPC    ), _
 	(@"ppc64"      , FB_DEFAULT_CPUTYPE_PPC64  ), _
@@ -2057,6 +2089,7 @@ dim shared as FBOSARCHINFO fbosarchmap(0 to ...) => _
 	_ '' win32/win64 refer to specific OS/arch combinations
 	(@"win32"  , FB_COMPTARGET_WIN32  , FB_DEFAULT_CPUTYPE_X86   ), _
 	(@"win64"  , FB_COMPTARGET_WIN32  , FB_DEFAULT_CPUTYPE_X86_64), _
+	(@"win32-aarch64", FB_COMPTARGET_WIN32, FB_DEFAULT_CPUTYPE_AARCH64), _
 	_ '' dragonfly is 64 bit only
 	(@"dragonfly", FB_COMPTARGET_DRAGONFLY, FB_DEFAULT_CPUTYPE_X86_64), _
 	_ '' solaris is 64 bit only
@@ -2088,6 +2121,7 @@ dim shared as FBOSARCHINFO fbosarchmap(0 to ...) => _
 '' Examples:
 ''    -target win32           ->    Windows + default x86 arch
 ''    -target win64           ->    Windows + x86_64
+''    -target win32-aarch64   ->    Windows + AArch64
 ''    -target dos             ->    DOS + x86
 ''    -target linux           ->    Linux + default arch
 ''    -target linux-x86       ->    Linux + default x86 arch
@@ -3348,6 +3382,12 @@ private sub hCheckArgs()
 		fbcEnd( 1 )
 	end if
 
+	if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS) and _
+		fbGetOption( FB_COMPOPT_MULTITHREADED ) ) then
+		errReportEx( FB_ERRMSG_INVALIDCMDOPTION, "-mt", -1 )
+		fbcEnd( 1 )
+	end if
+
 	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
 		'' The nxdk Xbox package uses worker-backed graphics and sound
 		'' services.  Prefer the thread-safe runtime by default so Xbox
@@ -3388,6 +3428,12 @@ private sub hCheckArgs()
 	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
 		'' nxdk is clang/LLVM based and does not provide the old xbox-as
 		'' toolchain expected by the GAS backend.
+		fbSetOption( FB_COMPOPT_BACKEND, FB_BACKEND_CLANG )
+	elseif( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32) and _
+		(fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64) ) then
+		'' Windows ARM64 toolchains are LLVM/Clang based in the supported
+		'' MSYS2 environment.  Prefer clang so assembly is handled by the
+		'' compiler driver instead of assuming a GNU as driver exists.
 		fbSetOption( FB_COMPOPT_BACKEND, FB_BACKEND_CLANG )
 	elseif( (fbGetCpuFamily( ) = FB_CPUFAMILY_X86) and _
 		(fbGetOption(FB_COMPOPT_TARGET) <> FB_COMPTARGET_DARWIN) ) then
@@ -3682,6 +3728,16 @@ private function hCompileStage2DirectlyToObj( ) as integer
 	select case( fbGetOption( FB_COMPOPT_TARGET ) )
 	case FB_COMPTARGET_JS, FB_COMPTARGET_XBOX
 		function = TRUE
+	case FB_COMPTARGET_WIN32
+		if( (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) and _
+		    (fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64) ) then
+			''
+			'' The Windows ARM64 toolchain is clang/LLVM based.  Let clang
+			'' compile its generated C straight to COFF objects instead of
+			'' sending clang assembly through a GNU as style stage.
+			''
+			function = TRUE
+		end if
 	case else
 		function = FALSE
 	end select
@@ -4071,6 +4127,11 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 	select case( fbGetOption( FB_COMPOPT_BACKEND ) )
 	case FB_BACKEND_GCC, FB_BACKEND_CLANG
 		dim as boolean ism64target = false
+
+		if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG ) then
+			ln += hGetClangTargetOption( )
+		end if
+
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86
 			ln += "-m32 "
@@ -4378,6 +4439,7 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 
 	select case assembler
 	case FBCTOOL_CLANG
+		ln += hGetClangTargetOption( )
 		ln += "-c "
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86, FB_CPUFAMILY_X86_64

@@ -51,6 +51,13 @@ private sub fbcHaikuPlatformAddGfxLibs( )
 	if( fbcHaikuPlatformIsSelected( ) = FALSE ) then
 		exit sub
 	end if
+
+	''
+	'' Haiku exposes BJoystick through libdevice.  The gfx runtime uses
+	'' BJoystick for GETJOYSTICK and GETXPAD, so programs that pull in
+	'' libfbgfx must link libdevice too.
+	''
+	fbcAddDefLib( "device" )
 end sub
 
 private sub fbcHaikuPlatformAddSfxLibs( )

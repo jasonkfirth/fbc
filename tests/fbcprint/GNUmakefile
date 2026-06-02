@@ -31,9 +31,13 @@ all:
 	$(call test,-print target -target openbsd-x86)
 	$(call test,-print target -target openbsd-x86_64)
 	$(call test,-print target -target win32)
+	$(call test,-print target -target win32-aarch64)
+	$(call test,-print target -target win32-arm64)
 	$(call test,-print target -target win64)
 
 	# -print target gcc triplets passed to -target
+	$(call test,-print target -target aarch64-w64-mingw32)
+	$(call test,-print target -target arm64-w64-mingw32)
 	$(call test,-print target -target i686-w64-mingw32)
 	$(call test,-print target -target i386-pc-mingw32)
 	$(call test,-print target -target i486-pc-mingw32)

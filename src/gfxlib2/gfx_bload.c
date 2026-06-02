@@ -581,7 +581,12 @@ static int gfx_bload(FBSTRING *filename, void *dest, void *pal, int usenewheader
 	buffer[MAX_PATH-1] = '\0';
 	fb_hConvertPath(buffer);
 
-	f = fopen(buffer, "rb");
+	/*
+		Use the rtlib path layer instead of raw fopen().  Targets such as
+		Xbox translate relative reads to the mounted disc drive so packaged
+		game assets can be loaded from the XISO.
+	*/
+	f = fb_hOpenFile(buffer, "rb");
 
 	if (!f) {
 		fb_hStrDelTemp(filename);

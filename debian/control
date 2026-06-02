@@ -183,6 +183,8 @@ Description: FreeBASIC compiler driver for Emscripten/JavaScript
  This package provides fbc-js, a native FreeBASIC compiler executable that
  defaults to the js-asmjs/Emscripten target, plus the target runtime libraries
  and JavaScript support assets needed to build browser or Node.js output.
+ It also includes fbc-js-app, a small helper for browser game directories with
+ preloaded current-directory assets.
 
 Package: freebasic-android
 Architecture: any
@@ -225,7 +227,8 @@ Recommends:
 Description: FreeBASIC compiler driver for Nintendo Wii homebrew
  This package provides fbc-wii, a native FreeBASIC compiler driver that
  defaults to the Nintendo Wii/powerpc target, plus Wii runtime libraries
- and headers needed to build libogc homebrew programs.
+ and headers needed to build libogc homebrew programs. The driver can also
+ stage a boot.dol folder with relative-path assets for older game code.
 
 Package: freebasic-full
 Section: metapackages

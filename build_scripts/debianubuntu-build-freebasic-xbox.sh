@@ -57,8 +57,8 @@ Artifacts are written under:
   out/linux/<distro>/<codename>/<arch>/xbox/
 
 This is an experimental nxdk-based revival path for the existing Xbox target.
-It packages the FreeBASIC Xbox runtime, a fbc-xbox wrapper, and the nxdk tree
-used to build it.
+It packages the FreeBASIC Xbox runtime, fbc-xbox, fbc-xbox-xiso, and the nxdk
+tree used to build it.
 EOF
 }
 
@@ -265,12 +265,24 @@ ensure_nxdk_tools() {
                 die "nxdk cxbe exists but is not executable: $NXDK_DIR/tools/cxbe/cxbe"
         fi
         echo "==> using nxdk cxbe: $NXDK_DIR/tools/cxbe/cxbe"
-        return 0
+    else
+        [ -f "$NXDK_DIR/Makefile" ] || die "nxdk cxbe is missing and nxdk Makefile was not found: $NXDK_DIR"
+        run "$MAKE_CMD" -C "$NXDK_DIR" cxbe
+        [ -x "$NXDK_DIR/tools/cxbe/cxbe" ] || die "nxdk cxbe was not built: $NXDK_DIR/tools/cxbe/cxbe"
     fi
 
-    [ -f "$NXDK_DIR/Makefile" ] || die "nxdk cxbe is missing and nxdk Makefile was not found: $NXDK_DIR"
-    run "$MAKE_CMD" -C "$NXDK_DIR" cxbe
-    [ -x "$NXDK_DIR/tools/cxbe/cxbe" ] || die "nxdk cxbe was not built: $NXDK_DIR/tools/cxbe/cxbe"
+    if [ -f "$NXDK_DIR/tools/extract-xiso/build/extract-xiso" ]; then
+        if [ ! -x "$NXDK_DIR/tools/extract-xiso/build/extract-xiso" ]; then
+            chmod 755 "$NXDK_DIR/tools/extract-xiso/build/extract-xiso" 2>/dev/null ||
+                die "nxdk extract-xiso exists but is not executable: $NXDK_DIR/tools/extract-xiso/build/extract-xiso"
+        fi
+        echo "==> using nxdk extract-xiso: $NXDK_DIR/tools/extract-xiso/build/extract-xiso"
+    else
+        [ -f "$NXDK_DIR/Makefile" ] || die "nxdk extract-xiso is missing and nxdk Makefile was not found: $NXDK_DIR"
+        run "$MAKE_CMD" -C "$NXDK_DIR" extract-xiso
+        [ -x "$NXDK_DIR/tools/extract-xiso/build/extract-xiso" ] ||
+            die "nxdk extract-xiso was not built: $NXDK_DIR/tools/extract-xiso/build/extract-xiso"
+    fi
 }
 
 ensure_nxdk_runtime_libs() {
@@ -340,6 +352,7 @@ package_xbox() {
         "$NXDK_DIR/" "$PKGROOT/usr/share/freebasic-xbox/nxdk/"
 
     write_wrapper "$PKGROOT/usr/bin/fbc-xbox"
+    install -m 755 src/tools/xbox/fbc-xbox-xiso "$PKGROOT/usr/bin/fbc-xbox-xiso"
 
     if [ -f debian/copyright ]; then
         install -m 644 debian/copyright "$PKGROOT/usr/share/doc/freebasic-xbox/copyright.FreeBASIC"
@@ -404,6 +417,16 @@ nxdk revision: $nxdk_rev
 Use:
   fbc-xbox program.bas
 
+For emulators or hardware launch workflows that need an XISO image:
+
+  fbc-xbox program.bas -x program.xbe
+  fbc-xbox-xiso program.xbe program.iso
+
+Programs that load files from the current directory can stage an asset folder
+into that XISO:
+
+  fbc-xbox-xiso program.xbe program.iso --assets game-folder
+
 The Xbox target is being revived from old OpenXDK-oriented FreeBASIC code, so
 source-level compatibility fixes may still be required.
 EOF
@@ -421,8 +444,8 @@ Depends: freebasic, clang, llvm, lld, make
 Installed-Size: $installed_size
 Homepage: https://freebasic.net/
 Description: experimental FreeBASIC compiler support for original Xbox
- This package provides fbc-xbox, the FreeBASIC Xbox target runtime, and the
- nxdk SDK tree used to build original Xbox binaries.
+ This package provides fbc-xbox, fbc-xbox-xiso, the FreeBASIC Xbox target
+ runtime, and the nxdk SDK tree used to build original Xbox binaries.
 EOF
 
     find "$PKGROOT" -type d -print0 | xargs -0 chmod 755
@@ -431,7 +454,10 @@ EOF
     if [ -f "$PKGROOT/usr/share/freebasic-xbox/nxdk/tools/cxbe/cxbe" ]; then
         chmod 755 "$PKGROOT/usr/share/freebasic-xbox/nxdk/tools/cxbe/cxbe"
     fi
-    chmod 755 "$PKGROOT/usr/bin/fbc-xbox"
+    if [ -f "$PKGROOT/usr/share/freebasic-xbox/nxdk/tools/extract-xiso/build/extract-xiso" ]; then
+        chmod 755 "$PKGROOT/usr/share/freebasic-xbox/nxdk/tools/extract-xiso/build/extract-xiso"
+    fi
+    chmod 755 "$PKGROOT/usr/bin/fbc-xbox" "$PKGROOT/usr/bin/fbc-xbox-xiso"
 
     mkdir -p "$OUTDIR"
     package="$OUTDIR/freebasic-xbox_${PACKAGE_VERSION}_${ARCH}.deb"

@@ -447,17 +447,17 @@ private function hCheckForIdToken( byval parent as FBSYMBOL ptr ) as integer
 		if( env.clopt.lang <> FB_LANG_QB ) then
 			'' only if inside a ns and if not local
 			if( (parent = NULL) or (parser.scope > FB_MAINSCOPE) ) then
-				function = FB_ERRMSG_DUPDEFINITION
+				function = symbKeywordGetIllegalRedefErr( lexGetToken( ) )
 			end if
 		end if
 
 	case FB_TKCLASS_KEYWORD, FB_TKCLASS_OPERATOR
 		if( env.clopt.lang <> FB_LANG_QB ) then
-			function = FB_ERRMSG_DUPDEFINITION
+			function = symbKeywordGetIllegalRedefErr( lexGetToken( ) )
 		else
 			'' Ok in -lang qb if it has a suffix
 			if( lexGetType( ) = FB_DATATYPE_INVALID ) then
-				function = FB_ERRMSG_DUPDEFINITION
+				function = symbKeywordGetIllegalRedefErr( lexGetToken( ) )
 			end if
 		end if
 

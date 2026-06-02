@@ -56,6 +56,7 @@ typedef struct FB_HAIKU_STATE
     int mouse_z;
 
     int mouse_buttons;
+    int mouse_latched_buttons;
     int mouse_visible;
     int mouse_clip;
 

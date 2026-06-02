@@ -30,6 +30,18 @@ cd "$ROOT"
 
 [ "$(uname -s)" = "Darwin" ] || { echo "ERROR: this script must run on Darwin/macOS"; exit 1; }
 
+# macOS archive metadata
+#
+# The package bundles the Command Line Tools SDK. Some SDK headers can deny
+# unprivileged reads of extended attributes even though the file contents are
+# readable. Apple tar attempts to save that metadata by default and aborts the
+# archive with "Failed to get metadata(xattr): Permission denied".
+#
+# FreeBASIC only needs the file contents, modes, and symlink layout from the
+# SDK. Disabling AppleDouble/copyfile metadata keeps package creation from
+# depending on xattrs that are not needed by the compiler.
+export COPYFILE_DISABLE=1
+
 ##############################################################################
 # Helpers
 ##############################################################################

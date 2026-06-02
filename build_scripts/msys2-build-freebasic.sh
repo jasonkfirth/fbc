@@ -7,7 +7,7 @@ trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 # msys2-build-freebasic.sh
 #
 # Build a self-contained Windows FreeBASIC distribution from MSYS2.
-# Produces a combined win32/win64 package tree, a .zip archive, and
+# Produces a combined win32/win64/ARM64 package tree, a .zip archive, and
 # an NSIS installer that installs into C:\freebasic.
 ##############################################################################
 
@@ -39,10 +39,12 @@ SKIP_DEPS=0
 SKIP_SOURCE_SYNC=0
 SKIP_BUILD32=0
 SKIP_BUILD64=0
+SKIP_BUILDARM64=0
 SKIP_PACKAGE=0
 SKIP_INSTALLER=0
 SKIP_VALIDATE=0
 KEEP_BUILDROOT=0
+QEMU_ARM64_VALIDATE=0
 
 usage() {
 	cat <<EOF
@@ -53,10 +55,13 @@ Options:
   --skip-source-sync  Reuse the existing per-target worktrees
   --skip-build32      Skip the win32 build
   --skip-build64      Skip the win64 build
+  --skip-buildarm64   Skip the Windows ARM64 build
   --skip-package      Skip distribution tree assembly and zip creation
   --skip-installer    Skip NSIS installer creation
   --skip-validate     Skip packaged compiler validation
   --keep-buildroot    Keep the build root on failure or success
+  --qemu-arm64-validate
+                       Run fbcarm64.exe in a Windows ARM64 QEMU guest
   --help              Show this help text
 
 Environment:
@@ -64,7 +69,20 @@ Environment:
   OUT                 Output directory (default: <repo>/out/mingw32)
   HOST_FBC_ROOT       Optional existing FreeBASIC install used as host compiler fallback
   NSIS_EXE            Explicit makensis path (default: /mingw64/bin/makensis.exe)
+  SOURCE_SYNC_EXTRA_EXCLUDES
+                       Optional space-separated rsync exclude patterns for local scratch trees
+  QEMU_ARM64_DISK     Bootable Windows ARM64 QEMU disk for --qemu-arm64-validate
+  QEMU_ARM64_SSH_USER Windows SSH user for --qemu-arm64-validate
+  QEMU_ARM64_SSH_PORT Windows SSH forwarded port (default: 2222)
+  QEMU_ARM64_SSH_KEY  Optional SSH private key
+  QEMU_AARCH64_EFI    Optional AArch64 UEFI firmware path
   JOBS                Parallel make job count (default: detected CPU core count)
+
+Related port package scripts:
+  build_scripts/msys2-build-freebasic-js.sh
+  build_scripts/msys2-build-freebasic-android.sh
+  build_scripts/msys2-build-freebasic-wii.sh
+  build_scripts/msys2-build-freebasic-xbox.sh
 EOF
 }
 
@@ -74,10 +92,12 @@ for arg in "$@"; do
 		--skip-source-sync) SKIP_SOURCE_SYNC=1 ;;
 		--skip-build32) SKIP_BUILD32=1 ;;
 		--skip-build64) SKIP_BUILD64=1 ;;
+		--skip-buildarm64) SKIP_BUILDARM64=1 ;;
 		--skip-package) SKIP_PACKAGE=1 ;;
 		--skip-installer) SKIP_INSTALLER=1 ;;
 		--skip-validate) SKIP_VALIDATE=1 ;;
 		--keep-buildroot) KEEP_BUILDROOT=1 ;;
+		--qemu-arm64-validate) QEMU_ARM64_VALIDATE=1 ;;
 		--help)
 			usage
 			exit 0
@@ -112,6 +132,36 @@ run() {
 
 have() {
 	command -v "$1" >/dev/null 2>&1
+}
+
+first_existing_tool() {
+	local candidate
+
+	for candidate in "$@"; do
+		[ -n "$candidate" ] || continue
+		if [ -x "$candidate" ]; then
+			echo "$candidate"
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+find_clang_resource_dir() {
+	local sysroot="$1"
+	local resource_dir
+
+	resource_dir="$(
+		{
+			find "$sysroot/lib/clang" -mindepth 1 -maxdepth 1 -type d 2>/dev/null || true
+		} |
+			sort -V |
+			tail -n 1
+	)"
+
+	[ -n "$resource_dir" ] || return 1
+	echo "$resource_dir"
 }
 
 copy_tree() {
@@ -243,10 +293,20 @@ copy_legacy_winlibs() {
 
 sync_source_tree() {
 	local dst="$1"
+	local extra_exclude
+	local rsync_excludes=()
+	shift
+
+	for extra_exclude in ${SOURCE_SYNC_EXTRA_EXCLUDES:-}; do
+		rsync_excludes+=(--exclude "$extra_exclude")
+	done
+
 	mkdir -p "$dst"
 	if have rsync; then
 		run rsync -a --delete --delete-excluded --prune-empty-dirs \
 			--exclude-from "$ROOT/mk/source-copy-excludes.rsync" \
+			"${rsync_excludes[@]}" \
+			"$@" \
 			"$ROOT/" "$dst/"
 	else
 		fail "rsync is required to create isolated worktrees"
@@ -311,6 +371,46 @@ detect_fbc() {
 	return 1
 }
 
+detect_external_fbc() {
+	local target="$1"
+	local candidates=()
+
+	candidates+=(
+		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/fbc64.exe}"
+		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/fbc32.exe}"
+		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/bin/fbc.exe}"
+		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/bin/fbc}"
+	)
+
+	if [ "$target" != "win64" ]; then
+		candidates+=(
+			"$WORKROOT/win64/bin/fbc.exe"
+			"$WORKROOT/win64/bootstrap/fbc.exe"
+		)
+	fi
+
+	if [ "$target" != "win32" ]; then
+		candidates+=(
+			"$WORKROOT/win32/bin/fbc.exe"
+			"$WORKROOT/win32/bootstrap/fbc.exe"
+		)
+	fi
+
+	if [ "$target" != "win32-aarch64" ]; then
+		candidates+=(
+			"$WORKROOT/win32-aarch64/bin/fbc.exe"
+			"$WORKROOT/win32-aarch64/bootstrap/fbc.exe"
+		)
+	fi
+
+	candidates+=(
+		"$ROOT/bin/fbc.exe"
+		"$ROOT/bootstrap/fbc.exe"
+	)
+
+	detect_fbc "${candidates[@]}"
+}
+
 ##############################################################################
 # Build configuration
 ##############################################################################
@@ -334,8 +434,10 @@ HOST_FBC_ROOT="${HOST_FBC_ROOT:-}"
 
 MINGW32_ROOT="/mingw32"
 MINGW64_ROOT="/mingw64"
+CLANGARM64_ROOT="/clangarm64"
 TRIPLET32="i686-w64-mingw32"
 TRIPLET64="x86_64-w64-mingw32"
+TRIPLETARM64="aarch64-w64-mingw32"
 NSIS_EXE="${NSIS_EXE:-$MINGW64_ROOT/bin/makensis.exe}"
 
 mkdir -p "$WORKROOT" "$STAGEROOT" "$DISTROOT_BASE" "$TMPROOT" "$OUT"
@@ -443,16 +545,41 @@ install_dependencies() {
 	)
 	local pkg
 
+	if [ "$QEMU_ARM64_VALIDATE" -ne 0 ]; then
+		msys_packages+=(openssh)
+	fi
+
 	msg "Updating MSYS2 package database"
 	run pacman -Sy --noconfirm
 
 	msg "Installing MSYS2 packaging dependencies"
 	run pacman -S --needed --noconfirm "${msys_packages[@]}"
 
+	if [ "$QEMU_ARM64_VALIDATE" -ne 0 ]; then
+		msg "Installing QEMU for Windows ARM64 validation"
+		run pacman -S --needed --noconfirm mingw-w64-x86_64-qemu
+	fi
+
 	msg "Installing MinGW toolchain groups"
 	run pacman -S --needed --noconfirm \
 		mingw-w64-i686-toolchain \
 		mingw-w64-x86_64-toolchain
+
+	if [ "$SKIP_BUILDARM64" -eq 0 ]; then
+		msg "Installing Windows ARM64 cross-build toolchains"
+		run pacman -S --needed --noconfirm \
+			mingw-w64-x86_64-clang \
+			mingw-w64-x86_64-lld \
+			mingw-w64-x86_64-llvm \
+			mingw-w64-x86_64-llvm-tools \
+			mingw-w64-x86_64-tools \
+			mingw-w64-clang-aarch64-compiler-rt \
+			mingw-w64-clang-aarch64-crt \
+			mingw-w64-clang-aarch64-headers \
+			mingw-w64-clang-aarch64-libunwind \
+			mingw-w64-clang-aarch64-libwinpthread \
+			mingw-w64-clang-aarch64-winpthreads
+	fi
 
 	msg "Installing MinGW dependency sets"
 	for pkg in "${mingw_suffixes[@]}"; do
@@ -469,6 +596,16 @@ install_dependencies() {
 				echo "WARNING: optional MSYS2 package not found: $fullpkg" >&2
 			fi
 		done
+
+		if [ "$SKIP_BUILDARM64" -eq 0 ]; then
+			local fullpkg="mingw-w64-clang-aarch64-${pkg}"
+
+			if pacman -Si "$fullpkg" >/dev/null 2>&1; then
+				run pacman -S --needed --noconfirm "$fullpkg"
+			else
+				echo "WARNING: optional MSYS2 package not found: $fullpkg" >&2
+			fi
+		fi
 	done
 }
 
@@ -487,47 +624,100 @@ build_target() {
 	local saved_path="$PATH"
 	local host_fbc=""
 	local build_fbc=""
-	local cc="$mingw_root/bin/gcc.exe"
-	local cxx="$mingw_root/bin/g++.exe"
-	local ar="$mingw_root/bin/ar.exe"
-	local as="$mingw_root/bin/as.exe"
-	local ld="$mingw_root/bin/ld.exe"
-	local ranlib="$mingw_root/bin/ranlib.exe"
-	local strip="$mingw_root/bin/strip.exe"
-	local dlltool="$mingw_root/bin/dlltool.exe"
+	local cc
+	local cxx
+	local ar
+	local as
+	local ld
+	local ranlib
+	local strip
+	local dlltool
+	local windres
+	local clang
+	local tool_root="$mingw_root"
+	local tool_path_root="$mingw_root"
+	local clang_resource_dir
+	local clang_target_flags
+	local fbc_clang_target_flags=""
+	local bootfbcgen="gcc"
+	local build_fbcflags=""
+
+	if [ "$target" = "win32-aarch64" ]; then
+		tool_root="$MINGW64_ROOT"
+		tool_path_root="$MINGW64_ROOT"
+		clang_resource_dir="$(find_clang_resource_dir "$CLANGARM64_ROOT")" || fail "clang resource directory not found under $CLANGARM64_ROOT"
+		clang_target_flags="-Qunused-arguments --target=$target_triplet --sysroot=$CLANGARM64_ROOT -resource-dir $clang_resource_dir -fuse-ld=lld --rtlib=compiler-rt --unwindlib=libunwind"
+		fbc_clang_target_flags="-gen clang -Wc -Qunused-arguments -Wc --target=$target_triplet -Wc --sysroot=$CLANGARM64_ROOT -Wc -resource-dir -Wc $clang_resource_dir -Wa -Qunused-arguments -Wa --target=$target_triplet -Wa --sysroot=$CLANGARM64_ROOT -Wa -resource-dir -Wa $clang_resource_dir"
+		bootfbcgen="clang"
+		build_fbcflags="$fbc_clang_target_flags"
+
+		clang="$(first_existing_tool "$tool_root/bin/clang.exe")" || fail "host clang not found under $tool_root"
+		cc="$clang $clang_target_flags"
+		cxx="$(first_existing_tool "$tool_root/bin/clang++.exe")" || fail "host clang++ not found under $tool_root"
+		cxx="$cxx $clang_target_flags -stdlib=libc++"
+		ar="$(first_existing_tool "$tool_root/bin/llvm-ar.exe")" || fail "host llvm-ar not found under $tool_root"
+		as="$clang"
+		ld="$(first_existing_tool "$tool_root/bin/ld.lld.exe")" || fail "host ld.lld not found under $tool_root"
+		ranlib="$(first_existing_tool "$tool_root/bin/llvm-ranlib.exe")" || fail "host llvm-ranlib not found under $tool_root"
+		strip="$(first_existing_tool "$tool_root/bin/llvm-strip.exe")" || fail "host llvm-strip not found under $tool_root"
+		dlltool="$(first_existing_tool "$tool_root/bin/llvm-dlltool.exe")" || fail "host llvm-dlltool not found under $tool_root"
+		windres="$(first_existing_tool "$tool_root/bin/llvm-windres.exe")" || fail "host llvm-windres not found under $tool_root"
+	else
+		cc="$(first_existing_tool "$mingw_root/bin/gcc.exe" "$mingw_root/bin/clang.exe")" || fail "C compiler not found under $mingw_root"
+		cxx="$(first_existing_tool "$mingw_root/bin/g++.exe" "$mingw_root/bin/clang++.exe")" || fail "C++ compiler not found under $mingw_root"
+		ar="$(first_existing_tool "$mingw_root/bin/ar.exe" "$mingw_root/bin/llvm-ar.exe")" || fail "archiver not found under $mingw_root"
+		as="$(first_existing_tool "$mingw_root/bin/as.exe" "$mingw_root/bin/clang.exe")" || fail "assembler not found under $mingw_root"
+		ld="$(first_existing_tool "$mingw_root/bin/ld.exe" "$mingw_root/bin/ld.lld.exe")" || fail "linker not found under $mingw_root"
+		ranlib="$(first_existing_tool "$mingw_root/bin/ranlib.exe" "$mingw_root/bin/llvm-ranlib.exe")" || fail "ranlib not found under $mingw_root"
+		strip="$(first_existing_tool "$mingw_root/bin/strip.exe" "$mingw_root/bin/llvm-strip.exe")" || fail "strip not found under $mingw_root"
+		dlltool="$(first_existing_tool "$mingw_root/bin/dlltool.exe" "$mingw_root/bin/llvm-dlltool.exe")" || fail "dlltool not found under $mingw_root"
+		windres="$(first_existing_tool "$mingw_root/bin/windres.exe" "$mingw_root/bin/llvm-windres.exe")" || fail "windres not found under $mingw_root"
+		clang="$(first_existing_tool "$mingw_root/bin/clang.exe" 2>/dev/null || true)"
+	fi
 
 	msg "Preparing $target worktree"
-	PATH="$mingw_root/bin:/usr/bin:$saved_path"
+	PATH="$tool_path_root/bin:/usr/bin:$saved_path"
 	export PATH
 	sanitize_source_tree "$target_triplet"
 	PATH="$saved_path"
 	export PATH
+	host_fbc="$(detect_external_fbc "$target" || true)"
 	if [ "$SKIP_SOURCE_SYNC" -eq 0 ] || [ ! -d "$worktree" ]; then
 		rm -rf "$worktree"
-		sync_source_tree "$worktree"
+		if [ -n "$host_fbc" ]; then
+			# A runnable compiler can emit the target bootstrap sources inside
+			# the worktree, so do not copy stale generated bootstrap trees.
+			sync_source_tree "$worktree" --exclude "/bootstrap/"
+		else
+			sync_source_tree "$worktree"
+		fi
 	fi
 
 	rm -rf "$stagedir"
 	mkdir -p "$stagedir"
 
 	cd "$worktree"
-	PATH="$worktree/bin:$ROOT/bin:$mingw_root/bin:/usr/bin:$saved_path"
+	PATH="$worktree/bin:$ROOT/bin:$tool_path_root/bin:/usr/bin:$saved_path"
 	export PATH
 
-	host_fbc="$(detect_fbc \
-		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/fbc64.exe}" \
-		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/fbc32.exe}" \
-		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/bin/fbc.exe}" \
-		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/bin/fbc}" \
-		"$WORKROOT/win64/bin/fbc.exe" \
-		"$WORKROOT/win64/bootstrap/fbc.exe" \
-		"$WORKROOT/win32/bin/fbc.exe" \
-		"$WORKROOT/win32/bootstrap/fbc.exe" \
-		"$worktree/bin/fbc.exe" \
-		"$worktree/bootstrap/fbc.exe" \
-		"$ROOT/bin/fbc.exe" \
-		"$ROOT/bootstrap/fbc.exe" \
-		|| true)"
+	if [ -z "$host_fbc" ]; then
+		host_fbc="$(detect_fbc \
+			"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/fbc64.exe}" \
+			"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/fbc32.exe}" \
+			"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/bin/fbc.exe}" \
+			"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/bin/fbc}" \
+			"$WORKROOT/win64/bin/fbc.exe" \
+			"$WORKROOT/win64/bootstrap/fbc.exe" \
+			"$WORKROOT/win32/bin/fbc.exe" \
+			"$WORKROOT/win32/bootstrap/fbc.exe" \
+			"$WORKROOT/win32-aarch64/bin/fbc.exe" \
+			"$WORKROOT/win32-aarch64/bootstrap/fbc.exe" \
+			"$worktree/bin/fbc.exe" \
+			"$worktree/bootstrap/fbc.exe" \
+			"$ROOT/bin/fbc.exe" \
+			"$ROOT/bootstrap/fbc.exe" \
+			|| true)"
+	fi
 
 	if [ -n "$host_fbc" ]; then
 		msg "Emitting fresh $target bootstrap sources"
@@ -536,16 +726,18 @@ build_target() {
 			bootstrap-emit \
 			FBC_EXE="$host_fbc" \
 			BUILD_FBC="$host_fbc" \
+			BOOTFBCGEN="$bootfbcgen" \
 			TARGET_TRIPLET="$target_triplet" \
-			CC="$cc" CXX="$cxx" AR="$ar" AS="$as" LD="$ld" RANLIB="$ranlib" STRIP="$strip" DLLTOOL="$dlltool"
+			CC="$cc" CXX="$cxx" AR="$ar" AS="$as" LD="$ld" RANLIB="$ranlib" STRIP="$strip" DLLTOOL="$dlltool" WINDRES="$windres" CLANG="$clang"
 	elif [ -d "$bootstrap_sources_dir" ] && find "$bootstrap_sources_dir" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .; then
 		msg "Bootstrap sources already present for $target"
 	else
 		msg "No direct bootstrap compiler available for $target; seeding from peer bootstrap sources"
 		run make -j"$JOBS" \
 			bootstrap-seed-peer \
+			BOOTFBCGEN="$bootfbcgen" \
 			TARGET_TRIPLET="$target_triplet" \
-			CC="$cc" CXX="$cxx" AR="$ar" AS="$as" LD="$ld" RANLIB="$ranlib" STRIP="$strip" DLLTOOL="$dlltool"
+			CC="$cc" CXX="$cxx" AR="$ar" AS="$as" LD="$ld" RANLIB="$ranlib" STRIP="$strip" DLLTOOL="$dlltool" WINDRES="$windres" CLANG="$clang"
 	fi
 
 	msg "Cleaning $target worktree"
@@ -555,11 +747,20 @@ build_target() {
 	run make -j"$JOBS" \
 		bootstrap-minimal \
 		TARGET_TRIPLET="$target_triplet" \
-		CC="$cc" CXX="$cxx" AR="$ar" AS="$as" LD="$ld" RANLIB="$ranlib" STRIP="$strip" DLLTOOL="$dlltool"
+		BUILD_FBCFLAGS="$build_fbcflags" \
+		CC="$cc" CXX="$cxx" AR="$ar" AS="$as" LD="$ld" RANLIB="$ranlib" STRIP="$strip" DLLTOOL="$dlltool" WINDRES="$windres" CLANG="$clang"
 
 	[ -f "$worktree/bootstrap/fbc.exe" ] || fail "bootstrap-minimal did not produce bootstrap/fbc.exe for $target"
 	build_fbc="$worktree/bin/fbc.exe"
 	[ -f "$build_fbc" ] || fail "bootstrap-minimal did not install bin/fbc.exe for $target"
+	if "$build_fbc" -version >/dev/null 2>&1; then
+		:
+	elif [ -n "$host_fbc" ]; then
+		msg "$target bootstrap compiler is not runnable on this host; using host compiler for the full target build"
+		build_fbc="$host_fbc"
+	else
+		fail "$target bootstrap compiler is not runnable on this host and no host compiler is available"
+	fi
 
 	msg "Resetting compiler/runtime outputs for standalone packaging"
 	run make clean-compiler clean-libs TARGET_TRIPLET="$target_triplet" ENABLE_STANDALONE=1
@@ -570,8 +771,11 @@ build_target() {
 		all \
 		ENABLE_STANDALONE=1 \
 		BUILD_FBC="$build_fbc" \
+		BUILD_FBCFLAGS="$build_fbcflags" \
+		BUILD_FBC_TARGET="$target" \
+		BUILD_FBC_BUILDPREFIX="$target_triplet-" \
 		TARGET_TRIPLET="$target_triplet" \
-		CC="$cc" CXX="$cxx" AR="$ar" AS="$as" LD="$ld" RANLIB="$ranlib" STRIP="$strip" DLLTOOL="$dlltool"
+		CC="$cc" CXX="$cxx" AR="$ar" AS="$as" LD="$ld" RANLIB="$ranlib" STRIP="$strip" DLLTOOL="$dlltool" WINDRES="$windres" CLANG="$clang"
 
 	msg "Installing $target into staging"
 	run make install \
@@ -579,8 +783,11 @@ build_target() {
 		prefix="/$INSTALL_SUBDIR" \
 		ENABLE_STANDALONE=1 \
 		BUILD_FBC="$build_fbc" \
+		BUILD_FBCFLAGS="$build_fbcflags" \
+		BUILD_FBC_TARGET="$target" \
+		BUILD_FBC_BUILDPREFIX="$target_triplet-" \
 		TARGET_TRIPLET="$target_triplet" \
-		CC="$cc" CXX="$cxx" AR="$ar" AS="$as" LD="$ld" RANLIB="$ranlib" STRIP="$strip" DLLTOOL="$dlltool"
+		CC="$cc" CXX="$cxx" AR="$ar" AS="$as" LD="$ld" RANLIB="$ranlib" STRIP="$strip" DLLTOOL="$dlltool" WINDRES="$windres" CLANG="$clang"
 
 	[ -f "$stagedir/fbc.exe" ] || fail "staged compiler missing for $target"
 
@@ -601,8 +808,10 @@ copy_tool_bins() {
 	mkdir -p "$dstbin"
 
 	for tool in \
-		ar as c++ cpp dlltool g++ gcc gcc-ar gcc-nm gcc-ranlib gprof \
-		ld ld.bfd nm objcopy objdump ranlib readelf strip windres
+		ar as c++ clang clang++ cpp dlltool g++ gcc gcc-ar gcc-nm gcc-ranlib gprof \
+		ld ld.bfd ld.lld lld llvm-ar llvm-dlltool llvm-nm llvm-objcopy \
+		llvm-objdump llvm-ranlib llvm-readobj llvm-strip llvm-windres nm \
+		objcopy objdump ranlib readelf strip windres
 	do
 		if [ -f "$srcbin/$tool.exe" ]; then
 			cp -a "$srcbin/$tool.exe" "$dstbin/"
@@ -610,25 +819,51 @@ copy_tool_bins() {
 	done
 
 	find "$srcbin" -maxdepth 1 -type f \( -iname '*.dll' -o -iname 'zlib1.dll' \) -exec cp -a {} "$dstbin/" \;
+
+	if [ ! -f "$dstbin/ld.exe" ] && [ -f "$dstbin/ld.lld.exe" ]; then
+		cp -a "$dstbin/ld.lld.exe" "$dstbin/ld.exe"
+	fi
+	if [ ! -f "$dstbin/ar.exe" ] && [ -f "$dstbin/llvm-ar.exe" ]; then
+		cp -a "$dstbin/llvm-ar.exe" "$dstbin/ar.exe"
+	fi
+	if [ ! -f "$dstbin/ranlib.exe" ] && [ -f "$dstbin/llvm-ranlib.exe" ]; then
+		cp -a "$dstbin/llvm-ranlib.exe" "$dstbin/ranlib.exe"
+	fi
+	if [ ! -f "$dstbin/dlltool.exe" ] && [ -f "$dstbin/llvm-dlltool.exe" ]; then
+		cp -a "$dstbin/llvm-dlltool.exe" "$dstbin/dlltool.exe"
+	fi
+	if [ ! -f "$dstbin/windres.exe" ] && [ -f "$dstbin/llvm-windres.exe" ]; then
+		cp -a "$dstbin/llvm-windres.exe" "$dstbin/windres.exe"
+	fi
+	if [ ! -f "$dstbin/strip.exe" ] && [ -f "$dstbin/llvm-strip.exe" ]; then
+		cp -a "$dstbin/llvm-strip.exe" "$dstbin/strip.exe"
+	fi
+	if [ ! -f "$dstbin/nm.exe" ] && [ -f "$dstbin/llvm-nm.exe" ]; then
+		cp -a "$dstbin/llvm-nm.exe" "$dstbin/nm.exe"
+	fi
+	if [ ! -f "$dstbin/objcopy.exe" ] && [ -f "$dstbin/llvm-objcopy.exe" ]; then
+		cp -a "$dstbin/llvm-objcopy.exe" "$dstbin/objcopy.exe"
+	fi
+	if [ ! -f "$dstbin/objdump.exe" ] && [ -f "$dstbin/llvm-objdump.exe" ]; then
+		cp -a "$dstbin/llvm-objdump.exe" "$dstbin/objdump.exe"
+	fi
 }
 
 copy_arch_toolchain() {
 	local arch="$1"
 	local mingw_root="$2"
 	local triplet="$3"
+	local tool_root="${4:-$mingw_root}"
 	local gcc_version
 	local gcc_libdir
 	local gcc_support_dir
+	local clang_libdir
+	local clang_builtins
 	local dll
 	local lib
 
-	gcc_version="$($mingw_root/bin/gcc -dumpfullversion -dumpversion)"
-	[ -n "$gcc_version" ] || fail "could not determine GCC version for $arch"
-	gcc_libdir="$mingw_root/lib/gcc/$triplet/$gcc_version"
-	gcc_support_dir="$DISTROOT/bin/lib/gcc/$triplet/$gcc_version"
-
 	msg "Bundling $arch MinGW toolchain"
-	copy_tool_bins "$mingw_root/bin" "$DISTROOT/bin/$arch"
+	copy_tool_bins "$tool_root/bin" "$DISTROOT/bin/$arch"
 
 	# The bundled GCC driver is relocated under bin/$arch.  Its built-in
 	# search path resolves the MinGW CRT headers through bin/$triplet/include,
@@ -641,28 +876,40 @@ copy_arch_toolchain() {
 		copy_tree "$mingw_root/$triplet/include" "$DISTROOT/bin/$triplet/include"
 	fi
 
-	if [ -d "$gcc_libdir" ]; then
-		copy_tree "$gcc_libdir" "$gcc_support_dir"
-		for dll in \
-			libgcc_s*.dll \
-			libgmp-*.dll \
-			libisl-*.dll \
-			libmpc-*.dll \
-			libmpfr-*.dll \
-			libwinpthread-*.dll \
-			libzstd.dll \
-			zlib1.dll
-		do
-			for f in "$mingw_root/bin"/$dll; do
-				[ -f "$f" ] || continue
-				cp -a "$f" "$gcc_support_dir/"
+	if [ -x "$mingw_root/bin/gcc.exe" ]; then
+		gcc_version="$($mingw_root/bin/gcc -dumpfullversion -dumpversion)"
+		[ -n "$gcc_version" ] || fail "could not determine GCC version for $arch"
+		gcc_libdir="$mingw_root/lib/gcc/$triplet/$gcc_version"
+		gcc_support_dir="$DISTROOT/bin/lib/gcc/$triplet/$gcc_version"
+
+		if [ -d "$gcc_libdir" ]; then
+			copy_tree "$gcc_libdir" "$gcc_support_dir"
+			for dll in \
+				libgcc_s*.dll \
+				libgmp-*.dll \
+				libisl-*.dll \
+				libmpc-*.dll \
+				libmpfr-*.dll \
+				libwinpthread-*.dll \
+				libzstd.dll \
+				zlib1.dll
+			do
+				for f in "$mingw_root/bin"/$dll; do
+					[ -f "$f" ] || continue
+					cp -a "$f" "$gcc_support_dir/"
+				done
 			done
-		done
-		for lib in libgcc.a libgcc_eh.a; do
-			if [ -f "$gcc_libdir/$lib" ]; then
-				cp -a "$gcc_libdir/$lib" "$DISTROOT/lib/$arch/"
-			fi
-		done
+			for lib in libgcc.a libgcc_eh.a; do
+				if [ -f "$gcc_libdir/$lib" ]; then
+					cp -a "$gcc_libdir/$lib" "$DISTROOT/lib/$arch/"
+				fi
+			done
+		fi
+	fi
+
+	clang_libdir="$mingw_root/lib/clang"
+	if [ -d "$clang_libdir" ]; then
+		copy_tree "$clang_libdir" "$DISTROOT/bin/lib/clang"
 	fi
 
 	if [ -d "$mingw_root/$triplet/lib" ]; then
@@ -670,19 +917,77 @@ copy_arch_toolchain() {
 	fi
 
 	copy_dir_files "$mingw_root/lib" "$DISTROOT/lib/$arch"
+	if [ "$arch" = "win32-aarch64" ] && [ ! -f "$DISTROOT/lib/$arch/libgcc.a" ]; then
+		clang_builtins="$(
+			{
+				find "$mingw_root/lib/clang" -type f -path '*/lib/windows/libclang_rt.builtins-aarch64.a' 2>/dev/null || true
+			} |
+				sort -V |
+				tail -n 1
+		)"
+		[ -n "$clang_builtins" ] || fail "could not find ARM64 clang builtins under $mingw_root"
+		cp -a "$clang_builtins" "$DISTROOT/lib/$arch/libgcc.a"
+	fi
 	create_arch_library_aliases "$DISTROOT/lib/$arch"
 	copy_legacy_winlibs "$arch" "$DISTROOT/lib/$arch" "$DISTROOT/bin/$arch"
 	remove_stale_crt_import_libs "$DISTROOT/lib/$arch"
 	assert_no_stale_crt_import_libs "$DISTROOT/lib/$arch"
 }
 
+write_platform_package_notes() {
+	cat > "$DISTROOT/readme-platform-packages.txt" <<'EOF'
+FreeBASIC platform package notes
+================================
+
+This package builds native Win32 and Win64 programs.
+When the ARM64 build is included it also builds native Windows ARM64 programs
+using the MSYS2 CLANGARM64 toolchain.
+
+The ARM64 compiler can be smoke-tested under QEMU once a Windows-on-Arm VM has
+OpenSSH enabled:
+
+  build_scripts/msys2-qemu-windows-arm64-smoke.sh --disk win11-arm64.qcow2 --ssh-user USER
+
+The non-desktop game targets use dedicated package scripts because they need
+extra toolchains and usually need assets staged with the runnable artifact:
+
+  build_scripts/msys2-build-freebasic-js.sh       browser/Node.js via Emscripten
+  build_scripts/msys2-build-freebasic-android.sh  Android APKs
+  build_scripts/msys2-build-freebasic-wii.sh      Wii DOL/homebrew folders
+  build_scripts/msys2-build-freebasic-xbox.sh     Xbox XBE/XISO packages
+
+For games that load files from the current directory, use the port helpers
+rather than hand-copying files after every build:
+
+  fbc-js-app.cmd --assets game-folder game.bas
+  fbc-android --assets game-folder game.bas
+  fbc-wii.cmd --bundle build\mygame --assets game-folder game.bas
+  fbc-xbox-xiso.cmd program.xbe program.iso --assets game-folder
+
+Those helpers do not change the FreeBASIC language or runtime APIs.  They only
+put the compiled program and its files into the layout expected by the target.
+EOF
+}
+
 assemble_distribution() {
 	local win32_stage="$STAGEROOT/win32"
 	local win64_stage="$STAGEROOT/win64"
+	local winarm64_stage="$STAGEROOT/win32-aarch64"
+	local include_arm64=0
 
 	DISTROOT="$DISTROOT_BASE/$DISTNAME"
 	rm -rf "$DISTROOT"
 	mkdir -p "$DISTROOT/bin" "$DISTROOT/lib/win32" "$DISTROOT/lib/win64"
+
+	if [ -f "$winarm64_stage/fbc.exe" ]; then
+		include_arm64=1
+	elif [ "$SKIP_BUILDARM64" -eq 0 ]; then
+		fail "missing staged fbcarm64.exe"
+	fi
+
+	if [ "$include_arm64" -ne 0 ]; then
+		mkdir -p "$DISTROOT/lib/win32-aarch64"
+	fi
 
 	sanitize_source_tree "$TRIPLET64"
 
@@ -699,20 +1004,39 @@ assemble_distribution() {
 	if [ -f "$win64_stage/fbc.exe" ]; then
 		cp -a "$win64_stage/fbc.exe" "$DISTROOT/fbc64.exe"
 	fi
+	if [ -f "$winarm64_stage/fbc.exe" ]; then
+		cp -a "$winarm64_stage/fbc.exe" "$DISTROOT/fbcarm64.exe"
+	fi
 
 	[ -f "$DISTROOT/fbc32.exe" ] || fail "missing staged fbc32.exe"
 	[ -f "$DISTROOT/fbc64.exe" ] || fail "missing staged fbc64.exe"
+	if [ "$include_arm64" -ne 0 ]; then
+		[ -f "$DISTROOT/fbcarm64.exe" ] || fail "missing staged fbcarm64.exe"
+	fi
 
 	copy_arch_toolchain win32 "$MINGW32_ROOT" "$TRIPLET32"
 	copy_arch_toolchain win64 "$MINGW64_ROOT" "$TRIPLET64"
+	if [ "$include_arm64" -ne 0 ]; then
+		copy_arch_toolchain win32-aarch64 "$CLANGARM64_ROOT" "$TRIPLETARM64" "$MINGW64_ROOT"
+	fi
 
 	msg "Merging staged FreeBASIC runtime libraries"
 	copy_dir_files "$win32_stage/lib/win32" "$DISTROOT/lib/win32"
 	copy_dir_files "$win64_stage/lib/win64" "$DISTROOT/lib/win64"
+	if [ "$include_arm64" -ne 0 ]; then
+		copy_dir_files "$winarm64_stage/lib/win32-aarch64" "$DISTROOT/lib/win32-aarch64"
+	fi
 	remove_stale_crt_import_libs "$DISTROOT/lib/win32"
 	remove_stale_crt_import_libs "$DISTROOT/lib/win64"
+	if [ "$include_arm64" -ne 0 ]; then
+		remove_stale_crt_import_libs "$DISTROOT/lib/win32-aarch64"
+	fi
 	assert_no_stale_crt_import_libs "$DISTROOT/lib/win32"
 	assert_no_stale_crt_import_libs "$DISTROOT/lib/win64"
+	if [ "$include_arm64" -ne 0 ]; then
+		assert_no_stale_crt_import_libs "$DISTROOT/lib/win32-aarch64"
+	fi
+	write_platform_package_notes
 }
 
 ##############################################################################
@@ -886,6 +1210,32 @@ EOF
 # Validation
 ##############################################################################
 
+validate_arm64_with_qemu() {
+	local qemu_smoke="$ROOT/build_scripts/msys2-qemu-windows-arm64-smoke.sh"
+	local args=(--dist "$DISTROOT")
+
+	[ -f "$qemu_smoke" ] || fail "missing QEMU ARM64 smoke script: $qemu_smoke"
+
+	if [ -n "${QEMU_ARM64_DISK:-}" ]; then
+		args+=(--disk "$QEMU_ARM64_DISK")
+	fi
+	if [ -n "${QEMU_ARM64_SSH_USER:-}" ]; then
+		args+=(--ssh-user "$QEMU_ARM64_SSH_USER")
+	fi
+	if [ -n "${QEMU_ARM64_SSH_PORT:-}" ]; then
+		args+=(--ssh-port "$QEMU_ARM64_SSH_PORT")
+	fi
+	if [ -n "${QEMU_ARM64_SSH_KEY:-}" ]; then
+		args+=(--ssh-key "$QEMU_ARM64_SSH_KEY")
+	fi
+	if [ -n "${QEMU_AARCH64_EFI:-}" ]; then
+		args+=(--efi "$QEMU_AARCH64_EFI")
+	fi
+
+	msg "Validating packaged fbcarm64.exe under QEMU"
+	run bash "$qemu_smoke" "${args[@]}"
+}
+
 validate_distribution() {
 	local validate_dir="$BUILDROOT/validate"
 	local saved_path="$PATH"
@@ -907,6 +1257,23 @@ EOF
 	run "$DISTROOT/fbc32.exe" "$validate_dir/hello.bas" -x "$validate_dir/hello32.exe"
 	[ "$("$validate_dir/hello32.exe")" = "FreeBASIC package test OK" ] || fail "packaged fbc32.exe produced bad output"
 
+	if [ -f "$DISTROOT/fbcarm64.exe" ]; then
+		if [ "$QEMU_ARM64_VALIDATE" -ne 0 ]; then
+			validate_arm64_with_qemu
+		else
+			case "$(uname -m)" in
+				aarch64|arm64)
+					run "$DISTROOT/fbcarm64.exe" "$validate_dir/hello.bas" -x "$validate_dir/helloarm64.exe"
+					[ "$("$validate_dir/helloarm64.exe")" = "FreeBASIC package test OK" ] || fail "packaged fbcarm64.exe produced bad output"
+					;;
+				*)
+					echo "WARNING: skipping fbcarm64.exe runtime validation on non-ARM64 host" >&2
+					echo "WARNING: use --qemu-arm64-validate with QEMU_ARM64_DISK and QEMU_ARM64_SSH_USER to run it under QEMU" >&2
+					;;
+			esac
+		fi
+	fi
+
 	PATH="$saved_path"
 	export PATH
 }
@@ -926,6 +1293,10 @@ DISTROOT="$DISTROOT_BASE/$DISTNAME"
 
 if [ "$SKIP_BUILD64" -eq 0 ]; then
 	build_target win64 "$MINGW64_ROOT" win64 "$TRIPLET64"
+fi
+
+if [ "$SKIP_BUILDARM64" -eq 0 ]; then
+	build_target win32-aarch64 "$CLANGARM64_ROOT" win32-aarch64 "$TRIPLETARM64"
 fi
 
 if [ "$SKIP_BUILD32" -eq 0 ]; then

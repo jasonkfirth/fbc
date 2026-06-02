@@ -3,7 +3,7 @@
 #include once "sfx_test_common.bi"
 
 const MAX_FRAMES = 240000
-const VOICE_COUNT = 128
+const VOICE_COUNT = 64
 const CHANNEL_COUNT = 16
 const BURSTS = 4
 
@@ -35,13 +35,10 @@ if( right( temp_dir, 1 ) <> "/" andalso right( temp_dir, 1 ) <> "\\" ) then
     temp_dir += "/"
 end if
 
-dump_file = temp_dir + "play-64-voice-smoke.tmp"
+dump_file = temp_dir + "play-64-voice-smoke-driver.tmp"
 
-if( lcase( trim( environ( "SFXLIB_DRIVER" ) ) ) = "null" ) then
-    SfxTestUseNullDriver()
-end if
-
-SfxTestSetMixerDump( dump_file, MAX_FRAMES )
+SfxTestUseNullDriver()
+SfxTestSetDriverDump( dump_file, MAX_FRAMES )
 
 '' Start many short background phrases using PLAY in a rotating channel set.
 '' This drives both the per-channel background queue and the global voice allocator.
@@ -60,8 +57,19 @@ next
 fb_sfxUpdate( 60000 )
 
 dim as integer frames = SfxTestLoadDump( dump_file, samples() )
+dim as zstring * 5 null_name = "null"
+dim as FB_SFX_DRIVER_STATS stats
 
 ASSERT( frames >= 60000 )
+ASSERT( fb_sfxDriverStatsSnapshot( @null_name, @stats ) = 0 )
+ASSERT( stats.write_calls > 0 )
+ASSERT( stats.frames_requested > 0 )
+ASSERT( stats.frames_accepted = stats.frames_requested )
+ASSERT( stats.frames_accepted >= 60000 )
+ASSERT( stats.frames_dropped = 0 )
+ASSERT( stats.short_writes = 0 )
+ASSERT( stats.zero_writes = 0 )
+ASSERT( stats.errors = 0 )
 
 '' The early output should contain noticeable activity; lockups or drops usually
 '' look like long quiet stretches in this smoke test.

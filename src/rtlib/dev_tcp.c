@@ -60,6 +60,7 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 		#include <sys/socket.h>
 		#include <sys/types.h>
 		#include <netinet/in.h>
+		#include <netinet/tcp.h>
 		#include <arpa/inet.h>
 		#include <unistd.h>
 	#endif
@@ -81,6 +82,9 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#define FB_TCP_SHUT_RDWR SD_BOTH
 	#define FB_TCP_SELECT(n, r, w, e, t) select( 0, r, w, e, t )
 	#define FB_TCP_IOCTL(s, cmd, argp) ioctlsocket( s, cmd, argp )
+	#define FB_TCP_RECV(s, b, l, f) recv( s, b, l, f )
+	#define FB_TCP_SEND(s, b, l, f) send( s, b, l, f )
+	#define FB_TCP_SETSOCKOPT(s, l, o, v, n) setsockopt( s, l, o, v, n )
 	#define FB_TCP_CAN_QUERY_BYTES TRUE
 #elif defined(HOST_WII)
 	#define FB_TCP_CLOSESOCKET(s) net_close( s )
@@ -93,6 +97,9 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#define FB_TCP_SHUT_RDWR SHUT_RDWR
 	#define FB_TCP_SELECT(n, r, w, e, t) net_select( n, r, w, e, t )
 	#define FB_TCP_IOCTL(s, cmd, argp) net_ioctl( s, cmd, argp )
+	#define FB_TCP_RECV(s, b, l, f) recv( s, b, l, f )
+	#define FB_TCP_SEND(s, b, l, f) send( s, b, l, f )
+	#define FB_TCP_SETSOCKOPT(s, l, o, v, n) setsockopt( s, l, o, v, n )
 	#define FB_TCP_CAN_QUERY_BYTES FALSE
 #else
 	#define FB_TCP_CLOSESOCKET(s) close( s )
@@ -103,6 +110,9 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#define FB_TCP_SHUT_RDWR SHUT_RDWR
 	#define FB_TCP_SELECT(n, r, w, e, t) select( n, r, w, e, t )
 	#define FB_TCP_IOCTL(s, cmd, argp) ioctl( s, cmd, argp )
+	#define FB_TCP_RECV(s, b, l, f) recv( s, b, l, f )
+	#define FB_TCP_SEND(s, b, l, f) send( s, b, l, f )
+	#define FB_TCP_SETSOCKOPT(s, l, o, v, n) setsockopt( s, l, o, v, n )
 	#define FB_TCP_CAN_QUERY_BYTES TRUE
 #endif
 
@@ -116,7 +126,33 @@ static int fb_DevTcpWriteWstr( FB_FILE *handle, const FB_WCHAR *value, size_t va
 static int fb_DevTcpTell( FB_FILE *handle, fb_off_t *pOffset );
 static int fb_DevTcpEof( FB_FILE *handle );
 static int fb_DevTcpServerEof( FB_FILE *handle );
+#if !defined(HOST_DOS) && !defined(HOST_JS) && !defined(HOST_WII)
 static void fb_hDevTcpFormatService( char *service, size_t service_len, unsigned int port );
+#endif
+
+static int fb_hDevTcpSocketError( int result )
+{
+#if defined(HOST_WII)
+	int err = FB_TCP_ERRNO();
+
+	/*
+		libogc socket calls may return the negative error value directly
+		instead of setting errno.  Keep that result so transient states such
+		as -EAGAIN remain distinguishable from a closed connection.
+	*/
+	if( result < 0 ) {
+		if( FB_TCP_WOULDBLOCK( result ) )
+			return result;
+		if( err == 0 )
+			return result;
+	}
+
+	return err;
+#else
+	(void)result;
+	return FB_TCP_ERRNO();
+#endif
+}
 
 static FB_FILE_HOOKS hooks_dev_tcp = {
 	fb_DevTcpEof,
@@ -285,36 +321,94 @@ static DEV_TCP_INFO *fb_hDevTcpAllocInfo( FB_TCP_SOCKET hSocket, const char *psz
 		return NULL;
 	}
 
+#if defined(HOST_WII)
+	if( is_server == FALSE ) {
+		info->wii_pump = fb_WiiTcpPumpCreate( hSocket );
+		if( info->wii_pump == NULL ) {
+			free( info->pszDevice );
+			free( info );
+			return NULL;
+		}
+	}
+#endif
+
 	return info;
 }
 
-static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int timeout )
+static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int timeout, int is_server )
 {
 #if defined(HOST_DOS) || defined(HOST_JS)
 	(void)hSocket;
 	(void)timeout;
+	(void)is_server;
 	return FB_RTERROR_ILLEGALFUNCTIONCALL;
 #else
 	#if defined(SO_NOSIGPIPE)
 		{
 			int value = 1;
-			setsockopt( hSocket, SOL_SOCKET, SO_NOSIGPIPE, (const char *)&value, sizeof( value ) );
+			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_NOSIGPIPE, (const char *)&value, sizeof( value ) );
+		}
+	#endif
+
+	#if defined(HOST_WII)
+		{
+			int buffer_size = 32768;
+			int low_water = 1;
+
+			/*
+				Duel-era FreeBASIC games can send a complete world snapshot as
+				hundreds of small PUT operations.  The Wii TCP defaults are
+				small enough that the local client/server pair can stall while
+				one side is still draining that startup packet.
+			*/
+			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_SNDBUF, (const char *)&buffer_size, sizeof( buffer_size ) );
+			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_RCVBUF, (const char *)&buffer_size, sizeof( buffer_size ) );
+
+			/*
+				Old code often polls EOF and then reads a single byte.  Keep
+				libogc from waiting for a larger low-water amount when only the
+				tail of a logical packet remains.
+			*/
+			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_SNDLOWAT, (const char *)&low_water, sizeof( low_water ) );
+			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_RCVLOWAT, (const char *)&low_water, sizeof( low_water ) );
 		}
 	#endif
 
 	if( timeout != 0 ) {
 		#if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
 			DWORD value = (DWORD)timeout;
-			setsockopt( hSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&value, sizeof( value ) );
-			setsockopt( hSocket, SOL_SOCKET, SO_SNDTIMEO, (const char *)&value, sizeof( value ) );
+			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&value, sizeof( value ) );
+			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_SNDTIMEO, (const char *)&value, sizeof( value ) );
 		#else
 			struct timeval value;
 
 			value.tv_sec = timeout / 1000;
 			value.tv_usec = (timeout % 1000) * 1000;
 
-			setsockopt( hSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&value, sizeof( value ) );
-			setsockopt( hSocket, SOL_SOCKET, SO_SNDTIMEO, (const char *)&value, sizeof( value ) );
+			#if !defined(HOST_WII)
+				FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&value, sizeof( value ) );
+			#else
+				/*
+					On Wii, connected sockets are drained by the receive pump.
+					Only listening sockets keep the BASIC timeout so TCP ACCEPT
+					can be used as a polling operation.
+				*/
+				if( is_server )
+					FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&value, sizeof( value ) );
+			#endif
+
+			#if !defined(HOST_WII)
+				FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_SNDTIMEO, (const char *)&value, sizeof( value ) );
+			#else
+				/*
+					libogc applies short send timeouts aggressively.  Old
+					threaded games such as Duel use timeout=1 on the listening
+					socket so their server loop can poll, but the accepted data
+					socket still needs blocking sends while the peer drains a
+					large startup packet.  send() releases FB_LOCK(), so the
+					receiving BASIC thread can continue running.
+				*/
+			#endif
 		#endif
 	}
 
@@ -322,6 +416,7 @@ static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int tim
 #endif
 }
 
+#if !defined(HOST_DOS) && !defined(HOST_JS) && !defined(HOST_WII)
 static void fb_hDevTcpFormatService( char *service, size_t service_len, unsigned int port )
 {
 	char tmp[16];
@@ -343,6 +438,7 @@ static void fb_hDevTcpFormatService( char *service, size_t service_len, unsigned
 
 	service[used] = '\0';
 }
+#endif
 
 #if defined(HOST_WII)
 static int fb_hDevTcpBuildWiiAddress( const char *host, unsigned int port, int passive, struct sockaddr_in *addr )
@@ -399,18 +495,20 @@ static int fb_hDevTcpBuildWiiAddress( const char *host, unsigned int port, int p
 	thread waiting for TCP input can otherwise prevent another FB thread in
 	the same process from writing the data it is waiting for.
 */
+#if !defined(HOST_WII)
 static int fb_hDevTcpRecvUnlocked( DEV_TCP_INFO *info, void *buffer, size_t length, int flags, int *err )
 {
 	FB_TCP_SOCKET hSocket = info->hSocket;
 	int bytes;
 
 	FB_UNLOCK();
-	bytes = recv( hSocket, buffer, (int)MIN( length, (size_t)INT_MAX ), flags );
-	*err = FB_TCP_ERRNO();
+	bytes = FB_TCP_RECV( hSocket, buffer, (int)MIN( length, (size_t)INT_MAX ), flags );
+	*err = fb_hDevTcpSocketError( bytes );
 	FB_LOCK();
 
 	return bytes;
 }
+#endif
 
 static int fb_hDevTcpSendUnlocked( DEV_TCP_INFO *info, const char *buffer, size_t length, int flags, int *err )
 {
@@ -418,12 +516,30 @@ static int fb_hDevTcpSendUnlocked( DEV_TCP_INFO *info, const char *buffer, size_
 	int bytes;
 
 	FB_UNLOCK();
-	bytes = send( hSocket, buffer, (int)MIN( length, (size_t)INT_MAX ), flags );
-	*err = FB_TCP_ERRNO();
+	bytes = FB_TCP_SEND( hSocket, buffer, (int)MIN( length, (size_t)INT_MAX ), flags );
+	*err = fb_hDevTcpSocketError( bytes );
 	FB_LOCK();
 
 	return bytes;
 }
+
+#if !defined(HOST_DOS) && !defined(HOST_JS)
+static void fb_hDevTcpSetNoDelay( FB_TCP_SOCKET hSocket )
+{
+#ifdef TCP_NODELAY
+	int value = 1;
+
+	/*
+		Old FreeBASIC TCP game code often writes packet fields one PUT at a
+		time.  Nagle delays make that pattern painfully slow on some targets,
+		especially when the peer polls EOF between byte reads.
+	*/
+	FB_TCP_SETSOCKOPT( hSocket, IPPROTO_TCP, TCP_NODELAY, (const char *)&value, sizeof( value ) );
+#else
+	(void)hSocket;
+#endif
+}
+#endif
 #endif
 
 static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOCKET *hSocketOut )
@@ -443,9 +559,10 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 	if( FB_TCP_SOCKET_ERROR( hSocket ) )
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 
-	fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout );
+	fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, FALSE );
 
 	if( connect( hSocket, (struct sockaddr *)&addr, sizeof( addr ) ) == 0 ) {
+		fb_hDevTcpSetNoDelay( hSocket );
 		*hSocketOut = hSocket;
 		return FB_RTERROR_OK;
 	}
@@ -474,9 +591,10 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 		if( FB_TCP_SOCKET_ERROR( hSocket ) )
 			continue;
 
-		fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout );
+		fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, FALSE );
 
 		if( connect( hSocket, it->ai_addr, (int)it->ai_addrlen ) == 0 ) {
+			fb_hDevTcpSetNoDelay( hSocket );
 			*hSocketOut = hSocket;
 			freeaddrinfo( result );
 			return FB_RTERROR_OK;
@@ -508,8 +626,8 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 	if( FB_TCP_SOCKET_ERROR( hSocket ) )
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 
-	setsockopt( hSocket, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof( yes ) );
-	fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout );
+	FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof( yes ) );
+	fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, TRUE );
 
 	if( bind( hSocket, (struct sockaddr *)&addr, sizeof( addr ) ) != 0 ) {
 		FB_TCP_CLOSESOCKET( hSocket );
@@ -533,8 +651,18 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 
 	memset( &hints, 0, sizeof( hints ) );
 	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_family = AF_UNSPEC;
 	hints.ai_flags = AI_PASSIVE;
+#if defined(__HAIKU__) || (defined(HOST_WIN32) && !defined(HOST_CYGWIN))
+	/*
+		Some stacks return an IPv6-only passive AF_UNSPEC listener first.
+		Old TCP programs commonly start a wildcard server and then connect
+		to 127.0.0.1 or the host's IPv4 LAN address, so keep wildcard
+		servers on IPv4 unless the program explicitly names a host.
+	*/
+	hints.ai_family = (*tcp_proto->host == '\0') ? AF_INET : AF_UNSPEC;
+#else
+	hints.ai_family = AF_UNSPEC;
+#endif
 
 	fb_hDevTcpFormatService( service, sizeof( service ), tcp_proto->port );
 	res = getaddrinfo( (*tcp_proto->host != '\0') ? tcp_proto->host : NULL, service, &hints, &result );
@@ -549,7 +677,7 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 			continue;
 
 		setsockopt( hSocket, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof( yes ) );
-		fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout );
+		fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, TRUE );
 
 		if( bind( hSocket, it->ai_addr, (int)it->ai_addrlen ) != 0 ) {
 			FB_TCP_CLOSESOCKET( hSocket );
@@ -576,6 +704,26 @@ static int fb_hDevTcpPeekState( DEV_TCP_INFO *info )
 #if defined(HOST_DOS) || defined(HOST_JS)
 	(void)info;
 	return -1;
+#elif defined(HOST_WII)
+	int state;
+
+	if( info == NULL || FB_TCP_SOCKET_ERROR( info->hSocket ) )
+		return -1;
+
+	if( info->is_closed )
+		return -1;
+
+	/*
+		libogc does not provide the exact readiness contract that FreeBASIC's
+		TCP device needs here.  A Wii receive pump owns blocking recv() and
+		keeps bytes in a handle-local buffer, so EOF can answer only the
+		FreeBASIC question: is there data available to GET right now?
+	*/
+	state = fb_WiiTcpPumpPeekState( info->wii_pump );
+	if( state < 0 )
+		info->is_closed = TRUE;
+
+	return state;
 #else
 	fd_set set;
 	struct timeval tv;
@@ -609,7 +757,7 @@ static int fb_hDevTcpPeekState( DEV_TCP_INFO *info )
 	}
 
 	res = recv( info->hSocket, &ch, 1, MSG_PEEK );
-	err = FB_TCP_ERRNO();
+	err = fb_hDevTcpSocketError( res );
 	FB_LOCK();
 
 	if( res > 0 )
@@ -625,6 +773,47 @@ static int fb_hDevTcpPeekState( DEV_TCP_INFO *info )
 
 	info->is_closed = TRUE;
 	return -1;
+#endif
+}
+
+static size_t fb_hDevTcpReadPeekByte( DEV_TCP_INFO *info, char *buffer, size_t length )
+{
+#if defined(HOST_WII)
+	if( info == NULL || buffer == NULL || length == 0 )
+		return 0;
+
+	return fb_WiiTcpPumpRead( info->wii_pump, buffer, length, FALSE );
+#else
+	(void)info;
+	(void)buffer;
+	(void)length;
+	return 0;
+#endif
+}
+
+static int fb_hDevTcpEocState( DEV_TCP_INFO *info )
+{
+#if defined(HOST_WII)
+	int state;
+
+	if( info == NULL || FB_TCP_SOCKET_ERROR( info->hSocket ) )
+		return -1;
+
+	if( info->is_closed )
+		return -1;
+
+	/*
+		EOC is a connection-lost test, not a readiness probe.  The receive pump
+		reports a closed connection only after buffered bytes have been drained,
+		so old code can still read the final packet before EOC becomes true.
+	*/
+	state = fb_WiiTcpPumpPeekState( info->wii_pump );
+	if( state < 0 )
+		info->is_closed = TRUE;
+
+	return state;
+#else
+	return fb_hDevTcpPeekState( info );
 #endif
 }
 
@@ -661,6 +850,7 @@ static int fb_hDevTcpSendAll( DEV_TCP_INFO *info, const char *buffer, size_t len
 #endif
 }
 
+#if !defined(HOST_WII)
 static void fb_hDevTcpShutdownConnectedSocket( DEV_TCP_INFO *info )
 {
 #if defined(HOST_DOS) || defined(HOST_JS)
@@ -707,6 +897,7 @@ static void fb_hDevTcpShutdownConnectedSocket( DEV_TCP_INFO *info )
 	}
 #endif
 }
+#endif
 
 static int fb_DevTcpClose( FB_FILE *handle )
 {
@@ -717,13 +908,26 @@ static int fb_DevTcpClose( FB_FILE *handle )
 	if( info != NULL ) {
 		if( FB_TCP_SOCKET_ERROR( info->hSocket ) == FALSE ) {
 			int close_res;
+			int socket_closed = FALSE;
 
+#if defined(HOST_WII)
+			if( info->wii_pump != NULL ) {
+				FB_UNLOCK();
+				fb_WiiTcpPumpDestroy( info->wii_pump );
+				info->wii_pump = NULL;
+				FB_LOCK();
+				socket_closed = TRUE;
+			}
+#else
 			fb_hDevTcpShutdownConnectedSocket( info );
-			FB_UNLOCK();
-			close_res = FB_TCP_CLOSESOCKET( info->hSocket );
-			FB_LOCK();
-			if( close_res != 0 )
-				res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
+#endif
+			if( socket_closed == FALSE ) {
+				FB_UNLOCK();
+				close_res = FB_TCP_CLOSESOCKET( info->hSocket );
+				FB_LOCK();
+				if( close_res != 0 )
+					res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
+			}
 		}
 
 		if( res == FB_RTERROR_OK ) {
@@ -758,13 +962,28 @@ static int fb_DevTcpRead( FB_FILE *handle, void *value, size_t *pValuelen )
 {
 	int res = FB_RTERROR_OK;
 	DEV_TCP_INFO *info;
+	size_t length;
+	size_t buffered;
 
 	info = (DEV_TCP_INFO*)handle->opaque;
 	if( info == NULL || pValuelen == NULL ) {
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}
 
+	length = *pValuelen;
+	buffered = fb_hDevTcpReadPeekByte( info, (char *)value, length );
+
+	if( buffered == length ) {
+		*pValuelen = buffered;
+		return FB_RTERROR_OK;
+	}
+
 	if( info->is_closed ) {
+		*pValuelen = buffered;
+		return FB_RTERROR_OK;
+	}
+
+	if( length == 0 ) {
 		*pValuelen = 0;
 		return FB_RTERROR_OK;
 	}
@@ -772,21 +991,41 @@ static int fb_DevTcpRead( FB_FILE *handle, void *value, size_t *pValuelen )
 #if defined(HOST_DOS) || defined(HOST_JS)
 	*pValuelen = 0;
 	res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+#elif defined(HOST_WII)
+	{
+		size_t bytes;
+
+		FB_UNLOCK();
+		bytes = fb_WiiTcpPumpRead( info->wii_pump,
+		                           ((char *)value) + buffered,
+		                           length - buffered,
+		                           TRUE );
+		FB_LOCK();
+
+		*pValuelen = buffered + bytes;
+		if( bytes == 0 )
+			info->is_closed = TRUE;
+	}
 #else
 	{
 		int err = 0;
-		int bytes = fb_hDevTcpRecvUnlocked( info, value, *pValuelen, 0, &err );
+		int bytes = fb_hDevTcpRecvUnlocked( info,
+		                                    ((char *)value) + buffered,
+		                                    length - buffered,
+		                                    0,
+		                                    &err );
 		if( bytes > 0 ) {
-			*pValuelen = bytes;
+			*pValuelen = buffered + bytes;
 		} else if( bytes == 0 ) {
 			info->is_closed = TRUE;
-			*pValuelen = 0;
+			*pValuelen = buffered;
 		} else if( FB_TCP_WOULDBLOCK( err ) ) {
-			*pValuelen = 0;
+			*pValuelen = buffered;
 		} else {
 			info->is_closed = TRUE;
-			*pValuelen = 0;
-			res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
+			*pValuelen = buffered;
+			if( buffered == 0 )
+				res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		}
 	}
 #endif
@@ -894,11 +1133,29 @@ static int fb_hDevTcpReadByte( FB_FILE *handle, DEV_TCP_INFO *info, char *ch, si
 		return FB_RTERROR_OK;
 	}
 
+	if( fb_hDevTcpReadPeekByte( info, ch, 1 ) ) {
+		*read_len = 1;
+		return FB_RTERROR_OK;
+	}
+
 	if( info->is_closed )
 		return FB_RTERROR_OK;
 
 #if defined(HOST_DOS) || defined(HOST_JS)
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+#elif defined(HOST_WII)
+	{
+		size_t bytes;
+
+		FB_UNLOCK();
+		bytes = fb_WiiTcpPumpRead( info->wii_pump, ch, 1, TRUE );
+		FB_LOCK();
+
+		if( bytes > 0 )
+			*read_len = 1;
+		else
+			info->is_closed = TRUE;
+	}
 #else
 	{
 		int err = 0;
@@ -1102,12 +1359,22 @@ int fb_DevTcpAcceptHandle( FB_FILE *server_handle, FB_FILE *client_handle )
 	if( FB_TCP_SOCKET_ERROR( hSocket ) )
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 
-	res = fb_hDevTcpApplySocketOptions( hSocket, server_info->timeout );
+	res = fb_hDevTcpApplySocketOptions( hSocket, server_info->timeout, FALSE );
 	if( res != FB_RTERROR_OK ) {
 		FB_TCP_CLOSESOCKET( hSocket );
 		return res;
 	}
 
+	fb_hDevTcpSetNoDelay( hSocket );
+
+	/*
+		fb_TcpAccept() reserves this file number before doing the blocking
+		accept().  Keep the final handle transition under FB_LOCK() too.  If the
+		placeholder were cleared without the lock, another thread could observe
+		the slot as free and reuse it via FREEFILE while the accepted TCP handle
+		was still being installed.
+	*/
+	FB_LOCK();
 	memset( client_handle, 0, sizeof( FB_FILE ) );
 	client_handle->mode = FB_FILE_MODE_BINARY;
 	client_handle->access = FB_FILE_ACCESS_READWRITE;
@@ -1119,8 +1386,11 @@ int fb_DevTcpAcceptHandle( FB_FILE *server_handle, FB_FILE *client_handle )
 		DEV_TCP_PROTOCOL dummy;
 		memset( &dummy, 0, sizeof( dummy ) );
 		dummy.timeout = server_info->timeout;
-		return fb_hDevTcpFinishOpen( client_handle, &dummy, hSocket, &hooks_dev_tcp, FB_FILE_TYPE_TCP, FALSE, "TCP" );
+		res = fb_hDevTcpFinishOpen( client_handle, &dummy, hSocket, &hooks_dev_tcp, FB_FILE_TYPE_TCP, FALSE, "TCP" );
 	}
+	FB_UNLOCK();
+
+	return res;
 #endif
 }
 
@@ -1140,7 +1410,7 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 		return FB_TRUE;
 
 	FB_LOCK();
-	res = (fb_hDevTcpPeekState( info ) < 0);
+	res = (fb_hDevTcpEocState( info ) < 0);
 	FB_UNLOCK();
 
 	return res ? FB_TRUE : FB_FALSE;

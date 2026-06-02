@@ -31,6 +31,7 @@
 #include "../fb_sfx_driver.h"
 #include "../fb_sfx_internal.h"
 
+#include <OS.h>
 #include <SoundPlayer.h>
 #include <limits.h>
 #include <stdio.h>
@@ -40,6 +41,14 @@
 
 #if FB_SFX_MT_ENABLED
 #include <pthread.h>
+#endif
+
+#ifndef FB_SFX_DRIVER_CAP_BACKGROUND
+#define FB_SFX_DRIVER_CAP_BACKGROUND 0
+static int fb_sfxForegroundFeedActive(void)
+{
+    return 0;
+}
 #endif
 
 /* ------------------------------------------------------------------------- */
@@ -105,6 +114,8 @@ static int rb_try_lock(void)
     return 1;
 #endif
 }
+
+static void haiku_sleep_ms(unsigned long milliseconds);
 
 #if FB_SFX_MT_ENABLED
 static void haiku_worker_stop_set(int value)
@@ -309,20 +320,6 @@ static int rb_pop_locked(float *out, int count)
     return actual;
 }
 
-static int rb_push(const float *in, int count)
-{
-    int accepted;
-
-    if (!haiku_running_get() || count <= 0)
-        return 0;
-
-    rb_lock();
-    accepted = rb_push_locked(in, count);
-    rb_unlock();
-
-    return accepted;
-}
-
 static int rb_pop(float *out, int count)
 {
     int read;
@@ -351,6 +348,66 @@ static void haiku_sleep_ms(unsigned long milliseconds)
     req.tv_sec = (time_t)(milliseconds / 1000UL);
     req.tv_nsec = (long)((milliseconds % 1000UL) * 1000000UL);
     nanosleep(&req, NULL);
+}
+
+static int rb_push_frames(const float *in, int frames, int channels)
+{
+    int accepted_frames;
+    int idle_count;
+
+    if (!in || frames <= 0 || channels <= 0)
+        return 0;
+
+    accepted_frames = 0;
+    idle_count = 0;
+
+    /*
+        BSoundPlayer consumes audio asynchronously from the Media Kit callback.
+        A quick foreground program can therefore produce samples faster than
+        the callback can drain them, especially on slow Haiku hardware.
+
+        The driver write contract is frame based, so only complete frames are
+        queued.  If the ring is full, wait for the callback to make room instead
+        of reporting a short write immediately.  The timeout is deliberately
+        generous: one blocked 8192-frame write should normally clear in well
+        under a quarter second at 44.1 kHz, while five seconds still prevents a
+        missing or wedged audio server from trapping the program forever.
+    */
+
+    while (accepted_frames < frames && haiku_running_get())
+    {
+        int free_frames;
+        int push_frames;
+        int pushed_samples;
+        int pushed_frames;
+
+        rb_lock();
+
+        free_frames = rb_free() / channels;
+        push_frames = frames - accepted_frames;
+        if (push_frames > free_frames)
+            push_frames = free_frames;
+
+        pushed_samples = rb_push_locked(in + (accepted_frames * channels),
+                                        push_frames * channels);
+
+        rb_unlock();
+
+        pushed_frames = pushed_samples / channels;
+        if (pushed_frames > 0)
+        {
+            accepted_frames += pushed_frames;
+            idle_count = 0;
+            continue;
+        }
+
+        if (++idle_count >= 5000)
+            break;
+
+        haiku_sleep_ms(1);
+    }
+
+    return accepted_frames;
 }
 
 static int haiku_worker_frames(void)
@@ -415,6 +472,22 @@ static int haiku_ensure_worker(void)
 
 static BSoundPlayer *g_player = NULL;
 
+#define FB_SFX_HAIKU_INIT_TIMEOUT_MS 1500
+
+static void audio_callback(void *cookie, void *buffer, size_t size,
+    const media_raw_audio_format &fmt);
+
+typedef struct HAIKU_PLAYER_INIT_REQUEST
+{
+    media_raw_audio_format fmt;
+    sem_id done_sem;
+    sem_id lock_sem;
+    BSoundPlayer *player;
+    status_t status;
+    int completed;
+    int timed_out;
+} HAIKU_PLAYER_INIT_REQUEST;
+
 static void haiku_player_shutdown(void)
 {
     if (g_player)
@@ -423,6 +496,187 @@ static void haiku_player_shutdown(void)
         delete g_player;
         g_player = NULL;
     }
+}
+
+static int haiku_init_timeout_ms(void)
+{
+    const char *value;
+    int timeout;
+
+    value = getenv("FB_SFX_HAIKU_INIT_TIMEOUT_MS");
+    if (!value || !*value)
+        return FB_SFX_HAIKU_INIT_TIMEOUT_MS;
+
+    timeout = atoi(value);
+    if (timeout < 0)
+        timeout = 0;
+
+    return timeout;
+}
+
+static void haiku_request_lock(HAIKU_PLAYER_INIT_REQUEST *request)
+{
+    if (request && request->lock_sem >= B_OK)
+        acquire_sem(request->lock_sem);
+}
+
+static void haiku_request_unlock(HAIKU_PLAYER_INIT_REQUEST *request)
+{
+    if (request && request->lock_sem >= B_OK)
+        release_sem(request->lock_sem);
+}
+
+static void haiku_player_request_destroy(HAIKU_PLAYER_INIT_REQUEST *request)
+{
+    if (!request)
+        return;
+
+    if (request->done_sem >= B_OK)
+        delete_sem(request->done_sem);
+
+    if (request->lock_sem >= B_OK)
+        delete_sem(request->lock_sem);
+
+    free(request);
+}
+
+static int32 haiku_player_create_thread(void *arg)
+{
+    HAIKU_PLAYER_INIT_REQUEST *request = (HAIKU_PLAYER_INIT_REQUEST*)arg;
+    BSoundPlayer *player;
+    status_t status;
+    int timed_out;
+
+    player = new BSoundPlayer(&request->fmt, "fbsfx", audio_callback, NULL);
+    if (!player)
+        status = B_NO_MEMORY;
+    else
+        status = player->InitCheck();
+
+    if (player && status != B_OK)
+    {
+        delete player;
+        player = NULL;
+    }
+
+    haiku_request_lock(request);
+
+    request->player = player;
+    request->status = status;
+    request->completed = 1;
+    timed_out = request->timed_out;
+
+    haiku_request_unlock(request);
+
+    if (timed_out)
+    {
+        if (player)
+            delete player;
+
+        haiku_player_request_destroy(request);
+        return 0;
+    }
+
+    release_sem(request->done_sem);
+    return 0;
+}
+
+static BSoundPlayer *haiku_player_create(media_raw_audio_format *fmt)
+{
+    HAIKU_PLAYER_INIT_REQUEST *request;
+    BSoundPlayer *player;
+    thread_id thread;
+    status_t wait_result;
+    int timeout_ms;
+    int completed;
+    status_t status;
+
+    if (!fmt)
+        return NULL;
+
+    request = (HAIKU_PLAYER_INIT_REQUEST*)calloc(1, sizeof(*request));
+    if (!request)
+        return NULL;
+
+    request->fmt = *fmt;
+    request->done_sem = create_sem(0, "fb_sfx_haiku_player_done");
+    request->lock_sem = create_sem(1, "fb_sfx_haiku_player_lock");
+    request->status = B_ERROR;
+
+    if (request->done_sem < B_OK || request->lock_sem < B_OK)
+    {
+        haiku_player_request_destroy(request);
+        return NULL;
+    }
+
+    thread = spawn_thread(
+        haiku_player_create_thread,
+        "fb_sfx_haiku_player_init",
+        B_NORMAL_PRIORITY,
+        request
+    );
+
+    if (thread < B_OK)
+    {
+        haiku_player_request_destroy(request);
+        return NULL;
+    }
+
+    if (resume_thread(thread) != B_OK)
+    {
+        haiku_player_request_destroy(request);
+        return NULL;
+    }
+
+    /*
+        Some Haiku systems can block indefinitely while BSoundPlayer asks the
+        Media Kit for a usable output.  Audio is optional for BASIC programs,
+        so fail this driver quickly and let sfxlib's null driver keep the
+        program running.
+    */
+    timeout_ms = haiku_init_timeout_ms();
+    if (timeout_ms == 0)
+    {
+        wait_for_thread(thread, NULL);
+        wait_result = B_OK;
+    }
+    else
+    {
+        wait_result = acquire_sem_etc(
+            request->done_sem,
+            1,
+            B_RELATIVE_TIMEOUT,
+            (bigtime_t)timeout_ms * 1000
+        );
+    }
+
+    haiku_request_lock(request);
+
+    completed = request->completed;
+    status = request->status;
+
+    if (wait_result == B_OK || completed)
+    {
+        player = request->player;
+        request->player = NULL;
+        haiku_request_unlock(request);
+
+        haiku_player_request_destroy(request);
+
+        if (status != B_OK)
+        {
+            if (player)
+                delete player;
+            return NULL;
+        }
+
+        return player;
+    }
+
+    request->timed_out = 1;
+    haiku_request_unlock(request);
+
+    return NULL;
 }
 
 static void audio_callback(void *cookie, void *buffer, size_t size, const media_raw_audio_format &fmt)
@@ -464,7 +718,6 @@ static void audio_callback(void *cookie, void *buffer, size_t size, const media_
 
 static int haiku_driver_init(int rate, int channels, int buffer, int flags)
 {
-    status_t err;
     int bytes_per_sample;
 
     (void)flags;
@@ -496,17 +749,9 @@ static int haiku_driver_init(int rate, int channels, int buffer, int flags)
         return -1;
     }
 
-    g_player = new BSoundPlayer(&fmt, "fbsfx", audio_callback, NULL);
+    g_player = haiku_player_create(&fmt);
     if (!g_player)
     {
-        rb_shutdown();
-        return -1;
-    }
-
-    err = g_player->InitCheck();
-    if (err != B_OK)
-    {
-        haiku_player_shutdown();
         rb_shutdown();
         return -1;
     }
@@ -551,7 +796,6 @@ static void haiku_driver_exit(void)
 
 static int haiku_driver_write(const float *buffer, int frames)
 {
-    int count;
     int accepted;
 
     if (!haiku_running_get() || !buffer || frames <= 0)
@@ -563,10 +807,9 @@ static int haiku_driver_write(const float *buffer, int frames)
     if (frames > INT_MAX / fb_sfx_haiku.channels)
         return -1;
 
-    count = frames * fb_sfx_haiku.channels;
-    accepted = rb_push(buffer, count);
+    accepted = rb_push_frames(buffer, frames, fb_sfx_haiku.channels);
 
-    return accepted / fb_sfx_haiku.channels;
+    return accepted;
 }
 
 static void haiku_driver_poll(void)

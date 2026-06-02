@@ -624,10 +624,10 @@ int fb_sfxDarwinWrite(float *buffer, int frames)
 
     if (g_write_debug_count < 8)
     {
-        DARWIN_DBG("enqueue: slot=%d frames=%d bytes=%zu\n",
+        DARWIN_DBG("enqueue: slot=%d frames=%d bytes=%llu\n",
                    current_buffer,
                    frames,
-                   bytes);
+                   (unsigned long long)bytes);
         g_write_debug_count++;
     }
 

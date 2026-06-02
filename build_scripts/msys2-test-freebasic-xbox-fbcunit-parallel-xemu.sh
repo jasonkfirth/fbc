@@ -156,6 +156,10 @@ skip_boot_anim = true
 [general.updates]
 check = false
 
+[net]
+enable = true
+backend = 'nat'
+
 [sys.files]
 bootrom_path = '$bootrom_path'
 flashrom_path = '$flashrom_path'
