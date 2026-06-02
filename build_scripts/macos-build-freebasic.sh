@@ -38,9 +38,12 @@ cd "$ROOT"
 # archive with "Failed to get metadata(xattr): Permission denied".
 #
 # FreeBASIC only needs the file contents, modes, and symlink layout from the
-# SDK. Disabling AppleDouble/copyfile metadata keeps package creation from
-# depending on xattrs that are not needed by the compiler.
+# SDK. Disabling AppleDouble/copyfile metadata and telling tar not to archive
+# xattrs keeps package creation from depending on metadata that is not needed by
+# the compiler.
 export COPYFILE_DISABLE=1
+
+TAR_METADATA_ARGS=(--no-xattrs)
 
 ##############################################################################
 # Helpers
@@ -90,10 +93,10 @@ copy_tree_preserve() {
     run mkdir -p "$dst"
     (
         cd "$src"
-        tar -cf - .
+        tar "${TAR_METADATA_ARGS[@]}" -cf - .
     ) | (
         cd "$dst"
-        tar -xpf -
+        tar "${TAR_METADATA_ARGS[@]}" -xpf -
     )
 }
 
@@ -764,7 +767,7 @@ if [ "$DO_PACKAGE" -eq 1 ]; then
     if command -v pkgbuild >/dev/null 2>&1; then
         msg "creating tar.xz package"
         run rm -f "$TAR_FILE"
-        run tar -C "$STAGE" -cJf "$TAR_FILE" .
+        run tar "${TAR_METADATA_ARGS[@]}" -C "$STAGE" -cJf "$TAR_FILE" .
         [ -f "$TAR_FILE" ] || die "tar package was not created: $TAR_FILE"
 
         msg "creating macOS installer package"
@@ -810,7 +813,7 @@ EOF
         run chmod 755 "$INSTALL_SH"
     else
         msg "creating tar.xz package"
-        run tar -C "$STAGE" -cJf "$TAR_FILE" .
+        run tar "${TAR_METADATA_ARGS[@]}" -C "$STAGE" -cJf "$TAR_FILE" .
         [ -f "$TAR_FILE" ] || die "tar package was not created: $TAR_FILE"
         echo "WARNING: pkgbuild not found; skipped .pkg creation"
     fi
