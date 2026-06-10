@@ -21,10 +21,7 @@
 
 
 '' Setup our booleans
-const false = 0
-const true  = not false
-const null = false
-
+const null = 0
 #include once "GL/gl.bi"
 #include once "GL/glu.bi"
 #include once "fbgfx.bi"                '' for Scan code constants
@@ -230,7 +227,7 @@ function InitGLObjects() as integer
 	dim as uinteger i
 
 	if (ReadObject(exepath + "/data/Object2.txt", @obj) = 0) then    '' Read Object2 Into obj
-		return FALSE                                      '' If Failed Return False
+		return false                                      '' If Failed Return False
 	end if
 
 	SetConnectivity(@obj)                                 '' Set Face To Face Connectivity
@@ -239,7 +236,7 @@ function InitGLObjects() as integer
 		CalcPlane(@obj, @obj.planes(i))  '' Compute Plane Equations For All Faces
 	next
 
-	return TRUE                          '' Return True
+	return true                          '' Return True
 end function
 
 '' Draw The Room (Box)

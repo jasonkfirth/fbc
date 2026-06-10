@@ -18,10 +18,7 @@
 
 
 '' Setup our booleans
-const false = 0
-const true  = not false
-const null = false
-
+const null = 0
 #include once "GL/gl.bi"
 #include once "GL/glu.bi"
 #include once "fbgfx.bi"                   '' for Scan code constants
@@ -47,7 +44,7 @@ declare sub glDrawCube()
 	dim as integer lp, fp, sp
 
 	dim filter as single                                   '' Which Filter To Use
-	dim texture(0 to 5) as uinteger                        '' Storage For 6 Textures (MODIFIED)
+	dim texture(0 to 5) as GLuint                        '' Storage For 6 Textures (MODIFIED)
 
 	dim object_ as uinteger = 1                            '' Which Object To Draw
 

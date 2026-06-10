@@ -22,8 +22,6 @@
 
 
 '' Setup our booleans
-const false = 0
-const true  = not false
 const null = 0
 
 
@@ -55,7 +53,7 @@ declare function InitGL() as integer
 
 ''------------------------------------------------------------------------------
 '' Declare Global Variables
-dim shared texture(0) as uinteger     '' Storage For 1 Texture
+dim shared texture(0) as GLuint     '' Storage For 1 Texture
 dim shared t1 as TEXTURE_IMAGE ptr    '' Pointer To The Texture Image Data Type
 dim shared t2 as TEXTURE_IMAGE ptr    '' Pointer To The Texture Image Data Type
 

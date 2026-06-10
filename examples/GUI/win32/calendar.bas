@@ -65,7 +65,7 @@ end function
 
 	with wcls
 		.style         = CS_HREDRAW or CS_VREDRAW 
-		.lpfnWndProc   = @WndProc
+		.lpfnWndProc   = cast( WNDPROC, @WndProc )
 		.cbClsExtra    = 0 
 		.cbWndExtra    = 0 
 		.hInstance     = hInstance 

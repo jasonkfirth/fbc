@@ -27,6 +27,7 @@
 
 set -euo pipefail
 trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
+CLEANUP_SUCCESS=0
 
 ##############################################################################
 # Locate project root
@@ -257,8 +258,10 @@ cleanup_mounts() {
 cleanup_root() {
     cleanup_mounts
 
+    [ "$CLEANUP_SUCCESS" -eq 1 ] || return 0
+
     if [ "$KEEP_ROOT" -eq 0 ] && [ "$REUSE_ROOT" -eq 0 ]; then
-        root_cmd rm -rf "$BUILDROOT/$ARCH" || true
+        root_cmd rm -rf "$BUILDROOT" || true
     fi
 }
 
@@ -826,6 +829,7 @@ chroot_run /usr/bin/env \
     bash /test-freebasic-packages.sh
 
 msg "Debian package tests passed for $ARCH on $SUITE"
+CLEANUP_SUCCESS=1
 
 ##############################################################################
 # end of debianports-test-freebasic.sh

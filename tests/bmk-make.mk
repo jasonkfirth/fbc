@@ -53,20 +53,20 @@ endif
 endif
 
 FBC_CFLAGS :=
-FBC_LFLAGS :=
 
 ifneq ($(FB_LANG),)
-FBC_CFLAGS += -lang $(FB_LANG)
+	FBC_CFLAGS += -lang $(FB_LANG)
+	override FBC_LFLAGS += -lang $(FB_LANG)
 endif
 
 ifneq ($(ARCH),)
-FBC_CFLAGS += -arch $(ARCH)
-FBC_LFLAGS += -arch $(ARCH)
+	FBC_CFLAGS += -arch $(ARCH)
+	override FBC_LFLAGS += -arch $(ARCH)
 endif
 
 ifneq ($(TARGET),)
-FBC_CFLAGS += -target $(TARGET)
-FBC_LFLAGS += -target $(TARGET)
+	FBC_CFLAGS += -target $(TARGET)
+	override FBC_LFLAGS += -target $(TARGET)
 endif
 
 ifneq ($(FPU),)

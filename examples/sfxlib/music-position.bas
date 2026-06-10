@@ -1,12 +1,12 @@
 #include once "example_common.bi"
 
 dim as string filename = SfxExampleMedia( "good-morning-to-all.ogg" )
-dim as long music_id
+dim as long result
 
 SfxExampleBanner( "MUSIC POSITION" )
 
-music_id = MUSIC PLAY( filename )
-if( music_id < 0 ) then
+result = MUSIC PLAY( filename )
+if( result < 0 ) then
 	print "Unable to start music playback."
 else
 	SfxExampleWait( 300 )

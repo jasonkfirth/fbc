@@ -890,6 +890,27 @@ private function hLinkFiles( ) as integer
 		case FB_CPUFAMILY_ARM
 			ldcline += "-m armelf_linux_eabi "
 		end select
+	case FB_COMPTARGET_SOLARIS
+		select case( fbGetCpuFamily( ) )
+		case FB_CPUFAMILY_X86_64
+			''
+			'' Solaris ld does not choose the output ELF class from the
+			'' startup objects or library search paths.  Without -64, an
+			'' x86_64 link still runs in the linker's default 32-bit mode
+			'' and rejects the 64-bit runtime archives as incompatible.
+			''
+			ldcline += "-64 "
+		end select
+	case FB_COMPTARGET_ILLUMOS
+		select case( fbGetCpuFamily( ) )
+		case FB_CPUFAMILY_X86_64
+			''
+			'' illumos builds commonly use GNU ld.  Its Solaris/x86_64
+			'' emulation must be selected explicitly; otherwise ld keeps
+			'' the default 32-bit Solaris mode and rejects 64-bit archives.
+			''
+			ldcline += "-m elf_x86_64_sol2 "
+		end select
 	case FB_COMPTARGET_HAIKU
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86
@@ -1529,6 +1550,28 @@ private function hLinkFiles( ) as integer
 		wend
 	end scope
 
+	dim as integer addsolarislibmearly = FALSE
+	if( fbc.nodeflibs = FALSE ) then
+		select case as const fbGetOption( FB_COMPOPT_TARGET )
+		case FB_COMPTARGET_SOLARIS, FB_COMPTARGET_ILLUMOS
+			'' Solaris libc exports some libm entry points too.  If a user
+			'' library appears before -lm and causes libc to be loaded first,
+			'' calls such as pow() can bind to libc's older entry point instead
+			'' of libm's.  Keep the default math library early in the group so
+			'' the runtime behavior matches GCC's normal Solaris link order.
+			scope
+				dim as TSTRSETITEM ptr i = listGetHead(@fbc.finallibs.list)
+				while (i)
+					if( i->s = "m" ) then
+						addsolarislibmearly = TRUE
+						exit while
+					end if
+					i = listGetNext(i)
+				wend
+			end scope
+		end select
+	end if
+
 	'' Begin of lib group
 	'' All libraries are passed inside -( -) so we don't need to worry as
 	'' much about their order and/or listing them repeatedly. (Not supported by Darwin ld)
@@ -1541,6 +1584,10 @@ private function hLinkFiles( ) as integer
 				ldcline += " ""-("""
 			end if
 		end if
+	end if
+
+	if( addsolarislibmearly ) then
+		ldcline += " -lm"
 	end if
 
 	'' Add libraries passed by file name
@@ -1562,7 +1609,9 @@ private function hLinkFiles( ) as integer
 			'' or .so's against themselves (ld will fail to read in
 			'' its output file...)
 			if ((checkdllname = FALSE) orelse (i->s <> dllname)) then
-				if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
+				if( addsolarislibmearly andalso (i->s = "m") ) then
+					'' Already emitted before user libraries, see above.
+				elseif( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
 					hAddXboxLibArchive( ldcline, i->s )
 				else
 					dim as string libname = i->s
@@ -1835,6 +1884,9 @@ private sub hReadObjinfo( )
 		select case as const( objinfoReadNext( dat ) )
 		case OBJINFO_LIB
 			strsetAdd( @fbc.finallibs, dat, FALSE )
+			if( dat = "sfx" OR dat = "sfxpic" OR dat = "sfxmt" OR dat = "sfxmtpic" ) then
+				fbSetOption( FB_COMPOPT_FBSFX, TRUE )
+			end if
 
 		case OBJINFO_LIBPATH
 			strsetAdd( @fbc.finallibpaths, dat, FALSE )
@@ -1863,6 +1915,9 @@ private sub hReadObjinfo( )
 				fbc.objinf.lang = lang
 				fbSetOption( FB_COMPOPT_LANG, lang )
 			end if
+
+		case OBJINFO_SFX
+			fbSetOption( FB_COMPOPT_FBSFX, TRUE )
 
 		case else
 			exit do
@@ -4270,6 +4325,11 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 		'' distinct types, 'char', 'unsigned char', 'signed char'.
 		'' See ir-hlc.bas:hEmitType()
 		ln += "-Wno-format "
+
+		'' Newer GCC versions diagnose some const-qualified pointer helper calls
+		'' more strictly.  The generated C is an intermediate representation owned
+		'' by fbc, so keep that compatibility detail out of user programs.
+		ln += "-Wno-incompatible-pointer-types "
 
 		if( fbGetOption( FB_COMPOPT_DEBUGINFO ) ) then
 			ln += "-g "

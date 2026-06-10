@@ -10,7 +10,7 @@
         FreeBASIC sound subsystem.
 
         The buffer layer provides the runtime-owned memory structures
-        that connect the mixer, audio drivers, streaming subsystem,
+        that connect the mixer, audio drivers, raw output queue,
         and audio capture system.
 
     Responsibilities:
@@ -33,7 +33,7 @@
 
         capture driver → runtime capture buffer → BASIC program
 
-        streaming audio → ring buffer → mixer
+        driver output queues and capture input use the shared ring buffer
 */
 
 #ifndef __FB_SFX_BUFFER_H__
@@ -55,7 +55,6 @@ extern "C" {
 
     Lock-safe ring buffer used by multiple subsystems:
 
-        • audio streaming
         • driver output queues
         • capture input buffering
 
@@ -230,25 +229,6 @@ int fb_sfxCaptureBufferRead(
     short *samples,
     int frames
 );
-
-
-
-/* ------------------------------------------------------------------------- */
-/* Stream buffer                                                             */
-/* ------------------------------------------------------------------------- */
-
-/*
-    Stream buffers are used by audio file playback and streaming
-    sources.
-
-    Streaming data is decoded into these buffers and consumed
-    by the mixer.
-*/
-
-void fb_sfxStreamBufferInit(void);
-void fb_sfxStreamBufferShutdown(void);
-
-
 
 #ifdef __cplusplus
 }

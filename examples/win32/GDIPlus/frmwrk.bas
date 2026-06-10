@@ -92,7 +92,7 @@ namespace frmwrk
 
 	    with wcls
 			.style         = CS_HREDRAW or CS_VREDRAW
-			.lpfnWndProc   = @_WndProc
+			.lpfnWndProc   = cast( WNDPROC, @_WndProc )
 			.cbClsExtra    = 0
 			.cbWndExtra    = 0
 			.hInstance     = hInstance
@@ -149,5 +149,4 @@ namespace frmwrk
 end namespace
 
 '':::::
-
 

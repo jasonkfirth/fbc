@@ -1,8 +1,43 @@
 Version 1.20.1
 
 [changed]
+- packaging/Arch Linux: added Docker-based package build and Linux package matrix coverage for Arch current x86_64 packages, writing pacman artifacts under out/linux/archlinux/current/<arch> and validating installation in a fresh Arch container.
+- packaging/Arch Linux: validated the packaged compiler dependency chain through clean-container console, gfxlib, SCREEN 13, sfxlib, sfxlib showcase, fbctests, and exampleageddon runs so installed packages bring in the libraries needed to build and run FreeBASIC programs.
+- packaging/Arch Linux: extended the Docker package matrix to cross-build aarch64 and riscv64 packages from an x86_64 Arch builder with target pacman sysroots, and validated the resulting packages in fresh native Arch Linux ARM/RISC-V containers with fbctests and exampleageddon.
+- packaging/Arch Linux: documented and skipped armv7h/armv7l package builds when using the official x86_64 Arch repositories because they do not currently provide a matching hard-float ARM Linux cross GCC package set.
+- packaging/AUR: added a separate AUR package tree for the stable freebasic package, including PKGBUILD, .SRCINFO, upload notes, metadata refresh helper, and an out/aur staging script so AUR support stays separate from the Docker package matrix.
+- inc/crt: corrected glibc jmp_buf layouts for non-x86 Linux targets, including ARM, AArch64, PowerPC, PowerPC64, RISC-V 64, S390x, and LoongArch64, fixing setjmp()/longjmp() buffer overruns exposed by the riscv64 trycatch example.
+- build/exampleageddon: filter example discovery to real .bas files so stale or broken source entries cannot crash the unattended package-validation sweep.
+- tests/package: print referenced fbctests per-test logs when log-tests summaries fail, making clean-container package failures actionable before the test container exits.
+- sfxlib: treat CAPTURE START on the null driver, including when it is the first sfxlib command in a program, as a buffer-only state change, keeping headless package validation from probing ALSA/Pulse capture devices when SFXLIB_DRIVER=null.
+- sfxlib: select exactly one MIDI backend per target, use the real Linux ALSA, Darwin CoreMIDI, Haiku, DOS, Win32, Xbox, or BSD-style backend where available, and make unsupported targets fail MIDI OPEN instead of silently dropping messages.
+- sfxlib: route SFX PLAY and SFX LOOP through the shared locked voice allocator so sample playback uses the same voice activation path as generated sounds and music.
+- sfxlib: narrowed the BASIC command surface by removing legacy media aliases, redundant wait/control forms, private generated-sound controls, and most historical SOUND overloads; MUSIC now manages one current music file with play, loop, pause, resume, stop, status, and position controls.
+- sfxlib: added opt-in `sfxlib_raw.bi` output-capture helpers for saving driver-accepted playback as 16-bit PCM WAV, and extended the composer-grid example with song load/save and WAV export.
+- tests/sfx: select the null driver by registered name in command sweeps and remove backend-library #inclib workarounds so package validation exercises the compiler/runtime link policy instead of hiding dependencies in test sources.
+- build/illumos: bootstrap and use GNU make explicitly for package builds, regardless of whether the guest names it make or gmake.
+- build/illumos: run the illumos package validation through the OpenIndiana/ttya VM path, keeping the package build, local IPS install, fbctests, and exampleageddon in one end-to-end pass.
+- build/Solaris: default x86_64 package builds to the Solaris linker at /usr/bin/ld, pass LD through bootstrap, build, and install stages, and use the Solaris 64-bit linker mode instead of accidentally selecting GNU ld from /usr/gnu/bin.
+- build/Solaris: allow package builds to bootstrap from an installed FreeBASIC compiler when no matching bootstrap/solaris-x86_64 C bootstrap sources are available.
+- packaging/Solaris: add developer/gcc to the runtime package dependency set so a clean IPS package install includes the C compiler needed by fbc-generated compile and link stages.
+- compiler/Solaris: keep libm early in the linker group so user libraries such as libffi cannot cause pow() and related math calls to bind to Solaris libc before libm.
+- compiler/Solaris: disable default PIE compiler builds on Solaris after Solaris 11.3 killed PIE-built compiler executables before startup.
+- rtlib/Solaris: use priority .init_array/.fini_array startup hooks instead of Solaris .init/.fini hooks so Solaris 11.4 runs runtime and TLS initialization before user constructors and fbcunit test registration.
+- sfxlib/third_party: guard ENOKEY errno mappings when Solaris aliases ENOKEY to ENOANO, fixing Solaris 11.4 builds of the bundled dr_wav and dr_mp3 decoders.
+- sfxlib/solaris: keep the illumos smoke path on the real Solaris audio driver instead of falling back to the null driver.
+- build scripts: clean temporary package and test build roots after successful build/validation runs across the Linux package matrices, Debian/Ubuntu/Raspbian native and cross package paths, Debian ports tests, RPM, Slackware, Haiku, and FreeBSD/OpenBSD/NetBSD/DragonFly builders, while preserving failed workspaces for diagnosis.
+- build/illumos: made OpenIndiana compiler dependency probing more deterministic on illumos by removing `sort -V` usage, preferring available compiler packages in a single candidate order, and adding clang-based fallbacks when GCC package names are absent.
+- build/illumos/VM: expanded OpenIndiana package-proxy configuration to try multiple validated mirror-root shapes and non-TLS/HTTP variants so installer path selection can recover when HTTPS endpoints are unavailable.
+- build/illumos/VM: updated OpenIndiana bootstrap/package-proxy handling so ttya bootstrap interface discovery prefers `dladm`/`ifconfig` fallback paths and package name rewrites support current OpenIndiana publisher layout under `publisher/openindiana.org`
+- build/illumos: updated build dependency install path for OpenIndiana IPS package renames (`x11/...`, `ooce/...`, and `developer/build/pkg-config`) with fallback attempts so dependency resolution works across current catalog naming variants
+- build/illumos: switched to fallback package installation for moved namespaces to avoid hard failures when exact names are absent on newer OpenIndiana repositories
+- packaging/Debian: recommend optional example development packages from freebasic-examples and freebasic-full without making those libraries mandatory compiler dependencies
+- compiler/C backend: preserve const qualifiers and selected C ABI type spellings when emitting procedure prototypes, including const pointer parameters, C long, size_t, uint64_t, and _Bool aliases
+- inc/examples: updated Linux link selection for Lua 5.3, DevIL, and GooCanvas 2.0 so their optional examples build against current distribution development packages
+- examples: reduced exampleageddon warning noise by matching OpenGL, zlib, PCRE, libcaca, SDL, Allegro, qsort, and Win32 callback examples to their C-facing binding types while preserving intentional teaching examples
 - rtlib: hardened the COM, LPT, and TCP protocol parsers against malformed numeric suffixes and integer overflows, and kept COM device formatting portable for MinGW builds
 - sfxlib: tightened buffer and capture-buffer size calculations to avoid sample-count overflows, and made CoreAudio debug byte-count formatting portable for Darwin builds
+- sfxlib/solaris: extended Solaris/illumos audio negotiation with format/channel fallback and stricter backpressure-aware write handling, including signed 8-bit conversion support so the VM audio smoke path can stay on the Solaris family driver when default constraints are not directly accepted
 - gfxlib2/Windows: quieted Cygwin GCC function-pointer cast warnings in the DPI-awareness loader
 - tests: quieted fbctests harness warnings by passing recursive make jobserver state, linking fbcunit tests with the same -mt mode used for compilation, and avoiding escaped-colon extended grep patterns
 - tests: added hardware-free COM/LPT/TCP parser coverage, runtime DIR() coverage, a thread create/join mutex stress test, and silent null-driver sfx lifecycle/capture-buffer stress tests
@@ -90,7 +125,7 @@ Version 1.20.1
 - macOS packaging: build the installer .pkg directly when pkgbuild is available, bundle the macOS SDK for package-local compile/link use, keep the bundled compiler wrapper responsible for package-local toolchain execution without leaking package dylib search paths into user-built binaries, and treat install_name_tool dependency rewrites as best-effort because some GCC-linked Mach-O layouts cannot be rewritten by Apple's tool
 - Linux/MSYS2 release flow: reworked the DOS package builder so build_scripts/msdos-build-freebasic.sh can bootstrap or reuse the DJGPP toolchain, emit the DOS distribution under out/msdos, keep Linux and MSYS2 host realities separate, and clean successful .build-msdos staging artifacts by default
 - DOS test flow: replaced the earlier ad-hoc DOS sound probe helper with a fuller image-backed build_scripts/msdos-test-freebasic.sh path that provisions its own host test dependencies on Linux or MSYS2/Windows, boots the packaged DOS distribution under DOSBox-X, validates console and SCREEN 13 from inside the DOS image, and captures isolated Sound Blaster and no-BLASTER PC speaker single/dual-tone WAVs for FFT, continuity, and spectral-noise checks
-- DOS test flow: expanded sfxlib capture validation across BEEP, SOUND, NOTE, PLAY, NOISE, SFX, MUSIC, AUDIO, and STREAM, including WAV/MP3 file playback and sample-rate-sensitive FFT checks
+- DOS test flow: expanded sfxlib capture validation across generated sound, score playback, effect playback, and decoded media paths, including WAV/MP3 file playback and sample-rate-sensitive FFT checks
 - DOS test flow: expanded the tests/ harness so fbcunit and log-test lanes can be run from the packaged DOS compiler under DOSBox-X/686, with DOS-only filtering for interactive tests, thread-only tests, and cases that depend on unavailable DOS platform behaviour
 - DOS threading policy: removed the misleading pthread-style DOS threading path, made -mt and ThreadCall unsupported on DOS, and kept the DOS thread runtime stubs non-parallel instead of pretending to provide normal cross-platform thread semantics
 - Debian/Ubuntu packaging: keep the native compiler, runtime, startup objects, libraries, and core headers together in the freebasic package, split third-party bindings and examples into separate packages, and leave freebasic-runtime/freebasic-dev as transitional compatibility packages
@@ -118,6 +153,7 @@ Version 1.20.1
 - Debian armel packaging: added Debian trixie armel package validation using official Debian armel packages, installed the linux-arm compatibility link to the linux-armel runtime directory, selected the soft-float ARM dynamic linker on armel, and validated console/gfxlib/sfxlib smokes plus a full fbctests run under qemu-arm
 - Linux package validation: extend the Docker package test matrix with optional full fbctests runs and stronger package smoke coverage for console, gfxlib, SCREEN 13/SCREENSET, sfxlib, and the installed sfxlib showcase example
 - Linux package validation: teach the Raspbian armhf test lane to run compiler, smoke, and fbctests checks under QEMU's ARM1176 CPU model, verify armv6l runtime exposure, and confirm emitted ARMv6 hard-float ELF attributes
+- illumos testing flow: switched all illumos build and test scripts away from OmniOS endpoints to OpenIndiana endpoints (images, package mirrors, and publishers), including HTTP mirroring/proxy rewrites and image format handling updates so fbctests can run against an accessible base
 - JavaScript/Emscripten packaging: split the JS-target compiler and runtime into a separate fbc-js/freebasic-js install layout so it can be installed alongside the native FreeBASIC packages without changing the normal fbc defaults
 - JavaScript/Emscripten packaging: make freebasic-js opt-in for Debian/Ubuntu builds via the nojs build profile and the build script's --no-js switch so default/native package builds can skip the Emscripten dependency chain
 - JavaScript/Emscripten runtime: make SLEEP 0 and tight INKEY polling yield through Asyncify instead of busy-waiting or returning as a no-op, so browser-hosted programs can keep input, timers, and canvas presentation moving
@@ -146,6 +182,8 @@ Version 1.20.1
 - examples: documented the Windows win32/win64 compile sweeps in examples/windows-example-notes.md, including the remaining old third-party library families that need a clean redistributable library set or later pruning
 - examples: documented the Cygwin compile sweep in examples/cygwin-example-notes.md, noting that the core examples compile and the remaining out-of-box failures are optional external-library link gaps
 - examples: added build_scripts/exampleageddon-freebasic.py to compile the full examples tree, classify external/platform/helper/interactive cases, run unattended self-contained examples from isolated out/ working directories, and write CSV/Markdown reports for future sweeps
+- examples/Solaris: made compiler builtin examples portable to the GCC 4.8 toolchain shipped with Solaris 11.3 by avoiding newer diagnostic options and checked-overflow builtins that older GCC does not lower.
+- packaging/Solaris: archived the validated Solaris IPS package repository under out/solaris/5.11/amd64/repo so Solaris package outputs use the same lowercase out/ platform layout as the other packaged targets.
 - examples/macOS: hardened the Exampleageddon runner around multi-file examples, timeout handling, and source-tree copying so the installed Darwin compiler can repeatedly compile and run self-contained examples from isolated work directories
 - macOS packaging: make build_scripts/macos-build-freebasic.sh work more consistently on Intel and Apple Silicon hosts by discovering Homebrew from either common prefix, accepting the aarch64 arch spelling, checking the selected GCC driver, using a portable version sort, and verifying the expected tar.xz/.pkg outputs
 - macOS tests: added gfxlib and sfxlib command-sweep programs that compile and run every compiler-registered graphics and sound command surface available on the platform, including null-driver gfx/sfx coverage and QB-only STICK/STRIG linkage coverage
@@ -153,6 +191,13 @@ Version 1.20.1
 - tests: refreshed warning-test expectations to match the compiler's corrected "Ambiguous" diagnostic spelling
 
 [added]
+- sfxlib: added inc/sfxlib_raw.bi and fb_sfxRawWrite() as opt-in raw floating-point output queue access for power users, keeping raw driver feeding separate from the compiler command surface.
+- build/illumos: added installed-package validation for illumos/OpenIndiana packages, including fbctests and exampleageddon after local IPS publication and installation.
+- build/Solaris: added clean Solaris 11.3/11.4 IPS package validation that installs the locally published package into a fresh VM, verifies package dependencies, and runs fbctests plus exampleageddon against the installed compiler.
+- gfxlib2/solaris: added a GETJOYSTICK missing-device fallback so Solaris/illumos gfxlib programs link and report the normal unsupported joystick values when no native joystick backend is present.
+- inc: added builtin.bi with GCC/Clang-compatible declarations for common memory/string, bit-operation, byte-swap, object-size, fixed-type overflow, and branch/codegen builtins
+- examples: added self-contained compiler builtin examples so exampleageddon validates builtin.bi through memory/string and numeric builtin use
+- tests: added C backend and builtin regression coverage for const pointer prototype emission, exact C ABI spelling, and GCC/Clang builtin declaration compatibility
 - gfxlib2: added GetTouchCount(), GetTouch(), and GetTouchHit() commands for logical-coordinate touch polling, with rectangular/circular hit testing, mouse-button fallback on drivers without native touch state, and native active-contact support on Android, JavaScript, and Windows
 - Nintendo Wii homebrew target support, including fbc-wii, powerpc-eabi/devkitPPC target selection, libogc headers/runtime libraries, DOL output generation, Wii CRT binding shims, and package-local compiler driver tooling
 - fbc-wii --bundle and --assets options for building a Homebrew Channel/Dolphin-style boot.dol directory with current-directory data files beside the executable
@@ -246,6 +291,14 @@ Version 1.20.1
 - Android/Xbox headers: extended selected CRT and SDL bindings so more examples compile against the Android and Xbox package headers without depending on unavailable desktop window-system types
 
 [fixed]
+- build/illumos: fixed package installation under illumos /usr/bin/install by using portable copy/chmod steps for installed binaries and runtime libraries.
+- build/illumos: fixed fbctests cleanup after log-tests by leaving the test working directory before removing the temporary tree.
+- compiler: fixed UTF-16LE macro argument list expansion for negative step counts by routing WSTRING integer parsing through the shared string parser.
+- rtlib/solaris: fixed numeric WSTRING formatting by avoiding the old Solaris swprintf ABI and the unavailable snwprintf symbol.
+- sfxlib/solaris: fixed illumos shutdown hangs by avoiding the Solaris background worker path and flushing queued /dev/audio output before close.
+- examples: fixed illumos exampleageddon classification for profiler examples that require profiler-specific compilation options.
+- illumos VM: made source tar extraction more resilient on OpenIndiana by excluding nonessential Android payload metadata and retrying with a targeted fallback when tar reports write failures on QEMU boots
+- illumos build flow: hardened serial bootstrap + upload path to avoid build-blocking `tar: ... HELP - extract write error` failures under illumos's extraction behavior by reducing tar metadata and preserving only extractable tree members
 - compiler: model LoongArch64 GCC __builtin_va_list as a void pointer type so C++ symbol mangling agrees with g++ for cva_list parameters
 - compiler/gas64: fix cycle-profiler epilog assembly emission so -profgen cycles no longer emits a malformed "mov rcx, rdx,KNOFREE" instruction
 - compiler/gas64: treat Haiku x86_64 as a System V assembler target for profiling sections, fixing Haiku cycle-profiling example builds under exampleageddon
@@ -304,7 +357,7 @@ Version 1.20.1
 - sfxlib: avoid a shutdown deadlock exposed by the new runtime state tests
 - Windows/sfxlib: avoid shutdown deadlocks and duplicate fallback-driver initialization when worker-thread output fails during teardown
 - Windows/sfxlib: let WASAPI and WinMM output writes abort promptly once shutdown has been requested, preventing short examples from leaving audio worker threads stuck
-- sfxlib: make mixer diagnostics and SFXLIB_MIXER_DUMP capture the final mixed output buffer, including decoded audio and stream sources, instead of only the synthesized voice pass
+- sfxlib: make mixer diagnostics and SFXLIB_MIXER_DUMP capture the final mixed output buffer, including decoded media sources, instead of only the synthesized voice pass
 - sfxlib: make the null output driver participate in SFXLIB_DRIVER_DUMP diagnostics so CI tests can inspect the stream at the driver-write boundary without opening a real audio device
 - sfxlib: process large fb_sfxUpdate() requests in mix-buffer-sized chunks and clamp output queue drains so long diagnostic updates cannot overwrite the runtime mix buffer
 - sfxlib: serialize platform driver writes and pause background feeder threads during foreground PLAY/BEEP waits, preventing Windows WASAPI/WinMM foreground examples from falling back or truncating near-device output
@@ -328,7 +381,7 @@ Version 1.20.1
 - x86/DOS codegen: keep DOS on the older x87 status-word comparison path even with -arch 686, avoiding operandless fcomip emission that produced unreliable results under the DJGPP/DPMI DOS test environment
 - DOS/rtlib: reset the x87 FPU during runtime startup and remove unused pthread mutex, condition variable, TLS, and delay paths from the DOS runtime so the non-threaded port starts from a known FPU state
 - DOS/sfxlib: fixed the DOS backend integration by moving the target sources into src/sfxlib/dos, wiring them into the normal DOS build graph, correcting the Sound Blaster/MIDI linkage and runtime initialization, making missing BLASTER settings fail visibly for the Sound Blaster path instead of silently pretending a card exists, and making DOS foreground/delay audio pumping aware of blocking drivers so Sound Blaster playback does not pick up extra sleep gaps
-- sfxlib: advance AUDIO PLAY and STREAM decoded media by the source-to-device sample-rate ratio, fixing half-speed file playback on DOS Sound Blaster's lower-rate DMA path
+- sfxlib: advance decoded media playback by the source-to-device sample-rate ratio, fixing half-speed file playback on DOS Sound Blaster's lower-rate DMA path
 - gfxlib2: finish updated JavaScript and Xbox driver stubs for screen locking, vsync, mouse handling, event polling, and joystick compatibility, with GETJOYSTICK backed by the new controller polling path where applicable
 - gfxlib2/DOS: implement BIOS EGA/CGA palette handling, preserve requested VESA refresh rates with a 60 Hz fallback, fix VESA palette buffer sizing, and remove dead unfinished protected-mode palette code
 - gfxlib2: fix endian and unaligned-access assumptions in BLOAD and image row conversion paths

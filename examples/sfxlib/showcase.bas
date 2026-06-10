@@ -14,13 +14,11 @@ declare sub DemoDevice()
 declare sub DemoSynthesis()
 declare sub DemoMusic( byref music_file as string )
 declare sub DemoSfx( byref sfx_file as string )
-declare sub DemoAudioAndStream( byref audio_file as string )
 declare sub DemoMidi( byref midi_file as string )
 declare sub DemoCapture( byref capture_output as string )
 
 dim as string music_file = SfxExampleMedia( "good-morning-to-all.ogg" )
 dim as string sfx_file = SfxExampleMedia( "buzzer.wav" )
-dim as string audio_file = SfxExampleMedia( "clown-laugh.mp3" )
 dim as string midi_file = SfxExampleMedia( "harmonized-scale.mid" )
 dim as string capture_output = exepath() & SFX_EXAMPLE_PATHSEP & "showcase-capture.wav"
 
@@ -37,7 +35,6 @@ DemoDevice()
 DemoSynthesis()
 DemoMusic( music_file )
 DemoSfx( sfx_file )
-DemoAudioAndStream( audio_file )
 DemoMidi( midi_file )
 DemoCapture( capture_output )
 
@@ -125,33 +122,32 @@ sub DemoSynthesis()
 end sub
 
 sub DemoMusic( byref music_file as string )
-	dim as long loaded_music
-	dim as long active_music
+	dim as long result
 
 	SfxExampleBanner( "MUSIC COMMANDS" )
 	print "Music file:"; music_file
 
-	'' MUSIC LOAD prepares a music file and returns an id.
-	'' This example prints the id so the reader can see what came back.
-	loaded_music = MUSIC LOAD( music_file )
-	print "MUSIC LOAD returned"; loaded_music
+	'' MUSIC LOAD prepares one current music file and replaces any previous
+	'' current music.
+	result = MUSIC LOAD( music_file )
+	print "MUSIC LOAD returned"; result
 	print "MUSIC STATUS before playback:"; MUSIC STATUS()
 
-	'' MUSIC PLAY starts playback immediately and returns the active music id.
-	active_music = MUSIC PLAY( music_file )
-	print "MUSIC PLAY returned"; active_music
+	'' MUSIC PLAY starts the current music.  The file form loads/replaces the
+	'' current music first, then starts it.
+	result = MUSIC PLAY( music_file )
+	print "MUSIC PLAY returned"; result
 
-	if( active_music >= 0 ) then
-		'' While music is running we can inspect state with CURRENT, POSITION,
-		'' and STATUS, then pause/resume by id.
+	if( result >= 0 ) then
+		'' While music is running we can inspect POSITION and STATUS, then
+		'' pause or resume the current music.
 		SfxExampleWait( 350 )
-		print "MUSIC CURRENT() ="; MUSIC CURRENT()
 		print "MUSIC POSITION() ="; MUSIC POSITION()
 		print "MUSIC STATUS() ="; MUSIC STATUS()
-		MUSIC PAUSE( active_music )
+		MUSIC PAUSE
 		print "Paused music."
 		SfxExampleWait( 250 )
-		MUSIC RESUME( active_music )
+		MUSIC RESUME
 		print "Resumed music."
 		SfxExampleWait( 350 )
 		MUSIC STOP
@@ -160,9 +156,9 @@ sub DemoMusic( byref music_file as string )
 
 	'' MUSIC LOOP works like MUSIC PLAY, but restarts automatically.
 	print "Starting a short MUSIC LOOP demo."
-	active_music = MUSIC LOOP( music_file )
-	print "MUSIC LOOP returned"; active_music
-	if( active_music >= 0 ) then
+	result = MUSIC LOOP( music_file )
+	print "MUSIC LOOP returned"; result
+	if( result >= 0 ) then
 		SfxExampleWait( 400 )
 		MUSIC STOP
 	end if
@@ -200,54 +196,6 @@ sub DemoSfx( byref sfx_file as string )
 	SfxExampleWait( 300 )
 	SFX STOP CHANNEL, 2
 	print "Stopped channel 2."
-end sub
-
-sub DemoAudioAndStream( byref audio_file as string )
-	dim as long result
-
-	SfxExampleBanner( "AUDIO AND STREAM COMMANDS" )
-	print "Audio file:"; audio_file
-	'' AUDIO commands are the "simple one-at-a-time" playback interface.
-	print "AUDIO STATUS before playback:"; AUDIO STATUS()
-
-	result = AUDIO PLAY( audio_file )
-	print "AUDIO PLAY returned"; result
-	if( result = 0 ) then
-		SfxExampleWait( 300 )
-		print "AUDIO STATUS while playing:"; AUDIO STATUS()
-		AUDIO PAUSE
-		print "AUDIO STATUS after pause:"; AUDIO STATUS()
-		SfxExampleWait( 200 )
-		AUDIO RESUME
-		SfxExampleWait( 250 )
-		AUDIO STOP
-	end if
-
-	'' AUDIO LOOP keeps replaying the file until AUDIO STOP is called.
-	result = AUDIO LOOP( audio_file )
-	print "AUDIO LOOP returned"; result
-	if( result = 0 ) then
-		SfxExampleWait( 350 )
-		AUDIO STOP
-	end if
-
-	'' STREAM commands expose a little more control.  You open a stream first,
-	'' then use PLAY, POSITION, SEEK, PAUSE, RESUME, and STOP on that stream.
-	result = STREAM OPEN( audio_file )
-	print "STREAM OPEN returned"; result
-	if( result = 0 ) then
-		STREAM PLAY
-		SfxExampleWait( 300 )
-		print "STREAM POSITION() ="; STREAM POSITION()
-		result = STREAM SEEK( 500 )
-		print "STREAM SEEK returned"; result
-		print "STREAM POSITION() after seek ="; STREAM POSITION()
-		STREAM PAUSE
-		SfxExampleWait( 200 )
-		STREAM RESUME
-		SfxExampleWait( 250 )
-		STREAM STOP
-	end if
 end sub
 
 sub DemoMidi( byref midi_file as string )

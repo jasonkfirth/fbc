@@ -11,9 +11,6 @@
 
 #include "fbgfx.bi"
 
-const FALSE = 0
-const TRUE = (-1)
-
 type EXPLOSION_TYPE
 	sprite as ubyte ptr
 	x as integer

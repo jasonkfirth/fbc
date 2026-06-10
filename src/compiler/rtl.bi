@@ -271,29 +271,15 @@
 #define FB_RTL_FILEOPEN_QB              "fb_FileOpenQB"
 #define FB_RTL_EOC                      "fb_Eoc"
 #define FB_RTL_TCPACCEPT                "fb_TcpAccept"
-#define FB_RTL_SFXSOUNDSTOP             "fb_sfxSoundStop"
-#define FB_RTL_SFXSOUNDSTOPCHANNEL      "fb_sfxSoundStopChannel"
-#define FB_RTL_SFXNOISESTOP             "fb_sfxNoiseStopAll"
-#define FB_RTL_SFXNOISESTOPCHANNEL      "fb_sfxNoiseStop"
-#define FB_RTL_SFXTONESTOP              "fb_sfxToneStopAll"
-#define FB_RTL_SFXTONESTOPCHANNEL       "fb_sfxToneStop"
-#define FB_RTL_SFXPLAYSTOP              "fb_sfxPlayStop"
-#define FB_RTL_SFXPLAYPAUSE             "fb_sfxPlayPause"
-#define FB_RTL_SFXPLAYRESUME            "fb_sfxPlayResume"
-#define FB_RTL_SFXPLAYSTATUS            "fb_sfxPlayStatus"
 #define FB_RTL_SFXMUSICLOAD             "fb_sfxMusicLoad"
 #define FB_RTL_SFXMUSICPLAY             "fb_sfxMusicPlayCmd"
 #define FB_RTL_SFXMUSICPLAYFILE         "fb_sfxMusicPlayFile"
 #define FB_RTL_SFXMUSICLOOP             "fb_sfxMusicLoopCmd"
 #define FB_RTL_SFXMUSICLOOPFILE         "fb_sfxMusicLoopFile"
 #define FB_RTL_SFXMUSICPAUSE            "fb_sfxMusicPause"
-#define FB_RTL_SFXMUSICPAUSEID          "fb_sfxMusicPauseId"
 #define FB_RTL_SFXMUSICRESUME           "fb_sfxMusicResume"
-#define FB_RTL_SFXMUSICRESUMEID         "fb_sfxMusicResumeId"
 #define FB_RTL_SFXMUSICSTOP             "fb_sfxMusicStop"
-#define FB_RTL_SFXMUSICSTOPID           "fb_sfxMusicStopId"
 #define FB_RTL_SFXMUSICSTATUS           "fb_sfxMusicStatus"
-#define FB_RTL_SFXMUSICCURRENT          "fb_sfxMusicCurrent"
 #define FB_RTL_SFXMUSICPOSITION         "fb_sfxMusicPosition"
 #define FB_RTL_SFXSFXLOAD               "fb_sfxSfxLoad"
 #define FB_RTL_SFXSFXPLAY               "fb_sfxSfxPlay"
@@ -314,19 +300,6 @@
 #define FB_RTL_SFXSFXSTATUS             "fb_sfxSfxStatus"
 #define FB_RTL_SFXSFXSTATUSCHANNEL      "fb_sfxSfxStatusChannel"
 #define FB_RTL_SFXSFXANYACTIVE          "fb_sfxSfxAnyActive"
-#define FB_RTL_SFXAUDIOPLAY             "fb_sfxAudioPlay"
-#define FB_RTL_SFXAUDIOLOOP             "fb_sfxAudioLoop"
-#define FB_RTL_SFXAUDIOSTOP             "fb_sfxAudioStop"
-#define FB_RTL_SFXAUDIOPAUSE            "fb_sfxAudioPause"
-#define FB_RTL_SFXAUDIORESUME           "fb_sfxAudioResume"
-#define FB_RTL_SFXAUDIOSTATUS           "fb_sfxAudioStatus"
-#define FB_RTL_SFXSTREAMOPEN            "fb_sfxStreamOpen"
-#define FB_RTL_SFXSTREAMPLAY            "fb_sfxStreamPlay"
-#define FB_RTL_SFXSTREAMSTOP            "fb_sfxStreamStop"
-#define FB_RTL_SFXSTREAMPAUSE           "fb_sfxStreamPause"
-#define FB_RTL_SFXSTREAMRESUME          "fb_sfxStreamResume"
-#define FB_RTL_SFXSTREAMPOSITION        "fb_sfxStreamPosition"
-#define FB_RTL_SFXSTREAMSEEK            "fb_sfxStreamSeek"
 #define FB_RTL_SFXMIDIOPEN              "fb_sfxMidiOpen"
 #define FB_RTL_SFXMIDICLOSE             "fb_sfxMidiClose"
 #define FB_RTL_SFXMIDIPLAY              "fb_sfxMidiPlay"
@@ -843,29 +816,15 @@ enum FB_RTL_IDX
 	FB_RTL_IDX_WIDTHFILE
 	FB_RTL_IDX_EOC
 	FB_RTL_IDX_TCPACCEPT
-	FB_RTL_IDX_SFXSOUNDSTOP
-	FB_RTL_IDX_SFXSOUNDSTOPCHANNEL
-	FB_RTL_IDX_SFXNOISESTOP
-	FB_RTL_IDX_SFXNOISESTOPCHANNEL
-	FB_RTL_IDX_SFXTONESTOP
-	FB_RTL_IDX_SFXTONESTOPCHANNEL
-	FB_RTL_IDX_SFXPLAYSTOP
-	FB_RTL_IDX_SFXPLAYPAUSE
-	FB_RTL_IDX_SFXPLAYRESUME
-	FB_RTL_IDX_SFXPLAYSTATUS
 	FB_RTL_IDX_SFXMUSICLOAD
 	FB_RTL_IDX_SFXMUSICPLAY
 	FB_RTL_IDX_SFXMUSICPLAYFILE
 	FB_RTL_IDX_SFXMUSICLOOP
 	FB_RTL_IDX_SFXMUSICLOOPFILE
 	FB_RTL_IDX_SFXMUSICPAUSE
-	FB_RTL_IDX_SFXMUSICPAUSEID
 	FB_RTL_IDX_SFXMUSICRESUME
-	FB_RTL_IDX_SFXMUSICRESUMEID
 	FB_RTL_IDX_SFXMUSICSTOP
-	FB_RTL_IDX_SFXMUSICSTOPID
 	FB_RTL_IDX_SFXMUSICSTATUS
-	FB_RTL_IDX_SFXMUSICCURRENT
 	FB_RTL_IDX_SFXMUSICPOSITION
 	FB_RTL_IDX_SFXSFXLOAD
 	FB_RTL_IDX_SFXSFXPLAY
@@ -886,19 +845,6 @@ enum FB_RTL_IDX
 	FB_RTL_IDX_SFXSFXSTATUS
 	FB_RTL_IDX_SFXSFXSTATUSCHANNEL
 	FB_RTL_IDX_SFXSFXANYACTIVE
-	FB_RTL_IDX_SFXAUDIOPLAY
-	FB_RTL_IDX_SFXAUDIOLOOP
-	FB_RTL_IDX_SFXAUDIOSTOP
-	FB_RTL_IDX_SFXAUDIOPAUSE
-	FB_RTL_IDX_SFXAUDIORESUME
-	FB_RTL_IDX_SFXAUDIOSTATUS
-	FB_RTL_IDX_SFXSTREAMOPEN
-	FB_RTL_IDX_SFXSTREAMPLAY
-	FB_RTL_IDX_SFXSTREAMSTOP
-	FB_RTL_IDX_SFXSTREAMPAUSE
-	FB_RTL_IDX_SFXSTREAMRESUME
-	FB_RTL_IDX_SFXSTREAMPOSITION
-	FB_RTL_IDX_SFXSTREAMSEEK
 	FB_RTL_IDX_SFXMIDIOPEN
 	FB_RTL_IDX_SFXMIDICLOSE
 	FB_RTL_IDX_SFXMIDIPLAY

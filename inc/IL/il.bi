@@ -30,7 +30,10 @@
 #pragma once
 
 #inclib "IL"
+'' Current Linux DevIL packages resolve codec dependencies through libIL.
+#ifndef __FB_LINUX__
 #inclib "jasper"
+#endif
 #inclib "jpeg"
 #inclib "tiff"
 #inclib "mng"

@@ -190,13 +190,13 @@ function WinMain ( byval hInstance as HINSTANCE, _
     appName = "Menu Test"
      
     with wcls
-     	.style         = CS_HREDRAW or CS_VREDRAW
-     	.lpfnWndProc   = @WndProc
-     	.cbClsExtra    = 0
-     	.cbWndExtra    = 0
-     	.hInstance     = hInstance
-     	.hIcon         = LoadIcon( null, IDI_APPLICATION )
-     	.hCursor       = LoadCursor( null, IDC_ARROW )
+		.style         = CS_HREDRAW or CS_VREDRAW
+		.lpfnWndProc   = cast( WNDPROC, @WndProc )
+		.cbClsExtra    = 0
+		.cbWndExtra    = 0
+		.hInstance     = hInstance
+		.hIcon         = LoadIcon( null, IDI_APPLICATION )
+		.hCursor       = LoadCursor( null, IDC_ARROW )
      	.hbrBackground = GetStockObject( WHITE_BRUSH )
      	.lpszMenuName  = null
      	.lpszClassName = strptr( appName )

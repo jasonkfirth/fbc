@@ -64,7 +64,7 @@ private function movctrl_GetRegClass _
 	
 	with wc
 		.cbSize 		= len( WNDCLASSEX )
-		.lpfnWndProc 	= @win_cb
+		.lpfnWndProc 	= cast( WNDPROC, @win_cb )
 		.hInstance 		= instance
 		.lpszClassName 	= @movctrl_name
 		''''''.style	= CS_HREDRAW or CS_VREDRAW  (not needed, the control takes the whole client area)

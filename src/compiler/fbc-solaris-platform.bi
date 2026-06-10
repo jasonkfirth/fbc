@@ -54,8 +54,8 @@ private sub fbcSolarisPlatformAddDefaultLibs( )
 
 	fbcAddDefLib( "gcc" )
 	fbcAddDefLib( "pthread" )
-	fbcAddDefLib( "c" )
 	fbcAddDefLib( "m" )
+	fbcAddDefLib( "c" )
 #ifndef DISABLE_TCP
 	fbcAddDefLib( "socket" )
 	fbcAddDefLib( "nsl" )

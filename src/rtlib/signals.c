@@ -6,6 +6,11 @@
 #include "fb.h"
 #include <signal.h>
 
+#ifndef NSIG
+/* Not all Unix headers expose the non-standard NSIG value. */
+#define NSIG 128
+#endif
+
 #if defined( HOST_WIN32 )
 #include <windows.h>
 

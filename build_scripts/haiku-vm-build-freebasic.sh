@@ -11,7 +11,7 @@
 #
 # Responsibilities:
 #
-#   * download or reuse an official Haiku x86 or x86_64 anyboot image
+#   * download or reuse an official Haiku x86_gcc2h or x86_64 anyboot image
 #   * patch the live image so it starts sshd on first boot
 #   * build FreeBASIC inside a Haiku QEMU VM using haiku-build-freebasic.sh
 #   * install the resulting .hpkg in a separate clean Haiku VM
@@ -33,6 +33,7 @@ RUN_DIR="$WORKROOT/run"
 PACKAGE_DIR="$WORKROOT/packages"
 LOG_DIR="$WORKROOT/logs"
 ARCH="x86_64"
+IMAGE_ARCH="x86_64"
 TARGET_ARCH=""
 ARCHIVE_DIR=""
 IMAGE_URL=""
@@ -68,8 +69,8 @@ usage() {
 Usage: ./build_scripts/haiku-vm-build-freebasic.sh [options]
 
 Options:
-  --image-url URL          Haiku x86_64 or x86 anyboot .zip or .iso URL.
-  --image FILE             Existing Haiku x86_64 or x86 anyboot .zip or .iso.
+  --image-url URL          Haiku x86_64 or x86_gcc2h anyboot .zip or .iso URL.
+  --image FILE             Existing Haiku x86_64 or x86_gcc2h anyboot .zip or .iso.
   --package FILE           Existing .hpkg to test.
   --arch ARCH              Haiku architecture: x86_64, x86, or i386.
   --test-only              Test --package without rebuilding FreeBASIC.
@@ -136,18 +137,34 @@ while [ "$#" -gt 0 ]; do
 	esac
 done
 
+QEMU_BIN=""
+case "$ARCH" in
+	x86_64)
+		IMAGE_ARCH="x86_64"
+		QEMU_BIN="qemu-system-x86_64"
+		;;
+	x86)
+		IMAGE_ARCH="x86_gcc2h"
+		QEMU_BIN="qemu-system-i386"
+		;;
+esac
+
 if [ -n "$TARGET_ARCH" ]; then
-    case "$TARGET_ARCH" in
-        x86_64|amd64)
-            ARCH="x86_64"
-            ;;
-        x86|i386)
-            ARCH="x86"
-            ;;
-        *)
-            die "unsupported Haiku architecture: $TARGET_ARCH"
-            ;;
-    esac
+	case "$TARGET_ARCH" in
+		x86_64|amd64)
+			ARCH="x86_64"
+			IMAGE_ARCH="x86_64"
+			QEMU_BIN="qemu-system-x86_64"
+			;;
+		x86|i386|i486|i586|i686|x86_gcc2|x86_gcc2h)
+			ARCH="x86"
+			IMAGE_ARCH="x86_gcc2h"
+			QEMU_BIN="qemu-system-i386"
+			;;
+		*)
+			die "unsupported Haiku architecture: $TARGET_ARCH"
+			;;
+	esac
 fi
 
 case "$ARCH" in
@@ -155,17 +172,7 @@ case "$ARCH" in
 	*) die "only x86_64 and x86 (i386) are supported by this script" ;;
 esac
 
-QEMU_BIN=""
-case "$ARCH" in
-	x86_64)
-		QEMU_BIN="qemu-system-x86_64"
-		;;
-	x86)
-		QEMU_BIN="qemu-system-i386"
-		;;
-esac
-
-NIGHTLY_INDEX_URL="https://download.haiku-os.org/nightly-images/$ARCH/"
+NIGHTLY_INDEX_URL="https://download.haiku-os.org/nightly-images/$IMAGE_ARCH/"
 
 if [ -z "$ARCHIVE_DIR" ]; then
     ARCHIVE_DIR="$ROOT/out/haiku/$ARCH"
@@ -246,7 +253,7 @@ check_host_tools() {
 
 latest_haiku_url() {
 	curl -fsSL "$NIGHTLY_INDEX_URL" |
-		sed -n "s/.*href=\"\([^\"]*${ARCH}-anyboot\.zip\)\".*/\1/p" |
+		sed -n "s/.*href=\"\([^\"]*${IMAGE_ARCH}-anyboot\.zip\)\".*/\1/p" |
 		awk 'NF && !found { print; found = 1 }'
 }
 
@@ -301,7 +308,7 @@ extract_iso() {
 	extract_dir="$CACHE_DIR/extracted/$image_base"
 	mkdir -p "$extract_dir"
 
-	ISO_FILE="$(find "$extract_dir" -maxdepth 1 -type f -name '*x86_64*anyboot*.iso' | head -n 1)"
+	ISO_FILE="$(find "$extract_dir" -maxdepth 1 -type f -name "*${IMAGE_ARCH}*anyboot*.iso" | head -n 1)"
 	if [ -n "$ISO_FILE" ] && [ -f "$ISO_FILE" ]; then
 		msg "Using extracted ISO $ISO_FILE"
 		return 0
@@ -317,9 +324,9 @@ extract_iso() {
 		unzip -q "$IMAGE_FILE" -d "$extract_dir"
 	fi
 
-	ISO_FILE="$(find "$extract_dir" -maxdepth 1 -type f -name '*x86_64*anyboot*.iso' | head -n 1)"
+	ISO_FILE="$(find "$extract_dir" -maxdepth 1 -type f -name "*${IMAGE_ARCH}*anyboot*.iso" | head -n 1)"
 	[ -n "$ISO_FILE" ] && [ -f "$ISO_FILE" ] ||
-		die "could not find x86_64 anyboot ISO in $IMAGE_FILE"
+		die "could not find $IMAGE_ARCH anyboot ISO in $IMAGE_FILE"
 }
 
 resolve_package_file() {
@@ -479,7 +486,7 @@ start_vm() {
 	local qemu_args
 
 	qemu_args=(
-		qemu-system-x86_64
+		"$QEMU_BIN"
 		-enable-kvm
 		-cpu host
 		-m "$MEMORY"
@@ -938,7 +945,7 @@ log=/Work/freebasic-haiku-build.log
 cd "$SOURCE_DIR"
 rm -f "$log"
 
-HAIKU_SKIP_DEPS=1 HAIKU_SKIP_NET_DEPS=1 ./build_scripts/haiku-build-freebasic.sh --noinstall > "$log" 2>&1 &
+HAIKU_SKIP_DEPS=1 HAIKU_SKIP_NET_DEPS=1 HAIKU_PRESERVE_HPKG=1 ./build_scripts/haiku-build-freebasic.sh --noinstall > "$log" 2>&1 &
 pid=$!
 
 while kill -0 "$pid" 2>/dev/null; do
@@ -967,7 +974,7 @@ EOF
 	scp_from_guest "$key" "$port" "$source_dir/$remote_hpkg" "$PACKAGE_DIR/"
 
 	local hpkg
-	hpkg="$(find "$PACKAGE_DIR" -maxdepth 1 -type f -name 'freebasic-*.hpkg' | sort | tail -n 1)"
+	hpkg="$PACKAGE_DIR/$remote_hpkg"
 	[ -n "$hpkg" ] && [ -f "$hpkg" ] || die "Haiku package was not copied out"
 	printf '%s\n' "$hpkg" > "$vm_dir/package.path"
 }

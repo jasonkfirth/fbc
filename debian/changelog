@@ -151,6 +151,9 @@ freebasic (1.20.1-1) jammy; urgency=medium
   * Recommend adb and Android emulator command-line tooling from the
     freebasic-android package so installed users have a local APK test path
     without making emulator infrastructure mandatory for package installs.
+  * Recommend optional example development packages from freebasic-examples
+    and freebasic-full so users can build more bundled examples without
+    making those libraries mandatory compiler dependencies.
   * Fix Android triplet detection so aarch64-linux-android resolves to
     TARGET_OS=android and use the NDK clang driver for Android assembly.
   * Fix Android sfxlib archives so the generic core does not retain a

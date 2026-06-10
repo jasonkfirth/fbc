@@ -64,10 +64,10 @@ private:
 	declare sub clearSubstrlist()
 
 	as pcre ptr reg
-	as pcre_extra_ ptr extra
-	as integer ptr vectb
+	as pcre_extra ptr extra
+	as long ptr vectb
 	as zstring ptr subject
-	as integer sublen
+	as long sublen
 	as integer substrcnt
-	as zstring ptr ptr substrlist
+	as const zstring ptr ptr substrlist
 end type

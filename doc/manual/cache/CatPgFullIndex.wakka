@@ -159,8 +159,6 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgAssertwarn|ASSERTWARN"}}
 	- {{fbdoc item="keyword" value="KeyPgAtan2|ATAN2"}}
 	- {{fbdoc item="keyword" value="KeyPgAtn|ATN"}}
-	- {{fbdoc item="keyword" value="KeyPgAudio|AUDIO"}}
-
 {{fbdoc item="section" value="B"}}{{anchor name="b"}}
 	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|BALANCE"}}
 	- {{fbdoc item="keyword" value="KeyPgBaseInit|BASE (initializer)"}}
@@ -535,7 +533,6 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgRedim|REDIM"}}
 	- {{fbdoc item="keyword" value="KeyPgRem|REM"}}
 	- {{fbdoc item="keyword" value="KeyPgReset|RESET"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|REST"}}
 	- {{fbdoc item="keyword" value="KeyPgRestore|RESTORE"}}
 	- {{fbdoc item="keyword" value="KeyPgResume|RESUME"}}
 	- {{fbdoc item="keyword" value="KeyPgResumenext|RESUME NEXT"}}
@@ -600,7 +597,6 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgStop|STOP"}}
 	- {{fbdoc item="keyword" value="KeyPgStr|STR"}}
 	- {{fbdoc item="keyword" value="KeyPgStrig|STRIG"}}
-	- {{fbdoc item="keyword" value="KeyPgStream|STREAM"}}
 	- {{fbdoc item="keyword" value="KeyPgStringFunction|STRING (Function)"}}
 	- {{fbdoc item="keyword" value="KeyPgString|STRING"}}
 	- {{fbdoc item="keyword" value="KeyPgOpStrptr|STRPTR"}}

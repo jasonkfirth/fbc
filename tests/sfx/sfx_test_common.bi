@@ -26,8 +26,17 @@
 #ifndef __SFX_TEST_COMMON_BI__
 #define __SFX_TEST_COMMON_BI__
 
+''
+'' Private sfxlib runtime test hooks.
+''
+'' These declarations are not public BASIC command syntax.  Tests use them
+'' to drive the mixer deterministically and to inspect the backend selected
+'' by the runtime.  The user-facing device API remains DEVICE LIST,
+'' DEVICE INFO, and DEVICE SELECT.
+''
 declare sub fb_sfxUpdate cdecl alias "fb_sfxUpdate" ( byval frames as long )
 declare function fb_sfxDeviceCurrent cdecl alias "fb_sfxDeviceCurrent" ( ) as long
+declare function fb_sfxDeviceFind cdecl alias "fb_sfxDeviceFind" ( byval name as const zstring ptr ) as long
 declare function fb_sfxDeviceName cdecl alias "fb_sfxDeviceName" ( byval id as long ) as zstring ptr
 
 type FB_SFX_DRIVER_STATS
@@ -67,6 +76,17 @@ end sub
 sub SfxTestUseNullDriver()
 	setenviron "SFXLIB_DRIVER=null"
 end sub
+
+function SfxTestNullDriverId() as long
+	dim as zstring * 5 null_driver_name = "null"
+	dim as long driver_id = fb_sfxDeviceFind( @null_driver_name )
+
+	if( driver_id >= 0 ) then
+		return driver_id
+	end if
+
+	return fb_sfxDeviceCurrent()
+end function
 
 sub SfxTestSetMixerDump( byref filename as string, byval frames as integer )
 	SfxTestDeleteFile( filename )

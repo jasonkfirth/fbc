@@ -24,6 +24,6 @@ Controls sfxlib audio capture.
 
 {{fbdoc item="see"}}
 	- ##[[KeyPgDevice|Device]]##
-	- ##[[KeyPgAudio|Audio]]##
+	- ##[[KeyPgMusic|Music]]##
 
 {{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

@@ -3791,7 +3791,7 @@ static drmp3_result drmp3_result_from_errno(int e)
     #ifdef ECANCELED
         case ECANCELED: return DRMP3_CANCELLED;
     #endif
-    #ifdef ENOKEY
+    #if defined(ENOKEY) && (!defined(ENOANO) || (ENOKEY != ENOANO))
         case ENOKEY: return DRMP3_ERROR;
     #endif
     #ifdef EKEYEXPIRED

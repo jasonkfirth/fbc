@@ -22,6 +22,16 @@ depends=(
   'libxrender'
   'glu'
 )
+# Disable link-time optimization for bootstrap compiler sources. Older GCC/assembler
+# combinations in Arch's current toolchain can emit incompatibilities from -flto in
+# generated C code during bootstrap build.
+#
+# Cross packages are assembled by an x86_64 makepkg process. Its automatic strip
+# step is a host operation, so leave target ELF files and archives untouched here.
+options=(
+  '!lto'
+  '!strip'
+)
 makedepends=(
   'make'
   'pkgconf'
@@ -33,11 +43,118 @@ sha256sums=('SKIP')
 
 build() {
   cd "${srcdir}/${pkgname}-${pkgver}"
-  make bootstrap-minimal
-  make all FBC=bootstrap/fbc
+
+  if [[ -z "${FBC_ARCH_CROSS:-}" ]]; then
+    make bootstrap-minimal
+    make all FBC=bootstrap/fbc
+    return
+  fi
+
+  : "${FBC_ARCH_TARGET_TRIPLET:?missing FBC_ARCH_TARGET_TRIPLET}"
+  : "${FBC_ARCH_BOOTKEY:?missing FBC_ARCH_BOOTKEY}"
+  : "${FBC_ARCH_FBC_TARGET:?missing FBC_ARCH_FBC_TARGET}"
+  : "${FBC_ARCH_BUILD_TRIPLET:?missing FBC_ARCH_BUILD_TRIPLET}"
+  : "${FBC_ARCH_BUILD_BOOTKEY:?missing FBC_ARCH_BUILD_BOOTKEY}"
+  : "${FBC_ARCH_BUILD_FBC_TARGET:?missing FBC_ARCH_BUILD_FBC_TARGET}"
+  : "${FBC_ARCH_SYSROOT:?missing FBC_ARCH_SYSROOT}"
+
+  local build_fbc="${srcdir}/${pkgname}-${pkgver}/.fbc-build/bin/fbc"
+  local build_fbc_with_inc="${build_fbc} -i ${srcdir}/${pkgname}-${pkgver}/inc"
+  local sysroot_flag="--sysroot=${FBC_ARCH_SYSROOT}"
+  local sysroot_cppflags="${sysroot_flag} -I${FBC_ARCH_SYSROOT}/usr/include"
+  local sysroot_ldflags="${sysroot_flag} -L${FBC_ARCH_SYSROOT}/usr/lib -Wl,-rpath-link,${FBC_ARCH_SYSROOT}/usr/lib"
+  local target_cc="${FBC_ARCH_TARGET_TRIPLET}-gcc"
+  local target_cxx="${FBC_ARCH_TARGET_TRIPLET}-g++"
+  local target_as="${FBC_ARCH_TARGET_TRIPLET}-as"
+  local target_ld="${FBC_ARCH_TARGET_TRIPLET}-ld"
+  local target_ar="${FBC_ARCH_TARGET_TRIPLET}-ar"
+  local target_ranlib="${FBC_ARCH_TARGET_TRIPLET}-ranlib"
+
+  export PKG_CONFIG_SYSROOT_DIR="${FBC_ARCH_SYSROOT}"
+  export PKG_CONFIG_LIBDIR="${FBC_ARCH_SYSROOT}/usr/lib/pkgconfig:${FBC_ARCH_SYSROOT}/usr/share/pkgconfig"
+
+  rm -rf "${srcdir}/${pkgname}-${pkgver}/.fbc-build"
+
+  make \
+    TARGET_TRIPLET="${FBC_ARCH_BUILD_TRIPLET}" \
+    TARGET="${FBC_ARCH_BUILD_TRIPLET}" \
+    MULTILIB="" \
+    FBTARGET_DIR_OVERRIDE="${FBC_ARCH_BUILD_BOOTKEY}" \
+    FBC_EXE="${build_fbc}" \
+    BUILD_FBC_TARGET="${FBC_ARCH_BUILD_FBC_TARGET}" \
+    CPPFLAGS="" \
+    CFLAGS="" \
+    CXXFLAGS="" \
+    LDFLAGS="" \
+    bootstrap-minimal
+
+  test -x "${build_fbc}"
+
+  make \
+    TARGET_TRIPLET="${FBC_ARCH_TARGET_TRIPLET}" \
+    TARGET="${FBC_ARCH_TARGET_TRIPLET}" \
+    MULTILIB="" \
+    FBTARGET_DIR_OVERRIDE="${FBC_ARCH_BOOTKEY}" \
+    CC="${target_cc}" \
+    CXX="${target_cxx}" \
+    AS="${target_as}" \
+    LD="${target_ld}" \
+    AR="${target_ar}" \
+    RANLIB="${target_ranlib}" \
+    FBC="${build_fbc_with_inc}" \
+    BUILD_FBC="${build_fbc}" \
+    BUILD_FBC_TARGET="${FBC_ARCH_FBC_TARGET}" \
+    BUILD_FBC_BUILDPREFIX="${FBC_ARCH_TARGET_TRIPLET}-" \
+    CPPFLAGS="${sysroot_cppflags}" \
+    CFLAGS="${sysroot_cppflags}" \
+    CXXFLAGS="${sysroot_cppflags}" \
+    LDFLAGS="${sysroot_ldflags}" \
+    rtlib fbrt gfxlib2 sfxlib
+
+  make \
+    TARGET_TRIPLET="${FBC_ARCH_TARGET_TRIPLET}" \
+    TARGET="${FBC_ARCH_TARGET_TRIPLET}" \
+    MULTILIB="" \
+    FBTARGET_DIR_OVERRIDE="${FBC_ARCH_BOOTKEY}" \
+    CC="${target_cc}" \
+    CXX="${target_cxx}" \
+    AS="${target_as}" \
+    LD="${target_ld}" \
+    AR="${target_ar}" \
+    RANLIB="${target_ranlib}" \
+    FBC="${build_fbc_with_inc}" \
+    BUILD_FBC="${build_fbc}" \
+    BUILD_FBC_TARGET="${FBC_ARCH_FBC_TARGET}" \
+    BUILD_FBC_BUILDPREFIX="${FBC_ARCH_TARGET_TRIPLET}-" \
+    CPPFLAGS="${sysroot_cppflags}" \
+    CFLAGS="${sysroot_cppflags}" \
+    CXXFLAGS="${sysroot_cppflags}" \
+    LDFLAGS="${sysroot_ldflags}" \
+    compiler
 }
 
 package() {
   cd "${srcdir}/${pkgname}-${pkgver}"
-  make install DESTDIR="${pkgdir}" prefix=/usr
+
+  if [[ -n "${FBC_ARCH_CROSS:-}" ]]; then
+    local build_fbc="${srcdir}/${pkgname}-${pkgver}/.fbc-build/bin/fbc"
+    local build_fbc_with_inc="${build_fbc} -i ${srcdir}/${pkgname}-${pkgver}/inc"
+
+    make \
+      TARGET_TRIPLET="${FBC_ARCH_TARGET_TRIPLET}" \
+      TARGET="${FBC_ARCH_TARGET_TRIPLET}" \
+      MULTILIB="" \
+      FBTARGET_DIR_OVERRIDE="${FBC_ARCH_BOOTKEY}" \
+      install \
+      DESTDIR="${pkgdir}" \
+      prefix=/usr \
+      FBC="${build_fbc_with_inc}" \
+      BUILD_FBC="${build_fbc}" \
+      BUILD_FBC_TARGET="${FBC_ARCH_FBC_TARGET}"
+  else
+    make install DESTDIR="${pkgdir}" prefix=/usr
+  fi
+
+  mkdir -p "${pkgdir}/usr/share/freebasic/examples"
+  cp -a "${srcdir}/${pkgname}-${pkgver}/examples/." "${pkgdir}/usr/share/freebasic/examples/"
 }

@@ -1,6 +1,7 @@
 /* serial port access for Linux */
 
 #include "../fb.h"
+#include <strings.h>
 #include "../io_serial_private.h"
 
 #include <sys/ioctl.h>

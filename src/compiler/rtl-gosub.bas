@@ -95,8 +95,8 @@
 		) _
 	 }
 
-	'' Linux/DOS setjmp()
-	dim shared as FB_RTL_PROCDEF funcdata2( 0 to ... ) = _
+	'' Non-NetBSD setjmp()
+	dim shared as FB_RTL_PROCDEF funcdata2_common( 0 to ... ) = _
 	{ _
 		/' function fb_SetJmp cdecl( byval buf as any ptr ) as long '/ _
 		( _
@@ -112,10 +112,29 @@
 		( _
 			NULL _
 		) _
-	 }
+	}
+
+	'' NetBSD setjmp()
+	dim shared as FB_RTL_PROCDEF funcdata2_netbsd( 0 to ... ) = _
+	{ _
+		/' function fb_SetJmp cdecl( byval buf as any ptr ) as long '/ _
+		( _
+			@FB_RTL_SETJMP, @"_setjmp", _
+			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_NONE, _
+			1, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
+		/' EOL '/ _
+		( _
+			NULL _
+		) _
+	}
 
 '':::::
-sub rtlGosubModInit( )
+	sub rtlGosubModInit( )
 
 	'' No need to add these procs if GOSUB isn't allowed in the dialect...
 	if( fbLangOptIsSet( FB_LANG_OPT_GOSUB ) ) then
@@ -128,8 +147,10 @@ sub rtlGosubModInit( )
 			else
 				rtlAddIntrinsicProcs( @funcdata1_win32(0) )
 			end if
+		elseif( env.clopt.target = FB_COMPTARGET_NETBSD ) then
+			rtlAddIntrinsicProcs( @funcdata2_netbsd(0) )
 		else
-			rtlAddIntrinsicProcs( @funcdata2(0) )
+			rtlAddIntrinsicProcs( @funcdata2_common(0) )
 		end if
 
 	end if

@@ -12,8 +12,6 @@
 
 
 '' Setup our booleans
-const false = 0
-const true  = not false
 const null = 0
 
 
@@ -30,13 +28,13 @@ declare sub ViewOrtho ()
 declare sub ProcessHelix ()
 declare sub calcNormal (v() as single, oout() as single)
 declare sub ReduceToUnit (vector() as single)
-declare function EmptyTexture () as unsigned integer
+declare function EmptyTexture () as GLuint
 
 '' User Defined Variables
 dim shared angle as single                            '' Used To Rotate The Helix
 dim shared vertexes(0 to 3, 0 to 2) as single         '' Holds single Info For 4 Sets Of Vertices
 dim shared normal(0 to 2) as single                   '' An Array To Store The Normal Data
-dim shared BlurTexture as unsigned integer            '' An Unsigned Int To Store The Texture Number
+dim shared BlurTexture as GLuint                      '' Texture ID
 
 	dim as double lastTickCount, tickCount
 
@@ -61,8 +59,8 @@ dim shared BlurTexture as unsigned integer            '' An Unsigned Int To Stor
 	end
 
 '' ------------------------------------------------------------------------
-function EmptyTexture () as unsigned integer              '' Create An Empty Texture
-	dim txtnumber as unsigned integer                     '' Texture ID
+function EmptyTexture () as GLuint                        '' Create An Empty Texture
+	dim txtnumber as GLuint                                '' Texture ID
 	dim ddata as unsigned integer ptr                     '' Stored Data
 
 	''  Create Storage Space For Texture Data (128x128x4)

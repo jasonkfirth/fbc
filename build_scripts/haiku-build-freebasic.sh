@@ -28,6 +28,7 @@ fi
 NOBUILD=0
 NOPACKAGE=0
 NOINSTALL=0
+CLEANUP_SUCCESS=0
 
 for arg in "$@"; do
 	case "$arg" in
@@ -102,6 +103,23 @@ cleanup_package_states() {
 	find /boot/system/packages/administrative -maxdepth 1 -type d -name 'state_*' -exec rm -rf {} + 2>/dev/null || true
 }
 
+cleanup_build_artifacts() {
+	[ "$CLEANUP_SUCCESS" -eq 1 ] || return 0
+
+	rm -rf package-root package-root.install_manifest
+	for artifact in ./*.hpkg ./*.install_manifest; do
+		[ -e "$artifact" ] || continue
+		case "$artifact" in
+			*.hpkg)
+				[ "${HAIKU_PRESERVE_HPKG:-0}" = "1" ] && continue
+				;;
+		esac
+		rm -f "$artifact" || true
+	done
+}
+
+trap cleanup_build_artifacts EXIT
+
 ##############################################################################
 # Version extraction
 ##############################################################################
@@ -113,7 +131,29 @@ REV=$(sed -n "s/^REV[[:space:]]*:=[[:space:]]*//p" mk/version.mk | head -n1)
 [ -z "$REV" ] && fail "REV missing"
 
 FULLVERSION="${VERSION}-${REV}"
-ARCH=$(uname -m)
+detect_package_arch() {
+	if command -v getarch >/dev/null 2>&1; then
+		getarch
+		return 0
+	fi
+
+	case "$(uname -m)" in
+		x86_64|amd64)
+			echo "x86_64"
+			;;
+		BePC|i386|i486|i586|i686|x86)
+			echo "x86_gcc2"
+			;;
+		aarch64|arm64)
+			echo "arm64"
+			;;
+		*)
+			uname -m
+			;;
+	esac
+}
+
+ARCH=$(detect_package_arch)
 HPKG="freebasic-${FULLVERSION}-${ARCH}.hpkg"
 
 ##############################################################################
@@ -162,7 +202,6 @@ if [ "$NOBUILD" -eq 0 ]; then
 	make -j"$JOBS" HAVE_PREREQS_MK=
 
 fi
-
 ##############################################################################
 # Packaging phase
 ##############################################################################
@@ -271,6 +310,8 @@ META
 	rm -f ./*.install_manifest package-root.install_manifest
 
 	msg "Build complete"
+
+	CLEANUP_SUCCESS=1
 
 	echo "Package created: $HPKG"
 	echo "Compiler installed at: /boot/system/bin/fbc"

@@ -52,56 +52,44 @@
 
 void fb_sfxMusicStop(void)
 {
-    int i;
-
     if (!fb_sfxEnsureInitialized())
         return;
 
-    if (__fb_sfx->music_playing < 0)
+    fb_sfxRuntimeLock();
+    fb_sfxMusicStopLocked();
+    fb_sfxRuntimeUnlock();
+}
+
+
+/* ------------------------------------------------------------------------- */
+/* MUSIC STOP locked helper                                                  */
+/* ------------------------------------------------------------------------- */
+
+void fb_sfxMusicStopLocked(void)
+{
+    int i;
+
+    if (!__fb_sfx)
         return;
 
-    SFX_DEBUG(
-        "sfx_music_stop: id=%d stopped",
-        __fb_sfx->music_playing
-    );
+    if (__fb_sfx->music_playing >= 0)
+        SFX_DEBUG("sfx_music_stop: current music stopped");
 
     for (i = 0; i < FB_SFX_MAX_VOICES; ++i)
     {
         FB_SFXVOICE *voice = &__fb_sfx->voices[i];
 
         if (voice->type == FB_SFX_VOICE_MUSIC)
+        {
             voice->active = 0;
+            voice->data = NULL;
+        }
     }
 
     __fb_sfx->music_playing = -1;
     __fb_sfx->music_paused  = 0;
     __fb_sfx->music_loop    = 0;
     __fb_sfx->music_pos     = 0;
-}
-
-
-/* ------------------------------------------------------------------------- */
-/* MUSIC STOP (specific id)                                                  */
-/* ------------------------------------------------------------------------- */
-
-/*
-    fb_sfxMusicStopId()
-
-    Stop a specific music asset if it is currently playing.
-*/
-
-void fb_sfxMusicStopId(int id)
-{
-    if (!fb_sfxEnsureInitialized())
-        return;
-
-    if (id < 0 || id >= FB_SFX_MAX_MUSIC)
-        return;
-
-    if (__fb_sfx->music_playing != id)
-        return;
-
-    fb_sfxMusicStop();
 }
 
 

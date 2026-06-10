@@ -45,6 +45,21 @@ done
 
 [ -n "$ROOT" ] || { echo "ERROR: could not locate FreeBASIC root"; exit 1; }
 cd "$ROOT"
+CLEANUP_SUCCESS=0
+CLEANUP_DIRS=("$ROOT/.build-slackware")
+
+cleanup_build_roots() {
+    local path
+
+    [ "$CLEANUP_SUCCESS" -eq 1 ] || return 0
+
+    for path in "${CLEANUP_DIRS[@]}"; do
+        [ -n "$path" ] || continue
+        rm -rf "$path" 2>/dev/null || true
+    done
+}
+
+trap cleanup_build_roots EXIT
 
 ##############################################################################
 # Helpers
@@ -424,6 +439,8 @@ if [ "$failures" -ne 0 ]; then
     echo "============================================================"
     exit 1
 fi
+
+CLEANUP_SUCCESS=1
 
 echo
 echo "============================================================"

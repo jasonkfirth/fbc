@@ -27,9 +27,9 @@
 ''
 '' Some common #defines:
 ''
-	#define TRUE (-1)
-	#define FALSE 0
-	#define NULL cast(any ptr, 0)
+	#define EXAMPLE_TRUE (-1)
+	#define EXAMPLE_FALSE 0
+	#define EXAMPLE_NULL cast(any ptr, 0)
 
 ''
 '' #if provides a way to conditionally compile code:

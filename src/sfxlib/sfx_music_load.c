@@ -8,14 +8,14 @@
 
         Implement the MUSIC LOAD command.
 
-        This loads a music file into memory and registers it
-        with the sfxlib music subsystem so it can be played later.
+        This loads one music file into memory and makes it the current
+        music asset. Loading another file replaces the previous asset.
 
     Responsibilities:
 
         • load music files from disk
         • allocate memory for music data
-        • store music asset metadata
+        • store current music asset metadata
         • provide safe loading and unloading
 
     This file intentionally does NOT contain:
@@ -30,7 +30,7 @@
         MUSIC LOAD
              │
              ▼
-        music asset table
+        current music asset
              │
              ▼
         playback system
@@ -58,17 +58,18 @@
 
     Returns:
 
-        music identifier or -1 on failure
+        0 on success or -1 on failure
 */
 
 int fb_sfxMusicLoad(const char *filename)
 {
+    FB_SFX_ASSET next_asset;
+    float *old_data;
     float *decoded = NULL;
     float *mono = NULL;
     int frames = 0;
     int channels = 0;
     int sample_rate = 0;
-    int id;
     int frame;
 
     if (!fb_sfxEnsureInitialized())
@@ -83,6 +84,12 @@ int fb_sfxMusicLoad(const char *filename)
                          &channels,
                          &sample_rate) != 0)
         return -1;
+
+    if (frames <= 0 || channels <= 0)
+    {
+        free(decoded);
+        return -1;
+    }
 
     mono = (float *)malloc((size_t)frames * sizeof(float));
     if (!mono)
@@ -104,43 +111,35 @@ int fb_sfxMusicLoad(const char *filename)
 
     free(decoded);
 
-    /* find free music slot */
+    memset(&next_asset, 0, sizeof(next_asset));
 
-    for (id = 0; id < FB_SFX_MAX_MUSIC; id++)
-    {
-        if (!__fb_sfx->music[id].loaded)
-            break;
-    }
+    next_asset.data = mono;
+    next_asset.size = frames * (int)sizeof(float);
+    next_asset.frames = frames;
+    next_asset.sample_rate = sample_rate;
+    next_asset.loaded = 1;
 
-    if (id >= FB_SFX_MAX_MUSIC)
-    {
-        free(mono);
-        return -1;
-    }
+    strncpy(next_asset.name, filename, sizeof(next_asset.name) - 1);
+    next_asset.name[sizeof(next_asset.name) - 1] = '\0';
 
-    __fb_sfx->music[id].data = mono;
-    __fb_sfx->music[id].size = frames * (int)sizeof(float);
-    __fb_sfx->music[id].frames = frames;
-    __fb_sfx->music[id].sample_rate = sample_rate;
-    __fb_sfx->music[id].loaded = 1;
+    fb_sfxRuntimeLock();
 
-    strncpy(
-        __fb_sfx->music[id].name,
-        filename,
-        sizeof(__fb_sfx->music[id].name) - 1
-    );
+    old_data = __fb_sfx->music.data;
+    fb_sfxMusicStopLocked();
+    __fb_sfx->music = next_asset;
 
-    __fb_sfx->music[id].name[sizeof(__fb_sfx->music[id].name) - 1] = '\0';
+    fb_sfxRuntimeUnlock();
+
+    free(old_data);
 
     SFX_DEBUG(
-        "sfx_music_load: loaded '%s' id=%d frames=%d rate=%d",
+        "sfx_music_load: loaded '%s' frames=%d rate=%d",
         filename,
-        id,
         frames,
         sample_rate
     );
 
-    return id;
+    return 0;
 }
 
 
@@ -148,26 +147,30 @@ int fb_sfxMusicLoad(const char *filename)
 /* MUSIC UNLOAD                                                              */
 /* ------------------------------------------------------------------------- */
 
-void fb_sfxMusicUnload(int id)
+void fb_sfxMusicUnload(void)
 {
+    float *old_data;
+
     if (!fb_sfxEnsureInitialized())
         return;
 
-    if (id < 0 || id >= FB_SFX_MAX_MUSIC)
-        return;
+    fb_sfxRuntimeLock();
 
-    if (!__fb_sfx->music[id].loaded)
-        return;
+    old_data = __fb_sfx->music.data;
+    fb_sfxMusicStopLocked();
 
-    free(__fb_sfx->music[id].data);
+    __fb_sfx->music.data = NULL;
+    __fb_sfx->music.size = 0;
+    __fb_sfx->music.frames = 0;
+    __fb_sfx->music.sample_rate = 0;
+    __fb_sfx->music.loaded = 0;
+    __fb_sfx->music.name[0] = '\0';
 
-    __fb_sfx->music[id].data = NULL;
-    __fb_sfx->music[id].size = 0;
-    __fb_sfx->music[id].frames = 0;
-    __fb_sfx->music[id].sample_rate = 0;
-    __fb_sfx->music[id].loaded = 0;
+    fb_sfxRuntimeUnlock();
 
-    SFX_DEBUG("sfx_music_load: unloaded id=%d", id);
+    free(old_data);
+
+    SFX_DEBUG("sfx_music_load: unloaded current music");
 }
 
 

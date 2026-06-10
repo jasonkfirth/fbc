@@ -25,15 +25,13 @@
 #include once "createtex.bi"
 
 '' Setup our booleans
-const false = 0
-const true  = not false
 
 	dim light as integer                    '' Lighting ON/OFF
 	dim lp as integer                       '' L Pressed?
 	dim fp as integer                       '' F Pressed?
 	dim gp as integer                       '' G Pressed? ( NEW )
 	dim filter as uinteger                  '' Which Filter To Use
-	dim texture(0 to 2) as uinteger         '' Storage For 3 Textures
+	dim texture(0 to 2) as GLuint         '' Storage For 3 Textures
 	dim fogfilter as uinteger               '' Which Fog Mode To Use
 
 	dim LightAmbient(0 to 3) as single => {0.5, 0.5, 0.5, 1.0}   '' Ambient Light Values ( NEW )

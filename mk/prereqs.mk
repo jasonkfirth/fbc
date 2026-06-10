@@ -50,6 +50,16 @@ define pr_check_hdr
 	$(call pr_error_block,Missing required header: $(1))
 endef
 
+define pr_check_lib
+	tmp="/tmp/fbc-prereq-$$$$.c"; \
+	printf "%s\n" "int main(void) { return 0; }" > "$$tmp"; \
+	$(PR_CC_RAW) $(CPPFLAGS) $(ALLCFLAGS) $(LDFLAGS) -x c -o /dev/null "$$tmp" $(1) >/dev/null 2>&1; \
+	rc=$$?; \
+	rm -f "$$tmp"; \
+	[ $$rc -eq 0 ] || \
+	$(call pr_error_block,Missing required library: $(1))
+endef
+
 define pr_check_no_space_path
 	case "$(1)" in \
 		*" "*) \
@@ -180,8 +190,16 @@ else ifeq ($(CROSS_BUILD),yes)
 else
 	@$(call pr_check_cmd,pkg-config)
 
+ifeq ($(TARGET_OS),solaris)
+	@echo "Checking ncurses header"
+	@$(call pr_check_hdr,ncurses/curses.h)
+
+	@echo "Checking ncurses library"
+	@$(call pr_check_lib,-lncurses)
+else
 	@echo "Checking ncurses"
 	@$(call pr_check_pc,ncurses)
+endif
 
 	@echo "Checking libm"
 	@$(call pr_check_hdr,math.h)

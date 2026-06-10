@@ -24,8 +24,6 @@
 #include once "fbgfx.bi"                   ''for Scan code constants
 
 '' Setup our booleans
-const false = 0
-const true  = not false
 
 const num = 50                                 '' Number Of Stars To Draw
 	

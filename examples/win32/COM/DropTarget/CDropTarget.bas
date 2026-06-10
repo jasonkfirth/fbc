@@ -262,4 +262,3 @@ private function CDropTarget.DropEffect _
 
 	return dwEffect
 end function
-

@@ -1,12 +1,22 @@
 /* libfb initialization for Unix */
 
-/* for getpgid() and PTHREAD_MUTEX_RECURSIVE */
+/* for getpgid(), PTHREAD_MUTEX_RECURSIVE and Solaris terminal ioctls */
 #define _GNU_SOURCE 1
 
+#ifndef __EXTENSIONS__
+#define __EXTENSIONS__
+#endif
+
 #include "../fb.h"
+#include <strings.h>
 #include "fb_private_console.h"
 #include "../fb_private_thread.h"
 #include <signal.h>
+
+#ifndef NSIG
+/* Not all Unix headers expose the non-standard NSIG value. */
+#define NSIG 128
+#endif
 
   #ifdef bool
     #undef bool
@@ -29,6 +39,7 @@
 #endif
 
 #include <sys/ioctl.h>
+#include <sys/termios.h>
 #include <fcntl.h>
 
 FBCONSOLE __fb_con;

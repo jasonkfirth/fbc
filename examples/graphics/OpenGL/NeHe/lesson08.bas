@@ -26,19 +26,17 @@
 #include once "fbgfx.bi"                   ''for Scan code constants
 
 '' Setup our booleans
-const false = 0
-const true  = not false
 
 declare function LoadGLTextures() as integer
 
 	dim shared filter as uinteger                  '' Which Filter To Use
-	dim shared texture(0 to 2) as uinteger         '' Storage For 3 Textures
+	dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 	
 	dim shared light as integer                    '' Lighting ON/OFF
 	dim shared blend as integer                    '' Blending OFF/ON? ( NEW )
 	dim shared lp as integer                       '' L Pressed?
 	dim shared fp as integer                       '' F Pressed?
-	dim shared bp as integer                       '' B Pressed? ( NEW )
+	dim shared blendpressed as integer             '' B Pressed? ( NEW )
 	
 	dim LightAmbient(0 to 3) as single => {0.5, 0.5, 0.5, 1.0}   '' Ambient Light Values
 	dim LightDiffuse(0 to 3) as single => {1.0, 1.0, 1.0, 1.0}   '' Diffuse Light Values
@@ -154,8 +152,8 @@ declare function LoadGLTextures() as integer
 		if not MULTIKEY(FB.SC_F) then fp = false   '' F Key Up
 	
 		'' Blending Code Starts Here
-		if MULTIKEY(FB.SC_B) and not bp then       '' B Key down
-			bp = true
+		if MULTIKEY(FB.SC_B) and not blendpressed then '' B Key down
+			blendpressed = true
 			blend = not blend                     '' toggle blending On/Off
 			if blend then
 				glEnable(GL_BLEND)                  '' Turn Blending On
@@ -165,7 +163,7 @@ declare function LoadGLTextures() as integer
 				glEnable(GL_DEPTH_TEST)             '' Turn Depth Testing On
 			end if
 		end if
-		if not MULTIKEY(FB.SC_B) then bp = false   '' B Key up
+		if not MULTIKEY(FB.SC_B) then blendpressed = false '' B Key up
 		'' Blending Code Ends Here
 	
 		if MULTIKEY(FB.SC_PAGEUP) then z-=0.02     '' If Page Up is Being Pressed, Move Into The Screen

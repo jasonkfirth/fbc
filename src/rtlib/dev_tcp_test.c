@@ -1,6 +1,7 @@
 /* TCP device protocol parser */
 
 #include "fb.h"
+#include <strings.h>
 #include "dev_tcp_private.h"
 
 #include <ctype.h>

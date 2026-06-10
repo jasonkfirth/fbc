@@ -25,13 +25,11 @@
 #include once "fbgfx.bi"                   ''for Scan code constants
 
 '' Setup our booleans
-const false = 0
-const true  = not false
 
 declare function LoadGLTextures() as integer
 
 	dim shared filter as uinteger                  '' Which Filter To Use
-	dim shared texture(0 to 2) as uinteger         '' Storage For 3 Textures
+	dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 	
 	dim shared light as integer                    '' Lighting ON/OFF ( NEW )
 	dim shared lp as integer                       '' L Pressed? ( NEW )

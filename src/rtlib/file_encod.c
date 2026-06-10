@@ -1,6 +1,7 @@
 /* string to file encoding function */
 
 #include "fb.h"
+#include <strings.h>
 
 
 /*:::::*/

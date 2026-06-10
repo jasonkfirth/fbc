@@ -8,7 +8,9 @@
 ' FB translation by TJF, 2011
 ' Details: http://library.gnome.org/devel/goocanvas/unstable/
 
-'#DEFINE __USE_GTK3__
+#IFDEF __FB_LINUX__
+#DEFINE __USE_GTK3__
+#ENDIF
 #INCLUDE "goocanvas.bi"
 
 FUNCTION on_button_press(BYVAL item AS GooCanvasItem PTR, _

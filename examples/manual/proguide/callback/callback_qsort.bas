@@ -8,9 +8,9 @@
 
 #include "crt/stdlib.bi"
 
-Function CmpVarLenStr cdecl( ByVal p1 As Any Ptr, ByVal p2 As Any Ptr ) As Long  '' compare 2 var-len strings
-	Dim As String Ptr ps1 = p1
-	Dim As String Ptr ps2 = p2
+Function CmpVarLenStr cdecl( ByVal p1 As Const Any Ptr, ByVal p2 As Const Any Ptr ) As Long  '' compare 2 var-len strings
+	Dim As Const String Ptr ps1 = p1
+	Dim As Const String Ptr ps2 = p2
 	If *ps1 < *ps2 Then
 		Return -1
 	ElseIf *ps1 > *ps2 Then

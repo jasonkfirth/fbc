@@ -8,8 +8,16 @@ trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 ##############################################################################
 
 export PATH="/usr/gnu/bin:/usr/bin:/usr/sbin:/sbin:$PATH"
-export CC=gcc
-export CXX=g++
+export CC="${CC:-gcc}"
+export CXX="${CXX:-g++}"
+export LD="${LD:-/usr/bin/ld}"
+export CFLAGS="${CFLAGS:-} -m64"
+export CXXFLAGS="${CXXFLAGS:-} -m64"
+export LDFLAGS="${LDFLAGS:-} -m64"
+AWK="${AWK:-/usr/gnu/bin/awk}"
+TARGET_TRIPLET="${TARGET_TRIPLET:-x86_64-pc-solaris2.11}"
+BOOTSTRAP_DIR="${BOOTSTRAP_DIR:-solaris-x86_64}"
+BOOTSTRAP_FBC="${BOOTSTRAP_FBC:-}"
 
 ##############################################################################
 # Options
@@ -54,8 +62,8 @@ cd "$ROOT"
 # Version extraction
 ##############################################################################
 
-FBVERSION="$(awk -F':=' '/^FBVERSION/ {gsub(/[ \t]/,"",$2); print $2}' mk/version.mk)"
-REV="$(awk -F':=' '/^REV/ {gsub(/[ \t]/,"",$2); print $2}' mk/version.mk)"
+FBVERSION="$("$AWK" -F':=' '/^FBVERSION/ {gsub(/[ \t]/,"",$2); print $2}' mk/version.mk)"
+REV="$("$AWK" -F':=' '/^REV/ {gsub(/[ \t]/,"",$2); print $2}' mk/version.mk)"
 
 [ -n "$FBVERSION" ] || exit 1
 [ -n "$REV" ] || exit 1
@@ -87,6 +95,7 @@ mkdir -p "$BUILDROOT" "$OUT_SOLARIS"
 PKGS_BUILD=(
     developer/gcc
     developer/build/gnu-make
+    developer/build/pkg-config
     library/ncurses
     library/libffi
     x11/library/libx11
@@ -102,6 +111,7 @@ PKGS_BUILD=(
 )
 
 PKGS_RUNTIME=(
+    developer/gcc
     library/ncurses
     library/libffi
     x11/library/libx11
@@ -127,6 +137,12 @@ for p in "${PKGS_BUILD[@]}"; do
     pkg install --accept "$p" >/dev/null 2>&1 || true
 done
 
+if pkg-config --exists libffi >/dev/null 2>&1; then
+    LIBFFI_CFLAGS="$(pkg-config --cflags libffi)"
+    export CFLAGS="${CFLAGS:-} ${LIBFFI_CFLAGS}"
+    export CXXFLAGS="${CXXFLAGS:-} ${LIBFFI_CFLAGS}"
+fi
+
 ##############################################################################
 # Build
 ##############################################################################
@@ -136,19 +152,43 @@ if [ "$DO_BUILD" -eq 1 ]; then
     echo "==> cleaning (preserving bootstrap)"
     gmake -f GNUmakefile clean || true
 
-    echo "==> bootstrap-minimal"
-    gmake -f GNUmakefile \
-        bootstrap-minimal \
-        CC=gcc \
-        TARGET_TRIPLET="$(gcc -dumpmachine)"
+    if [ -d "$ROOT/bootstrap/$BOOTSTRAP_DIR" ] &&
+        find "$ROOT/bootstrap/$BOOTSTRAP_DIR" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print | grep -q .
+    then
+        echo "==> bootstrap-minimal"
+        gmake -f GNUmakefile \
+            bootstrap-minimal \
+            CC="$CC" \
+            CXX="$CXX" \
+            LD="$LD" \
+            TARGET_TRIPLET="$TARGET_TRIPLET"
+        BOOTSTRAP_FBC="$ROOT/bootstrap/fbc"
+    elif [ -n "$BOOTSTRAP_FBC" ] ||
+        BOOTSTRAP_FBC="$(command -v fbc 2>/dev/null)" ||
+        { [ -x "$PREFIX/bin/fbc" ] && BOOTSTRAP_FBC="$PREFIX/bin/fbc"; }
+    then
+        echo "==> using bootstrap compiler: $BOOTSTRAP_FBC"
+    else
+        echo "==> bootstrap-seed-peer"
+        gmake -f GNUmakefile \
+            bootstrap-seed-peer \
+            CC="$CC" \
+            CXX="$CXX" \
+            LD="$LD" \
+            TARGET_TRIPLET="$TARGET_TRIPLET"
+        BOOTSTRAP_FBC="$ROOT/bootstrap/fbc"
+    fi
 
-    [ -x "$ROOT/bootstrap/fbc" ] || exit 1
+    [ -x "$BOOTSTRAP_FBC" ] || exit 1
 
     echo "==> full build"
     gmake -f GNUmakefile \
         all \
-        FBC="$ROOT/bootstrap/fbc" \
-        CC=gcc
+        FBC="$BOOTSTRAP_FBC" \
+        CC="$CC" \
+        CXX="$CXX" \
+        LD="$LD" \
+        TARGET_TRIPLET="$TARGET_TRIPLET"
 
     echo "==> staging install"
     rm -rf "$STAGE"
@@ -158,7 +198,11 @@ if [ "$DO_BUILD" -eq 1 ]; then
         install \
         DESTDIR="$STAGE" \
         prefix="$PREFIX" \
-        FBC="$ROOT/bootstrap/fbc"
+        FBC="$BOOTSTRAP_FBC" \
+        CC="$CC" \
+        CXX="$CXX" \
+        LD="$LD" \
+        TARGET_TRIPLET="$TARGET_TRIPLET"
 
 else
     echo "==> --no-build specified"

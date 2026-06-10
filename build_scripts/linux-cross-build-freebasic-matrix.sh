@@ -54,6 +54,25 @@ done
 [ -n "$ROOT" ] || { echo "ERROR: could not locate FreeBASIC root"; exit 1; }
 
 cd "$ROOT"
+CLEANUP_SUCCESS=0
+CLEANUP_DIRS=(
+    "$ROOT/.build-docs"
+    "$ROOT/.build-debianubuntu-cross"
+    "$ROOT/.build-debianubuntu-xbox"
+)
+
+cleanup_build_roots() {
+    local path
+
+    [ "$CLEANUP_SUCCESS" -eq 1 ] || return 0
+
+    for path in "${CLEANUP_DIRS[@]}"; do
+        [ -n "$path" ] || continue
+        rm -rf "$path" 2>/dev/null || true
+    done
+}
+
+trap cleanup_build_roots EXIT
 
 ##############################################################################
 # Helpers
@@ -69,7 +88,7 @@ Options:
   --distro NAME     Limit to one distro name
   --release NAME    Limit to one release/codename
   --arch ARCH       Limit to one package architecture
-  --family NAME     Limit to one package family (deb, apk, rpm, slackware, vm)
+  --family NAME     Limit to one package family (deb, apk, rpm, archlinux, slackware, vm)
   --jobs N          Parallel make jobs for package builds
   --keep-going      Continue after package-family failures
   --skip-host-deps  Skip host dependency installation in family builders
@@ -82,7 +101,8 @@ Options:
 This is the intended top-level Linux package factory entry point.
 
 The implementation dispatches each package family to the builder that owns
-that packaging format: Debian/Ubuntu/Raspbian, APK, RPM, and Slackware.
+that packaging format: Debian/Ubuntu/Raspbian, APK, RPM, Arch Linux, and
+Slackware.
 
 Each row is a Docker packaging environment plus one target CPU architecture.
 EOF
@@ -193,6 +213,13 @@ VM_ARCHES=(
     x86_64
 )
 
+ARCHLINUX_ARCHES=(
+    x86_64
+    aarch64
+    armv7h
+    riscv64
+)
+
 ##############################################################################
 # Distro/release matrix
 ##############################################################################
@@ -224,6 +251,7 @@ TARGETS=(
     "rpm|opensuse|opensuse/tumbleweed|tumbleweed|rpm-cross-build-freebasic-matrix.sh"
     "slackware|slackware|vbatts/slackware:15.0|15.0|slackware-cross-build-freebasic-matrix.sh"
     "slackware|slackware|vbatts/slackware:current|current|slackware-cross-build-freebasic-matrix.sh"
+    "archlinux|archlinux|archlinux/archlinux:base|current|archlinux-build-freebasic.sh"
     "vm|haiku||x86-64|haiku-vm-build-freebasic.sh"
     "vm|haiku||i386|haiku-vm-build-freebasic.sh"
     "vm|netbsd||x86-64|netbsd-vm-build-freebasic.sh"
@@ -264,6 +292,9 @@ arches_for_target() {
             ;;
         slackware/*)
             printf '%s\n' "${SLACKWARE_ARCHES[@]}"
+            ;;
+        archlinux/*)
+            printf '%s\n' "${ARCHLINUX_ARCHES[@]}"
             ;;
         vm/haiku/x86-64)
             printf '%s\n' x86_64
@@ -453,6 +484,9 @@ execute_plan() {
                     fedora|rocky|almalinux|opensuse) return 0 ;;
                 esac
                 ;;
+            archlinux)
+                [ "$DISTRO_FILTER" = "archlinux" ] && return 0
+                ;;
             slackware)
                 [ "$DISTRO_FILTER" = "slackware" ] && return 0
                 ;;
@@ -475,6 +509,42 @@ execute_plan() {
         done < <(list_plan)
 
         return 1
+    }
+
+    run_vm_families() {
+        local seen_scripts=()
+        local plan_family
+        local plan_distro
+        local plan_release
+        local plan_arch
+        local plan_image
+        local plan_script
+        local plan_outdir
+        local script
+        local seen
+
+        family_enabled vm || return 0
+        distro_allowed_for_family vm || return 0
+        family_has_selected_targets vm || return 0
+
+        while IFS="|" read -r plan_family plan_distro plan_release plan_arch plan_image plan_script plan_outdir; do
+            [ "$plan_family" = vm ] || continue
+
+            seen=0
+            for script in "${seen_scripts[@]}"; do
+                if [ "$script" = "$plan_script" ]; then
+                    seen=1
+                    break
+                fi
+            done
+
+            [ "$seen" -eq 0 ] || continue
+            seen_scripts+=("$plan_script")
+
+            run_family vm "$plan_script" || return 1
+        done < <(list_plan)
+
+        return 0
     }
 
     run_family() {
@@ -536,7 +606,7 @@ execute_plan() {
         fi
 
         case "$family" in
-            deb|apk|rpm|slackware)
+            deb|apk|rpm|archlinux|slackware)
                 args+=(--jobs "$MAKE_JOBS")
                 [ "$KEEP_GOING" -eq 0 ] || args+=(--keep-going)
                 [ "$SKIP_HOST_DEPS" -eq 0 ] || args+=(--skip-host-deps)
@@ -584,16 +654,22 @@ execute_plan() {
         exit 1
     fi
 
+    run_family archlinux archlinux-freebasic-matrix-build.sh || true
+    if [ "$KEEP_GOING" -eq 0 ] && [ "$failures" -ne 0 ]; then
+        exit 1
+    fi
+
     run_family slackware slackware-cross-build-freebasic-matrix.sh || true
     if [ "$KEEP_GOING" -eq 0 ] && [ "$failures" -ne 0 ]; then
         exit 1
     fi
 
-    run_family vm haiku-vm-build-freebasic.sh || true
+    run_vm_families || true
 
     [ "$ran" -gt 0 ] || die "no package family matched the selected filters"
 
     [ "$failures" -eq 0 ] || exit 1
+    CLEANUP_SUCCESS=1
 }
 
 ##############################################################################

@@ -21,8 +21,6 @@ const SCREEN_HEIGHT = 480
 const SCREEN_BPP    =  16
 
 '' Setup our booleans
-const FALSE = 0
-const TRUE  = not FALSE
 
 '' Max number of particles
 const MAX_PARTICLES = 1000

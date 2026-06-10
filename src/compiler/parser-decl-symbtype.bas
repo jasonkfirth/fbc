@@ -418,6 +418,8 @@ private function cMangleModifier _
 		byref subtype as FBSYMBOL ptr _
 	) as integer
 
+	dim as integer clongsize = any
+
 	function = FALSE
 
 	assert( dtype = typeGetDtOnly( dtype ) )
@@ -448,26 +450,52 @@ private function cMangleModifier _
 			'' "long"? "char"?
 			select case lcase( *lexGetText( ) )
 			case "long"
-				'' only Win64 is affected by ths modifer
-				if( fbIs64bit( ) and ((env.target.options and FB_TARGETOPT_UNIX) = 0) ) then
-					select case dtype
-					case FB_DATATYPE_LONG
+				''
+				'' C's long follows the target C ABI, not FB's fixed-width
+				'' Long keyword.  Win64 is LLP64, while the 64bit Unix-like
+				'' targets used by the C backend are LP64.  On 32bit targets
+				'' C long is 32bit either way.
+				''
+				'' The alias is kept opt-in because normal FB types still need
+				'' their usual backend spelling for ordinary generated code.
+				if( fbIs64bit( ) andalso ((env.target.options and FB_TARGETOPT_UNIX) <> 0) ) then
+					clongsize = 8
+				else
+					clongsize = 4
+				end if
+
+				select case dtype
+				case FB_DATATYPE_LONG
+					if( clongsize = typeGetSize( FB_DATATYPE_LONG ) ) then
+						dtype = typeSetMangleDt( dtype, FB_DATATYPE_INTEGER )
+					end if
+					function = TRUE
+
+				case FB_DATATYPE_ULONG
+					if( clongsize = typeGetSize( FB_DATATYPE_ULONG ) ) then
+						dtype = typeSetMangleDt( dtype, FB_DATATYPE_UINT )
+					end if
+					function = TRUE
+
+				case FB_DATATYPE_INTEGER
+					if( clongsize = typeGetSize( FB_DATATYPE_INTEGER ) ) then
 						dtype = typeSetMangleDt( dtype, FB_DATATYPE_INTEGER )
 						function = TRUE
-					case FB_DATATYPE_ULONG
+					else
+						errReport( FB_ERRMSG_SYNTAXERROR )
+					end if
+
+				case FB_DATATYPE_UINT
+					if( clongsize = typeGetSize( FB_DATATYPE_UINT ) ) then
 						dtype = typeSetMangleDt( dtype, FB_DATATYPE_UINT )
 						function = TRUE
-					case else
+					else
 						errReport( FB_ERRMSG_SYNTAXERROR )
-					end select
-				else
-					select case dtype
-					case FB_DATATYPE_LONG
-					case FB_DATATYPE_ULONG
-					case else
-						errReport( FB_ERRMSG_SYNTAXERROR )
-					end select
-				end if
+					end if
+
+				case else
+					errReport( FB_ERRMSG_SYNTAXERROR )
+				end select
 
 			case "char"
 				select case dtype
@@ -475,6 +503,14 @@ private function cMangleModifier _
 					dtype = typeSetMangleDt( dtype, FB_DATATYPE_CHAR )
 				case FB_DATATYPE_BYTE, FB_DATATYPE_UBYTE
 					dtype = typeSetMangleDt( dtype, FB_DATATYPE_CHAR )
+				case else
+					errReport( FB_ERRMSG_SYNTAXERROR )
+				end select
+
+			case "_bool"
+				select case dtype
+				case FB_DATATYPE_BOOLEAN
+					dtype = typeSetMangleDt( dtype, FB_DATATYPE_BOOLEAN )
 				case else
 					errReport( FB_ERRMSG_SYNTAXERROR )
 				end select
@@ -603,6 +639,7 @@ function cSymbolType _
 		case FB_TK_BOOLEAN
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 			dtype = FB_DATATYPE_BOOLEAN
+			cMangleModifier( dtype, subtype )
 
 		case FB_TK_BYTE
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -641,6 +678,7 @@ function cSymbolType _
 				dtype = env.lang.integerkeyworddtype
 
 			end if
+			cMangleModifier( dtype, subtype )
 
 		case FB_TK_UINT
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -662,6 +700,7 @@ function cSymbolType _
 				dtype = FB_DATATYPE_UINT
 
 			end if
+			cMangleModifier( dtype, subtype )
 
 		case FB_TK_LONG
 			lexSkipToken( LEXCHECK_POST_SUFFIX )

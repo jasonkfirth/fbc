@@ -1,6 +1,7 @@
 /* TCP device */
 
 #include "fb.h"
+#include <strings.h>
 #include "dev_tcp_private.h"
 
 #ifdef DISABLE_TCP
@@ -421,6 +422,7 @@ static void fb_hDevTcpFormatService( char *service, size_t service_len, unsigned
 {
 	char tmp[16];
 	size_t used = 0;
+	size_t i;
 
 	if( service_len == 0 )
 		return;
@@ -433,7 +435,7 @@ static void fb_hDevTcpFormatService( char *service, size_t service_len, unsigned
 	if( used >= service_len )
 		used = service_len - 1;
 
-	for( size_t i = 0; i < used; i++ )
+	for( i = 0; i < used; i++ )
 		service[i] = tmp[used - i - 1];
 
 	service[used] = '\0';

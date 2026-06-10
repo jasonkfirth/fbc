@@ -132,9 +132,12 @@ endif
 # PIE is useful on major hosted ELF systems.
 # Keep it disabled on DOS / JS / Windows-family / Xbox / Android by default.
 # Cygwin is treated conservatively here.
+# Oracle Solaris 11.3 can produce a PIE compiler executable that is killed by
+# the loader before startup.  Keep Solaris non-PIE by default until a newer
+# Solaris baseline proves that path is safe.
 # ---------------------------------------------------------------------------
 
-ifneq ($(filter linux freebsd netbsd openbsd dragonfly solaris haiku,$(TARGET_OS)),)
+ifneq ($(filter linux freebsd netbsd openbsd dragonfly haiku,$(TARGET_OS)),)
   ENABLE_PIE := YesPlease
 endif
 

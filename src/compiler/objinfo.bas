@@ -939,6 +939,7 @@ dim shared as ENTRYINFO entries(0 to (OBJINFO__COUNT - 1)) = _
 	( @"-p"   , TRUE  ), _
 	( @"-mt"  , FALSE ), _
 	( @"-gfx" , FALSE ), _
+	( @"-sfx" , FALSE ), _
 	( @"-lang", TRUE  )  _
 }
 

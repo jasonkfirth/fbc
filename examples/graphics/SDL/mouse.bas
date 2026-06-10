@@ -75,7 +75,7 @@ sub main()
 	   ' default cursor is the arrow cursor
 	   SDL_SetCursor(arrowCursor)
 	   
-	   dim mx as integer, my as integer
+	   dim mx as long, my as long
 	   
 	   ' get the x,y position of the mouse cursor
 	   SDL_GetMouseState(@mx, @my)

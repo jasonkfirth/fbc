@@ -10,7 +10,7 @@
 ''
 '' Responsibilities:
 ''
-''     - dispatch MUSIC/SFX/AUDIO/STREAM/MIDI/DEVICE/CAPTURE
+''     - dispatch MUSIC/SFX/MIDI/DEVICE/CAPTURE
 ''     - normalize optional parenthesized command syntax
 ''     - build rtl call trees for the corresponding sfxlib entry points
 ''
@@ -120,18 +120,6 @@ private sub hSfxOptEndArgs _
 	end if
 end sub
 
-private function hSfxTypeIsString _
-	( _
-		byval expr as ASTNODE ptr _
-	) as integer
-
-	if( expr = NULL ) then
-		return FALSE
-	end if
-
-	function = symbIsString( astGetDataType( expr ) )
-end function
-
 private function hSfxVoidInExpr( ) as ASTNODE ptr
 	errReport( FB_ERRMSG_SYNTAXERROR )
 	function = NULL
@@ -146,6 +134,54 @@ private function hSfxAtStmtEnd( ) as integer
 	end select
 end function
 
+private function hSfxNoArgs _
+	( _
+		byval had_parens as integer _
+	) as integer
+
+	if( had_parens ) then
+		if( lexGetToken( ) <> CHAR_RPRNT ) then
+			errReport( FB_ERRMSG_SYNTAXERROR )
+			return FALSE
+		end if
+
+		return TRUE
+	end if
+
+	if( hSfxAtStmtEnd( ) ) then
+		return TRUE
+	end if
+
+	errReport( FB_ERRMSG_SYNTAXERROR )
+	function = FALSE
+end function
+
+private function hSfxOptionalFileCall _
+	( _
+		byval proc_noarg as FBSYMBOL ptr, _
+		byval proc_file as FBSYMBOL ptr _
+	) as ASTNODE ptr
+
+	dim as integer had_parens
+	dim as ASTNODE ptr expr1
+
+	hSfxOptBeginArgs( had_parens )
+
+	if( had_parens andalso lexGetToken( ) = CHAR_RPRNT ) then
+		hSfxOptEndArgs( had_parens )
+		return hSfxCall0( proc_noarg )
+	end if
+
+	if( (had_parens = FALSE) andalso hSfxAtStmtEnd( ) ) then
+		return hSfxCall0( proc_noarg )
+	end if
+
+	hMatchExpressionEx( expr1, FB_DATATYPE_STRING )
+	hSfxOptEndArgs( had_parens )
+
+	function = hSfxCall1( proc_file, expr1 )
+end function
+
 '' ----------------------------------------------------------------------------
 '' MUSIC
 '' ----------------------------------------------------------------------------
@@ -157,7 +193,6 @@ private function hParseMusic _
 
 	dim as integer had_parens
 	dim as ASTNODE ptr expr1
-	dim as FBSYMBOL ptr proc
 
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
 
@@ -169,31 +204,13 @@ private function hParseMusic _
 	end if
 
 	if( hMatchIdOrKw( "PLAY", LEXCHECK_POST_SUFFIX ) ) then
-		hSfxOptBeginArgs( had_parens )
-		hMatchExpressionEx( expr1, FB_DATATYPE_INVALID )
-		hSfxOptEndArgs( had_parens )
-
-		if( hSfxTypeIsString( expr1 ) ) then
-			proc = PROCLOOKUP( SFXMUSICPLAYFILE )
-		else
-			proc = PROCLOOKUP( SFXMUSICPLAY )
-		end if
-
-		return hSfxCall1( proc, expr1 )
+		return hSfxOptionalFileCall( PROCLOOKUP( SFXMUSICPLAY ), _
+		                             PROCLOOKUP( SFXMUSICPLAYFILE ) )
 	end if
 
 	if( hMatchIdOrKw( "LOOP", LEXCHECK_POST_SUFFIX ) ) then
-		hSfxOptBeginArgs( had_parens )
-		hMatchExpressionEx( expr1, FB_DATATYPE_INVALID )
-		hSfxOptEndArgs( had_parens )
-
-		if( hSfxTypeIsString( expr1 ) ) then
-			proc = PROCLOOKUP( SFXMUSICLOOPFILE )
-		else
-			proc = PROCLOOKUP( SFXMUSICLOOP )
-		end if
-
-		return hSfxCall1( proc, expr1 )
+		return hSfxOptionalFileCall( PROCLOOKUP( SFXMUSICLOOP ), _
+		                             PROCLOOKUP( SFXMUSICLOOPFILE ) )
 	end if
 
 	if( hMatchIdOrKw( "STOP", LEXCHECK_POST_SUFFIX ) ) then
@@ -202,17 +219,10 @@ private function hParseMusic _
 		end if
 
 		hSfxOptBeginArgs( had_parens )
-		if( had_parens orelse (hSfxAtStmtEnd( ) = FALSE) ) then
-			if( had_parens andalso lexGetToken( ) = CHAR_RPRNT ) then
-				hSfxOptEndArgs( had_parens )
-				return hSfxCall0( PROCLOOKUP( SFXMUSICSTOP ) )
-			end if
-
-			hMatchExpressionEx( expr1, FB_DATATYPE_LONG )
-			hSfxOptEndArgs( had_parens )
-			return hSfxCall1( PROCLOOKUP( SFXMUSICSTOPID ), expr1 )
+		if( hSfxNoArgs( had_parens ) = FALSE ) then
+			return NULL
 		end if
-
+		hSfxOptEndArgs( had_parens )
 		return hSfxCall0( PROCLOOKUP( SFXMUSICSTOP ) )
 	end if
 
@@ -222,17 +232,10 @@ private function hParseMusic _
 		end if
 
 		hSfxOptBeginArgs( had_parens )
-		if( had_parens orelse (hSfxAtStmtEnd( ) = FALSE) ) then
-			if( had_parens andalso lexGetToken( ) = CHAR_RPRNT ) then
-				hSfxOptEndArgs( had_parens )
-				return hSfxCall0( PROCLOOKUP( SFXMUSICPAUSE ) )
-			end if
-
-			hMatchExpressionEx( expr1, FB_DATATYPE_LONG )
-			hSfxOptEndArgs( had_parens )
-			return hSfxCall1( PROCLOOKUP( SFXMUSICPAUSEID ), expr1 )
+		if( hSfxNoArgs( had_parens ) = FALSE ) then
+			return NULL
 		end if
-
+		hSfxOptEndArgs( had_parens )
 		return hSfxCall0( PROCLOOKUP( SFXMUSICPAUSE ) )
 	end if
 
@@ -242,34 +245,27 @@ private function hParseMusic _
 		end if
 
 		hSfxOptBeginArgs( had_parens )
-		if( had_parens orelse (hSfxAtStmtEnd( ) = FALSE) ) then
-			if( had_parens andalso lexGetToken( ) = CHAR_RPRNT ) then
-				hSfxOptEndArgs( had_parens )
-				return hSfxCall0( PROCLOOKUP( SFXMUSICRESUME ) )
-			end if
-
-			hMatchExpressionEx( expr1, FB_DATATYPE_LONG )
-			hSfxOptEndArgs( had_parens )
-			return hSfxCall1( PROCLOOKUP( SFXMUSICRESUMEID ), expr1 )
+		if( hSfxNoArgs( had_parens ) = FALSE ) then
+			return NULL
 		end if
-
+		hSfxOptEndArgs( had_parens )
 		return hSfxCall0( PROCLOOKUP( SFXMUSICRESUME ) )
 	end if
 
 	if( hMatchIdOrKw( "STATUS", LEXCHECK_POST_SUFFIX ) ) then
 		hSfxOptBeginArgs( had_parens )
+		if( hSfxNoArgs( had_parens ) = FALSE ) then
+			return NULL
+		end if
 		hSfxOptEndArgs( had_parens )
 		return hSfxCall0( PROCLOOKUP( SFXMUSICSTATUS ) )
 	end if
 
-	if( hMatchIdOrKw( "CURRENT", LEXCHECK_POST_SUFFIX ) ) then
-		hSfxOptBeginArgs( had_parens )
-		hSfxOptEndArgs( had_parens )
-		return hSfxCall0( PROCLOOKUP( SFXMUSICCURRENT ) )
-	end if
-
 	if( hMatchIdOrKw( "POSITION", LEXCHECK_POST_SUFFIX ) ) then
 		hSfxOptBeginArgs( had_parens )
+		if( hSfxNoArgs( had_parens ) = FALSE ) then
+			return NULL
+		end if
 		hSfxOptEndArgs( had_parens )
 		return hSfxCall0( PROCLOOKUP( SFXMUSICPOSITION ) )
 	end if
@@ -438,132 +434,6 @@ private function hParseSfx _
 		hMatchExpressionEx( expr1, FB_DATATYPE_LONG )
 		hSfxOptEndArgs( had_parens )
 		return hSfxCall1( PROCLOOKUP( SFXSFXSTATUS ), expr1 )
-	end if
-
-	errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
-	function = NULL
-end function
-
-
-'' ----------------------------------------------------------------------------
-'' AUDIO
-'' ----------------------------------------------------------------------------
-
-private function hParseAudio _
-	( _
-		byval is_func as integer _
-	) as ASTNODE ptr
-
-	dim as integer had_parens
-	dim as ASTNODE ptr expr1
-
-	lexSkipToken( LEXCHECK_POST_SUFFIX )
-
-	if( hMatchIdOrKw( "PLAY", LEXCHECK_POST_SUFFIX ) ) then
-		hSfxOptBeginArgs( had_parens )
-		hMatchExpressionEx( expr1, FB_DATATYPE_STRING )
-		hSfxOptEndArgs( had_parens )
-		return hSfxCall1( PROCLOOKUP( SFXAUDIOPLAY ), expr1 )
-	end if
-
-	if( hMatchIdOrKw( "LOOP", LEXCHECK_POST_SUFFIX ) ) then
-		hSfxOptBeginArgs( had_parens )
-		hMatchExpressionEx( expr1, FB_DATATYPE_STRING )
-		hSfxOptEndArgs( had_parens )
-		return hSfxCall1( PROCLOOKUP( SFXAUDIOLOOP ), expr1 )
-	end if
-
-	if( hMatchIdOrKw( "STOP", LEXCHECK_POST_SUFFIX ) ) then
-		if( is_func ) then return hSfxVoidInExpr( )
-		hSfxOptBeginArgs( had_parens )
-		hSfxOptEndArgs( had_parens )
-		return hSfxCall0( PROCLOOKUP( SFXAUDIOSTOP ) )
-	end if
-
-	if( hMatchIdOrKw( "PAUSE", LEXCHECK_POST_SUFFIX ) ) then
-		if( is_func ) then return hSfxVoidInExpr( )
-		hSfxOptBeginArgs( had_parens )
-		hSfxOptEndArgs( had_parens )
-		return hSfxCall0( PROCLOOKUP( SFXAUDIOPAUSE ) )
-	end if
-
-	if( hMatchIdOrKw( "RESUME", LEXCHECK_POST_SUFFIX ) ) then
-		if( is_func ) then return hSfxVoidInExpr( )
-		hSfxOptBeginArgs( had_parens )
-		hSfxOptEndArgs( had_parens )
-		return hSfxCall0( PROCLOOKUP( SFXAUDIORESUME ) )
-	end if
-
-	if( hMatchIdOrKw( "STATUS", LEXCHECK_POST_SUFFIX ) ) then
-		hSfxOptBeginArgs( had_parens )
-		hSfxOptEndArgs( had_parens )
-		return hSfxCall0( PROCLOOKUP( SFXAUDIOSTATUS ) )
-	end if
-
-	errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
-	function = NULL
-end function
-
-
-'' ----------------------------------------------------------------------------
-'' STREAM
-'' ----------------------------------------------------------------------------
-
-private function hParseStream _
-	( _
-		byval is_func as integer _
-	) as ASTNODE ptr
-
-	dim as integer had_parens
-	dim as ASTNODE ptr expr1
-
-	lexSkipToken( LEXCHECK_POST_SUFFIX )
-
-	if( hMatchIdOrKw( "OPEN", LEXCHECK_POST_SUFFIX ) ) then
-		hSfxOptBeginArgs( had_parens )
-		hMatchExpressionEx( expr1, FB_DATATYPE_STRING )
-		hSfxOptEndArgs( had_parens )
-		return hSfxCall1( PROCLOOKUP( SFXSTREAMOPEN ), expr1 )
-	end if
-
-	if( hMatchIdOrKw( "PLAY", LEXCHECK_POST_SUFFIX ) ) then
-		hSfxOptBeginArgs( had_parens )
-		hSfxOptEndArgs( had_parens )
-		return hSfxCall0( PROCLOOKUP( SFXSTREAMPLAY ) )
-	end if
-
-	if( hMatchIdOrKw( "STOP", LEXCHECK_POST_SUFFIX ) ) then
-		if( is_func ) then return hSfxVoidInExpr( )
-		hSfxOptBeginArgs( had_parens )
-		hSfxOptEndArgs( had_parens )
-		return hSfxCall0( PROCLOOKUP( SFXSTREAMSTOP ) )
-	end if
-
-	if( hMatchIdOrKw( "PAUSE", LEXCHECK_POST_SUFFIX ) ) then
-		if( is_func ) then return hSfxVoidInExpr( )
-		hSfxOptBeginArgs( had_parens )
-		hSfxOptEndArgs( had_parens )
-		return hSfxCall0( PROCLOOKUP( SFXSTREAMPAUSE ) )
-	end if
-
-	if( hMatchIdOrKw( "RESUME", LEXCHECK_POST_SUFFIX ) ) then
-		if( is_func ) then return hSfxVoidInExpr( )
-		hSfxOptBeginArgs( had_parens )
-		hSfxOptEndArgs( had_parens )
-		return hSfxCall0( PROCLOOKUP( SFXSTREAMRESUME ) )
-	end if
-
-	if( hMatchIdOrKw( "POSITION", LEXCHECK_POST_SUFFIX ) ) then
-		hSfxOptBeginArgs( had_parens )
-		hSfxOptEndArgs( had_parens )
-		return hSfxCall0( PROCLOOKUP( SFXSTREAMPOSITION ) )
-	end if
-
-	if( hMatchIdOrKw( "SEEK", LEXCHECK_POST_SUFFIX ) ) then
-		hSfxOptBeginArgs( had_parens )
-		hMatchExpressionEx( expr1, FB_DATATYPE_LONG )
-		hSfxOptEndArgs( had_parens )
-		return hSfxCall1( PROCLOOKUP( SFXSTREAMSEEK ), expr1 )
 	end if
 
 	errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
@@ -780,12 +650,6 @@ function cSfxStmt _
 	case FB_TK_SFX
 		expr = hParseSfx( FALSE )
 
-	case FB_TK_AUDIO
-		expr = hParseAudio( FALSE )
-
-	case FB_TK_STREAM
-		expr = hParseStream( FALSE )
-
 	case FB_TK_MIDI
 		expr = hParseMidi( FALSE )
 
@@ -817,12 +681,6 @@ function cSfxFunct _
 
 	case FB_TK_SFX
 		function = hParseSfx( TRUE )
-
-	case FB_TK_AUDIO
-		function = hParseAudio( TRUE )
-
-	case FB_TK_STREAM
-		function = hParseStream( TRUE )
 
 	case FB_TK_MIDI
 		function = hParseMidi( TRUE )

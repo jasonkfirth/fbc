@@ -1,6 +1,7 @@
 /* file device */
 
 #include "fb.h"
+#include <strings.h>
 
 static FB_FILE_HOOKS hooks_dev_file = {
     fb_DevFileEof,

@@ -1333,6 +1333,10 @@ FBCALL int fb_EndProfile( int errorlevel )
 	FB_PROFILER_CALLS *prof = fb_profiler;
 	FB_PROCINFO *lastproc;
 
+	if( !prof || !ctx || !prof->main_thread ) {
+		return errorlevel;
+	}
+
 	if( ctx != prof->main_thread ) {
 		/* TODO: Ending profiling from some other thread? */
 	}

@@ -10,8 +10,6 @@ Commands for generated sound, PLAY strings, and sfxlib mix settings.
 	**Noise** //channel//, //frequency//, //duration//, //volume//
 	**Note** //name//, //octave//, //duration//
 	**Note** //channel//, //name//, //octave//, //duration//
-	**Rest** //duration//
-	**Rest** //channel//, //duration//
 	**Play** //music//
 	**Play** //channel//, //music//
 	**Play** //music1//, //music2//
@@ -41,7 +39,7 @@ Commands for generated sound, PLAY strings, and sfxlib mix settings.
 {{fbdoc item="desc"}}
 	These commands synthesize sound directly through sfxlib.  ##Sound##, ##Tone##, ##Noise##, ##Note##, and ##Play## create voices.  ##Tempo##, ##Channel##, ##Octave##, and ##Voice## set defaults used by PLAY-string and generated-sound commands.  ##Volume##, ##Vol##, ##Balance##, and ##Pan## control mix levels and stereo placement.
 
-	##Sound## also accepts several legacy BASIC-compatible integer forms used by older dialects.  Those forms are provided so historical listings can compile with minimal changes; new code should prefer the frequency/duration or channel/frequency/duration/volume forms shown above.
+	##Sound## accepts the high-impact classic form ##Sound frequency, duration## and the explicit channel form ##Sound channel, frequency, duration, volume##.  When both arguments are integers, duration is interpreted as the PC BASIC timer-tick value.
 
 	##Wave## defines a waveform id.  The currently supported waveform values are:
 		- ##0## sine

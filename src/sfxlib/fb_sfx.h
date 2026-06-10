@@ -105,7 +105,6 @@ typedef SFXDRIVER FB_SFX_DRIVER;
 #define FB_SFX_MAX_WAVES 16
 #define FB_SFX_MAX_ENVELOPES 16
 #define FB_SFX_MAX_INSTRUMENTS 16
-#define FB_SFX_MAX_MUSIC 16
 #define FB_SFX_MAX_SFX 64
 
 
@@ -114,7 +113,6 @@ typedef SFXDRIVER FB_SFX_DRIVER;
 /* ------------------------------------------------------------------------- */
 
 #define FB_SFX_CAPTURE_BUFFER  65536
-#define FB_SFX_STREAM_BUFFER   65536
 
 
 /* ------------------------------------------------------------------------- */
@@ -191,7 +189,7 @@ typedef struct FB_SFX_ASSET
     A voice may represent:
         • a tone generator
         • a waveform
-        • a streamed audio source
+        • the current music asset
         • a sound effect
 */
 
@@ -321,7 +319,7 @@ typedef struct FB_SFXCTX
     FB_SFX_WAVE waves[FB_SFX_MAX_WAVES];
     FB_SFXENVELOPE envelopes[FB_SFX_MAX_ENVELOPES];
     FB_SFX_INSTRUMENT instruments[FB_SFX_MAX_INSTRUMENTS];
-    FB_SFX_ASSET music[FB_SFX_MAX_MUSIC];
+    FB_SFX_ASSET music;
     FB_SFX_ASSET sfx[FB_SFX_MAX_SFX];
     int music_playing;
     int music_paused;

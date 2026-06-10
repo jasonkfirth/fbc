@@ -14,7 +14,7 @@
 '' Responsibilities:
 ''
 ''     - keep the test silent by forcing the null driver
-''     - exercise generated sound, PLAY queues, and explicit stop commands
+''     - exercise generated sound, PLAY queues, and retained stop commands
 ''     - verify driver diagnostics across repeated init/exit cycles
 ''
 '' This file intentionally does NOT contain:
@@ -75,12 +75,8 @@ for cycle_index = 0 to CYCLES - 1
 	ASSERT( stats.zero_writes = 0 )
 	ASSERT( stats.errors = 0 )
 
-	fb_sfxSoundStop()
-	fb_sfxPlayStop()
 	sfx stop
 	music stop
-	stream stop
-	audio stop
 
 	fb_sfxUpdate( 1024 )
 	fb_sfxExit()

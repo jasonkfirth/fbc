@@ -56,13 +56,37 @@
 
 int fb_sfxCaptureStart(void)
 {
+    const FB_SFX_DRIVER *driver;
     int result;
 
-    if (!__fb_sfx)
+    if (!fb_sfxEnsureInitialized())
         return -1;
 
+    fb_sfxRuntimeLock();
+
     if (__fb_sfx->capture.enabled == FB_SFX_CAPTURE_RUNNING)
+    {
+        fb_sfxRuntimeUnlock();
         return 0;
+    }
+
+    driver = __fb_sfx->driver;
+
+    /*
+        The null driver is used by automated tests and headless package
+        validation to exercise the command surface without touching real
+        audio hardware.  Treat CAPTURE START as a buffer-only state change
+        in that mode; CAPTURE READ/SAVE will simply observe whatever samples
+        were injected into the capture buffer.
+    */
+    if (driver == &__fb_sfxDriverNull)
+    {
+        __fb_sfx->capture.enabled = FB_SFX_CAPTURE_RUNNING;
+        fb_sfxRuntimeUnlock();
+        return 0;
+    }
+
+    fb_sfxRuntimeUnlock();
 
     result = fb_sfxPlatformCaptureStart();
 
@@ -72,7 +96,10 @@ int fb_sfxCaptureStart(void)
         return -1;
     }
 
-    __fb_sfx->capture.enabled = FB_SFX_CAPTURE_RUNNING;
+    fb_sfxRuntimeLock();
+    if (__fb_sfx)
+        __fb_sfx->capture.enabled = FB_SFX_CAPTURE_RUNNING;
+    fb_sfxRuntimeUnlock();
 
     return 0;
 }

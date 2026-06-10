@@ -2,8 +2,8 @@
 
 #include "allegro.bi"
 
-	dim mickeyx as integer
-	dim mickeyy as integer
+	dim mickeyx as long
+	dim mickeyy as long
 	dim custom_cursor as BITMAP ptr
 	dim c as integer
 

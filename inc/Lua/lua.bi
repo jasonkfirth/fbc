@@ -27,7 +27,11 @@
 
 #pragma once
 
-#inclib "lua"
+#ifdef __FB_LINUX__
+	#inclib "lua5.3"
+#else
+	#inclib "lua"
+#endif
 
 #if (not defined(LUA_32BITS)) and defined(LUA_C89_NUMBERS)
 	#include once "crt/long.bi"

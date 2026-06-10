@@ -109,7 +109,8 @@ install: install-bin install-includes install-runtime
 .PHONY: install-bin
 install-bin:
 	mkdir -p "$(INSTALL_BINDIR)"
-	install -m 755 "$(FBC_EXE)" "$(INSTALL_BINDIR)/$(FBC_INSTALL_NAME)"
+	cp "$(FBC_EXE)" "$(INSTALL_BINDIR)/$(FBC_INSTALL_NAME)"
+	chmod 755 "$(INSTALL_BINDIR)/$(FBC_INSTALL_NAME)"
 	@echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_BINDIR),$(prefixbindir))/$(FBC_INSTALL_NAME)" >> "$(INSTALL_MANIFEST)"
 
 .PHONY: install-includes
@@ -128,7 +129,8 @@ install-runtime:
 		[ -e "$$f" ] || continue; \
 		if [ -f "$$f" ]; then \
 			b=$$(basename "$$f"); \
-			install -m 644 "$$f" "$(INSTALL_LIBDIR)/$$b"; \
+			cp "$$f" "$(INSTALL_LIBDIR)/$$b"; \
+			chmod 644 "$(INSTALL_LIBDIR)/$$b"; \
 			echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_LIBDIR),$(FBINSTALL_RUNTIME_DIR))/$$b" >> "$(INSTALL_MANIFEST)"; \
 		fi; \
 	done

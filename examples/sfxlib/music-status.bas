@@ -2,15 +2,15 @@
 
 dim as string filename = SfxExampleMedia( "good-morning-to-all.ogg" )
 dim as long state
-dim as long music_id
+dim as long result
 
 SfxExampleBanner( "MUSIC STATUS" )
 
 state = MUSIC STATUS()
 print "Status before playback:"; state
 
-music_id = MUSIC PLAY( filename )
-if( music_id >= 0 ) then
+result = MUSIC PLAY( filename )
+if( result >= 0 ) then
 	SfxExampleWait( 500 )
 	print "Status while playing:"; MUSIC STATUS()
 	MUSIC STOP

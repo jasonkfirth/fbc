@@ -9083,40 +9083,6 @@ See also
 
 
 
------------------------------------------------------------- KeyPgAudio ----
-Audio
-
-Plays a single decoded audio file through sfxlib.
-
-Syntax
-   result = Audio Play( filename )
-   result = Audio Loop( filename )
-   Audio Pause
-   Audio Resume
-   Audio Stop
-   status = Audio Status()
-
-Description
-   Audio is the simple file playback interface.  Audio Play starts a file 
-   once, Audio Loop repeats it, and the pause, resume, stop, and status 
-   commands control that active stream.
-
-   Audio Status returns 0 for stopped, 1 for playing, and 2 for paused.
-
-Example
-   See examples/sfxlib/audio-play.bas, examples/sfxlib/audio-loop.bas, and 
-   examples/sfxlib/showcase.bas.
-
-Differences from QB
-   * New to FreeBASIC.
-
-See also
-   * Stream
-   * Music
-
-
-
-
 ============================================================================
     B
 
@@ -9134,8 +9100,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -9168,11 +9132,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -11330,8 +11293,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -11364,11 +11325,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -19302,8 +19262,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -19336,11 +19294,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -21631,7 +21588,7 @@ Description
    graphics-library command words as built-in gfxlib command keywords.
 
    This is useful in larger programs or libraries that do not use the 
-   legacy graphics command surface and need names such as Screen, Paint, or 
+   legacy graphics command surface and need names such as Screen, Paint, or
    Window to be available as normal identifiers.
 
    The affected gfxlib command words are PSET, PRESET, POINT, CIRCLE, 
@@ -21677,11 +21634,11 @@ Description
    sound-library command words as built-in sfxlib command keywords.
 
    This is useful in larger programs or libraries that do not use the sound 
-   command surface and need names such as Music, Stream, or Device to be 
+   command surface and need names such as Music, Sfx, or Device to be
    available as normal identifiers.
 
-   The affected sfxlib command words are MUSIC, SFX, AUDIO, STREAM, MIDI, 
-   DEVICE, and CAPTURE.
+   The affected sfxlib command words are MUSIC, SFX, MIDI, DEVICE, and
+   CAPTURE.
 
    FB_NO_SFXLIB affects parsing only after the symbol has been defined.  It 
    does not remove libraries that are explicitly requested through other 
@@ -21690,12 +21647,12 @@ Description
 Example
    #define FB_NO_SFXLIB
 
-   Type Stream
+   Type Music
       As Integer id
    End Type
 
-   Dim As Stream output_stream
-   output_stream.id = 1
+   Dim As Music song
+   song.id = 1
 
 Version
    * Since fbc 1.20.1
@@ -24128,8 +24085,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -24162,11 +24117,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -25967,8 +25921,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -26001,11 +25953,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -28830,30 +28781,28 @@ See also
 ------------------------------------------------------------ KeyPgMusic ----
 Music
 
-Loads and controls music assets through sfxlib.
+Loads and controls the current music file through sfxlib.
 
 Syntax
-   id = Music Load( filename )
-   result = Music Play( id )
+   result = Music Load( filename )
+   result = Music Play()
    result = Music Play( filename )
-   result = Music Loop( id )
+   result = Music Loop()
    result = Music Loop( filename )
-   Music Pause [ id ]
-   Music Resume [ id ]
-   Music Stop [ id ]
+   Music Pause
+   Music Resume
+   Music Stop
    status = Music Status()
-   id = Music Current()
    position = Music Position()
 
 Description
-   Music is the long-form music playback interface.  Music Load loads a 
-   file into a music slot and returns the slot id.  Music Play and Music 
-   Loop can play either a loaded id or a filename directly.  Music Pause, 
-   Music Resume, and Music Stop act on all music when no id is supplied, or 
-   on the supplied id.
+   Music is the one-current-track file playback interface.  Music Load
+   loads a file as the current music and replaces any previous music.
+   Music Play and Music Loop start the current music when called without a
+   filename, or load and start the supplied filename directly.
 
+   Music Pause, Music Resume, and Music Stop control the current music.
    Music Status returns 0 for stopped, 1 for playing, and 2 for paused.  
-   Music Current returns the current music id, or -1 when none is active.  
    Music Position returns the current playback position in frames.
 
 Example
@@ -28864,8 +28813,6 @@ Differences from QB
    * New to FreeBASIC.
 
 See also
-   * Audio
-   * Stream
    * Sfx
 
 
@@ -30199,8 +30146,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -30233,11 +30178,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -30291,8 +30235,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -30325,11 +30267,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -30632,8 +30573,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -30666,11 +30605,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -33556,8 +33494,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -33590,11 +33526,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -33867,8 +33802,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -33901,11 +33834,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -37087,8 +37019,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -37121,11 +37051,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -41435,8 +41364,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -41469,11 +41396,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -42329,38 +42255,6 @@ Differences from QB
 See also
    * GetJoystick
    * Stick
-
-
-
------------------------------------------------------------ KeyPgStream ----
-Stream
-
-Opens and controls the sfxlib streaming-audio interface.
-
-Syntax
-   result = Stream Open( filename )
-   result = Stream Play()
-   Stream Pause
-   Stream Resume
-   Stream Stop
-   position = Stream Position()
-   result = Stream Seek( position )
-
-Description
-   Stream provides explicit control over a streaming audio source.  Open a 
-   file with Stream Open, start it with Stream Play, and use Stream Seek 
-   and Stream Position to reposition or query playback.
-
-Example
-   See examples/sfxlib/stream-open.bas, examples/sfxlib/stream-play.bas, 
-   examples/sfxlib/stream-seek.bas, and examples/sfxlib/showcase.bas.
-
-Differences from QB
-   * New to FreeBASIC.
-
-See also
-   * Audio
-   * Music
 
 
 
@@ -43322,8 +43216,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -43356,11 +43248,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -44593,8 +44484,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -44627,11 +44516,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -47520,8 +47408,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -47554,11 +47440,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -47612,8 +47497,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -47646,11 +47529,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -47704,8 +47586,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -47738,11 +47618,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:
@@ -47852,8 +47731,6 @@ Syntax
    Noise channel, frequency, duration, volume
    Note name, octave, duration
    Note channel, name, octave, duration
-   Rest duration
-   Rest channel, duration
    Play music
    Play channel, music
    Play music1, music2
@@ -47886,11 +47763,10 @@ Description
    set defaults used by PLAY-string and generated-sound commands.  Volume, 
    Vol, Balance, and Pan control mix levels and stereo placement.
 
-   Sound also accepts several legacy BASIC-compatible integer forms used by 
-   older dialects.  Those forms are provided so historical listings can 
-   compile with minimal changes; new code should prefer the 
-   frequency/duration or channel/frequency/duration/volume forms shown 
-   above.
+   Sound accepts the high-impact classic form Sound frequency, duration and
+   the explicit channel form Sound channel, frequency, duration, volume.
+   When both arguments are integers, duration is interpreted as the PC BASIC
+   timer-tick value.
 
    Wave defines a waveform id.  The currently supported waveform values 
    are:

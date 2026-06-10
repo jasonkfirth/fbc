@@ -14,7 +14,6 @@
     Responsibilities:
 
         • report whether music is playing, paused, or stopped
-        • expose current music asset identifier
         • provide helper queries for internal subsystems
 
     This file intentionally does NOT contain:
@@ -64,9 +63,12 @@
 int fb_sfxMusicStatus(void)
 {
     int i;
+    int status;
 
     if (!__fb_sfx)
         return FB_SFX_MUSIC_STOPPED;
+
+    fb_sfxRuntimeLock();
 
     if (__fb_sfx->music_playing >= 0)
     {
@@ -75,8 +77,7 @@ int fb_sfxMusicStatus(void)
             FB_SFXVOICE *voice = &__fb_sfx->voices[i];
 
             if (voice->active &&
-                voice->type == FB_SFX_VOICE_MUSIC &&
-                voice->sfx_id == __fb_sfx->music_playing)
+                voice->type == FB_SFX_VOICE_MUSIC)
                 break;
         }
 
@@ -86,40 +87,22 @@ int fb_sfxMusicStatus(void)
             __fb_sfx->music_paused = 0;
             __fb_sfx->music_loop = 0;
             __fb_sfx->music_pos = 0;
+            fb_sfxRuntimeUnlock();
             return FB_SFX_MUSIC_STOPPED;
         }
     }
 
+    status = FB_SFX_MUSIC_STOPPED;
+
     if (__fb_sfx->music_playing < 0)
-        return FB_SFX_MUSIC_STOPPED;
+        status = FB_SFX_MUSIC_STOPPED;
+    else if (__fb_sfx->music_paused)
+        status = FB_SFX_MUSIC_PAUSED;
+    else
+        status = FB_SFX_MUSIC_PLAYING;
 
-    if (__fb_sfx->music_paused)
-        return FB_SFX_MUSIC_PAUSED;
-
-    return FB_SFX_MUSIC_PLAYING;
-}
-
-
-/* ------------------------------------------------------------------------- */
-/* MUSIC CURRENT                                                             */
-/* ------------------------------------------------------------------------- */
-
-/*
-    fb_sfxMusicCurrent()
-
-    Return the identifier of the currently active music asset.
-
-    Returns:
-
-        music id or -1 if none is playing
-*/
-
-int fb_sfxMusicCurrent(void)
-{
-    if (!__fb_sfx)
-        return -1;
-
-    return __fb_sfx->music_playing;
+    fb_sfxRuntimeUnlock();
+    return status;
 }
 
 
@@ -138,10 +121,16 @@ int fb_sfxMusicCurrent(void)
 
 long fb_sfxMusicPosition(void)
 {
+    long result;
+
     if (!__fb_sfx)
         return 0;
 
-    return __fb_sfx->music_pos;
+    fb_sfxRuntimeLock();
+    result = __fb_sfx->music_pos;
+    fb_sfxRuntimeUnlock();
+
+    return result;
 }
 
 

@@ -2,6 +2,7 @@
 
 #include "fb.h"
 #include "dev_com_private.h"
+#include <strings.h>
 
 static int fb_DevComClose( FB_FILE *handle )
 {

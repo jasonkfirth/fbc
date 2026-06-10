@@ -8,22 +8,12 @@ dim as single level
 beep 0.01, 0.0
 sound 440, 0.01
 sound 440, 18
-sound 440, 18, 127
 sound 1, 440, 0.01, 0.5
-sound 1, 4096, 60
-sound 1, 49152, 240, 1, 0, 100, 1, 0
-sound 1, -15, 53, 20
-sound 0, 100, 10, 8
-sound 1, 121, 10, 8
-sound 1000, 110, 0
-sound 500, 110, 0, 131, 0, 196, 3
 tone 1, 440, 0.01
 noise 1, 0.01, 0.5
 noise 1, 1200, 0.01, 0.5
 note "C", 4, 0.01
 note 1, "D#", 5, 0.01
-rest 0.01
-rest 1, 0.01
 play "CDE"
 play 1, "CDE"
 play "CDE", "EFG"
@@ -52,18 +42,19 @@ instrument 1, 1, 1
 instrument 1, 1
 
 music load filename
-music play 1
+music play
+music play()
 music play filename
-music loop 1
+music loop
+music loop()
 music loop filename
 music pause
-music pause 1
+music pause()
 music resume
-music resume 1
+music resume()
 music stop
-music stop 1
+music stop()
 result = music status()
-result = music current()
 result = music position()
 
 sfx load 1, filename
@@ -89,28 +80,6 @@ sfx stop
 sfx stop()
 sfx stop 1
 sfx stop channel, 2
-
-audio play filename
-audio loop filename
-audio pause
-audio pause()
-audio resume
-audio resume()
-audio stop
-audio stop()
-result = audio status()
-
-stream open filename
-stream play
-stream play()
-stream pause
-stream pause()
-stream resume
-stream resume()
-stream seek 0
-stream stop
-stream stop()
-result = stream position()
 
 midi open 0
 midi play filename

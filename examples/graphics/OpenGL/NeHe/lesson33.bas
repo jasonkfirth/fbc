@@ -7,8 +7,6 @@
 ''------------------------------------------------------------------------------
 
 '' Setup our booleans
-const false = 0
-const true  = not false
 const null = 0
 
 

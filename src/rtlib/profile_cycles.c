@@ -356,6 +356,10 @@ FBCALL void fb_InitProfileCycles( void )
 /*:::::*/
 FBCALL int fb_EndProfileCycles( int errorlevel )
 {
+	if( !fb_profiler ) {
+		return errorlevel;
+	}
+
 	hProfilerWriteReport( fb_profiler );
 	PROFILER_CYCLES_destroy( );
 	return errorlevel;

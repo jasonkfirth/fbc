@@ -15,10 +15,7 @@
 
 
 '' Setup our booleans
-const false = 0
-const true  = not false
-const null = false
-
+const null = 0
 #include once "GL/gl.bi"
 #include once "GL/glu.bi"
 #include once "fbgfx.bi"                   '' for Scan code constants
@@ -31,7 +28,7 @@ type TEXTUREIMAGE                                  '' Create A Structure
 	bpp as uinteger                                '' Image Color Depth In Bits Per Pixel.
 	wwidth as uinteger                             '' Image Width
 	height as uinteger                             '' Image Height
-	texID as uinteger                              '' Texture ID Used To Select A Texture
+	texID as GLuint                              '' Texture ID Used To Select A Texture
 end type                                           '' Structure Name
 
 ''------------------------------------------------------------------------------
@@ -41,7 +38,7 @@ declare sub glPrint cdecl (byval x as integer, byval y as integer, byval gset as
 
 
 dim shared textures(0) as TEXTUREIMAGE             '' Storage For One Texture
-dim shared gbase as uinteger                       '' Base Display List For The Font
+dim shared gbase as GLuint                         '' Base Display List For The Font
 
 	dim scroll as integer                          '' Used For Scrolling The Screen
 	dim maxtokens as integer                       '' Keeps Track Of The Number Of Extensions Supported
@@ -170,7 +167,7 @@ function LoadTGA(byval texture as TEXTUREIMAGE ptr, byref filename as string) as
 	dim bytesPerPixel as uinteger              '' Holds Number Of Bytes Per Pixel Used In The TGA File
 	dim imageSize as integer                   '' Used To Store The Image Size When Setting Aside Ram
 	dim temp as ubyte                          '' Temporary Variable
-	dim gtype as uinteger  = GL_RGBA           '' Set The Default GL Mode To RBGA (32 BPP)
+	dim gtype as GLenum  = GL_RGBA             '' Set The Default GL Mode To RBGA (32 BPP)
 	dim hFile as integer
 	dim pb as ubyte ptr
 	dim b as ubyte
@@ -304,4 +301,3 @@ sub glPrint cdecl (byval x as integer, byval y as integer, byval gset as integer
 	glCallLists(strlen(text),GL_UNSIGNED_BYTE, strptr(text)) '' Write The Text To The Screen
 	glDisable(GL_TEXTURE_2D)                '' Disable Texture Mapping
 end sub
-

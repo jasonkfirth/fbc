@@ -16,10 +16,7 @@
 
 
 '' Setup our booleans
-const false = 0
-const true  = not false
-const null = false
-
+const null = 0
 #include once "GL/gl.bi"
 #include once "GL/glu.bi"
 #include once "fbgfx.bi"                   '' for Scan code constants
@@ -44,7 +41,7 @@ dim shared stage as integer = 1                             '' Game Stage
 dim shared level as integer = 1                             '' Internal Game Level
 dim shared enemy(8) as OBJECT_
 dim shared gbase as uinteger                                '' Base Display List For The Font
-dim shared texture(1) as uinteger                           '' Font Texture Storage Space
+dim shared texture(1) as GLuint                           '' Font Texture Storage Space
 
 	dim vline(0 to 10, 0 to 9) as integer                   '' Keeps Track Of Vertical Lines
 	dim hline(0 to 9, 0 to 10) as integer                   '' Keeps Track Of Horizontal Lines

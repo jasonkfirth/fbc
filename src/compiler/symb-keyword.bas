@@ -272,8 +272,6 @@ dim shared kwdTb( 0 to FB_TOKENS-1 ) as SYMBKWD => _
 	( @"TCP"        , FB_TK_TCP         , FB_TKCLASS_QUIRKWD , KWD_OPTION_NO_QB ), _
 	( @"MUSIC"      , FB_TK_MUSIC       , FB_TKCLASS_QUIRKWD ), _
 	( @"SFX"        , FB_TK_SFX         , FB_TKCLASS_QUIRKWD ), _
-	( @"AUDIO"      , FB_TK_AUDIO       , FB_TKCLASS_QUIRKWD ), _
-	( @"STREAM"     , FB_TK_STREAM      , FB_TKCLASS_QUIRKWD ), _
 	( @"MIDI"       , FB_TK_MIDI        , FB_TKCLASS_QUIRKWD ), _
 	( @"DEVICE"     , FB_TK_DEVICE      , FB_TKCLASS_QUIRKWD ), _
 	( @"CAPTURE"    , FB_TK_CAPTURE     , FB_TKCLASS_QUIRKWD ), _
@@ -381,8 +379,7 @@ function symbKeywordGetIllegalRedefErr( byval tk as integer ) as FB_ERRMSG
 	     FB_TK_PAINT, FB_TK_DRAW, FB_TK_IMAGECREATE
 		function = FB_ERRMSG_ILLEGALGFXLIBCOMMANDREDEF
 
-	case FB_TK_MUSIC, FB_TK_SFX, FB_TK_AUDIO, FB_TK_STREAM, _
-	     FB_TK_MIDI, FB_TK_DEVICE, FB_TK_CAPTURE
+	case FB_TK_MUSIC, FB_TK_SFX, FB_TK_MIDI, FB_TK_DEVICE, FB_TK_CAPTURE
 		function = FB_ERRMSG_ILLEGALSFXLIBCOMMANDREDEF
 
 	case FB_TK_ABS, FB_TK_SGN, FB_TK_FIX, FB_TK_FRAC, FB_TK_INT, _

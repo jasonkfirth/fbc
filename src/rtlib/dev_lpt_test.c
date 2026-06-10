@@ -1,6 +1,7 @@
 /* LPTx device */
 
 #include "fb.h"
+#include <strings.h>
 #include <ctype.h>
 #include <limits.h>
 

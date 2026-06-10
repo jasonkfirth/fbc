@@ -84,10 +84,22 @@ REV="$(awk -F':=' '/^[[:space:]]*REV/ {gsub(/[[:space:]]/,"",$2); print $2}' mk/
 PKGNAME="freebasic"
 PKGVERSION="${FBVERSION}.${REV}"
 PKGFILE="${OUT}/${PKGNAME}-${PKGVERSION}.tgz"
+CLEANUP_SUCCESS=0
 
 case "$JOBS" in
 	''|*[!0-9]*|0) die "JOBS must be a positive integer" ;;
 esac
+
+cleanup_build_artifacts() {
+	[ "$CLEANUP_SUCCESS" -eq 1 ] || return 0
+
+	rm -rf "$BUILDROOT"
+	rm -f /tmp/fb_test.bas /tmp/fb_test
+
+	return 0
+}
+
+trap cleanup_build_artifacts EXIT
 
 ##############################################################################
 # Dependencies
@@ -211,6 +223,8 @@ OUTPUT="$(/tmp/fb_test)"
 echo "==> output: $OUTPUT"
 
 [ "$OUTPUT" = "FreeBASIC test OK" ] || die "bad output"
+
+CLEANUP_SUCCESS=1
 
 echo "==> package created: $PKGFILE"
 echo "==> SUCCESS"

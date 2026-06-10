@@ -12,7 +12,7 @@
 
             • generated tone
             • waveform playback
-            • streamed audio
+            • music playback
             • sound effect
 
     Responsibilities:

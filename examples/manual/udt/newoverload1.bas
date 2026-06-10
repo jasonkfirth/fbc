@@ -29,8 +29,9 @@ End Operator
 Operator UDT.Delete (ByVal buffer As Any Ptr)
   Print "  Overloaded Delete operator, with parameter buffer = &h" & Hex(buffer)
   Dim pOrig As Any Ptr = Cast(Any Ptr Ptr, buffer)[-1]
+  Dim pOrigAddress As ULongInt = CULngInt(pOrig)
   Deallocate(pOrig)
-  Print "  real pointer = &h" & Hex(pOrig)
+  Print "  real pointer = &h" & Hex(pOrigAddress)
 End Operator
 
 Constructor UDT ()

@@ -35,6 +35,16 @@ set -euo pipefail
 run() { echo "==> $*"; "$@"; }
 fail() { echo "ERROR: $*" >&2; exit 1; }
 
+disable_pacman_download_sandbox() {
+    [ -f /etc/pacman.conf ] || return 0
+
+    if grep -Eq '^[[:space:]]*DisableSandbox([[:space:]]|$)' /etc/pacman.conf; then
+        return 0
+    fi
+
+    sed -i '/^\[options\]/a DisableSandbox' /etc/pacman.conf
+}
+
 pkg_family="${PACKAGE_FAMILY:-}"
 packages_dir="${PACKAGE_DIR:-/packages}"
 results_dir="${RESULTS_DIR:-/results}"
@@ -131,6 +141,44 @@ install_rpm_packages() {
     fail "no supported RPM package manager found"
 }
 
+install_arch_packages() {
+    local packages
+    local package_path
+
+    mapfile -t packages < <(find "$packages_dir" -maxdepth 1 -type f -name '*.pkg.tar.*' | sort)
+    [ "${#packages[@]}" -gt 0 ] || fail "no .pkg.tar.* packages found in $packages_dir"
+
+    disable_pacman_download_sandbox
+    run pacman -Syu --noconfirm
+    run pacman -S --noconfirm --needed \
+        base \
+        base-devel \
+        gcc \
+        make \
+        python3 \
+        tar \
+        xz \
+        findutils \
+        diffutils \
+        which \
+        ncurses \
+        gpm \
+        libffi \
+        alsa-lib \
+        pulseaudio \
+        libx11 \
+        libxext \
+        libxpm \
+        libxrandr \
+        libxrender \
+        mesa \
+        glu
+
+    for package_path in "${packages[@]}"; do
+        run pacman -U --noconfirm --needed "$package_path"
+    done
+}
+
 configure_slackpkg_mirror() {
     local release="${FBC_PACKAGE_CODENAME:-}"
     local machine
@@ -181,6 +229,7 @@ install_packages() {
     case "$pkg_family" in
         apk) install_apk_packages ;;
         rpm) install_rpm_packages ;;
+        arch) install_arch_packages ;;
         slackware) install_slackware_packages ;;
         *) fail "unsupported PACKAGE_FAMILY: $pkg_family" ;;
     esac
@@ -354,6 +403,7 @@ job_count() {
 run_fbctests() {
     local jobs
     local failed_log
+    local detail_log
 
     [ -d /source-tests ] || fail "tests/ tree was not mounted at /source-tests"
     [ -d /source-inc ] || fail "inc/ tree was not mounted at /source-inc"
@@ -406,6 +456,13 @@ run_fbctests() {
         [ -f "$failed_log" ] || fail "missing log-tests summary: $failed_log"
         if ! grep -qi 'None Found' "$failed_log"; then
             cat "$failed_log"
+            while IFS=: read -r detail_log _; do
+                [ -n "$detail_log" ] || continue
+                [ -f "$detail_log" ] || continue
+                echo
+                echo "==> $detail_log"
+                cat "$detail_log"
+            done < "$failed_log"
             fail "log-tests reported failures in $failed_log"
         fi
     done

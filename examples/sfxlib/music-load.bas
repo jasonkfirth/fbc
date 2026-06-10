@@ -1,20 +1,20 @@
 #include once "example_common.bi"
 
 dim as string filename = SfxExampleMedia( "good-morning-to-all.ogg" )
-dim as long music_id
+dim as long result
 
 SfxExampleBanner( "MUSIC LOAD" )
-print "Loading a reusable music asset from:"
+print "Loading the current music asset from:"
 print filename
 
-music_id = MUSIC LOAD( filename )
+result = MUSIC LOAD( filename )
 
-if( music_id < 0 ) then
+if( result < 0 ) then
 	print "MUSIC LOAD failed."
 else
-	print "Loaded music id:"; music_id
-	print "Playing the loaded music id briefly."
-	MUSIC PLAY music_id
+	print "MUSIC LOAD returned:"; result
+	print "Playing the current music briefly."
+	MUSIC PLAY
 	SfxExampleWait( 1800 )
-	MUSIC STOP music_id
+	MUSIC STOP
 end if

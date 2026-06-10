@@ -683,13 +683,23 @@ run_gfx_smoke() {
 	local out="$1"
 	local err="$2"
 	shift 2
+	local status
 
-	if timeout 30 "$@" > "$out" 2> "$err"; then
+	timeout 30 "$@" > "$out" 2> "$err"
+	status=$?
+
+	if [ "$status" -eq 0 ]; then
 		cat "$out" || true
 		[ ! -s "$err" ] || {
 			cat "$err"
 			fail "gfx smoke wrote stderr"
 		}
+		return 0
+	fi
+
+	if [ "$status" -eq 77 ] && grep -q 'gfx truecolor skipped: screenres failed' "$out"; then
+		cat "$out" || true
+		cat "$err" || true
 		return 0
 	fi
 

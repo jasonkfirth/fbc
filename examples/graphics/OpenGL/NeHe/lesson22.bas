@@ -33,8 +33,6 @@
 #include once "fbgfx.bi"            '' for Scan code constants
 #include once "bmpload.bi"
 
-const false = 0
-const true = not false
 const null = 0
 
 #define __ARB_ENABLE 1              '' Used To Disable ARB Extensions Entirely
@@ -49,7 +47,7 @@ const null = 0
 '' At A Cost Of Lower Quality (More Artifacts Will Occur!)
 const MAX_EMBOSS = 0.008
 ''-------------------------------------------------------------------------------
-declare sub ReSizeGLScene GLFWCALL( byval w as integer, byval h as integer )
+declare sub ReSizeGLScene GLFWCALL( byval w as long, byval h as long )
 declare function LoadGLTextures() as integer
 declare function initMultitexture() as integer
 declare sub initLights()
@@ -77,7 +75,7 @@ const MAX_EXTENSION_LENGTH = 256                           '' Maximum Of Charact
 
 dim shared multitextureSupported as integer                '' Flag Indicating Whether Multitexturing Is Supported
 dim shared useMultitexture as integer = true               '' Use It If It Is Supported?
-dim shared maxTexelUnits as integer = 1                    '' Number Of Texel-Pipelines. This Is At Least 1.
+dim shared maxTexelUnits as GLint = 1                      '' Number Of Texel-Pipelines. This Is At Least 1.
 
 '' These are the types of the C++ functions we will link with at runtime if supported
 dim shared glMultiTexCoord1fARB as PFNGLMULTITEXCOORD1FARBPROC
@@ -119,12 +117,12 @@ dim shared CubeData(0 to 119) as single => { _
 dim shared LightAmbient(0 to 2) as single => {0.2, 0.2, 0.2}   '' Ambient Light is 20% white
 dim shared LightDiffuse(0 to 2) as single => {1.0, 1.0, 1.0}   '' Diffuse Light is white
 dim shared LightPosition(0 to 2) as single => {0.0, 0.0, 2.0}  '' Position is somewhat in front of screen
-dim shared texture(0 to 2) as uinteger                         '' Storage For 3 Textures
+dim shared texture(0 to 2) as GLuint                       '' Storage For 3 Textures
 dim shared Gray(0 to 3) as single => {0.5, 0.5, 0.5, 1.0}
-dim shared bump(0 to 2) as uinteger                            '' Our Bumpmappings
-dim shared invbump(0 to 2) as uinteger                         '' Inverted Bumpmaps
-dim shared glLogo as uinteger                                  '' Handle For OpenGL-Logo
-dim shared multiLogo as uinteger                               '' Handle For Multitexture-Enabled-Logo
+dim shared bump(0 to 2) as GLuint                          '' Our Bumpmappings
+dim shared invbump(0 to 2) as GLuint                       '' Inverted Bumpmaps
+dim shared glLogo as GLuint                                '' Handle For OpenGL-Logo
+dim shared multiLogo as GLuint                             '' Handle For Multitexture-Enabled-Logo
 
 dim shared emboss as integer = false                           '' Emboss Only, No Basetexture?
 dim shared bumps as integer = true                             '' Do Bumpmapping?
@@ -137,7 +135,7 @@ dim shared z as single =-5.0                                   '' Depth Into The
 
 dim shared filter as integer =1                                '' Which Filter To Use
 
-	dim as integer mp, bp, fp, ep
+	dim as integer mp, bumppressed, fp, ep
 	dim as integer running = 1
 
 	'' Initialize GLFW
@@ -191,11 +189,11 @@ dim shared filter as integer =1                                '' Which Filter T
 		end if
 		if glfwGetKey(asc("M")) = FALSE then mp = false      '' M key up
 
-		if glfwGetKey(asc("B")) and not bp then          '' B Key down
-			bp = true
+		if glfwGetKey(asc("B")) and not bumppressed then '' B Key down
+			bumppressed = true
 			bumps= not bumps
 		end if
-		if glfwGetKey(asc("B")) = FALSE then bp = false      '' B Key Up
+		if glfwGetKey(asc("B")) = FALSE then bumppressed = false '' B Key Up
 
 		if glfwGetKey(asc("F")) and not fp then          '' F Key down
 			fp = true
@@ -219,7 +217,7 @@ dim shared filter as integer =1                                '' Which Filter T
 	'' Exit program
 	end 0
 
-sub ReSizeGLScene GLFWCALL( byval w as integer, byval h as integer )
+sub ReSizeGLScene GLFWCALL( byval w as long, byval h as long )
 	glViewport 0, 0, w, h                          '' Reset The Current Viewport
 	glMatrixMode GL_PROJECTION                     '' Select The Projection Matrix
 	glLoadIdentity                                 '' Reset The Projection Matrix

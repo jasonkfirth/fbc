@@ -271,14 +271,30 @@ package_family_for_target() {
         debian|ubuntu|raspbian) echo "deb" ;;
         alpine|postmarketos) echo "apk" ;;
         fedora|rocky|almalinux|opensuse) echo "rpm" ;;
+        archlinux) echo "arch" ;;
         slackware) echo "slackware" ;;
         *) return 1 ;;
+    esac
+}
+
+archlinux_image_for_arch() {
+    case "$1" in
+        x86_64)
+            echo "archlinux/archlinux:base"
+            ;;
+        aarch64|armv7h|armv7l|riscv64)
+            echo "menci/archlinuxarm:base"
+            ;;
+        *)
+            return 1
+            ;;
     esac
 }
 
 image_for_nondeb_target() {
     local distro="$1"
     local codename="$2"
+    local arch="${3:-}"
 
     case "$distro/$codename" in
         alpine/3.23) echo "alpine:3.23" ;;
@@ -293,6 +309,7 @@ image_for_nondeb_target() {
         almalinux/10) echo "almalinux:10" ;;
         almalinux/9) echo "almalinux:9" ;;
         opensuse/tumbleweed) echo "opensuse/tumbleweed" ;;
+        archlinux/current) archlinux_image_for_arch "$arch" ;;
         slackware/15.0) echo "vbatts/slackware:15.0" ;;
         slackware/current) echo "vbatts/slackware:current" ;;
         *) return 1 ;;
@@ -310,6 +327,7 @@ docker_platform_for_nondeb_target() {
         ppc64le|ppc64el) echo "linux/ppc64le" ;;
         s390x) echo "linux/s390x" ;;
         riscv64) echo "linux/riscv64" ;;
+        armv7|armv7h) echo "linux/arm/v7" ;;
         *)
             die "unsupported Docker platform arch: $arch"
             ;;
@@ -321,6 +339,7 @@ package_glob_for_family() {
         deb) echo "*.deb" ;;
         apk) echo "*.apk" ;;
         rpm) echo "*.rpm" ;;
+        arch) echo "*.pkg.tar.*" ;;
         slackware) echo "*.txz" ;;
         *) return 1 ;;
     esac
@@ -840,7 +859,7 @@ EOF
     fi
 
     if [ "$family" != "deb" ]; then
-        if ! image="$(image_for_nondeb_target "$distro" "$codename")"; then
+        if ! image="$(image_for_nondeb_target "$distro" "$codename" "$arch")"; then
             echo "SKIPPED: ${distro}/${codename} (${arch}) is not in the known Docker target map"
             return 0
         fi

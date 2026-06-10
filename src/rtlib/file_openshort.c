@@ -1,6 +1,7 @@
 /* short version of OPEN */
 
 #include "fb.h"
+#include <strings.h>
 
 /*:::::*/
 FBCALL int fb_FileOpenShort( FBSTRING *str_file_mode,

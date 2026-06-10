@@ -83,6 +83,24 @@ msg() {
 	echo "==> $*"
 }
 
+configure_test_locale() {
+	local candidate
+	local locales
+
+	locales="$(locale -a 2>/dev/null || true)"
+
+	for candidate in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
+		if printf '%s\n' "$locales" | grep -qx "$candidate"; then
+			export LANG="$candidate"
+			export LC_ALL="$candidate"
+			echo "==> using test locale: $candidate"
+			return 0
+		fi
+	done
+
+	echo "WARN: no UTF-8 locale found; wide-character tests may fail"
+}
+
 resolve_make() {
 	for make in gmake make; do
 		command -v "$make" >/dev/null 2>&1 && {
@@ -164,10 +182,9 @@ PY
 	python3 - <<'PY' > "$script"
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import http.client
-import ssl
 import sys
 
-UPSTREAM = "pkg.omnios.org"
+UPSTREAM = "mirror.math.princeton.edu"
 
 
 class Proxy(BaseHTTPRequestHandler):
@@ -186,9 +203,7 @@ class Proxy(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0") or "0")
         body = self.rfile.read(length) if length else None
 
-        ctx = ssl.create_default_context()
-        ctx.maximum_version = ssl.TLSVersion.TLSv1_2
-        conn = http.client.HTTPSConnection(UPSTREAM, 443, context=ctx, timeout=120)
+        conn = http.client.HTTPConnection(UPSTREAM, 80, timeout=120)
         headers = {
             k: v for k, v in self.headers.items()
             if k.lower() not in ("host", "connection", "proxy-connection")
@@ -205,8 +220,12 @@ class Proxy(BaseHTTPRequestHandler):
                     continue
                 if lower == "location":
                     value = value.replace(
-                        "https://pkg.omnios.org",
-                        f"http://127.0.0.1:{PORT}"
+                        "https://mirror.math.princeton.edu/pub/openindiana",
+                        "http://127.0.0.1:%d/pub/openindiana" % PORT
+                    )
+                    value = value.replace(
+                        "http://mirror.math.princeton.edu/pub/openindiana",
+                        "http://127.0.0.1:%d/pub/openindiana" % PORT
                     )
                 self.send_header(key, value)
             self.send_header("Connection", "close")
@@ -275,17 +294,11 @@ install_pkg_candidates() {
 }
 
 configure_pkg_publishers() {
-	local release
-
 	if [ -z "$ILLUMOS_PKG_PROXY" ]; then
 		return 0
 	fi
 
-	release="$(uname -v | sed -n 's/^omnios-\(r[0-9][0-9]*\).*/\1/p')"
-	[ -n "$release" ] || release="r151058"
-
-	run pkg set-publisher --no-refresh -M '*' -O "${ILLUMOS_PKG_PROXY}/${release}/core/" omnios
-	run pkg set-publisher --no-refresh -M '*' -O "${ILLUMOS_PKG_PROXY}/${release}/extra/" extra.omnios
+	run pkg set-publisher --no-refresh -M '*' -O "${ILLUMOS_PKG_PROXY}/pub/openindiana/hipster" openindiana.org
 }
 
 run_illumos_package_install() {
@@ -353,6 +366,7 @@ run_fbctests() {
 	done
 
 	msg "fbctests passed"
+	cd "$OUTROOT"
 	rm -rf "$work"
 }
 
@@ -440,6 +454,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 mkdir -p "$OUTROOT"
+configure_test_locale
 trap stop_pkg_proxy EXIT
 
 if [ "$SKIP_PACKAGE_INSTALL" -eq 0 ] && [ -n "$PACKAGE_DIR" ]; then

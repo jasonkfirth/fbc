@@ -50,7 +50,6 @@
 */
 
 #include <stdlib.h>
-#include <string.h>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -73,8 +72,11 @@ static int fb_sfxOutputQueueInitLocked(void);
 static void fb_sfxOutputQueueShutdownLocked(void);
 static int fb_sfxOutputQueueFillLocked(int frames);
 static int fb_sfxOutputQueueDrainLocked(int frames);
-static int fb_sfxMixFeedScratchEnsureLocked(int frames, int channels);
-static void fb_sfxMixFeedScratchShutdownLocked(void);
+static int fb_sfxRawCopyFramesLocked(float *dst,
+                                     const float *src,
+                                     int frames,
+                                     int src_channels,
+                                     int dst_channels);
 static void fb_sfxSleepMs(unsigned long milliseconds);
 static int fb_sfxCurrentDriverBlocksLocked(void);
 static int fb_sfxCurrentDriverBlocks(void);
@@ -85,8 +87,6 @@ static int fb_sfxUpdateDelayFrames(int msecs, int return_after_update);
 static int fb_sfxDriverNameEquals(const char *a, const char *b);
 static int fb_sfxDriverTryByName(const char *name);
 static int g_foreground_feed_count = 0;
-static float *g_fb_sfx_mix_feed_scratch = NULL;
-static int g_fb_sfx_mix_feed_capacity = 0;
 
 
 /* ------------------------------------------------------------------------- */
@@ -240,11 +240,11 @@ void fb_sfxExitCore(void)
     fb_sfxRuntimeLock();
 
     fb_sfxCaptureShutdown();
+    fb_sfxOutputCaptureShutdown();
 
     fb_sfxMixBufferShutdown();
     fb_sfxOutputQueueShutdownLocked();
     fb_sfxCaptureBufferShutdown();
-    fb_sfxMixFeedScratchShutdownLocked();
 
     fb_sfxMixerShutdown();
 
@@ -253,7 +253,6 @@ void fb_sfxExitCore(void)
 }
 
 static int fb_sfxDriverFallback(const SFXDRIVER *failed_driver);
-static void fb_sfxMixFeedSource(int frames, int (*feed_fn)(float *buffer, int frames));
 
 static void fb_sfxInitCoreRollbackLocked(void)
 {
@@ -264,52 +263,11 @@ static void fb_sfxInitCoreRollbackLocked(void)
     __fb_sfx->initialized = 0;
 
     fb_sfxCaptureShutdown();
+    fb_sfxOutputCaptureShutdown();
     fb_sfxMixBufferShutdown();
     fb_sfxOutputQueueShutdownLocked();
     fb_sfxCaptureBufferShutdown();
-    fb_sfxMixFeedScratchShutdownLocked();
     fb_sfxMixerShutdown();
-}
-
-static int fb_sfxMixFeedScratchEnsureLocked(int frames, int channels)
-{
-    int required_samples;
-    int next_capacity;
-    float *next_scratch;
-
-    if (frames <= 0 || channels <= 0)
-        return -1;
-
-    required_samples = frames * channels;
-    if (required_samples <= g_fb_sfx_mix_feed_capacity)
-        return 0;
-
-    next_capacity = g_fb_sfx_mix_feed_capacity > 0
-        ? g_fb_sfx_mix_feed_capacity
-        : 1024;
-
-    while (next_capacity < required_samples)
-        next_capacity <<= 1;
-
-    next_scratch = (float *)realloc(g_fb_sfx_mix_feed_scratch,
-                                   (size_t)next_capacity * sizeof(float));
-    if (!next_scratch)
-        return -1;
-
-    g_fb_sfx_mix_feed_scratch = next_scratch;
-    g_fb_sfx_mix_feed_capacity = next_capacity;
-
-    return 0;
-}
-
-static void fb_sfxMixFeedScratchShutdownLocked(void)
-{
-    if (g_fb_sfx_mix_feed_scratch)
-    {
-        free(g_fb_sfx_mix_feed_scratch);
-        g_fb_sfx_mix_feed_scratch = NULL;
-        g_fb_sfx_mix_feed_capacity = 0;
-    }
 }
 
 
@@ -505,6 +463,161 @@ int fb_sfxCooperativeDelay(int msecs)
 #endif
 }
 
+
+/* ------------------------------------------------------------------------- */
+/* Raw output queue write                                                    */
+/* ------------------------------------------------------------------------- */
+
+/*
+    fb_sfxRawWrite()
+
+    Place caller-supplied floating-point samples directly into the runtime
+    output queue. This is intentionally lower level than the BASIC command
+    set: callers are responsible for pacing writes by checking the returned
+    frame count and waiting before retrying when the queue is full.
+
+    Samples are interleaved and clamped into the mixer range [-1.0, 1.0].
+    Mono input is duplicated to every output channel. Stereo input is mapped
+    to the first two output channels, or averaged if the active driver is
+    configured for mono output.
+*/
+
+int fb_sfxRawWrite(const float *samples, int frames, int channels)
+{
+    int output_channels;
+    int chunk_limit;
+    int writable;
+    int written;
+
+    if (!samples || frames <= 0 || channels <= 0)
+        return -1;
+
+    if (!fb_sfxEnsureInitialized())
+        return -1;
+
+    fb_sfxRuntimeLock();
+
+    if (!__fb_sfx || !__fb_sfx->mixbuffer)
+    {
+        fb_sfxRuntimeUnlock();
+        return -1;
+    }
+
+    if (!g_output_queue_initialized && fb_sfxOutputQueueInitLocked() != 0)
+    {
+        fb_sfxRuntimeUnlock();
+        return -1;
+    }
+
+    output_channels = (__fb_sfx->output_channels > 0)
+        ? __fb_sfx->output_channels
+        : FB_SFX_DEFAULT_CHANNELS;
+
+    if (channels != 1 && channels != 2 && channels != output_channels)
+    {
+        fb_sfxRuntimeUnlock();
+        return -1;
+    }
+
+    writable = fb_sfxRingBufferFree(&g_output_queue);
+    if (writable <= 0)
+    {
+        fb_sfxRuntimeUnlock();
+        return 0;
+    }
+
+    if (frames > writable)
+        frames = writable;
+
+    chunk_limit = (__fb_sfx->buffer_frames > 0)
+        ? __fb_sfx->buffer_frames
+        : FB_SFX_DEFAULT_BUFFER;
+
+    if (chunk_limit <= 0)
+        chunk_limit = FB_SFX_DEFAULT_BUFFER;
+
+    written = 0;
+
+    while (written < frames)
+    {
+        int chunk;
+        int accepted;
+
+        chunk = frames - written;
+        if (chunk > chunk_limit)
+            chunk = chunk_limit;
+
+        if (fb_sfxRawCopyFramesLocked(__fb_sfx->mixbuffer,
+                                      samples + (written * channels),
+                                      chunk,
+                                      channels,
+                                      output_channels) != 0)
+        {
+            fb_sfxRuntimeUnlock();
+            return (written > 0) ? written : -1;
+        }
+
+        fb_sfxMixerDiagnostics(__fb_sfx->mixbuffer, chunk);
+
+        accepted = fb_sfxRingBufferWrite(&g_output_queue,
+                                         __fb_sfx->mixbuffer,
+                                         chunk);
+        if (accepted <= 0)
+            break;
+
+        written += accepted;
+
+        if (accepted < chunk)
+            break;
+    }
+
+    fb_sfxRuntimeUnlock();
+    return written;
+}
+
+static int fb_sfxRawCopyFramesLocked(float *dst,
+                                     const float *src,
+                                     int frames,
+                                     int src_channels,
+                                     int dst_channels)
+{
+    int frame;
+    int dst_channel;
+
+    if (!dst || !src || frames <= 0 || src_channels <= 0 || dst_channels <= 0)
+        return -1;
+
+    for (frame = 0; frame < frames; ++frame)
+    {
+        for (dst_channel = 0; dst_channel < dst_channels; ++dst_channel)
+        {
+            float sample;
+
+            if (src_channels == 1)
+            {
+                sample = src[frame];
+            }
+            else if (src_channels == 2 && dst_channels == 1)
+            {
+                sample = (src[(frame * 2)] + src[(frame * 2) + 1]) * 0.5f;
+            }
+            else
+            {
+                int src_channel = dst_channel;
+
+                if (src_channel >= src_channels)
+                    src_channel = src_channels - 1;
+
+                sample = src[(frame * src_channels) + src_channel];
+            }
+
+            dst[(frame * dst_channels) + dst_channel] = fb_sfxClampSample(sample);
+        }
+    }
+
+    return 0;
+}
+
 static void fb_sfxSleepMs(unsigned long milliseconds)
 {
     if (milliseconds == 0)
@@ -663,35 +776,6 @@ static int fb_sfxDriverIndexOf(const SFXDRIVER *driver)
     return -1;
 }
 
-static void fb_sfxMixFeedSource(int frames, int (*feed_fn)(float *buffer, int frames))
-{
-    float *scratch;
-    int channels;
-    int samples;
-    int produced;
-    int i;
-
-    if (!__fb_sfx || !__fb_sfx->mixbuffer || !feed_fn || frames <= 0)
-        return;
-
-    channels = (__fb_sfx->output_channels > 0)
-        ? __fb_sfx->output_channels
-        : FB_SFX_DEFAULT_CHANNELS;
-
-    if (fb_sfxMixFeedScratchEnsureLocked(frames, channels) != 0)
-        return;
-
-    samples = frames * channels;
-    scratch = g_fb_sfx_mix_feed_scratch;
-    memset(scratch, 0, (size_t)samples * sizeof(float));
-    produced = feed_fn(scratch, frames);
-    if (produced > frames)
-        produced = frames;
-
-    for (i = 0; i < produced * channels; ++i)
-        __fb_sfx->mixbuffer[i] = fb_sfxClampSample(__fb_sfx->mixbuffer[i] + scratch[i]);
-}
-
 static int fb_sfxOutputQueueInitLocked(void)
 {
     int queue_frames;
@@ -776,10 +860,6 @@ static int fb_sfxOutputQueueFillLocked(int frames)
 
         /* generate audio using the mixer */
         fb_sfxMixerProcess(frames_this_pass);
-
-        /* mix decoded playback sources into the same live output buffer */
-        fb_sfxMixFeedSource(frames_this_pass, fb_sfxAudioFeed);
-        fb_sfxMixFeedSource(frames_this_pass, fb_sfxStreamFeed);
 
         fb_sfxMixerDiagnostics(__fb_sfx->mixbuffer, frames_this_pass);
 
@@ -909,6 +989,8 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
                           write_frames);
                 result = write_frames;
             }
+
+            fb_sfxOutputCaptureAppendLocked(write_buffer, result, channels);
 
             written += result;
             zero_retry_count = 0;

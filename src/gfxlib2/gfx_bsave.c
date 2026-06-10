@@ -1,6 +1,7 @@
 /* BSAVE support. */
 
 #include "fb_gfx.h"
+#include <strings.h>
 #ifdef HOST_WIN32
 	#include <windows.h>
 #endif

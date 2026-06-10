@@ -17,6 +17,7 @@ ifndef FBC
 FBC := $(TESTS_DEFAULT_FBC)
 endif
 export FBC
+export FBC_LFLAGS
 
 ENABLE_CHECK_BUGS :=
 export ENABLE_CHECK_BUGS

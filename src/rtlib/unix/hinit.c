@@ -4,6 +4,7 @@
 #define _GNU_SOURCE 1
 
 #include "../fb.h"
+#include <strings.h>
 #include "fb_private_console.h"
 #include "../fb_private_thread.h"
 #include <signal.h>

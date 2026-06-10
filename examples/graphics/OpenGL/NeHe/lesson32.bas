@@ -9,8 +9,6 @@
 
 
 '' Setup our booleans
-const false = 0
-const true  = not false
 const null = 0
 
 
@@ -32,7 +30,7 @@ end type
 #endif
 
 '' User Defined Variables
-dim shared bbase as uinteger            '' Font Display List
+dim shared bbase as GLuint              '' Font Display List
 dim shared roll as single               '' Rolling Clouds
 dim shared as integer level = 1         '' Current Level
 dim shared miss as integer              '' Missed Targets
@@ -45,7 +43,7 @@ type objects
 	hit as integer                      '' Object Hit?
 	frame as uinteger                   '' Current Explosion Frame
 	ddir as uinteger                    '' Object Direction (0-Left, 1-Right, 2-Up, 3-Down)
-	texid as uinteger                   '' Object Texture ID
+	texid as GLuint                   '' Object Texture ID
 	x as single                         '' Object X Position
 	y as single                         '' Object Y Position
 	spin as single                      '' Object Spin
@@ -57,7 +55,7 @@ type TextureImage                       '' Create A Structure
 	bpp as uinteger                     '' Image Color Depth In Bits Per Pixel.
 	wwidth as uinteger                  '' Image Width
 	height as uinteger                  '' Image Height
-	texID as uinteger                   '' Texture ID Used To Select A Texture
+	texID as GLuint                   '' Texture ID Used To Select A Texture
 end type
 
 
@@ -90,7 +88,7 @@ declare function Initialize () as integer
 declare sub Deinitialize ()
 declare sub Selection ()
 declare sub Update (byval milliseconds as integer)
-declare sub drawobject (byval wwidth as single, byval height as single, byval texid as uinteger)
+declare sub drawobject (byval wwidth as single, byval height as single, byval texid as GLuint)
 declare sub Explosion (byval num as integer)
 declare sub DrawTargets ()
 declare sub drawscr ()
@@ -142,7 +140,7 @@ function LoadTGA(byval texture as TEXTUREIMAGE ptr, byref filename as string) as
 	dim bytesPerPixel as uinteger              '' Holds Number Of Bytes Per Pixel Used In The TGA File
 	dim imageSize as integer                   '' Used To Store The Image Size When Setting Aside Ram
 	dim temp as ubyte                          '' Temporary Variable
-	dim gtype as uinteger  = GL_RGBA           '' Set The Default GL Mode To RBGA (32 BPP)
+	dim gtype as GLenum  = GL_RGBA             '' Set The Default GL Mode To RBGA (32 BPP)
 	dim hFile as integer
 	dim pb as ubyte ptr
 	dim b as ubyte
@@ -378,7 +376,7 @@ end sub
 
 '------------------------------------------------------------------------
 sub Selection ()                                         '' This Is Where Selection Is Done
-	dim buffer(512) as uinteger                          '' Set Up A Selection Buffer
+	dim buffer(512) as GLuint                            '' Set Up A Selection Buffer
 	dim hits as integer                                  '' The Number Of Objects That We Selected
 	if mouse_x = -1 then exit sub
 	'' Is Game Over?
@@ -389,7 +387,7 @@ sub Selection ()                                         '' This Is Where Select
 		PlaySound ("data/shot.wav", NULL, SND_ASYNC)     '' Play Gun Shot Sound
 	#endif
 	'' The Size Of The Viewport. (0) Is <x>, (1) Is <y>, (2) Is <length>, (3) Is <width>
-	dim viewport(4) as integer
+	dim viewport(4) as GLint
 
 	'' This Sets The Array <viewport> To The Size And Location Of The Screen Relative To The Window
 	glGetIntegerv (GL_VIEWPORT, @viewport(0))
@@ -527,7 +525,7 @@ sub Update (byval milliseconds as integer)               '' Perform Motion Updat
 end sub
 
 '------------------------------------------------------------------------
-sub drawobject (byval wwidth as single, byval height as single, byval texid as uinteger)    '' Draw Object Using Requested Width, Height And Texture
+sub drawobject (byval wwidth as single, byval height as single, byval texid as GLuint)    '' Draw Object Using Requested Width, Height And Texture
 	glBindTexture (GL_TEXTURE_2D, textures(texid).texID) '' Select The Correct Texture
 	glBegin (GL_QUADS)                                   '' Start Drawing A Quad
 		glTexCoord2f (0.0f, 0.0f) : glVertex3f (- wwidth, - height, 0.0f)      '' Bottom Left

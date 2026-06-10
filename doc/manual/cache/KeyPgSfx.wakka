@@ -30,7 +30,6 @@ Loads and controls short sound effects through sfxlib.
 
 {{fbdoc item="see"}}
 	- ##[[KeyPgMusic|Music]]##
-	- ##[[KeyPgAudio|Audio]]##
 	- ##[[KeyPgSfxGenerated|Generated sound commands]]##
 
 {{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

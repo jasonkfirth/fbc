@@ -71,18 +71,6 @@ declare function hSfxlib_cb _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
 			} _
 		), _
-		/' sub sound overload( byval a as const long, byval b as const long, byval c as const long ) '/ _
-		( _
-			@"sound", @"fb_sfxSoundLegacy3", _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_OVER, _
-			3, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
 		/' sub sound overload( byval channel as const long, byval frequency as const long, byval duration as const single, byval volume as const single ) '/ _
 		( _
 			@"sound", @"fb_sfxSoundChannel", _
@@ -94,81 +82,6 @@ declare function hSfxlib_cb _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_SINGLE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_SINGLE ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
-		/' sub sound overload( byval a as const long, byval b as const long, byval c as const long, byval d as const long ) '/ _
-		( _
-			@"sound", @"fb_sfxSoundLegacy4", _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_OVER, _
-			4, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
-		/' sub sound overload( byval a as const long, byval b as const long, byval c as const long, byval d as const long, byval e as const long ) '/ _
-		( _
-			@"sound", @"fb_sfxSoundLegacy5", _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_OVER, _
-			5, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
-		/' sub sound overload( byval a as const long, byval b as const long, byval c as const long, byval d as const long, byval e as const long, byval f as const long ) '/ _
-		( _
-			@"sound", @"fb_sfxSoundLegacy6", _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_OVER, _
-			6, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
-		/' sub sound overload( byval a as const long, byval b as const long, byval c as const long, byval d as const long, byval e as const long, byval f as const long, byval g as const long ) '/ _
-		( _
-			@"sound", @"fb_sfxSoundLegacy7", _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_OVER, _
-			7, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
-		/' sub sound overload( byval a as const long, byval b as const long, byval c as const long, byval d as const long, byval e as const long, byval f as const long, byval g as const long, byval h as const long ) '/ _
-		( _
-			@"sound", @"fb_sfxSoundLegacy8", _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_OVER, _
-			8, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
 			} _
 		), _
 		/' sub noise overload( byval channel as const long, byval duration as const single, byval volume as const single ) '/ _
@@ -467,27 +380,6 @@ declare function hSfxlib_cb _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
 			} _
 		), _
-		/' sub rest overload( byval duration as const single ) '/ _
-		( _
-			@"rest", @"fb_sfxRest", _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_OVER, _
-			1, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_SINGLE ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
-		/' sub rest overload( byval channel as const long, byval duration as const single ) '/ _
-		( _
-			@"rest", @"fb_sfxRestChannel", _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_OVER, _
-			2, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
-				( typeSetIsConst( FB_DATATYPE_SINGLE ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
 		/' sub tone overload( byval channel as const long, byval frequency as const long, byval duration as const single ) '/ _
 		( _
 			@"tone", @"fb_sfxTone", _
@@ -512,85 +404,6 @@ declare function hSfxlib_cb _
 
 	dim shared as FB_RTL_PROCDEF cmddata( 0 to ... ) = _
 	{ _
-		/' sub fb_sfxSoundStop( ) '/ _
-		( _
-			@FB_RTL_SFXSOUNDSTOP, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' sub fb_sfxSoundStopChannel( byval channel as const long ) '/ _
-		( _
-			@FB_RTL_SFXSOUNDSTOPCHANNEL, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			1, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
-		/' sub fb_sfxNoiseStopAll( ) '/ _
-		( _
-			@FB_RTL_SFXNOISESTOP, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' sub fb_sfxNoiseStop( byval channel as const long ) '/ _
-		( _
-			@FB_RTL_SFXNOISESTOPCHANNEL, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			1, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
-		/' sub fb_sfxToneStopAll( ) '/ _
-		( _
-			@FB_RTL_SFXTONESTOP, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' sub fb_sfxToneStop( byval channel as const long ) '/ _
-		( _
-			@FB_RTL_SFXTONESTOPCHANNEL, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			1, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
-		/' sub fb_sfxPlayStop( ) '/ _
-		( _
-			@FB_RTL_SFXPLAYSTOP, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' sub fb_sfxPlayPause( ) '/ _
-		( _
-			@FB_RTL_SFXPLAYPAUSE, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' sub fb_sfxPlayResume( ) '/ _
-		( _
-			@FB_RTL_SFXPLAYRESUME, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' function fb_sfxPlayStatus( ) as long '/ _
-		( _
-			@FB_RTL_SFXPLAYSTATUS, NULL, _
-			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
 		/' function fb_sfxMusicLoad( byref filename as const string ) as long '/ _
 		( _
 			@FB_RTL_SFXMUSICLOAD, NULL, _
@@ -601,15 +414,12 @@ declare function hSfxlib_cb _
 				( typeAddrOf( typeSetIsConst( FB_DATATYPE_CHAR ) ), FB_PARAMMODE_BYVAL, FALSE ) _
 			} _
 		), _
-		/' function fb_sfxMusicPlayCmd( byval id as const long ) as long '/ _
+		/' function fb_sfxMusicPlayCmd( ) as long '/ _
 		( _
 			@FB_RTL_SFXMUSICPLAY, NULL, _
 			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
 			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			1, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
+			0 _
 		), _
 		/' function fb_sfxMusicPlayFile( byref filename as const string ) as long '/ _
 		( _
@@ -621,15 +431,12 @@ declare function hSfxlib_cb _
 				( typeAddrOf( typeSetIsConst( FB_DATATYPE_CHAR ) ), FB_PARAMMODE_BYVAL, FALSE ) _
 			} _
 		), _
-		/' function fb_sfxMusicLoopCmd( byval id as const long ) as long '/ _
+		/' function fb_sfxMusicLoopCmd( ) as long '/ _
 		( _
 			@FB_RTL_SFXMUSICLOOP, NULL, _
 			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
 			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			1, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
+			0 _
 		), _
 		/' function fb_sfxMusicLoopFile( byref filename as const string ) as long '/ _
 		( _
@@ -648,32 +455,12 @@ declare function hSfxlib_cb _
 			@hSfxlib_cb, FB_RTL_OPT_NONE, _
 			0 _
 		), _
-		/' sub fb_sfxMusicPauseId( byval id as const long ) '/ _
-		( _
-			@FB_RTL_SFXMUSICPAUSEID, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			1, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
 		/' sub fb_sfxMusicResume( ) '/ _
 		( _
 			@FB_RTL_SFXMUSICRESUME, NULL, _
 			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
 			@hSfxlib_cb, FB_RTL_OPT_NONE, _
 			0 _
-		), _
-		/' sub fb_sfxMusicResumeId( byval id as const long ) '/ _
-		( _
-			@FB_RTL_SFXMUSICRESUMEID, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			1, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
 		), _
 		/' sub fb_sfxMusicStop( ) '/ _
 		( _
@@ -682,26 +469,9 @@ declare function hSfxlib_cb _
 			@hSfxlib_cb, FB_RTL_OPT_NONE, _
 			0 _
 		), _
-		/' sub fb_sfxMusicStopId( byval id as const long ) '/ _
-		( _
-			@FB_RTL_SFXMUSICSTOPID, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			1, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
 		/' function fb_sfxMusicStatus( ) as long '/ _
 		( _
 			@FB_RTL_SFXMUSICSTATUS, NULL, _
-			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' function fb_sfxMusicCurrent( ) as long '/ _
-		( _
-			@FB_RTL_SFXMUSICCURRENT, NULL, _
 			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
 			@hSfxlib_cb, FB_RTL_OPT_NONE, _
 			0 _
@@ -897,109 +667,6 @@ declare function hSfxlib_cb _
 			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
 			@hSfxlib_cb, FB_RTL_OPT_NONE, _
 			0 _
-		), _
-		/' function fb_sfxAudioPlay( byref filename as const string ) as long '/ _
-		( _
-			@FB_RTL_SFXAUDIOPLAY, NULL, _
-			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			1, _
-			{ _
-				( typeAddrOf( typeSetIsConst( FB_DATATYPE_CHAR ) ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
-		/' function fb_sfxAudioLoop( byref filename as const string ) as long '/ _
-		( _
-			@FB_RTL_SFXAUDIOLOOP, NULL, _
-			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			1, _
-			{ _
-				( typeAddrOf( typeSetIsConst( FB_DATATYPE_CHAR ) ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
-		/' sub fb_sfxAudioStop( ) '/ _
-		( _
-			@FB_RTL_SFXAUDIOSTOP, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' sub fb_sfxAudioPause( ) '/ _
-		( _
-			@FB_RTL_SFXAUDIOPAUSE, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' sub fb_sfxAudioResume( ) '/ _
-		( _
-			@FB_RTL_SFXAUDIORESUME, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' function fb_sfxAudioStatus( ) as long '/ _
-		( _
-			@FB_RTL_SFXAUDIOSTATUS, NULL, _
-			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' function fb_sfxStreamOpen( byref filename as const string ) as long '/ _
-		( _
-			@FB_RTL_SFXSTREAMOPEN, NULL, _
-			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			1, _
-			{ _
-				( typeAddrOf( typeSetIsConst( FB_DATATYPE_CHAR ) ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
-		), _
-		/' function fb_sfxStreamPlay( ) as long '/ _
-		( _
-			@FB_RTL_SFXSTREAMPLAY, NULL, _
-			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' sub fb_sfxStreamStop( ) '/ _
-		( _
-			@FB_RTL_SFXSTREAMSTOP, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' sub fb_sfxStreamPause( ) '/ _
-		( _
-			@FB_RTL_SFXSTREAMPAUSE, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' sub fb_sfxStreamResume( ) '/ _
-		( _
-			@FB_RTL_SFXSTREAMRESUME, NULL, _
-			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' function fb_sfxStreamPosition( ) as long '/ _
-		( _
-			@FB_RTL_SFXSTREAMPOSITION, NULL, _
-			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			0 _
-		), _
-		/' function fb_sfxStreamSeek( byval position as const long ) as long '/ _
-		( _
-			@FB_RTL_SFXSTREAMSEEK, NULL, _
-			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
-			@hSfxlib_cb, FB_RTL_OPT_NONE, _
-			1, _
-			{ _
-				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
-			} _
 		), _
 		/' function fb_sfxMidiOpen( byval device as const long ) as long '/ _
 		( _

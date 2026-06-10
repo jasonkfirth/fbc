@@ -4,13 +4,13 @@
 
 #include once "pcre.bi"
 
-dim OVECCOUNT as const uinteger = 30    '' should be a multiple of 3
+dim OVECCOUNT as const long = 30        '' should be a multiple of 3
 
-	dim as pcre ptr re 
-	dim as zstring ptr error_ 
-	dim as integer erroffset 
-	dim as integer ovector(OVECCOUNT-1) 
-	dim as integer rc, i 
+		dim as pcre ptr re
+		dim as const zstring ptr error_
+		dim as long erroffset
+		dim as long ovector(OVECCOUNT-1)
+		dim as long rc, i
 	
 	dim as string pattern, buffer
 	
@@ -65,7 +65,7 @@ dim OVECCOUNT as const uinteger = 30    '' should be a multiple of 3
 	
 	'' show substrings stored in the output vector 
 	dim as zstring ptr substring_start  
-	dim as integer substring_length
+	dim as long substring_length
 	for i = 0 to rc-1
 	    substring_start = @buffer[ovector(2*i)]
 	    substring_length = ovector(2*i+1) - ovector(2*i) 
@@ -73,4 +73,3 @@ dim OVECCOUNT as const uinteger = 30    '' should be a multiple of 3
 	next
 	
 	end 
-

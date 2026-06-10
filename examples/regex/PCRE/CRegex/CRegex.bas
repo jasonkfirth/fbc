@@ -12,8 +12,8 @@ constructor CRegex _
 		byval opt as options _
 	) 
 
-	dim as zstring ptr err_msg = any
-	dim as integer err_ofs = any
+	dim as const zstring ptr err_msg = any
+	dim as long err_ofs = any
 	
 	reg = pcre_compile( pattern, opt, @err_msg, @err_ofs, NULL ) 
 	if( reg = NULL ) then
@@ -23,7 +23,7 @@ constructor CRegex _
 	extra = pcre_study( reg, 0, @err_msg )
 	pcre_fullinfo( reg, extra, PCRE_INFO_CAPTURECOUNT, @substrcnt )
 	substrcnt += 1
-	vectb = allocate( len( integer ) * (3 * substrcnt) )
+	vectb = allocate( len( long ) * (3 * substrcnt) )
 	substrlist = NULL
 end constructor
 
@@ -43,7 +43,7 @@ destructor CRegex()
 	end if
 
 	if( extra <> NULL ) then
-		pcre_free( extra )
+		pcre_free_study( extra )
 		extra = NULL
 	end if
 
@@ -99,7 +99,7 @@ function CRegex.getStr _
 		pcre_get_substring_list( subject, vectb, substrcnt, @substrlist )
 	end if
 
-	function = substrlist[i]
+	function = cast(zstring ptr, substrlist[i])
 end function
 
 function CRegex.getOfs _

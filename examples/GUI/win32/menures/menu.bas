@@ -176,13 +176,13 @@ function WinMain ( byval hInstance as HINSTANCE, _
     appName = "MenuResource"
      
     with wcls
-     	.style         = CS_HREDRAW or CS_VREDRAW
-     	.lpfnWndProc   = @WndProc
-     	.cbClsExtra    = 0
-     	.cbWndExtra    = 0
-     	.hInstance     = hInstance
-     	.hIcon         = LoadIcon( null, IDI_APPLICATION )
-     	.hCursor       = LoadCursor( null, IDC_ARROW )
+		.style         = CS_HREDRAW or CS_VREDRAW
+		.lpfnWndProc   = cast( WNDPROC, @WndProc )
+		.cbClsExtra    = 0
+		.cbWndExtra    = 0
+		.hInstance     = hInstance
+		.hIcon         = LoadIcon( null, IDI_APPLICATION )
+		.hCursor       = LoadCursor( null, IDC_ARROW )
      	.hbrBackground = GetStockObject( WHITE_BRUSH )
      	.lpszMenuName  = cast(zstring ptr, IDC_MAINMENU)
      	.lpszClassName = strptr( appName )
@@ -236,8 +236,6 @@ function WinMain ( byval hInstance as HINSTANCE, _
     function = wMsg.wParam
 
 end function
-
-
 
 
 

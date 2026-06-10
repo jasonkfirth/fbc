@@ -9,6 +9,8 @@
 # Host toolchain detection
 ##############################################################################
 
+MSYS_VERSION_SORT := $(strip $(shell if printf '2\n10\n' | sort -V >/dev/null 2>&1; then echo 'sort -V'; else echo sort; fi))
+
 LOCAL_GCC_CANDIDATE := $(firstword $(wildcard bin/gcc$(EXEEXT) bin/gcc.exe bin/gcc))
 LOCAL_GXX_CANDIDATE := $(firstword $(wildcard bin/g++$(EXEEXT) bin/g++.exe bin/g++))
 LOCAL_AR_CANDIDATE := $(firstword $(wildcard bin/ar$(EXEEXT) bin/ar.exe bin/ar))
@@ -27,7 +29,7 @@ MSYS_ACTIVE_PREFIX := $(strip $(MINGW_PREFIX))
 MSYS_TARGET_PREFIX :=
 MSYS_AARCH64_CROSS :=
 MSYS_AARCH64_SYSROOT := /clangarm64
-MSYS_AARCH64_RESOURCE_DIR := $(strip $(shell find $(MSYS_AARCH64_SYSROOT)/lib/clang -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -V | tail -n 1))
+MSYS_AARCH64_RESOURCE_DIR := $(strip $(shell find $(MSYS_AARCH64_SYSROOT)/lib/clang -mindepth 1 -maxdepth 1 -type d 2>/dev/null | $(MSYS_VERSION_SORT) | tail -n 1))
 MSYS_AARCH64_CLANG_FLAGS := -Qunused-arguments --target=aarch64-w64-mingw32 --sysroot=$(MSYS_AARCH64_SYSROOT) $(if $(MSYS_AARCH64_RESOURCE_DIR),-resource-dir $(MSYS_AARCH64_RESOURCE_DIR)) -fuse-ld=lld --rtlib=compiler-rt --unwindlib=libunwind
 
 ifneq ($(filter aarch64-w64-mingw32 arm64-w64-mingw32,$(TARGET_TRIPLET_LC)),)
@@ -77,7 +79,7 @@ ifeq ($(MSYS_AARCH64_CROSS),yes)
   MSYS_LD := $(firstword $(wildcard /mingw64/bin/ld.lld.exe /ucrt64/bin/ld.lld.exe /clang64/bin/ld.lld.exe))
 endif
 
-HOST_VERSION_SORT := $(strip $(shell if printf '2\n10\n' | sort -V >/dev/null 2>&1; then echo 'sort -V'; else echo sort; fi))
+HOST_VERSION_SORT := $(MSYS_VERSION_SORT)
 HOMEBREW_GCC := $(strip $(shell find /opt/homebrew/bin /usr/local/bin -maxdepth 1 \( -type f -o -type l \) -name 'gcc-*' 2>/dev/null | grep -E '/gcc-[0-9]+$$' | $(HOST_VERSION_SORT) | tail -n1))
 HOMEBREW_GXX := $(strip $(shell find /opt/homebrew/bin /usr/local/bin -maxdepth 1 \( -type f -o -type l \) -name 'g++-*' 2>/dev/null | grep -E '/g[+][+]-[0-9]+$$' | $(HOST_VERSION_SORT) | tail -n1))
 

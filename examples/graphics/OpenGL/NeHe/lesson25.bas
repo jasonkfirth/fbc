@@ -25,10 +25,7 @@
 
 
 '' Setup our booleans
-const false = 0
-const true  = not false
-const null = false
-
+const null = 0
 #include once "GL/gl.bi"
 #include once "GL/glu.bi"
 #include once "fbgfx.bi"                   '' for Scan code constants

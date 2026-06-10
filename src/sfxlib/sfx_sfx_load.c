@@ -44,6 +44,32 @@
 
 
 /* ------------------------------------------------------------------------- */
+/* Internal helpers                                                          */
+/* ------------------------------------------------------------------------- */
+
+static void fb_sfxSfxStopIdLocked(int id)
+{
+    int i;
+
+    if (!__fb_sfx)
+        return;
+
+    for (i = 0; i < FB_SFX_MAX_VOICES; ++i)
+    {
+        FB_SFXVOICE *voice = &__fb_sfx->voices[i];
+
+        if (voice->active &&
+            voice->type == FB_SFX_VOICE_SFX &&
+            voice->sfx_id == id)
+        {
+            voice->active = 0;
+            voice->data = NULL;
+        }
+    }
+}
+
+
+/* ------------------------------------------------------------------------- */
 /* SFX LOAD                                                                  */
 /* ------------------------------------------------------------------------- */
 
@@ -60,6 +86,8 @@
 
 void fb_sfxSfxLoad(int id, const char *filename)
 {
+    FB_SFX_ASSET next_asset;
+    float *old_data;
     float *decoded = NULL;
     float *mono = NULL;
     int frames = 0;
@@ -83,6 +111,12 @@ void fb_sfxSfxLoad(int id, const char *filename)
                          &sample_rate) != 0)
         return;
 
+    if (frames <= 0 || channels <= 0)
+    {
+        free(decoded);
+        return;
+    }
+
     mono = (float *)malloc((size_t)frames * sizeof(float));
     if (!mono)
     {
@@ -103,26 +137,26 @@ void fb_sfxSfxLoad(int id, const char *filename)
 
     free(decoded);
 
-    /* free previous SFX if slot already used */
+    memset(&next_asset, 0, sizeof(next_asset));
 
-    if (__fb_sfx->sfx[id].loaded)
-        free(__fb_sfx->sfx[id].data);
+    next_asset.data = mono;
+    next_asset.size = frames * (int)sizeof(float);
+    next_asset.frames = frames;
+    next_asset.sample_rate = sample_rate;
+    next_asset.loaded = 1;
 
-    __fb_sfx->sfx[id].data = mono;
-    __fb_sfx->sfx[id].size = frames * (int)sizeof(float);
-    __fb_sfx->sfx[id].frames = frames;
-    __fb_sfx->sfx[id].sample_rate = sample_rate;
-    __fb_sfx->sfx[id].loaded = 1;
+    strncpy(next_asset.name, filename, sizeof(next_asset.name) - 1);
+    next_asset.name[sizeof(next_asset.name) - 1] = '\0';
 
-    strncpy(
-        __fb_sfx->sfx[id].name,
-        filename,
-        sizeof(__fb_sfx->sfx[id].name) - 1
-    );
+    fb_sfxRuntimeLock();
 
-    __fb_sfx->sfx[id].name[
-        sizeof(__fb_sfx->sfx[id].name) - 1
-    ] = '\0';
+    old_data = __fb_sfx->sfx[id].data;
+    fb_sfxSfxStopIdLocked(id);
+    __fb_sfx->sfx[id] = next_asset;
+
+    fb_sfxRuntimeUnlock();
+
+    free(old_data);
 
     SFX_DEBUG(
         "sfx_sfx_load: id=%d '%s' frames=%d rate=%d",
@@ -146,22 +180,29 @@ void fb_sfxSfxLoad(int id, const char *filename)
 
 void fb_sfxSfxUnload(int id)
 {
+    float *old_data;
+
     if (!fb_sfxEnsureInitialized())
         return;
 
     if (id < 0 || id >= FB_SFX_MAX_SFX)
         return;
 
-    if (!__fb_sfx->sfx[id].loaded)
-        return;
+    fb_sfxRuntimeLock();
 
-    free(__fb_sfx->sfx[id].data);
+    old_data = __fb_sfx->sfx[id].data;
+    fb_sfxSfxStopIdLocked(id);
 
     __fb_sfx->sfx[id].data = NULL;
     __fb_sfx->sfx[id].size = 0;
     __fb_sfx->sfx[id].frames = 0;
     __fb_sfx->sfx[id].sample_rate = 0;
     __fb_sfx->sfx[id].loaded = 0;
+    __fb_sfx->sfx[id].name[0] = '\0';
+
+    fb_sfxRuntimeUnlock();
+
+    free(old_data);
 
     SFX_DEBUG("sfx_sfx_load: unloaded id=%d", id);
 }

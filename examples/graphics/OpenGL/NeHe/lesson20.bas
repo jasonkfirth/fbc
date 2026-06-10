@@ -23,14 +23,11 @@
 ''------------------------------------------------------------------------------
 '' Common window constants
 '' Setup our booleans
-const false = 0
-const true  = not false
-const null = false
-
+const null = 0
 declare function LoadGLTextures() as integer
 
 	'' Global variable
-	dim shared texture(5) as uinteger        '' Storage For Our Five Textures
+	dim shared texture(5) as GLuint        '' Storage For Our Five Textures
 	
 	'' Local variables
 	dim roll    as single                    '' Rolling Texture

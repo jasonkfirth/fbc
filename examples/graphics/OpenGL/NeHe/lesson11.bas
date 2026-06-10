@@ -19,11 +19,9 @@
 #include once "createtex.bi"
 
 '' Setup our booleans
-const FALSE = 0
-const TRUE  = not FALSE
 
 
-	dim texture(0) as uinteger                    '' Storage For One Texture
+	dim texture(0) as GLuint                    '' Storage For One Texture
 
 	dim points(44, 44, 2) as single               '' The Array For The Points On The Grid Of Our "Wave"
 	dim wiggle_count as integer                   '' Counter Used To Control How Fast Flag Waves

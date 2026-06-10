@@ -164,13 +164,13 @@ function WinMain ( byval hInstance as HINSTANCE, _
      
 	with wcls
     	.style         = CS_HREDRAW or CS_VREDRAW
-     	.lpfnWndProc   = @WndProc
-     	.cbClsExtra    = 0
-     	.cbWndExtra    = 0
-     	.hInstance     = hInstance
-     	.hIcon         = LoadIcon( null, IDI_APPLICATION )
-     	.hCursor       = LoadCursor( null, IDC_ARROW )
-     	.hbrBackground = GetStockObject( WHITE_BRUSH )
+		.lpfnWndProc   = cast( WNDPROC, @WndProc )
+		.cbClsExtra    = 0
+		.cbWndExtra    = 0
+		.hInstance     = hInstance
+		.hIcon         = LoadIcon( null, IDI_APPLICATION )
+		.hCursor       = LoadCursor( null, IDC_ARROW )
+		.hbrBackground = GetStockObject( WHITE_BRUSH )
      	.lpszMenuName  = null
      	.lpszClassName = strptr( szAppName )
     end with
@@ -302,5 +302,3 @@ dim shared fblogo_data(0 to 3126-1) as ubyte = { _
 &hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff, _
 &hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff, _
 &hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff,&hff }
-
-

@@ -14,6 +14,17 @@ run() {
     fi
 }
 
+CLEANUP_SUCCESS=0
+
+cleanup_build_artifacts() {
+	[ "$CLEANUP_SUCCESS" -eq 1 ] || return 0
+
+	rm -rf "$BUILDROOT"
+	rm -f /tmp/fb_test.bas /tmp/fb_test
+}
+
+trap cleanup_build_artifacts EXIT
+
 die() {
     echo "ERROR: $*" >&2
     exit 1
@@ -314,6 +325,8 @@ OUTPUT="$("$TEST_BIN")"
 echo "==> output: $OUTPUT"
 
 [ "$OUTPUT" = "FreeBASIC test OK" ] || die "bad output"
+
+CLEANUP_SUCCESS=1
 
 echo
 echo "==> SUCCESS"

@@ -251,7 +251,7 @@ ifneq ($(LOGLIST_COMPILE_AND_RUN_OK),)
 $(LOGLIST_COMPILE_AND_RUN_OK) : %.log : %.bas
 	@$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_OK"
 	@$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_OK" > $@
-	@if cd . && $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_OK LOGFILE=$@ \
+	@if cd . && $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_OK LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -267,7 +267,7 @@ ifneq ($(LOGLIST_COMPILE_AND_RUN_FAIL),)
 $(LOGLIST_COMPILE_AND_RUN_FAIL) : %.log : %.bas
 	@$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_FAIL"
 	@$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_FAIL" > $@
-	@if cd . && $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_FAIL LOGFILE=$@ \
+	@if cd . && $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_FAIL LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -283,7 +283,7 @@ ifneq ($(LOGLIST_MULTI_MODULE_OK),)
 $(LOGLIST_MULTI_MODULE_OK)  : %.log : %.bmk
 	@$(ECHO) "$< : TEST_MODE=MULTI_MODULE_OK"
 	@$(ECHO) "$< : TEST_MODE=MULTI_MODULE_OK" > $@
-	@if cd . && $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_OK LOGFILE=$@ \
+	@if cd . && $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_OK LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -299,7 +299,7 @@ ifneq ($(LOGLIST_MULTI_MODULE_FAIL),)
 $(LOGLIST_MULTI_MODULE_FAIL)  : %.log : %.bmk
 	@$(ECHO) "$< : TEST_MODE=MULTI_MODULE_FAIL"
 	@$(ECHO) "$< : TEST_MODE=MULTI_MODULE_FAIL" > $@
-	@if cd . && $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_FAIL LOGFILE=$@ \
+	@if cd . && $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_FAIL LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \

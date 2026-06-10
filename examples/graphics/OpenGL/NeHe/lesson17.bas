@@ -20,15 +20,13 @@
 #include once "createtex.bi"
 
 '' Setup our booleans
-const false = 0
-const true  = not false
 
 declare sub BuildFont()
 declare sub glPrint(byval x as integer, byval y as integer, byref glstring as string, byval gset as integer)
 
 
 dim shared gbase as uinteger                      '' Base Display List For The Font
-dim shared texture(0 to 1) as uinteger            '' Storage For Our Font Texture
+dim shared texture(0 to 1) as GLuint            '' Storage For Our Font Texture
 dim shared gloop as integer                       '' Generic Loop Variable
 
 	dim cnt1 as single                            '' 1st Counter Used To Move Text & For Coloring

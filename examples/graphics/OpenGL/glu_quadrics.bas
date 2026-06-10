@@ -12,8 +12,6 @@ const PI = 3.141593
 const SCR_WIDTH = 640
 const SCR_HEIGHT = 480
 const BPP = 16
-const FALSE = 0
-const TRUE = 1
 
 
 
@@ -275,5 +273,4 @@ private sub DrawScene
     theta = theta + 1       'increase rotval
 
 end sub
-
 

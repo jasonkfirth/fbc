@@ -1,9 +1,5 @@
 #ifndef _3DOBJECT_H_
 #define _3DOBJECT_H_
-#ifndef TRUE
-#define TRUE = not FALSE
-#endif
-
 '' vertex in 3d-coordinate system
 type sPoint
 	x as single
@@ -79,7 +75,7 @@ private function ReadObject(byref st as string, byval o as glObject ptr) as inte
 			@o->planes(i).normals(2).y, _
 			@o->planes(i).normals(2).z)
 	next
-	return TRUE
+	return true
 end function
 
 '' connectivity procedure - based on Gamasutra's article

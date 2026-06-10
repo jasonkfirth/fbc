@@ -6,10 +6,11 @@
 
     Purpose:
 
-        Implement the MUSIC PLAY command.
+        Implement playback for the current MUSIC asset.
 
-        This activates playback of a music asset that was
-        previously loaded with MUSIC LOAD.
+        MUSIC LOAD stores one decoded music file at a time. MUSIC PLAY
+        and MUSIC LOOP start that current asset instead of selecting
+        by numeric id.
 
     Responsibilities:
 
@@ -22,50 +23,43 @@
         • music decoding
         • audio synthesis
         • driver interaction
-        • streaming logic
-
-    Architectural overview:
-
-        MUSIC PLAY
-             │
-             ▼
-        playback state
-             │
-             ▼
-        mixer/music subsystem
+        • file-oriented MUSIC helpers
 */
 
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
 
-static FB_SFXVOICE *fb_sfxCurrentMusicVoice(void)
+
+/* ------------------------------------------------------------------------- */
+/* Current music helpers                                                     */
+/* ------------------------------------------------------------------------- */
+
+static FB_SFXVOICE *fb_sfxCurrentMusicVoiceLocked(void)
 {
     int i;
 
-    if (!__fb_sfx || __fb_sfx->music_playing < 0)
+    if (!__fb_sfx)
         return NULL;
 
     for (i = 0; i < FB_SFX_MAX_VOICES; ++i)
     {
         FB_SFXVOICE *voice = &__fb_sfx->voices[i];
 
-        if (voice->active &&
-            voice->type == FB_SFX_VOICE_MUSIC &&
-            voice->sfx_id == __fb_sfx->music_playing)
+        if (voice->active && voice->type == FB_SFX_VOICE_MUSIC)
             return voice;
     }
 
     return NULL;
 }
 
-static float fb_sfxMusicSampleStep(int id)
+static float fb_sfxMusicSampleStepLocked(void)
 {
     FB_SFX_ASSET *asset;
 
-    if (!__fb_sfx || id < 0 || id >= FB_SFX_MAX_MUSIC)
+    if (!__fb_sfx)
         return 1.0f;
 
-    asset = &__fb_sfx->music[id];
+    asset = &__fb_sfx->music;
 
     if (asset->sample_rate <= 0 || __fb_sfx->samplerate <= 0)
         return 1.0f;
@@ -73,42 +67,55 @@ static float fb_sfxMusicSampleStep(int id)
     return (float)asset->sample_rate / (float)__fb_sfx->samplerate;
 }
 
-static void fb_sfxStartMusicVoice(int id, int loop)
+static int fb_sfxStartMusicVoice(int loop)
 {
     FB_SFXVOICE *voice;
 
-    fb_sfxMusicStop();
+    if (!fb_sfxEnsureInitialized())
+        return -1;
 
     fb_sfxRuntimeLock();
+
+    if (!__fb_sfx->music.loaded ||
+        !__fb_sfx->music.data ||
+        __fb_sfx->music.frames <= 0)
+    {
+        fb_sfxRuntimeUnlock();
+        return -1;
+    }
+
+    fb_sfxMusicStopLocked();
 
     voice = fb_sfxVoiceAllocLocked();
     if (!voice)
     {
         fb_sfxRuntimeUnlock();
-        return;
+        return -1;
     }
 
     voice->type = FB_SFX_VOICE_MUSIC;
-    voice->sfx_id = id;
+    voice->sfx_id = 0;
     voice->channel = 0;
     voice->volume = 1.0f;
-    voice->data = __fb_sfx->music[id].data;
-    voice->length = __fb_sfx->music[id].size / (int)sizeof(float);
+    voice->data = __fb_sfx->music.data;
+    voice->length = __fb_sfx->music.size / (int)sizeof(float);
     voice->position = 0;
     voice->pos = 0;
     voice->sample_pos = 0.0f;
-    voice->sample_step = fb_sfxMusicSampleStep(id);
+    voice->sample_step = fb_sfxMusicSampleStepLocked();
     voice->loop = loop ? 1 : 0;
     voice->env_level = 1.0f;
     voice->env_state = FB_SFX_ENV_SUSTAIN;
 
-    __fb_sfx->music_playing = id;
+    __fb_sfx->music_playing = 0;
     __fb_sfx->music_paused = 0;
     __fb_sfx->music_loop = loop ? 1 : 0;
     __fb_sfx->music_pos = 0;
 
     fb_sfxVoiceActivateLocked(voice);
     fb_sfxRuntimeUnlock();
+
+    return 0;
 }
 
 
@@ -119,30 +126,16 @@ static void fb_sfxStartMusicVoice(int id, int loop)
 /*
     fb_sfxMusicPlay()
 
-    Start playback of a loaded music asset.
-
-    Parameters:
-
-        id    music identifier returned by MUSIC LOAD
+    Start playback of the current music asset.
 */
 
-void fb_sfxMusicPlay(int id)
+int fb_sfxMusicPlay(void)
 {
-    if (!fb_sfxEnsureInitialized())
-        return;
+    if (fb_sfxStartMusicVoice(0) != 0)
+        return -1;
 
-    if (id < 0 || id >= FB_SFX_MAX_MUSIC)
-        return;
-
-    if (!__fb_sfx->music[id].loaded)
-        return;
-
-    fb_sfxStartMusicVoice(id, 0);
-
-    SFX_DEBUG(
-        "sfx_music_play: id=%d started",
-        id
-    );
+    SFX_DEBUG("sfx_music_play: current music started");
+    return 0;
 }
 
 
@@ -153,26 +146,16 @@ void fb_sfxMusicPlay(int id)
 /*
     fb_sfxMusicLoop()
 
-    Start looping playback of a loaded music asset.
+    Start looping playback of the current music asset.
 */
 
-void fb_sfxMusicLoop(int id)
+int fb_sfxMusicLoop(void)
 {
-    if (!fb_sfxEnsureInitialized())
-        return;
+    if (fb_sfxStartMusicVoice(1) != 0)
+        return -1;
 
-    if (id < 0 || id >= FB_SFX_MAX_MUSIC)
-        return;
-
-    if (!__fb_sfx->music[id].loaded)
-        return;
-
-    fb_sfxStartMusicVoice(id, 1);
-
-    SFX_DEBUG(
-        "sfx_music_play: id=%d looping",
-        id
-    );
+    SFX_DEBUG("sfx_music_play: current music looping");
+    return 0;
 }
 
 
@@ -188,29 +171,32 @@ void fb_sfxMusicLoop(int id)
 
 void fb_sfxMusicRestart(void)
 {
+    FB_SFXVOICE *voice;
+
     if (!fb_sfxEnsureInitialized())
         return;
 
+    fb_sfxRuntimeLock();
+
     if (__fb_sfx->music_playing < 0)
-        return;
-
     {
-        FB_SFXVOICE *voice = fb_sfxCurrentMusicVoice();
-
-        __fb_sfx->music_pos = 0;
-
-        if (voice)
-        {
-            voice->position = 0;
-            voice->pos = 0;
-            voice->sample_pos = 0.0f;
-        }
+        fb_sfxRuntimeUnlock();
+        return;
     }
 
-    SFX_DEBUG(
-        "sfx_music_play: restart id=%d",
-        __fb_sfx->music_playing
-    );
+    voice = fb_sfxCurrentMusicVoiceLocked();
+    __fb_sfx->music_pos = 0;
+
+    if (voice)
+    {
+        voice->position = 0;
+        voice->pos = 0;
+        voice->sample_pos = 0.0f;
+    }
+
+    fb_sfxRuntimeUnlock();
+
+    SFX_DEBUG("sfx_music_play: current music restarted");
 }
 
 

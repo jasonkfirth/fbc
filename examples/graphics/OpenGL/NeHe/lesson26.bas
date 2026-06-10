@@ -24,10 +24,7 @@
 
 
 '' Setup our booleans
-const false = 0
-const true  = not false
-const null = false
-
+const null = 0
 #include once "GL/gl.bi"
 #include once "GL/glu.bi"
 #include once "fbgfx.bi"                   '' for Scan code constants
@@ -36,7 +33,7 @@ const null = false
 declare sub DrawObject()
 declare sub DrawFloor()
 
-dim shared texture(0 to 2) as uinteger                     '' 3 Textures
+dim shared texture(0 to 2) as GLuint                     '' 3 Textures
 dim shared q as GLUquadricObj ptr                          '' Quadratic For Drawing A Sphere
 
 	dim as single xrot = 0.0                               '' X Rotation

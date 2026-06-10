@@ -26,13 +26,13 @@ type preg_t
 	as integer             matches          '' read-only, number of resulting pattern matches
 	as integer             substrings       '' read-only, number of resulting pattern substrings matches
 
-	as integer     errorcode                '' read-only
-	as zstring ptr err_                     '' read-only
-	as integer     erroffset                '' read-only
+	as long        errorcode                '' read-only
+	as const zstring ptr err_               '' read-only
+	as long        erroffset                '' read-only
 
 	'' use match() to match only one instance, use match_all() to match all instances
-	declare function match(pattern as zstring ptr, subject as zstring ptr, byval offset as integer = 0, byval flags as integer = 0) as integer
-	declare function match_all(pattern as zstring ptr, subject as zstring ptr, byval offset as integer = 0, byval flags as integer = 0) as integer
+	declare function match(pattern as zstring ptr, subject as zstring ptr, byval offset as long = 0, byval flags as long = 0) as integer
+	declare function match_all(pattern as zstring ptr, subject as zstring ptr, byval offset as long = 0, byval flags as long = 0) as integer
 
 	'' use result() and result_all() corresponding with use of match() and match_all() respectively
 	'' result(0) is the whole match, result(n) is the nth substring
@@ -42,7 +42,7 @@ type preg_t
 	'' replacments use '$n' for substring replacements
 	'' there is an optional terminating $ (i.e. '$n$') to allow numbers to directly follow replacments
 	'' to insert a literal '$' use '$$'
-	declare function replace(pattern as zstring ptr, replacement as zstring ptr, subject as zstring ptr, byval offset as integer = 0, byval flags as integer = 0) as integer
+	declare function replace(pattern as zstring ptr, replacement as zstring ptr, subject as zstring ptr, byval offset as long = 0, byval flags as long = 0) as integer
 
 	declare function clean_up() as integer
 
@@ -50,7 +50,7 @@ type preg_t
 	declare destructor ()
 end type
 
-function preg_t.match(pattern as zstring ptr, subject as zstring ptr, byval offset as integer = 0, byval flags as integer = 0) as integer
+function preg_t.match(pattern as zstring ptr, subject as zstring ptr, byval offset as long = 0, byval flags as long = 0) as integer
 	this.clean_up()
 
 	this.errorcode = 0
@@ -63,9 +63,9 @@ function preg_t.match(pattern as zstring ptr, subject as zstring ptr, byval offs
 	pcre_fullinfo(temp_c, 0, PCRE_INFO_CAPTURECOUNT, @this.substrings)
 	if (this.substrings_limit >= 0 and this.substrings_limit < this.substrings) then this.substrings = this.substrings_limit
 
-	dim as integer ptr vector = allocate((this.substrings + 1) * 3 * sizeof(integer))
+	dim as long ptr vector = allocate((this.substrings + 1) * 3 * sizeof(long))
 
-	dim as integer temp_e = pcre_exec(temp_c, 0, subject, len(*subject), offset, 0 /'flags'/, vector, (this.substrings + 1) * 3)
+	dim as long temp_e = pcre_exec(temp_c, 0, subject, len(*subject), offset, 0 /'flags'/, vector, (this.substrings + 1) * 3)
 	if temp_e = 0 then temp_e = this.substrings + 1
 	if temp_e < 0 then
 		this.errorcode = temp_e
@@ -73,7 +73,9 @@ function preg_t.match(pattern as zstring ptr, subject as zstring ptr, byval offs
 		this.strings = reallocate(this.strings, (this.matches + 1) * sizeof(zstring ptr ptr))
 		this.strings[this.matches] = callocate((this.substrings + 1) * sizeof(zstring ptr))
 		for i as integer = 0 to temp_e - 1
-			pcre_get_substring(subject, vector, temp_e, i, @this.strings[this.matches][i])
+			dim as const zstring ptr substring
+			pcre_get_substring(subject, vector, temp_e, i, @substring)
+			this.strings[this.matches][i] = cast(zstring ptr, substring)
 		next
 		this.matches += 1
 	end if
@@ -86,7 +88,7 @@ function preg_t.match(pattern as zstring ptr, subject as zstring ptr, byval offs
 	return this.errorcode
 end function
 
-function preg_t.match_all(pattern as zstring ptr, subject as zstring ptr, byval offset as integer = 0, byval flags as integer = 0) as integer
+function preg_t.match_all(pattern as zstring ptr, subject as zstring ptr, byval offset as long = 0, byval flags as long = 0) as integer
 	this.clean_up()
 
 	this.errorcode = 0
@@ -99,11 +101,11 @@ function preg_t.match_all(pattern as zstring ptr, subject as zstring ptr, byval 
 	pcre_fullinfo(temp_c, 0, PCRE_INFO_CAPTURECOUNT, @this.substrings)
 	if (this.substrings_limit >= 0 and this.substrings_limit < this.substrings) then this.substrings = this.substrings_limit
 
-	dim as integer ptr vector = allocate((this.substrings + 1) * 3 * sizeof(integer))
+	dim as long ptr vector = allocate((this.substrings + 1) * 3 * sizeof(long))
 
-	dim as integer temp_l = len(*subject), temp_o = offset
+	dim as long temp_l = len(*subject), temp_o = offset
 	do
-		dim as integer temp_e = pcre_exec(temp_c, 0, subject, temp_l, temp_o, 0 /'flags'/, vector, (this.substrings + 1) * 3)
+		dim as long temp_e = pcre_exec(temp_c, 0, subject, temp_l, temp_o, 0 /'flags'/, vector, (this.substrings + 1) * 3)
 		if temp_e = 0 then temp_e = this.substrings + 1
 		if temp_e < 0 then
 			this.errorcode = temp_e
@@ -111,7 +113,9 @@ function preg_t.match_all(pattern as zstring ptr, subject as zstring ptr, byval 
 			this.strings = reallocate(this.strings, (this.matches + 1) * sizeof(zstring ptr ptr))
 			this.strings[this.matches] = callocate((this.substrings + 1) * sizeof(zstring ptr))
 			for i as integer = 0 to temp_e - 1
-				pcre_get_substring(subject, vector, temp_e, i, @this.strings[this.matches][i])
+				dim as const zstring ptr substring
+				pcre_get_substring(subject, vector, temp_e, i, @substring)
+				this.strings[this.matches][i] = cast(zstring ptr, substring)
 			next
 			temp_o = vector[1]
 			this.matches += 1
@@ -126,7 +130,7 @@ function preg_t.match_all(pattern as zstring ptr, subject as zstring ptr, byval 
 	return this.errorcode
 end function
 
-function preg_t.replace(pattern as zstring ptr, replacement as zstring ptr, subject as zstring ptr, byval offset as integer = 0, byval flags as integer = 0) as integer
+function preg_t.replace(pattern as zstring ptr, replacement as zstring ptr, subject as zstring ptr, byval offset as long = 0, byval flags as long = 0) as integer
 	this.clean_up()
 
 	this.errorcode = 0
@@ -141,11 +145,11 @@ function preg_t.replace(pattern as zstring ptr, replacement as zstring ptr, subj
 
 	dim as string result_
 
-	dim as integer ptr vector = allocate((this.substrings + 1) * 3 * sizeof(integer))
+	dim as long ptr vector = allocate((this.substrings + 1) * 3 * sizeof(long))
 
-	dim as integer temp_s = len(*subject), temp_o = offset
+	dim as long temp_s = len(*subject), temp_o = offset
 	do
-		dim as integer temp_e = pcre_exec(temp_c, 0, subject, temp_s, temp_o, 0 /'flags'/, vector, (this.substrings + 1) * 3)
+		dim as long temp_e = pcre_exec(temp_c, 0, subject, temp_s, temp_o, 0 /'flags'/, vector, (this.substrings + 1) * 3)
 		if temp_e = 0 then temp_e = this.substrings + 1
 		if temp_e < 0 then
 			this.errorcode = temp_e
@@ -220,10 +224,7 @@ function preg_t.result_all(byval match_ as integer, byval substring as integer =
 end function
 
 function preg_t.clean_up() as integer
-	if this.err_ then
-		deallocate(this.err_)
-		this.err_ = 0
-	end if
+	this.err_ = 0
 
 	if this.strings then
 		for i as integer = 0 to this.matches - 1
@@ -246,13 +247,13 @@ destructor preg_t()
 	clean_up()
 end destructor
 
-function preg_match_simple(pattern as zstring ptr, subject as zstring ptr, byval offset as integer = 0, byval flags as integer = 0) as string
+function preg_match_simple(pattern as zstring ptr, subject as zstring ptr, byval offset as long = 0, byval flags as long = 0) as string
 	dim as preg_t preg = 0
 	preg.match(pattern, subject, offset, flags)
 	return preg.result()
 end function
 
-function preg_replace_simple(pattern as zstring ptr, replacement as zstring ptr, subject as zstring ptr, byval offset as integer = 0, byval flags as integer = 0) as string
+function preg_replace_simple(pattern as zstring ptr, replacement as zstring ptr, subject as zstring ptr, byval offset as long = 0, byval flags as long = 0) as string
 	dim as preg_t preg
 	preg.replace(pattern, replacement, subject, offset, flags)
 	return preg.result()

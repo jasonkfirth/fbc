@@ -215,7 +215,8 @@ end type
 declare function hEmitType _
 	( _
 		byval dtype as integer, _
-		byval subtype as FBSYMBOL ptr _
+		byval subtype as FBSYMBOL ptr, _
+		byval emit_const as integer = FALSE _
 	) as string
 
 declare sub hEmitStruct( byval s as FBSYMBOL ptr, byval is_ptr as integer )
@@ -747,6 +748,63 @@ private function hNeedAlias( byval proc as FBSYMBOL ptr ) as integer
 	end select
 end function
 
+private function hEmitMutableLibcPtrParam _
+	( _
+		byref mangled as string, _
+		byval param_index as integer _
+	) as integer
+
+	function = FALSE
+
+	if( param_index <> 0 ) then
+		exit function
+	end if
+
+	'' DEALLOCATE()/REALLOCATE accept const pointers in FB source, but the
+	'' C library prototypes are free(void *) and realloc(void *, size_t).
+	'' Emit the libc ABI spelling so crt.bi and the built-ins can coexist.
+	select case( mangled )
+	case "free", "realloc"
+		function = TRUE
+	end select
+end function
+
+private function hEmitLibcSizeParam _
+	( _
+		byref mangled as string, _
+		byval param_index as integer _
+	) as integer
+
+	function = FALSE
+
+	select case( mangled )
+	case "malloc"
+		function = (param_index = 0)
+
+	case "calloc"
+		function = (param_index = 0) or (param_index = 1)
+
+	case "realloc"
+		function = (param_index = 1)
+	end select
+end function
+
+private function hGetLibcSizeDtype( ) as integer
+
+	'' The RTL intrinsics use uinteger for FreeBASIC's pointer-sized count,
+	'' but libc prototypes use C size_t.  On LP64 targets Clang compares the
+	'' spelling against unsigned long, not an unsigned long long typedef.
+	dim as integer dtype = FB_DATATYPE_UINT
+
+	if( fbIs64bit( ) andalso ((env.target.options and FB_TARGETOPT_UNIX) <> 0) ) then
+		dtype = typeSetMangleDt( dtype, FB_DATATYPE_UINT )
+	elseif( env.clopt.target = FB_COMPTARGET_DOS ) then
+		dtype = typeSetMangleDt( FB_DATATYPE_ULONG, FB_DATATYPE_UINT )
+	end if
+
+	function = dtype
+end function
+
 private function hEmitProcHeader _
 	( _
 		byval proc as FBSYMBOL ptr, _
@@ -836,6 +894,7 @@ private function hEmitProcHeader _
 	end if
 
 	var param = symbGetProcLastParam( proc )
+	dim as integer param_index = 0
 
 	if( (hidden = NULL) and (param = NULL) ) then
 		ln += "void"
@@ -851,7 +910,16 @@ private function hEmitProcHeader _
 				ln += "char**"
 			else
 				symbGetRealParamDtype( param, dtype, subtype )
-				ln += hEmitType( dtype, subtype )
+				if( ((options and EMITPROC_ISPROTO) <> 0) andalso _
+				    hEmitMutableLibcPtrParam( mangled, param_index ) ) then
+					dtype = typeAddrOf( FB_DATATYPE_VOID )
+					subtype = NULL
+				elseif( ((options and EMITPROC_ISPROTO) <> 0) andalso _
+				    hEmitLibcSizeParam( mangled, param_index ) ) then
+					dtype = hGetLibcSizeDtype( )
+					subtype = NULL
+				end if
+				ln += hEmitType( dtype, subtype, TRUE )
 			end if
 
 			if( (options and EMITPROC_ISPROTO) = 0 ) then
@@ -860,6 +928,7 @@ private function hEmitProcHeader _
 		end if
 
 		param = symbGetProcPrevParam( proc, param )
+		param_index += 1
 		if( param ) then
 			ln += ", "
 		end if
@@ -1828,7 +1897,8 @@ end sub
 private function hEmitType _
 	( _
 		byval dtype as integer, _
-		byval subtype as FBSYMBOL ptr _
+		byval subtype as FBSYMBOL ptr, _
+		byval emit_const as integer _
 	) as string
 
 	dim as string s
@@ -1845,15 +1915,14 @@ private function hEmitType _
 		end select
 	end if
 	ptrcount = typeGetPtrCnt( dtype )
-	dtype = typeGetDtOnly( dtype )
 
-	select case as const( dtype )
+	select case as const( typeGetDtOnly( dtype ) )
 	case FB_DATATYPE_STRUCT, FB_DATATYPE_ENUM
 		if( subtype ) then
 			hEmitUDT( subtype, (ptrcount > 0) )
 			s = hGetUdtName( subtype )
-		elseif( dtype = FB_DATATYPE_ENUM ) then
-			s = *dtypeName(typeGetRemapType( dtype ))
+		elseif( typeGetDtOnly( dtype ) = FB_DATATYPE_ENUM ) then
+			s = *dtypeName(typeGetRemapType( typeGetDtOnly( dtype ) ))
 		else
 			s = *dtypeName(FB_DATATYPE_VOID)
 		end if
@@ -1866,7 +1935,7 @@ private function hEmitType _
 
 	case FB_DATATYPE_WCHAR
 		'' Emit ubyte/ushort/uinteger instead of wchar_t
-		s = *dtypeName(typeGetRemapType( dtype ))
+		s = *dtypeName(typeGetRemapType( typeGetDtOnly( dtype ) ))
 
 	case FB_DATATYPE_FIXSTR
 		'' Ditto (but typeGetRemapType() returns FB_DATATYPE_FIXSTR,
@@ -1874,11 +1943,31 @@ private function hEmitType _
 		s = *dtypeName(FB_DATATYPE_UBYTE)
 
 	case else
-		s = *dtypeName(dtype)
+		select case typeGetMangleDt( dtype )
+		case FB_DATATYPE_CHAR
+			s = "char"
+		case FB_DATATYPE_BOOLEAN
+			s = "_Bool"
+		case FB_DATATYPE_INTEGER
+			s = "long"
+		case FB_DATATYPE_UINT
+			s = "unsigned long"
+		case else
+			s = *dtypeName(typeGetDtOnly( dtype ))
+		end select
 	end select
 
+	if( emit_const andalso typeIsConstAt( dtype, ptrcount ) ) then
+		s = "const " + s
+	end if
+
 	if( ptrcount > 0 ) then
-		s += string( ptrcount, "*" )
+		for i as integer = ptrcount - 1 to 0 step -1
+			s += "*"
+			if( emit_const andalso typeIsConstAt( dtype, i ) ) then
+				s += " const"
+			end if
+		next
 	end if
 
 	function = s
@@ -2480,9 +2569,12 @@ private sub hBuildStrLit _
 	ln += """"
 end sub
 
+'' The cursor is advanced by reference. Keep the pointer itself non-const here:
+'' generated C cannot safely pass a T ** cursor to a const T ** parameter, and
+'' recent GCC versions reject that mismatch while compiling bootstrap sources.
 private function hReadWstrChar _
 	( _
-		byref src as const wstring ptr, _
+		byref src as wstring ptr, _
 		byval src_end as const wstring ptr _
 	) as uinteger
 
@@ -2573,7 +2665,7 @@ private sub hBuildNumericWstrLit _
 	)
 
 	dim as uinteger ch = any
-	dim as const wstring ptr src = any, src_end = any
+	dim as wstring ptr src = any, src_end = any
 
 	ln += "(" + hEmitType( env.target.wchar, NULL ) + "[]){ "
 
@@ -2605,7 +2697,7 @@ private sub hBuildWstrLit _
 
 	dim as uinteger ch = any
 	dim as integer wcharsize = any
-	dim as const wstring ptr src = any, src_end = any
+	dim as wstring ptr src = any, src_end = any
 	dim as zstring ptr strstart = any
 
 	'' (ditto)
@@ -4539,7 +4631,7 @@ private sub _emitVarIniWstr _
 	dim as uinteger ch = any
 	dim as integer wcharsize = any
 	dim as integer use_numeric = any
-	dim as const wstring ptr src = any, src_end = any
+	dim as wstring ptr src = any, src_end = any
 
 	'' In Linux GCC, wchar_t and thus L"..." expressions use signed int,
 	'' but FB uses unsigned integers. But GCC will show an error when doing

@@ -18,7 +18,7 @@ Lists, selects, and queries sfxlib output devices.
 	- New to ""FreeBASIC"".
 
 {{fbdoc item="see"}}
-	- ##[[KeyPgAudio|Audio]]##
+	- ##[[KeyPgMusic|Music]]##
 	- ##[[KeyPgCapture|Capture]]##
 
 {{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

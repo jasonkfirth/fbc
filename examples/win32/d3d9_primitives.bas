@@ -142,7 +142,7 @@ function WinMain(byval hInstance as HINSTANCE, _
 		.lpszClassName = @"MY_WINDOWS_CLASS"
 		.cbSize        = len(WNDCLASSEX)
 		.style         = CS_HREDRAW or CS_VREDRAW
-		.lpfnWndProc   = @WindowProc
+		.lpfnWndProc   = cast( WNDPROC, @WindowProc )
 		.hInstance     = hInstance
 		.hIcon	       = LoadIcon(hInstance, cast(LPCTSTR,IDI_APPLICATION))
     	.hIconSm	   = LoadIcon(hInstance, cast(LPCTSTR,IDI_APPLICATION))

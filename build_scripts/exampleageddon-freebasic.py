@@ -173,12 +173,21 @@ INTENTIONAL_FAILURES = {
 
 PLATFORM_SOURCES = {
     "examples/manual/defines/fbasm.bas",
+    "examples/manual/defines/fboptionprofile.bas",
+    "examples/manual/defines/fbprofile.bas",
     "examples/manual/misc/asm.bas",
     "examples/manual/procs/naked1.bas",
     "examples/manual/procs/naked2.bas",
+    "examples/manual/proguide/binaries/call-tree-fb-profiling.bas",
+    "examples/manual/proguide/binaries/control-code-fb-profiling.bas",
+    "examples/manual/proguide/binaries/directly-call-fb-profiling.bas",
+    "examples/manual/proguide/binaries/report-name-fb-profiling.bas",
     "examples/manual/proguide/binaries/simple-fb-profiling-cycles.bas",
+    "examples/manual/proguide/binaries/simple-fb-profiling.bas",
     "examples/manual/proguide/libs/libs3.bas",
     "examples/manual/proguide/libs/libs4.bas",
+    # Recovering from SIGSEGV through signal()/longjmp() is platform behavior.
+    "examples/misc/trycatch/test.bas",
 }
 
 NONTERMINATING_SOURCES = {
@@ -614,7 +623,7 @@ def main(argv: list[str]) -> int:
     (args.outdir / "bin").mkdir(parents=True, exist_ok=True)
     (args.outdir / "logs").mkdir(parents=True, exist_ok=True)
 
-    sources = sorted(examples_dir.rglob("*.bas"))
+    sources = sorted(source for source in examples_dir.rglob("*.bas") if source.is_file())
     print(f"Compiling {len(sources)} example source files with {args.jobs} job(s)")
 
     results: list[Result] = []

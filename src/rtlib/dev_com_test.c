@@ -2,6 +2,7 @@
 
 #include "fb.h"
 #include <limits.h>
+#include <strings.h>
 
 int fb_DevComTestProtocolEx
 	(

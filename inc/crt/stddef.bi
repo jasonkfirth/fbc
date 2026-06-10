@@ -9,12 +9,23 @@
 #ifndef __crt_stddef_bi__
 #define __crt_stddef_bi__
 
-type ptrdiff_t as integer
+'' On LP64 targets, C's ptrdiff_t and size_t are long/unsigned long rather
+'' than long long.  Clang checks built-in CRT declarations against that spelling.
+#if defined( __FB_64BIT__ ) and defined( __FB_UNIX__ )
+	type ptrdiff_t as integer alias "long"
+#else
+	type ptrdiff_t as integer
+#endif
 
 #ifdef __FB_DOS__
-	type size_t as ulong
+	type size_t as ulong alias "long"
 	#ifndef ssize_t
 	type ssize_t as long
+	#endif
+#elseif defined( __FB_64BIT__ ) and defined( __FB_UNIX__ )
+	type size_t as uinteger alias "long"
+	#ifndef ssize_t
+	type ssize_t as integer alias "long"
 	#endif
 #else
 	type size_t as uinteger

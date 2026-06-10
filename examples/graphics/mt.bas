@@ -1,8 +1,5 @@
 '' An example program mixing FB graphics and multi-threading
 
-const TRUE = -1
-const FALSE = 0
-
 const SCREEN_W = 800
 const SCREEN_H = 600
 

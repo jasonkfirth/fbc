@@ -56,17 +56,19 @@ Operator UDT.New[] (ByVal size As UInteger) As Any Ptr
 End Operator
 
 Operator UDT.Delete (ByVal buf As Any Ptr)
+	Dim As ULongInt bufAddress = CULngInt(buf)
 	Print "    Operator Delete Overload"
 	Deallocate(buf)                                     ' Memory deallocation (with passed pointer)
 	Print "        memory deallocation: ";
-	Print "for @" & buf
+	Print "for @" & bufAddress
 End Operator
 
 Operator UDT.Delete[] (ByVal buf As Any Ptr)
+	Dim As ULongInt bufAddress = CULngInt(buf)
 	Print "    Operator Delete[] Overload"
 	Deallocate(buf)                                     ' Memory deallocation (with passed pointer)
 	Print "        memory deallocation: ";
-	Print "for @" & buf
+	Print "for @" & bufAddress
 End Operator
 
 

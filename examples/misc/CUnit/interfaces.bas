@@ -4,16 +4,13 @@
 #include once "CUnit/Console.bi"
 #include once "CUnit/Automated.bi"
 
-#define FALSE 0
-#define TRUE 1
-
 function init_suite_success cdecl() as long : return 0 : end function
 function init_suite_failure cdecl() as long : return -1: end function
 function clean_suite_success cdecl() as long : return 0: end function
 function clean_suite_failure cdecl() as long : return -1: end function
 
 sub test_success1 cdecl()
-   CU_ASSERT(TRUE)
+   CU_ASSERT(CU_TRUE)
 end sub
 
 sub test_success2 cdecl()
@@ -29,7 +26,7 @@ sub test_success4 cdecl()
 end sub
 
 sub test_failure1 cdecl()
-   CU_ASSERT(FALSE)
+   CU_ASSERT(CU_FALSE)
 end sub
 
 sub test_failure2 cdecl()

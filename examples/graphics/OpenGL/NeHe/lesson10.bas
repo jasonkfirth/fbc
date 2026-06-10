@@ -26,8 +26,6 @@
 #include once "createtex.bi"
 
 '' Setup our booleans
-const false = 0
-const true  = not false
 
 const piover180 = 0.0174532925f
 ''------------------------------------------------------------------------------
@@ -57,11 +55,11 @@ declare sub SetupWorld()
 dim shared sector1 as SECTOR                   '' Our Model Goes Here
 	
 dim shared filter as uinteger                  '' Which Filter To Use
-dim shared texture(0 to 2) as uinteger         '' Storage For 3 Textures
+dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 	
 	dim blend as integer                    '' Blending OFF/ON?
 	dim fp as integer                       '' F Pressed?
-	dim bp as integer                       '' B Pressed?
+	dim blendpressed as integer             '' B Pressed?
 
 	dim heading as single              '' direction of movement
 	dim xpos as single                 '' X position
@@ -170,8 +168,8 @@ dim shared texture(0 to 2) as uinteger         '' Storage For 3 Textures
 		end if
 		if not MULTIKEY(FB.SC_F) then fp = false       '' F Key Up
 	
-		if MULTIKEY(FB.SC_B) and not bp then           '' B Key down
-			bp = true
+		if MULTIKEY(FB.SC_B) and not blendpressed then '' B Key down
+			blendpressed = true
 			blend = not blend                       '' toggle blending On/Off
 			if blend then
 				glEnable(GL_BLEND)                  '' Turn Blending On
@@ -181,7 +179,7 @@ dim shared texture(0 to 2) as uinteger         '' Storage For 3 Textures
 				glEnable(GL_DEPTH_TEST)             '' Turn Depth Testing On
 			end if
 		end if
-		if not MULTIKEY(FB.SC_B) then bp = false       '' B Key up
+		if not MULTIKEY(FB.SC_B) then blendpressed = false '' B Key up
 	
 		if MULTIKEY(FB.SC_UP) then
 			xpos = xpos - sin(heading*piover180) * 0.05    '' Move On The X-Plane Based On Player Direction
@@ -271,4 +269,3 @@ sub SetupWorld()
 	next
 	close #fp
 end sub
-

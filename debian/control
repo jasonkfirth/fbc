@@ -119,12 +119,17 @@ Recommends:
  libsdl2-mixer-dev,
  libsdl2-ttf-dev,
  libopenal-dev,
+ libalut-dev,
  libasound2-dev,
  libpulse-dev,
  libcairo2-dev,
  libfontconfig-dev,
  libfreetype-dev,
- libcurl4-openssl-dev
+ libcurl4-openssl-dev,
+ libdevil-dev,
+ libgoocanvas-2.0-dev,
+ liblua5.3-dev,
+ libmng-dev
 Suggests:
  libpcre2-dev,
  libtre-dev,
@@ -152,9 +157,51 @@ Architecture: all
 Depends:
  ${misc:Depends},
  ttf-bitstream-vera
-Suggests:
- freebasic,
- freebasic-bindings
+Recommends:
+ freebasic (= ${binary:Version}),
+ freebasic-bindings (= ${binary:Version}),
+ pkgconf,
+ zlib1g-dev,
+ libbz2-dev,
+ libzip-dev,
+ libcurl4-openssl-dev,
+ libpng-dev,
+ libjpeg-dev,
+ libgif-dev,
+ libx11-dev,
+ libxext-dev,
+ libxpm-dev,
+ libxrandr-dev,
+ libxrender-dev,
+ libglu1-mesa-dev | libglu-dev,
+ libsdl2-dev,
+ libsdl2-image-dev,
+ libsdl2-mixer-dev,
+ libsdl2-ttf-dev,
+ libopenal-dev,
+ libalut-dev,
+ libasound2-dev,
+ libpulse-dev,
+ libcairo2-dev,
+ libfontconfig-dev,
+ libfreetype-dev,
+ libpcre2-dev,
+ libtre-dev,
+ libxml2-dev,
+ libexpat1-dev,
+ liballegro4-dev,
+ liballegro5-dev,
+ libgtk-3-dev,
+ libglib2.0-dev,
+ libsqlite3-dev,
+ libpq-dev,
+ default-libmysqlclient-dev,
+ libgsl-dev,
+ libdevil-dev,
+ libgoocanvas-2.0-dev,
+ liblua5.3-dev,
+ libmng-dev,
+ default-jdk-headless
 Description: FreeBASIC example source programs
  This package contains the FreeBASIC example source tree, including console,
  graphics, networking, sfxlib, and third-party binding examples.
@@ -262,11 +309,12 @@ Recommends:
  libsdl2-mixer-dev,
  libsdl2-ttf-dev,
  libopenal-dev,
+ libalut-dev,
  libasound2-dev,
+ libpulse-dev,
  libcairo2-dev,
  libfontconfig-dev,
- libfreetype-dev
-Suggests:
+ libfreetype-dev,
  libpcre2-dev,
  libtre-dev,
  libxml2-dev,
@@ -279,7 +327,12 @@ Suggests:
  libpq-dev,
  default-libmysqlclient-dev,
  libgsl-dev,
- libpulse-dev,
+ libdevil-dev,
+ libgoocanvas-2.0-dev,
+ liblua5.3-dev,
+ libmng-dev,
+ default-jdk-headless
+Suggests:
  libpipewire-0.3-dev
 Description: Full FreeBASIC installation (metapackage)
  This metapackage installs the full FreeBASIC toolchain including compiler,

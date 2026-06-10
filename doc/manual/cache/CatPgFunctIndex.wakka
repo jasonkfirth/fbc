@@ -237,7 +237,6 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgXorGfx|XOR (Graphics PUT)"}}
 
 {{fbdoc item="section" value="Sound"}}
-	- {{fbdoc item="keyword" value="KeyPgAudio|AUDIO"}}
 	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|BALANCE"}}
 	- {{fbdoc item="keyword" value="KeyPgBeep|BEEP"}}
 	- {{fbdoc item="keyword" value="KeyPgCapture|CAPTURE"}}
@@ -253,10 +252,8 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|OCTAVE"}}
 	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|PAN"}}
 	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|PLAY"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|REST"}}
 	- {{fbdoc item="keyword" value="KeyPgSfx|SFX"}}
 	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|SOUND"}}
-	- {{fbdoc item="keyword" value="KeyPgStream|STREAM"}}
 	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|TEMPO"}}
 	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|TONE"}}
 	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|VOICE"}}

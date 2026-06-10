@@ -152,8 +152,6 @@
 		[[KeyPgAssertwarn|ASSERTWARN]]
 		[[KeyPgAtan2|ATAN2]]
 		[[KeyPgAtn|ATN]]
-		[[KeyPgAudio|AUDIO]]
-
 	{{fbdoc item="subsect" value="B"}}
 		[[KeyPgSfxGenerated|BALANCE]]
 		[[KeyPgBaseInit|BASE (initialization)]]
@@ -522,7 +520,6 @@
 		[[KeyPgRedim|REDIM]]
 		[[KeyPgRem|REM]]
 		[[KeyPgReset|RESET]]
-		[[KeyPgSfxGenerated|REST]]
 		[[KeyPgRestore|RESTORE]]
 		[[KeyPgResume|RESUME]]
 		[[KeyPgResumenext|RESUME NEXT]]
@@ -585,7 +582,6 @@
 		[[KeyPgStop|STOP]]
 		[[KeyPgStr|STR]]
 		[[KeyPgStrig|STRIG]]
-		[[KeyPgStream|STREAM]]
 		[[KeyPgStringFunction|STRING (Function)]]
 		[[KeyPgString|STRING]]
 		[[KeyPgOpStrptr|STRPTR]]

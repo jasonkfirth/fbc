@@ -13,8 +13,8 @@
 #endif
 
 '' Simple definition/text replacement
-#define False 0
-#define True (Not False)
+#define ExampleFalse 0
+#define ExampleTrue (Not ExampleFalse)
 
 '' Function-like definition
 #define MyRGB(R,G,B) (((R)Shl 16)  Or ((G)Shl 8) Or (B)) 

@@ -347,9 +347,13 @@ private function hHexChar( byval value as integer ) as integer
 end function
 
 '':::::
+''
+'' The cursor is advanced by reference. Keep the pointer itself non-const here:
+'' generated C cannot safely pass a T ** cursor to a const T ** parameter, and
+'' recent GCC versions reject that mismatch while compiling bootstrap sources.
 private function hUnicodeHexToCodePointW _
 	( _
-		byref src as const wstring ptr, _
+		byref src as wstring ptr, _
 		byval digits as integer _
 	) as uinteger static
 
@@ -1183,7 +1187,7 @@ function hEscapeW _
 	static as DZSTRING res
 	dim as uinteger char
 	dim as integer lgt, i, wcharlen, n
-	dim as const wstring ptr src, src_end
+	dim as wstring ptr src, src_end
 	dim as zstring ptr dst
 
 	'' convert the internal escape sequences to GAS format
@@ -1200,7 +1204,7 @@ function hEscapeW _
 
 	DZstrAllocate( res, lgt * (1+3) * wcharlen )
 
-	src = text
+	src = cast( wstring ptr, text )
 	dst = res.data
 
 	src_end = src + lgt
@@ -1495,42 +1499,8 @@ function hStr2long( byref txt as string, byref value as long ) as integer
 end function
 
 function hWStr2long( byref txt as wstring, byref value as long ) as integer
-	'' could we not use VALINT() or some variation from rtlib?
-
-	const CHAR_ZERO = asc("0")
-
-	dim nvalue as long = 0
-	dim nsign as long = 1
-
-	if( len( txt ) = 0 ) then
-		return FALSE
-	end if
-
-	dim s as WSTRING_CHAR ptr = strptr(txt)
-
-	if( s = NULL orelse *s = CHAR_NULL ) then
-		return FALSE
-	end if
-
-	if( *s = CHAR_MINUS ) then
-		nsign = -1
-		s += 1
-	end if
-
-	if( *s = CHAR_NULL ) then
-		return FALSE
-	end if
-
-	while( hIsCharNumeric(*s) )
-		nvalue *= 10
-		nvalue += (*s - CHAR_ZERO)
-		s += 1
-	wend
-
-	value = nvalue * nsign
-
-	'' return TRUE if we read the entire string
-	return (*s = CHAR_NULL)
+	dim as string ztxt = txt
+	return hStr2long( ztxt, value )
 end function
 
 '':::::

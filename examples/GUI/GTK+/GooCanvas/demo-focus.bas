@@ -8,6 +8,9 @@
 ' FB translation by TJF, 2011
 ' Details: http://library.gnome.org/devel/goocanvas/unstable/
 
+#IFDEF __FB_LINUX__
+#DEFINE __USE_GTK3__
+#ENDIF
 #INCLUDE "goocanvas.bi"
 
 FUNCTION on_focus_in CDECL(BYVAL item AS GooCanvasItem PTR, _

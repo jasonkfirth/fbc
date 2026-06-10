@@ -26,26 +26,26 @@ dim shared hello as zstring ptr = @"hello, hello!"
  '/
 
 dim shared dictionary as zstring ptr = @"hello"
-dim shared dictId as uLong /' Adler32 value of the dictionary '/
+dim shared dictId as uLong_ /' Adler32 value of the dictionary '/
 
-declare sub test_deflate (byval compr as Byte ptr, byval comprLen as uLong)
-declare sub test_inflate (byval compr as Byte ptr, byval comprLen as uLong,_
-                          byval uncompr as Byte ptr, byval uncomprLen as uLong)
-declare sub test_large_deflate (byval compr as byte ptr, byval comprLen as uLong,_
-                                byval uncompr as Byte ptr, byval uncomprLen as uLong)
-declare sub test_large_inflate (byval compr as Byte ptr, byval comprLen as uLong,_
-                                byval uncompr as Byte ptr, byval uncomprLen as uLong)
-declare sub test_flush (byval compr as Byte ptr, byval comprLen as uLong ptr)
-declare sub test_sync  (byval compr as Byte ptr, byval comprLen as uLong,_
-                        byval uncompr as Byte ptr, byval uncomprLen as uLong)
-declare sub test_dict_deflate  (byval compr as Byte ptr, byval comprLen as uLong)
-declare sub test_dict_inflate  (byval compr as Byte ptr, byval comprLen as uLong,_
-                                byval uncompr as Byte ptr, byval uncomprLen as uLong)
+declare sub test_deflate (byval compr as Bytef ptr, byval comprLen as uLong_)
+declare sub test_inflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
+                          byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
+declare sub test_large_deflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
+                                byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
+declare sub test_large_inflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
+                                byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
+declare sub test_flush (byval compr as Bytef ptr, byval comprLen as uLong_ ptr)
+declare sub test_sync  (byval compr as Bytef ptr, byval comprLen as uLong_,_
+                        byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
+declare sub test_dict_deflate  (byval compr as Bytef ptr, byval comprLen as uLong_)
+declare sub test_dict_inflate  (byval compr as Bytef ptr, byval comprLen as uLong_,_
+                                byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 
-declare sub test_compress (byval compr as Byte ptr, byval comprLen as uLong,_
-                           byval uncompr as Byte ptr, byval uncomprLen as uLong)
+declare sub test_compress (byval compr as Bytef ptr, byval comprLen as uLong_,_
+                           byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 declare sub test_gzio     (byval fname as const zstring ptr,_
-                           byval uncompr as Byte ptr, byval uncomprLen as uLong)
+                           byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 declare function mymain() as integer
 
 ''used as replacement for fprintf(stderr_,...)
@@ -57,13 +57,13 @@ mymain()
 /' ===========================================================================
  * Test compress() and uncompress()
  '/
-sub test_compress (byval compr as Byte ptr, byval comprLen as uLong,_
-                   byval uncompr as Byte ptr, byval uncomprLen as uLong)
+sub test_compress (byval compr as Bytef ptr, byval comprLen as uLong_,_
+                   byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 
     dim err_ as integer
-    dim as uLong len_ = len(*hello) + 1
+    dim as uLong_ len_ = len(*hello) + 1
 
-    err_ = compress(compr, @comprLen, hello, len_)
+    err_ = compress(compr, @comprLen, cast(const Bytef ptr, hello), len_)
     CHECK_ERR(err_, @"compress")
 
     strcpy(uncompr, @"garbage")
@@ -84,10 +84,10 @@ end sub
  * Test read/write of .gz files
  '/
 sub test_gzio     (byval fname as const zstring ptr,_
-                   byval uncompr as Byte ptr, byval uncomprLen as uLong)
+                   byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
                                  
 
-    dim err_ as integer
+    dim err_ as long
     dim len_ as integer = len(*hello)+1
     dim as gzFile file_
     dim pos_ as z_off_t
@@ -145,7 +145,7 @@ sub test_gzio     (byval fname as const zstring ptr,_
         exit_(1)
     end if
 
-    gzgets(file_, cast(Byte ptr,uncompr), uncomprLen)
+    gzgets(file_, cast(zstring ptr, uncompr), uncomprLen)
     if (len(*cast(zstring ptr,uncompr)) <> 7) then /' " hello!" '/
       print #stderr_, "gzgets err after gzseek: "; gzerror(file_, @err_)
       exit_(1)
@@ -166,11 +166,11 @@ end sub
 /' ===========================================================================
  * Test deflate() with small buffers
  '/
-sub test_deflate (byval compr as Byte ptr, byval comprLen as uLong)
+sub test_deflate (byval compr as Bytef ptr, byval comprLen as uLong_)
 
     dim as z_stream c_stream /' compression stream '/
     dim as integer err_
-    dim as uLong len_ = len(*hello)+1
+    dim as uLong_ len_ = len(*hello)+1
 
     c_stream.zalloc = NULL
     c_stream.zfree = NULL
@@ -205,8 +205,8 @@ end sub
 /' ===========================================================================
  * Test inflate() with small buffers
  '/
-sub test_inflate (byval compr as Byte ptr, byval comprLen as uLong,_
-                  byval uncompr as Byte ptr, byval uncomprLen as uLong)
+sub test_inflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
+                  byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 
     dim err_ as integer
     dim d_stream as z_stream    /' decompression stream '/
@@ -248,8 +248,8 @@ end sub
 /' ===========================================================================
  * Test deflate() with large buffers and dynamic change of compression level
  '/
-sub test_large_deflate (byval compr as byte ptr, byval comprLen as uLong,_
-                        byval uncompr as Byte ptr, byval uncomprLen as uLong)
+sub test_large_deflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
+                        byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 
     dim as z_stream c_stream /' compression stream '/
     dim as integer err_
@@ -303,8 +303,8 @@ end sub
 /' ===========================================================================
  * Test inflate() with large buffers
  '/
-sub test_large_inflate (byval compr as Byte ptr, byval comprLen as uLong,_
-                        byval uncompr as Byte ptr, byval uncomprLen as uLong)
+sub test_large_inflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
+                        byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
     
     dim as integer err_
     dim as z_stream d_stream /' decompression stream '/
@@ -346,7 +346,7 @@ end sub
 /' ===========================================================================
  * Test deflate() with full flush
  '/
-sub test_flush (byval compr as Byte ptr, byval comprLen as uLong ptr)
+sub test_flush (byval compr as Bytef ptr, byval comprLen as uLong_ ptr)
 
     dim as z_stream c_stream /' compression stream '/
     dim err_ as integer
@@ -383,8 +383,8 @@ end sub
 /' ===========================================================================
  * Test inflateSync()
  '/
-sub test_sync  (byval compr as Byte ptr, byval comprLen as uLong,_
-                byval uncompr as Byte ptr, byval uncomprLen as uLong)
+sub test_sync  (byval compr as Bytef ptr, byval comprLen as uLong_,_
+                byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 
     dim err_ as integer
     dim as z_stream d_stream /' decompression stream '/
@@ -427,7 +427,7 @@ end sub
 /' ===========================================================================
  * Test deflate() with preset dictionary
  '/
-sub test_dict_deflate  (byval compr as Byte ptr, byval comprLen as uLong)
+sub test_dict_deflate  (byval compr as Bytef ptr, byval comprLen as uLong_)
 
     dim as z_stream c_stream /' compression stream '/
     dim as integer err_
@@ -440,7 +440,7 @@ sub test_dict_deflate  (byval compr as Byte ptr, byval comprLen as uLong)
     CHECK_ERR(err_, "deflateInit")
 
     err_ = deflateSetDictionary(@c_stream,_
-                cast(Bytef ptr,dictionary), cast(integer,sizeof(dictionary)))
+                cast(const Bytef ptr,dictionary), cast(integer,sizeof(dictionary)))
     CHECK_ERR(err_, "deflateSetDictionary")
 
     dictId = c_stream.adler
@@ -463,8 +463,8 @@ end sub
 /' ===========================================================================
  * Test inflate() with a preset dictionary
  '/
-sub test_dict_inflate  (byval compr as Byte ptr, byval comprLen as uLong,_
-                        byval uncompr as Byte ptr, byval uncomprLen as uLong)
+sub test_dict_inflate  (byval compr as Bytef ptr, byval comprLen as uLong_,_
+                        byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 
     dim err_ as integer
     dim as z_stream d_stream /' decompression stream '/
@@ -494,7 +494,7 @@ sub test_dict_inflate  (byval compr as Byte ptr, byval comprLen as uLong,_
                 print #stderr_, "unexpected dictionary"
                 exit_(1)
             end if
-            err_ = inflateSetDictionary(@d_stream, cast(Bytef ptr,dictionary),_
+            err_ = inflateSetDictionary(@d_stream, cast(const Bytef ptr,dictionary),_
                                        cast(integer,sizeof(dictionary)))
         end if
         CHECK_ERR(err_, "inflate with dict")
@@ -525,10 +525,10 @@ function mymain() as integer
       return -1
     end if
     
-    dim as Byte ptr compr
-    dim as Byte ptr uncompr
-    dim comprLen as uLong = 10000*sizeof(integer) /' don't overflow on MSDOS '/
-    dim as uLong uncomprLen = comprLen
+    dim as Bytef ptr compr
+    dim as Bytef ptr uncompr
+    dim comprLen as uLong_ = 10000*sizeof(integer) /' don't overflow on MSDOS '/
+    dim as uLong_ uncomprLen = comprLen
     dim myVersion as zstring ptr = @ZLIB_VERSION
 
     if (zlibVersion()[0][0] <> myVersion[0][0]) then
@@ -578,5 +578,4 @@ function mymain() as integer
     return 0
 
 end function
-
 

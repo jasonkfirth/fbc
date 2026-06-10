@@ -20,15 +20,13 @@
 #include once "createtex.bi"
 
 '' Setup our booleans
-const FALSE = 0
-const TRUE  = not FALSE
 
 declare sub BuildLists()
 
 dim shared box as uinteger               '' Storage For The Box Display List
 dim shared top as uinteger               '' Storage For The Top Display List
 
-	dim texture(0) as uinteger               '' Storage For One Texture
+	dim texture(0) as GLuint               '' Storage For One Texture
 	dim xloop as uinteger                    '' Loop For X Axis
 	dim yloop as uinteger                    '' Loop For Y Axis
 

@@ -104,8 +104,8 @@ sub main()
 		end 1
 	end if
 
-	dim as integer x = SCR_WIDTH\2 - srcimg->w\2
-	dim as integer y = SCR_HEIGHT\2 - srcimg->h\2
+	dim as long x = SCR_WIDTH\2 - srcimg->w\2
+	dim as long y = SCR_HEIGHT\2 - srcimg->h\2
 
 	dim doexit as integer, doupdate as integer
 	dim event as SDL_Event

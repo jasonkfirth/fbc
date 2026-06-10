@@ -52,25 +52,6 @@
 #define FB_SFX_MAX_SAMPLE_PITCH 16.0f
 
 
-/* ------------------------------------------------------------------------- */
-/* Internal helper                                                           */
-/* ------------------------------------------------------------------------- */
-
-static int fb_sfxFindFreeVoice(void)
-{
-    int i;
-
-    for (i = 0; i < FB_SFX_MAX_VOICES; i++)
-    {
-        if (!__fb_sfx->voices[i].active)
-            return i;
-    }
-
-    /* fallback: steal oldest voice */
-
-    return 0;
-}
-
 static float fb_sfxSfxPitchStep(const FB_SFX_ASSET *asset, float pitch)
 {
     float step;
@@ -108,7 +89,8 @@ static float fb_sfxSfxPitchStep(const FB_SFX_ASSET *asset, float pitch)
 
 static void fb_sfxSfxStart(int channel, int id, float pitch, int loop)
 {
-    int voice;
+    int voice_index;
+    FB_SFXVOICE *voice;
     FB_SFX_ASSET *asset;
 
     if (!fb_sfxEnsureInitialized())
@@ -117,41 +99,55 @@ static void fb_sfxSfxStart(int channel, int id, float pitch, int loop)
     if (id < 0 || id >= FB_SFX_MAX_SFX)
         return;
 
+    fb_sfxRuntimeLock();
+
     asset = &__fb_sfx->sfx[id];
 
     if (!asset->loaded)
+    {
+        fb_sfxRuntimeUnlock();
         return;
+    }
 
     if (channel < 0 || channel >= FB_SFX_MAX_CHANNELS)
         channel = 0;
 
-    voice = fb_sfxFindFreeVoice();
+    voice = fb_sfxVoiceAllocLocked();
+    if (!voice)
+    {
+        fb_sfxRuntimeUnlock();
+        return;
+    }
 
-    fb_sfxVoiceInit(&__fb_sfx->voices[voice]);
-    __fb_sfx->voices[voice].active = 1;
-    __fb_sfx->voices[voice].type = FB_SFX_VOICE_SFX;
-    __fb_sfx->voices[voice].sfx_id = id;
-    __fb_sfx->voices[voice].position = 0;
-    __fb_sfx->voices[voice].pos = 0;
-    __fb_sfx->voices[voice].sample_pos = 0.0f;
-    __fb_sfx->voices[voice].sample_step = fb_sfxSfxPitchStep(asset, pitch);
-    __fb_sfx->voices[voice].channel = channel;
-    __fb_sfx->voices[voice].volume = 1.0f;
-    __fb_sfx->voices[voice].loop = loop ? 1 : 0;
-    __fb_sfx->voices[voice].data = asset->data;
-    __fb_sfx->voices[voice].length = asset->size / (int)sizeof(float);
-    __fb_sfx->voices[voice].env_level = 1.0f;
-    __fb_sfx->voices[voice].env_state = FB_SFX_ENV_SUSTAIN;
+    voice_index = (int)(voice - __fb_sfx->voices);
+
+    voice->type = FB_SFX_VOICE_SFX;
+    voice->sfx_id = id;
+    voice->position = 0;
+    voice->pos = 0;
+    voice->sample_pos = 0.0f;
+    voice->sample_step = fb_sfxSfxPitchStep(asset, pitch);
+    voice->channel = channel;
+    voice->volume = 1.0f;
+    voice->loop = loop ? 1 : 0;
+    voice->data = asset->data;
+    voice->length = asset->size / (int)sizeof(float);
+    voice->env_level = 1.0f;
+    voice->env_state = FB_SFX_ENV_SUSTAIN;
+
+    fb_sfxVoiceActivateLocked(voice);
 
     SFX_DEBUG(
         "sfx_sfx_play: id=%d voice=%d channel=%d pitch=%f loop=%d step=%f",
         id,
-        voice,
+        voice_index,
         channel,
         pitch,
         loop ? 1 : 0,
-        __fb_sfx->voices[voice].sample_step
+        voice->sample_step
     );
+
+    fb_sfxRuntimeUnlock();
 }
 
 

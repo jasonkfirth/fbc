@@ -43,7 +43,7 @@ declare sub draw_ball(byval as uinteger, byval as uinteger)
 dim shared pixels(0 to XSIZ * YSIZ - 1) as ubyte
 dim shared metaball(0 to METASIZE * METASIZE - 1) as ubyte
 
-dim as integer r(0 to 255), g(0 to 255), b(0 to 255), a(0 to 255)
+dim as ulong r(0 to 255), g(0 to 255), b(0 to 255), a(0 to 255)
 dim as single d(0 to METABALLS - 1), di(0 to METABALLS - 1), dj(0 to METABALLS - 1), dk(0 to METABALLS - 1)
 dim as uinteger x(0 to METABALLS - 1), y(0 to METABALLS - 1)
 dim as single i = 10.0, j = 17.0, k = 11.0

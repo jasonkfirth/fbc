@@ -298,12 +298,13 @@ Operator T.^= ( ByRef rhs As DataType )
 End Operator
 
 Operator T.&= ( ByRef rhs As DataType )
-  Dim tmp As String
+  Dim tmp As String = Str( value )
   tmp &= Str( rhs )
+  value = ValInt( tmp )
 End Operator
 
 Operator T.@ () As DataType Ptr
-  Return( Cast( DataType Ptr, @This ))
+  Return @value
 End Operator
 
 

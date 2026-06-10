@@ -1,5 +1,13 @@
+#ifndef __EXTENSIONS__
+#define __EXTENSIONS__
+#endif
+
 #include "../fb.h"
 #include <sys/time.h>
+
+#if defined( HOST_SOLARIS )
+extern int settimeofday( struct timeval *, void * );
+#endif
 
 int fb_hSetDate( int y, int m, int d )
 {

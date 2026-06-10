@@ -34,6 +34,7 @@
 #define FB_SFX_BSD_RUNNING_FN fb_sfxSolarisRunning
 #define FB_SFX_BSD_ACTIVATE_FN fb_sfxSolarisActivate
 #define FB_SFX_BSD_DEACTIVATE_FN fb_sfxSolarisDeactivate
+#define FB_SFX_BSD_ENABLE_WORKER 0
 
 #include "../unix/sfx_bsd_template.inc"
 

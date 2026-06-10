@@ -51,14 +51,26 @@
 
 void fb_sfxCaptureStop(void)
 {
+    const FB_SFX_DRIVER *driver;
+
     if (!__fb_sfx)
         return;
 
-    if (__fb_sfx->capture.enabled == FB_SFX_CAPTURE_STOPPED)
-        return;
+    fb_sfxRuntimeLock();
 
-    fb_sfxPlatformCaptureStop();
+    if (__fb_sfx->capture.enabled == FB_SFX_CAPTURE_STOPPED)
+    {
+        fb_sfxRuntimeUnlock();
+        return;
+    }
+
+    driver = __fb_sfx->driver;
     __fb_sfx->capture.enabled = FB_SFX_CAPTURE_STOPPED;
+
+    fb_sfxRuntimeUnlock();
+
+    if (driver != &__fb_sfxDriverNull)
+        fb_sfxPlatformCaptureStop();
 }
 
 

@@ -1,6 +1,7 @@
 /* screen function and drivers handling */
 
 #include "fb_gfx.h"
+#include <strings.h>
 
 #define NUM_MODES 22
 

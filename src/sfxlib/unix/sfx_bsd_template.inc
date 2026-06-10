@@ -59,6 +59,10 @@
 #error "FB_SFX_BSD_DEACTIVATE_FN must be defined before including sfx_bsd_template.inc"
 #endif
 
+#ifndef FB_SFX_BSD_ENABLE_WORKER
+#define FB_SFX_BSD_ENABLE_WORKER 1
+#endif
+
 extern const FB_SFX_DRIVER FB_SFX_BSD_DRIVER_NAME;
 extern const FB_SFX_DRIVER __fb_sfxDriverNull;
 
@@ -80,7 +84,7 @@ FB_SFX_BSD_STATE FB_SFX_BSD_STATE_NAME =
 static int g_bsd_debug_initialized = 0;
 static int g_bsd_debug_enabled = 0;
 
-#if FB_SFX_MT_ENABLED
+#if FB_SFX_MT_ENABLED && FB_SFX_BSD_ENABLE_WORKER
 static pthread_t g_bsd_audio_thread;
 static int g_bsd_audio_thread_valid = 0;
 static volatile int g_bsd_audio_thread_stop = 0;
@@ -111,7 +115,7 @@ static int fb_sfxBsdWorkerFrames(void)
     return frames;
 }
 
-#if FB_SFX_MT_ENABLED
+#if FB_SFX_MT_ENABLED && FB_SFX_BSD_ENABLE_WORKER
 static void *fb_sfxBsdAudioWorker(void *unused)
 {
     (void)unused;
@@ -203,7 +207,7 @@ int FB_SFX_BSD_ACTIVATE_FN(int rate, int channels, int buffer_frames)
     FB_SFX_BSD_STATE_NAME.channels = (channels > 0) ? channels : FB_SFX_DEFAULT_CHANNELS;
     FB_SFX_BSD_STATE_NAME.buffer_frames = (buffer_frames > 0) ? buffer_frames : FB_SFX_DEFAULT_BUFFER;
 
-#if FB_SFX_MT_ENABLED
+#if FB_SFX_MT_ENABLED && FB_SFX_BSD_ENABLE_WORKER
     if (fb_sfxBsdEnsureWorker() != 0)
         return -1;
 #endif
@@ -224,7 +228,7 @@ void FB_SFX_BSD_EXIT_FN(void)
 
     FB_SFX_BSD_STATE_NAME.running = 0;
 
-#if FB_SFX_MT_ENABLED
+#if FB_SFX_MT_ENABLED && FB_SFX_BSD_ENABLE_WORKER
     if (g_bsd_audio_thread_valid)
     {
         g_bsd_audio_thread_stop = 1;

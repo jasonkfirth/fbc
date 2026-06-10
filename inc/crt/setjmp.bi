@@ -37,7 +37,51 @@
 	end type
 
 #else
-	#ifdef __FB_64BIT__
+	#if defined( __FB_RISCV64__ )
+		'' riscv64 glibc
+		type __jmp_buf
+			__pc		as longint
+			__regs(0 to 12-1)	as longint
+			__sp		as longint
+			__fpregs(0 to 12-1)	as double
+		end type
+	#elseif defined( __FB_LOONGARCH64__ )
+		'' loongarch64 glibc
+		type __jmp_buf
+			__pc		as longint
+			__sp		as longint
+			__x		as longint
+			__fp		as longint
+			__regs(0 to 9-1)	as longint
+			__fpregs(0 to 8-1)	as double
+		end type
+	#elseif defined( __FB_S390X__ )
+		'' s390x glibc
+		type __jmp_buf
+			__gregs(0 to 10-1)	as longint
+			__fpregs(0 to 8-1)	as longint
+		end type
+	#elseif defined( __FB_PPC__ ) and defined( __FB_64BIT__ )
+		'' powerpc64 glibc
+		type __jmp_buf
+			__opaque(0 to 64-1) as longint
+		end type
+	#elseif defined( __FB_PPC__ )
+		'' powerpc32 glibc
+		type __jmp_buf
+			__opaque(0 to 64+(12*4)-1) as long
+		end type
+	#elseif defined( __FB_64BIT__ ) and defined( __FB_ARM__ )
+		'' aarch64 glibc
+		type __jmp_buf
+			__opaque(0 to 22-1) as ulongint
+		end type
+	#elseif defined( __FB_ARM__ )
+		'' arm glibc
+		type __jmp_buf
+			__opaque(0 to 64-1) as long
+		end type
+	#elseif defined( __FB_64BIT__ )
 		'' x86_64 glibc
 		type __jmp_buf
 			__opaque(0 to 8-1) as longint

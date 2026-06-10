@@ -1252,6 +1252,14 @@ sub fbAddLib(byval libname as zstring ptr)
 		exit sub
 	end if
 
+	'' sound library?
+	if( *libname = "sfx" ) then
+		'' If a source includes "sfx" directly, use the regular
+		'' runtime-suffix selection logic from hAddDefaultLibs().
+		fbSetOption( FB_COMPOPT_FBSFX, TRUE )
+		exit sub
+	end if
+
 	strsetAdd(@env.libs, *libname, FALSE)
 end sub
 
@@ -1339,6 +1347,11 @@ private sub hEmitObjinfo( )
 	'' -fbgfx
 	if( env.clopt.fbgfx ) then
 		hAppendFbctinf( objinfoEncode( OBJINFO_GFX ) )
+	end if
+
+	'' -fbsfx
+	if( env.clopt.fbsfx ) then
+		hAppendFbctinf( objinfoEncode( OBJINFO_SFX ) )
 	end if
 
 	'' -lang

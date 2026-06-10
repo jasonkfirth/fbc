@@ -23,6 +23,21 @@ done
 [ -n "$ROOT" ] || { echo "ERROR: could not locate FreeBASIC root"; exit 1; }
 
 cd "$ROOT"
+CLEANUP_SUCCESS=0
+CLEANUP_DIRS=("$ROOT/.build-alpine")
+
+cleanup_build_roots() {
+    local path
+
+    [ "$CLEANUP_SUCCESS" -eq 1 ] || return 0
+
+    for path in "${CLEANUP_DIRS[@]}"; do
+        [ -n "$path" ] || continue
+        rm -rf "$path"
+    done
+}
+
+trap cleanup_build_roots EXIT
 
 ##############################################################################
 # Helpers
@@ -493,6 +508,8 @@ if [ "$failures" -ne 0 ]; then
     ls -R out/linux/alpine out/linux/postmarketos 2>/dev/null || true
     exit 1
 fi
+
+CLEANUP_SUCCESS=1
 
 echo
 echo "============================================================"

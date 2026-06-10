@@ -240,6 +240,21 @@ $(addprefix $(srcdir)/sfxlib/,$(SFX_BASE_UNIX)) \
 $(addprefix $(srcdir)/sfxlib/,$(SFX_BASE_TARGET)), \
 $(SFX_SRC_GENERIC))
 
+SFX_MIDI_TARGET_OS := linux darwin haiku dos win32 cygwin xbox
+SFX_MIDI_UNIX_OS := freebsd netbsd openbsd dragonfly solaris illumos
+
+ifneq ($(filter $(SFX_MIDI_TARGET_OS) $(SFX_MIDI_UNIX_OS),$(TARGET_OS)),)
+  SFX_SRC_GENERIC := $(filter-out \
+    $(srcdir)/sfxlib/sfx_midi_driver_stub.c, \
+    $(SFX_SRC_GENERIC))
+endif
+
+ifeq ($(filter $(SFX_MIDI_UNIX_OS),$(TARGET_OS)),)
+  SFX_SRC_UNIX := $(filter-out \
+    $(srcdir)/sfxlib/unix/sfx_midi_bsd.c, \
+    $(SFX_SRC_UNIX))
+endif
+
 ifeq ($(TARGET_OS),darwin)
   # These Darwin files are override markers.  Their filenames reserve the
   # shared Unix slots above, but they intentionally do not contribute code.
@@ -247,6 +262,16 @@ ifeq ($(TARGET_OS),darwin)
   SFX_SRC_TARGET := $(filter-out \
     $(srcdir)/sfxlib/darwin/sfx_midi_bsd.c \
     $(srcdir)/sfxlib/darwin/sfx_unix.c, \
+    $(SFX_SRC_TARGET))
+endif
+
+ifeq ($(TARGET_OS),haiku)
+  # These Haiku files are override markers.  Their filenames reserve the
+  # shared Unix slots above, but they intentionally do not contribute code.
+  # Keeping them out of the archive avoids ranlib "has no symbols" warnings.
+  SFX_SRC_TARGET := $(filter-out \
+    $(srcdir)/sfxlib/haiku/sfx_midi_bsd.c \
+    $(srcdir)/sfxlib/haiku/sfx_unix.c, \
     $(SFX_SRC_TARGET))
 endif
 

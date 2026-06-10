@@ -108,6 +108,61 @@ static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
 #	define FB_WCHAR wchar_t
 #	define _LC(c) L ## c
 #	define FB_WEOF ((FB_WCHAR)WEOF)
+#	if defined HOST_SOLARIS
+	static __inline__ int fb_solaris_swprintf( FB_WCHAR *buffer, size_t chars, const FB_WCHAR *format, ... )
+	{
+		char fmt[64];
+		char *tmp;
+		size_t i;
+		int result;
+		va_list ap;
+
+		if( (buffer == NULL) || (chars == 0) )
+			return -1;
+
+		buffer[0] = _LC('\0');
+
+		/*
+		   Solaris keeps the old two-argument swprintf() ABI. These runtime
+		   call sites only use ASCII numeric formats, so format through
+		   vsnprintf() and widen the ASCII result ourselves.
+		*/
+
+		for( i = 0; i < sizeof( fmt ) - 1; i++ )
+		{
+			FB_WCHAR c = format[i];
+			if( c == _LC('\0') )
+				break;
+			if( c > 127 )
+				return -1;
+			fmt[i] = (char)c;
+		}
+
+		if( format[i] != _LC('\0') )
+			return -1;
+
+		fmt[i] = '\0';
+
+		tmp = (char *)malloc( chars );
+		if( tmp == NULL )
+			return -1;
+
+		va_start( ap, format );
+		result = vsnprintf( tmp, chars, fmt, ap );
+		va_end( ap );
+
+		if( result >= 0 )
+		{
+			for( i = 0; (i < chars - 1) && (tmp[i] != '\0'); i++ )
+				buffer[i] = (FB_WCHAR)(unsigned char)tmp[i];
+			buffer[i] = _LC('\0');
+		}
+
+		free( tmp );
+		return result;
+	}
+#		define swprintf fb_solaris_swprintf
+#	endif
 #endif
 
 #ifdef HOST_ANDROID

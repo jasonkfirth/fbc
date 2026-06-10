@@ -13,8 +13,6 @@
 #include once "GL/glu.bi"
 
 '' Setup our booleans
-const FALSE = 0
-const TRUE  = not FALSE
 
 #include once "bmpload.bi"
 

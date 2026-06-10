@@ -6,11 +6,11 @@ const TEX_HASALPHA = &h8
 
 '------------------------------------------------------------------------
 '' Create texture creates textures from BLOAD buffer
-private function CreateTexture( byval buffer as any ptr, byval flags as integer = 0 ) as uinteger
+private function CreateTexture( byval buffer as any ptr, byval flags as integer = 0 ) as GLuint
 	
 	dim p as uinteger ptr
 	dim as integer w, h, x, y, col
-	dim tex as uinteger
+	dim tex as GLuint
 	dim as GLenum format, minfilter, magfilter
 	dim as FB.PUT_HEADER ptr header = buffer
 

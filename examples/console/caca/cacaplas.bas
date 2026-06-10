@@ -42,7 +42,7 @@ dim shared table(0 to TABLEX * TABLEY - 1) as ubyte
 
 declare sub do_plasma ( byval as ubyte ptr, byval as double, byval as double, byval as double, byval as double, byval as double, byval as double )
 
-dim as integer red(0 to 255), green(0 to 255), blue(0 to 255), alpha(0 to 255)
+dim as ulong red(0 to 255), green(0 to 255), blue(0 to 255), alpha(0 to 255)
 dim as double r(0 to 2), R_(0 to 5)
 dim bitmap as caca_bitmap ptr
 dim as integer i, x, y, frame
@@ -158,4 +158,3 @@ sub do_plasma ( byval pixels as ubyte ptr, byval x_1 as double, byval y_1 as dou
 	next y
 
 end sub
-

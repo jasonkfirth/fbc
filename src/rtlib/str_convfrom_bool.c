@@ -1,6 +1,7 @@
 /*  valbool (string) function (boolean)  */
 
 #include "fb.h"
+#include <strings.h>
 
 /** convert string to boolean value
  *  

@@ -23,6 +23,21 @@ done
 [ -n "$ROOT" ] || { echo "ERROR: could not locate FreeBASIC root"; exit 1; }
 
 cd "$ROOT"
+CLEANUP_SUCCESS=0
+CLEANUP_DIRS=()
+
+cleanup_build_roots() {
+    local path
+
+    [ "$CLEANUP_SUCCESS" -eq 1 ] || return 0
+
+    for path in "${CLEANUP_DIRS[@]}"; do
+        [ -n "$path" ] || continue
+        rm -rf "$path"
+    done
+}
+
+trap cleanup_build_roots EXIT
 
 ##############################################################################
 # Helpers
@@ -163,6 +178,7 @@ WORKDIR="${WORKDIR:-$BUILDROOT/work}"
 OUTBASE="${OUTBASE:-$ROOT/out}"
 BUILDDIR="${BUILDDIR:-$WORKDIR/package}"
 SOURCE_COPY_EXCLUDES="$ROOT/mk/source-copy-excludes.rsync"
+CLEANUP_DIRS=("$BUILDROOT")
 
 VERSION="$(sed -n 's/^FBVERSION[[:space:]]*:=[[:space:]]*//p' mk/version.mk | head -n1)"
 [ -n "$VERSION" ] || die "could not determine FBVERSION"
@@ -1006,8 +1022,10 @@ fi
 
 if [ "$NO_PACKAGE" -eq 1 ]; then
     msg "bootstrap tarball ready"
+    CLEANUP_SUCCESS=1
     echo "==> $BOOTSTRAP_TAR"
     exit 0
 fi
 
 package_current_target
+CLEANUP_SUCCESS=1

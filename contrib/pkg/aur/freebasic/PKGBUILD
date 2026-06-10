@@ -1,0 +1,109 @@
+# Maintainer: FreeBASIC Development Team <https://www.freebasic.net/forum/>
+#
+# Project: FreeBASIC AUR package
+# --------------------------------
+#
+# File: PKGBUILD
+#
+# Purpose:
+#
+#     Build the FreeBASIC compiler and runtime libraries from the release
+#     source-bootstrap archive in a normal Arch makepkg environment.
+#
+# Responsibilities:
+#
+#     * fetch the release bootstrap source archive
+#     * build a local bootstrap compiler
+#     * build the final compiler and runtime libraries
+#     * install the compiler, libraries, headers, docs, and examples
+#
+# This file intentionally does NOT contain:
+#
+#     * Docker or package-matrix orchestration
+#     * cross-sysroot preparation
+#     * release artifact generation
+#
+
+pkgname=freebasic
+pkgver=1.20.1
+pkgrel=1
+pkgdesc="FreeBASIC compiler and runtime libraries"
+arch=('x86_64' 'aarch64' 'armv7h' 'riscv64')
+url="https://www.freebasic.net/"
+license=('GPL-2.0-or-later' 'LGPL-2.1-or-later')
+depends=(
+	'gcc'
+	'binutils'
+	'ncurses'
+	'gpm'
+	'libffi'
+	'alsa-lib'
+	'libpulse'
+	'libx11'
+	'libxext'
+	'libxpm'
+	'libxrandr'
+	'libxrender'
+	'mesa'
+	'glu'
+)
+makedepends=(
+	'make'
+	'pkgconf'
+	'rsync'
+	'tar'
+	'xz'
+	'dos2unix'
+)
+optdepends=(
+	'gdb: debug native programs built by fbc'
+	'gtk3: build GTK examples'
+	'sdl2: build SDL2 examples'
+)
+provides=('fbc')
+conflicts=('fbc' 'fbc-git')
+options=('!strip')
+
+_source_dir="FreeBASIC-${pkgver}-source-bootstrap"
+source=("https://downloads.sourceforge.net/project/fbc/FreeBASIC-${pkgver}/Source/${_source_dir}.tar.xz")
+
+# Replace SKIP with the real release checksum before uploading to AUR.
+sha256sums=('SKIP')
+
+build() {
+	cd "${srcdir}/${_source_dir}"
+
+	make bootstrap-minimal
+	make all FBC=bootstrap/fbc
+}
+
+check() {
+	local smoke_src="${srcdir}/aur-smoke.bas"
+	local smoke_bin="${srcdir}/aur-smoke"
+
+	cd "${srcdir}/${_source_dir}"
+
+	bin/fbc -version
+
+	cat > "${smoke_src}" <<'FB'
+print "aur-smoke"
+FB
+
+	bin/fbc "${smoke_src}" -x "${smoke_bin}"
+	"${smoke_bin}"
+}
+
+package() {
+	cd "${srcdir}/${_source_dir}"
+
+	make install DESTDIR="${pkgdir}" prefix=/usr FBC=bootstrap/fbc
+
+	install -Dm644 changelog.txt "${pkgdir}/usr/share/doc/freebasic/changelog.txt"
+
+	if [ -d examples ]; then
+		install -d "${pkgdir}/usr/share/doc/freebasic/examples"
+		cp -a examples/. "${pkgdir}/usr/share/doc/freebasic/examples/"
+	fi
+}
+
+# end of PKGBUILD

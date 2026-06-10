@@ -5,6 +5,8 @@
 #ifndef __milkshapemodel_bi__
 #define __milkshapemodel_bi__
 
+#include once "GL/gl.bi"
+
 '' Use FIELD = 1 for all structures that are used to read data from disk.
 type MS3DHEADER FIELD = 1
 	m_ID(9) as ubyte
@@ -65,7 +67,7 @@ type MATERIAL
 	m_specular(3) as single
 	m_emissive(3) as single
 	m_shininess as single
-	m_texture as uinteger
+	m_texture as GLuint
 	m_pTextureFilename as zstring ptr
 end type
 
@@ -102,7 +104,7 @@ type MODEL
 end type
 
 '' Declare MilkShape functions
-declare function LoadGLTexture (byval filename as zstring ptr) as uinteger
+declare function LoadGLTexture (byval filename as zstring ptr) as GLuint
 declare function Model_LoadModelData(byval pM as MODEL ptr, byref filename as string) as integer
 declare sub Model_Draw(byval pM as MODEL ptr)
 declare sub Model_ReloadTextures(byval pM as MODEL ptr)
@@ -116,21 +118,10 @@ declare sub Model_Delete(byval pM as MODEL ptr)
 
 
 ''------------------------------------------------------------------------------
-'' Common window constants
-#ifndef FALSE
-#define FALSE 0
-#endif
-
-#ifndef TRUE
-#define TRUE -1
-#endif
-
-''------------------------------------------------------------------------------
 '' Load header files
 
 #include once "bmpload.bi"
 #include once "crt.bi"
-#include once "GL/gl.bi"
 #include once "GL/glu.bi"
 ''------------------------------------------------------------------------------
 ''Load the model data into the private variables.
@@ -160,7 +151,7 @@ function Model_LoadModelData(byval pM as MODEL ptr, byref filename as string) as
 	ffile = freefile
 
 	if  dir(filename) = "" then                                      '' Couldn't open the model file.
-		return FALSE
+		return false
 	end if
 
 	open filename for binary as ffile
@@ -181,11 +172,11 @@ function Model_LoadModelData(byval pM as MODEL ptr, byref filename as string) as
 	pPtr = pPtr + len(MS3DHEADER)
 
 	if strncmp(varptr(pHeader->m_ID(0)),"MS3D000000", 10) <> 0 then  '' Not a valid Milkshape3D model file.
-		return FALSE
+			return false
 	end if
 
 	if pHeader->m_version < 3  or  pHeader->m_version > 4 then        '' Unhandled file version. Only Milkshape3D Version 1.3 and 1.4 is supported.
-		return FALSE
+			return false
 	end if
 
 
@@ -271,7 +262,7 @@ function Model_LoadModelData(byval pM as MODEL ptr, byref filename as string) as
 	next
 	Model_ReloadTextures (pM)
 
-	return TRUE
+	return true
 end function
 
 ''------------------------------------------------------------------------------
@@ -410,9 +401,9 @@ end sub
 
 
 ''------------------------------------------------------------------------------
-function LoadGLTexture (byval filename as zstring ptr) as uinteger       '' Load Bitmaps And Convert To Textures
+function LoadGLTexture (byval filename as zstring ptr) as GLuint         '' Load Bitmaps And Convert To Textures
 	dim pImage as BITMAP_RGBImageRec ptr   	     '' Create Storage Space For The Texture
-	dim texture as uinteger           			 '' Texture ID
+	dim texture as GLuint           			 '' Texture ID
 	dim fbfilename as string
 
 	'' Convert filename in model from a zstring to a FB string.

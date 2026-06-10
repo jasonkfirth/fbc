@@ -256,8 +256,16 @@ endif
 
 ifdef ENABLE_CET
 ifneq ($(filter x86 x86_64,$(TARGET_ARCH)),)
+HARDEN_CET_C_SUPPORTED := $(shell printf 'int main(void){return 0;}\n' | $(CC) -x c -Werror -fcf-protection=full -c -o /dev/null - >/dev/null 2>&1 && echo yes)
+HARDEN_CET_CXX_SUPPORTED := $(shell printf 'int main(void){return 0;}\n' | $(CXX) -x c++ -Werror -fcf-protection=full -c -o /dev/null - >/dev/null 2>&1 && echo yes)
+
+ifeq ($(HARDEN_CET_C_SUPPORTED),yes)
 HARDEN_CFLAGS  += -fcf-protection=full
+endif
+
+ifeq ($(HARDEN_CET_CXX_SUPPORTED),yes)
 HARDEN_CXXFLAGS += -fcf-protection=full
+endif
 endif
 endif
 
@@ -267,8 +275,16 @@ endif
 ##############################################################################
 
 ifdef ENABLE_NO_PLT
+HARDEN_NO_PLT_C_SUPPORTED := $(shell printf 'int main(void){return 0;}\n' | $(CC) -x c -Werror -fno-plt -c -o /dev/null - >/dev/null 2>&1 && echo yes)
+HARDEN_NO_PLT_CXX_SUPPORTED := $(shell printf 'int main(void){return 0;}\n' | $(CXX) -x c++ -Werror -fno-plt -c -o /dev/null - >/dev/null 2>&1 && echo yes)
+
+ifeq ($(HARDEN_NO_PLT_C_SUPPORTED),yes)
 HARDEN_CFLAGS  += -fno-plt
+endif
+
+ifeq ($(HARDEN_NO_PLT_CXX_SUPPORTED),yes)
 HARDEN_CXXFLAGS += -fno-plt
+endif
 endif
 
 
@@ -298,11 +314,26 @@ ifdef ENABLE_REPRODUCIBLE
 
 ifneq ($(strip $(rootdir)),)
 
-HARDEN_CFLAGS += -ffile-prefix-map=$(rootdir)=.
-HARDEN_CFLAGS += -fdebug-prefix-map=$(rootdir)=.
+HARDEN_FILE_PREFIX_MAP_C_SUPPORTED := $(shell printf 'int main(void){return 0;}\n' | $(CC) -x c -Werror -ffile-prefix-map=$(rootdir)=. -c -o /dev/null - >/dev/null 2>&1 && echo yes)
+HARDEN_FILE_PREFIX_MAP_CXX_SUPPORTED := $(shell printf 'int main(void){return 0;}\n' | $(CXX) -x c++ -Werror -ffile-prefix-map=$(rootdir)=. -c -o /dev/null - >/dev/null 2>&1 && echo yes)
+HARDEN_DEBUG_PREFIX_MAP_C_SUPPORTED := $(shell printf 'int main(void){return 0;}\n' | $(CC) -x c -Werror -fdebug-prefix-map=$(rootdir)=. -c -o /dev/null - >/dev/null 2>&1 && echo yes)
+HARDEN_DEBUG_PREFIX_MAP_CXX_SUPPORTED := $(shell printf 'int main(void){return 0;}\n' | $(CXX) -x c++ -Werror -fdebug-prefix-map=$(rootdir)=. -c -o /dev/null - >/dev/null 2>&1 && echo yes)
 
+ifeq ($(HARDEN_FILE_PREFIX_MAP_C_SUPPORTED),yes)
+HARDEN_CFLAGS += -ffile-prefix-map=$(rootdir)=.
+endif
+
+ifeq ($(HARDEN_DEBUG_PREFIX_MAP_C_SUPPORTED),yes)
+HARDEN_CFLAGS += -fdebug-prefix-map=$(rootdir)=.
+endif
+
+ifeq ($(HARDEN_FILE_PREFIX_MAP_CXX_SUPPORTED),yes)
 HARDEN_CXXFLAGS += -ffile-prefix-map=$(rootdir)=.
+endif
+
+ifeq ($(HARDEN_DEBUG_PREFIX_MAP_CXX_SUPPORTED),yes)
 HARDEN_CXXFLAGS += -fdebug-prefix-map=$(rootdir)=.
+endif
 
 endif
 
@@ -629,6 +660,11 @@ ALLFBRTLFLAGS += $(TOOLCHAIN_FBRTLFLAGS)
 ##############################################################################
 
 FBC_FORWARD_CFLAGS := $(filter-out -MMD -MP,$(ALLCFLAGS))
+
+# fbc does not support clang-style -Wp, forwarding from environment hardening
+# flags for preprocessor options.  Drop those entries before converting to
+# -Wc arguments so builds stay compatible with distros that inject -Wp,-D...
+FBC_FORWARD_CFLAGS := $(filter-out -Wp%,$(FBC_FORWARD_CFLAGS))
 FBC_WCFLAGS := $(foreach f,$(FBC_FORWARD_CFLAGS),-Wc $(f))
 
 ALLFBCFLAGS += $(FBC_WCFLAGS)

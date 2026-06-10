@@ -9,11 +9,32 @@
 /* note: they must be static, or shared libraries in Linux would reuse the 
 		 same function */
 
-#if defined(HOST_DARWIN) || defined(HOST_ANDROID) || defined(HOST_SOLARIS)
-	/* It seems like __attribute__((constructor(priority))) (or in general, ordering
-	   ctors/dtors across modules) isn't supported on Darwin/MacOSX. illumos
-	   also does not run the sorted .ctors section reliably through the native
-	   linker path, so use plain __attribute__((constructor)). */
+#if defined(HOST_SOLARIS)
+	/*
+	   Solaris runs .init_array before .init.  Newer GCC releases use
+	   .init_array for ordinary constructors, so putting runtime startup in
+	   .init would leave FB global constructors running before the runtime
+	   has created its TLS keys.
+
+	   Solaris does sort the numbered .init_array/.fini_array input
+	   sections.  A low numbered init entry runs before ordinary
+	   constructors, and the matching fini entry runs after ordinary
+	   destructors because the fini array is walked in reverse order.
+	*/
+	static void fb_hDoInit( void )
+	{
+		fb_hRtInit( );
+	}
+
+	static void fb_hDoExit( void )
+	{
+		fb_hRtExit( );
+	}
+
+	static void (*priorityhDoInit)( void ) __attribute__((section(".init_array.00100"), used)) = fb_hDoInit;
+	static void (*priorityhDoExit)( void ) __attribute__((section(".fini_array.00100"), used)) = fb_hDoExit;
+#elif defined(HOST_DARWIN) || defined(HOST_ANDROID)
+	/* Darwin/MacOSX does not support ordered ctors/dtors across modules. */
 	__attribute__((constructor)) static void fb_hDoInit( void )
 	{
 		fb_hRtInit( );
@@ -44,8 +65,8 @@
 
 	   GCC on GNU/Linux seems to use .init_array.<0-padded priority> to implement
 	    __attribute__((constructor(priority))) now (instead of
-	   .ctors.<65535 - priority>), but .ctors.* still works, so it's probably ok to
-	   keep using it. */
+	   .ctors.<65535 - priority>). The .ctors.* sections still work here, so
+	   keep using them. */
 	static void * priorityhDoInit __attribute__((section(".ctors.65435"), used)) = fb_hDoInit;
 	static void * priorityhDoExit __attribute__((section(".dtors.65435"), used)) = fb_hDoExit;
 #endif

@@ -53,6 +53,16 @@ REV="$(awk -F':=' '/^[[:space:]]*REV/ {gsub(/[[:space:]]/,"",$2); print $2}' mk/
 PKGNAME="freebasic"
 PKGVERSION="${FBVERSION}_${REV}"
 PKGFILE="${OUT}/${PKGNAME}-${PKGVERSION}.pkg"
+CLEANUP_SUCCESS=0
+
+cleanup_build_artifacts() {
+	[ "$CLEANUP_SUCCESS" -eq 1 ] || return 0
+
+	rm -f /tmp/fb_test.bas /tmp/fb_test
+	rm -rf "$BUILDROOT"
+}
+
+trap cleanup_build_artifacts EXIT
 
 ##############################################################################
 # Install build dependencies
@@ -248,5 +258,7 @@ OUTPUT="$(/tmp/fb_test)"
 echo "==> output: $OUTPUT"
 
 [ "$OUTPUT" = "FreeBASIC test OK" ] || die "bad output"
+
+CLEANUP_SUCCESS=1
 
 echo "==> SUCCESS"

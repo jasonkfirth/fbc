@@ -24,6 +24,7 @@
 /* serial port access for Solaris and illumos */
 
 #include "../fb.h"
+#include <strings.h>
 #include "../io_serial_private.h"
 
 #include <sys/filio.h>

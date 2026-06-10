@@ -94,6 +94,18 @@ REV="$(awk -F':=' '/^[[:space:]]*REV/ {gsub(/[[:space:]]/,"",$2); print $2}' mk/
 PKGNAME="freebasic"
 PKGVERSION="${FBVERSION}_${REV}"
 PKGFILE="${OUT}/${PKGNAME}-${PKGVERSION}.pkg"
+CLEANUP_SUCCESS=0
+
+cleanup_build_artifacts() {
+	[ "$CLEANUP_SUCCESS" -eq 1 ] || return 0
+
+	rm -rf "$BUILDROOT"
+	rm -f /tmp/fb.bas /tmp/fb
+
+	return 0
+}
+
+trap cleanup_build_artifacts EXIT
 
 echo "==> DragonFly build"
 echo "==> package: ${PKGNAME}-${PKGVERSION}"
@@ -180,7 +192,10 @@ else
         die "staged sfxlib showcase example missing; run without --no-build first"
 fi
 
-[ "$NO_PACKAGE" -eq 1 ] && exit 0
+if [ "$NO_PACKAGE" -eq 1 ]; then
+	CLEANUP_SUCCESS=1
+	exit 0
+fi
 
 ##############################################################################
 # Prepare pkgroot
@@ -274,5 +289,7 @@ run pkg add -f "$PKGFILE"
 echo 'print "OK"' > /tmp/fb.bas
 run ${PREFIX}/bin/fbc /tmp/fb.bas -x /tmp/fb
 /tmp/fb
+
+CLEANUP_SUCCESS=1
 
 echo "==> SUCCESS"

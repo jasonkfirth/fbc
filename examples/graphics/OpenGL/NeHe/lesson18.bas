@@ -26,12 +26,10 @@
 #include once "createtex.bi"
 
 '' Setup our booleans
-const false = 0
-const true  = not false
 
 declare sub glDrawCube()
 
-	dim texture(0 to 2) as uinteger         '' Storage For 3 Textures
+	dim texture(0 to 2) as GLuint         '' Storage For 3 Textures
 
 	dim filter as uinteger                  '' Which Filter To Use
 	dim light as integer                    '' Lighting ON/OFF

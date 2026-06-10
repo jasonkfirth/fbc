@@ -235,7 +235,7 @@ private function window_oncreate _
 
 	with wc
 		.cbSize 		= len( WNDCLASSEX )
-		.lpfnWndProc 	= @win_cb
+		.lpfnWndProc 	= cast( WNDPROC, @win_cb )
 		.hInstance 		= hInstance
 		.lpszClassName 	= className
 		'.style			= CS_HREDRAW or CS_VREDRAW

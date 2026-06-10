@@ -1,6 +1,7 @@
 /* QB compatible OPEN */
 
 #include "fb.h"
+#include <strings.h>
 
 FBCALL int fb_FileOpenQB
 	(

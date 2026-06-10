@@ -56,11 +56,19 @@ void fb_sfxMusicResume(void)
     if (!fb_sfxEnsureInitialized())
         return;
 
+    fb_sfxRuntimeLock();
+
     if (__fb_sfx->music_playing < 0)
+    {
+        fb_sfxRuntimeUnlock();
         return;
+    }
 
     if (!__fb_sfx->music_paused)
+    {
+        fb_sfxRuntimeUnlock();
         return;
+    }
 
     __fb_sfx->music_paused = 0;
 
@@ -69,40 +77,13 @@ void fb_sfxMusicResume(void)
         FB_SFXVOICE *voice = &__fb_sfx->voices[i];
 
         if (voice->active &&
-            voice->type == FB_SFX_VOICE_MUSIC &&
-            voice->sfx_id == __fb_sfx->music_playing)
+            voice->type == FB_SFX_VOICE_MUSIC)
             voice->paused = 0;
     }
 
-    SFX_DEBUG(
-        "sfx_music_resume: id=%d resumed",
-        __fb_sfx->music_playing
-    );
-}
+    fb_sfxRuntimeUnlock();
 
-
-/* ------------------------------------------------------------------------- */
-/* MUSIC RESUME (specific id)                                                */
-/* ------------------------------------------------------------------------- */
-
-/*
-    fb_sfxMusicResumeId()
-
-    Resume a specific music asset if it is currently paused.
-*/
-
-void fb_sfxMusicResumeId(int id)
-{
-    if (!fb_sfxEnsureInitialized())
-        return;
-
-    if (id < 0 || id >= FB_SFX_MAX_MUSIC)
-        return;
-
-    if (__fb_sfx->music_playing != id)
-        return;
-
-    fb_sfxMusicResume();
+    SFX_DEBUG("sfx_music_resume: current music resumed");
 }
 
 

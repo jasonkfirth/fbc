@@ -41,7 +41,7 @@ declare sub shutdown ()
 ''
 	dim shared ctx as CONTEXT = ( WIN_WIDTH, WIN_HEIGHT, TRUE, (WIN_WIDTH\2, WIN_HEIGHT\2), TRUE )
 	
-	dim shared TexID(1) as uinteger		'our Texture Objects
+	dim shared TexID(1) as GLuint		'our Texture Objects
 
 	dim shared glActiveTextureARB_ as PFNGLACTIVETEXTUREARBPROC
 	dim shared glMultiTexCoord2iARB_ as PFNGLMULTITEXCOORD2IARBPROC
@@ -72,7 +72,7 @@ end sub
 
 '':::::
 sub initGL
-	dim TexUnits as integer
+	dim TexUnits as GLint
 
     glGetIntegerv GL_MAX_TEXTURE_UNITS, @TexUnits
 	print "Your GL implementation supports"; TexUnits; " texture unit(s)."

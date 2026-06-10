@@ -1,16 +1,16 @@
 #include once "example_common.bi"
 
 dim as string filename = SfxExampleMedia( "good-morning-to-all.ogg" )
-dim as long music_id
+dim as long result
 
 SfxExampleBanner( "MUSIC STOP" )
 
-music_id = MUSIC PLAY( filename )
-if( music_id < 0 ) then
+result = MUSIC PLAY( filename )
+if( result < 0 ) then
 	print "Unable to start music playback."
 else
 	SfxExampleWait( 800 )
-	MUSIC STOP( music_id )
-	print "Stopped music id:"; music_id
+	MUSIC STOP
+	print "Stopped current music."
 	print "MUSIC STATUS() ="; MUSIC STATUS()
 end if

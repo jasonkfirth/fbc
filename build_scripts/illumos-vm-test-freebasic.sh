@@ -11,7 +11,7 @@
 #
 # Responsibilities:
 #
-#   * launch a VM with the user-supplied or downloaded OmniOS cloud image
+#   * launch a VM with the user-supplied or downloaded OpenIndiana cloud image
 #   * copy prepared package repository and source trees into the guest
 #   * install the local freebasic IPS package
 #   * execute fbctests and exampleageddon in the guest
@@ -38,17 +38,18 @@ LOG_DIR="$WORKROOT/logs"
 CACHE_DIR="$WORKROOT/cache"
 PACKAGE_DIR=""
 PACKAGE_REPO_DIR=""
-RELEASE="r151058"
+RELEASE="20251026"
 PKG_PROXY_PORT=""
 PKG_PROXY_ENABLED=0
-PKG_REPO_URL="https://pkg.omnios.org"
-PKG_REPO_FALLBACK_URL="http://pkg.omnios.org"
+PKG_REPO_URL="http://mirror.math.princeton.edu/pub/openindiana/hipster"
+PKG_REPO_FALLBACK_URL="http://mirror.math.princeton.edu/pub/openindiana/hipster"
 PKG_INSTALL_ATTEMPTS=3
 PKG_INSTALL_RETRY_DELAY=6
 IMAGE_URL=""
 IMAGE_FILE=""
 WORKROOT_PACKAGE="$ROOT/out/illumos/x86-64"
 ARCHIVE_RESULTS="$RUN_DIR/results"
+OFFLINE_TEST_MODE=0
 SSH_PORT=""
 CPUS=""
 MEMORY="6144"
@@ -66,8 +67,10 @@ KEEP_VM=0
 GUEST_IMAGE_DIR="/work"
 WORK_ROOT_DIR="/work/freebasic-test"
 PKG_CACHE_DIR="/work/freebasic-package"
+SERIAL_TTY_HOST="127.0.0.1"
+SERIAL_TTY_PORT=""
 
-DEFAULT_IMAGE_URL="https://downloads.omnios.org/media/stable/omnios-${RELEASE}.cloud.qcow2"
+DEFAULT_IMAGE_URL="https://dlc.openindiana.org/isos/hipster/${RELEASE}/OI-hipster-cloudimage.img.zst"
 
 msg() { printf '\n==> %s\n' "$*"; }
 die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
@@ -78,12 +81,12 @@ Usage: ./build_scripts/illumos-vm-test-freebasic.sh [options]
 
 Options:
   --package-dir DIR     Package artifact path. Default: out/illumos/x86-64
-  --image-url URL       OmniOS cloud qcow2 URL.
-  --image FILE          Existing OmniOS cloud qcow2 image.
-  --release N           OmniOS release override. Default: ${RELEASE}
+  --image-url URL       OpenIndiana cloud image URL.
+  --image FILE          Existing OpenIndiana cloud image.
+  --release N           OpenIndiana release/date directory override. Default: ${RELEASE}
   --pkg-proxy-port N    Host package proxy port. Default: disabled
-  --pkg-repo-url URL    Base OmniOS package URL for direct mode. Default: https://pkg.omnios.org
-  --pkg-repo-fallback-url URL Optional fallback package URL for direct mode. Default: http://pkg.omnios.org
+  --pkg-repo-url URL    Base OpenIndiana package URL for direct mode. Default: http://mirror.math.princeton.edu/pub/openindiana/hipster
+  --pkg-repo-fallback-url URL Optional fallback package URL for direct mode.
   --workroot DIR        Work directory. Default: out/illumos-vm
   --jobs N              Build/test concurrency hint. Default: host CPU count
   --cpus N              QEMU CPU count. Default: --jobs value
@@ -99,6 +102,7 @@ Options:
   --pkg-install-timeout N  Seconds per package install attempt. Default: 1200.
   --pkg-install-attempts N  Number of attempts per package install. Default: 3.
   --pkg-install-retry-delay N  Delay in seconds between package retries. Default: 6.
+  --offline-test-mode     Use only local package repo for install and skip remote publisher refresh.
   --keep-vm             Keep VM artifacts after success.
   -h, --help            Show this help text.
 EOF
@@ -109,7 +113,7 @@ while [ "$#" -gt 0 ]; do
 		--package-dir) PACKAGE_DIR="$2"; shift 2 ;;
 		--image-url) IMAGE_URL="$2"; shift 2 ;;
 		--image) IMAGE_FILE="$2"; shift 2 ;;
-		--release) RELEASE="$2"; DEFAULT_IMAGE_URL="https://downloads.omnios.org/media/stable/omnios-${RELEASE}.cloud.qcow2"; shift 2 ;;
+		--release) RELEASE="$2"; DEFAULT_IMAGE_URL="https://dlc.openindiana.org/isos/hipster/${RELEASE}/OI-hipster-cloudimage.img.zst"; shift 2 ;;
 		--pkg-proxy-port)
 			PKG_PROXY_ENABLED=1
 			PKG_PROXY_PORT="$2"
@@ -138,6 +142,7 @@ while [ "$#" -gt 0 ]; do
 		--pkg-install-attempts) PKG_INSTALL_ATTEMPTS="$2"; shift 2 ;;
 		--pkg-install-retry-delay) PKG_INSTALL_RETRY_DELAY="$2"; shift 2 ;;
 		--pkg-install-timeout) PKG_INSTALL_TIMEOUT="$2"; shift 2 ;;
+		--offline-test-mode) OFFLINE_TEST_MODE=1; shift ;;
 		--skip-package-install) SKIP_PACKAGE_INSTALL=1; shift ;;
 		--keep-vm) KEEP_VM=1; shift ;;
 		-h|--help)
@@ -222,22 +227,58 @@ prepare_image() {
 	if [ -n "$IMAGE_FILE" ]; then
 		[ -f "$IMAGE_FILE" ] || die "image not found: $IMAGE_FILE"
 		IMAGE_FILE="$(cd "$(dirname "$IMAGE_FILE")" && pwd)/$(basename "$IMAGE_FILE")"
+		IMAGE_FILE="$(decompress_image_if_needed "$IMAGE_FILE")"
 		return
 	fi
 
 	[ -n "$IMAGE_URL" ] || IMAGE_URL="$DEFAULT_IMAGE_URL"
 	IMAGE_FILE="$CACHE_DIR/$(basename "$IMAGE_URL")"
-	[ -f "$IMAGE_FILE" ] && return
+	if [ -f "$IMAGE_FILE" ]; then
+		IMAGE_FILE="$(decompress_image_if_needed "$IMAGE_FILE")"
+		return
+	fi
 
 	download_url "$IMAGE_URL" "$IMAGE_FILE" ||
 		die "failed to download $IMAGE_URL"
+	IMAGE_FILE="$(decompress_image_if_needed "$IMAGE_FILE")"
+}
+
+decompress_image_if_needed() {
+	local image="$1"
+	local decompressed
+
+	case "$image" in
+		*.zst)
+			decompressed="${image%.zst}"
+			if [ -f "$decompressed" ] && [ "$decompressed" -nt "$image" ]; then
+				printf '%s\n' "$decompressed"
+				return 0
+			fi
+			if ! command -v zstd >/dev/null 2>&1; then
+				die "zstd is required to decompress ${image}"
+			fi
+			printf '==> Decompressing %s\n' "$image" >&2
+			zstd -d -f -o "$decompressed" "$image" ||
+				die "failed to decompress $image"
+			printf '%s\n' "$decompressed"
+			;;
+		*) printf '%s\n' "$image" ;;
+	esac
 }
 
 prepare_disk() {
 	local disk="$RUN_DIR/illumos.qcow2"
 	local src="$IMAGE_FILE"
+	local src_format="raw"
+
+	case "$src" in
+		*.qcow2) src_format="qcow2" ;;
+		*.zst|*.img|*.raw|*.iso) src_format="raw" ;;
+		*) src_format="qcow2" ;;
+	esac
+
 	rm -f "$disk"
-	qemu-img create -f qcow2 -F qcow2 -b "$src" "$disk" "$DISK_SIZE" >/dev/null
+	qemu-img create -f qcow2 -F "$src_format" -b "$src" "$disk" "$DISK_SIZE" >/dev/null
 	printf '%s\n' "$disk"
 }
 
@@ -274,6 +315,10 @@ start_vm() {
 	local pidfile="$RUN_DIR/qemu.pid"
 	local serial="$LOG_DIR/serial.log"
 
+	if [ -z "$SERIAL_TTY_PORT" ]; then
+		SERIAL_TTY_PORT="$(find_free_port 4300)"
+	fi
+
 	msg "starting illumos VM on SSH port $SSH_PORT"
 	qemu-system-x86_64 \
 		-m "$MEMORY" \
@@ -283,9 +328,10 @@ start_vm() {
 		-drive "file=$disk,if=virtio,format=qcow2" \
 		-drive "file=$iso,media=cdrom,if=ide,readonly=on" \
 		-netdev "user,id=net0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22" \
-		-device e1000,netdev=net0 \
+		-device virtio-net-pci,netdev=net0 \
 		-display none \
-		-serial "file:$serial" \
+		-chardev "socket,id=serial_ttya,host=$SERIAL_TTY_HOST,port=$SERIAL_TTY_PORT,server=on,wait=off" \
+		-serial "chardev:serial_ttya" \
 		-pidfile "$pidfile" \
 		-daemonize
 }
@@ -298,14 +344,87 @@ start_pkg_proxy() {
 		PKG_PROXY_PORT="$(find_free_port 18080)"
 	fi
 
-	msg "Starting OmniOS package proxy on port $PKG_PROXY_PORT"
+	msg "Starting OpenIndiana package proxy on port $PKG_PROXY_PORT"
 	cat > "$script" <<'PY'
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import http.client
-import ssl
 import sys
 
-UPSTREAM = "pkg.omnios.org"
+UPSTREAM = "mirror.math.princeton.edu"
+LEGACY_DIRECTORIES = {"index", "file", "pkg", "tmp", "trans", "catalog"}
+VERSION_PATHS = {
+    "/pub/openindiana/hipster/versions/0",
+    "/pub/openindiana/hipster/versions/0/",
+    "/pub/openindiana/hipster/publisher/openindiana.org/versions/0",
+    "/pub/openindiana/hipster/publisher/openindiana.org/versions/0/",
+}
+
+VERSIONS_RESPONSE = """pkg-server 0
+catalog 0
+file 0
+index 0
+info 0
+manifest 0
+pkg 0
+p5i 0
+publisher 0
+search 0
+status 0
+tmp 0
+trans 0
+versions 0
+"""
+
+SECTION_VERSION_MAPS = {"catalog", "file", "index", "pkg", "tmp", "trans", "search", "status", "info", "manifest", "p5i"}
+
+def rewrite_versioned_section(path):
+    if path.startswith("/pub/openindiana/hipster/"):
+        source_base = "/pub/openindiana/hipster"
+        target_base = "/pub/openindiana/hipster/publisher/openindiana.org"
+    elif path.startswith("/pub/openindiana/hipster/publisher/openindiana.org/"):
+        source_base = "/pub/openindiana/hipster/publisher/openindiana.org"
+        target_base = "/pub/openindiana/hipster/publisher/openindiana.org"
+    else:
+        return path
+
+    suffix = path[len(source_base):].lstrip("/")
+    if not suffix:
+        return path
+
+    parts = suffix.split("/")
+    if len(parts) >= 2 and parts[0] in SECTION_VERSION_MAPS and parts[1].isdigit():
+        rest = "/".join(parts[2:])
+        if rest:
+            return target_base + "/" + parts[0] + "/" + rest
+        return target_base + "/" + parts[0]
+    return path
+
+
+def rewrite_legacy_path(path):
+    if path in VERSION_PATHS:
+        return "/__fbc-versions-0"
+
+    legacy_prefixes = [
+        "/pub/openindiana/hipster/versions/0/",
+        "/pub/openindiana/hipster/versions/0",
+        "/pub/openindiana/hipster/publisher/openindiana.org/versions/0/",
+        "/pub/openindiana/hipster/publisher/openindiana.org/versions/0",
+    ]
+
+    for legacy_prefix in legacy_prefixes:
+        if path.startswith(legacy_prefix):
+            suffix = path[len(legacy_prefix):].lstrip("/")
+            if not suffix:
+                return "/pub/openindiana/hipster/publisher/openindiana.org/"
+            if "/" in suffix:
+                return "/pub/openindiana/hipster/publisher/openindiana.org/" + suffix
+            if suffix in LEGACY_DIRECTORIES:
+                return "/pub/openindiana/hipster/publisher/openindiana.org/" + suffix
+            return "/pub/openindiana/hipster/publisher/openindiana.org/catalog/" + suffix
+    rewritten = rewrite_versioned_section(path)
+    if rewritten != path:
+        return rewritten
+    return path
 
 
 class Proxy(BaseHTTPRequestHandler):
@@ -321,12 +440,21 @@ class Proxy(BaseHTTPRequestHandler):
         self.proxy(True)
 
     def proxy(self, include_body):
+        path = rewrite_legacy_path(self.path)
+        if path == "/__fbc-versions-0":
+            self.send_response(200, "OK")
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(VERSIONS_RESPONSE.encode("utf-8"))))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            if include_body:
+                self.wfile.write(VERSIONS_RESPONSE.encode("utf-8"))
+            return
+
         length = int(self.headers.get("Content-Length", "0") or "0")
         body = self.rfile.read(length) if length else None
 
-        ctx = ssl.create_default_context()
-        ctx.maximum_version = ssl.TLSVersion.TLSv1_2
-        conn = http.client.HTTPSConnection(UPSTREAM, 443, context=ctx, timeout=120)
+        conn = http.client.HTTPConnection(UPSTREAM, 80, timeout=120)
         headers = {
             k: v for k, v in self.headers.items()
             if k.lower() not in ("host", "connection", "proxy-connection")
@@ -334,7 +462,7 @@ class Proxy(BaseHTTPRequestHandler):
         headers["Host"] = UPSTREAM
 
         try:
-            conn.request(self.command, self.path, body=body, headers=headers)
+            conn.request(self.command, path, body=body, headers=headers)
             resp = conn.getresponse()
             self.send_response(resp.status, resp.reason)
             for key, value in resp.getheaders():
@@ -343,8 +471,12 @@ class Proxy(BaseHTTPRequestHandler):
                     continue
                 if lower == "location":
                     value = value.replace(
-                        "https://pkg.omnios.org",
-                        "http://10.0.2.2:%d" % PORT
+                        "https://mirror.math.princeton.edu/pub/openindiana",
+                        "http://10.0.2.2:%d/pub/openindiana" % PORT
+                    )
+                    value = value.replace(
+                        "http://mirror.math.princeton.edu/pub/openindiana",
+                        "http://10.0.2.2:%d/pub/openindiana" % PORT
                     )
                 self.send_header(key, value)
             self.send_header("Connection", "close")
@@ -401,16 +533,261 @@ cleanup_vm() {
 
 wait_for_ssh() {
 	local tries=90
+	local bootstrap_done=0
+	local bootstrap_attempted=0
+	local attempts_before_bootstrap=88
+
 	while [ "$tries" -gt 0 ]; do
 		if timeout 5 ssh -o BatchMode=yes -o StrictHostKeyChecking=no \
 			-o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
 			-i "$RUN_DIR/id_ed25519" -p "$SSH_PORT" root@127.0.0.1 'uname -a' >/dev/null 2>&1; then
 			return 0
 		fi
+		if [ "$bootstrap_done" -eq 0 ] && [ "$bootstrap_attempted" -eq 0 ] && [ "$tries" -le "$attempts_before_bootstrap" ]; then
+			bootstrap_attempted=1
+			msg "SSH not yet available; attempting console bootstrap via ttya"
+			if bootstrap_illumos_via_ttya; then
+				bootstrap_done=1
+			else
+				msg "ttya bootstrap failed; continuing to wait for SSH"
+			fi
+		fi
 		tries=$((tries - 1))
 		sleep 10
 	done
 	die "timed out waiting for illumos SSH"
+}
+
+bootstrap_illumos_via_ttya() {
+	local key_pub="$RUN_DIR/id_ed25519.pub"
+	local key_b64
+
+	if [ -z "$SERIAL_TTY_PORT" ]; then
+		msg "No ttya serial port configured; cannot bootstrap via console"
+		return 1
+	fi
+	if [ ! -f "$key_pub" ]; then
+		msg "Public SSH key missing: $key_pub"
+		return 1
+	fi
+
+	key_b64="$(python3 - "$key_pub" <<'PY'
+import base64
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    data = f.read()
+
+print(base64.b64encode(data.encode("utf-8")).decode("ascii"), end="")
+PY
+)"
+
+	python3 - "$SERIAL_TTY_HOST" "$SERIAL_TTY_PORT" "$key_b64" "$LOG_DIR/serial.log" "__FBC_TTYA_BOOTSTRAP_DONE__" <<'PY'
+import base64
+import socket
+import sys
+import time
+
+
+def log_to_file(handle, text):
+	if text:
+		handle.write(text)
+		handle.flush()
+
+
+def wait_for(sock, handle, patterns, timeout_seconds):
+	end = time.time() + timeout_seconds
+	buffer = ""
+	patterns = [p.lower() for p in patterns]
+	while time.time() < end:
+		try:
+			chunk = sock.recv(4096)
+		except socket.timeout:
+			time.sleep(0.1)
+			continue
+		except OSError:
+			break
+		if not chunk:
+			time.sleep(0.1)
+			continue
+		text = chunk.decode("utf-8", errors="replace")
+		buffer += text
+		log_to_file(handle, text)
+		low = buffer.lower()
+		for pattern in patterns:
+			if pattern in low:
+				return buffer
+		time.sleep(0.05)
+	return buffer
+
+
+def send_line(sock, text):
+	if not text.endswith("\n"):
+		text += "\n"
+	sock.sendall(text.encode("utf-8"))
+
+
+def looks_like_prompt(text):
+    for line in text.splitlines():
+        line = line.rstrip("\r\n")
+        if line.endswith("#") or line.endswith("$"):
+            return True
+    return "# " in text or "$ " in text
+
+
+def looks_like_maintenance_prompt(text):
+    return "enter user name for system maintenance" in text
+
+
+def wait_for_login_prompt(sock, handle):
+	attempts = 0
+	state = ""
+	while attempts < 8:
+		attempts += 1
+		state = wait_for(
+			sock,
+			handle,
+			[
+				"enter user name for system maintenance",
+				"console login:",
+				"login:",
+				"assword:",
+				"# ",
+				"$ ",
+				"#",
+				"$"
+			],
+			40
+		)
+		if looks_like_prompt(state):
+			return state
+		low = state.lower()
+		if looks_like_maintenance_prompt(low):
+			return state
+		if "login:" in low:
+			send_line(sock, "root")
+			continue
+		if "password:" in low or "assword:" in low:
+			send_line(sock, "")
+			continue
+		send_line(sock, "\n")
+	return state
+
+
+
+host = sys.argv[1]
+port = int(sys.argv[2])
+key_b64 = sys.argv[3]
+log_file = sys.argv[4]
+done_marker = sys.argv[5]
+
+public_key = base64.b64decode(key_b64.encode("ascii")).decode("utf-8").strip()
+
+needs_reboot = 0
+
+bootstrap_cmd_tmpl = """set -eu
+mkdir -p /root/.ssh
+chmod 700 /root/.ssh
+cat > /root/.ssh/authorized_keys <<'FBC_KEY'
+{key}
+FBC_KEY
+chmod 600 /root/.ssh/authorized_keys
+chown root:root /root/.ssh /root/.ssh/authorized_keys || true
+
+awk ' \
+/^#?PermitRootLogin[[:space:]]+/ {{ print "PermitRootLogin yes"; permit_root=1; next }} \
+/^#?PubkeyAuthentication[[:space:]]+/ {{ print "PubkeyAuthentication yes"; pubkey_auth=1; next }} \
+/^#?PasswordAuthentication[[:space:]]+/ {{ print "PasswordAuthentication yes"; password_auth=1; next }} \
+{{ print }} \
+END {{ \
+	if (!permit_root) print "PermitRootLogin yes"; \
+	if (!pubkey_auth) print "PubkeyAuthentication yes"; \
+	if (!password_auth) print "PasswordAuthentication yes"; \
+}}' /etc/ssh/sshd_config > /etc/ssh/sshd_config.new && mv /etc/ssh/sshd_config.new /etc/ssh/sshd_config
+
+if command -v svcadm >/dev/null 2>&1; then
+    if /usr/sbin/svcadm enable -r svc:/network/ssh:default >/dev/null 2>&1; then
+        :
+    elif /usr/sbin/svcadm restart svc:/network/ssh:default >/dev/null 2>&1; then
+        :
+    else
+        :
+    fi
+fi
+BOOTSTRAP_INTERFACES=$(
+    dladm show-phys -p -o LINK 2>/dev/null \
+        | awk '$1 != "" && $1 != "lo0" {{ print $1 }}'
+)
+if [ -z "$BOOTSTRAP_INTERFACES" ]; then
+    BOOTSTRAP_INTERFACES=$(
+        ifconfig -a 2>/dev/null \
+            | awk -F: '/^[a-zA-Z][a-zA-Z0-9_-]*:/{{print $1}}' \
+            | grep -Ev '^lo0$'
+    )
+fi
+if [ -n "$BOOTSTRAP_INTERFACES" ]; then
+    for bootstrap_iface in $BOOTSTRAP_INTERFACES; do
+        ifconfig "$bootstrap_iface" plumb >/dev/null 2>&1 || true
+        ifconfig "$bootstrap_iface" up >/dev/null 2>&1 || true
+        ifconfig "$bootstrap_iface" inet 10.0.2.15 netmask 255.255.255.0 up >/dev/null 2>&1 || true
+        break
+    done
+    route -p add net default 10.0.2.2 >/dev/null 2>&1 || true
+fi
+echo "{done_marker}"
+"""
+
+sock = socket.create_connection((host, port), timeout=20)
+sock.settimeout(1.0)
+with open(log_file, "a", encoding="utf-8", errors="replace") as handle:
+	try:
+		state = wait_for_login_prompt(sock, handle)
+		if looks_like_maintenance_prompt(state.lower()):
+			needs_reboot = 1
+			send_line(sock, "\x04")
+			state = wait_for_login_prompt(sock, handle)
+
+		if not looks_like_prompt(state):
+			send_line(sock, "root")
+			state = wait_for_login_prompt(sock, handle)
+			if "assword:" in state.lower():
+				send_line(sock, "")
+				state = wait_for_login_prompt(sock, handle)
+
+		if not looks_like_prompt(state):
+			raise SystemExit("serial session did not reach a shell prompt")
+
+		bootstrap_cmd = bootstrap_cmd_tmpl.format(
+			key=public_key,
+			done_marker=done_marker
+		)
+		if needs_reboot:
+			bootstrap_cmd += """
+if [ -x /usr/sbin/reboot ]; then
+    sync
+    /usr/sbin/reboot
+elif [ -x /sbin/reboot ]; then
+    sync
+    /sbin/reboot
+else
+    sync
+    /usr/sbin/init 6
+fi
+"""
+		send_line(sock, bootstrap_cmd)
+		done_marker_lower = done_marker.lower()
+		completion = wait_for(sock, handle, [done_marker], 600)
+		if done_marker_lower not in completion.lower():
+			prompt_wait = wait_for(sock, handle, ["#", "$", "# ", "$ "], 120)
+			if not looks_like_prompt(prompt_wait):
+				send_line(sock, "true")
+				wait_for(sock, handle, ["# ", "$ "], 5)
+	finally:
+		try:
+			sock.close()
+		except OSError:
+			pass
+PY
 }
 
 ssh_illumos() {
@@ -609,10 +986,9 @@ install_pkg_candidates() {
 	return 1
 }
 
-configure_omnios_publishers() {
-	local release="$1"
-	local mode="$2"
-	local base_url="$3"
+configure_openindiana_publishers() {
+	local mode="$1"
+	local base_url="$2"
 	local normalized_base
 	local direct_url
 
@@ -621,27 +997,21 @@ configure_omnios_publishers() {
 			if [ -z "${PKG_PROXY_PORT:-}" ]; then
 				fail "pkg proxy requested but no PKG_PROXY_PORT provided"
 			fi
-			run /usr/bin/pkg set-publisher --no-refresh -M '*' -O "http://10.0.2.2:${PKG_PROXY_PORT}/${release}/core/" omnios
-			run /usr/bin/pkg set-publisher --no-refresh -M '*' -O "http://10.0.2.2:${PKG_PROXY_PORT}/${release}/extra/" extra.omnios
-			run /usr/bin/pkg refresh omnios extra.omnios
+			run /usr/bin/pkg set-publisher --no-refresh -M '*' -O "http://10.0.2.2:${PKG_PROXY_PORT}/pub/openindiana/hipster" openindiana.org
+			if ! timeout 90 /usr/bin/pkg refresh openindiana.org; then
+				return 1
+			fi
 			;;
 		direct)
 			if [ -z "$base_url" ]; then
 				fail "no package repository URL configured for direct mode"
 			fi
 			normalized_base="${base_url%/}"
-			if [[ "$normalized_base" == */"${release}" ]]; then
-				direct_url="$normalized_base"
-			else
-				direct_url="${normalized_base}/${release}"
-			fi
-			if ! /usr/bin/pkg set-publisher --no-refresh -M '*' -O "${direct_url}/core/" omnios; then
+			direct_url="$normalized_base"
+			if ! /usr/bin/pkg set-publisher --no-refresh -M '*' -O "$direct_url" openindiana.org; then
 				return 1
 			fi
-			if ! /usr/bin/pkg set-publisher --no-refresh -M '*' -O "${direct_url}/extra/" extra.omnios; then
-				return 1
-			fi
-			if ! /usr/bin/pkg refresh omnios extra.omnios; then
+			if ! timeout 90 /usr/bin/pkg refresh openindiana.org; then
 				return 1
 			fi
 			;;
@@ -652,23 +1022,22 @@ configure_omnios_publishers() {
 	return 0
 }
 
-configure_omnios_publishers_with_fallback() {
-	local release="$1"
+configure_openindiana_publishers_with_fallback() {
 	local allow_proxy="${2:-1}"
 
 	if [ "$allow_proxy" -eq 1 ] && [ -n "${PKG_PROXY_PORT:-}" ]; then
-		if configure_omnios_publishers "$release" proxy; then
+		if configure_openindiana_publishers proxy; then
 			return 0
 		fi
 		echo "==> local package proxy unreachable, trying direct repositories" >&2
 	fi
 
-	if configure_omnios_publishers "$release" direct "${PKG_REPO_URL}"; then
+	if configure_openindiana_publishers direct "${PKG_REPO_URL}"; then
 		return 0
 	fi
 
 	if [ -n "$PKG_REPO_FALLBACK_URL" ] && [ "$PKG_REPO_FALLBACK_URL" != "$PKG_REPO_URL" ]; then
-		if configure_omnios_publishers "$release" direct "$PKG_REPO_FALLBACK_URL"; then
+		if configure_openindiana_publishers direct "$PKG_REPO_FALLBACK_URL"; then
 			return 0
 		fi
 	fi
@@ -767,44 +1136,67 @@ TLS_CFG
 }
 
 run_main_tests() {
-	local release
-
-	release="$(uname -v | sed -n 's/^omnios-\(r[0-9][0-9]*\).*/\1/p')"
-	[ -n "$release" ] || release="r151058"
-
 	prepare_tls_policy
 
 	echo "==> installing test dependencies"
 	run echo "==> proxy port in guest: ${PKG_PROXY_PORT:-<unset>}"
-	if ! configure_omnios_publishers_with_fallback "$release" 1; then
-		fail "unable to configure OmniOS package repositories"
+	if [ "$OFFLINE_TEST_MODE" -eq 1 ]; then
+		if [ -z "${PKG_REPO_DIR:-}" ] || [ ! -d "$PKG_REPO_DIR" ]; then
+			fail "offline test mode requires a local package repository; set PACKAGE_DIR accordingly"
+		fi
+		run echo "==> offline mode: configuring local package repository only"
+		run /usr/bin/pkg set-publisher --no-refresh -M '*' -g "file://${PKG_REPO_DIR}" local
+	else
+		if ! configure_openindiana_publishers_with_fallback 1; then
+			fail "unable to configure OpenIndiana package repositories"
+		fi
 	fi
 
 	if ! command -v python3 >/dev/null 2>&1; then
-		install_pkg_candidates runtime/python-313 runtime/python-311 runtime/python-310 runtime/python-39 runtime/python-27 ||
-			fail "python package unavailable in OmniOS repositories"
+		if [ "$OFFLINE_TEST_MODE" -eq 1 ]; then
+			fail "python3 missing and offline-test-mode disables remote package refresh installs"
+		else
+			install_pkg_candidates runtime/python-313 runtime/python-311 runtime/python-310 runtime/python-39 runtime/python-27 ||
+				fail "python package unavailable in OpenIndiana repositories"
+		fi
 	fi
 	if ! command -v make >/dev/null 2>&1; then
-		install_pkg_candidates developer/build/make ||
-			fail "make package unavailable in OmniOS repositories"
+		if [ "$OFFLINE_TEST_MODE" -eq 1 ]; then
+			fail "make missing and offline-test-mode disables remote package refresh installs"
+		else
+			install_pkg_candidates developer/build/make ||
+				fail "make package unavailable in OpenIndiana repositories"
+		fi
 	fi
 	if ! command -v gmake >/dev/null 2>&1; then
-		install_pkg_candidates developer/build/gnu-make ||
-			fail "gnu-make package unavailable in OmniOS repositories"
+		if [ "$OFFLINE_TEST_MODE" -eq 1 ]; then
+			if ! command -v make >/dev/null 2>&1; then
+				fail "gnu-make missing in guest image and offline mode does not allow package refresh installs"
+			else
+				echo "==> gnu-make missing; using make for fbctests"
+			fi
+		else
+			install_pkg_candidates developer/build/gnu-make ||
+				fail "gnu-make package unavailable in OpenIndiana repositories"
+		fi
 	fi
 
 	if ! find_cmd_or_path gcc cc clang /usr/gnu/bin/gcc /usr/gnu/bin/cc /usr/bin/cc /usr/local/bin/cc /usr/bin/clang /usr/local/bin/clang >/dev/null 2>&1; then
 		PKG_INSTALL_HAD_TIMEOUT=0
-		if ! install_pkg_candidates developer/gcc15 developer/gcc14 developer/gcc13 developer/gcc10; then
+		if [ "$OFFLINE_TEST_MODE" -eq 1 ]; then
+			echo "==> offline mode: skipping compiler package install attempts"
+		elif install_pkg_candidates developer/gcc15 developer/gcc14 developer/gcc13 developer/gcc10; then
+			echo "==> installed compiler from configured package repositories"
+		else
 			if [ "$PKG_INSTALL_HAD_TIMEOUT" -ne 0 ] && [ -n "${PKG_PROXY_PORT:-}" ]; then
 				echo "==> compiler install timed out via local proxy, retrying with only direct repositories"
 			else
 				echo "==> compiler install unavailable from initial publisher, trying direct repositories"
 			fi
 
-			if ! configure_omnios_publishers_with_fallback "$release" 0; then
-				if ! configure_omnios_publishers_with_fallback "$release" 1; then
-					fail "unable to configure OmniOS package repositories for compiler install"
+			if ! configure_openindiana_publishers_with_fallback 0; then
+				if ! configure_openindiana_publishers_with_fallback 1; then
+					fail "unable to configure OpenIndiana package repositories for compiler install"
 				fi
 			fi
 
@@ -903,6 +1295,7 @@ FBVERSION=$fbversion \
 PKG_OSREL=$pkg_osrel \
 PKG_REV=$pkg_rev \
 PKG_PROXY_PORT=$proxy_port \
+OFFLINE_TEST_MODE=$OFFLINE_TEST_MODE \
 PKG_INSTALL_TIMEOUT=$PKG_INSTALL_TIMEOUT \
 PKG_INSTALL_ATTEMPTS=$PKG_INSTALL_ATTEMPTS \
 PKG_INSTALL_RETRY_DELAY=$PKG_INSTALL_RETRY_DELAY \

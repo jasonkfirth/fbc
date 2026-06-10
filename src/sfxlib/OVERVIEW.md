@@ -117,6 +117,7 @@ Main routines:
 - `fb_sfxInit()` performs subsystem startup work
 - `fb_sfxExit()` performs subsystem shutdown work
 - `fb_sfxUpdate()` asks the mixer for frames and hands them to the driver
+- `fb_sfxRawWrite()` copies caller-provided float samples into the driver output queue
 - `fb_sfxDriverInit()` picks and starts a platform driver
 - `fb_sfxDriverShutdown()` stops the active driver
 
@@ -335,12 +336,6 @@ Main routines:
 - `fb_sfxNote()`
 - note-to-frequency helper logic lives here too
 
-### `sfx_rest.c`
-Implements rests for sequence-style playback.
-
-Main routines:
-- `fb_sfxRest()`
-
 ### `sfx_tempo.c`
 Implements tempo handling.
 
@@ -368,10 +363,10 @@ Main routines:
 - plain `PLAY` is meant to follow QB-style behavior first
 - channel `PLAY` is the non-blocking extension used for layered playback
 
-## Music, Audio, Stream, MIDI, And SFX Command Families
+## Music, MIDI, And SFX Command Families
 
 ### `sfx_music_load.c`
-Loads and unloads music assets into runtime slots.
+Loads and unloads the current music asset.
 
 Main routines:
 - `fb_sfxMusicLoad()`
@@ -390,21 +385,18 @@ Pauses music.
 
 Main routines:
 - `fb_sfxMusicPause()`
-- `fb_sfxMusicPauseId()`
 
 ### `sfx_music_resume.c`
 Resumes music.
 
 Main routines:
 - `fb_sfxMusicResume()`
-- `fb_sfxMusicResumeId()`
 
 ### `sfx_music_stop.c`
 Stops music.
 
 Main routines:
 - `fb_sfxMusicStop()`
-- `fb_sfxMusicStopId()`
 
 ### `sfx_music_status.c`
 Reports music state.
@@ -461,73 +453,6 @@ Main routines:
 - `fb_sfxSfxStatus()`
 - `fb_sfxSfxStatusChannel()`
 - `fb_sfxSfxAnyActive()`
-
-### `sfx_audio_play.c`
-Starts general audio playback from a filename.
-
-Main routines:
-- `fb_sfxAudioPlay()`
-- `fb_sfxAudioLoop()`
-
-### `sfx_audio_pause.c`
-Pauses the general audio player.
-
-Main routines:
-- `fb_sfxAudioPause()`
-
-### `sfx_audio_resume.c`
-Resumes the general audio player.
-
-Main routines:
-- `fb_sfxAudioResume()`
-
-### `sfx_audio_stop.c`
-Stops the general audio player.
-
-Main routines:
-- `fb_sfxAudioStop()`
-
-### `sfx_audio_status.c`
-Reports general audio player state.
-
-Main routines:
-- `fb_sfxAudioStatus()`
-
-### `sfx_stream_open.c`
-Opens a stream source.
-
-Main routines:
-- `fb_sfxStreamOpen()`
-
-### `sfx_stream_play.c`
-Starts stream playback.
-
-Main routines:
-- `fb_sfxStreamPlay()`
-
-### `sfx_stream_pause.c`
-Pauses a stream.
-
-Main routines:
-- `fb_sfxStreamPause()`
-
-### `sfx_stream_resume.c`
-Resumes a stream.
-
-Main routines:
-- `fb_sfxStreamResume()`
-
-### `sfx_stream_seek.c`
-Moves a stream to a new position.
-
-Main routines:
-- `fb_sfxStreamSeek()`
-
-### `sfx_stream_position.c`
-Reports the current stream position.
-
-Main routines:
-- `fb_sfxStreamPosition()`
 
 ### `sfx_midi_open.c`
 Opens a MIDI output device.

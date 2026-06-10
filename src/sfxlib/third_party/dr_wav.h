@@ -5089,7 +5089,7 @@ DRWAV_PRIVATE drwav_result drwav_result_from_errno(int e)
     #ifdef ECANCELED
         case ECANCELED: return DRWAV_CANCELLED;
     #endif
-    #ifdef ENOKEY
+    #if defined(ENOKEY) && (!defined(ENOANO) || (ENOKEY != ENOANO))
         case ENOKEY: return DRWAV_ERROR;
     #endif
     #ifdef EKEYEXPIRED

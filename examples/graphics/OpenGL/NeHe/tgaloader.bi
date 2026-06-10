@@ -12,7 +12,7 @@ type structTexture
 	bpp as uinteger						'' Image Color Depth In Bits Per Pixel
 	texwidth as uinteger				'' Image Width
 	height as uinteger					'' Image Height
-	texID as uinteger					'' Texture ID Used To Select A Texture
+	texID as GLuint					'' Texture ID Used To Select A Texture
 	textype	as uinteger					'' Image Type (GL_RGB, GL_RGBA)
 end type
 

@@ -423,6 +423,18 @@ run_fbctests() {
 		[ -f "\$failed_log" ] || fail "missing log-tests summary: \$failed_log"
 		if ! grep -qi 'None Found' "\$failed_log"; then
 			cat "\$failed_log"
+			awk -F: '/\\.log:/ { print \$1 }' "\$failed_log" | sort -u | while read -r detail_log; do
+				detail_log="\${detail_log#./}"
+				detail_log="\${detail_log%\\$'\\r'}"
+				if [ -f "\$detail_log" ]; then
+					echo
+					echo "==> failed detail: \$detail_log"
+					upload "\$detail_log" "\$detail_log"
+					cat "\$detail_log"
+				else
+					echo "WARNING: missing test log \$detail_log" >&2
+				fi
+			done
 			fail "log-tests reported failures in \$failed_log"
 		fi
 	done

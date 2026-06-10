@@ -8,14 +8,13 @@
 
         Provide small command-facing helpers for the MUSIC family.
 
-        The backend already exposes asset-oriented routines such as
-        MUSIC LOAD followed by MUSIC PLAY id.  The compiler surface
-        also wants direct file-oriented forms such as MUSIC PLAY
-        "song.wav".  These helpers bridge that small semantic gap.
+        MUSIC LOAD keeps one current music file. The compiler surface
+        also allows direct file-oriented forms such as MUSIC PLAY
+        "song.wav". These helpers bridge that small semantic gap.
 
     Responsibilities:
 
-        • map file-oriented MUSIC commands onto asset-oriented helpers
+        • map file-oriented MUSIC commands onto current-music helpers
         • preserve simple integer return values for command/function use
 
     This file intentionally does NOT contain:
@@ -33,40 +32,36 @@
 /* MUSIC command helpers                                                     */
 /* ------------------------------------------------------------------------- */
 
-int fb_sfxMusicPlayCmd(int id)
+int fb_sfxMusicPlayCmd(void)
 {
-    fb_sfxMusicPlay(id);
-    return id;
+    return fb_sfxMusicPlay();
 }
 
-int fb_sfxMusicLoopCmd(int id)
+int fb_sfxMusicLoopCmd(void)
 {
-    fb_sfxMusicLoop(id);
-    return id;
+    return fb_sfxMusicLoop();
 }
 
 int fb_sfxMusicPlayFile(const char *filename)
 {
-    int id;
+    int result;
 
-    id = fb_sfxMusicLoad(filename);
-    if (id < 0)
-        return id;
+    result = fb_sfxMusicLoad(filename);
+    if (result != 0)
+        return result;
 
-    fb_sfxMusicPlay(id);
-    return id;
+    return fb_sfxMusicPlay();
 }
 
 int fb_sfxMusicLoopFile(const char *filename)
 {
-    int id;
+    int result;
 
-    id = fb_sfxMusicLoad(filename);
-    if (id < 0)
-        return id;
+    result = fb_sfxMusicLoad(filename);
+    if (result != 0)
+        return result;
 
-    fb_sfxMusicLoop(id);
-    return id;
+    return fb_sfxMusicLoop();
 }
 
 /* end of sfx_music_cmd.c */
