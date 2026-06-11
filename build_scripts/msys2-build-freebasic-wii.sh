@@ -41,7 +41,8 @@ STAGEDIR="${STAGEDIR:-${BUILDROOT}/stage}"
 DISTDIR="${DISTDIR:-${BUILDROOT}/dist}"
 INSTALL_SUBDIR="${INSTALL_SUBDIR:-FreeBASIC-${FBVERSION}-fbc-wii}"
 PACKAGE_ROOT="${PACKAGE_ROOT:-${DISTDIR}/${INSTALL_SUBDIR}}"
-INSTALLER_PATH="${INSTALLER_PATH:-${DISTDIR}/FreeBASIC-${FBVERSION}-wii-windows.exe}"
+OUT="${OUT:-${ROOT_DIR}/out/mingw32-wii}"
+INSTALLER_PATH="${INSTALLER_PATH:-${OUT}/FreeBASIC-${FBVERSION}-fbc-wii-setup.exe}"
 JOBS="${JOBS:-}"
 HOST_FBC_TARGET="${HOST_FBC_TARGET:-win64}"
 WII_TARGET_TRIPLET="${WII_TARGET_TRIPLET:-powerpc-eabi}"
@@ -97,6 +98,7 @@ Options:
   --buildroot DIR          Temporary build root [${BUILDROOT}]
   --package-root DIR       Package directory to create [${PACKAGE_ROOT}]
   --installer PATH         NSIS installer output [${INSTALLER_PATH}]
+  --out DIR                Output directory for the default installer [${OUT}]
   --devkitpro DIR          devkitPro root [/opt/devkitpro or DEVKITPRO]
   --devkitppc DIR          devkitPPC root [DEVKITPRO/devkitPPC]
   --jobs N                 Parallel make jobs
@@ -260,7 +262,6 @@ sanitize_build_tree()
     rm -rf \
         "${tree}/bin" \
         "${tree}/lib/freebasic" \
-        "${tree}/inc" \
         "${tree}/obj" \
         "${tree}/.fbtmp" \
         "${tree}/tmp"
@@ -273,13 +274,8 @@ sync_source_tree()
     remove_if_requested "${WORKTREE}"
     mkdir -p "${WORKTREE}"
 
-    run rsync -a --delete \
-        --exclude '.git' \
-        --exclude '.vs' \
-        --exclude '.vscode' \
-        --exclude 'build' \
-        --exclude 'out' \
-        --exclude 'tmp' \
+    run rsync -a --delete --delete-excluded --prune-empty-dirs \
+        --exclude-from "${ROOT_DIR}/mk/source-copy-excludes.rsync" \
         "${ROOT_DIR}/" "${WORKTREE}/"
 
     sanitize_build_tree "${WORKTREE}"
@@ -301,6 +297,11 @@ while [ "$#" -gt 0 ]; do
             ;;
         --installer)
             INSTALLER_PATH="$(normalize_path "$2")"
+            shift 2
+            ;;
+        --out)
+            OUT="$(normalize_path "$2")"
+            INSTALLER_PATH="${OUT}/FreeBASIC-${FBVERSION}-fbc-wii-setup.exe"
             shift 2
             ;;
         --devkitpro)
@@ -485,7 +486,8 @@ build_wii_freebasic()
             BUILD_FBC_TARGET="${HOST_FBC_TARGET}" \
             compiler-wii
 
-        run make -f GNUmakefile -j"${JOBS}" \
+        run env PATH="${DEVKITPPC}/bin:${DEVKITPRO}/tools/bin:${PATH}" \
+            make -f GNUmakefile -j"${JOBS}" \
             TARGET_OS=wii \
             TARGET_TRIPLET="${WII_TARGET_TRIPLET}" \
             TARGET="${WII_TARGET_TRIPLET}" \
@@ -493,6 +495,8 @@ build_wii_freebasic()
             BUILD_PREFIX=powerpc-eabi- \
             DEVKITPRO="${DEVKITPRO}" \
             DEVKITPPC="${DEVKITPPC}" \
+            WII_LIBOGC_INC="${DEVKITPRO}/libogc/include" \
+            WII_LIBOGC_LIB="${DEVKITPRO}/libogc/lib/wii" \
             ELF2DOL="${ELF2DOL}" \
             CC="${POWERPC_GCC}" \
             CXX="${POWERPC_GXX}" \
@@ -504,10 +508,6 @@ build_wii_freebasic()
             BUILD_FBC="${build_fbc}" \
             BUILD_FBC_TARGET="${WII_TARGET_KEY}" \
             BUILD_FBC_BUILDPREFIX= \
-            CPPFLAGS= \
-            CFLAGS= \
-            CXXFLAGS= \
-            LDFLAGS= \
             rtlib fbrt gfxlib2 sfxlib
 
         remove_if_requested "${STAGEDIR}"
@@ -779,10 +779,11 @@ EOF
 write_nsis_script()
 {
     local script="$1"
-    local package_win
+    local payload_zip="$2"
+    local payload_win
     local installer_win
 
-    package_win="$(windows_path "${PACKAGE_ROOT}")"
+    payload_win="$(windows_path "${payload_zip}")"
     installer_win="$(windows_path "${INSTALLER_PATH}")"
 
     cat > "${script}" <<EOF
@@ -799,12 +800,29 @@ Page directory
 Page instfiles
 
 Section "FreeBASIC Wii" SEC01
+    InitPluginsDir
+    SetOutPath "\$PLUGINSDIR"
+    SetCompress off
+    File /oname=freebasic-wii-payload.zip "${payload_win}"
+    SetCompress auto
+    IfFileExists "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" 0 no_powershell
     SetOutPath "\$INSTDIR"
-    File /r "${package_win}\\*.*"
+    ;
+    ; Keep the package tree as a normal zip payload so makensis does not need
+    ; to mmap every bundled FreeBASIC and devkitPro file individually.
+    nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "\$\$ErrorActionPreference = ''Stop''; Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-wii-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force"'
+    Pop \$0
+    StrCmp \$0 "0" payload_done
+        Abort "Failed to extract the FreeBASIC Wii payload. PowerShell exit code: \$0"
+    payload_done:
     CreateDirectory "\$SMPROGRAMS\\FreeBASIC Wii"
     CreateShortCut "\$SMPROGRAMS\\FreeBASIC Wii\\FreeBASIC Wii Shell.lnk" "\$INSTDIR\\freebasic-wii-shell.cmd"
     CreateShortCut "\$SMPROGRAMS\\FreeBASIC Wii\\Uninstall.lnk" "\$INSTDIR\\uninstall.exe"
     WriteUninstaller "\$INSTDIR\\uninstall.exe"
+    Goto install_done
+    no_powershell:
+        Abort "Windows PowerShell is required to extract this installer."
+    install_done:
 SectionEnd
 
 Section "Uninstall"
@@ -820,11 +838,13 @@ build_installer()
 {
     local makensis
     local nsis_script="${BUILDROOT}/freebasic-wii.nsi"
+    local installer_payload_zip="${BUILDROOT}/freebasic-wii-installer-payload.zip"
 
     if [ "${DO_INSTALLER}" -eq 0 ]; then
         return 0
     fi
 
+    have zip || fail "zip was not found; install zip or pass --skip-installer"
     makensis="$(command -v makensis 2>/dev/null || true)"
     if [ -z "${makensis}" ]; then
         makensis="$(command -v makensis.exe 2>/dev/null || true)"
@@ -837,8 +857,20 @@ build_installer()
     msg "Building NSIS installer"
 
     mkdir -p "$(dirname "${INSTALLER_PATH}")"
-    write_nsis_script "${nsis_script}"
-    run "${makensis}" "${nsis_script}"
+    msg "Creating Wii NSIS payload zip"
+    rm -f "${installer_payload_zip}"
+    (
+        cd "${PACKAGE_ROOT}"
+        run zip -qr "${installer_payload_zip}" .
+    )
+
+    write_nsis_script "${nsis_script}" "${installer_payload_zip}"
+    rm -f "${INSTALLER_PATH}"
+    if ! run "${makensis}" "${nsis_script}"; then
+        rm -f "${installer_payload_zip}"
+        fail "makensis failed while creating FreeBASIC Wii installer"
+    fi
+    rm -f "${installer_payload_zip}"
 }
 
 # ---------------------------------------------------------------------------

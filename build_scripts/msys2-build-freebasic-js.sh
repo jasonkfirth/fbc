@@ -118,6 +118,68 @@ have() {
 	command -v "$1" >/dev/null 2>&1
 }
 
+download_file() {
+	local url="$1"
+	local dst="$2"
+	local tmp="$dst.part"
+	local tmp_win="$tmp"
+	local ps_code
+
+	rm -f "$tmp"
+	if have cygpath; then
+		tmp_win="$(cygpath -aw "$tmp")"
+	fi
+
+	if [ -x /c/Windows/System32/curl.exe ]; then
+		if run /c/Windows/System32/curl.exe -L --fail --show-error --connect-timeout 30 --max-time 900 -o "$tmp_win" "$url"; then
+			[ -s "$tmp" ] || fail "download produced an empty file: $url"
+			mv -f "$tmp" "$dst"
+			return 0
+		fi
+		rm -f "$tmp"
+	fi
+
+	if have curl; then
+		if run curl -L --fail --show-error --connect-timeout 30 --max-time 900 -o "$tmp" "$url"; then
+			[ -s "$tmp" ] || fail "download produced an empty file: $url"
+			mv -f "$tmp" "$dst"
+			return 0
+		fi
+		rm -f "$tmp"
+	fi
+
+	if have powershell.exe && have cygpath; then
+		ps_code="\$ProgressPreference = 'SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -TimeoutSec 900 -Uri '$url' -OutFile '$tmp_win'"
+		if run powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ps_code"; then
+			[ -s "$tmp" ] || fail "download produced an empty file: $url"
+			mv -f "$tmp" "$dst"
+			return 0
+		fi
+		rm -f "$tmp"
+	fi
+
+	fail "could not download: $url"
+}
+
+cache_download() {
+	local url="$1"
+	local archive="$2"
+	local sha256="$3"
+
+	if [ -f "$archive" ]; then
+		if printf '%s  %s\n' "$sha256" "$archive" | sha256sum -c - >/dev/null 2>&1; then
+			echo "$archive: OK"
+			return 0
+		fi
+
+		echo "cached download failed checksum, redownloading: $archive" >&2
+		rm -f "$archive"
+	fi
+
+	download_file "$url" "$archive"
+	printf '%s  %s\n' "$sha256" "$archive" | sha256sum -c -
+}
+
 copy_tree() {
 	local src="$1"
 	local dst="$2"
@@ -515,6 +577,69 @@ copy_ucrt64_toolchain() {
 	fi
 }
 
+repair_emscripten_windows_launchers() {
+	local emroot="$DISTROOT/toolchain/ucrt64/lib/emscripten"
+	local dir
+	local py
+	local base
+	local exe
+	local bat
+	local python_rel
+
+	[ -d "$emroot" ] || fail "Emscripten directory was not bundled"
+
+	msg "Repairing bundled Emscripten Windows launchers"
+
+	for dir in "$emroot" "$emroot/tools"; do
+		[ -d "$dir" ] || continue
+
+		case "$dir" in
+			"$emroot")
+				python_rel="..\\..\\bin\\python.exe"
+				;;
+			"$emroot/tools")
+				python_rel="..\\..\\..\\bin\\python.exe"
+				;;
+			*)
+				fail "unexpected Emscripten launcher directory: $dir"
+				;;
+		esac
+
+		for py in "$dir"/*.py; do
+			[ -f "$py" ] || continue
+
+			base="${py##*/}"
+			base="${base%.py}"
+			exe="$dir/${base}.exe"
+			bat="$dir/${base}.bat"
+
+			# The MSYS2 Emscripten package includes small .exe launchers next
+			# to the Python frontend scripts.  Those launchers work when MSYS2
+			# owns the whole environment, but the standalone FreeBASIC package
+			# runs them from an arbitrary install tree.  In that layout they can
+			# either hang or fail before reaching python.exe.
+			#
+			# Emscripten's Windows path resolver falls back from .exe to .bat.
+			# Replacing the package-local .exe frontend launchers with batch
+			# files keeps internal calls such as shared.EMCC Windows-callable
+			# without changing Emscripten's Python code.
+			rm -f "$exe"
+
+			cat > "$bat" <<EOF
+@echo off
+setlocal
+set "EMCC="
+set "EMLD="
+set "EMAS="
+set "EMAR="
+set "EMRANLIB="
+"%~dp0${python_rel}" "%~dp0${base}.py" %*
+exit /b %ERRORLEVEL%
+EOF
+		done
+	done
+}
+
 write_emscripten_config() {
 	local config="$DISTROOT/toolchain/ucrt64/lib/emscripten/.emscripten"
 
@@ -556,18 +681,13 @@ overlay_official_node() {
 	local nodedst="$DISTROOT/toolchain/official-node/node.exe"
 
 	[ "$NODE_OVERLAY" -ne 0 ] || return 0
-	have curl || fail "curl is required to download the official Node.js executable"
 	have sha256sum || fail "sha256sum is required to verify the official Node.js archive"
 	have unzip || fail "unzip is required to extract the official Node.js archive"
 
 	msg "Overlaying official Node.js Windows executable"
 
 	mkdir -p "$cache"
-	if [ ! -f "$archive" ]; then
-		run curl -L --fail -o "$archive" "$NODE_URL"
-	fi
-
-	printf '%s  %s\n' "$NODE_SHA256" "$archive" | sha256sum -c -
+	cache_download "$NODE_URL" "$archive" "$NODE_SHA256"
 
 	rm -rf "$extract"
 	mkdir -p "$extract"
@@ -587,17 +707,12 @@ overlay_official_binaryen() {
 
 	[ "$BINARYEN_OVERLAY" -ne 0 ] || return 0
 	[ -d "$bindst" ] || fail "UCRT64 bin directory was not bundled"
-	have curl || fail "curl is required to download the official Binaryen tools"
 	have sha256sum || fail "sha256sum is required to verify the official Binaryen archive"
 
 	msg "Overlaying official Binaryen Windows tools"
 
 	mkdir -p "$cache"
-	if [ ! -f "$archive" ]; then
-		run curl -L --fail -o "$archive" "$BINARYEN_URL"
-	fi
-
-	printf '%s  %s\n' "$BINARYEN_SHA256" "$archive" | sha256sum -c -
+	cache_download "$BINARYEN_URL" "$archive" "$BINARYEN_SHA256"
 
 	rm -rf "$extract"
 	mkdir -p "$extract"
@@ -627,13 +742,33 @@ overlay_official_binaryen() {
 write_launchers() {
 	msg "Writing fbc-js launcher scripts"
 
+	mkdir -p "$DISTROOT/toolchain/cmd-shims"
+	for tool in emcc em++ emar emranlib; do
+		cat > "$DISTROOT/toolchain/cmd-shims/${tool}.cmd" <<EOF
+@echo off
+setlocal
+set "FBJS_ROOT=%~dp0..\\.."
+set "EMCC="
+set "EMLD="
+set "EMAS="
+set "EMAR="
+set "EMRANLIB="
+"%FBJS_ROOT%\\toolchain\\ucrt64\\bin\\python.exe" "%FBJS_ROOT%\\toolchain\\ucrt64\\lib\\emscripten\\${tool}.py" %*
+exit /b %ERRORLEVEL%
+EOF
+	done
+
 cat > "$DISTROOT/fbc-js.cmd" <<'EOF'
 @echo off
 setlocal
 set "FBJS_ROOT=%~dp0"
-set "PATH=%FBJS_ROOT%toolchain\ucrt64\bin;%FBJS_ROOT%;%PATH%"
-set "PATH=%FBJS_ROOT%toolchain\ucrt64\lib\emscripten;%PATH%"
+set "PATH=%FBJS_ROOT%toolchain\cmd-shims;%FBJS_ROOT%toolchain\ucrt64\bin;%FBJS_ROOT%toolchain\ucrt64\lib\emscripten;%FBJS_ROOT%;%PATH%"
 if not defined EM_CONFIG set "EM_CONFIG=%FBJS_ROOT%toolchain\ucrt64\lib\emscripten\.emscripten"
+if not defined EMSDK_PYTHON set "EMSDK_PYTHON=%FBJS_ROOT%toolchain\ucrt64\bin\python.exe"
+if not defined EMCC set "EMCC=%FBJS_ROOT%toolchain\cmd-shims\emcc.cmd"
+if not defined EMLD set "EMLD=%FBJS_ROOT%toolchain\cmd-shims\emcc.cmd"
+if not defined EMAS set "EMAS=%FBJS_ROOT%toolchain\cmd-shims\emcc.cmd"
+if not defined EMAR set "EMAR=%FBJS_ROOT%toolchain\cmd-shims\emar.cmd"
 if not defined FBJS_CACHE_ROOT (
 	if defined LOCALAPPDATA (
 		set "FBJS_CACHE_ROOT=%LOCALAPPDATA%\FreeBASIC\fbc-js"
@@ -644,6 +779,7 @@ if not defined FBJS_CACHE_ROOT (
 if not defined EMCC_TEMP_DIR set "EMCC_TEMP_DIR=%FBJS_CACHE_ROOT%\emcc-temp"
 if not defined EM_CACHE set "EM_CACHE=%FBJS_CACHE_ROOT%\em-cache"
 if not defined BINARYEN_CORES set "BINARYEN_CORES=1"
+if not defined EMCC_BATCH_BUILD set "EMCC_BATCH_BUILD=0"
 if not exist "%EMCC_TEMP_DIR%" mkdir "%EMCC_TEMP_DIR%" >nul 2>nul
 if not exist "%EM_CACHE%" mkdir "%EM_CACHE%" >nul 2>nul
 "%FBJS_ROOT%bin\fbc-js.exe" %*
@@ -659,12 +795,8 @@ exit /b %ERRORLEVEL%
 EOF
 
 	cat > "$DISTROOT/fbc-js-app.ps1" <<'EOF'
-param(
-	[Parameter(ValueFromRemainingArguments = $true)]
-	[string[]] $AppArgs
-)
-
 $ErrorActionPreference = "Stop"
+$AppArgs = [string[]] $args
 
 function Show-Usage {
 	Write-Host "Usage: fbc-js-app.cmd [options] program.bas [fbc-js options]"
@@ -675,8 +807,12 @@ function Show-Usage {
 }
 
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$env:PATH = "$Root\toolchain\ucrt64\bin;$Root;$($env:PATH)"
-$env:PATH = "$Root\toolchain\ucrt64\lib\emscripten;$($env:PATH)"
+$env:PATH = "$Root\toolchain\cmd-shims;$Root\toolchain\ucrt64\bin;$Root\toolchain\ucrt64\lib\emscripten;$Root;$($env:PATH)"
+$env:EMSDK_PYTHON = "$Root\toolchain\ucrt64\bin\python.exe"
+$env:EMCC = "$Root\toolchain\cmd-shims\emcc.cmd"
+$env:EMLD = "$Root\toolchain\cmd-shims\emcc.cmd"
+$env:EMAS = "$Root\toolchain\cmd-shims\emcc.cmd"
+$env:EMAR = "$Root\toolchain\cmd-shims\emar.cmd"
 
 if (-not $env:EM_CONFIG) {
 	$env:EM_CONFIG = "$Root\toolchain\ucrt64\lib\emscripten\.emscripten"
@@ -700,6 +836,10 @@ if (-not $env:EM_CACHE) {
 
 if (-not $env:BINARYEN_CORES) {
 	$env:BINARYEN_CORES = "1"
+}
+
+if (-not $env:EMCC_BATCH_BUILD) {
+	$env:EMCC_BATCH_BUILD = "0"
 }
 
 New-Item -ItemType Directory -Force -Path $env:EMCC_TEMP_DIR, $env:EM_CACHE | Out-Null
@@ -777,9 +917,13 @@ EOF
 	cat > "$DISTROOT/freebasic-js-env.cmd" <<'EOF'
 @echo off
 set "FBJS_ROOT=%~dp0"
-set "PATH=%FBJS_ROOT%toolchain\ucrt64\bin;%FBJS_ROOT%;%PATH%"
-set "PATH=%FBJS_ROOT%toolchain\ucrt64\lib\emscripten;%PATH%"
+set "PATH=%FBJS_ROOT%toolchain\cmd-shims;%FBJS_ROOT%toolchain\ucrt64\bin;%FBJS_ROOT%toolchain\ucrt64\lib\emscripten;%FBJS_ROOT%;%PATH%"
 if not defined EM_CONFIG set "EM_CONFIG=%FBJS_ROOT%toolchain\ucrt64\lib\emscripten\.emscripten"
+if not defined EMSDK_PYTHON set "EMSDK_PYTHON=%FBJS_ROOT%toolchain\ucrt64\bin\python.exe"
+if not defined EMCC set "EMCC=%FBJS_ROOT%toolchain\cmd-shims\emcc.cmd"
+if not defined EMLD set "EMLD=%FBJS_ROOT%toolchain\cmd-shims\emcc.cmd"
+if not defined EMAS set "EMAS=%FBJS_ROOT%toolchain\cmd-shims\emcc.cmd"
+if not defined EMAR set "EMAR=%FBJS_ROOT%toolchain\cmd-shims\emar.cmd"
 if not defined FBJS_CACHE_ROOT (
 	if defined LOCALAPPDATA (
 		set "FBJS_CACHE_ROOT=%LOCALAPPDATA%\FreeBASIC\fbc-js"
@@ -790,6 +934,7 @@ if not defined FBJS_CACHE_ROOT (
 if not defined EMCC_TEMP_DIR set "EMCC_TEMP_DIR=%FBJS_CACHE_ROOT%\emcc-temp"
 if not defined EM_CACHE set "EM_CACHE=%FBJS_CACHE_ROOT%\em-cache"
 if not defined BINARYEN_CORES set "BINARYEN_CORES=1"
+if not defined EMCC_BATCH_BUILD set "EMCC_BATCH_BUILD=0"
 if not exist "%EMCC_TEMP_DIR%" mkdir "%EMCC_TEMP_DIR%" >nul 2>nul
 if not exist "%EM_CACHE%" mkdir "%EM_CACHE%" >nul 2>nul
 echo FreeBASIC JS environment ready.
@@ -810,8 +955,9 @@ PATH="${_fbjs_root}/toolchain/ucrt64/lib/emscripten:${PATH}"
 : "${EMCC_TEMP_DIR:=${FBJS_CACHE_ROOT}/emcc-temp}"
 : "${EM_CACHE:=${FBJS_CACHE_ROOT}/em-cache}"
 : "${BINARYEN_CORES:=1}"
+: "${EMCC_BATCH_BUILD:=0}"
 mkdir -p "$EMCC_TEMP_DIR" "$EM_CACHE" 2>/dev/null || true
-export PATH EM_CONFIG FBJS_CACHE_ROOT EMCC_TEMP_DIR EM_CACHE BINARYEN_CORES
+export PATH EM_CONFIG FBJS_CACHE_ROOT EMCC_TEMP_DIR EM_CACHE BINARYEN_CORES EMCC_BATCH_BUILD
 unset _fbjs_script _fbjs_root
 EOF
 
@@ -829,6 +975,7 @@ This package is intended to run without a separate MSYS2 installation.
 The installer adds these directories to the Windows system PATH:
 
     ${INSTALL_DIR_WIN}
+    ${INSTALL_DIR_WIN}\\toolchain\\cmd-shims
     ${INSTALL_DIR_WIN}\\toolchain\\ucrt64\\bin
     ${INSTALL_DIR_WIN}\\toolchain\\ucrt64\\lib\\emscripten
 
@@ -846,6 +993,11 @@ The Binaryen command-line tools and Node.js executable are overlaid from the
 official upstream Windows releases.  This keeps the standalone package on the
 same release levels while avoiding Windows hangs and crashes seen in the
 MSYS2-built tool executables.
+
+The package replaces MSYS2's Emscripten Python frontend .exe launchers with
+local .bat launchers that call the bundled python.exe directly.  The Windows
+launchers also disable Emscripten's batched system-library compile by default
+to avoid command-line length failures while filling a new cache.
 
 fbc-js.cmd creates a per-user Emscripten cache/temp area under:
 
@@ -896,6 +1048,7 @@ assemble_distribution() {
 
 	copy_runtime_dlls "$DISTROOT/bin/fbc-js.exe" "$DISTROOT/bin"
 	copy_ucrt64_toolchain
+	repair_emscripten_windows_launchers
 	overlay_official_binaryen
 	overlay_official_node
 	write_emscripten_config
@@ -920,14 +1073,23 @@ create_zip() {
 create_installer() {
 	local installer_nsi="$BUILDROOT/${DISTNAME}.nsi"
 	local installer_exe="$OUT/${DISTNAME}-setup.exe"
-	local dist_win
+	local installer_payload_zip="$BUILDROOT/${DISTNAME}-installer-payload.zip"
 	local out_win
+	local payload_win
 
 	[ -x "$NSIS_EXE" ] || fail "makensis not found at $NSIS_EXE; install the nsis package or set NSIS_EXE"
 	have cygpath || fail "cygpath not found"
+	have zip || fail "zip not found"
 
-	dist_win="$(cygpath -aw "$DISTROOT")"
 	out_win="$(cygpath -aw "$installer_exe")"
+	msg "Creating fbc-js NSIS payload zip"
+	rm -f "$installer_payload_zip"
+	(
+		cd "$DISTROOT"
+		run zip -qr "$installer_payload_zip" .
+	)
+
+	payload_win="$(cygpath -aw "$installer_payload_zip")"
 
 	msg "Generating NSIS installer script"
 	cat > "$installer_nsi" <<EOF
@@ -952,7 +1114,6 @@ ShowUninstDetails show
 !insertmacro MUI_LANGUAGE "English"
 
 \${Using:StrFunc} StrStr
-\${Using:StrFunc} StrRep
 \${Using:StrFunc} UnStrRep
 
 Function RefreshEnvironment
@@ -980,6 +1141,8 @@ FunctionEnd
 
 Function AddInstallDirsToPath
 	Push "\$INSTDIR"
+	Call AddOnePath
+	Push "\$INSTDIR\\toolchain\\cmd-shims"
 	Call AddOnePath
 	Push "\$INSTDIR\\toolchain\\ucrt64\\bin"
 	Call AddOnePath
@@ -1062,6 +1225,8 @@ Function un.RemoveInstallDirsFromPath
 	Call un.RemoveOnePath
 	Push "\$INSTDIR\\toolchain\\ucrt64\\bin"
 	Call un.RemoveOnePath
+	Push "\$INSTDIR\\toolchain\\cmd-shims"
+	Call un.RemoveOnePath
 	Push "\$INSTDIR"
 	Call un.RemoveOnePath
 	Call un.RefreshEnvironment
@@ -1073,11 +1238,30 @@ Function un.RemoveInstallDirsFromMsys2
 FunctionEnd
 
 Section "Install"
+	InitPluginsDir
+	SetOutPath "\$PLUGINSDIR"
+	SetCompress off
+	File /oname=freebasic-js-payload.zip "$payload_win"
+	SetCompress auto
+	IfFileExists "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" 0 no_powershell
 	SetOutPath "\$INSTDIR"
-	File /r "$dist_win\\*"
+	;
+	; The JS package bundles the compiler, Emscripten, Node.js, Binaryen,
+	; Python support, and UCRT runtime files.  Passing that expanded tree to
+	; NSIS File /r can hit makensis datablock limits, so store it as a normal
+	; zip payload and extract it through Windows PowerShell during install.
+	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "\$\$ErrorActionPreference = ''Stop''; Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-js-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force"'
+	Pop \$0
+	StrCmp \$0 "0" payload_done
+		Abort "Failed to extract the FreeBASIC JS payload. PowerShell exit code: \$0"
+	payload_done:
 	WriteUninstaller "\$INSTDIR\\uninstall.exe"
 	Call AddInstallDirsToPath
 	Call AddInstallDirsToMsys2
+	Goto install_done
+	no_powershell:
+		Abort "Windows PowerShell is required to extract this installer."
+	install_done:
 SectionEnd
 
 Section "Uninstall"
@@ -1089,7 +1273,12 @@ SectionEnd
 EOF
 
 	msg "Creating NSIS installer"
-	run "$NSIS_EXE" "$installer_nsi"
+	rm -f "$installer_exe"
+	if ! run "$NSIS_EXE" "$installer_nsi"; then
+		rm -f "$installer_payload_zip"
+		fail "makensis failed while creating fbc-js installer"
+	fi
+	rm -f "$installer_payload_zip"
 }
 
 ##############################################################################
@@ -1116,7 +1305,7 @@ EOF
 
 	dist_win="$(cygpath -aw "$DISTROOT")"
 	validate_win="$(cygpath -aw "$validate_dir")"
-	package_path_win="$dist_win\\toolchain\\ucrt64\\lib\\emscripten;$dist_win\\toolchain\\ucrt64\\bin;$dist_win;%PATH%"
+	package_path_win="$dist_win\\toolchain\\cmd-shims;$dist_win\\toolchain\\ucrt64\\bin;$dist_win\\toolchain\\ucrt64\\lib\\emscripten;$dist_win;%PATH%"
 	validate_cmd="$validate_dir/validate.cmd"
 	validate_ps1="$validate_dir/run-with-timeout.ps1"
 
@@ -1128,6 +1317,7 @@ if not exist "$validate_win\\em-cache" mkdir "$validate_win\\em-cache"
 set "EMCC_TEMP_DIR=$validate_win\\emcc-temp"
 set "EM_CACHE=$validate_win\\em-cache"
 set "BINARYEN_CORES=1"
+set "EMCC_BATCH_BUILD=0"
 call "$dist_win\\fbc-js.cmd" "$validate_win\\hello.bas" -x "$validate_win\\hello.js" > "$validate_win\\compile.out" 2> "$validate_win\\compile.err"
 if errorlevel 1 exit /b %ERRORLEVEL%
 node "$validate_win\\hello.js" > "$validate_win\\output.txt" 2> "$validate_win\\output.err"
@@ -1173,7 +1363,7 @@ EOF
 	run powershell.exe -NoProfile -ExecutionPolicy Bypass \
 		-File "$(cygpath -aw "$validate_ps1")" \
 		-CommandPath "$(cygpath -aw "$validate_cmd")" \
-		-TimeoutSeconds 180
+		-TimeoutSeconds 1200
 	[ -f "$validate_dir/hello.js" ] || fail "packaged fbc-js did not produce hello.js"
 	[ -f "$validate_dir/app/index.html" ] || fail "packaged fbc-js-app did not produce app/index.html"
 	grep -q "freebasic-js package test OK" "$validate_dir/output.txt" || fail "generated JavaScript output was wrong"
@@ -1208,3 +1398,5 @@ msg "Done"
 echo "Distribution root: $DISTROOT"
 echo "Zip archive: $OUT/${DISTNAME}.zip"
 echo "Installer: $OUT/${DISTNAME}-setup.exe"
+
+# end of msys2-build-freebasic-js.sh

@@ -71,8 +71,10 @@ Environment:
   MINGW64_ROOT        MinGW64 root used for nxdk/host helpers (default: /mingw64)
   NSIS_EXE            Explicit makensis path (default: /mingw64/bin/makensis.exe)
   JOBS                Parallel make job count (default: detected CPU core count)
+  NXDK_GIT_JOBS       Parallel git submodule jobs (default: JOBS)
   NXDK_REPO           nxdk Git URL (default: https://github.com/XboxDev/nxdk.git)
   NXDK_REF            Optional nxdk branch/tag/commit to checkout
+  NXDK_SHALLOW        Use shallow nxdk/submodule clones when NXDK_REF is unset (default: 1)
 EOF
 }
 
@@ -265,8 +267,10 @@ INSTALL_SUBDIR="${INSTALL_SUBDIR:-freebasic-xbox}"
 MINGW64_ROOT="${MINGW64_ROOT:-/mingw64}"
 NSIS_EXE="${NSIS_EXE:-/mingw64/bin/makensis.exe}"
 JOBS="${JOBS:-$(max_jobs)}"
+NXDK_GIT_JOBS="${NXDK_GIT_JOBS:-$JOBS}"
 
 NXDK_REPO="${NXDK_REPO:-https://github.com/XboxDev/nxdk.git}"
+NXDK_SHALLOW="${NXDK_SHALLOW:-1}"
 NXDK_DIR="${NXDK_DIR_ARG:-${NXDK_DIR:-$BUILDROOT/nxdk}}"
 XBOX_TARGET_TRIPLET="${XBOX_TARGET_TRIPLET:-i686-pc-xbox}"
 XBOX_TARGET_KEY="${XBOX_TARGET_KEY:-xbox}"
@@ -323,20 +327,33 @@ ensure_nxdk() {
 
 	if [ -d "$NXDK_DIR/.git" ]; then
 		if [ "$SKIP_NXDK" -eq 0 ]; then
-			run git -C "$NXDK_DIR" submodule update --init --recursive
+			if [ "$NXDK_SHALLOW" = "1" ] && [ -z "${NXDK_REF:-}" ]; then
+				run env GIT_TERMINAL_PROMPT=0 \
+					git -C "$NXDK_DIR" submodule update --init --recursive --depth 1 --jobs "$NXDK_GIT_JOBS"
+			else
+				run env GIT_TERMINAL_PROMPT=0 \
+					git -C "$NXDK_DIR" submodule update --init --recursive --jobs "$NXDK_GIT_JOBS"
+			fi
 		fi
 	elif [ -f "$NXDK_DIR/bin/activate" ] && [ -f "$NXDK_DIR/bin/nxdk-cc" ]; then
 		echo "==> using installed nxdk tree: $NXDK_DIR"
 	else
 		[ "$SKIP_NXDK" -eq 0 ] || fail "nxdk checkout not found: $NXDK_DIR"
-		run git clone --recursive "$NXDK_REPO" "$NXDK_DIR"
+		if [ "$NXDK_SHALLOW" = "1" ] && [ -z "${NXDK_REF:-}" ]; then
+			run env GIT_TERMINAL_PROMPT=0 \
+				git clone --depth 1 --recursive --shallow-submodules --jobs "$NXDK_GIT_JOBS" "$NXDK_REPO" "$NXDK_DIR"
+		else
+			run env GIT_TERMINAL_PROMPT=0 \
+				git clone --recursive --jobs "$NXDK_GIT_JOBS" "$NXDK_REPO" "$NXDK_DIR"
+		fi
 	fi
 
 	if [ -n "${NXDK_REF:-}" ]; then
 		[ -d "$NXDK_DIR/.git" ] || fail "NXDK_REF requires an nxdk git checkout: $NXDK_DIR"
-		run git -C "$NXDK_DIR" fetch --tags origin
+		run env GIT_TERMINAL_PROMPT=0 git -C "$NXDK_DIR" fetch --tags origin
 		run git -C "$NXDK_DIR" checkout "$NXDK_REF"
-		run git -C "$NXDK_DIR" submodule update --init --recursive
+		run env GIT_TERMINAL_PROMPT=0 \
+			git -C "$NXDK_DIR" submodule update --init --recursive --jobs "$NXDK_GIT_JOBS"
 	fi
 
 	[ -x "$NXDK_DIR/bin/activate" ] || fail "nxdk activation script not found: $NXDK_DIR/bin/activate"
@@ -938,16 +955,25 @@ EOF
 create_installer() {
 	local installer_nsi="$BUILDROOT/${DISTNAME}.nsi"
 	local installer_exe="$OUT/${DISTNAME}-setup.exe"
-	local dist_win
+	local installer_payload_zip="$BUILDROOT/${DISTNAME}-installer-payload.zip"
 	local out_win
+	local payload_win
 
 	[ "$SKIP_INSTALLER" -eq 0 ] || return 0
 	[ "$SKIP_PACKAGE" -eq 0 ] || return 0
 	[ -x "$NSIS_EXE" ] || fail "makensis not found at $NSIS_EXE; install the nsis package or set NSIS_EXE"
 	have cygpath || fail "cygpath not found"
+	have zip || fail "zip not found"
 
-	dist_win="$(cygpath -aw "$DISTROOT")"
 	out_win="$(cygpath -aw "$installer_exe")"
+	msg "Creating fbc-xbox NSIS payload zip"
+	rm -f "$installer_payload_zip"
+	(
+		cd "$DISTROOT"
+		run zip -qr "$installer_payload_zip" .
+	)
+
+	payload_win="$(cygpath -aw "$installer_payload_zip")"
 
 	msg "Generating NSIS installer script"
 	cat > "$installer_nsi" <<EOF
@@ -972,7 +998,6 @@ ShowUninstDetails show
 !insertmacro MUI_LANGUAGE "English"
 
 \${Using:StrFunc} StrStr
-\${Using:StrFunc} StrRep
 \${Using:StrFunc} UnStrRep
 
 Function RefreshEnvironment
@@ -1041,10 +1066,28 @@ Function un.RemoveInstallDirsFromPath
 FunctionEnd
 
 Section "Install"
+	InitPluginsDir
+	SetOutPath "\$PLUGINSDIR"
+	SetCompress off
+	File /oname=freebasic-xbox-payload.zip "$payload_win"
+	SetCompress auto
+	IfFileExists "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" 0 no_powershell
 	SetOutPath "\$INSTDIR"
-	File /r "$dist_win\\*"
+	;
+	; The Xbox package carries nxdk plus the FreeBASIC compiler, runtime
+	; libraries, and helper launchers.  Keep the installer payload as a zip so
+	; makensis does not need to mmap the entire expanded package tree.
+	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "\$\$ErrorActionPreference = ''Stop''; Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-xbox-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force"'
+	Pop \$0
+	StrCmp \$0 "0" payload_done
+		Abort "Failed to extract the FreeBASIC Xbox payload. PowerShell exit code: \$0"
+	payload_done:
 	WriteUninstaller "\$INSTDIR\\uninstall.exe"
 	Call AddInstallDirsToPath
+	Goto install_done
+	no_powershell:
+		Abort "Windows PowerShell is required to extract this installer."
+	install_done:
 SectionEnd
 
 Section "Uninstall"
@@ -1055,7 +1098,12 @@ SectionEnd
 EOF
 
 	msg "Creating NSIS installer"
-	run "$NSIS_EXE" "$installer_nsi"
+	rm -f "$installer_exe"
+	if ! run "$NSIS_EXE" "$installer_nsi"; then
+		rm -f "$installer_payload_zip"
+		fail "makensis failed while creating fbc-xbox installer"
+	fi
+	rm -f "$installer_payload_zip"
 }
 
 ##############################################################################

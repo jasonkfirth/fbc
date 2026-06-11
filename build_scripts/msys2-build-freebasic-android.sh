@@ -792,6 +792,34 @@ function EnvOrDefault {
 	return $value
 }
 
+function DownloadFile {
+	param([string] $url, [string] $path)
+
+	$curl = Get-Command "curl.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+	if ($null -ne $curl) {
+		& $curl.Source -L --fail --show-error --connect-timeout 30 --max-time 900 -o $path $url
+		if ($LASTEXITCODE -eq 0) {
+			return
+		}
+
+		Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $path
+		Write-Host "curl.exe download failed, retrying with PowerShell..."
+	}
+
+	$ProgressPreference = "SilentlyContinue"
+	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+	Invoke-WebRequest -UseBasicParsing -TimeoutSec 900 -Uri $url -OutFile $path
+
+	if (-not (Test-Path -LiteralPath $path)) {
+		Die "Download did not produce an output file: $url"
+	}
+
+	$downloadedFile = Get-Item -LiteralPath $path
+	if ($downloadedFile.Length -le 0) {
+		Die "Download produced an empty file: $url"
+	}
+}
+
 $acceptTerms = $false
 $withEmulatorTools = $false
 foreach ($arg in $args) {
@@ -844,8 +872,7 @@ if (-not (Test-Path -LiteralPath $sdkmanager)) {
 	try {
 		$zipFile = Join-Path $tempRoot "commandlinetools-win.zip"
 		Write-Host "Downloading Android command line tools from Google..."
-		[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-		Invoke-WebRequest -UseBasicParsing -Uri $downloadUrl -OutFile $zipFile
+		DownloadFile $downloadUrl $zipFile
 
 		Remove-Item -Recurse -Force -ErrorAction SilentlyContinue -LiteralPath $cmdlineTools
 		New-Item -ItemType Directory -Force -Path $cmdlineTools | Out-Null
@@ -1061,16 +1088,18 @@ create_zip() {
 create_installer() {
 	local installer_nsi="$BUILDROOT/${DISTNAME}.nsi"
 	local installer_exe="$OUT/${DISTNAME}-setup.exe"
+	local installer_payload_zip="$BUILDROOT/${DISTNAME}-installer-payload.zip"
 	local nsis_src="${NSIS_SRCROOT:-/tmp/fba}"
 	local terms_notice="$BUILDROOT/android-sdk-terms-notice.txt"
-	local dist_win
 	local out_win
+	local payload_win
 	local terms_notice_win
 
 	[ "$SKIP_INSTALLER" -eq 0 ] || return 0
 	[ "$SKIP_PACKAGE" -eq 0 ] || return 0
 	[ -x "$NSIS_EXE" ] || fail "makensis not found at $NSIS_EXE; install the nsis package or set NSIS_EXE"
 	have cygpath || fail "cygpath not found"
+	have zip || fail "zip not found"
 
 	msg "Preparing short NSIS source path"
 	rm -rf "$nsis_src"
@@ -1097,8 +1126,15 @@ Review Google's current Android SDK terms here before continuing:
 Continue only if you have reviewed and accept those terms and licenses.
 EOF
 
-	dist_win="$(cygpath -aw "$nsis_src")"
 	out_win="$(cygpath -aw "$installer_exe")"
+	msg "Creating fbc-android NSIS payload zip"
+	rm -f "$installer_payload_zip"
+	(
+		cd "$nsis_src"
+		run zip -qr "$installer_payload_zip" .
+	)
+
+	payload_win="$(cygpath -aw "$installer_payload_zip")"
 	terms_notice_win="$(cygpath -aw "$terms_notice")"
 
 	msg "Generating NSIS installer script"
@@ -1126,7 +1162,6 @@ ShowUninstDetails show
 !insertmacro MUI_LANGUAGE "English"
 
 \${Using:StrFunc} StrStr
-\${Using:StrFunc} StrRep
 \${Using:StrFunc} UnStrRep
 
 Function RefreshEnvironment
@@ -1187,8 +1222,24 @@ Function un.RemoveInstallDirFromPath
 FunctionEnd
 
 Section "Install"
+	InitPluginsDir
+	SetOutPath "\$PLUGINSDIR"
+	SetCompress off
+	File /oname=freebasic-android-payload.zip "$payload_win"
+	SetCompress auto
+	IfFileExists "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" 0 no_powershell
 	SetOutPath "\$INSTDIR"
-	File /r "$dist_win\\*"
+	;
+	; The Android package contains a Java runtime, MSYS2 shell helpers, and
+	; FreeBASIC runtime libraries.  Packing that tree through NSIS File /r can
+	; exceed makensis' practical datablock limits, so keep the payload as a
+	; normal zip and extract it with the Windows PowerShell already present on
+	; supported Windows systems.
+	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "\$\$ErrorActionPreference = ''Stop''; Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-android-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force"'
+	Pop \$0
+	StrCmp \$0 "0" payload_done
+		Abort "Failed to extract the FreeBASIC Android payload. PowerShell exit code: \$0"
+	payload_done:
 	DetailPrint "Downloading Android SDK/NDK packages from Google"
 	nsExec::ExecToLog '"\$INSTDIR\\setup-android-sdk.cmd" --accept-google-android-sdk-terms'
 	Pop \$0
@@ -1198,6 +1249,10 @@ Section "Install"
 	sdk_done:
 	WriteUninstaller "\$INSTDIR\\uninstall.exe"
 	Call AddInstallDirToPath
+	Goto install_done
+	no_powershell:
+		Abort "Windows PowerShell is required to extract this installer."
+	install_done:
 SectionEnd
 
 Section "Uninstall"
@@ -1208,7 +1263,12 @@ SectionEnd
 EOF
 
 	msg "Creating NSIS installer"
-	run "$NSIS_EXE" "$installer_nsi"
+	rm -f "$installer_exe"
+	if ! run "$NSIS_EXE" "$installer_nsi"; then
+		rm -f "$installer_payload_zip"
+		fail "makensis failed while creating fbc-android installer"
+	fi
+	rm -f "$installer_payload_zip"
 }
 
 ##############################################################################

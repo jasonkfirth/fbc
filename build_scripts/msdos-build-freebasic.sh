@@ -4,6 +4,15 @@ set -euo pipefail
 
 trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 
+##############################################################################
+# msdos-build-freebasic.sh
+#
+# Build a DOS FreeBASIC distribution from the current source tree.
+# Produces a staged DOS package tree and, by default, a .zip archive under
+# out/msdos.  The script also owns the DOSBox smoke-test step used to check the
+# packaged compiler in a DOS environment.
+##############################################################################
+
 run() { echo "==> $*"; "$@"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -1183,3 +1192,5 @@ echo "==> distribution root: $DISTROOT"
 if [ "$DO_PACKAGE" = "1" ]; then
 	echo "==> package created: $PKGFILE"
 fi
+
+# end of msdos-build-freebasic.sh

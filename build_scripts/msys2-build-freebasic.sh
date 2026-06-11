@@ -7,8 +7,8 @@ trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 # msys2-build-freebasic.sh
 #
 # Build a self-contained Windows FreeBASIC distribution from MSYS2.
-# Produces a combined win32/win64/ARM64 package tree, a .zip archive, and
-# an NSIS installer that installs into C:\freebasic.
+# Produces a desktop win32/win64 package tree and a separate Windows ARM64
+# package tree, each with its own .zip archive and NSIS installer.
 ##############################################################################
 
 SELF_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
@@ -291,6 +291,18 @@ copy_legacy_winlibs() {
 	fi
 }
 
+copy_distribution_common_content() {
+	local package_root="$1"
+
+	msg "Copying top-level FreeBASIC content to $(basename "$package_root")"
+	copy_tree "$ROOT/doc" "$package_root/doc"
+	copy_examples_tree "$package_root/examples"
+	copy_tree "$ROOT/inc" "$package_root/inc"
+	cp -a "$ROOT/changelog.txt" "$package_root/"
+	cp -a "$ROOT/readme.txt" "$package_root/"
+	write_platform_package_notes "$package_root"
+}
+
 sync_source_tree() {
 	local dst="$1"
 	local extra_exclude
@@ -428,9 +440,11 @@ DISTROOT_BASE="$BUILDROOT/dist"
 TMPROOT="$BUILDROOT/tmp"
 OUT="${OUT:-$ROOT/out/mingw32}"
 DISTNAME_BASE="FreeBASIC-${FBVERSION}-winlibs"
+ARM64_DISTNAME_BASE="FreeBASIC-${FBVERSION}-winlibs-arm64"
 INSTALL_SUBDIR="package"
 INSTALL_DIR_WIN='C:\FreeBASIC'
 HOST_FBC_ROOT="${HOST_FBC_ROOT:-}"
+PACKAGED_DISTROOTS=()
 
 MINGW32_ROOT="/mingw32"
 MINGW64_ROOT="/mingw64"
@@ -854,6 +868,7 @@ copy_arch_toolchain() {
 	local mingw_root="$2"
 	local triplet="$3"
 	local tool_root="${4:-$mingw_root}"
+	local package_root="${5:-$DISTROOT}"
 	local gcc_version
 	local gcc_libdir
 	local gcc_support_dir
@@ -863,24 +878,24 @@ copy_arch_toolchain() {
 	local lib
 
 	msg "Bundling $arch MinGW toolchain"
-	copy_tool_bins "$tool_root/bin" "$DISTROOT/bin/$arch"
+	copy_tool_bins "$tool_root/bin" "$package_root/bin/$arch"
 
 	# The bundled GCC driver is relocated under bin/$arch.  Its built-in
 	# search path resolves the MinGW CRT headers through bin/$triplet/include,
 	# so copy the headers there instead of depending on a live /mingw32 or
 	# /mingw64 tree being present on the user's machine.
 	if [ -d "$mingw_root/include" ]; then
-		copy_tree "$mingw_root/include" "$DISTROOT/bin/$triplet/include"
+		copy_tree "$mingw_root/include" "$package_root/bin/$triplet/include"
 	fi
 	if [ -d "$mingw_root/$triplet/include" ]; then
-		copy_tree "$mingw_root/$triplet/include" "$DISTROOT/bin/$triplet/include"
+		copy_tree "$mingw_root/$triplet/include" "$package_root/bin/$triplet/include"
 	fi
 
 	if [ -x "$mingw_root/bin/gcc.exe" ]; then
 		gcc_version="$($mingw_root/bin/gcc -dumpfullversion -dumpversion)"
 		[ -n "$gcc_version" ] || fail "could not determine GCC version for $arch"
 		gcc_libdir="$mingw_root/lib/gcc/$triplet/$gcc_version"
-		gcc_support_dir="$DISTROOT/bin/lib/gcc/$triplet/$gcc_version"
+		gcc_support_dir="$package_root/bin/lib/gcc/$triplet/$gcc_version"
 
 		if [ -d "$gcc_libdir" ]; then
 			copy_tree "$gcc_libdir" "$gcc_support_dir"
@@ -901,7 +916,7 @@ copy_arch_toolchain() {
 			done
 			for lib in libgcc.a libgcc_eh.a; do
 				if [ -f "$gcc_libdir/$lib" ]; then
-					cp -a "$gcc_libdir/$lib" "$DISTROOT/lib/$arch/"
+					cp -a "$gcc_libdir/$lib" "$package_root/lib/$arch/"
 				fi
 			done
 		fi
@@ -909,15 +924,15 @@ copy_arch_toolchain() {
 
 	clang_libdir="$mingw_root/lib/clang"
 	if [ -d "$clang_libdir" ]; then
-		copy_tree "$clang_libdir" "$DISTROOT/bin/lib/clang"
+		copy_tree "$clang_libdir" "$package_root/bin/lib/clang"
 	fi
 
 	if [ -d "$mingw_root/$triplet/lib" ]; then
-		copy_dir_files "$mingw_root/$triplet/lib" "$DISTROOT/lib/$arch"
+		copy_dir_files "$mingw_root/$triplet/lib" "$package_root/lib/$arch"
 	fi
 
-	copy_dir_files "$mingw_root/lib" "$DISTROOT/lib/$arch"
-	if [ "$arch" = "win32-aarch64" ] && [ ! -f "$DISTROOT/lib/$arch/libgcc.a" ]; then
+	copy_dir_files "$mingw_root/lib" "$package_root/lib/$arch"
+	if [ "$arch" = "win32-aarch64" ] && [ ! -f "$package_root/lib/$arch/libgcc.a" ]; then
 		clang_builtins="$(
 			{
 				find "$mingw_root/lib/clang" -type f -path '*/lib/windows/libclang_rt.builtins-aarch64.a' 2>/dev/null || true
@@ -926,22 +941,24 @@ copy_arch_toolchain() {
 				tail -n 1
 		)"
 		[ -n "$clang_builtins" ] || fail "could not find ARM64 clang builtins under $mingw_root"
-		cp -a "$clang_builtins" "$DISTROOT/lib/$arch/libgcc.a"
+		cp -a "$clang_builtins" "$package_root/lib/$arch/libgcc.a"
 	fi
-	create_arch_library_aliases "$DISTROOT/lib/$arch"
-	copy_legacy_winlibs "$arch" "$DISTROOT/lib/$arch" "$DISTROOT/bin/$arch"
-	remove_stale_crt_import_libs "$DISTROOT/lib/$arch"
-	assert_no_stale_crt_import_libs "$DISTROOT/lib/$arch"
+	create_arch_library_aliases "$package_root/lib/$arch"
+	copy_legacy_winlibs "$arch" "$package_root/lib/$arch" "$package_root/bin/$arch"
+	remove_stale_crt_import_libs "$package_root/lib/$arch"
+	assert_no_stale_crt_import_libs "$package_root/lib/$arch"
 }
 
 write_platform_package_notes() {
-	cat > "$DISTROOT/readme-platform-packages.txt" <<'EOF'
+	local package_root="${1:-$DISTROOT}"
+
+	cat > "$package_root/readme-platform-packages.txt" <<'EOF'
 FreeBASIC platform package notes
 ================================
 
-This package builds native Win32 and Win64 programs.
-When the ARM64 build is included it also builds native Windows ARM64 programs
-using the MSYS2 CLANGARM64 toolchain.
+The standard Windows installer contains the Win32 and Win64 compilers.
+The Windows ARM64 compiler is packaged as a separate installer because it is
+for Windows-on-Arm machines and uses the MSYS2 CLANGARM64 toolchain.
 
 The ARM64 compiler can be smoke-tested under QEMU once a Windows-on-Arm VM has
 OpenSSH enabled:
@@ -975,6 +992,7 @@ assemble_distribution() {
 	local winarm64_stage="$STAGEROOT/win32-aarch64"
 	local include_arm64=0
 
+	PACKAGED_DISTROOTS=()
 	DISTROOT="$DISTROOT_BASE/$DISTNAME"
 	rm -rf "$DISTROOT"
 	mkdir -p "$DISTROOT/bin" "$DISTROOT/lib/win32" "$DISTROOT/lib/win64"
@@ -985,18 +1003,9 @@ assemble_distribution() {
 		fail "missing staged fbcarm64.exe"
 	fi
 
-	if [ "$include_arm64" -ne 0 ]; then
-		mkdir -p "$DISTROOT/lib/win32-aarch64"
-	fi
-
 	sanitize_source_tree "$TRIPLET64"
 
-	msg "Copying top-level FreeBASIC content"
-	copy_tree "$ROOT/doc" "$DISTROOT/doc"
-	copy_examples_tree "$DISTROOT/examples"
-	copy_tree "$ROOT/inc" "$DISTROOT/inc"
-	cp -a "$ROOT/changelog.txt" "$DISTROOT/"
-	cp -a "$ROOT/readme.txt" "$DISTROOT/"
+	copy_distribution_common_content "$DISTROOT"
 
 	if [ -f "$win32_stage/fbc.exe" ]; then
 		cp -a "$win32_stage/fbc.exe" "$DISTROOT/fbc32.exe"
@@ -1004,39 +1013,44 @@ assemble_distribution() {
 	if [ -f "$win64_stage/fbc.exe" ]; then
 		cp -a "$win64_stage/fbc.exe" "$DISTROOT/fbc64.exe"
 	fi
-	if [ -f "$winarm64_stage/fbc.exe" ]; then
-		cp -a "$winarm64_stage/fbc.exe" "$DISTROOT/fbcarm64.exe"
-	fi
 
 	[ -f "$DISTROOT/fbc32.exe" ] || fail "missing staged fbc32.exe"
 	[ -f "$DISTROOT/fbc64.exe" ] || fail "missing staged fbc64.exe"
 	if [ "$include_arm64" -ne 0 ]; then
-		[ -f "$DISTROOT/fbcarm64.exe" ] || fail "missing staged fbcarm64.exe"
+		[ -n "$ARM64_DISTROOT" ] || fail "missing ARM64 distribution root name"
 	fi
 
-	copy_arch_toolchain win32 "$MINGW32_ROOT" "$TRIPLET32"
-	copy_arch_toolchain win64 "$MINGW64_ROOT" "$TRIPLET64"
-	if [ "$include_arm64" -ne 0 ]; then
-		copy_arch_toolchain win32-aarch64 "$CLANGARM64_ROOT" "$TRIPLETARM64" "$MINGW64_ROOT"
-	fi
+	copy_arch_toolchain win32 "$MINGW32_ROOT" "$TRIPLET32" "$MINGW32_ROOT" "$DISTROOT"
+	copy_arch_toolchain win64 "$MINGW64_ROOT" "$TRIPLET64" "$MINGW64_ROOT" "$DISTROOT"
 
 	msg "Merging staged FreeBASIC runtime libraries"
 	copy_dir_files "$win32_stage/lib/win32" "$DISTROOT/lib/win32"
 	copy_dir_files "$win64_stage/lib/win64" "$DISTROOT/lib/win64"
-	if [ "$include_arm64" -ne 0 ]; then
-		copy_dir_files "$winarm64_stage/lib/win32-aarch64" "$DISTROOT/lib/win32-aarch64"
-	fi
 	remove_stale_crt_import_libs "$DISTROOT/lib/win32"
 	remove_stale_crt_import_libs "$DISTROOT/lib/win64"
-	if [ "$include_arm64" -ne 0 ]; then
-		remove_stale_crt_import_libs "$DISTROOT/lib/win32-aarch64"
-	fi
 	assert_no_stale_crt_import_libs "$DISTROOT/lib/win32"
 	assert_no_stale_crt_import_libs "$DISTROOT/lib/win64"
+
+	PACKAGED_DISTROOTS+=("$DISTROOT")
+
 	if [ "$include_arm64" -ne 0 ]; then
-		assert_no_stale_crt_import_libs "$DISTROOT/lib/win32-aarch64"
+		msg "Assembling Windows ARM64 distribution"
+		rm -rf "$ARM64_DISTROOT"
+		mkdir -p "$ARM64_DISTROOT/bin" "$ARM64_DISTROOT/lib/win32-aarch64"
+
+		copy_distribution_common_content "$ARM64_DISTROOT"
+		cp -a "$winarm64_stage/fbc.exe" "$ARM64_DISTROOT/fbcarm64.exe"
+		[ -f "$ARM64_DISTROOT/fbcarm64.exe" ] || fail "missing staged fbcarm64.exe"
+
+		copy_arch_toolchain win32-aarch64 "$CLANGARM64_ROOT" "$TRIPLETARM64" "$CLANGARM64_ROOT" "$ARM64_DISTROOT"
+
+		msg "Merging staged FreeBASIC ARM64 runtime libraries"
+		copy_dir_files "$winarm64_stage/lib/win32-aarch64" "$ARM64_DISTROOT/lib/win32-aarch64"
+		remove_stale_crt_import_libs "$ARM64_DISTROOT/lib/win32-aarch64"
+		assert_no_stale_crt_import_libs "$ARM64_DISTROOT/lib/win32-aarch64"
+
+		PACKAGED_DISTROOTS+=("$ARM64_DISTROOT")
 	fi
-	write_platform_package_notes
 }
 
 ##############################################################################
@@ -1044,34 +1058,73 @@ assemble_distribution() {
 ##############################################################################
 
 create_zip() {
-	local zipfile="$OUT/${DISTNAME}.zip"
-	msg "Creating distribution zip"
+	local package_root="${1:-$DISTROOT}"
+	local package_name
+	local zipfile
+
+	package_name="$(basename "$package_root")"
+	zipfile="$OUT/${package_name}.zip"
+
+	msg "Creating $package_name distribution zip"
 	rm -f "$zipfile"
 	(
 		cd "$DISTROOT_BASE"
-		run zip -qr "$zipfile" "$DISTNAME"
+		run zip -qr "$zipfile" "$package_name"
 	)
 }
 
+collect_existing_distribution_roots() {
+	PACKAGED_DISTROOTS=()
+
+	[ -d "$DISTROOT" ] || fail "distribution root not found: $DISTROOT"
+	PACKAGED_DISTROOTS+=("$DISTROOT")
+
+	if [ -n "${ARM64_DISTROOT:-}" ] && [ -d "$ARM64_DISTROOT" ]; then
+		PACKAGED_DISTROOTS+=("$ARM64_DISTROOT")
+	fi
+}
+
 create_installer() {
-	local installer_nsi="$BUILDROOT/${DISTNAME}.nsi"
-	local installer_exe="$OUT/${DISTNAME}-setup.exe"
-	local dist_win
+	local package_root="${1:-$DISTROOT}"
+	local package_name
+	local installer_nsi
+	local installer_exe
+	local installer_payload_zip
+	local display_name="FreeBASIC ${FBVERSION}"
 	local out_win
+	local payload_win
 
 	[ -x "$NSIS_EXE" ] || fail "makensis not found at $NSIS_EXE; install the nsis package or set NSIS_EXE"
 	have cygpath || fail "cygpath not found"
+	have zip || fail "zip not found"
 
-	dist_win="$(cygpath -aw "$DISTROOT")"
+	package_name="$(basename "$package_root")"
+	installer_nsi="$BUILDROOT/${package_name}.nsi"
+	installer_exe="$OUT/${package_name}-setup.exe"
+	installer_payload_zip="$TMPROOT/${package_name}-installer-payload.zip"
+	case "$package_name" in
+		*arm64*)
+			display_name="FreeBASIC ${FBVERSION} ARM64"
+			;;
+	esac
+
 	out_win="$(cygpath -aw "$installer_exe")"
 
-	msg "Generating NSIS installer script"
+	msg "Creating $package_name NSIS payload zip"
+	rm -f "$installer_payload_zip"
+	(
+		cd "$package_root"
+		run zip -qr "$installer_payload_zip" .
+	)
+	payload_win="$(cygpath -aw "$installer_payload_zip")"
+
+	msg "Generating $package_name NSIS installer script"
 	cat > "$installer_nsi" <<EOF
 Unicode true
-SetCompressor /SOLID lzma
+SetCompressor /FINAL lzma
 RequestExecutionLevel admin
 
-Name "FreeBASIC ${FBVERSION}"
+Name "$display_name"
 OutFile "$out_win"
 InstallDir "$INSTALL_DIR_WIN"
 ShowInstDetails show
@@ -1187,11 +1240,31 @@ Function un.RemoveInstallDirFromMsys2
 FunctionEnd
 
 Section "Install"
+	InitPluginsDir
+	SetOutPath "\$PLUGINSDIR"
+	SetCompress off
+	File /oname=freebasic-payload.zip "$payload_win"
+	SetCompress auto
+	IfFileExists "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" 0 no_powershell
 	SetOutPath "\$INSTDIR"
-	File /r "$dist_win\\*"
+	;
+	; The package tree is intentionally large because it carries the compiler,
+	; toolchain, headers, and import libraries needed for offline use.  Feeding
+	; that expanded tree to NSIS with File /r can exceed makensis' practical
+	; datablock limits, so the installer stores a normal zip payload and asks
+	; Windows PowerShell to extract it into the chosen install directory.
+	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "\$\$ErrorActionPreference = ''Stop''; Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force"'
+	Pop \$0
+	StrCmp \$0 "0" payload_done
+		Abort "Failed to extract the FreeBASIC payload. PowerShell exit code: \$0"
+	payload_done:
 	WriteUninstaller "\$INSTDIR\\uninstall.exe"
 	Call AddInstallDirToPath
 	Call AddInstallDirToMsys2
+	Goto install_done
+	no_powershell:
+		Abort "Windows PowerShell is required to extract this installer."
+	install_done:
 SectionEnd
 
 Section "Uninstall"
@@ -1202,8 +1275,13 @@ Section "Uninstall"
 SectionEnd
 EOF
 
-	msg "Creating NSIS installer"
-	run "$NSIS_EXE" "$installer_nsi"
+	msg "Creating $package_name NSIS installer"
+	rm -f "$installer_exe"
+	if ! run "$NSIS_EXE" "$installer_nsi"; then
+		rm -f "$installer_payload_zip"
+		fail "makensis failed while creating $package_name installer"
+	fi
+	rm -f "$installer_payload_zip"
 }
 
 ##############################################################################
@@ -1212,9 +1290,11 @@ EOF
 
 validate_arm64_with_qemu() {
 	local qemu_smoke="$ROOT/build_scripts/msys2-qemu-windows-arm64-smoke.sh"
-	local args=(--dist "$DISTROOT")
+	local arm64_distroot="${1:-$ARM64_DISTROOT}"
+	local args=(--dist "$arm64_distroot")
 
 	[ -f "$qemu_smoke" ] || fail "missing QEMU ARM64 smoke script: $qemu_smoke"
+	[ -d "$arm64_distroot" ] || fail "missing ARM64 distribution root: $arm64_distroot"
 
 	if [ -n "${QEMU_ARM64_DISK:-}" ]; then
 		args+=(--disk "$QEMU_ARM64_DISK")
@@ -1240,7 +1320,7 @@ validate_distribution() {
 	local validate_dir="$BUILDROOT/validate"
 	local saved_path="$PATH"
 
-	msg "Validating packaged compilers"
+	msg "Validating packaged desktop compilers"
 	rm -rf "$validate_dir"
 	mkdir -p "$validate_dir"
 
@@ -1257,13 +1337,14 @@ EOF
 	run "$DISTROOT/fbc32.exe" "$validate_dir/hello.bas" -x "$validate_dir/hello32.exe"
 	[ "$("$validate_dir/hello32.exe")" = "FreeBASIC package test OK" ] || fail "packaged fbc32.exe produced bad output"
 
-	if [ -f "$DISTROOT/fbcarm64.exe" ]; then
+	if [ -f "$ARM64_DISTROOT/fbcarm64.exe" ]; then
+		msg "Validating packaged ARM64 compiler"
 		if [ "$QEMU_ARM64_VALIDATE" -ne 0 ]; then
-			validate_arm64_with_qemu
+			validate_arm64_with_qemu "$ARM64_DISTROOT"
 		else
 			case "$(uname -m)" in
 				aarch64|arm64)
-					run "$DISTROOT/fbcarm64.exe" "$validate_dir/hello.bas" -x "$validate_dir/helloarm64.exe"
+					run "$ARM64_DISTROOT/fbcarm64.exe" "$validate_dir/hello.bas" -x "$validate_dir/helloarm64.exe"
 					[ "$("$validate_dir/helloarm64.exe")" = "FreeBASIC package test OK" ] || fail "packaged fbcarm64.exe produced bad output"
 					;;
 				*)
@@ -1290,6 +1371,13 @@ GCC_VERSION="$($MINGW64_ROOT/bin/gcc -dumpfullversion -dumpversion)"
 [ -n "$GCC_VERSION" ] || fail "could not determine GCC version from $MINGW64_ROOT/bin/gcc"
 DISTNAME="${DISTNAME_BASE}-gcc-${GCC_VERSION}"
 DISTROOT="$DISTROOT_BASE/$DISTNAME"
+CLANG_VERSION="$($MINGW64_ROOT/bin/clang -dumpversion 2>/dev/null || true)"
+if [ -n "$CLANG_VERSION" ]; then
+	ARM64_DISTNAME="${ARM64_DISTNAME_BASE}-clang-${CLANG_VERSION}"
+else
+	ARM64_DISTNAME="$ARM64_DISTNAME_BASE"
+fi
+ARM64_DISTROOT="$DISTROOT_BASE/$ARM64_DISTNAME"
 
 if [ "$SKIP_BUILD64" -eq 0 ]; then
 	build_target win64 "$MINGW64_ROOT" win64 "$TRIPLET64"
@@ -1305,11 +1393,20 @@ fi
 
 if [ "$SKIP_PACKAGE" -eq 0 ]; then
 	assemble_distribution
-	create_zip
+else
+	collect_existing_distribution_roots
+fi
+
+if [ "$SKIP_PACKAGE" -eq 0 ]; then
+	for package_root in "${PACKAGED_DISTROOTS[@]}"; do
+		create_zip "$package_root"
+	done
 fi
 
 if [ "$SKIP_INSTALLER" -eq 0 ]; then
-	create_installer
+	for package_root in "${PACKAGED_DISTROOTS[@]}"; do
+		create_installer "$package_root"
+	done
 fi
 
 if [ "$SKIP_VALIDATE" -eq 0 ]; then
@@ -1317,6 +1414,11 @@ if [ "$SKIP_VALIDATE" -eq 0 ]; then
 fi
 
 msg "Done"
-echo "Distribution root: $DISTROOT"
-echo "Zip archive: $OUT/${DISTNAME}.zip"
-echo "Installer: $OUT/${DISTNAME}-setup.exe"
+for package_root in "${PACKAGED_DISTROOTS[@]}"; do
+	package_name="$(basename "$package_root")"
+	echo "Distribution root: $package_root"
+	echo "Zip archive: $OUT/${package_name}.zip"
+	echo "Installer: $OUT/${package_name}-setup.exe"
+done
+
+# end of msys2-build-freebasic.sh
