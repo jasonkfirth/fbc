@@ -989,11 +989,14 @@ run_dosbox_test() {
 		local mtools_image_file
 
 		cat > "$test_root/hello.bas" <<'EOF'
-open "C:\RESULT.TXT" for output as #1
+open "D:\RESULT.TXT" for output as #1
 print #1, "FreeBASIC DOS OK"
 close #1
 EOF
 
+		# DOSBox-X does not expose long file names consistently for mounted
+		# FAT images or host directories.  -R -RR keeps fbc's intermediate
+		# file names at HELLO.* instead of using its long temporary tag.
 		autoexec_bat="$test_root/fbtest.bat"
 		cat > "$autoexec_bat" <<'EOF'
 @echo off
@@ -1007,19 +1010,18 @@ if not exist C:\DJGPP\BIN\GCC.EXE echo missing-gcc>>D:\TRACE.LOG
 if not exist C:\DJGPP\DJGPP.ENV echo missing-env>>D:\TRACE.LOG
 C:\DJGPP\BIN\CWSDPMI.EXE -p >>D:\TRACE.LOG
 echo cwsdpmi-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD.LOG C:\FB\FBC.EXE -v C:\HELLO.BAS -x C:\HELLO.EXE
+C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD.LOG C:\FB\FBC.EXE -v -R -RR D:\HELLO.BAS -x D:\HELLO.EXE
 echo fbc-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
-dir C:\HELLO.* >>D:\TRACE.LOG
-if exist C:\HELLO.EXE goto runhello
+dir D:\HELLO.* >>D:\TRACE.LOG
+if exist D:\HELLO.EXE goto runhello
 echo hello-exe-missing>>D:\TRACE.LOG
 goto afterhello
 :runhello
 echo hello-exe-present>>D:\TRACE.LOG
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\RUN.LOG C:\HELLO.EXE
+C:\DJGPP\BIN\REDIR.EXE -eo -o D:\RUN.LOG D:\HELLO.EXE
 echo hello-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 :afterhello
-if exist C:\RESULT.TXT copy C:\RESULT.TXT D:\RESULT.TXT >NUL
-dir C:\RESULT.TXT >>D:\TRACE.LOG
+dir D:\RESULT.TXT >>D:\TRACE.LOG
 EOF
 
 		image_file="$DOSBOX_ROOT/smoke.img"
@@ -1078,6 +1080,7 @@ print #1, "FreeBASIC DOS OK"
 close #1
 EOF
 
+		# Keep the compiler's temporary assembly files 8.3-safe under DOSBox.
 		autoexec_bat="$test_root/fbtest.bat"
 		cat > "$autoexec_bat" <<'EOF'
 @echo off
@@ -1091,7 +1094,7 @@ if not exist C:\DJGPP\BIN\GCC.EXE echo missing-gcc>>trace.log
 if not exist C:\DJGPP\DJGPP.ENV echo missing-env>>trace.log
 C:\DJGPP\BIN\CWSDPMI.EXE -p >>trace.log
 echo cwsdpmi-errorlevel=%ERRORLEVEL%>>trace.log
-C:\FB\FBC.EXE hello.bas >>trace.log
+C:\FB\FBC.EXE -R -RR hello.bas >>trace.log
 echo fbc-errorlevel=%ERRORLEVEL%>>trace.log
 dir hello.* >>trace.log
 if exist hello.exe goto runhello

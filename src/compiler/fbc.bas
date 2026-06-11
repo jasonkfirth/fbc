@@ -332,6 +332,20 @@ private function hGetClangTargetOption( ) as string
 	end if
 end function
 
+private function fbcUseLldLinker( ) as integer
+	'' win32-aarch64 builds from MSYS2 use ld.lld.exe as the practical linker.
+	'' The package also provides ld.exe for compatibility, but this is actually
+	'' the LLVM driver binary and does not accept all GNU ld linker-option forms
+	'' that fbc currently emits.
+	if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32) and _
+		(fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) and _
+		(fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64) ) then
+		return hFileExists( fbc.binpath + "ld.lld" + FB_HOST_EXEEXT )
+	end if
+
+	function = FALSE
+end function
+
 '' Pass some arguments to gcc/clang and read the results. Returns an empty string on
 '' an error.
 private function fbcQueryCC( byref options as string ) as string
@@ -534,10 +548,18 @@ private sub fbcFindBin _
 		'' b) Try bin/ directory
 		#ifndef ENABLE_STANDALONE
 			'' normal build, the build/target prefix is already appended to binpath
-			path = fbc.binpath + fbctoolTB(tool).name + FB_HOST_EXEEXT
+			if( (tool = FBCTOOL_LD) and fbcUseLldLinker( ) ) then
+				path = fbc.binpath + "ld.lld" + FB_HOST_EXEEXT
+			else
+				path = fbc.binpath + fbctoolTB(tool).name + FB_HOST_EXEEXT
+			end if
 		#else
 			'' standalone build, we need to use insert it here
-			path = fbc.binpath + fbc.buildprefix + fbctoolTB(tool).name + FB_HOST_EXEEXT
+			if( (tool = FBCTOOL_LD) and fbcUseLldLinker( ) ) then
+				path = fbc.binpath + fbc.buildprefix + "ld.lld" + FB_HOST_EXEEXT
+			else
+				path = fbc.binpath + fbc.buildprefix + fbctoolTB(tool).name + FB_HOST_EXEEXT
+			end if
 		#endif
 
 		#ifndef ENABLE_STANDALONE

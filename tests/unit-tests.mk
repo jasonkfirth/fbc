@@ -225,7 +225,7 @@ $(UNIT_TESTS_INC) : $(DIRLIST_INC)
 
 $(UNIT_TESTS_OBJ_LST) : $(UNIT_TESTS_INC)
 	@$(GREP) -i -e 'SRCLIST +=' $(UNIT_TESTS_INC) \
-| $(SED) 's/^SRCLIST += \(.*\)\(\.b.*\)/\1\.o/g' \
+| $(SED) -e 's/^SRCLIST += \(.*\)\(\.b.*\)/\1\.o/g' \
 $(if $(filter dos,$(TARGET_OS)),-e '/^\.\/interactive\//d' -e '/^\.\/threads\//d' -e '/^\.\/compound\/select_const2\.o/d') \
 > $(UNIT_TESTS_OBJ_LST)
 	@$(PRINTF) '%s\n' $(UNIT_TESTS_EXPLICIT_OBJS) >> $(UNIT_TESTS_OBJ_LST)

@@ -384,20 +384,10 @@ ensure_nxdk_tools() {
 }
 
 build_nxdk_runtime_libs() {
-	local clang_resource=""
-	local cflags=""
-
 	[ "$SKIP_BUILD" -eq 0 ] || return 0
 
 	msg "Building nxdk runtime support libraries"
 	eval "$("$NXDK_DIR/bin/activate" -s)"
-
-	if have clang; then
-		clang_resource="$(clang -print-resource-dir 2>/dev/null || true)"
-		if [ -n "$clang_resource" ] && [ -d "$clang_resource/include" ]; then
-			cflags="-isystem $clang_resource/include"
-		fi
-	fi
 
 	run env \
 		MSYSTEM=MINGW64 \
@@ -406,7 +396,6 @@ build_nxdk_runtime_libs() {
 		PATH="/usr/bin:$MINGW64_ROOT/bin:$NXDK_DIR/bin:$PATH" \
 		make -C "$NXDK_DIR" \
 		NXDK_ONLY=1 \
-		CFLAGS="$cflags" \
 		main.exe \
 		-j"$JOBS"
 
@@ -847,6 +836,9 @@ copy_clang_resource_dir() {
 	local dst
 
 	src="$(clang -print-resource-dir 2>/dev/null || true)"
+	if [ -n "$src" ] && have cygpath; then
+		src="$(cygpath -u "$src" 2>/dev/null || printf '%s' "$src")"
+	fi
 	if [ -z "$src" ] || [ ! -d "$src" ]; then
 		return 0
 	fi
