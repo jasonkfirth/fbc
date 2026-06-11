@@ -1235,7 +1235,7 @@ Section "Install"
 	; exceed makensis' practical datablock limits, so keep the payload as a
 	; normal zip and extract it with the Windows PowerShell already present on
 	; supported Windows systems.
-	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "\$\$ErrorActionPreference = ''Stop''; Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-android-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force"'
+	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-android-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force -ErrorAction Stop"'
 	Pop \$0
 	StrCmp \$0 "0" payload_done
 		Abort "Failed to extract the FreeBASIC Android payload. PowerShell exit code: \$0"

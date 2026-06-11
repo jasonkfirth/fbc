@@ -810,7 +810,7 @@ Section "FreeBASIC Wii" SEC01
     ;
     ; Keep the package tree as a normal zip payload so makensis does not need
     ; to mmap every bundled FreeBASIC and devkitPro file individually.
-    nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "\$\$ErrorActionPreference = ''Stop''; Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-wii-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force"'
+	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-wii-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force -ErrorAction Stop"'
     Pop \$0
     StrCmp \$0 "0" payload_done
         Abort "Failed to extract the FreeBASIC Wii payload. PowerShell exit code: \$0"

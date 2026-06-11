@@ -1253,7 +1253,7 @@ Section "Install"
 	; that expanded tree to NSIS with File /r can exceed makensis' practical
 	; datablock limits, so the installer stores a normal zip payload and asks
 	; Windows PowerShell to extract it into the chosen install directory.
-	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "\$\$ErrorActionPreference = ''Stop''; Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force"'
+	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force -ErrorAction Stop"'
 	Pop \$0
 	StrCmp \$0 "0" payload_done
 		Abort "Failed to extract the FreeBASIC payload. PowerShell exit code: \$0"

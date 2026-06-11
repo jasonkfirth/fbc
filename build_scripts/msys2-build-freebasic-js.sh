@@ -1250,7 +1250,7 @@ Section "Install"
 	; Python support, and UCRT runtime files.  Passing that expanded tree to
 	; NSIS File /r can hit makensis datablock limits, so store it as a normal
 	; zip payload and extract it through Windows PowerShell during install.
-	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "\$\$ErrorActionPreference = ''Stop''; Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-js-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force"'
+	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-js-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force -ErrorAction Stop"'
 	Pop \$0
 	StrCmp \$0 "0" payload_done
 		Abort "Failed to extract the FreeBASIC JS payload. PowerShell exit code: \$0"

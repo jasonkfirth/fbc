@@ -1069,7 +1069,7 @@ Section "Install"
 	; The Xbox package carries nxdk plus the FreeBASIC compiler, runtime
 	; libraries, and helper launchers.  Keep the installer payload as a zip so
 	; makensis does not need to mmap the entire expanded package tree.
-	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "\$\$ErrorActionPreference = ''Stop''; Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-xbox-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force"'
+	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-xbox-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force -ErrorAction Stop"'
 	Pop \$0
 	StrCmp \$0 "0" payload_done
 		Abort "Failed to extract the FreeBASIC Xbox payload. PowerShell exit code: \$0"
