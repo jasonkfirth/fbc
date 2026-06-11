@@ -2,7 +2,13 @@
 
 #include "../fb.h"
 #include "fb_private_console.h"
+
+/* ARM64 runtimes do not expose the classic x87 control word API used below, and
+   the mingw cross-toolchain we use doesn't always provide float.h in that
+   configuration. Skip the x87/FPU-control setup there. */
+#if defined(HOST_MINGW) && !defined(__aarch64__) && !defined(_M_ARM64) && !defined(_M_ARM64EC)
 #include <float.h>
+#endif
 
 #ifdef ENABLE_MT
 static CRITICAL_SECTION __fb_global_mutex;
@@ -29,7 +35,7 @@ FB_CONSOLE_CTX __fb_con /* not initialized */;
 
 void fb_hInit( void )
 {
-#ifdef HOST_MINGW
+#if defined(HOST_MINGW) && !defined(__aarch64__) && !defined(_M_ARM64) && !defined(_M_ARM64EC)
 #ifndef _clear87
 /* if __STRICT_ANSI__ is defined the _controlfp function is not defined in some versions of mingw-gcc */
 #define	_PC_64		0x00000000
