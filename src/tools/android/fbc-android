@@ -197,8 +197,10 @@ find_prebuilt() {
 
 find_platform_jar() {
 	local sdk="$1"
+	local max_api="${2:-}"
 	local selected=""
 	local platform
+	local api
 
 	if [ -n "${ANDROID_PLATFORM_JAR:-}" ] && [ -f "$ANDROID_PLATFORM_JAR" ]; then
 		echo "$ANDROID_PLATFORM_JAR"
@@ -208,6 +210,11 @@ find_platform_jar() {
 	shopt -s nullglob
 	for platform in "$sdk"/platforms/android-*; do
 		[ -f "$platform/android.jar" ] || continue
+		if [ -n "$max_api" ]; then
+			api="${platform##*/android-}"
+			[[ "$api" =~ ^[0-9]+$ ]] || continue
+			[ "$api" -le "$max_api" ] || continue
+		fi
 		selected="$platform/android.jar"
 	done
 	shopt -u nullglob
@@ -616,6 +623,14 @@ target_sdk="${platform_jar%/android.jar}"
 target_sdk="${target_sdk##*/android-}"
 [ -z "$target_api" ] || target_sdk="$target_api"
 aapt="$(tool_or_die aapt "$sdk")"
+aapt_version="$( "$aapt" version 2>&1 || true )"
+use_aapt2=0
+if printf '%s' "$aapt_version" | grep -q "v0.2-debian"; then
+	aapt="$(tool_or_die aapt2 "$sdk")"
+	use_aapt2=1
+	aapt2_platform_jar="$(find_platform_jar "$sdk" 23 || true)"
+	[ -n "$aapt2_platform_jar" ] && platform_jar="$aapt2_platform_jar"
+fi
 apksigner="$(tool_or_die apksigner "$sdk")"
 keytool="$(command -v keytool || true)"
 [ -n "$keytool" ] || die "keytool not found; install a JDK"
@@ -704,7 +719,15 @@ unsigned="$tmp/freebasicapp-unsigned.apk"
 unaligned="$tmp/freebasicapp-unaligned.apk"
 aligned="$tmp/freebasicapp-aligned.apk"
 
-"$aapt" package -f -M "$tmp/AndroidManifest.xml" -S "$tmp/res" -A "$asset_root" -I "$platform_jar" -F "$unsigned"
+if [ "$use_aapt2" -eq 1 ]; then
+	mkdir -p "$tmp/res-compiled"
+	"$aapt" compile --dir "$tmp/res" -o "$tmp/res-compiled"
+	mapfile -d '' aapt2_res < <(find "$tmp/res-compiled" -name '*.flat' -print0)
+	[ "${#aapt2_res[@]}" -gt 0 ] || die "aapt2 produced no compiled resources"
+	"$aapt" link -o "$unsigned" --manifest "$tmp/AndroidManifest.xml" -I "$platform_jar" -A "$asset_root" "${aapt2_res[@]}"
+else
+	"$aapt" package -f -M "$tmp/AndroidManifest.xml" -S "$tmp/res" -A "$asset_root" -I "$platform_jar" -F "$unsigned"
+fi
 
 mkdir -p "$tmp/java/org/freebasic/android" "$tmp/classes" "$tmp/dex"
 cp "$template/FreeBasicNativeActivity.java" "$tmp/java/org/freebasic/android/FreeBasicNativeActivity.java"
