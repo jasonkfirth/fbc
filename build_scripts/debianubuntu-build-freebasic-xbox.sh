@@ -18,6 +18,8 @@ done
 
 [ -n "$ROOT" ] || { echo "ERROR: could not locate FreeBASIC root"; exit 1; }
 cd "$ROOT"
+. "$ROOT/build_scripts/build-success-cleanup.sh"
+
 CLEANUP_SUCCESS=0
 CLEANUP_DIRS=()
 
@@ -28,7 +30,7 @@ cleanup_build_roots() {
 
     for path in "${CLEANUP_DIRS[@]}"; do
         [ -n "$path" ] || continue
-        rm -rf "$path"
+        fb_remove_build_tree "$ROOT" "$path" || true
     done
 }
 

@@ -221,11 +221,6 @@ tool_or_die() {
 	local sdk="$2"
 	local found=""
 
-	if command -v "$name" >/dev/null 2>&1; then
-		command -v "$name"
-		return 0
-	fi
-
 	shopt -s nullglob
 	for found in \
 		"$sdk"/build-tools/*/"$name" \
@@ -247,6 +242,11 @@ tool_or_die() {
 		return 0
 	done
 	shopt -u nullglob
+
+	if command -v "$name" >/dev/null 2>&1; then
+		command -v "$name"
+		return 0
+	fi
 
 	die "required Android tool '$name' was not found"
 }

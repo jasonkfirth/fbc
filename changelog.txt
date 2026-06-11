@@ -1,6 +1,11 @@
 Version 1.20.1
 
 [changed]
+- build/Haiku: extended the VM package builder to build and validate both x86_64 and i386/x86_gcc2 Haiku packages, using the matching QEMU image/toolchain path for each architecture and archiving packages, logs, checksums, audio captures, and exampleageddon reports under out/haiku/<arch>.
+- packaging/Haiku: added secondary x86 package support by producing freebasic_x86 packages on x86_gcc2, installing the Haiku secondary x86 GCC/binutils/runtime dependencies, and running package builds and tests through setarch x86 where required.
+- compiler/Haiku: fixed i386 startup/link behavior by emitting constructor/destructor sections in the form expected by the Haiku x86 toolchain and teaching the installed compiler to discover Haiku's secondary x86 GCC, assembler, archiver, and linker.
+- build/exampleageddon: added remote-shell and path-map support so a host Python controller can compile and run examples inside a Haiku guest over SSH when the guest package repository does not provide Python, while still producing normal reports and failing on self-contained example problems.
+- build/Haiku: hardened VM image and archive reuse by clearing stale extracted ISOs after checksum mismatches and clearing generated archive contents before copying a fresh run's outputs.
 - packaging/Arch Linux: added Docker-based package build and Linux package matrix coverage for Arch current x86_64 packages, writing pacman artifacts under out/linux/archlinux/current/<arch> and validating installation in a fresh Arch container.
 - packaging/Arch Linux: validated the packaged compiler dependency chain through clean-container console, gfxlib, SCREEN 13, sfxlib, sfxlib showcase, fbctests, and exampleageddon runs so installed packages bring in the libraries needed to build and run FreeBASIC programs.
 - packaging/Arch Linux: extended the Docker package matrix to cross-build aarch64 and riscv64 packages from an x86_64 Arch builder with target pacman sysroots, and validated the resulting packages in fresh native Arch Linux ARM/RISC-V containers with fbctests and exampleageddon.

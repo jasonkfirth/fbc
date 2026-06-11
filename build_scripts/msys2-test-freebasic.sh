@@ -12,13 +12,13 @@
 #
 # Responsibilities:
 #
-#   * locate the packaged win32/win64 FreeBASIC distribution
+#   * locate the packaged Windows FreeBASIC distribution
 #   * copy tests/ and the shared inc/ tree into isolated per-architecture
 #     work directories
 #   * run the fbc sanity checks
 #   * build and run the fbcunit test executable
 #   * run all four log-test dialect lanes
-#   * report pass/fail summaries for win32 and win64 independently
+#   * report pass/fail summaries for each requested Windows architecture
 #
 # This file intentionally does NOT contain:
 #
@@ -59,9 +59,10 @@ usage()
 Usage: ./build_scripts/msys2-test-freebasic.sh [options]
 
 Options:
-  --dist-dir PATH      packaged FreeBASIC win32/win64 distribution directory
+  --dist-dir PATH      packaged FreeBASIC Windows distribution directory
   --workroot PATH      isolated test work root
-  --arch LIST          comma-separated list: win32,win64 (default: win32,win64)
+  --arch LIST          comma-separated list: win32,win64,win32-aarch64
+                       (default: win32,win64)
   --clean              remove the generated workroot after a successful run
   --keep-work          keep the generated workroot (default)
   -h, --help           show this help text
@@ -140,6 +141,10 @@ run_arch()
 		win64)
 			fbc_name="fbc64.exe"
 			mingw_root="/mingw64"
+			;;
+		win32-aarch64)
+			fbc_name="fbcarm64.exe"
+			mingw_root="/clangarm64"
 			;;
 		*)
 			fail "unsupported architecture: $arch"
@@ -221,7 +226,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$DIST_DIR" ]; then
-	DIST_DIR="$(default_dist_dir)" || fail "could not find a packaged FreeBASIC win32/win64 distribution"
+	DIST_DIR="$(default_dist_dir)" || fail "could not find a packaged FreeBASIC Windows distribution"
 else
 	DIST_DIR="$(to_msys_path "$DIST_DIR")"
 fi

@@ -23,6 +23,8 @@ done
 [ -n "$ROOT" ] || { echo "ERROR: could not locate FreeBASIC root"; exit 1; }
 
 cd "$ROOT"
+. "$ROOT/build_scripts/build-success-cleanup.sh"
+
 CLEANUP_SUCCESS=0
 CLEANUP_DIRS=(
     "$ROOT/.build-debianubuntu"
@@ -36,7 +38,7 @@ cleanup_build_roots() {
 
     for path in "${CLEANUP_DIRS[@]}"; do
         [ -n "$path" ] || continue
-        rm -rf "$path" 2>/dev/null || true
+        fb_remove_build_tree "$ROOT" "$path" || true
     done
 }
 
@@ -289,7 +291,7 @@ EOF
     fi
 
     rm -f "$pkg"
-    rm -rf "bootstrap/${dir_key}"
+    fb_remove_build_tree "$ROOT" "$ROOT/bootstrap/${dir_key}" || die "could not remove bootstrap/${dir_key}"
     "$MAKE_CMD" clean-bootstrap-sources >/dev/null 2>&1 || true
 
     run "$MAKE_CMD" \

@@ -431,10 +431,26 @@ static void fb_android_maybe_start_program(FB_ANDROID_APP *app)
 		return;
 
 	app->program_thread_started = 1;
-	if (pthread_create(&app->program_thread, NULL, fb_android_program_thread, app) == 0)
-		pthread_detach(app->program_thread);
-	else
-		app->program_thread_started = 0;
+	{
+		pthread_attr_t attrs;
+		if (pthread_attr_init(&attrs) != 0)
+		{
+			app->program_thread_started = 0;
+			return;
+		}
+
+		pthread_attr_setstacksize(&attrs, 4 * 1024 * 1024);
+		if (pthread_create(&app->program_thread, &attrs, fb_android_program_thread, app) == 0)
+		{
+			pthread_attr_destroy(&attrs);
+			pthread_detach(app->program_thread);
+		}
+		else
+		{
+			pthread_attr_destroy(&attrs);
+			app->program_thread_started = 0;
+		}
+	}
 }
 
 static int fb_android_handle_input(FB_ANDROID_APP *app)

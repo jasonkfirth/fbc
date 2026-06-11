@@ -172,6 +172,8 @@ INTENTIONAL_FAILURES = {
 }
 
 PLATFORM_SOURCES = {
+    "examples/compiler/builtin-memory.bas",
+    "examples/compiler/builtin-numeric.bas",
     "examples/manual/defines/fbasm.bas",
     "examples/manual/defines/fboptionprofile.bas",
     "examples/manual/defines/fbprofile.bas",
@@ -323,6 +325,77 @@ def prepare_run_directory(source_dir: Path, run_dir: Path, copy_directories: boo
             shutil.copy2(source, target)
 
 
+def map_remote_path(value: str, args: argparse.Namespace) -> str:
+    if not args.remote_shell:
+        return value
+
+    path = Path(value)
+    if not path.is_absolute():
+        return value
+
+    resolved = path.resolve()
+    for host_root, guest_root in args.path_maps:
+        try:
+            relative = resolved.relative_to(host_root)
+        except ValueError:
+            continue
+
+        if relative.as_posix() == ".":
+            return guest_root
+        return guest_root.rstrip("/") + "/" + relative.as_posix()
+
+    return value
+
+
+def sync_remote_directory(cwd: Path, args: argparse.Namespace) -> tuple[bool, str]:
+    remote_cwd = map_remote_path(str(cwd), args)
+    quoted_cwd = shlex.quote(remote_cwd)
+
+    reset = args.remote_shell + [f"rm -rf {quoted_cwd} && mkdir -p {quoted_cwd}"]
+    reset_done = subprocess.run(reset, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
+    if reset_done.returncode != 0:
+        return False, reset_done.stdout.decode("utf-8", errors="replace")
+
+    tar = subprocess.Popen(
+        ["tar", "-cf", "-", "."],
+        cwd=str(cwd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    extract = subprocess.run(
+        args.remote_shell + [f"cd {quoted_cwd} && tar -xf -"],
+        stdin=tar.stdout,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    if tar.stdout is not None:
+        tar.stdout.close()
+    _, tar_stderr = tar.communicate()
+
+    if tar.returncode != 0:
+        return False, tar_stderr.decode("utf-8", errors="replace")
+    if extract.returncode != 0:
+        return False, extract.stdout.decode("utf-8", errors="replace")
+
+    return True, remote_cwd
+
+
+def remote_env_prefix(env: dict[str, str] | None) -> str:
+    if not env:
+        return ""
+
+    parts = []
+    for key in ("SFXLIB_DRIVER", "FB_GFX_DRIVER", "FBGFX"):
+        if key in env:
+            parts.append(f"{key}={shlex.quote(env[key])}")
+
+    if not parts:
+        return ""
+
+    return " ".join(parts) + " "
+
+
 def compile_inputs(path: Path, root: Path, compile_cwd: Path) -> list[Path]:
     rel = relpath(path, root)
     inputs = [compile_cwd / path.name]
@@ -348,6 +421,7 @@ def run_command(
     cwd: Path,
     timeout: int,
     log_path: Path,
+    args: argparse.Namespace,
     env: dict[str, str] | None = None,
 ) -> tuple[str, float]:
     started = time.monotonic()
@@ -359,15 +433,37 @@ def run_command(
         log.flush()
 
         try:
-            completed = subprocess.run(
-                cmd,
-                cwd=str(cwd),
-                env=env,
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                timeout=timeout,
-                check=False,
-            )
+            if args.remote_shell:
+                synced, remote_cwd = sync_remote_directory(cwd, args)
+                if not synced:
+                    log.write(remote_cwd)
+                    return "fail(255)", time.monotonic() - started
+
+                remote_cmd = [map_remote_path(part, args) for part in cmd]
+                remote_bin_dir = map_remote_path(str(args.outdir / "bin"), args)
+                remote_script = (
+                    "mkdir -p " + shlex.quote(remote_bin_dir) + " && " +
+                    "cd " + shlex.quote(remote_cwd) + " && " +
+                    remote_env_prefix(env) +
+                    " ".join(shlex.quote(part) for part in remote_cmd)
+                )
+                completed = subprocess.run(
+                    args.remote_shell + [remote_script],
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    timeout=timeout,
+                    check=False,
+                )
+            else:
+                completed = subprocess.run(
+                    cmd,
+                    cwd=str(cwd),
+                    env=env,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    timeout=timeout,
+                    check=False,
+                )
         except subprocess.TimeoutExpired:
             elapsed = time.monotonic() - started
             log.write(f"\nTIMEOUT after {timeout}s\n")
@@ -410,6 +506,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
         cwd=compile_cwd,
         timeout=args.compile_timeout,
         log_path=compile_log,
+        args=args,
     )
 
     run_status = "skipped"
@@ -433,6 +530,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
                 cwd=run_cwd,
                 timeout=args.run_timeout,
                 log_path=run_log,
+                args=args,
                 env=env,
             )
         else:
@@ -595,6 +693,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--no-run", action="store_true")
     parser.add_argument("--run-all", action="store_true", help="Run compiled non-external/non-platform examples even if classified interactive")
     parser.add_argument("--fail-on-self-contained", action="store_true", help="Exit non-zero if self-contained examples fail to compile or run")
+    parser.add_argument("--remote-shell", default="", help="Run compile/run commands through this shell command, such as ssh user@host")
+    parser.add_argument("--path-map", action="append", default=[], help="Map an absolute host path prefix to a guest path, as HOST=GUEST")
 
     args = parser.parse_args(argv)
     args.root = args.root.resolve()
@@ -602,6 +702,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     args.prefix = (args.prefix or args.root).resolve()
     args.include_dir = (args.include_dir or (args.root / "inc")).resolve()
     args.fbc = shlex.split(args.fbc)
+    args.remote_shell = shlex.split(args.remote_shell)
+    args.path_maps = [
+        (Path(host).resolve(), guest)
+        for host, guest in (item.split("=", 1) for item in args.path_map)
+    ]
+    args.path_maps.sort(key=lambda item: len(str(item[0])), reverse=True)
 
     if args.jobs < 1:
         parser.error("--jobs must be positive")

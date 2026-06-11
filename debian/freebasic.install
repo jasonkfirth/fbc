@@ -1,5 +1,6 @@
 usr/bin/fbc
 usr/lib/freebasic/*
+usr/include/freebasic/builtin.bi
 usr/include/freebasic/crt
 usr/include/freebasic/crt.bi
 usr/include/freebasic/datetime.bi
@@ -10,9 +11,12 @@ usr/include/freebasic/fberror.bi
 usr/include/freebasic/fbgfx.bi
 usr/include/freebasic/fbio.bi
 usr/include/freebasic/fblimits.bi
+usr/include/freebasic/fbnetwire.bi
 usr/include/freebasic/fbprng.bi
 usr/include/freebasic/fbthread.bi
 usr/include/freebasic/file.bi
+usr/include/freebasic/sfxlib_raw.bi
 usr/include/freebasic/string.bi
 usr/include/freebasic/utf_conv.bi
+usr/include/freebasic/vbdos.bi
 usr/include/freebasic/vbcompat.bi

@@ -44,6 +44,7 @@ PYTHON_HPKG=""
 TEST_ONLY=0
 JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
 CPUS="$JOBS"
+CPUS_EXPLICIT=0
 MEMORY="4096"
 WORK_DISK_SIZE="24G"
 KEEP_VMS=0
@@ -118,8 +119,14 @@ while [ "$#" -gt 0 ]; do
 			;;
 		--archive-dir) ARCHIVE_DIR="$2"; shift 2 ;;
 		--arch) TARGET_ARCH="$2"; shift 2 ;;
-		--jobs) JOBS="$2"; CPUS="$2"; FBCTESTS_JOBS="$2"; EXAMPLEAGEDDON_JOBS="$2"; shift 2 ;;
-		--cpus) CPUS="$2"; shift 2 ;;
+		--jobs)
+			JOBS="$2"
+			[ "$CPUS_EXPLICIT" -eq 1 ] || CPUS="$2"
+			FBCTESTS_JOBS="$2"
+			EXAMPLEAGEDDON_JOBS="$2"
+			shift 2
+			;;
+		--cpus) CPUS="$2"; CPUS_EXPLICIT=1; shift 2 ;;
 		--memory) MEMORY="$2"; shift 2 ;;
 		--work-disk-size) WORK_DISK_SIZE="$2"; shift 2 ;;
 		--ssh-port) SSH_PORT="$2"; shift 2 ;;
@@ -273,23 +280,33 @@ download_image() {
 		[ -n "$IMAGE_URL" ] || die "could not locate latest Haiku nightly image"
 	fi
 
-	local name
+	local name partial_file
 	name="$(basename "$IMAGE_URL")"
 	IMAGE_FILE="$CACHE_DIR/$name"
+	partial_file="$IMAGE_FILE.part"
 
 	if [ ! -f "$IMAGE_FILE" ]; then
 		msg "Downloading $IMAGE_URL"
-		curl -fL --retry 3 --retry-delay 5 -o "$IMAGE_FILE" "$IMAGE_URL"
+		if [ -f "$partial_file" ]; then
+			curl -fL --retry 3 --retry-delay 5 -C - -o "$partial_file" "$IMAGE_URL"
+		else
+			curl -fL --retry 3 --retry-delay 5 -o "$partial_file" "$IMAGE_URL"
+		fi
+		mv -f "$partial_file" "$IMAGE_FILE"
 	else
 		msg "Using cached image $IMAGE_FILE"
 	fi
 
 	if curl -fsSL "$IMAGE_URL.sha256" -o "$IMAGE_FILE.sha256" 2>/dev/null; then
-		local expected actual
+		local expected actual extract_base
 		expected="$(sed -n 's/^.*= //p' "$IMAGE_FILE.sha256" | head -n 1)"
 		actual="$(sha256sum "$IMAGE_FILE" | awk '{print $1}')"
-		[ "$expected" = "$actual" ] ||
+		if [ "$expected" != "$actual" ]; then
+			extract_base="${name%.*}"
+			rm -f "$IMAGE_FILE"
+			rm -rf "$CACHE_DIR/extracted/$extract_base"
 			die "checksum mismatch for $IMAGE_FILE"
+		fi
 	fi
 }
 
@@ -342,6 +359,15 @@ archive_results() {
 
 	mkdir -p "$ARCHIVE_DIR"
 
+	# The archive directory is reused across reruns. Clear generated files first
+	# so optional logs from an earlier run cannot describe the current package.
+	rm -f "$ARCHIVE_DIR"/freebasic*.hpkg
+	rm -f "$ARCHIVE_DIR"/freebasic-haiku-*.log
+	rm -f "$ARCHIVE_DIR"/exampleageddon-report.md
+	rm -f "$ARCHIVE_DIR"/exampleageddon-results.csv
+	rm -f "$ARCHIVE_DIR"/freebasic-haiku-audio.wav
+	rm -f "$ARCHIVE_DIR"/SHA256SUMS
+
 	cp -f "$hpkg" "$ARCHIVE_DIR/"
 
 	for log in "$LOG_DIR"/freebasic-haiku-*.log; do
@@ -385,9 +411,9 @@ write_bootstrap_files() {
 
 	mkdir -p "$serve_dir"
 
-	cat > "$serve_dir/haiku-bootstrap.sh" <<EOF
+	cat > "$boot_script" <<EOF
 #!/bin/sh
-LOG="\$HOME/config/settings/boot/freebasic-bootstrap-inner.log"
+LOG="\$HOME/config/settings/boot/freebasic-bootstrap.log"
 (
 export PATH=/boot/system/bin:/bin:\$PATH
 mkdir -p "\$HOME/config/settings/ssh"
@@ -400,22 +426,6 @@ useradd sshd >/dev/null 2>&1 || true
 ssh-keygen -A >/dev/null 2>&1 || true
 sshd >/dev/null 2>&1 || /boot/system/bin/sshd >/dev/null 2>&1 || true
 touch "\$HOME/config/settings/boot/freebasic-ssh-ready"
-) >> "\$LOG" 2>&1
-EOF
-	chmod +x "$serve_dir/haiku-bootstrap.sh"
-
-	cat > "$boot_script" <<EOF
-#!/bin/sh
-LOG="\$HOME/config/settings/boot/freebasic-bootstrap.log"
-URL="http://10.0.2.2:$http_port/haiku-bootstrap.sh"
-(
-export PATH=/boot/system/bin:/bin:\$PATH
-for n in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40; do
-    curl -fsS "\$URL" -o "\$HOME/config/settings/boot/freebasic-bootstrap.sh" && break
-    sleep 2
-done
-chmod +x "\$HOME/config/settings/boot/freebasic-bootstrap.sh"
-"\$HOME/config/settings/boot/freebasic-bootstrap.sh" &
 ) >> "\$LOG" 2>&1 &
 #
 EOF
@@ -774,10 +784,26 @@ install_image_packages \
 	pkgconfig \
 	zstd_devel
 
+if [ "$(getarch 2>/dev/null || true)" = "x86_gcc2" ]; then
+	install_image_packages \
+		haiku_x86_devel \
+		binutils_x86 \
+		mpc_x86 \
+		mpfr_x86 \
+		gcc_x86 \
+		gcc_x86_syslibs \
+		zstd_x86_devel
+fi
+
 cleanup_package_states
 
-install_optional_network_packages libffi_devel ncurses6_devel
+if [ "$(getarch 2>/dev/null || true)" = "x86_gcc2" ]; then
+	install_optional_network_packages libffi_x86_devel ncurses6_x86_devel
+else
+	install_optional_network_packages libffi_devel ncurses6_devel
+fi
 cleanup_package_states
+find /boot/_packages_ -maxdepth 1 -type f -name '*.hpkg' -exec rm -f {} + 2>/dev/null || true
 
 df -h
 command -v gcc
@@ -969,7 +995,7 @@ EOF
 	scp_from_guest "$key" "$port" "/Work/freebasic-haiku-build.log" "$LOG_DIR/"
 
 	local remote_hpkg
-	remote_hpkg="$(ssh_guest "$key" "$port" "cd '$source_dir' && ls -1 freebasic-*.hpkg | sort | tail -n 1")"
+	remote_hpkg="$(ssh_guest "$key" "$port" "cd '$source_dir' && ls -1 freebasic*.hpkg | sort | tail -n 1")"
 	[ -n "$remote_hpkg" ] || die "Haiku package was not created"
 	scp_from_guest "$key" "$port" "$source_dir/$remote_hpkg" "$PACKAGE_DIR/"
 
@@ -1056,9 +1082,54 @@ cleanup_package_states() {
 	find /boot/system/packages/administrative -maxdepth 1 -type d -name 'state_*' -exec rm -rf {} + 2>/dev/null || true
 }
 
+using_secondary_x86() {
+	[ "$(getarch 2>/dev/null || true)" = "x86_gcc2" ]
+}
+
+fbc_make_command() {
+	if using_secondary_x86; then
+		echo "setarch x86 fbc"
+	else
+		echo "fbc"
+	fi
+}
+
+fbc_command() {
+	if using_secondary_x86; then
+		setarch x86 fbc "$@"
+	else
+		fbc "$@"
+	fi
+}
+
+print_secondary_x86_tools() {
+	using_secondary_x86 || return 0
+
+	echo "==> checking secondary x86 tool paths"
+	find /boot/system -type f \( -path '*/x86/*/ld' -o -path '*/x86/*/as' -o -path '*/x86/*/gcc' \) -print | sort
+	for tool in as ar ld; do
+		printf '%s: ' "$tool"
+		setarch x86 /boot/system/develop/tools/x86/bin/gcc "-print-prog-name=$tool"
+	done
+}
+
 ensure_python3() {
 	if command -v python3 >/dev/null 2>&1; then
 		return 0
+	fi
+
+	if using_secondary_x86; then
+		for exe in python3 python3.10 python3.12 python3.11 python3.13 python3.14; do
+			if setarch x86 "$exe" --version >/dev/null 2>&1; then
+				mkdir -p /Work/tools
+				cat > /Work/tools/python3 <<PYEOF
+#!/bin/sh
+exec setarch x86 $exe "\$@"
+PYEOF
+				chmod +x /Work/tools/python3
+				return 0
+			fi
+		done
 	fi
 
 	for package_file in /Work/package/python3*.hpkg; do
@@ -1072,14 +1143,34 @@ ensure_python3() {
 		return 0
 	fi
 
-	for package in python3.11 python3.10 python3.9 python3.12 python3; do
+	if using_secondary_x86; then
+		python_packages="python310_x86 python312_x86 python311_x86 python313_x86 python314_x86 python310 python312 python311 python313 python314"
+	else
+		python_packages="python310 python312 python311 python313 python314 python3.10 python3.12 python3.11 python3.13 python3.14 python3"
+	fi
+
+	for package in $python_packages; do
 		if run_limited "${PYTHON_INSTALL_TIMEOUT:-1800}" pkgman install -y "$package"; then
 			break
 		fi
 	done
 
+	if using_secondary_x86; then
+		for exe in python3 python3.10 python3.12 python3.11 python3.13 python3.14; do
+			if setarch x86 "$exe" --version >/dev/null 2>&1; then
+				mkdir -p /Work/tools
+				cat > /Work/tools/python3 <<PYEOF
+#!/bin/sh
+exec setarch x86 $exe "\$@"
+PYEOF
+				chmod +x /Work/tools/python3
+				return 0
+			fi
+		done
+	fi
+
 	if ! command -v python3 >/dev/null 2>&1; then
-		for exe in python3.12 python3.11 python3.10 python3.9; do
+		for exe in python3.14 python3.13 python3.12 python3.11 python3.10 python3.9; do
 			if command -v "$exe" >/dev/null 2>&1; then
 				mkdir -p /Work/tools
 				ln -sf "$(command -v "$exe")" /Work/tools/python3
@@ -1126,6 +1217,7 @@ run_gfx_smoke() {
 
 run_fbctests() {
 	jobs="$(fbctests_jobs)"
+	fbc_cmd="$(fbc_make_command)"
 
 	[ -d /Work/fbctests-source/tests ] || fail "tests source was not staged"
 	[ -d /Work/fbctests-source/inc ] || fail "inc source was not staged"
@@ -1133,16 +1225,16 @@ run_fbctests() {
 	cd /Work/fbctests-source/tests
 
 	echo "==> cleaning fbctests tree"
-	run make clean FBC=fbc
+	run make clean FBC="$fbc_cmd"
 
 	echo "==> checking installed compiler through fbctests"
-	run make check FBC=fbc
+	run make check FBC="$fbc_cmd"
 
 	echo "==> running unit-tests with ${jobs} job(s)"
-	run make -j "$jobs" unit-tests FBC=fbc UNITTEST_RUN_ARGS="${FBCTESTS_UNIT_ARGS:-}"
+	run make -j "$jobs" unit-tests FBC="$fbc_cmd" UNITTEST_RUN_ARGS="${FBCTESTS_UNIT_ARGS:-}"
 
 	echo "==> running log-tests with ${jobs} job(s)"
-	run make -j "$jobs" log-tests FBC=fbc
+	run make -j "$jobs" log-tests FBC="$fbc_cmd"
 
 	for failed_log in failed-fb.log failed-fblite.log failed-qb.log failed-deprecated.log; do
 		[ -f "$failed_log" ] || fail "missing log-tests summary: $failed_log"
@@ -1157,6 +1249,7 @@ run_fbctests() {
 
 run_exampleageddon() {
 	jobs="$(exampleageddon_jobs)"
+	fbc_cmd="$(fbc_make_command)"
 
 	[ -d /Work/exampleageddon-source/examples ] || fail "examples source was not staged"
 	[ -d /Work/exampleageddon-source/inc ] || fail "inc source was not staged for exampleageddon"
@@ -1171,7 +1264,7 @@ run_exampleageddon() {
 		--prefix /boot/system \
 		--include-dir /Work/exampleageddon-source/inc \
 		--outdir /Work/exampleageddon \
-		--fbc fbc \
+		--fbc "$fbc_cmd" \
 		--jobs "$jobs" \
 		--compile-timeout "${EXAMPLEAGEDDON_COMPILE_TIMEOUT:-120}" \
 		--run-timeout "${EXAMPLEAGEDDON_RUN_TIMEOUT:-10}"
@@ -1203,18 +1296,34 @@ install_image_packages \
 	pkgconfig \
 	zstd_devel
 
+if using_secondary_x86; then
+	install_image_packages \
+		haiku_x86_devel \
+		binutils_x86 \
+		mpc_x86 \
+		mpfr_x86 \
+		gcc_x86 \
+		gcc_x86_syslibs \
+		zstd_x86_devel
+fi
+
 cleanup_package_states
 
-run install_optional_packages libffi_devel ncurses6_devel
+if using_secondary_x86; then
+	run install_optional_packages libffi_x86_devel ncurses6_x86_devel
+else
+	run install_optional_packages libffi_devel ncurses6_devel
+fi
 cleanup_package_states
+find /boot/_packages_ -maxdepth 1 -type f -name '*.hpkg' -exec rm -f {} + 2>/dev/null || true
 
 echo "==> installing FreeBASIC package"
-pkgman uninstall -y freebasic >/dev/null 2>&1 || true
-run pkgman_install /Work/package/freebasic-*.hpkg
+pkgman uninstall -y freebasic freebasic_x86 >/dev/null 2>&1 || true
+run pkgman_install /Work/package/freebasic*.hpkg
 
 echo "==> verifying fbc"
-command -v fbc
-fbc -version
+fbc_command -version
+print_secondary_x86_tools
 
 mkdir -p /Work/smoke
 
@@ -1397,7 +1506,7 @@ print "sfx-end"
 FBEOF
 
 echo "==> compiling console smoke"
-run fbc /Work/smoke/console.bas -x /Work/smoke/console
+run fbc_command /Work/smoke/console.bas -x /Work/smoke/console
 
 echo "==> running console smoke"
 console_output="$(/Work/smoke/console)"
@@ -1405,10 +1514,10 @@ echo "$console_output"
 [ "$console_output" = "Hello world" ] || fail "unexpected console output"
 
 echo "==> compiling gfxlib truecolor smoke"
-run fbc /Work/smoke/gfx-truecolor.bas -x /Work/smoke/gfx-truecolor
+run fbc_command /Work/smoke/gfx-truecolor.bas -x /Work/smoke/gfx-truecolor
 
 echo "==> compiling gfxlib SCREEN mode smoke"
-run fbc -lang fblite -exx /Work/smoke/gfx-screen-modes.bas -x /Work/smoke/gfx-screen-modes
+run fbc_command -lang fblite -exx /Work/smoke/gfx-screen-modes.bas -x /Work/smoke/gfx-screen-modes
 
 echo "==> running gfxlib truecolor smoke"
 run_gfx_smoke /Work/smoke/gfx-truecolor.out /Work/smoke/gfx-truecolor.err /Work/smoke/gfx-truecolor
@@ -1417,7 +1526,7 @@ echo "==> running gfxlib SCREEN mode smoke"
 run_gfx_smoke /Work/smoke/gfx-screen-modes.out /Work/smoke/gfx-screen-modes.err /Work/smoke/gfx-screen-modes
 
 echo "==> compiling sfxlib smoke"
-run fbc /Work/smoke/sfx.bas -x /Work/smoke/sfx
+run fbc_command /Work/smoke/sfx.bas -x /Work/smoke/sfx
 
 echo "==> compiling sfxlib showcase"
 [ -f /boot/system/data/freebasic/examples/sfxlib/showcase.bas ] ||
@@ -1427,7 +1536,7 @@ mkdir -p /Work/smoke/sfxlib-showcase
 cp -R /boot/system/data/freebasic/examples/sfxlib/. /Work/smoke/sfxlib-showcase/
 (
 	cd /Work/smoke/sfxlib-showcase
-	run fbc showcase.bas -x /Work/smoke/sfx-showcase
+	run fbc_command showcase.bas -x /Work/smoke/sfx-showcase
 )
 [ -x /Work/smoke/sfx-showcase ] || fail "sfxlib showcase binary was not created"
 
@@ -1449,13 +1558,51 @@ grep -qi '^sfx-driver=haiku' /Work/smoke/sfx.out || fail "sfx smoke did not use 
 echo "==> sfxlib smoke passed"
 
 run_fbctests
-run ensure_python3
-run_exampleageddon
+if run ensure_python3; then
+	run_exampleageddon
+else
+	echo "==> guest Python unavailable; host will run exampleageddon"
+	touch /Work/exampleageddon-needs-host
+fi
 
 echo "==> TEST PASSED"
 EOF
 
 	chmod +x "$path"
+}
+
+run_host_exampleageddon() {
+	local vm_dir="$1"
+	local key="$2"
+	local port="$3"
+	local outdir="$vm_dir/exampleageddon-host"
+	local log="$LOG_DIR/freebasic-haiku-exampleageddon-host.log"
+	local remote_shell
+
+	remote_shell="ssh $(ssh_opts "$key" "$port") user@127.0.0.1"
+
+	msg "Running host-driven exampleageddon against Haiku"
+	rm -rf "$outdir"
+	if ! python3 "$ROOT/build_scripts/exampleageddon-freebasic.py" \
+			--root "$ROOT" \
+			--prefix /boot/system \
+			--include-dir "$ROOT/inc" \
+			--outdir "$outdir" \
+			--fbc "setarch x86 fbc" \
+			--jobs "$EXAMPLEAGEDDON_JOBS" \
+			--compile-timeout "$EXAMPLEAGEDDON_COMPILE_TIMEOUT" \
+			--run-timeout "$EXAMPLEAGEDDON_RUN_TIMEOUT" \
+			--fail-on-self-contained \
+			--remote-shell "$remote_shell" \
+			--path-map "$ROOT=/Work/exampleageddon-source" \
+			--path-map "$outdir=/Work/exampleageddon" \
+			> "$log" 2>&1; then
+		tail -n 160 "$log" >&2 || true
+		return 1
+	fi
+
+	cp -f "$outdir/report.md" "$vm_dir/exampleageddon-report.md"
+	cp -f "$outdir/results.csv" "$vm_dir/exampleageddon-results.csv"
 }
 
 test_package_in_vm() {
@@ -1511,8 +1658,13 @@ EOF
 
 	rm -f "$LOG_DIR/freebasic-haiku-test.log"
 	scp_from_guest "$key" "$port" "/Work/freebasic-haiku-test.log" "$LOG_DIR/"
-	scp_from_guest "$key" "$port" "/Work/exampleageddon/report.md" "$vm_dir/exampleageddon-report.md"
-	scp_from_guest "$key" "$port" "/Work/exampleageddon/results.csv" "$vm_dir/exampleageddon-results.csv"
+	if ssh_guest "$key" "$port" "test -f /Work/exampleageddon-needs-host"; then
+		run_host_exampleageddon "$vm_dir" "$key" "$port" ||
+			die "host-driven exampleageddon failed"
+	else
+		scp_from_guest "$key" "$port" "/Work/exampleageddon/report.md" "$vm_dir/exampleageddon-report.md"
+		scp_from_guest "$key" "$port" "/Work/exampleageddon/results.csv" "$vm_dir/exampleageddon-results.csv"
+	fi
 }
 
 verify_audio_capture() {
@@ -1607,6 +1759,7 @@ main() {
 
 	rm -rf "$RUN_DIR"
 	mkdir -p "$RUN_DIR" "$PACKAGE_DIR" "$LOG_DIR"
+	rm -f "$LOG_DIR"/freebasic-haiku-*.log
 
 	local build_dir test_dir hpkg
 

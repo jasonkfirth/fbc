@@ -8095,7 +8095,8 @@ private function _getSectionString _
 			if( priority > 0 ) then
 				ostr += "." + right( "00000" + str( 65535 - priority ), 5 )
 			end if
-			if( env.clopt.target = FB_COMPTARGET_LINUX ) then
+			if( (env.clopt.target = FB_COMPTARGET_LINUX) or _
+			    (env.clopt.target = FB_COMPTARGET_HAIKU) ) then
 				ostr += ", " + QUOTE + "aw" + QUOTE + ", @progbits"
 			end if
 		end if
@@ -8109,7 +8110,8 @@ private function _getSectionString _
 			if( priority > 0 ) then
 				ostr += "." + right( "00000" + str( 65535 - priority ), 5 )
 			end if
-			if( env.clopt.target = FB_COMPTARGET_LINUX ) then
+			if( (env.clopt.target = FB_COMPTARGET_LINUX) or _
+			    (env.clopt.target = FB_COMPTARGET_HAIKU) ) then
 				ostr += ", " + QUOTE + "aw" + QUOTE + ", @progbits"
 			end if
 		end if

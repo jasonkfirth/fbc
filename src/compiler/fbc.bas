@@ -390,6 +390,48 @@ private function fbcQueryCC( byref options as string ) as string
 	return ret
 end function
 
+#if defined( __FB_HAIKU__ )
+private function fbcUseHaikuSecondaryX86Tools( ) as integer
+	if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_HAIKU) and _
+		(fbIs64Bit( ) = FALSE) and _
+		(len( fbc.buildprefix ) = 0) and _
+		(len( fbc.targetprefix ) = 0) ) then
+		function = TRUE
+	end if
+end function
+
+private function fbcFindHaikuSecondaryX86Tool _
+	( _
+		byval tool as integer, _
+		byref path as string _
+	) as integer
+
+	if( fbcUseHaikuSecondaryX86Tools( ) = FALSE ) then
+		exit function
+	end if
+
+	select case tool
+	case FBCTOOL_GCC
+		path = fbc.prefix + "develop" + FB_HOST_PATHDIV + _
+			"tools" + FB_HOST_PATHDIV + "x86" + FB_HOST_PATHDIV + _
+			"bin" + FB_HOST_PATHDIV + "gcc"
+		function = hFileExists( path )
+
+	case FBCTOOL_AS
+		path = fbcQueryCC( " -print-prog-name=as" )
+		function = (len( path ) > 0)
+
+	case FBCTOOL_AR
+		path = fbcQueryCC( " -print-prog-name=ar" )
+		function = (len( path ) > 0)
+
+	case FBCTOOL_LD
+		path = fbcQueryCC( " -print-prog-name=ld" )
+		function = (len( path ) > 0)
+	end select
+end function
+#endif
+
 ''
 '' Build the path to a certain file in our lib/ directory (or, in case of
 '' non-standalone, somewhere in a system directory such as /usr/lib).
@@ -545,6 +587,14 @@ private sub fbcFindBin _
 	end if
 
 	if( len( path ) = 0 ) then
+		#if defined( __FB_HAIKU__ )
+			if( fbcFindHaikuSecondaryX86Tool( tool, path ) ) then
+				fbctoolTB( tool ).path = path
+				fbctoolSetFlags( tool, FBCTOOLFLAG_FOUND )
+				exit sub
+			end if
+		#endif
+
 		'' b) Try bin/ directory
 		#ifndef ENABLE_STANDALONE
 			'' normal build, the build/target prefix is already appended to binpath
@@ -3725,6 +3775,20 @@ private sub fbcSetupCompilerPaths( )
 	else
 		fbc.binpath = fbc.prefix + "bin"     + FB_HOST_PATHDIV + fbc.targetprefix
 	end if
+
+	#if defined( __FB_HAIKU__ )
+		if( (fbIs64Bit( ) = FALSE) and _
+			(fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_HAIKU) and _
+			(len( fbc.buildprefix ) = 0) and _
+			(len( fbc.targetprefix ) = 0) ) then
+			dim as string secondarybin = fbc.prefix + "develop" + _
+				FB_HOST_PATHDIV + "tools" + FB_HOST_PATHDIV + _
+				"x86" + FB_HOST_PATHDIV + "bin" + FB_HOST_PATHDIV
+			if( hFileExists( secondarybin + fbctoolTB(FBCTOOL_LD).name + FB_HOST_EXEEXT ) ) then
+				fbc.binpath = secondarybin
+			end if
+		end if
+	#endif
 
 	''
 	'' Haiku keeps development headers in /develop/headers instead of the

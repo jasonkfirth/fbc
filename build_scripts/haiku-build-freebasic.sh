@@ -154,7 +154,25 @@ detect_package_arch() {
 }
 
 ARCH=$(detect_package_arch)
-HPKG="freebasic-${FULLVERSION}-${ARCH}.hpkg"
+PACKAGE_NAME="freebasic"
+PACKAGE_FBCFLAGS=""
+USE_X86_SECONDARY=0
+
+if [ "$ARCH" = "x86_gcc2" ]; then
+	PACKAGE_NAME="freebasic_x86"
+	PACKAGE_FBCFLAGS='-d ENABLE_PREFIX=\"/boot/system\"'
+	USE_X86_SECONDARY=1
+fi
+
+HPKG="${PACKAGE_NAME}-${FULLVERSION}-${ARCH}.hpkg"
+
+run_build_arch() {
+	if [ "$USE_X86_SECONDARY" -eq 1 ]; then
+		setarch x86 "$@"
+	else
+		"$@"
+	fi
+}
 
 ##############################################################################
 # Build phase
@@ -178,8 +196,24 @@ if [ "$NOBUILD" -eq 0 ]; then
 			gcc \
 			pkgconfig \
 			zstd_devel
+
+		if [ "$USE_X86_SECONDARY" -eq 1 ]; then
+			install_image_packages \
+				haiku_x86_devel \
+				binutils_x86 \
+				mpc_x86 \
+				mpfr_x86 \
+				gcc_x86 \
+				gcc_x86_syslibs \
+				zstd_x86_devel
+		fi
+
 		cleanup_package_states
-		install_optional_network_packages libffi_devel ncurses6_devel
+		if [ "$USE_X86_SECONDARY" -eq 1 ]; then
+			install_optional_network_packages libffi_x86_devel ncurses6_x86_devel
+		else
+			install_optional_network_packages libffi_devel ncurses6_devel
+		fi
 		cleanup_package_states
 	fi
 
@@ -188,18 +222,18 @@ if [ "$NOBUILD" -eq 0 ]; then
 	[ "$CPU_COUNT" -lt 1 ] && CPU_COUNT=1
 	JOBS=$((CPU_COUNT + 1))
 
-	if [ -x bin/fbc ] && ! bin/fbc -version >/dev/null 2>&1; then
+	if [ -x bin/fbc ] && ! run_build_arch bin/fbc -version >/dev/null 2>&1; then
 		msg "Removing unusable in-tree compiler"
 		rm -f bin/fbc bin/fbc-js
 	fi
 
 	if [ ! -x bin/fbc ]; then
 		msg "Building bootstrap compiler ($JOBS threads)"
-		make -j"$JOBS" HAVE_PREREQS_MK= bootstrap-minimal
+		run_build_arch make -j"$JOBS" HAVE_PREREQS_MK= FBCFLAGS="$PACKAGE_FBCFLAGS" bootstrap-minimal
 	fi
 
 	msg "Building FreeBASIC ($JOBS threads)"
-	make -j"$JOBS" HAVE_PREREQS_MK=
+	run_build_arch make -j"$JOBS" HAVE_PREREQS_MK= FBCFLAGS="$PACKAGE_FBCFLAGS"
 
 fi
 ##############################################################################
@@ -213,7 +247,7 @@ if [ "$NOPACKAGE" -eq 0 ]; then
 	msg "Preparing staging directory"
 	rm -rf "$STAGE"
 
-	make HAVE_PREREQS_MK= install DESTDIR="$STAGE"
+	run_build_arch make HAVE_PREREQS_MK= FBCFLAGS="$PACKAGE_FBCFLAGS" install DESTDIR="$STAGE"
 
 	msg "Staging examples"
 	mkdir -p "$STAGE/data/freebasic"
@@ -231,7 +265,7 @@ if [ "$NOPACKAGE" -eq 0 ]; then
 	msg "Generating PackageInfo"
 
 	cat > "$STAGE/.PackageInfo" <<META
-name "freebasic"
+name "$PACKAGE_NAME"
 version "$FULLVERSION"
 architecture "$ARCH"
 summary "FreeBASIC compiler"
@@ -249,10 +283,24 @@ copyrights {
 }
 
 provides {
-	freebasic = $FULLVERSION
+	$PACKAGE_NAME = $FULLVERSION
 	cmd:fbc = $FULLVERSION
 }
 
+META
+
+	if [ "$USE_X86_SECONDARY" -eq 1 ]; then
+		cat >> "$STAGE/.PackageInfo" <<META
+requires {
+	haiku_x86
+	lib:libstdc++_x86
+	lib:libgcc_s_x86
+	lib:libncursesw_x86
+	ncurses6_x86
+}
+META
+	else
+		cat >> "$STAGE/.PackageInfo" <<META
 requires {
 	haiku
 	lib:libstdc++
@@ -261,6 +309,7 @@ requires {
 	ncurses6
 }
 META
+	fi
 
 ##############################################################################
 # Create package
@@ -279,7 +328,7 @@ META
 ##############################################################################
 
 	msg "Removing previous FreeBASIC installation"
-	pkgman uninstall -y freebasic
+	pkgman uninstall -y "$PACKAGE_NAME"
 
 ##############################################################################
 # Install package
@@ -293,11 +342,7 @@ META
 ##############################################################################
 
 	msg "Running compiler sanity check"
-	if command -v fbc >/dev/null 2>&1; then
-		fbc -version
-	else
-		fail "Installed compiler not found in PATH"
-	fi
+	run_build_arch fbc -version
 
 	fi
 

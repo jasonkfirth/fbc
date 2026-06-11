@@ -22,6 +22,8 @@ if [ "$(basename "$PWD")" = "build_scripts" ]; then
         exit 1
 fi
 
+. "$PWD/build_scripts/build-success-cleanup.sh"
+
 ##############################################################################
 # Select make implementation
 ##############################################################################
@@ -98,7 +100,7 @@ build_target(){
 
         rm -f "${PKG}.tar.xz"
         rm -rf "${PKG}"
-        rm -rf "bootstrap/${DIR}"
+        fb_remove_build_tree "$PWD" "$PWD/bootstrap/${DIR}" || die "could not remove bootstrap/${DIR}"
 
         $MAKE_CMD clean-bootstrap-sources >/dev/null 2>&1 || true
 
@@ -171,4 +173,3 @@ build_target cygwin-x86_64       cygwin-x86_64
 echo
 echo "==> All bootstrap tarballs built:"
 ls -1 FreeBASIC-${VERSION}-source-bootstrap-*.tar.xz
-

@@ -275,7 +275,7 @@ ifeq ($(TARGET_OS),haiku)
     $(SFX_SRC_TARGET))
 endif
 
-SFX_SRC := $(SFX_SRC_GENERIC) $(SFX_SRC_UNIX) $(SFX_SRC_TARGET)
+SFX_SRC := $(SFX_SRC_TARGET) $(SFX_SRC_UNIX) $(SFX_SRC_GENERIC)
 
 ##############################################################################
 # Canonical object lists

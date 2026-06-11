@@ -47,6 +47,8 @@ done
 [ -n "$ROOT" ] || { echo "ERROR: could not locate FreeBASIC root"; exit 1; }
 
 cd "$ROOT"
+. "$ROOT/build_scripts/build-success-cleanup.sh"
+
 CLEANUP_SUCCESS=0
 CLEANUP_DIRS=(
     "$ROOT/.build-debianubuntu-cross"
@@ -60,7 +62,7 @@ cleanup_build_roots() {
 
     for path in "${CLEANUP_DIRS[@]}"; do
         [ -n "$path" ] || continue
-        rm -rf "$path" 2>/dev/null || true
+        fb_remove_build_tree "$ROOT" "$path" || true
     done
 }
 
@@ -369,6 +371,12 @@ need_cmd() {
 
 run() { echo "==> $*"; "$@"; }
 
+if command -v gmake >/dev/null 2>&1; then
+    MAKE_CMD="gmake"
+else
+    MAKE_CMD="make"
+fi
+
 run_root() {
     if [ "$(id -u)" -eq 0 ]; then
         run "$@"
@@ -442,6 +450,121 @@ ensure_build_bootstrap_tarball() {
         --skip-deps \
         --no-js \
         --no-android
+}
+
+ensure_host_compiler() {
+    if [ ! -x "$ROOT/bin/fbc" ]; then
+        echo "==> building host compiler for bootstrap emission"
+        run "$MAKE_CMD" clean
+        run "$MAKE_CMD" compiler -j"$MAKE_JOBS"
+    fi
+
+    [ -x "$ROOT/bin/fbc" ] || die "host compiler not available"
+}
+
+bootstrap_mapping() {
+    case "$1" in
+        amd64)   echo "linux-x86_64 linux-amd64 x86_64-linux-gnu" ;;
+        i386)    echo "linux-x86 linux-i386 i686-linux-gnu" ;;
+        arm64)   echo "linux-aarch64 linux-arm64 aarch64-linux-gnu" ;;
+        armhf)   echo "linux-arm linux-armhf arm-linux-gnueabihf" ;;
+        armel)   echo "linux-arm linux-armel arm-linux-gnueabi" ;;
+        ppc64el) echo "linux-powerpc64le linux-ppc64el powerpc64le-linux-gnu" ;;
+        s390x)   echo "linux-s390x linux-s390x s390x-linux-gnu" ;;
+        riscv64) echo "linux-riscv64 linux-riscv64 riscv64-linux-gnu" ;;
+        loong64) echo "linux-loongarch64 linux-loongarch64 loongarch64-linux-gnu" ;;
+        *)
+            die "unsupported bootstrap arch: $1"
+            ;;
+    esac
+}
+
+build_bootstrap_for_arch() {
+    local debarch="$1"
+    local arm_arch="${2:-}"
+    local version
+    local fbc_target
+    local dir_key
+    local target_triplet
+    local pkg
+    local extra_make_args=()
+
+    version="$(sed -n 's/^FBVERSION[[:space:]]*:=[[:space:]]*//p' mk/version.mk | head -n1)"
+    [ -n "$version" ] || die "could not determine FBVERSION"
+
+    read -r fbc_target dir_key target_triplet <<EOF
+$(bootstrap_mapping "$debarch")
+EOF
+
+    case "$arm_arch" in
+        "")
+            ;;
+        armv6+fp)
+            extra_make_args=(
+                ARM_VER=v6
+                ARM_FLOAT_ABI=hf
+                DEFAULT_CPUTYPE_ARM=FB_CPUTYPE_ARMV6_FP
+            )
+            ;;
+        *)
+            die "unsupported ARM bootstrap arch override: $arm_arch"
+            ;;
+    esac
+
+    pkg="$ROOT/FreeBASIC-${version}-source-bootstrap-${dir_key}.tar.xz"
+
+    if [ -n "$arm_arch" ]; then
+        echo "==> building source bootstrap tarball for $debarch ($arm_arch)"
+    else
+        echo "==> building source bootstrap tarball for $debarch"
+    fi
+
+    ensure_host_compiler
+    rm -f "$pkg"
+    fb_remove_build_tree "$ROOT" "$ROOT/bootstrap/${dir_key}" || die "could not remove bootstrap/${dir_key}"
+    "$MAKE_CMD" clean-bootstrap-sources >/dev/null 2>&1 || true
+
+    run "$MAKE_CMD" \
+        TARGET_TRIPLET="$target_triplet" \
+        FBC_TARGET="$fbc_target" \
+        FBTARGET_DIR_OVERRIDE="$dir_key" \
+        "${extra_make_args[@]}" \
+        bootstrap-dist-target \
+        -j"$MAKE_JOBS"
+
+    [ -f "$pkg" ] || die "missing bootstrap archive: $pkg"
+}
+
+ensure_raspbian_bootstrap_tarballs() {
+    local selected
+    local distro
+    local codename
+    local arch
+    local image
+    local outdir
+    local arm_arch
+    local key
+    local prepared=""
+
+    [ "$SKIP_BOOTSTRAP" -eq 0 ] || return 0
+
+    for selected in "$@"; do
+        IFS="|" read -r distro codename arch image outdir <<EOF
+$selected
+EOF
+        [ "$distro" = "raspbian" ] || continue
+
+        arm_arch="$(arm_arch_for_target "$distro" "$arch")"
+        key="${arch}:${arm_arch}"
+        case " $prepared " in
+            *" $key "*)
+                continue
+                ;;
+        esac
+
+        build_bootstrap_for_arch "$arch" "$arm_arch"
+        prepared="${prepared:+$prepared }$key"
+    done
 }
 
 selected_entries() {
@@ -605,6 +728,7 @@ execute_plan() {
 
     if [ "$SKIP_BOOTSTRAP" -eq 0 ]; then
         ensure_build_bootstrap_tarball
+        ensure_raspbian_bootstrap_tarballs "${entries[@]}"
     fi
 
     failures=0
