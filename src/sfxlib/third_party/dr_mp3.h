@@ -657,10 +657,27 @@ DRMP3_API const char* drmp3_version_string(void)
 
 #if !defined(DR_MP3_NO_SIMD)
 
+#if defined(__ARM_NEON) || defined(__aarch64__) || defined(_M_ARM64) || defined(_M_ARM64EC)
+#define DRMP3_TARGETS_ARM_NEON 1
+#else
+#define DRMP3_TARGETS_ARM_NEON 0
+#endif
+
+#if defined(__has_include)
+#if __has_include(<arm_neon.h>)
+#define DRMP3_HAS_ARM_NEON 1
+#else
+#define DRMP3_HAS_ARM_NEON 0
+#endif
+#else
+/* Older preprocessors without __has_include support; preserve legacy behavior. */
+#define DRMP3_HAS_ARM_NEON 1
+#endif
+
 #if !defined(DR_MP3_ONLY_SIMD) && ((defined(_MSC_VER) && _MSC_VER >= 1400) && defined(_M_X64)) || ((defined(__i386) || defined(_M_IX86) || defined(__i386__) || defined(__x86_64__)) && ((defined(_M_IX86_FP) && _M_IX86_FP == 2) || defined(__SSE2__)))
 #define DR_MP3_ONLY_SIMD
 #endif
-#if !defined(DR_MP3_ONLY_SIMD) && (defined(__ARM_NEON) || defined(__aarch64__) || defined(_M_ARM64) || defined(_M_ARM64EC))
+#if !defined(DR_MP3_ONLY_SIMD) && DRMP3_TARGETS_ARM_NEON && DRMP3_HAS_ARM_NEON
 #define DR_MP3_ONLY_SIMD
 #endif
 
@@ -735,7 +752,7 @@ end:
     return g_have_simd - 1;
 #endif
 }
-#elif defined(__ARM_NEON) || defined(__aarch64__) || defined(_M_ARM64) || defined(_M_ARM64EC)
+#elif DRMP3_TARGETS_ARM_NEON && DRMP3_HAS_ARM_NEON
 #include <arm_neon.h>
 #define DRMP3_HAVE_SSE 0
 #define DRMP3_HAVE_SIMD 1
@@ -754,6 +771,12 @@ static int drmp3_have_simd(void)
 {   /* TODO: detect neon for !DR_MP3_ONLY_SIMD */
     return 1;
 }
+#elif DRMP3_TARGETS_ARM_NEON && !DRMP3_HAS_ARM_NEON
+#define DRMP3_HAVE_SSE 0
+#define DRMP3_HAVE_SIMD 0
+#ifdef DR_MP3_ONLY_SIMD
+#error DR_MP3_ONLY_SIMD used, but SSE/NEON not enabled
+#endif
 #else
 #define DRMP3_HAVE_SSE 0
 #define DRMP3_HAVE_SIMD 0
