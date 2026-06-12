@@ -1318,8 +1318,7 @@ validate_installer() {
 
 	run bash "$ROOT/build_scripts/msys2-test-freebasic-installer.sh" \
 		--installer "$installer_exe" \
-		--kind "$installer_kind" \
-		--workroot "$BUILDROOT/installer-smoke"
+		--kind "$installer_kind"
 }
 
 ##############################################################################

@@ -14,7 +14,7 @@
 #
 #       * build the standard Windows win32/win64 package
 #       * build the separate Windows ARM64 package
-#       * build the Android, JavaScript, Wii, Xbox, and DOS packages
+#       * build the JavaScript, Wii, Xbox, and DOS packages
 #       * leave each artifact in the output directory owned by its script
 #
 #   This file intentionally does NOT contain:
@@ -89,7 +89,6 @@ run_script() {
 msg "Building FreeBASIC MSYS2 package matrix"
 
 run_script "$ROOT/build_scripts/msys2-build-freebasic.sh"
-run_script "$ROOT/build_scripts/msys2-build-freebasic-android.sh"
 run_script "$ROOT/build_scripts/msys2-build-freebasic-js.sh"
 run_script "$ROOT/build_scripts/msys2-build-freebasic-wii.sh"
 run_script "$ROOT/build_scripts/msys2-build-freebasic-xbox.sh"
@@ -97,7 +96,6 @@ run_script "$ROOT/build_scripts/msdos-build-freebasic.sh"
 
 msg "MSYS2 package matrix complete"
 echo "Windows packages : $ROOT/out/mingw32"
-echo "Android package  : $ROOT/out/mingw32-android"
 echo "JavaScript package: $ROOT/out/mingw32-js"
 echo "Wii package      : $ROOT/out/mingw32-wii"
 echo "Xbox package     : $ROOT/out/mingw32-xbox"

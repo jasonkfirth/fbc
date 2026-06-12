@@ -47,7 +47,11 @@ esac
 
 INSTALLER=""
 KIND=""
-WORKROOT="${WORKROOT:-$ROOT/.build-msys2/installer-smoke}"
+
+# Keep the default close to the drive root.  The bundled toolchains contain
+# deep directory trees, and Windows archive APIs can still trip over long
+# install paths even on current Windows builds.
+WORKROOT="${WORKROOT:-${INSTALLER_SMOKE_WORKROOT:-/c/fbc-installer-smoke}}"
 KEEP_WORK=0
 
 usage()
@@ -198,10 +202,10 @@ function Invoke-Native {
 function Invoke-SilentInstaller {
 	param(
 		[string] $FilePath,
-		[string] $Arguments
+		[string[]] $Arguments = @()
 	)
 
-	Write-Host "==> $FilePath $Arguments"
+	Write-Host "==> $FilePath $($Arguments -join ' ')"
 	$process = Start-Process -FilePath $FilePath -ArgumentList $Arguments -Wait -PassThru
 	if ($null -ne $process.ExitCode -and $process.ExitCode -ne 0) {
 		Fail "installer command failed with exit code $($process.ExitCode): ${FilePath}"
@@ -416,7 +420,7 @@ try {
 	}
 	New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
 
-	Invoke-SilentInstaller $Installer "/S /D=$InstallDir"
+	Invoke-SilentInstaller $Installer @("/S", "/D=$InstallDir")
 	$installed = $true
 
 	Assert-Path (Join-Path $InstallDir "uninstall.exe") "uninstaller"
@@ -437,7 +441,7 @@ try {
 		$uninstaller = Join-Path $InstallDir "uninstall.exe"
 		if (Test-Path -LiteralPath $uninstaller) {
 			try {
-				Invoke-SilentInstaller $uninstaller "/S"
+				Invoke-SilentInstaller $uninstaller @("/S")
 			} catch {
 				Write-Warning $_
 			}

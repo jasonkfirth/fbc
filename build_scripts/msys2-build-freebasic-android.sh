@@ -11,8 +11,8 @@ trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 # installer that installs into C:\freebasic-android.
 #
 # The package contains the fbc-android driver, the Android/aarch64 FreeBASIC
-# runtime, a small MSYS2 shell runtime, a Java runtime, and setup scripts that
-# download the Android SDK/NDK from Google after the user accepts Google's
+# runtime, a small MSYS2 shell runtime, a Java runtime, and setup scripts for
+# downloading the Android SDK/NDK from Google after the user accepts Google's
 # Android SDK terms.
 ##############################################################################
 
@@ -67,7 +67,6 @@ Options:
                       Install Android emulator tools and a system image in the build cache
   --bundle-android-sdk
                       Also bundle the Android SDK/NDK in the zip package
-                      (the NSIS installer still downloads them from Google)
   --keep-buildroot    Keep the build root on failure or success
   --help              Show this help text
 
@@ -1035,8 +1034,9 @@ directory when the app starts:
 
     fbc-android.cmd --assets game-folder --package org.example.mygame game.bas
 
-The installer runs setup-android-sdk.cmd during installation after its Android
-SDK terms page is accepted.
+The installer does not download the Android SDK/NDK during installation.  Run
+setup-android-sdk.cmd after installation when the machine is ready to download
+the Android toolchain from Google.
 EOF
 }
 
@@ -1112,9 +1112,9 @@ FreeBASIC Android SDK Setup
 The FreeBASIC Android installer does not include Google's Android SDK, Android
 NDK, emulator, platform files, platform-tools, or build-tools.
 
-During installation, FreeBASIC Android will download the required Android SDK
-command line tools from Google's servers, then sdkmanager will download and
-install the required Android SDK and NDK packages.
+After installation, run setup-android-sdk.cmd to download the required Android
+SDK command line tools from Google's servers.  The setup script then runs
+sdkmanager to download and install the required Android SDK and NDK packages.
 
 Those Android SDK components are provided by Google and are governed by
 Google's Android SDK terms and the package licenses accepted by sdkmanager.
@@ -1123,7 +1123,8 @@ Review Google's current Android SDK terms here before continuing:
 
     https://developer.android.com/studio/terms
 
-Continue only if you have reviewed and accept those terms and licenses.
+Continue only if you are willing to review and accept those terms and licenses
+before running setup-android-sdk.cmd.
 EOF
 
 	out_win="$(cygpath -aw "$installer_exe")"
@@ -1245,13 +1246,7 @@ Section "Install"
 	StrCmp \$0 "0" payload_done
 		Abort "Failed to extract the FreeBASIC Android payload. PowerShell exit code: \$0"
 	payload_done:
-	DetailPrint "Downloading Android SDK/NDK packages from Google"
-	nsExec::ExecToLog '"\$INSTDIR\\setup-android-sdk.cmd" --accept-google-android-sdk-terms'
-	Pop \$0
-	StrCmp \$0 "0" sdk_done
-		MessageBox MB_ICONSTOP "Android SDK setup failed with exit code \$0. The install directory was left in place so setup-android-sdk.cmd can be rerun after fixing the download or network problem."
-		Abort
-	sdk_done:
+	DetailPrint "Android SDK/NDK setup is installed but not run automatically."
 	WriteUninstaller "\$INSTDIR\\uninstall.exe"
 	Call AddInstallDirToPath
 	Goto install_done
@@ -1286,8 +1281,7 @@ validate_installer() {
 
 	run bash "$ROOT/build_scripts/msys2-test-freebasic-installer.sh" \
 		--installer "$installer_exe" \
-		--kind android \
-		--workroot "$BUILDROOT/installer-smoke"
+		--kind android
 }
 
 ##############################################################################

@@ -1117,8 +1117,7 @@ validate_installer() {
 
 	run bash "$ROOT/build_scripts/msys2-test-freebasic-installer.sh" \
 		--installer "$installer_exe" \
-		--kind xbox \
-		--workroot "$BUILDROOT/installer-smoke"
+		--kind xbox
 }
 
 validate_distribution() {

@@ -150,6 +150,20 @@ first_existing()
     return 1
 }
 
+first_command()
+{
+    local tool
+
+    for tool in "$@"; do
+        if command -v "${tool}" >/dev/null 2>&1; then
+            command -v "${tool}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 max_jobs()
 {
     local count
@@ -369,6 +383,13 @@ HOST_TRIPLET="$(extract_host_triplet)"
 
 DEVKITPRO="$(normalize_path "${DEVKITPRO_ARG:-${DEVKITPRO:-/opt/devkitpro}}")"
 DEVKITPPC="$(normalize_path "${DEVKITPPC_ARG:-${DEVKITPPC:-${DEVKITPRO}/devkitPPC}}")"
+HOST_CC="$(first_command "${HOST_CC:-}" x86_64-pc-cygwin-gcc gcc || true)"
+HOST_CXX="$(first_command "${HOST_CXX:-}" x86_64-pc-cygwin-g++ g++ || true)"
+HOST_AS="$(first_command "${HOST_AS:-}" as || true)"
+HOST_AR="$(first_command "${HOST_AR:-}" ar || true)"
+HOST_LD="$(first_command "${HOST_LD:-}" ld || true)"
+HOST_RANLIB="$(first_command "${HOST_RANLIB:-}" ranlib || true)"
+HOST_STRIP="$(first_command "${HOST_STRIP:-}" strip || true)"
 POWERPC_GCC="$(first_existing "${DEVKITPPC}/bin/powerpc-eabi-gcc.exe" "${DEVKITPPC}/bin/powerpc-eabi-gcc" || true)"
 POWERPC_GXX="$(first_existing "${DEVKITPPC}/bin/powerpc-eabi-g++.exe" "${DEVKITPPC}/bin/powerpc-eabi-g++" || true)"
 POWERPC_AS="$(first_existing "${DEVKITPPC}/bin/powerpc-eabi-as.exe" "${DEVKITPPC}/bin/powerpc-eabi-as" || true)"
@@ -395,11 +416,61 @@ install_dependencies()
 
     run pacman --needed --noconfirm -S \
         base-devel \
+        binutils \
+        libffi-devel \
+        ncurses-devel \
+        pkgconf \
         rsync \
         zip \
         p7zip \
         mingw-w64-ucrt-x86_64-gcc \
         mingw-w64-x86_64-nsis
+}
+
+ensure_host_build_tools()
+{
+    local missing=0
+
+    msg "Checking MSYS2 host build tools"
+
+    if [ -z "${HOST_CC}" ] || [ ! -x "${HOST_CC}" ]; then
+        printf 'missing: host C compiler\n' >&2
+        missing=1
+    fi
+
+    if [ -z "${HOST_CXX}" ] || [ ! -x "${HOST_CXX}" ]; then
+        printf 'missing: host C++ compiler\n' >&2
+        missing=1
+    fi
+
+    if [ -z "${HOST_AS}" ] || [ ! -x "${HOST_AS}" ]; then
+        printf 'missing: host assembler\n' >&2
+        missing=1
+    fi
+
+    if [ -z "${HOST_AR}" ] || [ ! -x "${HOST_AR}" ]; then
+        printf 'missing: host archiver\n' >&2
+        missing=1
+    fi
+
+    if [ -z "${HOST_LD}" ] || [ ! -x "${HOST_LD}" ]; then
+        printf 'missing: host linker\n' >&2
+        missing=1
+    fi
+
+    if [ -z "${HOST_RANLIB}" ] || [ ! -x "${HOST_RANLIB}" ]; then
+        printf 'missing: host ranlib\n' >&2
+        missing=1
+    fi
+
+    if [ -z "${HOST_STRIP}" ] || [ ! -x "${HOST_STRIP}" ]; then
+        printf 'missing: host strip\n' >&2
+        missing=1
+    fi
+
+    if [ "${missing}" -ne 0 ]; then
+        fail "install MSYS2 gcc/binutils or rerun without --skip-deps"
+    fi
 }
 
 ensure_devkitpro()
@@ -481,6 +552,13 @@ build_wii_freebasic()
         run make -f GNUmakefile -j"${JOBS}" \
             TARGET_TRIPLET="${HOST_TRIPLET}" \
             TARGET="${HOST_TRIPLET}" \
+            CC="${HOST_CC}" \
+            CXX="${HOST_CXX}" \
+            AS="${HOST_AS}" \
+            AR="${HOST_AR}" \
+            LD="${HOST_LD}" \
+            RANLIB="${HOST_RANLIB}" \
+            STRIP="${HOST_STRIP}" \
             FBC="${build_fbc}" \
             BUILD_FBC="${build_fbc}" \
             BUILD_FBC_TARGET="${HOST_FBC_TARGET}" \
@@ -523,6 +601,13 @@ build_wii_freebasic()
             DEVKITPRO="${DEVKITPRO}" \
             DEVKITPPC="${DEVKITPPC}" \
             ELF2DOL="${ELF2DOL}" \
+            CC="${HOST_CC}" \
+            CXX="${HOST_CXX}" \
+            AS="${HOST_AS}" \
+            AR="${HOST_AR}" \
+            LD="${HOST_LD}" \
+            RANLIB="${HOST_RANLIB}" \
+            STRIP="${HOST_STRIP}" \
             FBC="${build_fbc}" \
             BUILD_FBC="${build_fbc}" \
             BUILD_FBC_TARGET="${HOST_FBC_TARGET}" \
@@ -647,7 +732,7 @@ copy_msys2_runtime()
 
     msg "Copying minimal MSYS2 runtime"
 
-    mkdir -p "${bindir}"
+    mkdir -p "${bindir}" "${root}/toolchain/msys2/tmp"
 
     for tool in bash sh env dirname pwd cygpath realpath sed tr mkdir cp rm mv find uname make; do
         copy_tool "${tool}" "${bindir}"
@@ -890,8 +975,7 @@ validate_installer()
 
     run bash "${ROOT_DIR}/build_scripts/msys2-test-freebasic-installer.sh" \
         --installer "${INSTALLER_PATH}" \
-        --kind wii \
-        --workroot "${BUILDROOT}/installer-smoke"
+        --kind wii
 }
 
 # ---------------------------------------------------------------------------
@@ -916,6 +1000,7 @@ printf 'devkitPPC   : %s\n' "${DEVKITPPC}"
 printf 'jobs        : %s\n' "${JOBS}"
 
 install_dependencies
+ensure_host_build_tools
 ensure_devkitpro
 build_wii_freebasic
 assemble_package

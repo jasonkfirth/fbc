@@ -202,8 +202,10 @@ host_devkitpro="$DEVKITPRO"
 host_devkitppc="$DEVKITPPC"
 fbc_gcc="$cc"
 fbc_ld="$cc"
+fbc_as="$as"
 fbc_ar="$ar"
 fbc_ranlib="$ranlib"
+fbc_elf2dol="$elf2dol"
 fbc_args=()
 raw_fbc_args=()
 bundle_dir=""
@@ -262,6 +264,8 @@ set TMPDIR=$native_tmpdir
 EOF
 			fbc_gcc="$native_gcc_trampoline"
 			fbc_ld="$native_gcc_trampoline"
+			fbc_as="$(cygpath -am "$as")"
+			fbc_elf2dol="$(cygpath -am "$elf2dol")"
 			ar_script="$tmpdir/fbc-wii-ar.sh"
 			ar_trampoline="$tmpdir/fbc-wii-ar.cmd"
 			native_ar_script="$(cygpath -am "$ar_script")"
@@ -385,11 +389,11 @@ env \
 	DEVKITPRO="$host_devkitpro" \
 	DEVKITPPC="$host_devkitppc" \
 	GCC="$fbc_gcc" \
-	AS="$as" \
+	AS="$fbc_as" \
 	AR="$fbc_ar" \
 	RANLIB="$fbc_ranlib" \
 	LD="$fbc_ld" \
-	ELF2DOL="$elf2dol" \
+	ELF2DOL="$fbc_elf2dol" \
 	"$compiler" \
 	-prefix "$host_prefix" \
 	-target wii \
