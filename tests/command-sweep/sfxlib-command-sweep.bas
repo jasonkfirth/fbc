@@ -32,7 +32,6 @@
 SfxTestUseNullDriver()
 
 dim shared as integer failures
-dim shared as integer stderr_file
 
 sub expect_nonnegative _
 	( _
@@ -86,11 +85,6 @@ sub write_empty_midi( byref filename as string )
 	close #f
 end sub
 
-sub mark( byref text as string )
-	print text
-	print #stderr_file, text
-end sub
-
 dim as string wav_file = "sfxlib-command-sweep.wav"
 dim as string midi_file = "sfxlib-command-sweep.mid"
 dim as string capture_file = "sfxlib-command-sweep-capture.wav"
@@ -98,14 +92,10 @@ dim as single samples(0 to 31)
 dim as long result
 dim as single level
 
-stderr_file = freefile()
-open err for input as #stderr_file
-
 SfxTestWriteSineWav wav_file, 44100, 440.0, 2205
 write_empty_midi midi_file
 SfxTestDeleteFile capture_file
 
-mark "marker: device"
 device list
 device info
 device info()
@@ -120,7 +110,6 @@ result = device select( SfxTestNullDriverId() )
 #endif
 expect_nonnegative "device select", result
 
-mark "marker: foreground"
 beep 0.01, 0.0
 sound 440, 0.01
 sound 440, 18
@@ -158,7 +147,6 @@ envelope 1, 0.01, 0.10, 0.50, 0.20
 instrument 1, 1, 1
 instrument 1, 1
 
-mark "marker: music"
 result = music load( wav_file )
 expect_nonnegative "music load", result
 music play
@@ -204,8 +192,13 @@ sfx stop()
 sfx stop 1
 sfx stop channel, 2
 
-mark "marker: midi"
-result = midi open( 0 )
+''
+'' The command sweep must not open real MIDI hardware.  Some VM-backed
+'' BSD MIDI devices accept the open but can block later while draining
+'' output.  Use an invalid device number so the remaining commands
+'' exercise their no-device paths without depending on a host synth.
+''
+result = midi open( -1 )
 midi play midi_file
 midi send &h90, 60, 100
 midi pause
@@ -217,7 +210,6 @@ midi stop()
 midi close
 midi close()
 
-mark "marker: capture"
 result = capture start()
 result = capture status()
 result = capture available()
@@ -230,7 +222,6 @@ capture resume()
 capture stop
 capture stop()
 
-mark "marker: update"
 fb_sfxUpdate 5000
 sleep 20, 1
 
