@@ -117,6 +117,10 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#define FB_TCP_CAN_QUERY_BYTES TRUE
 #endif
 
+#define FB_TCP_SOCKET_CLIENT 0
+#define FB_TCP_SOCKET_LISTENER 1
+#define FB_TCP_SOCKET_ACCEPTED 2
+
 static int fb_DevTcpClose( FB_FILE *handle );
 static int fb_DevTcpRead( FB_FILE *handle, void *value, size_t *pValuelen );
 static int fb_DevTcpReadWstr( FB_FILE *handle, FB_WCHAR *value, size_t *pValuelen );
@@ -336,12 +340,12 @@ static DEV_TCP_INFO *fb_hDevTcpAllocInfo( FB_TCP_SOCKET hSocket, const char *psz
 	return info;
 }
 
-static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int timeout, int is_server )
+static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int timeout, int socket_role )
 {
 #if defined(HOST_DOS) || defined(HOST_JS)
 	(void)hSocket;
 	(void)timeout;
-	(void)is_server;
+	(void)socket_role;
 	return FB_RTERROR_ILLEGALFUNCTIONCALL;
 #else
 	#if defined(SO_NOSIGPIPE)
@@ -378,8 +382,9 @@ static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int tim
 	if( timeout != 0 ) {
 		#if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
 			DWORD value = (DWORD)timeout;
+			DWORD send_value = (socket_role == FB_TCP_SOCKET_ACCEPTED) ? 0 : value;
 			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&value, sizeof( value ) );
-			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_SNDTIMEO, (const char *)&value, sizeof( value ) );
+			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_SNDTIMEO, (const char *)&send_value, sizeof( send_value ) );
 		#else
 			struct timeval value;
 
@@ -394,12 +399,33 @@ static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int tim
 					Only listening sockets keep the BASIC timeout so TCP ACCEPT
 					can be used as a polling operation.
 				*/
-				if( is_server )
+				if( socket_role == FB_TCP_SOCKET_LISTENER )
 					FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&value, sizeof( value ) );
 			#endif
 
 			#if !defined(HOST_WII)
-				FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_SNDTIMEO, (const char *)&value, sizeof( value ) );
+				/*
+					OPEN TCP SERVER timeout is useful on the listening socket
+					because old threaded games poll TCP ACCEPT from their main
+					server loop.  The accepted data socket must still allow a
+					large startup packet to drain.  Inheriting timeout=1 as a
+					send timeout can otherwise make byte-wise PUT code fail on
+					stacks that enforce SO_SNDTIMEO strictly.
+				*/
+				if( socket_role != FB_TCP_SOCKET_ACCEPTED )
+					FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_SNDTIMEO, (const char *)&value, sizeof( value ) );
+				else {
+					struct timeval no_timeout;
+
+					/*
+						Some BSD stacks inherit SO_SNDTIMEO from the listener.
+						Clear it explicitly so an accepted data socket can
+						block while the peer drains byte-wise PUT traffic.
+					*/
+					no_timeout.tv_sec = 0;
+					no_timeout.tv_usec = 0;
+					FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_SNDTIMEO, (const char *)&no_timeout, sizeof( no_timeout ) );
+				}
 			#else
 				/*
 					libogc applies short send timeouts aggressively.  Old
@@ -561,7 +587,7 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 	if( FB_TCP_SOCKET_ERROR( hSocket ) )
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 
-	fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, FALSE );
+	fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, FB_TCP_SOCKET_CLIENT );
 
 	if( connect( hSocket, (struct sockaddr *)&addr, sizeof( addr ) ) == 0 ) {
 		fb_hDevTcpSetNoDelay( hSocket );
@@ -593,7 +619,7 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 		if( FB_TCP_SOCKET_ERROR( hSocket ) )
 			continue;
 
-		fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, FALSE );
+		fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, FB_TCP_SOCKET_CLIENT );
 
 		if( connect( hSocket, it->ai_addr, (int)it->ai_addrlen ) == 0 ) {
 			fb_hDevTcpSetNoDelay( hSocket );
@@ -629,7 +655,7 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 
 	FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof( yes ) );
-	fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, TRUE );
+	fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, FB_TCP_SOCKET_LISTENER );
 
 	if( bind( hSocket, (struct sockaddr *)&addr, sizeof( addr ) ) != 0 ) {
 		FB_TCP_CLOSESOCKET( hSocket );
@@ -654,7 +680,9 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 	memset( &hints, 0, sizeof( hints ) );
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
-#if defined(__HAIKU__) || (defined(HOST_WIN32) && !defined(HOST_CYGWIN))
+#if defined(HOST_HAIKU) || defined(HOST_FREEBSD) || defined(HOST_NETBSD) || \
+    defined(HOST_OPENBSD) || defined(HOST_DRAGONFLY) || defined(HOST_SOLARIS) || \
+    (defined(HOST_WIN32) && !defined(HOST_CYGWIN))
 	/*
 		Some stacks return an IPv6-only passive AF_UNSPEC listener first.
 		Old TCP programs commonly start a wildcard server and then connect
@@ -679,7 +707,7 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 			continue;
 
 		setsockopt( hSocket, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof( yes ) );
-		fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, TRUE );
+		fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, FB_TCP_SOCKET_LISTENER );
 
 		if( bind( hSocket, it->ai_addr, (int)it->ai_addrlen ) != 0 ) {
 			FB_TCP_CLOSESOCKET( hSocket );
@@ -1361,7 +1389,7 @@ int fb_DevTcpAcceptHandle( FB_FILE *server_handle, FB_FILE *client_handle )
 	if( FB_TCP_SOCKET_ERROR( hSocket ) )
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 
-	res = fb_hDevTcpApplySocketOptions( hSocket, server_info->timeout, FALSE );
+	res = fb_hDevTcpApplySocketOptions( hSocket, server_info->timeout, FB_TCP_SOCKET_ACCEPTED );
 	if( res != FB_RTERROR_OK ) {
 		FB_TCP_CLOSESOCKET( hSocket );
 		return res;

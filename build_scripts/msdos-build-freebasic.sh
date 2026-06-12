@@ -54,6 +54,7 @@ Environment:
   MAKE_JOBS              Parallel make job count (default: auto-detect host cores)
   HOST_FBC               Host compiler executable used to seed bootstrap
   HOST_FBC_ROOT          Directory containing host fbc/fbc64 (MSYS2 default: /c/freebasic when present)
+  HOST_TRIPLET           Build-host triplet passed to cross make steps
   CURL_BIN               curl executable for host downloads (MSYS2 default: /usr/bin/curl)
   TARGET_TRIPLET         DJGPP target triplet (default: i586-pc-msdosdjgpp)
   DJGPP_CROSS_VERSION    MSYS2 prebuilt toolchain release tag (default: v3.4)
@@ -228,6 +229,7 @@ if [ "$HOST_KIND" = "msys2" ]; then
 fi
 
 CROSS_MAKE_TOOL_ARGS=()
+MAKE_HOST_TRIPLET="${HOST_TRIPLET:-}"
 
 ##############################################################################
 # Version metadata
@@ -465,6 +467,19 @@ host_path_for_tool() {
 	fi
 }
 
+detect_make_host_triplet() {
+	local host_cc
+
+	for host_cc in "${HOST_CC:-}" gcc cc; do
+		[ -n "$host_cc" ] || continue
+		if have "$host_cc"; then
+			"$host_cc" -dumpmachine 2>/dev/null && return 0
+		fi
+	done
+
+	return 1
+}
+
 configure_cross_make_tool_args() {
 	local cross_cc
 	local cross_cxx
@@ -472,6 +487,11 @@ configure_cross_make_tool_args() {
 	local cross_ranlib
 	local cross_as
 	local cross_ld
+
+	if [ -z "$MAKE_HOST_TRIPLET" ]; then
+		MAKE_HOST_TRIPLET="$(detect_make_host_triplet || true)"
+	fi
+	[ -n "$MAKE_HOST_TRIPLET" ] || die "could not determine host triplet for cross make"
 
 	cross_cc="$(host_path_for_tool "$(find_cross_tool gcc)")"
 	cross_cxx="$(host_path_for_tool "$(find_cross_tool g++)")"
@@ -481,6 +501,8 @@ configure_cross_make_tool_args() {
 	cross_ld="$(host_path_for_tool "$(find_cross_tool ld)")"
 
 	CROSS_MAKE_TOOL_ARGS=(
+		CROSS_BUILD=yes
+		HOST_TRIPLET="$MAKE_HOST_TRIPLET"
 		CC="$cross_cc"
 		CXX="$cross_cxx"
 		AR="$cross_ar"
@@ -605,7 +627,7 @@ EOF
 	fi
 
 	msg "patching Linux build-djgpp djlsr makefiles for parallel make"
-	if ! grep -Fq 'djlsr205/src/makefile' "$djlsr_patch"; then
+	if ! grep -Fq 'config $(DIRS) : misc.exe' "$djlsr_patch"; then
 		cat >> "$djlsr_patch" <<'EOF'
 diff -ur djlsr205-orig/src/makefile djlsr205/src/makefile
 --- djlsr205-orig/src/makefile	2017-04-29 14:32:47.000000000 +0800
@@ -614,12 +636,26 @@ diff -ur djlsr205-orig/src/makefile djlsr205/src/makefile
  misc.exe : misc.c
  	gcc -O2 -Wall misc.c -o misc.exe
  
-+$(DIRS) : misc.exe
++config $(DIRS) : misc.exe
 +
  $(DIRS) :
  	./misc.exe mkdir $@
- 
+
 EOF
+	fi
+
+	if ! grep -Fq 'subs: config $(DIRS) makemake.exe' "$djlsr_patch"; then
+		{
+			printf '%s\n' 'diff -ur djlsr205-orig/src/makefile djlsr205/src/makefile'
+			printf '%s\n' '--- djlsr205-orig/src/makefile	2017-04-29 14:32:47.000000000 +0800'
+			printf '%s\n' '+++ djlsr205/src/makefile	2026-04-23 00:00:00.000000000 +0000'
+			printf '%s\n' '@@ -24 +24 @@'
+			printf '%s\n' '-all : misc.exe config $(DIRS) makemake.exe subs ../lib/libg.a ../lib/libpc.a'
+			printf '%s\n' '+all : misc.exe config $(DIRS) makemake.exe subs'
+			printf '%s\n' '@@ -40 +40 @@'
+			printf '%s\n' '-subs:'
+			printf '%s\n' '+subs: config $(DIRS) makemake.exe'
+		} >> "$djlsr_patch"
 	fi
 }
 

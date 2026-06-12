@@ -181,9 +181,13 @@ if( __builtin_object_size( @dst, 0 ) < sizeof( dst ) ) then
 	end 1
 end if
 
-if( __builtin_dynamic_object_size( @dst, 0 ) < sizeof( dst ) ) then
-	end 1
-end if
+'' NetBSD pkgsrc GCC 12, OpenBSD egcc, and DragonFly GCC accept the prototype
+'' but do not lower this builtin.
+#if (not defined( __FB_NETBSD__ )) and (not defined( __FB_OPENBSD__ )) and (not defined( __FB_DRAGONFLY__ ))
+	if( __builtin_dynamic_object_size( @dst, 0 ) < sizeof( dst ) ) then
+		end 1
+	end if
+#endif
 
 if( __builtin_sadd_overflow( 1, 2, @signed_result ) ) then
 	end 1

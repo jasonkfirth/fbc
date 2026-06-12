@@ -36,7 +36,67 @@ static GC shape_gc;
 static XShmSegmentInfo shm_info;
 static BLITTER *blitter;
 static int is_shm;
+static int needs_byte_swap;
 static void (*update_mask)(unsigned char *src, unsigned char *mask, int w, int h);
+
+static int host_byte_order(void)
+{
+	const unsigned int value = 1;
+
+	if (*(const unsigned char *)&value)
+		return LSBFirst;
+	else
+		return MSBFirst;
+}
+
+static void byte_swap_16(unsigned char *data, int pitch, int w, int h)
+{
+	int x;
+	unsigned char temp;
+
+	for (; h; h--) {
+		for (x = 0; x < w; x++) {
+			temp = data[(x * 2) + 0];
+			data[(x * 2) + 0] = data[(x * 2) + 1];
+			data[(x * 2) + 1] = temp;
+		}
+		data += pitch;
+	}
+}
+
+static void byte_swap_32(unsigned char *data, int pitch, int w, int h)
+{
+	int x;
+	unsigned char temp;
+
+	for (; h; h--) {
+		for (x = 0; x < w; x++) {
+			temp = data[(x * 4) + 0];
+			data[(x * 4) + 0] = data[(x * 4) + 3];
+			data[(x * 4) + 3] = temp;
+
+			temp = data[(x * 4) + 1];
+			data[(x * 4) + 1] = data[(x * 4) + 2];
+			data[(x * 4) + 2] = temp;
+		}
+		data += pitch;
+	}
+}
+
+static void byte_swap_image_region(int y, int h)
+{
+	unsigned char *data;
+
+	if (!needs_byte_swap)
+		return;
+
+	data = (unsigned char *)image->data + (y * image->bytes_per_line);
+
+	if (image->bits_per_pixel == 16)
+		byte_swap_16(data, image->bytes_per_line, fb_x11.w, h);
+	else if (image->bits_per_pixel == 32)
+		byte_swap_32(data, image->bytes_per_line, fb_x11.w, h);
+}
 
 static void update_mask_8(unsigned char *pixel, unsigned char *mask, int w, int h)
 {
@@ -107,6 +167,7 @@ static int x11_init(void)
 	image = NULL;
 	shape_image = NULL;
 	is_shm = FALSE;
+	needs_byte_swap = FALSE;
 	
 	if ((fb_x11.visual_depth >= 24) && (fb_x11.visual->red_mask == 0xFF))
 		is_rgb = TRUE;
@@ -182,6 +243,9 @@ static int x11_init(void)
 	if (!image)
 		return -1;
 	
+	needs_byte_swap = ((image->bits_per_pixel == 16) || (image->bits_per_pixel == 32)) &&
+	                   (image->byte_order != host_byte_order());
+
 	return 0;
 }
 
@@ -231,6 +295,7 @@ static void x11_update(void)
 		if (__fb_gfx->dirty[i]) {
 			for (y = i, h = 0; (i < fb_x11.h) && __fb_gfx->dirty[i]; h++, i++)
 				;
+			byte_swap_image_region(y, h);
 			if (shape_image) {
 				update_mask((unsigned char *)__fb_gfx->framebuffer + (y * __fb_gfx->pitch),
 							(unsigned char *)shape_image->data + (y * shape_image->bytes_per_line), fb_x11.w, h);

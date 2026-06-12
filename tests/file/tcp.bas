@@ -5,6 +5,9 @@
 #else
 
 const TEST_PORT = 19091
+const BURST_PORT = TEST_PORT + 1
+const WILDCARD_PORT = TEST_PORT + 2
+const BURST_BYTES = 65536
 
 dim shared as integer server_ready
 dim shared as integer server_open_ok
@@ -28,6 +31,14 @@ dim shared as zstring * 64 server_write_text
 dim shared as zstring * 64 client_write_text
 dim shared as ubyte client_put_recv(0 to 3)
 dim shared as ubyte server_put_recv(0 to 3)
+dim shared as integer burst_listener
+dim shared as integer burst_server_done
+dim shared as integer burst_server_error
+dim shared as integer burst_client_done
+dim shared as integer burst_client_error
+dim shared as integer burst_server_step
+dim shared as integer burst_client_step
+dim shared as integer burst_stop
 
 sub server_thread( byval userdata as any ptr )
 	dim as integer server
@@ -200,6 +211,116 @@ sub client_thread( byval userdata as any ptr )
 	client_done = TRUE
 end sub
 
+sub burst_server_thread( byval userdata as any ptr )
+	dim as integer client
+	dim as integer i
+	dim as ubyte value
+
+	burst_server_step = 1
+	do
+		if( burst_stop <> FALSE ) then
+			exit sub
+		end if
+		client = TCP ACCEPT( #burst_listener )
+		if( client > 0 ) then
+			exit do
+		end if
+		sleep 1, 1
+	loop
+
+	burst_server_step = 2
+	do while( eof( client ) <> 0 )
+		if( burst_stop <> FALSE ) then
+			close #client
+			exit sub
+		end if
+		if( eoc( client ) <> 0 ) then
+			burst_server_error = 1
+			close #client
+			exit sub
+		end if
+		sleep 1, 1
+	loop
+
+	if( get( #client, , value ) <> 0 ) then
+		burst_server_error = 2
+		close #client
+		exit sub
+	end if
+
+	burst_server_step = 3
+	for i = 0 to BURST_BYTES - 1
+		if( burst_stop <> FALSE ) then
+			close #client
+			exit sub
+		end if
+		value = i and 255
+		if( put( #client, , value ) <> 0 ) then
+			burst_server_error = 3
+			close #client
+			exit sub
+		end if
+	next
+
+	close #client
+	burst_server_step = 4
+	burst_server_done = TRUE
+end sub
+
+sub burst_client_thread( byval userdata as any ptr )
+	dim as integer client
+	dim as integer i
+	dim as ubyte value
+	dim as ubyte expected
+
+	burst_client_step = 1
+	client = freefile()
+	if( OPEN TCP( "host=127.0.0.1,port=" & str( BURST_PORT ) AS #client ) <> 0 ) then
+		burst_client_error = 1
+		exit sub
+	end if
+
+	value = 101
+	if( put( #client, , value ) <> 0 ) then
+		burst_client_error = 2
+		close #client
+		exit sub
+	end if
+
+	burst_client_step = 2
+	for i = 0 to BURST_BYTES - 1
+		do while( eof( client ) <> 0 )
+			if( burst_stop <> FALSE ) then
+				close #client
+				exit sub
+			end if
+			if( eoc( client ) <> 0 ) then
+				burst_client_error = 3
+				close #client
+				exit sub
+			end if
+			sleep 1, 1
+		loop
+
+		if( get( #client, , value ) <> 0 ) then
+			burst_client_error = 4
+			close #client
+			exit sub
+		end if
+
+		expected = i and 255
+		if( value <> expected ) then
+			burst_client_error = 5
+			close #client
+			exit sub
+		end if
+	next
+
+	close #client
+	burst_client_step = 3
+	burst_client_done = TRUE
+end sub
+
 scope
 	dim as any ptr server_id
 	dim as any ptr client_id
@@ -249,5 +370,67 @@ ASSERT( server_put_recv(0) = 10 )
 ASSERT( server_put_recv(1) = 11 )
 ASSERT( server_put_recv(2) = 12 )
 ASSERT( server_put_recv(3) = 13 )
+
+scope
+	dim as any ptr server_id
+	dim as any ptr client_id
+	dim as integer tries
+
+	burst_listener = freefile()
+	burst_stop = FALSE
+	if( OPEN TCP SERVER( "host=127.0.0.1,port=" & str( BURST_PORT ) & ",backlog=1,timeout=1" AS #burst_listener ) <> 0 ) then
+		print "burst server open failed"
+		end 1
+	end if
+
+	server_id = threadcreate( @burst_server_thread )
+	client_id = threadcreate( @burst_client_thread )
+
+	tries = 0
+	do while( (burst_server_done = FALSE or burst_client_done = FALSE) andalso _
+	          (burst_server_error = 0) andalso (burst_client_error = 0) andalso _
+	          (tries < 20000) )
+		sleep 1, 1
+		tries += 1
+	loop
+
+	if( burst_server_done = FALSE or burst_client_done = FALSE ) then
+		burst_stop = TRUE
+		threadwait( server_id )
+		threadwait( client_id )
+		close #burst_listener
+		print "burst timeout server_step="; burst_server_step; " client_step="; burst_client_step; _
+		      " server_error="; burst_server_error; " client_error="; burst_client_error
+		end 1
+	end if
+
+	close #burst_listener
+	threadwait( server_id )
+	threadwait( client_id )
+end scope
+
+ASSERT( burst_server_error = 0 )
+ASSERT( burst_client_error = 0 )
+
+scope
+	dim as integer server
+	dim as integer client
+
+	server = freefile()
+	if( OPEN TCP SERVER( "port=" & str( WILDCARD_PORT ) & ",backlog=1" AS #server ) <> 0 ) then
+		print "wildcard server open failed"
+		end 1
+	end if
+
+	client = freefile()
+	if( OPEN TCP( "host=127.0.0.1,port=" & str( WILDCARD_PORT ) AS #client ) <> 0 ) then
+		print "wildcard IPv4 client open failed"
+		close #server
+		end 1
+	end if
+
+	close #client
+	close #server
+end scope
 
 #endif

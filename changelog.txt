@@ -1,6 +1,14 @@
 Version 1.20.1
 
 [changed]
+- build/DragonFly: print and upload the individual fbctests per-test logs when log-test summaries report failures, making VM package failures easier to diagnose from archived artifacts.
+- build/illumos: resolve the selected GCC package even when an installed compiler binary is already present, keeping compiler dependency metadata deterministic before package probes are skipped.
+- build/MS-DOS: pass the real build-host triplet into cross make steps, mark those make invocations as cross builds, and harden the Linux build-djgpp source patch so parallel builds order generated DJGPP helper targets correctly.
+- inc/tests: disable __builtin_dynamic_object_size declarations and checks on NetBSD, OpenBSD, and DragonFly GCC variants that accept the prototype but still emit unresolved external calls instead of lowering the builtin.
+- rtlib/TCP: distinguish client, listener, and accepted sockets when applying socket options, clear inherited send timeouts on accepted data sockets, and prefer IPv4 wildcard listeners on stacks where passive AF_UNSPEC can return an IPv6-only listener first.
+- rtlib/threading: raise the default pthread stack floor on Linux as well as the BSD, Haiku, and Solaris-family targets, covering musl systems whose PTHREAD_STACK_MIN is too small for normal threaded BASIC programs.
+- gfxlib2/X11: byte-swap 16-bit and 32-bit XImage dirty regions when the X server image byte order differs from the host, fixing mixed-endian or remote-display update paths while leaving same-endian updates untouched.
+- tests: extend TCP log-test coverage with a large accepted-socket burst transfer and wildcard IPv4 loopback connection check for the OPEN TCP SERVER/TCP ACCEPT path.
 - build/Haiku: extended the VM package builder to build and validate both x86_64 and i386/x86_gcc2 Haiku packages, using the matching QEMU image/toolchain path for each architecture and archiving packages, logs, checksums, audio captures, and exampleageddon reports under out/haiku/<arch>.
 - packaging/Haiku: added secondary x86 package support by producing freebasic_x86 packages on x86_gcc2, installing the Haiku secondary x86 GCC/binutils/runtime dependencies, and running package builds and tests through setarch x86 where required.
 - compiler/Haiku: fixed i386 startup/link behavior by emitting constructor/destructor sections in the form expected by the Haiku x86 toolchain and teaching the installed compiler to discover Haiku's secondary x86 GCC, assembler, archiver, and linker.

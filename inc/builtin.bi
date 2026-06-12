@@ -173,8 +173,12 @@ extern "C"
 #ifndef __builtin_object_size
 	declare function __builtin_object_size cdecl alias "__builtin_object_size" ( byval as const any ptr, byval as long ) as __fb_builtin_size_t
 #endif
-#ifndef __builtin_dynamic_object_size
-	declare function __builtin_dynamic_object_size cdecl alias "__builtin_dynamic_object_size" ( byval as const any ptr, byval as long ) as __fb_builtin_size_t
+'' NetBSD pkgsrc GCC 12, OpenBSD egcc, and DragonFly GCC accept this declaration
+'' but still emit an external call instead of lowering it as a builtin.
+#if (not defined( __FB_NETBSD__ )) and (not defined( __FB_OPENBSD__ )) and (not defined( __FB_DRAGONFLY__ ))
+	#ifndef __builtin_dynamic_object_size
+		declare function __builtin_dynamic_object_size cdecl alias "__builtin_dynamic_object_size" ( byval as const any ptr, byval as long ) as __fb_builtin_size_t
+	#endif
 #endif
 
 '' Fixed-type overflow helpers.  The C type-generic overflow builtins are not

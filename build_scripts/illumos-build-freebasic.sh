@@ -1060,6 +1060,7 @@ ensure_gcc_dependency() {
 		return 0
 	fi
 	if compiler_binary_present; then
+		resolve_gcc_package || true
 		echo "INFO: installed compiler binary found; skipping compiler package probes" >&2
 		return 0
 	fi

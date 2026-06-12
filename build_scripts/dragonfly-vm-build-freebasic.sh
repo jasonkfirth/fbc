@@ -593,6 +593,12 @@ run_fbctests() {
 		[ -f "\$failed_log" ] || fail "missing log-tests summary: \$failed_log"
 		if ! grep -qi 'None Found' "\$failed_log"; then
 			cat "\$failed_log"
+			grep ': RESULT=FAILED' "\$failed_log" | while IFS=: read -r test_log rest; do
+				[ -f "\$test_log" ] || continue
+				echo "==> failed test log: \$test_log"
+				cat "\$test_log"
+				upload "\$test_log" "fbctests-\$(basename "\$test_log")"
+			done
 			fail "log-tests reported failures in \$failed_log"
 		fi
 	done
