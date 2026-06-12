@@ -30,12 +30,41 @@ ifdef TARGET
   override TARGET :=
 endif
 
-# Determine host triplet via compiler driver; do NOT assume gcc exists
+# Determine host triplet via compiler driver; do NOT assume gcc exists.
+#
+# In MSYS2 it is common to invoke /usr/bin/make from an environment where the
+# active MinGW compiler is not on PATH yet.  That is especially visible on
+# Windows ARM64: the MSYS runtime can be x86_64 while the selected MinGW
+# subsystem is CLANGARM64.  Infer the subsystem triplet as a fallback so early
+# platform parsing does not abort before compiler-config.mk can select tools.
+_msys2_env_triplet := $(strip $(shell \
+  msystem="$${MSYSTEM:-}"; \
+  if [ "$$msystem" = CLANGARM64 ]; then \
+    echo aarch64-w64-mingw32; \
+  elif [ "$$msystem" = MINGW32 ]; then \
+    echo i686-w64-mingw32; \
+  elif [ "$$msystem" = MINGW64 ] || [ "$$msystem" = UCRT64 ] || [ "$$msystem" = CLANG64 ]; then \
+    echo x86_64-w64-mingw32; \
+  else \
+    uname_s="$$(uname -s 2>/dev/null || true)"; \
+    if printf '%s\n' "$$uname_s" | grep -Eq '^(MINGW|MSYS|CYGWIN).*_NT'; then \
+      if [ -x /mingw64/bin/gcc.exe ] || [ -x /mingw64/bin/clang.exe ]; then \
+        echo x86_64-w64-mingw32; \
+      elif [ -x /mingw32/bin/gcc.exe ] || [ -x /mingw32/bin/clang.exe ]; then \
+        echo i686-w64-mingw32; \
+      fi; \
+    fi; \
+  fi \
+))
 
-# Try known GNU-style compilers in order
+# Try known GNU-style compilers in order.  Prefer the active MSYS2 subsystem
+# when one is selected; non-active MinGW prefixes are handled by the fallback
+# above to avoid accidentally turning CLANGARM64 shells into x86_64 builds.
 _cc_for_dump := $(firstword \
   $(foreach c, \
-    $(CC) gcc egcc clang, \
+    $(CC) \
+    $(if $(MINGW_PREFIX),$(MINGW_PREFIX)/bin/gcc $(MINGW_PREFIX)/bin/clang) \
+    gcc egcc clang, \
     $(if $(shell command -v $(c) 2>/dev/null),$(c)) \
   ) \
 )
@@ -46,6 +75,11 @@ ifeq ($(_cc_for_dump),)
 endif
 
 HOST_TRIPLET := $(strip $(shell $(_cc_for_dump) -dumpmachine 2>/dev/null || echo unknown-unknown-unknown))
+ifeq ($(HOST_TRIPLET),unknown-unknown-unknown)
+  ifneq ($(strip $(_msys2_env_triplet)),)
+    HOST_TRIPLET := $(_msys2_env_triplet)
+  endif
+endif
 
 # Fallback to host if no explicit target
 TARGET_TRIPLET := $(strip $(if $(TARGET_TRIPLET),$(TARGET_TRIPLET),$(HOST_TRIPLET)))

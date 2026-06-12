@@ -29,17 +29,24 @@ MSYS_ACTIVE_PREFIX := $(strip $(MINGW_PREFIX))
 MSYS_TARGET_PREFIX :=
 MSYS_AARCH64_CROSS :=
 MSYS_AARCH64_SYSROOT := /clangarm64
-MSYS_AARCH64_RESOURCE_DIR := $(strip $(shell find $(MSYS_AARCH64_SYSROOT)/lib/clang -mindepth 1 -maxdepth 1 -type d 2>/dev/null | $(MSYS_VERSION_SORT) | tail -n 1))
-MSYS_AARCH64_CLANG_FLAGS := -Qunused-arguments --target=aarch64-w64-mingw32 --sysroot=$(MSYS_AARCH64_SYSROOT) $(if $(MSYS_AARCH64_RESOURCE_DIR),-resource-dir $(MSYS_AARCH64_RESOURCE_DIR)) -fuse-ld=lld --rtlib=compiler-rt --unwindlib=libunwind
+MSYS_AARCH64_NATIVE := $(strip $(if $(filter /clangarm64,$(MSYS_ACTIVE_PREFIX)),$(if $(wildcard /clangarm64/bin/gcc.exe /clangarm64/bin/clang.exe),yes)))
+MSYS_AARCH64_RESOURCE_DIR :=
 
-ifneq ($(filter aarch64-w64-mingw32 arm64-w64-mingw32,$(TARGET_TRIPLET_LC)),)
-  MSYS_TARGET_PREFIX := /mingw64
-  MSYS_AARCH64_CROSS := yes
+ifneq ($(filter aarch64-w64-mingw32 arm64-w64-mingw32 aarch64-w64-windows-gnu arm64-w64-windows-gnu,$(TARGET_TRIPLET_LC)),)
+  MSYS_AARCH64_RESOURCE_DIR := $(strip $(shell find $(MSYS_AARCH64_SYSROOT)/lib/clang -mindepth 1 -maxdepth 1 -type d 2>/dev/null | $(MSYS_VERSION_SORT) | tail -n 1))
+  ifeq ($(MSYS_AARCH64_NATIVE),yes)
+    MSYS_TARGET_PREFIX := /clangarm64
+  else
+    MSYS_TARGET_PREFIX := /mingw64
+    MSYS_AARCH64_CROSS := yes
+  endif
 else ifeq ($(TARGET_TRIPLET_LC),i686-w64-mingw32)
   MSYS_TARGET_PREFIX := /mingw32
 else ifeq ($(TARGET_TRIPLET_LC),x86_64-w64-mingw32)
   MSYS_TARGET_PREFIX := /mingw64
 endif
+
+MSYS_AARCH64_CLANG_FLAGS := -Qunused-arguments --target=aarch64-w64-mingw32 --sysroot=$(MSYS_AARCH64_SYSROOT) $(if $(MSYS_AARCH64_RESOURCE_DIR),-resource-dir $(MSYS_AARCH64_RESOURCE_DIR)) -fuse-ld=lld --rtlib=compiler-rt --unwindlib=libunwind
 
 MSYS_HOST_GCC := $(firstword $(wildcard \
   $(if $(MSYS_ACTIVE_PREFIX),$(MSYS_ACTIVE_PREFIX)/bin/gcc.exe $(MSYS_ACTIVE_PREFIX)/bin/clang.exe) \
@@ -80,8 +87,13 @@ ifeq ($(MSYS_AARCH64_CROSS),yes)
 endif
 
 HOST_VERSION_SORT := $(MSYS_VERSION_SORT)
-HOMEBREW_GCC := $(strip $(shell find /opt/homebrew/bin /usr/local/bin -maxdepth 1 \( -type f -o -type l \) -name 'gcc-*' 2>/dev/null | grep -E '/gcc-[0-9]+$$' | $(HOST_VERSION_SORT) | tail -n1))
-HOMEBREW_GXX := $(strip $(shell find /opt/homebrew/bin /usr/local/bin -maxdepth 1 \( -type f -o -type l \) -name 'g++-*' 2>/dev/null | grep -E '/g[+][+]-[0-9]+$$' | $(HOST_VERSION_SORT) | tail -n1))
+HOST_UNAME_S := $(strip $(shell uname -s 2>/dev/null || echo unknown))
+HOMEBREW_GCC :=
+HOMEBREW_GXX :=
+ifeq ($(HOST_UNAME_S),Darwin)
+  HOMEBREW_GCC := $(strip $(shell find /opt/homebrew/bin /usr/local/bin -maxdepth 1 \( -type f -o -type l \) -name 'gcc-*' 2>/dev/null | grep -E '/gcc-[0-9]+$$' | $(HOST_VERSION_SORT) | tail -n1))
+  HOMEBREW_GXX := $(strip $(shell find /opt/homebrew/bin /usr/local/bin -maxdepth 1 \( -type f -o -type l \) -name 'g++-*' 2>/dev/null | grep -E '/g[+][+]-[0-9]+$$' | $(HOST_VERSION_SORT) | tail -n1))
+endif
 
 HOST_CC_FOR_PROBE := $(strip $(or $(LOCAL_GCC),$(MSYS_HOST_GCC),$(HOMEBREW_GCC),$(CC),gcc))
 HOST_TRIPLET := $(shell $(HOST_CC_FOR_PROBE) -dumpmachine 2>/dev/null || echo unknown)
@@ -281,6 +293,17 @@ ifneq ($(filter default file,$(origin CC)),)
     CC := $(HOMEBREW_GCC)
   else
     CC := gcc
+  endif
+endif
+
+CC_TOOL := $(firstword $(CC))
+ifeq ($(strip $(CLANG)),)
+  ifneq ($(filter %clang %clang.exe,$(CC_TOOL)),)
+    CLANG := $(CC_TOOL)
+  else ifneq ($(strip $(MSYS_TARGET_PREFIX)),)
+    CLANG := $(firstword $(wildcard $(MSYS_TARGET_PREFIX)/bin/clang.exe))
+  else ifneq ($(strip $(MSYS_ACTIVE_PREFIX)),)
+    CLANG := $(firstword $(wildcard $(MSYS_ACTIVE_PREFIX)/bin/clang.exe))
   endif
 endif
 

@@ -104,9 +104,15 @@ FBC_TOOL_ENV := env \
 	ELF2DOL='$(FBC_ENV_ELF2DOL)'
 RUN_CC := $(TOOLCHAIN_PATH_ENV) $(CC)
 RUN_CXX := $(TOOLCHAIN_PATH_ENV) $(CXX)
-DARWIN_CLANG ?= $(strip $(shell xcrun --find clang 2>/dev/null || command -v clang 2>/dev/null || echo clang))
+DARWIN_CLANG ?= clang
+ifeq ($(TARGET_OS),darwin)
+DARWIN_CLANG := $(strip $(shell xcrun --find clang 2>/dev/null || command -v clang 2>/dev/null || echo clang))
+endif
 RUN_DARWIN_CLANG := $(TOOLCHAIN_PATH_ENV) $(DARWIN_CLANG)
+DARWIN_SDKROOT :=
+ifeq ($(TARGET_OS),darwin)
 DARWIN_SDKROOT := $(strip $(shell xcrun --show-sdk-path 2>/dev/null))
+endif
 DARWIN_BLOCKS_CFLAGS := -fblocks
 ifneq ($(strip $(DARWIN_SDKROOT)),)
 DARWIN_BLOCKS_CFLAGS += -isysroot $(DARWIN_SDKROOT)

@@ -21,8 +21,13 @@ BOOTFBCGEN ?= gcc
 BOOT_FBC := $(AVAILABLE_FBC)
 
 # Ensure bootstrap emission uses this tree's local bin/lib layout.
-BOOT_FBC_BUILD_ROOT := $(rootdir)
+BOOTSTRAP_HOST_IS_MSYS :=
 ifneq ($(filter MSYS% MINGW%,$(shell uname -s 2>/dev/null)),)
+BOOTSTRAP_HOST_IS_MSYS := yes
+endif
+
+BOOT_FBC_BUILD_ROOT := $(rootdir)
+ifeq ($(BOOTSTRAP_HOST_IS_MSYS),yes)
 BOOT_FBC_BUILD_ROOT := $(shell cygpath -m "$(rootdir)")
 endif
 BOOT_FBC_PREFIX_OPT := -prefix $(BOOT_FBC_BUILD_ROOT)
@@ -154,10 +159,6 @@ endif
 
 BOOTSTRAP_COMPILER_SRC := $(FBC_SRC)
 BOOTSTRAP_INC_DIR := $(rootdir)/inc
-ifneq ($(filter MSYS% MINGW%,$(shell uname -s 2>/dev/null)),)
-BOOTSTRAP_COMPILER_SRC := $(foreach f,$(BOOTSTRAP_COMPILER_SRC),$(shell cygpath -m "$(f)"))
-BOOTSTRAP_INC_DIR := $(shell cygpath -m "$(BOOTSTRAP_INC_DIR)")
-endif
 
 ##############################################################################
 # Bootstrap emission
@@ -165,7 +166,11 @@ endif
 
 bootstrap-emit-source-response: | $(BOOTSTRAP_OUT)
 	@rm -f "$(BOOTSTRAP_SRC_RSP)"
-	@for f in $(BOOTSTRAP_COMPILER_SRC); do \
+	@msys="$(BOOTSTRAP_HOST_IS_MSYS)"; \
+	for f in $(BOOTSTRAP_COMPILER_SRC); do \
+		if [ "$$msys" = yes ]; then \
+			f="$$(cygpath -m "$$f")"; \
+		fi; \
 		printf '%s\n' "-b $$f" >> "$(BOOTSTRAP_SRC_RSP)"; \
 	done
 	@test -s "$(BOOTSTRAP_SRC_RSP)" || { \
@@ -196,13 +201,17 @@ bootstrap-emit: bootstrap-check
 	@echo "==> Writing bootstrap source response file"
 	@$(MAKE) bootstrap-emit-source-response
 
+	@bootstrap_inc="$(BOOTSTRAP_INC_DIR)"; \
+	if [ "$(BOOTSTRAP_HOST_IS_MSYS)" = yes ]; then \
+		bootstrap_inc="$$(cygpath -m "$$bootstrap_inc")"; \
+	fi; \
 	$(BOOT_FBC_TOOL_ENV) $(BOOT_FBC) $(BOOT_FBC_PREFIX_OPT) @"$(BOOTSTRAP_SRC_RSP)" \
 		-m fbc \
 		-gen $(BOOTFBCGEN) \
 		-target $(BOOT_EMIT_TARGET) \
 		$(if $(BOOTSTRAP_ARCH),-arch $(BOOTSTRAP_ARCH)) \
 		$(BOOTSTRAP_COMPAT_DEFINES) \
-		-i $(BOOTSTRAP_INC_DIR) \
+		-i "$$bootstrap_inc" \
 		-e -r -v \
 		$(BOOTFBCFLAGS)
 

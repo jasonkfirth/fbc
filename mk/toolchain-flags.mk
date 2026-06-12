@@ -38,6 +38,12 @@ ARFLAGS ?= rcs
 RANLIB  ?= ranlib
 ELF2DOL ?= elf2dol
 
+TOOLCHAIN_CC_TOOL := $(notdir $(firstword $(CC)))
+TOOLCHAIN_CC_IS_CLANG :=
+ifneq ($(findstring clang,$(TOOLCHAIN_CC_TOOL)),)
+TOOLCHAIN_CC_IS_CLANG := yes
+endif
+
 # OpenBSD requires GCC (clang incompatible with fbc output)
 ifeq ($(TARGET_OS),openbsd)
   CC  := egcc
@@ -359,6 +365,8 @@ endif
 ifeq ($(THREAD_MODEL),win32)
 ifeq ($(TARGET_OS),xbox)
 MT_CFLAGS := -DENABLE_MT
+else ifeq ($(TOOLCHAIN_CC_IS_CLANG),yes)
+MT_CFLAGS := -DENABLE_MT
 else
 MT_CFLAGS := -mthreads -DENABLE_MT
 endif
@@ -440,30 +448,18 @@ TOOLCHAIN_CXXFLAGS :=
 TOOLCHAIN_LDFLAGS :=
 
 TOOLCHAIN_FBCFLAGS :=
-TOOLCHAIN_FBCFLAGS += -Wc -Wno-missing-field-initializers
-TOOLCHAIN_FBCFLAGS += -Wc -Wno-builtin-declaration-mismatch
 TOOLCHAIN_FBLFLAGS :=
 TOOLCHAIN_FBRTCFLAGS :=
 TOOLCHAIN_FBRTLFLAGS :=
 TOOLCHAIN_FBC_ENV :=
 
-ifneq ($(filter linux cygwin darwin win32 win64,$(TARGET_OS)),)
-  # Newer GCC range analysis is noisy on fbc-generated C code.  Keep this
-  # scoped to generated compiler/runtime C so handwritten C warnings remain
-  # visible.
-  TOOLCHAIN_FBCFLAGS += -Wc -Wno-maybe-uninitialized
-  TOOLCHAIN_FBCFLAGS += -Wc -Wno-type-limits
-  TOOLCHAIN_FBRTCFLAGS += -Wc -Wno-maybe-uninitialized
-  TOOLCHAIN_FBRTCFLAGS += -Wc -Wno-type-limits
-  TOOLCHAIN_FBRTLFLAGS += -Wc -Wno-maybe-uninitialized
-  TOOLCHAIN_FBRTLFLAGS += -Wc -Wno-type-limits
-endif
-
 
 ifeq ($(TARGET_OS),win32)
 
+ifneq ($(TOOLCHAIN_CC_IS_CLANG),yes)
 TOOLCHAIN_CFLAGS   += -mconsole
 TOOLCHAIN_CXXFLAGS += -mconsole
+endif
 TOOLCHAIN_LDFLAGS  += -mconsole
 
 endif
@@ -668,6 +664,31 @@ FBC_FORWARD_CFLAGS := $(filter-out -Wp%,$(FBC_FORWARD_CFLAGS))
 FBC_WCFLAGS := $(foreach f,$(FBC_FORWARD_CFLAGS),-Wc $(f))
 
 ALLFBCFLAGS += $(FBC_WCFLAGS)
+
+##############################################################################
+# Generated C warning suppressions
+##############################################################################
+
+# Keep these after forwarded -Wall/-Wextra so generated compiler/runtime C stays
+# quiet without weakening diagnostics for handwritten C sources.
+GENERATED_C_WARN_SUPPRESS := \
+  -Wc -Wno-missing-field-initializers
+
+ifeq ($(TOOLCHAIN_CC_IS_CLANG),yes)
+GENERATED_C_WARN_SUPPRESS += \
+  -Wc -Wno-unused-function \
+  -Wc -Wno-unused-label \
+  -Wc -Wno-unused-variable
+else ifneq ($(filter linux cygwin darwin win32 win64,$(TARGET_OS)),)
+GENERATED_C_WARN_SUPPRESS += \
+  -Wc -Wno-builtin-declaration-mismatch \
+  -Wc -Wno-maybe-uninitialized \
+  -Wc -Wno-type-limits
+endif
+
+ALLFBCFLAGS   += $(GENERATED_C_WARN_SUPPRESS)
+ALLFBRTCFLAGS += $(GENERATED_C_WARN_SUPPRESS)
+ALLFBRTLFLAGS += $(GENERATED_C_WARN_SUPPRESS)
 
 
 #############################

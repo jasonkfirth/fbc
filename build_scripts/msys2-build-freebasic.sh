@@ -587,11 +587,16 @@ install_dependencies() {
 			mingw-w64-x86_64-llvm \
 			mingw-w64-x86_64-llvm-tools \
 			mingw-w64-x86_64-tools \
+			mingw-w64-clang-aarch64-clang \
 			mingw-w64-clang-aarch64-compiler-rt \
 			mingw-w64-clang-aarch64-crt \
 			mingw-w64-clang-aarch64-headers \
+			mingw-w64-clang-aarch64-lld \
+			mingw-w64-clang-aarch64-llvm \
+			mingw-w64-clang-aarch64-llvm-tools \
 			mingw-w64-clang-aarch64-libunwind \
 			mingw-w64-clang-aarch64-libwinpthread \
+			mingw-w64-clang-aarch64-tools \
 			mingw-w64-clang-aarch64-winpthreads
 	fi
 
@@ -1319,6 +1324,9 @@ validate_arm64_with_qemu() {
 validate_distribution() {
 	local validate_dir="$BUILDROOT/validate"
 	local saved_path="$PATH"
+	local host_uname_s
+	local host_uname_m
+	local host_is_windows_arm64=0
 
 	msg "Validating packaged desktop compilers"
 	rm -rf "$validate_dir"
@@ -1342,16 +1350,25 @@ EOF
 		if [ "$QEMU_ARM64_VALIDATE" -ne 0 ]; then
 			validate_arm64_with_qemu "$ARM64_DISTROOT"
 		else
-			case "$(uname -m)" in
-				aarch64|arm64)
-					run "$ARM64_DISTROOT/fbcarm64.exe" "$validate_dir/hello.bas" -x "$validate_dir/helloarm64.exe"
-					[ "$("$validate_dir/helloarm64.exe")" = "FreeBASIC package test OK" ] || fail "packaged fbcarm64.exe produced bad output"
-					;;
-				*)
-					echo "WARNING: skipping fbcarm64.exe runtime validation on non-ARM64 host" >&2
-					echo "WARNING: use --qemu-arm64-validate with QEMU_ARM64_DISK and QEMU_ARM64_SSH_USER to run it under QEMU" >&2
+			host_uname_s="$(uname -s 2>/dev/null || true)"
+			host_uname_m="$(uname -m 2>/dev/null || true)"
+			case "$host_uname_s:${PROCESSOR_ARCHITECTURE:-}:${PROCESSOR_ARCHITEW6432:-}" in
+				*ARM64*|*arm64*|*AARCH64*|*aarch64*)
+					host_is_windows_arm64=1
 					;;
 			esac
+			case "$host_uname_m" in
+				aarch64|arm64)
+					host_is_windows_arm64=1
+					;;
+			esac
+			if [ "$host_is_windows_arm64" -ne 0 ]; then
+					run "$ARM64_DISTROOT/fbcarm64.exe" "$validate_dir/hello.bas" -x "$validate_dir/helloarm64.exe"
+					[ "$("$validate_dir/helloarm64.exe")" = "FreeBASIC package test OK" ] || fail "packaged fbcarm64.exe produced bad output"
+			else
+				echo "WARNING: skipping fbcarm64.exe runtime validation on non-ARM64 host" >&2
+				echo "WARNING: use --qemu-arm64-validate with QEMU_ARM64_DISK and QEMU_ARM64_SSH_USER to run it under QEMU" >&2
+			fi
 		fi
 	fi
 

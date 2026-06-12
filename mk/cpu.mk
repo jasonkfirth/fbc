@@ -26,7 +26,7 @@
 
 ARM_VER :=
 
-ifeq ($(ISA_FAMILY),arm)
+ifeq ($(TARGET_ARCH),arm)
 
   ifneq ($(filter armv8%,$(TARGET_ARCH_RAW)),)
     ARM_VER := v8
@@ -50,7 +50,7 @@ endif
 
 ifndef ARM_FLOAT_ABI
 
-ifeq ($(ISA_FAMILY),arm)
+ifeq ($(TARGET_ARCH),arm)
 
   ifneq ($(filter armhf,$(TARGET_ARCH_RAW)),)
     ARM_FLOAT_ABI := hf
@@ -70,7 +70,7 @@ endif
 # when the architecture requires a subtype.
 ##############################################################################
 
-ifeq ($(ISA_FAMILY),arm)
+ifeq ($(TARGET_ARCH),arm)
 
 ARM_FLOAT_ABI ?= soft
 
