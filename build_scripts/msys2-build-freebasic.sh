@@ -1261,7 +1261,12 @@ Section "Install"
 	; that expanded tree to NSIS with File /r can exceed makensis' practical
 	; datablock limits, so the installer stores a normal zip payload and asks
 	; Windows PowerShell to extract it into the chosen install directory.
-	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force -ErrorAction Stop"'
+	FileOpen \$0 "\$PLUGINSDIR\\extract-payload.ps1" w
+	FileWrite \$0 "param([string] \$\$PayloadZip, [string] \$\$Destination)$\r$\n"
+	FileWrite \$0 "\$\$ErrorActionPreference = 'Stop'$\r$\n"
+	FileWrite \$0 "Expand-Archive -LiteralPath \$\$PayloadZip -DestinationPath \$\$Destination -Force -ErrorAction Stop$\r$\n"
+	FileClose \$0
+	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "\$PLUGINSDIR\\extract-payload.ps1" "\$PLUGINSDIR\\freebasic-payload.zip" "\$INSTDIR"'
 	Pop \$0
 	StrCmp \$0 "0" payload_done
 		Abort "Failed to extract the FreeBASIC payload. PowerShell exit code: \$0"
@@ -1290,6 +1295,31 @@ EOF
 		fail "makensis failed while creating $package_name installer"
 	fi
 	rm -f "$installer_payload_zip"
+}
+
+validate_installer() {
+	local package_root="${1:-$DISTROOT}"
+	local package_name
+	local installer_exe
+	local installer_kind="windows-gcc"
+
+	[ "$SKIP_VALIDATE" -eq 0 ] || return 0
+	[ "$SKIP_INSTALLER" -eq 0 ] || return 0
+	[ "$SKIP_PACKAGE" -eq 0 ] || return 0
+
+	package_name="$(basename "$package_root")"
+	installer_exe="$OUT/${package_name}-setup.exe"
+
+	case "$package_name" in
+		*arm64*) installer_kind="windows-arm64" ;;
+	esac
+
+	[ -f "$installer_exe" ] || fail "missing installer for smoke test: $installer_exe"
+
+	run bash "$ROOT/build_scripts/msys2-test-freebasic-installer.sh" \
+		--installer "$installer_exe" \
+		--kind "$installer_kind" \
+		--workroot "$BUILDROOT/installer-smoke"
 }
 
 ##############################################################################
@@ -1426,6 +1456,7 @@ fi
 if [ "$SKIP_INSTALLER" -eq 0 ]; then
 	for package_root in "${PACKAGED_DISTROOTS[@]}"; do
 		create_installer "$package_root"
+		validate_installer "$package_root"
 	done
 fi
 

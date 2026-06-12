@@ -810,7 +810,12 @@ Section "FreeBASIC Wii" SEC01
     ;
     ; Keep the package tree as a normal zip payload so makensis does not need
     ; to mmap every bundled FreeBASIC and devkitPro file individually.
-	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-wii-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force -ErrorAction Stop"'
+    FileOpen \$0 "\$PLUGINSDIR\\extract-payload.ps1" w
+    FileWrite \$0 "param([string] \$\$PayloadZip, [string] \$\$Destination)$\r$\n"
+    FileWrite \$0 "\$\$ErrorActionPreference = 'Stop'$\r$\n"
+    FileWrite \$0 "Expand-Archive -LiteralPath \$\$PayloadZip -DestinationPath \$\$Destination -Force -ErrorAction Stop$\r$\n"
+    FileClose \$0
+    nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "\$PLUGINSDIR\\extract-payload.ps1" "\$PLUGINSDIR\\freebasic-wii-payload.zip" "\$INSTDIR"'
     Pop \$0
     StrCmp \$0 "0" payload_done
         Abort "Failed to extract the FreeBASIC Wii payload. PowerShell exit code: \$0"
@@ -873,6 +878,22 @@ build_installer()
     rm -f "${installer_payload_zip}"
 }
 
+validate_installer()
+{
+    if [ "${DO_VALIDATE}" -eq 0 ] || [ "${DO_INSTALLER}" -eq 0 ] || [ "${DO_PACKAGE}" -eq 0 ]; then
+        return 0
+    fi
+
+    if [ ! -f "${INSTALLER_PATH}" ]; then
+        fail "missing installer for smoke test: ${INSTALLER_PATH}"
+    fi
+
+    run bash "${ROOT_DIR}/build_scripts/msys2-test-freebasic-installer.sh" \
+        --installer "${INSTALLER_PATH}" \
+        --kind wii \
+        --workroot "${BUILDROOT}/installer-smoke"
+}
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -900,6 +921,7 @@ build_wii_freebasic
 assemble_package
 validate_package
 build_installer
+validate_installer
 
 msg "Wii package complete"
 printf 'package tree: %s\n' "${PACKAGE_ROOT}"

@@ -1250,7 +1250,12 @@ Section "Install"
 	; Python support, and UCRT runtime files.  Passing that expanded tree to
 	; NSIS File /r can hit makensis datablock limits, so store it as a normal
 	; zip payload and extract it through Windows PowerShell during install.
-	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-js-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force -ErrorAction Stop"'
+	FileOpen \$0 "\$PLUGINSDIR\\extract-payload.ps1" w
+	FileWrite \$0 "param([string] \$\$PayloadZip, [string] \$\$Destination)$\r$\n"
+	FileWrite \$0 "\$\$ErrorActionPreference = 'Stop'$\r$\n"
+	FileWrite \$0 "Expand-Archive -LiteralPath \$\$PayloadZip -DestinationPath \$\$Destination -Force -ErrorAction Stop$\r$\n"
+	FileClose \$0
+	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "\$PLUGINSDIR\\extract-payload.ps1" "\$PLUGINSDIR\\freebasic-js-payload.zip" "\$INSTDIR"'
 	Pop \$0
 	StrCmp \$0 "0" payload_done
 		Abort "Failed to extract the FreeBASIC JS payload. PowerShell exit code: \$0"
@@ -1279,6 +1284,20 @@ EOF
 		fail "makensis failed while creating fbc-js installer"
 	fi
 	rm -f "$installer_payload_zip"
+}
+
+validate_installer() {
+	local installer_exe="$OUT/${DISTNAME}-setup.exe"
+
+	[ "$SKIP_VALIDATE" -eq 0 ] || return 0
+	[ "$SKIP_INSTALLER" -eq 0 ] || return 0
+	[ "$SKIP_PACKAGE" -eq 0 ] || return 0
+	[ -f "$installer_exe" ] || fail "missing installer for smoke test: $installer_exe"
+
+	run bash "$ROOT/build_scripts/msys2-test-freebasic-installer.sh" \
+		--installer "$installer_exe" \
+		--kind js \
+		--workroot "$BUILDROOT/installer-smoke"
 }
 
 ##############################################################################
@@ -1388,6 +1407,7 @@ fi
 
 if [ "$SKIP_INSTALLER" -eq 0 ]; then
 	create_installer
+	validate_installer
 fi
 
 if [ "$SKIP_VALIDATE" -eq 0 ]; then

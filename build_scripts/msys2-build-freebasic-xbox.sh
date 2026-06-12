@@ -1069,7 +1069,12 @@ Section "Install"
 	; The Xbox package carries nxdk plus the FreeBASIC compiler, runtime
 	; libraries, and helper launchers.  Keep the installer payload as a zip so
 	; makensis does not need to mmap the entire expanded package tree.
-	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-xbox-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force -ErrorAction Stop"'
+	FileOpen \$0 "\$PLUGINSDIR\\extract-payload.ps1" w
+	FileWrite \$0 "param([string] \$\$PayloadZip, [string] \$\$Destination)$\r$\n"
+	FileWrite \$0 "\$\$ErrorActionPreference = 'Stop'$\r$\n"
+	FileWrite \$0 "Expand-Archive -LiteralPath \$\$PayloadZip -DestinationPath \$\$Destination -Force -ErrorAction Stop$\r$\n"
+	FileClose \$0
+	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "\$PLUGINSDIR\\extract-payload.ps1" "\$PLUGINSDIR\\freebasic-xbox-payload.zip" "\$INSTDIR"'
 	Pop \$0
 	StrCmp \$0 "0" payload_done
 		Abort "Failed to extract the FreeBASIC Xbox payload. PowerShell exit code: \$0"
@@ -1101,6 +1106,20 @@ EOF
 ##############################################################################
 # Validation
 ##############################################################################
+
+validate_installer() {
+	local installer_exe="$OUT/${DISTNAME}-setup.exe"
+
+	[ "$SKIP_VALIDATE" -eq 0 ] || return 0
+	[ "$SKIP_INSTALLER" -eq 0 ] || return 0
+	[ "$SKIP_PACKAGE" -eq 0 ] || return 0
+	[ -f "$installer_exe" ] || fail "missing installer for smoke test: $installer_exe"
+
+	run bash "$ROOT/build_scripts/msys2-test-freebasic-installer.sh" \
+		--installer "$installer_exe" \
+		--kind xbox \
+		--workroot "$BUILDROOT/installer-smoke"
+}
 
 validate_distribution() {
 	local validate_dir="$BUILDROOT/validate"
@@ -1158,6 +1177,7 @@ build_xbox_target
 assemble_distribution
 create_zip
 create_installer
+validate_installer
 validate_distribution
 
 echo ""

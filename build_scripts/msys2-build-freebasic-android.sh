@@ -1235,7 +1235,12 @@ Section "Install"
 	; exceed makensis' practical datablock limits, so keep the payload as a
 	; normal zip and extract it with the Windows PowerShell already present on
 	; supported Windows systems.
-	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath ''\$PLUGINSDIR\\freebasic-android-payload.zip'' -DestinationPath ''\$INSTDIR'' -Force -ErrorAction Stop"'
+	FileOpen \$0 "\$PLUGINSDIR\\extract-payload.ps1" w
+	FileWrite \$0 "param([string] \$\$PayloadZip, [string] \$\$Destination)$\r$\n"
+	FileWrite \$0 "\$\$ErrorActionPreference = 'Stop'$\r$\n"
+	FileWrite \$0 "Expand-Archive -LiteralPath \$\$PayloadZip -DestinationPath \$\$Destination -Force -ErrorAction Stop$\r$\n"
+	FileClose \$0
+	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "\$PLUGINSDIR\\extract-payload.ps1" "\$PLUGINSDIR\\freebasic-android-payload.zip" "\$INSTDIR"'
 	Pop \$0
 	StrCmp \$0 "0" payload_done
 		Abort "Failed to extract the FreeBASIC Android payload. PowerShell exit code: \$0"
@@ -1269,6 +1274,20 @@ EOF
 		fail "makensis failed while creating fbc-android installer"
 	fi
 	rm -f "$installer_payload_zip"
+}
+
+validate_installer() {
+	local installer_exe="$OUT/${DISTNAME}-setup.exe"
+
+	[ "$SKIP_VALIDATE" -eq 0 ] || return 0
+	[ "$SKIP_INSTALLER" -eq 0 ] || return 0
+	[ "$SKIP_PACKAGE" -eq 0 ] || return 0
+	[ -f "$installer_exe" ] || fail "missing installer for smoke test: $installer_exe"
+
+	run bash "$ROOT/build_scripts/msys2-test-freebasic-installer.sh" \
+		--installer "$installer_exe" \
+		--kind android \
+		--workroot "$BUILDROOT/installer-smoke"
 }
 
 ##############################################################################
@@ -1326,6 +1345,7 @@ build_android_target
 assemble_distribution
 create_zip
 create_installer
+validate_installer
 validate_distribution
 
 echo ""
