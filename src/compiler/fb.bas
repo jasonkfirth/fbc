@@ -1873,7 +1873,12 @@ function fbGetBackendValistType _
 			typedef = FB_CVA_LIST_BUILTIN_ARM
 
 		case FB_CPUFAMILY_AARCH64
-			typedef = FB_CVA_LIST_BUILTIN_AARCH64
+			select case env.clopt.target
+			case FB_COMPTARGET_WIN32
+				typedef = FB_CVA_LIST_BUILTIN_POINTER
+			case else
+				typedef = FB_CVA_LIST_BUILTIN_AARCH64
+			end select
 
 		case FB_CPUFAMILY_PPC
 			typedef = FB_CVA_LIST_BUILTIN_PPC

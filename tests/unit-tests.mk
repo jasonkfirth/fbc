@@ -176,7 +176,8 @@ endif
 
 OBJLIST := $(SRCLIST:%.bas=%.o)
 
-ifeq ($(TESTS_HOST_OS),darwin)
+TESTS_CC_IS_CLANG := $(strip $(shell $(CC) -dM -E -x c /dev/null 2>/dev/null | grep -q __clang__ && echo yes || true))
+ifeq ($(TESTS_CC_IS_CLANG),yes)
 ./functions/var_args-gcc.o functions/var_args-gcc.o: FBC_CFLAGS += -Wc -Wno-varargs
 ./optimizations/consteval.o optimizations/consteval.o: FBC_CFLAGS += -Wc -Wno-absolute-value
 endif
