@@ -773,8 +773,7 @@ if [ "$DO_PACKAGE" -eq 1 ]; then
         msg "creating macOS installer package"
         run rm -f "$PKG_FILE"
         run rm -rf "$PKGROOT"
-        run mkdir -p "$PKGROOT"
-        run cp -R "$STAGE"/. "$PKGROOT"/
+        copy_tree_preserve "$STAGE" "$PKGROOT"
         create_pkg_scripts
         PKGBUILD_ARGS=(
             --root "$PKGROOT"
