@@ -3879,12 +3879,13 @@ private function hCompileStage2DirectlyToObj( ) as integer
 	case FB_COMPTARGET_JS, FB_COMPTARGET_XBOX
 		function = TRUE
 	case FB_COMPTARGET_WIN32
-		if( (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) and _
+		if( ((fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) or _
+		     (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GCC)) and _
 		    (fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64) ) then
 			''
-			'' The Windows ARM64 toolchain is clang/LLVM based.  Let clang
-			'' compile its generated C straight to COFF objects instead of
-			'' sending clang assembly through a GNU as style stage.
+			'' The Windows ARM64 toolchain is clang/LLVM based.  Let the C
+			'' compiler produce COFF objects directly instead of sending C
+			'' backend assembly through a GNU as style stage.
 			''
 			function = TRUE
 		end if

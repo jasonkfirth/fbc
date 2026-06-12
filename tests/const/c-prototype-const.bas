@@ -9,6 +9,7 @@
 '
 
 #cmdline "-gen gcc"
+#cmdline "-Wc -Wno-unknown-warning-option"
 #cmdline "-Wc -Werror=discarded-qualifiers"
 
 extern "C"
