@@ -558,8 +558,6 @@ execute_plan() {
         distro_allowed_for_family "$family" || return 0
         family_has_selected_targets "$family" || return 0
 
-        args+=(--execute)
-
         if [ "$family" = vm ]; then
             local plan_family plan_distro plan_release plan_arch plan_image plan_script plan_outdir
 
@@ -568,8 +566,10 @@ execute_plan() {
                 [ "$plan_script" = "$script" ] || continue
                 target_matches_filters "$plan_family" "$plan_distro" "$plan_release" "$plan_arch" || continue
 
-                args=(--execute)
-                args+=(--arch "$plan_arch")
+                args=()
+                if [ "$plan_script" = "haiku-vm-build-freebasic.sh" ]; then
+                    args+=(--arch "$plan_arch")
+                fi
                 args+=(--archive-dir "$plan_outdir")
                 args+=(--workroot "$ROOT/out/${plan_distro}-vm/$plan_arch")
                 args+=(--jobs "$MAKE_JOBS")
@@ -594,6 +594,8 @@ execute_plan() {
 
             return 0
         fi
+
+        args+=(--execute)
 
         if [ -n "$DISTRO_FILTER" ]; then
             args+=(--distro "$DISTRO_FILTER")

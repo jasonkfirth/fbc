@@ -69,7 +69,7 @@ void fb_sfxCaptureStop(void)
 
     fb_sfxRuntimeUnlock();
 
-    if (driver != &__fb_sfxDriverNull)
+    if (!fb_sfxDriverIsNull(driver))
         fb_sfxPlatformCaptureStop();
 }
 

@@ -77,6 +77,9 @@ int fb_sfxCaptureReadSamples(float *buffer, int frames)
     if (frames <= 0)
         return -1;
 
+    if (__fb_sfx && fb_sfxDriverIsNull(__fb_sfx->driver))
+        return fb_sfxCaptureRead(buffer, frames);
+
     result = fb_sfxPlatformCaptureRead(buffer, frames);
     if (result != 0)
         return result;

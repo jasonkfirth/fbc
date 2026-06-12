@@ -754,7 +754,7 @@ install_image_package() {
 	fi
 
 	echo "==> installing image package $package_file"
-	pkgman install -y "$package_file"
+	run_limited 300 pkgman install -y "$package_file"
 }
 
 install_image_packages() {
@@ -1062,7 +1062,7 @@ install_image_package() {
 	fi
 
 	echo "==> installing image package $package_file"
-	pkgman install -y "$package_file"
+	run_limited 300 pkgman install -y "$package_file"
 }
 
 install_image_packages() {

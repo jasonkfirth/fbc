@@ -115,6 +115,18 @@ EXTERNAL_TEXT_MARKERS = (
     "zlib",
 )
 
+REMOTE_RETRY_ATTEMPTS = 3
+REMOTE_RETRY_DELAY = 2
+REMOTE_RETRY_MARKERS = (
+    "banner exchange",
+    "connection closed",
+    "connection refused",
+    "connection reset",
+    "connection timed out",
+    "kex_exchange_identification",
+    "operation timed out",
+)
+
 PLATFORM_PATH_MARKERS = (
     "/dos/",
     "/win32/",
@@ -347,36 +359,115 @@ def map_remote_path(value: str, args: argparse.Namespace) -> str:
     return value
 
 
+def remote_failure_is_transient(returncode: int, output: str) -> bool:
+    if returncode != 255:
+        return False
+
+    output = output.lower()
+    return any(marker in output for marker in REMOTE_RETRY_MARKERS)
+
+
+def remote_retry_note(attempt: int) -> str:
+    return f"\nremote shell transport failed, retrying ({attempt}/{REMOTE_RETRY_ATTEMPTS})\n"
+
+
+def run_remote_script(
+    args: argparse.Namespace,
+    script: str,
+    log=None,
+    timeout: int | None = None,
+) -> tuple[int, str]:
+    combined_output = []
+
+    for attempt in range(1, REMOTE_RETRY_ATTEMPTS + 1):
+        try:
+            completed = subprocess.run(
+                args.remote_shell + [script],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=timeout,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as e:
+            if e.output:
+                output = e.output.decode("utf-8", errors="replace")
+                combined_output.append(output)
+                if log is not None:
+                    log.write(output)
+                    log.flush()
+            raise
+
+        output = completed.stdout.decode("utf-8", errors="replace")
+        combined_output.append(output)
+
+        if log is not None:
+            log.write(output)
+            log.flush()
+
+        if not remote_failure_is_transient(completed.returncode, output):
+            return completed.returncode, "".join(combined_output)
+
+        if attempt == REMOTE_RETRY_ATTEMPTS:
+            return completed.returncode, "".join(combined_output)
+
+        note = remote_retry_note(attempt)
+        combined_output.append(note)
+        if log is not None:
+            log.write(note)
+            log.flush()
+
+        time.sleep(REMOTE_RETRY_DELAY)
+
+    return 255, "".join(combined_output)
+
+
 def sync_remote_directory(cwd: Path, args: argparse.Namespace) -> tuple[bool, str]:
     remote_cwd = map_remote_path(str(cwd), args)
     quoted_cwd = shlex.quote(remote_cwd)
 
-    reset = args.remote_shell + [f"rm -rf {quoted_cwd} && mkdir -p {quoted_cwd}"]
-    reset_done = subprocess.run(reset, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
-    if reset_done.returncode != 0:
-        return False, reset_done.stdout.decode("utf-8", errors="replace")
-
-    tar = subprocess.Popen(
-        ["tar", "-cf", "-", "."],
-        cwd=str(cwd),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+    reset_status, reset_output = run_remote_script(
+        args,
+        f"rm -rf {quoted_cwd} && mkdir -p {quoted_cwd}",
     )
-    extract = subprocess.run(
-        args.remote_shell + [f"cd {quoted_cwd} && tar -xf -"],
-        stdin=tar.stdout,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=False,
-    )
-    if tar.stdout is not None:
-        tar.stdout.close()
-    _, tar_stderr = tar.communicate()
+    if reset_status != 0:
+        return False, reset_output
 
-    if tar.returncode != 0:
-        return False, tar_stderr.decode("utf-8", errors="replace")
-    if extract.returncode != 0:
-        return False, extract.stdout.decode("utf-8", errors="replace")
+    extract_output = []
+    for attempt in range(1, REMOTE_RETRY_ATTEMPTS + 1):
+        tar = subprocess.Popen(
+            ["tar", "-cf", "-", "."],
+            cwd=str(cwd),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        extract = subprocess.run(
+            args.remote_shell + [f"cd {quoted_cwd} && tar -xf -"],
+            stdin=tar.stdout,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        if tar.stdout is not None:
+            tar.stdout.close()
+        _, tar_stderr = tar.communicate()
+
+        if tar.returncode != 0:
+            return False, tar_stderr.decode("utf-8", errors="replace")
+
+        output = extract.stdout.decode("utf-8", errors="replace")
+        extract_output.append(output)
+
+        if extract.returncode == 0:
+            return True, remote_cwd
+
+        if not remote_failure_is_transient(extract.returncode, output):
+            return False, "".join(extract_output)
+
+        if attempt == REMOTE_RETRY_ATTEMPTS:
+            return False, "".join(extract_output)
+
+        extract_output.append(remote_retry_note(attempt))
+        time.sleep(REMOTE_RETRY_DELAY)
 
     return True, remote_cwd
 
@@ -447,12 +538,11 @@ def run_command(
                     remote_env_prefix(env) +
                     " ".join(shlex.quote(part) for part in remote_cmd)
                 )
-                completed = subprocess.run(
-                    args.remote_shell + [remote_script],
-                    stdout=log,
-                    stderr=subprocess.STDOUT,
+                returncode, _ = run_remote_script(
+                    args,
+                    remote_script,
+                    log=log,
                     timeout=timeout,
-                    check=False,
                 )
             else:
                 completed = subprocess.run(
@@ -464,16 +554,17 @@ def run_command(
                     timeout=timeout,
                     check=False,
                 )
+                returncode = completed.returncode
         except subprocess.TimeoutExpired:
             elapsed = time.monotonic() - started
             log.write(f"\nTIMEOUT after {timeout}s\n")
             return "timeout", elapsed
 
     elapsed = time.monotonic() - started
-    if completed.returncode == 0:
+    if returncode == 0:
         return "pass", elapsed
 
-    return f"fail({completed.returncode})", elapsed
+    return f"fail({returncode})", elapsed
 
 
 def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:

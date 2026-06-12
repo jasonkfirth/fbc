@@ -760,6 +760,14 @@ static int fb_sfxDriverNameEquals(const char *a, const char *b)
     return (*a == '\0' && *b == '\0');
 }
 
+int fb_sfxDriverIsNull(const FB_SFX_DRIVER *driver)
+{
+    if (!driver)
+        return 0;
+
+    return fb_sfxDriverNameEquals(driver->name, "null");
+}
+
 static int fb_sfxDriverIndexOf(const SFXDRIVER *driver)
 {
     int i;

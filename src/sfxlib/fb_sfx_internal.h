@@ -144,6 +144,7 @@ void fb_sfxDriverIoLock(void);
 void fb_sfxDriverIoUnlock(void);
 int fb_sfxDriverFeedsAudio(void);
 int fb_sfxDriverValidate(const FB_SFX_DRIVER *driver);
+int fb_sfxDriverIsNull(const FB_SFX_DRIVER *driver);
 void fb_sfxRunForeground(int frames);
 int fb_sfxCooperativeDelay(int msecs);
 void fb_sfxForegroundFeedBegin(void);

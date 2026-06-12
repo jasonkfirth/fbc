@@ -79,7 +79,7 @@ int fb_sfxCaptureStart(void)
         in that mode; CAPTURE READ/SAVE will simply observe whatever samples
         were injected into the capture buffer.
     */
-    if (driver == &__fb_sfxDriverNull)
+    if (fb_sfxDriverIsNull(driver))
     {
         __fb_sfx->capture.enabled = FB_SFX_CAPTURE_RUNNING;
         fb_sfxRuntimeUnlock();
