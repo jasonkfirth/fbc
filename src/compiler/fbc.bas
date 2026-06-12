@@ -4360,7 +4360,7 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 			'' stage here.  Compile the generated C directly to object code and
 			'' skip hAssembleModule() for them.
 			ln += "-c -nostdlib -nostdinc -Wall -Wno-unused-label " + _
-				"-Wno-unused-function -Wno-unused-variable "
+				"-Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable "
 			if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS ) then
 				ln += "-Wno-warn-absolute-paths "
 			end if

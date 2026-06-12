@@ -84,6 +84,7 @@ private sub fbcWin32PlatformAddDefaultLibs( )
 	fbcAddDefLib( "msvcrt" )
 	fbcAddDefLib( "kernel32" )
 	fbcAddDefLib( "user32" )
+	fbcAddDefLib( "advapi32" )
 #ifndef DISABLE_TCP
 	fbcAddDefLib( "ws2_32" )
 #endif

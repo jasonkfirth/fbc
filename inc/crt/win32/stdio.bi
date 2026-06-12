@@ -44,7 +44,12 @@ type FILE as _iobuf
 
 extern "c"
 
-#ifdef __FB_64BIT__
+#if defined(__FB_64BIT__) and defined(__FB_ARM__)
+	declare function __acrt_iob_func(byval index as uinteger) as FILE ptr
+	#define stdin (__acrt_iob_func(STDIN_FILENO))
+	#define stdout (__acrt_iob_func(STDOUT_FILENO))
+	#define stderr (__acrt_iob_func(STDERR_FILENO))
+#elseif defined(__FB_64BIT__)
 	declare function __iob_func() as FILE ptr
 	#define stdin (@(__iob_func())[STDIN_FILENO])
 	#define stdout (@(__iob_func())[STDOUT_FILENO])
