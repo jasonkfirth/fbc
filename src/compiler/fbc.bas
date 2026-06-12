@@ -4264,12 +4264,17 @@ end function
 
 private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as integer
 	dim as string ln, asmfile
+	dim as integer directtoobj = hCompileStage2DirectlyToObj( )
 
 	asmfile = hGetAsmName( module, 2 )
+	if( directtoobj ) then
+		asmfile = *module->objfile
+	end if
+
 	'' Clean up stage 2 output (the final .asm for -gen gcc/llvm) unless
 	'' -RR was given.
 	if( (not fbc.keepfinalasm) and _
-		((hCompileStage2DirectlyToObj( ) = FALSE) or _
+		((directtoobj = FALSE) or _
 		(not fbc.keepobj)) ) then
 		fbcAddTemp( asmfile )
 	end if
@@ -4326,7 +4331,7 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 			ln += "-fPIC "
 		end if
 
-		if( hCompileStage2DirectlyToObj( ) = FALSE ) then
+		if( directtoobj = FALSE ) then
 
 			'' Even though clang's assembly output is syntax compatible with gnu-as,
 			'' clang may produce extra directives not understood by gnu-as
@@ -4425,6 +4430,10 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 		'' more strictly.  The generated C is an intermediate representation owned
 		'' by fbc, so keep that compatibility detail out of user programs.
 		ln += "-Wno-incompatible-pointer-types "
+
+		if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG ) then
+			ln += "-Wno-builtin-requires-header "
+		end if
 
 		if( fbGetOption( FB_COMPOPT_DEBUGINFO ) ) then
 			ln += "-g "
