@@ -340,7 +340,7 @@ private function fbcUseLldLinker( ) as integer
 	if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32) and _
 		(fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) and _
 		(fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64) ) then
-		return hFileExists( fbc.binpath + "ld.lld" + FB_HOST_EXEEXT )
+		return TRUE
 	end if
 
 	function = FALSE
@@ -502,6 +502,10 @@ private function fbcBuildPathToLibFile( byval file as zstring ptr ) as string
 	case FB_CPUFAMILY_PPC64, FB_CPUFAMILY_PPC64LE
 		path += " -m64"
 	end select
+
+	if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG ) then
+		path += " " + hGetClangTargetOption( )
+	end if
 
 	if( len( fbc.sysroot ) ) then
 		path += " --sysroot=" + fbc.sysroot
@@ -1378,6 +1382,7 @@ private function hLinkFiles( ) as integer
 			( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) and _
 			( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX ) and _
 			( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_WII ) and _
+			( not fbcUseLldLinker( ) ) and _
 			(not fbcIsUsingGoldLinker( )) ) then
 			ldcline += " -T """ + fbc.libpath + (FB_HOST_PATHDIV + "fbextra.x""")
 		end if
@@ -1652,6 +1657,8 @@ private function hLinkFiles( ) as integer
 		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
 			if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII ) then
 				ldcline += " -Wl,--start-group"
+			elseif( fbcUseLldLinker( ) ) then
+				ldcline += " --start-group"
 			else
 				ldcline += " ""-("""
 			end if
@@ -1710,6 +1717,8 @@ private function hLinkFiles( ) as integer
 			'' End of lib group
 			if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII ) then
 				ldcline += " -Wl,--end-group"
+			elseif( fbcUseLldLinker( ) ) then
+				ldcline += " --end-group"
 			else
 				ldcline += " ""-)"""
 			end if

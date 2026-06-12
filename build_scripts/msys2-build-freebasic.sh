@@ -937,7 +937,7 @@ copy_arch_toolchain() {
 	fi
 
 	copy_dir_files "$mingw_root/lib" "$package_root/lib/$arch"
-	if [ "$arch" = "win32-aarch64" ] && [ ! -f "$package_root/lib/$arch/libgcc.a" ]; then
+	if [ "$arch" = "win32-aarch64" ]; then
 		clang_builtins="$(
 			{
 				find "$mingw_root/lib/clang" -type f -path '*/lib/windows/libclang_rt.builtins-aarch64.a' 2>/dev/null || true
@@ -946,7 +946,10 @@ copy_arch_toolchain() {
 				tail -n 1
 		)"
 		[ -n "$clang_builtins" ] || fail "could not find ARM64 clang builtins under $mingw_root"
-		cp -a "$clang_builtins" "$package_root/lib/$arch/libgcc.a"
+		cp -a "$clang_builtins" "$package_root/lib/$arch/libclang_rt.builtins-aarch64.a"
+		if [ ! -f "$package_root/lib/$arch/libgcc.a" ]; then
+			cp -a "$clang_builtins" "$package_root/lib/$arch/libgcc.a"
+		fi
 	fi
 	create_arch_library_aliases "$package_root/lib/$arch"
 	copy_legacy_winlibs "$arch" "$package_root/lib/$arch" "$package_root/bin/$arch"

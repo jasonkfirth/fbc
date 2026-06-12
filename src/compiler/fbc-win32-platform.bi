@@ -28,12 +28,22 @@ private function fbcWin32PlatformIsSelected( ) as integer
 	function = (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32)
 end function
 
+private function fbcWin32PlatformUsesClangArm64Runtime( ) as integer
+	function = fbcWin32PlatformIsSelected( ) andalso _
+		(fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) andalso _
+		(fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64)
+end function
+
 private sub fbcWin32PlatformAddDefaultLibPaths( )
 	if( fbcWin32PlatformIsSelected( ) = FALSE ) then
 		exit sub
 	end if
 
 #ifndef ENABLE_STANDALONE
+	if( fbcWin32PlatformUsesClangArm64Runtime( ) ) then
+		fbcAddLibPathFor( "libclang_rt.builtins-aarch64.a" )
+	end if
+
 	'' Help the MinGW linker to find MinGW's lib/ dir, allowing
 	'' the C:\MinGW dir to be renamed and linking to still work.
 	fbcAddLibPathFor( "libmingw32.a" )
@@ -64,7 +74,13 @@ private sub fbcWin32PlatformAddDefaultLibs( )
 		exit sub
 	end if
 
-	fbcAddDefLib( "gcc" )
+	if( fbcWin32PlatformUsesClangArm64Runtime( ) ) then
+		fbcAddDefLib( "clang_rt.builtins-aarch64" )
+		fbcAddDefLib( "unwind" )
+	else
+		fbcAddDefLib( "gcc" )
+	end if
+
 	fbcAddDefLib( "msvcrt" )
 	fbcAddDefLib( "kernel32" )
 	fbcAddDefLib( "user32" )
