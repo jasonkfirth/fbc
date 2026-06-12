@@ -676,6 +676,8 @@ GENERATED_C_WARN_SUPPRESS := \
 
 ifeq ($(TOOLCHAIN_CC_IS_CLANG),yes)
 GENERATED_C_WARN_SUPPRESS += \
+  -Wc -Wno-sometimes-uninitialized \
+  -Wc -Wno-unused-but-set-variable \
   -Wc -Wno-unused-function \
   -Wc -Wno-unused-label \
   -Wc -Wno-unused-variable
