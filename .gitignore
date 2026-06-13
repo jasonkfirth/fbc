@@ -105,3 +105,4 @@ tests/syntax/r/win64/*.txt
 tests/syntax/r/linux-x86/*.txt
 tests/syntax/r/linux-x86_64/*.txt
 tests/syntax/r/dos/*.txt
+OMA_old

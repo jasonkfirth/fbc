@@ -43,6 +43,7 @@ INSTALL_SUBDIR="${INSTALL_SUBDIR:-FreeBASIC-${FBVERSION}-fbc-wii}"
 PACKAGE_ROOT="${PACKAGE_ROOT:-${DISTDIR}/${INSTALL_SUBDIR}}"
 OUT="${OUT:-${ROOT_DIR}/out/mingw32-wii}"
 INSTALLER_PATH="${INSTALLER_PATH:-${OUT}/FreeBASIC-${FBVERSION}-fbc-wii-setup.exe}"
+NSIS_EXE="${NSIS_EXE:-/mingw64/bin/makensis.exe}"
 JOBS="${JOBS:-}"
 HOST_FBC_TARGET="${HOST_FBC_TARGET:-win64}"
 WII_TARGET_TRIPLET="${WII_TARGET_TRIPLET:-powerpc-eabi}"
@@ -111,6 +112,9 @@ Options:
   --skip-validate          Do not compile the packaged hello-world test
   --keep-buildroot         Keep temporary package staging directories
   -h, --help               Show this help
+
+Environment:
+  NSIS_EXE                 makensis executable [${NSIS_EXE}]
 EOF
 }
 
@@ -926,7 +930,7 @@ EOF
 
 build_installer()
 {
-    local makensis
+    local makensis="${NSIS_EXE}"
     local nsis_script="${BUILDROOT}/freebasic-wii.nsi"
     local installer_payload_zip="${BUILDROOT}/freebasic-wii-installer-payload.zip"
 
@@ -935,13 +939,17 @@ build_installer()
     fi
 
     have zip || fail "zip was not found; install zip or pass --skip-installer"
-    makensis="$(command -v makensis 2>/dev/null || true)"
-    if [ -z "${makensis}" ]; then
-        makensis="$(command -v makensis.exe 2>/dev/null || true)"
+
+    if [ -n "${makensis}" ]; then
+        makensis="$(normalize_path "${makensis}")"
     fi
 
     if [ -z "${makensis}" ]; then
-        fail "makensis was not found; install mingw-w64-x86_64-nsis or pass --skip-installer"
+        makensis="$(first_command makensis makensis.exe || true)"
+    fi
+
+    if [ -z "${makensis}" ] || [ ! -x "${makensis}" ]; then
+        fail "makensis not found at ${makensis:-<PATH>}; install mingw-w64-x86_64-nsis or set NSIS_EXE"
     fi
 
     msg "Building NSIS installer"
