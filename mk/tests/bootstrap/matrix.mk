@@ -57,7 +57,7 @@ bootstrap-dist-matrix-test:
 	for arch in $(BOOTSTRAP_TEST_ARCHES); do \
 	        echo "==> Building bootstrap distribution for $$arch"; \
 	        ls -1 FreeBASIC-*.tar.xz 2>/dev/null | sort > "$$before" || true; \
-	        $(MAKE) bootstrap-dist-target FBTARGET_DIR_OVERRIDE=$$arch; \
+	        $(TEST_TOOLCHAIN_ENV) $(MAKE) bootstrap-dist-target BOOTSTRAP_DIST_WORKTREE=1 FBTARGET_DIR_OVERRIDE=$$arch; \
 	        ls -1 FreeBASIC-*.tar.xz 2>/dev/null | sort > "$$after" || true; \
 	        comm -13 "$$before" "$$after" > "$$new" || true; \
 	        ARCHIVE=$$(head -n1 "$$new"); \

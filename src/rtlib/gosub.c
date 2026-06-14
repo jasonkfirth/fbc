@@ -3,6 +3,10 @@
 #include "fb.h"
 #include <setjmp.h>
 
+#if defined( _WIN32 ) && defined( __aarch64__ )
+void __mingw_longjmp( jmp_buf buf, int value );
+#endif
+
 /* slow but easy to manage dynamic GOSUB call-stack */
 typedef struct gosubnode {
 	jmp_buf buf;
@@ -73,7 +77,11 @@ FBCALL int fb_GosubReturn( GOSUBCTX * ctx )
 		free(ctx->top);
 		ctx->top = node;
 
+#if defined( _WIN32 ) && defined( __aarch64__ )
+		__mingw_longjmp( buf, -1 );
+#else
 		longjmp( buf, -1 );
+#endif
 	}
 
 	/* don't know where to go next so return an error */

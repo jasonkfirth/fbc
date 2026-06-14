@@ -10,14 +10,22 @@
 #define __crt_setjmp_bi__
 
 #ifdef __FB_WIN32__
-	#define _JBLEN 16
+	#if defined( __FB_ARM__ ) and defined( __FB_64BIT__ )
+		#define _JBLEN 24
+		#define _JBTYPE ulongint
+	#elseif defined( __FB_ARM__ )
+		#define _JBLEN 28
+		#define _JBTYPE long
+	#else
+		#define _JBLEN 16
+	#endif
 
-	#ifdef __FB_64BIT__
+	#if defined( __FB_64BIT__ ) and not defined( __FB_ARM__ )
 		type SETJMP_FLOAT128
 			Part(0 to 1) as ulongint
 		end type
 		#define _JBTYPE SETJMP_FLOAT128
-	#else
+	#elseif not defined( _JBTYPE )
 		#define _JBTYPE long
 	#endif
 
@@ -104,13 +112,16 @@
 
 extern "C"
 
-#ifdef __FB_WIN32__
+#if defined( __FB_WIN32__ ) and defined( __FB_ARM__ )
+declare function setjmp alias "__mingw_setjmp" (byval as jmp_buf ptr) as long
+declare sub longjmp alias "__mingw_longjmp" (byval as jmp_buf ptr, byval as long)
+#elseif defined( __FB_WIN32__ )
 declare function setjmp alias "_setjmp" (byval as jmp_buf ptr) as long
+declare sub longjmp (byval as jmp_buf ptr, byval as long)
 #else
 declare function setjmp (byval as jmp_buf ptr) as long
-#endif
-
 declare sub longjmp (byval as jmp_buf ptr, byval as long)
+#endif
 
 end extern
 

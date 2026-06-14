@@ -1094,12 +1094,12 @@ function hEscape _
 
 	lgt = len( *text )
 	if( lgt = 0 ) then
-		return text
+		return cast( zstring ptr, text )
 	end if
 
 	DZstrAllocate( res, lgt * 4 )
 
-	src = text
+	src = cast( zstring ptr, text )
 	dst = res.data
 
 	src_end = src + lgt

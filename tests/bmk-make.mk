@@ -30,6 +30,21 @@ TESTS_BMK_CC := env $(TESTS_FBC_ENV_EXTRA) $(TESTS_BMK_CC)
 endif
 CC := $(TESTS_BMK_CC)
 
+CXX ?= g++
+TESTS_BMK_CXX_FOR_PROBE := $(CXX)
+TESTS_BMK_CXX := $(CXX)
+ifneq ($(strip $(TESTS_FBC_ENV_EXTRA)),)
+TESTS_BMK_CXX := env $(TESTS_FBC_ENV_EXTRA) $(TESTS_BMK_CXX)
+endif
+CXX := $(TESTS_BMK_CXX)
+
+TESTS_BMK_CXX_IS_CLANG := $(strip $(shell $(TESTS_BMK_CXX_FOR_PROBE) -dM -E -x c++ /dev/null 2>/dev/null | grep -q __clang__ && echo yes || true))
+
+CXXFLAGS ?=
+ifeq ($(TESTS_BMK_CXX_IS_CLANG),yes)
+	override CXXFLAGS += -Wno-return-type-c-linkage
+endif
+
 ifndef FBC
 FBC := $(TESTS_DEFAULT_FBC)
 endif
@@ -77,12 +92,22 @@ ifneq ($(GEN),)
 FBC_CFLAGS += -gen $(GEN)
 endif
 
-TARGET_ARCH := $(shell $(FBC) $(FBC_CFLAGS) -print target | cut -d - -f 2)
+TARGET_ID := $(shell $(FBC) $(FBC_CFLAGS) -print target)
+TARGET_ARCH := $(word 2,$(subst -, ,$(TARGET_ID)))
+ifeq ($(TARGET_ARCH),)
+TARGET_ARCH := $(TARGET_ID)
+endif
+ifeq ($(TARGET_ARCH),win32)
+TARGET_ARCH := x86
+endif
+ifeq ($(TARGET_ARCH),win64)
+TARGET_ARCH := x86_64
+endif
 ifeq ($(TARGET_ARCH),x86)
-	CFLAGS := -m32
+	override CFLAGS += -m32
 endif
 ifeq ($(TARGET_ARCH),x86_64)
-	CFLAGS := -m64
+	override CFLAGS += -m64
 endif
 
 ifeq ($(ENABLE_CHECK_BUGS),1)

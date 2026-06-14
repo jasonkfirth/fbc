@@ -8,7 +8,7 @@
 bootstrap-dist-test:
 	$(call _mt_echo,Testing bootstrap distribution generation)
 	@rm -f FreeBASIC-*.tar.xz 2>/dev/null || true
-	@ARCHIVE="$$( $(call _mt_find_new_archives,$(MAKE) bootstrap-dist-target) )"; \
+	@ARCHIVE="$$( $(call _mt_find_new_archives,$(MAKE) bootstrap-dist-target BOOTSTRAP_DIST_WORKTREE=1) )"; \
 	echo "==> Produced archive: $$ARCHIVE"; \
 	[ -n "$$ARCHIVE" ] || { echo "ERROR: bootstrap-dist-target did not produce an archive"; exit 1; }; \
 	if tar -tf "$$ARCHIVE" | grep -E '(^|/)\.[^/]+/|(^|/)(stage|dist|out|packages|package-root[^/]*|pkgroot[^/]*)/'; then \
@@ -32,7 +32,7 @@ bootstrap-rebuild-test:
 	$(call _mt_echo,Testing rebuild from bootstrap tarball)
 
 	@rm -f FreeBASIC-*.tar.xz 2>/dev/null || true; \
-	ARCHIVE="$$( $(call _mt_find_new_archives,$(MAKE) bootstrap-dist-target) )"; \
+	ARCHIVE="$$( $(call _mt_find_new_archives,$(MAKE) bootstrap-dist-target BOOTSTRAP_DIST_WORKTREE=1) )"; \
 	[ -n "$$ARCHIVE" ] || { echo "ERROR: bootstrap-dist-target did not produce an archive"; exit 1; }; \
 	echo "==> Using archive: $$ARCHIVE"; \
 	rm -rf "$(TEST_TMP)/bootstrap-rebuild"; \

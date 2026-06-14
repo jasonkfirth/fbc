@@ -6,6 +6,10 @@
 # waste large amounts of disk space.
 
 .*
+/fbc.exe
+/freebasic-dist.tar
+/freebasic-package.tar
+/freebasic-package.zip
 FreeBASIC-*-source-bootstrap-*.tar.*
 *.install_manifest
 *.log

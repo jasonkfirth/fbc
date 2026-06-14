@@ -95,6 +95,44 @@
 		) _
 	 }
 
+	'' GCC/Clang builtin used as the second Win64 _setjmp() argument.
+	dim shared as FB_RTL_PROCDEF funcdata1_win64_frameaddress( 0 to ... ) = _
+	{ _
+		/' function fb_FrameAddress cdecl( byval level as ulong ) as any ptr '/ _
+		( _
+			@FB_RTL_FRAMEADDRESS, @"__builtin_frame_address", _
+			typeAddrOf( FB_DATATYPE_VOID ), FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_NONE, _
+			1, _
+			{ _
+				( FB_DATATYPE_ULONG, FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
+		/' EOL '/ _
+		( _
+			NULL _
+		) _
+	 }
+
+	'' Win64 ARM64 __mingw_setjmp()
+	dim shared as FB_RTL_PROCDEF funcdata1_win64_arm( 0 to ... ) = _
+	{ _
+		/' function fb_SetJmp cdecl( byval buf as any ptr ) as long '/ _
+		( _
+			@FB_RTL_SETJMP, @"__mingw_setjmp", _
+			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_NONE, _
+			1, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
+		/' EOL '/ _
+		( _
+			NULL _
+		) _
+	 }
+
 	'' Non-NetBSD setjmp()
 	dim shared as FB_RTL_PROCDEF funcdata2_common( 0 to ... ) = _
 	{ _
@@ -143,7 +181,12 @@
 
 		if( env.clopt.target = FB_COMPTARGET_WIN32 ) then
 			if( fbIs64bit() ) then
-				rtlAddIntrinsicProcs( @funcdata1_win64(0) )
+				if( fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64 ) then
+					rtlAddIntrinsicProcs( @funcdata1_win64_arm(0) )
+				else
+					rtlAddIntrinsicProcs( @funcdata1_win64(0) )
+					rtlAddIntrinsicProcs( @funcdata1_win64_frameaddress(0) )
+				end if
 			else
 				rtlAddIntrinsicProcs( @funcdata1_win32(0) )
 			end if
@@ -248,6 +291,7 @@ function rtlSetJmp _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr proc = any
+	dim as ASTNODE ptr frame = any
 
 	function = NULL
 
@@ -258,20 +302,30 @@ function rtlSetJmp _
 		exit function
 	end if
 
-	'' mingw 64bit takes 2 arguments
+	'' mingw 64bit x86_64 takes 2 arguments
 	'' see also ast-gosub.bas:astGosubAddJump()
 	''
-	'' from win64 setjmp.h it looks like mingw_getsp() is needed for the second
-	'' parameter, but this causes the longjmp() to fail later in msvcrt/ntdll.
-	'' It appears that when the second parameter is NULL, then there is no
-	'' extra actions taken in the stack unwind and gosub 'works'.  Maybe the
-	'' second parameter is for an exception record?  The documentation on this
-	'' is scarce.
+	'' Current MinGW-w64 setjmp.h passes __builtin_frame_address(0), allowing
+	'' SEH stack unwinding to find the caller frame.  Keep the NULL fallback for
+	'' non-C backends where the C builtin is not available.
 
 	if( env.clopt.target = FB_COMPTARGET_WIN32 ) then
 		if( fbIs64bit() ) then
-			if( astNewARG( proc, astNewCONSTi( 0 ) ) = NULL ) then
-				exit function
+			if( fbGetCpuFamily( ) <> FB_CPUFAMILY_AARCH64 ) then
+				select case( env.clopt.backend )
+				case FB_BACKEND_GCC, FB_BACKEND_CLANG
+					frame = astNewCALL( PROCLOOKUP( FRAMEADDRESS ) )
+					if( astNewARG( frame, astNewCONSTi( 0, FB_DATATYPE_ULONG ) ) = NULL ) then
+						exit function
+					end if
+					if( astNewARG( proc, frame ) = NULL ) then
+						exit function
+					end if
+				case else
+					if( astNewARG( proc, astNewCONSTi( 0 ) ) = NULL ) then
+						exit function
+					end if
+				end select
 			end if
 		end if
 	end if

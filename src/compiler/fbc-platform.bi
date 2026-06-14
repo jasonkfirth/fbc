@@ -172,6 +172,19 @@ private sub fbcPlatformAddDefaultLibs( )
 	next
 end sub
 
+private function fbcPlatformMapLibName( byref libname as string ) as string
+	select case fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_WIN32
+		return fbcWin32PlatformMapLibName( libname )
+	case FB_COMPTARGET_OPENBSD
+		if( libname = "stdc++" ) then
+			return "estdc++"
+		end if
+	end select
+
+	function = libname
+end function
+
 private sub fbcPlatformAddLinkerFrameworks( byref ldcline as string )
 	for i as integer = 0 to ubound( fbcplatforms )
 		fbcplatforms(i).addLinkerFrameworks( ldcline )

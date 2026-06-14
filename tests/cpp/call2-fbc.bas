@@ -26,7 +26,7 @@
 	'' not working for several targets.  Just disable
 	'' for now.  It's likely related to passing
 	'' structs in registers and size of the struct.
-	#if defined( __FB_WIN32__ )
+	#if defined( __FB_WIN32__ ) and not defined( __FB_ARM__ )
 		#define DOFUNCS
 	#endif
 #endif

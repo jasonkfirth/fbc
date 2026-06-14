@@ -1,4 +1,5 @@
 ' TEST_MODE : COMPILE_ONLY_OK
+#cmdline "-Wc -Wno-infinite-recursion"
 
 type T
 	as integer i

@@ -246,7 +246,7 @@ function hashAdd _
 	end if
 
 	'' fill node
-	item->name = symbol
+	item->name = cast( zstring ptr, symbol )
 	item->data = userdata
 
 end function

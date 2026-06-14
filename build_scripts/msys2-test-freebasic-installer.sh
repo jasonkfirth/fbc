@@ -52,6 +52,7 @@ KIND=""
 # deep directory trees, and Windows archive APIs can still trip over long
 # install paths even on current Windows builds.
 WORKROOT="${WORKROOT:-${INSTALLER_SMOKE_WORKROOT:-/c/fbc-installer-smoke}}"
+POWERSHELL_EXE="${POWERSHELL_EXE:-}"
 KEEP_WORK=0
 
 usage()
@@ -65,6 +66,9 @@ Options:
   --workroot PATH   temporary smoke-test root
   --keep-work       keep smoke-test files after success
   -h, --help        show this help text
+
+Environment:
+  POWERSHELL_EXE    optional path to powershell.exe or pwsh.exe
 
 The test installs into a temporary directory, validates the installed copy,
 then runs the generated uninstaller.  It snapshots and restores the global
@@ -93,6 +97,48 @@ to_msys_path()
 to_win_path()
 {
 	cygpath -aw "$1"
+}
+
+find_powershell_exe()
+{
+	local candidate
+	local converted
+	local candidates=(
+		powershell.exe
+		pwsh.exe
+		/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe
+		/c/Windows/Sysnative/WindowsPowerShell/v1.0/powershell.exe
+		/c/Windows/SysWOW64/WindowsPowerShell/v1.0/powershell.exe
+		"/c/Program Files/PowerShell/7/pwsh.exe"
+	)
+
+	if [ -n "$POWERSHELL_EXE" ]; then
+		if command -v "$POWERSHELL_EXE" >/dev/null 2>&1; then
+			command -v "$POWERSHELL_EXE"
+			return 0
+		fi
+
+		converted="$(cygpath -au "$POWERSHELL_EXE" 2>/dev/null || printf '%s' "$POWERSHELL_EXE")"
+		if [ -f "$converted" ]; then
+			printf '%s\n' "$converted"
+			return 0
+		fi
+
+		fail "POWERSHELL_EXE was set but was not found: $POWERSHELL_EXE"
+	fi
+
+	for candidate in "${candidates[@]}"; do
+		if command -v "$candidate" >/dev/null 2>&1; then
+			command -v "$candidate"
+			return 0
+		fi
+		if [ -f "$candidate" ]; then
+			printf '%s\n' "$candidate"
+			return 0
+		fi
+	done
+
+	fail "could not find powershell.exe or pwsh.exe; set POWERSHELL_EXE to its full path"
 }
 
 safe_name()
@@ -133,6 +179,7 @@ done
 
 [ -n "$INSTALLER" ] || fail "--installer is required"
 [ -f "$INSTALLER" ] || fail "installer not found: $INSTALLER"
+POWERSHELL_EXE="$(find_powershell_exe)"
 
 case "$KIND" in
 	windows-gcc|windows-arm64|android|js|wii|xbox) ;;
@@ -183,6 +230,42 @@ function Assert-Path {
 	if (-not (Test-Path -LiteralPath $Path)) {
 		Fail "missing ${Description}: ${Path}"
 	}
+}
+
+function Remove-PathWithRetry {
+	param(
+		[string] $Path,
+		[switch] $Recurse,
+		[switch] $NonFatal
+	)
+
+	if (-not (Test-Path -LiteralPath $Path)) {
+		return
+	}
+
+	$lastError = $null
+	for ($attempt = 1; $attempt -le 120; $attempt++) {
+		try {
+			if ($Recurse) {
+				Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+			} else {
+				Remove-Item -LiteralPath $Path -Force -ErrorAction Stop
+			}
+			return
+		} catch {
+			$lastError = $_
+			[GC]::Collect()
+			[GC]::WaitForPendingFinalizers()
+			Start-Sleep -Seconds 1
+		}
+	}
+
+	if ($NonFatal) {
+		Write-Warning "could not remove path after retries: ${Path}: ${lastError}"
+		return
+	}
+
+	Fail "could not remove path after retries: ${Path}: ${lastError}"
 }
 
 function Invoke-Native {
@@ -237,6 +320,50 @@ function Invoke-ProgramAndExpect {
 	}
 }
 
+function Get-HostArchitectureLabel {
+	$parts = @()
+	if (-not [string]::IsNullOrEmpty($env:PROCESSOR_ARCHITECTURE)) {
+		$parts += "PROCESSOR_ARCHITECTURE=$env:PROCESSOR_ARCHITECTURE"
+	}
+	if (-not [string]::IsNullOrEmpty($env:PROCESSOR_ARCHITEW6432)) {
+		$parts += "PROCESSOR_ARCHITEW6432=$env:PROCESSOR_ARCHITEW6432"
+	}
+
+	try {
+		$processors = @(Get-CimInstance Win32_Processor -ErrorAction Stop)
+		foreach ($processor in $processors) {
+			$parts += "Win32_Processor.Architecture=$($processor.Architecture)"
+		}
+	} catch {
+	}
+
+	if ($parts.Count -eq 0) {
+		return "unknown host"
+	}
+	return ($parts -join ", ")
+}
+
+function Test-HostCanRunWindowsArm64 {
+	if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") {
+		return $true
+	}
+	if ($env:PROCESSOR_ARCHITEW6432 -eq "ARM64") {
+		return $true
+	}
+
+	try {
+		$processors = @(Get-CimInstance Win32_Processor -ErrorAction Stop)
+		foreach ($processor in $processors) {
+			if ($processor.Architecture -eq 12) {
+				return $true
+			}
+		}
+	} catch {
+	}
+
+	return $false
+}
+
 function Snapshot-File {
 	param([string] $Path)
 
@@ -255,7 +382,7 @@ function Restore-File {
 
 	if ($null -eq $Snapshot) {
 		if (Test-Path -LiteralPath $Path) {
-			Remove-Item -LiteralPath $Path -Force
+			Remove-PathWithRetry $Path
 		}
 		return
 	}
@@ -292,14 +419,14 @@ function Test-WindowsArm64 {
 	Assert-Path $fbc "Windows ARM64 compiler"
 	Assert-Path (Join-Path $InstallDir "bin\win32-aarch64") "Windows ARM64 tool directory"
 
-	if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") {
+	if (Test-HostCanRunWindowsArm64) {
 		$src = Join-Path $WorkDir "hello.bas"
 		$out = Join-Path $WorkDir "helloarm64.exe"
 		Write-BasicProgram $src "FreeBASIC ARM64 installer smoke OK"
 		Invoke-Native $fbc @($src, "-x", $out)
 		Invoke-ProgramAndExpect $out "FreeBASIC ARM64 installer smoke OK"
 	} else {
-		Write-Host "Windows ARM64 compiler execution skipped on $env:PROCESSOR_ARCHITECTURE host."
+		Write-Host "Windows ARM64 compiler execution skipped on $(Get-HostArchitectureLabel)."
 	}
 }
 
@@ -416,7 +543,7 @@ $installed = $false
 try {
 	Msg "Installing $Kind package smoke root"
 	if (Test-Path -LiteralPath $InstallDir) {
-		Remove-Item -LiteralPath $InstallDir -Recurse -Force
+		Remove-PathWithRetry $InstallDir -Recurse
 	}
 	New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
 
@@ -449,7 +576,7 @@ try {
 	}
 
 	if (Test-Path -LiteralPath $InstallDir) {
-		Remove-Item -LiteralPath $InstallDir -Recurse -Force
+		Remove-PathWithRetry $InstallDir -Recurse -NonFatal
 	}
 
 	if ($null -ne $oldPath) {
@@ -474,7 +601,7 @@ Write-Host "Installer smoke test passed: $Installer"
 EOF
 
 msg "Running installer smoke test for $(basename "$INSTALLER")"
-powershell.exe -NoProfile -ExecutionPolicy Bypass \
+"$POWERSHELL_EXE" -NoProfile -ExecutionPolicy Bypass \
 	-File "$(to_win_path "$PS1")" \
 	-Installer "$(to_win_path "$INSTALLER")" \
 	-InstallDir "$(to_win_path "$INSTALLDIR")" \
@@ -482,7 +609,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass \
 	-Kind "$KIND"
 
 if [ "$KEEP_WORK" -eq 0 ]; then
-	rm -rf "$TESTROOT"
+	rm -rf "$TESTROOT" 2>/dev/null || echo "WARNING: could not remove installer smoke workroot: $TESTROOT" >&2
 else
 	msg "Keeping installer smoke workroot: $TESTROOT"
 fi

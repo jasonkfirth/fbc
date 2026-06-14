@@ -18,6 +18,7 @@ int alignrequired(int arg) {
 #ifdef __GNUC__
     /* On x86/x86_64 with gcc -O0, this compiles to a pair of movaps instructions */
     v4si v2 = v1;
+    (void)v2;
 #endif
 
 #ifdef SSE

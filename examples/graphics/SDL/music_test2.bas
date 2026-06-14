@@ -51,6 +51,21 @@ declare sub handleKey(byval key as SDL_KeyboardEvent ptr)
 
 	video = SDL_SetVideoMode(320, 240, 0, 0)
 
+	if( environ( "FB_EXAMPLE_AUTOPLAY" ) <> "" ) then
+		phaserChannel = Mix_PlayChannel(-1, phaser, 0)
+		if( phaserChannel < 0 ) then
+			print "Unable to play phaser.wav!"
+			Mix_CloseAudio
+			SDL_Quit
+			end 1
+		end if
+
+		SDL_Delay(800)
+		Mix_HaltChannel(phaserChannel)
+		phaserChannel = -1
+		done = 1
+	end if
+
 	do while (done = 0)
    
    		do while (SDL_PollEvent(@event))

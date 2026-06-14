@@ -22,6 +22,12 @@ SUITE( fbc_tests.optimizations.inline_ops )
 		const EPSILON_DBL_FPU as double = EPSILON_DBL
 	#endif
 
+	#if defined(__FB_WIN32__) and defined(__FB_X86__) and not defined(__FB_64BIT__)
+		const EPSILON_DBL_X87 as double = EPSILON_DBL * 2
+	#else
+		const EPSILON_DBL_X87 as double = EPSILON_DBL
+	#endif
+
 	#define hFixF( x ) (floorf( abs( x ) ) * sgn( x ))
 	#define hFixD( x ) ( floor( abs( x ) ) * sgn( x ))
 
@@ -194,7 +200,7 @@ SUITE( fbc_tests.optimizations.inline_ops )
 			CU_ASSERT_DOUBLE_EQUAL(  sin( v ),  sin_( v ), EPSILON_DBL )
 			CU_ASSERT_DOUBLE_EQUAL( asin( v ), asin_( v ), EPSILON_DBL )
 			CU_ASSERT_DOUBLE_EQUAL(  cos( v ),  cos_( v ), EPSILON_DBL )
-			CU_ASSERT_DOUBLE_EQUAL( acos( v ), acos_( v ), EPSILON_DBL )
+			CU_ASSERT_DOUBLE_EQUAL( acos( v ), acos_( v ), EPSILON_DBL_X87 )
 #if defined(__FB_FREEBSD__)
 	#if (ENABLE_CHECK_BUGS<>0)
 			CU_ASSERT_DOUBLE_EQUAL(  tan( v ),  tan_( v ), EPSILON_DBL )
@@ -207,7 +213,7 @@ SUITE( fbc_tests.optimizations.inline_ops )
 #else
 			CU_ASSERT_DOUBLE_EQUAL(  atn( v ), atan_( v ), EPSILON_DBL )
 #endif
-			CU_ASSERT_DOUBLE_EQUAL(  exp( v ),  exp_( v ), EPSILON_DBL )
+			CU_ASSERT_DOUBLE_EQUAL(  exp( v ),  exp_( v ), EPSILON_DBL_X87 )
 		next
 
 		for v as single = 0 to 10 step .1

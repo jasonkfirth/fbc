@@ -45,6 +45,7 @@ SKIP_INSTALLER=0
 SKIP_VALIDATE=0
 KEEP_BUILDROOT=0
 QEMU_ARM64_VALIDATE=0
+ONLY_ARM64=0
 
 usage() {
 	cat <<EOF
@@ -60,6 +61,7 @@ Options:
   --skip-installer    Skip NSIS installer creation
   --skip-validate     Skip packaged compiler validation
   --keep-buildroot    Keep the build root on failure or success
+  --only-arm64        Only build/package the Windows ARM64 distribution
   --qemu-arm64-validate
                        Run fbcarm64.exe in a Windows ARM64 QEMU guest
   --help              Show this help text
@@ -97,6 +99,7 @@ for arg in "$@"; do
 		--skip-installer) SKIP_INSTALLER=1 ;;
 		--skip-validate) SKIP_VALIDATE=1 ;;
 		--keep-buildroot) KEEP_BUILDROOT=1 ;;
+		--only-arm64) ONLY_ARM64=1; SKIP_BUILD32=1; SKIP_BUILD64=1 ;;
 		--qemu-arm64-validate) QEMU_ARM64_VALIDATE=1 ;;
 		--help)
 			usage
@@ -132,6 +135,27 @@ run() {
 
 have() {
 	command -v "$1" >/dev/null 2>&1
+}
+
+host_is_windows_arm64() {
+	local host_uname_s
+	local host_uname_m
+
+	host_uname_s="$(uname -s 2>/dev/null || true)"
+	host_uname_m="$(uname -m 2>/dev/null || true)"
+
+	case "$host_uname_s:${PROCESSOR_ARCHITECTURE:-}:${PROCESSOR_ARCHITEW6432:-}" in
+		*ARM64*|*arm64*|*AARCH64*|*aarch64*)
+			return 0
+			;;
+	esac
+	case "$host_uname_m" in
+		aarch64|arm64)
+			return 0
+			;;
+	esac
+
+	return 1
 }
 
 first_existing_tool() {
@@ -612,7 +636,7 @@ install_dependencies() {
 			if pacman -Si "$fullpkg" >/dev/null 2>&1; then
 				run pacman -S --needed --noconfirm "$fullpkg"
 			else
-				echo "WARNING: optional MSYS2 package not found: $fullpkg" >&2
+				echo "NOTE: optional MSYS2 package not found: $fullpkg" >&2
 			fi
 		done
 
@@ -622,7 +646,7 @@ install_dependencies() {
 			if pacman -Si "$fullpkg" >/dev/null 2>&1; then
 				run pacman -S --needed --noconfirm "$fullpkg"
 			else
-				echo "WARNING: optional MSYS2 package not found: $fullpkg" >&2
+				echo "NOTE: optional MSYS2 package not found: $fullpkg" >&2
 			fi
 		fi
 	done
@@ -662,8 +686,15 @@ build_target() {
 	local build_fbcflags=""
 
 	if [ "$target" = "win32-aarch64" ]; then
-		tool_root="$MINGW64_ROOT"
-		tool_path_root="$MINGW64_ROOT"
+		if host_is_windows_arm64 && [ -x "$CLANGARM64_ROOT/bin/clang.exe" ]; then
+			tool_root="$CLANGARM64_ROOT"
+			tool_path_root="$CLANGARM64_ROOT"
+			msg "Using native CLANGARM64 host tools for $target"
+		else
+			tool_root="$MINGW64_ROOT"
+			tool_path_root="$MINGW64_ROOT"
+			msg "Using MINGW64 host clang to cross-build $target"
+		fi
 		clang_resource_dir="$(find_clang_resource_dir "$CLANGARM64_ROOT")" || fail "clang resource directory not found under $CLANGARM64_ROOT"
 		clang_target_flags="-Qunused-arguments --target=$target_triplet --sysroot=$CLANGARM64_ROOT -resource-dir $clang_resource_dir -fuse-ld=lld --rtlib=compiler-rt --unwindlib=libunwind"
 		fbc_clang_target_flags="-gen clang -Wc -Qunused-arguments -Wc --target=$target_triplet -Wc --sysroot=$CLANGARM64_ROOT -Wc -resource-dir -Wc $clang_resource_dir -Wa -Qunused-arguments -Wa --target=$target_triplet -Wa --sysroot=$CLANGARM64_ROOT -Wa -resource-dir -Wa $clang_resource_dir"
@@ -1061,6 +1092,35 @@ assemble_distribution() {
 	fi
 }
 
+assemble_arm64_distribution() {
+	local winarm64_stage="$STAGEROOT/win32-aarch64"
+
+	PACKAGED_DISTROOTS=()
+
+	if [ ! -f "$winarm64_stage/fbc.exe" ]; then
+		fail "missing staged fbcarm64.exe"
+	fi
+
+	sanitize_source_tree "$TRIPLETARM64"
+
+	msg "Assembling Windows ARM64 distribution"
+	rm -rf "$ARM64_DISTROOT"
+	mkdir -p "$ARM64_DISTROOT/bin" "$ARM64_DISTROOT/lib/win32-aarch64"
+
+	copy_distribution_common_content "$ARM64_DISTROOT"
+	cp -a "$winarm64_stage/fbc.exe" "$ARM64_DISTROOT/fbcarm64.exe"
+	[ -f "$ARM64_DISTROOT/fbcarm64.exe" ] || fail "missing staged fbcarm64.exe"
+
+	copy_arch_toolchain win32-aarch64 "$CLANGARM64_ROOT" "$TRIPLETARM64" "$CLANGARM64_ROOT" "$ARM64_DISTROOT"
+
+	msg "Merging staged FreeBASIC ARM64 runtime libraries"
+	copy_dir_files "$winarm64_stage/lib/win32-aarch64" "$ARM64_DISTROOT/lib/win32-aarch64"
+	remove_stale_crt_import_libs "$ARM64_DISTROOT/lib/win32-aarch64"
+	assert_no_stale_crt_import_libs "$ARM64_DISTROOT/lib/win32-aarch64"
+
+	PACKAGED_DISTROOTS+=("$ARM64_DISTROOT")
+}
+
 ##############################################################################
 # Packaging
 ##############################################################################
@@ -1083,6 +1143,12 @@ create_zip() {
 
 collect_existing_distribution_roots() {
 	PACKAGED_DISTROOTS=()
+
+	if [ "$ONLY_ARM64" -ne 0 ]; then
+		[ -n "${ARM64_DISTROOT:-}" ] && [ -d "$ARM64_DISTROOT" ] || fail "ARM64 distribution root not found: $ARM64_DISTROOT"
+		PACKAGED_DISTROOTS+=("$ARM64_DISTROOT")
+		return 0
+	fi
 
 	[ -d "$DISTROOT" ] || fail "distribution root not found: $DISTROOT"
 	PACKAGED_DISTROOTS+=("$DISTROOT")
@@ -1305,7 +1371,6 @@ validate_installer() {
 
 	[ "$SKIP_VALIDATE" -eq 0 ] || return 0
 	[ "$SKIP_INSTALLER" -eq 0 ] || return 0
-	[ "$SKIP_PACKAGE" -eq 0 ] || return 0
 
 	package_name="$(basename "$package_root")"
 	installer_exe="$OUT/${package_name}-setup.exe"
@@ -1356,11 +1421,7 @@ validate_arm64_with_qemu() {
 validate_distribution() {
 	local validate_dir="$BUILDROOT/validate"
 	local saved_path="$PATH"
-	local host_uname_s
-	local host_uname_m
-	local host_is_windows_arm64=0
 
-	msg "Validating packaged desktop compilers"
 	rm -rf "$validate_dir"
 	mkdir -p "$validate_dir"
 
@@ -1371,37 +1432,31 @@ EOF
 	PATH="/usr/bin:/c/Windows/System32:/c/Windows"
 	export PATH
 
-	run "$DISTROOT/fbc64.exe" "$validate_dir/hello.bas" -x "$validate_dir/hello64.exe"
-	[ "$("$validate_dir/hello64.exe")" = "FreeBASIC package test OK" ] || fail "packaged fbc64.exe produced bad output"
+	if [ "$ONLY_ARM64" -eq 0 ]; then
+		msg "Validating packaged desktop compilers"
 
-	run "$DISTROOT/fbc32.exe" "$validate_dir/hello.bas" -x "$validate_dir/hello32.exe"
-	[ "$("$validate_dir/hello32.exe")" = "FreeBASIC package test OK" ] || fail "packaged fbc32.exe produced bad output"
+		run "$DISTROOT/fbc64.exe" "$validate_dir/hello.bas" -x "$validate_dir/hello64.exe"
+		[ "$("$validate_dir/hello64.exe")" = "FreeBASIC package test OK" ] || fail "packaged fbc64.exe produced bad output"
+
+		run "$DISTROOT/fbc32.exe" "$validate_dir/hello.bas" -x "$validate_dir/hello32.exe"
+		[ "$("$validate_dir/hello32.exe")" = "FreeBASIC package test OK" ] || fail "packaged fbc32.exe produced bad output"
+	fi
 
 	if [ -f "$ARM64_DISTROOT/fbcarm64.exe" ]; then
 		msg "Validating packaged ARM64 compiler"
 		if [ "$QEMU_ARM64_VALIDATE" -ne 0 ]; then
 			validate_arm64_with_qemu "$ARM64_DISTROOT"
 		else
-			host_uname_s="$(uname -s 2>/dev/null || true)"
-			host_uname_m="$(uname -m 2>/dev/null || true)"
-			case "$host_uname_s:${PROCESSOR_ARCHITECTURE:-}:${PROCESSOR_ARCHITEW6432:-}" in
-				*ARM64*|*arm64*|*AARCH64*|*aarch64*)
-					host_is_windows_arm64=1
-					;;
-			esac
-			case "$host_uname_m" in
-				aarch64|arm64)
-					host_is_windows_arm64=1
-					;;
-			esac
-			if [ "$host_is_windows_arm64" -ne 0 ]; then
-					run "$ARM64_DISTROOT/fbcarm64.exe" "$validate_dir/hello.bas" -x "$validate_dir/helloarm64.exe"
-					[ "$("$validate_dir/helloarm64.exe")" = "FreeBASIC package test OK" ] || fail "packaged fbcarm64.exe produced bad output"
+			if host_is_windows_arm64; then
+				run "$ARM64_DISTROOT/fbcarm64.exe" "$validate_dir/hello.bas" -x "$validate_dir/helloarm64.exe"
+				[ "$("$validate_dir/helloarm64.exe")" = "FreeBASIC package test OK" ] || fail "packaged fbcarm64.exe produced bad output"
 			else
 				echo "WARNING: skipping fbcarm64.exe runtime validation on non-ARM64 host" >&2
 				echo "WARNING: use --qemu-arm64-validate with QEMU_ARM64_DISK and QEMU_ARM64_SSH_USER to run it under QEMU" >&2
 			fi
 		fi
+	elif [ "$ONLY_ARM64" -ne 0 ]; then
+		fail "missing ARM64 compiler for validation: $ARM64_DISTROOT/fbcarm64.exe"
 	fi
 
 	PATH="$saved_path"
@@ -1441,7 +1496,11 @@ if [ "$SKIP_BUILD32" -eq 0 ]; then
 fi
 
 if [ "$SKIP_PACKAGE" -eq 0 ]; then
-	assemble_distribution
+	if [ "$ONLY_ARM64" -ne 0 ]; then
+		assemble_arm64_distribution
+	else
+		assemble_distribution
+	fi
 else
 	collect_existing_distribution_roots
 fi

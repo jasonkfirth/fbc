@@ -131,20 +131,28 @@ run_arch()
 	local tests_work
 	local logroot
 	local fbc
+	local cc
+	local cxx
 	local lang
 
 	case "$arch" in
 		win32)
 			fbc_name="fbc32.exe"
 			mingw_root="/mingw32"
+			cc="$DIST_DIR/bin/$arch/gcc.exe"
+			cxx="$DIST_DIR/bin/$arch/g++.exe"
 			;;
 		win64)
 			fbc_name="fbc64.exe"
 			mingw_root="/mingw64"
+			cc="$DIST_DIR/bin/$arch/gcc.exe"
+			cxx="$DIST_DIR/bin/$arch/g++.exe"
 			;;
 		win32-aarch64)
 			fbc_name="fbcarm64.exe"
 			mingw_root="/clangarm64"
+			cc="$DIST_DIR/bin/$arch/clang.exe"
+			cxx="$DIST_DIR/bin/$arch/clang++.exe"
 			;;
 		*)
 			fail "unsupported architecture: $arch"
@@ -158,6 +166,8 @@ run_arch()
 
 	[ -f "$fbc" ] || fail "missing packaged compiler: $fbc"
 	[ -d "$DIST_DIR/bin/$arch" ] || fail "missing packaged tool directory: $DIST_DIR/bin/$arch"
+	[ -x "$cc" ] || fail "missing packaged C compiler: $cc"
+	[ -x "$cxx" ] || fail "missing packaged C++ compiler: $cxx"
 
 	msg "$arch: preparing isolated tests tree"
 	rm -rf "$arch_work"
@@ -168,6 +178,9 @@ run_arch()
 	cd "$tests_work"
 
 	export PATH="$DIST_DIR/bin/$arch:$DIST_DIR:$mingw_root/bin:/usr/bin:/c/Windows/System32:/c/Windows"
+	export GCC="$cc"
+	export CC="$cc"
+	export CXX="$cxx"
 
 	msg "$arch: compiler sanity checks"
 	"$fbc" -version

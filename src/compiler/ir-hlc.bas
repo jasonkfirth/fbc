@@ -4803,11 +4803,13 @@ private sub _emitProcBegin _
 	sectionIndent( )
 
 	if( (env.clopt.backend = FB_BACKEND_CLANG) or _
+	    (env.clopt.backend = FB_BACKEND_GCC) or _
 	    (env.clopt.target = FB_COMPTARGET_DARWIN) ) then
 		'' Work around an error clang throws if a function contains a
 		'' computed goto but no address-of-label operator.  Darwin uses
 		'' Apple's clang even when the driver command is named gcc, and
-		'' ordinary ERROR statements can emit computed gotos too.
+		'' gcc-backend C can be compiled by clang too.  Ordinary ERROR
+		'' statements can emit computed gotos.
 		'' See https://bugs.llvm.org/show_bug.cgi?id=18658
 		hWriteLine( "_unusedlabel: ; void *_llvmbug18658 = &&_unusedlabel;" )
 	end if

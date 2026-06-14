@@ -30,8 +30,13 @@ End If
 
 BASS_ChannelPlay(test, False)
 
-Print "Sound playing; waiting to keypress to stop and exit..."
-Sleep
+If( Environ( "FB_EXAMPLE_AUTOPLAY" ) <> "" ) Then
+	Sleep 1500, 1
+	Print "BASS position seconds:"; BASS_ChannelBytes2Seconds(test, BASS_ChannelGetPosition(test, BASS_POS_BYTE))
+Else
+	Print "Sound playing; waiting to keypress to stop and exit..."
+	Sleep
+End If
 
 BASS_ChannelStop(test)
 BASS_MusicFree(test)

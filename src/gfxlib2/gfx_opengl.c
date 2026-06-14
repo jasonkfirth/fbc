@@ -2,6 +2,9 @@
 
 #include "fb_gfx.h"
 #include "fb_gfx_gl.h"
+#ifdef HOST_WIN32
+#include "win32/fb_gfx_win32.h"
+#endif
 
 #ifdef DISABLE_OPENGL
 
@@ -248,6 +251,28 @@ void fb_hGL_SetPalette(int index, int r, int g, int b){
 	map_b[index]=(float)b/256.0;
 }
 
+#ifdef HOST_WIN32
+static int fb_hGL_GetWindowViewport(GLint *x, GLint *y, GLsizei *w, GLsizei *h)
+{
+	RECT client_rect, scaled_rect;
+	int client_h;
+
+	if (!fb_hWin32IsWindowScalingEnabled() || !fb_win32.wnd)
+		return 0;
+
+	if (!GetClientRect(fb_win32.wnd, &client_rect))
+		return 0;
+
+	fb_hWin32GetWindowScaledRect(&scaled_rect);
+	*x = scaled_rect.left;
+	*w = scaled_rect.right - scaled_rect.left;
+	*h = scaled_rect.bottom - scaled_rect.top;
+	client_h = client_rect.bottom - client_rect.top;
+	*y = client_h - scaled_rect.bottom;
+
+	return (*w > 0) && (*h > 0);
+}
+#endif
 
 void fb_hGL_SetupProjection(void)
 {
@@ -268,10 +293,19 @@ void fb_hGL_SetupProjection(void)
 	*/
 
 	const GLfloat vert[] = {-1,-1,-1,1,1,1,1,-1};
+	GLint viewport_x = 0;
+	GLint viewport_y = 0;
+	GLsizei viewport_w = __fb_gfx->w * __fb_gl_params.scale;
+	GLsizei viewport_h = __fb_gfx->h * __fb_gl_params.scale;
+	int clear_backbuffer = 0;
+
+#ifdef HOST_WIN32
+	clear_backbuffer = fb_hGL_GetWindowViewport(&viewport_x, &viewport_y, &viewport_w, &viewport_h);
+#endif
 
 	__fb_gl.PushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
 	__fb_gl.PushAttrib(GL_ALL_ATTRIB_BITS);
-	__fb_gl.Viewport(0, 0, __fb_gfx->w * __fb_gl_params.scale, __fb_gfx->h * __fb_gl_params.scale);
+	__fb_gl.Viewport(viewport_x, viewport_y, viewport_w, viewport_h);
 	__fb_gl.MatrixMode(GL_PROJECTION);
 	__fb_gl.PushMatrix();
 	__fb_gl.LoadIdentity();
@@ -282,7 +316,15 @@ void fb_hGL_SetupProjection(void)
 	__fb_gl.LoadIdentity();
 	__fb_gl.ShadeModel(GL_FLAT);
 	__fb_gl.Disable(GL_DEPTH_TEST);
+#ifdef GL_SCISSOR_TEST
+	if (clear_backbuffer)
+		__fb_gl.Disable(GL_SCISSOR_TEST);
+#endif
 	__fb_gl.DepthMask(GL_FALSE);
+	if (clear_backbuffer) {
+		__fb_gl.ClearColor(0.0, 0.0, 0.0, 1.0);
+		__fb_gl.Clear(GL_COLOR_BUFFER_BIT);
+	}
 	__fb_gl.EnableClientState( GL_VERTEX_ARRAY );
 	__fb_gl.EnableClientState( GL_TEXTURE_COORD_ARRAY );
 	__fb_gl.DisableClientState(GL_NORMAL_ARRAY);
@@ -293,6 +335,14 @@ void fb_hGL_SetupProjection(void)
 
 	//__fb_gl.ActiveTexture(GL_TEXTURE0);
 	__fb_gl.BindTexture(GL_TEXTURE_2D, ScreenTex);
+	if (clear_backbuffer) {
+		__fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+		__fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+	}
+	else {
+		__fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+		__fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+	}
 	switch(__fb_gfx->depth){
 	case 32:
 	case 24:

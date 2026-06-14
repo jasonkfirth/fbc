@@ -38,6 +38,11 @@ ARFLAGS ?= rcs
 RANLIB  ?= ranlib
 ELF2DOL ?= elf2dol
 
+tool_cmd = $(firstword $(strip $(1)))
+tool_args = $(wordlist 2,$(words $(strip $(1))),$(strip $(1)))
+tool_path = $(subst \,/,$(call tool_cmd,$(1)))
+tool_bindir = $(strip $(if $(findstring /,$(call tool_path,$(1))),$(patsubst %/,%,$(dir $(call tool_path,$(1))))))
+
 TOOLCHAIN_CC_TOOL := $(notdir $(firstword $(CC)))
 TOOLCHAIN_CC_IS_CLANG :=
 ifneq ($(findstring clang,$(TOOLCHAIN_CC_TOOL)),)

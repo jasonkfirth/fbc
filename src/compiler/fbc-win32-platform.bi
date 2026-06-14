@@ -42,6 +42,7 @@ private sub fbcWin32PlatformAddDefaultLibPaths( )
 #ifndef ENABLE_STANDALONE
 	if( fbcWin32PlatformUsesClangArm64Runtime( ) ) then
 		fbcAddLibPathFor( "libclang_rt.builtins-aarch64.a" )
+		fbcAddLibPathFor( "libc++.a" )
 	end if
 
 	'' Help the MinGW linker to find MinGW's lib/ dir, allowing
@@ -104,6 +105,16 @@ private sub fbcWin32PlatformAddDefaultLibs( )
 		fbcAddDefLib( "gmon" )
 	end if
 end sub
+
+private function fbcWin32PlatformMapLibName( byref libname as string ) as string
+	if( fbcWin32PlatformUsesClangArm64Runtime( ) ) then
+		if( libname = "stdc++" ) then
+			return "c++"
+		end if
+	end if
+
+	function = libname
+end function
 
 private sub fbcWin32PlatformAddLinkerFrameworks( byref ldcline as string )
 	if( fbcWin32PlatformIsSelected( ) = FALSE ) then

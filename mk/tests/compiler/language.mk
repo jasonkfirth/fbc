@@ -10,9 +10,9 @@ tests-test:
 	@mkdir -p $(LOG_DIR)
 	@set -e; \
 	status=0; \
-	$(MAKE) unit-tests    > $(LOG_DIR)/unit-tests.log 2>&1 || status=1; \
-	$(MAKE) log-tests     > $(LOG_DIR)/log-tests.log 2>&1 || status=1; \
-	$(MAKE) warning-tests > $(LOG_DIR)/warning-tests.log 2>&1 || status=1; \
+	$(TEST_TOOLCHAIN_ENV) $(MAKE) unit-tests    > $(LOG_DIR)/unit-tests.log 2>&1 || status=1; \
+	$(TEST_TOOLCHAIN_ENV) $(MAKE) log-tests     > $(LOG_DIR)/log-tests.log 2>&1 || status=1; \
+	$(TEST_TOOLCHAIN_ENV) $(MAKE) warning-tests > $(LOG_DIR)/warning-tests.log 2>&1 || status=1; \
 	if [ "$$status" -ne 0 ]; then \
 		echo "ERROR: one or more language test suites failed"; \
 		exit $$status; \

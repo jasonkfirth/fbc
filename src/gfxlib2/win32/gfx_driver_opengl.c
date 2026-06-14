@@ -339,7 +339,7 @@ static int opengl_init(void)
 		else {
 			style |= WS_OVERLAPPEDWINDOW;
 			style &= ~(WS_POPUP | WS_THICKFRAME);
-			if (fb_win32.flags & DRIVER_NO_SWITCH)
+			if ((fb_win32.flags & DRIVER_NO_SWITCH) && !fb_hWin32IsWindowScalingEnabled())
 				style &= ~WS_MAXIMIZEBOX;
 		}
 		flags |= SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOSENDCHANGING | SWP_NOZORDER;
@@ -365,6 +365,7 @@ static int opengl_init(void)
 	fb_win32.fullw = rect.right - rect.left;
 	fb_win32.fullh = rect.bottom - rect.top;
 	SetWindowPos(fb_win32.wnd, 0, x, y, fb_win32.fullw, fb_win32.fullh, flags);
+	fb_hWin32UpdateWindowLayout();
 	ShowWindow(fb_win32.wnd, SW_SHOW);
 	SetForegroundWindow(fb_win32.wnd);
 	fb_win32.is_active = TRUE;
@@ -446,6 +447,7 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 		w *= __fb_gl_params.scale;
 		h *= __fb_gl_params.scale;
 	}
+	fb_hWin32EnableWindowScaling((__fb_gl_params.mode_2d != DRIVER_OGL_2D_NONE) && (__fb_gl_params.scale == 1));
 
 	/*  Initialize the graphics window only.  Creation of the window
 	    is handled in next fb_hWin32Init() or GL_common_init()
@@ -466,17 +468,26 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 
 static void driver_exit(void)
 {
+	fb_hWin32StopThread();
+
 	if (library) {
+		if (fb_win32.exit) {
+			fb_win32.exit();
+			fb_win32.exit = NULL;
+		}
 		if (hglrc) {
 			fb_wgl.MakeCurrent(NULL, NULL);
 			fb_wgl.DeleteContext(hglrc);
+			hglrc = NULL;
 		}
-		if (hdc)
+		if (hdc) {
 			ReleaseDC(fb_win32.wnd, hdc);
-		if (fb_win32.flags & DRIVER_FULLSCREEN)
-			ChangeDisplaySettings(NULL, 0);
-		if (fb_win32.wnd)
+			hdc = NULL;
+		}
+		if (fb_win32.wnd) {
 			DestroyWindow(fb_win32.wnd);
+			fb_win32.wnd = NULL;
+		}
 		fb_hDynUnload(&library);
 	}
 

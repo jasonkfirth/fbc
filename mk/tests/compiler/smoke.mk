@@ -4,7 +4,7 @@
 # Compiler smoke test
 ##############################################################################
 
-.PHONY: compiler-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-ppc-smoke compiler-ppc64-smoke compiler-ppc64le-smoke
+.PHONY: compiler-smoke compiler-indirect-goto-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-ppc-smoke compiler-ppc64-smoke compiler-ppc64le-smoke
 compiler-smoke: libs
 	$(call _mt_echo,Compiler smoke test)
 	@mkdir -p "$(TEST_TMP)"
@@ -14,6 +14,23 @@ ifneq ($(CAN_RUN),)
 	@./"$(TEST_TMP)/smoke$(EXEEXT)" >/dev/null 2>&1 && echo "==> RUN OK"
 endif
 	$(call _mt_cleanup_success)
+
+compiler-indirect-goto-smoke:
+	@test -n "$(TEST_FBC)" || { echo "ERROR: no usable fbc found"; exit 1; }
+	$(call _mt_echo,Indirect goto C backend smoke test)
+	@mkdir -p "$(TEST_TMP)"
+	@printf "%s\n" \
+		'sub probe()' \
+		'    dim a() as integer' \
+		'    redim a(0 to 15)' \
+		'end sub' \
+		'probe()' \
+		> "$(TEST_TMP)/indirect-goto.bas"
+	$(call _mt_run,$(TEST_FBC_CMD) -gen gcc -e -r "$(TEST_TMP)/indirect-goto.bas" -x "$(TEST_TMP)/indirect-goto")
+	@grep -Fq 'goto *' "$(TEST_TMP)/indirect-goto.c" || { echo "ERROR: indirect goto C output was not produced"; exit 1; }
+	@grep -Fq '_llvmbug18658' "$(TEST_TMP)/indirect-goto.c" || { echo "ERROR: clang indirect goto workaround missing"; exit 1; }
+	$(call _mt_run,$(CC) -x c -c "$(TEST_TMP)/indirect-goto.c" -o "$(TEST_TMP)/indirect-goto.o")
+	@rm -rf "$(TEST_TMP)" "$(LOG_DIR)"
 
 compiler-riscv64-smoke:
 	@test -n "$(TEST_FBC)" || { echo "ERROR: no usable fbc found"; exit 1; }
@@ -55,14 +72,7 @@ compiler-s390x-smoke:
 		> "$(TEST_TMP)/s390x-smoke.bas"
 	$(call _mt_run,$(TEST_FBC_CMD) -target s390x-linux-gnu -r "$(TEST_TMP)/s390x-smoke.bas" -x "$(TEST_TMP)/s390x-smoke")
 	@test -s "$(TEST_TMP)/s390x-smoke.c" || { echo "ERROR: s390x C output was not produced"; exit 1; }
-	@mkdir -p "$(TEST_TMP)/fakebin"
-	@printf "%s\n" \
-		'#!/bin/sh' \
-		'printf "%s\n" "$$@" > "$(SRC_ROOT)/$(TEST_TMP)/s390x-gcc.args"' \
-		'exit 1' \
-		> "$(TEST_TMP)/fakebin/s390x-linux-gnu-gcc"
-	@chmod +x "$(TEST_TMP)/fakebin/s390x-linux-gnu-gcc"
-	@PATH="$(SRC_ROOT)/$(TEST_TMP)/fakebin:$$PATH" "$(TEST_FBC)" -target s390x-linux-gnu -c "$(TEST_TMP)/s390x-smoke.bas" -o "$(TEST_TMP)/s390x-smoke.o" >/dev/null 2>&1 || test -s "$(TEST_TMP)/s390x-gcc.args"
+	@$(TEST_FBC_CMD) -target s390x-linux-gnu -v -c "$(TEST_TMP)/s390x-smoke.bas" -o "$(TEST_TMP)/s390x-smoke.o" > "$(TEST_TMP)/s390x-gcc.args" 2>&1 || true
 	@grep -q -- '-march=z900' "$(TEST_TMP)/s390x-gcc.args" || { echo "ERROR: s390x gcc command did not use -march=z900"; exit 1; }
 	@! grep -q -- '-march=s390x' "$(TEST_TMP)/s390x-gcc.args" || { echo "ERROR: s390x gcc command used invalid -march=s390x"; exit 1; }
 	@if command -v s390x-linux-gnu-gcc >/dev/null 2>&1; then \

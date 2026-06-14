@@ -24,6 +24,7 @@
   distclean \
   clean-build \
   clean-compiler \
+  clean-all-objects \
   list-example-artifacts \
   clean-example-artifacts \
   clean-libs \
@@ -40,6 +41,20 @@
 clean-compiler:
 	@if [ -n "$(fbcobjdir)" ]; then rm -rf "$(fbcobjdir)"; fi
 	@if [ -n "$(fbcjsobjdir)" ]; then rm -rf "$(fbcjsobjdir)"; fi
+	@if [ -n "$(fbcandroidobjdir)" ]; then rm -rf "$(fbcandroidobjdir)"; fi
+	@if [ -n "$(fbcwiiobjdir)" ]; then rm -rf "$(fbcwiiobjdir)"; fi
+
+
+##############################################################################
+# All generated object roots
+##############################################################################
+
+clean-all-objects:
+	@rm -rf src/compiler/obj
+	@rm -rf src/rtlib/obj
+	@rm -rf src/fbrt/obj
+	@rm -rf src/gfxlib2/obj
+	@rm -rf src/sfxlib/obj
 
 
 ##############################################################################

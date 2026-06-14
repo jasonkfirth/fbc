@@ -35,6 +35,7 @@ BOOTSTRAP_MATRIX := $(SUPPORTED_BOOTSTRAP_TARGETS)
 
 BOOT_DIST_TAR := $(if $(strip $(DIST_TAR)),$(DIST_TAR),tar -cJf)
 BOOT_DIST_EXT := $(if $(strip $(DIST_EXT)),$(DIST_EXT),tar.xz)
+BOOTSTRAP_DIST_WORKTREE ?= 0
 BOOTSTRAP_RSYNC_EXCLUDES := \
 	--prune-empty-dirs \
 	--exclude-from="$(mkpath)/source-copy-excludes.rsync"
@@ -74,8 +75,19 @@ bootstrap-dist-target: bootstrap-check bootstrap-emit
 	mkdir -p "$(BOOTSTRAP_STAGE_ROOT)"
 
 	@if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
-		echo "==> Packaging sources via git archive"; \
-		git archive --format=tar --prefix="$(BOOTSTRAP_TITLE)/" HEAD | tar -C "$(BOOTSTRAP_STAGE_ROOT)" -xf -; \
+		if [ "$(BOOTSTRAP_DIST_WORKTREE)" = "1" ]; then \
+			echo "==> Packaging sources via git archive plus worktree changes"; \
+			changed="$$(mktemp)"; \
+			git archive --format=tar --prefix="$(BOOTSTRAP_TITLE)/" HEAD | tar -C "$(BOOTSTRAP_STAGE_ROOT)" -xf -; \
+			git diff --name-only -z --diff-filter=ACMRT HEAD -- > "$$changed"; \
+			if [ -s "$$changed" ]; then \
+				tar -cf - --null -T "$$changed" | tar -C "$(BOOTSTRAP_STAGE_DIR)" -xf -; \
+			fi; \
+			rm -f "$$changed"; \
+		else \
+			echo "==> Packaging sources via git archive"; \
+			git archive --format=tar --prefix="$(BOOTSTRAP_TITLE)/" HEAD | tar -C "$(BOOTSTRAP_STAGE_ROOT)" -xf -; \
+		fi; \
 	else \
 		echo "==> Packaging sources via rsync"; \
 		mkdir -p "$(BOOTSTRAP_STAGE_DIR)"; \

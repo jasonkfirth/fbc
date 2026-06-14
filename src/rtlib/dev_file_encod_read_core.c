@@ -368,16 +368,10 @@ static ssize_t hReadUTF16ToWchar( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 	}
 
 	/* convert.. */
-	switch( sizeof( FB_WCHAR ) )
-	{
-	case sizeof( char ):
+	if( sizeof( FB_WCHAR ) == sizeof( char ) )
 		res = hReadUTF16ToChar( fp, (char *)dst, max_chars );
-		break;
-
-	case sizeof( UTF_32 ):
+	else if( sizeof( FB_WCHAR ) == sizeof( UTF_32 ) )
 		res = hUTF16ToUTF32( fp, dst, max_chars );
-		break;
-	}
 
 	return res;
 }

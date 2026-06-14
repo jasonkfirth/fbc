@@ -11,7 +11,7 @@ print "Status before playback:"; state
 
 result = MUSIC PLAY( filename )
 if( result >= 0 ) then
-	SfxExampleWait( 500 )
+	SfxExampleWait( 1600 )
 	print "Status while playing:"; MUSIC STATUS()
 	MUSIC STOP
 end if

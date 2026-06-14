@@ -7,4 +7,4 @@ EXTRA_OBJS := this-cpp.o
 
 $(SRCDIR)this-cpp.o : $(SRCDIR)this-cpp.cpp
 	# Pass $(CFLAGS) to get -m32 or -m64 as required
-	$(CXX) -c $(CFLAGS) -Wall -Wno-attributes -o $@ $^
+	$(CXX) -c $(CFLAGS) -Wall -Wno-attributes $(CXXFLAGS) -o $@ $^

@@ -9,9 +9,9 @@ result = MUSIC PLAY( filename )
 if( result < 0 ) then
 	print "Unable to start music playback."
 else
-	SfxExampleWait( 300 )
-	print "Position after 0.3 s:"; MUSIC POSITION()
-	SfxExampleWait( 300 )
-	print "Position after 0.6 s:"; MUSIC POSITION()
+	SfxExampleWait( 1400 )
+	print "Position after 1.4 s:"; MUSIC POSITION()
+	SfxExampleWait( 500 )
+	print "Position after 1.9 s:"; MUSIC POSITION()
 	MUSIC STOP
 end if

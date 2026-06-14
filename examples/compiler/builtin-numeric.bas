@@ -4,7 +4,11 @@
 '' Demonstrates GCC/clang numeric builtins through inc/builtin.bi.
 ''
 
-#cmdline "-gen gcc"
+#if defined( __FB_WIN32__ ) and defined( __FB_ARM__ )
+	#cmdline "-gen clang"
+#else
+	#cmdline "-gen gcc"
+#endif
 
 '' Older GCC releases, including the GCC 4.8 shipped with Solaris 11.3, do
 '' not support -Werror=builtin-declaration-mismatch.  Keep this example focused

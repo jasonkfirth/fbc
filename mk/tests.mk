@@ -7,10 +7,7 @@
 .PHONY: unit-tests log-tests warning-tests clean-tests
 
 TESTS_FBC := $(if $(LOCAL_FBC),$(abspath $(LOCAL_FBC)),$(AVAILABLE_FBC))
-TESTS_TOOLCHAIN_BINDIR :=
-ifneq ($(findstring /,$(CC))$(findstring \,$(CC)),)
-TESTS_TOOLCHAIN_BINDIR := $(patsubst %/,%,$(dir $(CC)))
-endif
+TESTS_TOOLCHAIN_BINDIR := $(call tool_bindir,$(CC))
 TESTS_FBC_ENV := env \
 	$(TOOLCHAIN_FBC_ENV) \
 	PATH='$(if $(strip $(TESTS_TOOLCHAIN_BINDIR)),$(TESTS_TOOLCHAIN_BINDIR):)'"$$PATH" \

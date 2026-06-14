@@ -114,22 +114,24 @@ TESTS_FBC_ENV :=
 else
 TESTS_FBC_ENV := env \
 	$(TESTS_FBC_ENV_EXTRA) \
-	PATH='$(if $(strip $(TESTS_TOOLCHAIN_BINDIR)),$(TESTS_TOOLCHAIN_BINDIR):)'"$$PATH" \
-	AS='$(AS)' \
-	AR='$(AR)' \
-	LD='$(LD)' \
-	GCC='$(CC)' \
-	CLANG='$(CLANG)' \
-	LLC='$(LLC)' \
-	DLLTOOL='$(DLLTOOL)' \
-	WINDRES='$(WINDRES)' \
-	GORC='$(GORC)' \
-	EMAS='$(EMAS)' \
-	EMAR='$(EMAR)' \
-	EMLD='$(EMLD)' \
-	EMCC='$(EMCC)' \
-	CXBE='$(CXBE)' \
-	DXEGEN='$(DXEGEN)'
+	PATH="$(if $(strip $(TESTS_TOOLCHAIN_BINDIR)),$(TESTS_TOOLCHAIN_BINDIR):)$$PATH" \
+	AS="$(AS)" \
+	AR="$(AR)" \
+	LD="$(LD)" \
+	GCC="$(CC)" \
+	CLANG="$(CLANG)" \
+	LLC="$(LLC)" \
+	DLLTOOL="$(DLLTOOL)" \
+	WINDRES="$(WINDRES)" \
+	GORC="$(GORC)" \
+	EMAS="$(EMAS)" \
+	EMAR="$(EMAR)" \
+	EMLD="$(EMLD)" \
+	EMCC="$(EMCC)" \
+	CXBE="$(CXBE)" \
+	DXEGEN="$(DXEGEN)"
 endif
 
-TESTS_DEFAULT_FBC := $(TESTS_FBC_ENV) fbc$(EXEEXT)
+TESTS_FBC_TARGET_ARGS := $(if $(strip $(BUILD_FBC_TARGET)),-target $(BUILD_FBC_TARGET))
+TESTS_FBC_BUILDPREFIX_ARGS := $(if $(strip $(BUILD_FBC_BUILDPREFIX)),-buildprefix $(BUILD_FBC_BUILDPREFIX))
+TESTS_DEFAULT_FBC := $(TESTS_FBC_ENV) fbc$(EXEEXT) $(TESTS_FBC_TARGET_ARGS) $(TESTS_FBC_BUILDPREFIX_ARGS)

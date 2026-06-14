@@ -253,6 +253,16 @@ static LRESULT CALLBACK D2DWndProcSubclass(HWND hwnd, UINT msg, WPARAM wParam, L
 
 	if(!pGlobalState) return DefWindowProc(hwnd, msg, wParam, lParam);
 	switch(msg) {
+		case WM_SIZE:
+			if(fb_hWin32IsWindowScalingEnabled() && !pGlobalState->Paint && pGlobalState->RenderParams.NonLayered.pHwndTarget) {
+				D2D1_SIZE_U targetSize = {LOWORD(lParam), HIWORD(lParam)};
+
+				if(targetSize.width && targetSize.height) {
+					ID2D1HwndRenderTarget_Resize(pGlobalState->RenderParams.NonLayered.pHwndTarget, &targetSize);
+				}
+			}
+		break;
+
 		/* The other Win32 graphic drivers do the input handling in
 		// the main thread loop using GetKeyState, which happens even 
 		// if nothing has changed.
@@ -325,7 +335,7 @@ static HWND CreateTheWindow(WNDPROC* pOriginalProc)
 	else {
 		windowStyle |= WS_POPUP;
 	}
-	if(fbFlags & DRIVER_NO_SWITCH) {
+	if((fbFlags & DRIVER_NO_SWITCH) && !fb_hWin32IsWindowScalingEnabled()) {
 		windowStyle &= ~WS_MAXIMIZEBOX;
 	}
 	winSize.right = fb_win32.w;
@@ -585,6 +595,7 @@ static void D2DCommonPaintInternal(D2DGlobalState* pGlobalState)
 	const int winWidth = fb_win32.w, winHeight = fb_win32.h;
 	D2D1_RECT_U dirtyRect;
 	D2D1_RECT_F drawRect;
+	D2D1_RECT_F sourceRect;
 	char* pDirtyStart, *pDirtyEnd;
 	const char* pFirstDirtyRow = NULL, *pLastDirtyRow = NULL;
 	unsigned char* pBitmapDataSrc = NULL;
@@ -649,7 +660,25 @@ fillInDirtyRect:
 	ID2D1Bitmap_CopyFromMemory(pBackBuffer, &dirtyRect, pBitmapDataSrc, stride);
 
 	ID2D1RenderTarget_BeginDraw(pRT);
-	ID2D1RenderTarget_DrawBitmap(pRT, pBackBuffer, &drawRect, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &drawRect);
+	if(fb_hWin32IsWindowScalingEnabled()) {
+		RECT scaledRect;
+		D2D1_COLOR_F clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+
+		fb_hWin32GetWindowScaledRect(&scaledRect);
+		sourceRect.left = 0.0f;
+		sourceRect.top = 0.0f;
+		sourceRect.right = (FLOAT)winWidth;
+		sourceRect.bottom = (FLOAT)winHeight;
+		drawRect.left = (FLOAT)scaledRect.left;
+		drawRect.top = (FLOAT)scaledRect.top;
+		drawRect.right = (FLOAT)scaledRect.right;
+		drawRect.bottom = (FLOAT)scaledRect.bottom;
+		ID2D1RenderTarget_Clear(pRT, &clearColor);
+		ID2D1RenderTarget_DrawBitmap(pRT, pBackBuffer, &drawRect, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR, &sourceRect);
+	}
+	else {
+		ID2D1RenderTarget_DrawBitmap(pRT, pBackBuffer, &drawRect, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &drawRect);
+	}
 	if(pGlobalState->Paint)
 	{
 		pGlobalState->Paint(pGlobalState, &dirtyRect);
@@ -793,6 +822,7 @@ static int D2DDriverInit(char *title, int w, int h, int depth, int refresh_rate,
 	fb_win32.exit = &D2DCommonShutdown;
 	fb_win32.paint = &D2DCommonPaint;
 	fb_win32.thread = &D2DRenderThread;
+	fb_hWin32EnableWindowScaling(!(flags & DRIVER_SHAPED_WINDOW));
 
 	return fb_hWin32Init(title, w, h, depth, refresh_rate, flags);
 }

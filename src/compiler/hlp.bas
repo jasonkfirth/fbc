@@ -180,7 +180,7 @@ sub hUcase _
 	dim as const zstring ptr s
 	dim as zstring ptr d
 
-	s = src
+	s = cast( zstring ptr, src )
 	d = dst
 
 	do

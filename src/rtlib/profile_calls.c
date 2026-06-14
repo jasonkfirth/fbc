@@ -24,9 +24,7 @@
 
 /* choose a suitable 64-bit decimal printf specifier */
 #if !defined(fmtlld)
-	#if defined(PRId64)
-		#define fmtlld PRId64
-	#elif defined(FB_LL_FMTMOD)
+	#if defined(FB_LL_FMTMOD)
 		#define fmtlld "%12" FB_LL_FMTMOD "d"
 	#else
 		#define fmtlld "%12lld"

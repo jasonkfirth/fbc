@@ -1,4 +1,5 @@
 ' TEST_MODE : COMPILE_ONLY_OK
+#cmdline "-Wc -Wno-infinite-recursion"
 
 type Parent
 	as integer i

@@ -14,16 +14,17 @@ bootstrap-stage-test:
 	mkdir -p "$$STAGE_DIR"; \
 	mkdir -p "$$STAGE_DIR/../lib/freebasic/$(FBTARGET)"; \
 	cp -a "$(SRC_ROOT)/lib/freebasic/$(FBTARGET)/." "$$STAGE_DIR/../lib/freebasic/$(FBTARGET)/"; \
+	export SOURCE_DATE_EPOCH="$${SOURCE_DATE_EPOCH:-1}"; \
 	echo "==> Building stage1 compiler"; \
-	$(MAKE) -C "$(SRC_ROOT)" compiler; \
+	$(TEST_TOOLCHAIN_ENV) $(MAKE) -C "$(SRC_ROOT)" compiler; \
 	cp "$(SRC_ROOT)/$(FBC_EXE)" "$$STAGE_DIR/stage1-fbc"; \
 	echo "==> Building stage2 compiler using stage1"; \
-	$(MAKE) -C "$(SRC_ROOT)" clean-compiler; \
-	$(MAKE) -C "$(SRC_ROOT)" compiler BUILD_FBC="$$STAGE_DIR/stage1-fbc"; \
+	$(TEST_TOOLCHAIN_ENV) $(MAKE) -C "$(SRC_ROOT)" clean-compiler; \
+	$(TEST_TOOLCHAIN_ENV) $(MAKE) -C "$(SRC_ROOT)" compiler BUILD_FBC="$$STAGE_DIR/stage1-fbc"; \
 	cp "$(SRC_ROOT)/$(FBC_EXE)" "$$STAGE_DIR/stage2-fbc"; \
 	echo "==> Building stage3 compiler using stage2"; \
-	$(MAKE) -C "$(SRC_ROOT)" clean-compiler; \
-	$(MAKE) -C "$(SRC_ROOT)" compiler BUILD_FBC="$$STAGE_DIR/stage2-fbc"; \
+	$(TEST_TOOLCHAIN_ENV) $(MAKE) -C "$(SRC_ROOT)" clean-compiler; \
+	$(TEST_TOOLCHAIN_ENV) $(MAKE) -C "$(SRC_ROOT)" compiler BUILD_FBC="$$STAGE_DIR/stage2-fbc"; \
 	cp "$(SRC_ROOT)/$(FBC_EXE)" "$$STAGE_DIR/stage3-fbc"; \
 	echo "==> Comparing stage2 and stage3 compilers"; \
 	if cmp -s "$$STAGE_DIR/stage2-fbc" "$$STAGE_DIR/stage3-fbc"; then \

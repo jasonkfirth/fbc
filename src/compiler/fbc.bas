@@ -1694,11 +1694,7 @@ private function hLinkFiles( ) as integer
 					hAddXboxLibArchive( ldcline, i->s )
 				else
 					dim as string libname = i->s
-					if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_OPENBSD ) then
-						if( libname = "stdc++" ) then
-							libname = "estdc++"
-						end if
-					end if
+					libname = fbcPlatformMapLibName( libname )
 					ldcline += " -l" + libname
 				end if
 			end if

@@ -1397,9 +1397,10 @@ private sub hMangleProc( byval sym as FBSYMBOL ptr )
 	end if
 
 	'' params
-	if( docpp ) then
+	if( docpp orelse (symbIsOperator( sym ) andalso _
+	    ((sym->stats and FB_SYMBSTATS_HASALIAS) = 0)) ) then
 		'' nested? (namespace or class)
-		if( hIsNested( sym ) ) then
+		if( docpp andalso hIsNested( sym ) ) then
 			mangled += "E"
 		end if
 		hGetProcParamsTypeCode( mangled, sym, TRUE )

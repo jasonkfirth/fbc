@@ -54,6 +54,23 @@ sub main()
 
 	video = SDL_SetVideoMode(320, 240, 0, 0)
 
+	if( environ( "FB_EXAMPLE_AUTOPLAY" ) <> "" ) then
+		song = Mix_LoadMUS("data/music.ogg")
+		if( song = NULL ) then
+			print "Unable to load music!"
+			Mix_CloseAudio
+			SDL_Quit
+			end 1
+		end if
+
+		Mix_PlayMusic(song, 0)
+		SDL_Delay(1500)
+		Mix_HaltMusic
+		Mix_FreeMusic(song)
+		song = NULL
+		done = 1
+	end if
+
 	do while (done = 0)
    		do while (SDL_PollEvent(@event))
       		select case (event.type)

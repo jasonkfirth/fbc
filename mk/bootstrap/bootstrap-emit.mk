@@ -31,10 +31,7 @@ ifeq ($(BOOTSTRAP_HOST_IS_MSYS),yes)
 BOOT_FBC_BUILD_ROOT := $(shell cygpath -m "$(rootdir)")
 endif
 BOOT_FBC_PREFIX_OPT := -prefix $(BOOT_FBC_BUILD_ROOT)
-BOOT_TOOLCHAIN_BINDIR :=
-ifneq ($(findstring /,$(CC))$(findstring \,$(CC)),)
-BOOT_TOOLCHAIN_BINDIR := $(patsubst %/,%,$(dir $(CC)))
-endif
+BOOT_TOOLCHAIN_BINDIR := $(call tool_bindir,$(CC))
 BOOT_FBC_TOOL_ENV := env \
 	$(TOOLCHAIN_FBC_ENV) \
 	PATH='$(if $(strip $(BOOT_TOOLCHAIN_BINDIR)),$(BOOT_TOOLCHAIN_BINDIR):)'"$$PATH" \

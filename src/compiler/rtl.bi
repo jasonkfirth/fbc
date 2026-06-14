@@ -446,6 +446,7 @@
 #define FB_RTL_GOSUBRETURN              "fb_GosubReturn"
 #define FB_RTL_GOSUBEXIT                "fb_GosubExit"
 #define FB_RTL_SETJMP                   "fb_SetJmp"
+#define FB_RTL_FRAMEADDRESS             "fb_FrameAddress"
 
 #define FB_RTL_SGN                      "{sgn}"
 #define FB_RTL_ASIN                     "{asin}"
@@ -923,6 +924,7 @@ enum FB_RTL_IDX
 	FB_RTL_IDX_GOSUBRETURN
 	FB_RTL_IDX_GOSUBEXIT
 	FB_RTL_IDX_SETJMP
+	FB_RTL_IDX_FRAMEADDRESS
 
 	FB_RTL_IDX_SGN
 	FB_RTL_IDX_ASIN

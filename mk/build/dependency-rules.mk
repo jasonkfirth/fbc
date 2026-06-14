@@ -16,7 +16,9 @@ DEPFILES := $(ALL_RUNTIME_OBJS:.o=.d)
 # Include generated dependency files
 ##############################################################################
 
+ifeq ($(filter clean% distclean test-clean,$(MAKECMDGOALS)),)
 -include $(DEPFILES)
+endif
 
 ##############################################################################
 # END dependency-rules.mk

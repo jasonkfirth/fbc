@@ -26,10 +26,7 @@ ifneq ($(filter MSYS% MINGW%,$(shell uname -s 2>/dev/null)),)
 FBC_BUILD_ROOT := $(shell cygpath -m "$(rootdir)")
 endif
 FBC_PREFIX_OPT := -prefix $(FBC_BUILD_ROOT)
-TOOLCHAIN_BINDIR :=
-ifneq ($(findstring /,$(CC))$(findstring \,$(CC)),)
-TOOLCHAIN_BINDIR := $(patsubst %/,%,$(dir $(CC)))
-endif
+TOOLCHAIN_BINDIR := $(call tool_bindir,$(CC))
 FBC_ENV_TOOLCHAIN_BINDIR := $(TOOLCHAIN_BINDIR)
 FBC_ENV_PATH := $$PATH
 FBC_ENV_PATH_SEP := :
@@ -57,7 +54,7 @@ ifneq ($(filter MSYS% MINGW%,$(shell uname -s 2>/dev/null)),)
 # in the shell's native POSIX form because Cygwin tools expect that environment
 # after fbc launches them.
 #
-fbc_msys_tool = $(strip $(if $(strip $(1)),$(shell tool='$(1)'; if command -v "$$tool" >/dev/null 2>&1; then cygpath -m "$$(command -v "$$tool")"; else cygpath -m "$$tool" 2>/dev/null || printf '%s' "$$tool"; fi)))
+fbc_msys_tool = $(strip $(if $(strip $(1)),$(shell tool='$(call tool_cmd,$(1))'; args='$(call tool_args,$(1))'; if command -v "$$tool" >/dev/null 2>&1; then tool="$$(cygpath -m "$$(command -v "$$tool")")"; else tool="$$(cygpath -m "$$tool" 2>/dev/null || printf '%s' "$$tool")"; fi; if [ -n "$$args" ]; then printf '%s %s' "$$tool" "$$args"; else printf '%s' "$$tool"; fi)))
 FBC_ENV_AS := $(call fbc_msys_tool,$(AS))
 FBC_ENV_AR := $(call fbc_msys_tool,$(AR))
 FBC_ENV_LD := $(call fbc_msys_tool,$(LD))
@@ -180,6 +177,13 @@ $(fbcwiiobjdir)/%.o: $(srcdir)/compiler/%.bas $(FBC_BI) | $(fbcwiiobjdir)
 # rtlib (C runtime)
 ##############################################################################
 
+RTLIB_GOSUB_CFLAGS :=
+ifeq ($(TARGET_OS),win32)
+  ifeq ($(TARGET_ARCH),x86_64)
+    RTLIB_GOSUB_CFLAGS := -funwind-tables
+  endif
+endif
+
 $(libfbobjdir)/%.o: $(srcdir)/rtlib/%.c $(LIBFB_H) | $(libfbobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) -MMD -MP -c $< -o $@
@@ -195,6 +199,22 @@ $(libfbmtobjdir)/%.o: $(srcdir)/rtlib/%.c $(LIBFB_H) | $(libfbmtobjdir)
 $(libfbmtpicobjdir)/%.o: $(srcdir)/rtlib/%.c $(LIBFB_H) | $(libfbmtpicobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MTPIC_CFLAGS) -MMD -MP -c $< -o $@
+
+$(libfbobjdir)/gosub.o: $(srcdir)/rtlib/gosub.c $(LIBFB_H) | $(libfbobjdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(RTLIB_GOSUB_CFLAGS) -MMD -MP -c $< -o $@
+
+$(libfbpicobjdir)/gosub.o: $(srcdir)/rtlib/gosub.c $(LIBFB_H) | $(libfbpicobjdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) $(RTLIB_GOSUB_CFLAGS) -MMD -MP -c $< -o $@
+
+$(libfbmtobjdir)/gosub.o: $(srcdir)/rtlib/gosub.c $(LIBFB_H) | $(libfbmtobjdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MT_CFLAGS) $(RTLIB_GOSUB_CFLAGS) -MMD -MP -c $< -o $@
+
+$(libfbmtpicobjdir)/gosub.o: $(srcdir)/rtlib/gosub.c $(LIBFB_H) | $(libfbmtpicobjdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MTPIC_CFLAGS) $(RTLIB_GOSUB_CFLAGS) -MMD -MP -c $< -o $@
 
 $(libfbobjdir)/%.o: $(srcdir)/rtlib/%.s $(LIBFB_H) | $(libfbobjdir)
 	@mkdir -p "$(dir $@)"

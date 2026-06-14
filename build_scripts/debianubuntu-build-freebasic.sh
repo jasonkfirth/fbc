@@ -584,7 +584,6 @@ assert_orig_tarball_clean() {
                 */obj/*|\
                 .build-alpine/*|\
                 .build-debianubuntu*/*|\
-                .codex/*|\
                 .git/*|\
                 bin/*|\
                 dist/*|\

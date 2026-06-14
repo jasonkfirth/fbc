@@ -11,6 +11,7 @@
 #cmdline "-gen gcc"
 #cmdline "-Wc -Wno-unknown-warning-option"
 #cmdline "-Wc -Werror=discarded-qualifiers"
+#cmdline "-restart"
 
 extern "C"
 	declare function fb_const_proto_any cdecl alias "fb_const_proto_any" ( byval as const any ptr ) as any ptr

@@ -69,6 +69,7 @@ sanity: | prereqs
 .PHONY: quick-test quick-test-body
 quick-test: quick-test-body
 	@$(MAKE) clean-maketests-success
+	@$(MAKE) clean-maketests-host
 
 quick-test-body: sanity \
 	mk-structure-test \
@@ -76,6 +77,7 @@ quick-test-body: sanity \
 	build-graph-test \
 	bootstrap-emit-test \
 	compiler-smoke \
+	compiler-indirect-goto-smoke \
 	compiler-riscv64-smoke \
 	compiler-s390x-smoke \
 	compiler-loongarch64-smoke \
@@ -86,6 +88,7 @@ quick-test-body: sanity \
 .PHONY: full-test full-test-body
 full-test: full-test-body
 	@$(MAKE) clean-maketests-success
+	@$(MAKE) clean-maketests-host
 
 full-test-body: sanity \
 	mk-structure-test \
@@ -109,6 +112,7 @@ full-test-body: sanity \
 	uninstall-test \
 	matrix-test \
 	compiler-smoke \
+	compiler-indirect-goto-smoke \
 	compiler-riscv64-smoke \
 	compiler-s390x-smoke \
 	compiler-loongarch64-smoke \
@@ -116,6 +120,40 @@ full-test-body: sanity \
 	compiler-ppc64-smoke \
 	compiler-ppc64le-smoke \
 	tests-test
+
+MAKETEST_HOST_FBC_TARGETS := \
+	sanity \
+	mk-structure-test \
+	example-artifact-test \
+	build-graph-test \
+	parallel-build-test \
+	clean-test \
+	clean-idempotence \
+	dependency-test \
+	rebuild-test \
+	bootstrap-test \
+	bootstrap-emit-test \
+	bootstrap-emit-matrix-test \
+	bootstrap-dist-test \
+	bootstrap-dist-matrix-test \
+	bootstrap-rebuild-test \
+	bootstrap-stage-test \
+	packaging-test \
+	pkg-test \
+	install-test \
+	uninstall-test \
+	matrix-test \
+	compiler-smoke \
+	compiler-indirect-goto-smoke \
+	compiler-riscv64-smoke \
+	compiler-s390x-smoke \
+	compiler-loongarch64-smoke \
+	compiler-ppc-smoke \
+	compiler-ppc64-smoke \
+	compiler-ppc64le-smoke \
+	tests-test
+
+$(MAKETEST_HOST_FBC_TARGETS): | maketests-preserve-host-fbc
 
 ##############################################################################
 # end of mk/maketests.mk

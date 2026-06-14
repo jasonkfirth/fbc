@@ -10,6 +10,7 @@
 #cmdline "-gen gcc"
 #cmdline "-Wc -Wno-unknown-warning-option"
 #cmdline "-Wc -Werror=builtin-declaration-mismatch"
+#cmdline "-restart"
 
 #include once "../../inc/builtin.bi"
 

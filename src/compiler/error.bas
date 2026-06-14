@@ -852,7 +852,7 @@ private function hMakeParamDesc _
 
 	paramloc = listGetTail( @errctx.paramlocations )
 	if( paramloc = NULL ) then
-		return msgex
+		return cast( zstring ptr, msgex )
 	end if
 
 	proc = paramloc->proc

@@ -9,7 +9,7 @@ result = MUSIC PLAY( filename )
 if( result < 0 ) then
 	print "Unable to start music playback."
 else
-	SfxExampleWait( 800 )
+	SfxExampleWait( 1600 )
 	MUSIC STOP
 	print "Stopped current music."
 	print "MUSIC STATUS() ="; MUSIC STATUS()

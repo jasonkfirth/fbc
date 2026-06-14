@@ -7,4 +7,4 @@ EXTRA_OBJS := mangle-cpp.o
 
 $(SRCDIR)mangle-cpp.o : $(SRCDIR)mangle-cpp.cpp
 	# Pass $(CFLAGS) to get -m32 or -m64 as required
-	$(CXX) -c $(CFLAGS) -o $@ $^
+	$(CXX) -c $(CFLAGS) $(CXXFLAGS) -o $@ $^

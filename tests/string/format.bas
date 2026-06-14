@@ -6,8 +6,9 @@
 	#define B1 1
 	#define B2 1
 #else
-	'' inhibit some checks on win 64bit (typically mingw64)
-	#if (defined(__FB_WIN32__) and defined(__FB_64BIT__)) or defined(__FB_DOS__)
+	'' inhibit some checks on Windows/DOS C runtimes where conversion
+	'' of extreme values can differ in the last printed digits.
+	#if defined(__FB_WIN32__) or defined(__FB_DOS__)
 		#define B1 0
 	#else
 		#define B1 1

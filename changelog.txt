@@ -1,6 +1,18 @@
 Version 1.20.1
 
 [changed]
+- build/MSYS2 Windows ARM64: detect native Windows-on-ARM MSYS2 hosts and use the CLANGARM64 toolchain when building win32-aarch64, while retaining the existing MINGW64 cross-build path for non-ARM64 hosts.
+- packaging/MSYS2 Windows: allow Windows ARM64 hosts to build and validate the native ARM64 package while still producing the existing i386 and x86_64 GCC installer outputs from the same package script.
+- packaging/MSYS2: harden installer smoke tests by finding PowerShell reliably, retrying Windows cleanup, preserving PATH/profile snapshots, and running the Windows ARM64 compiler test only on hosts that can execute ARM64 binaries.
+- compiler/Windows ARM64: read FreeBASIC metadata from ARM64 COFF objects, map stdc++ requests to libc++ for the clangarm64 runtime, and use MinGW's ARM64 setjmp/longjmp entry points for GOSUB.
+- compiler/C backend: emit the clang indirect-goto workaround for gcc-backend generated C too, covering targets where the selected GCC-compatible driver is clang and avoiding -exx/error-path failures.
+- compiler/C++ interop: include parameter type codes for unaliased overloaded operators so generated references match the C++ compiler's operator symbols on GCC and clang.
+- compiler/rtlib: quieted stricter GCC/Clang diagnostics around const zstring pointers, UTF-16 conversion switch cases, and profiler integer format selection without changing the public ABI.
+- gfxlib2/Windows: added maximize-only integer window scaling for the Direct2D and OpenGL drivers, keeping low-resolution framebuffers centered and sharp while mapping mouse and touch input back to logical coordinates.
+- build/maketests: preserve a runnable host fbc before destructive makefile tests, propagate selected toolchain and target arguments through bootstrap and language suites, add a C-backend indirect-goto smoke target, and make cross-build checks less dependent on fake tool wrappers.
+- tests/fbctests: removed temporary Windows failure allowlists after fixing the underlying const-prototype, builtin, C++ interop, input, and sfx raw-write cases, and tightened target-specific math/NaN expectations for Windows ARM64 and clang C++ compilers.
+- examples/sfxlib: adjusted the short music-control examples so the bundled music asset reaches audible content before pause/status/stop checks, allowing driver-dump smoke runs to prove non-silent output instead of capturing only leading silence.
+- examples/sound: added opt-in FB_EXAMPLE_AUTOPLAY smoke paths and stronger load/play checks to the SDL_mixer and BASS examples, and used bundled WAV assets for BASS stream/sample playback so unattended validation can prove real driver output.
 - build/DragonFly: print and upload the individual fbctests per-test logs when log-test summaries report failures, making VM package failures easier to diagnose from archived artifacts.
 - build/illumos: resolve the selected GCC package even when an installed compiler binary is already present, keeping compiler dependency metadata deterministic before package probes are skipped.
 - build/MS-DOS: pass the real build-host triplet into cross make steps, mark those make invocations as cross builds, and harden the Linux build-djgpp source patch so parallel builds order generated DJGPP helper targets correctly.
@@ -112,7 +124,7 @@ Version 1.20.1
 - build system/MSYS2: added Windows ARM64 target wiring through win32-aarch64, using host-runnable LLVM/Clang with the CLANGARM64 sysroot for compiler, runtime, and package builds without changing the existing Win32/Win64 paths
 - compiler/Windows ARM64: default win32-aarch64 builds to the Clang backend, pass the aarch64-w64-mingw32 Clang target explicitly, emit direct COFF ARM64 objects, and accept arm64 as an AArch64 target alias
 - packaging/MSYS2 Windows ARM64: stage fbcarm64.exe, the win32-aarch64 runtime libraries, LLVM tool aliases, and package notes, and add an optional QEMU Windows-on-ARM smoke-test helper for user-provided VM images
-- packaging/MSYS2 native: add package notes pointing users to the JS, Android, Wii, and Xbox package builders and the asset-staging helpers needed by non-desktop game targets
+- packaging/MSYS2 native: add package notes pointing users to the JS, Android, Wii, and Xbox package builders and the asset-staging helpers needed by non-desktop targets
 - packaging/MSYS2 JavaScript: make the standalone fbc-js package more relocatable by writing a package-local Emscripten config, moving cache/temp files into per-user directories, overlaying official Node.js/Binaryen Windows tools, and validating package builds with a timeout wrapper
 - packaging/MSYS2 JavaScript: validate emcc, em++, emar, emranlib, Node.js, and Python before building the JavaScript runtime libraries, pass the selected Emscripten tools explicitly to make, and install curl with the MSYS2 package dependencies used for official Node.js/Binaryen overlays
 - packaging/MSYS2 JavaScript: add fbc-js-app.cmd and package validation for browser app-directory builds with preloaded current-directory assets
@@ -180,7 +192,7 @@ Version 1.20.1
 - Android packaging: add an fbc-android/freebasic-android install layout with Android-target runtime libraries, headers, APK template glue, and Debian/Ubuntu build-script support; Debian/Ubuntu package builds now include it by default while root make/all builds still leave it out
 - Android packaging: keep the fbc-android wrapper and APK template sources under tracked src/tools/android instead of the ignored local tools/ tree
 - Android fbc-android: add --runOnPhone for installing and launching the generated APK on the currently attached adb device, making real-device smoke testing a single wrapper step
-- Android fbc-android/gfxlib: add --hideKeyboardButton and the source-level FB_ANDROID_HIDE_KEYBOARD_BUTTON define so touch-only games can suppress the default on-screen keyboard toggle without changing the Android runtime
+- Android fbc-android/gfxlib: add --hideKeyboardButton and the source-level FB_ANDROID_HIDE_KEYBOARD_BUTTON define so touch-only graphics programs can suppress the default on-screen keyboard toggle without changing the Android runtime
 - Android fbc-android: use the packaged Android include tree directly instead of generating a copied include/freebasic-android mirror during wrapper builds, keeping wrapper-generated artifacts out of the source include directory
 - Android fbc-android documentation: document the real-device install/run path and Android keyboard-button suppression switches/defines in the packaged manual page
 - Android and Xbox packaging: added MSYS2 build scripts that create isolated freebasic-android and freebasic-xbox distribution trees, zip archives, NSIS installers, and package validation checks, matching the self-contained installer approach used by the MinGW port
@@ -260,7 +272,7 @@ Version 1.20.1
 - Android NativeActivity/gfxlib: honour source or command-line GUI app mode by suppressing the text console surface until graphics are explicitly opened with SCREEN, while console-mode APKs keep the existing PRINT-to-screen behaviour
 - Android gfxlib: scale the application framebuffer to the device surface for readable console and low-resolution graphics output on high-density phones
 - Android gfxlib: keep NativeActivity input and lifecycle events moving while programs are blocked in INKEY, SLEEP, GETMOUSE, or graphics page changes, matching the cooperative browser-port behaviour and avoiding Android "not responding" stalls
-- Android gfxlib: present page-flipped programs at visible-frame boundaries instead of posting the Android surface for every hidden-page drawing primitive, making SCREENSET/SCREENCOPY practical for old software-rendered games
+- Android gfxlib: present page-flipped programs at visible-frame boundaries instead of posting the Android surface for every hidden-page drawing primitive, making SCREENSET/SCREENCOPY practical for old software-rendered programs
 - Android tests: add an interactive real-phone perception test APK covering readable output, screen modes, page switching, touch/mouse input, soft-keyboard input, and leave/resume behaviour
 - Debian/Ubuntu Docker smoke-test script for freebasic-android that builds console, gfxlib, and sfxlib APKs in a fresh container and runs them under an Android emulator when KVM and a system image are available
 - Debian/Ubuntu freebasic-android smoke testing now separates the bare package install/APK build check from emulator harness provisioning for adb, avdmanager, emulator, system images, and the emulator's minimal X11 runtime libraries; the emulator APK launch check now uses an explicit Activity start, emits gfx/sfx markers through stderr so graphics-mode PRINT redirection cannot hide them, force-stops each smoke Activity after a clean marker pair, polls all logcat buffers, and dumps useful diagnostics on failure
@@ -328,7 +340,7 @@ Version 1.20.1
 - gfxlib2/rtlib: clean up cppcheck addon findings by keeping Android wide-character conversion wrappers on caller-local mbstate_t state, removing an unnecessary Android gfxlib local static digit table, and renaming misleading local "time" fields/parameters that were not time_t storage
 - Android gfxlib: fix soft-keyboard input delivery for NativeActivity graphics programs, including Gboard backspace/delete handling, so INKEY and line-style text entry receive ordinary character and erase events from the on-screen keyboard
 - Android gfxlib: fix touch-as-mouse polling so short taps are latched long enough for GETMOUSE-driven UI loops to see them, allowing touch menus and status screens to work without requiring a long press
-- Android gfxlib: avoid refreshing the NativeWindow while programs are drawing to hidden work pages, fixing severe slowdowns and Android "not responding" stalls in page-flipped games that use many drawing primitives before SCREENCOPY
+- Android gfxlib: avoid refreshing the NativeWindow while programs are drawing to hidden work pages, fixing severe slowdowns and Android "not responding" stalls in page-flipped programs that use many drawing primitives before SCREENCOPY
 - Android gfxlib: keep the on-screen keyboard toggle suppressed whenever FB_ANDROID_HIDE_KEYBOARD_BUTTON or --hideKeyboardButton is used, including graphics-mode programs that never need text entry
 - rtlib: clean up clang-tidy findings exposed by adding rtlib to the strict diagnostics pass, including signed-byte-safe string/radix/case conversion, zero-length/null wide-string copy guards, FORMAT mask output-pass initialization, UTF buffer allocation sizing, ThreadCall argument allocation and libffi enum handling, explicit no-flags thread state, and documented Unix fatal-signal console teardown
 - rtlib: harden file/device/profile/console helper paths with checked allocation, bounded append/copy/formatting helpers, unsigned byte widening for file putback/get paths, and clearer ownership transfer around TLS and profiler buffers

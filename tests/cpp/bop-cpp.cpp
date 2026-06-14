@@ -80,7 +80,18 @@ class UDT_C_DEFAULT
 		int value;
 };
 
-extern "C" {
+// GCC gives extern "C" overloaded operators C-linkage names such as _Zpl,
+// while FBC references the typed C++ operator names here.  Clang keeps the
+// typed names despite the C-linkage warning, matching FBC.
+#if defined(__GNUC__) && !defined(__clang__)
+#define BEGIN_EXTERN_C_OPERATORS
+#define END_EXTERN_C_OPERATORS
+#else
+#define BEGIN_EXTERN_C_OPERATORS extern "C" {
+#define END_EXTERN_C_OPERATORS }
+#endif
+
+BEGIN_EXTERN_C_OPERATORS
 UDT_C_DEFAULT operator+( UDT_C_DEFAULT const& lhs, UDT_C_DEFAULT const& rhs );
 UDT_C_DEFAULT operator-( UDT_C_DEFAULT const& lhs, UDT_C_DEFAULT const& rhs );
 UDT_C_DEFAULT operator*( UDT_C_DEFAULT const& lhs, UDT_C_DEFAULT const& rhs );
@@ -91,7 +102,7 @@ UDT_C_DEFAULT operator>>( UDT_C_DEFAULT const& lhs, UDT_C_DEFAULT const& rhs );
 UDT_C_DEFAULT operator&( UDT_C_DEFAULT const& lhs, UDT_C_DEFAULT const& rhs );
 UDT_C_DEFAULT operator|( UDT_C_DEFAULT const& lhs, UDT_C_DEFAULT const& rhs );
 UDT_C_DEFAULT operator^( UDT_C_DEFAULT const& lhs, UDT_C_DEFAULT const& rhs );
-}
+END_EXTERN_C_OPERATORS
 
 class UDT_CPP_DEFAULT
 {
@@ -135,7 +146,7 @@ UDT_DEFAULT operator|( UDT_DEFAULT const& lhs, UDT_DEFAULT const& rhs ) { exec_b
 UDT_DEFAULT operator^( UDT_DEFAULT const& lhs, UDT_DEFAULT const& rhs ) { exec_bop( UDT_DEFAULT, ^ ) }
 
 // C mangling (on fbc side), default calling convention
-extern "C" {
+BEGIN_EXTERN_C_OPERATORS
 UDT_C_DEFAULT operator+( UDT_C_DEFAULT const& lhs, UDT_C_DEFAULT const& rhs ){exec_bop( UDT_C_DEFAULT, + ) }
 UDT_C_DEFAULT operator-( UDT_C_DEFAULT const& lhs, UDT_C_DEFAULT const& rhs ) { exec_bop( UDT_C_DEFAULT, - ) }
 UDT_C_DEFAULT operator*( UDT_C_DEFAULT const& lhs, UDT_C_DEFAULT const& rhs ) { exec_bop( UDT_C_DEFAULT, * ) }
@@ -146,7 +157,7 @@ UDT_C_DEFAULT operator>>( UDT_C_DEFAULT const& lhs, UDT_C_DEFAULT const& rhs ) {
 UDT_C_DEFAULT operator&( UDT_C_DEFAULT const& lhs, UDT_C_DEFAULT const& rhs ) { exec_bop( UDT_C_DEFAULT, & ) }
 UDT_C_DEFAULT operator|( UDT_C_DEFAULT const& lhs, UDT_C_DEFAULT const& rhs ) { exec_bop( UDT_C_DEFAULT, | ) }
 UDT_C_DEFAULT operator^( UDT_C_DEFAULT const& lhs, UDT_C_DEFAULT const& rhs ) { exec_bop( UDT_C_DEFAULT, ^ ) }
-} // extern "C"
+END_EXTERN_C_OPERATORS
 
 // c++ mangling (on fbc side), default calling convention
 

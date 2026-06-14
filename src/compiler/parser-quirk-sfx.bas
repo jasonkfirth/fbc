@@ -20,7 +20,7 @@
 ''     - single-word intrinsic registration
 ''     - backend-specific audio behavior
 ''
-'' chng: apr/2026 written [codex]
+'' chng: apr/2026 written
 
 #include once "fb.bi"
 #include once "fbint.bi"

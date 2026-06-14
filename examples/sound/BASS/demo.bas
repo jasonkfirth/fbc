@@ -17,17 +17,36 @@ End If
 ' Load a looped example tracker module (music) file.
 Dim As String musicFile = ExePath & "/../data/example.mo3"
 Dim As HMUSIC musicHandle = BASS_MusicLoad(0, StrPtr(musicFile), 0, 0, BASS_SAMPLE_LOOP, 0)
+If( musicHandle = 0 ) Then
+	Print "Could not load background music! BASS returned error " & BASS_ErrorGetCode()
+	BASS_Free()
+	End 1
+End If
 ' Play the loaded music from the beginning.
-BASS_ChannelPlay(musicHandle, 0)
+If( BASS_ChannelPlay(musicHandle, 0) = FALSE ) Then
+	Print "Could not play background music! BASS returned error " & BASS_ErrorGetCode()
+	BASS_Free()
+	End 1
+End If
 
 ' Load a sound effect as a stream - can be played only once at a time
-Dim As String fx1File = ExePath & "/../data/example1.ogg"
+Dim As String fx1File = ExePath & "/../data/prodigy.wav"
 Dim As HSTREAM fx1Handle = BASS_StreamCreateFile(0, StrPtr(fx1File), 0, 0, 0)
+If( fx1Handle = 0 ) Then
+	Print "Could not load sound effect stream! BASS returned error " & BASS_ErrorGetCode()
+	BASS_Free()
+	End 1
+End If
 
 ' Load a sound effect as a sample and allocate 16 channels at maximum for it.
 ' To understand the difference between streams and samples, please consult the BASS documentation.
-Dim As String fx2File = ExePath & "/../data/example2.ogg"
+Dim As String fx2File = ExePath & "/../data/prodigy.wav"
 Dim As HSAMPLE fx2SampleHandle = BASS_SampleLoad(0, StrPtr(fx2File), 0, 0, 16, 0)
+If( fx2SampleHandle = 0 ) Then
+	Print "Could not load sound effect sample! BASS returned error " & BASS_ErrorGetCode()
+	BASS_Free()
+	End 1
+End If
 
 Print "Welcome to the BASS library demonstration."
 Print "Press A to trigger sound effect 1."
@@ -41,6 +60,7 @@ Print
 
 Dim As Integer musicState = 1
 Dim As Integer currentLine = CsrLin
+Dim As Integer autoplay = (Environ("FB_EXAMPLE_AUTOPLAY") <> "")
 
 Do
 	Dim As String key = UCase(Inkey)
@@ -90,6 +110,7 @@ Do
 	Dim As QWORD trackerPosition = BASS_ChannelGetPosition(musicHandle, BASS_POS_MUSIC_ORDER)
 	Dim As Double secondsPosition = BASS_ChannelBytes2Seconds(musicHandle, BASS_ChannelGetPosition(musicHandle, BASS_POS_BYTE))
 	Print "Music position: Order: " & LoWord(trackerPosition) & ", Row: " & HiWord(trackerPosition) & " (" & CInt(secondsPosition) & " seconds)    "
+	If( autoplay AndAlso secondsPosition >= 1.0 ) Then Exit Do
 
 	Sleep 10
 Loop

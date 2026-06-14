@@ -29,7 +29,7 @@ MSYS_ACTIVE_PREFIX := $(strip $(MINGW_PREFIX))
 MSYS_TARGET_PREFIX :=
 MSYS_AARCH64_CROSS :=
 MSYS_AARCH64_SYSROOT := /clangarm64
-MSYS_AARCH64_NATIVE := $(strip $(if $(filter /clangarm64,$(MSYS_ACTIVE_PREFIX)),$(if $(wildcard /clangarm64/bin/gcc.exe /clangarm64/bin/clang.exe),yes)))
+MSYS_AARCH64_NATIVE := $(strip $(shell if [ -x /clangarm64/bin/clang.exe ] && /clangarm64/bin/clang.exe -dumpmachine 2>/dev/null | grep -Eq '^(aarch64|arm64)-w64-'; then echo yes; fi))
 MSYS_AARCH64_RESOURCE_DIR :=
 
 ifneq ($(filter aarch64-w64-mingw32 arm64-w64-mingw32 aarch64-w64-windows-gnu arm64-w64-windows-gnu,$(TARGET_TRIPLET_LC)),)
@@ -49,6 +49,7 @@ endif
 MSYS_AARCH64_CLANG_FLAGS := -Qunused-arguments --target=aarch64-w64-mingw32 --sysroot=$(MSYS_AARCH64_SYSROOT) $(if $(MSYS_AARCH64_RESOURCE_DIR),-resource-dir $(MSYS_AARCH64_RESOURCE_DIR)) -fuse-ld=lld --rtlib=compiler-rt --unwindlib=libunwind
 
 MSYS_HOST_GCC := $(firstword $(wildcard \
+  $(if $(MSYS_AARCH64_NATIVE),/clangarm64/bin/clang.exe /clangarm64/bin/gcc.exe) \
   $(if $(MSYS_ACTIVE_PREFIX),$(MSYS_ACTIVE_PREFIX)/bin/gcc.exe $(MSYS_ACTIVE_PREFIX)/bin/clang.exe) \
   /mingw64/bin/gcc.exe /mingw64/bin/clang.exe /ucrt64/bin/gcc.exe /ucrt64/bin/clang.exe /clang64/bin/gcc.exe /clang64/bin/clang.exe))
 
@@ -83,7 +84,7 @@ ifeq ($(MSYS_AARCH64_CROSS),yes)
   MSYS_AR := $(firstword $(wildcard /mingw64/bin/llvm-ar.exe /ucrt64/bin/llvm-ar.exe /clang64/bin/llvm-ar.exe))
   MSYS_RANLIB := $(firstword $(wildcard /mingw64/bin/llvm-ranlib.exe /ucrt64/bin/llvm-ranlib.exe /clang64/bin/llvm-ranlib.exe))
   MSYS_AS := $(firstword $(wildcard /mingw64/bin/clang.exe /ucrt64/bin/clang.exe /clang64/bin/clang.exe))
-  MSYS_LD := $(firstword $(wildcard /mingw64/bin/ld.lld.exe /ucrt64/bin/ld.lld.exe /clang64/bin/ld.lld.exe))
+  MSYS_LD := $(firstword $(wildcard $(MSYS_AARCH64_SYSROOT)/bin/ld.exe $(MSYS_AARCH64_SYSROOT)/bin/ld.lld.exe /mingw64/bin/ld.lld.exe /ucrt64/bin/ld.lld.exe /clang64/bin/ld.lld.exe))
 endif
 
 HOST_VERSION_SORT := $(MSYS_VERSION_SORT)
@@ -259,6 +260,17 @@ endif
 
 endif
 
+ifneq ($(strip $(BUILD_PREFIX)),)
+ifneq ($(strip $(MSYS_TARGET_PREFIX)),)
+ifneq ($(wildcard $(MSYS_TARGET_PREFIX)/bin/gcc.exe $(MSYS_TARGET_PREFIX)/bin/clang.exe),)
+MSYS_PREFIXED_BINUTILS_COMPLETE := $(strip $(shell for tool in ar ranlib as ld; do command -v $(BUILD_PREFIX)$$tool >/dev/null 2>&1 || exit 1; done; echo yes))
+ifeq ($(MSYS_PREFIXED_BINUTILS_COMPLETE),)
+BUILD_PREFIX :=
+endif
+endif
+endif
+endif
+
 ifeq ($(TARGET_OS),js)
   CC      ?= emcc
   CXX     ?= em++
@@ -281,7 +293,7 @@ ifneq ($(filter default file,$(origin CC)),)
     ifneq ($(strip $(BUILD_PREFIX)),)
       CC := $(BUILD_PREFIX)gcc
     else ifneq ($(strip $(MSYS_GCC)),)
-      CC := $(MSYS_GCC) $(if $(MSYS_AARCH64_CROSS),$(MSYS_AARCH64_CLANG_FLAGS))
+      CC := $(strip $(MSYS_GCC) $(if $(MSYS_AARCH64_CROSS),$(MSYS_AARCH64_CLANG_FLAGS)))
     else
       CC := gcc
     endif
@@ -316,7 +328,7 @@ ifneq ($(filter default file,$(origin CXX)),)
     ifneq ($(strip $(BUILD_PREFIX)),)
       CXX := $(BUILD_PREFIX)g++
     else ifneq ($(strip $(MSYS_GXX)),)
-      CXX := $(MSYS_GXX) $(if $(MSYS_AARCH64_CROSS),$(MSYS_AARCH64_CLANG_FLAGS) -stdlib=libc++)
+      CXX := $(strip $(MSYS_GXX) $(if $(MSYS_AARCH64_CROSS),$(MSYS_AARCH64_CLANG_FLAGS) -stdlib=libc++))
     else
       CXX := g++
     endif
@@ -333,7 +345,7 @@ endif
 
 
 # Archiver
-ifneq ($(filter default file,$(origin AR)),)
+ifneq ($(filter undefined default file,$(origin AR)),)
   ifeq ($(TARGET_OS),js)
     AR := emar
   else ifeq ($(CROSS_BUILD),yes)
@@ -355,7 +367,7 @@ endif
 
 
 # Ranlib
-ifneq ($(filter default file,$(origin RANLIB)),)
+ifneq ($(filter undefined default file,$(origin RANLIB)),)
   ifeq ($(TARGET_OS),js)
     RANLIB := emranlib
   else ifeq ($(CROSS_BUILD),yes)
@@ -377,12 +389,12 @@ endif
 
 
 # Assembler
-ifneq ($(filter default file,$(origin AS)),)
+ifneq ($(filter undefined default file,$(origin AS)),)
   ifeq ($(CROSS_BUILD),yes)
     ifneq ($(strip $(BUILD_PREFIX)),)
       AS := $(BUILD_PREFIX)as
     else ifneq ($(strip $(MSYS_AS)),)
-      AS := $(MSYS_AS) $(if $(MSYS_AARCH64_CROSS),$(MSYS_AARCH64_CLANG_FLAGS))
+      AS := $(strip $(MSYS_AS) $(if $(MSYS_AARCH64_CROSS),$(MSYS_AARCH64_CLANG_FLAGS)))
     else
       AS := as
     endif
@@ -400,7 +412,7 @@ endif
 # Linker selection
 ##############################################################################
 
-ifneq ($(filter default file,$(origin LD)),)
+ifneq ($(filter undefined default file,$(origin LD)),)
 
   ifeq ($(TARGET_OS),js)
     LD := emcc
@@ -474,7 +486,11 @@ endif
 
 ifeq ($(CROSS_BUILD),yes)
   BUILD_FBC_TARGET ?= $(FBC_TARGET)
-  BUILD_FBC_BUILDPREFIX ?= $(BUILD_PREFIX)
+  ifneq ($(strip $(BUILD_PREFIX)),)
+    BUILD_FBC_BUILDPREFIX ?= $(BUILD_PREFIX)
+  else ifneq ($(strip $(MSYS_TARGET_PREFIX)),)
+    BUILD_FBC_BUILDPREFIX ?= $(MSYS_TARGET_PREFIX)/bin/
+  endif
 endif
 
 

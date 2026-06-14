@@ -105,6 +105,7 @@ static const struct { const char *name; FARPROC *proc; } user32_procs[] = {
 static CRITICAL_SECTION update_lock;
 static HANDLE handle;
 static BOOL screensaver_active, cursor_shown, has_focus = FALSE;
+static int win32_exit_done = TRUE;
 static int last_mouse_buttons, mouse_buttons;
 static int mouse_wheel, mouse_hwheel, mouse_x, mouse_y, mouse_on;
 static POINT last_mouse_pos;
@@ -128,11 +129,128 @@ static void keyconv_grow( KEYCONVINFO *k, int nchars, int charsize );
 
 static unsigned int hIntlConvertChar( int key, int source_cp, int dest_cp );
 
+void fb_hWin32EnableWindowScaling(int enable)
+{
+	fb_win32.window_scaling = enable;
+	fb_hWin32UpdateWindowLayout();
+}
+
+int fb_hWin32IsWindowScalingEnabled(void)
+{
+	return fb_win32.window_scaling && !(fb_win32.flags & DRIVER_FULLSCREEN);
+}
+
+void fb_hWin32UpdateWindowLayout(void)
+{
+	RECT rc;
+	int client_w, client_h, scale_x, scale_y, scale;
+	int scaled_w, scaled_h;
+
+	fb_win32.window_scale = 1;
+	SetRect(&fb_win32.window_scaled_rect, 0, 0, fb_win32.w, fb_win32.h);
+
+	if (!fb_hWin32IsWindowScalingEnabled() || !fb_win32.wnd)
+		return;
+
+	if (!GetClientRect(fb_win32.wnd, &rc))
+		return;
+
+	client_w = rc.right - rc.left;
+	client_h = rc.bottom - rc.top;
+	if ((client_w <= 0) || (client_h <= 0) || (fb_win32.w <= 0) || (fb_win32.h <= 0))
+		return;
+
+	scale_x = client_w / fb_win32.w;
+	scale_y = client_h / fb_win32.h;
+	scale = MIN(scale_x, scale_y);
+	if (scale < 1)
+		scale = 1;
+
+	scaled_w = fb_win32.w * scale;
+	scaled_h = fb_win32.h * scale;
+	fb_win32.window_scale = scale;
+	SetRect(&fb_win32.window_scaled_rect,
+		(client_w - scaled_w) / 2,
+		(client_h - scaled_h) / 2,
+		((client_w - scaled_w) / 2) + scaled_w,
+		((client_h - scaled_h) / 2) + scaled_h);
+}
+
+void fb_hWin32GetWindowScaledRect(RECT *rect)
+{
+	if (!rect)
+		return;
+
+	*rect = fb_win32.window_scaled_rect;
+}
+
+static void fb_hWin32ClientToFramebuffer(int client_x, int client_y, int *x, int *y)
+{
+	RECT rc;
+	int scale;
+
+	if (!fb_hWin32IsWindowScalingEnabled()) {
+		if (x) *x = client_x;
+		if (y) *y = client_y;
+		return;
+	}
+
+	rc = fb_win32.window_scaled_rect;
+	scale = fb_win32.window_scale;
+	if (scale < 1)
+		scale = 1;
+
+	if (x) {
+		if (client_x < rc.left)
+			*x = 0;
+		else if (client_x >= rc.right)
+			*x = fb_win32.w - 1;
+		else
+			*x = (client_x - rc.left) / scale;
+	}
+
+	if (y) {
+		if (client_y < rc.top)
+			*y = 0;
+		else if (client_y >= rc.bottom)
+			*y = fb_win32.h - 1;
+		else
+			*y = (client_y - rc.top) / scale;
+	}
+}
+
+static void fb_hWin32FramebufferToClient(int x, int y, POINT *point)
+{
+	RECT rc;
+	int scale;
+
+	if (!point)
+		return;
+
+	point->x = x;
+	point->y = y;
+
+	if (!fb_hWin32IsWindowScalingEnabled())
+		return;
+
+	rc = fb_win32.window_scaled_rect;
+	scale = fb_win32.window_scale;
+	if (scale < 1)
+		scale = 1;
+
+	point->x = rc.left + (x * scale) + (scale / 2);
+	point->y = rc.top + (y * scale) + (scale / 2);
+}
+
 static void fb_hSetMouseClip( void )
 {
 	RECT rc;
 	POINT point;
-	GetClientRect(fb_win32.wnd, &rc);
+
+	if (fb_hWin32IsWindowScalingEnabled())
+		rc = fb_win32.window_scaled_rect;
+	else
+		GetClientRect(fb_win32.wnd, &rc);
 	point.x = rc.left;
 	point.y = rc.top;
 	ClientToScreen(fb_win32.wnd, &point);
@@ -321,8 +439,7 @@ static void touch_input_to_client(const FB_WIN32_TOUCHINPUT *input, int *x, int 
 	point.y = TOUCH_COORD_TO_PIXEL(input->y);
 	ScreenToClient(fb_win32.wnd, &point);
 
-	*x = point.x;
-	*y = point.y;
+	fb_hWin32ClientToFramebuffer(point.x, point.y, x, y);
 }
 
 static LRESULT handle_touch_message(WPARAM wParam, LPARAM lParam)
@@ -461,14 +578,33 @@ LRESULT CALLBACK fb_hWin32WinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 
 		case WM_MOUSEMOVE:
 			e.type = EVENT_MOUSE_MOVE;
-			mouse_x = e.x = lParam & 0xFFFF;
-			mouse_y = e.y = (lParam >> 16) & 0xFFFF;
-			if (last_mouse_pos.x == 0xFFFF) {
-				e.dx = e.dy = 0;
+			if (fb_hWin32IsWindowScalingEnabled()) {
+				int old_mouse_x = mouse_x;
+				int old_mouse_y = mouse_y;
+				int client_x = (SHORT)LOWORD(lParam);
+				int client_y = (SHORT)HIWORD(lParam);
+
+				fb_hWin32ClientToFramebuffer(client_x, client_y, &mouse_x, &mouse_y);
+				e.x = mouse_x;
+				e.y = mouse_y;
+				if (last_mouse_pos.x == 0xFFFF) {
+					e.dx = e.dy = 0;
+				}
+				else {
+					e.dx = mouse_x - old_mouse_x;
+					e.dy = mouse_y - old_mouse_y;
+				}
 			}
 			else {
-				e.dx = mouse_pos.x - last_mouse_pos.x;
-				e.dy = mouse_pos.y - last_mouse_pos.y;
+				mouse_x = e.x = lParam & 0xFFFF;
+				mouse_y = e.y = (lParam >> 16) & 0xFFFF;
+				if (last_mouse_pos.x == 0xFFFF) {
+					e.dx = e.dy = 0;
+				}
+				else {
+					e.dx = mouse_pos.x - last_mouse_pos.x;
+					e.dy = mouse_pos.y - last_mouse_pos.y;
+				}
 			}
 			if( __fb_gfx->scanline_size != 1 ) {
 				e.y /= __fb_gfx->scanline_size;
@@ -583,7 +719,13 @@ LRESULT CALLBACK fb_hWin32WinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			break;
 
 		case WM_SIZE:
-			if (fb_win32.is_active) {
+			if (fb_hWin32IsWindowScalingEnabled()) {
+				fb_hWin32UpdateWindowLayout();
+				fb_hMemSet(__fb_gfx->dirty, TRUE, fb_win32.h);
+				if (fb_win32.mouse_clip)
+					fb_hSetMouseClip();
+			}
+			else if (fb_win32.is_active) {
 				if ( wParam == SIZE_MAXIMIZED ) {
 					ToggleFullScreen(&e);
 					return FALSE;
@@ -702,14 +844,19 @@ LRESULT CALLBACK fb_hWin32WinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 				int scanlineShift = __fb_gfx->scanline_size - 1;
 
 				BeginPaint(fb_win32.wnd, &ps);
-				dirtyStartLine = ps.rcPaint.top;
-				numLines = ps.rcPaint.bottom - dirtyStartLine;
+				if (fb_hWin32IsWindowScalingEnabled()) {
+					fb_hMemSet(__fb_gfx->dirty, TRUE, fb_win32.h);
+				}
+				else {
+					dirtyStartLine = ps.rcPaint.top;
+					numLines = ps.rcPaint.bottom - dirtyStartLine;
 
-				DBG_ASSERT(scanlineShift == 0 || scanlineShift == 1);
-				dirtyStartLine >>= scanlineShift;
-				numLines = max(numLines >> scanlineShift, 1);
+					DBG_ASSERT(scanlineShift == 0 || scanlineShift == 1);
+					dirtyStartLine >>= scanlineShift;
+					numLines = max(numLines >> scanlineShift, 1);
 
-				fb_hMemSet(__fb_gfx->dirty + dirtyStartLine, TRUE, numLines);
+					fb_hMemSet(__fb_gfx->dirty + dirtyStartLine, TRUE, numLines);
+				}
 
 				fb_win32.paint();
 				EndPaint(fb_win32.wnd, &ps);
@@ -727,14 +874,20 @@ LRESULT CALLBACK fb_hWin32WinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			break;
 
 		case WM_GETMINMAXINFO:
-			/* Don't let the window size be truncated to the screen size */
 			mmi = (MINMAXINFO *)lParam;
-			mmi->ptMaxSize.x      = fb_win32.fullw;
-			mmi->ptMaxSize.y      = fb_win32.fullh;
-			mmi->ptMinTrackSize.x = fb_win32.fullw;
-			mmi->ptMinTrackSize.y = fb_win32.fullh;
-			mmi->ptMaxTrackSize.x = fb_win32.fullw;
-			mmi->ptMaxTrackSize.y = fb_win32.fullh;
+			if (fb_hWin32IsWindowScalingEnabled()) {
+				mmi->ptMinTrackSize.x = fb_win32.fullw;
+				mmi->ptMinTrackSize.y = fb_win32.fullh;
+			}
+			else {
+				/* Don't let the window size be truncated to the screen size */
+				mmi->ptMaxSize.x      = fb_win32.fullw;
+				mmi->ptMaxSize.y      = fb_win32.fullh;
+				mmi->ptMinTrackSize.x = fb_win32.fullw;
+				mmi->ptMinTrackSize.y = fb_win32.fullh;
+				mmi->ptMaxTrackSize.x = fb_win32.fullw;
+				mmi->ptMaxTrackSize.y = fb_win32.fullh;
+			}
 			return 0;
 	}
 
@@ -784,6 +937,8 @@ int fb_hInitWindow(DWORD style, DWORD ex_style, int x, int y, int w, int h)
 		x, y, w, h, HWND_DESKTOP, NULL, fb_win32.hinstance, NULL);
 	if (!fb_win32.wnd)
 		return -1;
+
+	fb_hWin32UpdateWindowLayout();
 
 	if (fb_win32.RegisterTouchWindow)
 		fb_win32.RegisterTouchWindow(fb_win32.wnd, TWF_FINETOUCH);
@@ -865,6 +1020,7 @@ int fb_hWin32Init(char *title, int w, int h, int depth, int refresh_rate, int fl
 	mouse_buttons = mouse_wheel = 0;
 	touch_clear_all();
 	fb_win32.is_running = TRUE;
+	win32_exit_done = FALSE;
 
 	keyconv_clear( &keyconv1 );
 	keyconv_clear( &keyconv2 );
@@ -906,14 +1062,14 @@ int fb_hWin32Init(char *title, int w, int h, int depth, int refresh_rate, int fl
 	return 0;
 }
 
-void fb_hWin32Exit(void)
+void fb_hWin32StopThread(void)
 {
-	if (!fb_win32.is_running)
+	if (!fb_win32.is_running && !handle)
 		return;
 
 	fb_win32.is_running = FALSE;
 
-	if (__fb_gfx->lock_count != 0) {
+	if (__fb_gfx && (__fb_gfx->lock_count != 0)) {
 		__fb_gfx->lock_count = 0;
 		__fb_gfx->driver->unlock();
 	}
@@ -924,11 +1080,20 @@ void fb_hWin32Exit(void)
 		handle = NULL;
 		DeleteCriticalSection(&update_lock);
 	}
+}
+
+void fb_hWin32Exit(void)
+{
+	if (win32_exit_done)
+		return;
+
+	fb_hWin32StopThread();
 
 	keyconv_clear( &keyconv1 );
 	keyconv_clear( &keyconv2 );
 
-	fb_win32.exit();
+	if (fb_win32.exit)
+		fb_win32.exit();
 
 	SystemParametersInfo(SPI_SETSCREENSAVEACTIVE, screensaver_active, NULL, 0);
 	UnregisterClass(fb_win32.window_class, fb_win32.hinstance);
@@ -937,6 +1102,8 @@ void fb_hWin32Exit(void)
 		ClipCursor(NULL);
 		fb_win32.mouse_clip = FALSE;
 	}
+
+	win32_exit_done = TRUE;
 }
 
 void fb_hWin32Lock(void)
@@ -1031,8 +1198,7 @@ void fb_hWin32SetMouse(int x, int y, int cursor, int clip)
 		mouse_x = x;
 		mouse_y = y;
 
-		point.x = x;
-		point.y = y;
+		fb_hWin32FramebufferToClient(x, y, &point);
 		if (!(fb_win32.flags & DRIVER_FULLSCREEN))
 			ClientToScreen(fb_win32.wnd, &point);
 		SetCursorPos(point.x, point.y);

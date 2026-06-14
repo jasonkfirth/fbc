@@ -200,6 +200,9 @@ PLATFORM_SOURCES = {
     "examples/manual/proguide/binaries/simple-fb-profiling.bas",
     "examples/manual/proguide/libs/libs3.bas",
     "examples/manual/proguide/libs/libs4.bas",
+    "examples/manual/proguide/variadic_arguments/va_.bas",
+    "examples/manual/proguide/variadic_arguments/va_2.bas",
+    "examples/manual/proguide/variadic_arguments/va_3.bas",
     # Recovering from SIGSEGV through signal()/longjmp() is platform behavior.
     "examples/misc/trycatch/test.bas",
 }
@@ -208,9 +211,24 @@ NONTERMINATING_SOURCES = {
     "examples/manual/proguide/labels/labels_1.bas",
 }
 
+INTERACTIVE_SOURCES = {
+    # These samples are stored in various encodings and call MessageBox() on Windows.
+    "examples/unicode/hello_chinese.bas",
+    "examples/unicode/hello_greek.bas",
+    "examples/unicode/hello_japanese.bas",
+    "examples/unicode/hello_korean.bas",
+    "examples/unicode/hello_russian.bas",
+    "examples/unicode/hello_UNC.bas",
+    "examples/unicode/hello_UTF16BE.bas",
+    "examples/unicode/hello_UTF16LE.bas",
+    "examples/unicode/hello_UTF32BE.bas",
+    "examples/unicode/hello_UTF32LE.bas",
+    "examples/unicode/hello_UTF8.bas",
+}
+
 INTERACTIVE_RE = re.compile(
     r"\b("
-    r"getkey|inkey|input|line\s+input|sleep|screen|screenres|"
+    r"getkey|inkey|input|line\s+input|messagebox|open\s+lpt|sleep|screen|screenres|"
     r"multikey|getmouse|setmouse|open\s+cons|open\s+tcp\s+server"
     r")\b",
     re.IGNORECASE,
@@ -270,6 +288,9 @@ def classify(path: Path, root: Path) -> Classification:
 
     if rel in NONTERMINATING_SOURCES:
         return Classification("interactive", "example is intentionally non-terminating or control-flow oriented", False)
+
+    if rel in INTERACTIVE_SOURCES:
+        return Classification("interactive", "example opens an interactive UI or console prompt", False)
 
     for marker in PLATFORM_PATH_MARKERS:
         if marker in lowered_path:
