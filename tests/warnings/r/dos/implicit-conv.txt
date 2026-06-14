@@ -1,3 +1,0 @@
-1 warning:
-	Implicit conversion
-no warnings:

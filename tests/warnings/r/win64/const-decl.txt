@@ -1,4 +1,0 @@
-suspicious pointer assignment:
-	Suspicious pointer assignment
-constant conversion overflow:
-	Overflow in constant conversion

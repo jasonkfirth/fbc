@@ -1,3 +1,0 @@
-2 warnings:
-	Suspicious pointer assignment
-	Suspicious pointer assignment

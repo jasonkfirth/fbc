@@ -106,3 +106,12 @@ tests/syntax/r/linux-x86/*.txt
 tests/syntax/r/linux-x86_64/*.txt
 tests/syntax/r/dos/*.txt
 OMA_old
+pkgroot/
+tests/warnings/r/win64/*.txt
+tests/warnings/r/linux-x86/*.txt
+
+# Warning test outputs are generated.
+/tests/warnings/*.txt
+/tests/warnings/**/*.txt
+.maketests-tmp
+dist

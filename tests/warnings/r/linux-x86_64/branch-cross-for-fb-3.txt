@@ -1,3 +1,0 @@
-2 warnings (for the iterator var and the end condition temp var):
-	Branch crossing local variable definition, to label: INNER1, variable: A
-	Branch crossing local variable definition, to label: INNER1, variable: TMP$2
