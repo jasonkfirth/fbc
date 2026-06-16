@@ -1,0 +1,31 @@
+﻿{{fbdoc item="title" value="SOUND"}}----
+Plays a generated tone through sfxlib.
+
+{{fbdoc item="syntax"}}##
+	**Sound frequency, duration**
+	**Sound channel, frequency, duration, volume**
+##
+{{fbdoc item="desc"}}
+	SOUND is the easiest way to make the computer produce a pitched tone. The frequency tells sfxlib how high the tone is. A value of 440 produces the concert A above middle C; lower numbers sound lower and higher numbers sound higher.
+	The duration tells sfxlib how long to play the tone. Fractional values are useful for short game sounds and musical notes, for example 0.25 for roughly a quarter of a second. The classic two-argument BASIC form is kept for simple programs and compatibility-minded code.
+	The four-argument form is for programs that need more control. The first argument selects the sfxlib channel, so different sounds can be organized separately. The last argument sets the loudness for that tone.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+sound 440, 0.25
+sound 1, 660, 0.20, 0.5
+sleep 300, 1
+%%
+
+{{fbdoc item="target"}}
+	- Use NOTE when you want to name musical notes instead of calculating frequencies.
+	- Use TONE when you always want to be explicit about the channel.
+
+{{fbdoc item="diff"}}
+`t- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+`t- ##[[CatPgSfx|Sound Library Reference]]##
+`t- ##[[KeyPgSfxGenerated|Generated Sound Commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

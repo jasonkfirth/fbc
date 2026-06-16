@@ -1,4 +1,4 @@
-{{fbdoc item="title" value="Functional Keyword List"}}----
+﻿{{fbdoc item="title" value="Functional Keyword List"}}----
 List of ""FreeBASIC"" keywords sorted by the function they perform.
 
 <<{{fbdoc item="section" value="Arrays"}}
@@ -31,6 +31,7 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgDefstr|DEFSTR"}}
 	- {{fbdoc item="keyword" value="KeyPgDefubyte|DEFUBYTE"}}
 	- {{fbdoc item="keyword" value="KeyPgDefuint|DEFUINT"}}
+	- {{fbdoc item="keyword" value="KeyPgDefulng|DEFULNG"}}
 	- {{fbdoc item="keyword" value="KeyPgDefulongint|DEFULONGINT"}}
 	- {{fbdoc item="keyword" value="KeyPgDefushort|DEFUSHORT"}}
 	- {{fbdoc item="keyword" value="KeyPgOptionbase|OPTION BASE"}}
@@ -179,6 +180,7 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgReadFile|READ (File Access)"}}	
 	- {{fbdoc item="keyword" value="KeyPgReadWriteFile|READ WRITE (File Access)"}}
 	- {{fbdoc item="keyword" value="KeyPgReset|RESET"}}	
+	- {{fbdoc item="keyword" value="KeyPgSeek|SEEK"}}
 	- {{fbdoc item="keyword" value="KeyPgSeekset|SEEK (Statement)"}}
 	- {{fbdoc item="keyword" value="KeyPgSeekreturn|SEEK (Function)"}}
 	- {{fbdoc item="keyword" value="KeyPgTcpAccept|TCP ACCEPT"}}
@@ -201,6 +203,9 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgGetgraphics|GET (Graphics)"}}
 	- {{fbdoc item="keyword" value="KeyPgImageConvertRow|IMAGECONVERTROW"}}
 	- {{fbdoc item="keyword" value="KeyPgGetxpad|GETXPAD"}}
+	- {{fbdoc item="keyword" value="KeyPgGettouch|GETTOUCH"}}
+	- {{fbdoc item="keyword" value="KeyPgGettouchcount|GETTOUCHCOUNT"}}
+	- {{fbdoc item="keyword" value="KeyPgGettouchhit|GETTOUCHHIT"}}
 	- {{fbdoc item="keyword" value="KeyPgImagecreate|IMAGECREATE"}}
 	- {{fbdoc item="keyword" value="KeyPgImageDestroy|IMAGEDESTROY"}}
 	- {{fbdoc item="keyword" value="KeyPgImageInfo|IMAGEINFO"}}
@@ -237,29 +242,29 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgXorGfx|XOR (Graphics PUT)"}}
 
 {{fbdoc item="section" value="Sound"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|BALANCE"}}
+	- {{fbdoc item="keyword" value="KeyPgBalance|BALANCE"}}
 	- {{fbdoc item="keyword" value="KeyPgBeep|BEEP"}}
 	- {{fbdoc item="keyword" value="KeyPgCapture|CAPTURE"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|CHANNEL"}}
+	- {{fbdoc item="keyword" value="KeyPgChannel|CHANNEL"}}
 	- {{fbdoc item="keyword" value="KeyPgDevice|DEVICE"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|ENVELOPE"}}
+	- {{fbdoc item="keyword" value="KeyPgEnvelope|ENVELOPE"}}
 	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|Generated sound commands"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|INSTRUMENT"}}
+	- {{fbdoc item="keyword" value="KeyPgInstrument|INSTRUMENT"}}
 	- {{fbdoc item="keyword" value="KeyPgMidi|MIDI"}}
 	- {{fbdoc item="keyword" value="KeyPgMusic|MUSIC"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|NOISE"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|NOTE"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|OCTAVE"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|PAN"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|PLAY"}}
+	- {{fbdoc item="keyword" value="KeyPgNoise|NOISE"}}
+	- {{fbdoc item="keyword" value="KeyPgNote|NOTE"}}
+	- {{fbdoc item="keyword" value="KeyPgOctave|OCTAVE"}}
+	- {{fbdoc item="keyword" value="KeyPgPan|PAN"}}
+	- {{fbdoc item="keyword" value="KeyPgPlay|PLAY"}}
 	- {{fbdoc item="keyword" value="KeyPgSfx|SFX"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|SOUND"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|TEMPO"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|TONE"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|VOICE"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|VOL"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|VOLUME"}}
-	- {{fbdoc item="keyword" value="KeyPgSfxGenerated|WAVE"}}
+	- {{fbdoc item="keyword" value="KeyPgSound|SOUND"}}
+	- {{fbdoc item="keyword" value="KeyPgTempo|TEMPO"}}
+	- {{fbdoc item="keyword" value="KeyPgTone|TONE"}}
+	- {{fbdoc item="keyword" value="KeyPgVoice|VOICE"}}
+	- {{fbdoc item="keyword" value="KeyPgVol|VOL"}}
+	- {{fbdoc item="keyword" value="KeyPgVol|VOLUME"}}
+	- {{fbdoc item="keyword" value="KeyPgWave|WAVE"}}
 
 {{fbdoc item="section" value="Hardware access"}}
 	- {{fbdoc item="keyword" value="KeyPgInp|INP"}}
@@ -458,6 +463,7 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgDdfbbuildsha1|__FB_BUILD_SHA1__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbcygwin|__FB_CYGWIN__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbdarwin|__FB_DARWIN__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbdragonfly|__FB_DRAGONFLY__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbdebug|__FB_DEBUG__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbdos|__FB_DOS__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfberr|__FB_ERR__"}}
@@ -465,9 +471,11 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgDdfbfpmode|__FB_FPMODE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbfpu|__FB_FPU__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbfreebsd|__FB_FREEBSD__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbhaiku|__FB_HAIKU__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbgcc|__FB_GCC__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbgui|__FB_GUI__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbiif|__FB_IIF__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbillumos|__FB_ILLUMOS__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbjoin|__FB_JOIN__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbjs|__FB_JS__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfblang|__FB_LANG__"}}
@@ -497,6 +505,7 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgDdfbquote|__FB_QUOTE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbriscv64|__FB_RISCV64__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbs390x|__FB_S390X__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbsolaris|__FB_SOLARIS__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbsignature|__FB_SIGNATURE__"}} 
 	- {{fbdoc item="keyword" value="KeyPgDdfbsse|__FB_SSE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbuniqueid|__FB_UNIQUEID__"}}
@@ -511,6 +520,7 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgDdfbversion|__FB_VERSION__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbwin32|__FB_WIN32__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbxbox|__FB_XBOX__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbwii|__FB_WII__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbx86|__FB_X86__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfile|__FILE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfilenq|__FILE_NQ__"}}
@@ -639,6 +649,7 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgLen|LEN"}}
 	- {{fbdoc item="keyword" value="KeyPgLset|LSET"}}
 	- {{fbdoc item="keyword" value="KeyPgLtrim|LTRIM"}}
+	- {{fbdoc item="keyword" value="KeyPgMid|MID"}}
 	- {{fbdoc item="keyword" value="KeyPgMidstatement|MID (Statement)"}}
 	- {{fbdoc item="keyword" value="KeyPgMidfunction|MID (Function)"}}
 	- {{fbdoc item="keyword" value="KeyPgRight|RIGHT"}}
@@ -705,6 +716,9 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgGetjoystick|GETJOYSTICK"}}
 	- {{fbdoc item="keyword" value="KeyPgGetkey|GETKEY"}}
 	- {{fbdoc item="keyword" value="KeyPgGetmouse|GETMOUSE"}}
+	- {{fbdoc item="keyword" value="KeyPgGettouch|GETTOUCH"}}
+	- {{fbdoc item="keyword" value="KeyPgGettouchcount|GETTOUCHCOUNT"}}
+	- {{fbdoc item="keyword" value="KeyPgGettouchhit|GETTOUCHHIT"}}
 	- {{fbdoc item="keyword" value="KeyPgInkey|INKEY"}}
 	- {{fbdoc item="keyword" value="KeyPgInputnum|INPUT()"}}
 	- {{fbdoc item="keyword" value="KeyPgInput|INPUT (Statement)"}}
@@ -717,3 +731,4 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 >>::c::
 
 {{fbdoc item="back" value="DocToc|Table of Contents"}}
+

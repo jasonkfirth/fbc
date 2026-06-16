@@ -1,58 +1,73 @@
-{{fbdoc item="title" value="Information for hacking on FreeBASIC"}}----
+﻿{{fbdoc item="title" value="Developer pages"}}
 
-This area of the Wiki is for documenting everything about the compiler and the runtime libraries. It is, however, incomplete. If you find that information provided here does not match what the source is doing then please update the relevant pages here. New pages and articles may be added freely, provided they help understanding what's going on inside FB.
+This chapter collects the pages used by developers working on the compiler,
+runtime libraries, build system, package scripts, and platform ports.
 
-<<{{fbdoc item="section" value="Developing FreeBASIC Itself"}}
-	
-	{{fbdoc item="keyword" value="DevBuild|Compiling a Development Version of FreeBASIC"}}
-		{{fbdoc item="keyword" value="DevGettingTheSourceCode|Getting the source code"}}
-		{{fbdoc item="keyword" value="DevBuildDos|Compiling FB for DOS"}}
-		{{fbdoc item="keyword" value="DevBuildLinux|Compiling FB on Linux"}}
-		{{fbdoc item="keyword" value="DevBuildWindows|Compiling FB on Windows"}}
-		{{fbdoc item="keyword" value="DevBuildEmscripten|Compiling FB with Emscripten"}}
-		{{fbdoc item="keyword" value="DevRebuildAfterUpdates|Getting source code updates and recompiling FB"}}
-		{{fbdoc item="keyword" value="DevDebuggingFb|Debugging FB"}}
-		{{fbdoc item="keyword" value="DevBuildConfig|FB build configuration options"}}
-		{{fbdoc item="keyword" value="DevBuildKnownProblems|Known problems when compiling FB"}}
-		{{fbdoc item="keyword" value="DevGccToolchainChoice|GCC toolchain choice"}}
-	
-	{{fbdoc item="keyword" value="DevFbcTestSuite|Running the FreeBASIC test suite"}}
-	{{fbdoc item="keyword" value="DevNormalVsStandalone|Normal vs. Standalone"}}
-	{{fbdoc item="keyword" value="DevGlossary|Glossary"}}
-	{{fbdoc item="keyword" value="DevMakingReleases|Notes on the creation of FB releases"}}
-	{{fbdoc item="keyword" value="DevCrossCompiling|FB and cross-compiling"}}
-	{{fbdoc item="keyword" value="DevBootstrap|Bootstrapping/cross-compiling fbc"}}
-	
-	{{fbdoc item="keyword" value="DevBindingCreation|Creating FB bindings for C libraries"}}
-	{{fbdoc item="keyword" value="DevTranslateHeader|C Header Translation Tutorial"}}
-	{{fbdoc item="keyword" value="DevHeaderStyleGuide|Header Style Guidelines"}}
-	{{fbdoc item="keyword" value="ExtLibTOC|External Libraries Index (header status)"}}
+{{fbdoc item="section" value="Building FreeBASIC"}}
+<<
+<table class="fb_box"><tr><td><ul>
+<li> [[DevBuild|Building FreeBASIC from source]]
+<li> [[DevGettingTheSourceCode|Getting the source code]]
+<li> [[DevBuildDos|Building for DOS]]
+<li> [[DevBuildLinux|Building on Linux and package distros]]
+<li> [[DevBuildWindows|Building on Windows/MSYS2]]
+<li> [[DevBuildEmscripten|Building for JavaScript]]
+<li> [[DevBuildAndroid|Building for Android]]
+<li> [[DevBuildWii|Building for Wii]]
+<li> [[DevBuildXbox|Building for Xbox]]
+<li> [[DevRebuildAfterUpdates|Getting source code updates and rebuilding FreeBASIC]]
+</ul></td><td><ul>
+<li> [[DevDebuggingFb|Debugging FreeBASIC]]
+<li> [[DevBuildConfig|FreeBASIC build configuration]]
+<li> [[DevBuiltinBi|The builtin.bi include]]
+<li> [[DevBuildKnownProblems|Build troubleshooting notes]]
+<li> [[DevGccToolchainChoice|Toolchain choice notes]]
+<li> [[DevFbcTestSuite|The FreeBASIC test suite]]
+<li> [[DevNormalVsStandalone|Normal vs standalone compilers]]
+<li> [[DevGlossary|Developer glossary]]
+<li> [[DevMakingReleases|Making releases]]
+<li> [[DevCrossCompiling|Cross-compiling FreeBASIC]]
+<li> [[DevBootstrap|Bootstrapping FreeBASIC]]
+</ul></td></tr></table>
+>>::c::
 
-<<>>{{fbdoc item="section" value="Compiler internals"}}
-	
-	{{fbdoc item="keyword" value="DevFbcModules|Quick overview of all modules"}}
-	{{fbdoc item="keyword" value="DevObjinfo|The objinfo feature"}}
-	{{fbdoc item="keyword" value="DevFbcMem|Memory management"}}
-	{{fbdoc item="keyword" value="DevFbcLexer|Lexer & preprocessor"}}
-		
-	{{fbdoc item="subsect" value="Parser & compiler (fb, parser, symb, rtl)"}}
-		{{fbdoc item="keyword" value="DevFbcParser|Purpose"}}
-		{{fbdoc item="keyword" value="DevFbcParserToplevel|Top level parsing process"}}
-		{{fbdoc item="keyword" value="DevFbcParserSymbols|Symbols"}}
-		{{fbdoc item="keyword" value="DevFbcTypes|Representation of data types"}}
-	
-	{{fbdoc item="keyword" value="DevArrays|Arrays"}}
-	{{fbdoc item="keyword" value="DevSelectCase|SELECT CASE"}}
-	{{fbdoc item="keyword" value="ProPgProfilingFbProfiler|Profiling with fb's profiler"}}
-	{{fbdoc item="keyword" value="ProPgProfilingGmonGprof|Profiling for gmon/gprof"}}
-	{{fbdoc item="keyword" value="DevStructLayout|Structure packing/field alignment"}}
+{{fbdoc item="section" value="Headers, bindings, and libraries"}}
+<<
+<table class="fb_box"><tr><td><ul>
+<li> [[DevBindingCreation|Creating bindings]]
+<li> [[DevTranslateHeader|Translating C headers]]
+<li> [[DevHeaderStyleGuide|Header style guide]]
+<li> [[ExtLibTOC|External library bindings]]
+</ul></td></tr></table>
+>>::c::
 
-{{fbdoc item="section" value="Run-time (rtlib) and Graphics (gfxlib2) Libraries"}}
-	
-	{{fbdoc item="keyword" value="DevRtlInkey|Keyboard input: inkey(), multikey(), etc."}}
-	{{fbdoc item="keyword" value="GfxLib|Overview of drivers (backends)"}}
-	{{fbdoc item="keyword" value="GfxInternalFormats|Pixel formats"}}
+{{fbdoc item="section" value="Compiler internals"}}
+<<
+<table class="fb_box"><tr><td><ul>
+<li> [[DevFbcModules|Compiler platform modules]]
+<li> [[DevObjinfo|Object information]]
+<li> [[DevFbcMem|Compiler memory management]]
+<li> [[DevFbcLexer|Lexer]]
+<li> [[DevFbcParser|Parser]]
+<li> [[DevFbcParserToplevel|Top-level parser]]
+</ul></td><td><ul>
+<li> [[DevFbcParserSymbols|Symbol parser]]
+<li> [[DevFbcTypes|Compiler type system]]
+<li> [[DevArrays|Array implementation notes]]
+<li> [[DevSelectCase|SELECT CASE implementation notes]]
+<li> [[ProPgProfilingFbProfiler|Profiling with fb profiler]]
+<li> [[ProPgProfilingGmonGprof|Profiling with gprof]]
+</ul></td></tr></table>
+>>::c::
 
+{{fbdoc item="section" value="Runtime and graphics internals"}}
+<<
+<table class="fb_box"><tr><td><ul>
+<li> [[DevStructLayout|Structure layout]]
+<li> [[DevRtlInkey|INKEY runtime notes]]
+<li> [[GfxLib|Graphics library overview]]
+<li> [[GfxInternalFormats|Graphics internal formats]]
+</ul></td></tr></table>
 >>::c::
 
 {{fbdoc item="back" value="DocToc|Table of Contents"}}

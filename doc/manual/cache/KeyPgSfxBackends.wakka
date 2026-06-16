@@ -1,0 +1,32 @@
+﻿{{fbdoc item="title" value="sfxlib backends"}}----
+Output and capture backends used by FreeBASIC's built-in sound library.
+
+{{fbdoc item="desc"}}
+	sfxlib has a shared command layer and mixer, but it still needs a platform backend to talk to the actual operating system or hardware. The backend is the part that sends mixed audio to speakers, receives captured input, or talks to a platform MIDI system.
+
+	Most programs do not need to select a backend manually. sfxlib tries the compiled backend list for the target and uses a working output path. The DEVICE command family exists for diagnostics and programs that want to show or choose the available audio paths.
+
+	The null driver is special. It accepts sound output but does not play it through speakers. This is useful for automated tests, package smoke tests, servers, and systems where audio hardware is not available.
+
+{{fbdoc item="section" value="Common backends"}}
+	- Windows: WASAPI, WinMM, and the null driver.
+	- Linux: PulseAudio, ALSA, and the null driver.
+	- macOS: CoreAudio and the null driver.
+	- Android: AAudio, OpenSL ES, and the null driver.
+	- JavaScript: WebAudio and the null driver.
+	- Haiku: native Haiku audio and the null driver.
+	- DOS: Sound Blaster, PC speaker, and target-specific MIDI support where available.
+	- BSD targets: OSS-style backends; OpenBSD uses sndio.
+	- Solaris-like targets: the platform audio device backend.
+	- Wii: ASND.
+	- Xbox: XAudio.
+
+{{fbdoc item="section" value="Testing"}}
+	Set ##SFXLIB_DRIVER=null## before program startup to request the null driver when it is available. That lets a program exercise parsing, linking, mixing, and shutdown without requiring a real audio device.
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDevice|DEVICE]]##
+	- ##[[KeyPgCapture|CAPTURE]]##
+	- ##[[CatPgSfx|Sound Library Reference]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

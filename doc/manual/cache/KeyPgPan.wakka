@@ -1,0 +1,30 @@
+﻿{{fbdoc item="title" value="PAN"}}----
+Sets or returns channel stereo pan.
+
+{{fbdoc item="syntax"}}##
+	**Pan channel, position**
+	**position = Pan(channel)**
+##
+{{fbdoc item="desc"}}
+	PAN moves one sfxlib channel left or right in the stereo field. It is useful for simple positional effects, such as making a sound effect come from the left side of the screen while music remains centered.
+	The first argument is the channel to adjust. The second argument is the pan position. A centered value keeps the channel balanced; values to either side move that channel toward one speaker.
+	Calling PAN as a function returns the current pan position for the channel.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+pan 0, -0.5
+pan 1, 0.5
+print "channel 0 pan="; pan(0)
+%%
+
+{{fbdoc item="target"}}
+	- Use BALANCE when the whole mix should move left or right.
+
+{{fbdoc item="diff"}}
+`t- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+`t- ##[[CatPgSfx|Sound Library Reference]]##
+`t- ##[[KeyPgSfxGenerated|Generated Sound Commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

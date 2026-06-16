@@ -1,0 +1,29 @@
+﻿{{fbdoc item="title" value="BALANCE"}}----
+Sets or returns master stereo balance.
+
+{{fbdoc item="syntax"}}##
+	**Balance position**
+	**position = Balance()**
+##
+{{fbdoc item="desc"}}
+	BALANCE moves the whole sfxlib mix left or right. It is a master stereo control, so it affects the combined output rather than one channel.
+	A centered value keeps the left and right sides even. Moving the value in one direction makes the whole mix lean toward that speaker. This can be useful for accessibility, diagnostics, or simple stereo effects.
+	Calling BALANCE as a function returns the current master balance.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+balance 0.0
+print "balance="; balance()
+%%
+
+{{fbdoc item="target"}}
+	- Use PAN when only one channel should move left or right.
+
+{{fbdoc item="diff"}}
+`t- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+`t- ##[[CatPgSfx|Sound Library Reference]]##
+`t- ##[[KeyPgSfxGenerated|Generated Sound Commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

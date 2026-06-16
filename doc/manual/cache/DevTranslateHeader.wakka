@@ -1,7 +1,22 @@
-{{fbdoc item="title" value="C Header Translation Tutorial"}}----
-How to translate C headers to ""FreeBASIC""
+﻿{{fbdoc item="title" value="Translating C headers"}}
 
-==Under Construction==
+A FreeBASIC header should expose the C library interface accurately while still
+looking like normal FreeBASIC source. Start from the C declarations, translate
+types and calling conventions carefully, then keep platform-specific differences
+visible instead of hiding them behind guesses.
 
-{{fbdoc item="back" value="DevToc|FreeBASIC Developer Information"}}
-{{fbdoc item="back" value="DocToc|Table of Contents"}}
+{{fbdoc item="subsect" value="Basic process"}}
+
+	1) Identify the library version and platform ABI being translated.
+	2) Translate constants, enums, structs, unions, callbacks, and functions.
+	3) Use the C type comparison table for integer, pointer, string, and size
+	   types.
+	4) Keep conditional declarations close to the platform condition that requires
+	   them.
+	5) Compile small examples against the header on the target platform.
+
+{{fbdoc item="subsect" value="Useful pages"}}
+
+	::TblComparisonCTypes|C type comparison table::
+	::DevHeaderStyleGuide|Header style guide::
+	::DevBindingCreation|Creating bindings::

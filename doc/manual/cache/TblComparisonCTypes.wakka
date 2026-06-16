@@ -1,11 +1,92 @@
-{{fbdoc item="title" value="Comparison of integer data types: FreeBASIC vs. C/C++ (using GCC)"}}----
+{{fbdoc item="title" value="Comparison of FreeBASIC and C integer data types"}}----
 
-{{table columns="7" cellpadding="1" cells="; C int; C long long [int]; C long [int]; FB Long; FB LongInt; FB Integer; 32bit win32; 32; 64; 32 (ILP32); 32; 64; 32; 32bit linux-x86; 32; 64; 32 (ILP32); 32; 64; 32; 64bit win64; 32; 64; 32 (LLP64); 32; 64; 64; 64bit linux-x86_64; 32; 64; 64 (LP64); 32; 64; 64 "}}
+This page is a guide for writing ""FreeBASIC"" declarations for C libraries.
+It is not a promise that every C type name has one universal ""FreeBASIC""
+spelling.
 
-Some public symbols (like namespaces, and user defined type member procedures) will have data type information encoded in to the public name (also known as name mangling or name decoration).  Specific mapping of data types between FreeBASIC and gcc is required when linking ##fbc## compiled object modules with ##gcc## compiled object modules.  
-{{table columns="4" cellpadding="1" cells="Target; fbc data type; c data type; bits; all; byte; signed char; 8; all; ubyte; unsigned char; 8; all; byte alias &quot;char&quot;; char; 8; all; ubyte alias &quot;char&quot;; char; 8; all; short; [signed] short [int]; 16; all; ushort; unsigned short [int]; 16; all; long; [signed] int; 32; all; ulong; unsigned int; 32; x86; integer; [signed] long [int]; 32; x86; uinteger; unsigned long [int]; 32; win64; long alias &quot;long&quot;; [signed] long [int]; 32; win64; ulong alias &quot;long&quot;; unsigned long [int]; 32; win64; integer; INTEGER; 64; win64; uinteger; UINTEGER; 64; linux-x86_64; integer; [signed] long [int]; 64; linux-x86_64; uinteger; unsigned long [int]; 64; all; longint; [signed] long long [int]; 64; all; ulongint; unsigned long long [int];  64 "}}
+C has two different concerns that are easy to mix up:
+
+	- ABI compatibility: the argument has the same size, signedness, alignment,
+	  and calling convention.
+	- C spelling compatibility: the generated declaration uses the same C type
+	  spelling, which can matter for C++ name mangling, GCC/Clang builtin
+	  prototype checks, and compiler diagnostics.
+
+For ordinary ##Extern "C"## calls, ABI compatibility is often enough.  For C++
+bindings and compiler builtins, exact C spelling can matter.
+
+The most important rule is that ##[[KeyPgLong|Long]]## in ""FreeBASIC"" is
+always 32-bit.  It is not the same thing as C ##long## on all targets.
+##[[KeyPgInteger|Integer]]## is pointer-sized: 32-bit on 32-bit targets and
+64-bit on 64-bit targets.
+
+{{fbdoc item="section" value="Common C data models"}}
+
+{{table columns="6" cellpadding="1" cells="C data model; Example targets in this tree; C int; C long; C long long; Pointer size; ILP32; DOS, Win32, 32-bit Linux/BSD/Android, Wii, Xbox, WebAssembly/JavaScript; 32 bits; 32 bits; 64 bits; 32 bits; LLP64; Win64, Windows ARM64; 32 bits; 32 bits; 64 bits; 64 bits; LP64; 64-bit Linux/BSD/Android/macOS/Solaris/illumos/Haiku/Cygwin; 32 bits; 64 bits; 64 bits; 64 bits "}}
+
+All targets supported by this tree use a 32-bit C ##int##.  This is a statement
+about the targets supported here, not about every possible C implementation.
+
+{{fbdoc item="section" value="FreeBASIC integer sizes"}}
+
+{{table columns="4" cellpadding="1" cells="FreeBASIC type; Signedness; Size; Good ABI match for; Byte; signed; 8 bits; signed char; UByte; unsigned; 8 bits; unsigned char or raw bytes; Short; signed; 16 bits; short; UShort; unsigned; 16 bits; unsigned short; Long; signed; 32 bits; int, int32_t on most supported targets; ULong; unsigned; 32 bits; unsigned int, uint32_t on most supported targets; LongInt; signed; 64 bits; long long; ULongInt; unsigned; 64 bits; unsigned long long; Integer; signed; pointer size; intptr_t or pointer-sized indexes; UInteger; unsigned; pointer size; uintptr_t, size/count values when the target typedef agrees; Any Ptr; pointer; pointer size; void * or opaque handles "}}
+
+The table above is about ABI-sized values.  It is not enough when the exact C
+spelling matters.  For example, on LP64 targets C ##long## and C ##long long##
+are both 64-bit, but they are still different C types.
+
+{{fbdoc item="section" value="Recommended binding choices"}}
+
+{{table columns="4" cellpadding="1" cells="C type or typedef; Use in FreeBASIC; Why; Notes; signed char; Byte; exact 8-bit signed storage; Plain C char is a different C spelling; unsigned char; UByte; exact 8-bit unsigned storage; Also useful for raw byte buffers; char; ZString Ptr for C strings, otherwise a deliberate Byte/UByte based alias; C char signedness is target dependent; Plain char is distinct from signed char and unsigned char in C++; short; Short; exact 16-bit signed storage; ; unsigned short; UShort; exact 16-bit unsigned storage; ; int; Long; C int is 32-bit on supported targets; ; unsigned int; ULong; C unsigned int is 32-bit on supported targets; ; long; target c_long alias; C long is 32-bit on ILP32/LLP64 and 64-bit on LP64; Do not blindly use FB Long; unsigned long; target c_ulong alias; same data model issue as C long; Do not blindly use FB ULong; long long; LongInt; natural 64-bit signed long long spelling; Not the exact spelling of LP64 C long; unsigned long long; ULongInt; natural 64-bit unsigned long long spelling; Not the exact spelling of LP64 unsigned long; int32_t, uint32_t; crt/stdint.bi typedefs; fixed-width C typedefs are already translated; Use Long/ULong only when the actual header spelling does not matter; int64_t, uint64_t; crt/stdint.bi typedefs; fixed-width 64-bit typedef spelling can differ by target; Do not assume every int64_t is C long long; intptr_t, uintptr_t; crt/stdint.bi typedefs; pointer-sized integer typedefs; Integer/UInteger are the underlying FB-sized types; ptrdiff_t, size_t, ssize_t; crt/stddef.bi typedefs; spelling differs between LP64, LLP64 and some 32-bit targets; Avoid hand-written mappings unless needed; wchar_t, wint_t; crt/stddef.bi typedefs; width and signedness vary by target; Never assume wchar_t is always 16-bit; enum; usually Long for ordinary C enums; ordinary C enum ABI is normally int-sized on these targets; verify packed enums, compiler flags, and C++ scoped enums "}}
+
+For target-specific C ##long##, define a small alias once and use it in the
+binding:
+
+{{fbdoc item="ex"}}%%(freebasic)
+' C long follows the target C data model.
+#if defined( __FB_64BIT__ ) and defined( __FB_UNIX__ )
+	type c_long  as integer  alias "long"
+	type c_ulong as uinteger alias "long"
+#else
+	type c_long  as long  alias "long"
+	type c_ulong as ulong alias "long"
+#endif
+
+extern "C"
+	declare function c_function( byval value as c_long ) as c_long
+end extern
+%%
+
+For standard C typedefs, prefer the translated CRT headers instead of spelling
+the mapping by hand:
+
+%%(freebasic)
+#include once "crt/stddef.bi"   ' size_t, ptrdiff_t, wchar_t
+#include once "crt/stdint.bi"   ' int32_t, uint64_t, intptr_t
+%%
+
+{{fbdoc item="section" value="Common mistakes"}}
+
+	- Do not translate C ##long## as ""FreeBASIC"" ##Long## without checking the
+	  target data model.
+	- Do not translate LP64 C ##long## as ##LongInt## when exact C spelling
+	  matters.  The size matches, but the C type is ##long##, not ##long long##.
+	- Do not use ##Integer## as a universal replacement for C ##long##.
+	  ##Integer## is pointer-sized, while C ##long## is ABI-model-sized.
+	- Do not assume ##size_t## is always the same C spelling as
+	  ##unsigned long## or ##unsigned long long##.  Use the target typedef.
+	- Do not assume plain C ##char## has the same signedness on every target.
+	  Use ##signed char## or ##unsigned char## in the C API when signedness
+	  matters.
+	- Do not assume standard typedefs such as ##time_t##, ##wchar_t##, or
+	  ##ssize_t## are the same across all operating systems.
 
 {{fbdoc item="see"}}
 	- [[DevBindingCreation|Creating FB bindings for C libraries]] - How to translate C data types to FB
+	- [[TblVarTypes|Standard Data Type Limits]]
+	- [[KeyPgInteger|Integer]]
+	- [[KeyPgLong|Long]]
+	- [[KeyPgLongint|LongInt]]
+	- [[KeyPgTypeAlias|Type (Alias)]]
 
 {{fbdoc item="back" value="DocToc|Table of Contents"}}

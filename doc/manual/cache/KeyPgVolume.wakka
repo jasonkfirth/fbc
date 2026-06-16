@@ -1,0 +1,33 @@
+﻿{{fbdoc item="title" value="VOLUME"}}----
+Sets or returns master or channel volume.
+
+{{fbdoc item="syntax"}}##
+	**Volume level**
+	**level = Volume()**
+	**Volume channel, level**
+	**level = Volume(channel)**
+##
+{{fbdoc item="desc"}}
+	VOLUME controls how loud sfxlib output is. The one-argument statement changes the master volume, which affects the overall mix. The two-argument statement changes the volume for one channel, which is useful for balancing music, effects, and generated voices separately.
+	The function forms return the current master or channel volume. That lets a program save a value, fade it over time, or restore it later.
+	Volume changes affect sounds mixed through sfxlib. They do not change the operating system speaker volume.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+volume 0.5
+volume 1, 0.25
+print "master="; volume()
+print "channel 1="; volume(1)
+%%
+
+{{fbdoc item="target"}}
+	- Use PAN or BALANCE for left/right placement instead of loudness.
+
+{{fbdoc item="diff"}}
+`t- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+`t- ##[[CatPgSfx|Sound Library Reference]]##
+`t- ##[[KeyPgSfxGenerated|Generated Sound Commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

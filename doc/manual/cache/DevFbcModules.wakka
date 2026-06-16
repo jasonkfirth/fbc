@@ -1,46 +1,98 @@
-{{fbdoc item="title" value="Quick overview of all modules"}}----
-(Only somewhat sorted)
+{{fbdoc item="title" value="Quick overview of compiler modules"}}----
+
+This is a quick map of the main compiler modules.  It is not a complete list of
+every source file, but it should point new contributors at the right subsystem
+before they start changing code.
 
 ''fbc''
-	Frontend: main module, entry point, command-line handling, assembling/linking/etc.
+	Compiler driver and command-line frontend.  It parses driver options, manages
+	the compile/assemble/link pipeline, invokes external tools, adds libraries,
+	and performs final driver-side actions such as linking or post-link commands.
+
+	Generic driver flow belongs here.  Target-specific OS behavior should usually
+	live in ''fbc-platform'' or one of the ''fbc-*-platform'' files instead of
+	being added directly to ''fbc.bas''.
+
+''fbc-platform''
+	Compiler-driver platform hook dispatcher.  This module defines the hook table
+	used by ''fbc.bas'' and includes one platform module for each target in the
+	''FB_COMPTARGET'' table.
+
+	The current platform hooks cover:
+		- choosing the linker tool
+		- adding target default library search paths
+		- adding graphics library dependencies
+		- adding sound library dependencies
+		- adding ordinary target default libraries
+		- adding linker framework or target flag fragments
+		- mapping library names when one target needs a different library spelling
+
+	The platform hook layer is for compiler-driver behavior tied to the selected
+	OS target.  It is not the place for parser rules, AST behavior, ABI layout,
+	or backend code generation policy.
+
+''fbc-*-platform''
+	Per-target driver modules.  One compile target maps to one file named
+	''fbc-[target-id]-platform.bi'', where ''[target-id]'' matches the target id
+	from ''fb.bas:targetinfo()''.
+
+	These files keep target-specific linking and packaging rules out of
+	''fbc.bas''.  Examples include Win32 default system libraries, Darwin linker
+	tool selection, JavaScript and Wii linker-driver selection, devkitPro library
+	paths, X11 library search paths, OpenBSD library spelling differences, and
+	other target toolchain quirks.
+
+	Platform modules currently exist for Win32, Cygwin, Linux, Android, Haiku,
+	DOS, Xbox, FreeBSD, DragonFly, Solaris, illumos, OpenBSD, Darwin, NetBSD,
+	JavaScript/Emscripten, and Wii.
 
 ''objinfo''
-	[[DevObjinfo|Object/library information]] section reader/writer, used by ''fbc''. Includes tiny ELF/COFF object file format readers.
+	[[DevObjinfo|Object/library information]] section reader/writer, used by
+	''fbc''.  Includes small ELF/COFF object file readers.
 
 ''fb''
-	FB parser interface, starts the ''parser'' for every input/include file.
+	Compiler-wide state and parser interface.  It owns the target information
+	table, initializes target state, and starts the ''parser'' for each
+	input/include file.
 
 ''parser''
-	Recursive parser, asks ''lex'' for tokens, builds up the ''ast''.
+	Recursive parser.  It asks ''lex'' for tokens and builds up the ''ast''.
 
 ''lex'', ''pp''
 	Lexer/tokenizer and preprocessor directive parsing.
 
 ''error''
-	Error reporting functions, used by many parts of fbc, mostly the ''parser'' though.
+	Error reporting functions used by many parts of ''fbc'', especially the
+	''parser''.
 
 ''rtl''
-	Helper functions to build up the ''ast'' nodes for rtlib/gfxlib function calls. Declarations must match the actual functions in the rtlib/gfxlib2 source code.
+	Helper functions that build ''ast'' nodes for rtlib/gfxlib/sfxlib function
+	calls.  Declarations here must match the actual functions in the runtime,
+	gfxlib2, and sfxlib source code.
 
 ''symb''
-	Symbols lookup and storage (information on variables/functions), scope/namespace handling, name mangling; used by ''parser''/''ast''/emitters.
+	Symbol lookup and storage: variables, functions, scopes, namespaces, and name
+	mangling.  Used by the ''parser'', ''ast'', and emitters.
 
 ''ast''
-	Abstract syntax tree: per-function code-flow + expressions.
-	astNew*(): Node creation/tree building, used by the ''parser''.
-	astLoad*(): First step in emitting, calls ''ir'', called after each function is parsed.
+	Abstract syntax tree for per-function code flow and expressions.
+	''astNew*()'' creates and connects nodes for the ''parser''.
+	''astLoad*()'' is the first step in emitting and calls ''ir'' after each
+	function is parsed.
 
-''ir'', ''ir-hlc'', ''ir-llvm'', ''ir-tac''
-	Intermediate representation interface (using virtual registers) used to emit the ''ast''.
-	hlc: High level C emitter (high level in comparison to the ASM backend anyways)
-	llvm: LLVM IR emitter
-	tac: Three-address-codes module (asm backend), calls ''emit''. Reponsible for register allocation, reusing, spilling.
+''ir'', ''ir-hlc'', ''ir-llvm'', ''ir-tac'', ''ir-gas64''
+	Intermediate representation layer used to emit the ''ast''.
+	''ir-hlc'' emits high-level C.
+	''ir-llvm'' emits LLVM IR.
+	''ir-tac'' is the three-address-code path used by the asm backend and calls
+	''emit''.
+	''ir-gas64'' contains GAS-oriented 64-bit asm support.
 
 ''reg''
 	Register allocator for ''ir-tac''.
 
 ''emit'', ''emit_SSE'', ''emit_x86''
-	Assembler emitter abstraction and SSE/x86 emitters.
+	Assembler emitter abstraction plus the x86/SSE-specific emitters.
 
 ''edbg_stab''
 	Stabs debug format emitting for ''emit_x86''.
@@ -49,19 +101,23 @@
 	Dynamic z/wstrings, used mostly by ''lex''.
 
 ''hash''
-	Generic hash table, used by ''symb''/''fbc''.
+	Generic hash table, used by ''symb'' and ''fbc''.
 
 ''hlp'', ''hlp-str''
-	Helper functions for all parts of the compiler, plus another implementation of dynamic z/wstrings.
+	Helper functions used throughout the compiler, plus another dynamic
+	z/wstring implementation.
 
 ''list''
-	Generic linked list with built-in memory pool, used a lot. This is often used as pure pooled allocator, for example for AST nodes or symbols.
+	Generic linked list with built-in memory pool, used heavily throughout the
+	compiler.  It is often used as a pooled allocator, for example for AST nodes
+	or symbols.
 
 ''flist''
-	''list''-based  without deletions.
+	''list''-based container for append-only lists.
 
 ''pool''
-	''list''-based allocator using multiple lists with node sizes ranging from small to large, allowing it to store away strings into the next best fitting chunk to waste as less memory as possible. Used to store away symbol identifiers.
+	''list''-based allocator using multiple lists with node sizes from small to
+	large.  Used to store symbol identifiers with less wasted memory.
 
 ''stack''
 	Generic ''list''-based stack.

@@ -243,6 +243,23 @@ target_default_port() {
     esac
 }
 
+android_supported_for_target() {
+    local distro="$1"
+    local codename="$2"
+    local arch="$3"
+
+    : "$codename"
+
+    case "$distro/$arch" in
+        ubuntu/amd64|ubuntu/arm64)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 target_builds_js() {
     local distro="$1"
     local codename="$2"
@@ -255,6 +272,8 @@ target_builds_android() {
     local distro="$1"
     local codename="$2"
     local arch="$3"
+
+    android_supported_for_target "$distro" "$codename" "$arch" || return 1
 
     [ "$NO_ANDROID" -eq 0 ] || target_default_port android "$distro" "$codename" "$arch"
 }

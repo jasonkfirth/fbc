@@ -1,0 +1,30 @@
+﻿{{fbdoc item="title" value="CHANNEL"}}----
+Sets or returns the default generated-sound channel.
+
+{{fbdoc item="syntax"}}##
+	**Channel channel**
+	**channel = Channel()**
+##
+{{fbdoc item="desc"}}
+	CHANNEL selects the default sfxlib channel used by generated-sound commands that do not name a channel themselves. Think of channels as lanes in the sound mixer. Each lane can have its own pan, volume, and current generated sound behavior.
+	Using separate channels keeps a program organized. For example, one channel can be used for melody, another for warning beeps, and another for generated effects. Commands such as TONE, PAN, and VOLUME can then target a specific channel.
+	Calling CHANNEL as a function returns the current default channel.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+channel 2
+sound 440, 0.20
+print "current channel="; channel()
+%%
+
+{{fbdoc item="target"}}
+	- Channels are zero-based.
+
+{{fbdoc item="diff"}}
+`t- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+`t- ##[[CatPgSfx|Sound Library Reference]]##
+`t- ##[[KeyPgSfxGenerated|Generated Sound Commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

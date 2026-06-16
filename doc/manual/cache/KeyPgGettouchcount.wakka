@@ -1,0 +1,32 @@
+{{fbdoc item="title" value="GETTOUCHCOUNT"}}----
+Gets the number of active touch contacts.
+
+{{fbdoc item="syntax"}}##
+	[[KeyPgDeclare|declare]] [[KeyPgFunction|function]] **GetTouchCount** ( ) [[KeyPgAs|as]] [[KeyPgInteger|integer]]
+##
+{{fbdoc item="usage"}}##
+	//count// = **GetTouchCount**( )
+##
+{{fbdoc item="ret"}}
+	The number of currently active touch contacts.
+
+{{fbdoc item="desc"}}
+	##**GetTouchCount**## returns the number of active touch contacts reported by the current graphics driver.
+
+	On platforms with native touch support, this reports the active contacts known to the backend.  On platforms without native touch support, GfxLib exposes a simple compatibility fallback: if the left mouse button is held down over the graphics screen, the mouse position is reported as one touch contact.
+
+	The returned coordinates for touch contacts are in the same logical graphics coordinate space used by ##[[KeyPgGetmouse|GetMouse]]##.
+
+{{fbdoc item="lang"}}
+	- Not available in the //[[CompilerOptlang|-lang qb]]// dialect unless referenced with the alias ##**""__GetTouchCount""**##.
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC"" 1.20.1.
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgGettouch|GetTouch]]##
+	- ##[[KeyPgGettouchhit|GetTouchHit]]##
+	- ##[[KeyPgGetmouse|GetMouse]]##
+	- ##[[CatPgGfxInput|User Input Functions]]##
+
+{{fbdoc item="back" value="CatPgGfxInput|User Input Functions"}}

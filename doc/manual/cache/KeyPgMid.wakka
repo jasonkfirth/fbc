@@ -1,0 +1,17 @@
+{{fbdoc item="title" value="MID"}}----
+Gets or changes a substring
+
+{{fbdoc item="desc"}}
+	##**Mid**## is used in two forms:
+
+	- As a function, it returns part of a string.
+	- As a statement, it copies text into part of an existing string.
+
+	Use the pages below for the exact syntax and examples.
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgMidfunction|Mid (Function)]]##
+	- ##[[KeyPgMidstatement|Mid (Statement)]]##
+	- ##[[CatPgString|String Functions]]##
+
+{{fbdoc item="back" value="CatPgString|String Functions"}}

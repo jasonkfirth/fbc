@@ -1,35 +1,49 @@
-{{fbdoc item="title" value="SFX"}}----
-Loads and controls short sound effects through sfxlib.
+﻿{{fbdoc item="title" value="SFX"}}----
+Loads and controls short reusable sound effects through sfxlib.
 
 {{fbdoc item="syntax"}}##
-	**Sfx Load** //id//, //filename//
-	**Sfx Play** //id//
-	**Sfx Play** //channel//, //id//[, //pitch//]
-	**Sfx Loop** //id//
-	**Sfx Loop** //channel//, //id//[, //pitch//]
-	**Sfx Stop** [ //id// ]
-	**Sfx Stop Channel**, //channel//
-	**Sfx Pause** [ //id// ]
-	**Sfx Pause Channel**, //channel//
-	**Sfx Resume** [ //id// ]
-	**Sfx Resume Channel**, //channel//
-	//status// = **Sfx Status**()
-	//status// = **Sfx Status**( //id// )
-	//status// = **Sfx Status**( **Channel**, //channel// )
+	Sfx Load id, filename
+	Sfx Play id
+	Sfx Play channel, id[, pitch]
+	Sfx Loop id
+	Sfx Loop channel, id[, pitch]
+	Sfx Stop [id]
+	Sfx Stop Channel, channel
+	Sfx Pause [id]
+	Sfx Pause Channel, channel
+	Sfx Resume [id]
+	Sfx Resume Channel, channel
+	status = Sfx Status()
+	status = Sfx Status(id)
+	status = Sfx Status(Channel, channel)
 ##
 {{fbdoc item="desc"}}
-	##**Sfx**## handles short reusable samples.  ##Sfx Load## places a decoded sample in an id slot.  ##Sfx Play## plays it once, while ##Sfx Loop## repeats it.  The channel forms use the channel number first and the loaded effect id second.  The optional pitch argument scales playback speed.
-
-	With no argument, ##Sfx Stop##, ##Sfx Pause##, and ##Sfx Resume## affect all active sound effects.  ##Sfx Status## returns ##0## for stopped, ##1## for playing, and ##2## for paused.
+	SFX is for short reusable samples, usually game and user-interface sounds. The usual pattern is to load a sample once with Sfx Load, then play it whenever the program needs that sound.
+	The id is a number chosen by the program. After loading id 1 with a click sound, Sfx Play 1 plays that click. The channel forms let a program decide where the sound is mixed, and the optional pitch value changes playback speed for simple variation.
+	Sfx Loop repeats a sample until it is stopped. That is useful for engine hum, wind, alarms, or any sound that should continue while something is happening. Stop, Pause, and Resume can affect all effects, one loaded id, or one channel depending on the form used.
+	Sfx Status lets a program ask whether any effect is active, whether a specific id is active, or whether a specific channel is active.
 
 {{fbdoc item="ex"}}
-	See ##examples/sfxlib/sfx-load.bas##, ##examples/sfxlib/sfx-play.bas##, ##examples/sfxlib/sfx-loop.bas##, ##examples/sfxlib/sfx-pitch.bas##, and ##examples/sfxlib/showcase.bas##.
+%%(freebasic)
+sfx load 1, "click.wav"
+sfx play 1
+
+sfx load 2, "engine.wav"
+sfx loop 0, 2, 1.0
+sleep 1000, 1
+sfx stop channel, 0
+%%
+
+{{fbdoc item="target"}}
+	- Use MUSIC for one longer background track.
+	- Use generated commands such as NOISE or SOUND for effects that do not need a sample file.
 
 {{fbdoc item="diff"}}
-	- New to ""FreeBASIC"".
+`t- New to ""FreeBASIC"".
 
 {{fbdoc item="see"}}
-	- ##[[KeyPgMusic|Music]]##
-	- ##[[KeyPgSfxGenerated|Generated sound commands]]##
+	- ##[[KeyPgMusic|MUSIC]]##
+	- ##[[KeyPgVolume|VOLUME]]##
+	- ##[[CatPgSfx|Sound Library Reference]]##
 
 {{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

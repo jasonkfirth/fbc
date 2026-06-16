@@ -497,8 +497,13 @@ arm_arch_for_target() {
     fi
 }
 
-android_supported_for_arch() {
-    case "$1" in
+android_supported_for_target() {
+    local distro="$1"
+    local arch="$2"
+
+    [ "$distro" = "ubuntu" ] || return 1
+
+    case "$arch" in
         amd64)
             return 0
             ;;
@@ -688,7 +693,7 @@ EOF
     container_outdir="$(container_outdir_for_target "$distro" "$codename" "$arch")"
     arm_arch="$(arm_arch_for_target "$distro" "$arch")"
     android_arg=""
-    if [ "$NO_ANDROID" -eq 1 ] || ! android_supported_for_arch "$arch"; then
+    if [ "$NO_ANDROID" -eq 1 ] || ! android_supported_for_target "$distro" "$arch"; then
         android_arg=" --no-android"
     fi
     native_build_cmd="/work/build_scripts/${script_name} --no-build${android_arg}"

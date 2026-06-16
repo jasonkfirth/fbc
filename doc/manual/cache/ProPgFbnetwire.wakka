@@ -1,0 +1,135 @@
+﻿{{fbdoc item="title" value="fbnetwire.bi portable wire helpers"}}----
+
+##fbnetwire.bi## provides small source-level helpers for writing fixed-size values to files or ##[[KeyPgOpenTcp|Open Tcp]]## handles in a predictable byte order.
+
+It is meant for simple binary protocols where both sides need to agree on exactly how numbers and strings are represented on the wire. The helpers use little-endian byte order and fixed-width value sizes instead of relying on the target CPU's native byte order or native ##Integer## size.
+
+{{fbdoc item="syntax"}}##
+	#include once "fbnetwire.bi"
+##
+
+{{fbdoc item="desc"}}
+	The include supplies private helper procedures and functions. Because they are declared ##private##, each source file that includes ##fbnetwire.bi## gets its own local helpers without exporting public symbols.
+	
+	The helpers work with normal FreeBASIC file numbers. That means they can be used with ordinary binary files, pipes, or TCP sockets opened through ##[[KeyPgOpenTcp|Open Tcp]]## and ##[[KeyPgOpenTcpServer|Open Tcp Server]]##.
+	
+	##fbnetwire.bi## does not create sockets, accept clients, decide whether ##[[KeyPgEof|Eof]]## or ##[[KeyPgEoc|Eoc]]## should be used, or implement a full packet protocol. It only provides byte encoding and small read/write helpers.
+
+{{fbdoc item="section" value="Wire format"}}
+
+Values are encoded in little-endian order:
+
+	- ##Short## and ##UShort## values use 2 bytes.
+	- ##Long## and ##ULong## values use 4 bytes.
+	- ##LongInt## and ##ULongInt## values use 8 bytes.
+	- ##Single## values use 4 bytes.
+	- ##Double## values use 8 bytes.
+	- Strings are stored as a 32-bit little-endian byte length followed by that many string bytes.
+
+The string helpers store bytes, not characters. If the text has to be portable across machines and languages, choose an explicit encoding such as UTF-8 before sending it.
+
+{{fbdoc item="section" value="Helpers"}}
+
+Encoding and decoding helpers:
+
+	- ##FbNetEncodeInt16LE## / ##FbNetDecodeInt16LE##
+	- ##FbNetEncodeUInt16LE## / ##FbNetDecodeUInt16LE##
+	- ##FbNetEncodeInt32LE## / ##FbNetDecodeInt32LE##
+	- ##FbNetEncodeUInt32LE## / ##FbNetDecodeUInt32LE##
+	- ##FbNetEncodeInt64LE## / ##FbNetDecodeInt64LE##
+	- ##FbNetEncodeUInt64LE## / ##FbNetDecodeUInt64LE##
+	- ##FbNetEncodeSingleLE## / ##FbNetDecodeSingleLE##
+	- ##FbNetEncodeDoubleLE## / ##FbNetDecodeDoubleLE##
+
+File-number helpers:
+
+	- ##FbNetPutBytes## / ##FbNetGetBytes##
+	- ##FbNetPutInt16LE## / ##FbNetGetInt16LE##
+	- ##FbNetPutInt32LE## / ##FbNetGetInt32LE##
+	- ##FbNetPutInt64LE## / ##FbNetGetInt64LE##
+	- ##FbNetPutSingleLE## / ##FbNetGetSingleLE##
+	- ##FbNetPutDoubleLE## / ##FbNetGetDoubleLE##
+	- ##FbNetPutStringLE## / ##FbNetGetStringLE##
+
+The file-number helpers return ##1## for success and ##0## for failure.
+
+{{fbdoc item="section" value="Examples"}}
+
+Writing and reading a small binary record:
+
+%%(freebasic)
+#include once "fbnetwire.bi"
+
+dim as integer f = freefile()
+
+if open( "packet.bin" for binary as #f ) <> 0 then
+	end 1
+end if
+
+if FbNetPutInt32LE( f, 12345 ) = 0 then end 1
+if FbNetPutDoubleLE( f, 3.14159 ) = 0 then end 1
+if FbNetPutStringLE( f, "hello", 1024 ) = 0 then end 1
+
+close #f
+
+f = freefile()
+if open( "packet.bin" for binary as #f ) <> 0 then
+	end 1
+end if
+
+dim as long id
+dim as double value
+dim as string text
+
+if FbNetGetInt32LE( f, id ) = 0 then end 1
+if FbNetGetDoubleLE( f, value ) = 0 then end 1
+if FbNetGetStringLE( f, text, 1024 ) = 0 then end 1
+
+close #f
+
+print id, value, text
+%%
+
+The same helpers can be used with a TCP client file number:
+
+%%(freebasic)
+#include once "fbnetwire.bi"
+
+dim as integer sock = freefile()
+
+if open tcp( "host=127.0.0.1,port=9000,timeout=5000", as #sock ) <> 0 then
+	end 1
+end if
+
+if FbNetPutStringLE( sock, "ping", 4096 ) = 0 then
+	close #sock
+	end 1
+end if
+
+close #sock
+%%
+
+{{fbdoc item="section" value="Limits and policy"}}
+
+The string helpers take a ##max_bytes## argument. On write, text longer than ##max_bytes## is truncated before being sent. On read, any incoming string length below zero or above ##max_bytes## is rejected and the helper returns ##0##.
+
+These helpers deliberately do not define a whole message protocol. Real protocols usually need message types, versioning, limits, timeout policy, and recovery behavior. ##fbnetwire.bi## gives you predictable primitive values to build on.
+
+{{fbdoc item="target"}}
+	- The byte encoding helpers are source-level and do not depend on a particular operating system.
+	- TCP examples require targets with ##[[KeyPgOpenTcp|Open Tcp]]## support. Some targets, including DOS and JavaScript, do not provide TCP support.
+	- Floating-point helpers assume the target stores ##Single## and ##Double## in the normal IEEE-style layout used by supported FreeBASIC targets.
+
+{{fbdoc item="diff"}}
+	- New to ##""FreeBASIC""##.
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgOpenTcp|Open Tcp]]##
+	- ##[[KeyPgOpenTcpServer|Open Tcp Server]]##
+	- ##[[KeyPgTcpAccept|Tcp Accept]]##
+	- ##[[KeyPgGetfileio|Get #]]##
+	- ##[[KeyPgPutfileio|Put #]]##
+	- ##[[CatPgFile|File I/O Functions]]##
+
+{{fbdoc item="back" value="CatPgFile|File I/O Functions"}}
+{{fbdoc item="back" value="DocToc|Table of Contents"}}

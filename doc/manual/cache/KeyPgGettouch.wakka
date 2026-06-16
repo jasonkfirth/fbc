@@ -1,0 +1,44 @@
+{{fbdoc item="title" value="GETTOUCH"}}----
+Gets position and identifier information for an active touch contact.
+
+{{fbdoc item="syntax"}}##
+	[[KeyPgDeclare|declare]] [[KeyPgFunction|function]] **GetTouch** ( [[KeyPgByval|byval]] //index// [[KeyPgAs|as]] [[KeyPgInteger|integer]], [[KeyPgByref|byref]] //x// [[KeyPgAs|as]] [[KeyPgInteger|integer]], [[KeyPgByref|byref]] //y// [[KeyPgAs|as]] [[KeyPgInteger|integer]], [[KeyPgByref|byref]] //id// [[KeyPgAs|as]] [[KeyPgInteger|integer]] = 0 ) [[KeyPgAs|as]] [[KeyPgInteger|integer]]
+##
+{{fbdoc item="usage"}}##
+	//result// = **GetTouch**( //index//, //x//, //y// [, //id//] )
+##
+{{fbdoc item="param"}}
+	##//index//##
+		The zero-based touch contact index to query.
+	##//x//##
+		Receives the touch x coordinate.
+	##//y//##
+		Receives the touch y coordinate.
+	##//id//##
+		Receives the backend touch identifier, if available.
+
+{{fbdoc item="ret"}}
+	##0## on success, or a non-zero runtime error value if the requested contact is not available.
+
+{{fbdoc item="desc"}}
+	##**GetTouch**## retrieves one active touch contact from the current graphics screen.  ##//index//## is zero-based and should be less than the value returned by ##[[KeyPgGettouchcount|GetTouchCount]]##.
+
+	##//x//## and ##//y//## are returned in logical graphics coordinates relative to the upper-left corner of the graphics screen.  They are not affected by ##[[KeyPgViewgraphics|View]]## or ##[[KeyPgWindow|Window]]##.
+
+	##//id//## is intended to identify the same physical contact while it remains active.  Some backends provide a native contact id.  The mouse fallback uses id ##0##.
+
+	If the requested contact is not available, ##//x//##, ##//y//## and ##//id//## are set to ##-1## when those arguments are provided.
+
+{{fbdoc item="lang"}}
+	- Not available in the //[[CompilerOptlang|-lang qb]]// dialect unless referenced with the alias ##**""__GetTouch""**##.
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC"" 1.20.1.
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgGettouchcount|GetTouchCount]]##
+	- ##[[KeyPgGettouchhit|GetTouchHit]]##
+	- ##[[KeyPgGetmouse|GetMouse]]##
+	- ##[[CatPgGfxInput|User Input Functions]]##
+
+{{fbdoc item="back" value="CatPgGfxInput|User Input Functions"}}

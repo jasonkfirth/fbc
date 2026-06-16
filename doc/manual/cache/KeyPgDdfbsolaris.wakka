@@ -1,0 +1,25 @@
+{{fbdoc item="title" value="__FB_SOLARIS__"}}----
+
+{{fbdoc item="syntax"}}
+	""__FB_SOLARIS__""
+
+{{fbdoc item="desc"}}
+	Define without a value created at compile time when the Solaris target is
+	being used.
+
+	The compiler also defines ##**__FB_SOLARIS__**## for the illumos target as
+	a Solaris-family compatibility symbol.  Use ##[[KeyPgDdfbillumos|__FB_ILLUMOS__]]## when code must detect illumos specifically.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#IFDEF __FB_SOLARIS__
+	print "Solaris-family target"
+#ENDIF
+%%
+
+{{fbdoc item="back" value="CatPgDddefines|Predefined Defines"}}
+{{fbdoc item="see"}}
+	[[KeyPgDdfbillumos|__FB_ILLUMOS__]]
+	[[CompilerOpttarget|Compiler Option: -target]]
+----
+{{fbdoc item="back" value="CatPgCompiler|Compiler Meta-Commands"}}

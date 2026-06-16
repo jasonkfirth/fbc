@@ -1,0 +1,30 @@
+﻿{{fbdoc item="title" value="NOTE"}}----
+Plays a named musical note.
+
+{{fbdoc item="syntax"}}##
+	**Note name, octave, duration**
+	**Note channel, name, octave, duration**
+##
+{{fbdoc item="desc"}}
+	NOTE is for musical code where note names are clearer than raw frequencies. Instead of writing SOUND 440, you can write a note name and octave and let sfxlib calculate the pitch.
+	The name is a string such as "C" or "D#". The octave controls the register: higher octave values produce higher notes, and lower octave values produce lower notes. The duration controls how long the note plays.
+	The channel form sends the note to a specific sfxlib channel. The shorter form uses the current default channel.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+note "C", 4, 0.25
+note 1, "D#", 5, 0.25
+sleep 300, 1
+%%
+
+{{fbdoc item="target"}}
+	- Use PLAY when you want to write a phrase as one music string instead of one NOTE command per note.
+
+{{fbdoc item="diff"}}
+`t- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+`t- ##[[CatPgSfx|Sound Library Reference]]##
+`t- ##[[KeyPgSfxGenerated|Generated Sound Commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

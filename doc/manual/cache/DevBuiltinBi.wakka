@@ -1,0 +1,110 @@
+﻿{{fbdoc item="title" value="builtin.bi compiler builtin declarations"}}----
+
+##builtin.bi## exposes a selected set of GCC and clang ##__builtin_*## entry points to FreeBASIC code.
+
+It is a low-level include for code that is already depending on the C backend. It is not a general replacement for normal FreeBASIC statements, the runtime library, or the C runtime headers.
+
+{{fbdoc item="section" value="Backend requirement"}}
+
+##builtin.bi## requires the GCC or clang backend:
+
+%%#include once "builtin.bi"
+%%
+
+Compile with one of the C backends:
+
+%%fbc -gen gcc program.bas
+fbc -gen clang program.bas
+%%
+
+If the active backend is not ##gcc## or ##clang##, the include stops with an error. That is intentional. The declarations name compiler builtins, not portable runtime functions, and non-C backends do not have the same builtin lowering rules.
+
+{{fbdoc item="section" value="Why this header exists"}}
+
+GCC and clang recognize many ##__builtin_*## names specially. Some behave like C library calls that can be optimized or inlined. Others expose compiler knowledge such as object size, checked arithmetic, branch prediction hints, byte swapping, or bit counting.
+
+FreeBASIC can call those entry points through normal ##DECLARE## statements, but the declarations must match the target C ABI. That is the main job of ##builtin.bi##.
+
+The header defines private helper types such as ##__fb_builtin_size_t##, ##__fb_builtin_clong##, and ##__fb_builtin_culong## so declarations follow the target C data model. For example, LP64 Unix targets use C ##long## for ##size_t##-related declarations, while Win64 keeps C ##long## at 32 bits.
+
+{{fbdoc item="section" value="What is included"}}
+
+The header intentionally exposes a core useful set, not every builtin supported by GCC or clang.
+
+Currently included families:
+
+	- Memory and string builtins: ##__builtin_memcpy##, ##__builtin_memmove##, ##__builtin_memset##, ##__builtin_strlen##, ##__builtin_strcmp##, and related routines.
+	- Bit operations: ##__builtin_ffs##, ##__builtin_clz##, ##__builtin_ctz##, ##__builtin_clrsb##, ##__builtin_popcount##, and ##__builtin_parity## with ##int##, ##long##, and ##long long## variants.
+	- Byte swaps: ##__builtin_bswap16##, ##__builtin_bswap32##, and ##__builtin_bswap64##.
+	- Object-size queries: ##__builtin_object_size## and, on targets where it lowers correctly, ##__builtin_dynamic_object_size##.
+	- Checked arithmetic: fixed-type signed and unsigned add, subtract, and multiply overflow helpers.
+	- Code-generation hints: ##__builtin_expect##, ##__builtin_expect_with_probability##, ##__builtin_prefetch##, ##__builtin_trap##, and ##__builtin_unreachable##.
+
+The header intentionally does not include target-specific builtins, language-specific builtins, broad SIMD families, every C library builtin, or portable fallback implementations.
+
+{{fbdoc item="section" value="Examples"}}
+
+Checked addition:
+
+%%(freebasic)
+#include once "builtin.bi"
+
+dim as long a = &h7fffffff
+dim as long b = 1
+dim as long result
+
+if __builtin_sadd_overflow( a, b, @result ) then
+	print "overflow"
+else
+	print result
+end if
+%%
+
+Byte swapping:
+
+%%(freebasic)
+#include once "builtin.bi"
+
+dim as ulong value = &h12345678
+print hex( __builtin_bswap32( value ) )
+%%
+
+Using an unlikely branch hint:
+
+%%(freebasic)
+#include once "builtin.bi"
+
+dim as long failed = any
+failed = 0
+
+if __builtin_expect( failed, 0 ) then
+	print "rare failure path"
+end if
+%%
+
+{{fbdoc item="section" value="Important caveats"}}
+
+These calls follow the C compiler builtin semantics. That means some familiar-looking routines still carry C rules:
+
+	- ##__builtin_memcpy## requires non-overlapping source and destination ranges. Use ##__builtin_memmove## when overlap is possible.
+	- ##__builtin_clz## and ##__builtin_ctz## families have undefined results when the input is zero.
+	- ##__builtin_unreachable## tells the optimizer that execution cannot reach that point. If execution does reach it, program behavior is undefined.
+	- ##__builtin_trap## is an intentional abnormal stop, not normal error handling.
+	- Object-size builtins report what the compiler can prove, not a general run-time allocation size.
+	- Builtins may be optimized away, lowered inline, or emitted as calls depending on target, optimization level, and compiler version.
+
+{{fbdoc item="section" value="When to use it"}}
+
+Use ##builtin.bi## when the program or library is intentionally tied to the GCC/clang backend and needs a specific compiler builtin.
+
+Good uses include low-level runtime code, checked arithmetic helpers, fortify-style buffer checks, endian conversion helpers, and small hot paths where the C compiler builtin is exactly the interface desired.
+
+For ordinary application code, prefer normal FreeBASIC features, the runtime library, or documented C runtime declarations unless a builtin is specifically needed.
+
+{{fbdoc item="see"}}
+	- [[DevBuildConfig|FreeBASIC build configuration]]
+	- [[DevRebuildAfterUpdates|Getting source code updates and rebuilding FreeBASIC]]
+	- [[TblComparisonCTypes|C/C++ vs. FreeBASIC integer data type comparison]]
+
+{{fbdoc item="back" value="DevToc|FreeBASIC Developer Information"}}
+{{fbdoc item="back" value="DocToc|Table of Contents"}}

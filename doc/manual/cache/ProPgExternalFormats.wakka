@@ -1,53 +1,99 @@
-{{fbdoc item="title" value="External Graphics File Formats (page to be completed)"}}----
-The **external graphics file formats** supported by rtlib through Bload and Bsave.
+﻿{{fbdoc item="title" value="BLOAD and BSAVE Graphics File Formats"}}----
+BLOAD and BSAVE understand two families of graphics files:
 
-Here is a rough starting point, though many bits still to add in... (from coderJeff)
+* FreeBASIC/QuickBASIC BSAVE memory blocks.
+* Windows/OS2 bitmap files, normally using the .bmp extension.
 
-{{fbdoc item="section" value="Files used with BLOAD/BSAVE"}}
-	First byte of file:
-	%%
-&hFD  QB BSAVED BLOCK 
-&hFE  FB BSAVED BLOCK
-&h42  Windows Bitmap (&h42 = ASC("B"))
-%%	For the QB/FB saved block, &hFD and &hFE identify the file as a QB/FB format and the next bytes determine the SIZE of the data contained in the file, followed by DATA and optionally PALETTE.
-	
-	For the Windows Bitmap, should be binary compatible with standard Windows BMP files. When loading, &h42 only identifies the file as possibly a windows bitmap and other checks on the header may cause it to fail loading.
+The BSAVE block format is useful when a program wants to store raw screen or image memory exactly as FreeBASIC sees it.  BMP is useful when the file should be opened by other graphics tools.
 
-{{fbdoc item="section" value="QB BSAVED Block"}}
-	%%
-OFS  LEN   DESCRIPTION
-0    1     QB BSAVED BLOCK Identifier (&hFD)
-1    4     Ignored
-5    2     unsigned 16 bit SIZE, little endian order
-7   ...    DATA (expected to be SIZE bytes long) 
-?   ...    PALETTE COLORS
+{{fbdoc item="section" value="Format selection"}}
+
+|| **File marker or name** || **Meaning** ||
+|| &hFD || QuickBASIC BSAVEd block.  BLOAD can read this. ||
+|| &hFE || FreeBASIC BSAVEd block.  BSAVE writes this format unless the file name ends in .bmp. ||
+|| &h42, ASC("B") || Possible BMP file.  BLOAD seeks back to the start and validates the full BMP header. ||
+|| .bmp extension || BSAVE writes a BMP file instead of a FreeBASIC BSAVE block.  The extension check is case-insensitive. ||
+
+{{fbdoc item="section" value="FreeBASIC BSAVE block"}}
+
+A FreeBASIC BSAVE block starts with an &hFE marker followed by a 32-bit little-endian byte count.
+
 %%
-{{fbdoc item="section" value="BSAVE and QB/FB Save Block"}}
-	##**BSAVE**( //filename//, //source// [,[ //size// ][,{ //pal// | //pal//, //bitsperpixel// }]] )##
-	
-	BSAVE always writes using the FB format (&hFE)
-	DATA bytes written is the smaller of the SIZE parameter and screen * pitch
-	PALETTE is written either from pal parameter or from current screen's palette
+Offset  Size  Description
+0       1     &hFE, FreeBASIC BSAVE block marker
+1       4     Data size in bytes, little-endian unsigned 32-bit value
+5       ...   Raw image or memory bytes
+?       ...   Optional palette data when saving an indexed screen
+%%
 
-{{fbdoc item="section" value="BLOAD and QB/FB Save Block"}}
-	##**BLOAD** //filename// [, //dest// [, [//pal//]]]##
-	
-	If ##//dest//## is not given, then DATA is loaded directly to screen memory byte for byte. If SIZE exceeds the current screen * pitch, then DATA is truncated to fit the size of the current graphics mode.
-	
-	If ##//dest//## is given, then DATA is loaded directly to the memory location pointed to by 'dest'.
-	
-	RLE (Run-Length Encoding) not supported. So only uncompressed formats.
+BSAVE writes this format for any output file whose name does not end in .bmp.
 
-{{fbdoc item="section" value="BLOAD/BSAVE and Windows bitmap"}}
-	BLOAD - if first byte is &H42 then file is attempted to be loaded as a bitmap
-	BSAVE - if filename has '.bmp' extension, then is saved as bitmap
+When saving from the current graphics screen, BSAVE writes at most the current screen pitch multiplied by the screen height.  When the current graphics mode has an indexed palette, BSAVE also writes palette entries after the raw pixel data.
 
-.....
-.....
+When saving from an explicit source pointer, BSAVE writes the requested number of bytes from that address.  In that case the caller is responsible for choosing a sensible size.
+
+{{fbdoc item="section" value="QuickBASIC BSAVE block"}}
+
+BLOAD can also read the older QuickBASIC block marker, &hFD.  That format stores a 16-bit little-endian byte count after four bytes that FreeBASIC ignores.
+
+%%
+Offset  Size  Description
+0       1     &hFD, QuickBASIC BSAVE block marker
+1       4     Ignored by FreeBASIC
+5       2     Data size in bytes, little-endian unsigned 16-bit value
+7       ...   Raw image or memory bytes
+?       ...   Optional palette data
+%%
+
+FreeBASIC BSAVE does not write the QuickBASIC &hFD form.  It writes the newer &hFE form instead.
+
+{{fbdoc item="section" value="BLOAD with BSAVE blocks"}}
+
+##**BLOAD** //filename// [, //dest// [, //pal//]]##
+
+If ##//dest//## is omitted, BLOAD copies the raw bytes into the current graphics screen.  If the file contains more bytes than the screen can hold, the load is truncated to the screen size.
+
+If ##//dest//## is supplied, BLOAD copies the raw bytes to that address instead.  For BSAVE blocks, this is a straight memory load.  The destination must point at enough writable memory for the data being loaded.
+
+Palette data is only useful for indexed graphics modes.  If ##//pal//## is omitted while loading to the screen, FreeBASIC loads the palette into the current graphics device palette when palette data is present.
+
+{{fbdoc item="section" value="BMP files"}}
+
+BLOAD treats a file beginning with &h42 as a possible BMP file, but the full BMP header must still be valid.  The loader understands common uncompressed BMP headers, including the old OS/2 core header and Windows bitmap info headers.
+
+The BMP loader handles palette BMPs and 16-bit, 24-bit, and 32-bit BMP data.  One-bit and four-bit indexed BMP data are expanded while loading.  Top-down BMP files, identified by a negative height, are accepted for uncompressed and bitfield BMP data.
+
+RLE-compressed BMP files should not be relied on.  Use uncompressed BMP files for portable BLOAD/BSAVE work.
+
+{{fbdoc item="section" value="BSAVE as BMP"}}
+
+##**BSAVE**( //filename//, //source// [,[ //size// ][,{ //pal// | //pal//, //bitsperpixel// }]] )##
+
+If the file name ends in .bmp, BSAVE writes a Windows BMP file instead of a FreeBASIC BSAVE block.
+
+* 8-bit indexed graphics can be saved as 8-bit BMP, or as 24-bit BMP when a higher output depth is requested.
+* 16-bit graphics are saved as 24-bit BMP.
+* 32-bit graphics are saved as 32-bit BMP by default, or as 24-bit BMP if 24 bits per pixel is requested.
+* Rows are padded as required by the BMP format.
+* Palette output is written for 8-bit BMP files.
+
+{{fbdoc item="section" value="Choosing a format"}}
+
+Use a BSAVE block when both the writer and reader are FreeBASIC or QuickBASIC-style programs and you want a simple raw memory dump.  This is fast and small, but it is tied to the screen mode, image layout, pitch, and palette assumptions of the program that reads it.
+
+Use BMP when the file should be inspected, edited, or generated by normal image tools.  BMP is larger, but it carries width, height, bit depth, palette, and row layout information in the file header.
+
+{{fbdoc item="section" value="Common mistakes"}}
+
+* Loading a BSAVE block into the wrong screen mode can produce scrambled output because the raw bytes no longer match the destination layout.
+* Loading to a pointer does not allocate memory.  Allocate the image or buffer first.
+* A file starting with the letter B is not automatically a valid BMP.  BLOAD checks the BMP header after seeing the first byte.
+* A .bmp file saved by BSAVE is not the same format as a FreeBASIC BSAVE block.  The extension selects the BMP writer.
 
 {{fbdoc item="section" value="See also"}}
-	- ##[[KeyPgBload|Bload]]##
-	- ##[[KeyPgBsave|Bsave]]##
-	- .....
+
+* ##[[KeyPgBload|BLOAD]]##
+* ##[[KeyPgBsave|BSAVE]]##
+* ##[[CatPgGfx|Graphics Library]]##
 
 {{fbdoc item="back" value="CatPgProgrammer|Programmer's Guide"}}

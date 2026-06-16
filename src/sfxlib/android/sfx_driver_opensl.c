@@ -89,6 +89,22 @@ static void release_all_buffers_locked(void)
 	pthread_cond_broadcast(&buffer_cond);
 }
 
+static void stop_player_queue(void)
+{
+	/*
+		Some Android OpenSL ES implementations keep queued buffers alive until
+		the player is explicitly stopped and its queue is cleared.  Destroying
+		a player with buffers still owned by the engine can block process
+		shutdown, which leaves short NativeActivity programs visible after the
+		BASIC main routine has already ended.
+	*/
+	if (player)
+		(*player)->SetPlayState(player, SL_PLAYSTATE_STOPPED);
+
+	if (queue)
+		(*queue)->Clear(queue);
+}
+
 static void free_buffers(void)
 {
 	int i;
@@ -282,6 +298,8 @@ static void opensl_exit(void)
 	initialized = 0;
 	release_all_buffers_locked();
 	pthread_mutex_unlock(&buffer_mutex);
+
+	stop_player_queue();
 
 	if (player_object)
 	{

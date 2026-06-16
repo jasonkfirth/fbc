@@ -56,6 +56,8 @@ During the program compilation three types of errors can arise:
 	- //49(1) Up-casting discards initializer(s)//
 	- //50(2) Suspicious address expression passed to BYREF parameter//
 	- //51(1) GCC/Clang didn't provide a proper sysroot. You probably have to pass fbc an argument of the form '-sysroot $NDK/platforms/android-$API/arch-$ARCH'//
+	- //52(2) Invalid or truncated unicode escape sequence//
+	- //53(1) Surrogate or surrogate pair in unicode literal//
 
 ==Compiler Error messages:==
 	The error messages stop the compilation after 10 errors (see the -maxerr command-line option to change that default value) or a fatal error occurred, and require a correction by the user before the compilation can be continued. The compiler signals the lines where the errors have been found, so the correction can be done quickly. In a few cases the place pointed at by the error messages is not where the errors can be found, it's the place where the compiler has given up in waiting for something that should be somewhere.
@@ -89,7 +91,7 @@ During the program compilation three types of errors can arise:
 	- //27 Recursion level too deep//
 	- //28 Expected pointer//
 	- //29 Expected 'LOOP'//
-	- //30 Expected 'WEND'//
+	- //30 Expected 'WEND or END WHILE'//
 	- //31 Expected 'THEN'//
 	- //32 Expected 'END IF'//
 	- //33 Illegal 'END'//
@@ -167,7 +169,7 @@ During the program compilation three types of errors can arise:
 	- //105 Branch crossing local array, var-len string or object definition//
 	- //106 LOOP without DO//
 	- //107 NEXT without FOR//
-	- //108 WEND without WHILE//
+	- //108 WEND or END WHILE without WHILE//
 	- //109 END WITH without WITH//
 	- //110 END IF without IF//
 	- //111 END SELECT without SELECT//
@@ -392,6 +394,9 @@ During the program compilation three types of errors can arise:
 	- //330 -fpu sse option can only be used on x86 and x86_64 architectures//
 	- //331 -fpu neon option can only be used on arm architectures//
 	- //332 Undefined built-in symbol//
+	- //333 Illegal redefinition of rtlib command//
+	- //334 Illegal redefinition of gfxlib command. If gfxlib is not used, define FB_NO_GFXLIB before using this name//
+	- //335 Illegal redefinition of sfxlib command. If sfxlib is not used, define FB_NO_SFXLIB before using this name//
 
 
 ==Third party programs errors==

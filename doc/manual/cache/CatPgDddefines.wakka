@@ -36,8 +36,18 @@ Preprocessor symbols defined by the compiler.
 		Defined if compiling for ""OpenBSD"".
 	=={{fbdoc item="keyword" value="KeyPgDdfbdarwin|__FB_DARWIN__"}}==
 		Defined if compiling for Darwin.
+	=={{fbdoc item="keyword" value="KeyPgDdfbhaiku|__FB_HAIKU__"}}==
+		Defined if compiling for Haiku.
+	=={{fbdoc item="keyword" value="KeyPgDdfbdragonfly|__FB_DRAGONFLY__"}}==
+		Defined if compiling for ""DragonFly BSD"".
+	=={{fbdoc item="keyword" value="KeyPgDdfbsolaris|__FB_SOLARIS__"}}==
+		Defined if compiling for Solaris or a Solaris-family compatibility target.
+	=={{fbdoc item="keyword" value="KeyPgDdfbillumos|__FB_ILLUMOS__"}}==
+		Defined if compiling for illumos.
 	=={{fbdoc item="keyword" value="KeyPgDdfbxbox|__FB_XBOX__"}}==
 		Defined if compiling for Xbox.
+	=={{fbdoc item="keyword" value="KeyPgDdfbwii|__FB_WII__"}}==
+		Defined if compiling for Wii.
 	=={{fbdoc item="keyword" value="KeyPgDdFBBigEndian|__FB_BIGENDIAN__"}}==
 		Defined if compiling on a system using big-endian byte-order.
 	=={{fbdoc item="keyword" value="KeyPgDdfbpcos|__FB_PCOS__"}}==

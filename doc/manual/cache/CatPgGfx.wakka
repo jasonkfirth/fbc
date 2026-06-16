@@ -24,6 +24,9 @@ A list of the keywords and procedures of ""FreeBASIC""'s graphics library.
 	- {{fbdoc item="keyword" value="KeyPgGetgraphics|GET (GRAPHICS)"}}
 	- {{fbdoc item="keyword" value="KeyPgGetjoystick|GETJOYSTICK"}}
 	- {{fbdoc item="keyword" value="KeyPgGetmouse|GETMOUSE"}}
+	- {{fbdoc item="keyword" value="KeyPgGettouch|GETTOUCH"}}
+	- {{fbdoc item="keyword" value="KeyPgGettouchcount|GETTOUCHCOUNT"}}
+	- {{fbdoc item="keyword" value="KeyPgGettouchhit|GETTOUCHHIT"}}
 	- {{fbdoc item="keyword" value="KeyPgGetxpad|GETXPAD"}}
 	- {{fbdoc item="keyword" value="KeyPgInp|INP"}}
 	- {{fbdoc item="keyword" value="KeyPgLinegraphics|LINE (GRAPHICS)"}}

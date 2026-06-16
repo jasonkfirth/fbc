@@ -1,11 +1,11 @@
 {{fbdoc item="title" value="User Input Functions (Graphics Library)"}}----
-Procedures (from graphics library) for working with mice, gaming devices and keyboards.
+Procedures (from graphics library) for working with mice, touch devices, gaming devices and keyboards.
 
 {{fbdoc item="desc"}}
-	These procedures provide access to external devices such as keyboards, mice and gamepads.
+	These procedures provide access to external devices such as keyboards, mice, touch screens and gamepads.
 
-**{{anchor name="MOUSEJOY|Mouse and Joystick Input"}}**
-	Procedures that provide state information of the mouse or joystick.
+**{{anchor name="MOUSEJOY|Mouse, Touch and Joystick Input"}}**
+	Procedures that provide state information for mouse, touch and joystick input.
 **{{anchor name="KEYBOARD|Keyboard Input"}}**
 	Procedures that provide keyboard state information.
 
@@ -14,6 +14,12 @@ Procedures (from graphics library) for working with mice, gaming devices and key
 		Gets button and axis information for the mouse.
 	=={{fbdoc item="keyword" value="KeyPgSetmouse|SETMOUSE"}}==
 		Sets position and visibility of the mouse cursor.
+	=={{fbdoc item="keyword" value="KeyPgGettouchcount|GETTOUCHCOUNT"}}==
+		Gets the number of active touch contacts.
+	=={{fbdoc item="keyword" value="KeyPgGettouch|GETTOUCH"}}==
+		Gets position and identifier information for an active touch contact.
+	=={{fbdoc item="keyword" value="KeyPgGettouchhit|GETTOUCHHIT"}}==
+		Tests whether any active touch contact is inside a rectangle or circle.
 	=={{fbdoc item="keyword" value="KeyPgGetjoystick|GETJOYSTICK"}}==
 		Gets button and axis information for gaming devices.
 	=={{fbdoc item="keyword" value="KeyPgGetxpad|GETXPAD"}}==

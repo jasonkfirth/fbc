@@ -1,29 +1,46 @@
-{{fbdoc item="title" value="CAPTURE"}}----
-Controls sfxlib audio capture.
+﻿{{fbdoc item="title" value="CAPTURE"}}----
+Controls sfxlib audio capture where the active backend supports recording.
 
 {{fbdoc item="syntax"}}##
-	//result// = **Capture Start**()
-	**Capture Pause**
-	**Capture Resume**
-	**Capture Stop**
-	//status// = **Capture Status**()
-	//frames// = **Capture Available**()
-	//result// = **Capture Save**( //filename// )
-	//frames// = **Capture Read**( //samples//, //frames// )
+	result = Capture Start()
+	Capture Pause
+	Capture Resume
+	Capture Stop
+	status = Capture Status()
+	frames = Capture Available()
+	result = Capture Save(filename)
+	frames = Capture Read(samples, frames)
 ##
 {{fbdoc item="desc"}}
-	##**Capture**## records audio input when the active backend supports capture.  ##Capture Start## begins recording, pause/resume/stop control the capture state, ##Capture Available## reports how many frames can be read, ##Capture Read## copies captured samples into a ##Single## buffer, and ##Capture Save## writes the buffered capture data to a file.
-
-	##Capture Status## returns ##0## for stopped, ##1## for running, and ##2## for paused.
+	CAPTURE records audio input through the active sfxlib backend when that backend supports recording. It is the input side of the sound library, while commands such as SOUND, MUSIC, and SFX are output commands.
+	Capture Start begins recording. Capture Pause temporarily stops adding new input without throwing away the capture state. Capture Resume continues after a pause. Capture Stop ends the recording session.
+	Capture Available reports how many frames can be read. A frame is one moment of audio across the capture channels. Capture Read copies captured samples into a Single buffer supplied by the program. Capture Save writes the buffered recording to a file.
+	Capture is inherently platform and device dependent. A laptop microphone, a loopback device, and a headless server all behave differently, so programs should check return values and be ready for capture to be unavailable.
 
 {{fbdoc item="ex"}}
-	See ##examples/sfxlib/capture-start.bas##, ##examples/sfxlib/capture-read.bas##, ##examples/sfxlib/capture-save.bas##, and ##examples/sfxlib/showcase.bas##.
+%%(freebasic)
+dim as single samples(0 to 1023)
+
+if capture start() >= 0 then
+    sleep 500, 1
+    print "frames available="; capture available()
+    capture read @samples(0), 512
+    capture stop
+else
+    print "capture not available"
+end if
+%%
+
+{{fbdoc item="target"}}
+	- Use DEVICE to inspect or select the active output backend; capture support still depends on the backend and platform.
+	- Capture Read expects a buffer large enough for the requested frames and channels.
 
 {{fbdoc item="diff"}}
-	- New to ""FreeBASIC"".
+`t- New to ""FreeBASIC"".
 
 {{fbdoc item="see"}}
-	- ##[[KeyPgDevice|Device]]##
-	- ##[[KeyPgMusic|Music]]##
+	- ##[[KeyPgDevice|DEVICE]]##
+	- ##[[KeyPgSfxBackends|sfxlib backends]]##
+	- ##[[CatPgSfx|Sound Library Reference]]##
 
 {{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

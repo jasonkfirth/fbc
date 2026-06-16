@@ -103,6 +103,8 @@ Statements and Procedures that work with strings.
 {{anchor name="SUBSTRING"}}{{fbdoc item="section" value="Working with Substrings"}}
 	=={{fbdoc item="keyword" value="KeyPgLeft|LEFT"}}==
 		Returns a substring of the leftmost characters in a string.
+	=={{fbdoc item="keyword" value="KeyPgMid|MID"}}==
+		Overview of the ##Mid## function and statement forms.
 	=={{fbdoc item="keyword" value="KeyPgMidfunction|MID (Function)"}}==
 		Returns a substring of a string.
 	=={{fbdoc item="keyword" value="KeyPgRight|RIGHT"}}==

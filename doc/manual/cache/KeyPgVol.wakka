@@ -1,0 +1,29 @@
+﻿{{fbdoc item="title" value="VOL"}}----
+Sets the master generated-sound volume.
+
+{{fbdoc item="syntax"}}##
+	**Vol level**
+##
+{{fbdoc item="desc"}}
+	VOL is the short BASIC-style way to change overall generated-sound loudness. It affects the master level used by sfxlib output rather than one individual channel.
+	Use VOL when a program only needs to set the volume and does not need to read it back. It is good for simple examples, quick sound tests, and programs written in a compact older BASIC style.
+	For new code that needs more control, VOLUME is usually clearer because it can set the master level, set a channel level, and return the current level.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+vol 8
+sound 440, 0.25
+sleep 300, 1
+%%
+
+{{fbdoc item="target"}}
+	- Use VOLUME for channel-specific volume or when a function return value is needed.
+
+{{fbdoc item="diff"}}
+`t- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+`t- ##[[CatPgSfx|Sound Library Reference]]##
+`t- ##[[KeyPgSfxGenerated|Generated Sound Commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

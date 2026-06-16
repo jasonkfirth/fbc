@@ -1,0 +1,29 @@
+﻿{{fbdoc item="title" value="ENVELOPE"}}----
+Defines an ADSR envelope slot.
+
+{{fbdoc item="syntax"}}##
+	**Envelope id, attack, decay, sustain, release**
+##
+{{fbdoc item="desc"}}
+	ENVELOPE defines how a generated instrument changes volume over the life of a note. This is what makes a sound feel plucked, struck, held, or faded instead of simply turning on and off.
+	Attack is how long the sound takes to rise from silence. Decay is how long it takes to fall from the attack peak to the sustain level. Sustain is the level held while the sound continues. Release is how long the sound takes to fade out at the end.
+	Like WAVE, ENVELOPE stores a definition in a numbered slot. INSTRUMENT combines a waveform slot and an envelope slot into something NOTE and PLAY can use.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+envelope 1, 0.01, 0.10, 0.50, 0.20
+wave 1, 0
+instrument 1, 1, 1
+%%
+
+{{fbdoc item="target"}}
+	- Short attack and release values make percussive sounds. Longer values make softer fades.
+
+{{fbdoc item="diff"}}
+`t- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+`t- ##[[CatPgSfx|Sound Library Reference]]##
+`t- ##[[KeyPgSfxGenerated|Generated Sound Commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

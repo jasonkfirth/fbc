@@ -1,84 +1,38 @@
-{{fbdoc item="title" value="Getting the source code"}}----
+﻿{{fbdoc item="title" value="Getting the source code"}}
 
-{{fbdoc item="section" value="From Git"}}
+The FreeBASIC source tree is maintained in Git. A normal developer checkout is
+enough for compiler, runtime, documentation, and packaging work.
 
-The ""FreeBASIC"" source code is maintained using the [[http://git-scm.com/|Git version control system]]. The latest version of FB source code is available from these Git repositories:
+%%(sh)
+git clone https://github.com/freebasic/fbc.git
+cd fbc
+%%
 
-	- Main repository at ""SourceForge"":
-		Git clone URL: ##""git://git.code.sf.net/p/fbc/code""##
-		Web view: http://sourceforge.net/p/fbc/code/
-	
-	- Mirror repository at ""GitHub"":
-		Git clone URL: ##""https://github.com/freebasic/fbc.git""##
-		Web view: https://github.com/freebasic/fbc
+Some developers use a fork instead of the main repository. In that case, clone
+the fork and keep the upstream repository configured as a second remote:
 
-In order to access a Git repository, you first need to install a Git client.
+%%(sh)
+git remote add upstream https://github.com/freebasic/fbc.git
+git fetch upstream
+%%
 
-	- Linux:
-		- The standard Git command line client is available in form of packages for many GNU/Linux distributions. For example, on Debian/Ubuntu, you can install the ##git## and ##git-gui## packages: ##sudo apt-get install git git-gui##.
-		- File explorer integration: Some tools such as [[http://rabbitvcs.org/|RabbitVCS]] act as graphical frontend for the Git command line client. It can integrate into the Nautilus file explorer much like ""TortoiseSVN"" on Windows. Install the ##rabbitvcs-nautilus## package on Debian/Ubuntu to get it.
-	- Windows:
-		- The standard Git command line client is made available for Windows by the [[https://msysgit.github.io/|MsysGit]] project. Just download the latest installer from their website, and install it. The recommended setting for ##core.autocrlf## is ##true##, so that the FB source code in the working tree will have CRLF line endings. By default ""MsysGit"" will add some useful context-menu (right-click menu) entries for directories in the Windows Explorer.
-		- There are other Git clients available, for example [[https://code.google.com/p/tortoisegit/|TortoiseGit]] or [[http://www.sourcetreeapp.com/|SourceTree]].
+{{fbdoc item="subsect" value="Updating a checkout"}}
 
-Check out [[http://git-scm.com/downloads]] for more information.
+Use normal Git commands to update the source tree:
 
-After installing a Git client, you can download ("clone") the fbc repository.
+%%(sh)
+git fetch --all --prune
+git pull --ff-only
+%%
 
-	- Using the Git command line in a terminal on Linux:
+If the compiler was already built before the update, see
+::DevRebuildAfterUpdates|Getting source code updates and rebuilding FreeBASIC::.
+The build system can rebuild only what changed in many cases, but bootstrap and
+platform changes sometimes require a cleaner rebuild.
 
-		%%# Clone fbc's SourceForge repository into a new fbc/ directory
-git clone git://git.code.sf.net/p/fbc/code fbc
+{{fbdoc item="subsect" value="Windows notes"}}
 
-# Open graphical commit history browser:
-gitk --all &
-
-# Open graphical commit tool:
-git gui &%%
-
-	- Using the Git command line in the //Git Bash// terminal that comes with ""MsysGit"" on Windows:
-
-		%%# The Git Bash is an MSYS shell providing a Linux-like command line environment.
-# It should have mapped the ~ home directory to your C:\Documents and Settings\username or
-# C:\Users\name directory. It is ok to work there, but if you want to change directories and clone
-# the fbc repository to somewhere else, you can do so as follows:
-# Change directory to C:\foo\bar
-cd /c/foo/bar
-
-# Clone fbc's SourceForge repository into a new fbc directory
-git clone git://git.code.sf.net/p/fbc/code fbc
-
-# Open graphical commit history browser:
-gitk --all &
-
-# Open graphical commit tool:
-git gui &%%
-
-	- Using ""MsysGit""'s graphical user interface on Windows: Right click on your Desktop or somewhere else in the Explorer and select "Git Gui" to bring up the Git Clone window. Here you can enter the Git clone URL of the fbc repository and the directory into which the clone should go. Note: Right-clicking and selecting //Git Gui// on directories that already //are// Git repositories will bring up the git-gui commit tool.
-
-	- Other: Please check out your Git client's documentation. No matter what Git client you are using, you probably have to enter the Git clone URL somewhere. Then it should download the fbc repository to somewhere on your system.
-
-As a result you should have an ##fbc/## directory containing the ""FreeBASIC"" source code (and a ##.git## directory, Git repository metadata).
-
-You can regularly update it to the latest version by synchronizing it to the fbc repository which you originally cloned: Go into your fbc/ directory and run a Git Pull. When using the Git command line, this should do the trick:
-
-%%cd fbc/
-git pull%%
-
-{{fbdoc item="section" value="From Git but without using a Git client"}}
-
-Both ""SourceForge"" and ""GitHub"" allow you to download snapshots of the source code stored in the fbc Git repository. This way you can download the latest fbc source code without having to use a Git client. Using a Git client is generally more efficient though.
-
-	- ""SourceForge"": Visit [[http://sourceforge.net/p/fbc/code/]] in a web browser and click ""Download Snapshot"".
-	- ""GitHub"": Visit [[https://github.com/freebasic/fbc]] in a web browser and click ""Download ZIP"".
-
-{{fbdoc item="section" value="Source code for releases"}}
-
-Besides the source code in Git which corresponds to the development version of ""FreeBASIC"", you can also download the source code for the latest official stable release of ""FreeBASIC"" (or previous releases) by visiting the fbc downloads area on ""SourceForge"":
-
-[[http://sourceforge.net/projects/fbc/files/]]
-
-The ##Source Code## directory will always contain downloads for the source code of the latest ""FreeBASIC"" release. The source code of previous releases can be found in the ##Older versions## directory.
-
-{{fbdoc item="back" value="DevToc|FreeBASIC Developer Information"}}
-{{fbdoc item="back" value="DocToc|Table of Contents"}}
+On Windows, Git for Windows and MSYS2 Git both work. Be consistent about which
+shell owns the checkout when running long build scripts. Mixing Windows paths,
+MSYS2 paths, and Cygwin paths in one command line is a common source of avoidable
+build failures.

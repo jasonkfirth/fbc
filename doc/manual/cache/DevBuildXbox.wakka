@@ -1,0 +1,28 @@
+﻿{{fbdoc item="title" value="Building for Xbox"}}
+
+This page is about the original 2001 Xbox target. It is not for Xbox 360, Xbox
+One, Xbox Series X/S, or ordinary Windows programs.
+
+The modern Xbox package builds programs with ##fbc-xbox## and produces ##.xbe##
+executables. It also includes ##fbc-xbox-xiso## for creating ISO images with an
+optional asset directory.
+
+{{fbdoc item="subsect" value="Build scripts"}}
+
+%%(sh)
+./build_scripts/msys2-build-freebasic-xbox.sh
+./build_scripts/debianubuntu-build-freebasic-xbox.sh
+%%
+
+The package is built around open tools such as nxdk rather than the old
+proprietary Microsoft XDK.
+
+{{fbdoc item="subsect" value="Compiling a program"}}
+
+%%(sh)
+fbc-xbox program.bas -x program.xbe
+fbc-xbox-xiso program.xbe program.iso
+fbc-xbox-xiso program.xbe program.iso --assets game-assets
+%%
+
+Use real modified Xbox hardware or an emulator that can run homebrew XBE files.

@@ -1,0 +1,32 @@
+﻿{{fbdoc item="title" value="INSTRUMENT"}}----
+Defines an instrument or assigns one to a channel.
+
+{{fbdoc item="syntax"}}##
+	**Instrument id, wave_id, envelope_id**
+	**Instrument channel, instrument_id**
+##
+{{fbdoc item="desc"}}
+	INSTRUMENT gives generated sound a reusable voice. The definition form combines a WAVE slot and an ENVELOPE slot into an instrument id. That instrument can then be selected with VOICE or assigned to a specific channel.
+	The assignment form changes the instrument used by a channel. After that, NOTE and PLAY commands on that channel use the selected instrument, so the same melody can sound smooth, buzzy, plucked, or noisy depending on the waveform and envelope.
+	This is the command to use when SOUND and NOTE are working but the default tone is too plain for the program you are writing.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+wave 1, 0
+envelope 1, 0.01, 0.10, 0.50, 0.20
+instrument 1, 1, 1
+instrument 0, 1
+note 0, "C", 4, 0.25
+%%
+
+{{fbdoc item="target"}}
+	- Use VOICE to set the default instrument without naming a channel every time.
+
+{{fbdoc item="diff"}}
+`t- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+`t- ##[[CatPgSfx|Sound Library Reference]]##
+`t- ##[[KeyPgSfxGenerated|Generated Sound Commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

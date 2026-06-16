@@ -1,0 +1,30 @@
+﻿{{fbdoc item="title" value="OCTAVE"}}----
+Sets or returns the default musical octave.
+
+{{fbdoc item="syntax"}}##
+	**Octave octave**
+	**octave = Octave()**
+##
+{{fbdoc item="desc"}}
+	OCTAVE sets the default octave for generated musical notes. Higher octave numbers produce higher notes; lower octave numbers produce lower notes.
+	This is mainly useful with NOTE and PLAY. If a note command or PLAY string does not provide its own octave change, it can use the current default set by OCTAVE.
+	Calling OCTAVE as a function returns the current default octave.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+octave 4
+note "C", octave(), 0.25
+play "c d e f"
+%%
+
+{{fbdoc item="target"}}
+	- Use NOTE with an explicit octave when a single note should not depend on the current default.
+
+{{fbdoc item="diff"}}
+`t- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+`t- ##[[CatPgSfx|Sound Library Reference]]##
+`t- ##[[KeyPgSfxGenerated|Generated Sound Commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

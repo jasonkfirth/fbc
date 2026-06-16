@@ -1,0 +1,22 @@
+﻿{{fbdoc item="title" value="Building for Wii"}}
+
+The Wii port is a cross-target port. The build and installer scripts should be
+used instead of hand-copying compiler pieces, because the Wii package layout has
+target-specific library, include, and tool paths.
+
+{{fbdoc item="subsect" value="Build and installer test"}}
+
+%%(sh)
+./build_scripts/msys2-build-freebasic-wii.sh
+./build_scripts/msys2-test-freebasic-installer.sh --kind wii
+%%
+
+The package scripts use the same version metadata as the rest of the tree and
+the install/uninstall layout rules in ##mk/inst_uninst.mk##.
+
+{{fbdoc item="subsect" value="Runtime testing"}}
+
+Wii graphics, sound, input, and program startup should be tested with emulator
+or hardware smoke tests when the toolchain is available. This target is close
+enough to the graphics and sound internals that backend changes can affect it
+even when desktop tests pass.

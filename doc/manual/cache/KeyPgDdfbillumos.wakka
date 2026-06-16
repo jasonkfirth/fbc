@@ -1,0 +1,24 @@
+{{fbdoc item="title" value="__FB_ILLUMOS__"}}----
+
+{{fbdoc item="syntax"}}
+	""__FB_ILLUMOS__""
+
+{{fbdoc item="desc"}}
+	Define without a value created at compile time when the illumos target is
+	being used.  The ##sunos## target spelling also selects the illumos target.
+
+	When compiling for illumos, the compiler also defines ##[[KeyPgDdfbsolaris|__FB_SOLARIS__]]## for Solaris-family compatibility.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#IFDEF __FB_ILLUMOS__
+	print "illumos target"
+#ENDIF
+%%
+
+{{fbdoc item="back" value="CatPgDddefines|Predefined Defines"}}
+{{fbdoc item="see"}}
+	[[KeyPgDdfbsolaris|__FB_SOLARIS__]]
+	[[CompilerOpttarget|Compiler Option: -target]]
+----
+{{fbdoc item="back" value="CatPgCompiler|Compiler Meta-Commands"}}

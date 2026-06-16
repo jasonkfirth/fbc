@@ -77,8 +77,8 @@ Options:
   --no-build      Reuse the existing source bootstrap tarball
   --no-js         Build packages with DEB_BUILD_PROFILES=nojs
   --no-android    Build packages without DEB_BUILD_PROFILES=android
-  --android       Build the freebasic-android package; fail if SDK packages
-                  are not available
+  --android       Build the Ubuntu freebasic-android package; fail if SDK
+                  packages are not available
   --wii           Build the freebasic-wii package; fail if devkitPro packages
                   are not available
   --no-wii        Build packages without DEB_BUILD_PROFILES=wii
@@ -658,6 +658,19 @@ if [ -n "${FBC_PACKAGE_CODENAME:-}" ]; then
     CODENAME="$FBC_PACKAGE_CODENAME"
 fi
 
+android_supported_for_distro() {
+    [ "$DISTRO_ID" = "ubuntu" ]
+}
+
+if [ "$ANDROID" -eq 1 ] && ! android_supported_for_distro; then
+    if [ "$ANDROID_EXPLICIT" -eq 1 ]; then
+        die "freebasic-android is only packaged from Ubuntu targets; $DISTRO_ID/$CODENAME cannot provide the Android SDK/NDK dependency set"
+    fi
+
+    echo "==> disabling Android package profile for non-Ubuntu target: $DISTRO_ID/$CODENAME"
+    ANDROID=0
+fi
+
 OUTDIR="${FBC_PACKAGE_OUTDIR:-${OUTBASE}/linux/${DISTRO_ID}/${CODENAME}/${ARCH}}"
 
 mkdir -p "$WORKDIR" "$OUTDIR"
@@ -898,6 +911,15 @@ package_current_target() {
     [ -f debian/control ] || die "missing debian/control"
     [ -f debian/changelog ] || die "missing debian/changelog"
     [ -f GNUmakefile ] || [ -f makefile ] || [ -f Makefile ] || die "missing GNUmakefile/makefile/Makefile"
+
+    if [ "$ANDROID" -eq 0 ]; then
+        # Keep Debian and other non-Android package sets from advertising a
+        # sidecar package they did not build.  Ubuntu Android packages are
+        # still emitted when the android build profile is enabled.
+        awk '$0 == " freebasic-android (= ${binary:Version})," { next } { print }' debian/control > debian/control.tmp
+        mv debian/control.tmp debian/control
+    fi
+
     if [ "$NO_JS" -eq 0 ]; then
         [ -f src/tools/js/fbc-js-app ] || die "missing JS app helper: src/tools/js/fbc-js-app"
     fi

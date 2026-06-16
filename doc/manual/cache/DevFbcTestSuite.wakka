@@ -1,68 +1,31 @@
-{{fbdoc item="title" value="Compiling the test suite"}}----
+﻿{{fbdoc item="title" value="The FreeBASIC test suite"}}
 
-The ""FreeBASIC"" project has a suite of tests which ensure that bugs stay dead and that new bugs have a harder time of gaining a foothold.
+The test suite is used to catch compiler, runtime, library, and target
+regressions. It is also used by the packaging scripts to prove that an installed
+compiler can compile and run basic programs from a clean layout.
 
-{{fbdoc item="section" value="Compiling and getting Test Results"}}
-The tests are located in the ##tests## subdirectory within the main ""FreeBASIC"" directory.  The following two commands will compile and run all the tests:
-%%
-$ make unit-tests
-   generates fbc-tests[.exe]
+{{fbdoc item="subsect" value="Common make targets"}}
 
-$ make log-tests
-   generates failed-test-fb.log
-   generates failed-test-qb.log
-   generates failed-test-deprecated.log
-   if all tests passed, the log file reports "None found"
-%%
-
-Initial generation of index files will take place, followed by the compilation of hundreds of tests. Be patient, it can take a while to run all of the tests...
-
-{{fbdoc item="section" value="More testing options"}}
-
-Invoking with make will present the following help text:
-%%
-$ make
-usage: make target [options]
-
-Targets:
-   unit-tests
-   log-tests
-   failed-tests
-   check
-   mostlyclean
-   clean
-
-Options:
-   FBC=/path/fbc
-   FB_LANG=fb | fblite | qb | deprecated
-   DEBUG=1
-   EXTRAERR=1
-   TARGET=target
-   ARCH=arch (default is 486)
-   OS=DOS
-   FPU=fpu | sse
-   FPMODE=fast | precise
-   GEN=gas | gcc
-   UNITTEST_RUN_ARGS=args
-   ENABLE_CHECK_BUGS=1
-   ENABLE_CONSOLE_OUTPUT=1
-
-Targets: Configuration and Checks
-   check
-
-Example: make all available tests
-   make unit-tests
-   make log-tests
-
-Example: make the -lang qb tests
-   make log-tests FB_LANG=qb
+%%(sh)
+make sanity
+make quick-test
+make full-test
+make compiler-smoke
+make bootstrap-emit-test
 %%
 
-{{fbdoc item="section" value="Reporting Test Failures"}}
+Use the smaller targets while developing a focused change and the broader suite
+before release or after changes to parser, code generation, runtime startup,
+string handling, graphics, sound, or cross-target support.
 
-If everything is working as it should, there should be no failures.  If there is a failure, then it could indicate a problem with the compiler, or a particular build target.  If you get failures, please consider reporting on https://www.freebasic.net/forum so others can investigate.
+{{fbdoc item="subsect" value="Package and platform smoke tests"}}
 
-Thank you for running the tests and contributing to make ""FreeBASIC"" a healthy compiler!
+The ##build_scripts/## directory contains installer and platform smoke tests for
+supported package families and target ports. Those scripts are the preferred way
+to test an installed package because they catch missing files, wrong paths, wrong
+compiler names, and packaging-only problems that an in-tree build can hide.
 
-{{fbdoc item="back" value="DevToc|FreeBASIC Developer Information"}}
-{{fbdoc item="back" value="DocToc|Table of Contents"}}
+Graphics and sound work should be tested explicitly on the affected platform.
+SCREEN modes, SCREENSET behavior, input scaling, audio playback, and backend
+startup/shutdown have enough platform-specific behavior that compiler-only tests
+are not enough.

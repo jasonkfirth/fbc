@@ -1,0 +1,30 @@
+﻿{{fbdoc item="title" value="WAVE"}}----
+Defines a generated waveform slot.
+
+{{fbdoc item="syntax"}}##
+	**Wave id, waveform**
+##
+{{fbdoc item="desc"}}
+	WAVE defines the raw shape used by a generated instrument. It does not play sound by itself. Instead, it stores a waveform in a numbered slot so INSTRUMENT can use it later.
+	The waveform shape changes the tone color. Sine is smooth and plain, square is buzzy and retro, triangle is softer than square, saw is bright and sharp, and noise is useful for percussion and effects.
+	The currently supported waveform values are 0 for sine, 1 for square, 2 for triangle, 3 for saw, and 4 for noise.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+wave 1, 0
+envelope 1, 0.01, 0.10, 0.50, 0.20
+instrument 1, 1, 1
+voice 1
+%%
+
+{{fbdoc item="target"}}
+	- WAVE defines part of an instrument; use SOUND, NOTE, PLAY, or TONE to actually hear something.
+
+{{fbdoc item="diff"}}
+`t- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+`t- ##[[CatPgSfx|Sound Library Reference]]##
+`t- ##[[KeyPgSfxGenerated|Generated Sound Commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

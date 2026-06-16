@@ -1,0 +1,23 @@
+﻿{{fbdoc item="title" value="Building for Android"}}
+
+The Android port builds FreeBASIC programs into Android application packages
+using the Android SDK/NDK tools. The current tree keeps the Android application
+template under ##share/freebasic-android/template## and drives package creation
+through the build scripts.
+
+{{fbdoc item="subsect" value="Build scripts"}}
+
+%%(sh)
+./build_scripts/msys2-build-freebasic-android.sh
+./build_scripts/debianubuntu-test-freebasic-android.sh
+%%
+
+Those scripts check for the Android toolchain pieces that matter in practice,
+including the NDK compiler, ##android.jar##, ##aapt##, ##d8##, signing tools,
+and the runtime package layout.
+
+{{fbdoc item="subsect" value="What to test"}}
+
+Android changes should be tested with normal command-line programs and with
+application-style smoke tests. Graphics, touch input, audio, lifecycle exit, and
+asset packaging are all Android-specific enough to deserve explicit tests.

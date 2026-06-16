@@ -1,5 +1,5 @@
 {{image class="center" alt="FB Logo" title="FB Logo" url="/images/FBLOGO.PNG" link="RecentChanges"}}{{fbdoc item="title" value="FreeBASIC Manual"}}----
-@@{{fbdoc item="keyword" value="CompilerWelcome|Welcome to FreeBASIC"}} | {{fbdoc item="keyword" value="CompilerHelp|Getting Help with FreeBASIC"}}@@
+@@{{fbdoc item="keyword" value="CompilerWelcome|Welcome to FreeBASIC"}} | {{fbdoc item="keyword" value="CompilerHelp|Getting Help with FreeBASIC"}} | {{fbdoc item="keyword" value="CatPgSfx|Sound Library Reference"}} | {{fbdoc item="keyword" value="CatPgGfx|Graphics Keywords"}} | {{fbdoc item="keyword" value="CatPgFullIndex|Keyword Index"}}@@
 <<{{fbdoc item="section" value="Language Documentation"}}
 	
 	{{fbdoc item="keyword" value="CatPgFullIndex|Keywords - Alphabetical"}}

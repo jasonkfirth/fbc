@@ -580,6 +580,11 @@ def run_command(
             elapsed = time.monotonic() - started
             log.write(f"\nTIMEOUT after {timeout}s\n")
             return "timeout", elapsed
+        except OSError as exc:
+            elapsed = time.monotonic() - started
+            error_code = getattr(exc, "winerror", None) or exc.errno or 1
+            log.write(f"\nOSERROR {error_code}: {exc}\n")
+            return f"fail({error_code})", elapsed
 
     elapsed = time.monotonic() - started
     if returncode == 0:
@@ -628,6 +633,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     if compile_status == "pass":
         should_run = classification.runnable
         if args.no_run:
+            should_run = False
             run_status = "skipped-no-run"
         elif args.run_all and classification.group not in ("external-library", "platform-specific", "helper-module", "intentional-failure"):
             should_run = True
@@ -646,11 +652,14 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
                 env=env,
             )
         else:
-            run_log.write_text(
-                f"skipped: {classification.group}: {classification.reason}\n",
-                encoding="utf-8",
-            )
-            run_status = "skipped-" + classification.group
+            if args.no_run:
+                run_log.write_text("skipped: --no-run\n", encoding="utf-8")
+            else:
+                run_log.write_text(
+                    f"skipped: {classification.group}: {classification.reason}\n",
+                    encoding="utf-8",
+                )
+                run_status = "skipped-" + classification.group
     else:
         run_status = "skipped-compile-failed"
         run_log.write_text("skipped: compile did not pass\n", encoding="utf-8")
@@ -871,7 +880,10 @@ def main(argv: list[str]) -> int:
         1
         for result in results
         if result.group == "self-contained"
-        and (result.compile_status != "pass" or result.run_status != "pass")
+        and (
+            result.compile_status != "pass"
+            or (not args.no_run and result.run_status != "pass")
+        )
     )
 
     print()

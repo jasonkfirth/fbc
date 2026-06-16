@@ -74,6 +74,7 @@ typedef struct FB_ANDROID_APP
 	int started;
 	int resumed;
 	int focused;
+	int finish_requested;
 	int stdout_pipe[2];
 } FB_ANDROID_APP;
 
@@ -338,6 +339,9 @@ static void fb_android_redirect_stdio(FB_ANDROID_APP *app)
 	setvbuf(stderr, NULL, _IONBF, 0);
 }
 
+static void fb_android_flush_program_output(FB_ANDROID_APP *app);
+static void fb_android_request_finish(FB_ANDROID_APP *app);
+
 static void *fb_android_program_thread(void *arg)
 {
 	FB_ANDROID_APP *app = (FB_ANDROID_APP *)arg;
@@ -388,9 +392,24 @@ static void *fb_android_program_thread(void *arg)
 		rc = fb_android_exit_status;
 	fb_android_exit_jump = NULL;
 
+	fb_android_flush_program_output(app);
 	snprintf(message, sizeof(message), "FREEBASIC_ANDROID_EXIT:%d", rc);
 	fb_android_log(message);
-	return NULL;
+
+	/*
+		NativeActivity applications are hosted by Android instead of by a
+		normal process main(). Returning from the BASIC entry point only ends
+		this worker thread; without an explicit finish request the Activity
+		stays in the foreground even though the program is done.
+
+		After logging the exit code, ask Android to close the Activity and then
+		terminate the process. This keeps FreeBASIC's normal one-shot program
+		contract and avoids a later launcher restart reusing stale native
+		runtime state from the same cached Android process.
+	*/
+	fb_android_request_finish(app);
+	usleep(250000);
+	_exit(rc);
 }
 
 void __wrap_exit(int status)
@@ -539,6 +558,40 @@ static void fb_android_handle_stdout(FB_ANDROID_APP *app)
 		if (got < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
 			break;
 		break;
+	}
+}
+
+static void fb_android_flush_program_output(FB_ANDROID_APP *app)
+{
+	if (!app)
+		return;
+
+	fflush(stdout);
+	fflush(stderr);
+
+	if (app->stdout_pipe[0] >= 0)
+		fb_android_handle_stdout(app);
+}
+
+static void fb_android_request_finish(FB_ANDROID_APP *app)
+{
+	ANativeActivity *activity = NULL;
+
+	if (!app)
+		return;
+
+	pthread_mutex_lock(&app->mutex);
+	if (!app->destroyed && !app->finish_requested)
+	{
+		app->finish_requested = 1;
+		activity = app->activity;
+	}
+	pthread_mutex_unlock(&app->mutex);
+
+	if (activity)
+	{
+		fb_android_log("FreeBASIC Android activity finishing");
+		ANativeActivity_finish(activity);
 	}
 }
 

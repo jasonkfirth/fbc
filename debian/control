@@ -289,7 +289,6 @@ Depends:
  pkgconf
 Recommends:
  freebasic-js (= ${binary:Version}),
- freebasic-android (= ${binary:Version}),
  freebasic-wii (= ${binary:Version}),
  zlib1g-dev,
  libbz2-dev,

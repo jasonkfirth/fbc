@@ -67,6 +67,7 @@ Version 1.20.1
 - tests: quieted fbctests harness warnings by passing recursive make jobserver state, linking fbcunit tests with the same -mt mode used for compilation, and avoiding escaped-colon extended grep patterns
 - tests: added hardware-free COM/LPT/TCP parser coverage, runtime DIR() coverage, a thread create/join mutex stress test, and silent null-driver sfx lifecycle/capture-buffer stress tests
 - tests: validated the newly added and modified command, file/device, sfx, syntax, thread, and portable networking coverage across the Win32, Win64, Cygwin, JavaScript, DOS, Wii, Android, and Haiku target paths, plus Xbox compile-link XBE generation, with explicit platform exclusions where a target lacks threads, TCP, or a local runtime runner
+- documentation: refreshed the manual cache and generated pages for the new platform predefined symbols, Android/Wii/Xbox build helpers, DEFULNG, MID, and SEEK.
 - compiler: report dedicated rtlib, gfxlib, and sfxlib command redefinition errors when reserved command keywords are reused illegally, with gfxlib/sfxlib messages pointing users to FB_NO_GFXLIB and FB_NO_SFXLIB and syntax tests covering the displayed diagnostics
 - compiler/Haiku: link libdevice automatically for fbgfx programs so GETJOYSTICK and GETXPAD users do not need to add the Haiku device library by hand
 - rtlib: made runtime error declarations C++-safe so C++ platform backend objects resolve the C ABI error helpers correctly
@@ -76,6 +77,7 @@ Version 1.20.1
 - tests: documented command sweep tests as broad-but-shallow smoke tests for language, runtime, gfxlib, and sfxlib command families
 - rtlib/Android: return TIMER from CLOCK_MONOTONIC relative to runtime startup instead of wall-clock epoch time, preserving frame-scale timing precision when programs store TIMER values in SINGLE variables
 - sfxlib/Android: warm up the selected sound backend during NativeActivity startup, prefer the OpenSL ES backend before AAudio for current packaged builds, and keep foreground audio writes non-blocking so SOUND/BEEP-heavy programs do not stall the main loop when Android audio buffers are full or paused
+- sfxlib/Android: stop OpenSL ES playback and clear the Android buffer queue during driver shutdown so short SFX/NativeActivity programs can exit cleanly after the BASIC program ends.
 - fbc-android: infer landscape Activity orientation from common SCREEN and SCREENRES source usage, reducing the need for Android-specific source defines in ordinary graphics programs and avoiding surface churn during launch/resume
 - fbc-android: discover Debian/Ubuntu dalvik-exchange dx.jar installations when no d8/dx executable is present, and include dalvik-exchange in Android package dependencies so APK builds have a dexer out of the box
 - rtlib/gfxlib2 JavaScript: map browser touch events into the normal FreeBASIC GetMouse path so touch screens can drive mouse-style controls without JavaScript-specific application code
@@ -254,7 +256,7 @@ Version 1.20.1
 - Solaris target-specific rtlib console support carried forward from 1.10.4, including the local termcap shim and non-ncurses console/input runtime files
 - FreeBSD/OpenBSD/NetBSD/DragonFly/Haiku VM package validation scripts for x86_64 package builds, clean package installs, console/gfxlib/sfxlib smoke tests, full fbctests runs, and archived package/log/WAV evidence under out/<os>/x86-64
 - BSD and Haiku sfxlib package validation through real QEMU audio devices, covering FreeBSD OSS, OpenBSD sndio, NetBSD OSS, DragonFly OSS, and Haiku output drivers with WAV capture checks for non-silent playback
-- repository publishing support for serving out/ as deb.fbxl.net, including Ubuntu-side metadata generation for deb/rpm/apk package directories, SHA256SUMS for direct package installs, and per-distro installer scripts for Debian, Ubuntu, Raspbian, Alpine, postmarketOS, Fedora, Rocky, AlmaLinux, openSUSE, Slackware, FreeBSD, OpenBSD, NetBSD, DragonFly, and Haiku
+- package publication support for generated out/ artifacts, including Ubuntu-side metadata generation for deb/rpm/apk package directories, SHA256SUMS for direct package installs, and per-distro installer scripts for Debian, Ubuntu, Raspbian, Alpine, postmarketOS, Fedora, Rocky, AlmaLinux, openSUSE, Slackware, FreeBSD, OpenBSD, NetBSD, DragonFly, and Haiku
 - rtlib/gfxlib2/sfxlib strict diagnostics runner for building the core, graphics, and sound libraries in isolated object trees with clang/gcc warning-heavy flags, cppcheck and clang-tidy passes, optional cppcheck addon/style/exhaustive audits, and warning-as-error enforcement
 - beginner-oriented example coverage for sfxlib and OPEN TCP, including self-test examples for networking and a larger commented sfxlib showcase
 - DOS/sfxlib: added a fallback PC speaker backend that drives the direct speaker data line to provide audible playback when no Sound Blaster is configured and BLASTER is unset or unavailable

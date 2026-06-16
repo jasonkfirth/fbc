@@ -32,6 +32,7 @@ Statements that affect how code is compiled.
 	- {{fbdoc item="keyword" value="KeyPgDefstr|DEFSTR"}}
 	- {{fbdoc item="keyword" value="KeyPgDefubyte|DEFUBYTE"}}
 	- {{fbdoc item="keyword" value="KeyPgDefuint|DEFUINT"}}
+	- {{fbdoc item="keyword" value="KeyPgDefulng|DEFULNG"}}
 	- {{fbdoc item="keyword" value="KeyPgDefulongint|DEFULONGINT"}}
 	- {{fbdoc item="keyword" value="KeyPgDefushort|DEFUSHORT"}}
 >>

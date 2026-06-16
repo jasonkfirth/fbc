@@ -1,0 +1,30 @@
+﻿{{fbdoc item="title" value="TONE"}}----
+Plays a generated tone on a selected channel.
+
+{{fbdoc item="syntax"}}##
+	**Tone channel, frequency, duration**
+##
+{{fbdoc item="desc"}}
+	TONE is the channel-first form of generated tone playback. It does the same basic job as SOUND, but it makes the channel choice part of the command every time.
+	Channels are useful in games and music because they let you separate different sound jobs. For example, channel 0 might be a melody, channel 1 might be effects, and channel 2 might be a warning beep. Other commands such as PAN and VOLUME can then target those channels.
+	The frequency controls pitch and the duration controls how long the tone lasts.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+tone 0, 440, 0.20
+tone 1, 660, 0.20
+sleep 300, 1
+%%
+
+{{fbdoc item="target"}}
+	- Channels are zero-based.
+	- Use CHANNEL to set the default channel for generated commands that do not take a channel argument.
+
+{{fbdoc item="diff"}}
+`t- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+`t- ##[[CatPgSfx|Sound Library Reference]]##
+`t- ##[[KeyPgSfxGenerated|Generated Sound Commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

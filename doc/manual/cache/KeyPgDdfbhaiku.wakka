@@ -1,0 +1,21 @@
+{{fbdoc item="title" value="__FB_HAIKU__"}}----
+
+{{fbdoc item="syntax"}}
+	""__FB_HAIKU__""
+
+{{fbdoc item="desc"}}
+	Define without a value created at compile time when the Haiku target is
+	being used.  It can be used to compile parts of a program only for Haiku.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#IFDEF __FB_HAIKU__
+	print "Haiku target"
+#ENDIF
+%%
+
+{{fbdoc item="back" value="CatPgDddefines|Predefined Defines"}}
+{{fbdoc item="see"}}
+	[[CompilerOpttarget|Compiler Option: -target]]
+----
+{{fbdoc item="back" value="CatPgCompiler|Compiler Meta-Commands"}}

@@ -1,0 +1,30 @@
+﻿{{fbdoc item="title" value="TEMPO"}}----
+Sets or returns the PLAY-string tempo.
+
+{{fbdoc item="syntax"}}##
+	**Tempo bpm**
+	**bpm = Tempo()**
+##
+{{fbdoc item="desc"}}
+	TEMPO controls the speed used by PLAY strings and other note-oriented generated sound. The value is beats per minute. A larger number plays the same music faster; a smaller number plays it slower.
+	Setting TEMPO changes the default used by later commands. Calling TEMPO as a function returns the current default, which is useful when a routine wants to save the old tempo, change it temporarily, and then restore it.
+	TEMPO does not make sound by itself. It changes how future note durations are interpreted.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+tempo 140
+play "o4 cdef"
+print "current tempo="; tempo()
+%%
+
+{{fbdoc item="target"}}
+	- Tempo affects generated-note timing, not the speed of loaded SFX samples.
+
+{{fbdoc item="diff"}}
+`t- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+`t- ##[[CatPgSfx|Sound Library Reference]]##
+`t- ##[[KeyPgSfxGenerated|Generated Sound Commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

@@ -1,69 +1,81 @@
-{{fbdoc item="title" value="Sound Library Reference"}}----
-Procedures and command families for FreeBASIC's built-in sound library.
+﻿{{fbdoc item="title" value="Sound Library Reference"}}----
+Procedures, command families, examples, and backend notes for FreeBASIC's built-in sound library.
 
 {{fbdoc item="desc"}}
-	The sound library, or ##sfxlib##, provides generated tones, PLAY-string music, music file playback, sample playback, MIDI control, audio device selection, and capture support.  Programs that use these commands link the sound library automatically.
-	
-	If a program intentionally does not use the sound command surface and needs selected sfxlib command words as normal identifiers, define ##[[KeyPgFbNoSfxlib|FB_NO_SFXLIB]]## before those names are parsed.
+	The sound library, or ##sfxlib##, is the built-in audio layer used by FreeBASIC's new sound commands. It covers generated tones, PLAY-string music, short sound effects, music file playback, MIDI commands, output device selection, and audio capture where the target backend supports it.
 
-**{{anchor name="GENERATED|Generated Sound"}}**
-	Commands for tones, notes, PLAY strings, generated waveforms, and mix state.
-**{{anchor name="MEDIA|Digital Audio and MIDI"}}**
-	Commands for music files, loaded samples, and MIDI.
-**{{anchor name="DEVICE|Devices and Capture"}}**
-	Commands for selecting output drivers and recording input.
+	Programs that use these commands automatically request the sfxlib runtime. If a program does not use the sound command surface and needs words such as ##Music##, ##Sfx##, or ##Device## as normal identifiers, define ##[[KeyPgFbNoSfxlib|FB_NO_SFXLIB]]## before those names are parsed.
 
-<<{{anchor name="GENERATED"}}{{fbdoc item="section" value="Generated Sound"}}
+{{fbdoc item="section" value="How sfxlib is arranged"}}
+	Generated sound commands create tones, notes, PLAY strings, waveforms, envelopes, and instruments. The ##MUSIC## family controls one current music stream. The ##SFX## family loads and plays short reusable samples. ##MIDI## sends MIDI commands where a backend supports MIDI. ##DEVICE## selects the output backend, and ##CAPTURE## records input where capture support exists.
+
+	For headless tests and package smoke tests, set ##SFXLIB_DRIVER=null## before the program starts to use the null output driver.
+
+{{fbdoc item="section" value="Quick example"}}
+%%(freebasic)
+' generated tone
+sound 440, 0.25
+
+' PLAY-string phrase
+play "t140 o4 cdefgab"
+
+' short reusable sample
+sfx load 1, "click.wav"
+sfx play 1
+
+sleep 1000, 1
+%%
+
+{{fbdoc item="section" value="Generated Sound"}}
 	=={{fbdoc item="keyword" value="KeyPgBeep|BEEP"}}==
-		Produces a beep or a short pitched note.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|Generated sound commands"}}==
-		Documents ##SOUND##, ##TONE##, ##NOISE##, ##NOTE##, ##PLAY##, ##TEMPO##, ##CHANNEL##, ##OCTAVE##, ##VOICE##, ##VOL##, ##VOLUME##, ##BALANCE##, ##PAN##, ##WAVE##, ##ENVELOPE##, and ##INSTRUMENT##.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|SOUND"}}==
+		Produces a beep or short pitched note.
+	=={{fbdoc item="keyword" value="KeyPgSound|SOUND"}}==
 		Plays a generated tone.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|TONE"}}==
-		Plays a generated tone on a channel.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|NOISE"}}==
-		Plays generated noise on a channel.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|NOTE"}}==
-		Plays a named note.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|PLAY"}}==
+	=={{fbdoc item="keyword" value="KeyPgTone|TONE"}}==
+		Plays a generated tone on a selected channel.
+	=={{fbdoc item="keyword" value="KeyPgNoise|NOISE"}}==
+		Plays generated noise.
+	=={{fbdoc item="keyword" value="KeyPgNote|NOTE"}}==
+		Plays a named musical note.
+	=={{fbdoc item="keyword" value="KeyPgPlay|PLAY"}}==
 		Plays BASIC PLAY strings.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|TEMPO"}}==
-		Sets or returns the generated-sound tempo.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|CHANNEL"}}==
-		Sets or returns the generated-sound channel.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|OCTAVE"}}==
+	=={{fbdoc item="keyword" value="KeyPgTempo|TEMPO"}}==
+		Sets or returns PLAY-string tempo.
+	=={{fbdoc item="keyword" value="KeyPgChannel|CHANNEL"}}==
+		Sets or returns the default generated-sound channel.
+	=={{fbdoc item="keyword" value="KeyPgOctave|OCTAVE"}}==
 		Sets or returns the default note octave.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|VOICE"}}==
+	=={{fbdoc item="keyword" value="KeyPgVoice|VOICE"}}==
 		Sets or returns the default instrument.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|VOL"}}==
-		Sets the master volume.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|VOLUME"}}==
+	=={{fbdoc item="keyword" value="KeyPgVol|VOL"}}==
+		Sets master volume.
+	=={{fbdoc item="keyword" value="KeyPgVolume|VOLUME"}}==
 		Sets or returns master or channel volume.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|BALANCE"}}==
-		Sets or returns the master stereo balance.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|PAN"}}==
+	=={{fbdoc item="keyword" value="KeyPgBalance|BALANCE"}}==
+		Sets or returns master stereo balance.
+	=={{fbdoc item="keyword" value="KeyPgPan|PAN"}}==
 		Sets or returns channel stereo pan.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|WAVE"}}==
+	=={{fbdoc item="keyword" value="KeyPgWave|WAVE"}}==
 		Defines a generated waveform.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|ENVELOPE"}}==
+	=={{fbdoc item="keyword" value="KeyPgEnvelope|ENVELOPE"}}==
 		Defines an ADSR envelope.
-	=={{fbdoc item="keyword" value="KeyPgSfxGenerated|INSTRUMENT"}}==
+	=={{fbdoc item="keyword" value="KeyPgInstrument|INSTRUMENT"}}==
 		Defines or assigns an instrument.
 
 {{fbdoc item="section" value="Digital Audio and MIDI"}}
 	=={{fbdoc item="keyword" value="KeyPgMusic|MUSIC"}}==
-		Loads, plays, loops, pauses, resumes, stops, and queries music assets.
+		Loads, plays, loops, pauses, resumes, stops, and queries the current music stream.
 	=={{fbdoc item="keyword" value="KeyPgSfx|SFX"}}==
 		Loads and controls short sound effects by id or channel.
 	=={{fbdoc item="keyword" value="KeyPgMidi|MIDI"}}==
-		Opens MIDI output, plays MIDI files, and sends MIDI messages.
+		Opens MIDI output, plays MIDI files, and sends MIDI messages where supported.
 
-{{fbdoc item="section" value="Devices and Capture"}}
+{{fbdoc item="section" value="Devices, Backends, and Capture"}}
 	=={{fbdoc item="keyword" value="KeyPgDevice|DEVICE"}}==
 		Lists, selects, and queries sfxlib output devices.
+	=={{fbdoc item="keyword" value="KeyPgSfxBackends|sfxlib backends"}}==
+		Summarizes the output backends used on supported targets.
 	=={{fbdoc item="keyword" value="KeyPgCapture|CAPTURE"}}==
-		Starts, pauses, resumes, stops, reads, and saves audio capture.
->>::c::
+		Starts, pauses, resumes, stops, reads, and saves audio capture where available.
 
 {{fbdoc item="back" value="DocToc|Table of Contents"}}

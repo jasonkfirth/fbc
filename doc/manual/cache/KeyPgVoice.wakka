@@ -1,0 +1,32 @@
+﻿{{fbdoc item="title" value="VOICE"}}----
+Sets or returns the default instrument.
+
+{{fbdoc item="syntax"}}##
+	**Voice instrument**
+	**instrument = Voice()**
+##
+{{fbdoc item="desc"}}
+	VOICE selects the default instrument used by generated notes and PLAY strings. In sfxlib, an instrument is a combination of a waveform and an envelope, which together decide the general tone color and how the sound starts and fades.
+	Changing VOICE is like switching from one simple synth patch to another. A sine-like instrument can sound soft and clean, while a square or saw instrument can sound more electronic or buzzy.
+	Calling VOICE as a function returns the current default instrument id.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+wave 1, 0
+envelope 1, 0.01, 0.10, 0.60, 0.20
+instrument 1, 1, 1
+voice 1
+play "o4 c e g"
+%%
+
+{{fbdoc item="target"}}
+	- Define custom instruments with WAVE, ENVELOPE, and INSTRUMENT.
+
+{{fbdoc item="diff"}}
+`t- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+`t- ##[[CatPgSfx|Sound Library Reference]]##
+`t- ##[[KeyPgSfxGenerated|Generated Sound Commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

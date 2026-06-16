@@ -1,28 +1,116 @@
-{{fbdoc item="title" value="Getting source code updates and recompiling FB"}}----
+﻿{{fbdoc item="title" value="Getting source code updates and rebuilding FreeBASIC"}}----
 
-To download updates made available in the fbc Git repository, you can do a pull, either using your preferred graphical Git tool, or in a terminal:
+This page describes the normal rebuild path after updating a source checkout.
 
-%%git pull%%
+To download updates made available in the fbc Git repository, use your preferred Git tool, or run:
 
-To take a look at incoming changes //before// applying them, do this:
+%%git pull --ff-only%%
+
+To inspect incoming changes before applying them:
 
 %%# Update remote branches
 git fetch
 
-# Take a look
+# Review the remote history with your preferred Git viewer.
 gitk --all
 
-# Everything looks ok? Then merge the remote branch into the current branch to apply the update.
+# Merge the remote branch when you are ready.
 git merge origin/master
 %%
 
-Rebuilding is, most of the time, as easy as as running "make" again. Of course, if you used compilation options (like ENABLE_STANDALONE) for the build, you have to specify them again this time, unless they are (still) set in ##config.mk##.
+== Which rebuild path should I use? ==
 
-%%make
-# or if needed:
-make ENABLE_STANDALONE=1%%
+There are now two common rebuild paths:
 
-As a special exception, for the DOS build it is necessary to run ##make clean## before ##make## to properly rebuild FB after source modules have been renamed or deleted. The reason for this is that under DOS/DJGPP the makefile uses *.o wildcards to link fbc and archive libfb.a etc., instead of passing the explicit .o file names, because it has to obey the command line length limitation. If ##make clean## is not run, it may use old left-over object files from a previous build. Luckily, we do not rename or delete source files often.
+	- Use ##make## directly for normal developer builds from an already prepared checkout.
+	- Use a script from ##build_scripts/## for platform packaging, release builds, cross-builds, VM builds, emulator-based checks, or installer tests.
+
+The direct ##make## path is still valid, but it is no longer the whole build story. The top-level ##GNUmakefile## is now a small entrypoint that loads the modular build system under ##mk/##. The scripts in ##build_scripts/## sit above that make system and drive the platform-specific workflows.
+
+== Normal native rebuild ==
+
+For a native development build on a system that already has a usable compiler or bootstrap state:
+
+%%make print-config
+make prereqs-fbc
+make -j$(nproc)
+%%
+
+Some systems use ##gmake## instead of ##make##. The package and VM scripts choose the right command for the platform where practical.
+
+##make print-config## is the first thing to check when a rebuild does something surprising. It shows the resolved target identity, compiler tools, feature policy, and layout decisions. ##make prereqs-fbc## checks whether the build has a usable compiler or bootstrap path before the real build starts.
+
+If you use build options on the command line, pass them again on later rebuilds unless they are stored in ##config.mk##:
+
+%%make -j$(nproc) ENABLE_STANDALONE=1
+%%
+
+== When to clean first ==
+
+A simple rebuild is usually enough after ordinary source edits. Clean first when switching targets, changing toolchains, changing major feature policy, updating generated bootstrap sources, or after source files have been renamed or removed:
+
+%%make clean
+make -j$(nproc)
+%%
+
+The old DOS/DJGPP warning still matters, but it is no longer the only reason to clean. DOS is especially sensitive to stale objects because command-line length limits force parts of that build to rely on object wildcards. A clean rebuild is the safe choice after source graph changes.
+
+== Build scripts ==
+
+Use ##build_scripts/## when the job is more than a simple local rebuild. The scripts are the supported entrypoints for the release and platform workflows.
+
+Examples:
+
+%%./build_scripts/debianubuntu-build-freebasic.sh --help
+./build_scripts/msys2-build-freebasic.sh --help
+./build_scripts/macos-build-freebasic.sh --help
+./build_scripts/freebsd-vm-build-freebasic.sh --help
+%%
+
+The folder also contains matrix builders, cross-build helpers, VM builders for the BSD and Solaris-like targets, Windows/MSYS2 installer builders, Android/JavaScript/Xbox/Wii builders, package-test runners, and smoke-test wrappers. Prefer those scripts for producing redistributable packages because they know the staging layout, bootstrap archive names, dependency setup, and per-target test flow.
+
+== Modular make system ==
+
+The make system is intentionally split by responsibility. In broad terms:
+
+	- ##mk/platform.mk## resolves the target OS, CPU, runtime key, and package naming.
+	- ##mk/platform-features.mk## and ##mk/feature-policy.mk## decide which features are enabled.
+	- ##mk/compiler-config.mk##, ##mk/toolchain-flags.mk##, ##mk/host-tools.mk##, and ##mk/os-flags.mk## choose tools and flags.
+	- ##mk/layout.mk## and ##mk/build-layout.mk## define install-tree and in-tree paths.
+	- ##mk/source-graph.mk## and ##mk/archives.mk## decide what gets built.
+	- ##mk/build/*.mk## contains the actual compile, archive, dependency, target, and clean rules.
+	- ##mk/bootstrap/*.mk## owns compiler recovery and bootstrap source emission.
+	- ##mk/tests*.mk## and ##mk/tests/**/*.mk## own build-system verification targets.
+	- ##mk/inst_uninst.mk## owns install, uninstall, and simple package payload layout.
+
+For a more detailed map, read ##mk/README.md## and ##mk/File-Map.md## in the source tree.
+
+== Bootstrap notes ==
+
+A rebuild needs either a runnable ##fbc## or suitable bootstrap sources. The build now checks that state early instead of failing later with a malformed compiler command.
+
+Useful bootstrap commands:
+
+%%make prereqs-fbc
+make bootstrap-minimal
+make bootstrap-seed-peer
+%%
+
+Use ##bootstrap-minimal## when current-target bootstrap sources already exist. ##bootstrap-seed-peer## is a manual recovery tool for bring-up work when an appropriate peer bootstrap is available; it is not part of the normal default build.
+
+Most platform build scripts handle the bootstrap setup for their package workflow. If you are building a release package, start with the appropriate script before falling back to manual bootstrap commands.
+
+== Useful test targets ==
+
+After a rebuild, useful high-level checks include:
+
+%%make sanity
+make quick-test
+make compiler-smoke
+make bootstrap-emit-test
+%%
+
+Platform scripts may run stronger or more specific checks than these make targets, especially for installers, cross-build packages, VM targets, browsers, emulators, graphics, and sound.
 
 {{fbdoc item="back" value="DevToc|FreeBASIC Developer Information"}}
 {{fbdoc item="back" value="DocToc|Table of Contents"}}

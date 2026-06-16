@@ -1,0 +1,42 @@
+{{fbdoc item="title" value="GETTOUCHHIT"}}----
+Tests whether any active touch contact is inside a rectangle or circle.
+
+{{fbdoc item="syntax"}}##
+	[[KeyPgDeclare|declare]] [[KeyPgFunction|function]] **GetTouchHit** ( [[KeyPgByval|byval]] //x1// [[KeyPgAs|as]] [[KeyPgInteger|integer]], [[KeyPgByval|byval]] //y1// [[KeyPgAs|as]] [[KeyPgInteger|integer]], [[KeyPgByval|byval]] //x2// [[KeyPgAs|as]] [[KeyPgInteger|integer]], [[KeyPgByval|byval]] //y2// [[KeyPgAs|as]] [[KeyPgInteger|integer]] ) [[KeyPgAs|as]] [[KeyPgInteger|integer]]
+	[[KeyPgDeclare|declare]] [[KeyPgFunction|function]] **GetTouchHit** ( [[KeyPgByval|byval]] //x// [[KeyPgAs|as]] [[KeyPgInteger|integer]], [[KeyPgByval|byval]] //y// [[KeyPgAs|as]] [[KeyPgInteger|integer]], [[KeyPgByval|byval]] //radius// [[KeyPgAs|as]] [[KeyPgInteger|integer]] ) [[KeyPgAs|as]] [[KeyPgInteger|integer]]
+##
+{{fbdoc item="usage"}}##
+	//hit// = **GetTouchHit**( //x1//, //y1//, //x2//, //y2// )
+	//hit// = **GetTouchHit**( //x//, //y//, //radius// )
+##
+{{fbdoc item="param"}}
+	##//x1//##, ##//y1//##, ##//x2//##, ##//y2//##
+		Opposite corners of the rectangle to test.
+	##//x//##, ##//y//##
+		The center of the circle to test.
+	##//radius//##
+		The radius of the circle to test.
+
+{{fbdoc item="ret"}}
+	##-1## if one or more active touch contacts are inside the requested area, otherwise ##0##.
+
+{{fbdoc item="desc"}}
+	##**GetTouchHit**## is a small helper for touch-oriented user interfaces.  It checks all currently active touch contacts and reports whether any contact is inside the requested rectangle or circle.
+
+	The rectangle overload accepts the corners in either order.  The circle overload treats a negative radius as its absolute value.
+
+	On platforms without native touch support, the normal mouse fallback applies: a held left mouse button can count as one touch contact.
+
+{{fbdoc item="lang"}}
+	- Not available in the //[[CompilerOptlang|-lang qb]]// dialect unless referenced with the alias ##**""__GetTouchHit""**##.
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC"" 1.20.1.
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgGettouchcount|GetTouchCount]]##
+	- ##[[KeyPgGettouch|GetTouch]]##
+	- ##[[KeyPgGetmouse|GetMouse]]##
+	- ##[[CatPgGfxInput|User Input Functions]]##
+
+{{fbdoc item="back" value="CatPgGfxInput|User Input Functions"}}

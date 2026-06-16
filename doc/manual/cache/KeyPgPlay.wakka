@@ -1,0 +1,34 @@
+﻿{{fbdoc item="title" value="PLAY"}}----
+Plays BASIC PLAY strings through sfxlib.
+
+{{fbdoc item="syntax"}}##
+	**Play music**
+	**Play channel, music**
+	**Play music1, music2**
+	**Play music1, music2, music3**
+##
+{{fbdoc item="desc"}}
+	PLAY is a compact way to write a short tune or sound pattern as a string. The string uses the traditional BASIC idea of note letters, octave changes, tempo changes, and note lengths instead of one command per note.
+	A simple PLAY string can contain note letters such as C, D, E, F, G, A, and B. It can also contain controls such as T for tempo and O for octave. That makes it good for short melodies, jingles, alerts, and old-school game music.
+	The channel form starts the phrase on a chosen sfxlib channel. The multi-string forms are for simple layered playback, letting a program start more than one phrase together without writing a separate PLAY command for each one.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+play "t140 o4 cdefgab"
+play 1, "o5 c8 e8 g8"
+play "o3 c2", "o4 e2", "o4 g2"
+sleep 1000, 1
+%%
+
+{{fbdoc item="target"}}
+	- Use TEMPO and OCTAVE to set defaults before PLAY.
+	- Use NOTE when one note at a time is clearer than a PLAY string.
+
+{{fbdoc item="diff"}}
+`t- New to ""FreeBASIC"".
+
+{{fbdoc item="see"}}
+`t- ##[[CatPgSfx|Sound Library Reference]]##
+`t- ##[[KeyPgSfxGenerated|Generated Sound Commands]]##
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

@@ -1,0 +1,17 @@
+{{fbdoc item="title" value="SEEK"}}----
+Gets or changes the file position
+
+{{fbdoc item="desc"}}
+	##**Seek**## is used in two forms:
+
+	- As a statement, it sets the file position for the next read or write.
+	- As a function, it returns the current file position.
+
+	Use the pages below for the exact syntax and examples.
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgSeekset|Seek (Statement)]]##
+	- ##[[KeyPgSeekreturn|Seek (Function)]]##
+	- ##[[CatPgFile|File I/O Functions]]##
+
+{{fbdoc item="back" value="CatPgFile|File I/O Functions"}}
