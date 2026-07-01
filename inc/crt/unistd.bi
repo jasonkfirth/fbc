@@ -13,7 +13,7 @@
 #include once "crt/win32/unistd.bi"
 #elseif defined(__FB_DOS__)
 #include once "crt/dos/unistd.bi"
-#elseif defined(__FB_LINUX__)
+#elseif defined(__FB_LINUX__) or defined(__FB_NUTTX__)
 #include once "crt/linux/unistd.bi"
 #elseif defined(__FB_DRAGONFLY__)
 #include once "crt/dragonfly/unistd.bi"

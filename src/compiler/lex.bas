@@ -122,12 +122,19 @@ sub lexInit _
 		lex.ctx->linenum = (lex.ctx-1)->linenum
 		lex.ctx->reclevel = (lex.ctx-1)->reclevel
 		lex.ctx->currmacro = (lex.ctx-1)->currmacro
+		lex.ctx->macrodepth = (lex.ctx-1)->macrodepth
+
+		for i = 0 to lex.ctx->macrodepth - 1
+			lex.ctx->macrostack(i) = (lex.ctx-1)->macrostack(i)
+			lex.ctx->macroresume(i) = (lex.ctx-1)->macroresume(i)
+		next
 
 	'' else it is an include file or first time initialization
 	else
 		lex.ctx->linenum = 1
 		lex.ctx->reclevel = 0
 		lex.ctx->currmacro = NULL
+		lex.ctx->macrodepth = 0
 	end if
 
 	lex.ctx->lasttk_id = INVALID
@@ -357,8 +364,24 @@ private sub hSkipChar
 			lex.ctx->defptrw += 1
 		end if
 
-		'' Reset the current macro if all expansion text is consumed now
-		if( lex.ctx->deflen = 0 ) then
+		'' Macro expansion text can be nested by prepending a new replacement
+		'' list in front of the current remainder.  Each active macro stores
+		'' the deflen value that should be visible again when its replacement
+		'' text has been fully consumed.  Pop every completed frame here, but
+		'' note that readId() snapshots the stack before consuming an
+		'' identifier, because the identifier itself may be the last token in
+		'' the current replacement text.
+		while( lex.ctx->macrodepth > 0 )
+			if( lex.ctx->deflen > lex.ctx->macroresume(lex.ctx->macrodepth - 1) ) then
+				exit while
+			end if
+
+			lex.ctx->macrodepth -= 1
+		wend
+
+		if( lex.ctx->macrodepth > 0 ) then
+			lex.ctx->currmacro = lex.ctx->macrostack(lex.ctx->macrodepth - 1)
+		else
 			lex.ctx->currmacro = NULL
 		end if
 
@@ -1629,6 +1652,14 @@ private function readId( byref t as FBTOKEN, byval flags as LEXCHECK ) as intege
 	'' before we skip the identifier's chars, because that could reset the currmacro
 	'' if we leave the current expansion text in the process.
 	var currmacro = lex.ctx->currmacro
+	var macrodepth = lex.ctx->macrodepth
+	dim as FBSYMBOL ptr macrostack(0 to LEX_MAXMACROSTACK-1)
+	dim as integer macroresume(0 to LEX_MAXMACROSTACK-1)
+
+	for i as integer = 0 to macrodepth - 1
+		macrostack(i) = lex.ctx->macrostack(i)
+		macroresume(i) = lex.ctx->macroresume(i)
+	next
 
 	t.len = 0
 	t.prdpos = 0
@@ -1668,7 +1699,7 @@ private function readId( byref t as FBTOKEN, byval flags as LEXCHECK ) as intege
 		'' define? (defines can't have dups nor be part of namespaces)
 		if( symbGetClass( t.sym_chain->sym ) = FB_SYMBCLASS_DEFINE ) then
 			'' restart..
-			if( ppDefineLoad( t.sym_chain->sym, currmacro ) ) then
+			if( ppDefineLoad( t.sym_chain->sym, currmacro, macrodepth, @macrostack(0), @macroresume(0) ) ) then
 				t.after_space = TRUE
 				'' Ignore the ID and read expanded text
 				return FALSE

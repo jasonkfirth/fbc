@@ -186,6 +186,7 @@ target_platform() {
 		*mingw*|*windows*) printf 'win32\n' ;;
 		*xbox*) printf 'xbox\n' ;;
 		*js*|*emscripten*) printf 'js\n' ;;
+		*nuttx*) printf 'nuttx\n' ;;
 		*linux*|'')
 			case "$(uname -s)" in
 				DragonFly) printf 'dragonfly\n' ;;
@@ -216,6 +217,28 @@ collect_lint_paths() {
 		"$ROOT/src/sfxlib/$platform" \
 		-maxdepth 1 -type f \( -name '*.c' -o -name '*.cpp' \) 2>/dev/null |
 	sort -u
+}
+
+collect_clang_tidy_paths() {
+	local platform="$1"
+	local path
+
+	collect_lint_paths "$platform" |
+	while IFS= read -r path; do
+		case "$path" in
+			"$ROOT/src/rtlib/unix/"*|"$ROOT/src/gfxlib2/unix/"*|"$ROOT/src/sfxlib/unix/"*)
+				case "$platform" in
+					android|darwin|dragonfly|freebsd|haiku|linux|netbsd|openbsd)
+						;;
+					*)
+						continue
+						;;
+				esac
+				;;
+		esac
+
+		printf '%s\n' "$path"
+	done
 }
 
 build_flags() {
@@ -291,7 +314,9 @@ run_linters() {
 	local cppcheck_enable
 	local -a cppcheck_args
 	local cppcheck_build_dir
+	local cppcheck_file_list
 	local -a lint_paths
+	local -a clang_tidy_paths
 	local addon
 	local platform
 	local file
@@ -299,6 +324,7 @@ run_linters() {
 
 	platform="$(target_platform)"
 	mapfile -t lint_paths < <(collect_lint_paths "$platform")
+	mapfile -t clang_tidy_paths < <(collect_clang_tidy_paths "$platform")
 
 	cppcheck_enable="warning,performance,portability"
 	if [ "$RUN_LINTER_STYLE" -ne 0 ]; then
@@ -363,9 +389,23 @@ run_linters() {
 			cppcheck_args+=(--addon="$addon")
 		done
 
-		cppcheck \
+		cppcheck_file_list="$(mktemp)"
+		if command -v cygpath >/dev/null 2>&1; then
+			for file in "${lint_paths[@]}"; do
+				cygpath -m "$file"
+			done > "$cppcheck_file_list"
+		else
+			printf '%s\n' "${lint_paths[@]}" > "$cppcheck_file_list"
+		fi
+
+		if ! cppcheck \
 			"${cppcheck_args[@]}" \
-			"${lint_paths[@]}"
+			--file-list="$cppcheck_file_list"; then
+			rm -f "$cppcheck_file_list"
+			return 1
+		fi
+
+		rm -f "$cppcheck_file_list"
 	else
 		warn "cppcheck not found; skipping optional source linter"
 	fi
@@ -407,7 +447,7 @@ run_linters() {
 				printf '%s\n' "$output" | grep -vE '^[0-9]+ warnings? generated\.$' | grep -q .; then
 				printf '%s\n' "$output"
 			fi
-		done < <(printf '%s\n' "${lint_paths[@]}")
+		done < <(printf '%s\n' "${clang_tidy_paths[@]}")
 	else
 		warn "clang-tidy not found; skipping optional clang-tidy pass"
 	fi

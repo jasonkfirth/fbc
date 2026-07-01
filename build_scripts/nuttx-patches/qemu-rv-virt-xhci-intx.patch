@@ -1,0 +1,56 @@
+--- drivers/usbhost/Kconfig
++++ drivers/usbhost/Kconfig
+@@ -787,7 +787,7 @@ menuconfig USBHOST_XHCI_PCI
+ 	bool "USB xHCI PCI Host Driver Support"
+ 	default n
+-	depends on PCI && PCI_MSIX && USBHOST_WAITER && SCHED_HPWORK && SCHED_LPWORK
++	depends on PCI && USBHOST_WAITER && SCHED_HPWORK && SCHED_LPWORK
+ 	select USBHOST_HAVE_ASYNCH
+ 	---help---
+ 		USB xHCI PCI host driver support.
+--- drivers/usbhost/usbhost_xhci_pci.c
++++ drivers/usbhost/usbhost_xhci_pci.c
+@@ -4288,12 +4288,22 @@ static int xhci_ctrl_initialize(FAR stru
+  * Name: xhci_irq_initialize
+  *
+  * Description:
+- *   Initialize xHCI interrupts - require MSI-X support.
++ *   Initialize xHCI interrupts.
+  *
+  ****************************************************************************/
+ 
+ static int xhci_irq_initialize(FAR struct usbhost_xhci_s *priv)
+ {
++#ifndef CONFIG_PCI_MSIX
++  priv->irq = pci_get_irq(priv->pcidev);
++  if (priv->irq < 0)
++    {
++      pcierr("Failed to get legacy IRQ %d\n", priv->irq);
++      return priv->irq;
++    }
++
++  irq_attach(priv->irq, xhci_interrupt, priv);
++  up_enable_irq(priv->irq);
++  return OK;
++#else
+   int ret;
+ 
+   /* Allocate MSI */
+@@ -4322,6 +4332,7 @@ static int xhci_irq_initialize(FAR struc
+ 
+   up_enable_irq(priv->irq);
+ 
+   return OK;
++#endif
+ }
+ 
+ /****************************************************************************
+@@ -4474,7 +4485,7 @@ static int xhci_mem_free(FAR struct usbh
+ 
+   for (i = 0; i < priv->no_scratch; i++)
+     {
+-      kmm_free((FAR void *)priv->pg_sb[i]);
++      kmm_free((FAR void *)up_addrenv_pa_to_va(priv->pg_sb[i]));
+     }
+ 
+   kmm_free(priv->pg_sb);

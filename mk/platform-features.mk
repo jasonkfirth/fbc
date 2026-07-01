@@ -97,7 +97,7 @@ BSD_OS      := freebsd netbsd openbsd dragonfly
 WINDOWS_OS  := win32 cygwin xbox
 DOS_OS      := dos
 JS_OS       := js
-CONSOLE_OS  := wii
+CONSOLE_OS  := wii nuttx
 
 # ---------------------------------------------------------------------------
 # PIC policy
@@ -244,6 +244,16 @@ ifeq ($(TARGET_OS),wii)
   DISABLE_FBDEV := YesPlease
 endif
 
+# NuttX -> small RTOS backend, not a hosted desktop stack
+ifeq ($(TARGET_OS),nuttx)
+  ENABLE_X11 :=
+  ENABLE_SDL :=
+  DISABLE_X11 := YesPlease
+  DISABLE_OPENGL := YesPlease
+  DISABLE_FBDEV := YesPlease
+  DISABLE_TCP := YesPlease
+endif
+
 # DOS -> no hosted sockets in the current runtime
 ifeq ($(TARGET_OS),dos)
   DISABLE_TCP := YesPlease
@@ -370,10 +380,10 @@ ifneq ($(filter win32 xbox,$(TARGET_OS)),)
 
 endif
 
-# ---- DOS / JavaScript ----
+# ---- DOS / JavaScript / small console targets ----
 #
 # No modern native hardening defaults here.
-ifneq ($(filter dos js wii,$(TARGET_OS)),)
+ifneq ($(filter dos js wii nuttx,$(TARGET_OS)),)
 
   ENABLE_STACK_PROTECTOR :=
   ENABLE_FORTIFY         :=

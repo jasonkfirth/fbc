@@ -896,6 +896,9 @@ private sub hLoadFbctinfFromObj( )
 		case FB_CPUFAMILY_PPC
 			INFO( "reading powerpc32 ELF: " + parser.filename )
 			hLoadFbctinfFromELF32_H( EM_PPC )
+		case FB_CPUFAMILY_RISCV32
+			INFO( "reading riscv32 ELF: " + parser.filename )
+			hLoadFbctinfFromELF32_H( EM_RISCV )
 		case FB_CPUFAMILY_RISCV64
 			INFO( "reading riscv64 ELF: " + parser.filename )
 			hLoadFbctinfFromELF64_H( EM_RISCV )

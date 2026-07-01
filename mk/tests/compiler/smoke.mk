@@ -4,7 +4,7 @@
 # Compiler smoke test
 ##############################################################################
 
-.PHONY: compiler-smoke compiler-indirect-goto-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-ppc-smoke compiler-ppc64-smoke compiler-ppc64le-smoke
+.PHONY: compiler-smoke compiler-indirect-goto-smoke compiler-riscv32-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-ppc-smoke compiler-ppc64-smoke compiler-ppc64le-smoke
 compiler-smoke: libs
 	$(call _mt_echo,Compiler smoke test)
 	@mkdir -p "$(TEST_TMP)"
@@ -30,6 +30,31 @@ compiler-indirect-goto-smoke:
 	@grep -Fq 'goto *' "$(TEST_TMP)/indirect-goto.c" || { echo "ERROR: indirect goto C output was not produced"; exit 1; }
 	@grep -Fq '_llvmbug18658' "$(TEST_TMP)/indirect-goto.c" || { echo "ERROR: clang indirect goto workaround missing"; exit 1; }
 	$(call _mt_run,$(CC) -x c -c "$(TEST_TMP)/indirect-goto.c" -o "$(TEST_TMP)/indirect-goto.o")
+	@rm -rf "$(TEST_TMP)" "$(LOG_DIR)"
+
+compiler-riscv32-smoke:
+	@test -n "$(TEST_FBC)" || { echo "ERROR: no usable fbc found"; exit 1; }
+	$(call _mt_echo,RISC-V 32 compiler target smoke test)
+	@mkdir -p "$(TEST_TMP)"
+	@printf "%s\n" \
+		'#if not defined(__FB_LINUX__)' \
+		'#error expected linux target' \
+		'#endif' \
+		'#if not defined(__FB_RISCV32__)' \
+		'#error expected riscv32 target' \
+		'#endif' \
+		'print "riscv32 ok"' \
+		> "$(TEST_TMP)/riscv32-smoke.bas"
+	$(call _mt_run,$(TEST_FBC_CMD) -target riscv32-linux-gnu -r "$(TEST_TMP)/riscv32-smoke.bas" -x "$(TEST_TMP)/riscv32-smoke")
+	@test -s "$(TEST_TMP)/riscv32-smoke.c" || { echo "ERROR: riscv32 C output was not produced"; exit 1; }
+	@if command -v riscv32-linux-gnu-gcc >/dev/null 2>&1; then \
+		echo "==> riscv32-linux-gnu-gcc found; compiling riscv32 object"; \
+		$(TEST_FBC_CMD) -target riscv32-linux-gnu -c "$(TEST_TMP)/riscv32-smoke.bas" -o "$(TEST_TMP)/riscv32-smoke.o"; \
+		readelf -h "$(TEST_TMP)/riscv32-smoke.o" | grep -q 'Machine:.*RISC-V' || { echo "ERROR: object is not RISC-V"; exit 1; }; \
+		echo "==> RISCV32 OBJECT OK"; \
+	else \
+		echo "==> SKIP: riscv32-linux-gnu-gcc not found; target C emission only"; \
+	fi
 	@rm -rf "$(TEST_TMP)" "$(LOG_DIR)"
 
 compiler-riscv64-smoke:

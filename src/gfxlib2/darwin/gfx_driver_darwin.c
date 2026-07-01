@@ -572,8 +572,10 @@ static int fb_hDarwinAllocDisplayBuffer(int w, int h)
 static void fb_hDarwinRefreshLayout(void)
 {
 	CGRect bounds;
+#ifndef GFXLIB_NEVERSCALE
 	int scale_x;
 	int scale_y;
+#endif
 	int scale;
 
 	if (!fb_darwin.view)
@@ -592,11 +594,15 @@ static void fb_hDarwinRefreshLayout(void)
 		return;
 	}
 
+#ifdef GFXLIB_NEVERSCALE
+	scale = 1;
+#else
 	scale_x = fb_darwin.view_width / fb_darwin.width;
 	scale_y = fb_darwin.view_height / fb_darwin.height;
 	scale = (scale_x < scale_y) ? scale_x : scale_y;
 	if (scale < 1)
 		scale = 1;
+#endif
 
 	fb_darwin.scale = scale;
 	fb_darwin.draw_width = fb_darwin.width * scale;

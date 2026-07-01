@@ -14,6 +14,8 @@
 
 #if defined(__FB_LINUX__) or defined(__FB_ANDROID__)
 #include once "crt/sys/linux/socket.bi"
+#elseif defined(__FB_NUTTX__)
+#include once "crt/sys/nuttx/socket.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/sys/cygwin/socket.bi"
 #elseif defined(__FB_DRAGONFLY__)
@@ -31,11 +33,13 @@ type osockaddr
 	sa_data(0 to 14-1) as ubyte
 end type
 
+#if not defined(__FB_NUTTX__)
 enum 
 	SHUT_RD = 0
 	SHUT_WR
 	SHUT_RDWR
 end enum
+#endif
 
 extern "c"
 declare function socket_ alias "socket" (byval __domain as long, byval __type as long, byval __protocol as long) as long

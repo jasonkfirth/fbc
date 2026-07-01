@@ -150,7 +150,7 @@ enum FB_SYMBSTATS
 	FB_SYMBSTATS_CANTUNDEF    = &h00800000
 	FB_SYMBSTATS_UNIONFIELD   = &h01000000  '' fields only
 	FB_SYMBSTATS_TEMPORARY    = &h01000000  '' variables: String and Wstring - a pointer that needs deallocating at scope breaks/end
-	''                      ''= &h02000000  '' not-used
+	FB_SYMBSTATS_DECLAREDASANY= &h02000000  '' params only: the DECLARE used AS ANY
 	FB_SYMBSTATS_EMITTED      = &h04000000  '' needed by high-level IRs, to avoid emitting structs etc twice
 	FB_SYMBSTATS_BEINGEMITTED = &h08000000  '' ditto, for circular dependencies with structs
 	FB_SYMBSTATS_UNUSEDVTABLE = &h10000000
@@ -2535,6 +2535,8 @@ declare sub symbProcRecalcRealType( byval proc as FBSYMBOL ptr )
 #define symbGetParamNext(a) a->next
 
 #define symbParamIsOptional( param_ ) ((param_)->param.optexpr <> NULL)
+#define symbParamWasDeclaredAsAny( param_ ) (((param_)->stats and FB_SYMBSTATS_DECLAREDASANY) <> 0)
+#define symbSetParamDeclaredAsAny( param_ ) (param_)->stats or= FB_SYMBSTATS_DECLAREDASANY
 
 #define symbGetImportNamespc(s) s->nsimp.imp_ns
 

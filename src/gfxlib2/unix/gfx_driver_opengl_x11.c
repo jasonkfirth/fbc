@@ -92,8 +92,9 @@ static int opengl_window_init(void)
 				return -1;
 			}
 			XReparentWindow(fb_x11.display, fb_x11.window, fb_x11.fswindow, 0, 0);
-			XMoveResizeWindow(fb_x11.display, fb_x11.fswindow, 0,0,fb_x11.w, fb_x11.h);
-			XMoveResizeWindow(fb_x11.display, fb_x11.window, 0,0,fb_x11.w, fb_x11.h);
+			fb_hX11RefreshLayout(fb_x11.w, fb_x11.h);
+			XMoveResizeWindow(fb_x11.display, fb_x11.fswindow, 0,0,fb_x11.view_w, fb_x11.view_h);
+			XMoveResizeWindow(fb_x11.display, fb_x11.window, 0,0,fb_x11.view_w, fb_x11.view_h);
 		}
 		else
 			return -1;

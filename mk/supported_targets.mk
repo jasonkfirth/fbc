@@ -24,6 +24,7 @@ BOOTSTRAP_CPU_FAMILIES := \
 	powerpc \
 	powerpc64 \
 	powerpc64le \
+	riscv32 \
 	riscv64 \
 	s390x \
 	loongarch64
@@ -52,6 +53,7 @@ LINUX_BOOTSTRAP_TARGETS := \
 	$(call _fb_bootstrap_spec,linux-powerpc,linux-powerpc,powerpc-linux-gnu) \
 	$(call _fb_bootstrap_spec,linux-powerpc64,linux-powerpc64,powerpc64-linux-gnu) \
 	$(call _fb_bootstrap_spec,linux-powerpc64le,linux-powerpc64le,powerpc64le-linux-gnu) \
+	$(call _fb_bootstrap_spec,linux-riscv32,linux-riscv32,riscv32-linux-gnu) \
 	$(call _fb_bootstrap_spec,linux-riscv64,linux-riscv64,riscv64-linux-gnu) \
 	$(call _fb_bootstrap_spec,linux-s390x,linux-s390x,s390x-linux-gnu) \
 	$(call _fb_bootstrap_spec,linux-loongarch64,linux-loongarch64,loongarch64-linux-gnu)
@@ -99,6 +101,9 @@ ILLUMOS_BOOTSTRAP_TARGETS := \
 DOS_BOOTSTRAP_TARGETS := \
 	$(call _fb_bootstrap_spec,dos,dos,i586-pc-msdosdjgpp)
 
+NUTTX_BOOTSTRAP_TARGETS := \
+	$(call _fb_bootstrap_spec,nuttx-riscv32,nuttx-riscv32,riscv32-unknown-nuttx)
+
 ##############################################################################
 # Final supported bootstrap targets
 ##############################################################################
@@ -112,7 +117,8 @@ SUPPORTED_BOOTSTRAP_TARGETS := \
 	$(DARWIN_BOOTSTRAP_TARGETS) \
 	$(SOLARIS_BOOTSTRAP_TARGETS) \
 	$(ILLUMOS_BOOTSTRAP_TARGETS) \
-	$(DOS_BOOTSTRAP_TARGETS)
+	$(DOS_BOOTSTRAP_TARGETS) \
+	$(NUTTX_BOOTSTRAP_TARGETS)
 
 SUPPORTED_BOOTSTRAP_DIRS := $(foreach spec,$(SUPPORTED_BOOTSTRAP_TARGETS),$(word 2,$(subst :, ,$(spec))))
 

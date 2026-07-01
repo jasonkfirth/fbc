@@ -1,3 +1,99 @@
+freebasic (1.20.2-12) resolute; urgency=medium
+
+  * Drop explicit bash dependencies from shell-helper packages because bash is
+    essential on Debian and Ubuntu systems.
+
+ -- FreeBASIC Packagers <packagers@example.invalid>  Wed, 01 Jul 2026 16:30:00 -0400
+
+freebasic (1.20.2-11) resolute; urgency=medium
+
+  * Add packaged NuttX firmware-prep commands for ESP32-P4 Ethernet boards
+    and the Waveshare RP2350-PiZero, cloning NuttX/apps externally instead
+    of vendoring NuttX into the FreeBASIC package.
+  * Include the RP2350-PiZero NuttX image helpers in the installed
+    freebasic-nuttx SDK.
+
+ -- FreeBASIC Packagers <packagers@example.invalid>  Wed, 01 Jul 2026 16:00:00 -0400
+
+freebasic (1.20.2-10) resolute; urgency=medium
+
+  * Let the NuttX upload wrapper choose the next available HTTP port when
+    the default temporary transfer port is already in use.
+
+ -- FreeBASIC Packagers <packagers@example.invalid>  Wed, 01 Jul 2026 15:30:00 -0400
+
+freebasic (1.20.2-9) resolute; urgency=medium
+
+  * Build the NuttX remote-console and HTTP helper tools from writable
+    output-directory copies so installed SDK sources remain read-only.
+
+ -- FreeBASIC Packagers <packagers@example.invalid>  Wed, 01 Jul 2026 15:00:00 -0400
+
+freebasic (1.20.2-8) resolute; urgency=medium
+
+  * Clear generated NuttX dependency state even when reusing an existing
+    configured board tree, so container-mounted ESP32-P4 workdirs do not
+    inherit stale package-cache include paths.
+
+ -- FreeBASIC Packagers <packagers@example.invalid>  Wed, 01 Jul 2026 14:30:00 -0400
+
+freebasic (1.20.2-7) resolute; urgency=medium
+
+  * Provide the generated newlib _REENT_INIT fallback needed by the
+    packaged ESP32-P4 NuttX module build.
+
+ -- FreeBASIC Packagers <packagers@example.invalid>  Wed, 01 Jul 2026 14:00:00 -0400
+
+freebasic (1.20.2-6) resolute; urgency=medium
+
+  * Depend on kconfig-frontends-nox so the installed NuttX module workflow
+    has kconfig-tweak available in clean containers.
+
+ -- FreeBASIC Packagers <packagers@example.invalid>  Wed, 01 Jul 2026 13:30:00 -0400
+
+freebasic (1.20.2-5) resolute; urgency=medium
+
+  * Make the NuttX RISC-V relocation patch check recognize already-patched
+    NuttX trees when running from the installed SDK.
+
+ -- FreeBASIC Packagers <packagers@example.invalid>  Wed, 01 Jul 2026 13:00:00 -0400
+
+freebasic (1.20.2-4) resolute; urgency=medium
+
+  * Invoke installed NuttX SDK shell helpers through bash from the wrapper
+    commands so the package does not depend on source execute bits.
+  * Align the compiler build revision with the published Debian package
+    revision.
+
+ -- FreeBASIC Packagers <packagers@example.invalid>  Wed, 01 Jul 2026 12:30:00 -0400
+
+freebasic (1.20.2-3) resolute; urgency=medium
+
+  * Add the freebasic-nuttx package with the ESP32-P4 upload wrapper,
+    RISC-V NuttX smoke helper, remote console helpers, NuttX examples, and
+    the runtime/gfx/sfx source SDK needed to build loadable NuttX modules
+    from an installed package.
+
+ -- FreeBASIC Packagers <packagers@example.invalid>  Wed, 01 Jul 2026 12:00:00 -0400
+
+freebasic (1.20.2-2) resolute; urgency=medium
+
+  * Replace the unshipped NuttX iopins include and runtime symbols with the
+    platform-neutral gpiopins.bi / GpioPin* API.
+  * Add a generic GPIO runtime fallback so unsupported targets fail cleanly
+    while NuttX supplies the /dev/gpioN backend.
+
+ -- FreeBASIC Packagers <packagers@example.invalid>  Wed, 01 Jul 2026 06:00:00 -0400
+
+freebasic (1.20.2-1) resolute; urgency=medium
+
+  * Package the 1.20.2 development snapshot for Ubuntu Resolute.
+  * Include the new NuttX target work, runtime/library support, test
+    tooling, stricter diagnostics cleanup, and cross-target packaging
+    fixes recorded in changelog.txt.
+
+ -- FreeBASIC Packagers <packagers@example.invalid>  Wed, 01 Jul 2026 00:00:00 -0400
+
 freebasic (1.20.1-1) jammy; urgency=medium
 
   * Forward-port the divergent 1.10.4 line, including its separate

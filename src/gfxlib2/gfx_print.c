@@ -281,6 +281,8 @@ void fb_GfxPrintBuffer( const char *buffer, int mask )
 /* Caller is expected to hold FB_GRAPHICS_LOCK() */
 int fb_GfxLocateRaw( int y, int x, int cursor )
 {
+	(void)cursor;
+
 	if (x > -1)
 		__fb_gfx->cursor_x = x;
 	if (y > -1)

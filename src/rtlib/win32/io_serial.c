@@ -62,8 +62,8 @@ static char *fb_hSerialMakeDeviceName( int iPort, const char *pszDevice )
     if( pszDev==NULL )
         return NULL;
 
-    strcpy( pszDev, prefix );
-    strcat( pszDev, pszDevice );
+    memcpy( pszDev, prefix, prefix_len );
+    memcpy( pszDev + prefix_len, pszDevice, device_len + 1 );
 
     p = strchr( pszDev, ':' );
     if( p )

@@ -50,15 +50,17 @@ static wchar_t *fb_hConvertPathToWCInternal( const char *path, UINT codepage, DW
 {
 	char *tmp;
 	int chars;
+	size_t path_len;
 	wchar_t *wpath;
 
 	DBG_ASSERT( path != NULL );
 
-	tmp = (char*)malloc( strlen( path ) + 1 );
+	path_len = strlen( path ) + 1;
+	tmp = (char*)malloc( path_len );
 	if( tmp == NULL )
 		return NULL;
 
-	strcpy( tmp, path );
+	memcpy( tmp, path, path_len );
 	fb_hConvertPath( tmp );
 
 	chars = MultiByteToWideChar( codepage, flags, tmp, -1, NULL, 0 );

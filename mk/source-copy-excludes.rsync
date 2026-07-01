@@ -35,6 +35,10 @@ examples/manual/proguide/hello.txt
 maketests-log/
 obj/
 out/
+# Local game corpora sometimes live beside this source tree. They are not
+# inputs to compiler package builds.
+/OMA/
+/OMA_old/
 package-root/
 package-root*/
 packages/

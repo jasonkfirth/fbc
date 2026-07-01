@@ -2041,11 +2041,31 @@ static int framebuffer_viewport_locked(int dst_w, int dst_h, int *scale, int *sk
 {
 	int src_w = fb_android.width;
 	int src_h = fb_android.height;
+#ifndef GFXLIB_NEVERSCALE
 	int local_scale;
 	int local_skip;
+#endif
 
 	if (src_w <= 0 || src_h <= 0 || dst_w <= 0 || dst_h <= 0)
 		return 0;
+
+#ifdef GFXLIB_NEVERSCALE
+	*scale = 1;
+	*skip = 1;
+	*out_w = src_w;
+	*out_h = src_h;
+	if (*out_w > dst_w)
+		*out_w = dst_w;
+	if (*out_h > dst_h)
+		*out_h = dst_h;
+	*off_x = (dst_w - *out_w) / 2;
+	*off_y = (dst_h - *out_h) / 2;
+	if (*off_x < 0)
+		*off_x = 0;
+	if (*off_y < 0)
+		*off_y = 0;
+	return 1;
+#endif
 
 	local_scale = dst_w / src_w;
 	if (dst_h / src_h < local_scale)

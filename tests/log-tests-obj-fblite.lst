@@ -1,0 +1,3 @@
+./fblite/limits-fblite.o
+./fblite/command-sweep.o
+./fblite/len.o

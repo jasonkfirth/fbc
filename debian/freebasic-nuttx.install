@@ -1,0 +1,7 @@
+usr/bin/fbc-nuttx-esp32p4
+usr/bin/fbc-nuttx-esp32p4-firmware
+usr/bin/fbc-nuttx-rp2350-pizero-firmware
+usr/bin/nuttx-riscv32-qemu-smoke
+usr/bin/nuttx-remote-console
+usr/bin/nuttx-http-server
+usr/share/freebasic/nuttx-sdk

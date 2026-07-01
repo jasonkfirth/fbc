@@ -550,7 +550,7 @@ private sub hAppendProcAsmClobbers( byref ln as string )
 		hAppendClobber( ln, @"x28" )
 		hAppendClobber( ln, @"x30" )
 
-	case FB_CPUFAMILY_RISCV64
+	case FB_CPUFAMILY_RISCV32, FB_CPUFAMILY_RISCV64
 		hAppendClobber( ln, @"ra" )
 		hAppendClobber( ln, @"gp" )
 		hAppendClobber( ln, @"tp" )
@@ -805,6 +805,27 @@ private function hGetLibcSizeDtype( ) as integer
 	function = dtype
 end function
 
+private function hEmitLibcProcPtrParam _
+	( _
+		byref mangled as string, _
+		byval param_index as integer _
+	) as string
+
+	function = ""
+
+	if( param_index <> 0 ) then
+		exit function
+	end if
+
+	'' Match the C library prototype.  Some hosted libc headers are included
+	'' by the generated-C smoke harness, and gcc diagnoses a conflicting
+	'' atexit(void *) declaration before it gets to the BASIC test body.
+	select case( mangled )
+	case "atexit"
+		function = "void (*)( void )"
+	end select
+end function
+
 private function hEmitProcHeader _
 	( _
 		byval proc as FBSYMBOL ptr, _
@@ -910,14 +931,23 @@ private function hEmitProcHeader _
 				ln += "char**"
 			else
 				symbGetRealParamDtype( param, dtype, subtype )
-				if( ((options and EMITPROC_ISPROTO) <> 0) andalso _
-				    hEmitMutableLibcPtrParam( mangled, param_index ) ) then
-					dtype = typeAddrOf( FB_DATATYPE_VOID )
-					subtype = NULL
-				elseif( ((options and EMITPROC_ISPROTO) <> 0) andalso _
-				    hEmitLibcSizeParam( mangled, param_index ) ) then
-					dtype = hGetLibcSizeDtype( )
-					subtype = NULL
+				if( (options and EMITPROC_ISPROTO) <> 0 ) then
+					dim as string libc_procptr = hEmitLibcProcPtrParam( mangled, param_index )
+					if( len( libc_procptr ) > 0 ) then
+						ln += libc_procptr
+						param = symbGetProcPrevParam( proc, param )
+						param_index += 1
+						if( param ) then
+							ln += ", "
+						end if
+						continue while
+					elseif( hEmitMutableLibcPtrParam( mangled, param_index ) ) then
+						dtype = typeAddrOf( FB_DATATYPE_VOID )
+						subtype = NULL
+					elseif( hEmitLibcSizeParam( mangled, param_index ) ) then
+						dtype = hGetLibcSizeDtype( )
+						subtype = NULL
+					end if
 				end if
 				ln += hEmitType( dtype, subtype, TRUE )
 			end if
@@ -1576,7 +1606,17 @@ private sub hWriteGenericF2I _
 		callname = "nearbyint"
 	end if
 
-	hWriteLine( "#define fb_" + fname +  "( value ) ((" + hEmitType( rtype, NULL ) + ")__builtin_" + callname + "( value ))", TRUE )
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_NUTTX ) then
+		''
+		'' The NuttX loadable-module path supplies small local math helpers
+		'' from the FreeBASIC runtime.  Calling them by name keeps generated
+		'' code away from target libm/fenv paths that may not be module-safe
+		'' on the small board images.
+		hWriteLine( hEmitType( ptype, NULL ) + " " + callname + "( " + hEmitType( ptype, NULL ) + " );", TRUE )
+		hWriteLine( "#define fb_" + fname +  "( value ) ((" + hEmitType( rtype, NULL ) + ")" + callname + "( value ))", TRUE )
+	else
+		hWriteLine( "#define fb_" + fname +  "( value ) ((" + hEmitType( rtype, NULL ) + ")__builtin_" + callname + "( value ))", TRUE )
+	end if
 
 end sub
 

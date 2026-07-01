@@ -189,8 +189,28 @@ static void get_viewport(int *scale, int *skip, int *out_w, int *out_h, int *off
 {
 	int src_w = __fb_gfx->w;
 	int src_h = __fb_gfx->h;
+#ifndef GFXLIB_NEVERSCALE
 	int local_scale;
 	int local_skip;
+#endif
+
+#ifdef GFXLIB_NEVERSCALE
+	*scale = 1;
+	*skip = 1;
+	*out_w = src_w;
+	*out_h = src_h;
+	if (*out_w > video_w)
+		*out_w = video_w;
+	if (*out_h > video_h)
+		*out_h = video_h;
+	*off_x = (video_w - *out_w) / 2;
+	*off_y = (video_h - *out_h) / 2;
+	if (*off_x < 0)
+		*off_x = 0;
+	if (*off_y < 0)
+		*off_y = 0;
+	return;
+#endif
 
 	local_scale = video_w / src_w;
 	if ((video_h / src_h) < local_scale)

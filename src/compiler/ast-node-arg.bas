@@ -395,6 +395,9 @@ private function hCheckByDescParam _
 
 	'' same type? (don't check if it's a rtl proc, or a forward call)
 	sym_dtype = symbGetType( param )
+	if( symbParamWasDeclaredAsAny( param ) ) then
+		sym_dtype = FB_DATATYPE_VOID
+	end if
 	if( (parent->call.isrtl = FALSE) and (sym_dtype <> FB_DATATYPE_VOID) ) then
 		if( (typeGetClass( arg_dtype ) <> typeGetClass( sym_dtype )) or _
 			(typeGetSize( arg_dtype ) <> typeGetSize( sym_dtype )) ) then
@@ -835,7 +838,7 @@ private function hCheckParam _
 
 	case FB_PARAMMODE_BYREF
 		'' as any?
-		if( param_dtype = FB_DATATYPE_VOID ) then
+		if( (param_dtype = FB_DATATYPE_VOID) or symbParamWasDeclaredAsAny( param ) ) then
 			hCheckVoidParam( parent, param, n )
 			return TRUE
 		end if

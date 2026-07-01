@@ -116,6 +116,7 @@ end sub
 #include once "fbc-netbsd-platform.bi"
 #include once "fbc-js-platform.bi"
 #include once "fbc-wii-platform.bi"
+#include once "fbc-nuttx-platform.bi"
 
 '' must be same order as enum FB_COMPTARGET
 static shared as FBC_PLATFORM_HOOKS fbcplatforms(0 to FB_COMPTARGETS-1) = _
@@ -135,17 +136,25 @@ static shared as FBC_PLATFORM_HOOKS fbcplatforms(0 to FB_COMPTARGETS-1) = _
 	( @fbcDarwinPlatformGetLinkerTool,  @fbcDarwinPlatformAddDefaultLibPaths,    @fbcDarwinPlatformAddGfxLibs,    @fbcDarwinPlatformAddSfxLibs,    @fbcDarwinPlatformAddDefaultLibs,    @fbcDarwinPlatformAddLinkerFrameworks    ), _
 	( @fbcPlatformGetDefaultLinkerTool, @fbcNetbsdPlatformAddDefaultLibPaths,    @fbcNetbsdPlatformAddGfxLibs,    @fbcNetbsdPlatformAddSfxLibs,    @fbcNetbsdPlatformAddDefaultLibs,    @fbcNetbsdPlatformAddLinkerFrameworks    ), _
 	( @fbcJsPlatformGetLinkerTool,      @fbcJsPlatformAddDefaultLibPaths,        @fbcJsPlatformAddGfxLibs,        @fbcJsPlatformAddSfxLibs,        @fbcJsPlatformAddDefaultLibs,        @fbcJsPlatformAddLinkerFrameworks        ), _
-	( @fbcWiiPlatformGetLinkerTool,     @fbcWiiPlatformAddDefaultLibPaths,       @fbcWiiPlatformAddGfxLibs,       @fbcWiiPlatformAddSfxLibs,       @fbcWiiPlatformAddDefaultLibs,       @fbcWiiPlatformAddLinkerFrameworks       )  _
+	( @fbcWiiPlatformGetLinkerTool,     @fbcWiiPlatformAddDefaultLibPaths,       @fbcWiiPlatformAddGfxLibs,       @fbcWiiPlatformAddSfxLibs,       @fbcWiiPlatformAddDefaultLibs,       @fbcWiiPlatformAddLinkerFrameworks       ), _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcNuttxPlatformAddDefaultLibPaths,     @fbcNuttxPlatformAddGfxLibs,     @fbcNuttxPlatformAddSfxLibs,     @fbcNuttxPlatformAddDefaultLibs,     @fbcNuttxPlatformAddLinkerFrameworks     )  _
 }
 
 private function fbcPlatformGetLinkerTool( ) as integer
-	dim as integer target = fbGetOption( FB_COMPOPT_TARGET )
-
-	if( (target < 0) or (target >= FB_COMPTARGETS) ) then
-		function = FBCTOOL_LD
-	else
-		function = fbcplatforms(target).getLinkerTool( )
-	end if
+	select case as const fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_DARWIN
+		return fbcDarwinPlatformGetLinkerTool( )
+	case FB_COMPTARGET_JS
+		return fbcJsPlatformGetLinkerTool( )
+	case FB_COMPTARGET_WII
+		return fbcWiiPlatformGetLinkerTool( )
+	case else
+		'' Most targets link through the normal linker.  Keep this hook
+		'' explicit instead of dispatching through the platform procptr table:
+		'' the linker path must remain safe even while bootstrapping compiler
+		'' changes that add or reorder platform targets.
+		return FBCTOOL_LD
+	end select
 end function
 
 private sub fbcPlatformAddDefaultLibPaths( )

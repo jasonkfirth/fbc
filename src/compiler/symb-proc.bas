@@ -28,6 +28,7 @@ sub symbProcInit( )
 
 end sub
 
+
 '':::::
 sub symbProcEnd( )
 
@@ -2092,7 +2093,11 @@ private function hCheckOvlParam _
 			return FB_OVLPROC_NO_MATCH
 		end if
 
-		var match = typeCalcMatch( param_dtype, param_subtype, param_mode, arg_dtype, arg_subtype )
+		var match = FB_OVLPROC_FULLMATCH
+
+		if( symbParamWasDeclaredAsAny( param ) = FALSE ) then
+			match = typeCalcMatch( param_dtype, param_subtype, param_mode, arg_dtype, arg_subtype )
+		end if
 
 		'' not same type?
 		if( match < FB_OVLPROC_TYPEMATCH ) then
@@ -2117,6 +2122,14 @@ private function hCheckOvlParam _
 
 	'' byref param?
 	case FB_PARAMMODE_BYREF
+		if( symbParamWasDeclaredAsAny( param ) ) then
+			if( arg_mode = FB_PARAMMODE_BYDESC ) then
+				return FB_OVLPROC_NO_MATCH
+			end if
+
+			return FB_OVLPROC_HALFMATCH
+		end if
+
 		'' arg being passed by value? and not a UDT?
 		'' - fall through for UDTs because they will be handled below by
 		''   trying to find a ctor / cast operation that satisfies the call
@@ -3454,4 +3467,3 @@ sub symbFreeOvlCallArgs _
 	loop
 
 end sub
-

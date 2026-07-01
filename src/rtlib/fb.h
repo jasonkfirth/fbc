@@ -123,6 +123,8 @@
 	#include "xbox/fb_xbox.h"
 #elif defined HOST_WII
 	#include "wii/fb_wii.h"
+#elif defined HOST_NUTTX
+	#include "nuttx/fb_nuttx.h"
 #endif
 
 #if defined HOST_SOLARIS

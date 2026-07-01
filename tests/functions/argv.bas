@@ -56,6 +56,13 @@ expected_exe_1 = left( expected_exe_1, len( expected_exe_1 ) - 4 )  ' Remove .ba
 	ASSERT( right( *__FB_ARGV__[0], len(expected_exe_1) ) = expected_exe_1 )
 	ASSERT( right( command( 0 ), len(expected_exe_1) )    = expected_exe_1 )
 #endif
+#elseif defined( __FB_NUTTX__ )
+	'' NuttX smoke tests are built as named builtin applications. The program
+	'' name comes from NSH's builtin command table rather than from the host
+	'' source path used in __FILE__.
+	ASSERT( __FB_ARGV__[0] <> 0 )
+	ASSERT( len( *__FB_ARGV__[0] ) > 0 )
+	ASSERT( command( 0 ) = *__FB_ARGV__[0] )
 #else
 	ASSERT( *__FB_ARGV__[0] = expected_exe_1 )
 	ASSERT( command( 0 )    = expected_exe_1 )

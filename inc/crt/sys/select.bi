@@ -13,6 +13,8 @@
 
 #if defined(__FB_LINUX__) or defined(__FB_ANDROID__)
 #include once "crt/sys/linux/select.bi"
+#elseif defined(__FB_NUTTX__)
+#include once "crt/sys/nuttx/select.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/sys/linux/select.bi"
 #elseif defined(__FB_DRAGONFLY__)
@@ -34,6 +36,11 @@ type sigset_t as __sigset_t
 type suseconds_t as __suseconds_t
 #endif
 
+#if defined(__FB_NUTTX__)
+type fd_set
+	arr(0 to __SELECT_NUINT32-1) as uint32_t
+end type
+#else
 type __fd_mask as clong
 
 #define __NFDBITS (8 * len(__fd_mask))
@@ -50,6 +57,7 @@ end type
 
 type fd_mask as __fd_mask
 # define NFDBITS __NFDBITS
+#endif
 
 #define	FD_SET_(fd, fdsetp) __FD_SET(fd, fdsetp)
 #define	FD_CLR(fd, fdsetp) __FD_CLR(fd, fdsetp)

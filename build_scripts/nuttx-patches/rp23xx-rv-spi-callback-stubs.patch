@@ -1,0 +1,44 @@
+--- boards/risc-v/rp23xx-rv/common/src/rp23xx_spi.c
++++ boards/risc-v/rp23xx-rv/common/src/rp23xx_spi.c
+@@ -106,6 +106,21 @@
+   return -ENODEV;
+ }
+ #endif
++
++#ifdef CONFIG_SPI_CALLBACK
++int rp23xx_spi0register(struct spi_dev_s *dev,
++                        spi_mediachange_t callback, void *arg)
++{
++  /* This common board path has no card-detect interrupt yet.
++   * MMC/SD still polls status through rp23xx_spi0status().
++   */
++
++  (void)dev;
++  (void)callback;
++  (void)arg;
++  return OK;
++}
++#endif
+ #endif
+ 
+ #ifdef CONFIG_RP23XX_RV_SPI1
+@@ -147,4 +162,19 @@
+   return -ENODEV;
+ }
+ #endif
++
++#ifdef CONFIG_SPI_CALLBACK
++int rp23xx_spi1register(struct spi_dev_s *dev,
++                        spi_mediachange_t callback, void *arg)
++{
++  /* This common board path has no card-detect interrupt yet.
++   * MMC/SD still polls status through rp23xx_spi1status().
++   */
++
++  (void)dev;
++  (void)callback;
++  (void)arg;
++  return OK;
++}
++#endif
+ #endif

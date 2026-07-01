@@ -138,5 +138,7 @@ FBSTRING *fb_GfxInkey(void)
 
 int fb_GfxIsRedir(int is_input)
 {
+	(void)is_input;
+
 	return FB_FALSE;
 }

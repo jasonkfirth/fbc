@@ -1,0 +1,105 @@
+--- boards/risc-v/rp23xx-rv/common/src/rp23xx_spisd.c
++++ boards/risc-v/rp23xx-rv/common/src/rp23xx_spisd.c
+@@ -21,25 +21,62 @@
+  ****************************************************************************/
+ 
+ #include <nuttx/config.h>
+ 
++#include <errno.h>
++#include <stdio.h>
++
+ #include <nuttx/debug.h>
+ #include <nuttx/mmcsd.h>
+ #include <nuttx/board.h>
+ #include <nuttx/fs/fs.h>
++#include <nuttx/fs/partition.h>
+ 
+ #include "rp23xx_spi.h"
+ #include "rp23xx_gpio.h"
+ 
+ /****************************************************************************
+  * Pre-processor Definitions
+  ****************************************************************************/
+ 
++#define RP23XX_SPISD_RAW_DEVICE      "/dev/mmcsd0"
++#define RP23XX_SPISD_FIRST_PARTITION "/dev/mmcsd0p0"
++#define RP23XX_SPISD_MOUNTPOINT      "/mnt/sd0"
++
+ /* Configuration ************************************************************/
+ 
+ #ifndef CONFIG_RP23XX_RV_SPISD_SLOT_NO
+ #  define CONFIG_RP23XX_RV_SPISD_SLOT_NO 0
+ #endif
++
++/****************************************************************************
++ * Private Functions
++ ****************************************************************************/
++
++#if defined(CONFIG_MBR_PARTITION) || defined(CONFIG_GPT_PARTITION)
++static void rp23xx_spisd_partition_handler(FAR struct partition_s *part,
++                                           FAR void *arg)
++{
++  char devname[32];
++  int ret;
++
++  (void)arg;
++
++  snprintf(devname, sizeof(devname), "/dev/mmcsd0p%zu", part->index);
++  ret = register_blockpartition(devname, 0660, RP23XX_SPISD_RAW_DEVICE,
++                                part->firstblock, part->nblocks);
++  if (ret < 0)
++    {
++      ferr("ERROR: Failed to register partition %s: %d\n", devname, ret);
++    }
++  else
++    {
++      finfo("Registered partition %s (start=%lu nblocks=%lu)\n",
++            devname, (unsigned long)part->firstblock,
++            (unsigned long)part->nblocks);
++    }
++}
++#endif
+ 
+ /****************************************************************************
+  * Public Functions
+  ****************************************************************************/
+@@ -96,12 +133,37 @@ int board_spisd_initialize(int minor, int bus)
+       return ret;
+     }
+ 
++#if defined(CONFIG_MBR_PARTITION) || defined(CONFIG_GPT_PARTITION)
++  ret = parse_block_partition(RP23XX_SPISD_RAW_DEVICE,
++                              rp23xx_spisd_partition_handler, NULL);
++  if (ret < 0)
++    {
++      if (ret == -EINVAL)
++        {
++          finfo("No SDCARD partition table found: %d\n", ret);
++        }
++      else
++        {
++          ferr("ERROR: Failed to parse SDCARD partitions: %d\n", ret);
++        }
++    }
++#endif
++
+   /* Mount filesystem */
+ 
+-  ret = nx_mount("/dev/mmcsd0", "/mnt/sd0", "vfat", 0, NULL);
++#if defined(CONFIG_MBR_PARTITION) || defined(CONFIG_GPT_PARTITION)
++  ret = nx_mount(RP23XX_SPISD_FIRST_PARTITION, RP23XX_SPISD_MOUNTPOINT,
++                 "vfat", 0, NULL);
++  if (ret < 0)
++#endif
++    {
++      ret = nx_mount(RP23XX_SPISD_RAW_DEVICE, RP23XX_SPISD_MOUNTPOINT,
++                     "vfat", 0, NULL);
++    }
++
+   if (ret < 0)
+     {
+-      _err("ERROR: Failed to mount the SDCARD. %d\n", ret);
++      _err("ERROR: Failed to mount the SDCARD. %d\n", ret);
+     }
+ 
+   return OK;

@@ -332,12 +332,16 @@ void FBHaikuView::FrameResized(float width, float height)
     int fb_h = g_bmp->Bounds().IntegerHeight() + 1;
     int win_w = (int)width + 1;
     int win_h = (int)height + 1;
+#ifdef GFXLIB_NEVERSCALE
+    int scale = 1;
+#else
     int scale_x = win_w / fb_w;
     int scale_y = win_h / fb_h;
     int scale = scale_x < scale_y ? scale_x : scale_y;
 
     if (scale < 1)
         scale = 1;
+#endif
 
     int draw_w = fb_w * scale;
     int draw_h = fb_h * scale;

@@ -256,8 +256,9 @@ Recommends:
  google-android-cmdline-tools-19.0-installer
 Description: FreeBASIC compiler driver for Android APKs
  This package provides fbc-android, a native FreeBASIC compiler driver that
- defaults to the Android/aarch64 target, plus Android runtime libraries,
- headers, and APK build templates needed to produce signed debug APK files.
+ defaults to building universal APKs for Android ARMv7, AArch64, and x86_64,
+ plus Android runtime libraries, headers, and APK build templates needed to
+ produce signed debug APK files.
 
 Package: freebasic-wii
 Architecture: any
@@ -265,7 +266,6 @@ Build-Profiles: <wii>
 Depends:
  ${shlibs:Depends},
  ${misc:Depends},
- bash,
  devkitppc,
  libogc,
  gamecube-tools
@@ -276,6 +276,30 @@ Description: FreeBASIC compiler driver for Nintendo Wii homebrew
  defaults to the Nintendo Wii/powerpc target, plus Wii runtime libraries
  and headers needed to build libogc homebrew programs. The driver can also
  stage a boot.dol folder with relative-path assets for older game code.
+
+Package: freebasic-nuttx
+Architecture: any
+Depends:
+ ${misc:Depends},
+ freebasic (= ${binary:Version}),
+ make,
+ python3,
+ git,
+ patch,
+ kconfig-frontends-nox,
+ curl | wget,
+ gcc-riscv64-unknown-elf,
+ binutils-riscv64-unknown-elf,
+ picolibc-riscv64-unknown-elf
+Recommends:
+ qemu-system-misc
+Description: FreeBASIC NuttX/RISC-V board workflow tools
+ This package provides helper commands and the source SDK needed to build
+ FreeBASIC programs as NuttX RISC-V loadable modules. The ESP32-P4 and
+ Waveshare RP2350-PiZero workflows can fetch and build matching NuttX
+ firmware images, and the ESP32-P4 workflow can deploy programs to an
+ Ethernet-connected board over its NuttX console. The lower-level RISC-V
+ helper can also drive QEMU smoke tests.
 
 Package: freebasic-full
 Section: metapackages
@@ -290,6 +314,7 @@ Depends:
 Recommends:
  freebasic-js (= ${binary:Version}),
  freebasic-wii (= ${binary:Version}),
+ freebasic-nuttx (= ${binary:Version}),
  zlib1g-dev,
  libbz2-dev,
  libzip-dev,

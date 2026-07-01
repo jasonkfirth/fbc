@@ -1,0 +1,99 @@
+--- a/drivers/usbhost/usbhost_cdcecm.c
++++ b/drivers/usbhost/usbhost_cdcecm.c
+@@ -58,6 +58,11 @@
+ 
+ #define CDCECM_DEFAULT_MAXSEG   1514
+ 
++/* QEMU's usb-net device uses the Linux CDC Ethernet gadget VID/PID. */
++
++#define CDCECM_QEMU_NET_VID     0x0525
++#define CDCECM_QEMU_NET_PID     0xa4a2
++
+ /* ECM control requests */
+ 
+ #define ECM_SET_PACKET_FILTER_REQUEST 0x43
+@@ -106,6 +111,10 @@
+ #define USBHOST_ECMFOUND    0x20
+ #define USBHOST_ALLFOUND    0x3f
+ 
++#define USBHOST_QEMU_NET_FOUND \
++  (USBHOST_CTRLIFFOUND | USBHOST_DATAIFFOUND | USBHOST_INTRIFFOUND | \
++   USBHOST_BINFOUND | USBHOST_BOUTFOUND)
++
+ #define USBHOST_MAX_CREFS   0x7fff
+ 
+ /****************************************************************************
+@@ -160,6 +169,8 @@ struct usbhost_cdcecm_s
+   uint16_t                maxsegment;    /* Max Ethernet frame size */
+   uint8_t                 macstridx;     /* MAC address string index */
+   uint8_t                 macaddr[6];    /* Device MAC address */
++  uint16_t                vid;           /* Device vendor ID */
++  uint16_t                pid;           /* Device product ID */
+ 
+   /* Network device lowerhalf members */
+ 
+@@ -849,13 +860,21 @@ static int usbhost_cfgdesc(FAR struct usbhost_cdcecm_s *priv,
+             /* Is this the control interface? */
+ 
+             if (ifdesc->classid  == CDC_CLASS_COMM &&
+                 ifdesc->subclass == CDC_SUBCLASS_ECM &&
+                 ifdesc->protocol == CDC_PROTO_NONE)
+               {
+                 priv->ctrlif  = ifdesc->ifno;
+                 found        |= USBHOST_CTRLIFFOUND;
+               }
++            else if (priv->vid == CDCECM_QEMU_NET_VID &&
++                     priv->pid == CDCECM_QEMU_NET_PID &&
++                     (found & USBHOST_CTRLIFFOUND) == 0 &&
++                     ifdesc->classid != USB_CLASS_CDC_DATA)
++              {
++                priv->ctrlif = ifdesc->ifno;
++                found       |= USBHOST_CTRLIFFOUND;
++              }
+ 
+             /* Is this the data interface? */
+ 
+             else if (ifdesc->classid  == USB_CLASS_CDC_DATA &&
+@@ -985,18 +1005,32 @@ static int usbhost_cfgdesc(FAR struct usbhost_cdcecm_s *priv,
+       /* If we found everything we need with this interface, then break out
+        * of the loop early.
+        */
+ 
+       if (found == USBHOST_ALLFOUND)
+         {
+           break;
+         }
+ 
+       /* Increment the address of the next descriptor */
+ 
+       configdesc += desc->len;
+       remaining  -= desc->len;
+     }
+ 
++  if ((found & USBHOST_ALLFOUND) != USBHOST_ALLFOUND &&
++      priv->vid == CDCECM_QEMU_NET_VID &&
++      priv->pid == CDCECM_QEMU_NET_PID &&
++      (found & USBHOST_QEMU_NET_FOUND) == USBHOST_QEMU_NET_FOUND)
++    {
++      /* QEMU usb-net exposes the CDC Ethernet endpoint layout without an
++       * ECM functional descriptor.  Keep this compatibility path tied to
++       * the emulator VID/PID so stricter ECM devices still get validated.
++       */
++
++      uwarn("QEMU usb-net lacks an ECM functional descriptor\n");
++      found |= USBHOST_ECMFOUND;
++    }
++
+   /* Sanity checking... did we find all of things that we need? */
+ 
+   if (found != USBHOST_ALLFOUND)
+@@ -1584,6 +1616,9 @@ static FAR struct usbhost_class_s
+       priv->usbclass.connect      = usbhost_connect;
+       priv->usbclass.disconnected = usbhost_disconnected;
+ 
++      priv->vid = id->vid;
++      priv->pid = id->pid;
++
+       /* The initial reference count is 1... One reference is held by
+        * the driver.
+        */

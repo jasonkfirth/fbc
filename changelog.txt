@@ -1,3 +1,29 @@
+Version 1.20.2
+
+[changed]
+- compiler/build: added the first NuttX target path for FreeBASIC, including the nuttx-riscv32 target, RISC-V 32-bit CPU family handling, target-specific platform hooks, bootstrap/build defines, and a compiler smoke target for riscv32 code generation.
+- rtlib/NuttX: added the initial NuttX runtime layer covering console output, file and directory operations, device protocol helpers, environment access, arrays, DATA/READ support, math/time/string/wstring helpers, runtime errors, memory reporting, threading, TCP support, and GPIO pin entry points.
+- inc/crt/NuttX: added NuttX socket, select, netdb, and netinet bindings and routed the shared POSIX CRT headers through the NuttX definitions where their layouts differ from hosted Linux.
+- gfxlib2/NuttX/RP2350: added a low-memory software framebuffer path and RP2350-PiZero DVI backend work for QB-style paletted SCREEN modes, with framebuffer/page limits suitable for the board's small SRAM budget.
+- sfxlib/NuttX: added NuttX platform/audio driver glue and QEMU-visible null-driver diagnostics so SOUND and sfxlib paths can be smoke-tested without real audio hardware.
+- build/NuttX: added scripts for generating and compiling NuttX fbctests and examples, running QEMU smoke/device/network audits, checking runtime-symbol coverage, building RP2350-PiZero images, auditing RP2350 source and memory budgets, and uploading programs over YMODEM.
+- NuttX patches: added local patches for QEMU RISC-V PCI/XHCI/hub/network modelling and RP2350B, SPI, MicroSD, DVI clocking, executable symbols, and USB host-controller bring-up.
+- examples/NuttX: added hello, graphics, HID input, SD card, file-copy, math, string, sound, DVI, register-dump, and BOOTSEL smoke programs for board and emulator validation.
+- RP2350 image flow: added a BOOTSEL command so a running NuttX image can reboot the RP2350 into UF2 programming mode, plus an image builder for USB CDC console, MicroSD, DVI smoke/register tools, and optional USB host hub/HID/MSC/CDC-ECM support.
+- build/exampleageddon: added no-run reporting, safer package PATH setup for Windows-hosted package compilers, and clearer handling for self-contained compile-only sweeps.
+- preprocessor: track nested active macro expansions so recursive ping-pong expansions are rejected reliably while valid function-like macro expansion resumes correctly; added regression tests for the recursive and undef cases.
+- gfxlib2: improved logical-to-physical framebuffer scaling and mouse coordinate mapping for fbdev, X11, Win32, and Android display paths, including safer dirty-line scaling buffers and layout refresh handling.
+- compiler/Darwin: added post-link creation of simple macOS .app bundles for GUI executables, including Info.plist and PkgInfo generation next to the linked binary.
+- rtlib/Win32: tightened command-backed PIPE/SHELL/EXEC behavior, printer and serial helper allocation/casts, locale time/date flag parsing, and thread-procedure return handling to satisfy stricter compiler and analyzer checks.
+- tests: added generated-C object logs and smoke sources for NuttX, RISC-V 32-bit compiler coverage, preprocessor recursion coverage, device protocol coverage, directory runtime coverage, and target-specific argv behavior.
+
+[fixed]
+- rtlib/NuttX: made board-test stdout/status output use a small direct stdout writer for print, spacing, tab, beep, and newline paths, avoiding serial stdio/flush stalls seen while running ESP32-P4 loadable-module tests.
+- rtlib/NuttX: added local floor/floorf/sqrt/sqrtf/NaN helpers and kept generated floating-to-integer conversion on the NuttX nearbyint shim, avoiding NuttX/libm module hangs in math-heavy examples.
+- NuttX patches: hardened RISC-V loadable-module relocations by replacing S-type RELA immediates instead of adding encoded offsets, and by masking low immediates through unsigned 12-bit fields for negative LO12 encodings.
+- build/NuttX: made reused loadable-module test slots avoid unnecessary Kconfig rewrites/olddefconfig churn when the existing ESP32-P4 board config already matches the requested module app, cutting repeated board example builds to the fast path.
+- tests/NuttX/ESP32-P4: expanded board-side fbctests and exampleageddon runs over HTTP-loaded ELF modules, with targeted reruns to separate serial/prompt transport drops from real runtime or loader failures.
+
 Version 1.20.1
 
 [changed]

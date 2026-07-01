@@ -143,10 +143,10 @@ static int GL_init(PIXELFORMATDESCRIPTOR *pfd)
 	hglrc = fb_wgl.CreateContext(hdc);
 	fb_wgl.MakeCurrent(hdc, hglrc);
 	
-	fb_wgl.GetProcAddress = (WGLGETPROCADDRESS)(void*)GetProcAddress(library, "wglGetProcAddress");
-	fb_wgl.GetExtensionStringARB = (WGLGETEXTENSIONSTRINGARB)(void*)fb_wgl.GetProcAddress("wglGetExtensionsStringARB");
+	fb_wgl.GetProcAddress = (WGLGETPROCADDRESS)GetProcAddress(library, "wglGetProcAddress");
+	fb_wgl.GetExtensionStringARB = (WGLGETEXTENSIONSTRINGARB)fb_wgl.GetProcAddress("wglGetExtensionsStringARB");
 	if (!fb_wgl.GetExtensionStringARB){
-		fb_wgl.GetExtensionStringARB = (WGLGETEXTENSIONSTRINGARB)(void*)fb_wgl.GetProcAddress("wglGetExtensionsStringEXT");
+		fb_wgl.GetExtensionStringARB = (WGLGETEXTENSIONSTRINGARB)fb_wgl.GetProcAddress("wglGetExtensionsStringEXT");
 	}
 	if (fb_wgl.GetExtensionStringARB){
 		wgl_extensions = fb_wgl.GetExtensionStringARB(hdc);
@@ -154,7 +154,7 @@ static int GL_init(PIXELFORMATDESCRIPTOR *pfd)
 	res = fb_hGL_Init(library, wgl_extensions);
 	if (res == 0) {
 		if (fb_hGL_ExtensionSupported("WGL_ARB_pixel_format\n")){
-			fb_wgl.ChoosePixelFormatARB = (WGLCHOOSEPIXELFORMATARB)(void*)fb_wgl.GetProcAddress("wglChoosePixelFormatARB");
+			fb_wgl.ChoosePixelFormatARB = (WGLCHOOSEPIXELFORMATARB)fb_wgl.GetProcAddress("wglChoosePixelFormatARB");
 		}
 	}
 	
@@ -216,7 +216,7 @@ static int *GL_setup_pixel_format(PIXELFORMATDESCRIPTOR *pfd, int *attrib, int *
 	return attrib;
 }
 
-static int GL_common_init()
+static int GL_common_init(void)
 {
 	PIXELFORMATDESCRIPTOR pfd = {
 		sizeof(PIXELFORMATDESCRIPTOR), 1,
@@ -229,7 +229,7 @@ static int GL_common_init()
 		WGL_ACCELERATION_ARB,   WGL_FULL_ACCELERATION_ARB,
 		WGL_DOUBLE_BUFFER_ARB,  GL_TRUE,
 		0
-	}, *attrib = &attribs[6], *samples_attrib = NULL;
+	}, *samples_attrib = NULL;
 	int pf = 0, num_formats, format;
 
 	if (GL_init(&pfd)){
@@ -251,7 +251,7 @@ static int GL_common_init()
 		fb_hGL_NormalizeParameters( fb_win32.flags);
 	}
 
-	attrib = GL_setup_pixel_format( &pfd, attrib, &samples_attrib );
+	GL_setup_pixel_format( &pfd, &attribs[6], &samples_attrib );
 	
 	hdc = GetDC(fb_win32.wnd);
 	if (fb_wgl.ChoosePixelFormatARB) {
@@ -550,14 +550,15 @@ static int *driver_fetch_modes(int depth, int *size)
 			break;
 		index++;
 		if (devmode.dmBitsPerPel == (unsigned int)depth) {
+			int *newModes;
 			(*size)++;
-			int *oldModes = modes;
-			modes = (int *)realloc(modes, *size * sizeof(int));
-			if (modes == NULL) {
-				free(oldModes);
+			newModes = (int *)realloc(modes, *size * sizeof(int));
+			if (newModes == NULL) {
+				free(modes);
 				*size = 0;
 				return NULL;
 			}
+			modes = newModes;
 			modes[(*size) - 1] = (devmode.dmPelsWidth << 16) | devmode.dmPelsHeight;
 		}
 	}

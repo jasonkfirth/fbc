@@ -421,7 +421,7 @@ static int GdiInteropSetup(D2DGlobalState* pGlobalState, HWND hwnd)
 		HMODULE hUser32 = GetModuleHandle("user32.dll");
 		struct LayeredWindowRenderParams* pLayeredParams = &pGlobalState->RenderParams.Layered;
 
-		pfnD3D10CreateDevice1 CreateD3D10Device = (pfnD3D10CreateDevice1)(void*)GetProcAddress(hD3D, "D3D10CreateDevice1");
+		pfnD3D10CreateDevice1 CreateD3D10Device = (pfnD3D10CreateDevice1)GetProcAddress(hD3D, "D3D10CreateDevice1");
 		if(CreateD3D10Device == NULL) {
 			goto errorReturn;
 		}
@@ -474,7 +474,7 @@ static int GdiInteropSetup(D2DGlobalState* pGlobalState, HWND hwnd)
 				goto errorReturn;
 			}
 		}
-		if(!(pLayeredParams->updateLayeredWindow = (pfnUpdateLayeredWindow)(void*)GetProcAddress(hUser32, "UpdateLayeredWindow")))
+		if(!(pLayeredParams->updateLayeredWindow = (pfnUpdateLayeredWindow)GetProcAddress(hUser32, "UpdateLayeredWindow")))
 		{
 			goto errorReturn;
 		}
@@ -700,7 +700,7 @@ fillInDirtyRect:
 	}
 }
 
-static int D2DCommonInit()
+static int D2DCommonInit(void)
 {
 	int ret = -1;
 	D2DGlobalState* pGlobalState = NULL;
@@ -712,7 +712,7 @@ static int D2DCommonInit()
 	if(hD2D != NULL) {
 		D2D1_FACTORY_OPTIONS opts = {D2D1_FACTORY_INFO_TYPE};
 		WNDPROC wndProcCookie = NULL;
-		pfnCreateD2D1Factory D2DCreateFactory = (pfnCreateD2D1Factory)(void*)GetProcAddress(hD2D, "D2D1CreateFactory");
+		pfnCreateD2D1Factory D2DCreateFactory = (pfnCreateD2D1Factory)GetProcAddress(hD2D, "D2D1CreateFactory");
 
 		if((D2DCreateFactory == NULL) || 
 		   (NOTIFY_FAILED_HR(D2DCreateFactory(
@@ -750,7 +750,7 @@ errorReturn:
 	return ret;
 }
 
-static void D2DCommonPaint()
+static void D2DCommonPaint(void)
 {
 	D2DGlobalState* pGlobalState = GetGlobalState(fb_win32.wnd);
 
@@ -759,7 +759,7 @@ static void D2DCommonPaint()
 	}
 }
 
-static void D2DCommonShutdown()
+static void D2DCommonShutdown(void)
 {
 	HWND hwnd = fb_win32.wnd;
 	D2DGlobalState* pGlobalState = GetGlobalState(hwnd);
@@ -893,7 +893,7 @@ static int* D2DFetchModes(int depth, int *size)
 	*/
 	hDxgi = LoadLibrary("dxgi.dll");
 	if (hDxgi != NULL) {
-		CreateDXGIFactory = (pfnCreateDXGIFactory)(void*)GetProcAddress(hDxgi, "CreateDXGIFactory");
+		CreateDXGIFactory = (pfnCreateDXGIFactory)GetProcAddress(hDxgi, "CreateDXGIFactory");
 		if ((CreateDXGIFactory) && (!NOTIFY_FAILED_HR(CreateDXGIFactory(&__fb_IID_IDXGIFactory, (void**)&pFactory)))) {
 			while((hardwareModes.elems == 0) && SUCCEEDED(IDXGIFactory_EnumAdapters(pFactory, adapterIter++, &pAdapter))) {
 				IDXGIOutput* pOutput = NULL;

@@ -2,6 +2,10 @@
 #define __FB_CONFIG_H__
 
 #if defined HOST_XBOX
+#elif defined HOST_NUTTX || defined __NuttX__
+	#ifndef HOST_NUTTX
+		#define HOST_NUTTX
+	#endif
 #elif defined GEKKO
 	#define HOST_WII
 #elif defined __DJGPP__
@@ -56,7 +60,7 @@
 	#error "Couldn't identify target system!"
 #endif
 
-#ifdef HOST_UNIX
+#if defined HOST_UNIX
 	/* Map off_t/fopen/fseeko/etc. to their 64bit versions */
 	#define _FILE_OFFSET_BITS 64
 #endif

@@ -92,8 +92,6 @@ int fb_sfxMusicStatus(void)
         }
     }
 
-    status = FB_SFX_MUSIC_STOPPED;
-
     if (__fb_sfx->music_playing < 0)
         status = FB_SFX_MUSIC_STOPPED;
     else if (__fb_sfx->music_paused)

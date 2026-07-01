@@ -104,3 +104,4 @@ OMA_old
 pkgroot/
 .maketests-tmp
 dist
+generated

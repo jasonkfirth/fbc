@@ -10,10 +10,10 @@ trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 # Produces a freebasic-android package tree, a .zip archive, and an NSIS
 # installer that installs into C:\freebasic-android.
 #
-# The package contains the fbc-android driver, the Android/aarch64 FreeBASIC
-# runtime, a small MSYS2 shell runtime, a Java runtime, and setup scripts for
-# downloading the Android SDK/NDK from Google after the user accepts Google's
-# Android SDK terms.
+# The package contains the fbc-android driver, Android ARMv7/AArch64/x86_64
+# FreeBASIC runtimes, a small MSYS2 shell runtime, a Java runtime, and setup
+# scripts for downloading the Android SDK/NDK from Google after the user
+# accepts Google's Android SDK terms.
 ##############################################################################
 
 SELF_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
@@ -81,6 +81,11 @@ Environment:
   ANDROID_PLATFORM    SDK platform package (default: platforms;android-35)
   ANDROID_BUILDTOOLS  SDK build-tools package (default: build-tools;35.0.0)
   ANDROID_NDK_PACKAGE SDK NDK package (default: ndk;27.2.12479018)
+  ANDROID_ABI_SPECS   Space-separated runtime build list in the form
+                      target-key:ndk-triplet
+                      (default: android-arm:armv7a-linux-androideabi
+                       android-aarch64:aarch64-linux-android
+                       android-x86_64:x86_64-linux-android)
   ANDROID_EMULATOR_PACKAGE
                       SDK emulator package used with --with-emulator-tools
                       (default: emulator)
@@ -170,6 +175,7 @@ sync_source_tree() {
 	if have rsync; then
 		run rsync -a --delete --delete-excluded --prune-empty-dirs \
 			--exclude-from "$ROOT/mk/source-copy-excludes.rsync" \
+			--exclude "/bootstrap/" \
 			"$ROOT/" "$dst/"
 	else
 		fail "rsync is required to create an isolated worktree"
@@ -296,8 +302,16 @@ ANDROID_EMULATOR_PACKAGE="${ANDROID_EMULATOR_PACKAGE:-emulator}"
 ANDROID_SYSTEM_IMAGE_PACKAGE="${ANDROID_SYSTEM_IMAGE_PACKAGE:-system-images;android-35;google_apis;x86_64}"
 ANDROID_CMDLINE_TOOLS_URL="${ANDROID_CMDLINE_TOOLS_URL:-https://dl.google.com/android/repository/commandlinetools-win-13114758_latest.zip}"
 JAVA_RUNTIME_URL="${JAVA_RUNTIME_URL:-https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jdk/hotspot/normal/eclipse}"
-ANDROID_TARGET_TRIPLET="${ANDROID_TARGET_TRIPLET:-aarch64-linux-android}"
-ANDROID_TARGET_KEY="${ANDROID_TARGET_KEY:-android-aarch64}"
+ANDROID_ABI_SPECS="${ANDROID_ABI_SPECS:-android-arm:armv7a-linux-androideabi android-aarch64:aarch64-linux-android android-x86_64:x86_64-linux-android}"
+ANDROID_TARGET_KEYS=""
+for android_spec in $ANDROID_ABI_SPECS; do
+	android_key="${android_spec%%:*}"
+	android_triplet="${android_spec#*:}"
+	[ -n "$android_key" ] && [ -n "$android_triplet" ] && [ "$android_key" != "$android_triplet" ] ||
+		fail "invalid ANDROID_ABI_SPECS entry: $android_spec"
+	ANDROID_TARGET_KEYS="${ANDROID_TARGET_KEYS:+$ANDROID_TARGET_KEYS }$android_key"
+done
+unset android_spec android_key android_triplet
 
 HOST_TRIPLET="$("$UCRT64_ROOT/bin/gcc" -dumpmachine 2>/dev/null || true)"
 if [ -z "$HOST_TRIPLET" ]; then
@@ -507,8 +521,6 @@ build_android_target() {
 	local host_ranlib="$UCRT64_ROOT/bin/ranlib.exe"
 	local host_strip="$UCRT64_ROOT/bin/strip.exe"
 	local host_dlltool="$UCRT64_ROOT/bin/dlltool.exe"
-	local cc
-	local cxx
 	local ar
 	local ranlib
 
@@ -516,7 +528,7 @@ build_android_target() {
 		return 0
 	fi
 
-	msg "Building fbc-android and Android runtime"
+	msg "Building fbc-android and Android runtimes"
 	cd "$WORKTREE"
 
 	seed_fbc="$(detect_fbc \
@@ -566,19 +578,12 @@ build_android_target() {
 
 	ndk="$(find_ndk_root)" || fail "Android NDK not found under $SDKROOT"
 	prebuilt="$(find_ndk_prebuilt "$ndk")" || fail "Android NDK LLVM prebuilt toolchain not found"
-	cc="$prebuilt/bin/${ANDROID_TARGET_TRIPLET}${ANDROID_API}-clang"
-	cxx="$prebuilt/bin/${ANDROID_TARGET_TRIPLET}${ANDROID_API}-clang++"
 	ar="$prebuilt/bin/llvm-ar"
 	ranlib="$prebuilt/bin/llvm-ranlib"
 
-	[ -x "$cc" ] || cc="$cc.exe"
-	[ -x "$cc" ] || cc="${cc%.exe}.cmd"
-	[ -x "$cxx" ] || cxx="$cxx.exe"
-	[ -x "$cxx" ] || cxx="${cxx%.exe}.cmd"
 	[ -x "$ar" ] || ar="$ar.exe"
 	[ -x "$ranlib" ] || ranlib="$ranlib.exe"
 
-	[ -x "$cc" ] || fail "Android clang not found: $cc"
 	[ -x "$ar" ] || fail "Android llvm-ar not found: $ar"
 	[ -x "$ranlib" ] || fail "Android llvm-ranlib not found: $ranlib"
 
@@ -594,26 +599,41 @@ build_android_target() {
 		LDFLAGS= \
 		-j"$JOBS"
 
-	run make TARGET_TRIPLET="$ANDROID_TARGET_TRIPLET" TARGET="$ANDROID_TARGET_TRIPLET" \
-		MULTILIB= \
-		FBTARGET_DIR_OVERRIDE="$ANDROID_TARGET_KEY" \
-		BUILD_PREFIX= \
-		CC="$cc" \
-		CXX="$cxx" \
-		CLANG="$cc" \
-		AS="$cc" \
-		LD="$cc" \
-		AR="$ar" \
-		RANLIB="$ranlib" \
-		BUILD_FBC="$build_fbc" \
-		BUILD_FBC_TARGET="$ANDROID_TARGET_KEY" \
-		BUILD_FBC_BUILDPREFIX= \
-		CPPFLAGS= \
-		CFLAGS= \
-		CXXFLAGS= \
-		LDFLAGS= \
-		rtlib fbrt gfxlib2 sfxlib \
-		-j"$JOBS"
+	for android_spec in $ANDROID_ABI_SPECS; do
+		local target_key="${android_spec%%:*}"
+		local target_triplet="${android_spec#*:}"
+		local cc="$prebuilt/bin/${target_triplet}${ANDROID_API}-clang"
+		local cxx="$prebuilt/bin/${target_triplet}${ANDROID_API}-clang++"
+
+		[ -x "$cc" ] || cc="$cc.exe"
+		[ -x "$cc" ] || cc="${cc%.exe}.cmd"
+		[ -x "$cxx" ] || cxx="$cxx.exe"
+		[ -x "$cxx" ] || cxx="${cxx%.exe}.cmd"
+
+		[ -x "$cc" ] || fail "Android clang not found for $target_key: $cc"
+		[ -x "$cxx" ] || fail "Android clang++ not found for $target_key: $cxx"
+
+		run make TARGET_TRIPLET="$target_triplet" TARGET="$target_triplet" \
+			MULTILIB= \
+			FBTARGET_DIR_OVERRIDE="$target_key" \
+			BUILD_PREFIX= \
+			CC="$cc" \
+			CXX="$cxx" \
+			CLANG="$cc" \
+			AS="$cc" \
+			LD="$cc" \
+			AR="$ar" \
+			RANLIB="$ranlib" \
+			BUILD_FBC="$build_fbc" \
+			BUILD_FBC_TARGET="$target_key" \
+			BUILD_FBC_BUILDPREFIX= \
+			CPPFLAGS= \
+			CFLAGS= \
+			CXXFLAGS= \
+			LDFLAGS= \
+			rtlib fbrt gfxlib2 sfxlib \
+			-j"$JOBS"
+	done
 
 	rm -rf "$STAGEDIR"
 	run make TARGET_TRIPLET="$HOST_TRIPLET" TARGET="$HOST_TRIPLET" \
@@ -622,7 +642,8 @@ build_android_target() {
 		BUILD_FBC="$build_fbc" \
 		BUILD_FBC_TARGET=win64 \
 		BUILD_FBCFLAGS= \
-		ANDROID_BUILD_LIBDIR="$WORKTREE/lib/freebasic/$ANDROID_TARGET_KEY" \
+		FB_ANDROID_TARGETS="$ANDROID_TARGET_KEYS" \
+		ANDROID_BUILD_LIBROOT="$WORKTREE/lib/freebasic" \
 		install-android
 
 	[ -f "$STAGEDIR/fbc-android.exe" ] || fail "staged fbc-android wrapper is missing"
@@ -925,7 +946,11 @@ if ($LASTEXITCODE -ne 0) {
 
 $aapt = Get-ChildItem -Path (Join-Path $androidHome "build-tools") -Recurse -Filter "aapt.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
 $d8 = Get-ChildItem -Path (Join-Path $androidHome "build-tools") -Recurse -Filter "d8.bat" -ErrorAction SilentlyContinue | Select-Object -First 1
-$clang = Get-ChildItem -Path (Join-Path $androidHome "ndk") -Recurse -Filter "aarch64-linux-android26-clang.cmd" -ErrorAction SilentlyContinue | Select-Object -First 1
+$clangTargets = @(
+	"armv7a-linux-androideabi26-clang.cmd",
+	"aarch64-linux-android26-clang.cmd",
+	"x86_64-linux-android26-clang.cmd"
+)
 $androidJar = Get-ChildItem -Path (Join-Path $androidHome "platforms") -Recurse -Filter "android.jar" -ErrorAction SilentlyContinue | Select-Object -First 1
 
 if ($null -eq $aapt) {
@@ -934,8 +959,11 @@ if ($null -eq $aapt) {
 if ($null -eq $d8) {
 	Die "Android build-tools did not install d8.bat"
 }
-if ($null -eq $clang) {
-	Die "Android NDK did not install aarch64-linux-android26-clang.cmd"
+foreach ($clangTarget in $clangTargets) {
+	$clang = Get-ChildItem -Path (Join-Path $androidHome "ndk") -Recurse -Filter $clangTarget -ErrorAction SilentlyContinue | Select-Object -First 1
+	if ($null -eq $clang) {
+		Die "Android NDK did not install $clangTarget"
+	}
 }
 if ($null -eq $androidJar) {
 	Die "Android platform package did not install android.jar"
@@ -997,8 +1025,8 @@ write_distribution_notes() {
 	cat > "$DISTROOT/readme-fbc-android.txt" <<EOF
 FreeBASIC Android ${FBVERSION}
 
-This package contains the FreeBASIC Android driver, Android/aarch64 runtime
-libraries, a small MSYS2 shell runtime, and a Java runtime.
+This package contains the FreeBASIC Android driver, Android ARMv7, AArch64,
+and x86_64 runtime libraries, a small MSYS2 shell runtime, and a Java runtime.
 
 The installer adds this directory to the Windows system PATH:
 

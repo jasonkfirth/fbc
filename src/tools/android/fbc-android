@@ -20,6 +20,9 @@ Options:
   --api N                NDK API level for native compilation (default: 26)
   --min-api N            APK minSdkVersion (default: 21)
   --target-api N         APK targetSdkVersion (default: highest installed platform)
+  --target TARGET        Build one Android ABI target
+  --targets LIST         Build APK native libraries for a comma/space-separated
+                         target list (default: android-arm,android-aarch64,android-x86_64)
   --assets DIR           Add all files from DIR as current-directory APK assets
   --env NAME=VALUE       Set an environment variable before the program starts
   --package NAME         Android application package name
@@ -37,6 +40,8 @@ Environment:
   ANDROID_DX_JAR / DX_JAR           dx jar to use when no d8/dx tool exists
   FBANDROID_PREFIX                  Install prefix (default: /usr)
   FBANDROID_ASSETS                  Directory to include as current-directory APK assets
+  FBANDROID_TARGET                  Single Android target key
+  FBANDROID_TARGETS                 Comma/space-separated Android target keys
 
 Source defines:
   #define FB_ANDROID_HIDE_KEYBOARD_BUTTON
@@ -307,6 +312,51 @@ sanitize_package() {
 	echo "org.freebasic.$value"
 }
 
+android_target_info() {
+	local target="$1"
+
+	case "$target" in
+		android-arm|arm|armhf|armeabi-v7a)
+			echo "android-arm|armv7a-linux-androideabi|armv7a|armeabi-v7a"
+			;;
+		android-aarch64|aarch64|arm64|arm64-v8a)
+			echo "android-aarch64|aarch64-linux-android|aarch64|arm64-v8a"
+			;;
+		android-x86_64|x86_64)
+			echo "android-x86_64|x86_64-linux-android|x86_64|x86_64"
+			;;
+		*)
+			die "unsupported Android target: $target"
+			;;
+	esac
+}
+
+append_android_target() {
+	local spec="$1"
+	local info
+	local key
+	local triple
+	local arch
+	local abi
+	local existing
+
+	info="$(android_target_info "$spec")"
+	IFS='|' read -r key triple arch abi <<EOF
+$info
+EOF
+
+	for existing in "${target_keys[@]:-}"; do
+		if [ "$existing" = "$key" ]; then
+			return 0
+		fi
+	done
+
+	target_keys+=("$key")
+	target_triples+=("$triple")
+	target_arches+=("$arch")
+	target_abis+=("$abi")
+}
+
 prefix="${FBANDROID_PREFIX:-/usr}"
 libroot="${FBANDROID_LIBROOT:-$prefix/lib/freebasic-android}"
 compiler="${FBANDROID_COMPILER:-$libroot/bin/fbc-android-compiler}"
@@ -326,8 +376,11 @@ if [ -z "$incdir" ]; then
 		incdir="$prefix/include/freebasic-android"
 	fi
 fi
-target_key="${FBANDROID_TARGET:-android-aarch64}"
-libdir="${FBANDROID_LIBDIR:-$libroot/$target_key}"
+target_list="${FBANDROID_TARGETS:-${FBANDROID_TARGET:-android-arm,android-aarch64,android-x86_64}}"
+if [ -n "${FBANDROID_LIBDIR:-}" ] && [ -z "${FBANDROID_TARGETS:-}" ]; then
+	target_list="${FBANDROID_TARGET:-android-aarch64}"
+fi
+single_libdir="${FBANDROID_LIBDIR:-}"
 api="${ANDROID_API:-26}"
 min_api="${ANDROID_MIN_API:-21}"
 target_api="${ANDROID_TARGET_API:-}"
@@ -359,6 +412,8 @@ while [ $# -gt 0 ]; do
 		--api) api="$2"; shift 2 ;;
 		--min-api) min_api="$2"; shift 2 ;;
 		--target-api) target_api="$2"; shift 2 ;;
+		--target) target_list="$2"; shift 2 ;;
+		--targets) target_list="$2"; shift 2 ;;
 		--package) package="$2"; shift 2 ;;
 		--label) label="$2"; shift 2 ;;
 		--hideKeyboardButton) keyboard_button="false"; shift ;;
@@ -414,11 +469,39 @@ done
 [ -f "$src" ] || die "source file not found: $src"
 [ -x "$compiler" ] || die "Android-targeting compiler not found: $compiler"
 [ -d "$incdir" ] || die "Android include directory not found: $incdir"
-[ -d "$libdir" ] || die "Android runtime directory not found: $libdir"
 [ -f "$template/fb_android_app.c" ] || die "Android APK template not found: $template"
 [ -f "$template/FreeBasicNativeActivity.java" ] || die "Android Java activity template not found: $template"
 [ -f "$template/FreeBasicInputBridge.java" ] || die "Android Java input bridge template not found: $template"
 [ -f "$template/FreeBasicInputView.java" ] || die "Android Java input-view template not found: $template"
+
+target_keys=()
+target_triples=()
+target_arches=()
+target_abis=()
+
+target_list="$(printf '%s' "$target_list" | tr ',' ' ')"
+for target_spec in $target_list; do
+	append_android_target "$target_spec"
+done
+
+[ "${#target_keys[@]}" -gt 0 ] || die "no Android targets selected"
+
+if [ "$mode" != "apk" ] && [ "${#target_keys[@]}" -ne 1 ]; then
+	die "--emit-so and --emit-obj require exactly one Android target; use --target TARGET"
+fi
+
+if [ -n "$single_libdir" ] && [ "${#target_keys[@]}" -ne 1 ]; then
+	die "FBANDROID_LIBDIR can only be used with one Android target"
+fi
+
+for ((i = 0; i < ${#target_keys[@]}; ++i)); do
+	if [ -n "$single_libdir" ]; then
+		check_libdir="$single_libdir"
+	else
+		check_libdir="$libroot/${target_keys[$i]}"
+	fi
+	[ -d "$check_libdir" ] || die "Android runtime directory not found: $check_libdir"
+done
 
 if [ "$keyboard_button" = "true" ] && \
    grep -Eiq '^[[:space:]]*#[[:space:]]*(define|DEFINE)[[:space:]]+FB_ANDROID_HIDE_KEYBOARD_BUTTON([[:space:]]|$)' "$src"; then
@@ -495,18 +578,12 @@ esac
 sdk="$(find_sdk)" || die "Android SDK not found; set ANDROID_HOME or ANDROID_SDK_ROOT"
 ndk="$(find_ndk "$sdk")" || die "Android NDK not found; set ANDROID_NDK_HOME"
 prebuilt="$(find_prebuilt "$ndk")" || die "Android NDK LLVM toolchain not found under $ndk"
-
-triple="aarch64-linux-android"
-abi="arm64-v8a"
-cc="$prebuilt/bin/${triple}${api}-clang"
 ar="$prebuilt/bin/llvm-ar"
 ranlib="$prebuilt/bin/llvm-ranlib"
 
-[ -x "$cc" ] || cc="$cc.exe"
 [ -x "$ar" ] || ar="$ar.exe"
 [ -x "$ranlib" ] || ranlib="$ranlib.exe"
 
-[ -x "$cc" ] || die "NDK compiler not found: $cc"
 [ -x "$ar" ] || die "NDK llvm-ar not found: $ar"
 [ -x "$ranlib" ] || die "NDK llvm-ranlib not found: $ranlib"
 
@@ -527,96 +604,123 @@ appobj="$tmp/fb_android_app.o"
 sofile="$tmp/libfreebasicapp.so"
 entry_args=()
 module_args=()
+sofiles=()
 
 if [ "$use_entry" -eq 1 ]; then
 	entry_args=(-entry fb_android_program_main)
 fi
 module_args=(-m "$module")
 
-env GCC="$cc" CLANG="$cc" AS="$cc" LD="$cc" AR="$ar" RANLIB="$ranlib" \
-	"$compiler" \
-	-prefix "$prefix" \
-	-target "$triple" \
-	-arch aarch64 \
-	-d __FB_ANDROID__ \
-	-gen gcc \
-	-r \
-	-pic \
-	"${entry_args[@]}" \
-	"${module_args[@]}" \
-	-i "$incdir" \
-	-p "$libdir" \
-	"${fbc_args[@]}" \
-	-o "$cfile" \
-	"$src"
+for ((target_index = 0; target_index < ${#target_keys[@]}; ++target_index)); do
+	target_key="${target_keys[$target_index]}"
+	triple="${target_triples[$target_index]}"
+	fbc_arch="${target_arches[$target_index]}"
+	abi="${target_abis[$target_index]}"
 
-"$cc" -fPIC -DANDROID -D__FB_ANDROID__ -I"$incdir" -Wno-unused-variable -Wno-unused-function -c "$cfile" -o "$objfile"
-
-if [ "$mode" = "obj" ]; then
-	cp "$objfile" "$output"
-	echo "$output"
-	exit 0
-fi
-
-"$cc" -fPIC -DANDROID -DFB_ANDROID_KEYBOARD_ENABLED="$keyboard_enabled_define" -I"$incdir" -c "$template/fb_android_app.c" -o "$appobj"
-
-envobj=""
-if [ "${#env_defs[@]}" -gt 0 ]; then
-	envc="$tmp/fb_android_env.c"
-	envobj="$tmp/fb_android_env.o"
-	{
-		echo '#include <stdlib.h>'
-		echo ''
-		echo 'static void __attribute__((constructor)) fb_android_set_package_env(void)'
-		echo '{'
-		for env_def in "${env_defs[@]}"; do
-			env_name="${env_def%%=*}"
-			env_value="${env_def#*=}"
-			printf '\tsetenv(%s, %s, 1);\n' "$(c_string "$env_name")" "$(c_string "$env_value")"
-		done
-		echo '}'
-	} > "$envc"
-	"$cc" -fPIC -DANDROID -c "$envc" -o "$envobj"
-fi
-
-startup="$libdir/fbrt0pic.o"
-runtime=()
-if [ "$use_mt" -eq 1 ]; then
-	fb_runtime="libfbmtpic.a"
-	fbrt_runtime="libfbrtmtpic.a"
-	gfx_runtime="libfbgfxmtpic.a"
-	sfx_runtime="libsfxmtpic.a"
-else
-	fb_runtime="libfbpic.a"
-	fbrt_runtime="libfbrtpic.a"
-	gfx_runtime="libfbgfxpic.a"
-	sfx_runtime="libsfxpic.a"
-fi
-
-[ -f "$startup" ] || die "required Android runtime file is missing: $startup"
-[ -f "$libdir/$fb_runtime" ] || die "required Android runtime file is missing: $libdir/$fb_runtime"
-runtime+=("$libdir/$fb_runtime")
-for optional in "$fbrt_runtime" "$gfx_runtime" "$sfx_runtime"; do
-	if [ -f "$libdir/$optional" ]; then
-		runtime+=("$libdir/$optional")
+	if [ -n "$single_libdir" ]; then
+		libdir="$single_libdir"
+	else
+		libdir="$libroot/$target_key"
 	fi
+
+	cc="$prebuilt/bin/${triple}${api}-clang"
+	[ -x "$cc" ] || cc="$cc.exe"
+	[ -x "$cc" ] || die "NDK compiler not found: $cc"
+
+	target_tmp="$tmp/$target_key"
+	mkdir -p "$target_tmp"
+	cfile="$target_tmp/$module.c"
+	objfile="$target_tmp/$module.o"
+	appobj="$target_tmp/fb_android_app.o"
+	sofile="$target_tmp/libfreebasicapp.so"
+
+	env GCC="$cc" CLANG="$cc" AS="$cc" LD="$cc" AR="$ar" RANLIB="$ranlib" \
+		"$compiler" \
+		-prefix "$prefix" \
+		-target "$triple" \
+		-arch "$fbc_arch" \
+		-d __FB_ANDROID__ \
+		-gen gcc \
+		-r \
+		-pic \
+		"${entry_args[@]}" \
+		"${module_args[@]}" \
+		-i "$incdir" \
+		-p "$libdir" \
+		"${fbc_args[@]}" \
+		-o "$cfile" \
+		"$src"
+
+	"$cc" -fPIC -DANDROID -D__FB_ANDROID__ -I"$incdir" -Wno-unused-variable -Wno-unused-function -c "$cfile" -o "$objfile"
+
+	if [ "$mode" = "obj" ]; then
+		cp "$objfile" "$output"
+		echo "$output"
+		exit 0
+	fi
+
+	"$cc" -fPIC -DANDROID -DFB_ANDROID_KEYBOARD_ENABLED="$keyboard_enabled_define" -I"$incdir" -c "$template/fb_android_app.c" -o "$appobj"
+
+	envobj=""
+	if [ "${#env_defs[@]}" -gt 0 ]; then
+		envc="$target_tmp/fb_android_env.c"
+		envobj="$target_tmp/fb_android_env.o"
+		{
+			echo '#include <stdlib.h>'
+			echo ''
+			echo 'static void __attribute__((constructor)) fb_android_set_package_env(void)'
+			echo '{'
+			for env_def in "${env_defs[@]}"; do
+				env_name="${env_def%%=*}"
+				env_value="${env_def#*=}"
+				printf '\tsetenv(%s, %s, 1);\n' "$(c_string "$env_name")" "$(c_string "$env_value")"
+			done
+			echo '}'
+		} > "$envc"
+		"$cc" -fPIC -DANDROID -c "$envc" -o "$envobj"
+	fi
+
+	startup="$libdir/fbrt0pic.o"
+	runtime=()
+	if [ "$use_mt" -eq 1 ]; then
+		fb_runtime="libfbmtpic.a"
+		fbrt_runtime="libfbrtmtpic.a"
+		gfx_runtime="libfbgfxmtpic.a"
+		sfx_runtime="libsfxmtpic.a"
+	else
+		fb_runtime="libfbpic.a"
+		fbrt_runtime="libfbrtpic.a"
+		gfx_runtime="libfbgfxpic.a"
+		sfx_runtime="libsfxpic.a"
+	fi
+
+	[ -f "$startup" ] || die "required Android runtime file is missing: $startup"
+	[ -f "$libdir/$fb_runtime" ] || die "required Android runtime file is missing: $libdir/$fb_runtime"
+	runtime+=("$libdir/$fb_runtime")
+	for optional in "$fbrt_runtime" "$gfx_runtime" "$sfx_runtime"; do
+		if [ -f "$libdir/$optional" ]; then
+			runtime+=("$libdir/$optional")
+		fi
+	done
+
+	link_objects=("$appobj")
+	[ -z "$envobj" ] || link_objects+=("$envobj")
+	link_objects+=("$startup" "$objfile")
+
+	"$cc" -shared -Wl,-soname,libfreebasicapp.so -o "$sofile" \
+		"${link_objects[@]}" \
+		-Wl,--start-group "${runtime[@]}" -Wl,--end-group \
+		-Wl,--wrap=exit \
+		-llog -landroid -lOpenSLES -ldl -lm
+
+	if [ "$mode" = "so" ]; then
+		cp "$sofile" "$output"
+		echo "$output"
+		exit 0
+	fi
+
+	sofiles+=("$abi|$sofile")
 done
-
-link_objects=("$appobj")
-[ -z "$envobj" ] || link_objects+=("$envobj")
-link_objects+=("$startup" "$objfile")
-
-"$cc" -shared -Wl,-soname,libfreebasicapp.so -o "$sofile" \
-	"${link_objects[@]}" \
-	-Wl,--start-group "${runtime[@]}" -Wl,--end-group \
-	-Wl,--wrap=exit \
-	-llog -landroid -lOpenSLES -ldl -lm
-
-if [ "$mode" = "so" ]; then
-	cp "$sofile" "$output"
-	echo "$output"
-	exit 0
-fi
 
 platform_jar="$(find_platform_jar "$sdk")" || die "no Android platform android.jar found under $sdk/platforms"
 target_sdk="${platform_jar%/android.jar}"
@@ -692,7 +796,7 @@ fi
 [ -n "$d8" ] || [ -n "$dx" ] || [ -n "$java_tool" ] || die "no dexer found; install Android build-tools with d8, the dalvik-exchange package for dx, or set ANDROID_D8_JAR/ANDROID_DX_JAR"
 
 asset_root="$tmp/assets"
-mkdir -p "$tmp/assets" "$tmp/apk/lib/$abi" "$tmp/res/values"
+mkdir -p "$tmp/assets" "$tmp/apk/lib" "$tmp/res/values"
 if [ -n "$asset_dir" ]; then
 	cp -a "$asset_dir/." "$asset_root"/
 	(
@@ -703,7 +807,12 @@ if [ -n "$asset_dir" ]; then
 			| sort > "_freebasic_asset_manifest.txt"
 	)
 fi
-cp "$sofile" "$tmp/apk/lib/$abi/libfreebasicapp.so"
+for so_entry in "${sofiles[@]}"; do
+	abi="${so_entry%%|*}"
+	sofile="${so_entry#*|}"
+	mkdir -p "$tmp/apk/lib/$abi"
+	cp "$sofile" "$tmp/apk/lib/$abi/libfreebasicapp.so"
+done
 cp "$template/strings.xml" "$tmp/res/values/strings.xml"
 sed \
 	-e "s|@PACKAGE@|$package|g" \

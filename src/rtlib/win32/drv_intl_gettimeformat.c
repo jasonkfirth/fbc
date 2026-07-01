@@ -13,6 +13,8 @@ int fb_DrvIntlGetTimeFormat( char *buffer, size_t len )
     size_t i;
 
     DBG_ASSERT(buffer!=NULL);
+    if( len==0 )
+        return FALSE;
 
     /* Can I use this? The problem is that it returns the date format
      * with localized separators. */
@@ -21,7 +23,7 @@ int fb_DrvIntlGetTimeFormat( char *buffer, size_t len )
     if( pszFormat!=NULL ) {
         size_t uiNameSize = strlen(pszFormat);
         if( uiNameSize < len ) {
-            strcpy( buffer, pszFormat );
+            memcpy( buffer, pszFormat, uiNameSize + 1 );
             return TRUE;
         } else {
             return FALSE;
@@ -39,27 +41,27 @@ int fb_DrvIntlGetTimeFormat( char *buffer, size_t len )
 
     i = 0;
 
-    use_timemark = ( pszTimeMark!=NULL && atoi( pszTimeMark )==1 );
-    timemark_prefix = ( pszTimeMarkPos!=NULL && atoi( pszTimeMarkPos )==1 );
+    use_timemark = ( pszTimeMark!=NULL && pszTimeMark[0]=='1' );
+    timemark_prefix = ( pszTimeMarkPos!=NULL && pszTimeMarkPos[0]=='1' );
 
     if( use_timemark && timemark_prefix ) {
-        strcpy( achFormat + i, "AM/PM " );
+        FB_MEMCPY( achFormat + i, "AM/PM ", 6 );
         i += 6;
     }
 
-    if( pszHourZero!=NULL && atoi( pszHourZero )==1 ) {
+    if( pszHourZero!=NULL && pszHourZero[0]=='1' ) {
         if( !use_timemark ) {
-            strcpy( achFormat + i, "HH:" );
+            FB_MEMCPY( achFormat + i, "HH:", 3 );
         } else {
-            strcpy( achFormat + i, "hh:" );
+            FB_MEMCPY( achFormat + i, "hh:", 3 );
         }
         i += 3;
     }
-    strcpy( achFormat + i, "mm:ss" );
+    FB_MEMCPY( achFormat + i, "mm:ss", 5 );
     i += 5;
 
     if( use_timemark && !timemark_prefix ) {
-        strcpy( achFormat + i, " AM/PM" );
+        FB_MEMCPY( achFormat + i, " AM/PM", 6 );
         i += 6;
     }
 

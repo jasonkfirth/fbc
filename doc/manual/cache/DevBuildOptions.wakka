@@ -110,6 +110,8 @@ Building FreeBASIC from sources uses a ##makefile## that is intended to be used 
 		build without OpenGL headers (disables OpenGL gfx drivers)
 	##-DDISABLE_FBDEV##
 		build without Linux framebuffer device headers (disables Linux fbdev gfx driver)
+	##-DGFXLIB_NEVERSCALE##
+		build gfxlib2 so supported drivers do not present low-resolution framebuffers with centered integer scaling.  A ##320x200## screen remains ##320x200## on the physical display or inside a larger window, and mouse/touch input is only offset for centering.
 	##-DDISABLE_D3D10##
 		build without DirectX 10 driver (disable D2D driver in windows)
 	##-DDISABLE_NCURSES##

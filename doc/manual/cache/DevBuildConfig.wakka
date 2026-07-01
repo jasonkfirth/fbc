@@ -118,6 +118,7 @@ Optional library and platform features:
 	- ##DISABLE_XPM## disables XPM-dependent support.
 	- ##DISABLE_OPENGL## disables OpenGL graphics support.
 	- ##DISABLE_FBDEV## disables the Linux framebuffer driver.
+	- ##GFXLIB_NEVERSCALE## disables centered integer presentation scaling in gfxlib2 drivers that support it.  Low-resolution screens remain physically small instead of being scaled up inside larger windows or displays.
 	- ##DISABLE_D3D10## disables the Direct3D 10/D2D Windows graphics path.
 	- ##DISABLE_TCP## disables TCP support in targets where that switch is honored.
 	- ##DISABLE_FFI## disables libffi-dependent runtime support such as ##[[KeyPgThreadCall|ThreadCall]]##.

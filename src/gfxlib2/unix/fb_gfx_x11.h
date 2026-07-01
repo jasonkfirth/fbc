@@ -30,6 +30,9 @@ typedef struct X11DRIVER
 	XRRScreenConfiguration *config;
 	int w, h, depth, visual_depth, flags;
 	int refresh_rate, display_offset;
+	int content_w, content_h;
+	int view_w, view_h;
+	int scale, draw_offset_x, draw_offset_y, draw_w, draw_h;
 	int (*init)(void);
 	void (*exit)(void);
 	void (*update)(void);
@@ -57,6 +60,8 @@ extern void fb_hX11SetMouse(int x, int y, int cursor, int clip);
 extern void fb_hX11SetWindowTitle(char *title);
 extern int fb_hX11SetWindowPos(int x, int y);
 extern int *fb_hX11FetchModes(int depth, int *size);
+extern void fb_hX11RefreshLayout(int view_w, int view_h);
+extern int fb_hX11GetGLViewport(int *x, int *y, int *w, int *h);
 extern int fb_hX11EnterFullscreen(int *h);
 extern void fb_hX11LeaveFullscreen(void);
 extern void fb_hX11InitWindow(int x, int y);

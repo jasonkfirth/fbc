@@ -1,3 +1,7 @@
+freebasic-android: binary-from-other-architecture [usr/lib/freebasic-android/android-arm/fbrt*.o]
 freebasic-android: binary-from-other-architecture [usr/lib/freebasic-android/android-aarch64/fbrt*.o]
+freebasic-android: binary-from-other-architecture [usr/lib/freebasic-android/android-x86_64/fbrt*.o]
+freebasic-android: static-library-has-unneeded-sections * [usr/lib/freebasic-android/android-arm/*.a]
 freebasic-android: static-library-has-unneeded-sections * [usr/lib/freebasic-android/android-aarch64/*.a]
+freebasic-android: static-library-has-unneeded-sections * [usr/lib/freebasic-android/android-x86_64/*.a]
 freebasic-android: executable-in-usr-lib [usr/lib/freebasic-android/bin/fbc-android-compiler]

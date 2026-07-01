@@ -67,7 +67,7 @@ endif
 endif
 endif
 
-FBC_CFLAGS :=
+FBC_CFLAGS := -i $(abspath ../inc)
 
 ifneq ($(FB_LANG),)
 	FBC_CFLAGS += -lang $(FB_LANG)

@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef __FB_LINUX__
-	#error "Target platform not supported; this is the header for the glibc iconv implementation on GNU/Linux."
+#if (not defined(__FB_LINUX__)) and (not defined(__FB_NUTTX__))
+	#error "Target platform not supported; this is the header for POSIX iconv implementations."
 #endif
 
 extern "C"

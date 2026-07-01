@@ -1,0 +1,5 @@
+./deprecated/command-sweep.o
+./deprecated/implicit_explicit.o
+./deprecated/innerdup.o
+./deprecated/shadow_inherit.o
+./deprecated/string_suffix.o

@@ -40,6 +40,7 @@ FB_JS_RUNTIME_ASSETS := fb_shell.html fb_rtlib.js termlib_min.js
 JS_TOOLS_DIR ?= $(rootdir)/src/tools/js
 FB_ANDROID_NAME ?= freebasic-android
 FB_ANDROID_TARGET ?= android-aarch64
+FB_ANDROID_TARGETS ?= $(FB_ANDROID_TARGET)
 FB_WII_NAME ?= freebasic-wii
 FB_WII_TARGET ?= wii-powerpc
 
@@ -53,6 +54,7 @@ prefixandroidrootdir ?= $(prefix)/$(libdirname)/$(FB_ANDROID_NAME)
 prefixandroidsharedir ?= $(prefix)/share/$(FB_ANDROID_NAME)
 prefixandroidbindir ?= $(prefixandroidrootdir)/bin
 FBINSTALL_ANDROID_RUNTIME_DIR := $(prefixandroidrootdir)/$(FB_ANDROID_TARGET)
+ANDROID_BUILD_LIBROOT ?= $(rootdir)/$(libdirname)/freebasic
 ANDROID_BUILD_LIBDIR ?= $(rootdir)/$(libdirname)/freebasic/$(FB_ANDROID_TARGET)
 ANDROID_TOOLS_DIR ?= $(rootdir)/src/tools/android
 
@@ -192,16 +194,26 @@ install-android-includes:
 
 .PHONY: install-android-runtime
 install-android-runtime:
-	@test -d "$(ANDROID_BUILD_LIBDIR)" || { echo "ERROR: Android runtime build directory missing: $(ANDROID_BUILD_LIBDIR)"; exit 1; }
-	mkdir -p "$(INSTALL_ANDROID_LIBDIR)"
+	mkdir -p "$(INSTALL_ANDROID_ROOTDIR)"
 	set -e; \
-	for f in "$(ANDROID_BUILD_LIBDIR)"/*; do \
-		[ -e "$$f" ] || continue; \
-		if [ -f "$$f" ]; then \
-			b=$$(basename "$$f"); \
-			install -m 644 "$$f" "$(INSTALL_ANDROID_LIBDIR)/$$b"; \
-			echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_ANDROID_LIBDIR),$(FBINSTALL_ANDROID_RUNTIME_DIR))/$$b" >> "$(INSTALL_MANIFEST)"; \
+	targets="$(FB_ANDROID_TARGETS)"; \
+	for target in $$targets; do \
+		if [ "$$targets" = "$(FB_ANDROID_TARGET)" ]; then \
+			builddir="$(ANDROID_BUILD_LIBDIR)"; \
+		else \
+			builddir="$(ANDROID_BUILD_LIBROOT)/$$target"; \
 		fi; \
+		test -d "$$builddir" || { echo "ERROR: Android runtime build directory missing: $$builddir"; exit 1; }; \
+		installdir="$(INSTALL_ANDROID_ROOTDIR)/$$target"; \
+		mkdir -p "$$installdir"; \
+		for f in "$$builddir"/*; do \
+			[ -e "$$f" ] || continue; \
+			if [ -f "$$f" ]; then \
+				b=$$(basename "$$f"); \
+				install -m 644 "$$f" "$$installdir/$$b"; \
+				echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_ANDROID_ROOTDIR),$(prefixandroidrootdir))/$$target/$$b" >> "$(INSTALL_MANIFEST)"; \
+			fi; \
+		done; \
 	done
 
 .PHONY: install-android-tools

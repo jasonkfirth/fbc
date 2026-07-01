@@ -15,5 +15,6 @@ int fb_hFileResetEx( int streamno )
 	/* force handles to be reinitialized now */
 	fb_hConsoleGetHandle( TRUE );
 
+	// cppcheck-suppress resourceLeak
 	return (f != NULL);
 }

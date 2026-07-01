@@ -1,0 +1,96 @@
+--- arch/risc-v/src/rp23xx-rv/rp23xx_gpio.c
++++ arch/risc-v/src/rp23xx-rv/rp23xx_gpio.c
+@@ -72,4 +72,4 @@
+     8, 12, 24, 28,
+ #ifdef CONFIG_RP23XX_RV_RP2350B
+-    40, 44
++    40, 44,
+ #endif
+@@ -94,8 +94,8 @@
+   {
+     4,  8, 20, 24,
+-    -1,
+ #ifdef CONFIG_RP23XX_RV_RP2350B
+     36, 40,
+ #endif
++    -1,
+   },     /* pin numbers assignable to UART1 */
+ };
+@@ -118,4 +118,4 @@
+     2,  6, 10, 14, 18, 22, 26,
+ #ifdef CONFIG_RP23XX_RV_RP2350B
+-  30, 34, 38, 42
++    30, 34, 38, 42,
+ #endif
+--- boards/risc-v/rp23xx-rv/common/Kconfig
++++ boards/risc-v/rp23xx-rv/common/Kconfig
+@@ -139,4 +139,4 @@
+ config RP23XX_RV_SPI0_RX_GPIO
+-	int "GPIO pin for SPI0 RX (0, 4, 16, or 20)"
++	int "GPIO pin for SPI0 RX (0, 4, 16, 20, 32, or 36)"
+ 	default 16
+-	range 0 20
++	range 0 36
+@@ -149,4 +149,4 @@
+ config RP23XX_RV_SPI0_CS_GPIO
+-	int "GPIO pin for SPI0 CSn (1, 5, 17, or 21)"
++	int "GPIO pin used as SPI0 CSn"
+ 	default 17
+-	range 1 21
++	range 0 47
+@@ -158,4 +158,4 @@
+ config RP23XX_RV_SPI0_SCK_GPIO
+-	int "GPIO pin for SPI0 SCK (2, 6, 18, or 22)"
++	int "GPIO pin for SPI0 SCK (2, 6, 18, 22, 34, or 38)"
+ 	default 18
+-	range 2 22
++	range 2 38
+@@ -165,4 +165,4 @@
+ config RP23XX_RV_SPI0_TX_GPIO
+-	int "GPIO pin for SPI0 TX (3, 7, 19, or 23)"
++	int "GPIO pin for SPI0 TX (3, 7, 19, 23, 35, or 39)"
+ 	default 19
+-	range 3 23
++	range 3 39
+@@ -180,4 +180,4 @@
+ config RP23XX_RV_SPI1_RX_GPIO
+-	int "GPIO pin for SPI1 RX (8, 12, 24, or 28)"
++	int "GPIO pin for SPI1 RX (8, 12, 24, 28, 40, or 44)"
+ 	default 8
+-	range 8 28
++	range 8 44
+@@ -190,4 +190,4 @@
+ config RP23XX_RV_SPI1_CS_GPIO
+-	int "GPIO pin for SPI1 CSn (9, 13, 25, or 29)"
++	int "GPIO pin used as SPI1 CSn"
+ 	default 9
+-	range 9 29
++	range 0 47
+@@ -197,4 +197,4 @@
+ config RP23XX_RV_SPI1_SCK_GPIO
+-	int "GPIO pin for SPI1 SCK (10, 14, or 26)"
++	int "GPIO pin for SPI1 SCK (10, 14, 26, 30, 42, or 46)"
+ 	default 10
+-	range 10 26
++	range 10 46
+@@ -204,4 +204,4 @@
+ config RP23XX_RV_SPI1_TX_GPIO
+-	int "GPIO pin for SPI1 TX (11, 15, or 27)"
++	int "GPIO pin for SPI1 TX (11, 15, 27, 31, 43, or 47)"
+ 	default 11
+-	range 11 27
++	range 11 47
+@@ -492,4 +492,4 @@
+ config RP23XX_RV_I2S_DATA
+-	int "GPIO pin for I2S DATA (0-29)"
++	int "GPIO pin for I2S DATA"
+ 	default 9
+-	range 0 29
++	range 0 47
+@@ -497,4 +497,4 @@
+ config RP23XX_RV_I2S_CLOCK
+-	int "GPIO pin for I2S CLOCK (0-29)"
++	int "GPIO pin for I2S CLOCK"
+ 	default 10
+-	range 0 29
++	range 0 47

@@ -1,0 +1,20 @@
+--- apps/examples/fbcon/Kconfig
++++ apps/examples/fbcon/Kconfig
+@@ -60,7 +60,7 @@ config EXAMPLES_FBCON_CUSTOM_BPP
+ 
+ endchoice # EXAMPLES_FBCON_BPP_SELECTION
+ 
+-choice EXAMPLES_FBCON_CUSTOM_BPP
++choice EXAMPLES_FBCON_CUSTOM_BPP_SELECTION
+ 	prompt "Custom Font pixel depth (BPP - Bits Per Pixel)"
+ 	depends on EXAMPLES_FBCON_CUSTOM_BPP
+ 	---help---
+@@ -94,7 +94,7 @@ config EXAMPLES_FBCON_32BPP
+ 	bool "32 BPP"
+ 	depends on !NX_DISABLE_32BPP
+ 
+-endchoice # EXAMPLES_FBCON_CUSTOM_BPP
++endchoice # EXAMPLES_FBCON_CUSTOM_BPP_SELECTION
+ 
+ comment "Console appearance"
+ 

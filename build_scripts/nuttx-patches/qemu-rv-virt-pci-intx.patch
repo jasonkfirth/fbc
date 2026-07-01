@@ -1,0 +1,88 @@
+--- arch/risc-v/src/qemu-rv/qemu_rv_irq.c
++++ arch/risc-v/src/qemu-rv/qemu_rv_irq.c
+@@ -25,11 +25,13 @@
+ #include <nuttx/config.h>
+ 
+ #include <stdint.h>
++#include <errno.h>
+ #include <stdio.h>
+ #include <assert.h>
+ #include <nuttx/debug.h>
+ 
+ #include <nuttx/arch.h>
+ #include <nuttx/irq.h>
++#include <nuttx/pci/pci.h>
+ 
+ #include "riscv_internal.h"
+ #include "riscv_ipi.h"
+@@ -43,6 +45,15 @@
+ #include "qemu_rv_rptun.h"
+ #endif
+ 
++/****************************************************************************
++ * Pre-processor Definitions
++ ****************************************************************************/
++
++#define QEMU_RV_PCI_INTX_BASE    32
++#define QEMU_RV_PCI_INTX_COUNT   4
++
+ /****************************************************************************
+  * Private Functions
+  ****************************************************************************/
+@@ -302,3 +313,35 @@ irqstate_t up_irq_enable(void)
+ 
+   return oldstat;
+ }
++
++/****************************************************************************
++ * Name: up_get_legacy_irq
++ *
++ * Description:
++ *   Return the NuttX IRQ number for a QEMU virt PCI INTx pin.
++ *
++ *   QEMU's riscv virt machine describes the PCI host bridge in the generated
++ *   device tree.  Its interrupt-map routes INT[A-D] over PLIC interrupt IDs
++ *   32 through 35, rotating the pin assignment by slot number in the usual
++ *   PCI fashion.
++ *
++ ****************************************************************************/
++
++#ifdef CONFIG_PCI
++int up_get_legacy_irq(uint32_t devfn, uint8_t line, uint8_t pin)
++{
++  uint8_t slot;
++  uint8_t index;
++
++  UNUSED(line);
++
++  if (pin < PCI_INTERRUPT_INTA || pin > PCI_INTERRUPT_INTD)
++    {
++      return -EINVAL;
++    }
++
++  slot = PCI_SLOT(devfn);
++  index = (pin - PCI_INTERRUPT_INTA + slot) % QEMU_RV_PCI_INTX_COUNT;
++
++  return RISCV_IRQ_EXT + QEMU_RV_PCI_INTX_BASE + index;
++}
++#endif
+--- arch/risc-v/include/qemu-rv/irq.h
++++ arch/risc-v/include/qemu-rv/irq.h
+@@ -34,8 +34,15 @@
+ 
+ /* Map RISC-V exception code to NuttX IRQ */
+ 
+-#define QEMU_RV_IRQ_UART0  (RISCV_IRQ_MEXT + 10)
++#define QEMU_RV_IRQ_UART0      (RISCV_IRQ_MEXT + 10)
+ 
+-#define NR_IRQS (QEMU_RV_IRQ_UART0 + 1)
++/* QEMU's virt PCI host bridge routes legacy INT[A-D] through PLIC interrupt
++ * IDs 32 through 35.  Keep the IRQ table large enough for PCI INTx handlers
++ * when CONFIG_PCI is enabled.
++ */
++
++#define QEMU_RV_IRQ_PCI_INTD   (RISCV_IRQ_MEXT + 35)
++
++#define NR_IRQS (QEMU_RV_IRQ_PCI_INTD + 1)
+ 
+ #endif /* __ARCH_RISCV_INCLUDE_QEMU_RV_IRQ_H */

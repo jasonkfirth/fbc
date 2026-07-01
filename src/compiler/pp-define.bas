@@ -50,6 +50,73 @@ private function isMacroAllowed(byval s as FBSYMBOL ptr) as integer
 	return TRUE
 end function
 
+private function hMacroIsActive _
+	( _
+		byval s as FBSYMBOL ptr, _
+		byval currmacro as FBSYMBOL ptr, _
+		byval macrodepth as integer, _
+		byval macrostack as FBSYMBOL ptr ptr, _
+		byval macroresume as integer ptr _
+	) as integer
+
+	for i as integer = macrodepth - 1 to 0 step -1
+		if( s = macrostack[i] ) then
+			'' Function-like macro walkers may leave the current macro name as
+			'' the tail of their replacement text so the next argument group can
+			'' be consumed from the caller's remaining input.  Other active
+			'' function-like stack references are recursive DEFINEs and must be
+			'' rejected before they can keep prepending replacement text forever.
+			if( i = macrodepth - 1 ) then
+				if( symbGetDefineParams( s ) > 0 ) then
+					return FALSE
+				end if
+
+				return TRUE
+			end if
+
+			if( pp.skipping ) then
+				return TRUE
+			end if
+
+			if( symbGetDefineParams( macrostack[macrodepth - 1] ) = 0 ) then
+				return FALSE
+			end if
+
+			if( symbGetDefineParams( s ) > 0 ) then
+				return TRUE
+			end if
+		end if
+	next
+
+	if( s = currmacro ) then
+		return TRUE
+	end if
+
+	return FALSE
+
+end function
+
+private sub hMacroPush _
+	( _
+		byval s as FBSYMBOL ptr, _
+		byval resume_len as integer, _
+		byval macrodepth as integer, _
+		byval macrostack as FBSYMBOL ptr ptr, _
+		byval macroresume as integer ptr _
+	)
+
+	for i as integer = 0 to macrodepth - 1
+		lex.ctx->macrostack(i) = macrostack[i]
+		lex.ctx->macroresume(i) = macroresume[i]
+	next
+
+	lex.ctx->macrostack(macrodepth) = s
+	lex.ctx->macroresume(macrodepth) = resume_len
+	lex.ctx->macrodepth = macrodepth + 1
+	lex.ctx->currmacro = s
+
+end sub
+
 '':::::
 private function hLoadMacro _
 	( _
@@ -1014,30 +1081,46 @@ end function
 function ppDefineLoad _
 	( _
 		byval s as FBSYMBOL ptr, _
-		byval currmacro as FBSYMBOL ptr _
+		byval currmacro as FBSYMBOL ptr, _
+		byval macrodepth as integer, _
+		byval macrostack as FBSYMBOL ptr ptr, _
+		byval macroresume as integer ptr _
 	) as integer
 
+	dim as integer loaded = any
+
 	'' recursion?
-	if( s = currmacro ) then
+	if( hMacroIsActive( s, currmacro, macrodepth, macrostack, macroresume ) ) then
 		errReport( FB_ERRMSG_RECURSIVEMACRO )
 		'' error recovery: skip
 		hSkipUntil( INVALID, FALSE, LEX_FLAGS )
 		return TRUE
 	end if
 
-	if( env.inf.format = FBFILE_FORMAT_ASCII ) then
-		function = hLoadDefine( s )
-	else
-		function = hLoadDefineW( s )
+	if( macrodepth >= LEX_MAXMACROSTACK ) then
+		errReport( FB_ERRMSG_RECURSIVEMACRO )
+		'' error recovery: skip
+		hSkipUntil( INVALID, FALSE, LEX_FLAGS )
+		return TRUE
 	end if
 
+	var olddeflen = lex.ctx->deflen
+
+	if( env.inf.format = FBFILE_FORMAT_ASCII ) then
+		loaded = hLoadDefine( s )
+	else
+		loaded = hLoadDefineW( s )
+	end if
+
+	function = loaded
+
 	'' Not empty?
-	if( lex.ctx->deflen > 0 ) then
-		'' Set currmacro if there is no other currmacro yet,
-		'' to prevent at least trivial recursion
-		if( lex.ctx->currmacro = NULL ) then
-			lex.ctx->currmacro = s
-		end if
+	if( (loaded <> FALSE) and (lex.ctx->deflen > olddeflen) ) then
+		'' Remember the active macro chain while the replacement text is being
+		'' scanned.  A single "current macro" pointer catches direct
+		'' self-recursion.  The wider stack is used to stop ancestor cycles when
+		'' a false conditional block is being skipped.
+		hMacroPush( s, olddeflen, macrodepth, macrostack, macroresume )
 	end if
 
 	'' force a re-read

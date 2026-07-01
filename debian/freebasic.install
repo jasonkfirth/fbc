@@ -15,6 +15,8 @@ usr/include/freebasic/fbnetwire.bi
 usr/include/freebasic/fbprng.bi
 usr/include/freebasic/fbthread.bi
 usr/include/freebasic/file.bi
+usr/include/freebasic/gpiopins.bi
+usr/include/freebasic/nuttx
 usr/include/freebasic/sfxlib_raw.bi
 usr/include/freebasic/string.bi
 usr/include/freebasic/utf_conv.bi

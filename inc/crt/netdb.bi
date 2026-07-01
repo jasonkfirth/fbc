@@ -14,6 +14,8 @@
 
 #if defined(__FB_LINUX__)
 #include once "crt/linux/netdb.bi"
+#elseif defined(__FB_NUTTX__)
+#include once "crt/nuttx/netdb.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/linux/netdb.bi"
 #elseif defined(__FB_DRAGONFLY__)
@@ -34,6 +36,8 @@
 #define _PATH_SERVICES "/etc/services"
 
 #if defined(__FB_CYGWIN__)
+extern h_errno alias "h_errno" as long
+#elseif defined(__FB_NUTTX__)
 extern h_errno alias "h_errno" as long
 #elseif defined(__FB_OPENBSD__)
 extern h_errno alias "h_errno" as long
@@ -89,7 +93,25 @@ type addrinfo
 	ai_next as addrinfo ptr
 end type
 
-#if defined(__FB_CYGWIN__) or defined(__FB_DRAGONFLY__) or defined(__FB_NETBSD__)
+#if defined(__FB_NUTTX__)
+const AI_PASSIVE = 1 shl 0
+const AI_CANONNAME = 1 shl 1
+const AI_NUMERICHOST = 1 shl 2
+const AI_NUMERICSERV = 1 shl 3
+const AI_V4MAPPED = 1 shl 4
+const AI_ALL = 1 shl 5
+const AI_ADDRCONFIG = 1 shl 6
+#define EAI_AGAIN 1
+#define EAI_BADFLAGS 2
+#define EAI_FAIL 3
+#define EAI_FAMILY 4
+#define EAI_MEMORY 5
+#define EAI_NONAME 6
+#define EAI_SERVICE 7
+#define EAI_SOCKTYPE 8
+#define EAI_SYSTEM 9
+#define EAI_OVERFLOW 10
+#elseif defined(__FB_CYGWIN__) or defined(__FB_DRAGONFLY__) or defined(__FB_NETBSD__)
 const AI_PASSIVE = &h0001
 const AI_CANONNAME = &h0002
 const AI_NUMERICHOST = &h0004
@@ -154,26 +176,42 @@ const AI_NUMERICSERV = &h0400
 
 #if defined(__FB_OPENBSD__)
 #define NI_MAXHOST 256
+#elseif defined(__FB_NUTTX__)
+#define NI_MAXHOST INET6_ADDRSTRLEN
 #else
 #define NI_MAXHOST 1025
 #endif
+#if defined(__FB_NUTTX__)
+#define NI_MAXSERV 16
+#else
 #define NI_MAXSERV 32
-#if defined(__FB_CYGWIN__) or defined(__FB_DRAGONFLY__) or defined(__FB_NETBSD__)
+#endif
+#if defined(__FB_NUTTX__)
 #define NI_NOFQDN 1
 #define NI_NUMERICHOST 2
 #define NI_NAMEREQD 4
 #define NI_NUMERICSERV 8
+#define NI_NUMERICSCOPE 16
+#define NI_DGRAM 32
+#elseif defined(__FB_CYGWIN__) or defined(__FB_DRAGONFLY__) or defined(__FB_NETBSD__)
+#define NI_NOFQDN 1
+#define NI_NUMERICHOST 2
+#define NI_NAMEREQD 4
+#define NI_NUMERICSERV 8
+#define NI_DGRAM 16
 #else
 #define NI_NUMERICHOST 1
 #define NI_NUMERICSERV 2
 #define NI_NOFQDN 4
 #define NI_NAMEREQD 8
-#endif
 #define NI_DGRAM 16
+#endif
 
 extern "c"
 
-#if defined(__FB_DRAGONFLY__) or defined(__FB_NETBSD__)
+#if defined(__FB_NUTTX__)
+'' h_errno is an exported data symbol on NuttX.
+#elseif defined(__FB_DRAGONFLY__) or defined(__FB_NETBSD__)
 declare function __h_errno () as long ptr
 #else
 declare function __h_errno_location () as long ptr

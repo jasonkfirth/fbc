@@ -78,9 +78,12 @@ int fb_DevPipeOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 	    if( (res == FB_RTERROR_OK) && (openmask != NULL) )
     {
         /* try to open/create pipe */
+        /* OPEN PIPE is specified as a command-backed pipe on host targets. */
 #ifdef HOST_MINGW
+        // NOLINTNEXTLINE(bugprone-command-processor)
         if( (fp = _popen( filename, openmask )) == NULL )
 #else
+        // NOLINTNEXTLINE(bugprone-command-processor)
         if( (fp = popen( filename, openmask )) == NULL )
 #endif
         {

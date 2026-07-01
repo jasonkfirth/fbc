@@ -108,6 +108,7 @@ define _set_os_if_token
 endef
 
 $(eval $(call _set_os_if_token,android,android))
+$(eval $(call _set_os_if_token,nuttx,nuttx))
 $(eval $(call _set_os_if_token,linux,linux))
 $(eval $(call _set_os_if_token,emscripten,js))
 $(eval $(call _set_os_if_token,js,js))
@@ -196,6 +197,11 @@ ifneq ($(filter riscv64,$(TARGET_ARCH_RAW)),)
   TARGET_ARCH := riscv64
 endif
 
+# RISC-V 32
+ifneq ($(filter riscv32 rv32%,$(TARGET_ARCH_RAW)),)
+  TARGET_ARCH := riscv32
+endif
+
 # IBM z
 ifneq ($(filter s390x,$(TARGET_ARCH_RAW)),)
   TARGET_ARCH := s390x
@@ -228,8 +234,8 @@ ifneq ($(filter powerpc powerpc64 powerpc64le,$(TARGET_ARCH)),)
   ISA_FAMILY := powerpc
 endif
 
-# riscv64 uses riscv directory
-ifeq ($(TARGET_ARCH),riscv64)
+# riscv32/riscv64 use riscv directory
+ifneq ($(filter riscv32 riscv64,$(TARGET_ARCH)),)
   ISA_FAMILY := riscv
 endif
 
@@ -351,6 +357,9 @@ ifeq ($(TARGET_OS),linux)
 
   else ifeq ($(TARGET_ARCH),riscv64)
     FBPACK_DIR := linux-riscv64
+
+  else ifeq ($(TARGET_ARCH),riscv32)
+    FBPACK_DIR := linux-riscv32
 
   else ifeq ($(TARGET_ARCH),s390x)
     FBPACK_DIR := linux-s390x

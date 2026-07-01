@@ -20,7 +20,7 @@
 #include once "crt/wii/wchar.bi"
 #elseif defined(__FB_WIN32__) or defined(__FB_XBOX__)
 #include once "crt/win32/wchar.bi"
-#elseif defined(__FB_LINUX__) or defined(__FB_ANDROID__)
+#elseif defined(__FB_LINUX__) or defined(__FB_ANDROID__) or defined(__FB_NUTTX__)
 #include once "crt/linux/wchar.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/cygwin/wchar.bi"

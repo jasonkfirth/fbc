@@ -14,6 +14,8 @@ int fb_DrvIntlGetDateFormat( char *buffer, size_t len )
     size_t i;
 
     DBG_ASSERT(buffer!=NULL);
+    if( len==0 )
+        return FALSE;
 
     /* Can I use this? The problem is that it returns the date format
      * with localized separators. */
@@ -22,7 +24,7 @@ int fb_DrvIntlGetDateFormat( char *buffer, size_t len )
     if( pszName!=NULL ) {
         size_t uiNameSize = strlen(pszName);
         if( uiNameSize < len ) {
-            strcpy( buffer, pszName );
+            memcpy( buffer, pszName, uiNameSize + 1 );
             return TRUE;
         } else {
             return FALSE;
@@ -38,14 +40,14 @@ int fb_DrvIntlGetDateFormat( char *buffer, size_t len )
     pszDate = fb_hGetLocaleInfo( LOCALE_USER_DEFAULT, LOCALE_IDATE,
                                  achDate, sizeof(achDate) );
     if( pszDate!=NULL && pszDayZero!=0 && pszMonZero!=0 ) {
-        switch( atoi( pszDate ) ) {
-        case 0:
+        switch( pszDate[0] ) {
+        case '0':
             FB_MEMCPY(achOrder, "mdy", 3);
             break;
-        case 1:
+        case '1':
             FB_MEMCPY(achOrder, "dmy", 3);
             break;
-        case 2:
+        case '2':
             FB_MEMCPY(achOrder, "ymd", 3);
             break;
         default:
@@ -54,8 +56,8 @@ int fb_DrvIntlGetDateFormat( char *buffer, size_t len )
 
         if( achOrder[0]!=0 ) {
             size_t remaining = len - 1;
-            int day_lead_zero = atoi( pszDayZero ) != 0;
-            int mon_lead_zero = atoi( pszMonZero ) != 0;
+            int day_lead_zero = pszDayZero[0] != '0';
+            int mon_lead_zero = pszMonZero[0] != '0';
             for(i=0; i!=3; ++i) {
                 const char *pszAdd = NULL;
                 size_t add_len;
@@ -77,21 +79,24 @@ int fb_DrvIntlGetDateFormat( char *buffer, size_t len )
                 case 'y':
                     pszAdd = "yyyy";
                     break;
+                default:
+                    return FALSE;
                 }
                 add_len = strlen(pszAdd);
                 if( remaining < add_len )
                     return FALSE;
-                strcpy( buffer, pszAdd );
+                memcpy( buffer, pszAdd, add_len );
                 buffer += add_len;
                 remaining -= add_len;
                 if( i!=2 ) {
                     if( remaining==0 )
                         return FALSE;
-                    strcpy( buffer, "/" );
+                    *buffer = '/';
                     buffer += 1;
                     remaining -= 1;
                 }
             }
+            *buffer = '\0';
             return TRUE;
         }
     }

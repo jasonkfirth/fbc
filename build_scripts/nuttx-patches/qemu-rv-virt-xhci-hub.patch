@@ -1,0 +1,413 @@
+diff --git a/drivers/usbhost/usbhost_hub.c b/drivers/usbhost/usbhost_hub.c
+index 52032ee8..ea3f9f50 100644
+--- a/drivers/usbhost/usbhost_hub.c
++++ b/drivers/usbhost/usbhost_hub.c
+@@ -1484,13 +1484,18 @@ static int usbhost_connect(FAR struct usbhost_class_s *hubclass,
+       return ret;
+     }
+ 
+-  /* Begin monitoring of port status change events */
++  /* Begin monitoring of port status change events.  Some controllers and
++   * emulators do not report an interrupt packet for devices that were already
++   * attached before the hub class finished binding.  Queue one normal hub scan
++   * after power-up so those ports are still discovered.
++   */
+ 
+-  ret = DRVR_ASYNCH(hport->drvr, priv->intin, (FAR uint8_t *)priv->buffer,
+-                    INTIN_BUFSIZE, usbhost_callback, hubclass);
++  priv->buffer[0] = (uint8_t)(((uint16_t)1 << (priv->nports + 1)) - 2);
++  ret = work_queue(LPWORK, &priv->work, usbhost_hub_event,
++                   hubclass, POLL_DELAY);
+   if (ret < 0)
+     {
+-      uerr("ERROR: DRVR_ASYNCH failed: %d\n", ret);
++      uerr("ERROR: initial hub scan failed: %d\n", ret);
+       usbhost_hubpwr(priv, hport, false);
+     }
+ 
+diff --git a/drivers/usbhost/usbhost_xhci_pci.c b/drivers/usbhost/usbhost_xhci_pci.c
+index 03b40816..b13c5241 100644
+--- a/drivers/usbhost/usbhost_xhci_pci.c
++++ b/drivers/usbhost/usbhost_xhci_pci.c
+@@ -56,11 +56,7 @@
+ #  error Invalid value for CONFIG_USBHOST_XHCI_MAX_DEVS
+ #endif
+ 
+-/* USB HUB support is not yet implemented */
+-
+-#ifdef CONFIG_USBHOST_HUB
+-#  error XHCI USB HUB support is not yet implemented
+-#endif
++/* External hub support is enabled by the generic USB host hub class. */
+ 
+ /* Some constants for this implementation */
+ 
+@@ -70,6 +66,17 @@
+ #define XHCI_TD_MAX              (8)
+ #define XHCI_BUFSIZE             (512)
+ 
++#ifdef CONFIG_USBHOST_HUB
++/*
++ * External hub connection events are reported by the hub class and consumed
++ * by the single USB host waiter thread.  A hub can report several changed
++ * ports in one scan, so xHCI must queue those port events instead of keeping
++ * only the last pointer written by connect().
++ */
++
++#  define XHCI_HUB_PORT_EVENT_MAX (8)
++#endif
++
+ /* Port numbers macros */
+ 
+ #define HPNDX(hp)                ((hp)->port)
+@@ -179,6 +186,9 @@ struct xhci_dev_s
+   FAR struct xhci_dev_ctx_s       *ctx;     /* Output Device Context. Managed by xHC */
+   FAR struct xhci_input_dev_ctx_s *input;   /* Input Device Context. Input to xHC */
+   FAR struct xhci_rhport_s        *rhport;  /* Root Hub Port associated with this device */
++#ifdef CONFIG_USBHOST_HUB
++  FAR struct usbhost_hubport_s    *hport;   /* Hub port associated with this device */
++#endif
+ 
+   /* Reference to allocated endpoints */
+ 
+@@ -190,7 +200,10 @@ struct xhci_dev_s
+ struct usbhost_xhci_s
+ {
+ #ifdef CONFIG_USBHOST_HUB
+-  FAR struct usbhost_hubport_s *hport;      /* Used to pass external hub port events */
++  FAR struct usbhost_hubport_s *hportq[XHCI_HUB_PORT_EVENT_MAX];
++  uint8_t                       hportq_head;
++  uint8_t                       hportq_tail;
++  uint8_t                       hportq_count;
+ #endif
+   struct usbhost_devaddr_s      devgen;     /* Address generation data */
+   bool                          pscwait;    /* TRUE: Thread is waiting for port status change event */
+@@ -1495,16 +1508,20 @@ static void xhci_ep_configure(FAR struct usbhost_xhci_s *priv,
+  *
+  ****************************************************************************/
+ 
+-static int xhci_address_set(FAR struct usbhost_xhci_s *priv,
+-                            FAR struct xhci_rhport_s *rhport, bool setaddr)
++static int xhci_address_set_dev(FAR struct usbhost_xhci_s *priv,
++                                FAR struct xhci_dev_s *dev,
++                                uint8_t slot, bool setaddr)
+ {
+-  FAR struct xhci_dev_s *dev;
+   uint64_t ctx;
+ 
+-  dev = rhport->dev;
+   ctx = up_addrenv_va_to_pa(dev->input);
++  return xhci_cmd_setaddr(priv, slot, ctx, !setaddr);
++}
+ 
+-  return xhci_cmd_setaddr(priv, rhport->slot, ctx, !setaddr);
++static int xhci_address_set(FAR struct usbhost_xhci_s *priv,
++                            FAR struct xhci_rhport_s *rhport, bool setaddr)
++{
++  return xhci_address_set_dev(priv, rhport->dev, rhport->slot, setaddr);
+ }
+ 
+ /****************************************************************************
+@@ -1525,6 +1542,8 @@ static int xhci_address_set(FAR struct usbhost_xhci_s *priv,
+ static int xhci_slot_init(FAR struct usbhost_xhci_s *priv,
+                           FAR struct xhci_dev_s *dev)
+ {
++  FAR struct xhci_epinfo_s *ep0info;
++  FAR struct usbhost_hubport_s *hport;
+   uint32_t regval;
+   uint16_t maxpkt;
+   uintptr_t drdp;
+@@ -1548,13 +1567,27 @@ static int xhci_slot_init(FAR struct usbhost_xhci_s *priv,
+   regval = XHCI_ST_CTX0_CTXENT_SET(1);
+ 
+ #ifdef CONFIG_USBHOST_HUB
+-  /* TODO:
+-   *   1. Activate the transaction translator if required
+-   *   2. Configure hub bit in slot context if hub
+-   *   3. configure route string
+-   */
++  if (dev->hport != NULL && !ROOTHUB(dev->hport))
++    {
++      FAR struct usbhost_hubport_s *routeport;
++      uint32_t route = 0;
++      int shift = 0;
++
++      for (routeport = dev->hport;
++           routeport != NULL && !ROOTHUB(routeport);
++           routeport = routeport->parent)
++        {
++          if (shift >= 20)
++            {
++              return -EINVAL;
++            }
++
++          route |= ((uint32_t)HPORT(routeport) & 0xf) << shift;
++          shift += 4;
++        }
+ 
+-#  warning missing logic
++      regval |= route & XHCI_ST_CTX0_RTSTR_MASK;
++    }
+ #endif
+ 
+   dev->input->slot.ctx[0] = htole32(regval);
+@@ -1569,15 +1602,29 @@ static int xhci_slot_init(FAR struct usbhost_xhci_s *priv,
+   dev->input->slot.ctx[1] = htole32(regval);
+ 
+   /* Step 4. the Transfer Ring for the Default Control Endpoint is already
+-   * allocated.
++   * allocated.  Devices behind an external hub own their own EP0 ring; using
++   * the root-port EP0 ring here leaves the controller talking to the wrong
++   * transfer ring when it tries to fetch the child device descriptor.
+    */
+ 
+-  drdp = up_addrenv_va_to_pa(dev->rhport->ep0.td.ring);
++  ep0info = &dev->rhport->ep0;
++  hport   = &dev->rhport->hport.hport;
++
++#ifdef CONFIG_USBHOST_HUB
++  if (dev->hport != NULL && !ROOTHUB(dev->hport))
++    {
++      ep0info = (FAR struct xhci_epinfo_s *)dev->hport->ep0;
++      hport   = dev->hport;
++    }
++#endif
++
++  DEBUGASSERT(ep0info != NULL && ep0info->td.ring != NULL);
++  drdp = up_addrenv_va_to_pa(ep0info->td.ring);
+ 
+   /* Step 5. Initialize the Input default control Endpoint 0 Context */
+ 
+   DEBUGASSERT(dev->rhport != NULL);
+-  if (dev->rhport->hport.hport.speed == USB_SPEED_HIGH)
++  if (hport->speed == USB_SPEED_HIGH)
+     {
+       /* For high-speed, we must use 64 bytes */
+ 
+@@ -1684,6 +1731,9 @@ static int xhci_device_init(FAR struct usbhost_xhci_s *priv,
+   rhport->ep0.slot = slot;
+   dev->rhport      = rhport;
+   dev->slot        = slot;
++#ifdef CONFIG_USBHOST_HUB
++  dev->hport       = &rhport->hport.hport;
++#endif
+   dev->epinfo[0]   = &rhport->ep0;
+ 
+   ret = xhci_slot_init(priv, dev);
+@@ -3010,12 +3060,19 @@ static int xhci_wait(FAR struct usbhost_connection_s *conn,
+ #ifdef CONFIG_USBHOST_HUB
+       /* Is a device connected to an external hub? */
+ 
+-      if (priv->hport)
++      if (priv->hportq_count > 0)
+         {
+-          /* Yes.. return the external hub port */
++          /* Yes.. return the oldest pending external hub port event. */
+ 
+-          connport = priv->hport;
+-          priv->hport = NULL;
++          connport = priv->hportq[priv->hportq_head];
++          priv->hportq[priv->hportq_head] = NULL;
++          priv->hportq_head++;
++          if (priv->hportq_head >= XHCI_HUB_PORT_EVENT_MAX)
++            {
++              priv->hportq_head = 0;
++            }
++
++          priv->hportq_count--;
+ 
+           *hport = (FAR struct usbhost_hubport_s *)connport;
+           spin_unlock_irqrestore(&priv->spinlock, flags);
+@@ -3316,7 +3373,52 @@ static int xhci_epalloc(FAR struct usbhost_driver_s *drvr,
+ 
+   idx              = xhci_epno_get(epinfo);
+   mask             = XHCI_IN_CTX1_A(XHCI_EP_FLAG(idx));
+-  dev              = rhport->dev;
++
++#ifdef CONFIG_USBHOST_HUB
++  if (!ROOTHUB(hport))
++    {
++      FAR struct xhci_epinfo_s *ep0info;
++
++      if (epinfo->xfrtype == USB_EP_ATTR_XFER_CONTROL &&
++          epinfo->epno == 0 && hport->ep0 == NULL)
++        {
++          uint8_t slot;
++
++          ret = xhci_cmd_sloten(priv, &slot);
++          if (ret < 0 || slot == 0 || slot > priv->no_slots)
++            {
++              kmm_free(epinfo);
++              return ret < 0 ? ret : -EINVAL;
++            }
++
++          dev = &priv->devs[slot - 1];
++          dev->state = XHCI_SLOT_ENABLED;
++          dev->slot = slot;
++          dev->rhport = rhport;
++          dev->hport = hport;
++          epinfo->slot = slot;
++        }
++      else
++        {
++          ep0info = (FAR struct xhci_epinfo_s *)hport->ep0;
++          if (ep0info == NULL || ep0info->slot == 0 ||
++              ep0info->slot > priv->no_slots)
++            {
++              kmm_free(epinfo);
++              return -ENODEV;
++            }
++
++          dev = &priv->devs[ep0info->slot - 1];
++          epinfo->slot = ep0info->slot;
++        }
++    }
++  else
++#endif
++    {
++      dev = rhport->dev;
++      epinfo->slot = rhport->slot;
++    }
++
+   dev->epinfo[idx - 1] = epinfo;
+ 
+   /* TD rings already allocated but not connected yet. */
+@@ -3328,32 +3430,51 @@ static int xhci_epalloc(FAR struct usbhost_driver_s *drvr,
+       return ret;
+     }
+ 
+-  /* Store slot ID for later */
+-
+-  epinfo->slot = rhport->slot;
+-
+ #ifdef CONFIG_USBHOST_HUB
+-  if (hport->speed != USB_SPEED_HIGH)
++  if (!ROOTHUB(hport) && epinfo->xfrtype == USB_EP_ATTR_XFER_CONTROL &&
++      epinfo->epno == 0)
+     {
+-      /* A high speed hub exists between this device and the root hub
+-       * otherwise we would not get here.
+-       */
++      hport->ep0 = (usbhost_ep_t)epinfo;
+ 
+-      FAR struct usbhost_hubport_s *parent = hport->parent;
++      ret = xhci_slot_init(priv, dev);
++      if (ret < 0)
++        {
++          hport->ep0 = NULL;
++          return ret;
++        }
+ 
+-      for (; parent->speed != USB_SPEED_HIGH; parent = hport->parent)
++      ret = xhci_address_set_dev(priv, dev, epinfo->slot, false);
++      if (ret < 0)
+         {
+-          hport = parent;
++          pcierr("failed to set hub child address %d\n", ret);
++          hport->ep0 = NULL;
++          return ret;
+         }
+ 
+-      if (parent->speed == USB_SPEED_HIGH)
++      *ep = (usbhost_ep_t)epinfo;
++      return OK;
++    }
++
++  if (!ROOTHUB(hport) && hport->speed != USB_SPEED_HIGH)
++    {
++      FAR struct usbhost_hubport_s *child;
++      FAR struct usbhost_hubport_s *parent;
++
++      /* Split transaction fields are only valid for full-/low-speed devices
++       * below a high-speed hub.  A full-speed hub attached directly to the
++       * root port has no upstream transaction translator to reference here.
++       */
++
++      for (child = hport, parent = child->parent;
++           parent != NULL && parent->speed != USB_SPEED_HIGH;
++           child = parent, parent = parent->parent)
+         {
+-          epinfo->hubport = HPORT(hport);
+-          epinfo->hubaddr = hport->parent->funcaddr;
+         }
+-      else
++
++      if (parent != NULL && parent->speed == USB_SPEED_HIGH)
+         {
+-          return -EINVAL;
++          epinfo->hubport = HPORT(child);
++          epinfo->hubaddr = parent->funcaddr;
+         }
+     }
+ #endif
+@@ -3708,24 +3829,33 @@ static int xhci_ctrl_xfer(FAR struct usbhost_driver_s *drvr,
+ 
+   if (req->req == USB_REQ_SETADDRESS)
+     {
++      FAR struct xhci_dev_s *dev;
++
++      if (ep0info->slot == 0 || ep0info->slot > priv->no_slots)
++        {
++          return -ENODEV;
++        }
++
++      dev = &priv->devs[ep0info->slot - 1];
++
+       /* Reset EP0 ring to its initial state, so when xHCI update EP0
+        * context, TD dequeue pointer would be valid. It may be already
+        * off, because the USB Host stack has already sent some messages
+        * on control EP.
+        */
+ 
+-      xhci_ring_init(&rhport->dev->rhport->ep0.td, 0);
++      xhci_ring_init(&ep0info->td, 0);
+ 
+       /* Issue SET_ADDRESS request */
+ 
+-      ret = xhci_address_set(priv, rhport, true);
++      ret = xhci_address_set_dev(priv, dev, ep0info->slot, true);
+       if (ret == OK)
+         {
+           /* Store USB Device Address assigned by xHCI */
+ 
+           ep0info->devaddr =
+-            XHCI_ST_CTX3_ADDR_GET(rhport->dev->ctx->slot.ctx[3]);
+-          rhport->dev->input->slot.ctx[3] = rhport->dev->ctx->slot.ctx[3];
++            XHCI_ST_CTX3_ADDR_GET(dev->ctx->slot.ctx[3]);
++          dev->input->slot.ctx[3] = dev->ctx->slot.ctx[3];
+         }
+ 
+       return OK;
+@@ -4167,7 +4297,31 @@ static int xhci_connect(FAR struct usbhost_driver_s *drvr,
+                         FAR struct usbhost_hubport_s *hport,
+                         bool connected)
+ {
+-#error missing logic
++  FAR struct usbhost_xhci_s *priv = XHCI_PRIV_FROM_DRVR(drvr);
++  irqstate_t flags;
++
++  DEBUGASSERT(priv != NULL && hport != NULL);
++
++  flags = spin_lock_irqsave(&priv->spinlock);
++  if (priv->hportq_count >= XHCI_HUB_PORT_EVENT_MAX)
++    {
++      spin_unlock_irqrestore(&priv->spinlock, flags);
++      return -EBUSY;
++    }
++
++  hport->connected = connected;
++  priv->hportq[priv->hportq_tail] = hport;
++  priv->hportq_tail++;
++  if (priv->hportq_tail >= XHCI_HUB_PORT_EVENT_MAX)
++    {
++      priv->hportq_tail = 0;
++    }
++
++  priv->hportq_count++;
++  spin_unlock_irqrestore(&priv->spinlock, flags);
++
++  nxsem_post(&priv->pscsem);
++  return OK;
+ }
+ #endif
+ 

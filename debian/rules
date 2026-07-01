@@ -229,13 +229,11 @@ endif
 # ------------------------------------------------------------
 
 ANDROID_API ?= 26
-ANDROID_TARGET_TRIPLET ?= aarch64-linux-android
-ANDROID_FBTARGET_KEY ?= android-aarch64
+ANDROID_ABI_SPECS ?= android-arm:armv7a-linux-androideabi android-aarch64:aarch64-linux-android android-x86_64:x86_64-linux-android
+ANDROID_FBTARGET_KEYS := $(foreach spec,$(ANDROID_ABI_SPECS),$(word 1,$(subst :, ,$(spec))))
 ANDROID_NDK_HOME ?= $(firstword $(wildcard /usr/lib/android-sdk/ndk/* /usr/lib/android-sdk/ndk-bundle /usr/lib/android-ndk* /opt/android-ndk*))
 ANDROID_TOOLCHAIN_PREBUILT ?= $(firstword $(wildcard $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/linux-x86_64 $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/*))
 ANDROID_TOOLCHAIN_BINDIR := $(ANDROID_TOOLCHAIN_PREBUILT)/bin
-ANDROID_CC := $(ANDROID_TOOLCHAIN_BINDIR)/$(ANDROID_TARGET_TRIPLET)$(ANDROID_API)-clang
-ANDROID_CXX := $(ANDROID_TOOLCHAIN_BINDIR)/$(ANDROID_TARGET_TRIPLET)$(ANDROID_API)-clang++
 ANDROID_AR := $(ANDROID_TOOLCHAIN_BINDIR)/llvm-ar
 ANDROID_RANLIB := $(ANDROID_TOOLCHAIN_BINDIR)/llvm-ranlib
 
@@ -394,9 +392,15 @@ endif
 
 ifeq ($(BUILD_ANDROID),yes)
 	@test -n "$(ANDROID_NDK_HOME)" || { echo "ERROR: Android NDK not found. Install google-android-ndk-r28-installer or set ANDROID_NDK_HOME."; exit 1; }
-	@test -x "$(ANDROID_CC)" || { echo "ERROR: Android clang not found: $(ANDROID_CC)"; exit 1; }
 	@test -x "$(ANDROID_AR)" || { echo "ERROR: Android llvm-ar not found: $(ANDROID_AR)"; exit 1; }
 	@test -x "$(ANDROID_RANLIB)" || { echo "ERROR: Android llvm-ranlib not found: $(ANDROID_RANLIB)"; exit 1; }
+	@set -e; \
+	for spec in $(ANDROID_ABI_SPECS); do \
+		target_key=$${spec%%:*}; \
+		triplet=$${spec#*:}; \
+		cc="$(ANDROID_TOOLCHAIN_BINDIR)/$${triplet}$(ANDROID_API)-clang"; \
+		test -x "$$cc" || { echo "ERROR: Android clang not found for $$target_key: $$cc"; exit 1; }; \
+	done
 
 	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
 		$(ARM_CPU_MAKE_ARGS) \
@@ -410,25 +414,32 @@ ifeq ($(BUILD_ANDROID),yes)
 		CXXFLAGS="$(CXXFLAGS)" \
 		LDFLAGS="$(LDFLAGS)"
 
-	$(PARMAKE) TARGET_TRIPLET="$(ANDROID_TARGET_TRIPLET)" TARGET="$(ANDROID_TARGET_TRIPLET)" MULTILIB="" \
-		FBTARGET_DIR_OVERRIDE="$(ANDROID_FBTARGET_KEY)" \
-		BUILD_PREFIX= \
-		CC="$(ANDROID_CC)" \
-		CXX="$(ANDROID_CXX)" \
-		CLANG="$(ANDROID_CC)" \
-		AS="$(ANDROID_CC)" \
-		LD="$(ANDROID_CC)" \
-		AR="$(ANDROID_AR)" \
-		RANLIB="$(ANDROID_RANLIB)" \
-		rtlib fbrt gfxlib2 sfxlib \
-		FBC="$(PACKAGE_FBC)" \
-		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
-		BUILD_FBC_TARGET="$(ANDROID_FBTARGET_KEY)" \
-		BUILD_FBC_BUILDPREFIX= \
-		CPPFLAGS= \
-		CFLAGS= \
-		CXXFLAGS= \
-		LDFLAGS=
+	set -e; \
+	for spec in $(ANDROID_ABI_SPECS); do \
+		target_key=$${spec%%:*}; \
+		triplet=$${spec#*:}; \
+		cc="$(ANDROID_TOOLCHAIN_BINDIR)/$${triplet}$(ANDROID_API)-clang"; \
+		cxx="$(ANDROID_TOOLCHAIN_BINDIR)/$${triplet}$(ANDROID_API)-clang++"; \
+		$(PARMAKE) TARGET_TRIPLET="$$triplet" TARGET="$$triplet" MULTILIB="" \
+			FBTARGET_DIR_OVERRIDE="$$target_key" \
+			BUILD_PREFIX= \
+			CC="$$cc" \
+			CXX="$$cxx" \
+			CLANG="$$cc" \
+			AS="$$cc" \
+			LD="$$cc" \
+			AR="$(ANDROID_AR)" \
+			RANLIB="$(ANDROID_RANLIB)" \
+			rtlib fbrt gfxlib2 sfxlib \
+			FBC="$(PACKAGE_FBC)" \
+			BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
+			BUILD_FBC_TARGET="$$target_key" \
+			BUILD_FBC_BUILDPREFIX= \
+			CPPFLAGS= \
+			CFLAGS= \
+			CXXFLAGS= \
+			LDFLAGS=; \
+	done
 endif
 
 ifeq ($(BUILD_WII),yes)
@@ -510,7 +521,8 @@ ifeq ($(BUILD_ANDROID),yes)
 		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
 		BUILD_FBCFLAGS="$(ARM_BUILD_FBCFLAGS)" \
-		ANDROID_BUILD_LIBDIR="$(CURDIR)/lib/freebasic/$(ANDROID_FBTARGET_KEY)"
+		FB_ANDROID_TARGETS="$(ANDROID_FBTARGET_KEYS)" \
+		ANDROID_BUILD_LIBROOT="$(CURDIR)/lib/freebasic"
 endif
 
 ifeq ($(BUILD_WII),yes)
@@ -567,6 +579,104 @@ endif
 			debian/tmp/usr/share/freebasic/examples/graphics/SDL/data/Vera.ttf; \
 	fi
 	find debian/tmp/usr/share/freebasic/examples -type d -empty -delete || true
+
+# ------------------------------------------------------------
+# NuttX module workflow SDK
+# ------------------------------------------------------------
+
+	rm -rf debian/tmp/usr/share/freebasic/nuttx-sdk
+	mkdir -p debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts
+	mkdir -p debian/tmp/usr/share/freebasic/nuttx-sdk/examples
+	mkdir -p debian/tmp/usr/share/freebasic/nuttx-sdk/src
+	touch debian/tmp/usr/share/freebasic/nuttx-sdk/.nuttx-sdk-root
+	printf '%s\n' '# Installed FreeBASIC NuttX SDK root.' \
+		> debian/tmp/usr/share/freebasic/nuttx-sdk/GNUmakefile
+	cp -a build_scripts/fbc-nuttx-esp32p4.sh \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/
+	cp -a build_scripts/fbc-nuttx-esp32p4-firmware.sh \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/
+	cp -a build_scripts/fbc-nuttx-rp2350-pizero-firmware.sh \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/
+	cp -a build_scripts/nuttx-rp2350-* \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/
+	cp -a build_scripts/nuttx-riscv32-qemu-smoke.sh \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/
+	cp -a build_scripts/nuttx-remote-console.bas \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/
+	cp -a build_scripts/nuttx-http-server.bas \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/
+	cp -a build_scripts/nuttx-patches \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/
+	cp -a examples/nuttx \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/examples/
+	cp -a src/rtlib \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/src/
+	cp -a src/gfxlib2 \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/src/
+	cp -a src/sfxlib \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/src/
+	find debian/tmp/usr/share/freebasic/nuttx-sdk -type f \
+		\( -name '*.o' -o -name '*.obj' -o -name '*.a' -o -name '*.dll' \
+		   -o -name '*.exe' -o -name '*.so' -o -name '*.d' \) \
+		-delete
+	mkdir -p debian/tmp/usr/bin
+	printf '%s\n' \
+		'#!/usr/bin/env bash' \
+		'exec bash /usr/share/freebasic/nuttx-sdk/build_scripts/fbc-nuttx-esp32p4.sh "$$@"' \
+		> debian/tmp/usr/bin/fbc-nuttx-esp32p4
+	printf '%s\n' \
+		'#!/usr/bin/env bash' \
+		'exec bash /usr/share/freebasic/nuttx-sdk/build_scripts/fbc-nuttx-esp32p4-firmware.sh "$$@"' \
+		> debian/tmp/usr/bin/fbc-nuttx-esp32p4-firmware
+	printf '%s\n' \
+		'#!/usr/bin/env bash' \
+		'exec bash /usr/share/freebasic/nuttx-sdk/build_scripts/fbc-nuttx-rp2350-pizero-firmware.sh "$$@"' \
+		> debian/tmp/usr/bin/fbc-nuttx-rp2350-pizero-firmware
+	printf '%s\n' \
+		'#!/usr/bin/env bash' \
+		'exec bash /usr/share/freebasic/nuttx-sdk/build_scripts/nuttx-riscv32-qemu-smoke.sh "$$@"' \
+		> debian/tmp/usr/bin/nuttx-riscv32-qemu-smoke
+	printf '%s\n' \
+		'#!/usr/bin/env bash' \
+		'set -e' \
+		'cache="$${XDG_CACHE_HOME:-$${HOME:-/tmp}/.cache}/freebasic/nuttx-tools"' \
+		'src=/usr/share/freebasic/nuttx-sdk/build_scripts/nuttx-remote-console.bas' \
+		'exe="$$cache/nuttx-remote-console"' \
+		'worksrcdir="$$cache/src"' \
+		'worksrc="$$worksrcdir/nuttx-remote-console.bas"' \
+		'mkdir -p "$$worksrcdir"' \
+		'if [ ! -f "$$worksrc" ] || [ "$$src" -nt "$$worksrc" ]; then' \
+		'	cp -p "$$src" "$$worksrc"' \
+		'fi' \
+		'if [ ! -x "$$exe" ] || [ "$$worksrc" -nt "$$exe" ]; then' \
+		'	fbc -noobjinfo "$$worksrc" -x "$$exe"' \
+		'fi' \
+		'exec "$$exe" "$$@"' \
+		> debian/tmp/usr/bin/nuttx-remote-console
+	printf '%s\n' \
+		'#!/usr/bin/env bash' \
+		'set -e' \
+		'cache="$${XDG_CACHE_HOME:-$${HOME:-/tmp}/.cache}/freebasic/nuttx-tools"' \
+		'src=/usr/share/freebasic/nuttx-sdk/build_scripts/nuttx-http-server.bas' \
+		'exe="$$cache/nuttx-http-server"' \
+		'worksrcdir="$$cache/src"' \
+		'worksrc="$$worksrcdir/nuttx-http-server.bas"' \
+		'mkdir -p "$$worksrcdir"' \
+		'if [ ! -f "$$worksrc" ] || [ "$$src" -nt "$$worksrc" ]; then' \
+		'	cp -p "$$src" "$$worksrc"' \
+		'fi' \
+		'if [ ! -x "$$exe" ] || [ "$$worksrc" -nt "$$exe" ]; then' \
+		'	fbc -noobjinfo "$$worksrc" -x "$$exe"' \
+		'fi' \
+		'exec "$$exe" "$$@"' \
+		> debian/tmp/usr/bin/nuttx-http-server
+	chmod 755 \
+		debian/tmp/usr/bin/fbc-nuttx-esp32p4 \
+		debian/tmp/usr/bin/fbc-nuttx-esp32p4-firmware \
+		debian/tmp/usr/bin/fbc-nuttx-rp2350-pizero-firmware \
+		debian/tmp/usr/bin/nuttx-riscv32-qemu-smoke \
+		debian/tmp/usr/bin/nuttx-remote-console \
+		debian/tmp/usr/bin/nuttx-http-server
 
 # ------------------------------------------------------------
 # FLTK license relocation

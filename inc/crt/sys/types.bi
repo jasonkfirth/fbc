@@ -17,7 +17,7 @@
 #include once "crt/sys/win32/types.bi"
 #elseif defined(__FB_DOS__)
 #include once "crt/sys/dos/types.bi"
-#elseif defined(__FB_LINUX__) or defined(__FB_ANDROID__)
+#elseif defined(__FB_LINUX__) or defined(__FB_ANDROID__) or defined(__FB_NUTTX__)
 #include once "crt/sys/linux/types.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/sys/cygwin/types.bi"

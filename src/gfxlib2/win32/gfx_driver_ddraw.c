@@ -49,6 +49,7 @@ typedef struct MODESLIST {
 	int depth;
 	int size;
 	int *data;
+	int failed;
 } MODESLIST;
 
 typedef struct DEVENUMDATA {
@@ -205,9 +206,9 @@ static int directx_init(void)
 	if (!di_library)
 		return -1;
 
-	DirectDrawCreate = (DIRECTDRAWCREATE)(void*)GetProcAddress(dd_library, "DirectDrawCreate");
-	DirectDrawEnumerateEx = (DIRECTDRAWENUMERATEEX)(void*)GetProcAddress(dd_library, "DirectDrawEnumerateExA");
-	DirectInputCreate = (DIRECTINPUTCREATE)(void*)GetProcAddress(di_library, "DirectInputCreateA");
+	DirectDrawCreate = (DIRECTDRAWCREATE)GetProcAddress(dd_library, "DirectDrawCreate");
+	DirectDrawEnumerateEx = (DIRECTDRAWENUMERATEEX)GetProcAddress(dd_library, "DirectDrawEnumerateExA");
+	DirectInputCreate = (DIRECTINPUTCREATE)GetProcAddress(di_library, "DirectInputCreateA");
 	
 	dev_enum_data.success = FALSE;
 	
@@ -221,7 +222,7 @@ static int directx_init(void)
 	
 	if ((!DirectDrawCreate) || (DirectDrawCreate(ddGUID, &lpDD1, NULL) != DD_OK))
 		return -1;
-	res = IDirectDraw_QueryInterface(lpDD1, &__fb_IID_IDirectDraw2, (LPVOID)&lpDD);
+	res = IDirectDraw_QueryInterface(lpDD1, &__fb_IID_IDirectDraw2, (void **)&lpDD);
 	IDirectDraw_Release(lpDD1);
 	if (res != DD_OK)
 		return -1;
@@ -525,8 +526,15 @@ static HRESULT CALLBACK fetch_modes_callback(LPDDSURFACEDESC desc, LPVOID data)
 	if ((depth == 16) && (desc->ddpfPixelFormat.dwGBitMask == 0x03E0))
 		depth = 15;
 	if (depth == modes->depth) {
+		int *newdata;
 		modes->size++;
-		modes->data = (int *)realloc(modes->data, modes->size * sizeof(int));
+		newdata = (int *)realloc(modes->data, modes->size * sizeof(int));
+		if (newdata == NULL) {
+			modes->size--;
+			modes->failed = TRUE;
+			return DDENUMRET_CANCEL;
+		}
+		modes->data = newdata;
 		modes->data[modes->size - 1] = (desc->dwWidth << 16) | desc->dwHeight;
 	}
 
@@ -535,7 +543,7 @@ static HRESULT CALLBACK fetch_modes_callback(LPDDSURFACEDESC desc, LPVOID data)
 
 static int *driver_fetch_modes(int depth, int *size)
 {
-	MODESLIST modes = { depth, 0, NULL };
+	MODESLIST modes = { depth, 0, NULL, FALSE };
 	LPDIRECTDRAW dd1;
 	LPDIRECTDRAW2 dd2;
 	DIRECTDRAWCREATE DirectDrawCreate;
@@ -546,12 +554,12 @@ static int *driver_fetch_modes(int depth, int *size)
 		library = (HMODULE)LoadLibrary("ddraw.dll");
 		if (!library)
 			return NULL;
-		DirectDrawCreate = (DIRECTDRAWCREATE)(void*)GetProcAddress(library, "DirectDrawCreate");
+		DirectDrawCreate = (DIRECTDRAWCREATE)GetProcAddress(library, "DirectDrawCreate");
 		if ((!DirectDrawCreate) || (DirectDrawCreate(NULL, &dd1, NULL) != DD_OK)) {
 			FreeLibrary(library);
 			return NULL;
 		}
-		res = IDirectDraw_QueryInterface(dd1, &__fb_IID_IDirectDraw2, (LPVOID)&dd2);
+		res = IDirectDraw_QueryInterface(dd1, &__fb_IID_IDirectDraw2, (void **)&dd2);
 		IDirectDraw_Release(dd1);
 		if (res != DD_OK) {
 			FreeLibrary(library);
@@ -560,8 +568,12 @@ static int *driver_fetch_modes(int depth, int *size)
 	} else {
 		dd2 = lpDD;
 	}
-	if (IDirectDraw2_EnumDisplayModes(dd2, DDEDM_STANDARDVGAMODES, NULL, (LPVOID)&modes, fetch_modes_callback) != DD_OK)
+	if ((IDirectDraw2_EnumDisplayModes(dd2, DDEDM_STANDARDVGAMODES, NULL, (LPVOID)&modes, fetch_modes_callback) != DD_OK) ||
+	    modes.failed) {
+		free(modes.data);
 		modes.data = NULL;
+		modes.size = 0;
+	}
 
 	if (!lpDD) {
 		IDirectDraw_Release(dd2);

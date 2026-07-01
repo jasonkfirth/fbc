@@ -1,0 +1,54 @@
+--- boards/risc-v/qemu-rv/rv-virt/src/qemu_rv_boardinit.c
++++ boards/risc-v/qemu-rv/rv-virt/src/qemu_rv_boardinit.c
+@@ -34,6 +34,7 @@
+ 
+ #include <nuttx/board.h>
+ #include <nuttx/drivers/ramdisk.h>
++#include <nuttx/fdt.h>
+ #include <nuttx/virtio/virtio-mmio.h>
+ 
+ #include <sys/mount.h>
+@@ -88,6 +89,34 @@
+ }
+ #endif
+ 
++#if defined(CONFIG_LIBC_FDT) && defined(CONFIG_DEVICE_TREE) && \
++    defined(CONFIG_PCI)
++
++/****************************************************************************
++ * Name: qemu_pci_register_from_fdt
++ ****************************************************************************/
++
++static void qemu_pci_register_from_fdt(void)
++{
++  const void *fdt = fdt_get();
++  int ret;
++
++  if (fdt == NULL)
++    {
++      return;
++    }
++
++  ret = fdt_pci_ecam_register(fdt);
++  if (ret < 0)
++    {
++      syslog(LOG_ERR, "fdt_pci_ecam_register failed, ret=%d\n", ret);
++    }
++}
++
++#else
++#  define qemu_pci_register_from_fdt()
++#endif
++
+ /****************************************************************************
+  * Public Functions
+  ****************************************************************************/
+@@ -144,6 +173,8 @@
+ #endif
+ #endif
+ 
++  qemu_pci_register_from_fdt();
++
+ #ifdef CONFIG_RPTUN
+   qemu_rptun_init();
+ #endif

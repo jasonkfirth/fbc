@@ -44,6 +44,96 @@ static const MODEINFO mode_info[NUM_MODES] = {
 	{ 1280, 1024, 8, 1, 1, FB_PALETTE_256, FB_FONT_16, 160, 64 }  /* 21: 1280x1024 */
 };
 
+#ifdef HOST_NUTTX
+#define FB_NUTTX_GFX_MAX_FRAMEBUFFER_BYTES (320U * 200U)
+
+static size_t fb_nuttx_gfx_page_bytes(int w, int h, int depth,
+	int allow_truecolor)
+{
+	size_t bytes_per_pixel;
+	size_t bytes_per_line;
+	size_t max_size;
+
+	if ((w <= 0) || (h <= 0))
+		return 0;
+
+	switch (depth) {
+	case 1:
+	case 2:
+	case 4:
+	case 8:
+		break;
+	case 15:
+	case 16:
+	case 24:
+	case 32:
+		if (!allow_truecolor)
+			return 0;
+		break;
+	default:
+		return 0;
+	}
+
+	/*
+		NuttX is currently using the normal gfxlib2 software framebuffer.  It
+		represents sub-byte palette depths as one byte per pixel, so the memory
+		budget check must match that allocation until a packed-page backend
+		exists.  The null driver is the one exception: it never presents to the
+		board, but the fbctests command sweep uses a small true-color null
+		surface to verify generic gfxlib calls.
+	*/
+	bytes_per_pixel = (size_t)BYTES_PER_PIXEL(depth);
+	max_size = (size_t)-1;
+
+	if ((size_t)w > (max_size / bytes_per_pixel))
+		return 0;
+
+	bytes_per_line = (size_t)w * bytes_per_pixel;
+
+	if ((size_t)h > (max_size / bytes_per_line))
+		return 0;
+
+	return bytes_per_line * (size_t)h;
+}
+
+static int fb_nuttx_gfx_limit_pages(int w, int h, int depth,
+	int requested_pages, int default_pages, int allow_truecolor,
+	int *num_pages)
+{
+	size_t page_bytes;
+	size_t max_pages;
+	int pages;
+
+	page_bytes = fb_nuttx_gfx_page_bytes(w, h, depth, allow_truecolor);
+
+	if ((page_bytes == 0) || (page_bytes > FB_NUTTX_GFX_MAX_FRAMEBUFFER_BYTES))
+		return FALSE;
+
+	max_pages = FB_NUTTX_GFX_MAX_FRAMEBUFFER_BYTES / page_bytes;
+
+	if (max_pages == 0)
+		return FALSE;
+
+	if (requested_pages <= 0) {
+		pages = default_pages;
+
+		if (pages <= 0)
+			pages = 1;
+
+		if ((size_t)pages > max_pages)
+			pages = (int)max_pages;
+	} else {
+		pages = requested_pages;
+
+		if ((size_t)pages > max_pages)
+			return FALSE;
+	}
+
+	*num_pages = pages;
+	return TRUE;
+}
+#endif
+
 static int  screen_id = 1;
 static char window_title_buff[WINDOW_TITLE_SIZE] = { 0 };
 static int  exit_proc_set = FALSE;
@@ -420,6 +510,10 @@ FBCALL int fb_GfxScreen
 		int flags, int refresh_rate
 	)
 {
+#ifdef HOST_NUTTX
+	int requested_pages = num_pages;
+#endif
+
 	if( (mode < 0) || (mode >= NUM_MODES) )
 		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 
@@ -445,9 +539,20 @@ FBCALL int fb_GfxScreen
 		break;
 	}
 
+#ifdef HOST_NUTTX
+	if( mode > 0 ) {
+		if( !fb_nuttx_gfx_limit_pages(info->w, info->h, depth,
+		    requested_pages, info->num_pages, flags == DRIVER_NULL,
+		    &num_pages) )
+			return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+	} else if( num_pages <= 0 ) {
+		num_pages = info->num_pages;
+	}
+#else
 	if( num_pages <= 0 ) {
 		num_pages = info->num_pages;
 	}
+#endif
 
 	FB_GRAPHICS_LOCK( );
 
@@ -496,6 +601,10 @@ FBCALL int fb_GfxScreenRes
 		int flags, int refresh_rate
 	)
 {
+#ifdef HOST_NUTTX
+	int requested_pages = num_pages;
+#endif
+
 	if ((w <= 0) || (h <= 0))
 		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 
@@ -513,9 +622,15 @@ FBCALL int fb_GfxScreenRes
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}
 
+#ifdef HOST_NUTTX
+	if( !fb_nuttx_gfx_limit_pages(w, h, depth, requested_pages, 1,
+	    flags == DRIVER_NULL, &num_pages) )
+		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+#else
 	if( num_pages <= 0 ) {
 		num_pages = 1;
 	}
+#endif
 
 	FB_GRAPHICS_LOCK( );
 

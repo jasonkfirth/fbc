@@ -5,6 +5,8 @@ SUITE( fbc_tests.functions.void_param )
 	declare  sub test_const( byref p as any )
 	declare  sub test_byval( byref p as any )
 	declare  sub test_str( byref p as any )
+	declare  sub test_after_byref( byref p as any )
+	declare  sub test_after_bydesc( p() as any )
 		
 	TEST( default )
 
@@ -30,5 +32,23 @@ SUITE( fbc_tests.functions.void_param )
 		dim expected as zstring ptr = @"abcd"
 		CU_ASSERT_EQUAL( @p, expected )
 	end sub
+
+	sub test_after_byref( byref p as integer )
+		CU_ASSERT_EQUAL( sizeof( p ), sizeof( integer ) )
+	end sub
+
+	sub test_after_bydesc( p() as integer )
+		CU_ASSERT_EQUAL( sizeof( p(0) ), sizeof( integer ) )
+	end sub
+
+	TEST( after_definition )
+
+		dim as single s = 1
+		test_after_byref s
+
+		dim as single a(0 to 1) = { 1, 2 }
+		test_after_bydesc a()
+
+	END_TEST
 
 END_SUITE

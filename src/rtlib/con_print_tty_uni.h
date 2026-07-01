@@ -99,7 +99,6 @@ void FB_CONPRINTTTY
         }
 
         if( fDoFlush ) {
-            fDoFlush = FALSE;
             if( OutputBufferLength!=0 ) {
                 FB_CONPRINTRAW( handle,
                                 OutputBuffer,
@@ -110,7 +109,6 @@ void FB_CONPRINTTTY
         }
 
         if( fSetNewCoord ) {
-            fSetNewCoord = FALSE;
             pCoord->X += dwMoveCoord.X;
             pCoord->Y += dwMoveCoord.Y;
             memcpy( &dwCurrentCoord, pCoord, sizeof( fb_Coord ) );

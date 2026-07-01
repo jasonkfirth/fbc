@@ -77,6 +77,7 @@ end type
 const FB_LEX_MAXK   = 3
 
 const LEX_MAXBUFFCHARS = 8192
+const LEX_MAXMACROSTACK = 64
 
 enum LEX_TKCTX_CONTEXT
 	LEX_TKCTX_CONTEXT_INIT = 0                  '' initializing, first time only
@@ -100,6 +101,9 @@ type LEX_TKCTX
 
 	reclevel        as integer                  '' PP recursion
 	currmacro       as FBSYMBOL ptr             '' used to check macro recursion
+	macrodepth      as integer
+	macrostack(0 to LEX_MAXMACROSTACK-1) as FBSYMBOL ptr
+	macroresume(0 to LEX_MAXMACROSTACK-1) as integer
 
 	kwdns           as FBSYMBOL ptr             '' used by the PP
 	kind            as LEX_TKCTX_CONTEXT        '' the kind of lexer context

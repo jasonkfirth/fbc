@@ -83,10 +83,12 @@ static unsigned char *framebuffer = NULL;
 static unsigned short *palette = NULL;
 static unsigned char color_conv[4096];
 static BLITTER *blitter;
+static unsigned char *scale_buffer = NULL;
 static int framebuffer_offset, is_running = FALSE, is_active = TRUE;
+static int framebuffer_scale = 1, framebuffer_scaled_w = 0, framebuffer_scaled_h = 0, scale_pitch = 0;
 static int vsync_flags = 0, is_palette_changed = FALSE;
 static int mouse_fd = -1, mouse_packet_size, mouse_shown = TRUE;
-static int mouse_x, mouse_y, mouse_z, mouse_buttons;
+static int mouse_x, mouse_y, mouse_screen_x, mouse_screen_y, mouse_z, mouse_buttons;
 static int mouse_clip = 0;
 static unsigned int last_click_time = 0;
 static pthread_t thread;
@@ -189,6 +191,91 @@ static void vga16_blitter(unsigned char *dest, int pitch)
 
 #endif /* defined HOST_X86 || defined HOST_X86_64 */
 
+static void scaled_blitter(unsigned char *dest, int pitch)
+{
+	unsigned char *src, *src_pixel, *dst, *dst_pixel;
+	int bytes_per_pixel, x, y, sx, sy;
+
+	if ((framebuffer_scale <= 1) || (!scale_buffer)) {
+		blitter(dest, pitch);
+		return;
+	}
+
+	bytes_per_pixel = BYTES_PER_PIXEL(mode.bits_per_pixel);
+	if ((bytes_per_pixel <= 0) || (scale_pitch <= 0)) {
+		blitter(dest, pitch);
+		return;
+	}
+
+	/*
+	 * Reuse the normal blitter for color conversion.
+	 *
+	 * The generic blitters already know how to translate gfxlib's internal
+	 * framebuffer into the active fbdev pixel format.  The scaled path first
+	 * asks the normal blitter to build an unscaled device-format image, then
+	 * expands only the dirty lines into the real framebuffer.
+	 */
+	blitter(scale_buffer, scale_pitch);
+
+	for (y = 0; y < fb_fbdev.h; y++) {
+		if (!__fb_gfx->dirty[y])
+			continue;
+
+		src = scale_buffer + (y * scale_pitch);
+		for (sy = 0; sy < framebuffer_scale; sy++) {
+			dst = dest + (((y * framebuffer_scale) + sy) * pitch);
+			for (x = 0; x < fb_fbdev.w; x++) {
+				src_pixel = src + (x * bytes_per_pixel);
+				for (sx = 0; sx < framebuffer_scale; sx++) {
+					dst_pixel = dst + (((x * framebuffer_scale) + sx) * bytes_per_pixel);
+					fb_hMemCpy(dst_pixel, src_pixel, bytes_per_pixel);
+				}
+			}
+		}
+	}
+}
+
+static void fbdev_sync_mouse_screen_pos(void)
+{
+	if (framebuffer_scale > 1) {
+		mouse_screen_x = (mouse_x * framebuffer_scale) + (framebuffer_scale / 2);
+		mouse_screen_y = (mouse_y * framebuffer_scale) + (framebuffer_scale / 2);
+		mouse_screen_x = MID(0, mouse_screen_x, framebuffer_scaled_w - 1);
+		mouse_screen_y = MID(0, mouse_screen_y, framebuffer_scaled_h - 1);
+	} else {
+		mouse_screen_x = mouse_x;
+		mouse_screen_y = mouse_y;
+	}
+}
+
+static void fbdev_apply_mouse_delta(int dx, int dy, EVENT *e)
+{
+	int old_x = mouse_x;
+	int old_y = mouse_y;
+
+	if (framebuffer_scale > 1) {
+		mouse_screen_x = MID(0, mouse_screen_x + dx, framebuffer_scaled_w - 1);
+		mouse_screen_y = MID(0, mouse_screen_y + dy, framebuffer_scaled_h - 1);
+		mouse_x = MID(0, mouse_screen_x / framebuffer_scale, __fb_gfx->w - 1);
+		mouse_y = MID(0, mouse_screen_y / framebuffer_scale, __fb_gfx->h - 1);
+	} else {
+		mouse_x = MID(0, mouse_x + dx, __fb_gfx->w - 1);
+		mouse_y = MID(0, mouse_y + dy, __fb_gfx->h - 1);
+		mouse_screen_x = mouse_x;
+		mouse_screen_y = mouse_y;
+	}
+
+	e->x = mouse_x;
+	e->y = mouse_y;
+	e->dx = mouse_x - old_x;
+	e->dy = mouse_y - old_y;
+
+	if( __fb_gfx->scanline_size != 1 ) {
+		e->y /= __fb_gfx->scanline_size;
+		e->dy /= __fb_gfx->scanline_size;
+	}
+}
+
 static void *driver_thread(void *arg)
 {
 	struct fb_vblank vblank;
@@ -222,16 +309,11 @@ static void *driver_thread(void *arg)
 						   ((mouse_packet_size == 4) && ((buffer[0] & 0xC8) != 0x08)))
 							bytes_read = 1;
 						else {
-							e.dx = (unsigned int)buffer[1] - ((int)(buffer[0] & 0x10) << 4);
-							e.dy = -(unsigned int)buffer[2] + ((int)(buffer[0] & 0x20) << 3);
-							mouse_x += e.dx;
-							mouse_y += e.dy;
-							e.x = mouse_x = MID(0, mouse_x, __fb_gfx->w - 1);
-							e.y = mouse_y = MID(0, mouse_y, __fb_gfx->h - 1);
-							if( __fb_gfx->scanline_size != 1 ) {
-								e.y /= __fb_gfx->scanline_size;
-								e.dy /= __fb_gfx->scanline_size;
-							}
+							fbdev_apply_mouse_delta(
+								(unsigned int)buffer[1] - ((int)(buffer[0] & 0x10) << 4),
+								-(unsigned int)buffer[2] + ((int)(buffer[0] & 0x20) << 3),
+								&e
+							);
 							if (e.dx || e.dy) {
 								e.type = EVENT_MOUSE_MOVE;
 								fb_hPostEvent(&e);
@@ -298,7 +380,7 @@ static void *driver_thread(void *arg)
 			}
 			if ((mouse_fd >= 0) && (mouse_shown))
 				fb_hSoftCursorPut(mouse_x, mouse_y);
-			blitter(framebuffer + framebuffer_offset, device_info.line_length);
+			scaled_blitter(framebuffer + framebuffer_offset, device_info.line_length);
 			fb_hMemSet(__fb_gfx->dirty, FALSE, fb_fbdev.h);
 			if ((mouse_fd >= 0) && (mouse_shown))
 				fb_hSoftCursorUnput(mouse_x, mouse_y);
@@ -366,9 +448,10 @@ static void driver_key_handler( int pressed, int repeated, int scancode, int key
 static int driver_init(char *title, int w, int h, int depth, int refresh_rate, int flags)
 {
 	const char *device_name;
-	int try, res_index, i, j, r, g, b, dist, best_dist, best_index = 0;
+	int try, i, j, r, g, b, dist, best_dist, best_index = 0;
 	ssize_t dummy;
 	int palette_len;
+	int using_current_mode = FALSE;
 	struct fb_vblank vblank;
 	const char *mouse_device[] = { "/dev/input/mice", "/dev/usbmouse", "/dev/psaux", NULL };
 	const unsigned char im_init[] = { 243, 200, 243, 100, 243, 80 };
@@ -379,6 +462,10 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 	fb_fbdev.w = w;
 	fb_fbdev.h = h;
 	fb_fbdev.flags = flags;
+	framebuffer_scale = 1;
+	framebuffer_scaled_w = w;
+	framebuffer_scaled_h = h;
+	scale_pitch = 0;
 	depth = MAX(depth, 4);
 
 	device_name = getenv("FBGFX_FRAMEBUFFER");
@@ -419,17 +506,21 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 
 	/* tries in order:
 	 *  1) wanted resolution and color depth;
-	 *  2) any higher resolution and wanted color depth;
-	 *  3) wanted resolution and original color depth;
-	 *  4) any higher resolution and original color depth;
+	 *  2) wanted resolution and original color depth;
+	 *  3) current framebuffer mode, centered/scaled if it is large enough.
+	 *
+	 * The fallback deliberately does not switch to the next larger standard
+	 * mode.  If the requested mode cannot be set exactly, the safest fbdev
+	 * behavior is to leave the display at the user's current resolution and
+	 * present the logical SCREEN as a centered integer-scaled image there.
 	 */
-	for (try = 0; try < 4; try++) {
+	for (try = 0; try < 2; try++) {
 		mode = orig_mode;
 
 		mode.xoffset = 0;
 		mode.yoffset = 0;
 
-		if (try < 2) {
+		if (try == 0) {
 			mode.bits_per_pixel = depth;
 			mode.grayscale = 0;
 			switch (depth) {
@@ -458,27 +549,32 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 			mode.red.msb_right = mode.green.msb_right = mode.blue.msb_right = 0;
 		}
 
-		if (try & 1) {
-			for (res_index = 0; standard_mode[res_index].w; res_index++) {
-				if ((standard_mode[res_index].w >= w) && (standard_mode[res_index].h > h)) {
-					mode.xres = mode.xres_virtual = standard_mode[res_index].w;
-					mode.yres = mode.yres_virtual = standard_mode[res_index].h;
-					if (ioctl(device_fd, FBIOPUT_VSCREENINFO, &mode) == 0)
-						goto got_mode;
-				}
-			}
-		}
-		else {
-			mode.xres = mode.xres_virtual = w;
-			mode.yres = mode.yres_virtual = h;
-			if (ioctl(device_fd, FBIOPUT_VSCREENINFO, &mode) == 0)
+		mode.xres = mode.xres_virtual = w;
+		mode.yres = mode.yres_virtual = h;
+		if (ioctl(device_fd, FBIOPUT_VSCREENINFO, &mode) == 0) {
+			/*
+			 * Some fbdev drivers accept FBIOPUT_VSCREENINFO but then
+			 * round the visible geometry.  Treat that as a failed exact
+			 * mode switch so the scaled-current-mode path below can
+			 * handle it consistently.
+			 */
+			if ((ioctl(device_fd, FBIOGET_VSCREENINFO, &mode) == 0) &&
+			    (mode.xres == (unsigned int)w) &&
+			    (mode.yres == (unsigned int)h)) {
 				goto got_mode;
+			}
 		}
 	}
 
 	mode = orig_mode;
-	if ((mode.xres >= (unsigned int)w) && (mode.yres >= (unsigned int)h))
+	mode.xoffset = 0;
+	mode.yoffset = 0;
+	if ((mode.xres >= (unsigned int)w) && (mode.yres >= (unsigned int)h)) {
+		if (ioctl(device_fd, FBIOPUT_VSCREENINFO, &mode) == 0)
+			ioctl(device_fd, FBIOGET_VSCREENINFO, &mode);
+		using_current_mode = TRUE;
 		goto got_mode;
+	}
 
 	close(device_fd);
 	device_fd = -1;
@@ -500,17 +596,58 @@ got_mode:
 
 	fb_hMemSet(framebuffer, 0, device_info.smem_len);
 
+	/*
+	 * Some fbdev drivers cannot switch to the exact requested mode even
+	 * though the current framebuffer is large enough.  In that case, keep
+	 * the application's logical SCREEN size unchanged, but present it as a
+	 * centered integer-scaled image.  Exact mode switches keep the old
+	 * one-to-one behavior.
+	 */
+	if (using_current_mode && ((mode.xres != (unsigned int)w) || (mode.yres != (unsigned int)h))) {
+#ifndef GFXLIB_NEVERSCALE
+		int scale_x = mode.xres / w;
+		int scale_y = mode.yres / h;
+		int scale = (scale_x < scale_y) ? scale_x : scale_y;
+
+		if ((scale > 1) && (mode.bits_per_pixel >= 8)) {
+			framebuffer_scale = scale;
+			framebuffer_scaled_w = w * framebuffer_scale;
+			framebuffer_scaled_h = h * framebuffer_scale;
+		}
+#endif
+	}
+
 	if (mode.bits_per_pixel == 4) {
+		framebuffer_scale = 1;
+		framebuffer_scaled_w = w;
+		framebuffer_scaled_h = h;
 		palette_len = 16;
 		framebuffer_offset = (((mode.yres - h) >> 1) * (mode.xres >> 3)) + ((mode.xres - w) >> 4);
 		blitter = vga16_blitter;
 	} else {
+		size_t scale_size;
+
 		palette_len = 256;
-		framebuffer_offset = (((mode.yres - h) >> 1) * device_info.line_length) +
-		                     (((mode.xres - w) >> 1) * BYTES_PER_PIXEL(mode.bits_per_pixel));
+		framebuffer_offset = (((mode.yres - framebuffer_scaled_h) >> 1) * device_info.line_length) +
+		                     (((mode.xres - framebuffer_scaled_w) >> 1) * BYTES_PER_PIXEL(mode.bits_per_pixel));
 		blitter = fb_hGetBlitter(mode.bits_per_pixel, (mode.red.offset == 0) ? TRUE : FALSE);
 		if (!blitter)
 			return -1;
+
+		if (framebuffer_scale > 1) {
+			scale_pitch = w * BYTES_PER_PIXEL(mode.bits_per_pixel);
+			scale_size = (size_t)scale_pitch * (size_t)h;
+			if ((scale_pitch > 0) && (scale_size / (size_t)scale_pitch == (size_t)h))
+				scale_buffer = (unsigned char *)malloc(scale_size);
+			if (!scale_buffer) {
+				framebuffer_scale = 1;
+				framebuffer_scaled_w = w;
+				framebuffer_scaled_h = h;
+				scale_pitch = 0;
+				framebuffer_offset = (((mode.yres - h) >> 1) * device_info.line_length) +
+				                     (((mode.xres - w) >> 1) * BYTES_PER_PIXEL(mode.bits_per_pixel));
+			}
+		}
 	}
 
 	mouse_packet_size = 3;
@@ -528,6 +665,7 @@ got_mode:
 	if (mouse_fd >= 0) {
 		mouse_x = w >> 1;
 		mouse_y = h >> 1;
+		fbdev_sync_mouse_screen_pos();
 		mouse_buttons = mouse_z = 0;
 		mouse_shown = TRUE;
 		fb_hSoftCursorInit();
@@ -611,6 +749,10 @@ static void driver_exit(void)
 			munmap(framebuffer, device_info.smem_len);
 			framebuffer = NULL;
 		}
+		if (scale_buffer) {
+			free(scale_buffer);
+			scale_buffer = NULL;
+		}
 		if (palette) {
 			ioctl(device_fd, FBIOPUTCMAP, &orig_cmap);
 			free(palette);
@@ -674,6 +816,7 @@ static void driver_set_mouse(int x, int y, int cursor, int clip)
 
 		mouse_x = x;
 		mouse_y = y;
+		fbdev_sync_mouse_screen_pos();
 	}
 	mouse_shown = (cursor != 0);
 	if (clip == 0)

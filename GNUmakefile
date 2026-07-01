@@ -209,6 +209,7 @@ log-tests: | maybe-build-fbc
 warning-tests: | maybe-build-fbc
 tests-test: | maybe-build-fbc
 compiler-smoke: | maybe-build-fbc
+compiler-riscv32-smoke: | maybe-build-fbc
 compiler-riscv64-smoke: | maybe-build-fbc
 compiler-s390x-smoke: | maybe-build-fbc
 compiler-loongarch64-smoke: | maybe-build-fbc
@@ -333,6 +334,7 @@ help:
 	@echo "  log-tests               Run compiler log tests"
 	@echo "  warning-tests           Run warning tests"
 	@echo "  compiler-smoke          Build and run a small compiler smoke test"
+	@echo "  compiler-riscv32-smoke  Check linux-riscv32 target codegen/compile"
 	@echo "  compiler-riscv64-smoke  Check linux-riscv64 target codegen/compile"
 	@echo "  compiler-s390x-smoke    Check linux-s390x target codegen/compile"
 	@echo "  compiler-loongarch64-smoke Check linux-loongarch64 target codegen/compile"

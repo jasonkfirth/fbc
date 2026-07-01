@@ -1262,6 +1262,12 @@ private function hLinkFiles( ) as integer
 					#else
 						ldcline += " -dynamic-linker /lib64/ld64.so.2"
 					#endif
+				case FB_CPUFAMILY_RISCV32
+					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+						ldcline += " -dynamic-linker /lib/ld-musl-riscv32.so.1"
+					#else
+						ldcline += " -dynamic-linker /lib/ld-linux-riscv32-ilp32.so.1"
+					#endif
 				case FB_CPUFAMILY_RISCV64
 					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
 						ldcline += " -dynamic-linker /lib/ld-musl-riscv64.so.1"
@@ -1859,6 +1865,10 @@ private function hLinkFiles( ) as integer
 		exit function
 	end if
 
+	if( fbcDarwinPlatformBuildGuiAppBundle( ) = FALSE ) then
+		exit function
+	end if
+
 	select case as const fbGetOption( FB_COMPOPT_TARGET )
 	case FB_COMPTARGET_DOS
 		'' patch the exe to change the stack size
@@ -2112,6 +2122,7 @@ end type
 dim shared as FBGNUOSINFO gnuosmap(0 to ...) => _
 { _
 	(@"android"    , FB_COMPTARGET_ANDROID  ), _ '' Must appear before linux
+	(@"nuttx"      , FB_COMPTARGET_NUTTX    ), _
 	(@"linux"      , FB_COMPTARGET_LINUX    ), _
 	(@"haiku"      , FB_COMPTARGET_HAIKU    ), _
 	(@"mingw"      , FB_COMPTARGET_WIN32    ), _
@@ -2154,7 +2165,12 @@ dim shared as FBGNUARCHINFO gnuarchmap(0 to ...) => _
 	(@"powerpc64"  , FB_DEFAULT_CPUTYPE_PPC64  ),  _
 	(@"ppc64le"    , FB_DEFAULT_CPUTYPE_PPC64LE), _
 	(@"powerpc64le", FB_DEFAULT_CPUTYPE_PPC64LE), _
+	(@"riscv32"    , FB_DEFAULT_CPUTYPE_RISCV32), _
+	(@"rv32"       , FB_DEFAULT_CPUTYPE_RISCV32), _
+	(@"rv32imac"   , FB_DEFAULT_CPUTYPE_RISCV32), _
 	(@"riscv64"    , FB_DEFAULT_CPUTYPE_RISCV64), _
+	(@"rv64"       , FB_DEFAULT_CPUTYPE_RISCV64), _
+	(@"rv64gc"     , FB_DEFAULT_CPUTYPE_RISCV64), _
 	(@"s390x"      , FB_DEFAULT_CPUTYPE_S390X  ), _
 	(@"loongarch64", FB_DEFAULT_CPUTYPE_LOONGARCH64)  _
 }
@@ -2244,7 +2260,8 @@ dim shared as FBOSARCHINFO fbosarchmap(0 to ...) => _
 	(@"android", FB_COMPTARGET_ANDROID, FB_CPUTYPE_ARMV7A        ), _
 	(@"netbsd" , FB_COMPTARGET_NETBSD , FB_DEFAULT_CPUTYPE       ), _
 	(@"openbsd", FB_COMPTARGET_OPENBSD, FB_DEFAULT_CPUTYPE       ), _
-	(@"wii"    , FB_COMPTARGET_WII    , FB_DEFAULT_CPUTYPE_PPC   )  _
+	(@"wii"    , FB_COMPTARGET_WII    , FB_DEFAULT_CPUTYPE_PPC   ), _
+	(@"nuttx"  , FB_COMPTARGET_NUTTX  , FB_DEFAULT_CPUTYPE_RISCV32)  _
 }
 
 ''
@@ -4313,6 +4330,10 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 					ln += "-march=" + *fbGetGccArch( ) + " "
 				end if
 			end select
+
+			if( fbGetCpuFamily( ) = FB_CPUFAMILY_RISCV32 ) then
+				ln += "-mabi=ilp32 "
+			end if
 		end if
 
 		if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_ANDROID) and _

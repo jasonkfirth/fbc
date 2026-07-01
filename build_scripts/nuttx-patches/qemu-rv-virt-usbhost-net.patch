@@ -1,0 +1,19 @@
+--- a/drivers/usbhost/usbhost_drivers.c
++++ b/drivers/usbhost/usbhost_drivers.c
+@@ -82,6 +82,16 @@ void usbhost_drivers_initialize(void)
+     }
+ #endif
+ 
++#ifdef CONFIG_USBHOST_CDCECM
++  /* Register the CDC/ECM Ethernet class */
++
++  ret = usbhost_cdcecm_initialize();
++  if (ret != OK)
++    {
++      uerr("ERROR: Failed to register the CDC/ECM Ethernet class: %d\n", ret);
++    }
++#endif
++
+ #ifdef CONFIG_USBHOST_HIDKBD
+   /* Initialize the HID keyboard class */
+ 

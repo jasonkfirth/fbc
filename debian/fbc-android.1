@@ -7,7 +7,8 @@ fbc-android \- FreeBASIC compiler driver for Android APKs
 .SH DESCRIPTION
 .B fbc-android
 builds a FreeBASIC source file using the packaged Android target runtime and
-produces a signed debug APK by default.
+produces a signed debug APK by default. APK builds include Android ARMv7,
+AArch64, and x86_64 native libraries unless a specific target is selected.
 .SH OPTIONS
 .TP
 .B --emit-apk
@@ -30,6 +31,16 @@ Set APK minSdkVersion to
 .BI --target-api " N"
 Set APK targetSdkVersion to
 .IR N .
+.TP
+.BI --target " TARGET"
+Build one Android ABI target. Accepted target keys include
+.BR android-arm ,
+.BR android-aarch64 ,
+and
+.BR android-x86_64 .
+.TP
+.BI --targets " LIST"
+Build APK native libraries for a comma- or space-separated target list.
 .TP
 .BI --package " NAME"
 Set the Android application package name.
@@ -56,5 +67,15 @@ Android NDK location.
 .B FBANDROID_PREFIX
 Installation prefix used to find the packaged compiler, headers, runtime
 libraries, and APK templates.
+.TP
+.B FBANDROID_TARGET
+Single Android target key to build when no
+.B --target
+or
+.B --targets
+option is given.
+.TP
+.B FBANDROID_TARGETS
+Comma- or space-separated Android target keys to build into APKs by default.
 .SH SEE ALSO
 .BR fbc (1)

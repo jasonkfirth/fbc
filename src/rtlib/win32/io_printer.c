@@ -179,12 +179,15 @@ static PRINTER_INFO_5 *GetDefaultPrinters( int *pCount )
         if (GetLastError()!=ERROR_INSUFFICIENT_BUFFER)
             break;
 
-		PRINTER_INFO_5* oldResult = result;
-        result = (PRINTER_INFO_5*) realloc( result, dwNeeded );
-        if( result == NULL ) {
-            free(oldResult);
+		PRINTER_INFO_5* newResult = (PRINTER_INFO_5*) malloc( dwNeeded );
+        if( newResult == NULL ) {
+            free(result);
+            result = NULL;
+            dwReturned = 0;
             break;
         }
+        free(result);
+        result = newResult;
 
         fResult = EnumPrinters(dwFlags,
                                NULL,
@@ -222,12 +225,15 @@ static PRINTER_INFO_2 *GetPrinters( int *pCount )
         if (GetLastError()!=ERROR_INSUFFICIENT_BUFFER)
             break;
 
-		PRINTER_INFO_2* oldResult = result;
-        result = (PRINTER_INFO_2*) realloc( result, dwNeeded );
-        if( result == NULL ) {
-            free(oldResult);
+		PRINTER_INFO_2* newResult = (PRINTER_INFO_2*) malloc( dwNeeded );
+        if( newResult == NULL ) {
+            free(result);
+            result = NULL;
+            dwReturned = 0;
             break;
         }
+        free(result);
+        result = newResult;
 
         fResult = EnumPrinters(dwFlags,
                                NULL,
@@ -257,7 +263,7 @@ static char *GetDefaultPrinterName(void)
             LPCTSTR pszPrinterId = TEXT("GetDefaultPrinterA");
 #endif
             FnGetDefaultPrinter pfnGetDefaultPrinter =
-                (FnGetDefaultPrinter)(void*)GetProcAddress(hMod, pszPrinterId);
+                (FnGetDefaultPrinter)GetProcAddress(hMod, pszPrinterId);
             if (pfnGetDefaultPrinter!=NULL) {
                 TCHAR *buffer = NULL;
                 DWORD dwSize = 0;
@@ -266,12 +272,14 @@ static char *GetDefaultPrinterName(void)
                     if (GetLastError()!=ERROR_INSUFFICIENT_BUFFER)
                         break;
                     
-                    TCHAR *oldBuffer = buffer;
-                    buffer = (TCHAR*) realloc(buffer, dwSize * sizeof(TCHAR));
-                    if (buffer == NULL) {
-                        free(oldBuffer);
+                    TCHAR *newBuffer = (TCHAR*) malloc(dwSize * sizeof(TCHAR));
+                    if (newBuffer == NULL) {
+                        free(buffer);
+                        buffer = NULL;
                         break;
                     }
+                    free(buffer);
+                    buffer = newBuffer;
                     fResult = pfnGetDefaultPrinter(buffer, &dwSize);
                 }
                 if (fResult && dwSize>1) {
@@ -518,9 +526,10 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDevice )
             }
         } else {
             DOC_INFO_1 DocInfo;
+            TCHAR raw_datatype[] = TEXT("RAW");
             DocInfo.pDocName = doc_title;
             DocInfo.pOutputFile = NULL;
-            DocInfo.pDatatype = TEXT("RAW");
+            DocInfo.pDatatype = raw_datatype;
 
             dwJob = StartDocPrinter( hPrinter, 1, (BYTE*) &DocInfo );
             if( dwJob==0 ) {
@@ -661,39 +670,54 @@ static void EmuPrint_RAW( W32_PRINTER_INFO *pInfo,
                           size_t uiLength,
                           int isunicode )
 {
-    while( uiLength-- ) {
-				if( !isunicode )
-				{
-					char ch = *(char *)pText;
-					pText += sizeof(char);
+		if( !isunicode )
+		{
+				const char *pachText = pText;
 
-					EmuPageStart( pInfo );
-          TextOut( pInfo->hDc,
-                 pInfo->Emu.dwCurrentX, pInfo->Emu.dwCurrentY,
-                 &ch, 1 );
-				} else {
-					FB_WCHAR ch = *(FB_WCHAR *)pText;
-					pText += sizeof(FB_WCHAR);
+				while( uiLength-- ) {
+						char ch = *pachText++;
 
+						EmuPageStart( pInfo );
+						TextOut( pInfo->hDc,
+										 pInfo->Emu.dwCurrentX, pInfo->Emu.dwCurrentY,
+										 &ch, 1 );
 
-					EmuPageStart( pInfo );
-          TextOutW( pInfo->hDc,
-                 pInfo->Emu.dwCurrentX, pInfo->Emu.dwCurrentY,
-                 &ch, 1 );
+						pInfo->Emu.dwCurrentX += pInfo->Emu.dwFontSizeX;
+
+						if( pInfo->Emu.dwCurrentX>=pInfo->Emu.dwSizeX ) {
+								pInfo->Emu.dwCurrentX = 0;
+								pInfo->Emu.dwCurrentY += pInfo->Emu.dwFontSizeY;
+								if( pInfo->Emu.dwCurrentY>=pInfo->Emu.dwSizeY ) {
+										pInfo->Emu.dwCurrentY = 0;
+										EndPage( pInfo->hDc );
+										pInfo->Emu.iPageStarted = FALSE;
+								}
+						}
 				}
+		} else {
+				const FB_WCHAR *pachText = pText;
 
-        pInfo->Emu.dwCurrentX += pInfo->Emu.dwFontSizeX;
+				while( uiLength-- ) {
+						FB_WCHAR ch = *pachText++;
 
-        if( pInfo->Emu.dwCurrentX>=pInfo->Emu.dwSizeX ) {
-            pInfo->Emu.dwCurrentX = 0;
-            pInfo->Emu.dwCurrentY += pInfo->Emu.dwFontSizeY;
-            if( pInfo->Emu.dwCurrentY>=pInfo->Emu.dwSizeY ) {
-                pInfo->Emu.dwCurrentY = 0;
-                EndPage( pInfo->hDc );
-                pInfo->Emu.iPageStarted = FALSE;
-            }
-        }
-    }
+						EmuPageStart( pInfo );
+						TextOutW( pInfo->hDc,
+											pInfo->Emu.dwCurrentX, pInfo->Emu.dwCurrentY,
+											&ch, 1 );
+
+						pInfo->Emu.dwCurrentX += pInfo->Emu.dwFontSizeX;
+
+						if( pInfo->Emu.dwCurrentX>=pInfo->Emu.dwSizeX ) {
+								pInfo->Emu.dwCurrentX = 0;
+								pInfo->Emu.dwCurrentY += pInfo->Emu.dwFontSizeY;
+								if( pInfo->Emu.dwCurrentY>=pInfo->Emu.dwSizeY ) {
+										pInfo->Emu.dwCurrentY = 0;
+										EndPage( pInfo->hDc );
+										pInfo->Emu.iPageStarted = FALSE;
+								}
+						}
+				}
+		}
 }
 
 static
@@ -774,6 +798,7 @@ static void EmuPrint_TTY( W32_PRINTER_INFO *pInfo,
 
 		if( !isunicode )
 		{
+			const char *pachText = pText;
 
 			while( uiLength!=0 ) {
 					char chControl = 0;
@@ -781,7 +806,7 @@ static void EmuPrint_TTY( W32_PRINTER_INFO *pInfo,
 					/* Check for additional control characters */
 					for( ui=0; ui!=uiLength; ++ui ) {
 							int iFound = FALSE;
-							char ch = ((char *)pText)[ui];
+							char ch = pachText[ui];
 							switch( ch ) {
 							case 12:
 									/* FormFeed */
@@ -795,7 +820,7 @@ static void EmuPrint_TTY( W32_PRINTER_INFO *pInfo,
 							}
 					}
 					fb_ConPrintTTY( &hooks,
-													(char *)pText,
+													pachText,
 													uiLengthTTY,
 													TRUE );
 					if( uiLength!=uiLengthTTY ) {
@@ -809,19 +834,20 @@ static void EmuPrint_TTY( W32_PRINTER_INFO *pInfo,
 									break;
 							}
 					}
-					pText += uiLengthTTY * sizeof(char);
+					pachText += uiLengthTTY;
 					uiLength -= uiLengthTTY;
 			}
 
 		} else {
+			const FB_WCHAR *pachText = pText;
 
 			while( uiLength!=0 ) {
-					char chControl = 0;
+					FB_WCHAR chControl = 0;
 					size_t uiLengthTTY = uiLength, ui;
 					/* Check for additional control characters */
 					for( ui=0; ui!=uiLength; ++ui ) {
 							int iFound = FALSE;
-							char ch = ((FB_WCHAR *)pText)[ui];
+							FB_WCHAR ch = pachText[ui];
 							switch( ch ) {
 							case 12:
 									/* FormFeed */
@@ -835,7 +861,7 @@ static void EmuPrint_TTY( W32_PRINTER_INFO *pInfo,
 							}
 					}
 					fb_ConPrintTTYWstr( &hooks,
-													(FB_WCHAR *)pText,
+													pachText,
 													uiLengthTTY,
 													TRUE );
 					if( uiLength!=uiLengthTTY ) {
@@ -849,7 +875,7 @@ static void EmuPrint_TTY( W32_PRINTER_INFO *pInfo,
 									break;
 							}
 					}
-					pText += uiLengthTTY * sizeof(FB_WCHAR);
+					pachText += uiLengthTTY;
 					uiLength -= uiLengthTTY;
 			}
 

@@ -5,6 +5,8 @@ GfxLib is not one single display driver.  The common runtime owns the program-vi
 
 ##[[KeyPgScreencontrol|ScreenControl]]## can be used with ##SET_DRIVER_NAME## before the first graphics screen is opened to request a specific driver.  The same choice can be made from the environment by setting ##FBGFX##.  Driver names are matched case-insensitively.  ##ScreenControl## with ##GET_DRIVER_NAME## can be used after a graphics screen has opened to see which driver was selected.
 
+Several modern backends can present a low-resolution GfxLib framebuffer inside a larger display area by using centered integer scaling.  This keeps the program's logical screen size unchanged while avoiding blurry fractional scaling.  Mouse and touch coordinates are mapped back to the logical framebuffer so ##[[KeyPgGetmouse|GetMouse]]## and touch queries still point at the same pixel the program sees.  Builds that define ##GFXLIB_NEVERSCALE## disable this presentation scaling for users who want a ##320x200## screen to remain exactly ##320x200## on the physical display or inside a maximized window.
+
 The available driver names depend on the target and build configuration:
 
 	- All targets:
@@ -55,8 +57,10 @@ The available driver names depend on the target and build configuration:
 	- Driver availability is a compile-time and run-time property.  A driver can be present in the binary but still fail to initialize if the operating system, display server, hardware, emulator, or browser environment does not provide what it needs.
 	- On DOS, windowing and OpenGL-related options are not available.  The refresh-rate setting is also not generally available.  Programs should check whether the requested screen was opened successfully before using ##[[KeyPgScreenptr|ScreenPtr]]## or drawing into the screen.
 	- On DOS, the requested resolution must match a mode supported by the video hardware or emulator.  Safe fallback modes such as 640x480 or 800x600 are more portable than vendor-specific modes.
+	- On desktop/windowed backends such as Windows, X11, OpenGL-on-X11, Darwin/macOS, and Haiku, resizing or maximizing a window can keep the GfxLib framebuffer centered and integer-scaled instead of stretching it fractionally.
+	- On Linux fbdev, if the driver cannot switch the real framebuffer to the exact requested mode but the current framebuffer mode is large enough, GfxLib can keep the current mode and present the requested logical screen centered at the largest integer scale that fits.
 	- On JavaScript targets, the browser owns the real window, event loop, and presentation timing.  GfxLib presents through browser canvas/WebGL rather than a native desktop window.
-	- On console-style targets such as Wii and Xbox, the backend presents to the target's video output and scales the GfxLib framebuffer as needed.  Controller input is exposed through the target-specific input functions instead of pretending every controller is a PC keyboard.
+	- On console-style targets such as Wii and Xbox, the backend presents to the target's video output and scales the GfxLib framebuffer as needed unless the runtime was built with ##GFXLIB_NEVERSCALE##.  Controller input is exposed through the target-specific input functions instead of pretending every controller is a PC keyboard.
 	- On Android, touch input is available through the GfxLib touch functions, and mouse-style compatibility is provided where it makes sense.
 
 {{fbdoc item="diff"}}

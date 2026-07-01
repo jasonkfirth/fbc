@@ -183,6 +183,7 @@ private sub hCheckPrototype _
 
 		'' convert any AS ANY arg to the final one
 		if( typeGet( dtype ) = FB_DATATYPE_VOID ) then
+			symbSetParamDeclaredAsAny( proto_param )
 			proto_param->typ = param->typ
 			proto_param->subtype = param->subtype
 

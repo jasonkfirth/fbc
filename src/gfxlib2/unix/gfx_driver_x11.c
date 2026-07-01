@@ -31,6 +31,7 @@ const GFXDRIVER fb_gfxDriverX11 =
 };
 
 static XImage *image, *shape_image;
+static XImage *scaled_image;
 static Pixmap shape_pixmap;
 static GC shape_gc;
 static XShmSegmentInfo shm_info;
@@ -165,6 +166,7 @@ static int x11_init(void)
 	char *display_name;
 	
 	image = NULL;
+	scaled_image = NULL;
 	shape_image = NULL;
 	is_shm = FALSE;
 	needs_byte_swap = FALSE;
@@ -209,9 +211,9 @@ static int x11_init(void)
 				return -1;
 			}
 			XReparentWindow(fb_x11.display, fb_x11.window, fb_x11.fswindow, 0, 0);
-			XMoveResizeWindow(fb_x11.display, fb_x11.fswindow, 0,0,fb_x11.w, h);
-			XMoveResizeWindow(fb_x11.display, fb_x11.window, 0, 0, fb_x11.w, h);
-			fb_x11.display_offset = (h - fb_x11.h) >> 1;
+			fb_hX11RefreshLayout(fb_x11.w, h);
+			XMoveResizeWindow(fb_x11.display, fb_x11.fswindow, 0,0,fb_x11.view_w, fb_x11.view_h);
+			XMoveResizeWindow(fb_x11.display, fb_x11.window, 0, 0, fb_x11.view_w, fb_x11.view_h);
 		}
 		is_shm = TRUE;
 		image = XShmCreateImage(fb_x11.display, fb_x11.visual, XDefaultDepth(fb_x11.display, fb_x11.screen),
@@ -249,6 +251,65 @@ static int x11_init(void)
 	return 0;
 }
 
+static int ensure_scaled_image(void)
+{
+	if (fb_x11.scale <= 1)
+		return 0;
+
+	if (scaled_image &&
+	    (scaled_image->width == fb_x11.draw_w) &&
+	    (scaled_image->height == fb_x11.draw_h))
+		return 0;
+
+	if (scaled_image) {
+		XDestroyImage(scaled_image);
+		scaled_image = NULL;
+	}
+
+	scaled_image = XCreateImage(fb_x11.display, fb_x11.visual,
+	                            XDefaultDepth(fb_x11.display, fb_x11.screen),
+	                            ZPixmap, 0, NULL, fb_x11.draw_w, fb_x11.draw_h, 32, 0);
+	if (!scaled_image)
+		return -1;
+
+	scaled_image->data = malloc(scaled_image->bytes_per_line * scaled_image->height);
+	if (!scaled_image->data) {
+		XDestroyImage(scaled_image);
+		scaled_image = NULL;
+		return -1;
+	}
+
+	return 0;
+}
+
+static void scale_image_region(int y, int h)
+{
+	unsigned char *src_line, *dst_line, *src_pixel, *dst_pixel;
+	int bytes_per_pixel, x, sx, sy;
+
+	if (!scaled_image)
+		return;
+
+	bytes_per_pixel = image->bits_per_pixel >> 3;
+	if (bytes_per_pixel <= 0)
+		return;
+
+	for (; h; h--, y++) {
+		src_line = (unsigned char *)image->data + (y * image->bytes_per_line);
+		for (sy = 0; sy < fb_x11.scale; sy++) {
+			dst_line = (unsigned char *)scaled_image->data +
+			           (((y * fb_x11.scale) + sy) * scaled_image->bytes_per_line);
+			for (x = 0; x < fb_x11.w; x++) {
+				src_pixel = src_line + (x * bytes_per_pixel);
+				for (sx = 0; sx < fb_x11.scale; sx++) {
+					dst_pixel = dst_line + (((x * fb_x11.scale) + sx) * bytes_per_pixel);
+					fb_hMemCpy(dst_pixel, src_pixel, bytes_per_pixel);
+				}
+			}
+		}
+	}
+}
+
 void fb_hX11WaitUnmapped(Window w)
 {
 	XEvent e;
@@ -280,6 +341,10 @@ static void x11_exit(void)
 		}
 		XDestroyImage(image);
 	}
+	if (scaled_image) {
+		XDestroyImage(scaled_image);
+		scaled_image = NULL;
+	}
 	if (shape_image) {
 		XDestroyImage(shape_image);
 		XFreePixmap(fb_x11.display, shape_pixmap);
@@ -290,6 +355,7 @@ static void x11_update(void)
 {
 	int i, y, h;
 	
+	fb_hX11RefreshLayout(fb_x11.view_w, fb_x11.view_h);
 	blitter((unsigned char *)image->data, image->bytes_per_line);
 	for (i = 0; i < fb_x11.h; i++) {
 		if (__fb_gfx->dirty[i]) {
@@ -302,10 +368,23 @@ static void x11_update(void)
 				XPutImage(fb_x11.display, shape_pixmap, shape_gc, shape_image, 0, y, 0, y, fb_x11.w, h);
 				XShapeCombineMask(fb_x11.display, fb_x11.window, ShapeBounding, 0, 0, shape_pixmap, ShapeSet);
 			}
-			if (is_shm)
-				XShmPutImage(fb_x11.display, fb_x11.window, fb_x11.gc, image, 0, y, 0, y + fb_x11.display_offset, fb_x11.w, h, False);
-			else
-				XPutImage(fb_x11.display, fb_x11.window, fb_x11.gc, image, 0, y, 0, y + fb_x11.display_offset, fb_x11.w, h);
+			if (fb_x11.scale > 1) {
+				if (!ensure_scaled_image()) {
+					scale_image_region(y, h);
+					XPutImage(fb_x11.display, fb_x11.window, fb_x11.gc, scaled_image,
+					          0, y * fb_x11.scale,
+					          fb_x11.draw_offset_x, fb_x11.draw_offset_y + (y * fb_x11.scale),
+					          fb_x11.draw_w, h * fb_x11.scale);
+				}
+			}
+			else {
+				if (is_shm)
+					XShmPutImage(fb_x11.display, fb_x11.window, fb_x11.gc, image, 0, y,
+					             fb_x11.draw_offset_x, y + fb_x11.draw_offset_y, fb_x11.w, h, False);
+				else
+					XPutImage(fb_x11.display, fb_x11.window, fb_x11.gc, image, 0, y,
+					          fb_x11.draw_offset_x, y + fb_x11.draw_offset_y, fb_x11.w, h);
+			}
 		}
 	}
 	fb_hMemSet(__fb_gfx->dirty, FALSE, fb_x11.h);

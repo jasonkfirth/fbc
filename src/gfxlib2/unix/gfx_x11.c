@@ -109,11 +109,109 @@ static void hOnAltEnter( void )
 	fb_hMemSet(__fb_gfx->key, FALSE, 128);
 }
 
+void fb_hX11RefreshLayout(int view_w, int view_h)
+{
+#ifndef GFXLIB_NEVERSCALE
+	int scale_x;
+	int scale_y;
+#endif
+	int scale;
+
+	if (view_w <= 0)
+		view_w = fb_x11.w;
+	if (view_h <= 0)
+		view_h = fb_x11.h;
+
+	if (fb_x11.content_w <= 0)
+		fb_x11.content_w = fb_x11.w;
+	if (fb_x11.content_h <= 0)
+		fb_x11.content_h = fb_x11.h;
+
+	fb_x11.view_w = view_w;
+	fb_x11.view_h = view_h;
+
+#ifdef GFXLIB_NEVERSCALE
+	scale = 1;
+#else
+	scale_x = view_w / fb_x11.content_w;
+	scale_y = view_h / fb_x11.content_h;
+	scale = (scale_x < scale_y) ? scale_x : scale_y;
+	if (scale < 1)
+		scale = 1;
+#endif
+
+	fb_x11.scale = scale;
+	fb_x11.draw_w = fb_x11.content_w * scale;
+	fb_x11.draw_h = fb_x11.content_h * scale;
+	fb_x11.draw_offset_x = (view_w - fb_x11.draw_w) / 2;
+	fb_x11.draw_offset_y = (view_h - fb_x11.draw_h) / 2;
+	fb_x11.display_offset = fb_x11.draw_offset_y;
+}
+
+static void hWindowToFramebuffer(int window_x, int window_y, int *x, int *y, int *inside)
+{
+	int rel_x;
+	int rel_y;
+	int mapped_x;
+	int mapped_y;
+
+	if (fb_x11.scale <= 0)
+		fb_hX11RefreshLayout(fb_x11.view_w, fb_x11.view_h);
+
+	rel_x = window_x - fb_x11.draw_offset_x;
+	rel_y = window_y - fb_x11.draw_offset_y;
+
+	if (inside) {
+		*inside = (rel_x >= 0) && (rel_y >= 0) &&
+		          (rel_x < fb_x11.draw_w) && (rel_y < fb_x11.draw_h);
+	}
+
+	if (rel_x < 0)
+		rel_x = 0;
+	if (rel_y < 0)
+		rel_y = 0;
+	if (rel_x >= fb_x11.draw_w)
+		rel_x = fb_x11.draw_w - 1;
+	if (rel_y >= fb_x11.draw_h)
+		rel_y = fb_x11.draw_h - 1;
+
+	mapped_x = rel_x / fb_x11.scale;
+	mapped_y = rel_y / fb_x11.scale;
+
+	if (mapped_x < 0)
+		mapped_x = 0;
+	if (mapped_y < 0)
+		mapped_y = 0;
+	if (mapped_x >= fb_x11.content_w)
+		mapped_x = fb_x11.content_w - 1;
+	if (mapped_y >= fb_x11.content_h)
+		mapped_y = fb_x11.content_h - 1;
+
+	if (x)
+		*x = mapped_x;
+	if (y)
+		*y = mapped_y;
+}
+
+static void hFramebufferToWindow(int x, int y, int *window_x, int *window_y)
+{
+	if (fb_x11.scale <= 0)
+		fb_hX11RefreshLayout(fb_x11.view_w, fb_x11.view_h);
+
+	x = MID(0, x, fb_x11.content_w - 1);
+	y = MID(0, y, fb_x11.content_h - 1);
+
+	if (window_x)
+		*window_x = fb_x11.draw_offset_x + (x * fb_x11.scale) + (fb_x11.scale / 2);
+	if (window_y)
+		*window_y = fb_x11.draw_offset_y + (y * fb_x11.scale) + (fb_x11.scale / 2);
+}
+
 static void *window_thread(void *arg)
 {
 	XEvent event;
 	EVENT e;
-	int key;
+	int key, old_mouse_x, old_mouse_y;
 
 	(void)arg;
 
@@ -171,22 +269,17 @@ static void *window_thread(void *arg)
 					break;
 
 				case MotionNotify:
-					if (mouse_x_root < 0) {
-						e.dx = e.dy = 0;
-					}
-					else {
-						e.dx = event.xmotion.x_root - mouse_x_root;
-						e.dy = event.xmotion.y_root - mouse_y_root;
-					}
+					old_mouse_x = mouse_x;
+					old_mouse_y = mouse_y;
 					mouse_x_root = event.xmotion.x_root;
 					mouse_y_root = event.xmotion.y_root;
-					mouse_x = event.xmotion.x;
-					mouse_y = event.xmotion.y - fb_x11.display_offset;
-					mouse_on = ((mouse_x >= 0) && (mouse_x < fb_x11.w) && (mouse_y >= 0) && (mouse_y < fb_x11.h));
+					hWindowToFramebuffer(event.xmotion.x, event.xmotion.y, &mouse_x, &mouse_y, &mouse_on);
 					if (has_focus) {
 						e.type = EVENT_MOUSE_MOVE;
 						e.x = mouse_x;
 						e.y = mouse_y;
+						e.dx = mouse_x - old_mouse_x;
+						e.dy = mouse_y - old_mouse_y;
 						if( __fb_gfx->scanline_size != 1 ) {
 							e.y /= __fb_gfx->scanline_size;
 							e.dy /= __fb_gfx->scanline_size;
@@ -195,11 +288,9 @@ static void *window_thread(void *arg)
 					break;
 
 				case ButtonPress:
-					mouse_x = event.xbutton.x;
-					mouse_y = event.xbutton.y - fb_x11.display_offset;
+					hWindowToFramebuffer(event.xbutton.x, event.xbutton.y, &mouse_x, &mouse_y, &mouse_on);
 					mouse_x_root = event.xbutton.x_root;
 					mouse_y_root = event.xbutton.y_root;
-					mouse_on = ((mouse_x >= 0) && (mouse_x < fb_x11.w) && (mouse_y >= 0) && (mouse_y < fb_x11.h));
 					has_focus = TRUE;
 					switch (event.xbutton.button) {
 					case Button1: mouse_buttons |= BUTTON_LEFT; mouse_latched_buttons |= BUTTON_LEFT; e.button = BUTTON_LEFT; break;
@@ -232,6 +323,7 @@ static void *window_thread(void *arg)
 					break;
 
 				case ButtonRelease:
+					hWindowToFramebuffer(event.xbutton.x, event.xbutton.y, &mouse_x, &mouse_y, &mouse_on);
 					e.type = EVENT_MOUSE_BUTTON_RELEASE;
 					switch (event.xbutton.button) {
 						case Button1:	mouse_buttons &= ~BUTTON_LEFT; e.button = BUTTON_LEFT; break;
@@ -242,12 +334,16 @@ static void *window_thread(void *arg)
 					break;
 
 				case ConfigureNotify:
-					if( (event.xconfigure.width != fb_x11.w) ||
-					    ((event.xconfigure.height != fb_x11.h) &&
-					     (event.xconfigure.height != real_h)) ) {
-						/* Window has been maximized: simulate ALT-Enter */
-						__fb_gfx->key[SC_ENTER] = __fb_gfx->key[SC_ALT] = TRUE;
-						hOnAltEnter( );
+					if (!(fb_x11.flags & DRIVER_FULLSCREEN) &&
+					    !(fb_x11.flags & DRIVER_NO_FRAME) &&
+					    (event.xconfigure.window == fb_x11.wmwindow)) {
+						XResizeWindow(fb_x11.display, fb_x11.window,
+						              event.xconfigure.width, event.xconfigure.height);
+					}
+					if (event.xconfigure.window == fb_x11.window) {
+						fb_hX11RefreshLayout(event.xconfigure.width, event.xconfigure.height);
+						fb_hMemSet(__fb_gfx->dirty, TRUE, fb_x11.h);
+						XClearWindow(fb_x11.display, fb_x11.window);
 					}
 					break;
 
@@ -370,8 +466,9 @@ void fb_hX11InitWindow(int x, int y)
 
 	if (!(fb_x11.flags & DRIVER_FULLSCREEN)){
 		/* windowed */
-		XResizeWindow(fb_x11.display, fb_x11.wmwindow, fb_x11.w, fb_x11.h);
-		XResizeWindow(fb_x11.display, fb_x11.window, fb_x11.w, fb_x11.h);
+		fb_hX11RefreshLayout(fb_x11.view_w, fb_x11.view_h);
+		XResizeWindow(fb_x11.display, fb_x11.wmwindow, fb_x11.view_w, fb_x11.view_h);
+		XResizeWindow(fb_x11.display, fb_x11.window, fb_x11.view_w, fb_x11.view_h);
 
 		if (!(fb_x11.flags & DRIVER_NO_FRAME)) {
 			XReparentWindow(fb_x11.display, fb_x11.window, fb_x11.wmwindow, 0, 0);
@@ -385,8 +482,9 @@ void fb_hX11InitWindow(int x, int y)
 		XRaiseWindow(fb_x11.display, fb_x11.window);
 	} else {
 		/* fullscreen */
-		XMoveResizeWindow(fb_x11.display, fb_x11.fswindow, 0, 0, fb_x11.w, fb_x11.h);
-		XMoveResizeWindow(fb_x11.display, fb_x11.window, 0, 0, fb_x11.w, fb_x11.h);
+		fb_hX11RefreshLayout(fb_x11.view_w, fb_x11.view_h);
+		XMoveResizeWindow(fb_x11.display, fb_x11.fswindow, 0, 0, fb_x11.view_w, fb_x11.view_h);
+		XMoveResizeWindow(fb_x11.display, fb_x11.window, 0, 0, fb_x11.view_w, fb_x11.view_h);
 		XReparentWindow(fb_x11.display, fb_x11.window, fb_x11.fswindow, 0, 0);
 		XMapRaised(fb_x11.display, fb_x11.fswindow);
 		/* use XSync instead of WaitMapped for unmanaged windows */
@@ -442,6 +540,11 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 
 	fb_x11.w = w;
 	fb_x11.h = h;
+	fb_x11.content_w = __fb_gfx ? __fb_gfx->w : w;
+	fb_x11.content_h = __fb_gfx ? (__fb_gfx->h * __fb_gfx->scanline_size) : h;
+	fb_x11.view_w = w;
+	fb_x11.view_h = h;
+	fb_hX11RefreshLayout(w, h);
 	fb_x11.flags = flags;
 	fb_x11.refresh_rate = refresh_rate;
 
@@ -507,8 +610,8 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 
 	size = XAllocSizeHints();
 	size->flags = PBaseSize | PMinSize | PMaxSize | PResizeInc;
-	size->min_width = size->base_width = fb_x11.w;
-	size->min_height = size->base_height = fb_x11.h;
+	size->min_width = size->base_width = fb_x11.content_w;
+	size->min_height = size->base_height = fb_x11.content_h;
 	if (flags & DRIVER_NO_SWITCH) {
 		size->max_width = size->min_width;
 		size->max_height = size->min_height;
@@ -516,12 +619,10 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 		size->max_width = XDisplayWidth(fb_x11.display, fb_x11.screen);
 		size->max_height = XDisplayHeight(fb_x11.display, fb_x11.screen);
 	}
-	size->width_inc = 0x10000;
-	size->height_inc = 0x10000;
+	size->width_inc = (flags & DRIVER_NO_SWITCH) ? 0x10000 : 1;
+	size->height_inc = (flags & DRIVER_NO_SWITCH) ? 0x10000 : 1;
 	XSetWMNormalHints(fb_x11.display, fb_x11.window, size);
 	XSetWMNormalHints(fb_x11.display, fb_x11.fswindow, size);
-	size->max_width = size->min_width;
-	size->max_height = size->min_height;
 	XSetWMNormalHints(fb_x11.display, fb_x11.wmwindow, size);
 	XFree(size);
 
@@ -601,8 +702,8 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	if (flags & DRIVER_FULLSCREEN) {
 		has_focus = TRUE;
 		mouse_on = TRUE;
-		mouse_x = fb_x11.w >> 1;
-		mouse_y = fb_x11.h >> 1;
+		mouse_x = fb_x11.content_w >> 1;
+		mouse_y = fb_x11.content_h >> 1;
 	} else {
 		has_focus = FALSE;
 		mouse_on = FALSE;
@@ -726,6 +827,7 @@ int fb_hX11GetMouse(int *x, int *y, int *z, int *buttons, int *clip)
 	if (XQueryPointer(fb_x11.display, fb_x11.window, &root, &child, &root_x, &root_y, &win_x, &win_y, &buttons_mask)) {
 		if (x) *x = win_x;
 		if (y) *y = win_y;
+		hWindowToFramebuffer(win_x, win_y, x, y, NULL);
 		if (buttons) {
 			*buttons = (buttons_mask & Button1Mask ? 0x1 : 0) |
 				   (buttons_mask & Button3Mask ? 0x2 : 0) |
@@ -755,14 +857,15 @@ void fb_hX11SetMouse(int x, int y, int show, int clip)
 			y = mouse_y;
 		}
 
-		x = MID(0, x, fb_x11.w - 1);
-		y = MID(0, y, fb_x11.h - 1);
+		x = MID(0, x, fb_x11.content_w - 1);
+		y = MID(0, y, fb_x11.content_h - 1);
 
 		mouse_on = TRUE;
 		mouse_x = x;
 		mouse_y = y;
 
-		XWarpPointer(fb_x11.display, None, fb_x11.window, 0, 0, 0, 0, mouse_x, mouse_y);
+		hFramebufferToWindow(mouse_x, mouse_y, &x, &y);
+		XWarpPointer(fb_x11.display, None, fb_x11.window, 0, 0, 0, 0, x, y);
 	}
 	if ((show > 0) && (!cursor_shown)) {
 		XUndefineCursor(fb_x11.display, fb_x11.window);
@@ -839,6 +942,27 @@ int fb_hX11SetWindowPos(int x, int y)
 	fb_hX11Unlock();
 
 	return ((attribs.x + dx) & 0xFFFF) | ((attribs.y + dy) << 16);
+}
+
+int fb_hX11GetGLViewport(int *x, int *y, int *w, int *h)
+{
+	if (!fb_x11.display)
+		return 0;
+
+	fb_hX11RefreshLayout(fb_x11.view_w, fb_x11.view_h);
+	if ((fb_x11.draw_w <= 0) || (fb_x11.draw_h <= 0))
+		return 0;
+
+	if (x)
+		*x = fb_x11.draw_offset_x;
+	if (y)
+		*y = fb_x11.view_h - (fb_x11.draw_offset_y + fb_x11.draw_h);
+	if (w)
+		*w = fb_x11.draw_w;
+	if (h)
+		*h = fb_x11.draw_h;
+
+	return 1;
 }
 
 int *fb_hX11FetchModes(int depth, int *size)

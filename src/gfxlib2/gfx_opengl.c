@@ -2,6 +2,10 @@
 
 #include "fb_gfx.h"
 #include "fb_gfx_gl.h"
+
+#if defined HOST_UNIX && !defined DISABLE_X11
+#include "unix/fb_gfx_x11.h"
+#endif
 #ifdef HOST_WIN32
 #include "win32/fb_gfx_win32.h"
 #endif
@@ -274,6 +278,26 @@ static int fb_hGL_GetWindowViewport(GLint *x, GLint *y, GLsizei *w, GLsizei *h)
 }
 #endif
 
+#if defined HOST_UNIX && !defined DISABLE_X11
+static int fb_hGL_GetX11WindowViewport(GLint *x, GLint *y, GLsizei *w, GLsizei *h)
+{
+	int viewport_x;
+	int viewport_y;
+	int viewport_w;
+	int viewport_h;
+
+	if (!fb_hX11GetGLViewport(&viewport_x, &viewport_y, &viewport_w, &viewport_h))
+		return 0;
+
+	*x = viewport_x;
+	*y = viewport_y;
+	*w = viewport_w;
+	*h = viewport_h;
+
+	return 1;
+}
+#endif
+
 void fb_hGL_SetupProjection(void)
 {
 	/*
@@ -301,6 +325,8 @@ void fb_hGL_SetupProjection(void)
 
 #ifdef HOST_WIN32
 	clear_backbuffer = fb_hGL_GetWindowViewport(&viewport_x, &viewport_y, &viewport_w, &viewport_h);
+#elif defined HOST_UNIX && !defined DISABLE_X11
+	clear_backbuffer = fb_hGL_GetX11WindowViewport(&viewport_x, &viewport_y, &viewport_w, &viewport_h);
 #endif
 
 	__fb_gl.PushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);

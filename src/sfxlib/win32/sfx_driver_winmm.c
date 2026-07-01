@@ -346,7 +346,7 @@ static int winmm_write(const float *buffer, int frames)
     fb_sfxConvertFloatToS16(buffer, dst, samples);
 
     header->lpData = (LPSTR)dst;
-    header->dwBufferLength = (DWORD)(samples * (int)sizeof(short));
+    header->dwBufferLength = (DWORD)samples * (DWORD)sizeof(short);
     header->dwFlags &= ~(DWORD)WHDR_DONE;
 
     res = waveOutWrite(g_waveout, header, sizeof(WAVEHDR));

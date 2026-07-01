@@ -1584,6 +1584,8 @@ sub symbDefineInit _
 		symbAddDefine( @"__FB_ASM__", NULL, 0, FALSE, @hDefAsm_cb, FB_DEFINE_FLAGS_STR )
 	case FB_CPUFAMILY_PPC, FB_CPUFAMILY_PPC64, FB_CPUFAMILY_PPC64LE
 		symbAddDefine( @"__FB_PPC__", NULL, 0 )
+	case FB_CPUFAMILY_RISCV32
+		symbAddDefine( @"__FB_RISCV32__", NULL, 0 )
 	case FB_CPUFAMILY_RISCV64
 		symbAddDefine( @"__FB_RISCV64__", NULL, 0 )
 	case FB_CPUFAMILY_S390X

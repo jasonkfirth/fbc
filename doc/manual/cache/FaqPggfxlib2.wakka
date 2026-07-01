@@ -12,6 +12,7 @@
 	==- {{anchor name="item6|How can I make the 'x' button in the window header close my application?"}}==
 	==- {{anchor name="item7|Can't run programs using Screen 13 or 14 in fullscreen !"}}==
 	==- {{anchor name="item8|Why does Imagecreate return a NULL pointer?"}}==
+	==- {{anchor name="item9|Why does a low resolution graphics screen get bigger when I maximize the window?"}}==
 
 {{fbdoc item="back" value="DocToc|Table of Contents"}}
 
@@ -82,7 +83,9 @@ Loop Until key = Chr(27) Or key = Chr(255, 107) 'escape or x-button
 {{anchor name="item0|Back to top"}}
 
 {{anchor name="item7"}}==Can't run programs using Screen 13 or 14 in full-screen!==
-	It's a hardware/driver limitation (""Win32"" and Linux only?). Video cards don't implement those low resolution graphic modes nowadays. If full-screen is required you should rewrite it using at least Screen 17 or 18, or a resolution of 640x480 or higher to be sure modern hardware can handle it.
+	Modern hardware and display systems often do not expose old low-resolution modes such as 320x200 directly.  On current backends this is less of a problem than it used to be: several drivers can keep the program's logical framebuffer at the requested size while presenting it centered and integer-scaled on a larger display or in a maximized window.
+
+	This means ##Screen 13## can still behave like a ##320x200## screen to the program, while the driver presents it at a larger clean scale when possible.  If a backend cannot provide the requested mode or an integer-scaled presentation, use ##[[KeyPgScreenlist|ScreenList]]## or a safer fallback resolution such as 640x480.
 
 {{anchor name="item0|Back to top"}}
 
@@ -90,6 +93,13 @@ Loop Until key = Chr(27) Or key = Chr(255, 107) 'escape or x-button
 	[[KeyPgImagecreate|Imagecreate]] needs to create an image buffer that fits the current screen's pixel format, and it cannot do so if there is no screen mode setup yet, so it returns NULL, very likely resulting in a NULL pointer access later on that crashes the program.
 
 	This is known to happen when Imagecreate is called //before// the graphics library was initialized with a call to [[KeyPgScreengraphics|Screen (Graphics)]] or [[KeyPgScreenres|Screenres]], as may happen when Imagecreate is called in a global constructor that is invoked before the Screen or Screenres call in the main part of the program. In such a case it is necessary to move the screen initialization into a constructor too, and have it execute before the image-creating constructors.
+
+{{anchor name="item0|Back to top"}}
+
+{{anchor name="item9"}}==Why does a low resolution graphics screen get bigger when I maximize the window?==
+	Several GfxLib backends use centered integer scaling when the visible window or display is larger than the program's framebuffer.  For example, a ##320x200## screen on a ##1920x1080## display can be shown as a centered ##1600x1000## image at 5x scale.  The program still sees a ##320x200## framebuffer, and mouse/touch coordinates are mapped back to that logical size.
+
+	Integer scaling is used because it keeps old pixel-art and QB-style graphics sharp.  It also avoids lying to the program about the screen size.  If you are building the runtime yourself and really want low-resolution screens to stay physically small even in a larger window or display area, build gfxlib2 with ##-DGFXLIB_NEVERSCALE##.
 
 {{anchor name="item0|Back to top"}}
 

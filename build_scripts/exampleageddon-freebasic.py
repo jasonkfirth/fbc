@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import csv
 import os
+import platform
 import re
 import shlex
 import shutil
@@ -265,6 +266,86 @@ def relpath(path: Path, root: Path) -> str:
 def safe_name(path: str) -> str:
     name = path.replace("/", "__")
     return re.sub(r"[^A-Za-z0-9_.-]", "_", name)
+
+
+def host_uses_windows_executables() -> bool:
+    if os.name == "nt":
+        return True
+
+    system = platform.system().lower()
+    return system.startswith(("msys", "mingw", "cygwin"))
+
+
+def executable_name(stem: str) -> str:
+    if not host_uses_windows_executables():
+        return stem
+
+    name = stem
+
+    # Windows UAC installer detection:
+    # 32-bit PE files without an application manifest can be treated as
+    # installers if their file name contains words such as "setup", "install",
+    # "update", or "patch".  Exampleageddon is not testing UAC, so avoid those
+    # trigger words in the generated executable name.
+    for word, replacement in (
+        ("install", "inst"),
+        ("setup", "stp"),
+        ("update", "upd"),
+        ("patch", "ptch"),
+    ):
+        name = re.sub(word, replacement, name, flags=re.IGNORECASE)
+
+    return name + ".exe"
+
+
+def fbc_package_path_entries(args: argparse.Namespace) -> list[str]:
+    if not args.fbc:
+        return []
+
+    fbc_path = Path(args.fbc[0])
+    entries = []
+
+    if fbc_path.is_absolute():
+        entries.append(str(fbc_path.parent))
+
+    if host_uses_windows_executables():
+        compiler_name = fbc_path.name.lower()
+        arch_dir = ""
+
+        if compiler_name == "fbc32.exe":
+            arch_dir = "win32"
+        elif compiler_name == "fbc64.exe":
+            arch_dir = "win64"
+        elif compiler_name == "fbcarm64.exe":
+            arch_dir = "win32-aarch64"
+
+        if arch_dir:
+            entries.append(str(args.prefix / "bin" / arch_dir))
+
+        entries.append(str(args.prefix))
+
+    result = []
+    seen = set()
+    for entry in entries:
+        if not entry:
+            continue
+        if entry in seen:
+            continue
+        seen.add(entry)
+        result.append(entry)
+
+    return result
+
+
+def command_environment(args: argparse.Namespace, env: dict[str, str] | None = None) -> dict[str, str]:
+    result = dict(env if env is not None else os.environ)
+    path_entries = fbc_package_path_entries(args)
+
+    if path_entries:
+        current_path = result.get("PATH", "")
+        result["PATH"] = os.pathsep.join(path_entries + ([current_path] if current_path else []))
+
+    return result
 
 
 def read_text(path: Path) -> str:
@@ -569,7 +650,7 @@ def run_command(
                 completed = subprocess.run(
                     cmd,
                     cwd=str(cwd),
-                    env=env,
+                    env=command_environment(args, env),
                     stdout=log,
                     stderr=subprocess.STDOUT,
                     timeout=timeout,
@@ -597,7 +678,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     rel = relpath(path, root)
     classification = classify(path, root)
     stem = safe_name(rel[:-4])
-    binary = args.outdir / "bin" / stem
+    binary = args.outdir / "bin" / executable_name(stem)
     compile_log = args.outdir / "logs" / (stem + ".compile.log")
     run_log = args.outdir / "logs" / (stem + ".run.log")
     compile_cwd = args.outdir / "work" / stem / "compile"
@@ -615,6 +696,8 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
         "-p",
         str(compile_cwd),
     ]
+    if args.main_module_from_source:
+        cmd.extend(["-m", path.stem])
     cmd.extend(str(source) for source in compile_inputs(path, root, compile_cwd))
     cmd.extend(["-x", str(binary)])
 
@@ -705,7 +788,7 @@ def table_rows(results: list[Result], limit: int = 80) -> list[str]:
     return rows
 
 
-def write_report(results: list[Result], path: Path) -> None:
+def write_report(results: list[Result], path: Path, args: argparse.Namespace) -> None:
     compile_failures = [result for result in results if result.compile_status != "pass"]
     run_failures = [
         result
@@ -721,7 +804,7 @@ def write_report(results: list[Result], path: Path) -> None:
     self_contained_problems = [
         result
         for result in self_contained
-        if result.compile_status != "pass" or result.run_status != "pass"
+        if result.compile_status != "pass" or (not args.no_run and result.run_status != "pass")
     ]
 
     lines = [
@@ -780,7 +863,10 @@ def write_report(results: list[Result], path: Path) -> None:
     if self_contained_problems:
         lines.extend(table_rows(self_contained_problems))
     else:
-        lines.append("| None | self-contained | pass | pass | All self-contained examples compiled and ran |  |")
+        if args.no_run:
+            lines.append("| None | self-contained | pass | skipped-no-run | All self-contained examples compiled |  |")
+        else:
+            lines.append("| None | self-contained | pass | pass | All self-contained examples compiled and ran |  |")
 
     lines.extend(
         [
@@ -814,6 +900,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--no-run", action="store_true")
     parser.add_argument("--run-all", action="store_true", help="Run compiled non-external/non-platform examples even if classified interactive")
     parser.add_argument("--fail-on-self-contained", action="store_true", help="Exit non-zero if self-contained examples fail to compile or run")
+    parser.add_argument("--main-module-from-source", action="store_true", help="Pass -m <source-stem> when compiling each example")
     parser.add_argument("--remote-shell", default="", help="Run compile/run commands through this shell command, such as ssh user@host")
     parser.add_argument("--path-map", action="append", default=[], help="Map an absolute host path prefix to a guest path, as HOST=GUEST")
 
@@ -867,7 +954,7 @@ def main(argv: list[str]) -> int:
 
     results.sort(key=lambda result: result.path)
     write_csv(results, args.outdir / "results.csv")
-    write_report(results, args.outdir / "report.md")
+    write_report(results, args.outdir / "report.md", args)
 
     compile_failures = sum(1 for result in results if result.compile_status != "pass")
     run_failures = sum(

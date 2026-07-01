@@ -18,7 +18,7 @@
 #include once "crt/win32/time.bi"
 #elseif defined(__FB_DOS__)
 #include once "crt/dos/time.bi"
-#elseif defined(__FB_LINUX__) or defined(__FB_ANDROID__)
+#elseif defined(__FB_LINUX__) or defined(__FB_ANDROID__) or defined(__FB_NUTTX__)
 #include once "crt/linux/time.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/cygwin/time.bi"

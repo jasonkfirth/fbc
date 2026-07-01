@@ -143,7 +143,10 @@ int fb_hWin32IsWindowScalingEnabled(void)
 void fb_hWin32UpdateWindowLayout(void)
 {
 	RECT rc;
-	int client_w, client_h, scale_x, scale_y, scale;
+	int client_w, client_h, scale;
+#ifndef GFXLIB_NEVERSCALE
+	int scale_x, scale_y;
+#endif
 	int scaled_w, scaled_h;
 
 	fb_win32.window_scale = 1;
@@ -160,11 +163,15 @@ void fb_hWin32UpdateWindowLayout(void)
 	if ((client_w <= 0) || (client_h <= 0) || (fb_win32.w <= 0) || (fb_win32.h <= 0))
 		return;
 
+#ifdef GFXLIB_NEVERSCALE
+	scale = 1;
+#else
 	scale_x = client_w / fb_win32.w;
 	scale_y = client_h / fb_win32.h;
 	scale = MIN(scale_x, scale_y);
 	if (scale < 1)
 		scale = 1;
+#endif
 
 	scaled_w = fb_win32.w * scale;
 	scaled_h = fb_win32.h * scale;
@@ -396,7 +403,7 @@ static void fb_hEnableDPIAwareness(int os_major_version)
 
 	shcore = LoadLibrary("shcore");
 	if (shcore) {
-		set_process_dpi_awareness = (SETPROCESSDPIAWARENESS)(void*)GetProcAddress(shcore, "SetProcessDpiAwareness");
+		set_process_dpi_awareness = (SETPROCESSDPIAWARENESS)GetProcAddress(shcore, "SetProcessDpiAwareness");
 		if (set_process_dpi_awareness) {
 			ret = set_process_dpi_awareness(PROCESS_PER_MONITOR_DPI_AWARE);
 			FreeLibrary(shcore);
@@ -412,7 +419,7 @@ static void fb_hEnableDPIAwareness(int os_major_version)
 	if (!user32) {
 		return;
 	}
-	set_process_dpi_aware = (SETPROCESSDPIAWARE)(void*)GetProcAddress(user32, "SetProcessDPIAware");
+	set_process_dpi_aware = (SETPROCESSDPIAWARE)GetProcAddress(user32, "SetProcessDPIAware");
 	if (set_process_dpi_aware) {
 		set_process_dpi_aware();
 	}
