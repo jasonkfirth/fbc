@@ -35,8 +35,9 @@ namespace fb
 
 	type CStream
 		as byte ptr				buffer
-		as integer				size
-		as integer				pos
+		as size_t				size
+		as size_t				pos
+		as integer				owns_buffer
 	end type
 
 	type CHttpStreamCtx_
@@ -62,6 +63,9 @@ namespace fb
 		
 		ctx->http = http
 		ctx->stream.buffer = NULL
+		ctx->stream.size = 0
+		ctx->stream.pos = 0
+		ctx->stream.owns_buffer = FALSE
   		
 	end constructor
 
@@ -70,10 +74,11 @@ namespace fb
 		( _
 		)
 		
- 		if( ctx->stream.buffer <> NULL ) then
- 			deallocate( ctx->stream.buffer )
- 			ctx->stream.buffer = NULL
- 		end if
+		if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
+			deallocate( ctx->stream.buffer )
+		end if
+		ctx->stream.buffer = NULL
+		ctx->stream.owns_buffer = FALSE
 
  		if( ctx->http <> NULL ) then
  			if( ctx->delcon ) then
@@ -90,17 +95,76 @@ namespace fb
 	private function recv_cb cdecl _
 		( _
 			byval buffer as byte ptr, _
-			byval size as integer, _
-			byval nitems as integer, _
+			byval size as size_t, _
+			byval nitems as size_t, _
 			byval userdata as any ptr _
-		) as integer
+		) as size_t
 
 		dim as CStream ptr ctx = userdata
-		dim as integer bytes = size * nitems
+
+		if( ctx = NULL ) then
+			return 0
+		end if
+
+		dim as size_t maximum_size = cast( size_t, -1 )
+
+		if( size <> 0 andalso nitems > maximum_size \ size ) then
+			return 0
+		end if
+
+		dim as size_t bytes = size * nitems
+
+		if( bytes = 0 ) then
+			return 0
+		end if
+
+		if( buffer = NULL ) then
+			return 0
+		end if
+
+		if( ctx->pos > ctx->size ) then
+			return 0
+		end if
+
+		if( bytes > maximum_size - ctx->pos ) then
+			return 0
+		end if
+
+		dim as size_t data_end = ctx->pos + bytes
 		
-		if( ctx->pos + bytes >= ctx->size ) then
-			ctx->size += iif( bytes < CSTREAM_MINALLOC, CSTREAM_MINALLOC, bytes )
-			ctx->buffer = reallocate( ctx->buffer, ctx->size + 1 )
+		if( data_end >= ctx->size ) then
+			dim as size_t growth
+
+			if( bytes < CSTREAM_MINALLOC ) then
+				growth = CSTREAM_MINALLOC
+			else
+				growth = bytes
+			end if
+
+			'' One extra byte is reserved for the terminator added by Receive().
+			if( ctx->size = maximum_size ) then
+				return 0
+			end if
+
+			if( growth > maximum_size - ctx->size - 1 ) then
+				return 0
+			end if
+
+			dim as size_t new_size = ctx->size + growth
+
+			if( new_size < data_end ) then
+				return 0
+			end if
+
+			dim as byte ptr new_buffer = reallocate( ctx->buffer, new_size + 1 )
+
+			if( new_buffer = NULL ) then
+				return 0
+			end if
+
+			ctx->buffer = new_buffer
+			ctx->size = new_size
+			ctx->owns_buffer = TRUE
 		end if
 		
 		memcpy( ctx->buffer + ctx->pos, buffer, bytes )
@@ -135,29 +199,35 @@ namespace fb
 		end if
 		
  		''
- 		if( ctx->stream.buffer <> NULL ) then
- 			deallocate( ctx->stream.buffer )
- 			ctx->stream.buffer = NULL
- 		end if
+		if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
+			deallocate( ctx->stream.buffer )
+		end if
+		ctx->stream.buffer = NULL
  		
  		ctx->stream.size = 0
  		ctx->stream.pos = 0
+		ctx->stream.owns_buffer = FALSE
  		
  		''
  		if( doreset ) then
  			curl_easy_reset( curl )
  		end if
 
+		dim as clong verbose = 1
+		dim as clong follow_location = 2
+		dim as clong maximum_redirects = 2
+		dim as clong ssl_options = CURLSSLOPT_NATIVE_CA
+
 		if( fbdoc.get_trace() ) then
-			curl_easy_setopt( curl, CURLOPT_VERBOSE, TRUE )
+			curl_easy_setopt( curl, CURLOPT_VERBOSE, verbose )
 		end if
 
 		curl_easy_setopt( curl, CURLOPT_URL, url )
 
 		'' Follow at most two redirection to allow for url rewrite
 		'' and page redirect on service side
-		curl_easy_setopt( curl, CURLOPT_FOLLOWLOCATION, 2 )
-		curl_easy_setopt( curl, CURLOPT_MAXREDIRS, 2 )
+		curl_easy_setopt( curl, CURLOPT_FOLLOWLOCATION, follow_location )
+		curl_easy_setopt( curl, CURLOPT_MAXREDIRS, maximum_redirects )
 
 		curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, @recv_cb )
 		curl_easy_setopt( curl, CURLOPT_WRITEDATA, @ctx->stream )
@@ -165,7 +235,7 @@ namespace fb
 		if( ca_file ) then
 			ret = curl_easy_setopt( curl, CURLOPT_CAINFO, ca_file )
 		else
-			curl_easy_setopt( curl, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA )
+			curl_easy_setopt( curl, CURLOPT_SSL_OPTIONS, ssl_options )
 		end if
 
 		'' This option should not be needed.  It wasn't in earlier version
@@ -173,7 +243,8 @@ namespace fb
 		'' be a problem getting pages consistently from www.freebasic.net/wiki
 		'' could be a bug in libcurl.  It wasn't a problem before.  This is the
 		'' work-around for now.
-		'' curl_easy_setopt( curl, CURLOPT_FRESH_CONNECT, TRUE )
+		'' dim as clong fresh_connect = 1
+		'' curl_easy_setopt( curl, CURLOPT_FRESH_CONNECT, fresh_connect )
 
 		'' This shouldn't be needed either, as it wasn't in previous versions
 		'' But now, we might get CURLE_COULDNT_RESOLVE_HOST on the first try
@@ -185,11 +256,14 @@ namespace fb
 		end if
 
 		if( ret <> 0 ) then
- 			if( ctx->stream.buffer <> NULL ) then
- 				deallocate( ctx->stream.buffer )
- 				ctx->stream.buffer = NULL
- 			end if
- 			return FALSE
+			if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
+				deallocate( ctx->stream.buffer )
+			end if
+			ctx->stream.buffer = NULL
+			ctx->stream.size = 0
+			ctx->stream.pos = 0
+			ctx->stream.owns_buffer = FALSE
+			return FALSE
 		end if
  		
 		if( ctx->stream.buffer <> NULL ) then
@@ -221,17 +295,38 @@ namespace fb
 	private function send_cb cdecl _
 		( _
 			byval buffer as byte ptr, _
-			byval size as integer, _
-			byval nitems as integer, _
+			byval size as size_t, _
+			byval nitems as size_t, _
 			byval userdata as any ptr _
-		) as integer
+		) as size_t
 
 		dim as CStream ptr ctx = userdata
-		dim as integer bytes = size * nitems
+
+		if( ctx = NULL ) then
+			return 0
+		end if
+
+		dim as size_t maximum_size = cast( size_t, -1 )
+
+		if( size <> 0 andalso nitems > maximum_size \ size ) then
+			return 0
+		end if
+
+		dim as size_t bytes = size * nitems
 		
-		bytes = iif( bytes < ctx->size, bytes, ctx->size )
+		if( bytes > ctx->size ) then
+			bytes = ctx->size
+		end if
 		
 		if( bytes = 0 ) then
+			return 0
+		end if
+
+		if( buffer = NULL or ctx->buffer = NULL ) then
+			return 0
+		end if
+
+		if( bytes > maximum_size - ctx->pos ) then
 			return 0
 		end if
 
@@ -268,36 +363,46 @@ namespace fb
 			return TRUE
 		end if
 
+		if( data_ = NULL ) then
+			return FALSE
+		end if
+
 		curl = ctx->http->GetHandle()
 		if( curl = NULL ) then
 			return FALSE
 		end if
 		
  		''
- 		if( ctx->stream.buffer <> NULL ) then
- 			deallocate( ctx->stream.buffer )
- 			ctx->stream.buffer = NULL
- 		end if
+		if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
+			deallocate( ctx->stream.buffer )
+		end if
  		
- 		ctx->stream.buffer = data_
- 		ctx->stream.size = bytes
- 		ctx->stream.pos = 0
+		ctx->stream.buffer = data_
+		ctx->stream.size = bytes
+		ctx->stream.pos = 0
+		ctx->stream.owns_buffer = FALSE
  		
  		''
  		if( doreset ) then
  			curl_easy_reset( curl )
  		end if
 
+		dim as clong verbose = 1
+		dim as clong follow_location = 2
+		dim as clong maximum_redirects = 2
+		dim as clong post_redirect = CURL_REDIR_POST_ALL
+		dim as clong ssl_options = CURLSSLOPT_NATIVE_CA
+
 		if( fbdoc.get_trace() ) then
-			curl_easy_setopt( curl, CURLOPT_VERBOSE, TRUE )
+			curl_easy_setopt( curl, CURLOPT_VERBOSE, verbose )
 		end if
 
 		curl_easy_setopt( curl, CURLOPT_URL, url )
 
-		curl_easy_setopt( curl, CURLOPT_FOLLOWLOCATION, 2 )
-		curl_easy_setopt( curl, CURLOPT_MAXREDIRS, 2 )
+		curl_easy_setopt( curl, CURLOPT_FOLLOWLOCATION, follow_location )
+		curl_easy_setopt( curl, CURLOPT_MAXREDIRS, maximum_redirects )
 
-		curl_easy_setopt( curl, CURLOPT_POSTREDIR, CURL_REDIR_POST_ALL )
+		curl_easy_setopt( curl, CURLOPT_POSTREDIR, post_redirect )
 
 		curl_easy_setopt( curl, CURLOPT_READFUNCTION, @send_cb )
 		curl_easy_setopt( curl, CURLOPT_READDATA, @ctx->stream )
@@ -305,7 +410,7 @@ namespace fb
 		if( ca_file ) then
 			curl_easy_setopt( curl, CURLOPT_CAINFO, ca_file )
 		else
-			curl_easy_setopt( curl, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA )
+			curl_easy_setopt( curl, CURLOPT_SSL_OPTIONS, ssl_options )
 		end if
 
 		ret = curl_easy_perform( curl )
@@ -313,6 +418,13 @@ namespace fb
 			'' Retry
 			ret = curl_easy_perform( curl )
 		end if
+
+		'' Send() borrows the caller's buffer only during curl_easy_perform().
+		'' Clear the pointer before later operations or the destructor can see it.
+		ctx->stream.buffer = NULL
+		ctx->stream.size = 0
+		ctx->stream.pos = 0
+		ctx->stream.owns_buffer = FALSE
 
  		if( ret <> 0 ) then
  			return FALSE
@@ -323,3 +435,5 @@ namespace fb
 	end function
 
 end namespace
+
+'' end of CHttpStream.bas

@@ -404,7 +404,7 @@ sub test_sync  (byval compr as Bytef ptr, byval comprLen as uLong_,_
     d_stream.next_out = uncompr
     d_stream.avail_out = uncomprLen
 
-    inflate(@d_stream, Z_NO_FLUSH)
+    err_ = inflate(@d_stream, Z_NO_FLUSH)
     CHECK_ERR(err_, "inflate")
 
     d_stream.avail_in = comprLen-2          /' read all compressed data '/
@@ -412,9 +412,15 @@ sub test_sync  (byval compr as Bytef ptr, byval comprLen as uLong_,_
     CHECK_ERR(err_, "inflateSync")
 
     err_ = inflate(@d_stream, Z_FINISH)
-    if (err_ <> Z_DATA_ERROR) then
-        print #stderr_, "inflate should report DATA_ERROR"
-        /' Because of incorrect adler32 '/
+    /'
+     * zlib through 1.2.11 reports Z_DATA_ERROR here because the recovered
+     * stream has an incorrect Adler-32 value.  Starting with zlib 1.2.12,
+     * inflateSync() can recover through the complete stream and inflate()
+     * reports Z_STREAM_END instead.  Both results are valid for the zlib
+     * versions this example may be linked against.
+     '/
+    if (err_ <> Z_DATA_ERROR andalso err_ <> Z_STREAM_END) then
+        print #stderr_, "inflate should report DATA_ERROR or STREAM_END"
         exit_(1)
     end if
     err_ = inflateEnd(@d_stream)
@@ -579,3 +585,4 @@ function mymain() as integer
 
 end function
 
+/' end of zlib.bas '/

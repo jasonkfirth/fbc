@@ -143,7 +143,7 @@ extern in6addr_loopback alias "in6addr_loopback" as in6_addr
 
 #include once "crt/sys/socket.bi"
 
-#if defined(__FB_DRAGONFLY__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)
+#if defined(__FB_DRAGONFLY__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_DARWIN__)
 	type sockaddr_in
 		sin_len as ubyte
 		sin_family as sa_family_t
@@ -182,17 +182,37 @@ type ip_mreq
 	imr_interface as in_addr
 end type
 
+#if defined(__FB_DARWIN__)
+type ip_mreq_source field = 4
+	imr_multiaddr as in_addr
+	imr_sourceaddr as in_addr
+	imr_interface as in_addr
+end type
+#else
 type ip_mreq_source
 	imr_multiaddr as in_addr
 	imr_interface as in_addr
 	imr_sourceaddr as in_addr
 end type
+#endif
 
 type ipv6_mreq
 	ipv6mr_multiaddr as in6_addr
 	ipv6mr_interface as ulong
 end type
 
+#if defined(__FB_DARWIN__)
+type group_req field = 4
+	gr_interface as uint32_t
+	gr_group as sockaddr_storage
+end type
+
+type group_source_req field = 4
+	gsr_interface as uint32_t
+	gsr_group as sockaddr_storage
+	gsr_source as sockaddr_storage
+end type
+#else
 type group_req
 	gr_interface as uint32_t
 	gr_group as sockaddr_storage
@@ -203,7 +223,9 @@ type group_source_req
 	gsr_group as sockaddr_storage
 	gsr_source as sockaddr_storage
 end type
+#endif
 
+#if not defined(__FB_DARWIN__)
 type ip_msfilter
 	imsf_multiaddr as in_addr
 	imsf_interface as in_addr
@@ -219,6 +241,7 @@ type group_filter
 	gf_numsrc as uint32_t
 	gf_slist(0 to 1-1) as sockaddr_storage
 end type
+#endif
 
 #if defined(__FB_LINUX__)
 #include once "crt/netinet/linux/in.bi"
@@ -232,6 +255,8 @@ end type
 #include once "crt/netinet/openbsd/in.bi"
 #elseif defined(__FB_NETBSD__)
 #include once "crt/netinet/netbsd/in.bi"
+#elseif defined(__FB_DARWIN__)
+#include once "crt/netinet/darwin/in.bi"
 #else
 #error Platform unsupported
 #endif
@@ -241,8 +266,12 @@ declare function ntohl (byval __netlong as uint32_t) as uint32_t
 declare function ntohs (byval __netshort as uint16_t) as uint16_t
 declare function htonl (byval __hostlong as uint32_t) as uint32_t
 declare function htons (byval __hostshort as uint16_t) as uint16_t
-declare function bindresvport (byval __sockfd as integer, byval __sock_in as sockaddr_in ptr) as long
-declare function bindresvport6 (byval __sockfd as integer, byval __sock_in as sockaddr_in6 ptr) as long
+declare function bindresvport (byval __sockfd as long, byval __sock_in as sockaddr_in ptr) as long
+#if defined(__FB_DARWIN__)
+declare function bindresvport_sa (byval __sockfd as long, byval __sockaddr as sockaddr ptr) as long
+#else
+declare function bindresvport6 (byval __sockfd as long, byval __sock_in as sockaddr_in6 ptr) as long
+#endif
 end extern
 
 type in6_pktinfo
@@ -251,3 +280,5 @@ type in6_pktinfo
 end type
 
 #endif
+
+'' end of crt/netinet/in.bi

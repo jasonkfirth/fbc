@@ -33,6 +33,8 @@
 	#inclib "opengl32"
 #elseif defined(__FB_DOS__)
 	#inclib "gl"
+#elseif defined(__FB_DARWIN__)
+	#inclib "OpenGL"
 #else
 	#inclib "GL"
 #endif
@@ -1382,3 +1384,5 @@ type PFNGLEGLIMAGETARGETTEXTURE2DOESPROC as sub(byval target as GLenum, byval im
 type PFNGLEGLIMAGETARGETRENDERBUFFERSTORAGEOESPROC as sub(byval target as GLenum, byval image as GLeglImageOES)
 
 end extern
+
+'' end of GL/mesa/gl.bi

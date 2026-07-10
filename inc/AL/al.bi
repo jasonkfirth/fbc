@@ -25,7 +25,11 @@
 
 #pragma once
 
-#inclib "openal"
+#ifdef __FB_DARWIN__
+	#inclib "OpenAL"
+#else
+	#inclib "openal"
+#endif
 
 extern "C"
 
@@ -266,3 +270,5 @@ type LPALSPEEDOFSOUND as sub(byval value as ALfloat)
 type LPALDISTANCEMODEL as sub(byval distanceModel as ALenum)
 
 end extern
+
+'' end of AL/al.bi

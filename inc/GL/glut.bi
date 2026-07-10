@@ -12,7 +12,9 @@
 
 #pragma once
 
-#ifdef __FB_UNIX__
+#ifdef __FB_DARWIN__
+	#inclib "GLUT"
+#elseif defined(__FB_UNIX__)
 	#inclib "glut"
 #elseif defined(__FB_WIN32__)
 	#inclib "freeglut"
@@ -359,3 +361,5 @@ declare sub glutLeaveGameMode()
 declare function glutGameModeGet(byval mode as GLenum) as long
 
 end extern
+
+'' end of GL/glut.bi

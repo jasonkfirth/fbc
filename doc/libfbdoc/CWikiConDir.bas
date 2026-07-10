@@ -27,7 +27,7 @@
 #include "crt/stdlib.bi"
 #include "crt/string.bi"
 
-#ifdef __FB_LINUX__
+#ifdef __FB_UNIX__
 extern "c"
 	declare function strcasecmp(byval as const zstring ptr, byval as const zstring ptr) as long
 end extern
@@ -263,3 +263,5 @@ namespace fb.fbdoc
 	end function
 
 end namespace
+
+'' end of CWikiConDir.bas

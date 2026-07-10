@@ -1,8 +1,10 @@
 #pragma once
 
-#ifndef __FB_LINUX__
+#ifdef __FB_DARWIN__
+	#include once "crt/darwin/regex.bi"
+#elseif not defined(__FB_LINUX__)
 	#error "Target platform not supported; this is the header for the glibc regex implementation on GNU/Linux."
-#endif
+#else
 
 #include once "crt/long.bi"
 #include once "crt/sys/types.bi"
@@ -73,3 +75,7 @@ declare function regerror(byval __errcode as long, byval __preg as const regex_t
 declare sub regfree(byval __preg as regex_t ptr)
 
 end extern
+
+#endif
+
+'' end of crt/regex.bi

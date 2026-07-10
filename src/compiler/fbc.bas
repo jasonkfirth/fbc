@@ -1700,8 +1700,15 @@ private function hLinkFiles( ) as integer
 					hAddXboxLibArchive( ldcline, i->s )
 				else
 					dim as string libname = i->s
-					libname = fbcPlatformMapLibName( libname )
-					ldcline += " -l" + libname
+					dim as string frameworkname = _
+						fbcDarwinPlatformGetFrameworkName( libname )
+
+					if( len( frameworkname ) > 0 ) then
+						ldcline += " -framework " + frameworkname
+					else
+						libname = fbcPlatformMapLibName( libname )
+						ldcline += " -l" + libname
+					end if
 				end if
 			end if
 			i = listGetNext(i)
@@ -5327,3 +5334,5 @@ end sub
 	end if
 
 	fbcEnd( 0 )
+
+'' end of fbc.bas

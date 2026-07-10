@@ -1,5 +1,28 @@
 #!/usr/bin/env bash
 
+# FreeBASIC macOS package builder
+# --------------------------------
+#
+# File: macos-build-freebasic.sh
+#
+# Purpose:
+#
+#     Build and package separate x86_64 and arm64 FreeBASIC distributions
+#     from either supported macOS host architecture.
+#
+# Responsibilities:
+#
+#     - prepare the native and Apple-clang cross toolchains
+#     - keep a host-runnable compiler available during cross builds
+#     - stage architecture-specific install trees
+#     - create tar.xz archives and macOS installer packages
+#
+# This file intentionally does NOT contain:
+#
+#     - FreeBASIC compiler or runtime implementation code
+#     - universal-binary merging
+#     - package installation without an explicit installer invocation
+
 set -euo pipefail
 trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 
@@ -143,22 +166,26 @@ usage() {
 Usage: ./build_scripts/macos-build-freebasic.sh [options]
 
 Options:
-  --arch <arm64|aarch64|x86_64|native>
-                                Build architecture (default: native host arch)
+  --arch <all|both|arm64|aarch64|x86_64|native>
+                                Build architectures (default: all)
   --skip-deps                   Skip Command Line Tools/Homebrew dependency installation
   --no-build                    Skip compilation and reuse staged artifacts
   --no-package                  Skip package creation
   -h, --help                    Show this help text
 
 Environment:
-  BUILDROOT                     Temporary build root (default: <repo>/.build-macos/<arch>)
-  OUTBASE                       Output root (default: <repo>/out/macos/<arch>)
+  BUILDROOT                     Temporary build root. In all mode this is the
+                                parent of one directory per architecture.
+  OUTBASE                       Output root. In all mode this is the parent of
+                                one directory per architecture.
   PREFIX                        Install prefix inside the package (default: /usr/local)
   JOBS                          Parallel make job count (default: sysctl hw.ncpu)
   DARWIN_CROSS_PREFIX           Optional GCC cross prefix for opposite-arch Darwin builds
                                 Example: aarch64-apple-darwin or arm64-apple-darwin
 
 Artifacts:
+  out/macos/x86_64/freebasic-<version>-<rev>-macos-x86_64.tar.xz
+  out/macos/arm64/freebasic-<version>-<rev>-macos-arm64.tar.xz
   out/macos/<arch>/freebasic-<version>-<rev>-macos-<arch>.tar.xz
   out/macos/<arch>/freebasic-<version>-<rev>-macos-<arch>.pkg  (when pkgbuild exists)
 EOF
@@ -168,7 +195,7 @@ EOF
 # Options
 ##############################################################################
 
-TARGET_ARCH="native"
+TARGET_ARCH="all"
 SKIP_DEPS=0
 DO_BUILD=1
 DO_PACKAGE=1
@@ -210,6 +237,82 @@ case "$HOST_ARCH_RAW" in
     *) die "unsupported host architecture: $HOST_ARCH_RAW" ;;
 esac
 
+run_arch_matrix() {
+    local other_arch matrix_buildroot matrix_outbase host_cache status
+    local -a common_args host_args cross_args
+
+    if [ "$HOST_ARCH" = "arm64" ]; then
+        other_arch="x86_64"
+    else
+        other_arch="arm64"
+    fi
+
+    matrix_buildroot="${BUILDROOT:-$ROOT/.build-macos}"
+    matrix_outbase="${OUTBASE:-$ROOT/out/macos}"
+    host_cache="${matrix_buildroot}/host-tools/${HOST_ARCH}/fbc"
+
+    common_args=()
+    [ "$DO_BUILD" -eq 1 ] || common_args+=(--no-build)
+    [ "$DO_PACKAGE" -eq 1 ] || common_args+=(--no-package)
+
+    host_args=("${common_args[@]}")
+    if [ "$SKIP_DEPS" -eq 1 ]; then
+        host_args+=(--skip-deps)
+    fi
+
+    cross_args=("${common_args[@]}" --skip-deps)
+
+    msg "building macOS package matrix"
+    echo "Host architecture: $HOST_ARCH"
+    echo "Second architecture: $other_arch"
+
+    run env \
+        BUILDROOT="${matrix_buildroot}/${HOST_ARCH}" \
+        OUTBASE="${matrix_outbase}/${HOST_ARCH}" \
+        HOST_FBC_CACHE="$host_cache" \
+        "$ROOT/build_scripts/macos-build-freebasic.sh" \
+        --arch "$HOST_ARCH" "${host_args[@]}"
+
+    if [ "$DO_BUILD" -eq 1 ]; then
+        [ -x "$ROOT/bin/fbc" ] || die "native matrix build did not produce bin/fbc"
+        run mkdir -p "$(dirname "$host_cache")"
+        run cp "$ROOT/bin/fbc" "$host_cache"
+        run chmod 755 "$host_cache"
+    fi
+
+    if env \
+        BUILDROOT="${matrix_buildroot}/${other_arch}" \
+        OUTBASE="${matrix_outbase}/${other_arch}" \
+        HOST_FBC_CACHE="$host_cache" \
+        "$ROOT/build_scripts/macos-build-freebasic.sh" \
+        --arch "$other_arch" "${cross_args[@]}"; then
+        status=0
+    else
+        status=$?
+    fi
+
+    if [ "$DO_BUILD" -eq 1 ] && [ -x "$host_cache" ]; then
+        run mkdir -p "$ROOT/bin"
+        run cp "$host_cache" "$ROOT/bin/fbc"
+        run chmod 755 "$ROOT/bin/fbc"
+    fi
+
+    [ "$status" -eq 0 ] || return "$status"
+
+    if [ "$DO_PACKAGE" -eq 1 ]; then
+        msg "matrix artifacts"
+        echo "${matrix_outbase}/${HOST_ARCH}"
+        echo "${matrix_outbase}/${other_arch}"
+    fi
+}
+
+case "$TARGET_ARCH" in
+    all|both)
+        run_arch_matrix
+        exit 0
+        ;;
+esac
+
 if [ "$TARGET_ARCH" = "native" ]; then
     TARGET_ARCH="$HOST_ARCH"
 fi
@@ -220,11 +323,13 @@ case "$TARGET_ARCH" in
         FBC_TARGET="darwin-aarch64"
         TARGET_TRIPLET="aarch64-apple-darwin"
         CLANG_ARCH="arm64"
+        CLANG_TARGET="arm64-apple-macos11"
         ;;
     x86_64)
         FBC_TARGET="darwin-x86_64"
         TARGET_TRIPLET="x86_64-apple-darwin"
         CLANG_ARCH="x86_64"
+        CLANG_TARGET="x86_64-apple-macos10.13"
         ;;
     *)
         die "unsupported target architecture: $TARGET_ARCH"
@@ -244,6 +349,9 @@ PKGROOT="${BUILDROOT}/pkgroot"
 PKGSCRIPTS="${BUILDROOT}/pkgscripts"
 OUTBASE="${OUTBASE:-$ROOT/out/macos/$TARGET_ARCH}"
 PREFIX="${PREFIX:-/usr/local}"
+HOST_FBC_CACHE="${HOST_FBC_CACHE:-$ROOT/.build-macos/host-tools/$HOST_ARCH/fbc}"
+CROSS_TOOL_ROOT="${CROSS_TOOL_ROOT:-$ROOT/.build-macos/cross-tools/${HOST_ARCH}-to-${TARGET_ARCH}}"
+RESTORE_HOST_FBC=0
 
 mkdir -p "$BUILDROOT" "$OUTBASE"
 
@@ -339,6 +447,10 @@ NCURSES_PREFIX=""
 BOOT_FBC_RESULT=""
 TOOL_CC=""
 TOOL_CXX=""
+TOOL_AS=""
+TOOL_AR=""
+TOOL_RANLIB=""
+TOOL_DARWIN_CLANG=""
 HOST_TRIPLET=""
 
 resolve_gcc_toolchain() {
@@ -369,27 +481,9 @@ resolve_gcc_toolchain() {
 }
 
 resolve_cross_gcc_toolchain() {
-    local prefix gcc_bin gxx_bin triplet_guess
+    local prefix gcc_bin gxx_bin
 
     prefix="${DARWIN_CROSS_PREFIX:-}"
-    if [ -z "$prefix" ]; then
-        if [ "$TARGET_ARCH" = "arm64" ]; then
-            for triplet_guess in aarch64-apple-darwin arm64-apple-darwin; do
-                if command -v "${triplet_guess}-gcc" >/dev/null 2>&1 && command -v "${triplet_guess}-g++" >/dev/null 2>&1; then
-                    prefix="$triplet_guess"
-                    break
-                fi
-            done
-        elif [ "$TARGET_ARCH" = "x86_64" ]; then
-            for triplet_guess in x86_64-apple-darwin amd64-apple-darwin; do
-                if command -v "${triplet_guess}-gcc" >/dev/null 2>&1 && command -v "${triplet_guess}-g++" >/dev/null 2>&1; then
-                    prefix="$triplet_guess"
-                    break
-                fi
-            done
-        fi
-    fi
-
     [ -n "$prefix" ] || return 1
 
     gcc_bin="$(command -v "${prefix}-gcc" 2>/dev/null || true)"
@@ -400,10 +494,95 @@ resolve_cross_gcc_toolchain() {
 
     TOOL_CC="$gcc_bin"
     TOOL_CXX="$gxx_bin"
-    HOST_TRIPLET="$("$TOOL_CC" -dumpmachine 2>/dev/null || true)"
-    [ -n "$HOST_TRIPLET" ] || HOST_TRIPLET="${prefix}"
+    TOOL_AS="$(command -v "${prefix}-as" 2>/dev/null || true)"
+    TOOL_AR="$(command -v "${prefix}-ar" 2>/dev/null || true)"
+    TOOL_RANLIB="$(command -v "${prefix}-ranlib" 2>/dev/null || true)"
+
+    [ -n "$TOOL_AS" ] || return 1
+    [ -n "$TOOL_AR" ] || return 1
+    [ -n "$TOOL_RANLIB" ] || return 1
+
     DARWIN_CROSS_PREFIX="$prefix"
     return 0
+}
+
+create_clang_cross_toolchain() {
+    local clang clangxx ar ranlib cross_cc cross_cxx cross_as
+
+    clang="$(xcrun --find clang 2>/dev/null || true)"
+    clangxx="$(xcrun --find clang++ 2>/dev/null || true)"
+    ar="$(xcrun --find ar 2>/dev/null || true)"
+    ranlib="$(xcrun --find ranlib 2>/dev/null || true)"
+
+    [ -x "$clang" ] || die "Apple clang was not found through xcrun"
+    [ -x "$clangxx" ] || die "Apple clang++ was not found through xcrun"
+    [ -x "$ar" ] || die "Apple ar was not found through xcrun"
+    [ -x "$ranlib" ] || die "Apple ranlib was not found through xcrun"
+
+    cross_cc="${CROSS_TOOL_ROOT}/cc"
+    cross_cxx="${CROSS_TOOL_ROOT}/cxx"
+    cross_as="${CROSS_TOOL_ROOT}/as"
+
+    run mkdir -p "$CROSS_TOOL_ROOT"
+
+    cat > "$cross_cc" <<EOF
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+exec "$clang" -target "$CLANG_TARGET" "\$@"
+
+# end of cc
+EOF
+
+    cat > "$cross_cxx" <<EOF
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+exec "$clangxx" -target "$CLANG_TARGET" "\$@"
+
+# end of cxx
+EOF
+
+    cat > "$cross_as" <<EOF
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# fbc normally invokes the host assembler directly.  Compile the emitted
+# assembly through clang so the target triple is explicit during a cross build.
+exec "$clang" -target "$CLANG_TARGET" -c "\$@"
+
+# end of as
+EOF
+
+    run chmod 755 "$cross_cc" "$cross_cxx" "$cross_as"
+
+    TOOL_CC="$cross_cc"
+    TOOL_CXX="$cross_cxx"
+    TOOL_AS="$cross_as"
+    TOOL_AR="$ar"
+    TOOL_RANLIB="$ranlib"
+    TOOL_DARWIN_CLANG="$cross_cc"
+}
+
+select_build_toolchain() {
+    if ! resolve_gcc_toolchain; then
+        TOOL_CC="$(xcrun --find clang)"
+        TOOL_CXX="$(xcrun --find clang++)"
+        HOST_TRIPLET="$HOST_ARCH_RAW-apple-darwin"
+    fi
+
+    if [ "$TARGET_ARCH" = "$HOST_ARCH" ]; then
+        return 0
+    fi
+
+    create_clang_cross_toolchain
+
+    if [ -n "${DARWIN_CROSS_PREFIX:-}" ]; then
+        resolve_cross_gcc_toolchain || die "DARWIN_CROSS_PREFIX does not provide a complete GCC, G++, assembler, archiver, and ranlib toolchain"
+    fi
 }
 
 refresh_make_vars() {
@@ -412,7 +591,7 @@ refresh_make_vars() {
     LIBFFI_PREFIX=""
     NCURSES_PREFIX=""
 
-    if activate_homebrew; then
+    if [ "$TARGET_ARCH" = "$HOST_ARCH" ] && activate_homebrew; then
         BREW_PREFIX="$(brew --prefix 2>/dev/null || true)"
         LIBFFI_PREFIX="$(brew --prefix libffi 2>/dev/null || true)"
         NCURSES_PREFIX="$(brew --prefix ncurses 2>/dev/null || true)"
@@ -434,12 +613,24 @@ refresh_make_vars() {
     MAKE_VARS=(
         "CC=${TOOL_CC}"
         "CXX=${TOOL_CXX}"
+        "HOST_TRIPLET=${HOST_TRIPLET}"
     )
 
     if [ "$TARGET_ARCH" = "$HOST_ARCH" ]; then
         MAKE_VARS+=("TARGET_TRIPLET=${HOST_TRIPLET}")
     else
-        MAKE_VARS+=("TARGET_TRIPLET=${TARGET_TRIPLET}")
+        MAKE_VARS+=(
+            "TARGET_TRIPLET=${TARGET_TRIPLET}"
+            "AS=${TOOL_AS}"
+            "AR=${TOOL_AR}"
+            "RANLIB=${TOOL_RANLIB}"
+            "LD=${TOOL_CC}"
+            "CLANG=${TOOL_DARWIN_CLANG}"
+            "DARWIN_CLANG=${TOOL_DARWIN_CLANG}"
+        )
+        if [ "$DO_BUILD" -eq 1 ]; then
+            MAKE_VARS+=("CPPFLAGS=${CPPFLAGS:-} -I$(find_macos_sdkroot)/usr/include/ffi")
+        fi
         if [ -n "${DARWIN_CROSS_PREFIX:-}" ]; then
             MAKE_VARS+=("BUILD_PREFIX=${DARWIN_CROSS_PREFIX}-")
         else
@@ -448,13 +639,26 @@ refresh_make_vars() {
     fi
 }
 
-if ! resolve_gcc_toolchain; then
-    TOOL_CC="gcc"
-    TOOL_CXX="g++"
-    HOST_TRIPLET="${HOST_ARCH_RAW}-apple-darwin"
+# Tool selection is repeated after dependency setup in the build path.  These
+# placeholders let package-only runs inspect an existing stage without
+# requiring Command Line Tools before the script has had a chance to install
+# them.
+TOOL_CC="${CC:-cc}"
+TOOL_CXX="${CXX:-c++}"
+TOOL_AS="${AS:-as}"
+TOOL_AR="${AR:-ar}"
+TOOL_RANLIB="${RANLIB:-ranlib}"
+HOST_TRIPLET="${HOST_ARCH_RAW}-apple-darwin"
+MAKE_VARS=()
+if [ "$DO_BUILD" -eq 0 ]; then
+    refresh_make_vars
 fi
 
-refresh_make_vars
+if [ "$TARGET_ARCH" != "$HOST_ARCH" ]; then
+    run mkdir -p "$CROSS_TOOL_ROOT/pkgconfig-empty"
+    export PKG_CONFIG_PATH=""
+    export PKG_CONFIG_LIBDIR="$CROSS_TOOL_ROOT/pkgconfig-empty"
+fi
 
 ##############################################################################
 # Dependencies
@@ -496,19 +700,7 @@ install_deps() {
     fi
 
     activate_homebrew || die "Homebrew was installed but is not available on PATH"
-    resolve_gcc_toolchain || die "Homebrew GCC toolchain was not installed correctly"
-    refresh_make_vars
 }
-
-resolve_gcc_toolchain || true
-refresh_make_vars
-
-if [ "$TARGET_ARCH" != "$HOST_ARCH" ]; then
-    if ! resolve_cross_gcc_toolchain; then
-        die "Cross-arch Darwin builds require a real GCC cross toolchain for ${TARGET_ARCH}. Install one and set DARWIN_CROSS_PREFIX (for example aarch64-apple-darwin), or run this script natively on ${TARGET_ARCH} hardware."
-    fi
-    refresh_make_vars
-fi
 
 ##############################################################################
 # Bootstrap helper
@@ -533,6 +725,38 @@ detect_boot_fbc() {
     fi
 
     return 1
+}
+
+preserve_host_fbc() {
+    local candidate
+
+    if [ -x "$HOST_FBC_CACHE" ] && "$HOST_FBC_CACHE" -version >/dev/null 2>&1; then
+        return 0
+    fi
+
+    candidate="$(detect_boot_fbc)" || die "a host-runnable fbc is required before cross-building ${TARGET_ARCH}"
+
+    run mkdir -p "$(dirname "$HOST_FBC_CACHE")"
+    run cp "$candidate" "$HOST_FBC_CACHE"
+    run chmod 755 "$HOST_FBC_CACHE"
+
+    "$HOST_FBC_CACHE" -version >/dev/null 2>&1 || die "preserved compiler is not runnable on the host"
+}
+
+restore_host_fbc_on_exit() {
+    local status
+
+    status=$?
+    trap - EXIT
+
+    if [ "$RESTORE_HOST_FBC" -eq 1 ]; then
+        echo "==> restoring host compiler to $ROOT/bin/fbc"
+        mkdir -p "$ROOT/bin" || status=1
+        cp "$HOST_FBC_CACHE" "$ROOT/bin/fbc" || status=1
+        chmod 755 "$ROOT/bin/fbc" || status=1
+    fi
+
+    exit "$status"
 }
 
 have_bootstrap_sources() {
@@ -574,7 +798,7 @@ bootstrap_if_needed() {
 ##############################################################################
 
 bundle_toolchain_into_stage() {
-    local stage_prefix stage_libexec bundle_root gcc_root libffi_root ncurses_root sdk_root
+    local stage_prefix stage_libexec bundle_root ncurses_root sdk_root
     local real_fbc wrapper_fbc helper_script old_ncurses bundled_ncurses
 
     stage_prefix="${STAGE}${PREFIX}"
@@ -582,21 +806,27 @@ bundle_toolchain_into_stage() {
     bundle_root="${stage_prefix}/lib/freebasic/toolchain"
 
     [ -x "${stage_prefix}/bin/fbc" ] || die "staged compiler missing before toolchain bundling"
-    [ -n "$BREW_PREFIX" ] || die "Homebrew prefix unavailable for macOS packaging"
-    [ -n "$LIBFFI_PREFIX" ] || die "libffi prefix unavailable for macOS packaging"
-    [ -n "$NCURSES_PREFIX" ] || die "ncurses prefix unavailable for macOS packaging"
-
-    gcc_root="$(cd "$(brew --prefix gcc)" && pwd -P)"
-    libffi_root="$(cd "$LIBFFI_PREFIX" && pwd -P)"
-    ncurses_root="$(cd "$NCURSES_PREFIX" && pwd -P)"
     sdk_root="$(find_macos_sdkroot)" || die "macOS SDK not found through xcrun"
 
     msg "bundling macOS toolchain into staged package"
-    [ -x "${gcc_root}/bin/$(basename "$TOOL_CC")" ] || die "packaged GCC driver missing: ${gcc_root}/bin/$(basename "$TOOL_CC")"
     run rm -rf "$bundle_root"
-    copy_tree_preserve "$gcc_root" "${bundle_root}/gcc"
-    copy_tree_preserve "$libffi_root" "${bundle_root}/libffi"
-    copy_tree_preserve "$ncurses_root" "${bundle_root}/ncurses"
+    run mkdir -p "$bundle_root"
+
+    # Homebrew's GCC formula is not a self-contained directory.  Its internal
+    # compiler programs load libraries from separate Homebrew formulas, and a
+    # copy made on one architecture cannot serve the other architecture.  The
+    # installed wrapper therefore uses the target Mac's Apple clang through
+    # xcrun.  The package installer already checks for Command Line Tools.
+    if [ "$TARGET_ARCH" = "$HOST_ARCH" ]; then
+        [ -n "$NCURSES_PREFIX" ] || die "ncurses prefix unavailable for native macOS packaging"
+
+        ncurses_root="$(cd "$NCURSES_PREFIX" && pwd -P)"
+
+        copy_tree_preserve "$ncurses_root" "${bundle_root}/ncurses"
+    else
+        echo "Cross-architecture package will use the target Mac's Apple clang and system libraries."
+    fi
+
     copy_tree_preserve "$sdk_root" "${bundle_root}/sdk/MacOSX.sdk"
 
     real_fbc="${stage_libexec}/fbc-real"
@@ -616,13 +846,23 @@ SELF_DIR="\$(CDPATH= cd -- "\$(dirname "\$0")" && pwd)"
 PREFIX_ROOT="\$(cd "\$SELF_DIR/.." && pwd)"
 FBROOT="\$PREFIX_ROOT/lib/freebasic"
 TOOLCHAIN_ROOT="\$FBROOT/toolchain"
-GCC_ROOT="\$TOOLCHAIN_ROOT/gcc"
 NCURSES_ROOT="\$TOOLCHAIN_ROOT/ncurses"
 SDK_ROOT="\$TOOLCHAIN_ROOT/sdk/MacOSX.sdk"
 
-export PATH="\$GCC_ROOT/bin:\$PATH"
-export GCC="\$GCC_ROOT/bin/$(basename "$TOOL_CC")"
-export DYLD_LIBRARY_PATH="\$NCURSES_ROOT/lib\${DYLD_LIBRARY_PATH:+:\$DYLD_LIBRARY_PATH}"
+if command -v xcrun >/dev/null 2>&1; then
+    export GCC="\$(xcrun --find clang)"
+    export CLANG="\$GCC"
+    export AS="\$(xcrun --find as)"
+    export AR="\$(xcrun --find ar)"
+    export LD="\$(xcrun --find ld)"
+else
+    echo "ERROR: Apple Command Line Tools are required. Run fbc-setup-darwin first." >&2
+    exit 1
+fi
+
+if [ -d "\$NCURSES_ROOT/lib" ]; then
+    export DYLD_LIBRARY_PATH="\$NCURSES_ROOT/lib\${DYLD_LIBRARY_PATH:+:\$DYLD_LIBRARY_PATH}"
+fi
 
 if [ -d "\$SDK_ROOT/usr/lib" ]; then
     export SDKROOT="\$SDK_ROOT"
@@ -669,14 +909,49 @@ fi
 EOF
     run chmod 755 "$helper_script"
 
-    old_ncurses="${NCURSES_PREFIX}/lib/libncursesw.6.dylib"
+    if [ -n "$NCURSES_PREFIX" ]; then
+        old_ncurses="${NCURSES_PREFIX}/lib/libncursesw.6.dylib"
+    else
+        old_ncurses=""
+    fi
     bundled_ncurses="@executable_path/../toolchain/ncurses/lib/libncursesw.6.dylib"
-    if command -v install_name_tool >/dev/null 2>&1 && [ -f "${bundle_root}/ncurses/lib/libncursesw.6.dylib" ]; then
+    if [ -n "$old_ncurses" ] && command -v install_name_tool >/dev/null 2>&1 && [ -f "${bundle_root}/ncurses/lib/libncursesw.6.dylib" ]; then
         echo "==> install_name_tool -change $old_ncurses $bundled_ncurses $real_fbc"
         if ! install_name_tool -change "$old_ncurses" "$bundled_ncurses" "$real_fbc" 2>"${BUILDROOT}/install_name_tool-fbc-real.log"; then
             echo "NOTE: install_name_tool could not rewrite fbc-real's ncurses load path; the public fbc wrapper will use the bundled ncurses via DYLD_LIBRARY_PATH" >&2
         fi
     fi
+}
+
+verify_staged_architecture() {
+    local stage_prefix real_fbc runtime_dir file actual checked
+
+    stage_prefix="${STAGE}${PREFIX}"
+    real_fbc="${stage_prefix}/lib/freebasic/libexec/fbc-real"
+    runtime_dir="${stage_prefix}/lib/freebasic/${FBC_TARGET}"
+    checked=0
+
+    [ -x "$real_fbc" ] || die "staged real compiler missing: $real_fbc"
+    [ -d "$runtime_dir" ] || die "staged runtime directory missing: $runtime_dir"
+
+    while IFS= read -r file; do
+        actual="$(lipo -archs "$file" 2>/dev/null || true)"
+        [ "$actual" = "$CLANG_ARCH" ] || die "wrong architecture in staged file $file: expected $CLANG_ARCH, found ${actual:-unknown}"
+        checked=$((checked + 1))
+    done < <(
+        printf '%s\n' "$real_fbc"
+        find "$runtime_dir" -maxdepth 1 -type f \( -name '*.o' -o -name '*.a' \) -print | sort
+    )
+
+    [ "$checked" -gt 1 ] || die "no staged runtime objects were available for architecture verification"
+
+    if [ "$TARGET_ARCH" != "$HOST_ARCH" ]; then
+        if otool -L "$real_fbc" | sed '1d' | grep -E '/usr/local/|/opt/homebrew/' >/dev/null 2>&1; then
+            die "cross-built compiler links against host Homebrew libraries"
+        fi
+    fi
+
+    echo "Verified $checked staged compiler/runtime files as $CLANG_ARCH"
 }
 
 create_pkg_scripts() {
@@ -712,10 +987,21 @@ EOF
 ##############################################################################
 
 if [ "$DO_BUILD" -eq 1 ]; then
+    BUILD_COMPILER=""
+    BUILD_COMPILER_ARGS=()
+
     install_deps
     ensure_clt
+    select_build_toolchain
+    refresh_make_vars
     if [ -n "$BASE_PKG_CONFIG_PATH" ]; then
         export PKG_CONFIG_PATH="${BASE_PKG_CONFIG_PATH}${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+    fi
+
+    if [ "$TARGET_ARCH" != "$HOST_ARCH" ]; then
+        preserve_host_fbc
+        RESTORE_HOST_FBC=1
+        trap restore_host_fbc_on_exit EXIT
     fi
 
     msg "cleaning previous Darwin build artifacts"
@@ -729,22 +1015,37 @@ if [ "$DO_BUILD" -eq 1 ]; then
     run rm -rf "$ROOT/src/sfxlib/obj/$FBC_TARGET"
     run rm -rf "$ROOT/lib/freebasic/$FBC_TARGET"
 
-    bootstrap_if_needed
-    BOOT_FBC="$BOOT_FBC_RESULT"
+    if [ "$TARGET_ARCH" = "$HOST_ARCH" ]; then
+        bootstrap_if_needed
+        BOOT_FBC="$BOOT_FBC_RESULT"
 
-    msg "building bootstrap compiler for ${FBC_TARGET}"
-    run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "BOOT_FBC=${BOOT_FBC}" "BUILD_FBC=${BOOT_FBC}" bootstrap-minimal
+        msg "building bootstrap compiler for ${FBC_TARGET}"
+        run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "BOOT_FBC=${BOOT_FBC}" "BUILD_FBC=${BOOT_FBC}" bootstrap-minimal
 
-    BOOT_FBC="$ROOT/bootstrap/fbc"
-    [ -x "$BOOT_FBC" ] || die "bootstrap compiler was not produced at $BOOT_FBC"
+        BUILD_COMPILER="$ROOT/bootstrap/fbc"
+        [ -x "$BUILD_COMPILER" ] || die "bootstrap compiler was not produced at $BUILD_COMPILER"
+        BUILD_COMPILER_ARGS=(
+            "FBC=${BUILD_COMPILER}"
+            "BUILD_FBC=${BUILD_COMPILER}"
+        )
+    else
+        BUILD_COMPILER="$HOST_FBC_CACHE"
+        BUILD_COMPILER_ARGS=(
+            "FBC=${BUILD_COMPILER}"
+            "BUILD_FBC=${BUILD_COMPILER}"
+            "BUILD_FBC_TARGET=${FBC_TARGET}"
+            "BUILD_FBC_BUILDPREFIX="
+        )
+    fi
 
     msg "building FreeBASIC for ${FBC_TARGET}"
-    run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "FBC=${BOOT_FBC}" all
+    run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "${BUILD_COMPILER_ARGS[@]}" all
 
     msg "staging install tree"
     run mkdir -p "$STAGE"
-    run "$MAKE_CMD" -f GNUmakefile "${MAKE_VARS[@]}" "FBC=${BOOT_FBC}" install "DESTDIR=${STAGE}" "prefix=${PREFIX}"
+    run "$MAKE_CMD" -f GNUmakefile "${MAKE_VARS[@]}" "${BUILD_COMPILER_ARGS[@]}" install "DESTDIR=${STAGE}" "prefix=${PREFIX}"
     bundle_toolchain_into_stage
+    verify_staged_architecture
 fi
 
 ##############################################################################
@@ -759,6 +1060,8 @@ if [ "$DO_PACKAGE" -eq 1 ]; then
         [ ! -d "$STAGE$PREFIX/lib/freebasic/toolchain/sdk/MacOSX.sdk/usr/lib" ]; then
         bundle_toolchain_into_stage
     fi
+
+    verify_staged_architecture
 
     TAR_FILE="$OUTBASE/${PKG_BASENAME}.tar.xz"
     PKG_FILE="$OUTBASE/${PKG_BASENAME}.pkg"
@@ -822,3 +1125,5 @@ EOF
     [ -f "$PKG_FILE" ] && echo "$PKG_FILE"
     [ -f "$INSTALL_SH" ] && echo "$INSTALL_SH"
 fi
+
+# end of macos-build-freebasic.sh

@@ -44,8 +44,20 @@ dim shared NumImageFiles as integer = 0
 
 '':::::
 function writeFunction cdecl ( byval buf as any ptr, byval size as size_t, byval nmemb as size_t , byval out_file as any ptr) as size_t
-	fwrite( buf, size, nmemb, out_file )
-	function = nmemb * size										    
+	if( size = 0 or nmemb = 0 ) then
+		return 0
+	end if
+
+	if( nmemb > cast( size_t, -1 ) \ size ) then
+		return 0
+	end if
+
+	if( buf = NULL or out_file = NULL ) then
+		return 0
+	end if
+
+	dim as size_t items_written = fwrite( buf, size, nmemb, out_file )
+	function = items_written * size
 end function
 
 '':::::
@@ -58,13 +70,14 @@ function GetImage( byref url as string, byref filename as string ) as integer
 	curl = curl_easy_init()
 
 	if(curl) then
+		dim as clong enabled = 1
 
 		if( fb.fbdoc.get_trace() ) then
-			curl_easy_setopt( curl, CURLOPT_VERBOSE, TRUE )
+			curl_easy_setopt( curl, CURLOPT_VERBOSE, enabled )
 		end if
 
-		curl_easy_setopt( curl, CURLOPT_URL, url )
-		curl_easy_setopt( curl, CURLOPT_FRESH_CONNECT, TRUE )
+		curl_easy_setopt( curl, CURLOPT_URL, strptr( url ) )
+		curl_easy_setopt( curl, CURLOPT_FRESH_CONNECT, enabled )
 
 		destFile = fopen( filename, "wb" )
 
@@ -211,3 +224,5 @@ if( NumImageFiles > 0 ) then
 else
 	print "No image files specified"
 end if
+
+'' end of getimage.bas

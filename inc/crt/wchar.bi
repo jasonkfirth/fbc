@@ -37,7 +37,7 @@
 #elseif defined(__FB_DOS__)
 #include once "crt/dos/wchar.bi"
 #elseif defined(__FB_DARWIN__)
-#include once "crt/linux/wchar.bi"
+#include once "crt/darwin/wchar.bi"
 #elseif defined(__FB_SOLARIS__)
 #include once "crt/linux/wchar.bi"
 #else
@@ -62,3 +62,5 @@ declare function wmemcpy(byval as wchar_t ptr, byval as const wchar_t ptr, byval
 end extern
 
 #endif
+
+'' end of crt/wchar.bi

@@ -31,12 +31,10 @@ type __fb_builtin_bool as boolean alias "_Bool"
 	type __fb_builtin_clong as integer alias "long"
 	type __fb_builtin_culong as uinteger alias "long"
 	type __fb_builtin_size_t as uinteger alias "long"
-	type __fb_builtin_uint64_t as uinteger alias "long"
 #else
 	type __fb_builtin_clong as long alias "long"
 	type __fb_builtin_culong as ulong alias "long"
 	type __fb_builtin_size_t as uinteger
-	type __fb_builtin_uint64_t as ulongint
 #endif
 
 extern "C"
@@ -156,8 +154,10 @@ extern "C"
 	declare function __builtin_parityll cdecl alias "__builtin_parityll" ( byval as ulongint ) as long
 #endif
 
-'' Byte-swap builtins use fixed-width C integer typedefs.  On LP64 targets,
-'' uint64_t is usually unsigned long rather than unsigned long long.
+'' Byte-swap builtins use GCC/clang's builtin-family argument types rather
+'' than the platform's fixed-width typedef spellings.  In particular,
+'' __builtin_bswap64 is defined with unsigned long long even on LP64 targets
+'' where uint64_t is an unsigned long.
 #ifndef __builtin_bswap16
 	declare function __builtin_bswap16 cdecl alias "__builtin_bswap16" ( byval as ushort ) as ushort
 #endif
@@ -165,7 +165,7 @@ extern "C"
 	declare function __builtin_bswap32 cdecl alias "__builtin_bswap32" ( byval as ulong ) as ulong
 #endif
 #ifndef __builtin_bswap64
-	declare function __builtin_bswap64 cdecl alias "__builtin_bswap64" ( byval as __fb_builtin_uint64_t ) as __fb_builtin_uint64_t
+	declare function __builtin_bswap64 cdecl alias "__builtin_bswap64" ( byval as ulongint ) as ulongint
 #endif
 
 '' Object-size builtins are useful for fortify-style wrappers and low-level

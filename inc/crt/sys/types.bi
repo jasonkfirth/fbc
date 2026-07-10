@@ -34,10 +34,11 @@
 #elseif defined(__FB_SOLARIS__)
 #include once "crt/sys/solaris/types.bi"
 #elseif defined(__FB_DARWIN__)
-'' May not be correct
-#include once "crt/sys/linux/types.bi"
+#include once "crt/sys/darwin/types.bi"
 #else
 #error Platform unsupported
 #endif
 
 #endif
+
+'' end of crt/sys/types.bi

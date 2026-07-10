@@ -26,9 +26,6 @@
 
 #include once "../sfx/sfx_test_common.bi"
 
-declare function fb_sfxControlDeviceList cdecl alias "fb_sfxControlDeviceList" ( ) as integer
-declare function fb_sfxControlDeviceSelect cdecl alias "fb_sfxControlDeviceSelect" ( byval device as integer ) as integer
-
 const SKIP_NO_COREAUDIO_LOOPBACK = 77
 const LOOPBACK_SAMPLE_RATE = 44100.0
 const LOOPBACK_CHANNELS = 2
@@ -560,13 +557,13 @@ if( lcase( *driver_name ) <> "coreaudio" ) then
 	Skip( "CoreAudio driver is not active" )
 end if
 
-if( fb_sfxControlDeviceList() <= 0 ) then
-	Skip( "no CoreAudio output device is available" )
-end if
-
-if( fb_sfxControlDeviceSelect( 0 ) <> 0 ) then
-	Fail( "failed to select first CoreAudio output device" )
-end if
+''
+'' The default output device is also the intended loopback source.  Selecting
+'' an arbitrary output index here tears down an idle CoreAudio queue, and the
+'' replacement queue does not begin playback until a later sound command.
+'' Keeping the current device makes the test exercise the configured system
+'' loopback route instead of changing it as part of the test setup.
+''
 
 dim as LoopbackMetrics one_note
 dim as LoopbackMetrics two_notes

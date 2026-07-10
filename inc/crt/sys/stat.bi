@@ -14,10 +14,13 @@
 
 #if defined(__FB_WIN32__)
 #include once "crt/sys/win32/stat.bi"
+#elseif defined(__FB_DARWIN__)
+#include once "crt/sys/darwin/stat.bi"
 #else
 #error Unsupported platform
 #endif
 
+#if not defined(__FB_DARWIN__)
 extern "C"
 
 declare function fstat (byval as long, byval as _stat ptr) as long
@@ -25,5 +28,8 @@ declare function chmod (byval as const zstring ptr, byval as long) as long
 declare function stat (byval as const zstring ptr, byval as _stat ptr) as long
 
 end extern
+#endif
 
 #endif
+
+'' end of crt/sys/stat.bi

@@ -51,16 +51,20 @@ namespace fb
 
 		ctx->curl = curl_easy_init()
 
-		if( fbdoc.get_trace() ) then
-			curl_easy_setopt( ctx->curl, CURLOPT_VERBOSE, TRUE )
-		end if
+		if( ctx->curl <> NULL ) then
+			if( fbdoc.get_trace() ) then
+				dim as clong verbose = 1
+				curl_easy_setopt( ctx->curl, CURLOPT_VERBOSE, verbose )
+			end if
 
-		curl_easy_setopt( ctx->curl, CURLOPT_COOKIEFILE, "" )
+			curl_easy_setopt( ctx->curl, CURLOPT_COOKIEFILE, "" )
+		end if
 
 		'' TODO: Use option file or command line arguments
 		'' curl_easy_setopt( ctx->curl, CURLOPT_PROXY, "http://proxyname:80" )
 		'' curl_easy_setopt( ctx->curl, CURLOPT_PROXYUSERPWD, "domain\username:password" )
- 		'' curl_easy_setopt( ctx->curl, CURLOPT_PROXYAUTH, CURLAUTH_NTLM )
+		'' dim as clong proxy_auth = CURLAUTH_NTLM
+		'' curl_easy_setopt( ctx->curl, CURLOPT_PROXYAUTH, proxy_auth )
 
 		ctx->headerlist = curl_slist_append( NULL, "Expect:" )
 
@@ -106,6 +110,10 @@ namespace fb
 		if( ctx->curl = NULL ) then
 			exit function
 		end if
+
+		if( form = NULL ) then
+			exit function
+		end if
 		
 		dim as CHttpStream ptr http_stream = new CHttpStream( @this )
 
@@ -135,3 +143,5 @@ namespace fb
 	end function
 
 end namespace
+
+'' end of CHttp.bas

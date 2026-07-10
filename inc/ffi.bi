@@ -56,13 +56,18 @@ extern "C"
 
 #define LIBFFI_H
 
+'' Apple's arm64 libffi ABI is not the x86 Darwin ABI.  Its ffi_cif has an
+'' extra variadic-call field, and its closure structures hold trampoline-table
+'' pointers instead of an inline x86 trampoline.  Keep that target separate so
+'' libffi does not write past the FreeBASIC structures supplied by callers.
+
 #if (not defined(__FB_64BIT__)) and (not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_NETBSD__))
 	#define X86
 #elseif defined(__FB_64BIT__) and (not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
 	#define X86_64
 #elseif (not defined(__FB_64BIT__)) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
 	#define ARM
-#elseif defined(__FB_64BIT__) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
+#elseif defined(__FB_64BIT__) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_DARWIN__))
 	#define AARCH64
 #elseif (not defined(__FB_64BIT__)) and (not defined(__FB_ARM__)) and (defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__))
 	#define X86_FREEBSD
@@ -79,7 +84,7 @@ extern "C"
 type ffi_arg as uinteger
 type ffi_sarg as integer
 
-#if ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))) or defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
+#if ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_DARWIN__))) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
 	#define X86_ANY
 #endif
 
@@ -88,11 +93,21 @@ type ffi_sarg as integer
 	const USE_BUILTIN_FFS = 0
 #endif
 
-#if ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))) or defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
+#if ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_DARWIN__))) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
 	#define FFI_TARGET_SPECIFIC_STACK_SPACE_ALLOCATION
 	#define FFI_TARGET_HAS_COMPLEX_TYPE
 #endif
 
+#if defined(__FB_DARWIN__) and defined(__FB_64BIT__) and defined(__FB_ARM__)
+	type ffi_abi as long
+	enum
+		FFI_FIRST_ABI = 0
+		FFI_SYSV
+		FFI_WIN64
+		FFI_LAST_ABI
+		FFI_DEFAULT_ABI = FFI_SYSV
+	end enum
+#else
 type ffi_abi as long
 enum
 	#if (not defined(__FB_64BIT__)) or (defined(__FB_64BIT__) and (defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or (defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)))))
@@ -166,8 +181,17 @@ enum
 		FFI_DEFAULT_ABI = FFI_GNUW64
 	#endif
 end enum
+#endif
 
-#if (not defined(__FB_64BIT__)) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
+#if defined(__FB_DARWIN__) and defined(__FB_64BIT__) and defined(__FB_ARM__)
+	#define FFI_TARGET_SPECIFIC_VARIADIC
+	#define FFI_TARGET_HAS_COMPLEX_TYPE
+	const FFI_CLOSURES = 1
+	const FFI_LEGACY_CLOSURE_API = 0
+	const FFI_NATIVE_RAW_API = 0
+	const FFI_TRAMPOLINE_SIZE = 24
+	const FFI_TRAMPOLINE_CLOSURE_OFFSET = FFI_TRAMPOLINE_SIZE
+#elseif (not defined(__FB_64BIT__)) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
 	#define FFI_TARGET_SPECIFIC_VARIADIC
 #elseif defined(__FB_64BIT__) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
 	const FFI_CLOSURES = 1
@@ -177,16 +201,22 @@ end enum
 	const FFI_GO_CLOSURES = 1
 #endif
 
+#if defined(__FB_DARWIN__) and not defined(__FB_ARM__)
+	const FFI_LEGACY_CLOSURE_API = 1
+#endif
+
 #if defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
 	#define FFI_TARGET_HAS_COMPLEX_TYPE
 #endif
 
-#if (not defined(__FB_64BIT__)) or (defined(__FB_64BIT__) and (defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)))))
+#if (not defined(__FB_64BIT__)) or (defined(__FB_64BIT__) and (defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_DARWIN__) or defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)))))
 	const FFI_CLOSURES = 1
-	const FFI_GO_CLOSURES = 1
+	#if not defined(__FB_DARWIN__)
+		const FFI_GO_CLOSURES = 1
+	#endif
 #endif
 
-#if ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))) or defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
+#if ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_DARWIN__))) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
 	#define FFI_TYPE_SMALL_STRUCT_1B (FFI_TYPE_LAST + 1)
 	#define FFI_TYPE_SMALL_STRUCT_2B (FFI_TYPE_LAST + 2)
 	#define FFI_TYPE_SMALL_STRUCT_4B (FFI_TYPE_LAST + 3)
@@ -201,7 +231,7 @@ end enum
 
 #if (not defined(__FB_64BIT__)) and (defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))))
 	const FFI_NATIVE_RAW_API = 1
-#elseif defined(__FB_64BIT__) and (defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))))
+#elseif defined(__FB_64BIT__) and (defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_DARWIN__) or defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))))
 	const FFI_TRAMPOLINE_SIZE = 24
 	const FFI_NATIVE_RAW_API = 0
 #elseif (not defined(__FB_64BIT__)) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
@@ -258,16 +288,27 @@ extern ffi_type_sint64 as ffi_type
 extern ffi_type_float as ffi_type
 extern ffi_type_double as ffi_type
 extern ffi_type_pointer as ffi_type
-extern ffi_type_longdouble as ffi_type
+#if defined(__FB_DARWIN__) and defined(__FB_64BIT__) and defined(__FB_ARM__)
+	extern ffi_type_longdouble alias "ffi_type_double" as ffi_type
+#else
+	extern ffi_type_longdouble as ffi_type
+#endif
 extern ffi_type_complex_float as ffi_type
 extern ffi_type_complex_double as ffi_type
-extern ffi_type_complex_longdouble as ffi_type
+#if defined(__FB_DARWIN__) and defined(__FB_64BIT__) and defined(__FB_ARM__)
+	extern ffi_type_complex_longdouble alias "ffi_type_complex_double" as ffi_type
+#else
+	extern ffi_type_complex_longdouble as ffi_type
+#endif
 
 type ffi_status as long
 enum
 	FFI_OK = 0
 	FFI_BAD_TYPEDEF
 	FFI_BAD_ABI
+	#ifdef __FB_DARWIN__
+		FFI_BAD_ARGTYPE
+	#endif
 end enum
 
 type ffi_cif
@@ -277,6 +318,10 @@ type ffi_cif
 	rtype as ffi_type ptr
 	bytes as ulong
 	flags as ulong
+
+	#if defined(__FB_DARWIN__) and defined(__FB_64BIT__) and defined(__FB_ARM__)
+		aarch64_nfixedargs as ulong
+	#endif
 
 	#if (not defined(__FB_64BIT__)) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
 		vfp_used as long
@@ -317,7 +362,12 @@ declare sub ffi_java_raw_to_ptrarray(byval cif as ffi_cif ptr, byval raw as ffi_
 declare function ffi_java_raw_size(byval cif as ffi_cif ptr) as uinteger
 
 type ffi_closure
-	tramp as zstring * FFI_TRAMPOLINE_SIZE
+	#if defined(__FB_DARWIN__) and defined(__FB_64BIT__) and defined(__FB_ARM__)
+		trampoline_table as any ptr
+		trampoline_table_entry as any ptr
+	#else
+		tramp as zstring * FFI_TRAMPOLINE_SIZE
+	#endif
 	cif as ffi_cif ptr
 	fun as sub(byval as ffi_cif ptr, byval as any ptr, byval as any ptr ptr, byval as any ptr)
 	user_data as any ptr
@@ -325,11 +375,18 @@ end type
 
 declare function ffi_closure_alloc(byval size as uinteger, byval code as any ptr ptr) as any ptr
 declare sub ffi_closure_free(byval as any ptr)
-declare function ffi_prep_closure(byval as ffi_closure ptr, byval as ffi_cif ptr, byval fun as sub(byval as ffi_cif ptr, byval as any ptr, byval as any ptr ptr, byval as any ptr), byval user_data as any ptr) as ffi_status
+#if not (defined(__FB_DARWIN__) and defined(__FB_64BIT__) and defined(__FB_ARM__))
+	declare function ffi_prep_closure(byval as ffi_closure ptr, byval as ffi_cif ptr, byval fun as sub(byval as ffi_cif ptr, byval as any ptr, byval as any ptr ptr, byval as any ptr), byval user_data as any ptr) as ffi_status
+#endif
 declare function ffi_prep_closure_loc(byval as ffi_closure ptr, byval as ffi_cif ptr, byval fun as sub(byval as ffi_cif ptr, byval as any ptr, byval as any ptr ptr, byval as any ptr), byval user_data as any ptr, byval codeloc as any ptr) as ffi_status
 
 type ffi_raw_closure
-	tramp as zstring * FFI_TRAMPOLINE_SIZE
+	#if defined(__FB_DARWIN__) and defined(__FB_64BIT__) and defined(__FB_ARM__)
+		trampoline_table as any ptr
+		trampoline_table_entry as any ptr
+	#else
+		tramp as zstring * FFI_TRAMPOLINE_SIZE
+	#endif
 	cif as ffi_cif ptr
 
 	#if defined(__FB_64BIT__) or ((not defined(__FB_64BIT__)) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)))
@@ -342,7 +399,12 @@ type ffi_raw_closure
 end type
 
 type ffi_java_raw_closure
-	tramp as zstring * FFI_TRAMPOLINE_SIZE
+	#if defined(__FB_DARWIN__) and defined(__FB_64BIT__) and defined(__FB_ARM__)
+		trampoline_table as any ptr
+		trampoline_table_entry as any ptr
+	#else
+		tramp as zstring * FFI_TRAMPOLINE_SIZE
+	#endif
 	cif as ffi_cif ptr
 
 	#if defined(__FB_64BIT__) or ((not defined(__FB_64BIT__)) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)))
@@ -362,14 +424,17 @@ declare function ffi_prep_raw_closure_loc(byval as ffi_raw_closure ptr, byval ci
 	declare function ffi_prep_java_raw_closure_loc(byval as ffi_java_raw_closure ptr, byval cif as ffi_cif ptr, byval fun as sub(byval as ffi_cif ptr, byval as any ptr, byval as ffi_java_raw ptr, byval as any ptr), byval user_data as any ptr, byval codeloc as any ptr) as ffi_status
 #endif
 
-type ffi_go_closure
-	tramp as any ptr
-	cif as ffi_cif ptr
-	fun as sub(byval as ffi_cif ptr, byval as any ptr, byval as any ptr ptr, byval as any ptr)
-end type
+'' Apple's libffi exports neither Go-closure entry point on Intel or ARM.
+#if not defined(__FB_DARWIN__)
+	type ffi_go_closure
+		tramp as any ptr
+		cif as ffi_cif ptr
+		fun as sub(byval as ffi_cif ptr, byval as any ptr, byval as any ptr ptr, byval as any ptr)
+	end type
 
-declare function ffi_prep_go_closure(byval as ffi_go_closure ptr, byval as ffi_cif ptr, byval fun as sub(byval as ffi_cif ptr, byval as any ptr, byval as any ptr ptr, byval as any ptr)) as ffi_status
-declare sub ffi_call_go(byval cif as ffi_cif ptr, byval fn as sub(), byval rvalue as any ptr, byval avalue as any ptr ptr, byval closure as any ptr)
+	declare function ffi_prep_go_closure(byval as ffi_go_closure ptr, byval as ffi_cif ptr, byval fun as sub(byval as ffi_cif ptr, byval as any ptr, byval as any ptr ptr, byval as any ptr)) as ffi_status
+	declare sub ffi_call_go(byval cif as ffi_cif ptr, byval fn as sub(), byval rvalue as any ptr, byval avalue as any ptr ptr, byval closure as any ptr)
+#endif
 declare function ffi_prep_cif(byval cif as ffi_cif ptr, byval abi as ffi_abi, byval nargs as ulong, byval rtype as ffi_type ptr, byval atypes as ffi_type ptr ptr) as ffi_status
 declare function ffi_prep_cif_var(byval cif as ffi_cif ptr, byval abi as ffi_abi, byval nfixedargs as ulong, byval ntotalargs as ulong, byval rtype as ffi_type ptr, byval atypes as ffi_type ptr ptr) as ffi_status
 declare sub ffi_call(byval cif as ffi_cif ptr, byval fn as sub(), byval rvalue as any ptr, byval avalue as any ptr ptr)
@@ -395,3 +460,5 @@ const FFI_TYPE_COMPLEX = 15
 const FFI_TYPE_LAST = FFI_TYPE_COMPLEX
 
 end extern
+
+'' end of ffi.bi

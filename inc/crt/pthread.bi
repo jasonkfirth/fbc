@@ -23,6 +23,10 @@
 
 #pragma once
 
+#ifdef __FB_DARWIN__
+	#include once "crt/darwin/pthread.bi"
+#else
+
 #ifndef __FB_UNIX__
 	#error "target not supported; this header is for GNU/Linux glibc"
 #endif
@@ -167,8 +171,11 @@ declare function pthread_attr_getstacksize(byval __attr as const pthread_attr_t 
 declare function pthread_attr_setstacksize(byval __attr as pthread_attr_t ptr, byval __stacksize as uinteger) as long
 declare function pthread_attr_getstack(byval __attr as const pthread_attr_t ptr, byval __stackaddr as any ptr ptr, byval __stacksize as uinteger ptr) as long
 declare function pthread_attr_setstack(byval __attr as pthread_attr_t ptr, byval __stackaddr as any ptr, byval __stacksize as uinteger) as long
+'' Darwin does not provide pthread CPU affinity entry points or cpu_set_t.
+#ifndef __FB_DARWIN__
 declare function pthread_attr_setaffinity_np(byval __attr as pthread_attr_t ptr, byval __cpusetsize as uinteger, byval __cpuset as const cpu_set_t ptr) as long
 declare function pthread_attr_getaffinity_np(byval __attr as const pthread_attr_t ptr, byval __cpusetsize as uinteger, byval __cpuset as cpu_set_t ptr) as long
+#endif
 declare function pthread_getattr_default_np(byval __attr as pthread_attr_t ptr) as long
 declare function pthread_setattr_default_np(byval __attr as const pthread_attr_t ptr) as long
 declare function pthread_getattr_np(byval __th as pthread_t, byval __attr as pthread_attr_t ptr) as long
@@ -180,8 +187,11 @@ declare function pthread_setname_np(byval __target_thread as pthread_t, byval __
 declare function pthread_getconcurrency() as long
 declare function pthread_setconcurrency(byval __level as long) as long
 declare function pthread_yield() as long
+'' Darwin does not provide pthread CPU affinity entry points or cpu_set_t.
+#ifndef __FB_DARWIN__
 declare function pthread_setaffinity_np(byval __th as pthread_t, byval __cpusetsize as uinteger, byval __cpuset as const cpu_set_t ptr) as long
 declare function pthread_getaffinity_np(byval __th as pthread_t, byval __cpusetsize as uinteger, byval __cpuset as cpu_set_t ptr) as long
+#endif
 declare function pthread_once(byval __once_control as pthread_once_t ptr, byval __init_routine as sub()) as long
 declare function pthread_setcancelstate(byval __state as long, byval __oldstate as long ptr) as long
 declare function pthread_setcanceltype(byval __type as long, byval __oldtype as long ptr) as long
@@ -292,3 +302,7 @@ declare function pthread_getcpuclockid(byval __thread_id as pthread_t, byval __c
 declare function pthread_atfork(byval __prepare as sub(), byval __parent as sub(), byval __child as sub()) as long
 
 end extern
+
+#endif
+
+'' end of crt/pthread.bi

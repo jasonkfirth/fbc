@@ -38,7 +38,10 @@
 
 #pragma once
 
-#inclib "uuid"
+#ifndef __FB_DARWIN__
+	'' Linux and the BSD ports provide these routines in a separate libuuid.
+	#inclib "uuid"
+#endif
 
 #include once "crt/sys/types.bi"
 #include once "crt/sys/time.bi"
@@ -66,8 +69,14 @@ declare function uuid_parse(byval in as const zstring ptr, byval uu as ubyte ptr
 declare sub uuid_unparse(byval uu as const ubyte ptr, byval out as zstring ptr)
 declare sub uuid_unparse_lower(byval uu as const ubyte ptr, byval out as zstring ptr)
 declare sub uuid_unparse_upper(byval uu as const ubyte ptr, byval out as zstring ptr)
-declare function uuid_time(byval uu as const ubyte ptr, byval ret_tv as timeval ptr) as time_t
-declare function uuid_type(byval uu as const ubyte ptr) as long
-declare function uuid_variant(byval uu as const ubyte ptr) as long
+
+#ifndef __FB_DARWIN__
+	'' These e2fsprogs extensions are not part of Apple's public UUID API.
+	declare function uuid_time(byval uu as const ubyte ptr, byval ret_tv as timeval ptr) as time_t
+	declare function uuid_type(byval uu as const ubyte ptr) as long
+	declare function uuid_variant(byval uu as const ubyte ptr) as long
+#endif
 
 end extern
+
+'' end of uuid.bi

@@ -1,5 +1,25 @@
 ''
-'' CHttp - a class wrapper for the CURL library
+'' CHttp curl example
+'' ------------------
+''
+'' File: CHttpStream.bas
+''
+'' Purpose:
+''
+''     Move response and request bodies between libcurl and an in-memory
+''     stream used by the CHttp example.
+''
+'' Responsibilities:
+''
+''     - provide ABI-correct libcurl read and write callbacks
+''     - grow and release the receive buffer
+''     - configure and perform receive and send transfers
+''
+'' This file intentionally does NOT contain:
+''
+''     - libcurl global or easy-handle ownership
+''     - form construction
+''     - application-level HTTP policy
 ''
 
 #include once "CHttp.bi"
@@ -10,8 +30,9 @@ const CSTREAM_MINALLOC = 1024
 
 type CStream
 	as byte ptr				buffer
-	as integer				size	
-	as integer				pos
+	as size_t				size
+	as size_t				pos
+	as integer				owns_buffer
 end type
 
 type CHttpStreamCtx_
@@ -37,6 +58,9 @@ constructor CHttpStream _
 	
 	ctx->http = http
 	ctx->stream.buffer = NULL
+	ctx->stream.size = 0
+	ctx->stream.pos = 0
+	ctx->stream.owns_buffer = FALSE
 
 end constructor
 
@@ -46,10 +70,11 @@ destructor CHttpStream _
 		_
 	)
 	
- 	if( ctx->stream.buffer <> NULL ) then
- 		deallocate( ctx->stream.buffer )
- 		ctx->stream.buffer = NULL
- 	end if
+	if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
+		deallocate( ctx->stream.buffer )
+	end if
+	ctx->stream.buffer = NULL
+	ctx->stream.owns_buffer = FALSE
 
  	if( ctx->http <> NULL ) then
  		if( ctx->delcon ) then
@@ -66,20 +91,77 @@ end destructor
 private function recv_cb cdecl _
 	( _
 		byval buffer as byte ptr, _
-		byval size as integer, _
-		byval nitems as integer, _
+		byval size as size_t, _
+		byval nitems as size_t, _
 		byval userdata as any ptr _
-	) as integer
+	) as size_t
 
 	dim as CStream ptr memstream = userdata
-	dim as integer bytes = size * nitems
-	
-	if( memstream->pos + bytes >= memstream->size ) then
-		memstream->size += iif( bytes < CSTREAM_MINALLOC, CSTREAM_MINALLOC, bytes )
-		memstream->buffer = reallocate( memstream->buffer, memstream->size + 1 )
+
+	if( memstream = NULL ) then
+		return 0
 	end if
-	
-	memcpy( memstream->buffer + memstream->pos, buffer, bytes )
+
+	dim as size_t maximum_size = cast( size_t, -1 )
+
+	if( size <> 0 andalso nitems > maximum_size \ size ) then
+		return 0
+	end if
+
+	dim as size_t bytes = size * nitems
+
+	if( bytes <> 0 andalso buffer = NULL ) then
+		return 0
+	end if
+
+	if( memstream->pos > memstream->size ) then
+		return 0
+	end if
+
+	if( bytes > maximum_size - memstream->pos ) then
+		return 0
+	end if
+
+	dim as size_t data_end = memstream->pos + bytes
+
+	if( data_end >= memstream->size ) then
+		dim as size_t growth
+
+		if( bytes < CSTREAM_MINALLOC ) then
+			growth = CSTREAM_MINALLOC
+		else
+			growth = bytes
+		end if
+
+		'' Reallocate one extra byte because receive() appends a terminator.
+		if( memstream->size = maximum_size ) then
+			return 0
+		end if
+
+		if( growth > maximum_size - memstream->size - 1 ) then
+			return 0
+		end if
+
+		dim as size_t new_size = memstream->size + growth
+
+		if( new_size < data_end ) then
+			return 0
+		end if
+
+		dim as byte ptr new_buffer = reallocate( memstream->buffer, new_size + 1 )
+
+		if( new_buffer = NULL ) then
+			return 0
+		end if
+
+		memstream->buffer = new_buffer
+		memstream->size = new_size
+		memstream->owns_buffer = TRUE
+	end if
+
+	if( bytes <> 0 ) then
+		memcpy( memstream->buffer + memstream->pos, buffer, bytes )
+	end if
 	memstream->pos += bytes
 	
 	function = bytes
@@ -106,23 +188,26 @@ function CHttpStream.receive _
 	end if
 	
  	''
- 	if( ctx->stream.buffer <> NULL ) then
- 		deallocate( ctx->stream.buffer )
- 		ctx->stream.buffer = NULL
- 	end if
- 	
- 	ctx->stream.size = 0
- 	ctx->stream.pos = 0
+	if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
+		deallocate( ctx->stream.buffer )
+	end if
+	ctx->stream.buffer = NULL
+	ctx->stream.size = 0
+	ctx->stream.pos = 0
+	ctx->stream.owns_buffer = FALSE
  	
  	''
- 	if( doreset ) then
- 		curl_easy_reset( curl )
- 	end if
+	if( doreset ) then
+		curl_easy_reset( curl )
+	end if
+
+	dim as clong follow_location = 1
+	dim as clong maximum_redirects = 16
 
 	curl_easy_setopt( curl, CURLOPT_URL, url )
 	
-	curl_easy_setopt( curl, CURLOPT_FOLLOWLOCATION, 1 )
-	curl_easy_setopt( curl, CURLOPT_MAXREDIRS, 16 )
+	curl_easy_setopt( curl, CURLOPT_FOLLOWLOCATION, follow_location )
+	curl_easy_setopt( curl, CURLOPT_MAXREDIRS, maximum_redirects )
 	
 	if( referer <> NULL ) then
 		curl_easy_setopt( curl, CURLOPT_REFERER, referer )
@@ -132,11 +217,14 @@ function CHttpStream.receive _
 	curl_easy_setopt( curl, CURLOPT_WRITEDATA, @ctx->stream )
 
  	if( curl_easy_perform( curl ) <> 0 ) then
- 		if( ctx->stream.buffer <> NULL ) then
- 			deallocate( ctx->stream.buffer )
- 			ctx->stream.buffer = NULL
- 		end if
- 		return FALSE
+		if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
+			deallocate( ctx->stream.buffer )
+		end if
+		ctx->stream.buffer = NULL
+		ctx->stream.size = 0
+		ctx->stream.pos = 0
+		ctx->stream.owns_buffer = FALSE
+		return FALSE
  	end if
  	
 	if( ctx->stream.buffer <> NULL ) then
@@ -172,17 +260,38 @@ end function
 private function send_cb cdecl _
 	( _
 		byval buffer as byte ptr, _
-		byval size as integer, _
-		byval nitems as integer, _
+		byval size as size_t, _
+		byval nitems as size_t, _
 		byval userdata as any ptr _
-	) as integer
+	) as size_t
 
 	dim as CStream ptr memstream = userdata
-	dim as integer bytes = size * nitems
+
+	if( memstream = NULL ) then
+		return 0
+	end if
+
+	dim as size_t maximum_size = cast( size_t, -1 )
+
+	if( size <> 0 andalso nitems > maximum_size \ size ) then
+		return 0
+	end if
+
+	dim as size_t bytes = size * nitems
 	
-	bytes = iif( bytes < memstream->size, bytes, memstream->size )
+	if( bytes > memstream->size ) then
+		bytes = memstream->size
+	end if
 	
 	if( bytes = 0 ) then
+		return 0
+	end if
+
+	if( buffer = NULL or memstream->buffer = NULL ) then
+		return 0
+	end if
+
+	if( bytes > maximum_size - memstream->pos ) then
 		return 0
 	end if
 
@@ -214,30 +323,36 @@ function CHttpStream.send _
 		return TRUE
 	end if
 
+	if( data_ = NULL ) then
+		return FALSE
+	end if
+
 	curl = ctx->http->getHandle( )
 	if( curl = NULL ) then
 		return FALSE
 	end if
 	
  	''
- 	if( ctx->stream.buffer <> NULL ) then
- 		deallocate( ctx->stream.buffer )
- 		ctx->stream.buffer = NULL
- 	end if
- 	
- 	ctx->stream.buffer = data_
- 	ctx->stream.size = bytes
- 	ctx->stream.pos = 0
+	if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
+		deallocate( ctx->stream.buffer )
+	end if
+	ctx->stream.buffer = data_
+	ctx->stream.size = bytes
+	ctx->stream.pos = 0
+	ctx->stream.owns_buffer = FALSE
  	
  	''
- 	if( doreset ) then
- 		curl_easy_reset( curl )
- 	end if
+	if( doreset ) then
+		curl_easy_reset( curl )
+	end if
+
+	dim as clong follow_location = 1
+	dim as clong maximum_redirects = 16
 
 	curl_easy_setopt( curl, CURLOPT_URL, url )
 
-	curl_easy_setopt( curl, CURLOPT_FOLLOWLOCATION, 1 )
-	curl_easy_setopt( curl, CURLOPT_MAXREDIRS, 16 )
+	curl_easy_setopt( curl, CURLOPT_FOLLOWLOCATION, follow_location )
+	curl_easy_setopt( curl, CURLOPT_MAXREDIRS, maximum_redirects )
 	
 	if( referer <> NULL ) then
 		curl_easy_setopt( curl, CURLOPT_REFERER, referer )
@@ -246,10 +361,22 @@ function CHttpStream.send _
 	curl_easy_setopt( curl, CURLOPT_READFUNCTION, @send_cb )
 	curl_easy_setopt( curl, CURLOPT_READDATA, @ctx->stream )
  	
- 	if( curl_easy_perform( curl ) <> 0 ) then
- 		return FALSE
- 	end if
+	dim as CURLcode transfer_result = curl_easy_perform( curl )
+
+	'' send() borrows the caller's buffer only for the synchronous transfer.
+	'' Clear the pointer before any later receive, send, or destructor can see
+	'' memory that this object does not own.
+	ctx->stream.buffer = NULL
+	ctx->stream.size = 0
+	ctx->stream.pos = 0
+	ctx->stream.owns_buffer = FALSE
+
+	if( transfer_result <> 0 ) then
+		return FALSE
+	end if
  	
 	function = TRUE
 
 end function
+
+'' end of CHttpStream.bas

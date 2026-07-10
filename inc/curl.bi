@@ -1,4 +1,25 @@
-'' FreeBASIC binding for curl-7.85.0
+''
+'' FreeBASIC external library bindings
+'' -----------------------------------
+''
+'' File: curl.bi
+''
+'' Purpose:
+''
+''     Expose the libcurl 7.85.0 public C API to FreeBASIC programs.
+''
+'' Responsibilities:
+''
+''     - mirror libcurl public constants, types, and entry points
+''     - preserve the platform C ABI used by libcurl
+''     - request the curl library when a program includes this file
+''
+'' This file intentionally does NOT contain:
+''
+''     - a bundled libcurl implementation
+''     - declarations added after libcurl 7.85.0
+''     - application-level HTTP or transfer policy
+''
 ''
 '' based on the C header files:
 ''   Copyright (c) 1996 - 2022, Daniel Stenberg, <daniel@haxx.se>, and many
@@ -73,6 +94,8 @@ const LIBCURL_VERSION_NUM = &h075500
 	#define CURL_FORMAT_CURL_OFF_TU "I64u"
 #endif
 
+'' FreeBASIC's L suffix is always a 32-bit Long, including on LP64 targets.
+'' Keep these constants 64-bit and assign them to curl_off_t before varargs use.
 #define CURL_SUFFIX_CURL_OFF_T LL
 #define CURL_SUFFIX_CURL_OFF_TU ULL
 
@@ -82,7 +105,13 @@ const LIBCURL_VERSION_NUM = &h075500
 	type curl_socklen_t as socklen_t
 #endif
 
-type curl_off_t as longint
+#if defined(__FB_64BIT__) and defined(__FB_UNIX__)
+	'' libcurl uses C long for curl_off_t on LP64 targets.  Keeping the C type
+	'' spelling is important when curl_off_t values cross a varargs boundary.
+	type curl_off_t as clong
+#else
+	type curl_off_t as longint
+#endif
 #define CURL_ISOCPP
 #define CURLINC_OFF_T_C_HLPR2(Val, Suffix) Val##Suffix
 #define CURLINC_OFF_T_C_HLPR1(Val, Suffix) CURLINC_OFF_T_C_HLPR2(Val, Suffix)
@@ -158,7 +187,7 @@ const CURL_MAX_READ_SIZE = 524288
 const CURL_MAX_WRITE_SIZE = 16384
 const CURL_MAX_HTTP_HEADER = 100 * 1024
 const CURL_WRITEFUNC_PAUSE = &h10000001
-type curl_write_callback as function(byval buffer as zstring ptr, byval size as uinteger, byval nitems as uinteger, byval outstream as any ptr) as uinteger
+type curl_write_callback as function(byval buffer as zstring ptr, byval size as size_t, byval nitems as size_t, byval outstream as any ptr) as size_t
 type curl_resolver_start_callback as function(byval resolver_state as any ptr, byval reserved as any ptr, byval userdata as any ptr) as long
 
 type curlfiletype as long
@@ -203,8 +232,8 @@ type curl_fileinfo
 	strings as curl_fileinfo_strings
 	flags as ulong
 	b_data as zstring ptr
-	b_size as uinteger
-	b_used as uinteger
+	b_size as size_t
+	b_used as size_t
 end type
 
 const CURL_CHUNK_BGN_FUNC_OK = 0
@@ -226,7 +255,7 @@ const CURL_READFUNC_ABORT = &h10000000
 const CURL_READFUNC_PAUSE = &h10000001
 const CURL_TRAILERFUNC_OK = 0
 const CURL_TRAILERFUNC_ABORT = 1
-type curl_read_callback as function(byval buffer as zstring ptr, byval size as uinteger, byval nitems as uinteger, byval instream as any ptr) as uinteger
+type curl_read_callback as function(byval buffer as zstring ptr, byval size as size_t, byval nitems as size_t, byval instream as any ptr) as size_t
 type curl_trailer_callback as function(byval list as curl_slist ptr ptr, byval userdata as any ptr) as long
 
 type curlsocktype as long
@@ -268,11 +297,11 @@ enum
 end enum
 
 type curl_ioctl_callback as function(byval handle as CURL ptr, byval cmd as long, byval clientp as any ptr) as curlioerr
-type curl_malloc_callback as function(byval size as uinteger) as any ptr
+type curl_malloc_callback as function(byval size as size_t) as any ptr
 type curl_free_callback as sub(byval ptr as any ptr)
-type curl_realloc_callback as function(byval ptr as any ptr, byval size as uinteger) as any ptr
+type curl_realloc_callback as function(byval ptr as any ptr, byval size as size_t) as any ptr
 type curl_strdup_callback as function(byval str as const zstring ptr) as zstring ptr
-type curl_calloc_callback as function(byval nmemb as uinteger, byval size as uinteger) as any ptr
+type curl_calloc_callback as function(byval nmemb as size_t, byval size as size_t) as any ptr
 
 type curl_infotype as long
 enum
@@ -286,7 +315,7 @@ enum
 	CURLINFO_END
 end enum
 
-type curl_debug_callback as function(byval handle as CURL ptr, byval type as curl_infotype, byval data as zstring ptr, byval size as uinteger, byval userptr as any ptr) as long
+type curl_debug_callback as function(byval handle as CURL ptr, byval type as curl_infotype, byval data as zstring ptr, byval size as size_t, byval userptr as any ptr) as long
 type curl_prereq_callback as function(byval clientp as any ptr, byval conn_primary_ip as zstring ptr, byval conn_local_ip as zstring ptr, byval conn_primary_port as long, byval conn_local_port as long) as long
 const CURL_PREREQFUNC_OK = 0
 const CURL_PREREQFUNC_ABORT = 1
@@ -474,7 +503,7 @@ enum
 	CURLPX_LAST
 end enum
 
-type curl_conv_callback as function(byval buffer as zstring ptr, byval length as uinteger) as CURLcode
+type curl_conv_callback as function(byval buffer as zstring ptr, byval length as size_t) as CURLcode
 type curl_ssl_ctx_callback as function(byval curl as CURL ptr, byval ssl_ctx as any ptr, byval userptr as any ptr) as CURLcode
 
 type curl_proxytype as long
@@ -528,7 +557,7 @@ end enum
 
 type curl_khkey
 	key as const zstring ptr
-	len as uinteger
+	len as size_t
 	keytype as curl_khtype
 end type
 
@@ -551,7 +580,7 @@ enum
 end enum
 
 type curl_sshkeycallback as function(byval easy as CURL ptr, byval knownkey as const curl_khkey ptr, byval foundkey as const curl_khkey ptr, byval as curl_khmatch, byval clientp as any ptr) as long
-type curl_sshhostkeycallback as function(byval clientp as any ptr, byval keytype as long, byval key as const zstring ptr, byval keylen as uinteger) as long
+type curl_sshhostkeycallback as function(byval clientp as any ptr, byval keytype as long, byval key as const zstring ptr, byval keylen as size_t) as long
 
 type curl_usessl as long
 enum
@@ -619,14 +648,14 @@ const CURLALTSVC_H3 = 1 shl 5
 
 type curl_hstsentry
 	name as zstring ptr
-	namelen as uinteger
+	namelen as size_t
 	includeSubDomains : 1 as ulong
 	expire as zstring * 18
 end type
 
 type curl_index
-	index as uinteger
-	total as uinteger
+	index as size_t
+	total as size_t
 end type
 
 type CURLSTScode as long
@@ -1089,9 +1118,9 @@ enum
 	CURL_TIMECOND_LAST
 end enum
 
-const CURL_ZERO_TERMINATED = cuint(-1)
+const CURL_ZERO_TERMINATED = cast(size_t, -1)
 declare function curl_strequal(byval s1 as const zstring ptr, byval s2 as const zstring ptr) as long
-declare function curl_strnequal(byval s1 as const zstring ptr, byval s2 as const zstring ptr, byval n as uinteger) as long
+declare function curl_strnequal(byval s1 as const zstring ptr, byval s2 as const zstring ptr, byval n as size_t) as long
 const CURLMIMEOPT_FORMESCAPE = 1 shl 0
 type curl_mime as curl_mime_
 declare function curl_mime_init(byval easy as CURL ptr) as curl_mime ptr
@@ -1102,7 +1131,7 @@ declare function curl_mime_name(byval part as curl_mimepart ptr, byval name as c
 declare function curl_mime_filename(byval part as curl_mimepart ptr, byval filename as const zstring ptr) as CURLcode
 declare function curl_mime_type(byval part as curl_mimepart ptr, byval mimetype as const zstring ptr) as CURLcode
 declare function curl_mime_encoder(byval part as curl_mimepart ptr, byval encoding as const zstring ptr) as CURLcode
-declare function curl_mime_data(byval part as curl_mimepart ptr, byval data as const zstring ptr, byval datasize as uinteger) as CURLcode
+declare function curl_mime_data(byval part as curl_mimepart ptr, byval data as const zstring ptr, byval datasize as size_t) as CURLcode
 declare function curl_mime_filedata(byval part as curl_mimepart ptr, byval filename as const zstring ptr) as CURLcode
 declare function curl_mime_data_cb(byval part as curl_mimepart ptr, byval datasize as curl_off_t, byval readfunc as curl_read_callback, byval seekfunc as curl_seek_callback, byval freefunc as curl_free_callback, byval arg as any ptr) as CURLcode
 declare function curl_mime_subparts(byval part as curl_mimepart ptr, byval subparts as curl_mime ptr) as CURLcode
@@ -1153,7 +1182,7 @@ enum
 end enum
 
 declare function curl_formadd(byval httppost as curl_httppost ptr ptr, byval last_post as curl_httppost ptr ptr, ...) as CURLFORMcode
-type curl_formget_callback as function(byval arg as any ptr, byval buf as const zstring ptr, byval len as uinteger) as uinteger
+type curl_formget_callback as function(byval arg as any ptr, byval buf as const zstring ptr, byval len as size_t) as size_t
 declare function curl_formget(byval form as curl_httppost ptr, byval arg as any ptr, byval append as curl_formget_callback) as long
 declare sub curl_formfree(byval form as curl_httppost ptr)
 declare function curl_getenv(byval variable as const zstring ptr) as zstring ptr
@@ -1369,6 +1398,8 @@ enum
 	CURLVERSION_LAST
 end enum
 
+'' curl_version_info_data ends with the TENTH-age gsasl_version field.
+'' Newer libcurl releases keep this prefix compatible when TENTH is requested.
 const CURLVERSION_NOW = CURLVERSION_TENTH
 
 type curl_version_info_data
@@ -1448,19 +1479,24 @@ const CURL_BLOB_NOCOPY = 0
 
 type curl_blob
 	data as any ptr
-	len as uinteger
+	len as size_t
 	flags as ulong
 end type
 
 declare function curl_easy_init() as CURL ptr
+''
+'' LP64 varargs require the caller to preserve the C type as well as its width.
+'' Store CURLOPTTYPE_LONG values in clong and CURLOPTTYPE_OFF_T values in
+'' curl_off_t variables before passing them to curl_easy_setopt().
+''
 declare function curl_easy_setopt(byval curl as CURL ptr, byval option as CURLoption, ...) as CURLcode
 declare function curl_easy_perform(byval curl as CURL ptr) as CURLcode
 declare sub curl_easy_cleanup(byval curl as CURL ptr)
 declare function curl_easy_getinfo(byval curl as CURL ptr, byval info as CURLINFO, ...) as CURLcode
 declare function curl_easy_duphandle(byval curl as CURL ptr) as CURL ptr
 declare sub curl_easy_reset(byval curl as CURL ptr)
-declare function curl_easy_recv(byval curl as CURL ptr, byval buffer as any ptr, byval buflen as uinteger, byval n as uinteger ptr) as CURLcode
-declare function curl_easy_send(byval curl as CURL ptr, byval buffer as const any ptr, byval buflen as uinteger, byval n as uinteger ptr) as CURLcode
+declare function curl_easy_recv(byval curl as CURL ptr, byval buffer as any ptr, byval buflen as size_t, byval n as size_t ptr) as CURLcode
+declare function curl_easy_send(byval curl as CURL ptr, byval buffer as const any ptr, byval buflen as size_t, byval n as size_t ptr) as CURLcode
 declare function curl_easy_upkeep(byval curl as CURL ptr) as CURLcode
 #define CURLINC_MULTI_H
 type CURLM as any
@@ -1580,9 +1616,9 @@ const CURL_PUSH_OK = 0
 const CURL_PUSH_DENY = 1
 const CURL_PUSH_ERROROUT = 2
 type curl_pushheaders as curl_pushheaders_
-declare function curl_pushheader_bynum(byval h as curl_pushheaders ptr, byval num as uinteger) as zstring ptr
+declare function curl_pushheader_bynum(byval h as curl_pushheaders ptr, byval num as size_t) as zstring ptr
 declare function curl_pushheader_byname(byval h as curl_pushheaders ptr, byval name as const zstring ptr) as zstring ptr
-type curl_push_callback as function(byval parent as CURL ptr, byval easy as CURL ptr, byval num_headers as uinteger, byval headers as curl_pushheaders ptr, byval userp as any ptr) as long
+type curl_push_callback as function(byval parent as CURL ptr, byval easy as CURL ptr, byval num_headers as size_t, byval headers as curl_pushheaders ptr, byval userp as any ptr) as long
 #define CURLINC_URLAPI_H
 
 type CURLUcode as long
@@ -1687,8 +1723,8 @@ declare function curl_easy_option_next(byval prev as const curl_easyoption ptr) 
 type curl_header
 	name as zstring ptr
 	value as zstring ptr
-	amount as uinteger
-	index as uinteger
+	amount as size_t
+	index as size_t
 	origin as ulong
 	anchor as any ptr
 end type
@@ -1711,7 +1747,9 @@ enum
 	CURLHE_NOT_BUILT_IN
 end enum
 
-declare function curl_easy_header(byval easy as CURL ptr, byval name as const zstring ptr, byval index as uinteger, byval origin as ulong, byval request as long, byval hout as curl_header ptr ptr) as CURLHcode
+declare function curl_easy_header(byval easy as CURL ptr, byval name as const zstring ptr, byval index as size_t, byval origin as ulong, byval request as long, byval hout as curl_header ptr ptr) as CURLHcode
 declare function curl_easy_nextheader(byval easy as CURL ptr, byval origin as ulong, byval request as long, byval prev as curl_header ptr) as curl_header ptr
 
 end extern
+
+'' end of curl.bi

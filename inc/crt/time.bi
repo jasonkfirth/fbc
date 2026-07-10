@@ -35,8 +35,7 @@
 #elseif defined(__FB_SOLARIS__)
 #include once "crt/solaris/time.bi"
 #elseif defined(__FB_DARWIN__)
-'' Darwin uses the POSIX time declarations shared with the Unix CRT layer.
-#include once "crt/linux/time.bi"
+#include once "crt/darwin/time.bi"
 #else
 #error Unsupported platform
 #endif
@@ -65,3 +64,5 @@ declare function wcsftime (byval as wchar_t ptr, byval as size_t, byval as wchar
 end extern
 
 #endif
+
+'' end of crt/time.bi

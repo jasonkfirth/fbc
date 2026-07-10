@@ -38,6 +38,8 @@
 	#inclib "glu32"
 #elseif defined(__FB_DOS__)
 	#inclib "glu"
+#elseif defined(__FB_DARWIN__)
+	#inclib "OpenGL"
 #else
 	#inclib "GLU"
 #endif
@@ -277,3 +279,5 @@ declare function gluUnProject(byval winX as GLdouble, byval winY as GLdouble, by
 declare function gluUnProject4(byval winX as GLdouble, byval winY as GLdouble, byval winZ as GLdouble, byval clipW as GLdouble, byval model as const GLdouble ptr, byval proj as const GLdouble ptr, byval view as const GLint ptr, byval nearVal as GLdouble, byval farVal as GLdouble, byval objX as GLdouble ptr, byval objY as GLdouble ptr, byval objZ as GLdouble ptr, byval objW as GLdouble ptr) as GLint
 
 end extern
+
+'' end of GL/mesa/glu.bi

@@ -23,6 +23,8 @@
 #include once "crt/sys/openbsd/time.bi"
 #elseif defined(__FB_NETBSD__)
 #include once "crt/sys/netbsd/time.bi"
+#elseif defined(__FB_DARWIN__)
+#include once "crt/sys/darwin/time.bi"
 #elseif defined(__FB_DOS__)
 #include once "crt/dos/time.bi"
 #else
@@ -42,3 +44,5 @@
 #endif
 
 #endif
+
+'' end of crt/sys/time.bi

@@ -2,9 +2,9 @@
 #
 # FreeBASIC macOS smoke-test runner.
 #
-# This script compiles and runs small Darwin-specific gfxlib/sfxlib programs
-# against the in-tree compiler.  It is intentionally focused on exercising the
-# real macOS platform drivers after the build has completed.
+# This script compiles and runs small Darwin-specific system binding,
+# gfxlib, and sfxlib programs against the in-tree compiler.  It is intentionally
+# focused on exercising the real macOS interfaces after the build has completed.
 
 set -euo pipefail
 
@@ -13,6 +13,7 @@ FBC="${FBC:-$ROOT_DIR/bin/fbc}"
 OUT_DIR="${OUT_DIR:-$ROOT_DIR/out/macos-smoke}"
 SKIP_STATUS=77
 SMOKE_RESULT=""
+SYSTEM_BINDINGS_ONLY="${SYSTEM_BINDINGS_ONLY:-0}"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
     echo "macos-smoke: skipped, this runner requires Darwin"
@@ -24,6 +25,9 @@ if [[ ! -x "$FBC" ]]; then
     exit 1
 fi
 
+SDKROOT="${SDKROOT:-$(xcrun --sdk macosx --show-sdk-path)}"
+CLANG="${CLANG:-$(xcrun --find clang)}"
+
 mkdir -p "$OUT_DIR"
 
 compile_smoke()
@@ -32,6 +36,23 @@ compile_smoke()
     local output="$2"
 
     "$FBC" -i "$ROOT_DIR/inc" -i "$ROOT_DIR/tests/sfx" "$source" -x "$output"
+}
+
+compile_arm64_smoke()
+{
+    local source="$1"
+    local name="$2"
+    local generated_c="$OUT_DIR/$name-arm64.c"
+    local object="$OUT_DIR/$name-arm64.o"
+
+    "$FBC" -i "$ROOT_DIR/inc" -arch aarch64 -gen gcc -r \
+        "$source" -o "$generated_c"
+
+    "$CLANG" -target arm64-apple-macos11 -c -nostdlib -nostdinc \
+        -fno-builtin -Werror=implicit-function-declaration \
+        -isystem "$SDKROOT/usr/include" \
+        -iframework "$SDKROOT/System/Library/Frameworks" \
+        "$generated_c" -o "$object"
 }
 
 run_smoke()
@@ -150,6 +171,23 @@ die "silent audio dump rms=$rms\n" if $rms < 0.01;
 PERL
 }
 
+SOCKET_BINDING="$OUT_DIR/socket-darwin-smoke"
+SETJMP_BINDING="$OUT_DIR/setjmp-darwin-smoke"
+SCHED_BINDING="$OUT_DIR/sched-darwin-smoke"
+STAT_BINDING="$OUT_DIR/stat-darwin-smoke"
+PTHREAD_BINDING="$OUT_DIR/pthread-darwin-smoke"
+CURL_BINDING="$OUT_DIR/curl-smoke"
+CURL_STREAM_OWNERSHIP="$OUT_DIR/curl-stream-ownership-smoke"
+CURL_EXAMPLE="$OUT_DIR/curl-example"
+HTTP_GET_EXAMPLE="$OUT_DIR/http-get-example"
+ICONV_BINDING="$OUT_DIR/iconv-smoke"
+REGEX_BINDING="$OUT_DIR/regex-smoke"
+UUID_BINDING="$OUT_DIR/uuid-smoke"
+CURSES_BINDING="$OUT_DIR/curses-smoke"
+FFI_LAYOUT="$OUT_DIR/ffi-darwin-layout-check"
+FFI_CALL="$OUT_DIR/ffi-darwin-call-smoke"
+FRAMEWORK_LINK="$OUT_DIR/framework-link-smoke"
+ZLIB_EXAMPLE="$OUT_DIR/zlib-example"
 GFX_PALETTED="$OUT_DIR/gfx-darwin-paletted-smoke"
 GFX_TRUECOLOR="$OUT_DIR/gfx-darwin-truecolor-smoke"
 GFX_SCREEN_MODES="$OUT_DIR/gfx-darwin-screen-modes-smoke"
@@ -157,14 +195,77 @@ SFX_PLAYBACK="$OUT_DIR/sfx-coreaudio-smoke"
 SFX_CAPTURE="$OUT_DIR/sfx-capture-smoke"
 SFX_DUMMY="$OUT_DIR/sfx-dummy-smoke"
 
-compile_smoke "$ROOT_DIR/tests/macos/gfx-darwin-paletted-smoke.bas" "$GFX_PALETTED"
-compile_smoke "$ROOT_DIR/tests/macos/gfx-darwin-truecolor-smoke.bas" "$GFX_TRUECOLOR"
-compile_smoke "$ROOT_DIR/tests/macos/gfx-darwin-screen-modes-smoke.bas" "$GFX_SCREEN_MODES"
-compile_smoke "$ROOT_DIR/tests/macos/sfx-coreaudio-smoke.bas" "$SFX_PLAYBACK"
-compile_smoke "$ROOT_DIR/tests/macos/sfx-capture-smoke.bas" "$SFX_CAPTURE"
-compile_smoke "$ROOT_DIR/tests/macos/sfx-dummy-smoke.bas" "$SFX_DUMMY"
+compile_smoke "$ROOT_DIR/tests/macos/socket-darwin-smoke.bas" "$SOCKET_BINDING"
+compile_smoke "$ROOT_DIR/tests/macos/setjmp-darwin-smoke.bas" "$SETJMP_BINDING"
+compile_smoke "$ROOT_DIR/tests/macos/sched-darwin-smoke.bas" "$SCHED_BINDING"
+compile_smoke "$ROOT_DIR/tests/macos/stat-darwin-smoke.bas" "$STAT_BINDING"
+compile_smoke "$ROOT_DIR/tests/macos/pthread-darwin-smoke.bas" "$PTHREAD_BINDING"
+compile_smoke "$ROOT_DIR/tests/macos/curl-smoke.bas" "$CURL_BINDING"
+"$FBC" -i "$ROOT_DIR/inc" -i "$ROOT_DIR/examples/network/curl/CHttp" \
+    -lib \
+    "$ROOT_DIR/examples/network/curl/CHttp/CHttp.bas" \
+    "$ROOT_DIR/examples/network/curl/CHttp/CHttpStream.bas" \
+    "$ROOT_DIR/examples/network/curl/CHttp/CHttpForm.bas" \
+    -x "$OUT_DIR/libCHttp.a"
+"$FBC" -i "$ROOT_DIR/inc" -i "$ROOT_DIR/examples/network/curl/CHttp" \
+    -p "$OUT_DIR" \
+    "$ROOT_DIR/tests/macos/curl-stream-ownership-smoke.bas" \
+    -x "$CURL_STREAM_OWNERSHIP"
+compile_smoke "$ROOT_DIR/tests/macos/iconv-smoke.bas" "$ICONV_BINDING"
+compile_smoke "$ROOT_DIR/tests/macos/regex-smoke.bas" "$REGEX_BINDING"
+compile_smoke "$ROOT_DIR/tests/macos/uuid-smoke.bas" "$UUID_BINDING"
+compile_smoke "$ROOT_DIR/tests/macos/curses-smoke.bas" "$CURSES_BINDING"
+compile_smoke "$ROOT_DIR/tests/macos/ffi-darwin-layout-check.bas" "$FFI_LAYOUT"
+compile_smoke "$ROOT_DIR/tests/macos/ffi-darwin-call-smoke.bas" "$FFI_CALL"
+compile_smoke "$ROOT_DIR/tests/macos/framework-link-smoke.bas" "$FRAMEWORK_LINK"
+compile_smoke "$ROOT_DIR/examples/compression/zlib.bas" "$ZLIB_EXAMPLE"
+compile_smoke "$ROOT_DIR/examples/manual/libraries/curl.bas" "$CURL_EXAMPLE"
+compile_smoke "$ROOT_DIR/examples/network/http-get.bas" "$HTTP_GET_EXAMPLE"
 
-rm -f "$OUT_DIR"/gfx-screen-*.ppm "$OUT_DIR/gfx-paletted.ppm" "$OUT_DIR/gfx-truecolor.ppm" "$OUT_DIR/sfx-coreaudio.txt" "$OUT_DIR/sfx-dummy.txt"
+if [[ "$SYSTEM_BINDINGS_ONLY" != "1" ]]; then
+    compile_smoke "$ROOT_DIR/tests/macos/gfx-darwin-paletted-smoke.bas" "$GFX_PALETTED"
+    compile_smoke "$ROOT_DIR/tests/macos/gfx-darwin-truecolor-smoke.bas" "$GFX_TRUECOLOR"
+    compile_smoke "$ROOT_DIR/tests/macos/gfx-darwin-screen-modes-smoke.bas" "$GFX_SCREEN_MODES"
+    compile_smoke "$ROOT_DIR/tests/macos/sfx-coreaudio-smoke.bas" "$SFX_PLAYBACK"
+    compile_smoke "$ROOT_DIR/tests/macos/sfx-capture-smoke.bas" "$SFX_CAPTURE"
+    compile_smoke "$ROOT_DIR/tests/macos/sfx-dummy-smoke.bas" "$SFX_DUMMY"
+fi
+
+compile_arm64_smoke "$ROOT_DIR/tests/macos/socket-darwin-smoke.bas" "socket-darwin-smoke"
+compile_arm64_smoke "$ROOT_DIR/tests/macos/setjmp-darwin-smoke.bas" "setjmp-darwin-smoke"
+compile_arm64_smoke "$ROOT_DIR/tests/macos/sched-darwin-smoke.bas" "sched-darwin-smoke"
+compile_arm64_smoke "$ROOT_DIR/tests/macos/stat-darwin-smoke.bas" "stat-darwin-smoke"
+compile_arm64_smoke "$ROOT_DIR/tests/macos/pthread-darwin-smoke.bas" "pthread-darwin-smoke"
+compile_arm64_smoke "$ROOT_DIR/tests/macos/curl-smoke.bas" "curl-smoke"
+compile_arm64_smoke "$ROOT_DIR/tests/macos/iconv-smoke.bas" "iconv-smoke"
+compile_arm64_smoke "$ROOT_DIR/tests/macos/regex-smoke.bas" "regex-smoke"
+compile_arm64_smoke "$ROOT_DIR/tests/macos/curses-smoke.bas" "curses-smoke"
+compile_arm64_smoke "$ROOT_DIR/tests/macos/ffi-darwin-layout-check.bas" "ffi-darwin-layout-check"
+compile_arm64_smoke "$ROOT_DIR/tests/macos/ffi-darwin-call-smoke.bas" "ffi-darwin-call-smoke"
+compile_arm64_smoke "$ROOT_DIR/tests/macos/framework-link-smoke.bas" "framework-link-smoke"
+
+rm -f "$OUT_DIR"/gfx-screen-*.ppm "$OUT_DIR/gfx-paletted.ppm" "$OUT_DIR/gfx-truecolor.ppm" "$OUT_DIR/sfx-coreaudio.txt" "$OUT_DIR/sfx-dummy.txt" "$OUT_DIR/zlib-smoke.gz"
+
+run_smoke "Darwin sockets and resolver" "$SOCKET_BINDING"
+run_smoke "Darwin setjmp storage" "$SETJMP_BINDING"
+run_smoke "Darwin scheduler" "$SCHED_BINDING"
+run_smoke "Darwin file status" "$STAT_BINDING"
+run_smoke "Darwin pthread" "$PTHREAD_BINDING"
+run_smoke "system libcurl" "$CURL_BINDING"
+run_smoke "curl stream buffer ownership" "$CURL_STREAM_OWNERSHIP"
+run_smoke "system iconv" "$ICONV_BINDING"
+run_smoke "system POSIX regex" "$REGEX_BINDING"
+run_smoke "system UUID" "$UUID_BINDING"
+run_smoke "system ncurses" "$CURSES_BINDING"
+run_smoke "libffi native layout" "$FFI_LAYOUT"
+run_smoke "libffi call and closure" "$FFI_CALL"
+run_smoke "system frameworks" "$FRAMEWORK_LINK"
+run_smoke "system zlib example" "$ZLIB_EXAMPLE" "$OUT_DIR/zlib-smoke.gz"
+
+if [[ "$SYSTEM_BINDINGS_ONLY" == "1" ]]; then
+    echo "macos-smoke: all system binding smoke tests passed"
+    exit 0
+fi
 
 run_smoke "gfx paletted" env FBGFX=Darwin FBGFX_DARWIN_DUMP="$OUT_DIR/gfx-paletted.ppm" "$GFX_PALETTED"
 if [[ "$SMOKE_RESULT" == "passed" ]]; then

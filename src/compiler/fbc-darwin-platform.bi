@@ -558,6 +558,27 @@ end sub
 '' Frameworks
 ''
 
+private function fbcDarwinPlatformGetFrameworkName _
+	( _
+		byref libname as string _
+	) as string
+
+	if( fbcDarwinPlatformIsSelected( ) = FALSE ) then
+		exit function
+	end if
+
+	''
+	'' FreeBASIC bindings record link dependencies with #inclib.  Apple ships
+	'' these system APIs as frameworks instead of Unix-style lib*.dylib files.
+	'' Keep the translation here so each binding can name the Apple framework
+	'' while the shared linker path still owns the order of all dependencies.
+	''
+	select case libname
+	case "OpenGL", "GLUT", "OpenAL", "Cocoa"
+		function = libname
+	end select
+end function
+
 private sub fbcDarwinPlatformAddLinkerFrameworks( byref ldcline as string )
 	if( fbcDarwinPlatformIsSelected( ) = FALSE ) then
 		exit sub

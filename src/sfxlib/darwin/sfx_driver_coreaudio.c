@@ -55,6 +55,15 @@ static int g_audio_thread_valid = 0;
 static volatile int g_audio_thread_stop = 0;
 #endif
 
+static int fb_sfxDarwinStopRequested(void)
+{
+#if FB_SFX_MT_ENABLED
+    return g_audio_thread_stop;
+#else
+    return 0;
+#endif
+}
+
 static void fb_sfxDarwinInitDebug(void)
 {
     const char *env;
@@ -579,7 +588,8 @@ int fb_sfxDarwinWrite(float *buffer, int frames)
     size_t bytes;
     int current_buffer;
 
-    if (!g_audio_queue || !buffer || frames <= 0 || !fb_sfx_darwin.running)
+    if (!g_audio_queue || !buffer || frames <= 0 || !fb_sfx_darwin.running ||
+        fb_sfxDarwinStopRequested())
         return -1;
 
     fb_sfxDriverDiagnostics("CoreAudio",
@@ -590,7 +600,13 @@ int fb_sfxDarwinWrite(float *buffer, int frames)
     for (;;)
     {
         pthread_mutex_lock(&g_darwin_coreaudio_lock);
-        if (!fb_sfx_darwin.running)
+        /*
+            AudioQueue callbacks may stop returning buffers while shutdown is
+            in progress.  DarwinExit waits for the worker before it disposes
+            the queue, so the polling loop must observe the worker stop flag
+            instead of relying on another callback to release a buffer.
+        */
+        if (!fb_sfx_darwin.running || fb_sfxDarwinStopRequested())
         {
             pthread_mutex_unlock(&g_darwin_coreaudio_lock);
             return -1;

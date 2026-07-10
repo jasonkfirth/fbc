@@ -19,8 +19,12 @@
 #include once "crt/dragonfly/unistd.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/linux/unistd.bi"
+#elseif defined(__FB_DARWIN__)
+#include once "crt/darwin/unistd.bi"
 #else
 #error unsupported platform
 #endif
 
 #endif
+
+'' end of crt/unistd.bi

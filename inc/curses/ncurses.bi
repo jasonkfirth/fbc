@@ -60,11 +60,21 @@ extern "C"
 #define __NCURSES_H
 const CURSES = 1
 const CURSES_H = 1
-const NCURSES_VERSION_MAJOR = 5
-const NCURSES_VERSION_MINOR = 9
-const NCURSES_VERSION_PATCH = 20110404
+#ifdef __FB_DARWIN__
+	const NCURSES_VERSION_MAJOR = 6
+	const NCURSES_VERSION_MINOR = 0
+	const NCURSES_VERSION_PATCH = 20150808
+#else
+	const NCURSES_VERSION_MAJOR = 5
+	const NCURSES_VERSION_MINOR = 9
+	const NCURSES_VERSION_PATCH = 20110404
+#endif
 #undef NCURSES_VERSION
-#define NCURSES_VERSION "5.9"
+#ifdef __FB_DARWIN__
+	#define NCURSES_VERSION "6.0"
+#else
+	#define NCURSES_VERSION "5.9"
+#endif
 const NCURSES_MOUSE_VERSION = 1
 const NCURSES_DLL_H_incl = 1
 #undef NCURSES_DLL
@@ -72,7 +82,11 @@ const NCURSES_ENABLE_STDBOOL_H = 1
 type NCURSES_ATTR_T as long
 #undef NCURSES_COLOR_T
 type NCURSES_COLOR_T as short
-const NCURSES_OPAQUE = 0
+#ifdef __FB_DARWIN__
+	const NCURSES_OPAQUE = 1
+#else
+	const NCURSES_OPAQUE = 0
+#endif
 const NCURSES_REENTRANT = 0
 #undef NCURSES_INTEROP_FUNCS
 const NCURSES_INTEROP_FUNCS = 0
@@ -83,7 +97,12 @@ const NCURSES_TPARM_VARARGS = 1
 #undef NCURSES_CH_T
 
 type NCURSES_CH_T as chtype
-type chtype as culong
+#ifdef __FB_DARWIN__
+	'' Apple's public ncurses ABI defines chtype and attr_t as unsigned int.
+	type chtype as ulong
+#else
+	type chtype as culong
+#endif
 type mmask_t as culong
 #undef NCURSES_WIDECHAR
 #ifndef CTRUE
@@ -182,9 +201,15 @@ const _HASMOVED = &h20
 const _WRAPPED = &h40
 const _NOCHANGE = -1
 const _NEWINDEX = -1
-type WINDOW_ as _win_st
+#ifdef __FB_DARWIN__
+	'' The SDK deliberately hides struct _win_st and exports accessors for it.
+	type WINDOW_ as any
+#else
+	type WINDOW_ as _win_st
+#endif
 type attr_t as chtype
 
+#ifndef __FB_DARWIN__
 type pdat
 	_pad_y as short
 	_pad_x as short
@@ -225,6 +250,7 @@ type _win_st
 	_pad as pdat
 	_yoffset as short
 end type
+#endif
 
 type NCURSES_OUTC as function(byval as long) as long
 declare function baudrate() as long
@@ -238,7 +264,11 @@ declare function curs_set(byval as long) as long
 declare function def_prog_mode() as long
 declare function def_shell_mode() as long
 declare function delay_output(byval as long) as long
-type SCREEN_ as SCREEN__
+#ifdef __FB_DARWIN__
+	type SCREEN_ as any
+#else
+	type SCREEN_ as SCREEN__
+#endif
 declare sub delscreen(byval as SCREEN_ ptr)
 declare function delwin(byval as WINDOW_ ptr) as long
 declare function derwin(byval as WINDOW_ ptr, byval as long, byval as long, byval as long, byval as long) as WINDOW_ ptr
@@ -416,27 +446,51 @@ const NCURSES_SP_FUNCS = 0
 type NCURSES_SP_OUTC as NCURSES_OUTC
 
 const NCURSES_ATTR_SHIFT = 8
-#define NCURSES_BITS(mask, shift) ((mask) shl ((shift) + NCURSES_ATTR_SHIFT))
-const A_NORMAL = cast(culong, 1) - cast(culong, 1)
-const WA_NORMAL = A_NORMAL
-#define A_ATTRIBUTES NCURSES_BITS(not (cast(culong, 1) - cast(culong, 1)), 0)
-#define A_CHARTEXT (NCURSES_BITS(cast(culong, 1), 0) - cast(culong, 1))
-#define A_COLOR NCURSES_BITS((cast(culong, 1) shl 8) - cast(culong, 1), 0)
-#define A_STANDOUT NCURSES_BITS(cast(culong, 1), 8)
-#define A_UNDERLINE NCURSES_BITS(cast(culong, 1), 9)
-#define A_REVERSE NCURSES_BITS(cast(culong, 1), 10)
-#define A_BLINK NCURSES_BITS(cast(culong, 1), 11)
-#define A_DIM NCURSES_BITS(cast(culong, 1), 12)
-#define A_BOLD NCURSES_BITS(cast(culong, 1), 13)
-#define A_ALTCHARSET NCURSES_BITS(cast(culong, 1), 14)
-#define A_INVIS NCURSES_BITS(cast(culong, 1), 15)
-#define A_PROTECT NCURSES_BITS(cast(culong, 1), 16)
-#define A_HORIZONTAL NCURSES_BITS(cast(culong, 1), 17)
-#define A_LEFT NCURSES_BITS(cast(culong, 1), 18)
-#define A_LOW NCURSES_BITS(cast(culong, 1), 19)
-#define A_RIGHT NCURSES_BITS(cast(culong, 1), 20)
-#define A_TOP NCURSES_BITS(cast(culong, 1), 21)
-#define A_VERTICAL NCURSES_BITS(cast(culong, 1), 22)
+#ifdef __FB_DARWIN__
+	#define NCURSES_BITS(mask, shift) cast(chtype, ((mask) shl ((shift) + NCURSES_ATTR_SHIFT)))
+	const A_NORMAL = cast(chtype, 1) - cast(chtype, 1)
+	const WA_NORMAL = A_NORMAL
+	#define A_ATTRIBUTES NCURSES_BITS(not (cast(chtype, 1) - cast(chtype, 1)), 0)
+	#define A_CHARTEXT (NCURSES_BITS(cast(chtype, 1), 0) - cast(chtype, 1))
+	#define A_COLOR NCURSES_BITS((cast(chtype, 1) shl 8) - cast(chtype, 1), 0)
+	#define A_STANDOUT NCURSES_BITS(cast(chtype, 1), 8)
+	#define A_UNDERLINE NCURSES_BITS(cast(chtype, 1), 9)
+	#define A_REVERSE NCURSES_BITS(cast(chtype, 1), 10)
+	#define A_BLINK NCURSES_BITS(cast(chtype, 1), 11)
+	#define A_DIM NCURSES_BITS(cast(chtype, 1), 12)
+	#define A_BOLD NCURSES_BITS(cast(chtype, 1), 13)
+	#define A_ALTCHARSET NCURSES_BITS(cast(chtype, 1), 14)
+	#define A_INVIS NCURSES_BITS(cast(chtype, 1), 15)
+	#define A_PROTECT NCURSES_BITS(cast(chtype, 1), 16)
+	#define A_HORIZONTAL NCURSES_BITS(cast(chtype, 1), 17)
+	#define A_LEFT NCURSES_BITS(cast(chtype, 1), 18)
+	#define A_LOW NCURSES_BITS(cast(chtype, 1), 19)
+	#define A_RIGHT NCURSES_BITS(cast(chtype, 1), 20)
+	#define A_TOP NCURSES_BITS(cast(chtype, 1), 21)
+	#define A_VERTICAL NCURSES_BITS(cast(chtype, 1), 22)
+#else
+	#define NCURSES_BITS(mask, shift) ((mask) shl ((shift) + NCURSES_ATTR_SHIFT))
+	const A_NORMAL = cast(culong, 1) - cast(culong, 1)
+	const WA_NORMAL = A_NORMAL
+	#define A_ATTRIBUTES NCURSES_BITS(not (cast(culong, 1) - cast(culong, 1)), 0)
+	#define A_CHARTEXT (NCURSES_BITS(cast(culong, 1), 0) - cast(culong, 1))
+	#define A_COLOR NCURSES_BITS((cast(culong, 1) shl 8) - cast(culong, 1), 0)
+	#define A_STANDOUT NCURSES_BITS(cast(culong, 1), 8)
+	#define A_UNDERLINE NCURSES_BITS(cast(culong, 1), 9)
+	#define A_REVERSE NCURSES_BITS(cast(culong, 1), 10)
+	#define A_BLINK NCURSES_BITS(cast(culong, 1), 11)
+	#define A_DIM NCURSES_BITS(cast(culong, 1), 12)
+	#define A_BOLD NCURSES_BITS(cast(culong, 1), 13)
+	#define A_ALTCHARSET NCURSES_BITS(cast(culong, 1), 14)
+	#define A_INVIS NCURSES_BITS(cast(culong, 1), 15)
+	#define A_PROTECT NCURSES_BITS(cast(culong, 1), 16)
+	#define A_HORIZONTAL NCURSES_BITS(cast(culong, 1), 17)
+	#define A_LEFT NCURSES_BITS(cast(culong, 1), 18)
+	#define A_LOW NCURSES_BITS(cast(culong, 1), 19)
+	#define A_RIGHT NCURSES_BITS(cast(culong, 1), 20)
+	#define A_TOP NCURSES_BITS(cast(culong, 1), 21)
+	#define A_VERTICAL NCURSES_BITS(cast(culong, 1), 22)
+#endif
 #macro getyx(win, y, x)
 	scope
 		y = getcury(win)
@@ -490,24 +544,40 @@ const WA_NORMAL = A_NORMAL
 #define crmode() cbreak()
 #define nocrmode() nocbreak()
 #define gettmode()
-#define getattrs(win) clng(iif((win), (win)->_attrs, A_NORMAL))
-#define getcurx(win) iif((win), (win)->_curx, ERR_)
-#define getcury(win) iif((win), (win)->_cury, ERR_)
-#define getbegx(win) iif((win), (win)->_begx, ERR_)
-#define getbegy(win) iif((win), (win)->_begy, ERR_)
-#define getmaxx(win) iif((win), (win)->_maxx + 1, ERR_)
-#define getmaxy(win) iif((win), (win)->_maxy + 1, ERR_)
-#define getparx(win) iif((win), (win)->_parx, ERR_)
-#define getpary(win) iif((win), (win)->_pary, ERR_)
+#ifdef __FB_DARWIN__
+	declare function getattrs(byval win as const WINDOW_ ptr) as long
+	declare function getcurx(byval win as const WINDOW_ ptr) as long
+	declare function getcury(byval win as const WINDOW_ ptr) as long
+	declare function getbegx(byval win as const WINDOW_ ptr) as long
+	declare function getbegy(byval win as const WINDOW_ ptr) as long
+	declare function getmaxx(byval win as const WINDOW_ ptr) as long
+	declare function getmaxy(byval win as const WINDOW_ ptr) as long
+	declare function getparx(byval win as const WINDOW_ ptr) as long
+	declare function getpary(byval win as const WINDOW_ ptr) as long
+#else
+	#define getattrs(win) clng(iif((win), (win)->_attrs, A_NORMAL))
+	#define getcurx(win) iif((win), (win)->_curx, ERR_)
+	#define getcury(win) iif((win), (win)->_cury, ERR_)
+	#define getbegx(win) iif((win), (win)->_begx, ERR_)
+	#define getbegy(win) iif((win), (win)->_begy, ERR_)
+	#define getmaxx(win) iif((win), (win)->_maxx + 1, ERR_)
+	#define getmaxy(win) iif((win), (win)->_maxy + 1, ERR_)
+	#define getparx(win) iif((win), (win)->_parx, ERR_)
+	#define getpary(win) iif((win), (win)->_pary, ERR_)
+#endif
 #define wstandout(win) wattrset(win, A_STANDOUT)
 #define wstandend(win) wattrset(win, A_NORMAL)
 #define wattron(win, at) wattr_on(win, NCURSES_CAST(attr_t, at), NULL)
 #define wattroff(win, at) wattr_off(win, NCURSES_CAST(attr_t, at), NULL)
-#macro wattrset(win,at)
-	if (win) then
-		(win)->_attrs = NCURSES_CAST(attr_t, at)
-	end if
-#endmacro
+#ifdef __FB_DARWIN__
+	declare function wattrset(byval win as WINDOW_ ptr, byval attrs as long) as long
+#else
+	#macro wattrset(win,at)
+		if (win) then
+			(win)->_attrs = NCURSES_CAST(attr_t, at)
+		end if
+	#endmacro
+#endif
 #define scroll(win) wscrl(win, 1)
 #define touchwin(win) wtouchln((win), 0, getmaxy(win), 1)
 #define touchline(win, s, c) wtouchln((win), s, c, 1)
@@ -519,7 +589,11 @@ const WA_NORMAL = A_NORMAL
 #define winstr(w, s) winnstr(w, s, -1)
 #define winchstr(w, s) winchnstr(w, s, -1)
 #define winsstr(w, s) winsnstr(w, s, -1)
-#define redrawwin(win) wredrawln(win, 0, (win)->_maxy + 1)
+#ifdef __FB_DARWIN__
+	declare function redrawwin(byval win as WINDOW_ ptr) as long
+#else
+	#define redrawwin(win) wredrawln(win, 0, (win)->_maxy + 1)
+#endif
 #define waddstr(win, str) waddnstr(win, str, -1)
 #define waddchstr(win, str) waddchnstr(win, str, -1)
 #define COLOR_PAIR(n) NCURSES_BITS(n, 0)
@@ -608,43 +682,66 @@ const WA_NORMAL = A_NORMAL
 #define mvinsstr(y, x, s) mvwinsstr(stdscr, y, x, s)
 #define mvinstr(y, x, s) mvwinstr(stdscr, y, x, s)
 #define mvvline(y, x, c, n) mvwvline(stdscr, y, x, c, n)
-#define getbkgd(win) (win)->_bkgd
 #define slk_attr_off_(a, v) iif((v), ERR_, slk_attroff(a))
 #define slk_attr_on_(a, v) iif((v), ERR_, slk_attron(a))
-#define wattr_set(win, a, p, opts) scope : (win)->_attrs = ((a) and (not A_COLOR)) or cast(attr_t, COLOR_PAIR(p)) : end scope
-#macro wattr_get(win,a,p,opts)
-	if a then
-		*(a) = (win)->_attrs
-	end if
-	if p then
-		*(p) = cshort(PAIR_NUMBER((win)->_attrs))
-	end if
-#endmacro
+#ifdef __FB_DARWIN__
+	declare function getbkgd(byval win as WINDOW_ ptr) as chtype
+	declare function wattr_set(byval win as WINDOW_ ptr, byval attrs as attr_t, byval color_pair as short, byval opts as any ptr) as long
+	declare function wattr_get(byval win as WINDOW_ ptr, byval attrs as attr_t ptr, byval color_pair as short ptr, byval opts as any ptr) as long
+#else
+	#define getbkgd(win) (win)->_bkgd
+	#define wattr_set(win, a, p, opts) scope : (win)->_attrs = ((a) and (not A_COLOR)) or cast(attr_t, COLOR_PAIR(p)) : end scope
+	#macro wattr_get(win,a,p,opts)
+		if a then
+			*(a) = (win)->_attrs
+		end if
+		if p then
+			*(p) = cshort(PAIR_NUMBER((win)->_attrs))
+		end if
+	#endmacro
+#endif
 declare function vw_printw alias "vwprintw"(byval as WINDOW_ ptr, byval as const zstring ptr, byval as va_list) as long
 declare function vw_scanw alias "vwscanw"(byval as WINDOW_ ptr, byval as zstring ptr, byval as va_list) as long
-#define is_cleared(win) iif((win), (win)->_clear, FALSE)
-#define is_idcok(win) iif((win), (win)->_idcok, FALSE)
-#define is_idlok(win) iif((win), (win)->_idlok, FALSE)
-#define is_immedok(win) iif((win), (win)->_immed, FALSE)
-#define is_keypad(win) iif((win), (win)->_use_keypad, FALSE)
-#define is_leaveok(win) iif((win), (win)->_leaveok, FALSE)
-#define is_nodelay(win) iif((win), -((win)->_delay = 0), FALSE)
-#define is_notimeout(win) iif((win), (win)->_notimeout, FALSE)
-#define is_pad(win) iif((win), -(((win)->_flags and _ISPAD) <> 0), FALSE)
-#define is_scrollok(win) iif((win), (win)->_scroll, FALSE)
-#define is_subwin(win) iif((win), -(((win)->_flags and _SUBWIN) <> 0), FALSE)
-#define is_syncok(win) iif((win), (win)->_sync, FALSE)
-#define wgetparent(win) iif((win), (win)->_parent, 0)
+#ifdef __FB_DARWIN__
+	declare function is_cleared(byval win as const WINDOW_ ptr) as byte
+	declare function is_idcok(byval win as const WINDOW_ ptr) as byte
+	declare function is_idlok(byval win as const WINDOW_ ptr) as byte
+	declare function is_immedok(byval win as const WINDOW_ ptr) as byte
+	declare function is_keypad(byval win as const WINDOW_ ptr) as byte
+	declare function is_leaveok(byval win as const WINDOW_ ptr) as byte
+	declare function is_nodelay(byval win as const WINDOW_ ptr) as byte
+	declare function is_notimeout(byval win as const WINDOW_ ptr) as byte
+	declare function is_pad(byval win as const WINDOW_ ptr) as byte
+	declare function is_scrollok(byval win as const WINDOW_ ptr) as byte
+	declare function is_subwin(byval win as const WINDOW_ ptr) as byte
+	declare function is_syncok(byval win as const WINDOW_ ptr) as byte
+	declare function wgetparent(byval win as const WINDOW_ ptr) as WINDOW_ ptr
+	declare function wgetscrreg(byval win as const WINDOW_ ptr, byval top_row as long ptr, byval bottom_row as long ptr) as long
+#else
+	#define is_cleared(win) iif((win), (win)->_clear, FALSE)
+	#define is_idcok(win) iif((win), (win)->_idcok, FALSE)
+	#define is_idlok(win) iif((win), (win)->_idlok, FALSE)
+	#define is_immedok(win) iif((win), (win)->_immed, FALSE)
+	#define is_keypad(win) iif((win), (win)->_use_keypad, FALSE)
+	#define is_leaveok(win) iif((win), (win)->_leaveok, FALSE)
+	#define is_nodelay(win) iif((win), -((win)->_delay = 0), FALSE)
+	#define is_notimeout(win) iif((win), (win)->_notimeout, FALSE)
+	#define is_pad(win) iif((win), -(((win)->_flags and _ISPAD) <> 0), FALSE)
+	#define is_scrollok(win) iif((win), (win)->_scroll, FALSE)
+	#define is_subwin(win) iif((win), -(((win)->_flags and _SUBWIN) <> 0), FALSE)
+	#define is_syncok(win) iif((win), (win)->_sync, FALSE)
+	#define wgetparent(win) iif((win), (win)->_parent, 0)
 
-private function wgetscrreg(byval win as WINDOW_ ptr, byval t as short ptr, byval b as short ptr) as integer
-	if win then
-		*t = win->_regtop
-		*b = win->_regbottom
-		function = OK
-	else
-		function = ERR_
-	end if
-end function
+	private function wgetscrreg(byval win as WINDOW_ ptr, byval t as short ptr, byval b as short ptr) as integer
+		if win then
+			*t = win->_regtop
+			*b = win->_regbottom
+			function = OK
+		else
+			function = ERR_
+		end if
+	end function
+#endif
 
 extern curscr as WINDOW_ ptr
 extern newscr as WINDOW_ ptr
@@ -816,6 +913,9 @@ declare function mouse_trafo_ alias "mouse_trafo"(byval as long ptr, byval as lo
 #define mouse_trafo(y, x, to_screen) wmouse_trafo(stdscr, y, x, to_screen)
 declare function mcprint(byval as zstring ptr, byval as long) as long
 declare function has_key(byval as long) as long
+#ifndef __FB_DARWIN__
+	'' Apple's system library is the release build and exports none of the
+	'' entry points reserved for the separate ncurses debug library.
 declare sub _tracef(byval as const zstring ptr, ...)
 declare sub _tracedump(byval as const zstring ptr, byval as WINDOW_ ptr)
 declare function _traceattr(byval as attr_t) as zstring ptr
@@ -828,6 +928,7 @@ declare function _tracech_t alias "_tracechtype"(byval as chtype) as zstring ptr
 declare function _tracech_t2 alias "_tracechtype2"(byval as long, byval as chtype) as zstring ptr
 declare function _tracemouse(byval as const MEVENT ptr) as zstring ptr
 declare sub trace(byval as const ulong)
+#endif
 
 const TRACE_DISABLE = &h0000
 const TRACE_TIMES = &h0001
@@ -848,8 +949,14 @@ const TRACE_SHIFT = 13
 const TRACE_MAXIMUM = (1 shl TRACE_SHIFT) - 1
 const NCURSES_UNCTRL_H_incl = 1
 #undef NCURSES_VERSION
-#define NCURSES_VERSION "5.9"
+#ifdef __FB_DARWIN__
+	#define NCURSES_VERSION "6.0"
+#else
+	#define NCURSES_VERSION "5.9"
+#endif
 #undef unctrl
 declare function unctrl(byval as chtype) as zstring ptr
 
 end extern
+
+'' end of curses/ncurses.bi

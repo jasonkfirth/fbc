@@ -44,6 +44,30 @@
 		as ubyte __fpu_state(0 to 108-1)
 	end type
 
+#elseif defined( __FB_DARWIN__ )
+	''
+	'' Darwin defines jmp_buf as an opaque array of C int values.  Its storage
+	'' is deliberately larger than the glibc register structure used below and
+	'' differs between Intel and ARM targets.
+	''
+	#if defined( __FB_64BIT__ ) and defined( __FB_ARM__ )
+		#define _JBLEN 48
+	#elseif defined( __FB_ARM__ )
+		#define _JBLEN 28
+	#elseif defined( __FB_64BIT__ )
+		#define _JBLEN 37
+	#else
+		#define _JBLEN 18
+	#endif
+
+	type jmp_buf
+		__opaque(0 to _JBLEN-1) as long
+	end type
+
+	type sigjmp_buf
+		__opaque(0 to _JBLEN) as long
+	end type
+
 #else
 	#if defined( __FB_RISCV64__ )
 		'' riscv64 glibc
@@ -118,6 +142,14 @@ declare sub longjmp alias "__mingw_longjmp" (byval as jmp_buf ptr, byval as long
 #elseif defined( __FB_WIN32__ )
 declare function setjmp alias "_setjmp" (byval as jmp_buf ptr) as long
 declare sub longjmp (byval as jmp_buf ptr, byval as long)
+#elseif defined( __FB_DARWIN__ )
+declare function setjmp (byval as jmp_buf ptr) as long
+declare sub longjmp (byval as jmp_buf ptr, byval as long)
+declare function _setjmp (byval as jmp_buf ptr) as long
+declare sub _longjmp (byval as jmp_buf ptr, byval as long)
+declare function sigsetjmp (byval as sigjmp_buf ptr, byval as long) as long
+declare sub siglongjmp (byval as sigjmp_buf ptr, byval as long)
+declare sub longjmperror ()
 #else
 declare function setjmp (byval as jmp_buf ptr) as long
 declare sub longjmp (byval as jmp_buf ptr, byval as long)
@@ -126,3 +158,5 @@ declare sub longjmp (byval as jmp_buf ptr, byval as long)
 end extern
 
 #endif
+
+'' end of crt/setjmp.bi

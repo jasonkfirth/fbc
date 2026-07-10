@@ -1,5 +1,5 @@
 ''
-'' simple http-get example for both Windows and Linux
+'' simple http-get example for Windows and Unix-like systems
 ''
 
 #ifdef __FB_WIN32__
@@ -51,13 +51,16 @@ declare sub reportError( byref msg as string )
 
 	'' open socket
 	s = opensocket( AF_INET, SOCK_STREAM, IPPROTO_TCP )
-	if( s = 0 ) then
+	if( s = SOCKET_ERROR ) then
 		reportError( "socket()" )
 		end 1
 	end if
 
 	'' connect to host
 	dim sa as sockaddr_in
+#if defined(__FB_DARWIN__) or defined(__FB_DRAGONFLY__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)
+	sa.sin_len         = sizeof( sa )
+#endif
 	sa.sin_port        = htons( 80 )
 	sa.sin_family      = AF_INET
 	sa.sin_addr.S_addr = ip
@@ -102,7 +105,11 @@ declare sub reportError( byref msg as string )
 	print
 
 	'' close socket
-	shutdown( s, 2 )
+#ifdef __FB_WIN32__
+	shutdown( s, SD_BOTH )
+#else
+	shutdown( s, SHUT_RDWR )
+#endif
 	closesocket( s )
 
 	doShutdown( )
@@ -173,3 +180,5 @@ sub doShutdown( )
 	WSACleanup( )
 #endif
 end sub
+
+'' end of http-get.bas

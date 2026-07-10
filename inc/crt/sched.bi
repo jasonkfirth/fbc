@@ -24,6 +24,10 @@
 
 #pragma once
 
+#ifdef __FB_DARWIN__
+	#include once "crt/darwin/sched.bi"
+#else
+
 #ifndef __FB_UNIX__
 	#error "target not supported; this header is for GNU/Linux glibc"
 #endif
@@ -65,3 +69,7 @@ declare function __clone(byval __fn as function(byval __arg as any ptr) as long,
 declare function __clone2(byval __fn as function(byval __arg as any ptr) as long, byval __child_stack_base as any ptr, byval __child_stack_size as uinteger, byval __flags as long, byval __arg as any ptr, ...) as long
 
 end extern
+
+#endif
+
+'' end of crt/sched.bi
