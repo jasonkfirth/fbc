@@ -1,3 +1,10 @@
+freebasic (1.20.2-13) resolute; urgency=medium
+
+  * Publish the integrated freebasic-android package with the Android NDK
+    dependency required by fbc-android for clean-install APK builds.
+
+ -- FreeBASIC Packagers <packagers@example.invalid>  Tue, 14 Jul 2026 10:40:00 -0400
+
 freebasic (1.20.2-12) resolute; urgency=medium
 
   * Drop explicit bash dependencies from shell-helper packages because bash is

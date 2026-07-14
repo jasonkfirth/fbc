@@ -2,6 +2,21 @@
 
 SUITE( fbc_tests.file_.input_ )
 
+	type FixedStringInputGuard
+		text as string * 4
+		canary as ubyte
+	end type
+
+	type WStringInputGuard
+		text as wstring * 5
+		canary as ubyte
+	end type
+
+	type LongInputGuard
+		value as long
+		canary as ubyte
+	end type
+
 	'' The test data must match the test file's content
 	type DataEntry
 		as zstring * 8 field1
@@ -146,6 +161,54 @@ SUITE( fbc_tests.file_.input_ )
 
 		CU_ASSERT( x.w = wstr( "b" ) )
 		CU_ASSERT( x.i = -1 )
+	END_TEST
+
+	TEST( inputDestinationCanaries )
+		const TESTFILE = "file/input-canaries.tmp"
+
+		scope
+			var f = freefile( )
+			if( open( TESTFILE, for output, as #f ) <> 0 ) then
+				CU_FAIL( "could not create file " & TESTFILE )
+			end if
+
+			write #f, "ABCD", 12345, "WXYZ"
+			close #f
+		end scope
+
+		scope
+			dim as FixedStringInputGuard strguard
+			dim as LongInputGuard longguard
+			dim as WStringInputGuard wstrguard
+
+			strguard.text = "    "
+			strguard.canary = &h5a
+			longguard.value = 0
+			longguard.canary = &h5a
+			wstrguard.text = wstr( "" )
+			wstrguard.canary = &h5a
+
+			CU_ASSERT( cast( ulongint, @strguard.canary ) = cast( ulongint, @strguard.text ) + len( strguard.text ) )
+			CU_ASSERT( cast( ulongint, @longguard.canary ) = cast( ulongint, @longguard.value ) + sizeof( longguard.value ) )
+			CU_ASSERT( cast( ulongint, @wstrguard.canary ) = cast( ulongint, @wstrguard.text ) + sizeof( wstrguard.text ) )
+
+			var f = freefile( )
+			if( open( TESTFILE, for input, as #f ) <> 0 ) then
+				CU_FAIL( "could not open file " & TESTFILE )
+			end if
+
+			input #f, strguard.text, longguard.value, wstrguard.text
+			close #f
+
+			CU_ASSERT( strguard.text = "ABCD" )
+			CU_ASSERT( strguard.canary = &h5a )
+			CU_ASSERT( longguard.value = 12345 )
+			CU_ASSERT( longguard.canary = &h5a )
+			CU_ASSERT( wstrguard.text = wstr( "WXYZ" ) )
+			CU_ASSERT( wstrguard.canary = &h5a )
+		end scope
+
+		CU_ASSERT( kill( TESTFILE ) = 0 )
 	END_TEST
 
 	'' [W]INPUT() function

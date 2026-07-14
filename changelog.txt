@@ -18,6 +18,8 @@ Version 1.20.2
 - tests: added generated-C object logs and smoke sources for NuttX, RISC-V 32-bit compiler coverage, preprocessor recursion coverage, device protocol coverage, directory runtime coverage, and target-specific argv behavior.
 
 [fixed]
+- gfxlib2/NuttX/RP2350: stabilized Waveshare RP2350-PiZero DVI scanout with a three-buffer SRAM encoder, core-1 timer isolation, and a guarded fast path for the DVI DMA interrupt; preserved 8-bit palette shades and kept demo input and register diagnostics from disrupting active scanout.
+- rtlib/file: fixed binary GET # into fixed-length STRING*N destinations to avoid writing a terminating NUL past the fixed buffer, and added file IO canary coverage across GET #, INPUT #, and LINE INPUT # destinations.
 - rtlib/NuttX: made board-test stdout/status output use a small direct stdout writer for print, spacing, tab, beep, and newline paths, avoiding serial stdio/flush stalls seen while running ESP32-P4 loadable-module tests.
 - rtlib/NuttX: added local floor/floorf/sqrt/sqrtf/NaN helpers and kept generated floating-to-integer conversion on the NuttX nearbyint shim, avoiding NuttX/libm module hangs in math-heavy examples.
 - NuttX patches: hardened RISC-V loadable-module relocations by replacing S-type RELA immediates instead of adding encoded offsets, and by masking low immediates through unsigned 12-bit fields for negative LO12 encodings.

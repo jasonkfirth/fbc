@@ -2,6 +2,16 @@
 
 SUITE( fbc_tests.file_.line_input )
 
+	type FixedStringLineInputGuard
+		text as string * 4
+		canary as ubyte
+	end type
+
+	type WStringLineInputGuard
+		text as wstring * 5
+		canary as ubyte
+	end type
+
 	TEST( bigList )
 		'' FB should be able to read in big-list.txt line by line using Line Input.
 		'' All 3349 lines of that file should be read.
@@ -30,6 +40,50 @@ SUITE( fbc_tests.file_.line_input )
 		CU_ASSERT( lines = 3349 )
 
 		close #f
+	END_TEST
+
+	TEST( lineInputDestinationCanaries )
+		const TESTFILE = "file/line-input-canaries.tmp"
+
+		scope
+			var f = freefile( )
+			if( open( TESTFILE, for output, as #f ) <> 0 ) then
+				CU_FAIL( "could not create file " & TESTFILE )
+			end if
+
+			print #f, "ABCD"
+			print #f, "WXYZ"
+			close #f
+		end scope
+
+		scope
+			dim as FixedStringLineInputGuard strguard
+			dim as WStringLineInputGuard wstrguard
+
+			strguard.text = "    "
+			strguard.canary = &h5a
+			wstrguard.text = wstr( "" )
+			wstrguard.canary = &h5a
+
+			CU_ASSERT( cast( ulongint, @strguard.canary ) = cast( ulongint, @strguard.text ) + len( strguard.text ) )
+			CU_ASSERT( cast( ulongint, @wstrguard.canary ) = cast( ulongint, @wstrguard.text ) + sizeof( wstrguard.text ) )
+
+			var f = freefile( )
+			if( open( TESTFILE, for input, as #f ) <> 0 ) then
+				CU_FAIL( "could not open file " & TESTFILE )
+			end if
+
+			line input #f, strguard.text
+			line input #f, wstrguard.text
+			close #f
+
+			CU_ASSERT( strguard.text = "ABCD" )
+			CU_ASSERT( strguard.canary = &h5a )
+			CU_ASSERT( wstrguard.text = wstr( "WXYZ" ) )
+			CU_ASSERT( wstrguard.canary = &h5a )
+		end scope
+
+		CU_ASSERT( kill( TESTFILE ) = 0 )
 	END_TEST
 
 END_SUITE

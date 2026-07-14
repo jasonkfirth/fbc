@@ -70,7 +70,7 @@ print "FreeBASIC NuttX"
 locate 7, 6
 print "RP2350 DVI demo"
 locate 10, 6
-print "Press Q or Esc"
+print "Press Q to exit"
 
 do
     key_text = inkey$
@@ -79,7 +79,7 @@ loop while len(key_text) > 0
 do
     sleep 25
     key_text = inkey$
-loop while (key_text <> "q") and (key_text <> "Q") and (key_text <> chr$(27))
+loop while (key_text <> "q") and (key_text <> "Q")
 
 screen 0
 print "FB_NUTTX_GFX_DEMO_OK"

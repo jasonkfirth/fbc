@@ -5,6 +5,7 @@
 int fb_FileGetStrEx( FB_FILE *handle, fb_off_t pos, void *str, ssize_t str_len, size_t *bytesread )
 {
     int res;
+    int is_fixed_len;
     size_t len;
 	char *data;
 
@@ -15,12 +16,20 @@ int fb_FileGetStrEx( FB_FILE *handle, fb_off_t pos, void *str, ssize_t str_len, 
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
     /* get string len */
+	is_fixed_len = (str_len != FB_STRSIZEVARLEN) &&
+	               ((str_len & FB_STRISFIXED) != 0);
 	FB_STRSETUP_DYN( str, str_len, data, len );
 
 	/* perform call ... but only if there's data ... */
     if( (data != NULL) && (len > 0) ) {
         res = fb_FileGetDataEx( handle, pos, data, len, &len, TRUE, FALSE );
-        data[len] = 0;                                /* add the null-term */
+        /*
+         * Fixed-length STRING*N buffers do not have a spare byte for a
+         * terminating NUL.  Other string destinations are descriptor or
+         * ZSTRING-backed and still need the terminator maintained.
+         */
+        if( !is_fixed_len )
+            data[len] = 0;                        /* add the null-term */
     } else {
 		/* no/empty destination string */
 		res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );

@@ -184,6 +184,7 @@ write_sha256sums() {
 			-o -name 'freebasic*.ddeb' \
 			-o -name 'freebasic*.rpm' \
 			-o -name 'freebasic*.apk' \
+			-o -name 'freebasic*.tar.xz' \
 			-o -name 'freebasic*.txz' \
 			-o -name 'freebasic*.tgz' \
 			-o -name 'freebasic*.pkg' \
@@ -300,6 +301,7 @@ Examples:
     sh install-freebasic-debian.sh --release trixie --arch amd64
     sh install-freebasic-alpine.sh --release 3.23 --arch x86_64
     sh install-freebasic-fedora.sh --release 44 --arch x86_64
+    sh install-freebasic-macos.sh --arch arm64
 
 Override the repository root while testing:
 
@@ -337,6 +339,7 @@ main() {
 			-o -name 'freebasic*.ddeb' \
 			-o -name 'freebasic*.rpm' \
 			-o -name 'freebasic*.apk' \
+			-o -name 'freebasic*.tar.xz' \
 			-o -name 'freebasic*.txz' \
 			-o -name 'freebasic*.tgz' \
 			-o -name 'freebasic*.pkg' \

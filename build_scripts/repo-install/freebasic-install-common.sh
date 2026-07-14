@@ -91,6 +91,13 @@ fb_detect_arch() {
 		*) uname -m ;;
 		esac
 		;;
+	macos)
+		case "$(uname -m)" in
+		arm64|aarch64) printf '%s\n' "arm64" ;;
+		x86_64|amd64) printf '%s\n' "x86_64" ;;
+		*) uname -m ;;
+		esac
+		;;
 	freebsd|dragonfly|openbsd|netbsd|haiku)
 		case "$(uname -m)" in
 		x86_64|amd64) printf '%s\n' "x86-64" ;;
@@ -110,6 +117,9 @@ fb_package_url() {
 		;;
 	freebsd|dragonfly|openbsd|netbsd|haiku)
 		printf '%s/%s/%s\n' "$repo_base" "$distro" "$arch"
+		;;
+	macos)
+		printf '%s/macos/%s\n' "$repo_base" "$arch"
 		;;
 	*)
 		fb_die "unsupported package family: $family"
@@ -154,7 +164,7 @@ fb_download_remote_package() {
 	if command -v sha256sum >/dev/null 2>&1; then
 		(
 			cd "$tmpdir"
-			grep "[[:space:]]\\*\\{0,1\\}$name\$" SHA256SUMS | sha256sum -c -
+			grep "[[:space:]]\\*\\{0,1\\}$name\$" SHA256SUMS | sha256sum -c - >&2
 		)
 	fi
 
@@ -219,7 +229,7 @@ EOF"
 	fi
 
 	tmpdir="$(fb_make_temp_dir)"
-	pkg="$(fb_download_remote_package "$repo_url" 'freebasic.*\.rpm$' "$tmpdir")"
+	pkg="$(fb_download_remote_package "$repo_url" 'freebasic.*[.]rpm$' "$tmpdir")"
 	if command -v rpm >/dev/null 2>&1; then
 		fb_run_root rpm -Uvh --replacepkgs "$pkg"
 	else
@@ -238,14 +248,14 @@ fb_install_apk() {
 		fb_run_root apk add --allow-untrusted freebasic && return
 
 		tmpdir="$(fb_make_temp_dir)"
-		pkg="$(fb_download_remote_package "$repo_url" 'freebasic.*\.apk$' "$tmpdir")"
+		pkg="$(fb_download_remote_package "$repo_url" 'freebasic.*[.]apk$' "$tmpdir")"
 		fb_run_root apk add --allow-untrusted "$pkg"
 	fi
 }
 
 fb_install_slackware() {
 	tmpdir="$(fb_make_temp_dir)"
-	pkg="$(fb_download_remote_package "$repo_url" 'freebasic.*\.txz$' "$tmpdir")"
+	pkg="$(fb_download_remote_package "$repo_url" 'freebasic.*[.]txz$' "$tmpdir")"
 
 	[ "$skip_install" -ne 0 ] || fb_run_root installpkg "$pkg"
 }
@@ -277,13 +287,27 @@ fb_install_pkg_add() {
 
 fb_install_haiku() {
 	tmpdir="$(fb_make_temp_dir)"
-	pkg="$(fb_download_remote_package "$repo_url" 'freebasic.*\.hpkg$' "$tmpdir")"
+	pkg="$(fb_download_remote_package "$repo_url" 'freebasic.*[.]hpkg$' "$tmpdir")"
 
 	[ "$skip_install" -ne 0 ] || pkgman install -y "$pkg"
 }
 
+fb_install_macos() {
+	tmpdir="$(fb_make_temp_dir)"
+	pkg="$(fb_download_remote_package "$repo_url" 'freebasic.*[.]pkg$' "$tmpdir")"
+
+	if [ "$skip_install" -ne 0 ]; then
+		return
+	fi
+
+	command -v installer >/dev/null 2>&1 || fb_die "macOS installer tool was not found"
+	fb_run_root installer -pkg "$pkg" -target /
+}
+
 fb_verify() {
-	[ "$skip_verify" -eq 0 ] || return
+	if [ "$skip_verify" -ne 0 ]; then
+		return 0
+	fi
 
 	if command -v fbc >/dev/null 2>&1; then
 		fbc -version
@@ -342,11 +366,12 @@ EOF
 	rpm) fb_install_rpm ;;
 	apk) fb_install_apk ;;
 	slackware) fb_install_slackware ;;
-	freebsd) fb_install_pkg 'freebasic.*\.pkg$' ;;
-	dragonfly) fb_install_pkg 'freebasic.*\.pkg$' ;;
-	openbsd) fb_install_pkg_add 'freebasic.*\.tgz$' ;;
-	netbsd) fb_install_pkg_add 'freebasic.*\.tgz$' ;;
+	freebsd) fb_install_pkg 'freebasic.*[.]pkg$' ;;
+	dragonfly) fb_install_pkg 'freebasic.*[.]pkg$' ;;
+	openbsd) fb_install_pkg_add 'freebasic.*[.]tgz$' ;;
+	netbsd) fb_install_pkg_add 'freebasic.*[.]tgz$' ;;
 	haiku) fb_install_haiku ;;
+	macos) fb_install_macos ;;
 	*) fb_die "unsupported package family: $family" ;;
 	esac
 

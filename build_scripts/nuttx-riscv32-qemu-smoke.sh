@@ -162,7 +162,9 @@ EOF
         fi
     fi
 
-    command -v riscv64-unknown-elf-gcc >/dev/null 2>&1 || return
+    # RP2350 containers commonly mount an xPack riscv-none-elf toolchain.
+    # The optional riscv64-prefixed header probe is not required there.
+    command -v riscv64-unknown-elf-gcc >/dev/null 2>&1 || return 0
 
     if printf '#include <sys/lock.h>\n' |
         riscv64-unknown-elf-gcc -x c -E - >/dev/null 2>&1; then
@@ -181,6 +183,8 @@ EOF
         echo "==> using picolibc headers: $candidate"
         return
     done
+
+    return 0
 }
 
 config_has_line() {
@@ -481,7 +485,7 @@ USE_GENERIC_STR_BASE="${FB_NUTTX_USE_GENERIC_STR_BASE:-1}"
 USE_GENERIC_STR_FILL="${FB_NUTTX_USE_GENERIC_STR_FILL:-1}"
 USE_GENERIC_STR_EXTRA="${FB_NUTTX_USE_GENERIC_STR_EXTRA:-1}"
 USE_GENERIC_WSTRING="${FB_NUTTX_USE_GENERIC_WSTRING:-1}"
-USE_GENERIC_ASSERT="${FB_NUTTX_USE_GENERIC_ASSERT:-0}"
+USE_GENERIC_ASSERT="${FB_NUTTX_USE_GENERIC_ASSERT:-1}"
 LOCAL_GENERATED_SYMBOLS=0
 NUTTX_CONFIG="${NUTTX_CONFIG:-rv-virt:nsh}"
 SKIP_NUTTX_CONFIG=0
@@ -2716,6 +2720,18 @@ EOF
 KCONFIG_LINE="source \"$APP_DIR/Kconfig\""
 KCONFIG_TMP="$WORK_DIR/examples.Kconfig"
 
+if [ ! -f "$APPS_DIR/examples/Kconfig" ]; then
+    #
+    # apps_distclean removes generated Kconfig indexes.  The temporary app is
+    # staged before NuttX configure runs, so rebuild the Examples index here
+    # instead of requiring an earlier build to have left one behind.
+    #
+    (
+        cd "$APPS_DIR/examples"
+        "$APPS_DIR/tools/mkkconfig.sh" -m Examples
+    )
+fi
+
 awk -v line="$KCONFIG_LINE" \
     -v old_apps="$FB_NUTTX_KCONFIG_OLD_APPS" '
     BEGIN {
@@ -2808,6 +2824,17 @@ if [ "$REUSE_CONFIG" -eq 0 ] && [ "$SKIP_NUTTX_CONFIG" -eq 0 ]; then
     run ./tools/configure.sh "$NUTTX_CONFIG"
 fi
 
+if [ -f "$NUTTX_DIR/openamp/libmetal/lib/system/nuttx/io.c" ]; then
+    #
+    # configure.sh materializes NuttX's OpenAMP/libmetal dependency.  Current
+    # libmetal calls address-environment hooks even for flat rv-virt builds,
+    # where physical and virtual addresses are identical and those optional
+    # hooks do not exist.
+    #
+    apply_nuttx_patch_if_needed \
+        "$ROOT/build_scripts/nuttx-patches/openamp-nuttx-flat-address-identity.patch"
+fi
+
 #
 # Interrupted or relocated NuttX builds can leave generated dependency files
 # behind that refer to stale .ddc fragments or package-cache include paths.
@@ -2864,6 +2891,11 @@ if [ "$REUSE_CONFIG" -eq 0 ]; then
     run kconfig-tweak --enable CONFIG_LIBM
 
     run kconfig-tweak --enable CONFIG_FS_TMPFS
+
+    if [ "$USES_SFX" -eq 1 ]; then
+        # sfxlib nests its runtime lock during lazy/core/driver setup.
+        run kconfig-tweak --enable CONFIG_PTHREAD_MUTEX_TYPES
+    fi
 
     if [ "$QEMU_STORAGE_BACKEND" = "virtio-blk" ]; then
         run kconfig-tweak --enable CONFIG_DRIVERS_VIRTIO
@@ -3006,6 +3038,11 @@ config.write_text(text)
 PY
         yes "" | make olddefconfig >/dev/null || true
     fi
+fi
+
+if [ "$USES_SFX" -eq 1 ] &&
+   ! config_has_line "CONFIG_PTHREAD_MUTEX_TYPES=y"; then
+    die "NuttX sfxlib requires CONFIG_PTHREAD_MUTEX_TYPES=y"
 fi
 
 if [ "$LOADABLE_MODULE" -eq 1 ]; then

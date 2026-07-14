@@ -3,6 +3,31 @@
 
 SUITE( fbc_tests.file_.get_ )
 
+	type FixedStringGuard
+		text as string * 4
+		canary as ubyte
+	end type
+
+	type ZStringGuard
+		text as zstring * 5
+		canary as ubyte
+	end type
+
+	type WStringGuard
+		text as wstring * 5
+		canary as ubyte
+	end type
+
+	type LongGuard
+		value as long
+		canary as ubyte
+	end type
+
+	type DoubleGuard
+		value as double
+		canary as ubyte
+	end type
+
 	TEST( allTypes )
 		const TESTFILE = "data/123.txt"
 
@@ -456,6 +481,189 @@ SUITE( fbc_tests.file_.get_ )
 		deallocate( pw6 )
 		deallocate( pz6 )
 		close #f
+	END_TEST
+
+	TEST( fixLenStringNoTerminatorOverflow )
+		const TESTFILE = "file/get-fixstr.tmp"
+
+		scope
+			var f = freefile( )
+			if( open( TESTFILE, for binary, access write, as #f ) <> 0 ) then
+				CU_FAIL( "could not create file " & TESTFILE )
+			end if
+
+			put #f, , "JRPG"
+			close #f
+		end scope
+
+		scope
+			var f = freefile( )
+			dim as FixedStringGuard guard
+			guard.text = "    "
+			guard.canary = &h5a
+
+			CU_ASSERT( sizeof( FixedStringGuard ) = 5 )
+			CU_ASSERT( cast( ulongint, @guard.canary ) = cast( ulongint, @guard.text ) + len( guard.text ) )
+
+			if( open( TESTFILE, for binary, access read, as #f ) <> 0 ) then
+				CU_FAIL( "could not open file " & TESTFILE )
+			end if
+
+			CU_ASSERT( get( #f, , guard.text ) = 0 )
+			close #f
+
+			CU_ASSERT( guard.text = "JRPG" )
+			CU_ASSERT( guard.canary = &h5a )
+		end scope
+
+		scope
+			var f = freefile( )
+			dim as FixedStringGuard guard
+			dim as integer bytesread
+			guard.text = "    "
+			guard.canary = &h5a
+
+			if( open( TESTFILE, for binary, access read, as #f ) <> 0 ) then
+				CU_FAIL( "could not open file " & TESTFILE )
+			end if
+
+			CU_ASSERT( get( #f, 1, guard.text, , bytesread ) = 0 )
+			close #f
+
+			CU_ASSERT( bytesread = 4 )
+			CU_ASSERT( guard.text = "JRPG" )
+			CU_ASSERT( guard.canary = &h5a )
+		end scope
+
+		scope
+			var f = freefile( )
+			dim as FixedStringGuard guard
+			guard.text = "    "
+			guard.canary = &h5a
+
+			if( open( TESTFILE, for binary, access read, as #f ) <> 0 ) then
+				CU_FAIL( "could not open file " & TESTFILE )
+			end if
+
+			CU_ASSERT( get( #f, 1ll, guard.text ) = 0 )
+			close #f
+
+			CU_ASSERT( guard.text = "JRPG" )
+			CU_ASSERT( guard.canary = &h5a )
+		end scope
+
+		scope
+			var f = freefile( )
+			dim as FixedStringGuard guard
+			dim as integer bytesread
+			guard.text = "    "
+			guard.canary = &h5a
+
+			if( open( TESTFILE, for binary, access read, as #f ) <> 0 ) then
+				CU_FAIL( "could not open file " & TESTFILE )
+			end if
+
+			CU_ASSERT( get( #f, 1ll, guard.text, , bytesread ) = 0 )
+			close #f
+
+			CU_ASSERT( bytesread = 4 )
+			CU_ASSERT( guard.text = "JRPG" )
+			CU_ASSERT( guard.canary = &h5a )
+		end scope
+
+		CU_ASSERT( kill( TESTFILE ) = 0 )
+	END_TEST
+
+	TEST( getDestinationCanaries )
+		const TESTFILE = "file/get-canaries.tmp"
+
+		scope
+			var f = freefile( )
+			dim as string payload = "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345"
+
+			if( open( TESTFILE, for binary, access write, as #f ) <> 0 ) then
+				CU_FAIL( "could not create file " & TESTFILE )
+			end if
+
+			put #f, , payload
+			close #f
+		end scope
+
+		scope
+			var f = freefile( )
+			dim as ZStringGuard guard
+			guard.text = ""
+			guard.canary = &h5a
+
+			CU_ASSERT( cast( ulongint, @guard.canary ) = cast( ulongint, @guard.text ) + sizeof( guard.text ) )
+
+			if( open( TESTFILE, for binary, access read, as #f ) <> 0 ) then
+				CU_FAIL( "could not open file " & TESTFILE )
+			end if
+
+			CU_ASSERT( get( #f, 1, guard.text ) = 0 )
+			close #f
+
+			CU_ASSERT( guard.text = "ABCD" )
+			CU_ASSERT( guard.canary = &h5a )
+		end scope
+
+		scope
+			var f = freefile( )
+			dim as WStringGuard guard
+			guard.text = wstr( "" )
+			guard.canary = &h5a
+
+			CU_ASSERT( cast( ulongint, @guard.canary ) = cast( ulongint, @guard.text ) + sizeof( guard.text ) )
+
+			if( open( TESTFILE, for binary, access read, as #f ) <> 0 ) then
+				CU_FAIL( "could not open file " & TESTFILE )
+			end if
+
+			CU_ASSERT( get( #f, 1, guard.text ) = 0 )
+			close #f
+
+			CU_ASSERT( guard.canary = &h5a )
+		end scope
+
+		scope
+			var f = freefile( )
+			dim as LongGuard guard
+			guard.value = 0
+			guard.canary = &h5a
+
+			CU_ASSERT( cast( ulongint, @guard.canary ) = cast( ulongint, @guard.value ) + sizeof( guard.value ) )
+
+			if( open( TESTFILE, for binary, access read, as #f ) <> 0 ) then
+				CU_FAIL( "could not open file " & TESTFILE )
+			end if
+
+			CU_ASSERT( get( #f, 1, guard.value ) = 0 )
+			close #f
+
+			CU_ASSERT( guard.value = cvl( "ABCD" ) )
+			CU_ASSERT( guard.canary = &h5a )
+		end scope
+
+		scope
+			var f = freefile( )
+			dim as DoubleGuard guard
+			guard.value = 0.0
+			guard.canary = &h5a
+
+			CU_ASSERT( cast( ulongint, @guard.canary ) = cast( ulongint, @guard.value ) + sizeof( guard.value ) )
+
+			if( open( TESTFILE, for binary, access read, as #f ) <> 0 ) then
+				CU_FAIL( "could not open file " & TESTFILE )
+			end if
+
+			CU_ASSERT( get( #f, 1, guard.value ) = 0 )
+			close #f
+
+			CU_ASSERT( guard.canary = &h5a )
+		end scope
+
+		CU_ASSERT( kill( TESTFILE ) = 0 )
 	END_TEST
 
 	TEST( getWstrFill )

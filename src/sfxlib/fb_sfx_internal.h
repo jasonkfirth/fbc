@@ -129,6 +129,7 @@ int fb_sfxEnsureInit(void);
     defined(__DragonFly__) || \
     defined(__sun) || \
     defined(__HAIKU__) || \
+    defined(__NuttX__) || \
     defined(HOST_XBOX) || \
     defined(HOST_WII)
 #define FB_SFX_MT_ENABLED 1

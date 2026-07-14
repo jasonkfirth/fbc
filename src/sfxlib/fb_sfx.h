@@ -76,6 +76,13 @@ typedef SFXDRIVER FB_SFX_DRIVER;
 */
 #if defined(__DJGPP__)
 #define FB_SFX_DEFAULT_BUFFER    32768
+#elif defined(__NuttX__)
+/*
+    NuttX targets include SRAM-limited microcontrollers.  A 4096-frame block
+    still gives the background worker about 93 ms of stereo PCM while keeping
+    the mix buffer and its two-block output queue within a practical budget.
+*/
+#define FB_SFX_DEFAULT_BUFFER    4096
 #else
 #define FB_SFX_DEFAULT_BUFFER    8192
 #endif
@@ -112,7 +119,12 @@ typedef SFXDRIVER FB_SFX_DRIVER;
 /* Ring buffer sizes                                                         */
 /* ------------------------------------------------------------------------- */
 
+#if defined(__NuttX__)
+/* NuttX has no sfxlib capture backend yet, so do not reserve 128 KB for it. */
+#define FB_SFX_CAPTURE_BUFFER  4096
+#else
 #define FB_SFX_CAPTURE_BUFFER  65536
+#endif
 
 
 /* ------------------------------------------------------------------------- */

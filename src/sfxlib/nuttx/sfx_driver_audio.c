@@ -50,7 +50,19 @@
 
 #define FB_SFX_NUTTX_MAX_BUFFERS 4
 #define FB_SFX_NUTTX_MIN_BUFFER_BYTES 512
-#define FB_SFX_NUTTX_DEFAULT_DEVICE "/dev/audio/pcm0p"
+#define FB_SFX_NUTTX_DEFAULT_DEVICE "/dev/audio/pcm0"
+#define FB_SFX_NUTTX_SIM_DEVICE "/dev/audio/pcm0p"
+
+#ifndef CONFIG_AUDIO_BUFFER_NUMBYTES
+#define CONFIG_AUDIO_BUFFER_NUMBYTES 8192
+#endif
+
+#ifndef CONFIG_AUDIO_NUM_BUFFERS
+#define CONFIG_AUDIO_NUM_BUFFERS 2
+#endif
+
+int fb_sfxNuttXWorkerStart(int buffer_frames);
+void fb_sfxNuttXWorkerStop(void);
 
 /* ------------------------------------------------------------------------- */
 /* Driver state                                                              */
@@ -80,15 +92,38 @@ static unsigned int g_nuttx_audio_write_count = 0;
 /* ------------------------------------------------------------------------- */
 
 #ifdef CONFIG_AUDIO
-static const char *nuttx_audio_device_path(void)
+static int nuttx_audio_open_device(const char **opened_path)
 {
     const char *path;
+    int fd;
 
     path = getenv("FB_SFX_NUTTX_AUDIO_DEVICE");
     if ((path != NULL) && (*path != '\0'))
-        return path;
+    {
+        *opened_path = path;
+        return open(path, O_RDWR | O_CLOEXEC);
+    }
 
-    return FB_SFX_NUTTX_DEFAULT_DEVICE;
+    /*
+        RP23xx and ESP board bring-up code normally registers playback as
+        /dev/audio/pcm0. The NuttX simulator and virtio-sound path use the
+        direction-suffixed /dev/audio/pcm0p name instead. Probe the hardware
+        convention first without making emulator tests configure an override.
+    */
+    path = FB_SFX_NUTTX_DEFAULT_DEVICE;
+    fd = open(path, O_RDWR | O_CLOEXEC);
+
+    if (fd >= 0)
+    {
+        *opened_path = path;
+        return fd;
+    }
+
+    path = FB_SFX_NUTTX_SIM_DEVICE;
+    fd = open(path, O_RDWR | O_CLOEXEC);
+    *opened_path = path;
+
+    return fd;
 }
 
 static int nuttx_audio_keep_open_on_exit(void)
@@ -165,7 +200,6 @@ static void nuttx_audio_poll_messages(void)
 {
     struct audio_msg_s msg;
     unsigned int prio;
-    ssize_t nread;
     int i;
 
     if (g_nuttx_audio_mq == (mqd_t)-1)
@@ -173,6 +207,8 @@ static void nuttx_audio_poll_messages(void)
 
     for (;;)
     {
+        ssize_t nread;
+
         nread = mq_receive(g_nuttx_audio_mq, (char *)&msg,
             sizeof(msg), &prio);
         if (nread != sizeof(msg))
@@ -253,8 +289,19 @@ static int nuttx_audio_alloc_buffers(int fd)
     int i;
 
     memset(&info, 0, sizeof(info));
-    if (ioctl(fd, AUDIOIOC_GETBUFFERINFO, (unsigned long)(uintptr_t)&info) < 0)
-        return -1;
+    if (ioctl(fd, AUDIOIOC_GETBUFFERINFO,
+        (unsigned long)(uintptr_t)&info) < 0)
+    {
+        /*
+            NuttX's generic RP23xx audio-I2S lower half allocates pipeline
+            buffers but does not currently answer AUDIOIOC_GETBUFFERINFO.
+            The upper-half Kconfig values are the documented fallback for
+            drivers that do not provide device-specific buffer geometry.
+        */
+
+        info.buffer_size = CONFIG_AUDIO_BUFFER_NUMBYTES;
+        info.nbuffers = CONFIG_AUDIO_NUM_BUFFERS;
+    }
 
     if (info.buffer_size < FB_SFX_NUTTX_MIN_BUFFER_BYTES)
         return -1;
@@ -353,6 +400,8 @@ static int nuttx_audio_enqueue(FB_SFX_NUTTX_BUFFER *buffer, int bytes)
 /* Driver lifecycle                                                          */
 /* ------------------------------------------------------------------------- */
 
+static void nuttx_audio_exit(void);
+
 static int nuttx_audio_init(int rate, int channels, int buffer, int flags)
 {
 #ifdef CONFIG_AUDIO
@@ -360,7 +409,6 @@ static int nuttx_audio_init(int rate, int channels, int buffer, int flags)
     int fd;
     int mq_messages;
 
-    (void)buffer;
     (void)flags;
 
     if (g_nuttx_audio_fd >= 0)
@@ -372,8 +420,8 @@ static int nuttx_audio_init(int rate, int channels, int buffer, int flags)
     if ((g_nuttx_audio_channels <= 0) || (g_nuttx_audio_channels > 2))
         return -1;
 
-    path = nuttx_audio_device_path();
-    fd = open(path, O_RDWR | O_CLOEXEC);
+    path = NULL;
+    fd = nuttx_audio_open_device(&path);
     if (fd < 0)
         return -1;
 
@@ -415,6 +463,12 @@ static int nuttx_audio_init(int rate, int channels, int buffer, int flags)
     g_nuttx_audio_started = 0;
     g_nuttx_audio_write_count = 0;
 
+    if (fb_sfxNuttXWorkerStart(buffer) != 0)
+    {
+        nuttx_audio_exit();
+        return -1;
+    }
+
     printf("FB_NUTTX_QEMU_SFX_AUDIO_OPEN device=%s buffers=%d rate=%d channels=%d\n",
         path, g_nuttx_audio_buffer_count, g_nuttx_audio_rate,
         g_nuttx_audio_channels);
@@ -433,6 +487,8 @@ static int nuttx_audio_init(int rate, int channels, int buffer, int flags)
 
 static void nuttx_audio_exit(void)
 {
+    fb_sfxNuttXWorkerStop();
+
 #ifdef CONFIG_AUDIO
     if (g_nuttx_audio_fd < 0)
         return;
@@ -525,9 +581,12 @@ static int nuttx_audio_write(const float *samples, int frames)
     fb_sfxDriverDiagnostics("NuttX audio", samples, accepted_frames,
         g_nuttx_audio_channels);
 
-    printf("FB_NUTTX_QEMU_SFX_AUDIO_ENQUEUE write=%u frames=%d bytes=%d\n",
-        g_nuttx_audio_write_count, accepted_frames, bytes);
-    fflush(stdout);
+    if (g_nuttx_audio_write_count == 1)
+    {
+        printf("FB_NUTTX_QEMU_SFX_AUDIO_ENQUEUE write=%u frames=%d bytes=%d\n",
+            g_nuttx_audio_write_count, accepted_frames, bytes);
+        fflush(stdout);
+    }
 
     return accepted_frames;
 #else
@@ -550,7 +609,7 @@ static int nuttx_audio_device_list(void)
 const FB_SFX_DRIVER fb_sfxDriverNuttXAudio =
 {
     "NuttX audio",
-    FB_SFX_DRIVER_CAP_BLOCKING,
+    FB_SFX_DRIVER_CAP_BACKGROUND,
     nuttx_audio_init,
     nuttx_audio_exit,
     nuttx_audio_write,

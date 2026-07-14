@@ -14,7 +14,7 @@
         - register a NuttX driver with the normal gfxlib2 driver list
         - accept low-memory paletted framebuffer modes
         - keep framebuffer ownership and drawing commands in generic gfxlib2
-        - provide safe presentation hooks until a board scanout exists
+        - connect the generic framebuffer to the RP2350 DVI scanout backend
         - feed gfxlib2 input from NuttX USB HID devices when available
 
     This file intentionally does NOT contain:
@@ -30,9 +30,9 @@
         backend is the set of low-memory paletted modes whose current gfxlib2
         framebuffer storage fits inside the SCREEN 13 budget: 64,000 bytes per
         page.  The generic gfxlib2 core already owns the framebuffer pages,
-        dirty lines, palette arrays, and drawing commands. This driver is only
-        the platform edge where a later RP2350 HDMI or board framebuffer path
-        can copy dirty lines to hardware.
+        dirty lines, palette arrays, and drawing commands. This driver is the
+        platform edge that forwards presentation and palette changes to the
+        board-specific RP2350 DVI scanout implementation.
 */
 
 #include "../fb_gfx.h"
@@ -104,6 +104,8 @@ extern int fb_nuttx_dvi_start(void);
 extern void fb_nuttx_dvi_set_palette(int index, unsigned int rgb);
 extern void fb_nuttx_dvi_present(void);
 extern void fb_nuttx_dvi_blank(void);
+extern void fb_nuttx_dvi_framebuffer_lock(void);
+extern void fb_nuttx_dvi_framebuffer_unlock(void);
 
 static int clamp_int(int value, int low, int high)
 {
@@ -522,6 +524,8 @@ static int driver_init(char *title, int w, int h, int depth,
 
 static void driver_exit(void)
 {
+    fb_nuttx_dvi_framebuffer_lock();
+
     if (nuttx_dvi_ready)
         fb_nuttx_dvi_blank();
 
@@ -529,21 +533,25 @@ static void driver_exit(void)
     driver_restore_stdin();
     nuttx_dvi_ready = FALSE;
     nuttx_active = FALSE;
+    fb_nuttx_dvi_framebuffer_unlock();
 }
 
 static void driver_lock(void)
 {
+    fb_nuttx_dvi_framebuffer_lock();
 }
 
 static void driver_unlock(void)
 {
-    if (!nuttx_active || (__fb_gfx == NULL))
+    if (!nuttx_active || (__fb_gfx == NULL)) {
+        fb_nuttx_dvi_framebuffer_unlock();
         return;
+    }
 
     /*
-        A hardware backend belongs here later.  For now, dirty lines are marked
-        clean so programs that draw many frames do not accumulate stale work in
-        the software-only smoke configuration.
+        The RP2350 encoder reads the framebuffer directly on core 1.  Clear
+        gfxlib's dirty markers after drawing while continuous scanout samples
+        the current framebuffer contents.
     */
     if (__fb_gfx->dirty)
         fb_hMemSet(__fb_gfx->dirty, FALSE,
@@ -555,6 +563,8 @@ static void driver_unlock(void)
 
     if (nuttx_dvi_ready)
         fb_nuttx_dvi_present();
+
+    fb_nuttx_dvi_framebuffer_unlock();
 }
 
 static void driver_set_palette(int index, int r, int g, int b)
@@ -566,9 +576,11 @@ static void driver_set_palette(int index, int r, int g, int b)
     if ((index < 0) || (index >= 256))
         return;
 
-    red = (unsigned int)((r < 0) ? 0 : ((r > 63) ? 255 : ((r * 255) / 63)));
-    green = (unsigned int)((g < 0) ? 0 : ((g > 63) ? 255 : ((g * 255) / 63)));
-    blue = (unsigned int)((b < 0) ? 0 : ((b > 63) ? 255 : ((b * 255) / 63)));
+    /* gfxlib's driver interface already supplies 8-bit RGB components. */
+
+    red = (unsigned int)clamp_int(r, 0, 255);
+    green = (unsigned int)clamp_int(g, 0, 255);
+    blue = (unsigned int)clamp_int(b, 0, 255);
 
     nuttx_palette[index] = (red << 16) | (green << 8) | blue;
 
