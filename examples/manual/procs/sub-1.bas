@@ -17,7 +17,7 @@ End Sub
    PrintColoredText( 2, "green" )
    PrintColoredText( 4, "red" )
    Print
-   
+
    Dim i As Integer
    For i = 0 To 15                        '' all 16 colors
 	  PrintColoredText( i, ("color " & i) )

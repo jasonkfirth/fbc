@@ -201,7 +201,7 @@ private sub  CastShadow(byval o as glObject ptr, byval lp as single ptr)
 					v2.x = (o->points(p2).x - lp[0])*100
 					v2.y = (o->points(p2).y - lp[1])*100
 					v2.z = (o->points(p2).z - lp[2])*100
-					
+
 					'' draw the polygon
 					glBegin(GL_TRIANGLE_STRIP)
 						glVertex3f(o->points(p1).x, _
@@ -244,7 +244,7 @@ private sub  CastShadow(byval o as glObject ptr, byval lp as single ptr)
 					v2.x = (o->points(p2).x - lp[0])*100
 					v2.y = (o->points(p2).y - lp[1])*100
 					v2.z = (o->points(p2).z - lp[2])*100
-					
+
 					''draw the polygon
 					glBegin(GL_TRIANGLE_STRIP)
 						glVertex3f(o->points(p1).x, _

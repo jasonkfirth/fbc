@@ -63,7 +63,7 @@ Namespace VBIDE
 	Const IID__References = "{0002E17A-0000-0000-C000-000000000046}"
 	Const IID_Reference = "{0002E17E-0000-0000-C000-000000000046}"
 	Const IID__dispReferences_Events = "{CDDE3804-2064-11CF-867F-00AA005FF34A}"
-	
+
 
 	Enum vbextFileTypes
 		vbextFileTypeForm = 0

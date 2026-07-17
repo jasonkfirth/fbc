@@ -1,10 +1,10 @@
 type MyType
 	bar as integer
-	declare sub printMe( ) 
+	declare sub printMe( )
 	declare static sub printThis( byref x as MyType )
 end type
 
-sub MyType.printMe( ) 
+sub MyType.printMe( )
 	print bar
 end sub
 

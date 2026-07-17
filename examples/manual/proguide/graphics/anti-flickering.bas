@@ -154,4 +154,4 @@ Sub Draw_circle_recursion ( ByVal x As Integer, ByVal y As Integer, ByVal r As I
 		Draw_circle_recursion(x - r Shr 1, y - r Shr 1, r Shr 2, rmin)
 	End If
 End Sub
-					
+

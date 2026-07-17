@@ -8,12 +8,12 @@
 
 'main loop
 Do
-  
+
   ' do user input
   ' calculate_a_frame
-   
+
   ScreenSync
-  
-  ' draw_ a_ frame  
-  
+
+  ' draw_ a_ frame
+
 Loop Until Inkey <> ""

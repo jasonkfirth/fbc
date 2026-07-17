@@ -23,7 +23,7 @@ Sub vproc cdecl(count As Integer, ByRef args As Cva_List )
 	For i As Integer = 1 To count
 		Print Cva_Arg( a, Integer )
 	Next
-	
+
 	'' clean-up
 	Cva_End( a )
 
@@ -48,7 +48,7 @@ Sub proc cdecl(count As Integer, ... )
 	For i As Integer = 1 To count
 		Print Cva_Arg( args, Integer )
 	Next
-	
+
 	'' clean-up
 	Cva_End( args )
 

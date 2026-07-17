@@ -4,7 +4,7 @@
  *                1998 Michele Bini <mibin@tin.it>
  *                All Rights Reserved
  *
- *  Id: cacaplas.bas,v 1.1 2005/03/27 07:21:59 i_am_drv Exp 
+ *  Id: cacaplas.bas,v 1.1 2005/03/27 07:21:59 i_am_drv Exp
  *
  *  This program is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public

@@ -407,11 +407,13 @@ private sub hOptConstIdxMult( byval n as ASTNODE ptr )
 		if( astIsCONST( lr ) ) then
 			'' ASM backend?
 			if( irGetOption( IR_OPT_ADDRCISC ) ) then
+				const X86_LEA_MAX_MULTIPLIER = 9
 				'' Check whether the constant is in usable range
 				'' (just casting to 32bit could break if 64bit
 				'' values are given)
+				'' x86 LEA multiplication supports the scale factors 1, 2, 4 and 8.
 				c = astConstGetInt( lr )
-				if( (c >= 1) and (c <= 9) ) then
+				if( (c >= 1) and (c <= X86_LEA_MAX_MULTIPLIER) ) then
 					select case as const( c )
 					case 1, 2, 4, 8
 						'' The main multipliers supported by x86

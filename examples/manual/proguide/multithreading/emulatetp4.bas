@@ -6,14 +6,20 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgEmulateTlsTp
 '' --------
 
+' -------------------------------------------------------------------------
+' Reusable worker thread
+' -------------------------------------------------------------------------
+
 Type ThreadInitThenMultiStartData
 	Dim As Function(ByVal p As Any Ptr) As String _pThread
 	Dim As Any Ptr _p
-	Dim As Any Ptr _mutex1
-	Dim As Any Ptr _mutex2
-	Dim As Any Ptr _mutex3
+	Dim As Any Ptr _mutex
+	Dim As Any Ptr _startCondition
+	Dim As Any Ptr _doneCondition
 	Dim As Any Ptr _pt
-	Dim As Byte _end
+	Dim As Integer _end
+	Dim As Integer _startPending
+	Dim As Integer _resultPending
 	Dim As String _returnF
 	Dim As UByte _state
 End Type
@@ -22,10 +28,11 @@ Type ThreadInitThenMultiStart
 	Public:
 		Declare Constructor()
 		Declare Sub ThreadInit(ByVal pThread As Function(ByVal As Any Ptr) As String, ByVal p As Any Ptr = 0)
-		Declare Sub ThreadStart()
-		Declare Sub ThreadStart(ByVal p As Any Ptr)
+		Declare Sub ThreadStart Overload()
+		Declare Sub ThreadStart Overload(ByVal p As Any Ptr)
 		Declare Function ThreadWait() As String
 
+		Declare Property ThreadReady() As Boolean
 		Declare Property ThreadState() As UByte
 
 		Declare Destructor()
@@ -38,99 +45,220 @@ End Type
 
 Constructor ThreadInitThenMultiStart()
 	This._pdata = New ThreadInitThenMultiStartData
-	With *This._pdata
-		._mutex1 = MutexCreate()
-		MutexLock(._mutex1)
-		._mutex2 = MutexCreate()
-		MutexLock(._mutex2)
-		._mutex3 = MutexCreate()
-		MutexLock(._mutex3)
-	End With
+
+	If This._pdata <> 0 Then
+		With *This._pdata
+			._mutex = MutexCreate()
+
+			If ._mutex <> 0 Then
+				._startCondition = CondCreate()
+			End If
+
+			If ._startCondition <> 0 Then
+				._doneCondition = CondCreate()
+			End If
+
+			If ._doneCondition = 0 Then
+				If ._startCondition <> 0 Then CondDestroy ._startCondition
+				If ._mutex <> 0 Then MutexDestroy ._mutex
+				Delete This._pdata
+				This._pdata = 0
+			End If
+		End With
+	End If
 End Constructor
 
-Sub ThreadInitThenMultiStart.ThreadInit(ByVal pThread As Function(ByVal As Any Ptr) As String, ByVal p As Any Ptr = 0)
+Sub ThreadInitThenMultiStart.ThreadInit( _
+	ByVal pThread As Function(ByVal As Any Ptr) As String, _
+	ByVal p As Any Ptr = 0 )
+
+	If (This._pdata = 0) OrElse (pThread = 0) Then Exit Sub
+
 	With *This._pdata
-		._pThread = pThread
-		._p = p
-		If ._pt = 0 Then
-			._pt= ThreadCreate(@ThreadInitThenMultiStart._Thread, This._pdata)
-			MutexUnlock(._mutex3)
-			._state = 1
+		MutexLock ._mutex
+
+		While (._startPending OrElse ._resultPending) AndAlso (._end = FALSE)
+			CondWait ._doneCondition, ._mutex
+		Wend
+
+		If ._end = FALSE Then
+			._pThread = pThread
+			._p = p
+
+			If ._pt = 0 Then
+				._pt = ThreadCreate(@ThreadInitThenMultiStart._Thread, This._pdata)
+			End If
+
+			If ._pt <> 0 Then
+				._state = 1
+			Else
+				._state = 0
+			End If
 		End If
+
+		MutexUnlock ._mutex
 	End With
 End Sub
 
-Sub ThreadInitThenMultiStart.ThreadStart()
+Sub ThreadInitThenMultiStart.ThreadStart Overload()
+	If This._pdata = 0 Then Exit Sub
+
 	With *This._pdata
-		MutexLock(._mutex3)
-		MutexUnlock(._mutex1)
+		MutexLock ._mutex
+
+		While (._startPending OrElse ._resultPending) AndAlso (._end = FALSE)
+			CondWait ._doneCondition, ._mutex
+		Wend
+
+		If (._end = FALSE) AndAlso (._pt <> 0) AndAlso (._pThread <> 0) Then
+			._startPending = TRUE
+			._state = 1
+			CondSignal ._startCondition
+		End If
+
+		MutexUnlock ._mutex
 	End With
 End Sub
 
-Sub ThreadInitThenMultiStart.ThreadStart(ByVal p As Any Ptr)
+Sub ThreadInitThenMultiStart.ThreadStart Overload(ByVal p As Any Ptr)
+	If This._pdata = 0 Then Exit Sub
+
 	With *This._pdata
-		MutexLock(._mutex3)
-		._p = p
-		MutexUnlock(._mutex1)
+		MutexLock ._mutex
+
+		While (._startPending OrElse ._resultPending) AndAlso (._end = FALSE)
+			CondWait ._doneCondition, ._mutex
+		Wend
+
+		If (._end = FALSE) AndAlso (._pt <> 0) AndAlso (._pThread <> 0) Then
+			._p = p
+			._startPending = TRUE
+			._state = 1
+			CondSignal ._startCondition
+		End If
+
+		MutexUnlock ._mutex
 	End With
 End Sub
 
 Function ThreadInitThenMultiStart.ThreadWait() As String
+	If This._pdata = 0 Then Return ""
+
 	With *This._pdata
-		MutexLock(._mutex2)
-		MutexUnlock(._mutex3)
-		._state = 1
-		Return ._returnF
+		MutexLock ._mutex
+
+		While (._resultPending = FALSE) AndAlso (._end = FALSE) AndAlso (._pt <> 0)
+			CondWait ._doneCondition, ._mutex
+		Wend
+
+		Dim As String Result
+
+		If ._resultPending Then
+			Result = ._returnF
+			._resultPending = FALSE
+			._state = 1
+			CondBroadcast ._doneCondition
+		End If
+
+		MutexUnlock ._mutex
+		Return Result
 	End With
 End Function
 
+Property ThreadInitThenMultiStart.ThreadReady() As Boolean
+	Return This._pdata <> 0
+End Property
+
 Property ThreadInitThenMultiStart.ThreadState() As UByte
-	Return This._pdata->_state
+	If This._pdata = 0 Then Return 0
+
+	MutexLock This._pdata->_mutex
+	Dim As UByte State = This._pdata->_state
+	MutexUnlock This._pdata->_mutex
+
+	Return State
 End Property
 
 Sub ThreadInitThenMultiStart._Thread(ByVal p As Any Ptr)
-	Dim As ThreadInitThenMultiStartData Ptr pdata = p
-	With *pdata
-		Do
-			MutexLock(._mutex1)
-			If ._end = 1 Then Exit Sub
-			._state = 2
-			._returnF = ._pThread(._p)
-			._state = 4
-			MutexUnlock(._mutex2)
-		Loop
-	End With
+	Dim As ThreadInitThenMultiStartData Ptr StateData = _
+	    Cast(ThreadInitThenMultiStartData Ptr, p)
+	If StateData = 0 Then Exit Sub
+
+	MutexLock StateData->_mutex
+
+	Do
+		While (StateData->_startPending = FALSE) AndAlso (StateData->_end = FALSE)
+			CondWait StateData->_startCondition, StateData->_mutex
+		Wend
+
+		If StateData->_end Then Exit Do
+
+		Dim As Function(ByVal p As Any Ptr) As String CurrentThread = StateData->_pThread
+		Dim As Any Ptr CurrentParameter = StateData->_p
+		StateData->_state = 2
+		MutexUnlock StateData->_mutex
+
+		Dim As String Result
+		If CurrentThread <> 0 Then Result = CurrentThread(CurrentParameter)
+
+		MutexLock StateData->_mutex
+		StateData->_returnF = Result
+		StateData->_startPending = FALSE
+		StateData->_resultPending = TRUE
+		StateData->_state = 4
+		CondBroadcast StateData->_doneCondition
+	Loop
+
+	MutexUnlock StateData->_mutex
 End Sub
 
 Destructor ThreadInitThenMultiStart()
-	With *This._pdata
-		If ._pt > 0 Then
-			._end = 1
-			MutexUnlock(._mutex1)
-			..ThreadWait(._pt)
-		End If
-		MutexDestroy(._mutex1)
-		MutexDestroy(._mutex2)
-		MutexDestroy(._mutex3)
-	End With
-	Delete This._pdata
+	If This._pdata <> 0 Then
+		With *This._pdata
+			If ._pt <> 0 Then
+				MutexLock ._mutex
+				._end = TRUE
+				CondBroadcast ._startCondition
+				CondBroadcast ._doneCondition
+				MutexUnlock ._mutex
+				..ThreadWait ._pt
+			End If
+
+			CondDestroy ._startCondition
+			CondDestroy ._doneCondition
+			MutexDestroy ._mutex
+		End With
+
+		Delete This._pdata
+		This._pdata = 0
+	End If
 End Destructor
 
-'---------------------------------------------------
+' -------------------------------------------------------------------------
+' Single-thread task pool
+' -------------------------------------------------------------------------
 
-#include Once "crt/string.bi"
+Const POOL_INITIAL_CAPACITY = 8
+Const POOL_STATE_SUBMITTED As UByte = 1
+Const POOL_STATE_RUNNING As UByte = 2
+Const POOL_STATE_IDLE As UByte = 4
+Const POOL_STATE_QUEUED As UByte = 8
+Const POOL_BUSY_MASK As UByte = 11
 
 Type ThreadPoolingData
-	Dim As Function(ByVal p As Any Ptr) As String _pThread0
-	Dim As Any Ptr _p0
 	Dim As Function(ByVal p As Any Ptr) As String _pThread(Any)
 	Dim As Any Ptr _p(Any)
+	Dim As String _returnF(Any)
 	Dim As Any Ptr _mutex
 	Dim As Any Ptr _cond1
 	Dim As Any Ptr _cond2
 	Dim As Any Ptr _pt
-	Dim As Byte _end
-	Dim As String _returnF(Any)
+	Dim As Integer _end
+	Dim As Integer _ready
+	Dim As Integer _capacity
+	Dim As Integer _taskCount
+	Dim As Integer _nextTask
+	Dim As Integer _completedCount
 	Dim As UByte _state
 End Type
 
@@ -138,10 +266,12 @@ Type ThreadPooling
 	Public:
 		Declare Constructor()
 		Declare Sub PoolingSubmit(ByVal pThread As Function(ByVal As Any Ptr) As String, ByVal p As Any Ptr = 0)
-		Declare Sub PoolingWait()
-		Declare Sub PoolingWait(values() As String)
+		Declare Sub PoolingWait Overload()
+		Declare Sub PoolingWait Overload(values() As String)
 
+		Declare Property PoolingReady() As Boolean
 		Declare Property PoolingState() As UByte
+		Declare Property PoolingTaskCount() As Integer
 
 		Declare Destructor()
 	Private:
@@ -153,123 +283,214 @@ End Type
 
 Constructor ThreadPooling()
 	This._pdata = New ThreadPoolingData
-	With *This._pdata
-		ReDim ._pThread(0)
-		ReDim ._p(0)
-		ReDim ._returnF(0)
-		._mutex = MutexCreate()
-		._cond1 = CondCreate()
-		._cond2 = CondCreate()
-		._pt= ThreadCreate(@ThreadPooling._Thread, This._pdata)
-	End With
+
+	If This._pdata <> 0 Then
+		With *This._pdata
+			._mutex = MutexCreate()
+
+			If ._mutex <> 0 Then
+				._cond1 = CondCreate()
+			End If
+
+			If ._cond1 <> 0 Then
+				._cond2 = CondCreate()
+			End If
+
+			If ._cond2 <> 0 Then
+				._pt = ThreadCreate(@ThreadPooling._Thread, This._pdata)
+			End If
+
+			If ._pt <> 0 Then
+				._ready = TRUE
+			Else
+				If ._cond2 <> 0 Then CondDestroy ._cond2
+				If ._cond1 <> 0 Then CondDestroy ._cond1
+				If ._mutex <> 0 Then MutexDestroy ._mutex
+				Delete This._pdata
+				This._pdata = 0
+			End If
+		End With
+	End If
 End Constructor
 
 Sub ThreadPooling.PoolingSubmit(ByVal pThread As Function(ByVal As Any Ptr) As String, ByVal p As Any Ptr = 0)
+	If (This._pdata = 0) OrElse (pThread = 0) Then Exit Sub
+
 	With *This._pdata
-		MutexLock(._mutex)
-		ReDim Preserve ._pThread(UBound(._pThread) + 1)
-		._pThread(UBound(._pThread)) = pThread
-		ReDim Preserve ._p(UBound(._p) + 1)
-		._p(UBound(._p)) = p
-		CondSignal(._cond2)
-		._state = 1
-		MutexUnlock(._mutex)
+		MutexLock ._mutex
+
+		If ._end = FALSE Then
+			If ._taskCount = ._capacity Then
+				Dim As Integer NewCapacity = ._capacity * 2
+				If NewCapacity = 0 Then NewCapacity = POOL_INITIAL_CAPACITY
+
+				ReDim Preserve ._pThread(0 To NewCapacity - 1)
+				ReDim Preserve ._p(0 To NewCapacity - 1)
+				ReDim Preserve ._returnF(0 To NewCapacity - 1)
+				._capacity = NewCapacity
+			End If
+
+			._pThread(._taskCount) = pThread
+			._p(._taskCount) = p
+			._taskCount += 1
+			._state = POOL_STATE_SUBMITTED
+			CondSignal ._cond2
+		End If
+
+		MutexUnlock ._mutex
 	End With
 End Sub
 
-Sub ThreadPooling.PoolingWait()
+Sub ThreadPooling.PoolingWait Overload()
+	If This._pdata = 0 Then Exit Sub
+
 	With *This._pdata
-		MutexLock(._mutex)
-		While (._state And 11) > 0
-			CondWait(._Cond1, ._mutex)
+		MutexLock ._mutex
+
+		While (._completedCount < ._taskCount) AndAlso (._end = FALSE)
+			CondWait ._cond1, ._mutex
 		Wend
-		ReDim ._returnF(0)
-		._state = 0
-		MutexUnlock(._mutex)
+
+		For ResultIndex As Integer = 0 To ._completedCount - 1
+			._returnF(ResultIndex) = ""
+		Next ResultIndex
+
+		._taskCount = 0
+		._nextTask = 0
+		._completedCount = 0
+		._state = POOL_STATE_IDLE
+		MutexUnlock ._mutex
 	End With
 End Sub
 
-Sub ThreadPooling.PoolingWait(values() As String)
+Sub ThreadPooling.PoolingWait Overload(values() As String)
+	If This._pdata = 0 Then
+		Erase values
+		Exit Sub
+	End If
+
 	With *This._pdata
-		MutexLock(._mutex)
-		While (._state And 11) > 0
-			CondWait(._Cond1, ._mutex)
+		MutexLock ._mutex
+
+		While (._completedCount < ._taskCount) AndAlso (._end = FALSE)
+			CondWait ._cond1, ._mutex
 		Wend
-		If UBound(._returnF) > 0 Then
-			ReDim values(1 To UBound(._returnF))
-			For I As Integer = 1 To UBound(._returnF)
-				values(I) = ._returnF(I)
-			Next I
-			ReDim ._returnF(0)
+
+		If ._completedCount > 0 Then
+			ReDim values(1 To ._completedCount)
+
+			For ResultIndex As Integer = 0 To ._completedCount - 1
+				values(ResultIndex + 1) = ._returnF(ResultIndex)
+				._returnF(ResultIndex) = ""
+			Next ResultIndex
 		Else
 			Erase values
 		End If
-		._state = 0
-		MutexUnlock(._mutex)
+
+		._taskCount = 0
+		._nextTask = 0
+		._completedCount = 0
+		._state = POOL_STATE_IDLE
+		MutexUnlock ._mutex
 	End With
 End Sub
 
+Property ThreadPooling.PoolingReady() As Boolean
+	Return This._pdata <> 0
+End Property
+
 Property ThreadPooling.PoolingState() As UByte
+	If This._pdata = 0 Then Return 0
+
 	With *This._pdata
-		If UBound(._p) > 0 Then
-			Return 8 + ._state
-		Else
-			Return ._state
+		MutexLock ._mutex
+		Dim As UByte State = ._state
+
+		If ._nextTask < ._taskCount Then
+			State Or= POOL_STATE_QUEUED
 		End If
+
+		MutexUnlock ._mutex
+		Return State
 	End With
 End Property
 
+Property ThreadPooling.PoolingTaskCount() As Integer
+	If This._pdata = 0 Then Return 0
+
+	MutexLock This._pdata->_mutex
+	Dim As Integer TaskCount = This._pdata->_taskCount
+	MutexUnlock This._pdata->_mutex
+
+	Return TaskCount
+End Property
+
 Sub ThreadPooling._Thread(ByVal p As Any Ptr)
-	Dim As ThreadPoolingData Ptr pdata = p
-	With *pdata
-		Do
-			MutexLock(._mutex)
-			If UBound(._pThread) = 0 Then
-				._state = 4
-				CondSignal(._cond1)
-				While UBound(._pThread) = 0
-					If ._end = 1 Then Exit Sub
-					CondWait(._cond2, ._mutex)
-				Wend
-			End If
-			._pThread0 = ._pThread(1)
-			._p0 = ._p(1)
-			If UBound(._pThread) > 1 Then
-				memmove(@._pThread(1), @._pThread(2), (UBound(._pThread) - 1) * SizeOf(._pThread))
-				memmove(@._p(1), @._p(2), (UBound(._p) - 1) * SizeOf(._p))
-			End If
-			ReDim Preserve ._pThread(UBound(._pThread) - 1)
-			ReDim Preserve ._p(UBound(._p) - 1)
-			MutexUnlock(._mutex)
-			ReDim Preserve ._ReturnF(UBound(._returnF) + 1)
-			._state = 2
-			._returnF(UBound(._returnF)) = ._pThread0(._p0)
-		Loop
-	End With
+	Dim As ThreadPoolingData Ptr Pool = Cast(ThreadPoolingData Ptr, p)
+	If Pool = 0 Then Exit Sub
+
+	MutexLock Pool->_mutex
+
+	Do
+		While (Pool->_nextTask >= Pool->_taskCount) AndAlso (Pool->_end = FALSE)
+			Pool->_state = POOL_STATE_IDLE
+			CondBroadcast Pool->_cond1
+			CondWait Pool->_cond2, Pool->_mutex
+		Wend
+
+		If Pool->_end Then Exit Do
+
+		Dim As Function(ByVal p As Any Ptr) As String CurrentThread = _
+		    Pool->_pThread(Pool->_nextTask)
+		Dim As Any Ptr CurrentParameter = Pool->_p(Pool->_nextTask)
+		Pool->_nextTask += 1
+		Pool->_state = POOL_STATE_RUNNING
+		MutexUnlock Pool->_mutex
+
+		Dim As String Result
+		If CurrentThread <> 0 Then Result = CurrentThread(CurrentParameter)
+
+		MutexLock Pool->_mutex
+		Pool->_returnF(Pool->_completedCount) = Result
+		Pool->_completedCount += 1
+
+		If Pool->_completedCount = Pool->_taskCount Then
+			Pool->_state = POOL_STATE_IDLE
+			CondBroadcast Pool->_cond1
+		End If
+	Loop
+
+	MutexUnlock Pool->_mutex
 End Sub
 
 Destructor ThreadPooling()
-	With *This._pdata
-		MutexLock(._mutex)
-		._end = 1
-		CondSignal(._cond2)
-		MutexUnlock(._mutex)
-		..ThreadWait(._pt)
-		MutexDestroy(._mutex)
-		CondDestroy(._cond1)
-		CondDestroy(._cond2)
-	End With
-	Delete This._pdata
+	If This._pdata <> 0 Then
+		With *This._pdata
+			MutexLock ._mutex
+			._end = TRUE
+			CondBroadcast ._cond2
+			MutexUnlock ._mutex
+			..ThreadWait ._pt
+			CondDestroy ._cond1
+			CondDestroy ._cond2
+			MutexDestroy ._mutex
+		End With
+
+		Delete This._pdata
+		This._pdata = 0
+	End If
 End Destructor
 
-'---------------------------------------------------
+' -------------------------------------------------------------------------
+' Multi-thread task dispatcher
+' -------------------------------------------------------------------------
 
 Type ThreadDispatching
 	Public:
 		Declare Constructor(ByVal nbMaxSecondaryThread As Integer = 1, ByVal nbMinSecondaryThread As Integer = 0)
 		Declare Sub DispatchingSubmit(ByVal pThread As Function(ByVal As Any Ptr) As String, ByVal p As Any Ptr = 0)
-		Declare Sub DispatchingWait()
-		Declare Sub DispatchingWait(values() As String)
+		Declare Sub DispatchingWait Overload()
+		Declare Sub DispatchingWait Overload(values() As String)
 
 		Declare Property DispatchingThread() As Integer
 		Declare Sub DispatchingState(state() As UByte)
@@ -278,114 +499,203 @@ Type ThreadDispatching
 	Private:
 		Dim As Integer _nbmst
 		Dim As Integer _dstnb
+		Dim As Integer _poolCount
+		Dim As Integer _poolCapacity
+		Dim As Integer _submittedCount
 		Dim As ThreadPooling Ptr _tp(Any)
 		Declare Constructor(ByRef t As ThreadDispatching)
 		Declare Operator Let(ByRef t As ThreadDispatching)
 End Type
 
 Constructor ThreadDispatching(ByVal nbMaxSecondaryThread As Integer = 1, ByVal nbMinSecondaryThread As Integer = 0)
+	If nbMaxSecondaryThread < 1 Then nbMaxSecondaryThread = 1
+	If nbMinSecondaryThread < 0 Then nbMinSecondaryThread = 0
+
 	This._nbmst = nbMaxSecondaryThread
+
 	If nbMinSecondaryThread > nbMaxSecondaryThread Then
 		nbMinSecondaryThread = nbMaxSecondaryThread
 	End If
+
 	If nbMinSecondaryThread > 0 Then
-		ReDim This._tp(nbMinSecondaryThread - 1)
-		For I As Integer = 0 To nbMinSecondaryThread - 1
-			This._tp(I) = New ThreadPooling
-		Next I
+		ReDim This._tp(0 To nbMinSecondaryThread - 1)
+		This._poolCapacity = nbMinSecondaryThread
+
+		For PoolIndex As Integer = 0 To nbMinSecondaryThread - 1
+			Dim As ThreadPooling Ptr Pool = New ThreadPooling
+
+			If Pool <> 0 Then
+				If Pool->PoolingReady Then
+					This._tp(This._poolCount) = Pool
+					This._poolCount += 1
+				Else
+					Delete Pool
+				End If
+			End If
+		Next PoolIndex
 	End If
 End Constructor
 
 Sub ThreadDispatching.DispatchingSubmit(ByVal pThread As Function(ByVal As Any Ptr) As String, ByVal p As Any Ptr = 0)
-	For I As Integer = 0 To UBound(This._tp)
-		If (This._tp(I)->PoolingState And 11) = 0 Then
-			This._tp(I)->PoolingSubmit(pThread, p)
-			Exit Sub
+	If pThread = 0 Then Exit Sub
+
+	Dim As Integer TargetPool = -1
+
+	For PoolIndex As Integer = 0 To This._poolCount - 1
+		If (This._tp(PoolIndex)->PoolingState And POOL_BUSY_MASK) = 0 Then
+			TargetPool = PoolIndex
+			Exit For
 		End If
-	Next I
-	If UBound(This._tp) < This._nbmst - 1 Then
-		ReDim Preserve This._tp(UBound(This._tp) + 1)
-		This._tp(UBound(This._tp)) = New ThreadPooling
-		This._tp(UBound(This._tp))->PoolingSubmit(pThread, p)
-	ElseIf UBound(This._tp) >= 0 Then
-		This._tp(This._dstnb)->PoolingSubmit(pThread, p)
-		This._dstnb = (This._dstnb + 1) Mod This._nbmst
+	Next PoolIndex
+
+	If (TargetPool < 0) AndAlso (This._poolCount < This._nbmst) Then
+		If This._poolCount = This._poolCapacity Then
+			Dim As Integer NewCapacity = This._poolCapacity * 2
+			If NewCapacity = 0 Then NewCapacity = 1
+			If NewCapacity > This._nbmst Then NewCapacity = This._nbmst
+
+			ReDim Preserve This._tp(0 To NewCapacity - 1)
+			This._poolCapacity = NewCapacity
+		End If
+
+		Dim As ThreadPooling Ptr Pool = New ThreadPooling
+
+		If Pool <> 0 Then
+			If Pool->PoolingReady Then
+				TargetPool = This._poolCount
+				This._tp(TargetPool) = Pool
+				This._poolCount += 1
+			Else
+				Delete Pool
+			End If
+		End If
+	End If
+
+	If (TargetPool < 0) AndAlso (This._poolCount > 0) Then
+		If This._dstnb >= This._poolCount Then This._dstnb = 0
+		TargetPool = This._dstnb
+		This._dstnb = (This._dstnb + 1) Mod This._poolCount
+	End If
+
+	If TargetPool >= 0 Then
+		This._tp(TargetPool)->PoolingSubmit(pThread, p)
+		This._submittedCount += 1
 	End If
 End Sub
 
-Sub ThreadDispatching.DispatchingWait()
-	For I As Integer = 0 To UBound(This._tp)
-		This._tp(I)->PoolingWait()
-	Next I
+Sub ThreadDispatching.DispatchingWait Overload()
+	For PoolIndex As Integer = 0 To This._poolCount - 1
+		This._tp(PoolIndex)->PoolingWait()
+	Next PoolIndex
+
+	This._submittedCount = 0
 End Sub
 
-Sub ThreadDispatching.DispatchingWait(values() As String)
-	Dim As String s()
-	For I As Integer = 0 To UBound(This._tp)
-		This._tp(I)->PoolingWait(s())
-		If UBound(s) >= 1 Then
-			If UBound(values) = -1 Then
-				ReDim Preserve values(1 To UBound(values) + UBound(s) + 1)
-			Else
-				ReDim Preserve values(1 To UBound(values) + UBound(s))
-			End If
-			For I As Integer = 1 To UBound(s)
-				values(UBound(values) - UBound(s) + I) = s(I)
-			Next I
+Sub ThreadDispatching.DispatchingWait Overload(values() As String)
+	If This._submittedCount = 0 Then
+		Erase values
+		Exit Sub
+	End If
+
+	ReDim values(1 To This._submittedCount)
+
+	Dim As String PoolValues()
+	Dim As Integer NextValue = 1
+
+	For PoolIndex As Integer = 0 To This._poolCount - 1
+		Dim As Integer PoolResultCount = This._tp(PoolIndex)->PoolingTaskCount
+		This._tp(PoolIndex)->PoolingWait(PoolValues())
+
+		If PoolResultCount > 0 Then
+			For ResultOffset As Integer = 0 To PoolResultCount - 1
+				If NextValue <= This._submittedCount Then
+					values(NextValue) = PoolValues(ResultOffset + 1)
+					NextValue += 1
+				End If
+			Next ResultOffset
 		End If
-	Next I
+	Next PoolIndex
+
+	This._submittedCount = 0
 End Sub
 
 Property ThreadDispatching.DispatchingThread() As Integer
-	Return UBound(This._tp) + 1
+	Return This._poolCount
 End Property
 
 Sub ThreadDispatching.DispatchingState(state() As UByte)
-	If UBound(This._tp) >= 0 Then
-		ReDim state(1 To UBound(This._tp) + 1)
-		For I As Integer = 0 To UBound(This._tp)
-			state(I + 1) = This._tp(I)->PoolingState
-		Next I
+	If This._poolCount > 0 Then
+		ReDim state(1 To This._poolCount)
+
+		For PoolIndex As Integer = 0 To This._poolCount - 1
+			state(PoolIndex + 1) = This._tp(PoolIndex)->PoolingState
+		Next PoolIndex
+	Else
+		Erase state
 	End If
 End Sub
 
 Destructor ThreadDispatching()
-	For I As Integer = 0 To UBound(This._tp)
-		Delete This._tp(I)
-	Next I
+	For PoolIndex As Integer = 0 To This._poolCount - 1
+		Delete This._tp(PoolIndex)
+	Next PoolIndex
 End Destructor
 
-'---------------------------------------------------
+' -------------------------------------------------------------------------
+' Benchmark workload and timing
+' -------------------------------------------------------------------------
 
-Dim Shared As Double array(1 To 800000)  '' only used by the [For...Next] waiting loop in UserCode()
+Const TASK_SLOT_COUNT = 32
+Const HEX_LABEL_COUNT = 16
+Const ASCII_HEX_LETTER_OFFSET = 55
+Const WORK_REPETITIONS = 2
+Const WORK_ITERATIONS = 800000
+Const SECONDS_PER_DAY = 86400.0
+
+Function ElapsedSeconds(ByVal StartedAt As Double) As Double
+	Dim As Double FinishedAt = Timer
+
+	If FinishedAt < StartedAt Then
+		FinishedAt += SECONDS_PER_DAY
+	End If
+
+	Return FinishedAt - StartedAt
+End Function
 
 Function UserCode (ByVal p As Any Ptr) As String
 	Dim As String Ptr ps = p
-	For I As Integer = 1 To 2
+	If ps = 0 Then Return ""
+
+	Dim As Double WorkValue
+
+	For I As Integer = 1 To WORK_REPETITIONS
 		Print *ps;
-		For J As Integer = 1 To 800000
-			array(J) = Tan(J) * Atn(J) * Exp(J) * Log(J)  '' [For...Next] waiting loop not freeing any CPU resource
+		For J As Integer = 1 To WORK_ITERATIONS
+			'' This calculation keeps the worker CPU-bound without sharing writable
+			'' storage between threads.
+			WorkValue = Tan(J) * Atn(J) * Exp(J) * Log(J)
 		Next J
 	Next I
-	Return ""
+
+	Return Str(WorkValue)
 End Function
 
-Dim As String s(0 To 31)
-For I As Integer = 0 To 15
+Dim As String s(0 To TASK_SLOT_COUNT - 1)
+For I As Integer = 0 To HEX_LABEL_COUNT - 1
 	s(I) = Str(Hex(I))
 Next I
-For I As Integer = 16 To 31
-	s(I) = Chr(55 + I)
+For I As Integer = HEX_LABEL_COUNT To TASK_SLOT_COUNT - 1
+	s(I) = Chr(ASCII_HEX_LETTER_OFFSET + I)
 Next I
 
 '---------------------------------------------------
 
 #macro ThreadInitThenMultiStartSequence(nbThread)
 Scope
-	ReDim As ThreadInitThenMultiStart ts(nbThread - 1)
+	Dim As ThreadInitThenMultiStart ts(0 To nbThread - 1)
 	Print "   ";
 	Dim As Double t = Timer
-	For I As Integer = 0 To 32 - nbThread Step nbThread
+	For I As Integer = 0 To TASK_SLOT_COUNT - nbThread Step nbThread
 		For J As Integer = 0 To nbThread - 1
 			ts(J).ThreadInit(@UserCode, @s(I + J))
 			ts(J).ThreadStart()
@@ -394,17 +704,17 @@ Scope
 			ts(J).ThreadWait()
 		Next J
 	Next I
-	t = Timer - t
+	t = ElapsedSeconds(t)
 	Print Using " : ####.## s"; t
 End Scope
 #endmacro
 
 #macro ThreadPoolingSequence(nbThread)
 Scope
-	ReDim As ThreadPooling tp(nbThread - 1)
+	Dim As ThreadPooling tp(0 To nbThread - 1)
 	Print "   ";
 	Dim As Double t = Timer
-	For I As Integer = 0 To 32 - nbThread Step nbThread
+	For I As Integer = 0 To TASK_SLOT_COUNT - nbThread Step nbThread
 		For J As Integer = 0 To nbThread - 1
 			tp(J).PoolingSubmit(@UserCode, @s(I + J))
 		Next J
@@ -412,7 +722,7 @@ Scope
 	For I As Integer = 0 To nbThread - 1
 		tp(I).PoolingWait()
 	Next I
-	t = Timer - t
+	t = ElapsedSeconds(t)
 	Print Using " : ####.## s"; t
 End Scope
 #endmacro
@@ -422,15 +732,15 @@ Scope
 	Dim As ThreadDispatching td##nbThreadmax = nbThreadmax
 	Print "   ";
 	Dim As Double t = Timer
-	For I As Integer = 0 To 31
+	For I As Integer = 0 To TASK_SLOT_COUNT - 1
 		td##nbThreadmax.DispatchingSubmit(@UserCode, @s(I))
 	Next I
 	td##nbThreadmax.DispatchingWait()
-	t = Timer - t
+	t = ElapsedSeconds(t)
 	Print Using " : ####.## s"; t
 End Scope
 #endmacro
-   
+
 '---------------------------------------------------
 
 Print "'ThreadInitThenMultiStart' with 1 secondary thread:"
@@ -502,6 +812,3 @@ ThreadPoolingSequence(32)
 Print "'ThreadDispatching' with 32 secondary threads max:"
 ThreadDispatchingSequence(32)
 Print
-
-Sleep
-							

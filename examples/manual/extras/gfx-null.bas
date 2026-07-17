@@ -39,7 +39,7 @@ Function on_paint(ByVal hwnd As HWND,ByVal wparam As WPARAM,ByVal lparam As LPAR
 
 	Function = 0
 
-End Function     
+End Function
 
 ''
 ''---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ End Function
 ''----------------------------------------------------------------------------
 Function WndProc ( ByVal hWnd As HWND,ByVal message As UINT, _
 				   ByVal wParam As WPARAM,ByVal lParam As LPARAM ) As LRESULT
-   
+
 	Function = 0
 
 	Select Case As Const  message
@@ -93,7 +93,7 @@ Function WndProc ( ByVal hWnd As HWND,ByVal message As UINT, _
 	Case WM_DESTROY
 		Function = On_destroy(hwnd,wparam,lparam)
 	Case Else
-		Function = DefWindowProc( hWnd, message, wParam, lParam )   
+		Function = DefWindowProc( hWnd, message, wParam, lParam )
 	End Select
 
 End Function
@@ -103,7 +103,7 @@ End Function
 ''main program create window + event loop
 
 	Dim wMsg As MSG
-	Dim wcls As WNDCLASS     
+	Dim wcls As WNDCLASS
 	Dim szAppName As ZString * 30 => "Random Rectangles"
 	Dim hWnd As HWND
 	Dim i As Integer
@@ -121,7 +121,7 @@ End Function
 		.lpszClassName = @szAppName
 	End With
 
-	If( RegisterClass( @wcls ) = False ) Then 
+	If( RegisterClass( @wcls ) = False ) Then
 		End
 	End If
 
@@ -135,8 +135,8 @@ End Function
 	UpdateWindow( hWnd )
 
 	While 1
-		If PeekMessage( @wMsg, NULL, 0,0, PM_Remove) Then   
-			If wmsg.message=WM_QUIT Then 
+		If PeekMessage( @wMsg, NULL, 0,0, PM_Remove) Then
+			If wmsg.message=WM_QUIT Then
 				Exit While
 			End If
 			TranslateMessage( @wMsg )
@@ -149,4 +149,4 @@ End Function
 		End If
 	Wend
 
-	End wMsg.wparam 
+	End wMsg.wparam

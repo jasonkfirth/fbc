@@ -8,5 +8,5 @@
 
 #ifndef __MYFILE_BI__
 #define __MYFILE_BI__
-	' Declarations 
+	' Declarations
 #endif

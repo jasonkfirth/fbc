@@ -23,6 +23,7 @@ End Destructor
 
 Sub MySub
   Dim x As T = ("A.x")
+  Print "Using: "; x.value
 End Sub
 
 Dim x As T = ("main.x")

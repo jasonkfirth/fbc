@@ -7,7 +7,7 @@
 '' --------
 
 Function UbyteToOctalString (ByVal b As UByte) As String
- 
+
 	Union UbyteOctal
 		number As UByte
 		Type
@@ -16,11 +16,11 @@ Function UbyteToOctalString (ByVal b As UByte) As String
 			d2 : 2 As UByte
 		End Type
 	End Union
- 
+
 	Dim uo As UbyteOctal
 	uo.number = b
 	Return uo.d2 & uo.d1 & uo.d0
- 
+
 End Function
 
 

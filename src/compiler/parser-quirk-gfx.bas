@@ -320,12 +320,14 @@ private function hGetMode _
 			return TRUE
 
 		case "ADD"
+			'' PUT ADD without an explicit alpha uses a fully opaque source.
+			const FBGFX_DEFAULT_OPAQUE_ALPHA = 255
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 			mode = FBGFX_PUTMODE_ADD
 			if( hMatch( CHAR_COMMA ) ) then
 				hMatchExpression( alphaexpr )
 			else
-				alphaexpr = astNewCONSTi( 255, FB_DATATYPE_UINT )
+				alphaexpr = astNewCONSTi( FBGFX_DEFAULT_OPAQUE_ALPHA, FB_DATATYPE_UINT )
 			end if
 			return TRUE
 
@@ -339,6 +341,8 @@ private function hGetMode _
 			return TRUE
 
 		case "CUSTOM"
+			'' Custom PUT mode callbacks receive source, destination, and parameter.
+			const FBGFX_PUT_CUSTOM_CALLBACK_PARAMETER_COUNT = 3
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 			mode = FBGFX_PUTMODE_CUSTOM
@@ -361,7 +365,7 @@ private function hGetMode _
 				exit function
 			end if
 			if( ( symbGetType( s ) <> FB_DATATYPE_ULONG ) or _
-				( symbGetProcParams( s ) <> 3 ) ) then
+				( symbGetProcParams( s ) <> FBGFX_PUT_CUSTOM_CALLBACK_PARAMETER_COUNT ) ) then
 				errReport( FB_ERRMSG_TYPEMISMATCH )
 				exit function
 			end if
@@ -1387,4 +1391,3 @@ function cGfxFunct _
 	function = expr
 
 end function
-

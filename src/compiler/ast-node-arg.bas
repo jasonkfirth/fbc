@@ -283,13 +283,10 @@ private sub hCheckByrefParam _
 	dim as ASTNODE ptr t = any
 
 	'' skip any casting if they won't do any conversion
-	'' TODO: astSkipConstCASTs() will skip over any CONST conversions
-	'' This is OK when generating the final AST, as we probably no longer care
-	'' about CONST.  However, if we ever get here and we expect PARSER/AST to
-	'' return an error, or preserve the CONST conversion as part of the
-	'' translation, this may introduce undesired behaviour.  Need to verify.
-	'' Specifically, using astSkipConstCASTs() instead of astSkipNoConvCAST()
-	'' allows us to fix the fbc crash as reported in sf.net bug #910
+	'' astSkipConstCASTs() removes CONST conversions. This is safe while
+	'' generating the final AST because CONST no longer affects code generation.
+	'' Parser-stage checks that must preserve a CONST conversion must not use it.
+	'' Using it here fixes the crash reported in sf.net bug #910.
 	t = astSkipConstCASTs( n->l )
 
 	'' If it's a CALL returning a STRING, it actually returns a pointer,
@@ -797,7 +794,6 @@ private function hCheckUDTParam _
 	'' set the length if it's being passed by value
 	case FB_PARAMMODE_BYVAL
 		hUDTPassByval( param, n )
-
 	end select
 
 	function = TRUE

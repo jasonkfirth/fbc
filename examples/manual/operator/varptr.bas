@@ -13,11 +13,11 @@ a = 10
 addr = CInt( VarPtr(a) )
 
 '' change all 4 bytes (size of INTEGER) of a
-Poke Integer, addr, -1000 
+Poke Integer, addr, -1000
 Print a
 
 '' place the address of a in addr (same as above)
 addr = CInt( @a )
 
 '' print the least or most significant byte, depending on the CPU endianess
-Print Peek( addr ) 
+Print Peek( addr )

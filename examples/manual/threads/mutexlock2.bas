@@ -74,7 +74,7 @@ Do
 	MutexUnlock(sync)                   '' end exclusion
 	Sleep 10, 1                         '' ajust display period
 Loop Until s <> ""
- 
+
 quit = Not quit     '' order thread end
 ThreadWait(handle)  '' wait for thread end
 MutexDestroy(sync)  '' free Mutex

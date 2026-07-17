@@ -1499,8 +1499,8 @@ function emitJMPTB _
 	assert( labelcount > 0 )
 
 	'' Duplicate the values/labels arrays
-	values = callocate( sizeof( *values ) * labelcount )
-	labels = callocate( sizeof( *labels ) * labelcount )
+	values = xcallocate( sizeof( *values ) * labelcount )
+	labels = xcallocate( sizeof( *labels ) * labelcount )
 	for i as integer = 0 to labelcount - 1
 		values[i] = values1[i]
 		labels[i] = labels1[i]
@@ -1700,5 +1700,3 @@ function emitDBGScopeEnd _
 	function = hNewDBG( EMIT_OP_SCOPEEND, sym )
 
 end function
-
-

@@ -189,6 +189,7 @@ function rtlDataRead _
 	dim as FBSYMBOL ptr f = any
 	dim as integer args = any, dtype = any
 	dim as longint lgt = any
+	const DATA_READ_STRING_ARGUMENT_COUNT = 3
 
 	function = FALSE
 
@@ -199,7 +200,7 @@ function rtlDataRead _
 	select case as const typeGet( dtype )
 	case FB_DATATYPE_STRING, FB_DATATYPE_FIXSTR, FB_DATATYPE_CHAR
 		f = PROCLOOKUP( DATAREADSTR )
-		args = 3
+		args = DATA_READ_STRING_ARGUMENT_COUNT
 
 	case FB_DATATYPE_WCHAR
 		f = PROCLOOKUP( DATAREADWSTR )

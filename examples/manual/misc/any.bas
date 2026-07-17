@@ -22,7 +22,7 @@ Print "Initialized ";
 echo pd       '' pass to echo a pointer to double
 
 p = pa     '' assign to p a pointer to integer
-p = pd     '' assign to p a pointer to double      
+p = pd     '' assign to p a pointer to double
 
 Sleep
 

@@ -22,8 +22,8 @@ end type
 	dim shared Lsin2( -1024 to 1024) as integer
 	dim shared Lsin3( -1024 to 1024) as integer
 	dim shared Lcols(255) as TRGB
-	
-	
+
+
     dim frame as long
     dim col as integer
     dim i as integer
@@ -54,26 +54,25 @@ end type
     dim p as integer ptr
     do
 		counter = counter + cdir
-      	if( (counter < 1) or (counter > 4096) ) then 
+		if( (counter < 1) or (counter > 4096) ) then
 			cdir = -cdir
       	end if
-     
+
       	rot = 64 * (((counter AND 1) = 1) OR 1)
-      
+
       	p = @buffer(0)
       	FOR y As Integer = 0 TO SCR_HEIGHT-1
           	FOR x As Integer = 0 TO SCR_WIDTH-1
 				rot = -rot
               	col = (Lsin3(x + Rot) + Lsin1(x + Rot + Counter) + Lsin2(y + Rot)) and 255
-              	
+
               	*p = rgb( Lcols(col).r, Lcols(col).g, Lcols(col).b )
               	p += 1
           	NEXT x
       	NEXT y
-    
+
 		ptc_update @buffer(0)
 	loop until( inkey = chr( 27 ) )
 
 	ptc_close
-	
-	
+

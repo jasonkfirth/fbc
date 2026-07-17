@@ -23,6 +23,6 @@ Dim As testing myVariable
 '' This is OK, number is public
 myVariable.number = 69
 
-'' this would generate a compile error 
-'' - nome is private and we're trying to access it outside any of this TYPE's member functions 
+'' this would generate a compile error
+'' - nome is private and we're trying to access it outside any of this TYPE's member functions
 '' myVariable.nome = "FreeBASIC"

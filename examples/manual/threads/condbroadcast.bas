@@ -24,51 +24,51 @@ Dim threadnumber As Integer = 4
 '' global data for all threads
 	Dim Shared restart As Integer = 0
 	Dim Shared threadcount As Integer = 0
-   
+
 	Dim Shared hmutexrestart As Any Ptr
 	Dim Shared hcondrestart As Any Ptr
 	Dim Shared hmutexready As Any Ptr
 	Dim Shared hcondready As Any Ptr
 
 Sub mythread(ByVal p As Any Ptr)
-   
+
 	Dim id As Integer = Cast(Integer, p)
-   
+
 	'' for visualizing thread status
 		Print "   Thread #" & id & " is started..."
-	   
+
 	'' instead of starting user code
 		Sleep id * 40, 1
-	   
+
 	'' for visualizing thread status
 		Print "      Thread #" & id & " is running..."
 		Sleep id * 20, 1  '' just to well visualize thread interlacing
 		Print "   Thread #" & id & " is waiting for synchronization..."
-	   
+
 	'' for sending signal to main code
 		MutexLock hmutexready
 		threadcount += 1
 		CondSignal hcondready
 		MutexUnlock hmutexready
-	   
+
 	'' for waiting signal from main code
 		MutexLock hmutexrestart
-		Do While restart = 0  
+		Do While restart = 0
 			CondWait hcondrestart, hmutexrestart
 		Loop
 		MutexUnlock hmutexrestart
-	   
+
 	'' for visualizing thread status
 		Print "   Thread #" & id & " is reactivated..."
-	   
+
 	'' instead of synchronized user code
 		Sleep id * 40, 1
-	   
+
 	'' for visualizing thread status
 		Print "      Thread #" & id & " is continuing..."
 		Sleep id * 20, 1  '' just to well visualize thread interlacing
 		Print "   Thread #" & id & " is finishing execution..."
-   
+
 End Sub
 
 
@@ -81,7 +81,7 @@ hmutexready = MutexCreate()
 
 '' for visualizing main code status
 	Print "Start all threads from main code :"
-	   
+
 '' for starting all threads
 	For i As Integer = 1 To threadnumber
 		threads(i) = ThreadCreate(@mythread, Cast(Any Ptr, i))
@@ -98,7 +98,7 @@ hmutexready = MutexCreate()
 	Print "All thread seen waiting from main code"
 	Print
 	Print "Reactivate all threads from main code :"
-	   
+
 '' for reactivating all threads
 	MutexLock hmutexrestart
 	restart = 1
@@ -111,7 +111,7 @@ hmutexready = MutexCreate()
 			ThreadWait threads(i)
 		End If
 	Next i
-   
+
 '' for visualizing main code status
 	Print "All thread seen completed from main code"
 

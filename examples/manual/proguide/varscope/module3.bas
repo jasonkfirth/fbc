@@ -16,7 +16,7 @@ Common m2 As Integer
 '' This is executed after all other modules
 m1 = 1
 
-Print "Module3"       
+Print "Module3"
 Print "m1 = "; m1     '' m1 = 1 as set in this module
 Print "m2 = "; m2     '' m2 = 2 as set in module2
 

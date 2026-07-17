@@ -1,6 +1,6 @@
 ''
 '' CInPlaceSite - a "class" that implements the IOleInPlaceSite interface
-'' 
+''
 
 
 
@@ -18,12 +18,12 @@ private function CInPlaceSite_QueryInterface _
 	dim as CInPlaceSite ptr self_ = cast( CInPlaceSite ptr, _this )
 
 	LOG_FUNC()
-	
+
 	if( memcmp( riid, @IID_IOleInPlaceSite, len( GUID ) ) = 0 ) then
 		*ppvObj = @self_->interface
 		return S_OK
 	end if
-	
+
 	function = self_->frame.interface.lpVtbl->QueryInterface( @self_->frame.interface, riid, ppvObj )
 
 end function
@@ -35,9 +35,9 @@ private function CInPlaceSite_AddRef _
 	) as ULONG
 
 	LOG_FUNC()
-	
+
 	function = 1
-	
+
 end function
 
 ''::::
@@ -47,9 +47,9 @@ private function CInPlaceSite_Release _
 	) as ULONG
 
 	LOG_FUNC()
-	
+
 	function = 1
-	
+
 end function
 
 ''::::
@@ -60,11 +60,11 @@ private function CInPlaceSite_GetWindow _
 	) as HRESULT
 
 	LOG_FUNC()
-	
+
 	*lphwnd = cast( CInPlaceSite ptr, _this )->frame.hwnd
 
 	function = S_OK
-	
+
 end function
 
 ''::::
@@ -75,9 +75,9 @@ private function CInPlaceSite_ContextSensitiveHelp _
 	) as HRESULT
 
 	LOG_FUNC()
-	
+
 	function = E_NOTIMPL
-	
+
 end function
 
 ''::::
@@ -87,9 +87,9 @@ private function CInPlaceSite_CanInPlaceActivate _
 	) as HRESULT
 
 	LOG_FUNC()
-	
+
 	function = S_OK
-	
+
 end function
 
 ''::::
@@ -99,15 +99,15 @@ private function CInPlaceSite_OnInPlaceActivate _
 	) as HRESULT
 
 	dim as CInPlaceSite ptr self_ = cast( CInPlaceSite ptr, _this )
-	
+
 	LOG_FUNC()
-	
+
 	self_->oleobj->lpVtbl->QueryInterface( self_->oleobj, _
 										   @IID_IOleInPlaceObject, _
 										   cast( PVOID ptr, @self_->inplaceobj ) )
-	
+
 	function = S_OK
-	
+
 end function
 
 ''::::
@@ -117,9 +117,9 @@ private function CInPlaceSite_OnUIActivate _
 	) as HRESULT
 
 	LOG_FUNC()
-	
+
 	function = S_OK
-	
+
 end function
 
 ''::::
@@ -134,13 +134,13 @@ private function CInPlaceSite_GetWindowContext _
 	) as HRESULT
 
 	dim as CInPlaceSite ptr self_ = cast( CInPlaceSite ptr, _this )
-	
+
 	LOG_FUNC()
-	
+
 	*lplpFrame = cast( LPOLEINPLACEFRAME, @self_->frame.interface )
 
 	*lplpDoc = NULL
-	
+
 	dim as RECT rect
 	GetClientRect( self_->frame.hwnd, @rect )
 	*lprcPosRect = rect
@@ -151,9 +151,9 @@ private function CInPlaceSite_GetWindowContext _
 	lpFrameInfo->hwndFrame = self_->frame.hwnd
 	lpFrameInfo->haccel = NULL
 	lpFrameInfo->cAccelEntries = 0
-			
+
 	function = S_OK
-	
+
 end function
 
 ''::::
@@ -164,9 +164,9 @@ private function CInPlaceSite_Scroll _
 	) as HRESULT
 
 	LOG_FUNC()
-	
+
 	function = E_NOTIMPL
-	
+
 end function
 
 ''::::
@@ -177,9 +177,9 @@ private function CInPlaceSite_OnUIDeactivate _
 	) as HRESULT
 
 	LOG_FUNC()
-	
+
 	function = S_OK
-	
+
 end function
 
 ''::::
@@ -189,14 +189,14 @@ private function CInPlaceSite_OnInPlaceDeactivate _
 	) as HRESULT
 
 	dim as CInPlaceSite ptr self_ = cast( CInPlaceSite ptr, _this )
-	
+
 	LOG_FUNC()
-	
+
 	self_->inplaceobj->lpVtbl->Release( self_->inplaceobj )
 	self_->inplaceobj = NULL
-	
+
 	function = S_OK
-	
+
 end function
 
 ''::::
@@ -206,9 +206,9 @@ private function CInPlaceSite_DiscardUndoState _
 	) as HRESULT
 
 	LOG_FUNC()
-	
+
 	function = E_NOTIMPL
-	
+
 end function
 
 ''::::
@@ -218,9 +218,9 @@ private function CInPlaceSite_DeactivateAndUndo _
 	) as HRESULT
 
 	LOG_FUNC()
-	
+
 	function = E_NOTIMPL
-	
+
 end function
 
 ''::::
@@ -234,7 +234,7 @@ private function CInPlaceSite_OnPosRectChange _
 	dim as CInPlaceSite ptr self_ = cast( CInPlaceSite ptr, _this )
 
 	LOG_FUNC()
-	
+
 	self_->inplaceobj->lpVtbl->SetObjectRects( self_->inplaceobj, lprcPosRect, lprcPosRect )
 
 	function = S_OK
@@ -242,7 +242,7 @@ private function CInPlaceSite_OnPosRectChange _
 #else
 	function = E_NOTIMPL
 #endif
-	
+
 end function
 
 '' constructor
@@ -270,7 +270,7 @@ function CInPlaceSite_New _
 			@CInPlaceSite_DeactivateAndUndo, _
 			@CInPlaceSite_OnPosRectChange _
 		)
-	
+
 	if( _this = NULL ) then
 		_this = cast( CInPlaceSite ptr, allocate( len( CInPlaceSite ) ) )
 		if( _this = NULL ) then
@@ -282,7 +282,7 @@ function CInPlaceSite_New _
 
 	CInPlaceFrame_New( @_this->frame, hwnd )
 	_this->inplaceobj = NULL
-	
+
 	function = _this
 
 end function
@@ -300,7 +300,7 @@ sub CInPlaceSite_Delete _
 	end if
 
 	CInPlaceFrame_Delete( @_this->frame, TRUE )
-	
+
 	if( isstatic = FALSE ) then
 		if( _this <> NULL ) then
 			deallocate( _this )

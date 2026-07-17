@@ -62,7 +62,7 @@ dim shared as OBJECT_ ptr sour, dest              '' Source Object, Destination 
 	dim as integer iSTEP = 0 '' Step Counter
 	dim as integer morph = FALSE                 '' Default morph To False (Not Morphing)
 
-	
+
 	dim as OBJECT_ morph1, morph2, morph3, morph4 '' Our 4 Morphable Objects (morph1,2,3 & 4)
 	dim as OBJECT_ helper                         '' Helper Object
 	dim as single tx, ty, tz                      '' Temp X, Y & Z Variables
@@ -259,7 +259,7 @@ end sub
 
 '---------------------------------------------------
 '' Reads A String From File (f)
-sub readstr(byval f as integer, byref sstring as string)                 
+sub readstr(byval f as integer, byref sstring as string)
 	if eof(f) then
 		sstring = ""
 	else
@@ -269,7 +269,7 @@ end sub
 
 '---------------------------------------------------
 '' Loads Object From File (name)
-sub objload (byref fname as string, byval k as OBJECT_ ptr)          
+sub objload (byref fname as string, byval k as OBJECT_ ptr)
 	dim ver as integer                                  '' Will Hold Vertice Count
 	dim as single rx, ry, rz                            '' Hold Vertex X, Y & Z Position
 	dim oneline as string * 256                         '' Holds One Line Of Text
@@ -302,7 +302,7 @@ end sub
 
 '---------------------------------------------------
 '' Calculates Movement Of Points During Morphing
-sub calculate (byval i as integer, byval v as VERTEX ptr)                
+sub calculate (byval i as integer, byval v as VERTEX ptr)
 	v->x = (sour->points[i].x - dest->points[i].x) / steps    '' a.x Value Equals Source x - Destination x Divided By Steps
 	v->y = (sour->points[i].y - dest->points[i].y) / steps    '' a.y Value Equals Source y - Destination y Divided By Steps
 	v->z = (sour->points[i].z - dest->points[i].z) / steps    '' a.z Value Equals Source z - Destination z Divided By Steps

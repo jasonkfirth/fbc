@@ -252,7 +252,7 @@ Namespace Office
 	Const IID_PictureEffects = "{000C03D2-0000-0000-C000-000000000046}"
 	Const IID_Crop = "{000C03D3-0000-0000-C000-000000000046}"
 	Const IID_ContactCard = "{000C03F1-0000-0000-C000-000000000046}"
-	
+
 	Type MsoRGBType As Long
 
 	Enum MsoLineDashStyle

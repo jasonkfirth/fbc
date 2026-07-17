@@ -503,7 +503,7 @@ SUITE( fbc_tests.file_.get_ )
 			guard.canary = &h5a
 
 			CU_ASSERT( sizeof( FixedStringGuard ) = 5 )
-			CU_ASSERT( cast( ulongint, @guard.canary ) = cast( ulongint, @guard.text ) + len( guard.text ) )
+			CU_ASSERT( cast( uinteger, @guard.canary ) = cast( uinteger, @guard.text ) + len( guard.text ) )
 
 			if( open( TESTFILE, for binary, access read, as #f ) <> 0 ) then
 				CU_FAIL( "could not open file " & TESTFILE )
@@ -595,7 +595,7 @@ SUITE( fbc_tests.file_.get_ )
 			guard.text = ""
 			guard.canary = &h5a
 
-			CU_ASSERT( cast( ulongint, @guard.canary ) = cast( ulongint, @guard.text ) + sizeof( guard.text ) )
+			CU_ASSERT( cast( uinteger, @guard.canary ) = cast( uinteger, @guard.text ) + sizeof( guard.text ) )
 
 			if( open( TESTFILE, for binary, access read, as #f ) <> 0 ) then
 				CU_FAIL( "could not open file " & TESTFILE )
@@ -614,7 +614,7 @@ SUITE( fbc_tests.file_.get_ )
 			guard.text = wstr( "" )
 			guard.canary = &h5a
 
-			CU_ASSERT( cast( ulongint, @guard.canary ) = cast( ulongint, @guard.text ) + sizeof( guard.text ) )
+			CU_ASSERT( cast( uinteger, @guard.canary ) = cast( uinteger, @guard.text ) + sizeof( guard.text ) )
 
 			if( open( TESTFILE, for binary, access read, as #f ) <> 0 ) then
 				CU_FAIL( "could not open file " & TESTFILE )
@@ -632,7 +632,7 @@ SUITE( fbc_tests.file_.get_ )
 			guard.value = 0
 			guard.canary = &h5a
 
-			CU_ASSERT( cast( ulongint, @guard.canary ) = cast( ulongint, @guard.value ) + sizeof( guard.value ) )
+			CU_ASSERT( cast( uinteger, @guard.canary ) = cast( uinteger, @guard.value ) + sizeof( guard.value ) )
 
 			if( open( TESTFILE, for binary, access read, as #f ) <> 0 ) then
 				CU_FAIL( "could not open file " & TESTFILE )
@@ -651,7 +651,7 @@ SUITE( fbc_tests.file_.get_ )
 			guard.value = 0.0
 			guard.canary = &h5a
 
-			CU_ASSERT( cast( ulongint, @guard.canary ) = cast( ulongint, @guard.value ) + sizeof( guard.value ) )
+			CU_ASSERT( cast( uinteger, @guard.canary ) = cast( uinteger, @guard.value ) + sizeof( guard.value ) )
 
 			if( open( TESTFILE, for binary, access read, as #f ) <> 0 ) then
 				CU_FAIL( "could not open file " & TESTFILE )

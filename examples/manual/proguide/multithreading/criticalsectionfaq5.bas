@@ -16,7 +16,7 @@ Function threadInput (ByVal row As Integer, ByVal column As Integer, ByRef promp
 	Dim As Integer r
 	Dim As Integer c
 
- 
+
 	MutexLock(mutex)
 	r = CsrLin()
 	c = Pos()
@@ -145,4 +145,4 @@ Locate UDT.numberMax + 4, 1
 Print CULngInt(c / t) & " increments per second"
 
 Sleep
-					
+

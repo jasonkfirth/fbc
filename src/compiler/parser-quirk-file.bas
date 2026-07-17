@@ -796,6 +796,124 @@ end function
 ''
 ''                  OPEN ("O"|"I"|"B"|"R"|"A")',' '#'? Expression{int}',' Expression{str} (',' Expression{int})?
 ''
+private function hFileOpenShortForm _
+	( _
+		byval isfunc as integer, _
+		byval fmode as ASTNODE ptr _
+	) as ASTNODE ptr
+
+	dim as ASTNODE ptr filenum, filename, faccess, flock, flen
+
+	'' '#'? file number
+	hMatch( CHAR_SHARP )
+	hMatchFileNumberExpression( filenum, FB_DATATYPE_INTEGER )
+
+	hMatchCOMMA( )
+	'' file name
+	hMatchExpressionEx( filename, FB_DATATYPE_STRING )
+
+	'' record length
+	if( hMatch( CHAR_COMMA ) ) then
+		if( lexGetToken( ) <> CHAR_COMMA ) then
+			hMatchExpressionEx( flen, FB_DATATYPE_INTEGER )
+		end if
+		'' access mode
+		if( hMatch( CHAR_COMMA ) ) then
+			if( lexGetToken( ) <> CHAR_COMMA ) then
+				hMatchExpressionEx( faccess, FB_DATATYPE_STRING )
+			end if
+			'' lock mode
+			if( hMatch( CHAR_COMMA ) ) then
+				hMatchExpressionEx( flock, FB_DATATYPE_STRING )
+			end if
+		end if
+	end if
+
+	if( flen = NULL ) then
+		flen = astNewCONSTi( 0 )
+	end if
+
+	if( faccess = NULL ) then
+		faccess = astNewCONSTstr( "" )
+	end if
+
+	if( flock = NULL ) then
+		flock = astNewCONSTstr( "" )
+	end if
+
+	if( isfunc ) then
+		'' ')'
+		hMatchRPRNT( )
+	end if
+
+	function = rtlFileOpenShort( filename, fmode, faccess, flock, _
+	                             filenum, flen, isfunc )
+
+end function
+
+private function hParseFileOpenMode( ) as integer
+
+	function = FB_FILE_MODE_RANDOM
+
+	if( hMatch( FB_TK_FOR, LEXCHECK_POST_SUFFIX ) ) then
+		select case ucase( *lexGetText( ) )
+		case "INPUT"
+			function = FB_FILE_MODE_INPUT
+		case "OUTPUT"
+			function = FB_FILE_MODE_OUTPUT
+		case "BINARY"
+			function = FB_FILE_MODE_BINARY
+		case "RANDOM"
+			function = FB_FILE_MODE_RANDOM
+		case "APPEND"
+			function = FB_FILE_MODE_APPEND
+		case else
+			function = -1
+			return -1
+		end select
+
+		lexSkipToken( LEXCHECK_POST_SUFFIX )
+	end if
+
+end function
+
+private function hParseFileOpenEncoding _
+	( _
+		byval isfunc as integer, _
+		byval file_mode as integer _
+	) as ASTNODE ptr
+
+	dim as ASTNODE ptr fencoding = NULL
+
+	if( fbLangIsSet( FB_LANG_QB ) ) then
+		exit function
+	end if
+
+	'' ENCODING is only allowed for text modes.
+	select case file_mode
+	case FB_FILE_MODE_INPUT, FB_FILE_MODE_OUTPUT, FB_FILE_MODE_APPEND
+		if( hMatch( FB_TK_ENCODING, LEXCHECK_POST_SUFFIX ) ) then
+			hMatchExpressionEx( fencoding, FB_DATATYPE_STRING )
+
+			if( isfunc ) then
+				hMatch( CHAR_COMMA )
+			end if
+		end if
+	case else
+		'' ENCODING is not valid for the remaining file modes.
+	end select
+
+	function = fencoding
+
+end function
+
+private sub hFileOpenMatchFuncComma( byval isfunc as integer )
+	if( isfunc ) then
+		hMatch( CHAR_COMMA )
+	end if
+
+end sub
+
 private function hFileOpen _
 	( _
 		byval isfunc as integer _
@@ -917,103 +1035,22 @@ private function hFileOpen _
 	if( short_form ) then
 		'' file mode ("I"|"O"|"A"|"B"|"R")
 		fmode = filename
-		filename = NULL
-
-		'' '#'? file number
-		hMatch( CHAR_SHARP )
-		hMatchFileNumberExpression( filenum, FB_DATATYPE_INTEGER )
-
-		hMatchCOMMA( )
-		'' file name
-		hMatchExpressionEx( filename, FB_DATATYPE_STRING )
-
-		'' record length
-		if( hMatch( CHAR_COMMA ) ) then
-			if( lexGetToken( ) <> CHAR_COMMA ) then
-				hMatchExpressionEx( flen, FB_DATATYPE_INTEGER )
-			end if
-			'' access mode
-			if( hMatch( CHAR_COMMA ) ) then
-				if( lexGetToken( ) <> CHAR_COMMA ) then
-					hMatchExpressionEx( faccess, FB_DATATYPE_STRING )
-				end if
-				'' lock mode
-				if( hMatch( CHAR_COMMA ) ) then
-					hMatchExpressionEx( flock, FB_DATATYPE_STRING )
-				end if
-			end if
-		end if
-
-		if( flen = NULL ) then
-			flen = astNewCONSTi( 0 )
-		end if
-
-		if( faccess = NULL ) then
-			faccess = astNewCONSTstr( "" )
-		end if
-
-		if( flock = NULL ) then
-			flock = astNewCONSTstr( "" )
-		end if
-
-		if( isfunc ) then
-			'' ')'
-			hMatchRPRNT( )
-		end if
-
-		return rtlFileOpenShort( filename, fmode, faccess, flock, _
-								filenum, flen, isfunc )
+		return hFileOpenShortForm( isfunc, fmode )
 	end if
 
 	'' long form..
 
 	'' (FOR (INPUT|OUTPUT|BINARY|RANDOM|APPEND))?
-	if( hMatch( FB_TK_FOR, LEXCHECK_POST_SUFFIX ) ) then
-		select case ucase( *lexGetText( ) )
-		case "INPUT"
-			file_mode = FB_FILE_MODE_INPUT
-		case "OUTPUT"
-			file_mode = FB_FILE_MODE_OUTPUT
-		case "BINARY"
-			file_mode = FB_FILE_MODE_BINARY
-		case "RANDOM"
-			file_mode = FB_FILE_MODE_RANDOM
-		case "APPEND"
-			file_mode = FB_FILE_MODE_APPEND
-		case else
-			exit function
-		end select
-
-		lexSkipToken( LEXCHECK_POST_SUFFIX )
-
-	else
-		file_mode = FB_FILE_MODE_RANDOM
+	file_mode = hParseFileOpenMode( )
+	if( file_mode < 0 ) then
+		exit function
 	end if
 
 	fmode = astNewCONSTi( file_mode )
 
-	if( isfunc ) then
-		'' ','?
-		hMatch( CHAR_COMMA )
-	end if
+	hFileOpenMatchFuncComma( isfunc )
 
-	fencoding = NULL
-
-	if( fbLangIsSet( FB_LANG_QB ) ) = FALSE then
-		'' ENCODING is only allowed in text-mode
-		select case file_mode
-		case FB_FILE_MODE_INPUT, FB_FILE_MODE_OUTPUT, FB_FILE_MODE_APPEND
-			'' (ENCODING Expression)?
-			if( hMatch( FB_TK_ENCODING, LEXCHECK_POST_SUFFIX ) ) then
-				hMatchExpressionEx( fencoding, FB_DATATYPE_STRING )
-
-				if( isfunc ) then
-					'' ','?
-					hMatch( CHAR_COMMA )
-				end if
-			end if
-		end select
-	end if
+	fencoding = hParseFileOpenEncoding( isfunc, file_mode )
 
 	'' (ACCESS (READ|WRITE|READ WRITE))?
 	if( hMatchIdOrKw( "ACCESS", LEXCHECK_POST_SUFFIX ) ) then
@@ -1032,10 +1069,7 @@ private function hFileOpen _
 
 	faccess = astNewCONSTi( access_mode )
 
-	if( isfunc ) then
-		'' ','?
-		hMatch( CHAR_COMMA )
-	end if
+	hFileOpenMatchFuncComma( isfunc )
 
 	'' (SHARED|LOCK (READ|WRITE|READ WRITE))?
 	if( hMatch( FB_TK_SHARED, LEXCHECK_POST_SUFFIX ) ) then
@@ -1057,10 +1091,7 @@ private function hFileOpen _
 
 	flock = astNewCONSTi( lock_mode )
 
-	if( isfunc ) then
-		'' ','?
-		hMatch( CHAR_COMMA )
-	end if
+	hFileOpenMatchFuncComma( isfunc )
 
 	'' AS '#'? Expression
 	if( hMatch( FB_TK_AS, LEXCHECK_POST_SUFFIX ) = FALSE ) then
@@ -1071,10 +1102,7 @@ private function hFileOpen _
 
 	hMatchFileNumberExpression( filenum, FB_DATATYPE_INTEGER )
 
-	if( isfunc ) then
-		'' ','?
-		hMatch( CHAR_COMMA )
-	end if
+	hFileOpenMatchFuncComma( isfunc )
 
 	'' (LEN '=' Expression)?
 	if( hMatchIdOrKw( "LEN", LEXCHECK_POST_SUFFIX ) ) then

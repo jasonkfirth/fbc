@@ -18,7 +18,7 @@ End Type
 Sub printUDT cdecl (ByVal count As Integer, ...)
 	Dim arg As Any Ptr
 	Dim pu As UDT Ptr
-   
+
 	arg = va_first()
 
 	For i As Integer = 1 To count
@@ -41,4 +41,4 @@ Sleep
 ' 4*Atn(1)       3.141593
 ' Sqr(2)         1.414214
 ' Log(10)        2.302585
-		
+

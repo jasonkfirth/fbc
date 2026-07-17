@@ -143,7 +143,24 @@ extern in6addr_loopback alias "in6addr_loopback" as in6_addr
 
 #include once "crt/sys/socket.bi"
 
-#if defined(__FB_DRAGONFLY__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_DARWIN__)
+#if defined(__FB_HAIKU__)
+	type sockaddr_in
+		sin_len as ubyte
+		sin_family as sa_family_t
+		sin_port as in_port_t
+		sin_addr as in_addr
+		sin_zero(0 to 24-1) as ubyte
+	end type
+
+	type sockaddr_in6
+		sin6_len as ubyte
+		sin6_family as sa_family_t
+		sin6_port as in_port_t
+		sin6_flowinfo as uint32_t
+		sin6_addr as in6_addr
+		sin6_scope_id as uint32_t
+	end type
+#elseif defined(__FB_FREEBSD__) or defined(__FB_DRAGONFLY__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_DARWIN__)
 	type sockaddr_in
 		sin_len as ubyte
 		sin_family as sa_family_t
@@ -159,6 +176,22 @@ extern in6addr_loopback alias "in6addr_loopback" as in6_addr
 		sin6_flowinfo as uint32_t
 		sin6_addr as in6_addr
 		sin6_scope_id as uint32_t
+	end type
+#elseif defined(__FB_SOLARIS__)
+	type sockaddr_in
+		sin_family as sa_family_t
+		sin_port as in_port_t
+		sin_addr as in_addr
+		sin_zero(0 to 8-1) as ubyte
+	end type
+
+	type sockaddr_in6
+		sin6_family as sa_family_t
+		sin6_port as in_port_t
+		sin6_flowinfo as uint32_t
+		sin6_addr as in6_addr
+		sin6_scope_id as uint32_t
+		__sin6_src_id as uint32_t
 	end type
 #else
 	type sockaddr_in
@@ -249,6 +282,8 @@ end type
 #include once "crt/netinet/nuttx/in.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/netinet/cygwin/in.bi"
+#elseif defined(__FB_FREEBSD__)
+#include once "crt/netinet/freebsd/in.bi"
 #elseif defined(__FB_DRAGONFLY__)
 #include once "crt/netinet/dragonfly/in.bi"
 #elseif defined(__FB_OPENBSD__)
@@ -257,6 +292,10 @@ end type
 #include once "crt/netinet/netbsd/in.bi"
 #elseif defined(__FB_DARWIN__)
 #include once "crt/netinet/darwin/in.bi"
+#elseif defined(__FB_HAIKU__)
+#include once "crt/netinet/haiku/in.bi"
+#elseif defined(__FB_SOLARIS__)
+#include once "crt/netinet/solaris/in.bi"
 #else
 #error Platform unsupported
 #endif

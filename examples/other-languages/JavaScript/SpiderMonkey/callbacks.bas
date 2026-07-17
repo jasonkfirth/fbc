@@ -35,14 +35,14 @@ Private Function ucase_callback cdecl _
         ByVal argv As jsval Ptr, _
         ByVal rval As jsval Ptr _
     ) As JSBool
-   
+
     If (argc < 1) Then
         Return 0
     End If
-   
+
     '' Get the first argument
     Dim As ZString Ptr arg1 = JS_GetStringBytes(JS_ValueToString(cx, argv[0]))
-   
+
     '' Get a buffer for the result string
     Dim As ZString Ptr result = JS_malloc(cx, Len(*arg1) + 1)
 

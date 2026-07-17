@@ -31,8 +31,11 @@ threadID = ThreadCreate(@thread)  '' creation of the child thread from the main 
 For I As Integer = 1 To 10  '' 'For' loop of the main thread
 	MutexLock(mutID)        '' set mutex locked at the beginning of the exclusive section
 	Print "[";
+	'' These delays make the uninterrupted critical-section output visible.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 	Sleep 50, 1
 	Print "M";
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 	Sleep 50, 1
 	Print "]";
 	MutexUnlock(mutID)      '' set mutex unlocked at the end of the exclusive section
@@ -52,12 +55,14 @@ Sub thread (ByVal userdata As Any Ptr)  '' sub executed by the child thread
 	For I As Integer = 1 To 10          '' 'For' loop of the child thread
 		MutexLock(mutID)                '' set mutex locked at the beginning of the exclusive section
 		Print "(";
+		'' These delays make the uninterrupted critical-section output visible.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 		Sleep 50, 1
 		Print "C";
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 		Sleep 50, 1
 		Print ")";
 		MutexUnlock(mutID)              '' set mutex unlocked at the end of the exclusive section
 		Sleep 250, 1
 	Next I
 End Sub
-		

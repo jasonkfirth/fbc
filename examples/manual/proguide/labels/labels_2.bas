@@ -14,7 +14,7 @@
 Read a,b,c
 Restore here
 Read d,e
-Print a,b,c,d,e 
+Print a,b,c,d,e
 
 Data 1,2,3,4,5
 here:

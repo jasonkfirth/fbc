@@ -373,6 +373,9 @@ private function hEmitProcCallConv( byval proc as FBSYMBOL ptr ) as string
 		function = "x86_thiscall "
 	case FB_FUNCMODE_FASTCALL
 		function = "x86_fastcall "
+	case else
+		assert( 0 )
+		function = ""
 	end select
 end function
 
@@ -562,6 +565,9 @@ private sub hBuildWstrLit _
 	)
 
 	dim as uinteger ch = any, wcharsize = any
+	const WCHAR_BYTE_1_SHIFT = 8
+	const WCHAR_BYTE_2_SHIFT = 16
+	const WCHAR_BYTE_3_SHIFT = 24
 
 	'' (ditto)
 	''
@@ -587,11 +593,11 @@ private sub hBuildWstrLit _
 				ln += $"\" + hex( (ch       ) and &hFF, 2 )
 			end if
 			if( wcharsize >= 2 ) then
-				ln += $"\" + hex( (ch shr  8) and &hFF, 2 )
+				ln += $"\" + hex( (ch shr WCHAR_BYTE_1_SHIFT) and &hFF, 2 )
 			end if
 			if( wcharsize >= 4 ) then
-				ln += $"\" + hex( (ch shr 16) and &hFF, 2 )
-				ln += $"\" + hex( (ch shr 24) and &hFF, 2 )
+				ln += $"\" + hex( (ch shr WCHAR_BYTE_2_SHIFT) and &hFF, 2 )
+				ln += $"\" + hex( (ch shr WCHAR_BYTE_3_SHIFT) and &hFF, 2 )
 			end if
 		else
 			ln += chr( ch )
@@ -876,7 +882,9 @@ end sub
 
 private function _emitBegin( ) as integer
 	if( hFileExists( env.outf.name ) ) then
-		kill env.outf.name
+		if( kill( env.outf.name ) <> 0 ) then
+			return FALSE
+		end if
 	end if
 
 	env.outf.num = freefile
@@ -1415,7 +1423,10 @@ private function hGetBopCode _
 		end if
 	case AST_OP_NE
 		if( typeGetClass( dtype ) = FB_DATACLASS_FPOINT ) then
-			function = @"fcmp one"
+			'' FB follows IEEE comparison rules: a NaN is not equal to every
+			'' value, including itself. LLVM's unordered-not-equal predicate
+			'' preserves that behaviour.
+			function = @"fcmp une"
 		else
 			function = @"icmp ne"
 		end if
@@ -1443,12 +1454,11 @@ private function hGetBopCode _
 		else
 			function = @"icmp sle"
 		end if
-	case AST_OP_EQV
-		'' TODO: vr = not (v1 xor v2)
-		function = @"eqv"
-	case AST_OP_IMP
-		'' TODO: vr =  (not v1) or v2
-		function = @"imp"
+	case AST_OP_EQV, AST_OP_IMP
+		'' hEmitBop() lowers these operations to XOR/OR instructions before
+		'' reaching this opcode lookup.
+		assert( FALSE )
+		function = @"xor"
 
 	end select
 
@@ -1469,8 +1479,6 @@ private sub hLoadOperandsAndWriteBop _
 	hLoadVreg( v2 )
 	_setVregDataType( v1, dtype, subtype )
 	_setVregDataType( v2, dtype, subtype )
-
-	'' !!!TODO!!! Comparisons with NaN not tested
 
 	if( (options and IR_EMITOPT_REL_DOINVERSE) <> 0 ) then
 		op = astGetInverseLogOp( op )
@@ -1544,7 +1552,27 @@ private sub hEmitBop _
 		v1orig = *v1
 	end if
 
-	hLoadOperandsAndWriteBop( op, v1, v2, vr, vr->dtype, vr->subtype, options )
+	select case as const( op )
+	case AST_OP_EQV
+		'' LLVM has no EQV instruction. EQV is NOT (v1 XOR v2).
+		var vtemp = irhlAllocVreg( vr->dtype, vr->subtype )
+		hEmitBop( AST_OP_XOR, v1, v2, vtemp, NULL, IR_EMITOPT_NONE )
+
+		'' Boolean values are stored as 0/1, so invert their low bit. Other
+		'' integer types use an all-bits-set mask for the bitwise NOT.
+		var inverse = irhlAllocVrImm( FB_DATATYPE_INTEGER, NULL, iif( vr->dtype = FB_DATATYPE_BOOLEAN, 1, -1 ) )
+		hEmitBop( AST_OP_XOR, vtemp, inverse, vr, NULL, IR_EMITOPT_NONE )
+
+	case AST_OP_IMP
+		'' LLVM has no IMP instruction. IMP is (NOT v1) OR v2.
+		var vtemp = irhlAllocVreg( vr->dtype, vr->subtype )
+		var inverse = irhlAllocVrImm( FB_DATATYPE_INTEGER, NULL, iif( vr->dtype = FB_DATATYPE_BOOLEAN, 1, -1 ) )
+		hEmitBop( AST_OP_XOR, v1, inverse, vtemp, NULL, IR_EMITOPT_NONE )
+		hEmitBop( AST_OP_OR, vtemp, v2, vr, NULL, IR_EMITOPT_NONE )
+
+	case else
+		hLoadOperandsAndWriteBop( op, v1, v2, vr, vr->dtype, vr->subtype, options )
+	end select
 
 	'' LLVM comparison ops return i1, but we usually want i32,
 	'' so do an sign-extending cast (i1 -1 to i32 -1).

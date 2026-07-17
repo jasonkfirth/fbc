@@ -212,6 +212,12 @@ NONTERMINATING_SOURCES = {
     "examples/manual/proguide/labels/labels_1.bas",
 }
 
+LONG_RUNNING_BENCHMARKS = {
+    "examples/manual/proguide/multithreading/criticalsectionfaq15.bas",
+    "examples/manual/proguide/multithreading/emulatetp4.bas",
+    "examples/manual/proguide/multithreading/emulatetp5.bas",
+}
+
 INTERACTIVE_SOURCES = {
     # These samples are stored in various encodings and call MessageBox() on Windows.
     "examples/unicode/hello_chinese.bas",
@@ -369,6 +375,9 @@ def classify(path: Path, root: Path) -> Classification:
 
     if rel in NONTERMINATING_SOURCES:
         return Classification("interactive", "example is intentionally non-terminating or control-flow oriented", False)
+
+    if rel in LONG_RUNNING_BENCHMARKS:
+        return Classification("long-running-benchmark", "benchmark intentionally exceeds the bounded smoke-test runtime", False)
 
     if rel in INTERACTIVE_SOURCES:
         return Classification("interactive", "example opens an interactive UI or console prompt", False)
@@ -909,8 +918,20 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     args.outdir = args.outdir.resolve()
     args.prefix = (args.prefix or args.root).resolve()
     args.include_dir = (args.include_dir or (args.root / "inc")).resolve()
-    args.fbc = shlex.split(args.fbc)
     args.remote_shell = shlex.split(args.remote_shell)
+
+    if args.remote_shell:
+        args.fbc = shlex.split(args.fbc)
+    else:
+        fbc_path = Path(args.fbc).resolve()
+        if os.name == "nt" and not fbc_path.suffix and not fbc_path.is_file():
+            fbc_path = fbc_path.with_suffix(".exe")
+
+        if fbc_path.is_file():
+            args.fbc = [str(fbc_path)]
+        else:
+            args.fbc = shlex.split(args.fbc, posix=(os.name != "nt"))
+
     args.path_maps = [
         (Path(host).resolve(), guest)
         for host, guest in (item.split("=", 1) for item in args.path_map)

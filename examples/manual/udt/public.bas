@@ -15,7 +15,7 @@ Type testing
 End Type
 
 Sub testing.setnome( ByRef newnome As String )
-  this.nome = newnome 
+  this.nome = newnome
 End Sub
 
 Dim As testing myVariable

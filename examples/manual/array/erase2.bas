@@ -16,4 +16,4 @@ Erase MyArray1, MyArray2
 
 Print "MyArray1", LBound( MyArray1 ), UBound( MyArray1 ) ' prints: MyArray1       1             10
 Print "MyArray2", LBound( MyArray2 ), UBound( MyArray2 ) ' prints: MyArray2       0            -1
-		
+

@@ -22,7 +22,7 @@ Sub proc cdecl(count As Integer, ... )
 	For i As Integer = 1 To count
 		Print Cva_Arg( args1, Integer ), Cva_Arg( args2, Integer )
 	Next
-	
+
 	'' clean-up
 	Cva_End( args2 )
 	Cva_End( args1 )

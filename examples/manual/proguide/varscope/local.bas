@@ -15,7 +15,7 @@ Print local_moduleLevel1
 Scope
   '' OK; SCOPE Blocks inherit outer scope
   Print local_moduleLevel1
-  
+
   '' visible only in this SCOPE Block
   Dim As Integer local_moduleLevel2
 
@@ -33,7 +33,7 @@ Function some_function( ) As Integer
   '' OK.
   Print local_functionLevel
 
-  '' Error; can't see local module-level vars  
+  '' Error; can't see local module-level vars
   '' print local_moduleLevel1
 
   '' Error; can't see local module-level vars

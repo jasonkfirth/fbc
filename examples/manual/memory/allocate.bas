@@ -14,10 +14,9 @@
 
 	'' Try allocating memory for a number of integers.
 	''
-	Dim buffer As Integer Ptr
-	buffer = Allocate(integerCount * SizeOf(Integer))
+	Dim buffer As Integer Ptr = Allocate(integerCount * SizeOf(Integer))
 
-	If (0 = buffer) Then
+	If buffer = 0 Then
 		Print "Error: unable to allocate memory, quitting."
 		End -1
 	End If

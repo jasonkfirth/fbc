@@ -8,7 +8,7 @@
 
 Type Rational
 	As Integer numerator, denominator
-	
+
 	Declare Operator Cast () As Double
 	Declare Operator Cast () As String
 	Declare Operator *= (ByRef rhs As Rational)
@@ -31,4 +31,4 @@ Dim As Rational r1 = (2, 3), r2 = (3, 4)
 r1 *= r2
 Dim As Double d = r1
 Print r1, d
-		
+

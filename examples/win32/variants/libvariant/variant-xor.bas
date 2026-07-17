@@ -15,13 +15,13 @@ operator xor _
 		byref lhs as VARIANT, _
 		byref rhs as VARIANT _
 	) as VARIANT
-	
+
 	dim as VARIANT_ res = any
-	
+
 	VarXor( @lhs.var_, @rhs.var_, @res )
-	
+
 	return VARIANT( res, FALSE )
-	
+
 end operator
 
 
@@ -31,12 +31,12 @@ operator xor _
 		byref lhs as VARIANT, _
 		byref rhs as VARIANT_ _
 	) as VARIANT
-	
+
 	dim as VARIANT_ res = any
-	
+
 	VarXor( @lhs.var_, @rhs, @res )
-	
+
 	return VARIANT( res, FALSE )
-	
+
 end operator
 

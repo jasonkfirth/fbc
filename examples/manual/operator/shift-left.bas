@@ -8,7 +8,7 @@
 
 'Double a number
 For i As Integer = 0 To 10
-	
+
 	Print 5 Shl i, Bin(5 Shl i, 16)
-	
+
 Next i

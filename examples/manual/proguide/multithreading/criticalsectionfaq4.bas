@@ -56,7 +56,7 @@ Do
 	MutexUnlock(mutex)
 	Sleep 1, 1
 Loop
- 
+
 ThreadWait(handle)
 MutexDestroy(mutex)
 CondDestroy(cond1)
@@ -64,4 +64,4 @@ CondDestroy(cond2)
 Print
 
 Sleep
-					
+

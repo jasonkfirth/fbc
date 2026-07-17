@@ -52,7 +52,7 @@ Constructor Student (ByRef _name As String, ByVal _age As Integer, ByVal _marks 
 	This.Init(_name, _age) 'implicit access to base member procedure'
 	This.marks = _marks
 End Constructor
-	
+
 Sub Student.Tell ()
 	Print "Marks:"; This.marks
 End Sub

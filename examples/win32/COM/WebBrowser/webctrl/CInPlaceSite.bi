@@ -1,6 +1,6 @@
 ''
 '' CInPlaceSite - a "class" that implements the IOleInPlaceSite interface
-'' 
+''
 
 #ifndef _CInPlaceSite_bi_
 #define _CInPlaceSite_bi_ 1

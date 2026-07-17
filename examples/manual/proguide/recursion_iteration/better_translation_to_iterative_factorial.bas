@@ -14,4 +14,4 @@ Function  betterTranslationToIterativeFactorial (ByVal n As Integer) As Integer
 	Wend
 	Return result
 End Function
-			
+

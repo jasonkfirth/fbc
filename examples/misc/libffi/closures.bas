@@ -14,7 +14,7 @@ closure = ffi_closure_alloc(SizeOf(ffi_closure), @PrinterBinding)
 If closure <> 0 Then
     ' Initialize the argument info vector
     Dim args(0 To 0) As ffi_type Ptr = {@ffi_type_pointer}
-   
+
     ' Initialize the call interface
     Dim cif As ffi_cif
     Dim prep_result As ffi_status = ffi_prep_cif( _
@@ -28,7 +28,7 @@ If closure <> 0 Then
         ' Open console file to send to PrinterBinding as user data
         Dim ConsoleFile As Integer = FreeFile()
         Open Cons For Output As ConsoleFile
-       
+
         ' Initialize the closure, setting user data to the console file
         prep_result = ffi_prep_closure_loc( _
             closure,         _ ' closure object
@@ -43,7 +43,7 @@ If closure <> 0 Then
             Result = PrinterBinding("Hello World!")
             Print Using "Returned &"; Result
         End If
-       
+
         Close ConsoleFile
     End If
 End If

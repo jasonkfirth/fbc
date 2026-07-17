@@ -10,4 +10,4 @@ Dim As ZString Ptr str2
 str2 = Allocate( 13 )
 *str2 = "hello, world"
 Print *str2
-Print Len(*str2)     'returns 12, the size of the string it contains 
+Print Len(*str2)     'returns 12, the size of the string it contains

@@ -290,9 +290,10 @@ Depends:
  curl | wget,
  gcc-riscv64-unknown-elf,
  binutils-riscv64-unknown-elf,
- picolibc-riscv64-unknown-elf
+ picolibc-riscv64-unknown-elf,
+ xxd
 Recommends:
- qemu-system-misc
+ qemu-system-riscv
 Description: FreeBASIC NuttX/RISC-V board workflow tools
  This package provides helper commands and the source SDK needed to build
  FreeBASIC programs as NuttX RISC-V loadable modules. The ESP32-P4 and

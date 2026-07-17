@@ -55,6 +55,7 @@ dim shared symb_dtypeTB( 0 to FB_DATATYPES-1 ) as SYMB_DATATYPE => _
 '' result type being the same no matter whether we're doing signed + unsigned
 '' or unsigned + signed, we need to have this kind of rule to decide)
 
+'' Module state: symbol initialization builds this numeric type-match lookup table.
 dim shared symb_dtypeMatchTB(FB_DATATYPE_FIRST_NUMERIC to FB_DATATYPE_LAST_NUMERIC, FB_DATATYPE_FIRST_NUMERIC to FB_DATATYPE_LAST_NUMERIC) as integer
 
 declare function closestType _
@@ -65,13 +66,21 @@ declare function closestType _
 	) as FB_DATATYPE
 
 sub symbDataInit( )
+	'' FBSTRING contains a data pointer, a length, and an allocation size.
+	const STRING_DESCRIPTOR_POINTER_FIELDS = 3
+	'' Keep the 64bit native integer ranks between LONGINT and ULONGINT.
+	const INTEGER_64BIT_INTRANK = 81
+	const UINT_64BIT_INTRANK = 86
+	const INTEGER_32BIT_INTRANK = 41
+	const UINT_32BIT_INTRANK = 46
+
 	if( fbIs64bit( ) ) then
 		'' 64bit
 		env.pointersize = 8
 		symb_dtypeTB(FB_DATATYPE_INTEGER ).size = 8
 		symb_dtypeTB(FB_DATATYPE_UINT    ).size = 8
 		symb_dtypeTB(FB_DATATYPE_ENUM    ).size = 8
-		symb_dtypeTB(FB_DATATYPE_STRING  ).size = 24
+		symb_dtypeTB(FB_DATATYPE_STRING  ).size = env.pointersize * STRING_DESCRIPTOR_POINTER_FIELDS
 		symb_dtypeTB(FB_DATATYPE_POINTER ).size = 8
 
 		symb_dtypeTB(FB_DATATYPE_INTEGER ).sizetype = FB_SIZETYPE_INT64
@@ -79,15 +88,15 @@ sub symbDataInit( )
 		symb_dtypeTB(FB_DATATYPE_ENUM    ).sizetype = FB_SIZETYPE_INT64
 		symb_dtypeTB(FB_DATATYPE_POINTER ).sizetype = FB_SIZETYPE_UINT64
 
-		symb_dtypeTB(FB_DATATYPE_INTEGER ).intrank = 81
-		symb_dtypeTB(FB_DATATYPE_UINT    ).intrank = 86
+		symb_dtypeTB(FB_DATATYPE_INTEGER ).intrank = INTEGER_64BIT_INTRANK
+		symb_dtypeTB(FB_DATATYPE_UINT    ).intrank = UINT_64BIT_INTRANK
 	else
 		'' 32bit
 		env.pointersize = 4
 		symb_dtypeTB(FB_DATATYPE_INTEGER ).size = 4
 		symb_dtypeTB(FB_DATATYPE_UINT    ).size = 4
 		symb_dtypeTB(FB_DATATYPE_ENUM    ).size = 4
-		symb_dtypeTB(FB_DATATYPE_STRING  ).size = 12
+		symb_dtypeTB(FB_DATATYPE_STRING  ).size = env.pointersize * STRING_DESCRIPTOR_POINTER_FIELDS
 		symb_dtypeTB(FB_DATATYPE_POINTER ).size = 4
 
 		symb_dtypeTB(FB_DATATYPE_INTEGER ).sizetype = FB_SIZETYPE_INT32
@@ -95,8 +104,8 @@ sub symbDataInit( )
 		symb_dtypeTB(FB_DATATYPE_ENUM    ).sizetype = FB_SIZETYPE_INT32
 		symb_dtypeTB(FB_DATATYPE_POINTER ).sizetype = FB_SIZETYPE_UINT32
 
-		symb_dtypeTB(FB_DATATYPE_INTEGER ).intrank = 41
-		symb_dtypeTB(FB_DATATYPE_UINT    ).intrank = 46
+		symb_dtypeTB(FB_DATATYPE_INTEGER ).intrank = INTEGER_32BIT_INTRANK
+		symb_dtypeTB(FB_DATATYPE_UINT    ).intrank = UINT_32BIT_INTRANK
 	end if
 
 	'' Remap wchar to target-specific type
@@ -207,7 +216,8 @@ function typeToSigned _
 		byval dtype as integer _
 	) as integer
 
-	dim as integer dt = typeGet( dtype ), nd = any
+	dim as integer dt = typeGet( dtype )
+	dim as integer nd = any
 
 	if( symb_dtypeTB(dt).class <> FB_DATACLASS_INTEGER ) then
 		return dtype
@@ -253,7 +263,8 @@ function typeToUnsigned _
 		byval dtype as integer _
 	) as integer
 
-	dim as integer dt = typeGet( dtype ), nd = any
+	dim as integer dt = typeGet( dtype )
+	dim as integer nd = any
 
 	if( symb_dtypeTB(dt).class <> FB_DATACLASS_INTEGER ) then
 		return dtype

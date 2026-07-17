@@ -9,5 +9,5 @@
 #define c 1
 
 #if c = 1
-  #error Bad value of c 
+  #error Bad value of c
 #endif

@@ -1,6 +1,6 @@
 '' Example by Shawn Hargreaves.
 '' This program demonstrates how to use the timer routines.
-'' These can be a bit of a pain, because you have to be sure you lock 
+'' These can be a bit of a pain, because you have to be sure you lock
 '' all the memory that is used inside your interrupt handlers.
 
 #include "allegro.bi"

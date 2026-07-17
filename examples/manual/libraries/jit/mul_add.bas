@@ -16,7 +16,7 @@ jit_context_build_start(context)
 
 ' define function mul_add(x, y, z)
 Dim params(0 To 2) As jit_type_t = {jit_type_int, jit_type_int, jit_type_int}
-Dim signature As jit_type_t = jit_type_create_signature( _  
+Dim signature As jit_type_t = jit_type_create_signature( _
 	jit_abi_cdecl,  _ ' C-style function
 	jit_type_int,   _ ' Return type
 	@params(0),     _ ' Parameter array

@@ -46,16 +46,16 @@ constructor CHttpStream _
 	( _
 		byval http as CHttp ptr _
 	)
-	
+
 	ctx = new CHttpStreamCtx_
-	
+
 	if( http = NULL ) then
 		http = new CHttp
 		ctx->delcon = TRUE
 	else
 		ctx->delcon = FALSE
 	end if
-	
+
 	ctx->http = http
 	ctx->stream.buffer = NULL
 	ctx->stream.size = 0
@@ -69,7 +69,7 @@ destructor CHttpStream _
 	( _
 		_
 	)
-	
+
 	if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
 		deallocate( ctx->stream.buffer )
 	end if
@@ -82,7 +82,7 @@ destructor CHttpStream _
  		end if
  		ctx->http = NULL
 	end if
-	
+
 	delete ctx
 
 end destructor
@@ -163,7 +163,7 @@ private function recv_cb cdecl _
 		memcpy( memstream->buffer + memstream->pos, buffer, bytes )
 	end if
 	memstream->pos += bytes
-	
+
 	function = bytes
 
 end function
@@ -177,7 +177,7 @@ function CHttpStream.receive _
 	) as integer
 
 	dim as CURL ptr curl
-	
+
 	if( ctx->http = NULL ) then
 		return FALSE
 	end if
@@ -186,7 +186,7 @@ function CHttpStream.receive _
 	if( curl = NULL ) then
 		return FALSE
 	end if
-	
+
  	''
 	if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
 		deallocate( ctx->stream.buffer )
@@ -195,7 +195,7 @@ function CHttpStream.receive _
 	ctx->stream.size = 0
 	ctx->stream.pos = 0
 	ctx->stream.owns_buffer = FALSE
- 	
+
  	''
 	if( doreset ) then
 		curl_easy_reset( curl )
@@ -205,14 +205,14 @@ function CHttpStream.receive _
 	dim as clong maximum_redirects = 16
 
 	curl_easy_setopt( curl, CURLOPT_URL, url )
-	
+
 	curl_easy_setopt( curl, CURLOPT_FOLLOWLOCATION, follow_location )
 	curl_easy_setopt( curl, CURLOPT_MAXREDIRS, maximum_redirects )
-	
+
 	if( referer <> NULL ) then
 		curl_easy_setopt( curl, CURLOPT_REFERER, referer )
 	end if
-	
+
 	curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, @recv_cb )
 	curl_easy_setopt( curl, CURLOPT_WRITEDATA, @ctx->stream )
 
@@ -226,11 +226,11 @@ function CHttpStream.receive _
 		ctx->stream.owns_buffer = FALSE
 		return FALSE
  	end if
- 	
+
 	if( ctx->stream.buffer <> NULL ) then
 		ctx->stream.buffer[ctx->stream.pos] = 0
 	end if
-	
+
 	function = TRUE
 
 end function
@@ -240,7 +240,7 @@ function CHttpStream.read _
 	( _
 		byval is_binary as integer _
 	) as string
-	
+
 	if( ctx->stream.buffer <> NULL ) then
 		if( is_binary = FALSE ) then
 			function = *cptr(zstring ptr, ctx->stream.buffer)
@@ -249,11 +249,11 @@ function CHttpStream.read _
 			memcpy( strptr( res ), ctx->stream.buffer, ctx->stream.pos + 1 )
 			function = res
 		end if
-	
+
 	else
 		function = ""
 	end if
-	
+
 end function
 
 '':::::
@@ -278,11 +278,11 @@ private function send_cb cdecl _
 	end if
 
 	dim as size_t bytes = size * nitems
-	
+
 	if( bytes > memstream->size ) then
 		bytes = memstream->size
 	end if
-	
+
 	if( bytes = 0 ) then
 		return 0
 	end if
@@ -298,7 +298,7 @@ private function send_cb cdecl _
 	memcpy( buffer, memstream->buffer + memstream->pos, bytes )
 	memstream->pos += bytes
 	memstream->size -= bytes
-	
+
 	function = bytes
 
 end function
@@ -314,7 +314,7 @@ function CHttpStream.send _
 	) as integer
 
 	dim as CURL ptr curl
-	
+
 	if( ctx->http = NULL ) then
 		return FALSE
 	end if
@@ -331,7 +331,7 @@ function CHttpStream.send _
 	if( curl = NULL ) then
 		return FALSE
 	end if
-	
+
  	''
 	if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
 		deallocate( ctx->stream.buffer )
@@ -340,7 +340,7 @@ function CHttpStream.send _
 	ctx->stream.size = bytes
 	ctx->stream.pos = 0
 	ctx->stream.owns_buffer = FALSE
- 	
+
  	''
 	if( doreset ) then
 		curl_easy_reset( curl )
@@ -353,14 +353,14 @@ function CHttpStream.send _
 
 	curl_easy_setopt( curl, CURLOPT_FOLLOWLOCATION, follow_location )
 	curl_easy_setopt( curl, CURLOPT_MAXREDIRS, maximum_redirects )
-	
+
 	if( referer <> NULL ) then
 		curl_easy_setopt( curl, CURLOPT_REFERER, referer )
 	end if
 
 	curl_easy_setopt( curl, CURLOPT_READFUNCTION, @send_cb )
 	curl_easy_setopt( curl, CURLOPT_READDATA, @ctx->stream )
- 	
+
 	dim as CURLcode transfer_result = curl_easy_perform( curl )
 
 	'' send() borrows the caller's buffer only for the synchronous transfer.
@@ -374,7 +374,7 @@ function CHttpStream.send _
 	if( transfer_result <> 0 ) then
 		return FALSE
 	end if
- 	
+
 	function = TRUE
 
 end function

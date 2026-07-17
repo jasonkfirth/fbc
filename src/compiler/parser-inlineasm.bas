@@ -112,8 +112,13 @@ type AsmKeywordsInfo
 	list as TLIST     '' only the user added words - will be deallocated when parser ends
 end type
 
+'' Module state: parser initialization builds the inline and global ASM keyword tables.
 dim shared inlineAsmKeywords as AsmKeywordsInfo
 dim shared globalAsmKeywords as AsmKeywordsInfo
+
+'' The inline table is larger because it combines language and target keywords.
+const INLINE_ASM_KEYWORD_HASH_BUCKETS = 800
+const GLOBAL_ASM_KEYWORD_HASH_BUCKETS = 200
 
 #if 0
 !!!FIXME!!! - we'd like to use this sub, but see https://sourceforge.net/p/fbc/bugs/944/
@@ -134,7 +139,7 @@ private sub hInitInlineAsmKeywords( )
 	'' TODO: support x86_64, arm, aarch64; select keyword list based on compilation target
 	if( inlineAsmKeywords.inited = FALSE ) then
 		listInit( @inlineAsmKeywords.list, 8, sizeof( zstring ptr ) )
-		hashInit( @inlineAsmKeywords.hash, 800 )
+		hashInit( @inlineAsmKeywords.hash, INLINE_ASM_KEYWORD_HASH_BUCKETS )
 		hAddAsmKeywords( inlineAsmKeywords, inlineAsmKeywordsX86 )
 		hAddAsmKeywords( inlineAsmKeywords, globalAsmKeywordsX86 )
 		inlineAsmKeywords.inited = TRUE
@@ -144,7 +149,7 @@ end sub
 private sub hInitGlobalAsmKeywords( )
 	if( globalAsmKeywords.inited = FALSE ) then
 		listInit( @globalAsmKeywords.list, 8, sizeof( zstring ptr ) )
-		hashInit( @globalAsmKeywords.hash, 200 )
+		hashInit( @globalAsmKeywords.hash, GLOBAL_ASM_KEYWORD_HASH_BUCKETS )
 		'' TODO: support x86_64, arm, aarch64; select keyword list based on compilation target
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86, FB_CPUFAMILY_X86_64
@@ -174,7 +179,7 @@ end function
 
 private sub hAddAsmKeyword( byref info as AsmKeywordsInfo, byval id as const zstring ptr )
 	dim as zstring ptr ptr s = listNewNode( @info.list )
-	*s = callocate( len(*id) + 1 )
+	*s = xcallocate( len(*id) + 1 )
 	**s = *id
 	hashAdd( @info.hash, *s, cast( any ptr, INVALID ), INVALID )
 end sub
@@ -314,11 +319,14 @@ sub cAsmCode()
 				dim as FBSYMBOL ptr litsym = astGetStrLitSymbol( expr )
 				if( litsym <> NULL ) then
 					text = """"
+					'' A single literal token has only these bounded quote/value appends.
+					'' FB-LINTER: DISABLE-NEXT-LINE FBL503
 					if( symbGetType( litsym ) <> FB_DATATYPE_WCHAR ) then
 						text += *symbGetVarLitText( litsym )
 					else
 						text += *symbGetVarLitTextW( litsym )
 					end if
+					'' FB-LINTER: DISABLE-NEXT-LINE FBL503
 					text += """"
 				end if
 

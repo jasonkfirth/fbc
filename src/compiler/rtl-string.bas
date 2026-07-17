@@ -3015,49 +3015,75 @@ private function hDecodeUtf8Char _
 
 	dim as ulong c = bytes[index]
 	dim as ulong codepoint = any
+	const UTF8_ASCII_MAX = &h7Ful
+	const UTF8_CONTINUATION_BYTE_OFFSET = 1
+	const UTF8_CONTINUATION_BYTE_MASK = &hC0u
+	const UTF8_CONTINUATION_BYTE_VALUE = &h80u
+	const UTF8_CONTINUATION_PAYLOAD_MASK = &h3Fu
+	const UTF8_CONTINUATION_PAYLOAD_BITS = 6
+	const UTF8_2BYTE_SEQUENCE_LENGTH = 2
+	const UTF8_3BYTE_SEQUENCE_LENGTH = 3
+	const UTF8_4BYTE_SEQUENCE_LENGTH = 4
+	const UTF8_3BYTE_LEAD_PAYLOAD_BITS = UTF8_CONTINUATION_PAYLOAD_BITS * 2
+	const UTF8_4BYTE_LEAD_PAYLOAD_BITS = UTF8_CONTINUATION_PAYLOAD_BITS * 3
+	const UTF8_2BYTE_LEAD_MIN = &hC2ul
+	const UTF8_2BYTE_LEAD_MAX = &hDFul
+	const UTF8_2BYTE_LEAD_PAYLOAD_MASK = &h1Ful
+	const UTF8_3BYTE_LEAD_MIN = &hE0ul
+	const UTF8_3BYTE_LEAD_MAX = &hEFul
+	const UTF8_3BYTE_LEAD_PAYLOAD_MASK = &h0Ful
+	const UTF8_3BYTE_MIN_CODEPOINT = &h800ul
+	const UTF16_SURROGATE_MIN = &hD800ul
+	const UTF16_SURROGATE_MAX = &hDFFFul
+	const UTF8_4BYTE_LEAD_MIN = &hF0ul
+	const UTF8_4BYTE_LEAD_MAX = &hF4ul
+	const UTF8_4BYTE_LEAD_PAYLOAD_MASK = &h07ul
+	const UTF8_4BYTE_MIN_CODEPOINT = &h10000ul
+	const UNICODE_MAX_CODEPOINT = &h10FFFFul
 
-	if( c < &h80ul ) then
+	if( c < UTF8_ASCII_MAX + 1 ) then
 		index += 1
 		return c
 	end if
 
-	if( (c >= &hC2ul) and (c <= &hDFul) and _
-	    ((index + 1) < textlen) and _
-	    ((bytes[index + 1] and &hC0u) = &h80u) ) then
-		codepoint = ((c and &h1Ful) shl 6) or (bytes[index + 1] and &h3Fu)
-		index += 2
+	if( (c >= UTF8_2BYTE_LEAD_MIN) and (c <= UTF8_2BYTE_LEAD_MAX) and _
+	    ((index + UTF8_CONTINUATION_BYTE_OFFSET) < textlen) and _
+	    ((bytes[index + UTF8_CONTINUATION_BYTE_OFFSET] and UTF8_CONTINUATION_BYTE_MASK) = UTF8_CONTINUATION_BYTE_VALUE) ) then
+		codepoint = ((c and UTF8_2BYTE_LEAD_PAYLOAD_MASK) shl UTF8_CONTINUATION_PAYLOAD_BITS) or _
+		            (bytes[index + UTF8_CONTINUATION_BYTE_OFFSET] and UTF8_CONTINUATION_PAYLOAD_MASK)
+		index += UTF8_2BYTE_SEQUENCE_LENGTH
 		function = codepoint
 		exit function
 	end if
 
-	if( (c >= &hE0ul) and (c <= &hEFul) and _
-	    ((index + 2) < textlen) and _
-	    ((bytes[index + 1] and &hC0u) = &h80u) and _
-	    ((bytes[index + 2] and &hC0u) = &h80u) ) then
-		codepoint = ((c and &h0Ful) shl 12) or _
-		            ((bytes[index + 1] and &h3Fu) shl 6) or _
-		            (bytes[index + 2] and &h3Fu)
+	if( (c >= UTF8_3BYTE_LEAD_MIN) and (c <= UTF8_3BYTE_LEAD_MAX) and _
+	    ((index + UTF8_2BYTE_SEQUENCE_LENGTH) < textlen) and _
+	    ((bytes[index + UTF8_CONTINUATION_BYTE_OFFSET] and UTF8_CONTINUATION_BYTE_MASK) = UTF8_CONTINUATION_BYTE_VALUE) and _
+	    ((bytes[index + UTF8_2BYTE_SEQUENCE_LENGTH] and UTF8_CONTINUATION_BYTE_MASK) = UTF8_CONTINUATION_BYTE_VALUE) ) then
+		codepoint = ((c and UTF8_3BYTE_LEAD_PAYLOAD_MASK) shl UTF8_3BYTE_LEAD_PAYLOAD_BITS) or _
+		            ((bytes[index + UTF8_CONTINUATION_BYTE_OFFSET] and UTF8_CONTINUATION_PAYLOAD_MASK) shl UTF8_CONTINUATION_PAYLOAD_BITS) or _
+		            (bytes[index + UTF8_2BYTE_SEQUENCE_LENGTH] and UTF8_CONTINUATION_PAYLOAD_MASK)
 
-		if( (codepoint >= &h800ul) and _
-		    ((codepoint < &hD800ul) or (codepoint > &hDFFFul)) ) then
-			index += 3
+		if( (codepoint >= UTF8_3BYTE_MIN_CODEPOINT) and _
+		    ((codepoint < UTF16_SURROGATE_MIN) or (codepoint > UTF16_SURROGATE_MAX)) ) then
+			index += UTF8_3BYTE_SEQUENCE_LENGTH
 			function = codepoint
 			exit function
 		end if
 	end if
 
-	if( (c >= &hF0ul) and (c <= &hF4ul) and _
-	    ((index + 3) < textlen) and _
-	    ((bytes[index + 1] and &hC0u) = &h80u) and _
-	    ((bytes[index + 2] and &hC0u) = &h80u) and _
-	    ((bytes[index + 3] and &hC0u) = &h80u) ) then
-		codepoint = ((c and &h07ul) shl 18) or _
-		            ((bytes[index + 1] and &h3Fu) shl 12) or _
-		            ((bytes[index + 2] and &h3Fu) shl 6) or _
-		            (bytes[index + 3] and &h3Fu)
+	if( (c >= UTF8_4BYTE_LEAD_MIN) and (c <= UTF8_4BYTE_LEAD_MAX) and _
+	    ((index + UTF8_3BYTE_SEQUENCE_LENGTH) < textlen) and _
+	    ((bytes[index + UTF8_CONTINUATION_BYTE_OFFSET] and UTF8_CONTINUATION_BYTE_MASK) = UTF8_CONTINUATION_BYTE_VALUE) and _
+	    ((bytes[index + UTF8_2BYTE_SEQUENCE_LENGTH] and UTF8_CONTINUATION_BYTE_MASK) = UTF8_CONTINUATION_BYTE_VALUE) and _
+	    ((bytes[index + UTF8_3BYTE_SEQUENCE_LENGTH] and UTF8_CONTINUATION_BYTE_MASK) = UTF8_CONTINUATION_BYTE_VALUE) ) then
+		codepoint = ((c and UTF8_4BYTE_LEAD_PAYLOAD_MASK) shl UTF8_4BYTE_LEAD_PAYLOAD_BITS) or _
+		            ((bytes[index + UTF8_CONTINUATION_BYTE_OFFSET] and UTF8_CONTINUATION_PAYLOAD_MASK) shl UTF8_3BYTE_LEAD_PAYLOAD_BITS) or _
+		            ((bytes[index + UTF8_2BYTE_SEQUENCE_LENGTH] and UTF8_CONTINUATION_PAYLOAD_MASK) shl UTF8_CONTINUATION_PAYLOAD_BITS) or _
+		            (bytes[index + UTF8_3BYTE_SEQUENCE_LENGTH] and UTF8_CONTINUATION_PAYLOAD_MASK)
 
-		if( (codepoint >= &h10000ul) and (codepoint <= &h10FFFFul) ) then
-			index += 4
+		if( (codepoint >= UTF8_4BYTE_MIN_CODEPOINT) and (codepoint <= UNICODE_MAX_CODEPOINT) ) then
+			index += UTF8_4BYTE_SEQUENCE_LENGTH
 			function = codepoint
 			exit function
 		end if
@@ -3970,13 +3996,10 @@ private function hEvalAscCase _
 		z = hUnescape( z )
 		reallength = symbGetStrLength( literal )
 
-		'' Don't do it if it includes internal escape sequences,
-		'' handling these here would be quite hard... (TODO)
-		'' On one hand we should handle "A" disguised as !"\&h41" which
-		'' internally is something involving FB_INTSCAPECHAR; on the
-		'' other hand to do that we'd have to solve the internal escape
-		'' sequences, do the lcase/ucase, and then re-create internal
-		'' escape sequences where needed.
+		'' Literals containing internal escape sequences stay on the runtime
+		'' path. This constant-folding shortcut must preserve the escaped
+		'' representation, for example !"\&h41", rather than rebuilding it
+		'' after changing the unescaped text.
 		if( internallength <> reallength ) then
 			exit function
 		end if

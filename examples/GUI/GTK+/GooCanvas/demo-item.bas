@@ -20,6 +20,16 @@
 #DEFINE GOO_IS_DEMO_ITEM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), GOO_TYPE_DEMO_ITEM))
 #DEFINE GOO_DEMO_ITEM_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS ((obj), GOO_TYPE_DEMO_ITEM, GooDemoItemClass))
 
+CONST WINDOW_WIDTH = 640
+CONST WINDOW_HEIGHT = 600
+CONST CANVAS_VIEW_WIDTH = 600
+CONST CANVAS_VIEW_HEIGHT = 450
+CONST CANVAS_BOUND = 1000.0
+CONST DEMO_X = 100.0
+CONST DEMO_Y = 100.0
+CONST DEMO_WIDTH = 400.0
+CONST DEMO_HEIGHT = 300.0
+
 TYPE GooDemoItem AS _GooDemoItem
 TYPE GooDemoItemClass AS _GooDemoItemClass
 
@@ -156,16 +166,20 @@ FUNCTION create_demo_item_page() AS GtkWidget PTR
 
   VAR canvas = goo_canvas_new ()
   gtk_widget_set_can_focus (canvas, TRUE)
-  gtk_widget_set_size_request (canvas, 600, 450)
-  goo_canvas_set_bounds (GOO_CANVAS (canvas), 0, 0, 1000, 1000)
+  gtk_widget_set_size_request (canvas, CANVAS_VIEW_WIDTH, CANVAS_VIEW_HEIGHT)
+  goo_canvas_set_bounds (GOO_CANVAS (canvas), 0, 0, CANVAS_BOUND, CANVAS_BOUND)
   gtk_widget_show (canvas)
   gtk_container_add (GTK_CONTAINER (scrolled_win), canvas)
 
   VAR root = goo_canvas_get_root_item (GOO_CANVAS (canvas))
 
-  VAR demo = goo_demo_item_new(root, 100.0, 100.0, 400.0, 300.0, _
+  VAR demo = goo_demo_item_new(root, DEMO_X, DEMO_Y, DEMO_WIDTH, DEMO_HEIGHT, _
                                "fill-color", "blue", _
                                NULL)
+
+  IF demo = NULL THEN
+    PRINT "Unable to create the demo canvas item."
+  END IF
 
   RETURN scrolled_win
 END FUNCTION
@@ -176,7 +190,7 @@ gtk_init (@__FB_ARGC__, @__FB_ARGV__)
 
 ' Create the window and widgets.
 VAR win = gtk_window_new (GTK_WINDOW_TOPLEVEL)
-gtk_window_set_default_size (GTK_WINDOW (win), 640, 600)
+gtk_window_set_default_size (GTK_WINDOW (win), WINDOW_WIDTH, WINDOW_HEIGHT)
 gtk_widget_show (win)
 g_signal_connect (win, "delete_event", G_CALLBACK(@gtk_main_quit), NULL)
 

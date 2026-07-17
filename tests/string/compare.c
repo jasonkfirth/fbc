@@ -1,0 +1,14 @@
+typedef   signed char       int8;
+typedef unsigned char      uint8;
+typedef   signed short      int16;
+typedef unsigned short     uint16;
+typedef   signed int        int32;
+typedef unsigned int       uint32;
+typedef   signed long long  int64;
+typedef unsigned long long uint64;
+typedef struct { char *data; int64 len; int64 size; } FBSTRING;
+typedef int8 boolean;
+FBSTRING* fb_StrAssign( void*, const int64, const void*, const int64, const int32 );
+static void fb_ctor__compare( void ) __attribute__(( constructor ));
+static FBSTRING S1$;
+static FBSTRING S2$;

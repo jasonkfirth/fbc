@@ -6,7 +6,7 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgTimer
 '' --------
 
-'' Example of using TIMER function 
+'' Example of using TIMER function
 '' Note: see text about correct waiting strategies
 Dim Start As Double
 Print "Wait 2.5 seconds."

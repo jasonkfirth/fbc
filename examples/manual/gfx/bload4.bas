@@ -6,7 +6,7 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgBload
 '' --------
 
-'' A function that creates an image buffer with the same 
+'' A function that creates an image buffer with the same
 '' dimensions as a BMP image, and loads a file into it.
 
 Const NULL As Any Ptr = 0

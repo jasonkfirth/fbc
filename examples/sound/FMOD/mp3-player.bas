@@ -67,7 +67,7 @@ End Function
         End If
         Sleep 50, 1
     Wend
-   
+
     FSOUND_Stream_Stop(fmod_stream)
     FSOUND_Stream_Close(fmod_stream)
     FSOUND_Close()

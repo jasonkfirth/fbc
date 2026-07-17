@@ -660,12 +660,9 @@ private function hVarPtrBody _
 	end if
 
 	'' skip any casting if they won't do any conversion
-	'' TODO: replace astSkipNoConvCast() with astSkipConstCASTs()
-	'' where applicable.  Need to verify.  On one hand, we
-	'' probably don't care about CONST anymore, on the other
-	'' hand, we need to make sure we don't prematurely optimize
-	'' the CONST specifier away in the event that it is needed
-	'' to be known with AST type checking later.
+	'' astSkipConstCASTs() removes CONST conversions here because they do not
+	'' affect whether the expression can be used by @ or VARPTR. Parser paths
+	'' that need to retain CONST for later type checking must not use it.
 
 	dim as ASTNODE ptr t = astSkipConstCASTs( expr )
 

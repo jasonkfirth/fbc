@@ -12,8 +12,14 @@
 private function hConstCastFloatToULongint( byval f as double ) as ulongint
 	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
 		dim as ulongint bits = *cptr( ulongint ptr, @f )
-		dim as integer rawexp = (bits shr 52) and &h7FF
-		dim as integer expnt = rawexp - 1023
+		'' IEEE-754 DOUBLE has an 11-bit exponent at bit 52, biased by 1023.
+		const DOUBLE_EXPONENT_SHIFT = 52
+		const DOUBLE_EXPONENT_MASK = &h7FF
+		const DOUBLE_EXPONENT_BIAS = 1023
+		const DOUBLE_MANTISSA_BITS = 52
+		const ULONGINT_MAX_EXPONENT = 63
+		dim as integer rawexp = (bits shr DOUBLE_EXPONENT_SHIFT) and DOUBLE_EXPONENT_MASK
+		dim as integer expnt = rawexp - DOUBLE_EXPONENT_BIAS
 
 		'' DJGPP's direct DOUBLE -> ULONGINT conversion does not match
 		'' FreeBASIC's round-to-nearest rules on all DOS hosts.  For
@@ -30,8 +36,8 @@ private function hConstCastFloatToULongint( byval f as double ) as ulongint
 				else
 					function = 0
 				end if
-			elseif( expnt < 52 ) then
-				dim as integer shift = 52 - expnt
+			elseif( expnt < DOUBLE_MANTISSA_BITS ) then
+				dim as integer shift = DOUBLE_MANTISSA_BITS - expnt
 				dim as ulongint result = mant shr shift
 				dim as ulongint remainder = mant and ((1ull shl shift) - 1ull)
 				dim as ulongint half = 1ull shl (shift - 1)
@@ -42,8 +48,8 @@ private function hConstCastFloatToULongint( byval f as double ) as ulongint
 				end if
 
 				function = result
-			elseif( expnt <= 63 ) then
-				function = mant shl (expnt - 52)
+			elseif( expnt <= ULONGINT_MAX_EXPONENT ) then
+				function = mant shl (expnt - DOUBLE_MANTISSA_BITS)
 			else
 				function = 0
 			end if
@@ -399,6 +405,145 @@ function astTryOvlStringCONV( byref expr as ASTNODE ptr ) as integer
 end function
 
 '':::::
+private function hCheckSameTypeCONV _
+	( _
+		byval to_dtype as integer, _
+		byval to_subtype as FBSYMBOL ptr, _
+		byval l as ASTNODE ptr, _
+		byval options as AST_CONVOPT, _
+		byref result as ASTNODE ptr _
+	) as integer
+
+	dim as integer ldtype = astGetFullType( l )
+
+	if( typeGetDtAndPtrOnly( ldtype ) <> typeGetDtAndPtrOnly( to_dtype ) ) then
+		exit function
+	end if
+
+	if( l->subtype <> to_subtype ) then
+		exit function
+	end if
+
+	'' Only CONST bits changed?
+	if( typeGetConstMask( ldtype ) <> typeGetConstMask( to_dtype ) ) then
+		'' CONST node? Evaluate at compile-time
+		if( astIsCONST( l ) ) then
+			astSetType( l, to_dtype, to_subtype )
+			result = l
+		else
+			'' Otherwise, add a CONV node to represent the changed CONST bits
+			'' to the expression parser
+			result = astNewNode( AST_NODECLASS_CONV, to_dtype, to_subtype )
+			result->l = l
+
+			result->cast.doconv = FALSE
+			result->cast.do_convfd2fs = FALSE
+
+			'' data types and levels of pointer inderection are the same,
+			'' always record this as const conversion
+			result->cast.convconst = TRUE
+
+			if( (options and AST_CONVOPT_DONTWARNCONST) = 0 ) then
+				if( fbPdCheckIsSet( FB_PDCHECK_CONSTNESS ) ) then
+					errReportWarn( FB_WARNINGMSG_CONSTQUALIFIERDISCARDED )
+				end if
+			end if
+		end if
+	else
+		result = l
+	end if
+
+	function = TRUE
+
+end function
+
+'':::::
+private sub hCheckPtrConstCONV _
+	( _
+		byval n as ASTNODE ptr, _
+		byval to_dtype as integer, _
+		byval to_subtype as FBSYMBOL ptr, _
+		byval ldtype as integer, _
+		byval l as ASTNODE ptr, _
+		byval options as AST_CONVOPT _
+	)
+
+	dim as integer wrnmsg = any
+
+	if( typeIsPtr( ldtype ) = FALSE ) then
+		exit sub
+	end if
+
+	if( typeIsPtr( to_dtype ) = FALSE ) then
+		exit sub
+	end if
+
+	n->cast.convconst = ( symbCheckConstAssign( to_dtype, ldtype, to_subtype, l->subtype, , , wrnmsg ) = FALSE )
+
+	'' -w funcptr  -w constness
+	''    no           no          don't warn anything
+	''    yes          yes         warn everything
+	''    yes          no          warn if wrnmsg<>0
+	''    no           yes         warn everything (-w constness implies -w funcptr)
+	if( n->cast.convconst = FALSE ) then
+		exit sub
+	end if
+
+	'' wrnmsg is <> 0 only if funcptr check failed
+	'' specific warning message takes priority over const warning
+	if( wrnmsg <> 0 ) then
+		if( (options and AST_CONVOPT_DONTWARNFUNCPTR) = 0 ) then
+			errReportWarn( wrnmsg, , , strptr(" in function pointer") )
+		end if
+	else
+		'' else, must be const warning
+		if( (options and AST_CONVOPT_DONTWARNCONST) = 0 ) then
+			if( fbPdCheckIsSet( FB_PDCHECK_CONSTNESS ) ) then
+				errReportWarn( FB_WARNINGMSG_CONSTQUALIFIERDISCARDED )
+			end if
+		end if
+	end if
+
+end sub
+
+'':::::
+private function hConvNeedsConversion _
+	( _
+		byval ldtype as integer, _
+		byval to_dtype as integer, _
+		byval ldclass as integer _
+	) as integer
+
+	function = TRUE
+
+	'' Only convert if the classes are different (ie, floating<->integer),
+	'' if sizes are different (ie, byte<->int), or one type is BOOLEAN.
+	if( ldclass = typeGetClass( to_dtype ) ) then
+		select case( typeGet( to_dtype ) )
+		case FB_DATATYPE_STRUCT '', FB_DATATYPE_CLASS
+			function = FALSE
+		case else
+			if( (ldtype = FB_DATATYPE_BOOLEAN) or (to_dtype = FB_DATATYPE_BOOLEAN) ) then
+				function = (ldtype <> to_dtype)
+			else
+				function = (typeGetSize( ldtype ) <> typeGetSize( to_dtype ))
+			end if
+		end select
+	end if
+
+	'' The GAS backend must preserve a floating-point size conversion for
+	'' the backend's FPU conversion path.
+	if( irGetOption( IR_OPT_FPUCONV ) ) then
+		if (ldclass = FB_DATACLASS_FPOINT) and ( typeGetClass( to_dtype ) = FB_DATACLASS_FPOINT ) then
+			if( typeGetSize( ldtype ) <> typeGetSize( to_dtype ) ) then
+				function = TRUE
+			end if
+		end if
+	end if
+
+end function
+
+'':::::
 function astNewCONV _
 	( _
 		byval to_dtype as integer, _
@@ -409,49 +554,18 @@ function astNewCONV _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr n = any
-	dim as integer ldclass = any, ldtype = any, errmsg = any, wrnmsg = any, doconv = any
+	dim as integer ldclass = any, ldtype = any, errmsg = any, doconv = any
 
 	if( perrmsg ) then
 		*perrmsg = FB_ERRMSG_OK
 	end if
 
-	ldtype = astGetFullType( l )
-
 	'' same type?
-	if( typeGetDtAndPtrOnly( ldtype ) = typeGetDtAndPtrOnly( to_dtype ) ) then
-		if( l->subtype = to_subtype ) then
-			'' Only CONST bits changed?
-			if( typeGetConstMask( ldtype ) <> typeGetConstMask( to_dtype ) ) then
-				'' CONST node? Evaluate at compile-time
-				if( astIsCONST( l ) ) then
-					astSetType( l, to_dtype, to_subtype )
-					n = l
-				else
-					'' Otherwise, add a CONV node to represent the changed CONST bits
-					'' to the expression parser
-					n = astNewNode( AST_NODECLASS_CONV, to_dtype, to_subtype )
-					n->l = l
-
-					n->cast.doconv = FALSE
-					n->cast.do_convfd2fs = FALSE
-
-					'' data types and levels of pointer inderection are the same,
-					'' always record this as const conversion
-					n->cast.convconst = TRUE
-
-					if( (options and AST_CONVOPT_DONTWARNCONST) = 0 ) then
-						if( fbPdCheckIsSet( FB_PDCHECK_CONSTNESS ) ) then
-							errReportWarn( FB_WARNINGMSG_CONSTQUALIFIERDISCARDED )
-						end if
-					end if
-				end if
-			else
-				n = l
-			end if
-
-			return n
-		end if
+	if( hCheckSameTypeCONV( to_dtype, to_subtype, l, options, n ) ) then
+		return n
 	end if
+
+	ldtype = astGetFullType( l )
 
 	'' UDT? check if it is z|wstring?
 	if( typeGet( ldtype ) = FB_DATATYPE_STRUCT ) then
@@ -602,36 +716,7 @@ function astNewCONV _
 		return l
 	end if
 
-	doconv = TRUE
-
-	'' only convert if the classes are different (ie, floating<->integer) or
-	'' if sizes are different (ie, byte<->int)
-	'' or one is a boolean and the other is not boolean
-	if( ldclass = typeGetClass( to_dtype ) ) then
-		select case( typeGet( to_dtype ) )
-		case FB_DATATYPE_STRUCT '', FB_DATATYPE_CLASS
-			'' do nothing
-			doconv = FALSE
-		case else
-			if( (ldtype = FB_DATATYPE_BOOLEAN) or (to_dtype = FB_DATATYPE_BOOLEAN) ) then
-				if( ldtype = to_dtype ) then
-					doconv = FALSE
-				end if
-			else
-				if( typeGetSize( ldtype ) = typeGetSize( to_dtype ) ) then
-					doconv = FALSE
-				end if
-			end if
-		end select
-	end if
-
-	if( irGetOption( IR_OPT_FPUCONV ) ) then
-		if (ldclass = FB_DATACLASS_FPOINT) and ( typeGetClass( to_dtype ) = FB_DATACLASS_FPOINT ) then
-			if( typeGetSize( ldtype ) <> typeGetSize( to_dtype ) ) then
-				doconv = TRUE
-			end if
-		end if
-	end if
+	doconv = hConvNeedsConversion( ldtype, to_dtype, ldclass )
 
 	'' casting another cast?
 	if( l->class = AST_NODECLASS_CONV ) then
@@ -655,42 +740,7 @@ function astNewCONV _
 	n->cast.convconst = FALSE
 
 	'' Discarding/changing const qualifier bits ?
-	if( typeIsPtr( ldtype ) and typeIsPtr( to_dtype ) ) then
-
-		wrnmsg = 0
-
-		n->cast.convconst = ( symbCheckConstAssign( to_dtype, ldtype, to_subtype, l->subtype, , , wrnmsg ) = FALSE )
-
-		'' -w funcptr  -w constness
-		''    no           no          don't warn anything
-		''    yes          yes         warn everything
-		''    yes          no          warn if wrnmsg<>0
-		''    no           yes         warn everything (-w constness implies -w funcptr)
-
-		'' else check if const conversion
-		if( n->cast.convconst ) then
-
-			'' wrnmsg is <> 0 only if funcptr check failed
-			'' specific warning message takes priority over const warning
-			if( wrnmsg <> 0 ) then
-				if( (options and AST_CONVOPT_DONTWARNFUNCPTR) = 0 ) then
-					errReportWarn( wrnmsg, , , strptr(" in function pointer") )
-				end if
-
-			'' else, must be const warning
-			else
-
-				if( (options and AST_CONVOPT_DONTWARNCONST) = 0 ) then
-					if( fbPdCheckIsSet( FB_PDCHECK_CONSTNESS ) ) then
-						errReportWarn( FB_WARNINGMSG_CONSTQUALIFIERDISCARDED )
-					end if
-				end if
-
-			end if
-
-		end if
-
-	end if
+	hCheckPtrConstCONV( n, to_dtype, to_subtype, ldtype, l, options )
 
 	if( env.clopt.backend = FB_BACKEND_GAS ) then
 		if( doconv ) then

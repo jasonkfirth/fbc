@@ -12,16 +12,16 @@
 Sub zipAddFileFromString(ByVal fname As ZString Ptr, ByVal id_d As ZString Ptr, ByVal myData As ZString Ptr)
 	Dim As Any Ptr pzo
 	Dim As Any Ptr pzsb
-   
+
 	pzo = zip_open(fname, ZIP_CREATE, 0)
 	If pzo = 0 Then End
-   
+
 	pzsb = zip_source_buffer(pzo, myData, Len(*myData), 0)
 	If pzsb = 0 Then End
-   
+
 	zip_file_add(pzo, id_d, pzsb, ZIP_FL_OVERWRITE)
 	zip_close(pzo)
-   
+
 	Print "OK"
 End Sub
 

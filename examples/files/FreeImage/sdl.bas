@@ -117,12 +117,12 @@ sub main()
 	do while( doexit = 0 and SDL_WaitEvent( @event ) <> -1 )
 		doupdate = 0
 
-		select case event.type 
+		select case event.type
 		case SDL_KEYDOWN
 			'' key pressed
 			select case event.key.keysym.sym
-			case SDLK_ESCAPE 
-				doexit = -1 
+			case SDLK_ESCAPE
+				doexit = -1
 			case SDLK_UP
 				y = y - 8
 				doupdate = -1
@@ -136,7 +136,7 @@ sub main()
 				x = x + 8
 				doupdate = -1
 			end select
-   
+
 		case SDL_MOUSEBUTTONDOWN
 			'' mouse button pressed
 			SDL_GetMouseState( @x, @y )

@@ -472,6 +472,114 @@ private function hShallowCopy _
 	function = astNewMEM( AST_OP_MEMMOVE, l, r, bytestocopy )
 end function
 
+'':::::
+private function hTryAssignOvl _
+	( _
+		byval l as ASTNODE ptr, _
+		byval r as ASTNODE ptr, _
+		byval options as AST_OPOPT, _
+		byref result as ASTNODE ptr _
+	) as integer
+
+	dim as FBSYMBOL ptr proc = any
+	dim as FB_ERRMSG err_num = any
+	dim as integer check_letop = TRUE
+
+	if( options and AST_OPOPT_DONTCHKOPOVL ) then
+		exit function
+	end if
+
+	'' Do not invoke LET for a shallow copy of an already constructed UDT.
+	select case as const astGetDataType( l )
+	case FB_DATATYPE_STRUCT ', FB_DATATYPE_CLASS
+		if( astGetDataType( l ) = astGetDataType( r ) ) then
+			if( l->subtype = r->subtype ) then
+				if( (options and AST_OPOPT_ISINI) = 0 ) then
+					check_letop = symbCompHasCopyLetOps( l->subtype )
+				else
+					check_letop = FALSE
+				end if
+			end if
+		end if
+	end select
+
+	if( check_letop ) then
+		proc = symbFindSelfBopOvlProc( AST_OP_ASSIGN, l, r, @err_num )
+		if( proc <> NULL ) then
+			'' A variable initialized by LET must start in a defined state,
+			'' because the overload may choose not to initialize every field.
+			if( options and AST_OPOPT_ISINI ) then
+				if( symbGetCompDefCtor( l->subtype ) <> NULL ) then
+					result = astBuildCtorCall( l->subtype, astCloneTree( l ) )
+				else
+					result = astNewMEM( AST_OP_MEMFILL, _
+						astCloneTree( l ), _
+						astNewCONSTi( symbGetSizeOf( l->subtype ) ) )
+				end if
+			else
+				result = NULL
+			end if
+
+			result = astNewLINK( result, astBuildCall( proc, l, r ), AST_LINK_RETURN_NONE )
+			function = TRUE
+			exit function
+		end if
+
+		if( err_num <> FB_ERRMSG_OK ) then
+			result = NULL
+			function = TRUE
+		end if
+	end if
+
+end function
+
+'':::::
+private function hTryAssignCastOvl _
+	( _
+		byval ldfull as FB_DATATYPE, _
+		byval lsubtype as FBSYMBOL ptr, _
+		byref r as ASTNODE ptr, _
+		byval options as AST_OPOPT _
+	) as integer
+
+	dim as FBSYMBOL ptr proc = any
+	dim as FB_ERRMSG err_num = any
+	function = TRUE
+
+	if( options and AST_OPOPT_DONTCHKOPOVL ) then
+		exit function
+	end if
+
+	proc = symbFindCastOvlProc( ldfull, lsubtype, r, @err_num )
+	if( proc <> NULL ) then
+		'' parser-decl-symb-init.bas::hDoAssign() has already converted
+		'' initializer expressions, so a successful cast falls through to
+		'' the shallow-copy or LET handling below.
+		r = astBuildCall( proc, r )
+	elseif( err_num <> FB_ERRMSG_OK ) then
+		function = FALSE
+	end if
+
+end function
+
+'':::::
+private function hNewAssignNode _
+	( _
+		byval l as ASTNODE ptr, _
+		byval r as ASTNODE ptr, _
+		byval dtype as FB_DATATYPE, _
+		byval subtype as FBSYMBOL ptr _
+	) as ASTNODE ptr
+
+	dim as ASTNODE ptr n = astNewNode( AST_NODECLASS_ASSIGN, dtype, subtype )
+
+	n->l = l
+	n->r = r
+
+	function = n
+
+end function
+
 function astNewASSIGN _
 	( _
 		byval l as ASTNODE ptr, _
@@ -482,8 +590,7 @@ function astNewASSIGN _
 	dim as ASTNODE ptr n = any, tr = any
 	dim as FB_DATATYPE ldtype = any, rdtype = any, ldfull = any, rdfull = any
 	dim as FB_DATACLASS ldclass = any, rdclass = any
-	dim as FBSYMBOL ptr lsubtype = any, proc = any
-	dim as FB_ERRMSG err_num = any
+	dim as FBSYMBOL ptr lsubtype = any
 	dim as integer do_move = any
 
 	function = NULL
@@ -503,76 +610,13 @@ function astNewASSIGN _
 
 	'' 1st) check assign op overloading (unless the types are the same and
 	''      there's no clone function: just do a shallow copy)
-	if( (options and AST_OPOPT_DONTCHKOPOVL) = 0 ) then
-
-		dim as integer check_letop = TRUE
-
-		select case as const ldtype
-		case FB_DATATYPE_STRUCT ', FB_DATATYPE_CLASS
-			if( ldtype = rdtype ) then
-				if( l->subtype = r->subtype ) then
-
-					'' Only invoke the LET operator if it's not an
-					'' initialization.  The initializer should be
-					'' a fully constructed object.
-					if( (options and AST_OPOPT_ISINI) = 0 ) then
-						check_letop = symbCompHasCopyLetOps( l->subtype )
-					else
-						check_letop = FALSE
-					end if
-				end if
-			end if
-		end select
-
-		if( check_letop ) then
-			proc = symbFindSelfBopOvlProc( AST_OP_ASSIGN, l, r, @err_num )
-			if( proc <> NULL ) then
-				dim as ASTNODE ptr result = any
-
-				'' if this is a variable initialization, we have to
-				'' ensure that the variable is zeroed in memory,
-				'' because operator let could do nothing.
-				if( (options and AST_OPOPT_ISINI) <> 0 ) then
-					if( symbGetCompDefCtor( l->subtype ) <> NULL ) then
-						result = astBuildCtorCall( l->subtype, astCloneTree( l ) )
-					else
-						result = astNewMEM( AST_OP_MEMFILL, _
-							astCloneTree( l ), _
-							astNewCONSTi( symbGetSizeOf( l->subtype ) ) )
-					end if
-				else
-					result = NULL
-				end if
-
-				'' build a proc call
-				return astNewLINK( result, astBuildCall( proc, l, r ), AST_LINK_RETURN_NONE )
-			end if
-
-			if( err_num <> FB_ERRMSG_OK ) then
-				return NULL
-			end if
-		end if
+	if( hTryAssignOvl( l, r, options, n ) ) then
+		return n
 	end if
 
 	'' 2nd) implicit casting op overloading
-	if( (options and AST_OPOPT_DONTCHKOPOVL) = 0 ) then
-		proc = symbFindCastOvlProc( ldfull, lsubtype, r, @err_num )
-		if( proc <> NULL ) then
-
-			'' we don't have to worry about initializing the lhs
-			'' in case of an initialization, this is because in
-			'' parser-decl-symb-init.bas::hDoAssign( ), the node
-			'' has already been converted if necessary, therefore
-			'' it would fall back on either a shallow copy, or the
-			'' operator LET, which was handled just above.
-
-			'' build a proc call
-			r = astBuildCall( proc, r )
-		else
-			if( err_num <> FB_ERRMSG_OK ) then
-				return NULL
-			end if
-		end if
+	if( hTryAssignCastOvl( ldfull, lsubtype, r, options ) = FALSE ) then
+		return NULL
 	end if
 
 	rdfull = astGetFullType( r )
@@ -752,13 +796,7 @@ function astNewASSIGN _
 		end if
 	end if
 
-	'' alloc new node
-	n = astNewNode( AST_NODECLASS_ASSIGN, ldfull, lsubtype )
-
-	n->l = l
-	n->r = r
-
-	function = n
+	function = hNewAssignNode( l, r, ldfull, lsubtype )
 
 end function
 

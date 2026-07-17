@@ -47,7 +47,7 @@ sub main()
 		SDL_Quit
 		end 1
 	end if
-   
+
 	Font1 = TTF_OpenFont( FONTFILE, FONTSIZE )
 	if( Font1 = 0 ) then
 		print "TTF_OpenFont() failed"
@@ -55,7 +55,7 @@ sub main()
 		SDL_Quit
 		end 1
 	end if
-   
+
 	dim w as integer, h as integer
 	TTF_SizeText( Font1, FONTTEXT, @w, @h )
 

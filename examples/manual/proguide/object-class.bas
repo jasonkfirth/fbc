@@ -20,7 +20,7 @@
 '' any data type might be used
 Type DataType As Integer
 
-'' The type 'UDT' is included to show where only 
+'' The type 'UDT' is included to show where only
 '' a UDT data type can be used
 Type UDT
   value As DataType
@@ -72,7 +72,7 @@ Type T
   '' Nonstatic Member Declarations:
 
   '' Memory Allocation/Deallocation
-  
+
   Declare Operator New ( ByVal size As UInteger ) As Any Ptr
   Declare Operator New[] ( ByVal size As UInteger ) As Any Ptr
   Declare Operator Delete ( ByVal buf As Any Ptr )
@@ -106,7 +106,7 @@ Type T
   Declare Operator Eqv= ( ByRef rhs As DataType )
   Declare Operator ^= ( ByRef rhs As DataType )
   Declare Operator &= ( ByRef rhs As DataType )
-  
+
   '' Address of
 
   Declare Operator @ () As DataType Ptr
@@ -140,7 +140,7 @@ Type T
   Declare Property pidx ( ByVal index As DataType, ByRef new_value As DataType )
 
   '' Iterator
-  
+
   Declare Operator For ()
   Declare Operator Step ()
   Declare Operator Next ( ByRef cond As T ) As Integer
@@ -165,7 +165,7 @@ Declare Operator -> ( ByRef rhs As T ) As UDT
 Declare Operator * ( ByRef rhs As T ) As DataType
 
 Declare Operator + ( ByRef lhs As T, ByRef rhs As DataType ) As DataType
-Declare Operator - ( ByRef lhs As T, ByRef rhs As DataType ) As DataType 
+Declare Operator - ( ByRef lhs As T, ByRef rhs As DataType ) As DataType
 Declare Operator * ( ByRef lhs As T, ByRef rhs As DataType ) As DataType
 Declare Operator / ( ByRef lhs As T, ByRef rhs As DataType ) As DataType
 Declare Operator \ ( ByRef lhs As T, ByRef rhs As DataType ) As DataType
@@ -208,7 +208,7 @@ Declare Operator Sgn ( ByRef arg As UDT ) As Double
 Operator T.new ( ByVal size As UInteger ) As Any Ptr
 	Operator = Allocate( size )
 End Operator
- 
+
 Operator T.new[] ( ByVal size As UInteger ) As Any Ptr
 	Operator = Allocate( size )
 End Operator
@@ -222,11 +222,11 @@ Operator T.delete[] ( ByVal buf As Any Ptr )
 End Operator
 
 Operator T.let ( ByRef rhs As T )
-  value = rhs.value  
+  value = rhs.value
 End Operator
 
 Operator T.let ( ByRef rhs As DataType )
-  value = rhs  
+  value = rhs
 End Operator
 
 Operator T.cast ( ) As String
@@ -469,15 +469,15 @@ End Function
 
 Sub T.s ( )
   '' refer to the type using
-  
+
   '' with block
   With This
 	.value = 1
   End With
-  
+
   '' field access
   this.value = 2
-  
+
   '' directly
   value = 3
 
@@ -522,7 +522,7 @@ Operator T.next ( ByRef cond As T ) As Integer
 End Operator
 
 Operator T.for ( ByRef stp As T )
-End Operator 
+End Operator
 
 Operator T.step ( ByRef stp As T )
 End Operator
@@ -544,4 +544,4 @@ Dim Xlist As T Ptr = New T[10]
 
 '' Deallocate object vector
 Delete[] Xlist
-		
+

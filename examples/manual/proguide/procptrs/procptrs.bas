@@ -33,4 +33,4 @@ While (*op <> 0)
 Wend
 
 Print "Value of 'i' after all operations performed: " & i
-		
+

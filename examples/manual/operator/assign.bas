@@ -9,7 +9,7 @@
 Dim i As Integer
 i = 420    ' <- this is the assignment operator
 
-If  i = 69 Then   '<-this is the equivalence operator 
+If  i = 69 Then   '<-this is the equivalence operator
   Print "ERROR: i should equal 420"
   End -1
 End If

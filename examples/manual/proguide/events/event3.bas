@@ -29,25 +29,25 @@ Do
 		Case EVENT_MOUSE_MOVE
 			e.mx = e.x
 			e.my = e.y
-			Print Using "Mouse move:                  x=####   /   y=####      dx=####  /  dy=####      button=##";_ 
+			Print Using "Mouse move:                  x=####   /   y=####      dx=####  /  dy=####      button=##";_
 			e.x; e.y; e.dx; e.dy; e.mbutton
 		Case EVENT_MOUSE_BUTTON_PRESS
 			e.mbutton = e.mbutton Or e.button
-			Print Using "Mouse button press:          button =##               x=####   /   y=####";_ 
+			Print Using "Mouse button press:          button =##               x=####   /   y=####";_
 			e.button; e.mx; e.my
 		Case EVENT_MOUSE_BUTTON_RELEASE
 			e.mbutton = e.mbutton Xor e.button
-			Print Using "Mouse button release:        button =##               x=####   /   y=####";_ 
+			Print Using "Mouse button release:        button =##               x=####   /   y=####";_
 			e.button; e.mx; e.my
 		Case EVENT_MOUSE_DOUBLE_CLICK
 			e.mbutton = e.mbutton Or e.button
-			Print Using "Mouse button double click:   button =##               x=####   /   y=####";_ 
+			Print Using "Mouse button double click:   button =##               x=####   /   y=####";_
 			e.button; e.mx; e.my
 		Case EVENT_MOUSE_WHEEL
-			Print Using "Mouse wheel:                 wheel=  ###########      x=####   /   y=####";_ 
+			Print Using "Mouse wheel:                 wheel=  ###########      x=####   /   y=####";_
 			e.z; e.mx; e.my
 		Case EVENT_MOUSE_HWHEEL
-			Print Using "Mouse hwheel:                hwheel= ###########      x=####   /   y=####";_ 
+			Print Using "Mouse hwheel:                hwheel= ###########      x=####   /   y=####";_
 			e.z; e.mx; e.my
 		Case EVENT_WINDOW_CLOSE
 			Exit Do
@@ -55,4 +55,4 @@ Do
 	End If
 	Sleep 10, 1
 Loop
-		
+

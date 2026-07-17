@@ -21,7 +21,7 @@ dim as single x = 10, y = 10, dx = 50, dy = 0, r = 10
 dim as double t0 = timer, t1 = t0, t2 = 0, td = 0.0001
 dim as string k
 
-do while( t1 - t0 < maxtime ) 
+do while( t1 - t0 < maxtime )
 
 	k = inkey
 	select case k
@@ -42,7 +42,7 @@ do while( t1 - t0 < maxtime )
 	if( (dy > 0) and (y > h - r - r) ) then
 		dy *= -1 * 0.9
 	end if
-	
+
 	circle ( x, y ), r
 
 	sleep 15, 1

@@ -6,7 +6,7 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgOpenPipe
 '' --------
 
-'' This example uses Open Pipe to run a shell command and retrieve its output. 
+'' This example uses Open Pipe to run a shell command and retrieve its output.
 #ifdef __FB_UNIX__
 Const TEST_COMMAND = "ls *"
 #else

@@ -188,9 +188,9 @@ SUITE( fbc_tests.file_.input_ )
 			wstrguard.text = wstr( "" )
 			wstrguard.canary = &h5a
 
-			CU_ASSERT( cast( ulongint, @strguard.canary ) = cast( ulongint, @strguard.text ) + len( strguard.text ) )
-			CU_ASSERT( cast( ulongint, @longguard.canary ) = cast( ulongint, @longguard.value ) + sizeof( longguard.value ) )
-			CU_ASSERT( cast( ulongint, @wstrguard.canary ) = cast( ulongint, @wstrguard.text ) + sizeof( wstrguard.text ) )
+			CU_ASSERT( cast( uinteger, @strguard.canary ) = cast( uinteger, @strguard.text ) + len( strguard.text ) )
+			CU_ASSERT( cast( uinteger, @longguard.canary ) = cast( uinteger, @longguard.value ) + sizeof( longguard.value ) )
+			CU_ASSERT( cast( uinteger, @wstrguard.canary ) = cast( uinteger, @wstrguard.text ) + sizeof( wstrguard.text ) )
 
 			var f = freefile( )
 			if( open( TESTFILE, for input, as #f ) <> 0 ) then

@@ -17,9 +17,9 @@ operator <> _
 		byref lhs as VARIANT_, _
 		byref rhs as VARIANT _
 	) as integer
-	
+
 	operator = VarCmp( @lhs, @rhs.var_, NULL, 0 ) <> VARCMP_EQ
-	
+
 end operator
 
 '':::::
@@ -28,17 +28,17 @@ operator <> _
 		byval lhs as zstring ptr, _
 		byref rhs as VARIANT _
 	) as integer
-	
+
 	dim as VARIANT_ tmp = any
-	
+
 	VariantInit( @tmp )
 	V_VT(@tmp) = VT_BSTR
 	V_BSTR(@tmp) = SysAllocStringByteLen( lhs, len( *lhs ) )
-	
+
 	operator = VarCmp( @tmp, @rhs.var_, NULL, 0 ) <> VARCMP_EQ
-	
+
 	VariantClear( @tmp )
-	
+
 end operator
 
 '':::::
@@ -47,16 +47,16 @@ operator <> _
 		byval lhs as wstring ptr, _
 		byref rhs as VARIANT _
 	) as integer
-	
+
 	dim as VARIANT_ tmp = any
-	
+
 	VariantInit( @tmp )
 	V_VT(@tmp) = VT_BSTR
 	V_BSTR(@tmp) = SysAllocStringLen( lhs, len( *lhs ) )
-	
+
 	operator = VarCmp( @tmp, @rhs.var_, NULL, 0 ) <> VARCMP_EQ
-	
+
 	VariantClear( @tmp )
-	
+
 end operator
 

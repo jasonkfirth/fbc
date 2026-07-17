@@ -18,4 +18,4 @@ Input "enter a string"; s
 Print "string entered: " & "'" & s & "'"
 
 Sleep
-	
+

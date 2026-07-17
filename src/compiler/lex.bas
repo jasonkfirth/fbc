@@ -27,9 +27,10 @@ declare sub hSkipChar( )
 
 const UINVALID as uinteger = cuint( INVALID )
 
+'' Module state: lexer initialization and shutdown own this scanning context.
 dim shared as LEX_CTX lex
 
-'' Buffer holding the current line when emitting in -pp only mode
+'' Module state: buffer holding the current line when emitting in -pp only mode.
 dim shared as string pponly_ln
 
 '':::::
@@ -601,6 +602,25 @@ private function hReadNonDecNumber _
 	dim as ulongint value64 = any
 	dim as integer lgt = any, havedigits = any
 	dim as integer skipchar = any
+	const DECIMAL_DIGIT_MAX = 9
+	const HEX_BASE = 16
+	const HEX_INTEGER_MAX_DIGITS = 8
+	const HEX_LONG_START_DIGIT = 5
+	const HEX_LONGINT_START_DIGIT = 9
+	const HEX_ULONGINT_OVERFLOW_DIGIT = 17
+	const OCT_BASE = 8
+	const OCT_INTEGER_MAX_DIGITS = 10
+	const OCT_LONGINT_START_DIGIT = 11
+	const OCT_LONGINT_SECOND_DIGIT = 12
+	const OCT_ULONGINT_FIRST_OVERFLOW_DIGIT = 22
+	const OCT_ULONGINT_OVERFLOW_DIGIT = 23
+	const OCT_LONG_START_DIGIT = 6
+	const OCT_LONG_SECOND_DIGIT = 7
+	const BIN_BASE = 2
+	const BIN_INTEGER_MAX_DIGITS = 32
+	const BIN_LONGINT_START_DIGIT = 33
+	const BIN_ULONGINT_OVERFLOW_DIGIT = 65
+	const BIN_LONG_START_DIGIT = 17
 
 	assert( dtype = FB_DATATYPE_SHORT )
 
@@ -632,6 +652,7 @@ private function hReadNonDecNumber _
 	select case as const c
 	'' hex
 	case CHAR_HUPP, CHAR_HLOW
+		const HEX_LOWERCASE_ADJUST_THRESHOLD = HEX_BASE
 		pnum[0] = CHAR_AMP
 		pnum[1] = c
 		pnum += 2
@@ -661,31 +682,31 @@ private function hReadNonDecNumber _
 					tlen += 1
 
 					c -= CHAR_0
-					if( c > 9 ) then
+					if( c > DECIMAL_DIGIT_MAX ) then
 						c -= (CHAR_AUPP - CHAR_9 - 1)
 					end if
-					if( c > 16 ) then
+					if( c > HEX_LOWERCASE_ADJUST_THRESHOLD ) then
 						c -= (CHAR_ALOW - CHAR_AUPP)
 					end if
 
 					lgt += 1
-					if( lgt > 8 ) then
-						if( lgt = 9 ) then
+					if( lgt > HEX_INTEGER_MAX_DIGITS ) then
+						if( lgt = HEX_LONGINT_START_DIGIT ) then
 							dtype = FB_DATATYPE_LONGINT
-							value64 = (culngint( value ) * 16) + c
-						elseif( lgt = 17 ) then
+							value64 = (culngint( value ) * HEX_BASE) + c
+						elseif( lgt = HEX_ULONGINT_OVERFLOW_DIGIT ) then
 							if( (flags and LEXCHECK_NOLINECONT) = 0 ) then
 								errReportWarn( FB_WARNINGMSG_NUMBERTOOBIG )
 							end if
 							skipchar = TRUE
 						else
-							value64 = (value64 * 16) + c
+							value64 = (value64 * HEX_BASE) + c
 						end if
 					else
-						if( lgt = 5 ) then
+						if( lgt = HEX_LONG_START_DIGIT ) then
 							dtype = FB_DATATYPE_LONG
 						end if
-						value = (value * 16) + c
+						value = (value * HEX_BASE) + c
 					end if
 				end if
 
@@ -729,52 +750,52 @@ private function hReadNonDecNumber _
 					c -= CHAR_0
 
 					lgt += 1
-					if( lgt > 10 ) then
+					if( lgt > OCT_INTEGER_MAX_DIGITS ) then
 						select case as const lgt
-						case 11
+						case OCT_LONGINT_START_DIGIT
 							if( first_c > CHAR_3 ) then
 								dtype = FB_DATATYPE_LONGINT
-								value64 = (culngint( value ) * 8) + c
+								value64 = (culngint( value ) * OCT_BASE) + c
 							else
-								value = (value * 8) + c
+								value = (value * OCT_BASE) + c
 							end if
 
-						case 12
+						case OCT_LONGINT_SECOND_DIGIT
 							if( typeGetSize( dtype ) < 8  ) then
 								dtype = FB_DATATYPE_LONGINT
 								value64 = culngint( value )
 							end if
-							value64 = (value64 * 8) + c
+							value64 = (value64 * OCT_BASE) + c
 
-						case 22
+						case OCT_ULONGINT_FIRST_OVERFLOW_DIGIT
 							if( first_c > CHAR_1 ) then
 								if( (flags and LEXCHECK_NOLINECONT) = 0 ) then
 									errReportWarn( FB_WARNINGMSG_NUMBERTOOBIG )
 								end if
 								skipchar = TRUE
 							else
-								value64 = (value64 * 8) + c
+								value64 = (value64 * OCT_BASE) + c
 							end if
 
-						case 23
+						case OCT_ULONGINT_OVERFLOW_DIGIT
 							if( (flags and LEXCHECK_NOLINECONT) = 0 ) then
 								errReportWarn( FB_WARNINGMSG_NUMBERTOOBIG )
 							end if
 							skipchar = TRUE
 
 						case else
-							value64 = (value64 * 8) + c
+							value64 = (value64 * OCT_BASE) + c
 						end select
 
 					else
-						if( lgt = 6 ) then
+						if( lgt = OCT_LONG_START_DIGIT ) then
 							if( first_c > CHAR_1 ) then
 								dtype = FB_DATATYPE_LONG
 							end if
-						elseif( lgt = 7 ) then
+						elseif( lgt = OCT_LONG_SECOND_DIGIT ) then
 							dtype = FB_DATATYPE_LONG
 						end if
-						value = (value * 8) + c
+						value = (value * OCT_BASE) + c
 					end if
 				end if
 
@@ -817,26 +838,26 @@ private function hReadNonDecNumber _
 					c -= CHAR_0
 
 					lgt += 1
-					if( lgt > 32 ) then
-						if( lgt = 33 ) then
+					if( lgt > BIN_INTEGER_MAX_DIGITS ) then
+						if( lgt = BIN_LONGINT_START_DIGIT ) then
 							dtype = FB_DATATYPE_LONGINT
-							value64 = (culngint( value ) * 2) + c
+							value64 = (culngint( value ) * BIN_BASE) + c
 
-						elseif( lgt = 65 ) then
+						elseif( lgt = BIN_ULONGINT_OVERFLOW_DIGIT ) then
 							if( (flags and LEXCHECK_NOLINECONT) = 0 ) then
 								errReportWarn( FB_WARNINGMSG_NUMBERTOOBIG )
 							end if
 							skipchar = TRUE
 
 						else
-							value64 = (value64 * 2) + c
+							value64 = (value64 * BIN_BASE) + c
 						end if
 
 					else
-						if( lgt = 17 ) then
+						if( lgt = BIN_LONG_START_DIGIT ) then
 							dtype = FB_DATATYPE_LONG
 						end if
-						value = (value * 2) + c
+						value = (value * BIN_BASE) + c
 					end if
 				end if
 
@@ -892,6 +913,9 @@ private sub hReadFloatNumber _
 	dim as uinteger c = any
 	dim as integer llen = any
 	dim as integer skipchar = any
+	const SINGLE_LITERAL_MAX_DIGITS = 7
+	const FLOAT_DOT_LENGTH = 1
+	const NO_FLOAT_DOT_LENGTH = 0
 
 	t.dtype = env.lang.floatliteraldtype
 	llen = t.len
@@ -928,7 +952,8 @@ private sub hReadFloatNumber _
 		end if
 	loop
 
-	if( t.len > 7 + iif( hasdot, 1, 0 ) ) then
+	if( t.len > SINGLE_LITERAL_MAX_DIGITS + _
+	             iif( hasdot, FLOAT_DOT_LENGTH, NO_FLOAT_DOT_LENGTH ) ) then
 		t.dtype = FB_DATATYPE_DOUBLE
 	end if
 
@@ -1044,6 +1069,18 @@ private sub readNumberChars _
 		byref value as ulongint _
 	)
 
+	const DECIMAL_RADIX = 10
+	const SHORT_DECIMAL_DIGITS = 5
+	const LONG_DECIMAL_DIGITS = 10
+	const LONGINT_DECIMAL_DIGITS = 19
+	const ULONGINT_DECIMAL_DIGITS = 20
+	const INTEGER_LITERAL_OVERFLOW_DIGITS = 21
+	const SHORT_MAX_VALUE = 32767ULL
+	const LONG_MAX_VALUE = 2147483647ULL
+	const ULONG_MAX_VALUE = 4294967295ULL
+	const LONGINT_MAX_VALUE = 9223372036854775807ULL
+	const ULONGINT_LAST_DIGIT_MAX_PREFIX = 1844674407370955161ULL
+
 	'' Skip leading zeroes if not inside a comment or parsing an $include
 	var save_first_leading_zero = ((flags and (LEXCHECK_NOLINECONT or LEXCHECK_NOSUFFIX)) <> 0)
 
@@ -1059,7 +1096,7 @@ private sub readNumberChars _
 				*pnum = c
 				pnum += 1
 				t.len += 1
-				value = (value shl 3) + (value shl 1) + (c - CHAR_0)
+				value = (value * DECIMAL_RADIX) + (c - CHAR_0)
 			end if
 
 		case CHAR_DOT, CHAR_ELOW, CHAR_EUPP, CHAR_DLOW, CHAR_DUPP
@@ -1084,43 +1121,43 @@ private sub readNumberChars _
 		if( (flags and LEXCHECK_NOSUFFIX) = 0 ) then
 			if( skipchar = FALSE ) then
 				select case as const t.len
-				case 5
-					if( value > 32767 ) then
+				case SHORT_DECIMAL_DIGITS
+					if( value > SHORT_MAX_VALUE ) then
 						t.dtype = FB_DATATYPE_LONG
 					end if
 
-				case 6
+				case SHORT_DECIMAL_DIGITS + 1
 					t.dtype = FB_DATATYPE_LONG
 
-				case 10
-					if( value > 2147483647ULL ) then
-						if( value > 4294967295ULL ) then
+				case LONG_DECIMAL_DIGITS
+					if( value > LONG_MAX_VALUE ) then
+						if( value > ULONG_MAX_VALUE ) then
 							t.dtype = FB_DATATYPE_LONGINT
 						else
 							t.dtype = FB_DATATYPE_ULONG
 						end if
 					end if
 
-				case 11
+				case LONG_DECIMAL_DIGITS + 1
 					t.dtype = FB_DATATYPE_LONGINT
 
-				case 19
-					if( value > 9223372036854775807ULL ) then
+				case LONGINT_DECIMAL_DIGITS
+					if( value > LONGINT_MAX_VALUE ) then
 						t.dtype = FB_DATATYPE_ULONGINT
 					end if
 					value_prev = value
 
-				case 20
+				case ULONGINT_DECIMAL_DIGITS
 					t.dtype = FB_DATATYPE_ULONGINT
 					if( (flags and LEXCHECK_NOLINECONT) = 0 ) then
-						if( value_prev > 1844674407370955161ULL or _
+						if( value_prev > ULONGINT_LAST_DIGIT_MAX_PREFIX or _
 						(value and &h8000000000000000ULL) = 0 ) then
 							errReportWarn( FB_WARNINGMSG_NUMBERTOOBIG )
 							skipchar = TRUE
 						end if
 					end if
 
-				case 21
+				case INTEGER_LITERAL_OVERFLOW_DIGITS
 					if( (flags and LEXCHECK_NOLINECONT) = 0 ) then
 						errReportWarn( FB_WARNINGMSG_NUMBERTOOBIG )
 						skipchar = TRUE
@@ -1724,12 +1761,14 @@ sub lexNextToken _
 	)
 
 	dim as uinteger char = any
-	dim as integer islinecont = any, lgt = any
+	dim as integer islinecont = any, lgt = any, reread = any, readchar = any
 
 	t->after_space = lex.ctx->after_space
 	lex.ctx->after_space = FALSE
 
-re_read:
+	do
+		reread = FALSE
+		readchar = FALSE
 	t->text[0] = 0                                  '' t.text = ""
 	t->len = 0
 	t->sym_chain = NULL
@@ -1848,7 +1887,7 @@ re_read:
 				exit select
 			end if
 		end if
-		goto read_char
+		readchar = TRUE
 
 	'' '&'?
 	case CHAR_AMP
@@ -1872,7 +1911,7 @@ re_read:
 	'' A-Z, a-z, _
 	case CHAR_AUPP to CHAR_ZUPP, CHAR_ALOW to CHAR_ZLOW, CHAR_UNDER
 		if( not readId( *t, flags ) ) then
-			goto re_read
+			reread = TRUE
 		end if
 
 	'' '"'?
@@ -1891,46 +1930,47 @@ re_read:
 	case CHAR_EXCL, CHAR_DOLAR
 		'' '"' following?
 		if( lexGetLookAheadChar( ) <> CHAR_QUOTE ) then
-			goto read_char
-		end if
-
-		lexEatChar( )
-
-		t->class = FB_TKCLASS_STRLITERAL
-		t->id = iif( char = CHAR_EXCL, FB_TK_STRLIT_ESC, FB_TK_STRLIT_NOESC )
-		t->dtype = FB_DATATYPE_INVALID
-
-		if( env.inf.format = FBFILE_FORMAT_ASCII ) then
-			dim as zstring ptr ps = any
-
-			'' do not preserve the string modifier?
-			if( (flags and LEXCHECK_NOQUOTES) = 0 ) then
-				ps = @t->text
-			else
-				t->text[0] = char
-				ps = @t->text[1]
-			end if
-
-			hReadString( t, ps, flags )
-
+			readchar = TRUE
 		else
-			dim as wstring ptr ps = any
+			lexEatChar( )
 
-			'' do not preserve the string modifier?
-			if( (flags and LEXCHECK_NOQUOTES) = 0 ) then
-				ps = @t->textw
+			t->class = FB_TKCLASS_STRLITERAL
+			t->id = iif( char = CHAR_EXCL, FB_TK_STRLIT_ESC, FB_TK_STRLIT_NOESC )
+			t->dtype = FB_DATATYPE_INVALID
+
+			if( env.inf.format = FBFILE_FORMAT_ASCII ) then
+				dim as zstring ptr ps = any
+
+				'' do not preserve the string modifier?
+				if( (flags and LEXCHECK_NOQUOTES) = 0 ) then
+					ps = @t->text
+				else
+					t->text[0] = char
+					ps = @t->text[1]
+				end if
+
+				hReadString( t, ps, flags )
 			else
-				t->textw[0] = char
-				ps = @t->textw[1]
-			end if
+				dim as wstring ptr ps = any
 
-			hReadWStr( t, ps, flags )
+				'' do not preserve the string modifier?
+				if( (flags and LEXCHECK_NOQUOTES) = 0 ) then
+					ps = @t->textw
+				else
+					t->textw[0] = char
+					ps = @t->textw[1]
+				end if
+
+				hReadWStr( t, ps, flags )
+			end if
 		end if
 
 	'':::::
 	case else
-read_char:
+		readchar = TRUE
+	end select
 
+	if( readchar ) then
 		t->id = char
 		t->dtype = t->id
 		t->suffixchar = CHAR_NULL
@@ -2020,7 +2060,7 @@ read_char:
 					'' multi-line comment..
 					hMultiLineComment( )
 					t->after_space = TRUE
-					goto re_read
+					reread = TRUE
 				end if
 			end if
 
@@ -2061,8 +2101,9 @@ read_char:
 		case else
 			t->class = FB_TKCLASS_UNKNOWN
 		end select
+	end if
 
-	end select
+	loop while( reread )
 
 end sub
 

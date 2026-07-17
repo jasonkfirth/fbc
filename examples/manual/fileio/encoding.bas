@@ -47,7 +47,7 @@ Scope
   s = Space( n )
   Get #1,,s
   Close #1
-  
+
   Print "Binary contents of " + f + ":"
   For i As Integer = 1 To n
 	Print Hex( Asc( Mid( s, i, 1 )), 2); " ";
@@ -60,7 +60,7 @@ End Scope
 ''
 Scope
   Dim s As String
-  
+
   '' open a file for input using utf-16 encoding
   '' and read back the message
   Open f For Input Encoding "utf-16" As #1

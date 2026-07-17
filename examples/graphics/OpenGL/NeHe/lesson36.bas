@@ -260,7 +260,7 @@ end sub
 
 '' ------------------------------------------------------------------------
 '' Draw The Blurred Image
-sub DrawBlur (byval times as integer, byval inc as single)  
+sub DrawBlur (byval times as integer, byval inc as single)
 	dim as single spost = 0.0f                              '' Starting Texture Coordinate Offset
 	dim as single alphainc = 0.9f / times                   '' Fade Speed For Alpha Blending
 	dim as single alpha = 0.2f                              '' Starting Alpha Value
@@ -311,7 +311,7 @@ end sub
 
 '' ------------------------------------------------------------------------
 '' Any GL Init Code & User Initialiazation Goes Here
-sub Initialize ()        
+sub Initialize ()
 	dim as integer w, h
 	screeninfo w, h
 

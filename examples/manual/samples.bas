@@ -56,7 +56,7 @@
 
 #define FWD_SLASH "/"
 #define BACK_SLASH "\"
-	
+
 #ifdef __UNIX__
 	const exe_ext = ""
 	const dll_ext = ".so"
@@ -121,17 +121,17 @@ function ReplaceSubStr _
 		byref src as string, _
 		byref old as string, _
 		byref rep as string _
-	) as string 
+	) as string
 
-	dim i as integer = 1, ret as string 
-	ret = src 
-	do 
-	  i = instr(i, ret, old) 
-	  if i = 0 then exit do 
-	  ret = left(ret, i - 1) + rep + mid(ret, i + len(old)) 
-	  i += len(rep) 
-	loop 
-	return ret 
+	dim i as integer = 1, ret as string
+	ret = src
+	do
+	  i = instr(i, ret, old)
+	  if i = 0 then exit do
+	  ret = left(ret, i - 1) + rep + mid(ret, i + len(old))
+	  i += len(rep)
+	loop
+	return ret
 
 end function
 
@@ -167,7 +167,7 @@ dim shared opt_error as integer
 
 ''
 sub ReadSampleIni( byref filename as string )
-	
+
 	dim h as integer, x as string, i as integer, skiptonext as integer
 	dim v as string, t as string, p as string
 	dim buildstep as SpecialBuildStep
@@ -199,7 +199,7 @@ sub ReadSampleIni( byref filename as string )
 						v = trim( left( x, i - 1 ), any chr(9,32) )
 						t = trim( mid( x, i + 1 ), any chr(9,32) )
 						t = SetPathChars( t, FWD_SLASH )
-						
+
 						'' Does v have a conditional target
 						i = instr( v, "," )
 						if( i > 0 ) then
@@ -218,7 +218,7 @@ sub ReadSampleIni( byref filename as string )
 							else
 
 								select case ucase(v)
-								case "SRC"	
+								case "SRC"
 									buildstep = SBS_SRC
 								case "DST"
 									buildstep = SBS_DST
@@ -237,7 +237,7 @@ sub ReadSampleIni( byref filename as string )
 
 							nsbCmds += 1
 							redim preserve sbCmds( 0 to nsbCmds - 1 )
-							with sbCmds( nsbCmds - 1 ) 
+							with sbCmds( nsbCmds - 1 )
 								.buildstep = buildstep
 								.value = t
 							end with
@@ -316,13 +316,13 @@ sub ScanDirectories _
 	wend
 
 	for i = start to ndirs
-		
+
 		'' NOTE: we don't pass dirs(i) directly to ScanDirectories()
 		'' because dirs() might get resized, and the descriptor
 		'' relocated, corrupting the stack since ScanDirectories()
 		'' is called recursively.
 
-		dim tmp as string		
+		dim tmp as string
 		tmp = dirs(i)
 		ScanDirectories( sourcedir, tmp, dirs(), ndirs )
 
@@ -477,7 +477,7 @@ function DoSpecialBuild _
 	if( i < 0 ) then
 		exit function
 	end if
-		
+
 	first = sbFiles(i).index1
 	last = sbFiles(i).index2 - 1
 
@@ -491,7 +491,7 @@ function DoSpecialBuild _
 
 	'' Do the dependencies first
 	for j = first to last
-		if( sbCmds(j).buildstep = SBS_DEP ) then				
+		if( sbCmds(j).buildstep = SBS_DEP ) then
 			ret = DoSpecialBuild( cmd, sourcedir, fbc, sbCmds(j).value, newest )
 			if( ret = BUILD_FAIL ) then
 				haderror = TRUE
@@ -577,17 +577,17 @@ function DoSpecialBuild _
 
 					end if
 				end if
-			next 
+			next
 		end if
 
 		''
 		if( dobuild ) then
-		
+
 			'' At least one file is out of date or missing,
 			'' so do this special build
 
 			for j = first to last
-				select case sbCmds(j).buildstep 
+				select case sbCmds(j).buildstep
 				case SBS_CMD
 
 					args = sbCmds(j).value
@@ -608,10 +608,10 @@ function DoSpecialBuild _
 			next
 
 			function = iif( haderror = FALSE, BUILD_SUCCESS, BUILD_FAIL )
-		
+
 		else
 			function = BUILD_NOT_NEEDED
-		
+
 		end if
 
 		'' Get the newest date of all DST files
@@ -629,7 +629,7 @@ function DoSpecialBuild _
 	case CMD_CLEAN
 
 		for j = first to last
-			if( sbCmds(j).buildstep = SBS_DST ) then				
+			if( sbCmds(j).buildstep = SBS_DST ) then
 
 				args = sbCmds(j).value
 				args = ReplaceSubStr( args, "$(EXEEXT)", exe_ext )
@@ -649,7 +649,7 @@ function DoSpecialBuild _
 
 	end select
 
-	
+
 
 end function
 
@@ -714,7 +714,7 @@ case else
 	print "         Abort on first error detected"
 	print
 	print "      -opts options"
-	print "         Add options to the command line" 
+	print "         Add options to the command line"
 	print
 	end
 end select
@@ -740,7 +740,7 @@ while( command(i) > "" )
 
 		case "-error"
 			opt_error = TRUE
-		
+
 		case "-opts"
 			i += 1
 			extra_opts = command(i)
@@ -808,7 +808,7 @@ case CMD_COMPILE, CMD_CLEAN
 
 	for i = 1 to nfiles
 		if( IsSpecialBuild( files(i) ) ) then
-		
+
 			if( DoSpecialBuild( cmd, sourcedir, fbc, files(i) ) = BUILD_FAIL ) then
 				haderror = TRUE
 				if( opt_error ) then

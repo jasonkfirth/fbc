@@ -27,16 +27,16 @@ Sub Thread (ByVal p As Any Ptr)
 		If (ScreenEvent(@e)) Then
 			Select Case As Const e.Type
 			Case EVENT_KEY_PRESS                                      '' test key-pressed event
-				Print getAscii(e.ascii) &_ 
+				Print getAscii(e.ascii) &_
 				" is pressed    (from ScreenEvent)   (other thread)"
 				If (e.scancode=SC_ESCAPE) Then                        '' test ESC
 					Exit Sub
 				End If
 			Case EVENT_KEY_RELEASE                                    '' test key-released event
-				Print getAscii(e.ascii) &_ 
+				Print getAscii(e.ascii) &_
 				" is released   (from ScreenEvent)   (other thread)"
 			Case EVENT_KEY_REPEAT                                     '' test key-repeated event
-				Print getAscii(e.ascii) &_ 
+				Print getAscii(e.ascii) &_
 				" is repeated   (from ScreenEvent)   (other thread)"
 			End Select
 		End If
@@ -53,7 +53,7 @@ pt = ThreadCreate(@Thread)
 Do
 	s = Inkey
 	If s <> "" Then                                                   '' test inkey return
-		Print getAscii(s[0]) &_ 
+		Print getAscii(s[0]) &_
 		" is viewed     (from Inkey)         (main thread)"
 	End If
 	Sleep 10, 1
@@ -63,4 +63,4 @@ ThreadWait(pt)
 Print "main and other thread completed"
 
 Sleep
-		
+

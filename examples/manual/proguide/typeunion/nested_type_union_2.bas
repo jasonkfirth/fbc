@@ -22,7 +22,7 @@
 
 
 
-'' same example of two dependent types, but with simply one of them a Nested Named Type: 
+'' same example of two dependent types, but with simply one of them a Nested Named Type:
 
 Type list
 	count As Integer

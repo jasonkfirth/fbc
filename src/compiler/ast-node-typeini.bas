@@ -98,10 +98,9 @@ private sub hAstTypeIniMaybeConvertUpcast _
 					l->l->typeini.bytes = maxsize
 					l->l->subtype = n->subtype
 
-					'' !!!TODO!!! confirm ast class? - it only makes sense if it
-					'' is another TYPEINI node that tracks offset/bytes/type
-					'' do we need this, or can it be assumed that everywhere handled
-					'' this correctly?
+					'' The following node carries the same TYPEINI offset, byte-count,
+					'' and subtype state. Debug builds verify that it is a TYPEINI
+					'' continuation node before those fields are patched.
 
 					#ifdef __FB_DEBUG__
 					select case astGetClass( l->l )

@@ -15,12 +15,12 @@ operator imp _
 		byref lhs as VARIANT_, _
 		byref rhs as VARIANT _
 	) as VARIANT
-	
+
 	dim as VARIANT_ res = any
-	
+
 	VarImp( @lhs, @rhs.var_, @res )
-	
+
 	return VARIANT( res, FALSE )
-	
+
 end operator
 

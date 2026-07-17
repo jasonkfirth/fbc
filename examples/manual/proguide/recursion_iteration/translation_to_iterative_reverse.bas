@@ -16,4 +16,4 @@ Function translationToIterativeReverse (ByVal s As String, ByVal cumul As String
 		Goto begin                  '' iterative jump
 	End If
 End Function
-		
+

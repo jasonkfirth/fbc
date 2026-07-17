@@ -6,7 +6,7 @@
   '' IUP identifiers
   dim as Ihandle ptr frame, dialog
 
-  '' Initializes IUP 
+  '' Initializes IUP
   IupOpen( NULL, NULL )
 
   '' Creates frame with a label
@@ -24,17 +24,17 @@
   '' Sets frame's attributes
   IupSetAttributes(frame, !"FGCOLOR=\"255 0 0\", SIZE=EIGHTHxEIGHTH, TITLE=\"This is the frame\", MARGIN=10x10")
 
-  '' Creates dialog 
+  '' Creates dialog
   dialog = IupDialog(frame)
 
   '' Sets dialog's title
   IupSetAttribute(dialog, IUP_TITLE, "IupFrame")
 
   '' Shows dialog in the center of the screen
-  IupShow( dialog )  
-  
+  IupShow( dialog )
+
   '' Initializes IUP main loop
-  IupMainLoop()      
-  
+  IupMainLoop()
+
   '' Finishes IUP
   IupClose()

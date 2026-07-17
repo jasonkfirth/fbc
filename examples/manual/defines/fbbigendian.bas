@@ -10,4 +10,4 @@
    '...instructions only for big endian machines
 #else
   '...instructions only for little endian machines
-#endif 
+#endif

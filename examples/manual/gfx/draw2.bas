@@ -45,7 +45,7 @@ For i = 1 To 24
 
 	'' draw the petal pattern, which links to angle-setting and filling strings
 	Draw petal
-	
+
 	'' short delay
 	Sleep 100
 

@@ -27,4 +27,4 @@ Function transitbyref( ByRef _s As String ) ByRef As String
 	'' This var-len string will transit by reference (input and output), no copy will be created.
 	Return _s
 End Function
-				
+

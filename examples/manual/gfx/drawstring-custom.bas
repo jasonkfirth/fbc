@@ -34,14 +34,14 @@ p[2] = LASTCHAR
 
  '' PUT each character into the font and update width information
 For i = FIRSTCHAR To LASTCHAR
-	
+
 	'' Here we could define a custom width for each letter, but for simplicity we use
 	'' a fixed width of 8 since we are reusing the default font glyphs
 	p[3 + i - FIRSTCHAR] = 8
-	
+
 	'' Create character onto custom font buffer by drawing using default font
 	Draw String myFont, ((i - FIRSTCHAR) * 8, 1), Chr(i), 32 + (i Mod 24) + 24
-	
+
 Next i
 
 '' Now the font buffer is ready; we could save it using BSAVE for later use

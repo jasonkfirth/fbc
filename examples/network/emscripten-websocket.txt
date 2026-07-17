@@ -1,0 +1,30 @@
+FreeBASIC JavaScript WebSocket example
+======================================
+
+`emscripten-websocket.bas` uses the optional Emscripten WebSocket binding
+installed as `emscripten_websocket.bi` with fbc-js.
+
+Build it from this directory with:
+
+    fbc-js -Wl -lwebsocket -x emscripten-websocket.html emscripten-websocket.bas
+
+Start the local host in another terminal:
+
+    node emscripten-websocket-host.js --root .
+
+Then open `http://127.0.0.1:18087/emscripten-websocket.html`. The client uses
+`ws://127.0.0.1:18087` by default, sends one message, prints the echoed reply,
+and closes the connection. The host serves the generated page and implements a
+small WebSocket echo service without npm packages.
+
+To connect somewhere else, change `websocketUrl` in the example. This keeps
+the browser build independent of page query-string and host command-line
+conventions.
+
+The `-Wl -lwebsocket` pair matters. Emscripten does not link its WebSocket
+implementation unless the program requests it. The browser WebSocket API is
+asynchronous, so a program must keep yielding to the event loop after it opens
+a socket. The example uses `Sleep` for that purpose.
+
+When serving the generated page over HTTPS, use a `wss://` endpoint. Browsers
+normally reject an insecure `ws://` connection from a secure page.

@@ -11,10 +11,10 @@ Declare Sub echo (ByRef a As Any) '' ANY disables the checking for the type of d
 
 Dim x As Single
 x = -15
-echo x                  '' Passing a single to a function that expects an integer. The compiler does not complain!!             
+echo x                  '' Passing a single to a function that expects an integer. The compiler does not complain!!
 Sleep
 
 Sub echo (ByRef a As Integer)
-  Print Hex(a)         
+  Print Hex(a)
 End Sub
 

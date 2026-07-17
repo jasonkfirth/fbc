@@ -13,8 +13,8 @@
 	If Command(1) = "" Then
 		ShowHelp
 		End 0
-	End If	
+	End If
 
 	Sub ShowHelp()
-		Print "no options specified."	
+		Print "no options specified."
 	End Sub

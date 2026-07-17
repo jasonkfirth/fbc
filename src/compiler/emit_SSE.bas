@@ -13,6 +13,11 @@
 #include once "symb.bi"
 #include once "emit-private.bi"
 
+const SSE_VECTOR_WIDTH_2 = 2
+const SSE_VECTOR_WIDTH_3 = 3
+const SSE_VECTOR_WIDTH_4 = 4
+
+'' Module state: backend initialization selects these conversion emitters.
 dim shared _emitLOADB2F_x86 as sub( byval dvreg as IRVREG ptr, byval svreg as IRVREG ptr )
 dim shared _emitLOADF2B_x86 as sub( byval dvreg as IRVREG ptr, byval svreg as IRVREG ptr )
 
@@ -400,19 +405,19 @@ private sub hEmitStoreFreg2F_SSE _
 
 	ddsize = typeGetSize( dvreg->dtype )
 
-	if( ( svreg->vector = 2 ) and ( ddsize > 4 ) ) then
+	if( ( svreg->vector = SSE_VECTOR_WIDTH_2 ) and ( ddsize > 4 ) ) then
 		outp "movupd " + dst + COMMA + src
 		exit sub
 	end if
 
-	if( svreg->vector = 2 ) then
+	if( svreg->vector = SSE_VECTOR_WIDTH_2 ) then
 		outp "movlps " + dst + COMMA + src
-	elseif( svreg->vector = 3 ) then
+	elseif( svreg->vector = SSE_VECTOR_WIDTH_3 ) then
 		outp "movhlps xmm7" + COMMA + src
 		outp "movlps " + dst + COMMA + src
 		hPrepOperand( dvreg, dst, , 8, FALSE )
 		outp "movss " + dst + COMMA + "xmm7"
-	elseif( svreg->vector = 4 ) then
+	elseif( svreg->vector = SSE_VECTOR_WIDTH_4 ) then
 		outp "movups " + dst + COMMA + src
 	end if
 
@@ -477,16 +482,16 @@ private sub _emitSTORF2F_SSE _
 					outp "movupd xmm7" + COMMA + src
 					outp "movupd " + dst + COMMA + "xmm7"
 				else
-					if( svreg->vector = 2 ) then
+					if( svreg->vector = SSE_VECTOR_WIDTH_2 ) then
 						outp "movlps xmm7" + COMMA + src
 						outp "movlps " + dst + COMMA + "xmm7"
-					elseif( svreg->vector = 3 ) then
+					elseif( svreg->vector = SSE_VECTOR_WIDTH_3 ) then
 						outp "movups xmm7" + COMMA + src
 						outp "movlps " + dst + COMMA + "xmm7"
 						outp "unpckhps xmm7, xmm7"
 						hPrepOperand( dvreg, dst, , 8, FALSE )
 						outp "movss " + dst + COMMA + "xmm7"
-					elseif( svreg->vector = 4 ) then
+					elseif( svreg->vector = SSE_VECTOR_WIDTH_4 ) then
 						outp "movups xmm7" + COMMA + src
 						outp "movups " + dst + COMMA + "xmm7"
 					end if
@@ -608,6 +613,8 @@ private sub _emitLOADF2I_SSE _
 	dim as string aux, aux8_16
 	dim as integer sdsize, ddsize
 	dim as integer isFree, reg, wasReg
+	const FLOAT64_CONVERSION_SUFFIX = asc( "d" )
+	const FLOAT32_CONVERSION_SUFFIX = asc( "s" )
 
 	dim as FBSYMBOL ptr sym
 	dim as IRVREG ptr tempVreg
@@ -672,7 +679,7 @@ private sub _emitLOADF2I_SSE _
 		end if
 		hPOP aux
 	else
-		suffix = chr( iif( sdsize > 4 , 100, 115 ) )
+		suffix = chr( iif( sdsize > 4, FLOAT64_CONVERSION_SUFFIX, FLOAT32_CONVERSION_SUFFIX ) )
 		if( typeIsSigned( dvreg->dtype ) and ( ddsize = 2 ) ) then
 			if( svreg->typ <> IR_VREGTYPE_REG ) then
 				if( sdsize > 4 ) then
@@ -923,7 +930,7 @@ private sub _emitLOADF2F_SSE _
 			if( ddsize > 4 ) then
 				outp "movupd " + dst + COMMA + src
 			else
-				if( svreg->vector = 2 ) then
+				if( svreg->vector = SSE_VECTOR_WIDTH_2 ) then
 					outp "movlps " + dst + COMMA + src
 				else
 					outp "movups " + dst + COMMA + src
@@ -1011,7 +1018,7 @@ private sub _emitSWZREPF_SSE _
 	if( ddsize > 4 ) then
 		outp "unpcklpd " + dst + COMMA + dst
 	else
-		if( dvreg->vector = 2 ) then
+		if( dvreg->vector = SSE_VECTOR_WIDTH_2 ) then
 			outp "unpcklps " + dst + COMMA + dst
 		else
 			outp "shufps " + dst + COMMA + dst + COMMA + "0x0"
@@ -1115,7 +1122,7 @@ private sub _emitADDF_SSE _
 			if( sdsize > 4 ) then
 				outp "movupd xmm7" + COMMA + src
 			else
-				if( svreg->vector = 2 ) then
+				if( svreg->vector = SSE_VECTOR_WIDTH_2 ) then
 					outp "movlps xmm7" + COMMA + src
 				else
 					outp "movups xmm7" + COMMA + src
@@ -1195,7 +1202,7 @@ private sub _emitSUBF_SSE _
 			if( sdsize > 4 ) then
 				outp "movupd xmm7" + COMMA + src
 			else
-				if( svreg->vector = 2 ) then
+				if( svreg->vector = SSE_VECTOR_WIDTH_2 ) then
 					outp "movlps xmm7" + COMMA + src
 				else
 					outp "movups xmm7" + COMMA + src
@@ -1275,7 +1282,7 @@ private sub _emitMULF_SSE _
 			if( sdsize > 4 ) then
 				outp "movupd xmm7" + COMMA + src
 			else
-				if( svreg->vector = 2 ) then
+				if( svreg->vector = SSE_VECTOR_WIDTH_2 ) then
 					outp "movlps xmm7" + COMMA + src
 				else
 					outp "movups xmm7" + COMMA + src
@@ -1356,7 +1363,7 @@ private sub _emitDIVF_SSE _
 			if( sdsize > 4 ) then
 				outp "movupd xmm7" + COMMA + src
 			else
-				if( svreg->vector = 2 ) then
+				if( svreg->vector = SSE_VECTOR_WIDTH_2 ) then
 					outp "movlps xmm7" + COMMA + src
 				else
 					outp "movups xmm7" + COMMA + src
@@ -1534,6 +1541,8 @@ private function hCMPF_get_recipe _
 	) as CMPF_RECIPE ptr
 
 	assert( op >= 0 and op <= CMPF_OP_COUNT )
+	const CMPF_RECIPE_INVERSE_OFFSET = 6
+	const CMPF_RECIPE_LABEL_OFFSET = CMPF_RECIPE_INVERSE_OFFSET * 2
 
 	'' These recipes work for x86 (non-SSE) comparisons too.
 	'' The difference is that we don't use any swapregs, it seems less
@@ -1576,10 +1585,10 @@ private function hCMPF_get_recipe _
 
 	dim index as integer = op
 	if( label ) then
-		index += 12
+		index += CMPF_RECIPE_LABEL_OFFSET
 	end if
 	if( (options and IR_EMITOPT_REL_DOINVERSE) <> 0 ) then
-		index += 6
+		index += CMPF_RECIPE_INVERSE_OFFSET
 	end if
 
 	return @recipe(index)
@@ -1826,15 +1835,15 @@ private sub _emitHADDF_SSE _
 		outp "movhlps xmm7" + COMMA + dst
 		outp "addsd " + dst + COMMA + "xmm7"
 	else
-		if( dvreg->vector = 2 ) then
+		if( dvreg->vector = SSE_VECTOR_WIDTH_2 ) then
 			outp "pshufd xmm7" + COMMA + dst + COMMA + "0x01"
 			outp "addss " + dst + COMMA + "xmm7"
-		elseif( dvreg->vector = 3 ) then
+		elseif( dvreg->vector = SSE_VECTOR_WIDTH_3 ) then
 			outp "pshufd xmm7" + COMMA + dst + COMMA + "0x01"
 			outp "addss " + dst + COMMA + "xmm7"
 			outp "movhlps xmm7" + COMMA + dst
 			outp "addss " + dst + COMMA + "xmm7"
-		elseif( dvreg->vector = 4 ) then
+		elseif( dvreg->vector = SSE_VECTOR_WIDTH_4 ) then
 			outp "movhlps xmm7" + COMMA + dst
 			outp "addps " + dst + COMMA + "xmm7"
 			outp "pshufd xmm7" + COMMA + dst + COMMA + "0x01"
@@ -1965,8 +1974,8 @@ private sub hSINCOS_FAST_SSE _
 		byval iscos as integer _
 	) static
 
-	dim as integer reg(2), isFree(2), stackSize, i, stackPointer
-	dim as string dst, src, regName(2)
+	dim as integer reg(0 to 2), isFree(0 to 2), stackSize, i, stackPointer
+	dim as string dst, src, regName(0 to 2)
 	dim as FBSYMBOL ptr sym_invSignBitMask, sym_one, sym_piOverTwo, sym_twoOverPI
 	dim as FBSYMBOL ptr sym_sin_c0, sym_sin_c1, sym_sin_c2, sym_sin_c3
 	dim as IRVREG ptr vReg_invSignBitMask, vReg_one, vReg_piOverTwo, vReg_twoOverPI
@@ -3072,5 +3081,3 @@ function _init_opFnTB_SSE _
 
 	function = TRUE
 end function
-
-

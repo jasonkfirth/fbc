@@ -26,10 +26,10 @@ macroargcount>0 (=1):
    Hello2
    Hello3
    Hello4
- 
+
 macroargcount=0 (=0):
    Hello1, Hello2, Hello3, Hello4
- 
+
 macroargcount<0 (=-1):
    Hello1, Hello2, Hello3, Hello4
    Hello2, Hello3, Hello4

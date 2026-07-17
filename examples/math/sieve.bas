@@ -26,7 +26,7 @@ print "number of primes ="; count
 print
 print "finding first 1000000 primes..."
 
-const as integer n2 = 15485863 
+const as integer n2 = 15485863
 redim as byte flags(2 to n2)
 
 dim as double s = timer()

@@ -55,12 +55,12 @@ Operator * (ByRef sp As SmartPointer) ByRef As UDT   '' overloaded operator '*'
 	Print "SmartPointer operator '*'"
 	Return *Cast(UDT Ptr, sp)                        ''    (returning byref)
 End Operator                                         ''    to behave as pointer
- 
+
 Operator -> (ByRef sp As SmartPointer) ByRef As UDT  '' overloaded operator '->'
 	Print "SmartPointer operator '->'"
 	Return *Cast(UDT Ptr, sp)                        ''    (returning byref)
 End Operator                                         ''    to behave as pointer
- 
+
 
 Scope
 	Dim sp1 As SmartPointer
@@ -68,13 +68,13 @@ Scope
 	sp1->s = "object #1"
 	Print "'" & sp1->s & "'"
 	Print
- 
+
 	Dim sp2 As SmartPointer = sp1
 	Print "'" & (*sp2).s & "'"
 	(*sp2).s = "object #2"
 	Print "'" & (*sp2).s & "'"
 	Print
- 
+
 	Dim sp3 As SmartPointer = sp1
 	Print "'" & sp3->s & "'"
 	*sp3 = *sp2
@@ -85,4 +85,4 @@ Scope
 End Scope
 
 Sleep
-			
+

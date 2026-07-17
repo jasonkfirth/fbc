@@ -679,6 +679,14 @@ private sub hRtrimMacroTextW _
 
 	'' remove the white-spaces (including nl)
 
+	if( text = NULL ) then
+		exit sub
+	end if
+
+	if( (text->data = NULL) or (text->len = 0) ) then
+		exit sub
+	end if
+
 	p = text->data + (text->len - 1)
 	do while( p > text->data )
 

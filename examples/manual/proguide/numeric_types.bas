@@ -28,4 +28,4 @@ Print
 Print Using "A  POINTER  is ##"; SizeOf(Any Ptr)  * 8; : Print "-bit"
 
 Sleep
-		
+

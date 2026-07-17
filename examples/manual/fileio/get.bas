@@ -69,5 +69,5 @@ Open "file.ext" For Binary As #f
 
   get_mem()
 
-' Close the file.  
+' Close the file.
 Close #f

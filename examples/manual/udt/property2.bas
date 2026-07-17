@@ -14,7 +14,7 @@ End Namespace
 
 Type BitNum
   Num As UInteger
-  
+
 	'' Get/Set Properties each with an Index.
   Declare Property NumBit( ByVal Index As Integer ) As Integer
   Declare Property NumBit( ByVal Index As Integer, ByVal Value As Byte )
@@ -35,15 +35,15 @@ Property BitNum.NumBit( ByVal Index As Integer, ByVal Value As Byte )
   Else
 	If Index < 0 Then Exit Property
   End If
-  
+
   If Value = BOOL.FALSE Then
 	This.Num = BitReset( This.Num, Index )
   End If
-  
+
   If Value = BOOL.TRUE Then
 	This.Num = BitSet( This.Num, Index )
   End If
-  
+
 End Property
 
 

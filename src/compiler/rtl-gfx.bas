@@ -8,6 +8,10 @@
 #include once "lex.bi"
 #include once "rtl.bi"
 
+'' The runtime uses this out-of-range coordinate to select the current Y.
+const FBGFX_CURRENT_Y_SENTINEL = -8388607
+const FBGFX_FULL_CIRCLE_RADIANS = 3.141593 * 2
+
 declare function hGfxlib_cb _
 	( _
 		byval sym as FBSYMBOL ptr _
@@ -1630,7 +1634,7 @@ function rtlGfxPoint _
 
 	'' byval y as single
 	if( yexpr = NULL ) then
-		yexpr = astNewCONSTf( -8388607, FB_DATATYPE_SINGLE )
+		yexpr = astNewCONSTf( FBGFX_CURRENT_Y_SENTINEL, FB_DATATYPE_SINGLE )
 	end if
 	if( astNewARG( proc, yexpr ) = NULL ) then
 		exit function
@@ -1771,7 +1775,7 @@ function rtlGfxCircle _
 
 	'' byval arcend as single
 	if( endexpr = NULL ) then
-		endexpr = astNewCONSTf( 3.141593*2, FB_DATATYPE_SINGLE )
+		endexpr = astNewCONSTf( FBGFX_FULL_CIRCLE_RADIANS, FB_DATATYPE_SINGLE )
 	end if
 	if( astNewARG( proc, endexpr ) = NULL ) then
 		exit function

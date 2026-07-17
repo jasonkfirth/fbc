@@ -77,7 +77,7 @@ const BLOB_HEI = 128
 
 	ptc_close
 
-end  
+end
 
 '*******************************************************************************************
 'bass subs
@@ -102,10 +102,10 @@ private sub draw_blob(buffer() as integer, light() as integer,_
    	const SCR_X_MAX = SCR_WIDTH - 1
 	const SCR_Y_MAX = SCR_HEIGHT - 1
 
-    dim as integer wid, hei 
-    dim as integer minx, miny 
-    dim as integer wtemp, htemp 
-    dim as integer ptr offset 
+    dim as integer wid, hei
+    dim as integer minx, miny
+    dim as integer wtemp, htemp
+    dim as integer ptr offset
 
 
     wid = (Ubound(light,1) - Lbound(light,1)) + 1
@@ -143,11 +143,11 @@ private sub draw_blob(buffer() as integer, light() as integer,_
 
 
 
-    dim as integer erroradd 
-    dim as integer nx, ny 
-    dim as integer c, oc 
+    dim as integer erroradd
+    dim as integer nx, ny
+    dim as integer c, oc
     dim as integer lr, lg, lb, br, bg, bb
-    dim as integer r, g, b 
+    dim as integer r, g, b
 
     erroradd = SCR_WIDTH - wid
 	offset = @buffer(0) + (y * SCR_WIDTH + x)

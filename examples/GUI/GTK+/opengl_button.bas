@@ -22,7 +22,7 @@ dim shared as GLfloat pos_y
 '':::::
 sub realize cdecl (byval widget as GtkWidget ptr, _
          	 	   byval userdata as gpointer )
-  
+
   dim as GdkGLContext ptr glcontext = gtk_widget_get_gl_context (widget)
   dim as GdkGLDrawable ptr gldrawable = gtk_widget_get_gl_drawable (widget)
 
@@ -31,7 +31,7 @@ sub realize cdecl (byval widget as GtkWidget ptr, _
   static as GLfloat position(0 to 3) = { 1.0, 1.0, 1.0, 0.0 }
   static as GLfloat lmodel_ambient(0 to 3) = { 0.2, 0.2, 0.2, 1.0 }
   static as GLfloat local_view(0) = { 0.0 }
-  
+
   ''** OpenGL BEGIN **
   if( gdk_gl_drawable_gl_begin (gldrawable, glcontext) = 0) then
     exit sub
@@ -62,7 +62,7 @@ function configure_event cdecl (byval widget as GtkWidget ptr, _
   dim as GLfloat w
   dim as GLfloat h
   dim as GLfloat aspect
-  
+
   w = widget->allocation.width
   h = widget->allocation.height
 
@@ -213,7 +213,7 @@ function visibility_notify_event cdecl (byval widget as GtkWidget ptr, _
 end function
 
 sub toggle_animation cdecl (byval widget as GtkWidget ptr)
-  
+
   if( animate ) then
   	animate = FALSE
   else
@@ -291,19 +291,19 @@ end function
   dim as GtkWidget ptr win
   dim as GtkWidget ptr button
 
-  '' 
+  ''
   '' Init GTK.
   ''
 
   gtk_init (NULL, NULL)
 
-  '' 
+  ''
   '' Init GtkGLExt.
   ''
 
   gtk_gl_init (NULL, NULL)
 
-  '' 
+  ''
   '' Configure OpenGL-capable visual.
   ''
 
@@ -324,7 +324,7 @@ end function
       end if
   end if
 
-  '' 
+  ''
   '' Top-level window.
   ''
 
@@ -338,7 +338,7 @@ end function
 
   g_signal_connect(GTK_OBJECT(win), "delete_event", GTK_SIGNAL_FUNC(@gtk_main_quit), NULL)
 
-  '' 
+  ''
   '' Toggle button which contains an OpenGL scene.
   ''
 
@@ -346,13 +346,13 @@ end function
   gtk_widget_show (button)
   gtk_container_add(GTK_CONTAINER(win), button)
 
-  '' 
+  ''
   '' Show window.
   ''
 
   gtk_widget_show (win)
 
-  '' 
+  ''
   '' Main loop.
   ''
 

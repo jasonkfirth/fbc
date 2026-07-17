@@ -17,4 +17,4 @@ If Not numeric_value2 = 25 Then Print "Numeric_Value2 is not equal to 25"
 ' This will output "Numeric_Value1 is not equal to 10" because
 ' the first IF statement is false.
 ' It will not output the result of the second IF statement because the
-' condition is true. 
+' condition is true.

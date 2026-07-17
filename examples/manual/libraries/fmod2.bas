@@ -44,7 +44,7 @@ End Function
 	If (FSOUND_GetVersion < FMOD_VERSION) Then
 		Print "FMOD version " + Str(FMOD_VERSION) + " or greater required!"
 		End 1
-	End If 
+	End If
 
 	If (FSOUND_Init(44100, 4, 0) = 0) Then
 		Print "Could not initialize FMOD"
@@ -75,7 +75,7 @@ End Function
 		End If
 		Sleep 50, 1
 	Wend
-   
+
 	FSOUND_Stream_Stop(fmod_stream)
 	FSOUND_Stream_Close(fmod_stream)
 	FSOUND_Close()

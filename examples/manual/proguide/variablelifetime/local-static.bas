@@ -15,10 +15,10 @@ Declare Sub prntSubString (ByVal p As ZString Ptr, ByVal size As Integer)
 Sub s ()                                          ' beginning of procedure scope
 	Dim As ZString * 15 zl = "local variable"     ' declare/initialize a local Zstring
 	pzl = @zl                                     ' memorize the local Zstring address
-	 
+
 	Static As ZString * 16 zs = "static variable" ' declare/initialize a static Zstring
 	pzs = @zs                                     ' memorize the static Zstring address
-	 
+
 	Print "     From inside the procedure scope:"
 	prntSubString(pzl, 14)                        ' display address/content of the local zstring
 	prntSubString(pzs, 15)                        ' display address/content of the static zstring
@@ -47,4 +47,4 @@ Sub prntSubString (ByVal p As ZString Ptr, ByVal size As Integer)
 	Next I
 	Print """"
 End Sub
-			
+

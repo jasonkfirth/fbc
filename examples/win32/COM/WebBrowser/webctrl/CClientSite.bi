@@ -1,6 +1,6 @@
 ''
 '' CClientSite - a "class" that implements the IOleClientSite interface
-'' 
+''
 
 #ifndef _CClientSite_bi_
 #define _CClientSite_bi_ 1

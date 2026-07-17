@@ -11,9 +11,9 @@
 '' This will create mydll.dll (and libmydll.dll.a import library) on Windows,
 '' and libmydll.so on Linux.
 ''
-'' Note: libmydll.dll.a is an import library, it's only needed when creating 
-'' an executable that calls any of mydll's functions, only distribute 
-'' the DLL files with your apps, do not include the import libraries, 
+'' Note: libmydll.dll.a is an import library, it's only needed when creating
+'' an executable that calls any of mydll's functions, only distribute
+'' the DLL files with your apps, do not include the import libraries,
 '' they are useless to end-users.
 
 '' Simple exported function; the <alias "..."> disables FB's default

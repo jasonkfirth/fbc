@@ -67,7 +67,7 @@ type dimensions                         '' Object Dimensions
 	h as single                         '' Object Height
 end type
 
-'' Size Of Each Object:    
+'' Size Of Each Object:
 dim shared size(0 to 4) as dimensions => { _
 		(1.0f, 1.0f), _                       '' Blueface
 		(1.0f, 1.0f), _                       '' Bucket
@@ -77,7 +77,7 @@ dim shared size(0 to 4) as dimensions => { _
 		}
 
 dim shared as integer mouse_x, mouse_y, mouse_b, mouse_down
- 
+
 '------------------------------------------------------------------------
 declare function LoadTGA(byval texture as TEXTUREIMAGE ptr, byref filename as string) as integer
 declare sub BuildFont ()
@@ -271,7 +271,7 @@ end sub
 '------------------------------------------------------------------------
 '' Compare Function *** MSDN CODE MODIFIED FOR THIS TUT ***
 function Compare (byval elem1 as objects ptr, byval elem2 as objects ptr) as integer
- 
+
 	if elem1->distance < elem2->distance then
 		'' If First Structure distance Is Less Than The Second Return -1
 		return  - 1
@@ -454,10 +454,10 @@ end sub
 sub Update (byval milliseconds as integer)               '' Perform Motion Updates Here
 
 	dim as integer iLoop = 0
-	
+
 	'' Space Bar Being Pressed After Game Has Ended?
 	if MULTIKEY(FB.SC_SPACE)  and  game = TRUE then
-		'' Loop Through 30 Objects		
+		'' Loop Through 30 Objects
 		while iLoop<30
 			'' Initialize Each Object
 			InitObject (iLoop)

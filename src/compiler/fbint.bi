@@ -565,12 +565,11 @@ enum FB_TARGETOPT
 	''    hidden param is popped according to calling convention
 	FB_TARGETOPT_CALLEEPOPSHIDDENPTR = &h00000008
 
-	'' Returning structures in registers only exists on Win32 and Darwin/MacOSX, and
-	'' - neither Linux GCC (following the i386 SysV ABI),
-	'' - nor DJGPP
-	'' do it. TODO: what about the BSDs?
-	FB_TARGETOPT_RETURNINREGS        = &h00000010   '' mingw-w64 & winlibs / BSD's
-	FB_TARGETOPT_RETURNINFLTS        = &h00000020   '' mingw-w64 / BSD, but not win-libs
+	'' Structure-return conventions differ by target. The target table enables
+	'' register returns for Windows-compatible targets, Darwin, the BSDs,
+	'' Solaris, illumos and JS. Linux and DJGPP use a hidden result pointer.
+	FB_TARGETOPT_RETURNINREGS        = &h00000010
+	FB_TARGETOPT_RETURNINFLTS        = &h00000020   '' mingw-w64, FreeBSD, OpenBSD and NetBSD
 
 	'' Whether the stack needs to be aligned to 16 bytes before any
 	'' call to external code (x86/x86_64 GNU/Linux, Android and Darwin)

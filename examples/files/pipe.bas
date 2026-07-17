@@ -3,18 +3,23 @@ const SHELL_COMMAND = "ls *"
 #else
 const SHELL_COMMAND = "dir *.*"
 #endif
+const SEPARATOR_WIDTH = 60
 
 dim inpline as string
+dim as integer pipeFile = freefile
 
-open pipe SHELL_COMMAND for input as #1
+if open pipe( SHELL_COMMAND, for input, as #pipeFile ) <> 0 then
+	print "Unable to run: "; SHELL_COMMAND
+	end 1
+end if
 
-print string( 60, "-" )
+print string( SEPARATOR_WIDTH, "-" )
 
-do while( not eof(1 ) )
-	line input #1, inpline
+do while( not eof(pipeFile) )
+	line input #pipeFile, inpline
 	print inpline
 loop
 
-print string( 60, "-" )
+print string( SEPARATOR_WIDTH, "-" )
 
-close #1
+close #pipeFile

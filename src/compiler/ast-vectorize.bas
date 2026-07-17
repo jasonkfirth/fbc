@@ -7,6 +7,7 @@
 #include once "fbint.bi"
 #include once "ast.bi"
 
+'' Module state: vectorization width is established during analysis.
 dim shared as integer           vectorWidth
 dim shared as integer           maxVectorWidth          '' 2 if doubles are found anywhere, otherwise 4
 

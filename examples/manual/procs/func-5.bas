@@ -6,7 +6,7 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgFunction
 '' --------
 
-'' This example shows how to declare and call 
+'' This example shows how to declare and call
 '' functions taking array arguments.
 
 Function x(b() As Double) As Integer
@@ -15,5 +15,5 @@ End Function
 
 Dim a(1 To 10) As Double
 Print x(a())
-Dim c(10 To 20) As Double 
+Dim c(10 To 20) As Double
 Print x(c())

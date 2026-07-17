@@ -14,4 +14,4 @@ arraylen = UBound(array) - LBound(array) + 1
 arraysize = arraylen * SizeOf( Short )
 
 Print "Number of elements in array:", arraylen    '10
-Print "Number of bytes used in array:", arraysize '10 * 2 = 20 
+Print "Number of bytes used in array:", arraysize '10 * 2 = 20

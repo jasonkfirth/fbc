@@ -317,7 +317,8 @@ function cUdtMember _
 	) as ASTNODE ptr
 
 	'' note: assuming a pointer is being passed to this function
-	dim as integer is_ptr = TRUE, mask = typeGetConstMask( dtype )
+	dim as integer is_ptr = TRUE
+	dim as integer mask = typeGetConstMask( dtype )
 
 	do
 		dim as FBSYMBOL ptr fld = hMemberId( subtype, FALSE )

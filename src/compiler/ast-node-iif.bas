@@ -155,6 +155,73 @@ function hCheckTypes _
 	function = TRUE
 end function
 
+private sub hNormalizeIifStringUdt _
+	( _
+		byref truexpr as ASTNODE ptr, _
+		byref falsexpr as ASTNODE ptr _
+	)
+
+	if( truexpr->dtype = falsexpr->dtype ) then
+		exit sub
+	end if
+
+	if( truexpr->dtype = FB_DATATYPE_STRUCT ) then
+		if( symbGetUdtIsZstring( truexpr->subtype ) ) then
+			if( falsexpr->dtype = FB_DATATYPE_CHAR ) then
+				astTryOvlStringCONV( truexpr )
+				truexpr->dtype = astGetDataType( truexpr )
+			end if
+		elseif( symbGetUdtIsWstring( truexpr->subtype ) ) then
+			if( falsexpr->dtype = FB_DATATYPE_WCHAR ) then
+				astTryOvlStringCONV( truexpr )
+				truexpr->dtype = astGetDataType( truexpr )
+			end if
+		end if
+	elseif( falsexpr->dtype = FB_DATATYPE_STRUCT ) then
+		if( symbGetUdtIsZstring( falsexpr->subtype ) ) then
+			if( truexpr->dtype = FB_DATATYPE_CHAR ) then
+				astTryOvlStringCONV( falsexpr )
+				falsexpr->dtype = astGetDataType( falsexpr )
+			end if
+		elseif( symbGetUdtIsWstring( falsexpr->subtype ) ) then
+			if( truexpr->dtype = FB_DATATYPE_WCHAR ) then
+				astTryOvlStringCONV( falsexpr )
+				falsexpr->dtype = astGetDataType( falsexpr )
+			end if
+		end if
+	end if
+end sub
+
+private function hFoldConstIif _
+	( _
+		byval condexpr as ASTNODE ptr, _
+		byref truexpr as ASTNODE ptr, _
+		byval truecookie as integer, _
+		byref falsexpr as ASTNODE ptr, _
+		byval falsecookie as integer, _
+		byref result as ASTNODE ptr _
+	) as integer
+
+	if( astIsCONST( condexpr ) = FALSE ) then
+		return FALSE
+	end if
+
+	if( astConstEqZero( condexpr ) ) then
+		astDelTree( truexpr )
+		astDtorListScopeDelete( truecookie )
+		result = falsexpr
+		astDtorListUnscope( falsecookie )
+	else
+		astDelTree( falsexpr )
+		astDtorListScopeDelete( falsecookie )
+		result = truexpr
+		astDtorListUnscope( truecookie )
+	end if
+
+	astDelTree( condexpr )
+	return TRUE
+end function
+
 function astNewIIF _
 	( _
 		byval condexpr as ASTNODE ptr, _
@@ -164,7 +231,7 @@ function astNewIIF _
 		byval falsecookie as integer _
 	) as ASTNODE ptr
 
-	dim as ASTNODE ptr n = any, varexpr = any
+	dim as ASTNODE ptr n = any, varexpr = any, foldedexpr = any
 	dim as integer dtype = any
 	dim as integer is_true_ctorcall = any, is_false_ctorcall = any
 	dim as integer call_true_defctor = any, call_false_defctor = any
@@ -176,59 +243,16 @@ function astNewIIF _
 		exit function
 	end if
 
-	'' Constant condition?
-	if( astIsCONST( condexpr ) ) then
-		'' Note: maybe the type checks should be done for this too,
-		'' but then what result type should something like
-		''    iif( 0, mystr, myfixstr )
-		'' produce? myfixstr is a fix-len string, it cannot just be
-		'' treated as a var-len string, and there is no temp var...
-		if( astConstEqZero( condexpr ) ) then
-			astDelTree( truexpr )
-			astDtorListScopeDelete( truecookie )
-			function = falsexpr
-			astDtorListUnscope( falsecookie )
-		else
-			astDelTree( falsexpr )
-			astDtorListScopeDelete( falsecookie )
-			function = truexpr
-			astDtorListUnscope( truecookie )
-		end if
-		astDelTree( condexpr )
-		exit function
+	'' Constant conditions bypass IIF type checks and return the selected branch.
+	if( hFoldConstIif( condexpr, truexpr, truecookie, falsexpr, falsecookie, foldedexpr ) ) then
+		return foldedexpr
 	end if
 
 	dtype = FB_DATATYPE_INVALID
 	subtype = NULL
 
-	'' Maybe UDT extends Z|WSTRING? Check for string conversions...
-	if( truexpr->dtype <> falsexpr->dtype ) then
-		if( truexpr->dtype = FB_DATATYPE_STRUCT ) then
-			if( symbGetUdtIsZstring( truexpr->subtype ) ) then
-				if( falsexpr->dtype = FB_DATATYPE_CHAR ) then
-					astTryOvlStringCONV( truexpr )
-					truexpr->dtype = astGetDataType( truexpr )
-				end if
-			elseif( symbGetUdtIsWstring( truexpr->subtype ) ) then
-				if( falsexpr->dtype = FB_DATATYPE_WCHAR ) then
-					astTryOvlStringCONV( truexpr )
-					truexpr->dtype = astGetDataType( truexpr )
-				end if
-			end if
-		elseif( falsexpr->dtype = FB_DATATYPE_STRUCT ) then
-			if( symbGetUdtIsZstring( falsexpr->subtype ) ) then
-				if( truexpr->dtype = FB_DATATYPE_CHAR ) then
-					astTryOvlStringCONV( falsexpr )
-					falsexpr->dtype = astGetDataType( falsexpr )
-				end if
-			elseif( symbGetUdtIsWstring( falsexpr->subtype ) ) then
-				if( truexpr->dtype = FB_DATATYPE_WCHAR ) then
-					astTryOvlStringCONV( falsexpr )
-					falsexpr->dtype = astGetDataType( falsexpr )
-				end if
-			end if
-		end if
-	end if
+	'' UDTs extending zstring/wstring may need a string conversion first.
+	hNormalizeIifStringUdt( truexpr, falsexpr )
 
 	'' check types & find the iif() result type
 	if( hCheckTypes( truexpr->dtype, truexpr->subtype, _

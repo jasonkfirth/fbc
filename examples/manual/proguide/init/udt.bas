@@ -18,7 +18,7 @@ Dim As UDT1 Ptr pu14 = New UDT1(1, 2)     '' default-construction + initializati
 	Delete pu14
 Dim ByRef As UDT1 ru15 = *New UDT1(1, 2)  '' default-construction + initialization
 	Delete @ru15
-   
+
 Dim As UDT1 u16 = u13                     '' default copy-construction
 'Dim As UDT1 u17 = UDT1(u13)              '' not valid: no implicit Constructor(As UDT1)
 Dim As UDT1 u18 = Type<UDT1>(u13)         '' default-construction + initialization
@@ -52,7 +52,7 @@ Dim As UDT2 Ptr pu24 = New UDT2(1, 2)      '' call Constructor(As Integer, As In
 	Delete pu24
 Dim ByRef As UDT2 ru25 = *New UDT2(1, 2)   '' call Constructor(As Integer, As Integer)
 	Delete @ru25
-   
+
 Dim As UDT2 u26 = u23                      '' default copy-construction
 'Dim As UDT2 u27 = UDT2(u23)               '' not valid: no implicit Constructor(As UDT2)
 'Dim As UDT2 u28 = Type<UDT2>(u23)         '' not valid: no implicit Constructor(As UDT2)
@@ -84,7 +84,7 @@ Dim As UDT3 Ptr pu34 = New UDT3(1, "2")     '' call Constructor(As Integer, As S
 	Delete pu34
 Dim ByRef As UDT3 ru35 = *New UDT3(1, "2")  '' call Constructor(As Integer, As String)
 	Delete @ru35
-   
+
 Dim As UDT3 u36 = u33                       '' default copy-construction
 Dim As UDT3 u37 = UDT3(u33)                 '' call implicit Constructor(As UDT3)
 Dim As UDT3 u38 = Type<UDT3>(u33)           '' call implicit Constructor(As UDT3)
@@ -118,7 +118,7 @@ Dim As UDT4 Ptr pu44 = New UDT4(1, 2)     '' call Constructor(As Integer, As Int
 	Delete pu44
 Dim ByRef As UDT4 ru45 = *New UDT4(1, 2)  '' call Constructor(As Integer, As Integer)
 	Delete @ru45
-   
+
 Dim As UDT4 u46 = u43                     '' default copy-construction
 Dim As UDT4 u47 = UDT4(u43)               '' call implicit Constructor(As UDT4)
 Dim As UDT4 u48 = Type<UDT4>(u43)         '' call implicit Constructor(As UDT4)
@@ -159,7 +159,7 @@ Dim As UDT5 Ptr pu55 = New UDT5(1)         '' call Constructor(As Integer)
 	Delete pu55
 Dim ByRef As UDT5 ru56 = *New UDT5(1)      '' call Constructor(As Integer)
 	Delete @ru56
-   
+
 Dim As UDT5 u57 = u54                      '' default copy-construction
 'Dim As UDT5 u58 = UDT5(u54)               '' not valid: no implicit Constructor(As UDT5)
 'Dim As UDT5 u59 = Type<UDT5>(u54)         '' not valid: no implicit Constructor(As UDT5)
@@ -168,4 +168,4 @@ Dim As UDT5 u57 = u54                      '' default copy-construction
 Print
 
 Sleep
-		
+

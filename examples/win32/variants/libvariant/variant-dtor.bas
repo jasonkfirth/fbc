@@ -7,9 +7,9 @@
 destructor VARIANT _
 	( _
 		_
-	) 
-	
+	)
+
 	VariantClear( @this.var_ )
-		
+
 end destructor
 

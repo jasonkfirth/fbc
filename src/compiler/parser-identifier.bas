@@ -146,7 +146,8 @@ private function hCheckDecl _
 				if( chain_->next <> NULL ) then
 					'' imported namespace?
 					if( chain_->isimport ) then
-						dim as FBSYMBOL ptr ns = symbGetNamespace( chain_->sym ), ns2 = symbGetNamespace( chain_->next->sym )
+						dim as FBSYMBOL ptr ns = symbGetNamespace( chain_->sym )
+						dim as FBSYMBOL ptr ns2 = symbGetNamespace( chain_->next->sym )
 						'' first symbol declared in other namespace?
 						if( iif( parent, ns <> parent, ns <> ns2 ) ) then
 							'' more than one imported symbol
@@ -205,6 +206,40 @@ end function
 '' Identifier   = (ID{namespace|class} '.')* ID
 ''              |  ID ('.' ID)* .
 ''
+private sub hCheckStaticMemberAccess _
+	( _
+		byval parent as FBSYMBOL ptr, _
+		byval chain_ as FBSYMCHAIN ptr, _
+		byval options as FB_IDOPT _
+	)
+
+	if( (options and FB_IDOPT_CHECKSTATIC) = 0 ) then
+		exit sub
+	end if
+
+	'' Only members of a TYPE or CLASS can be reached through this path.
+	select case symbGetClass( parent )
+	case FB_SYMBCLASS_STRUCT, FB_SYMBCLASS_CLASS
+		'' Check every duplicate in the chain because one field is enough
+		'' to make this member access non-static.
+		dim as FBSYMCHAIN ptr iter = chain_
+		do
+			dim as FBSYMBOL ptr sym = iter->sym
+			do
+				if( symbGetClass( sym ) = FB_SYMBCLASS_FIELD ) then
+					errReport( FB_ERRMSG_ACCESSTONONSTATICMEMBER )
+					exit do, do
+				end if
+
+				sym = sym->hash.next
+			loop while( sym <> NULL )
+
+			iter = symbChainGetNext( iter )
+		loop while( iter <> NULL )
+	end select
+
+end sub
+
 function cIdentifier _
 	( _
 		byref base_parent as FBSYMBOL ptr, _
@@ -411,28 +446,7 @@ function cIdentifier _
 		end if
 
 		'' check access to non-static members
-		if( (options and FB_IDOPT_CHECKSTATIC) <> 0 ) then
-			'' struct or class?
-			select case symbGetClass( parent )
-			case FB_SYMBCLASS_STRUCT, FB_SYMBCLASS_CLASS
-				'' for each symbol (because dups..)
-				dim as FBSYMCHAIN ptr iter = chain_
-				do
-					dim as FBSYMBOL ptr sym = iter->sym
-					do
-						'' field, never static..
-						if( symbGetClass( sym ) = FB_SYMBCLASS_FIELD ) then
-							errReport( FB_ERRMSG_ACCESSTONONSTATICMEMBER )
-							exit do, do
-						end if
-
-						sym = sym->hash.next
-					loop while( sym <> NULL )
-
-					iter = symbChainGetNext( iter )
-				loop while( iter <> NULL )
-			end select
-		end if
+		hCheckStaticMemberAccess( parent, chain_, options )
 	loop
 
 	''

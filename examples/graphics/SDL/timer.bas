@@ -1,5 +1,5 @@
 ' SDL_timer example adapted to freeBasic from:
-' http://www.lugod.org/presentations/sdl-talk-2/18.html 
+' http://www.lugod.org/presentations/sdl-talk-2/18.html
 
 #include  "SDL\SDL.bi"
 
@@ -11,7 +11,7 @@
 ' any callback function used by SDL
 function setflag SDLCALL (byval interval as Uint32) as Uint32
 	flag = 1
-	setflag = interval \ 2
+	Return interval \ 2
 end function
 
 	dim i as integer
@@ -29,13 +29,13 @@ end function
 	for i = 0 to 4
    		' show a countdown
    		print 5 - i
-   
+
    		' show if the flag was set during the last second (clear it, too)
    		if (flag = 1) then
       		print "Flag was set!"
       		flag = 0
    		end if
-   
+
    		SDL_Delay(1000)
 	next
 

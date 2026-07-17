@@ -677,6 +677,8 @@ private function hDeclPointer _
 	desc = ""
 	do while( typeIsPtr( dtype ) )
 		dtype = typeDeref( dtype )
+		'' Pointer depth is bounded by the datatype bitfield.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL503
 		desc += str( ctx.typecnt ) + "=*"
 		ctx.typecnt += 1
 	loop
@@ -729,7 +731,12 @@ private function hGetDataType _
 		dtype = symbGetType( sym )
 		subtype = symbGetSubtype( sym )
 
-		'' TODO: handle byref functions?
+		'' BYREF functions return an address, not a value of their declared type.
+		'' STABS has no separate reference-return encoding, so describe that ABI
+		'' result as a pointer just like reference variables below.
+		if( symbIsProc( sym ) andalso symbIsReturnByRef( sym ) ) then
+			dtype = typeAddrOf( dtype )
+		end if
 
 		if( symbIsVar( sym ) or symbIsField( sym ) ) then
 			'' Looks like reference vars need to be emitted as pointers;
@@ -758,6 +765,8 @@ private function hGetDataType _
 					desc += str( requesteddimtbelements - 1 ) + ";"
 				else
 					for i as integer = 0 to symbGetArrayDimensions( sym ) - 1
+						'' Array dimensions are limited to FB_MAXARRAYDIMS.
+						'' FB-LINTER: DISABLE-NEXT-LINE FBL503
 						desc += "ar1;"
 						desc += str( symbArrayLbound( sym, i ) ) + ";"
 						desc += str( symbArrayUbound( sym, i ) ) + ";"
@@ -884,25 +893,31 @@ private sub hDeclENUM _
 	)
 
 	dim as FBSYMBOL ptr e
-	dim as string desc
+	dim as DZSTRING desc
+
+	DZstrZero( desc )
 
 	sym->enum_.dbg.typenum = ctx.typecnt
 	ctx.typecnt += 1
 
-	desc = *symbGetDBGName( sym )
+	DZstrAssign( desc, symbGetDBGName( sym ) )
 
-	desc += ":T" + str( sym->enum_.dbg.typenum ) + "=e"
+	DZstrConcatAssign( desc, ":T" + str( sym->enum_.dbg.typenum ) + "=e" )
 
 	e = symbGetENUMFirstElm( sym )
 	do while( e <> NULL )
-		desc += *symbGetName( e ) + ":" + str( symbGetConstInt( e ) ) + ","
+		DZstrConcatAssign( desc, symbGetName( e ) )
+		DZstrConcatAssign( desc, ":" )
+		DZstrConcatAssign( desc, str( symbGetConstInt( e ) ) )
+		DZstrConcatAssign( desc, "," )
 
 		e = symbGetENUMNextElm( e )
 	loop
 
-	desc += ";"
+	DZstrConcatAssign( desc, ";" )
 
-	hEmitSTABS( STAB_TYPE_LSYM, desc, 0, 0, "0" )
+	hEmitSTABS( STAB_TYPE_LSYM, desc.data, 0, 0, "0" )
+	DZstrAllocate( desc, 0 )
 
 end sub
 

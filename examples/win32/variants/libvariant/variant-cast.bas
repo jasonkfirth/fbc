@@ -15,16 +15,16 @@ operator VARIANT.cast _
 	( _
 		_
 	) as string
-	
+
 	dim as VARIANT_ tmp = any
-		
+
 	VariantInit( @tmp )
 	VariantChangeTypeEx( @tmp, @this.var_, NULL, VARIANT_NOVALUEPROP, VT_BSTR )
 
 	operator = *cast( wstring ptr, V_BSTR(@tmp) )
-	
+
 	VariantClear( @tmp )
-	
+
 end operator
 
 '':::::
@@ -32,17 +32,17 @@ operator VARIANT.cast _
 	( _
 		_
 	) as wstring ptr
-	
+
 	dim as VARIANT_ tmp = any
-		
+
 	VariantInit( @tmp )
 	VariantChangeTypeEx( @tmp, @this.var_, NULL, VARIANT_NOVALUEPROP, VT_BSTR )
 
 	'' !!!FIXME!!! the pointer returned will leak
 
 	operator = V_BSTR(@tmp)
-	
+
 	''VariantClear( @tmp )
-	
+
 end operator
 

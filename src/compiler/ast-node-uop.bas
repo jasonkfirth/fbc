@@ -56,8 +56,13 @@ private function hFloatConstFix _
 	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
 		dim as ulongint bits = *cptr( ulongint ptr, @f )
 		dim as ulongint signbit = bits and &h8000000000000000ull
-		dim as integer expraw = (bits shr 52) and &h7FF
-		dim as integer expnt = expraw - 1023
+		'' IEEE-754 DOUBLE has an 11-bit exponent at bit 52, biased by 1023.
+		const DOUBLE_EXPONENT_SHIFT = 52
+		const DOUBLE_EXPONENT_MASK = &h7FF
+		const DOUBLE_EXPONENT_BIAS = 1023
+		const DOUBLE_MANTISSA_BITS = 52
+		dim as integer expraw = (bits shr DOUBLE_EXPONENT_SHIFT) and DOUBLE_EXPONENT_MASK
+		dim as integer expnt = expraw - DOUBLE_EXPONENT_BIAS
 
 		hadfrac = FALSE
 
@@ -71,17 +76,17 @@ private function hFloatConstFix _
 			return *cptr( double ptr, @bits )
 		end if
 
-		if( expnt >= 52 ) then
+		if( expnt >= DOUBLE_MANTISSA_BITS ) then
 			return f
 		end if
 
 		dim as ulongint mant = (bits and &h000FFFFFFFFFFFFFull) or &h0010000000000000ull
-		dim as ulongint fracmask = (1ull shl (52 - expnt)) - 1
+		dim as ulongint fracmask = (1ull shl (DOUBLE_MANTISSA_BITS - expnt)) - 1
 
 		hadfrac = ((mant and fracmask) <> 0)
 		if( hadfrac ) then
 			mant and= not fracmask
-			bits = signbit or (culngint( expraw ) shl 52) or (mant and &h000FFFFFFFFFFFFFull)
+			bits = signbit or (culngint( expraw ) shl DOUBLE_EXPONENT_SHIFT) or (mant and &h000FFFFFFFFFFFFFull)
 			function = *cptr( double ptr, @bits )
 		else
 			function = f
@@ -226,13 +231,31 @@ private function hConstUop _
 	function = l
 end function
 
+private function hNewUopNode _
+	( _
+		byval op as integer, _
+		byval dtype as integer, _
+		byval subtype as FBSYMBOL ptr, _
+		byval o as ASTNODE ptr _
+	) as ASTNODE ptr
+
+	dim as ASTNODE ptr n = astNewNode( AST_NODECLASS_UOP, dtype, subtype )
+
+	n->l = o
+	n->r = NULL
+	n->op.op = op
+	n->op.ex = NULL
+	n->op.options = AST_OPOPT_ALLOCRES
+
+	return n
+end function
+
 function astNewUOP _
 	( _
 		byval op as integer, _
 		byval o as ASTNODE ptr _
 	) as ASTNODE ptr
 
-	dim as ASTNODE ptr n = any
 	dim as integer dtype = any, rank = any, intrank = any, uintrank = any
 	dim as FBSYMBOL ptr subtype = any
 	dim as integer do_promote = any
@@ -260,15 +283,7 @@ function astNewUOP _
 
 	select case( op )
 	case AST_OP_SWZ_REPEAT
-		'' alloc new node
-		n = astNewNode( AST_NODECLASS_UOP, o->dtype, o->subtype )
-
-		n->l = o
-		n->r = NULL
-		n->op.op = op
-		n->op.ex = NULL
-		n->op.options = AST_OPOPT_ALLOCRES
-		return n
+		return hNewUopNode( op, o->dtype, o->subtype, o )
 
 	case AST_OP_LEN
 		'' The len() UOP is only allowed if overloaded
@@ -450,15 +465,7 @@ function astNewUOP _
 		end if
 	end if
 
-	'' alloc new node
-	n = astNewNode( AST_NODECLASS_UOP, dtype, subtype )
-	n->l = o
-	n->r = NULL
-	n->op.op = op
-	n->op.ex = NULL
-	n->op.options = AST_OPOPT_ALLOCRES
-
-	function = n
+	return hNewUopNode( op, dtype, subtype, o )
 end function
 
 '':::::

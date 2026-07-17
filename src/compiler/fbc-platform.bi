@@ -121,23 +121,57 @@ end sub
 '' must be same order as enum FB_COMPTARGET
 static shared as FBC_PLATFORM_HOOKS fbcplatforms(0 to FB_COMPTARGETS-1) = _
 { _
-	( @fbcPlatformGetDefaultLinkerTool, @fbcWin32PlatformAddDefaultLibPaths,     @fbcWin32PlatformAddGfxLibs,     @fbcWin32PlatformAddSfxLibs,     @fbcWin32PlatformAddDefaultLibs,     @fbcWin32PlatformAddLinkerFrameworks     ), _
-	( @fbcPlatformGetDefaultLinkerTool, @fbcCygwinPlatformAddDefaultLibPaths,    @fbcCygwinPlatformAddGfxLibs,    @fbcCygwinPlatformAddSfxLibs,    @fbcCygwinPlatformAddDefaultLibs,    @fbcCygwinPlatformAddLinkerFrameworks    ), _
-	( @fbcPlatformGetDefaultLinkerTool, @fbcLinuxPlatformAddDefaultLibPaths,     @fbcLinuxPlatformAddGfxLibs,     @fbcLinuxPlatformAddSfxLibs,     @fbcLinuxPlatformAddDefaultLibs,     @fbcLinuxPlatformAddLinkerFrameworks     ), _
-	( @fbcPlatformGetDefaultLinkerTool, @fbcAndroidPlatformAddDefaultLibPaths,   @fbcAndroidPlatformAddGfxLibs,   @fbcAndroidPlatformAddSfxLibs,   @fbcAndroidPlatformAddDefaultLibs,   @fbcAndroidPlatformAddLinkerFrameworks   ), _
-	( @fbcPlatformGetDefaultLinkerTool, @fbcHaikuPlatformAddDefaultLibPaths,     @fbcHaikuPlatformAddGfxLibs,     @fbcHaikuPlatformAddSfxLibs,     @fbcHaikuPlatformAddDefaultLibs,     @fbcHaikuPlatformAddLinkerFrameworks     ), _
-	( @fbcPlatformGetDefaultLinkerTool, @fbcDosPlatformAddDefaultLibPaths,       @fbcDosPlatformAddGfxLibs,       @fbcDosPlatformAddSfxLibs,       @fbcDosPlatformAddDefaultLibs,       @fbcDosPlatformAddLinkerFrameworks       ), _
-	( @fbcPlatformGetDefaultLinkerTool, @fbcXboxPlatformAddDefaultLibPaths,      @fbcXboxPlatformAddGfxLibs,      @fbcXboxPlatformAddSfxLibs,      @fbcXboxPlatformAddDefaultLibs,      @fbcXboxPlatformAddLinkerFrameworks      ), _
-	( @fbcPlatformGetDefaultLinkerTool, @fbcFreebsdPlatformAddDefaultLibPaths,   @fbcFreebsdPlatformAddGfxLibs,   @fbcFreebsdPlatformAddSfxLibs,   @fbcFreebsdPlatformAddDefaultLibs,   @fbcFreebsdPlatformAddLinkerFrameworks   ), _
-	( @fbcPlatformGetDefaultLinkerTool, @fbcDragonflyPlatformAddDefaultLibPaths, @fbcDragonflyPlatformAddGfxLibs, @fbcDragonflyPlatformAddSfxLibs, @fbcDragonflyPlatformAddDefaultLibs, @fbcDragonflyPlatformAddLinkerFrameworks ), _
-	( @fbcPlatformGetDefaultLinkerTool, @fbcSolarisPlatformAddDefaultLibPaths,   @fbcSolarisPlatformAddGfxLibs,   @fbcSolarisPlatformAddSfxLibs,   @fbcSolarisPlatformAddDefaultLibs,   @fbcSolarisPlatformAddLinkerFrameworks   ), _
-	( @fbcPlatformGetDefaultLinkerTool, @fbcIllumosPlatformAddDefaultLibPaths,   @fbcIllumosPlatformAddGfxLibs,   @fbcIllumosPlatformAddSfxLibs,   @fbcIllumosPlatformAddDefaultLibs,   @fbcIllumosPlatformAddLinkerFrameworks   ), _
-	( @fbcPlatformGetDefaultLinkerTool, @fbcOpenbsdPlatformAddDefaultLibPaths,   @fbcOpenbsdPlatformAddGfxLibs,   @fbcOpenbsdPlatformAddSfxLibs,   @fbcOpenbsdPlatformAddDefaultLibs,   @fbcOpenbsdPlatformAddLinkerFrameworks   ), _
-	( @fbcDarwinPlatformGetLinkerTool,  @fbcDarwinPlatformAddDefaultLibPaths,    @fbcDarwinPlatformAddGfxLibs,    @fbcDarwinPlatformAddSfxLibs,    @fbcDarwinPlatformAddDefaultLibs,    @fbcDarwinPlatformAddLinkerFrameworks    ), _
-	( @fbcPlatformGetDefaultLinkerTool, @fbcNetbsdPlatformAddDefaultLibPaths,    @fbcNetbsdPlatformAddGfxLibs,    @fbcNetbsdPlatformAddSfxLibs,    @fbcNetbsdPlatformAddDefaultLibs,    @fbcNetbsdPlatformAddLinkerFrameworks    ), _
-	( @fbcJsPlatformGetLinkerTool,      @fbcJsPlatformAddDefaultLibPaths,        @fbcJsPlatformAddGfxLibs,        @fbcJsPlatformAddSfxLibs,        @fbcJsPlatformAddDefaultLibs,        @fbcJsPlatformAddLinkerFrameworks        ), _
-	( @fbcWiiPlatformGetLinkerTool,     @fbcWiiPlatformAddDefaultLibPaths,       @fbcWiiPlatformAddGfxLibs,       @fbcWiiPlatformAddSfxLibs,       @fbcWiiPlatformAddDefaultLibs,       @fbcWiiPlatformAddLinkerFrameworks       ), _
-	( @fbcPlatformGetDefaultLinkerTool, @fbcNuttxPlatformAddDefaultLibPaths,     @fbcNuttxPlatformAddGfxLibs,     @fbcNuttxPlatformAddSfxLibs,     @fbcNuttxPlatformAddDefaultLibs,     @fbcNuttxPlatformAddLinkerFrameworks     )  _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcWin32PlatformAddDefaultLibPaths, _
+	  @fbcWin32PlatformAddGfxLibs, @fbcWin32PlatformAddSfxLibs, _
+	  @fbcWin32PlatformAddDefaultLibs, @fbcWin32PlatformAddLinkerFrameworks ), _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcCygwinPlatformAddDefaultLibPaths, _
+	  @fbcCygwinPlatformAddGfxLibs, @fbcCygwinPlatformAddSfxLibs, _
+	  @fbcCygwinPlatformAddDefaultLibs, @fbcCygwinPlatformAddLinkerFrameworks ), _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcLinuxPlatformAddDefaultLibPaths, _
+	  @fbcLinuxPlatformAddGfxLibs, @fbcLinuxPlatformAddSfxLibs, _
+	  @fbcLinuxPlatformAddDefaultLibs, @fbcLinuxPlatformAddLinkerFrameworks ), _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcAndroidPlatformAddDefaultLibPaths, _
+	  @fbcAndroidPlatformAddGfxLibs, @fbcAndroidPlatformAddSfxLibs, _
+	  @fbcAndroidPlatformAddDefaultLibs, @fbcAndroidPlatformAddLinkerFrameworks ), _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcHaikuPlatformAddDefaultLibPaths, _
+	  @fbcHaikuPlatformAddGfxLibs, @fbcHaikuPlatformAddSfxLibs, _
+	  @fbcHaikuPlatformAddDefaultLibs, @fbcHaikuPlatformAddLinkerFrameworks ), _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcDosPlatformAddDefaultLibPaths, _
+	  @fbcDosPlatformAddGfxLibs, @fbcDosPlatformAddSfxLibs, _
+	  @fbcDosPlatformAddDefaultLibs, @fbcDosPlatformAddLinkerFrameworks ), _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcXboxPlatformAddDefaultLibPaths, _
+	  @fbcXboxPlatformAddGfxLibs, @fbcXboxPlatformAddSfxLibs, _
+	  @fbcXboxPlatformAddDefaultLibs, @fbcXboxPlatformAddLinkerFrameworks ), _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcFreebsdPlatformAddDefaultLibPaths, _
+	  @fbcFreebsdPlatformAddGfxLibs, @fbcFreebsdPlatformAddSfxLibs, _
+	  @fbcFreebsdPlatformAddDefaultLibs, @fbcFreebsdPlatformAddLinkerFrameworks ), _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcDragonflyPlatformAddDefaultLibPaths, _
+	  @fbcDragonflyPlatformAddGfxLibs, @fbcDragonflyPlatformAddSfxLibs, _
+	  @fbcDragonflyPlatformAddDefaultLibs, @fbcDragonflyPlatformAddLinkerFrameworks ), _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcSolarisPlatformAddDefaultLibPaths, _
+	  @fbcSolarisPlatformAddGfxLibs, @fbcSolarisPlatformAddSfxLibs, _
+	  @fbcSolarisPlatformAddDefaultLibs, @fbcSolarisPlatformAddLinkerFrameworks ), _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcIllumosPlatformAddDefaultLibPaths, _
+	  @fbcIllumosPlatformAddGfxLibs, @fbcIllumosPlatformAddSfxLibs, _
+	  @fbcIllumosPlatformAddDefaultLibs, @fbcIllumosPlatformAddLinkerFrameworks ), _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcOpenbsdPlatformAddDefaultLibPaths, _
+	  @fbcOpenbsdPlatformAddGfxLibs, @fbcOpenbsdPlatformAddSfxLibs, _
+	  @fbcOpenbsdPlatformAddDefaultLibs, @fbcOpenbsdPlatformAddLinkerFrameworks ), _
+	( @fbcDarwinPlatformGetLinkerTool, @fbcDarwinPlatformAddDefaultLibPaths, _
+	  @fbcDarwinPlatformAddGfxLibs, @fbcDarwinPlatformAddSfxLibs, _
+	  @fbcDarwinPlatformAddDefaultLibs, @fbcDarwinPlatformAddLinkerFrameworks ), _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcNetbsdPlatformAddDefaultLibPaths, _
+	  @fbcNetbsdPlatformAddGfxLibs, @fbcNetbsdPlatformAddSfxLibs, _
+	  @fbcNetbsdPlatformAddDefaultLibs, @fbcNetbsdPlatformAddLinkerFrameworks ), _
+	( @fbcJsPlatformGetLinkerTool, @fbcJsPlatformAddDefaultLibPaths, _
+	  @fbcJsPlatformAddGfxLibs, @fbcJsPlatformAddSfxLibs, _
+	  @fbcJsPlatformAddDefaultLibs, @fbcJsPlatformAddLinkerFrameworks ), _
+	( @fbcWiiPlatformGetLinkerTool, @fbcWiiPlatformAddDefaultLibPaths, _
+	  @fbcWiiPlatformAddGfxLibs, @fbcWiiPlatformAddSfxLibs, _
+	  @fbcWiiPlatformAddDefaultLibs, @fbcWiiPlatformAddLinkerFrameworks ), _
+	( @fbcPlatformGetDefaultLinkerTool, @fbcNuttxPlatformAddDefaultLibPaths, _
+	  @fbcNuttxPlatformAddGfxLibs, @fbcNuttxPlatformAddSfxLibs, _
+	  @fbcNuttxPlatformAddDefaultLibs, @fbcNuttxPlatformAddLinkerFrameworks )  _
 }
 
 private function fbcPlatformGetLinkerTool( ) as integer

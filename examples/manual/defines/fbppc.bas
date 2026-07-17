@@ -10,4 +10,4 @@
   '...instructions for PowerPC OSes...
 #else
   '...instructions for other OSes
-#endif 
+#endif

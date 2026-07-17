@@ -1113,6 +1113,11 @@ install_pkg_with_fallback() {
 
 	for candidate in "${candidates[@]}"; do
 		[ -z "$candidate" ] && continue
+		if pkg list -H "$candidate" >/dev/null 2>&1 ||
+			pkg list -H "pkg://$namespace/$candidate" >/dev/null 2>&1; then
+			echo "INFO: dependency package already installed: $candidate" >&2
+			return 0
+		fi
 		for candidate_try in \
 			"$candidate" \
 			"pkg://$namespace/$candidate"; do
@@ -1226,27 +1231,22 @@ PY
 prefer_gnu_userland_tools() {
 	#
 	# OpenIndiana images can expose the historical illumos utilities before
-	# the GNU tools.  Some package/install helper paths use GNU extensions
-	# such as "sort -V", so make the GNU coreutils package available before
-	# asking IPS to solve compiler packages.
+	# the GNU tools.  Prefer an existing GNU coreutils installation, but do not
+	# make it a build dependency.  The FreeBASIC build has portable fallbacks,
+	# and older images may be unable to satisfy a current coreutils package
+	# under their incorporation locks.
 	#
-	if [ -x /usr/gnu/bin/sort ] && /usr/gnu/bin/sort -V /dev/null >/dev/null 2>&1; then
-		PATH="/usr/gnu/bin:$PATH"
-		export PATH
-		return 0
-	fi
-
-	install_pkg_with_fallback "file/gnu-coreutils|SUNWgnu-coreutils" || return 1
-
 	if [ -x /usr/gnu/bin/sort ] && /usr/gnu/bin/sort -V /dev/null >/dev/null 2>&1; then
 		PATH="/usr/gnu/bin:$PATH"
 		export PATH
 	fi
 }
 
+# GNU Make is resolved separately after package installation.  Some OpenIndiana
+# images cannot install its Guile dependency under their incorporation locks,
+# so bootstrap_gnu_make() provides the reliable source-build fallback.
 PKGS_BUILD_REQUIRED=(
     "developer/build/pkg-config|pkgconfig"
-    "developer/build/gnu-make|developer/build/make"
     library/ncurses
     library/libffi
     "x11/library/libx11|ooce/x11/library/libx11"
@@ -1256,12 +1256,6 @@ PKGS_BUILD_REQUIRED=(
     "x11/library/libxrandr|ooce/x11/library/libxrandr"
     "x11/library/libxi|ooce/x11/library/libxi"
     "x11/library/libxcb|ooce/x11/library/libxcb"
-)
-
-PKGS_BUILD_OPTIONAL=(
-    system/header
-    developer/linker
-    developer/base-developer
 )
 
 PKGS_RUNTIME=(
@@ -1281,8 +1275,8 @@ PKGS_RUNTIME=(
 ##############################################################################
 
 prepare_tls_policy
-configure_pkg_proxy
 grow_root_pool
+configure_pkg_proxy
 ensure_build_swap
 raise_build_resource_limits
 
@@ -1310,6 +1304,11 @@ for pkg_item in "${PKGS_BUILD_REQUIRED[@]}"; do
         exit 1
     fi
 done
+
+PKGS_BUILD_OPTIONAL=()
+[ -r /usr/include/stdio.h ] || PKGS_BUILD_OPTIONAL+=(system/header)
+command -v ld >/dev/null 2>&1 || PKGS_BUILD_OPTIONAL+=(developer/linker)
+
 for pkg_item in "${PKGS_BUILD_OPTIONAL[@]}"; do
     install_pkg_with_fallback "$pkg_item" ||
         echo "WARN: optional build package not installed: $pkg_item"
@@ -1492,7 +1491,6 @@ if [ "$DO_BUILD" -eq 1 ]; then
             CC=$CC \
             CFLAGS="$BOOTSTRAP_CFLAGS" \
             HAVE_PREREQS_MK= \
-            BUILD_FBCFLAGS="-d __FB_ILLUMOS__ -d DISABLE_XPM" \
             HOST_OS=illumos \
             HOST_ARCH="$FBC_ARCH" \
             HOST_TRIPLET="$TARGET_TRIPLET" \
@@ -1506,7 +1504,6 @@ if [ "$DO_BUILD" -eq 1 ]; then
             CC=$CC \
             CFLAGS="$BOOTSTRAP_CFLAGS" \
             HAVE_PREREQS_MK= \
-            BUILD_FBCFLAGS="-d __FB_ILLUMOS__ -d DISABLE_XPM" \
             HOST_OS=illumos \
             HOST_ARCH="$FBC_ARCH" \
             HOST_TRIPLET="$TARGET_TRIPLET" \
@@ -1523,7 +1520,6 @@ if [ "$DO_BUILD" -eq 1 ]; then
         FBC="$ROOT/bootstrap/fbc" \
         CC=$CC \
         HAVE_PREREQS_MK= \
-        BUILD_FBCFLAGS="-d __FB_ILLUMOS__ -d DISABLE_XPM" \
         HOST_OS=illumos \
         HOST_ARCH="$FBC_ARCH" \
         HOST_TRIPLET="$TARGET_TRIPLET" \
@@ -1541,7 +1537,6 @@ if [ "$DO_BUILD" -eq 1 ]; then
         prefix="$PREFIX" \
         FBC="$ROOT/bootstrap/fbc" \
         HAVE_PREREQS_MK= \
-        BUILD_FBCFLAGS="-d __FB_ILLUMOS__ -d DISABLE_XPM" \
         HOST_OS=illumos \
         HOST_ARCH="$FBC_ARCH" \
         HOST_TRIPLET="$TARGET_TRIPLET" \
@@ -1899,7 +1894,7 @@ if [ "$sfx_driver_selected" -eq 0 ]; then
 fi
 
     echo "==> fbctests and exampleageddon"
-    bash "$ROOT/build_scripts/illumos-test-freebasic.sh" \
+    FBC_GMAKE="$GMAKE" bash "$ROOT/build_scripts/illumos-test-freebasic.sh" \
         --skip-package-install \
         --fbc "$PREFIX/bin/fbc" \
         --fbctests-jobs "$BUILD_JOBS" \

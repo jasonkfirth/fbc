@@ -32,19 +32,19 @@ sub print_num (byval tpl as string, byval num as big_int ptr)
         print "error when creating [s]"
         exit sub
     end if
-    
+
     if( big_int_to_str( num, 10, s ) <> 0 ) then
         print "error when converting number [num] to string [s]"
         exit sub
     end if
-    
+
     print tpl; *s->str
-    
+
     big_int_str_destroy( s )
-    
+
 end sub
 
-    
+
     dim as big_int ptr a, b, c
 
     '' initialize of [a], [b] & [c]
@@ -71,12 +71,12 @@ end sub
         print "error in big_int_from_int"
     	end 3
     end if
-    
+
     if( big_int_pow(a, 3000, a) ) then
         print "error during calculating 17^3000"
     	end 4
     end if
-    
+
     print_num( "17^3000 = ", a )
     print
 
@@ -100,7 +100,7 @@ end sub
         print "error during finding nextprime(2^1024)"
         end 7
     end if
-    
+
     print_num("nextprime(2^1024) = ", a)
     print
 

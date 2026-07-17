@@ -18,7 +18,7 @@ End Type
 Static Sub foo.f (n As Integer) Static
 	Print n
 End Sub
-	
+
 Function foo.g As Integer
 	Return 420
 End Function

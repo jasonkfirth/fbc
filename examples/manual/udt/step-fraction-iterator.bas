@@ -20,7 +20,7 @@ Type fraction
 	Declare Operator Step( ByRef step_var As fraction )
 	Declare Operator Next( ByRef end_cond As fraction, ByRef step_var As fraction ) As Integer
 
-	'' Give the current "value"    
+	'' Give the current "value"
 	Declare Operator Cast( ) As Double
 	Declare Operator Cast( ) As String
 
@@ -69,13 +69,13 @@ Operator fraction.Step( )
 	Dim As Integer lowest = lcd( This.den, 1 )
 	Dim As Double mult_factor = This.den / lowest
 	Dim As fraction step_temp = fraction( 1, 1 )
-   
+
 	This.num *= mult_factor
 	This.den *= mult_factor
-   
+
 	step_temp.num *= lowest
 	step_temp.den *= lowest
-   
+
 	This.num += step_temp.num
 End Operator
 
@@ -133,4 +133,4 @@ For i As fraction = fraction(4,4) To fraction(1,4)
 	Print i; " ";
 Next
 Print "done"
-	
+

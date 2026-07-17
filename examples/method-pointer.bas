@@ -1,9 +1,9 @@
 /''
- ' This example shows how you can simulate getting a class method pointer, 
+ ' This example shows how you can simulate getting a class method pointer,
  ' until support is properly implemented in the compiler.
  '
  ' When this is supported, you will only need to remove the static wrapper
- ' function presented here, to maintain compatibility. 
+ ' function presented here, to maintain compatibility.
  '/
 
 type MyFavoriteType

@@ -21,7 +21,7 @@ sub CTimer.threadcb( byval ctx as CTimer ptr ) export
 
 		case TIMER_STATE_RUNNING
 			dim as integer interval = ctx->interval
-			do 
+			do
 				sleep iif( interval <= 100, interval, 100 ), 1
 
 				if( ctx->state <> TIMER_STATE_RUNNING ) then

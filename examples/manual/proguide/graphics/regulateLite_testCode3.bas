@@ -17,7 +17,7 @@ Screen 12, , 2
 ScreenSet 1, 0
 
 Dim As ULongInt MyFps = 100
-	
+
 Dim As String res = "N"
 Dim As Boolean SkipImage = True
 Dim As Boolean Restart = False

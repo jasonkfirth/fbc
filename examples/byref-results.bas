@@ -4,7 +4,10 @@
 '' of the variable/object returned from a function.
 ''
 
-dim shared dat(0 to ...) as zstring * 512 = _
+const DAT_FIRST = 0
+const DAT_LAST = 4
+
+dim shared dat(DAT_FIRST to DAT_LAST) as zstring * 512 = _
 { _
 	( "stand still"        ), _
 	( "jump the mountains" ), _
@@ -13,13 +16,20 @@ dim shared dat(0 to ...) as zstring * 512 = _
 	( "fly like the wind"  ) _
 }
 
+randomize( timer( ) )
+
 function accessRandomElement( ) byref as zstring
-	function = dat( rnd( ) * ubound( dat ) )
+	dim as integer index = DAT_FIRST + _
+	                       int( rnd( ) * (DAT_LAST - DAT_FIRST + 1) )
+	function = dat( index )
 end function
 
-	randomize( timer( ) )
+const RANDOM_ACCESS_COUNT = 10
 
-	for i as integer = 1 to 10
-		print accessRandomElement( )
-		accessRandomElement( ) += " +1"
+	for i as integer = 1 to RANDOM_ACCESS_COUNT
+		dim byref element as zstring = accessRandomElement( )
+		print element
+		'' The table uses fixed-capacity ZSTRING entries, so this does not reallocate.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL503
+		element += " +1"
 	next

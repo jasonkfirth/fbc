@@ -14,17 +14,17 @@ Print
 Dim n As Integer, d As Integer
 
 For n = 2 To 20
-	
+
 	For d = 2 To Int(Sqr(n))
-		
+
 		If ( n Mod d ) = 0 Then ' d divides n
-			
+
 			Continue For, For ' n is not prime, so try next n
-			
+
 		End If
-		
+
 	Next d
-	
+
 	Print n
-	
+
 Next n

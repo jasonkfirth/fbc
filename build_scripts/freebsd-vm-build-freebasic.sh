@@ -50,6 +50,9 @@ VNC_DISPLAY=""
 KEEP_VM=0
 FBCTESTS_JOBS="$JOBS"
 FBCTESTS_UNIT_ARGS=""
+QEMU_ACCEL="${QEMU_ACCEL:-kvm}"
+QEMU_CPU="${QEMU_CPU:-host}"
+SSH_READY_ATTEMPTS="${FREEBSD_VM_SSH_ATTEMPTS:-600}"
 
 DEFAULT_IMAGE_URL="https://download.freebsd.org/releases/VM-IMAGES/${RELEASE}/amd64/Latest/FreeBSD-${RELEASE}-amd64-BASIC-CLOUDINIT-ufs.qcow2.xz"
 
@@ -169,6 +172,15 @@ check_host_tools() {
 	require_tool ssh
 	require_tool xorriso
 	require_tool xz
+}
+
+configure_qemu_acceleration() {
+	if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
+		QEMU_ACCEL="tcg"
+		QEMU_CPU="max"
+	fi
+
+	msg "QEMU acceleration: $QEMU_ACCEL (CPU: $QEMU_CPU)"
 }
 
 resolve_package_file() {
@@ -292,8 +304,8 @@ start_vm() {
 	local audio_wav="$vm_dir/freebasic-freebsd-audio.wav"
 
 	qemu-system-x86_64 \
-		-enable-kvm \
-		-cpu host \
+		-accel "$QEMU_ACCEL" \
+		-cpu "$QEMU_CPU" \
 		-m "$MEMORY" \
 		-smp "$CPUS" \
 		-drive "file=$disk,format=qcow2,if=virtio,index=0" \
@@ -397,7 +409,7 @@ wait_for_ssh() {
 	local key="$1"
 	local port="$2"
 	local vm_dir="$3"
-	local attempts="${4:-240}"
+	local attempts="${4:-$SSH_READY_ATTEMPTS}"
 
 	msg "Waiting for FreeBSD SSH on localhost:$port"
 	for _ in $(seq 1 "$attempts"); do
@@ -414,6 +426,34 @@ wait_for_ssh() {
 	die "timed out waiting for FreeBSD SSH"
 }
 
+wait_for_guest_ready() {
+	local key="$1"
+	local port="$2"
+	local attempt=1
+	local stable_checks=0
+	local max_attempts="${3:-$SSH_READY_ATTEMPTS}"
+
+	msg "Waiting for FreeBSD first-boot update to finish"
+
+	while [ "$attempt" -le "$max_attempts" ]; do
+		if ssh_guest "$key" "$port" "pgrep -f '[f]reebsd-update' >/dev/null" >/dev/null 2>&1; then
+			stable_checks=0
+		elif ssh_guest "$key" "$port" true >/dev/null 2>&1; then
+			stable_checks=$((stable_checks + 1))
+			if [ "$stable_checks" -ge 6 ]; then
+				return 0
+			fi
+		else
+			stable_checks=0
+		fi
+
+		sleep 10
+		attempt=$((attempt + 1))
+	done
+
+	die "FreeBSD did not reach a stable first-boot state"
+}
+
 prepare_vm() {
 	local vm_dir="$RUN_DIR/freebsd"
 	local key="$vm_dir/id_ed25519"
@@ -426,6 +466,7 @@ prepare_vm() {
 	write_seed_iso "$vm_dir" "$key.pub" >&2
 	start_vm "$vm_dir" "$SSH_PORT" "$VNC_DISPLAY"
 	wait_for_ssh "$key" "$SSH_PORT" "$vm_dir" >&2
+	wait_for_guest_ready "$key" "$SSH_PORT" >&2
 
 	printf '%s\n' "$vm_dir"
 }
@@ -439,8 +480,8 @@ set -eu
 
 export ASSUME_ALWAYS_YES=yes
 env ASSUME_ALWAYS_YES=yes pkg bootstrap || true
-pkg update -f
-pkg install -y \
+env IGNORE_OSVERSION=yes pkg update -f
+env IGNORE_OSVERSION=yes pkg install -y \
 	bash \
 	binutils \
 	gcc \
@@ -462,7 +503,9 @@ pkg install -y \
 	mesa-libs \
 	ncurses \
 	pkgconf \
+	python312 \
 	rsync \
+	terminfo-db \
 	xauth \
 	xorg-vfbserver
 mkdir -p /work
@@ -475,8 +518,14 @@ send_source_tree() {
 	local port="$2"
 	local target="$3"
 
+	case "$target" in
+		/work/*) ;;
+		*) die "refusing to replace source directory outside /work: $target" ;;
+	esac
+
 	msg "Copying source tree to FreeBSD"
-	ssh_guest "$key" "$port" "rm -rf '$target' && mkdir -p '$target'"
+	ssh_guest "$key" "$port" \
+		"su -m root -c 'rm -rf \"$target\" && mkdir -p \"$target\" && chown freebsd:freebsd \"$target\"'"
 
 	rsync -a --delete \
 		--exclude-from "$ROOT/mk/source-copy-excludes.rsync" \
@@ -489,7 +538,8 @@ send_tests_tree() {
 	local port="$2"
 
 	msg "Copying fbctests source to FreeBSD"
-	ssh_guest "$key" "$port" "rm -rf /work/fbctests-source && mkdir -p /work/fbctests-source/tests /work/fbctests-source/inc"
+	ssh_guest "$key" "$port" \
+		"su -m root -c 'rm -rf /work/fbctests-source && mkdir -p /work/fbctests-source/tests /work/fbctests-source/inc && chown -R freebsd:freebsd /work/fbctests-source'"
 
 	rsync -a --delete \
 		--exclude='*.o' \
@@ -529,7 +579,7 @@ mkdir -p /work/packages
 cd "$source_dir"
 rm -f /work/freebasic-freebsd-build.log
 
-env JOBS="$JOBS" OUT=/work/packages ./build_scripts/freebsd-build-freebasic.sh > /work/freebasic-freebsd-build.log 2>&1 &
+env JOBS="$JOBS" OUT=/work/packages bash ./build_scripts/freebsd-build-freebasic.sh > /work/freebasic-freebsd-build.log 2>&1 &
 pid=\$!
 
 while kill -0 "\$pid" 2>/dev/null; do
@@ -682,6 +732,35 @@ run_fbctests() {
 	echo "==> fbctests passed"
 }
 
+run_exampleageddon() {
+	local python
+
+	python="/usr/local/bin/python3.12"
+	[ -x "$python" ] || fail "python312 is required for exampleageddon"
+
+	echo "==> running exampleageddon"
+	rm -rf /work/exampleageddon
+	run "$python" /work/freebasic-source/build_scripts/exampleageddon-freebasic.py \
+		--root /work/freebasic-source \
+		--outdir /work/exampleageddon \
+		--prefix /usr/local \
+		--include-dir /work/freebasic-source/inc \
+		--fbc fbc \
+		--jobs 1 \
+		--compile-timeout 180 \
+		--run-timeout 10 \
+		--fail-on-self-contained
+
+	[ -f /work/exampleageddon/report.md ] || fail "exampleageddon report was not created"
+	[ -f /work/exampleageddon/results.csv ] || fail "exampleageddon results CSV was not created"
+	grep -qx -- '- Self-contained problems: 0' /work/exampleageddon/report.md || {
+		cat /work/exampleageddon/report.md
+		fail "exampleageddon reported self-contained example problems"
+	}
+
+	echo "==> exampleageddon passed"
+}
+
 trap stop_xvfb EXIT
 
 export PATH=/usr/local/bin:/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin:$PATH
@@ -697,7 +776,7 @@ prepare_audio_device() {
 
 echo "==> installing package test dependencies"
 export ASSUME_ALWAYS_YES=yes
-su -m root -c 'env ASSUME_ALWAYS_YES=yes pkg install -y \
+su -m root -c 'env ASSUME_ALWAYS_YES=yes IGNORE_OSVERSION=yes pkg install -y \
 	bash \
 	binutils \
 	gcc \
@@ -720,6 +799,7 @@ su -m root -c 'env ASSUME_ALWAYS_YES=yes pkg install -y \
 	ncurses \
 	pkgconf \
 	rsync \
+	terminfo-db \
 	xauth \
 	xorg-vfbserver'
 
@@ -915,6 +995,24 @@ console_output="$(/work/smoke/console)"
 echo "$console_output"
 [ "$console_output" = "Hello world" ] || fail "unexpected console output"
 
+echo "==> compiling crt/sys/socket.bi API smoke"
+run fbc /work/fbctests-source/tests/crt/socket.bas -x /work/smoke/socket-bi
+
+echo "==> running crt/sys/socket.bi API smoke"
+run /work/smoke/socket-bi
+
+echo "==> compiling curses.bi API smoke"
+run fbc /work/fbctests-source/tests/crt/curses.bas -x /work/smoke/curses-bi
+
+echo "==> running curses.bi API smoke"
+run /work/smoke/curses-bi
+
+echo "==> compiling TCP loopback smoke"
+run fbc -mt /work/fbctests-source/tests/file/tcp.bas -x /work/smoke/tcp
+
+echo "==> running TCP loopback smoke"
+timeout 60 /work/smoke/tcp
+
 start_xvfb
 
 echo "==> compiling gfxlib truecolor smoke"
@@ -962,6 +1060,7 @@ grep -qi '^sfx-driver=freebsd oss' /work/smoke/sfx.out || fail "sfx smoke did no
 }
 
 run_fbctests
+run_exampleageddon
 
 echo "==> TEST PASSED"
 EOF
@@ -980,6 +1079,7 @@ test_package_in_vm() {
 	install_guest_tools "$key" "$port"
 	ssh_guest "$key" "$port" "mkdir -p /work/package"
 	scp_to_guest "$key" "$port" "$pkg" "/work/package/"
+	send_source_tree "$key" "$port" "/work/freebasic-source"
 	send_tests_tree "$key" "$port"
 
 	write_test_runner "$runner"
@@ -1015,6 +1115,8 @@ EOF
 
 	rm -f "$LOG_DIR/freebasic-freebsd-test.log"
 	scp_from_guest "$key" "$port" "/work/freebasic-freebsd-test.log" "$LOG_DIR/"
+	scp_from_guest "$key" "$port" "/work/exampleageddon/report.md" "$vm_dir/exampleageddon-report.md"
+	scp_from_guest "$key" "$port" "/work/exampleageddon/results.csv" "$vm_dir/exampleageddon-results.csv"
 }
 
 verify_audio_capture() {
@@ -1102,6 +1204,12 @@ archive_results() {
 	if [ -f "$RUN_DIR/freebsd/freebasic-freebsd-audio.wav" ]; then
 		cp -f "$RUN_DIR/freebsd/freebasic-freebsd-audio.wav" "$ARCHIVE_DIR/"
 	fi
+	if [ -f "$RUN_DIR/freebsd/exampleageddon-report.md" ]; then
+		cp -f "$RUN_DIR/freebsd/exampleageddon-report.md" "$ARCHIVE_DIR/"
+	fi
+	if [ -f "$RUN_DIR/freebsd/exampleageddon-results.csv" ]; then
+		cp -f "$RUN_DIR/freebsd/exampleageddon-results.csv" "$ARCHIVE_DIR/"
+	fi
 
 	base="$(basename "$pkg")"
 	(
@@ -1118,6 +1226,7 @@ trap cleanup EXIT
 
 main() {
 	check_host_tools
+	configure_qemu_acceleration
 	resolve_package_file
 
 	if [ -z "$SSH_PORT" ]; then SSH_PORT="$(find_free_port 11022)"; fi

@@ -17,7 +17,7 @@
 #define ExampleTrue (Not ExampleFalse)
 
 '' Function-like definition
-#define MyRGB(R,G,B) (((R)Shl 16)  Or ((G)Shl 8) Or (B)) 
+#define MyRGB(R,G,B) (((R)Shl 16)  Or ((G)Shl 8) Or (B))
 Print Hex( MyRGB(&hff, &h00, &hff) )
 
 '' Line continuation and statements in a definition

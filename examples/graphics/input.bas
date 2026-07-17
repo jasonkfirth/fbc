@@ -156,7 +156,7 @@ sub joystick_demo
 			else
 				center( 19, "Buttons: " + bin(buttons), 4 )
 			end if
-			
+
 			cur_x += x / 32
 			cur_y += y / 32
 			if (cur_x < 0) then cur_x = 0

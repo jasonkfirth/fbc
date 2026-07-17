@@ -92,13 +92,13 @@ Do
 		' Music volume (in range [0.0, 1.0])
 		Dim As Single currentVolume = 1.0
 		BASS_ChannelGetAttribute(musicHandle, BASS_ATTRIB_VOL, @currentVolume)
-		BASS_ChannelSetAttribute(musicHandle, BASS_ATTRIB_VOL, currentVolume * 0.5) 
+		BASS_ChannelSetAttribute(musicHandle, BASS_ATTRIB_VOL, currentVolume * 0.5)
 
 	Case "D"
 		' Music volume (in range [0.0, 1.0])
 		Dim As Single currentVolume = 1.0
 		BASS_ChannelGetAttribute(musicHandle, BASS_ATTRIB_VOL, @currentVolume)
-		BASS_ChannelSetAttribute(musicHandle, BASS_ATTRIB_VOL, currentVolume * 2) 
+		BASS_ChannelSetAttribute(musicHandle, BASS_ATTRIB_VOL, currentVolume * 2)
 
 	Case Chr(27)
 		Exit Do

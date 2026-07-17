@@ -12,7 +12,7 @@ Dim As Integer num, guess
 
 Randomize
 num = Int(Rnd * 10) + 1 'Create a random number between 1 and 10...
-				
+
 Print "guess the number between 1 and 10 (or CTRL-C to abort)"
 
 Do 'Start a loop
@@ -33,4 +33,4 @@ Do 'Start a loop
 Loop 'Go back to the start of the loop
 
 Sleep
-	
+

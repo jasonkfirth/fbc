@@ -14,7 +14,7 @@ Declare Sub foo
 Sleep
 
 Sub foo
-	
+
 	Dim filename As String
 	Dim errmsg As String
 	filename = ""
@@ -23,12 +23,12 @@ Sub foo
 	Print "No error"
 	On Local Error Goto 0
 	Exit Sub
-	
+
   fail:
   errmsg = "Error " & Err & _
 		   " in function " & *Erfn & _
 		   " on line " & Erl
   Print errmsg
-	
+
 End Sub
-	
+

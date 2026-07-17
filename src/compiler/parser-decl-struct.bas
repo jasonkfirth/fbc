@@ -732,13 +732,15 @@ private function cFieldAlignmentAttribute( ) as integer
 	end if
 
 	'' follow the GCC 3.x ABI
+	const GCC3_ALIGN_FIXUP_FROM = 3
+	const GCC3_ALIGN_FIXUP_TO = 2
 	var align = astConstFlushToInt( expr )
 	if( align < 0 ) then
 		align = 0
 	elseif( align > env.pointersize ) then
 		align = 0
-	elseif( align = 3 ) then
-		align = 2
+	elseif( align = GCC3_ALIGN_FIXUP_FROM ) then
+		align = GCC3_ALIGN_FIXUP_TO
 	end if
 
 	function = align
@@ -753,12 +755,14 @@ end function
 ''
 private sub hTypeBody( byval s as FBSYMBOL ptr )
 	dim as integer isunion = any
+	dim as integer isinner = any
 	dim as FB_SYMBATTRIB attrib = any
 	dim as FBSYMBOL ptr inner = any
 
 	attrib = FB_SYMBATTRIB_NONE  '' Used to hold visibility attributes
 
 	do
+		isinner = FALSE
 		select case as const lexGetToken( )
 		'' visibility?
 		case FB_TK_PRIVATE, FB_TK_PUBLIC, FB_TK_PROTECTED
@@ -816,52 +820,17 @@ private sub hTypeBody( byval s as FBSYMBOL ptr )
 			select case as const lexGetLookAhead( 1 )
 			case FB_TK_EOL, FB_TK_EOF, FB_TK_COMMENT, FB_TK_REM, _
 			     FB_TK_FIELD
-
-decl_inner:
-				'' it's an anonymous inner UDT
-				isunion = lexGetToken( ) = FB_TK_UNION
-				if( symbGetUDTIsUnion( s ) = isunion ) then
-					errReport( FB_ERRMSG_SYNTAXERROR )
-					'' error recovery: fake type
-					isunion = not isunion
-				end if
-
-				lexSkipToken( LEXCHECK_POST_SUFFIX )
-
-				'' [FIELD '=' ConstExpression]
-				dim as integer align = cFieldAlignmentAttribute( )
-				if( align = 0 ) then
-					align = symbGetUDTAlign( s )
-				end if
-
-				'' create a "temp" one
-				inner = hTypeAdd( s, symbUniqueId( ), NULL, isunion, align )
-
-				if( isunion ) then
-					symbSetUDTIsUnion( inner )
-					symbSetUDTHasAnonUnion( s )
-				end if
-
-				'' walk through all the anon UDT's symbols, and
-				'' promote their attributes from the root
-				dim as FBSYMBOL ptr walkSymbols = symbGetUDTSymbTbHead( inner )
-				do while( walkSymbols <> NULL )
-					symbGetAttrib( walkSymbols ) or= attrib
-					walkSymbols = symbGetNext( walkSymbols )
-				loop
-
-				'' insert it into the parent UDT
-				symbInsertInnerUDT( s, inner )
+				isinner = TRUE
 
 			'' ambiguity: can be a stmt separator or bitfield
 			case FB_TK_STMTSEP
 				'' not a bitfield? separator..
 				if( lexGetLookAheadClass( 2 ) <> FB_TKCLASS_NUMLITERAL ) then
-					goto decl_inner
+					isinner = TRUE
+				else
+					'' bitfield..
+					hTypeElementDecl( FB_TK_DIM, s, attrib )
 				end if
-
-				'' bitfield..
-				hTypeElementDecl( FB_TK_DIM, s, attrib )
 
 			'' it's a field, parse it, 'AS' is a reserved word
 			'' so it's probably OK we don't allow 'TYPE AS' to start
@@ -885,6 +854,43 @@ decl_inner:
 				end if
 
 			end select
+
+			if( isinner ) then
+				'' It's an anonymous inner UDT.
+				isunion = lexGetToken( ) = FB_TK_UNION
+				if( symbGetUDTIsUnion( s ) = isunion ) then
+					errReport( FB_ERRMSG_SYNTAXERROR )
+					'' error recovery: fake type
+					isunion = not isunion
+				end if
+
+				lexSkipToken( LEXCHECK_POST_SUFFIX )
+
+				'' [FIELD '=' ConstExpression]
+				dim as integer align = cFieldAlignmentAttribute( )
+				if( align = 0 ) then
+					align = symbGetUDTAlign( s )
+				end if
+
+				'' create a "temp" one
+				inner = hTypeAdd( s, symbUniqueId( ), NULL, isunion, align )
+
+				if( isunion ) then
+					symbSetUDTIsUnion( inner )
+					symbSetUDTHasAnonUnion( s )
+				end if
+
+				'' Walk through all anonymous UDT symbols and promote
+				'' their attributes from the root.
+				dim as FBSYMBOL ptr walkSymbols = symbGetUDTSymbTbHead( inner )
+				do while( walkSymbols <> NULL )
+					symbGetAttrib( walkSymbols ) or= attrib
+					walkSymbols = symbGetNext( walkSymbols )
+				loop
+
+				'' insert it into the parent UDT
+				symbInsertInnerUDT( s, inner )
+			end if
 
 		'' AS?
 		case FB_TK_AS
@@ -955,6 +961,81 @@ private sub hDisallowNestedClasses( byval sym as FBSYMBOL ptr )
 			member = member->next
 		wend
 	end if
+end sub
+
+private sub hParseTypeExtends _
+	( _
+		byref baseDType as integer, _
+		byref baseSubtype as FBSYMBOL ptr, _
+		byref stringType as integer _
+	)
+
+	if( lexGetToken( ) <> FB_TK_EXTENDS ) then
+		exit sub
+	end if
+
+	lexSkipToken( LEXCHECK_POST_SUFFIX )
+
+	'' SymbolType
+	'' - on error hSymbolType() will return [integer] in baseDType
+	hSymbolType( baseDType, baseSubtype, 0, FALSE, TRUE )
+
+	'' Is the base type a zstring, wstring, or something else (error)?
+	if( baseDType <> FB_DATATYPE_STRUCT ) then
+		'' Allow extending WSTRING and ZSTRING.  The UDT will use
+		'' different conversion rules for these string-compatible bases.
+		if( (baseDType = FB_DATATYPE_WCHAR) or (baseDType = FB_DATATYPE_CHAR) ) then
+			stringType = baseDType
+			baseDType = 0
+			assert( baseSubtype = NULL )
+		else
+			errReport( FB_ERRMSG_EXPECTEDCLASSTYPE )
+			baseSubtype = NULL
+		end if
+	end if
+
+	'' A string-compatible base may be followed by its UDT base.
+	if( stringType <> 0 ) then
+		if( lexGetToken( ) = CHAR_COMMA ) then
+			lexSkipToken( )
+			hSymbolType( baseDType, baseSubtype, 0, FALSE, TRUE )
+
+			if( baseDType <> FB_DATATYPE_STRUCT ) then
+				errReport( FB_ERRMSG_EXPECTEDCLASSTYPE )
+				baseSubtype = NULL
+			end if
+		end if
+	end if
+
+	'' A UDT cannot inherit from the namespace used to contain it.
+	if( symbIsParentNamespace( baseDType, baseSubtype ) ) then
+		baseDType = 0
+		baseSubtype = NULL
+		errReport( FB_ERRMSG_INVALIDDATATYPES )
+	end if
+
+	'' Check whether a string-compatible base was inherited already.
+	if( baseSubtype ) then
+		select case stringType
+		case FB_DATATYPE_CHAR
+			if( symbGetUdtIsWstring( baseSubtype ) ) then
+				errReport( FB_ERRMSG_INVALIDDATATYPES )
+				stringType = FB_DATATYPE_WCHAR
+			end if
+		case FB_DATATYPE_WCHAR
+			if( symbGetUdtIsZstring( baseSubtype ) ) then
+				errReport( FB_ERRMSG_INVALIDDATATYPES )
+				stringType = FB_DATATYPE_CHAR
+			end if
+		case else
+			if( symbGetUdtIsZstring( baseSubtype ) ) then
+				stringType = FB_DATATYPE_CHAR
+			elseif( symbGetUdtIsWstring( baseSubtype ) ) then
+				stringType = FB_DATATYPE_WCHAR
+			end if
+		end select
+	end if
+
 end sub
 
 '' TypeDecl  =
@@ -1042,82 +1123,7 @@ sub cTypeDecl( byval attrib as FB_SYMBATTRIB )
 	dim as integer baseDType = 0
 	dim as integer stringType = 0
 
-	if( lexGetToken( ) = FB_TK_EXTENDS ) then
-		lexSkipToken( LEXCHECK_POST_SUFFIX )
-
-		'' SymbolType
-		'' - on error hSymbolType() will return [integer] in baseDType
-		hSymbolType( baseDType, baseSubtype, 0, FALSE, TRUE )
-
-		'' is the base type a zstring, wstring, or something else (error)?
-		if( baseDType <> FB_DATATYPE_STRUCT ) then
-
-			'' allow extending WSTRING and ZSTRING, the UDT
-			'' will use different rules for conversions,
-			if (baseDType = FB_DATATYPE_WCHAR) or (baseDType = FB_DATATYPE_CHAR) then
-				stringType = baseDType
-				baseDType = 0
-				assert( baseSubtype = NULL )
-
-			'' anything else? don't allow
-			else
-				errReport( FB_ERRMSG_EXPECTEDCLASSTYPE )
-				'' error recovery: skip
-				baseSubtype = NULL
-			end if
-		end if
-
-		'' got a string type?  check for another base type
-		if( stringType <> 0 ) then
-
-			'' ','?
-			if( lexGetToken( ) = CHAR_COMMA ) then
-				lexSkipToken( )
-
-				'' SymbolType
-				hSymbolType( baseDType, baseSubtype, 0, FALSE, TRUE )
-
-				'' is the base type a struct?
-				if( baseDType <> FB_DATATYPE_STRUCT ) then
-					errReport( FB_ERRMSG_EXPECTEDCLASSTYPE )
-					'' error recovery: skip
-					baseSubtype = NULL
-				end if
-			end if
-		end if
-
-		'' check that the base type is not a parent struct namespace
-		if( symbIsParentNamespace( baseDType, baseSubtype ) ) then
-			baseDType = 0
-			baseSubtype = NULL
-			errReport( FB_ERRMSG_INVALIDDATATYPES )
-		end if
-
-		'' base type? check if z|wstring was already extended
-		if( baseSubType ) then
-			select case stringType
-			case FB_DATATYPE_CHAR
-				'' can't extend zstring if inheriting from wstring
-				if( symbGetUdtIsWstring( baseSubtype ) ) then
-					errReport( FB_ERRMSG_INVALIDDATATYPES )
-					stringType = FB_DATATYPE_WCHAR
-				end if
-			case FB_DATATYPE_WCHAR
-				'' can't extend wstring if inheriting from zstring
-				if( symbGetUdtIsZstring( baseSubtype ) ) then
-					errReport( FB_ERRMSG_INVALIDDATATYPES )
-					stringType = FB_DATATYPE_CHAR
-				end if
-			case else
-				'' inherit from base type
-				if( symbGetUdtIsZstring( baseSubtype ) ) then
-					stringType = FB_DATATYPE_CHAR
-				elseif( symbGetUdtIsWstring( baseSubtype ) ) then
-					stringType = FB_DATATYPE_WCHAR
-				end if
-			end select
-		end if
-	end if
+	hParseTypeExtends( baseDType, baseSubtype, stringType )
 
 	'' [FIELD '=' ConstExpression]
 	dim as integer align = cFieldAlignmentAttribute( )
@@ -1131,8 +1137,10 @@ sub cTypeDecl( byval attrib as FB_SYMBATTRIB )
 	'' we have to store some contextual information,
 	'' while there's no proper scope stack
 
-	dim as ASTNODE ptr currproc = ast.proc.curr, currblock = ast.currblock
-	dim as FBSYMBOL ptr currprocsym = parser.currproc, currblocksym = parser.currblock
+	dim as ASTNODE ptr currproc = ast.proc.curr
+	dim as ASTNODE ptr currblock = ast.currblock
+	dim as FBSYMBOL ptr currprocsym = parser.currproc
+	dim as FBSYMBOL ptr currblocksym = parser.currblock
 	dim as integer scope_depth = parser.scope
 
 	sym = hTypeAdd( NULL, id, palias, isunion, align, baseDType, baseSubtype, stringType )

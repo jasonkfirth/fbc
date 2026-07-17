@@ -11,4 +11,4 @@ Dim b As Double = -123e
 Dim c As Double = 743.1e+13
 Dim d As Double = 743.1D-13
 Dim e As Double = 743.1E13
-Dim f As Single = 743D! 
+Dim f As Single = 743D!

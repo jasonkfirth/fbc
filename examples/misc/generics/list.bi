@@ -7,7 +7,7 @@
 #endmacro
 
 #macro imp_list_of ? (T)
-#if not defined(list_##T)	
+#if not defined(list_##T)
 	type list_item_##T
 		value as T
 		next_ as list_item_##T ptr
@@ -27,7 +27,7 @@
 		this.head = 0
 		this.tail = 0
 	end constructor
-	
+
 	destructor list_##T()
 		do while head <> 0
 			var next_ = head->next_
@@ -35,7 +35,7 @@
 			head = next_
 		loop
 	end destructor
-	
+
 	sub list_##T.add(v as T)
 		dim as list_item_##T ptr node = new list_item_##T
 		node->value = v
@@ -47,7 +47,7 @@
 		node->next_ = 0
 		tail = node
 	end sub
-	
+
 	operator list_##T.[](idx as integer) as T
 		var i = 0
 		var node = head

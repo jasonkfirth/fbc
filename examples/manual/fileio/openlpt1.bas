@@ -8,5 +8,5 @@
 
 ' Send some text to the Windows printer on LPT1:, using driver text imaging.
 Open Lpt "LPT1:EMU=TTY" For Output  As #1
-Print #1, "Testing!" 
+Print #1, "Testing!"
 Close

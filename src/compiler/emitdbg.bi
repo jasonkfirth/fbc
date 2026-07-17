@@ -1,3 +1,6 @@
+#ifndef __EMITDBG_BI__
+#define __EMITDBG_BI__
+
 declare sub edbgInit( )
 
 declare sub edbgEmitHeader _
@@ -103,3 +106,5 @@ declare sub edbgEmitLocalVar _
 	)
 
 declare sub edbgInclude( byval incfile as zstring ptr )
+
+#endif

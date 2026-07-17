@@ -23,4 +23,4 @@ End Type
 Declare Operator Len (ByRef v As varZstring) As Integer  '' mandatory for the user code to call
 														 ''    the overload Len operator and
 														 ''    not the prebuilt-in Len operator
-		
+

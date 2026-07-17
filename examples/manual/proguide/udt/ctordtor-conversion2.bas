@@ -41,4 +41,4 @@ Print "Multiplication of v1: 'v1 * 5'"
 Print "  => " & v1 * 5                  ''  5: implicite conversion using the conversion-constructor,
 '                                       ''             short_cut of point2D(5, ) or point2D(5)
 Sleep
-				
+

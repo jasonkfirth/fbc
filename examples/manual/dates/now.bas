@@ -10,4 +10,4 @@
 
 Dim a As Double = Now()
 
-Print Format(a, "yyyy/mm/dd hh:mm:ss") 
+Print Format(a, "yyyy/mm/dd hh:mm:ss")

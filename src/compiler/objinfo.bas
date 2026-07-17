@@ -1,6 +1,8 @@
 ''
 '' FB compile time information section (.fbctinf) reader
 ''
+'' Ownership: This module owns its object/archive data buffers.  hLoadFile()
+'' allocates them and hResetBuffers() releases them after each input object.
 ''
 '' Old format (supported for backwards compatibility with FB <= 0.24):
 ''
@@ -109,6 +111,7 @@ type DATABUFFER
 	size    as integer
 end type
 
+'' Module state: hLoadFile() fills these buffers and hResetBuffers() releases them.
 dim shared as DATABUFFER _
 	ardata, _   '' current .a file content (if any)
 	objdata, _  '' current .o file content (can point into ardata)
@@ -128,11 +131,13 @@ type OBJINFOPARSERCTX
 	old_section as integer  '' FB_INFOSEC_* or -1
 end type
 
+'' Module state: object readers update this parser context for one input object.
 dim shared as OBJINFOPARSERCTX parser
 
 ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 '' archive/object reading code
 
+'' Module state: canonical section name used by all object-format readers.
 dim shared as zstring * 9 fbctinfname = ".fbctinf"
 
 '' ELF main headers
@@ -251,7 +256,7 @@ private function hCheck##ELF_SH _
 		exit function
 	end if
 
-	sh = cptr( any ptr, objdata.p ) + headeroffset
+	sh = cptr( ELF_SH ptr, cptr( ubyte ptr, objdata.p ) + headeroffset )
 
 	'' Verify the sh_offset/sh_size fields
 	if( (culngint( sh->sh_offset ) + sh->sh_size) > objdata.size ) then
@@ -464,19 +469,20 @@ private sub hLoadFbctinfFromCOFF( byval magic as ushort )
 	end if
 
 	'' Enough room for whole section header table?
-	if( (culngint( h->seccount ) * sizeof( COFF_SH )) > objdata.size ) then
+	if( (sizeof( COFF_H ) + culngint( h->seccount ) * sizeof( COFF_SH )) > objdata.size ) then
 		INFO( "coff: no room for section header table" )
 		exit sub
 	end if
 
-	shbase = cptr( any ptr, h ) + sizeof( COFF_H )
+	shbase = cptr( COFF_SH ptr, cptr( ubyte ptr, h ) + sizeof( COFF_H ) )
+	const COFF_SECTION_NAME_LAST_INDEX = 7
 
 	for i as integer = 0 to (h->seccount - 1)
 		sh = shbase + i
 
 		#ifdef DEBUG_OBJINFO
 			dim temp as zstring * 9
-			for j as integer = 0 to 7
+			for j as integer = 0 to COFF_SECTION_NAME_LAST_INDEX
 				temp[j] = sh->name(j)
 			next
 			INFO( "coff: seeing section '" + temp + "'" )
@@ -486,7 +492,7 @@ private sub hLoadFbctinfFromCOFF( byval magic as ushort )
 		'' padded with nulls. If it takes up all 8 chars, there's no
 		'' null padding at the end. Since ".fbctinf" takes up all 8
 		'' chars we can simply compare each char 1 by 1.
-		for j as integer = 0 to 7
+		for j as integer = 0 to COFF_SECTION_NAME_LAST_INDEX
 			if( sh->name(j) <> fbctinfname[j] ) then
 				continue for, for
 			end if
@@ -766,31 +772,34 @@ private sub hLoadObjFromAr( )
 	dim as AR_H ptr h = any
 	dim as string filename
 	dim as integer i = any, filesize = any
+	const AR_NAME_FIELD_LENGTH = 16
+	const AR_SIZE_FIELD_LENGTH = 10
 
 	objdata.p = NULL
 	objdata.size = 0
+	const AR_MAGIC_BYTE_COUNT = 8
 
 	'' 8 magic bytes
-	if( ardata.size < 8 ) then
+	if( ardata.size < AR_MAGIC_BYTE_COUNT ) then
 		exit sub
 	end if
 
-	for i = 0 to 7
+	for i = 0 to AR_MAGIC_BYTE_COUNT - 1
 		if( ardata.p[i] <> armagic(i) ) then
 			exit sub
 		end if
 	next
 
-	i = 8
+	i = AR_MAGIC_BYTE_COUNT
 	do
 		'' Enough room for header?
 		if( ((i + sizeof( AR_H )) > ardata.size) ) then
 			exit sub
 		end if
 
-		h = cptr( any ptr, ardata.p ) + i
-		filename = *hLoadArString( @h->name(0), 16 )
-		filesize = val( *hLoadArString( @h->size(0), 10 ) )
+		h = cptr( AR_H ptr, cptr( ubyte ptr, ardata.p ) + i )
+		filename = *hLoadArString( @h->name(0), AR_NAME_FIELD_LENGTH )
+		filesize = val( *hLoadArString( @h->size(0), AR_SIZE_FIELD_LENGTH ) )
 
 		INFO( "ar: found " + filename + ", " + str( filesize ) + " bytes" )
 
@@ -807,7 +816,7 @@ private sub hLoadObjFromAr( )
 		select case( filename )
 		case "__fb_ct.inf", "__fb_ct.inf/"
 			if( filesize > 0 ) then
-				objdata.p = cptr( any ptr, ardata.p ) + i
+				objdata.p = cptr( ubyte ptr, ardata.p ) + i
 				objdata.size = filesize
 			end if
 			exit do
@@ -852,12 +861,16 @@ private sub hLoadFile _
 	size = lof( f )
 
 	if( size > 0 ) then
-		p = allocate( size )
-		if( get( #f, , *p, size, size ) <> 0 ) then
+		p = xallocate( size )
+		if( get( #f, , *p, size, size ) = 0 ) then
+			buf->p = p
+			buf->size = size
+		else
+			deallocate( p )
+			p = NULL
+			close #f
 			exit sub
 		end if
-		buf->p = p
-		buf->size = size
 	end if
 
 	close #f

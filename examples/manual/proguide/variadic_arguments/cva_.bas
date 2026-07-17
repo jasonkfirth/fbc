@@ -14,9 +14,9 @@
 Function concatenation cdecl (ByVal count As Integer, ...) As String
 	Dim s As String
 	Dim args As Cva_List
-	
+
 	Cva_Start(args, count)
-	
+
 	For i As Integer = 1 To count
 		If i < count Then
 			s &= *Cva_Arg(args, ZString Ptr)
@@ -24,9 +24,9 @@ Function concatenation cdecl (ByVal count As Integer, ...) As String
 			s &= Cva_Arg(args, Double)
 		End If
 	Next
-	
+
 	Cva_End(args)
-   
+
 	Return s
 End Function
 
@@ -35,4 +35,4 @@ Print concatenation(6, "Free", "BASIC", " ", "version", " ", 1.07)
 Sleep
 
 ' Output: FreeBASIC version 1.07
-		
+

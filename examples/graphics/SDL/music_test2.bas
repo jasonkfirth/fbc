@@ -67,7 +67,7 @@ declare sub handleKey(byval key as SDL_KeyboardEvent ptr)
 	end if
 
 	do while (done = 0)
-   
+
    		do while (SDL_PollEvent(@event))
       		select case (event.type)
       		case SDL_QUIT_
@@ -79,9 +79,9 @@ declare sub handleKey(byval key as SDL_KeyboardEvent ptr)
          		handleKey @event.key
       		end select
    		loop
-   
+
    		SDL_Delay(50)
-   
+
 	loop
 
 	Mix_CloseAudio
@@ -90,9 +90,9 @@ declare sub handleKey(byval key as SDL_KeyboardEvent ptr)
 sub handleKey (byval key as SDL_KeyboardEvent ptr)
    	dim keyEvent as SDL_KeyboardEvent
    	keyEvent = *key
-   
+
     if (phaserChannel < 0) then
-         
+
 		' Mix_PlayChannel takes, as its arguments, the channel that
         ' the given sound should be played on, the sound itself, and
         ' the number of times it should be looped.  If you don't care
@@ -100,13 +100,13 @@ sub handleKey (byval key as SDL_KeyboardEvent ptr)
         ' works like Mix_PlayMusic. This function returns the channel
         ' that the sound was assigned to, which you'll need later.
         phaserChannel = Mix_PlayChannel(-1, phaser, -1)
-         
+
 	else
         'Mix_HaltChannel stops a certain channel from playing - this
         'is one of the reasons we kept track of which channel the
-        'phaser had been assigned to 
+        'phaser had been assigned to
         Mix_HaltChannel(phaserChannel)
-            
+
         phaserChannel = -1
 	end if
 

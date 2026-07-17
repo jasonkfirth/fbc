@@ -18,7 +18,7 @@ Sub Thing(ByVal w As Integer=700, _
 	ByVal aspect As Single=3, _
 	ByVal grade As Single=6, _
 	ByVal col As UInteger=RGBA(255,255,255,0))
-		  
+
 	Dim As Single XStep = 1
 	Dim As Single YStep = 1
 	Dim As Single b=w*w
@@ -34,7 +34,7 @@ Sub Thing(ByVal w As Integer=700, _
 			If y > m Then m = y
 			If y < n Then n = y
 			If m=y OrElse n=y Then
-				PSet(x/2+posx,-Y/2+posy),col/i 
+				PSet(x/2+posx,-Y/2+posy),col/i
 				PSet(-x/2+posx,-Y/2+posy),col/i
 			End If
 		Next
@@ -66,7 +66,7 @@ Do
 	If Morph<-35 Then k=-k
 	If (remove = False) Or (skipped = False) Then
 		Cls
-		Thing(800,500,400,300,Morph,aspect) 
+		Thing(800,500,400,300,Morph,aspect)
 		Draw String (16,16),"Requested FPS = " & Right("  " & fps, 3)
 		Draw String (16,32),"Applied FPS   = " & Right("  " & rfps, 3) & "   (average = " & Right("  " & averageFps, 3) & ")"
 		Draw String (16,48),"Status : " & _

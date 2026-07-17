@@ -1767,18 +1767,19 @@ end function
 
 '' look for ... followed by ')', ',' or TO
 private function hMatchEllipsis( ) as integer
+	const ELLIPSIS_TOKEN_COUNT = 3
 	function = FALSE
 
 	if( lexGetToken( ) = CHAR_DOT ) then
 		if( lexGetLookAhead( 1 ) = CHAR_DOT ) then
 			if( lexGetLookAhead( 2 ) = CHAR_DOT ) then
-				select case lexGetLookAhead( 3 )
+				select case lexGetLookAhead( ELLIPSIS_TOKEN_COUNT )
 					case CHAR_COMMA, CHAR_RPRNT, FB_TK_TO
 						function = TRUE
 						' Skip the dots
+					for i as integer = 1 to ELLIPSIS_TOKEN_COUNT
 						lexSkipToken( )
-						lexSkipToken( )
-						lexSkipToken( )
+					next
 				end select
 			end if
 		end if

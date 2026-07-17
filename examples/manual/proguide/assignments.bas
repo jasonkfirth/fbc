@@ -29,4 +29,4 @@ End If
 
 x = y = z      ''        (or 'x => y = z')    (value of y is not modified)
 Print x, y, z  ''  0     12    15
-		
+

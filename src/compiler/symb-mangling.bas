@@ -313,6 +313,10 @@ private function hAbbrevAdd _
 end function
 
 private sub hAbbrevGet( byref mangled as string, byval idx as integer )
+	const ABBREV_DIGIT_MAX_INDEX = 10
+	const ABBREV_LETTER_MAX_INDEX = 33
+	const ABBREV_LETTER_INDEX_OFFSET = 11
+
 	mangled += "S"
 
 	'' abbreviation index   mangling
@@ -322,18 +326,18 @@ private sub hAbbrevGet( byref mangled as string, byval idx as integer )
 	'' etc.
 
 	if( idx > 0 ) then
-		if( idx <= 10 ) then
+		if( idx <= ABBREV_DIGIT_MAX_INDEX ) then
 			mangled += chr( asc( "0" ) + (idx - 1) )
-		elseif( idx <= 33 ) then
-			mangled += chr( asc( "A" ) + (idx - 11) )
+		elseif( idx <= ABBREV_LETTER_MAX_INDEX ) then
+			mangled += chr( asc( "A" ) + (idx - ABBREV_LETTER_INDEX_OFFSET) )
 		else
 			'' 2 digits are enough for 333 abbreviations
-			mangled += chr( idx \ 33 )
-			idx mod= 33
-			if( idx <= 10 ) then
+			mangled += chr( idx \ ABBREV_LETTER_MAX_INDEX )
+			idx mod= ABBREV_LETTER_MAX_INDEX
+			if( idx <= ABBREV_DIGIT_MAX_INDEX ) then
 				mangled += chr( asc( "0" ) + (idx - 1) )
-			elseif( idx <= 33 ) then
-				mangled += chr( asc( "A" ) + (idx - 11) )
+			elseif( idx <= ABBREV_LETTER_MAX_INDEX ) then
+				mangled += chr( asc( "A" ) + (idx - ABBREV_LETTER_INDEX_OFFSET) )
 			end if
 		end if
 	end if
@@ -656,6 +660,8 @@ sub symbMangleParam( byref mangled as string, byval param as FBSYMBOL ptr )
 
 	case FB_PARAMMODE_VARARG
 		mangled += "z"
+	case else
+		assert( 0 )
 	end select
 end sub
 
@@ -1012,144 +1018,8 @@ private sub hGetProcParamsTypeCode _
 	loop while( param )
 end sub
 
-private function hGetOperatorName( byval proc as FBSYMBOL ptr ) as const zstring ptr
-	''
-	'' Most operators follow the "Operator Encodings" section of the
-	'' Itanium C++ ABI.
-	''
-	'' However, FB has some operators that C++ doesn't have, these "custom"
-	'' operators should use the predefined scheme of the ABI, to allow
-	'' C++-compatible tools to demangle them:
-	''    v <num-args> <length> <name>
-	'' where <num-args> is the operand count as a single decimal
-	'' digit, and <length> is the length of <name>.
-	''
-	select case as const symbGetProcOpOvl( proc )
-	case AST_OP_ASSIGN
-		function = @"aS"
-
-	case AST_OP_ADD
-		function = @"pl"
-
-	case AST_OP_ADD_SELF
-		function = @"pL"
-
-	case AST_OP_SUB
-		function = @"mi"
-
-	case AST_OP_SUB_SELF
-		function = @"mI"
-
-	case AST_OP_MUL
-		function = @"ml"
-
-	case AST_OP_MUL_SELF
-		function = @"mL"
-
-	case AST_OP_DIV
-		function = @"dv"
-
-	case AST_OP_DIV_SELF
-		function = @"dV"
-
-	case AST_OP_INTDIV
-		function = @"v24idiv"
-
-	case AST_OP_INTDIV_SELF
-		function = @"v28selfidiv"
-
-	case AST_OP_MOD
-		function = @"rm"
-
-	case AST_OP_MOD_SELF
-		function = @"rM"
-
-	case AST_OP_AND
-		function = @"an"
-
-	case AST_OP_AND_SELF
-		function = @"aN"
-
-	case AST_OP_OR
-		function = @"or"
-
-	case AST_OP_OR_SELF
-		function = @"oR"
-
-	'' Note: The ANDALSO/ORELSE operators can't currently be
-	'' overloaded, much less the self versions
-	case AST_OP_ANDALSO
-		function = @"aa"
-
-	case AST_OP_ANDALSO_SELF
-		function = @"aA" '' FB-specific
-
-	case AST_OP_ORELSE
-		function = @"oo"
-
-	case AST_OP_ORELSE_SELF
-		function = @"oO" '' FB-specific
-
-	case AST_OP_XOR
-		function = @"eo"
-
-	case AST_OP_XOR_SELF
-		function = @"eO"
-
-	case AST_OP_EQV
-		function = @"v23eqv"
-
-	case AST_OP_EQV_SELF
-		function = @"v27selfeqv"
-
-	case AST_OP_IMP
-		function = @"v23imp"
-
-	case AST_OP_IMP_SELF
-		function = @"v27selfimp"
-
-	case AST_OP_SHL
-		function = @"ls"
-
-	case AST_OP_SHL_SELF
-		function = @"lS"
-
-	case AST_OP_SHR
-		function = @"rs"
-
-	case AST_OP_SHR_SELF
-		function = @"rS"
-
-	case AST_OP_POW
-		function = @"v23pow"
-
-	case AST_OP_POW_SELF
-		function = @"v27selfpow"
-
-	case AST_OP_CONCAT
-		function = @"v23cat"
-
-	case AST_OP_CONCAT_SELF
-		function = @"v27selfcat"
-
-	case AST_OP_EQ
-		function = @"eq"
-
-	case AST_OP_GT
-		function = @"gt"
-
-	case AST_OP_LT
-		function = @"lt"
-
-	case AST_OP_NE
-		function = @"ne"
-
-	case AST_OP_GE
-		function = @"ge"
-
-	case AST_OP_LE
-		function = @"le"
-
+private function hGetUnaryOperatorName( byval op as integer ) as const zstring ptr
+	select case as const op
 	case AST_OP_NOT
 		function = @"co"
 
@@ -1203,6 +1073,177 @@ private function hGetOperatorName( byval proc as FBSYMBOL ptr ) as const zstring
 
 	case AST_OP_SQRT
 		function = @"v13sqr"
+
+	end select
+end function
+
+private function hGetArithmeticOperatorName( byval op as integer ) as const zstring ptr
+	select case as const op
+	case AST_OP_ASSIGN
+		function = @"aS"
+
+	case AST_OP_ADD
+		function = @"pl"
+
+	case AST_OP_ADD_SELF
+		function = @"pL"
+
+	case AST_OP_SUB
+		function = @"mi"
+
+	case AST_OP_SUB_SELF
+		function = @"mI"
+
+	case AST_OP_MUL
+		function = @"ml"
+
+	case AST_OP_MUL_SELF
+		function = @"mL"
+
+	case AST_OP_DIV
+		function = @"dv"
+
+	case AST_OP_DIV_SELF
+		function = @"dV"
+
+	case AST_OP_INTDIV
+		function = @"v24idiv"
+
+	case AST_OP_INTDIV_SELF
+		function = @"v28selfidiv"
+
+	case AST_OP_MOD
+		function = @"rm"
+
+	case AST_OP_MOD_SELF
+		function = @"rM"
+
+	case AST_OP_SHL
+		function = @"ls"
+
+	case AST_OP_SHL_SELF
+		function = @"lS"
+
+	case AST_OP_SHR
+		function = @"rs"
+
+	case AST_OP_SHR_SELF
+		function = @"rS"
+
+	case AST_OP_POW
+		function = @"v23pow"
+
+	case AST_OP_POW_SELF
+		function = @"v27selfpow"
+
+	case AST_OP_CONCAT
+		function = @"v23cat"
+
+	case AST_OP_CONCAT_SELF
+		function = @"v27selfcat"
+
+	end select
+end function
+
+private function hGetLogicalOperatorName( byval op as integer ) as const zstring ptr
+	select case as const op
+	case AST_OP_AND
+		function = @"an"
+
+	case AST_OP_AND_SELF
+		function = @"aN"
+
+	case AST_OP_OR
+		function = @"or"
+
+	case AST_OP_OR_SELF
+		function = @"oR"
+
+	'' Note: The ANDALSO/ORELSE operators can't currently be
+	'' overloaded, much less the self versions
+	case AST_OP_ANDALSO
+		function = @"aa"
+
+	case AST_OP_ANDALSO_SELF
+		function = @"aA" '' FB-specific
+
+	case AST_OP_ORELSE
+		function = @"oo"
+
+	case AST_OP_ORELSE_SELF
+		function = @"oO" '' FB-specific
+
+	case AST_OP_XOR
+		function = @"eo"
+
+	case AST_OP_XOR_SELF
+		function = @"eO"
+
+	case AST_OP_EQV
+		function = @"v23eqv"
+
+	case AST_OP_EQV_SELF
+		function = @"v27selfeqv"
+
+	case AST_OP_IMP
+		function = @"v23imp"
+
+	case AST_OP_IMP_SELF
+		function = @"v27selfimp"
+
+	case AST_OP_EQ
+		function = @"eq"
+
+	case AST_OP_GT
+		function = @"gt"
+
+	case AST_OP_LT
+		function = @"lt"
+
+	case AST_OP_NE
+		function = @"ne"
+
+	case AST_OP_GE
+		function = @"ge"
+
+	case AST_OP_LE
+		function = @"le"
+
+	end select
+end function
+
+private function hGetOperatorName( byval proc as FBSYMBOL ptr ) as const zstring ptr
+	dim as integer op
+	''
+	'' Most operators follow the "Operator Encodings" section of the
+	'' Itanium C++ ABI.
+	''
+	'' However, FB has some operators that C++ doesn't have, these "custom"
+	'' operators should use the predefined scheme of the ABI, to allow
+	'' C++-compatible tools to demangle them:
+	''    v <num-args> <length> <name>
+	'' where <num-args> is the operand count as a single decimal
+	'' digit, and <length> is the length of <name>.
+	''
+	op = symbGetProcOpOvl( proc )
+	select case as const op
+	case AST_OP_ASSIGN, AST_OP_ADD, AST_OP_ADD_SELF, AST_OP_SUB, AST_OP_SUB_SELF, _
+	     AST_OP_MUL, AST_OP_MUL_SELF, AST_OP_DIV, AST_OP_DIV_SELF, AST_OP_INTDIV, _
+	     AST_OP_INTDIV_SELF, AST_OP_MOD, AST_OP_MOD_SELF, AST_OP_SHL, AST_OP_SHL_SELF, _
+	     AST_OP_SHR, AST_OP_SHR_SELF, AST_OP_POW, AST_OP_POW_SELF, AST_OP_CONCAT, _
+	     AST_OP_CONCAT_SELF
+		function = hGetArithmeticOperatorName( op )
+
+	case AST_OP_AND, AST_OP_AND_SELF, AST_OP_OR, AST_OP_OR_SELF, AST_OP_ANDALSO, _
+	     AST_OP_ANDALSO_SELF, AST_OP_ORELSE, AST_OP_ORELSE_SELF, AST_OP_XOR, _
+	     AST_OP_XOR_SELF, AST_OP_EQV, AST_OP_EQV_SELF, AST_OP_IMP, AST_OP_IMP_SELF, _
+	     AST_OP_EQ, AST_OP_GT, AST_OP_LT, AST_OP_NE, AST_OP_GE, AST_OP_LE
+		function = hGetLogicalOperatorName( op )
+
+	case AST_OP_NOT, AST_OP_NEG, AST_OP_PLUS, AST_OP_ABS, AST_OP_FIX, AST_OP_FRAC, _
+	     AST_OP_LEN, AST_OP_SGN, AST_OP_FLOOR, AST_OP_EXP, AST_OP_LOG, AST_OP_SIN, _
+	     AST_OP_ASIN, AST_OP_COS, AST_OP_ACOS, AST_OP_TAN, AST_OP_ATAN, AST_OP_SQRT
+		function = hGetUnaryOperatorName( op )
 
 	case AST_OP_NEW, AST_OP_NEW_SELF
 		function = @"nw"

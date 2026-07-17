@@ -22,4 +22,4 @@ Using Sample
 
 '' This statement is valid now, since T exists
 '' without the "Sample." prefix.
-Dim OtherVariable As T 
+Dim OtherVariable As T

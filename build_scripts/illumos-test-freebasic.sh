@@ -102,13 +102,58 @@ configure_test_locale() {
 }
 
 resolve_make() {
-	for make in gmake make; do
-		command -v "$make" >/dev/null 2>&1 && {
-			echo "$make"
-			return 0
-		}
+	local make
+	local resolved
+
+	for make in \
+		"${FBC_GMAKE:-}" \
+		/var/tmp/freebasic-gnu-make/bin/make \
+		/usr/gnu/bin/gmake \
+		/usr/gnu/bin/make \
+		gmake \
+		make
+	do
+		[ -n "$make" ] || continue
+		resolved="$(command -v "$make" 2>/dev/null)" || continue
+		"$resolved" --version 2>/dev/null | grep -q '^GNU Make ' || continue
+		echo "$resolved"
+		return 0
 	done
 	return 1
+}
+
+prepare_xargs() {
+	local wrapper_dir="/var/tmp/freebasic-test-tool-wrappers"
+
+	if printf '' | /usr/bin/xargs -r true >/dev/null 2>&1; then
+		return 0
+	fi
+
+	mkdir -p "$wrapper_dir"
+	cat > "$wrapper_dir/xargs" <<'XARGS_WRAPPER'
+#!/usr/bin/env bash
+no_run_if_empty=0
+filtered=()
+
+for arg in "$@"; do
+	case "$arg" in
+		-r|--no-run-if-empty) no_run_if_empty=1 ;;
+		*) filtered+=("$arg") ;;
+	esac
+done
+
+tmp="${TMPDIR:-/tmp}/freebasic-test-xargs.$$"
+trap 'rm -f "$tmp"' EXIT
+cat > "$tmp"
+
+if [ "$no_run_if_empty" -eq 1 ] && [ ! -s "$tmp" ]; then
+	exit 0
+fi
+
+exec /usr/bin/xargs "${filtered[@]}" < "$tmp"
+XARGS_WRAPPER
+	chmod +x "$wrapper_dir/xargs"
+	export PATH="$wrapper_dir:$PATH"
 }
 
 resolve_repo_dir() {
@@ -311,7 +356,8 @@ run_illumos_package_install() {
 
 	prepare_tls_policy
 	configure_pkg_publishers
-	run pkg set-publisher --no-refresh -g "$repo_uri" local
+	run pkg set-publisher --no-refresh -G '*' -M '*' -g "$repo_uri" local
+	run pkg refresh local
 	install_pkg_candidates "$fmri" "lang/freebasic" || fail "freebasic package unavailable in repositories"
 }
 
@@ -346,11 +392,7 @@ run_fbctests() {
 
 	msg "running fbctests with ${jobs} job(s)"
 
-	# illumos /usr/bin/xargs does not support -r, which log-tests expects.
-	if [ -x /usr/gnu/bin/xargs ]; then
-		export PATH="/usr/gnu/bin:$PATH"
-		export XARGS=/usr/gnu/bin/xargs
-	fi
+	prepare_xargs
 	cd "$work/tests"
 	run "$make" clean FBC="$FBC"
 	run "$make" check FBC="$FBC"

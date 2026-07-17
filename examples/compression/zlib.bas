@@ -74,7 +74,7 @@ sub test_compress (byval compr as Bytef ptr, byval comprLen as uLong_,_
     if (*uncompr <> *hello) then
         print #stderr_, "bad uncompress"
         exit_(1)
-    else 
+    else
         print "uncompress(): ";*cast(zstring ptr,uncompr)
     end if
 
@@ -85,7 +85,7 @@ end sub
  '/
 sub test_gzio     (byval fname as const zstring ptr,_
                    byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
-                                 
+
 
     dim err_ as long
     dim len_ as integer = len(*hello)+1
@@ -125,7 +125,7 @@ sub test_gzio     (byval fname as const zstring ptr,_
     if (*uncompr <> *hello) then
         print #stderr_, "bad gzread: ", *cast(zstring ptr,uncompr)
         exit_(1)
-    else 
+    else
         print "gzread(): ";*cast(zstring ptr,uncompr)
     end if
 
@@ -150,11 +150,11 @@ sub test_gzio     (byval fname as const zstring ptr,_
       print #stderr_, "gzgets err after gzseek: "; gzerror(file_, @err_)
       exit_(1)
     end if
-    
+
     if (*cast(zstring ptr,uncompr) <> *(hello + 6))  then
       print #stderr_, "bad gzgets after gzseek"
       exit_(1)
-    else        
+    else
       print "gzgets() after gzseek: ";*cast(zstring ptr,uncompr)
     end if
 
@@ -182,7 +182,7 @@ sub test_deflate (byval compr as Bytef ptr, byval comprLen as uLong_)
     c_stream.next_in  = hello
     c_stream.next_out = compr
 
-    while (c_stream.total_in <> len_ andalso c_stream.total_out < comprLen) 
+    while (c_stream.total_in <> len_ andalso c_stream.total_out < comprLen)
         c_stream.avail_in = 1:c_stream.avail_out = 1 /' force small buffers '/
         err_ = deflate(@c_stream, Z_NO_FLUSH)
         CHECK_ERR(err_, "deflate")
@@ -224,7 +224,7 @@ sub test_inflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
     err_ = inflateInit(@d_stream)
     CHECK_ERR(err_, "inflateInit")
 
-    while (d_stream.total_out < uncomprLen andalso d_stream.total_in < comprLen) 
+    while (d_stream.total_out < uncomprLen andalso d_stream.total_in < comprLen)
         d_stream.avail_in = 1:d_stream.avail_out = 1 /' force small buffers '/
         err_ = inflate(@d_stream, Z_NO_FLUSH)
         if (err_ = Z_STREAM_END) then
@@ -239,7 +239,7 @@ sub test_inflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
     if (*cast(zstring ptr,uncompr) <> *hello) then
         print #stderr_, "bad inflate"
         exit_(1)
-    else 
+    else
         print "inflate(): ";*cast(zstring ptr,uncompr)
     end if
 
@@ -305,7 +305,7 @@ end sub
  '/
 sub test_large_inflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
                         byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
-    
+
     dim as integer err_
     dim as z_stream d_stream /' decompression stream '/
 
@@ -530,7 +530,7 @@ function mymain() as integer
       print "could not open stderr_"
       return -1
     end if
-    
+
     dim as Bytef ptr compr
     dim as Bytef ptr uncompr
     dim comprLen as uLong_ = 10000*sizeof(integer) /' don't overflow on MSDOS '/
@@ -539,7 +539,7 @@ function mymain() as integer
 
     if (zlibVersion()[0][0] <> myVersion[0][0]) then
         print #stderr_,"incompatible zlib version"
-        exit_(1)  
+        exit_(1)
     elseif (*zlibVersion() <> ZLIB_VERSION) then
         print #stderr_,"warning: different zlib version"
     end if
@@ -564,7 +564,7 @@ function mymain() as integer
     else
       test_gzio(TESTFILE,uncompr,uncomprLen)
     end if
-    
+
     test_deflate(compr, comprLen)
     test_inflate(compr, comprLen, uncompr, uncomprLen)
 

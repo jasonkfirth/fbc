@@ -53,4 +53,4 @@ Sub prntZstring (ByRef refZstring As ZString)
 	Print "  " & @refZstring, "'" & refZstring & "'"
 	Print
 End Sub
-		
+

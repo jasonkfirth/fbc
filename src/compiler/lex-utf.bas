@@ -17,11 +17,14 @@
 #define UTF16_HALFSHIFT      10
 #define UTF16_HALFBASE       &h0010000UL
 #define UTF16_HALFMASK       &h3FFUL
+#define UTF32_BYTE3_SHIFT    24
+#define UTF8_CONTINUATION_PAYLOAD_BITS 6
+#define SINGLE_BYTE_CODEPOINT_MAX 255
 
 #define U16_SWAP(c) (((c) shr 8) or ((c) shl 8) and &hFF00)
 
-#define U32_SWAP(c) (((c) shr 24) or (((c) shl 8) and &h00FF0000) or _
-					(((c) shr 8) and &h0000FF00) or ((c) shl 24))
+#define U32_SWAP(c) (((c) shr UTF32_BYTE3_SHIFT) or (((c) shl 8) and &h00FF0000) or _
+					(((c) shr 8) and &h0000FF00) or ((c) shl UTF32_BYTE3_SHIFT))
 
 '' Source files have explicit byte order, but lex.ctx->buffw is native WSTRING
 '' storage.  Swap values while reading from the file, not after writing them
@@ -92,7 +95,7 @@ private function hUTF8ToChar( ) as integer static
 			do
 				c += *p
 				p += 1
-				c shl= 6
+				c shl= UTF8_CONTINUATION_PAYLOAD_BITS
 				i -= 1
 			loop while( i > 0 )
 		end if
@@ -101,7 +104,7 @@ private function hUTF8ToChar( ) as integer static
 
 		c -= utf8_offsetsTb(extbytes)
 
-		if( c > 255 ) then
+		if( c > SINGLE_BYTE_CODEPOINT_MAX ) then
 			c = asc( "?" )
 		end if
 
@@ -147,7 +150,7 @@ private function hUTF8ToUTF16LE( ) as integer static
 			do
 				c += *p
 				p += 1
-				c shl= 6
+				c shl= UTF8_CONTINUATION_PAYLOAD_BITS
 				i -= 1
 			loop while( i > 0 )
 		end if
@@ -209,7 +212,7 @@ private function hUTF8ToUTF32LE( ) as integer static
 			do
 				c += *p
 				p += 1
-				c shl= 6
+				c shl= UTF8_CONTINUATION_PAYLOAD_BITS
 				i -= 1
 			loop while( i > 0 )
 		end if
@@ -287,7 +290,7 @@ private function hUTF16LEToChar( ) as integer static
 
 		c = U16_FROM_LE( c )
 
-		if( c > 255 ) then
+		if( c > SINGLE_BYTE_CODEPOINT_MAX ) then
 			'' surrogate?
 			if( c >= UTF16_SUR_HIGH_START ) then
 				if( c <= UTF16_SUR_HIGH_END ) then
@@ -449,7 +452,7 @@ private function hUTF16BEToChar( ) as integer static
 
 		c = U16_FROM_BE( c )
 
-		if( c > 255 ) then
+		if( c > SINGLE_BYTE_CODEPOINT_MAX ) then
 			'' surrogate?
 			if( c >= UTF16_SUR_HIGH_START ) then
 				if( c <= UTF16_SUR_HIGH_END ) then
@@ -588,7 +591,7 @@ private function hUTF32LEToChar( ) as integer static
 
 		c = U32_FROM_LE( c )
 
-		if( c > 255 ) then
+		if( c > SINGLE_BYTE_CODEPOINT_MAX ) then
 			c = asc( "?" )
 		end if
 
@@ -726,7 +729,7 @@ private function hUTF32BEToChar( ) as integer static
 
 		c = U32_FROM_BE( c )
 
-		if( c > 255 ) then
+		if( c > SINGLE_BYTE_CODEPOINT_MAX ) then
 			c = asc( "?" )
 		end if
 

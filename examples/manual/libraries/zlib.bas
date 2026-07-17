@@ -17,7 +17,7 @@ Dim As Integer src_len = 100000
 
 Print "ZLib test - Version " & *zlibVersion()
 Print
-Print "Test data size      : " & src_len & " bytes." 
+Print "Test data size      : " & src_len & " bytes."
 
 '' The size of the destination buffer for the compressed data is calculated by
 '' the compressBound function.
@@ -32,7 +32,7 @@ For i As Integer = 0 To src_len - 1
 	src[i] = Rnd * 4
 Next
 
-'' Store the crc32 checksum of the input data, so we can check if the 
+'' Store the crc32 checksum of the input data, so we can check if the
 '' uncompression has worked.
 Dim As UInteger crc = crc32(0, src, src_len)
 
@@ -50,13 +50,13 @@ Print "Compressed to       : " & dest_len & " bytes."
 '' just leave it in src_len.  The same goes for dest_len, which is the compressed
 '' datas size.
 
-'' Wipe the src buffer before we uncompress to it, so that we can check if the 
+'' Wipe the src buffer before we uncompress to it, so that we can check if the
 '' decompression has worked.
 For i As Integer = 0 To src_len - 1
 	src[i] = 0
 Next
 
-'' Perform a decompression.  This time we uncompress the data back to src.  
+'' Perform a decompression.  This time we uncompress the data back to src.
 '' src_len is passed as its address, because when
 '' the function returns it will contain the size of the uncompressed data.
 errlev = uncompress(src, @src_len, dest, dest_len)

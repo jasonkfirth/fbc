@@ -12,7 +12,7 @@ Screen 12, , 2
 ScreenSet 1, 0
 
 Dim As ULongInt MyFps = 100
-	
+
 Dim As String res = "N"
 Dim As ULong thresholdNR = 32
 Dim As ULong thresholdHR = 2
@@ -133,7 +133,7 @@ Do
 	End If
 	Select Case res
 	Case "N"
-		dt = regulate(MyFps, thresholdNR) 
+		dt = regulate(MyFps, thresholdNR)
 	#if defined(__FB_WIN32__)
 	Case "H"
 		dt = regulateHR(MyFps, thresholdHR)

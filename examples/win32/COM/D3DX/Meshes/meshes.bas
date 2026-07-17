@@ -37,8 +37,8 @@ dim shared as DWORD                 g_dwNumMaterials = 0    '' Number of mesh ma
 '' Name: InitD3D()
 '' Desc: Initializes Direct3D
 ''-----------------------------------------------------------------------------
-function InitD3D( byval hWnd as HWND ) as HRESULT 
-    
+function InitD3D( byval hWnd as HWND ) as HRESULT
+
     '' Create the D3D object.
     g_pD3D = Direct3DCreate9( D3D_SDK_VERSION )
     if( g_pD3D = NULL ) then
@@ -54,7 +54,7 @@ function InitD3D( byval hWnd as HWND ) as HRESULT
 
     '' Set up the structure used to create the D3DDevice. Since we are now
     '' using more complex geometry, we will create a device with a zbuffer.
-    dim as D3DPRESENT_PARAMETERS d3dpp 
+    dim as D3DPRESENT_PARAMETERS d3dpp
     with d3dpp
     	.Windowed = TRUE
     	.SwapEffect = D3DSWAPEFFECT_DISCARD
@@ -73,18 +73,18 @@ function InitD3D( byval hWnd as HWND ) as HRESULT
     '' Turn on the zbuffer
     IDirect3DDevice9_SetRenderState( g_pd3dDevice, D3DRS_ZENABLE, TRUE )
 
-    '' Turn on ambient lighting 
+    '' Turn on ambient lighting
     IDirect3DDevice9_SetRenderState( g_pd3dDevice, D3DRS_AMBIENT, &hffffffff )
 
     return S_OK
-    
+
 end function
 
 ''-----------------------------------------------------------------------------
 '' Name: InitGeometry()
 '' Desc: Load the mesh and build the material and texture arrays
 ''-----------------------------------------------------------------------------
-function InitGeometry() as HRESULT 
+function InitGeometry() as HRESULT
     dim as LPD3DXBUFFER pD3DXMtrlBuffer
 
     '' Load the mesh from the specified file
@@ -95,11 +95,11 @@ function InitGeometry() as HRESULT
         return E_FAIL
     end if
 
-    '' We need to extract the material properties and texture names from the 
+    '' We need to extract the material properties and texture names from the
     '' pD3DXMtrlBuffer
     dim as D3DXMATERIAL ptr d3dxMaterials
     d3dxMaterials = cast( D3DXMATERIAL ptr, pD3DXMtrlBuffer->lpVtbl->GetBufferPointer( pD3DXMtrlBuffer ) )
-    
+
     redim g_pMeshMaterials(0 to g_dwNumMaterials-1)
     redim g_pMeshTextures(0 to g_dwNumMaterials-1)
 
@@ -110,7 +110,7 @@ function InitGeometry() as HRESULT
 
         '' Set the ambient color for the material (D3DX does not do this)
         g_pMeshMaterials(i).Ambient = g_pMeshMaterials(i).Diffuse
-     
+
         '' Create the texture
         if( FAILED( D3DXCreateTextureFromFile( g_pd3dDevice, _
                                                d3dxMaterials[i].pTextureFilename, _
@@ -123,7 +123,7 @@ function InitGeometry() as HRESULT
     pD3DXMtrlBuffer->lpVtbl->Release( pD3DXMtrlBuffer )
 
     return S_OK
-    
+
 end function
 
 ''-----------------------------------------------------------------------------
@@ -131,7 +131,7 @@ end function
 '' Desc: Releases all previously initialized objects
 ''-----------------------------------------------------------------------------
 sub Cleanup()
-    
+
     erase g_pMeshMaterials
 
     if( g_dwNumMaterials > 0 ) then
@@ -141,14 +141,14 @@ sub Cleanup()
                 g_pMeshTextures(i)->lpVtbl->Release( g_pMeshTextures(i) )
             end if
         next
-        
+
         erase g_pMeshTextures
     end if
-    
+
     if( g_pMesh <> NULL ) then
         g_pMesh->lpVtbl->Release( g_pMesh )
     end if
-    
+
     if( g_pd3dDevice <> NULL ) then
         IDirect3DDevice9_Release( g_pd3dDevice )
     end if
@@ -164,7 +164,7 @@ end sub
 '' Desc: Sets up the world, view, and projection transform matrices.
 ''-----------------------------------------------------------------------------
 sub SetupMatrices()
-    
+
     '' For our world matrix, we will just leave it as the identity
     dim as D3DXMATRIX matWorld
     D3DXMatrixRotationY( @matWorld, timeGetTime() / 1000.0 )
@@ -172,10 +172,10 @@ sub SetupMatrices()
 
     '' Set up our view matrix. A view matrix can be defined given an eye point,
     '' a point to lookat, and a direction for which way is up. Here, we set the
-    '' eye five units back along the z-axis and up three units, look at the 
+    '' eye five units back along the z-axis and up three units, look at the
     '' origin, and define "up" to be in the y-direction.
     dim as D3DXMATRIX matView
-    D3DXMatrixLookAtLH( @matView, @type<D3DVECTOR>( 0.0, 2.0,-2.0 ), _ 
+    D3DXMatrixLookAtLH( @matView, @type<D3DVECTOR>( 0.0, 2.0,-2.0 ), _
                                   @type<D3DVECTOR>( 0.0, 0.0, 0.0 ), _
                                   @type<D3DVECTOR>( 0.0, 1.0, 0.0 ) )
     IDirect3DDevice9_SetTransform( g_pd3dDevice, D3DTS_VIEW, @matView )
@@ -189,7 +189,7 @@ sub SetupMatrices()
     dim as D3DXMATRIX matProj
     D3DXMatrixPerspectiveFovLH( @matProj, D3DX_PI/4, 1.0, 1.0, 100.0 )
     IDirect3DDevice9_SetTransform( g_pd3dDevice, D3DTS_PROJECTION, @matProj )
-    
+
 end sub
 
 ''-----------------------------------------------------------------------------
@@ -201,7 +201,7 @@ sub Render()
     '' Clear the backbuffer and the zbuffer
     IDirect3DDevice9_Clear( g_pd3dDevice, 0, NULL, D3DCLEAR_TARGET or D3DCLEAR_ZBUFFER, _
                          	D3DCOLOR_XRGB( 0, 0, 255 ), 1.0, 0 )
-    
+
     '' Begin the scene
     IDirect3DDevice9_BeginScene( g_pd3dDevice )
 
@@ -215,14 +215,14 @@ sub Render()
         '' Set the material and texture for this subset
         IDirect3DDevice9_SetMaterial( g_pd3dDevice, @g_pMeshMaterials(i) )
         IDirect3DDevice9_SetTexture( g_pd3dDevice, 0, cast( PVOID, g_pMeshTextures(i) ) )
-        
+
         '' Draw the mesh subset
         g_pMesh->lpVtbl->DrawSubset( g_pMesh, i )
     next
 
     '' End the scene
     IDirect3DDevice9_EndScene( g_pd3dDevice )
-    
+
     '' Present the backbuffer contents to the display
     IDirect3DDevice9_Present( g_pd3dDevice, NULL, NULL, NULL, NULL )
 
@@ -241,7 +241,7 @@ function MsgProc( byval hWnd as HWND, byval msg as UINT, byval wParam as WPARAM,
     end select
 
     return DefWindowProc( hWnd, msg, wParam, lParam )
-    
+
 end function
 
 ''-----------------------------------------------------------------------------
@@ -271,7 +271,7 @@ end function
             UpdateWindow( hWnd )
 
             '' Enter the message loop
-            dim as MSG msg 
+            dim as MSG msg
 
             do while( msg.message <> WM_QUIT )
 

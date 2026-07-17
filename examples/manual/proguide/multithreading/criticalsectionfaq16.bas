@@ -32,7 +32,7 @@ End Sub
 Sub MyThreads(ByVal pThread As Any Ptr, ByVal threadNB As UInteger = 1)
 	Dim As Thread td(1 To threadNB)
 	Dim As Double t
-	
+
 	t = Timer
 	For i As Integer = 1 To threadNB
 		td(i).valueIN = 100000000 + i

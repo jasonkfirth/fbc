@@ -17,7 +17,10 @@
 
 #pragma once
 
-#if defined(__FB_LINUX__) or defined(__FB_DARWIN__) or defined(USE_NCURSES)
+#if defined(__FB_LINUX__) or defined(__FB_CYGWIN__) or defined(__FB_FREEBSD__) or _
+	defined(__FB_DRAGONFLY__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or _
+	defined(__FB_DARWIN__) or defined(__FB_HAIKU__) or defined(__FB_SOLARIS__) or _
+	defined(USE_NCURSES)
 	#include once "curses/ncurses.bi"
 #else
 	#include once "curses/pdcurses.bi"

@@ -26,4 +26,4 @@ Print "MyArray1", _
 Print "MyArray2", _
 	  LBound( MyArray2, 1 ); ", "; LBound( MyArray2, 2 ), _
 	  UBound( MyArray2, 1 ); ", "; UBound( MyArray2, 2 )
-		
+

@@ -4,12 +4,12 @@
 		( _
 			byval rhs as r_type _
 		)
-		
+
 		VariantInit( @this.var_ )
-	
+
 		V_VT(@this.var_) = VT_##vt_type
 		V_##vt_type(@this.var_) = rhs
-		
+
 	end constructor
 #endmacro
 
@@ -19,12 +19,12 @@
 		( _
 			byval rhs as r_type _
 		)
-		
+
 		VariantClear( @this.var_ )
-	
+
 		V_VT(@this.var_) = VT_##vt_type
 		V_##vt_type(@this.var_) = rhs
-		
+
 	end operator
 #endmacro
 
@@ -34,16 +34,16 @@
 		( _
 			_
 		) as ret_type
-		
+
 		dim as VARIANT_ tmp = any
-		
+
 		VariantInit( @tmp )
 		VariantChangeTypeEx( @tmp, @this.var_, NULL, VARIANT_NOVALUEPROP, VT_##vt_type )
-		
+
 		operator = V_##vt_type(@tmp)
-		
+
 		VariantClear( @tmp )
-		
+
 	end operator
 #endmacro
 
@@ -54,17 +54,17 @@
 			byref lhs as VARIANT, _
 			byval rhs as r_type _
 		) as VARIANT
-		
+
 		dim as VARIANT_ tmp = any, res = any
-		
+
 		VariantInit( @tmp )
 		V_VT(@tmp) = VT_##vt_type
 		V_##vt_type(@tmp) = rhs
-		
+
 		proc( @lhs.var_, @tmp, @res )
-		
+
 		return VARIANT( res, FALSE )
-		
+
 	end operator
 #endmacro
 
@@ -75,17 +75,17 @@
 			byval lhs as r_type, _
 			byref rhs as VARIANT _
 		) as VARIANT
-		
+
 		dim as VARIANT_ tmp = any, res = any
-		
+
 		VariantInit( @tmp )
 		V_VT(@tmp) = VT_##vt_type
 		V_##vt_type(@tmp) = lhs
-		
+
 		proc( @tmp, @rhs.var_, @res )
-		
+
 		return VARIANT( res, FALSE )
-		
+
 	end operator
 #endmacro
 
@@ -95,18 +95,18 @@
 		( _
 			byval rhs as r_type _
 		)
-		
+
 		dim as VARIANT_ tmp = any, res = any
-		
+
 		VariantInit( @tmp )
 		V_VT(@tmp) = VT_##vt_type
 		V_##vt_type(@tmp) = rhs
-		
+
 		proc( @this.var_, @tmp, @res )
-		
+
 		VariantClear( @this.var_ )
 		this.var_ = res
-		
+
 	end operator
 #endmacro
 
@@ -117,15 +117,15 @@
 			byref lhs as VARIANT, _
 			byval rhs as r_type _
 		) as integer
-		
+
 		dim as VARIANT_ tmp = any
-		
+
 		VariantInit( @tmp )
 		V_VT(@tmp) = VT_##vt_type
 		V_##vt_type(@tmp) = rhs
-		
+
 		operator = VarCmp( @lhs.var_, @tmp, NULL, 0 ) op VARCMP_EQ
-		
+
 	end operator
 #endmacro
 
@@ -136,14 +136,14 @@
 			byval lhs as r_type, _
 			byref rhs as VARIANT _
 		) as integer
-		
+
 		dim as VARIANT_ tmp = any
-		
+
 		VariantInit( @tmp )
 		V_VT(@tmp) = VT_##vt_type
 		V_##vt_type(@tmp) = lhs
-		
+
 		operator = VarCmp( @tmp, @rhs.var_, NULL, 0 ) op VARCMP_EQ
-		
+
 	end operator
 #endmacro

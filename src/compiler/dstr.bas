@@ -1,5 +1,7 @@
 '' dynamic zstring helpers
 ''
+'' Ownership: Each DSTRING owns its allocated character buffer.  The helper
+'' routines replace or release that buffer; callers retain the DSTRING itself.
 ''
 
 
@@ -358,13 +360,15 @@ private sub hRealloc _
 
 	dim as integer newsize
 	dim as any ptr p
+	'' Shrink only after the request falls below seven eighths of capacity.
+	const DSTRING_SHRINK_SHIFT = 3
 
 	'' alloc every 16-chars
 	newsize = (chars + 15) and not 15
 
 	if( (s->data = NULL) or _
 	    (chars > s->size) or _
-	    (newsize < (s->size - (s->size shr 3))) ) then
+	    (newsize < (s->size - (s->size shr DSTRING_SHRINK_SHIFT))) ) then
 
 		if( dopreserve = FALSE ) then
 			if( s->data <> NULL ) then
@@ -395,4 +399,3 @@ private sub hRealloc _
 	s->len = chars
 
 end sub
-

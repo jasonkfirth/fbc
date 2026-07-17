@@ -68,7 +68,7 @@ dim shared gbase as GLuint                         '' Base Display List For The 
 	if (not LoadTGA(@textures(0), exepath + "/data/Font.tga")) then   '' Load The Font Texture
 		end 1                                  '' If Loading Failed, Quit
 	end if
-	
+
 	BuildFont()                                           '' Build The Font
 
 	glShadeModel(GL_SMOOTH)                               '' Enable Smooth Shading

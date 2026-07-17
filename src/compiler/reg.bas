@@ -574,9 +574,11 @@ private function sregFindLowestReg _
 	) as integer Static
 
 	dim as integer r, i, lowest
+	'' Register stack positions are non-negative; start below every valid one.
+	const LOWEST_REGISTER_STACK_POSITION = -32768
 
 	i = INVALID
-	lowest = -32768
+	lowest = LOWEST_REGISTER_STACK_POSITION
 
 	for r = 0 to this_->regs - 1
 		if( this_->stkctx.regTB(r) <> INVALID ) then

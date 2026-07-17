@@ -14,4 +14,4 @@ Function betterTranslationToIterativeReverse (ByVal s As String) As String
 	Wend
 	Return cumul
 End Function
-		
+

@@ -32,7 +32,7 @@ Dim bmp_header As bitmap_header
 Open "bmp.bmp" For Binary As #1
 
 	Get #1, , bmp_header
-	
+
 Close #1
 
 Print bmp_header.biWidth, bmp_header.biHeight

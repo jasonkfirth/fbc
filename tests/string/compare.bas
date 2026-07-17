@@ -45,4 +45,26 @@ SUITE( fbc_tests.string_.compare )
 
 	END_TEST
 
+	TEST( embeddedNulConst )
+
+		CU_ASSERT( !"A\000B" <> !"A\000C" )
+		CU_ASSERT( !"A\000B" < !"A\000C" )
+		CU_ASSERT( !"A\000C" > !"A\000B" )
+
+	END_TEST
+
+	TEST( wstringEmbeddedNulConst )
+
+		CU_ASSERT( wstr( !"A\000B" ) <> wstr( !"A\000C" ) )
+		CU_ASSERT( wstr( !"A\000B" ) < wstr( !"A\000C" ) )
+		CU_ASSERT( wstr( !"A\000C" ) > wstr( !"A\000B" ) )
+		CU_ASSERT( !"A\000B" <> wstr( !"A\000C" ) )
+		CU_ASSERT( !"A\000B" < wstr( !"A\000C" ) )
+		CU_ASSERT( wstr( !"A\000C" ) > !"A\000B" )
+		CU_ASSERT( !"\000A" <> wstr( !"\000B" ) )
+		CU_ASSERT( !"\000A" < wstr( !"\000B" ) )
+		CU_ASSERT( wstr( !"A\000" ) < !"A\001" )
+
+	END_TEST
+
 END_SUITE

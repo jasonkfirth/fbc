@@ -697,11 +697,25 @@ for ((target_index = 0; target_index < ${#target_keys[@]}; ++target_index)); do
 	[ -f "$startup" ] || die "required Android runtime file is missing: $startup"
 	[ -f "$libdir/$fb_runtime" ] || die "required Android runtime file is missing: $libdir/$fb_runtime"
 	runtime+=("$libdir/$fb_runtime")
-	for optional in "$fbrt_runtime" "$gfx_runtime" "$sfx_runtime"; do
+	gfx_runtime_path=""
+	for optional in "$fbrt_runtime" "$sfx_runtime"; do
 		if [ -f "$libdir/$optional" ]; then
 			runtime+=("$libdir/$optional")
 		fi
 	done
+	if [ -f "$libdir/$gfx_runtime" ]; then
+		gfx_runtime_path="$libdir/$gfx_runtime"
+	fi
+
+	# The Android graphics archive exports JNI entry points used by the
+	# Java activity.  Native code does not reference those entry points,
+	# so the linker would otherwise discard their archive member.  Keep
+	# the graphics archive whole so the Java and native input bridge stay
+	# together in every generated shared library.
+	runtime_group=("${runtime[@]}")
+	if [ -n "$gfx_runtime_path" ]; then
+		runtime_group+=("-Wl,--whole-archive" "$gfx_runtime_path" "-Wl,--no-whole-archive")
+	fi
 
 	link_objects=("$appobj")
 	[ -z "$envobj" ] || link_objects+=("$envobj")
@@ -709,7 +723,7 @@ for ((target_index = 0; target_index < ${#target_keys[@]}; ++target_index)); do
 
 	"$cc" -shared -Wl,-soname,libfreebasicapp.so -o "$sofile" \
 		"${link_objects[@]}" \
-		-Wl,--start-group "${runtime[@]}" -Wl,--end-group \
+		-Wl,--start-group "${runtime_group[@]}" -Wl,--end-group \
 		-Wl,--wrap=exit \
 		-llog -landroid -lOpenSLES -ldl -lm
 

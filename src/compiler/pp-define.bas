@@ -130,6 +130,7 @@ private function hLoadMacro _
 	dim as integer prntcnt = any, num = any, reached_vararg = any, is_variadic = any
 	dim as zstring ptr argtext = any
 	static as string text
+	static as DZSTRING expanded
 
 	function = -1
 
@@ -394,6 +395,7 @@ private function hLoadMacro _
 	loop
 
 	text = ""
+	DZstrReset( expanded )
 
 	'' should we call a function to get definition text?
 	if( symbGetMacroCallbackZ( s ) <> NULL ) then
@@ -419,7 +421,7 @@ private function hLoadMacro _
 
 					'' Only if not empty ("..." param can be empty)
 					if( argtext <> NULL ) then
-						text += *argtext
+						DZstrConcatAssign( expanded, argtext )
 					end if
 
 				'' stringize parameter?
@@ -430,21 +432,21 @@ private function hLoadMacro _
 					'' Only if not empty ("..." param can be empty)
 					if( argtext <> NULL ) then
 						'' don't escape, preserve the sequencies as-is
-						text += "$" + QUOTE
-						text += hReplace( argtext, QUOTE, QUOTE + QUOTE )
-						text += QUOTE
+						DZstrConcatAssign( expanded, "$" + QUOTE )
+						DZstrConcatAssign( expanded, hReplace( argtext, QUOTE, QUOTE + QUOTE ) )
+						DZstrConcatAssign( expanded, QUOTE )
 					else
 						'' If it's empty, produce an empty string ("")
-						text += QUOTE + QUOTE
+						DZstrConcatAssign( expanded, QUOTE + QUOTE )
 					end if
 
 				'' ordinary text..
 				case FB_DEFTOK_TYPE_TEX
-					text += *symbGetDefTokText( dt )
+					DZstrConcatAssign( expanded, symbGetDefTokText( dt ) )
 
 				'' unicode text?
 				case FB_DEFTOK_TYPE_TEXW
-					text += str( *symbGetDefTokTextW( dt ) )
+					DZstrConcatAssign( expanded, str( *symbGetDefTokTextW( dt ) ) )
 				end select
 
 				'' next
@@ -458,6 +460,10 @@ private function hLoadMacro _
 			loop
 
 			listDelNode( @pp.argtblist, argtb )
+
+			if( expanded.data <> NULL ) then
+				text = *expanded.data
+			end if
 		end if
 
 		if( readdchar <> -1 ) then

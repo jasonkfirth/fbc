@@ -34,6 +34,8 @@ Sub ProcedureThread (ByVal param As Any Ptr)
 			Dim s As String = ClockTime()
 			For I As Integer = 1 To 2  '' updating the two screen pages
 				Line (544, 0)-(639, 49), 0, BF  '' clear the print area
+				'' The delay intentionally makes each protected page update visible.
+				'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 				Sleep 100, 1
 				Locate 2, 71
 				Print s;
@@ -67,6 +69,8 @@ Do
 	Dim C As Integer = Counter()
 	For I As Integer = 1 To 2  '' updating the two screen pages
 		Line (296, 208)-(376, 256), 0, BF  '' clear the print area
+		'' The delay intentionally makes each protected main-thread update visible.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 		Sleep 100, 1
 		Locate 15,40
 		Print Using "######"; c;
@@ -77,9 +81,8 @@ Do
 	MutexUnlock(ThreadUDT.sync)
 	Sleep 100, 1
 Loop Until LCase(s) = "q"
- 
+
 ThreadUDT.quit = 1
 ThreadWait(TTptr->handle)
 MutexDestroy(ThreadUDT.sync)
 Delete TTptr
-				

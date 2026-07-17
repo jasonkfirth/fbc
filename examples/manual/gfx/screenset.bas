@@ -19,11 +19,11 @@ Do
 	Cls
 	Line (x, 80)-Step(39, 39), 4, BF
 	x += 1: If (x > 319) Then x = -40
-	
+
 	' Wait for vertical sync: only used to control refresh rate, can be put anywhere in the Do loop
 	ScreenSync
-	
+
 	' Copy work page to visible page
 	ScreenCopy
-	
+
 Loop While Inkey = ""

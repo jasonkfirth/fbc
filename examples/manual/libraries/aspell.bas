@@ -25,7 +25,7 @@ Dim As AspellSpeller Ptr speller = to_aspell_speller(possible_err)
 
 Dim As String word
 Do
-	Print 
+	Print
 	Input "Enter a word (blank to quit): ", word
 	If (Len(word) = 0) Then
 		Exit Do

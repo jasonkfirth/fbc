@@ -25,4 +25,4 @@ REV_STR(s, "CISABeerF")  '' FreeBASIC
 Print s
 
 Sleep
-		
+

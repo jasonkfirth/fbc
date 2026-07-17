@@ -15,22 +15,22 @@ type CMovieCtx
     as IBasicVideo ptr 		basvideo
 end type
 
-'' 
+''
 constructor CMovie _
 	( _
 		byval hwnd as HWND _
 	)
-	
+
 	dim as integer isstatic
 	dim as HRESULT hr
 
 	ctx = new CMovieCtx
 
 	ctx->hwnd = hwnd
-	
+
 	hr = CoCreateInstance( @CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, _
-                      	   @IID_IGraphBuilder, cast( PVOID ptr, @ctx->graph ) )	
-                      	   
+						   @IID_IGraphBuilder, cast( PVOID ptr, @ctx->graph ) )
+
 	if( FAILED( hr ) ) then
 		return
 	end if
@@ -48,14 +48,14 @@ constructor CMovie _
     		end if
     	end if
     end if
-	
+
 	if( FAILED( hr ) ) then
 		return
 	end if
-	
+
 end constructor
 
-'' 
+''
 destructor CMovie _
 	( _
 		_
@@ -68,31 +68,31 @@ destructor CMovie _
 	    	IBasicVideo_Release( ctx->basvideo )
 	    	ctx->basvideo = NULL
 		end if
-	
+
 		if( ctx->vidwindow <> NULL ) then
 			IVideoWindow_Release( ctx->vidwindow )
 			ctx->vidwindow = NULL
 		end if
-		
+
 		if( ctx->medseek <> NULL ) then
 			IMediaSeeking_Release( ctx->medseek )
 			ctx->medseek = NULL
 		end if
-		
+
 		if( ctx->medevent <> NULL ) then
 			IMediaEvent_Release( ctx->medevent )
 			ctx->medevent = NULL
 		end if
-		
+
 		if( ctx->medctrl <> NULL ) then
 			IMediaControl_Release( ctx->medctrl )
 			ctx->medctrl = NULL
 		end if
-	
+
     	IGraphBuilder_Release( ctx->graph )
 		ctx->graph = NULL
 	end if
-    
+
 	delete ctx
 
 end destructor
@@ -125,18 +125,18 @@ function CMovie.resize _
 	) as BOOL
 
 	dim as HRESULT hr
-	
+
 	function = FALSE
 
 	if( ctx->graph = NULL ) then
 		exit function
 	end if
-	
+
 	hr = IVideoWindow_put_Width( ctx->vidwindow, width_ )
 	if( SUCCEEDED( hr ) ) then
 		hr = IVideoWindow_put_Height( ctx->vidwindow, height )
 	end if
-	
+
 	function = SUCCEEDED( hr )
 
 end function
@@ -149,7 +149,7 @@ private function hSetOwner _
 	) as BOOL
 
     function = FALSE
-    
+
     IVideoWindow_put_Owner( vidwindow, cast( OAHWND, hwnd ) )
     IVideoWindow_put_WindowStyle( vidwindow, WS_CHILD or WS_CLIPSIBLINGS or WS_CLIPCHILDREN )
     'IVideoWindow_put_MessageDrain( vidwindow, cast( OAHWND, hwnd ) )
@@ -158,7 +158,7 @@ private function hSetOwner _
     dim as RECT rc
     GetWindowRect( hwnd, @rc )
     IVideoWindow_SetWindowPosition( vidwindow, 0, 0, rc.right - rc.left, rc.bottom - rc.top )
-		
+
 	function = TRUE
 
 end function
@@ -172,15 +172,15 @@ function CMovie.load _
 	dim as HRESULT hr
 
 	function = FALSE
-	
+
 	if( ctx->graph = NULL ) then
 		exit function
 	end if
-	
+
     hr = IGraphBuilder_RenderFile( ctx->graph, filename, NULL )
-    
+
     hSetOwner( ctx->hwnd, ctx->vidwindow )
-    
+
     function = SUCCEEDED( hr )
 
 end function
@@ -194,13 +194,13 @@ function CMovie.play _
 	dim as HRESULT hr
 
 	function = FALSE
-	
+
 	if( ctx->graph = NULL ) then
 		exit function
 	end if
-	
+
     hr = IMediaControl_Run( ctx->medctrl )
-    
+
     function = SUCCEEDED( hr )
 
 end function
@@ -210,19 +210,19 @@ function CMovie.pause _
 	( _
 		_
 	) as BOOL
-	
+
 	dim as HRESULT hr
 
 	function = FALSE
-	
+
 	if( ctx->graph = NULL ) then
 		exit function
 	end if
-	
+
     hr = IMediaControl_Pause( ctx->medctrl )
-    
+
     function = SUCCEEDED( hr )
-	
+
 end function
 
 ''::::
@@ -230,15 +230,15 @@ function CMovie.stop _
 	( _
 		_
 	) as BOOL
-	
+
 	dim as HRESULT hr
 
 	function = FALSE
-	
+
 	if( ctx->graph = NULL ) then
 		exit function
 	end if
-	
+
     hr = IMediaControl_Stop( ctx->medctrl )
     if( FAILED( hr ) ) then
     	exit function
@@ -251,8 +251,8 @@ function CMovie.stop _
     end if
 
     hr = IMediaControl_StopWhenReady( ctx->medctrl )
-    
+
     function = SUCCEEDED( hr )
-	
+
 end function
 

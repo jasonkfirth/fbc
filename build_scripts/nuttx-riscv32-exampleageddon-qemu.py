@@ -171,6 +171,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--app-name", default="eg_exampleageddon")
     parser.add_argument("--start-index", type=int, default=1)
     parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument(
+        "--reuse-config",
+        action="store_true",
+        help="reuse the existing NuttX configuration for the first case too",
+    )
     parser.add_argument("--keep-going", action="store_true")
 
     args = parser.parse_args(argv)
@@ -205,7 +210,7 @@ def main(argv: list[str]) -> int:
 
     for offset, entry in enumerate(selected):
         index = args.start_index + offset
-        reuse_config = index != args.start_index
+        reuse_config = args.reuse_config or index != args.start_index
 
         print(f"[{index}/{total}] run {entry.source_name}", flush=True)
         result = run_one(entry, index, total, args, reuse_config)

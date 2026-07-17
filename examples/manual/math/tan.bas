@@ -12,5 +12,5 @@ Dim r As Double
 Input "Please enter an angle in degrees: ", a
 r = a * PI / 180	'Convert the degrees to Radians
 Print ""
-Print "The tangent of a" ; a; " degree angle is"; Tan ( r ) 
+Print "The tangent of a" ; a; " degree angle is"; Tan ( r )
 Sleep

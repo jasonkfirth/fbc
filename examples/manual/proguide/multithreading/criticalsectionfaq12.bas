@@ -24,9 +24,9 @@ Do
 	count += 1
 	ptid = ThreadCreate(@myThread, @t1)
 	*Cast(Double Ptr, p0) = Timer  '' similar code line as in thread code
-   
+
 	ThreadWait(ptid)
-   
+
 	tmean = (tmean * (count - 1) + (t1 - t0)) / count
 	If t1 - t0 < tmin Or t1 - t0 > tmax Then
 		If t1 - t0 < tmin Then

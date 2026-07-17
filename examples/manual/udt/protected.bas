@@ -27,6 +27,6 @@ Dim As dog d
 '' This is OK, animalName is public
 d.animalName = "Buddy"
 
-'' this would generate a compile error: 
+'' this would generate a compile error:
 '' - serialNumber is protected and we're trying to access it outside its type and the derived type
 '' d.serialNumber = 123456789

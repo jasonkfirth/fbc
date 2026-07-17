@@ -20,7 +20,7 @@ Draw "R50 D30 L50 U30"
 'Move inside the box
 Draw "BM +1,1"
 
-'Flood fill with color 1 (blue) up to border color 2 
+'Flood fill with color 1 (blue) up to border color 2
 Draw "P 1,2"
 
 Sleep

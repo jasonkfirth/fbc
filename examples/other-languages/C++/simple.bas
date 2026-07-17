@@ -2,7 +2,7 @@
 
 extern "c++" lib "simple"
 	namespace cpp
-		declare function sum( byval a as integer, byval b as integer ) as integer        
+		declare function sum( byval a as integer, byval b as integer ) as integer
 	end namespace
 end extern
 

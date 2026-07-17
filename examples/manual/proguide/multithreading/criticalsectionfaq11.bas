@@ -49,13 +49,13 @@ Sub threadUDT.threadDetach ()
 		This.pThread = 0
 	End If
 End Sub
-  
+
 Sub threadUDT.mutexCreate ()
 	If threadUDT.pMutex = 0 Then
 		threadUDT.pMutex = .MutexCreate
 	End If
 End Sub
-  
+
 Sub threadUDT.mutexLock ()
 	If threadUDT.pMutex > 0 Then
 		.MutexLock(threadUDT.pMutex)
@@ -192,4 +192,4 @@ Locate UDT.numberMax+2, 1
 Print CULngInt(c / t) & " increments per second"
 
 Sleep
-				
+

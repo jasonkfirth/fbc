@@ -11,7 +11,7 @@
 #include "varZstring.bi"  '' must contain also the overload Len operator declaration,
 						  ''    otherwise the prebuilt-in Len operator is called and applied
 						  ''    on the object variable (providing the length of its member data)
-						
+
 #inclib "varZstring"      '' one can also put this line in the 'varZstring.bi' file
 						  ''   (and not in this file), but it seems a bit crooked
 
@@ -35,4 +35,4 @@ v.Constructor(v)  '' readjusts memory allocation to minimum
 Print "varZstring v:", "'" & v & "'", "|"; Using "########|"; Len(v); v.allocated
 
 Sleep
-		
+

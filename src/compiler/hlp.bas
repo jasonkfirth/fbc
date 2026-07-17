@@ -18,6 +18,7 @@ function hHexUInt _
 	static as zstring * 8 + 1 res
 	dim as zstring ptr p
 	dim as integer lgt, maxlen
+	const USHORT_MAX = 65535
 
 	static as integer hexTB(0 to 15) = _
 	{ _
@@ -28,7 +29,7 @@ function hHexUInt _
 	}
 
 	maxlen = 4
-	if( value > 65535 ) then
+	if( value > USHORT_MAX ) then
 		maxlen = 8
 	end if
 
@@ -74,6 +75,8 @@ function hFloatToHex_C99 _
 	) as string
 
 	'' float hex format defined in C99 spec: e.g. 0x1.fp+3
+	const DOUBLE_EXPONENT_BIAS = 1023
+	const DOUBLE_MANTISSA_HEX_DIGITS = 13
 
 	dim as ulongint n = *cptr( ulongint ptr, @value )
 
@@ -91,10 +94,10 @@ function hFloatToHex_C99 _
 		ret = "0x"
 	end if
 
-	exp2 -= 1023
-	if( exp2 > -1023 ) then
+	exp2 -= DOUBLE_EXPONENT_BIAS
+	if( exp2 > -DOUBLE_EXPONENT_BIAS ) then
 		'' normalized
-		ret += "1." + hex( mantissa, 13 )
+		ret += "1." + hex( mantissa, DOUBLE_MANTISSA_HEX_DIGITS )
 		if right( ret, 1 ) = "0" then ret = rtrim( ret, "0" )
 	else
 		if mantissa = 0 then
@@ -104,7 +107,7 @@ function hFloatToHex_C99 _
 		else
 			'' denormed
 			exp2 += 1
-			ret += "0." + hex( mantissa, 13  )
+			ret += "0." + hex( mantissa, DOUBLE_MANTISSA_HEX_DIGITS )
 			if right( ret, 1 ) = "0" then ret = rtrim( ret, "0" )
 		end if
 	end if
@@ -179,15 +182,16 @@ sub hUcase _
 	dim as integer c
 	dim as const zstring ptr s
 	dim as zstring ptr d
+	const ASCII_CASE_OFFSET = CHAR_ALOW - CHAR_AUPP
 
 	s = cast( zstring ptr, src )
 	d = dst
 
 	do
 		c = *s
-		if( c >= 97 ) then
-			if( c <= 122 ) then
-				c -= (97 - 65)
+		if( c >= CHAR_ALOW ) then
+			if( c <= CHAR_ZLOW ) then
+				c -= ASCII_CASE_OFFSET
 			end if
 		elseif( c = 0 ) then
 			exit do
@@ -210,22 +214,22 @@ sub hClearName _
 		byval src as zstring ptr _
 	) static
 
-	dim as zstring ptr p
-
-	p = src
+	if( src = NULL ) then
+		exit sub
+	end if
 
 	do
-		select case as const *p
+		select case as const *src
 		case 0
 			exit do
 
 		case CHAR_AUPP to CHAR_ZUPP, CHAR_ALOW to CHAR_ZLOW, CHAR_0 to CHAR_9, CHAR_UNDER
 
 		case else
-			*p = CHAR_ZLOW
+			*src = CHAR_ZLOW
 		end select
 
-		p += 1
+		src += 1
 	loop
 
 end sub
@@ -391,12 +395,13 @@ end function
 function pathNormalizeHost( byref path as string ) as string
 #if defined( __FB_CYGWIN__ )
 	dim as string normalized
+	const WINDOWS_DRIVE_PATH_PREFIX_LENGTH = 2
 
 	normalized = path
 
 	hReplaceSlash( strptr( normalized ), asc( "/" ) )
 
-	if( len( normalized ) >= 2 ) then
+	if( len( normalized ) >= WINDOWS_DRIVE_PATH_PREFIX_LENGTH ) then
 		if( normalized[1] = asc( ":" ) ) then
 			dim as integer drive = normalized[0]
 
@@ -404,11 +409,11 @@ function pathNormalizeHost( byref path as string ) as string
 			    ((drive >= asc( "a" )) and (drive <= asc( "z" ))) ) then
 				dim as string drivepath = hCygwinDrivePrefix( ) + lcase( chr( drive ) )
 
-				if( len( normalized ) = 2 ) then
+				if( len( normalized ) = WINDOWS_DRIVE_PATH_PREFIX_LENGTH ) then
 					function = drivepath
 					exit function
-				elseif( normalized[2] = asc( "/" ) ) then
-					function = drivepath + mid( normalized, 3 )
+				elseif( normalized[WINDOWS_DRIVE_PATH_PREFIX_LENGTH] = asc( "/" ) ) then
+					function = drivepath + mid( normalized, WINDOWS_DRIVE_PATH_PREFIX_LENGTH + 1 )
 					exit function
 				end if
 			end if
@@ -460,28 +465,48 @@ end function
 function hCheckFileFormat( byval f as integer ) as integer
 	dim as ubyte BOM(0 to 3)
 	dim as FBFILE_FORMAT fmt
+	const FILE_START_POSITION = 1
+	const BOM_FIRST_BYTE = 0
+	const BOM_SECOND_BYTE = 1
+	const BOM_THIRD_BYTE = 2
+	const BOM_FOURTH_BYTE = 3
+	const UTF8_BOM_LENGTH = 3
+	const UTF16_BOM_LENGTH = 2
+	const UTF32_BOM_LENGTH = 4
+	static as ubyte UTF32BE_BOM(0 to UTF32_BOM_LENGTH - 1) => { &h00, &h00, &hFE, &hFF }
+	static as ubyte UTF32LE_BOM(0 to UTF32_BOM_LENGTH - 1) => { &hFF, &hFE, &h00, &h00 }
+	static as ubyte UTF8_BOM(0 to UTF8_BOM_LENGTH - 1) => { &hEF, &hBB, &hBF }
+	static as ubyte UTF16LE_BOM(0 to UTF16_BOM_LENGTH - 1) => { &hFF, &hFE }
+	static as ubyte UTF16BE_BOM(0 to UTF16_BOM_LENGTH - 1) => { &hFE, &hFF }
 
 	fmt = FBFILE_FORMAT_ASCII
 
 	if( get( #f, 0, BOM() ) = 0 ) then
-		if( (BOM(0) = &h00) andalso (BOM(1) = &h00) andalso _
-		    (BOM(2) = &hFE) andalso (BOM(3) = &hFF) ) then
+		if( (BOM(BOM_FIRST_BYTE) = UTF32BE_BOM(BOM_FIRST_BYTE)) andalso _
+		    (BOM(BOM_SECOND_BYTE) = UTF32BE_BOM(BOM_SECOND_BYTE)) andalso _
+		    (BOM(BOM_THIRD_BYTE) = UTF32BE_BOM(BOM_THIRD_BYTE)) andalso _
+		    (BOM(BOM_FOURTH_BYTE) = UTF32BE_BOM(BOM_FOURTH_BYTE)) ) then
 			fmt = FBFILE_FORMAT_UTF32BE
 
-		elseif( (BOM(0) = &hFF) andalso (BOM(1) = &hFE) andalso _
-		        (BOM(2) = &h00) andalso (BOM(3) = &h00) ) then
+		elseif( (BOM(BOM_FIRST_BYTE) = UTF32LE_BOM(BOM_FIRST_BYTE)) andalso _
+		        (BOM(BOM_SECOND_BYTE) = UTF32LE_BOM(BOM_SECOND_BYTE)) andalso _
+		        (BOM(BOM_THIRD_BYTE) = UTF32LE_BOM(BOM_THIRD_BYTE)) andalso _
+		        (BOM(BOM_FOURTH_BYTE) = UTF32LE_BOM(BOM_FOURTH_BYTE)) ) then
 		    fmt = FBFILE_FORMAT_UTF32LE
 
 		else
-			if( (BOM(0) = &hEF) andalso (BOM(1) = &hBB) andalso _
-			    (BOM(2) = &hBF) ) then
+			if( (BOM(BOM_FIRST_BYTE) = UTF8_BOM(BOM_FIRST_BYTE)) andalso _
+			    (BOM(BOM_SECOND_BYTE) = UTF8_BOM(BOM_SECOND_BYTE)) andalso _
+			    (BOM(BOM_THIRD_BYTE) = UTF8_BOM(BOM_THIRD_BYTE)) ) then
 				fmt = FBFILE_FORMAT_UTF8
 
 			else
-				if( (BOM(0) = &hFF) andalso (BOM(1) = &hFE) ) then
+				if( (BOM(BOM_FIRST_BYTE) = UTF16LE_BOM(BOM_FIRST_BYTE)) andalso _
+				    (BOM(BOM_SECOND_BYTE) = UTF16LE_BOM(BOM_SECOND_BYTE)) ) then
 					fmt = FBFILE_FORMAT_UTF16LE
 
-				elseif( (BOM(0) = &hFE) andalso (BOM(1) = &hFF) ) then
+				elseif( (BOM(BOM_FIRST_BYTE) = UTF16BE_BOM(BOM_FIRST_BYTE)) andalso _
+				        (BOM(BOM_SECOND_BYTE) = UTF16BE_BOM(BOM_SECOND_BYTE)) ) then
 					fmt = FBFILE_FORMAT_UTF16BE
 				end if
 			end if
@@ -489,18 +514,18 @@ function hCheckFileFormat( byval f as integer ) as integer
 
 		select case fmt
 		case FBFILE_FORMAT_ASCII
-			seek #f, 1
+			seek #f, FILE_START_POSITION
 
 		case FBFILE_FORMAT_UTF8
-			seek #f, 1+3
+			seek #f, FILE_START_POSITION + UTF8_BOM_LENGTH
 
 		case FBFILE_FORMAT_UTF16LE, _
 			 FBFILE_FORMAT_UTF16BE
-			seek #f, 1+2
+			seek #f, FILE_START_POSITION + UTF16_BOM_LENGTH
 
 		case FBFILE_FORMAT_UTF32LE, _
 			 FBFILE_FORMAT_UTF32BE
-			seek #f, 1+4
+			seek #f, FILE_START_POSITION + UTF32_BOM_LENGTH
 		end select
 	end if
 

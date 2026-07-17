@@ -9,8 +9,8 @@
 '' Matrix example
 #include "gsl/gsl_matrix.bi"
 
-'' gsl uses the c-style row major order, unlike VB or Fortran 
-? "A 3x3 matrix" 
+'' gsl uses the c-style row major order, unlike VB or Fortran
+? "A 3x3 matrix"
 Dim As gsl_matrix Ptr m = gsl_matrix_alloc(3, 3)
 For i As Integer = 0 To 2
 	For j As Integer = 0 To 2

@@ -54,4 +54,4 @@ ReDim test3(0 To 9, 1 To 100)
 printArrayDescriptor(FBC.ArrayDescriptorPtr(test3()), 4, "'Redim test3(0 to 9, 1 to 100)':")
 
 Sleep
-		
+

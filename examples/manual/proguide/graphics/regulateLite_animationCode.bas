@@ -15,7 +15,7 @@ Type vector3d
 End Type
 'assignment macro
 #define vct Type<vector3d>
- 
+
  'macros
 	#define map(a,b,x,c,d) ((d)-(c))*((x)-(a))/((b)-(a))+(c)
 	#macro combsort(array,begin,finish,dot)
@@ -27,26 +27,26 @@ End Type
 			switch=0
 			For i As Integer =(begin) To size-void
 				j=i+void
-				If array(i)dot<array(j)dot Then 
+				If array(i)dot<array(j)dot Then
 					Swap array(i),array(j): switch=1
 				End If
 			Next
 		Loop Until  switch =0 And void=1
 	End Scope
 	#endmacro
-	
+
 	Operator -(ByRef v1 As vector3d,ByRef v2 As vector3d) As vector3d
 		Return Type<vector3d>(v1.x-v2.x,v1.y-v2.y,v1.z-v2.z)
 	End Operator
-	
+
 	Operator + (ByRef v1 As vector3d,ByRef v2 As vector3d) As vector3d
 	Return Type<vector3d>(v1.x+v2.x,v1.y+v2.y,v1.z+v2.z)
 	End Operator
-	
+
 	Function length(ByRef v1 As vector3d) As Single
 		Return Sqr(v1.x*v1.x+v1.y*v1.y+v1.z*v1.z)
-	End Function 
-	
+	End Function
+
 	Function rotate3d(ByVal pivot As vector3d,ByVal pt As vector3d,ByVal Angle As vector3d, ByVal scale As vector3d=Type<vector3d>(1,1,1)) As vector3d
 		#define cr 0.0174532925199433
 		Angle=Type<vector3d>(Angle.x*cr,Angle.y*cr,Angle.z*cr)
@@ -56,8 +56,8 @@ End Type
 		Dim As vector3d p=Type<vector3d>(pt.x-pivot.x,pt.y-pivot.y,pt.z-pivot.z)
 		Dim As vector3d rot,temp
 		Rotate(p.y,-p.z,p.z,p.y,x)'X
-		rot.y=temp.x:rot.z=temp.y 
-		p.y = rot.y:p.z = rot.z 
+		rot.y=temp.x:rot.z=temp.y
+		p.y = rot.y:p.z = rot.z
 		Rotate(p.z,-p.x,p.x,p.z,y)'Y
 		rot.z=temp.x:rot.x=temp.y
 		p.x=rot.x
@@ -65,7 +65,7 @@ End Type
 		rot.x=temp.x:rot.y=temp.y
 		Return Type<vector3d>((scale.x*rot.x+pivot.x),(scale.y*rot.y+pivot.y),(scale.z*rot.z+pivot.z))
 	End Function
-	
+
 	Function apply_perspective(ByRef p As vector3d,ByRef eyepoint As vector3d) As vector3d
 		Dim As Single   w=1+(p.z/eyepoint.z)
 		If w=0 Then w=1e-20
@@ -97,7 +97,7 @@ End Type
 		ReDim rotated(LBound(array) To UBound(array))
 		Return 0
 	End Function
-	
+
 	'variables
 	Dim As vector3d centre=vct(xres/2,yres/2,0)
 	Dim As vector3d eyepoint=vct(xres/2,yres/2,600)
@@ -127,23 +127,23 @@ End Type
 		If (remove = False) Or (skipped = False) Then
 			ScreenLock
 			Cls
-			
+
 			For n As Integer=1 To UBound(rotated)
 				rotated(n)=rotate3d(centre,(array(n)),angle,vct(sx,sx,sx))
 			Next n
-			
+
 			combsort(rotated,1,UBound(rotated),.z)
-			
+
 			For n As Integer=1 To UBound(rotated)
 				Var dist=length(rotated(n)-centre)
 				rotated(n)=apply_perspective(rotated(n),eyepoint)
 				rotated(n)=rotated(n)+(disp-centre)
-				
+
 				Var col=map(0,200,dist,1,15)
 				Var radius=map(-400,400,rotated(n).z,10,1)
 				Circle (rotated(n).x,rotated(n).y),radius,col,,,,f
 			Next n
-			
+
 			Draw String (16,16),"Requested FPS = " & Right("  " & fps, 3)
 			Draw String (16,32),"Applied FPS   = " & Right("  " & rfps, 3) & "   (average = " & Right("  " & averageFps, 3) & ")"
 			Draw String (16,48),"Status : " & _

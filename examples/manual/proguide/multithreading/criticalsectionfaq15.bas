@@ -6,84 +6,177 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtCriticalSectionsFAQ
 '' --------
 
-Sub userTask(ByVal p As Any Ptr)   '' task to execute
+'' The reusable worker owns one mutex. LaunchPending and Quit are protected by
+'' that mutex, while the two conditions wake the worker and its caller. The user
+'' task runs without the mutex held so it cannot block control operations.
+
+Const TASK_COUNT = 10000
+Const SECONDS_PER_DAY = 86400.0
+Const MICROSECONDS_PER_TASK_SCALE = 100.0
+
+Sub UserTask(ByVal p As Any Ptr)
 End Sub
 
-Dim As Double t
+Function ElapsedSeconds(ByVal StartedAt As Double) As Double
+	Dim As Double FinishedAt = Timer
 
-'---------------------------------------------------------------------------
+	If FinishedAt < StartedAt Then
+		FinishedAt += SECONDS_PER_DAY
+	End If
 
-Print "Successive (empty) user tasks executed by one thread for each:"
-t = Timer
-For i As Integer = 1 To 10000
-	Dim As Any Ptr p = ThreadCreate(@userTask)
-	ThreadWait(p)
-Next i
-t = Timer - t
-Print Using "######.### microdeconds per user task"; t * 100
-Print
+	Return FinishedAt - StartedAt
+End Function
 
-'---------------------------------------------------------------------------
-
-Type thread
+Type Thread
 	Public:
-		Dim As Sub(ByVal p As Any Ptr) task  '' pointer to user task
-		Declare Sub Launch()                 '' launch user task
-		Declare Sub Wait()                   '' wait for user task completed
+		Dim As Sub(ByVal p As Any Ptr) Task
+		Declare Sub Launch()
+		Declare Sub Wait()
+		Declare Property Ready() As Boolean
 		Declare Constructor()
 		Declare Destructor()
 	Private:
-		Dim As Any Ptr mutex1
-		Dim As Any Ptr mutex2
-		Dim As Any Ptr handle
-		Dim As Boolean quit
-		Declare Static Sub proc(ByVal pthread As thread Ptr)
+		Dim As Any Ptr Mutex
+		Dim As Any Ptr LaunchCondition
+		Dim As Any Ptr DoneCondition
+		Dim As Any Ptr Handle
+		Dim As Boolean Quit
+		Dim As Boolean LaunchPending
+		Declare Static Sub Proc(ByVal Worker As Thread Ptr)
 End Type
 
-Constructor thread()
-	This.mutex1 = MutexCreate
-	This.mutex2 = MutexCreate
-	MutexLock(This.mutex1)
-	MutexLock(This.mutex2)
-	This.handle = ThreadCreate(CPtr(Any Ptr, @thread.proc), @This)
+Constructor Thread()
+	This.Mutex = MutexCreate
+
+	If This.Mutex <> 0 Then
+		This.LaunchCondition = CondCreate
+	End If
+
+	If This.LaunchCondition <> 0 Then
+		This.DoneCondition = CondCreate
+	End If
+
+	If This.DoneCondition <> 0 Then
+		This.Handle = ThreadCreate(CPtr(Any Ptr, @Thread.Proc), @This)
+	End If
+
+	If This.Handle = 0 Then
+		If This.DoneCondition <> 0 Then CondDestroy This.DoneCondition
+		If This.LaunchCondition <> 0 Then CondDestroy This.LaunchCondition
+		If This.Mutex <> 0 Then MutexDestroy This.Mutex
+
+		This.DoneCondition = 0
+		This.LaunchCondition = 0
+		This.Mutex = 0
+	End If
 End Constructor
 
-Destructor thread()
-	This.quit = True
-	MutexUnlock(This.mutex1)
-	ThreadWait(This.handle)
-	MutexDestroy(This.mutex1)
-	MutexDestroy(This.mutex2)
+Destructor Thread()
+	If This.Handle <> 0 Then
+		MutexLock This.Mutex
+		This.Quit = TRUE
+		CondSignal This.LaunchCondition
+		MutexUnlock This.Mutex
+		ThreadWait This.Handle
+	End If
+
+	If This.DoneCondition <> 0 Then CondDestroy This.DoneCondition
+	If This.LaunchCondition <> 0 Then CondDestroy This.LaunchCondition
+	If This.Mutex <> 0 Then MutexDestroy This.Mutex
 End Destructor
 
-Sub thread.proc(ByVal pthread As thread Ptr)
+Sub Thread.Proc(ByVal Worker As Thread Ptr)
+	If Worker = 0 Then Exit Sub
+
+	MutexLock Worker->Mutex
+
 	Do
-		MutexLock(pthread->mutex1)    '' wait for launching task
-		If pthread->quit = True Then Exit Sub
-		pthread->task(pthread)
-		MutexUnlock(pthread->mutex2)  '' task completed
+		While (Worker->LaunchPending = FALSE) AndAlso (Worker->Quit = FALSE)
+			CondWait Worker->LaunchCondition, Worker->Mutex
+		Wend
+
+		If Worker->Quit Then Exit Do
+
+		Dim As Sub(ByVal p As Any Ptr) CurrentTask = Worker->Task
+		MutexUnlock Worker->Mutex
+
+		If CurrentTask <> 0 Then CurrentTask(Worker)
+
+		MutexLock Worker->Mutex
+		Worker->LaunchPending = FALSE
+		CondSignal Worker->DoneCondition
 	Loop
+
+	MutexUnlock Worker->Mutex
 End Sub
 
-Sub thread.Launch()
-	MutexUnlock(This.mutex1)
+Sub Thread.Launch()
+	MutexLock This.Mutex
+
+	While This.LaunchPending AndAlso (This.Quit = FALSE)
+		CondWait This.DoneCondition, This.Mutex
+	Wend
+
+	If This.Quit = FALSE Then
+		This.LaunchPending = TRUE
+		CondSignal This.LaunchCondition
+	End If
+
+	MutexUnlock This.Mutex
 End Sub
 
-Sub thread.Wait()
-	MutexLock(This.mutex2)
+Sub Thread.Wait()
+	MutexLock This.Mutex
+
+	While This.LaunchPending AndAlso (This.Quit = FALSE)
+		CondWait This.DoneCondition, This.Mutex
+	Wend
+
+	MutexUnlock This.Mutex
 End Sub
 
-Print "Successive (empty) user tasks executed by a single thread for all:"
-t = Timer
-Dim As thread Ptr pThread = New Thread
-pThread->task = @userTask
-For i As Integer = 1 To 10000
-	pThread->Launch()
-	pThread->Wait()
-Next i
-Delete pThread
-t = Timer - t
-Print Using "######.### microdeconds per user task"; t * 100
+Property Thread.Ready() As Boolean
+	Return This.Handle <> 0
+End Property
+
+Print "Successive empty user tasks executed by one thread for each:"
+Dim As Double t = Timer
+
+For I As Integer = 1 To TASK_COUNT
+	Dim As Any Ptr Handle = ThreadCreate(@UserTask)
+
+	If Handle = 0 Then
+		Print "Unable to create benchmark thread "; I; "."
+		End 1
+	End If
+
+	ThreadWait Handle
+Next I
+
+t = ElapsedSeconds(t)
+Print Using "######.### microseconds per user task"; _
+            t * MICROSECONDS_PER_TASK_SCALE
 Print
 
-Sleep
+Print "Successive empty user tasks executed by a single reusable thread:"
+t = Timer
+
+Dim As Thread Ptr Worker = New Thread
+
+If (Worker = 0) OrElse (Worker->Ready = FALSE) Then
+	Print "Unable to create the reusable worker thread."
+	Delete Worker
+	End 1
+End If
+
+Worker->Task = @UserTask
+
+For I As Integer = 1 To TASK_COUNT
+	Worker->Launch()
+	Worker->Wait()
+Next I
+
+Delete Worker
+t = ElapsedSeconds(t)
+Print Using "######.### microseconds per user task"; _
+            t * MICROSECONDS_PER_TASK_SCALE

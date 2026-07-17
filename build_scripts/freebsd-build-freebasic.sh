@@ -70,16 +70,20 @@ trap cleanup_build_artifacts EXIT
 
 echo "==> installing build dependencies"
 
-run pkg update -f
+# The VM image is pinned to FreeBSD 14.3 while the package repository may
+# already advertise the following point release.  The ABI remains compatible
+# for this build environment, but pkg otherwise stops for an interactive
+# confirmation that this non-interactive build cannot answer.
+run env IGNORE_OSVERSION=yes pkg update -f
 
-run pkg install -y \
+run env IGNORE_OSVERSION=yes pkg install -y \
     gmake gcc binutils bash rsync pkgconf \
     mesa-libs libglvnd \
     xorgproto \
     libX11 libXext libXrandr libXrender libXpm \
     libXcursor libXi libXinerama libXxf86vm \
     libxcb libXau libXdmcp \
-    libffi ncurses
+    libffi ncurses terminfo-db
 
 ##############################################################################
 # Resolve installed GCC package (meta preferred, fallback to gcc)
@@ -124,6 +128,7 @@ GCC_ENTRY="$(
 
 DEPS_LIST=(
     ncurses
+    terminfo-db
     mesa-libs
     libglvnd
     libX11

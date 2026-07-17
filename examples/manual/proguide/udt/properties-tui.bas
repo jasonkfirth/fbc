@@ -24,7 +24,7 @@ Namespace tui
 				w As Integer = 20, h As Integer = 5, _
 				title As ZString Ptr = 0 _
 			)
-		
+
 		Declare Destructor
 
 		Declare Sub show

@@ -22,4 +22,4 @@ For i = 7 To 11
 	a[i] = a[i] - 32  ' converting lowercase alphabetic characters to uppercase
 Next i
 Print a
-	
+

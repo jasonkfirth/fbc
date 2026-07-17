@@ -1,6 +1,6 @@
 ''
 '' CInPlaceFrame - a "class" that implements the IOleInPlaceFrame interface
-'' 
+''
 
 #ifndef _CInPlaceFrame_bi_
 #define _CInPlaceFrame_bi_ 1

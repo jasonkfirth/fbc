@@ -18,7 +18,7 @@ Const JoystickID = 0
 
 'This line checks to see if the joystick is ok.
 
-If GetJoystick(JoystickID,buttons,x,y) Then 
+If GetJoystick(JoystickID,buttons,x,y) Then
 	Print "Joystick doesn't exist or joystick error."
 	Print
 	Print "Press any key to continue."
@@ -32,12 +32,12 @@ Do
 
 	Locate 1,1
 	Print ;"result:";result;" x:" ;x;" y:";y;" Buttons:";buttons,"","",""
-	
-	'This tests to see which buttons from 1 to 27 are pressed. 
-	For a = 0 To 26 
-		If (buttons And (1 Shl a)) Then 
+
+	'This tests to see which buttons from 1 to 27 are pressed.
+	For a = 0 To 26
+		If (buttons And (1 Shl a)) Then
 			Print "Button ";a;" pressed.    "
-		Else 
+		Else
 			Print "Button ";a;" not pressed."
 		End If
 	Next a

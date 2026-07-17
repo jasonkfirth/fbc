@@ -250,6 +250,7 @@ private function hCard2Ord _
 	case 3
 		return @"3rd"
 	case else
+		'' Static storage keeps the returned zstring valid until the next call.
 		static as string tmp
 		tmp = str( num ) + "th"
 		return strptr( tmp )

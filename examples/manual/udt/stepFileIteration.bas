@@ -16,20 +16,20 @@ Type FileIter
 	Declare Operator Next( ByRef endCond As FileIter) As Integer
 End Type
 
-Constructor FileIter( ByRef pathName As String )   
+Constructor FileIter( ByRef pathName As String )
 	this.pathName = pathName
 End Constructor
 
-Operator FileIter.for( )   
-	fileName = Dir(pathName & "/*.*")   
+Operator FileIter.for( )
+	fileName = Dir(pathName & "/*.*")
 End Operator
 
-Operator FileIter.step( )   
+Operator FileIter.step( )
 	fileName = Dir("")
 End Operator
 
 Operator FileIter.next( ByRef endCond As FileIter ) As Integer
-	Return(fileName <> endCond.pathName)   
+	Return(fileName <> endCond.pathName)
 	'' the c'tor sets the path name and so we check against that
 End Operator
 
@@ -38,4 +38,4 @@ End Operator
 For i As FileIter = "./" To ""
 	Print i.fileName
 Next
-	
+

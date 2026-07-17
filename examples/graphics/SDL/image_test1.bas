@@ -55,26 +55,26 @@ declare sub blitImage _
 
 	do while (done = 0)
    		dim event as SDL_Event
-   
+
    		do while (SDL_PollEvent(@event))
       		if (event.type = SDL_QUIT_) then done = 1
       			if (event.type = SDL_KEYDOWN) then
-        	 		if (event.key.keysym.sym = SDLK_ESCAPE) then done = 1      
+					if (event.key.keysym.sym = SDLK_ESCAPE) then done = 1
       		end if
    		loop
-   
+
    		dim destrect as SDL_Rect
    		destrect.w = video->w
    		destrect.h = video->h
-   
+
    		' clear the screen with the colour white
    		SDL_FillRect(video, @destrect, SDL_MapRGB(video->format, 255, 255, 255))
-   
+
    		' draw the images onto the screen
-   		blitImage freeImg, 245, 205 
-   		blitImage basicImg, 250, 230 
-   		blitImage horseImg, 145, 200 
-   
+		blitImage freeImg, 245, 205
+		blitImage basicImg, 250, 230
+		blitImage horseImg, 145, 200
+
    		SDL_Flip(video)
 	loop
 

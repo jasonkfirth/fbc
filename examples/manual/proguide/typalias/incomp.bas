@@ -35,4 +35,4 @@ Type completed
 End Type
 
 Dim size_completed As Integer = SizeOf( completed )
-	
+

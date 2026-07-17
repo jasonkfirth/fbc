@@ -8,6 +8,11 @@
 ''
 ''     Keep Darwin target driver behavior out of fbc.bas.
 ''
+'' Ownership:
+''
+''     This helper retains no files or process resources.  It only appends
+''     driver arguments; the compiler driver owns their final execution.
+''
 '' Responsibilities:
 ''
 ''     - choose the compiler driver for Darwin link jobs
@@ -239,38 +244,45 @@ private function fbcDarwinPlatformAddDynamicLibOptions _
 	ldcline += " -install_name " + QUOTE + hStripPath( fbc.outname ) + QUOTE
 
 	'' Turn libfoo into foo, so it can be checked against -l foo below.
-	if( left( dllname, 3 ) = "lib" ) then
-		dllname = right( dllname, len( dllname ) - 3 )
+	const DYNAMIC_LIBRARY_PREFIX_LENGTH = 3
+	if( left( dllname, DYNAMIC_LIBRARY_PREFIX_LENGTH ) = "lib" ) then
+		dllname = right( dllname, len( dllname ) - DYNAMIC_LIBRARY_PREFIX_LENGTH )
 	end if
 
 	return TRUE
 end function
 
 private function fbcDarwinPlatformXmlEscape( byref text as string ) as string
-	dim as string result
+	dim as integer resultlen = 0
+	dim as string result = space( len( text ) * 6 )
+	dim as string escaped
 
 	for i as integer = 1 to len( text )
 		select case mid( text, i, 1 )
 		case "&"
-			result += "&amp;"
+			escaped = "&amp;"
 		case "<"
-			result += "&lt;"
+			escaped = "&lt;"
 		case ">"
-			result += "&gt;"
+			escaped = "&gt;"
 		case chr( 34 )
-			result += "&quot;"
+			escaped = "&quot;"
 		case "'"
-			result += "&apos;"
+			escaped = "&apos;"
 		case else
-			result += mid( text, i, 1 )
+			escaped = mid( text, i, 1 )
 		end select
+
+		mid( result, resultlen + 1, len( escaped ) ) = escaped
+		resultlen += len( escaped )
 	next
 
-	function = result
+	function = left( result, resultlen )
 end function
 
 private function fbcDarwinPlatformBundleIdComponent( byref appname as string ) as string
-	dim as string result
+	dim as integer resultlen = 0
+	dim as string result = space( len( appname ) )
 
 	for i as integer = 1 to len( appname )
 		dim as integer ch = asc( mid( appname, i, 1 ) )
@@ -278,20 +290,24 @@ private function fbcDarwinPlatformBundleIdComponent( byref appname as string ) a
 		if( ((ch >= asc( "a" )) and (ch <= asc( "z" ))) or _
 		    ((ch >= asc( "A" )) and (ch <= asc( "Z" ))) or _
 		    ((ch >= asc( "0" )) and (ch <= asc( "9" ))) ) then
-			result += lcase( chr( ch ) )
+			resultlen += 1
+			mid( result, resultlen, 1 ) = lcase( chr( ch ) )
 		else
-			if( (len( result ) > 0) andalso (right( result, 1 ) <> "-") ) then
-				result += "-"
+			if( (resultlen > 0) andalso (mid( result, resultlen, 1 ) <> "-") ) then
+				resultlen += 1
+				mid( result, resultlen, 1 ) = "-"
 			end if
 		end if
 	next
 
-	while( (len( result ) > 0) andalso (right( result, 1 ) = "-") )
-		result = left( result, len( result ) - 1 )
-	wend
+	if( (resultlen > 0) andalso (mid( result, resultlen, 1 ) = "-") ) then
+		resultlen -= 1
+	end if
 
-	if( len( result ) = 0 ) then
+	if( resultlen = 0 ) then
 		result = "program"
+	else
+		result = left( result, resultlen )
 	end if
 
 	function = result

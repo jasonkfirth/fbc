@@ -20,7 +20,7 @@ If Err>0 Then Print "Error opening the file":End
 ' Place our string inside the file, using number "f".
 Put #f, , buffer
 
-' Close all open files.  
+' Close all open files.
 Close
 
 ' End the program. (Check the file "file.ext" upon running to see the output.)

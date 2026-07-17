@@ -105,7 +105,7 @@ Do
 	Print I;
 	MutexUnlock(Tptr->sync) 'Mutex (Unlock) for main thread
 Loop Until Inkey <> ""
- 
+
 Tptr->quit = Tptr->True
 ThreadWait(Tptr->handle)
 MutexDestroy(Tptr->sync)

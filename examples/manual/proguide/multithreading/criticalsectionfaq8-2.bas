@@ -9,13 +9,13 @@
 #include "vbcompat.bi"
 
 Screen 12, , 2
-ScreenSet 1, 0   
+ScreenSet 1, 0
 Color 0, 7
 Cls
 
 Dim Shared terminate As Integer = 0
 
-Sub thread (ByVal param As Any Ptr)   
+Sub thread (ByVal param As Any Ptr)
 	ScreenSet 1, 0
 	Do
 		Line (16, 432)-Step(96, 32), 11, BF  'clear print area
@@ -47,4 +47,4 @@ Print " Thread terminated"
 ScreenCopy
 
 Sleep
-				
+

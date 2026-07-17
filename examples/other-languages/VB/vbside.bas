@@ -5,13 +5,13 @@ Attribute VB_Name = "Module1"
 ''	  	 pass the BSTR correctly by reference without a COM type-library
 
 Declare Function dupme Lib "fbside.dll" Alias "dupme" (ByVal arg As String) As String
-        
-        
+
+
 Sub main()
     Dim res As String
-        
+
     res = "Hello! "
-        
+
     MsgBox dupme(res)
-        
+
 End Sub

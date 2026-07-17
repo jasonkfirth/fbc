@@ -194,7 +194,7 @@ private sub DrawScene
 
 
     glPushMatrix                    'word matrix
-    
+
     if( z = 0 ) then
     	z = -10.0
     	zdir = 0.5
@@ -203,7 +203,7 @@ private sub DrawScene
     elseif( z < -10.0 ) then
     	zdir = 0.5
     end if
-    
+
     z = z + zdir
 
     'sphere

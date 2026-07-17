@@ -9,7 +9,56 @@
 #ifndef __crt_errno_bi__
 #define __crt_errno_bi__
 
-#ifdef __FB_DARWIN__
+#ifdef __FB_HAIKU__
+	'' Haiku exposes POSIX errors through status_t values instead of the
+	'' small positive numbers used by Linux.  These bases and mappings come
+	'' from Haiku's public Errors.h ABI.
+	#define __FB_HAIKU_GENERAL_ERROR_BASE cast(long, &h80000000)
+	#define __FB_HAIKU_OS_ERROR_BASE (__FB_HAIKU_GENERAL_ERROR_BASE + &h1000)
+	#define __FB_HAIKU_STORAGE_ERROR_BASE (__FB_HAIKU_GENERAL_ERROR_BASE + &h6000)
+	#define __FB_HAIKU_POSIX_ERROR_BASE (__FB_HAIKU_GENERAL_ERROR_BASE + &h7000)
+
+	#define EPERM (__FB_HAIKU_GENERAL_ERROR_BASE + 15)
+	#define ENOFILE (__FB_HAIKU_STORAGE_ERROR_BASE + 3)
+	#define ENOENT (__FB_HAIKU_STORAGE_ERROR_BASE + 3)
+	#define ESRCH (__FB_HAIKU_POSIX_ERROR_BASE + 13)
+	#define EINTR (__FB_HAIKU_GENERAL_ERROR_BASE + 10)
+	#define EIO (__FB_HAIKU_GENERAL_ERROR_BASE + 1)
+	#define ENXIO (__FB_HAIKU_POSIX_ERROR_BASE + 11)
+	#define E2BIG (__FB_HAIKU_POSIX_ERROR_BASE + 1)
+	#define ENOEXEC (__FB_HAIKU_OS_ERROR_BASE + &h302)
+	#define EBADF (__FB_HAIKU_STORAGE_ERROR_BASE + 0)
+	#define ECHILD (__FB_HAIKU_POSIX_ERROR_BASE + 2)
+	#define EAGAIN (__FB_HAIKU_GENERAL_ERROR_BASE + 11)
+	#define ENOMEM __FB_HAIKU_GENERAL_ERROR_BASE
+	#define EACCES (__FB_HAIKU_GENERAL_ERROR_BASE + 2)
+	#define EFAULT (__FB_HAIKU_OS_ERROR_BASE + &h301)
+	#define EBUSY (__FB_HAIKU_GENERAL_ERROR_BASE + 14)
+	#define EEXIST (__FB_HAIKU_STORAGE_ERROR_BASE + 2)
+	#define EXDEV (__FB_HAIKU_STORAGE_ERROR_BASE + 11)
+	#define ENODEV (__FB_HAIKU_POSIX_ERROR_BASE + 7)
+	#define ENOTDIR (__FB_HAIKU_STORAGE_ERROR_BASE + 5)
+	#define EISDIR (__FB_HAIKU_STORAGE_ERROR_BASE + 9)
+	#define EINVAL (__FB_HAIKU_GENERAL_ERROR_BASE + 5)
+	#define ENFILE (__FB_HAIKU_POSIX_ERROR_BASE + 6)
+	#define EMFILE (__FB_HAIKU_STORAGE_ERROR_BASE + 10)
+	#define ENOTTY (__FB_HAIKU_POSIX_ERROR_BASE + 10)
+	#define EFBIG (__FB_HAIKU_POSIX_ERROR_BASE + 4)
+	#define ENOSPC (__FB_HAIKU_STORAGE_ERROR_BASE + 7)
+	#define ESPIPE (__FB_HAIKU_POSIX_ERROR_BASE + 12)
+	#define EROFS (__FB_HAIKU_STORAGE_ERROR_BASE + 8)
+	#define EMLINK (__FB_HAIKU_POSIX_ERROR_BASE + 5)
+	#define EPIPE (__FB_HAIKU_STORAGE_ERROR_BASE + 13)
+	#define EDOM (__FB_HAIKU_POSIX_ERROR_BASE + 16)
+	#define ERANGE (__FB_HAIKU_POSIX_ERROR_BASE + 17)
+	#define EDEADLOCK (__FB_HAIKU_POSIX_ERROR_BASE + 3)
+	#define EDEADLK (__FB_HAIKU_POSIX_ERROR_BASE + 3)
+	#define ENAMETOOLONG (__FB_HAIKU_STORAGE_ERROR_BASE + 4)
+	#define ENOLCK (__FB_HAIKU_POSIX_ERROR_BASE + 8)
+	#define ENOSYS (__FB_HAIKU_POSIX_ERROR_BASE + 9)
+	#define ENOTEMPTY (__FB_HAIKU_STORAGE_ERROR_BASE + 6)
+	#define EILSEQ (__FB_HAIKU_POSIX_ERROR_BASE + 38)
+#elseif defined(__FB_DARWIN__)
         '' Darwin errno numbers are different from Linux, so use Darwin values here.
 #else
 
@@ -66,6 +115,9 @@ extern "C"
 #elseif defined( __FB_DARWIN__ )
         declare function __error() as long ptr
         #define errno (*__error())
+#elseif defined( __FB_HAIKU__ )
+	declare function _errnop() as long ptr
+	#define errno (*_errnop())
 #else
 	extern errno as long
 #endif

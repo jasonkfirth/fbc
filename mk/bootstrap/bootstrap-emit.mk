@@ -153,6 +153,18 @@ ifeq ($(BOOT_EMIT_TARGET),mingw)
 BOOT_EMIT_TARGET := win32
 endif
 
+#
+# Older peer bootstrap compilers predate the illumos target name, but their
+# Solaris backend emits the same ABI.  Use that accepted target spelling while
+# defining the newer host identity explicitly.  The emitted current compiler
+# will then contain native illumos target support.
+#
+BOOT_FBC_TARGET := $(BOOT_EMIT_TARGET)
+ifeq ($(BOOT_EMIT_TARGET),illumos)
+BOOT_FBC_TARGET := solaris
+BOOTSTRAP_COMPAT_DEFINES += -d __FB_ILLUMOS__
+endif
+
 ##############################################################################
 # Compiler sources
 ##############################################################################
@@ -208,7 +220,7 @@ bootstrap-emit: bootstrap-check
 	$(BOOT_FBC_TOOL_ENV) $(BOOT_FBC) $(BOOT_FBC_PREFIX_OPT) @"$(BOOTSTRAP_SRC_RSP)" \
 		-m fbc \
 		-gen $(BOOTFBCGEN) \
-		-target $(BOOT_EMIT_TARGET) \
+		-target $(BOOT_FBC_TARGET) \
 		$(if $(BOOTSTRAP_ARCH),-arch $(BOOTSTRAP_ARCH)) \
 		$(BOOTSTRAP_COMPAT_DEFINES) \
 		-i "$$bootstrap_inc" \

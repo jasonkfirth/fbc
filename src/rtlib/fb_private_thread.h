@@ -34,13 +34,14 @@
 // The default of 2048 KiB is too small as tested on freebsd-13.0-i386.
 // OpenBSD's PTHREAD_STACK_MIN is also too small for libc resolver paths
 // reached from threaded TCP programs. Haiku's PTHREAD_STACK_MIN is likewise
-// too small for threaded TCP INPUT paths. illumos also exposes very small
-// minimum stacks that crash ordinary BASIC thread examples. Linux targets
-// using musl can expose the same problem in ordinary threaded BASIC programs.
+// too small for threaded TCP INPUT paths. NetBSD and DragonFlyBSD also expose
+// small minimum stacks that are not sufficient for resolver calls made by
+// threaded TCP programs. illumos has the same issue in ordinary BASIC thread
+// examples. Linux targets using musl can expose it too.
 // 8192 KiB seems about alright (jeffm)
 // see https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=234775
 */
-#if defined( HOST_LINUX ) || defined( HOST_FREEBSD ) || defined( HOST_OPENBSD ) || defined( HOST_HAIKU ) || defined( HOST_SOLARIS )
+#if defined( HOST_LINUX ) || defined( HOST_FREEBSD ) || defined( HOST_DRAGONFLY ) || defined( HOST_OPENBSD ) || defined( HOST_NETBSD ) || defined( HOST_HAIKU ) || defined( HOST_SOLARIS )
 	#define FBTHREAD_STACK_MIN (8192 * 1024)
 #else
 	#define FBTHREAD_STACK_MIN PTHREAD_STACK_MIN

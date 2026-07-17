@@ -116,7 +116,7 @@ sub DrawScene(  )
 	static as GLfloat model_shininess = 20.0
 
     glPushMatrix( )
-    
+
     '' Rotate the object
     glRotatef( rot_x*0.5, 1.0, 0.0, 0.0 )
     glRotatef( rot_y*0.5, 0.0, 1.0, 0.0 )
@@ -351,7 +351,7 @@ end sub
 sub WindowSizeFun cdecl( byval window_handle as GLFWwindow ptr, byval w as long, byval h as long )
     width_  = w
     height = iif( h > 0, h, 1 )
-    
+
     doredraw = TRUE
 end sub
 
@@ -381,10 +381,10 @@ sub MousePosFun cdecl( byval window_handle as GLFWwindow ptr, byval x as double,
     '' Remember mouse position
     xpos = mouse_x
     ypos = mouse_y
-    
+
     if( active_view <> 0 ) then
     	doredraw = TRUE
-    end if 
+    end if
 end sub
 
 
@@ -393,31 +393,31 @@ end sub
 ''========================================================================
 
 sub MouseButtonFun cdecl( byval window_handle as GLFWwindow ptr, byval button as long, byval action as long, byval mods as long )
-    
+
     '' Button clicked?
     select case button
     case GLFW_MOUSE_BUTTON_LEFT
-    	
+
     	if( action = GLFW_PRESS ) then
         	'' Detect which of the four views was clicked
         	active_view = 1
         	if( xpos >= width_\2 ) then
 	            active_view += 1
-			end if            
+			end if
         	if( ypos >= height\2 ) then
             	active_view += 2
         	end if
-        	
+
     	'' Button released?
     	else
         	'' Deselect any previously selected view
         	active_view = 0
         end if
-        
+
         doredraw = TRUE
-    
+
     end select
-    
+
 end sub
 
 
@@ -459,21 +459,21 @@ end sub
     do
         if( doredraw ) then
         	doredraw = FALSE
-        	
+
         	'' Draw all views
         	DrawAllViews( )
-        	
+
         else
-        
+
         	'' Idle process
         	sleep 25, 1
-        	
+
         end if
 
         '' Swap buffers
         glfwSwapBuffers( glfw_window )
         glfwPollEvents( )
-        	
+
         '' Check if the ESC key was pressed or the window was closed
         running = (glfwGetKey( glfw_window, GLFW_KEY_ESCAPE ) = 0) and _
                   (glfwWindowShouldClose( glfw_window ) = 0)

@@ -1,6 +1,6 @@
 ''
 '' CClientSite - a "class" that implements the IOleClientSite interface
-'' 
+''
 
 
 
@@ -14,19 +14,19 @@ private function CClientSite_QueryInterface _
 		byval riid as REFIID, _
 		byval ppvObj as PVOID ptr _
 	) as HRESULT
-														
+
 	dim as CClientSite ptr self_ = cast( CClientSite ptr, _this )
-	
+
 	LOG_FUNC()
-	
+
 	if( (memcmp( riid, @IID_IUnknown, len( GUID ) ) = 0) or _
 		(memcmp( riid, @IID_IOleClientSite, len( GUID ) ) = 0) ) then
 		*ppvObj = @self_->interface
 		return S_OK
 	end if
-		
+
 	function = self_->site.interface.lpVtbl->QueryInterface( @self_->site.interface, riid, ppvObj )
-	
+
 end function
 
 ''::::
@@ -36,7 +36,7 @@ private function CClientSite_AddRef _
 	) as ULONG
 
 	LOG_FUNC()
-	
+
 	function = 1
 
 end function
@@ -48,7 +48,7 @@ private function CClientSite_Release _
 	) as ULONG
 
 	LOG_FUNC()
-	
+
 	function = 1
 
 end function
@@ -60,9 +60,9 @@ private function CClientSite_SaveObject _
 	) as HRESULT
 
 	LOG_FUNC()
-	
+
 	function = S_OK
-	
+
 end function
 
 ''::::
@@ -75,7 +75,7 @@ private function CClientSite_GetMoniker _
 	) as HRESULT
 
 	LOG_FUNC()
-	
+
 	function = E_NOTIMPL
 
 end function
@@ -86,9 +86,9 @@ private function CClientSite_GetContainer _
 		byval _this as IOleClientSite ptr, _
 		byval ppContainer as LPOLECONTAINER ptr _
 	) as HRESULT
-	
+
 	LOG_FUNC()
-	
+
 	*ppContainer = NULL
 
 	function = E_NOINTERFACE
@@ -110,7 +110,7 @@ private function CClientSite_ShowObject _
 		dim as HDC hdc = getDC( hwnd )
 		dim as RECT rect
 		GetClientRect( hwnd, @rect )
-		
+
 		self_->viewobj->lpVtbl->Draw( self_->viewobj, _
 									  DVASPECT_CONTENT, _
 									  -1, _
@@ -123,7 +123,7 @@ private function CClientSite_ShowObject _
 									  NULL, _
 									  NULL )
 	end if
-	
+
 	function = NOERROR
 
 end function
@@ -136,7 +136,7 @@ private function CClientSite_OnShowWindow _
 	) as HRESULT
 
 	LOG_FUNC()
-	
+
 	function = E_NOTIMPL
 
 end function
@@ -148,7 +148,7 @@ private function CClientSite_RequestNewObjectLayout _
 	) as HRESULT
 
 	LOG_FUNC()
-	
+
 	function = E_NOTIMPL
 
 end function
@@ -183,8 +183,8 @@ function CClientSite_New _
 	_this->interface.lpVtbl = @vtbl
 
 	CInPlaceSite_New( @_this->site, hwnd )
-	_this->viewobj = NULL	
-	
+	_this->viewobj = NULL
+
 	function = _this
 
 end function
@@ -200,9 +200,9 @@ sub CClientSite_Delete _
 		_this->viewobj->lpVtbl->Release( _this->viewobj )
 		_this->viewobj = NULL
 	end if
-	
+
 	CInPlaceSite_Delete( @_this->site, TRUE )
-	
+
 	if( isstatic = FALSE ) then
 		if( _this <> NULL ) then
 			deallocate( _this )
@@ -225,15 +225,15 @@ function CClientSite_SetObject _
 	if( obj->lpVtbl->SetClientSite( obj, @_this->interface ) <> S_OK ) then
 		exit function
 	end if
-	
+
 	if( OleSetContainedObject( cast( IUnknown ptr, obj ), TRUE ) <> S_OK ) then
 		exit function
 	end if
 
-	if( obj->lpVtbl->QueryInterface( obj, @IID_IViewObject, @_this->viewobj ) <> S_OK ) then	
+	if( obj->lpVtbl->QueryInterface( obj, @IID_IViewObject, @_this->viewobj ) <> S_OK ) then
 		_this->viewobj = NULL
 	end if
 
 	function = TRUE
-	
+
 end function

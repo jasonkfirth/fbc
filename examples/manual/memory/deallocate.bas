@@ -10,6 +10,11 @@ Sub DeallocateExample1()
    Dim As Integer Ptr integerPtr = Allocate( Len( Integer ) )  '' initialize pointer to
 															   '' new memory address
 
+   If integerPtr = 0 Then
+      Print "Unable to allocate the integer."
+      Exit Sub
+   End If
+
    *integerPtr = 420                                     '' use pointer
    Print *integerPtr
 
@@ -19,4 +24,3 @@ End Sub
 
    DeallocateExample1()
    End 0
-	

@@ -25,20 +25,20 @@ end type
 
 	dim shared ctx as TryCatchCtx
 	dim shared messages(0 to 31) as zstring * 32
-	
+
 private sub handler cdecl(byval sig as integer)
 	if ctx.cur = 0 then
 		error sig
 	end if
-	
+
 	signal(sig, @handler)
-	
+
 	ctx.cur->ex = new Exception(messages(sig))
-	
+
 	var buf = @ctx.cur->buf
-	
+
 	ctx.cur = ctx.cur->prev
-	
+
 	crt.longjmp(buf, sig)
 end sub
 
@@ -50,7 +50,7 @@ private sub __construc() constructor
 	messages(SIGTERM)	= "Termination request"
 	messages(SIGBREAK)	= "Control-break"
 	messages(SIGABRT)	= "Abnormal termination"
-	
+
 	ctx.oldsigabrt = signal(SIGABRT, @handler)
 	ctx.oldsigsegv = signal(SIGSEGV, @handler)
 	ctx.oldsigfpe = signal(SIGFPE, @handler)
@@ -67,7 +67,7 @@ private sub __destruc() destructor
 	signal(SIGTERM, ctx.oldsigterm)
 	signal(SIGINT, ctx.oldsigint)
 end sub
-		
+
 ''
 '' TryCatch
 ''
@@ -89,7 +89,7 @@ sub TryCatch.throw_(file as zstring ptr, func as zstring ptr, line_ as integer)
 	if ctx.cur = 0 then
 		error 1
 	end if
-	
+
 	this.ex->file = file
 	this.ex->func = func
 	this.ex->line = line_

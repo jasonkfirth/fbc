@@ -354,7 +354,10 @@ private function hGetIdxName _
 		'' (in case we do addone and the vreg also has an offset)
 
 		assert( (mult >= 1) and (mult <= 9) )
-		assert( (mult <> 6) and (mult <> 7) )
+		const X86_LEA_UNSUPPORTED_MULTIPLIER_FIRST = 6
+		const X86_LEA_UNSUPPORTED_MULTIPLIER_LAST = 7
+		assert( (mult <> X86_LEA_UNSUPPORTED_MULTIPLIER_FIRST) and _
+		        (mult <> X86_LEA_UNSUPPORTED_MULTIPLIER_LAST) )
 
 		if( mult > 1 ) then
 			addone = FALSE
@@ -844,6 +847,8 @@ private sub hEmitVarConst _
 		stext = QUOTE
 		stext += *hEscapeW( symbGetVarLitTextW( s ) )
 		for i as integer = 1 to typeGetSize( FB_DATATYPE_WCHAR )
+			'' A WCHAR terminator has a fixed target representation size.
+			'' FB-LINTER: DISABLE-NEXT-LINE FBL503
 			stext += RSLASH + "0"
 		next
 		stext += QUOTE
@@ -1054,8 +1059,13 @@ private function hFrameBytesToAlloc _
 	) as integer static
 
 	dim as integer bytestoalloc, bytespushed = any
+	const STACK_DWORD_BYTES = 4
+	const STACK_DWORD_ALIGN_MASK = STACK_DWORD_BYTES - 1
+	const STACK_ALIGNMENT_BYTES = 16
+	const STACK_ALIGNMENT_MASK = STACK_ALIGNMENT_BYTES - 1
 
-	bytestoalloc = ((proc->proc.ext->stk.localmax - EMIT_LOCSTART) + 3) and (not 3)
+	bytestoalloc = ((proc->proc.ext->stk.localmax - EMIT_LOCSTART) + STACK_DWORD_ALIGN_MASK) and _
+	               (not STACK_DWORD_ALIGN_MASK)
 
 	if( (env.target.options and FB_TARGETOPT_STACKALIGN16) <> 0 ) then
 
@@ -1063,18 +1073,18 @@ private function hFrameBytesToAlloc _
 		'EMIT_ARGSTART includes eip and ebp pushed to stack
 		bytespushed = EMIT_ARGSTART
 		if( EMIT_REGISUSED( FB_DATACLASS_INTEGER, EMIT_REG_EDI ) ) then
-			bytespushed += 4
+		bytespushed += STACK_DWORD_BYTES
 		end if
 		if( EMIT_REGISUSED( FB_DATACLASS_INTEGER, EMIT_REG_ESI ) ) then
-			bytespushed += 4
+		bytespushed += STACK_DWORD_BYTES
 		end if
 		if( EMIT_REGISUSED( FB_DATACLASS_INTEGER, EMIT_REG_EBX ) ) then
-			bytespushed += 4
+		bytespushed += STACK_DWORD_BYTES
 		end if
 
-		'' Ensure total size of locals + preserved registers (inc. eip) + padding is a multiple of 16
+		'' Ensure total size of locals + preserved registers (inc. eip) + padding is aligned.
 		bytestoalloc += bytespushed
-		bytestoalloc = (bytestoalloc + 15) and (not 15)
+		bytestoalloc = (bytestoalloc + STACK_ALIGNMENT_MASK) and (not STACK_ALIGNMENT_MASK)
 		bytestoalloc -= bytespushed
 	end if
 
@@ -2976,6 +2986,11 @@ private sub _emitMULL _
 	dim iseaxfree as integer, isedxfree as integer
 	dim eaxindest as integer, edxindest as integer
 	dim ofs as integer
+	const STACK_DST_LOW_OFFSET = 0
+	const STACK_DST_HIGH_OFFSET = 4
+	const STACK_SRC_LOW_OFFSET = 8
+	const STACK_SRC_HIGH_OFFSET = 12
+	const STACK_SAVED_REGISTER_BYTES = 4
 
 	hPrepOperand64( dvreg, dst1, dst2 )
 	hPrepOperand64( svreg, src1, src2 )
@@ -2991,47 +3006,47 @@ private sub _emitMULL _
 	hPUSH( dst2 )
 	hPUSH( dst1 )
 
-	ofs = 0
+	ofs = STACK_DST_LOW_OFFSET
 
 	if( edxindest ) then
 		if( dvreg->typ <> IR_VREGTYPE_REG ) then
-			ofs += 4
+			ofs += STACK_SAVED_REGISTER_BYTES
 			hPUSH( "edx" )
 		end if
 	else
 		if( isedxfree = FALSE ) then
-			ofs += 4
+			ofs += STACK_SAVED_REGISTER_BYTES
 			hPUSH( "edx" )
 		end if
 	end if
 
 	if( eaxindest ) then
 		if( dvreg->typ <> IR_VREGTYPE_REG ) then
-			ofs += 4
+			ofs += STACK_SAVED_REGISTER_BYTES
 			hPUSH "eax"
 		end if
 	else
 		if( iseaxfree = FALSE ) then
-			ofs += 4
+			ofs += STACK_SAVED_REGISTER_BYTES
 			hPUSH "eax"
 		end if
 	end if
 
 	'' res = low(dst) * low(src)
-	outp "mov eax, [esp+" + str( 0+ofs ) + "]"
-	outp "mul dword ptr [esp+" + str( 8+ofs ) + "]"
+	outp "mov eax, [esp+" + str( STACK_DST_LOW_OFFSET + ofs ) + "]"
+	outp "mul dword ptr [esp+" + str( STACK_SRC_LOW_OFFSET + ofs ) + "]"
 
 	'' hres= low(dst) * high(src) + high(res)
-	outp "xchg eax, [esp+" + str ( 0+ofs ) + "]"
+	outp "xchg eax, [esp+" + str ( STACK_DST_LOW_OFFSET + ofs ) + "]"
 
-	outp "imul eax, [esp+" + str ( 12+ofs ) + "]"
+	outp "imul eax, [esp+" + str ( STACK_SRC_HIGH_OFFSET + ofs ) + "]"
 	outp "add eax, edx"
 
 	'' hres += high(dst) * low(src)
-	outp "mov edx, [esp+" + str( 4+ofs ) + "]"
-	outp "imul edx, [esp+" + str( 8+ofs ) + "]"
+	outp "mov edx, [esp+" + str( STACK_DST_HIGH_OFFSET + ofs ) + "]"
+	outp "imul edx, [esp+" + str( STACK_SRC_LOW_OFFSET + ofs ) + "]"
 	outp "add edx, eax"
-	outp "mov [esp+" + str( 4+ofs ) + "], edx"
+	outp "mov [esp+" + str( STACK_DST_HIGH_OFFSET + ofs ) + "], edx"
 
 	if( eaxindest ) then
 		if( dvreg->typ <> IR_VREGTYPE_REG ) then
@@ -4609,6 +4624,8 @@ private function hCMPF_get_recipe _
 	) as CMPF_RECIPE ptr
 
 	assert( op >= 0 and op <= CMPF_OP_COUNT )
+	const CMPF_RECIPE_INVERSE_OFFSET = 6
+	const CMPF_RECIPE_LABEL_OFFSET = CMPF_RECIPE_INVERSE_OFFSET * 2
 
 	'' !!!TODO!!! - mask is a carry over from older versions - not tested
 
@@ -4648,10 +4665,10 @@ private function hCMPF_get_recipe _
 
 	dim index as integer = op
 	if( label ) then
-		index += 12
+		index += CMPF_RECIPE_LABEL_OFFSET
 	end if
 	if( (options and IR_EMITOPT_REL_DOINVERSE) <> 0 ) then
-		index += 6
+		index += CMPF_RECIPE_INVERSE_OFFSET
 	end if
 
 	return @recipe(index)
@@ -5637,6 +5654,10 @@ private sub hFpuChangeRC( byref regname as string, byval mode as zstring ptr )
 	outp( "add esp, 4" )
 end sub
 
+const FLOATFUNC_FLOOR = 1
+const FLOATFUNC_FIX = 2
+const FLOATFUNC_FRAC = 3
+
 private sub hEmitFloatFunc( byval func as integer )
 	dim as integer reg = any, isregfree = any
 	dim as string regname
@@ -5656,17 +5677,17 @@ private sub hEmitFloatFunc( byval func as integer )
 	end if
 
 	select case( func )
-	case 1
+	case FLOATFUNC_FLOOR
 		'' st(0) = floor( st(0) )
 		'' round down toward -infinity
 		hFpuChangeRC( regname, "01" )
 		outp( "frndint" )
-	case 2
+	case FLOATFUNC_FIX
 		'' st(0) = fix( st(0) ) = floor( abs( st(0) ) ) * sng( st(0) )
 		'' chop truncating toward 0
 		hFpuChangeRC( regname, "11" )
 		outp( "frndint" )
-	case 3
+	case FLOATFUNC_FRAC
 		'' st(0) = st(0) - fix( st(0) )
 		'' chop truncating toward 0
 		hFpuChangeRC( regname, "11" )
@@ -5750,7 +5771,7 @@ private sub _emitFLOOR( byval dvreg as IRVREG ptr )
 	if( hUse686FpuOps( ) ) then
 		hEmitFloat_Int_686(dvreg)
 	else
-		hEmitFloatFunc( 1 )
+		hEmitFloatFunc( FLOATFUNC_FLOOR )
 	end if
 end sub
 
@@ -5761,7 +5782,7 @@ private sub _emitFIX( byval dvreg as IRVREG ptr )
 	if( hUse686FpuOps( ) ) then
 		hEmitFloat_fix_686( dvreg )
 	else
-		hEmitFloatFunc( 2 )
+		hEmitFloatFunc( FLOATFUNC_FIX )
 	end if
 end sub
 
@@ -5769,7 +5790,7 @@ private sub _emitFRAC( byval dvreg as IRVREG ptr )
 
 	ASSERT_PROC_DECL( EMIT_UOPCB )
 
-	hEmitFloatFunc( 3 )
+	hEmitFloatFunc( FLOATFUNC_FRAC )
 end sub
 
 private sub _emitCONVFD2FS( byval dvreg as IRVREG ptr )
@@ -5948,6 +5969,12 @@ private sub _emitPUSHUDT( byval svreg as IRVREG ptr, byval sdsize as integer )
 
 	dim as string src, tmp32, tmp16
 	dim as integer ofs = any, tmpreg = any, istmpfree = any, remainder = any
+	const STACK_DWORD_BYTES = 4
+	const STACK_WORD_BYTES = 2
+	const BYTE_BITS = 8
+	const UDT_PUSH_THREE_BYTE_REMAINDER = 3
+	const UDT_PUSH_TWO_BYTE_REMAINDER = 2
+	const UDT_PUSH_ONE_BYTE_REMAINDER = 1
 
 	'' The UDT should be pushed byte-by-byte, it must end up in the same
 	'' order on stack as it is originally layed out in memory.
@@ -5976,7 +6003,7 @@ private sub _emitPUSHUDT( byval svreg as IRVREG ptr, byval sdsize as integer )
 
 	'' Push remainder (last 1/2/3 bytes of the struct, located in memory
 	'' at src + length - N)
-	remainder = sdsize and (4-1)
+	remainder = sdsize and (STACK_DWORD_BYTES - 1)
 	if( remainder > 0 ) then
 		'' Load into 4-byte reg first - it's not safe to assume
 		'' we can just use DWORD PTR instead of BYTE PTR or
@@ -5991,7 +6018,7 @@ private sub _emitPUSHUDT( byval svreg as IRVREG ptr, byval sdsize as integer )
 		end if
 
 		select case( remainder )
-		case 3
+		case UDT_PUSH_THREE_BYTE_REMAINDER
 			'' 3-byte remainder:
 			''        &h11 &h22 &h33
 			'' It's probably best to access them as &h2211 WORD
@@ -6001,19 +6028,19 @@ private sub _emitPUSHUDT( byval svreg as IRVREG ptr, byval sdsize as integer )
 
 			'' 1. load 3rd byte:
 			''        &h00000033 <- byte ptr [src + length - 1]
-			hPrepOperand( svreg, src, FB_DATATYPE_BYTE, sdsize - 1 )
+			hPrepOperand( svreg, src, FB_DATATYPE_BYTE, sdsize - UDT_PUSH_ONE_BYTE_REMAINDER )
 			outp( "movzx " + tmp32 + ", " + src )
 
 			'' 2. shl
 			''        &h00330000 <- &h00000033 shl 16
-			outp( "shl " + tmp32 + ", 16" )
+			outp( "shl " + tmp32 + ", " + str( STACK_WORD_BYTES * BYTE_BITS ) )
 
 			'' 3. load first two bytes into the lower 16 bits
 			''    of the register:
 			''        &h00002211 <- word ptr [src + length - 3]
 			''        &h00332211 <- &h00330000, &h00002211
 			tmp16 = *hGetRegName( FB_DATATYPE_SHORT, tmpreg )
-			hPrepOperand( svreg, src, FB_DATATYPE_SHORT, sdsize - 3 )
+			hPrepOperand( svreg, src, FB_DATATYPE_SHORT, sdsize - UDT_PUSH_THREE_BYTE_REMAINDER )
 			outp( "mov " + tmp16 + ", " + src )
 
 			'' 4. push
@@ -6021,18 +6048,18 @@ private sub _emitPUSHUDT( byval svreg as IRVREG ptr, byval sdsize as integer )
 			'' producing on stack:
 			''        &h11 &h22 &h33 &h00
 
-		case 2
+		case UDT_PUSH_TWO_BYTE_REMAINDER
 			'' mov tmp, word ptr [src + length - 2]
 			'' (zero-extending, because e.g. &hFFFF should become
 			'' &h0000FFFF, and not &hFFFFFFFF)
-			ofs = sdsize - 2
+			ofs = sdsize - STACK_WORD_BYTES
 			hPrepOperand( svreg, src, FB_DATATYPE_SHORT, ofs )
 			outp( "movzx " + tmp32 + ", " + src )
 
-		case 1
+		case UDT_PUSH_ONE_BYTE_REMAINDER
 			'' mov tmp, byte ptr [src + length - 1]
 			'' (zero-extending, ditto)
-			ofs = sdsize - 1
+			ofs = sdsize - UDT_PUSH_ONE_BYTE_REMAINDER
 			hPrepOperand( svreg, src, FB_DATATYPE_BYTE, ofs )
 			outp( "movzx " + tmp32 + ", " + src )
 
@@ -6051,11 +6078,11 @@ private sub _emitPUSHUDT( byval svreg as IRVREG ptr, byval sdsize as integer )
 
 	'' Push whole dwords, backwards (from high address to low address,
 	'' since the stack grows downwards)
-	ofs = sdsize - 4
+	ofs = sdsize - STACK_DWORD_BYTES
 	while( ofs >= 0 )
 		hPrepOperand( svreg, src, FB_DATATYPE_INTEGER, ofs )
 		outp( "push " + src )
-		ofs -= 4
+		ofs -= STACK_DWORD_BYTES
 	wend
 
 end sub
@@ -6278,6 +6305,9 @@ private sub hMemMoveRep _
 	dim as string ostr
 	dim as integer ecxfree, edifree, esifree
 	dim as integer ediinsrc, ecxinsrc
+	const DWORD_BYTES = 4
+	const WORD_BYTES = 2
+	const DWORD_REMAINDER_MASK = DWORD_BYTES - 1
 
 	hPrepOperand( dvreg, dst )
 	hPrepOperand( svreg, src )
@@ -6338,28 +6368,28 @@ private sub hMemMoveRep _
 		end if
 	end if
 
-	if( bytes > 4 ) then
-		ostr = "mov ecx, " + str( cunsg(bytes) \ 4 )
+	if( bytes > DWORD_BYTES ) then
+		ostr = "mov ecx, " + str( cunsg(bytes) \ DWORD_BYTES )
 		outp ostr
 		outp "rep movsd"
 
-	elseif( bytes = 4 ) then
+	elseif( bytes = DWORD_BYTES ) then
 		outp "mov ecx, [esi]"
 		outp "mov [edi], ecx"
-		if( (bytes and 3) > 0 ) then
-			outp "add esi, 4"
-			outp "add edi, 4"
+		if( (bytes and DWORD_REMAINDER_MASK) > 0 ) then
+			outp "add esi, " + str( DWORD_BYTES )
+			outp "add edi, " + str( DWORD_BYTES )
 		end if
 	end if
 
-		bytes and= 3
+	bytes and= DWORD_REMAINDER_MASK
 	if( bytes > 0 ) then
-		if( bytes >= 2 ) then
+		if( bytes >= WORD_BYTES ) then
 			outp "mov cx, [esi]"
 			outp "mov [edi], cx"
-			if( bytes = 3 ) then
-				outp "add esi, 2"
-				outp "add edi, 2"
+			if( bytes = DWORD_REMAINDER_MASK ) then
+				outp "add esi, " + str( WORD_BYTES )
+				outp "add edi, " + str( WORD_BYTES )
 			end if
 		end if
 
@@ -6488,6 +6518,9 @@ private sub hMemFillRepIMM _
 	dim as string dst
 	dim as string ostr
 	dim as integer eaxfree, ecxfree, edifree
+	const DWORD_BYTES = 4
+	const WORD_BYTES = 2
+	const DWORD_REMAINDER_MASK = DWORD_BYTES - 1
 
 	hPrepOperand( dvreg, dst )
 
@@ -6524,24 +6557,24 @@ private sub hMemFillRepIMM _
 		outp "mov eax, " + str(fillchar)
 	end if
 
-	if( bytes > 4 ) then
-		ostr = "mov ecx, " + str( bytes \ 4 )
+	if( bytes > DWORD_BYTES ) then
+		ostr = "mov ecx, " + str( bytes \ DWORD_BYTES )
 		outp ostr
 		outp "rep stosd"
 
-	elseif( bytes = 4 ) then
+	elseif( bytes = DWORD_BYTES ) then
 		outp "mov dword ptr [edi], eax"
-		if( (bytes and 3) > 0 ) then
-			outp "add edi, 4"
+		if( (bytes and DWORD_REMAINDER_MASK) > 0 ) then
+			outp "add edi, " + str( DWORD_BYTES )
 		end if
 	end if
 
-	bytes and= 3
+	bytes and= DWORD_REMAINDER_MASK
 	if( bytes > 0 ) then
-		if( bytes >= 2 ) then
+		if( bytes >= WORD_BYTES ) then
 			outp "mov word ptr [edi], ax"
-			if( bytes = 3 ) then
-				outp "add edi, 2"
+			if( bytes = DWORD_REMAINDER_MASK ) then
+				outp "add edi, " + str( WORD_BYTES )
 			end if
 		end if
 
@@ -6573,28 +6606,34 @@ private sub hMemFillBlkIMM _
 	dim as string dst
 	dim as integer i, ofs
 	dim as long fill1, fill2, fill4
+	const BYTE_BYTES = 1
+	const WORD_BYTES = BYTE_BYTES * 2
+	const DWORD_BYTES = WORD_BYTES * 2
+	const BYTE_VALUE_MASK = &hFF
+	const BYTE_BITS = 8
+	const WORD_BITS = BYTE_BITS * WORD_BYTES
 
-	fill1 = fillchar and 255
-	fill2 = (fill1 shl 8) or fill1
-	fill4  = (fill2 shl 16) or fill2
+	fill1 = fillchar and BYTE_VALUE_MASK
+	fill2 = (fill1 shl BYTE_BITS) or fill1
+	fill4  = (fill2 shl WORD_BITS) or fill2
 
 	ofs = 0
 	'' move dwords
-	for i = 1 to bytes \ 4
+	for i = BYTE_BYTES to bytes \ DWORD_BYTES
 		hPrepOperand( dvreg, dst, FB_DATATYPE_INTEGER, ofs )
 		hMOV( dst, str(fill4) )
-		ofs += 4
+		ofs += DWORD_BYTES
 	next
 
 	'' a word left?
-	if( (bytes and 2) <> 0 ) then
+	if( (bytes and WORD_BYTES) <> 0 ) then
 		hPrepOperand( dvreg, dst, FB_DATATYPE_SHORT, ofs )
 		hMOV( dst, str(fill2) )
-		ofs += 2
+		ofs += WORD_BYTES
 	end if
 
 	'' a byte left?
-	if( (bytes and 1) <> 0 ) then
+	if( (bytes and BYTE_BYTES) <> 0 ) then
 		hPrepOperand( dvreg, dst, FB_DATATYPE_BYTE, ofs )
 		hMOV( dst, str(fill1) )
 	end if
@@ -7382,6 +7421,8 @@ sub emitVARINIWSTR( byval s as zstring ptr )
 	ostr = ".ascii " + QUOTE
 	ostr += *s
 	for i as integer = 1 to typeGetSize( FB_DATATYPE_WCHAR )
+		'' A WCHAR terminator has a fixed target representation size.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL503
 		ostr += RSLASH + "0"
 	next
 	ostr += QUOTE + NEWLINE
@@ -7582,7 +7623,9 @@ private function _open _
 	) as integer
 
 	if( hFileExists( env.outf.name ) ) then
-		kill env.outf.name
+		if( kill( env.outf.name ) <> 0 ) then
+			return FALSE
+		end if
 	end if
 
 	env.outf.num = freefile
@@ -7788,6 +7831,8 @@ private sub _procAllocLocal _
 	)
 
 	dim as integer ofs = any, lgt = any
+	const STACK_ALIGNMENT = 4
+	const STACK_ALIGNMENT_MASK = STACK_ALIGNMENT - 1
 
 	'' Do not allocate stack space for fake dynamic array symbols; only the
 	'' corresponding descriptors will be emitted.
@@ -7802,7 +7847,7 @@ private sub _procAllocLocal _
 
 	lgt = symbGetRealSize( sym )
 
-	proc->proc.ext->stk.localofs += ((lgt + 3) and not 3)
+	proc->proc.ext->stk.localofs += ((lgt + STACK_ALIGNMENT_MASK) and not STACK_ALIGNMENT_MASK)
 
 	ofs = -proc->proc.ext->stk.localofs
 
@@ -7821,6 +7866,8 @@ private sub _procAllocArg _
 	)
 
 	dim as integer lgt = any
+	const STACK_ALIGNMENT = 4
+	const STACK_ALIGNMENT_MASK = STACK_ALIGNMENT - 1
 
 	assert( symbIsParamVar( sym ) )
 
@@ -7872,10 +7919,12 @@ private sub _procAllocArg _
 			param = symbGetParamNext( param )
 		wend
 
+	case else
+		'' Other conventions do not pass this argument in a register.
 	end select
 
 	sym->ofs = proc->proc.ext->stk.argofs
-	proc->proc.ext->stk.argofs += ((lgt + 3) and not 3)
+	proc->proc.ext->stk.argofs += ((lgt + STACK_ALIGNMENT_MASK) and not STACK_ALIGNMENT_MASK)
 
 end sub
 
@@ -8035,6 +8084,9 @@ private function _getSectionString _
 	) as const zstring ptr
 
 	static as string ostr
+	const CTOR_DTOR_PRIORITY_MAX = 65535
+	const CTOR_DTOR_PRIORITY_WIDTH = 5
+	const CTOR_DTOR_PRIORITY_PADDING = "00000"
 
 	if( (section = emit.lastsection) and (priority = emit.lastpriority) ) then
 		return NULL
@@ -8093,7 +8145,7 @@ private function _getSectionString _
 		else
 			ostr += "ctors"
 			if( priority > 0 ) then
-				ostr += "." + right( "00000" + str( 65535 - priority ), 5 )
+				ostr += "." + right( CTOR_DTOR_PRIORITY_PADDING + str( CTOR_DTOR_PRIORITY_MAX - priority ), CTOR_DTOR_PRIORITY_WIDTH )
 			end if
 			if( (env.clopt.target = FB_COMPTARGET_LINUX) or _
 			    (env.clopt.target = FB_COMPTARGET_HAIKU) ) then
@@ -8108,7 +8160,7 @@ private function _getSectionString _
 		else
 			ostr += "dtors"
 			if( priority > 0 ) then
-				ostr += "." + right( "00000" + str( 65535 - priority ), 5 )
+				ostr += "." + right( CTOR_DTOR_PRIORITY_PADDING + str( CTOR_DTOR_PRIORITY_MAX - priority ), CTOR_DTOR_PRIORITY_WIDTH )
 			end if
 			if( (env.clopt.target = FB_COMPTARGET_LINUX) or _
 			    (env.clopt.target = FB_COMPTARGET_HAIKU) ) then

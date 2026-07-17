@@ -116,7 +116,6 @@ end sub
 '' Pragma           =   PRAGMA RESERVE ( '(' (ASM|EXTERN)?  ')' )? symbol
 ''
 private sub pragmaReserve( )
-	dim as FBSYMCHAIN ptr chain_ = any
 	dim as FBSYMBOL ptr base_parent = any, sym = any
 	'' dim as FB_SYMBATTRIB attrib = FB_SYMBATTRIB_NONE
 	dim as zstring ptr id = any
@@ -201,7 +200,7 @@ private sub pragmaReserve( )
 		end if
 	end if
 
-	chain_ = cIdentifier( base_parent, FB_IDOPT_NONE )
+	cIdentifier( base_parent, FB_IDOPT_NONE )
 	id = lexGetText( )
 
 	if( hIsValidSymbolName( id ) = FALSE ) then

@@ -1,6 +1,6 @@
 ''
 '' Loads mydll at runtime, calls a mydll's function and prints the result
-'' 
+''
 '' compile as: fbc dylib.bas
 '' (mydll must be compiled first)
 ''

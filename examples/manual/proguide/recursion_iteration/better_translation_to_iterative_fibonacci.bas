@@ -15,4 +15,4 @@ Function betterTranslationToIterativeFibonacci (ByVal n As UInteger) As LongInt
 	Wend
 	Return b * n
 End Function
-			
+

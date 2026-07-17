@@ -68,6 +68,200 @@ private function hWstrLiteralConcat _
 end function
 
 '':::::
+private sub hStrLiteralUnescape _
+	( _
+		byval text as zstring ptr, _
+		byref dst as DZSTRING, _
+		byref lgt as integer _
+	)
+
+	dim as const ubyte ptr src = cast( const ubyte ptr, hUnescape( text, lgt ) )
+
+	DZstrAllocate( dst, lgt )
+	if( lgt > 0 ) then
+		for i as integer = 0 to lgt - 1
+			dst.data[i] = src[i]
+		next
+		dst.data[lgt] = 0
+	end if
+end sub
+
+'':::::
+private function hStrLiteralIsAscii _
+	( _
+		byval text as zstring ptr _
+	) as integer
+
+	static as DZSTRING decoded
+	dim as integer textlen
+
+	hStrLiteralUnescape( text, decoded, textlen )
+
+	for i as integer = 0 to textlen - 1
+		if( cast( ubyte, decoded.data[i] ) > &h7F ) then
+			exit function
+		end if
+	next
+
+	function = TRUE
+end function
+
+'':::::
+private function hWstrLiteralCanFoldCompare _
+	( _
+		byval n as ASTNODE ptr _
+	) as integer
+
+	dim as FBSYMBOL ptr s = astGetSymbol( n )
+
+	if( symbGetType( s ) = FB_DATATYPE_WCHAR ) then
+		return TRUE
+	end if
+
+	function = hStrLiteralIsAscii( symbGetVarLitText( s ) )
+end function
+
+'':::::
+private function hStrLiteralCmp _
+	( _
+		byval ltext as const zstring ptr, _
+		byval lgt as integer, _
+		byval rtext as const zstring ptr, _
+		byval rgt as integer _
+	) as integer
+
+	dim as const ubyte ptr l = cast( const ubyte ptr, ltext )
+	dim as const ubyte ptr r = cast( const ubyte ptr, rtext )
+	dim as integer cmplgt = any
+
+	if( lgt < rgt ) then
+		cmplgt = lgt
+	else
+		cmplgt = rgt
+	end if
+
+	for i as integer = 0 to cmplgt - 1
+		if( l[i] < r[i] ) then
+			return -1
+		elseif( l[i] > r[i] ) then
+			return 1
+		end if
+	next
+
+	if( lgt < rgt ) then
+		return -1
+	elseif( lgt > rgt ) then
+		return 1
+	end if
+
+	function = 0
+end function
+
+'':::::
+private sub hWstrLiteralUnescape _
+	( _
+		byval text as wstring ptr, _
+		byref dst as DWSTRING, _
+		byref lgt as integer _
+	)
+
+	dim as wstring ptr src = hUnescapeW( text, lgt )
+
+	DWstrAllocate( dst, lgt )
+	if( lgt > 0 ) then
+		for i as integer = 0 to lgt - 1
+			dst.data[i] = src[i]
+		next
+		dst.data[lgt] = 0
+	end if
+end sub
+
+'':::::
+private sub hWstrLiteralUnescapeA _
+	( _
+		byval text as zstring ptr, _
+		byref dst as DWSTRING, _
+		byref lgt as integer _
+	)
+
+	static as DZSTRING textz
+	static as DWSTRING textw
+	dim as integer textlen, first, i
+
+	hStrLiteralUnescape( text, textz, textlen )
+	if( textlen = 0 ) then
+		DWstrAllocate( dst, 0 )
+		lgt = 0
+		exit sub
+	end if
+
+	'' A converted character sequence cannot use more wide characters than
+	'' the source used bytes.  Convert each NUL-terminated segment separately
+	'' so embedded NUL characters are retained in the literal text.
+	DWstrAllocate( dst, textlen )
+	lgt = 0
+	first = 0
+	do
+		i = first
+		while( (i < textlen) andalso (textz.data[i] <> 0) )
+			i += 1
+		wend
+
+		DWstrAssignA( textw, @textz.data[first] )
+		if( textw.data <> NULL ) then
+			for j as integer = 0 to len( *textw.data ) - 1
+				dst.data[lgt] = textw.data[j]
+				lgt += 1
+			next
+		end if
+
+		if( i = textlen ) then
+			exit do
+		end if
+
+		dst.data[lgt] = 0
+		lgt += 1
+		first = i + 1
+	loop
+
+	dst.data[lgt] = 0
+end sub
+
+'':::::
+private function hWstrLiteralCmp _
+	( _
+		byval ltext as const wstring ptr, _
+		byval lgt as integer, _
+		byval rtext as const wstring ptr, _
+		byval rgt as integer _
+	) as integer
+
+	dim as integer cmplgt = any
+
+	if( lgt < rgt ) then
+		cmplgt = lgt
+	else
+		cmplgt = rgt
+	end if
+
+	for i as integer = 0 to cmplgt - 1
+		if( ltext[i] < rtext[i] ) then
+			return -1
+		elseif( ltext[i] > rtext[i] ) then
+			return 1
+		end if
+	next
+
+	if( lgt < rgt ) then
+		return -1
+	elseif( lgt > rgt ) then
+		return 1
+	end if
+
+	function = 0
+end function
+
+'':::::
 private function hStrLiteralCompare _
 	( _
 		byval op as integer, _
@@ -76,27 +270,26 @@ private function hStrLiteralCompare _
 	) as ASTNODE ptr
 
 	static as DZSTRING ltext, rtext
-	dim as integer res = any
+	dim as integer lgt, rgt, res
 
-	'' !!!FIXME!!! - embedded NUL CHARs incorrectly end the string
-	'' !!!TODO!!! - use textlen returned from hUnescape() to get proper comparison length
+	hStrLiteralUnescape( symbGetVarLitText( astGetSymbol( l ) ), ltext, lgt )
+	hStrLiteralUnescape( symbGetVarLitText( astGetSymbol( r ) ), rtext, rgt )
 
-	DZstrAssign( ltext, hUnescape( symbGetVarLitText( astGetSymbol( l ) ) ) )
-	DZstrAssign( rtext, hUnescape( symbGetVarLitText( astGetSymbol( r ) ) ) )
+	res = hStrLiteralCmp( ltext.data, lgt, rtext.data, rgt )
 
 	select case as const op
 	case AST_OP_EQ
-		res = (*ltext.data = *rtext.data)
+		res = (res = 0)
 	case AST_OP_GT
-		res = (*ltext.data > *rtext.data)
+		res = (res > 0)
 	case AST_OP_LT
-		res = (*ltext.data < *rtext.data)
+		res = (res < 0)
 	case AST_OP_NE
-		res = (*ltext.data <> *rtext.data)
+		res = (res <> 0)
 	case AST_OP_LE
-		res = (*ltext.data <= *rtext.data)
+		res = (res <= 0)
 	case AST_OP_GE
-		res = (*ltext.data >= *rtext.data)
+		res = (res >= 0)
 	end select
 
 	function = astNewCONSTi( res )
@@ -115,77 +308,42 @@ private function hWStrLiteralCompare _
 	) as ASTNODE ptr
 
 	dim as FBSYMBOL ptr ls = any, rs = any
-	static as DZSTRING textz
 	static as DWSTRING ltextw, rtextw
-	dim as integer res = any
+	dim as integer lgt, rgt, res
 
 	ls = astGetSymbol( l )
 	rs = astGetSymbol( r )
 
-	'' !!!FIXME!!! - embedded NUL CHARs incorrectly end the string
-	'' !!!TODO!!! - use textlen returned from hUnescape[W]() to get proper comparison length
-
 	'' left operand not a wstring?
 	if( symbGetType( ls ) <> FB_DATATYPE_WCHAR ) then
-		DZstrAssign( textz, hUnescape( symbGetVarLitText( ls ) ) )
-		DWstrAssign( rtextw, hUnescapeW( symbGetVarLitTextW( rs ) ) )
-
-		select case as const op
-		case AST_OP_EQ
-			res = (*textz.data = *rtextw.data)
-		case AST_OP_GT
-			res = (*textz.data > *rtextw.data)
-		case AST_OP_LT
-			res = (*textz.data < *rtextw.data)
-		case AST_OP_NE
-			res = (*textz.data <> *rtextw.data)
-		case AST_OP_LE
-			res = (*textz.data <= *rtextw.data)
-		case AST_OP_GE
-			res = (*textz.data >= *rtextw.data)
-		end select
-
-	'' right operand?
-	elseif( symbGetType( rs ) <> FB_DATATYPE_WCHAR ) then
-		DWstrAssign( ltextw, hUnescapeW( symbGetVarLitTextW( ls ) ) )
-		DZstrAssign( textz, hUnescape( symbGetVarLitText( rs ) ) )
-
-		select case as const op
-		case AST_OP_EQ
-			res = (*ltextw.data = *textz.data)
-		case AST_OP_GT
-			res = (*ltextw.data > *textz.data)
-		case AST_OP_LT
-			res = (*ltextw.data < *textz.data)
-		case AST_OP_NE
-			res = (*ltextw.data <> *textz.data)
-		case AST_OP_LE
-			res = (*ltextw.data <= *textz.data)
-		case AST_OP_GE
-			res = (*ltextw.data >= *textz.data)
-		end select
-
-	'' both wstrings..
+		hWstrLiteralUnescapeA( symbGetVarLitText( ls ), ltextw, lgt )
 	else
-		DWstrAssign( ltextw, hUnescapeW( symbGetVarLitTextW( ls ) ) )
-		DWstrAssign( rtextw, hUnescapeW( symbGetVarLitTextW( rs ) ) )
-
-		select case as const op
-		case AST_OP_EQ
-			res = (*ltextw.data = *rtextw.data)
-		case AST_OP_GT
-			res = (*ltextw.data > *rtextw.data)
-		case AST_OP_LT
-			res = (*ltextw.data < *rtextw.data)
-		case AST_OP_NE
-			res = (*ltextw.data <> *rtextw.data)
-		case AST_OP_LE
-			res = (*ltextw.data <= *rtextw.data)
-		case AST_OP_GE
-			res = (*ltextw.data >= *rtextw.data)
-		end select
-
+		hWstrLiteralUnescape( symbGetVarLitTextW( ls ), ltextw, lgt )
 	end if
+
+	'' right operand not a wstring?
+	if( symbGetType( rs ) <> FB_DATATYPE_WCHAR ) then
+		hWstrLiteralUnescapeA( symbGetVarLitText( rs ), rtextw, rgt )
+	else
+		hWstrLiteralUnescape( symbGetVarLitTextW( rs ), rtextw, rgt )
+	end if
+
+	res = hWstrLiteralCmp( ltextw.data, lgt, rtextw.data, rgt )
+
+	select case as const op
+	case AST_OP_EQ
+		res = (res = 0)
+	case AST_OP_GT
+		res = (res > 0)
+	case AST_OP_LT
+		res = (res < 0)
+	case AST_OP_NE
+		res = (res <> 0)
+	case AST_OP_LE
+		res = (res <= 0)
+	case AST_OP_GE
+		res = (res >= 0)
+	end select
 
 	function = astNewCONSTi( res )
 
@@ -1009,7 +1167,8 @@ function astNewBOP _
 				'' both literals?
 				if( litsym <> NULL ) then
 					if( (typeGetDtAndPtrOnly( ldtype ) = typeGetDtAndPtrOnly( rdtype )) or _
-					    fbTargetCanFoldStrLitToWstr( FALSE ) ) then
+					    fbTargetCanFoldStrLitToWstr( FALSE ) or _
+					    (hWstrLiteralCanFoldCompare( l ) and hWstrLiteralCanFoldCompare( r )) ) then
 						return hWstrLiteralCompare( op, l, r )
 					end if
 				end if

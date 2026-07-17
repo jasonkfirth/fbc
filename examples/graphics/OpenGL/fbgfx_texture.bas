@@ -134,7 +134,7 @@ SUB Init_GL_SCREEN()
 
 	'get info of current screen
 	screeninfo w, h
-	
+
     'Set OpenGL ViewPort to screen dimensions
     'using screen info w and h as params
 	glViewport 0, 0, w, h
@@ -337,7 +337,7 @@ End Sub
 
 
 
-							 
+
 function load_texture(byref image_file as string, byval w as integer, byval h as integer) as GLuint
 	dim image(w * h * 2 + 4) as ushort   ' set up a big enough array for our image
 	bload image_file, @image(0)			 'load it

@@ -54,9 +54,9 @@ private function LoadBMP(byref Filename as string) as BITMAP_RGBImageRec ptr
   dim pbmpdata as BITMAP_RGBImageRec ptr
   dim f as integer
   f = freefile
-  
+
   if (open (Filename, for binary, as #f) = 0) then             '' Does The File Exist?
-  
+
     get #f, , bitmapfileheader
     if bitmapfileheader.bfType <> BITMAP_ID then
       close #f

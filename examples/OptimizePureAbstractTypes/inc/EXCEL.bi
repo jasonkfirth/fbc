@@ -397,7 +397,7 @@ Namespace Excel
 	Const IID_ModelFormatScientificNumber = "{000244F4-0000-0000-C000-000000000046}"
 	Const IID_ModelFormatCurrency = "{000244F5-0000-0000-C000-000000000046}"
 	Const IID_ModelFormatBoolean = "{000244F6-0000-0000-C000-000000000046}"
-	
+
 
 	Enum Constants
 		xlAll = -4104

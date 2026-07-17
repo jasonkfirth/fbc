@@ -13,4 +13,4 @@ Function tailRecursiveReverse (ByVal s As String, ByVal cumul As String = "") As
 		Return tailRecursiveReverse(Mid(s, 2), Left(s, 1) & cumul)  '' tail recursive call
 	End If
 End Function
-		
+

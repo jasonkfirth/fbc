@@ -12,8 +12,8 @@ Type sample
 
   Declare Constructor ()
   Declare Constructor ( a As Integer )
-  Declare Constructor ( a As Single  ) 
-  Declare Constructor ( a As String, b As Byte ) 
+  Declare Constructor ( a As Single  )
+  Declare Constructor ( a As String, b As Byte )
 
   Declare Operator Cast () As String
 

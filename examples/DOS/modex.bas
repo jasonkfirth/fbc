@@ -71,15 +71,15 @@ loop until i = 0
 
 
 Do While Len(InKey) = 0
-	
+
 	__dpmi_yield
-	
+
 	For i = @buffer(0) To @buffer(320 * 240 - 1)
 		Poke i, Int(Rnd * 256)
 	Next i
-	
+
 	linear_to_modex(@buffer(0))
-	
+
 Loop
 
 ' set a standard text mode

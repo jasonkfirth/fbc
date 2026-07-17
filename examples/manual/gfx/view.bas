@@ -27,14 +27,14 @@ Do
 
   x = 100*Sin(Timer*2.0)+50
   y = 100*Sin(Timer*2.7)+50
-  
+
   ScreenSync
   ScreenLock
-  
+
   'clear viewport and put image
   Cls 1
   Put (x, y), ip, PSet
-	
+
   ScreenUnlock
 
 Loop While Inkey = ""

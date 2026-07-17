@@ -244,7 +244,7 @@ function initMultitexture() as integer
 		glfwExtensionSupported("GL_EXT_texture_env_combine") = GL_TRUE) then  '' Is texture_env_combining Supported?
 
 		glGetIntegerv(GL_MAX_TEXTURE_UNITS_ARB,@maxTexelUnits)
-		
+
 		'' Set addresses of functions we will use
 		glMultiTexCoord1fARB = cast( PFNGLMULTITEXCOORD1FARBPROC, glfwGetProcAddress( "glMultiTexCoord1fARB" ) )
 		glMultiTexCoord2fARB = cast( PFNGLMULTITEXCOORD2FARBPROC, glfwGetProcAddress( "glMultiTexCoord2fARB" ) )
@@ -252,11 +252,11 @@ function initMultitexture() as integer
 		glMultiTexCoord4fARB = cast( PFNGLMULTITEXCOORD4FARBPROC, glfwGetProcAddress( "glMultiTexCoord4fARB" ) )
 		glActiveTextureARB   = cast( PFNGLACTIVETEXTUREARBPROC, glfwGetProcAddress( "glActiveTextureARB" ) )
 		glClientActiveTextureARB = cast( PFNGLCLIENTACTIVETEXTUREARBPROC, glfwGetProcAddress( "glClientActiveTextureARB" ) )
-		
+
 		#if EXT_INFO
 		MessageBox(0,"The GL_ARB_multitexture extension will be used.","feature supported!",MB_OK or MB_ICONINFORMATION)
 		#endif
-		
+
 		return true
 	end if
 	useMultitexture=false                                      '' We Can't Use It If It Isn't Supported!

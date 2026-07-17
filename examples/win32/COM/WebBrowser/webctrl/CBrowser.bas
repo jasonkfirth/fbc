@@ -18,16 +18,16 @@ constructor CBrowser _
 	( _
 		byval hwnd as HWND, _
 		byval ismozilla as integer _
-	) 
+	)
 
 	ctx = new CBrowserCtx
-	
+
 	ctx->client = CClientSite_New( NULL, hwnd )
 	ctx->hwnd = hwnd
 	ctx->ismozilla = ismozilla
 	ctx->browserclass = NULL
 	ctx->browser = NULL
-	
+
 end constructor
 
 ''::::
@@ -37,9 +37,9 @@ destructor CBrowser _
 	)
 
 	remove( )
-	
+
 	CClientSite_Delete( ctx->client, FALSE )
-	
+
 	delete ctx
 
 end destructor
@@ -57,15 +57,15 @@ function CBrowser.insert _
 
 	dim as LPCLASSFACTORY classFactory = NULL
 	dim as RECT rect
-	
+
 	function = FALSE
-	
+
 	if( CoGetClassObject( iif( ctx->ismozilla, @CLSID_MozillaBrowser, @CLSID_WebBrowser ), _
 						  CLSCTX_INPROC_SERVER or CLSCTX_INPROC_HANDLER, _
 						  NULL, _
 						  @IID_IClassFactory, _
 						  cast( PVOID ptr, @classFactory ) ) <> S_OK ) then
-	
+
 		exit function
 	end if
 
@@ -73,25 +73,25 @@ function CBrowser.insert _
 											  0, _
 											  @IID_IOleObject, _
 											  cast( PVOID ptr, @ctx->browserclass ) ) <> S_OK ) then
-		
-		ctx->browserclass = NULL		
+
+		ctx->browserclass = NULL
 	end if
-		
+
 	classFactory->lpVtbl->Release( classFactory )
-	
+
 	if( ctx->browserclass = NULL ) then
 		exit function
 	end if
-	
+
 	if( CClientSite_SetObject( ctx->client, ctx->browserclass ) = FALSE ) then
 		remove( )
 		exit function
 	end if
-	
+
 	ctx->browserclass->lpVtbl->SetHostNames( ctx->browserclass, "fb_webctrl", NULL )
 
 	GetClientRect( ctx->hwnd, @rect )
-		
+
 	if( ctx->browserclass->lpVtbl->DoVerb( ctx->browserclass, _
 											 OLEIVERB_INPLACEACTIVATE, _
 											 NULL, _
@@ -101,20 +101,20 @@ function CBrowser.insert _
 											 @rect ) <> S_OK ) then
 		exit function
 	end if
-	
+
 	if( ctx->browserclass->lpVtbl->QueryInterface( ctx->browserclass, _
 												  	 @IID_IWebBrowser2, _
 													 cast( PVOID ptr, @ctx->browser ) ) <> S_OK ) then
 		exit function
 	end if
-			
+
 	if( ctx->ismozilla = FALSE ) then
 		ctx->browser->lpVtbl->put_Left( ctx->browser, rect.left )
 		ctx->browser->lpVtbl->put_Top( ctx->browser, rect.top )
 		ctx->browser->lpVtbl->put_Width( ctx->browser, rect.right )
 		ctx->browser->lpVtbl->put_Height( ctx->browser, rect.bottom )
 	end if
-		
+
 	function = TRUE
 
 end function
@@ -126,7 +126,7 @@ function CBrowser.remove _
 	) as BOOL
 
 	function = FALSE
-	
+
 	if( ctx->browserclass = NULL ) then
 		return TRUE
 	end if
@@ -138,9 +138,9 @@ function CBrowser.remove _
 
 	ctx->browserclass->lpVtbl->Close( ctx->browserclass, OLECLOSE_NOSAVE )
 	ctx->browserclass->lpVtbl->Release( ctx->browserclass )
-	
+
 	ctx->browserclass = NULL
-	
+
 	function = TRUE
 
 end function
@@ -164,7 +164,7 @@ private sub hPixelToMetric _
 
 	dst->cx = MAP_PIX_TO_LOGHIM( src->cx, x )
 	dst->cy = MAP_PIX_TO_LOGHIM( src->cy, y )
-	
+
 end sub
 
 ''::::
@@ -179,13 +179,13 @@ function CBrowser.resize _
 	if( ctx->browserclass = NULL ) then
 		exit function
 	end if
-	
+
 	dim as SIZEL pxSize, hmSize = ( width_, height )
 	hPixelToMetric( @pxSize, @hmSize )
 	ctx->browserclass->lpVtbl->SetExtent( ctx->browserclass, _
 											DVASPECT_CONTENT, _
 											@hmSize )
-	
+
 	dim as RECT rect = (0, 0, width_, height )
 	ctx->client->site.inplaceobj->lpVtbl->SetObjectRects( ctx->client->site.inplaceobj, _
 															@rect, _
@@ -195,7 +195,7 @@ function CBrowser.resize _
 		ctx->browser->lpVtbl->put_Width( ctx->browser, width_ )
 		ctx->browser->lpVtbl->put_Height( ctx->browser, height )
 	end if
-	
+
 	function = TRUE
 
 end function
@@ -209,13 +209,13 @@ function CBrowser.setFocus _
 	dim as RECT rect
 
 	function = FALSE
-	
+
 	if( ctx->browserclass = NULL ) then
 		exit function
 	end if
 
 	GetClientRect( ctx->hwnd, @rect )
-	
+
 	ctx->browserclass->lpVtbl->DoVerb( ctx->browserclass, _
 										 OLEIVERB_UIACTIVATE, _
 										 NULL, _
@@ -238,23 +238,23 @@ function CBrowser.navigate _
 	dim as VARIANT vURL, vTarget
 
 	function = FALSE
-	
+
 	if( ctx->browserclass = NULL ) then
 		exit function
 	end if
-	
+
 	if( url <> NULL ) then
 		VariantInit( @vURL )
 		vURL.vt = VT_BSTR
 		vURL.bstrVal = SysAllocString( url )
 	end if
-	
+
 	if( target <> NULL ) then
 		VariantInit( @vTarget )
 		vTarget.vt = VT_BSTR
 		vTarget.bstrVal = SysAllocString( target )
 	end if
-	
+
 	if( vURL.bstrVal <> NULL ) then
 		function = (ctx->browser->lpVtbl->Navigate2( ctx->browser, _
 												 	   iif( url <> NULL, @vURL, NULL ), _
@@ -284,20 +284,20 @@ function CBrowser.render _
 	dim as BOOL res
 
 	function = FALSE
-	
+
 	if( ctx->browserclass = NULL ) then
 		exit function
 	end if
-	
+
 	res = TRUE
 
 	if( ctx->browser->lpVtbl->get_Document( ctx->browser, @doc ) <> S_OK ) then
 		return FALSE
 	end if
-		
+
 	if( doc = NULL ) then
 		navigate( "about:blank", NULL )
-			
+
 		if( ctx->browser->lpVtbl->get_Document( ctx->browser, @doc ) <> S_OK ) then
 			return FALSE
 		end if
@@ -307,7 +307,7 @@ function CBrowser.render _
 		if( doc->lpVtbl->QueryInterface( doc, _
 										 @IID_IHTMLDocument2, _
 										 cast( PVOID ptr, @htmldoc2 ) ) = S_OK ) then
-		
+
 			dim as SAFEARRAY ptr arraydesc
 			dim as VARIANT ptr arraydata
 
@@ -317,36 +317,36 @@ function CBrowser.render _
 				if( SafeArrayAccessData( arraydesc, cast( PVOID ptr, @arraydata ) ) = S_OK ) then
 					arraydata[0].vt = VT_BSTR
 					arraydata[0].bstrVal = SysAllocString( text )
-					
+
 					htmlDoc2->lpVtbl->write( htmlDoc2, arraydesc )
 					htmlDoc2->lpVtbl->close( htmlDoc2 )
-				
+
 					SafeArrayUnaccessData( arraydesc )
-				
+
 				else
 					res = FALSE
 				end if
-			
+
 				SafeArrayDestroy( arraydesc )
 
 			else
 				res = FALSE
 			end if
-			
+
 			htmldoc2->lpVtbl->Release( htmldoc2 )
-		
+
 		else
 			res = FALSE
 		end if
-		
+
 		doc->lpVtbl->Release( doc )
-	
+
 	else
 		res = FALSE
 	end if
-	
+
 	function = res
-	
+
 end function
 
 ''::::
@@ -356,13 +356,13 @@ function CBrowser.goBack _
 	) as BOOL
 
 	function = FALSE
-	
+
 	if( ctx->browserclass = NULL ) then
 		exit function
 	end if
-	
+
 	function = ctx->browser->lpVtbl->GoBack( ctx->browser ) = S_OK
-	
+
 end function
 
 ''::::
@@ -372,13 +372,13 @@ function CBrowser.goForward _
 	) as BOOL
 
 	function = FALSE
-	
+
 	if( ctx->browserclass = NULL ) then
 		exit function
 	end if
-	
+
 	function = ctx->browser->lpVtbl->GoForward( ctx->browser ) = S_OK
-	
+
 end function
 
 ''::::
@@ -388,13 +388,13 @@ function CBrowser.refresh _
 	) as BOOL
 
 	function = FALSE
-	
+
 	if( ctx->browserclass = NULL ) then
 		exit function
 	end if
-	
+
 	function = ctx->browser->lpVtbl->Refresh( ctx->browser ) = S_OK
-	
+
 end function
 
 ''::::
@@ -404,11 +404,11 @@ function CBrowser.stop _
 	) as BOOL
 
 	function = FALSE
-	
+
 	if( ctx->browserclass = NULL ) then
 		exit function
 	end if
-	
+
 	function = ctx->browser->lpVtbl->Stop( ctx->browser ) = S_OK
-	
+
 end function

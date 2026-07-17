@@ -12,7 +12,7 @@ Type UDT
 	Declare Operator Let (ByRef rhs As UDT)              ''operator Let (assignment)
 	Declare Function getString () As String              ''function to get string
 	Declare Destructor ()                                ''destructor
-  Private:         
+  Private:
 	Dim zp As ZString Ptr                                ''private pointer to avoid direct access
 End Type
 

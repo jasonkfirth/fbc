@@ -12,6 +12,6 @@ Sub foo
  Assert(a=1)
 End Sub
 
-foo 
+foo
 
-'' If -g or -eassert is used, this code stops with: test.bas(3): assertion failed at FOO: a=1 
+'' If -g or -eassert is used, this code stops with: test.bas(3): assertion failed at FOO: a=1

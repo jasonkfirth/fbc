@@ -1,7 +1,8 @@
 #ifndef __REG_BI__
 #define __REG_BI__
 
-'' TODO: x86 specific
+'' The x86 emitter's general-purpose and floating-point register classes
+'' cannot contain more than the eight architectural register slots.
 const REG_MAXREGS   = 8
 
 type REG_FREETB     as integer

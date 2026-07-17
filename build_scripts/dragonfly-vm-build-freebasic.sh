@@ -16,7 +16,7 @@
 #   * attach a writable work disk for packages, source, and build output
 #   * build the DragonFly package with build_scripts/dragonfly-build-freebasic.sh
 #   * install the package in a fresh live VM snapshot
-#   * run console, gfxlib, sfxlib, and fbctests checks
+#   * run binding, console, gfxlib, sfxlib, fbctests, and Exampleageddon checks
 #   * capture QEMU audio output and verify that it is not silent
 #
 # This script intentionally does NOT contain:
@@ -48,10 +48,15 @@ TEST_ONLY=0
 JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
 CPUS="$JOBS"
 FBCTESTS_JOBS="$JOBS"
+EXAMPLEAGEDDON_JOBS="$JOBS"
+EXAMPLEAGEDDON_COMPILE_TIMEOUT="120"
+EXAMPLEAGEDDON_RUN_TIMEOUT="10"
 MEMORY="6144"
 WORK_DISK_SIZE="32G"
 HTTP_PORT=""
 KEEP_VM=0
+QEMU_ACCEL="${QEMU_ACCEL:-kvm}"
+QEMU_CPU="${QEMU_CPU:-host}"
 
 DEFAULT_IMAGE_URL="https://mirror-master.dragonflybsd.org/iso-images/dfly-x86_64-${RELEASE}_REL.img.bz2"
 
@@ -74,6 +79,12 @@ Options:
   --jobs N               Build jobs inside DragonFly. Default: host CPU count
   --cpus N               QEMU CPU count. Default: --jobs value
   --fbctests-jobs N      fbctests unit-test jobs. Default: --jobs value
+  --exampleageddon-jobs N
+                         Exampleageddon jobs. Default: --jobs value
+  --exampleageddon-compile-timeout N
+                         Per-example compile timeout. Default: 120
+  --exampleageddon-run-timeout N
+                         Per-example run timeout. Default: 10
   --memory MB            QEMU memory in MB. Default: 6144
   --work-disk-size SIZE  Per-VM writable work disk size. Default: 32G
   --http-port N          Host bootstrap HTTP port. Default: auto
@@ -106,9 +117,12 @@ while [ "$#" -gt 0 ]; do
 			shift 2
 			;;
 		--archive-dir) ARCHIVE_DIR="$2"; shift 2 ;;
-		--jobs) JOBS="$2"; CPUS="$2"; FBCTESTS_JOBS="$2"; shift 2 ;;
+		--jobs) JOBS="$2"; CPUS="$2"; FBCTESTS_JOBS="$2"; EXAMPLEAGEDDON_JOBS="$2"; shift 2 ;;
 		--cpus) CPUS="$2"; shift 2 ;;
 		--fbctests-jobs) FBCTESTS_JOBS="$2"; shift 2 ;;
+		--exampleageddon-jobs) EXAMPLEAGEDDON_JOBS="$2"; shift 2 ;;
+		--exampleageddon-compile-timeout) EXAMPLEAGEDDON_COMPILE_TIMEOUT="$2"; shift 2 ;;
+		--exampleageddon-run-timeout) EXAMPLEAGEDDON_RUN_TIMEOUT="$2"; shift 2 ;;
 		--memory) MEMORY="$2"; shift 2 ;;
 		--work-disk-size) WORK_DISK_SIZE="$2"; shift 2 ;;
 		--http-port) HTTP_PORT="$2"; shift 2 ;;
@@ -121,6 +135,9 @@ done
 case "$JOBS" in ''|*[!0-9]*|0) die "--jobs must be a positive integer" ;; esac
 case "$CPUS" in ''|*[!0-9]*|0) die "--cpus must be a positive integer" ;; esac
 case "$FBCTESTS_JOBS" in ''|*[!0-9]*|0) die "--fbctests-jobs must be a positive integer" ;; esac
+case "$EXAMPLEAGEDDON_JOBS" in ''|*[!0-9]*|0) die "--exampleageddon-jobs must be a positive integer" ;; esac
+case "$EXAMPLEAGEDDON_COMPILE_TIMEOUT" in ''|*[!0-9]*|0) die "--exampleageddon-compile-timeout must be a positive integer" ;; esac
+case "$EXAMPLEAGEDDON_RUN_TIMEOUT" in ''|*[!0-9]*|0) die "--exampleageddon-run-timeout must be a positive integer" ;; esac
 
 if [ "$TEST_ONLY" -eq 1 ] && [ -z "$PACKAGE_FILE" ]; then
 	die "--test-only requires --package"
@@ -163,6 +180,15 @@ check_host_tools() {
 	python3 - <<'PY'
 import pexpect
 PY
+}
+
+configure_qemu_acceleration() {
+	if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
+		QEMU_ACCEL="tcg"
+		QEMU_CPU="max"
+	fi
+
+	msg "QEMU acceleration: $QEMU_ACCEL (CPU: $QEMU_CPU)"
 }
 
 resolve_package_file() {
@@ -218,7 +244,12 @@ make_source_archive() {
 	tar -czf "$SERVE_DIR/freebasic-source.tar.gz" \
 		--exclude='./.git' \
 		--exclude='./out' \
+		--exclude='./build' \
 		--exclude='./.build*' \
+		--exclude='./OMA' \
+		--exclude='./OMA_old' \
+		--exclude='./remote_probe_temp' \
+		--exclude='./nuttx-suite-logs' \
 		--exclude='./package-root' \
 		--exclude='./bin/fbc*' \
 		--exclude='./bootstrap/fbc*' \
@@ -308,6 +339,8 @@ qemu_args() {
 
 	printf '%s\n' \
 		qemu-system-x86_64 \
+		-accel "$QEMU_ACCEL" \
+		-cpu "$QEMU_CPU" \
 		-m "$MEMORY" \
 		-smp "$CPUS" \
 		-drive "file=$vm_dir/dragonfly.img,format=raw,if=ide,index=0" \
@@ -353,14 +386,23 @@ def stop_qemu():
     if child.isalive():
         child.kill(signal.SIGKILL)
 
+def send_loader_command(command):
+    for character in command:
+        child.send(character)
+        time.sleep(0.03)
+    child.send("\r")
+
 try:
     child.expect("Booting in", timeout=90)
-    child.send("999999999")
+    child.send("9")
     child.expect("OK", timeout=60)
-    child.send("\b" * 16)
-    child.sendline("set console=comconsole")
+
+    # Keep loader input on the channel that pexpect is already using, but ask
+    # the kernel to use COM1 after boot.  Switching the loader's own console to
+    # comconsole here would also move its input before we can submit "boot".
+    send_loader_command("set boot_serial=YES")
     child.expect("OK", timeout=60)
-    child.sendline(" boot")
+    send_loader_command("boot")
     child.expect("login:", timeout=240)
     child.sendline("root")
     child.expect("#", timeout=60)
@@ -470,6 +512,9 @@ set -eu
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:\$PATH"
 export PATH
 export FBCTESTS_JOBS="$FBCTESTS_JOBS"
+export EXAMPLEAGEDDON_JOBS="$EXAMPLEAGEDDON_JOBS"
+export EXAMPLEAGEDDON_COMPILE_TIMEOUT="$EXAMPLEAGEDDON_COMPILE_TIMEOUT"
+export EXAMPLEAGEDDON_RUN_TIMEOUT="$EXAMPLEAGEDDON_RUN_TIMEOUT"
 export PKG_CACHEDIR="/work/pkg-cache"
 export TMPDIR="/work/tmp"
 export SFXLIB_OSS_DEVICE="/dev/dsp"
@@ -505,6 +550,13 @@ fbctests_jobs() {
 	case "\${FBCTESTS_JOBS:-}" in
 		''|*[!0-9]*|0) echo 1 ;;
 		*) echo "\$FBCTESTS_JOBS" ;;
+	esac
+}
+
+exampleageddon_jobs() {
+	case "\${EXAMPLEAGEDDON_JOBS:-}" in
+		''|*[!0-9]*|0) echo 1 ;;
+		*) echo "\$EXAMPLEAGEDDON_JOBS" ;;
 	esac
 }
 
@@ -606,6 +658,39 @@ run_fbctests() {
 	echo "==> fbctests passed"
 }
 
+run_exampleageddon() {
+	jobs="\$(exampleageddon_jobs)"
+	python=/usr/local/bin/python3.11
+
+	[ -x "\$python" ] || fail "python311 is required for Exampleageddon"
+	[ -f /work/freebasic-source/build_scripts/exampleageddon-freebasic.py ] ||
+		fail "Exampleageddon runner was not staged"
+
+	echo "==> running Exampleageddon with \${jobs} job(s)"
+	rm -rf /work/exampleageddon
+	run "\$python" /work/freebasic-source/build_scripts/exampleageddon-freebasic.py \
+		--root /work/freebasic-source \
+		--outdir /work/exampleageddon \
+		--prefix /usr/local \
+		--include-dir /work/freebasic-source/inc \
+		--fbc /usr/local/bin/fbc \
+		--jobs "\$jobs" \
+		--compile-timeout "\$EXAMPLEAGEDDON_COMPILE_TIMEOUT" \
+		--run-timeout "\$EXAMPLEAGEDDON_RUN_TIMEOUT" \
+		--fail-on-self-contained
+
+	[ -f /work/exampleageddon/report.md ] || fail "Exampleageddon report was not created"
+	[ -f /work/exampleageddon/results.csv ] || fail "Exampleageddon results CSV was not created"
+	grep -qx -- '- Self-contained problems: 0' /work/exampleageddon/report.md || {
+		sed -n '1,80p' /work/exampleageddon/report.md
+		fail "Exampleageddon reported self-contained example problems"
+	}
+
+	upload /work/exampleageddon/report.md exampleageddon-report.md
+	upload /work/exampleageddon/results.csv exampleageddon-results.csv
+	echo "==> Exampleageddon passed"
+}
+
 trap finish_with_xvfb EXIT
 
 (
@@ -646,6 +731,7 @@ pkg install -y \\
 	mesa-libs \\
 	ncurses \\
 	pkgconf \\
+	python311 \\
 	xorg-vfbserver \\
 	xorgproto
 
@@ -815,6 +901,24 @@ console_output="\$(/work/smoke/console)"
 echo "\$console_output"
 [ "\$console_output" = "Hello world" ] || fail "unexpected console output"
 
+echo "==> compiling crt/sys/socket.bi API smoke"
+run fbc /work/freebasic-source/tests/crt/socket.bas -x /work/smoke/socket-bi
+
+echo "==> running crt/sys/socket.bi API smoke"
+run /work/smoke/socket-bi
+
+echo "==> compiling curses.bi API smoke"
+run fbc /work/freebasic-source/tests/crt/curses.bas -x /work/smoke/curses-bi
+
+echo "==> running curses.bi API smoke"
+run /work/smoke/curses-bi
+
+echo "==> compiling threaded TCP runtime smoke"
+run fbc -mt /work/freebasic-source/tests/file/tcp.bas -x /work/smoke/tcp
+
+echo "==> running threaded TCP runtime smoke"
+run timeout 30 /work/smoke/tcp
+
 echo "==> compiling gfxlib smoke"
 run fbc /work/smoke/gfx-truecolor.bas -x /work/smoke/gfx-truecolor
 run fbc -lang fblite -exx /work/smoke/gfx-screen-modes.bas -x /work/smoke/gfx-screen-modes
@@ -854,6 +958,7 @@ grep -qi '^sfx-driver=dragonfly oss' /work/smoke/sfx.out || fail "sfx smoke did 
 }
 
 run_fbctests
+run_exampleageddon
 
 echo "==> TEST PASSED"
 ) > "\$log" 2>&1
@@ -982,6 +1087,8 @@ archive_results() {
 	cp -f "$LOG_DIR/freebasic-dragonfly-test-console.log" "$ARCHIVE_DIR/" 2>/dev/null || true
 	cp -f "$UPLOAD_DIR/freebasic-dragonfly-build.log" "$ARCHIVE_DIR/" 2>/dev/null || true
 	cp -f "$UPLOAD_DIR/freebasic-dragonfly-test.log" "$ARCHIVE_DIR/" 2>/dev/null || true
+	cp -f "$UPLOAD_DIR/exampleageddon-report.md" "$ARCHIVE_DIR/" 2>/dev/null || true
+	cp -f "$UPLOAD_DIR/exampleageddon-results.csv" "$ARCHIVE_DIR/" 2>/dev/null || true
 	cp -f "$LOG_DIR/freebasic-dragonfly-audio.log" "$ARCHIVE_DIR/" 2>/dev/null || true
 	cp -f "$RUN_DIR/freebasic-dragonfly-audio.wav" "$ARCHIVE_DIR/" 2>/dev/null || true
 
@@ -999,6 +1106,7 @@ trap cleanup EXIT
 
 main() {
 	check_host_tools
+	configure_qemu_acceleration
 	resolve_package_file
 
 	if [ -z "$HTTP_PORT" ]; then
@@ -1034,7 +1142,7 @@ main() {
 		rm -rf "$RUN_DIR/build" "$RUN_DIR/test"
 	fi
 
-	msg "DragonFly package build and fbctests completed"
+	msg "DragonFly package build, fbctests, and Exampleageddon completed"
 	echo "Package: $ARCHIVE_DIR/$(basename "$PACKAGE_FILE")"
 	echo "Archive: $ARCHIVE_DIR"
 	if [ -f "$ARCHIVE_DIR/freebasic-dragonfly-build.log" ]; then

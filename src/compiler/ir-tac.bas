@@ -741,6 +741,7 @@ private sub _emitDBG _
 end sub
 
 private sub _emitComment( byval text as zstring ptr )
+	'' The queued literal owns this duplicated text until hFlushLIT() frees it.
 	_emit( AST_OP_LIT_COMMENT, NULL, NULL, NULL, cast( any ptr, ZstrDup( text ) ) )
 end sub
 
@@ -767,6 +768,7 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 		n = n->next
 	wend
 
+	'' The queued literal owns this duplicated text until hFlushLIT() frees it.
 	_emit( AST_OP_LIT_ASM, NULL, NULL, NULL, cast( any ptr, ZstrDup( strptr( ln ) ) ) )
 end sub
 
@@ -1217,7 +1219,9 @@ private sub hDump _
 		s += NEWLINE
 	end if
 
-	if( (wrapline = FALSE) and (len( s ) > 79) ) then
+	'' Keep a TAC record within the traditional 80-column diagnostic width.
+	const TAC_DUMP_WRAP_COLUMN = 79
+	if( (wrapline = FALSE) and (len( s ) > TAC_DUMP_WRAP_COLUMN) ) then
 		hDump( op, v1, v2, vr, TRUE )
 	else
 		print s;
@@ -1440,7 +1444,8 @@ private sub _flush static
 			hFlushDBG( op, t->ex1, t->ex2, t->ex3 )
 
 		case AST_NODECLASS_LIT
-			hFlushLIT( op, cast( any ptr, t->ex1 ) )
+			'' ex1 holds the owned ZstrDup() text until hFlushLIT() releases it.
+			hFlushLIT( op, cast( zstring ptr, t->ex1 ) )
 
 		end select
 

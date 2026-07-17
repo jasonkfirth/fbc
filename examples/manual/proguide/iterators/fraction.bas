@@ -28,7 +28,7 @@ Operator fraction.Cast () As String
 	' search for the highest common factor (a) between numerator and denominator
 		Dim As Integer a = Abs(This.num), b = Abs(This.den)
 		If a <> 0 Then
-			While a <> b 
+			While a <> b
 				If a > b Then
 					a -= b
 				Else
@@ -73,7 +73,7 @@ End Operator
 
 Operator fraction.Step (ByRef iterateStep As fraction)
 	This.num += iterateStep.num
-End Operator 
+End Operator
 
 
 Print "iteration from 1/8 to 1/2 by step of 1/12:"
@@ -89,4 +89,4 @@ Next
 Print
 
 Sleep
-		
+

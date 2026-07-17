@@ -12,10 +12,10 @@ const webctrl_name = "fb_webctrl_0_1"
 
 type webctrl_ctx
 	as HWND 			hwnd
-	as WEBCTRL_FLAGS	flags		
+	as WEBCTRL_FLAGS	flags
 	as CBrowser ptr 	browser
 end type
-	
+
 ''::::
 private function win_cb _
 	( _
@@ -25,17 +25,17 @@ private function win_cb _
 		byval lParam as LPARAM _
 	) as LRESULT
 
-	dim as webctrl ptr _this 
-	
+	dim as webctrl ptr _this
+
 	_this = cast( webctrl ptr, GetWindowLongPtr( hwnd, GWLP_USERDATA ) )
-	
+
 	if( _this <> NULL ) then
 		if( _this->ctx->browser <> NULL ) then
 			select case uMsg
 			case WM_SIZE
 				_this->ctx->browser->resize( LOWORD( lParam ), HIWORD( lParam ) )
 				return 0
-		
+
 			case WM_DESTROY
 				if( _this->ctx->browser <> NULL ) then
 					_this->ctx->browser->remove( )
@@ -43,13 +43,13 @@ private function win_cb _
 					_this->ctx->browser = NULL
 				end if
 				return 0
-			
+
 			end select
 		end if
 	end if
 
 	return DefWindowProc( hwnd, uMsg, wParam, lParam )
-	
+
 end function
 
 ''::::
@@ -57,13 +57,13 @@ private function webctrl_GetRegClass _
 	( _
 		byval instance as HINSTANCE _
 	) as WNDCLASSEX ptr
-	
+
 	static as WNDCLASSEX wc
-	
+
 	if( wc.lpfnWndProc <> NULL ) then
 		return @wc
 	end if
-	
+
 	with wc
 		.cbSize 		= len( WNDCLASSEX )
 		.lpfnWndProc 	= cast( WNDPROC, @win_cb )
@@ -71,9 +71,9 @@ private function webctrl_GetRegClass _
 		.lpszClassName 	= @webctrl_name
 		''''''.style	= CS_HREDRAW or CS_VREDRAW  (not needed, the control takes the whole client area)
 	end with
-	
+
 	RegisterClassEx( @wc )
-	
+
 	function = @wc
 
 end function
@@ -87,17 +87,17 @@ constructor webctrl _
 		byval width_ as integer, _
 		byval height as integer, _
 		byval flags as WEBCTRL_FLAGS _
-	) 
-	
+	)
+
 	dim as WNDCLASSEX ptr wc
 	dim as HINSTANCE hInstance
-	
+
 	hInstance = cast( .HINSTANCE, GetWindowLongPtr( parent, GWLP_HINSTANCE ) )
-	
+
 	wc = webctrl_GetRegClass( hInstance )
-	
+
 	ctx = new webctrl_ctx
-	
+
 	ctx->hwnd = CreateWindowEx( 0, _
 						   		@webctrl_name, _
 						   		"webctrwin_" + hex( @this ), _
@@ -110,19 +110,19 @@ constructor webctrl _
 						   		NULL, _
 						   		hInstance, _
 						   		NULL )
-	
+
 	SetWindowLongPtr( ctx->hwnd, GWLP_USERDATA, cast( LONG_PTR, @this ) )
 
 	ctx->flags = flags
 
 	''
 	ctx->browser = new CBrowser( ctx->hwnd, (flags and WEBCTRL_MOZILLA) <> 0 )
-		
+
 	if( ctx->browser->insert( ) = FALSE ) then
 		delete ctx->browser
 		ctx->browser = NULL
 	end if
-	
+
 end constructor
 
 ''::::
@@ -136,13 +136,13 @@ destructor webctrl _
 		DestroyWindow( ctx->hwnd )
 		ctx->hwnd = NULL
 	end if
-	
+
 	if( ctx->browser <> NULL ) then
 		ctx->browser->remove( )
 		delete ctx->browser
 		ctx->browser = NULL
 	end if
-	
+
 	delete ctx
 
 end destructor
@@ -155,17 +155,17 @@ function webctrl.move _
 		byval width_ as integer, _
 		byval height as integer _
 	) as BOOL
-	
+
 	function = FALSE
-	
+
 	if( ctx->hwnd = NULL ) then
 		exit function
 	end if
-	
+
 	MoveWindow( ctx->hwnd, x, y, width_, height, FALSE )
-	
+
 	function = TRUE
-	
+
 end function
 
 ''::::
@@ -180,8 +180,8 @@ function webctrl.navigate _
 	end if
 
 	function = ctx->browser->navigate( url, target )
-	
-end function 
+
+end function
 
 ''::::
 function webctrl.render _
@@ -194,8 +194,8 @@ function webctrl.render _
 	end if
 
 	function = ctx->browser->render( text )
-	
-end function 
+
+end function
 
 ''::::
 function webctrl.goBack _
@@ -208,8 +208,8 @@ function webctrl.goBack _
 	end if
 
 	function = ctx->browser->goBack( )
-	
-end function 
+
+end function
 
 ''::::
 function webctrl.goForward _
@@ -222,8 +222,8 @@ function webctrl.goForward _
 	end if
 
 	function = ctx->browser->goForward( )
-	
-end function 
+
+end function
 
 ''::::
 function webctrl.refresh _
@@ -236,8 +236,8 @@ function webctrl.refresh _
 	end if
 
 	function = ctx->browser->refresh( )
-	
-end function 
+
+end function
 
 ''::::
 function webctrl.stop _
@@ -250,5 +250,5 @@ function webctrl.stop _
 	end if
 
 	function = ctx->browser->stop( )
-	
-end function 
+
+end function

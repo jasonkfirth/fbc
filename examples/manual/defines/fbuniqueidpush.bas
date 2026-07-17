@@ -19,19 +19,19 @@
 	__FB_UNIQUEID__( stk ):
 	__FB_UNIQUEID_POP__( stk )
 #endmacro
-	
+
 Dim As Integer N
 
 Do
 	Input "Enter a value between 1 and 4 (0 or empty input for exit) ? ", N
-	
+
 	If N = 0 Then go
 	If N = 1 Then go
 	If N = 2 Then go
 	If N = 3 Then go
 	If N = 4 Then go
 	Continue Do
-	
+
 	end_go
 		Print "You entered 4" : Continue Do
 	end_go
@@ -45,4 +45,4 @@ Do
 Loop
 
 Sleep
-	
+

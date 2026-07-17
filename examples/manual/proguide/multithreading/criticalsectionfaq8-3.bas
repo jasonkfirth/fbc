@@ -9,18 +9,20 @@
 #include "vbcompat.bi"
 
 Screen 12, , 2
-ScreenSet 1, 0   
+ScreenSet 1, 0
 Color 0, 7
 Cls
 
 Dim Shared terminate As Integer = 0
 Dim Shared mutex As Any Ptr
 
-Sub thread1 (ByVal param As Any Ptr)   
+Sub thread1 (ByVal param As Any Ptr)
 	ScreenSet 1, 0
 	Do
 		MutexLock(mutex)
 		Line (16, 432)-Step(96, 16), 11, BF  'clear the print area
+		'' The delay intentionally makes the protected screen update visible.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 		Sleep 200, 1
 		Draw String (24, 432), Format(Now,"dd/mm/yyyy"), 0
 		ScreenCopy
@@ -29,11 +31,13 @@ Sub thread1 (ByVal param As Any Ptr)
 	Loop Until terminate = 1
 End Sub
 
-Sub thread2 (ByVal param As Any Ptr)   
+Sub thread2 (ByVal param As Any Ptr)
 	ScreenSet 1, 0
 	Do
 		MutexLock(mutex)
 		Line (16, 448)-Step(96, 16), 11, BF  'clear the print area
+		'' The delay intentionally makes the protected clock update visible.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 		Sleep 100, 1
 		Draw String (32, 448), Format(Now,"hh:mm:ss"), 0
 		ScreenCopy
@@ -66,4 +70,3 @@ Print " Threads terminated"
 ScreenCopy
 
 Sleep
-				

@@ -11,6 +11,6 @@ Dim As UByte numeric_value1, numeric_value2
 numeric_value1 = 15 '00001111
 numeric_value2 = 30 '00011110
 
-'Result =  31  =     00011111       
+'Result =  31  =     00011111
 Print numeric_value1 Or numeric_value2
 Sleep

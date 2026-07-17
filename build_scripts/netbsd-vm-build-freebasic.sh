@@ -15,7 +15,7 @@
 #   * copy the current source tree into the VM over QEMU user networking
 #   * build the native NetBSD pkgsrc-style binary package
 #   * install that package in a fresh NetBSD VM snapshot
-#   * run console, gfxlib, sfxlib, and fbctests checks
+#   * run console, gfxlib, sfxlib, fbctests, and exampleageddon checks
 #   * capture QEMU audio output and verify that it is not silent
 #
 # This script intentionally does NOT contain:
@@ -51,12 +51,17 @@ DIST_URL=""
 JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
 CPUS="$JOBS"
 FBCTESTS_JOBS="$JOBS"
+EXAMPLEAGEDDON_JOBS="$JOBS"
+EXAMPLEAGEDDON_COMPILE_TIMEOUT="180"
+EXAMPLEAGEDDON_RUN_TIMEOUT="10"
 MEMORY="6144M"
 DISK_SIZE="32G"
 HTTP_PORT=""
 PACKAGE_FILE=""
 TEST_ONLY=0
 KEEP_VM=0
+QEMU_ACCEL="${QEMU_ACCEL:-kvm}"
+QEMU_CPU="${QEMU_CPU:-host}"
 
 msg() { printf '\n==> %s\n' "$*"; }
 warn() { printf '\nWARNING: %s\n' "$*" >&2; }
@@ -76,6 +81,9 @@ Options:
   --jobs N               Build jobs inside NetBSD. Default: host CPU count
   --cpus N               QEMU CPU count. Default: --jobs value
   --fbctests-jobs N      fbctests make jobs. Default: --jobs value
+  --exampleageddon-jobs N exampleageddon jobs. Default: --jobs value
+  --exampleageddon-compile-timeout N Compile timeout in seconds. Default: 180
+  --exampleageddon-run-timeout N Run timeout in seconds. Default: 10
   --memory SIZE          QEMU memory passed to Anita. Default: 6144M
   --disk-size SIZE       Anita disk size. Default: 32G
   --http-port N          Host HTTP port. Default: auto
@@ -107,9 +115,12 @@ while [ "$#" -gt 0 ]; do
 			shift 2
 			;;
 		--archive-dir) ARCHIVE_DIR="$2"; shift 2 ;;
-		--jobs) JOBS="$2"; CPUS="$2"; FBCTESTS_JOBS="$2"; shift 2 ;;
+		--jobs) JOBS="$2"; CPUS="$2"; FBCTESTS_JOBS="$2"; EXAMPLEAGEDDON_JOBS="$2"; shift 2 ;;
 		--cpus) CPUS="$2"; shift 2 ;;
 		--fbctests-jobs) FBCTESTS_JOBS="$2"; shift 2 ;;
+		--exampleageddon-jobs) EXAMPLEAGEDDON_JOBS="$2"; shift 2 ;;
+		--exampleageddon-compile-timeout) EXAMPLEAGEDDON_COMPILE_TIMEOUT="$2"; shift 2 ;;
+		--exampleageddon-run-timeout) EXAMPLEAGEDDON_RUN_TIMEOUT="$2"; shift 2 ;;
 		--memory) MEMORY="$2"; shift 2 ;;
 		--disk-size) DISK_SIZE="$2"; shift 2 ;;
 		--http-port) HTTP_PORT="$2"; shift 2 ;;
@@ -122,6 +133,9 @@ done
 case "$JOBS" in ''|*[!0-9]*|0) die "--jobs must be a positive integer" ;; esac
 case "$CPUS" in ''|*[!0-9]*|0) die "--cpus must be a positive integer" ;; esac
 case "$FBCTESTS_JOBS" in ''|*[!0-9]*|0) die "--fbctests-jobs must be a positive integer" ;; esac
+case "$EXAMPLEAGEDDON_JOBS" in ''|*[!0-9]*|0) die "--exampleageddon-jobs must be a positive integer" ;; esac
+case "$EXAMPLEAGEDDON_COMPILE_TIMEOUT" in ''|*[!0-9]*|0) die "--exampleageddon-compile-timeout must be a positive integer" ;; esac
+case "$EXAMPLEAGEDDON_RUN_TIMEOUT" in ''|*[!0-9]*|0) die "--exampleageddon-run-timeout must be a positive integer" ;; esac
 
 if [ "$TEST_ONLY" -eq 1 ] && [ -z "$PACKAGE_FILE" ]; then
 	die "--test-only requires --package"
@@ -172,6 +186,15 @@ import pexpect
 PY
 }
 
+configure_qemu_acceleration() {
+	if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
+		QEMU_ACCEL="tcg"
+		QEMU_CPU="max"
+	fi
+
+	msg "QEMU acceleration: $QEMU_ACCEL (CPU: $QEMU_CPU)"
+}
+
 install_anita() {
 	mkdir -p "$TOOLS_DIR" "$TOOL_BIN"
 
@@ -196,7 +219,12 @@ make_source_archive() {
 	tar -czf "$SERVE_DIR/freebasic-source.tar.gz" \
 		--exclude='./.git' \
 		--exclude='./out' \
+		--exclude='./build' \
 		--exclude='./.build*' \
+		--exclude='./OMA' \
+		--exclude='./OMA_old' \
+		--exclude='./remote_probe_temp' \
+		--exclude='./nuttx-suite-logs' \
 		--exclude='./package-root' \
 		--exclude='./bin/fbc*' \
 		--exclude='./bootstrap/fbc*' \
@@ -311,7 +339,7 @@ tar -xzf /tmp/freebasic-source.tar.gz -C /work/freebasic-source
 find /work/freebasic-source -exec chown -h root:wheel {} +
 
 cd /work/freebasic-source
-./build_scripts/netbsd-build-freebasic.sh --jobs="$JOBS"
+sh ./build_scripts/netbsd-build-freebasic.sh --jobs="$JOBS"
 
 if ! command -v curl >/dev/null 2>&1; then
 	pkgin -y install curl
@@ -347,6 +375,9 @@ PATH="/usr/pkg/bin:/usr/pkg/sbin:/usr/X11R7/bin:/bin:/sbin:/usr/bin:/usr/sbin:\$
 export PATH
 export PKG_PATH="$PKG_REPO"
 export FBCTESTS_JOBS="$FBCTESTS_JOBS"
+export EXAMPLEAGEDDON_JOBS="$EXAMPLEAGEDDON_JOBS"
+export EXAMPLEAGEDDON_COMPILE_TIMEOUT="$EXAMPLEAGEDDON_COMPILE_TIMEOUT"
+export EXAMPLEAGEDDON_RUN_TIMEOUT="$EXAMPLEAGEDDON_RUN_TIMEOUT"
 export SFXLIB_OSS_DEVICE="/dev/sound0"
 
 log=/tmp/freebasic-netbsd-test.log
@@ -368,7 +399,9 @@ finish() {
 
 run() {
 	echo "==> \$*"
-	"\$@"
+	status=0
+	"\$@" || status=\$?
+	[ "\$status" -eq 0 ] || fail "command exited with status \$status: \$*"
 }
 
 fail() {
@@ -442,6 +475,39 @@ run_fbctests() {
 	echo "==> fbctests passed"
 }
 
+run_exampleageddon() {
+	python=/usr/pkg/bin/python3.12
+	[ -x "\$python" ] || fail "python3.12 is required for exampleageddon"
+
+	echo "==> running exampleageddon"
+	rm -rf /work/exampleageddon
+	if ! run "\$python" /work/freebasic-source/build_scripts/exampleageddon-freebasic.py \
+			--root /work/freebasic-source \
+			--outdir /work/exampleageddon \
+			--prefix /usr/pkg \
+			--include-dir /work/freebasic-source/inc \
+			--fbc fbc \
+			--jobs "\$EXAMPLEAGEDDON_JOBS" \
+			--compile-timeout "\$EXAMPLEAGEDDON_COMPILE_TIMEOUT" \
+			--run-timeout "\$EXAMPLEAGEDDON_RUN_TIMEOUT" \
+			--fail-on-self-contained; then
+		upload /work/exampleageddon/report.md freebasic-netbsd-exampleageddon-report.md
+		upload /work/exampleageddon/results.csv freebasic-netbsd-exampleageddon-results.csv
+		fail "exampleageddon failed"
+	fi
+
+	[ -f /work/exampleageddon/report.md ] || fail "exampleageddon report was not created"
+	[ -f /work/exampleageddon/results.csv ] || fail "exampleageddon results CSV was not created"
+	grep -qx -- '- Self-contained problems: 0' /work/exampleageddon/report.md || {
+		cat /work/exampleageddon/report.md
+		fail "exampleageddon reported self-contained example problems"
+	}
+
+	upload /work/exampleageddon/report.md freebasic-netbsd-exampleageddon-report.md
+	upload /work/exampleageddon/results.csv freebasic-netbsd-exampleageddon-results.csv
+	echo "==> exampleageddon passed"
+}
+
 start_xvfb() {
 	xvfb=""
 
@@ -502,6 +568,7 @@ pkgin -y install \\
 	MesaLib \\
 	ncurses \\
 	pkgconf \\
+	python312 \\
 	rsync
 
 ftp -o /tmp/freebasic-source.tar.gz "http://10.0.2.2:$HTTP_PORT/freebasic-source.tar.gz"
@@ -668,6 +735,79 @@ console_output="\$(/work/smoke/console)"
 echo "\$console_output"
 [ "\$console_output" = "Hello world" ] || fail "unexpected console output"
 
+echo "==> compiling crt/sys/socket.bi API smoke"
+run fbc /work/freebasic-source/tests/crt/socket.bas -x /work/smoke/socket-bi
+
+echo "==> running crt/sys/socket.bi API smoke"
+run /work/smoke/socket-bi
+
+echo "==> compiling curses.bi API smoke"
+run fbc /work/freebasic-source/tests/crt/curses.bas -x /work/smoke/curses-bi
+
+echo "==> reporting NetBSD curses runtime selection"
+echo "TERM=\${TERM-<unset>} TERMINFO=\${TERMINFO-<unset>} TERMINFO_DIRS=\${TERMINFO_DIRS-<unset>}"
+command -v infocmp || true
+infocmp dumb 2>&1 || true
+find /usr/share /usr/pkg/share -path '*/terminfo/*/dumb' -print 2>/dev/null || true
+ldd /work/smoke/curses-bi 2>&1 || true
+
+cat > /work/smoke/curses-reference.c <<'CEOF'
+#include <curses.h>
+#include <errno.h>
+#include <stdio.h>
+
+int main(void)
+{
+	FILE *input_file = tmpfile();
+	FILE *output_file = tmpfile();
+	SCREEN *screen;
+
+	printf("curses_version=%s\n", curses_version());
+	if (input_file == NULL || output_file == NULL) {
+		perror("tmpfile");
+		return 2;
+	}
+
+	screen = newterm("dumb", output_file, input_file);
+	printf("newterm=%p errno=%d\n", (void *)screen, errno);
+	if (screen == NULL)
+		return 3;
+
+	endwin();
+	delscreen(screen);
+	fclose(input_file);
+	fclose(output_file);
+	return 0;
+}
+CEOF
+
+echo "==> running system C curses reference smoke"
+if cc /work/smoke/curses-reference.c -lcurses -o /work/smoke/curses-reference; then
+	ldd /work/smoke/curses-reference 2>&1 || true
+	/work/smoke/curses-reference 2>&1 || true
+else
+	echo "system C curses reference did not compile"
+fi
+
+if pkg-config --exists ncurses 2>/dev/null; then
+	echo "==> running pkgsrc ncurses C reference smoke"
+	if cc /work/smoke/curses-reference.c \$(pkg-config --cflags --libs ncurses) -o /work/smoke/ncurses-reference; then
+		ldd /work/smoke/ncurses-reference 2>&1 || true
+		/work/smoke/ncurses-reference 2>&1 || true
+	else
+		echo "pkgsrc ncurses C reference did not compile"
+	fi
+fi
+
+echo "==> running curses.bi API smoke"
+run /work/smoke/curses-bi
+
+echo "==> compiling TCP loopback smoke"
+run fbc -mt /work/freebasic-source/tests/file/tcp.bas -x /work/smoke/tcp
+
+echo "==> running TCP loopback smoke"
+timeout 60 /work/smoke/tcp
+
 start_xvfb
 run fbc /work/smoke/gfx-truecolor.bas -x /work/smoke/gfx-truecolor
 run fbc -lang fblite -exx /work/smoke/gfx-screen-modes.bas -x /work/smoke/gfx-screen-modes
@@ -698,6 +838,7 @@ grep -qx 'sfx-end' /work/smoke/sfx.out || fail "sfx smoke did not finish"
 }
 
 run_fbctests
+run_exampleageddon
 
 echo "==> TEST PASSED"
 ) > "\$log" 2>&1 &
@@ -740,6 +881,7 @@ install_base_vm() {
 		--image-format=sparse \
 		--disk-size="$DISK_SIZE" \
 		--memory-size="$MEMORY" \
+		--vmm-args="-accel $QEMU_ACCEL -cpu $QEMU_CPU -smp $CPUS" \
 		--sets=kern-GENERIC,modules,base,etc,comp,xbase,xcomp,xserver \
 		install "$DIST_URL"
 }
@@ -749,7 +891,7 @@ run_guest_script() {
 	local script="$2"
 	local log="$3"
 	local audio_wav="${4:-}"
-	local vmm_args="-smp $CPUS"
+	local vmm_args="-accel $QEMU_ACCEL -cpu $QEMU_CPU -smp $CPUS"
 
 	if [ -n "$audio_wav" ]; then
 		vmm_args="$vmm_args -audiodev wav,id=audio0,path=$audio_wav -device ES1370,audiodev=audio0"
@@ -870,6 +1012,14 @@ archive_results() {
 		cp -f "$RUN_DIR/netbsd-audio.wav" "$ARCHIVE_DIR/freebasic-netbsd-audio.wav"
 	fi
 
+	if [ -f "$UPLOAD_DIR/freebasic-netbsd-exampleageddon-report.md" ]; then
+		cp -f "$UPLOAD_DIR/freebasic-netbsd-exampleageddon-report.md" "$ARCHIVE_DIR/exampleageddon-report.md"
+	fi
+
+	if [ -f "$UPLOAD_DIR/freebasic-netbsd-exampleageddon-results.csv" ]; then
+		cp -f "$UPLOAD_DIR/freebasic-netbsd-exampleageddon-results.csv" "$ARCHIVE_DIR/exampleageddon-results.csv"
+	fi
+
 	base="$(basename "$pkg")"
 	(
 		cd "$ARCHIVE_DIR"
@@ -891,6 +1041,7 @@ trap cleanup EXIT
 
 main() {
 	check_host_tools
+	configure_qemu_acceleration
 	install_anita
 	resolve_package_file
 
@@ -941,6 +1092,8 @@ main() {
 		"$LOG_DIR/freebasic-netbsd-test-console.log" "$RUN_DIR/netbsd-audio.wav"
 
 	wait_for_upload 'freebasic-netbsd-test.log' test-log >/dev/null
+	wait_for_upload 'freebasic-netbsd-exampleageddon-report.md' exampleageddon-report >/dev/null
+	wait_for_upload 'freebasic-netbsd-exampleageddon-results.csv' exampleageddon-results >/dev/null
 	if [ -f "$UPLOAD_DIR/freebasic-netbsd-build.log" ]; then
 		cp -f "$UPLOAD_DIR/freebasic-netbsd-build.log" "$LOG_DIR/"
 	fi

@@ -6,7 +6,7 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgComments
 '' --------
 
-/' this is a multi line 
+/' this is a multi line
 comment as a header of
 this example '/
 

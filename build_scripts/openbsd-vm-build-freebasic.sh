@@ -15,7 +15,7 @@
 #   * install a clean OpenBSD VM with SSH enabled
 #   * build the OpenBSD package with build_scripts/openbsd-build-freebasic.sh
 #   * install the package in a separate clean VM overlay
-#   * run console, gfxlib, sfxlib, and fbctests checks
+#   * run console, gfxlib, sfxlib, fbctests, and exampleageddon checks
 #   * archive the package and logs under out/openbsd/x86-64
 #
 # This script intentionally does NOT contain:
@@ -50,6 +50,11 @@ SSH_PORT=""
 KEEP_VMS=0
 FBCTESTS_JOBS="$JOBS"
 FBCTESTS_UNIT_ARGS=""
+EXAMPLEAGEDDON_JOBS="$JOBS"
+EXAMPLEAGEDDON_COMPILE_TIMEOUT="180"
+EXAMPLEAGEDDON_RUN_TIMEOUT="10"
+QEMU_ACCEL="${QEMU_ACCEL:-kvm}"
+QEMU_CPU="${QEMU_CPU:-host}"
 
 DEFAULT_BASE_URL="https://cdn.openbsd.org/pub/OpenBSD/${RELEASE}/${ARCH}"
 DEFAULT_PACKAGE_PATH="https://cdn.openbsd.org/pub/OpenBSD/${RELEASE}/packages/${ARCH}"
@@ -76,6 +81,9 @@ Options:
   --ssh-port N             Host SSH forward port. Default: auto
   --fbctests-jobs N        fbctests gmake jobs. Default: --jobs value
   --fbctests-unit-args S   Extra UNITTEST_RUN_ARGS for fbctests.
+  --exampleageddon-jobs N  exampleageddon jobs. Default: --jobs value
+  --exampleageddon-compile-timeout N Compile timeout in seconds. Default: 180
+  --exampleageddon-run-timeout N Run timeout in seconds. Default: 10
   --keep-vms               Do not delete VM run directories on success.
   -h, --help               Show this help.
 EOF
@@ -95,13 +103,16 @@ while [ "$#" -gt 0 ]; do
 			shift 2
 			;;
 		--archive-dir) ARCHIVE_DIR="$2"; shift 2 ;;
-		--jobs) JOBS="$2"; CPUS="$2"; FBCTESTS_JOBS="$2"; shift 2 ;;
+		--jobs) JOBS="$2"; CPUS="$2"; FBCTESTS_JOBS="$2"; EXAMPLEAGEDDON_JOBS="$2"; shift 2 ;;
 		--cpus) CPUS="$2"; shift 2 ;;
 		--memory) MEMORY="$2"; shift 2 ;;
 		--disk-size) DISK_SIZE="$2"; shift 2 ;;
 		--ssh-port) SSH_PORT="$2"; shift 2 ;;
 		--fbctests-jobs) FBCTESTS_JOBS="$2"; shift 2 ;;
 		--fbctests-unit-args) FBCTESTS_UNIT_ARGS="$2"; shift 2 ;;
+		--exampleageddon-jobs) EXAMPLEAGEDDON_JOBS="$2"; shift 2 ;;
+		--exampleageddon-compile-timeout) EXAMPLEAGEDDON_COMPILE_TIMEOUT="$2"; shift 2 ;;
+		--exampleageddon-run-timeout) EXAMPLEAGEDDON_RUN_TIMEOUT="$2"; shift 2 ;;
 		--keep-vms) KEEP_VMS=1; shift ;;
 		-h|--help) usage; exit 0 ;;
 		*) die "unknown option: $1" ;;
@@ -111,6 +122,9 @@ done
 case "$JOBS" in ''|*[!0-9]*|0) die "--jobs must be a positive integer" ;; esac
 case "$CPUS" in ''|*[!0-9]*|0) die "--cpus must be a positive integer" ;; esac
 case "$FBCTESTS_JOBS" in ''|*[!0-9]*|0) die "--fbctests-jobs must be a positive integer" ;; esac
+case "$EXAMPLEAGEDDON_JOBS" in ''|*[!0-9]*|0) die "--exampleageddon-jobs must be a positive integer" ;; esac
+case "$EXAMPLEAGEDDON_COMPILE_TIMEOUT" in ''|*[!0-9]*|0) die "--exampleageddon-compile-timeout must be a positive integer" ;; esac
+case "$EXAMPLEAGEDDON_RUN_TIMEOUT" in ''|*[!0-9]*|0) die "--exampleageddon-run-timeout must be a positive integer" ;; esac
 
 if [ "$TEST_ONLY" -eq 1 ] && [ -z "$PACKAGE_FILE" ]; then
 	die "--test-only requires --package"
@@ -149,6 +163,15 @@ check_host_tools() {
 	require_tool rsync
 	require_tool scp
 	require_tool ssh
+}
+
+configure_qemu_acceleration() {
+	if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
+		QEMU_ACCEL="tcg"
+		QEMU_CPU="max"
+	fi
+
+	msg "QEMU acceleration: $QEMU_ACCEL (CPU: $QEMU_CPU)"
 }
 
 resolve_package_file() {
@@ -245,9 +268,20 @@ install_base_vm() {
 	local disk="$vm_dir/openbsd-base.qcow2"
 	local key="$RUN_DIR/id_ed25519"
 	local install_log="$LOG_DIR/freebasic-openbsd-install.log"
+	local cached_disk="$CACHE_DIR/openbsd-${RELEASE}-${ARCH}-base.qcow2"
+	local cached_key="$CACHE_DIR/openbsd-${RELEASE}-${ARCH}-id_ed25519"
 
 	rm -rf "$vm_dir"
-	mkdir -p "$vm_dir" "$LOG_DIR"
+	mkdir -p "$vm_dir" "$LOG_DIR" "$CACHE_DIR"
+
+	if [ -f "$cached_disk" ] && [ -f "$cached_key" ] && [ -f "$cached_key.pub" ]; then
+		msg "Reusing cached OpenBSD base VM"
+		cp --reflink=auto "$cached_disk" "$disk"
+		cp "$cached_key" "$key"
+		cp "$cached_key.pub" "$key.pub"
+		chmod 600 "$key"
+		return
+	fi
 
 	make_ssh_key "$key"
 	write_install_files "$vm_dir" "$key.pub"
@@ -256,7 +290,7 @@ install_base_vm() {
 	qemu-img create -f qcow2 "$disk" "$DISK_SIZE" >/dev/null
 
 	msg "Installing OpenBSD ${RELEASE} ${ARCH}"
-	python3 - "$disk" "$vm_dir/tftp" "$vm_dir/install.conf" "$install_log" "$CPUS" "$MEMORY" "$SSH_PORT" <<'PY'
+python3 - "$disk" "$vm_dir/tftp" "$vm_dir/install.conf" "$install_log" "$CPUS" "$MEMORY" "$SSH_PORT" "$QEMU_ACCEL" "$QEMU_CPU" <<'PY'
 import os
 import pty
 import re
@@ -266,11 +300,12 @@ import subprocess
 import sys
 import time
 
-disk, tftp_dir, conf_path, log_path, cpus, memory, ssh_port = sys.argv[1:]
+disk, tftp_dir, conf_path, log_path, cpus, memory, ssh_port, accel, cpu = sys.argv[1:]
 
 cmd = [
     "qemu-system-x86_64",
-    "-enable-kvm",
+    "-accel", accel,
+    "-cpu", cpu,
     "-m", memory,
     "-smp", cpus,
     "-drive", f"file={disk},if=virtio,format=qcow2",
@@ -369,6 +404,11 @@ finally:
 PY
 
 	[ -f "$disk" ] || die "OpenBSD base disk was not created"
+	cp --reflink=auto "$disk" "$cached_disk.tmp"
+	mv -f "$cached_disk.tmp" "$cached_disk"
+	cp "$key" "$cached_key"
+	cp "$key.pub" "$cached_key.pub"
+	chmod 600 "$cached_key"
 }
 
 start_vm() {
@@ -385,7 +425,8 @@ start_vm() {
 	qemu-img create -f qcow2 -F qcow2 -b "$base_disk" "$disk" >/dev/null
 
 	qemu-system-x86_64 \
-		-enable-kvm \
+		-accel "$QEMU_ACCEL" \
+		-cpu "$QEMU_CPU" \
 		-m "$MEMORY" \
 		-smp "$CPUS" \
 		-drive "file=$disk,if=virtio,format=qcow2" \
@@ -529,6 +570,7 @@ pkg_add -I \
 	git \
 	gmake \
 	libffi \
+	python-3.12.11 \
 	rsync-3.4.1
 
 mkdir -p /home/fbc/work
@@ -575,6 +617,27 @@ send_tests_tree() {
 		"$ROOT/inc/" "$GUEST_USER@127.0.0.1:/home/fbc/work/fbctests-source/inc/"
 }
 
+send_exampleageddon_tree() {
+	local key="$1"
+	local port="$2"
+	local target="/home/fbc/work/exampleageddon-source"
+
+	msg "Copying exampleageddon source to OpenBSD"
+	ssh_guest "$key" "$port" "rm -rf '$target' && mkdir -p '$target/build_scripts' '$target/examples' '$target/inc'"
+
+	rsync -a --delete \
+		-e "$(rsync_ssh "$key" "$port")" \
+		"$ROOT/examples/" "$GUEST_USER@127.0.0.1:$target/examples/"
+
+	rsync -a --delete \
+		-e "$(rsync_ssh "$key" "$port")" \
+		"$ROOT/inc/" "$GUEST_USER@127.0.0.1:$target/inc/"
+
+	scp_to_guest "$key" "$port" \
+		"$ROOT/build_scripts/exampleageddon-freebasic.py" \
+		"$target/build_scripts/exampleageddon-freebasic.py"
+}
+
 build_package_in_vm() {
 	local vm_dir="$1"
 	local key="$RUN_DIR/id_ed25519"
@@ -594,7 +657,7 @@ mkdir -p /home/fbc/work/packages
 cd "$SOURCE_DIR"
 rm -f /home/fbc/work/freebasic-openbsd-build.log
 
-env JOBS="$JOBS" OUT=/home/fbc/work/packages ./build_scripts/openbsd-build-freebasic.sh > /home/fbc/work/freebasic-openbsd-build.log 2>&1 &
+env JOBS="$JOBS" OUT=/home/fbc/work/packages bash ./build_scripts/openbsd-build-freebasic.sh > /home/fbc/work/freebasic-openbsd-build.log 2>&1 &
 pid=$!
 
 while kill -0 "$pid" 2>/dev/null; do
@@ -654,6 +717,34 @@ fbctests_jobs() {
 		''|*[!0-9]*|0) echo 1 ;;
 		*) echo "$FBCTESTS_JOBS" ;;
 	esac
+}
+
+run_exampleageddon() {
+	local python="/usr/local/bin/python3.12"
+
+	[ -x "$python" ] || fail "python3.12 is required for exampleageddon"
+
+	echo "==> running exampleageddon"
+	rm -rf /home/fbc/work/exampleageddon
+	run "$python" /home/fbc/work/exampleageddon-source/build_scripts/exampleageddon-freebasic.py \
+		--root /home/fbc/work/exampleageddon-source \
+		--outdir /home/fbc/work/exampleageddon \
+		--prefix /usr/local \
+		--include-dir /home/fbc/work/exampleageddon-source/inc \
+		--fbc fbc \
+		--jobs "${EXAMPLEAGEDDON_JOBS:-1}" \
+		--compile-timeout "${EXAMPLEAGEDDON_COMPILE_TIMEOUT:-180}" \
+		--run-timeout "${EXAMPLEAGEDDON_RUN_TIMEOUT:-10}" \
+		--fail-on-self-contained
+
+	[ -f /home/fbc/work/exampleageddon/report.md ] || fail "exampleageddon report was not created"
+	[ -f /home/fbc/work/exampleageddon/results.csv ] || fail "exampleageddon results CSV was not created"
+	grep -qx -- '- Self-contained problems: 0' /home/fbc/work/exampleageddon/report.md || {
+		cat /home/fbc/work/exampleageddon/report.md
+		fail "exampleageddon reported self-contained example problems"
+	}
+
+	echo "==> exampleageddon passed"
 }
 
 start_xvfb() {
@@ -971,6 +1062,24 @@ console_output="$(/home/fbc/work/smoke/console)"
 echo "$console_output"
 [ "$console_output" = "Hello world" ] || fail "unexpected console output"
 
+echo "==> compiling crt/sys/socket.bi API smoke"
+run fbc /home/fbc/work/fbctests-source/tests/crt/socket.bas -x /home/fbc/work/smoke/socket-bi
+
+echo "==> running crt/sys/socket.bi API smoke"
+run /home/fbc/work/smoke/socket-bi
+
+echo "==> compiling curses.bi API smoke"
+run fbc /home/fbc/work/fbctests-source/tests/crt/curses.bas -x /home/fbc/work/smoke/curses-bi
+
+echo "==> running curses.bi API smoke"
+run /home/fbc/work/smoke/curses-bi
+
+echo "==> compiling TCP loopback smoke"
+run fbc -mt /home/fbc/work/fbctests-source/tests/file/tcp.bas -x /home/fbc/work/smoke/tcp
+
+echo "==> running TCP loopback smoke"
+timeout 60 /home/fbc/work/smoke/tcp
+
 start_xvfb
 
 echo "==> compiling gfxlib truecolor smoke"
@@ -1018,6 +1127,7 @@ grep -q '^sfx-driver=OpenBSD sndio' /home/fbc/work/smoke/sfx.out || fail "sfx sm
 }
 
 run_fbctests
+run_exampleageddon
 
 echo "==> TEST PASSED"
 EOF
@@ -1037,13 +1147,14 @@ test_package_in_vm() {
 	ssh_guest "$key" "$port" "mkdir -p /home/fbc/work/package"
 	scp_to_guest "$key" "$port" "$pkg" "/home/fbc/work/package/"
 	send_tests_tree "$key" "$port"
+	send_exampleageddon_tree "$key" "$port"
 
 	write_test_runner "$runner"
 	scp_to_guest "$key" "$port" "$runner" "/home/fbc/work/test-freebasic-openbsd.sh"
 
 	msg "Running OpenBSD package smoke tests and fbctests"
 	if ! ssh_guest "$key" "$port" \
-			"FBCTESTS_JOBS='$FBCTESTS_JOBS' FBCTESTS_UNIT_ARGS='$FBCTESTS_UNIT_ARGS' bash -s" <<'EOF'
+			"FBCTESTS_JOBS='$FBCTESTS_JOBS' FBCTESTS_UNIT_ARGS='$FBCTESTS_UNIT_ARGS' EXAMPLEAGEDDON_JOBS='$EXAMPLEAGEDDON_JOBS' EXAMPLEAGEDDON_COMPILE_TIMEOUT='$EXAMPLEAGEDDON_COMPILE_TIMEOUT' EXAMPLEAGEDDON_RUN_TIMEOUT='$EXAMPLEAGEDDON_RUN_TIMEOUT' bash -s" <<'EOF'
 set -euo pipefail
 
 log=/home/fbc/work/freebasic-openbsd-test.log
@@ -1066,12 +1177,16 @@ EOF
 	then
 		rm -f "$LOG_DIR/freebasic-openbsd-test.log"
 		scp_from_guest "$key" "$port" "/home/fbc/work/freebasic-openbsd-test.log" "$LOG_DIR/" || true
+		scp_from_guest "$key" "$port" "/home/fbc/work/exampleageddon/report.md" "$vm_dir/exampleageddon-report.md" || true
+		scp_from_guest "$key" "$port" "/home/fbc/work/exampleageddon/results.csv" "$vm_dir/exampleageddon-results.csv" || true
 		tail -n 220 "$LOG_DIR/freebasic-openbsd-test.log" >&2 || true
 		die "OpenBSD package smoke tests or fbctests failed"
 	fi
 
 	rm -f "$LOG_DIR/freebasic-openbsd-test.log"
 	scp_from_guest "$key" "$port" "/home/fbc/work/freebasic-openbsd-test.log" "$LOG_DIR/"
+	scp_from_guest "$key" "$port" "/home/fbc/work/exampleageddon/report.md" "$vm_dir/exampleageddon-report.md"
+	scp_from_guest "$key" "$port" "/home/fbc/work/exampleageddon/results.csv" "$vm_dir/exampleageddon-results.csv"
 }
 
 verify_audio_capture() {
@@ -1160,6 +1275,14 @@ archive_results() {
 		cp -f "$RUN_DIR/test/freebasic-openbsd-audio.wav" "$ARCHIVE_DIR/"
 	fi
 
+	if [ -f "$RUN_DIR/test/exampleageddon-report.md" ]; then
+		cp -f "$RUN_DIR/test/exampleageddon-report.md" "$ARCHIVE_DIR/"
+	fi
+
+	if [ -f "$RUN_DIR/test/exampleageddon-results.csv" ]; then
+		cp -f "$RUN_DIR/test/exampleageddon-results.csv" "$ARCHIVE_DIR/"
+	fi
+
 	base="$(basename "$pkg")"
 	(
 		cd "$ARCHIVE_DIR"
@@ -1176,6 +1299,7 @@ trap cleanup EXIT
 
 main() {
 	check_host_tools
+	configure_qemu_acceleration
 	resolve_package_file
 
 	if [ -z "$SSH_PORT" ]; then SSH_PORT="$(find_free_port 12022)"; fi

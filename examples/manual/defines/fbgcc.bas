@@ -8,7 +8,7 @@
 
 #if __FB_GCC__ <> 0
 		#print Backend Code Emitter And Assembler: gcc
-#else 
+#else
 		#print Backend Code Emitter And Assembler: Not gcc
 #endif
-	
+

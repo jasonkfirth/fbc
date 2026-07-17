@@ -1,21 +1,33 @@
+const SCREEN_WIDTH = 320
+const SCREEN_HEIGHT = 200
+const SCREEN_DEPTH = 8
+const IMAGE_WIDTH = 45
+const IMAGE_HEIGHT = 37
+
 dim as any ptr image
 dim as integer w, h, bpp, pitch
 dim as byte ptr pixdata
 dim as integer size
 dim as integer result
 
-screenres 320, 200, 8
+screenres SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_DEPTH
+if screenptr = 0 then
+	print "Unable to create the graphics window."
+	end 1
+end if
 
-image = imagecreate( 45, 37 )
+image = imagecreate( IMAGE_WIDTH, IMAGE_HEIGHT )
 if( image = 0 ) then
 	print "ImageCreate failed"
-	end
+	end 1
 end if
 
 '' Get image information:
 result = imageinfo( image, w, h, bpp, pitch, pixdata, size )
 if( result <> 0 ) then
 	print "imageinfo() failed with error: " & result
+	imagedestroy( image )
+	end 1
 end if
 
 print "image buffer at address: " & hex( image )

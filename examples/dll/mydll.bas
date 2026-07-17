@@ -6,9 +6,9 @@
 '' (will create mydll.dll and libmydll.dll.a under Win32,
 ''  or libmydll.so under Linux)
 ''
-'' note: libmydll.dll.a is an import library, it's only needed when creating 
-''       an executable that calls any of mydll's functions, only distribute 
-''       the DLL files with your apps, do not include the import libraries, 
+'' note: libmydll.dll.a is an import library, it's only needed when creating
+''       an executable that calls any of mydll's functions, only distribute
+''       the DLL files with your apps, do not include the import libraries,
 ''       they are useless to end-users
 ''
 

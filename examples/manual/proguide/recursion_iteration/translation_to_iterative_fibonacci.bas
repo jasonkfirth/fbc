@@ -17,4 +17,4 @@ Function translationToIterativeFibonacci (ByVal n As UInteger, ByVal a As UInteg
 		Goto begin    '' iterative jump
 	End If
 End Function
-			
+

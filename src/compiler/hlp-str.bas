@@ -1,6 +1,7 @@
 '' string helpers
 ''
-''
+'' Ownership: Conversion helpers write into caller-owned DSTRING buffers.
+'' Local temporary buffers are released before the helper returns.
 
 
 #include once "fb.bi"
@@ -203,6 +204,22 @@ function ZstrDup _
 end function
 
 '':::::
+sub ZstrFree( byref p as zstring ptr )
+	if( p <> NULL ) then
+		deallocate( p )
+		p = NULL
+	end if
+end sub
+
+'':::::
+sub WstrFree( byref p as wstring ptr )
+	if( p <> NULL ) then
+		deallocate( p )
+		p = NULL
+	end if
+end sub
+
+'':::::
 function WstrDup _
 	( _
 		byval s as wstring ptr _
@@ -359,6 +376,7 @@ private function hUnicodeHexToCodePointW _
 
 	dim as uinteger char, c
 	dim as integer i
+	const DECIMAL_DIGIT_MAX = 9
 
 	char = 0
 
@@ -366,7 +384,7 @@ private function hUnicodeHexToCodePointW _
 		c = *src - CHAR_0
 		src += 1
 
-		if( c > 9 ) then
+		if( c > DECIMAL_DIGIT_MAX ) then
 			c -= (CHAR_AUPP - CHAR_9 - 1)
 		end if
 		if( c > 16 ) then
@@ -1504,45 +1522,44 @@ function hWStr2long( byref txt as wstring, byref value as long ) as integer
 end function
 
 '':::::
-sub hSplitStr(byref txt as string, byref del as string, res() as string)
-
-	var items = 10
-	redim dpos(0 to items-1) as integer
+function hSplitStr(byref txt as string, byref del as string, res() as string) as integer
 
 	var dellen = len(del)
+
+	if( dellen = 0 ) then
+		redim res(0 to 0)
+		res(0) = txt
+		return 1
+	end if
 
 	var cnt = 0
 	var p = 1
 	do
 		p = instr(p, txt, del)
-		if( p > 0 ) then
-			if( cnt >= items ) then
-				items += 10
-				redim preserve dpos(0 to items-1)
-			end if
-			dpos(cnt) = p
-			p += dellen
+		if( p = 0 ) then
+			exit do
 		end if
 		cnt += 1
-	loop until( p = 0 )
+		p += dellen
+	loop
 
-	cnt -= 1
 	if( cnt = 0 ) then
 		redim res(0 to 0)
 		res(0) = txt
-		return
+		return 1
 	end if
 
 	redim res(0 to cnt)
-	res(0) = Left(txt, dpos(0) - 1 )
 	p = 1
-	do until( p = cnt )
-		res(p) = mid(txt, dpos(p - 1) + dellen, dpos(p) - dpos(p - 1) - dellen )
-		p += 1
-	loop
-	res(cnt) = mid(txt, dpos(cnt - 1) + dellen)
+	for i as integer = 0 to cnt - 1
+		var nextp = instr(p, txt, del)
+		res(i) = mid(txt, p, nextp - p)
+		p = nextp + dellen
+	next
+	res(cnt) = mid(txt, p)
 
-end sub
+	return cnt + 1
+end function
 
 '':::::
 function hStr2Tok(byval txt as const zstring ptr, res() as string) as integer
@@ -1580,6 +1597,7 @@ function hStr2Tok(byval txt as const zstring ptr, res() as string) as integer
 	t = 0
 	lc = CHAR_SPACE
 	s = cast(const ubyte ptr, txt)
+	dim as integer token_start = 0, textpos = 0
 	do while( *s <> CHAR_NULL )
 		var c = cast(uinteger, *s)
 
@@ -1589,17 +1607,26 @@ function hStr2Tok(byval txt as const zstring ptr, res() as string) as integer
 
 		if( c = CHAR_SPACE ) then
 			if( lc <> CHAR_SPACE ) then
+				res(t) = mid( *txt, token_start + 1, textpos - token_start )
 				t += 1
 			end if
 		else
-			res(t) += chr(c)
+			if( lc = CHAR_SPACE ) then
+				token_start = textpos
+			end if
 		end if
 
 		lc = c
 		s += 1
+		textpos += 1
 	loop
 
-	function = iif(lc <> CHAR_SPACE, t + 1, t)
+	if( lc <> CHAR_SPACE ) then
+		res(t) = mid( *txt, token_start + 1, textpos - token_start )
+		t += 1
+	end if
+
+	function = t
 
 end function
 
@@ -1612,11 +1639,15 @@ function hStr2Args( byval txt as const zstring ptr, res() as string ) as integer
 	dim as const ubyte ptr s = cast(const ubyte ptr, txt)
 	dim as integer prntcnt = 0
 	dim as uinteger c = CHAR_NULL
-	dim as integer max_t = 10
+	dim as integer max_t
 
 	if( txt = NULl ) then
 		return 0
 	end if
+
+	'' Each argument needs at least one source character, except for empty
+	'' arguments around a comma.  This is therefore a safe upper bound.
+	max_t = len( *txt ) + 1
 
 	#define PeekChar()   cast( uinteger, s[0] )
 	#define SkipChar()   s += 1
@@ -1659,10 +1690,6 @@ function hStr2Args( byval txt as const zstring ptr, res() as string ) as integer
 		case CHAR_COMMA
 			if( prntcnt = 0 ) then
 				t += 1
-				if( t > max_t ) then
-					max_t += 10
-					redim preserve res( 0 to max_t - 1 )
-				end if
 				SkipChar()
 				continue do
 			end if
@@ -1776,11 +1803,15 @@ function hWStr2Args( byval txt as const wstring ptr, res() as DWSTRING ) as inte
 
 	dim as integer prntcnt = 0
 	dim as uinteger c = CHAR_NULL
-	dim as integer max_t = 10
+	dim as integer max_t
 
 	if( txt = NULl ) then
 		return 0
 	end if
+
+	'' See hStr2Args(): empty arguments are the only case needing one
+	'' more result than source characters.
+	max_t = len( *txt ) + 1
 
 	#define PeekChar()   cast( uinteger, s[0] )
 	#define SkipChar()   s += 1
@@ -1823,10 +1854,6 @@ function hWStr2Args( byval txt as const wstring ptr, res() as DWSTRING ) as inte
 		case CHAR_COMMA
 			if( prntcnt = 0 ) then
 				t += 1
-				if( t > max_t ) then
-					max_t += 10
-					redim preserve res( 0 to max_t - 1 )
-				end if
 				SkipChar()
 				continue do
 			end if

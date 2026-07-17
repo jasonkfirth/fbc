@@ -16,6 +16,6 @@ End Function
 	'' acquire result
 	Dim As Integer result
 	result = func( param1 )
-	
+
 	'' acquire new result with param2
 	result = func( param1, param2 )

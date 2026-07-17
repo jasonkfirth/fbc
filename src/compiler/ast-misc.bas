@@ -600,16 +600,23 @@ sub astCheckConst _
 
 		select case as const( typeGetSizeType( dtype ) )
 		case FB_SIZETYPE_INT8, FB_SIZETYPE_UINT8
+			'' A byte-sized constant must fit either signed or unsigned 8-bit range.
+			const BYTE_MIN = -128
+			const UBYTE_MAX = 255
 			lval = astConstGetAsInt64( n )
-			result = ((lval >= -128) and (lval <= 255))
+			result = ((lval >= BYTE_MIN) and (lval <= UBYTE_MAX))
 
 		case FB_SIZETYPE_INT16, FB_SIZETYPE_UINT16
+			const SHORT_MIN = -32768
+			const USHORT_MAX = 65535
 			lval = astConstGetAsInt64( n )
-			result = ((lval >= -32768) and (lval <= 65535))
+			result = ((lval >= SHORT_MIN) and (lval <= USHORT_MAX))
 
 		case FB_SIZETYPE_INT32, FB_SIZETYPE_UINT32
+			const LONG_MIN = -2147483648ll
+			const ULONG_MAX = 4294967295ll
 			lval = astConstGetAsInt64( n )
-			result = ((lval >= -2147483648ll) and (lval <= 4294967295ll))
+			result = ((lval >= LONG_MIN) and (lval <= ULONG_MAX))
 
 		case FB_SIZETYPE_INT64, FB_SIZETYPE_UINT64
 			'' longints can hold most other type's values, except floats
@@ -705,7 +712,8 @@ function astUpdStrConcat( byval n as ASTNODE ptr ) as ASTNODE ptr
 		if( n->op.op = AST_OP_ADD ) then
 			l = n->l
 			r = n->r
-			dim as integer ldtype = astGetDataType( l ), rdtype = astGetDataType( r )
+			dim as integer ldtype = astGetDataType( l )
+			dim as integer rdtype = astGetDataType( r )
 			if( astGetDataType( n ) <> FB_DATATYPE_WCHAR ) then
 				function = rtlStrConcat( l, ldtype, r, rdtype )
 			else
@@ -716,6 +724,68 @@ function astUpdStrConcat( byval n as ASTNODE ptr ) as ASTNODE ptr
 	end if
 
 end function
+
+private function hPrepareBranchExpr _
+	( _
+		byref expr as ASTNODE ptr, _
+		byref dtype as integer _
+	) as integer
+
+	'' Finalize the toplevel BOP before testing its x86 flag behavior below.
+	expr = astOptimizeTree( expr )
+	dtype = astGetFullType( expr )
+
+	if( typeGetClass( dtype ) = FB_DATACLASS_STRING ) then
+		return FALSE
+	end if
+
+	'' CHAR and WCHAR literals are also from the INTEGER class.
+	select case as const typeGetDtAndPtrOnly( dtype )
+	case FB_DATATYPE_CHAR, FB_DATATYPE_WCHAR
+		if( astIsDEREF( expr ) = FALSE ) then
+			return FALSE
+		end if
+
+	case FB_DATATYPE_STRUCT ', FB_DATATYPE_CLASS
+		dim as FB_ERRMSG err_num = any
+		dim as FBSYMBOL ptr ovlProc = any
+
+		'' First look for a scalar cast, then for a pointer cast.
+		ovlProc = symbFindCastOvlProc( FB_DATATYPE_VOID, NULL, expr, @err_num )
+		if( ovlProc = NULL ) then
+			ovlProc = symbFindCastOvlProc( typeAddrOf( FB_DATATYPE_VOID ), NULL, expr, @err_num )
+			if( ovlProc = NULL ) then
+				ovlProc = symbGetCompOpOvlHead( expr->subtype, AST_OP_CAST )
+				if( ovlProc = NULL ) then
+					errReport( FB_ERRMSG_NOMATCHINGPROC, TRUE, _
+					           " """ & *symbGetName( expr->subtype ) & ".cast()""" )
+					return FALSE
+				end if
+
+				errReport( FB_ERRMSG_NOMATCHINGPROC, TRUE )
+				return FALSE
+			end if
+		end if
+
+		expr = astBuildCall( ovlProc, expr )
+		dtype = astGetFullType( expr )
+	end select
+
+	return TRUE
+end function
+
+private sub hPrepareFloatBranchExpr _
+	( _
+		byref expr as ASTNODE ptr, _
+		byval dtype as integer _
+	)
+
+	if( typeGetClass( dtype ) = FB_DATACLASS_FPOINT ) then
+		if( env.clopt.fpmode = FB_FPMODE_PRECISE ) then
+			expr = astNewCONV( FB_DATATYPE_BOOLEAN, NULL, expr )
+		end if
+	end if
+end sub
 
 '' Turn a comparison expression (or anything that can be compared = 0)
 '' into a (conditional) branch
@@ -735,53 +805,9 @@ function astBuildBranch _
 		return NULL
 	end if
 
-	'' Optimize here already to ensure the toplevel BOP is final and can be
-	'' relied upon for x86 flag assumptions below
-	expr = astOptimizeTree( expr )
-
-	dtype = astGetFullType( expr )
-
-	'' string? invalid..
-	if( typeGetClass( dtype ) = FB_DATACLASS_STRING ) then
+	if( hPrepareBranchExpr( expr, dtype ) = FALSE ) then
 		return NULL
 	end if
-
-	'' CHAR and WCHAR literals are also from the INTEGER class
-	select case as const typeGetDtAndPtrOnly( dtype )
-	case FB_DATATYPE_CHAR, FB_DATATYPE_WCHAR
-		'' don't allow, unless it's a deref pointer
-		if( astIsDEREF( expr ) = FALSE ) then
-			return NULL
-		end if
-
-	'' UDT or CLASS?
-	case FB_DATATYPE_STRUCT ', FB_DATATYPE_CLASS
-		dim as FB_ERRMSG err_num = any
-		dim as FBSYMBOL ptr ovlProc = any
-
-		'' check for a scalar overload..
-		ovlProc = symbFindCastOvlProc( FB_DATATYPE_VOID, NULL, expr, @err_num )
-		if( ovlProc = NULL ) then
-			'' no? try pointers...
-			ovlProc = symbFindCastOvlProc( typeAddrOf( FB_DATATYPE_VOID ), NULL, expr, @err_num )
-			if( ovlProc = NULL ) then
-				ovlProc = symbGetCompOpOvlHead( expr->subtype, AST_OP_CAST )
-				if( ovlProc = NULL ) then
-					errReport( FB_ERRMSG_NOMATCHINGPROC, TRUE, _
-					           " """ & *symbGetName( expr->subtype ) & ".cast()""" )
-					return NULL
-				end if
-
-				errReport( FB_ERRMSG_NOMATCHINGPROC, TRUE )
-				return NULL
-			end if
-		end if
-
-		'' build cast call
-		expr = astBuildCall( ovlProc, expr )
-		dtype = astGetFullType( expr )
-
-	end select
 
 	'' If the condition expression uses temp vars, we may have to call their
 	'' dtors before branching (or instead insert the dtor calls at the two
@@ -971,13 +997,8 @@ function astBuildBranch _
 		expr = astNewVAR( temp )
 	end if
 
-	'' test floating point directly?  effectively convert to cbool(float-expression)
-	if( typeGetClass( dtype ) = FB_DATACLASS_FPOINT ) then
-		if( env.clopt.fpmode = FB_FPMODE_PRECISE ) then
-			'' convert exrpression to boolean
-			expr = astNewCONV( FB_DATATYPE_BOOLEAN, NULL, expr )
-		end if
-	end if
+	'' In precise floating-point mode, branch on an explicit boolean conversion.
+	hPrepareFloatBranchExpr( expr, dtype )
 
 	'' Check expression against zero (= FALSE)
 	n = astNewLINK( n, _

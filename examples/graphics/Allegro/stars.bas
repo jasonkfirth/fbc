@@ -321,7 +321,7 @@ end sub
 	clear_bitmap(buffer)
 
 	set_projection_viewport(0, 0, SCREEN_W, SCREEN_H)
-   
+
 	init_stars()
 	draw_stars()
 	init_ship()
@@ -372,7 +372,7 @@ end sub
 		if (key(KEY_LCONTROL) <> 0) or (key(KEY_RCONTROL) <> 0) then
 			ship.faces(ENGINE).colour = ENGINE_ON
 			ship.faces(ENGINE).range = 3
-			if (ship.velocity < SPEED_LIMIT) then 
+			if (ship.velocity < SPEED_LIMIT) then
 				ship.velocity = ship.velocity + 2
 			end if
 		else
@@ -393,5 +393,5 @@ end sub
 	loop
 
 	destroy_bitmap(buffer)
-   
+
 	END_OF_MAIN()

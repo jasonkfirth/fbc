@@ -745,6 +745,8 @@ private function hNeedAlias( byval proc as FBSYMBOL ptr ) as integer
 	'' ourselves since we already must control for the special cases.
 	case FB_FUNCMODE_STDCALL
 		function = TRUE
+	case else
+		'' Other conventions do not need a separately emitted alias.
 	end select
 end function
 
@@ -1111,6 +1113,8 @@ private function hEmitArrayDecl( byval sym as FBSYMBOL ptr ) as string
 		if( symbGetIsDynamic( sym ) = FALSE ) then
 			for i as integer = 0 to symbGetArrayDimensions( sym ) - 1
 				'' elements = ubound( array, d ) - lbound( array, d ) + 1
+				'' Array dimensions are limited to FB_MAXARRAYDIMS.
+				'' FB-LINTER: DISABLE-NEXT-LINE FBL503
 				s += "[" + str( symbArrayUbound( sym, i ) - symbArrayLbound( sym, i ) + 1 ) + "]"
 			next
 		end if
@@ -1664,7 +1668,9 @@ end sub
 
 private function _emitBegin( ) as integer
 	if( hFileExists( env.outf.name ) ) then
-		kill env.outf.name
+		if( kill( env.outf.name ) <> 0 ) then
+			return FALSE
+		end if
 	end if
 
 	env.outf.num = freefile
@@ -2809,7 +2815,46 @@ private function hBopToStr( byval op as integer ) as zstring ptr
 	case AST_OP_NE  : function = @" != "
 	case AST_OP_GE  : function = @" >= "
 	case AST_OP_LE  : function = @" <= "
+	case else
+		assert( 0 )
+		function = @""
 	end select
+end function
+
+private function hFloatUopToStr( byval op as integer, byval dtype as integer ) as zstring ptr
+	function = @""
+
+	'' Ignore any const qualifier.
+	if( typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_SINGLE ) then
+		select case as const( op )
+		case AST_OP_SIN   : function = @"__builtin_sinf"
+		case AST_OP_ASIN  : function = @"__builtin_asinf"
+		case AST_OP_COS   : function = @"__builtin_cosf"
+		case AST_OP_ACOS  : function = @"__builtin_acosf"
+		case AST_OP_TAN   : function = @"__builtin_tanf"
+		case AST_OP_ATAN  : function = @"__builtin_atanf"
+		case AST_OP_SQRT  : function = @"__builtin_sqrtf"
+		case AST_OP_LOG   : function = @"__builtin_logf"
+		case AST_OP_EXP   : function = @"__builtin_expf"
+		case AST_OP_FLOOR : function = @"__builtin_floorf"
+		case else          : assert( FALSE )
+		end select
+	else
+		assert( typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_DOUBLE )
+		select case as const( op )
+		case AST_OP_SIN   : function = @"__builtin_sin"
+		case AST_OP_ASIN  : function = @"__builtin_asin"
+		case AST_OP_COS   : function = @"__builtin_cos"
+		case AST_OP_ACOS  : function = @"__builtin_acos"
+		case AST_OP_TAN   : function = @"__builtin_tan"
+		case AST_OP_ATAN  : function = @"__builtin_atan"
+		case AST_OP_SQRT  : function = @"__builtin_sqrt"
+		case AST_OP_LOG   : function = @"__builtin_log"
+		case AST_OP_EXP   : function = @"__builtin_exp"
+		case AST_OP_FLOOR : function = @"__builtin_floor"
+		case else          : assert( FALSE )
+		end select
+	end if
 end function
 
 private function hUopToStr _
@@ -2844,38 +2889,7 @@ private function hUopToStr _
 
 	case else
 		is_builtin = TRUE
-
-		'' ignore any const qualifier
-		if( typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_SINGLE ) then
-			select case as const( op )
-			case AST_OP_SIN   : function = @"__builtin_sinf"
-			case AST_OP_ASIN  : function = @"__builtin_asinf"
-			case AST_OP_COS   : function = @"__builtin_cosf"
-			case AST_OP_ACOS  : function = @"__builtin_acosf"
-			case AST_OP_TAN   : function = @"__builtin_tanf"
-			case AST_OP_ATAN  : function = @"__builtin_atanf"
-			case AST_OP_SQRT  : function = @"__builtin_sqrtf"
-			case AST_OP_LOG   : function = @"__builtin_logf"
-			case AST_OP_EXP   : function = @"__builtin_expf"
-			case AST_OP_FLOOR : function = @"__builtin_floorf"
-			case else          : assert( FALSE )
-			end select
-		else
-			assert( typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_DOUBLE )
-			select case as const( op )
-			case AST_OP_SIN   : function = @"__builtin_sin"
-			case AST_OP_ASIN  : function = @"__builtin_asin"
-			case AST_OP_COS   : function = @"__builtin_cos"
-			case AST_OP_ACOS  : function = @"__builtin_acos"
-			case AST_OP_TAN   : function = @"__builtin_tan"
-			case AST_OP_ATAN  : function = @"__builtin_atan"
-			case AST_OP_SQRT  : function = @"__builtin_sqrt"
-			case AST_OP_LOG   : function = @"__builtin_log"
-			case AST_OP_EXP   : function = @"__builtin_exp"
-			case AST_OP_FLOOR : function = @"__builtin_floor"
-			case else          : assert( FALSE )
-			end select
-		end if
+		function = hFloatUopToStr( op, dtype )
 	end select
 
 end function
@@ -3210,6 +3224,8 @@ private function hSymBaseMayBeUnaligned _
 		select case symbGetParamMode( sym )
 		case FB_PARAMMODE_BYREF, FB_PARAMMODE_BYDESC
 			return TRUE
+		case else
+			'' Other parameter modes use the type alignment checks below.
 		end select
 	end if
 
@@ -3831,9 +3847,8 @@ private sub _emitUop _
 		'' booleans store 0/1, and a boolean NOT is supposed to produce
 		'' the inverse 1/0 boolean. Thus it can't be implemented as
 		'' bitwise NOT.
-		'' Do: <expr == 0>
-		'' !!!TODO!!! We could also do <!expr>, see AST_OP_BOOLNOT
-		expr = exprNewBOP( AST_OP_EQ, expr, exprNewIMMi( 0 ) )
+		'' C's logical NOT produces the required inverse 1/0 value.
+		expr = exprNewUOP( AST_OP_BOOLNOT, expr )
 	else
 		expr = exprNewUOP( op, expr )
 	end if
@@ -4334,7 +4349,8 @@ end function
 
 private function hStripSimpleAsmPlaceholderBrackets( byref asmcode as string ) as string
 	dim as string result
-	dim as integer i = 1, length = len( asmcode )
+	dim as integer i = 1
+	dim as integer length = len( asmcode )
 
 	while( i <= length )
 		dim as integer matched = FALSE
@@ -4740,7 +4756,7 @@ end sub
 
 private sub _emitVarIniScopeBegin( byval sym as FBSYMBOL ptr, byval is_array as integer )
 	ctx.variniscopelevel += 1
-	
+
 	ctx.varini += "{ "
 
 end sub
@@ -4842,15 +4858,21 @@ private sub _emitProcBegin _
 	hWriteLine( "{" )
 	sectionIndent( )
 
-	if( (env.clopt.backend = FB_BACKEND_CLANG) or _
-	    (env.clopt.backend = FB_BACKEND_GCC) or _
-	    (env.clopt.target = FB_COMPTARGET_DARWIN) ) then
+	if( ((env.clopt.backend = FB_BACKEND_CLANG) or _
+	     (env.clopt.backend = FB_BACKEND_GCC) or _
+	     (env.clopt.target = FB_COMPTARGET_DARWIN)) and _
+	    (env.clopt.target <> FB_COMPTARGET_JS) ) then
 		'' Work around an error clang throws if a function contains a
 		'' computed goto but no address-of-label operator.  Darwin uses
 		'' Apple's clang even when the driver command is named gcc, and
 		'' gcc-backend C can be compiled by clang too.  Ordinary ERROR
 		'' statements can emit computed gotos.
 		'' See https://bugs.llvm.org/show_bug.cgi?id=18658
+		''
+		'' Emscripten's WebAssembly backend does not implement address-of-label
+		'' expressions.  The JavaScript target must therefore leave this
+		'' workaround out; a harmless label address is still a WebAssembly
+		'' blockaddress and fails even when the program has no computed goto.
 		hWriteLine( "_unusedlabel: ; void *_llvmbug18658 = &&_unusedlabel;" )
 	end if
 end sub

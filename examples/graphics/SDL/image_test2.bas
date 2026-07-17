@@ -47,7 +47,7 @@ end sub
    	image->format->BitsPerPixel; "bpp"
 
 	' open the screen for displaying the image
-	' try to match the image size and depth 
+	' try to match the image size and depth
 	video = SDL_SetVideoMode(image->w, image->h, image->format->BitsPerPixel, SDL_ANYFORMAT)
 	if (video = 0) then
    		print "SDL_SetVideoMode: "; *SDL_GetError()
@@ -56,7 +56,7 @@ end sub
 	end if
 
 	' set the window title to the filename
-	SDL_WM_SetCaption filename, filename 
+	SDL_WM_SetCaption filename, filename
 
 	' print some info about the obtained screen
 	print "screen is"; video->w; "x"; trim(str(video->h)); ""; video->format->BitsPerPixel; "bpp"
@@ -65,7 +65,7 @@ end sub
 
 	' do the initial image display
 	SDL_BlitSurface(image, 0, video, 0)
-	fade video, SDL_MapRGB(video->format, 0, 0, 0), a 
+	fade video, SDL_MapRGB(video->format, 0, 0, 0), a
 	SDL_Flip(video)
 
 	' key repeat so we don't have to keep pressing over and over...
@@ -92,18 +92,18 @@ end sub
       		if (handled) then
          		print "fade = "; a
          		SDL_BlitSurface(image, 0, video, 0)
-         		fade video, SDL_MapRGB(video->format, 0, 0, 0), a 
+				fade video, SDL_MapRGB(video->format, 0, 0, 0), a
          		SDL_Flip(video)
       		end if
-   		
+
    		case SDL_QUIT_:
       		' quit events, exit the event loop
       		done = 1
-   		
+
    		case SDL_VIDEOEXPOSE:
-      		' need a redraw, we just redraw the whole screen for simplicity 
+			' need a redraw, we just redraw the whole screen for simplicity
       		SDL_BlitSurface(image, 0, video, 0)
-      		fade video, SDL_MapRGB(video->format, 0, 0, 0), a 
+			fade video, SDL_MapRGB(video->format, 0, 0, 0), a
       		SDL_Flip(video)
    		end select
 	loop

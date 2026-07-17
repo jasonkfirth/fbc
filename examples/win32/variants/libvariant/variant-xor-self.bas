@@ -13,14 +13,14 @@ operator VARIANT.xor= _
 	( _
 		byref rhs as VARIANT _
 	)
-	
+
 	dim as VARIANT_ res = any
-	
+
 	VarXor( @this.var_, @rhs.var_, @res )
-	
+
 	VariantClear( @this.var_ )
 	this.var_ = res
-	
+
 end operator
 
 '':::::
@@ -28,13 +28,13 @@ operator VARIANT.xor= _
 	( _
 		byref rhs as VARIANT_ _
 	)
-	
+
 	dim as VARIANT_ res = any
-	
+
 	VarXor( @this.var_, @rhs, @res )
-	
+
 	VariantClear( @this.var_ )
 	this.var_ = res
-	
+
 end operator
 

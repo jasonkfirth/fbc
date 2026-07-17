@@ -8,6 +8,7 @@
 #include once "emit.bi"
 #include once "ir-private.bi"
 
+'' Module state: irInit() selects and initializes the active backend context.
 dim shared ir as IRCTX
 
 sub irInit( )
@@ -43,6 +44,7 @@ sub irEnd( )
 
 end sub
 
+'' Module state: irhlInit() and irhlEnd() own the HLC backend context.
 dim shared irhl as IRHLCONTEXT
 
 sub irhlInit( )

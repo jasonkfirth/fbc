@@ -9,11 +9,11 @@
 #include "dos/sys/movedata.bi"
 
 Sub TextBufferToScreen(buffer() As UByte, size As Integer)
-	
+
 	Do Until inportb(&H3DA) And 8: Loop	' wait for vertical blank
-	
+
 	dosmemput(@buffer(0), size, ScreenPrimary)
-	
+
 End Sub
 
 Const ScreenWidth As Integer = 80
@@ -32,13 +32,13 @@ Do Until Len(Inkey)
 	For i = 0 To ScreenBytes - 1 Step 2
 		buffer(i) = Int(Rnd * 3) + 176
 	Next i
-	
+
 	For i = 1 To ScreenBytes - 1 Step 2
 		buffer(i) = Int(Rnd * 16)
 	Next i
-	
+
 	TextBufferToScreen buffer(), ScreenWidth * ScreenHeight * 2
-	
+
 Loop
 
 Cls

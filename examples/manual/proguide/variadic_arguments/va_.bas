@@ -14,7 +14,7 @@
 Function concatenation cdecl (ByVal count As Integer, ...) As String
 	Dim arg As Any Ptr
 	Dim s As String
-   
+
 	arg = va_first()
 
 	For i As Integer = 1 To count
@@ -25,7 +25,7 @@ Function concatenation cdecl (ByVal count As Integer, ...) As String
 			s &= va_arg(arg, Double)
 		End If
 	Next
-   
+
 	Return s
 End Function
 
@@ -34,4 +34,4 @@ Print concatenation(6, "Free", "BASIC", " ", "version", " ", 0.13)
 Sleep
 
 ' Output: FreeBASIC version 0.13
-		
+

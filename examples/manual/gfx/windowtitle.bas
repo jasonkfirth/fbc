@@ -6,7 +6,7 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgWindowtitle
 '' --------
 
-'Set screen mode 
+'Set screen mode
 Screen 13
 
 'Set the window title

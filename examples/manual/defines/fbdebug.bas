@@ -7,7 +7,7 @@
 '' --------
 
 #if __FB_DEBUG__ <> 0
-		#print Debug mode 
-#else 
-		#print Release mode 
+		#print Debug mode
+#else
+		#print Release mode
 #endif

@@ -292,6 +292,8 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 			if( (env.target.options and FB_TARGETOPT_CALLEEPOPSHIDDENPTR) = 0) then
 				bytestopop += env.pointersize
 			end if
+		case else
+			'' The callee pops the hidden result pointer for other conventions.
 		end select
 		if( ast.doemit ) then
 			'' Clear the temp struct (so the function can safely

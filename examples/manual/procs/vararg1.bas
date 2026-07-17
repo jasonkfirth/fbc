@@ -10,14 +10,14 @@ Function average cdecl(count As Integer, ... ) As Double
 	Dim arg As Any Ptr
 	Dim sum As Double = 0
 	Dim i As Integer
-	
+
 	arg = va_first()
 
 	For i = 1 To count
 		sum += va_arg(arg, Double)
 		arg = va_next(arg, Double)
 	Next
-	
+
 	Return sum / count
 End Function
 

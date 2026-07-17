@@ -15,6 +15,7 @@
 #include once "ir.bi"
 #include once "ast.bi"
 
+'' Module state: AST lifecycle routines initialize and reset this context.
 dim shared as ASTCTX ast
 
 type AST_LOADCALLBACK as function( byval n as ASTNODE ptr ) as IRVREG ptr

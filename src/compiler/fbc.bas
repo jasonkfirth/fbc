@@ -1,5 +1,8 @@
 '' main module, front-end
 ''
+'' Ownership: The driver owns its shared context, command-line temporary state,
+'' and generated temporary files until fbcEnd() releases them.
+''
 '' chng: sep/2004 written [v1ctor]
 ''       dec/2004 linux support added [lillo]
 ''       jan/2005 dos support added [DrV]
@@ -722,6 +725,8 @@ private function fbcRunBin _
 		if( fbctoolGetFlags( tool, FBCTOOLFLAG_RELYING_ON_SYSTEM ) = FALSE ) then
 			result = exec( path, ln )
 		else
+			'' System-provided tools must be resolved through the host PATH; Exec()
+			'' cannot reproduce that platform-specific command lookup.
 			result = shell( path + " " + ln )
 		end if
 	#endif
@@ -740,12 +745,29 @@ private function fbcRunBin _
 	end if
 end function
 
+private function hGetTempFileTag( ) as string
+	static as string tag
+
+	if( len( tag ) = 0 ) then
+		''
+		'' Intermediate and response files are deleted automatically unless
+		'' the user asked to keep them.  Keep their names away from normal
+		'' source names and from another compiler invocation in the same
+		'' output directory.
+		''
+		tag = ".fbc-" + hex( cuint( timer( ) * 1000.0 ), 8 )
+	end if
+
+	function = tag
+end function
+
 #if defined( __FB_WIN32__ ) or defined( __FB_DOS__ )
 private function hPutLdArgsIntoFile( byref ldcline as string ) as integer
 	dim as string argsfile, ln
 	dim as integer f = any
 
-	argsfile = hStripFilename( fbc.outname ) + "ldopt.tmp"
+	argsfile = hStripFilename( fbc.outname ) + _
+		"ldopt" + hGetTempFileTag( ) + ".tmp"
 
 	f = freefile( )
 	if( open( argsfile, for output, as #f ) ) then
@@ -981,11 +1003,11 @@ private function hLinkFiles( ) as integer
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86_64
 			''
-			'' illumos builds commonly use GNU ld.  Its Solaris/x86_64
-			'' emulation must be selected explicitly; otherwise ld keeps
-			'' the default 32-bit Solaris mode and rejects 64-bit archives.
+			'' illumos provides the Solaris link editor as the native system
+			'' linker.  Select its 64-bit output mode explicitly; otherwise
+			'' it rejects the 64-bit runtime archives as incompatible.
 			''
-			ldcline += "-m elf_x86_64_sol2 "
+			ldcline += "-64 "
 		end select
 	case FB_COMPTARGET_HAIKU
 		select case( fbGetCpuFamily( ) )
@@ -1498,7 +1520,7 @@ private function hLinkFiles( ) as integer
 		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then
 			ldcline += hFindLib( "crtbeginS.o" )
 		else
-			'' TODO
+			'' Cygwin needs crt0.o for normal program initialization.
 			ldcline += hFindLib( "crt0.o" )
 			'' additional support for gmon
 			if( fbGetOption( FB_COMPOPT_PROFILE ) = FB_PROFILE_OPT_GMON ) then
@@ -1797,12 +1819,11 @@ private function hLinkFiles( ) as integer
 	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS ) then
 		''
 		'' Keep the wasm link optimized, but do not ask Emscripten to run
-		'' its optional HTML/JavaScript minifier afterwards.  On Windows,
-		'' the Node-based html-minifier wrapper can crash after the wasm
-		'' output has already been produced, turning a good link into a
-		'' failed build for browser programs.
+		'' its optional HTML/JavaScript minifier afterwards.  The current
+		'' Emscripten setting is used instead of --minify 0 because that
+		'' option selects debug level 1 rather than disabling HTML minification.
 		''
-		ldcline += " --minify 0"
+		ldcline += " -s MINIFY_HTML=0"
 	end if
 
 	'' extra options
@@ -1946,7 +1967,9 @@ private function hLinkFiles( ) as integer
 		end if
 
 		'' remove .exe
-		kill fbc.outname
+		if( kill( fbc.outname ) <> 0 ) then
+			exit function
+		end if
 
 	case FB_COMPTARGET_WII
 		'' Turn the linked ELF into a bootable DOL image.
@@ -1958,7 +1981,9 @@ private function hLinkFiles( ) as integer
 			exit function
 		end if
 
-		kill fbc.outname
+		if( kill( fbc.outname ) <> 0 ) then
+			exit function
+		end if
 
 	end select
 
@@ -2780,11 +2805,11 @@ private sub handleOpt _
 
 	case OPT_NOLIB
 		dim libs() as string
-		hSplitStr(arg, ",", libs())
-		for i as integer = lbound(libs) to ubound(libs)
-			if len(libs(i)) > 0 then
-				strsetAdd(@fbc.excludedlibs, libs(i), 0 /'unused userdata'/)
-			end if
+		var libcount = hSplitStr(arg, ",", libs())
+		for i as integer = 0 to libcount - 1
+				if len(libs(i)) > 0 then
+					strsetAdd(@fbc.excludedlibs, libs(i), 0 /'unused userdata'/)
+				end if
 		next
 
 	case OPT_NOOBJINFO
@@ -3073,12 +3098,12 @@ private function parseOption(byval opt as zstring ptr) as integer
 	#endmacro
 
 	#macro ONECHAR(optid)
-		if (cptr(ubyte ptr, opt)[1] = 0) then
+		if (len(*opt) = 1) then
 			return optid
 		end if
 	#endmacro
 
-	select case as const (cptr(ubyte ptr, opt)[0])
+	select case as const asc(*opt)
 	case asc("a")
 		ONECHAR(OPT_A)
 		CHECK("arch", OPT_ARCH)
@@ -3243,12 +3268,12 @@ private sub handleArg _
 		return
 	end if
 
-	select case (arg[0])
+	select case asc(arg)
 	case asc("-")
 		dim as zstring ptr opt = strptr(arg) + 1
 
 		'' Complain about '-' only
-		if (cptr(ubyte ptr, opt)[0] = 0) then
+		if (len(arg) = 1) then
 			'' Incomplete command line option
 			hFatalInvalidOption( arg, is_source )
 		end if
@@ -3878,22 +3903,6 @@ private sub fbcDetermineMainName( )
 	end if
 end sub
 
-private function hGetTempFileTag( ) as string
-	static as string tag
-
-	if( len( tag ) = 0 ) then
-		''
-		'' Intermediate backend files are deleted automatically unless the user
-		'' asked to keep them.  Keep their names away from normal source names
-		'' such as foo.c so a compile in the source directory cannot overwrite
-		'' and then delete an existing file.
-		''
-		tag = ".fbc-" + hex( cuint( timer( ) * 1000.0 ), 8 )
-	end if
-
-	function = tag
-end function
-
 private function hCompileStage2DirectlyToObj( ) as integer
 	select case( fbGetOption( FB_COMPOPT_TARGET ) )
 	case FB_COMPTARGET_JS, FB_COMPTARGET_XBOX
@@ -4177,6 +4186,7 @@ private function hParseXpm _
 
 	dim as integer f = freefile( )
 	if( open( xpmfile, for input, as #f ) ) then
+		errReportEx( FB_ERRMSG_FILEACCESSERROR, xpmfile, -1 )
 		exit function
 	end if
 
@@ -4187,6 +4197,7 @@ private function hParseXpm _
 	if( ucase( ln ) <> "/* XPM */" ) then
 		'' Invalid XPM header
 		close #f
+		errReportEx( FB_ERRMSG_INVALIDXPMFILE, xpmfile, -1 )
 		exit function
 	end if
 
@@ -4220,6 +4231,7 @@ private function hParseXpm _
 
 	if( saw_rows = FALSE ) then
 		'' No image data found
+		errReportEx( FB_ERRMSG_INVALIDXPMFILE, xpmfile, -1 )
 		exit function
 	end if
 
@@ -4262,13 +4274,12 @@ private function hCompileXpm( ) as integer
 	end if
 
 	if( hParseXpm( xpmfile, code ) = FALSE ) then
-		'' TODO: show error message
 		exit function
 	end if
 
 	fo = freefile( )
 	if( open( fbc.xpm.srcfile, for output, as #fo ) ) then
-		'' TODO: show error message
+		errReportEx( FB_ERRMSG_FILEACCESSERROR, fbc.xpm.srcfile, -1 )
 		exit function
 	end if
 	print #fo, code;
@@ -4443,13 +4454,6 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 		else
 			ln += "-fno-unwind-tables "
 		end if
-
-		'' Prevent format string errors on gcc 9.x. (enabled by default with '-Wall')
-		'' TODO: fbc currently emits the ZSTRING type as 'uint8' when it
-		'' should probably preserve the 'char' type.  In C, there are 3
-		'' distinct types, 'char', 'unsigned char', 'signed char'.
-		'' See ir-hlc.bas:hEmitType()
-		ln += "-Wno-format "
 
 		'' Newer GCC versions diagnose some const-qualified pointer helper calls
 		'' more strictly.  The generated C is an intermediate representation owned
@@ -5082,8 +5086,8 @@ private sub hPrintOptions( byval verbose as integer )
 	print "  -sysroot <path>  Linker sysroot, needed by some cross-compiling toolchains"
 	print "  -t <value>       Set .exe stack size in kbytes, default: 1024 (win32/dos/xbox)"
 	if( verbose ) then
-	'' !!!TODO!!! provide more examples of available targets
 	print "  -target <name>   Set cross-compilation target"
+	print "                   Examples: win64, linux-x86_64, android, nuttx"
 	else
 	print "  -target <name>   Set cross-compilation target"
 	end if

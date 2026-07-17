@@ -20,22 +20,22 @@ Dim Shared hcondready As Any Ptr
 
 Sub mythread(ByVal id_ptr As Any Ptr)
 	Dim id As Integer = Cast(Integer, id_ptr)
-  
+
 	'' signal that this thread is ready
 	MutexLock hmutexready
 	threadcount += 1
 	Print "Thread #" & id & " is waiting..."
 	CondSignal hcondready
 	MutexUnlock hmutexready
-   
+
 	'' wait for the start signal
 	MutexLock hmutexstart
-	Do While start = 0   
+	Do While start = 0
 		CondWait hcondstart, hmutexstart
 	Loop
 
 	'' now this thread holds the lock on hmutexstart
-   
+
 	MutexUnlock hmutexstart
 
 	'' print out the number of this thread

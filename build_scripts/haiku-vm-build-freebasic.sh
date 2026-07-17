@@ -53,6 +53,8 @@ HTTP_PORT=""
 VNC_DISPLAY=""
 FBCTESTS_JOBS="$JOBS"
 FBCTESTS_UNIT_ARGS=""
+QEMU_ACCEL="${QEMU_ACCEL:-kvm}"
+QEMU_CPU="${QEMU_CPU:-host}"
 EXAMPLEAGEDDON_JOBS="$JOBS"
 EXAMPLEAGEDDON_COMPILE_TIMEOUT="120"
 EXAMPLEAGEDDON_RUN_TIMEOUT="10"
@@ -256,6 +258,15 @@ check_host_tools() {
 	if ! command -v 7z >/dev/null 2>&1 && ! command -v unzip >/dev/null 2>&1; then
 		die "required tool not found: 7z or unzip"
 	fi
+}
+
+configure_qemu_acceleration() {
+	if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
+		QEMU_ACCEL="tcg"
+		QEMU_CPU="max"
+	fi
+
+	msg "QEMU acceleration: $QEMU_ACCEL (CPU: $QEMU_CPU)"
 }
 
 latest_haiku_url() {
@@ -497,8 +508,8 @@ start_vm() {
 
 	qemu_args=(
 		"$QEMU_BIN"
-		-enable-kvm
-		-cpu host
+		-accel "$QEMU_ACCEL"
+		-cpu "$QEMU_CPU"
 		-m "$MEMORY"
 		-smp "$CPUS"
 		-drive "file=$boot_image,format=raw,if=ide,index=0"
@@ -886,7 +897,12 @@ send_source_tree() {
 	tar_directory_to_guest "$key" "$port" "$ROOT" "$target" \
 		--exclude='./.git' \
 		--exclude='./out' \
+		--exclude='./build' \
 		--exclude='./.build*' \
+		--exclude='./OMA' \
+		--exclude='./OMA_old' \
+		--exclude='./remote_probe_temp' \
+		--exclude='./nuttx-suite-logs' \
 		--exclude='./package-root' \
 		--exclude='./package-root*' \
 		--exclude='./*.hpkg' \
@@ -971,7 +987,7 @@ log=/Work/freebasic-haiku-build.log
 cd "$SOURCE_DIR"
 rm -f "$log"
 
-HAIKU_SKIP_DEPS=1 HAIKU_SKIP_NET_DEPS=1 HAIKU_PRESERVE_HPKG=1 ./build_scripts/haiku-build-freebasic.sh --noinstall > "$log" 2>&1 &
+HAIKU_SKIP_DEPS=1 HAIKU_SKIP_NET_DEPS=1 HAIKU_PRESERVE_HPKG=1 sh ./build_scripts/haiku-build-freebasic.sh --noinstall > "$log" 2>&1 &
 pid=$!
 
 while kill -0 "$pid" 2>/dev/null; do
@@ -1513,6 +1529,24 @@ console_output="$(/Work/smoke/console)"
 echo "$console_output"
 [ "$console_output" = "Hello world" ] || fail "unexpected console output"
 
+echo "==> compiling crt/sys/socket.bi API smoke"
+run fbc_command /Work/fbctests-source/tests/crt/socket.bas -x /Work/smoke/socket-bi
+
+echo "==> running crt/sys/socket.bi API smoke"
+run /Work/smoke/socket-bi
+
+echo "==> compiling curses.bi API smoke"
+run fbc_command /Work/fbctests-source/tests/crt/curses.bas -x /Work/smoke/curses-bi
+
+echo "==> running curses.bi API smoke"
+run /Work/smoke/curses-bi
+
+echo "==> compiling TCP loopback smoke"
+run fbc_command -mt /Work/fbctests-source/tests/file/tcp.bas -x /Work/smoke/tcp
+
+echo "==> running TCP loopback smoke"
+timeout 60 /Work/smoke/tcp
+
 echo "==> compiling gfxlib truecolor smoke"
 run fbc_command /Work/smoke/gfx-truecolor.bas -x /Work/smoke/gfx-truecolor
 
@@ -1746,6 +1780,7 @@ trap cleanup EXIT
 
 main() {
 	check_host_tools
+	configure_qemu_acceleration
 	resolve_package_file
 
 	if [ -z "$SSH_PORT" ]; then SSH_PORT="$(find_free_port 10022)"; fi

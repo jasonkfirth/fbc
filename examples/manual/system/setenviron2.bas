@@ -26,18 +26,18 @@ Dim As Double T = Timer
   '' Lock our page
 ScreenLock
 Do
-  
+
 	'' Print time since last frame
   Locate 1, 1
   Print "FPS: " & 1 / ( Timer - T )
   T = Timer
-  
+
 	'' Flip our screen
   ScreenUnlock
   ScreenLock
 	'' Commit a graphical change to our screen.
   Cls
-  
+
 Loop Until Len(Inkey)
 
   '' unlock our page.

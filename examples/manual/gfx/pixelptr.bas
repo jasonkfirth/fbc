@@ -13,9 +13,9 @@ Function pixelptr(ByVal img As Any Ptr, ByVal x As Integer, ByVal y As Integer) 
 	Dim As Long w, h, bypp, pitch
 	Dim As Any Ptr pixdata
 	Dim As Long result
-	
+
 	result = ImageInfo(img, w, h, bypp, pitch, pixdata)
-	
+
 	If result = 0 Then '' seems like a valid image
 		If x < 0 Or x >= w Then Return 0
 		If y < 0 Or y >= h Then Return 0
@@ -23,7 +23,7 @@ Function pixelptr(ByVal img As Any Ptr, ByVal x As Integer, ByVal y As Integer) 
 	Else
 		Return 0
 	End If
-	
+
 End Function
 
 '' usage example:
@@ -67,4 +67,4 @@ Else
 End If
 
 Sleep
-	
+

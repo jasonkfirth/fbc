@@ -836,39 +836,51 @@ sub cForStmtBegin( )
 
 	if( stk->for.end.sym = NULL and stk->for.ispos.sym = NULL ) then
 		dim as integer toobig = FALSE
+		const FOR_INT8_MAX = 127
+		const FOR_UINT8_MAX = 255
+		const FOR_INT16_MAX = 32767
+		const FOR_UINT16_MAX = 65535
+		const FOR_INT32_MAX = 2147483647
+		const FOR_UINT32_MAX = 4294967295
+		const FOR_INT64_MAX = 9223372036854775807
+		const FOR_UINT64_MAX = 18446744073709551615
+		const FOR_INT8_MIN = -128
+		const FOR_INT16_MIN = -32768
+		const FOR_INT32_MIN = -2147483648
+		const FOR_INT64_MIN = -9223372036854775808
 		if ( stk->for.ispos.value.i ) then
 			select case as const typeGetSizeType( stk->for.cnt.dtype )
 			case FB_SIZETYPE_INT8
-				toobig = (stk->for.end.value.i >= 127)
+				toobig = (stk->for.end.value.i >= FOR_INT8_MAX)
 			case FB_SIZETYPE_UINT8
-				toobig = (stk->for.end.value.i >= 255)
+				toobig = (stk->for.end.value.i >= FOR_UINT8_MAX)
 			case FB_SIZETYPE_INT16
-				toobig = (stk->for.end.value.i >= 32767)
+				toobig = (stk->for.end.value.i >= FOR_INT16_MAX)
 			case FB_SIZETYPE_UINT16
-				toobig = (stk->for.end.value.i >= 65535)
+				toobig = (stk->for.end.value.i >= FOR_UINT16_MAX)
 			case FB_SIZETYPE_INT32
-				toobig = (stk->for.end.value.i >= 2147483647)
+				toobig = (stk->for.end.value.i >= FOR_INT32_MAX)
 			case FB_SIZETYPE_UINT32
-				toobig = (stk->for.end.value.i >= 4294967295)
+				toobig = (stk->for.end.value.i >= FOR_UINT32_MAX)
 			case FB_SIZETYPE_INT64
-				toobig = (culngint(stk->for.end.value.i) >= 9223372036854775807)
+				toobig = (culngint(stk->for.end.value.i) >= FOR_INT64_MAX)
 			case FB_SIZETYPE_UINT64
-				toobig = (culngint(stk->for.end.value.i) >= 18446744073709551615)
+				toobig = (culngint(stk->for.end.value.i) >= FOR_UINT64_MAX)
 			end select
 		else
 			select case as const typeGetSizeType( stk->for.cnt.dtype )
 			case FB_SIZETYPE_UINT8, FB_SIZETYPE_UINT16, FB_SIZETYPE_UINT32, FB_SIZETYPE_UINT64
 				toobig = (stk->for.end.value.i <= 0)
 			case FB_SIZETYPE_INT8
-				toobig = (stk->for.end.value.i <= -128)
+				toobig = (stk->for.end.value.i <= FOR_INT8_MIN)
 			case FB_SIZETYPE_INT16
-				toobig = (stk->for.end.value.i <= -32768)
+				toobig = (stk->for.end.value.i <= FOR_INT16_MIN)
 			case FB_SIZETYPE_INT32
-				toobig = (stk->for.end.value.i <= -2147483648)
+				toobig = (stk->for.end.value.i <= FOR_INT32_MIN)
 			case FB_SIZETYPE_INT64
 				'' can't test with '<=' comparison here otherwise
 				'' condition is always true on 64-bit integer counters
-				toobig = (stk->for.end.value.i = -9223372036854775808)
+				toobig = (stk->for.end.value.i = FOR_INT64_MIN)
 			end select
 		end if
 		if( toobig ) then

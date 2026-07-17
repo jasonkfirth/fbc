@@ -7,4 +7,4 @@
 '' --------
 
 Print Frac(10.625)  '' will print  0.625
-Print Frac(-10.625) '' will print -0.625 
+Print Frac(-10.625) '' will print -0.625

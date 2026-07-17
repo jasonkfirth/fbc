@@ -229,7 +229,26 @@ if [ "$NOBUILD" -eq 0 ]; then
 
 	if [ ! -x bin/fbc ]; then
 		msg "Building bootstrap compiler ($JOBS threads)"
-		run_build_arch make -j"$JOBS" HAVE_PREREQS_MK= FBCFLAGS="$PACKAGE_FBCFLAGS" bootstrap-minimal
+		if [ "$ARCH" = "x86_64" ] && [ -d bootstrap/haiku-amd64 ]; then
+			# The legacy amd64 bootstrap snapshot is native Haiku code.  The
+			# canonical x86_64 snapshot in older source archives was emitted by
+			# a Linux compiler and therefore selects Linux as its default host.
+			run_build_arch make -j"$JOBS" HAVE_PREREQS_MK= \
+				FBTARGET_DIR_OVERRIDE=haiku-amd64 \
+				FBCFLAGS="$PACKAGE_FBCFLAGS" bootstrap-minimal
+		else
+			run_build_arch make -j"$JOBS" HAVE_PREREQS_MK= \
+				FBCFLAGS="$PACKAGE_FBCFLAGS" bootstrap-minimal
+		fi
+
+		BOOTSTRAP_VERSION=$(run_build_arch bin/fbc -version 2>&1)
+		case "$BOOTSTRAP_VERSION" in
+			*"built for haiku-"*) ;;
+			*)
+				printf '%s\n' "$BOOTSTRAP_VERSION" >&2
+				fail "bootstrap compiler selected a non-Haiku host"
+				;;
+		esac
 	fi
 
 	msg "Building FreeBASIC ($JOBS threads)"

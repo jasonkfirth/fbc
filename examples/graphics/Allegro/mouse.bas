@@ -11,7 +11,7 @@
 	install_keyboard()
 	install_timer()
 	if (set_gfx_mode(GFX_SAFE, 320, 240, 0, 0) <> 0) then
-		end 1 
+		end 1
 	end if
 
 	set_palette( @desktop_palette(0) )
@@ -40,8 +40,8 @@
 		textout(screen, font, "mouse_y =" + str(mouse_y) + "    ", 16, 64, makecol(0, 0, 0))
 
 		'' or you can use this function to measure the speed of movement.
-		'' Note that we only call it every fourth time round the loop: 
-		'' there's no need for that other than to slow the numbers down 
+		'' Note that we only call it every fourth time round the loop:
+		'' there's no need for that other than to slow the numbers down
 		'' a bit so that you will have time to read them...
 		c = c + 1
 		if ((c and 3) = 0) then
@@ -80,11 +80,11 @@
 
 	clear_keybuf()
 
-	''  To display a mouse pointer, call show_mouse(). There are several 
+	''  To display a mouse pointer, call show_mouse(). There are several
 	''  things you should be aware of before you do this, though. For one,
 	''  it won't work unless you call install_timer() first. For another,
 	''  you must never draw anything onto the screen while the mouse
-	''  pointer is visible. So before you draw anything, be sure to turn 
+	''  pointer is visible. So before you draw anything, be sure to turn
 	''  the mouse off with show_mouse(NULL), and turn it back on again when
 	''  you are done.
 	clear_to_color(screen, makecol(255, 255, 255))

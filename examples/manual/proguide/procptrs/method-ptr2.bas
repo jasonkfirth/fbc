@@ -25,4 +25,4 @@ p = ProcPtr(T.test)  '' or 'p = @T.test'
 Dim As T obj
 
 Print p(obj, 69) '' prints 489
-	
+

@@ -16,4 +16,4 @@ Function translationToIterativeFactorial (ByVal n As Integer, ByVal result As In
 		Goto begin           '' iterative jump
 	End If
 End Function
-			
+

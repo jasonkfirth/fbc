@@ -26,5 +26,5 @@ Do
 
   'free up CPU time
   Sleep(18, 1)
-  
+
 Loop Until key = Chr(27) Or key = Chr(255, 107)

@@ -99,6 +99,13 @@ function symbCalcArgLen _
 	select case( mode )
 	case FB_PARAMMODE_BYREF, FB_PARAMMODE_BYDESC
 		return env.pointersize
+	case FB_PARAMMODE_BYVAL, FB_PARAMMODE_VARARG, INVALID
+		'' AST call arguments use INVALID when no explicit passing mode was given.
+		'' Those arguments follow the declared parameter mode and reach this helper
+		'' only when their storage must be calculated as BYVAL/VARARG.
+	case else
+		assert( 0 )
+		return 0
 	end select
 
 	'' BYVAL/VARARG
@@ -699,6 +706,8 @@ private sub hSetupProcRegisterParameters _
 		'' should never get here if "-z no-fastcall" is active
 		assert( env.clopt.nofastcall = FALSE )
 		maxregnum = 2
+	case else
+		'' The remaining conventions pass all parameters on the stack.
 	end select
 
 	if( maxregnum > 0 ) then
@@ -738,6 +747,166 @@ private sub hSetupProcRegisterParameters _
 
 end sub
 
+private sub hSetupProcMethod _
+	( _
+		byval proc as FBSYMBOL ptr, _
+		byval parent as FBSYMBOL ptr, _
+		byval id as const zstring ptr, _
+		byval options as FB_SYMBOPT _
+	)
+
+	dim as integer lookupoptions = any
+	dim as FBSYMBOL ptr overridden = any
+
+	if( symbIsMethod( proc ) = FALSE ) then
+		exit sub
+	end if
+
+	assert( symbIsStruct( parent ) )
+
+	'' Adding an ABSTRACT? Increase ABSTRACT count
+	if( symbIsAbstract( proc ) ) then
+		parent->udt.ext->abstractcount += 1
+	end if
+
+	'' Only check if this really is a derived UDT
+	overridden = NULL
+	if( parent->udt.base ) then
+		'' Destructor?
+		if( symbIsDestructor1( proc ) ) then
+			'' There can always only be one complete dtor, so there is no
+			'' need to do a lookup and/or overload checks.
+			overridden = symbGetCompDtor1( parent->udt.base->subtype )
+		elseif( symbIsDestructor0( proc ) ) then
+			'' There can always only be deleting dtor, so there is no
+			'' need to do a lookup and/or overload checks.
+			overridden = symbGetCompDtor0( parent->udt.base->subtype )
+		elseif( symbIsOperator( proc ) ) then
+			'' Get the corresponding operator from the base
+			'' (actually a chain of overloads for that particular operator)
+			overridden = symbGetCompOpOvlHead( parent->udt.base->subtype, _
+			                                   symbGetProcOpOvl( proc ) )
+
+			'' Find the overload with the exact same signature
+			overridden = symbFindOpOvlProc( symbGetProcOpOvl( proc ), overridden, proc )
+		elseif( id ) then
+			'' If this method has the same id and signature as
+			'' a virtual derived from some base, it overrides that
+			'' virtual, by being assigned the same vtable index.
+
+			'' Find a method in the base with the same name
+			overridden = symbLookupByNameAndClass( _
+				parent->udt.base->subtype, _
+				id, FB_SYMBCLASS_PROC, _
+				((options and FB_SYMBOPT_PRESERVECASE) <> 0), _
+				TRUE )  '' search NSIMPORTs (bases)
+
+			'' Property getters need this special flag to be looked up
+			lookupoptions = 0
+			if( symbIsProperty( proc ) ) then
+				'' Not a sub?
+				if( symbGetType( proc ) <> FB_DATATYPE_VOID ) then
+					'' then it's a getter
+					lookupoptions = FB_SYMBFINDOPT_PROPGET
+				end if
+			end if
+
+			'' Find the overload with the exact same signature
+			overridden = symbFindOverloadProc( overridden, proc, lookupoptions )
+		end if
+
+		'' Found anything?
+		if( overridden ) then
+			'' Only override if the found overload really is a virtual
+			if( symbIsVirtual( overridden ) = FALSE ) then
+				overridden = NULL
+			end if
+		end if
+	end if
+
+	if( overridden ) then
+		'' Overriding an ABSTRACT? Decrease ABSTRACT count
+		if( symbIsAbstract( overridden ) ) then
+			parent->udt.ext->abstractcount -= 1
+		end if
+
+		'' Use the same vtable slot as the virtual that's being overridden
+		symbProcSetVtableIndex( proc, symbProcGetVtableIndex( overridden ) )
+		proc->proc.ext->overridden = overridden
+	else
+		'' Allocate a *new* vtable slot, but only if this is a virtual,
+		'' and it didn't override anything (thus doesn't reuse a vtable slot).
+		if( symbIsVirtual( proc ) ) then
+			symbProcSetVtableIndex( proc, symbCompAddVirtual( parent ) )
+		end if
+	end if
+
+end sub
+
+private sub hLinkProcOverload _
+	( _
+		byval proc as FBSYMBOL ptr, _
+		byval head_proc as FBSYMBOL ptr _
+	)
+
+	dim as integer params = symbGetProcParams( proc )
+
+	if( symbIsMethod( proc ) ) then
+		'' The hidden instance pointer is not part of the callable arity.
+		params -= 1
+	end if
+
+	if( head_proc <> NULL ) then
+		proc->proc.ovl.next = head_proc->proc.ovl.next
+		head_proc->proc.ovl.next = proc
+
+		if( params < symGetProcOvlMinParams( head_proc ) ) then
+			symGetProcOvlMinParams( head_proc ) = params
+		end if
+
+		if( params > symGetProcOvlMaxParams( head_proc ) ) then
+			symGetProcOvlMaxParams( head_proc ) = params
+		end if
+	else
+		proc->proc.ovl.next = NULL
+		symGetProcOvlMinParams( proc ) = params
+		symGetProcOvlMaxParams( proc ) = params
+	end if
+
+end sub
+
+private sub hFinalizeProcMetadata _
+	( _
+		byval proc as FBSYMBOL ptr, _
+		byref stats as integer, _
+		byval mode as integer, _
+		byval options as FB_SYMBOPT _
+	)
+
+	if( options and FB_SYMBOPT_RTL ) then
+		stats or= FB_SYMBSTATS_RTL
+	end if
+
+	proc->proc.mode = mode
+
+	'' An EXTERN compound omits the parent from basic mangling, except
+	'' for C++ and rtlib declarations which retain their normal namespace.
+	if( fbGetCompStmtId( ) = FB_TK_EXTERN ) then
+		if(( parser.mangling <> FB_MANGLING_CPP ) and ( parser.mangling <> FB_MANGLING_RTLIB )) then
+			stats or= FB_SYMBSTATS_EXCLPARENT
+		end if
+	end if
+
+	symbProcRecalcRealType( proc )
+
+	if( options and FB_SYMBOPT_DECLARING ) then
+		stats or= FB_SYMBSTATS_DECLARED
+	end if
+
+	proc->proc.rtl.callback = NULL
+
+end sub
+
 private function hSetupProc _
 	( _
 		byval sym as FBSYMBOL ptr, _
@@ -754,8 +923,8 @@ private function hSetupProc _
 		byval options as FB_SYMBOPT _
 	) as FBSYMBOL ptr
 
-	dim as integer stats = any, preserve_case = any, lookupoptions = any
-	dim as FBSYMBOL ptr proc = any, head_proc = any, overridden = any
+	dim as integer stats = any, preserve_case = any
+	dim as FBSYMBOL ptr proc = any, head_proc = any
 
 	function = NULL
 
@@ -853,12 +1022,7 @@ private function hSetupProc _
 		end if
 
 	'' operator?
-	elseif( (pattrib and FB_PROCATTRIB_OPERATOR) <> 0 ) then
-
-		'' op not set? (because error recovery)
-		if( sym->proc.ext = NULL ) then
-			goto add_proc
-		end if
+	elseif( ((pattrib and FB_PROCATTRIB_OPERATOR) <> 0) andalso (sym->proc.ext <> NULL) ) then
 
 		dim as AST_OP op
 
@@ -888,9 +1052,8 @@ private function hSetupProc _
 			end if
 		end if
 
-	'' ordinary proc..
+	'' ordinary proc, or an operator without metadata due to error recovery..
 	else
-add_proc:
 
 		preserve_case = (options and FB_SYMBOPT_PRESERVECASE) <> 0
 
@@ -940,141 +1103,17 @@ add_proc:
 
 	end if
 
-	if( (options and FB_SYMBOPT_RTL) <> 0 ) then
-		stats or= FB_SYMBSTATS_RTL
-	end if
-
-	''
-	proc->proc.mode = mode
-
-	'' last compound was an EXTERN?
-	if( fbGetCompStmtId( ) = FB_TK_EXTERN ) then
-		'' don't add parent when mangling, even if inside an UDT, unless
-		'' it's in "c++" mode or "rtlib" mode
-		if(( parser.mangling <> FB_MANGLING_CPP ) and ( parser.mangling <> FB_MANGLING_RTLIB )) then
-			stats or= FB_SYMBSTATS_EXCLPARENT
-		end if
-	end if
-
-	symbProcRecalcRealType( proc )
-
-	if( (options and FB_SYMBOPT_DECLARING) <> 0 ) then
-		stats or= FB_SYMBSTATS_DECLARED
-	end if
-
-	proc->proc.rtl.callback = NULL
+	hFinalizeProcMetadata( proc, stats, mode, options )
 
 	'' if overloading, update the linked-list
 	if( symbIsOverloaded( proc ) ) then
-		dim as integer params = symbGetProcParams( proc )
-
-		'' note: min and max params don't count the instance ptr
-		if( symbIsMethod( proc ) ) then
-			params -= 1
-		end if
-
-		if( head_proc <> NULL ) then
-			proc->proc.ovl.next = head_proc->proc.ovl.next
-			head_proc->proc.ovl.next = proc
-
-			if( params < symGetProcOvlMinParams( head_proc ) ) then
-				symGetProcOvlMinParams( head_proc ) = params
-			end if
-
-			if( params > symGetProcOvlMaxParams( head_proc ) ) then
-				symGetProcOvlMaxParams( head_proc ) = params
-			end if
-
-		else
-			proc->proc.ovl.next = NULL
-			symGetProcOvlMinParams( proc ) = params
-			symGetProcOvlMaxParams( proc ) = params
-		end if
+		hLinkProcOverload( proc, head_proc )
 	end if
 
 	proc->stats or= stats
 
 	'' Adding method to UDT?
-	if( symbIsMethod( proc ) ) then
-		assert( symbIsStruct( parent ) )
-
-		'' Adding an ABSTRACT? Increase ABSTRACT count
-		if( symbIsAbstract( proc ) ) then
-			parent->udt.ext->abstractcount += 1
-		end if
-
-		'' Only check if this really is a derived UDT
-		overridden = NULL
-		if( parent->udt.base ) then
-			'' Destructor?
-			if( symbIsDestructor1( proc ) ) then
-				'' There can always only be one complete dtor, so there is no
-				'' need to do a lookup and/or overload checks.
-				overridden = symbGetCompDtor1( parent->udt.base->subtype )
-			elseif( symbIsDestructor0( proc ) ) then
-				'' There can always only be deleting dtor, so there is no
-				'' need to do a lookup and/or overload checks.
-				overridden = symbGetCompDtor0( parent->udt.base->subtype )
-			elseif( symbIsOperator( proc ) ) then
-				'' Get the corresponding operator from the base
-				'' (actually a chain of overloads for that particular operator)
-				overridden = symbGetCompOpOvlHead( parent->udt.base->subtype, _
-				                                   symbGetProcOpOvl( proc ) )
-
-				'' Find the overload with the exact same signature
-				overridden = symbFindOpOvlProc( symbGetProcOpOvl( proc ), overridden, proc )
-			elseif( id ) then
-				'' If this method has the same id and signature as
-				'' a virtual derived from some base, it overrides that
-				'' virtual, by being assigned the same vtable index.
-
-				'' Find a method in the base with the same name
-				overridden = symbLookupByNameAndClass( _
-					parent->udt.base->subtype, _
-					id, FB_SYMBCLASS_PROC, _
-					((options and FB_SYMBOPT_PRESERVECASE) <> 0), _
-					TRUE )  '' search NSIMPORTs (bases)
-
-				'' Property getters need this special flag to be looked up
-				lookupoptions = 0
-				if( symbIsProperty( proc ) ) then
-					'' Not a sub?
-					if( symbGetType( proc ) <> FB_DATATYPE_VOID ) then
-						'' then it's a getter
-						lookupoptions = FB_SYMBFINDOPT_PROPGET
-					end if
-				end if
-
-				'' Find the overload with the exact same signature
-				overridden = symbFindOverloadProc( overridden, proc, lookupoptions )
-			end if
-
-			'' Found anything?
-			if( overridden ) then
-				'' Only override if the found overload really is a virtual
-				if( symbIsVirtual( overridden ) = FALSE ) then
-					overridden = NULL
-				end if
-			end if
-		end if
-
-		if( overridden ) then
-			'' Overriding an ABSTRACT? Decrease ABSTRACT count
-			if( symbIsAbstract( overridden ) ) then
-				parent->udt.ext->abstractcount -= 1
-			end if
-
-			'' Use the same vtable slot as the virtual that's being overridden
-			symbProcSetVtableIndex( proc, symbProcGetVtableIndex( overridden ) )
-			proc->proc.ext->overridden = overridden
-		else
-			'' Allocate a *new* vtable slot, but only if this is a virtual,
-			'' and it didn't override anything (thus doesn't reuse a vtable slot).
-			if( symbIsVirtual( proc ) ) then
-				symbProcSetVtableIndex( proc, symbCompAddVirtual( parent ) )
-			end if
-		end if
-	end if
+	hSetupProcMethod( proc, parent, id, options )
 
 	hSetupProcRegisterParameters( proc )
 
@@ -1435,6 +1474,10 @@ sub symbGetRealParamDtype overload _
 		dtype = typeAddrOf( FB_DATATYPE_STRUCT )
 		assert( symbIsDescriptor( bydescrealsubtype ) )
 		subtype = bydescrealsubtype
+
+	case else
+		'' A parameter symbol must always carry one of the supported modes.
+		assert( FALSE )
 	end select
 
 end sub
@@ -1816,6 +1859,35 @@ end function
 #endmacro
 
 '':::::
+private function hCalcStringParamDiff _
+	( _
+		byval arg_dtype as integer, _
+		byval arg_dclass as integer _
+	) as FB_OVLPROC_MATCH_SCORE
+
+	function = FB_OVLPROC_NO_MATCH
+
+	select case arg_dclass
+	'' okay if it's a fixed-len string
+	case FB_DATACLASS_STRING
+		function = FB_OVLPROC_FULLMATCH
+
+	'' integer if it's a z/wstring (no matter whether a
+	'' variable/literal or DEREF, it can all be treated as string)
+	case FB_DATACLASS_INTEGER
+		select case arg_dtype
+		case FB_DATATYPE_CHAR
+			'' zstring => string
+			function = FB_OVLPROC_FULLMATCH - OvlMatchScore( 0, 2 )
+		case FB_DATATYPE_WCHAR
+			'' wstring => string
+			function = FB_OVLPROC_HALFMATCH - OvlMatchScore( 0, 2 )
+		end select
+	end select
+
+end function
+
+'':::::
 private function hCalcTypesDiff _
 	( _
 		byval param_dtype_in as integer, _
@@ -2027,25 +2099,7 @@ private function hCalcTypesDiff _
 
 	'' string?
 	case FB_DATACLASS_STRING
-
-		select case arg_dclass
-		'' okay if it's a fixed-len string
-		case FB_DATACLASS_STRING
-			function = FB_OVLPROC_FULLMATCH
-
-		'' integer if it's a z/wstring (no matter whether a
-		'' variable/literal or DEREF, it can all be treated as string)
-		case FB_DATACLASS_INTEGER
-			select case arg_dtype
-			case FB_DATATYPE_CHAR
-				'' zstring => string
-				function = FB_OVLPROC_FULLMATCH - OvlMatchScore( 0, 2 )
-			case FB_DATATYPE_WCHAR
-				'' wstring => string
-				function = FB_OVLPROC_HALFMATCH - OvlMatchScore( 0, 2 )
-			end select
-
-		end select
+		return hCalcStringParamDiff( arg_dtype, arg_dclass )
 
 	end select
 
@@ -2146,6 +2200,13 @@ private function hCheckOvlParam _
 			param_ptrcnt += 1
 
 		end if
+
+	case FB_PARAMMODE_BYVAL, FB_PARAMMODE_VARARG
+		'' These modes require no special handling before common matching.
+
+	case else
+		assert( FALSE )
+		return FB_OVLPROC_NO_MATCH
 	end select
 
 	'' arg passed by descriptor? refuse..
@@ -2269,7 +2330,8 @@ private function hCheckOvlProc _
 	) as integer
 
 	dim as FBSYMBOL ptr param = any
-	dim as FB_OVLPROC_MATCH_SCORE arg_matchscore = any, matchscore = FB_OVLPROC_NO_MATCH
+	dim as FB_OVLPROC_MATCH_SCORE arg_matchscore = any
+	dim as FB_OVLPROC_MATCH_SCORE matchscore = FB_OVLPROC_NO_MATCH
 	dim as integer matchcount = any
 	dim as FB_CALL_ARG ptr arg = any
 
@@ -3213,6 +3275,10 @@ private sub hProcModeToStr( byref s as string, byval proc as FBSYMBOL ptr )
 			s += " fastcall"
 		case FB_FUNCMODE_PASCAL
 			s += " pascal"
+		case FB_FUNCMODE_CDECL
+			'' CDECL is the constructor/destructor default.
+		case else
+			assert( FALSE )
 		end select
 	else
 		'' Others default to FBCALL
@@ -3236,6 +3302,10 @@ private sub hProcModeToStr( byref s as string, byval proc as FBSYMBOL ptr )
 			if( env.target.fbcall <> FB_FUNCMODE_CDECL ) then
 				s += " cdecl"
 			end if
+		case FB_FUNCMODE_FBCALL
+			'' FBCALL is the default convention in this branch.
+		case else
+			assert( FALSE )
 		end select
 	end if
 end sub
@@ -3287,6 +3357,9 @@ private sub hParamsToStr( byref s as string, byval proc as FBSYMBOL ptr )
 
 			case FB_PARAMMODE_BYDESC
 				s += hDumpDynamicArrayDimensions( param->param.bydescdimensions )
+			case else
+				'' The outer dispatch accepts only BYVAL, BYREF and BYDESC.
+				assert( FALSE )
 			end select
 
 			'' Parameter's data type
@@ -3294,6 +3367,8 @@ private sub hParamsToStr( byref s as string, byval proc as FBSYMBOL ptr )
 
 		case FB_PARAMMODE_VARARG
 			s += "..."
+		case else
+			assert( FALSE )
 		end select
 
 		param = symbGetParamNext( param )

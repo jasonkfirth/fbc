@@ -50,7 +50,7 @@ Sub CompressFile( ByRef infile As String, ByRef outfile As String )
         Print "Unable to write compressed data!"
         End 4
     End If
-   
+
     Put #FF, ,*outBuffer, CSize
     Close #FF
 

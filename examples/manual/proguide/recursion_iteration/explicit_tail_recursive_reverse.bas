@@ -15,4 +15,4 @@ Function explicitTailRecursiveReverse (ByVal s As String, ByVal cumul As String 
 		Return explicitTailRecursiveReverse(s, cumul)  '' tail recursive call
 	End If
 End Function
-		
+

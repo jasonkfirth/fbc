@@ -10,8 +10,8 @@ declare function        WinMain     ( byval hInstance as HINSTANCE, _
                                       byval hPrevInstance as HINSTANCE, _
                                       byval szCmdLine as zstring ptr, _
                                       byval iCmdShow as integer ) as integer
-                                  
-                                  
+
+
 '':::::
 	end WinMain( GetModuleHandle( null ), null, Command( ), SW_NORMAL )
 
@@ -20,23 +20,23 @@ sub create_poly (byval x as integer, byval y as integer, _
 				 byval radius as integer, byval vertices as integer, _
 				 byval ang as integer, _
 				 vertTb() as POINT )
-     
+
 	dim as integer cx = x - radius, cy = y
 	dim as integer stp = 180 \ vertices, df = 180 mod vertices
 	dim as integer diam = radius * 2
 	dim as integer deg = (ang \ 2) - stp
 	dim as integer v = vertices
 	dim as integer i
-	
+
 	for i = 0 to vertices
 		v -= df
 		if v <= 0 then
 			v += vertices
 		end if
-     
+
      	deg += stp
      	dim as double r = diam * cos( DEG2RAD(deg) )
-    	
+
     	with vertTb(i)
      		.x = cx + r * cos( DEG2RAD(deg) )
      		.y = cy + r * sin( DEG2RAD(deg) )
@@ -50,47 +50,47 @@ function WndProc ( byval hWnd as HWND, _
                    byval wMsg as UINT, _
                    byval wParam as WPARAM, _
                    byval lParam as LPARAM ) as LRESULT
-    
+
 	dim as RECT rect
 	static as POINT vertTB( 0 to POLY_VERTICES )
 
     function = 0
-    
+
     select case( wMsg )
-        case WM_CREATE            
+        case WM_CREATE
         	GetClientRect( hWnd, @rect )
-        	
+
         	create_poly( rect.right \ 2, _
         				 rect.bottom \ 2, _
         				 iif(rect.right < rect.bottom, rect.right, rect.bottom) \ 2, _
         				 POLY_VERTICES, _
         				 0, _
         				 vertTb() )
-            
+
             SetWindowRgn( hWnd, CreatePolygonRgn( @vertTb(0), POLY_VERTICES, WINDING ), TRUE )
-            
+
             exit function
-        
+
         case WM_PAINT
-    		dim as PAINTSTRUCT pnt 
+			dim as PAINTSTRUCT pnt
     		dim as HDC hDC
-          
+
             hDC = BeginPaint( hWnd, @pnt )
             GetClientRect( hWnd, @rect )
-            
+
             SetBkMode( hDC, TRANSPARENT	)
             SetTextColor( hDC, BGR( 63, 127, 255 ) )
-            
+
             DrawText( hDC, _
               	  	  "Hello, World!", _
               	  	  -1, _
                	  	  @rect, _
                	  	  DT_SINGLELINE or DT_CENTER or DT_VCENTER )
-               	  	  
+
             EndPaint( hWnd, @pnt )
-            
-            exit function            
-        
+
+            exit function
+
 		case WM_LBUTTONDOWN
 			SendMessage( hWnd, WM_NCLBUTTONDOWN, HTCAPTION, NULL )
 
@@ -104,9 +104,9 @@ function WndProc ( byval hWnd as HWND, _
             PostQuitMessage( 0 )
             exit function
     end select
-    
-    function = DefWindowProc( hWnd, wMsg, wParam, lParam )    
-    
+
+    function = DefWindowProc( hWnd, wMsg, wParam, lParam )
+
 end function
 
 '':::::
@@ -114,7 +114,7 @@ sub remove_caption(byval hwnd as HWND )
 	dim as RECT rect
 
   	dim as integer style = GetWindowLong( hwnd, GWL_STYLE ) and (not WS_CAPTION)
-  	SetWindowLong( hwnd, GWL_STYLE, style ) 
+	SetWindowLong( hwnd, GWL_STYLE, style )
   	GetClientRect( hwnd, @rect )
 	AdjustWindowRect( @rect, style, (GetMenu( hwnd ) <> NULL) )
   	SetWindowPos( hwnd, 0, 0, 0, rect.Right, rect.Bottom, _
@@ -125,14 +125,14 @@ end sub
 function WinMain ( byval hInstance as HINSTANCE, _
                    byval hPrevInstance as HINSTANCE, _
                    byval szCmdLine as zstring ptr, _
-                   byval iCmdShow as integer ) as integer    
-     
-    dim as MSG wMsg 
-    dim as WNDCLASS wcls 
-    dim as HWND hWnd 
-     
+                   byval iCmdShow as integer ) as integer
+
+    dim as MSG wMsg
+    dim as WNDCLASS wcls
+    dim as HWND hWnd
+
     function = 0
-     
+
     with wcls
     	.style         = CS_HREDRAW or CS_VREDRAW
 		.lpfnWndProc   = cast( WNDPROC, @WndProc )
@@ -145,12 +145,12 @@ function WinMain ( byval hInstance as HINSTANCE, _
     	.lpszMenuName  = NULL
     	.lpszClassName = @"HelloWin"
     end with
-          
+
     if( RegisterClass( @wcls ) = FALSE ) then
        MessageBox( null, "Failed to register wcls!", "Error", MB_ICONERROR )
        exit function
     end if
-    
+
     hWnd = CreateWindowEx( 0, _
     			 		   "HelloWin", _
                            NULL, _
@@ -163,18 +163,18 @@ function WinMain ( byval hInstance as HINSTANCE, _
                            NULL, _
                            hInstance, _
                            NULL )
-                          
+
     remove_caption( hWnd )
-    
+
     ShowWindow( hWnd, iCmdShow )
     UpdateWindow( hWnd )
-     
-    while( GetMessage( @wMsg, NULL, 0, 0 ) <> FALSE )    
+
+    while( GetMessage( @wMsg, NULL, 0, 0 ) <> FALSE )
         TranslateMessage( @wMsg )
         DispatchMessage( @wMsg )
     wend
-    
-    
+
+
     function = wMsg.wParam
 
 end function

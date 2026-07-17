@@ -10,4 +10,4 @@
 
 Dim a As Long = DateSerial(2005, 11, 28)
 
-Print Format(a, "yyyy/mm/dd hh:mm:ss") 
+Print Format(a, "yyyy/mm/dd hh:mm:ss")

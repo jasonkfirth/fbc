@@ -25,7 +25,7 @@ With p.ChildList(0)
 	.Name = "Jr."
 	.ParentRef = @p
 	'' ...
-End With	
+End With
 
 With p.ChildList(0)
 	Print .Name; " is child of "; .parentRef->Name

@@ -31,4 +31,4 @@ Print "Your age is: " + Str(age_ubyte)
 
 'File outputted by this sample will look like this,
 'minus the comment of course:
-'23,"Your Name",19 
+'23,"Your Name",19

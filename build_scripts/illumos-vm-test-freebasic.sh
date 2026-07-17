@@ -40,9 +40,9 @@ PACKAGE_DIR=""
 PACKAGE_REPO_DIR=""
 RELEASE="20251026"
 PKG_PROXY_PORT=""
-PKG_PROXY_ENABLED=0
-PKG_REPO_URL="http://mirror.math.princeton.edu/pub/openindiana/hipster"
-PKG_REPO_FALLBACK_URL="http://mirror.math.princeton.edu/pub/openindiana/hipster"
+PKG_PROXY_ENABLED=1
+PKG_REPO_URL="http://mirror.math.princeton.edu/pub/openindiana/hipster/publisher/openindiana.org"
+PKG_REPO_FALLBACK_URL="http://mirror.math.princeton.edu/pub/openindiana/hipster/publisher/openindiana.org"
 PKG_INSTALL_ATTEMPTS=3
 PKG_INSTALL_RETRY_DELAY=6
 IMAGE_URL=""
@@ -84,8 +84,8 @@ Options:
   --image-url URL       OpenIndiana cloud image URL.
   --image FILE          Existing OpenIndiana cloud image.
   --release N           OpenIndiana release/date directory override. Default: ${RELEASE}
-  --pkg-proxy-port N    Host package proxy port. Default: disabled
-  --pkg-repo-url URL    Base OpenIndiana package URL for direct mode. Default: http://mirror.math.princeton.edu/pub/openindiana/hipster
+  --pkg-proxy-port N    Host package proxy port. Default: auto-selected.
+  --pkg-repo-url URL    Base OpenIndiana publisher URL for direct mode.
   --pkg-repo-fallback-url URL Optional fallback package URL for direct mode.
   --workroot DIR        Work directory. Default: out/illumos-vm
   --jobs N              Build/test concurrency hint. Default: host CPU count
@@ -903,12 +903,73 @@ find_cmd_or_path() {
 	return 1
 }
 
+resolve_timeout() {
+	find_cmd_or_path timeout /usr/gnu/bin/timeout
+}
+
+run_with_timeout() {
+	local seconds="$1"
+	local timeout_cmd
+	shift
+
+	timeout_cmd="$(resolve_timeout)" || {
+		"$@"
+		return
+	}
+	"$timeout_cmd" "$seconds" "$@"
+}
+
+prepare_xargs() {
+	local wrapper_dir="/var/tmp/freebasic-test-tool-wrappers"
+
+	if printf '' | /usr/bin/xargs -r true >/dev/null 2>&1; then
+		return 0
+	fi
+
+	mkdir -p "$wrapper_dir"
+	cat > "$wrapper_dir/xargs" <<'XARGS_WRAPPER'
+#!/usr/bin/env bash
+no_run_if_empty=0
+filtered=()
+
+for arg in "$@"; do
+	case "$arg" in
+		-r|--no-run-if-empty) no_run_if_empty=1 ;;
+		*) filtered+=("$arg") ;;
+	esac
+done
+
+tmp="${TMPDIR:-/tmp}/freebasic-test-xargs.$$"
+trap 'rm -f "$tmp"' EXIT
+cat > "$tmp"
+
+if [ "$no_run_if_empty" -eq 1 ] && [ ! -s "$tmp" ]; then
+	exit 0
+fi
+
+exec /usr/bin/xargs "${filtered[@]}" < "$tmp"
+XARGS_WRAPPER
+	chmod +x "$wrapper_dir/xargs"
+	export PATH="$wrapper_dir:$PATH"
+}
+
 resolve_make() {
-	for make in gmake make; do
-		command -v "$make" >/dev/null 2>&1 && {
-			echo "$make"
-			return 0
-		}
+	local make
+	local resolved
+
+	for make in \
+		"${FBC_GMAKE:-}" \
+		/var/tmp/freebasic-gnu-make/bin/make \
+		/usr/gnu/bin/gmake \
+		/usr/gnu/bin/make \
+		gmake \
+		make
+	do
+		[ -n "$make" ] || continue
+		resolved="$(command -v "$make" 2>/dev/null)" || continue
+		"$resolved" --version 2>/dev/null | grep -q '^GNU Make ' || continue
+		echo "$resolved"
+		return 0
 	done
 	return 1
 }
@@ -916,6 +977,7 @@ resolve_make() {
 install_pkg_candidates() {
 	local pkg
 	local timeout_s
+	local timeout_cmd
 	local rc
 	local log
 	local had_timeout
@@ -930,7 +992,8 @@ install_pkg_candidates() {
 		''|*[!0-9]*|0) timeout_s="" ;;
 		*) timeout_s="$PKG_INSTALL_TIMEOUT" ;;
 	esac
-	command -v timeout >/dev/null 2>&1 || timeout_s=""
+	timeout_cmd="$(resolve_timeout 2>/dev/null || true)"
+	[ -n "$timeout_cmd" ] || timeout_s=""
 
 	case "${PKG_INSTALL_ATTEMPTS:-3}" in
 		''|*[!0-9]*|0) attempts=3 ;;
@@ -946,7 +1009,7 @@ install_pkg_candidates() {
 			: > "$log"
 			pkg_timeouted=0
 			if [ -n "$timeout_s" ]; then
-				timeout "$timeout_s" /usr/bin/pkg install --accept --no-refresh "$pkg" > "$log" 2>&1
+				"$timeout_cmd" "$timeout_s" /usr/bin/pkg install --accept --no-refresh "$pkg" > "$log" 2>&1
 				rc=$?
 			else
 				/usr/bin/pkg install --accept --no-refresh "$pkg" > "$log" 2>&1
@@ -998,7 +1061,7 @@ configure_openindiana_publishers() {
 				fail "pkg proxy requested but no PKG_PROXY_PORT provided"
 			fi
 			run /usr/bin/pkg set-publisher --no-refresh -M '*' -O "http://10.0.2.2:${PKG_PROXY_PORT}/pub/openindiana/hipster" openindiana.org
-			if ! timeout 90 /usr/bin/pkg refresh openindiana.org; then
+			if ! run_with_timeout 90 /usr/bin/pkg refresh openindiana.org; then
 				return 1
 			fi
 			;;
@@ -1011,7 +1074,7 @@ configure_openindiana_publishers() {
 			if ! /usr/bin/pkg set-publisher --no-refresh -M '*' -O "$direct_url" openindiana.org; then
 				return 1
 			fi
-			if ! timeout 90 /usr/bin/pkg refresh openindiana.org; then
+			if ! run_with_timeout 90 /usr/bin/pkg refresh openindiana.org; then
 				return 1
 			fi
 			;;
@@ -1059,11 +1122,36 @@ exampleageddon_jobs() {
 	esac
 }
 
+run_socket_smoke() {
+	echo "==> compiling crt/sys/socket.bi API smoke"
+	run "$FBC_BIN" /work/freebasic-test/tests/crt/socket.bas -x /work/freebasic-test/socket-bi-smoke
+
+	echo "==> running crt/sys/socket.bi API smoke"
+	run /work/freebasic-test/socket-bi-smoke
+
+	echo "==> compiling curses.bi API smoke"
+	run "$FBC_BIN" /work/freebasic-test/tests/crt/curses.bas -x /work/freebasic-test/curses-bi-smoke
+
+	echo "==> running curses.bi API smoke"
+	run /work/freebasic-test/curses-bi-smoke
+
+	echo "==> compiling TCP loopback smoke"
+	run "$FBC_BIN" -mt /work/freebasic-test/tests/file/tcp.bas -x /work/freebasic-test/tcp-smoke
+
+	echo "==> running TCP loopback smoke"
+	if [ -x /usr/gnu/bin/timeout ]; then
+		run /usr/gnu/bin/timeout 60 /work/freebasic-test/tcp-smoke
+	else
+		run /work/freebasic-test/tcp-smoke
+	fi
+}
+
 run_fbctests() {
 	local jobs
 	local make
 	jobs="$(fbctests_jobs)"
 	make="$(resolve_make)" || fail "missing gmake/make"
+	prepare_xargs
 
 	cd /work/freebasic-test/tests
 	run "$make" clean FBC="$FBC_BIN"
@@ -1145,7 +1233,8 @@ run_main_tests() {
 			fail "offline test mode requires a local package repository; set PACKAGE_DIR accordingly"
 		fi
 		run echo "==> offline mode: configuring local package repository only"
-		run /usr/bin/pkg set-publisher --no-refresh -M '*' -g "file://${PKG_REPO_DIR}" local
+		run /usr/bin/pkg set-publisher --no-refresh -G '*' -M '*' -g "file://${PKG_REPO_DIR}" local
+		run /usr/bin/pkg refresh local
 	else
 		if ! configure_openindiana_publishers_with_fallback 1; then
 			fail "unable to configure OpenIndiana package repositories"
@@ -1168,18 +1257,15 @@ run_main_tests() {
 				fail "make package unavailable in OpenIndiana repositories"
 		fi
 	fi
-	if ! command -v gmake >/dev/null 2>&1; then
+	if ! resolve_make >/dev/null 2>&1; then
 		if [ "$OFFLINE_TEST_MODE" -eq 1 ]; then
-			if ! command -v make >/dev/null 2>&1; then
-				fail "gnu-make missing in guest image and offline mode does not allow package refresh installs"
-			else
-				echo "==> gnu-make missing; using make for fbctests"
-			fi
+			fail "GNU Make missing in guest image and offline mode does not allow package refresh installs"
 		else
 			install_pkg_candidates developer/build/gnu-make ||
-				fail "gnu-make package unavailable in OpenIndiana repositories"
+				fail "GNU Make package unavailable in OpenIndiana repositories"
 		fi
 	fi
+	resolve_make >/dev/null 2>&1 || fail "GNU Make is required for fbctests"
 
 	if ! find_cmd_or_path gcc cc clang /usr/gnu/bin/gcc /usr/gnu/bin/cc /usr/bin/cc /usr/local/bin/cc /usr/bin/clang /usr/local/bin/clang >/dev/null 2>&1; then
 		PKG_INSTALL_HAD_TIMEOUT=0
@@ -1240,24 +1326,26 @@ run_main_tests() {
 	fi
 
 	if [ "${SKIP_PACKAGE_INSTALL:-0}" -eq 0 ] && \
-		[ -d "${PKG_REPO_DIR:-}" ] && \
-		[ -z "${FBC_BIN:-}" ]; then
+		[ -d "${PKG_REPO_DIR:-}" ]; then
 		PKG_URI="file://${PKG_REPO_DIR}"
 		FBVERSION="${FBVERSION:-1.20.1}"
 		PKG_OSREL="${PKG_OSREL:-5.11}"
 		PKG_REV="${PKG_REV:-1}"
-		run /usr/bin/pkg set-publisher --no-refresh -g "$PKG_URI" local
+		run /usr/bin/pkg set-publisher --no-refresh -G '*' -M '*' -g "$PKG_URI" local
+		run /usr/bin/pkg refresh local
+		if /usr/bin/pkg info lang/freebasic >/dev/null 2>&1; then
+			run /usr/bin/pkg uninstall lang/freebasic
+		fi
 		install_pkg_candidates "pkg://local/lang/freebasic@${FBVERSION},${PKG_OSREL}-${PKG_REV}" "lang/freebasic" || fail "freebasic package unavailable in repositories"
 		FBC_BIN="$(command -v fbc || true)"
 		if [ -z "${FBC_BIN:-}" ] && [ -x /usr/local/bin/fbc ]; then
 			FBC_BIN="/usr/local/bin/fbc"
 		fi
 		command -v "$FBC_BIN" >/dev/null 2>&1 || fail "fbc not installed after package install"
-	elif [ "${SKIP_PACKAGE_INSTALL:-0}" -eq 0 ] && [ -n "${FBC_BIN:-}" ]; then
-		echo "==> using existing fbc in guest, skipping package install"
 	fi
 	command -v "$FBC_BIN" >/dev/null 2>&1 || fail "fbc not installed"
 
+	run_socket_smoke
 	run_fbctests
 	run_exampleageddon
 	echo "==> TEST PASSED"

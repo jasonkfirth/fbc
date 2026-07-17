@@ -20,15 +20,15 @@ declare function LoadGLTextures() as integer
 
 
 	dim shared texture(0) as GLuint               '' Storage For One Texture ( NEW )
-	
+
 	dim xrot as single                            '' X Rotation ( NEW )
 	dim yrot as single                            '' Y Rotation ( NEW )
 	dim zrot as single                            '' Z Rotation ( NEW )
-	
-	
-	
+
+
+
 	screen 18, 16, , 2
-	
+
 	'' ReSizeGLScene
 	glViewport 0, 0, 640, 480                      '' Reset The Current Viewport
 	glMatrixMode GL_PROJECTION                     '' Select The Projection Matrix
@@ -36,12 +36,12 @@ declare function LoadGLTextures() as integer
 	gluPerspective 45.0, 640.0/480.0, 0.1, 100.0   '' Calculate The Aspect Ratio Of The Window
 	glMatrixMode GL_MODELVIEW                      '' Select The Modelview Matrix
 	glLoadIdentity                                 '' Reset The Modelview Matrix
-	
+
 	'' Jump To Texture Loading Routine
 	if (not LoadGLTextures()) then
 		end 1                                        '' If Texture Didn't Load Quit
 	end if
-	
+
 	'' All Setup For OpenGL Goes Here
 	glEnable GL_TEXTURE_2D                         '' Enable Texture Mapping ( NEW )
 	glShadeModel GL_SMOOTH                         '' Enable Smooth Shading
@@ -50,19 +50,19 @@ declare function LoadGLTextures() as integer
 	glEnable GL_DEPTH_TEST                         '' Enables Depth Testing
 	glDepthFunc GL_LEQUAL                          '' The Type Of Depth Testing To Do
 	glHint GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST    '' Really Nice Perspective Calculations
-	
-	
+
+
 	do
 		glClear GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT      '' Clear Screen And Depth Buffer
 		glLoadIdentity                                          '' Reset The View
 		glTranslatef 0.0, 0.0, -5.0                             '' Move Into The Screen 5 Units
-		
+
 		glRotatef xrot,1.0, 0.0, 0.0                            '' Rotate On The X Axis
 		glRotatef yrot,0.0, 1.0, 0.0                            '' Rotate On The Y Axis
 		glRotatef zrot,0.0, 0.0, 1.0                            '' Rotate On The Z Axis
-		
+
 		glBindTexture GL_TEXTURE_2D, texture(0)                 '' Select Our Texture
-		
+
 		glBegin GL_QUADS
 			' Front Face
 			glTexCoord2f 0.0, 0.0 : glVertex3f -1.0, -1.0,  1.0  '' Bottom Left Of The Texture and Quad
@@ -95,14 +95,14 @@ declare function LoadGLTextures() as integer
 			glTexCoord2f 1.0, 1.0 : glVertex3f -1.0,  1.0,  1.0  '' Top Right Of The Texture and Quad
 			glTexCoord2f 0.0, 1.0 : glVertex3f -1.0,  1.0, -1.0  '' Top Left Of The Texture and Quad
 		glEnd
-		
+
 		xrot += 0.3     '' X Axis Rotation
 		yrot += 0.2     '' Y Axis Rotation
 		zrot += 0.4     '' Z Axis Rotation
-		
+
 		flip
 	loop while inkey = ""
-	
+
 
 '' Load Bitmaps And Convert To Textures
 function LoadGLTextures() as integer

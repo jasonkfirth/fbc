@@ -44,4 +44,4 @@ End Destructor
 Operator Len (ByRef v As varZstring) As Integer
 	Return Len(Type<String>(v))  '' found nothing better than this
 End Operator                     ''     (or: 'Return Len(Str(v))')
-		
+

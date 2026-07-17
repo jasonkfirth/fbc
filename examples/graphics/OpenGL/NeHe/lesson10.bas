@@ -53,10 +53,10 @@ declare sub SetupWorld()
 
 
 dim shared sector1 as SECTOR                   '' Our Model Goes Here
-	
+
 dim shared filter as uinteger                  '' Which Filter To Use
 dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
-	
+
 	dim blend as integer                    '' Blending OFF/ON?
 	dim fp as integer                       '' F Pressed?
 	dim blendpressed as integer             '' B Pressed?
@@ -64,18 +64,18 @@ dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 	dim heading as single              '' direction of movement
 	dim xpos as single                 '' X position
 	dim zpos as single                 '' Y position
-	
+
 	dim yrot as single                 '' Y Rotation = heading
 	dim walkbias as single             '' used with walkbiasangle for bouncing effect
 	dim walkbiasangle as single        '' used with walkbias for bouncing effect
 	dim lookupdown as single           '' View direction
-	
+
 	dim x_m as single            '' Floating Point For Temp X, Y, Z, U And V Vertices
 	dim y_m as single
 	dim z_m as single
 	dim u_m as single
 	dim v_m as single
-	
+
 	dim xtrans as single         '' Used For Player Translation
 	dim ztrans as single         '' Used For Player Translation
 	dim ytrans as single         '' Used For Bouncing Motion Up And Down
@@ -118,23 +118,23 @@ dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 	do
 		glClear GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT      '' Clear Screen And Depth Buffer
 		glLoadIdentity()                                        '' Reset The View
-		
+
 		xtrans = - xpos
 		ztrans = - zpos
 		ytrans = - walkbias - 0.25                      '' Used For Bouncing Motion Up And Down
 		sceneroty = 360.0 - yrot                        '' 360 Degree Angle For Player Direction
-		
+
 		glRotatef lookupdown, 1.0, 0,0                  '' Rotate Up And Down To Look Up And Down
 		glRotatef sceneroty, 0, 1.0, 0                  '' Rotate Depending On Direction Player Is Facing
-		
+
 		glTranslatef xtrans, ytrans, ztrans             '' Translate The Scene Based On Player Position
 		glBindTexture GL_TEXTURE_2D, texture(filter)    '' Select A Texture Based On filter
-		
+
 		numtriangles = sector1.numtriangles             '' Get The Number Of Triangles In Sector 1
-		
+
 		' Process Each Triangle
 		for loop_m = 0 to numtriangles - 1
-		
+
 			glBegin GL_TRIANGLES                          '' Start Drawing Triangles
 				glNormal3f 0.0, 0.0, 1.0                  '' Normal Pointing Forward
 				x_m = sector1.triangle[loop_m].vertex(0).x         '' X Vertex Of 1st Point
@@ -143,14 +143,14 @@ dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 				u_m = sector1.triangle[loop_m].vertex(0).u         '' U Texture Coord Of 1st Point
 				v_m = sector1.triangle[loop_m].vertex(0).v         '' V Texture Coord Of 1st Point
 				glTexCoord2f u_m, v_m : glVertex3f x_m, y_m, z_m   '' Set The TexCoord And Vertice
-			
+
 				x_m = sector1.triangle[loop_m].vertex(1).x         '' X Vertex Of 2nd Point
 				y_m = sector1.triangle[loop_m].vertex(1).y         '' Y Vertex Of 2nd Point
 				z_m = sector1.triangle[loop_m].vertex(1).z         '' Z Vertex Of 2nd Point
 				u_m = sector1.triangle[loop_m].vertex(1).u         '' U Texture Coord Of 2nd Point
 				v_m = sector1.triangle[loop_m].vertex(1).v         '' V Texture Coord Of 2nd Point
 				glTexCoord2f u_m, v_m : glVertex3f x_m, y_m, z_m   '' Set The TexCoord And Vertice
-			
+
 				x_m = sector1.triangle[loop_m].vertex(2).x         '' X Vertex Of 3rd Point
 				y_m = sector1.triangle[loop_m].vertex(2).y         '' Y Vertex Of 3rd Point
 				z_m = sector1.triangle[loop_m].vertex(2).z         '' Z Vertex Of 3rd Point
@@ -167,7 +167,7 @@ dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 			if (filter > 2) then filter = 0         '' 2 -> 0
 		end if
 		if not MULTIKEY(FB.SC_F) then fp = false       '' F Key Up
-	
+
 		if MULTIKEY(FB.SC_B) and not blendpressed then '' B Key down
 			blendpressed = true
 			blend = not blend                       '' toggle blending On/Off
@@ -180,7 +180,7 @@ dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 			end if
 		end if
 		if not MULTIKEY(FB.SC_B) then blendpressed = false '' B Key up
-	
+
 		if MULTIKEY(FB.SC_UP) then
 			xpos = xpos - sin(heading*piover180) * 0.05    '' Move On The X-Plane Based On Player Direction
 			zpos = zpos - cos(heading*piover180) * 0.05    '' Move On The Z-Plane Based On Player Direction
@@ -191,7 +191,7 @@ dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 			end if
 			walkbias = sin(walkbiasangle * piover180)/20.0 '' Causes The Player To Bounce
 		end if
-	
+
 		if MULTIKEY(FB.SC_DOWN) then
 			xpos = xpos + sin(heading*piover180) * 0.05    '' Move On The X-Plane Based On Player Direction
 			zpos = zpos + cos(heading*piover180) * 0.05    '' Move On The Z-Plane Based On Player Direction
@@ -202,12 +202,12 @@ dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 			end if
 			walkbias = sin(walkbiasangle * piover180)/20.0 '' Causes The Player To Bounce
 		end if
-	
+
 		if MULTIKEY(FB.SC_RIGHT) then
 			heading = heading - 1.0        '' Rotate The Scene To The Left
 			yrot = heading
 		end if
-	
+
 		if MULTIKEY(FB.SC_LEFT) then
 			heading = heading + 1.0        '' Rotate The Scene To The Right
 			yrot = heading

@@ -18,10 +18,10 @@ declare sub mandelbrot
 declare function DotsColor( byval xval as double, byval yval as double ) as double
 declare function HSBtoRGB( byval hue as double, byval saturation as double, byval brightness as double ) as long
 
-'' globals	
+'' globals
    	dim shared as double xstart, ystart
    	dim shared as double xzoom, yzoom
-	dim shared as integer buffer( 0 to SCR_SIZE-1 ) 
+	dim shared as integer buffer( 0 to SCR_SIZE-1 )
 
 	if( ptc_open( "mandelbrot test", SCR_WIDTH, SCR_HEIGHT ) = 0 ) then
 		end -1
@@ -34,34 +34,34 @@ declare function HSBtoRGB( byval hue as double, byval saturation as double, byva
 
    	dim as uinteger starttime, tottime
 #ifdef __FB_WIN32__
-   	dim as HWND hwnd 
+	dim as HWND hwnd
    	hwnd = GetActiveWindow( )
 #endif
-   	
+
    	dim as uinteger sectimer
    	dim as integer frames
-   
-   	dim as double fac = 0.99   
+
+	dim as double fac = 0.99
    	dim as double finc = .01
-   	
+
    	frames = 0
    	tottime = 0
    	sectimer = GetTickCount
-   	do      
+	do
 		starttime = GetTickCount
-      
+
       	xend = xend * fac
       	yend = yend * fac
       	xstart = xstart * fac
       	ystart = ystart * fac
       	xzoom = (xend - xstart) / SCR_WIDTH
       	yzoom = (yend - ystart) / SCR_HEIGHT
-      	
+
       	mandelbrot( )
-      	
+
       	tottime = tottime + (GetTickCount - starttime)
       	frames = frames + 1
-      	
+
       	fac = fac - finc
       	if( fac <= 0.91 ) then
       		fac = 0.93
@@ -73,10 +73,10 @@ declare function HSBtoRGB( byval hue as double, byval saturation as double, byva
    			ystart = SY
    			xend = EX
    			yend = EY
-      	end if      	
-      
+		end if
+
       	ptc_update( @buffer(0) )
-      	
+
 #ifdef __FB_WIN32__
       	if( GetTickCount( ) - sectimer >= 1000 ) then
 
@@ -84,11 +84,11 @@ declare function HSBtoRGB( byval hue as double, byval saturation as double, byva
 
       		sectimer = GetTickCount( )
       		frames = 0
-			tottime = 0      		
+			tottime = 0
     	end if
 #endif
 
-    	
+
 	loop until( inkey = chr( 27 ) )
 
 'END
@@ -101,25 +101,25 @@ private sub mandelbrot static
    dim as integer x, y, col
    dim as integer ptr p
    dim as double old, h
-   
+
    p = @buffer(0)
    old = 0
    col = 0
-   
+
    FOR y = 0 TO SCR_HEIGHT-1
    	FOR x = 0 TO SCR_WIDTH-1
-         
+
          h = DotsColor( xstart + xzoom * x, ystart + yzoom * y )
-         
+
          IF h <> old then
             col = HSBtoRGB( h, 0.8, 1.0 - h * h )
             old = h
          END IF
-         
+
          'buffer( y * SCR_WIDTH + x ) = col
          *p = col
          p += 1
-      
+
       NEXT x
    NEXT y
 end sub
@@ -130,7 +130,7 @@ end sub
 ' ------------------------------------------------------------- '
 ' color value from 0.0 to 1.0 by iterations
 private function DotsColor( byval xval as double, byval yval as double ) as double static
-   
+
    dim as integer j
    dim as double m, r, i
 
@@ -154,11 +154,11 @@ end function
 private function HSBtoRGB( byval hue as double, byval saturation as double, byval brightness as double ) as long static
    dim as double red, green, blue, domainOffset
 
-   IF brightness = 0.0 THEN 
+   IF brightness = 0.0 THEN
    		function = 0
    		exit function
    end if
-   'IF saturation = 0.0 THEN 
+   'IF saturation = 0.0 THEN
    '		function = CINT(brightness*255) shl 16 + CINT(brightness*255) shl 8 + CINT(brightness*255)
    '		exit function
    'end if
@@ -170,35 +170,35 @@ private function HSBtoRGB( byval hue as double, byval saturation as double, byva
       red   = brightness
       blue  = brightness * (1.0 - saturation)
       green = blue + (brightness - blue) * domainOffset * 6.0
-   
+
    case is < 2.0/6.0
       ' yellow domain; red descends
       domainOffset = hue - 1.0/6.0
       green = brightness
       blue  = brightness * (1.0 - saturation)
       red   = green - (brightness - blue) * domainOffset * 6.0
-   
+
    case is < 3.0/6.0
 	  ' green domain; blue ascends
       domainOffset = hue - 2.0/6.0
       green = brightness
       red   = brightness * (1.0 - saturation)
       blue  = red + (brightness - red) * domainOffset * 6.0
-   
+
    case is < 4.0/6.0
 	  ' cyan domain; green descends
       domainOffset = hue - 3.0/6.0
       blue  = brightness
       red   = brightness * (1.0 - saturation)
       green = blue - (brightness - red) * domainOffset * 6.0
-   
+
    case is < 5.0/6.0
 	  ' blue domain; red ascends
       domainOffset = hue - 4.0/6.0
       blue  = brightness
       green = brightness * (1.0 - saturation)
       red   = green + (brightness - green) * domainOffset * 6.0
-   
+
    case else
 	  ' magenta domain; blue descends
       domainOffset = hue - 5.0/6.0
@@ -206,7 +206,7 @@ private function HSBtoRGB( byval hue as double, byval saturation as double, byva
       green = brightness * (1.0 - saturation)
       blue  = red - (brightness - green) * domainOffset * 6.0
    ENd select
-   
+
    function = rgb( red*255.0, green*255.0, blue*255.0 )
 
 end function

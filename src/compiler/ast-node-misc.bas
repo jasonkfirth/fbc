@@ -1019,9 +1019,12 @@ private sub astDumpTreeEx _
 		byval just as integer, _
 		byval depth as integer _
 	)
+	const AST_DUMP_MIN_COLUMN = 4
+	const AST_DUMP_MAX_COLUMN = 76
+	const AST_DUMP_DEFAULT_COLUMN = 40
 
-	if( col <= 4 or col >= 76 ) then
-		col = 40
+	if( col <= AST_DUMP_MIN_COLUMN or col >= AST_DUMP_MAX_COLUMN ) then
+		col = AST_DUMP_DEFAULT_COLUMN
 	end if
 
 	if( n = NULL ) then

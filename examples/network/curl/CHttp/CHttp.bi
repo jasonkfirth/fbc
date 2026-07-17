@@ -23,19 +23,19 @@ type CHttpCtx as CHttpCtx_
 type CHttp_
 	declare constructor	_
 		( _
-		) 
-	
+		)
+
 	declare destructor _
 		( _
 		)
-	
+
 	declare function post _
 		( _
 			byval url as zstring ptr, _
 			byval form as CHttpForm ptr, _
 			byval is_binary as integer = FALSE _
 		) as string
-	
+
 	declare function getHandle _
 		( _
 		) as any ptr

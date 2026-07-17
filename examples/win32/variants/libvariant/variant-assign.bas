@@ -15,7 +15,7 @@ operator VARIANT.let _
 	( _
 		byval rhs as VARIANT_NOTHING _
 	)
-	
+
 	VariantClear( @this.var_ )
 
 end operator
@@ -25,10 +25,10 @@ operator VARIANT.let _
 	( _
 		byref rhs as VARIANT _
 	)
-	
+
 	VariantClear( @this.var_ )
 	VariantCopy( @this.var_, @rhs.var_ )
-	
+
 end operator
 
 '':::::
@@ -36,10 +36,10 @@ operator VARIANT.let _
 	( _
 		byref rhs as VARIANT_ _
 	)
-	
+
 	VariantClear( @this.var_ )
 	VariantCopy( @this.var_, @rhs )
-	
+
 end operator
 
 '':::::
@@ -47,12 +47,12 @@ operator VARIANT.let _
 	( _
 		byval rhs as zstring ptr _
 	)
-	
+
 	VariantClear( @this.var_ )
 
 	V_VT(@this.var_) = VT_BSTR
 	V_BSTR(@this.var_) = SysAllocStringByteLen( rhs, len( *rhs ) )
-	
+
 end operator
 
 '':::::
@@ -60,11 +60,11 @@ operator VARIANT.let _
 	( _
 		byval rhs as wstring ptr _
 	)
-	
+
 	VariantClear( @this.var_ )
 
 	V_VT(@this.var_) = VT_BSTR
 	V_BSTR(@this.var_) = SysAllocStringLen( rhs, len( *rhs ) )
-	
+
 end operator
 

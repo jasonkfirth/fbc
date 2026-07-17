@@ -10,6 +10,6 @@
 
 Dim x As Unsigned Integer
 x = -1
-Print x 
+Print x
 
 'output is 4294967295

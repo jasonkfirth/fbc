@@ -10,12 +10,12 @@ constructor CRegex _
 	( _
 		byval pattern as zstring ptr, _
 		byval opt as options _
-	) 
+	)
 
 	dim as const zstring ptr err_msg = any
 	dim as long err_ofs = any
-	
-	reg = pcre_compile( pattern, opt, @err_msg, @err_ofs, NULL ) 
+
+	reg = pcre_compile( pattern, opt, @err_msg, @err_ofs, NULL )
 	if( reg = NULL ) then
 		return
 	end if
@@ -63,7 +63,7 @@ function CRegex.search _
 		byval lgt as integer, _
 		byval opt as options _
 	) as integer
-	
+
 	clearsubstrlist( )
 
 	this.subject = subject

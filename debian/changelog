@@ -1,3 +1,10 @@
+freebasic (1.20.2-14) resolute; urgency=medium
+
+  * Keep Android graphics JNI entry points in generated shared libraries so
+    the packaged Java input bridge is fully linked at runtime.
+
+ -- FreeBASIC Packagers <packagers@example.invalid>  Tue, 14 Jul 2026 15:20:00 -0400
+
 freebasic (1.20.2-13) resolute; urgency=medium
 
   * Publish the integrated freebasic-android package with the Android NDK

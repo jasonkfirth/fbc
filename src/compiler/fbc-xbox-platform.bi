@@ -61,7 +61,7 @@ private function hGetXboxNxdkDir( ) as string
 end function
 
 private sub hAddXboxNxdkLib( byref ldcline as string, byref nxdkdir as string, byval relpath as zstring ptr )
-	dim as string file = nxdkdir + "/" + *relpath
+	dim as string file = nxdkdir + FB_HOST_PATHDIV + pathNormalizeHost( *relpath )
 
 	hAddXboxLinkFile( ldcline, file )
 end sub

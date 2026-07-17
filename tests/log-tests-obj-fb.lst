@@ -191,6 +191,7 @@
 ./expressions/idiv-by-zero-4.o
 ./file/dir-overloads.o
 ./functions/bydesc-known-dimensions-2.o
+./functions/gpiopins-header.o
 ./functions/mangle-types.o
 ./functions/mangle.o
 ./functions/paraminit-vector-new.o
@@ -902,6 +903,7 @@
 ./functions/return-byref-string-literal.o
 ./functions/return-byref-type-mismatch-1.o
 ./functions/return-byref-type-mismatch-2.o
+./functions/sub-typesuffix.o
 ./functions/udt-result-exit-function-return.o
 ./functions/udt-result-exit-operator-return.o
 ./functions/udt-result-exit-property-return.o

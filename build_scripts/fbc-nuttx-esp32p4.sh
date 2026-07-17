@@ -13,10 +13,11 @@
 # Responsibilities:
 #
 #     - reuse the existing generated-FreeBASIC NuttX module build path
+#     - create and configure the default NuttX workspace on first use
 #     - serve the module and optional data files over a temporary HTTP server
 #     - use serial only for first-contact DHCP/IP discovery when needed
 #     - use telnet for normal remote NSH command execution once available
-#     - fetch modules onto board storage and optionally start them with runelf
+#     - fetch ELF programs onto board storage and optionally execute them
 #
 # This file intentionally does NOT contain:
 #
@@ -81,6 +82,18 @@ default_out_dir() {
     fi
 }
 
+default_nuttx_workdir() {
+    if [ -n "${FB_NUTTX_ESP32P4_WORKDIR:-}" ]; then
+        printf '%s\n' "$FB_NUTTX_ESP32P4_WORKDIR"
+    elif [ -n "${NUTTX_WORKDIR:-}" ]; then
+        printf '%s\n' "$NUTTX_WORKDIR"
+    elif [ -n "${XDG_CACHE_HOME:-}" ]; then
+        printf '%s\n' "$XDG_CACHE_HOME/freebasic/nuttx-esp32p4"
+    else
+        printf '%s\n' "${HOME:-/tmp}/.cache/freebasic/nuttx-esp32p4"
+    fi
+}
+
 max_jobs() {
     local n=1
 
@@ -121,6 +134,8 @@ Usage: ./build_scripts/fbc-nuttx-esp32p4.sh [options]
 
 Options:
   --nuttx-workdir DIR   Directory containing nuttx/ and apps/
+                        Default: \$XDG_CACHE_HOME/freebasic/nuttx-esp32p4
+                        or \$HOME/.cache/freebasic/nuttx-esp32p4
   --bas FILE            FreeBASIC source, default: examples/nuttx/fbhello.bas
   --app-name NAME       Module name, default: basename of --bas
   --fbc FILE            fbc binary used when generating C
@@ -144,12 +159,17 @@ Options:
   --telnet-port PORT    Board telnet port, default: 23
   --serial-port DEVICE  Serial console used for first-contact DHCP/IP discovery
   --control MODE        auto, telnet, serial, or none. Default: auto
-  --run                 Run the uploaded module with runelf
+  --run                 Run the uploaded ELF program from board storage
   --no-upload           Build and stage the module only
+  --prepare-only        Create and configure the workspace, then stop
+  --no-bootstrap        Require an already configured workspace
   --help                Show this help text
 
 Environment:
   NUTTX_WORKDIR         Same as --nuttx-workdir
+  FB_NUTTX_ESP32P4_WORKDIR
+                        Alternate default workdir
+  FB_NUTTX_AUTO_SETUP   Set to 0 to disable workspace setup
   FBC                   Same as --fbc
   FB_HOST_FBC           Host fbc used to build the helper tools
   FB_GENERATED_C        Same as --generated-c
@@ -164,19 +184,20 @@ Environment:
 Typical first contact:
 
   ./build_scripts/fbc-nuttx-esp32p4.sh \\
-    --nuttx-workdir \$HOME/fbxl-nuttx-esp32p4 \\
     --serial-port /dev/ttyACM0 --run
 
 Typical later upload once telnet is available:
 
   ./build_scripts/fbc-nuttx-esp32p4.sh \\
-    --nuttx-workdir \$HOME/fbxl-nuttx-esp32p4 \\
     --board-ip 192.168.250.162 --bas examples/nuttx/fbgfx_sfx_smoke.bas \\
     --with-gfxlib --sfx-no-media-decoders --run
+
+The first normal run creates and configures the workspace when needed. It
+does not flash firmware; use fbc-nuttx-esp32p4-firmware for that step.
 EOF
 }
 
-NUTTX_WORKDIR="${NUTTX_WORKDIR:-}"
+NUTTX_WORKDIR="${NUTTX_WORKDIR:-$(default_nuttx_workdir)}"
 BAS_SRC="$ROOT/examples/nuttx/fbhello.bas"
 APP_NAME=""
 FBC_BIN="${FBC:-}"
@@ -201,6 +222,8 @@ RENEW_ETH0="${FB_NUTTX_RENEW_ETH0:-0}"
 CONTROL="${FB_NUTTX_CONTROL:-auto}"
 DO_RUN=0
 DO_UPLOAD=1
+AUTO_SETUP="${FB_NUTTX_AUTO_SETUP:-1}"
+PREPARE_ONLY=0
 JOBS="${JOBS:-$(max_jobs)}"
 
 while [ "$#" -gt 0 ]; do
@@ -306,6 +329,15 @@ while [ "$#" -gt 0 ]; do
             DO_UPLOAD=0
             shift
             ;;
+        --prepare-only)
+            PREPARE_ONLY=1
+            DO_UPLOAD=0
+            shift
+            ;;
+        --no-bootstrap)
+            AUTO_SETUP=0
+            shift
+            ;;
         --help|-h)
             usage
             exit 0
@@ -316,9 +348,42 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-[ -n "$NUTTX_WORKDIR" ] || die "set NUTTX_WORKDIR or pass --nuttx-workdir"
-[ -d "$NUTTX_WORKDIR/nuttx" ] || die "missing NuttX tree: $NUTTX_WORKDIR/nuttx"
-[ -d "$NUTTX_WORKDIR/apps" ] || die "missing NuttX apps tree: $NUTTX_WORKDIR/apps"
+case "$AUTO_SETUP" in
+    0|1) ;;
+    *) die "FB_NUTTX_AUTO_SETUP must be 0 or 1" ;;
+esac
+
+ensure_nuttx_workspace() {
+    local firmware_script="$ROOT/build_scripts/fbc-nuttx-esp32p4-firmware.sh"
+
+    if [ "$AUTO_SETUP" -eq 0 ]; then
+        [ -d "$NUTTX_WORKDIR/nuttx" ] || die "missing NuttX tree: $NUTTX_WORKDIR/nuttx"
+        [ -d "$NUTTX_WORKDIR/apps" ] || die "missing NuttX apps tree: $NUTTX_WORKDIR/apps"
+        [ -f "$NUTTX_WORKDIR/nuttx/.config" ] ||
+            die "missing NuttX configuration: $NUTTX_WORKDIR/nuttx/.config"
+        return 0
+    fi
+
+    [ -f "$firmware_script" ] || die "missing NuttX firmware setup script: $firmware_script"
+
+    if [ -d "$NUTTX_WORKDIR/nuttx" ] &&
+       [ -d "$NUTTX_WORKDIR/apps" ] &&
+       [ -f "$NUTTX_WORKDIR/nuttx/.config" ]; then
+        echo "==> using configured NuttX workspace: $NUTTX_WORKDIR"
+        return 0
+    fi
+
+    echo "==> preparing NuttX workspace: $NUTTX_WORKDIR"
+    run bash "$firmware_script" --workdir "$NUTTX_WORKDIR" --no-build
+}
+
+ensure_nuttx_workspace
+
+if [ "$PREPARE_ONLY" -eq 1 ]; then
+    echo "NUTTX_WORKSPACE_READY: $NUTTX_WORKDIR"
+    exit 0
+fi
+
 [ -f "$BAS_SRC" ] || [ -n "$GENERATED_C" ] || die "missing FreeBASIC source: $BAS_SRC"
 
 if [ -z "$APP_NAME" ]; then
@@ -801,7 +866,7 @@ for asset in "${ASSETS[@]}"; do
 done
 
 if [ "$DO_RUN" -eq 1 ]; then
-    UPLOAD_COMMANDS+=("runelf $REMOTE_FILE")
+    UPLOAD_COMMANDS+=("$REMOTE_FILE")
 fi
 
 echo "==> uploading to $REMOTE_FILE using $CONTROL_MODE"

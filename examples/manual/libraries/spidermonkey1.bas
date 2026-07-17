@@ -18,7 +18,7 @@ Dim Shared As JSClass global_class = _
 
 Dim As JSRuntime Ptr rt = JS_NewRuntime(1048576 /'memory limit'/)
 Dim As JSContext Ptr cx = JS_NewContext(rt, 4096 /'stack size'/)
-Dim As JSObject Ptr global = JS_NewObject(cx, @global_class, NULL, NULL) 
+Dim As JSObject Ptr global = JS_NewObject(cx, @global_class, NULL, NULL)
 
 JS_InitStandardClasses(cx, global)
 

@@ -423,9 +423,10 @@ function astBuildVtableLookup _
 		''    (*((*cptr( any ptr ptr ptr, @this ))[vtableindex-2]))( this )
 
 		'' Get the vtable pointer of type ANY PTR PTR
+		const VTABLE_POINTER_DEPTH = 3
 		p = astCloneTree( thisexpr )
 		p = astNewADDROF( p )
-		p = astNewCONV( typeMultAddrOf( FB_DATATYPE_VOID, 3 ), NULL, p, AST_CONVOPT_DONTCHKPTR )
+		p = astNewCONV( typeMultAddrOf( FB_DATATYPE_VOID, VTABLE_POINTER_DEPTH ), NULL, p, AST_CONVOPT_DONTCHKPTR )
 		p = astNewDEREF( p )
 
 		'' Apply the index

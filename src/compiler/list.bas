@@ -1,5 +1,8 @@
 '' generic double-linked list
 ''
+'' Ownership: Lists own their node storage, but not caller payloads.  The
+'' LIST_FLAGS_CLEARNODES option clears payload storage before a node is reused.
+''
 '' chng: jan/2005 written [v1ctor]
 ''
 

@@ -7,4 +7,4 @@
 '' --------
 
 Print Fix(1.9)  '' will print  1
-Print Fix(-1.9) '' will print -1 
+Print Fix(-1.9) '' will print -1

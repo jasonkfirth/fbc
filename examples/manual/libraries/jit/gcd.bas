@@ -16,7 +16,7 @@ jit_context_build_start(context)
 
 ' define function gcd(x as uinteger, y as uinteger) as uinteger
 Dim params(0 To 1) As jit_type_t = {jit_type_uint, jit_type_uint}
-Dim signature As jit_type_t = jit_type_create_signature( _  
+Dim signature As jit_type_t = jit_type_create_signature( _
 	jit_abi_cdecl,  _ ' C-style function
 	jit_type_uint,  _ ' Return type
 	@params(0),     _ ' Parameter array

@@ -100,8 +100,10 @@ default_workdir() {
         printf '%s\n' "$FB_NUTTX_ESP32P4_WORKDIR"
     elif [ -n "${NUTTX_WORKDIR:-}" ]; then
         printf '%s\n' "$NUTTX_WORKDIR"
+    elif [ -n "${XDG_CACHE_HOME:-}" ]; then
+        printf '%s\n' "$XDG_CACHE_HOME/freebasic/nuttx-esp32p4"
     else
-        printf '%s\n' "${HOME:-/tmp}/fbxl-nuttx-esp32p4"
+        printf '%s\n' "${HOME:-/tmp}/.cache/freebasic/nuttx-esp32p4"
     fi
 }
 
@@ -377,14 +379,11 @@ Environment:
 
 Typical board preparation:
 
-  fbc-nuttx-esp32p4-firmware \\
-    --workdir \$HOME/fbxl-nuttx-esp32p4 \\
-    --flash --port /dev/ttyACM0
+  fbc-nuttx-esp32p4-firmware --flash --port /dev/ttyACM0
 
 After the firmware is running, upload FreeBASIC programs with:
 
   fbc-nuttx-esp32p4 \\
-    --nuttx-workdir \$HOME/fbxl-nuttx-esp32p4 \\
     --serial-port /dev/ttyACM0 --run
 EOF
 }
@@ -587,11 +586,6 @@ if [ "$SKIP_CONFIG" -eq 0 ]; then
     kconfig_enable CONFIG_NSH_FILE_APPS
     kconfig_set_str CONFIG_PATH_INITIAL "/data/fb:/mnt/sd0/fb:/bin"
     kconfig_set_val CONFIG_ELF_STACKSIZE 32768
-    kconfig_enable CONFIG_EXAMPLES_RUNELF
-    kconfig_set_str CONFIG_EXAMPLES_RUNELF_PROGNAME runelf
-    kconfig_set_val CONFIG_EXAMPLES_RUNELF_PRIORITY 100
-    kconfig_set_val CONFIG_EXAMPLES_RUNELF_STACKSIZE 8192
-
     #
     # The ESP32-P4 board image should come up as a remotely reachable target.
     # DHCP keeps the first board-prep path simple on a normal LAN, while telnet
@@ -660,7 +654,7 @@ if [ "$SKIP_CONFIG" -eq 0 ]; then
     require_config_enabled CONFIG_ELF
     require_config_enabled CONFIG_MODULES
     require_config_enabled CONFIG_LIBC_EXECFUNCS
-    require_config_enabled CONFIG_EXAMPLES_RUNELF
+    require_config_enabled CONFIG_NSH_FILE_APPS
     require_config_enabled CONFIG_NET
     require_config_enabled CONFIG_NET_IPv4
     require_config_enabled CONFIG_NET_TCP

@@ -13,7 +13,7 @@ Function dataclassToStr( ByVal classid As fbc.FB_DATACLASS ) As String
 	Static As ZString Ptr classnames _
 		( FB_DATACLASS.FB_DATACLASS_INTEGER To FB_DATACLASS.FB_DATACLASS_UDT ) _
 		= { @"integer", @"float", @"string", @"udt" }
-	   
+
 	Select Case classid
 	Case LBound(classnames) To UBound(classnames)
 		Return *classnames(classid)
@@ -26,7 +26,7 @@ End Function
 	Scope
 		Var classid = __FB_QUERY_SYMBOL__( FB_QUERY_SYMBOL.dataclass, sym )
 		Print Left( "   [" & classid & "] " & dataclassToStr(classid) + Space(16), 16 ) & ": ";
-		Print #sym  
+		Print #sym
 	End Scope
 #endmacro
 

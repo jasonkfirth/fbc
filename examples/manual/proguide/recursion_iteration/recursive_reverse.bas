@@ -13,4 +13,4 @@ Function recursiveReverse (ByVal s As String) As String
 		Return recursiveReverse(Mid(s, 2)) & Left(s, 1)  '' recursive call
 	End If
 End Function
-		
+

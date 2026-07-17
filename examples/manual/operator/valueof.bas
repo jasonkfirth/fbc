@@ -15,7 +15,7 @@ pa=@a 'Here, we use the @ operator to point our integer ptr at 'a'.
 
 a=9     'Here we give 'a' a value of 9.
 
-Print "The value of 'a' is";*pa 'Here, we display the value of 'a' using a pointer. 
+Print "The value of 'a' is";*pa 'Here, we display the value of 'a' using a pointer.
 
 *pa = 1 'Here we use our pointer to change the value of 'a'
 Print "The new value of 'a' is";a 'Here we display the new value of 'a'.

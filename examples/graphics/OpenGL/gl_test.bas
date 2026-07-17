@@ -19,9 +19,9 @@ declare sub         doShutdown		 ( )
     '' Entry point
     ''
     doMain
-    
 
-    
+
+
 
 '' ::::::::::::
 '' name: doRender
@@ -31,14 +31,14 @@ declare sub         doShutdown		 ( )
 sub doRender cdecl
     static rtri as single
     static rqud as single
-    
+
     glClear GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT
     glPushMatrix
-    
+
     glLoadIdentity
     glTranslatef -1.5, 0.0, -6.0
     glRotatef rtri, 0, 1, 0
-         
+
     glBegin GL_TRIANGLES
 		glColor3f   1.0, 0.0, 0.0			'' Red
 		glVertex3f  0.0, 1.0, 0.0			'' Top Of Triangle  Front)
@@ -65,26 +65,26 @@ sub doRender cdecl
 		glColor3f   0.0, 1.0, 0.0			'' Green
 		glVertex3f -1.0,-1.0, 1.0			'' Right Of Triangle  Left)
     glEnd
-    
+
     glColor3f 0.5, 0.5, 1.0
-    glLoadIdentity    
+    glLoadIdentity
     glTranslatef -1.5, 0.0, -6.0
-	glTranslatef 3.0,0.0,0.0	
+	glTranslatef 3.0,0.0,0.0
 	glRotatef rqud, 1.0, 0.0, 0.0
-	
+
 	glBegin GL_QUADS
 		glVertex3f -1.0, 1.0, 0.0
 		glVertex3f  1.0, 1.0, 0.0
 		glVertex3f  1.0,-1.0, 0.0
 		glVertex3f -1.0,-1.0, 0.0
-	glEnd    
+	glEnd
 
-    glPopMatrix            
+    glPopMatrix
     glutSwapBuffers
-    
+
     rtri = rtri + 2.0
     rqud = rqud + 1.5
-    
+
 end sub
 
 
@@ -97,7 +97,7 @@ end sub
 sub doInput CDECL ( byval kbcode as unsigned byte, _
               byval mousex as integer, _
               byval mousey as integer )
-              
+
     if ( kbcode = 27 ) then
         doShutdown
         end 0
@@ -117,7 +117,7 @@ sub doInitGL
     dim lightAmb(3) as single
     dim lightDif(3) as single
     dim lightPos(3) as single
-    
+
     ''
     '' Rendering stuff
     ''
@@ -128,7 +128,7 @@ sub doInitGL
 	glDepthFunc GL_LEQUAL
     glEnable GL_COLOR_MATERIAL
 	glHint GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST
-    
+
     ''
     '' Light setup ( not used at the moment )
     ''
@@ -140,8 +140,8 @@ sub doInitGL
 
     lightAmb(3) = 1.0
     lightPos(2) = 2.0
-    lightPos(3) = 1.0    
-	
+    lightPos(3) = 1.0
+
     glLightfv GL_LIGHT1, GL_AMBIENT, @lightAmb(0)
 	glLightfv GL_LIGHT1, GL_DIFFUSE, @lightDif(0)
 	glLightfv GL_LIGHT1, GL_POSITION,@lightPos(0)
@@ -164,17 +164,17 @@ end sub
 '' ::::::::::::
 sub doReshapeGL CDECL ( byval w as integer, _
                         byval h as integer )
-    
-    glViewport 0, 0, w, h 
+
+    glViewport 0, 0, w, h
     glMatrixMode GL_PROJECTION
     glLoadIdentity
-    
+
     if ( h = 0 ) then
-        gluPerspective  80/2, w, 1.0, 5000.0 
+        gluPerspective  80/2, w, 1.0, 5000.0
     else
         gluPerspective  80/2, w / h, 1.0, 5000.0
     end if
-    
+
     glMatrixMode GL_MODELVIEW
     glLoadIdentity
 
@@ -185,15 +185,15 @@ sub initGLUT
     ''
     '' Setup glut
     ''
-    glutInit 1, strptr( " " )    
-    
+    glutInit 1, strptr( " " )
+
     glutInitWindowPosition 0, 0
     glutInitWindowSize 640, 480
     glutInitDisplayMode GLUT_RGBA or GLUT_DOUBLE or GLUT_DEPTH
     glutCreateWindow "FreeBASIC OpenGL example"
-    
+
     doInitGL
-    
+
     glutDisplayFunc  @doRender
     glutIdleFunc     @doRender
     glutReshapeFunc  @doReshapeGL
@@ -203,12 +203,12 @@ end sub
 
 '':::::
 sub doInit
-    
+
 	''
 	'' Init GLUT
 	''
-	initGLUT    
-	
+	initGLUT
+
 end sub
 
 '':::::
@@ -220,12 +220,12 @@ end sub
 
 '':::::
 sub doShutdown
-    
+
 	''
 	'' GLUT
 	''
 	shutdownGLUT
-	
+
 end sub
 
 '' ::::::::::::
@@ -234,17 +234,17 @@ end sub
 ''
 '' ::::::::::::
 sub doMain
-    
+
     ''
-    '' 
+    ''
     ''
     doInit
-    
+
     ''
     ''
     ''
     glutMainLoop
-    
+
 end sub
 
 

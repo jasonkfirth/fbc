@@ -13,7 +13,7 @@ Screen 14, 32
 Color RGB(255, 128, 0), RGB(0, 0, 64)
 
 ' Clears the screen to the background color
-Cls                     
+Cls
 
 ' Prints "Hello World!" in the middle of the screen
 Locate 15, 14

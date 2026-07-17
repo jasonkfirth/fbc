@@ -47,7 +47,7 @@ end function
 	if( reg->search( text ) ) then
 		'' match found..
 		dim as string match
-		do 
+		do
 			match = *reg->getStr( 0 )
 
 			'' naive check..

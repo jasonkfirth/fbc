@@ -30,6 +30,8 @@ Sub ProcedureThread (ByVal param As Any Ptr)
 		Do
 			MutexLock(.sync)
 			Line (544, 0)-(639, 49), 0, BF  '' clear the print area
+			'' The delay intentionally makes serialized page updates visible.
+			'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 			Sleep 100, 1
 			Locate 2, 71
 			Print ClockTime();
@@ -54,6 +56,8 @@ Dim s As String
 Do
 	MutexLock(ThreadUDT.sync)
 	Line (296, 208)-(376, 256), 0, BF  '' clear the print area
+	'' The delay intentionally makes the main thread's page update visible.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 	Sleep 100, 1
 	Locate 15,40
 	Print Using "######"; Counter();
@@ -62,9 +66,8 @@ Do
 	MutexUnlock(ThreadUDT.sync)
 	Sleep 100, 1
 Loop Until LCase(s) = "q"
- 
+
 ThreadUDT.quit = 1
 ThreadWait(TTptr->handle)
 MutexDestroy(ThreadUDT.sync)
 Delete TTptr
-				

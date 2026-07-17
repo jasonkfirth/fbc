@@ -11,7 +11,7 @@
 
 Declare Sub mySubroutine ()
 
-Dim say_Hello As Sub() 
+Dim say_Hello As Sub()
 
 say_Hello = @mySubroutine   'We tell say_Hello to point to mySubroutine.
 							'The sub() datatype acts as a pointer here.

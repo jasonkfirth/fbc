@@ -26,7 +26,7 @@ ScreenControl GET_WINDOW_POS, x0, y0
 Do
 
 	If (shakes > 0) Then
-		
+
 		'' do a shake of the window
 
 		If (shakes > 1) Then
@@ -49,7 +49,7 @@ Do
 
 	If (ScreenEvent(@e)) Then
 		Select Case e.type
-		
+
 		'' user pressed the mouse button
 		Case EVENT_MOUSE_BUTTON_PRESS
 
@@ -73,4 +73,4 @@ Do
 	Sleep 5
 
 Loop
-	
+

@@ -10,16 +10,27 @@ function get_ascii(a as integer) as string
 end function
 
 function get_button(b as integer) as string
+	dim result as string = "middle"
+
 	if (b = BUTTON_LEFT) then
-		return "left"
+		result = "left"
 	elseif (b = BUTTON_RIGHT) then
-		return "right"
-	else
-		return "middle"
+		result = "right"
 	end if
+
+	return result
 end function
 
-screenres 640, 480, 32
+const SCREEN_WIDTH = 640
+const SCREEN_HEIGHT = 480
+const SCREEN_DEPTH = 32
+
+screenres SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_DEPTH
+
+if screenptr = 0 then
+	print "Unable to create the graphics window."
+	end 1
+end if
 
 dim e as EVENT
 do

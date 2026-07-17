@@ -8,13 +8,13 @@
 
 Dim As Integer i, j
 For i = 1 To 10
-	
+
 	For j = 1 To 10
-		
+
 		Exit For, For
-		
+
 	Next j
-	
+
 	Print "I will never be shown"
-	
+
 Next i

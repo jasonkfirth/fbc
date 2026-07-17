@@ -13,7 +13,7 @@ For index As Integer = LBound(array) To UBound(array)
 	array(index) = index
 Next
 
-'' Resize a variable-length array with 10 elements 
+'' Resize a variable-length array with 10 elements
 '' (the lower bound should be kept the same)
 ReDim Preserve array(0 To 9)
 

@@ -59,8 +59,6 @@ private function CDropTarget.QueryInterface _
 	(byval pInst as IDropTarget ptr, _
 	 byval iid as REFIID, byval ppvObject as any ptr ptr) as HRESULT
 
-	dim as CDropTarget ptr _this = cast(CDropTarget ptr, pInst)
-
 	if( (memcmp( iid, @IID_IUnknown, len( GUID ) ) = 0) or _
 		(memcmp( iid, @IID_IDropTarget, len( GUID ) ) = 0) ) then
 		CDropTarget.AddRef( pInst )
@@ -152,8 +150,6 @@ end function
 ''
 private function CDropTarget.DragLeave _
 	(byval pInst as IDropTarget ptr) as HRESULT
-
-	dim as CDropTarget ptr _this = cast(CDropTarget ptr, pInst)
 
 	return S_OK
 end function

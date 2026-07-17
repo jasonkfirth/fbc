@@ -24,7 +24,7 @@
  '                      tests         2       2       2       0
  '                      asserts       5       5       5       0
  '/
- 
+
 
 #include once "crt/stdio.bi"
 #include once "crt/string.bi"
@@ -118,6 +118,6 @@ end sub
    '' Run all tests using the CUnit Basic interface
    CU_basic_set_mode(CU_BRM_VERBOSE)
    CU_basic_run_tests()
-   
+
    CU_cleanup_registry()
    end CU_get_error()

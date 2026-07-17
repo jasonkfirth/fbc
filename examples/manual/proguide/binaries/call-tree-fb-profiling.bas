@@ -6,11 +6,11 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgProfilingFbProfiler
 '' --------
 
-#cmdline "-profgen fb" 
+#cmdline "-profgen fb"
 #include Once "fbc-int/profile.bi"
 Using FBC
 
-ProfileSetOptions( PROFILE_OPTION_REPORT_CALLTREE ) 
+ProfileSetOptions( PROFILE_OPTION_REPORT_CALLTREE )
 
 Sub A
 	Print "A"

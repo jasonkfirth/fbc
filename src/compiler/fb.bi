@@ -762,7 +762,7 @@ declare function fbGetBackendValistType () as FB_CVA_LIST_TYPEDEF
 '' new implementation
 ''
 
-'' !!!TODO!!! - remove when 1.05 or later is released
+'' Bootstrap compilers without CBOOL need explicit boolean string values.
 #ifndef cbool
 	#define cbool(x_) iif((x_),-1,0)
 	#define INT_BOOL_TO_STR(y_) *iif(y_,@"true",@"false")

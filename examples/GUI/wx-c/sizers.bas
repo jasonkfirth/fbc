@@ -44,7 +44,7 @@ Function App_OnInit WXCALL ( ) As wxBool
     wxButton_Create( button2, frame, 2, wxString_ctorUTF8("Button2"), -1, -1, -1, -1, 0, 0, 0 )
     wxSizer_AddWindow( sizer, button2, -1, -1, -1, 0 )
 
-    '' 
+    ''
     wxWindow_SetSizerAndFit( frame, sizer, 0 )
 
     ''

@@ -2,7 +2,7 @@
 ''           Name: dx9_primitive_types.cpp
 ''         Author: Kevin Harris
 ''  Last Modified: 06/06/05
-''    Description: This sample demonstrates how to properly use all the 
+''    Description: This sample demonstrates how to properly use all the
 ''                 primitive types available under Direct3D.
 ''
 ''                 The primitive types are:
@@ -50,9 +50,9 @@ dim shared as integer g_bRenderInWireFrame = false
 dim shared as D3DPRIMITIVETYPE g_currentPrimitive = D3DPT_TRIANGLEFAN
 
 ''
-'' We'll store the vertex data in simple arrays until we're ready to load 
-'' them into actual Direct3D Vertex Buffers. Seeing the vertices laid out 
-'' like this should make it easier to understand how vertices need to be 
+'' We'll store the vertex data in simple arrays until we're ready to load
+'' them into actual Direct3D Vertex Buffers. Seeing the vertices laid out
+'' like this should make it easier to understand how vertices need to be
 '' passed to be considered valid for each primitive type.
 ''
 
@@ -95,7 +95,7 @@ dim shared as Vertex g_triangleList(0 to 6-1) => _
     ( 0.5f,-1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) )_
 }
 
-dim shared as Vertex g_triangleStrip(0 to 8-1) => _ 
+dim shared as Vertex g_triangleStrip(0 to 8-1) => _
 {_
     (-2.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ),_
     (-1.0f, 1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) ),_
@@ -135,7 +135,7 @@ function WinMain(byval hInstance as HINSTANCE, _
 				 byval nCmdShow as long _
 				) as long
 
-	dim as WNDCLASSEX winClass 
+	dim as WNDCLASSEX winClass
 	dim as MSG        uMsg
 
 	with winClass
@@ -229,8 +229,8 @@ function WindowProc( byval hWnd as HWND, _
 			end select
 
 		case WM_CLOSE
-			PostQuitMessage(0)	
-		
+			PostQuitMessage(0)
+
         case WM_DESTROY
             PostQuitMessage(0)
 
@@ -360,27 +360,27 @@ end sub
 ''-----------------------------------------------------------------------------
 sub shutDown( )
 	if( g_pPointList_VB <> NULL ) then
-        IDirect3DVertexBuffer9_Release(g_pPointList_VB) 
+        IDirect3DVertexBuffer9_Release(g_pPointList_VB)
     end if
 
 	if( g_pLineList_VB <> NULL ) then
-        IDirect3DVertexBuffer9_Release(g_pLineList_VB) 
+        IDirect3DVertexBuffer9_Release(g_pLineList_VB)
     end if
 
 	if( g_pLineStrip_VB <> NULL ) then
-        IDirect3DVertexBuffer9_Release(g_pLineStrip_VB) 
+        IDirect3DVertexBuffer9_Release(g_pLineStrip_VB)
     end if
 
     if( g_pTriangleList_VB <> NULL ) then
-        IDirect3DVertexBuffer9_Release(g_pTriangleList_VB) 
+        IDirect3DVertexBuffer9_Release(g_pTriangleList_VB)
     end if
 
 	if( g_pTriangleStrip_VB <> NULL ) then
-        IDirect3DVertexBuffer9_Release(g_pTriangleStrip_VB) 
+        IDirect3DVertexBuffer9_Release(g_pTriangleStrip_VB)
     end if
 
 	if( g_pTriangleFan_VB <> NULL ) then
-        IDirect3DVertexBuffer9_Release(g_pTriangleFan_VB) 
+        IDirect3DVertexBuffer9_Release(g_pTriangleFan_VB)
     end if
 
     if( g_pd3dDevice <> NULL ) then
@@ -407,7 +407,7 @@ sub render( )
 	'' begin drawing
 	''
 	IDirect3DDevice9_BeginScene(g_pd3dDevice)
-    
+
     ''
     '' rotate
     ''
@@ -424,7 +424,7 @@ sub render( )
     if( zPos < 2.5 or zPos > 10 ) then
     	zInc = -zInc
     end if
-    
+
 	''
 	'' draw vertex buffer
 	''
@@ -466,7 +466,7 @@ sub render( )
 	''
 	IDirect3DDevice9_EndScene(g_pd3dDevice)
     IDirect3DDevice9_Present(g_pd3dDevice, NULL, NULL, NULL, NULL )
-    
+
 end sub
 
 	''

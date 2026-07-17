@@ -15,7 +15,7 @@ ScreenRes SCREEN_WIDTH, SCREEN_HEIGHT, 32
 '' Get screen info (w and h should match the constants above, bypp should be 4)
 ScreenInfo w, h, , bypp, pitch
 
-'' Get the address of the frame buffer. An Any Ptr 
+'' Get the address of the frame buffer. An Any Ptr
 '' is used here to allow simple pointer arithmetic
 Dim buffer As Any Ptr = ScreenPtr()
 If (buffer = 0) Then
@@ -26,32 +26,32 @@ End If
 
 '' Lock the screen to allow direct frame buffer access
 ScreenLock()
-	
+
 	'' Set row address to the start of the buffer
 	Dim As Any Ptr row = buffer
-	
+
 	'' Iterate over all the pixels in the screen:
-	
+
 	For y As Integer = 0 To h - 1
-		
+
 		'' Set pixel address to the start of the row
 		'' It's a 32-bit pixel, so use a ULong Ptr
 		Dim As ULong Ptr pixel = row
-		
+
 		For x As Integer = 0 To w - 1
-			
+
 			'' Set the pixel value
-			*pixel = RGB(x, x Xor y, y) 
-			
-			'' Get the next pixel address 
+			*pixel = RGB(x, x Xor y, y)
+
+			'' Get the next pixel address
 			'' (ULong Ptr will increment by 4 bytes)
 			pixel += 1
-			
+
 		Next x
-		
+
 		'' Go to the next row
 		row += pitch
-		
+
 	Next y
 
 '' Unlock the screen.

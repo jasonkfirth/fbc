@@ -21,6 +21,8 @@ dim s as string  '' variable-length single-byte string (up to 2 GB on 32bit and
                  '' more on 64bit, may contain nulls, implicitly null-terminated
                  '' for C compatibility)
 
+'' This is an in-memory datatype demonstration, not a binary file layout.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-STR-009
 dim fixstr as string * 5  '' fixed-length string (implicitly null-terminated)
 
 dim z as zstring * 5+1  '' null-terminated fixed-length string

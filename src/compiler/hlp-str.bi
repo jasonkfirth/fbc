@@ -143,7 +143,7 @@ declare function hStr2long( byref txt as string, byref value as long ) as intege
 
 declare function hWStr2long( byref txt as wstring, byref value as long ) as integer
 
-declare sub hSplitStr(byref txt as string, byref del as string, res() as string)
+declare function hSplitStr(byref txt as string, byref del as string, res() as string) as integer
 
 declare function hStr2Tok(byval txt as const zstring ptr, res() as string) as integer
 
@@ -154,10 +154,10 @@ declare function hWStr2Args( byval txt as const wstring ptr, res() as DWSTRING )
 '':::::
 #define ZstrAllocate(chars) xallocate( chars + 1 )
 
-#define ZstrFree(p) if( p <> NULL ) then : deallocate( p ) : end if
+declare sub ZstrFree( byref p as zstring ptr )
 
 #define WstrAllocate(chars) xallocate( (chars + 1) * len( wstring ) )
 
-#define WstrFree(p) if( p <> NULL ) then : deallocate( p ) : end if
+declare sub WstrFree( byref p as wstring ptr )
 
 #endif ''__HELP_STR_BI__

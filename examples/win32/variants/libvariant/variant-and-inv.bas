@@ -15,12 +15,12 @@ operator and _
 		byref lhs as VARIANT_, _
 		byref rhs as VARIANT _
 	) as VARIANT
-	
+
 	dim as VARIANT_ res = any
-	
+
 	VarAnd( @lhs, @rhs.var_, @res )
-	
+
 	return VARIANT( res, FALSE )
-	
+
 end operator
 

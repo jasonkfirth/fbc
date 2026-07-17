@@ -25,7 +25,7 @@ End Constructor
 Function RtnI (ByRef u As UDT) As Integer
 	Return u.i
 End Function
- 
+
 Destructor UDT ()
 	Print "   => UDT.destructor", , @This
 End Destructor
@@ -42,4 +42,4 @@ Scope
 End Scope
 
 Sleep
-				
+

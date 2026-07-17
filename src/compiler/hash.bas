@@ -1,5 +1,8 @@
 '' generic hash tables
 ''
+'' Ownership: Hash tables own their internal items.  The shared item pool is
+'' reference-counted and is released when its final table is destroyed.
+''
 '' chng: sep/2004 written [v1ctor]
 ''       jan/2005 updated to use real linked-lists [v1ctor]
 
@@ -17,6 +20,7 @@ declare function    hashNewItem ( byval list as HASHLIST ptr ) as HASHITEM ptr
 declare sub         hashDelItem ( byval list as HASHLIST ptr, _
 								  byval item as HASHITEM ptr )
 
+'' Module state: the shared item pool is reference-counted by hash instances.
 dim shared as HASHITEMPOOL itempool
 
 
@@ -107,9 +111,11 @@ sub hashEnd(byval hash as THASH ptr)
 end sub
 
 function hashHash(byval s as const zstring ptr) as uinteger
+	'' This is the traditional multiply-by-31 string hash, written as a shift.
+	const HASH_MULTIPLIER_SHIFT = 5
 	dim as uinteger index = 0
 	while (s[0])
-		index = s[0] + (index shl 5) - index
+		index = s[0] + (index shl HASH_MULTIPLIER_SHIFT) - index
 		s += 1
 	wend
 	return index

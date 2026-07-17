@@ -143,7 +143,10 @@ end type
 				( -1 ) _
 			} _
 		), _
-		/' #define __FB_MIN_VERSION__(major, minor, patch_level) ((__FB_VER_MAJOR__ > (major)) or ((__FB_VER_MAJOR__ = (major)) and ((__FB_VER_MINOR__ > (minor)) or (__FB_VER_MINOR__ = (minor) and __FB_VER_PATCH__ >= (patch_level))))) '/ _
+		/' #define __FB_MIN_VERSION__(major, minor, patch_level)
+		   ((__FB_VER_MAJOR__ > (major)) or ((__FB_VER_MAJOR__ = (major)) and _
+		   ((__FB_VER_MINOR__ > (minor)) or (__FB_VER_MINOR__ = (minor) and _
+		   __FB_VER_PATCH__ >= (patch_level))))) '/ _
 		( _
 			@"__FB_MIN_VERSION__", FB_RTL_OPT_NONE, _
 			3, _
@@ -439,7 +442,10 @@ end type
 				( -1 ) _
 			} _
 		), _
-		/' #define __FB_MIN_VERSION__(major, minor, patch_level) ((__FB_VER_MAJOR__ > (major)) or ((__FB_VER_MAJOR__ = (major)) and ((__FB_VER_MINOR__ > (minor)) or (__FB_VER_MINOR__ = (minor) and __FB_VER_PATCH__ >= (patch_level))))) '/ _
+		/' #define __FB_MIN_VERSION__(major, minor, patch_level)
+		   ((__FB_VER_MAJOR__ > (major)) or ((__FB_VER_MAJOR__ = (major)) and _
+		   ((__FB_VER_MINOR__ > (minor)) or (__FB_VER_MINOR__ = (minor) and _
+		   __FB_VER_PATCH__ >= (patch_level))))) '/ _
 		( _
 			@"__FB_MIN_VERSION__", FB_RTL_OPT_NONE, _
 			3, _

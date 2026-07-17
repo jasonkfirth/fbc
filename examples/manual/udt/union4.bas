@@ -16,7 +16,7 @@ Type T
 		End Type
 		Declare Sub proc(ByVal _b1 As Byte, ByVal _b2 As Byte)
 	End Union
-	m As U	
+	m As U
 	Declare Sub proc()
 End Type
 

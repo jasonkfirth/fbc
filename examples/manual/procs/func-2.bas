@@ -6,7 +6,7 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgFunction
 '' --------
 
-'' This program demonstrates the declaration of a function 
+'' This program demonstrates the declaration of a function
 '' and returning a value using assignment to function name
 
 Declare Function ReturnTen () As Integer

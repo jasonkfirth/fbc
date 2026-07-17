@@ -19,7 +19,7 @@ Function hFileExists( filename As String ) As Integer Static
 
 	f = FreeFile
 	Open filename For Input As #f
-	
+
 	Close #f
 
 	hFileExists = -1

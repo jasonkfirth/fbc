@@ -70,8 +70,8 @@ Do
 	c = (c Mod 15) + 1
 '    Sleep 5, 1
 Loop Until Inkey <> ""
- 
+
 quit = 1
 ThreadWait(handle)
 MutexDestroy(mutex)
-			
+

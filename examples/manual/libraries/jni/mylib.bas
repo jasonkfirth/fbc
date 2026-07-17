@@ -7,7 +7,7 @@
 '' --------
 
 #include "jni.bi"
-	
+
 '' Note: The mangling must be "windows-ms" or the JRE won't find any function
 Extern "windows-ms"
 	Function Java_MyLib_add( env As JNIEnv Ptr, obj As jobject, l As jint, r As jint ) As jint Export

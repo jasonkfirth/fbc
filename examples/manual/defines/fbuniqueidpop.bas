@@ -15,7 +15,7 @@
 #macro end_repeat  '' with user named variable
 			__counter__ -= 1
 		Wend
-	End Scope   
+	End Scope
 #endmacro
 
 Print "With user named variable:"
@@ -76,4 +76,4 @@ With "unique identifier" variable:
    --- inner
    --- inner
 '/
-	
+

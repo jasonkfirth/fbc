@@ -9,5 +9,5 @@
 ' header.bi file
 Type FooType
 	Bar As Byte
-	Barbeque As Byte 
+	Barbeque As Byte
 End Type

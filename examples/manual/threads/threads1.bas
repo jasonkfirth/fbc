@@ -32,6 +32,8 @@ Sub teletype( ByRef text As String, ByVal x As Long, ByVal y As Long )
 	For i As Integer = 0 To (Len(text) - 1)
 		Locate x, y + i
 		Print Chr(text[i])
+		'' The delay makes serialized character output visible in this example.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 		Sleep 25, 1
 	Next
 

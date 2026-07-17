@@ -742,10 +742,11 @@ end sub
 ''================================================
 private sub struct_analyze( byval fld as FBSYMBOL ptr, byref part1 as integer, byref part2 as integer, byref range as integer )
 
+	const LOW8BYTE_LAST_OFFSET = 7
 	dim as integer lgt=fld->lgt
 	fld = symbUdtGetFirstField(fld)
 	while fld
-		if range=KLOW8BYTES and fld->ofs>7 then
+		if range=KLOW8BYTES and fld->ofs>LOW8BYTE_LAST_OFFSET then
 			range = KHIGH8BYTES
 			part2 = KPART2FLOAT ''default
 		end if

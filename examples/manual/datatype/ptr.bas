@@ -17,7 +17,7 @@ p = @num
 
 ' Print the value stored in memory pointed to by pointer "p"
 Print "Pointer 'p' ="; *p
-Print 
+Print
 
 ' Print the actual location in memory that pointer "p" points at.
 Print "Pointer 'p' points to memory location:"

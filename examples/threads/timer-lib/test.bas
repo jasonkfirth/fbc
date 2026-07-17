@@ -1,11 +1,11 @@
 '' Timer library test
-'' To compile: fbc test.bas -mt 
+'' To compile: fbc test.bas -mt
 '' (compile timer.bas first, of course)
 
 #include once "timer.bi"
 
 sub timer_handler( byval id as integer )
-	print "(timer:" & id & " handler)" 
+	print "(timer:" & id & " handler)"
 end sub
 
 	dim as CTimer ptr t1, t2, t3

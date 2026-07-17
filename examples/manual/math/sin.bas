@@ -12,5 +12,5 @@ Dim r As Double
 Input "Please enter an angle in degrees: ", a
 r = a * PI / 180	'Convert the degrees to Radians
 Print ""
-Print "The sine of a" ; a; " degree angle is"; Sin ( r ) 
+Print "The sine of a" ; a; " degree angle is"; Sin ( r )
 Sleep

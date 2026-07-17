@@ -12,4 +12,4 @@ Type bar
 End Type
 Dim foo As bar
 Print SizeOf(foo)
-	
+

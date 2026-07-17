@@ -19,7 +19,7 @@ Type mouse
 		End Type
 	End Union
 End Type
- 
+
 Screen 11
 Dim As mouse m
 

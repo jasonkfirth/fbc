@@ -25,10 +25,10 @@ PRINT STRING(SCRW * SCRH, asc("3"));
 '' copy to page 0
 dim as integer pg = 0, fpscnt = 0, fps = 0
 dim as double tini = timer
-do 
+do
 	pcopy 1 + pg
 	pg = (pg + 1) mod 3
-	
+
 	fps += 1
 	if timer - tini >= 1 then
 		fpscnt = fps

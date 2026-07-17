@@ -34,7 +34,7 @@ Function subtract_cp Naked cdecl _      '' parameters pushed onto call stack in 
 		ByVal a As Long, _
 		ByVal b As Long _            '' parameter pushed onto stack in first
 	) As Long
-   
+
 	Asm
 		push ebp                        '' push ebp onto stack   => esp -= 4
 		mov ebp, esp                    '' ebp = esp
@@ -49,7 +49,7 @@ Function subtract_cp Naked cdecl _      '' parameters pushed onto call stack in 
 										''    => discard user stack
 		ret                             '' return result in eax
 	End Asm
-   
+
 End Function
 
 #endif

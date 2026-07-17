@@ -140,7 +140,7 @@ Do
 	MutexUnlock(Tptr->sync)               'Mutex (Unlock) for main thread
 	Sleep 5, 1
 Loop
- 
+
 
 ThreadWait(Tptr->handle)
 MutexDestroy(Tptr->sync)

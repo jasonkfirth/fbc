@@ -468,11 +468,10 @@ private function hGetId _
 	'' Disallow type suffix on SUBs
 	if( is_sub ) then
 		if( *dtype <> FB_DATATYPE_INVALID ) then
-			'' TODO: error message is weird because it reports proc name
-			'' as the invalid character, when it should probably:
-			''    a) a different error message
-			''    b) point to the invalid suffix character
-			errReport( FB_ERRMSG_INVALIDCHARACTER )
+			'' Report the suffix itself. lexGetText() names the procedure,
+			'' which is not the character rejected for a SUB declaration.
+			errReportEx( FB_ERRMSG_INVALIDCHARACTER, chr( lexGetSuffixChar( ) ), , _
+			             FB_ERRMSGOPT_ADDCOLON or FB_ERRMSGOPT_ADDQUOTES )
 			'' error recovery: invalidate the data type and suffix
 			*dtype = FB_DATATYPE_INVALID
 			lexGetType() = FB_DATATYPE_INVALID
@@ -1336,9 +1335,9 @@ function cProcHeader _
 				op = AST_OP_ADD
 			end if
 		else
-			'' non-self op in a type declaration... !!WRITEME!! static global operators should be allowed?
+			'' non-self op in a type declaration
 			if( is_memberproc ) then
-				errReport( FB_ERRMSG_OPCANNOTBEAMETHOD, TRUE, " (TODO)" )
+				errReport( FB_ERRMSG_OPCANNOTBEAMETHOD, TRUE )
 			end if
 		end if
 
@@ -1705,6 +1704,10 @@ function cProcHeader _
 
 		'' Priority?
 		if( lexGetClass( ) = FB_TKCLASS_NUMLITERAL ) then
+			'' Constructor/destructor priorities are stored in an unsigned 16-bit field;
+			'' 100 and below are reserved for compiler-generated initialization.
+			const USER_PRIORITY_MIN = 101
+			const USER_PRIORITY_MAX = 65535
 			'' not an integer?
 			if( lexGetType( ) <> FB_DATATYPE_INTEGER ) then
 				errReport( FB_ERRMSG_INVALIDPRIORITY )
@@ -1712,7 +1715,7 @@ function cProcHeader _
 				lexSkipToken( )
 			else
 				priority = clng( *lexGetText() )
-				if priority < 101 or priority > 65535 then
+				if priority < USER_PRIORITY_MIN or priority > USER_PRIORITY_MAX then
 					errReport( FB_ERRMSG_INVALIDPRIORITY )
 					'' error recovery: skip token
 					lexSkipToken( )

@@ -6,8 +6,11 @@
 #include "portaudio.bi"
 
 Const Pi as Double = 3.14159265358979323846
+Const TwoPi as Double = 2.0 * Pi
 Const SampleRate as Integer = 44100
-Const SineSamples as Integer = SampleRate / 10
+Const SineSamples as Integer = SampleRate \ 10
+Const MaximumSample as Double = 2147483647.0
+Const AmplitudeScale as Double = 0.5
 
 Type PlayPayload
     frequency As Single
@@ -17,11 +20,16 @@ Function PlayCallback cdecl (InputBuff as Const Any Ptr, OutputBuff as Any Ptr, 
                     FrameCount as CUlong, TimeInfo as Const PaStreamCallbackTimeInfo Ptr, _
                     StatusFlags as PaStreamCallbackFlags, UserData as Any ptr) as Long
 
+    If (OutputBuff = 0) OrElse (UserData = 0) Then Return paAbort
+    If FrameCount = 0 Then Return paContinue
+
     Dim as Long Ptr outBuff = OutputBuff
     Dim as PlayPayload Ptr payload = UserData
     Dim as Single frequency = payload->frequency
-    For i as Integer = 0 To FrameCount - 1
-        outBuff[i] = CLng(&h7FFFFFFF * 0.5 * Sin(2 * Pi * frequency * i / SampleRate))
+
+    For i as CULong = 0 To FrameCount - 1
+        outBuff[i] = CLng(MaximumSample * AmplitudeScale * _
+            Sin(TwoPi * frequency * i / SampleRate))
     Next
     Function = paContinue
 End Function

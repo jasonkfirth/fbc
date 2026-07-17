@@ -6,69 +6,124 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgMutexLock
 '' --------
 
-'Example of mutual exclusion for synchronization between 2 threads
-'by using 2 Mutexes only (by self lock and mutual unlock):
-'The Producer works one time, then the Consumer works one time.
-'
-'Principle of synchronisation by mutual exclusion
-'(initial condition: mut#A and mut#B locked)
-'
-'          Thread#A              XORs              Thread#B
-'Do_something#A_with_exclusion          MutexLock(mut#A)
-'MutexUnlock(mut#A)                       Do_something#B_with_exclusion
-'.....                                  MutexUnlock(mut#B)
-'MutexLock(mut#B)                       .....
+'' Producer/consumer synchronization using one mutex and two conditions.
+''
+'' A mutex is always unlocked by the same thread that locked it. This matters
+'' on pthread-based targets, where using mutexes as cross-thread semaphores is
+'' invalid. The condition variables signal when the single-item buffer changes
+'' state, and the predicates are always checked while the mutex is held.
 
-'----------------------------------------------------------------------
+Const ITEM_COUNT = 10
 
-Dim Shared produced As Any Ptr
-Dim Shared consumed As Any Ptr
-Dim consumer_id As Any Ptr
-Dim producer_id As Any Ptr
+Type THREAD_STATE
+	Lock As Any Ptr
+	CanProduce As Any Ptr
+	CanConsume As Any Ptr
+	ItemReady As Integer
+	ShutdownRequested As Integer
+End Type
 
-
-Sub consumer ( ByVal param As Any Ptr )
-	For i As Integer = 0 To 9
-		MutexLock produced
-		Print , ",consumer gets:" ; i
-		MutexUnlock consumed
-		Sleep 5, 1
-	Next i
+Sub DestroyState( ByRef State As THREAD_STATE )
+	If State.CanConsume <> 0 Then CondDestroy State.CanConsume
+	If State.CanProduce <> 0 Then CondDestroy State.CanProduce
+	If State.Lock <> 0 Then MutexDestroy State.Lock
 End Sub
 
-Sub producer ( ByVal param As Any Ptr )
-	For i As Integer = 0 To 9
-		Print "Producer puts:" ; i;
-		MutexUnlock produced
-		MutexLock consumed
-	Sleep 5, 1
-Next i
+Sub RequestShutdown( ByRef State As THREAD_STATE )
+	MutexLock State.Lock
+	State.ShutdownRequested = TRUE
+	CondBroadcast State.CanConsume
+	CondBroadcast State.CanProduce
+	MutexUnlock State.Lock
 End Sub
 
+Sub Consumer( ByVal Param As Any Ptr )
+	Dim State As THREAD_STATE Ptr = Cast(THREAD_STATE Ptr, Param)
+	If State = 0 Then Exit Sub
 
-produced = MutexCreate
-consumed = MutexCreate
-If ( produced = 0 ) Or ( consumed = 0 ) Then
-	Print "Error creating mutexes! Exiting..."
-	Sleep
-	End
+	For I As Integer = 0 To ITEM_COUNT - 1
+		MutexLock State->Lock
+
+		While (State->ItemReady = FALSE) AndAlso _
+		      (State->ShutdownRequested = FALSE)
+			CondWait State->CanConsume, State->Lock
+		Wend
+
+		If State->ShutdownRequested AndAlso (State->ItemReady = FALSE) Then
+			MutexUnlock State->Lock
+			Exit Sub
+		End If
+
+		Print , ", consumer gets: "; I
+		State->ItemReady = FALSE
+		CondSignal State->CanProduce
+		MutexUnlock State->Lock
+	Next
+End Sub
+
+Sub Producer( ByVal Param As Any Ptr )
+	Dim State As THREAD_STATE Ptr = Cast(THREAD_STATE Ptr, Param)
+	If State = 0 Then Exit Sub
+
+	For I As Integer = 0 To ITEM_COUNT - 1
+		MutexLock State->Lock
+
+		While (State->ItemReady <> FALSE) AndAlso _
+		      (State->ShutdownRequested = FALSE)
+			CondWait State->CanProduce, State->Lock
+		Wend
+
+		If State->ShutdownRequested Then
+			MutexUnlock State->Lock
+			Exit Sub
+		End If
+
+		Print "Producer puts: "; I;
+		State->ItemReady = TRUE
+		CondSignal State->CanConsume
+		MutexUnlock State->Lock
+	Next
+End Sub
+
+Dim State As THREAD_STATE
+Dim As Any Ptr ConsumerId, ProducerId
+
+State.Lock = MutexCreate
+If State.Lock = 0 Then
+	Print "Error creating the producer/consumer mutex."
+	End 1
 End If
 
-MutexLock produced
-MutexLock consumed
-
-consumer_id = ThreadCreate ( @ consumer )
-producer_id = ThreadCreate ( @ producer )
-If ( producer_id = 0 ) Or ( consumer_id = 0 ) Then
-	Print "Error creating threads! Exiting..."
-	Sleep
-	End
+State.CanProduce = CondCreate
+If State.CanProduce = 0 Then
+	DestroyState State
+	Print "Error creating the producer condition."
+	End 1
 End If
 
-ThreadWait consumer_id
-ThreadWait producer_id
+State.CanConsume = CondCreate
+If State.CanConsume = 0 Then
+	DestroyState State
+	Print "Error creating the consumer condition."
+	End 1
+End If
 
-MutexDestroy consumed
-MutexDestroy produced
+ConsumerId = ThreadCreate(@Consumer, @State)
+If ConsumerId = 0 Then
+	DestroyState State
+	Print "Error creating the consumer thread."
+	End 1
+End If
 
-Sleep
+ProducerId = ThreadCreate(@Producer, @State)
+If ProducerId = 0 Then
+	RequestShutdown State
+	ThreadWait ConsumerId
+	DestroyState State
+	Print "Error creating the producer thread."
+	End 1
+End If
+
+ThreadWait ProducerId
+ThreadWait ConsumerId
+DestroyState State

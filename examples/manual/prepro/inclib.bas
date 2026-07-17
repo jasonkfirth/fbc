@@ -9,4 +9,4 @@
 '' incomplete code snippet
 
 '' this will include libmystuff.a in the link process
-#inclib "mystuff" 
+#inclib "mystuff"

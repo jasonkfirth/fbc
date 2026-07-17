@@ -19,8 +19,8 @@ Type complexUDT
 End Type
 
 Declare Sub prntInfo_printString (ByRef u As complexUDT)
-  
-  
+
+
 Print "'Dim Byref As complexUDT ref = *New complexUDT(""Beginning"")':"
 Dim ByRef As complexUDT ref = *New complexUDT("Beginning")
 prntInfo_printString(ref)
@@ -95,4 +95,4 @@ Sub prntInfo_printString (ByRef u As complexUDT)
 	Print "        " & u
 	Print
 End Sub
-			
+

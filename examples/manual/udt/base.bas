@@ -35,7 +35,7 @@ End Constructor
 Sub Child.show()
 	'' Call base type's show() method, not ours
 	Base.show()
-   
+
 	'' Show both a fields, the base type's and ours'
 	Print "child", Base.a, a
 End Sub
@@ -55,7 +55,7 @@ End Constructor
 Sub GrandChild.show()
 	'' Call base type's show() method, not ours
 	Base.show()
-   
+
 	'' Show both a fields, the base.base type's, the base type's and ours'
 	Print "grandchild", Base.Base.a, Base.a, a
 End Sub

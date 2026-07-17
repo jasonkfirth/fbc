@@ -92,7 +92,8 @@ type FB_CMPSTMT_WITH
 	'' (if a simple VAR access was given to the WITH)
 	sym         as FBSYMBOL ptr
 	is_ptr      as integer
-	last        as FB_CMPSTMTSTK_ ptr  '' Previous WITH node on the stack; so parser.stmt.with can be restored in cCompStmtPop()
+	'' Previous WITH node on the stack; parser.stmt.with is restored in cCompStmtPop().
+	last        as FB_CMPSTMTSTK_ ptr
 end type
 
 type FB_CMPSTMT_NAMESPACE
@@ -152,8 +153,11 @@ end type
 
 enum FB_PARSEROPT
 	FB_PARSEROPT_NONE             = &h00000000
-	FB_PARSEROPT_PRNTOPT          = &h00000001  '' Used to determine if parenthesis are optional and if the next ')' should end the expression for highest precedence operators
-	FB_PARSEROPT_CHKARRAY         = &h00000002  '' used by LEN() to handle expr's and ()-less arrays (while set, there will be "array access, index expected" errors, unsetting allows to have no-index arrays, e.g. as bydesc arguments, or in l/ubound())
+	'' Parentheses are optional, and ')' ends the expression at highest precedence.
+	FB_PARSEROPT_PRNTOPT          = &h00000001
+	'' LEN() uses this while parsing expr's and ()-less arrays.  Clearing it permits
+	'' no-index arrays, for example BYDESC arguments and L/UBOUND().
+	FB_PARSEROPT_CHKARRAY         = &h00000002
 	FB_PARSEROPT_ISEXPR           = &h00000004  '' parsing an expression?
 	FB_PARSEROPT_ISSCOPE          = &h00000008
 	FB_PARSEROPT_ISFUNC           = &h00000010
@@ -163,8 +167,10 @@ enum FB_PARSEROPT
 	FB_PARSEROPT_EQINPARENSONLY   = &h00000100  '' only check for '=' if inside parentheses
 	FB_PARSEROPT_GTINPARENSONLY   = &h00000200  '' only check for '>' if inside parentheses
 	FB_PARSEROPT_ISPP             = &h00000400  '' PP expression? (e.g. #if condition)
-	FB_PARSEROPT_EXPLICITBASE     = &h00000800  '' Used to tell cProcArgList() & co about explicit BASE accesses from hBaseMemberAccess() functions
-	FB_PARSEROPT_IDXINPARENSONLY  = &h00001000  '' Only parse array index if inside parentheses (used by REDIM, so it can handle 'expr(1 to 2)', where the expression parser should parse 'expr' but not the '(1 to 2)' part)
+	'' Tell cProcArgList() and related code about explicit BASE accesses.
+	FB_PARSEROPT_EXPLICITBASE     = &h00000800
+	'' REDIM uses this to parse expr in 'expr(1 to 2)' without consuming the bounds.
+	FB_PARSEROPT_IDXINPARENSONLY  = &h00001000
 end enum
 
 type PARSERCTX

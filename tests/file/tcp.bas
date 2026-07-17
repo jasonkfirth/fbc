@@ -270,15 +270,26 @@ end sub
 sub burst_client_thread( byval userdata as any ptr )
 	dim as integer client
 	dim as integer i
+	dim as integer tries
 	dim as ubyte value
 	dim as ubyte expected
 
 	burst_client_step = 1
 	client = freefile()
-	if( OPEN TCP( "host=127.0.0.1,port=" & str( BURST_PORT ) AS #client ) <> 0 ) then
-		burst_client_error = 1
-		exit sub
-	end if
+	tries = 0
+	do
+		if( OPEN TCP( "host=127.0.0.1,port=" & str( BURST_PORT ) AS #client ) = 0 ) then
+			exit do
+		end if
+
+		tries += 1
+		if( tries >= 5000 ) then
+			burst_client_error = 1
+			exit sub
+		end if
+
+		sleep 1, 1
+	loop
 
 	value = 101
 	if( put( #client, , value ) <> 0 ) then

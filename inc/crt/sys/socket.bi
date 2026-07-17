@@ -18,6 +18,8 @@
 #include once "crt/sys/nuttx/socket.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/sys/cygwin/socket.bi"
+#elseif defined(__FB_FREEBSD__)
+#include once "crt/sys/freebsd/socket.bi"
 #elseif defined(__FB_DRAGONFLY__)
 #include once "crt/sys/dragonfly/socket.bi"
 #elseif defined(__FB_OPENBSD__)
@@ -26,6 +28,10 @@
 #include once "crt/sys/netbsd/socket.bi"
 #elseif defined(__FB_DARWIN__)
 #include once "crt/sys/darwin/socket.bi"
+#elseif defined(__FB_HAIKU__)
+#include once "crt/sys/haiku/socket.bi"
+#elseif defined(__FB_SOLARIS__)
+#include once "crt/sys/solaris/socket.bi"
 #else
 #error Platform unsupported
 #endif
@@ -62,6 +68,7 @@ declare function setsockopt (byval __fd as long, byval __level as long, byval __
 declare function listen (byval __fd as long, byval __n as long) as long
 declare function accept (byval __fd as long, byval __addr as sockaddr ptr, byval __addr_len as socklen_t ptr) as long
 declare function shutdown (byval __fd as long, byval __how as long) as long
+declare function close_ alias "close" (byval __fd as long) as long
 #if defined(__FB_DARWIN__)
 declare function sockatmark (byval __fd as long) as long
 #else

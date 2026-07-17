@@ -34,6 +34,8 @@ Dim Shared As Integer ok = 0
 Sub thread (ByVal p As Any Ptr)
 	Print "thread is complementing the string"
 	MutexLock(mutex)
+	'' Keep the operation visibly in progress while ownership is demonstrated.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 	Sleep 400, 1
 	txt &= " complemented by thread"
 	ok = 1

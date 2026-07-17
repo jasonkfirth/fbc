@@ -72,4 +72,4 @@ Color std_colors.foreground, std_colors.background
 Print "end"
 
 Sleep
-		
+

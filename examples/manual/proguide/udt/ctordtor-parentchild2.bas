@@ -33,4 +33,4 @@ c2 = c1
 'Dim As Parent Ptr pp2 = New Parent(c1)  '' forbidden
 
 Sleep
-			
+

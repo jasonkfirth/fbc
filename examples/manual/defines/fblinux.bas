@@ -8,7 +8,7 @@
 
 #ifdef __FB_LINUX__
   ' ... instructions only for Linux ...
-  ' ... #libpath "/usr/X11/lib" 
+  ' ... #libpath "/usr/X11/lib"
 #else
   ' ... instructions not for Linux ...
-#endif 
+#endif

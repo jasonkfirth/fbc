@@ -5,7 +5,7 @@
 	#include once "windows.bi"
 	#include once "win/ole2.bi"
 
-	'' older fbc packages (before 2015) had this forward declaration in 
+	'' older fbc packages (before 2015) had this forward declaration in
 	'' inc/win/oaidl.bi - having it here allows this library to be compiled
 	'' (but has not been tested for correctness / completeness)
 	type VARIANT_ as VARIANT
@@ -29,7 +29,7 @@ end enum
 
 type VARIANT
 	as VARIANT_ var_
- 	
+
  	declare constructor ( )
  	declare constructor ( byref rhs as VARIANT )
 	declare constructor ( byref rhs as VARIANT, byval deep_copy as integer )
@@ -43,9 +43,9 @@ type VARIANT
 	declare constructor ( byval rhs as double )
 	declare constructor ( byval rhs as zstring ptr )
 	declare constructor ( byval rhs as wstring ptr )
- 	
+
  	declare destructor ( )
- 
+
  #ifndef VARIANT_NOASSIGNMENT
 	declare operator let ( byval rhs as VARIANT_NOTHING )
 	declare operator let ( byref rhs as VARIANT )
@@ -72,110 +72,110 @@ type VARIANT
 	declare operator cast ( ) as wstring ptr
 
 	declare operator += ( byref rhs as VARIANT )
-	declare operator += ( byref rhs as VARIANT_ ) 
-	declare operator += ( byval rhs as integer ) 
-	declare operator += ( byval rhs as uinteger ) 
-	declare operator += ( byval rhs as longint ) 
-	declare operator += ( byval rhs as ulongint ) 
-	declare operator += ( byval rhs as single ) 
-	declare operator += ( byval rhs as double ) 
-	declare operator += ( byval rhs as zstring ptr ) 
-	declare operator += ( byval rhs as wstring ptr ) 
+	declare operator += ( byref rhs as VARIANT_ )
+	declare operator += ( byval rhs as integer )
+	declare operator += ( byval rhs as uinteger )
+	declare operator += ( byval rhs as longint )
+	declare operator += ( byval rhs as ulongint )
+	declare operator += ( byval rhs as single )
+	declare operator += ( byval rhs as double )
+	declare operator += ( byval rhs as zstring ptr )
+	declare operator += ( byval rhs as wstring ptr )
 
 	declare operator -= ( byref rhs as VARIANT )
-	declare operator -= ( byref rhs as VARIANT_ ) 
-	declare operator -= ( byval rhs as integer ) 
-	declare operator -= ( byval rhs as uinteger ) 
-	declare operator -= ( byval rhs as longint ) 
-	declare operator -= ( byval rhs as ulongint ) 
-	declare operator -= ( byval rhs as single ) 
-	declare operator -= ( byval rhs as double ) 
+	declare operator -= ( byref rhs as VARIANT_ )
+	declare operator -= ( byval rhs as integer )
+	declare operator -= ( byval rhs as uinteger )
+	declare operator -= ( byval rhs as longint )
+	declare operator -= ( byval rhs as ulongint )
+	declare operator -= ( byval rhs as single )
+	declare operator -= ( byval rhs as double )
 
 	declare operator *= ( byref rhs as VARIANT )
-	declare operator *= ( byref rhs as VARIANT_ ) 
-	declare operator *= ( byval rhs as integer ) 
-	declare operator *= ( byval rhs as uinteger ) 
-	declare operator *= ( byval rhs as longint ) 
-	declare operator *= ( byval rhs as ulongint ) 
-	declare operator *= ( byval rhs as single ) 
-	declare operator *= ( byval rhs as double ) 
-	
+	declare operator *= ( byref rhs as VARIANT_ )
+	declare operator *= ( byval rhs as integer )
+	declare operator *= ( byval rhs as uinteger )
+	declare operator *= ( byval rhs as longint )
+	declare operator *= ( byval rhs as ulongint )
+	declare operator *= ( byval rhs as single )
+	declare operator *= ( byval rhs as double )
+
 	declare operator /= ( byref rhs as VARIANT )
-	declare operator /= ( byref rhs as VARIANT_ ) 
-	declare operator /= ( byval rhs as integer ) 
-	declare operator /= ( byval rhs as uinteger ) 
-	declare operator /= ( byval rhs as longint ) 
-	declare operator /= ( byval rhs as ulongint ) 
-	declare operator /= ( byval rhs as single ) 
-	declare operator /= ( byval rhs as double ) 
-	
+	declare operator /= ( byref rhs as VARIANT_ )
+	declare operator /= ( byval rhs as integer )
+	declare operator /= ( byval rhs as uinteger )
+	declare operator /= ( byval rhs as longint )
+	declare operator /= ( byval rhs as ulongint )
+	declare operator /= ( byval rhs as single )
+	declare operator /= ( byval rhs as double )
+
 	declare operator \= ( byref rhs as VARIANT )
-	declare operator \= ( byref rhs as VARIANT_ ) 
-	declare operator \= ( byval rhs as integer ) 
-	declare operator \= ( byval rhs as uinteger ) 
-	declare operator \= ( byval rhs as longint ) 
-	declare operator \= ( byval rhs as ulongint ) 
-	declare operator \= ( byval rhs as single ) 
-	declare operator \= ( byval rhs as double ) 
-	
+	declare operator \= ( byref rhs as VARIANT_ )
+	declare operator \= ( byval rhs as integer )
+	declare operator \= ( byval rhs as uinteger )
+	declare operator \= ( byval rhs as longint )
+	declare operator \= ( byval rhs as ulongint )
+	declare operator \= ( byval rhs as single )
+	declare operator \= ( byval rhs as double )
+
 	declare operator mod= ( byref rhs as VARIANT )
-	declare operator mod= ( byref rhs as VARIANT_ ) 
-	declare operator mod= ( byval rhs as integer ) 
-	declare operator mod= ( byval rhs as uinteger ) 
-	declare operator mod= ( byval rhs as longint ) 
-	declare operator mod= ( byval rhs as ulongint ) 
-	declare operator mod= ( byval rhs as single ) 
-	declare operator mod= ( byval rhs as double ) 
-	
+	declare operator mod= ( byref rhs as VARIANT_ )
+	declare operator mod= ( byval rhs as integer )
+	declare operator mod= ( byval rhs as uinteger )
+	declare operator mod= ( byval rhs as longint )
+	declare operator mod= ( byval rhs as ulongint )
+	declare operator mod= ( byval rhs as single )
+	declare operator mod= ( byval rhs as double )
+
 	declare operator shl= ( byref rhs as VARIANT )
-	declare operator shl= ( byval rhs as integer ) 
+	declare operator shl= ( byval rhs as integer )
 
 	declare operator shr= ( byref rhs as VARIANT )
-	declare operator shr= ( byval rhs as integer ) 
+	declare operator shr= ( byval rhs as integer )
 
 	declare operator and= ( byref rhs as VARIANT )
-	declare operator and= ( byref rhs as VARIANT_ ) 
-	declare operator and= ( byval rhs as integer ) 
-	declare operator and= ( byval rhs as uinteger ) 
-	declare operator and= ( byval rhs as longint ) 
-	declare operator and= ( byval rhs as ulongint ) 
-	
+	declare operator and= ( byref rhs as VARIANT_ )
+	declare operator and= ( byval rhs as integer )
+	declare operator and= ( byval rhs as uinteger )
+	declare operator and= ( byval rhs as longint )
+	declare operator and= ( byval rhs as ulongint )
+
 	declare operator or= ( byref rhs as VARIANT )
-	declare operator or= ( byref rhs as VARIANT_ ) 
-	declare operator or= ( byval rhs as integer ) 
-	declare operator or= ( byval rhs as uinteger ) 
-	declare operator or= ( byval rhs as longint ) 
-	declare operator or= ( byval rhs as ulongint ) 
-	
+	declare operator or= ( byref rhs as VARIANT_ )
+	declare operator or= ( byval rhs as integer )
+	declare operator or= ( byval rhs as uinteger )
+	declare operator or= ( byval rhs as longint )
+	declare operator or= ( byval rhs as ulongint )
+
 	declare operator xor= ( byref rhs as VARIANT )
-	declare operator xor= ( byref rhs as VARIANT_ ) 
-	declare operator xor= ( byval rhs as integer ) 
-	declare operator xor= ( byval rhs as uinteger ) 
-	declare operator xor= ( byval rhs as longint ) 
-	declare operator xor= ( byval rhs as ulongint ) 
-	
+	declare operator xor= ( byref rhs as VARIANT_ )
+	declare operator xor= ( byval rhs as integer )
+	declare operator xor= ( byval rhs as uinteger )
+	declare operator xor= ( byval rhs as longint )
+	declare operator xor= ( byval rhs as ulongint )
+
 	declare operator imp= ( byref rhs as VARIANT )
-	declare operator imp= ( byref rhs as VARIANT_ ) 
-	declare operator imp= ( byval rhs as integer ) 
-	declare operator imp= ( byval rhs as uinteger ) 
-	declare operator imp= ( byval rhs as longint ) 
-	declare operator imp= ( byval rhs as ulongint ) 
-	
+	declare operator imp= ( byref rhs as VARIANT_ )
+	declare operator imp= ( byval rhs as integer )
+	declare operator imp= ( byval rhs as uinteger )
+	declare operator imp= ( byval rhs as longint )
+	declare operator imp= ( byval rhs as ulongint )
+
 	declare operator eqv= ( byref rhs as VARIANT )
-	declare operator eqv= ( byref rhs as VARIANT_ ) 
-	declare operator eqv= ( byval rhs as integer ) 
-	declare operator eqv= ( byval rhs as uinteger ) 
-	declare operator eqv= ( byval rhs as longint ) 
-	declare operator eqv= ( byval rhs as ulongint ) 
-	
+	declare operator eqv= ( byref rhs as VARIANT_ )
+	declare operator eqv= ( byval rhs as integer )
+	declare operator eqv= ( byval rhs as uinteger )
+	declare operator eqv= ( byval rhs as longint )
+	declare operator eqv= ( byval rhs as ulongint )
+
 	declare operator ^= ( byref rhs as VARIANT )
-	declare operator ^= ( byref rhs as VARIANT_ ) 
-	declare operator ^= ( byval rhs as integer ) 
-	declare operator ^= ( byval rhs as uinteger ) 
-	declare operator ^= ( byval rhs as longint ) 
-	declare operator ^= ( byval rhs as ulongint ) 
-	declare operator ^= ( byval rhs as single ) 
-	declare operator ^= ( byval rhs as double ) 
+	declare operator ^= ( byref rhs as VARIANT_ )
+	declare operator ^= ( byval rhs as integer )
+	declare operator ^= ( byval rhs as uinteger )
+	declare operator ^= ( byval rhs as longint )
+	declare operator ^= ( byval rhs as ulongint )
+	declare operator ^= ( byval rhs as single )
+	declare operator ^= ( byval rhs as double )
 end type
 
 '' neg

@@ -8,6 +8,6 @@
 
 Const upperbound = 10
 
-'' Declare an array with indexes ranging from 0 to upperbound, 
+'' Declare an array with indexes ranging from 0 to upperbound,
 '' for a total of (upperbound + 1) indexes.
 Dim array(upperbound) As Single

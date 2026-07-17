@@ -26,7 +26,7 @@ Namespace N
 		'    Print "   N.P.duplicateSub"
 		'End Sub
 		Sub test()
-			Using M  '' useless, but just to demonstrate that does not increase priority level of imported namespace 
+			Using M  '' useless, but just to demonstrate that does not increase priority level of imported namespace
 			duplicateSub()
 		End Sub
 	End Namespace

@@ -230,7 +230,7 @@ function symbAddArrayDesc( byval array as FBSYMBOL ptr ) as FBSYMBOL ptr
 	dim as FBSYMBOL ptr desc = any, desctype = any
 	dim as FB_SYMBATTRIB attrib = any
 	dim as FBSYMBOLTB ptr symtb = any
-	dim as integer isdynamic = any, ispubext = any, stats = any
+	dim as integer isdynamic = any, stats = any
 
 	function = NULL
 
@@ -254,8 +254,6 @@ function symbAddArrayDesc( byval array as FBSYMBOL ptr ) as FBSYMBOL ptr
 	'' var_..
 	else
 		isdynamic = symbIsDynamic( array )
-		ispubext = (array->attrib and (FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN)) <> 0
-
 		'' common or dynamic? Use the array's name/alias for the
 		'' descriptor, allowing it to be a from other modules if
 		'' Extern, and making debugging nicer.

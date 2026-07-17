@@ -6,7 +6,7 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgRem
 '' --------
 
-/' this is a multi line 
+/' this is a multi line
 comment as a header of
 this example '/
 
@@ -18,7 +18,7 @@ Rem This Is a Single Line comment
 
 Dim a As Integer ' comment following a statement
 
-? "FreeBASIC" : ' also acceptable 
+? "FreeBASIC" : ' also acceptable
 
 Dim b As /' can comment in here also '/    Integer
 

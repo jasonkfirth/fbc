@@ -32,11 +32,11 @@ function minmax cdecl(byval L as lua_State ptr) as long
 			end if
 		end if
 	next
-  
+
 	'' Push the results on the virtual stack
 	lua_pushnumber( L, minnum )
 	lua_pushnumber( L, maxnum )
-  
+
 	'' Return number of returned parameters
 	function = 2
 end function

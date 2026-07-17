@@ -7,7 +7,7 @@
 '' --------
 
 
-Dim As Long x, y, buttons, res 
+Dim As Long x, y, buttons, res
 ' Set video mode and enter loop
 ScreenRes 640, 480, 8
 Do

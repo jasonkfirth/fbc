@@ -1,6 +1,6 @@
 ''
 '' CInPlaceFrame - a "class" that implements the IOleInPlaceFrame interface
-'' 
+''
 
 
 
@@ -16,9 +16,9 @@ private function CInPlaceFrame_QueryInterface _
 	) as HRESULT
 
 	dim as CInPlaceFrame ptr self_ = cast( CInPlaceFrame ptr, _this )
-	
+
 	LOG_FUNC()
-	
+
 	if( memcmp( riid, @IID_IOleInPlaceFrame, len( GUID ) ) = 0 ) then
 		*ppvObj = @self_->interface
 		return S_OK
@@ -26,7 +26,7 @@ private function CInPlaceFrame_QueryInterface _
 
 	*ppvObj = NULL
 	function = E_NOINTERFACE
-	
+
 end function
 
 ''::::
@@ -34,11 +34,11 @@ private function CInPlaceFrame_AddRef _
 	( _
 		byval _this as IOleInPlaceFrame ptr _
 	) as ULONG
-	
+
 	LOG_FUNC()
 
 	function = 1
-	
+
 end function
 
 ''::::
@@ -46,11 +46,11 @@ private function CInPlaceFrame_Release _
 	( _
 		byval _this as IOleInPlaceFrame ptr _
 	) as ULONG
-	
+
 	LOG_FUNC()
 
 	function = 1
-	
+
 end function
 
 ''::::
@@ -59,11 +59,11 @@ private function CInPlaceFrame_GetWindow _
 		byval _this as IOleInPlaceFrame ptr, _
 		byval lphwnd as HWND ptr _
 	) as HRESULT
-	
+
 	LOG_FUNC()
 
 	*lphwnd = cast( CInPlaceFrame ptr, _this )->hwnd
-	
+
 	function = S_OK
 
 end function
@@ -74,7 +74,7 @@ private function CInPlaceFrame_ContextSensitiveHelp _
 		byval _this as IOleInPlaceFrame ptr, _
 		byval fEnterMode as BOOL _
 	) as HRESULT
-	
+
 	LOG_FUNC()
 
 	function = E_NOTIMPL
@@ -87,7 +87,7 @@ private function CInPlaceFrame_GetBorder _
 		byval _this as IOleInPlaceFrame ptr, _
 		byval lprectBorder as LPRECT _
 	) as HRESULT
-	
+
 	LOG_FUNC()
 
 	function = E_NOTIMPL
@@ -100,7 +100,7 @@ private function CInPlaceFrame_RequestBorderSpace _
 		byval _this as IOleInPlaceFrame ptr, _
 		byval pborderwidths as LPCBORDERWIDTHS _
 	) as HRESULT
-	
+
 	LOG_FUNC()
 
 	function = E_NOTIMPL
@@ -113,7 +113,7 @@ private function CInPlaceFrame_SetBorderSpace _
 		byval _this as IOleInPlaceFrame ptr, _
 		byval pborderwidths as LPCBORDERWIDTHS _
 	) as HRESULT
-	
+
 	LOG_FUNC()
 
 	function = E_NOTIMPL
@@ -127,7 +127,7 @@ private function CInPlaceFrame_SetActiveObject _
 		byval pActiveObject as IOleInPlaceActiveObject ptr, _
 		byval pszObjName as LPCOLESTR _
 	) as HRESULT
-	
+
 	LOG_FUNC()
 
 	function = S_OK
@@ -141,7 +141,7 @@ private function CInPlaceFrame_InsertMenus _
 		byval hmenuShared as HMENU, _
 		byval lpMenuWidths as LPOLEMENUGROUPWIDTHS _
 	) as HRESULT
-	
+
 	LOG_FUNC()
 
 	function = E_NOTIMPL
@@ -156,7 +156,7 @@ private function CInPlaceFrame_SetMenu _
 		byval holemenu as HOLEMENU, _
 		byval hwndActiveObject as HWND _
 	) as HRESULT
-	
+
 	LOG_FUNC()
 
 	function = S_OK
@@ -169,7 +169,7 @@ private function CInPlaceFrame_RemoveMenus _
 		byval _this as IOleInPlaceFrame ptr, _
 		byval hmenuShared as HMENU _
 	) as HRESULT
-	
+
 	LOG_FUNC()
 
 	function = E_NOTIMPL
@@ -182,7 +182,7 @@ private function CInPlaceFrame_SetStatusText _
 		byval _this as IOleInPlaceFrame ptr, _
 		byval pszStatusText as LPCOLESTR _
 	) as HRESULT
-	
+
 	LOG_FUNC()
 
 	function = S_OK
@@ -195,7 +195,7 @@ private function CInPlaceFrame_EnableModeless _
 		byval _this as IOleInPlaceFrame ptr, _
 		byval fEnable as BOOL _
 	) as HRESULT
-	
+
 	LOG_FUNC()
 
 	function = S_OK
@@ -209,7 +209,7 @@ private function CInPlaceFrame_TranslateAccelerator _
 		byval lpmsg as LPMSG, _
 		byval wID as WORD _
 	) as HRESULT
-	
+
 	LOG_FUNC()
 
 	function = E_NOTIMPL
@@ -250,7 +250,7 @@ function CInPlaceFrame_New _
 	end if
 
 	_this->interface.lpVtbl = @vtbl
-	
+
 	_this->hwnd = hwnd
 
 	function = _this

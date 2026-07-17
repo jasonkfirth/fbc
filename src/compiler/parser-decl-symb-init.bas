@@ -26,7 +26,7 @@ type FB_INITCTX
 	last_ctx    as FB_INITCTX ptr   '' pointer to the last ctx to track global recursion
 end type
 
-'' track all FB_INITCTX in a stack
+'' Module state: track all FB_INITCTX in a stack for nested initializers.
 dim shared top_ctx as FB_INITCTX ptr = NULL
 
 declare function hUDTInit _
@@ -362,68 +362,72 @@ private function hArrayInit _
 	function = TRUE
 end function
 
+private function hUDTInitObject( byref ctx as FB_INITCTX ) as integer
+	dim as ASTNODE ptr expr = any
+	dim as FBSYMBOL ptr oldsubtype = any
+	dim as integer olddtype = any
+	dim as integer is_ctorcall = any
+
+	'' Set the context data type, to allow anonymous type()'s to
+	'' work for UDTs with constructors here
+	oldsubtype = parser.ctxsym
+	olddtype   = parser.ctx_dtype
+	parser.ctx_dtype = ctx.dtype
+	parser.ctxsym    = ctx.subtype
+
+	'' Expression
+	expr = cExpression( )
+
+	'' Restore context data type
+	parser.ctx_dtype = olddtype
+	parser.ctxsym    = oldsubtype
+
+	if( expr = NULL ) then
+		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
+		'' error recovery: fake an expr
+		expr = astNewCONSTi( 0 )
+	end if
+
+	'' When initializing a BYREF parameter, an expression of the
+	'' same type should be used as-is instead of causing a copy
+	'' constructor call + temp var to be used, because that would
+	'' destroy the BYREF semantics. For any other expression it's
+	'' ok to cause implicit constructor calls though, because it
+	'' couldn't be passed BYREF anyways.
+	if( symbGetClass( ctx.sym ) = FB_SYMBCLASS_PARAM ) then
+		if( symbGetParamMode( ctx.sym ) = FB_PARAMMODE_BYREF ) then
+			if( (astGetDataType( expr ) = typeGetDtAndPtrOnly( ctx.dtype )) and _
+			    (astGetSubtype( expr ) = ctx.subtype) ) then
+				return hDoAssign( ctx, expr )
+			end if
+		end if
+	end if
+
+	expr = astBuildImplicitCtorCallEx( ctx.sym, expr, astBydescArrayArg( expr ), is_ctorcall )
+	if( expr = NULL ) then
+		exit function
+	end if
+
+	if( is_ctorcall ) then
+		return astTypeIniAddCtorCall( ctx.tree, ctx.sym, expr, ctx.dtype, ctx.subtype ) <> NULL
+	end if
+
+	'' try to assign it (do a shallow copy)
+	return hDoAssign( ctx, expr )
+end function
+
 private function hUDTInit( byref ctx as FB_INITCTX ) as integer
 
 	dim as integer elm_cnt = any
 	dim as longint lgt = any, baseofs = any, pad_lgt = any
 	dim as FBSYMBOL ptr fld = any, first = any
-	dim as FBSYMBOL ptr oldsubtype = any
-	dim as integer olddtype = any
 	dim as FB_INITCTX old_ctx = any
 
 	function = FALSE
 
 	'' ctor?
 	if( (ctx.options and FB_INIOPT_ISOBJ) <> 0 ) then
-		dim as ASTNODE ptr expr = any
-
-		'' Set the context data type, to allow anonymous type()'s to
-		'' work for UDTs with constructors here
-		oldsubtype = parser.ctxsym
-		olddtype   = parser.ctx_dtype
-		parser.ctx_dtype = ctx.dtype
-		parser.ctxsym    = ctx.subtype
-
-		'' Expression
-		expr = cExpression( )
-
-		'' Restore context data type
-		parser.ctx_dtype = olddtype
-		parser.ctxsym    = oldsubtype
-
-		if( expr = NULL ) then
-			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
-			'' error recovery: fake an expr
-			expr = astNewCONSTi( 0 )
-		end if
-
-		'' When initializing a BYREF parameter, an expression of the
-		'' same type should be used as-is instead of causing a copy
-		'' constructor call + temp var to be used, because that would
-		'' destroy the BYREF semantics. For any other expression it's
-		'' ok to cause implicit constructor calls though, because it
-		'' couldn't be passed BYREF anyways.
-		if( symbGetClass( ctx.sym ) = FB_SYMBCLASS_PARAM ) then
-			if( symbGetParamMode( ctx.sym ) = FB_PARAMMODE_BYREF ) then
-				if( (astGetDataType( expr ) = typeGetDtAndPtrOnly( ctx.dtype )) and _
-				    (astGetSubtype( expr ) = ctx.subtype) ) then
-					return hDoAssign( ctx, expr )
-				end if
-			end if
-		end if
-
-		dim as integer is_ctorcall = any
-		expr = astBuildImplicitCtorCallEx( ctx.sym, expr, astBydescArrayArg( expr ), is_ctorcall )
-		if( expr = NULL ) then
-			exit function
-		end if
-
-		if( is_ctorcall ) then
-			return astTypeIniAddCtorCall( ctx.tree, ctx.sym, expr, ctx.dtype, ctx.subtype ) <> NULL
-		end if
-
-		'' try to assign it (do a shallow copy)
-		return hDoAssign( ctx, expr )
+		return hUDTInitObject( ctx )
 	end if
 
 	dim as integer parenth = TRUE, comma = FALSE

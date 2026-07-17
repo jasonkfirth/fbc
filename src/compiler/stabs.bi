@@ -1,3 +1,6 @@
+#ifndef __STABS_BI__
+#define __STABS_BI__
+
 const STAB_TYPE_GSYM    = 32 'Global symbol
 const STAB_TYPE_FNAME   = 34 'Function name (for BSD Fortran)
 const STAB_TYPE_FUN     = 36 'Function
@@ -38,3 +41,5 @@ const STAB_TYPE_BCOMM   = 226 'Begin named common block
 const STAB_TYPE_ECOMM   = 228 'End named common block
 const STAB_TYPE_ECOML   = 230 'Member of a common block
 const STAB_TYPE_WITH    = 232 'Pascal with statement: type,,0,0,offset
+
+#endif

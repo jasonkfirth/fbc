@@ -89,7 +89,7 @@ declare sub reportError( byref msg as string )
 	dim recvbuffer as zstring * RECVBUFFLEN+1
 	dim bytes as integer
 
-	do 
+	do
 		bytes = recv( s, recvBuffer, RECVBUFFLEN, 0 )
 		if( bytes <= 0 ) then
 			exit do
@@ -140,13 +140,13 @@ function resolveHost( byref hostname as string ) as integer
 	'' check if it's an ip address
 	ia.S_addr = inet_addr( hostname )
 	if ( ia.S_addr = INADDR_NONE ) then
-		
+
 		'' if not, assume it's a name, resolve it
 		hostentry = gethostbyname( hostname )
 		if ( hostentry = 0 ) then
 			exit function
 		end if
-		
+
 		function = *cast( integer ptr, *hostentry->h_addr_list )
 	else
 		'' just return the address

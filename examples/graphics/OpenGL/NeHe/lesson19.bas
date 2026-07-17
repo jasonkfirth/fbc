@@ -1,16 +1,16 @@
 ''
-'' This code was created by Jeff Molofee '99 
+'' This code was created by Jeff Molofee '99
 ''
 '' If you've found this code useful, please let me know.
 ''
 '' Visit Jeff at http://nehe.gamedev.net/
-'' 
-'' or for port-specific comments, questions, bugreports etc. 
+''
+'' or for port-specific comments, questions, bugreports etc.
 '' email to leggett@eecs.tulane.edu
 ''
 
 
- 
+
 #include once "GL/gl.bi"
 #include once "GL/glu.bi"
 #include once "SDL/SDL.bi"
@@ -28,38 +28,38 @@ const MAX_PARTICLES = 1000
 '' This is our SDL surface
 dim shared as SDL_Surface ptr surface
 
-dim shared as integer rainbow = TRUE    '' Toggle rainbow effect                             
+dim shared as integer rainbow = TRUE    '' Toggle rainbow effect
 
-dim shared as single slowdown = 1.0f '' Slow Down Particles                               
+dim shared as single slowdown = 1.0f '' Slow Down Particles
 dim shared as single xspeed          '' Base X Speed (To Allow Keyboard Direction Of Tail)
 dim shared as single yspeed          '' Base Y Speed (To Allow Keyboard Direction Of Tail)
-dim shared as single zoom = -20.0f   '' Used To Zoom Out                                  
+dim shared as single zoom = -20.0f   '' Used To Zoom Out
 
-dim shared as GLuint col = 0        '' Current Color Selection                           
-dim shared as GLuint delay          '' Rainbow Effect Delay                              
-dim shared as GLuint texture(0)     '' Storage For Our Particle Texture                  
+dim shared as GLuint col = 0        '' Current Color Selection
+dim shared as GLuint delay          '' Rainbow Effect Delay
+dim shared as GLuint texture(0)     '' Storage For Our Particle Texture
 
 '' Create our particle structure
 type particle
     as integer active '' Active (Yes/No)
-    as single  life   '' Particle Life  
-    as single  fade   '' Fade Speed     
+    as single  life   '' Particle Life
+    as single  fade   '' Fade Speed
 
-    as single  r      '' Red Value      
-    as single  g      '' Green Value    
-    as single  b      '' Blue Value     
+    as single  r      '' Red Value
+    as single  g      '' Green Value
+    as single  b      '' Blue Value
 
-    as single  x      '' X Position     
-    as single  y      '' Y Position     
-    as single  z      '' Z Position     
+    as single  x      '' X Position
+    as single  y      '' Y Position
+    as single  z      '' Z Position
 
-    as single  xi     '' X Direction    
-    as single  yi     '' Y Direction    
-    as single  zi     '' Z Direction    
+    as single  xi     '' X Direction
+    as single  yi     '' Y Direction
+    as single  zi     '' Z Direction
 
-    as single  xg     '' X Gravity      
-    as single  yg     '' Y Gravity      
-    as single  zg     '' Z Gravity      
+    as single  xg     '' X Gravity
+    as single  yg     '' Y Gravity
+    as single  zg     '' Z Gravity
 end type
 
 '' Rainbow of colors
@@ -204,112 +204,112 @@ end sub
 '' function to handle key press events
 sub handleKeyPress( byval keysym as SDL_keysym ptr )
     dim as integer i
-    
+
     select case keysym->sym
 	case SDLK_ESCAPE
 	    '' ESC key was pressed
 	    Quit( 0 )
-	
+
 	case SDLK_F1
 	    '' F1 key was pressed
 	    '' this toggles fullscreen mode
-	    
+
 	    SDL_WM_ToggleFullScreen( surface )
-	
+
 	case SDLK_KP_PLUS
 	    '' '+' key was pressed
 	    '' this speeds up the particles
-	    
+
 	    if ( slowdown > 1.0f ) then _
 			slowdown -= 0.1f
-	    
+
 	case SDLK_KP_MINUS
 	    '' '-' key was pressed
 	    '' this slows down the particles
-	    
+
 	    if ( slowdown < 4.0f ) then _
 			slowdown += 0.1f
-	
+
 	case SDLK_PAGEUP
 	    '' PageUp key was pressed
 	    '' this zooms into the scene
-	    
+
 	    zoom += 0.5f
-	
+
 	case SDLK_PAGEDOWN
 	    '' PageDown key was pressed
 	    '' this zooms out of the scene
-	    
+
 	    zoom -= 0.5f
-	    
+
 	case SDLK_UP
 	    '' Up arrow key was pressed
 	    '' this increases the particles' y movement
-	    
+
 	    if ( yspeed < 200.0f ) then _
 			yspeed += 4
-	
+
 	case SDLK_DOWN
 	    '' Down arrow key was pressed
 	    '' this decreases the particles' y movement
-	    
+
 	    if ( yspeed > -200.0f ) then _
 			yspeed -= 4
-	
+
 	case SDLK_RIGHT
 	    '' Right arrow key was pressed
 	    '' this increases the particles' x movement
-	    
+
 	    if ( xspeed < 200.0f ) then _
 			xspeed += 4
-	
+
 	case SDLK_LEFT
 	    '' Left arrow key was pressed
 	    '' this decreases the particles' x movement
-	    
+
 	    if ( xspeed > -200.0f ) then _
 			xspeed -= 4
-	
+
 	case SDLK_KP8
 	    '' NumPad 8 key was pressed
 	    '' increase particles' y gravity
-	    
+
 	    for i = 0 to MAX_PARTICLES-1
 			if ( particles(i).yg < 1.5f ) then _
 		    	particles(i).yg += 0.5f
 		next
-	
+
 	case SDLK_KP2
 	    '' NumPad 2 key was pressed
 	    '' decrease particles' y gravity
-	    
+
 	    for i = 0 to MAX_PARTICLES-1
 			if ( particles(i).yg > -1.5f ) then _
 		    	particles(i).yg -= 0.5f
 	    next
-	
+
 	case SDLK_KP6
 	    '' NumPad 6 key was pressed
 	    '' this increases the particles' x gravity
-	    
+
 	    for i = 0 to MAX_PARTICLES-1
 			if ( particles(i).xg < 1.5f ) then _
 		    	particles(i).xg += 0.5f
 	    next
-	
+
 	case SDLK_KP4
 	    '' NumPad 4 key was pressed
 	    '' this decreases the particles' y gravity
-	    
+
 	    for i = 0 to MAX_PARTICLES-1
 			if ( particles(i).xg > -1.5f ) then _
 		    	particles(i).xg -= 0.5f
 	    next
-	
+
 	case SDLK_TAB
 	    '' Tab key was pressed
 	    '' this resets the particles and makes them re-explode
-	    
+
 	    for i = 0 to MAX_PARTICLES-1
 		   dim as integer clr = ( i + 1 ) \ ( MAX_PARTICLES \ 12 )
 		   dim as single xi, yi, zi
@@ -319,18 +319,18 @@ sub handleKeyPress( byval keysym as SDL_keysym ptr )
 
 		   ResetParticle( i, clr, xi, yi, zi )
 		next
-	
+
 	case SDLK_RETURN
 	    '' Return key was pressed
 	    '' this toggles the rainbow color effect
-	    
+
 	    rainbow = not rainbow
 	    delay = 25
-	
+
 	case SDLK_SPACE
 	    '' Spacebar was pressed
 	    '' this turns off rainbow-ing and manually cycles through colors
-	    
+
 	    rainbow = FALSE
 	    delay = 0
 	    col = ( col + 1 ) mod 12
@@ -341,7 +341,7 @@ end sub
 '' general OpenGL initialization function
 function initGL( ) as integer
 	dim as integer i
-    
+
     '' Load in the texture
     if ( not LoadGLTextures( ) ) then _
 		return FALSE
@@ -382,15 +382,15 @@ function initGL( ) as integer
 	    zi =  yi
 
 	    ResetParticle( i, clr, xi, yi, zi )
-    next 
+    next
 
-    return TRUE 
+    return TRUE
 end function
 
 '' Here goes our drawing code
 function drawGLScene( ) as integer
     dim as integer i
-    
+
     '' These are to calculate our fps
     static as GLint T0     = 0
     static as GLint Frames = 0
@@ -412,7 +412,7 @@ function drawGLScene( ) as integer
 
 		    '' Draw The Particle Using Our RGB Values,
 		    '' Fade The Particle Based On It's Life
-		    
+
 		    glColor4f( particles(i).r, _
 			       particles(i).g, _
 			       particles(i).b, _
@@ -480,7 +480,7 @@ function drawGLScene( ) as integer
 end function
 
 '' main
-    
+
     '' Flags to pass to SDL_SetVideoMode
     dim as integer videoFlags
     '' main i variable
@@ -506,11 +506,11 @@ end function
 	    Quit( 1 )
 	end if
 
-    '' the flags to pass to SDL_SetVideoMode                           
-    videoFlags   = SDL_OPENGL          '' Enable OpenGL in SDL         
-    videoFlags or= SDL_GL_DOUBLEBUFFER '' Enable double buffering      
+    '' the flags to pass to SDL_SetVideoMode
+    videoFlags   = SDL_OPENGL          '' Enable OpenGL in SDL
+    videoFlags or= SDL_GL_DOUBLEBUFFER '' Enable double buffering
     videoFlags or= SDL_HWPALETTE       '' Store the palette in hardware
-    videoFlags or= SDL_RESIZABLE       '' Enable window resizing       
+    videoFlags or= SDL_RESIZABLE       '' Enable window resizing
 
     '' This checks to see if surfaces can be stored in memory
     if ( videoInfo->hw_available ) then
@@ -522,7 +522,7 @@ end function
     '' This checks if hardware blits can be done
     if ( videoInfo->blit_hw ) then _
 		videoFlags or= SDL_HWACCEL
-		
+
     '' Sets up OpenGL double buffering
     SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 )
 
@@ -549,27 +549,27 @@ end function
 
     '' Resize the initial window
     resizeWindow( SCREEN_WIDTH, SCREEN_HEIGHT )
-    
+
     drawGLScene( )
 
     '' wait for events
     do while ( not done )
-	    
+
 	    '' handle the events in the queue
 	    do while ( SDL_PollEvent( @event ) )
-		    
+
 		    select case event.type
 			case SDL_ACTIVEEVENT
 			    '' Something's happend with our focus
 			    '' If we lost focus or we are iconified, we
 			    '' shouldn't draw the screen
-			    
+
 			    if ( event.active.gain = 0 ) then
 					isActive = FALSE
 			    else
-					isActive = TRUE					
+					isActive = TRUE
 			    end if
-		
+
 			case SDL_VIDEORESIZE
 			    '' handle resize event
 			    'surface = SDL_SetVideoMode( event.resize.w, event.resize.h, 16, videoFlags )
@@ -578,17 +578,17 @@ end function
 				  '  Quit( 1 )
 				'end if
 			    resizeWindow( event.resize.w, event.resize.h )
-			    
+
 			case SDL_KEYDOWN
 			    '' handle key presses
 			    handleKeyPress( @event.key.keysym )
-			    			
+
 			case SDL_QUIT_
 			    '' handle quit requests
 			    done = TRUE
-			    
+
 			end select
-			    
+
 		loop
 
 	    '' If rainbow coloring is turned on, cycle the colors

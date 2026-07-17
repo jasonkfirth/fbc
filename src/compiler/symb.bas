@@ -270,6 +270,74 @@ function symbKeywordIsDisabledCommand _
 end function
 
 '':::::
+private function hCanDuplicateConstOrProc _
+	( _
+		byval head_sym as FBSYMBOL ptr, _
+		byval s as FBSYMBOL ptr _
+	) as integer
+
+	function = FALSE
+
+	do
+		select case as const head_sym->class
+		'' only dup allowed are labels and UDTs
+		case FB_SYMBCLASS_LABEL, FB_SYMBCLASS_ENUM, _
+		     FB_SYMBCLASS_TYPEDEF, FB_SYMBCLASS_FWDREF
+
+		'' struct? only it's not unique
+		case FB_SYMBCLASS_STRUCT
+			if( symbGetIsUnique( head_sym ) ) then
+				exit function
+			end if
+
+		'' only if the keyword or the rtl-proc has a string suffix
+		case FB_SYMBCLASS_KEYWORD, FB_SYMBCLASS_PROC
+			if( head_sym->class = FB_SYMBCLASS_KEYWORD ) then
+				if( symbKeywordIsDisabledCommand( head_sym->key.id ) ) then
+					head_sym = head_sym->hash.next
+					continue do
+				end if
+			end if
+
+			if( env.clopt.lang <> FB_LANG_QB ) then
+				exit function
+			end if
+
+			'' only if it's a RTL function..
+			if( symbIsProc( head_sym ) ) then
+				if( symbGetIsRTL( head_sym ) = FALSE ) then
+					exit function
+				else
+					'' both RTL? don't allow dup so overloaded procs
+					'' will get chained
+					if( symbGetIsRTL( head_sym ) ) then
+						exit function
+					end if
+				end if
+			end if
+
+			'' nothing else takes a suffix but rtl-funcs returning strings
+			if( symbIsSuffixed( s ) ) then
+				if( symbGetType( s ) = symbGetType( head_sym ) ) then
+					exit function
+				end if
+			else
+				if( symbGetType( head_sym ) <> FB_DATATYPE_STRING ) then
+					exit function
+				end if
+			end if
+
+		case else
+			exit function
+		end select
+
+		head_sym = head_sym->hash.next
+	loop while( head_sym <> NULL )
+
+	function = TRUE
+
+end function
+
 function symbCanDuplicate _
 	( _
 		byval head_sym as FBSYMBOL ptr, _
@@ -345,62 +413,7 @@ function symbCanDuplicate _
 
 	'' constant or proc?
 	case FB_SYMBCLASS_CONST, FB_SYMBCLASS_PROC
-
-		do
-			select case as const head_sym->class
-			'' only dup allowed are labels and UDTs
-			case FB_SYMBCLASS_LABEL, FB_SYMBCLASS_ENUM, _
-			     FB_SYMBCLASS_TYPEDEF, FB_SYMBCLASS_FWDREF
-
-			'' struct? only it's not unique
-			case FB_SYMBCLASS_STRUCT
-				if( symbGetIsUnique( head_sym ) ) then
-					exit function
-				end if
-
-			'' only if the keyword or the rtl-proc has a string suffix
-			case FB_SYMBCLASS_KEYWORD, FB_SYMBCLASS_PROC
-				if( head_sym->class = FB_SYMBCLASS_KEYWORD ) then
-					if( symbKeywordIsDisabledCommand( head_sym->key.id ) ) then
-						head_sym = head_sym->hash.next
-						continue do
-					end if
-				end if
-
-				if( env.clopt.lang <> FB_LANG_QB ) then
-					exit function
-				end if
-
-				'' only if it's a RTL function..
-				if( symbIsProc( head_sym ) ) then
-					if( symbGetIsRTL( head_sym ) = FALSE ) then
-						exit function
-					else
-						'' both RTL? don't allow dup so overloaded procs
-						'' will get chained
-						if( symbGetIsRTL( head_sym ) ) then
-							exit function
-						end if
-					end if
-				end if
-
-				'' nothing else takes a suffix but rtl-funcs returning strings
-				if( symbIsSuffixed( s ) ) then
-					if( symbGetType( s ) = symbGetType( head_sym ) ) then
-						exit function
-					end if
-				else
-					if( symbGetType( head_sym ) <> FB_DATATYPE_STRING ) then
-						exit function
-					end if
-				end if
-
-			case else
-				exit function
-			end select
-
-			head_sym = head_sym->hash.next
-		loop while( head_sym <> NULL )
+		return hCanDuplicateConstOrProc( head_sym, s )
 
 	'' variable?
 	case FB_SYMBCLASS_VAR
@@ -675,11 +688,12 @@ function symbNewSymbol _
 			s->hash.item = head_sym->hash.item
 
 			'' add to head so no scope resolution is needed
+			dim as FBSYMBOL ptr prev = NULL
+			dim as integer addAtHead = TRUE
 
 			'' QB mode?
 			if( env.clopt.lang = FB_LANG_QB ) then
 				'' keywords must stay at the head
-				dim as FBSYMBOL ptr prev = NULL
 				do while( symbIsKeyword( head_sym ) )
 					prev = head_sym
 					head_sym = head_sym->hash.next
@@ -688,19 +702,19 @@ function symbNewSymbol _
 					end if
 				loop
 
-				if( prev = NULL ) then
-					goto add_prev
-				endif
-
-				prev->hash.next = s
-				s->hash.prev = prev
-				s->hash.next = head_sym
-				if( head_sym <> NULL ) then
-					head_sym->hash.prev = s
+				if( prev <> NULL ) then
+					prev->hash.next = s
+					s->hash.prev = prev
+					s->hash.next = head_sym
+					if( head_sym <> NULL ) then
+						head_sym->hash.prev = s
+					end if
+					addAtHead = FALSE
 				end if
+			end if
 
-			else
-add_prev:       head_sym->hash.item->data = s
+			if( addAtHead ) then
+				head_sym->hash.item->data = s
 				head_sym->hash.item->name = s->id.name
 				head_sym->hash.prev = s
 				s->hash.prev = NULL
@@ -1459,7 +1473,10 @@ function symbFindVarBySuffix _
 				if( symbIsVar( sym ) ) then
 					select case symbGetType( sym )
 					case FB_DATATYPE_STRING, FB_DATATYPE_FIXSTR, FB_DATATYPE_CHAR
-						goto check_var
+						if( symbVarCheckAccess( sym ) ) then
+							return sym
+						end if
+						return NULL
 					end select
 				end if
 
@@ -1476,7 +1493,10 @@ function symbFindVarBySuffix _
 			do
 				if( symbIsVar( sym ) ) then
 					if( symbGetType( sym ) = suffix ) then
-						goto check_var
+						if( symbVarCheckAccess( sym ) ) then
+							return sym
+						end if
+						return NULL
 					end if
 				end if
 
@@ -1488,14 +1508,6 @@ function symbFindVarBySuffix _
 	end if
 
 	return NULL
-
-check_var:
-	'' check if symbol isn't a non-shared module level one
-	if( symbVarCheckAccess( sym ) ) then
-		function = sym
-	else
-		function = NULL
-	end if
 
 end function
 
@@ -1520,10 +1532,16 @@ function symbFindVarByDefType _
 					if( symbIsSuffixed( sym ) ) then
 						select case sym->typ
 						case FB_DATATYPE_STRING, FB_DATATYPE_FIXSTR, FB_DATATYPE_CHAR
-							goto check_var
+							if( symbVarCheckAccess( sym ) ) then
+								return sym
+							end if
+							return NULL
 						end select
 					else
-						goto check_var
+						if( symbVarCheckAccess( sym ) ) then
+							return sym
+						end if
+						return NULL
 					end if
 				end if
 
@@ -1541,10 +1559,16 @@ function symbFindVarByDefType _
 				if( symbIsVar( sym ) ) then
 					if( symbIsSuffixed( sym ) ) then
 						if( symbGetType( sym ) = def_dtype ) then
-							goto check_var
+							if( symbVarCheckAccess( sym ) ) then
+								return sym
+							end if
+							return NULL
 						end if
 					else
-						goto check_var
+						if( symbVarCheckAccess( sym ) ) then
+							return sym
+						end if
+						return NULL
 					end if
 				end if
 
@@ -1556,14 +1580,6 @@ function symbFindVarByDefType _
 	end if
 
 	return NULL
-
-check_var:
-	'' check if symbol isn't a non-shared module level one
-	if( symbVarCheckAccess( sym ) ) then
-		function = sym
-	else
-		function = NULL
-	end if
 
 end function
 
@@ -2879,21 +2895,7 @@ private sub hDumpName( byref s as string, byval sym as FBSYMBOL ptr )
 #endif
 end sub
 
-function symbDumpToStr _
-	( _
-		byval sym as FBSYMBOL ptr, _
-		byval verbose as boolean _
-	) as string
-
-	dim as string s
-
-	if( sym = NULL ) then
-		return "<NULL>"
-	end if
-
-#if 0
-	s += "[" & hex( sym ) & "] "
-#endif
+private sub hDumpSymbolFlags( byref s as string, byval sym as FBSYMBOL ptr )
 
 #if 1
 	if( (sym->class < FB_SYMBCLASS_VAR) or (sym->class > FB_SYMBCLASS_NSIMPORT) ) then
@@ -3002,6 +3004,26 @@ function symbDumpToStr _
 	checkStat( BEINGEMITTED )
 #endif
 
+end sub
+
+function symbDumpToStr _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byval verbose as boolean _
+	) as string
+
+	dim as string s
+
+	if( sym = NULL ) then
+		return "<NULL>"
+	end if
+
+#if 0
+	s += "[" & hex( sym ) & "] "
+#endif
+
+	hDumpSymbolFlags( s, sym )
+
 	if( sym->class = FB_SYMBCLASS_NSIMPORT ) then
 		s += "from: "
 		s += symbDumpToStr( sym->nsimp.imp_ns, verbose )
@@ -3019,6 +3041,8 @@ function symbDumpToStr _
 		case FB_FUNCMODE_CDECL      : s += " cdecl"
 		case FB_FUNCMODE_THISCALL   : s += " thiscall"
 		case FB_FUNCMODE_FASTCALL   : s += " fastcall"
+		case else
+			assert( 0 )
 		end select
 
 		if( verbose ) then
@@ -3041,6 +3065,8 @@ function symbDumpToStr _
 		case FB_PARAMMODE_BYREF  : s += "byref "
 		case FB_PARAMMODE_BYDESC : s += "bydesc "
 		case FB_PARAMMODE_VARARG : s += "vararg "
+		case else
+			assert( 0 )
 		end select
 
 		hDumpName( s, sym )

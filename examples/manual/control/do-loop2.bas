@@ -10,7 +10,7 @@
    Dim As Integer total_even = 0                   '' running total of even numbers
    Do
 	  If( n > 10 ) Then Exit Do                    '' exit if we've scanned our 10 numbers
-   
+
 	  If( ( n Mod 2 ) = 0 ) Then total_even += 1   '' add to total if n is even (no remainder from division by 2)
 	  n += 1
    Loop

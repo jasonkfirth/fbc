@@ -8,6 +8,6 @@
 
 Cls
 View Print 5 To 6
-Color , 1 
+Color , 1
 '' clear only View Print area
-Cls 
+Cls

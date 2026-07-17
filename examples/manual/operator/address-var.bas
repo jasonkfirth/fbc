@@ -21,7 +21,7 @@ Print "The value in A is ";a;" but the pointer to a is ";@a
 Print "The value in B is ";b;" but the pointer to b is ";@b
 
 'Now, we will take the integer ptr above, and use @ to place a value into it.
-'Note that the * will check the value in the ptr, just as @ checked the ptr 
+'Note that the * will check the value in the ptr, just as @ checked the ptr
 'for a normal variable.
 
 addr = @a

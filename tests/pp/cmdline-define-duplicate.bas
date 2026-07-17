@@ -1,0 +1,4 @@
+' TEST_MODE : COMPILE_ONLY_FAIL
+
+#cmdline "-d DUPLICATE_DEFINE=1"
+#cmdline "-d DUPLICATE_DEFINE=2"

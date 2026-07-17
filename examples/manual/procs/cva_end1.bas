@@ -14,7 +14,7 @@ Sub proc cdecl(count As Integer, ... )
 	For i As Integer = 1 To count
 		Print Cva_Arg( args, Integer )
 	Next
-   
+
 	Cva_End( args )
 End Sub
 

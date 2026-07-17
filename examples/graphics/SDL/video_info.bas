@@ -19,7 +19,7 @@
 		dim NameBuffer as string * 256
 
 		Print "Device: "; *SDL_VideoDriverName( NameBuffer, len( NameBuffer ) )
-		
+
 		Print Using "VRAM: ###,### KB"; Video->video_mem
 
 		If ( Video->hw_available ) Then Print "  + Hardware surfaces available"

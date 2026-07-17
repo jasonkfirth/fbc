@@ -9,8 +9,13 @@
 '' WARNING: "evil" example showing how things should NOT be done
 
 Sub DeallocateExample2()
-   Dim As Integer Ptr integerPtr = Allocate( Len( Integer ) )  
+   Dim As Integer Ptr integerPtr = Allocate( Len( Integer ) )
    '' initialize ^^^ pointer to new memory
+
+   If integerPtr = 0 Then
+      Print "Unable to allocate the integer."
+      Exit Sub
+   End If
 
    Dim As Integer Ptr anotherIntegerPtr = integerPtr
    '' initialize ^^^ another pointer to the same memory
@@ -27,4 +32,3 @@ End Sub
 
    DeallocateExample2()
    End 0
-	

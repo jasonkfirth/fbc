@@ -9,10 +9,10 @@
 Screen 13
 
 '' define clipping area
-View ( 10, 10 ) - ( 310, 150 ), 1, 15    
+View ( 10, 10 ) - ( 310, 150 ), 1, 15
 
 '' set view coordinates
-Window ( -1, -1 ) - ( 1, 1 )             
+Window ( -1, -1 ) - ( 1, 1 )
 
 '' Draw X axis
 Line (-1,0)-(1,0),7

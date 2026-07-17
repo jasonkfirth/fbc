@@ -7,18 +7,18 @@
 '' --------
 
 Function dither ( ByVal source_pixel As ULong, ByVal destination_pixel As ULong, ByVal parameter As Any Ptr ) As ULong
-	
+
 	''either returns the source pixel or the destination pixel, depending on the outcome of rnd
-	
+
 	Dim threshold As Single = 0.5
 	If parameter <> 0 Then threshold = *CPtr(Single Ptr, parameter)
-	
+
 	If Rnd() < threshold Then
 		Return source_pixel
 	Else
 		Return destination_pixel
 	End If
-	
+
 End Function
 
 
@@ -37,21 +37,21 @@ Line img, (16, 16)-(31,  31), RGB(255,   0, 255), bf
 
 '' dither the image with varying thresholds
 Do Until Len(Inkey)
-	
+
 	Cls
-	
+
 	threshold = 0.2
 	Put ( 80 - 16, 100 - 16), img, Custom, @dither, @threshold
-	
+
 	'' default threshold = 0.5
 	Put (160 - 16, 100 - 16), img, Custom, @dither
-	
+
 	threshold = 0.8
 	Put (240 - 16, 100 - 16), img, Custom, @dither, @threshold
-	
+
 	ScreenCopy
 	Sleep 25
-	
+
 Loop
 
 '' free the image memory

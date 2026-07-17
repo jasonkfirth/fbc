@@ -1,5 +1,8 @@
 '' fb - main interface
 ''
+'' Ownership: This module owns compiler-wide environment state between fbInit()
+'' and fbEnd().  Subsystems initialize and release their own subordinate data.
+''
 '' chng: sep/2004 written [v1ctor]
 
 
@@ -1115,7 +1118,9 @@ function fbIdentifyFbcArch( byref fbcarch as string ) as integer
 		function = FB_DEFAULT_CPUTYPE
 
 		#if (not defined( __FB_64BIT__ )) and defined( __FB_X86__ )
-			select case( fb_CpuDetect( ) shr 28 )
+			'' CPUID encodes the legacy x86 family in bits 28 through 31.
+			const CPUID_FAMILY_SHIFT = 28
+			select case( fb_CpuDetect( ) shr CPUID_FAMILY_SHIFT )
 			case 3 : function = FB_CPUTYPE_386
 			case 4 : function = FB_CPUTYPE_486
 			case 5 : function = FB_CPUTYPE_586
@@ -1126,14 +1131,17 @@ function fbIdentifyFbcArch( byref fbcarch as string ) as integer
 		exit function
 
 	case "32"
-		return FB_DEFAULT_CPUTYPE32
+		function = FB_DEFAULT_CPUTYPE32
+		exit function
 	case "64"
-		return FB_DEFAULT_CPUTYPE64
+		function = FB_DEFAULT_CPUTYPE64
+		exit function
 	end select
 
 	for i as integer = 0 to FB_CPUTYPE__COUNT-1
 		if( *cputypeinfo(i).fbcarch = fbcarch ) then
-			return i
+			function = i
+			exit function
 		end if
 	next
 
@@ -1300,8 +1308,13 @@ private sub fbParsePreDefines()
 			deftext = "1"
 		end if
 
-		'' TODO: Check for invalid identifier and duplicated definition
-		symbAddDefine(defid, deftext, len(deftext))
+		'' Command-line defines bypass the preprocessor token parser, so validate
+		'' the name and report a duplicate before continuing with compilation.
+		if( hIsValidSymbolName( defid ) = FALSE ) then
+			errReportEx( FB_ERRMSG_EXPECTEDIDENTIFIER, defid, -1 )
+		elseif( symbAddDefine( defid, deftext, len(deftext) ) = NULL ) then
+			errReportEx( FB_ERRMSG_DUPDEFINITION, defid, -1 )
+		end if
 
 		def = listGetNext(def)
 	wend
@@ -1435,6 +1448,7 @@ sub fbCompile _
 	''
 	if( irEmitBegin( ) = FALSE ) then
 		errReportEx( FB_ERRMSG_FILEACCESSERROR, env.outf.name, -1 )
+		close #env.inf.num
 		exit sub
 	end if
 
@@ -1603,10 +1617,11 @@ private function get_rootpath_len( byval path as zstring ptr ) as integer
 	function = 1
 
 #if defined( __FB_WIN32__ ) or defined( __FB_DOS__ )
+	const DRIVE_ROOT_PATH_LENGTH = 3
 
 	'' {d:/}
 	if( path[1] = asc(":") ) then
-		function = 3
+		function = DRIVE_ROOT_PATH_LENGTH
 	end if
 	if( (path[0] = asc("/")) or (path[0] = asc(RSLASH)) ) then
 		'' UNC?

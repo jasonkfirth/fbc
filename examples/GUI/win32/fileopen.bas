@@ -30,11 +30,11 @@ declare function WinMain     	( byval hInstance as HINSTANCE, _
                                   byval hPrevInstance as HINSTANCE, _
                                   byref szCmdLine as string, _
                                   byval iCmdShow as integer ) as integer
-                                  
-                                  
+
+
 	''
 	dim shared submenuTB(0 to MAXMENUS) as TMENU
-    
+
     ''
 	end WinMain( GetModuleHandle( null ), null, Command, SW_NORMAL )
 
@@ -48,7 +48,7 @@ function file_getname( byval hWnd as HWND ) as string
 
 	dim ofn as OPENFILENAME
 	dim filename as zstring * MAX_PATH+1
-	
+
 	with ofn
 		.lStructSize 		= sizeof( OPENFILENAME )
 		.hwndOwner	 		= hWnd
@@ -101,57 +101,57 @@ function WndProc ( byval hWnd as HWND, _
     dim rct as RECT
     dim pnt as PAINTSTRUCT
     dim hDC as HDC
-    
+
     static as string filetoopen
 
     function = 0
-    
+
     ''see which message we got
     select case( message )
-        
+
     ''on opening the window, initialize the menu
-    case WM_CREATE            
+    case WM_CREATE
 		init_menus( hWnd )
 		exit function
-        
+
     ''on getting a menu command selected, see which one it is (wParam contains the menu ID)
-    
+
 	case WM_COMMAND
-			
+
 		select case loword( wParam )
-		
+
 		'' quit? then quit the application
 		case MENUID_FILE_EXIT
 			PostMessage( hWnd, WM_CLOSE, 0, 0 )
-		
+
 		'' open? then get the file name to open and invalidate the client rectangle
 		case MENUID_FILE_OPEN
 			filetoopen = file_getname( hWnd )
 			GetClientRect( hWnd, @rct )
 			InvalidateRect( hWnd, @rct, TRUE )
 		end select
-		
+
 		exit function
-			
+
 	''on getting a repaint command, draw the explaning text into the window
     case WM_PAINT
     	hDC = BeginPaint( hWnd, @pnt )
         GetClientRect( hWnd, @rct )
-            
+
         if( len( filetoopen ) = 0 ) then
        		filetoopen = "Select a file using the File->Open... menu"
     	end if
-        	
+
         DrawText( hDC, _
            		  !"\"" & filetoopen & !"\"", _
            		  -1, _
            		  @rct, _
            		  DT_SINGLELINE or DT_CENTER or DT_VCENTER )
-            
+
         EndPaint( hWnd, @pnt )
-            
-        exit function            
-        
+
+        exit function
+
 	''on getting a keyboard input, close the application if the keycode = 27 (ESC)
 		case WM_KEYDOWN
 		if( lobyte( wParam ) = 27 ) then
@@ -164,10 +164,10 @@ function WndProc ( byval hWnd as HWND, _
     	PostQuitMessage( 0 )
         exit function
     end select
-    
+
     ''if this is reached, the message can't be handled here, so repost it to Windows
-    function = DefWindowProc( hWnd, message, wParam, lParam )    
-    
+    function = DefWindowProc( hWnd, message, wParam, lParam )
+
 end function
 
 ''Function to create the application window and process any messages
@@ -182,21 +182,21 @@ end function
 function WinMain ( byval hInstance as HINSTANCE, _
                    byval hPrevInstance as HINSTANCE, _
                    byref szCmdLine as string, _
-                   byval iCmdShow as integer ) as integer    
-     
+                   byval iCmdShow as integer ) as integer
+
     dim wMsg as MSG
-    dim wcls as WNDCLASS     
+    dim wcls as WNDCLASS
     dim appName as string
     dim hWnd as HWND
-     
+
     function = 0
-    
+
     ''set application name
-    
+
     appName = "FileOpenTest"
-    
+
     '' fill parameters for wcls
-     
+
     with wcls
     	.style         = CS_HREDRAW or CS_VREDRAW
 		.lpfnWndProc   = cast( WNDPROC, @WndProc )
@@ -209,15 +209,15 @@ function WinMain ( byval hInstance as HINSTANCE, _
     	.lpszMenuName  = NULL
     	.lpszClassName = strptr( appName )
     end with
-          
+
     ''Try to register the wcl class and exit if unsuccessful
-    
+
     if( RegisterClass( @wcls ) = FALSE ) then
        	exit function
     end if
-    
+
     ''create the window, show and update it
-    
+
     hWnd = CreateWindowEx( 0, _
     			 		   appName, _
                            "File Open", _
@@ -230,20 +230,20 @@ function WinMain ( byval hInstance as HINSTANCE, _
                            NULL, _
                            hInstance, _
                            NULL )
-                          
+
 
     ShowWindow( hWnd, iCmdShow )
     UpdateWindow( hWnd )
-     
+
     ''look for messages, translate and dispatch them
-    
-    while( GetMessage( @wMsg, NULL, 0, 0 ) <> FALSE )    
+
+    while( GetMessage( @wMsg, NULL, 0, 0 ) <> FALSE )
         TranslateMessage( @wMsg )
         DispatchMessage( @wMsg )
     wend
-    
+
     ''return the parameter of the last message
-    
+
     function = wMsg.wParam
 
 end function
@@ -258,15 +258,15 @@ end function
 ''flags = flags to pass to the InsertMenu function
 
 sub menu_insert( byval hmenu as HMENU, byval submenu as integer, byref title as string, byval flags as integer = 0 )
-    
+
     with submenuTB(submenu)
-    
+
     	.hnd 	= CreatePopupMenu( )
-    
+
     	InsertMenu( hmenu, submenu, MF_BYPOSITION Or MF_POPUP Or MF_STRING or flags, cuint( .hnd ), title )
-    	
+
     end with
-    
+
 end sub
 
 '':::::
@@ -279,9 +279,9 @@ end sub
 ''flags = flags to use for the AppendMenu function (see there)
 
 sub menu_append( byval submenu as integer, byval id as integer, byref title as string, byval flags as integer = 0 )
-    
+
     AppendMenu( submenuTB(submenu).hnd, MF_STRING or flags, id, title )
-   
+
 end sub
 
 '':::::
@@ -291,7 +291,7 @@ end sub
 sub menu_separator( byval submenu as integer )
 
     AppendMenu( submenuTB(submenu).hnd, MF_SEPARATOR, 0, NULL )
-   
+
 end sub
 
 '':::::
@@ -300,21 +300,21 @@ end sub
 
 sub init_menus( byval hWnd as HWND )
 	dim menu as HMENU '' menu in its creation stage
- 	
+
  	menu = CreateMenu( )
- 	
+
  	'' add File menu, consisting of Open, separator and Exit
- 	
+
  	menu_insert( menu, 0, "&File" )
-    
+
     menu_append( 0, MENUID_FILE_OPEN, "&Open..." )
     menu_separator( 0 )
     menu_append( 0, MENUID_FILE_EXIT, "&Exit" )
-    
+
     '' set the menu as the menu of the given window and draw it
-    
+
     SetMenu( hWnd, menu )
-    
+
     DrawMenuBar( hWnd )
-    
+
 end sub

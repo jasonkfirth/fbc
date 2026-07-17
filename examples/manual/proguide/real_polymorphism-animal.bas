@@ -23,7 +23,7 @@
 		Private:
 			Dim As String animal_type = "dog"
 	End Type
-	
+
 	'override_sub procedures for dog object:
 		Virtual Function dog.addr_override_fct () As animal Ptr
 			Return @This
@@ -44,7 +44,7 @@
 		Private:
 			Dim As String animal_type = "cat"
 	End Type
-   
+
 	'override_sub mehods for cat object:
 		Virtual Function cat.addr_override_fct () As animal Ptr
 			Return @This
@@ -65,7 +65,7 @@
 		Private:
 			Dim As String animal_type = "bird"
 	End Type
-   
+
 	'override_sub mehods for bird object:
 		Virtual Function bird.addr_override_fct () As animal Ptr
 			Return @This
@@ -98,4 +98,4 @@ Sleep
 Delete p_my_dog
 Delete p_my_cat
 Delete p_my_bird
-				
+

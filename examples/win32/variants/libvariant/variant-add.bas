@@ -17,13 +17,13 @@ operator + _
 		byref lhs as VARIANT, _
 		byref rhs as VARIANT _
 	) as VARIANT
-	
+
 	dim as VARIANT_ res = any
-	
+
 	VarAdd( @lhs.var_, @rhs.var_, @res )
-	
+
 	return VARIANT( res, FALSE )
-	
+
 end operator
 
 '':::::
@@ -32,13 +32,13 @@ operator + _
 		byref lhs as VARIANT, _
 		byref rhs as VARIANT_ _
 	) as VARIANT
-	
+
 	dim as VARIANT_ res = any
-	
+
 	VarAdd( @lhs.var_, @rhs, @res )
-	
+
 	return VARIANT( res, FALSE )
-	
+
 end operator
 
 '':::::
@@ -47,19 +47,19 @@ operator + _
 		byref lhs as VARIANT, _
 		byval rhs as zstring ptr _
 	) as VARIANT
-	
+
 	dim as VARIANT_ tmp = any, res = any
-	
+
 	VariantInit( @tmp )
 	V_VT(@tmp) = VT_BSTR
 	V_BSTR(@tmp) = SysAllocStringByteLen( rhs, len( *rhs ) )
-	
+
 	VarAdd( @lhs.var_, @tmp, @res )
-	
+
 	VariantClear( @tmp )
-	
+
 	return VARIANT( res, FALSE )
-	
+
 end operator
 
 '':::::
@@ -68,18 +68,18 @@ operator + _
 		byref lhs as VARIANT, _
 		byval rhs as wstring ptr _
 	) as VARIANT
-	
+
 	dim as VARIANT_ tmp = any, res = any
-	
+
 	VariantInit( @tmp )
 	V_VT(@tmp) = VT_BSTR
 	V_BSTR(@tmp) = SysAllocStringLen( rhs, len( *rhs ) )
-	
+
 	VarAdd( @lhs.var_, @tmp, @res )
-	
+
 	VariantClear( @tmp )
-	
+
 	return VARIANT( res, FALSE )
-	
+
 end operator
 

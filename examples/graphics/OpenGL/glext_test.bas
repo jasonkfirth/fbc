@@ -37,10 +37,10 @@ declare sub main ()
 declare sub shutdown ()
 
 ''
-'' globals	
+'' globals
 ''
 	dim shared ctx as CONTEXT = ( WIN_WIDTH, WIN_HEIGHT, TRUE, (WIN_WIDTH\2, WIN_HEIGHT\2), TRUE )
-	
+
 	dim shared TexID(1) as GLuint		'our Texture Objects
 
 	dim shared glActiveTextureARB_ as PFNGLACTIVETEXTUREARBPROC
@@ -51,14 +51,14 @@ declare sub shutdown ()
 
 '':::::
 sub windowSizeCB cdecl( byval window_handle as GLFWwindow ptr, byval w as long, byval h as long )
-    
+
     ctx.width  = w
     ctx.height = h
     ctx.updviewport = TRUE
     ctx.mouse.xpos = w \ 2
     ctx.mouse.ypos = h \ 2
     ctx.redraw = TRUE
-    
+
 end sub
 
 '':::::
@@ -81,17 +81,17 @@ sub initGL
 	if glfwExtensionSupported( "GL_ARB_multitexture" ) = 0 then
 		print "You do not have the ARB multitexture extension."
 		sleep
-		shutdown		
+		shutdown
 	end if
 
 	glActiveTextureARB_ = cast(PFNGLACTIVETEXTUREARBPROC, glfwGetProcAddress( "glActiveTextureARB" ))
 	glMultiTexCoord2iARB_ = cast(PFNGLMULTITEXCOORD2IARBPROC, glfwGetProcAddress( "glMultiTexCoord2iARB" ))
 
 	'shouldn't be necessary, but can't be too careful
-	if (glActiveTextureARB_ = NULL) or (glMultiTexCoord2iARB_ = NULL) then 
+	if (glActiveTextureARB_ = NULL) or (glMultiTexCoord2iARB_ = NULL) then
 		shutdown
 	end if
-			
+
 	''
 	dim x as integer, y as integer, i as integer
 	dim Img(16383) as ubyte
@@ -136,14 +136,14 @@ sub initGL
 			i=i+1
 		next x
 	next y
-	
+
 	glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR
 	glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR
 	glTexEnvi GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE
     glTexImage2D GL_TEXTURE_2D, 0, 1, 128, 128, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, @Img(0)
 	glEnable GL_TEXTURE_2D
 
-	glClearColor 0.0, 0.0, 0.0, 0.0	
+	glClearColor 0.0, 0.0, 0.0, 0.0
 
 end sub
 
@@ -154,7 +154,7 @@ sub initGLFW
     if( glfwInit( ) = 0 ) then
     	end 1
     end if
-    
+
     '' create window
     glfw_window = glfwCreateWindow( WIN_WIDTH, WIN_HEIGHT, _
     	"FreeBASIC OpenGL Extension example", NULL, NULL )
@@ -164,21 +164,21 @@ sub initGLFW
     end if
 
     glfwMakeContextCurrent( glfw_window )
-    
+
     '' set callbacks
     glfwSetWindowSizeCallback( glfw_window, @windowSizeCB )
     glfwSetCursorPosCallback( glfw_window, @mousePosCB )
     windowSizeCB( glfw_window, WIN_WIDTH, WIN_HEIGHT )
-    
+
 end sub
 
 '':::::
 sub init
-    
+
 	initGLFW
-	
+
 	initGL
-	
+
 end sub
 
 '':::::
@@ -202,35 +202,35 @@ end sub
 
 '':::::
 sub shutdown
-    
+
     shutdownGL
-	
+
 	shutdownGLFW
 
 	end 0
-	
+
 end sub
 
 '':::::
 sub renderScene
-    
+
 	''
 	if( ctx.updviewport ) then
     	ctx.updviewport = FALSE
-    	
+
     	glViewport 0, 0, ctx.width, ctx.height
     	glMatrixMode GL_PROJECTION
     	glLoadIdentity
-    
+
     	if ( ctx.height = 0 ) then
-        	gluPerspective 60, ctx.width, 1.0, 100.0 
+			gluPerspective 60, ctx.width, 1.0, 100.0
     	else
         	gluPerspective 60, ctx.width / ctx.height, 1.0, 100.0
     	end if
-    
+
     	glMatrixMode GL_MODELVIEW
     	glLoadIdentity
-    
+
     end if
 
 	''
@@ -239,56 +239,56 @@ sub renderScene
 		glTranslatef 1.0 - (ctx.mouse.xpos*2) / ctx.width, _
 					 (ctx.mouse.ypos*2) / ctx.height, _
 					 -5.0	'set the quad back 5 units
-         
+
 		glBegin GL_QUADS
 			'first texture unit may use standard TexCoord call
-			glTexCoord2i 0, 0	
+			glTexCoord2i 0, 0
 			glMultiTexCoord2iARB_(GL_TEXTURE1_ARB, 0, 0)
 			glVertex2i -3, -3
-			
+
 			glTexCoord2i 1, 0
 			glMultiTexCoord2iARB_(GL_TEXTURE1_ARB, 1, 0)
 			glVertex2i  3, -3
-			
+
 			glTexCoord2i 1, 1
 			glMultiTexCoord2iARB_(GL_TEXTURE1_ARB, 1, 1)
 			glVertex2i  3, 3
-			
+
 			glTexCoord2i 0, 1
 			glMultiTexCoord2iARB_(GL_TEXTURE1_ARB, 0, 1)
 			glVertex2i -3, 3
-		glEnd    
-	glPopMatrix            
-	
+		glEnd
+	glPopMatrix
+
 end sub
 
 '':::::
 sub main
 	dim running as integer
-    
+
     ''
     init( )
-    
+
     ''
     do
-    
+
     	if( ctx.redraw ) then
     		ctx.redraw = FALSE
-    		
+
     		'' render the scene
     		renderScene( )
-    	
+
         else
-        
+
         	'' Idle process
         	sleep 50, 1
-        	
+
         end if
 
         '' Swap buffers
         glfwSwapBuffers( glfw_window )
         glfwPollEvents( )
-        	
+
         '' Check if the ESC key was pressed or the window was closed
         running = (glfwGetKey( glfw_window, GLFW_KEY_ESCAPE ) = 0) and _
                   (glfwWindowShouldClose( glfw_window ) = 0)
@@ -297,5 +297,5 @@ sub main
     ''
 	shutdown( )
 
-    
+
 end sub

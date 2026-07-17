@@ -15,7 +15,7 @@ Dim p As Rational Ptr = New Rational(3, 4)
 
 Print p->numerator & "/" & p->denominator
 
-' Destroy the rational and give its memory back to the system. 
+' Destroy the rational and give its memory back to the system.
 Delete p
 
 ' Set the pointer to null to guard against future accesses

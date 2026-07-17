@@ -16,8 +16,8 @@ end type
 constructor CHttp _
 	( _
 		_
-	) 
-	
+	)
+
 	ctx = NULL
 	ctx = new CHttpCtx_
 	if( ctx = NULL ) then
@@ -26,7 +26,7 @@ constructor CHttp _
 
 	ctx->curl = NULL
 	ctx->headerlist = NULL
-  
+
   	curl_global_init( CURL_GLOBAL_ALL )
 
   	ctx->curl = curl_easy_init()
@@ -37,7 +37,7 @@ constructor CHttp _
 	end if
 
 	curl_easy_setopt( ctx->curl, CURLOPT_COOKIEFILE, "" )
-	
+
 	ctx->headerlist = curl_slist_append( NULL, "Expect:" )
 	if( ctx->headerlist = NULL ) then
 		curl_easy_cleanup( ctx->curl )
@@ -46,7 +46,7 @@ constructor CHttp _
 		ctx = NULL
 		return
 	end if
-  	
+
 end constructor
 
 '':::::
@@ -63,12 +63,12 @@ destructor CHttp _
     	curl_slist_free_all( ctx->headerlist )
     	ctx->headerlist = NULL
     end if
-	
+
 	if( ctx->curl <> NULL ) then
 		curl_easy_cleanup( ctx->curl )
 		ctx->curl = NULL
-	end if		
-	
+	end if
+
 	delete ctx
 	ctx = NULL
 
@@ -93,23 +93,23 @@ function CHttp.post _
 	if( form = NULL ) then
 		return ""
 	end if
-	
+
 	dim as CHttpStream ptr http_stream = new CHttpStream( @this )
 	if( http_stream = NULL ) then
 		return ""
 	end if
 
     curl_easy_reset( ctx->curl )
-    
+
     curl_easy_setopt( ctx->curl, CURLOPT_HTTPHEADER, ctx->headerlist )
     curl_easy_setopt( ctx->curl, CURLOPT_HTTPPOST, form->getHandle( ) )
 
     if( http_stream->receive( url, NULL, FALSE ) ) then
     	function = http_stream->read( is_binary )
     end if
-    
+
     delete http_stream
-    
+
 end function
 
 '':::::
@@ -123,7 +123,7 @@ function CHttp.getHandle _
 	end if
 
 	function = ctx->curl
-	
+
 end function
 
 '' end of CHttp.bas

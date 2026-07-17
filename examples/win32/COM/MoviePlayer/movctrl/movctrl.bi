@@ -12,17 +12,17 @@ type movctrl
 						  byval y as integer, _
 						  byval width_ as integer, _
 						  byval height as integer )
-	
+
 	declare destructor (  )
-	
+
 	declare function load ( byval filename as wstring ptr ) as BOOL
-	
+
 	declare function play (  ) as BOOL
-	
+
 	declare function pause (  ) as BOOL
-	
+
 	declare function stop (  ) as BOOL
-	
+
 	declare function move ( byval x as integer, _
 							byval y as integer, _
 							byval width_ as integer, _

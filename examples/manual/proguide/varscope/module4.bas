@@ -17,6 +17,6 @@ Print "m2 = "; m2     '' m2 = 2
 
 Sub Print_Values()
   Print "Module4.Print_Values"
-  Print "m1 = "; m1   '' m1 = 1    
+  Print "m1 = "; m1   '' m1 = 1
   Print "m2 = "; m2   '' m2 = 2
 End Sub

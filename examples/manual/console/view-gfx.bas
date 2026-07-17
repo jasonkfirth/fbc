@@ -18,7 +18,7 @@ Do
    y1 = ((1190 \ y + r) And 15)
    y2 = 6 / y
    For x = 100 To 540
-	PSet (x, y + 100), CInt((319 - x) * y2) And 15 Xor y1 
+	PSet (x, y + 100), CInt((319 - x) * y2) And 15 Xor y1
   Next x,y
  If r=0 Then Color Int(Rnd*16): Print "blah"
 Loop Until Len(Inkey)

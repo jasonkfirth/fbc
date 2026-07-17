@@ -283,7 +283,7 @@ dim shared kwdTb( 0 to FB_TOKENS-1 ) as SYMBKWD => _
 }
 
 '' FALSE/TRUE are names of keyword constants but
-'' don't exactly fit in purpose of the KwdTb().
+'' Module state: canonical keyword spellings that do not fit in the KwdTb().
 dim shared kwdFALSE as zstring * 6 = "FALSE"
 dim shared kwdTRUE as zstring * 5  = "TRUE"
 
@@ -362,8 +362,8 @@ end function
 
 function symbKeywordGetText( byval tk as integer ) as const zstring ptr
 	'' This is super slow, but as long as it's only used for error
-	'' reporting it does not matter.
-	'' (TODO: sort the keyword table to match FB_TOKEN enum)
+	'' reporting it does not matter. A linear lookup also keeps the error
+	'' message table independent from the numeric FB_TOKEN ordering.
 	for i as integer = lbound( kwdTb ) to ubound( kwdTb )
 		if( kwdTb(i).id = tk ) then
 			return kwdTb(i).name
@@ -442,6 +442,21 @@ sub symbKeywordConstsInit( )
 	if( sym ) then
 		symbSetCanRedef( sym )
 	end if
+
+end sub
+
+'':::::
+private sub hAddValistTypedef _
+	( _
+		byval pid as zstring ptr, _
+		byval s as FBSYMBOL ptr, _
+		byval valisttype as integer _
+	)
+
+	'' Keep the architecture-specific va_list UDT as the mangle source.
+	'' cMangleModifier() patches that original symbol rather than a clone.
+	symbSetUdtValistType( s, valisttype )
+	symbAddTypedef( pid, typeSetMangleDt( symbGetType( s ), FB_DATATYPE_VA_LIST ), s, symbGetSizeOf( s ) )
 
 end sub
 
@@ -542,13 +557,8 @@ sub symbKeywordTypeInit( )
 		'' end type
 		symbStructEnd( s )
 
-		'' subtype mangle modifier
-		'' don't clone struct, back patch the original only, see note in cMangleModifier()
-		'' TODO: s = symbCloneSymbol( s )
-		symbSetUdtValistType( s, FB_CVA_LIST_BUILTIN_C_STD )
-
 		'' type cva_list as __va_list_tag alias "__builtin_va_list[]"
-		symbAddTypedef( pid, typeSetMangleDt( symbGetType( s ), FB_DATATYPE_VA_LIST ), s, symbGetSizeOf( s ) )
+		hAddValistTypedef( pid, s, FB_CVA_LIST_BUILTIN_C_STD )
 
 	case FB_CVA_LIST_BUILTIN_PPC
 		'' 32bit PowerPC exposes __builtin_va_list as a one-element
@@ -575,13 +585,8 @@ sub symbKeywordTypeInit( )
 		'' end type
 		symbStructEnd( s )
 
-		'' subtype mangle modifier
-		'' don't clone struct, back patch the original only, see note in cMangleModifier()
-		'' TODO: s = symbCloneSymbol( s )
-		symbSetUdtValistType( s, FB_CVA_LIST_BUILTIN_PPC )
-
 		'' type cva_list as __va_list_tag alias "__builtin_va_list[]"
-		symbAddTypedef( pid, typeSetMangleDt( symbGetType( s ), FB_DATATYPE_VA_LIST ), s, symbGetSizeOf( s ) )
+		hAddValistTypedef( pid, s, FB_CVA_LIST_BUILTIN_PPC )
 
 	case FB_CVA_LIST_BUILTIN_S390X
 		'' s390x also exposes __builtin_va_list as an array type, but its
@@ -604,13 +609,8 @@ sub symbKeywordTypeInit( )
 		'' end type
 		symbStructEnd( s )
 
-		'' subtype mangle modifier
-		'' don't clone struct, back patch the original only, see note in cMangleModifier()
-		'' TODO: s = symbCloneSymbol( s )
-		symbSetUdtValistType( s, FB_CVA_LIST_BUILTIN_S390X )
-
 		'' type cva_list as __va_list_tag alias "__builtin_va_list[]"
-		symbAddTypedef( pid, typeSetMangleDt( symbGetType( s ), FB_DATATYPE_VA_LIST ), s, symbGetSizeOf( s ) )
+		hAddValistTypedef( pid, s, FB_CVA_LIST_BUILTIN_S390X )
 
 	case FB_CVA_LIST_BUILTIN_AARCH64
 		'' cva_list is from ARM64 definition:
@@ -642,13 +642,8 @@ sub symbKeywordTypeInit( )
 		'' end type
 		symbStructEnd( s )
 
-		'' subtype mangle modifier
-		'' don't clone struct, back patch the original only, see note in cMangleModifier()
-		'' TODO: s = symbCloneSymbol( s )
-		symbSetUdtValistType( s, FB_CVA_LIST_BUILTIN_AARCH64 )
-
 		'' type cva_list as __va_list alias "__builtin_va_list"
-		symbAddTypedef( pid, typeSetMangleDt( symbGetType( s ), FB_DATATYPE_VA_LIST ), s, symbGetSizeOf( s ) )
+		hAddValistTypedef( pid, s, FB_CVA_LIST_BUILTIN_AARCH64 )
 
 	case FB_CVA_LIST_BUILTIN_ARM
 		'' cva_list is from ARM definition
@@ -664,13 +659,8 @@ sub symbKeywordTypeInit( )
 		'' end type
 		symbStructEnd( s )
 
-		'' subtype mangle modifier
-		'' don't clone struct, back patch the original only, see note in cMangleModifier()
-		'' TODO: s = symbCloneSymbol( s )
-		symbSetUdtValistType( s, FB_CVA_LIST_BUILTIN_ARM )
-
 		'' type cva_list as __va_list alias "__builtin_va_list"
-		symbAddTypedef( pid, typeSetMangleDt( symbGetType( s ), FB_DATATYPE_VA_LIST ), s, symbGetSizeOf( s ) )
+		hAddValistTypedef( pid, s, FB_CVA_LIST_BUILTIN_ARM )
 
 	case else
 		'' FB_CVA_LIST_POINTER

@@ -11,73 +11,73 @@
 
 ''
 function BrowseCallbackProc(byval hWnd as HWND, _
-							byval uMsg as UINT, _ 
+							byval uMsg as UINT, _
                             byval lParam as LPARAM, _
                             byval lpData as LPARAM) as long
 
-    select case uMsg 
-    case BFFM_INITIALIZED 
-        SendMessage( hWnd, BFFM_SETSELECTION, -1, lpData ) 
-    
-    case BFFM_SELCHANGED 
-        dim as zstring * MAX_PATH sPath
-      	
-      	if SHGetPathFromIDList( cast( LPCITEMIDLIST, lParam ), sPath) = 0 then 
-            sPath = "Unknown"
-        else 
-            sPath = "PATH: " + sPath
-        end if 
-        
-        SendMessage( hWnd, BFFM_SETSTATUSTEXT, 0, cuint( @sPath ) )
-   end select 
-   
-   function = 0 
+    select case uMsg
+    case BFFM_INITIALIZED
+        SendMessage( hWnd, BFFM_SETSELECTION, -1, lpData )
 
-end function 
+    case BFFM_SELCHANGED
+        dim as zstring * MAX_PATH sPath
+
+		if SHGetPathFromIDList( cast( LPCITEMIDLIST, lParam ), sPath) = 0 then
+            sPath = "Unknown"
+        else
+            sPath = "PATH: " + sPath
+        end if
+
+        SendMessage( hWnd, BFFM_SETSTATUSTEXT, 0, cuint( @sPath ) )
+   end select
+
+   function = 0
+
+end function
 
 ''
 function BrowseForFolder(byval hWnd as HWND, _
-						 byval Prompt as string, _ 
+						 byval Prompt as string, _
                          byval Flags as integer, _
-                         byval DefaultFolder as string) as string 
-    
-    dim bi         as BROWSEINFO 
+                         byval DefaultFolder as string) as string
+
+    dim bi         as BROWSEINFO
     dim pidlReturn as LPITEMIDLIST
     dim pidlStart  as LPITEMIDLIST
-	static sFolder as string 
+	static sFolder as string
 
-    CoInitialize( NULL ) 
-    SHGetSpecialFolderLocation( NULL, CSIDL_DRIVES, @pidlStart ) 
+    CoInitialize( NULL )
+    SHGetSpecialFolderLocation( NULL, CSIDL_DRIVES, @pidlStart )
 
     sFolder       	= DefaultFolder
 
     with bi
-	    .pidlRoot   = pidlStart 
-	    .hwndOwner  = hWnd 
+	    .pidlRoot   = pidlStart
+	    .hwndOwner  = hWnd
 	    .lpszTitle  = strptr(Prompt)
-	    .ulFlags    = Flags 
-	   	.lpfn       = @BrowseCallbackProc 
+	    .ulFlags    = Flags
+		.lpfn       = @BrowseCallbackProc
 	   	.lParam		= cuint( strptr( sFolder ) )
 	end with
-    
-   	pidlReturn = SHBrowseForFolder( @bi ) 
-   
-   	CoTaskMemFree( pidlStart ) 
-   
-   	if( pidlReturn <> NULL ) Then 
+
+	pidlReturn = SHBrowseForFolder( @bi )
+
+	CoTaskMemFree( pidlStart )
+
+	if( pidlReturn <> NULL ) Then
         dim as zstring * MAX_PATH path
-        SHGetPathFromIDList( pidlReturn, path ) 
-        CoTaskMemFree( pidlReturn ) 
-        function = path    
+        SHGetPathFromIDList( pidlReturn, path )
+        CoTaskMemFree( pidlReturn )
+        function = path
     else
     	function = ""
-    end if 
-    
-    CoUninitialize( ) 
-    
+    end if
+
+    CoUninitialize( )
+
 end function
 
 
 ''
-	print BrowseForFolder( NULL, "Shell Folder Test", BIF_RETURNONLYFSDIRS Or BIF_USENEWUI, "c:\" ) 
+	print BrowseForFolder( NULL, "Shell Folder Test", BIF_RETURNONLYFSDIRS Or BIF_USENEWUI, "c:\" )
 sleep

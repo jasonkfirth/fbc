@@ -11,4 +11,4 @@
   ' ... INT 0x31
 #else
   ' ... instructions not for DOS ...
-#endif 
+#endif

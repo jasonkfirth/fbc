@@ -22,12 +22,12 @@ Sub printNumericList cdecl (ByRef argtype As String, ...)
 		Print "Invalid argument type"
 		Exit Sub
 	End If
-   
+
 	Dim args As Cva_List
 	Dim pn As Any Ptr
-   
+
 	Cva_Start(args, argtype)
-   
+
 	Do
 		pn = Cva_Arg(args, Any Ptr)
 		If pn = 0 Then Exit Do
@@ -37,11 +37,11 @@ Sub printNumericList cdecl (ByRef argtype As String, ...)
 			Print *CPtr(Integer Ptr, pn);
 		Case 2
 			Print *CPtr(Double Ptr, pn);
-		End Select    
+		End Select
 	Loop
-   
+
 	Print
-   
+
 	Cva_End(args)
 End Sub
 
@@ -53,4 +53,4 @@ Sleep
 ' Output:
 ' List of integers :           123           456           789
 ' List of doubles :            1.2           3.4           5.6           7.8
-		
+

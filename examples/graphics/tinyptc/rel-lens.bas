@@ -41,12 +41,12 @@ const YMID = SCR_HEIGHT \ 2
 
 
 	if( ptc_open( "Lens mapping", SCR_WIDTH, SCR_HEIGHT ) = 0 ) then
-		end -1                                    
+		end -1
 	end if
 
 
     randomize timer
-    
+
     dim as integer x, y, i, r, g, b, frame
 
     for i = 0 to 256*256
@@ -58,7 +58,7 @@ const YMID = SCR_HEIGHT \ 2
         xcoords(i) = rnd * SCR_WIDTH
         ycoords(i) = rnd * SCR_HEIGHT
     NEXT i
-    
+
     dim as single mindist, maxdist, tx, ty, distance
 
     frame = 0
@@ -78,7 +78,7 @@ const YMID = SCR_HEIGHT \ 2
           NEXT y
 
           dim as single c
-          
+
           '1
           FOR y = 0 TO SCR_HEIGHT - 1
           FOR x = 0 TO SCR_WIDTH - 1
@@ -124,18 +124,18 @@ const YMID = SCR_HEIGHT \ 2
 
 
 private FUNCTION dist (byval x as single, byval y as single, xc() as single, yc() as single) as single
-    dim as single mindist = 1D+16 
-    dim as integer max = UBOUND(xc) 
+    dim as single mindist = 1D+16
+    dim as integer max = UBOUND(xc)
     dim as single a, b, d
     dim as integer i
-    FOR i = 0 TO max 
-        a = (xc(i) - x) * (xc(i) - x) 
-        b = (yc(i) - y) * (yc(i) - y) 
-        d = SQR(a + b) 
+    FOR i = 0 TO max
+        a = (xc(i) - x) * (xc(i) - x)
+        b = (yc(i) - y) * (yc(i) - y)
+        d = SQR(a + b)
         IF d < mindist THEN mindist = d
-    NEXT i 
+    NEXT i
     dist = mindist
-END FUNCTION 
+END FUNCTION
 
 '*******************************************************************************************
 'GFX subs/Funks
@@ -164,9 +164,9 @@ Private sub do_lens(dest()as integer, source() as integer,_
     dim as integer sx, sy, x1, y1, yt, xt
     dim as integer px, py
     dim as integer minx, miny
-    dim as integer pixel 
-    dim as integer wtemp, htemp 
-    dim as integer sphereheight, cleaner 
+    dim as integer pixel
+    dim as integer wtemp, htemp
+    dim as integer sphereheight, cleaner
 
     sphereheight = (radius shr 1)
     cleaner = sphereheight * 10

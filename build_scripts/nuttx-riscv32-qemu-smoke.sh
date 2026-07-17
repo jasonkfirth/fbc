@@ -17,7 +17,8 @@
 #     - adapt the compiler's constructor-style C output to a NuttX app main
 #     - stage extra generated C modules when a fbctest needs more than one
 #       translation unit
-#     - install a temporary NuttX example app into an existing NuttX tree
+#     - create or reuse the default NuttX and NuttX apps workspace
+#     - install a temporary NuttX example app into that workspace
 #     - build and run the selected NuttX RISC-V target
 #     - post-process loadable modules for NuttX ELF loader constraints
 #
@@ -90,6 +91,102 @@ default_work_root() {
         printf '%s\n' "$XDG_CACHE_HOME/freebasic/nuttx-riscv32"
     else
         printf '%s\n' "${HOME:-/tmp}/.cache/freebasic/nuttx-riscv32"
+    fi
+}
+
+default_nuttx_workdir() {
+    if [ -n "${FB_NUTTX_RISCV32_WORKDIR:-}" ]; then
+        printf '%s\n' "$FB_NUTTX_RISCV32_WORKDIR"
+    elif [ -n "${NUTTX_WORKDIR:-}" ]; then
+        printf '%s\n' "$NUTTX_WORKDIR"
+    elif [ -n "${XDG_CACHE_HOME:-}" ]; then
+        printf '%s\n' "$XDG_CACHE_HOME/freebasic/nuttx-riscv32"
+    else
+        printf '%s\n' "${HOME:-/tmp}/.cache/freebasic/nuttx-riscv32"
+    fi
+}
+
+safe_remove_temp_dir() {
+    local target="$1"
+    local parent="$2"
+
+    case "$target" in
+        "$parent"/.clone-*)
+            rm -rf "$target"
+            ;;
+        *)
+            die "refusing to remove unexpected temporary directory: $target"
+            ;;
+    esac
+}
+
+clone_repo() {
+    local url="$1"
+    local ref="$2"
+    local target="$3"
+    local parent
+    local temp_target
+
+    if [ -d "$target/.git" ]; then
+        echo "==> repository exists: $target"
+        return 0
+    fi
+
+    if [ -e "$target" ]; then
+        die "$target exists but is not a git repository"
+    fi
+
+    parent="$(dirname "$target")"
+    mkdir -p "$parent"
+    temp_target="$parent/.clone-$(basename "$target").$$"
+    safe_remove_temp_dir "$temp_target" "$parent" >/dev/null 2>&1 || true
+
+    echo "==> cloning $url ($ref) into $target"
+    if git clone --depth 1 --branch "$ref" "$url" "$temp_target"; then
+        mv "$temp_target" "$target"
+        return 0
+    fi
+
+    safe_remove_temp_dir "$temp_target" "$parent"
+
+    # A commit hash is not accepted by git clone --branch on every git
+    # version. Fall back to a full clone and then check out the requested ref.
+    run git clone "$url" "$temp_target"
+    (
+        cd "$temp_target"
+        run git checkout "$ref"
+    )
+    mv "$temp_target" "$target"
+}
+
+update_repo() {
+    local target="$1"
+    local ref="$2"
+
+    [ -d "$target/.git" ] || die "$target is not a git repository"
+
+    (
+        cd "$target"
+        run git fetch --tags --prune origin
+        run git checkout "$ref"
+
+        if git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+            run git pull --ff-only
+        fi
+    )
+}
+
+prepare_nuttx_workspace() {
+    [ "$AUTO_SETUP" -eq 0 ] && return 0
+    command -v git >/dev/null 2>&1 || die "git is required to create the NuttX workspace"
+
+    mkdir -p "$NUTTX_WORKDIR"
+    clone_repo "$NUTTX_URL" "$NUTTX_REF" "$NUTTX_DIR"
+    clone_repo "$APPS_URL" "$APPS_REF" "$APPS_DIR"
+
+    if [ "$UPDATE_REPOS" -eq 1 ]; then
+        update_repo "$NUTTX_DIR" "$NUTTX_REF"
+        update_repo "$APPS_DIR" "$APPS_REF"
     fi
 }
 
@@ -258,7 +355,7 @@ allocate_loadable_module_common_symbols() {
     # FreeBASIC intentionally emits C COMMON symbols for BASIC COMMON blocks so
     # the hosted linker can merge the same block across translation units.  For
     # NuttX loadable modules, do a final partial link with -d so those COMMON
-    # symbols are allocated into the module's BSS before runelf sees it.
+    # symbols are allocated into the module's BSS before NuttX loads it.
     run "$module_ld" -m elf32lriscv -r -d -o "$temp_file" "$module_file"
     chmod --reference="$module_file" "$temp_file" 2>/dev/null || chmod 755 "$temp_file"
     mv "$temp_file" "$module_file"
@@ -316,6 +413,15 @@ Usage: ./build_scripts/nuttx-riscv32-qemu-smoke.sh [options]
 
 Options:
   --nuttx-workdir DIR   Directory containing nuttx/ and apps/
+                        Default: \$XDG_CACHE_HOME/freebasic/nuttx-riscv32
+                        or \$HOME/.cache/freebasic/nuttx-riscv32
+  --update              Fetch and fast-forward existing NuttX repositories
+  --nuttx-url URL       NuttX repository URL
+  --apps-url URL        NuttX apps repository URL
+  --nuttx-ref REF       NuttX branch/tag/commit, default: master
+  --apps-ref REF        apps branch/tag/commit, default: same as NuttX
+  --no-bootstrap        Require nuttx/ and apps/ to already exist
+  --prepare-only        Create or reuse the workspace, then stop
   --bas FILE            FreeBASIC source to compile
   --fbc FILE            fbc binary to use
   --generated-c FILE    Use existing generated C instead of invoking fbc
@@ -410,6 +516,10 @@ Options:
 
 Environment:
   NUTTX_WORKDIR         Same as --nuttx-workdir
+  FB_NUTTX_RISCV32_WORKDIR
+                        Alternate default workdir
+  FB_NUTTX_AUTO_SETUP   Set to 0 to disable repository bootstrap
+  FB_NUTTX_UPDATE_REPOS Set to 1 to update existing repositories
   FBC                   Same as --fbc
   FB_GENERATED_C        Same as --generated-c
   APP_STACKSIZE         NuttX task stack size, default: 65536
@@ -429,6 +539,10 @@ EOF
 ##############################################################################
 
 NUTTX_WORKDIR="${NUTTX_WORKDIR:-}"
+NUTTX_URL="${NUTTX_URL:-https://github.com/apache/nuttx.git}"
+APPS_URL="${APPS_URL:-https://github.com/apache/nuttx-apps.git}"
+NUTTX_REF="${NUTTX_REF:-master}"
+APPS_REF="${APPS_REF:-}"
 BAS_SRC="$ROOT/examples/nuttx/fbhello.bas"
 FBC_BIN="${FBC:-}"
 GENERATED_C="${FB_GENERATED_C:-}"
@@ -489,6 +603,9 @@ USE_GENERIC_ASSERT="${FB_NUTTX_USE_GENERIC_ASSERT:-1}"
 LOCAL_GENERATED_SYMBOLS=0
 NUTTX_CONFIG="${NUTTX_CONFIG:-rv-virt:nsh}"
 SKIP_NUTTX_CONFIG=0
+AUTO_SETUP="${FB_NUTTX_AUTO_SETUP:-1}"
+UPDATE_REPOS="${FB_NUTTX_UPDATE_REPOS:-0}"
+PREPARE_ONLY=0
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -496,6 +613,39 @@ while [ "$#" -gt 0 ]; do
             [ "$#" -ge 2 ] || die "--nuttx-workdir requires a directory"
             NUTTX_WORKDIR="$2"
             shift 2
+            ;;
+        --update)
+            UPDATE_REPOS=1
+            shift
+            ;;
+        --nuttx-url)
+            [ "$#" -ge 2 ] || die "--nuttx-url requires a URL"
+            NUTTX_URL="$2"
+            shift 2
+            ;;
+        --apps-url)
+            [ "$#" -ge 2 ] || die "--apps-url requires a URL"
+            APPS_URL="$2"
+            shift 2
+            ;;
+        --nuttx-ref)
+            [ "$#" -ge 2 ] || die "--nuttx-ref requires a ref"
+            NUTTX_REF="$2"
+            shift 2
+            ;;
+        --apps-ref)
+            [ "$#" -ge 2 ] || die "--apps-ref requires a ref"
+            APPS_REF="$2"
+            shift 2
+            ;;
+        --no-bootstrap)
+            AUTO_SETUP=0
+            shift
+            ;;
+        --prepare-only)
+            PREPARE_ONLY=1
+            RUN_QEMU=0
+            shift
             ;;
         --bas)
             [ "$#" -ge 2 ] || die "--bas requires a file"
@@ -662,7 +812,18 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-[ -n "$NUTTX_WORKDIR" ] || die "set NUTTX_WORKDIR or pass --nuttx-workdir"
+[ -n "$APPS_REF" ] || APPS_REF="$NUTTX_REF"
+[ -n "$NUTTX_WORKDIR" ] || NUTTX_WORKDIR="$(default_nuttx_workdir)"
+
+case "$AUTO_SETUP" in
+    0|1) ;;
+    *) die "FB_NUTTX_AUTO_SETUP must be 0 or 1" ;;
+esac
+
+case "$UPDATE_REPOS" in
+    0|1) ;;
+    *) die "FB_NUTTX_UPDATE_REPOS must be 0 or 1" ;;
+esac
 
 if [ "$QEMU_USB_ROOT_DEVICES" -eq 1 ] && [ "$QEMU_USB_HUB_DEVICES" -eq 1 ]; then
     die "--qemu-usb-root-devices and --qemu-usb-hub-devices are separate topologies"
@@ -694,6 +855,17 @@ fi
 
 NUTTX_DIR="$NUTTX_WORKDIR/nuttx"
 APPS_DIR="$NUTTX_WORKDIR/apps"
+
+prepare_nuttx_workspace
+
+[ -d "$NUTTX_DIR" ] || die "missing NuttX directory: $NUTTX_DIR"
+[ -d "$APPS_DIR" ] || die "missing NuttX apps directory: $APPS_DIR"
+
+if [ "$PREPARE_ONLY" -eq 1 ]; then
+    echo "NUTTX_WORKSPACE_READY: $NUTTX_WORKDIR"
+    exit 0
+fi
+
 APP_DIR="$APPS_DIR/examples/$APP_NAME"
 WORK_DIR="${FB_NUTTX_WORK_ROOT:-$(default_work_root)}/$APP_NAME"
 JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}"
@@ -718,8 +890,6 @@ fi
 
 QEMU_SEED_HOST_INPUT_FILE=0
 
-[ -d "$NUTTX_DIR" ] || die "missing NuttX directory: $NUTTX_DIR"
-[ -d "$APPS_DIR" ] || die "missing NuttX apps directory: $APPS_DIR"
 
 case "$APP_NAME" in
     *[!A-Za-z0-9_]*|'')
@@ -3425,7 +3595,7 @@ PY
     fi
 
     if [ "$APP_NAME" = "fbhello" ]; then
-    if ! grep -Fq "hello from FreeBASIC on NuttX RISC-V" "$QEMU_LOG"; then
+    if ! grep -Fq "fbhello: FreeBASIC is running on NuttX/RISC-V" "$QEMU_LOG"; then
         die "FreeBASIC NuttX output was not observed"
     fi
 

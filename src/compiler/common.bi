@@ -1,3 +1,6 @@
+#ifndef __COMMON_BI__
+#define __COMMON_BI__
+
 #ifdef BOOLEAN
 '' fbc sources do not use the boolean datatype and therefore
 '' probably shouldn't use the intrinsic false/true constants,
@@ -12,3 +15,5 @@
 declare function xallocate(byval as long) as any ptr
 declare function xcallocate(byval as long) as any ptr
 declare function xreallocate(byval as any ptr, byval as long) as any ptr
+
+#endif

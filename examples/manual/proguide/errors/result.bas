@@ -8,4 +8,4 @@
 
 Print Open ("xzxwz.zwz" For Input As #1)
 Sleep
-	
+

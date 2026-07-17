@@ -38,7 +38,7 @@ Function calc_hash( ByVal filename As String, ByVal algo As CRYPT_ALGO_TYPE ) As
     For i As Integer = 0 To buffersize-1
         result += Hex( buffer(i) )
     Next
-   
+
     '' free the context
     cryptDestroyContext( ctx )
 

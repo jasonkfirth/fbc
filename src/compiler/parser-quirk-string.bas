@@ -270,6 +270,9 @@ private function cStrCHR(byval is_wstr as integer) as ASTNODE ptr
 	end if
 
 	if( isconst ) then
+		'' A narrow string literal stores one byte per codepoint.
+		const ZSTRING_LITERAL_BYTE_MAX = 255
+		const CHAR_PRINTABLE_MAX = 127
 		if( is_wstr = FALSE ) then
 			zs = ""
 		else
@@ -281,10 +284,10 @@ private function cStrCHR(byval is_wstr as integer) as ASTNODE ptr
 			exprtb(i) = NULL
 
 			if( is_wstr = FALSE ) then
-				if( culngint( v ) > 255 ) then
-					v = 255
+				if( culngint( v ) > ZSTRING_LITERAL_BYTE_MAX ) then
+					v = ZSTRING_LITERAL_BYTE_MAX
 				end if
-				if( (v < CHAR_SPACE) or (v > 127) ) then
+				if( (v < CHAR_SPACE) or (v > CHAR_PRINTABLE_MAX) ) then
 					zs += ESCCHAR
 					o = oct( v )
 					zs += chr( len( o ) )
@@ -293,7 +296,7 @@ private function cStrCHR(byval is_wstr as integer) as ASTNODE ptr
 					zs += chr( v )
 				end if
 			else
-				if( (v < CHAR_SPACE) or (v > 127) ) then
+				if( (v < CHAR_SPACE) or (v > CHAR_PRINTABLE_MAX) ) then
 					ws += ESCCHAR
 					o = oct( v )
 					ws += wchr( len( o ) )
@@ -362,18 +365,9 @@ private function cStrASC() as ASTNODE ptr
 
 		if( p >= 0 ) then
 
-			'' !!!TODO!!! we would probably prefer that fbc just call ASC() in the runtime lib
-			'' - maybe add new ASC() entry points to rtlib?:
-			'' - a new rtlib function allowing the actual length to specified would move this function
-			''   from here back in to the rtlib
-			''     ASC( const zstring ptr, pos as integer, textlen as integer ) as ulong
-			''     ASC( const wstring ptr, pos as integer, textlen as integer ) as ulong
-			'' Because previously in either the zstring or wstring case:
-			''    function = astNewCONSTi( asc( *zs, p ), FB_DATATYPE_UINT )
-			''    function = astNewCONSTi( asc( *ws, p ), FB_DATATYPE_UINT )
-			'' The zstring|wstring ptr loses the actual length when passed to ASC() in the rtlib
-			'' if the constant string contains an embedded NUL CHAR then ASC will fail for any
-			'' position after the first embedded NUL char.
+			'' Constant string evaluation stays here because the rtlib ASC()
+			'' entry point receives only a terminated pointer. hUnescape[W]()
+			'' gives us the literal length, including embedded NUL characters.
 
 			dim textlen as integer
 			'' zstring?

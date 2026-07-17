@@ -26,7 +26,7 @@ end operator
 
 operator Alphabet.step( )
 	value[0] += 1
-end operator 
+end operator
 
 operator Alphabet.next( byref end_cond as Alphabet ) as integer
 	return this.value <= end_cond.value

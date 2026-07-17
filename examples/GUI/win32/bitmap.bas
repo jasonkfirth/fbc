@@ -27,18 +27,18 @@ function WndProc ( byval hWnd as HWND, _
                    byval wParam as WPARAM, _
                    byval lParam as LPARAM ) as LRESULT
 
-    dim as PAINTSTRUCT pnt 
-    dim as HDC hDC 
+    dim as PAINTSTRUCT pnt
+    dim as HDC hDC
     dim as RECT rct
-  	
+
   	static logoinfo as BITMAPINFO ptr
     static logodib as HBITMAP
     static as integer x = 0, y = 0, scale = SCALE_MULT
-    
+
     select case ( message )
-       
+
 	''
-    case WM_CREATE            
+    case WM_CREATE
 
 		'' pointer to bitmap file
 		dim logo as BITMAPFILEHEADER ptr = cast( any ptr, @fblogo_data(0) )
@@ -52,54 +52,54 @@ function WndProc ( byval hWnd as HWND, _
   								  CBM_INIT, _
   								  cast(byte ptr, logo) + logo->bfOffBits, _
   								  logoinfo, _
-  								  DIB_RGB_COLORS ) 
-  	
+								  DIB_RGB_COLORS )
+
         return 0
-        
+
 	''
 	case WM_PAINT
-          
+
     	hDC = BeginPaint( hWnd, @pnt )
-            
+
         '' load DIB into a compatible DC
         dim memDC as HDC
         memDC = CreateCompatibleDC( hDC )
-            
+
         dim oldobj as HGDIOBJ
         oldobj = SelectObject( memDC, logodib )
-            
+
         '' blit the compatible DC to this window
         if( scale = SCALE_MULT ) then
         	BitBlt( hDC, _
         			x, y, logoinfo->bmiHeader.biWidth, logoinfo->bmiHeader.biHeight, _
            			memDC, 0, 0, _
            			SRCCOPY )
-		
+
 		else
         	StretchBlt( hDC, _
         				x, y, SCALE_CALC( logoinfo->bmiHeader.biWidth, scale ), SCALE_CALC( logoinfo->bmiHeader.biHeight, scale ), _
            				memDC, 0, 0, logoinfo->bmiHeader.biWidth, logoinfo->bmiHeader.biHeight, _
            				SRCCOPY )
 		end if
-            
+
         '' restore
         SelectObject( memDC, oldobj )
         DeleteDC( memDC )
-            
+
         EndPaint( hWnd, @pnt )
-            
+
         return 0
-        
+
 	''
 	case WM_KEYDOWN
-			
+
 		dim doupdate as integer = FALSE
-		
+
 		select case lobyte( wParam )
 		case VK_ESCAPE
 			PostMessage( hWnd, WM_CLOSE, 0, 0 )
 			return 0
-		
+
 		case VK_UP
 			y -= 8
 			doupdate = TRUE
@@ -119,7 +119,7 @@ function WndProc ( byval hWnd as HWND, _
 			scale -= 8
 			doupdate = TRUE
 		end select
-			
+
 		if( doupdate ) then
 			with rct
 				.left 	= x - 8
@@ -131,18 +131,18 @@ function WndProc ( byval hWnd as HWND, _
 			InvalidateRect( hwnd, @rct, TRUE )
 			return 0
 		end if
-        
+
 	''
 	case WM_DESTROY
-    	
+
     	PostQuitMessage( 0 )
     	return 0
-    
+
     end select
-    
+
     ''
-    return DefWindowProc( hWnd, message, wParam, lParam )    
-    
+    return DefWindowProc( hWnd, message, wParam, lParam )
+
 end function
 
 ''::::
@@ -151,17 +151,17 @@ end function
 function WinMain ( byval hInstance as HINSTANCE, _
                    byval hPrevInstance as HINSTANCE, _
                    byref szCmdLine as string, _
-                   byval iCmdShow as integer ) as integer    
-     
+                   byval iCmdShow as integer ) as integer
+
     dim wMsg as MSG
-    dim wcls as WNDCLASS     
+    dim wcls as WNDCLASS
     dim szAppName as string
     dim hWnd as HWND
 
     function = 0
-     
+
     szAppName = "BitmapTest"
-     
+
 	with wcls
     	.style         = CS_HREDRAW or CS_VREDRAW
 		.lpfnWndProc   = cast( WNDPROC, @WndProc )
@@ -174,7 +174,7 @@ function WinMain ( byval hInstance as HINSTANCE, _
      	.lpszMenuName  = null
      	.lpszClassName = strptr( szAppName )
     end with
-     
+
     if( RegisterClass( @wcls ) = false ) then
         exit function
     end if
@@ -182,16 +182,16 @@ function WinMain ( byval hInstance as HINSTANCE, _
     hWnd = CreateWindowEx( 0, szAppName, "Bitmap Test", WS_OVERLAPPEDWINDOW, _
                            CW_USEDEFAULT, CW_USEDEFAULT, 320, 200, _
                            null, null, hInstance, null )
-                          
+
 
     ShowWindow( hWnd, iCmdShow )
     UpdateWindow( hWnd )
-     
-    while ( GetMessage( @wMsg, null, 0, 0 ) <> false )    
+
+    while ( GetMessage( @wMsg, null, 0, 0 ) <> false )
         TranslateMessage( @wMsg )
         DispatchMessage( @wMsg )
     wend
-    
+
     function = wMsg.wParam
 
 end function

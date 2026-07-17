@@ -34,7 +34,7 @@ sub fun3()
 	catch ex as Exception
 		print "fun3.1:" & *ex
 	end_try
-	
+
 	print "end fun3"
 end sub
 
@@ -50,18 +50,18 @@ sub fun2()
 		print "fun2:" & *ex
 		return
 	end_try
-	
+
 	print "end fun2"
 end sub
 
 
-sub fun1()	
+sub fun1()
 	print "begin fun1"
 
 	try
 		print "Begin try1"
 		fun2()
-		throw new MyException 
+		throw new MyException
 		throw "never executed"
 		print "End try1"
 	catch ex as MyException

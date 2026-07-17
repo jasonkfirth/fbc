@@ -79,7 +79,7 @@ Delete pu1                           ' Operator Delete Statement
 Sleep
 
 Print
-Print "Operator New[] Expression"      
+Print "Operator New[] Expression"
 Dim As UDT Ptr pu2 = New UDT[2]      ' Operator New[] Expression
 Print "Operator Delete[] Statement"
 Delete[] pu2                         ' Operator Delete[] Statement

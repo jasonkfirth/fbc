@@ -97,7 +97,7 @@ if( ftp_getfile( @ftp, "README", "gnu.org.readme.txt", FTP_TRANSFER_TYPE_ASCII )
 	print "ERROR: Calling ftp_getfile()"
 	ftp_close( @ftp )
 	end 1
-end if	
+end if
 
 '' exit
 ftp_close( @ftp )

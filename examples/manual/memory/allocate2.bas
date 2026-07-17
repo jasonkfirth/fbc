@@ -6,7 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgAllocate
 '' --------
 
-'' Bad example of Allocate usage, causing memory leaks
+'' Ownership policy: this bad example deliberately overwrites an owning pointer
+'' to demonstrate how incorrect Allocate usage causes memory leaks.
 
 Sub BadAllocateExample()
 
@@ -22,7 +23,7 @@ Sub BadAllocateExample()
 End Sub
 
 	'' Main
-	BadAllocateExample() '' Creates a memory leak 
+	BadAllocateExample() '' Creates a memory leak
 	Print "Memory leak!"
 	BadAllocateExample() '' ... and another
 	Print "Memory leak!"

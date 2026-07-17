@@ -16,6 +16,7 @@ type SELECTCTX
 	caselabels(0 to FB_MAXJUMPTBSLOTS-1) as FBSYMBOL ptr
 end type
 
+'' Module state: SELECT CASE parsing owns this context for the current statement.
 dim shared ctx as SELECTCTX
 
 sub parserSelConstStmtInit( )

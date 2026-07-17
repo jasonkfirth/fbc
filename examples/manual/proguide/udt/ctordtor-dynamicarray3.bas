@@ -42,7 +42,7 @@ ReDim u1.array(1 To 9)
 For I As Integer = LBound(u1.array) To UBound(u1.array)
 	u1.array(I) = I
 Next I
- 
+
 u2 = u1
 For I As Integer = LBound(u2.array) To UBound(u2.array)
 	Print u2.array(I);
@@ -56,4 +56,4 @@ Next I
 Print
 
 Sleep
-			
+

@@ -48,7 +48,7 @@ dim shared gloop as integer                       '' Generic Loop Variable
 	texture(0) = CreateTexture(@buffer(0))   '' Linear Texture
 	bload exepath + "/data/Bumps.bmp", @buffer(0)       '' BLOAD the bitmap
 	texture(1) = CreateTexture(@buffer(0))   '' Linear Texture
-	
+
 	'' Exit if error loading textures
 	if texture(0) = 0 or texture(1) = 0 then end 1
 

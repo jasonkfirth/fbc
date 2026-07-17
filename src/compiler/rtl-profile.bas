@@ -154,17 +154,13 @@ private function hGetProcName _
 	else
 		dim as string procname
 
-		'' TODO: private subs should have a unique identifier
-		''       otherwise same named private subs will be
-		''       grouped togther across separate modules.
-		'' if( symbIsPrivate( proc ) ) then
-		''     procname = module_identifier
-		'' else
-		''     procname = ""
-		'' end if
-		'' procname = *symbGetDBGName( proc )
-
-		procname = *symbGetDBGName( proc )
+		'' Private procedure names can occur in each module. Prefix them
+		'' with the source file name so the call profiler keeps them apart.
+		if( symbIsPrivate( proc ) ) then
+			procname = env.inf.name + ":" + *symbGetDBGName( proc )
+		else
+			procname = *symbGetDBGName( proc )
+		end if
 		lgt = len( procname )
 		s = symbAllocStrConst( procname, lgt )
 	end if

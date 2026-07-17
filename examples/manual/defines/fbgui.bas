@@ -8,6 +8,6 @@
 
 #if __FB_GUI__ <> 0
 		#print Executable subsystem: gui
-#else 
+#else
 		#print Executable subsystem: console
 #endif

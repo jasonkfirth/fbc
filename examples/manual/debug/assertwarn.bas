@@ -12,6 +12,6 @@ Sub foo
   AssertWarn(a=1)
 End Sub
 
-foo 
+foo
 
-'' If -g is used this code prints: test.bas(3): assertion failed at FOO: a=1 
+'' If -g is used this code prints: test.bas(3): assertion failed at FOO: a=1

@@ -35,31 +35,31 @@ function winmmInitMidi as integer
 
 end function
 
-'':::::	
+'':::::
 function winmmEndMidi as integer
-    
+
 	function = mciSendString( "close sequencer", NULL, 0, 0 ) = 0
-	
+
 end function
 
 '':::::
 function winmmPlayMidi( byval filename as string ) as integer
-    
+
     if( mciSendString( "open " + filename + " alias mymidifile", NULL, 0, 0 ) <> 0 ) then
     	return 0
 	end if
-    
+
     function = mciSendString( "play mymidifile", NULL, 0, 0 ) = 0
-    
+
 end function
 
 '':::::
 function winmmStopMidi( ) as integer
-    
+
     mciSendString( "stop mymidifile", NULL, 0, 0 )
 
     function = mciSendString( "close mymidifile", NULL, 0, 0 ) = 0
-    
+
 end function
 
 ''
@@ -84,7 +84,7 @@ end function
 function winmmPlayWave( byval filename as string ) as integer
 
 	function = sndPlaySound( filename, SND_ASYNC )
-	
+
 end function
 
 '':::::

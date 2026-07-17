@@ -1,7 +1,7 @@
 ' SDL_music example adapted to freeBasic from:
 ' http://www.kekkai.org/roger/sdl/mixer/
 '
-' music.ogg is a freely distributed song by "Honest Bob and the 
+' music.ogg is a freely distributed song by "Honest Bob and the
 ' Factory-to-Dealer Incentives" called "Another person you had sex with" for
 ' people who wanted an ogg file to test their programs with.
 '
@@ -80,7 +80,7 @@ sub main()
          		if( event.key.keysym.sym = SDLK_ESCAPE ) then
          			done = -1
          		end if
-         
+
          		handleKey @event.key
       		end select
    		loop
@@ -97,37 +97,37 @@ end sub
 sub handleKey (byval key as SDL_KeyboardEvent ptr)
 	dim keyEvent as SDL_KeyboardEvent
    	keyEvent = *key
-   
+
     ' Here we're going to have the 'm' key toggle the music on and
     ' off.  When it's on, it'll be loaded and 'music' will point to
     ' something valid.  If it's off, song will be NULL.
-      
+
     if (song = NULL) then
 		' Actually loads up the music
-        song = Mix_LoadMUS("data/music.ogg")            
-         
+        song = Mix_LoadMUS("data/music.ogg")
+
         ' This begins playing the music - the first argument is a
         ' pointer to Mix_Music structure, and the second is how many
         ' times you want it to loop (use -1 for infinite, and 0 to
         ' have it just play once)
-        Mix_PlayMusic(song, 0)            
-         
+        Mix_PlayMusic(song, 0)
+
         ' We want to know when our music has stopped playing so we
         ' can free it up and set 'music' back to NULL.  SDL_Mixer
         ' provides us with a callback routine we can use to do
         ' exactly that
-        Mix_HookMusicFinished(@musicDone)     
+        Mix_HookMusicFinished(@musicDone)
     else
         ' Stop the music from playing
         Mix_HaltMusic
-         
+
         ' Unload the music from memory, since we don't need it
         ' anymore
-        Mix_FreeMusic(song)         
-         
+        Mix_FreeMusic(song)
+
         song = NULL
     end if
-      
+
 end sub
 
 ' This is the function that we told SDL_Mixer to call when the music

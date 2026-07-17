@@ -202,7 +202,9 @@ function symbAllocStrConst _
 		strlength = internalstrlen
 	end if
 
-	if( internalstrlen <= FB_MAXNAMELEN-6 ) then
+	'' Keep room for the {fbsc} prefix used to reserve compiler string constants.
+	const STRING_CONSTANT_PREFIX_LENGTH = 6
+	if( internalstrlen <= FB_MAXNAMELEN-STRING_CONSTANT_PREFIX_LENGTH ) then
 		id = "{fbsc}"
 		id += *sname
 	else

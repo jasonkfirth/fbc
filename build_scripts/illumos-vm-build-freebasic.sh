@@ -1393,16 +1393,26 @@ key_b64 = sys.argv[3]
 log_file = sys.argv[4]
 done_marker = sys.argv[5]
 
-public_key = base64.b64decode(key_b64.encode("ascii")).decode("utf-8").strip()
+key_commands = [": > /root/.ssh/fbc-key.b64"]
+for offset in range(0, len(key_b64), 48):
+	chunk = key_b64[offset:offset + 48]
+	key_commands.append(
+		"printf '%s' '" + chunk + "' >> /root/.ssh/fbc-key.b64"
+	)
+key_commands.extend([
+	"/usr/bin/python3.9 -c 'import base64; "
+	"open(\"/root/.ssh/authorized_keys\", \"wb\").write(base64.b64decode("
+	"open(\"/root/.ssh/fbc-key.b64\", \"rb\").read()))'",
+	"rm -f /root/.ssh/fbc-key.b64"
+])
+key_commands = "\n".join(key_commands)
 
 needs_reboot = 0
 
 bootstrap_cmd_tmpl = """set -eu
 mkdir -p /root/.ssh
 chmod 700 /root/.ssh
-cat > /root/.ssh/authorized_keys <<'FBC_KEY'
-{key}
-FBC_KEY
+{key_commands}
 chmod 600 /root/.ssh/authorized_keys
 chown root:root /root/.ssh /root/.ssh/authorized_keys || true
 
@@ -1417,13 +1427,11 @@ END {{ \
 	if (!password_auth) print "PasswordAuthentication yes"; \
 }}' /etc/ssh/sshd_config > /etc/ssh/sshd_config.new && mv /etc/ssh/sshd_config.new /etc/ssh/sshd_config
 
-if /usr/sbin/svcadm enable -r svc:/network/ssh:default >/dev/null 2>&1; then
-    :
-elif /usr/sbin/svcadm restart svc:/network/ssh:default >/dev/null 2>&1; then
-    :
-else
-    :
-fi
+/usr/sbin/svcadm enable -r svc:/network/ssh:default >/dev/null 2>&1 || true
+
+# The service may already be online with the cloud image's original sshd
+# configuration.  Restart it so the root-key settings above take effect.
+/usr/sbin/svcadm restart svc:/network/ssh:default >/dev/null 2>&1 || true
 BOOTSTRAP_INTERFACES=$(
     /usr/sbin/dladm show-phys -p -o LINK 2>/dev/null \
         | /usr/bin/awk '$1 != "" && $1 != "lo0" {{ print $1 }}'
@@ -1468,7 +1476,7 @@ with open(log_file, "a", encoding="utf-8", errors="replace") as handle:
 			raise SystemExit("serial session did not reach a shell prompt")
 
 		bootstrap_cmd = bootstrap_cmd_tmpl.format(
-			key=public_key,
+			key_commands=key_commands,
 			done_marker=done_marker
 		)
 		bootstrap_cmd = bootstrap_cmd.replace("\t", "    ")
@@ -1526,7 +1534,7 @@ pack_source() {
 		mk \
 		src \
 		tests \
-		bootstrap/illumos-x86_64
+		bootstrap/linux-x86_64
 }
 
 run_guest_build() {

@@ -75,7 +75,8 @@ operator + ( byref l as MyInteger, byref r as MyInteger ) as MyInteger
 	return MyInteger( l.i + r.i )
 end operator
 
-dim as MyInteger x = MyInteger( 3 ), y = MyInteger( 4 )
+dim as MyInteger x = MyInteger( 3 )
+dim as MyInteger y = MyInteger( 4 )
 print x + y
 
 sleep

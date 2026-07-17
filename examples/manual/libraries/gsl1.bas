@@ -13,7 +13,7 @@
 ? "3.141 ^ 4 = "; gsl_pow_4(3.141)
 ?
 
-'' Find the hypotenuse of a right triangle with sides 3 and 4 
+'' Find the hypotenuse of a right triangle with sides 3 and 4
 ? "The hypotenuse of a right triangle with sides of length 3 and 4 is"; gsl_hypot(3,4)
 ?
 

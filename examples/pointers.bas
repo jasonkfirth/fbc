@@ -35,6 +35,10 @@
 ''
 	'' Allocate memory for 3 integers
 	p = callocate( sizeof(integer) * 3 )
+	if( p = 0 ) then
+		print "Unable to allocate the integer buffer."
+		end 1
+	end if
 
 	p[0] = 123
 	p[1] = 456
@@ -42,6 +46,7 @@
 	print p[0], p[1], p[2]
 
 	deallocate( p )
+	p = 0
 
 ''
 '' Oldschool peek():
@@ -67,7 +72,7 @@
 	dim as MyVector ptr pv = @v
 	pv->x = 1
 	pv->y = 2
-	pv->z = 3
+	pv->z = 3  '' Distinct sample coordinates make each field easy to recognize.
 
 	print pv->x, pv->y, pv->z
 	print (*pv).x, (*pv).y, (*pv).z

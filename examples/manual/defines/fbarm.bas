@@ -10,4 +10,4 @@
   '...instructions for ARM OSes...
 #else
   '...instructions for other OSes
-#endif 
+#endif

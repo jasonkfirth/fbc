@@ -35,4 +35,4 @@ PlotF( @Sinusoidal )
 PlotF( @Quadratic )
 
 Sleep
-		
+

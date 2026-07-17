@@ -11,7 +11,7 @@ enum WEBCTRL_FLAGS
 end enum
 
 type webctrl
-	
+
 	declare constructor _
 		( _
 			byval parent as HWND, _
@@ -21,20 +21,20 @@ type webctrl
 			byval height as integer, _
 			byval flags as WEBCTRL_FLAGS = 0 _
 		)
-												  
+
 	declare destructor ( )
-	
+
 	declare function navigate _
 		( _
 			byval url as wstring ptr, _
 			byval target as wstring ptr = NULL _
 		) as BOOL
-	
-	declare function render _ 
+
+	declare function render _
 		( _
 			byval text as wstring ptr _
 		) as BOOL
-	
+
 	declare function move _
 		( _
 			byval x as integer, _
@@ -42,13 +42,13 @@ type webctrl
 			byval width_ as integer, _
 			byval height as integer _
 		) as BOOL
-	
+
 	declare function goBack	(  ) as BOOL
-	
+
 	declare function goForward (  ) as BOOL
-	
+
 	declare function refresh (  ) as BOOL
-	
+
 	declare function stop (  ) as BOOL
 
 /'private:'/

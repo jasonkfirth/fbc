@@ -17,7 +17,7 @@ Function average cdecl(count As Integer, ... ) As Double
 		sum += Cva_Arg(args, Double)
 	Next
 	Cva_End( args ) '' destructor
-	
+
 	Return sum / count
 End Function
 

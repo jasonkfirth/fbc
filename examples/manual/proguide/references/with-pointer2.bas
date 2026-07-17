@@ -54,4 +54,4 @@ ppc1->Destroy()                           '' using base type pointer and polymor
 pcc1->Destroy()                           '' using derived type pointer
 
 Sleep
-			
+

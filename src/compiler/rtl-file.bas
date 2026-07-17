@@ -1607,13 +1607,14 @@ function rtlFilePut _
 	end if
 
 	'' any pointer fields?
+	const DATA_WRITE_VALUE_PARAMETER = 3
 	if( astGetDataType( src ) = FB_DATATYPE_STRUCT ) then
 		if( symbGetUDTHasPtrField( astGetSubType( src ) ) ) then
-			errReportParamWarn( proc->sym, 3, NULL, FB_WARNINGMSG_POINTERFIELDS )
+			errReportParamWarn( proc->sym, DATA_WRITE_VALUE_PARAMETER, NULL, FB_WARNINGMSG_POINTERFIELDS )
 		end if
 	'' warn if data is pointer
 	elseif( typeIsPtr( astGetDataType( src ) ) ) then
-		errReportParamWarn( proc->sym, 3, NULL, FB_WARNINGMSG_PASSINGPTR )
+		errReportParamWarn( proc->sym, DATA_WRITE_VALUE_PARAMETER, NULL, FB_WARNINGMSG_PASSINGPTR )
 	end if
 
 	'' value as any | s as string
@@ -1645,6 +1646,7 @@ function rtlFilePutArray _
 	dim as ASTNODE ptr proc = any
 	dim as FBSYMBOL ptr f = any
 	dim as integer o_dtype = any
+	const FILEPUTARRAY_VALUE_PARAMETER = 3
 
 	function = NULL
 
@@ -1675,11 +1677,11 @@ function rtlFilePutArray _
 	'' any pointer fields?
 	if( astGetDataType( src ) = FB_DATATYPE_STRUCT ) then
 		if( symbGetUDTHasPtrField( astGetSubType( src ) ) ) then
-			errReportParamWarn( proc->sym, 3, NULL, FB_WARNINGMSG_POINTERFIELDS )
+			errReportParamWarn( proc->sym, FILEPUTARRAY_VALUE_PARAMETER, NULL, FB_WARNINGMSG_POINTERFIELDS )
 		end if
 	'' warn if data is pointer
 	elseif( typeIsPtr( astGetDataType( src ) ) ) then
-		errReportParamWarn( proc->sym, 3, NULL, FB_WARNINGMSG_PASSINGPTR )
+		errReportParamWarn( proc->sym, FILEPUTARRAY_VALUE_PARAMETER, NULL, FB_WARNINGMSG_PASSINGPTR )
 	end if
 
 	'' array() as any
@@ -1709,6 +1711,7 @@ function rtlFileGet _
 	dim as integer dtype = any, o_dtype = any, isstring = any, islarge = any
 	dim as longint lgt = any
 	dim as FBSYMBOL ptr f = any
+	const FILEGET_VALUE_PARAMETER = 3
 
 	function = NULL
 
@@ -1799,11 +1802,11 @@ function rtlFileGet _
 	'' any pointer fields?
 	if( dtype = FB_DATATYPE_STRUCT ) then
 		if( symbGetUDTHasPtrField( astGetSubType( dst ) ) ) then
-			errReportParamWarn( proc->sym, 3, NULL, FB_WARNINGMSG_POINTERFIELDS )
+			errReportParamWarn( proc->sym, FILEGET_VALUE_PARAMETER, NULL, FB_WARNINGMSG_POINTERFIELDS )
 		end if
 	'' warn if data is pointer
 	elseif( typeIsPtr( astGetDataType( dst ) ) ) then
-		errReportParamWarn( proc->sym, 3, NULL, FB_WARNINGMSG_PASSINGPTR )
+		errReportParamWarn( proc->sym, FILEGET_VALUE_PARAMETER, NULL, FB_WARNINGMSG_PASSINGPTR )
 	end if
 
 	'' value as any
@@ -1843,6 +1846,7 @@ function rtlFileGetArray _
 	dim as ASTNODE ptr proc = any
 	dim as FBSYMBOL ptr f = any
 	dim as integer o_dtype = any, islarge = any
+	const FILEGETARRAY_VALUE_PARAMETER = 3
 
 	function = NULL
 
@@ -1883,11 +1887,11 @@ function rtlFileGetArray _
 	'' any pointer fields?
 	if( astGetDataType( dst ) = FB_DATATYPE_STRUCT ) then
 		if( symbGetUDTHasPtrField( astGetSubType( dst ) ) ) then
-			errReportParamWarn( proc->sym, 3, NULL, FB_WARNINGMSG_POINTERFIELDS )
+			errReportParamWarn( proc->sym, FILEGETARRAY_VALUE_PARAMETER, NULL, FB_WARNINGMSG_POINTERFIELDS )
 		end if
 	'' warn if data is pointer
 	elseif( typeIsPtr( astGetDataType( dst ) ) ) then
-		errReportParamWarn( proc->sym, 3, NULL, FB_WARNINGMSG_PASSINGPTR )
+		errReportParamWarn( proc->sym, FILEGETARRAY_VALUE_PARAMETER, NULL, FB_WARNINGMSG_PASSINGPTR )
 	end if
 
 	'' array() as any
@@ -1950,7 +1954,7 @@ function rtlFileLineInput _
 
 	dim as ASTNODE ptr proc = any
 	dim as FBSYMBOL ptr f = any
-	dim as integer args = any, dtype = any
+	dim as integer addpromptargs = FALSE, dtype = any
 	dim as longint lgt = any
 
 	function = FALSE
@@ -1958,10 +1962,9 @@ function rtlFileLineInput _
 	''
 	if( isfile ) then
 		f = PROCLOOKUP( FILELINEINPUT )
-		args = 4
 	else
 		f = PROCLOOKUP( CONSOLELINEINPUT )
-		args = 6
+		addpromptargs = TRUE
 	end if
 
 	proc = astNewCALL( f )
@@ -2002,7 +2005,7 @@ function rtlFileLineInput _
 		exit function
 	end if
 
-	if( args = 6 ) then
+	if( addpromptargs ) then
 		'' byval addquestion as integer
 		if( astNewARG( proc, astNewCONSTi( addquestion ) ) = NULL ) then
 			exit function
@@ -2033,7 +2036,7 @@ function rtlFileLineInputWstr _
 
 	dim as ASTNODE ptr proc = any
 	dim as FBSYMBOL ptr f = any
-	dim as integer args = any, dtype = any
+	dim as integer addpromptargs = FALSE, dtype = any
 	dim as longint lgt = any
 
 	function = FALSE
@@ -2041,10 +2044,9 @@ function rtlFileLineInputWstr _
 	''
 	if( isfile ) then
 		f = PROCLOOKUP( FILELINEINPUTWSTR )
-		args = 3
 	else
 		f = PROCLOOKUP( CONSOLELINEINPUTWSTR )
-		args = 5
+		addpromptargs = TRUE
 	end if
 
 	proc = astNewCALL( f )
@@ -2080,7 +2082,7 @@ function rtlFileLineInputWstr _
 		end if
 	end if
 
-	if( args = 5 ) then
+	if( addpromptargs ) then
 		'' byval addquestion as integer
 		if( astNewARG( proc, astNewCONSTi( addquestion ) ) = NULL ) then
 			exit function
@@ -2109,17 +2111,16 @@ function rtlFileInput _
 
 	dim as ASTNODE ptr proc = any
 	dim as FBSYMBOL ptr f = any
-	dim as integer args = any
+	dim as integer addpromptargs = FALSE
 
 	function = FALSE
 
 	''
 	if( isfile ) then
 		f = PROCLOOKUP( FILEINPUT )
-		args = 1
 	else
 		f = PROCLOOKUP( CONSOLEINPUT )
-		args = 3
+		addpromptargs = TRUE
 	end if
 
 	proc = astNewCALL( f )
@@ -2133,7 +2134,7 @@ function rtlFileInput _
 		exit function
 	end if
 
-	if( args = 3 ) then
+	if( addpromptargs ) then
 		'' byval addquestion as integer
 		if( astNewARG( proc, astNewCONSTi( addquestion ) ) = NULL ) then
 			exit function
@@ -2161,21 +2162,24 @@ function rtlFileInputGet _
 	dim as FBSYMBOL ptr f = any
 	dim as integer args = any, dtype = any
 	dim as longint lgt = any
+	const INPUT_VALUE_ARGUMENT_COUNT = 1
+	const INPUT_WSTRING_ARGUMENT_COUNT = 2
+	const INPUT_STRING_ARGUMENT_COUNT = 3
 
 	function = FALSE
 
 	''
-	args = 1
+	args = INPUT_VALUE_ARGUMENT_COUNT
 	dtype = astGetDataType( dstexpr )
 
 	select case as const typeGet( dtype )
 	case FB_DATATYPE_FIXSTR, FB_DATATYPE_STRING, FB_DATATYPE_CHAR
 		f = PROCLOOKUP( INPUTSTR )
-		args = 3
+		args = INPUT_STRING_ARGUMENT_COUNT
 
 	case FB_DATATYPE_WCHAR
 		f = PROCLOOKUP( INPUTWSTR )
-		args = 2
+		args = INPUT_WSTRING_ARGUMENT_COUNT
 
 	case FB_DATATYPE_BOOLEAN
 		f = PROCLOOKUP( INPUTBOOL )
@@ -2211,7 +2215,7 @@ function rtlFileInputGet _
 	proc = astNewCALL( f )
 
 	'' always calc len before pushing the param
-	if( args > 1 ) then
+	if( args > INPUT_VALUE_ARGUMENT_COUNT ) then
 		lgt = rtlCalcStrLen( dstexpr, dtype )
 	end if
 
@@ -2220,13 +2224,13 @@ function rtlFileInputGet _
 		exit function
 	end if
 
-	if( args > 1 ) then
+	if( args > INPUT_VALUE_ARGUMENT_COUNT ) then
 		'' byval dstlen as integer
 		if( astNewARG( proc, astNewCONSTi( lgt ) ) = NULL ) then
 			exit function
 		end if
 
-		if( args > 2 ) then
+		if( args > INPUT_WSTRING_ARGUMENT_COUNT ) then
 			'' byval fillrem as integer
 			if( astNewARG( proc, astNewCONSTi( dtype = FB_DATATYPE_FIXSTR ) ) = NULL ) then
 				exit function
