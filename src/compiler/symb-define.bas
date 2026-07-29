@@ -1090,22 +1090,30 @@ private function hDefUnquoteZ_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum a
 	var arg = hMacro_getArgZ( argtb, 0 )
 	var res = ""
 	const DOLLAR_QUOTED_PREFIX_LENGTH = 2
+	const ESCAPED_QUOTED_PREFIX_LENGTH = 2
 	const QUOTED_STRING_DELIMITER_LENGTH = 2
 
 	'' arg must be of the form [$]"[text]"
 	if( arg <> NULL ) then
 		var length = len(*arg)
 
-		'' !!!TODO!!! add support for !"escaped-strings"
-
 		'' $"[text]"?
 		if( (length >= DOLLAR_QUOTED_PREFIX_LENGTH + 1) andalso ((arg[0] = asc( "$" )) and (arg[1] = asc(QUOTE)) and (arg[length-1] = asc(QUOTE))) ) then
 			res = hReplace( mid( *arg, DOLLAR_QUOTED_PREFIX_LENGTH + 1, length-DOLLAR_QUOTED_PREFIX_LENGTH-1 ), QUOTE + QUOTE, QUOTE )
 
+		'' !"[escaped text]"?
+		elseif( (length >= ESCAPED_QUOTED_PREFIX_LENGTH + 1) andalso ((arg[0] = asc( "!" )) and (arg[1] = asc(QUOTE)) and (arg[length-1] = asc(QUOTE))) ) then
+			res = hReplace( mid( *arg, ESCAPED_QUOTED_PREFIX_LENGTH + 1, length-ESCAPED_QUOTED_PREFIX_LENGTH-1 ), QUOTE + QUOTE, QUOTE )
+			dim as integer textlen, isunicode
+			res = *hUnescape( hReEscape( strptr( res ), textlen, isunicode ) )
+
 		'' "[text]"?
 		elseif( (length >= QUOTED_STRING_DELIMITER_LENGTH) andalso ((arg[0] = asc(QUOTE)) and (arg[length-1] = asc(QUOTE))) ) then
-			'' !!!FIXME!!! check env.opt.escapestr
 			res = hReplace( mid( *arg, QUOTED_STRING_DELIMITER_LENGTH, length-QUOTED_STRING_DELIMITER_LENGTH ), QUOTE + QUOTE, QUOTE )
+			if( env.opt.escapestr ) then
+				dim as integer textlen, isunicode
+				res = *hUnescape( hReEscape( strptr( res ), textlen, isunicode ) )
+			end if
 
 		'' anything else, return as-is
 		else
@@ -1126,6 +1134,7 @@ private function hDefUnquoteW_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum a
 	var arg = hMacro_getArgW( argtb, 0 )
 	static as DWSTRING res, quotew, quotequotew
 	const DOLLAR_QUOTED_PREFIX_LENGTH = 2
+	const ESCAPED_QUOTED_PREFIX_LENGTH = 2
 	const QUOTED_STRING_DELIMITER_LENGTH = 2
 
 	DWstrAssign( res, NULL )
@@ -1139,16 +1148,25 @@ private function hDefUnquoteW_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum a
 	if( arg <> NULL ) then
 		var length = len(*arg)
 
-		'' !!!TODO!!! add support for !"escaped-strings"
-
 		'' $"[text]"?
 		if( (length >= DOLLAR_QUOTED_PREFIX_LENGTH + 1) andalso ((arg[0] = asc( "$" )) and (arg[1] = asc(QUOTE)) and (arg[length-1] = asc(QUOTE))) ) then
 			DWstrAssign( res, hReplaceW( mid( *arg, DOLLAR_QUOTED_PREFIX_LENGTH + 1, length-DOLLAR_QUOTED_PREFIX_LENGTH-1 ), quotequotew.data, quotew.data ) )
 
+		'' !"[escaped text]"?
+		elseif( (length >= ESCAPED_QUOTED_PREFIX_LENGTH + 1) andalso ((arg[0] = asc( "!" )) and (arg[1] = asc(QUOTE)) and (arg[length-1] = asc(QUOTE))) ) then
+			DWstrAssign( res, hReplaceW( mid( *arg, ESCAPED_QUOTED_PREFIX_LENGTH + 1, length-ESCAPED_QUOTED_PREFIX_LENGTH-1 ), quotequotew.data, quotew.data ) )
+			dim as integer textlen
+			DWstrAssign( res, hReEscapeW( res.data, textlen ) )
+			DWstrAssign( res, hUnescapeW( res.data ) )
+
 		'' "[text]"?
 		elseif( (length >= QUOTED_STRING_DELIMITER_LENGTH) andalso ((arg[0] = asc(QUOTE)) and (arg[length-1] = asc(QUOTE))) ) then
-			'' !!!FIXME!!! check env.opt.escapestr
 			DWstrAssign( res, hReplaceW( mid( *arg, QUOTED_STRING_DELIMITER_LENGTH, length-QUOTED_STRING_DELIMITER_LENGTH ), quotequotew.data, quotew.data ) )
+			if( env.opt.escapestr ) then
+				dim as integer textlen
+				DWstrAssign( res, hReEscapeW( res.data, textlen ) )
+				DWstrAssign( res, hUnescapeW( res.data ) )
+			end if
 
 		'' anything else, return as-is
 		else
@@ -1394,10 +1412,7 @@ private function hDefQuerySymZ_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum 
 					sym = NULL
 
 					'' reset the current lexer context and refresh the text to parse.
-					'' !!!TODO!!! - probably more efficient with some kind of 'lexReinit()' function
-					lexPopCtx( )
-					lexPushCtx( )
-					lexInit( LEX_TKCTX_CONTEXT_EVAL )
+					lexReinitEvalCtx( )
 
 					hArgInsertArgA( sexpr )
 					hArgAppendLFCHAR()
@@ -1660,8 +1675,8 @@ sub symbDefineInit _
 			lastparam = symbAddDefineParam( lastparam, macroTb(i).params(j) )
 		next
 
-		'' TODO: if any macros are added that don't need params, then
-		'' flags should be stored in macroTb
+		'' All current entries need parentheses. Store this flag in macroTb
+		'' if a parameterless intrinsic macro is added.
 		var sym = symbAddDefineMacro( macroTb(i).name, NULL, macroTb(i).nparams, firstparam, macroTb(i).flags or FB_DEFINE_FLAGS_NEEDPARENS )
 		sym->def.mprocz = macroTb(i).procz
 		sym->def.mprocw = macroTb(i).procw
@@ -1842,7 +1857,8 @@ function symbAddDefineParam _
 	'' add to hash, for fast lookup
 	index = hashHash( param->name )
 
-	'' dup definition? !!!FIXME!!! don't do this check for system headers !!!FIXME!!!
+	'' Duplicate parameter names are ambiguous in every macro, including
+	'' definitions imported from system headers.
 	if( hashLookupEx( @symb.def.paramhash, param->name, index ) <> NULL ) then
 		ZstrFree( param->name )
 		listDelNode( @symb.def.paramlist, param )

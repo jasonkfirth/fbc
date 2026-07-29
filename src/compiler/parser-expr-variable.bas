@@ -548,6 +548,8 @@ end function
 '':::::
 ''MemberDeref   =   (('->' DREF* | '[' Expression ']' '.'?) UdtMember)* .
 ''
+'' Member dereference is one left-to-right grammar pass over shared chain state.
+''
 function cMemberDeref _
 	( _
 		byval dtype as integer, _
@@ -607,7 +609,7 @@ function cMemberDeref _
 				end if
 
 				dim as FBSYMBOL ptr proc = any
-				dim as FB_ERRMSG err_num = any
+				dim as FB_ERRMSG err_num = FB_ERRMSG_OK
 
 				proc = symbFindUopOvlProc( AST_OP_FLDDEREF, varexpr, @err_num )
 				if( proc = NULL ) then
@@ -686,7 +688,7 @@ function cMemberDeref _
 
 			'' [] overloaded for UDT?
 			case FB_DATATYPE_STRUCT
-				dim as FB_ERRMSG err_num = any
+				dim as FB_ERRMSG err_num = FB_ERRMSG_OK
 				var proc = symbFindSelfBopOvlProc( AST_OP_PTRINDEX, varexpr, idxexpr, @err_num )
 				if( proc ) then
 					varexpr = astBuildCall( proc, varexpr, idxexpr )

@@ -525,6 +525,8 @@ function hHasEscapeW _
 end function
 
 '':::::
+'' Re-escaping is a state machine; its branches are ordered by escape syntax.
+''
 function hReEscape _
 	( _
 		byval text as zstring ptr, _
@@ -814,6 +816,8 @@ function hReEscape _
 end function
 
 '':::::
+'' This is the wchar counterpart of hReEscape() and keeps the same state flow.
+''
 function hReEscapeW _
 	( _
 		byval text as wstring ptr, _

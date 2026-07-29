@@ -48,6 +48,9 @@ static int driver_init(char *title,
                        int refresh_rate,
                        int flags)
 {
+    if (flags & DRIVER_OPENGL)
+        return -1;
+
     HAIKU_DRIVER_DEBUG(
         "driver_init(title=%s, w=%d, h=%d, depth=%d, refresh=%d, flags=%d)\n",
         title ? title : "(null)",

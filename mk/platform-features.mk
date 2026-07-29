@@ -194,24 +194,22 @@ ifeq ($(TARGET_OS),haiku)
   ENABLE_X11 :=
   ENABLE_SDL :=
   DISABLE_X11 := YesPlease
-  DISABLE_OPENGL := YesPlease
   DISABLE_FBDEV := YesPlease
 endif
 
-# Android -> SDL-style portability layer; no X11
+# Android -> NativeActivity software and EGL/OpenGL ES backends; no X11
 ifeq ($(TARGET_OS),android)
   ENABLE_X11 :=
   ENABLE_SDL := YesPlease
   DISABLE_X11 := YesPlease
-  DISABLE_OPENGL := YesPlease
   DISABLE_FBDEV := YesPlease
+  ALLCFLAGS += -DOPENGL_CONTEXT_ONLY
 endif
 
 # Darwin -> native Cocoa/CoreGraphics path, not X11
 ifeq ($(TARGET_OS),darwin)
   ENABLE_X11 :=
   DISABLE_X11 := YesPlease
-  DISABLE_OPENGL := YesPlease
 endif
 
 # Windows / Xbox -> native backend, not X11

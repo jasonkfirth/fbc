@@ -739,20 +739,22 @@ end function
 '' other optimizations
 '':::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-private sub hDivToShift_Signed _
+private function hDivToShift_Signed _
 	( _
 		byval n as ASTNODE ptr, _
 		byval const_val as integer _
-	)
+	) as ASTNODE ptr
 
-	dim as ASTNODE ptr l = any, l_cpy = any
+	dim as ASTNODE ptr l = any, l_cpy = any, prefix = NULL
 	dim as integer dtype = any, bits = any
 
 	l = n->l
 
-	'' !!!FIXME!!! while there's no common sub-expr elimination, only allow VAR nodes
+	'' The shift form references the dividend twice. Materialize non-variable
+	'' expressions once so calls and other side effects are not duplicated.
 	if( l->class <> AST_NODECLASS_VAR ) then
-		exit sub
+		prefix = astRemSideFx( l )
+		n->l = l
 	end if
 
 	dtype = astGetFullType( l )
@@ -790,7 +792,12 @@ private sub hDivToShift_Signed _
 	n->op.op = AST_OP_SHR
 	astConstGetInt( n->r ) = const_val
 
-end sub
+	if( prefix <> NULL ) then
+		function = astNewLINK( prefix, n, AST_LINK_RETURN_RIGHT )
+	else
+		function = n
+	end if
+end function
 
 private function hToPow2( byval v as ulongint ) as integer
 	'' Is it a power of 2? (2/4/8/16/32/...)
@@ -803,13 +810,13 @@ private function hToPow2( byval v as ulongint ) as integer
 	function = 0
 end function
 
-private sub hOptToShift( byval n as ASTNODE ptr )
+private function hOptToShift( byval n as ASTNODE ptr ) as ASTNODE ptr
 	dim as ASTNODE ptr l = any, r = any
 	dim as integer op = any, exponent = any
 	dim as longint value = any
 
 	if( n = NULL ) then
-		exit sub
+		return NULL
 	end if
 
 	'' convert '     a  *  pow2 imm' to 'a SHL pow2',
@@ -863,7 +870,7 @@ private sub hOptToShift( byval n as ASTNODE ptr )
 					n->op.op = AST_OP_SHR
 					astConstGetInt( r ) = exponent
 				else
-					hDivToShift_Signed( n, exponent )
+					n = hDivToShift_Signed( n, exponent )
 				end if
 
 			case AST_OP_MOD
@@ -881,15 +888,16 @@ private sub hOptToShift( byval n as ASTNODE ptr )
 	'' walk
 	l = n->l
 	if( l <> NULL ) then
-		hOptToShift( l )
+		n->l = hOptToShift( l )
 	end if
 
 	r = n->r
 	if( r <> NULL ) then
-		hOptToShift( r )
+		n->r = hOptToShift( r )
 	end if
 
-end sub
+	function = n
+end function
 
 private function hTryRemoveCAST( byval n as ASTNODE ptr, byval dtype as FB_DATATYPE ) as ASTNODE ptr
 	dim as ASTNODE ptr l = any
@@ -983,9 +991,12 @@ private function hOptBOP32 _
 		return n
 	end if
 
-	'' TODO: maybe should add to IR_OPT_* and let irGetOption()
-	'' control optimization of 32 bit operations on 64 bit target
-	if( fbGetCpuFamily() <> FB_CPUFAMILY_X86_64 ) then
+	'' This rewrite depends on native 64-bit integer registers, not on a
+	'' particular CPU family. Query the active backend's declared capability.
+	'' TODO: Set IR_OPT_64BITCPUREGS in each backend which actually provides
+	'' 64-bit integer registers. Until then this capability check disables
+	'' the rewrite for every backend.
+	if( irGetOption( IR_OPT_64BITCPUREGS ) = FALSE ) then
 		return n
 	end if
 
@@ -1692,7 +1703,9 @@ private function hOptStrAssignment _
 		'' is left side a var?
 		select case as const l->class
 		case AST_NODECLASS_VAR, AST_NODECLASS_IDX
-			'' !!!FIXME!!! can't include AST_NODECLASS_DEREF, unless -noaliasing is added
+			'' General dereferences cannot use symbol-only alias checks.
+			'' The stricter dereference case below requires identical trees
+			'' and verifies that the other operand does not reuse the symbol.
 
 			if( astIsTreeEqual( l, r->l ) ) then
 				sym = astGetSymbol( l )
@@ -1762,12 +1775,27 @@ private function hOptStrAssignment _
 			end if
 		end if
 	else
-		'' !!!TODO!!! - fixed length string can be optimized this
-		'' this way with multiple concatassign, so just disable
-		'' for now.  Maybe could optimize with a different
-		'' concatassign just for fixed length strings - TODO
 		select case astGetDataType( l )
 		case FB_DATATYPE_FIXSTR
+			if( hIsMultStrConcat( l, r ) ) then
+				'' Repeated concat-assign directly into a fixed string would
+				'' pad the first fragment before appending the next one. Build
+				'' in a dynamic temporary, then truncate and pad only once.
+				dim as FBSYMBOL ptr tmp = symbAddTempVar( FB_DATATYPE_STRING )
+				astDtorListAdd( tmp )
+
+				dim as ASTNODE ptr concat_tree = _
+					hOptStrMultConcat( NULL, astNewVAR( tmp ), r, FALSE )
+
+				n->l = NULL
+				n->r = NULL
+				astDelNode( n )
+
+				function = astNewLINK( concat_tree, _
+					rtlStrAssign( l, astNewVAR( tmp ) ), _
+					AST_LINK_RETURN_NONE )
+				exit function
+			end if
 		case else
 			optimize = hIsMultStrConcat( l, r )
 		end select
@@ -2105,7 +2133,7 @@ function astOptimizeTree( byval n as ASTNODE ptr ) as ASTNODE ptr
 
 	n = hOptConstIDX( n )
 
-	hOptToShift( n )
+	n = hOptToShift( n )
 
 	n = hOptBOP32( n )
 

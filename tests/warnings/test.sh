@@ -19,6 +19,8 @@
 
 FBC=`printenv FBC`
 FBC=${FBC:-fbc}
+FBC_FLAGS=${FBC_FLAGS:-}
+TEST_FILTER=${TEST_FILTER:-*.bas}
 
 function run_tests() {
 	fbtarget="$1"
@@ -27,11 +29,12 @@ function run_tests() {
 	mkdir -p $txtdir
 	rm -f $txtdir/*
 
-	for i in *.bas; do
+	for i in $TEST_FILTER; do
+		[ -f "$i" ] || continue
 		echo "TEST $fbtarget $i"
 		withoutext=${i%.bas}
 
-		$FBC -maxerr inf -w constness -target $fbtarget $i -r -m $withoutext | \
+		$FBC $FBC_FLAGS -maxerr inf -w constness -target $fbtarget $i -r -m $withoutext | \
 			sed -e 's,^.*\.\(bas\|bi\)(.*) warning .*(.*): ,\t,g' > \
 			$txtdir/$withoutext.txt
 	done

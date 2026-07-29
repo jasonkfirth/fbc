@@ -29,6 +29,7 @@
         mixer → ring buffer → driver → OS audio
 */
 
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -51,8 +52,15 @@ int fb_sfxRingBufferInit(FB_SFXRINGBUFFER *rb, int frames, int channels)
     if (frames <= 0 || channels <= 0)
         return -1;
 
+    if (frames > INT_MAX / channels)
+        return -1;
+
     samples = frames * channels;
-    size = samples * sizeof(float);
+
+    if ((size_t)samples > ((size_t)-1) / sizeof(float))
+        return -1;
+
+    size = (size_t)samples * sizeof(float);
 
     rb->data = (float*)malloc(size);
 
@@ -109,7 +117,11 @@ void fb_sfxRingBufferClear(FB_SFXRINGBUFFER *rb)
     if (!rb->data)
         return;
 
-    size = rb->frames * rb->channels * sizeof(float);
+    if (rb->frames <= 0 || rb->channels <= 0 ||
+        rb->frames > INT_MAX / rb->channels)
+        return;
+
+    size = (size_t)(rb->frames * rb->channels) * sizeof(float);
 
     memset(rb->data, 0, size);
 

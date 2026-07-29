@@ -55,6 +55,9 @@
 */
 
 extern const GFXDRIVER fb_gfxDriverHaiku;
+#ifndef DISABLE_OPENGL
+extern const GFXDRIVER fb_gfxDriverHaikuOpenGL;
+#endif
 
 
 /* ------------------------------------------------------------------------- */
@@ -70,6 +73,9 @@ extern const GFXDRIVER fb_gfxDriverHaiku;
 
 const GFXDRIVER *__fb_gfx_drivers_list[] =
 {
+#ifndef DISABLE_OPENGL
+    &fb_gfxDriverHaikuOpenGL,
+#endif
     &fb_gfxDriverHaiku,   /* Primary Haiku graphics backend */
     &__fb_gfxDriverNull,  /* Fallback driver */
     NULL

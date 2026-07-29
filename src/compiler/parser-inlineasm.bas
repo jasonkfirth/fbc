@@ -120,28 +120,24 @@ dim shared globalAsmKeywords as AsmKeywordsInfo
 const INLINE_ASM_KEYWORD_HASH_BUCKETS = 800
 const GLOBAL_ASM_KEYWORD_HASH_BUCKETS = 200
 
-#if 0
-!!!FIXME!!! - we'd like to use this sub, but see https://sourceforge.net/p/fbc/bugs/944/
 private sub hAddAsmKeywords( byref info as AsmKeywordsInfo, keywords() as const zstring ptr )
-	for i as integer = 0 to ubound( keywords )
+	for i as integer = lbound( keywords ) to ubound( keywords )
 		hashAdd( @info.hash, keywords(i), cast( any ptr, INVALID ), INVALID )
 	next
 end sub
-#else
-#macro hAddAsmKeywords( info, keywords )
-	for i as integer = 0 to ubound( keywords )
-		hashAdd( @info.hash, keywords(i), cast( any ptr, INVALID ), INVALID )
-	next
-#endmacro
-#endif
 
 private sub hInitInlineAsmKeywords( )
-	'' TODO: support x86_64, arm, aarch64; select keyword list based on compilation target
 	if( inlineAsmKeywords.inited = FALSE ) then
 		listInit( @inlineAsmKeywords.list, 8, sizeof( zstring ptr ) )
 		hashInit( @inlineAsmKeywords.hash, INLINE_ASM_KEYWORD_HASH_BUCKETS )
-		hAddAsmKeywords( inlineAsmKeywords, inlineAsmKeywordsX86 )
-		hAddAsmKeywords( inlineAsmKeywords, globalAsmKeywordsX86 )
+		'' TODO: Add target keyword tables for ARM and AArch64 inline
+		'' assembly instead of leaving their tables empty.
+		select case( fbGetCpuFamily( ) )
+		case FB_CPUFAMILY_X86, FB_CPUFAMILY_X86_64
+			'' The x86 tables include the 64-bit registers and operand sizes.
+			hAddAsmKeywords( inlineAsmKeywords, inlineAsmKeywordsX86() )
+			hAddAsmKeywords( inlineAsmKeywords, globalAsmKeywordsX86() )
+		end select
 		inlineAsmKeywords.inited = TRUE
 	end if
 end sub
@@ -150,10 +146,11 @@ private sub hInitGlobalAsmKeywords( )
 	if( globalAsmKeywords.inited = FALSE ) then
 		listInit( @globalAsmKeywords.list, 8, sizeof( zstring ptr ) )
 		hashInit( @globalAsmKeywords.hash, GLOBAL_ASM_KEYWORD_HASH_BUCKETS )
-		'' TODO: support x86_64, arm, aarch64; select keyword list based on compilation target
+		'' TODO: Add target keyword tables for ARM and AArch64 global
+		'' assembly instead of leaving their tables empty.
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86, FB_CPUFAMILY_X86_64
-			hAddAsmKeywords( globalAsmKeywords, globalAsmKeywordsX86 )
+			hAddAsmKeywords( globalAsmKeywords, globalAsmKeywordsX86() )
 		end select
 		globalAsmKeywords.inited = TRUE
 	end if
@@ -320,13 +317,13 @@ sub cAsmCode()
 				if( litsym <> NULL ) then
 					text = """"
 					'' A single literal token has only these bounded quote/value appends.
-					'' FB-LINTER: DISABLE-NEXT-LINE FBL503
+					''
 					if( symbGetType( litsym ) <> FB_DATATYPE_WCHAR ) then
 						text += *symbGetVarLitText( litsym )
 					else
 						text += *symbGetVarLitTextW( litsym )
 					end if
-					'' FB-LINTER: DISABLE-NEXT-LINE FBL503
+					''
 					text += """"
 				end if
 

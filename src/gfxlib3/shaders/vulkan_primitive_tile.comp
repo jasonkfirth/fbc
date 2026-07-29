@@ -1,0 +1,178 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_primitive_tile.comp
+
+    Purpose:
+
+        Apply an ordered mixed point, line, and rectangle packet through
+        independently owned destination tiles.
+
+    Responsibilities:
+
+        - preserve FIFO overlap order without destination atomics
+        - calculate exact styled-line and styled-rectangle coverage on the GPU
+        - apply VIEW clipping for every candidate inside the shader
+        - write each touched destination pixel once
+
+    This file intentionally does NOT contain:
+
+        - ellipse or alpha-blended primitive handling
+        - host-side raster coverage calculations
+        - final presentation conversion
+*/
+
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) buffer SurfacePixels
+{
+	uint pixels[];
+} surface_pixels;
+
+struct PrimitiveCommand
+{
+	ivec4 geometry;
+	ivec4 clip;
+	uvec4 parameters; /* color, type, style/filled, order */
+	uvec4 format;     /* surface width, height, color mask, reserved */
+	uvec4 batch;
+};
+
+layout(set = 0, binding = 1, std430) readonly buffer PrimitiveCommands
+{
+	PrimitiveCommand commands[];
+} primitive_commands;
+
+layout(set = 0, binding = 2, std430) readonly buffer TileCoordinates
+{
+	uvec2 coordinates[];
+} tile_coordinates;
+
+layout(set = 0, binding = 3, std430) readonly buffer TileRanges
+{
+	uvec2 ranges[];
+} tile_ranges;
+
+layout(set = 0, binding = 4, std430) readonly buffer TileIndices
+{
+	uint indices[];
+} tile_indices;
+
+bool line_covers(PrimitiveCommand command, ivec2 position)
+{
+	ivec2 start = command.geometry.xy;
+	ivec2 finish = command.geometry.zw;
+	ivec2 difference = abs(finish - start);
+	ivec2 direction = ivec2((finish.x < start.x) ? -1 : 1,
+		(finish.y < start.y) ? -1 : 1);
+	ivec2 expected;
+	int step_index;
+
+	if ((position.x < min(start.x, finish.x)) ||
+	    (position.x > max(start.x, finish.x)) ||
+	    (position.y < min(start.y, finish.y)) ||
+	    (position.y > max(start.y, finish.y)))
+		return false;
+	if (difference.x >= difference.y) {
+		step_index = abs(position.x - start.x);
+		expected.x = start.x + direction.x * step_index;
+		expected.y = start.y;
+		if (difference.x != 0)
+			expected.y += direction.y *
+				((difference.y * step_index + difference.x / 2) /
+				 difference.x);
+	} else {
+		step_index = abs(position.y - start.y);
+		expected.y = start.y + direction.y * step_index;
+		expected.x = start.x;
+		if (difference.y != 0)
+			expected.x += direction.x *
+				((difference.x * step_index + difference.y / 2) /
+				 difference.y);
+	}
+	return all(equal(position, expected)) &&
+		((command.parameters.z &
+		  (0x8000u >> (uint(step_index) & 15u))) != 0u);
+}
+
+bool rectangle_covers(PrimitiveCommand command, ivec2 position)
+{
+	uint width = uint(command.geometry.z - command.geometry.x) + 1u;
+	uint height = uint(command.geometry.w - command.geometry.y) + 1u;
+	uint style = command.parameters.z;
+	uint index;
+
+	if ((position.x < command.geometry.x) ||
+	    (position.y < command.geometry.y) ||
+	    (position.x > command.geometry.z) ||
+	    (position.y > command.geometry.w))
+		return false;
+	if ((style & 0x80000000u) != 0u)
+		return true;
+	if (position.y == command.geometry.w) {
+		index = uint(position.x - command.geometry.x);
+		if ((style & (0x8000u >> (index & 15u))) != 0u)
+			return true;
+	}
+	if (position.y == command.geometry.y) {
+		index = width + uint(position.x - command.geometry.x);
+		if ((style & (0x8000u >> (index & 15u))) != 0u)
+			return true;
+	}
+	if (position.x == command.geometry.z) {
+		index = (width * 2u) +
+			uint(position.y - command.geometry.y);
+		if ((style & (0x8000u >> (index & 15u))) != 0u)
+			return true;
+	}
+	if (position.x == command.geometry.x) {
+		index = (width * 2u) + height +
+			uint(position.y - command.geometry.y);
+		if ((style & (0x8000u >> (index & 15u))) != 0u)
+			return true;
+	}
+	return false;
+}
+
+void main(void)
+{
+	PrimitiveCommand first = primitive_commands.commands[0];
+	uint tile = gl_WorkGroupID.x;
+	uvec2 tile_position = tile_coordinates.coordinates[tile];
+	ivec2 position = ivec2(
+		(tile_position * 16u) + gl_LocalInvocationID.xy);
+	uvec2 range = tile_ranges.ranges[tile];
+	uint color;
+
+	if ((uint(position.x) >= first.format.x) ||
+	    (uint(position.y) >= first.format.y))
+		return;
+	color = surface_pixels.pixels[
+		(uint(position.y) * first.format.x) + uint(position.x)];
+	for (uint offset = 0u; offset < range.y; ++offset) {
+		PrimitiveCommand command = primitive_commands.commands[
+			tile_indices.indices[range.x + offset]];
+		bool covered = false;
+
+		if ((position.x < command.clip.x) ||
+		    (position.y < command.clip.y) ||
+		    (position.x > command.clip.z) ||
+		    (position.y > command.clip.w))
+			continue;
+		if (command.parameters.y == 1u)
+			covered = line_covers(command, position);
+		else if (command.parameters.y == 3u)
+			covered = all(equal(position, command.geometry.xy));
+		else if (command.parameters.y == 4u)
+			covered = rectangle_covers(command, position);
+		if (covered)
+			color = command.parameters.x & command.format.z;
+	}
+	surface_pixels.pixels[
+		(uint(position.y) * first.format.x) + uint(position.x)] = color;
+}
+
+/* end of vulkan_primitive_tile.comp */

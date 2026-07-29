@@ -105,3 +105,4 @@ pkgroot/
 .maketests-tmp
 dist
 generated
+obj

@@ -1,0 +1,91 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_points.comp
+
+    Purpose:
+
+        Draw a bounded batch of FreeBASIC points into a device-local Vulkan
+        surface buffer.
+
+    Responsibilities:
+
+        - consume the common 16-byte point layout
+        - enforce both surface and VIEW clipping
+        - mask logical colors to the active surface depth
+
+    This file intentionally does NOT contain:
+
+        - line or area rasterization
+        - transfer or presentation behavior
+        - host-side bounds validation
+*/
+
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) buffer SurfacePixels
+{
+	uint pixels[];
+} surface_pixels;
+
+layout(set = 0, binding = 1, std430) readonly buffer PointCommand
+{
+	/* width, height, point count, and logical color mask */
+	ivec4 surface;
+	ivec4 clip;
+	ivec4 points[];
+} point_command;
+
+uint alpha_primitive(uint source, uint destination)
+{
+	uint alpha = source >> 24;
+	uint source_red_blue = source & 0x00FF00FFu;
+	uint source_green = source & 0x0000FF00u;
+	uint destination_red_blue = destination & 0x00FF00FFu;
+	uint destination_green = destination & 0x0000FF00u;
+
+	source_red_blue = ((source_red_blue - destination_red_blue) * alpha) >> 8;
+	source_green = ((source_green - destination_green) * alpha) >> 8;
+	return ((destination_red_blue + source_red_blue) & 0x00FF00FFu) |
+		((destination_green + source_green) & 0x0000FF00u) |
+		(source & 0xFF000000u);
+}
+
+void write_pixel(uint offset, uint source, uint flags)
+{
+	source &= uint(point_command.surface.w);
+	if ((flags & 1u) == 0u) {
+		surface_pixels.pixels[offset] = source;
+		return;
+	}
+	uint expected = surface_pixels.pixels[offset];
+	for (;;) {
+		uint prior = expected;
+		expected = atomicCompSwap(surface_pixels.pixels[offset], prior,
+			alpha_primitive(source, prior));
+		if (expected == prior)
+			return;
+	}
+}
+
+void main(void)
+{
+	uint index = gl_GlobalInvocationID.x;
+	ivec4 point;
+
+	if (index >= uint(point_command.surface.z))
+		return;
+	point = point_command.points[index];
+	if ((point.x < point_command.clip.x) ||
+	    (point.y < point_command.clip.y) ||
+	    (point.x > point_command.clip.z) ||
+	    (point.y > point_command.clip.w))
+		return;
+	write_pixel((uint(point.y) * uint(point_command.surface.x)) +
+		uint(point.x), uint(point.z), uint(point.w));
+}
+
+/* end of vulkan_points.comp */

@@ -101,6 +101,7 @@ EM_JS(int, fb_sfx_js_webaudio_init, (int rate, int channels, int buffer_frames),
             context: context,
             processor: processor,
             channels: channels,
+            streamEpoch: 0,
             queue: [],
             offset: 0
         };
@@ -159,15 +160,28 @@ EM_JS(void, fb_sfx_js_webaudio_exit, (void), {
     Module.__fbSfxWebAudio = null;
 });
 
-EM_JS(int, fb_sfx_js_webaudio_write, (const float *samples, int frames, int channels), {
+EM_JS(int, fb_sfx_js_webaudio_write,
+      (const float *samples, int frames, int channels, unsigned long stream_epoch), {
     var state = Module.__fbSfxWebAudio;
     if (!state || !state.context || !state.processor)
         return -1;
 
     channels = state.channels | 0;
     frames = frames | 0;
+    stream_epoch = stream_epoch >>> 0;
     if (frames <= 0)
         return 0;
+
+    /*
+        RawOpen and RawClose establish hard stream boundaries. C-side ring
+        buffers are cleared at those boundaries, but blocks already handed to
+        WebAudio live in JavaScript and must be discarded separately.
+    */
+    if ((state.streamEpoch >>> 0) !== stream_epoch) {
+        state.queue.length = 0;
+        state.offset = 0;
+        state.streamEpoch = stream_epoch;
+    }
 
     var count = frames * channels;
     var start = samples >> 2;
@@ -179,9 +193,19 @@ EM_JS(int, fb_sfx_js_webaudio_write, (const float *samples, int frames, int chan
         frames: frames
     });
 
-    while (state.queue.length > 64) {
-        state.queue.shift();
-        state.offset = 0;
+    /*
+        ScriptProcessor consumes one callback block at a time. Keeping the
+        active block plus two future blocks tolerates ordinary browser jitter
+        while bounding command-to-sound latency. The old 64-block limit could
+        retain roughly three seconds at 44.1 kHz.
+
+        Preserve queue[0] because state.offset belongs to it. When a producer
+        gets too far ahead, discard the oldest not-yet-started block instead.
+        Real-time game audio should stay current rather than play obsolete
+        engine or interface state seconds later.
+    */
+    while (state.queue.length > 3) {
+        state.queue.splice(1, 1);
     }
 
     if (state.context.state === 'suspended' && state.context.resume)
@@ -211,7 +235,10 @@ static void webaudio_driver_exit(void)
 
 static int webaudio_driver_write(const float *samples, int frames)
 {
-    return fb_sfx_js_webaudio_write(samples, frames, FB_SFX_INTERNAL_CHANNELS);
+    return fb_sfx_js_webaudio_write(samples,
+                                    frames,
+                                    FB_SFX_INTERNAL_CHANNELS,
+                                    fb_sfxOutputStreamEpoch());
 }
 
 const FB_SFX_DRIVER fb_sfxDriverWebAudio =

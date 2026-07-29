@@ -49,7 +49,7 @@
 /* Constants                                                                 */
 /* ------------------------------------------------------------------------- */
 
-#define FB_SFX_PI 3.14159265358979323846
+#define FB_SFX_PI 3.14159265358979323846f
 
 
 /* ------------------------------------------------------------------------- */
@@ -227,9 +227,10 @@ float fb_sfxWaveformSample(FB_SFXVOICE *v)
 
         case FB_SFX_WAVE_NOISE:
             return fb_sfxWaveNoise(v);
-    }
 
-    return 0.0f;
+        default:
+            return 0.0f;
+    }
 }
 
 

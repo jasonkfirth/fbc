@@ -992,7 +992,697 @@ private function hShouldWarnAboutMixedBool( byval l as ASTNODE ptr, byval r as A
 	return FALSE
 end function
 
+private enum H_BOP_STRING_ACTION
+	H_BOP_STRING_CONTINUE
+	H_BOP_STRING_RETURN
+	H_BOP_STRING_ERROR
+end enum
+
+private function hCheckBopStrings _
+	( _
+		byref result as ASTNODE ptr, _
+		byval op as integer, _
+		byref l as ASTNODE ptr, _
+		byref r as ASTNODE ptr, _
+		byref ldtype as integer, _
+		byref rdtype as integer, _
+		byref ldclass as integer, _
+		byref rdclass as integer, _
+		byref is_str as integer _
+	) as H_BOP_STRING_ACTION
+
+	dim as FBSYMBOL ptr litsym = any
+
+	result = NULL
+
+	'' both zstrings? treat as string..
+	if( (typeGet( ldtype ) = FB_DATATYPE_CHAR) and _
+		(typeGet( rdtype ) = FB_DATATYPE_CHAR) ) then
+		ldclass = FB_DATACLASS_STRING
+		rdclass = ldclass
+	end if
+
+	'' wstrings?
+	if( (typeGet( ldtype ) = FB_DATATYPE_WCHAR) or _
+		(typeGet( rdtype ) = FB_DATATYPE_WCHAR) ) then
+
+		'' not both wstrings?
+		if( typeGetDtAndPtrOnly( ldtype ) <> typeGetDtAndPtrOnly( rdtype ) ) then
+			if( typeGet( ldtype ) = FB_DATATYPE_WCHAR ) then
+				'' is right a string?
+				is_str = (rdclass = FB_DATACLASS_STRING) or (typeGet( rdtype ) = FB_DATATYPE_CHAR)
+			else
+				'' is left a string?
+				is_str = (ldclass = FB_DATACLASS_STRING) or (typeGet( ldtype ) = FB_DATATYPE_CHAR)
+			end if
+		else
+			is_str = TRUE
+		end if
+
+		if( is_str ) then
+
+			'' check for string literals
+			litsym = NULL
+			select case typeGet( ldtype )
+			case FB_DATATYPE_CHAR, FB_DATATYPE_WCHAR
+				litsym = astGetStrLitSymbol( l )
+				if( litsym <> NULL ) then
+					select case rdtype
+					case FB_DATATYPE_CHAR, FB_DATATYPE_WCHAR
+						litsym = astGetStrLitSymbol( r )
+					case else
+						litsym = NULL
+					end select
+				end if
+			end select
+
+			'' concatenation?
+			if( op = AST_OP_ADD ) then
+				'' both literals?
+				if( litsym <> NULL ) then
+					'' ok to convert at compile-time?
+					if( (typeGetDtAndPtrOnly( ldtype ) = typeGetDtAndPtrOnly( rdtype )) or _
+					    ((env.wcharconv <> FB_WCHARCONV_NEVER) and _
+					     fbTargetCanFoldStrLitToWstr( FALSE )) ) then
+						result = hWstrLiteralConcat( l, r )
+						return H_BOP_STRING_RETURN
+					end if
+				end if
+
+				'' not both wstrings?
+				if( typeGetDtAndPtrOnly( ldtype ) <> typeGetDtAndPtrOnly( rdtype ) ) then
+					result = rtlWstrConcat( l, ldtype, r, rdtype )
+					return H_BOP_STRING_RETURN
+				end if
+
+				'' result will be always a wstring
+				ldtype = typeUnsetIsConst( typeJoin( ldtype, FB_DATATYPE_WCHAR ) )
+				ldclass = FB_DATACLASS_INTEGER
+				rdtype = typeJoin( rdtype, ldtype )
+				rdclass = ldclass
+				is_str = TRUE
+
+				'' concatenation will only be done when loading,
+				'' to allow optimizations..
+
+			'' comparison?
+			elseif( astOpIsRelational( op ) ) then
+				'' both literals?
+				if( litsym <> NULL ) then
+					if( (typeGetDtAndPtrOnly( ldtype ) = typeGetDtAndPtrOnly( rdtype )) or _
+					    fbTargetCanFoldStrLitToWstr( FALSE ) or _
+					    (hWstrLiteralCanFoldCompare( l ) and hWstrLiteralCanFoldCompare( r )) ) then
+						result = hWstrLiteralCompare( op, l, r )
+						return H_BOP_STRING_RETURN
+					end if
+				end if
+
+				'' convert to: wstrcmp(l,r) op 0
+				l = rtlWstrCompare( l, r )
+				r = astNewCONSTi( 0 )
+
+				ldtype = typeJoin( ldtype, astGetFullType( l ) )
+				rdtype = typeJoin( rdtype, astGetFullType( r ) )
+				ldclass = FB_DATACLASS_INTEGER
+				rdclass = FB_DATACLASS_INTEGER
+
+			'' no other operation allowed
+			else
+				return H_BOP_STRING_ERROR
+			end if
+
+		'' One is not a string, but e.g. an integer. Disallow if the
+		'' other is not a DEREF'ed wchar ptr - this allows comparisons
+		'' such as "wstringptr[index] = someinteger", i.e. a simplified
+		'' form of string indexing when dealing with a DEREF'ed ptr.
+		else
+			if( typeGet( ldtype ) = FB_DATATYPE_WCHAR ) then
+				if( hCheckDerefWcharPtr( l, @ldtype, r, rdtype ) = FALSE ) then
+					return H_BOP_STRING_ERROR
+				end if
+			else
+				if( hCheckDerefWcharPtr( r, @rdtype, l, ldtype ) = FALSE ) then
+					return H_BOP_STRING_ERROR
+				end if
+			end if
+		end if
+
+	'' strings?
+	elseif( (ldclass = FB_DATACLASS_STRING) or _
+	        (rdclass = FB_DATACLASS_STRING) ) then
+
+		'' not both strings?
+		if( ldclass <> rdclass ) then
+			if( ldclass = FB_DATACLASS_STRING ) then
+				'' not a zstring?
+				if( typeGet( rdtype ) <> FB_DATATYPE_CHAR ) then
+					return H_BOP_STRING_ERROR
+				end if
+			else
+				'' not a zstring?
+				if( typeGet( ldtype ) <> FB_DATATYPE_CHAR ) then
+					return H_BOP_STRING_ERROR
+				end if
+			end if
+		end if
+
+		'' check for string literals
+		litsym = NULL
+		if( typeGet( ldtype ) = FB_DATATYPE_CHAR ) then
+			if( typeGet( rdtype ) = FB_DATATYPE_CHAR ) then
+				litsym = astGetStrLitSymbol( l )
+				if( litsym <> NULL ) then
+					litsym = astGetStrLitSymbol( r )
+				end if
+			end if
+		end if
+
+		'' concatenation?
+		if( op = AST_OP_ADD ) then
+			'' both literals?
+			if( litsym <> NULL ) then
+				result = hStrLiteralConcat( l, r )
+				return H_BOP_STRING_RETURN
+			end if
+
+			'' result will be always an var-len string
+			ldtype = typeUnsetIsConst( typeJoin( ldtype, FB_DATATYPE_STRING ) )
+			ldclass = FB_DATACLASS_STRING
+			rdtype = typeJoin( rdtype, ldtype )
+			rdclass = ldclass
+			is_str = TRUE
+
+			'' concatenation will only be done when loading,
+			'' to allow optimizations..
+
+		'' comparison?
+		elseif( astOpIsRelational( op ) ) then
+			'' both literals?
+			if( litsym <> NULL ) then
+				result = hStrLiteralCompare( op, l, r )
+				return H_BOP_STRING_RETURN
+			end if
+
+			'' convert to: strcmp(l,r) op 0
+			l = rtlStrCompare( l, ldtype, r, rdtype )
+			r = astNewCONSTi( 0 )
+
+			ldtype = typeJoin( ldtype, astGetFullType( l ) )
+			ldclass = FB_DATACLASS_INTEGER
+			rdtype = typeJoin( rdtype, astGetFullType( r ) )
+			rdclass = FB_DATACLASS_INTEGER
+
+		'' no other operation allowed
+		else
+			return H_BOP_STRING_ERROR
+		end if
+
+	'' zstrings?
+	elseif( (typeGet( ldtype ) = FB_DATATYPE_CHAR) or _
+		    (typeGet( rdtype ) = FB_DATATYPE_CHAR) ) then
+
+		'' one is not a string (not fixed, var-len, z- or w-string,
+		'' or the tests above would catch them)
+		if( typeGet( ldtype ) = FB_DATATYPE_CHAR ) then
+			'' don't allow, unless it's a deref pointer
+			if( l->class <> AST_NODECLASS_DEREF ) then
+				return H_BOP_STRING_ERROR
+			end if
+			'' remap the type or the optimizer can
+			'' make a wrong assumption
+			ldtype = typeJoin( ldtype, FB_DATATYPE_UBYTE )
+
+		else
+			'' same as above..
+			if( r->class <> AST_NODECLASS_DEREF ) then
+				return H_BOP_STRING_ERROR
+			end if
+			rdtype = typeJoin( rdtype, FB_DATATYPE_UBYTE )
+		end if
+
+	end if
+
+	return H_BOP_STRING_CONTINUE
+end function
+
+private sub hPromoteBopOperand _
+	( _
+		byref n as ASTNODE ptr, _
+		byref dtype as integer, _
+		byref dclass as integer _
+	)
+
+	if( dclass <> FB_DATACLASS_INTEGER ) then
+		exit sub
+	end if
+
+	dim as integer rank = typeGetIntRank( typeGetRemapType( dtype ) )
+	dim as integer intrank = typeGetIntRank( FB_DATATYPE_INTEGER )
+	dim as integer uintrank = typeGetIntRank( FB_DATATYPE_UINT )
+
+	if( rank < intrank ) then
+		hConvOperand( FB_DATATYPE_INTEGER, dtype, dclass, n )
+	elseif( (intrank < rank) and (rank < uintrank) ) then
+		'' Keep the integer promotions consistent for types ranked between
+		'' INTEGER and UINTEGER, such as ULONG on 32-bit targets.
+		hConvOperand( FB_DATATYPE_UINT, dtype, dclass, n )
+	end if
+end sub
+
+private sub hConvertBopOperandsForOperator _
+	( _
+		byval op as integer, _
+		byref l as ASTNODE ptr, _
+		byref r as ASTNODE ptr, _
+		byref ldtype as integer, _
+		byref rdtype as integer, _
+		byref ldclass as integer, _
+		byref rdclass as integer _
+	)
+
+	select case as const op
+	'' flt div (/) can only operate on floats
+	case AST_OP_DIV
+
+		if( ldclass <> FB_DATACLASS_FPOINT ) then
+			hConvOperand( FB_DATATYPE_DOUBLE, ldtype, ldclass, l )
+		end if
+
+		if( rdclass <> FB_DATACLASS_FPOINT ) then
+			rdtype = typeJoin( rdtype, FB_DATATYPE_DOUBLE )
+
+			if( irGetOption( IR_OPT_FPUCONV ) ) then
+				r = astNewCONV( rdtype, NULL, r )
+			else
+				'' if it's an int var, let the FPU do it
+				if( (r->class <> AST_NODECLASS_VAR) or (rdtype <> FB_DATATYPE_INTEGER) ) then
+					r = astNewCONV( rdtype, NULL, r )
+				end if
+			end if
+
+			rdclass = FB_DATACLASS_FPOINT
+		end if
+
+	'' bitwise ops, int div (\), modulus and shift can only operate on integers
+	case AST_OP_AND, AST_OP_OR, AST_OP_XOR, AST_OP_EQV, AST_OP_IMP, _
+		 AST_OP_INTDIV, AST_OP_MOD, AST_OP_SHL, AST_OP_SHR
+
+		'' Examples:
+		''     double xor double =>  integer xor integer
+		''    integer xor double =>  integer xor integer
+		''    longint xor double =>  longint xor longint
+		''   ulongint xor double => ulongint xor longint
+		'' etc.
+
+		if( ldclass <> FB_DATACLASS_INTEGER ) then
+			hConvOperand( hGetIntegerOrBigger( rdtype ), ldtype, ldclass, l )
+		end if
+
+		if( rdclass <> FB_DATACLASS_INTEGER ) then
+			hConvOperand( hGetIntegerOrBigger( ldtype ), rdtype, rdclass, r )
+		end if
+
+	'' atan2 and pow can only operate on floats
+	case AST_OP_ATAN2, AST_OP_POW
+
+		if( ldclass <> FB_DATACLASS_FPOINT ) then
+			hConvOperand( FB_DATATYPE_DOUBLE, ldtype, ldclass, l )
+		end if
+
+		if( rdclass <> FB_DATACLASS_FPOINT ) then
+			hConvOperand( FB_DATATYPE_DOUBLE, rdtype, rdclass, r )
+		end if
+
+	end select
+end sub
+
+private function hCoerceBopOperandTypes _
+	( _
+		byval op as integer, _
+		byref l as ASTNODE ptr, _
+		byref r as ASTNODE ptr, _
+		byref ldtype as integer, _
+		byref rdtype as integer, _
+		byref ldclass as integer, _
+		byref rdclass as integer, _
+		byref dtype as integer, _
+		byref subtype as FBSYMBOL ptr _
+	) as integer
+
+	if( (ldtype <> rdtype) or (l->subtype <> r->subtype) ) then
+		'' Pointer arithmetic (but not handled above by hDoPointerArith())?
+		'' (assuming hCheckPtr() checks were already done)
+		if( (typeIsPtr( ldtype ) or typeIsPtr( rdtype )) and _
+		    ((op = AST_OP_ADD) or (op = AST_OP_SUB)) ) then
+			'' The result is supposed to be the pointer type
+			if( typeIsPtr( ldtype ) ) then
+				dtype   = ldtype
+				subtype = l->subtype
+			else
+				dtype   = rdtype
+				subtype = r->subtype
+			end if
+		else
+			'' Convert lhs/rhs to most precise type
+			'' (e.g. for +/-/* math BOPs, but also for relational BOPs,
+			'' even if they involve pointers)
+			typeMax( ldtype, l->subtype, rdtype, r->subtype, dtype, subtype )
+
+			if( (typeGetDtAndPtrOnly( dtype ) <> typeGetDtAndPtrOnly( ldtype )) or _
+			    (subtype <> l->subtype) ) then
+				l = astNewCONV( dtype, subtype, l )
+				if( l = NULL ) then return FALSE
+				ldtype = dtype
+				ldclass = typeGetClass( dtype )
+			end if
+
+			if( (typeGetDtAndPtrOnly( dtype ) <> typeGetDtAndPtrOnly( rdtype )) or _
+			    (subtype <> r->subtype) ) then
+				'' Shift counts remain independently typed integers.
+				select case op
+				case AST_OP_SHL, AST_OP_SHR
+				case else
+					r = astNewCONV( dtype, subtype, r )
+					if( r = NULL ) then return FALSE
+
+					rdtype = dtype
+					rdclass = typeGetClass( dtype )
+				end select
+			end if
+		end if
+	else
+		dtype   = ldtype
+		subtype = l->subtype
+	end if
+
+	return TRUE
+end function
+
+private sub hWarnBopMixedSignedness _
+	( _
+		byval op as integer, _
+		byval l as ASTNODE ptr, _
+		byval r as ASTNODE ptr, _
+		byval ldtype0 as integer, _
+		byval rdtype0 as integer, _
+		byval ldtype as integer, _
+		byval rdtype as integer _
+	)
+
+	select case as const op
+	case AST_OP_EQ, AST_OP_GT, AST_OP_LT, AST_OP_NE, AST_OP_LE, AST_OP_GE, _
+	     AST_OP_INTDIV, AST_OP_MOD, AST_OP_SHR
+
+		dim as FB_WARNINGMSG warning = 0
+
+		'' lhs signed->unsigned?
+		if( typeIsSigned( ldtype0 ) andalso _
+		    (typeIsSigned( ldtype ) = FALSE) ) then
+			if( astIsConst( l ) ) then
+				if( astConstGetAsInt64( l ) < 0 ) then
+					warning = FB_WARNINGMSG_OPERANDSMIXEDSIGNEDNESS
+				end if
+			elseif( fbPdCheckIsSet( FB_PDCHECK_SIGNEDNESS ) ) then
+				warning = FB_WARNINGMSG_OPERANDSMIXEDSIGNEDNESS
+			end if
+		end if
+
+		'' rhs signed->unsigned?  (Except in SHR)
+		if( (warning = 0) andalso (op <> AST_OP_SHR) andalso _
+		    typeIsSigned( rdtype0 ) andalso _
+		    (typeIsSigned( rdtype ) = FALSE) ) then
+			if( astIsConst( r ) ) then
+				if( astConstGetAsInt64( r ) < 0 ) then
+					warning = FB_WARNINGMSG_OPERANDSMIXEDSIGNEDNESS
+				end if
+			elseif( fbPdCheckIsSet( FB_PDCHECK_SIGNEDNESS ) ) then
+				warning = FB_WARNINGMSG_OPERANDSMIXEDSIGNEDNESS
+			end if
+		end if
+
+		if( warning <> 0 ) then
+			errReportWarn( warning )
+		end if
+	end select
+end sub
+
+private sub hPostCheckBop _
+	( _
+		byval op as integer, _
+		byref r as ASTNODE ptr, _
+		byval ldtype as integer, _
+		byref rdtype as integer, _
+		byref rdclass as integer, _
+		byref dtype as integer, _
+		byref subtype as FBSYMBOL ptr _
+	)
+
+	select case as const op
+	'' relational operations always return an integer
+	case AST_OP_EQ, AST_OP_GT, AST_OP_LT, AST_OP_NE, AST_OP_LE, AST_OP_GE, _
+	     AST_OP_ANDALSO, AST_OP_ORELSE
+
+		'' except, if it's boolean
+		if( typeGetDtAndPtrOnly( dtype ) <> FB_DATATYPE_BOOLEAN ) then
+			dtype = FB_DATATYPE_INTEGER
+		end if
+		subtype = NULL
+
+	'' right-operand must be an integer, so pow2 opts can be done on longint's
+	case AST_OP_SHL, AST_OP_SHR
+		if( astIsCONST( r ) ) then
+			'' Ensure the shift amount is in the range 0..bitsize-1.
+			'' - x86 only supports 0..31 shifts
+			'' - GAS will show errors if outside 0..255 (byte operand)
+			'' - C backend: anything outside the 0..bitsize-1 range is undefined behaviour
+			assert( typeGetClass( r->dtype ) = FB_DATACLASS_INTEGER )
+			if( cunsg( r->val.i ) >= typeGetBits( ldtype ) ) then
+				errReportWarn( FB_WARNINGMSG_SHIFTEXCEEDSBITSINDATATYPE )
+				r = astNewBOP( AST_OP_AND, r, astNewCONSTi( typeGetBits( ldtype )-1 ) )
+			end if
+		end if
+
+		if( typeGetDtAndPtrOnly( rdtype ) <> FB_DATATYPE_INTEGER ) then
+			if( typeGetDtAndPtrOnly( rdtype ) <> FB_DATATYPE_UINT ) then
+				rdtype = typeJoin( rdtype, FB_DATATYPE_INTEGER )
+				r = astNewCONV( rdtype, NULL, r )
+				rdclass = FB_DATACLASS_INTEGER
+			end if
+		end if
+	end select
+end sub
+
+private enum H_BOP_CONST_ACTION
+	H_BOP_CONST_CONTINUE
+	H_BOP_CONST_RETURN
+	H_BOP_CONST_ERROR
+end enum
+
+private function hOptimizeConstBop _
+	( _
+		byref result as ASTNODE ptr, _
+		byref op as integer, _
+		byref l as ASTNODE ptr, _
+		byref r as ASTNODE ptr, _
+		byref ldtype as integer, _
+		byref rdtype as integer, _
+		byref ldclass as integer, _
+		byref rdclass as integer, _
+		byval dtype as integer, _
+		byval subtype as FBSYMBOL ptr _
+	) as H_BOP_CONST_ACTION
+
+	dim as ASTNODE ptr n = any
+
+	result = NULL
+
+	if( astIsCONST( l ) and astIsCONST( r ) ) then
+		'' Xbox pow() comes from the target runtime, while constant folding here
+		'' would use the host compiler's math library.  Leave fractional
+		'' floating point ^ expressions for the Xbox code generator so literals
+		'' and variables use the same target libm semantics.  Integer exponents
+		'' must keep folding because tests and user code rely on values such as
+		'' 2^32 being accepted as constant expressions.
+		if( (op = AST_OP_POW) andalso _
+		    (env.clopt.target = FB_COMPTARGET_XBOX) andalso _
+		    (typeGetClass( l->dtype ) = FB_DATACLASS_FPOINT) andalso _
+		    (frac( r->val.f ) <> 0.0) ) then
+			'' fall through and build the BOP node
+		else
+			l = hConstBop( op, dtype, subtype, l, r )
+
+			astGetFullType( l ) = dtype
+			l->subtype = subtype
+
+			astDelNode( r )
+			result = l
+			return H_BOP_CONST_RETURN
+		end if
+	end if
+
+	'' CONST + x  =>  x + CONST
+	'' Moving CONSTs to the rhs reduces the amount of code needed in later
+	'' optimization passes, which only need to inspect the rhs.
+	if( astIsCONST( l ) ) then
+		var do_swap = FALSE
+
+		select case op
+		case AST_OP_ADD, AST_OP_MUL, _
+		     AST_OP_AND, AST_OP_OR, AST_OP_XOR, AST_OP_EQV, _
+		     AST_OP_EQ, AST_OP_NE
+			do_swap = TRUE
+
+		case AST_OP_GE
+			op = AST_OP_LE
+			do_swap = TRUE
+
+		case AST_OP_GT
+			op = AST_OP_LT
+			do_swap = TRUE
+
+		case AST_OP_LE
+			op = AST_OP_GE
+			do_swap = TRUE
+
+		case AST_OP_LT
+			op = AST_OP_GT
+			do_swap = TRUE
+
+		case AST_OP_SUB
+			'' c - x = -x + c
+			astBeginHideWarnings( )
+			r = astNewUOP( AST_OP_NEG, r )
+			astEndHideWarnings( )
+			if( r = NULL ) then
+				return H_BOP_CONST_ERROR
+			end if
+			op = AST_OP_ADD
+			do_swap = TRUE
+		end select
+
+		if( do_swap ) then
+			swap ldtype, rdtype
+			swap ldclass, rdclass
+			swap l, r
+		end if
+	end if
+
+	if( astIsCONST( r ) ) then
+		select case op
+		case AST_OP_NE
+			'' x <> 0 => x, but only if x is already a relational BOP.
+			if( (ldclass = FB_DATACLASS_INTEGER) and _
+			    (rdclass = FB_DATACLASS_INTEGER) andalso _
+			    (r->val.i = 0) andalso astIsRelationalBop( l ) ) then
+				astDelNode( r )
+				result = l
+				return H_BOP_CONST_RETURN
+			end if
+
+		case AST_OP_EQ
+			'' Solve an integer "= 0" check by inverting a relational BOP.
+			if( (ldclass = FB_DATACLASS_INTEGER) and _
+			    (rdclass = FB_DATACLASS_INTEGER) andalso _
+			    (r->val.i = 0) andalso astIsRelationalBop( l ) ) then
+				'' Floating-point comparisons in precise mode must preserve
+				'' unordered-result handling, so ask the backend to invert.
+				if( (astGetDataClass( l->l ) = FB_DATACLASS_FPOINT) and _
+				    (env.clopt.fpmode = FB_FPMODE_PRECISE) ) then
+					l->op.options xor= AST_OPOPT_DOINVERSE
+				else
+					l->op.op = astGetInverseLogOp( l->op.op )
+				end if
+				astDelNode( r )
+				result = l
+				return H_BOP_CONST_RETURN
+			end if
+
+		case AST_OP_ADD
+			select case( l->class )
+			case AST_NODECLASS_OFFSET
+				l->ofs.ofs += r->val.i
+				astDelNode( r )
+				result = l
+				return H_BOP_CONST_RETURN
+
+			'' BOP(ADDROF(VAR(x)), CONST(N)) => ADDROF(VAR(x, ofs=N))
+			case AST_NODECLASS_ADDROF
+				if( astIncOffset( l->l, r->val.i ) ) then
+					astDelNode( r )
+					result = l
+					return H_BOP_CONST_RETURN
+				end if
+			end select
+
+		case AST_OP_SUB
+			select case( l->class )
+			case AST_NODECLASS_OFFSET
+				l->ofs.ofs -= r->val.i
+				astDelNode( r )
+				result = l
+				return H_BOP_CONST_RETURN
+
+			'' BOP(ADDROF(VAR(x)), CONST(N)) => ADDROF(VAR(x, ofs=-N))
+			case AST_NODECLASS_ADDROF
+				if( astIncOffset( l->l, -r->val.i ) ) then
+					astDelNode( r )
+					result = l
+					return H_BOP_CONST_RETURN
+				end if
+			end select
+
+			'' x - c = x + -c
+			astBeginHideWarnings( )
+			r = astNewUOP( AST_OP_NEG, r )
+			astEndHideWarnings( )
+			op = AST_OP_ADD
+
+		'' report error for 'x \ 0', 'x mod 0'
+		'' Note: no error for 'x / 0', that should just return INF
+		case AST_OP_INTDIV, AST_OP_MOD
+			if( r->val.i = 0 ) then
+				errReport( FB_ERRMSG_DIVBYZERO )
+			end if
+
+		case AST_OP_POW
+			'' convert var ^ 2 to var * var
+			if( r->val.f = 2.0 ) then
+				'' operands will be converted to DOUBLE if not floats..
+				if( l->class = AST_NODECLASS_CONV ) then
+					select case l->l->class
+					case AST_NODECLASS_VAR, AST_NODECLASS_IDX, _
+					     AST_NODECLASS_FIELD, AST_NODECLASS_DEREF
+						n = l
+						l = l->l
+						astDelNode( n )
+						ldtype = typeJoin( ldtype, astGetFullType( l ) )
+					end select
+				end if
+
+				select case l->class
+				case AST_NODECLASS_VAR, AST_NODECLASS_IDX, _
+				     AST_NODECLASS_FIELD, AST_NODECLASS_DEREF
+
+					if( astHasSideFx( l ) = FALSE ) then
+						'' POW always promotes operands and its result to float.
+						if( typeGetClass( astGetDataType( l ) ) <> FB_DATACLASS_FPOINT ) then
+							l = astNewCONV( FB_DATATYPE_DOUBLE, NULL, l )
+						end if
+						astDelNode( r )
+						r = astCloneTree( l )
+						op = AST_OP_MUL
+					end if
+				end select
+			end if
+		end select
+	end if
+
+	return H_BOP_CONST_CONTINUE
+end function
+
 '':::::
+'' Binary-operator construction keeps coercion and overload decisions together.
+''
 function astNewBOP _
 	( _
 		byval op as integer, _
@@ -1006,9 +1696,8 @@ function astNewBOP _
 	dim as integer ldtype0 = any, rdtype0 = any
 	dim as integer ldtype = any, rdtype = any, dtype = any
 	dim as integer ldclass = any, rdclass = any
-	dim as integer lrank = any, rrank = any, intrank = any, uintrank = any
 	dim as integer is_str = any
-	dim as FBSYMBOL ptr litsym = any, subtype = any
+	dim as FBSYMBOL ptr subtype = any
 	dim as integer do_promote = any
 
 	function = NULL
@@ -1094,207 +1783,13 @@ function astNewBOP _
 		hConvOperand( FB_DATATYPE_INTEGER, rdtype, rdclass, r )
 	end if
 
-	'' both zstrings? treat as string..
-	if( (typeGet( ldtype ) = FB_DATATYPE_CHAR) and _
-		(typeGet( rdtype ) = FB_DATATYPE_CHAR) ) then
-		ldclass = FB_DATACLASS_STRING
-		rdclass = ldclass
-	end if
-
-	'' wstrings?
-	if( (typeGet( ldtype ) = FB_DATATYPE_WCHAR) or _
-		(typeGet( rdtype ) = FB_DATATYPE_WCHAR) ) then
-
-		'' not both wstrings?
-		if( typeGetDtAndPtrOnly( ldtype ) <> typeGetDtAndPtrOnly( rdtype ) ) then
-			if( typeGet( ldtype ) = FB_DATATYPE_WCHAR ) then
-				'' is right a string?
-				is_str = (rdclass = FB_DATACLASS_STRING) or (typeGet( rdtype ) = FB_DATATYPE_CHAR)
-			else
-				'' is left a string?
-				is_str = (ldclass = FB_DATACLASS_STRING) or (typeGet( ldtype ) = FB_DATATYPE_CHAR)
-			end if
-		else
-			is_str = TRUE
-		end if
-
-		if( is_str ) then
-
-			'' check for string literals
-			litsym = NULL
-			select case typeGet( ldtype )
-			case FB_DATATYPE_CHAR, FB_DATATYPE_WCHAR
-				litsym = astGetStrLitSymbol( l )
-				if( litsym <> NULL ) then
-					select case rdtype
-					case FB_DATATYPE_CHAR, FB_DATATYPE_WCHAR
-						litsym = astGetStrLitSymbol( r )
-					case else
-						litsym = NULL
-					end select
-				end if
-			end select
-
-			'' concatenation?
-			if( op = AST_OP_ADD ) then
-				'' both literals?
-				if( litsym <> NULL ) then
-					'' ok to convert at compile-time?
-					if( (typeGetDtAndPtrOnly( ldtype ) = typeGetDtAndPtrOnly( rdtype )) or _
-					    ((env.wcharconv <> FB_WCHARCONV_NEVER) and _
-					     fbTargetCanFoldStrLitToWstr( FALSE )) ) then
-						return hWstrLiteralConcat( l, r )
-					end if
-				end if
-
-				'' not both wstrings?
-				if( typeGetDtAndPtrOnly( ldtype ) <> typeGetDtAndPtrOnly( rdtype ) ) then
-					return rtlWstrConcat( l, ldtype, r, rdtype )
-				end if
-
-				'' result will be always a wstring
-				ldtype = typeUnsetIsConst( typeJoin( ldtype, FB_DATATYPE_WCHAR ) )
-				ldclass = FB_DATACLASS_INTEGER
-				rdtype = typeJoin( rdtype, ldtype )
-				rdclass = ldclass
-				is_str = TRUE
-
-				'' concatenation will only be done when loading,
-				'' to allow optimizations..
-
-			'' comparison?
-			elseif( astOpIsRelational( op ) ) then
-				'' both literals?
-				if( litsym <> NULL ) then
-					if( (typeGetDtAndPtrOnly( ldtype ) = typeGetDtAndPtrOnly( rdtype )) or _
-					    fbTargetCanFoldStrLitToWstr( FALSE ) or _
-					    (hWstrLiteralCanFoldCompare( l ) and hWstrLiteralCanFoldCompare( r )) ) then
-						return hWstrLiteralCompare( op, l, r )
-					end if
-				end if
-
-				'' convert to: wstrcmp(l,r) op 0
-				l = rtlWstrCompare( l, r )
-				r = astNewCONSTi( 0 )
-
-				ldtype = typeJoin( ldtype, astGetFullType( l ) )
-				rdtype = typeJoin( rdtype, astGetFullType( r ) )
-				ldclass = FB_DATACLASS_INTEGER
-				rdclass = FB_DATACLASS_INTEGER
-
-			'' no other operation allowed
-			else
-				exit function
-			end if
-
-		'' One is not a string, but e.g. an integer. Disallow if the
-		'' other is not a DEREF'ed wchar ptr - this allows comparisons
-		'' such as "wstringptr[index] = someinteger", i.e. a simplified
-		'' form of string indexing when dealing with a DEREF'ed ptr.
-		else
-			if( typeGet( ldtype ) = FB_DATATYPE_WCHAR ) then
-				if( hCheckDerefWcharPtr( l, @ldtype, r, rdtype ) = FALSE ) then
-					exit function
-				end if
-			else
-				if( hCheckDerefWcharPtr( r, @rdtype, l, ldtype ) = FALSE ) then
-					exit function
-				end if
-			end if
-		end if
-
-	'' strings?
-	elseif( (ldclass = FB_DATACLASS_STRING) or _
-	        (rdclass = FB_DATACLASS_STRING) ) then
-
-		'' not both strings?
-		if( ldclass <> rdclass ) then
-			if( ldclass = FB_DATACLASS_STRING ) then
-				'' not a zstring?
-				if( typeGet( rdtype ) <> FB_DATATYPE_CHAR ) then
-					exit function
-				end if
-			else
-				'' not a zstring?
-				if( typeGet( ldtype ) <> FB_DATATYPE_CHAR ) then
-					exit function
-				end if
-			end if
-		end if
-
-		'' check for string literals
-		litsym = NULL
-		if( typeGet( ldtype ) = FB_DATATYPE_CHAR ) then
-			if( typeGet( rdtype ) = FB_DATATYPE_CHAR ) then
-				litsym = astGetStrLitSymbol( l )
-				if( litsym <> NULL ) then
-					litsym = astGetStrLitSymbol( r )
-				end if
-			end if
-		end if
-
-		'' concatenation?
-		if( op = AST_OP_ADD ) then
-			'' both literals?
-			if( litsym <> NULL ) then
-				return hStrLiteralConcat( l, r )
-			end if
-
-			'' result will be always an var-len string
-			ldtype = typeUnsetIsConst( typeJoin( ldtype, FB_DATATYPE_STRING ) )
-			ldclass = FB_DATACLASS_STRING
-			rdtype = typeJoin( rdtype, ldtype )
-			rdclass = ldclass
-			is_str = TRUE
-
-			'' concatenation will only be done when loading,
-			'' to allow optimizations..
-
-		'' comparison?
-		elseif( astOpIsRelational( op ) ) then
-			'' both literals?
-			if( litsym <> NULL ) then
-				return hStrLiteralCompare( op, l, r )
-			end if
-
-			'' convert to: strcmp(l,r) op 0
-			l = rtlStrCompare( l, ldtype, r, rdtype )
-			r = astNewCONSTi( 0 )
-
-			ldtype = typeJoin( ldtype, astGetFullType( l ) )
-			ldclass = FB_DATACLASS_INTEGER
-			rdtype = typeJoin( rdtype, astGetFullType( r ) )
-			rdclass = FB_DATACLASS_INTEGER
-
-		'' no other operation allowed
-		else
-			exit function
-		end if
-
-	'' zstrings?
-	elseif( (typeGet( ldtype ) = FB_DATATYPE_CHAR) or _
-		    (typeGet( rdtype ) = FB_DATATYPE_CHAR) ) then
-
-		'' one is not a string (not fixed, var-len, z- or w-string,
-		'' or the tests above would catch them)
-		if( typeGet( ldtype ) = FB_DATATYPE_CHAR ) then
-			'' don't allow, unless it's a deref pointer
-			if( l->class <> AST_NODECLASS_DEREF ) then
-				exit function
-			end if
-			'' remap the type or the optimizer can
-			'' make a wrong assumption
-			ldtype = typeJoin( ldtype, FB_DATATYPE_UBYTE )
-
-		else
-			'' same as above..
-			if( r->class <> AST_NODECLASS_DEREF ) then
-				exit function
-			end if
-			rdtype = typeJoin( rdtype, FB_DATATYPE_UBYTE )
-		end if
-
-	end if
+	select case hCheckBopStrings( n, op, l, r, ldtype, rdtype, _
+	                              ldclass, rdclass, is_str )
+	case H_BOP_STRING_RETURN
+		return n
+	case H_BOP_STRING_ERROR
+		exit function
+	end select
 
 	dim as integer is_boolean = FALSE
 
@@ -1362,235 +1857,22 @@ function astNewBOP _
 	do_promote = (env.clopt.lang <> FB_LANG_QB) and (not is_str) and (not is_boolean)
 
 	if( do_promote ) then
-
-		intrank = typeGetIntRank( FB_DATATYPE_INTEGER )
-		uintrank = typeGetIntRank( FB_DATATYPE_UINT )
-
-		'' not for float
-		if( ldclass = FB_DATACLASS_INTEGER ) then
-			lrank = typeGetIntRank( typeGetRemapType( ldtype ) )
-
-			'' l < INTEGER?
-			if( lrank < intrank ) then
-				hConvOperand( FB_DATATYPE_INTEGER, ldtype, ldclass, l )
-			else
-				'' INTEGER < l < UINTEGER?
-				if( (intrank < lrank) and (lrank < uintrank) ) then
-					'' Convert to UINTEGER for consistency with
-					'' the above conversion to INTEGER (this can
-					'' happen with ULONG on 32bit, and ULONGINT
-					'' on 64bit, due to the ranking order)
-					hConvOperand( FB_DATATYPE_UINT, ldtype, ldclass, l )
-				end if
-			end if
-		end if
-
-		'' not for float
-		if( rdclass = FB_DATACLASS_INTEGER ) then
-			rrank = typeGetIntRank( typeGetRemapType( rdtype ) )
-
-			'' same for r
-			if( rrank < intrank ) then
-				hConvOperand( FB_DATATYPE_INTEGER, rdtype, rdclass, r )
-			else
-				if( (intrank < rrank) and (rrank < uintrank) ) then
-					hConvOperand( FB_DATATYPE_UINT, rdtype, rdclass, r )
-				end if
-			end if
-		end if
+		hPromoteBopOperand( l, ldtype, ldclass )
+		hPromoteBopOperand( r, rdtype, rdclass )
 	end if
 
-	'' convert types
-	select case as const op
-	'' flt div (/) can only operate on floats
-	case AST_OP_DIV
-
-		if( ldclass <> FB_DATACLASS_FPOINT ) then
-			hConvOperand( FB_DATATYPE_DOUBLE, ldtype, ldclass, l )
-		end if
-
-		if( rdclass <> FB_DATACLASS_FPOINT ) then
-			rdtype = typeJoin( rdtype, FB_DATATYPE_DOUBLE )
-
-			if( irGetOption( IR_OPT_FPUCONV ) ) then
-				r = astNewCONV( rdtype, NULL, r )
-			else
-				'' if it's an int var, let the FPU do it
-				if( (r->class <> AST_NODECLASS_VAR) or (rdtype <> FB_DATATYPE_INTEGER) ) then
-					r = astNewCONV( rdtype, NULL, r )
-				end if
-			end if
-
-			rdclass = FB_DATACLASS_FPOINT
-		end if
-
-	'' bitwise ops, int div (\), modulus and shift can only operate on integers
-	case AST_OP_AND, AST_OP_OR, AST_OP_XOR, AST_OP_EQV, AST_OP_IMP, _
-		 AST_OP_INTDIV, AST_OP_MOD, AST_OP_SHL, AST_OP_SHR
-
-		'' Examples:
-		''     double xor double =>  integer xor integer
-		''    integer xor double =>  integer xor integer
-		''    longint xor double =>  longint xor longint
-		''   ulongint xor double => ulongint xor longint
-		'' etc.
-
-		if( ldclass <> FB_DATACLASS_INTEGER ) then
-			hConvOperand( hGetIntegerOrBigger( rdtype ), ldtype, ldclass, l )
-		end if
-
-		if( rdclass <> FB_DATACLASS_INTEGER ) then
-			hConvOperand( hGetIntegerOrBigger( ldtype ), rdtype, rdclass, r )
-		end if
-
-	'' atan2 can only operate on floats
-	case AST_OP_ATAN2, AST_OP_POW
-
-		if( ldclass <> FB_DATACLASS_FPOINT ) then
-			hConvOperand( FB_DATATYPE_DOUBLE, ldtype, ldclass, l )
-		end if
-
-		if( rdclass <> FB_DATACLASS_FPOINT ) then
-			hConvOperand( FB_DATATYPE_DOUBLE, rdtype, rdclass, r )
-		end if
-
-	end select
+	hConvertBopOperandsForOperator( op, l, r, ldtype, rdtype, _
+	                                ldclass, rdclass )
 
 	''::::::
 
-	if( (ldtype <> rdtype) or (l->subtype <> r->subtype) ) then
-		'' Pointer arithmetic (but not handled above by hDoPointerArith())?
-		'' (assuming hCheckPtr() checks were already done)
-		if( (typeIsPtr( ldtype ) or typeIsPtr( rdtype )) and _
-		    ((op = AST_OP_ADD) or (op = AST_OP_SUB)) ) then
-			'' The result is supposed to be the pointer type
-			if( typeIsPtr( ldtype ) ) then
-				dtype   = ldtype
-				subtype = l->subtype
-			else
-				dtype   = rdtype
-				subtype = r->subtype
-			end if
-		else
-			'' Convert lhs/rhs to most precise type
-			'' (e.g. for +/-/* math BOPs, but also for relational BOPs,
-			'' even if they involve pointers)
-			typeMax( ldtype, l->subtype, rdtype, r->subtype, dtype, subtype )
-
-			if( (typeGetDtAndPtrOnly( dtype ) <> typeGetDtAndPtrOnly( ldtype )) or _
-			    (subtype <> l->subtype) ) then
-				l = astNewCONV( dtype, subtype, l )
-				if( l = NULL ) then exit function
-				ldtype = dtype
-				ldclass = typeGetClass( dtype )
-			end if
-
-			if( (typeGetDtAndPtrOnly( dtype ) <> typeGetDtAndPtrOnly( rdtype )) or _
-			    (subtype <> r->subtype) ) then
-				'' if it's the src-operand of a shift operation, do nothing
-				select case op
-				case AST_OP_SHL, AST_OP_SHR
-					'' it's already an integer
-
-				case else
-					r = astNewCONV( dtype, subtype, r )
-					if( r = NULL ) then exit function
-
-					rdtype = dtype
-					rdclass = typeGetClass( dtype )
-				end select
-			end if
-		end if
-	'' no conversion, same types
-	else
-		dtype   = ldtype
-		subtype = l->subtype
+	if( hCoerceBopOperandTypes( op, l, r, ldtype, rdtype, ldclass, _
+	                            rdclass, dtype, subtype ) = FALSE ) then
+		exit function
 	end if
 
-	'' warn on mixing signed and unsigned ops on comparisons/intdiv/mod/shr (unless signed value was a positive constant)
-	select case as const op
-	case AST_OP_EQ, AST_OP_GT, AST_OP_LT, AST_OP_NE, AST_OP_LE, AST_OP_GE, _
-	     AST_OP_INTDIV, AST_OP_MOD, AST_OP_SHR
-
-	    dim as FB_WARNINGMSG warning = 0
-
-		'' lhs signed->unsigned?
-		if( typeIsSigned( ldtype0 ) ) then
-			if( typeIsSigned( ldtype ) = FALSE ) then
-				if( astIsConst( l ) ) then
-					'' check for negative const lhs
-					if( astConstGetAsInt64( l ) < 0 ) then
-						'' lhs const int was negative
-						warning = FB_WARNINGMSG_OPERANDSMIXEDSIGNEDNESS
-					end if
-				else
-					'' lhs var may have been negative
-					'' (only a pedantic warning)
-					if( fbPdCheckIsSet( FB_PDCHECK_SIGNEDNESS ) ) then
-						warning = FB_WARNINGMSG_OPERANDSMIXEDSIGNEDNESS
-					end if
-				end if
-			end if
-		end if
-
-		'' rhs signed->unsigned?  (Except in SHR)
-		if( (warning = 0) andalso op <> AST_OP_SHR andalso typeIsSigned( rdtype0 ) ) then
-			if( typeIsSigned( rdtype ) = FALSE ) then
-				if( astIsConst( r ) ) then
-					if( astConstGetAsInt64( r ) < 0 ) then
-						'' rhs const int was negative
-						warning = FB_WARNINGMSG_OPERANDSMIXEDSIGNEDNESS
-					end if
-				else
-					'' rhs var may have been negative
-					'' (only a pedantic warning)
-					if( fbPdCheckIsSet( FB_PDCHECK_SIGNEDNESS ) ) then
-						warning = FB_WARNINGMSG_OPERANDSMIXEDSIGNEDNESS
-					end if
-				end if
-			end if
-		end if
-
-		if( warning <> 0 ) then
-			errReportWarn( warning )
-		end if
-
-	end select
-
-	'' post check
-	select case as const op
-	'' relational operations always return an integer
-	case AST_OP_EQ, AST_OP_GT, AST_OP_LT, AST_OP_NE, AST_OP_LE, AST_OP_GE, _
-	     AST_OP_ANDALSO, AST_OP_ORELSE
-
-		'' except, if it's boolean
-		if( typeGetDtAndPtrOnly( dtype ) <> FB_DATATYPE_BOOLEAN ) then
-			dtype = FB_DATATYPE_INTEGER
-		end if
-		subtype = NULL
-
-	'' right-operand must be an integer, so pow2 opts can be done on longint's
-	case AST_OP_SHL, AST_OP_SHR
-		if( astIsCONST( r ) ) then
-			'' Ensure the shift amount is in the range 0..bitsize-1.
-			'' - x86 only supports 0..31 shifts
-			'' - GAS will show errors if outside 0..255 (byte operand)
-			'' - C backend: anything outside the 0..bitsize-1 range is undefined behaviour
-			assert( typeGetClass( r->dtype ) = FB_DATACLASS_INTEGER )
-			if( cunsg( r->val.i ) >= typeGetBits( ldtype ) ) then
-				errReportWarn( FB_WARNINGMSG_SHIFTEXCEEDSBITSINDATATYPE )
-				r = astNewBOP( AST_OP_AND, r, astNewCONSTi( typeGetBits( ldtype )-1 ) )
-			end if
-		end if
-
-		if( typeGetDtAndPtrOnly( rdtype ) <> FB_DATATYPE_INTEGER ) then
-			if( typeGetDtAndPtrOnly( rdtype ) <> FB_DATATYPE_UINT ) then
-				rdtype = typeJoin( rdtype, FB_DATATYPE_INTEGER )
-				r = astNewCONV( rdtype, NULL, r )
-				rdclass = FB_DATACLASS_INTEGER
-			end if
-		end if
-	end select
+	hWarnBopMixedSignedness( op, l, r, ldtype0, rdtype0, ldtype, rdtype )
+	hPostCheckBop( op, r, ldtype, rdtype, rdclass, dtype, subtype )
 
 	'' constant folding (won't handle commutation, ie: "1+a+2+3" will become "1+a+5", not "a+6")
 	''
@@ -1602,217 +1884,13 @@ function astNewBOP _
 	'' they don't use CONSTs (string literals are VARs). Even "str & int"
 	'' BOPs are already converted to "str + fb_IntToStr(int)".
 
-	if( astIsCONST( l ) and astIsCONST( r ) ) then
-		'' Xbox pow() comes from the target runtime, while constant folding here
-		'' would use the host compiler's math library.  Leave fractional
-		'' floating point ^ expressions for the Xbox code generator so literals
-		'' and variables use the same target libm semantics.  Integer exponents
-		'' must keep folding because tests and user code rely on values such as
-		'' 2^32 being accepted as constant expressions.
-		if( (op = AST_OP_POW) andalso _
-		    (env.clopt.target = FB_COMPTARGET_XBOX) andalso _
-		    (typeGetClass( l->dtype ) = FB_DATACLASS_FPOINT) andalso _
-		    (frac( r->val.f ) <> 0.0) ) then
-			'' fall through and build the BOP node
-		else
-			l = hConstBop( op, dtype, subtype, l, r )
-
-			astGetFullType( l ) = dtype
-			l->subtype = subtype
-
-			astDelNode( r )
-
-			return l
-		end if
-	end if
-
-	'' CONST + x  =>  x + CONST
-	'' Moving CONSTs to the rhs (where possible) reduces the amount of code
-	'' needed in astOptimizeTree() etc., as from now on only the rhs needs
-	'' to be checked for being CONST (otherwise we'd always have to check
-	'' both sides).
-	if( astIsCONST( l ) ) then
-		var do_swap = FALSE
-
-		select case op
-		case AST_OP_ADD, AST_OP_MUL, _
-		     AST_OP_AND, AST_OP_OR, AST_OP_XOR, AST_OP_EQV, _
-		     AST_OP_EQ, AST_OP_NE
-			'' ? OP c = c OP ?
-			do_swap = TRUE
-
-		case AST_OP_GE
-			'' c >= ?  =  ? <= c
-			op = AST_OP_LE
-			do_swap = TRUE
-
-		case AST_OP_GT
-			'' c > ?  =  ? < c
-			op = AST_OP_LT
-			do_swap = TRUE
-
-		case AST_OP_LE
-			'' c <= ?  =  ? >= c
-			op = AST_OP_GE
-			do_swap = TRUE
-
-		case AST_OP_LT
-			'' c < ?  =  ? > c
-			op = AST_OP_GT
-			do_swap = TRUE
-
-		case AST_OP_SUB
-			'' c - ? = -? + c (this will removed later if no const folding can be done)
-			astBeginHideWarnings( )
-			r = astNewUOP( AST_OP_NEG, r )
-			astEndHideWarnings( )
-			if( r = NULL ) then
-				return NULL
-			end if
-			op = AST_OP_ADD
-			do_swap = TRUE
-		end select
-
-		if( do_swap ) then
-			swap ldtype, rdtype
-			swap ldclass, rdclass
-			swap l, r
-		end if
-	end if
-
-	if( astIsCONST( r ) ) then
-		select case op
-		case AST_OP_NE
-			'' Integer comparison (not a string/float one)?
-			if( (ldclass = FB_DATACLASS_INTEGER) and (rdclass = FB_DATACLASS_INTEGER) ) then
-				if( r->val.i = 0 ) then
-					''
-					'' x <> 0  =>  x  if x already is a boolean
-					''
-					'' but only if x is a relational BOP, for example:
-					''   (a <> b) <> 0  =>  a <> b
-					''
-					'' Generally there are more cases where this optimization could be done, for example:
-					''   (not a) <> 0  =>   not a   (at least if the <not a> has Integer type, i.e. boolean)
-					'' but then astBuildBranch() could be missing the BOP for doing an optimized conditional branch,
-					'' so it's probably better to only optimize if there will still be a BOP.
-					''
-					if( astIsRelationalBop( l ) ) then
-						astDelNode( r )
-						return l
-					end if
-				end if
-			end if
-
-		case AST_OP_EQ
-			'' Integer comparison (not a string/float one)?
-			if( (ldclass = FB_DATACLASS_INTEGER) and (rdclass = FB_DATACLASS_INTEGER) ) then
-				if( r->val.i = 0 ) then
-					'' Solve out = 0 checks on relational BOPs: = 0 is a logical negation,
-					'' and we can solve it out by inverting the relational BOP.
-					'' (a <> b) = 0  =>  (a =  b)
-					'' (a =  b) = 0  =>  (a <> b)
-					'' (a <  b) = 0  =>  (a >= b)
-					'' etc.
-					if( astIsRelationalBop( l ) ) then
-						'' Floating point? let backend optimize this.  We can't assume
-						'' we can invert the logic for floats.  Unless we are using
-						'' '-fpmode fast' then disregard consistency.
-						if( (astGetDataClass( l->l ) = FB_DATACLASS_FPOINT) and _
-						    (env.clopt.fpmode = FB_FPMODE_PRECISE) ) then
-							l->op.options xor= AST_OPOPT_DOINVERSE
-						else
-							l->op.op = astGetInverseLogOp( l->op.op )
-						end if
-						astDelNode( r )
-						return l
-					end if
-				end if
-			end if
-
-		case AST_OP_ADD
-			select case( l->class )
-			case AST_NODECLASS_OFFSET
-				'' no need to check for other values, floats aren't
-				'' allowed and if longints were used, this wouldn't be
-				'' an ofs node
-				l->ofs.ofs += r->val.i
-				astDelNode( r )
-
-				return l
-
-			'' BOP(ADDROF(VAR(x)), CONST(N))  =>  ADDROF(VAR(x, ofs=N))
-			case AST_NODECLASS_ADDROF
-				if( astIncOffset( l->l, r->val.i ) ) then
-					astDelNode( r )
-					return l
-				end if
-			end select
-
-		case AST_OP_SUB
-			select case( l->class )
-			case AST_NODECLASS_OFFSET
-				'' see above
-				l->ofs.ofs -= r->val.i
-				astDelNode( r )
-
-				return l
-
-			'' BOP(ADDROF(VAR(x)), CONST(N))  =>  ADDROF(VAR(x, ofs=N))
-			case AST_NODECLASS_ADDROF
-				if( astIncOffset( l->l, -r->val.i ) ) then
-					astDelNode( r )
-					return l
-				end if
-			end select
-
-			'' ? - c = ? + -c
-			astBeginHideWarnings( )
-			r = astNewUOP( AST_OP_NEG, r )
-			astEndHideWarnings( )
-			op = AST_OP_ADD
-
-		'' report error for 'x \ 0', 'x mod 0'
-		'' Note: no error for 'x / 0', that should just return INF
-		case AST_OP_INTDIV, AST_OP_MOD
-			if( r->val.i = 0 ) then
-				errReport( FB_ERRMSG_DIVBYZERO )
-			end if
-
-		case AST_OP_POW
-			'' convert var ^ 2 to var * var
-			if( r->val.f = 2.0 ) then
-				'' operands will be converted to DOUBLE if not floats..
-				if( l->class = AST_NODECLASS_CONV ) then
-					select case l->l->class
-					case AST_NODECLASS_VAR, AST_NODECLASS_IDX, _
-						 AST_NODECLASS_FIELD, AST_NODECLASS_DEREF
-						n = l
-						l = l->l
-						astDelNode( n )
-						ldtype = typeJoin( ldtype, astGetFullType( l ) )
-					end select
-				end if
-
-				select case l->class
-				case AST_NODECLASS_VAR, AST_NODECLASS_IDX, _
-					 AST_NODECLASS_FIELD, AST_NODECLASS_DEREF
-
-					'' can't clone if there's a side-effect in the tree
-					if( astHasSideFx( l ) = FALSE ) then
-						' A pow should always promote l and r to
-						' float, and return a float
-						if( typeGetClass( astGetDataType( l ) ) <> FB_DATACLASS_FPOINT ) then
-							l = astNewCONV( FB_DATATYPE_DOUBLE, NULL, l )
-						end if
-						astDelNode( r )
-						r = astCloneTree( l )
-						op = AST_OP_MUL
-					end if
-				end select
-			end if
-		end select
-	end if
+	select case hOptimizeConstBop( n, op, l, r, ldtype, rdtype, _
+	                               ldclass, rdclass, dtype, subtype )
+	case H_BOP_CONST_RETURN
+		return n
+	case H_BOP_CONST_ERROR
+		exit function
+	end select
 
 	''::::::
 	'' handle special cases
@@ -1908,7 +1986,7 @@ function astNewSelfBOP _
 
 	dim as ASTNODE ptr t = any
 	dim as FBSYMBOL ptr proc = any
-	dim as FB_ERRMSG err_num = any
+	dim as FB_ERRMSG err_num = FB_ERRMSG_OK
 
 	function = NULL
 

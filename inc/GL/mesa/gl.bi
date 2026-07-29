@@ -35,6 +35,8 @@
 	#inclib "gl"
 #elseif defined(__FB_DARWIN__)
 	#inclib "OpenGL"
+#elseif defined(__FB_ANDROID__)
+	#inclib "GLESv2"
 #else
 	#inclib "GL"
 #endif

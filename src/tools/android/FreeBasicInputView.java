@@ -12,8 +12,9 @@
     Responsibilities:
 
         * behave like a normal EditText from the IME's point of view
-        * catch soft-keyboard Backspace events sent to the served view
-        * forward those Backspace events to the native gfx driver
+        * catch key events sent to the served view by software or hardware
+          keyboards
+        * forward supported FreeBASIC text input to the native gfx driver
 
     This file intentionally does NOT contain:
 
@@ -25,6 +26,8 @@
 package org.freebasic.android;
 
 import android.content.Context;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.KeyEvent;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
@@ -33,18 +36,65 @@ import android.widget.EditText;
 
 public class FreeBasicInputView extends EditText {
     private static final int MAX_DELETE_COUNT = 16;
+    private boolean clearingForwardedText;
 
     public FreeBasicInputView(Context context) {
         super(context);
+
+        /*
+            Some older Android IMEs bypass the InputConnection wrapper and
+            modify their served EditText directly.  Keep the helper view
+            empty, but treat that otherwise invisible change as a fallback
+            text commit.  The normal wrapper path returns true before this
+            watcher sees a change, so it cannot duplicate ordinary input.
+        */
+        addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence text, int start,
+                int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence text, int start,
+                int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable text) {
+                if (clearingForwardedText || text == null || text.length() == 0) {
+                    return;
+                }
+
+                dispatchCommittedText(text);
+                clearingForwardedText = true;
+                text.clear();
+                clearingForwardedText = false;
+            }
+        });
     }
 
-    private static boolean dispatchBackspaceEvent(KeyEvent event) {
-        if (event == null || event.getKeyCode() != KeyEvent.KEYCODE_DEL) {
+    private static boolean dispatchNativeKeyEvent(KeyEvent event) {
+        int keyCode;
+        int unicodeChar;
+
+        if (event == null) {
+            return false;
+        }
+
+        keyCode = event.getKeyCode();
+        unicodeChar = event.getUnicodeChar();
+        if (keyCode != KeyEvent.KEYCODE_DEL &&
+            unicodeChar != '\t' && unicodeChar != '\r' && unicodeChar != '\n' &&
+            (unicodeChar < 32 || unicodeChar >= 127)) {
             return false;
         }
 
         try {
-            return FreeBasicNativeActivity.dispatchImeKey(event.getKeyCode(), event.getAction(), event.getUnicodeChar());
+            return FreeBasicNativeActivity.dispatchImeKey(
+                keyCode,
+                event.getAction(),
+                unicodeChar
+            );
         } catch (UnsatisfiedLinkError error) {
             return false;
         }
@@ -118,7 +168,7 @@ public class FreeBasicInputView extends EditText {
             reliably receive that event, so catch it here before EditText
             handles it internally.
         */
-        if (dispatchBackspaceEvent(event)) {
+        if (dispatchNativeKeyEvent(event)) {
             return true;
         }
 
@@ -137,7 +187,7 @@ public class FreeBasicInputView extends EditText {
         return new InputConnectionWrapper(base, true) {
             @Override
             public boolean sendKeyEvent(KeyEvent event) {
-                if (dispatchBackspaceEvent(event)) {
+                if (dispatchNativeKeyEvent(event)) {
                     return true;
                 }
 

@@ -485,6 +485,109 @@ void fb_StrRsetANA(void *dst_void, const int32 dst_len, const FBSTRING *src)
     fb_nuttx_fixed_set(dst_void, dst_len, src, 1);
 }
 
+static char *fb_nuttx_set_data(void *str, const int32 encoded_size)
+{
+    FBSTRING *descriptor;
+
+    if (str == NULL)
+        return NULL;
+
+    if (encoded_size != -1)
+        return (char *)str;
+
+    descriptor = (FBSTRING *)str;
+
+    return descriptor->data;
+}
+
+static int32 fb_nuttx_set_length(void *str, const int32 encoded_size)
+{
+    FBSTRING *descriptor;
+    size_t measured_len;
+
+    if (str == NULL)
+        return 0;
+
+    if (encoded_size == -1) {
+        descriptor = (FBSTRING *)str;
+
+        if (descriptor->len <= 0)
+            return 0;
+
+        return descriptor->len;
+    }
+
+    if (fb_nuttx_is_fixed_length(encoded_size))
+        return fb_nuttx_decode_fixed_length(encoded_size);
+
+    if (encoded_size > 0)
+        return encoded_size - 1;
+
+    measured_len = strlen((const char *)str);
+
+    if (measured_len > (size_t)INT32_MAX)
+        return INT32_MAX;
+
+    return (int32)measured_len;
+}
+
+static void fb_nuttx_str_set_ex(void *dst_void, const int32 dst_size,
+    void *src_void, const int32 src_size, const int right_align)
+{
+    char *dst;
+    const char *src;
+    int32 dst_len;
+    int32 src_len;
+    int32 copy_len;
+    int32 pad_len;
+    int dst_is_fixed;
+
+    dst = fb_nuttx_set_data(dst_void, dst_size);
+    src = fb_nuttx_set_data(src_void, src_size);
+    dst_len = fb_nuttx_set_length(dst_void, dst_size);
+    src_len = fb_nuttx_set_length(src_void, src_size);
+
+    if ((dst == NULL) || (src == NULL) || (dst_len <= 0))
+        return;
+
+    copy_len = src_len;
+
+    if (copy_len > dst_len)
+        copy_len = dst_len;
+
+    pad_len = 0;
+
+    if (right_align != 0)
+        pad_len = dst_len - copy_len;
+
+    if (pad_len > 0)
+        memset(dst, ' ', (size_t)pad_len);
+
+    if (copy_len > 0)
+        memmove(dst + pad_len, src, (size_t)copy_len);
+
+    if ((right_align == 0) && (copy_len < dst_len))
+        memset(dst + copy_len, ' ', (size_t)(dst_len - copy_len));
+
+    dst_is_fixed =
+        (dst_size != -1) && fb_nuttx_is_fixed_length(dst_size);
+
+    if (dst_is_fixed == 0)
+        dst[dst_len] = '\0';
+}
+
+void fb_StrLsetEx(void *dst, const int32 dst_size,
+    void *src, const int32 src_size)
+{
+    fb_nuttx_str_set_ex(dst, dst_size, src, src_size, 0);
+}
+
+void fb_StrRsetEx(void *dst, const int32 dst_size,
+    void *src, const int32 src_size)
+{
+    fb_nuttx_str_set_ex(dst, dst_size, src, src_size, 1);
+}
+
 void fb_StrDelete(const FBSTRING *s)
 {
     FBSTRING *owned;

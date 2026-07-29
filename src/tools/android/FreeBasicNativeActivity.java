@@ -29,8 +29,14 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.KeyEvent;
+import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
+import android.text.InputType;
 
 public class FreeBasicNativeActivity extends NativeActivity {
+	private static final int INPUT_VIEW_ID = 0x0fb60001;
+	private FreeBasicInputView keyboardInputView;
     static {
         System.loadLibrary("freebasicapp");
     }
@@ -70,9 +76,89 @@ public class FreeBasicNativeActivity extends NativeActivity {
         return metaData.getBoolean("org.freebasic.android.keyboard_button", true);
     }
 
+	/*
+		NativeActivity's graphics surface is not a reliable IME target on every
+		Android release.  Keep a one-pixel, transparent EditText in the activity
+		content hierarchy instead.  The view is deliberately unfocused until the
+		GPU-rendered KB control is tapped, so starting a graphics program never
+		causes a keyboard or handwriting panel to appear unexpectedly.
+	*/
+	private void installKeyboardInputView() {
+		ViewGroup content;
+
+		content = (ViewGroup)findViewById(android.R.id.content);
+		if (content == null || keyboardInputView != null) {
+			return;
+		}
+
+		keyboardInputView = new FreeBasicInputView(this);
+		keyboardInputView.setId(INPUT_VIEW_ID);
+		/*
+			Do not let this one-pixel helper win Android's initial focus search.
+			It becomes focusable only for an explicit renderer-originated show
+			request, then returns to this inactive state after hiding the IME.
+		*/
+		keyboardInputView.setFocusable(false);
+		keyboardInputView.setFocusableInTouchMode(false);
+		keyboardInputView.setBackgroundColor(0);
+		keyboardInputView.setAlpha(0.01f);
+		keyboardInputView.setInputType(
+			InputType.TYPE_CLASS_TEXT |
+			InputType.TYPE_TEXT_FLAG_MULTI_LINE |
+			InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+		);
+		keyboardInputView.setImeOptions(
+			EditorInfo.IME_ACTION_NONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI
+		);
+		keyboardInputView.setSingleLine(false);
+		keyboardInputView.setCursorVisible(false);
+		keyboardInputView.setTextColor(0);
+		FreeBasicInputBridge.attach(keyboardInputView);
+		content.addView(keyboardInputView, new ViewGroup.LayoutParams(1, 1));
+	}
+
+	/*
+		Called from the native input thread after a touch has been consumed by the
+		gfxlib3 presentation overlay.  runOnUiThread is necessary because the
+		InputMethodManager and the served view belong to Android's UI thread, not
+		the renderer's EGL thread.
+	*/
+	private void setKeyboardVisibleFromNative(final boolean visible) {
+		runOnUiThread(new Runnable() {
+			@Override
+			public void run() {
+				InputMethodManager inputManager;
+
+				installKeyboardInputView();
+				if (keyboardInputView == null) {
+					return;
+				}
+				inputManager = (InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
+				if (inputManager == null) {
+					return;
+				}
+				if (visible) {
+					keyboardInputView.setFocusable(true);
+					keyboardInputView.setFocusableInTouchMode(true);
+					keyboardInputView.requestFocus();
+					inputManager.showSoftInput(keyboardInputView,
+						InputMethodManager.SHOW_IMPLICIT |
+						InputMethodManager.SHOW_FORCED);
+				} else {
+					inputManager.hideSoftInputFromWindow(
+						keyboardInputView.getWindowToken(), 0);
+					keyboardInputView.clearFocus();
+					keyboardInputView.setFocusable(false);
+					keyboardInputView.setFocusableInTouchMode(false);
+				}
+			}
+		});
+	}
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+		installKeyboardInputView();
 
         try {
             nativeSetKeyboardButtonVisible(readKeyboardButtonVisible());

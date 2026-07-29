@@ -552,12 +552,13 @@ private function hUDTInit( byref ctx as FB_INITCTX ) as integer
 
 		'' next field to initialize
 		if( symbFieldIsBitField( fld ) ) then
-			'' !!! TODO !!! - this logic is a carry over from previous
-			'' versions of fbc, but it doesn't seem correct
-			'' multiple bitfields share the same offset so seems like
-			'' we should only add the size of the field once.
-			'' more tests are required for bitfields
-			lgt += symbGetRealSize( fld )
+			'' Packed bitfields share a container and therefore an offset.
+			'' Advance to the end of that container instead of adding its
+			'' size once for every field stored inside it.
+			dim as longint container_end = fld->ofs + symbGetRealSize( fld )
+			if( container_end > lgt ) then
+				lgt = container_end
+			end if
 			fld = symbUdtGetNextInitableField( fld )
 		else
 			'' loop through next initializable fields until we

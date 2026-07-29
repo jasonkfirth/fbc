@@ -113,18 +113,10 @@ function astNewCALL _
 	if( env.opt.procprofile ) then
 		if( canprofile ) then
 			if( fbGetOption( FB_COMPOPT_PROFILE ) = FB_PROFILE_OPT_CALLS ) then
-				'' fb's call profiling will clobber registers and will mess
-				'' up register loadeding for THISCALL and FASTCALL calling
-				'' conventions, so must disable unless astLoadCALL() is
-				'' fixed for better handling of THISCALL and FASTCALL.
-				select case symbGetProcMode( sym )
-				case FB_FUNCMODE_THISCALL, FB_FUNCMODE_FASTCALL
-				case else
-					n->call.profbegin = rtlProfileBeginCall( sym )
-					if( n->call.profbegin <> NULL ) then
-						n->call.profend = rtlProfileEndCall( )
-					end if
-				end select
+				n->call.profbegin = rtlProfileBeginCall( sym )
+				if( n->call.profbegin <> NULL ) then
+					n->call.profend = rtlProfileEndCall( )
+				end if
 			end if
 		end if
 	end if
@@ -178,6 +170,10 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 	dim as integer bytestopop = any, bytestoalign = any, argbytes = any
 	dim as integer prev_totalstackbytes = totalstackbytes
 	dim as IRVREG ptr vr = NULL, v1 = any, lreg = NULL, pcvr = NULL
+	dim as FBSYMBOL ptr regarg_param(0 to 1)
+	dim as IRVREG ptr regarg_value(0 to 1), regarg_target(0 to 1)
+	dim as longint regarg_length(0 to 1)
+	dim as integer regarg_count = 0
 
 	'' ARGs can contain CALLs themselves, then astLoadCALL() will recurse
 	reclevel += 1
@@ -220,23 +216,11 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 	'' Count up the size for the caller's stack clean up (after the call)
 	bytestopop = bytestoalign
 
-	'' FB_BACKEND_GAS: THISCALL & FASTCALL
-	'' ECX is always loaded last before the function call
-	'' so we don't need to worry about preserving it
-	'' EDX might get trashed if we have nested function calls
-	'' !!!FIXME!!! we maybe need to preserve EDX before we
-	'' start pushing arguments to the function call and restore
-	'' EDX after the call completes.
-	'' if( (env.clopt.backend = FB_BACKEND_GAS) then
-	''     arg = n->r
-	''     while( arg )
-	''         if( arg->sym->param.regnum = 2 ) then
-	''             save_edx = TRUE
-	''             exit while
-	''          end if
-	''         arg = arg->r
-	''     wend
-	'' end if
+	'' THISCALL and FASTCALL argument expressions are evaluated in the normal
+	'' order, but their ECX/EDX loads are deferred until all argument, hidden
+	'' result and profiling expressions have been evaluated. This prevents a
+	'' nested call or integer operation from clobbering an earlier register
+	'' argument.
 
 	'' Push each argument
 	arg = n->r
@@ -275,7 +259,16 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 			else
 				lreg = NULL
 			end if
-			irEmitPUSHARG( arg->sym, v1, arg->arg.lgt, reclevel, lreg )
+			if( lreg <> NULL ) then
+				assert( regarg_count <= ubound( regarg_param ) )
+				regarg_param(regarg_count) = arg->sym
+				regarg_value(regarg_count) = v1
+				regarg_target(regarg_count) = lreg
+				regarg_length(regarg_count) = arg->arg.lgt
+				regarg_count += 1
+			else
+				irEmitPUSHARG( arg->sym, v1, arg->arg.lgt, reclevel, NULL )
+			end if
 		end if
 		totalstackbytes += argbytes
 
@@ -350,16 +343,29 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 		n->call.profbegin = NULL
 	end if
 
-	'' function pointer?
+	'' Evaluate a function-pointer expression before loading register
+	'' arguments because it may contain a call of its own.
 	l = n->l
 	if( l ) then
 		v1 = astLoad( l )
 		astDelNode( l )
-		if( ast.doemit ) then
+	end if
+
+	if( ast.doemit ) then
+		'' Load EDX first and ECX last. The register loads are adjacent to the
+		'' call, so no intervening expression can overwrite either argument.
+		for regnum as integer = 2 to 1 step -1
+			for i as integer = 0 to regarg_count - 1
+				if( regarg_param(i)->param.regnum = regnum ) then
+					irEmitPUSHARG( regarg_param(i), regarg_value(i), _
+					               regarg_length(i), reclevel, regarg_target(i) )
+				end if
+			next
+		next
+
+		if( l ) then
 			irEmitCALLPTR( proc, v1, vr, bytestopop, reclevel )
-		end if
-	else
-		if( ast.doemit ) then
+		else
 			irEmitCALLFUNCT( proc, bytestopop, vr, reclevel )
 		end if
 	end if

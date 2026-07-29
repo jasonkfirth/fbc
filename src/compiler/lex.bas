@@ -87,10 +87,9 @@ sub lexInit _
 	dim as integer i
 	dim as FBTOKEN ptr n
 
-	'' !!!TODO!!! - determine if env.includerec check can be removed
-
 	'' first time? make sure lex.ctx points to something
-	if( (env.includerec = 0) and (ctx_kind = LEX_TKCTX_CONTEXT_INIT) ) then
+	if( ctx_kind = LEX_TKCTX_CONTEXT_INIT ) then
+		assert( env.includerec = 0 )
 		lex.ctx = @lex.ctxTB(0)
 	end if
 
@@ -167,9 +166,10 @@ sub lexInit _
 		lex.ctx->physfilepos = 0
 	end if
 
-	'' only if it's not on an inc file
-	'' !!!TODO!!! - determine if env.includerec check can be removed
-	'' if( ctx_kind <> LEX_TKCTX_CONTEXT_INCLUDE ) then
+	''
+	'' currline records top-level source for debug output.  Include contexts
+	'' must not reset it, while evaluation contexts own temporary line state.
+	''
 	if( (env.includerec = 0) or (ctx_kind = LEX_TKCTX_CONTEXT_EVAL) ) then
 		DZstrAllocate( lex.ctx->currline, 0 )
 		lex.insidemacro = FALSE
@@ -181,6 +181,14 @@ sub lexInit _
 		ppInit( )
 	end if
 
+end sub
+
+'' Reset the active preprocessor-evaluation context in place. Reusing the
+'' context avoids a redundant parent restore followed immediately by another
+'' push of the same context slot.
+sub lexReinitEvalCtx( )
+	assert( lex.ctx->kind = LEX_TKCTX_CONTEXT_EVAL )
+	lexInit( LEX_TKCTX_CONTEXT_EVAL )
 end sub
 
 '':::::
@@ -590,6 +598,36 @@ end sub
 ''                | '&' 'O' OCTDIG+
 ''                | '&' 'B' BINDIG+
 ''
+'' Non-decimal literal scanning is one stateful pass over all accepted suffixes.
+''
+private sub hReadNonDecPrefix _
+	( _
+		byval prefix as uinteger, _
+		byref pnum as zstring ptr, _
+		byref tlen as integer, _
+		byref havedigits as integer, _
+		byval flags as LEXCHECK _
+	)
+
+	pnum[0] = CHAR_AMP
+	pnum[1] = prefix
+	pnum += 2
+	tlen += 2
+	lexEatChar( )
+
+	'' Leading zeroes are preserved, but they need not participate in
+	'' overflow checks unless the lexer is retaining the input verbatim.
+	if( (flags and (LEXCHECK_NOLINECONT or LEXCHECK_NOSUFFIX)) = 0 ) then
+		while( lexCurrentChar( ) = CHAR_0 )
+			*pnum = CHAR_0
+			pnum += 1
+			tlen += 1
+			lexEatChar( )
+			havedigits = TRUE
+		wend
+	end if
+end sub
+
 private function hReadNonDecNumber _
 	( _
 		byref pnum as zstring ptr, _
@@ -653,22 +691,7 @@ private function hReadNonDecNumber _
 	'' hex
 	case CHAR_HUPP, CHAR_HLOW
 		const HEX_LOWERCASE_ADJUST_THRESHOLD = HEX_BASE
-		pnum[0] = CHAR_AMP
-		pnum[1] = c
-		pnum += 2
-		tlen += 2
-		lexEatChar( )
-
-		'' skip leading zeroes if not inside a comment or parsing an $include
-		if( (flags and (LEXCHECK_NOLINECONT or LEXCHECK_NOSUFFIX)) = 0 ) then
-			while( lexCurrentChar( ) = CHAR_0 )
-				*pnum = CHAR_0
-				pnum += 1
-				tlen += 1
-				lexEatChar( )
-				havedigits = TRUE
-			wend
-		end if
+		hReadNonDecPrefix( c, pnum, tlen, havedigits, flags )
 
 		do
 			c = lexCurrentChar( )
@@ -717,22 +740,7 @@ private function hReadNonDecNumber _
 
 	'' oct
 	case CHAR_OUPP, CHAR_OLOW
-		pnum[0] = CHAR_AMP
-		pnum[1] = c
-		pnum += 2
-		tlen += 2
-		lexEatChar( )
-
-		'' skip leading zeroes if not inside a comment or parsing an $include
-		if( (flags and (LEXCHECK_NOLINECONT or LEXCHECK_NOSUFFIX)) = 0 ) then
-			while( lexCurrentChar( ) = CHAR_0 )
-				*pnum = CHAR_0
-				pnum += 1
-				tlen += 1
-				lexEatChar( )
-				havedigits = TRUE
-			wend
-		end if
+		hReadNonDecPrefix( c, pnum, tlen, havedigits, flags )
 
 		first_c = lexCurrentChar( )
 		do
@@ -806,22 +814,7 @@ private function hReadNonDecNumber _
 
 	'' bin
 	case CHAR_BUPP, CHAR_BLOW
-		pnum[0] = CHAR_AMP
-		pnum[1] = c
-		pnum += 2
-		tlen += 2
-		lexEatChar( )
-
-		'' skip leading zeroes if not inside a comment or parsing an $include
-		if( (flags and (LEXCHECK_NOLINECONT or LEXCHECK_NOSUFFIX)) = 0 ) then
-			while( lexCurrentChar( ) = CHAR_0 )
-				*pnum = CHAR_0
-				pnum += 1
-				tlen += 1
-				lexEatChar( )
-				havedigits = TRUE
-			wend
-		end if
+		hReadNonDecPrefix( c, pnum, tlen, havedigits, flags )
 
 		do
 			c = lexCurrentChar( )
@@ -1753,28 +1746,15 @@ private function readId( byref t as FBTOKEN, byval flags as LEXCHECK ) as intege
 	return TRUE
 end function
 
-'':::::
-sub lexNextToken _
+private function hSkipWhitespace _
 	( _
 		byval t as FBTOKEN ptr, _
-		byval flags as LEXCHECK _
-	)
+		byval flags as LEXCHECK, _
+		byref char as uinteger _
+	) as integer
 
-	dim as uinteger char = any
-	dim as integer islinecont = any, lgt = any, reread = any, readchar = any
+	dim as integer islinecont = FALSE
 
-	t->after_space = lex.ctx->after_space
-	lex.ctx->after_space = FALSE
-
-	do
-		reread = FALSE
-		readchar = FALSE
-	t->text[0] = 0                                  '' t.text = ""
-	t->len = 0
-	t->sym_chain = NULL
-
-	'' skip white space
-	islinecont = FALSE
 	do
 		char = lexCurrentChar( )
 
@@ -1785,12 +1765,11 @@ sub lexNextToken _
 			t->class = FB_TKCLASS_DELIMITER
 			t->dtype = FB_DATATYPE_INVALID
 			t->suffixchar = CHAR_NULL
-			exit sub
+			return TRUE
 
 		'' line continuation?
 		case CHAR_UNDER
-
-			'' alread skipping?
+			'' already skipping?
 			if( islinecont ) then
 				lexEatChar( )
 				continue do
@@ -1798,7 +1777,6 @@ sub lexNextToken _
 
 			'' check for line cont?
 			if( (flags and LEXCHECK_NOLINECONT) = 0 ) then
-
 				'' is next char a valid identifier char? then, read it
 				select case as const lexGetLookAheadChar( )
 				case CHAR_AUPP to CHAR_ZUPP, CHAR_ALOW to CHAR_ZLOW, _
@@ -1810,16 +1788,14 @@ sub lexNextToken _
 					if( lexGetLookAheadChar2( ) = CHAR_SHARP ) then
 						exit do
 					end if
-
 				end select
 
 				'' otherwise, skip until new-line is found
 				lexEatChar( )
 				islinecont = TRUE
 				continue do
-
-			'' else, take it as-is
 			else
+				'' take it as-is
 				exit do
 			end if
 
@@ -1840,16 +1816,14 @@ sub lexNextToken _
 				t->dtype = FB_DATATYPE_INVALID
 				t->suffixchar = CHAR_NULL
 				t->len = 1
-				t->text[0] = CHAR_LF                    '' t.text = chr( 10 )
-				t->text[1] = 0                          '' /
-				exit sub
-
-			else
-				t->after_space = TRUE
-				UPDATE_LINENUM( )
-				islinecont = FALSE
-				continue do
+				t->text[0] = CHAR_LF
+				t->text[1] = 0
+				return TRUE
 			end if
+
+			t->after_space = TRUE
+			UPDATE_LINENUM( )
+			islinecont = FALSE
 
 		'' white-space?
 		case CHAR_TAB, CHAR_SPACE
@@ -1862,7 +1836,6 @@ sub lexNextToken _
 
 			lexEatChar( )
 
-		''
 		case else
 			if( islinecont = FALSE ) then
 				exit do
@@ -1870,8 +1843,37 @@ sub lexNextToken _
 
 			lexEatChar( )
 		end select
-
 	loop
+
+	return FALSE
+end function
+
+'':::::
+'' Tokenization is an ordered scanner; each branch consumes the shared input state.
+''
+sub lexNextToken _
+	( _
+		byval t as FBTOKEN ptr, _
+		byval flags as LEXCHECK _
+	)
+
+	dim as uinteger char = any
+	dim as integer lgt = any, reread = any, readchar = any
+
+	t->after_space = lex.ctx->after_space
+	lex.ctx->after_space = FALSE
+
+	do
+		reread = FALSE
+		readchar = FALSE
+	t->text[0] = 0                                  '' t.text = ""
+	t->len = 0
+	t->sym_chain = NULL
+
+	'' skip white space
+	if( hSkipWhitespace( t, flags, char ) ) then
+		exit sub
+	end if
 
 	lex.ctx->lastfilepos = lex.ctx->filepos + (lex.ctx->buffptr - @lex.ctx->buff) - 1
 
@@ -2264,22 +2266,24 @@ private sub hMoveKDown( ) static
 end sub
 
 private function lexGetStrLitText( byval tk as integer ) as string
-	dim as string s
+	dim as DZSTRING s
 	dim as integer is_escaped = any, saw_backslash = any
 	dim as ubyte ptr p = any
+
+	DZstrZero( s )
 
 	select case( tk )
 	case FB_TK_STRLIT
 		is_escaped = FALSE
 	case FB_TK_STRLIT_ESC
-		s += "!"
+		DZstrConcatAssignC( s, asc( "!" ) )
 		is_escaped = TRUE
 	case FB_TK_STRLIT_NOESC
-		s += "$"
+		DZstrConcatAssignC( s, asc( "$" ) )
 		is_escaped = FALSE
 	end select
 
-	s += """"
+	DZstrConcatAssignC( s, asc( """" ) )
 
 	'' Escaping is enabled for this string literal, so it could contain
 	''  \"  (which didn't stop the string token parser), or
@@ -2297,29 +2301,30 @@ private function lexGetStrLitText( byval tk as integer ) as string
 		case asc( """" )
 			if( saw_backslash ) then
 				'' It's just a '\"'
-				s += """"
+				DZstrConcatAssignC( s, asc( """" ) )
 			else
 				'' It's a '"', and the user did '""'
-				s += """"""
+				DZstrConcatAssign( s, """""" )
 			end if
 			saw_backslash = FALSE
 
 		case asc( "\" )
 			saw_backslash = is_escaped
-			s += "\"
+			DZstrConcatAssignC( s, asc( "\" ) )
 
 		case else
 			saw_backslash = FALSE
-			s += chr( *p )
+			DZstrConcatAssignC( s, *p )
 
 		end select
 
 		p += 1
 	loop
 
-	s += """"
+	DZstrConcatAssignC( s, asc( """" ) )
 
-	function = s
+	function = *s.data
+	DZstrAllocate( s, 0 )
 end function
 
 sub lexPPOnlyEmitToken( )
@@ -2505,6 +2510,8 @@ sub lexReadLine _
 
 		lexEatChar( )
 		if( skipline = FALSE ) then
+			'' Scanner line storage is capped by LEX_MAXBUFFCHARS.
+			''
 			*dst += chr( char )
 		end if
 	loop
@@ -2527,6 +2534,7 @@ function lexPeekCurrentLine _
 
 	static as zstring * 1024+1 buffer
 	dim as string res
+	dim as DZSTRING linebuilder, positionbuilder
 	dim as integer p, old_p, start, token_len
 	dim as ubyte ptr c
 	dim as uinteger char
@@ -2582,6 +2590,8 @@ function lexPeekCurrentLine _
 	'' build source line
 	res = ""
 	token_pos = ""
+	DZstrZero( linebuilder )
+	DZstrZero( positionbuilder )
 	do
 		char = *c
 		select case char
@@ -2589,14 +2599,23 @@ function lexPeekCurrentLine _
 			exit do
 		end select
 
-		res += chr( char )
+		DZstrConcatAssignC( linebuilder, char )
 		if( token_len > 0 ) then
-			token_pos += chr( iif( char = CHAR_TAB, CHAR_TAB, CHAR_SPACE ) )
+			DZstrConcatAssignC( positionbuilder, _
+				iif( char = CHAR_TAB, CHAR_TAB, CHAR_SPACE ) )
 			token_len -= 1
 		end if
 
 		c += 1
 	loop
+	if( linebuilder.data <> NULL ) then
+		res = *linebuilder.data
+	end if
+	if( positionbuilder.data <> NULL ) then
+		token_pos = *positionbuilder.data
+	end if
+	DZstrAllocate( linebuilder, 0 )
+	DZstrAllocate( positionbuilder, 0 )
 
 	if( do_trim ) then
 		dim as integer i

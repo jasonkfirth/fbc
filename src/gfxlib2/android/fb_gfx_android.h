@@ -14,6 +14,8 @@ extern "C" {
 
 extern const GFXDRIVER fb_gfxDriverAndroidModern;
 extern const GFXDRIVER fb_gfxDriverAndroidLegacy;
+extern const GFXDRIVER fb_gfxDriverAndroidOpenGLESModern;
+extern const GFXDRIVER fb_gfxDriverAndroidOpenGLESLegacy;
 
 int fb_hAndroidInit(char *title, int w, int h, int depth, int refresh_rate, int flags, int require_api26);
 void fb_hAndroidExit(void);
@@ -28,7 +30,14 @@ int fb_hAndroidSetWindowPos(int x, int y);
 int *fb_hAndroidFetchModes(int depth, int *size);
 void fb_hAndroidPollEvents(void);
 void fb_hAndroidUpdate(void);
+void fb_hAndroidLog(const char *text);
 void fb_hAndroidScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *refresh);
+ANativeWindow *fb_hAndroidAcquireWindow(unsigned *generation, int *can_render);
+int fb_hAndroidOpenGLInit(char *title, int w, int h, int depth, int refresh_rate,
+                         int flags, int require_api26);
+void fb_hAndroidOpenGLExit(void);
+void fb_hAndroidOpenGLFlip(void);
+ssize_t fb_hAndroidOpenGLDisplayHandle(void);
 
 void fb_hAndroidSetActivity(ANativeActivity *activity);
 void fb_hAndroidSetKeyboardEnabled(int enabled);

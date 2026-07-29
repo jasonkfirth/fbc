@@ -9,6 +9,9 @@ struct _EVENT {
 			int x, y;
 			int dx, dy;
 		};
+		struct {			/* window resize events */
+			int width, height;
+		};
 		int button;
 		int z;
 		int w;
@@ -31,6 +34,7 @@ typedef struct _EVENT EVENT;
 #define EVENT_WINDOW_LOST_FOCUS		12
 #define EVENT_WINDOW_CLOSE			13
 #define EVENT_MOUSE_HWHEEL			14
+#define EVENT_WINDOW_RESIZE			15
 
 #define MAX_EVENTS					128
 
@@ -158,4 +162,3 @@ typedef struct _EVENT EVENT;
 #define KEY_QUIT        FB_MAKE_EXT_KEY( 'k' )
 
 #define QB_EXTK(x)(((unsigned short)(x))<<8|0xff)
-

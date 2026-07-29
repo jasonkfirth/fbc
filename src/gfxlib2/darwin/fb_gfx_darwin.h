@@ -39,6 +39,7 @@ typedef struct FB_DARWIN_STATE {
 	void *app;
 	void *window;
 	void *view;
+	void *gl_context;
 	void *main_menu;
 	void *app_menu;
 	void *run_loop_mode;
@@ -46,6 +47,9 @@ typedef struct FB_DARWIN_STATE {
 
 extern FB_DARWIN_STATE fb_darwin;
 extern const GFXDRIVER fb_gfxDriverDarwin;
+#ifndef DISABLE_OPENGL
+extern const GFXDRIVER fb_gfxDriverDarwinOpenGL;
+#endif
 
 int fb_hDarwinInit(char *title, int w, int h, int depth, int refresh_rate, int flags);
 void fb_hDarwinExit(void);
@@ -60,6 +64,11 @@ int fb_hDarwinSetWindowPos(int x, int y);
 int *fb_hDarwinFetchModes(int depth, int *size);
 void fb_hDarwinPollEvents(void);
 void fb_hDarwinUpdate(void);
+#ifndef DISABLE_OPENGL
+int fb_hDarwinOpenGLMakeCurrent(void);
+void fb_hDarwinOpenGLUpdate(void);
+void fb_hDarwinOpenGLSwapBuffers(void);
+#endif
 int fb_hDarwinScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *refresh);
 ssize_t fb_hGetWindowHandle(void);
 ssize_t fb_hGetDisplayHandle(void);

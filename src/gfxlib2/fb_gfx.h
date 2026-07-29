@@ -48,6 +48,7 @@ DRIVER_ALWAYS_ON_TOP    0x00000020    no   no   yes  no   no
 DRIVER_ALPHA_PRIMITIVES 0x00000040    yes  no   no   no   no
 DRIVER_HIGH_PRIORITY    0x00000080    yes  no   yes  no   no
 DRIVER_NO_X86_MMX       0x00000100    yes  no   yes  no   no
+DRIVER_RESIZABLE        0x00000400    yes  yes  yes  no   no
 DRIVER_OPENGL_OPTIONS   0x000F0000    no   no   yes  no   no
 HAS_STENCIL_BUFFER      0x00010000    no   no   yes  no   no
 HAS_ACCUMULATION_BUFFER 0x00020000    no   no   yes  no   no
@@ -80,6 +81,7 @@ OPENGL_SUPPORT          0x20000000    no   yes  no   yes  yes
 #define DRIVER_ALPHA_PRIMITIVES 0x00000040
 #define DRIVER_HIGH_PRIORITY    0x00000080
 #define DRIVER_NO_X86_MMX       0x00000100
+#define DRIVER_RESIZABLE        0x00000400
 #define DRIVER_OPENGL_OPTIONS   0x000F0000
 #define HAS_STENCIL_BUFFER      0x00010000
 #define HAS_ACCUMULATION_BUFFER 0x00020000
@@ -267,6 +269,8 @@ typedef struct FBGFX
 	FBMUTEX *event_mutex;                   /**< Mutex lock for accessing the events queue */
 	volatile int flags;                     /**< Status flags */
 	int lock_count;                         /**<Reference count for SCREENLOCK/UNLOCK */
+	volatile int pending_width;             /**< Coalesced client width requested by the window thread */
+	volatile int pending_height;            /**< Coalesced client height requested by the window thread */
 } FBGFX;
 
 typedef struct GFXDRIVER
@@ -454,6 +458,21 @@ typedef struct GFXDRIVER
 	 * Manually refresh the screen by copying from gfxlib2 memory to video memory
 	 */
 	void (*update)(void);
+
+	/** Driver framebuffer resize function pointer.
+	 *
+	 * The generic layer has already allocated replacement software pages when
+	 * this is called.  The driver must resize its device-side presentation
+	 * resources without reading or replacing __fb_gfx's page pointers.  A
+	 * failure leaves the old logical framebuffer active.
+	 *
+	 * Can be NULL if the driver does not support DRIVER_RESIZABLE.
+	 *
+	 * \param[in] width new logical framebuffer width in pixels
+	 * \param[in] height new logical framebuffer height in pixels
+	 * \return -1 on failure; 0 on success
+	 */
+	int (*resize)(int width, int height);
 } GFXDRIVER;
 
 typedef struct PALETTE
@@ -527,6 +546,8 @@ extern void fb_hSetupData(void);
 extern FBCALL int fb_hEncode(const unsigned char *in_buffer, ssize_t in_size, unsigned char *out_buffer, ssize_t *out_size);
 extern FBCALL int fb_hDecode(const unsigned char *in_buffer, ssize_t in_size, unsigned char *out_buffer, ssize_t *out_size);
 extern void fb_hPostEvent(EVENT *e);
+extern void fb_hRequestResize(int width, int height);
+extern int fb_hApplyPendingResize(void);
 extern void fb_hPostKey(int key);
 extern BLITTER *fb_hGetBlitter(int device_depth, int is_rgb);
 extern unsigned int fb_hMakeColor(int bpp, unsigned int index, int r, int g, int b);

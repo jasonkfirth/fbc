@@ -624,7 +624,7 @@ function astBuildImplicitCtorCall _
 		byref is_ctorcall as integer _
 	) as ASTNODE ptr
 
-	dim as integer err_num = any
+	dim as integer err_num = FB_ERRMSG_OK
 	dim as FBSYMBOL ptr proc = any
 
 	proc = symbFindCtorOvlProc( subtype, expr, arg_mode, @err_num )

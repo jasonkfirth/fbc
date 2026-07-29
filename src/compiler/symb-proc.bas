@@ -69,10 +69,10 @@ function symbProcReturnsOnStack( byval proc as FBSYMBOL ptr ) as integer
 		'' Real type is an UDT pointer (instead of INTEGER/LONGINT)?
 		'' Then it's returned on stack (instead of in registers)
 
-		'' was structure calculated to return in registers?
-		'' - (gas64, calculated in hGetReturnTypeGas64Linux() )
-		'' !!!TODO!!! - we probably need to check other ABI's too
-		'' since they aren't all the same depending on target platform
+		'' GAS64 stores its aggregate-return decision in retin2regs.
+		'' A non-zero value means no hidden stack-result pointer is needed.
+		'' TODO: Audit the remaining target ABIs and expose their aggregate
+		'' return decisions through target data instead of a GAS64-only field.
 		if( (proc->subtype <> NULL) andalso (proc->subtype->udt.retin2regs <> FB_STRUCT_NONE) ) then
 			exit function
 		end if
@@ -2252,7 +2252,7 @@ private function hCheckOvlParam _
 			end if
 
 			'' Check whether CONSTness allows passing the arg to the param.
-			if( symbCheckConstAssignTopLevel( param_dtype, arg_dtype, param_subtype, arg_subtype, param_mode, const_matches ) ) then
+			if( symbCheckConstAssignTopLevel( param_dtype, arg_dtype, param_mode, const_matches ) ) then
 				'' They're compatible despite having different CONSTs -- e.g. "non-const Foo" passed to "Byref As Const Foo".
 				'' Treat it as lower score match than an exact match.
 				if( match > FB_OVLPROC_TYPEMATCH ) then
@@ -3311,22 +3311,26 @@ private sub hProcModeToStr( byref s as string, byval proc as FBSYMBOL ptr )
 end sub
 
 function hDumpDynamicArrayDimensions( byval dimensions as integer ) as string
-	dim s as string
+	dim as DZSTRING s
+	DZstrZero( s )
 
-	s += "("
+	DZstrConcatAssign( s, "(" )
 	for i as integer = 1 to dimensions
 		if( i > 1 ) then
-			s += ", "
+			DZstrConcatAssign( s, ", " )
 		end if
-		s += "any"
+		DZstrConcatAssign( s, "any" )
 	next
-	s += ") "
+	DZstrConcatAssign( s, ") " )
 
-	function = s
+	function = *s.data
+	DZstrAllocate( s, 0 )
 end function
 
 private sub hParamsToStr( byref s as string, byval proc as FBSYMBOL ptr )
 	s += "("
+	dim as DZSTRING params
+	DZstrZero( params )
 
 	var param = symbGetProcHeadParam( proc )
 
@@ -3349,33 +3353,38 @@ private sub hParamsToStr( byref s as string, byval proc as FBSYMBOL ptr )
 				if( fbLangIsSet( FB_LANG_FB ) and _
 				    (symbGetDefaultParamMode( param->typ, param->subtype ) <> parammode) ) then
 					if( parammode = FB_PARAMMODE_BYVAL ) then
-						s += "byval "
+						DZstrConcatAssign( params, "byval " )
 					else
-						s += "byref "
+						DZstrConcatAssign( params, "byref " )
 					end if
 				end if
 
 			case FB_PARAMMODE_BYDESC
-				s += hDumpDynamicArrayDimensions( param->param.bydescdimensions )
+				DZstrConcatAssign( params, hDumpDynamicArrayDimensions( param->param.bydescdimensions ) )
 			case else
 				'' The outer dispatch accepts only BYVAL, BYREF and BYDESC.
 				assert( FALSE )
 			end select
 
 			'' Parameter's data type
-			s += "as " + symbTypeToStr( param->typ, param->subtype )
+			DZstrConcatAssign( params, "as " + symbTypeToStr( param->typ, param->subtype ) )
 
 		case FB_PARAMMODE_VARARG
-			s += "..."
+			DZstrConcatAssign( params, "..." )
 		case else
 			assert( FALSE )
 		end select
 
 		param = symbGetParamNext( param )
 		if( param ) then
-			s += ", "
+			DZstrConcatAssign( params, ", " )
 		end if
 	wend
+
+	if( params.data <> NULL ) then
+		s += *params.data
+	end if
+	DZstrAllocate( params, 0 )
 
 	s += ")"
 end sub

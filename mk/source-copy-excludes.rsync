@@ -22,6 +22,10 @@ bootstrap/fbc*
 /build/
 dist/
 /lib/freebasic/
+# Local probe and packaging output can be extremely large.  They are not
+# source inputs and must not be copied into isolated cross-build worktrees.
+/remote_probe_temp/
+/$out/
 examples/**/*.a
 examples/**/*.asm
 examples/**/*.dll

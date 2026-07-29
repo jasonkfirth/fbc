@@ -39,18 +39,6 @@
 
 
 /* ------------------------------------------------------------------------- */
-/* External MIDI state                                                       */
-/* ------------------------------------------------------------------------- */
-
-/*
-    The MIDI state variables are owned by sfx_midi_open.c.
-*/
-
-extern int g_midi_device;
-extern int g_midi_open;
-
-
-/* ------------------------------------------------------------------------- */
 /* MIDI CLOSE                                                                */
 /* ------------------------------------------------------------------------- */
 
@@ -74,7 +62,13 @@ int fb_sfxMidiClose(void)
         return 0;
     }
 
-    fb_sfxMidiDriverClose();
+    /*
+        Route shutdown through the same layer used by MIDI SEND. A
+        software-backed open has no platform MIDI handle to close.
+    */
+    fb_sfxMidiOutputSilence();
+    fb_sfxMidiOutputPause(0);
+    fb_sfxMidiOutputClose();
 
     g_midi_device = -1;
     g_midi_open   = 0;

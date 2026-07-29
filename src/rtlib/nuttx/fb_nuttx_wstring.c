@@ -371,6 +371,79 @@ ssize_t fb_WstrLen(uint32_t *text)
     return (ssize_t)fb_nuttx_wstr_len(text);
 }
 
+static ssize_t fb_nuttx_wstr_set_length(const uint32_t *text,
+    const ssize_t encoded_size)
+{
+    if (text == NULL)
+        return 0;
+
+    if (encoded_size <= 0)
+        return (ssize_t)fb_nuttx_wstr_len(text);
+
+    return encoded_size - 1;
+}
+
+static void fb_nuttx_wstr_set_ex(uint32_t *dst, const ssize_t dst_size,
+    const uint32_t *src, const ssize_t src_size, const int right_align)
+{
+    ssize_t dst_len;
+    ssize_t src_len;
+    ssize_t copy_len;
+    ssize_t pad_len;
+
+    if ((dst == NULL) || (src == NULL))
+        return;
+
+    dst_len = fb_nuttx_wstr_set_length(dst, dst_size);
+    src_len = fb_nuttx_wstr_set_length(src, src_size);
+
+    if (dst_len <= 0)
+        return;
+
+    copy_len = src_len;
+
+    if (copy_len > dst_len)
+        copy_len = dst_len;
+
+    pad_len = 0;
+
+    if (right_align != 0)
+        pad_len = dst_len - copy_len;
+
+    while (pad_len > 0) {
+        dst[pad_len - 1] = (uint32_t)' ';
+        pad_len--;
+    }
+
+    pad_len = (right_align != 0) ? dst_len - copy_len : 0;
+
+    if (copy_len > 0)
+        memmove(dst + pad_len, src, (size_t)copy_len * sizeof(uint32_t));
+
+    if (right_align == 0) {
+        pad_len = dst_len - copy_len;
+
+        while (pad_len > 0) {
+            dst[copy_len + pad_len - 1] = (uint32_t)' ';
+            pad_len--;
+        }
+    }
+
+    dst[dst_len] = 0;
+}
+
+void fb_WstrLsetEx(uint32_t *dst, const ssize_t dst_size,
+    const uint32_t *src, const ssize_t src_size)
+{
+    fb_nuttx_wstr_set_ex(dst, dst_size, src, src_size, 0);
+}
+
+void fb_WstrRsetEx(uint32_t *dst, const ssize_t dst_size,
+    const uint32_t *src, const ssize_t src_size)
+{
+    fb_nuttx_wstr_set_ex(dst, dst_size, src, src_size, 1);
+}
+
 uint32_t *fb_WstrAlloc(ssize_t chars)
 {
     if ((chars < 0) || (chars > INT32_MAX))

@@ -402,13 +402,16 @@ function rtlCalcExprLen( byval expr as ASTNODE ptr ) as longint
 end function
 
 '':::::
-'' note: this function must be called *before* astNewARG(e) because the
-''       expression 'e' can be changed inside the former (address-of string's etc)
-'' !!!TODO!!! - in places where rtlCalcStrLen() is called, if it is a UDT
-'' that overloads operator len(), then the value returned by operator len() should
-'' be prefered to calculating length in the run-time based on the null terminated
-'' length.  Many fb_Wstr* functions will need alternate versions that accept a length
-'' parameter.
+''
+'' Return the static size encoding expected by the string runtime.  A zero
+'' means that the runtime must scan for a terminator, while -1 identifies a
+'' dynamic STRING descriptor.  Positive zstring and wstring sizes include the
+'' terminator, and fixed STRING sizes carry FB_STRISFIXED in the high bit.
+''
+'' This helper must be called before astNewARG(), because argument lowering can
+'' replace the expression with an address or a temporary.  Code that can accept
+'' a run-time length uses rtlBuildStrLenExpr() below so an overloaded LEN()
+'' supplied by a string-like UDT is not discarded.
 function rtlCalcStrLen _
 	( _
 		byval expr as ASTNODE ptr, _
@@ -461,4 +464,128 @@ function rtlCalcStrLen _
 
 	end select
 
+end function
+
+private function hFindStringCastCall( byval expr as ASTNODE ptr ) as ASTNODE ptr
+	do while( expr <> NULL )
+		select case as const astGetClass( expr )
+		case AST_NODECLASS_CALL
+			if( symbIsOperator( expr->sym ) ) then
+				if( symbGetProcOpOvl( expr->sym ) = AST_OP_CAST ) then
+					return expr
+				end if
+			end if
+			exit do
+
+		case AST_NODECLASS_CONV, AST_NODECLASS_DEREF
+			expr = astGetLeft( expr )
+
+		case else
+			exit do
+		end select
+	loop
+
+	function = NULL
+end function
+
+private function hBuildOverloadedStrLen _
+	( _
+		byref expr as ASTNODE ptr, _
+		byref prelude as ASTNODE ptr _
+	) as ASTNODE ptr
+
+	dim as ASTNODE ptr cast_call = hFindStringCastCall( expr )
+	if( cast_call = NULL ) then
+		return NULL
+	end if
+
+	dim as ASTNODE ptr instance_arg = cast_call->call.argtail
+	if( instance_arg = NULL ) then
+		return NULL
+	end if
+
+	dim as FBSYMBOL ptr subtype = symbGetNamespace( cast_call->sym )
+	if( symbIsStruct( subtype ) = FALSE ) then
+		return NULL
+	end if
+
+	''
+	'' The instance argument has already been lowered to a UDT pointer by
+	'' astNewARG().  Dereferencing a clone reconstructs the exact object on
+	'' which the cast operates, including base-class adjustments.
+	''
+	dim as ASTNODE ptr instance_expr = astNewDEREF( _
+		astCloneTree( instance_arg->l ), FB_DATATYPE_STRUCT, subtype )
+	dim as ASTNODE ptr length_expr = astNewUOP( AST_OP_LEN, instance_expr )
+	if( length_expr = NULL ) then
+		astDelTree( instance_expr )
+		return NULL
+	end if
+
+	''
+	'' An indexed object or a temporary-return expression may have side
+	'' effects.  Cache the already-adjusted instance pointer so the cast and
+	'' LEN() overload observe the same object without evaluating it twice.
+	''
+	if( astHasSideFx( instance_arg->l ) ) then
+		astDelTree( length_expr )
+
+		dim as ASTNODE ptr save_instance = astRemSideFx( instance_arg->l )
+		prelude = astNewLINK( prelude, save_instance, AST_LINK_RETURN_NONE )
+
+		instance_expr = astNewDEREF( _
+			astCloneTree( instance_arg->l ), FB_DATATYPE_STRUCT, subtype )
+		length_expr = astNewUOP( AST_OP_LEN, instance_expr )
+		assert( length_expr <> NULL )
+	end if
+
+	''
+	'' Evaluate LEN() once and clamp a broken negative overload result to an
+	'' empty string.  The runtime size encoding includes the terminator, so
+	'' the clamped character count is incremented before it is passed on.
+	''
+	dim as FBSYMBOL ptr length_temp = symbAddTempVar( FB_DATATYPE_INTEGER )
+	dim as ASTNODE ptr save_length = astNewASSIGN( _
+		astNewVAR( length_temp ), length_expr, AST_OPOPT_ISINI )
+	prelude = astNewLINK( prelude, save_length, AST_LINK_RETURN_NONE )
+
+	dim as ASTNODE ptr is_negative = astNewBOP( _
+		AST_OP_LT, astNewVAR( length_temp ), astNewCONSTi( 0 ) )
+	dim as ASTNODE ptr clamped_length = astNewIIF( _
+		is_negative, astNewCONSTi( 0 ), 0, astNewVAR( length_temp ), 0 )
+	assert( clamped_length <> NULL )
+
+	function = astNewBOP( _
+		AST_OP_ADD, clamped_length, astNewCONSTi( 1 ) )
+end function
+
+function rtlBuildStrLenExpr _
+	( _
+		byref expr as ASTNODE ptr, _
+		byval dtype as integer, _
+		byref prelude as ASTNODE ptr, _
+		byref uses_overloaded_len as integer _
+	) as ASTNODE ptr
+
+	uses_overloaded_len = FALSE
+
+	dim as ASTNODE ptr length_expr = hBuildOverloadedStrLen( expr, prelude )
+	if( length_expr <> NULL ) then
+		uses_overloaded_len = TRUE
+		return length_expr
+	end if
+
+	''
+	'' LSET and RSET operate on the current contents of zstrings and
+	'' wstrings, not on the capacity of their backing arrays.  When the
+	'' other operand needs an overloaded LEN(), pass zero for ordinary
+	'' zero-terminated operands so the explicit-length runtime entry point
+	'' scans for the terminator just like the traditional entry points do.
+	''
+	select case as const typeGet( dtype )
+	case FB_DATATYPE_CHAR, FB_DATATYPE_WCHAR
+		function = astNewCONSTi( 0 )
+	case else
+		function = astNewCONSTi( rtlCalcStrLen( expr, dtype ) )
+	end select
 end function

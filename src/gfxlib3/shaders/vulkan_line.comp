@@ -1,0 +1,115 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_line.comp
+
+    Purpose:
+
+        Rasterize a FreeBASIC styled line directly into a device-local Vulkan
+        surface buffer.
+
+    Responsibilities:
+
+        - reproduce the integer nearest-pixel coverage used by gfxlib3
+        - apply the repeating 16-bit line style by original step index
+        - enforce the clipped surface rectangle and logical color mask
+
+    This file intentionally does NOT contain:
+
+        - rectangle or ellipse rasterization
+        - host-side endpoint validation
+        - presentation behavior
+*/
+
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) buffer SurfacePixels
+{
+	uint pixels[];
+} surface_pixels;
+
+layout(set = 0, binding = 1, std430) readonly buffer LineCommand
+{
+	ivec4 endpoints;
+	ivec4 clip;
+	uvec4 parameters; /* width, point count, color, style */
+	uvec4 format;     /* logical color mask, then reserved words */
+} line_command;
+
+uint alpha_primitive(uint source, uint destination)
+{
+	uint alpha = source >> 24;
+	uint source_red_blue = source & 0x00FF00FFu;
+	uint source_green = source & 0x0000FF00u;
+	uint destination_red_blue = destination & 0x00FF00FFu;
+	uint destination_green = destination & 0x0000FF00u;
+
+	source_red_blue = ((source_red_blue - destination_red_blue) * alpha) >> 8;
+	source_green = ((source_green - destination_green) * alpha) >> 8;
+	return ((destination_red_blue + source_red_blue) & 0x00FF00FFu) |
+		((destination_green + source_green) & 0x0000FF00u) |
+		(source & 0xFF000000u);
+}
+
+void write_pixel(uint offset)
+{
+	uint source = line_command.parameters.z & line_command.format.x;
+	if ((line_command.format.y & 1u) == 0u) {
+		surface_pixels.pixels[offset] = source;
+		return;
+	}
+	uint expected = surface_pixels.pixels[offset];
+	for (;;) {
+		uint prior = expected;
+		expected = atomicCompSwap(surface_pixels.pixels[offset], prior,
+			alpha_primitive(source, prior));
+		if (expected == prior)
+			return;
+	}
+}
+
+void main(void)
+{
+	uint index = gl_GlobalInvocationID.x;
+	ivec2 start;
+	ivec2 finish;
+	ivec2 difference;
+	ivec2 direction;
+	ivec2 position;
+	int step_index;
+	uint style_bit;
+
+	if (index >= line_command.parameters.y)
+		return;
+	start = line_command.endpoints.xy;
+	finish = line_command.endpoints.zw;
+	difference = abs(finish - start);
+	direction = ivec2((finish.x < start.x) ? -1 : 1,
+		(finish.y < start.y) ? -1 : 1);
+	step_index = int(index);
+	if (difference.x >= difference.y) {
+		position.x = start.x + (direction.x * step_index);
+		position.y = start.y;
+		if (difference.x != 0)
+			position.y += direction.y * ((difference.y * step_index +
+				(difference.x / 2)) / difference.x);
+	} else {
+		position.y = start.y + (direction.y * step_index);
+		position.x = start.x + direction.x * ((difference.x * step_index +
+			(difference.y / 2)) / difference.y);
+	}
+	if ((position.x < line_command.clip.x) ||
+	    (position.y < line_command.clip.y) ||
+	    (position.x > line_command.clip.z) ||
+	    (position.y > line_command.clip.w))
+		return;
+	style_bit = 0x8000u >> (index & 15u);
+	if ((line_command.parameters.w & style_bit) != 0u)
+		write_pixel((uint(position.y) * line_command.parameters.x) +
+			uint(position.x));
+}
+
+/* end of vulkan_line.comp */

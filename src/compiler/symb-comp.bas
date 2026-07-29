@@ -1531,16 +1531,10 @@ sub symbCompRTTIInit( )
 
 	dim mode as FB_FUNCMODE = FB_FUNCMODE_CDECL
 
-	'' !!!TODO!!! is this required for OBJECT and RTTI?
-	''if( parser.mangling = FB_MANGLING_CPP ) then
-	''  if( env.clopt.target = FB_COMPTARGET_WIN32 ) then
-	''      if( fbIs64bit( ) = FALSE ) then
-	''          if( env.clopt.nothiscall = FALSE ) then
-	''              mode = FB_FUNCMODE_THISCALL
-	''          end if
-	''      end if
-	''  end if
-	''end if
+	'' OBJECT's constructors are implemented by the C runtime as
+	'' _ZN10fb_Object$C1Ev() and _ZN10fb_Object$C1ERKS_(). Their C prototypes
+	'' use the platform's ordinary calling convention, including on 32-bit
+	'' Windows. The names use C++ mangling, but the ABI must remain CDECL.
 
 	'' declare constructor( )
 	ctor = symbPreAddProc( NULL )

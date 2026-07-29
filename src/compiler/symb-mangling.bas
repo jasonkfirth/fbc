@@ -23,6 +23,8 @@ type FB_MANGLECTX
 	uniqueidcount       as integer
 	uniquelabelcount    as integer
 	profilelabelcount   as integer
+	localudtcount       as integer
+	varcount            as integer
 end type
 
 const FB_INITMANGARGS = 96
@@ -56,6 +58,8 @@ sub symbMangleInit( )
 	ctx.uniqueidcount = 0
 	ctx.uniquelabelcount = 0
 	ctx.profilelabelcount = 0
+	ctx.localudtcount = 1
+	ctx.varcount = 0
 end sub
 
 sub symbMangleEnd( )
@@ -172,18 +176,16 @@ private sub hMangleUdtId( byref mangled as string, byval sym as FBSYMBOL ptr )
 		'' unique so we avoid collisions between structs that have the same name
 		'' in different scopes regardless if the types are actually the same or not
 
-		'' !!!TODO!!! should localUDTcounter reset between modules and on restarts with fbRestartableStaticVariable()?
-		static localUDTcounter as integer = 1
 		dim tmp as string
 		if( sym->id.alias ) then
 			tmp = *sym->id.alias
 		else
 			tmp = *sym->id.name
 		end if
-		tmp += "$" + str(localUDTcounter)
+		tmp += "$" + str(ctx.localudtcount)
 		mangled += str( len(tmp) )
 		mangled += tmp
-		localUDTcounter += 1
+		ctx.localudtcount += 1
 	else
 		if( sym->id.alias ) then
 			mangled += str( len( *sym->id.alias ) )
@@ -774,8 +776,6 @@ private sub hMangleVariable( byval sym as FBSYMBOL ptr )
 	'' local optimization for 'id' allocation - it's always initialized by logic below
 	static as string id
 
-	'' !!!TODO!!! should varcounter reset between modules and on restarts with fbRestartableStaticVariable()?
-	static as integer varcounter
 	dim as string mangled
 	dim as zstring ptr p = any
 	dim as integer docpp = any, isglobal = any
@@ -854,9 +854,15 @@ private sub hMangleVariable( byval sym as FBSYMBOL ptr )
 			'' BASIC? use the upper-cased name
 			if( symbGetMangling( sym ) = FB_MANGLING_BASIC ) then
 				id = *sym->id.name
-				'' !!! TODO !!! - if backend is gas, then can't mix gcc and gas globals
+
+				''
+				'' Use the same non-FB identifier marker for every
+				'' backend.  This keeps BASIC globals link-compatible
+				'' when object files from different backends are mixed.
+				''
 				select case env.clopt.backend
-				case FB_BACKEND_GCC, FB_BACKEND_CLANG, FB_BACKEND_GAS64
+				case FB_BACKEND_GCC, FB_BACKEND_CLANG, _
+				     FB_BACKEND_GAS, FB_BACKEND_GAS64
 					id += "$"
 				end select
 			'' else, the case-sensitive name saved in the alias..
@@ -868,7 +874,8 @@ private sub hMangleVariable( byval sym as FBSYMBOL ptr )
 			if( symbIsSuffixed( sym ) ) then
 				id += *hMangleBuiltInType( symbGetType( sym ) )
 				select case env.clopt.backend
-				case FB_BACKEND_GCC, FB_BACKEND_CLANG
+				case FB_BACKEND_GCC, FB_BACKEND_CLANG, _
+				     FB_BACKEND_GAS, FB_BACKEND_GAS64
 					id += "$"
 				end select
 			end if
@@ -923,8 +930,8 @@ private sub hMangleVariable( byval sym as FBSYMBOL ptr )
 					'' Make the symbol unique - LLVM IR doesn't have scopes.
 					'' (appending the scope level wouldn't be enough due to
 					'' conflicts between sibling scopes)
-					id += "." + str( varcounter )
-					varcounter += 1
+					id += "." + str( ctx.varcount )
+					ctx.varcount += 1
 				else
 					'' Use the case-sensitive name saved in the alias
 					id = *sym->id.alias
@@ -942,8 +949,8 @@ private sub hMangleVariable( byval sym as FBSYMBOL ptr )
 					'' Make the symbol unique - gas doesn't have scopes.
 					'' (appending the scope level wouldn't be enough due to
 					'' conflicts between sibling scopes)
-					id += "." + str( varcounter )
-					varcounter += 1
+					id += "." + str( ctx.varcount )
+					ctx.varcount += 1
 				elseif( symbIsStatic( sym ) ) then
 					id = *symbUniqueId( )
 				else
@@ -1303,6 +1310,7 @@ private sub hMangleProc( byval sym as FBSYMBOL ptr )
 	dim as string mangled
 	dim as integer length = any, docpp = any, add_stdcall_suffix = any
 	dim as integer quote_mangled_name = false
+	dim as integer escape_mangled_name = false
 	dim as zstring ptr id = any
 
 	docpp = hDoCppMangling( sym )
@@ -1327,33 +1335,26 @@ private sub hMangleProc( byval sym as FBSYMBOL ptr )
 	if( env.clopt.backend = FB_BACKEND_LLVM ) then
 		mangled += "@"
 
-		'' TODO: should be able to clean up this logic where we have a windows
-		'' target and remove the check on 'add_stdcall_suffix' here.
-		'' on win we are also quoting and escaping and should not need to quote
-		'' only or have @N suffix only on any other target.
-
-		'' Going to add @N stdcall suffix below?
-		'' In LLVM, @ is a special char, identifiers using it must be quoted
-		if( add_stdcall_suffix ) then
-			mangled += """"
-			quote_mangled_name = true
-		end if
-
 		'' Windows target also? we provide the mangling so the name
 		'' must be both quoted and escaped so that our mangled name does not
 		'' get mangled again by llvm.  we need to do this on all names
 		'' not just the ones with @N suffix due the leading underscore handling
 		select case( env.clopt.target )
 		case FB_COMPTARGET_WIN32, FB_COMPTARGET_CYGWIN, FB_COMPTARGET_XBOX
-			if( quote_mangled_name = false ) then
-				mangled += """"
-				quote_mangled_name = true
-			end if
-
-			'' chr(1) will escape the name so it's passed through to assembler as-is
-			mangled += chr(1)
+			escape_mangled_name = true
 		end select
 
+		'' The @N suffix also needs quoting on non-Windows x86 targets because
+		'' @ is a special character in LLVM identifiers.
+		quote_mangled_name = escape_mangled_name or add_stdcall_suffix
+		if( quote_mangled_name ) then
+			mangled += """"
+		end if
+
+		'' chr(1) passes an explicitly mangled Windows name through unchanged.
+		if( escape_mangled_name ) then
+			mangled += chr(1)
+		end if
 	end if
 
 	'' Win32 underscore prefix

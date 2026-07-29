@@ -55,8 +55,6 @@
 /* Driver state                                                              */
 /* ------------------------------------------------------------------------- */
 
-extern const FB_SFX_DRIVER fb_sfxDriverWinMM;
-
 static IMMDeviceEnumerator *g_device_enum = NULL;
 static IMMDevice *g_device = NULL;
 static IAudioClient *g_audio = NULL;
@@ -68,6 +66,8 @@ static int g_wasapi_com_ready = 0;
 static HANDLE g_worker_thread = NULL;
 static DWORD g_worker_thread_id = 0;
 static volatile LONG g_worker_stop = 0;
+static int g_wasapi_stream_primed = 0;
+static unsigned long g_wasapi_stream_epoch = 0;
 static const GUID sfx_wasapi_float_guid =
 {
     0x00000003, 0x0000, 0x0010,
@@ -317,6 +317,8 @@ static int wasapi_init(int rate, int channels, int buffer_size, int flags)
 
     wasapi_release_interfaces();
     g_wasapi_running = 0;
+    g_wasapi_stream_primed = 0;
+    g_wasapi_stream_epoch = fb_sfxOutputStreamEpoch();
 
     hr = CoCreateInstance(
         &CLSID_MMDeviceEnumerator,
@@ -446,6 +448,8 @@ static void wasapi_exit(void)
 {
     WASAPI_DBG("Shutting down WASAPI driver\n");
 
+    fb_sfxDriverStatsLog("WASAPI", "WASAPI");
+
     g_wasapi_running = 0;
     InterlockedExchange(&g_worker_stop, 1);
 
@@ -463,6 +467,8 @@ static void wasapi_exit(void)
         g_audio->lpVtbl->Stop(g_audio);
 
     g_buffer_frames = 0;
+    g_wasapi_stream_primed = 0;
+    g_wasapi_stream_epoch = 0;
     wasapi_release_interfaces();
 
     if (g_wasapi_com_ready)
@@ -486,6 +492,7 @@ static int wasapi_write(const float *buffer, int frames)
     HRESULT hr;
     int src_channels;
     int total_written = 0;
+    unsigned long stream_epoch;
 
     if (!g_audio || !g_render || !g_mix_format || !buffer || frames <= 0)
         return -1;
@@ -507,6 +514,25 @@ static int wasapi_write(const float *buffer, int frames)
         hr = g_audio->lpVtbl->GetCurrentPadding(g_audio, &padding);
         if (FAILED(hr))
             return (total_written > 0) ? total_written : -1;
+
+        stream_epoch = fb_sfxOutputStreamEpoch();
+        if (stream_epoch != g_wasapi_stream_epoch)
+        {
+            g_wasapi_stream_primed = 0;
+            g_wasapi_stream_epoch = stream_epoch;
+        }
+
+        /*
+            A zero-padding observation after the first successful write means
+            the shared-mode device consumed everything before the producer
+            supplied another block. The capture hook sees only submitted PCM,
+            so record this device-side gap explicitly for diagnostics.
+        */
+        if (padding == 0 && g_wasapi_stream_primed)
+        {
+            fb_sfxDriverStatsRecordUnderrun("WASAPI");
+            g_wasapi_stream_primed = 0;
+        }
 
         if (padding >= g_buffer_frames)
         {
@@ -541,6 +567,7 @@ static int wasapi_write(const float *buffer, int frames)
             return (total_written > 0) ? total_written : -1;
 
         total_written += (int)frames_to_write;
+        g_wasapi_stream_primed = 1;
     }
 
     return total_written;
@@ -551,7 +578,7 @@ static int wasapi_write(const float *buffer, int frames)
 /* Driver definition                                                         */
 /* ------------------------------------------------------------------------- */
 
-const FB_SFX_DRIVER fb_sfxDriverWASAPI =
+static const FB_SFX_DRIVER fb_sfxDriverWASAPI =
 {
     "WASAPI",
     FB_SFX_DRIVER_CAP_BACKGROUND,

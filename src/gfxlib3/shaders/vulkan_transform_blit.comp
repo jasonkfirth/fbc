@@ -1,0 +1,287 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_transform_blit.comp
+
+    Purpose:
+
+        Scale, rotate, and project GPU-resident surfaces with Vulkan compute.
+
+    Responsibilities:
+
+        - inverse-map one invocation per destination pixel
+        - provide nearest and bilinear sampling for packed gfxlib colours
+        - provide clamp and repeat addressing
+        - preserve the built-in FreeBASIC PUT blend modes
+
+    This file intentionally does NOT contain:
+
+        - CPU rasterization or transformed geometry generation
+        - custom BASIC blender callbacks
+        - overlap snapshot allocation
+*/
+
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) buffer DestinationPixels
+{
+	uint pixels[];
+} destination_pixels;
+
+layout(set = 0, binding = 1, std430) readonly buffer SourcePixels
+{
+	uint pixels[];
+} source_pixels;
+
+layout(set = 0, binding = 2, std430) readonly buffer TransformCommand
+{
+	ivec4 source_rect;
+	ivec4 clip;
+	ivec4 bounds;
+	vec4 inverse_row_0;
+	vec4 inverse_row_1;
+	vec4 inverse_row_2;
+	uvec4 format;      /* depth, mode, alpha, logical colour mask */
+	uvec4 options;     /* filter, wrap, source width, destination width */
+	uvec4 dimensions;  /* source height, destination height, reserved */
+} transform_command;
+
+ivec2 source_coordinate(ivec2 position)
+{
+	ivec2 origin = transform_command.source_rect.xy;
+	ivec2 size = transform_command.source_rect.zw - origin + ivec2(1);
+
+	if (transform_command.options.y != 0u) {
+		ivec2 relative = (position - origin) % size;
+		relative = (relative + size) % size;
+		return origin + relative;
+	}
+	return clamp(position, origin, transform_command.source_rect.zw);
+}
+
+uint source_pixel(ivec2 position)
+{
+	ivec2 coordinate = source_coordinate(position);
+	return source_pixels.pixels[(uint(coordinate.y) *
+		transform_command.options.z) + uint(coordinate.x)];
+}
+
+uvec4 unpack_color(uint color)
+{
+	if (transform_command.format.x == 16u) {
+		return uvec4(((color >> 11) & 31u) * 255u / 31u,
+			((color >> 5) & 63u) * 255u / 63u,
+			(color & 31u) * 255u / 31u, 255u);
+	}
+	return uvec4((color >> 16) & 255u, (color >> 8) & 255u,
+		color & 255u, (color >> 24) & 255u);
+}
+
+uint pack_color(uvec4 color)
+{
+	if (transform_command.format.x == 16u) {
+		return ((color.r * 31u / 255u) << 11) |
+			((color.g * 63u / 255u) << 5) |
+			(color.b * 31u / 255u);
+	}
+	return (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
+}
+
+uint sample_source(vec2 coordinate)
+{
+	if ((transform_command.options.x == 0u) ||
+	    (transform_command.format.x <= 8u))
+		return source_pixel(ivec2(floor(coordinate)));
+
+	vec2 texel = coordinate - vec2(0.5);
+	ivec2 base = ivec2(floor(texel));
+	vec2 fraction = fract(texel);
+	vec4 top = mix(vec4(unpack_color(source_pixel(base))),
+		vec4(unpack_color(source_pixel(base + ivec2(1, 0)))), fraction.x);
+	vec4 bottom = mix(vec4(unpack_color(source_pixel(base + ivec2(0, 1)))),
+		vec4(unpack_color(source_pixel(base + ivec2(1, 1)))), fraction.x);
+	return pack_color(uvec4(round(mix(top, bottom, fraction.y))));
+}
+
+bool blend_pixel(uint source, uint destination, out uint result_color)
+{
+	uint depth = transform_command.format.x;
+	uint mode = transform_command.format.y;
+	uint operation_alpha = transform_command.format.z;
+	uint mask = transform_command.format.w;
+	uint alpha;
+	uint srb;
+	uint sga;
+	uint drb;
+	uint dga;
+	uint temporary1;
+	uint temporary2;
+	uint overflow;
+
+	if (mode == 1u) {
+		result_color = source & mask;
+		return true;
+	} else if (mode == 2u) {
+		result_color = (~source) & mask;
+		return true;
+	} else if (mode == 3u) {
+		result_color = (source & destination) & mask;
+	} else if (mode == 4u) {
+		result_color = (source | destination) & mask;
+	} else if (mode == 5u) {
+		result_color = (source ^ destination) & mask;
+	} else if (mode == 0u) {
+		if (depth <= 8u) {
+			result_color = source & mask;
+			return result_color != 0u;
+		} else if (depth == 16u) {
+			result_color = source & 0xFFFFu;
+			return result_color != 0xF81Fu;
+		}
+		result_color = source & mask;
+		return (result_color & 0x00FFFFFFu) != 0x00FF00FFu;
+	} else if (mode == 6u) {
+		if (depth != 32u) {
+			result_color = source & mask;
+			return true;
+		}
+		alpha = (source >> 24) + 1u;
+		srb = source & 0x00FF00FFu;
+		sga = source & 0xFF00FF00u;
+		drb = destination & 0x00FF00FFu;
+		dga = destination & 0xFF00FF00u;
+		srb = ((srb - drb) * alpha) >> 8;
+		sga = ((sga >> 8) - (dga >> 8)) * alpha;
+		result_color = ((drb + srb) & 0x00FF00FFu) |
+			((dga + sga) & 0xFF00FF00u);
+	} else if (mode == 7u) {
+		alpha = operation_alpha & 0xFFu;
+		if (depth <= 8u) {
+			result_color = (source | destination) & mask;
+		} else if (depth == 16u) {
+			if ((source & 0xFFFFu) == 0xF81Fu)
+				return false;
+			alpha = (alpha + 7u) >> 3;
+			source = ((source << 16) | source) & 0x07C0F81Fu;
+			source = ((source * alpha) >> 5) & 0x07C0F81Fu;
+			destination = ((destination << 16) | destination) & 0x07C0F81Fu;
+			source += destination;
+			overflow = source & 0x08010020u;
+			overflow -= overflow >> 5;
+			source |= overflow;
+			source &= 0x07C0F81Fu;
+			source |= source >> 16;
+			result_color = source & 0xFFFFu;
+		} else {
+			if ((source & 0x00FFFFFFu) == 0x00FF00FFu)
+				return false;
+			temporary1 = source & 0x00FF00FFu;
+			temporary2 = (source >> 8) & 0x00FF00FFu;
+			temporary1 = ((temporary1 * alpha) >> 8) & 0x00FF00FFu;
+			temporary2 = (temporary2 * alpha) & 0xFF00FF00u;
+			source = temporary1 | temporary2;
+			temporary1 = source & 0x80808080u;
+			temporary2 = destination & 0x80808080u;
+			source = (source & 0x7F7F7F7Fu) +
+				(destination & 0x7F7F7F7Fu);
+			destination = temporary1;
+			temporary1 |= temporary2;
+			temporary2 = destination & temporary2;
+			destination = temporary1 & source;
+			source |= ((((temporary2 | destination) >> 7) +
+				0x7F7F7F7Fu) ^ 0x7F7F7F7Fu) | temporary1;
+			result_color = source;
+		}
+	} else if (mode == 9u) {
+		alpha = operation_alpha & 0xFFu;
+		if (alpha == 0u)
+			return false;
+		if (depth <= 8u) {
+			result_color = source & mask;
+			return result_color != 0u;
+		} else if (depth == 16u) {
+			if ((source & 0xFFFFu) == 0xF81Fu)
+				return false;
+			alpha = (alpha + 7u) >> 3;
+			srb = source & 0xF81Fu;
+			sga = source & 0x07E0u;
+			drb = destination & 0xF81Fu;
+			dga = destination & 0x07E0u;
+			srb = ((srb - drb) * alpha) >> 5;
+			sga = ((sga - dga) * alpha) >> 5;
+			result_color = ((drb + srb) & 0xF81Fu) |
+				((dga + sga) & 0x07E0u);
+		} else {
+			if ((source & 0x00FFFFFFu) == 0x00FF00FFu)
+				return false;
+			alpha++;
+			srb = source & 0x00FF00FFu;
+			sga = source & 0xFF00FF00u;
+			drb = destination & 0x00FF00FFu;
+			dga = destination & 0xFF00FF00u;
+			srb = ((srb - drb) * alpha) >> 8;
+			sga = ((sga >> 8) - (dga >> 8)) * alpha;
+			result_color = ((drb + srb) & 0x00FF00FFu) |
+				((dga + sga) & 0xFF00FF00u);
+		}
+	} else {
+		return false;
+	}
+	return true;
+}
+
+void main(void)
+{
+	uint index = gl_GlobalInvocationID.x;
+	uint width = uint(transform_command.bounds.z -
+		transform_command.bounds.x + 1);
+	uint height = uint(transform_command.bounds.w -
+		transform_command.bounds.y + 1);
+	ivec2 offset;
+	ivec2 destination;
+	vec2 destination_center;
+	vec3 mapped;
+	vec2 source_coordinate_value;
+	uint source;
+	uint old_destination;
+	uint result_color;
+
+	if (index >= (width * height))
+		return;
+	offset = ivec2(int(index % width), int(index / width));
+	destination = transform_command.bounds.xy + offset;
+	if ((destination.x < transform_command.clip.x) ||
+	    (destination.y < transform_command.clip.y) ||
+	    (destination.x > transform_command.clip.z) ||
+	    (destination.y > transform_command.clip.w))
+		return;
+	destination_center = vec2(destination) + vec2(0.5);
+	mapped = vec3(dot(transform_command.inverse_row_0.xyz,
+		vec3(destination_center, 1.0)),
+		dot(transform_command.inverse_row_1.xyz,
+		vec3(destination_center, 1.0)),
+		dot(transform_command.inverse_row_2.xyz,
+		vec3(destination_center, 1.0)));
+	if (mapped.z <= 0.000001)
+		return;
+	source_coordinate_value = mapped.xy / mapped.z;
+	if ((transform_command.options.y == 0u) &&
+	    ((source_coordinate_value.x < float(transform_command.source_rect.x)) ||
+	     (source_coordinate_value.y < float(transform_command.source_rect.y)) ||
+	     (source_coordinate_value.x >= float(transform_command.source_rect.z + 1)) ||
+	     (source_coordinate_value.y >= float(transform_command.source_rect.w + 1))))
+		return;
+	source = sample_source(source_coordinate_value);
+	old_destination = destination_pixels.pixels[(uint(destination.y) *
+		transform_command.options.w) + uint(destination.x)];
+	if (blend_pixel(source, old_destination, result_color)) {
+		destination_pixels.pixels[(uint(destination.y) *
+			transform_command.options.w) + uint(destination.x)] =
+			result_color & transform_command.format.w;
+	}
+}
+
+/* end of vulkan_transform_blit.comp */

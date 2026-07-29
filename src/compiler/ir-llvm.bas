@@ -191,6 +191,7 @@ declare sub _emitDBG _
 declare function hVregToStr( byval vreg as IRVREG ptr ) as string
 declare sub hEmitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 declare sub hEmitStore( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
+declare sub hLoadVreg( byval v as IRVREG ptr )
 declare sub hEmitBop _
 	( _
 		byval op as integer, _
@@ -425,33 +426,39 @@ private function hEmitProcHeader _
 		end if
 	end if
 
+	dim as DZSTRING params
+	DZstrZero( params )
 	var param = symbGetProcLastParam( proc )
 	while( param )
 		if( symbGetParamMode( param ) = FB_PARAMMODE_VARARG ) then
-			ln += "..."
+			DZstrConcatAssign( params, "..." )
 		else
 			symbGetRealParamDtype( param, dtype, subtype )
-			ln += hEmitType( dtype, subtype )
+			DZstrConcatAssign( params, hEmitType( dtype, subtype ) )
 
 			if( is_proto = FALSE ) then
 				'' Proc body? Emit the mangled name of the param var
 				'' (the param itself isn't mangled)
-				ln += " " + hEmitParamName( symbGetParamVar( param ) )
+				DZstrConcatAssign( params, " " + hEmitParamName( symbGetParamVar( param ) ) )
 			end if
 		end if
 
 		param = symbGetProcPrevParam( proc, param )
 		if( param ) then
-			ln += ", "
+			DZstrConcatAssign( params, ", " )
 		end if
 	wend
+
+	if( params.data <> NULL ) then
+		ln += *params.data
+	end if
+	DZstrAllocate( params, 0 )
 
 	ln += " )"
 
 	if( is_type = FALSE ) then
-		'' Function attributes
-		'' TODO: clang emits this for C code, seems good for us too, but if
-		'' there will be exceptions, this must be removed...
+		'' The LLVM backend has no exception-unwind model. Marking procedures
+		'' nounwind records that contract and allows LLVM to optimize calls.
 		ln += " nounwind"
 
 		if( proc->pattrib and FB_PROCATTRIB_NAKED ) then
@@ -464,21 +471,24 @@ end function
 
 private function hGetUDTName( byval sym as FBSYMBOL ptr ) as string
 	dim as FBSYMBOL ptr ns = symbGetNamespace( sym )
+	dim as DZSTRING s
 
-	var s = "%"
+	DZstrZero( s )
+	DZstrAssign( s, "%" )
 	do until( ns = @symbGetGlobalNamespc( ) )
-		s += *symbGetName( ns )
-		s += "."
+		DZstrConcatAssign( s, symbGetName( ns ) )
+		DZstrConcatAssignC( s, asc( "." ) )
 		ns = symbGetNamespace( ns )
 	loop
 
 	if( sym->id.alias <> NULL ) then
-		s += *sym->id.alias
+		DZstrConcatAssign( s, sym->id.alias )
 	else
-		s += *symbGetName( sym )
+		DZstrConcatAssign( s, symbGetName( sym ) )
 	end if
 
-	function = s
+	function = *s.data
+	DZstrAllocate( s, 0 )
 end function
 
 private sub hEmitUDT( byval s as FBSYMBOL ptr )
@@ -518,6 +528,10 @@ private sub hBuildStrLit _
 	)
 
 	dim as integer ch = any
+	dim as DZSTRING buffer
+
+	DZstrZero( buffer )
+	DZstrAssign( buffer, strptr( ln ) )
 
 	'' Convert the string to LLVM IR format
 	'' (assuming internal escape sequences have already been solved out
@@ -542,18 +556,25 @@ private sub hBuildStrLit _
 		'' but special chars (including '\') should be encoded in hex
 		if( hCharNeedsEscaping( ch, asc( """" ) ) ) then
 			'' emit in \XX escape form
-			ln += $"\" + hex( ch, 2 )
+			DZstrConcatAssign( buffer, $"\" + hex( ch, 2 ) )
 		else
 			'' emit as-is
-			ln += chr( ch )
+			DZstrConcatAssignC( buffer, ch )
 		end if
 	next
 
 	'' Pad with zeroes if string literal too short
 	while( length < wantedlength )
-		ln += $"\00"
+		DZstrConcatAssign( buffer, $"\00" )
 		length += 1
 	wend
+
+	if( buffer.data <> NULL ) then
+		ln = *buffer.data
+	else
+		ln = ""
+	end if
+	DZstrAllocate( buffer, 0 )
 end sub
 
 private sub hBuildWstrLit _
@@ -565,9 +586,13 @@ private sub hBuildWstrLit _
 	)
 
 	dim as uinteger ch = any, wcharsize = any
+	dim as DZSTRING buffer
 	const WCHAR_BYTE_1_SHIFT = 8
 	const WCHAR_BYTE_2_SHIFT = 16
 	const WCHAR_BYTE_3_SHIFT = 24
+
+	DZstrZero( buffer )
+	DZstrAssign( buffer, strptr( ln ) )
 
 	'' (ditto)
 	''
@@ -590,20 +615,20 @@ private sub hBuildWstrLit _
 		'' (ditto)
 		if( hCharNeedsEscaping( ch, asc( """" ) ) ) then
 			if( wcharsize >= 1 ) then
-				ln += $"\" + hex( (ch       ) and &hFF, 2 )
+				DZstrConcatAssign( buffer, $"\" + hex( (ch       ) and &hFF, 2 ) )
 			end if
 			if( wcharsize >= 2 ) then
-				ln += $"\" + hex( (ch shr WCHAR_BYTE_1_SHIFT) and &hFF, 2 )
+				DZstrConcatAssign( buffer, $"\" + hex( (ch shr WCHAR_BYTE_1_SHIFT) and &hFF, 2 ) )
 			end if
 			if( wcharsize >= 4 ) then
-				ln += $"\" + hex( (ch shr WCHAR_BYTE_2_SHIFT) and &hFF, 2 )
-				ln += $"\" + hex( (ch shr WCHAR_BYTE_3_SHIFT) and &hFF, 2 )
+				DZstrConcatAssign( buffer, $"\" + hex( (ch shr WCHAR_BYTE_2_SHIFT) and &hFF, 2 ) )
+				DZstrConcatAssign( buffer, $"\" + hex( (ch shr WCHAR_BYTE_3_SHIFT) and &hFF, 2 ) )
 			end if
 		else
-			ln += chr( ch )
+			DZstrConcatAssignC( buffer, ch )
 			'' Pad up to wchar_t size
 			for j as integer = 2 to wcharsize
-				ln += $"\00"
+				DZstrConcatAssign( buffer, $"\00" )
 			next
 		end if
 	next
@@ -612,10 +637,17 @@ private sub hBuildWstrLit _
 	while( length < wantedlength )
 		'' Pad up to wchar_t size
 		for j as integer = 1 to wcharsize
-			ln += $"\00"
+			DZstrConcatAssign( buffer, $"\00" )
 		next
 		length += 1
 	wend
+
+	if( buffer.data <> NULL ) then
+		ln = *buffer.data
+	else
+		ln = ""
+	end if
+	DZstrAllocate( buffer, 0 )
 end sub
 
 private function hEmitStrLitType( byval length as integer ) as string
@@ -637,21 +669,20 @@ private function hEmitSymType( byval sym as FBSYMBOL ptr ) as string
 		end select
 	end if
 
-	if( symbGetIsDynamic( sym ) ) then
-		'' Dynamic array vars/fields/params
-		'' TODO: emit descriptor type instead of array element type!?
-	else
-		select case( symbGetClass( sym ) )
-		case FB_SYMBCLASS_VAR, FB_SYMBCLASS_FIELD
-			'' Fixed-size array vars/fields
-			''    (0 to 9) as long            =>   [10 x i32]
-			''    (0 to 9, 0 to 19) as long   =>   [10 x [20 x i32]]
-			for i as integer = symbGetArrayDimensions( sym ) - 1 to 0 step -1
-				var elements = symbArrayUbound( sym, i ) - symbArrayLbound( sym, i ) + 1
-				s = "[" & elements & " x " + s + "]"
-			next
-		end select
-	end if
+	'' Fake dynamic-array symbols are filtered before type emission; their
+	'' companion descriptor symbols carry the actual structure type.
+	assert( symbGetIsDynamic( sym ) = FALSE )
+
+	select case( symbGetClass( sym ) )
+	case FB_SYMBCLASS_VAR, FB_SYMBCLASS_FIELD
+		'' Fixed-size array vars/fields
+		''    (0 to 9) as long            =>   [10 x i32]
+		''    (0 to 9, 0 to 19) as long   =>   [10 x [20 x i32]]
+		for i as integer = symbGetArrayDimensions( sym ) - 1 to 0 step -1
+			var elements = symbArrayUbound( sym, i ) - symbArrayLbound( sym, i ) + 1
+			s = "[" & elements & " x " + s + "]"
+		next
+	end select
 
 	function = s
 end function
@@ -825,19 +856,26 @@ private sub hEmitStruct( byval s as FBSYMBOL ptr )
 	ln += "{ "
 
 	'' Write out the elements
+	dim as DZSTRING fields
+	DZstrZero( fields )
 	fld = symbUdtGetFirstField( s )
 	while( fld )
 
 		'' Don't emit fake dynamic array fields
 		if( symbIsDynamic( fld ) = FALSE ) then
-			ln += hEmitSymType( fld )
+			DZstrConcatAssign( fields, hEmitSymType( fld ) )
 		end if
 
 		fld = symbUdtGetNextField( fld )
 		if( fld ) then
-			ln += ", "
+			DZstrConcatAssign( fields, ", " )
 		end if
 	wend
+
+	if( fields.data <> NULL ) then
+		ln += *fields.data
+	end if
+	DZstrAllocate( fields, 0 )
 
 	'' Close UDT body
 	ln += " }"
@@ -1076,17 +1114,35 @@ private sub _setVregDataType _
 
 end sub
 
-private sub hAddOffset _
+private sub hAddAddressComponents _
 	( _
 		byval v as IRVREG ptr, _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr, _
-		byval ofs as longint _
+		byval ofs as longint, _
+		byval mult as integer, _
+		byval vidx as IRVREG ptr _
 	)
 
 	'' voffset = ptrtoint l
 	var voffset = irhlAllocVreg( FB_DATATYPE_INTEGER, NULL )
 	hEmitConvert( voffset, v )
+
+	if( (vidx <> NULL) andalso (mult <> 0) ) then
+		hLoadVreg( vidx )
+		_setVregDataType( vidx, FB_DATATYPE_INTEGER, NULL )
+
+		if( mult <> 1 ) then
+			var vscale = irhlAllocVrImm( FB_DATATYPE_INTEGER, NULL, mult )
+			var vscaled = irhlAllocVreg( FB_DATATYPE_INTEGER, NULL )
+			hEmitBop( AST_OP_MUL, vidx, vscale, vscaled, NULL, IR_EMITOPT_NONE )
+			vidx = vscaled
+		end if
+
+		var vindexed = irhlAllocVreg( FB_DATATYPE_INTEGER, NULL )
+		hEmitBop( AST_OP_ADD, voffset, vidx, vindexed, NULL, IR_EMITOPT_NONE )
+		voffset = vindexed
+	end if
 
 	if( ofs <> 0 ) then
 		'' voffset += <offset>
@@ -1160,9 +1216,11 @@ private sub hPrepareAddress( byval v as IRVREG ptr )
 		end if
 	end if
 
-	'' TODO: handle vidx too
+	'' TODO: Finish LLVM indexed-address lowering with valid LLVM pointer
+	'' arithmetic and add an end-to-end regression once the generated module
+	'' can be accepted by LLVM or Clang.
 	if( (vidx <> NULL) or (ofs <> 0) ) then
-		hAddOffset( v, addrdtype, addrsubtype, ofs )
+		hAddAddressComponents( v, addrdtype, addrsubtype, ofs, v->mult, vidx )
 	end if
 end sub
 
@@ -1928,6 +1986,8 @@ private sub hDoCall _
 	dim as string ln
 	dim as IRCALLARG ptr arg = any, prev = any
 	dim as IRVREG ptr varg = any, v0 = any
+	dim as DZSTRING args
+	DZstrZero( args )
 
 	assert( symbIsProc( proc ) )
 
@@ -1979,24 +2039,29 @@ private sub hDoCall _
 			dtype = varg->dtype
 			subtype = varg->subtype
 		end if
-		ln += hEmitType( dtype, subtype )
+		DZstrConcatAssign( args, hEmitType( dtype, subtype ) )
 
 		'' Convert arg to param's dtype if needed
 		_setVregDataType( varg, dtype, subtype )
 
-		ln += " "
-		ln += hVregToStr( varg )
+		DZstrConcatAssign( args, " " )
+		DZstrConcatAssign( args, hVregToStr( varg ) )
 
 		listDelNode( @irhl.callargs, arg )
 
 		if( prev ) then
 			if( prev->level = level ) then
-				ln += ", "
+				DZstrConcatAssign( args, ", " )
 			end if
 		end if
 
 		arg = prev
 	wend
+
+	if( args.data <> NULL ) then
+		ln += *args.data
+	end if
+	DZstrAllocate( args, 0 )
 
 	ln += " )"
 
@@ -2184,29 +2249,34 @@ private sub _emitComment( byval text as zstring ptr )
 end sub
 
 private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
-	dim ln as string
+	dim ln as DZSTRING
+
+	DZstrZero( ln )
+	DZstrAllocate( ln, 1 )
+	DZstrReset( ln )
 
 	var n = asmtokenhead
 	while( n )
 
 		select case( n->type )
 		case AST_ASMTOK_TEXT
-			ln += *n->text
+			DZstrConcatAssign( ln, n->text )
 		case AST_ASMTOK_SYMB
-			ln += *symbGetMangledName( n->sym )
+			DZstrConcatAssign( ln, symbGetMangledName( n->sym ) )
 			var ofs = symbGetOfs( n->sym )
 			if( ofs <> 0 ) then
 				if( ofs > 0 ) then
-					ln += "+"
+					DZstrConcatAssignC( ln, asc( "+" ) )
 				end if
-				ln += str( ofs )
+				DZstrConcatAssign( ln, str( ofs ) )
 			end if
 		end select
 
 		n = n->next
 	wend
 
-	hWriteLine( ln )
+	hWriteLine( *ln.data )
+	DZstrAllocate( ln, 0 )
 end sub
 
 private sub _emitVarIniBegin( byval sym as FBSYMBOL ptr )

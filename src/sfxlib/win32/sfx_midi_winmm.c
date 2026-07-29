@@ -15,8 +15,6 @@
 static HMIDIOUT g_fb_sfx_midi_out = NULL;
 static UINT g_fb_sfx_midi_device = MIDI_MAPPER;
 
-void fb_sfxMidiDriverClose(void);
-
 int fb_sfxMidiDriverOpen(int device)
 {
     MMRESULT result;

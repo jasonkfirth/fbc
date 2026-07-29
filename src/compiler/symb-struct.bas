@@ -307,8 +307,9 @@ function symbCheckBitField _
 
 	case FB_DATATYPE_LONGINT, FB_DATATYPE_ULONGINT
 		'' Allow 64bit bitfields on 64bit
-		'' TODO: 64bit bitfields on 32bit -- currently not supported
-		'' because bitfield accesses are based on the default word size
+		'' TODO: Support 64-bit bitfield access on 32-bit targets.
+		'' 64bit bitfields remain unsupported on 32bit because bitfield
+		'' accesses are based on the default word size.
 		function = fbIs64bit( )
 	case else
 		return FALSE
@@ -335,6 +336,8 @@ end function
 ''    memory, only the descriptor will actually be emitted. While adding the
 ''    fake array field, the struct layout doesn't change. When adding the
 ''    descriptor, it changes, as with any other real field.
+''
+'' Field layout keeps ABI alignment, bitfield, and descriptor updates together.
 ''
 function symbAddField _
 	( _
@@ -407,22 +410,23 @@ function symbAddField _
 
 			assert( symbIsBitfield( tail ) )
 
+			'' Microsoft layout starts a new allocation unit when the
+			'' underlying integer size changes. GCC layout may continue in
+			'' the previous unit and uses that unit's type and size.
+			dim as integer starts_new_ms_container = _
+				env.clopt.msbitfields andalso (lgt <> tail->lgt)
+
 			'' Too many bits to fit into previous bitfield container field?
-			if( parent->udt.bitpos + bits > tail->lgt*8 ) then
+			if( starts_new_ms_container or _
+			    (parent->udt.bitpos + bits > tail->lgt*8) ) then
 				'' Start new container field, this bitfield will be at bitpos 0 in it
 				parent->udt.bitpos = 0
 			else
 				'' The previous container field still has enough
 				'' room to hold this new bitfield.
 
-				'' if it fits but len is different, make it the same
-				'' TODO: is this "right"? shouldn't the different
-				'' type trigger a new container field to be used?
-				'' look what gcc does, with/without -mms-bitfields
-				'' This for now allows merging bitfields if they
-				'' have a different length, but maybe then this
-				'' check shouldn't just be done for different lengths,
-				'' but always if the dtypes are different?
+				'' Under GCC layout, a differently sized bitfield which fits
+				'' continues using the current allocation unit.
 				if( lgt <> tail->lgt ) then
 					dtype = symbGetType( tail )
 					lgt = tail->lgt
@@ -846,12 +850,10 @@ private function hGetReturnType( byval sym as FBSYMBOL ptr ) as integer
 		return FB_DATATYPE_STRUCT
 	end select
 
-	'' 64-bit + gas64 + linux?
+	'' 64-bit gas64 targets using the System V aggregate-return ABI?
 	if( fbIs64Bit() ) then
 		if( env.clopt.backend = FB_BACKEND_GAS64 ) then
-			'' linux 64bit allows structure returned in registers
-			'' !!!TODO!!! add to target options
-			if( (env.clopt.target = FB_COMPTARGET_LINUX) or (env.clopt.target = FB_COMPTARGET_FREEBSD)) then
+			if( (env.target.options and FB_TARGETOPT_GAS64_SYSV_STRUCTRET) <> 0 ) then
 				return hGetReturnTypeGas64SystemV( sym )
 			end if
 		end if

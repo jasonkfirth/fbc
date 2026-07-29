@@ -1,0 +1,231 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_ellipse.comp
+
+    Purpose:
+
+        Rasterize a full FreeBASIC ellipse into a device-local Vulkan surface
+        with the same midpoint state machine as the reference backend.
+
+    Responsibilities:
+
+        - preserve exact integer-valued midpoint intermediates in Float64
+        - draw outlines or filled horizontal spans with clipping
+        - apply the destination surface's logical color mask
+
+    This file intentionally does NOT contain:
+
+        - arc endpoint filtering
+        - parallel midpoint state generation
+        - host-side radius or feature validation
+*/
+
+#version 450
+
+/*
+    One invocation owns the midpoint state because its decisions must remain
+    bit-for-bit compatible with gfxlib2.  For an opaque filled ellipse, the
+    other 63 invocations cooperatively write each horizontal span.  This keeps
+    the state machine ordered while moving the expensive per-pixel work onto
+    the GPU's shader lanes.  Alpha and outline paths stay serial: their writes
+    can overlap and must preserve their existing destination-read ordering.
+*/
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+shared int parallel_x1;
+shared int parallel_x2;
+shared int parallel_y1;
+shared int parallel_y2;
+shared int parallel_d;
+shared double parallel_aq;
+shared double parallel_bq;
+shared double parallel_dx;
+shared double parallel_dy;
+shared double parallel_r;
+shared double parallel_rx;
+shared double parallel_ry;
+
+layout(set = 0, binding = 0, std430) buffer SurfacePixels
+{
+	uint pixels[];
+} surface_pixels;
+
+layout(set = 0, binding = 1, std430) readonly buffer EllipseCommand
+{
+	ivec4 center;     /* x, y, surface width, reserved */
+	ivec4 clip;
+	vec4 radii;       /* radius x, radius y, then reserved values */
+	uvec4 parameters; /* color, filled, logical color mask, reserved */
+} ellipse_command;
+
+uint alpha_primitive(uint source, uint destination)
+{
+	uint alpha = source >> 24;
+	uint source_red_blue = source & 0x00FF00FFu;
+	uint source_green = source & 0x0000FF00u;
+	uint destination_red_blue = destination & 0x00FF00FFu;
+	uint destination_green = destination & 0x0000FF00u;
+
+	source_red_blue = ((source_red_blue - destination_red_blue) * alpha) >> 8;
+	source_green = ((source_green - destination_green) * alpha) >> 8;
+	return ((destination_red_blue + source_red_blue) & 0x00FF00FFu) |
+		((destination_green + source_green) & 0x0000FF00u) |
+		(source & 0xFF000000u);
+}
+
+void write_pixel(int x, int y, uint color)
+{
+	uint offset = (uint(y) * uint(ellipse_command.center.z)) + uint(x);
+	if ((ellipse_command.parameters.w & 1u) != 0u)
+		color = alpha_primitive(color, surface_pixels.pixels[offset]);
+	surface_pixels.pixels[offset] = color;
+}
+
+void draw_scanline(int y, int x1, int x2, bool filled)
+{
+	uint color = ellipse_command.parameters.x &
+		ellipse_command.parameters.z;
+
+	if ((y < ellipse_command.clip.y) || (y > ellipse_command.clip.w))
+		return;
+	if (filled) {
+		int first = max(x1, ellipse_command.clip.x);
+		int last = min(x2, ellipse_command.clip.z);
+
+		for (int x = first; x <= last; x++)
+			write_pixel(x, y, color);
+	} else {
+		if ((x1 >= ellipse_command.clip.x) &&
+		    (x1 <= ellipse_command.clip.z))
+			write_pixel(x1, y, color);
+		if ((x2 >= ellipse_command.clip.x) &&
+		    (x2 <= ellipse_command.clip.z))
+			write_pixel(x2, y, color);
+	}
+}
+
+void draw_opaque_filled_scanline(int y, int x1, int x2)
+{
+	int first;
+	int last;
+	uint color = ellipse_command.parameters.x &
+		ellipse_command.parameters.z;
+
+	if ((y < ellipse_command.clip.y) || (y > ellipse_command.clip.w))
+		return;
+	first = max(x1, ellipse_command.clip.x);
+	last = min(x2, ellipse_command.clip.z);
+	for (int x = first + int(gl_LocalInvocationID.x); x <= last;
+	     x += int(gl_WorkGroupSize.x))
+		write_pixel(x, y, color);
+}
+
+void main(void)
+{
+	int x1 = int(float(ellipse_command.center.x) -
+		ellipse_command.radii.x);
+	int x2 = int(float(ellipse_command.center.x) +
+		ellipse_command.radii.x);
+	int y1 = ellipse_command.center.y;
+	int y2 = ellipse_command.center.y;
+	bool filled;
+	double aq;
+	double bq;
+	double dx;
+	double dy;
+	double r;
+	double rx;
+	double ry;
+	int d;
+
+	filled = ellipse_command.parameters.y != 0u;
+	if (filled && ((ellipse_command.parameters.w & 1u) == 0u)) {
+		if (gl_LocalInvocationID.x == 0u) {
+			parallel_x1 = x1;
+			parallel_x2 = x2;
+			parallel_y1 = y1;
+			parallel_y2 = y2;
+			parallel_d = int(ellipse_command.radii.x);
+			parallel_aq = trunc(double(ellipse_command.radii.x *
+				ellipse_command.radii.x));
+			parallel_bq = trunc(double(ellipse_command.radii.y *
+				ellipse_command.radii.y));
+			parallel_dx = parallel_aq * 2.0;
+			parallel_dy = parallel_bq * 2.0;
+			parallel_r = trunc(double(ellipse_command.radii.x *
+				float(parallel_bq)));
+			parallel_rx = parallel_r * 2.0;
+			parallel_ry = 0.0;
+		}
+		barrier();
+		if (ellipse_command.radii.y == 0.0) {
+			draw_opaque_filled_scanline(parallel_y1, parallel_x1,
+				parallel_x2);
+			return;
+		}
+		draw_opaque_filled_scanline(parallel_y1, parallel_x1,
+			parallel_x2);
+		while (parallel_d > 0) {
+			if (gl_LocalInvocationID.x == 0u) {
+				if (parallel_r > 0.0) {
+					parallel_y1++;
+					parallel_y2--;
+					parallel_ry += parallel_dx;
+					parallel_r -= parallel_ry;
+				}
+				if (parallel_r <= 0.0) {
+					parallel_d--;
+					parallel_x1++;
+					parallel_x2--;
+					parallel_rx -= parallel_dy;
+					parallel_r += parallel_rx;
+				}
+			}
+			barrier();
+			draw_opaque_filled_scanline(parallel_y1, parallel_x1,
+				parallel_x2);
+			if (parallel_y2 != parallel_y1)
+				draw_opaque_filled_scanline(parallel_y2, parallel_x1,
+					parallel_x2);
+			barrier();
+		}
+		return;
+	}
+
+	if (gl_LocalInvocationID.x != 0u)
+		return;
+	if (ellipse_command.radii.y == 0.0) {
+		draw_scanline(y1, x1, x2, true);
+		return;
+	}
+	draw_scanline(y1, x1, x2, filled);
+	aq = trunc(double(ellipse_command.radii.x * ellipse_command.radii.x));
+	bq = trunc(double(ellipse_command.radii.y * ellipse_command.radii.y));
+	dx = aq * 2.0;
+	dy = bq * 2.0;
+	r = trunc(double(ellipse_command.radii.x * float(bq)));
+	rx = r * 2.0;
+	ry = 0.0;
+	d = int(ellipse_command.radii.x);
+	while (d > 0) {
+		if (r > 0.0) {
+			y1++;
+			y2--;
+			ry += dx;
+			r -= ry;
+		}
+		if (r <= 0.0) {
+			d--;
+			x1++;
+			x2--;
+			rx -= dy;
+			r += rx;
+		}
+		draw_scanline(y1, x1, x2, filled);
+		draw_scanline(y2, x1, x2, filled);
+	}
+}
+
+/* end of vulkan_ellipse.comp */

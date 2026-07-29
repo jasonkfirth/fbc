@@ -1,0 +1,344 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_paint.comp
+
+    Purpose:
+
+        Execute a bounded FreeBASIC PAINT flood fill entirely in Vulkan
+        device-local storage.
+
+    Responsibilities:
+
+        - preserve gfxlib2 border and primitive-alpha pixel rules
+        - verify and fill ordinary rectangular regions across many workgroups
+        - keep visited state and a compact scanline queue in GPU storage
+        - restrict discovery to the submitted VIEW rectangle
+        - reconstruct copied 8 by 8 pattern values in native target depth
+
+    This file intentionally does NOT contain:
+
+        - approximate or scheduling-dependent flood-fill topology
+        - CPU image compatibility handling
+*/
+
+#version 450
+
+/*
+    One lane owns exact scanline discovery because adjacent runs must enter the
+    queue in a deterministic order. Once it discovers a span, all 128 lanes
+    write independent pixels from that span. Workgroup barriers make the span
+    visible before the owner examines its neighbouring rows.
+*/
+layout(local_size_x = 16, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) buffer SurfacePixels
+{
+	uint pixels[];
+} surface_pixels;
+
+layout(set = 0, binding = 1, std430) readonly buffer PaintCommand
+{
+	ivec4 seed;
+	ivec4 clip;
+	uvec4 format; /* color, border, logical mask, primitive flags */
+	uvec4 pattern; /* mode, byte count, absolute x, absolute y */
+	uint pattern_word[64];
+} paint_command;
+
+layout(set = 0, binding = 2, std430) buffer PaintScratch
+{
+	uint entries[];
+} paint_scratch;
+
+shared uint queue_head;
+shared uint queue_tail;
+shared uint span_active;
+shared int span_y;
+shared int span_left;
+shared int span_right;
+
+uint alpha_primitive(uint source, uint destination)
+{
+	uint alpha = source >> 24;
+	uint source_red_blue = source & 0x00FF00FFu;
+	uint source_green = source & 0x0000FF00u;
+	uint destination_red_blue = destination & 0x00FF00FFu;
+	uint destination_green = destination & 0x0000FF00u;
+
+	source_red_blue = ((source_red_blue - destination_red_blue) * alpha) >> 8;
+	source_green = ((source_green - destination_green) * alpha) >> 8;
+	return ((destination_red_blue + source_red_blue) & 0x00FF00FFu) |
+		((destination_green + source_green) & 0x0000FF00u) |
+		(source & 0xFF000000u);
+}
+
+uint pattern_byte(uint offset)
+{
+	return (paint_command.pattern_word[offset >> 2u] >>
+		((offset & 3u) * 8u)) & 255u;
+}
+
+uint pattern_color(int x, int y)
+{
+	uint bytes_per_pixel = (paint_command.format.z <= 255u) ? 1u :
+		((paint_command.format.z <= 65535u) ? 2u : 4u);
+	uint pattern_x = uint(x) & 7u;
+	uint pattern_y = uint(y) & 7u;
+	uint offset = ((pattern_y * 8u) + pattern_x) * bytes_per_pixel;
+	uint color = 0u;
+
+	if ((offset + bytes_per_pixel) > paint_command.pattern.y)
+		return 0u;
+	for (uint byte_index = 0u; byte_index < bytes_per_pixel; byte_index++)
+		color |= pattern_byte(offset + byte_index) << (byte_index * 8u);
+	return color;
+}
+
+void write_pixel(uint index, int x, int y)
+{
+	uint color = (paint_command.pattern.x != 0u) ? pattern_color(x, y) :
+		(paint_command.format.x & paint_command.format.z);
+
+	if (paint_command.pattern.x != 0u) {
+		surface_pixels.pixels[index] = color;
+		return;
+	}
+	if ((paint_command.format.w & 1u) != 0u)
+		color = alpha_primitive(color, surface_pixels.pixels[index]);
+	surface_pixels.pixels[index] = color;
+}
+
+void main(void)
+{
+	int width = paint_command.seed.z;
+	int height = paint_command.seed.w;
+	uint count = uint(width * height);
+	uint clip_width = uint(paint_command.clip.z - paint_command.clip.x + 1);
+	uint clip_height = uint(paint_command.clip.w - paint_command.clip.y + 1);
+	uint clip_count = clip_width * clip_height;
+	uint lane = gl_LocalInvocationIndex;
+	uint lanes = gl_WorkGroupSize.x * gl_WorkGroupSize.y;
+	uint metadata = count * 2u;
+	uint phase = paint_scratch.entries[metadata];
+
+	/*
+		A Vulkan dispatch is the global synchronization boundary. Phase one finds
+		seed-aligned bounds. Phase two verifies every interior and adjacent-
+		perimeter pixel across the device. Phase three fills only a verified
+		rectangle, and phase four runs the exact one-workgroup scanline fallback
+		only when verification failed. The host inserts storage barriers between
+		phases, so no target write can race the topology check.
+	*/
+	if (phase == 1u) {
+	  if (lane == 0u) {
+		paint_scratch.entries[metadata + 1u] = 0u;
+		if ((paint_command.seed.x >= paint_command.clip.x) &&
+			(paint_command.seed.y >= paint_command.clip.y) &&
+			(paint_command.seed.x <= paint_command.clip.z) &&
+			(paint_command.seed.y <= paint_command.clip.w) &&
+			(paint_command.seed.x >= 0) && (paint_command.seed.y >= 0) &&
+			(paint_command.seed.x < width) &&
+			(paint_command.seed.y < height)) {
+			uint seed_index = uint((paint_command.seed.y * width) +
+				paint_command.seed.x);
+
+			if (surface_pixels.pixels[seed_index] != paint_command.format.y) {
+				int left = paint_command.seed.x;
+				int right = paint_command.seed.x;
+				int top = paint_command.seed.y;
+				int bottom = paint_command.seed.y;
+				while ((left > paint_command.clip.x) &&
+					(surface_pixels.pixels[uint((paint_command.seed.y * width) +
+					 left - 1)] != paint_command.format.y))
+					left--;
+				while ((right < paint_command.clip.z) &&
+					(surface_pixels.pixels[uint((paint_command.seed.y * width) +
+					 right + 1)] != paint_command.format.y))
+					right++;
+				while ((top > paint_command.clip.y) &&
+					(surface_pixels.pixels[uint(((top - 1) * width) +
+					 paint_command.seed.x)] != paint_command.format.y))
+					top--;
+				while ((bottom < paint_command.clip.w) &&
+					(surface_pixels.pixels[uint(((bottom + 1) * width) +
+					 paint_command.seed.x)] != paint_command.format.y))
+					bottom++;
+				paint_scratch.entries[metadata + 1u] = 1u;
+				paint_scratch.entries[metadata + 2u] = uint(left);
+				paint_scratch.entries[metadata + 3u] = uint(right);
+				paint_scratch.entries[metadata + 4u] = uint(top);
+				paint_scratch.entries[metadata + 5u] = uint(bottom);
+			}
+		}
+	  }
+	  return;
+	}
+	if ((phase == 2u) || (phase == 3u)) {
+		if (paint_scratch.entries[metadata + 1u] == 0u)
+			return;
+		int left = int(paint_scratch.entries[metadata + 2u]);
+		int right = int(paint_scratch.entries[metadata + 3u]);
+		int top = int(paint_scratch.entries[metadata + 4u]);
+		int bottom = int(paint_scratch.entries[metadata + 5u]);
+		ivec2 position = paint_command.clip.xy + ivec2(gl_GlobalInvocationID.xy);
+		if ((position.x > paint_command.clip.z) ||
+			(position.y > paint_command.clip.w) ||
+			(position.x < left) || (position.x > right) ||
+			(position.y < top) || (position.y > bottom))
+			return;
+
+		if (phase == 2u) {
+			if (surface_pixels.pixels[uint((position.y * width) + position.x)] ==
+				paint_command.format.y)
+				atomicAnd(paint_scratch.entries[metadata + 1u], 0u);
+			if ((position.y == top) && (top > paint_command.clip.y) &&
+				(surface_pixels.pixels[uint(((position.y - 1) * width) +
+				 position.x)] !=
+				 paint_command.format.y))
+				atomicAnd(paint_scratch.entries[metadata + 1u], 0u);
+			if ((position.y == bottom) && (bottom < paint_command.clip.w) &&
+				(surface_pixels.pixels[uint(((position.y + 1) * width) +
+				 position.x)] !=
+				 paint_command.format.y))
+				atomicAnd(paint_scratch.entries[metadata + 1u], 0u);
+			if ((position.x == left) && (left > paint_command.clip.x) &&
+				(surface_pixels.pixels[uint((position.y * width) +
+				 position.x - 1)] !=
+				 paint_command.format.y))
+				atomicAnd(paint_scratch.entries[metadata + 1u], 0u);
+			if ((position.x == right) && (right < paint_command.clip.z) &&
+				(surface_pixels.pixels[uint((position.y * width) +
+				 position.x + 1)] !=
+				 paint_command.format.y))
+				atomicAnd(paint_scratch.entries[metadata + 1u], 0u);
+			return;
+		}
+		write_pixel(uint((position.y * width) + position.x),
+			position.x, position.y);
+		return;
+	}
+	if ((phase != 4u) || (paint_scratch.entries[metadata + 1u] != 0u))
+		return;
+
+	for (uint offset = lane; offset < clip_count;
+	     offset += lanes) {
+		uint x = uint(paint_command.clip.x) + (offset % clip_width);
+		uint y = uint(paint_command.clip.y) + (offset / clip_width);
+
+		paint_scratch.entries[(y * uint(width)) + x] = 0u;
+	}
+	memoryBarrierBuffer();
+	barrier();
+	if (lane == 0u) {
+		queue_head = 0u;
+		queue_tail = 0u;
+		span_active = 0u;
+		if ((paint_command.seed.x >= paint_command.clip.x) &&
+			(paint_command.seed.y >= paint_command.clip.y) &&
+			(paint_command.seed.x <= paint_command.clip.z) &&
+			(paint_command.seed.y <= paint_command.clip.w) &&
+			(paint_command.seed.x >= 0) && (paint_command.seed.y >= 0) &&
+			(paint_command.seed.x < width) &&
+			(paint_command.seed.y < height)) {
+			uint seed_index = uint((paint_command.seed.y * width) +
+				paint_command.seed.x);
+
+			if (surface_pixels.pixels[seed_index] != paint_command.format.y) {
+				paint_scratch.entries[seed_index] = 1u;
+				paint_scratch.entries[count] = seed_index;
+				queue_tail = 1u;
+				span_active = 1u;
+			}
+		}
+	}
+	barrier();
+	if (span_active == 0u)
+		return;
+	for (;;) {
+		if (lane == 0u) {
+			span_active = 0u;
+			while ((queue_head < queue_tail) && (span_active == 0u)) {
+				uint index = paint_scratch.entries[count + queue_head++];
+				int y;
+				int x;
+				int left;
+				int right;
+
+				if ((paint_scratch.entries[index] == 2u) ||
+					(surface_pixels.pixels[index] == paint_command.format.y))
+					continue;
+				y = int(index / uint(width));
+				x = int(index % uint(width));
+				left = x;
+				while (left > paint_command.clip.x) {
+					uint candidate = uint(y * width + left - 1);
+
+					if ((paint_scratch.entries[candidate] == 2u) ||
+						(surface_pixels.pixels[candidate] ==
+						 paint_command.format.y))
+						break;
+					left--;
+				}
+				right = x;
+				while (right < paint_command.clip.z) {
+					uint candidate = uint(y * width + right + 1);
+
+					if ((paint_scratch.entries[candidate] == 2u) ||
+						(surface_pixels.pixels[candidate] ==
+						 paint_command.format.y))
+						break;
+					right++;
+				}
+				span_y = y;
+				span_left = left;
+				span_right = right;
+				span_active = 1u;
+			}
+		}
+		barrier();
+		if (span_active == 0u)
+			break;
+		for (int scan_x = span_left + int(lane); scan_x <= span_right;
+		     scan_x += int(lanes)) {
+			uint candidate = uint(span_y * width + scan_x);
+
+			paint_scratch.entries[candidate] = 2u;
+			write_pixel(candidate, scan_x, span_y);
+		}
+		memoryBarrierBuffer();
+		barrier();
+		if (lane == 0u) {
+			for (int direction = -1; direction <= 1; direction += 2) {
+				int scan_y = span_y + direction;
+				bool in_run = false;
+
+				if ((scan_y < paint_command.clip.y) ||
+					(scan_y > paint_command.clip.w))
+					continue;
+				for (int scan_x = span_left; scan_x <= span_right; ++scan_x) {
+					uint candidate = uint(scan_y * width + scan_x);
+					uint state = paint_scratch.entries[candidate];
+					bool fillable = (state != 2u) &&
+						(surface_pixels.pixels[candidate] !=
+						 paint_command.format.y);
+
+					if (!fillable) {
+						in_run = false;
+						continue;
+					}
+					if (!in_run && (state == 0u))
+						paint_scratch.entries[count + queue_tail++] = candidate;
+					in_run = true;
+					if (state == 0u)
+						paint_scratch.entries[candidate] = 1u;
+				}
+			}
+		}
+		memoryBarrierBuffer();
+		barrier();
+	}
+}
+
+/* end of vulkan_paint.comp */

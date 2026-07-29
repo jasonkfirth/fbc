@@ -1,0 +1,113 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_blit_tile_trans.comp
+
+    Purpose:
+
+        Replay an ordered transparent PUT batch using a native-depth shader.
+
+    Responsibilities:
+
+        - preserve FIFO overlap behavior inside each destination tile
+        - perform only the transparent-key test required by the selected depth
+        - retain one coherent destination read and write per tile pixel
+
+    This file intentionally does NOT contain:
+
+        - destination-read blend modes
+        - same-surface snapshot handling
+        - CPU tile-list construction
+*/
+
+#version 450
+
+#ifndef FB_GFX3_VULKAN_BLIT_TRANS_DEPTH
+#define FB_GFX3_VULKAN_BLIT_TRANS_DEPTH 32
+#endif
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) buffer DestinationPixels
+{
+	uint pixels[];
+} destination_pixels;
+
+layout(set = 0, binding = 1, std430) readonly buffer SourcePixels
+{
+	uint pixels[];
+} source_pixels;
+
+struct BlitCommand
+{
+	ivec4 source_rect;
+	ivec4 clip;
+	ivec4 destination;
+	uvec4 format;
+	uvec4 dimensions;
+};
+
+layout(set = 0, binding = 2, std430) readonly buffer BlitCommands
+{
+	BlitCommand commands[];
+} blit_commands;
+
+layout(set = 0, binding = 3, std430) readonly buffer TileRanges
+{
+	uvec4 ranges[];
+} tile_ranges;
+
+layout(set = 0, binding = 4, std430) readonly buffer TileCommands
+{
+	uint words[];
+} tile_commands;
+
+bool source_is_visible(uint source)
+{
+#if FB_GFX3_VULKAN_BLIT_TRANS_DEPTH == 8
+	return (source & 0xFFu) != 0u;
+#elif FB_GFX3_VULKAN_BLIT_TRANS_DEPTH == 16
+	return (source & 0xFFFFu) != 0xF81Fu;
+#else
+	return (source & 0x00FFFFFFu) != 0x00FF00FFu;
+#endif
+}
+
+void main(void)
+{
+	BlitCommand first = blit_commands.commands[0];
+	uint destination_width = first.dimensions.y;
+	uint destination_height = first.dimensions.z;
+	uvec4 range = tile_ranges.ranges[gl_WorkGroupID.x];
+	ivec2 position = ivec2(range.xy * 16u + gl_LocalInvocationID.xy);
+	uint destination;
+	uint destination_offset;
+	uint required_coverage = (1u << gl_LocalInvocationID.x) |
+		(1u << (gl_LocalInvocationID.y + 16u));
+	int source_position;
+
+	if ((uint(position.x) >= destination_width) ||
+		(uint(position.y) >= destination_height))
+		return;
+	destination_offset = (uint(position.y) * destination_width) +
+		uint(position.x);
+	source_position = (position.y * first.destination.z) + position.x;
+	destination = destination_pixels.pixels[destination_offset];
+	for (uint offset = 0u; offset < range.w; offset++) {
+		uint command_index = range.z + offset;
+		uint coverage = tile_commands.words[command_index * 2u];
+		uint source;
+
+		if ((coverage & required_coverage) != required_coverage)
+			continue;
+		source = source_pixels.pixels[
+			uint(source_position +
+			 int(tile_commands.words[command_index * 2u + 1u]))];
+		if (source_is_visible(source))
+			destination = source & first.format.w;
+	}
+	destination_pixels.pixels[destination_offset] = destination;
+}
+
+/* end of vulkan_blit_tile_trans.comp */

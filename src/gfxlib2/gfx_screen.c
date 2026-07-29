@@ -1,6 +1,7 @@
 /* screen function and drivers handling */
 
 #include "fb_gfx.h"
+#include <limits.h>
 #include <strings.h>
 
 #define NUM_MODES 22
@@ -193,6 +194,295 @@ static void exit_proc(void)
 #endif
 }
 
+/* ------------------------------------------------------------------------- */
+/* Resizable framebuffer support                                             */
+/* ------------------------------------------------------------------------- */
+
+static unsigned char *allocate_aligned_page(size_t page_size)
+{
+	unsigned char *page;
+	void *allocation;
+	uintptr_t aligned;
+
+	if (page_size > ((size_t)-1 - sizeof(void *) - 15u))
+		return NULL;
+
+	allocation = malloc(page_size + sizeof(void *) + 15u);
+	if (!allocation)
+		return NULL;
+
+	aligned = ((uintptr_t)allocation + sizeof(void *) + 15u) & ~(uintptr_t)15u;
+	page = (unsigned char *)aligned;
+	((void **)page)[-1] = allocation;
+	return page;
+}
+
+static void free_aligned_pages(unsigned char **pages, int page_count)
+{
+	int page;
+
+	if (!pages)
+		return;
+
+	for (page = 0; page < page_count; ++page) {
+		if (pages[page])
+			free(((void **)pages[page])[-1]);
+	}
+	free((void *)pages);
+}
+
+static void free_char_pages(GFX_CHAR_CELL **pages, int page_count)
+{
+	int page;
+
+	if (!pages)
+		return;
+
+	for (page = 0; page < page_count; ++page)
+		free(pages[page]);
+	free((void *)pages);
+}
+
+/*
+	Native window threads call this while holding their driver lock.  They must
+	not allocate or take FB_GRAPHICS_LOCK here because application drawing takes
+	the locks in the opposite order.  Replacing the two dimensions is enough:
+	the application thread rechecks both values while holding the driver lock.
+*/
+void fb_hRequestResize(int width, int height)
+{
+	if (!__fb_gfx || !(__fb_gfx->flags & DRIVER_RESIZABLE))
+		return;
+	if ((width <= 0) || (height <= 0))
+		return;
+
+	__fb_gfx->pending_width = width;
+	__fb_gfx->pending_height = height;
+}
+
+/*
+	Apply a coalesced resize request while FB_GRAPHICS_LOCK is held.  All new
+	software pages and console pages are prepared before the driver is changed,
+	so allocation failure leaves the old mode completely usable.  The driver
+	lock keeps the presentation thread away from both generations of pointers.
+*/
+int fb_hApplyPendingResize(void)
+{
+	GFX_CHAR_CELL **new_con_pages = NULL;
+	GFX_CHAR_CELL blank_cell;
+	unsigned char **new_pages = NULL;
+	char *new_dirty = NULL;
+	EVENT event;
+	size_t page_size, dirty_size, cell_count, row_bytes;
+	int width, height, pitch, text_width, text_height;
+	int copy_width, copy_height, copy_text_width, copy_text_height;
+	int old_width, old_height, old_pitch, old_text_width, old_text_height;
+	int bytes_per_pixel, scanline_size, page_count, visible_page;
+	unsigned int color_mask, depth;
+	unsigned char **old_pages;
+	GFX_CHAR_CELL **old_con_pages;
+	char *old_dirty;
+	int page, row;
+
+	if (!__fb_gfx || !(__fb_gfx->flags & DRIVER_RESIZABLE))
+		return 0;
+	if (__fb_gfx->lock_count != 0)
+		return 0;
+	if (!__fb_gfx->driver || !__fb_gfx->driver->resize)
+		return -1;
+
+	/*
+		The native window thread publishes both dimensions while holding the
+		driver lock.  Take the same lock for the first snapshot so this read is
+		not a data race.  Allocation remains outside the lock because changing a
+		large multi-page mode can otherwise stall the presentation thread.
+	*/
+	__fb_gfx->driver->lock();
+	width = __fb_gfx->pending_width;
+	height = __fb_gfx->pending_height;
+	if ((width <= 0) || (height <= 0)) {
+		__fb_gfx->driver->unlock();
+		return 0;
+	}
+	if ((width == __fb_gfx->w) && (height == __fb_gfx->h)) {
+		__fb_gfx->pending_width = 0;
+		__fb_gfx->pending_height = 0;
+		__fb_gfx->driver->unlock();
+		return 0;
+	}
+	page_count = __fb_gfx->num_pages;
+	visible_page = __fb_gfx->visible_page;
+	bytes_per_pixel = __fb_gfx->bpp;
+	scanline_size = __fb_gfx->scanline_size;
+	color_mask = __fb_gfx->color_mask;
+	depth = __fb_gfx->depth;
+	old_width = __fb_gfx->w;
+	old_height = __fb_gfx->h;
+	old_pitch = __fb_gfx->pitch;
+	old_text_width = __fb_gfx->text_w;
+	old_text_height = __fb_gfx->text_h;
+	old_pages = __fb_gfx->page;
+	old_con_pages = __fb_gfx->con_pages;
+	old_dirty = __fb_gfx->dirty;
+	if ((page_count <= 0) || (visible_page < 0) ||
+	    (visible_page >= page_count) || (bytes_per_pixel <= 0) ||
+	    (scanline_size <= 0) || (old_pitch <= 0) ||
+	    (old_text_width < 0) || (old_text_height < 0) ||
+	    (old_pages == NULL) ||
+	    (old_con_pages == NULL)) {
+		__fb_gfx->driver->unlock();
+		return -1;
+	}
+	for (page = 0; page < page_count; ++page) {
+		if ((old_pages[page] == NULL) ||
+		    (((old_text_width > 0) && (old_text_height > 0)) &&
+		     (old_con_pages[page] == NULL))) {
+			__fb_gfx->driver->unlock();
+			return -1;
+		}
+	}
+	__fb_gfx->driver->unlock();
+	if ((size_t)width > ((size_t)INT_MAX / (size_t)bytes_per_pixel))
+		return -1;
+
+	pitch = width * bytes_per_pixel;
+	if (((size_t)pitch > ((size_t)-1 / (size_t)height)) ||
+	    ((size_t)height > ((size_t)-1 / (size_t)scanline_size)))
+		return -1;
+	page_size = (size_t)pitch * (size_t)height;
+	dirty_size = (size_t)height * (size_t)scanline_size;
+
+	new_pages = (unsigned char **)calloc((size_t)page_count,
+		sizeof(new_pages[0]));
+	if (!new_pages)
+		goto fail;
+	for (page = 0; page < page_count; ++page) {
+		new_pages[page] = allocate_aligned_page(page_size);
+		if (!new_pages[page])
+			goto fail;
+		for (row = 0; row < height; ++row)
+			fb_hPixelSet(new_pages[page] + ((size_t)row * pitch),
+				MASK_A_32 & color_mask, (size_t)width);
+	}
+
+	new_dirty = (char *)malloc(dirty_size);
+	if (!new_dirty)
+		goto fail;
+	fb_hMemSet(new_dirty, TRUE, dirty_size);
+
+	text_width = __fb_gfx->font ? width / __fb_gfx->font->w : __fb_gfx->text_w;
+	text_height = __fb_gfx->font ? height / __fb_gfx->font->h : __fb_gfx->text_h;
+	if ((text_width < 0) || (text_height < 0))
+		goto fail;
+	if ((text_width != 0) && ((size_t)text_height > ((size_t)-1 / (size_t)text_width)))
+		goto fail;
+	cell_count = (size_t)text_width * (size_t)text_height;
+	if ((cell_count != 0) &&
+	    (cell_count > ((size_t)-1 / sizeof(GFX_CHAR_CELL))))
+		goto fail;
+
+	new_con_pages = (GFX_CHAR_CELL **)calloc((size_t)page_count,
+		sizeof(new_con_pages[0]));
+	if (!new_con_pages)
+		goto fail;
+	blank_cell.ch = 32;
+	blank_cell.fg = ((depth > 4) && (depth <= 8)) ?
+		15u : color_mask;
+	blank_cell.bg = MASK_A_32 & color_mask;
+	for (page = 0; page < page_count; ++page) {
+		size_t cell;
+
+		if (cell_count != 0) {
+			new_con_pages[page] = (GFX_CHAR_CELL *)malloc(
+				cell_count * sizeof(GFX_CHAR_CELL));
+			if (!new_con_pages[page])
+				goto fail;
+			for (cell = 0; cell < cell_count; ++cell)
+				new_con_pages[page][cell] = blank_cell;
+		}
+	}
+
+	copy_width = MIN(width, old_width);
+	copy_height = MIN(height, old_height);
+	row_bytes = (size_t)copy_width * (size_t)bytes_per_pixel;
+	copy_text_width = MIN(text_width, old_text_width);
+	copy_text_height = MIN(text_height, old_text_height);
+	for (page = 0; page < page_count; ++page) {
+		for (row = 0; row < copy_height; ++row) {
+			fb_hMemCpy(new_pages[page] + ((size_t)row * pitch),
+				old_pages[page] + ((size_t)row * old_pitch),
+				row_bytes);
+		}
+		if ((copy_text_width > 0) && (copy_text_height > 0)) {
+			if ((new_con_pages[page] == NULL) ||
+			    (old_con_pages[page] == NULL))
+				goto fail;
+			for (row = 0; row < copy_text_height; ++row) {
+				fb_hMemCpy(new_con_pages[page] +
+					((size_t)row * text_width),
+					old_con_pages[page] +
+					((size_t)row * old_text_width),
+					(size_t)copy_text_width * sizeof(GFX_CHAR_CELL));
+			}
+		}
+	}
+
+	__fb_gfx->driver->lock();
+	width = __fb_gfx->pending_width;
+	height = __fb_gfx->pending_height;
+	if ((width != (pitch / bytes_per_pixel)) ||
+	    (height != (int)(page_size / (size_t)pitch))) {
+		__fb_gfx->driver->unlock();
+		goto fail;
+	}
+	if (__fb_gfx->driver->resize(width, height) != 0) {
+		__fb_gfx->driver->unlock();
+		goto fail;
+	}
+
+	{
+		__fb_gfx->page = new_pages;
+		__fb_gfx->con_pages = new_con_pages;
+		__fb_gfx->dirty = new_dirty;
+		__fb_gfx->w = width;
+		__fb_gfx->h = height;
+		__fb_gfx->pitch = pitch;
+		__fb_gfx->text_w = text_width;
+		__fb_gfx->text_h = text_height;
+		__fb_gfx->framebuffer = new_pages[visible_page];
+		__fb_gfx->aspect = 1.0f;
+		__fb_gfx->pending_width = 0;
+		__fb_gfx->pending_height = 0;
+		__fb_gfx->id = screen_id++;
+		if (__fb_gfx->cursor_x >= text_width)
+			__fb_gfx->cursor_x = MAX(text_width - 1, 0);
+		if (__fb_gfx->cursor_y >= text_height)
+			__fb_gfx->cursor_y = MAX(text_height - 1, 0);
+
+		new_pages = NULL;
+		new_con_pages = NULL;
+		new_dirty = NULL;
+		free_aligned_pages(old_pages, page_count);
+		free_char_pages(old_con_pages, page_count);
+		free(old_dirty);
+	}
+	__fb_gfx->driver->unlock();
+
+	fb_DevScrnMaybeUpdateWidth();
+	fb_hMemSet(&event, 0, sizeof(event));
+	event.type = EVENT_WINDOW_RESIZE;
+	event.width = width;
+	event.height = height;
+	fb_hPostEvent(&event);
+	return 1;
+
+fail:
+	free_aligned_pages(new_pages, page_count);
+	free_char_pages(new_con_pages, page_count);
+	free(new_dirty);
+	return -1;
+}
+
 /* Dummy function to ensure that the CONSOLE "update" hook for a VIEW PRINT
  * doesn't get called */
 void fb_GfxViewUpdate( void )
@@ -278,6 +568,9 @@ static int set_mode
 	/* normalize flags */
 	if ((flags >= 0) && (flags & DRIVER_SHAPED_WINDOW))
 		flags |= DRIVER_SHAPED_WINDOW | DRIVER_NO_FRAME | DRIVER_NO_SWITCH;
+	if ((flags >= 0) && (flags & DRIVER_RESIZABLE) &&
+	    (flags & (DRIVER_FULLSCREEN | DRIVER_NO_FRAME | DRIVER_SHAPED_WINDOW)))
+		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 
     release_gfx_mem();
 
@@ -387,6 +680,9 @@ static int set_mode
 			if (flags & DRIVER_HIGH_PRIORITY) {
 				__fb_gfx->flags |= HIGH_PRIORITY;
 			}
+			if (flags & DRIVER_RESIZABLE) {
+				__fb_gfx->flags |= DRIVER_RESIZABLE;
+			}
 		}
 
 #ifdef HOST_X86
@@ -414,8 +710,12 @@ static int set_mode
             driver = &__fb_gfxDriverNull;
         else {
             for (try_count = (driver_name ? 4 : 2); try_count; try_count--) {
-                for (i = 0; __fb_gfx_drivers_list[i >> 1]; i++) {
-                    driver = __fb_gfx_drivers_list[i >> 1];
+				for (i = 0; __fb_gfx_drivers_list[i >> 1]; i++) {
+					driver = __fb_gfx_drivers_list[i >> 1];
+					if ((flags & DRIVER_RESIZABLE) && !driver->resize) {
+						driver = NULL;
+						continue;
+					}
                     if ((driver_name) && !(try_count & 0x1) && (strcasecmp(driver_name, driver->name) != 0)) {
                         driver = NULL;
                         continue;
@@ -427,12 +727,12 @@ static int set_mode
                 }
                 if (driver)
                     break;
-                if (driver_name) {
-                    if (try_count == 3)
-                        flags ^= DRIVER_FULLSCREEN;
-                }
-                else
-                    flags ^= DRIVER_FULLSCREEN;
+				if (driver_name) {
+					if ((try_count == 3) && !(flags & DRIVER_RESIZABLE))
+						flags ^= DRIVER_FULLSCREEN;
+				}
+				else if (!(flags & DRIVER_RESIZABLE))
+					flags ^= DRIVER_FULLSCREEN;
             }
         }
 

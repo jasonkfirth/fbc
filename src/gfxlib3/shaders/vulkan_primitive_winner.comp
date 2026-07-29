@@ -1,0 +1,247 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_primitive_winner.comp
+
+    Purpose:
+
+        Select the final opaque point, line, styled rectangle, or midpoint
+        ellipse reaching each pixel in one mixed Vulkan primitive packet.
+
+    Responsibilities:
+
+        - retain exact styled-line and midpoint-ellipse pixel coverage
+        - retain exact filled and styled-outline rectangle coverage
+        - apply the current clip rectangle inside the shader
+        - preserve Basic FIFO order with a one-based atomic winner key
+
+    This file intentionally does NOT contain:
+
+        - final surface colour writes
+        - alpha-blended primitive handling
+        - host-side command validation
+*/
+
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) buffer WinnerPixels
+{
+	uint pixels[];
+} winner_pixels;
+
+struct PrimitiveCommand
+{
+	ivec4 geometry;
+	ivec4 clip;
+	uvec4 parameters; /* color, type, style/filled, order */
+	uvec4 format;     /* surface width, height, color mask, reserved */
+	uvec4 batch;      /* generation, resolve x, resolve y, workgroups */
+};
+
+layout(set = 0, binding = 1, std430) readonly buffer PrimitiveCommands
+{
+	PrimitiveCommand commands[];
+} primitive_commands;
+
+/*
+	The host assigns only useful 64-pixel chunks. This avoids a rectangular
+	dispatch padded to the longest primitive while leaving all coverage and
+	clipping decisions in shader code.
+*/
+layout(set = 0, binding = 2, std430) readonly buffer PrimitiveWorkgroups
+{
+	uvec2 workgroups[]; /* primitive index, first coverage index */
+} primitive_workgroups;
+
+shared int ellipse_x1;
+shared int ellipse_x2;
+shared int ellipse_y1;
+shared int ellipse_y2;
+shared int ellipse_d;
+shared double ellipse_aq;
+shared double ellipse_bq;
+shared double ellipse_dx;
+shared double ellipse_dy;
+shared double ellipse_r;
+shared double ellipse_rx;
+shared double ellipse_ry;
+
+void select_pixel(PrimitiveCommand command, ivec2 position)
+{
+	if ((position.x < command.clip.x) || (position.y < command.clip.y) ||
+	    (position.x > command.clip.z) || (position.y > command.clip.w))
+		return;
+	atomicMax(winner_pixels.pixels[
+		(uint(position.y) * command.format.x) + uint(position.x)],
+		(command.batch.x << 13u) | command.parameters.w);
+}
+
+void select_line(PrimitiveCommand command, uint first_index)
+{
+	uint index = first_index + gl_LocalInvocationID.x;
+	ivec2 start = command.geometry.xy;
+	ivec2 finish = command.geometry.zw;
+	ivec2 difference = abs(finish - start);
+	uint count = uint(max(difference.x, difference.y)) + 1u;
+	ivec2 direction;
+	ivec2 position;
+	int step_index;
+
+	if (index >= count)
+		return;
+	direction = ivec2((finish.x < start.x) ? -1 : 1,
+		(finish.y < start.y) ? -1 : 1);
+	step_index = int(index);
+	if (difference.x >= difference.y) {
+		position.x = start.x + direction.x * step_index;
+		position.y = start.y;
+		if (difference.x != 0)
+			position.y += direction.y *
+				((difference.y * step_index + difference.x / 2) /
+				 difference.x);
+	} else {
+		position.y = start.y + direction.y * step_index;
+		position.x = start.x;
+		if (difference.y != 0)
+			position.x += direction.x *
+				((difference.x * step_index + difference.y / 2) /
+				 difference.y);
+	}
+	if ((command.parameters.z &
+	     (0x8000u >> (index & 15u))) != 0u)
+		select_pixel(command, position);
+}
+
+void select_ellipse_row(PrimitiveCommand command, int y, int x1, int x2,
+	bool filled)
+{
+	if ((y < command.clip.y) || (y > command.clip.w))
+		return;
+	if (filled) {
+		int first = max(x1, command.clip.x);
+		int last = min(x2, command.clip.z);
+
+		for (int x = first + int(gl_LocalInvocationID.x); x <= last;
+		     x += int(gl_WorkGroupSize.x))
+			atomicMax(winner_pixels.pixels[
+				(uint(y) * command.format.x) + uint(x)],
+				(command.batch.x << 13u) | command.parameters.w);
+	} else if (gl_LocalInvocationID.x == 0u) {
+		select_pixel(command, ivec2(x1, y));
+		if (x2 != x1)
+			select_pixel(command, ivec2(x2, y));
+	}
+}
+
+void select_ellipse(PrimitiveCommand command)
+{
+	float radius_x;
+	float radius_y;
+	bool filled;
+
+	radius_x = uintBitsToFloat(uint(command.geometry.z));
+	radius_y = uintBitsToFloat(uint(command.geometry.w));
+	filled = command.parameters.z != 0u;
+	if (gl_LocalInvocationID.x == 0u) {
+		ellipse_x1 = int(float(command.geometry.x) - radius_x);
+		ellipse_x2 = int(float(command.geometry.x) + radius_x);
+		ellipse_y1 = command.geometry.y;
+		ellipse_y2 = command.geometry.y;
+		ellipse_d = int(radius_x);
+		ellipse_aq = trunc(double(radius_x * radius_x));
+		ellipse_bq = trunc(double(radius_y * radius_y));
+		ellipse_dx = ellipse_aq * 2.0;
+		ellipse_dy = ellipse_bq * 2.0;
+		ellipse_r = trunc(double(radius_x * float(ellipse_bq)));
+		ellipse_rx = ellipse_r * 2.0;
+		ellipse_ry = 0.0;
+	}
+	barrier();
+	if (radius_y == 0.0) {
+		select_ellipse_row(command, ellipse_y1, ellipse_x1, ellipse_x2,
+			true);
+		return;
+	}
+	select_ellipse_row(command, ellipse_y1, ellipse_x1, ellipse_x2, filled);
+	while (ellipse_d > 0) {
+		if (gl_LocalInvocationID.x == 0u) {
+			if (ellipse_r > 0.0) {
+				ellipse_y1++;
+				ellipse_y2--;
+				ellipse_ry += ellipse_dx;
+				ellipse_r -= ellipse_ry;
+			}
+			if (ellipse_r <= 0.0) {
+				ellipse_d--;
+				ellipse_x1++;
+				ellipse_x2--;
+				ellipse_rx -= ellipse_dy;
+				ellipse_r += ellipse_rx;
+			}
+		}
+		barrier();
+		select_ellipse_row(command, ellipse_y1, ellipse_x1, ellipse_x2,
+			filled);
+		if (ellipse_y2 != ellipse_y1)
+			select_ellipse_row(command, ellipse_y2, ellipse_x1,
+				ellipse_x2, filled);
+		barrier();
+	}
+}
+
+void select_rectangle(PrimitiveCommand command, uint first_index)
+{
+	uint index = first_index + gl_LocalInvocationID.x;
+	uint width = uint(command.geometry.z - command.geometry.x) + 1u;
+	uint height = uint(command.geometry.w - command.geometry.y) + 1u;
+	bool filled = (command.parameters.z & 0x80000000u) != 0u;
+	uint count = filled ? width * height : (width + height) * 2u;
+	ivec2 position;
+
+	if (index >= count)
+		return;
+	if (filled) {
+		position = ivec2(command.geometry.x + int(index % width),
+			command.geometry.y + int(index / width));
+	} else if (index < width) {
+		position = ivec2(command.geometry.x + int(index),
+			command.geometry.w);
+	} else if (index < (width * 2u)) {
+		position = ivec2(command.geometry.x + int(index - width),
+			command.geometry.y);
+	} else if (index < ((width * 2u) + height)) {
+		position = ivec2(command.geometry.z,
+			command.geometry.y + int(index - (width * 2u)));
+	} else {
+		position = ivec2(command.geometry.x,
+			command.geometry.y +
+			int(index - (width * 2u) - height));
+	}
+	if (filled ||
+	    ((command.parameters.z & (0x8000u >> (index & 15u))) != 0u))
+		select_pixel(command, position);
+}
+
+void main(void)
+{
+	uvec2 workgroup = primitive_workgroups.workgroups[gl_WorkGroupID.x];
+	PrimitiveCommand command =
+		primitive_commands.commands[workgroup.x];
+
+	if (command.parameters.y == 1u) {
+		select_line(command, workgroup.y);
+	} else if (command.parameters.y == 2u) {
+		select_ellipse(command);
+	} else if ((command.parameters.y == 3u) &&
+	           (workgroup.y == 0u) &&
+	           (gl_LocalInvocationID.x == 0u)) {
+		select_pixel(command, command.geometry.xy);
+	} else if (command.parameters.y == 4u) {
+		select_rectangle(command, workgroup.y);
+	}
+}
+
+/* end of vulkan_primitive_winner.comp */

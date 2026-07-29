@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 ##############################################################################
-# FreeBASIC rtlib/gfxlib2/sfxlib strict diagnostics runner
+# FreeBASIC rtlib/gfxlib2/gfxlib3/sfxlib strict diagnostics runner
 ##############################################################################
 #
 # Purpose:
 #
-#   Build the core rtlib, gfxlib2, and sfxlib runtime libraries with a
-#   warning-heavy diagnostics profile.
+#   Build the core rtlib, gfxlib2, gfxlib3, and sfxlib runtime libraries with
+#   a warning-heavy diagnostics profile.
 #
 # Responsibilities:
 #
@@ -212,6 +212,8 @@ collect_lint_paths() {
 		"$ROOT/src/gfxlib2" \
 		"$ROOT/src/gfxlib2/unix" \
 		"$ROOT/src/gfxlib2/$platform" \
+		"$ROOT/src/gfxlib3" \
+		"$ROOT/src/gfxlib3/$platform" \
 		"$ROOT/src/sfxlib" \
 		"$ROOT/src/sfxlib/unix" \
 		"$ROOT/src/sfxlib/$platform" \
@@ -332,7 +334,7 @@ run_linters() {
 	fi
 
 	if command -v cppcheck >/dev/null 2>&1; then
-		msg "Running cppcheck over rtlib, gfxlib2, and sfxlib"
+		msg "Running cppcheck over rtlib, gfxlib2, gfxlib3, and sfxlib"
 		cppcheck_args=(
 			--enable="$cppcheck_enable"
 			--error-exitcode=1
@@ -349,11 +351,13 @@ run_linters() {
 			--suppress='*:*/src/sfxlib/third_party/*'
 			-I "$ROOT/src"
 			-I "$ROOT/src/gfxlib2"
+			-I "$ROOT/src/gfxlib3"
 			-I "$ROOT/src/sfxlib"
 			-I "$ROOT/src/rtlib"
 			-i "$ROOT/src/rtlib/obj"
 			-i "$ROOT/src/gfxlib2/obj"
 			-i "$ROOT/src/gfxlib2/js"
+			-i "$ROOT/src/gfxlib3/obj"
 			-i "$ROOT/src/sfxlib/obj"
 			-i "$ROOT/src/sfxlib/js"
 			-i "$ROOT/src/sfxlib/third_party"
@@ -411,7 +415,7 @@ run_linters() {
 	fi
 
 	if command -v clang-tidy >/dev/null 2>&1; then
-		msg "Running clang-tidy over rtlib, gfxlib2, and sfxlib source set for $platform"
+		msg "Running clang-tidy over rtlib, gfxlib2, gfxlib3, and sfxlib source set for $platform"
 
 		while IFS= read -r file; do
 			case "$file" in
@@ -425,7 +429,7 @@ run_linters() {
 					output="$(clang-tidy --quiet "$file" \
 						--checks='clang-diagnostic-*,clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,-clang-analyzer-security.FloatLoopCounter,bugprone-*,-bugprone-assignment-in-if-condition,-bugprone-branch-clone,-bugprone-easily-swappable-parameters,-bugprone-reserved-identifier,-bugprone-switch-missing-default-case,-bugprone-implicit-widening-of-multiplication-result,-bugprone-narrowing-conversions,-bugprone-macro-parentheses,performance-*,-performance-no-int-to-ptr,portability-*' \
 						--warnings-as-errors='clang-diagnostic-*,clang-analyzer-*,bugprone-*,performance-*,portability-*' \
-						-- -std=gnu++17 -I "$ROOT/src" -I "$ROOT/src/gfxlib2" -I "$ROOT/src/sfxlib" -I "$ROOT/src/rtlib" -I "$ROOT/inc" 2>&1)" ||
+						-- -std=gnu++17 -I "$ROOT/src" -I "$ROOT/src/gfxlib2" -I "$ROOT/src/gfxlib3" -I "$ROOT/src/sfxlib" -I "$ROOT/src/rtlib" -I "$ROOT/inc" 2>&1)" ||
 					{
 						printf '%s\n' "$output"
 						return 1
@@ -435,7 +439,7 @@ run_linters() {
 					output="$(clang-tidy --quiet "$file" \
 						--checks='clang-diagnostic-*,clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,-clang-analyzer-security.FloatLoopCounter,bugprone-*,-bugprone-assignment-in-if-condition,-bugprone-branch-clone,-bugprone-easily-swappable-parameters,-bugprone-reserved-identifier,-bugprone-switch-missing-default-case,-bugprone-implicit-widening-of-multiplication-result,-bugprone-narrowing-conversions,-bugprone-macro-parentheses,performance-*,-performance-no-int-to-ptr,portability-*' \
 						--warnings-as-errors='clang-diagnostic-*,clang-analyzer-*,bugprone-*,performance-*,portability-*' \
-						-- -std=gnu11 -I "$ROOT/src" -I "$ROOT/src/gfxlib2" -I "$ROOT/src/sfxlib" -I "$ROOT/src/rtlib" -I "$ROOT/inc" 2>&1)" ||
+						-- -std=gnu11 -I "$ROOT/src" -I "$ROOT/src/gfxlib2" -I "$ROOT/src/gfxlib3" -I "$ROOT/src/sfxlib" -I "$ROOT/src/rtlib" -I "$ROOT/inc" 2>&1)" ||
 					{
 						printf '%s\n' "$output"
 						return 1
@@ -459,6 +463,7 @@ cleanup_objects() {
 	rm -rf \
 		"$ROOT/src/rtlib/obj/$key" \
 		"$ROOT/src/gfxlib2/obj/$key" \
+		"$ROOT/src/gfxlib3/obj/$key" \
 		"$ROOT/src/sfxlib/obj/$key" \
 		"$ROOT/lib/freebasic/$key" \
 		"$ROOT/lib/$key"
@@ -481,8 +486,13 @@ main() {
 	cleanup_objects "$key"
 	run_linters
 
+	#
+	# This runner checks its compilers before invoking make and only builds
+	# runtime archives. Do not require unrelated packaging tools such as rsync.
+	#
 	make_args=(
 		-j "$JOBS"
+		"HAVE_PREREQS_MK="
 		"FBTARGET_DIR_OVERRIDE=$key"
 		"CC=$CC_NAME"
 		"CXX=$CXX_NAME"
@@ -494,17 +504,17 @@ main() {
 		make_args+=("TARGET_TRIPLET=$TARGET_TRIPLET")
 	fi
 
-	msg "Building rtlib, gfxlib2, and sfxlib with strict diagnostics"
+	msg "Building rtlib, gfxlib2, gfxlib3, and sfxlib with strict diagnostics"
 	(
 		cd "$ROOT"
-		make "${make_args[@]}" rtlib gfxlib2 sfxlib
+		make "${make_args[@]}" rtlib gfxlib2 gfxlib3 sfxlib
 	)
 
 	if [ "$KEEP_OBJECTS" -eq 0 ]; then
 		cleanup_objects "$key"
 	fi
 
-	msg "rtlib/gfxlib2/sfxlib strict diagnostics completed"
+	msg "rtlib/gfxlib2/gfxlib3/sfxlib strict diagnostics completed"
 }
 
 main "$@"

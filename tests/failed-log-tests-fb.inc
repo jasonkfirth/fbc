@@ -1,0 +1,17 @@
+SRCLIST_COMPILE_AND_RUN_OK += gfx/getjoystick.bas
+SRCLIST_COMPILE_AND_RUN_OK += gfx/gettouch.bas
+SRCLIST_COMPILE_AND_RUN_OK += gfx/getxpad.bas
+SRCLIST_COMPILE_ONLY_OK += gfx/bsave-nullptr-fb.bas
+SRCLIST_COMPILE_ONLY_OK += gfx/bsave-nullptr-qb.bas
+SRCLIST_COMPILE_ONLY_OK += gfx/imageinfo-params.bas
+SRCLIST_COMPILE_ONLY_OK += gfx/put-mode-syntax-good.bas
+SRCLIST_COMPILE_ONLY_OK += gfx/screeninfo-params.bas
+SRCLIST_COMPILE_AND_RUN_OK += gfx/getjoystick.bas
+SRCLIST_COMPILE_AND_RUN_OK += gfx/gettouch.bas
+SRCLIST_COMPILE_AND_RUN_OK += gfx/getxpad.bas
+SRCLIST_COMPILE_AND_RUN_OK += gfx/getjoystick.bas
+SRCLIST_COMPILE_AND_RUN_OK += gfx/gettouch.bas
+SRCLIST_COMPILE_AND_RUN_OK += gfx/getxpad.bas
+SRCLIST_COMPILE_AND_RUN_OK += gfx/getjoystick.bas
+SRCLIST_COMPILE_AND_RUN_OK += gfx/gettouch.bas
+SRCLIST_COMPILE_AND_RUN_OK += gfx/getxpad.bas

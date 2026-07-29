@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+    <testsuite name="fbc_tests.string.asc_utf16le" errors="0" tests="4" failures="0" time="0">
+        <testcase classname="fbc_tests.string.asc_utf16le" name="const_wstr" />
+        <testcase classname="fbc_tests.string.asc_utf16le" name="ascii" />
+        <testcase classname="fbc_tests.string.asc_utf16le" name="const" />
+        <testcase classname="fbc_tests.string.asc_utf16le" name="default" />
+    </testsuite>
+    <testsuite name="fbc_tests.pp.quote_utf16le" errors="0" tests="4" failures="0" time="0">
+        <testcase classname="fbc_tests.pp.quote_utf16le" name="defs" />
+        <testcase classname="fbc_tests.pp.quote_utf16le" name="multiple" />
+        <testcase classname="fbc_tests.pp.quote_utf16le" name="empty" />
+        <testcase classname="fbc_tests.pp.quote_utf16le" name="direct" />
+    </testsuite>
+    <testsuite name="fbc_tests.pp.quote_utf16be" errors="0" tests="4" failures="0" time="0">
+        <testcase classname="fbc_tests.pp.quote_utf16be" name="defs" />
+        <testcase classname="fbc_tests.pp.quote_utf16be" name="multiple" />
+        <testcase classname="fbc_tests.pp.quote_utf16be" name="empty" />
+        <testcase classname="fbc_tests.pp.quote_utf16be" name="direct" />
+    </testsuite>
+    <testsuite name="fbc_tests.pp.macro_eval_str_utf16le" errors="0" tests="2" failures="0" time="0">
+        <testcase classname="fbc_tests.pp.macro_eval_str_utf16le" name="nulchar" />
+        <testcase classname="fbc_tests.pp.macro_eval_str_utf16le" name="direct" />
+    </testsuite>
+    <testsuite name="fbc_tests.pp.macro_arg_listexpand_utf16le" errors="0" tests="65" failures="0" time="0">
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg6_5" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg6_4" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg6_3" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg6_2" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg6_1" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg5_5" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg5_4" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg5_3" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg5_2" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg5_1" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg4_5" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg4_4" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg4_3" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg4_2" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg4_1" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg3_5" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg3_4" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg3_3" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg3_2" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg3_1" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg2_5" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg2_4" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg2_3" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg2_2" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg2_1" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg1_5" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg1_4" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg1_3" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg1_2" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_neg1_1" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos6_5" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos6_4" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos6_3" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos6_2" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos6_1" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos5_5" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos5_4" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos5_3" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos5_2" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos5_1" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos4_5" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos4_4" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos4_3" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos4_2" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos4_1" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos3_5" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos3_4" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos3_3" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos3_2" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos3_1" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos2_5" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos2_4" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos2_3" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos2_2" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos2_1" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos1_5" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos1_4" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos1_3" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos1_2" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_pos1_1" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_zero_5" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_zero_4" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_zero_3" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_zero_2" />
+        <testcase classname="fbc_tests.pp.macro_arg_listexpand_utf16le" name="T_zero_1" />
+    </testsuite>
+    <testsuite name="fbc_tests.gfx.rgb_qb" errors="0" tests="2" failures="0" time="0">
+        <testcase classname="fbc_tests.gfx.rgb_qb" name="MacroRGBA" />
+        <testcase classname="fbc_tests.gfx.rgb_qb" name="MacroRGB" />
+    </testsuite>
+    <testsuite name="fbc_tests.gfx.rgb" errors="0" tests="2" failures="0" time="0">
+        <testcase classname="fbc_tests.gfx.rgb" name="MacroRGBA" />
+        <testcase classname="fbc_tests.gfx.rgb" name="MacroRGB" />
+    </testsuite>
+    <testsuite name="fbc_tests.gfx.point" errors="0" tests="1" failures="0" time="0">
+        <testcase classname="fbc_tests.gfx.point" name="rgba" />
+    </testsuite>
+    <testsuite name="fbc_tests.gfx.palette" errors="0" tests="8" failures="0" time="0">
+        <testcase classname="fbc_tests.gfx.palette" name="paletteGetByrefPointer" />
+        <testcase classname="fbc_tests.gfx.palette" name="paletteGetRgbValue" />
+        <testcase classname="fbc_tests.gfx.palette" name="paletteGetQbValue" />
+        <testcase classname="fbc_tests.gfx.palette" name="paletteGetUDTPtr" />
+        <testcase classname="fbc_tests.gfx.palette" name="paletteGetPtrToArray" />
+        <testcase classname="fbc_tests.gfx.palette" name="paletteGetPtrToArrayIndex" />
+        <testcase classname="fbc_tests.gfx.palette" name="paletteGetArrayByIndex" />
+        <testcase classname="fbc_tests.gfx.palette" name="paletteGetArrayByName" />
+    </testsuite>
+    <testsuite name="fbc_tests.gfx.line" errors="0" tests="1" failures="0" time="0">
+        <testcase classname="fbc_tests.gfx.line" name="linestyle" />
+    </testsuite>
+    <testsuite name="fbc_tests.gfx.image_expr" errors="0" tests="1" failures="0" time="0">
+        <testcase classname="fbc_tests.gfx.image_expr" name="all" />
+    </testsuite>
+    <testsuite name="fbc_tests.gfx.draw" errors="0" tests="2" failures="0" time="0">
+        <testcase classname="fbc_tests.gfx.draw" name="rememberPenPositionFromXCommand" />
+        <testcase classname="fbc_tests.gfx.draw" name="RememberPenPositionForXCommand" />
+    </testsuite>
+    <testsuite name="fbc_tests.gfx.blender_alpha4" errors="0" tests="2" failures="0" time="0">
+        <testcase classname="fbc_tests.gfx.blender_alpha4" name="putAlpha" />
+        <testcase classname="fbc_tests.gfx.blender_alpha4" name="setAlpha" />
+    </testsuite>
+</testsuites>

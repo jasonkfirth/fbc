@@ -61,8 +61,8 @@
 /* MIDI playback state                                                       */
 /* ------------------------------------------------------------------------- */
 
-FILE *g_midi_file   = NULL;
-int   g_midi_playing = 0;
+static FILE *g_midi_file = NULL;
+int g_midi_playing = 0;
 
 #if FB_SFX_MT_ENABLED
 #if defined(_WIN32)
@@ -355,7 +355,14 @@ static int fb_sfxMidiTrackProcessEvent(FB_SFX_MIDI_TRACKSTATE *track,
             track->offset++;
         }
 
-        fb_sfxMidiDriverSend(status, data1, data2);
+        /*
+            The software fallback shares state with the mixer. Serialize MIDI
+            event changes with audio generation just like MIDI SEND does.
+        */
+        fb_sfxRuntimeLock();
+        if (g_midi_playing)
+            (void)fb_sfxMidiOutputSend(status, data1, data2);
+        fb_sfxRuntimeUnlock();
     }
 
     if (track->offset >= track->size)
@@ -527,6 +534,7 @@ static void *fb_sfxMidiWorkerEntry(void *param)
 
     fb_sfxRuntimeLock();
     g_midi_playing = 0;
+    fb_sfxMidiOutputReleaseAll();
     fb_sfxRuntimeUnlock();
 
     fb_sfxMidiPauseReset();
@@ -555,6 +563,7 @@ void fb_sfxMidiStopInternal(void)
     }
 
     g_midi_playing = 0;
+    fb_sfxMidiOutputSilence();
 }
 
 void fb_sfxMidiJoinWorker(void)
@@ -732,7 +741,8 @@ int fb_sfxMidiPlay(const char *filename)
 
     free(file_data);
     fb_sfxRuntimeLock();
-    fb_sfxMidiStopInternal();
+    g_midi_playing = 0;
+    fb_sfxMidiOutputReleaseAll();
     fb_sfxRuntimeUnlock();
     fb_sfxMidiPauseReset();
     return 0;

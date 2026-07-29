@@ -1,6 +1,28 @@
-/* BSAVE support. */
+/*
+    FreeBASIC Graphics Library
+    --------------------------
+
+    File: gfx_bsave.c
+
+    Purpose:
+
+        Implement BSAVE file selection and the legacy BMP/raw writers.
+
+    Responsibilities:
+
+        - select BMP, PNG, or FreeBASIC raw-block output
+        - convert gfxlib2 images to BMP storage
+        - preserve the public BSAVE runtime entry points
+
+    This file intentionally does NOT contain:
+
+        - BLOAD handling
+        - PNG codec internals
+        - graphics driver lifecycle code
+*/
 
 #include "fb_gfx.h"
+#include "gfx_png.h"
 #include <strings.h>
 #ifdef HOST_WIN32
 	#include <windows.h>
@@ -248,6 +270,8 @@ FBCALL int fb_GfxBsaveEx(FBSTRING *filename, void *src, unsigned int size, void 
 	p = strrchr(filename->data, '.');
 	if (p && (!strcasecmp(p + 1, "bmp"))) {
 		result = save_bmp(context, f, src, pal, bitsperpixel);
+	} else if (p && (!strcasecmp(p + 1, "png"))) {
+		result = fb_hGfxPngSave(context, f, src, pal, bitsperpixel);
 	} else {
 		if ((size == 0) && src) {
 			fclose(f);
@@ -295,3 +319,5 @@ FBCALL int fb_GfxBsave(FBSTRING *filename, void *src, unsigned int size, void *p
 {
 	return fb_GfxBsaveEx(filename, src, size, pal, 0);
 }
+
+/* end of gfx_bsave.c */

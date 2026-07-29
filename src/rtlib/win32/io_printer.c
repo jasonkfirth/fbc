@@ -257,13 +257,20 @@ static char *GetDefaultPrinterName(void)
     if( count==0 ) {
         HMODULE hMod = LoadLibrary(TEXT("winspool.drv"));
         if (hMod!=NULL) {
+            FARPROC procedure;
+            FnGetDefaultPrinter pfnGetDefaultPrinter = NULL;
 #ifdef UNICODE
             LPCTSTR pszPrinterId = TEXT("GetDefaultPrinterW");
 #else
             LPCTSTR pszPrinterId = TEXT("GetDefaultPrinterA");
 #endif
-            FnGetDefaultPrinter pfnGetDefaultPrinter =
-                (FnGetDefaultPrinter)GetProcAddress(hMod, pszPrinterId);
+            procedure = GetProcAddress(hMod, pszPrinterId);
+            if ((procedure!=NULL) &&
+                (sizeof(pfnGetDefaultPrinter)==sizeof(procedure))) {
+                memcpy((void*)&pfnGetDefaultPrinter,
+                       (const void*)&procedure,
+                       sizeof(pfnGetDefaultPrinter));
+            }
             if (pfnGetDefaultPrinter!=NULL) {
                 TCHAR *buffer = NULL;
                 DWORD dwSize = 0;

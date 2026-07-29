@@ -8,6 +8,31 @@
 #include once "ir.bi"
 #include once "ast.bi"
 
+private sub hRemoveRedundantPtrCheckFromIndex( byval expr as ASTNODE ptr )
+	dim as ASTNODE ptr parent = expr
+
+	while( parent->class = AST_NODECLASS_BOP )
+		dim as ASTNODE ptr check = parent->l
+
+		if( check->class = AST_NODECLASS_PTRCHK ) then
+			dim as ASTNODE ptr baseexpr = check->l
+
+			'' An address-of expression cannot be null. The check can be
+			'' discarded even when pointer arithmetic sits between it and
+			'' the final dereference.
+			if( (baseexpr->class = AST_NODECLASS_ADDROF) or _
+			    (baseexpr->class = AST_NODECLASS_OFFSET and baseexpr->ofs.ofs = 0) ) then
+				parent->l = baseexpr
+				astDelTree( check->r )
+				astDelNode( check )
+			end if
+			exit sub
+		end if
+
+		parent = check
+	wend
+end sub
+
 function astNewDEREF _
 	( _
 		byval l as ASTNODE ptr, _
@@ -40,7 +65,8 @@ function astNewDEREF _
 			case AST_NODECLASS_PTRCHK
 
 				'' convert *PTRCHK(@expr) to (expr)
-				'' TODO: remove null-ptr checks in ptr indexing
+				'' TODO: Remove redundant null-pointer checks introduced by
+				'' pointer indexing when the indexed base is provably valid.
 
 				if( (t->l->class = AST_NODECLASS_ADDROF) or _
 					(t->l->class = AST_NODECLASS_OFFSET and t->l->ofs.ofs = 0) ) then
@@ -55,6 +81,10 @@ function astNewDEREF _
 				else
 					delchild = FALSE
 				end if
+
+			case AST_NODECLASS_BOP
+				hRemoveRedundantPtrCheckFromIndex( t )
+				delchild = FALSE
 
 			case else
 				delchild = FALSE

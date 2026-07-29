@@ -631,7 +631,7 @@ build_android_target() {
 			CFLAGS= \
 			CXXFLAGS= \
 			LDFLAGS= \
-			rtlib fbrt gfxlib2 sfxlib \
+			rtlib fbrt gfxlib2 gfxlib3 sfxlib \
 			-j"$JOBS"
 	done
 

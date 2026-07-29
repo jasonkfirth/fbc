@@ -234,7 +234,7 @@ end sub
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 '':::::
-private function hIsDefineSet _
+function symbIsDefineSet _
 	( _
 		byval id as const zstring ptr _
 	) as integer
@@ -259,10 +259,10 @@ function symbKeywordIsDisabledCommand _
 
 	select case as const symbKeywordGetIllegalRedefErr( tk )
 	case FB_ERRMSG_ILLEGALGFXLIBCOMMANDREDEF
-		function = hIsDefineSet( @"FB_NO_GFXLIB" )
+		function = symbIsDefineSet( @"FB_NO_GFXLIB" )
 
 	case FB_ERRMSG_ILLEGALSFXLIBCOMMANDREDEF
-		function = hIsDefineSet( @"FB_NO_SFXLIB" )
+		function = symbIsDefineSet( @"FB_NO_SFXLIB" )
 
 	case else
 		function = FALSE
@@ -1024,6 +1024,52 @@ private function hLookupImportList _
 	return head
 end function
 
+private function hLookupActiveEnumImports _
+	( _
+		byval imports as FBSYMCHAIN ptr _
+	) as FBSYMCHAIN ptr
+
+	dim as FBHASHTB ptr hashtb = symb.hashlist.tail
+
+	do while( hashtb <> NULL )
+		if( hashtb->owner = @symbGetGlobalNamespc( ) ) then
+			exit do
+		end if
+
+		dim as FBSYMCHAIN ptr head = NULL
+		dim as FBSYMCHAIN ptr tail = NULL
+		dim as FBSYMCHAIN ptr import_ = imports
+
+		do while( import_ <> NULL )
+			dim as FBSYMBOL ptr enum_ = symbGetParent( import_->sym )
+			if( (enum_ <> NULL) andalso _
+			    (symbGetType( enum_ ) = FB_DATATYPE_ENUM) andalso _
+			    (symbGetParent( enum_ ) = hashtb->owner) ) then
+				dim as FBSYMCHAIN ptr match = chainpoolNext( )
+				match->sym = import_->sym
+				match->next = NULL
+				match->isimport = TRUE
+
+				if( head = NULL ) then
+					head = match
+				else
+					tail->next = match
+				end if
+				tail = match
+			end if
+
+			import_ = import_->next
+		loop
+
+		if( head <> NULL ) then
+			return head
+		end if
+		hashtb = hashtb->prev
+	loop
+
+	return NULL
+end function
+
 '':::::
 private function hsymbLookupNS _
 	( _
@@ -1067,15 +1113,16 @@ private function hsymbLookupNS _
 	imp_chain = hashLookupEx( @symb.imphashtb, id, index )
 	if( imp_chain <> NULL ) then
 
-		'' We have both an ancestor (which was reached directly in the current
-		'' namespace, plus we also have imports.
-		'' !!!TODO!!! scoped+non-explicit enums are going to give us trouble here
-		'' because the enum member is imported in to the current namespace
-		'' The choices are:
-		'' - always return the first_ancestor found
-		'' - return the first_ancestor + imports, and give ambiguous errors
-		'' - something else where we search the imports for enums
-		'' For now, return the first ancestor and all imports
+		''
+		'' Non-explicit enum elements belong to the namespace that contains
+		'' their enum.  The global import hash flattens those elements
+		'' together with USING imports, so recover their active lexical
+		'' scope before considering a global ancestor with the same name.
+		''
+		chain_ = hLookupActiveEnumImports( imp_chain )
+		if( chain_ <> NULL ) then
+			return chain_
+		end if
 
 		if( first_ancestor ) then
 			chain_ = symbNewChainpool( first_ancestor )
@@ -1171,9 +1218,12 @@ private function hsymbLookupTypeNS _
 						return symbNewChainpool( chain_->sym )
 					end if
 				case FB_DATATYPE_ENUM
-					'' !!!TODO!!! scoped+non-explicit enums?
-					'' They will probably need special treatment
-					'' or we need to confirm they don't
+					''
+					'' Non-explicit enums declared in a UDT are imported
+					'' into that UDT.  Imports are copied through the base
+					'' hierarchy, so their elements are inherited members.
+					''
+					return symbNewChainpool( chain_->sym )
 				end select
 				sym = sym->hash.next
 			wend
@@ -1342,8 +1392,12 @@ function symbLookupAt _
 	'' search in UDT's (NAMESPACE, TYPE, CLASS or ENUM) hash tb first
 	dim as FBSYMBOL ptr sym = hashLookupEx( @symbGetCompHashTb( ns ).tb, id, index )
 
-	'' !!!TODO!!! some imports won't make sense in an explicit namespace
-	'' for example this.proc() where proc() is imported from a plain old namespace
+	''
+	'' Imported names are considered only after the namespace's own symbols.
+	'' Qualified UDT lookup is filtered below to inherited UDT members and
+	'' nested enum elements, so THIS.PROC() cannot bind to a plain namespace
+	'' import.
+	''
 
 	'' don't access local variables in an explicit namespace
 	while( sym )
@@ -2010,6 +2064,8 @@ function symbTypeToStr _
 	) as string
 
 	dim as string s
+	dim as DZSTRING pointers
+	DZstrZero( pointers )
 
 	if( dtype = FB_DATATYPE_INVALID ) then
 		exit function
@@ -2076,10 +2132,14 @@ function symbTypeToStr _
 
 	for i as integer = ptrcount-1 to 0 step -1
 		if( typeIsConstAt( dtype, i ) ) then
-			s += " const"
+			DZstrConcatAssign( pointers, " const" )
 		end if
-		s += " ptr"
+		DZstrConcatAssign( pointers, " ptr" )
 	next
+	if( pointers.data <> NULL ) then
+		s += *pointers.data
+	end if
+	DZstrAllocate( pointers, 0 )
 
 	function = s
 end function
@@ -2414,8 +2474,6 @@ function symbCheckConstAssignTopLevel _
 	( _
 		byval ldtype as FB_DATATYPE, _
 		byval rdtype as FB_DATATYPE, _
-		byval lsubtype as FBSYMBOL ptr, _
-		byval rsubtype as FBSYMBOL ptr, _
 		byval mode as FB_PARAMMODE = 0, _
 		byref matches as integer = 0 _
 	) as integer
@@ -2523,33 +2581,26 @@ private function hSymbCheckConstAssignFuncPtr _
 		byval rdtype as FB_DATATYPE, _
 		byval lsubtype as FBSYMBOL ptr, _
 		byval rsubtype as FBSYMBOL ptr, _
-		byval mode as FB_PARAMMODE = 0, _
-		byref matches as integer = 0, _
 		byref wrnmsg as FB_WARNINGMSG = 0 _
 	) as integer
 
 	'' return value:
-	'' TRUE = assignment is comatible
+	'' TRUE = assignment is compatible
 	'' FALSE = assignment is not compatible
 
 	function = FALSE
-
-	'' TODO
-	'' 1) consider also combining (in some way) with symbCalcProcMatch()
-	'' 2) the structure of the call is very similar
-	'' 3) possibly leading towards a generic type compatibility check
 
 	assert( typeGetDtOnly( ldType ) = FB_DATATYPE_FUNCTION )
 	assert( typeGetDtOnly( rdType ) = FB_DATATYPE_FUNCTION )
 	assert( symbIsProc( lsubtype ) )
 	assert( symbIsProc( rsubtype ) )
 
-	'' Return warnings even though some checks are not CONSTness releated.  We could
-	'' promote them to errors, but that will cause many tests to break, and really, we are
-	'' not specifically checking the assignment, but rather the function pointer compatibility.
-	'' So we should get a suspicious pointer warning anyway, plus one of these here.
-
-	'' similar to symbCalcProcMatch(), however, only checking function pointer assignments.
+	''
+	'' This is deliberately separate from symbCalcProcMatch().  Overload
+	'' resolution needs a ranked match score, while assignment checking
+	'' needs the precise warning that explains an incompatible function
+	'' pointer.  Sharing either result would couple two different policies.
+	''
 
 	'' check for identical return type
 	var match = typeCalcMatch( lsubtype->typ, lsubtype->subtype, _
@@ -2616,23 +2667,20 @@ function symbCheckConstAssign _
 		byref wrnmsg as FB_WARNINGMSG = 0 _
 	) as integer
 
-	'' TODO:
-	'' 1) consider combining
-	''      - symbCheckConstAssign()
-	''      - hSymbCheckConstAssignFuncPtr()
-	''      - symbCheckConstAssignTopLevel()
-	'' 2) callers of symbCheckConstAssignTopLevel() need to respond to errors
-	''    and warnings if calling symbCheckConstAssign() instead
-
 	dim ret as integer = any
 
-	'' check top-level const
-	ret = symbCheckConstAssignTopLevel( ldtype, rdtype, lsubtype, rsubtype, mode, matches )
+	''
+	'' Const-level compatibility is also used directly by overload
+	'' resolution, where function-pointer signatures are ranked separately.
+	'' Assignment and conversion paths call this full check so they can
+	'' receive a specific function-pointer warning through WRNMSG.
+	''
+	ret = symbCheckConstAssignTopLevel( ldtype, rdtype, mode, matches )
 
 	if( ret ) then
 		'' both types function pointer?
 		if( ( typeGetDtOnly( ldType ) = FB_DATATYPE_FUNCTION ) and ( typeGetDtOnly( rdType ) = FB_DATATYPE_FUNCTION ) ) then
-			ret and= hSymbCheckConstAssignFuncPtr( ldtype, rdtype, lsubtype, rsubtype, mode, matches, wrnmsg )
+			ret and= hSymbCheckConstAssignFuncPtr( ldtype, rdtype, lsubtype, rsubtype, wrnmsg )
 		end if
 	end if
 
@@ -2731,6 +2779,8 @@ function typeDumpToStr _
 
 	dim as string dump
 	dim as integer ok = any, ptrcount = any, dtypeonly = any
+	dim as DZSTRING pointers
+	DZstrZero( pointers )
 
 	dump = "["
 
@@ -2807,10 +2857,14 @@ function typeDumpToStr _
 
 		for i as integer = (ptrcount-1) to 0 step -1
 			if( typeIsConstAt( dtype, i ) ) then
-				dump += " const"
+				DZstrConcatAssign( pointers, " const" )
 			end if
-			dump += " ptr"
+			DZstrConcatAssign( pointers, " ptr" )
 		next
+		if( pointers.data <> NULL ) then
+			dump += *pointers.data
+		end if
+		DZstrAllocate( pointers, 0 )
 
 		'' Report unusual subtypes
 		if( subtype ) then
@@ -3048,14 +3102,20 @@ function symbDumpToStr _
 		if( verbose ) then
 			'' Dump parameters recursively (if any)
 			s += "("
+			dim as DZSTRING params
+			DZstrZero( params )
 			var param = symbGetProcHeadParam( sym )
 			while( param )
-				s += symbDumpToStr( param, verbose )
+				DZstrConcatAssign( params, symbDumpToStr( param, verbose ) )
 				param = param->next
 				if( param ) then
-					s += ", "
+					DZstrConcatAssign( params, ", " )
 				end if
 			wend
+			if( params.data <> NULL ) then
+				s += *params.data
+			end if
+			DZstrAllocate( params, 0 )
 			s += ")"
 		end if
 
@@ -3088,18 +3148,24 @@ function symbDumpToStr _
 			s += hDumpDynamicArrayDimensions( symbGetArrayDimensions( sym ) )
 		elseif( symbGetArrayDimensions( sym ) > 0 ) then
 			s += "("
+			dim as DZSTRING dimensions
+			DZstrZero( dimensions )
 			for i as integer = 0 to symbGetArrayDimensions( sym ) - 1
 				if( i > 0 ) then
-					s += ", "
+					DZstrConcatAssign( dimensions, ", " )
 				end if
-				s &= symbArrayLbound( sym, i )
-				s += " to "
+				DZstrConcatAssign( dimensions, str( symbArrayLbound( sym, i ) ) )
+				DZstrConcatAssign( dimensions, " to " )
 				if( symbArrayUbound( sym, i ) = FB_ARRAYDIM_UNKNOWN ) then
-					s += "..."
+					DZstrConcatAssign( dimensions, "..." )
 				else
-					s &= symbArrayUbound( sym, i )
+					DZstrConcatAssign( dimensions, str( symbArrayUbound( sym, i ) ) )
 				end if
 			next
+			if( dimensions.data <> NULL ) then
+				s += *dimensions.data
+			end if
+			DZstrAllocate( dimensions, 0 )
 			s += ")"
 		end if
 

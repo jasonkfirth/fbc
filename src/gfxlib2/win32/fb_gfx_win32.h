@@ -100,6 +100,10 @@ extern int fb_hWin32GetTouch(int index, int *x, int *y, int *id);
 extern void fb_hWin32SetMouse(int x, int y, int cursor, int clip);
 extern void fb_hWin32SetWindowTitle(char *title);
 extern int fb_hWin32SetWindowPos(int x, int y);
+extern int fb_hWin32CopyProcedure(void *destination, size_t destination_size,
+                                 const void *source, size_t source_size);
+extern int fb_hWin32LoadProcedure(HMODULE module, const char *name,
+                                 void *destination, size_t destination_size);
 
 /* from the rtlib */
 extern const unsigned char __fb_keytable[][3];

@@ -1,5 +1,5 @@
 {{fbdoc item="title" value="BLOAD"}}----
-Loads arbitrary data from a file created with ##[[KeyPgBsave|Bsave]]##, or a compatible BMP image file.
+Loads arbitrary data from a file created with ##[[KeyPgBsave|Bsave]]##, or a compatible BMP or PNG image file.
 
 {{fbdoc item="syntax"}}##
 	[[KeyPgDeclare|declare]] [[KeyPgFunction|function]] **Bload** ( [[KeyPgByref|byref]] //filename// [[KeyPgAs|as]] [[KeyPgConstQualifier|const]] [[KeyPgString|string]], [[KeyPgByval|byval]] //dest// [[KeyPgAs|as]] [[KeyPgAny|any]] [[KeyPgPtr|ptr]] = 0, [[KeyPgByval|byval]] //pal// [[KeyPgAs|as]] [[KeyPgAny|any]] [[KeyPgPtr|ptr]] = 0 ) [[KeyPgAs|as]] [[KeyPgLong|long]]
@@ -22,17 +22,20 @@ Loads arbitrary data from a file created with ##[[KeyPgBsave|Bsave]]##, or a com
 	##**Bload**## can be used to load image data or any other data from a file created with ##[[KeyPgBsave|Bsave]]##, and store that data in an array or paste it to the screen. If ##//dest//## is absent or null (##0##), the image data is pasted to the current graphics screen work page.  Otherwise it is loaded as image data to the address given by ##//dest//##.
 	##**Bload**## must be called only if a graphics mode is initialized, else the program crashes (see ##[[FaqPgbloadworkaround|BLOAD/BSAVE text mode work-around]]## to work in text mode).
 	
-	##**Bload**## can load 3 different types of files:
+	##**Bload**## can load 4 different types of files:
 		- Old QB-like data files, saved with ##BSAVE## from QB code, containing "raw" data preceded by a 7-byte header, beginning with ##&HFD##, up to 64 ""KiB"" in size
 		- New FB-like data files, saved with ##[[KeyPgBsave|Bsave]]## from FB code, containing "raw" data preceded by a 5-byte header, beginning with ##&HFE##. There is no 64 ""KiB"" limit with this format
 		- BMP image files, supports a subset of valid ("Windows") .BMP files, beginning with ##"BM"##, saved from FB code with ##[[KeyPgBsave|Bsave]]##, or created / saved in a compatible format using a graphics editor / converter.
-	QB-like data files and BMP files are converted to an FB-compatible image format when opened.
+		- PNG image files, beginning with the standard PNG signature, saved from FB code with ##[[KeyPgBsave|Bsave]]## or created by a compatible graphics editor / converter.
+	QB-like data files, BMP files, and PNG files are converted to an FB-compatible image format when opened.
 	
 	Image files with 8-bit per pixel resolution or lower contain a palette that describes the color values used in the images. If ##//pal//## is not null (##0##), the palette is copied to memory starting at the address specified. Otherwise, if the current graphics screen uses a palette then its palette is changed to match that of the image file.
 	
-	When using one of the 2 "non-BMP" file formats to save images, the image files must have been created with ##[[KeyPgBsave|Bsave]]## in the same graphics screen mode as it is being loaded into. When using the BMP file format, this restriction doesn't apply. 
+	When using one of the 2 raw-data file formats to save images, the image files must have been created with ##[[KeyPgBsave|Bsave]]## in the same graphics screen mode as it is being loaded into. This restriction does not apply to BMP or PNG files.
 	
-	When loading a BMP file using ##**Bload**##,  the images must be true-color (15-, 16-, 24- or 32-bits per pixel) or palettized/indexed (8-bit or lower). The image data will be converted to the proper pixel format for the current color depth, except that true-color can't be reduced to a palettized image. ##**Bload**## doesn't support BMP files using RLE compression or other image file types (PNG, JPG, GIF, ...).  ##**Bload**## will load alpha channel information, if available, from 32-bit BMP files with ##BITMAPV4HEADER## or ##BITMAPV5HEADER## file headers.
+	When loading a BMP file using ##**Bload**##, the images must be true-color (15-, 16-, 24- or 32-bits per pixel) or palettized/indexed (8-bit or lower). The image data will be converted to the proper pixel format for the current color depth, except that true-color can't be reduced to a palettized image. ##**Bload**## doesn't support BMP files using RLE compression. ##**Bload**## will load alpha channel information, if available, from 32-bit BMP files with ##BITMAPV4HEADER## or ##BITMAPV5HEADER## file headers.
+
+	PNG input may be indexed, grayscale, grayscale with alpha, true-color, or true-color with alpha. Standard 1-, 2-, 4-, 8-, and 16-bit sample depths are accepted where the PNG format permits them. Scanline filters and Adam7 interlacing are supported. Alpha and ##tRNS## transparency are retained when loading into a 32-bit target. As with BMP input, true-color PNG data can't be reduced to a palettized target.
 	
 	The error code returned by ##**Bload**## can be checked using ##[[KeyPgErr|Err]]## in the next line. The function version of  ##**Bload**## returns directly the error code as a 32 bit ##[[KeyPgLong|Long]]##.
 
@@ -48,7 +51,7 @@ Loads arbitrary data from a file created with ##[[KeyPgBsave|Bsave]]##, or a com
 			- The file doesn't have any of the supported types 
 			- A general read error occurred.
 			
-~&//Note: When you use ##**BLoad**## to load a BMP file into an image buffer, the original dimensions of the image are not changed.  If you want the image buffer to have the same dimensions as the BMP file, you have to find out the dimensions beforehand, and create an image of the right size yourself.  See {{anchor name="bmp_load|the example below"}} for an example of how to do this.//
+~&//Note: When you use ##**BLoad**## to load a BMP or PNG file into an image buffer, the original dimensions of the image buffer are not changed. If you want the image buffer to have the same dimensions as the file, find the dimensions beforehand and create an image of the right size. See {{anchor name="bmp_load|the BMP example below"}} for an example.//
 
 {{fbdoc item="ex"}}
 	{{fbdoc item="filename" value="examples/manual/gfx/bload.bas"}}%%(freebasic)
@@ -140,6 +143,7 @@ sleep
 %%
 {{fbdoc item="diff"}}
 	- Support for loading BMP files is new to ""FreeBASIC"".
+	- Support for loading PNG files is new to ""FreeBASIC"".
 	- Support for retrieving the palette from BMP files is new to ""FreeBASIC"".
 	- ""FreeBASIC"" uses a different file format from QBASIC internally, which doesn't have the 64 ""KiB"" limit, and is unsupported by QBASIC.
 

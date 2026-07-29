@@ -1547,40 +1547,39 @@ private function hCMPF_get_recipe _
 	'' These recipes work for x86 (non-SSE) comparisons too.
 	'' The difference is that we don't use any swapregs, it seems less
 	'' expensive to just do the parity flags check when needed.
-	'' msk Jcc & mask are just a carry over from x86, not used here.
 
 	static recipe( 0 to 23 ) as CMPF_RECIPE = _
 		{ _
-			/' op          x86    rev    msk                  parity parity swap   swap '/ _
-			/' op          Jcc    Jcc    Jcc    mask          false  true   regs   init '/ _
+			/' op          Jcc    reverse Jcc  parity parity swap   swap '/ _
+			/'                              false  true   regs   init '/ _
 			/' Result = ( a op b ) '/ _
-			( CMPF_OP_EQ, @"e" , @""  , @""  , @""          , FALSE, TRUE , FALSE, FALSE ), _
-			( CMPF_OP_NE, @"ne", @""  , @""  , @""          , TRUE , FALSE, FALSE, FALSE ), _
-			( CMPF_OP_GT, @"a" , @""  , @""  , @""          , FALSE, FALSE, FALSE, FALSE ), _
-			( CMPF_OP_LT, @"b" , @""  , @""  , @""          , FALSE ,TRUE , FALSE, FALSE ), _
-			( CMPF_OP_GE, @"ae", @""  , @""  , @""          , FALSE, FALSE, FALSE, FALSE ), _
-			( CMPF_OP_LE, @"be", @""  , @""  , @""          , FALSE, TRUE , FALSE, FALSE ), _
+			( CMPF_OP_EQ, @"e" , @""  , FALSE, TRUE , FALSE, FALSE ), _
+			( CMPF_OP_NE, @"ne", @""  , TRUE , FALSE, FALSE, FALSE ), _
+			( CMPF_OP_GT, @"a" , @""  , FALSE, FALSE, FALSE, FALSE ), _
+			( CMPF_OP_LT, @"b" , @""  , FALSE, TRUE , FALSE, FALSE ), _
+			( CMPF_OP_GE, @"ae", @""  , FALSE, FALSE, FALSE, FALSE ), _
+			( CMPF_OP_LE, @"be", @""  , FALSE, TRUE , FALSE, FALSE ), _
 			/' Result = !( a op b ) '/ _
-			( CMPF_OP_EQ, @"ne", @""  , @""  , @""          , TRUE , FALSE, FALSE, FALSE ), _
-			( CMPF_OP_NE, @"e" , @""  , @""  , @""          , FALSE, TRUE , FALSE, FALSE ), _
-			( CMPF_OP_GT, @"be", @""  , @""  , @""          , FALSE, FALSE, FALSE, FALSE ), _
-			( CMPF_OP_LT, @"ae", @""  , @""  , @""          , TRUE , FALSE, FALSE, FALSE ), _
-			( CMPF_OP_GE, @"b" , @""  , @""  , @""          , FALSE, FALSE, FALSE, FALSE ), _
-			( CMPF_OP_LE, @"a" , @""  , @""  , @""          , TRUE , FALSE, FALSE, FALSE ), _
+			( CMPF_OP_EQ, @"ne", @""  , TRUE , FALSE, FALSE, FALSE ), _
+			( CMPF_OP_NE, @"e" , @""  , FALSE, TRUE , FALSE, FALSE ), _
+			( CMPF_OP_GT, @"be", @""  , FALSE, FALSE, FALSE, FALSE ), _
+			( CMPF_OP_LT, @"ae", @""  , TRUE , FALSE, FALSE, FALSE ), _
+			( CMPF_OP_GE, @"b" , @""  , FALSE, FALSE, FALSE, FALSE ), _
+			( CMPF_OP_LE, @"a" , @""  , TRUE , FALSE, FALSE, FALSE ), _
 			/' if !( a op b ) then goto exit label '/ _
-			( CMPF_OP_EQ, @"e" , @""  , @""  , @""          , FALSE, TRUE , FALSE, FALSE ), _
-			( CMPF_OP_NE, @"ne", @""  , @""  , @""          , TRUE , FALSE, FALSE, FALSE ), _
-			( CMPF_OP_GT, @"a" , @""  , @""  , @""          , FALSE, FALSE, FALSE, FALSE ), _
-			( CMPF_OP_LT, @"b" , @""  , @""  , @""          , FALSE, TRUE , FALSE, FALSE ), _
-			( CMPF_OP_GE, @"ae", @""  , @""  , @""          , FALSE, FALSE, FALSE, FALSE ), _
-			( CMPF_OP_LE, @"be", @""  , @""  , @""          , FALSE, TRUE , FALSE, FALSE ), _
+			( CMPF_OP_EQ, @"e" , @""  , FALSE, TRUE , FALSE, FALSE ), _
+			( CMPF_OP_NE, @"ne", @""  , TRUE , FALSE, FALSE, FALSE ), _
+			( CMPF_OP_GT, @"a" , @""  , FALSE, FALSE, FALSE, FALSE ), _
+			( CMPF_OP_LT, @"b" , @""  , FALSE, TRUE , FALSE, FALSE ), _
+			( CMPF_OP_GE, @"ae", @""  , FALSE, FALSE, FALSE, FALSE ), _
+			( CMPF_OP_LE, @"be", @""  , FALSE, TRUE , FALSE, FALSE ), _
 			/' if ( a op b ) then goto exit label '/ _
-			( CMPF_OP_EQ, @"ne", @""  , @"nz", @"0b01000000", TRUE , FALSE, FALSE, FALSE ), _
-			( CMPF_OP_NE, @"e" , @""  , @"z" , @"0b01000000", FALSE, TRUE , FALSE, FALSE ), _
-			( CMPF_OP_GT, @"be", @""  , @"z" , @"0b01000001", FALSE, FALSE, FALSE, FALSE ), _
-			( CMPF_OP_LT, @"ae", @""  , @"nz", @"0b00000001", TRUE , FALSE, FALSE, FALSE ), _
-			( CMPF_OP_GE, @"b" , @""  , @""  , @""          , FALSE, FALSE, FALSE, FALSE ), _
-			( CMPF_OP_LE, @"a" , @""  , @"nz", @"0b01000001", TRUE , FALSE, FALSE, FALSE ) _
+			( CMPF_OP_EQ, @"ne", @""  , TRUE , FALSE, FALSE, FALSE ), _
+			( CMPF_OP_NE, @"e" , @""  , FALSE, TRUE , FALSE, FALSE ), _
+			( CMPF_OP_GT, @"be", @""  , FALSE, FALSE, FALSE, FALSE ), _
+			( CMPF_OP_LT, @"ae", @""  , TRUE , FALSE, FALSE, FALSE ), _
+			( CMPF_OP_GE, @"b" , @""  , FALSE, FALSE, FALSE, FALSE ), _
+			( CMPF_OP_LE, @"a" , @""  , TRUE , FALSE, FALSE, FALSE ) _
 		}
 
 	dim index as integer = op

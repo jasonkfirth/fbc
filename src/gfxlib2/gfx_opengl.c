@@ -20,6 +20,31 @@ FBCALL void *fb_GfxGetGLProcAddress(const char *proc)
 
 #else /* DISABLE_OPENGL */
 
+FB_GL_PARAMS __fb_gl_params = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, NULL };
+char __fb_gl_extensions[FBGL_EXTENSIONS_STRING_SIZE];
+
+FBCALL void *fb_GfxGetGLProcAddress(const char *proc)
+{
+	void *result;
+
+	if (!proc || !proc[0])
+		return NULL;
+
+	FB_GRAPHICS_LOCK( );
+
+	if (__fb_gfx && (__fb_gfx->flags & OPENGL_SUPPORT)) {
+		result = fb_hGL_GetProcAddress(proc);
+	} else {
+		result = NULL;
+	}
+
+	FB_GRAPHICS_UNLOCK( );
+
+	return result;
+}
+
+#ifndef OPENGL_CONTEXT_ONLY
+
 #define FBGL_TEXTURE 0x1
 #define FBGL_BLEND   0x2
 
@@ -32,7 +57,6 @@ FBCALL void *fb_GfxGetGLProcAddress(const char *proc)
 #endif
 
 FB_GL __fb_gl;
-FB_GL_PARAMS __fb_gl_params = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, NULL };
 static GLfloat texcoords[8];
 static GLuint ScreenTex;
 static GLfloat map_r[256], map_g[256], map_b[256];
@@ -49,27 +73,10 @@ static int next_pow2(int n)
 	return n;
 }
 
-FBCALL void *fb_GfxGetGLProcAddress(const char *proc)
-{
-	void *result;
-
-	FB_GRAPHICS_LOCK( );
-
-	if (__fb_gfx && (__fb_gfx->flags & OPENGL_SUPPORT)) {
-		result = fb_hGL_GetProcAddress(proc);
-	} else {
-		result = NULL;
-	}
-
-	FB_GRAPHICS_UNLOCK( );
-
-	return result;
-}
-
 int fb_hGL_ExtensionSupported(const char *extension)
 {
 	ssize_t len;
-	char *string = __fb_gl.extensions;
+	char *string = __fb_gl_extensions;
 
 	len = strlen(extension);
 	while ((string = strstr(string, extension)) != NULL) {
@@ -159,6 +166,8 @@ void fb_hGL_ImageDestroy(GLuint id)
 	__fb_gl.DeleteTextures(1, &id);
 }
 
+#endif /* not OPENGL_CONTEXT_ONLY */
+
 void fb_hGL_NormalizeParameters(int gl_options)
 {
 	int default_color_bits[4] = { 0, 5, 8, 8 };
@@ -217,6 +226,8 @@ void fb_hGL_NormalizeParameters(int gl_options)
 		__fb_gl_params.num_samples = 4;
 }
 
+#ifndef OPENGL_CONTEXT_ONLY
+
 int fb_hGL_Init(FB_DYLIB lib, char *os_extensions)
 {
 	const char *const gl_funcs[] = { "glEnable", "glDisable", "glEnableClientState", "glDisableClientState",
@@ -230,18 +241,25 @@ int fb_hGL_Init(FB_DYLIB lib, char *os_extensions)
 							   "glPixelTransferi", "glPixelMapfv" };
 	FB_GL *funcs = &__fb_gl;
 	void **funcs_ptr = (void **)funcs;
+	const char *extensions;
 	int res = 0, size = FBGL_EXTENSIONS_STRING_SIZE - 1;
 
 	fb_hMemSet(&__fb_gl, 0, sizeof(FB_GL));
+	__fb_gl_extensions[0] = '\0';
 
 	if (fb_hDynLoadAlso(lib, gl_funcs, funcs_ptr, ARRAY_SIZE(gl_funcs)))
 		return -1;
 
-	strncpy(__fb_gl.extensions, (char *)__fb_gl.GetString(GL_EXTENSIONS), size);
-	size -= strlen(__fb_gl.extensions);
+	extensions = (const char *)__fb_gl.GetString(GL_EXTENSIONS);
+	if (!extensions)
+		return -1;
+
+	strncpy(__fb_gl_extensions, extensions, size);
+	__fb_gl_extensions[size] = '\0';
+	size -= strlen(__fb_gl_extensions);
 	if (os_extensions)
-		strncat(__fb_gl.extensions, os_extensions, size);
-	__fb_gl.extensions[FBGL_EXTENSIONS_STRING_SIZE - 1] = '\0';
+		strncat(__fb_gl_extensions, os_extensions, size);
+	__fb_gl_extensions[FBGL_EXTENSIONS_STRING_SIZE - 1] = '\0';
 
 	res |= !fb_hGL_ExtensionSupported("GL_EXT_bgra");
 
@@ -403,5 +421,7 @@ void fb_hGL_SetupProjection(void)
 	__fb_gl.PopClientAttrib();
 
 }
+
+#endif /* not OPENGL_CONTEXT_ONLY */
 
 #endif /* DISABLE_OPENGL */

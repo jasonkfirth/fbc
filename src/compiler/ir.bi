@@ -113,6 +113,8 @@ type ASTASMTOK
 	next        as ASTASMTOK ptr
 end type
 
+'' Backend interface and shared context
+
 '' if changed, update the _vtbl symbols at ir-*.bas::*_ctor
 type IR_VTBL
 	init as sub( )

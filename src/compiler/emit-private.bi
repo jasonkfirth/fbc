@@ -135,8 +135,6 @@ type CMPF_RECIPE
 	op as CMPF_OP
 	mnemonic as zstring ptr             '' 'normal' comparison to use
 	rev_mnemonic as zstring ptr         '' swapped comparison
-	msk_mnemonic as zstring ptr
-	mask as zstring ptr
 	parity_false as integer
 	parity_true as integer
 	swapregs as integer

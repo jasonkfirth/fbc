@@ -5,6 +5,9 @@
 
 static int driver_init(char *title, int w, int h, int depth, int refresh_rate, int flags)
 {
+	if (flags & DRIVER_OPENGL)
+		return -1;
+
 	return fb_hDarwinInit(title, w, h, depth, refresh_rate, flags);
 }
 

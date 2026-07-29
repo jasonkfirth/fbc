@@ -49,6 +49,7 @@
         for delivering the generated samples to the operating system.
 */
 
+#include <limits.h>
 #include <stdlib.h>
 
 #if defined(_WIN32)
@@ -104,6 +105,10 @@ static int g_foreground_feed_count = 0;
 
 static FB_SFX_RINGBUFFER g_output_queue;
 static int g_output_queue_initialized = 0;
+static float *g_driver_output_buffer = NULL;
+static int g_driver_output_frames = 0;
+static int g_raw_output_active = 0;
+static unsigned long g_output_stream_epoch = 1;
 
 /* ------------------------------------------------------------------------- */
 /* Subsystem initialization                                                  */
@@ -147,6 +152,7 @@ int fb_sfxInitCore(void)
     /* initialize shared runtime state */
     fb_sfxChannelInit();
     fb_sfxEnvelopeInit();
+    fb_sfxEchoInit();
 
     /* initialize mixer */
     fb_sfxMixerInit();
@@ -246,6 +252,7 @@ void fb_sfxExitCore(void)
     fb_sfxOutputQueueShutdownLocked();
     fb_sfxCaptureBufferShutdown();
 
+    fb_sfxEchoShutdown();
     fb_sfxMixerShutdown();
 
     __fb_sfx->initialized = 0;
@@ -267,6 +274,7 @@ static void fb_sfxInitCoreRollbackLocked(void)
     fb_sfxMixBufferShutdown();
     fb_sfxOutputQueueShutdownLocked();
     fb_sfxCaptureBufferShutdown();
+    fb_sfxEchoShutdown();
     fb_sfxMixerShutdown();
 }
 
@@ -509,6 +517,21 @@ int fb_sfxRawWrite(const float *samples, int frames, int channels)
         return -1;
     }
 
+    /*
+        Raw output is one complete, caller-clocked stream.  Discard any
+        mixer-generated frames that were queued while the lazy audio driver
+        started, then stop the ordinary mixer from inserting silence between
+        later raw writes.
+    */
+    if (!g_raw_output_active)
+    {
+        fb_sfxRingBufferClear(&g_output_queue);
+        g_raw_output_active = 1;
+        g_output_stream_epoch++;
+        if (g_output_stream_epoch == 0)
+            g_output_stream_epoch = 1;
+    }
+
     output_channels = (__fb_sfx->output_channels > 0)
         ? __fb_sfx->output_channels
         : FB_SFX_DEFAULT_CHANNELS;
@@ -573,6 +596,110 @@ int fb_sfxRawWrite(const float *samples, int frames, int channels)
 
     fb_sfxRuntimeUnlock();
     return written;
+}
+
+int fb_sfxRawOpen(void)
+{
+    int sample_rate;
+
+    if (!fb_sfxEnsureInitialized())
+        return -1;
+
+    fb_sfxRuntimeLock();
+
+    if (!__fb_sfx ||
+        (!g_output_queue_initialized && fb_sfxOutputQueueInitLocked() != 0))
+    {
+        fb_sfxRuntimeUnlock();
+        return -1;
+    }
+
+    fb_sfxRingBufferClear(&g_output_queue);
+
+    /*
+        RawOpen is an explicit stream restart even when another raw producer
+        already owns output. Backends with a platform-side queue use this
+        epoch to discard blocks which have left the common ring buffer.
+    */
+    g_output_stream_epoch++;
+    if (g_output_stream_epoch == 0)
+        g_output_stream_epoch = 1;
+
+    g_raw_output_active = 1;
+    sample_rate = __fb_sfx->samplerate;
+
+    fb_sfxRuntimeUnlock();
+
+    return (sample_rate > 0) ? sample_rate : -1;
+}
+
+void fb_sfxRawClose(void)
+{
+    fb_sfxRuntimeLock();
+
+    if (g_output_queue_initialized)
+        fb_sfxRingBufferClear(&g_output_queue);
+
+    if (g_raw_output_active)
+    {
+        g_output_stream_epoch++;
+        if (g_output_stream_epoch == 0)
+            g_output_stream_epoch = 1;
+    }
+
+    g_raw_output_active = 0;
+
+    fb_sfxRuntimeUnlock();
+}
+
+unsigned long long fb_sfxOutputUnderruns(void)
+{
+    FB_SFX_DRIVER_STATS stats;
+    const char *driver_name;
+
+    driver_name = NULL;
+
+    fb_sfxRuntimeLock();
+
+    if (__fb_sfx && __fb_sfx->driver)
+        driver_name = __fb_sfx->driver->name;
+
+    fb_sfxRuntimeUnlock();
+
+    if (!driver_name || fb_sfxDriverStatsSnapshot(driver_name, &stats) != 0)
+        return 0;
+
+    return stats.underruns;
+}
+
+unsigned long long fb_sfxRawUnderruns(void)
+{
+    return fb_sfxOutputUnderruns();
+}
+
+int fb_sfxOutputSampleRate(void)
+{
+    int sample_rate;
+
+    if (!fb_sfxEnsureInitialized())
+        return -1;
+
+    fb_sfxRuntimeLock();
+    sample_rate = (__fb_sfx) ? __fb_sfx->samplerate : -1;
+    fb_sfxRuntimeUnlock();
+
+    return (sample_rate > 0) ? sample_rate : -1;
+}
+
+unsigned long fb_sfxOutputStreamEpoch(void)
+{
+    unsigned long epoch;
+
+    fb_sfxRuntimeLock();
+    epoch = g_output_stream_epoch;
+    fb_sfxRuntimeUnlock();
+
+    return epoch;
 }
 
 static int fb_sfxRawCopyFramesLocked(float *dst,
@@ -786,7 +913,11 @@ static int fb_sfxDriverIndexOf(const SFXDRIVER *driver)
 
 static int fb_sfxOutputQueueInitLocked(void)
 {
+    int channels;
+    int driver_frames;
     int queue_frames;
+    int driver_samples;
+    size_t driver_bytes;
 
     if (!__fb_sfx)
         return -1;
@@ -794,23 +925,58 @@ static int fb_sfxOutputQueueInitLocked(void)
     if (g_output_queue_initialized)
         return 0;
 
+    channels = __fb_sfx->output_channels;
+    if (channels <= 0)
+        return -1;
+
     queue_frames = __fb_sfx->buffer_size;
     if (queue_frames <= 0)
         queue_frames = FB_SFX_DEFAULT_BUFFER;
 
     /*
-        Two runtime-sized blocks provide enough slack for ordinary worker
-        thread jitter without moving too far away from the requested
-        device buffer size.
+        Four runtime-sized blocks let caller-clocked streams stay ahead of a
+        display or asset-loading stall. Ordinary mixer updates still generate
+        and drain one requested block at a time, so the added capacity does
+        not increase their latency.
     */
-    queue_frames *= 2;
+    if (queue_frames > (INT_MAX / 4))
+        return -1;
+
+    queue_frames *= 4;
 
     if (fb_sfxRingBufferInit(&g_output_queue,
                              queue_frames,
-                             __fb_sfx->output_channels) != 0)
+                             channels) != 0)
     {
         return -1;
     }
+
+    driver_frames = (__fb_sfx->buffer_frames > 0)
+        ? __fb_sfx->buffer_frames
+        : FB_SFX_DEFAULT_BUFFER;
+
+    if (driver_frames <= 0 || driver_frames > INT_MAX / channels)
+    {
+        fb_sfxRingBufferShutdown(&g_output_queue);
+        return -1;
+    }
+
+    driver_samples = driver_frames * channels;
+    if ((size_t)driver_samples > ((size_t)-1) / sizeof(float))
+    {
+        fb_sfxRingBufferShutdown(&g_output_queue);
+        return -1;
+    }
+
+    driver_bytes = (size_t)driver_samples * sizeof(float);
+    g_driver_output_buffer = (float *)malloc(driver_bytes);
+    if (!g_driver_output_buffer)
+    {
+        fb_sfxRingBufferShutdown(&g_output_queue);
+        return -1;
+    }
+
+    g_driver_output_frames = driver_frames;
 
     g_output_queue_initialized = 1;
     return 0;
@@ -822,6 +988,10 @@ static void fb_sfxOutputQueueShutdownLocked(void)
         return;
 
     fb_sfxRingBufferShutdown(&g_output_queue);
+    free(g_driver_output_buffer);
+    g_driver_output_buffer = NULL;
+    g_driver_output_frames = 0;
+    g_raw_output_active = 0;
     g_output_queue_initialized = 0;
 }
 
@@ -836,6 +1006,15 @@ static int fb_sfxOutputQueueFillLocked(int frames)
     if (!g_output_queue_initialized && fb_sfxOutputQueueInitLocked() != 0)
         return -1;
 
+    /*
+        A raw stream owns the complete output clock.  Generating ordinary
+        mixer frames here would splice silence or unrelated voices between
+        caller-supplied blocks whenever the producer and device threads wake
+        at slightly different times.
+    */
+    if (g_raw_output_active)
+        return 0;
+
     if (frames <= 0)
         frames = __fb_sfx->buffer_size;
 
@@ -845,24 +1024,39 @@ static int fb_sfxOutputQueueFillLocked(int frames)
     if (max_frames <= 0)
         max_frames = FB_SFX_DEFAULT_BUFFER;
 
+    /*
+        Generate only the block the current update will immediately submit.
+        Pre-generating a full default buffer leaves future silence ahead of a
+        newly queued voice, adding several audio periods of command latency.
+        The ring buffer remains larger for raw producers, which fill it through
+        fb_sfxRawWrite() and do not use this mixer path.
+    */
     target_frames = frames;
-    if (__fb_sfx->buffer_size > target_frames)
-        target_frames = __fb_sfx->buffer_size;
 
     if (target_frames > g_output_queue.frames)
         target_frames = g_output_queue.frames;
 
     while (fb_sfxRingBufferAvailable(&g_output_queue) < target_frames)
     {
+        int available_frames;
         int free_frames;
         int frames_this_pass;
         int written;
 
+        available_frames = fb_sfxRingBufferAvailable(&g_output_queue);
         free_frames = fb_sfxRingBufferFree(&g_output_queue);
         if (free_frames <= 0)
             break;
 
-        frames_this_pass = free_frames;
+        /*
+            Generate only the deficit that this update will drain. Filling a
+            complete mix block for a smaller deficit leaves pre-rendered audio
+            in the queue. Repeating non-block-aligned updates can then advance
+            the output clock without advancing voices by the same frame count.
+        */
+        frames_this_pass = target_frames - available_frames;
+        if (frames_this_pass > free_frames)
+            frames_this_pass = free_frames;
         if (frames_this_pass > max_frames)
             frames_this_pass = max_frames;
 
@@ -883,6 +1077,7 @@ static int fb_sfxOutputQueueFillLocked(int frames)
 
 static int fb_sfxOutputQueueDrainLocked(int frames)
 {
+    const SFXDRIVER *failed_driver;
     const SFXDRIVER *driver;
     const char *last_driver_name;
     int channels;
@@ -892,7 +1087,7 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
     int zero_retry_count;
     int zero_retry_limit;
 
-    if (!__fb_sfx || !__fb_sfx->mixbuffer || frames <= 0)
+    if (!__fb_sfx || !g_driver_output_buffer || frames <= 0)
         return 0;
 
     if (__fb_sfx->shutting_down)
@@ -901,9 +1096,32 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
     if (!g_output_queue_initialized)
         return 0;
 
+    /*
+        Serialize before copying frames into the driver staging buffer.  The
+        runtime lock is intentionally released during driver writes, so the
+        mixer scratch buffer cannot safely double as driver-owned storage.
+        Taking the I/O lock first gives every update its own stable staging
+        interval while raw producers remain free to fill the queue.
+    */
+    fb_sfxRuntimeUnlock();
+    fb_sfxDriverIoLock();
+    fb_sfxRuntimeLock();
+
+    if (!__fb_sfx ||
+        __fb_sfx->shutting_down ||
+        !g_output_queue_initialized ||
+        !g_driver_output_buffer)
+    {
+        fb_sfxDriverIoUnlock();
+        return 0;
+    }
+
     queued = fb_sfxRingBufferAvailable(&g_output_queue);
     if (queued <= 0)
+    {
+        fb_sfxDriverIoUnlock();
         return 0;
+    }
 
     if (frames > queued)
         frames = queued;
@@ -911,9 +1129,17 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
     if (__fb_sfx->buffer_frames > 0 && frames > __fb_sfx->buffer_frames)
         frames = __fb_sfx->buffer_frames;
 
-    drained = fb_sfxRingBufferRead(&g_output_queue, __fb_sfx->mixbuffer, frames);
+    if (frames > g_driver_output_frames)
+        frames = g_driver_output_frames;
+
+    drained = fb_sfxRingBufferRead(&g_output_queue,
+                                   g_driver_output_buffer,
+                                   frames);
     if (drained <= 0)
+    {
+        fb_sfxDriverIoUnlock();
         return 0;
+    }
 
     channels = (__fb_sfx->output_channels > 0)
         ? __fb_sfx->output_channels
@@ -949,7 +1175,7 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
             continue;
         }
 
-        write_buffer = __fb_sfx->mixbuffer + (written * channels);
+        write_buffer = g_driver_output_buffer + (written * channels);
         write_frames = drained - written;
         last_driver_name = driver->name;
 
@@ -964,17 +1190,12 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
             a real driver error, so the active driver is rechecked after the
             I/O lock is acquired.
         */
-        fb_sfxRuntimeUnlock();
-        fb_sfxDriverIoLock();
-        fb_sfxRuntimeLock();
-
         if (!__fb_sfx ||
             __fb_sfx->driver != driver ||
             __fb_sfx->shutting_down ||
             !driver ||
             !driver->write)
         {
-            fb_sfxDriverIoUnlock();
             driver = (__fb_sfx) ? __fb_sfx->driver : NULL;
             continue;
         }
@@ -983,7 +1204,6 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
         fb_sfxRuntimeUnlock();
         result = write_proc(write_buffer, write_frames);
         fb_sfxRuntimeLock();
-        fb_sfxDriverIoUnlock();
 
         fb_sfxDriverStatsRecordWrite(driver->name, write_frames, result);
 
@@ -1004,7 +1224,10 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
             zero_retry_count = 0;
 
             if (written >= drained)
+            {
+                fb_sfxDriverIoUnlock();
                 return written;
+            }
 
             continue;
         }
@@ -1033,13 +1256,24 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
             break;
         }
 
-        if (fb_sfxDriverFallback(driver) != 0)
-            break;
+        failed_driver = driver;
+        fb_sfxDriverIoUnlock();
 
-        driver = (__fb_sfx) ? __fb_sfx->driver : NULL;
-        if (driver)
-            last_driver_name = driver->name;
+        /*
+            A failed block cannot be replayed after releasing the staging
+            buffer to another update.  Switch drivers for the next block and
+            account for the unaccepted tail instead of risking duplicated or
+            corrupted PCM during recovery.
+        */
+        (void)fb_sfxDriverFallback(failed_driver);
+
+        if (written < drained && last_driver_name)
+            fb_sfxDriverStatsRecordDrop(last_driver_name, drained - written);
+
+        return written;
     }
+
+    fb_sfxDriverIoUnlock();
 
     if (written < drained && last_driver_name)
         fb_sfxDriverStatsRecordDrop(last_driver_name, drained - written);

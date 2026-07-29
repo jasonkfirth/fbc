@@ -1,0 +1,51 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_ellipse_resolve.comp
+
+    Purpose:
+
+        Resolve the opaque filled midpoint ellipse winner image into a Vulkan
+        surface after the ordered selection pass.
+
+    Responsibilities:
+
+        - write each selected command's native logical colour once
+        - leave pixels with no current-batch winner unchanged
+
+    This file intentionally does NOT contain:
+
+        - midpoint coverage generation
+        - destination-read blending
+        - host-side winner-buffer lifetime management
+*/
+
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) buffer SurfacePixels { uint pixels[]; }
+	surface_pixels;
+layout(set = 0, binding = 1, std430) readonly buffer WinnerPixels { uint pixels[]; }
+	winner_pixels;
+struct EllipseCommand { ivec4 center; ivec4 clip; vec4 radii; uvec4 parameters; };
+layout(set = 0, binding = 2, std430) readonly buffer EllipseCommands
+{ EllipseCommand commands[]; } ellipse_commands;
+
+void main(void)
+{
+	EllipseCommand first = ellipse_commands.commands[0];
+	ivec2 position = ivec2(gl_GlobalInvocationID.xy);
+	uint offset;
+	uint winner;
+	if ((uint(position.x) >= uint(first.radii.z)) ||
+		(uint(position.y) >= uint(first.radii.w))) return;
+	offset = (uint(position.y) * uint(first.radii.z)) + uint(position.x);
+	winner = winner_pixels.pixels[offset];
+	if (winner == 0u) return;
+	surface_pixels.pixels[offset] = ellipse_commands.commands[winner - 1u].parameters.x &
+		ellipse_commands.commands[winner - 1u].parameters.z;
+}
+
+/* end of vulkan_ellipse_resolve.comp */

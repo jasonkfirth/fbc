@@ -343,7 +343,7 @@ private function astTryOvlOpCastCONV _
 	) as integer
 
 	dim as FBSYMBOL ptr proc = any
-	dim as FB_ERRMSG err_num = any
+	dim as FB_ERRMSG err_num = FB_ERRMSG_OK
 	dim as FB_SYMBFINDOPT find_options = FB_SYMBFINDOPT_NONE
 
 	if( (options and AST_CONVOPT_EXACT_CAST)<>0 ) then

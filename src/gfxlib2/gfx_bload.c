@@ -1,6 +1,28 @@
-/* BLOAD support. */
+/*
+    FreeBASIC Graphics Library
+    --------------------------
+
+    File: gfx_bload.c
+
+    Purpose:
+
+        Implement BLOAD file identification and the legacy BMP/raw readers.
+
+    Responsibilities:
+
+        - identify BMP, PNG, and BSAVE-block files by their contents
+        - convert supported BMP images into gfxlib2 targets
+        - preserve the public BLOAD runtime entry points
+
+    This file intentionally does NOT contain:
+
+        - BSAVE output handling
+        - PNG codec internals
+        - image allocation policy
+*/
 
 #include "fb_gfx.h"
+#include "gfx_png.h"
 #ifdef HOST_WIN32
 	#include <windows.h>
 #endif
@@ -626,6 +648,19 @@ static int gfx_bload(FBSTRING *filename, void *dest, void *pal, int usenewheader
 			FB_GRAPHICS_UNLOCK( );
 			return result;
 
+		case 0x89:
+			/* Can be a PNG */
+			if (fseek(f, 0L, SEEK_SET) != 0) {
+				result = FB_RTERROR_FILEIO;
+				break;
+			}
+			result = fb_hGfxPngLoad(context, f, dest, pal,
+				usenewheader);
+			fclose(f);
+			fb_hStrDelTemp(filename);
+			FB_GRAPHICS_UNLOCK( );
+			return result;
+
 		default:
 			result = FB_RTERROR_FILEIO;
 			break;
@@ -681,3 +716,5 @@ FBCALL int fb_GfxBloadQB(FBSTRING *filename, void *dest, void *pal)
 {
 	return gfx_bload( filename, dest, pal, FALSE );
 }
+
+/* end of gfx_bload.c */

@@ -303,6 +303,10 @@ const FB_SFX_DRIVER __fb_sfxDriverNull =
     NULL
 };
 
+/*
+    Some platform driver lists use the non-prefixed internal spelling.  Keep
+    this separate object until those target adapters converge on one symbol.
+*/
 const FB_SFX_DRIVER fb_sfxDriverNull =
 {
     "null",

@@ -341,7 +341,18 @@ static void *window_thread(void *arg)
 						              event.xconfigure.width, event.xconfigure.height);
 					}
 					if (event.xconfigure.window == fb_x11.window) {
-						fb_hX11RefreshLayout(event.xconfigure.width, event.xconfigure.height);
+						if (fb_x11.flags & DRIVER_RESIZABLE) {
+							int logical_height =
+								(event.xconfigure.height +
+								 __fb_gfx->scanline_size - 1) /
+								__fb_gfx->scanline_size;
+
+							fb_hRequestResize(event.xconfigure.width,
+								logical_height);
+						} else {
+							fb_hX11RefreshLayout(event.xconfigure.width,
+								event.xconfigure.height);
+						}
 						fb_hMemSet(__fb_gfx->dirty, TRUE, fb_x11.h);
 						XClearWindow(fb_x11.display, fb_x11.window);
 					}
@@ -610,17 +621,29 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 
 	size = XAllocSizeHints();
 	size->flags = PBaseSize | PMinSize | PMaxSize | PResizeInc;
-	size->min_width = size->base_width = fb_x11.content_w;
-	size->min_height = size->base_height = fb_x11.content_h;
-	if (flags & DRIVER_NO_SWITCH) {
+	size->base_width = fb_x11.content_w;
+	size->base_height = fb_x11.content_h;
+	if (flags & DRIVER_RESIZABLE) {
+		size->min_width = 8;
+		size->min_height = (__fb_gfx && __fb_gfx->font) ?
+			__fb_gfx->font->h * __fb_gfx->scanline_size : 16;
+		size->max_width = XDisplayWidth(fb_x11.display, fb_x11.screen);
+		size->max_height = XDisplayHeight(fb_x11.display, fb_x11.screen);
+	} else {
+		size->min_width = fb_x11.content_w;
+		size->min_height = fb_x11.content_h;
+	}
+	if ((flags & DRIVER_NO_SWITCH) && !(flags & DRIVER_RESIZABLE)) {
 		size->max_width = size->min_width;
 		size->max_height = size->min_height;
-	} else {
+	} else if (!(flags & DRIVER_RESIZABLE)) {
 		size->max_width = XDisplayWidth(fb_x11.display, fb_x11.screen);
 		size->max_height = XDisplayHeight(fb_x11.display, fb_x11.screen);
 	}
-	size->width_inc = (flags & DRIVER_NO_SWITCH) ? 0x10000 : 1;
-	size->height_inc = (flags & DRIVER_NO_SWITCH) ? 0x10000 : 1;
+	size->width_inc = ((flags & DRIVER_NO_SWITCH) &&
+		!(flags & DRIVER_RESIZABLE)) ? 0x10000 : 1;
+	size->height_inc = ((flags & DRIVER_NO_SWITCH) &&
+		!(flags & DRIVER_RESIZABLE)) ? 0x10000 : 1;
 	XSetWMNormalHints(fb_x11.display, fb_x11.window, size);
 	XSetWMNormalHints(fb_x11.display, fb_x11.fswindow, size);
 	XSetWMNormalHints(fb_x11.display, fb_x11.wmwindow, size);

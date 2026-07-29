@@ -210,9 +210,10 @@ function cLRSetStmt(byval tk as FB_TOKEN) as integer
 		function = rtlMemCopyClear( dstexpr, symbGetSizeOf( dst->subtype ), _
 		                            srcexpr, symbGetSizeOf( src->subtype ) )
 	else
-		'' !!!TODO!!! - if udt extends z|wstring, check if operator len()
-		'' was overloaded and pass the length parameters to a separate
-		'' rtlib function
+		''
+		'' rtlStrLRSet() preserves an overloaded LEN() from a UDT string
+		'' conversion and selects the explicit-length runtime entry point.
+		''
 		function = rtlStrLRSet( dstexpr, srcexpr, is_rset )
 	end if
 
@@ -290,6 +291,8 @@ private function cStrCHR(byval is_wstr as integer) as ASTNODE ptr
 				if( (v < CHAR_SPACE) or (v > CHAR_PRINTABLE_MAX) ) then
 					zs += ESCCHAR
 					o = oct( v )
+					'' CHR() accepts at most 32 arguments in the table above.
+					''
 					zs += chr( len( o ) )
 					zs += o
 				else

@@ -5,6 +5,9 @@
 #include "haiku_render.h"
 #include "haiku_debug.h"
 #include "../fb_gfx.h"
+#ifndef DISABLE_OPENGL
+#include "../fb_gfx_gl.h"
+#endif
 
 #include <Application.h>
 #include <Bitmap.h>
@@ -17,10 +20,31 @@
 extern BBitmap *g_bmp;
 extern BWindow *g_win;
 extern BView   *g_view;
+#ifndef DISABLE_OPENGL
+extern BGLView *g_gl_view;
+#endif
 
 extern thread_id fb_haiku_event_thread;
 
 static BApplication *fb_app = NULL;
+
+#ifndef DISABLE_OPENGL
+static uint32 fb_hHaikuOpenGLViewOptions(void)
+{
+    uint32 options = BGL_RGB | BGL_DOUBLE;
+
+    if (__fb_gl_params.color_alpha_bits > 0)
+        options |= BGL_ALPHA;
+    if (__fb_gl_params.depth_bits > 0)
+        options |= BGL_DEPTH;
+    if (__fb_gl_params.stencil_bits > 0)
+        options |= BGL_STENCIL;
+    if (__fb_gl_params.accum_bits > 0)
+        options |= BGL_ACCUM;
+
+    return options;
+}
+#endif
 
 static int32 fb_hHaikuInitFail(void)
 {
@@ -81,7 +105,19 @@ static int32 fb_haiku_event_thread_func(void *userdata)
     if (!g_win)
         return fb_hHaikuInitFail();
 
-    g_view = new(std::nothrow) FBHaikuView(g_win->Bounds());
+#ifndef DISABLE_OPENGL
+    if (fb_haiku.flags & DRIVER_OPENGL)
+    {
+        g_gl_view = new(std::nothrow)
+            FBHaikuGLView(g_win->Bounds(), fb_hHaikuOpenGLViewOptions());
+        g_view = g_gl_view;
+    }
+    else
+#endif
+    {
+        g_view = new(std::nothrow) FBHaikuView(g_win->Bounds());
+    }
+
     if (!g_view)
     {
         if (g_win->Lock())
@@ -92,20 +128,23 @@ static int32 fb_haiku_event_thread_func(void *userdata)
 
     g_win->AddChild(g_view);
 
-    g_bmp = new(std::nothrow)
-        BBitmap(
-            BRect(0, 0, fb_haiku.width - 1, fb_haiku.height - 1),
-            B_BITMAP_ACCEPTS_VIEWS,
-            B_RGB32
-        );
-
-    if (!g_bmp || !g_bmp->IsValid() || !g_bmp->Bits())
+    if (!(fb_haiku.flags & DRIVER_OPENGL))
     {
-        if (g_bmp) { delete g_bmp; g_bmp = NULL; }
-        if (g_win->Lock()) g_win->Quit();
-        g_win = NULL;
-        g_view = NULL;
-        return fb_hHaikuInitFail();
+        g_bmp = new(std::nothrow)
+            BBitmap(
+                BRect(0, 0, fb_haiku.width - 1, fb_haiku.height - 1),
+                B_BITMAP_ACCEPTS_VIEWS,
+                B_RGB32
+            );
+
+        if (!g_bmp || !g_bmp->IsValid() || !g_bmp->Bits())
+        {
+            if (g_bmp) { delete g_bmp; g_bmp = NULL; }
+            if (g_win->Lock()) g_win->Quit();
+            g_win = NULL;
+            g_view = NULL;
+            return fb_hHaikuInitFail();
+        }
     }
 
     g_win->Show();
@@ -122,6 +161,9 @@ static int32 fb_haiku_event_thread_func(void *userdata)
     fb_haiku.window = g_win;
     fb_haiku.view   = g_view;
     fb_haiku.bitmap = g_bmp;
+#ifndef DISABLE_OPENGL
+    fb_haiku.gl_view = g_gl_view;
+#endif
     fb_haiku.gui_ready = 1;
     fb_hHaikuUnlockState();
 
@@ -143,10 +185,14 @@ static int32 fb_haiku_event_thread_func(void *userdata)
     fb_haiku.window      = NULL;
     fb_haiku.view        = NULL;
     fb_haiku.bitmap      = NULL;
+    fb_haiku.gl_view     = NULL;
     fb_haiku.app         = NULL;
     fb_hHaikuUnlockState();
 
     g_view = NULL;
+#ifndef DISABLE_OPENGL
+    g_gl_view = NULL;
+#endif
     g_win  = NULL;
     fb_app = NULL;
 
@@ -207,10 +253,18 @@ int fb_hHaikuInit(char *title, int w, int h, int depth, int refresh, int flags)
     if (fb_haiku.gui_ready_sem >= B_OK)
         acquire_sem(fb_haiku.gui_ready_sem);
 
-    if (fb_haiku.gui_failed || !fb_haiku.gui_ready || !g_win || !g_view || !g_bmp) {
+    if (fb_haiku.gui_failed || !fb_haiku.gui_ready || !g_win || !g_view ||
+        (!(flags & DRIVER_OPENGL) && !g_bmp)) {
         fb_hHaikuExit();
         return -1;
     }
+
+#ifndef DISABLE_OPENGL
+    if (flags & DRIVER_OPENGL) {
+        g_gl_view->LockGL();
+        fb_haiku.gl_locked = 1;
+    }
+#endif
 
     fb_haiku.initialized = 1;
 
@@ -224,6 +278,13 @@ void fb_hHaikuExit(void)
     thread_id tid = fb_haiku_event_thread;
 
     fb_haiku.quitting = 1;
+
+#ifndef DISABLE_OPENGL
+    if (g_gl_view && fb_haiku.gl_locked && (find_thread(NULL) != tid)) {
+        g_gl_view->UnlockGL();
+        fb_haiku.gl_locked = 0;
+    }
+#endif
 
     if (g_win)
         g_win->PostMessage(B_QUIT_REQUESTED);

@@ -173,6 +173,10 @@ declare sub lexInit _
 		byval ctx_kind as LEX_TKCTX_CONTEXT _
 	)
 
+declare sub lexReinitEvalCtx _
+	( _
+	)
+
 declare sub lexEnd _
 	( _
 	)

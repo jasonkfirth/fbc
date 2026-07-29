@@ -90,7 +90,8 @@ const GFXDRIVER fb_gfxDriverD2D = {
 	&D2DFetchModes,          /* int *(*fetch_modes)(int depth, int *size); */
 	NULL,                    /* void (*flip)(void); */
 	NULL,                    /* void (*poll_events)(void); */
-	NULL                     /* void (*update)(void); */
+	NULL,                    /* void (*update)(void); */
+	NULL                     /* int (*resize)(int width, int height); */
 };
 
 #define DX_GUID(id,l,w1,w2,b1,b2,b3,b4,b5,b6,b7,b8) static const GUID id = {l,w1,w2,{b1,b2,b3,b4,b5,b6,b7,b8}}
@@ -421,7 +422,10 @@ static int GdiInteropSetup(D2DGlobalState* pGlobalState, HWND hwnd)
 		HMODULE hUser32 = GetModuleHandle("user32.dll");
 		struct LayeredWindowRenderParams* pLayeredParams = &pGlobalState->RenderParams.Layered;
 
-		pfnD3D10CreateDevice1 CreateD3D10Device = (pfnD3D10CreateDevice1)GetProcAddress(hD3D, "D3D10CreateDevice1");
+		pfnD3D10CreateDevice1 CreateD3D10Device = NULL;
+		fb_hWin32LoadProcedure(hD3D, "D3D10CreateDevice1",
+		                       (void *)&CreateD3D10Device,
+		                       sizeof(CreateD3D10Device));
 		if(CreateD3D10Device == NULL) {
 			goto errorReturn;
 		}
@@ -474,7 +478,11 @@ static int GdiInteropSetup(D2DGlobalState* pGlobalState, HWND hwnd)
 				goto errorReturn;
 			}
 		}
-		if(!(pLayeredParams->updateLayeredWindow = (pfnUpdateLayeredWindow)GetProcAddress(hUser32, "UpdateLayeredWindow")))
+		pLayeredParams->updateLayeredWindow = NULL;
+		fb_hWin32LoadProcedure(hUser32, "UpdateLayeredWindow",
+		                       (void *)&pLayeredParams->updateLayeredWindow,
+		                       sizeof(pLayeredParams->updateLayeredWindow));
+		if(!pLayeredParams->updateLayeredWindow)
 		{
 			goto errorReturn;
 		}
@@ -712,7 +720,10 @@ static int D2DCommonInit(void)
 	if(hD2D != NULL) {
 		D2D1_FACTORY_OPTIONS opts = {D2D1_FACTORY_INFO_TYPE};
 		WNDPROC wndProcCookie = NULL;
-		pfnCreateD2D1Factory D2DCreateFactory = (pfnCreateD2D1Factory)GetProcAddress(hD2D, "D2D1CreateFactory");
+		pfnCreateD2D1Factory D2DCreateFactory = NULL;
+		fb_hWin32LoadProcedure(hD2D, "D2D1CreateFactory",
+		                       (void *)&D2DCreateFactory,
+		                       sizeof(D2DCreateFactory));
 
 		if((D2DCreateFactory == NULL) || 
 		   (NOTIFY_FAILED_HR(D2DCreateFactory(
@@ -893,7 +904,9 @@ static int* D2DFetchModes(int depth, int *size)
 	*/
 	hDxgi = LoadLibrary("dxgi.dll");
 	if (hDxgi != NULL) {
-		CreateDXGIFactory = (pfnCreateDXGIFactory)GetProcAddress(hDxgi, "CreateDXGIFactory");
+		fb_hWin32LoadProcedure(hDxgi, "CreateDXGIFactory",
+		                       (void *)&CreateDXGIFactory,
+		                       sizeof(CreateDXGIFactory));
 		if ((CreateDXGIFactory) && (!NOTIFY_FAILED_HR(CreateDXGIFactory(&__fb_IID_IDXGIFactory, (void**)&pFactory)))) {
 			while((hardwareModes.elems == 0) && SUCCEEDED(IDXGIFactory_EnumAdapters(pFactory, adapterIter++, &pAdapter))) {
 				IDXGIOutput* pOutput = NULL;

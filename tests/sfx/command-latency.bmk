@@ -1,0 +1,6 @@
+# TEST_MODE : MULTI_MODULE_OK
+
+MAIN := command-latency.bas
+COMPILE_AND_LINK := 1
+
+# end of command-latency.bmk

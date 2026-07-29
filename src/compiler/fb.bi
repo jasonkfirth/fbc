@@ -132,7 +132,7 @@ enum FB_COMPOPT
 	FB_COMPOPT_EXPORT               '' boolean: export all symbols declared as EXPORT?
 	FB_COMPOPT_MSBITFIELDS          '' boolean: use M$'s bitfields packing?
 	FB_COMPOPT_MULTITHREADED        '' boolean: -mt
-	FB_COMPOPT_FBGFX                '' boolean: -fbgfx (whether libfbgfx should be linked)
+	FB_COMPOPT_FBGFX                '' FB_GFXLIB_SELECTION: selected graphics runtime
 	FB_COMPOPT_FBSFX                '' boolean: whether libsfx should be linked
 	FB_COMPOPT_PIC                  '' boolean: -pic (whether to use position-independent code)
 	FB_COMPOPT_STACKSIZE            '' integer
@@ -145,6 +145,12 @@ enum FB_COMPOPT
 	FB_COMPOPT_OPTABSTRACT          '' boolean: -z optabstract, only supports optimizing purely abstract types
 
 	FB_COMPOPTIONS
+end enum
+
+enum FB_GFXLIB_SELECTION
+	FB_GFXLIB_NONE = 0
+	FB_GFXLIB_DEFAULT
+	FB_GFXLIB_GFX3
 end enum
 
 enum FB_MODEVIEW
@@ -247,7 +253,7 @@ enum FB_VECTORIZELEVEL
 	FB_VECTORIZE_NONE               '' no vectorization
 	FB_VECTORIZE_NORMAL             '' complete expression merging
 	FB_VECTORIZE_INTRATREE          '' intra-expression merging
-	FB_VECTORIZE_SUBEXPRESSION      '' sub-expression merging (not implemented yet)
+	FB_VECTORIZE_SUBEXPRESSION      '' TODO: Implement sub-expression merging.
 end enum
 
 const FB_DEFAULT_VECTORIZELEVEL    = FB_VECTORIZE_NONE
@@ -363,7 +369,7 @@ type FBCMMLINEOPT
 	export          as integer              '' export all symbols declared as EXPORT (default = true)
 	msbitfields     as integer              '' use M$'s bitfields packing
 	multithreaded   as integer              '' link against thread-safe runtime library (default = false)
-	fbgfx           as integer              '' Link against gfx library (default = false)
+	fbgfx           as FB_GFXLIB_SELECTION  '' Selected gfx library (default = none)
 	fbsfx           as integer              '' Link against sound library (default = false)
 	pic             as integer              '' Whether to use position-independent code (default = false)
 	stacksize       as integer

@@ -38,6 +38,7 @@ declare sub fb_sfxUpdate cdecl alias "fb_sfxUpdate" ( byval frames as long )
 declare function fb_sfxDeviceCurrent cdecl alias "fb_sfxDeviceCurrent" ( ) as long
 declare function fb_sfxDeviceFind cdecl alias "fb_sfxDeviceFind" ( byval name as const zstring ptr ) as long
 declare function fb_sfxDeviceName cdecl alias "fb_sfxDeviceName" ( byval id as long ) as zstring ptr
+declare function fb_sfxVoiceActiveCount cdecl alias "fb_sfxVoiceActiveCount" ( ) as long
 
 type FB_SFX_DRIVER_STATS
 	as ulongint write_calls

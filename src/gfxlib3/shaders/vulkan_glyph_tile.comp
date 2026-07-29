@@ -1,0 +1,101 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_glyph_tile.comp
+
+    Purpose:
+
+        Rasterize an ordered run of compact bitmap glyphs on independent
+        destination tiles.
+
+    Responsibilities:
+
+        - decode built-in font row masks on Vulkan shader units
+        - preserve foreground and console-background overwrite order
+        - make each destination pixel private to one shader invocation
+
+    This file intentionally does NOT contain:
+
+        - host-side clipping or tile-list construction
+        - custom-font PUT modes
+        - alpha primitive blending
+*/
+
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) buffer SurfacePixels
+{
+	uint pixels[];
+} surface_pixels;
+
+struct Glyph
+{
+	ivec2 position;
+	uvec2 colors;
+	uvec4 format;
+	uint rows[16];
+};
+
+layout(set = 0, binding = 1, std430) readonly buffer GlyphCommands
+{
+	uvec4 surface;
+	ivec4 clip;
+	uvec4 tile_grid;
+	Glyph glyphs[];
+} glyph_commands;
+
+layout(set = 0, binding = 3, std430) readonly buffer TileRanges
+{
+	uvec2 ranges[];
+} tile_ranges;
+
+layout(set = 0, binding = 4, std430) readonly buffer TileIndices
+{
+	uint indices[];
+} tile_indices;
+
+void main(void)
+{
+	uvec2 tile_position = glyph_commands.tile_grid.xy + gl_WorkGroupID.xy;
+	ivec2 position = ivec2((tile_position * 16u) + gl_LocalInvocationID.xy);
+	uint tile = gl_WorkGroupID.y * glyph_commands.tile_grid.z +
+		gl_WorkGroupID.x;
+	uvec2 range = tile_ranges.ranges[tile];
+	uint color = 0u;
+	bool write_pixel = false;
+
+	if ((uint(position.x) >= glyph_commands.surface.x) ||
+		(uint(position.y) >= glyph_commands.surface.y) ||
+		(position.x < glyph_commands.clip.x) ||
+		(position.y < glyph_commands.clip.y) ||
+		(position.x > glyph_commands.clip.z) ||
+		(position.y > glyph_commands.clip.w))
+		return;
+	for (uint offset = 0u; offset < range.y; ++offset) {
+		uint glyph_index = tile_indices.indices[range.x + offset];
+		if (glyph_index >= glyph_commands.surface.w)
+			continue;
+		Glyph glyph = glyph_commands.glyphs[glyph_index];
+		ivec2 relative = position - glyph.position;
+
+		if ((relative.x < 0) || (relative.y < 0) ||
+			(uint(relative.x) >= glyph.format.x) ||
+			(uint(relative.y) >= glyph.format.y))
+			continue;
+		if ((glyph.rows[relative.y] & (1u << uint(relative.x))) != 0u) {
+			color = glyph.colors.x;
+			write_pixel = true;
+		} else if ((glyph.format.z & 1u) != 0u) {
+			color = glyph.colors.y;
+			write_pixel = true;
+		}
+	}
+	if (write_pixel)
+		surface_pixels.pixels[(uint(position.y) * glyph_commands.surface.x) +
+			uint(position.x)] = color & glyph_commands.surface.z;
+}
+
+/* end of vulkan_glyph_tile.comp */

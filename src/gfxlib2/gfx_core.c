@@ -43,6 +43,8 @@ FB_GFXCTX *fb_hGetContext(void)
 {
 	FB_GFXCTX *context = FB_TLSGETCTX(GFX);
 
+	fb_hApplyPendingResize();
+
 	if ((__fb_gfx) && (context->id != __fb_gfx->id)) {
 		/* context has to be initialized; default to screen */
 		if (context->line)

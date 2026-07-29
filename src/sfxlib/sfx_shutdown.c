@@ -50,7 +50,27 @@
 
 #include <stdio.h>
 
+/*
+    The runtime header predates sfxlib's strict warning policy.  Isolate its
+    legacy enum and signed-size diagnostics without weakening checks in this
+    translation unit.
+*/
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc23-extensions"
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
 #include "../rtlib/fb.h"
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
 #include "fb_sfx_driver.h"

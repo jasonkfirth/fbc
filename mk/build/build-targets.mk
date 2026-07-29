@@ -53,6 +53,7 @@ endif
 	rtlib \
 	fbrt \
 	gfxlib2 \
+	gfxlib3 \
 	sfxlib \
 	libs \
 	runtime
@@ -72,6 +73,8 @@ rtlib: $(RTL_LIBS)
 fbrt: $(FBRTL_LIBS)
 
 gfxlib2: $(GFX_LIBS)
+
+gfxlib3: $(GFX3_LIBS)
 
 sfxlib: $(SFX_LIBS)
 

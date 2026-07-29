@@ -679,7 +679,8 @@ private sub hValidateGlobalVarInit( byval sym as FBSYMBOL ptr, byref initree as 
 	end if
 
 	'' Disallow initialization of global dynamic strings
-	'' (not implemented - requires executing code)
+	'' TODO: Support global dynamic-string initialization through generated
+	'' startup code. It cannot be represented by the static initializer alone.
 	if( (symbGetType( sym ) = FB_DATATYPE_STRING) and (not symbIsRef( sym )) ) then
 		errReport( FB_ERRMSG_CANTINITDYNAMICSTRINGS, TRUE )
 		astDelTree( initree )
@@ -1165,6 +1166,266 @@ private function hMaybeBuildFieldAccess _
 	function = astBuildVarField( symbGetParamVar( thisparam ), fld )
 end function
 
+private function hEmitVarDecl _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byval token as integer, _
+		byval is_fordecl as integer, _
+		byval attrib as FB_SYMBATTRIB, _
+		byval dimensions as integer, _
+		byval have_bounds as integer, _
+		byref varexpr as ASTNODE ptr, _
+		exprTB() as ASTNODE ptr, _
+		byval dopreserve as integer _
+	) as integer
+
+	dim as ASTNODE ptr initree = any, assign_initree = any
+	dim as ASTNODE ptr redimcall = any
+	dim as integer is_declared = FALSE
+	dim as integer has_defctor = FALSE, has_dtor = FALSE
+
+	function = FALSE
+
+	if( sym <> NULL ) then
+		'' Dynamic array fields already have storage owned by their parent UDT.
+		is_declared = iif( symbIsField( sym ), TRUE, symbGetIsDeclared( sym ) )
+		has_defctor = symbHasDefCtor( sym )
+		has_dtor = symbHasDtor( sym )
+	end if
+
+	if( is_fordecl = FALSE ) then
+		assign_initree = NULL
+
+		if( hIsAssignToken( lexGetToken( ) ) ) then
+			initree = hVarInit( sym, is_declared )
+
+			if( (initree <> NULL) and _
+			    (fbLangOptIsSet( FB_LANG_OPT_SCOPE ) = FALSE) ) then
+				if( (symbGetAttrib( sym ) and _
+				    (FB_SYMBATTRIB_STATIC or FB_SYMBATTRIB_SHARED or _
+				     FB_SYMBATTRIB_COMMON)) = 0 ) then
+					''
+					'' Unscoped locals need a default initializer at procedure
+					'' level and the explicit assignment at the declaration.
+					''
+					assign_initree = initree
+					initree = hVarInitDefault( sym, is_declared, has_defctor )
+				end if
+			end if
+		else
+			if( sym ) then
+				if( (not symbIsExtern( sym )) and symbIsRef( sym ) ) then
+					errReport( FB_ERRMSG_MISSINGREFINIT )
+					hSkipStmt( )
+					exit function
+				end if
+
+				if( symbArrayHasUnknownBounds( sym ) ) then
+					errReport( FB_ERRMSG_MUSTHAVEINITWITHELLIPSIS )
+					hSkipStmt( )
+					exit function
+				end if
+			end if
+
+			initree = hVarInitDefault( sym, is_declared, has_defctor )
+		end if
+	else
+		initree = NULL
+		assign_initree = NULL
+	end if
+
+	'' EXTERN declarations do not emit storage or initialization nodes.
+	if( (sym = NULL) or (token = FB_TK_EXTERN) ) then
+		return TRUE
+	end if
+
+	dim as ASTNODE ptr tree
+
+	if( is_declared = FALSE ) then
+		dim as FBSYMBOL ptr desc = NULL
+
+		''
+		'' COMMON and SHARED storage is allocated by the backend's global
+		'' pass. A DECL node only owns local storage.
+		''
+		if( (symbGetAttrib( sym ) and _
+		    (FB_SYMBATTRIB_COMMON or FB_SYMBATTRIB_SHARED)) = 0 ) then
+			tree = astNewDECL( sym, ((initree = NULL) and (not is_fordecl)) )
+		end if
+
+		desc = symbGetArrayDescriptor( sym )
+		if( desc <> NULL ) then
+			if( (symbGetAttrib( desc ) and _
+			    (FB_SYMBATTRIB_COMMON or FB_SYMBATTRIB_SHARED)) = 0 ) then
+				tree = astNewLINK( tree, _
+					astNewDECL( desc, (symbGetTypeIniTree( desc ) = NULL) ), _
+					AST_LINK_RETURN_NONE )
+			end if
+		end if
+
+		if( ((attrib and FB_SYMBATTRIB_DYNAMIC) <> 0) or _
+		    (dimensions > 0) ) then
+			if( (symbGetAttrib( sym ) and _
+			    (FB_SYMBATTRIB_STATIC or FB_SYMBATTRIB_SHARED or _
+			     FB_SYMBATTRIB_COMMON)) = 0 ) then
+				tree = hFlushDecl( tree )
+
+				if( desc <> NULL ) then
+					tree = astNewLINK( tree, _
+						astTypeIniFlush( desc, symbGetTypeIniTree( desc ), _
+							FALSE, AST_OPOPT_ISINI ), AST_LINK_RETURN_NONE )
+					symbSetTypeIniTree( desc, NULL )
+				end if
+			end if
+		end if
+
+		symbSetIsDeclared( sym )
+
+		if( fbLangOptIsSet( FB_LANG_OPT_SCOPE ) ) then
+			tree = hFlushInitializer( sym, tree, initree, has_dtor )
+		else
+			astAddUnscoped( _
+				hFlushInitializer( sym, tree, initree, has_dtor ) )
+			tree = NULL
+
+			if( assign_initree ) then
+				if( symbGetVarHasDtor( sym ) ) then
+					tree = astNewLINK( tree, _
+						astBuildVarDtorCall( sym, TRUE ), _
+						AST_LINK_RETURN_NONE )
+				end if
+
+				tree = astNewLINK( tree, _
+					astTypeIniFlush( sym, assign_initree, FALSE, _
+						AST_OPOPT_ISINI ), AST_LINK_RETURN_NONE )
+			end if
+		end if
+	end if
+
+	if( ((attrib and FB_SYMBATTRIB_DYNAMIC) <> 0) and have_bounds ) then
+		if( varexpr = NULL ) then
+			varexpr = astNewNIDXARRAY( astNewVAR( sym ) )
+		end if
+
+		redimcall = rtlArrayRedim( varexpr, dimensions, exprTB(), _
+		                           dopreserve, (not symbGetDontInit( sym )) )
+
+		''
+		'' A local STATIC array declaration allocates once. Typeless REDIMs
+		'' reach this helper with an already-declared symbol and remain
+		'' executable on every statement visit.
+		''
+		if( symbIsStatic( sym ) and symbIsLocal( sym ) and _
+		    ((symbGetAttrib( sym ) and _
+		    (FB_SYMBATTRIB_SHARED or FB_SYMBATTRIB_COMMON)) = 0) and _
+		    (not is_declared) ) then
+			redimcall = hWrapInStaticFlag( redimcall )
+		end if
+
+		tree = astNewLINK( tree, redimcall, AST_LINK_RETURN_NONE )
+	end if
+
+	astAdd( tree )
+	function = TRUE
+end function
+
+private sub hParseVarDimensions _
+	( _
+		byref attrib as FB_SYMBATTRIB, _
+		byval token as integer, _
+		byval is_fordecl as integer, _
+		byval id as zstring ptr, _
+		byref is_redim as integer, _
+		byref dimensions as integer, _
+		byref have_bounds as integer, _
+		exprTB() as ASTNODE ptr _
+	)
+
+	dimensions = 0
+	have_bounds = FALSE
+
+	if( (lexGetToken( ) = CHAR_LPRNT) and (is_fordecl = FALSE) ) then
+		if( attrib and FB_SYMBATTRIB_REF ) then
+			errReport( FB_ERRMSG_ARRAYOFREFS )
+			attrib and= not FB_SYMBATTRIB_REF
+		end if
+		lexSkipToken( )
+
+		if( lexGetToken( ) = CHAR_RPRNT ) then
+			''
+			'' A bare () declares a dynamic array whose dimension count is
+			'' established by its first indexed use or REDIM.
+			''
+			dimensions = -1
+			attrib or= FB_SYMBATTRIB_DYNAMIC
+		else
+			cArrayDecl( dimensions, have_bounds, exprTB() )
+			if( have_bounds ) then
+				if( ((attrib and FB_SYMBATTRIB_COMMON) <> 0) or _
+				    (((attrib and FB_SYMBATTRIB_EXTERN) <> 0) and _
+				    ((attrib and FB_SYMBATTRIB_DYNAMIC) <> 0)) ) then
+					errReport( FB_ERRMSG_DYNAMICEXTERNCANTHAVEBOUNDS )
+					dimensions = -1
+					have_bounds = FALSE
+				end if
+			else
+				attrib or= FB_SYMBATTRIB_DYNAMIC
+			end if
+		end if
+
+		if( lexGetToken( ) <> CHAR_RPRNT ) then
+			errReport( FB_ERRMSG_EXPECTEDRPRNT )
+		else
+			lexSkipToken( )
+		end if
+	elseif( token = FB_TK_REDIM ) then
+		errReportEx( FB_ERRMSG_EXPECTEDARRAY, id )
+		dimensions = -1
+	else
+		'' OPTION DYNAMIC does not apply to scalar declarations.
+		attrib and= not FB_SYMBATTRIB_DYNAMIC
+	end if
+
+	''
+	'' A REDIM is only actionable when explicit bounds were parsed. A bare
+	'' declaration or dimensions without bounds remains a declaration.
+	''
+	is_redim and= have_bounds
+end sub
+
+private sub hParseLeadingVarType _
+	( _
+		byref baseattrib as FB_SYMBATTRIB, _
+		byref has_byref as integer, _
+		byref is_multdecl as integer, _
+		byref dtype as integer, _
+		byref subtype as FBSYMBOL ptr, _
+		byref lgt as longint, _
+		byref addsuffix as integer _
+	)
+
+	is_multdecl = FALSE
+	if( lexGetToken( ) <> FB_TK_AS ) then
+		exit sub
+	end if
+
+	lexSkipToken( LEXCHECK_POST_SUFFIX )
+	hSymbolType( dtype, subtype, lgt, has_byref )
+
+	if( has_byref = FALSE ) then
+		hComplainIfAbstractClass( dtype, subtype )
+	end if
+
+	hMaybeComplainTypeUsage( dtype, subtype, lgt )
+
+	addsuffix = FALSE
+	is_multdecl = TRUE
+	if( has_byref ) then
+		has_byref = FALSE
+		baseattrib or= FB_SYMBATTRIB_REF
+	end if
+end sub
+
 ''
 '' VarDecl =
 ''     SingleVarDecl (',' SingleVarDecl)*
@@ -1173,6 +1434,8 @@ end function
 '' SingleVarDecl = [BYREF] Identifier ['(' ArrayDimensions ')'] [AS SymbolType] ['=' VarInitializer]
 ''
 '' MultVarDecl = Identifier ['(' ArrayDimensions ')'] ['=' VarInitializer]
+''
+'' Variable declaration parsing keeps grammar recovery and symbol creation aligned.
 ''
 function cVarDecl _
 	( _
@@ -1187,14 +1450,13 @@ function cVarDecl _
 	static as FBARRAYDIM dTB(0 to FB_MAXARRAYDIMS-1)
 	dim as FBSYMCHAIN ptr chain_ = any
 	dim as FBSYMBOL ptr sym = any, subtype = any, parent = any
-	dim as ASTNODE ptr varexpr = any, initree = any, redimcall = any
+	dim as ASTNODE ptr varexpr = any
 	dim as integer addsuffix = any, is_multdecl = any, have_bounds = any
-	dim as integer is_typeless = any, is_declared = any, is_redim = any
+	dim as integer is_typeless = any, is_redim = any
 	dim as integer dtype = any, maybe_expr = any
 	dim as longint lgt = any
 	dim as integer dimensions = any, suffix = any
 	dim as zstring ptr palias = any
-	dim as ASTNODE ptr assign_initree = any
 	dim as FB_IDOPT options = any
 
 	function = NULL
@@ -1210,28 +1472,8 @@ function cVarDecl _
 	'' BYREF?
 	var has_byref_at_start = hMatch( FB_TK_BYREF, LEXCHECK_POST_SUFFIX )
 
-	'' (AS SymbolType)?
-	is_multdecl = FALSE
-	if( lexGetToken( ) = FB_TK_AS ) then
-		lexSkipToken( LEXCHECK_POST_SUFFIX )
-
-		'' parse the symbol type (INTEGER, STRING, etc...)
-		hSymbolType( dtype, subtype, lgt, has_byref_at_start )
-
-		if( has_byref_at_start = FALSE ) then
-			'' Disallow creating objects of abstract classes
-			hComplainIfAbstractClass( dtype, subtype )
-		end if
-
-		hMaybeComplainTypeUsage( dtype, subtype, lgt )
-
-		addsuffix = FALSE
-		is_multdecl = TRUE
-		if( has_byref_at_start ) then
-			has_byref_at_start = FALSE
-			baseattrib or= FB_SYMBATTRIB_REF
-		end if
-	end if
+	hParseLeadingVarType( baseattrib, has_byref_at_start, is_multdecl, _
+		dtype, subtype, lgt, addsuffix )
 
 	do
 		dim as integer attrib = baseattrib
@@ -1335,66 +1577,8 @@ function cVarDecl _
 			end if
 		end if
 
-		'' ('(' ArrayDecl? ')')?
-		dimensions = 0
-		have_bounds = FALSE
-		if( (lexGetToken( ) = CHAR_LPRNT) and (is_fordecl = FALSE) ) then
-			if( attrib and FB_SYMBATTRIB_REF ) then
-				errReport( FB_ERRMSG_ARRAYOFREFS )
-				attrib and= not FB_SYMBATTRIB_REF
-			end if
-			lexSkipToken( )
-
-			'' '()'
-			if( lexGetToken( ) = CHAR_RPRNT ) then
-				'' Dynamic array; dimension count unknown until
-				'' first array access or REDIM (see also
-				'' symbSetDynamicArrayDimensions())
-				dimensions = -1
-				attrib or= FB_SYMBATTRIB_DYNAMIC
-
-			'' '(' ArrayDecl ')'
-			else
-				cArrayDecl( dimensions, have_bounds, exprTB() )
-				if( have_bounds ) then
-					'' COMMON or dynamic EXTERN (can happen due to OPTION DYNAMIC)?
-					'' No exact bounds allowed, just like they can't have initializers either.
-					'' (but they can have fixed dimensions)
-					if( ((attrib and FB_SYMBATTRIB_COMMON) <> 0) or _
-					    (((attrib and FB_SYMBATTRIB_EXTERN) <> 0) and _
-					    ((attrib and FB_SYMBATTRIB_DYNAMIC) <> 0)) ) then
-						errReport( FB_ERRMSG_DYNAMICEXTERNCANTHAVEBOUNDS )
-						dimensions = -1
-						have_bounds = FALSE
-					end if
-				else
-					attrib or= FB_SYMBATTRIB_DYNAMIC
-				end if
-			end if
-
-			'' ')'
-			if( lexGetToken( ) <> CHAR_RPRNT ) then
-				errReport( FB_ERRMSG_EXPECTEDRPRNT )
-			else
-				lexSkipToken( )
-			end if
-
-		'' REDIM? Must have array dimensions
-		elseif( token = FB_TK_REDIM ) then
-			errReportEx( FB_ERRMSG_EXPECTEDARRAY, @id )
-			dimensions = -1
-
-		'' Scalar, no array subscripts
-		else
-			'' (could have been added due to OPTION DYNAMIC,
-			'' but if it's not an array, then it can't be DYNAMIC)
-			attrib and= not FB_SYMBATTRIB_DYNAMIC
-		end if
-
-		'' Update is_redim now that we've parsed the array bounds, if any.
-		'' It's only a true redim if array bounds are given. If it's not an array,
-		'' or dimensions were given without bounds, then it can't be a redim.
-		is_redim and= have_bounds
+		hParseVarDimensions( attrib, token, is_fordecl, @id, is_redim, _
+			dimensions, have_bounds, exprTB() )
 
 		palias = NULL
 		if( (attrib and (FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN)) <> 0 ) then
@@ -1577,177 +1761,9 @@ function cVarDecl _
 		sym = hAddVar( sym, parent, id, palias, dtype, subtype, lgt, addsuffix, _
 		               attrib, dimensions, have_bounds, dTB(), token )
 
-		dim as integer has_defctor = FALSE, has_dtor = FALSE
-		if( sym <> NULL ) then
-			'' Treat dynamic array fields as "already declared",
-			'' because we don't want to emit DECL nodes for them below.
-			is_declared = iif( symbIsField( sym ), TRUE, symbGetIsDeclared( sym ) )
-			has_defctor = symbHasDefCtor( sym )
-			has_dtor = symbHasDtor( sym )
-		else
-			is_declared = FALSE
-		end if
-
-		''
-		'' Check for an initializer
-		''
-
-		if( is_fordecl = FALSE ) then
-			'' assume no assignment
-			assign_initree = NULL
-
-			'' '=' | '=>' ?
-			if( hIsAssignToken( lexGetToken( ) ) ) then
-				initree = hVarInit( sym, is_declared )
-
-				if( ( initree <> NULL ) and ( fbLangOptIsSet( FB_LANG_OPT_SCOPE ) = FALSE ) ) then
-					'' local?
-					if( (symbGetAttrib( sym ) and (FB_SYMBATTRIB_STATIC or _
-					                               FB_SYMBATTRIB_SHARED or _
-					                               FB_SYMBATTRIB_COMMON)) = 0 ) then
-
-						''
-						'' The variable will be unscoped, i.e. it needs a default initree
-						'' for the implicit declaration at procedure level, plus the assignment
-						'' with the initializer in the nested scope where it was defined.
-						''
-						''      scope
-						''          dim as integer i = 5
-						''      end scope
-						''
-						''  becomes:
-						''
-						''      dim as integer i
-						''      scope
-						''          i = 5
-						''      end scope
-						''
-						assign_initree = initree
-						initree = hVarInitDefault( sym, is_declared, has_defctor )
-					end if
-				end if
-			else
-				'' default initialization
-				if( sym ) then
-					'' Allocating a Byref variable? Always requires an explicit initializer
-					if( (not symbIsExtern( sym )) and symbIsRef( sym ) ) then
-						errReport( FB_ERRMSG_MISSINGREFINIT )
-						hSkipStmt( )
-						exit function
-					end if
-
-					if( symbArrayHasUnknownBounds( sym ) ) then
-						errReport( FB_ERRMSG_MUSTHAVEINITWITHELLIPSIS )
-						hSkipStmt( )
-						exit function
-					end if
-				end if
-
-				initree = hVarInitDefault( sym, is_declared, has_defctor )
-			end if
-		else
-			initree = NULL
-			assign_initree = NULL
-		end if
-
-		''
-		'' Add to AST: DECL nodes, initialization code, REDIMs.
-		'' Nothing to do for EXTERNs.
-		''
-		if( sym <> NULL ) then
-			if( token <> FB_TK_EXTERN ) then
-				'' Build a LINK'ed tree of all code that should
-				'' be astAdd'ed here in place of the vardecl.
-				'' (early astAdd's would cause problems with temp var dtors)
-				dim t as ASTNODE ptr
-
-				'' not declared already?
-				if( is_declared = FALSE ) then
-					dim as FBSYMBOL ptr desc = NULL
-
-					'' Don't init if it's a temp FOR var, it will
-					'' have the start condition put into it.
-					t = astNewDECL( sym, ((initree = NULL) and (not is_fordecl)) )
-
-					'' add the descriptor too, if any
-					desc = symbGetArrayDescriptor( sym )
-					if( desc <> NULL ) then
-						'' Note: descriptor may not have an initree here, in case it's COMMON
-						'' FIXME: should probably not add DECL nodes for COMMONs/SHAREDs in the first place (not done for EXTERNs either)
-						t = astNewLINK( t, astNewDECL( desc, (symbGetTypeIniTree( desc ) = NULL) ), AST_LINK_RETURN_NONE )
-					end if
-
-					'' handle arrays (must be done after adding the decl node)
-					if( ((attrib and FB_SYMBATTRIB_DYNAMIC) <> 0) or (dimensions > 0) ) then
-						'' local?
-						if( (symbGetAttrib( sym ) and (FB_SYMBATTRIB_STATIC or _
-						                               FB_SYMBATTRIB_SHARED or _
-						                               FB_SYMBATTRIB_COMMON)) = 0 ) then
-
-							'' flush the decl node, safe to do here as it's a non-static
-							'' local var (and because the decl must be flushed first)
-							t = hFlushDecl( t )
-
-							'' bydesc array params have no descriptor
-							if( desc <> NULL ) then
-								'' Initialize the array descriptor
-								'' * This should be added to the variable declaration because it belongs to that,
-								''   even if unscoped, more so than to the array's own initializer.
-								'' * This must be LINK'ed to avoid astAdd() which would destroy temp vars from the
-								''   array initializer too early.
-								t = astNewLINK( t, astTypeIniFlush( desc, symbGetTypeIniTree( desc ), FALSE, AST_OPOPT_ISINI ), AST_LINK_RETURN_NONE )
-								symbSetTypeIniTree( desc, NULL )
-							end if
-						end if
-					end if
-
-					'' all set as declared
-					symbSetIsDeclared( sym )
-
-					if( fbLangOptIsSet( FB_LANG_OPT_SCOPE ) ) then
-						'' flush the init tree (must be done after adding the decl node)
-						t = hFlushInitializer( sym, t, initree, has_dtor )
-					'' unscoped
-					else
-						'' flush the init tree (must be done after adding the decl node)
-						astAddUnscoped( hFlushInitializer( sym, t, initree, has_dtor ) )
-						t = NULL
-
-						'' initializer as assignment?
-						if( assign_initree ) then
-							'' clear it before it's initialized?
-							if( symbGetVarHasDtor( sym ) ) then
-								t = astNewLINK( t, astBuildVarDtorCall( sym, TRUE ), AST_LINK_RETURN_NONE )
-							end if
-
-							'' use the initializer as an assignment
-							t = astNewLINK( t, astTypeIniFlush( sym, assign_initree, FALSE, AST_OPOPT_ISINI ), AST_LINK_RETURN_NONE )
-						end if
-					end if
-				end if
-
-				'' Dynamic array? If the dimensions are known, redim it.
-				if( ((attrib and FB_SYMBATTRIB_DYNAMIC) <> 0) and have_bounds ) then
-					if( varexpr = NULL ) then
-						varexpr = astNewNIDXARRAY( astNewVAR( sym ) )
-					end if
-					redimcall = rtlArrayRedim( varexpr, dimensions, exprTB(), _
-					                           dopreserve, (not symbGetDontInit( sym )) )
-
-					'' If this is a local STATIC (not SHARED/COMMON) array declaration (and not
-					'' a typeless REDIM), then the redim call should be executed only once, not
-					'' during every call to the parent procedure.
-					if( symbIsStatic( sym ) and symbIsLocal( sym ) and _
-					    ((symbGetAttrib( sym ) and (FB_SYMBATTRIB_SHARED or FB_SYMBATTRIB_COMMON)) = 0) and _
-					    (not is_declared) ) then
-						redimcall = hWrapInStaticFlag( redimcall )
-					end if
-
-					t = astNewLINK( t, redimcall, AST_LINK_RETURN_NONE )
-				end if
-
-				astAdd( t )
-			end if
+		if( hEmitVarDecl( sym, token, is_fordecl, attrib, dimensions, _
+		    have_bounds, varexpr, exprTB(), dopreserve ) = FALSE ) then
+			exit function
 		end if
 
 		if( is_fordecl ) then
@@ -2054,27 +2070,35 @@ private sub cAutoVarDecl( byval baseattrib as FB_SYMBATTRIB )
 		'' Determine var's dtype based on the initializer expression
 		var dtype = expr->dtype
 		var subtype = expr->subtype
+		dim as longint lgt = 0
 
 		if( is_byref = FALSE ) then
 			select case( typeGetDtAndPtrOnly( dtype ) )
 			case FB_DATATYPE_WCHAR
-				'' wstrings: can't make a "wstring variable" to hold this expression,
-				'' because 1) we don't have dynamic wstrings yet, and 2) we can't use
-				'' a fixed-length wstring because we don't know the length (it may not
-				'' even be constant).
-				'' TODO: could allow VAR initialized with a wstring literal, then the length is known
-				errReport( FB_ERRMSG_INVALIDDATATYPES, TRUE )
-				'' error recovery: create a fake expression
-				astDelTree( expr )
-				expr = astNewCONSTi( 0 )
-				dtype = FB_DATATYPE_INTEGER
-				subtype = NULL
+				'' There is no dynamic WSTRING type.  A literal still has a
+				'' compile-time size, so it can be represented by a fixed
+				'' WSTRING variable of exactly that size.
+				dim as FBSYMBOL ptr litsym = astGetStrLitSymbol( expr )
+				if( litsym <> NULL ) then
+					lgt = symbGetSizeOf( litsym )
+				else
+					errReport( FB_ERRMSG_INVALIDDATATYPES, TRUE )
+					'' error recovery: create a fake expression
+					astDelTree( expr )
+					expr = astNewCONSTi( 0 )
+					dtype = FB_DATATYPE_INTEGER
+					subtype = NULL
+				end if
 
 			case FB_DATATYPE_CHAR, FB_DATATYPE_FIXSTR
 				'' zstring: create a dynamic string variable to hold the zstring data
 				dtype = FB_DATATYPE_STRING
 
 			end select
+		end if
+
+		if( lgt = 0 ) then
+			lgt = symbCalcLen( dtype, subtype )
 		end if
 
 		'' For function pointers, the expression's subtype should be one of the special PROCs created by
@@ -2086,7 +2110,7 @@ private sub cAutoVarDecl( byval baseattrib as FB_SYMBATTRIB )
 
 		'' add var after parsing the expression, or the the var itself could be used
 		sym = hAddVar( sym, parent, id, NULL, dtype, subtype, _
-		               symbCalcLen( dtype, subtype ), FALSE, attrib, 0, FALSE, dTB(), FB_TK_VAR )
+		               lgt, FALSE, attrib, 0, FALSE, dTB(), FB_TK_VAR )
 
 		if( sym <> NULL ) then
 			if( symbIsRef( sym ) ) then

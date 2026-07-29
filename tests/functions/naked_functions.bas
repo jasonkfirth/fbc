@@ -27,9 +27,25 @@ SUITE( fbc_tests.functions.naked_functions )
 		#endif
 	end function
 
+	function read_global naked cdecl( ) as integer
+		#if __FB_ASM__ = "att"
+			#assert __FB_BACKEND__ = "gcc"
+			asm
+				"mov " foo ", %eax"
+				"ret"
+			end asm
+		#else
+			asm
+				mov eax, dword ptr [foo]
+				ret
+			end asm
+		#endif
+	end function
+
 	TEST( default )
 		CU_ASSERT_EQUAL( add_cdecl( 3, 7 ), 10 )
 		CU_ASSERT( foo = 123 ) '' Ensure "foo" is referenced and will be emitted by fbc
+		CU_ASSERT_EQUAL( read_global( ), 123 )
 	END_TEST
 
 END_SUITE

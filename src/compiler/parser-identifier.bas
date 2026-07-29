@@ -82,7 +82,8 @@ end function
 '':::::
 private function hGetChainNames( byval chain_ as FBSYMCHAIN ptr ) as string
 	dim as FBSYMBOL ptr ns = any
-	dim as string names
+	dim as DZSTRING names
+	DZstrZero( names )
 	do
 		dim s as string
 		ns = symbGetNamespace( chain_->sym )
@@ -102,18 +103,19 @@ private function hGetChainNames( byval chain_ as FBSYMCHAIN ptr ) as string
 			ns = symbGetNamespace( ns )
 		wend
 		if( (symbGetAttrib( chain_->sym ) and FB_SYMBATTRIB_ANONYMOUS) <> 0 ) then
-			names += s + "<unnamed>"
+			DZstrConcatAssign( names, s + "<unnamed>" )
 		else
-			names += s + *symbGetName( chain_->sym )
+			DZstrConcatAssign( names, s + *symbGetName( chain_->sym ) )
 		end if
 
 		chain_ = chain_->next
 		if( chain_ = NULL ) then
 			exit do
 		end if
-		names &= ", "
+		DZstrConcatAssign( names, ", " )
 	loop
-	return names
+	function = *names.data
+	DZstrAllocate( names, 0 )
 end function
 
 '':::::
@@ -702,36 +704,27 @@ function cIdentifierOrUDTMember _
 			return NULL
 		end if
 
-		'' else there are member procs, so search for keywords as members
-		'' !!!TODO!!! - optimize lookups
-		'' symbGetCompXXX() functions test for things we already know here
+		'' There are member procedures, and base_parent is already known to
+		'' be a UDT. Read its extension table directly instead of repeating
+		'' the class and null checks in the general symbGetCompXXX() helpers.
+		dim as FB_STRUCTEXT ptr ext = base_parent->udt.ext
 
-		select case as const lexGetToken( )
-		case FB_TK_CONSTRUCTOR
-			sym = symbGetCompCtorHead( base_parent )
-			'' if( base_parent->udt.ext ) then
-			''  sym = base_parent->udt.ext->ctorhead
-			'' end if
+		if( ext <> NULL ) then
+			select case as const lexGetToken( )
+			case FB_TK_CONSTRUCTOR
+				sym = ext->ctorhead
 
-		case FB_TK_DESTRUCTOR
-			sym = symbGetCompDtor1( base_parent )
-			'' if( base_parent->udt.ext ) then
-			''  sym = base_parent->udt.ext->dtor1
-			'' end if
+			case FB_TK_DESTRUCTOR
+				sym = ext->dtor1
 
-		case FB_TK_LET
-			sym = symbGetCompOpOvlHead( base_parent, AST_OP_ASSIGN )
-			'' if( base_parent->udt.ext ) then
-			''  sym = symbGetUDTOpOvlTb( base_parent )(AST_OP_ASSIGN - AST_OP_SELFBASE)
-			'' end if
+			case FB_TK_LET
+				sym = ext->opovlTb(AST_OP_ASSIGN - AST_OP_SELFBASE)
 
-		case FB_TK_CAST
-			sym = symbGetCompOpOvlHead( base_parent, AST_OP_CAST )
-			'' if( base_parent->udt.ext ) then
-			''  sym = symbGetUDTOpOvlTb( base_parent )(AST_OP_CAST - AST_OP_SELFBASE)
-			'' end if
+			case FB_TK_CAST
+				sym = ext->opovlTb(AST_OP_CAST - AST_OP_SELFBASE)
 
-		end select
+			end select
+		end if
 
 		'' keyword
 		lexSkipToken( )
@@ -748,6 +741,9 @@ function cIdentifierOrUDTMember _
 		op = cOperator( TRUE )
 
 		if( op <> INVALID ) then
+			if( astGetOpIsSelf( op ) andalso (base_parent->udt.ext <> NULL) ) then
+				return base_parent->udt.ext->opovlTb(op - AST_OP_SELFBASE)
+			end if
 			return symbGetCompOpOvlHead( base_parent, op )
 		end if
 

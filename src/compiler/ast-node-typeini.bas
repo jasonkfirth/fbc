@@ -61,6 +61,28 @@ function astTypeIniBegin _
 
 end function
 
+private function hAstTypeIniIsUpcast _
+	( _
+		byval target as ASTNODE ptr, _
+		byval value as ASTNODE ptr _
+	) as integer
+
+	if( typeGet( astGetDataType( target ) ) <> FB_DATATYPE_STRUCT ) then
+		return FALSE
+	end if
+
+	if( typeGet( astGetDataType( value ) ) <> FB_DATATYPE_STRUCT ) then
+		return FALSE
+	end if
+
+	if( astGetSubtype( target ) = astGetSubtype( value ) ) then
+		return FALSE
+	end if
+
+	return (symbGetUDTBaseLevel( astGetSubtype( value ), _
+		astGetSubtype( target ) ) > 0)
+end function
+
 private sub hAstTypeIniMaybeConvertUpcast _
 	( _
 		byval n as ASTNODE ptr, _
@@ -72,48 +94,36 @@ private sub hAstTypeIniMaybeConvertUpcast _
 
 	sym = n->sym
 
-	'' we want the size of the elements (type) not the whole array
-	'' !!!TODO!!! byrefs? with symbGetRealSize( sym )?
-
+	'' TYPEINI byte counts describe the declared element or UDT payload.
+	'' symbGetRealSize() would instead use pointer size for BYREF symbols
+	'' and multiply arrays by their element count.
 	maxsize = symbGetSizeOf( sym )
 
 	'' This should only be true if astTypeIniAddAssign()
 	'' determined that the initree was constant
 
-	'' !!!TODO!!! there is a few places where we use the same
-	'' pattern of if statements to check if one ast node is a type
-	'' derived from another.  Maybe make a common function?
+	if( hAstTypeIniIsUpcast( n, l ) ) then
+		'' patch the subtype (up-cast)
+		l->subtype = n->subtype
+		l->typeini.bytes = maxsize
 
-	if( typeGet( astGetDataType( n ) ) = FB_DATATYPE_STRUCT ) then
-		if( typeGet( astGetDataType( l ) ) = FB_DATATYPE_STRUCT ) then
-			if( astGetSubtype( n ) <> astGetSubtype( l ) ) then
-				if( symbGetUDTBaseLevel( astGetSubtype( l ), astGetSubtype( n ) ) > 0 ) then
+		'' patch the next node too
+		l->l->typeini.ofs = n->typeini.ofs
+		l->l->typeini.bytes = maxsize
+		l->l->subtype = n->subtype
 
-					'' patch the subtype (up-cast)
-					l->subtype = n->subtype
-					l->typeini.bytes = maxsize
-
-					'' patch the next node too
-					l->l->typeini.ofs = n->typeini.ofs
-					l->l->typeini.bytes = maxsize
-					l->l->subtype = n->subtype
-
-					'' The following node carries the same TYPEINI offset, byte-count,
-					'' and subtype state. Debug builds verify that it is a TYPEINI
-					'' continuation node before those fields are patched.
-
-					#ifdef __FB_DEBUG__
-					select case astGetClass( l->l )
-					case AST_NODECLASS_TYPEINI
-					case AST_NODECLASS_TYPEINI_ASSIGN
-					case AST_NODECLASS_TYPEINI_SCOPEINI
-					case else
-						assert( FALSE )
-					end select
-					#endif
-				end if
-			end if
-		end if
+		'' The following node carries the same TYPEINI offset, byte-count,
+		'' and subtype state. Debug builds verify that it is a TYPEINI
+		'' continuation node before those fields are patched.
+		#ifdef __FB_DEBUG__
+		select case astGetClass( l->l )
+		case AST_NODECLASS_TYPEINI
+		case AST_NODECLASS_TYPEINI_ASSIGN
+		case AST_NODECLASS_TYPEINI_SCOPEINI
+		case else
+			assert( FALSE )
+		end select
+		#endif
 	end if
 end sub
 
@@ -1019,7 +1029,8 @@ end sub
 private function hExprIsConst( byval n as ASTNODE ptr ) as integer
 	var lsym = n->sym
 	if( lsym ) then
-		'' Disallow initialization of global bitfields (not implemented)
+		'' TODO: Implement constant initialization of global bitfields.
+		'' Until then, reject it instead of emitting an invalid initializer.
 		if( symbIsBitfield( lsym ) ) then
 			errReport( FB_ERRMSG_INVALIDDATATYPES, TRUE )
 			return FALSE

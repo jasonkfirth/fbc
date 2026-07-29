@@ -128,6 +128,21 @@ source_uses_threading() {
 	' "$source_file"
 }
 
+source_uses_gfxlib3() {
+	local source_file="$1"
+
+	if grep -Eiq '^[[:space:]]*#define[[:space:]]+__FB_GFXLIB3__([[:space:]]|$)' \
+		"$source_file"; then
+		return 0
+	fi
+
+	# fbgfx3.bi declares the extension API and defines the public marker itself.
+	# Treat a direct include as selection even when a program does not repeat the
+	# marker in its own source.
+	grep -Eiq '^[[:space:]]*#include([[:space:]]+once)?[[:space:]]+"fbgfx3\.bi"' \
+		"$source_file"
+}
+
 find_sdk() {
 	local candidate
 	for candidate in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" /usr/lib/android-sdk /opt/android-sdk "$HOME/Android/Sdk"; do
@@ -393,11 +408,14 @@ src=""
 asset_dir="${FBANDROID_ASSETS:-}"
 env_defs=()
 use_mt=0
+use_gfx3=0
+use_gfx2_reference=0
 use_entry=1
 run_on_phone=0
 keyboard_button="true"
 screen_orientation="unspecified"
 fbc_args=()
+project_sources=()
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -443,12 +461,29 @@ while [ $# -gt 0 ]; do
 			if [ "$1" = "-mt" ]; then
 				use_mt=1
 			fi
-			fbc_args+=("$1")
+			if [ "$1" = "-gfx3" ]; then
+				#
+				# The Android cross compiler can predate the host compiler's
+				# -gfx3 switch. Translate it to a private marker instead of
+				# passing an option it cannot parse. The checkout fbgfx.bi maps
+				# that marker to __FB_GFXLIB3__ only when the source has not
+				# already selected gfxlib3. The header overlay below supplies
+				# fbgfx3's declarations.
+				use_gfx3=1
+				fbc_args+=(
+					"-d" "__FB_GFXLIB3_OPTION__"
+					"-include" "fbgfx3-option.bi"
+				)
+			else
+				fbc_args+=("$1")
+			fi
 			shift
 			;;
 		*)
 			if [ -z "$src" ] && [ "${1##*.}" = "bas" ]; then
 				src="$1"
+			elif [ "${1##*.}" = "bas" ]; then
+				project_sources+=("$1")
 			else
 				fbc_args+=("$1")
 			fi
@@ -461,18 +496,63 @@ for arg in "${fbc_args[@]}"; do
 	if [ "$arg" = "-mt" ]; then
 		use_mt=1
 	fi
+	if [ "$arg" = "-gfx3" ]; then
+		#
+		# -gfx3 injects __FB_GFXLIB3__ inside the compiler.  The wrapper must
+		# make the same archive decision as it does for a visible source define,
+		# because gfxlib3 owns renderer and event-pump threads even when BASIC
+		# does not explicitly use THREADCREATE.
+		use_gfx3=1
+	fi
+done
+
+#
+# The graphics benchmark contains a conditional __FB_GFXLIB3__ define so one
+# source can build both backends on Android. The lightweight source scan below
+# cannot evaluate nested preprocessor conditions, therefore an explicit
+# GFX2_REFERENCE command-line definition must suppress that inference.
+#
+for ((argument_index = 0; argument_index < ${#fbc_args[@]}; ++argument_index)); do
+	if [ "${fbc_args[$argument_index]}" = "-d" ] &&
+	   [ $((argument_index + 1)) -lt ${#fbc_args[@]} ] &&
+	   [ "${fbc_args[$((argument_index + 1))]}" = "GFX2_REFERENCE" ]; then
+		use_gfx2_reference=1
+	fi
 done
 
 [ "$run_on_phone" -eq 0 ] || [ "$mode" = "apk" ] || die "--runOnPhone only applies to APK output"
 
 [ -n "$src" ] || die "missing program.bas"
 [ -f "$src" ] || die "source file not found: $src"
+for project_source in "${project_sources[@]}"; do
+	[ -f "$project_source" ] || die "project source file not found: $project_source"
+done
 [ -x "$compiler" ] || die "Android-targeting compiler not found: $compiler"
 [ -d "$incdir" ] || die "Android include directory not found: $incdir"
 [ -f "$template/fb_android_app.c" ] || die "Android APK template not found: $template"
 [ -f "$template/FreeBasicNativeActivity.java" ] || die "Android Java activity template not found: $template"
 [ -f "$template/FreeBasicInputBridge.java" ] || die "Android Java input bridge template not found: $template"
 [ -f "$template/FreeBasicInputView.java" ] || die "Android Java input-view template not found: $template"
+
+if [ "$use_gfx2_reference" -eq 0 ] && source_uses_gfxlib3 "$src"; then
+	use_gfx3=1
+fi
+for ((argument_index = 0; argument_index < ${#fbc_args[@]}; ++argument_index)); do
+	if [ "$use_gfx2_reference" -eq 0 ] &&
+	   [ "${fbc_args[$argument_index]}" = "-d" ] &&
+	   [ $((argument_index + 1)) -lt ${#fbc_args[@]} ] &&
+	   [ "${fbc_args[$((argument_index + 1))]}" = "__FB_GFXLIB3__" ]; then
+		use_gfx3=1
+	fi
+done
+
+# gfxlib3 always owns a renderer thread, even when the BASIC source does not
+# use THREADCREATE itself.  Select the thread-safe rtlib and graphics archives
+# so the renderer, idle event pump, and BASIC program can use runtime services
+# concurrently.
+if [ "$use_gfx3" -eq 1 ]; then
+	use_mt=1
+fi
 
 target_keys=()
 target_triples=()
@@ -598,6 +678,29 @@ cleanup() {
 }
 trap cleanup EXIT
 
+#
+# A source checkout can contain newer gfxlib3 selection and declaration
+# headers than the standalone Android compiler installation. Copy the selected
+# Android include tree and replace only those public headers when gfxlib3 is
+# requested. The compiler still sees every target-specific runtime include,
+# while the program sees the same -gfx3 pre-include, constants, and #inclib
+# selection as a normal checkout build. Installed wrappers without the
+# checkout files retain their existing include directory.
+compiler_incdir="$incdir"
+checkout_incdir="${BASH_SOURCE[0]%/*}/../../../inc"
+if [ "$use_gfx3" -eq 1 ] && \
+	[ -f "$checkout_incdir/fbgfx.bi" ] && \
+	[ -f "$checkout_incdir/fbgfx3.bi" ] && \
+	[ -f "$checkout_incdir/fbgfx3-option.bi" ]; then
+	compiler_incdir="$tmp/gfx3-include"
+	mkdir -p "$compiler_incdir"
+	cp -a "$incdir"/. "$compiler_incdir"/
+	cp "$checkout_incdir/fbgfx.bi" "$compiler_incdir/fbgfx.bi"
+	cp "$checkout_incdir/fbgfx3.bi" "$compiler_incdir/fbgfx3.bi"
+	cp "$checkout_incdir/fbgfx3-option.bi" \
+		"$compiler_incdir/fbgfx3-option.bi"
+fi
+
 cfile="$tmp/$module.c"
 objfile="$tmp/$module.o"
 appobj="$tmp/fb_android_app.o"
@@ -609,7 +712,12 @@ sofiles=()
 if [ "$use_entry" -eq 1 ]; then
 	entry_args=(-entry fb_android_program_main)
 fi
-module_args=(-m "$module")
+# -m identifies the input module by its original file name.  The sanitized
+# name is only suitable for generated C and object paths.  Passing the
+# sanitized name for a source such as game-demo.bas makes fbc treat it as a
+# constructor module, which runs the BASIC program while the native library is
+# still loading and before Android has supplied a window.
+module_args=(-m "$base")
 
 for ((target_index = 0; target_index < ${#target_keys[@]}; ++target_index)); do
 	target_key="${target_keys[$target_index]}"
@@ -639,13 +747,12 @@ for ((target_index = 0; target_index < ${#target_keys[@]}; ++target_index)); do
 		-prefix "$prefix" \
 		-target "$triple" \
 		-arch "$fbc_arch" \
-		-d __FB_ANDROID__ \
 		-gen gcc \
 		-r \
 		-pic \
 		"${entry_args[@]}" \
 		"${module_args[@]}" \
-		-i "$incdir" \
+		-i "$compiler_incdir" \
 		-p "$libdir" \
 		"${fbc_args[@]}" \
 		-o "$cfile" \
@@ -653,7 +760,58 @@ for ((target_index = 0; target_index < ${#target_keys[@]}; ++target_index)); do
 
 	"$cc" -fPIC -DANDROID -D__FB_ANDROID__ -I"$incdir" -Wno-unused-variable -Wno-unused-function -c "$cfile" -o "$objfile"
 
+	#
+	# Multi-module FreeBASIC project
+	#
+	# The main module owns the renamed Android entry point. Compile every
+	# additional .bas argument as an ordinary separately linked module. Passing
+	# those sources to the main compiler invocation does not emit their code in
+	# -r mode and leaves unresolved BASIC symbols in the shared library.
+	project_objects=()
+	project_pids=()
+	for project_source in "${project_sources[@]}"; do
+		project_name="${project_source##*/}"
+		project_name="${project_name%.*}"
+		project_module="$(sanitize_module "$project_source")"
+		project_cfile="$target_tmp/$project_module.c"
+		project_objfile="$target_tmp/$project_module.o"
+
+		project_objects+=("$project_objfile")
+		(
+			env GCC="$cc" CLANG="$cc" AS="$cc" LD="$cc" AR="$ar" RANLIB="$ranlib" \
+				"$compiler" \
+				-prefix "$prefix" \
+				-target "$triple" \
+				-arch "$fbc_arch" \
+				-gen gcc \
+				-r \
+				-pic \
+				-i "$compiler_incdir" \
+				-p "$libdir" \
+				"${fbc_args[@]}" \
+				-o "$project_cfile" \
+				"$project_source"
+
+			"$cc" -fPIC -DANDROID -D__FB_ANDROID__ -I"$incdir" \
+				-Wno-unused-variable -Wno-unused-function \
+				-c "$project_cfile" -o "$project_objfile"
+		) &
+		project_pids+=("$!")
+
+		# Two compiler processes keep memory bounded on development machines
+		# while allowing independent FreeBASIC modules to make progress.
+		if [ "${#project_pids[@]}" -ge 2 ]; then
+			wait "${project_pids[0]}"
+			project_pids=("${project_pids[@]:1}")
+		fi
+	done
+	for project_pid in "${project_pids[@]}"; do
+		wait "$project_pid"
+	done
+
 	if [ "$mode" = "obj" ]; then
+		[ "${#project_objects[@]}" -eq 0 ] || \
+			die "--emit-obj accepts only one FreeBASIC source"
 		cp "$objfile" "$output"
 		echo "$output"
 		exit 0
@@ -685,12 +843,20 @@ for ((target_index = 0; target_index < ${#target_keys[@]}; ++target_index)); do
 	if [ "$use_mt" -eq 1 ]; then
 		fb_runtime="libfbmtpic.a"
 		fbrt_runtime="libfbrtmtpic.a"
-		gfx_runtime="libfbgfxmtpic.a"
+		if [ "$use_gfx3" -eq 1 ]; then
+			gfx_runtime="libfbgfx3mtpic.a"
+		else
+			gfx_runtime="libfbgfxmtpic.a"
+		fi
 		sfx_runtime="libsfxmtpic.a"
 	else
 		fb_runtime="libfbpic.a"
 		fbrt_runtime="libfbrtpic.a"
-		gfx_runtime="libfbgfxpic.a"
+		if [ "$use_gfx3" -eq 1 ]; then
+			gfx_runtime="libfbgfx3pic.a"
+		else
+			gfx_runtime="libfbgfxpic.a"
+		fi
 		sfx_runtime="libsfxpic.a"
 	fi
 
@@ -707,11 +873,9 @@ for ((target_index = 0; target_index < ${#target_keys[@]}; ++target_index)); do
 		gfx_runtime_path="$libdir/$gfx_runtime"
 	fi
 
-	# The Android graphics archive exports JNI entry points used by the
-	# Java activity.  Native code does not reference those entry points,
-	# so the linker would otherwise discard their archive member.  Keep
-	# the graphics archive whole so the Java and native input bridge stay
-	# together in every generated shared library.
+	# Both graphics runtimes export NativeActivity callback targets which are
+	# reached through weak symbols in fb_android_app.c. Keep the selected
+	# graphics archive whole so those entry points are retained.
 	runtime_group=("${runtime[@]}")
 	if [ -n "$gfx_runtime_path" ]; then
 		runtime_group+=("-Wl,--whole-archive" "$gfx_runtime_path" "-Wl,--no-whole-archive")
@@ -720,12 +884,18 @@ for ((target_index = 0; target_index < ${#target_keys[@]}; ++target_index)); do
 	link_objects=("$appobj")
 	[ -z "$envobj" ] || link_objects+=("$envobj")
 	link_objects+=("$startup" "$objfile")
+	link_objects+=("${project_objects[@]}")
+	android_graphics_libraries=()
+	if [ "$use_gfx3" -eq 1 ]; then
+		android_graphics_libraries=(-lEGL -lGLESv3)
+	fi
 
 	"$cc" -shared -Wl,-soname,libfreebasicapp.so -o "$sofile" \
 		"${link_objects[@]}" \
 		-Wl,--start-group "${runtime_group[@]}" -Wl,--end-group \
 		-Wl,--wrap=exit \
-		-llog -landroid -lOpenSLES -ldl -lm
+		-llog -landroid -lEGL -lGLESv2 -lOpenSLES "${android_graphics_libraries[@]}" \
+		-ldl -lm
 
 	if [ "$mode" = "so" ]; then
 		cp "$sofile" "$output"

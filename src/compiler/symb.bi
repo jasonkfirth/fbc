@@ -427,6 +427,11 @@ enum FB_DEFINE_FLAGS
 	FB_DEFINE_FLAGS_NEEDPARENS  = &h00000008
 end enum
 
+declare function symbIsDefineSet _
+	( _
+		byval id as const zstring ptr _
+	) as integer
+
 type LEXPP_ARGTB_ as LEXPP_ARGTB ptr
 
 type FBS_DEFINE_PROCZ as function( ) as string
@@ -2044,8 +2049,6 @@ declare function symbCheckConstAssignTopLevel _
 	( _
 		byval ldtype as FB_DATATYPE, _
 		byval rdtype as FB_DATATYPE, _
-		byval lsubtype as FBSYMBOL ptr, _
-		byval rsubtype as FBSYMBOL ptr, _
 		byval mode as FB_PARAMMODE = 0, _
 		byref matches as integer = 0 _
 	) as integer

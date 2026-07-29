@@ -1,0 +1,6 @@
+# TEST_MODE : MULTI_MODULE_OK
+
+MAIN := midi-fm-programs.bas
+COMPILE_AND_LINK := 1
+
+# end of midi-fm-programs.bmk

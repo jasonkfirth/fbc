@@ -89,17 +89,21 @@ const GFXDRIVER *__fb_gfx_drivers_list[] = {
 	NULL
 };
 
-static const struct { const char *name; FARPROC *proc; } user32_procs[] = {
-	{"SetLayeredWindowAttributes", (FARPROC *)&fb_win32.SetLayeredWindowAttributes},
-	{"MonitorFromWindow",          (FARPROC *)&fb_win32.MonitorFromWindow         },
-	{"MonitorFromPoint",           (FARPROC *)&fb_win32.MonitorFromPoint          },
-	{"FlashWindowEx",              (FARPROC *)&fb_win32.FlashWindowEx             },
-	{"TrackMouseEvent",            (FARPROC *)&fb_win32.TrackMouseEvent           },
-	{"GetMonitorInfoA",            (FARPROC *)&fb_win32.GetMonitorInfo            },
-	{"ChangeDisplaySettingsExA",   (FARPROC *)&fb_win32.ChangeDisplaySettingsEx   },
-	{"RegisterTouchWindow",        (FARPROC *)&fb_win32.RegisterTouchWindow       },
-	{"GetTouchInputInfo",          (FARPROC *)&fb_win32.GetTouchInputInfo         },
-	{"CloseTouchInputHandle",      (FARPROC *)&fb_win32.CloseTouchInputHandle     }
+static const struct {
+	const char *name;
+	void *destination;
+	size_t destination_size;
+} user32_procs[] = {
+	{"SetLayeredWindowAttributes", (void *)&fb_win32.SetLayeredWindowAttributes, sizeof(fb_win32.SetLayeredWindowAttributes)},
+	{"MonitorFromWindow",          (void *)&fb_win32.MonitorFromWindow,          sizeof(fb_win32.MonitorFromWindow)         },
+	{"MonitorFromPoint",           (void *)&fb_win32.MonitorFromPoint,           sizeof(fb_win32.MonitorFromPoint)          },
+	{"FlashWindowEx",              (void *)&fb_win32.FlashWindowEx,              sizeof(fb_win32.FlashWindowEx)             },
+	{"TrackMouseEvent",            (void *)&fb_win32.TrackMouseEvent,            sizeof(fb_win32.TrackMouseEvent)           },
+	{"GetMonitorInfoA",            (void *)&fb_win32.GetMonitorInfo,             sizeof(fb_win32.GetMonitorInfo)            },
+	{"ChangeDisplaySettingsExA",   (void *)&fb_win32.ChangeDisplaySettingsEx,    sizeof(fb_win32.ChangeDisplaySettingsEx)   },
+	{"RegisterTouchWindow",        (void *)&fb_win32.RegisterTouchWindow,        sizeof(fb_win32.RegisterTouchWindow)       },
+	{"GetTouchInputInfo",          (void *)&fb_win32.GetTouchInputInfo,          sizeof(fb_win32.GetTouchInputInfo)         },
+	{"CloseTouchInputHandle",      (void *)&fb_win32.CloseTouchInputHandle,      sizeof(fb_win32.CloseTouchInputHandle)     }
 };
 
 static CRITICAL_SECTION update_lock;
@@ -128,6 +132,40 @@ static void keyconv_clear( KEYCONVINFO *k );
 static void keyconv_grow( KEYCONVINFO *k, int nchars, int charsize );
 
 static unsigned int hIntlConvertChar( int key, int source_cp, int dest_cp );
+
+int fb_hWin32CopyProcedure(void *destination, size_t destination_size,
+                           const void *source, size_t source_size)
+{
+	/*
+	 * GetProcAddress() and wglGetProcAddress() return generic function
+	 * pointers.  C does not define casts between incompatible function
+	 * pointer types, so copy the representation only when this ABI uses the
+	 * same size for both types.
+	 */
+	if ((destination == NULL) || (source == NULL) ||
+	    (destination_size == 0) || (destination_size != source_size))
+		return -1;
+
+	memcpy(destination, source, destination_size);
+	return 0;
+}
+
+int fb_hWin32LoadProcedure(HMODULE module, const char *name,
+                           void *destination, size_t destination_size)
+{
+	FARPROC procedure;
+
+	if ((module == NULL) || (name == NULL))
+		return -1;
+
+	procedure = GetProcAddress(module, name);
+	if (procedure == NULL)
+		return -1;
+
+	return fb_hWin32CopyProcedure(destination, destination_size,
+	                              (const void *)&procedure,
+	                              sizeof(procedure));
+}
 
 void fb_hWin32EnableWindowScaling(int enable)
 {
@@ -403,7 +441,10 @@ static void fb_hEnableDPIAwareness(int os_major_version)
 
 	shcore = LoadLibrary("shcore");
 	if (shcore) {
-		set_process_dpi_awareness = (SETPROCESSDPIAWARENESS)GetProcAddress(shcore, "SetProcessDpiAwareness");
+		set_process_dpi_awareness = NULL;
+		fb_hWin32LoadProcedure(shcore, "SetProcessDpiAwareness",
+		                       (void *)&set_process_dpi_awareness,
+		                       sizeof(set_process_dpi_awareness));
 		if (set_process_dpi_awareness) {
 			ret = set_process_dpi_awareness(PROCESS_PER_MONITOR_DPI_AWARE);
 			FreeLibrary(shcore);
@@ -419,7 +460,10 @@ static void fb_hEnableDPIAwareness(int os_major_version)
 	if (!user32) {
 		return;
 	}
-	set_process_dpi_aware = (SETPROCESSDPIAWARE)GetProcAddress(user32, "SetProcessDPIAware");
+	set_process_dpi_aware = NULL;
+	fb_hWin32LoadProcedure(user32, "SetProcessDPIAware",
+	                       (void *)&set_process_dpi_aware,
+	                       sizeof(set_process_dpi_aware));
 	if (set_process_dpi_aware) {
 		set_process_dpi_aware();
 	}
@@ -726,7 +770,18 @@ LRESULT CALLBACK fb_hWin32WinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 			break;
 
 		case WM_SIZE:
-			if (fb_hWin32IsWindowScalingEnabled()) {
+			if ((fb_win32.flags & DRIVER_RESIZABLE) &&
+			    (wParam != SIZE_MINIMIZED)) {
+				int client_width = LOWORD(lParam);
+				int client_height = HIWORD(lParam);
+
+				client_height = (client_height + __fb_gfx->scanline_size - 1) /
+					__fb_gfx->scanline_size;
+				fb_hRequestResize(client_width, client_height);
+				if (fb_win32.mouse_clip)
+					fb_hSetMouseClip();
+			}
+			else if (fb_hWin32IsWindowScalingEnabled()) {
 				fb_hWin32UpdateWindowLayout();
 				fb_hMemSet(__fb_gfx->dirty, TRUE, fb_win32.h);
 				if (fb_win32.mouse_clip)
@@ -851,7 +906,11 @@ LRESULT CALLBACK fb_hWin32WinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 				int scanlineShift = __fb_gfx->scanline_size - 1;
 
 				BeginPaint(fb_win32.wnd, &ps);
-				if (fb_hWin32IsWindowScalingEnabled()) {
+				if (fb_win32.flags & DRIVER_RESIZABLE) {
+					fb_hMemSet(__fb_gfx->dirty, TRUE,
+						(size_t)__fb_gfx->h * __fb_gfx->scanline_size);
+				}
+				else if (fb_hWin32IsWindowScalingEnabled()) {
 					fb_hMemSet(__fb_gfx->dirty, TRUE, fb_win32.h);
 				}
 				else {
@@ -882,6 +941,21 @@ LRESULT CALLBACK fb_hWin32WinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 
 		case WM_GETMINMAXINFO:
 			mmi = (MINMAXINFO *)lParam;
+			if (fb_win32.flags & DRIVER_RESIZABLE) {
+				RECT minimum = { 0, 0, 8,
+					(__fb_gfx && __fb_gfx->font) ?
+					 __fb_gfx->font->h * __fb_gfx->scanline_size : 16 };
+				DWORD style = (DWORD)GetWindowLongPtr(hWnd, GWL_STYLE);
+				DWORD extended_style =
+					(DWORD)GetWindowLongPtr(hWnd, GWL_EXSTYLE);
+
+				if (AdjustWindowRectEx(&minimum, style, FALSE,
+				    extended_style)) {
+					mmi->ptMinTrackSize.x = minimum.right - minimum.left;
+					mmi->ptMinTrackSize.y = minimum.bottom - minimum.top;
+				}
+				return 0;
+			}
 			if (fb_hWin32IsWindowScalingEnabled()) {
 				mmi->ptMinTrackSize.x = fb_win32.fullw;
 				mmi->ptMinTrackSize.y = fb_win32.fullh;
@@ -979,7 +1053,9 @@ int fb_hWin32Init(char *title, int w, int h, int depth, int refresh_rate, int fl
 
 	module = GetModuleHandle("USER32");
 	for (i = 0; i < ((int)sizeof(user32_procs)) / ((int)sizeof(user32_procs[0])); i++) {
-		*user32_procs[i].proc = GetProcAddress(module, user32_procs[i].name);
+		fb_hWin32LoadProcedure(module, user32_procs[i].name,
+		                       user32_procs[i].destination,
+		                       user32_procs[i].destination_size);
 	}
 
 	if (fb_win32.MonitorFromPoint) {

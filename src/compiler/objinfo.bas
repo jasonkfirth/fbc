@@ -959,7 +959,8 @@ dim shared as ENTRYINFO entries(0 to (OBJINFO__COUNT - 1)) = _
 	( @"-mt"  , FALSE ), _
 	( @"-gfx" , FALSE ), _
 	( @"-sfx" , FALSE ), _
-	( @"-lang", TRUE  )  _
+	( @"-lang", TRUE  ), _
+	( @"-gfx3", FALSE )  _
 }
 
 private sub hResetBuffers( )

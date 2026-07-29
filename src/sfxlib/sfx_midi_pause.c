@@ -42,17 +42,6 @@
 
 
 /* ------------------------------------------------------------------------- */
-/* External MIDI playback state                                              */
-/* ------------------------------------------------------------------------- */
-
-/*
-    These variables are owned by sfx_midi_play.c.
-*/
-
-extern int g_midi_playing;
-
-
-/* ------------------------------------------------------------------------- */
 /* Pause state                                                               */
 /* ------------------------------------------------------------------------- */
 
@@ -85,6 +74,7 @@ int fb_sfxMidiPause(void)
     }
 
     g_midi_paused = 1;
+    fb_sfxMidiOutputPause(1);
     fb_sfxRuntimeUnlock();
 
     return 0;
@@ -123,6 +113,7 @@ void fb_sfxMidiPauseReset(void)
 {
     fb_sfxRuntimeLock();
     g_midi_paused = 0;
+    fb_sfxMidiOutputPause(0);
     fb_sfxRuntimeUnlock();
 }
 

@@ -2,9 +2,6 @@
 
 #include "fb.h"
 
-FBCALL int fb_SGNSingle( float x );
-FBCALL int fb_SGNDouble( double x );
-
 /*:::::*/
 FBCALL float fb_FIXSingle( float x )
 {

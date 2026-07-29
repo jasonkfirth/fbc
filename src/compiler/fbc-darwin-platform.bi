@@ -549,8 +549,6 @@ private sub fbcDarwinPlatformAddGfxLibs( )
 	if( fbcDarwinPlatformIsSelected( ) = FALSE ) then
 		exit sub
 	end if
-
-	fbcPlatformAddX11GfxLibs( )
 end sub
 
 private sub fbcDarwinPlatformAddSfxLibs( )

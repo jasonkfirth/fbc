@@ -25,23 +25,50 @@
 #define DR_WAV_IMPLEMENTATION
 #define DR_MP3_IMPLEMENTATION
 
-#include "third_party/dr_wav.h"
-#include "third_party/dr_mp3.h"
-
 /*
-    stb_vorbis is a bundled third-party decoder.  Clang correctly warns about
-    one defensive pointer-wrap check inside that file when strict diagnostics
-    are enabled.  Keep the diagnostic boundary around the vendored include so
-    FreeBASIC-owned code remains covered by the normal warning profile.
+    Bundled decoder boundary
+
+    dr_wav, dr_mp3, and stb_vorbis are maintained as upstream source drops.
+    Their implementation warnings are not actionable sfxlib diagnostics, so
+    keep strict warning policy outside this boundary while still compiling the
+    decoder code normally.
 */
 
 #if defined(__clang__)
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wtautological-compare"
+#pragma clang diagnostic ignored "-Weverything"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wlogical-op"
+#pragma GCC diagnostic ignored "-Wshadow"
+#pragma GCC diagnostic ignored "-Wshadow=compatible-local"
+#pragma GCC diagnostic ignored "-Wshadow=local"
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
+
+#include "third_party/dr_wav.h"
+#include "third_party/dr_mp3.h"
+
+/*
+    Analyze the sfxlib-owned call boundary without reinterpreting stb_vorbis
+    internals.  The analyzer otherwise explores an impossible mix of the
+    library's push and pull modes and reports a null output path that
+    stb_vorbis_decode_filename cannot enter.
+*/
+#if defined(__clang_analyzer__)
+#define STB_VORBIS_HEADER_ONLY
 #endif
 #include "third_party/stb_vorbis.c"
+#if defined(__clang_analyzer__)
+#undef STB_VORBIS_HEADER_ONLY
+#endif
+
 #if defined(__clang__)
 #pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
 #endif
 
 #include <ctype.h>

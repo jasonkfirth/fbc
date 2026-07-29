@@ -322,6 +322,12 @@ void fb_sfxVoiceResumeTypeChannel(int voice_type, int channel);
 int fb_sfxVoiceStatusType(int voice_type);
 int fb_sfxVoiceStatusTypeChannel(int voice_type, int channel);
 void fb_sfxEnvelopeInit(void);
+void fb_sfxEchoInit(void);
+void fb_sfxEchoShutdown(void);
+int fb_sfxEchoCmd(float wet, float delay_seconds, float feedback);
+void fb_sfxEchoReset(void);
+int fb_sfxEchoEnabled(void);
+void fb_sfxEchoProcess(float *left, float *right);
 void fb_sfxEnvelopeDefine(int id, float attack, float decay, float sustain, float release);
 void fb_sfxEnvelopeRelease(FB_SFXVOICE *voice);
 float fb_sfxEnvelopeProcess(FB_SFXVOICE *voice, float dt);
@@ -416,6 +422,12 @@ void fb_sfxSfxResumeAll(void);
 int fb_sfxSfxStatus(int id);
 int fb_sfxSfxStatusChannel(int channel);
 int fb_sfxSfxAnyActive(void);
+int fb_sfxRawOpen(void);
+void fb_sfxRawClose(void);
+unsigned long long fb_sfxOutputUnderruns(void);
+unsigned long long fb_sfxRawUnderruns(void);
+int fb_sfxOutputSampleRate(void);
+unsigned long fb_sfxOutputStreamEpoch(void);
 int fb_sfxRawWrite(const float *samples, int frames, int channels);
 int fb_sfxOutputCaptureStart(void);
 int fb_sfxOutputCaptureReserve(int frames);
@@ -440,6 +452,36 @@ void fb_sfxMidiDriverClose(void);
 int fb_sfxMidiDriverSend(unsigned char status,
                          unsigned char data1,
                          unsigned char data2);
+int fb_sfxMidiOutputSend(unsigned char status,
+                         unsigned char data1,
+                         unsigned char data2);
+void fb_sfxMidiOutputClose(void);
+void fb_sfxMidiOutputSilence(void);
+void fb_sfxMidiOutputReleaseAll(void);
+void fb_sfxMidiOutputPause(int paused);
+int fb_sfxMidiSoftwareOpen(void);
+void fb_sfxMidiSoftwareClose(void);
+void fb_sfxMidiSoftwareSilence(void);
+void fb_sfxMidiSoftwareReleaseAll(void);
+void fb_sfxMidiSoftwarePause(int paused);
+int fb_sfxMidiSoftwareSend(unsigned char status,
+                           unsigned char data1,
+                           unsigned char data2);
+void fb_sfxMidiSoftwareMixFrame(float *left, float *right);
+
+/*
+    Shared MIDI state
+
+    MIDI command modules are intentionally split by responsibility.  These
+    declarations identify the small state set shared between those modules;
+    each variable has one definition in its owning source file.
+*/
+
+extern int g_midi_device;
+extern int g_midi_open;
+extern int g_midi_paused;
+extern int g_midi_playing;
+
 int fb_sfxMidiSend(unsigned char status,
                    unsigned char data1,
                    unsigned char data2);

@@ -45,7 +45,7 @@
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
 
-#define FB_SFX_PI 3.14159265358979323846
+#define FB_SFX_PI 3.14159265358979323846f
 
 
 /* ------------------------------------------------------------------------- */
@@ -257,9 +257,10 @@ float fb_sfxOscillatorSample(FB_SFXVOICE *voice)
 
         case FB_SFX_WAVE_NOISE:
             return fb_sfxOscillatorNoise(voice);
-    }
 
-    return 0.0f;
+        default:
+            return 0.0f;
+    }
 }
 
 

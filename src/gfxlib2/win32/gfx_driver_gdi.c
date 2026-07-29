@@ -10,6 +10,7 @@
 
 static int driver_init(char *title, int w, int h, int depth, int refresh_rate, int flags);
 static int *driver_fetch_modes(int depth, int *size);
+static int driver_resize(int width, int height);
 
 /* GFXDRIVER */
 const GFXDRIVER fb_gfxDriverGDI =
@@ -30,7 +31,8 @@ const GFXDRIVER fb_gfxDriverGDI =
 	driver_fetch_modes,     /* int *(*fetch_modes)(int depth, int *size); */
 	NULL,                   /* void (*flip)(void); */
 	NULL,                   /* void (*poll_events)(void); */
-	NULL                    /* void (*update)(void); */
+	NULL,                   /* void (*update)(void); */
+	driver_resize           /* int (*resize)(int width, int height); */
 };
 
 static BITMAPINFO *bitmap_info;
@@ -123,7 +125,9 @@ static int gdi_init(void)
 		switched_to_fullscreen = 1;
 		style = WS_POPUP | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
 	} else {
-		style = WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME;
+		style = WS_OVERLAPPEDWINDOW;
+		if (!(fb_win32.flags & DRIVER_RESIZABLE))
+			style &= ~WS_THICKFRAME;
 		if (fb_win32.flags & DRIVER_NO_SWITCH)
 			style &= ~WS_MAXIMIZEBOX;
 		if (fb_win32.flags & DRIVER_NO_FRAME)
@@ -258,6 +262,7 @@ static DWORD WINAPI gdi_thread( LPVOID param )
 	{
 		fb_hWin32Lock();
 		scanline_size = __fb_gfx->scanline_size;
+		rect.right = fb_win32.w;
 
 		hdc = GetDC(fb_win32.wnd);
 		if (fb_win32.is_palette_changed) {
@@ -339,6 +344,60 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 	fb_win32.thread = gdi_thread;
 
 	return fb_hWin32Init(title, w, h, MAX(8, depth), refresh_rate, flags);
+}
+
+/*
+	Resize the GDI presentation objects after the generic layer has prepared a
+	replacement framebuffer.  The caller holds update_lock, so the paint thread
+	cannot observe bitmap dimensions that disagree with the active pages.
+*/
+static int driver_resize(int width, int height)
+{
+	BLITTER *new_blitter = fb_win32.blitter;
+	unsigned char *new_buffer = NULL;
+	size_t physical_height, row_bytes, row_pitch, buffer_size;
+	RECT window_rect;
+
+	if ((width <= 0) || (height <= 0) || !bitmap_info)
+		return -1;
+	if ((size_t)height > ((size_t)INT_MAX /
+	    (size_t)__fb_gfx->scanline_size))
+		return -1;
+	physical_height = (size_t)height * (size_t)__fb_gfx->scanline_size;
+	if ((size_t)width > ((size_t)-1 / (size_t)__fb_gfx->bpp))
+		return -1;
+	row_bytes = (size_t)width * (size_t)__fb_gfx->bpp;
+
+	/* Indexed DIB rows require four-byte alignment. */
+	if (!new_blitter && ((row_bytes & 3u) != 0u)) {
+		new_blitter = fb_hGetBlitter(fb_win32.depth, FALSE);
+		if (!new_blitter)
+			return -1;
+	}
+	if (new_blitter) {
+		if (row_bytes > ((size_t)-1 - 3u))
+			return -1;
+		row_pitch = (row_bytes + 3u) & ~(size_t)3u;
+		if (physical_height > ((size_t)-1 / row_pitch))
+			return -1;
+		buffer_size = row_pitch * physical_height;
+		new_buffer = (unsigned char *)malloc(buffer_size);
+		if (!new_buffer)
+			return -1;
+	}
+
+	free(buffer);
+	buffer = new_buffer;
+	fb_win32.blitter = new_blitter;
+	fb_win32.w = width;
+	fb_win32.h = (int)physical_height;
+	bitmap_info->bmiHeader.biWidth = width;
+	bitmap_info->bmiHeader.biHeight = -(int)physical_height;
+	if (GetWindowRect(fb_win32.wnd, &window_rect)) {
+		fb_win32.fullw = window_rect.right - window_rect.left;
+		fb_win32.fullh = window_rect.bottom - window_rect.top;
+	}
+	return 0;
 }
 
 static int *driver_fetch_modes(int depth, int *size)

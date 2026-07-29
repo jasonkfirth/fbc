@@ -4,9 +4,11 @@
 
 #include "../fb_gfx.h"
 #include "fb_gfx_x11.h"
+#include <limits.h>
 #include <sys/shm.h>
 
 static int driver_init(char *title, int w, int h, int depth, int refresh_rate, int flags);
+static int driver_resize(int width, int height);
 
 /* GFXDRIVER */
 const GFXDRIVER fb_gfxDriverX11 =
@@ -27,7 +29,8 @@ const GFXDRIVER fb_gfxDriverX11 =
 	fb_hX11FetchModes,      /* int *(*fetch_modes)(void); */
 	NULL,                   /* void (*flip)(void); */
 	NULL,                   /* void (*poll_events)(void); */
-	NULL                    /* void (*update)(void); */
+	NULL,                   /* void (*update)(void); */
+	driver_resize           /* int (*resize)(int width, int height); */
 };
 
 static XImage *image, *shape_image;
@@ -203,8 +206,10 @@ static int x11_init(void)
 	
 	fb_x11.display_offset = 0;
 	display_name = XDisplayName(NULL);
-	if (((!display_name[0]) || (display_name[0] == ':') || (!strncmp(display_name, "unix:", 5))) &&
-	    (XShmQueryExtension(fb_x11.display))) {
+	if (((!display_name[0]) || (display_name[0] == ':') ||
+	    (!strncmp(display_name, "unix:", 5))) &&
+	    (XShmQueryExtension(fb_x11.display)) &&
+	    !(fb_x11.flags & DRIVER_RESIZABLE)) {
 		if (fb_x11.flags & DRIVER_FULLSCREEN) {
 			if (fb_hX11EnterFullscreen(&h)) {
 				fb_hX11LeaveFullscreen();
@@ -400,6 +405,59 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 	fb_x11.exit = x11_exit;
 	fb_x11.update = x11_update;
 	return fb_hX11Init(title, w, h, depth, refresh_rate, flags);
+}
+
+/*
+	Resizable modes deliberately use an ordinary XImage rather than MIT-SHM.
+	That keeps replacement failure atomic and avoids detaching a shared segment
+	while the X server may still be consuming an earlier presentation request.
+*/
+static int driver_resize(int width, int height)
+{
+	XImage *replacement;
+	size_t data_size;
+	int physical_height;
+
+	if ((width <= 0) || (height <= 0) || is_shm || (image == NULL) ||
+	    ((size_t)height > ((size_t)INT_MAX /
+	     (size_t)__fb_gfx->scanline_size)))
+		return -1;
+	physical_height = height * __fb_gfx->scanline_size;
+	replacement = XCreateImage(fb_x11.display, fb_x11.visual,
+		XDefaultDepth(fb_x11.display, fb_x11.screen), ZPixmap, 0, NULL,
+		width, physical_height, 32, 0);
+	if (replacement == NULL)
+		return -1;
+	if ((replacement->bytes_per_line <= 0) ||
+	    ((size_t)replacement->height > ((size_t)-1 /
+	     (size_t)replacement->bytes_per_line))) {
+		XDestroyImage(replacement);
+		return -1;
+	}
+	data_size = (size_t)replacement->bytes_per_line *
+		(size_t)replacement->height;
+	replacement->data = (char *)malloc(data_size);
+	if (replacement->data == NULL) {
+		XDestroyImage(replacement);
+		return -1;
+	}
+	memset(replacement->data, 0, data_size);
+
+	XDestroyImage(image);
+	image = replacement;
+	if (scaled_image != NULL) {
+		XDestroyImage(scaled_image);
+		scaled_image = NULL;
+	}
+	fb_x11.w = width;
+	fb_x11.h = physical_height;
+	fb_x11.content_w = width;
+	fb_x11.content_h = physical_height;
+	fb_hX11RefreshLayout(width, physical_height);
+	needs_byte_swap = ((image->bits_per_pixel == 16) ||
+		(image->bits_per_pixel == 32)) &&
+		(image->byte_order != host_byte_order());
+	return 0;
 }
 
 #endif

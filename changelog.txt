@@ -13,6 +13,7 @@ Version 1.20.2
 - build/exampleageddon: added no-run reporting, safer package PATH setup for Windows-hosted package compilers, and clearer handling for self-contained compile-only sweeps.
 - preprocessor: track nested active macro expansions so recursive ping-pong expansions are rejected reliably while valid function-like macro expansion resumes correctly; added regression tests for the recursive and undef cases.
 - gfxlib2: improved logical-to-physical framebuffer scaling and mouse coordinate mapping for fbdev, X11, Win32, and Android display paths, including safer dirty-line scaling buffers and layout refresh handling.
+- gfxlib2: added dependency-free PNG input and output to BLOAD and BSAVE, including indexed, grayscale, true-color, alpha, 16-bit-sample, filtered, and Adam7-interlaced input without adding libpng or zlib link requirements to supported targets.
 - compiler/Darwin: added post-link creation of simple macOS .app bundles for GUI executables, including Info.plist and PkgInfo generation next to the linked binary.
 - rtlib/Win32: tightened command-backed PIPE/SHELL/EXEC behavior, printer and serial helper allocation/casts, locale time/date flag parsing, and thread-procedure return handling to satisfy stricter compiler and analyzer checks.
 - tests: added generated-C object logs and smoke sources for NuttX, RISC-V 32-bit compiler coverage, preprocessor recursion coverage, device protocol coverage, directory runtime coverage, and target-specific argv behavior.
@@ -36,6 +37,7 @@ Version 1.20.2
 - tests: added regression coverage for embedded-NUL constant string comparisons, IEEE NaN comparisons, invalid and duplicate command-line defines, SUB type-suffix diagnostics, 32-bit cdecl caller cleanup, FreeBSD/Haiku/illumos socket ABI layouts, Haiku errno, non-interactive curses initialization, and compiler header/object cases exposed by the maintenance pass.
 
 [fixed]
+- compiler/preprocessor: preserve the first token after a trailing single-line comment on variadic macros with optional parentheses, preventing the following source line from being consumed and keeping diagnostics on the correct line.
 - gfxlib2/NuttX/RP2350: stabilized Waveshare RP2350-PiZero DVI scanout with a three-buffer SRAM encoder, core-1 timer isolation, and a guarded fast path for the DVI DMA interrupt; preserved 8-bit palette shades and kept demo input and register diagnostics from disrupting active scanout.
 - rtlib/file: fixed binary GET # into fixed-length STRING*N destinations to avoid writing a terminating NUL past the fixed buffer, and added file IO canary coverage across GET #, INPUT #, and LINE INPUT # destinations.
 - rtlib/NuttX: made board-test stdout/status output use a small direct stdout writer for print, spacing, tab, beep, and newline paths, avoiding serial stdio/flush stalls seen while running ESP32-P4 loadable-module tests.

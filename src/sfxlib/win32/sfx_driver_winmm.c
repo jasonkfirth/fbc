@@ -43,6 +43,8 @@
 
 #include <windows.h>
 #include <mmsystem.h>
+#include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -159,12 +161,32 @@ static int winmm_init(int rate, int channels, int buffer_size, int flags)
 
     WINMM_DBG("Initializing WinMM driver\n");
 
+    if (rate <= 0 || (channels != 1 && channels != 2))
+        return -1;
+
+    if (buffer_size <= 0)
+        buffer_size = FB_SFX_DEFAULT_BUFFER;
+
+    if (buffer_size > INT_MAX / channels)
+        return -1;
+
+    g_buffer_samples = buffer_size * channels;
+    if (g_buffer_samples > INT_MAX / (int)sizeof(short))
+        return -1;
+
+    g_buffer_bytes = g_buffer_samples * (int)sizeof(short);
+
     g_format.wFormatTag      = WAVE_FORMAT_PCM;
-    g_format.nChannels       = (WORD)channels;
-    g_format.nSamplesPerSec  = (DWORD)rate;
+    g_format.nChannels       = (WORD)(unsigned int)channels;
+    g_format.nSamplesPerSec  = (DWORD)(unsigned int)rate;
     g_format.wBitsPerSample  = 16;
 
-    g_format.nBlockAlign = (g_format.nChannels * g_format.wBitsPerSample) / 8;
+    g_format.nBlockAlign = (WORD)(((unsigned int)g_format.nChannels *
+        (unsigned int)g_format.wBitsPerSample) / 8u);
+    if ((uint32_t)(unsigned int)rate >
+        UINT32_MAX / (uint32_t)g_format.nBlockAlign)
+        return -1;
+
     g_format.nAvgBytesPerSec = g_format.nSamplesPerSec * g_format.nBlockAlign;
     g_format.cbSize = 0;
 
@@ -186,11 +208,6 @@ static int winmm_init(int rate, int channels, int buffer_size, int flags)
         return -1;
     }
 
-    g_buffer_samples = buffer_size * channels;
-    if (g_buffer_samples <= 0)
-        g_buffer_samples = 4096;
-
-    g_buffer_bytes = (int)(sizeof(short) * g_buffer_samples);
     g_current_buffer = 0;
     memset(g_headers, 0, sizeof(g_headers));
 

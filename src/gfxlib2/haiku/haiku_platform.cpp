@@ -34,6 +34,9 @@
 BBitmap *g_bmp = NULL;
 BWindow *g_win = NULL;
 BView   *g_view = NULL;
+#ifndef DISABLE_OPENGL
+BGLView *g_gl_view = NULL;
+#endif
 
 /* ------------------------------------------------------------------------- */
 /* Reset backend state                                                       */
@@ -48,6 +51,9 @@ void fb_hHaikuResetState(void)
     g_bmp = NULL;
     g_win = NULL;
     g_view = NULL;
+#ifndef DISABLE_OPENGL
+    g_gl_view = NULL;
+#endif
 }
 
 /* ------------------------------------------------------------------------- */

@@ -29,6 +29,11 @@ SUITE( fbc_tests.pp.quote )
 			CU_ASSERT_EQUAL( s, "freebasic" )
 		end scope
 
+		scope
+			__FB_UNQUOTE__( !"dim s as string = \"freebasic\"" )
+			CU_ASSERT_EQUAL( s, "freebasic" )
+		end scope
+
 	END_TEST
 
 	TEST( empty )

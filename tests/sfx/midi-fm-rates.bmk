@@ -1,0 +1,11 @@
+# TEST_MODE : MULTI_MODULE_OK
+
+MAIN := midi-fm-rates.bas
+COMPILE_AND_LINK := 1
+
+EXTRA_OBJS := midi-fm-test-rate.o
+
+$(SRCDIR)midi-fm-test-rate.o : $(SRCDIR)midi-fm-test-rate.c
+	$(CC) -c $(CFLAGS) -Wall -Wextra -Werror -I$(abspath ../src/sfxlib) -o $@ $<
+
+# end of midi-fm-rates.bmk

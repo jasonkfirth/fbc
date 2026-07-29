@@ -918,6 +918,8 @@ private function hEmitProcHeader _
 
 	var param = symbGetProcLastParam( proc )
 	dim as integer param_index = 0
+	dim as DZSTRING params
+	DZstrZero( params )
 
 	if( (hidden = NULL) and (param = NULL) ) then
 		ln += "void"
@@ -925,22 +927,22 @@ private function hEmitProcHeader _
 
 	while( param )
 		if( symbGetParamMode( param ) = FB_PARAMMODE_VARARG ) then
-			ln += "..."
+			DZstrConcatAssign( params, "..." )
 		else
 			'' Emit clang-compatible datatype for main()'s argv,
 			'' clang is very strict about this...
 			if( param->stats and FB_SYMBSTATS_ARGV ) then
-				ln += "char**"
+				DZstrConcatAssign( params, "char**" )
 			else
 				symbGetRealParamDtype( param, dtype, subtype )
 				if( (options and EMITPROC_ISPROTO) <> 0 ) then
 					dim as string libc_procptr = hEmitLibcProcPtrParam( mangled, param_index )
 					if( len( libc_procptr ) > 0 ) then
-						ln += libc_procptr
+						DZstrConcatAssign( params, libc_procptr )
 						param = symbGetProcPrevParam( proc, param )
 						param_index += 1
 						if( param ) then
-							ln += ", "
+							DZstrConcatAssign( params, ", " )
 						end if
 						continue while
 					elseif( hEmitMutableLibcPtrParam( mangled, param_index ) ) then
@@ -951,20 +953,25 @@ private function hEmitProcHeader _
 						subtype = NULL
 					end if
 				end if
-				ln += hEmitType( dtype, subtype, TRUE )
+				DZstrConcatAssign( params, hEmitType( dtype, subtype, TRUE ) )
 			end if
 
 			if( (options and EMITPROC_ISPROTO) = 0 ) then
-				ln += " " + *symbGetMangledName( symbGetParamVar( param ) )
+				DZstrConcatAssign( params, " " + *symbGetMangledName( symbGetParamVar( param ) ) )
 			end if
 		end if
 
 		param = symbGetProcPrevParam( proc, param )
 		param_index += 1
 		if( param ) then
-			ln += ", "
+			DZstrConcatAssign( params, ", " )
 		end if
 	wend
+
+	if( params.data <> NULL ) then
+		ln += *params.data
+	end if
+	DZstrAllocate( params, 0 )
 
 	ln += " )"
 
@@ -1099,6 +1106,8 @@ end sub
 '' Returns "[N]" (N = array size) if the symbol is an array or a fixlen string.
 private function hEmitArrayDecl( byval sym as FBSYMBOL ptr ) as string
 	dim as string s
+	dim as DZSTRING dimensions
+	DZstrZero( dimensions )
 
 	'' even dllimport'ed arrays are emitted as pointers, not arrays
 	if( symbIsImport( sym ) ) then
@@ -1113,12 +1122,15 @@ private function hEmitArrayDecl( byval sym as FBSYMBOL ptr ) as string
 		if( symbGetIsDynamic( sym ) = FALSE ) then
 			for i as integer = 0 to symbGetArrayDimensions( sym ) - 1
 				'' elements = ubound( array, d ) - lbound( array, d ) + 1
-				'' Array dimensions are limited to FB_MAXARRAYDIMS.
-				'' FB-LINTER: DISABLE-NEXT-LINE FBL503
-				s += "[" + str( symbArrayUbound( sym, i ) - symbArrayLbound( sym, i ) + 1 ) + "]"
+				DZstrConcatAssign( dimensions, _
+					"[" + str( symbArrayUbound( sym, i ) - symbArrayLbound( sym, i ) + 1 ) + "]" )
 			next
 		end if
 	end select
+	if( dimensions.data <> NULL ) then
+		s = *dimensions.data
+	end if
+	DZstrAllocate( dimensions, 0 )
 
 	if( symbIsRef( sym ) = FALSE ) then
 		'' If it's a fixed-length string, add an extra array dimension
@@ -1186,12 +1198,54 @@ private sub hEmitVarDecl _
 	hWriteLine( ln )
 end sub
 
+private sub hMarkReferencedStaticLocalInTree( byval n as ASTNODE ptr )
+	if( n = NULL ) then
+		exit sub
+	end if
+
+	select case as const n->class
+	case AST_NODECLASS_VAR, AST_NODECLASS_IDX, _
+	     AST_NODECLASS_ADDROF, AST_NODECLASS_OFFSET
+
+		dim as FBSYMBOL ptr sym = astGetSymbol( n )
+		if( sym <> NULL ) then
+			if( symbIsVar( sym ) andalso _
+			    symbIsLocal( sym ) andalso _
+			    symbIsStatic( sym ) ) then
+				symbSetIsAccessed( sym )
+			end if
+		end if
+	end select
+
+	''
+	'' NEXT links roots in the procedure statement list.  It is not part
+	'' of an expression tree and must not be followed recursively here.
+	''
+	hMarkReferencedStaticLocalInTree( n->l )
+	hMarkReferencedStaticLocalInTree( n->r )
+end sub
+
+private sub hMarkReferencedStaticLocals( byval n as ASTNODE ptr )
+	while( n <> NULL )
+		hMarkReferencedStaticLocalInTree( n )
+		n = n->next
+	wend
+end sub
+
 private sub hMaybeEmitLocalVar( byval sym as FBSYMBOL ptr )
 	assert( symbIsLocal( sym ) )
 
 	'' Fake dynamic array symbol? Descriptor will be emitted instead
-	'' TODO: Skip unused STATICs
 	if( symbGetIsDynamic( sym ) ) then
+		exit sub
+	end if
+
+	'' _emitProcBegin() scans the complete optimized procedure AST before
+	'' declarations are emitted, so an unreferenced static without an
+	'' initializer cannot be needed by a later expression.
+	if( symbIsStatic( sym ) andalso _
+	    (symbGetIsAccessed( sym ) = FALSE) andalso _
+	    (symbGetTypeIniTree( sym ) = NULL) ) then
 		exit sub
 	end if
 
@@ -1219,11 +1273,18 @@ private sub hMaybeEmitGlobalVar( byval sym as FBSYMBOL ptr )
 
 	'' String literals? Emitted inline instead of as global vars
 	'' Unused EXTERN? Don't bother emitting it
-	'' TODO: Skip all unused private globals, not just initialized ones below
 	'' Fake dynamic array symbol? Descriptor will be emitted instead
 	if( symbGetIsLiteral( sym ) or _
 	    (symbIsExtern( sym ) and (not symbGetIsAccessed( sym ))) or _
 	    symbGetIsDynamic( sym ) ) then
+		exit sub
+	end if
+
+	'' Private globals which are never referenced do not need a C declaration.
+	'' Public and COMMON symbols remain visible to other translation units.
+	if( (symbIsPublic( sym ) = FALSE) andalso _
+	    (symbIsCommon( sym ) = FALSE) andalso _
+	    (symbGetIsAccessed( sym ) = FALSE) ) then
 		exit sub
 	end if
 
@@ -1362,7 +1423,8 @@ private sub hEmitStructWithFields( byval s as FBSYMBOL ptr )
 	dim as integer skip = any, dtype = any, align = any
 	dim as FBSYMBOL ptr subtype = any, fld = any
 	dim as FBSYMBOL ptr ptr anonnode = any
-	dim as string ln
+	dim as DZSTRING ln
+	DZstrZero( ln )
 
 	'' Write out the fields
 	fld = symbUdtGetFirstField( s )
@@ -1397,9 +1459,9 @@ private sub hEmitStructWithFields( byval s as FBSYMBOL ptr )
 		if( skip = FALSE ) then
 			dtype = symbGetType( fld )
 			subtype = symbGetSubtype( fld )
-			ln = hEmitType( dtype, subtype )
-			ln += " " + *symbGetName( fld )
-			ln += hEmitArrayDecl( fld )
+			DZstrAssign( ln, hEmitType( dtype, subtype ) )
+			DZstrConcatAssign( ln, " " + *symbGetName( fld ) )
+			DZstrConcatAssign( ln, hEmitArrayDecl( fld ) )
 
 			'' Field alignment (FIELD = N)?
 			align = symbGetUDTAlign( s )
@@ -1421,7 +1483,8 @@ private sub hEmitStructWithFields( byval s as FBSYMBOL ptr )
 				end if
 
 				if( skip = FALSE ) then
-					ln += " __attribute__((packed, aligned(" + str( align ) + ")))"
+					DZstrConcatAssign( ln, _
+						" __attribute__((packed, aligned(" + str( align ) + ")))" )
 				end if
 			end if
 
@@ -1437,13 +1500,14 @@ private sub hEmitStructWithFields( byval s as FBSYMBOL ptr )
 					end if
 					var fieldudtalign = symbGetUDTAlign( subtype )
 					if( fieldudtalign > 0 andalso effectivealign > fieldudtalign ) then
-						ln += " __attribute__((aligned(" + str( effectivealign ) + ")))"
+						DZstrConcatAssign( ln, _
+							" __attribute__((aligned(" + str( effectivealign ) + ")))" )
 					end if
 				end if
 			end if
 
-			ln += ";"
-			hWriteLine( ln, TRUE )
+			DZstrConcatAssign( ln, ";" )
+			hWriteLine( *ln.data, TRUE )
 		end if
 
 		fld = symbUdtGetNextField( fld )
@@ -1453,6 +1517,7 @@ private sub hEmitStructWithFields( byval s as FBSYMBOL ptr )
 	hPopAnonParents( NULL )
 
 	assert( listGetHead( @ctx.anonstack ) = NULL )
+	DZstrAllocate( ln, 0 )
 end sub
 
 private sub hEmitStruct( byval s as FBSYMBOL ptr, byval is_ptr as integer )
@@ -1488,7 +1553,9 @@ private sub hEmitStruct( byval s as FBSYMBOL ptr, byval is_ptr as integer )
 	'' Currently we prefer emitting fields explicitly. Bitfields are the
 	'' only case where it's currently not possible, because FB's bitfields
 	'' are currently not ABI-compatible to GCC's.
-	'' TODO: Emit C bitfields once FB is compatible, for better debug info.
+	'' TODO: Emit ABI-compatible C bitfields so field-level debug information
+	'' remains available for UDTs which contain bitfield members.
+	'' This sacrifices field-level debug information for bitfield members.
 	emit_fields = not symbGetUdtHasBitfield( s )
 
 	if( emit_fields ) then
@@ -1949,6 +2016,8 @@ private function hEmitType _
 
 	dim as string s
 	dim as integer ptrcount = any
+	dim as DZSTRING pointers
+	DZstrZero( pointers )
 
 	'' replace type with __builtin_va_list if
 	'' the mangle modifier was given
@@ -2009,12 +2078,16 @@ private function hEmitType _
 
 	if( ptrcount > 0 ) then
 		for i as integer = ptrcount - 1 to 0 step -1
-			s += "*"
+			DZstrConcatAssign( pointers, "*" )
 			if( emit_const andalso typeIsConstAt( dtype, i ) ) then
-				s += " const"
+				DZstrConcatAssign( pointers, " const" )
 			end if
 		next
 	end if
+	if( pointers.data <> NULL ) then
+		s += *pointers.data
+	end if
+	DZstrAllocate( pointers, 0 )
 
 	function = s
 end function
@@ -2561,6 +2634,10 @@ private sub hBuildStrLit _
 	)
 
 	dim as integer ch = any
+	dim as DZSTRING buffer
+
+	DZstrZero( buffer )
+	DZstrAssign( buffer, strptr( ln ) )
 
 	'' Convert the string to something suitable for C
 	'' (assuming internal escape sequences have already been solved out
@@ -2570,7 +2647,7 @@ private sub hBuildStrLit _
 	'' be seen as part of that escape sequence. This is handled by splitting
 	'' the string literal in two at that position.
 
-	ln += """"
+	DZstrConcatAssign( buffer, """" )
 
 	'' Don't bother emitting the null terminator explicitly - gcc will add
 	'' it automatically already
@@ -2579,17 +2656,17 @@ private sub hBuildStrLit _
 
 		if( hCharNeedsEscaping( ch, asc( """" ) ) ) then
 			'' Emit in \xNN escape form
-			ln += $"\x" + hex( ch, 2 )
+			DZstrConcatAssign( buffer, $"\x" + hex( ch, 2 ) )
 
 			'' Is there an 0-9, a-f or A-F char following?
 			if( hIsValidHexDigit( (*z)[i+1] ) ) then
 				'' Split up the string literal to prevent
 				'' the compiler from treating this following
 				'' char as part of the escape sequence
-				ln += """ """
+				DZstrConcatAssign( buffer, """ """ )
 			end if
 		elseif( ch = asc( "?" ) ) then
-			ln += "?"
+			DZstrConcatAssignC( buffer, asc( "?" ) )
 			'' If the following string literal content would form a
 			'' trigraph, it must be escaped
 			if( (*z)[i+1] = asc( "?" ) ) then
@@ -2599,20 +2676,27 @@ private sub hBuildStrLit _
 				     asc( "(" ), asc( ")" ), asc( "!" ), _
 				     asc( "<" ), asc( ">" ), asc( "-" )
 					'' Split up the string literal between the two '??', ditto
-					ln += """ """
+					DZstrConcatAssign( buffer, """ """ )
 				end select
 			end if
 		else
 			'' Emit as-is
-			ln += chr( ch )
+			DZstrConcatAssignC( buffer, ch )
 		end if
 	next
 
 	if( paddedlength > length ) then
-		ln += space( paddedlength-length )
+		DZstrConcatAssign( buffer, space( paddedlength-length ) )
 	end if
 
-	ln += """"
+	DZstrConcatAssign( buffer, """" )
+
+	if( buffer.data <> NULL ) then
+		ln = *buffer.data
+	else
+		ln = ""
+	end if
+	DZstrAllocate( buffer, 0 )
 end sub
 
 '' The cursor is advanced by reference. Keep the pointer itself non-const here:
@@ -2712,14 +2796,18 @@ private sub hBuildNumericWstrLit _
 
 	dim as uinteger ch = any
 	dim as wstring ptr src = any, src_end = any
+	dim as DZSTRING buffer
 
-	ln += "(" + hEmitType( env.target.wchar, NULL ) + "[]){ "
+	DZstrZero( buffer )
+	DZstrAssign( buffer, strptr( ln ) )
+
+	DZstrConcatAssign( buffer, "(" + hEmitType( env.target.wchar, NULL ) + "[]){ " )
 
 	src = w
 	src_end = w + len( *w )
 	for i as longint = 0 to length - 1
 		if( i > 0 ) then
-			ln += ", "
+			DZstrConcatAssign( buffer, ", " )
 		end if
 
 		if( src < src_end ) then
@@ -2728,10 +2816,17 @@ private sub hBuildNumericWstrLit _
 			ch = 0
 		end if
 
-		ln += hEmitInt( env.target.wchar, ch )
+		DZstrConcatAssign( buffer, hEmitInt( env.target.wchar, ch ) )
 	next
 
-	ln += " }"
+	DZstrConcatAssign( buffer, " }" )
+
+	if( buffer.data <> NULL ) then
+		ln = *buffer.data
+	else
+		ln = ""
+	end if
+	DZstrAllocate( buffer, 0 )
 end sub
 
 private sub hBuildWstrLit _
@@ -2745,6 +2840,7 @@ private sub hBuildWstrLit _
 	dim as integer wcharsize = any
 	dim as wstring ptr src = any, src_end = any
 	dim as zstring ptr strstart = any
+	dim as DZSTRING buffer
 
 	'' (ditto)
 
@@ -2762,7 +2858,9 @@ private sub hBuildWstrLit _
 		strstart = @"L"""
 	end if
 
-	ln += *strstart
+	DZstrZero( buffer )
+	DZstrAssign( buffer, strptr( ln ) )
+	DZstrConcatAssign( buffer, strstart )
 
 	'' Don't bother emitting the null terminator explicitly - gcc will add
 	'' it automatically already
@@ -2776,24 +2874,31 @@ private sub hBuildWstrLit _
 		ch = hReadWstrChar( src, src_end )
 
 		if( hCharNeedsEscaping( ch, asc( """" ) ) ) then
-			ln += $"\x" + hex( ch, wcharsize * 2 )
-			ln += chr( 34 ) + " " + *strstart
+			DZstrConcatAssign( buffer, $"\x" + hex( ch, wcharsize * 2 ) )
+			DZstrConcatAssign( buffer, chr( 34 ) + " " + *strstart )
 		elseif( ch = asc( "?" ) ) then
-			ln += "?"
+			DZstrConcatAssignC( buffer, asc( "?" ) )
 			if( (src < src_end) andalso (*src = asc( "?" )) ) then
 				select case( cint( src[1] ) )
 				case asc( "=" ), asc( "/" ), asc( "'" ), _
 				     asc( "(" ), asc( ")" ), asc( "!" ), _
 				     asc( "<" ), asc( ">" ), asc( "-" )
-					ln += chr( 34 ) + " " + *strstart
+					DZstrConcatAssign( buffer, chr( 34 ) + " " + *strstart )
 				end select
 			end if
 		else
-			ln += chr( ch )
+			DZstrConcatAssignC( buffer, ch )
 		end if
 	next
 
-	ln += """"
+	DZstrConcatAssign( buffer, """" )
+
+	if( buffer.data <> NULL ) then
+		ln = *buffer.data
+	else
+		ln = ""
+	end if
+	DZstrAllocate( buffer, 0 )
 end sub
 
 private function hBopToStr( byval op as integer ) as zstring ptr
@@ -3998,6 +4103,8 @@ private sub hDoCall _
 	dim as IRCALLARG ptr arg = any
 	dim as integer dtype = any
 	dim as FBSYMBOL ptr subtype = any
+	dim as DZSTRING args
+	DZstrZero( args )
 
 	'' Flush argument list
 	s += "( "
@@ -4018,18 +4125,22 @@ private sub hDoCall _
 			expr = exprNewCAST( dtype, subtype, expr )
 		end if
 
-		s += exprFlush( expr )
+		DZstrConcatAssign( args, exprFlush( expr ) )
 
 		listDelNode( @irhl.callargs, arg )
 
 		if( prev ) then
 			if( prev->level = level ) then
-				s += ", "
+				DZstrConcatAssign( args, ", " )
 			end if
 		end if
 
 		arg = prev
 	wend
+	if( args.data <> NULL ) then
+		s += *args.data
+	end if
+	DZstrAllocate( args, 0 )
 	s += " )"
 
 	if( vr = NULL ) then
@@ -4348,9 +4459,10 @@ private function hFindLabelInSeenList( _
 end function
 
 private function hStripSimpleAsmPlaceholderBrackets( byref asmcode as string ) as string
-	dim as string result
+	dim as DZSTRING result
 	dim as integer i = 1
 	dim as integer length = len( asmcode )
+	DZstrZero( result )
 
 	while( i <= length )
 		dim as integer matched = FALSE
@@ -4367,19 +4479,24 @@ private function hStripSimpleAsmPlaceholderBrackets( byref asmcode as string ) a
 			wend
 
 			if( (j > i + 2) andalso (j <= length) andalso (asmcode[j - 1] = asc( "]" )) ) then
-				result += mid( asmcode, i + 1, j - i - 1 )
+				DZstrConcatAssign( result, mid( asmcode, i + 1, j - i - 1 ) )
 				i = j + 1
 				matched = TRUE
 			end if
 		end if
 
 		if( matched = FALSE ) then
-			result += mid( asmcode, i, 1 )
+			DZstrConcatAssignC( result, asmcode[i - 1] )
 			i += 1
 		end if
 	wend
 
-	function = result
+	if( result.data <> NULL ) then
+		function = *result.data
+	else
+		function = ""
+	end if
+	DZstrAllocate( result, 0 )
 end function
 
 private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
@@ -4420,6 +4537,11 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 	ln += "( "
 
 	dim asmcode as string
+	dim as DZSTRING asmbuffer, outputbuffer, inputbuffer, labelbuffer
+	DZstrZero( asmbuffer )
+	DZstrZero( outputbuffer )
+	DZstrZero( inputbuffer )
+	DZstrZero( labelbuffer )
 
 	'' 2nd pass - emitting
 	dim as integer operandindex
@@ -4433,7 +4555,7 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 			'' -asm att: String literals containing the ASM, tokens for the constraints lists, etc.
 			'' Symbol references in the asm strings for -asm att must use the ASM name already,
 			'' since we don't parse the string literal content.
-			asmcode += *n->text
+			DZstrConcatAssign( asmbuffer, n->text )
 
 		case AST_ASMTOK_SYMB
 			if( env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
@@ -4443,7 +4565,7 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 						'' Referencing a variable: insert %N place-holder...
 						'' (N refers to N'th operand written in the whole
 						'' asm [goto]([outputs...] inputs... [labels...]) statement)
-						asmcode += "%" & operandindex
+						DZstrConcatAssign( asmbuffer, "%" & operandindex )
 						operandindex += 1
 
 						'' ... and add the symbol to a constraint list
@@ -4452,16 +4574,16 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 							'' "asm goto" doesn't allow output constraints, so we can only use
 							'' input constraints. Hopefully there are no jump instructions that
 							'' modify their memory operand...
-							if( len( inputconstraints ) > 0 ) then
-								inputconstraints  += ", "
+							if( inputbuffer.len > 0 ) then
+								DZstrConcatAssign( inputbuffer, ", " )
 							end if
-							inputconstraints  +=  """m"" (" + *symbGetMangledName( n->sym ) + ")"
+							DZstrConcatAssign( inputbuffer, """m"" (" + *symbGetMangledName( n->sym ) + ")" )
 						else
 							'' read+write output operand constraint: "+m" (symbol)
-							if( len( outputconstraints ) > 0 ) then
-								outputconstraints += ", "
+							if( outputbuffer.len > 0 ) then
+								DZstrConcatAssign( outputbuffer, ", " )
 							end if
-							outputconstraints += """+m"" (" + *symbGetMangledName( n->sym ) + ")"
+							DZstrConcatAssign( outputbuffer, """+m"" (" + *symbGetMangledName( n->sym ) + ")" )
 						end if
 
 					case FB_SYMBCLASS_LABEL
@@ -4482,37 +4604,52 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 							labelnum = labelindex
 							labelindex += 1
 							*CPtr(FBSYMBOL ptr ptr, listNewNode( @seenlabellist ) ) = labelsym
-							if( len( labellist ) > 0 ) then
-								labellist += ", "
+							if( labelbuffer.len > 0 ) then
+								DZstrConcatAssign( labelbuffer, ", " )
 							end if
-							labellist += *symbGetMangledName( labelsym )
+							DZstrConcatAssign( labelbuffer, symbGetMangledName( labelsym ) )
 						end if
 
-						asmcode += "%l" & labelnum
+						DZstrConcatAssign( asmbuffer, "%l" & labelnum )
 
 					case else
 						'' Referencing a procedure: no gcc constraints needed;
 						'' instead emit the symbol directly with its ASM name.
-						asmcode += hGetMangledNameForASM( n->sym, TRUE )
+						DZstrConcatAssign( asmbuffer, hGetMangledNameForASM( n->sym, TRUE ) )
 					end select
 				else
 					'' Inside NAKED procedure: Currently emitted as pure inline asm,
 					'' so constraints are (hopefully!?) not needed.
-					asmcode += hGetMangledNameForASM( n->sym, TRUE )
+					DZstrConcatAssign( asmbuffer, hGetMangledNameForASM( n->sym, TRUE ) )
 				end if
 			else
-				'' -asm att: Since the FB inline asm is in gcc's format already,
-				'' AST_ASMTOK_SYMB can only appear for symbol tokens in the constraints list,
-				'' for which we must emit the symbol with its C name.
-				'' FIXME: AST_ASMTOK_SYMB (reference to C symbol) can't be supported inside NAKED procedures currently,
-				'' because they are emitted as pure inline asm (string literals).
-				asmcode += *symbGetMangledName( n->sym )
+				if( sectionInsideProc( ) ) then
+					'' Normal AT&T inline asm uses C expressions in its
+					'' constraints, so these references need C names.
+					DZstrConcatAssign( asmbuffer, symbGetMangledName( n->sym ) )
+				else
+					'' NAKED procedures are emitted as file-scope asm strings.
+					'' Direct references there need the platform assembler
+					'' name, including any required leading underscore. Keep
+					'' the name inside a C string literal so adjacent ASM text
+					'' tokens remain valid C.
+					DZstrConcatAssign( asmbuffer, _
+						QUOTE + hGetMangledNameForASM( n->sym, TRUE ) + QUOTE )
+				end if
 			end if
 
 		end select
 
 		n = n->next
 	wend
+	if( asmbuffer.data <> NULL ) then asmcode = *asmbuffer.data
+	if( outputbuffer.data <> NULL ) then outputconstraints = *outputbuffer.data
+	if( inputbuffer.data <> NULL ) then inputconstraints = *inputbuffer.data
+	if( labelbuffer.data <> NULL ) then labellist = *labelbuffer.data
+	DZstrAllocate( asmbuffer, 0 )
+	DZstrAllocate( outputbuffer, 0 )
+	DZstrAllocate( inputbuffer, 0 )
+	DZstrAllocate( labelbuffer, 0 )
 	listEnd( @seenlabellist )
 
 	if( env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
@@ -4688,6 +4825,10 @@ private sub _emitVarIniWstr _
 	dim as integer wcharsize = any
 	dim as integer use_numeric = any
 	dim as wstring ptr src = any, src_end = any
+	dim as DZSTRING initializer
+
+	DZstrZero( initializer )
+	DZstrAssign( initializer, strptr( ctx.varini ) )
 
 	'' In Linux GCC, wchar_t and thus L"..." expressions use signed int,
 	'' but FB uses unsigned integers. But GCC will show an error when doing
@@ -4695,7 +4836,7 @@ private sub _emitVarIniWstr _
 	'' so we must emit it as
 	''    unsigned int mywstring[] = { L'f', L'o', L'o' }
 
-	ctx.varini += "{ "
+	DZstrConcatAssign( initializer, "{ " )
 	wcharsize = fbGetTargetWcharSize( )
 	use_numeric = hUseNumericWstrLit( )
 	if( not fbTargetWcharIsUtf32( ) ) then
@@ -4716,33 +4857,35 @@ private sub _emitVarIniWstr _
 		end if
 
 		if( i > 0 ) then
-			ctx.varini += ", "
+			DZstrConcatAssign( initializer, ", " )
 		end if
 
 		ch = hReadWstrChar( src, src_end )
 
 		if( use_numeric ) then
-			ctx.varini += hEmitInt( env.target.wchar, ch )
+			DZstrConcatAssign( initializer, hEmitInt( env.target.wchar, ch ) )
 		else
 			'' On targets with 1-byte wstring data, C wide strings/chars are too
 			'' wide, so don't use them.
 			if( wcharsize = 1 ) then
-				ctx.varini += "'"
+				DZstrConcatAssign( initializer, "'" )
 			else
-				ctx.varini += "L'"
+				DZstrConcatAssign( initializer, "L'" )
 			end if
 
 			if( hCharNeedsEscaping( ch, asc( "'" ) ) ) then
-				ctx.varini += $"\x" + hex( ch, wcharsize * 2 )
+				DZstrConcatAssign( initializer, $"\x" + hex( ch, wcharsize * 2 ) )
 			else
-				ctx.varini += chr( ch )
+				DZstrConcatAssignC( initializer, ch )
 			end if
 
-			ctx.varini += "'"
+			DZstrConcatAssign( initializer, "'" )
 		end if
 	next
 
-	ctx.varini += " }"
+	DZstrConcatAssign( initializer, " }" )
+	ctx.varini = *initializer.data
+	DZstrAllocate( initializer, 0 )
 
 	hVarIniSeparator( )
 
@@ -4818,6 +4961,8 @@ private sub _emitProcBegin _
 		byval proc as FBSYMBOL ptr, _
 		byval initlabel as FBSYMBOL ptr _
 	)
+
+	hMarkReferencedStaticLocals( astGetProc()->l )
 
 	hUpdateCurrentFileName( symbGetProcIncFile( proc ) )
 

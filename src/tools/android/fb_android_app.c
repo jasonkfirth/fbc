@@ -512,9 +512,15 @@ static int fb_android_handle_input(FB_ANDROID_APP *app)
 		{
 			int32_t source = AInputEvent_getSource(event);
 
-			if ((source & (AINPUT_SOURCE_GAMEPAD |
-			               AINPUT_SOURCE_DPAD |
-			               AINPUT_SOURCE_JOYSTICK)) != 0)
+			/*
+			 * Android input sources include low class bits shared by keyboards,
+			 * D-pads, and gamepads.  A nonzero intersection therefore labels an
+			 * ordinary keyboard as a gamepad.  Compare each complete source mask
+			 * so keyboard events reach the graphics key translator.
+			 */
+			if (((source & AINPUT_SOURCE_GAMEPAD) == AINPUT_SOURCE_GAMEPAD) ||
+			    ((source & AINPUT_SOURCE_DPAD) == AINPUT_SOURCE_DPAD) ||
+			    ((source & AINPUT_SOURCE_JOYSTICK) == AINPUT_SOURCE_JOYSTICK))
 			{
 				if (fb_hAndroidGamepadKey)
 					fb_hAndroidGamepadKey(event);

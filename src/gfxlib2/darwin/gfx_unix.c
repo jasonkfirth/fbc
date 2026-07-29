@@ -4,6 +4,9 @@
 #ifdef HOST_DARWIN
 
 const GFXDRIVER *__fb_gfx_drivers_list[] = {
+#ifndef DISABLE_OPENGL
+	&fb_gfxDriverDarwinOpenGL,
+#endif
 	&fb_gfxDriverDarwin,
 	&__fb_gfxDriverNull,
 	NULL

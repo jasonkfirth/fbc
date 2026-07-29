@@ -58,6 +58,7 @@ private sub fbcHaikuPlatformAddGfxLibs( )
 	'' libfbgfx must link libdevice too.
 	''
 	fbcAddDefLib( "device" )
+	fbcAddDefLib( "GL" )
 end sub
 
 private sub fbcHaikuPlatformAddSfxLibs( )

@@ -12,6 +12,9 @@
         The mixer combines all active voices into a single output stream
         that is written into the runtime mix buffer.
 
+        The software MIDI fallback contributes its FM voices here so they
+        follow the same ring-buffer and output-driver path.
+
     Responsibilities:
 
         • voice accumulation
@@ -334,12 +337,16 @@ void fb_sfxMixerClear(float *buffer, int frames)
 {
     int samples;
 
-    if (!buffer)
+    if (!buffer || !__fb_sfx || frames <= 0 ||
+        __fb_sfx->output_channels <= 0)
+        return;
+
+    if (frames > INT_MAX / __fb_sfx->output_channels)
         return;
 
     samples = frames * __fb_sfx->output_channels;
 
-    memset(buffer, 0, samples * sizeof(float));
+    memset(buffer, 0, (size_t)samples * sizeof(float));
 }
 
 
@@ -586,6 +593,20 @@ void fb_sfxMixerProcess(int frames)
             left  += sample * (1.0f - pan) * 0.5f;
             right += sample * (1.0f + pan) * 0.5f;
         }
+
+        /*
+            The software MIDI fallback owns a separate, bounded FM voice
+            pool. Add it to the completed sfxlib voice mix so its waveform
+            follows the same effects, capture, and output-ring path.
+        */
+        fb_sfxMidiSoftwareMixFrame(&left, &right);
+
+        /*
+            Global effects operate on the completed stereo frame. Applying
+            them here preserves each voice's own envelope and panning while
+            keeping the delay line independent of the platform driver.
+        */
+        fb_sfxEchoProcess(&left, &right);
 
         left  = fb_sfxMixerClamp(left);
         right = fb_sfxMixerClamp(right);

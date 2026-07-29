@@ -1,0 +1,193 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_blit_tile.comp
+
+    Purpose:
+
+        Replay an ordered compatible PUT batch using adapter-selected command
+        bins inside 16 by 16 destination workgroups.
+
+    Responsibilities:
+
+        - keep built-in PUT pixel math on Vulkan shader units
+        - preserve FIFO overlap behavior inside each destination tile
+        - avoid one compute dispatch and descriptor bind per sprite
+
+    This file intentionally does NOT contain:
+
+        - same-surface snapshot handling
+        - CPU custom blender callbacks
+        - tile-list construction or source validation
+*/
+
+#version 450
+
+#ifndef FB_GFX3_VULKAN_BLIT_BIN_SHIFT
+#define FB_GFX3_VULKAN_BLIT_BIN_SHIFT 4
+#endif
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) buffer DestinationPixels
+{
+	uint pixels[];
+} destination_pixels;
+
+layout(set = 0, binding = 1, std430) readonly buffer SourcePixels
+{
+	uint pixels[];
+} source_pixels;
+
+struct BlitCommand
+{
+	ivec4 source_rect;
+	ivec4 clip;
+	ivec4 destination;
+	uvec4 format;
+	uvec4 dimensions;
+};
+
+layout(set = 0, binding = 2, std430) readonly buffer BlitCommands
+{
+	BlitCommand commands[];
+} blit_commands;
+
+layout(set = 0, binding = 3, std430) readonly buffer TileRanges
+{
+	uvec2 ranges[];
+} tile_ranges;
+
+layout(set = 0, binding = 4, std430) readonly buffer TileIndices
+{
+	uint indices[];
+} tile_indices;
+
+bool blend_pixel(BlitCommand command, uint source, uint destination,
+	out uint result_color)
+{
+	uint depth = command.format.x;
+	uint mode = command.format.y;
+	uint operation_alpha = command.format.z;
+	uint mask = command.format.w;
+	uint alpha;
+	uint srb;
+	uint sga;
+	uint drb;
+	uint dga;
+	uint temporary1;
+	uint temporary2;
+	uint overflow;
+
+	if (mode == 1u) { result_color = source & mask; return true; }
+	else if (mode == 2u) { result_color = (~source) & mask; return true; }
+	else if (mode == 3u) result_color = (source & destination) & mask;
+	else if (mode == 4u) result_color = (source | destination) & mask;
+	else if (mode == 5u) result_color = (source ^ destination) & mask;
+	else if (mode == 0u) {
+		if (depth <= 8u) { result_color = source & mask; return result_color != 0u; }
+		if (depth == 16u) { result_color = source & 0xFFFFu; return result_color != 0xF81Fu; }
+		result_color = source & mask;
+		return (result_color & 0x00FFFFFFu) != 0x00FF00FFu;
+	} else if (mode == 6u) {
+		if (depth != 32u) { result_color = source & mask; return true; }
+		alpha = (source >> 24) + 1u;
+		srb = source & 0x00FF00FFu; sga = source & 0xFF00FF00u;
+		drb = destination & 0x00FF00FFu; dga = destination & 0xFF00FF00u;
+		srb = ((srb - drb) * alpha) >> 8;
+		sga = ((sga >> 8) - (dga >> 8)) * alpha;
+		result_color = ((drb + srb) & 0x00FF00FFu) |
+			((dga + sga) & 0xFF00FF00u);
+	} else if (mode == 7u) {
+		alpha = operation_alpha & 0xFFu;
+		if (depth <= 8u) result_color = (source | destination) & mask;
+		else if (depth == 16u) {
+			if ((source & 0xFFFFu) == 0xF81Fu) return false;
+			alpha = (alpha + 7u) >> 3;
+			source = ((source << 16) | source) & 0x07C0F81Fu;
+			source = ((source * alpha) >> 5) & 0x07C0F81Fu;
+			destination = ((destination << 16) | destination) & 0x07C0F81Fu;
+			source += destination; overflow = source & 0x08010020u;
+			overflow -= overflow >> 5; source |= overflow;
+			source &= 0x07C0F81Fu; source |= source >> 16;
+			result_color = source & 0xFFFFu;
+		} else {
+			if ((source & 0x00FFFFFFu) == 0x00FF00FFu) return false;
+			temporary1 = source & 0x00FF00FFu;
+			temporary2 = (source >> 8) & 0x00FF00FFu;
+			temporary1 = ((temporary1 * alpha) >> 8) & 0x00FF00FFu;
+			temporary2 = (temporary2 * alpha) & 0xFF00FF00u;
+			source = temporary1 | temporary2;
+			temporary1 = source & 0x80808080u; temporary2 = destination & 0x80808080u;
+			source = (source & 0x7F7F7F7Fu) + (destination & 0x7F7F7F7Fu);
+			destination = temporary1; temporary1 |= temporary2;
+			temporary2 = destination & temporary2; destination = temporary1 & source;
+			result_color = source | ((((temporary2 | destination) >> 7) +
+				0x7F7F7F7Fu) ^ 0x7F7F7F7Fu) | temporary1;
+		}
+	} else if (mode == 9u) {
+		alpha = operation_alpha & 0xFFu;
+		if (alpha == 0u) return false;
+		if (depth <= 8u) { result_color = source & mask; return result_color != 0u; }
+		if (depth == 16u) {
+			if ((source & 0xFFFFu) == 0xF81Fu) return false;
+			alpha = (alpha + 7u) >> 3;
+			srb = source & 0xF81Fu; sga = source & 0x07E0u;
+			drb = destination & 0xF81Fu; dga = destination & 0x07E0u;
+			srb = ((srb - drb) * alpha) >> 5; sga = ((sga - dga) * alpha) >> 5;
+			result_color = ((drb + srb) & 0xF81Fu) | ((dga + sga) & 0x07E0u);
+		} else {
+			if ((source & 0x00FFFFFFu) == 0x00FF00FFu) return false;
+			alpha++; srb = source & 0x00FF00FFu; sga = source & 0xFF00FF00u;
+			drb = destination & 0x00FF00FFu; dga = destination & 0xFF00FF00u;
+			srb = ((srb - drb) * alpha) >> 8;
+			sga = ((sga >> 8) - (dga >> 8)) * alpha;
+			result_color = ((drb + srb) & 0x00FF00FFu) |
+				((dga + sga) & 0xFF00FF00u);
+		}
+	} else return false;
+	return true;
+}
+
+void main(void)
+{
+	BlitCommand first = blit_commands.commands[0];
+	uint destination_width = first.dimensions.y;
+	uint destination_height = first.dimensions.z;
+#if FB_GFX3_VULKAN_BLIT_BIN_SHIFT == 4
+	uint tiles_x = (destination_width + 15u) / 16u;
+#else
+	uint tiles_x = (destination_width + 7u) / 8u;
+#endif
+	ivec2 position = ivec2(gl_GlobalInvocationID.xy);
+	uint tile;
+	uvec2 range;
+	uint destination;
+
+	if ((uint(position.x) >= destination_width) ||
+		(uint(position.y) >= destination_height))
+		return;
+#if FB_GFX3_VULKAN_BLIT_BIN_SHIFT == 4
+	tile = gl_WorkGroupID.y * tiles_x + gl_WorkGroupID.x;
+#else
+	tile = (uint(position.y) / 8u) * tiles_x + uint(position.x) / 8u;
+#endif
+	range = tile_ranges.ranges[tile];
+	destination = destination_pixels.pixels[(uint(position.y) * destination_width) + uint(position.x)];
+	for (uint offset = 0u; offset < range.y; ++offset) {
+		BlitCommand command = blit_commands.commands[tile_indices.indices[range.x + offset]];
+		if ((position.x < command.clip.x) || (position.y < command.clip.y) ||
+			(position.x > command.clip.z) || (position.y > command.clip.w) ||
+			(position.x < command.destination.x) || (position.y < command.destination.y) ||
+			(position.x >= command.destination.x + command.source_rect.z) ||
+			(position.y >= command.destination.y + command.source_rect.w)) continue;
+		uint source = source_pixels.pixels[(uint(command.source_rect.y + position.y - command.destination.y) *
+			uint(command.destination.z)) + uint(command.source_rect.x + position.x - command.destination.x)];
+		uint result_color;
+		if (blend_pixel(command, source, destination, result_color)) destination = result_color;
+	}
+	destination_pixels.pixels[(uint(position.y) * destination_width) + uint(position.x)] = destination;
+}
+
+/* end of vulkan_blit_tile.comp */

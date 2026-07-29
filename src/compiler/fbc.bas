@@ -12,6 +12,7 @@
 #include once "hash.bi"
 #include once "list.bi"
 #include once "objinfo.bi"
+#include once "dstr.bi"
 
 #include once "file.bi"
 
@@ -106,6 +107,7 @@ type FBCCTX
 #endif
 	sysroot             as zstring * FB_MAXPATHLEN+1
 	xbe_title           as zstring * FB_MAXNAMELEN+1  '' For the '-title <title>' xbox option
+	stacksize_set       as integer
 	nodeflibs           as integer
 	nofbrt0             as integer  '' If we should exclude fbrt0.o or fbrt0pic.o (implied by nodeflibs, and optional by -nolib fbrt0.o,fbrt0pic.o)
 	staticlink          as integer
@@ -335,6 +337,23 @@ private function hGetClangTargetOption( ) as string
 	end if
 end function
 
+private sub hAppendTargetCcQueryOptions( byref path as string )
+	select case( fbGetCpuFamily( ) )
+	case FB_CPUFAMILY_X86
+		path += " -m32"
+	case FB_CPUFAMILY_X86_64
+		path += " -m64"
+	case FB_CPUFAMILY_PPC
+		path += " -m32"
+	case FB_CPUFAMILY_PPC64, FB_CPUFAMILY_PPC64LE
+		path += " -m64"
+	end select
+
+	if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG ) then
+		path += " " + hGetClangTargetOption( )
+	end if
+end sub
+
 private function fbcUseLldLinker( ) as integer
 	'' win32-aarch64 builds from MSYS2 use ld.lld.exe as the practical linker.
 	'' The package also provides ld.exe for compatibility, but this is actually
@@ -363,20 +382,7 @@ private function fbcQueryCC( byref options as string ) as string
 		fbcFindBin( FBCTOOL_GCC, path )
 	end select
 
-	select case( fbGetCpuFamily( ) )
-	case FB_CPUFAMILY_X86
-		path += " -m32"
-	case FB_CPUFAMILY_X86_64
-		path += " -m64"
-	case FB_CPUFAMILY_PPC
-		path += " -m32"
-	case FB_CPUFAMILY_PPC64, FB_CPUFAMILY_PPC64LE
-		path += " -m64"
-	end select
-
-	if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG ) then
-		path += " " + hGetClangTargetOption( )
-	end if
+	hAppendTargetCcQueryOptions( path )
 
 	path += options
 
@@ -495,20 +501,7 @@ private function fbcBuildPathToLibFile( byval file as zstring ptr ) as string
 		fbcFindBin( FBCTOOL_GCC, path )
 	end select
 
-	select case( fbGetCpuFamily( ) )
-	case FB_CPUFAMILY_X86
-		path += " -m32"
-	case FB_CPUFAMILY_X86_64
-		path += " -m64"
-	case FB_CPUFAMILY_PPC
-		path += " -m32"
-	case FB_CPUFAMILY_PPC64, FB_CPUFAMILY_PPC64LE
-		path += " -m64"
-	end select
-
-	if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG ) then
-		path += " " + hGetClangTargetOption( )
-	end if
+	hAppendTargetCcQueryOptions( path )
 
 	if( len( fbc.sysroot ) ) then
 		path += " --sysroot=" + fbc.sysroot
@@ -531,7 +524,6 @@ end function
 '' gcc may have a default sysroot which we need to pass on to ld. Or it may not know the sysroot.
 private function fbcFindSysroot( ) as string
 	'' Query the target-specific gcc
-	'' (TODO: need to tell which arch and ABI we are targetting, especially on android)
 	dim as string path
 
 	select case( fbGetOption( FB_COMPOPT_BACKEND ) )
@@ -543,6 +535,7 @@ private function fbcFindSysroot( ) as string
 		fbcFindBin( FBCTOOL_GCC, path )
 	end select
 
+	hAppendTargetCcQueryOptions( path )
 	path += " --print-sysroot"
 	return hGet1stOutputLineFromCommand( path )
 end function
@@ -946,12 +939,12 @@ private function hArmLinuxUsesHardFloatAbi( ) as integer
 	end select
 end function
 
-private function hLinkFiles( ) as integer
-	dim as string ldcline, dllname, deffile
-	dim as string xbox_xbe_outname
-	dim as string wii_dol_outname
-
-	function = FALSE
+private sub hPrepareLinkTarget _
+	( _
+		byref ldcline as string, _
+		byref xbox_xbe_outname as string, _
+		byref wii_dol_outname as string _
+	)
 
 	hSetOutName( )
 
@@ -989,26 +982,17 @@ private function hLinkFiles( ) as integer
 			ldcline += "-m armelf_linux_eabi "
 		end select
 	case FB_COMPTARGET_SOLARIS
-		select case( fbGetCpuFamily( ) )
-		case FB_CPUFAMILY_X86_64
-			''
-			'' Solaris ld does not choose the output ELF class from the
-			'' startup objects or library search paths.  Without -64, an
-			'' x86_64 link still runs in the linker's default 32-bit mode
-			'' and rejects the 64-bit runtime archives as incompatible.
-			''
+		if( fbGetCpuFamily( ) = FB_CPUFAMILY_X86_64 ) then
+			'' Solaris ld does not infer the output ELF class from startup
+			'' objects or library paths.
 			ldcline += "-64 "
-		end select
+		end if
 	case FB_COMPTARGET_ILLUMOS
-		select case( fbGetCpuFamily( ) )
-		case FB_CPUFAMILY_X86_64
-			''
-			'' illumos provides the Solaris link editor as the native system
-			'' linker.  Select its 64-bit output mode explicitly; otherwise
-			'' it rejects the 64-bit runtime archives as incompatible.
-			''
+		if( fbGetCpuFamily( ) = FB_CPUFAMILY_X86_64 ) then
+			'' illumos uses the Solaris link editor and likewise requires
+			'' its 64-bit output mode to be selected explicitly.
 			ldcline += "-64 "
-		end select
+		end if
 	case FB_COMPTARGET_HAIKU
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86
@@ -1021,51 +1005,32 @@ private function hLinkFiles( ) as integer
 	case FB_COMPTARGET_ANDROID
 		if( (len( fbc.sysroot ) = 0) and _
 		    (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GCC) ) then
-			'' Newer NDKs use clang which doesn't support -print-sysroot,
-			'' and we don't need it.
-			'' GCC in older NDKs may need the sysroot before calling hFindLib().
-			'' At least in older NDKs, if a standalone NDK toolchain (for a particular
-			'' platform+arch) is used then gcc --print-sysroot returns the correct
-			'' sysroot. Otherwise, running directly from a full NDK install, it prints a
-			'' /tmp/... directory, and the user needs to manually pass the correct sysroot.
-			'' The link-time sysroot should be $NDK/platforms/android-$API/arch-$ARCH
-			'' (Since NDK r15, the sysroot for the C headers is $NDK/sysroot, but we
-			'' don't need them.)
+			'' Newer NDKs use clang, which does not support -print-sysroot.
+			'' Older GCC toolchains need their link-time sysroot discovered.
 			fbc.sysroot = fbcFindSysroot( )
 			if( left( fbc.sysroot, 5 ) = "/tmp/" ) then
 				errReportWarnEx( FB_WARNINGMSG_MISSINGANDROIDSYSROOT, , 0 )
 			end if
 		end if
 
-		'' The compiler runtime support library, usually called libgcc on other platforms
-		'' (even when using clang) or when using gcc in older NDK, varies by target, something
-		'' like libclang_rt.builtins-aarch64-android.a
+		'' Query the compiler driver because the builtins archive name varies
+		'' with the Android target and toolchain.
 		var args = ""
 #ifndef ENABLE_STANDALONE
 		if( len( fbc.target ) > 0 ) then
-			'' Without the correct -target, clang just returns the host libgcc.
 			args = " -target " & fbc.target
 		end if
 #endif
 		args &= " -print-libgcc-file-name"
-		var path = fbcQueryCC( args )
-		ldcline &= path & " "
+		ldcline &= fbcQueryCC( args ) & " "
 
-		'' androideabi-v7a ABI requires extra linker options; apparently
-		'' others don't. See https://developer.android.com/ndk/guides/standalone_toolchain.html
 		if( fbGetOption( FB_COMPOPT_CPUTYPE ) = FB_CPUTYPE_ARMV7A ) then
 			ldcline += "--fix-cortex-a8 "
 		end if
-		'' Optional?
-		' select case( fbGetCpuFamily( ) )
-		' case FB_CPUFAMILY_X86
-		'   ldcline += "-m elf_i386 "
-		' end select
 	case FB_COMPTARGET_DARWIN
-		'' Let the Darwin compiler driver choose the native architecture and
-		'' startup/runtime defaults instead of pushing raw ld -arch flags.
+		'' The compiler driver supplies native architecture and startup defaults.
 	case FB_COMPTARGET_WII
-		'' Let the devkitPPC GCC driver choose newlib/libgcc startup support.
+		'' The devkitPPC driver supplies newlib and libgcc startup support.
 	case FB_COMPTARGET_NETBSD
 		ldcline += " -rpath /usr/X11R7/lib/ "
 		ldcline += " -rpath /usr/pkg/lib/ "
@@ -1077,67 +1042,254 @@ private function hLinkFiles( ) as integer
 	else
 		ldcline += "-o " + QUOTE + fbc.outname + QUOTE
 	end if
+end sub
 
-	'' dll dos targets need to run DXE3GEN
-	if (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_DOS) and _
-	   (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB) then
-		'' Building an import library is usable but need to watch
-		'' the initialization order.  libfb exports need to be
-		'' initialized before trying to load the DXE.  FYI, if this
-		'' is handled at load time by the loader code (global
-		'' constructor) user may have issues with the ctor order.
-		'' Which means that user is expected to have called
-		'' DyLibLoad("") in a global ctor and no other global ctors
-		'' that depend on libfb functions are defined
-		''
-		ldcline += " -I ""lib" + hStripExt( fbc.outname ) + "_il.a"""
-		''
-		'' the -U switch allows the DXE to be created with unresolved
-		'' symbols.  FYI, we won't know which symbols are needed until
-		'' the loader tries to load the DXE.  This seems to be the only
-		'' kind we can make (i.e. not possible to build a fully resolved DXE
-		'' because dxe3gen seems to only resolve with in the current DXE and
-		'' not any statically linked library)
-		''
-		ldcline += " -U"
-		''
-		scope
-			dim as string ptr objfile = listGetHead( @fbc.objlist )
-			while( objfile )
-				ldcline += " """ + *objfile + """"
-				objfile = listGetNext( objfile )
-			wend
-		end scope
-		scope
-			dim as string ptr libfile = listGetHead(@fbc.libfiles)
-			if (libfile) then
-				ldcline +=  " -lc"
-			end if
-			while (libfile)
-				ldcline += " """ + *libfile + """"
-				libfile = listGetNext(libfile)
-			wend
-		end scope
-		#ifdef __FB_DOS__
-			'' windows (maybe others) version of DXE3GEN doesn't seem to be able
-			'' to handle @ldopt.tmp argument when cross compiling - only write to
-			'' lpopt.tmp if we are hosted on DOS
-			if( hPutLdArgsIntoFile( ldcline ) = FALSE ) then
-				exit function
-			end if
-		#endif
-		#ifdef ENABLE_STANDALONE
-			dim as string dxepath = environ( "DXE_LD_LIBRARY_PATH" )
-			if( dxepath = "" ) then
-				setenviron "DXE_LD_LIBRARY_PATH=" + fbc.libpath + FB_HOST_PATHDIV
-				if( fbc.verbose ) then
-					print "DXE_LD_LIBRARY_PATH=" + fbc.libpath + FB_HOST_PATHDIV
-				end if
-			end if
-		#endif
-		function = fbcRunBin( "making DXE", FBCTOOL_DXEGEN, ldcline )
-		exit function
+private function hLinkDosDxe _
+	( _
+		byref ldcline as string, _
+		byref handled as integer _
+	) as integer
+
+	handled = FALSE
+	if( (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DOS) or _
+	    (fbGetOption( FB_COMPOPT_OUTTYPE ) <> FB_OUTTYPE_DYNAMICLIB) ) then
+		return TRUE
 	end if
+
+	handled = TRUE
+
+	'' DXE modules use an import archive for libfb and leave the remaining
+	'' references for the loader to resolve when the module is loaded.
+	ldcline += " -I ""lib" + hStripExt( fbc.outname ) + "_il.a"""
+	ldcline += " -U"
+
+	scope
+		dim as DZSTRING args
+		dim as string ptr objfile = listGetHead( @fbc.objlist )
+		DZstrZero( args )
+		while( objfile )
+			DZstrConcatAssign( args, " """ + *objfile + """" )
+			objfile = listGetNext( objfile )
+		wend
+		if( args.data <> NULL ) then
+			ldcline += *args.data
+		end if
+		DZstrAllocate( args, 0 )
+	end scope
+
+	scope
+		dim as DZSTRING args
+		dim as string ptr libfile = listGetHead( @fbc.libfiles )
+		DZstrZero( args )
+		if( libfile ) then
+			ldcline += " -lc"
+		end if
+		while( libfile )
+			DZstrConcatAssign( args, " """ + *libfile + """" )
+			libfile = listGetNext( libfile )
+		wend
+		if( args.data <> NULL ) then
+			ldcline += *args.data
+		end if
+		DZstrAllocate( args, 0 )
+	end scope
+
+#ifdef __FB_DOS__
+	'' DOS dxe3gen accepts the response-file form used to avoid its short
+	'' process command line. Windows-hosted versions do not accept it.
+	if( hPutLdArgsIntoFile( ldcline ) = FALSE ) then
+		return FALSE
+	end if
+#endif
+
+#ifdef ENABLE_STANDALONE
+	dim as string dxepath = environ( "DXE_LD_LIBRARY_PATH" )
+	if( dxepath = "" ) then
+		setenviron "DXE_LD_LIBRARY_PATH=" + fbc.libpath + FB_HOST_PATHDIV
+		if( fbc.verbose ) then
+			print "DXE_LD_LIBRARY_PATH=" + fbc.libpath + FB_HOST_PATHDIV
+		end if
+	end if
+#endif
+
+	function = fbcRunBin( "making DXE", FBCTOOL_DXEGEN, ldcline )
+end function
+
+private sub hAddUnixDynamicLinker( byref ldcline as string )
+	select case as const fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_FREEBSD
+		ldcline += " -dynamic-linker /libexec/ld-elf.so.1"
+	case FB_COMPTARGET_DRAGONFLY
+		ldcline += " -dynamic-linker /libexec/ld-elf.so.2"
+	case FB_COMPTARGET_SOLARIS, FB_COMPTARGET_ILLUMOS
+		if( fbGetCpuFamily( ) = FB_CPUFAMILY_X86_64 ) then
+			ldcline += " -I /lib/64/ld.so.1"
+		else
+			ldcline += " -I /lib/ld.so.1"
+		end if
+	case FB_COMPTARGET_LINUX
+		select case( fbGetCpuFamily( ) )
+		case FB_CPUFAMILY_X86
+#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+			ldcline += " -dynamic-linker /lib/ld-musl-i386.so.1"
+#else
+			ldcline += " -dynamic-linker /lib/ld-linux.so.2"
+#endif
+		case FB_CPUFAMILY_X86_64
+#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+			ldcline += " -dynamic-linker /lib/ld-musl-x86_64.so.1"
+#else
+			ldcline += " -dynamic-linker /lib64/ld-linux-x86-64.so.2"
+#endif
+		case FB_CPUFAMILY_ARM
+#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+			if( hArmLinuxUsesHardFloatAbi( ) ) then
+				ldcline += " -dynamic-linker /lib/ld-musl-armhf.so.1"
+			else
+				ldcline += " -dynamic-linker /lib/ld-musl-arm.so.1"
+			end if
+#else
+			if( hArmLinuxUsesHardFloatAbi( ) ) then
+				ldcline += " -dynamic-linker /lib/ld-linux-armhf.so.3"
+			else
+				ldcline += " -dynamic-linker /lib/ld-linux.so.3"
+			end if
+#endif
+		case FB_CPUFAMILY_AARCH64
+#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+			ldcline += " -dynamic-linker /lib/ld-musl-aarch64.so.1"
+#else
+			ldcline += " -dynamic-linker /lib/ld-linux-aarch64.so.1"
+#endif
+		case FB_CPUFAMILY_PPC
+#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+			ldcline += " -dynamic-linker /lib/ld-musl-powerpc.so.1"
+#else
+			ldcline += " -dynamic-linker /lib/ld.so.1"
+#endif
+		case FB_CPUFAMILY_PPC64
+#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+			ldcline += " -dynamic-linker /lib/ld-musl-powerpc64.so.1"
+#else
+			ldcline += " -dynamic-linker /lib64/ld64.so.1"
+#endif
+		case FB_CPUFAMILY_PPC64LE
+#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+			ldcline += " -dynamic-linker /lib/ld-musl-powerpc64le.so.1"
+#else
+			ldcline += " -dynamic-linker /lib64/ld64.so.2"
+#endif
+		case FB_CPUFAMILY_RISCV32
+#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+			ldcline += " -dynamic-linker /lib/ld-musl-riscv32.so.1"
+#else
+			ldcline += " -dynamic-linker /lib/ld-linux-riscv32-ilp32.so.1"
+#endif
+		case FB_CPUFAMILY_RISCV64
+#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+			ldcline += " -dynamic-linker /lib/ld-musl-riscv64.so.1"
+#else
+			ldcline += " -dynamic-linker /lib/ld-linux-riscv64-lp64d.so.1"
+#endif
+		case FB_CPUFAMILY_S390X
+#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+			ldcline += " -dynamic-linker /lib/ld-musl-s390x.so.1"
+#else
+			ldcline += " -dynamic-linker /lib/ld64.so.1"
+#endif
+		case FB_CPUFAMILY_LOONGARCH64
+#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+			ldcline += " -dynamic-linker /lib/ld-musl-loongarch64.so.1"
+#else
+			ldcline += " -dynamic-linker /lib64/ld-linux-loongarch-lp64d.so.1"
+#endif
+		end select
+	case FB_COMPTARGET_HAIKU
+		'' Haiku executables use the shared-object path. Bind definitions
+		'' locally so RIP-relative inline assembly references remain valid.
+		ldcline += " -shared -no-undefined -Bsymbolic"
+	case FB_COMPTARGET_NETBSD
+		ldcline += " -dynamic-linker /usr/libexec/ld.elf_so"
+	case FB_COMPTARGET_OPENBSD
+		ldcline += " -dynamic-linker /usr/libexec/ld.so"
+	case FB_COMPTARGET_ANDROID
+		ldcline += " -dynamic-linker /system/bin/linker"
+	end select
+end sub
+
+private sub hAddUnixLinkOptions _
+	( _
+		byref ldcline as string, _
+		byref dllname as string _
+	)
+
+	if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then
+		dllname = hStripPath( hStripExt( fbc.outname ) )
+		ldcline += " -shared -h" + hStripPath( fbc.outname )
+
+		'' Normalize libfoo to foo so the library list can avoid linking a
+		'' shared library against its own output.
+		if( left( dllname, 3 ) = "lib" ) then
+			dllname = right( dllname, len( dllname ) - 3 )
+		end if
+	else
+		hAddUnixDynamicLinker( ldcline )
+	end if
+
+	'' Solaris-family linkers do not support GNU --export-dynamic.
+	if( ((fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB) or _
+	     fbGetOption( FB_COMPOPT_EXPORT )) and _
+	    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_SOLARIS) and _
+	    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_ILLUMOS) and _
+	    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) ) then
+		ldcline += " --export-dynamic"
+	end if
+	fbcDarwinPlatformAddExportDynamic( ldcline )
+end sub
+
+private sub hAddJsLinkOptions( byref ldcline as string )
+	dim as integer js_link_optimize = fbGetOption( FB_COMPOPT_OPTIMIZELEVEL )
+	if( js_link_optimize < 2 ) then
+		'' Asyncify expands reachable control flow. Keeping the final wasm
+		'' link at O2 prevents large QB-era programs from exceeding browser
+		'' function limits even when BASIC compilation itself uses -O0.
+		js_link_optimize = 2
+	end if
+	ldcline += " -O" + str( js_link_optimize )
+
+	static as zstring*32 emscripten_options(...) = _
+	{ _
+		"CASE_INSENSITIVE_FS=1", _
+		"TOTAL_MEMORY=67108864", _
+		"ALLOW_MEMORY_GROWTH=1", _
+		"RETAIN_COMPILER_SETTINGS=1", _
+		"ASYNCIFY=1", _
+		"ASYNCIFY_STACK_SIZE=65536" _
+	}
+
+	ldcline += " -Wno-warn-absolute-paths"
+	dim as DZSTRING emscripten_args
+	DZstrZero( emscripten_args )
+	for i as integer = 0 to ubound( emscripten_options )
+		DZstrConcatAssign( emscripten_args, " -s " + emscripten_options(i) )
+	next
+	ldcline += *emscripten_args.data
+	DZstrAllocate( emscripten_args, 0 )
+
+	ldcline += " --shell-file" + hFindLib( "fb_shell.html" )
+	ldcline += " --post-js" + hFindLib( "fb_rtlib.js" )
+	if( ((len( fbc.subsystem ) = 0) and _
+	     (fbGetOption( FB_COMPOPT_MODEVIEW ) = FB_MODEVIEW_CONSOLE)) or _
+	    (fbc.subsystem = "console") ) then
+		ldcline += " --post-js" + hFindLib( "termlib_min.js" )
+	end if
+end sub
+
+private function hAddPlatformLinkOptions _
+	( _
+		byref ldcline as string, _
+		byref dllname as string _
+	) as integer
 
 	select case as const fbGetOption( FB_COMPOPT_TARGET )
 	case FB_COMPTARGET_CYGWIN
@@ -1145,49 +1297,33 @@ private function hLinkFiles( ) as integer
 			dllname = hStripPath( hStripExt( fbc.outname ) )
 			ldcline += " --shared -e _cygwin_dll_entry --enable-auto-image-base --dll-search-prefix=cyg"
 		else
-			'' set default subsystem mode
 			if( len( fbc.subsystem ) = 0 ) then
 				if( fbGetOption( FB_COMPOPT_MODEVIEW ) = FB_MODEVIEW_GUI ) then
 					fbc.subsystem = "windows"
 				else
 					fbc.subsystem = "console"
 				end if
-			else
-				if( fbc.subsystem = "gui" ) then
-					fbc.subsystem = "windows"
-				end if
+			elseif( fbc.subsystem = "gui" ) then
+				fbc.subsystem = "windows"
 			end if
-
 			ldcline += " -subsystem " + fbc.subsystem
 		end if
 
 	case FB_COMPTARGET_WIN32
-
-		'' set default subsystem mode
 		if( len( fbc.subsystem ) = 0 ) then
 			if( fbGetOption( FB_COMPOPT_MODEVIEW ) = FB_MODEVIEW_GUI ) then
 				fbc.subsystem = "windows"
 			else
 				fbc.subsystem = "console"
 			end if
-		else
-			if( fbc.subsystem = "gui" ) then
-				fbc.subsystem = "windows"
-			end if
+		elseif( fbc.subsystem = "gui" ) then
+			fbc.subsystem = "windows"
 		end if
-
 		ldcline += " -subsystem " + fbc.subsystem
 
 		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then
-			''
 			dllname = hStripPath( hStripExt( fbc.outname ) )
-
-			'' create a dll
 			ldcline += " --dll --enable-stdcall-fixup"
-
-			'' Specify the DLL entry-point, like gcc:
-			'' with underscore and @N stdcall suffix on x86,
-			'' but without that for x86_64.
 			if( fbGetCpuFamily( ) = FB_CPUFAMILY_X86 ) then
 				ldcline += " -e _DllMainCRTStartup@12"
 			else
@@ -1197,7 +1333,7 @@ private function hLinkFiles( ) as integer
 
 	case FB_COMPTARGET_DARWIN
 		if( fbcDarwinPlatformAddDynamicLibOptions( ldcline, dllname ) = FALSE ) then
-			exit function
+			return FALSE
 		end if
 
 	case FB_COMPTARGET_LINUX, FB_COMPTARGET_HAIKU, _
@@ -1205,270 +1341,83 @@ private function hLinkFiles( ) as integer
 	     FB_COMPTARGET_NETBSD, FB_COMPTARGET_DRAGONFLY, _
 	     FB_COMPTARGET_SOLARIS, FB_COMPTARGET_ILLUMOS, _
 	     FB_COMPTARGET_ANDROID
-
-		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then
-			dllname = hStripPath( hStripExt( fbc.outname ) )
-			ldcline += " -shared -h" + hStripPath( fbc.outname )
-
-			'' Turn libfoo into foo, so it can be checked against -l foo below
-			if( left( dllname, 3 ) = "lib" ) then
-				dllname = right( dllname, len( dllname ) - 3 )
-			end if
-		else
-			select case as const fbGetOption( FB_COMPOPT_TARGET )
-			case FB_COMPTARGET_FREEBSD
-				ldcline += " -dynamic-linker /libexec/ld-elf.so.1"
-			case FB_COMPTARGET_DRAGONFLY
-				ldcline += " -dynamic-linker /libexec/ld-elf.so.2"
-			case FB_COMPTARGET_SOLARIS
-				if( fbGetCpuFamily( ) = FB_CPUFAMILY_X86_64 ) then
-					ldcline += " -I /lib/64/ld.so.1"
-				else
-					ldcline += " -I /lib/ld.so.1"
-				end if
-			case FB_COMPTARGET_ILLUMOS
-				if( fbGetCpuFamily( ) = FB_CPUFAMILY_X86_64 ) then
-					ldcline += " -I /lib/64/ld.so.1"
-				else
-					ldcline += " -I /lib/ld.so.1"
-				end if
-			case FB_COMPTARGET_LINUX
-				select case( fbGetCpuFamily( ) )
-				case FB_CPUFAMILY_X86
-					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
-						ldcline += " -dynamic-linker /lib/ld-musl-i386.so.1"
-					#else
-					ldcline += " -dynamic-linker /lib/ld-linux.so.2"
-					#endif
-				case FB_CPUFAMILY_X86_64
-					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
-						ldcline += " -dynamic-linker /lib/ld-musl-x86_64.so.1"
-					#else
-					ldcline += " -dynamic-linker /lib64/ld-linux-x86-64.so.2"
-					#endif
-				case FB_CPUFAMILY_ARM
-					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
-						if( hArmLinuxUsesHardFloatAbi( ) ) then
-							ldcline += " -dynamic-linker /lib/ld-musl-armhf.so.1"
-						else
-							ldcline += " -dynamic-linker /lib/ld-musl-arm.so.1"
-						end if
-					#else
-						if( hArmLinuxUsesHardFloatAbi( ) ) then
-							ldcline += " -dynamic-linker /lib/ld-linux-armhf.so.3"
-						else
-							ldcline += " -dynamic-linker /lib/ld-linux.so.3"
-						end if
-					#endif
-				case FB_CPUFAMILY_AARCH64
-					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
-						ldcline += " -dynamic-linker /lib/ld-musl-aarch64.so.1"
-					#else
-					ldcline += " -dynamic-linker /lib/ld-linux-aarch64.so.1"
-					#endif
-				case FB_CPUFAMILY_PPC
-					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
-						ldcline += " -dynamic-linker /lib/ld-musl-powerpc.so.1"
-					#else
-						ldcline += " -dynamic-linker /lib/ld.so.1"
-					#endif
-				case FB_CPUFAMILY_PPC64
-					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
-						ldcline += " -dynamic-linker /lib/ld-musl-powerpc64.so.1"
-					#else
-						ldcline += " -dynamic-linker /lib64/ld64.so.1"
-					#endif
-				case FB_CPUFAMILY_PPC64LE
-					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
-						ldcline += " -dynamic-linker /lib/ld-musl-powerpc64le.so.1"
-					#else
-						ldcline += " -dynamic-linker /lib64/ld64.so.2"
-					#endif
-				case FB_CPUFAMILY_RISCV32
-					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
-						ldcline += " -dynamic-linker /lib/ld-musl-riscv32.so.1"
-					#else
-						ldcline += " -dynamic-linker /lib/ld-linux-riscv32-ilp32.so.1"
-					#endif
-				case FB_CPUFAMILY_RISCV64
-					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
-						ldcline += " -dynamic-linker /lib/ld-musl-riscv64.so.1"
-					#else
-						ldcline += " -dynamic-linker /lib/ld-linux-riscv64-lp64d.so.1"
-					#endif
-				case FB_CPUFAMILY_S390X
-					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
-						ldcline += " -dynamic-linker /lib/ld-musl-s390x.so.1"
-					#else
-						ldcline += " -dynamic-linker /lib/ld64.so.1"
-					#endif
-				case FB_CPUFAMILY_LOONGARCH64
-					#ifdef ENABLE_MUSL_DYNAMIC_LINKER
-						ldcline += " -dynamic-linker /lib/ld-musl-loongarch64.so.1"
-					#else
-						ldcline += " -dynamic-linker /lib64/ld-linux-loongarch-lp64d.so.1"
-					#endif
-				end select
-			case FB_COMPTARGET_HAIKU
-				'' Haiku executables are linked through the shared-object path.
-				'' Bind definitions within the executable so RIP-relative inline
-				'' assembly references to local FB symbols remain linkable.
-				ldcline += " -shared -no-undefined -Bsymbolic"
-			case FB_COMPTARGET_NETBSD
-				ldcline += " -dynamic-linker /usr/libexec/ld.elf_so"
-			case FB_COMPTARGET_OPENBSD
-				ldcline += " -dynamic-linker /usr/libexec/ld.so"
-			case FB_COMPTARGET_ANDROID
-				ldcline += " -dynamic-linker /system/bin/linker"
-			end select
-		end if
-
-		'' Add all symbols to the dynamic symbol table
-		'' The Solaris linker doesn't support --export-dynamic
-		'' I don't know the equivalent option for it so I just disable this for Solaris
-		'' Don't know the side effects, though
-		'' But able to have shared library generated successfully afterward
-		if( (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB) or _
-			fbGetOption( FB_COMPOPT_EXPORT ) ) and _
-			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_SOLARIS) and _
-			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_ILLUMOS) and _
-			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) then
-			ldcline += " --export-dynamic"
-		end if
-		fbcDarwinPlatformAddExportDynamic( ldcline )
+		hAddUnixLinkOptions( ldcline, dllname )
 
 	case FB_COMPTARGET_XBOX
-		'' nxdk-link is lld's MSVC-compatible linker frontend.  The common
-		'' GNU ld flags used by the old OpenXDK path are not accepted here.
-		'' automount_d only contains startup registration, so force its symbol
-		'' in exactly as nxdk's own makefiles do.
+		'' nxdk-link uses lld's MSVC-compatible frontend.
 		ldcline += " -safeseh:no"
 		ldcline += " -include:_automount_d_drive"
 
 	case FB_COMPTARGET_JS
-		dim as integer js_link_optimize = fbGetOption( FB_COMPOPT_OPTIMIZELEVEL )
-		if( js_link_optimize < 2 ) then
-			''
-			'' Asyncify keeps SLEEP and old input loops cooperative in the
-			'' browser, but it also rewrites reachable control flow.  At -O0
-			'' large QB-era programs can exceed browser wasm function limits
-			'' after that rewrite.  Keep the final Emscripten link at O2 or
-			'' better even when the BASIC compiler itself is not optimizing.
-			''
-			js_link_optimize = 2
-		end if
-		ldcline += " -O" + str( js_link_optimize )
-
-		static as zstring*32 emscripten_options(...) = _
-		{ _
-			"CASE_INSENSITIVE_FS=1", _
-			"TOTAL_MEMORY=67108864", _
-			"ALLOW_MEMORY_GROWTH=1", _
-			"RETAIN_COMPILER_SETTINGS=1", _
-			"ASYNCIFY=1", _
-			"ASYNCIFY_STACK_SIZE=65536" _
-		}
-			'"WARN_UNALIGNED=1", _
-
-		ldcline += " -Wno-warn-absolute-paths"
-		for i as integer = 0 to ubound(emscripten_options)
-			ldcline += " -s " + emscripten_options(i)
-		next
-
-		ldcline += " --shell-file" + hFindLib("fb_shell.html")
-		ldcline += " --post-js" + hFindLib("fb_rtlib.js")
-		if( ((len(fbc.subsystem) = 0) and (fbGetOption( FB_COMPOPT_MODEVIEW ) = FB_MODEVIEW_CONSOLE)) or _
-		    (fbc.subsystem = "console") ) then
-			ldcline += " --post-js" + hFindLib("termlib_min.js")
-		end if
-
+		hAddJsLinkOptions( ldcline )
 	end select
 
-	if (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_DOS) then
-		'' For DJGPP, the custom ldscript must always be used,
-		'' to get ctors/dtors into the correct order that lets
-		'' fbrt0's c/dtor be the first/last respectively.
-		'' (needed until binutils' default DJGPP ldscripts are fixed)
+	function = TRUE
+end function
+
+private sub hAddGeneralLinkOptions _
+	( _
+		byref ldcline as string, _
+		byref deffile as string _
+	)
+
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_DOS ) then
+		'' DJGPP needs fbc's script to order runtime constructors and
+		'' destructors around the program's own initialization.
 		ldcline += " -T """ + fbc.libpath + (FB_HOST_PATHDIV + "i386go32.x""")
 	else
-		'' Supplementary ld script to drop the fbctinf objinfo section
-		''  - only if objinfo is enabled
-		''  - only with ld.bfd, not ld.gold, because gold doesn't support this kind
-		''    of linker script (results in broken binaries).
-
-		'' Solaris uses it own linker
-		''  - don't know if it support this kind of linker script or not
-		''  - so just disable it for the solaris target, too
-		''  - the solaris linker will cause major problems
-		''  - because of imcompatibilities with the GNU linker
-		''  - we can only know if when really testing on the platform
-		''  - and adapt the code over time
+		'' GNU ld can discard object-info metadata through a supplementary
+		'' script. Gold, lld, and the non-GNU target linkers cannot use it.
 		if( fbGetOption( FB_COMPOPT_OBJINFO ) and _
-			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) and _
-			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_SOLARIS) and _
-			(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_ILLUMOS) and _
-			( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) and _
-			( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX ) and _
-			( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_WII ) and _
-			( not fbcUseLldLinker( ) ) and _
-			(not fbcIsUsingGoldLinker( )) ) then
+		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) and _
+		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_SOLARIS) and _
+		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_ILLUMOS) and _
+		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
+		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) and _
+		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_WII) and _
+		    (not fbcUseLldLinker( )) and _
+		    (not fbcIsUsingGoldLinker( )) ) then
 			ldcline += " -T """ + fbc.libpath + (FB_HOST_PATHDIV + "fbextra.x""")
 		end if
 	end if
 
 	select case as const fbGetOption( FB_COMPOPT_TARGET )
 	case FB_COMPTARGET_CYGWIN, FB_COMPTARGET_WIN32
-		'' stack size
-		dim as integer stacksize = fbGetOption(FB_COMPOPT_STACKSIZE)
-		ldcline += " --stack " + str(stacksize) + "," + str(stacksize)
+		dim as integer stacksize = fbGetOption( FB_COMPOPT_STACKSIZE )
+		ldcline += " --stack " + str( stacksize ) + "," + str( stacksize )
 
 		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then
-			'' When building DLLs, we also create an import library, as
-			'' convenience for the user. There are several ways to do this:
-			''    a) ld --output-def + dlltool
-			''    b) ld --output-def --out-implib
-			''    c) pexports + dlltool
-			'' At the moment it seems like "ld --out-implib" alone
-			'' does not work, and b) shows a verbose message that
-			'' wouldn't be nice to have, so a) is the best way.
+			'' The generated definition file is converted to the import
+			'' archive after the DLL has linked successfully.
 			deffile = hStripExt( fbc.outname ) + ".def"
 			ldcline += " --output-def """ + deffile + """"
 		end if
 
 	case FB_COMPTARGET_XBOX
-		'' set entry point
 		ldcline += " -entry:WinMainCRTStartup"
-		'' nxdk-link supplies a small 64 KiB default.  Pass fbc's stack
-		'' setting after the wrapper defaults so fbcunit and programs with
-		'' large local buffers use the same default reserve as Win32.
+		'' nxdk-link's 64 KiB default is too small for programs with large
+		'' local buffers, so use the compiler's normal stack setting.
 		ldcline += " -stack:" + str( fbGetOption( FB_COMPOPT_STACKSIZE ) )
+
 	case FB_COMPTARGET_OPENBSD
-		'' OpenBSD executables are PIE and enter through __start.
 		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_EXECUTABLE ) then
 			ldcline += " -pie -e __start"
 		end if
-
 	end select
 
-	if (fbc.staticlink) and (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) then
+	if( fbc.staticlink and _
+	    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
 		ldcline += " -Bstatic"
 	end if
 
-	if( fbGetOption( FB_COMPOPT_PIC ) and (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
+	if( fbGetOption( FB_COMPOPT_PIC ) and _
+	    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
 		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_EXECUTABLE ) then
-			'' NOTE: For android 4.0-, user will need to pass in '-Wl -no-pie'
-			''       to override this default.
-			''       On android 4.1+ this is accepted, and on android 5.0+
-			''       is required. For android 4.0- this will probably link
-			''       but then segfault when executed on the device.
-
 			ldcline += " -pie"
-		else
-			'' Dynamic library: no flag needed
 		end if
 	end if
 
-	if( len( fbc.mapfile ) > 0) then
+	if( len( fbc.mapfile ) > 0 ) then
 		if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
 			ldcline += " -map:" + fbc.mapfile
 		elseif( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII ) then
@@ -1480,41 +1429,48 @@ private function hLinkFiles( ) as integer
 
 	if( fbGetOption( FB_COMPOPT_DEBUGINFO ) = FALSE ) then
 		if( fbGetOption( FB_COMPOPT_PROFILE ) <> FB_PROFILE_OPT_GMON ) then
-			if(( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN ) and _
-				( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS )) then
-
-				if( fbc.stripsymbols and (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
+			if( (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) and _
+			    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) ) then
+				if( fbc.stripsymbols and _
+				    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
 					ldcline += " -s"
 				end if
 			end if
 		end if
 	end if
+end sub
 
-	'' Add the library search paths
+private sub hAddLinkSearchPaths( byref ldcline as string )
 	scope
-		dim as TSTRSETITEM ptr i = listGetHead(@fbc.finallibpaths.list)
+		dim as DZSTRING args
+		dim as TSTRSETITEM ptr i = listGetHead( @fbc.finallibpaths.list )
+		DZstrZero( args )
 
-		dim as string L
+		dim as string option_prefix
 		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
-			L = " -L """
+			option_prefix = " -L """
 		else
-			L = " -L"""
+			option_prefix = " -L"""
 		end if
 
 		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX ) then
-			while (i)
-				ldcline += L + i->s + """"
-				i = listGetNext(i)
+			while( i )
+				DZstrConcatAssign( args, option_prefix + i->s + """" )
+				i = listGetNext( i )
 			wend
 		end if
+		if( args.data <> NULL ) then
+			ldcline += *args.data
+		end if
+		DZstrAllocate( args, 0 )
 	end scope
 
-	'' And the sysroot
 	if( len( fbc.sysroot ) ) then
 		ldcline += " --sysroot=" + fbc.sysroot
 	end if
+end sub
 
-	'' crt begin objects
+private sub hAddCrtBeginObjects( byref ldcline as string )
 	select case as const fbGetOption( FB_COMPOPT_TARGET )
 	case FB_COMPTARGET_CYGWIN
 		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then
@@ -1522,7 +1478,6 @@ private function hLinkFiles( ) as integer
 		else
 			'' Cygwin needs crt0.o for normal program initialization.
 			ldcline += hFindLib( "crt0.o" )
-			'' additional support for gmon
 			if( fbGetOption( FB_COMPOPT_PROFILE ) = FB_PROFILE_OPT_GMON ) then
 				ldcline += hFindLib( "gcrt0.o" )
 			end if
@@ -1533,55 +1488,52 @@ private function hLinkFiles( ) as integer
 			ldcline += hFindLib( "dllcrt2.o" )
 		else
 			ldcline += hFindLib( "crt2.o" )
-			'' additional support for gmon
-			if( fbGetOption( FB_COMPOPT_PROFILE ) = FB_PROFILE_OPT_GMON  ) then
+			if( fbGetOption( FB_COMPOPT_PROFILE ) = FB_PROFILE_OPT_GMON ) then
 				ldcline += hFindLib( "gcrt2.o" )
 			end if
 		end if
-
 		ldcline += hFindLib( "crtbegin.o" )
 
 	case FB_COMPTARGET_DOS
-		if( fbGetOption( FB_COMPOPT_PROFILE ) = FB_PROFILE_OPT_GMON  ) then
+		if( fbGetOption( FB_COMPOPT_PROFILE ) = FB_PROFILE_OPT_GMON ) then
 			ldcline += hFindLib( "gcrt0.o" )
 		else
 			ldcline += hFindLib( "crt0.o" )
 		end if
 
 	case FB_COMPTARGET_LINUX, FB_COMPTARGET_HAIKU, FB_COMPTARGET_DARWIN, _
-		FB_COMPTARGET_FREEBSD, FB_COMPTARGET_OPENBSD, _
-		FB_COMPTARGET_NETBSD, FB_COMPTARGET_DRAGONFLY, _
-		FB_COMPTARGET_SOLARIS, FB_COMPTARGET_ILLUMOS
+	     FB_COMPTARGET_FREEBSD, FB_COMPTARGET_OPENBSD, _
+	     FB_COMPTARGET_NETBSD, FB_COMPTARGET_DRAGONFLY, _
+	     FB_COMPTARGET_SOLARIS, FB_COMPTARGET_ILLUMOS
 
-		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_EXECUTABLE) then
-				if( fbGetOption( FB_COMPOPT_PROFILE ) ) then
-					select case as const fbGetOption( FB_COMPOPT_TARGET )
-					case FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD
-						ldcline += hFindLib( "gcrt0.o" )
-					case FB_COMPTARGET_DARWIN
-						'' Darwin's compiler driver supplies the startup objects.
-					case FB_COMPTARGET_HAIKU
-						'' no gcrt1.o on Haiku
-					case else
+		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_EXECUTABLE ) then
+			if( fbGetOption( FB_COMPOPT_PROFILE ) ) then
+				select case as const fbGetOption( FB_COMPOPT_TARGET )
+				case FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD
+					ldcline += hFindLib( "gcrt0.o" )
+				case FB_COMPTARGET_DARWIN
+					'' The Darwin compiler driver supplies startup objects.
+				case FB_COMPTARGET_HAIKU
+					'' Haiku has no gcrt1.o.
+				case else
 					ldcline += hFindLib( "gcrt1.o" )
 				end select
-				else
-					select case as const fbGetOption( FB_COMPOPT_TARGET )
-					case FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD
-						ldcline += hFindLib( "crt0.o" )
-					case FB_COMPTARGET_DARWIN
-						'' Darwin's compiler driver supplies the startup objects.
-					case FB_COMPTARGET_HAIKU
-						'' no crt1.o on Haiku
-					case else
+			else
+				select case as const fbGetOption( FB_COMPOPT_TARGET )
+				case FB_COMPTARGET_OPENBSD, FB_COMPTARGET_NETBSD
+					ldcline += hFindLib( "crt0.o" )
+				case FB_COMPTARGET_DARWIN
+					'' The Darwin compiler driver supplies startup objects.
+				case FB_COMPTARGET_HAIKU
+					'' Haiku has no crt1.o.
+				case else
 					ldcline += hFindLib( "crt1.o" )
 				end select
 			end if
 		end if
 
-		if (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN) then
-			'' All have crti.o, except OpenBSD and Darwin
-			if (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_OPENBSD) then
+		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN ) then
+			if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_OPENBSD ) then
 				ldcline += hFindLib( "crti.o" )
 			end if
 
@@ -1602,25 +1554,25 @@ private function hLinkFiles( ) as integer
 		end if
 
 	case FB_COMPTARGET_ANDROID
-		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_EXECUTABLE) then
+		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_EXECUTABLE ) then
 			if( fbc.staticlink ) then
 				ldcline += hFindLib( "crtbegin_static.o" )
 			else
 				ldcline += hFindLib( "crtbegin_dynamic.o" )
 			end if
 		else
-			'' FB_OUTTYPE_DYNAMICLIB
 			ldcline += hFindLib( "crtbegin_so.o" )
 		end if
 
 	case FB_COMPTARGET_XBOX
-		'' nxdk's CRT startup object is provided by libpdclib.lib below.
-
+		'' nxdk's CRT startup object is supplied by libpdclib.lib.
 	end select
+end sub
 
+private sub hAddRuntimeAndObjectFiles( byref ldcline as string )
 	if( fbc.nofbrt0 = FALSE ) then
-		'' don't add the fbrt0|fbrt1 if compiling for javascript, because global
-		'' constructors and destructors are not supported by emscripten
+		'' Emscripten does not use fbrt0 because it does not support the
+		'' constructor/destructor scheme used by the native runtimes.
 		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
 			ldcline += " """ + fbc.libpath + FB_HOST_PATHDIV
 			select case fbGetOption( FB_COMPOPT_PROFILE )
@@ -1648,12 +1600,172 @@ private function hLinkFiles( ) as integer
 	end if
 
 	scope
+		dim as DZSTRING args
 		dim as string ptr objfile = listGetHead( @fbc.objlist )
+		DZstrZero( args )
 		while( objfile )
-			ldcline += " """ + *objfile + """"
+			DZstrConcatAssign( args, " """ + *objfile + """" )
 			objfile = listGetNext( objfile )
 		wend
+		if( args.data <> NULL ) then
+			ldcline += *args.data
+		end if
+		DZstrAllocate( args, 0 )
 	end scope
+end sub
+
+private function hRunLinkCommand( byref ldcline as string ) as integer
+	'' DOS process command lines are limited to 127 characters. Windows
+	'' also needs a response file when cmd.exe's 2047-character legacy
+	'' limit may be reached, or when DOS/JS cross tools require one.
+#ifdef __FB_DOS__
+	if( hPutLdArgsIntoFile( ldcline ) = FALSE ) then
+		return FALSE
+	end if
+#elseif defined( __FB_WIN32__ )
+	dim as long forcefile
+	dim as ulong targetprefixlen
+#ifdef ENABLE_STANDALONE
+	select case fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_DOS, FB_COMPTARGET_JS
+		forcefile = TRUE
+	end select
+#else
+	targetprefixlen = len( fbc.targetprefix )
+#endif
+	dim as integer toolnamelen = len( "ld.exe " ) + _
+		iif( targetprefixlen > len( fbc.buildprefix ), _
+		     targetprefixlen, len( fbc.buildprefix ) )
+	if( forcefile or _
+	    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_DOS) or _
+	    (len( ldcline ) > (2047 - toolnamelen)) ) then
+		if( hPutLdArgsIntoFile( ldcline ) = FALSE ) then
+			return FALSE
+		end if
+	end if
+#endif
+
+	var ld = fbcPlatformGetLinkerTool( )
+	if( fbcRunBin( "linking", ld, ldcline ) = FALSE ) then
+		return FALSE
+	end if
+
+	function = fbcDarwinPlatformBuildGuiAppBundle( )
+end function
+
+private function hFinishLinkedOutput _
+	( _
+		byref dllname as string, _
+		byref deffile as string, _
+		byref xbox_xbe_outname as string, _
+		byref wii_dol_outname as string _
+	) as integer
+
+	select case as const fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_DOS
+		'' DJGPP stores the requested stack size in the executable header.
+		dim as integer f = freefile( )
+		if( open( fbc.outname, for binary, access read write, as #f ) <> 0 ) then
+			return FALSE
+		end if
+
+		dim as long value = clng( fbGetOption( FB_COMPOPT_STACKSIZE ) )
+		put #f, 533, value
+		close #f
+
+	case FB_COMPTARGET_CYGWIN, FB_COMPTARGET_WIN32
+		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then
+			if( makeImpLib( dllname, deffile ) = FALSE ) then
+				return FALSE
+			end if
+		end if
+
+	case FB_COMPTARGET_XBOX
+		'' cxbe converts the linked PE executable into the Xbox XBE image.
+		dim as string cxbepath, cxbecline
+		if( len( xbox_xbe_outname ) = 0 ) then
+			xbox_xbe_outname = hStripExt( fbc.outname ) + ".xbe"
+		end if
+		if( len( fbc.xbe_title ) = 0 ) then
+			fbc.xbe_title = hStripPath( hStripExt( xbox_xbe_outname ) )
+		end if
+
+		cxbecline = "-TITLE:" + QUOTE + fbc.xbe_title + (QUOTE + " ")
+		if( fbGetOption( FB_COMPOPT_DEBUGINFO ) ) then
+			cxbecline += "-DUMPINFO:" + QUOTE + _
+				hStripExt( xbox_xbe_outname ) + (".cxbe" + QUOTE)
+		end if
+		cxbecline += " -OUT:" + QUOTE + xbox_xbe_outname + QUOTE
+		cxbecline += " " + QUOTE + fbc.outname + QUOTE
+		if( fbc.verbose = FALSE ) then
+			cxbecline += " >nul"
+		end if
+		if( fbc.verbose ) then
+			print "cxbe: ", cxbecline
+		end if
+
+		fbcFindBin( FBCTOOL_CXBE, cxbepath )
+		'' Shell redirection suppresses cxbe output in non-verbose mode.
+		dim as integer res = shell( cxbepath + " " + cxbecline )
+		if( res <> 0 ) then
+			if( fbc.verbose ) then
+				print "cxbe failed: exit code " & res
+			end if
+			return FALSE
+		end if
+		if( kill( fbc.outname ) <> 0 ) then
+			return FALSE
+		end if
+
+	case FB_COMPTARGET_WII
+		'' elf2dol converts the linked ELF into the bootable Wii image.
+		if( len( wii_dol_outname ) = 0 ) then
+			wii_dol_outname = hStripExt( fbc.outname ) + ".dol"
+		end if
+		if( fbcRunBin( "making DOL", FBCTOOL_ELF2DOL, _
+		               QUOTE + fbc.outname + QUOTE + " " + _
+		               QUOTE + wii_dol_outname + QUOTE ) = FALSE ) then
+			return FALSE
+		end if
+		if( kill( fbc.outname ) <> 0 ) then
+			return FALSE
+		end if
+	end select
+
+	function = TRUE
+end function
+
+'' Link command construction is ordered and shares target state throughout.
+''
+private function hLinkFiles( ) as integer
+	dim as string ldcline, dllname, deffile
+	dim as string xbox_xbe_outname
+	dim as string wii_dol_outname
+
+	function = FALSE
+
+	hPrepareLinkTarget( ldcline, xbox_xbe_outname, wii_dol_outname )
+
+	dim as integer link_was_handled = any
+	if( hLinkDosDxe( ldcline, link_was_handled ) = FALSE ) then
+		exit function
+	end if
+	if( link_was_handled ) then
+		function = TRUE
+		exit function
+	end if
+
+	if( hAddPlatformLinkOptions( ldcline, dllname ) = FALSE ) then
+		exit function
+	end if
+
+	hAddGeneralLinkOptions( ldcline, deffile )
+
+	hAddLinkSearchPaths( ldcline )
+
+	hAddCrtBeginObjects( ldcline )
+
+	hAddRuntimeAndObjectFiles( ldcline )
 
 	dim as integer addsolarislibmearly = FALSE
 	if( fbc.nodeflibs = FALSE ) then
@@ -1699,18 +1811,26 @@ private function hLinkFiles( ) as integer
 
 	'' Add libraries passed by file name
 	scope
+		dim as DZSTRING args
 		dim as string ptr libfile = listGetHead(@fbc.libfiles)
+		DZstrZero( args )
 		while (libfile)
-			ldcline += " """ + *libfile + """"
+			DZstrConcatAssign( args, " """ + *libfile + """" )
 			libfile = listGetNext(libfile)
 		wend
+		if( args.data <> NULL ) then
+			ldcline += *args.data
+		end if
+		DZstrAllocate( args, 0 )
 	end scope
 
 	'' Add libraries from command-line, those found during parsing, and
 	'' the default ones
 	scope
+		dim as DZSTRING args
 		dim as TSTRSETITEM ptr i = listGetHead(@fbc.finallibs.list)
 		dim as integer checkdllname = (fbGetOption(FB_COMPOPT_OUTTYPE) = FB_OUTTYPE_DYNAMICLIB)
+		DZstrZero( args )
 		while (i)
 			'' Prevent linking DLLs against their own import library,
 			'' or .so's against themselves (ld will fail to read in
@@ -1726,15 +1846,19 @@ private function hLinkFiles( ) as integer
 						fbcDarwinPlatformGetFrameworkName( libname )
 
 					if( len( frameworkname ) > 0 ) then
-						ldcline += " -framework " + frameworkname
+						DZstrConcatAssign( args, " -framework " + frameworkname )
 					else
 						libname = fbcPlatformMapLibName( libname )
-						ldcline += " -l" + libname
+						DZstrConcatAssign( args, " -l" + libname )
 					end if
 				end if
 			end if
 			i = listGetNext(i)
 		wend
+		if( args.data <> NULL ) then
+			ldcline += *args.data
+		end if
+		DZstrAllocate( args, 0 )
 	end scope
 
 	hAddDarwinFrameworks( ldcline )
@@ -1829,163 +1953,14 @@ private function hLinkFiles( ) as integer
 	'' extra options
 	ldcline += " " + fbc.extopt.ld
 
-	'' On some systems there are certain command line length limits which we
-	'' can easily hit with our ld invocation, especially when linking huge
-	'' programs, with lots of *.o files with long file names, such as the
-	'' FB test suite.
-	'' Typically > 127 chars but < 8k, but with huge programs, even > 32k.
-	''
-	'' On DOS there's a 127 char command line length limit. Our ld command
-	'' line will typically be much longer than that, so we use ld's @file
-	'' feature ("ld @file") and put the command line into that file.
-	''
-	'' The same happens on Win32 when we're invoking DOS .exes (some people
-	'' use DOS binutils, instead of proper Win32-to-DOS binutils, to compile
-	'' for DOS on Win32).
-	''
-	'' On Win32, there are multiple command line length limits to worry
-	'' about:
-	''    - cmd.exe (applies to FB shell()): 8192 on Windows XP+,
-	''      2047 on Windows NT 4.0/2000
-	''    - 32767 for CreateProcess() (applies to FB exec())
-	'' fbcRunBin() can use either shell() or exec() depending on whether
-	'' it's a normal/standalone build and whether the binutils were found.
-	'' For standalone, it will always use exec(), but for non-standalone,
-	'' we don't know what it'll do, so we should use the minimum limit.
-	'' For shell() the full command line will also include the ld.exe
-	'' command, i.e. "[<target>-]ld.exe ", which reduces the amount of room
-	'' left over for the ld arguments.
-	''
-	'' On Linux/BSD systems there's typically some 100k or 200k limit which
-	'' we usually don't hit.
-	#ifdef __FB_DOS__
-		if( hPutLdArgsIntoFile( ldcline ) = FALSE ) then
-			exit function
-		end if
-	#elseif defined( __FB_WIN32__ )
-		dim forcefile As Long
-		dim targetprefixlen As ULong
-		#ifdef ENABLE_STANDALONE
-			'' "cross"-compiling? djgpp cross tools and emscripten
-			'' build tools can't seem to handle the long command line
-			'' created when linking ./tests/fbc-tests
-			select case fbGetOption( FB_COMPOPT_TARGET )
-			case FB_COMPTARGET_DOS, FB_COMPTARGET_JS
-				forcefile = 1
-			end select
-		#else
-			targetprefixlen = len( fbc.targetprefix )
-		#endif
-		dim toolnamelen as integer = len( "ld.exe " ) + _
-			iif( targetprefixlen > len( fbc.buildprefix ), targetprefixlen, len( fbc.buildprefix ) )
-		if( forcefile OrElse (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_DOS) or _
-			(len( ldcline ) > (2047 - toolnamelen)) ) then
-			if( hPutLdArgsIntoFile( ldcline ) = FALSE ) then
-				exit function
-			end if
-		end if
-	#endif
-
-	'' invoke ld
-	var ld = fbcPlatformGetLinkerTool( )
-
-	if( fbcRunBin( "linking", ld, ldcline ) = FALSE ) then
+	if( hRunLinkCommand( ldcline ) = FALSE ) then
 		exit function
 	end if
 
-	if( fbcDarwinPlatformBuildGuiAppBundle( ) = FALSE ) then
+	if( hFinishLinkedOutput( dllname, deffile, xbox_xbe_outname, _
+	                         wii_dol_outname ) = FALSE ) then
 		exit function
 	end if
-
-	select case as const fbGetOption( FB_COMPOPT_TARGET )
-	case FB_COMPTARGET_DOS
-		'' patch the exe to change the stack size
-		dim as integer f = freefile()
-
-		if (open(fbc.outname, for binary, access read write, as #f) <> 0) then
-			exit function
-		end if
-
-		dim value as long = clng( fbGetOption( FB_COMPOPT_STACKSIZE ) )
-		put #f, 533, value
-
-		close #f
-
-	case FB_COMPTARGET_CYGWIN, FB_COMPTARGET_WIN32
-		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then
-			'' Create the .dll.a import library from the generated .def
-			if (makeImpLib(dllname, deffile) = FALSE) then
-				exit function
-			end if
-		end if
-
-	case FB_COMPTARGET_XBOX
-		'' Turn .exe into .xbe
-		dim as string cxbepath, cxbecline
-		dim as integer res = any
-
-		if( len( xbox_xbe_outname ) = 0 ) then
-			xbox_xbe_outname = hStripExt( fbc.outname ) + ".xbe"
-		end if
-
-		'' xbe title
-		if( len(fbc.xbe_title) = 0 ) then
-			fbc.xbe_title = hStripPath( hStripExt( xbox_xbe_outname ) )
-		end if
-
-		cxbecline = "-TITLE:" + QUOTE + fbc.xbe_title + (QUOTE + " ")
-
-		if( fbGetOption( FB_COMPOPT_DEBUGINFO ) ) then
-			cxbecline += "-DUMPINFO:" + QUOTE + hStripExt(xbox_xbe_outname) + (".cxbe" + QUOTE)
-		end if
-
-		'' output xbe filename
-		cxbecline += " -OUT:" + QUOTE + xbox_xbe_outname + QUOTE
-
-		'' input exe filename
-		cxbecline += " " + QUOTE + fbc.outname + QUOTE
-
-		'' don't echo cxbe output
-		if( fbc.verbose = FALSE ) then
-			cxbecline += " >nul"
-		end if
-
-		'' invoke cxbe (exe -> xbe)
-		if( fbc.verbose ) then
-			print "cxbe: ", cxbecline
-		end if
-
-		fbcFindBin( FBCTOOL_CXBE, cxbepath )
-
-		'' have to use shell instead of exec in order to use >nul
-		res = shell(cxbepath + " " + cxbecline)
-		if( res <> 0 ) then
-			if( fbc.verbose ) then
-				print "cxbe failed: exit code " & res
-			end if
-			exit function
-		end if
-
-		'' remove .exe
-		if( kill( fbc.outname ) <> 0 ) then
-			exit function
-		end if
-
-	case FB_COMPTARGET_WII
-		'' Turn the linked ELF into a bootable DOL image.
-		if( len( wii_dol_outname ) = 0 ) then
-			wii_dol_outname = hStripExt( fbc.outname ) + ".dol"
-		end if
-
-		if( fbcRunBin( "making DOL", FBCTOOL_ELF2DOL, QUOTE + fbc.outname + QUOTE + " " + QUOTE + wii_dol_outname + QUOTE ) = FALSE ) then
-			exit function
-		end if
-
-		if( kill( fbc.outname ) <> 0 ) then
-			exit function
-		end if
-
-	end select
 
 	function = TRUE
 
@@ -2019,7 +1994,12 @@ private sub hReadObjinfo( )
 			end if
 
 		case OBJINFO_GFX
-			fbSetOption( FB_COMPOPT_FBGFX, TRUE )
+			if( fbGetOption( FB_COMPOPT_FBGFX ) = FB_GFXLIB_NONE ) then
+				fbSetOption( FB_COMPOPT_FBGFX, FB_GFXLIB_DEFAULT )
+			end if
+
+		case OBJINFO_GFX3
+			fbSetOption( FB_COMPOPT_FBGFX, FB_GFXLIB_GFX3 )
 
 		case OBJINFO_LANG
 			lang = fbGetLangId( dat )
@@ -2431,6 +2411,7 @@ enum
 	OPT_FPMODE
 	OPT_FPU
 	OPT_G
+	OPT_GFX3
 	OPT_GEN
 	OPT_HELP
 	OPT_I
@@ -2517,6 +2498,7 @@ dim shared as FBC_CMDLINE_OPTION cmdlineOptionTB(0 to (OPT__COUNT - 1)) = _
 	( TRUE , TRUE , TRUE , TRUE  ), _ '' OPT_FPMODE       affects major initialization, affects code generation
 	( TRUE , TRUE , TRUE , TRUE  ), _ '' OPT_FPU          affects major initialization,affects code generation, affects second stage compile, affects link
 	( FALSE, TRUE , TRUE , FALSE ), _ '' OPT_G            affects code generation, affects link
+	( FALSE, TRUE , FALSE, TRUE  ), _ '' OPT_GFX3         selects gfxlib3 and adds a global define
 	( TRUE , TRUE , TRUE , TRUE  ), _ '' OPT_GEN          affects major initialization
 	( FALSE, FALSE, FALSE, FALSE ), _ '' OPT_HELP         never allow, real command line only, makes no sense to have in source
 	( TRUE , TRUE , TRUE , TRUE  ), _ '' OPT_I            add include path before the default one
@@ -2565,19 +2547,19 @@ dim shared as FBC_CMDLINE_OPTION cmdlineOptionTB(0 to (OPT__COUNT - 1)) = _
 	( TRUE , TRUE , TRUE , TRUE  )  _ '' OPT_Z            affects various - code generation
 }
 
-private sub handleOpt _
+private sub hHandleOptCompileSetup _
 	( _
 		byval optid as integer, _
 		byref arg as string, _
 		byval is_source as integer _
 	)
 
-	select case as const (optid)
+	select case as const optid
 	case OPT_A
 		fbcAddObj( arg )
 
 	case OPT_ARCH
-		'' Set cputype later, so it overrides -target
+		'' Set cputype later, so it overrides -target.
 		fbc.cputype_is_native = (arg = "native")
 		fbc.cputype = fbIdentifyFbcArch( arg )
 		if( fbc.cputype < 0 ) then
@@ -2585,7 +2567,7 @@ private sub handleOpt _
 		end if
 
 	case OPT_ASM
-		select case( arg )
+		select case arg
 		case "att"
 			fbc.asmsyntax = FB_ASMSYNTAX_ATT
 		case "intel"
@@ -2601,8 +2583,6 @@ private sub handleOpt _
 		fbc.buildprefix = arg
 
 	case OPT_C
-		'' -c changes the output type from exe/lib/dll to object,
-		'' overwriting previous -dll, -lib or the default exe.
 		fbSetOption( FB_COMPOPT_OUTTYPE, FB_OUTTYPE_OBJECT )
 		fbc.keepobj = TRUE
 
@@ -2610,7 +2590,7 @@ private sub handleOpt _
 		fbc.keepobj = TRUE
 
 	case OPT_D
-		fbAddPreDefine(arg)
+		fbAddPreDefine( arg )
 
 	case OPT_DLL, OPT_DYLIB
 		fbSetOption( FB_COMPOPT_OUTTYPE, FB_OUTTYPE_DYNAMICLIB )
@@ -2667,32 +2647,32 @@ private sub handleOpt _
 	case OPT_FBGFX
 		fbSetOption( FB_COMPOPT_FBGFX, TRUE )
 
+	case OPT_GFX3
+		'' The preinclude uses the same empty define spelling as source code,
+		'' avoiding a conflicting redefinition when both forms are present.
+		fbSetOption( FB_COMPOPT_FBGFX, FB_GFXLIB_GFX3 )
+		fbAddPreInclude( "fbgfx3-option.bi" )
+
 	case OPT_FORCELANG
-		dim as integer value = fbGetLangId(strptr(arg))
+		dim as integer value = fbGetLangId( strptr( arg ) )
 		if( value = FB_LANG_INVALID ) then
 			hFatalInvalidOption( arg, is_source )
 		end if
 
-		'' show a warning only if forcelang was already set and
-		'' we are handling this from a #cmdline.  We'd like that
-		'' -forcelang from the real command line takes priority
-		'' over source code #cmdline "-forcelang"
 		if( is_source and fbGetOption( FB_COMPOPT_FORCELANG ) ) then
 			errReportWarn( FB_WARNINGMSG_CMDLINEOVERRIDES )
 		else
 			fbSetOption( FB_COMPOPT_LANG, value )
 			fbSetOption( FB_COMPOPT_FORCELANG, TRUE )
 			fbc.objinf.lang = value
-
 			if( is_source ) then
 				fbSetOption( FB_COMPOPT_RESTART_LANG, value )
 			end if
 		end if
 
 	case OPT_FPMODE
-		dim as integer value = any
-
-		select case ucase(arg)
+		dim as integer value = FB_FPMODE_PRECISE
+		select case ucase( arg )
 		case "PRECISE"
 			value = FB_FPMODE_PRECISE
 		case "FAST"
@@ -2700,13 +2680,11 @@ private sub handleOpt _
 		case else
 			hFatalInvalidOption( arg, is_source )
 		end select
-
 		fbSetOption( FB_COMPOPT_FPMODE, value )
 
 	case OPT_FPU
-		dim as integer value = any
-
-		select case ucase(arg)
+		dim as integer value = FB_FPUTYPE_FPU
+		select case ucase( arg )
 		case "X87", "FPU"
 			value = FB_FPUTYPE_FPU
 		case "SSE"
@@ -2716,16 +2694,25 @@ private sub handleOpt _
 		case else
 			hFatalInvalidOption( arg, is_source )
 		end select
-
 		fbSetOption( FB_COMPOPT_FPUTYPE, value )
+	end select
+end sub
 
+private sub hHandleOptFilesAndOutput _
+	( _
+		byval optid as integer, _
+		byref arg as string, _
+		byval is_source as integer _
+	)
+
+	select case as const optid
 	case OPT_G
 		fbSetOption( FB_COMPOPT_DEBUG, TRUE )
 		fbSetOption( FB_COMPOPT_DEBUGINFO, TRUE )
 		fbSetOption( FB_COMPOPT_ASSERTIONS, TRUE )
 
 	case OPT_GEN
-		select case( lcase( arg ) )
+		select case lcase( arg )
 		case "gas"
 			fbc.backend = FB_BACKEND_GAS
 		case "gcc"
@@ -2734,7 +2721,7 @@ private sub handleOpt _
 			fbc.backend = FB_BACKEND_CLANG
 		case "llvm"
 			fbc.backend = FB_BACKEND_LLVM
-		Case "gas64"
+		case "gas64"
 			fbc.backend = FB_BACKEND_GAS64
 		case else
 			hFatalInvalidOption( arg, is_source )
@@ -2744,28 +2731,28 @@ private sub handleOpt _
 		fbc.showhelp = TRUE
 
 	case OPT_I
-		fbAddIncludePath(arg)
+		fbAddIncludePath( arg )
 
 	case OPT_INCLUDE
-		fbAddPreInclude(arg)
+		fbAddPreInclude( arg )
 
 	case OPT_L
-		strsetAdd(@fbc.libs, arg, FALSE)
+		strsetAdd( @fbc.libs, arg, FALSE )
 
 	case OPT_LANG
-		dim as integer value = fbGetLangId( strptr(arg) )
+		dim as integer value = fbGetLangId( strptr( arg ) )
 		if( value = FB_LANG_INVALID ) then
 			hFatalInvalidOption( arg, is_source )
 		end if
 
-		'' don't let '-lang' option or #cmdline "-lang" overide -forcelang
+		'' A real-command-line -forcelang takes precedence over source
+		'' #cmdline language selections.
 		if( fbGetOption( FB_COMPOPT_FORCELANG ) = FALSE ) then
 			fbSetOption( FB_COMPOPT_LANG, value )
 			fbc.objinf.lang = value
-
 			if( is_source ) then
 				fbSetOption( FB_COMPOPT_RESTART_LANG, value )
-			endif
+			end if
 		end if
 
 	case OPT_LIB
@@ -2779,17 +2766,13 @@ private sub handleOpt _
 		fbc.mapfile = arg
 
 	case OPT_MAXERR
-		dim as integer value = any
-
-		if( arg = "inf" ) then
-			value = FB_ERR_INFINITE
-		else
+		dim as integer value = FB_ERR_INFINITE
+		if( arg <> "inf" ) then
 			value = clng( arg )
 			if( value <= 0 ) then
 				hFatalInvalidOption( arg, is_source )
 			end if
 		end if
-
 		fbSetOption( FB_COMPOPT_MAXERRORS, value )
 
 	case OPT_MT
@@ -2805,11 +2788,11 @@ private sub handleOpt _
 
 	case OPT_NOLIB
 		dim libs() as string
-		var libcount = hSplitStr(arg, ",", libs())
+		var libcount = hSplitStr( arg, ",", libs() )
 		for i as integer = 0 to libcount - 1
-				if len(libs(i)) > 0 then
-					strsetAdd(@fbc.excludedlibs, libs(i), 0 /'unused userdata'/)
-				end if
+			if( len( libs(i) ) > 0 ) then
+				strsetAdd( @fbc.excludedlibs, libs(i), 0 /'unused userdata'/ )
+			end if
 		next
 
 	case OPT_NOOBJINFO
@@ -2819,43 +2802,50 @@ private sub handleOpt _
 		fbc.stripsymbols = FALSE
 
 	case OPT_O
-		'' Error if there already is an -o waiting to be assigned
+		'' Bind -o to the last module when possible, otherwise hold it for
+		'' the next module encountered by command-line parsing.
 		hCheckWaitingObjfile( )
-
-		'' Assign it to the last module, if it doesn't have an
-		'' -o filename yet, or store it for later otherwise.
 		if( fbc.lastmodule ) then
 			*fbc.lastmodule->objfile = arg
 			fbc.lastmodule->is_custom_objfile = TRUE
 		else
 			fbc.objfile = arg
 		end if
+	end select
+end sub
 
+private sub hHandleOptPipeline _
+	( _
+		byval optid as integer, _
+		byref arg as string, _
+		byval is_source as integer _
+	)
+
+	select case as const optid
 	case OPT_OPTIMIZE
-		dim as integer value = any
-
-		if (arg = "max") then
+		dim as integer value = 0
+		if( arg = "max" ) then
 			value = 3
 		else
 			value = clng( arg )
-			if (value < 0) then
+			if( value < 0 ) then
 				value = 0
-			elseif (value > 3) then
+			elseif( value > 3 ) then
 				value = 3
 			end if
 		end if
-
 		fbSetOption( FB_COMPOPT_OPTIMIZELEVEL, value )
 
 	case OPT_P
-		strsetAdd(@fbc.libpaths, pathStripDiv( pathNormalizeHost( arg ) ), FALSE)
+		strsetAdd( @fbc.libpaths, _
+		           pathStripDiv( pathNormalizeHost( arg ) ), FALSE )
 
 	case OPT_PIC
 		fbSetOption( FB_COMPOPT_PIC, TRUE )
 
 	case OPT_PP
-		'' -pp doesn't change the output type, but like -r we want to
-		'' stop fbc very early.
+		'' Preprocessing stops before code generation without changing the
+		'' output type selected for the module.
 		fbSetOption( FB_COMPOPT_PPONLY, TRUE )
 		fbc.emitasmonly = TRUE
 
@@ -2864,13 +2854,13 @@ private sub handleOpt _
 		hReplaceSlash( fbc.prefix, asc( FB_HOST_PATHDIV ) )
 
 	case OPT_PRINT
-		select case( arg )
-		case "host"   : fbc.print = PRINT_HOST
-		case "target" : fbc.print = PRINT_TARGET
-		case "x"      : fbc.print = PRINT_X
+		select case arg
+		case "host"     : fbc.print = PRINT_HOST
+		case "target"   : fbc.print = PRINT_TARGET
+		case "x"        : fbc.print = PRINT_X
 		case "fblibdir" : fbc.print = PRINT_FBLIBDIR
-		case "sha-1"  : fbc.print = PRINT_SHA1
-		case "fork-id": fbc.print = PRINT_FORK_ID
+		case "sha-1"    : fbc.print = PRINT_SHA1
+		case "fork-id"  : fbc.print = PRINT_FORK_ID
 		case else
 			hFatalInvalidOption( arg, is_source )
 		end select
@@ -2879,7 +2869,7 @@ private sub handleOpt _
 		fbSetOption( FB_COMPOPT_PROFILE, FB_PROFILE_OPT_GMON )
 
 	case OPT_PROFGEN
-		select case( arg )
+		select case arg
 		case "default", "gmon"
 			fbSetOption( FB_COMPOPT_PROFILE, FB_PROFILE_OPT_GMON )
 		case "fb"
@@ -2891,10 +2881,7 @@ private sub handleOpt _
 		end select
 
 	case OPT_R
-		'' -r changes the output type to .o, like -c, i.e. -m may have
-		'' to be used to mark the main module, just like -c.
 		fbSetOption( FB_COMPOPT_OUTTYPE, FB_OUTTYPE_OBJECT )
-		'' -r will stop fbc earlier than -c though.
 		fbc.emitasmonly = TRUE
 		fbc.keepasm = TRUE
 
@@ -2916,7 +2903,6 @@ private sub handleOpt _
 			fbSetOption( FB_COMPOPT_MODEVIEW, FB_MODEVIEW_GUI )
 		case "console"
 			fbSetOption( FB_COMPOPT_MODEVIEW, FB_MODEVIEW_CONSOLE )
-
 		end select
 
 	case OPT_SHOWINCLUDES
@@ -2933,32 +2919,89 @@ private sub handleOpt _
 
 	case OPT_T
 		fbSetOption( FB_COMPOPT_STACKSIZE, clng( arg ) * 1024 )
+		fbc.stacksize_set = TRUE
 
 	case OPT_TARGET
 		dim as integer os, cputype, is_gnu_triplet
 		hParseTargetArg( arg, os, cputype, is_gnu_triplet )
-
 		if( (os < 0) or (cputype < 0) ) then
 			hFatalInvalidOption( arg, is_source )
 		end if
 
-		'' Store the OS/cputype, overwriting the values from any
-		'' previous -target options.
 		fbSetOption( FB_COMPOPT_TARGET, os )
 		fbSetOption( FB_COMPOPT_CPUTYPE, cputype )
 
-		#ifndef ENABLE_STANDALONE
-			'' Normal build: Store the original -target argument
-			'' for use as prefix for binutils/gcc tools, but only
-			'' when cross-compiling or if it's really a GNU triplet.
-			if( (os <> FB_DEFAULT_TARGET) or _
-				(cputype <> FB_DEFAULT_CPUTYPE) or _
-				is_gnu_triplet ) then
-				fbc.target = arg
-				fbc.targetprefix = fbc.target + "-"
-			end if
-		#endif
+#ifndef ENABLE_STANDALONE
+		'' Preserve GNU triplets as tool prefixes for cross compilation.
+		if( (os <> FB_DEFAULT_TARGET) or _
+		    (cputype <> FB_DEFAULT_CPUTYPE) or _
+		    is_gnu_triplet ) then
+			fbc.target = arg
+			fbc.targetprefix = fbc.target + "-"
+		end if
+#endif
+	end select
+end sub
 
+private sub hHandleWarningOption( byref arg as string )
+	dim as integer value = FB_WARNINGMSGS_LOWEST_LEVEL - 1
+
+	select case arg
+	case "all"
+		value = FB_WARNINGMSGS_LOWEST_LEVEL
+	case "none"
+		value = FB_WARNINGMSGS_HIGHEST_LEVEL + 1
+	case "param"
+		fbSetOption( FB_COMPOPT_PEDANTICCHK, _
+			fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_PARAMMODE )
+	case "escape"
+		fbSetOption( FB_COMPOPT_PEDANTICCHK, _
+			fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_ESCSEQ )
+	case "next"
+		fbSetOption( FB_COMPOPT_PEDANTICCHK, _
+			fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_NEXTVAR )
+	case "signedness"
+		fbSetOption( FB_COMPOPT_PEDANTICCHK, _
+			fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_SIGNEDNESS )
+	case "constness"
+		fbSetOption( FB_COMPOPT_PEDANTICCHK, _
+			fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_CONSTNESS )
+		value = FB_WARNINGMSGS_LOWEST_LEVEL
+	case "funcptr"
+		fbSetOption( FB_COMPOPT_PEDANTICCHK, _
+			fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_CASTFUNCPTR )
+		value = FB_WARNINGMSGS_LOWEST_LEVEL
+	case "suffix"
+		fbSetOption( FB_COMPOPT_PEDANTICCHK, _
+			fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_SUFFIX )
+	case "pedantic"
+		fbSetOption( FB_COMPOPT_PEDANTICCHK, FB_PDCHECK_DEFAULT )
+		if( value > FB_WARNINGMSGS_DEFAULT_LEVEL ) then
+			value = FB_WARNINGMSGS_DEFAULT_LEVEL
+		end if
+	case "error"
+		fbSetOption( FB_COMPOPT_PEDANTICCHK, _
+			fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_ERROR )
+	case "upcast"
+		fbSetOption( FB_COMPOPT_PEDANTICCHK, _
+			fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_UPCAST )
+	case else
+		value = clng( arg )
+	end select
+
+	if( value >= FB_WARNINGMSGS_LOWEST_LEVEL ) then
+		fbSetOption( FB_COMPOPT_WARNINGLEVEL, value )
+	end if
+end sub
+
+private sub hHandleOptDiagnostics _
+	( _
+		byval optid as integer, _
+		byref arg as string, _
+		byval is_source as integer _
+	)
+
+	select case as const optid
 	case OPT_TITLE
 		fbc.xbe_title = arg
 
@@ -2966,9 +3009,8 @@ private sub handleOpt _
 		fbc.verbose = TRUE
 
 	case OPT_VEC
-		dim as integer value = any
-
-		select case (ucase(arg))
+		dim as integer value = FB_VECTORIZE_NONE
+		select case ucase( arg )
 		case "NONE", "0"
 			value = FB_VECTORIZE_NONE
 		case "1"
@@ -2978,7 +3020,6 @@ private sub handleOpt _
 		case else
 			hFatalInvalidOption( arg, is_source )
 		end select
-
 		fbSetOption( FB_COMPOPT_VECTORIZE, value )
 
 	case OPT_VERSION
@@ -2990,66 +3031,7 @@ private sub handleOpt _
 		fbc.showversion = TRUE
 
 	case OPT_W
-		dim as integer value = FB_WARNINGMSGS_LOWEST_LEVEL - 1
-
-		select case (arg)
-		case "all"
-			value = FB_WARNINGMSGS_LOWEST_LEVEL
-
-		case "none"
-			value = FB_WARNINGMSGS_HIGHEST_LEVEL + 1
-
-		case "param"
-			fbSetOption( FB_COMPOPT_PEDANTICCHK, _
-				fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_PARAMMODE )
-
-		case "escape"
-			fbSetOption( FB_COMPOPT_PEDANTICCHK, _
-				fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_ESCSEQ )
-
-		case "next"
-			fbSetOption( FB_COMPOPT_PEDANTICCHK, _
-				fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_NEXTVAR )
-
-		case "signedness"
-			fbSetOption( FB_COMPOPT_PEDANTICCHK, _
-				fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_SIGNEDNESS )
-
-		case "constness"
-			fbSetOption( FB_COMPOPT_PEDANTICCHK, _
-						fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_CONSTNESS )
-			value = FB_WARNINGMSGS_LOWEST_LEVEL
-
-		case "funcptr"
-			fbSetOption( FB_COMPOPT_PEDANTICCHK, _
-				fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_CASTFUNCPTR )
-			value = FB_WARNINGMSGS_LOWEST_LEVEL
-
-		case "suffix"
-			fbSetOption( FB_COMPOPT_PEDANTICCHK, _
-				fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_SUFFIX )
-
-		case "pedantic"
-			fbSetOption( FB_COMPOPT_PEDANTICCHK, FB_PDCHECK_DEFAULT )
-			if( value > FB_WARNINGMSGS_DEFAULT_LEVEL ) then
-				value = FB_WARNINGMSGS_DEFAULT_LEVEL
-			end if
-
-		case "error"
-			fbSetOption( FB_COMPOPT_PEDANTICCHK, _
-				fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_ERROR )
-
-		case "upcast"
-			fbSetOption( FB_COMPOPT_PEDANTICCHK, _
-				fbGetOption( FB_COMPOPT_PEDANTICCHK ) or FB_PDCHECK_UPCAST )
-
-		case else
-			value = clng( arg )
-		end select
-
-		if( value >= FB_WARNINGMSGS_LOWEST_LEVEL ) then
-			fbSetOption( FB_COMPOPT_WARNINGLEVEL, value )
-		end if
+		hHandleWarningOption( arg )
 
 	case OPT_WA
 		fbc.extopt.gas += " " + hReplace( arg, ",", " " ) + " "
@@ -3064,7 +3046,7 @@ private sub handleOpt _
 		fbc.outname = arg
 
 	case OPT_Z
-		select case( lcase( arg ) )
+		select case lcase( arg )
 		case "gosub-setjmp"
 			fbSetOption( FB_COMPOPT_GOSUBSETJMP, TRUE )
 		case "valist-as-ptr"
@@ -3086,6 +3068,30 @@ private sub handleOpt _
 		case else
 			hFatalInvalidOption( arg, is_source )
 		end select
+	end select
+end sub
+
+'' Command-line options form a closed dispatcher with option-specific parsing.
+''
+private sub handleOpt _
+	( _
+		byval optid as integer, _
+		byref arg as string, _
+		byval is_source as integer _
+	)
+
+	select case as const optid
+	case OPT_A to OPT_FPU, OPT_GFX3
+		hHandleOptCompileSetup( optid, arg, is_source )
+
+	case OPT_G, OPT_GEN to OPT_O
+		hHandleOptFilesAndOutput( optid, arg, is_source )
+
+	case OPT_OPTIMIZE to OPT_TARGET
+		hHandleOptPipeline( optid, arg, is_source )
+
+	case OPT_TITLE to OPT_Z
+		hHandleOptDiagnostics( optid, arg, is_source )
 
 	end select
 end sub
@@ -3147,6 +3153,7 @@ private function parseOption(byval opt as zstring ptr) as integer
 
 	case asc("g")
 		ONECHAR(OPT_G)
+		CHECK("gfx3", OPT_GFX3)
 		CHECK("gen", OPT_GEN)
 
 	case asc( "h" )
@@ -3709,9 +3716,28 @@ private sub hCheckArgs()
 	'' stacksize was never set yet by passing a negative stacksize
 	fbSetOption( FB_COMPOPT_STACKSIZE, -1 )
 
-	'' TODO: Check whether subsystem/stacksize/xboxtitle were set and
-	'' complain about it when the target doesn't allow it, or just
-	'' ignore silently (that might not even be too bad for portability)?
+	if( len( fbc.subsystem ) > 0 ) then
+		select case fbGetOption( FB_COMPOPT_TARGET )
+		case FB_COMPTARGET_CYGWIN, FB_COMPTARGET_WIN32, FB_COMPTARGET_JS
+		case else
+			hFatalInvalidOption( "-s " + fbc.subsystem, FALSE )
+		end select
+	end if
+
+	if( fbc.stacksize_set ) then
+		select case fbGetOption( FB_COMPOPT_TARGET )
+		case FB_COMPTARGET_CYGWIN, FB_COMPTARGET_WIN32, _
+		     FB_COMPTARGET_XBOX, FB_COMPTARGET_DOS
+		case else
+			hFatalInvalidOption( "-t", FALSE )
+		end select
+	end if
+
+	if( len( fbc.xbe_title ) > 0 ) then
+		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX ) then
+			hFatalInvalidOption( "-title " + fbc.xbe_title, FALSE )
+		end if
+	end if
 end sub
 
 '' Determine base/prefix path
@@ -4206,6 +4232,8 @@ private function hParseXpm _
 	'' explicitely handled, but should automatically be ignored, as long as
 	'' they don't contain strings.
 	dim as integer saw_rows = FALSE
+	dim as DZSTRING rows
+	DZstrZero( rows )
 	while( eof( f ) = FALSE )
 		line input #f, ln
 
@@ -4220,9 +4248,9 @@ private function hParseXpm _
 			'' Add an entry to the array, in a new line,
 			'' separated by a comma, if it's not the first one.
 			if( saw_rows ) then
-				code += !", _\n"
+				DZstrConcatAssign( rows, !", _\n" )
 			end if
-			code += !"\t@" + ln
+			DZstrConcatAssign( rows, !"\t@" + ln )
 			saw_rows = TRUE
 		end if
 	wend
@@ -4231,9 +4259,13 @@ private function hParseXpm _
 
 	if( saw_rows = FALSE ) then
 		'' No image data found
+		DZstrAllocate( rows, 0 )
 		errReportEx( FB_ERRMSG_INVALIDXPMFILE, xpmfile, -1 )
 		exit function
 	end if
+
+	code += *rows.data
+	DZstrAllocate( rows, 0 )
 
 	'' Line break after the last entry
 	code += !" _ \n"
@@ -4294,6 +4326,8 @@ private function hCompileXpm( ) as integer
 	function = TRUE
 end function
 
+'' A module's stage-two lifecycle is kept in one cleanup-controlled routine.
+''
 private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as integer
 	dim as string ln, asmfile
 	dim as integer directtoobj = hCompileStage2DirectlyToObj( )
@@ -4855,11 +4889,17 @@ private function hArchiveFiles( ) as integer
 		fbcAddTemp( FB_INFOSEC_OBJNAME )
 	end if
 
+	dim as DZSTRING objects
+	DZstrZero( objects )
 	dim as string ptr objfile = listGetHead( @fbc.objlist )
 	while( objfile )
-		ln += """" + *objfile + """ "
+		DZstrConcatAssign( objects, """" + *objfile + """ " )
 		objfile = listGetNext( objfile )
 	wend
+	if( objects.data <> NULL ) then
+		ln += *objects.data
+	end if
+	DZstrAllocate( objects, 0 )
 
 	var ar = FBCTOOL_AR
 	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS ) then
@@ -4956,7 +4996,11 @@ private sub hAddDefaultLibs( )
 
 	'' and the gfxlib, if gfx functions were used
 	if( fbGetOption( FB_COMPOPT_FBGFX ) ) then
-		fbcAddDefLib( "fbgfx" + hGetFbLibNameSuffix( ) )
+		if( fbGetOption( FB_COMPOPT_FBGFX ) = FB_GFXLIB_GFX3 ) then
+			fbcAddDefLib( "fbgfx3" + hGetFbLibNameSuffix( ) )
+		else
+			fbcAddDefLib( "fbgfx" + hGetFbLibNameSuffix( ) )
+		end if
 		fbcPlatformAddGfxLibs( )
 	end if
 
@@ -5028,6 +5072,7 @@ private sub hPrintOptions( byval verbose as integer )
 	if( verbose ) then
 	print "  -fbgfx           Link to the appropriate libfbgfx variant (normally automatic)"
 	end if
+	print "  -gfx3            Select gfxlib3 and define __FB_GFXLIB3__"
 	print "  -forcelang <name>  Override #lang statements in source code"
 	if( verbose ) then
 	print "  -fpmode fast|precise  Select floating-point math accuracy/speed"

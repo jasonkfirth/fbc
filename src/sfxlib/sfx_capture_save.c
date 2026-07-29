@@ -40,6 +40,8 @@
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
 
+#include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,20 +54,20 @@
 typedef struct WAV_HEADER
 {
     char  riff[4];
-    unsigned int file_size;
+    uint32_t file_size;
     char  wave[4];
 
     char  fmt[4];
-    unsigned int fmt_size;
-    unsigned short format;
-    unsigned short channels;
-    unsigned int sample_rate;
-    unsigned int byte_rate;
-    unsigned short block_align;
-    unsigned short bits_per_sample;
+    uint32_t fmt_size;
+    uint16_t format;
+    uint16_t channels;
+    uint32_t sample_rate;
+    uint32_t byte_rate;
+    uint16_t block_align;
+    uint16_t bits_per_sample;
 
     char  data[4];
-    unsigned int data_size;
+    uint32_t data_size;
 
 } WAV_HEADER;
 
@@ -77,42 +79,50 @@ typedef struct WAV_HEADER
 int fb_sfxCaptureSave(const char *filename, int seconds)
 {
     FILE *f;
-    int sample_rate = 44100;
-    int channels = 2;
+    const int sample_rate = 44100;
+    const int channels = 2;
     int frames;
     int total_frames;
+    int result = -1;
 
-    float *buffer;
-    short *pcm;
+    float *buffer = NULL;
+    short *pcm = NULL;
+    size_t sample_count;
+    size_t buffer_bytes;
+    size_t pcm_bytes;
 
     WAV_HEADER header;
 
-    if (!filename)
+    if (!filename || seconds <= 0)
         return -1;
 
-    if (seconds <= 0)
+    if (seconds > INT_MAX / sample_rate)
         return -1;
+
+    total_frames = sample_rate * seconds;
+    if (total_frames > INT_MAX / channels)
+        return -1;
+
+    sample_count = (size_t)total_frames * (size_t)channels;
+    if (sample_count > SIZE_MAX / sizeof(*buffer) ||
+        sample_count > SIZE_MAX / sizeof(*pcm))
+        return -1;
+
+    buffer_bytes = sample_count * sizeof(*buffer);
+    pcm_bytes = sample_count * sizeof(*pcm);
 
     f = fopen(filename, "wb");
-
     if (!f)
     {
         SFX_DEBUG("sfx_capture_save: failed to open file");
         return -1;
     }
 
-    total_frames = sample_rate * seconds;
-
-    buffer = (float*)malloc(sizeof(float) * total_frames * channels);
-    pcm    = (short*)malloc(sizeof(short) * total_frames * channels);
+    buffer = (float*)malloc(buffer_bytes);
+    pcm = (short*)malloc(pcm_bytes);
 
     if (!buffer || !pcm)
-    {
-        fclose(f);
-        free(buffer);
-        free(pcm);
-        return -1;
-    }
+        goto done;
 
     /*
         Read captured samples
@@ -120,13 +130,8 @@ int fb_sfxCaptureSave(const char *filename, int seconds)
 
     frames = fb_sfxCaptureReadSamples(buffer, total_frames);
 
-    if (frames <= 0)
-    {
-        fclose(f);
-        free(buffer);
-        free(pcm);
-        return -1;
-    }
+    if (frames <= 0 || frames > total_frames)
+        goto done;
 
     /*
         Convert to PCM
@@ -143,31 +148,40 @@ int fb_sfxCaptureSave(const char *filename, int seconds)
     memcpy(header.fmt,  "fmt ", 4);
     memcpy(header.data, "data", 4);
 
-    header.fmt_size = 16;
-    header.format = 1;
-    header.channels = channels;
-    header.sample_rate = sample_rate;
-    header.bits_per_sample = 16;
+    header.fmt_size = UINT32_C(16);
+    header.format = UINT16_C(1);
+    header.channels = (uint16_t)(unsigned int)channels;
+    header.sample_rate = (uint32_t)(unsigned int)sample_rate;
+    header.bits_per_sample = UINT16_C(16);
 
-    header.block_align = channels * (header.bits_per_sample / 8);
-    header.byte_rate = header.sample_rate * header.block_align;
+    header.block_align = (uint16_t)((unsigned int)channels *
+        ((unsigned int)header.bits_per_sample / 8u));
+    header.byte_rate = header.sample_rate * (uint32_t)header.block_align;
 
-    header.data_size = frames * header.block_align;
-    header.file_size = 36 + header.data_size;
+    if ((uint32_t)frames >
+        (UINT32_MAX - UINT32_C(36)) / (uint32_t)header.block_align)
+        goto done;
+
+    header.data_size = (uint32_t)frames * (uint32_t)header.block_align;
+    header.file_size = UINT32_C(36) + header.data_size;
 
     /*
         Write file
     */
 
-    fwrite(&header, sizeof(header), 1, f);
-    fwrite(pcm, header.data_size, 1, f);
+    if (fwrite(&header, sizeof(header), 1, f) != 1 ||
+        fwrite(pcm, 1, header.data_size, f) != header.data_size)
+        goto done;
 
+    result = 0;
+
+done:
     fclose(f);
 
     free(buffer);
     free(pcm);
 
-    return 0;
+    return result;
 }
 
 

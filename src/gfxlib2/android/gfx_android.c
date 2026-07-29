@@ -103,6 +103,7 @@ typedef struct FB_ANDROID_GFX_STATE
 	int mouse_latched_buttons;
 	int window_width;
 	int window_height;
+	int opengl;
 	BLITTER *blitter;
 	unsigned char *scale_buffer;
 	size_t scale_buffer_size;
@@ -112,6 +113,7 @@ typedef struct FB_ANDROID_GFX_STATE
 	unsigned surface_generation;
 	int render_suspended;
 	int console_enabled;
+	int console_has_output;
 	char console[FB_ANDROID_CONSOLE_LINES][FB_ANDROID_CONSOLE_COLS];
 	int console_line;
 	int console_col;
@@ -144,6 +146,7 @@ static FB_ANDROID_GFX_STATE fb_android =
 	.mouse_latched_buttons = 0,
 	.window_width = 0,
 	.window_height = 0,
+	.opengl = 0,
 	.blitter = NULL,
 	.scale_buffer = NULL,
 	.scale_buffer_size = 0,
@@ -153,6 +156,7 @@ static FB_ANDROID_GFX_STATE fb_android =
 	.surface_generation = 0,
 	.render_suspended = 1,
 	.console_enabled = 1,
+	.console_has_output = 0,
 	.console = {{0}},
 	.console_line = 0,
 	.console_col = 0,
@@ -174,6 +178,11 @@ static void android_log(const char *text)
 {
 	if (text)
 		__android_log_write(ANDROID_LOG_INFO, FB_ANDROID_LOG_TAG, text);
+}
+
+void fb_hAndroidLog(const char *text)
+{
+	android_log(text);
 }
 
 static void android_log_debug(const char *text, int x0, int y0, int x1, int y1, int action, int x, int y)
@@ -274,7 +283,9 @@ static void configure_window_locked(void)
 		return;
 	}
 
-	ANativeWindow_setBuffersGeometry(fb_android.window, 0, 0, WINDOW_FORMAT_RGBA_8888);
+	/* EGL selects the native visual used by an OpenGL ES window surface. */
+	if (!fb_android.opengl)
+		ANativeWindow_setBuffersGeometry(fb_android.window, 0, 0, WINDOW_FORMAT_RGBA_8888);
 
 	update_window_size_locked();
 	update_render_suspended_locked();
@@ -1445,9 +1456,6 @@ int fb_hAndroidInit(char *title, int w, int h, int depth, int refresh_rate, int 
 	if (w <= 0 || h <= 0 || depth <= 0)
 		return 0;
 
-	if (flags & DRIVER_OPENGL)
-		return -1;
-
 	if (require_api26 && android_get_device_api_level() < 26)
 		return -1;
 
@@ -1469,9 +1477,10 @@ int fb_hAndroidInit(char *title, int w, int h, int depth, int refresh_rate, int 
 	fb_android.mouse_buttons = 0;
 	fb_android.mouse_latched_buttons = 0;
 	memset(fb_android.touch, 0, sizeof(fb_android.touch));
-	fb_android.blitter = fb_hGetBlitter(32, TRUE);
+	fb_android.opengl = (flags & DRIVER_OPENGL) ? 1 : 0;
+	fb_android.blitter = fb_android.opengl ? NULL : fb_hGetBlitter(32, TRUE);
 
-	if (!fb_android.blitter)
+	if (!fb_android.opengl && !fb_android.blitter)
 	{
 		pthread_mutex_unlock(&fb_android.mutex);
 		return -1;
@@ -1484,7 +1493,8 @@ int fb_hAndroidInit(char *title, int w, int h, int depth, int refresh_rate, int 
 	pthread_mutex_unlock(&fb_android.mutex);
 
 	android_log("Android gfx driver initialized");
-	fb_hAndroidUpdate();
+	if (!fb_android.opengl)
+		fb_hAndroidUpdate();
 	return 0;
 }
 
@@ -1495,6 +1505,7 @@ void fb_hAndroidExit(void)
 	fb_android.width = 0;
 	fb_android.height = 0;
 	fb_android.depth = 0;
+	fb_android.opengl = 0;
 	fb_android.blitter = NULL;
 	free(fb_android.scale_buffer);
 	fb_android.scale_buffer = NULL;
@@ -2498,7 +2509,7 @@ void fb_hAndroidUpdate(void)
 
 	pthread_mutex_lock(&fb_android.mutex);
 	window = fb_android.window;
-	if (fb_android.display_locked || !fb_android.active || !can_render_locked() ||
+	if (fb_android.opengl || fb_android.display_locked || !fb_android.active || !can_render_locked() ||
 	    !window || !fb_android.blitter || !__fb_gfx || !__fb_gfx->framebuffer)
 	{
 		pthread_mutex_unlock(&fb_android.mutex);
@@ -2538,7 +2549,8 @@ void fb_hAndroidConsoleRender(void)
 
 	pthread_mutex_lock(&fb_android.mutex);
 	window = fb_android.window;
-	if (!fb_android.console_enabled || fb_android.active || !can_render_locked() || !window)
+	if (!fb_android.console_enabled || !fb_android.console_has_output ||
+	    fb_android.active || !can_render_locked() || !window)
 	{
 		pthread_mutex_unlock(&fb_android.mutex);
 		return;
@@ -2592,6 +2604,7 @@ void fb_hAndroidConsoleWrite(const char *text, size_t length)
 		pthread_mutex_unlock(&fb_android.mutex);
 		return;
 	}
+	fb_android.console_has_output = 1;
 
 	for (i = 0; i < length; ++i)
 	{
@@ -3152,10 +3165,33 @@ void fb_hAndroidScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssiz
 
 ssize_t fb_hGetWindowHandle(void)
 {
-	return 0;
+	ssize_t handle;
+
+	pthread_mutex_lock(&fb_android.mutex);
+	handle = (ssize_t)(intptr_t)fb_android.window;
+	pthread_mutex_unlock(&fb_android.mutex);
+
+	return handle;
 }
 
 ssize_t fb_hGetDisplayHandle(void)
 {
-	return 0;
+	return fb_hAndroidOpenGLDisplayHandle();
+}
+
+ANativeWindow *fb_hAndroidAcquireWindow(unsigned *generation, int *renderable)
+{
+	ANativeWindow *window;
+
+	pthread_mutex_lock(&fb_android.mutex);
+	window = fb_android.window;
+	if (window)
+		ANativeWindow_acquire(window);
+	if (generation)
+		*generation = fb_android.surface_generation;
+	if (renderable)
+		*renderable = fb_android.active && can_render_locked();
+	pthread_mutex_unlock(&fb_android.mutex);
+
+	return window;
 }

@@ -93,7 +93,8 @@ const GFXDRIVER fb_gfxDriverOpenGL =
 	driver_fetch_modes,     /* int *(*fetch_modes)(int depth, int *size); */
 	driver_flip,            /* void (*flip)(void); */
 	driver_poll_events,     /* void (*poll_events)(void); */
-	NULL                    /* void (*update)(void); */
+	NULL,                   /* void (*update)(void); */
+	NULL                    /* int (*resize)(int width, int height); */
 };
 
 
@@ -128,6 +129,7 @@ static int GL_init(PIXELFORMATDESCRIPTOR *pfd)
 	HWND wnd;
 	HDC hdc;
 	HGLRC hglrc;
+	PROC procedure;
 	int pf, res = 0;
 	char *wgl_extensions = NULL;
 	
@@ -143,10 +145,24 @@ static int GL_init(PIXELFORMATDESCRIPTOR *pfd)
 	hglrc = fb_wgl.CreateContext(hdc);
 	fb_wgl.MakeCurrent(hdc, hglrc);
 	
-	fb_wgl.GetProcAddress = (WGLGETPROCADDRESS)GetProcAddress(library, "wglGetProcAddress");
-	fb_wgl.GetExtensionStringARB = (WGLGETEXTENSIONSTRINGARB)fb_wgl.GetProcAddress("wglGetExtensionsStringARB");
+	fb_wgl.GetProcAddress = NULL;
+	if (fb_hWin32LoadProcedure(library, "wglGetProcAddress",
+	                           (void *)&fb_wgl.GetProcAddress,
+	                           sizeof(fb_wgl.GetProcAddress)) != 0) {
+		res = -1;
+		goto cleanup;
+	}
+	fb_wgl.ChoosePixelFormatARB = NULL;
+	fb_wgl.GetExtensionStringARB = NULL;
+	procedure = fb_wgl.GetProcAddress("wglGetExtensionsStringARB");
+	fb_hWin32CopyProcedure((void *)&fb_wgl.GetExtensionStringARB,
+	                       sizeof(fb_wgl.GetExtensionStringARB),
+	                       (const void *)&procedure, sizeof(procedure));
 	if (!fb_wgl.GetExtensionStringARB){
-		fb_wgl.GetExtensionStringARB = (WGLGETEXTENSIONSTRINGARB)fb_wgl.GetProcAddress("wglGetExtensionsStringEXT");
+		procedure = fb_wgl.GetProcAddress("wglGetExtensionsStringEXT");
+		fb_hWin32CopyProcedure((void *)&fb_wgl.GetExtensionStringARB,
+		                       sizeof(fb_wgl.GetExtensionStringARB),
+		                       (const void *)&procedure, sizeof(procedure));
 	}
 	if (fb_wgl.GetExtensionStringARB){
 		wgl_extensions = fb_wgl.GetExtensionStringARB(hdc);
@@ -154,10 +170,14 @@ static int GL_init(PIXELFORMATDESCRIPTOR *pfd)
 	res = fb_hGL_Init(library, wgl_extensions);
 	if (res == 0) {
 		if (fb_hGL_ExtensionSupported("WGL_ARB_pixel_format\n")){
-			fb_wgl.ChoosePixelFormatARB = (WGLCHOOSEPIXELFORMATARB)fb_wgl.GetProcAddress("wglChoosePixelFormatARB");
+			procedure = fb_wgl.GetProcAddress("wglChoosePixelFormatARB");
+			fb_hWin32CopyProcedure((void *)&fb_wgl.ChoosePixelFormatARB,
+			                       sizeof(fb_wgl.ChoosePixelFormatARB),
+			                       (const void *)&procedure, sizeof(procedure));
 		}
 	}
 	
+cleanup:
 	fb_wgl.MakeCurrent(NULL, NULL);
 	fb_wgl.DeleteContext(hglrc);
 	ReleaseDC(wnd, hdc);

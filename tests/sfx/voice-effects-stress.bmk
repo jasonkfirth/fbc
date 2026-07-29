@@ -1,0 +1,6 @@
+# TEST_MODE : MULTI_MODULE_OK
+
+MAIN := voice-effects-stress.bas
+COMPILE_AND_LINK := 1
+
+# end of voice-effects-stress.bmk

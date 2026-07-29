@@ -59,6 +59,9 @@ static FBCONDOPS __condops;
 
 static inline void fb_CondInit( void )
 {
+	HMODULE kernel32;
+	FARPROC procedure;
+
 	/* If two threads get here at the same time, make sure only one of
 	   them does the initialization while the other one waits. */
 	FB_MTLOCK();
@@ -72,7 +75,14 @@ static inline void fb_CondInit( void )
 	   win98: pSignalObjectAndWait() returns ERROR_INVALID_FUNCTION
 	   winnt: pSignalObjectAndWait() returns WAIT_FAILED */
 
-	pSignalObjectAndWait = (SIGNALOBJECTANDWAIT)GetProcAddress( GetModuleHandle( "KERNEL32" ), "SignalObjectAndWait" );
+	kernel32 = GetModuleHandle( "KERNEL32" );
+	procedure = NULL;
+	if( kernel32 != NULL )
+		procedure = GetProcAddress( kernel32, "SignalObjectAndWait" );
+	if( (procedure != NULL) &&
+	    (sizeof( pSignalObjectAndWait ) == sizeof( procedure )) )
+		memcpy( (void *)&pSignalObjectAndWait, (const void *)&procedure,
+		        sizeof( pSignalObjectAndWait ) );
 	if( (pSignalObjectAndWait != NULL)
 	    && (pSignalObjectAndWait(NULL, NULL, 0, 0) == WAIT_FAILED) ) {
 		__condops.create    = fb_CondCreate_nt;

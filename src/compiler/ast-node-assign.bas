@@ -208,7 +208,7 @@ private function hCheckConstAndPointerOps _
 	function = FALSE
 
 	'' lhs marked CONST? disallow the assignment then.
-	if( symbCheckConstAssignTopLevel( ldtype, rdtype, l->subtype, r->subtype ) = FALSE ) then
+	if( symbCheckConstAssignTopLevel( ldtype, rdtype ) = FALSE ) then
 		errReport( FB_ERRMSG_ILLEGALASSIGNMENT, TRUE )
 		exit function
 	end if
@@ -482,7 +482,7 @@ private function hTryAssignOvl _
 	) as integer
 
 	dim as FBSYMBOL ptr proc = any
-	dim as FB_ERRMSG err_num = any
+	dim as FB_ERRMSG err_num = FB_ERRMSG_OK
 	dim as integer check_letop = TRUE
 
 	if( options and AST_OPOPT_DONTCHKOPOVL ) then
@@ -543,7 +543,7 @@ private function hTryAssignCastOvl _
 	) as integer
 
 	dim as FBSYMBOL ptr proc = any
-	dim as FB_ERRMSG err_num = any
+	dim as FB_ERRMSG err_num = FB_ERRMSG_OK
 	function = TRUE
 
 	if( options and AST_OPOPT_DONTCHKOPOVL ) then

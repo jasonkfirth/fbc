@@ -13,6 +13,8 @@ FBCALL int fb_GfxEvent(EVENT *event)
 		return FB_FALSE;
 	}
 
+	fb_hApplyPendingResize();
+
 	EVENT_LOCK();
 	if (__fb_gfx->event_head != __fb_gfx->event_tail) {
 		e = &__fb_gfx->event_queue[__fb_gfx->event_head];

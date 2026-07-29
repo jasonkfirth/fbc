@@ -248,6 +248,9 @@ float fb_sfxEnvelopeProcess(FB_SFXVOICE *voice, float dt)
             }
 
             break;
+
+        default:
+            break;
     }
 
     voice->env_level = level;

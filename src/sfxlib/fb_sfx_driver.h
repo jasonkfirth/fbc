@@ -310,6 +310,7 @@ extern const SFXDRIVER *__fb_sfx_drivers_list[];
 */
 
 extern const SFXDRIVER __fb_sfxDriverNull;
+extern const SFXDRIVER fb_sfxDriverNull;
 
 
 

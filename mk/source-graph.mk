@@ -75,6 +75,13 @@ ifeq ($(TARGET_ARCH),x86)
 GFXLIB2_DIRS += $(srcdir)/gfxlib2/x86
 endif
 
+GFXLIB3_PLATFORM_OS := android linux win32
+
+GFXLIB3_DIRS := $(srcdir)/gfxlib3
+ifneq ($(filter $(SOURCE_OS),$(GFXLIB3_PLATFORM_OS)),)
+GFXLIB3_DIRS += $(srcdir)/gfxlib3/$(SOURCE_OS)
+endif
+
 SFXLIB_DIRS := $(srcdir)/sfxlib
 ifneq ($(USE_UNIX_LAYER),)
 SFXLIB_DIRS += $(srcdir)/sfxlib/unix
@@ -196,9 +203,31 @@ endif
 
 ifdef DISABLE_OPENGL
 GFX_SRC := $(filter-out \
-$(srcdir)/gfxlib2/darwin/gfx_driver_opengl.c, \
+$(srcdir)/gfxlib2/darwin/gfx_driver_opengl.c \
+$(srcdir)/gfxlib2/haiku/gfx_driver_opengl.cpp \
+$(srcdir)/gfxlib2/haiku/haiku_gl_view.cpp, \
 $(GFX_SRC))
 endif
+
+##############################################################################
+# GFXLIB3 sources
+##############################################################################
+
+# gfxlib3 currently has native Android/EGL, Linux/X11, and Win32/WGL
+# adapters. Target sources override generic stubs with the same basename,
+# matching the source precedence used by gfxlib2, rtlib, and sfxlib.
+GFX3_SRC_GENERIC := $(wildcard $(srcdir)/gfxlib3/*.c)
+GFX3_SRC_TARGET :=
+ifneq ($(filter $(SOURCE_OS),$(GFXLIB3_PLATFORM_OS)),)
+GFX3_SRC_TARGET := $(wildcard $(srcdir)/gfxlib3/$(SOURCE_OS)/*.c)
+endif
+
+GFX3_BASE_TARGET := $(notdir $(GFX3_SRC_TARGET))
+GFX3_SRC_GENERIC := $(filter-out \
+$(addprefix $(srcdir)/gfxlib3/,$(GFX3_BASE_TARGET)), \
+$(GFX3_SRC_GENERIC))
+
+GFX3_SRC := $(GFX3_SRC_TARGET) $(GFX3_SRC_GENERIC)
 
 ##############################################################################
 # SFXLIB sources
@@ -291,6 +320,7 @@ GFX_OBJ := \
 $(patsubst $(srcdir)/gfxlib2/%.c,$(libfbgfxobjdir)/%.o,$(GFX_SRC_C)) \
 $(patsubst $(srcdir)/gfxlib2/%.cpp,$(libfbgfxobjdir)/%.o,$(GFX_SRC_CPP)) \
 $(patsubst $(srcdir)/gfxlib2/%.s,$(libfbgfxobjdir)/%.o,$(GFX_SRC_ASM))
+GFX3_OBJ := $(patsubst $(srcdir)/gfxlib3/%.c,$(libfbgfx3objdir)/%.o,$(GFX3_SRC))
 SFX_SRC_C := $(filter %.c,$(SFX_SRC))
 SFX_SRC_CPP := $(filter %.cpp,$(SFX_SRC))
 SFX_OBJ := \
@@ -310,6 +340,9 @@ FBRT_MT_PIC_OBJ := $(FBRT_OBJ:$(libfbrtobjdir)/%.o=$(libfbrtmtpicobjdir)/%.o)
 GFX_PIC_OBJ := $(GFX_OBJ:$(libfbgfxobjdir)/%.o=$(libfbgfxpicobjdir)/%.o)
 GFX_MT_OBJ := $(GFX_OBJ:$(libfbgfxobjdir)/%.o=$(libfbgfxmtobjdir)/%.o)
 GFX_MT_PIC_OBJ := $(GFX_OBJ:$(libfbgfxobjdir)/%.o=$(libfbgfxmtpicobjdir)/%.o)
+GFX3_PIC_OBJ := $(GFX3_OBJ:$(libfbgfx3objdir)/%.o=$(libfbgfx3picobjdir)/%.o)
+GFX3_MT_OBJ := $(GFX3_OBJ:$(libfbgfx3objdir)/%.o=$(libfbgfx3mtobjdir)/%.o)
+GFX3_MT_PIC_OBJ := $(GFX3_OBJ:$(libfbgfx3objdir)/%.o=$(libfbgfx3mtpicobjdir)/%.o)
 SFX_PIC_OBJ := $(SFX_OBJ:$(libsfxobjdir)/%.o=$(libsfxpicobjdir)/%.o)
 SFX_MT_OBJ := $(SFX_OBJ:$(libsfxobjdir)/%.o=$(libsfxmtobjdir)/%.o)
 SFX_MT_PIC_OBJ := $(SFX_OBJ:$(libsfxobjdir)/%.o=$(libsfxmtpicobjdir)/%.o)
@@ -322,6 +355,7 @@ ALL_RUNTIME_OBJS := \
 $(RTLIB_OBJ) $(RTLIB_PIC_OBJ) $(RTLIB_MT_OBJ) $(RTLIB_MT_PIC_OBJ) \
 $(FBRT_OBJ) $(FBRT_PIC_OBJ) $(FBRT_MT_OBJ) $(FBRT_MT_PIC_OBJ) \
 $(GFX_OBJ) $(GFX_PIC_OBJ) $(GFX_MT_OBJ) $(GFX_MT_PIC_OBJ) \
+$(GFX3_OBJ) $(GFX3_PIC_OBJ) $(GFX3_MT_OBJ) $(GFX3_MT_PIC_OBJ) \
 $(SFX_OBJ) $(SFX_PIC_OBJ) $(SFX_MT_OBJ) $(SFX_MT_PIC_OBJ)
 
 ##############################################################################
@@ -331,6 +365,7 @@ $(SFX_OBJ) $(SFX_PIC_OBJ) $(SFX_MT_OBJ) $(SFX_MT_PIC_OBJ)
 LIBFB_H := $(wildcard $(srcdir)/rtlib/*.h) $(wildcard $(srcdir)/rtlib/*/*.h)
 LIBFBRT_BI := $(wildcard $(srcdir)/fbrt/*.bi)
 LIBFBGFX_H := $(wildcard $(srcdir)/gfxlib2/*.h) $(wildcard $(srcdir)/gfxlib2/*/*.h)
+LIBFBGFX3_H := $(wildcard $(srcdir)/gfxlib3/*.h) $(wildcard $(srcdir)/gfxlib3/*/*.h)
 LIBSFX_H := $(wildcard $(srcdir)/sfxlib/*.h) $(wildcard $(srcdir)/sfxlib/*/*.h)
 
 ##############################################################################

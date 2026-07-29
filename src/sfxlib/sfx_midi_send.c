@@ -83,7 +83,7 @@ int fb_sfxMidiSend(unsigned char status,
     }
 
     fb_sfxRuntimeLock();
-    result = fb_sfxMidiDriverSend(status, data1, data2);
+    result = fb_sfxMidiOutputSend(status, data1, data2);
     fb_sfxRuntimeUnlock();
 
     return result;
@@ -136,7 +136,7 @@ int fb_sfxMidiProgramChange(unsigned char channel,
         return -1;
 
     fb_sfxRuntimeLock();
-    result = fb_sfxMidiDriverSend(status, program, 0);
+    result = fb_sfxMidiOutputSend(status, program, 0);
     fb_sfxRuntimeUnlock();
 
     return result;

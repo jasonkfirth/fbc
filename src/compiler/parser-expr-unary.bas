@@ -304,7 +304,8 @@ end function
 
 '' '(' DataType ',' Expression ')'
 private function hCast( byval options as AST_CONVOPT ) as ASTNODE ptr
-	dim as integer dtype = any, errmsg = any
+	dim as integer dtype = any
+	dim as integer errmsg = FB_ERRMSG_OK
 	dim as FBSYMBOL ptr subtype = any
 	dim as ASTNODE ptr expr = any
 
@@ -689,7 +690,7 @@ private function hVarPtrBody _
 	'' check op overloading
 	scope
 		dim as FBSYMBOL ptr proc = any
-		dim as FB_ERRMSG err_num = any
+		dim as FB_ERRMSG err_num = FB_ERRMSG_OK
 
 		proc = symbFindSelfUopOvlProc( AST_OP_ADDROF, expr, @err_num )
 		if( proc <> NULL ) then

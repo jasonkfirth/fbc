@@ -61,6 +61,22 @@ $(libdir)/libfbgfxmtpic.a: $(GFX_MT_PIC_OBJ) | $(libdir)
 	$(call DO_AR)
 
 ##############################################################################
+# Experimental GPU graphics runtime (gfxlib3)
+##############################################################################
+
+$(libdir)/libfbgfx3.a: $(GFX3_OBJ) | $(libdir)
+	$(call DO_AR)
+
+$(libdir)/libfbgfx3pic.a: $(GFX3_PIC_OBJ) | $(libdir)
+	$(call DO_AR)
+
+$(libdir)/libfbgfx3mt.a: $(GFX3_MT_OBJ) | $(libdir)
+	$(call DO_AR)
+
+$(libdir)/libfbgfx3mtpic.a: $(GFX3_MT_PIC_OBJ) | $(libdir)
+	$(call DO_AR)
+
+##############################################################################
 # Sound runtime (sfxlib)
 ##############################################################################
 

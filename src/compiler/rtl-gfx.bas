@@ -7,6 +7,7 @@
 #include once "ast.bi"
 #include once "lex.bi"
 #include once "rtl.bi"
+#include once "symb.bi"
 
 '' The runtime uses this out-of-range coordinate to select the current Y.
 const FBGFX_CURRENT_Y_SENTINEL = -8388607
@@ -1520,7 +1521,11 @@ private function hPorts_cb _
 end function
 
 private function hGfxlib_cb( byval sym as FBSYMBOL ptr ) as integer
-	env.clopt.fbgfx = TRUE
+	if( symbIsDefineSet( @"__FB_GFXLIB3__" ) ) then
+		env.clopt.fbgfx = FB_GFXLIB_GFX3
+	elseif( env.clopt.fbgfx = FB_GFXLIB_NONE ) then
+		env.clopt.fbgfx = FB_GFXLIB_DEFAULT
+	end if
 	function = TRUE
 end function
 

@@ -54,6 +54,7 @@ clean-all-objects:
 	@rm -rf src/rtlib/obj
 	@rm -rf src/fbrt/obj
 	@rm -rf src/gfxlib2/obj
+	@rm -rf src/gfxlib3/obj
 	@rm -rf src/sfxlib/obj
 
 
@@ -76,6 +77,11 @@ clean-libs:
 	@if [ -n "$(libfbgfxpicobjdir)" ]; then rm -rf "$(libfbgfxpicobjdir)"; fi
 	@if [ -n "$(libfbgfxmtobjdir)" ]; then rm -rf "$(libfbgfxmtobjdir)"; fi
 	@if [ -n "$(libfbgfxmtpicobjdir)" ]; then rm -rf "$(libfbgfxmtpicobjdir)"; fi
+
+	@if [ -n "$(libfbgfx3objdir)" ]; then rm -rf "$(libfbgfx3objdir)"; fi
+	@if [ -n "$(libfbgfx3picobjdir)" ]; then rm -rf "$(libfbgfx3picobjdir)"; fi
+	@if [ -n "$(libfbgfx3mtobjdir)" ]; then rm -rf "$(libfbgfx3mtobjdir)"; fi
+	@if [ -n "$(libfbgfx3mtpicobjdir)" ]; then rm -rf "$(libfbgfx3mtpicobjdir)"; fi
 
 	@if [ -n "$(libsfxobjdir)" ]; then rm -rf "$(libsfxobjdir)"; fi
 	@if [ -n "$(libsfxpicobjdir)" ]; then rm -rf "$(libsfxpicobjdir)"; fi

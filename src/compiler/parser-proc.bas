@@ -742,6 +742,8 @@ private sub hCheckAttrib _
 
 end sub
 
+'' Operator parameter validation is a closed table of language signatures.
+''
 private function hCheckOpOvlParams _
 	( _
 		byval parent as FBSYMBOL ptr, _
@@ -1158,42 +1160,16 @@ private sub hSetUdtPropertyFlags _
 
 end sub
 
-'' ProcHeader  =
-''    ParentID? (ID|Operator)? CallConvention? OVERLOAD? (ALIAS LIT_STRING)?
-''    Parameters? BYREF? (AS SymbolType)?
-''    (CONSTRUCTOR|DESTRUCTOR)? Priority? STATIC? EXPORT?
-function cProcHeader _
+private function hResolveProcParent _
 	( _
-		byval attrib as FB_SYMBATTRIB, _
-		byval pattrib as FB_PROCATTRIB, _
-		byref is_nested as integer, _
+		byval tk as integer, _
 		byval options as FB_PROCOPT, _
-		byval tk as integer _
-	) as FBSYMBOL ptr
-
-	#define CREATEFAKE( ) _
-		symbAddProc( proc, symbUniqueLabel( ), NULL, dtype, subtype, _
-				attrib, pattrib, mode, FB_SYMBOPT_DECLARING )
-
-	static as zstring * FB_MAXNAMELEN+1 id
-	dim as zstring ptr palias = any
-	dim as FBSYMBOL ptr head_proc = any, proc = any, parent = any, subtype = any
-	dim as FBSYMBOL ptr param = any
-	dim as integer dtype = any, is_outside = any, is_memberproc = any
-	dim as integer mode = any, stats = any, op = any, is_get = any, is_indexed = any
-	dim as integer priority = any, idopt = any
-	dim as integer mode_is_explicit = any
-
-	is_nested = FALSE
-	is_outside = FALSE
-	is_memberproc = FALSE
-	is_get = FALSE
-	is_indexed = FALSE
-	dtype = FB_DATATYPE_INVALID
-	subtype = NULL
-	stats = 0
-	priority = 0
-	mode_is_explicit = FALSE
+		byref attrib as FB_SYMBATTRIB, _
+		byref pattrib as FB_PROCATTRIB, _
+		byref parent as FBSYMBOL ptr, _
+		byref is_outside as integer, _
+		byref is_memberproc as integer _
+	) as integer
 
 	select case( tk )
 	case FB_TK_CONSTRUCTOR, FB_TK_DESTRUCTOR
@@ -1218,7 +1194,6 @@ function cProcHeader _
 		'' Properties are always methods and overloaded
 		pattrib or= FB_PROCATTRIB_PROPERTY or FB_PROCATTRIB_METHOD or _
 		           FB_PROCATTRIB_OVERLOADED
-
 	end select
 
 	'' Parent UDT/namespace ID (if allowed)
@@ -1228,7 +1203,7 @@ function cProcHeader _
 		parent = NULL
 	else
 		'' Parent/namespace ID
-		idopt = FB_IDOPT_ISDECL or FB_IDOPT_SHOWERROR or FB_IDOPT_ALLOWSTRUCT
+		dim as integer idopt = FB_IDOPT_ISDECL or FB_IDOPT_SHOWERROR or FB_IDOPT_ALLOWSTRUCT
 		select case( tk )
 		case FB_TK_OPERATOR
 			idopt or= FB_IDOPT_ALLOWOPERATOR
@@ -1238,7 +1213,7 @@ function cProcHeader _
 		'' don't check access if we are defining the procedure
 		'' (which must be done outside of the TYPE declaration)
 		if( (options and FB_PROCOPT_ISPROTO) = 0 ) then
-			idopt or= idopt or FB_IDOPT_ISDEFN
+			idopt or= FB_IDOPT_ISDEFN
 		end if
 		parent = cParentId( idopt )
 	end if
@@ -1299,7 +1274,7 @@ function cProcHeader _
 				hSkipCompound( tk )
 			end if
 
-			exit function
+			return FALSE
 		end select
 
 		'' Check whether STATIC, CONST, ABSTRACT and VIRTUAL were used correctly
@@ -1309,10 +1284,26 @@ function cProcHeader _
 		hCheckAttrib( pattrib, FB_PROCATTRIB_VIRTUAL , FB_ERRMSG_VIRTUALNONMEMBERPROC  )
 	end if
 
+	function = TRUE
+end function
+
+private function hPreAddHeaderProc _
+	( _
+		byval tk as integer, _
+		byval parent as FBSYMBOL ptr, _
+		byval is_memberproc as integer, _
+		byval id as zstring ptr, _
+		byref head_proc as FBSYMBOL ptr, _
+		byref attrib as FB_SYMBATTRIB, _
+		byref pattrib as FB_PROCATTRIB, _
+		byref dtype as integer, _
+		byref op as integer _
+	) as FBSYMBOL ptr
+
 	select case( tk )
 	case FB_TK_CONSTRUCTOR, FB_TK_DESTRUCTOR
 		'' Ctors/dtors don't have an ID on their own
-		proc = symbPreAddProc( NULL )
+		function = symbPreAddProc( NULL )
 
 	case FB_TK_OPERATOR
 		'' Operator (instead of an ID)
@@ -1347,7 +1338,6 @@ function cProcHeader _
 
 			'' These ops are made STATIC implicitly, and they can't
 			'' be CONST/VIRTUAL/ABSTRACT
-
 			if( pattrib and (FB_PROCATTRIB_VIRTUAL or FB_PROCATTRIB_ABSTRACT) ) then
 				errReport( FB_ERRMSG_OPERATORCANTBEVIRTUAL, TRUE )
 				pattrib and= not (FB_PROCATTRIB_VIRTUAL or FB_PROCATTRIB_ABSTRACT)
@@ -1372,11 +1362,11 @@ function cProcHeader _
 			end if
 		end select
 
-		proc = symbPreAddProc( NULL )
+		function = symbPreAddProc( NULL )
 
 	case else
 		'' Procedure/property ID
-		head_proc = hGetId( parent, @id, @dtype, _
+		head_proc = hGetId( parent, id, @dtype, _
 				(tk = FB_TK_SUB) or (tk = FB_TK_PROPERTY) )
 
 		if( fbLangOptIsSet( FB_LANG_OPT_SUFFIX ) ) then
@@ -1385,8 +1375,21 @@ function cProcHeader _
 			end if
 		end if
 
-		proc = symbPreAddProc( @id )
+		function = symbPreAddProc( id )
 	end select
+end function
+
+private sub hParseProcHeaderAttributes _
+	( _
+		byval tk as integer, _
+		byval options as FB_PROCOPT, _
+		byval is_memberproc as integer, _
+		byval attrib as FB_SYMBATTRIB, _
+		byref pattrib as FB_PROCATTRIB, _
+		byref mode as integer, _
+		byref mode_is_explicit as integer, _
+		byref palias as zstring ptr _
+	)
 
 	'' [NAKED]
 	cNakedAttribute( pattrib )
@@ -1435,32 +1438,24 @@ function cProcHeader _
 
 	'' [ALIAS "id"]
 	palias = cAliasAttribute( )
+end sub
 
-	'' If this is a proc body (not a proto), then we'll open a new scope
-	'' with astProcBegin(), and additionally we may have to re-open the
-	'' proc's namespace, in case it's being declared outside the original
-	'' namespace where we found the prototype.
-	''
-	'' This ensures the proc and code in it behaves as if it was written
-	'' in the original namespace to begin with. For example, it must be
-	'' possible to access symbols from that namespace without using the
-	'' namespace prefix explicitly, even if the body is written outside
-	'' the namespace block that contains the prototype.
-	''
-	'' Note: Even parameter initializers are affected, thus this must be
-	'' done even before parsing the parameter list.
-	if( ((options and FB_PROCOPT_ISPROTO) = 0) and (parent <> NULL) ) then
-		if( parent <> symbGetCurrentNamespc( ) ) then
-			symbNestBegin( parent, TRUE )
-			is_nested = TRUE
-		end if
-	end if
-
-	proc->attrib = attrib
-	proc->pattrib = pattrib
-
-	'' Parameters?
-	cParameters( parent, proc, mode, ((options and FB_PROCOPT_ISPROTO) <> 0) )
+private function hFinishProcHeaderSignature _
+	( _
+		byval tk as integer, _
+		byval parent as FBSYMBOL ptr, _
+		byval proc as FBSYMBOL ptr, _
+		byval options as FB_PROCOPT, _
+		byval is_memberproc as integer, _
+		byval id as zstring ptr, _
+		byref attrib as FB_SYMBATTRIB, _
+		byref pattrib as FB_PROCATTRIB, _
+		byref dtype as integer, _
+		byref subtype as FBSYMBOL ptr, _
+		byref op as integer, _
+		byref is_get as integer, _
+		byref is_indexed as integer _
+	) as integer
 
 	select case( tk )
 	case FB_TK_DESTRUCTOR
@@ -1475,14 +1470,14 @@ function cProcHeader _
 		'' ctor can't take a byval arg of its own type as only non-optional arg
 		if( hCheckIsSelfCloneByval( parent, proc, options ) ) then
 			errReport( FB_ERRMSG_CLONECANTTAKESELFBYVAL, TRUE )
-			exit function
+			return FALSE
 		end if
 
 		'' vararg?
 		if( symbGetParamMode( symbGetProcTailParam( proc ) ) = FB_PARAMMODE_VARARG ) then
 			hParamError( proc, 0, FB_ERRMSG_VARARGPARAMNOTALLOWED )
 			'' error recovery: remove the param
-			param = symbGetProcTailParam( proc )
+			dim as FBSYMBOL ptr param = symbGetProcTailParam( proc )
 			symbGetProcTailParam( proc ) = param->prev
 			if( param->prev <> NULL ) then
 				param->prev->next = NULL
@@ -1512,7 +1507,6 @@ function cProcHeader _
 			if( symbGetProcParams( proc ) = 1 ) then
 				op = AST_OP_DEREF
 			end if
-
 		end select
 
 		'' self? (but type casting)
@@ -1535,20 +1529,19 @@ function cProcHeader _
 
 		symbGetFullType( proc ) = dtype
 		symbGetSubtype( proc ) = subtype
-
 		symbSetProcOpOvl( proc, op )
 
 		'' operator LET can't take a byval arg of its own type
 		if( op = AST_OP_ASSIGN ) then
 			if( hCheckIsSelfCloneByval( parent, proc, options ) ) then
 				errReport( FB_ERRMSG_CLONECANTTAKESELFBYVAL, TRUE )
-				exit function
+				return FALSE
 			end if
 		end if
 
 		'' Check param/result types
 		if( hCheckOpOvlParams( parent, op, proc ) = FALSE ) then
-			exit function
+			return FALSE
 		end if
 
 	case FB_TK_PROPERTY
@@ -1613,63 +1606,172 @@ function cProcHeader _
 				dtype = FB_DATATYPE_VOID
 			end if
 		end if
-
 	end select
+
+	function = TRUE
+end function
+
+private function hAddProcPrototype _
+	( _
+		byval tk as integer, _
+		byval parent as FBSYMBOL ptr, _
+		byval head_proc as FBSYMBOL ptr, _
+		byval parsed_proc as FBSYMBOL ptr, _
+		byval id as zstring ptr, _
+		byval palias as zstring ptr, _
+		byval attrib as FB_SYMBATTRIB, _
+		byval pattrib as FB_PROCATTRIB, _
+		byval mode as integer, _
+		byval op as integer, _
+		byval dtype as integer, _
+		byval subtype as FBSYMBOL ptr, _
+		byval options as FB_PROCOPT, _
+		byval is_get as integer, _
+		byval is_indexed as integer _
+	) as FBSYMBOL ptr
+
+	dim as FBSYMBOL ptr proc = any
+
+	select case( tk )
+	case FB_TK_CONSTRUCTOR, FB_TK_DESTRUCTOR
+		proc = symbAddCtor( parsed_proc, palias, attrib, pattrib, mode )
+	case FB_TK_OPERATOR
+		proc = symbAddOperator( parsed_proc, op, palias, dtype, subtype, attrib, pattrib, mode )
+	case else
+		proc = symbAddProc( parsed_proc, id, palias, dtype, subtype, attrib, pattrib, mode, FB_SYMBOPT_NONE )
+	end select
+
+	if( proc = NULL ) then
+		select case( tk )
+		case FB_TK_SUB, FB_TK_FUNCTION, FB_TK_PROPERTY
+			proc = hFindDuplicatePrototype( head_proc, parsed_proc, palias, dtype, subtype, _
+			                                pattrib, mode, is_get )
+		end select
+	end if
+
+	if( proc = NULL ) then
+		errReport( FB_ERRMSG_DUPDEFINITION )
+		return NULL
+	end if
+
+	'' OVERRIDE?
+	'' - Only allowed inside the TYPE compound, since it's a
+	''   compile-time check in the inheritance hierarchy, and does
+	''   not affect the method at all
+	'' - Not allowed on ctors, since they cannot be VIRTUAL
+	if( ((options and FB_PROCOPT_HASPARENT) <> 0) and _
+	    (tk <> FB_TK_CONSTRUCTOR) ) then
+		cOverrideAttribute( proc )
+	end if
+
+	'' destructor? maybe implicitly declare the deleting destructor too
+	if( tk = FB_TK_DESTRUCTOR ) then
+		'' fbc won't generate any code that calls the deleting destructor
+		'' so don't create the deleting destructor unless we're binding to c++
+		if( symbGetMangling( parent ) = FB_MANGLING_CPP ) then
+			'' - inherit all the attribs from the declared destructor
+			''   except for the destructor type
+			dim dtor0 as FBSYMBOL ptr = symbPreAddProc( NULL )
+			symbAddProcInstanceParam( parent, dtor0 )
+			dtor0 = symbAddCtor( dtor0, NULL, attrib, _
+			                    ((pattrib and not FB_PROCATTRIB_DESTRUCTOR1) or _
+			                    FB_PROCATTRIB_DESTRUCTOR0), mode )
+		end if
+	end if
+
+	if( tk = FB_TK_PROPERTY ) then
+		hSetUdtPropertyFlags( parent, is_indexed, is_get )
+	end if
+
+	function = proc
+end function
+
+'' ProcHeader  =
+''    ParentID? (ID|Operator)? CallConvention? OVERLOAD? (ALIAS LIT_STRING)?
+''    Parameters? BYREF? (AS SymbolType)?
+''    (CONSTRUCTOR|DESTRUCTOR)? Priority? STATIC? EXPORT?
+'' Procedure headers share parsing, symbol lookup, and recovery state throughout.
+''
+function cProcHeader _
+	( _
+		byval attrib as FB_SYMBATTRIB, _
+		byval pattrib as FB_PROCATTRIB, _
+		byref is_nested as integer, _
+		byval options as FB_PROCOPT, _
+		byval tk as integer _
+	) as FBSYMBOL ptr
+
+	#define CREATEFAKE( ) _
+		symbAddProc( proc, symbUniqueLabel( ), NULL, dtype, subtype, _
+				attrib, pattrib, mode, FB_SYMBOPT_DECLARING )
+
+	static as zstring * FB_MAXNAMELEN+1 id
+	dim as zstring ptr palias = any
+	dim as FBSYMBOL ptr head_proc = any, proc = any, parent = any, subtype = any
+	dim as integer dtype = any, is_outside = any, is_memberproc = any
+	dim as integer mode = any, stats = any, op = any, is_get = any, is_indexed = any
+	dim as integer priority = any
+	dim as integer mode_is_explicit = any
+
+	is_nested = FALSE
+	is_outside = FALSE
+	is_memberproc = FALSE
+	is_get = FALSE
+	is_indexed = FALSE
+	dtype = FB_DATATYPE_INVALID
+	subtype = NULL
+	stats = 0
+	priority = 0
+	mode_is_explicit = FALSE
+
+	if( hResolveProcParent( tk, options, attrib, pattrib, parent, _
+	                       is_outside, is_memberproc ) = FALSE ) then
+		exit function
+	end if
+
+	proc = hPreAddHeaderProc( tk, parent, is_memberproc, @id, head_proc, _
+	                          attrib, pattrib, dtype, op )
+
+	hParseProcHeaderAttributes( tk, options, is_memberproc, attrib, pattrib, _
+	                            mode, mode_is_explicit, palias )
+
+	'' If this is a proc body (not a proto), then we'll open a new scope
+	'' with astProcBegin(), and additionally we may have to re-open the
+	'' proc's namespace, in case it's being declared outside the original
+	'' namespace where we found the prototype.
+	''
+	'' This ensures the proc and code in it behaves as if it was written
+	'' in the original namespace to begin with. For example, it must be
+	'' possible to access symbols from that namespace without using the
+	'' namespace prefix explicitly, even if the body is written outside
+	'' the namespace block that contains the prototype.
+	''
+	'' Note: Even parameter initializers are affected, thus this must be
+	'' done even before parsing the parameter list.
+	if( ((options and FB_PROCOPT_ISPROTO) = 0) and (parent <> NULL) ) then
+		if( parent <> symbGetCurrentNamespc( ) ) then
+			symbNestBegin( parent, TRUE )
+			is_nested = TRUE
+		end if
+	end if
+
+	proc->attrib = attrib
+	proc->pattrib = pattrib
+
+	'' Parameters?
+	cParameters( parent, proc, mode, ((options and FB_PROCOPT_ISPROTO) <> 0) )
+
+	if( hFinishProcHeaderSignature( tk, parent, proc, options, is_memberproc, _
+	                               @id, attrib, pattrib, dtype, subtype, op, _
+	                               is_get, is_indexed ) = FALSE ) then
+		exit function
+	end if
 
 	'' Prototype?
 	if( options and FB_PROCOPT_ISPROTO ) then
-		dim as FBSYMBOL ptr parsed_proc = proc
-
-		select case( tk )
-		case FB_TK_CONSTRUCTOR, FB_TK_DESTRUCTOR
-			proc = symbAddCtor( proc, palias, attrib, pattrib, mode )
-		case FB_TK_OPERATOR
-			proc = symbAddOperator( proc, op, palias, dtype, subtype, attrib, pattrib, mode )
-		case else
-			proc = symbAddProc( proc, @id, palias, dtype, subtype, attrib, pattrib, mode, FB_SYMBOPT_NONE )
-		end select
-
-		if( proc = NULL ) then
-			select case( tk )
-			case FB_TK_SUB, FB_TK_FUNCTION, FB_TK_PROPERTY
-				proc = hFindDuplicatePrototype( head_proc, parsed_proc, palias, dtype, subtype, _
-				                                 pattrib, mode, is_get )
-			end select
-		end if
-
-		if( proc = NULL ) then
-			errReport( FB_ERRMSG_DUPDEFINITION )
-			exit function
-		end if
-
-		'' OVERRIDE?
-		'' - Only allowed inside the TYPE compound, since it's a
-		''   compile-time check in the inheritance hierarchy, and does
-		''   not affect the method at all
-		'' - Not allowed on ctors, since they cannot be VIRTUAL
-		if( ((options and FB_PROCOPT_HASPARENT) <> 0) and _
-		    (tk <> FB_TK_CONSTRUCTOR) ) then
-			cOverrideAttribute( proc )
-		end if
-
-		'' destructor? maybe implicitly declare the deleting destructor too
-		if( tk = FB_TK_DESTRUCTOR ) then
-			'' fbc won't generate any code that calls the deleting destructor
-			'' so don't create the deleting destructor unless we're binding to c++
-			if( symbGetMangling( parent ) = FB_MANGLING_CPP ) then
-				'' - inherit all the attribs from the declared destructor
-				''   except for the destructor type
-				dim dtor0 as FBSYMBOL ptr = symbPreAddProc( NULL )
-				symbAddProcInstanceParam( parent, dtor0 )
-				dtor0 = symbAddCtor( dtor0, NULL, attrib, ((pattrib and not FB_PROCATTRIB_DESTRUCTOR1) or FB_PROCATTRIB_DESTRUCTOR0), mode )
-			end if
-		end if
-
-		if( tk = FB_TK_PROPERTY ) then
-			hSetUdtPropertyFlags( parent, is_indexed, is_get )
-		end if
-
-		return proc
+		return hAddProcPrototype( tk, parent, head_proc, proc, @id, palias, _
+		                          attrib, pattrib, mode, op, dtype, subtype, _
+		                          options, is_get, is_indexed )
 	end if
 
 	''

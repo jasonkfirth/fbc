@@ -75,6 +75,14 @@ typedef struct FB_SFX_WIN32_STATE
 
 extern FB_SFX_WIN32_STATE fb_sfx_win32;
 
+/*
+    Driver objects
+
+    The WASAPI driver list uses WinMM as its compatibility fallback.
+*/
+
+extern const FB_SFX_DRIVER fb_sfxDriverWinMM;
+
 
 /* ------------------------------------------------------------------------- */
 /* Driver lifecycle                                                          */

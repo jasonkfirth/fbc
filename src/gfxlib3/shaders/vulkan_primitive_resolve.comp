@@ -1,0 +1,75 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_primitive_resolve.comp
+
+    Purpose:
+
+        Resolve one mixed primitive winner buffer into its Vulkan destination
+        surface.
+
+    Responsibilities:
+
+        - write the selected command colour once per destination pixel
+        - preserve the destination where no command in this batch reached it
+        - apply the logical surface colour mask
+
+    This file intentionally does NOT contain:
+
+        - primitive coverage calculations
+        - alpha blending or destination-dependent operations
+        - host-side buffer ownership
+*/
+
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) buffer SurfacePixels
+{
+	uint pixels[];
+} surface_pixels;
+
+layout(set = 0, binding = 1, std430) readonly buffer WinnerPixels
+{
+	uint pixels[];
+} winner_pixels;
+
+struct PrimitiveCommand
+{
+	ivec4 geometry;
+	ivec4 clip;
+	uvec4 parameters;
+	uvec4 format;
+	uvec4 batch;
+};
+
+layout(set = 0, binding = 2, std430) readonly buffer PrimitiveCommands
+{
+	PrimitiveCommand commands[];
+} primitive_commands;
+
+void main(void)
+{
+	PrimitiveCommand first = primitive_commands.commands[0];
+	uvec2 position = gl_GlobalInvocationID.xy + first.batch.yz;
+	uint offset;
+	uint winner;
+	uint order;
+
+	if ((position.x >= first.format.x) || (position.y >= first.format.y))
+		return;
+	offset = position.y * first.format.x + position.x;
+	winner = winner_pixels.pixels[offset];
+	if ((winner >> 13u) != first.batch.x)
+		return;
+	order = winner & 0x1FFFu;
+	if (order == 0u)
+		return;
+	surface_pixels.pixels[offset] =
+		primitive_commands.commands[order - 1u].parameters.x &
+		first.format.z;
+}
+
+/* end of vulkan_primitive_resolve.comp */

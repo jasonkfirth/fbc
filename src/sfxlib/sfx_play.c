@@ -290,9 +290,10 @@ static float fb_sfxPlayArticulationScale(const FB_SFX_PLAYSTATE *st)
 
         case FB_SFX_PLAY_MODE_STACCATO:
             return 0.75f;
-    }
 
-    return 0.875f;
+        default:
+            return 0.875f;
+    }
 }
 
 static void fb_sfxPlayQueueTone(FB_SFX_PLAYSTATE *st,
@@ -399,9 +400,10 @@ static int fb_sfxPlayNoteIndex(char note)
         case 'G': return 7;
         case 'A': return 9;
         case 'B': return 11;
-    }
 
-    return -1;
+        default:
+            return -1;
+    }
 }
 
 
@@ -813,6 +815,9 @@ static int fb_sfxPlayStringImpl(int channel, const char *str, int default_foregr
                 case 'S':
                     st.articulation = FB_SFX_PLAY_MODE_STACCATO;
                     p++;
+                    break;
+
+                default:
                     break;
             }
 

@@ -24,12 +24,17 @@
 
 #include once "sfxlib_raw.bi"
 
-const SAMPLE_RATE = 44100
-const FRAMES = SAMPLE_RATE \ 2
 const FREQUENCY = 440.0
 const PI_VALUE = 3.14159265358979323846
 
-dim samples( 0 to FRAMES - 1 ) as single
+dim as long sample_rate = sfxlib.RawOpen()
+if( sample_rate <= 0 ) then
+	print "Raw output initialization failed."
+	end 1
+end if
+
+dim as long frames = sample_rate \ 2
+redim samples( 0 to frames - 1 ) as single
 dim as long frame_index
 dim as long written
 
@@ -39,14 +44,14 @@ print "SFXLIB RAW WRITE"
 print "========================================"
 print "Writing a short generated sine wave through sfxlib_raw.bi."
 
-for frame_index = 0 to FRAMES - 1
-	dim as double phase = (2.0 * PI_VALUE * FREQUENCY * frame_index) / SAMPLE_RATE
+for frame_index = 0 to frames - 1
+	dim as double phase = (2.0 * PI_VALUE * FREQUENCY * frame_index) / sample_rate
 	samples(frame_index) = csng(sin( phase ) * 0.25)
 next
 
 frame_index = 0
-while( frame_index < FRAMES )
-	written = sfxlib.RawWrite( @samples(frame_index), FRAMES - frame_index, 1 )
+while( frame_index < frames )
+	written = sfxlib.RawWrite( @samples(frame_index), frames - frame_index, 1 )
 
 	if( written < 0 ) then
 		print "RawWrite failed."
@@ -61,6 +66,7 @@ while( frame_index < FRAMES )
 wend
 
 sleep 700, 1
+sfxlib.RawClose()
 
 print "Done."
 

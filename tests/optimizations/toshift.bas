@@ -15,6 +15,12 @@ SUITE( fbc_tests.optimizations.toshift )
 
 	dim shared as integer div2 = 2
 	dim shared as integer div4 = 4
+	dim shared as integer dividend_calls
+
+	private function getNegativeDividend( ) as integer
+		dividend_calls += 1
+		return -7
+	end function
 
 	TEST( positive )
 		b   = 7
@@ -144,6 +150,16 @@ SUITE( fbc_tests.optimizations.toshift )
 	#else
 		CU_ASSERT_EQUAL( ui  \ div4,  &h3FFFFFFE )
 	#endif
+	END_TEST
+
+	TEST( signedDividendSideEffects )
+		dividend_calls = 0
+		CU_ASSERT_EQUAL( getNegativeDividend( ) \ 2, -3 )
+		CU_ASSERT_EQUAL( dividend_calls, 1 )
+
+		dividend_calls = 0
+		CU_ASSERT_EQUAL( getNegativeDividend( ) \ 4, -1 )
+		CU_ASSERT_EQUAL( dividend_calls, 1 )
 	END_TEST
 
 END_SUITE

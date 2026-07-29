@@ -556,8 +556,12 @@ sub astCheckConst _
 	''    dim a as uinteger = -1
 	''    dim b as uinteger = 1 shl 31
 	''
-	'' TODO: handle bitfields
+	'' TODO: Extend this check so bitfield assignments can be validated
+	'' against the declared field width instead of only the container type.
+	'' That requires passing bitfield metadata through the conversion path.
 	''
+	'' Bitfield assignments are range-masked by astSetBitfield(). This
+	'' routine receives only a datatype, so it checks scalar conversions.
 
 	select case as const( typeGetDtAndPtrOnly( dtype ) )
 	''case FB_DATATYPE_DOUBLE
@@ -596,8 +600,6 @@ sub astCheckConst _
 		result = (lval = 0) or (lval = 1) or (lval = -1)
 
 	case else
-		'' TODO: bitfields
-
 		select case as const( typeGetSizeType( dtype ) )
 		case FB_SIZETYPE_INT8, FB_SIZETYPE_UINT8
 			'' A byte-sized constant must fit either signed or unsigned 8-bit range.

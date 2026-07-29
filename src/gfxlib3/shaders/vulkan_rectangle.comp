@@ -1,0 +1,127 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_rectangle.comp
+
+    Purpose:
+
+        Rasterize a styled FreeBASIC rectangle outline directly into a
+        device-local Vulkan surface buffer.
+
+    Responsibilities:
+
+        - preserve gfxlib2's continuous style phase around the perimeter
+        - clip writes without changing the original perimeter index
+        - apply the destination surface's logical color mask
+
+    This file intentionally does NOT contain:
+
+        - filled rectangles, which use the GPU clear path
+        - lines, ellipses, or presentation behavior
+        - host-side rectangle validation
+*/
+
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) buffer SurfacePixels
+{
+	uint pixels[];
+} surface_pixels;
+
+struct RectangleCommand
+{
+	ivec4 box;
+	ivec4 clip;
+	uvec4 dimensions; /* surface width, box width, box height, point count */
+	uvec4 parameters; /* color, style, logical color mask, reserved */
+};
+
+/*
+	The y workgroup selects one command. A single rectangle still dispatches
+	one row, while a same-colour filled batch lets every shader unit own pixels
+	from a different BASIC rectangle without requiring one host fill per row.
+*/
+layout(set = 0, binding = 1, std430) readonly buffer RectangleCommands
+{
+	RectangleCommand commands[];
+} rectangle_commands;
+
+uint alpha_primitive(uint source, uint destination)
+{
+	uint alpha = source >> 24;
+	uint source_red_blue = source & 0x00FF00FFu;
+	uint source_green = source & 0x0000FF00u;
+	uint destination_red_blue = destination & 0x00FF00FFu;
+	uint destination_green = destination & 0x0000FF00u;
+
+	source_red_blue = ((source_red_blue - destination_red_blue) * alpha) >> 8;
+	source_green = ((source_green - destination_green) * alpha) >> 8;
+	return ((destination_red_blue + source_red_blue) & 0x00FF00FFu) |
+		((destination_green + source_green) & 0x0000FF00u) |
+		(source & 0xFF000000u);
+}
+
+void write_pixel(RectangleCommand rectangle_command, uint offset)
+{
+	uint source = rectangle_command.parameters.x &
+		rectangle_command.parameters.z;
+	if ((rectangle_command.parameters.w & 1u) == 0u) {
+		surface_pixels.pixels[offset] = source;
+		return;
+	}
+	uint expected = surface_pixels.pixels[offset];
+	for (;;) {
+		uint prior = expected;
+		expected = atomicCompSwap(surface_pixels.pixels[offset], prior,
+			alpha_primitive(source, prior));
+		if (expected == prior)
+			return;
+	}
+}
+
+void main(void)
+{
+	uint index = gl_GlobalInvocationID.x;
+	RectangleCommand rectangle_command = rectangle_commands.commands[
+		gl_GlobalInvocationID.y];
+	uvec4 dimensions = rectangle_command.dimensions;
+	ivec2 position;
+	uint style_bit;
+	bool filled = (rectangle_command.parameters.w & 0x80000000u) != 0u;
+
+	if (index >= dimensions.w)
+		return;
+	if (filled) {
+		position = ivec2(rectangle_command.box.x +
+			int(index % dimensions.y), rectangle_command.box.y +
+			int(index / dimensions.y));
+	} else if (index < dimensions.y) {
+		position = ivec2(rectangle_command.box.x + int(index),
+			rectangle_command.box.w);
+	} else if (index < (dimensions.y * 2u)) {
+		position = ivec2(rectangle_command.box.x +
+			int(index - dimensions.y), rectangle_command.box.y);
+	} else if (index < ((dimensions.y * 2u) + dimensions.z)) {
+		position = ivec2(rectangle_command.box.z,
+			rectangle_command.box.y +
+			int(index - (dimensions.y * 2u)));
+	} else {
+		position = ivec2(rectangle_command.box.x,
+			rectangle_command.box.y +
+			int(index - (dimensions.y * 2u) - dimensions.z));
+	}
+	if ((position.x < rectangle_command.clip.x) ||
+	    (position.y < rectangle_command.clip.y) ||
+	    (position.x > rectangle_command.clip.z) ||
+	    (position.y > rectangle_command.clip.w))
+		return;
+	style_bit = 0x8000u >> (index & 15u);
+	if (filled || ((rectangle_command.parameters.y & style_bit) != 0u))
+		write_pixel(rectangle_command,
+			(uint(position.y) * dimensions.x) + uint(position.x));
+}
+
+/* end of vulkan_rectangle.comp */

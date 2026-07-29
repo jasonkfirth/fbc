@@ -33,12 +33,68 @@ namespace sfxlib
 	extern "C"
 
 	''
+	'' RawOpen()
+	''
+	'' Starts an exclusive caller-clocked raw stream, discards previously
+	'' queued output, and returns the active device sample rate. Callers must
+	'' generate frames at this rate. A negative result indicates that the
+	'' output device could not be initialized.
+	''
+	declare function RawOpen cdecl alias "fb_sfxRawOpen" _
+		( _
+		) as long
+
+	''
+	'' RawClose()
+	''
+	'' Stops raw streaming and discards frames that have not reached the
+	'' platform driver. Ordinary sfxlib mixer commands may resume afterward.
+	''
+	declare sub RawClose cdecl alias "fb_sfxRawClose" _
+		( _
+		)
+
+	''
+	'' RawUnderruns()
+	''
+	'' Returns the number of device-side starvation events observed by the
+	'' active driver since it was selected. A submitted capture can look valid
+	'' even when the hardware ran out of queued frames between writes.
+	''
+	declare function RawUnderruns cdecl alias "fb_sfxRawUnderruns" _
+		( _
+		) as ulongint
+
+	''
+	'' OutputUnderruns()
+	''
+	'' Returns device starvation events for either the ordinary mixer or a raw
+	'' stream. Stream handoffs are excluded from the count.
+	''
+	declare function OutputUnderruns cdecl alias "fb_sfxOutputUnderruns" _
+		( _
+		) as ulongint
+
+	''
+	'' OutputSampleRate()
+	''
+	'' Returns the sample rate selected by the active output driver. This is
+	'' useful to sample-clocked sequencers that use the ordinary sfxlib mixer.
+	'' A negative result indicates that output could not be initialized.
+	''
+	declare function OutputSampleRate cdecl alias "fb_sfxOutputSampleRate" _
+		( _
+		) as long
+
+	''
 	'' RawWrite()
 	''
 	'' Writes interleaved floating-point samples to the runtime output queue.
 	'' Samples are clamped to [-1.0, 1.0]. The function returns the number of
 	'' frames accepted, 0 when the queue is full, or -1 on invalid input or
-	'' initialization failure.
+	'' initialization failure. RawOpen() should normally be called first so
+	'' the producer can use the device's actual sample rate. RawWrite() opens
+	'' a stream implicitly for compatibility if necessary.
 	''
 	declare function RawWrite cdecl alias "fb_sfxRawWrite" _
 		( _

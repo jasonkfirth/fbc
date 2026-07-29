@@ -1,0 +1,135 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_rectangle_tile.comp
+
+    Purpose:
+
+        Apply an ordered run of opaque FreeBASIC rectangles through
+        independently owned destination tiles.
+
+    Responsibilities:
+
+        - preserve last-writer-wins rectangle overlap order
+        - keep mixed BOX B and BOX BF work on Vulkan shader units
+        - preserve the continuous 16-bit style phase around outline boxes
+        - avoid one compute dispatch per public rectangle
+
+    This file intentionally does NOT contain:
+
+        - alpha rectangle blending
+        - host-side raster clipping
+        - host-side tile-list construction
+*/
+
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) buffer SurfacePixels { uint pixels[]; }
+	surface_pixels;
+
+struct RectangleCommand
+{
+	ivec4 box;
+	ivec4 clip;
+	uvec4 dimensions;
+	uvec4 parameters;
+};
+
+layout(set = 0, binding = 1, std430) readonly buffer RectangleCommands
+{
+	RectangleCommand commands[];
+} rectangle_commands;
+
+/*
+	The host compacts the set of touched 16 by 16 tiles. This shader still
+	performs every per-pixel clipping and coverage decision, but it does not
+	launch workgroups for empty parts of the destination surface.
+*/
+layout(set = 0, binding = 2, std430) readonly buffer TileCoordinates
+{
+	uvec2 coordinates[];
+} tile_coordinates;
+
+layout(set = 0, binding = 3, std430) readonly buffer TileRanges
+{
+	uvec2 ranges[];
+} tile_ranges;
+
+layout(set = 0, binding = 4, std430) readonly buffer TileIndices
+{
+	uint indices[];
+} tile_indices;
+
+bool outline_covers(RectangleCommand command, ivec2 position)
+{
+	uint width = command.dimensions.y;
+	uint height = command.dimensions.z;
+	uint style = command.parameters.y;
+	uint index;
+
+	/*
+		gfxlib2 advances one continuous style around bottom, top, right, then
+		left. Corners occur in more than one segment. Because this packet is
+		opaque and every occurrence has the same colour, a corner is covered if
+		any of its corresponding style bits is set.
+	*/
+	if (position.y == command.box.w) {
+		index = uint(position.x - command.box.x);
+		if ((style & (0x8000u >> (index & 15u))) != 0u)
+			return true;
+	}
+	if (position.y == command.box.y) {
+		index = width + uint(position.x - command.box.x);
+		if ((style & (0x8000u >> (index & 15u))) != 0u)
+			return true;
+	}
+	if (position.x == command.box.z) {
+		index = (width * 2u) + uint(position.y - command.box.y);
+		if ((style & (0x8000u >> (index & 15u))) != 0u)
+			return true;
+	}
+	if (position.x == command.box.x) {
+		index = (width * 2u) + height +
+			uint(position.y - command.box.y);
+		if ((style & (0x8000u >> (index & 15u))) != 0u)
+			return true;
+	}
+	return false;
+}
+
+void main(void)
+{
+	RectangleCommand first = rectangle_commands.commands[0];
+	uint width = first.dimensions.x;
+	uint height = first.dimensions.w;
+	uint tile = gl_WorkGroupID.x;
+	uvec2 tile_position = tile_coordinates.coordinates[tile];
+	ivec2 position = ivec2(
+		(tile_position * 16u) + gl_LocalInvocationID.xy);
+	uvec2 range = tile_ranges.ranges[tile];
+	uint color;
+
+	if ((uint(position.x) >= width) || (uint(position.y) >= height))
+		return;
+	color = surface_pixels.pixels[
+		(uint(position.y) * width) + uint(position.x)];
+	for (uint offset = 0u; offset < range.y; ++offset) {
+		RectangleCommand command = rectangle_commands.commands[
+			tile_indices.indices[range.x + offset]];
+		if ((position.x < command.clip.x) || (position.y < command.clip.y) ||
+			(position.x > command.clip.z) || (position.y > command.clip.w) ||
+			(position.x < command.box.x) || (position.y < command.box.y) ||
+			(position.x > command.box.z) || (position.y > command.box.w))
+			continue;
+		if (((command.parameters.w & 0x80000000u) == 0u) &&
+			!outline_covers(command, position))
+			continue;
+		color = command.parameters.x & command.parameters.z;
+	}
+	surface_pixels.pixels[(uint(position.y) * width) + uint(position.x)] = color;
+}
+
+/* end of vulkan_rectangle_tile.comp */

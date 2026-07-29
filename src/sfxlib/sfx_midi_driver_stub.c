@@ -6,25 +6,26 @@
 
     Purpose:
 
-        Provide the fallback MIDI driver for targets that do not
-        have a platform MIDI output backend.
+        Mark the platform MIDI transport as unavailable on targets that do
+        not have a native MIDI output backend.
 
     Responsibilities:
 
-        • satisfy the internal MIDI driver symbols on unsupported targets
-        • report unsupported MIDI output honestly
+        - satisfy the internal MIDI driver symbols on unsupported targets
+        - let the generic MIDI router select the software FM fallback
 
     This file intentionally does NOT contain:
 
-        • a silent no-op MIDI backend
-        • platform MIDI device discovery
-        • MIDI file parsing
+        - a silent no-op MIDI backend
+        - software synthesis, which is implemented in sfx_midi_fm.c
+        - platform MIDI device discovery
+        - MIDI file parsing
 
     Backend contract:
 
-        MIDI OPEN must fail when no real output path exists.  Returning
-        success here would make MIDI commands look usable while dropping
-        every message.
+        This transport must fail MIDI OPEN. The command-level router then
+        tries the C software synthesizer, whose waveform follows the normal
+        sfxlib mixer and audio-driver path.
 */
 
 #if !defined(_WIN32) && \
@@ -59,6 +60,15 @@ int fb_sfxMidiDriverSend(unsigned char status,
     (void)data2;
     return -1;
 }
+
+#else
+
+/*
+    The build graph includes this portable selector on every target.  Keep a
+    declaration in native-backend builds so the translation unit remains valid
+    ISO C after the stub implementation is compiled out.
+*/
+typedef int FB_SFX_MIDI_NATIVE_DRIVER_PRESENT;
 
 #endif
 

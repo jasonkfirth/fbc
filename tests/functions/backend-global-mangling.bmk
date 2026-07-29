@@ -1,0 +1,22 @@
+# FreeBASIC compiler regression test
+# ----------------------------------
+#
+# File: backend-global-mangling.bmk
+#
+# Purpose:
+#     Build one module with the GCC backend while the test driver uses the
+#     backend selected by the test matrix.
+#
+# This file intentionally does not select the driver's backend.
+
+# TEST_MODE : MULTI_MODULE_OK
+
+MAIN := backend-global-mangling-main.bas
+SRCS :=
+
+EXTRA_OBJS := backend-global-mangling-provider.o
+
+$(SRCDIR)backend-global-mangling-provider.o : $(SRCDIR)backend-global-mangling-provider.bas
+	$(FBC) $(FBC_CFLAGS) -gen gcc -m $(MAIN_MODULE) -c $< -o $@
+
+# end of backend-global-mangling.bmk

@@ -1,0 +1,148 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_present.comp
+
+    Purpose:
+
+        Convert a logical FreeBASIC page into the BGRA8 buffer copied into a
+        Vulkan swapchain image.
+
+    Responsibilities:
+
+        - integer nearest-neighbor scaling into a centered presentation area
+        - black letterboxing outside the logical page
+        - palette lookup for 1, 2, 4, and 8-bit indexed pages
+        - exact RGB565 expansion for 16-bit pages
+        - opaque 32-bit FreeBASIC color conversion
+
+    This file intentionally does NOT contain:
+
+        - swapchain acquisition or image layout transitions
+        - CPU pixel conversion
+        - filtering or color-management policy
+*/
+
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) writeonly buffer PresentPixels
+{
+	uint pixels[];
+} present_pixels;
+
+layout(set = 0, binding = 1, std430) readonly buffer SourcePixels
+{
+	uint pixels[];
+} source_pixels;
+
+layout(set = 0, binding = 2, std430) readonly buffer PresentCommand
+{
+	uvec4 source;      /* width, height, depth, unused */
+	uvec4 destination; /* width, height, unused, unused */
+	ivec4 presentation_rect; /* native x, y, width, height */
+	uint palette[256];
+	ivec4 keyboard_button_rect; /* native x0, y0, x1, y1 */
+	uint keyboard_button_state; /* 0 none, 1 dark, 2 active, 3 pressed */
+} present_command;
+
+bool keyboard_glyph(int glyph, int x, int y)
+{
+	if ((x < 0) || (x >= 5) || (y < 0) || (y >= 7)) return false;
+	if (glyph == 0) {
+		if (x == 0) return true;
+		if ((y == 0) || (y == 6)) return x == 4;
+		if ((y == 1) || (y == 5)) return x == 3;
+		if ((y == 2) || (y == 4)) return x == 2;
+		return (y == 3) && (x == 1);
+	}
+	if (x == 0) return true;
+	if ((y == 0) || (y == 3) || (y == 6)) return x < 4;
+	return ((y == 1) || (y == 2) || (y == 4) || (y == 5)) && (x == 4);
+}
+
+void main(void)
+{
+	uint index = gl_GlobalInvocationID.x;
+	uint destination_width = present_command.destination.x;
+	uint destination_height = present_command.destination.y;
+	uint pixel_count = destination_width * destination_height;
+	uint invocation_count = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+	uint source_width;
+	uint source_height;
+	uint x;
+	uint y;
+	uint source_x;
+	uint source_y;
+	uint depth;
+	uint pixel;
+	uint color;
+	ivec2 local;
+	ivec2 size;
+
+	source_width = present_command.source.x;
+	source_height = present_command.source.y;
+	depth = present_command.source.z;
+	while (index < pixel_count) {
+		x = index % destination_width;
+		y = index / destination_width;
+		local = ivec2(int(x), int(y)) -
+			present_command.presentation_rect.xy;
+		size = present_command.presentation_rect.zw;
+		color = 0xFF000000u;
+		if ((local.x >= 0) && (local.y >= 0) &&
+		    (local.x < size.x) && (local.y < size.y)) {
+			source_x = min((uint(local.x) * source_width) /
+				uint(size.x), source_width - 1u);
+			source_y = min((uint(local.y) * source_height) /
+				uint(size.y), source_height - 1u);
+			pixel = source_pixels.pixels[
+				(source_y * source_width) + source_x];
+			if (depth <= 8u) {
+				uint mask = (1u << depth) - 1u;
+
+				color = present_command.palette[pixel & mask] &
+					0x00FFFFFFu;
+			} else if (depth == 16u) {
+				uint red = ((pixel >> 11) & 31u) * 255u / 31u;
+				uint green = ((pixel >> 5) & 63u) * 255u / 63u;
+				uint blue = (pixel & 31u) * 255u / 31u;
+
+				color = (red << 16) | (green << 8) | blue;
+			} else {
+				color = pixel & 0x00FFFFFFu;
+			}
+			color = 0xFF000000u | color;
+		} else {
+			color = 0xFF000000u;
+		}
+		if (present_command.keyboard_button_state != 0u) {
+			local = ivec2(int(x), int(y)) -
+				present_command.keyboard_button_rect.xy;
+			size = present_command.keyboard_button_rect.zw -
+				present_command.keyboard_button_rect.xy;
+			if ((local.x >= 0) && (local.y >= 0) &&
+				(local.x < size.x) && (local.y < size.y)) {
+				if ((local.x < 2) || (local.y < 2) ||
+					(local.x >= size.x - 2) || (local.y >= size.y - 2)) {
+					color = 0xFF101218u;
+				} else if (present_command.keyboard_button_state == 3u) {
+					color = 0xFF5E80C8u;
+				} else if (present_command.keyboard_button_state == 2u) {
+					color = 0xFF2878B4u;
+				} else {
+					color = 0xFF363B44u;
+				}
+				if (keyboard_glyph(0, local.x - 10, local.y - 16) ||
+					keyboard_glyph(1, local.x - 17, local.y - 16))
+					color = 0xFFF5F6FAu;
+			}
+		}
+		present_pixels.pixels[index] = color;
+		index += invocation_count;
+	}
+}
+
+/* end of vulkan_present.comp */

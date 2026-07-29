@@ -269,7 +269,7 @@ function astNewUOP _
 	'' check op overloading
 	if( symb.globOpOvlTb(op).head <> NULL ) then
 		dim as FBSYMBOL ptr proc = any
-		dim as FB_ERRMSG err_num = any
+		dim as FB_ERRMSG err_num = FB_ERRMSG_OK
 		proc = symbFindUopOvlProc( op, o, @err_num )
 		if( proc <> NULL ) then
 			'' build a proc call

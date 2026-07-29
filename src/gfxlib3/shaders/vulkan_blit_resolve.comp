@@ -1,0 +1,93 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_blit_resolve.comp
+
+    Purpose:
+
+        Resolve an ordered destination-independent PUT winner image into a
+        Vulkan surface.
+
+    Responsibilities:
+
+        - fetch the source pixel belonging to each selected sprite command
+        - apply native PSET, PRESET and TRANS output conversion
+        - leave destination pixels with no batch winner unchanged
+
+    This file intentionally does NOT contain:
+
+        - transparent-key selection
+        - destination-read blend modes
+        - winner-buffer lifecycle management
+*/
+
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) buffer DestinationPixels
+{
+	uint pixels[];
+} destination_pixels;
+
+layout(set = 0, binding = 1, std430) readonly buffer SourcePixels
+{
+	uint pixels[];
+} source_pixels;
+
+layout(set = 0, binding = 2, std430) readonly buffer WinnerPixels
+{
+	uint pixels[];
+} winner_pixels;
+
+struct BlitCommand
+{
+	ivec4 source_rect;
+	ivec4 clip;
+	ivec4 destination;
+	uvec4 format;
+	uvec4 dimensions;
+};
+
+layout(set = 0, binding = 3, std430) readonly buffer BlitCommands
+{
+	BlitCommand commands[];
+} blit_commands;
+
+void main(void)
+{
+	BlitCommand first = blit_commands.commands[0];
+	uint packed_origin = first.dimensions.w;
+	ivec2 resolve_origin = ivec2(int(packed_origin & 0xFFFFu),
+		int(packed_origin >> 16u));
+	ivec2 position = resolve_origin + ivec2(gl_GlobalInvocationID.xy);
+	uint destination_offset;
+	uint winner;
+	BlitCommand command;
+	ivec2 source_offset;
+	uint source;
+	uint result_color;
+
+	if ((uint(position.x) >= first.dimensions.y) ||
+		(uint(position.y) >= first.dimensions.z))
+		return;
+	destination_offset = (uint(position.y) * first.dimensions.y) +
+		uint(position.x);
+	winner = winner_pixels.pixels[destination_offset];
+	if (winner == 0u)
+		return;
+	command = blit_commands.commands[winner - 1u];
+	source_offset = position - command.destination.xy;
+	source = source_pixels.pixels[
+		(uint(command.source_rect.y + source_offset.y) *
+		 uint(command.destination.z)) +
+		 uint(command.source_rect.x + source_offset.x)];
+	if (command.format.y == 2u)
+		result_color = (~source) & command.format.w;
+	else
+		result_color = source & command.format.w;
+	destination_pixels.pixels[destination_offset] = result_color;
+}
+
+/* end of vulkan_blit_resolve.comp */

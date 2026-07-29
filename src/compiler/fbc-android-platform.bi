@@ -10,7 +10,7 @@
 ''
 '' Responsibilities:
 ''
-''     - reject unsupported gfx library linking
+''     - add Android gfx library dependencies
 ''     - add Android default system libraries
 ''
 '' This file intentionally does NOT contain:
@@ -38,7 +38,10 @@ private sub fbcAndroidPlatformAddGfxLibs( )
 		exit sub
 	end if
 
-	errReportEx( FB_ERRMSG_GFXLIBNOTSUPPORTEDFORTARGET, "", -1 )
+	fbcAddDefLib( "android" )
+	fbcAddDefLib( "log" )
+	fbcAddDefLib( "EGL" )
+	fbcAddDefLib( "GLESv2" )
 end sub
 
 private sub fbcAndroidPlatformAddSfxLibs( )

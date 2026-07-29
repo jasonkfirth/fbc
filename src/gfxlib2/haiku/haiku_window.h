@@ -5,6 +5,9 @@
 #include <Window.h>
 #include <View.h>
 #include <Rect.h>
+#ifndef DISABLE_OPENGL
+#include <GLView.h>
+#endif
 
 /* ------------------------------------------------------------------------- */
 
@@ -45,6 +48,26 @@ private:
     /* cached scaling destination */
     BRect fDestRect;
 };
+
+#ifndef DISABLE_OPENGL
+
+/* ------------------------------------------------------------------------- */
+
+class FBHaikuGLView : public BGLView
+{
+public:
+
+    FBHaikuGLView(BRect frame, uint32 options);
+
+    virtual void AttachedToWindow();
+    virtual void KeyDown(const char *bytes, int32 numBytes);
+    virtual void KeyUp(const char *bytes, int32 numBytes);
+    virtual void MouseMoved(BPoint where, uint32 transit, const BMessage *message);
+    virtual void MouseDown(BPoint where);
+    virtual void MouseUp(BPoint where);
+};
+
+#endif
 
 /* ------------------------------------------------------------------------- */
 

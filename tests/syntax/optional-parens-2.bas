@@ -34,3 +34,10 @@ foo 10 ', foo
 #print "-----"
 #print "foo 10 'foo"
 foo 10 'foo
+
+'' The comment parser must leave the first token of the next line untouched.
+#macro discard?(args...)
+#endmacro
+
+discard argument ' comment
+dim as integer value = 10

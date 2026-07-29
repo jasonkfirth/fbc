@@ -28,7 +28,8 @@ function cTypeConvExpr _
 		byval isASM as integer = FALSE _
 	) as ASTNODE ptr
 
-	dim as integer dtype = any, op = any, errmsg = any
+	dim as integer dtype = any, op = any
+	dim as integer errmsg = FB_ERRMSG_OK
 	dim as ASTNODE ptr expr = any
 
 	dtype = FB_DATATYPE_INVALID

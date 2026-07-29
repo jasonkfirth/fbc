@@ -42,7 +42,8 @@ const GFXDRIVER fb_gfxDriverDirectDraw =
 	driver_fetch_modes,     /* int *(*fetch_modes)(int depth, int *size); */
 	NULL,                   /* void (*flip)(void); */
 	NULL,                   /* void (*poll_events)(void); */
-	NULL                    /* void (*update)(void); */
+	NULL,                   /* void (*update)(void); */
+	NULL                    /* int (*resize)(int width, int height); */
 };
 
 typedef struct MODESLIST {
@@ -182,9 +183,9 @@ static int directx_init(void)
 	LPDIRECTDRAW lpDD1 = NULL;
 	LPDIRECTDRAWCLIPPER lpDDC = NULL;
 	GUID *ddGUID = NULL;
-	DIRECTDRAWCREATE DirectDrawCreate;
-	DIRECTDRAWENUMERATEEX DirectDrawEnumerateEx;
-	DIRECTINPUTCREATE DirectInputCreate;
+	DIRECTDRAWCREATE DirectDrawCreate = NULL;
+	DIRECTDRAWENUMERATEEX DirectDrawEnumerateEx = NULL;
+	DIRECTINPUTCREATE DirectInputCreate = NULL;
 	DDSURFACEDESC desc;
 	DDPIXELFORMAT format;
 	HRESULT res;
@@ -206,9 +207,14 @@ static int directx_init(void)
 	if (!di_library)
 		return -1;
 
-	DirectDrawCreate = (DIRECTDRAWCREATE)GetProcAddress(dd_library, "DirectDrawCreate");
-	DirectDrawEnumerateEx = (DIRECTDRAWENUMERATEEX)GetProcAddress(dd_library, "DirectDrawEnumerateExA");
-	DirectInputCreate = (DIRECTINPUTCREATE)GetProcAddress(di_library, "DirectInputCreateA");
+	fb_hWin32LoadProcedure(dd_library, "DirectDrawCreate",
+	                       (void *)&DirectDrawCreate, sizeof(DirectDrawCreate));
+	fb_hWin32LoadProcedure(dd_library, "DirectDrawEnumerateExA",
+	                       (void *)&DirectDrawEnumerateEx,
+	                       sizeof(DirectDrawEnumerateEx));
+	fb_hWin32LoadProcedure(di_library, "DirectInputCreateA",
+	                       (void *)&DirectInputCreate,
+	                       sizeof(DirectInputCreate));
 	
 	dev_enum_data.success = FALSE;
 	
@@ -546,7 +552,7 @@ static int *driver_fetch_modes(int depth, int *size)
 	MODESLIST modes = { depth, 0, NULL, FALSE };
 	LPDIRECTDRAW dd1;
 	LPDIRECTDRAW2 dd2;
-	DIRECTDRAWCREATE DirectDrawCreate;
+	DIRECTDRAWCREATE DirectDrawCreate = NULL;
 	HMODULE library = NULL;
 	HRESULT res;
 
@@ -554,7 +560,9 @@ static int *driver_fetch_modes(int depth, int *size)
 		library = (HMODULE)LoadLibrary("ddraw.dll");
 		if (!library)
 			return NULL;
-		DirectDrawCreate = (DIRECTDRAWCREATE)GetProcAddress(library, "DirectDrawCreate");
+		fb_hWin32LoadProcedure(library, "DirectDrawCreate",
+		                       (void *)&DirectDrawCreate,
+		                       sizeof(DirectDrawCreate));
 		if ((!DirectDrawCreate) || (DirectDrawCreate(NULL, &dd1, NULL) != DD_OK)) {
 			FreeLibrary(library);
 			return NULL;

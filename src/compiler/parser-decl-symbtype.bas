@@ -47,11 +47,13 @@ function hIsConstInRange _
 		byval todtype as integer _
 	) as integer
 
-	'' TODO:
-	'' - consider moving this table to symb-data.bas
-	'' - consider using in astCheckConst(), possibly? with -w pedantic
-	'' - consider adding src/compiler/fb-limit.bi or inc/fb-limit.bi.  These
-	''   limit values are used in several locations in fbc compiler source.
+	'' These signed and unsigned views are specific to declaration parsing:
+	'' they decide whether an explicit enum or alias constant fits its requested
+	'' storage type. astCheckConst() has different conversion-warning semantics,
+	'' so sharing this table there would couple two separate diagnostics.
+	'' TODO: Centralize the integer limit constants used here and by
+	'' astCheckConst() so the two diagnostic policies share one source of
+	'' numeric bounds without sharing their decision logic.
 
 	static range( FB_SIZETYPE_BOOLEAN to FB_SIZETYPE_UINT64 ) as RANGEVALUES = _
 		{ _
@@ -521,12 +523,14 @@ private function cMangleModifier _
 					dtype = typeSetMangleDt( dtype, FB_DATATYPE_VA_LIST )
 				case FB_DATATYPE_STRUCT
 					dtype = typeSetMangleDt( dtype, FB_DATATYPE_VA_LIST )
-					'' TODO: we would probably like to clone the
-					'' struct here but implementation of PARSER/AST
-					'' does not immediately allow for this cleanly, for
-					'' now just back patch the original struct and
-					'' remember to document this on mangle modifier page.
-					'' subtype = symbCloneSymbol( subtype )
+
+					''
+					'' The mangling modifier belongs to the typedef, not
+					'' to the UDT named by it.  Keep the original UDT an
+					'' ordinary type by attaching the backend va_list
+					'' classification to a private structural clone.
+					''
+					subtype = symbCloneSimpleStruct( subtype )
 					symbSetUdtValistType( subtype, fbGetBackendValistType() )
 				case else
 					errReport( FB_ERRMSG_SYNTAXERROR )
@@ -564,6 +568,130 @@ private sub hCheckFixedStringSize _
 
 end sub
 
+private sub hParseUserDefinedType _
+	( _
+		byref dtype as integer, _
+		byref subtype as FBSYMBOL ptr, _
+		byref lgt as longint, _
+		byref is_fixlenstr as integer, _
+		byref ptr_cnt as integer, _
+		byval options as FB_SYMBTYPEOPT _
+	)
+
+	dim as FBSYMCHAIN ptr chain_ = NULL
+	dim as FBSYMBOL ptr base_parent = any
+	dim as integer check_id = TRUE
+
+	if( parser.stmt.with ) then
+		if( lexGetToken( ) = CHAR_DOT ) then
+			'' not a '..'?
+			check_id = (lexGetLookAhead( 1, LEXCHECK_NOPERIOD ) = CHAR_DOT)
+		end if
+	end if
+
+	if( check_id ) then
+		chain_ = cIdentifier( base_parent, _
+		                      iif( options and FB_SYMBTYPEOPT_SAVENSPREFIX, FB_IDOPT_NONE, FB_IDOPT_DEFAULT or FB_IDOPT_ALLOWSTRUCT ) _
+		                    )
+	end if
+
+	if( chain_ = NULL ) then
+		exit sub
+	end if
+
+	'' cTypeOrExpression() will expect that the namespace prefix
+	'' will be preserved if we abort and retry as an expression.
+	'' Eventually namespace prefix gets used in cIdentifier()
+	if( options and FB_SYMBTYPEOPT_SAVENSPREFIX ) then
+		assert( parser.nsprefix = NULL )
+		select case symbGetClass( chain_->sym )
+		case FB_SYMBCLASS_CONST, FB_SYMBCLASS_VAR, FB_SYMBCLASS_FIELD
+			parser.nsprefix = chain_
+		end select
+	end if
+
+	do
+		dim as FBSYMBOL ptr sym = chain_->sym
+		do
+			select case symbGetClass( sym )
+			case FB_SYMBCLASS_STRUCT
+				lexSkipToken( LEXCHECK_POST_SUFFIX )
+				dtype = FB_DATATYPE_STRUCT
+				subtype = sym
+				lgt = symbGetSizeOf( sym )
+				cMangleModifier( dtype, subtype )
+				exit do, do
+
+			case FB_SYMBCLASS_ENUM
+				lexSkipToken( LEXCHECK_POST_SUFFIX )
+				dtype = FB_DATATYPE_ENUM
+				subtype = sym
+				lgt = typeGetSize( FB_DATATYPE_ENUM )
+				exit do, do
+
+			case FB_SYMBCLASS_TYPEDEF
+				'' Check access on the typedef only.  The final type
+				'' will be checked after it is returned.
+				if( symbCheckAccess( sym ) = FALSE ) then
+					errReport( FB_ERRMSG_ILLEGALMEMBERACCESS )
+				end if
+				lexSkipToken( LEXCHECK_POST_SUFFIX )
+				dtype = symbGetFullType( sym )
+				subtype = symbGetSubtype( sym )
+				lgt = symbGetSizeOf( sym )
+				is_fixlenstr = symbGetIsFixLenStr( sym )
+				ptr_cnt += typeGetPtrCnt( dtype )
+				exit do, do
+			end select
+
+			sym = sym->hash.next
+		loop while( sym <> NULL )
+
+		chain_ = symbChainGetNext( chain_ )
+	loop while( chain_ <> NULL )
+
+	'' Discard the namespace prefix if it will not be needed later.
+	if( options and FB_SYMBTYPEOPT_SAVENSPREFIX ) then
+		if( dtype <> FB_DATATYPE_INVALID ) then
+			parser.nsprefix = NULL
+		end if
+	end if
+
+end sub
+
+private sub hApplyUnsignedType( byref dtype as integer )
+
+	'' Remap the signed spelling while preserving any C type modifier.
+	select case as const typeGet( dtype )
+	case FB_DATATYPE_BYTE
+		if( typeHasMangleDt( dtype ) ) then
+			dtype = typeSetMangleDt( FB_DATATYPE_UBYTE, FB_DATATYPE_CHAR )
+		else
+			dtype = FB_DATATYPE_UBYTE
+		end if
+
+	case FB_DATATYPE_SHORT
+		dtype = FB_DATATYPE_USHORT
+
+	case FB_DATATYPE_INTEGER
+		dtype = FB_DATATYPE_UINT
+
+	case FB_DATATYPE_LONG
+		if( typeHasMangleDt( dtype ) ) then
+			dtype = typeSetMangleDt( FB_DATATYPE_ULONG, FB_DATATYPE_UINT )
+		else
+			dtype = FB_DATATYPE_ULONG
+		end if
+
+	case FB_DATATYPE_LONGINT
+		dtype = FB_DATATYPE_ULONGINT
+
+	case else
+		errReport( FB_ERRMSG_SYNTAXERROR, TRUE )
+	end select
+
+end sub
+
 '':::::
 ''SymbolType      =   CONST? UNSIGNED? (
 ''                    ANY
@@ -577,6 +705,8 @@ end sub
 ''                |   USERDEFTYPE
 ''                |   (FUNCTION|SUB) ('(' args ')') (AS SymbolType)?
 ''                    (CONST? (PTR|POINTER))* .
+''
+'' Type parsing is an ordered grammar with shared qualifier and subtype state.
 ''
 function cSymbolType _
 	( _
@@ -770,83 +900,8 @@ function cSymbolType _
 				lgt = typeGetSize( dtype )
 			end select
 		else
-			dim as FBSYMCHAIN ptr chain_ = NULL
-			dim as FBSYMBOL ptr base_parent = any
-			dim as integer check_id = TRUE
-
-			if( parser.stmt.with ) then
-				if( lexGetToken( ) = CHAR_DOT ) then
-					'' not a '..'?
-					check_id = (lexGetLookAhead( 1, LEXCHECK_NOPERIOD ) = CHAR_DOT)
-				end if
-			end if
-
-			if( check_id ) then
-				chain_ = cIdentifier( base_parent, _
-				                      iif( options and FB_SYMBTYPEOPT_SAVENSPREFIX, FB_IDOPT_NONE, FB_IDOPT_DEFAULT or FB_IDOPT_ALLOWSTRUCT ) _
-				                    )
-			end if
-
-			if( chain_ ) then
-				'' cTypeOrExpression() will expect that the namespace prefix
-				'' will be preserved if we abort and retry as an expression.
-				'' Eventually namespace prefix gets used in cIdentifier()
-				if( options and FB_SYMBTYPEOPT_SAVENSPREFIX ) then
-					assert( parser.nsprefix = NULL )
-					select case symbGetClass( chain_->sym )
-					case FB_SYMBCLASS_CONST, FB_SYMBCLASS_VAR, FB_SYMBCLASS_FIELD
-						parser.nsprefix = chain_
-					end select
-				end if
-
-				do
-					dim as FBSYMBOL ptr sym = chain_->sym
-					do
-						select case symbGetClass( sym )
-						case FB_SYMBCLASS_STRUCT
-							lexSkipToken( LEXCHECK_POST_SUFFIX )
-							dtype = FB_DATATYPE_STRUCT
-							subtype = sym
-							lgt = symbGetSizeOf( sym )
-							cMangleModifier( dtype, subtype )
-							exit do, do
-
-						case FB_SYMBCLASS_ENUM
-							lexSkipToken( LEXCHECK_POST_SUFFIX )
-							dtype = FB_DATATYPE_ENUM
-							subtype = sym
-							lgt = typeGetSize( FB_DATATYPE_ENUM )
-							exit do, do
-
-						case FB_SYMBCLASS_TYPEDEF
-							'' check access on the typedef only, the
-							'' final type will be checked for access
-							'' after it is returned.
-							if( symbCheckAccess( sym ) = FALSE ) then
-								errReport( FB_ERRMSG_ILLEGALMEMBERACCESS )
-							end if
-							lexSkipToken( LEXCHECK_POST_SUFFIX )
-							dtype = symbGetFullType( sym )
-							subtype = symbGetSubtype( sym )
-							lgt = symbGetSizeOf( sym )
-							is_fixlenstr = symbGetIsFixLenStr( sym )
-							ptr_cnt += typeGetPtrCnt( dtype )
-							exit do, do
-						end select
-
-						sym = sym->hash.next
-					loop while( sym <> NULL )
-
-					chain_ = symbChainGetNext( chain_ )
-				loop while( chain_ <> NULL )
-
-				'' discard the namespace prefix if it won't be needed later
-				if( options and FB_SYMBTYPEOPT_SAVENSPREFIX ) then
-					if( dtype <> FB_DATATYPE_INVALID ) then
-						parser.nsprefix = NULL
-					end if
-				end if
-			end if
+			hParseUserDefinedType( dtype, subtype, lgt, is_fixlenstr, _
+			                       ptr_cnt, options )
 		end if
 
 		'' no type?
@@ -863,36 +918,7 @@ function cSymbolType _
 		end if
 
 		'' unsigned?
-		if( isunsigned ) then
-			'' remap type, if valid
-			select case as const typeGet( dtype )
-			case FB_DATATYPE_BYTE
-				if( typeHasMangleDt( dtype ) ) then
-					dtype = typeSetMangleDt( FB_DATATYPE_UBYTE, FB_DATATYPE_CHAR )
-				else
-					dtype = FB_DATATYPE_UBYTE
-				end if
-
-			case FB_DATATYPE_SHORT
-				dtype = FB_DATATYPE_USHORT
-
-			case FB_DATATYPE_INTEGER
-				dtype = FB_DATATYPE_UINT
-
-			case FB_DATATYPE_LONG
-				if( typeHasMangleDt( dtype ) ) then
-					dtype = typeSetMangleDt( FB_DATATYPE_ULONG, FB_DATATYPE_UINT )
-				else
-					dtype = FB_DATATYPE_ULONG
-				end if
-
-			case FB_DATATYPE_LONGINT
-				dtype = FB_DATATYPE_ULONGINT
-
-			case else
-				errReport( FB_ERRMSG_SYNTAXERROR, TRUE )
-			end select
-		end if
+		if( isunsigned ) then hApplyUnsignedType( dtype )
 	end if
 
 	'' fixed-len z|w|string? (must be handled here because the typedefs)

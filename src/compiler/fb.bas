@@ -136,6 +136,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		0   or FB_TARGETOPT_UNIX _
 		    or FB_TARGETOPT_CALLEEPOPSHIDDENPTR _
 		    or FB_TARGETOPT_STACKALIGN16 _
+		    or FB_TARGETOPT_GAS64_SYSV_STRUCTRET _
 		    or FB_TARGETOPT_ELF _
 	), _
 	( _
@@ -183,6 +184,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		    or FB_TARGETOPT_CALLEEPOPSHIDDENPTR _
 		    or FB_TARGETOPT_RETURNINREGS _
 		    or FB_TARGETOPT_RETURNINFLTS _
+		    or FB_TARGETOPT_GAS64_SYSV_STRUCTRET _
 		    or FB_TARGETOPT_ELF _
 	), _
 	( _
@@ -639,7 +641,7 @@ sub fbGlobalInit()
 	env.clopt.gosubsetjmp   = FALSE
 	env.clopt.export        = FALSE
 	env.clopt.multithreaded = FALSE
-	env.clopt.fbgfx         = FALSE
+	env.clopt.fbgfx         = FB_GFXLIB_NONE
 	env.clopt.fbsfx         = FALSE
 	env.clopt.pic           = FALSE
 	env.clopt.msbitfields   = FALSE
@@ -676,6 +678,8 @@ sub fbAddPreInclude(byref file as string)
 	strlistAppend(@env.preincludes, file)
 end sub
 
+'' Compiler options form a closed dispatch table; all setters stay visible here.
+''
 sub fbSetOption( byval opt as integer, byval value as integer )
 	select case as const( opt )
 	case FB_COMPOPT_OUTTYPE
@@ -797,6 +801,8 @@ sub fbSetOption( byval opt as integer, byval value as integer )
 	end select
 end sub
 
+'' Keep this table parallel with fbSetOption() so missing cases are apparent.
+''
 function fbGetOption( byval opt as integer ) as integer
 	select case as const( opt )
 	case FB_COMPOPT_OUTTYPE
@@ -1269,7 +1275,14 @@ sub fbAddLib(byval libname as zstring ptr)
 
 		'' Set the -fbgfx option to link to the gfx library
 		'' and the lib will be added in hAddDefaultLibs()
-		fbSetOption( FB_COMPOPT_FBGFX, TRUE )
+		if( fbGetOption( FB_COMPOPT_FBGFX ) = FB_GFXLIB_NONE ) then
+			fbSetOption( FB_COMPOPT_FBGFX, FB_GFXLIB_DEFAULT )
+		end if
+
+		exit sub
+	elseif( *libname = "fbgfx3?" ) then
+		'' gfxlib3 uses the same suffix selection but has its own archive.
+		fbSetOption( FB_COMPOPT_FBGFX, FB_GFXLIB_GFX3 )
 
 		exit sub
 	end if
@@ -1371,8 +1384,10 @@ private sub hEmitObjinfo( )
 		hAppendFbctinf( objinfoEncode( OBJINFO_MT ) )
 	end if
 
-	'' -fbgfx
-	if( env.clopt.fbgfx ) then
+	'' Selected gfx library
+	if( env.clopt.fbgfx = FB_GFXLIB_GFX3 ) then
+		hAppendFbctinf( objinfoEncode( OBJINFO_GFX3 ) )
+	elseif( env.clopt.fbgfx = FB_GFXLIB_DEFAULT ) then
 		hAppendFbctinf( objinfoEncode( OBJINFO_GFX ) )
 	end if
 
@@ -1397,9 +1412,15 @@ end sub
 private sub hShowInclude( byval includelevel as integer, byref message as string )
 	'' Show message with the proper indentation
 	dim ln as string
+	dim as DZSTRING indentation
+	DZstrZero( indentation )
 	for i as integer = 1 to includelevel
-		ln += " |  "
+		DZstrConcatAssign( indentation, " |  " )
 	next
+	if( indentation.data <> NULL ) then
+		ln = *indentation.data
+	end if
+	DZstrAllocate( indentation, 0 )
 	ln += message
 	print ln
 end sub

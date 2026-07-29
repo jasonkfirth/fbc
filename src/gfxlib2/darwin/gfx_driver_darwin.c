@@ -1,5 +1,8 @@
 #include "../fb_gfx.h"
 #include "fb_gfx_darwin.h"
+#ifndef DISABLE_OPENGL
+#include "../fb_gfx_gl.h"
+#endif
 
 #ifdef HOST_DARWIN
 
@@ -24,6 +27,21 @@
 #define FB_DARWIN_BACKING_BUFFERED 2UL
 #define FB_DARWIN_ACTIVATION_POLICY_REGULAR 0L
 #define FB_DARWIN_FLOATING_WINDOW_LEVEL 3L
+
+/*
+	NSOpenGLPixelFormatAttribute values are part of AppKit's public ABI.  The
+	backend uses the Objective-C runtime from C, so these named constants keep
+	the attribute list readable without requiring Objective-C syntax.
+*/
+#define FB_NSOPENGL_PFA_DOUBLE_BUFFER   5U
+#define FB_NSOPENGL_PFA_COLOR_SIZE      8U
+#define FB_NSOPENGL_PFA_ALPHA_SIZE     11U
+#define FB_NSOPENGL_PFA_DEPTH_SIZE     12U
+#define FB_NSOPENGL_PFA_STENCIL_SIZE   13U
+#define FB_NSOPENGL_PFA_ACCUM_SIZE     14U
+#define FB_NSOPENGL_PFA_SAMPLE_BUFFERS 55U
+#define FB_NSOPENGL_PFA_SAMPLES        56U
+#define FB_NSOPENGL_CP_SWAP_INTERVAL  222L
 
 #define FB_DARWIN_EVENT_LEFT_MOUSE_DOWN    1
 #define FB_DARWIN_EVENT_LEFT_MOUSE_UP      2
@@ -53,6 +71,9 @@
 FB_DARWIN_STATE fb_darwin;
 
 static Class fb_darwin_view_class = Nil;
+#ifndef DISABLE_OPENGL
+static Class fb_darwin_opengl_view_class = Nil;
+#endif
 
 extern void fb_hPostKey(int key);
 
@@ -79,6 +100,16 @@ static id fb_msg_id_cstr(id obj, const char *sel_name, const char *arg)
 static id fb_msg_id_rect(id obj, const char *sel_name, CGRect rect)
 {
 	return ((id (*)(id, SEL, CGRect))objc_msgSend)(obj, fb_sel(sel_name), rect);
+}
+
+static id fb_msg_id_rect_id(id obj, const char *sel_name, CGRect rect, id arg)
+{
+	return ((id (*)(id, SEL, CGRect, id))objc_msgSend)(obj, fb_sel(sel_name), rect, arg);
+}
+
+static id fb_msg_id_ptr(id obj, const char *sel_name, const void *arg)
+{
+	return ((id (*)(id, SEL, const void *))objc_msgSend)(obj, fb_sel(sel_name), arg);
 }
 
 static id fb_msg_id_rect_ulong_ulong_bool(id obj, const char *sel_name, CGRect rect, unsigned long style, unsigned long backing, BOOL defer_flag)
@@ -149,6 +180,13 @@ static void fb_msg_void_point(id obj, const char *sel_name, CGPoint pt)
 static void fb_msg_void_size(id obj, const char *sel_name, CGSize size)
 {
 	((void (*)(id, SEL, CGSize))objc_msgSend)(obj, fb_sel(sel_name), size);
+}
+
+static void fb_msg_void_ptr_long(id obj, const char *sel_name, const void *value, long parameter)
+{
+	((void (*)(id, SEL, const void *, long))objc_msgSend)(
+		obj, fb_sel(sel_name), value, parameter
+	);
 }
 
 static BOOL fb_msg_bool(id obj, const char *sel_name)
@@ -1108,24 +1146,103 @@ static void fb_hDarwinEnsureClasses(void)
 {
 	Class NSViewClass;
 
-	if (fb_darwin_view_class != Nil)
-		return;
+	if (fb_darwin_view_class == Nil) {
+		NSViewClass = objc_getClass("NSView");
+		if (NSViewClass) {
+			fb_darwin_view_class = objc_allocateClassPair(NSViewClass, "FBDarwinView", 0);
+			if (fb_darwin_view_class) {
+				class_addMethod(fb_darwin_view_class, fb_sel("isFlipped"), (IMP)fb_darwin_view_is_flipped, "B@:");
+				class_addMethod(fb_darwin_view_class, fb_sel("acceptsFirstResponder"), (IMP)fb_darwin_view_accepts_first_responder, "B@:");
+				class_addMethod(fb_darwin_view_class, fb_sel("viewDidMoveToWindow"), (IMP)fb_darwin_view_view_did_move_to_window, "v@:");
+				class_addMethod(fb_darwin_view_class, fb_sel("drawRect:"), (IMP)fb_darwin_view_draw_rect, FB_DARWIN_VIEW_ENCODING_RECT);
+				objc_registerClassPair(fb_darwin_view_class);
+			}
+		}
+	}
 
-	NSViewClass = objc_getClass("NSView");
-	if (!NSViewClass)
-		return;
-
-	fb_darwin_view_class = objc_allocateClassPair(NSViewClass, "FBDarwinView", 0);
-	if (!fb_darwin_view_class)
-		return;
-
-	class_addMethod(fb_darwin_view_class, fb_sel("isFlipped"), (IMP)fb_darwin_view_is_flipped, "B@:");
-	class_addMethod(fb_darwin_view_class, fb_sel("acceptsFirstResponder"), (IMP)fb_darwin_view_accepts_first_responder, "B@:");
-	class_addMethod(fb_darwin_view_class, fb_sel("viewDidMoveToWindow"), (IMP)fb_darwin_view_view_did_move_to_window, "v@:");
-	class_addMethod(fb_darwin_view_class, fb_sel("drawRect:"), (IMP)fb_darwin_view_draw_rect, FB_DARWIN_VIEW_ENCODING_RECT);
-
-	objc_registerClassPair(fb_darwin_view_class);
+#ifndef DISABLE_OPENGL
+	if (fb_darwin_opengl_view_class == Nil) {
+		NSViewClass = objc_getClass("NSOpenGLView");
+		if (NSViewClass) {
+			fb_darwin_opengl_view_class = objc_allocateClassPair(NSViewClass, "FBDarwinOpenGLView", 0);
+			if (fb_darwin_opengl_view_class) {
+				class_addMethod(fb_darwin_opengl_view_class, fb_sel("isFlipped"), (IMP)fb_darwin_view_is_flipped, "B@:");
+				class_addMethod(fb_darwin_opengl_view_class, fb_sel("acceptsFirstResponder"), (IMP)fb_darwin_view_accepts_first_responder, "B@:");
+				objc_registerClassPair(fb_darwin_opengl_view_class);
+			}
+		}
+	}
+#endif
 }
+
+#ifndef DISABLE_OPENGL
+static id fb_hDarwinCreateOpenGLPixelFormat(void)
+{
+	Class pixel_format_class;
+	unsigned int attributes[32];
+	unsigned int *attribute;
+	unsigned int *sample_count;
+	id pixel_format;
+
+	pixel_format_class = objc_getClass("NSOpenGLPixelFormat");
+	if (!pixel_format_class)
+		return nil;
+
+	attribute = attributes;
+	*attribute++ = FB_NSOPENGL_PFA_DOUBLE_BUFFER;
+	*attribute++ = FB_NSOPENGL_PFA_COLOR_SIZE;
+	*attribute++ = (unsigned int)__fb_gl_params.color_bits;
+
+	if (__fb_gl_params.color_alpha_bits > 0) {
+		*attribute++ = FB_NSOPENGL_PFA_ALPHA_SIZE;
+		*attribute++ = (unsigned int)__fb_gl_params.color_alpha_bits;
+	}
+	if (__fb_gl_params.depth_bits > 0) {
+		*attribute++ = FB_NSOPENGL_PFA_DEPTH_SIZE;
+		*attribute++ = (unsigned int)__fb_gl_params.depth_bits;
+	}
+	if (__fb_gl_params.stencil_bits > 0) {
+		*attribute++ = FB_NSOPENGL_PFA_STENCIL_SIZE;
+		*attribute++ = (unsigned int)__fb_gl_params.stencil_bits;
+	}
+	if (__fb_gl_params.accum_bits > 0) {
+		*attribute++ = FB_NSOPENGL_PFA_ACCUM_SIZE;
+		*attribute++ = (unsigned int)__fb_gl_params.accum_bits;
+	}
+
+	sample_count = NULL;
+	if (__fb_gl_params.num_samples > 0) {
+		*attribute++ = FB_NSOPENGL_PFA_SAMPLE_BUFFERS;
+		*attribute++ = 1;
+		*attribute++ = FB_NSOPENGL_PFA_SAMPLES;
+		sample_count = attribute;
+		*attribute++ = (unsigned int)__fb_gl_params.num_samples;
+	}
+	*attribute = 0;
+
+	for (;;) {
+		pixel_format = fb_msg_id((id)pixel_format_class, "alloc");
+		pixel_format = fb_msg_id_ptr(pixel_format, "initWithAttributes:", attributes);
+		if (pixel_format) {
+			if (sample_count)
+				__fb_gl_params.num_samples = (int)*sample_count;
+			return pixel_format;
+		}
+
+		if (!sample_count || *sample_count == 0)
+			break;
+
+		if (*sample_count >= 2)
+			*sample_count -= 2;
+		else
+			*sample_count = 0;
+		if (*sample_count == 0)
+			sample_count[-3] = 0;
+	}
+
+	return nil;
+}
+#endif
 
 static void fb_hDarwinEnsureMenu(char *title)
 {
@@ -1184,10 +1301,12 @@ int fb_hDarwinInit(char *title, int w, int h, int depth, int refresh_rate, int f
 	id app;
 	id window;
 	id view;
+#ifndef DISABLE_OPENGL
+	id pixel_format;
+	id gl_context;
+	int swap_interval;
+#endif
 	unsigned long style_mask;
-
-	if (flags & DRIVER_OPENGL)
-		return -1;
 
 	if (!fb_hDarwinDepthSupported(depth))
 		return -1;
@@ -1203,7 +1322,7 @@ int fb_hDarwinInit(char *title, int w, int h, int depth, int refresh_rate, int f
 	fb_darwin.flags = flags;
 	fb_darwin.mouse_cursor = 1;
 
-	if (fb_hDarwinAllocDisplayBuffer(w, h) != 0)
+	if (!(flags & DRIVER_OPENGL) && fb_hDarwinAllocDisplayBuffer(w, h) != 0)
 		return -1;
 
 	fb_hDarwinQueryDesktop();
@@ -1211,7 +1330,12 @@ int fb_hDarwinInit(char *title, int w, int h, int depth, int refresh_rate, int f
 
 	NSApplicationClass = objc_getClass("NSApplication");
 	NSWindowClass = objc_getClass("NSWindow");
-	if (!NSApplicationClass || !NSWindowClass || fb_darwin_view_class == Nil)
+	if (!NSApplicationClass || !NSWindowClass ||
+	    (!(flags & DRIVER_OPENGL) && fb_darwin_view_class == Nil)
+#ifndef DISABLE_OPENGL
+	    || ((flags & DRIVER_OPENGL) && fb_darwin_opengl_view_class == Nil)
+#endif
+	   )
 		goto fail;
 
 	app = fb_msg_id((id)NSApplicationClass, "sharedApplication");
@@ -1241,13 +1365,42 @@ int fb_hDarwinInit(char *title, int w, int h, int depth, int refresh_rate, int f
 	if (!window)
 		goto fail;
 
-	view = fb_msg_id((id)fb_darwin_view_class, "alloc");
-	view = fb_msg_id_rect(view, "initWithFrame:", view_frame);
+#ifndef DISABLE_OPENGL
+	pixel_format = nil;
+	gl_context = nil;
+	if (flags & DRIVER_OPENGL) {
+		pixel_format = fb_hDarwinCreateOpenGLPixelFormat();
+		if (!pixel_format) {
+			fb_msg_void(window, "close");
+			fb_msg_void(window, "release");
+			goto fail;
+		}
+
+		view = fb_msg_id((id)fb_darwin_opengl_view_class, "alloc");
+		view = fb_msg_id_rect_id(view, "initWithFrame:pixelFormat:", view_frame, pixel_format);
+		fb_msg_void(pixel_format, "release");
+		if (view)
+			gl_context = fb_msg_id(view, "openGLContext");
+	} else
+#endif
+	{
+		view = fb_msg_id((id)fb_darwin_view_class, "alloc");
+		view = fb_msg_id_rect(view, "initWithFrame:", view_frame);
+	}
+
 	if (!view) {
 		fb_msg_void(window, "close");
 		fb_msg_void(window, "release");
 		goto fail;
 	}
+#ifndef DISABLE_OPENGL
+	if ((flags & DRIVER_OPENGL) && !gl_context) {
+		fb_msg_void(view, "release");
+		fb_msg_void(window, "close");
+		fb_msg_void(window, "release");
+		goto fail;
+	}
+#endif
 
 	min_size.width = (CGFloat)w;
 	min_size.height = (CGFloat)h;
@@ -1268,6 +1421,15 @@ int fb_hDarwinInit(char *title, int w, int h, int depth, int refresh_rate, int f
 
 	fb_darwin.window = window;
 	fb_darwin.view = view;
+#ifndef DISABLE_OPENGL
+	fb_darwin.gl_context = gl_context;
+	if (gl_context) {
+		fb_msg_void(gl_context, "makeCurrentContext");
+		swap_interval = 1;
+		fb_msg_void_ptr_long(gl_context, "setValues:forParameter:",
+		                     &swap_interval, FB_NSOPENGL_CP_SWAP_INTERVAL);
+	}
+#endif
 	fb_darwin.initialized = TRUE;
 
 	fb_hDarwinRefreshLayout();
@@ -1283,6 +1445,14 @@ fail:
 void fb_hDarwinExit(void)
 {
 	fb_hDarwinFreeDisplayBuffer();
+
+#ifndef DISABLE_OPENGL
+	if (fb_darwin.gl_context) {
+		fb_msg_void((id)fb_darwin.gl_context, "clearDrawable");
+		fb_msg_void((id)objc_getClass("NSOpenGLContext"), "clearCurrentContext");
+		fb_darwin.gl_context = NULL;
+	}
+#endif
 
 	if (fb_darwin.view) {
 		fb_msg_void((id)fb_darwin.view, "release");
@@ -1306,10 +1476,42 @@ void fb_hDarwinUpdate(void)
 		return;
 
 	fb_hDarwinRefreshLayout();
+
+#ifndef DISABLE_OPENGL
+	if (fb_darwin.flags & DRIVER_OPENGL) {
+		fb_hDarwinOpenGLUpdate();
+		fb_hDarwinPumpEvents();
+		return;
+	}
+#endif
+
 	fb_hDarwinBlitDisplayBuffer();
 	fb_msg_void_bool((id)fb_darwin.view, "setNeedsDisplay:", YES);
 	fb_hDarwinPumpEvents();
 }
+
+#ifndef DISABLE_OPENGL
+int fb_hDarwinOpenGLMakeCurrent(void)
+{
+	if (!fb_darwin.initialized || !fb_darwin.gl_context)
+		return -1;
+
+	fb_msg_void((id)fb_darwin.gl_context, "makeCurrentContext");
+	return 0;
+}
+
+void fb_hDarwinOpenGLUpdate(void)
+{
+	if (fb_darwin.gl_context)
+		fb_msg_void((id)fb_darwin.gl_context, "update");
+}
+
+void fb_hDarwinOpenGLSwapBuffers(void)
+{
+	if (fb_darwin.gl_context)
+		fb_msg_void((id)fb_darwin.gl_context, "flushBuffer");
+}
+#endif
 
 void fb_hDarwinPollEvents(void)
 {

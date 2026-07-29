@@ -117,44 +117,34 @@ private sub hMacroPush _
 
 end sub
 
-'':::::
-private function hLoadMacro _
+private function hBeginMacroInvocation _
 	( _
-		byval s as FBSYMBOL ptr _
+		byval s as FBSYMBOL ptr, _
+		byref hasParens as integer, _
+		byref param as FB_DEFPARAM ptr, _
+		byref argtb as LEXPP_ARGTB ptr, _
+		byref is_variadic as integer _
 	) as integer
 
-	dim as FB_DEFPARAM ptr param = any, nextparam = any
-	dim as FB_DEFTOK ptr dt = any
-	dim as FBTOKEN t = any
-	dim as LEXPP_ARGTB ptr argtb = any
-	dim as integer prntcnt = any, num = any, reached_vararg = any, is_variadic = any
-	dim as zstring ptr argtext = any
-	static as string text
-	static as DZSTRING expanded
-
-	function = -1
-
-	var hasParens = FALSE
+	hasParens = FALSE
 	var hasWhitespace = lexEatWhitespace( )
 
-	'' '('?
 	if( lexCurrentChar( ) = CHAR_LPRNT ) then
 		hasParens = TRUE
 	end if
 
 	if( (symbGetDefineFlags( s ) and FB_DEFINE_FLAGS_NEEDPARENS) <> 0 ) then
 		if( hasParens = FALSE ) then
-			'' not an error, macro can be passed as param to other macros
-			exit function
+			'' A macro name can be passed as an argument without invoking it.
+			return FALSE
 		end if
 	else
-		'' parens optional? then whitespace before '(' will determine that the '('
-		'' is part of the first argument instead of starting the argument list
+		'' With optional parentheses, whitespace makes the '(' part of arg 1.
 		hasParens and= not hasWhitespace
 	end if
 
-	if (isMacroAllowed(s) = FALSE) then
-		exit function
+	if( isMacroAllowed( s ) = FALSE ) then
+		return FALSE
 	end if
 
 	pp.invoking += 1
@@ -163,27 +153,107 @@ private function hLoadMacro _
 		lexEatChar( )
 	end if
 
-	'' allocate a new arg list (support recursion)
+	'' Each recursive expansion needs its own argument storage.
 	param = symbGetDefineHeadParam( s )
 	if( param <> NULL ) then
 		argtb = listNewNode( @pp.argtblist )
+		argtb->count = 0
 	else
 		argtb = NULL
+	end if
+
+	is_variadic = ((s->def.flags and FB_DEFINE_FLAGS_VARIADIC) <> 0)
+	return TRUE
+end function
+
+private sub hTrimMacroArg _
+	( _
+		byval argtb as LEXPP_ARGTB ptr, _
+		byval num as integer, _
+		byval is_wide as integer _
+	)
+
+	if( argtb = NULL ) then
+		exit sub
+	end if
+
+	with( argtb->tb(num) )
+		if( is_wide ) then
+			if( .textw.data ) then
+				if( (.textw.data[0][0] = CHAR_SPACE) or _
+				    (.textw.data[0][len( *.textw.data )-1] = CHAR_SPACE) ) then
+					DWstrAssign( .textw, trim( *.textw.data ) )
+				end if
+			end if
+		else
+			if( .text.data ) then
+				if( (.text.data[0][0] = CHAR_SPACE) or _
+				    (.text.data[0][len( *.text.data )-1] = CHAR_SPACE) ) then
+					DZstrAssign( .text, trim( *.text.data ) )
+				end if
+			end if
+		end if
+	end with
+end sub
+
+private sub hAddMissingMacroArgs _
+	( _
+		byval s as FBSYMBOL ptr, _
+		byval nextparam as FB_DEFPARAM ptr, _
+		byval argtb as LEXPP_ARGTB ptr, _
+		byref num as integer, _
+		byval is_variadic as integer, _
+		byval is_wide as integer _
+	)
+
+	if( (symbGetDefParamNext( nextparam ) <> NULL) or (not is_variadic) ) then
+		hReportMacroError( s, FB_ERRMSG_ARGCNTMISMATCH )
+	end if
+
+	assert( argtb <> NULL )
+	assert( num < (symbGetDefineParams( s ) - 1) )
+	do
+		num += 1
+		'' argtb entries must be cleared because this is a NOCLEAR list.
+		if( is_wide ) then
+			DWstrZero( argtb->tb(num).textw )
+		else
+			DZstrZero( argtb->tb(num).text )
+		end if
+	loop while( num < (symbGetDefineParams( s ) - 1) )
+end sub
+
+'':::::
+'' Macro loading is a byte-oriented scanner with shared nesting and quote state.
+''
+private function hLoadMacro _
+	( _
+		byval s as FBSYMBOL ptr _
+	) as integer
+
+	dim as FB_DEFPARAM ptr param = any, nextparam = any
+	dim as FB_DEFTOK ptr dt = any
+	dim as FBTOKEN t
+	dim as LEXPP_ARGTB ptr argtb = any
+	dim as integer prntcnt = any, num = any, reached_vararg = any, is_variadic = any
+	dim as zstring ptr argtext = any
+	static as string text
+	static as DZSTRING expanded
+
+	function = -1
+
+	dim as integer hasParens = any
+	if( hBeginMacroInvocation( s, hasParens, param, argtb, is_variadic ) = FALSE ) then
+		exit function
 	end if
 
 	prntcnt = 1
 	reached_vararg = FALSE
 
-	'' Variadic macro?
-	is_variadic = ((s->def.flags and FB_DEFINE_FLAGS_VARIADIC) <> 0)
-
 	var readdchar = -1
 
 	'' for each arg
 	num = 0   '' num represents the current last cleared/used entry in the argtb
-	if( argtb ) then
-		argtb->count = 0
-	end if
 	do
 		if( argtb ) then
 			'' argtb entries must be cleared! (it's a NOCLEAR list)
@@ -303,15 +373,15 @@ private function hLoadMacro _
 					end if
 				else
 					do
-						lexSkipToken( LEX_FLAGS or LEXCHECK_NOMULTILINECOMMENT )
+						'' Continue through the private token buffer used for macro
+						'' arguments.  The shared lookahead belongs to the outer lexer.
+						lexNextToken( @t, LEX_FLAGS or LEXCHECK_NOMULTILINECOMMENT )
 
-						select case lexGetToken( LEX_FLAGS )
+						select case t.id
 						case FB_TK_EOL, FB_TK_EOF
 							exit do
 						end select
 					loop
-
-					lexSkipToken( LEX_FLAGS or LEXCHECK_NOMULTILINECOMMENT )
 
 					readdchar = iif(t.id = FB_TK_EOF, 0, CHAR_LF)
 					if( prntcnt > 0 ) then
@@ -343,18 +413,7 @@ private function hLoadMacro _
 			end if
 		loop
 
-		if( argtb ) then
-			with( argtb->tb(num) )
-				'' Arguments are allowed to be empty, so must check for NULL
-				if( .text.data ) then
-					'' Trim space
-					if( (.text.data[0][0] = CHAR_SPACE) or _
-						(.text.data[0][len( *.text.data )-1] = CHAR_SPACE) ) then
-						DZstrAssign( .text, trim( *.text.data ) )
-					end if
-				end if
-			end with
-		end if
+		hTrimMacroArg( argtb, num, FALSE )
 
 		'' Reached closing parentheses?
 		if( prntcnt = 0 ) then
@@ -362,19 +421,7 @@ private function hLoadMacro _
 			if( nextparam ) then
 				'' Too few args specified. This is an error, unless it's
 				'' only the "..." vararg param that wasn't given any arg.
-
-				'' Not the last param, or not variadic?
-				if( (symbGetDefParamNext( nextparam ) <> NULL) or (not is_variadic) ) then
-					hReportMacroError( s, FB_ERRMSG_ARGCNTMISMATCH )
-				end if
-
-				'' Clear any missing args
-				assert( num < (symbGetDefineParams( s ) - 1) )
-				do
-					num += 1
-					'' argtb entries must be cleared! (it's a NOCLEAR list)
-					DZstrZero( argtb->tb(num).text )
-				loop while( num < (symbGetDefineParams( s ) - 1) )
+				hAddMissingMacroArgs( s, nextparam, argtb, num, is_variadic, FALSE )
 			end if
 
 			exit do
@@ -593,6 +640,8 @@ private function hLoadDefine _
 
 end function
 
+'' The wchar macro scanner mirrors hLoadMacro() and keeps the same state flow.
+''
 private function hLoadMacroW _
 	( _
 		byval s as FBSYMBOL ptr _
@@ -600,7 +649,7 @@ private function hLoadMacroW _
 
 	dim as FB_DEFPARAM ptr param = any, nextparam = any
 	dim as FB_DEFTOK ptr dt = any
-	dim as FBTOKEN t = any
+	dim as FBTOKEN t
 	dim as LEXPP_ARGTB ptr argtb = any
 	dim as integer prntcnt = any, lgt = any, num = any, reached_vararg = any, is_variadic = any
 	dim as wstring ptr argtext = any
@@ -615,56 +664,18 @@ private function hLoadMacroW _
 		DWstrConcatAssignA( dollarquotew, QUOTE )
 	end if
 
-	var hasParens = FALSE
-	var hasWhitespace = lexEatWhitespace( )
-
-	'' '('?
-	if( lexCurrentChar( ) = CHAR_LPRNT ) then
-		hasParens = TRUE
-	end if
-
-	if( (symbGetDefineFlags( s ) and FB_DEFINE_FLAGS_NEEDPARENS) <> 0 ) then
-		if( hasParens = FALSE ) then
-			'' not an error, macro can be passed as param to other macros
-			exit function
-		end if
-	else
-		'' parens optional? then whitespace before '(' will determine that the '('
-		'' is part of the first argument instead of starting the argument list
-		hasParens and= not hasWhitespace
-	end if
-
-	if (isMacroAllowed(s) = FALSE) then
+	dim as integer hasParens = any
+	if( hBeginMacroInvocation( s, hasParens, param, argtb, is_variadic ) = FALSE ) then
 		exit function
-	end if
-
-	pp.invoking += 1
-
-	if( hasParens ) then
-		lexEatChar( )
-	end if
-
-	'' allocate a new arg list (because the recursivity)
-	param = symbGetDefineHeadParam( s )
-	if( param <> NULL ) then
-		argtb = listNewNode( @pp.argtblist )
-	else
-		argtb = NULL
 	end if
 
 	prntcnt = 1
 	reached_vararg = FALSE
 
-	'' Variadic macro?
-	is_variadic = ((s->def.flags and FB_DEFINE_FLAGS_VARIADIC) <> 0)
-
 	var readdchar = -1
 
 	'' for each arg
 	num = 0 '' num represents the current last cleared/used entry in the argtb
-	if( argtb ) then
-		argtb->count = 0
-	end if
 	do
 		if( argtb ) then
 			'' argtb entries must be cleared! (it's a NOCLEAR list)
@@ -784,15 +795,15 @@ private function hLoadMacroW _
 					end if
 				else
 					do
-						lexSkipToken( LEX_FLAGS or LEXCHECK_NOMULTILINECOMMENT )
+						'' Continue through the private token buffer used for macro
+						'' arguments.  The shared lookahead belongs to the outer lexer.
+						lexNextToken( @t, LEX_FLAGS or LEXCHECK_NOMULTILINECOMMENT )
 
-						select case lexGetToken( LEX_FLAGS )
+						select case t.id
 						case FB_TK_EOL, FB_TK_EOF
 							exit do
 						end select
 					loop
-
-					lexSkipToken( LEX_FLAGS or LEXCHECK_NOMULTILINECOMMENT)
 
 					readdchar = iif(t.id = FB_TK_EOF, 0, CHAR_LF)
 					if( prntcnt > 0 ) then
@@ -824,18 +835,7 @@ private function hLoadMacroW _
 			end if
 		loop
 
-		if( argtb ) then
-			with( argtb->tb(num) )
-				'' Arguments are allowed to be empty, so must check for NULL
-				if( .textw.data ) then
-					'' Trim space
-					if( (.textw.data[0][0] = CHAR_SPACE) or _
-						(.textw.data[0][len( *.textw.data )-1] = CHAR_SPACE) ) then
-						DWstrAssign( .textw, trim( *.textw.data ) )
-					end if
-				end if
-			end with
-		end if
+		hTrimMacroArg( argtb, num, TRUE )
 
 		'' Reached closing parentheses?
 		if( prntcnt = 0 ) then
@@ -843,19 +843,7 @@ private function hLoadMacroW _
 			if( nextparam ) then
 				'' Too few args specified. This is an error, unless it's
 				'' only the "..." vararg param that wasn't given any arg.
-
-				'' Not the last param, or not variadic?
-				if( (symbGetDefParamNext( nextparam ) <> NULL) or (not is_variadic) ) then
-					hReportMacroError( s, FB_ERRMSG_ARGCNTMISMATCH )
-				end if
-
-				'' Clear any missing args
-				assert( num < (symbGetDefineParams( s ) - 1) )
-				do
-					num += 1
-					'' argtb entries must be cleared! (it's a NOCLEAR list)
-					DWstrZero( argtb->tb(num).textw )
-				loop while( num < (symbGetDefineParams( s ) - 1) )
+				hAddMissingMacroArgs( s, nextparam, argtb, num, is_variadic, TRUE )
 			end if
 
 			exit do

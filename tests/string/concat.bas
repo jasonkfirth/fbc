@@ -61,4 +61,16 @@ SUITE( fbc_tests.string_.concat )
 
 	END_TEST
 
+	TEST( fixedLengthAssignment )
+		dim as string a = "a", b = "b", c = "c"
+		dim result as string * 4
+
+		result = a + b + c
+
+		CU_ASSERT_EQUAL( result[0], asc( "a" ) )
+		CU_ASSERT_EQUAL( result[1], asc( "b" ) )
+		CU_ASSERT_EQUAL( result[2], asc( "c" ) )
+		CU_ASSERT_EQUAL( result[3], asc( " " ) )
+	END_TEST
+
 END_SUITE

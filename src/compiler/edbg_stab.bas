@@ -672,18 +672,19 @@ private function hDeclPointer _
 		byref dtype as integer _
 	) as string static
 
-	dim as string desc
+	dim as DZSTRING desc
 
-	desc = ""
+	DZstrZero( desc )
 	do while( typeIsPtr( dtype ) )
 		dtype = typeDeref( dtype )
-		'' Pointer depth is bounded by the datatype bitfield.
-		'' FB-LINTER: DISABLE-NEXT-LINE FBL503
-		desc += str( ctx.typecnt ) + "=*"
+		DZstrConcatAssign( desc, str( ctx.typecnt ) + "=*" )
 		ctx.typecnt += 1
 	loop
 
-	function = desc
+	if( desc.data <> NULL ) then
+		function = *desc.data
+	end if
+	DZstrAllocate( desc, 0 )
 
 end function
 
@@ -764,13 +765,17 @@ private function hGetDataType _
 					desc += "0;"
 					desc += str( requesteddimtbelements - 1 ) + ";"
 				else
+					dim as DZSTRING arraydesc
+					DZstrZero( arraydesc )
 					for i as integer = 0 to symbGetArrayDimensions( sym ) - 1
-						'' Array dimensions are limited to FB_MAXARRAYDIMS.
-						'' FB-LINTER: DISABLE-NEXT-LINE FBL503
-						desc += "ar1;"
-						desc += str( symbArrayLbound( sym, i ) ) + ";"
-						desc += str( symbArrayUbound( sym, i ) ) + ";"
+						DZstrConcatAssign( arraydesc, "ar1;" )
+						DZstrConcatAssign( arraydesc, str( symbArrayLbound( sym, i ) ) + ";" )
+						DZstrConcatAssign( arraydesc, str( symbArrayUbound( sym, i ) ) + ";" )
 					next
+					if( arraydesc.data <> NULL ) then
+						desc += *arraydesc.data
+					end if
+					DZstrAllocate( arraydesc, 0 )
 				end if
 			end if
 
@@ -849,16 +854,17 @@ private sub hDeclUDT _
 	)
 
 	dim as FBSYMBOL ptr fld = any
-	dim as string desc
+	dim as DZSTRING desc
 
 	assert( symbIsStruct( sym ) )
+	DZstrZero( desc )
 
 	sym->udt.dbg.typenum = ctx.typecnt
 	ctx.typecnt += 1
 
-	desc = *symbGetDBGName( sym )
+	DZstrAssign( desc, symbGetDBGName( sym ) )
 
-	desc += ":Tt" + str( sym->udt.dbg.typenum ) + "=s" + str( symbGetSizeOf( sym ) )
+	DZstrConcatAssign( desc, ":Tt" + str( sym->udt.dbg.typenum ) + "=s" + str( symbGetSizeOf( sym ) ) )
 
 	fld = symbUdtGetFirstField( sym )
 	while( fld )
@@ -871,18 +877,20 @@ private sub hDeclUDT _
 			'' a descriptor type, and dimtbelements will only be set
 			'' if declaring a descriptor type, so we can just pass it
 			'' always, to keep it simple)
-			desc += *symbGetName( fld ) + ":" + hGetDataType( fld, dimtbelements )
-			desc += "," + str( symbGetFieldBitOffset( fld ) )
-			desc += "," + str( symbGetFieldBitLength( fld ) )
-			desc += ";"
+			DZstrConcatAssign( desc, symbGetName( fld ) )
+			DZstrConcatAssign( desc, ":" + hGetDataType( fld, dimtbelements ) )
+			DZstrConcatAssign( desc, "," + str( symbGetFieldBitOffset( fld ) ) )
+			DZstrConcatAssign( desc, "," + str( symbGetFieldBitLength( fld ) ) )
+			DZstrConcatAssign( desc, ";" )
 		end if
 
 		fld = symbUdtGetNextField( fld )
 	wend
 
-	desc += ";"
+	DZstrConcatAssign( desc, ";" )
 
-	hEmitSTABS( STAB_TYPE_LSYM, desc, 0, 0, "0" )
+	hEmitSTABS( STAB_TYPE_LSYM, desc.data, 0, 0, "0" )
+	DZstrAllocate( desc, 0 )
 
 end sub
 

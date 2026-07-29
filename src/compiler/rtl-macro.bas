@@ -298,6 +298,8 @@ end type
 		) _
 	}
 
+'' QB dialect macro definitions
+
 	'' These are the -lang qb versions of the built-in macros, using the
 	'' '__' prefixes where necessary.
 	dim shared as FB_RTL_MACRODEF macrodataQB(0 to ...) = _
@@ -583,6 +585,8 @@ end type
 		) _
 	}
 
+'' Macro symbol construction
+
 private sub hAddMacro( byval macdef as FB_RTL_MACRODEF ptr )
 	dim as integer addbody = TRUE
 	var flags = FB_DEFINE_FLAGS_NONE
@@ -591,8 +595,7 @@ private sub hAddMacro( byval macdef as FB_RTL_MACRODEF ptr )
 	dim as FB_DEFPARAM ptr paramhead, lastparam
 	for i as integer = 0 to macdef->params-1
 		'' if there are parameters, then must have parens
-		'' TODO: if other optional flags are needed,
-		'' then must add macrodata() table
+		'' Per-macro optional flags belong in macrodata() if they are needed.
 		flags or= FB_DEFINE_FLAGS_NEEDPARENS
 		lastparam = symbAddDefineParam( lastparam, macdef->paramTb(i) )
 		if( paramhead = NULL ) then
@@ -660,6 +663,8 @@ private sub hAddMacros( byval macdef as FB_RTL_MACRODEF ptr )
 		macdef += 1
 	wend
 end sub
+
+'' Module lifecycle
 
 sub rtlMacroModInit( )
 	if( fbLangIsSet( FB_LANG_QB ) ) then

@@ -153,7 +153,6 @@ private function hThreadCallPushType _
 	function = true
 end function
 
-'' TODO: Re-use astRemSideFx/astMakeRef instead of this?
 private function hGetExprRef( byref expr as ASTNODE ptr ) as ASTNODE ptr
 	dim as FBSYMBOL ptr tmpvar = any
 
@@ -161,8 +160,16 @@ private function hGetExprRef( byref expr as ASTNODE ptr ) as ASTNODE ptr
 		'' already a variable? just get the address
 		'' @expr
 		expr = astNewADDROF( expr )
+	elseif( typeGetClass( astGetDataType( expr ) ) <> FB_DATACLASS_UDT andalso _
+	        typeGetClass( astGetDataType( expr ) ) <> FB_DATACLASS_STRING ) then
+		'' astRemSideFx() owns the canonical scalar temporary handling.
+		'' hGetExprRef() additionally turns the resulting value into the
+		'' pointer expected by the thread-call argument packer.
+		function = astRemSideFx( expr )
+		expr = astNewADDROF( expr )
 	else
-		'' copy expression to a variable, and get the address
+		'' Complex values must be copied into storage that remains valid while
+		'' the thread-call argument packer reads it.
 		tmpvar = symbAddTempVar( astGetDataType( expr ), astGetSubType( expr ) )
 
 		'' tmpvar = expr

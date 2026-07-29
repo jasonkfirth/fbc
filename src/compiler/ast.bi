@@ -422,6 +422,8 @@ type AST_OPINFO
 	selfop          as AST_OP                       '' self version
 end type
 
+'' AST construction and transformation API
+
 declare sub astInit( )
 declare sub astEnd( )
 declare sub astProcListInit( )

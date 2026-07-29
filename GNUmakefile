@@ -160,6 +160,7 @@ compiler-wii: | maybe-prereqs
 rtlib: | maybe-prereqs
 fbrt: | maybe-prereqs
 gfxlib2: | maybe-prereqs
+gfxlib3: | maybe-prereqs
 sfxlib: | maybe-prereqs
 
 bootstrap: | maybe-prereqs
@@ -301,6 +302,7 @@ help:
 	@echo "  rtlib                   Build core runtime library"
 	@echo "  fbrt                    Build startup/runtime objects"
 	@echo "  gfxlib2                 Build graphics library"
+	@echo "  gfxlib3                 Build experimental GPU graphics core"
 	@echo "  sfxlib                  Build sound library"
 	@echo ""
 	@echo "Bootstrap:"

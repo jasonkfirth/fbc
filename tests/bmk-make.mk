@@ -69,6 +69,13 @@ endif
 
 FBC_CFLAGS := -i $(abspath ../inc)
 
+# Specialized runtime wrappers sometimes need a source-level compiler switch
+# for every module. Keep it separate from FBC_LFLAGS because object metadata
+# must be chosen while each source is compiled, before the final link occurs.
+ifneq ($(strip $(FBC_EXTRA_CFLAGS)),)
+	FBC_CFLAGS += $(FBC_EXTRA_CFLAGS)
+endif
+
 ifneq ($(FB_LANG),)
 	FBC_CFLAGS += -lang $(FB_LANG)
 	override FBC_LFLAGS += -lang $(FB_LANG)

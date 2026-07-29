@@ -65,8 +65,10 @@
 #define FB_RTL_STRLEN                   "fb_StrLen"
 #define FB_RTL_STRLSET                  "fb_StrLset"        '' set var-len string from var-len string
 #define FB_RTL_STRLSETANA               "fb_StrLsetANA"     '' set var-len string from fixed-len string
+#define FB_RTL_STRLSETEX                "fb_StrLsetEx"      '' set strings with explicit encoded lengths
 #define FB_RTL_STRRSET                  "fb_StrRset"        '' set var-len string from var-len string
 #define FB_RTL_STRRSETANA               "fb_StrRsetANA"     '' set var-len string from fixed-len string
+#define FB_RTL_STRRSETEX                "fb_StrRsetEx"      '' set strings with explicit encoded lengths
 #define FB_RTL_STRASC                   "fb_ASC"
 #define FB_RTL_STRCHR                   "fb_CHR"
 #define FB_RTL_STRINSTR                 "fb_StrInstr"
@@ -113,7 +115,9 @@
 #define FB_RTL_WSTRFILL2                "fb_WstrFill2"
 #define FB_RTL_WSTRLEN                  "fb_WstrLen"
 #define FB_RTL_WSTRLSET                 "fb_WstrLset"
+#define FB_RTL_WSTRLSETEX               "fb_WstrLsetEx"
 #define FB_RTL_WSTRRSET                 "fb_WstrRset"
+#define FB_RTL_WSTRRSETEX               "fb_WstrRsetEx"
 #define FB_RTL_WSTRASC                  "fb_WstrAsc"
 #define FB_RTL_WSTRCHR                  "fb_WstrChr"
 #define FB_RTL_WSTRINSTR                "fb_WstrInstr"
@@ -477,6 +481,8 @@
 
 #define FB_RTL_THREADCALL               "fb_ThreadCall"
 
+
+'' Runtime procedure index
 
 '' the order doesn't matter but it makes more sense to follow the same
 '' order as the FB_RTL_* defines above
@@ -955,6 +961,15 @@ enum FB_RTL_IDX
 
 	FB_RTL_IDX_THREADCALL
 
+	''
+	'' Appended to preserve the cache indices embedded in compiler objects
+	'' built before these explicit-length LSET/RSET entry points existed.
+	''
+	FB_RTL_IDX_STRLSETEX
+	FB_RTL_IDX_STRRSETEX
+	FB_RTL_IDX_WSTRLSETEX
+	FB_RTL_IDX_WSTRRSETEX
+
 	FB_RTL_INDEXES
 end enum
 
@@ -978,6 +993,8 @@ enum FB_RTL_OPT
 	FB_RTL_OPT_32BIT          = &h00008000  '' 32bit only
 	FB_RTL_OPT_64BIT          = &h00010000  '' 64bit only
 end enum
+
+'' Intrinsic registration metadata
 
 '' mirrored in rtlib/thread_call.c
 enum
@@ -1015,6 +1032,8 @@ type FB_RTL_PROCDEF
 	paramTb(0 to 15) as FB_RTL_PARAMDEF
 end type
 
+'' Runtime AST construction API
+
 declare sub rtlInit _
 	( _
 	)
@@ -1045,6 +1064,14 @@ declare function rtlCalcStrLen _
 		byval expr as ASTNODE ptr, _
 		byval dtype as integer _
 	) as longint
+
+declare function rtlBuildStrLenExpr _
+	( _
+		byref expr as ASTNODE ptr, _
+		byval dtype as integer, _
+		byref prelude as ASTNODE ptr, _
+		byref uses_overloaded_len as integer _
+	) as ASTNODE ptr
 
 declare function rtlStrCompare _
 	( _

@@ -31,6 +31,10 @@ OBJDIRS := \
 	$(libfbgfxpicobjdir) \
 	$(libfbgfxmtobjdir) \
 	$(libfbgfxmtpicobjdir) \
+	$(libfbgfx3objdir) \
+	$(libfbgfx3picobjdir) \
+	$(libfbgfx3mtobjdir) \
+	$(libfbgfx3mtpicobjdir) \
 	$(libsfxobjdir) \
 	$(libsfxpicobjdir) \
 	$(libsfxmtobjdir) \

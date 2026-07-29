@@ -100,6 +100,12 @@ libfbgfxpicobjdir   := src/gfxlib2/obj/$(objsubdir)/pic
 libfbgfxmtobjdir    := src/gfxlib2/obj/$(objsubdir)/mt
 libfbgfxmtpicobjdir := src/gfxlib2/obj/$(objsubdir)/mt/pic
 
+# Experimental GPU graphics runtime
+libfbgfx3objdir      := src/gfxlib3/obj/$(objsubdir)
+libfbgfx3picobjdir   := src/gfxlib3/obj/$(objsubdir)/pic
+libfbgfx3mtobjdir    := src/gfxlib3/obj/$(objsubdir)/mt
+libfbgfx3mtpicobjdir := src/gfxlib3/obj/$(objsubdir)/mt/pic
+
 # Sound runtime
 
 libsfxobjdir       := src/sfxlib/obj/$(objsubdir)

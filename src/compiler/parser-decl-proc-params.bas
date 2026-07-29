@@ -195,8 +195,23 @@ private function hMockParam _
 	function = symbAddProcParam( proc, NULL, dtype, NULL, iif( pmode = FB_PARAMMODE_BYDESC, -1, 0 ), pmode, 0, 0 )
 end function
 
+private function hParseParamMode( ) as integer
+	select case lexGetToken( )
+	case FB_TK_BYVAL
+		lexSkipToken( LEXCHECK_POST_SUFFIX )
+		return FB_PARAMMODE_BYVAL
+	case FB_TK_BYREF
+		lexSkipToken( LEXCHECK_POST_SUFFIX )
+		return FB_PARAMMODE_BYREF
+	end select
+
+	return INVALID
+end function
+
 '':::::
 '' ParamDecl      =   (BYVAL|BYREF)? ID (('(' ')')? (AS SymbolType)?)? ('=" (NUM_LIT|STR_LIT))? .
+''
+'' Parameter grammar and symbol construction share error-recovery state here.
 ''
 private function hParamDecl _
 	( _
@@ -261,16 +276,7 @@ private function hParamDecl _
 	end if
 
 	'' (BYVAL|BYREF)?
-	select case lexGetToken( )
-	case FB_TK_BYVAL
-		mode = FB_PARAMMODE_BYVAL
-		lexSkipToken( LEXCHECK_POST_SUFFIX )
-	case FB_TK_BYREF
-		mode = FB_PARAMMODE_BYREF
-		lexSkipToken( LEXCHECK_POST_SUFFIX )
-	case else
-		mode = INVALID
-	end select
+	mode = hParseParamMode( )
 
 	'' Check whether a param ID was given or not
 	'' In prototypes they can be omitted, and in fact we even allow

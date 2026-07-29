@@ -4,14 +4,27 @@
 #ifndef __fbgfx_bi__
 #define __fbgfx_bi__
 
-'' #inclib "fbgfx?" is handled as a special case by the compiler
-'' and will be replaced one of the following libraries later.
+'' The Android packaging helper uses this private marker when its bundled
+'' cross compiler predates the public -gfx3 option. Do not redefine the public
+'' marker when source code has already selected gfxlib3 directly.
+#ifdef __FB_GFXLIB3_OPTION__
+	#ifndef __FB_GFXLIB3__
+		#define __FB_GFXLIB3__
+	#endif
+#endif
+
+'' The question-mark names are handled as special cases by the compiler and
+'' are replaced by the correct threading/PIC library variant at link time.
 ''   fbgfx
 ''   fbgfxmt      thread-safe
 ''   fbgfxpic     position independent code
 ''   fbgfxmtpic   thread-safe & PIC
 
-#inclib "fbgfx?"
+#ifdef __FB_GFXLIB3__
+	#inclib "fbgfx3?"
+#else
+	#inclib "fbgfx?"
+#endif
 
 #ifdef __FB_WIN32__
 	#inclib "gdi32"
@@ -37,6 +50,7 @@ namespace FB
 	'' Usage examples:
 	''  SCREEN 14, 16,, GFX_FULLSCREEN
 	''  SCREEN 18, 32,, GFX_OPENGL OR GFX_STENCIL_BUFFER
+	''  SCREENRES 640, 480, 32, 2, GFX_RESIZABLE
 	''
 	const as long _
 		GFX_NULL                    = -1        , _
@@ -50,7 +64,13 @@ namespace FB
 		GFX_ALPHA_PRIMITIVES        = &h00000040, _
 		GFX_HIGH_PRIORITY           = &h00000080, _
 		GFX_NO_X86_MMX              = &h00000100, _
+		GFX_RESIZABLE               = &h00000400, _
 		GFX_SCREEN_EXIT             = &h80000000l
+
+#ifdef __FB_GFXLIB3__
+	'' Select the explicit Vulkan path while that backend reaches full parity.
+	const as long GFX_VULKAN = &h00000200
+#endif
 
 	'' OpenGL options
 	const as long _
@@ -165,7 +185,8 @@ namespace FB
 		EVENT_WINDOW_GOT_FOCUS      = 11, _
 		EVENT_WINDOW_LOST_FOCUS     = 12, _
 		EVENT_WINDOW_CLOSE          = 13, _
-		EVENT_MOUSE_HWHEEL          = 14
+		EVENT_MOUSE_HWHEEL          = 14, _
+		EVENT_WINDOW_RESIZE         = 15
 
 
 	'' Event structure, to be used with ScreenEvent
@@ -186,6 +207,10 @@ namespace FB
 				y as long
 				dx as long
 				dy as long
+			end type
+			type
+				width as long
+				height as long
 			end type
 			button as long
 			z as long

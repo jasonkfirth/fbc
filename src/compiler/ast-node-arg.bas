@@ -601,6 +601,9 @@ private function hCheckStrParam _
 	'' passed BYREF implicitly)
 	case FB_PARAMMODE_BYVAL
 		hBuildByrefArg( param, n )
+	case else
+		'' Scalar STRING parameters can only be declared BYREF or BYVAL.
+		assert( FALSE )
 	end select
 
 	function = TRUE
@@ -794,12 +797,17 @@ private function hCheckUDTParam _
 	'' set the length if it's being passed by value
 	case FB_PARAMMODE_BYVAL
 		hUDTPassByval( param, n )
+	case else
+		'' UDT parameters cannot use descriptor or variadic modes here.
+		assert( FALSE )
 	end select
 
 	function = TRUE
 end function
 
 '':::::
+'' Parameter checking is one ordered pass over the language's calling rules.
+''
 private function hCheckParam _
 	( _
 		byval parent as ASTNODE ptr, _
@@ -856,6 +864,11 @@ private function hCheckParam _
 			exit function
 		end if
 
+	case FB_PARAMMODE_BYVAL
+		'' Scalar BYVAL parameters are handled by the type checks below.
+
+	case else
+		assert( FALSE )
 	end select
 
 	'' UDT arg? convert to param type if possible (including strings)
@@ -1104,7 +1117,7 @@ function astNewARG _
 	'' dtor don't matter)
 	if( ((not symbIsInstanceParam( param )) or _
 		((sym->pattrib and FB_PROCATTRIB_NOTHISCONSTNESS) = 0)) ) then
-		if( symbCheckConstAssignTopLevel( symbGetFullType( param ), dtype, param->subtype, arg->subtype, symbGetParamMode( param ) ) = FALSE ) then
+		if( symbCheckConstAssignTopLevel( symbGetFullType( param ), dtype, symbGetParamMode( param ) ) = FALSE ) then
 			if( symbIsInstanceParam( param ) ) then
 				errReportParam( parent->sym, 0, NULL, FB_ERRMSG_CONSTUDTTONONCONSTMETHOD )
 			else

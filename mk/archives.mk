@@ -108,6 +108,29 @@ endif
 endif
 
 ##############################################################################
+# Experimental GPU graphics runtime (gfxlib3)
+##############################################################################
+
+GFX3_LIBS :=
+
+ifdef ENABLE_NONPIC
+GFX3_LIBS += $(libdir)/libfbgfx3.a
+endif
+
+ifdef ENABLE_PIC
+GFX3_LIBS += $(libdir)/libfbgfx3pic.a
+endif
+
+ifndef DISABLE_MT
+ifdef ENABLE_NONPIC
+GFX3_LIBS += $(libdir)/libfbgfx3mt.a
+endif
+ifdef ENABLE_PIC
+GFX3_LIBS += $(libdir)/libfbgfx3mtpic.a
+endif
+endif
+
+##############################################################################
 # Sound runtime (sfxlib)
 ###############################################################################
 

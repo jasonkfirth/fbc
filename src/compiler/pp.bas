@@ -163,14 +163,14 @@ sub ppCheck( )
 
 	lex.ctx->reclevel += 1
 
-	'' !!!FIXME!!! if LEXCHECK_KWDNAMESPC is used in future, it
-	'' must be restored
+	dim as FBSYMBOL ptr previous_kwdns = lex.ctx->kwdns
 	lex.ctx->kwdns = @pp.kwdns
 
 	lexSkipToken( LEXCHECK_KWDNAMESPC )
 
 	'' let the parser do the rest..
 	ppParse( )
+	lex.ctx->kwdns = previous_kwdns
 	lex.ctx->reclevel -= 1
 
 end sub

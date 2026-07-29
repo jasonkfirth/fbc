@@ -1,14 +1,16 @@
 
+#include once "fbgfx.bi"
+
 const SCREEN_MODE = 13
 const IMAGE_WIDTH = 320
 const IMAGE_HEIGHT = 200
 const IMAGE_PIXELS = IMAGE_WIDTH * IMAGE_HEIGHT
-const IMAGE_HEADER_BYTES = 4
+'' GET writes the current FB.IMAGE header, not the four-byte QB header.
+const IMAGE_HEADER_BYTES = sizeof(FB.IMAGE)
 const IMAGE_BUFFER_BYTES = IMAGE_HEADER_BYTES + IMAGE_PIXELS
 
 type fb_image field = 1
-	width 				as ushort
-	height 				as ushort
+	header				as FB.IMAGE
 	imagedata(0 to IMAGE_PIXELS - 1) as ubyte
 end type
 

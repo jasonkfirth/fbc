@@ -10,6 +10,7 @@
 #include once "flist.bi"
 #include once "ir.bi"
 #include once "hlp.bi"
+#include once "dstr.bi"
 
 type IRTAC_CTX
 	tacTB           as TFLIST
@@ -746,22 +747,26 @@ private sub _emitComment( byval text as zstring ptr )
 end sub
 
 private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
-	dim ln as string
+	dim ln as DZSTRING
+
+	DZstrZero( ln )
+	DZstrAllocate( ln, 1 )
+	DZstrReset( ln )
 
 	var n = asmtokenhead
 	while( n )
 
 		select case( n->type )
 		case AST_ASMTOK_TEXT
-			ln += *n->text
+			DZstrConcatAssign( ln, n->text )
 		case AST_ASMTOK_SYMB
-			ln += *symbGetMangledName( n->sym )
+			DZstrConcatAssign( ln, symbGetMangledName( n->sym ) )
 			var ofs = symbGetOfs( n->sym )
 			if( ofs <> 0 ) then
 				if( ofs > 0 ) then
-					ln += "+"
+					DZstrConcatAssignC( ln, asc( "+" ) )
 				end if
-				ln += str( ofs )
+				DZstrConcatAssign( ln, str( ofs ) )
 			end if
 		end select
 
@@ -769,7 +774,8 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 	wend
 
 	'' The queued literal owns this duplicated text until hFlushLIT() frees it.
-	_emit( AST_OP_LIT_ASM, NULL, NULL, NULL, cast( any ptr, ZstrDup( strptr( ln ) ) ) )
+	_emit( AST_OP_LIT_ASM, NULL, NULL, NULL, cast( any ptr, ZstrDup( ln.data ) ) )
+	DZstrAllocate( ln, 0 )
 end sub
 
 private sub _emitVarIniBegin( byval sym as FBSYMBOL ptr )
@@ -1148,25 +1154,32 @@ end sub
 
 #if __FB_DEBUG__
 sub hDumpFreeIntRegs( )
-	dim as string free, used
+	dim as DZSTRING free, used
 	dim as integer reg = any
+	dim as string freetext, usedtext
+	DZstrZero( free )
+	DZstrZero( used )
 
 	'' For each register in the integer class
 	reg = regTB(FB_DATACLASS_INTEGER)->getFirst( regTB(FB_DATACLASS_INTEGER) )
 	while( reg <> INVALID )
 
 		if( regTB(FB_DATACLASS_INTEGER)->isFree( regTB(FB_DATACLASS_INTEGER), reg ) ) then
-			if( len( free ) > 0 ) then free += ", "
-			free += emitDumpRegName( FB_DATATYPE_INTEGER, reg )
+			if( free.len > 0 ) then DZstrConcatAssign( free, ", " )
+			DZstrConcatAssign( free, emitDumpRegName( FB_DATATYPE_INTEGER, reg ) )
 		else
-			if( len( used ) > 0 ) then used += ", "
-			used += emitDumpRegName( FB_DATATYPE_INTEGER, reg )
+			if( used.len > 0 ) then DZstrConcatAssign( used, ", " )
+			DZstrConcatAssign( used, emitDumpRegName( FB_DATATYPE_INTEGER, reg ) )
 		end if
 
 		reg = regTB(FB_DATACLASS_INTEGER)->getNext( regTB(FB_DATACLASS_INTEGER), reg )
 	wend
 
-	print , "used: " & used & " | free: " & free
+	if( used.data <> NULL ) then usedtext = *used.data
+	if( free.data <> NULL ) then freetext = *free.data
+	print , "used: " & usedtext & " | free: " & freetext
+	DZstrAllocate( free, 0 )
+	DZstrAllocate( used, 0 )
 end sub
 
 private sub hDump _

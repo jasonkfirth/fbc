@@ -15,6 +15,7 @@ $(srcdir)/compiler \
 $(RTLIB_DIRS) \
 $(FBRT_DIRS) \
 $(GFXLIB2_DIRS) \
+$(GFXLIB3_DIRS) \
 $(SFXLIB_DIRS)
 
 .SUFFIXES:
@@ -22,7 +23,7 @@ $(SFXLIB_DIRS)
 # Ensure bootstrap/self-hosted fbc uses this source tree's bin/lib paths
 # instead of any compiled-in installation prefix.
 FBC_BUILD_ROOT := $(rootdir)
-ifneq ($(filter MSYS% MINGW%,$(shell uname -s 2>/dev/null)),)
+ifneq ($(filter MSYS% MINGW% CYGWIN%,$(shell uname -s 2>/dev/null)),)
 FBC_BUILD_ROOT := $(shell cygpath -m "$(rootdir)")
 endif
 FBC_PREFIX_OPT := -prefix $(FBC_BUILD_ROOT)
@@ -46,13 +47,13 @@ FBC_ENV_EMCC := $(EMCC)
 FBC_ENV_CXBE := $(CXBE)
 FBC_ENV_DXEGEN := $(DXEGEN)
 FBC_ENV_ELF2DOL := $(ELF2DOL)
-ifneq ($(filter MSYS% MINGW%,$(shell uname -s 2>/dev/null)),)
+ifneq ($(filter MSYS% MINGW% CYGWIN%,$(shell uname -s 2>/dev/null)),)
 #
 # BUILD_FBC is often a native Windows executable even when make is running
-# from MSYS2.  fbc consults tool-specific environment variables such as GCC
-# and AS directly, so convert those to absolute Windows-style paths.  Keep PATH
-# in the shell's native POSIX form because Cygwin tools expect that environment
-# after fbc launches them.
+# from MSYS2 or Cygwin.  fbc consults tool-specific environment variables such
+# as GCC and AS directly, so convert those to absolute Windows-style paths.
+# Keep PATH in the shell's native POSIX form because the shell tools expect
+# that environment after fbc launches them.
 #
 fbc_msys_tool = $(strip $(if $(strip $(1)),$(shell tool='$(call tool_cmd,$(1))'; args='$(call tool_args,$(1))'; if command -v "$$tool" >/dev/null 2>&1; then tool="$$(cygpath -m "$$(command -v "$$tool")")"; else tool="$$(cygpath -m "$$tool" 2>/dev/null || printf '%s' "$$tool")"; fi; if [ -n "$$args" ]; then printf '%s %s' "$$tool" "$$args"; else printf '%s' "$$tool"; fi)))
 FBC_ENV_AS := $(call fbc_msys_tool,$(AS))
@@ -362,6 +363,26 @@ $(libfbgfxmtobjdir)/%.o: $(srcdir)/gfxlib2/%.s $(LIBFBGFX_H) | $(libfbgfxmtobjdi
 $(libfbgfxmtpicobjdir)/%.o: $(srcdir)/gfxlib2/%.s $(LIBFBGFX_H) | $(libfbgfxmtpicobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(ALLCFLAGS) $(MTPIC_CFLAGS) -x assembler-with-cpp -MMD -MP -c $< -o $@
+
+##############################################################################
+# gfxlib3 common core (C sources)
+##############################################################################
+
+$(libfbgfx3objdir)/%.o: $(srcdir)/gfxlib3/%.c $(LIBFBGFX3_H) | $(libfbgfx3objdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) -MMD -MP -c $< -o $@
+
+$(libfbgfx3picobjdir)/%.o: $(srcdir)/gfxlib3/%.c $(LIBFBGFX3_H) | $(libfbgfx3picobjdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) -MMD -MP -c $< -o $@
+
+$(libfbgfx3mtobjdir)/%.o: $(srcdir)/gfxlib3/%.c $(LIBFBGFX3_H) | $(libfbgfx3mtobjdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MT_CFLAGS) -MMD -MP -c $< -o $@
+
+$(libfbgfx3mtpicobjdir)/%.o: $(srcdir)/gfxlib3/%.c $(LIBFBGFX3_H) | $(libfbgfx3mtpicobjdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MTPIC_CFLAGS) -MMD -MP -c $< -o $@
 
 ##############################################################################
 # sfxlib (C sources)

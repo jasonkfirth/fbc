@@ -117,7 +117,10 @@ Main routines:
 - `fb_sfxInit()` performs subsystem startup work
 - `fb_sfxExit()` performs subsystem shutdown work
 - `fb_sfxUpdate()` asks the mixer for frames and hands them to the driver
+- `fb_sfxOutputSampleRate()` reports the active driver's synthesis clock
+- `fb_sfxRawOpen()` and `fb_sfxRawClose()` bracket caller-clocked output
 - `fb_sfxRawWrite()` copies caller-provided float samples into the driver output queue
+- `fb_sfxOutputUnderruns()` reports device-side starvation events
 - `fb_sfxDriverInit()` picks and starts a platform driver
 - `fb_sfxDriverShutdown()` stops the active driver
 
@@ -231,6 +234,15 @@ Main routines:
 - `fb_sfxEnvelopeCmd()` defines an envelope from command-style inputs
 - `fb_sfxEnvelopeDefined()` checks whether an envelope exists
 - `fb_sfxEnvelopeCmdReset()` clears all envelope definitions
+
+### `sfx_echo.c`
+Owns the optional whole-mix stereo ping-pong echo.
+
+Main routines:
+- `fb_sfxEchoCmd()` validates settings and creates the delay line
+- `fb_sfxEchoProcess()` applies delay and bounded cross-channel feedback
+- `fb_sfxEchoReset()` clears and disables the effect
+- `fb_sfxEchoEnabled()` reports whether the effect is active
 
 ### `sfx_instrument.c`
 Stores instruments, which group wave and envelope choices together.
@@ -455,10 +467,31 @@ Main routines:
 - `fb_sfxSfxAnyActive()`
 
 ### `sfx_midi_open.c`
-Opens a MIDI output device.
+Opens a MIDI output device and owns MIDI output routing. A native MIDI backend
+is tried first. If it cannot be opened, the command selects the C software FM
+synthesizer instead. `SFXLIB_MIDI_DRIVER=fm` selects that fallback explicitly,
+which is useful for repeatable tests and consistent sound across platforms.
 
 Main routines:
 - `fb_sfxMidiOpen()`
+- `fb_sfxMidiOutputSend()`
+- `fb_sfxMidiOutputClose()`
+
+### `sfx_midi_fm.c`
+Provides the bounded software fallback used when no platform MIDI output is
+available. It keeps 32 two-operator FM voices, gives all 128 General MIDI
+program numbers compact individual presets, implements common channel
+controls, and provides noise-assisted channel 10 presets for the standard
+General MIDI percussion range. High-note brightness is reduced when necessary
+to keep FM sidebands controlled at low output sample rates. Its stereo output
+is added to the normal mixer before effects and the output ring buffer.
+
+Main routines:
+- `fb_sfxMidiSoftwareOpen()`, `fb_sfxMidiSoftwareClose()`
+- `fb_sfxMidiSoftwareSend()`
+- `fb_sfxMidiSoftwareSilence()`, `fb_sfxMidiSoftwareReleaseAll()`
+- `fb_sfxMidiSoftwarePause()`
+- `fb_sfxMidiSoftwareMixFrame()`
 
 ### `sfx_midi_close.c`
 Closes the MIDI device.

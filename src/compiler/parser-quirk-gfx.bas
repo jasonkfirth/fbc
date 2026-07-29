@@ -26,7 +26,7 @@ const FBGFX_VIEW_SCREEN_FLAG       = &h00000001
 
 '' Check for cast() AS ANY PTR or compatible overloads, and call them, if any.
 private function hMaybeUdt2Ptr( byval expr as ASTNODE ptr ) as ASTNODE ptr
-	dim as FB_ERRMSG err_num = any
+	dim as FB_ERRMSG err_num = FB_ERRMSG_OK
 	dim as FBSYMBOL ptr castproc = any
 
 	castproc = symbFindCastOvlProc( typeAddrOf( FB_DATATYPE_VOID ), NULL, expr, @err_num )

@@ -24,6 +24,9 @@ extern "C" {
 #include <Window.h>
 #include <View.h>
 #include <Locker.h>
+#ifndef DISABLE_OPENGL
+#include <GLView.h>
+#endif
 #endif
 
 /* ------------------------------------------------------------------------- */
@@ -42,6 +45,7 @@ typedef struct FB_HAIKU_STATE
     /* lifecycle */
     int initialized;
     int quitting;
+    int gl_locked;
 
     /*
         Thread that called into the graphics backend from the runtime side.
@@ -69,12 +73,18 @@ typedef struct FB_HAIKU_STATE
     BWindow *window;
     BView *view;
     BBitmap *bitmap;
+#ifndef DISABLE_OPENGL
+    BGLView *gl_view;
+#else
+    void *gl_view;
+#endif
     BLocker *backend_lock;
 #else
     void *app;
     void *window;
     void *view;
     void *bitmap;
+    void *gl_view;
     void *backend_lock;
 #endif
 
@@ -111,6 +121,9 @@ extern thread_id fb_haiku_event_thread;
 extern BBitmap *g_bmp;
 extern BWindow *g_win;
 extern BView   *g_view;
+#ifndef DISABLE_OPENGL
+extern BGLView *g_gl_view;
+#endif
 #endif
 
 /* ------------------------------------------------------------------------- */
@@ -128,6 +141,9 @@ void fb_hHaikuUpdate(void);
 void fb_hHaikuPollEvents(void);
 void fb_hHaikuWaitVSync(void);
 void fb_hHaikuSetPalette(int index, int r, int g, int b);
+#ifndef DISABLE_OPENGL
+void fb_hHaikuOpenGLFlip(void);
+#endif
 
 /* ------------------------------------------------------------------------- */
 /* Window helpers                                                            */

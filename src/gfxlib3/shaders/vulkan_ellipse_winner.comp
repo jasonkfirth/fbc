@@ -1,0 +1,79 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_ellipse_winner.comp
+
+    Purpose:
+
+        Select the last opaque filled midpoint ellipse reaching each pixel.
+
+    Responsibilities:
+
+        - retain gfxlib2's exact midpoint coverage sequence
+        - let overlapping CIRCLE calls select their final Basic writer
+        - run one workgroup row per ellipse command
+
+    This file intentionally does NOT contain:
+
+        - final colour writes
+        - alpha or outline ellipse handling
+        - host-side command validation
+*/
+
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+shared int x1; shared int x2; shared int y1; shared int y2; shared int d;
+shared double aq; shared double bq; shared double dx; shared double dy;
+shared double r; shared double rx; shared double ry;
+
+layout(set = 0, binding = 0, std430) buffer WinnerPixels { uint pixels[]; }
+	winner_pixels;
+
+struct EllipseCommand { ivec4 center; ivec4 clip; vec4 radii; uvec4 parameters; };
+layout(set = 0, binding = 1, std430) readonly buffer EllipseCommands
+{ EllipseCommand commands[]; } ellipse_commands;
+
+void select_span(EllipseCommand command, int y, int first_x, int last_x, uint tag)
+{
+	int first = max(first_x, command.clip.x);
+	int last = min(last_x, command.clip.z);
+	if ((y < command.clip.y) || (y > command.clip.w)) return;
+	for (int x = first + int(gl_LocalInvocationID.x); x <= last;
+	     x += int(gl_WorkGroupSize.x))
+		atomicMax(winner_pixels.pixels[(uint(y) * uint(command.radii.z)) + uint(x)], tag);
+}
+
+void main(void)
+{
+	uint command_index = gl_WorkGroupID.y;
+	EllipseCommand command = ellipse_commands.commands[command_index];
+	uint tag = command_index + 1u;
+
+	if (gl_LocalInvocationID.x == 0u) {
+		x1 = int(float(command.center.x) - command.radii.x);
+		x2 = int(float(command.center.x) + command.radii.x);
+		y1 = command.center.y; y2 = command.center.y; d = int(command.radii.x);
+		aq = trunc(double(command.radii.x * command.radii.x));
+		bq = trunc(double(command.radii.y * command.radii.y));
+		dx = aq * 2.0; dy = bq * 2.0;
+		r = trunc(double(command.radii.x * float(bq))); rx = r * 2.0; ry = 0.0;
+	}
+	barrier();
+	if (command.radii.y == 0.0) { select_span(command, y1, x1, x2, tag); return; }
+	select_span(command, y1, x1, x2, tag);
+	while (d > 0) {
+		if (gl_LocalInvocationID.x == 0u) {
+			if (r > 0.0) { y1++; y2--; ry += dx; r -= ry; }
+			if (r <= 0.0) { d--; x1++; x2--; rx -= dy; r += rx; }
+		}
+		barrier();
+		select_span(command, y1, x1, x2, tag);
+		if (y2 != y1) select_span(command, y2, x1, x2, tag);
+		barrier();
+	}
+}
+
+/* end of vulkan_ellipse_winner.comp */

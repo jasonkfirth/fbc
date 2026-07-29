@@ -1,0 +1,44 @@
+/*
+    Project: FreeBASIC gfxlib3
+    --------------------------
+
+    File: vulkan_compute_smoke.comp
+
+    Purpose:
+
+        Provide the first Vulkan compute-pipeline proof used while bringing up
+        gfxlib3's header-independent Vulkan backend.
+
+    Responsibilities:
+
+        - read a bounded element count and addend from a storage-buffer header
+        - update each following 32-bit value exactly once
+        - tolerate a final partially occupied workgroup
+
+    This file intentionally does NOT contain:
+
+        - graphics-surface formats
+        - a production primitive rasterizer
+        - presentation or image-layout policy
+*/
+
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) buffer ComputeValues
+{
+	uint element_count;
+	uint addend;
+	uint values[];
+} compute_values;
+
+void main(void)
+{
+	uint index = gl_GlobalInvocationID.x;
+
+	if (index < compute_values.element_count)
+		compute_values.values[index] += compute_values.addend;
+}
+
+/* end of vulkan_compute_smoke.comp */

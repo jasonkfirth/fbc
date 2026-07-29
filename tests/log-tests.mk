@@ -193,6 +193,12 @@ ifeq ($(ENABLE_CONSOLE_OUTPUT),1)
 	FBC_CFLAGS += -d ENABLE_CONSOLE_OUTPUT=$(ENABLE_CONSOLE_OUTPUT)
 endif
 
+# Keep recursive run-time tests on the same compiler and per-source option
+# set as direct compile-only tests. Object metadata is selected during module
+# compilation, so forwarding only FBC_LFLAGS is not sufficient for wrappers
+# such as gfxlib3 that choose a runtime through a compiler define.
+BMK_MAKE_COMMON_ARGS = FBC="$(FBC)" FBC_EXTRA_CFLAGS="$(FBC_EXTRA_CFLAGS)" GCC="$(GCC)"
+
 # ------------------------------------------------------------------------
 
 all : $(LOGLIST_ALL)
@@ -251,7 +257,7 @@ ifneq ($(LOGLIST_COMPILE_AND_RUN_OK),)
 $(LOGLIST_COMPILE_AND_RUN_OK) : %.log : %.bas
 	@$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_OK"
 	@$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_OK" > $@
-	@if cd . && $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_OK LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" \
+	@if cd . && $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_OK LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -267,7 +273,7 @@ ifneq ($(LOGLIST_COMPILE_AND_RUN_FAIL),)
 $(LOGLIST_COMPILE_AND_RUN_FAIL) : %.log : %.bas
 	@$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_FAIL"
 	@$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_FAIL" > $@
-	@if cd . && $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_FAIL LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" \
+	@if cd . && $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_FAIL LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -283,7 +289,7 @@ ifneq ($(LOGLIST_MULTI_MODULE_OK),)
 $(LOGLIST_MULTI_MODULE_OK)  : %.log : %.bmk
 	@$(ECHO) "$< : TEST_MODE=MULTI_MODULE_OK"
 	@$(ECHO) "$< : TEST_MODE=MULTI_MODULE_OK" > $@
-	@if cd . && $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_OK LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" \
+	@if cd . && $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_OK LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -299,7 +305,7 @@ ifneq ($(LOGLIST_MULTI_MODULE_FAIL),)
 $(LOGLIST_MULTI_MODULE_FAIL)  : %.log : %.bmk
 	@$(ECHO) "$< : TEST_MODE=MULTI_MODULE_FAIL"
 	@$(ECHO) "$< : TEST_MODE=MULTI_MODULE_FAIL" > $@
-	@if cd . && $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_FAIL LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" \
+	@if cd . && $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_FAIL LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \

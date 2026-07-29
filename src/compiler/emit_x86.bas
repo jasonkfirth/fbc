@@ -846,28 +846,24 @@ private sub hEmitVarConst _
 	case FB_DATATYPE_WCHAR
 		stext = QUOTE
 		stext += *hEscapeW( symbGetVarLitTextW( s ) )
+		dim as DZSTRING terminator
+		DZstrZero( terminator )
 		for i as integer = 1 to typeGetSize( FB_DATATYPE_WCHAR )
-			'' A WCHAR terminator has a fixed target representation size.
-			'' FB-LINTER: DISABLE-NEXT-LINE FBL503
-			stext += RSLASH + "0"
+			DZstrConcatAssign( terminator, RSLASH + "0" )
 		next
+		if( terminator.data <> NULL ) then
+			stext += *terminator.data
+		end if
+		DZstrAllocate( terminator, 0 )
 		stext += QUOTE
 
 	case else
 		stext = *symbGetVarLitText( s )
 	end select
 
-	''
-	'' !!!FIXME!!!
-	''
-	'' Linux appears to support .rodata section, but I'm not sure about other platforms, and that's
-	'' probably the reason FB used to output a normal .data section in any case...
-	''
-	if( env.clopt.target = FB_COMPTARGET_LINUX ) then
-		_setSection( IR_SECTION_CONST, 0 )
-	else
-		_setSection( IR_SECTION_DATA, 0 )
-	end if
+	'' _getSectionString() maps the read-only section name for COFF, Mach-O
+	'' and ELF targets, so constants need not fall back to writable data.
+	_setSection( IR_SECTION_CONST, 0 )
 
 	'' some SSE instructions require operands to be 16-byte aligned
 	if( s->var_.align ) then
@@ -911,7 +907,8 @@ private sub hWriteCtor _
 end sub
 
 private sub hEmitExport( byval s as FBSYMBOL ptr )
-	if( symbIsExport( s ) ) then
+	if( symbIsExport( s ) andalso _
+	    ((env.target.options and FB_TARGETOPT_COFF) <> 0) ) then
 		_setSection( IR_SECTION_DIRECTIVE, 0 )
 
 		dim as zstring ptr sname = symbGetMangledName( s )
@@ -3507,6 +3504,112 @@ private sub _emitMODI _
 end sub
 
 '':::::
+private sub hShiftLImmediate _
+	( _
+		byval op as integer, _
+		byval dvreg as IRVREG ptr, _
+		byval svreg as IRVREG ptr, _
+		byval av as IRVREG ptr, _
+		byval bv as IRVREG ptr, _
+		byref a as string, _
+		byref b as string, _
+		byval src as string, _
+		byref mnemonic32 as string, _
+		byref mnemonic64 as string _
+	) static
+
+	dim as integer tmpreg, tmpisfree
+	dim as string tmpregname
+
+	if( svreg->value.i >= 64 ) then
+		'' zero both result halves
+		if( bv->typ = IR_VREGTYPE_REG ) then
+			outp "xor " + b + ", " + b
+		else
+			outp "mov " + b + ", 0"
+		end if
+
+		if( av->typ = IR_VREGTYPE_REG ) then
+			outp "xor " + a + ", " + a
+		else
+			outp "mov " + a + ", 0"
+		end if
+	elseif( svreg->value.i >= 32 ) then
+		tmpisfree = TRUE
+		if( (bv->typ = IR_VREGTYPE_REG) or (av->typ = IR_VREGTYPE_REG) ) then
+			'' a or b is a reg
+			outp "mov " + a + ", " + b
+		else
+			'' neither is a reg; get a temp
+			tmpreg = hFindFreeReg( FB_DATACLASS_INTEGER )
+			if( tmpreg = INVALID ) then
+				'' Can only use a temp reg that isn't used in the dest vreg,
+				'' because the code generated below doesn't handle that case.
+				tmpreg = hFindRegNotInVreg( dvreg )
+				tmpisfree = FALSE
+			end if
+			tmpregname = *hGetRegName( FB_DATATYPE_INTEGER, tmpreg )
+			if( tmpisfree = FALSE ) then
+				hPUSH( tmpregname )
+			end if
+			outp "mov " + tmpregname + ", " + b
+			outp "mov " + a + ", " + tmpregname
+		end if
+
+		if( (op = AST_OP_SHR) and typeIsSigned( dvreg->dtype ) ) then
+			outp "sar " + b +", 31"
+		elseif( bv->typ = IR_VREGTYPE_REG ) then
+			outp "xor " + b + ", " + b
+		else
+			outp "mov " + b + ", 0"
+		end if
+
+		if( svreg->value.i > 32 ) then
+			src = str( svreg->value.i - 32 )
+			outp mnemonic32 + a + ", " + src
+		end if
+
+		if( tmpisfree = FALSE ) then
+			hPOP( tmpregname )
+		end if
+
+	else '' src < 32
+		if( bv->typ = IR_VREGTYPE_REG ) then
+			outp mnemonic64 + a + ", " + b + ", " + src
+			outp mnemonic32 + b + ", " + src
+		elseif( av->typ = IR_VREGTYPE_REG ) then
+			outp "xchg " + a + ", " + b
+			outp mnemonic64 + b + ", " + a + ", " + src
+			outp mnemonic32 + a + ", " + src
+			outp "xchg " + a + ", " + b
+		else
+			tmpreg = hFindFreeReg( FB_DATACLASS_INTEGER )
+			if( tmpreg = INVALID ) then
+				'' Can only use a temp reg that isn't used in the dest vreg,
+				'' because the code generated below doesn't handle that case.
+				tmpreg = hFindRegNotInVreg( dvreg )
+				tmpisfree = FALSE
+			else
+				tmpisfree = TRUE
+			end if
+			tmpregname = *hGetRegName( FB_DATATYPE_INTEGER, tmpreg )
+			if( tmpisfree = FALSE ) then
+				hPUSH( tmpregname )
+			end if
+			outp "mov " + tmpregname + ", " + b
+			outp mnemonic64 + a + ", " + tmpregname + ", " + src
+			outp mnemonic32 + tmpregname + ", " + src
+			outp "mov " + b + ", " + tmpregname
+			if( tmpisfree = FALSE ) then
+				hPOP( "eax" )
+			end if
+		end if
+	end if
+end sub
+
+'':::::
+'' Shift emission is a single instruction-selection table with shared setup.
+''
 private sub hSHIFTL _
 	( _
 		byval op as integer, _
@@ -3515,8 +3618,6 @@ private sub hSHIFTL _
 	) static
 
 	dim as string dst1, dst2, src, label, mnemonic32, mnemonic64
-	dim as integer tmpreg, tmpisfree
-	dim as string tmpregname
 	dim as string a, b
 	dim as IRVREG ptr av, bv
 
@@ -3551,90 +3652,8 @@ private sub hSHIFTL _
 	end if
 
 	if( svreg->typ = IR_VREGTYPE_IMM ) then
-		if( svreg->value.i >= 64 ) then
-			'' zero both result halves
-			if( bv->typ = IR_VREGTYPE_REG ) then
-				outp "xor " + b + ", " + b
-			else
-				outp "mov " + b + ", 0"
-			end if
-
-			if( av->typ = IR_VREGTYPE_REG ) then
-				outp "xor " + a + ", " + a
-			else
-				outp "mov " + a + ", 0"
-			end if
-		elseif( svreg->value.i >= 32 ) then
-			tmpisfree = TRUE
-			if( (bv->typ = IR_VREGTYPE_REG) or (av->typ = IR_VREGTYPE_REG) ) then
-				'' a or b is a reg
-				outp "mov " + a + ", " + b
-			else
-				'' neither is a reg; get a temp
-				tmpreg = hFindFreeReg( FB_DATACLASS_INTEGER )
-				if( tmpreg = INVALID ) then
-					'' Can only use a temp reg that isn't used in the dest vreg,
-					'' because the code generated below doesn't handle that case.
-					tmpreg = hFindRegNotInVreg( dvreg )
-					tmpisfree = FALSE
-				end if
-				tmpregname = *hGetRegName( FB_DATATYPE_INTEGER, tmpreg )
-				if( tmpisfree = FALSE ) then
-					hPUSH( tmpregname )
-				end if
-				outp "mov " + tmpregname + ", " + b
-				outp "mov " + a + ", " + tmpregname
-			end if
-
-			if( (op = AST_OP_SHR) and typeIsSigned( dvreg->dtype ) ) then
-				outp "sar " + b +", 31"
-			elseif( bv->typ = IR_VREGTYPE_REG ) then
-				outp "xor " + b + ", " + b
-			else
-				outp "mov " + b + ", 0"
-			end if
-
-			if( svreg->value.i > 32 ) then
-				src = str( svreg->value.i - 32 )
-				outp mnemonic32 + a + ", " + src
-			end if
-
-			if( tmpisfree = FALSE ) then
-				hPOP( tmpregname )
-			end if
-
-		else '' src < 32
-			if( bv->typ = IR_VREGTYPE_REG ) then
-				outp mnemonic64 + a + ", " + b + ", " + src
-				outp mnemonic32 + b + ", " + src
-			elseif( av->typ = IR_VREGTYPE_REG ) then
-				outp "xchg " + a + ", " + b
-				outp mnemonic64 + b + ", " + a + ", " + src
-				outp mnemonic32 + a + ", " + src
-				outp "xchg " + a + ", " + b
-			else
-				tmpreg = hFindFreeReg( FB_DATACLASS_INTEGER )
-				if( tmpreg = INVALID ) then
-					'' Can only use a temp reg that isn't used in the dest vreg,
-					'' because the code generated below doesn't handle that case.
-					tmpreg = hFindRegNotInVreg( dvreg )
-					tmpisfree = FALSE
-				else
-					tmpisfree = TRUE
-				end if
-				tmpregname = *hGetRegName( FB_DATATYPE_INTEGER, tmpreg )
-				if( tmpisfree = FALSE ) then
-					hPUSH( tmpregname )
-				end if
-				outp "mov " + tmpregname + ", " + b
-				outp mnemonic64 + a + ", " + tmpregname + ", " + src
-				outp mnemonic32 + tmpregname + ", " + src
-				outp "mov " + b + ", " + tmpregname
-				if( tmpisfree = FALSE ) then
-					hPOP( "eax" )
-				end if
-			end if
-		end if
+		hShiftLImmediate( op, dvreg, svreg, av, bv, a, b, src, _
+			mnemonic32, mnemonic64 )
 	else
 		'' if src is not an imm, use cl and check for the x86 glitches
 
@@ -4427,6 +4446,106 @@ end sub
 
 '' used by emit_SSE.bas
 
+private function hCMPF_get_high_byte_name _
+	( _
+		byval reg as integer _
+	) as zstring ptr
+
+	select case reg
+	case EMIT_REG_EAX
+		return @"ah"
+	case EMIT_REG_EBX
+		return @"bh"
+	case EMIT_REG_ECX
+		return @"ch"
+	case EMIT_REG_EDX
+		return @"dh"
+	end select
+
+	return NULL
+end function
+
+private function hCMPF_swap_mnemonic _
+	( _
+		byval mnemonic as zstring ptr _
+	) as zstring ptr
+
+	select case *mnemonic
+	case "e"
+		return @"e"
+	case "ne"
+		return @"ne"
+	case "a"
+		return @"b"
+	case "ae"
+		return @"be"
+	case "b"
+		return @"a"
+	case "be"
+		return @"ae"
+	end select
+
+	assert( FALSE )
+	return mnemonic
+end function
+
+private function hCMPF_prepare_fast_recipe _
+	( _
+		byval recipe as CMPF_RECIPE ptr, _
+		byval swapregs as integer, _
+		byref fast_recipe as CMPF_RECIPE _
+	) as CMPF_RECIPE ptr
+
+	fast_recipe = *recipe
+
+	'' Fast mode deliberately treats unordered comparisons like ordinary
+	'' comparisons.  Clearing the parity actions also makes value-producing
+	'' and branch-producing comparisons follow the same policy.
+	fast_recipe.parity_false = FALSE
+	fast_recipe.parity_true = FALSE
+
+	if( fast_recipe.swapregs <> swapregs ) then
+		fast_recipe.mnemonic = hCMPF_swap_mnemonic( fast_recipe.mnemonic )
+		if( len( *fast_recipe.rev_mnemonic ) > 0 ) then
+			fast_recipe.rev_mnemonic = hCMPF_swap_mnemonic( fast_recipe.rev_mnemonic )
+		end if
+	end if
+	fast_recipe.swapregs = swapregs
+
+	return @fast_recipe
+end function
+
+private sub hCMPF_emit_setcc _
+	( _
+		byval recipe as CMPF_RECIPE ptr, _
+		byref rname8lo as string, _
+		byref rname8hi as string _
+	)
+
+	dim as string ostr
+
+	if( recipe->parity_false ) then
+		ostr = "setp" + (TABCHAR + rname8hi)
+		outp ostr
+	elseif( recipe->parity_true ) then
+		ostr = "setnp" + (TABCHAR + rname8hi)
+		outp ostr
+	end if
+
+	ostr = "set" + *recipe->mnemonic + (TABCHAR + rname8lo)
+	outp ostr
+
+	if( recipe->parity_false ) then
+		assert( recipe->swapinit = FALSE )
+		ostr = "or " + rname8lo + ", " + rname8hi
+		outp ostr
+	elseif( recipe->parity_true ) then
+		assert( recipe->swapinit = FALSE )
+		ostr = "and " + rname8lo + ", " + rname8hi
+		outp ostr
+	end if
+end sub
+
 sub hCMPF_jxx _
 	( _
 		byval recipe as CMPF_RECIPE ptr, _
@@ -4442,12 +4561,7 @@ sub hCMPF_jxx _
 		hBRANCH( "jp", isnanlabel )
 	end if
 
-	if( len( *recipe->msk_mnemonic ) > 0 ) then
-		'' !!!TODO!!! - test use of *recipe->msk_mnemonic
-		ostr = "j" + *recipe->mnemonic
-	else
-		ostr = "j" + *recipe->mnemonic
-	end if
+	ostr = "j" + *recipe->mnemonic
 	hBRANCH( ostr, lname )
 
 	if( recipe->parity_true ) then
@@ -4463,8 +4577,8 @@ sub hCMPF_set _
 		byref lname as string _
 	) static
 
-	dim as string rname, rname8, ostr, isnanlabel
-	dim as integer iseaxfree, isedxfree
+	dim as string rname, rname8, rname8hi, ostr, isnanlabel
+	dim as integer isedxfree, use_aux_reg
 
 	hPrepOperand( rvreg, rname )
 
@@ -4481,67 +4595,19 @@ sub hCMPF_set _
 	''
 	if( (env.clopt.cputype >= FB_CPUTYPE_486) ) then
 		rname8 = *hGetRegName( FB_DATATYPE_BYTE, rvreg->reg )
+		use_aux_reg = FALSE
 
-		'' handle EDI and ESI
-		if( (rvreg->reg = EMIT_REG_ESI) or (rvreg->reg = EMIT_REG_EDI) or _
-		    (recipe->parity_true or recipe->parity_false) ) then
-
-			'' !!!TODO!!! - use high register of 'rname' instead of
-			'' finding a free register (like above)
-			const rname8lo = "dl"
-			const rname8hi = "dh"
-
-			'' no implementation currently exists for parity + swapinit
-			assert( iif( recipe->parity_false, recipe->swapinit=FALSE, TRUE ) )
-			assert( iif( recipe->parity_true , recipe->swapinit=FALSE, TRUE ) )
-
-			isedxfree = hIsRegFree( FB_DATACLASS_INTEGER, EMIT_REG_EDX )
-			if( rvreg->reg <> EMIT_REG_EDX ) then
-				if( isedxfree = FALSE ) then
-					ostr = "xchg edx, " + rname
-					outp ostr
-				end if
+		if( recipe->parity_true or recipe->parity_false ) then
+			dim as zstring ptr high_byte
+			high_byte = hCMPF_get_high_byte_name( rvreg->reg )
+			if( high_byte <> NULL ) then
+				rname8hi = *high_byte
+				hCMPF_emit_setcc( recipe, rname8, rname8hi )
+			else
+				use_aux_reg = TRUE
 			end if
-
-			if( env.clopt.fpmode <> FB_FPMODE_FAST ) then
-				if( recipe->parity_false ) then
-					ostr = "setp" + (TABCHAR + rname8hi)
-					outp ostr
-				elseif( recipe->parity_true ) then
-					ostr = "setnp" + (TABCHAR + rname8hi)
-					outp ostr
-				end if
-			end if
-
-			ostr = "set" + *recipe->mnemonic + (TABCHAR + rname8lo)
-			outp ostr
-
-			if( env.clopt.fpmode <> FB_FPMODE_FAST ) then
-				if( recipe->parity_false ) then
-					if( recipe->swapinit ) then
-						ostr = "and " + rname8lo + ", " + rname8hi
-					else
-						ostr = "or " + rname8lo + ", " + rname8hi
-					end if
-					outp ostr
-				elseif( recipe->parity_true ) then
-					if( recipe->swapinit ) then
-						ostr = "or " + rname8lo + ", " + rname8hi
-					else
-						ostr = "and " + rname8lo + ", " + rname8hi
-					end if
-					outp ostr
-				end if
-			end if
-
-			if( rvreg->reg <> EMIT_REG_EDX ) then
-				if( isedxfree = FALSE ) then
-					ostr = "xchg edx, " + rname
-					outp ostr
-				else
-					hMOV rname, "edx"
-				end if
-			end if
+		elseif( (rvreg->reg = EMIT_REG_ESI) or (rvreg->reg = EMIT_REG_EDI) ) then
+			use_aux_reg = TRUE
 		else
 			if( recipe->swapinit ) then
 				assert( len( *recipe->rev_mnemonic ) > 0 )
@@ -4551,6 +4617,30 @@ sub hCMPF_set _
 				assert( len( *recipe->mnemonic ) > 0 )
 				ostr = "set" + *recipe->mnemonic + " " + rname8
 				outp ostr
+			end if
+		end if
+
+		if( use_aux_reg ) then
+			isedxfree = hIsRegFree( FB_DATACLASS_INTEGER, EMIT_REG_EDX )
+			if( rvreg->reg <> EMIT_REG_EDX ) then
+				if( isedxfree = FALSE ) then
+					ostr = "xchg edx, " + rname
+					outp ostr
+				end if
+			end if
+
+			dim as string auxlo, auxhi
+			auxlo = "dl"
+			auxhi = "dh"
+			hCMPF_emit_setcc( recipe, auxlo, auxhi )
+
+			if( rvreg->reg <> EMIT_REG_EDX ) then
+				if( isedxfree = FALSE ) then
+					ostr = "xchg edx, " + rname
+					outp ostr
+				else
+					hMOV rname, "edx"
+				end if
 			end if
 		end if
 
@@ -4565,19 +4655,26 @@ sub hCMPF_set _
 
 	'' set boolean using conditional jump
 	else
-		'' !!!TODO!!! - optimize for env.clopt.fpmode=FB_FPUMODE_FAST
-		'' if we don't care about precision (NaN's) then we should ignore
-		'' swapinit=TRUE and instead use the reverse instruction.
+		dim as integer initialize_true
+		dim as zstring ptr branch_mnemonic
+		initialize_true = (recipe->swapinit = FALSE)
+		branch_mnemonic = recipe->mnemonic
 
-		if( recipe->swapinit ) then
-			ostr = "mov " + rname + ", 0"
-			outp ostr
-		else
+		if( (env.clopt.fpmode = FB_FPMODE_FAST) and recipe->swapinit ) then
+			assert( len( *recipe->rev_mnemonic ) > 0 )
+			branch_mnemonic = recipe->rev_mnemonic
+			initialize_true = TRUE
+		end if
+
+		if( initialize_true ) then
 			if( rvreg->dtype = FB_DATATYPE_BOOLEAN ) then
 				ostr = "mov " + rname + ", 1"
 			else
 				ostr = "mov " + rname + ", -1"
 			end if
+			outp ostr
+		else
+			ostr = "mov " + rname + ", 0"
 			outp ostr
 		end if
 
@@ -4590,7 +4687,7 @@ sub hCMPF_set _
 			end if
 		end if
 
-		ostr = "j" + *recipe->mnemonic
+		ostr = "j" + *branch_mnemonic
 		hBRANCH( ostr, lname )
 
 		if( env.clopt.fpmode = FB_FPMODE_PRECISE ) then
@@ -4599,15 +4696,15 @@ sub hCMPF_set _
 			end if
 		end if
 
-		if( recipe->swapinit ) then
+		if( initialize_true ) then
+			ostr = "xor " + rname + COMMA + rname
+			outp ostr
+		else
 			if( rvreg->dtype = FB_DATATYPE_BOOLEAN ) then
 				ostr = "mov " + rname + ", 1"
 			else
 				ostr = "mov " + rname + ", -1"
 			end if
-			outp ostr
-		else
-			ostr = "xor " + rname + COMMA + rname
 			outp ostr
 		end if
 
@@ -4627,40 +4724,38 @@ private function hCMPF_get_recipe _
 	const CMPF_RECIPE_INVERSE_OFFSET = 6
 	const CMPF_RECIPE_LABEL_OFFSET = CMPF_RECIPE_INVERSE_OFFSET * 2
 
-	'' !!!TODO!!! - mask is a carry over from older versions - not tested
-
 	static recipe( 0 to 23 ) as CMPF_RECIPE = _
 		{ _
-			/' op          x86    rev    msk                  parity parity swap   swap '/ _
-			/' op          Jcc    Jcc    Jcc    mask          false  true   regs   init '/ _
+			/' op          Jcc    reverse Jcc  parity parity swap   swap '/ _
+			/'                              false  true   regs   init '/ _
 			/' Result = ( a op b ) '/ _
-			( CMPF_OP_EQ, @"e" , @""  , @""  , @""          , FALSE, TRUE , FALSE, FALSE ), _
-			( CMPF_OP_NE, @"ne", @""  , @""  , @""          , TRUE , FALSE, FALSE, FALSE ), _
-			( CMPF_OP_GT, @"a" , @""  , @""  , @""          , FALSE, FALSE, FALSE, FALSE ), _
-			( CMPF_OP_LT, @"a" , @""  , @""  , @""          , FALSE, FALSE, TRUE , FALSE ), _
-			( CMPF_OP_GE, @"ae", @""  , @""  , @""          , FALSE, FALSE, FALSE, FALSE ), _
-			( CMPF_OP_LE, @"ae", @""  , @""  , @""          , FALSE, FALSE, TRUE , FALSE ), _
+			( CMPF_OP_EQ, @"e" , @""  , FALSE, TRUE , FALSE, FALSE ), _
+			( CMPF_OP_NE, @"ne", @""  , TRUE , FALSE, FALSE, FALSE ), _
+			( CMPF_OP_GT, @"a" , @""  , FALSE, FALSE, FALSE, FALSE ), _
+			( CMPF_OP_LT, @"a" , @""  , FALSE, FALSE, TRUE , FALSE ), _
+			( CMPF_OP_GE, @"ae", @""  , FALSE, FALSE, FALSE, FALSE ), _
+			( CMPF_OP_LE, @"ae", @""  , FALSE, FALSE, TRUE , FALSE ), _
 			/' Result = !( a op b ) '/ _
-			( CMPF_OP_EQ, @"ne", @""  , @""  , @""          , TRUE , FALSE, FALSE, FALSE ), _
-			( CMPF_OP_NE, @"e" , @""  , @""  , @""          , FALSE, TRUE , FALSE, FALSE ), _
-			( CMPF_OP_GT, @"a" , @"be", @""  , @""          , FALSE, FALSE, FALSE, TRUE  ), _
-			( CMPF_OP_LT, @"a" , @"be", @""  , @""          , FALSE, FALSE, TRUE , TRUE  ), _
-			( CMPF_OP_GE, @"ae", @"b" , @""  , @""          , FALSE, FALSE, FALSE, TRUE  ), _
-			( CMPF_OP_LE, @"ae", @"b" , @""  , @""          , FALSE, FALSE, TRUE , TRUE  ), _
+			( CMPF_OP_EQ, @"ne", @""  , TRUE , FALSE, FALSE, FALSE ), _
+			( CMPF_OP_NE, @"e" , @""  , FALSE, TRUE , FALSE, FALSE ), _
+			( CMPF_OP_GT, @"a" , @"be", FALSE, FALSE, FALSE, TRUE  ), _
+			( CMPF_OP_LT, @"a" , @"be", FALSE, FALSE, TRUE , TRUE  ), _
+			( CMPF_OP_GE, @"ae", @"b" , FALSE, FALSE, FALSE, TRUE  ), _
+			( CMPF_OP_LE, @"ae", @"b" , FALSE, FALSE, TRUE , TRUE  ), _
 			/' if !( a op b ) then goto exit label '/ _
-			( CMPF_OP_EQ, @"e" , @""  , @""  , @""          , FALSE, TRUE , FALSE, FALSE ), _
-			( CMPF_OP_NE, @"ne", @""  , @""  , @""          , TRUE , FALSE, FALSE, FALSE ), _
-			( CMPF_OP_GT, @"a" , @""  , @""  , @""          , FALSE, FALSE, FALSE, FALSE ), _
-			( CMPF_OP_LT, @"a" , @""  , @""  , @""          , FALSE, FALSE, TRUE , FALSE ), _
-			( CMPF_OP_GE, @"ae", @""  , @""  , @""          , FALSE, FALSE, FALSE, FALSE ), _
-			( CMPF_OP_LE, @"ae", @""  , @""  , @""          , FALSE, FALSE, TRUE , FALSE ), _
+			( CMPF_OP_EQ, @"e" , @""  , FALSE, TRUE , FALSE, FALSE ), _
+			( CMPF_OP_NE, @"ne", @""  , TRUE , FALSE, FALSE, FALSE ), _
+			( CMPF_OP_GT, @"a" , @""  , FALSE, FALSE, FALSE, FALSE ), _
+			( CMPF_OP_LT, @"a" , @""  , FALSE, FALSE, TRUE , FALSE ), _
+			( CMPF_OP_GE, @"ae", @""  , FALSE, FALSE, FALSE, FALSE ), _
+			( CMPF_OP_LE, @"ae", @""  , FALSE, FALSE, TRUE , FALSE ), _
 			/' if ( a op b ) then goto exit label '/ _
-			( CMPF_OP_EQ, @"ne", @""  , @"nz", @"0b01000000", TRUE , FALSE, FALSE, FALSE ), _
-			( CMPF_OP_NE, @"e" , @""  , @"z" , @"0b01000000", FALSE, TRUE , FALSE, FALSE ), _
-			( CMPF_OP_GT, @"be", @""  , @"z" , @"0b01000001", FALSE, FALSE, FALSE, FALSE ), _
-			( CMPF_OP_LT, @"be", @""  , @"nz", @"0b00000001", FALSE, FALSE, TRUE , FALSE ), _
-			( CMPF_OP_GE, @"b" , @""  , @""  , @""          , FALSE, FALSE, FALSE, FALSE ), _
-			( CMPF_OP_LE, @"b" , @""  , @"nz", @"0b01000001", FALSE, FALSE, TRUE , FALSE ) _
+			( CMPF_OP_EQ, @"ne", @""  , TRUE , FALSE, FALSE, FALSE ), _
+			( CMPF_OP_NE, @"e" , @""  , FALSE, TRUE , FALSE, FALSE ), _
+			( CMPF_OP_GT, @"be", @""  , FALSE, FALSE, FALSE, FALSE ), _
+			( CMPF_OP_LT, @"be", @""  , FALSE, FALSE, TRUE , FALSE ), _
+			( CMPF_OP_GE, @"b" , @""  , FALSE, FALSE, FALSE, FALSE ), _
+			( CMPF_OP_LE, @"b" , @""  , FALSE, FALSE, TRUE , FALSE ) _
 		}
 
 	dim index as integer = op
@@ -4731,10 +4826,15 @@ private sub hCMPF _
 		ST0 > ST(i)    0   0   JA    Both CF and ZF must be clear
 	'/
 
-	'' !!!TODO!!! - optimize swapregs=TRUE and env.clopt.fpmode=FB_FPMODE_FAST
-	'' if we don't care about precision (with NaN's) then we could avoid
-	'' exchanging registers by using the inverse Jcc/Setcc instructions
-	'' But this is complicated enough, ...
+	dim as CMPF_RECIPE fast_recipe
+	if( env.clopt.fpmode = FB_FPMODE_FAST ) then
+		'' For register operands, comparing the existing stack order avoids
+		'' FXCH. For memory operands, FLD reverses that order, so retaining the
+		'' loaded value on top is the exchange-free form.
+		recipe = hCMPF_prepare_fast_recipe( recipe, _
+		                                  (svreg->typ <> IR_VREGTYPE_REG), _
+		                                  fast_recipe )
+	end if
 
 	'' do comp
 	if( hUse686FpuOps( ) ) then
@@ -4784,17 +4884,7 @@ private sub hCMPF _
 		'' load fpu flags
 		outp "fnstsw ax"
 
-'' !!!TODO!!! testing float comparison with 'mask' not tested
-#if 1
 		outp "sahf"
-#else
-		if( len( *recipe->mask ) > 0 ) then
-			ostr = "test ah, " + *recipe->mask
-			outp ostr
-		else
-			outp "sahf"
-		end if
-#endif
 		if( iseaxfree = FALSE ) then
 			hPOP( "eax" )
 		end if
@@ -7420,11 +7510,15 @@ sub emitVARINIWSTR( byval s as zstring ptr )
 	static as string ostr
 	ostr = ".ascii " + QUOTE
 	ostr += *s
+	dim as DZSTRING terminator
+	DZstrZero( terminator )
 	for i as integer = 1 to typeGetSize( FB_DATATYPE_WCHAR )
-		'' A WCHAR terminator has a fixed target representation size.
-		'' FB-LINTER: DISABLE-NEXT-LINE FBL503
-		ostr += RSLASH + "0"
+		DZstrConcatAssign( terminator, RSLASH + "0" )
 	next
+	if( terminator.data <> NULL ) then
+		ostr += *terminator.data
+	end if
+	DZstrAllocate( terminator, 0 )
 	ostr += QUOTE + NEWLINE
 	outEx( ostr )
 end sub
@@ -8128,7 +8222,7 @@ private function _getSectionString _
 		ostr += "text"
 
 	case IR_SECTION_DIRECTIVE
-		'' TODO: there is no .drectve on Darwin
+		'' Export directives are emitted only for COFF targets by hEmitExport().
 		ostr += "drectve"
 
 	case IR_SECTION_INFO

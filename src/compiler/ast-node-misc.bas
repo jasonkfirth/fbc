@@ -344,14 +344,10 @@ function astNewFIELD _
 	assert( symbIsField( sym ) )
 	if( symbFieldIsBitfield( sym ) ) then
 		if( typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_BOOLEAN ) then
-			'' !!!TODO!!! check for other sizes of BOOLEAN bitfield containers?
-			'' final type is always a signed int
-			select case symbGetSizeOf( sym )
-			case 1
-				dtype = typeJoin( dtype, FB_DATATYPE_BYTE )
-			case else
-				dtype = typeJoin( dtype, FB_DATATYPE_INTEGER )
-			end select
+			'' BOOLEAN has a one-byte storage type, including when used as
+			'' a bitfield container. Keep the signed representation here.
+			assert( symbGetSizeOf( sym ) = 1 )
+			dtype = typeJoin( dtype, FB_DATATYPE_BYTE )
 		else
 			'' final type is always an unsigned int
 			dtype = typeJoin( dtype, FB_DATATYPE_UINT )
@@ -442,7 +438,7 @@ private function astSetBitfield _
 	''
 
 	if( symbGetType( bitfield ) = FB_DATATYPE_BOOLEAN ) then
-		'' !!!TODO!!! check for other sizes of BOOLEAN bitfield containers?
+		assert( symbGetSizeOf( bitfield ) = 1 )
 		l->dtype = typeJoin( bitfield->typ, FB_DATATYPE_UBYTE )
 		l->subtype = NULL
 	else
@@ -470,7 +466,7 @@ private function astSetBitfield _
 		if( (r->class <> AST_NODECLASS_CONV) orelse (astGetFullType( r ) <> FB_DATATYPE_BOOLEAN) ) then
 			r = astNewCONV( FB_DATATYPE_BOOLEAN, NULL, r )
 		end if
-		'' !!!TODO!!! check for other sizes of BOOLEAN bitfield containers?
+		assert( symbGetSizeOf( bitfield ) = 1 )
 		r = astNewCONV( FB_DATATYPE_UBYTE, NULL, r )
 		r = astNewBOP( AST_OP_AND, r, hMakeUintMask( bitfield->var_.bits, bitfield->var_.bitpos, r->dtype ) )
 	else

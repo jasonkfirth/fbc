@@ -65,14 +65,20 @@ private function hCheckForValistCompatibleType _
 		return FALSE
 	end if
 
-	'' cva_list compatible type?
-	select case typeGetDtOnly( astGetDataType( expr ) )
-	case FB_DATATYPE_VOID, FB_DATATYPE_STRUCT
-		'' TODO: maybe can be more selective here
-		'' possibly checking target platform and known
-		'' compatible types
+	dim as integer dtype = astGetFullType( expr )
+
+	'' Built-in cva_list types carry a private mangling modifier, and
+	'' structure forms are marked on the UDT symbol.  Checking both here
+	'' prevents an unrelated UDT from reaching the backend as a va_list.
+	if( symbGetValistType( dtype, astGetSubtype( expr ) ) <> FB_CVA_LIST_NONE ) then
 		return TRUE
-	end select
+	end if
+
+	'' Pointer-based va_list code has traditionally accepted ANY PTR
+	'' expressions in addition to the cva_list alias.
+	if( (typeGetDtOnly( dtype ) = FB_DATATYPE_VOID) and typeIsPtr( dtype ) ) then
+		return TRUE
+	end if
 
 	'' invalid type
 	errReport( FB_ERRMSG_INVALIDDATATYPES )
@@ -175,8 +181,10 @@ private sub hSolveValistType _
 			end if
 
 			'' for anything else, replace the dtype here and let backend
+			'' TODO: Remove the redundant casts which exprNewVREG() can still
+			'' produce after this va_list dtype replacement.
 			'' handle it (though there are some casts in exprNewVREG that
-			'' could be solved out, TODO).  Taking the address of array
+			'' remain redundant).  Taking the address of array
 			'' variable (in C) is the same address as just referencing
 			'' the array name.  e.g. "int a[10]", a == &a == &(a[0]), but
 			'' different pointer types

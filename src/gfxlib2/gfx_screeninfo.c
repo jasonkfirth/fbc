@@ -17,6 +17,7 @@ FBCALL void fb_GfxScreenInfo
 	size_t name_len;
 
 	FB_GRAPHICS_LOCK( );
+	fb_hApplyPendingResize();
 
 	if (!__fb_gfx) {
 		name = "";

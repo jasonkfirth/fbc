@@ -13,7 +13,12 @@
    versions, which is also why we #define NO_OLDNAMES and _NO_OLDNAMES.
    However, this sort of re-defining should only be used for functions that
    are used more than once, for the others #ifdef should do */
-#define snprintf _snprintf
+/*
+   MinGW-w64 provides ISO C99 snprintf through its runtime support library.
+   Mapping it to the Microsoft-only _snprintf spelling leaves a UCRT-built
+   archive with an unresolved __imp__snprintf import when the final program
+   links against the normal FreeBASIC MinGW runtime set.
+*/
 #define strdup(s) _strdup(s)
 #define strcasecmp(a, b) _stricmp(a, b)
 #define strncasecmp(a, b, n) _strnicmp(a, b, n)
@@ -40,7 +45,7 @@
 	#define FB_LL_FMTMOD "ll"
 #else
 	/* ucrt and mingw-w64's implementation of printf format specifers
-	   require that long long use the 'll' specifier instead of 'I64' 
+	   require that long long use the 'll' specifier instead of 'I64'
 	*/
 	#if defined(_UCRT) || __USE_MINGW_ANSI_STDIO
 		#define FB_LL_FMTMOD "ll"
