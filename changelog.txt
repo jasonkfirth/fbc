@@ -72,6 +72,7 @@ Version 1.20.3
 - tests: added regression coverage for embedded-NUL constant string comparisons, IEEE NaN comparisons, invalid and duplicate command-line defines, SUB type-suffix diagnostics, 32-bit cdecl caller cleanup, FreeBSD/Haiku/illumos socket ABI layouts, Haiku errno, non-interactive curses initialization, and compiler header/object cases exposed by the maintenance pass.
 
 [fixed]
+- Debian/Ubuntu Android packaging: restrict the package and package-matrix lane to amd64 because Ubuntu only publishes Google's required Android NDK host toolchain for that architecture, avoiding an uninstallable arm64 package.
 - build/Exampleageddon: added a no-prefix package-test mode so an installed compiler is validated against its installed runtime archives instead of silently linking stale archives from the example source tree.
 - Debian/Trixie packaging: disable `-fno-plt` through an explicit build-system opt-out because the GCC 14 and binutils combination mis-relaxes a stack-passed runtime callback address into a call, preventing file I/O programs from later jumping through an invalid callback.
 - Debian/Ubuntu sfxlib packaging: make the base compiler depend on the ALSA and PulseAudio development link interfaces required by its static sound runtime, so a fresh package installation can link SOUND and sfxlib programs.

@@ -297,8 +297,10 @@ if [ "$BUILD_ARCH" != "$HOST_ARCH" ]; then
 fi
 
 android_supported_for_arch() {
+    # Google's Linux NDK host tools, and Ubuntu's installer for them, are
+    # amd64-only.  The package still emits Android ARM target runtimes.
     case "$1" in
-        amd64|arm64)
+        amd64)
             return 0
             ;;
         *)

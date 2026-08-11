@@ -231,7 +231,7 @@ Description: FreeBASIC compiler driver for Emscripten/JavaScript
  preloaded current-directory assets.
 
 Package: freebasic-android
-Architecture: any
+Architecture: amd64
 Build-Profiles: <pkg.freebasic.android>
 Depends:
  ${shlibs:Depends},

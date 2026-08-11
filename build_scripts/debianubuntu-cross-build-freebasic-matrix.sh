@@ -221,7 +221,7 @@ target_default_port() {
     case "$distro/$codename/$arch/$port" in
         ubuntu/resolute/amd64/js|ubuntu/resolute/amd64/android|ubuntu/resolute/amd64/wii|ubuntu/resolute/amd64/xbox|\
         debian/trixie/amd64/js|debian/trixie/amd64/xbox|\
-        ubuntu/resolute/arm64/js|ubuntu/resolute/arm64/android|\
+        ubuntu/resolute/arm64/js|\
         debian/trixie/arm64/js)
             return 0
             ;;
@@ -238,8 +238,10 @@ android_supported_for_target() {
 
     : "$codename"
 
+    # The Android target runtimes include ARM, but Google's Linux NDK host
+    # programs and Ubuntu's installer package are only available on amd64.
     case "$distro/$arch" in
-        ubuntu/amd64|ubuntu/arm64)
+        ubuntu/amd64)
             return 0
             ;;
         *)
