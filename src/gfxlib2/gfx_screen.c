@@ -678,7 +678,7 @@ static int set_mode
 				__fb_gfx->flags |= OPENGL_SUPPORT;
 			}
 			if (flags & DRIVER_HIGH_PRIORITY) {
-				__fb_gfx->flags |= HIGH_PRIORITY;
+				__fb_gfx->flags |= GFX_HIGH_PRIORITY;
 			}
 			if (flags & DRIVER_RESIZABLE) {
 				__fb_gfx->flags |= DRIVER_RESIZABLE;

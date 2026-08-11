@@ -105,7 +105,7 @@ fb_remove_build_tree() {
         docker run --rm "$@" \
             -v "$fb_root:/work" \
             -w /work \
-            alpine:3.23 \
+            alpine:3.24 \
             sh -c 'for fb_path do rm -rf "$fb_path"; done' \
             sh "$fb_rel"
         return $?

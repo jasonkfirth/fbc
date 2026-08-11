@@ -43,6 +43,7 @@
 
 #if defined(HOST_JS)
 #include <emscripten/emscripten.h>
+#define FB_JS_ENABLE_GAMEPAD_API 0
 #endif
 
 #if defined(HOST_WII)
@@ -89,6 +90,9 @@ static void xpad_clear_outputs(ssize_t *buttons,
 		*dpad = 0;
 }
 
+#if defined(HOST_WIN32) || defined(FB_XPAD_HAS_JOYDEV) || \
+	defined(HOST_XBOX) || defined(HOST_WII)
+
 static float xpad_normalize_axis(int value)
 {
 	if (value <= -32768)
@@ -98,7 +102,10 @@ static float xpad_normalize_axis(int value)
 	return (float)value / 32767.0f;
 }
 
-#if defined(FB_XPAD_HAS_JOYDEV) || defined(HOST_JS) || defined(HOST_WII)
+#endif
+
+#if defined(FB_XPAD_HAS_JOYDEV) || defined(HOST_WII) || \
+	(defined(HOST_JS) && FB_JS_ENABLE_GAMEPAD_API)
 
 static float xpad_clamp_unit(float value)
 {
@@ -840,8 +847,6 @@ static int xpad_xbox_get(int id, ssize_t *buttons,
 #endif
 
 #if defined(HOST_JS)
-
-#define FB_JS_ENABLE_GAMEPAD_API 0
 
 #if FB_JS_ENABLE_GAMEPAD_API
 

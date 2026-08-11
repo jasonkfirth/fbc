@@ -2,6 +2,7 @@
 
 #include "../fb_gfx.h"
 #include "fb_gfx_win32.h"
+#include <limits.h>
 
 #define SCREENLIST(w, h) ((h) | (w) << 16)
 #ifndef LWA_COLORKEY

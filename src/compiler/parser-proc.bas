@@ -12,12 +12,26 @@
 '' [ALIAS "id"]
 function cAliasAttribute( ) as zstring ptr
 	static as zstring * FB_MAXNAMELEN+1 aliasid
+	dim as integer aliaslen = any
+	dim as integer isunicode = any
+	dim as FB_WARNINGMSG wrnmsg = 0
+	dim as zstring ptr text = any
 
 	if( lexGetToken( ) = FB_TK_ALIAS ) then
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		if( lexGetClass( ) = FB_TKCLASS_STRLITERAL ) then
-			aliasid = *lexGetText( )
+			text = lexGetText( )
+			if( lexGetToken( ) = FB_TK_STRLIT_ESC ) then
+				aliaslen = lexGetTextLen( )
+				text = hReEscape( text, aliaslen, isunicode, wrnmsg )
+				text = hUnescape( text, aliaslen )
+				if( wrnmsg <> 0 ) then
+					errReportWarn( wrnmsg )
+				end if
+			end if
+
+			aliasid = *text
 			lexSkipToken( )
 
 			if( len( aliasid ) > 0 ) then

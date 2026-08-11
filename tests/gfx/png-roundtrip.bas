@@ -17,6 +17,11 @@
 ''     - verify indexed pixels and palette values
 ''     - reject a PNG whose chunk checksum was damaged
 ''
+'' Ownership:
+''
+''     - temporary PNG files belong to this test and are removed before and
+''       after use
+''
 '' This file intentionally does NOT contain:
 ''
 ''     - visual or interactive checks
@@ -26,11 +31,34 @@
 
 #include once "fbgfx.bi"
 
-const TRUECOLOR_FILE = "png-roundtrip-rgba.PnG"
-const INDEXED_FILE = "png-roundtrip-indexed.png"
-const RGB565_FILE = "png-roundtrip-rgb565.png"
-const INDEXED_TRUECOLOR_FILE = "png-roundtrip-indexed-truecolor.png"
-const DAMAGED_FILE = "png-roundtrip-damaged.png"
+function test_file_path( byref leaf_name as const string ) as string
+	dim directory as string = environ( "TMPDIR" )
+
+	if len( directory ) = 0 then directory = environ( "TEMP" )
+	if len( directory ) = 0 then directory = environ( "TMP" )
+	if len( directory ) = 0 then return leaf_name
+
+	dim final_character as string = right( directory, 1 )
+	if ( final_character <> "/" ) and _
+	   ( final_character <> chr( 92 ) ) then
+		directory += chr( 47 )
+	end if
+	return directory + leaf_name
+end function
+
+'' Keep transient images out of source trees watched by synchronization tools.
+dim as string TRUECOLOR_FILE
+dim as string INDEXED_FILE
+dim as string RGB565_FILE
+dim as string INDEXED_TRUECOLOR_FILE
+dim as string DAMAGED_FILE
+
+TRUECOLOR_FILE = test_file_path( "freebasic-png-roundtrip-rgba.PnG" )
+INDEXED_FILE = test_file_path( "freebasic-png-roundtrip-indexed.png" )
+RGB565_FILE = test_file_path( "freebasic-png-roundtrip-rgb565.png" )
+INDEXED_TRUECOLOR_FILE = _
+	test_file_path( "freebasic-png-roundtrip-indexed-truecolor.png" )
+DAMAGED_FILE = test_file_path( "freebasic-png-roundtrip-damaged.png" )
 
 sub remove_test_file( byref filename as const string )
 	if len( dir( filename ) ) <> 0 then kill filename

@@ -203,6 +203,7 @@ sub astInit( )
 	ast.bitfieldcount = 0
 	ast.currblock = NULL
 	ast.hidewarningslevel = 0
+	ast.hideconsterrorslevel = 0
 
 	astCallInit( )
 	astProcListInit( )

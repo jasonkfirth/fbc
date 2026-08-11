@@ -113,6 +113,7 @@ endif
 
 GFX3_LIBS :=
 
+ifneq ($(filter $(SOURCE_OS),$(GFXLIB3_PLATFORM_OS)),)
 ifdef ENABLE_NONPIC
 GFX3_LIBS += $(libdir)/libfbgfx3.a
 endif
@@ -127,6 +128,7 @@ GFX3_LIBS += $(libdir)/libfbgfx3mt.a
 endif
 ifdef ENABLE_PIC
 GFX3_LIBS += $(libdir)/libfbgfx3mtpic.a
+endif
 endif
 endif
 
@@ -205,7 +207,7 @@ $(libdir)/$(FBEXTRA_SCRIPT):
 
 .PHONY: runtime-libs
 
-runtime-libs: $(RTL_LIBS) $(FBRTL_LIBS) $(GFX_LIBS) $(SFX_LIBS)
+runtime-libs: $(RTL_LIBS) $(FBRTL_LIBS) $(GFX_LIBS) $(GFX3_LIBS) $(SFX_LIBS)
 
 ##############################################################################
 # END archives.mk

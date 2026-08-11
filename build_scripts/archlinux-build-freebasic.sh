@@ -497,6 +497,7 @@ build_bootstrap_tarball() {
     run "$MAKE_CMD" \
         FBC_TARGET="$BUILD_FBC_TARGET" \
         FBTARGET_DIR_OVERRIDE="$BUILD_BOOTKEY" \
+        BOOTSTRAP_DIST_WORKTREE=1 \
         bootstrap-dist-target \
         -j"$JOBS"
 

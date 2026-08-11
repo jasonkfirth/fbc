@@ -157,6 +157,11 @@ struct FB_GFX3_CONTEXT {
 	_Atomic uint64_t visible_content_revision;
 	_Atomic uint64_t queued_present_revision;
 	/*
+		A direct application renderer can retain the gfxlib3 window and input
+		without allowing compatibility-page swaps to replace its back buffer.
+	*/
+	_Atomic int external_presentation;
+	/*
 		The common unchanged-frame path may return without taking
 		submission_mutex only when no staged or queued producer work remains.
 	*/
@@ -252,6 +257,8 @@ int fb_gfx3_context_set_window_title(FB_GFX3_CONTEXT *context,
 	const char *title, size_t length);
 int fb_gfx3_context_run_interop_callback(FB_GFX3_CONTEXT *context,
 	FB_GFX3_INTEROP_CALLBACK callback, void *user_data);
+int fb_gfx3_context_set_external_presentation(FB_GFX3_CONTEXT *context,
+	int enabled);
 
 int fb_gfx3_surface_create(FB_GFX3_CONTEXT *context,
 	FB_GFX3_SURFACE *surface, uint32_t width, uint32_t height,

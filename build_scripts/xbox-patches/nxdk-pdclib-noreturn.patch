@@ -1,0 +1,49 @@
+diff --git a/include/pdclib/_PDCLIB_aux.h b/include/pdclib/_PDCLIB_aux.h
+index d3296d1..467ba72 100644
+--- a/include/pdclib/_PDCLIB_aux.h
++++ b/include/pdclib/_PDCLIB_aux.h
+@@ -30,7 +30,9 @@
+ #define _PDCLIB_inline inline
+ #endif
+ 
+-#if __STDC_VERSION__ < 201112L
++#if defined( __cplusplus )
++#define _PDCLIB_Noreturn [[noreturn]]
++#elif __STDC_VERSION__ < 201112L
+ #define _PDCLIB_Noreturn
+ #else
+ #define _PDCLIB_Noreturn _Noreturn
+diff --git a/platform/xbox/functions/assert/assert.c b/platform/xbox/functions/assert/assert.c
+index a212afe..63e59bb 100644
+--- a/platform/xbox/functions/assert/assert.c
++++ b/platform/xbox/functions/assert/assert.c
+@@ -5,7 +5,7 @@
+ 
+ #include <xboxkrnl/xboxkrnl.h>
+ 
+-void _xbox_assert(char const * const expression, char const * const file_name, char const * const function_name, unsigned long line)
++_PDCLIB_Noreturn void _xbox_assert(char const * const expression, char const * const file_name, char const * const function_name, unsigned long line)
+ {
+ #ifdef DEBUG_CONSOLE
+     char buffer[512];
+@@ -18,4 +18,7 @@ void _xbox_assert(char const * const expression, char const * const file_name, c
+              "hlt\n"
+              "jmp 1b\n");
+ #endif
++
++    for (;;) {
++    }
+ }
+diff --git a/platform/xbox/include/assert.h b/platform/xbox/include/assert.h
+index c1383ed..2b9888d 100644
+--- a/platform/xbox/include/assert.h
++++ b/platform/xbox/include/assert.h
+@@ -12,7 +12,7 @@ extern "C" {
+ 
+ #ifndef _PDCLIB_ASSERT_H
+ #define _PDCLIB_ASSERT_H
+-void _xbox_assert(char const * const expression, char const * const file_name, char const * const function_name, unsigned long line);
++_PDCLIB_Noreturn void _xbox_assert(char const * const expression, char const * const file_name, char const * const function_name, unsigned long line);
+ #endif
+ 
+ /* If NDEBUG is set, assert() is a null operation. */

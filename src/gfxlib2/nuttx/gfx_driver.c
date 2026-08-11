@@ -715,6 +715,7 @@ static const GFXDRIVER fb_gfxDriverNuttX =
     driver_fetch_modes,
     NULL,
     driver_poll_events,
+    NULL,
     NULL
 };
 

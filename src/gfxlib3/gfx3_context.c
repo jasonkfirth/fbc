@@ -845,6 +845,7 @@ int fb_gfx3_context_init(FB_GFX3_CONTEXT *context,
 	atomic_init(&context->visible_surface_handle, 0);
 	atomic_init(&context->visible_content_revision, 0u);
 	atomic_init(&context->queued_present_revision, 0u);
+	atomic_init(&context->external_presentation, FALSE);
 	atomic_init(&context->pending_submission_work, FALSE);
 	result = fb_gfx3_log_init(&context->logger);
 	if (result != FB_GFX3_OK)
@@ -1109,6 +1110,24 @@ int fb_gfx3_context_run_interop_callback(FB_GFX3_CONTEXT *context,
 	return context_submit(context, command, TRUE, NULL);
 }
 
+int fb_gfx3_context_set_external_presentation(FB_GFX3_CONTEXT *context,
+	int enabled)
+{
+	int result;
+
+	if ((context == NULL) || !context->renderer_initialized)
+		return FB_GFX3_INVALID;
+	/*
+		Finish every previously accepted swap before changing ownership. The
+		caller holds FB_GRAPHICS_LOCK, so another BASIC graphics call cannot queue
+		a new presentation between this completion and the atomic state change.
+	*/
+	result = fb_gfx3_context_flush(context);
+	if (result == FB_GFX3_OK)
+		atomic_store(&context->external_presentation, enabled ? TRUE : FALSE);
+	return result;
+}
+
 /* ------------------------------------------------------------------------- */
 /* Surface lifecycle and transfers                                           */
 /* ------------------------------------------------------------------------- */
@@ -1217,6 +1236,18 @@ int fb_gfx3_surface_present(FB_GFX3_SURFACE *surface, int wait)
 	if (result != FB_GFX3_OK)
 		return result;
 	context = surface->context;
+	/*
+		External renderer presentation
+
+		Keep PRESENT as an ordering boundary while suppressing the native swap.
+		This lets a caller-owned compatibility context share gfxlib3's window
+		without a delayed view-update hook replacing part of its frame. Asynchronous
+		boundaries still submit accumulated surface work so offscreen operations do
+		not remain parked indefinitely.
+	*/
+	if (atomic_load(&context->external_presentation))
+		return wait ? fb_gfx3_context_flush(context) :
+			fb_gfx3_context_submit_pending(context);
 	if (wait) {
 		command = fb_gfx3_command_create(FB_GFX3_COMMAND_PRESENT, 0);
 		if (command == NULL)

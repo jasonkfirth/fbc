@@ -352,7 +352,8 @@ static const GFXDRIVER fb_gfxDriverJS =
 	driver_fetch_modes,      /* int *(*fetch_modes)(int depth, int *size); */
 	NULL,                    /* void (*flip)(void); */
 	driver_poll_events,      /* void (*poll_events)(void); */
-	NULL                     /* void (*update)(void); */
+	NULL,                    /* void (*update)(void); */
+	NULL                     /* int (*resize)(int width, int height); */
 };
 
 /* GFXDRIVER */
@@ -374,7 +375,8 @@ static const GFXDRIVER fb_gfxWebGL =
 	driver_fetch_modes,      /* int *(*fetch_modes)(int depth, int *size); */
 	WGL_Flip,                /* void (*flip)(void); */
 	driver_poll_events,      /* void (*poll_events)(void); */
-	NULL                     /* void (*update)(void); */
+	NULL,                    /* void (*update)(void); */
+	NULL                     /* int (*resize)(int width, int height); */
 };
 
 const GFXDRIVER *__fb_gfx_drivers_list[] = {

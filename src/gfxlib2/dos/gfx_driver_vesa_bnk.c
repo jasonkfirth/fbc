@@ -31,7 +31,8 @@ const GFXDRIVER fb_gfxDriverVESA =
 	fb_dos_vesa_fetch_modes, /* int *(*fetch_modes)(int depth, int *size); */
 	NULL,                    /* void (*flip)(void); */
 	NULL,                    /* void (*poll_events)(void); */
-	NULL                     /* void (*update)(void); */
+	NULL,                    /* void (*update)(void); */
+	NULL                     /* int (*resize)(int width, int height); */
 };
 
 static int data_locked = FALSE;

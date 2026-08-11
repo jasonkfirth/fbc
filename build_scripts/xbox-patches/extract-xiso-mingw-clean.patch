@@ -1,0 +1,48 @@
+diff --git a/extract-xiso.c b/extract-xiso.c
+index 2d965c3..3d55721 100644
+--- a/extract-xiso.c
++++ b/extract-xiso.c
+@@ -326,8 +326,12 @@
+ 	#define WRITEFLAGS					O_WRONLY | O_CREAT | O_TRUNC | O_BINARY
+ 	#define READWRITEFLAGS				O_RDWR   | O_BINARY
+ 
+-	#define S_ISDIR( x )				( ( x ) & _S_IFDIR )
+-	#define S_ISREG( x )				( ( x ) & _S_IFREG )
++	#ifndef S_ISDIR
++		#define S_ISDIR( x )			( ( x ) & _S_IFDIR )
++	#endif
++	#ifndef S_ISREG
++		#define S_ISREG( x )			( ( x ) & _S_IFREG )
++	#endif
+ 
+ 	#include "win32/getopt.c"
+ #if defined(_MSC_VER)
+@@ -600,6 +604,7 @@ FILE_TIME *alloc_filetime_now( void );
+ int generate_avl_tree_local( dir_node_avl **out_root, int *io_n );
+ int generate_avl_tree_remote( dir_node_avl **out_root, int *io_n );
+ int write_directory( dir_node_avl *in_avl, int in_xiso, int in_depth );
++int write_directory_callback( void *in_avl, void *in_context, long in_depth );
+ int write_file( dir_node_avl *in_avl, write_tree_context *in_context, int in_depth );
+ int write_tree( dir_node_avl *in_avl, write_tree_context *in_context, int in_depth );
+ int calculate_total_files_and_bytes( dir_node_avl *in_avl, void *in_context, int in_depth );
+@@ -1699,6 +1704,11 @@ int free_dir_node_avl( void *in_dir_node_avl, void *in_context, long in_depth )
+ }
+ 
+ 
++int write_directory_callback( void *in_avl, void *in_context, long in_depth ) {
++	return write_directory( (dir_node_avl *) in_avl, (int) (intptr_t) in_context, (int) in_depth );
++}
++
++
+ int write_tree( dir_node_avl *in_avl, write_tree_context *in_context, int in_depth ) {
+ 	xoff_t					pos;
+ 	write_tree_context		context;
+@@ -1726,7 +1736,7 @@ int write_tree( dir_node_avl *in_avl, write_tree_context *in_context, int in_dep
+ 				if ( ! err ) err = avl_traverse_depth_first( in_avl->subdirectory, (traversal_callback) write_tree, &context, k_prefix, 0 );
+ 
+ 				if (!err && lseek(in_context->xiso, (xoff_t)in_avl->start_sector * XISO_SECTOR_SIZE, SEEK_SET) == -1) seek_err();
+-				if (!err) err = avl_traverse_depth_first(in_avl->subdirectory, (traversal_callback)write_directory, (void*)in_context->xiso, k_prefix, 0);
++				if (!err) err = avl_traverse_depth_first(in_avl->subdirectory, write_directory_callback, (void *) (intptr_t) in_context->xiso, k_prefix, 0);
+ 				if (!err && (pos = lseek(in_context->xiso, 0, SEEK_CUR)) == -1) seek_err();
+ 				if (!err && (pad = (int)((XISO_SECTOR_SIZE - (pos % XISO_SECTOR_SIZE)) % XISO_SECTOR_SIZE))) {
+ 					memset(sector, XISO_PAD_BYTE, pad);

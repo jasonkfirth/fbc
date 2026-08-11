@@ -1,3 +1,87 @@
+freebasic (1.20.3-1) unstable; urgency=medium
+
+  * Package the 1.20.3 release with the new gfxlib3 runtime, expanded
+    QuickBASIC SCREEN compatibility, dependency-free PNG I/O, and current
+    sfxlib MIDI and mixer work.
+  * Stop the NuttX SDK package referencing a retired RP2350 firmware wrapper.
+  * Skip the unavailable Ubuntu Jammy riscv64 multiarch package lane.
+  * Avoid duplicate target CPU-family definitions in RISC-V, s390x, and
+    LoongArch cross-compiler builds.
+  * Install the packaged NuttX SDK shell helpers with executable permissions
+    and remove generated empty object directories from the package.
+  * Preserve deferred win32 fastcall and thiscall register arguments while
+    later arguments are evaluated.
+  * Correct short-circuit constant-expression diagnostics, macro invocation
+    whitespace, equivalent macro redefinitions, token cleanup, and the
+    32-parameter limit.
+  * Stage sfxlib sources in isolated Windows package tests so MIDI/FM coverage
+    validates the packaged compiler and runtime.
+  * Depend on the ALSA and PulseAudio development packages from the base
+    compiler so packaged SOUND and sfxlib programs link on a fresh install.
+  * Elevate machine-wide Windows installer smoke tests automatically while
+    retaining their validation transcript and restoring PATH/profile state.
+  * Keep generated APKs, NuttX test output, probe tools, and Python caches out
+    of isolated source and bootstrap worktrees.
+  * Keep generated test executables and release output backups out of source
+    packages, and package filtered working-tree changes in bootstrap archives.
+  * Keep release-monitor PID and status files out of source packages, and
+    reject an archive if transient process state bypasses staging filters.
+  * Limit release package matrices to each distribution's current stable and
+    rolling or unstable channel, including Resolute, Trixie/Sid, Alpine
+    3.24/edge, openSUSE Leap 16/Tumbleweed, and current enterprise releases;
+    omit postmarketOS architectures its published edge image cannot run.
+  * Require NuttX, Wii, and Xbox artifacts from the Resolute x86_64 row,
+    staging Wii build tools from a pinned official devkitPPC image when
+    Ubuntu does not package devkitPro.
+  * Expose staged devkitPPC binaries to the makefile's early cross-toolchain
+    probe, retain the libogc include path while clearing host build flags, and
+    keep optimization enabled for libogc's always-inline clock helpers.
+  * Document the three intentional PowerPC Wii startup objects with narrow
+    Lintian overrides for the amd64 cross-target package.
+  * Remove ignored Wii object files and archives left by earlier local builds
+    before creating the upstream source archive, and reject the archive if
+    those generated files bypass cleanup.
+  * Build the multithreaded Xbox runtime selected by the compiler's default
+    Xbox mode so installed packages link normal programs successfully.
+  * Complete every gfxlib2 platform driver callback table with an explicit
+    resize slot, removing strict GCC missing-initializer warnings.
+  * Run pedantic Lintian on complete package sets and fail release rows on
+    errors or warnings.
+  * Group Android cross-architecture runtime overrides so host-matching
+    Android targets do not leave unused Lintian overrides.
+  * Set each staged package's target distribution, use Jammy's supported
+    policy level, adapt path-based overrides to old and new Lintian parsers,
+    and narrowly recognize its known false-positive warning for normal
+    binutils dbgsym files.
+  * Use Raspbian Buster's Policy level, old override syntax, and legacy
+    fail-on-warnings interface while continuing to reject every non-overridden
+    error and warning.
+  * Lock Multi-Arch: same linux-libc-dev packages to the newest version shared
+    by both architectures, and install Architecture: all releases without an
+    invalid target qualifier.
+  * Build Sid target libraries in isolated sysroots so asynchronous C library,
+    cross-toolchain, and Debian Ports transitions cannot conflict in the
+    native package database; retain common libzstd versions for other rolling
+    multiarch repositories that temporarily publish different candidates.
+  * Retry transient APT downloads with bounded network timeouts so archived
+    distribution mirrors do not abort otherwise valid package builds.
+  * Install manual pages for the NuttX helper commands, mark the source-only
+    SDK architecture-independent, and document its DOS code-page byte table.
+  * Remove the Windows-only SWIG executable before creating Debian source
+    archives, avoiding a deleted-file mismatch from dpkg-source.
+  * Use registered package build-profile names, binNMU-safe dependencies,
+    current OpenGL and ncurses build dependencies, and source-only Debian
+    archives so strict Lintian package checks remain clean.
+  * Build and install gfxlib3 for supported Linux and Android targets, and
+    link a gfxlib3 SCREEN 13 smoke so incomplete packages fail validation.
+  * Disable -fno-plt for Debian package builds through an explicit build-system
+    opt-out, avoiding a Trixie GCC 14 and binutils relaxation bug that turns a
+    stack-passed runtime callback address into a call and crashes file I/O.
+  * Let Exampleageddon omit its source-tree runtime prefix during package
+    validation so tests link the installed package archives being qualified.
+
+ -- SJ_Zero <sj@fbxl.net>  Thu, 30 Jul 2026 05:06:38 -0400
+
 freebasic (1.20.2-14) resolute; urgency=medium
 
   * Keep Android graphics JNI entry points in generated shared libraries so

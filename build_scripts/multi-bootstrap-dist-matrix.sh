@@ -109,6 +109,7 @@ build_target(){
         $MAKE_CMD \
                 FBC_TARGET="$FBC_T" \
                 FBTARGET_DIR_OVERRIDE="$DIR" \
+                BOOTSTRAP_DIST_WORKTREE=1 \
                 bootstrap-dist-target \
                 -j"$JOBS" || die "bootstrap-dist-target failed"
 

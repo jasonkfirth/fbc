@@ -82,7 +82,7 @@ sfxlib: $(SFX_LIBS)
 # Convenience target
 ##############################################################################
 
-libs: rtlib fbrt gfxlib2 sfxlib
+libs: rtlib fbrt gfxlib2 gfxlib3 sfxlib
 
 ##############################################################################
 # Compiler executable

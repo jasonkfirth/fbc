@@ -4,7 +4,6 @@
 #include "fb_private_console.h"
 #include <pc.h>
 #include <go32.h>
-#include <dpmi.h>
 #include <sys/farptr.h>
 
 void (*__fb_dos_multikey_hook)(int scancode, int flags) = NULL;
@@ -29,9 +28,6 @@ int fb_hWriteControlCommand( unsigned char uchValue )
 
 static int fb_MultikeyHandler(unsigned irq_number)
 {
-#if 1
-    __dpmi_regs regs;
-#endif
 	unsigned char scancode_raw;
 
 	fb_hWriteControlCommand( 0xAD );    /* Lock keyboard */
@@ -43,19 +39,15 @@ static int fb_MultikeyHandler(unsigned irq_number)
 	printf(":%02x", scancode_raw);
 #endif
 
-#if 1
-	/* Translate scancode */
-	regs.h.ah = 0x4F;
-	regs.h.al = scancode_raw;
-	__dpmi_int(0x15, &regs);
-	if( regs.x.flags & 1 )
-#endif
+	/*
+	 * DJGPP interrupt wrappers do not permit system calls from a protected-mode
+	 * hardware interrupt handler.  In particular, simulating BIOS interrupt
+	 * 15h here can fault under CWSDPMI.  The old BIOS keyboard handler receives
+	 * this IRQ after us and performs its own translation, while MULTIKEY needs
+	 * the raw hardware scancode.
+	 */
 	{
-#if 0
-		size_t code = regs.h.al;
-#else
 		size_t code = scancode_raw;
-#endif
 		if( code==0xE0 )
 		{
 			got_extended_key = TRUE;

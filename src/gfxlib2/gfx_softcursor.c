@@ -76,12 +76,24 @@ int fb_hColorDistance(int index, int r, int g, int b)
 	       ((((__fb_gfx->device_palette[index] >> 16) & 0xFF) - b) * (((__fb_gfx->device_palette[index] >> 16) & 0xFF) - b));
 }
 
-void fb_hSoftCursorInit(void)
+int fb_hSoftCursorInit(void)
 {
-	cursor_area = malloc(CURSOR_W * CURSOR_H * __fb_gfx->bpp);
+	size_t cursor_size;
+
+	if ((!__fb_gfx) || (__fb_gfx->bpp < 1) || (__fb_gfx->bpp > (int)sizeof(unsigned int)))
+		return -1;
+
+	cursor_size = (size_t)CURSOR_W * CURSOR_H * (size_t)__fb_gfx->bpp;
+	cursor_area = calloc(1, cursor_size);
+	if (!cursor_area)
+		return -1;
 
 #ifdef HOST_DOS
-	fb_dos_lock_data(cursor_area, CURSOR_W * CURSOR_H * __fb_gfx->bpp);
+	if (fb_dos_lock_data(cursor_area, cursor_size) != 0) {
+		free(cursor_area);
+		cursor_area = NULL;
+		return -1;
+	}
 #endif
 
 	if (__fb_gfx->bpp == 1) {
@@ -92,14 +104,20 @@ void fb_hSoftCursorInit(void)
 		white = fb_hFixColor(__fb_gfx->bpp, 0xFFFFFF);
 		black = fb_hFixColor(__fb_gfx->bpp, 0x000000);
 	}
+
+	return 0;
 }
 
 void fb_hSoftCursorExit(void)
 {
+	if (!cursor_area)
+		return;
+
 #ifdef HOST_DOS
 	fb_dos_unlock_data(cursor_area, CURSOR_W * CURSOR_H * __fb_gfx->bpp);
 #endif
 	free(cursor_area);
+	cursor_area = NULL;
 }
 
 void fb_hSoftCursorPut(int x, int y)

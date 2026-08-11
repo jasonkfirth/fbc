@@ -39,7 +39,8 @@ const GFXDRIVER fb_gfxDriverOpenGL =
 	fb_hX11FetchModes,      /* int *(*fetch_modes)(void); */
 	driver_flip,            /* void (*flip)(void); */
 	NULL,                   /* void (*poll_events)(void); */
-	NULL                    /* void (*update)(void); */
+	NULL,                   /* void (*update)(void); */
+	NULL                    /* int (*resize)(int width, int height); */
 };
 
 

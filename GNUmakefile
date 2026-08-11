@@ -220,7 +220,7 @@ compiler-ppc64le-smoke: | maybe-build-fbc
 # Build ordering
 ##############################################################################
 
-libs: rtlib fbrt gfxlib2 sfxlib
+libs: rtlib fbrt gfxlib2 gfxlib3 sfxlib
 compiler-stage: rtlib compiler
 
 ##############################################################################

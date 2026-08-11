@@ -1,3 +1,0 @@
-freebasic-examples: package-contains-documentation-outside-usr-share-doc [usr/share/freebasic/examples/manual/samples.txt]
-freebasic-examples: package-contains-documentation-outside-usr-share-doc [usr/share/freebasic/examples/regex/PCRE/CRegex/test.txt]
-freebasic-examples: package-contains-documentation-outside-usr-share-doc [usr/share/freebasic/examples/sfxlib/media/README.txt]

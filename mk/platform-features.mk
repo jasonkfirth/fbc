@@ -416,6 +416,13 @@ ifneq ($(filter linux freebsd netbsd openbsd dragonfly solaris illumos haiku,$(T
   ENABLE_NO_PLT := YesPlease
 endif
 
+# Some distro compiler/linker combinations accept -fno-plt but mis-relax a
+# function address passed on the stack. Packagers can disable the optional
+# optimization without weakening the other hardening features.
+ifdef DISABLE_NO_PLT
+  ENABLE_NO_PLT :=
+endif
+
 # Auto var init is valuable but somewhat more toolchain-sensitive.
 # Restrict to mainstream hosted ELF targets; packagers can disable if needed.
 ifneq ($(filter linux freebsd solaris illumos haiku,$(TARGET_OS)),)

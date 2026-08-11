@@ -4,23 +4,34 @@
 
 SUITE( fbc_tests.file_.pipe_ )
 
-	const filename = "./file/pipe.bas"
+	#ifdef __FB_WIN32__
+		const filename = ".\file\pipe.bas"
+	#else
+		const filename = "./file/pipe.bas"
+	#endif
 
 	TEST( pipeInput )
+		dim as integer pipe_file = freefile( )
 
-		if open pipe ( "ls " + filename for input As #1) = 0 then
+		#ifdef __FB_WIN32__
+			dim as string pipe_command = "cmd /d /c dir /b """ + filename + """"
+		#else
+			dim as string pipe_command = "ls " + filename
+		#endif
+
+		if open pipe ( pipe_command for input as #pipe_file ) = 0 then
 
 			dim as string text
 			dim as integer files = 0
 
-			do while not eof(1)
-				input #1, text
+			do while not eof( pipe_file )
+				line input #pipe_file, text
 				if len( trim( text ) ) > 0 then files += 1
 			loop
 
 			CU_ASSERT_EQUAL( files, 1 )
 
-			close #1
+			close #pipe_file
 
 		else
 			CU_FAIL( "file not found" )

@@ -34,7 +34,9 @@ endif
 CC      ?= gcc
 CXX     ?= g++
 AR      ?= ar
-ARFLAGS ?= rcs
+# GNU make predefines ARFLAGS as "rv", so ?= would retain its verbose default.
+# A command-line ARFLAGS assignment can still override this release default.
+ARFLAGS = rcs
 RANLIB  ?= ranlib
 ELF2DOL ?= elf2dol
 

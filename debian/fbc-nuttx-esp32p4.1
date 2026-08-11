@@ -1,0 +1,87 @@
+.\" FreeBASIC NuttX SDK
+.\" -------------------
+.\" File: fbc-nuttx-esp32p4.1
+.\" Purpose: Document the installed ESP32-P4 application build and upload driver.
+.\" Responsibilities: Describe the normal build, transfer, and run workflow.
+.\" This file intentionally does not document NuttX firmware construction.
+.\"
+.TH FBC-NUTTX-ESP32P4 1 "2026-07-30" "FreeBASIC NuttX SDK" "User Commands"
+.SH NAME
+fbc-nuttx-esp32p4 \- build and deploy a FreeBASIC NuttX module for ESP32-P4
+.SH SYNOPSIS
+.B fbc-nuttx-esp32p4
+[\fIoptions\fR]
+.SH DESCRIPTION
+.B fbc-nuttx-esp32p4
+generates C from a FreeBASIC program, builds it as a loadable NuttX RISC-V
+module, and can transfer the module and data files to an ESP32-P4 board.
+The first normal run prepares a NuttX workspace when one is not already
+available. Firmware flashing is handled by
+.BR fbc-nuttx-esp32p4-firmware (1).
+.SH OPTIONS
+.TP
+.BI --nuttx-workdir " DIR"
+Use the workspace containing the NuttX and apps source trees.
+.TP
+.BI --bas " FILE"
+Build the specified FreeBASIC source file.
+.TP
+.BI --app-name " NAME"
+Set the NuttX module name.
+.TP
+.BI --generated-c " FILE"
+Compile existing generated C instead of invoking the FreeBASIC compiler.
+.TP
+.B --with-gfxlib
+Link the NuttX graphics support objects.
+.TP
+.B --sfx-no-media-decoders
+Link generated-tone sound support without the media decoders.
+.TP
+.BI --asset " FILE[:DEST]"
+Transfer an additional data file. The option may be repeated.
+.TP
+.BR --storage " " data | sd | auto
+Select the board storage root. The default is
+.BR auto .
+.TP
+.BI --board-ip " ADDRESS"
+Use the given board address for telnet control.
+.TP
+.BI --serial-port " DEVICE"
+Use a serial console for first-contact address discovery and control.
+.TP
+.BR --control " " auto | telnet | serial | none
+Select the board control transport.
+.TP
+.B --run
+Run the uploaded module after transfer.
+.TP
+.B --no-upload
+Build and stage the module without contacting a board.
+.TP
+.B --prepare-only
+Prepare the workspace, then stop.
+.TP
+.B --help
+Show the complete option and environment reference.
+.SH ENVIRONMENT
+.TP
+.B NUTTX_WORKDIR, FB_NUTTX_ESP32P4_WORKDIR
+Default NuttX workspace.
+.TP
+.B FBC
+FreeBASIC compiler used to generate C.
+.TP
+.B FB_NUTTX_BOARD_IP
+Default ESP32-P4 board address.
+.TP
+.B ESPTOOL_PORT
+Default serial device.
+.SH SEE ALSO
+.BR fbc (1),
+.BR fbc-nuttx-esp32p4-firmware (1),
+.BR nuttx-http-server (1),
+.BR nuttx-remote-console (1)
+.\"
+.\" end of fbc-nuttx-esp32p4.1

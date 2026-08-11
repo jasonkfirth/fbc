@@ -52,6 +52,7 @@ cd "$ROOT"
 CLEANUP_SUCCESS=0
 CLEANUP_DIRS=(
     "$ROOT/.build-debianubuntu-cross"
+    "$ROOT/.build-debianubuntu-wii"
     "$ROOT/.build-debianubuntu-xbox"
 )
 
@@ -88,8 +89,9 @@ Options:
   --skip-bootstrap  Reuse existing build-architecture bootstrap tarball
   --with-js         Include the freebasic-js package in cross-builds
   --with-android    Include the freebasic-android package in cross-builds
+  --with-wii        Include the freebasic-wii package where supported
   --with-xbox       Include the freebasic-xbox sidecar package where supported
-  --no-target-ports Disable the default JS/Android/Xbox target additions
+  --no-target-ports Disable the default JS/Android/Wii/Xbox target additions
   --execute         Attempt the cross-build execution path
   --list            Show the planned native-container cross-build matrix
   --help            Show this help text
@@ -113,6 +115,7 @@ EXECUTE=0
 LIST_ONLY=0
 NO_JS=1
 NO_ANDROID=1
+WITH_WII=0
 WITH_XBOX=0
 TARGET_PORTS=1
 KEEP_GOING=0
@@ -136,6 +139,7 @@ while [ $# -gt 0 ]; do
         --skip-bootstrap) SKIP_BOOTSTRAP=1; shift ;;
         --with-js) NO_JS=0; shift ;;
         --with-android) NO_ANDROID=0; shift ;;
+        --with-wii) WITH_WII=1; shift ;;
         --with-xbox) WITH_XBOX=1; shift ;;
         --no-target-ports) TARGET_PORTS=0; shift ;;
         --execute) EXECUTE=1; shift ;;
@@ -180,18 +184,10 @@ DEBIAN_SID_ARCHES=(
 )
 
 DISTRO_TARGETS=(
-    "ubuntu|ubuntu:22.04|22.04|jammy"
-    "ubuntu|ubuntu:24.04|24.04|noble"
-    "ubuntu|ubuntu:24.10|24.10|oracular"
-    "ubuntu|ubuntu:25.04|25.04|plucky"
-    "ubuntu|ubuntu:25.10|25.10|questing"
     "ubuntu|ubuntu:26.04|26.04|resolute"
-    "debian|debian:12|12|bookworm"
     "debian|debian:13|13|trixie"
     "debian|debian:sid|sid|sid"
     "raspbian|badaix/raspios-lite:trixie|trixie|trixie"
-    "raspbian|badaix/raspios-lite:bookworm|bookworm|bookworm"
-    "raspbian|badaix/raspios-buster-armhf-lite:latest|buster|buster"
 )
 
 target_arches() {
@@ -199,12 +195,6 @@ target_arches() {
     local codename="$2"
 
     case "$distro/$codename" in
-        debian/bookworm)
-            printf '%s\n' amd64 arm64 armhf ppc64el s390x
-            ;;
-        raspbian/bookworm)
-            printf '%s\n' armhf arm64
-            ;;
         debian/trixie)
             printf '%s\n' "${DEBIAN_TRIXIE_ARCHES[@]}"
             ;;
@@ -229,10 +219,8 @@ target_default_port() {
     [ "$TARGET_PORTS" -eq 1 ] || return 1
 
     case "$distro/$codename/$arch/$port" in
-        ubuntu/questing/amd64/js|ubuntu/questing/amd64/android|ubuntu/questing/amd64/xbox|\
-        ubuntu/resolute/amd64/js|ubuntu/resolute/amd64/android|ubuntu/resolute/amd64/xbox|\
+        ubuntu/resolute/amd64/js|ubuntu/resolute/amd64/android|ubuntu/resolute/amd64/wii|ubuntu/resolute/amd64/xbox|\
         debian/trixie/amd64/js|debian/trixie/amd64/xbox|\
-        ubuntu/questing/arm64/js|ubuntu/questing/arm64/android|\
         ubuntu/resolute/arm64/js|ubuntu/resolute/arm64/android|\
         debian/trixie/arm64/js)
             return 0
@@ -276,6 +264,23 @@ target_builds_android() {
     android_supported_for_target "$distro" "$codename" "$arch" || return 1
 
     [ "$NO_ANDROID" -eq 0 ] || target_default_port android "$distro" "$codename" "$arch"
+}
+
+wii_supported_for_target() {
+    local distro="$1"
+    local codename="$2"
+    local arch="$3"
+
+    [ "$distro/$codename/$arch" = "ubuntu/resolute/amd64" ]
+}
+
+target_builds_wii() {
+    local distro="$1"
+    local codename="$2"
+    local arch="$3"
+
+    wii_supported_for_target "$distro" "$codename" "$arch" || return 1
+    [ "$WITH_WII" -eq 1 ] || target_default_port wii "$distro" "$codename" "$arch"
 }
 
 target_builds_xbox() {
@@ -406,6 +411,41 @@ run_root() {
     else
         die "this step requires root privileges; rerun as root or install sudo"
     fi
+}
+
+WII_TOOLCHAIN_IMAGE="${FBC_WII_TOOLCHAIN_IMAGE:-devkitpro/devkitppc@sha256:44cb1a920e1ec3ec7c06767493c3b85f8d643d6137cc4661f0201895ac6e4967}"
+
+wii_toolchain_available() {
+    local devkitpro="$ROOT/.build-debianubuntu-wii/devkitpro"
+
+    [ -x "$devkitpro/devkitPPC/bin/powerpc-eabi-gcc" ] || return 1
+    [ -x "$devkitpro/devkitPPC/bin/powerpc-eabi-ar" ] || return 1
+    [ -x "$devkitpro/devkitPPC/bin/powerpc-eabi-ranlib" ] || return 1
+    [ -x "$devkitpro/tools/bin/elf2dol" ] || return 1
+    [ -d "$devkitpro/libogc/include" ] || return 1
+    [ -d "$devkitpro/libogc/lib/wii" ] || return 1
+}
+
+prepare_wii_toolchain() {
+    local devkitpro="$ROOT/.build-debianubuntu-wii/devkitpro"
+
+    if wii_toolchain_available; then
+        echo "==> reusing staged Wii toolchain: $devkitpro"
+        return 0
+    fi
+
+    fb_remove_build_tree "$ROOT" "$devkitpro" || die "could not reset Wii toolchain staging directory"
+    mkdir -p "$devkitpro"
+
+    echo "==> staging the pinned official devkitPPC toolchain"
+    run_root docker pull --platform linux/amd64 "$WII_TOOLCHAIN_IMAGE"
+    run_root docker run --rm --platform linux/amd64 \
+        --user "$(id -u):$(id -g)" \
+        -v "$devkitpro:/export" \
+        "$WII_TOOLCHAIN_IMAGE" \
+        bash -lc 'set -e; tar -C /opt/devkitpro -cf - devkitPPC libogc tools | tar -C /export -xf -'
+
+    wii_toolchain_available || die "the staged devkitPPC image is missing required Wii tools or libogc files"
 }
 
 install_host_deps() {
@@ -547,6 +587,7 @@ EOF
         TARGET_TRIPLET="$target_triplet" \
         FBC_TARGET="$fbc_target" \
         FBTARGET_DIR_OVERRIDE="$dir_key" \
+        BOOTSTRAP_DIST_WORKTREE=1 \
         "${extra_make_args[@]}" \
         bootstrap-dist-target \
         -j"$MAKE_JOBS"
@@ -628,6 +669,7 @@ build_one() {
     local xbox_cmd
     local js_enabled
     local android_enabled
+    local wii_enabled
     local xbox_enabled
 
     IFS="|" read -r distro codename arch image outdir <<EOF
@@ -651,10 +693,20 @@ EOF
 
     js_enabled=0
     android_enabled=0
+    wii_enabled=0
     xbox_enabled=0
     target_builds_js "$distro" "$codename" "$arch" && js_enabled=1
     target_builds_android "$distro" "$codename" "$arch" && android_enabled=1
+    target_builds_wii "$distro" "$codename" "$arch" && wii_enabled=1
     target_builds_xbox "$distro" "$codename" "$arch" && xbox_enabled=1
+
+    if [ "$wii_enabled" -eq 1 ]; then
+        prepare_wii_toolchain
+        docker_env_args+=(
+            -e DEVKITPRO=/work/.build-debianubuntu-wii/devkitpro
+            -e DEVKITPPC=/work/.build-debianubuntu-wii/devkitpro/devkitPPC
+        )
+    fi
 
     build_args=(/work/build_scripts/debianubuntu-build-freebasic.sh --host-arch "$arch" --no-build)
     if [ "$js_enabled" -eq 0 ]; then
@@ -664,6 +716,11 @@ EOF
         build_args+=(--android)
     else
         build_args+=(--no-android)
+    fi
+    if [ "$wii_enabled" -eq 1 ]; then
+        build_args+=(--wii)
+    else
+        build_args+=(--no-wii)
     fi
 
     printf -v build_cmd '%q ' "${build_args[@]}"
@@ -691,10 +748,11 @@ EOF
     echo "Make jobs: ${MAKE_JOBS}"
     echo "Output: ${outdir}"
     [ -z "$arm_arch" ] || echo "ARM default arch: ${arm_arch}"
-    if [ "$js_enabled" -eq 1 ] || [ "$android_enabled" -eq 1 ] || [ "$xbox_enabled" -eq 1 ]; then
+    if [ "$js_enabled" -eq 1 ] || [ "$android_enabled" -eq 1 ] || [ "$wii_enabled" -eq 1 ] || [ "$xbox_enabled" -eq 1 ]; then
         echo -n "Extra ports:"
         [ "$js_enabled" -eq 0 ] || echo -n " js"
         [ "$android_enabled" -eq 0 ] || echo -n " android"
+        [ "$wii_enabled" -eq 0 ] || echo -n " wii"
         [ "$xbox_enabled" -eq 0 ] || echo -n " xbox"
         echo
     else
@@ -721,6 +779,19 @@ EOF
     } > "$docker_log" 2>&1; then
         echo "BUILD FAILED: ${distro}/${codename} (${arch})"
         echo "Log: $docker_log"
+        return 1
+    fi
+
+    compgen -G "$outdir/freebasic-nuttx_*.deb" >/dev/null || {
+        echo "BUILD FAILED: ${distro}/${codename} (${arch}) did not produce freebasic-nuttx"
+        return 1
+    }
+    if [ "$wii_enabled" -eq 1 ] && ! compgen -G "$outdir/freebasic-wii_*.deb" >/dev/null; then
+        echo "BUILD FAILED: ${distro}/${codename} (${arch}) did not produce freebasic-wii"
+        return 1
+    fi
+    if [ "$xbox_enabled" -eq 1 ] && ! compgen -G "$outdir/xbox/freebasic-xbox_*.deb" >/dev/null; then
+        echo "BUILD FAILED: ${distro}/${codename} (${arch}) did not produce freebasic-xbox"
         return 1
     fi
 

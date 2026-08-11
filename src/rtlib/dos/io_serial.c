@@ -236,21 +236,34 @@ static void BUFFER_reset( buffer_t * buf )
 
 static int BUFFER_alloc( buffer_t * buf, int size )
 {
-	size = next_pow2( size );
+	unsigned int buffer_size;
 
+	if( (buf == NULL) || (size <= 0) )
+		return FALSE;
+
+	buffer_size = next_pow2( (unsigned int)size );
+
+	buf->data = NULL;
 	buf->size = 0;
-
-	buf->data = malloc( size );
-	if( buf->data )
-	{
-		buf->size = size;
-		fb_dos_lock_data( buf->data, buf->size);
-	}
-
 	BUFFER_reset( buf );
 
+	buf->data = malloc( buffer_size );
+	if( buf->data == NULL )
+		return FALSE;
+
+	buf->size = buffer_size;
+	BUFFER_reset( buf );
+
+	if( fb_dos_lock_data( buf->data, buf->size ) != 0 )
+	{
+		free( buf->data );
+		buf->data = NULL;
+		buf->size = 0;
+		return FALSE;
+	}
+
 	/* TRUE = success */
-	return ( buf->size != 0 ); 
+	return TRUE;
 }
 
 static void BUFFER_free( buffer_t * buf )

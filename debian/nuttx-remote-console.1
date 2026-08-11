@@ -1,0 +1,54 @@
+.\" FreeBASIC NuttX SDK
+.\" -------------------
+.\" File: nuttx-remote-console.1
+.\" Purpose: Document the installed NuttX command-console helper.
+.\" Responsibilities: Describe serial and telnet command execution.
+.\" This file intentionally does not document board firmware configuration.
+.\"
+.TH NUTTX-REMOTE-CONSOLE 1 "2026-07-30" "FreeBASIC NuttX SDK" "User Commands"
+.SH NAME
+nuttx-remote-console \- execute commands through a NuttX NSH console
+.SH SYNOPSIS
+.B nuttx-remote-console
+[\fIoptions\fR]
+.SH DESCRIPTION
+.B nuttx-remote-console
+connects to a NuttX NSH prompt over telnet or a serial device, synchronizes
+with the prompt, runs one or more commands, and returns a failure when the
+console cannot complete the requested exchange.
+.SH OPTIONS
+.TP
+.BI --telnet " HOST"
+Connect to an NSH telnet server.
+.TP
+.BI --serial " DEVICE"
+Connect to a serial console.
+.TP
+.BI --telnet-port " PORT"
+Set the telnet port. The default is 23.
+.TP
+.BI --baud " RATE"
+Set the serial rate. The default is 115200.
+.TP
+.BI --timeout " SECONDS"
+Set the command timeout.
+.TP
+.BI --startup-wait " SECONDS"
+Wait after opening the transport.
+.TP
+.BI --prompt " TEXT"
+Set the expected NSH prompt text.
+.TP
+.BI --cmd " TEXT"
+Run a command. This option may be repeated.
+.TP
+.B --no-sync
+Skip initial prompt synchronization.
+.TP
+.B --help
+Show command help.
+.SH SEE ALSO
+.BR fbc-nuttx-esp32p4 (1),
+.BR nuttx-http-server (1)
+.\"
+.\" end of nuttx-remote-console.1

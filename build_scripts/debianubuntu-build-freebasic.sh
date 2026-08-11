@@ -69,19 +69,34 @@ run_root() {
     fi
 }
 
+run_root_apt() {
+    #
+    # Archived distribution mirrors occasionally reset an individual
+    # package download while the rest of the transaction succeeds. Let apt
+    # retry those transfers before abandoning an otherwise valid build.
+    # The timeouts also prevent an unreachable mirror from hanging a matrix
+    # row indefinitely.
+    #
+    run_root apt-get \
+        -o Acquire::Retries=5 \
+        -o Acquire::http::Timeout=30 \
+        -o Acquire::https::Timeout=30 \
+        "$@"
+}
+
 usage() {
     cat <<EOF
 Usage: ./build_scripts/debianubuntu-build-freebasic.sh [options]
 
 Options:
   --no-build      Reuse the existing source bootstrap tarball
-  --no-js         Build packages with DEB_BUILD_PROFILES=nojs
-  --no-android    Build packages without DEB_BUILD_PROFILES=android
+  --no-js         Build packages with DEB_BUILD_PROFILES=pkg.freebasic.nojs
+  --no-android    Build packages without DEB_BUILD_PROFILES=pkg.freebasic.android
   --android       Build the Ubuntu freebasic-android package; fail if SDK
                   packages are not available
-  --wii           Build the freebasic-wii package; fail if devkitPro packages
-                  are not available
-  --no-wii        Build packages without DEB_BUILD_PROFILES=wii
+  --wii           Build the freebasic-wii package; fail if a devkitPro
+                  toolchain is not available
+  --no-wii        Build packages without DEB_BUILD_PROFILES=pkg.freebasic.wii
   --host-arch A   Build a package for Debian architecture A
   --no-package    Stop after ensuring the bootstrap tarball exists
   --skip-deps     Skip apt dependency installation
@@ -100,6 +115,11 @@ Environment:
                   cross-architecture package indexes
   FBC_PACKAGE_ARM_ARCH
                   ARM default arch override for package builds (armv6+fp)
+  FBC_PACKAGE_SKIP_BUILD_DEPENDS
+                  Set to 1 only when an externally supplied toolchain satisfies
+                  profile-specific build dependencies unavailable through APT
+  DEVKITPRO       devkitPro root for an externally supplied Wii toolchain
+  DEVKITPPC       devkitPPC root (default: <DEVKITPRO>/devkitPPC)
   JOBS            Parallel make job count for bootstrap generation
 
 Artifacts are written under:
@@ -336,6 +356,18 @@ wii_sdk_packages_available() {
     return 0
 }
 
+wii_external_toolchain_available() {
+    local devkitpro="${DEVKITPRO:-/opt/devkitpro}"
+    local devkitppc="${DEVKITPPC:-$devkitpro/devkitPPC}"
+
+    [ -x "$devkitppc/bin/powerpc-eabi-gcc" ] || return 1
+    [ -x "$devkitppc/bin/powerpc-eabi-ar" ] || return 1
+    [ -x "$devkitppc/bin/powerpc-eabi-ranlib" ] || return 1
+    [ -x "$devkitpro/tools/bin/elf2dol" ] || return 1
+    [ -d "$devkitpro/libogc/include" ] || return 1
+    [ -d "$devkitpro/libogc/lib/wii" ] || return 1
+}
+
 disable_android_if_sdk_unavailable() {
     [ "$SKIP_DEPS" -eq 0 ] || return 0
     [ "$ANDROID" -eq 1 ] || return 0
@@ -356,7 +388,7 @@ disable_wii_if_sdk_unavailable() {
     [ "$SKIP_DEPS" -eq 0 ] || return 0
     [ "$WII" -eq 1 ] || return 0
 
-    if wii_sdk_packages_available; then
+    if wii_external_toolchain_available || wii_sdk_packages_available; then
         return 0
     fi
 
@@ -530,6 +562,12 @@ needs_debian_ports_cross_apt() {
     esac
 }
 
+needs_isolated_target_sysroot() {
+    [ "$CROSS_PACKAGE_BUILD" -eq 1 ] || return 1
+    [ "$DISTRO_ID" = "debian" ] || return 1
+    [ "$CODENAME" = "sid" ] || return 1
+}
+
 install_debian_ports_cross_keyring() {
     needs_debian_ports_cross_apt || return 0
 
@@ -539,8 +577,8 @@ install_debian_ports_cross_keyring() {
 
     msg "installing Debian Ports archive keyring"
 
-    run_root apt-get update -y
-    run_root apt-get install -y --no-install-recommends \
+    run_root_apt update -y
+    run_root_apt install -y --no-install-recommends \
         ca-certificates \
         debian-ports-archive-keyring
 }
@@ -572,6 +610,140 @@ EOF
     rm -f "$tmp_sources"
 }
 
+find_common_multiarch_version() {
+    local package="$1"
+    local build_versions
+    local host_versions
+    local installed_build_version
+    local version
+
+    build_versions="$(
+        apt-cache madison "${package}:${BUILD_ARCH}" |
+        awk -F '|' '{ gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2 }'
+    )"
+    host_versions="$(
+        apt-cache madison "${package}:${HOST_ARCH}" |
+        awk -F '|' '{ gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2 }'
+    )"
+
+    #
+    # Rolling images can contain a version that has already disappeared from
+    # the build architecture's package index but is still current for the
+    # target architecture.  Include that installed version when looking for
+    # the exact match required by Multi-Arch: same packages.
+    #
+    installed_build_version="$(
+        dpkg-query -W -f='${Version}' "${package}:${BUILD_ARCH}" 2>/dev/null || true
+    )"
+    if [ -n "$installed_build_version" ]; then
+        build_versions="${installed_build_version}"$'\n'"${build_versions}"
+    fi
+
+    [ -n "$build_versions" ] || return 1
+    [ -n "$host_versions" ] || return 1
+
+    while IFS= read -r version; do
+        [ -n "$version" ] || continue
+        if printf '%s\n' "$host_versions" | grep -Fqx "$version"; then
+            printf '%s\n' "$version"
+            return 0
+        fi
+    done <<< "$build_versions"
+
+    return 1
+}
+
+install_debian_target_sysroot() {
+    local packages=("$@")
+    local sysroot_base="$BUILDROOT/debian-target-sysroot"
+    local apt_state="$sysroot_base/apt-state"
+    local apt_archives="$sysroot_base/apt-cache/archives"
+    local sysroot="$sysroot_base/root"
+    local controls="$sysroot_base/controls"
+    local shlibs_file="$sysroot_base/shlibs.local"
+    local downloaded_packages=()
+    local package
+    local package_arch
+    local package_control
+    local package_index=0
+
+    needs_isolated_target_sysroot || return 0
+    [ "${#packages[@]}" -gt 0 ] || die "Debian target sysroot package list is empty"
+
+    msg "creating isolated Debian target sysroot for $HOST_ARCH"
+
+    assert_removable_tree "$sysroot_base"
+    fb_remove_build_tree "$ROOT" "$sysroot_base" ||
+        die "could not remove the previous Debian target sysroot"
+
+    mkdir -p \
+        "$apt_state" \
+        "$apt_archives/partial" \
+        "$sysroot" \
+        "$controls"
+    : > "$apt_state/status"
+    : > "$apt_state/extended_states"
+
+    #
+    # Sid architectures and cross toolchains are published asynchronously.
+    # During a C library transition, the target development packages can be
+    # newer than the libc headers required by the cross compiler itself.
+    # Debian Ports can also carry a different version of a Multi-Arch: same
+    # library than the amd64 build container. Installing either combination
+    # into one dpkg database is impossible. Resolve the target dependency
+    # closure against an empty target-only package state instead, then
+    # extract that closure into a compiler sysroot.
+    #
+    run_root_apt \
+        -o "APT::Architecture=${HOST_ARCH}" \
+        -o "APT::Architectures=${HOST_ARCH}" \
+        -o "Dir::State::status=${apt_state}/status" \
+        -o "Dir::State::extended_states=${apt_state}/extended_states" \
+        -o "Dir::State::lists=/var/lib/apt/lists" \
+        -o "Dir::Cache::archives=${apt_archives}" \
+        -o Debug::NoLocking=true \
+        install -y --download-only --no-install-recommends \
+        "${packages[@]}"
+
+    shopt -s nullglob
+    downloaded_packages=("$apt_archives"/*.deb)
+    shopt -u nullglob
+    [ "${#downloaded_packages[@]}" -gt 0 ] ||
+        die "Debian target sysroot resolver downloaded no packages"
+
+    : > "$shlibs_file"
+    for package in "${downloaded_packages[@]}"; do
+        package_arch="$(dpkg-deb --field "$package" Architecture)"
+        case "$package_arch" in
+        all|"$HOST_ARCH")
+            ;;
+        *)
+            die "Debian target sysroot contains unexpected ${package_arch} package: $(basename "$package")"
+            ;;
+        esac
+
+        dpkg-deb --extract "$package" "$sysroot"
+
+        package_index=$((package_index + 1))
+        package_control="$controls/$package_index"
+        mkdir -p "$package_control"
+        dpkg-deb --control "$package" "$package_control"
+        if [ -f "$package_control/shlibs" ]; then
+            cat "$package_control/shlibs" >> "$shlibs_file"
+        fi
+    done
+
+    sort -u "$shlibs_file" -o "$shlibs_file"
+    [ -s "$shlibs_file" ] ||
+        die "Debian target sysroot packages supplied no shared-library metadata"
+
+    export FBC_PACKAGE_SYSROOT="$sysroot"
+    export FBC_PACKAGE_TARGET_SHLIBS="$shlibs_file"
+
+    echo "==> Debian target sysroot packages: ${#downloaded_packages[@]}"
+    echo "==> Debian target sysroot: $FBC_PACKAGE_SYSROOT"
+}
+
 assert_orig_tarball_clean() {
     local archive="$1"
     local bad_entry
@@ -587,12 +759,30 @@ assert_orig_tarball_clean() {
                 .git/*|\
                 bin/*|\
                 dist/*|\
+                doc/manual/FB-manual-*|\
                 lib/freebasic/*|\
+                lib/freebasic-wii/*/*.a|\
+                lib/freebasic-wii/*/*.o|\
                 out/*|\
                 package-root*/*|\
                 packages/*|\
                 pkgroot*/*|\
                 stage/*|\
+                */__pycache__/*|\
+                tests/*.asm|\
+                tests/*.dol|\
+                tests/*.exe|\
+                tests/log-tests-*.inc|\
+                tests/log-tests-*.lst|\
+                tests/*.o|\
+                tests/*.obj|\
+                tests/unit-tests.inc|\
+                tests/unit-tests-obj.lst|\
+                tests/*.xml|\
+                *.log|\
+                *.pid|\
+                *.status|\
+                *.tmp|\
                 tmp/*)
                     printf '%s\n' "$entry"
                     break
@@ -700,7 +890,7 @@ install_deps() {
         configure_raspbian_legacy_apt_sources
     fi
 
-    run_root apt-get update -y
+    run_root_apt update -y
     disable_android_if_sdk_unavailable
     disable_wii_if_sdk_unavailable
 
@@ -726,7 +916,7 @@ install_deps() {
         )
     fi
     local wii_deps=()
-    if [ "$WII" -eq 1 ]; then
+    if [ "$WII" -eq 1 ] && ! wii_external_toolchain_available; then
         wii_deps=(
             devkitppc
             libogc
@@ -736,6 +926,8 @@ install_deps() {
     local cross_deps=()
     local native_library_deps=()
     local target_deps=()
+    local target_package_names=()
+    local multiarch_version_locks=()
     if [ "$CROSS_PACKAGE_BUILD" -eq 1 ]; then
         native_library_deps=(
             libncurses-dev
@@ -779,30 +971,112 @@ install_deps() {
             "g++-${TARGET_TRIPLET}"
         )
 
-        target_deps=(
-            "libncurses-dev:${HOST_ARCH}"
-            "libtinfo-dev:${HOST_ARCH}"
-            "libgpm-dev:${HOST_ARCH}"
-            "libffi-dev:${HOST_ARCH}"
-            "libasound2-dev:${HOST_ARCH}"
-            "libpulse-dev:${HOST_ARCH}"
-            "libx11-dev:${HOST_ARCH}"
-            "libxpm-dev:${HOST_ARCH}"
-            "libxext-dev:${HOST_ARCH}"
-            "libxrandr-dev:${HOST_ARCH}"
-            "libxrender-dev:${HOST_ARCH}"
-            "libxcb1-dev:${HOST_ARCH}"
-            "libxau-dev:${HOST_ARCH}"
-            "libxdmcp-dev:${HOST_ARCH}"
-            "libxi-dev:${HOST_ARCH}"
-            "libxinerama-dev:${HOST_ARCH}"
-            "libxxf86vm-dev:${HOST_ARCH}"
-            "libgl1-mesa-dev:${HOST_ARCH}"
-            "libglu1-mesa-dev:${HOST_ARCH}"
+        target_package_names=(
+            libc6-dev
+            libncurses-dev
+            libtinfo-dev
+            libgpm-dev
+            libffi-dev
+            libasound2-dev
+            libpulse-dev
+            libx11-dev
+            libxpm-dev
+            libxext-dev
+            libxrandr-dev
+            libxrender-dev
+            libxcb1-dev
+            libxau-dev
+            libxdmcp-dev
+            libxi-dev
+            libxinerama-dev
+            libxxf86vm-dev
+            libgl1-mesa-dev
+            libglu1-mesa-dev
         )
+
+        if needs_isolated_target_sysroot; then
+            # The target libraries are installed into an isolated sysroot
+            # after the native build tools have been installed.
+            target_deps=()
+        else
+            local target_package
+            for target_package in "${target_package_names[@]}"; do
+                target_deps+=("${target_package}:${HOST_ARCH}")
+            done
+
+            local linux_libc_architecture
+            local linux_libc_version
+            linux_libc_architecture="$(
+                apt-cache show linux-libc-dev |
+                awk '/^Architecture:/ { print $2; exit }'
+            )"
+            [ -n "$linux_libc_architecture" ] ||
+                die "could not determine the linux-libc-dev package architecture"
+
+            if [ "$linux_libc_architecture" = "all" ]; then
+                # Debian 13 and newer provide one Multi-Arch: foreign package.
+                # An architecture qualifier is invalid for this package layout.
+                linux_libc_version="$(
+                    apt-cache madison linux-libc-dev |
+                    awk -F '|' '
+                        {
+                            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
+                            if ($2 != "") {
+                                print $2
+                                exit
+                            }
+                        }
+                    '
+                )"
+                [ -n "$linux_libc_version" ] ||
+                    die "linux-libc-dev has no installable version"
+                echo "==> locking architecture-independent linux-libc-dev to version: $linux_libc_version"
+                multiarch_version_locks=(
+                    "linux-libc-dev=${linux_libc_version}"
+                )
+            else
+                linux_libc_version="$(find_common_multiarch_version linux-libc-dev)" ||
+                    die "linux-libc-dev has no version available for both ${BUILD_ARCH} and ${HOST_ARCH}"
+                echo "==> locking linux-libc-dev for ${BUILD_ARCH} and ${HOST_ARCH} to common version: $linux_libc_version"
+                multiarch_version_locks=(
+                    "linux-libc-dev:${BUILD_ARCH}=${linux_libc_version}"
+                    "linux-libc-dev:${HOST_ARCH}=${linux_libc_version}"
+                )
+            fi
+
+            local libzstd_build_candidate
+            local libzstd_target_candidate
+            local libzstd_version
+            libzstd_build_candidate="$(
+                apt-cache policy "libzstd1:${BUILD_ARCH}" |
+                awk '/Candidate:/ { print $2; exit }'
+            )"
+            libzstd_target_candidate="$(
+                apt-cache policy "libzstd1:${HOST_ARCH}" |
+                awk '/Candidate:/ { print $2; exit }'
+            )"
+
+            if [ -n "$libzstd_build_candidate" ] &&
+               [ -n "$libzstd_target_candidate" ] &&
+               [ "$libzstd_build_candidate" != "$libzstd_target_candidate" ]; then
+                if libzstd_version="$(find_common_multiarch_version libzstd1)"; then
+                    #
+                    # Mesa and LLVM pull libzstd1 into graphics cross-builds.
+                    # Debian architectures are published independently, so
+                    # apt must sometimes retain the image's installed native
+                    # version while installing the matching target package.
+                    #
+                    echo "==> locking libzstd1 for ${BUILD_ARCH} and ${HOST_ARCH} to common version: $libzstd_version"
+                    multiarch_version_locks+=(
+                        "libzstd1:${BUILD_ARCH}=${libzstd_version}"
+                        "libzstd1:${HOST_ARCH}=${libzstd_version}"
+                    )
+                fi
+            fi
+        fi
     fi
 
-    run_root apt-get install -y --no-install-recommends \
+    run_root_apt install -y --allow-downgrades --no-install-recommends \
         ca-certificates \
         build-essential gcc g++ binutils make \
         pkgconf rsync \
@@ -812,10 +1086,15 @@ install_deps() {
         "${native_library_deps[@]}" \
         "${cross_deps[@]}" \
         "${target_deps[@]}" \
+        "${multiarch_version_locks[@]}" \
         "${js_deps[@]}" \
         "${android_deps[@]}" \
         "${wii_deps[@]}" \
         perl python3 git
+
+    if needs_isolated_target_sysroot; then
+        install_debian_target_sysroot "${target_package_names[@]}"
+    fi
 }
 
 ##############################################################################
@@ -845,6 +1124,7 @@ build_bootstrap_tarball() {
         TARGET_TRIPLET="$BUILD_TARGET_TRIPLET" \
         FBC_TARGET="$BUILD_FBC_TARGET" \
         FBTARGET_DIR_OVERRIDE="$BUILD_BOOTKEY" \
+        BOOTSTRAP_DIST_WORKTREE=1 \
         "${ARM_MAKE_ARGS[@]}" \
         bootstrap-dist-target \
         -j"$JOBS"
@@ -865,6 +1145,12 @@ package_current_target() {
     local rc
     local bootstrap_srcdir
     local deb_build_options
+    local lintian_log
+    local lintian_help
+    local lintian_fail_args=()
+    local override_file
+    local target_standards_version=""
+    local unexpected_lintian
 
     msg "preparing Debian package build"
 
@@ -912,6 +1198,68 @@ package_current_target() {
     [ -f debian/changelog ] || die "missing debian/changelog"
     [ -f GNUmakefile ] || [ -f makefile ] || [ -f Makefile ] || die "missing GNUmakefile/makefile/Makefile"
 
+    if [ "$CODENAME" != "unknown" ]; then
+        awk -v distribution="$CODENAME" '
+            NR == 1 {
+                if (!sub(/\) [^;]+;/, ") " distribution ";")) {
+                    exit 1
+                }
+            }
+            { print }
+        ' debian/changelog > debian/changelog.tmp
+        mv debian/changelog.tmp debian/changelog
+    fi
+
+    case "$DISTRO_ID/$CODENAME" in
+    ubuntu/jammy)
+        target_standards_version="4.6.0"
+        ;;
+    raspbian/buster)
+        target_standards_version="4.3.0"
+        ;;
+    esac
+
+    if [ -n "$target_standards_version" ]; then
+        # Archived validators only know the Policy version shipped with their
+        # release. The package does not rely on later policy features, so use
+        # the newest version understood by the target's Lintian.
+        awk -v target_standards_version="$target_standards_version" '
+            BEGIN {
+                replacement = "Standards-Version: " target_standards_version
+            }
+            /^Standards-Version:/ {
+                print replacement
+                next
+            }
+            { print }
+        ' debian/control > debian/control.tmp
+        mv debian/control.tmp debian/control
+    fi
+
+    if { [ "$DISTRO_ID" = "ubuntu" ] && [ "$CODENAME" = "jammy" ]; } ||
+        { [ "$DISTRO_ID" = "raspbian" ] && [ "$CODENAME" = "buster" ]; }
+    then
+        #
+        # Older Lintian releases treat file names as tag context. Newer
+        # releases treat them as item pointers and require square brackets in
+        # overrides. Keep the modern form in the source tree and adapt staged
+        # packages for the old parser used by Jammy and Buster.
+        #
+        for override_file in \
+            debian/source/lintian-overrides \
+            debian/freebasic-nuttx.lintian-overrides
+        do
+            awk '
+                /^(freebasic source: source-is-missing|freebasic-nuttx: national-encoding) \[[^][]+\]$/ {
+                    sub(/ \[/, " ")
+                    sub(/\]$/, "")
+                }
+                { print }
+            ' "$override_file" > "$override_file.tmp"
+            mv "$override_file.tmp" "$override_file"
+        done
+    fi
+
     if [ "$ANDROID" -eq 0 ]; then
         # Keep Debian and other non-Android package sets from advertising a
         # sidecar package they did not build.  Ubuntu Android packages are
@@ -937,11 +1285,30 @@ package_current_target() {
     echo "==> output dir: $OUTDIR"
     echo "==> build jobs: $JOBS"
     [ -z "${FBC_PACKAGE_ARM_ARCH:-}" ] || echo "==> ARM default arch: $FBC_PACKAGE_ARM_ARCH"
-    [ "$NO_JS" -eq 0 ] || echo "==> build profile: nojs"
-    [ "$ANDROID" -eq 0 ] || echo "==> build profile: android"
-    [ "$WII" -eq 0 ] || echo "==> build profile: wii"
+    [ "$NO_JS" -eq 0 ] || echo "==> build profile: pkg.freebasic.nojs"
+    [ "$ANDROID" -eq 0 ] || echo "==> build profile: pkg.freebasic.android"
+    [ "$WII" -eq 0 ] || echo "==> build profile: pkg.freebasic.wii"
 
     cd "$BUILDDIR"
+
+    # Debian source archives must contain the editable sources for every
+    # shipped object. Windows compatibility libraries, generated manual
+    # tools, and host runtime objects are not used by a Debian build.
+    rm -rf "$srcdir/contrib/winlibs-legacy"
+    rm -f "$srcdir/contrib/swig/swig.exe"
+    rm -f "$srcdir"/doc/manual/*.chm
+    rm -f "$srcdir"/lib/linux-*/libgcc_s.so.1
+    find \
+        "$srcdir/doc/fbchkdoc" \
+        "$srcdir/doc/fbdoc" \
+        "$srcdir/doc/makefbhelp" \
+        -maxdepth 1 -type f -perm /111 -delete
+    find "$srcdir/doc/libfbdoc" -maxdepth 1 -type f \
+        \( -name '*.o' -o -name '*.a' \) -delete
+    if [ -d "$srcdir/lib/freebasic-wii" ]; then
+        find "$srcdir/lib/freebasic-wii" -type f \
+            \( -name '*.o' -o -name '*.a' \) -delete
+    fi
 
     origtar="${pkgname}_${upver}.orig.tar.xz"
     rm -f "$origtar"
@@ -957,19 +1324,17 @@ package_current_target() {
         chmod +x debian/rules || true
     fi
 
-    rm -f contrib/swig/swig.exe || true
-
     msg "running dpkg-buildpackage"
 
     local build_profiles=()
     if [ "$NO_JS" -eq 1 ]; then
-        build_profiles+=(nojs)
+        build_profiles+=(pkg.freebasic.nojs)
     fi
     if [ "$ANDROID" -eq 1 ]; then
-        build_profiles+=(android)
+        build_profiles+=(pkg.freebasic.android)
     fi
     if [ "$WII" -eq 1 ]; then
-        build_profiles+=(wii)
+        build_profiles+=(pkg.freebasic.wii)
     fi
 
     deb_build_options="${DEB_BUILD_OPTIONS:-}"
@@ -985,6 +1350,8 @@ package_current_target() {
     local dpkg_args=(-us -uc)
     if [ "$CROSS_PACKAGE_BUILD" -eq 1 ]; then
         dpkg_args=(-a "$HOST_ARCH" -d "${dpkg_args[@]}")
+    elif [ "${FBC_PACKAGE_SKIP_BUILD_DEPENDS:-0}" -eq 1 ]; then
+        dpkg_args=(-d "${dpkg_args[@]}")
     fi
 
     if [ "${#build_profiles[@]}" -gt 0 ]; then
@@ -1018,12 +1385,77 @@ package_current_target() {
     done
     shopt -u nullglob
 
+    local changes_files=()
+    local changes_file=""
+    local lintian_rc=0
+
     shopt -s nullglob
-    for deb in "$OUTDIR"/*.deb; do
-        [ -f "$deb" ] || continue
-        lintian -IE --pedantic "$deb" | tee "$OUTDIR/lintian-$(basename "$deb").log" || true
-    done
+    changes_files=("$OUTDIR"/*.changes)
     shopt -u nullglob
+
+    if [ "${#changes_files[@]}" -eq 0 ]; then
+        echo "ERROR: no .changes file was produced for Lintian"
+        exit 1
+    fi
+
+    lintian_help="$(lintian --help 2>&1)" || die "could not query Lintian command-line options"
+
+    if grep -Eq -- '(^|[[:space:]])--fail-on([=[:space:]]|$)' <<< "$lintian_help"; then
+        lintian_fail_args=(--fail-on error,warning)
+    elif grep -q -- '--fail-on-warnings' <<< "$lintian_help"; then
+        #
+        # Raspbian Buster provides Lintian 2.15. It predates --fail-on, but
+        # its deprecated --fail-on-warnings option returns failure for either
+        # warnings or errors. This keeps archived package rows as strict as
+        # rows validated by current Lintian releases.
+        #
+        lintian_fail_args=(--fail-on-warnings)
+    else
+        die "installed Lintian cannot be configured to fail on warnings"
+    fi
+
+    for changes_file in "${changes_files[@]}"; do
+        lintian_log="$OUTDIR/lintian-$(basename "$changes_file").log"
+
+        set +e
+        lintian -IE --pedantic "${lintian_fail_args[@]}" "$changes_file" 2>&1 |
+            tee "$lintian_log"
+        lintian_rc=${PIPESTATUS[0]}
+        set -e
+
+        unexpected_lintian="$(
+            grep -E '^[EW]:' "$lintian_log" |
+                grep -Ev '^W: freebasic-dbgsym: elf-error In program headers: Unable to find program interpreter name \[usr/lib/debug/\.build-id/[[:xdigit:]]{2}/[[:xdigit:]]+\.debug\]$' ||
+                true
+        )"
+
+        if [ -n "$unexpected_lintian" ]; then
+            echo "ERROR: Lintian reported errors or warnings for $(basename "$changes_file")"
+            printf '%s\n' "$unexpected_lintian"
+
+            if [ "$lintian_rc" -eq 0 ]; then
+                lintian_rc=1
+            fi
+
+            exit "$lintian_rc"
+        fi
+
+        if [ "$lintian_rc" -ne 0 ]; then
+            #
+            # Binutils debug files retain the executable's program headers
+            # while objcopy removes the interpreter bytes. Jammy's Lintian
+            # reports that normal dbgsym layout as an elf-error. Accept only
+            # that exact warning; every other error or warning still fails.
+            #
+            if grep -Eq '^W: freebasic-dbgsym: elf-error In program headers: Unable to find program interpreter name \[usr/lib/debug/\.build-id/[[:xdigit:]]{2}/[[:xdigit:]]+\.debug\]$' "$lintian_log"
+            then
+                echo "==> accepted Jammy Lintian's known dbgsym interpreter warning"
+            else
+                echo "ERROR: Lintian failed for $(basename "$changes_file") (exit=$lintian_rc)"
+                exit "$lintian_rc"
+            fi
+        fi
+    done
 
     echo
     echo "==> build completed"

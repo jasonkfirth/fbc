@@ -13,8 +13,8 @@
 # Responsibilities:
 #
 #   * locate the packaged Windows FreeBASIC distribution
-#   * copy tests/ and the shared inc/ tree into isolated per-architecture
-#     work directories
+#   * copy tests/, inc/, and test-facing sfxlib sources into isolated
+#     per-architecture work directories
 #   * run the fbc sanity checks
 #   * build and run the fbcunit test executable
 #   * run all four log-test dialect lanes
@@ -122,6 +122,55 @@ assert_no_failed_log_tests()
 	return 1
 }
 
+stage_test_sources()
+{
+	local arch_work="$1"
+	local tests_work="$arch_work/tests"
+
+	rm -rf "$arch_work"
+	mkdir -p "$tests_work" "$arch_work/logs"
+
+	# A developer tree can contain ignored Windows .exe files beside tracked
+	# extensionless Unix test fixtures.  MSYS treats those names as aliases
+	# while copying, so a blind "cp -a" can collide and leave an incomplete
+	# test tree.  Prefer Git's tracked plus non-ignored file list when it is
+	# available.  Release source archives use the explicit artifact excludes.
+	if command -v git >/dev/null 2>&1 &&
+		git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+		git -C "$ROOT" ls-files -co --exclude-standard -z -- tests inc src/sfxlib |
+			while IFS= read -r -d '' source_path; do
+				[ -e "$ROOT/$source_path" ] || continue
+				printf '%s\0' "$source_path"
+			done |
+			rsync -a --from0 --files-from=- "$ROOT/" "$arch_work/"
+	else
+		rsync -a --delete \
+			--exclude='*.a' \
+			--exclude='*.asm' \
+			--exclude='*.dylib' \
+			--exclude='*.exe' \
+			--exclude='*.lib' \
+			--exclude='*.log' \
+			--exclude='*.o' \
+			--exclude='*.obj' \
+			--exclude='*.so' \
+			--exclude='*.tmp' \
+			--exclude='.fbwii-tmp/' \
+			--exclude='.maketests-tmp/' \
+			--exclude='fbc-tests' \
+			--exclude='unit-tests.inc' \
+			--exclude='unit-tests-obj.lst' \
+			--exclude='log-tests-*.inc' \
+			--exclude='failed-log-tests-*.inc' \
+			--exclude='log-tests-*.lst' \
+			--exclude='log-tests-results-*.log' \
+			"$ROOT/tests/" "$tests_work/"
+
+		rsync -a --delete "$ROOT/inc/" "$arch_work/inc/"
+		rsync -a --delete "$ROOT/src/sfxlib/" "$arch_work/src/sfxlib/"
+	fi
+}
+
 run_arch()
 {
 	local arch="$1"
@@ -170,10 +219,7 @@ run_arch()
 	[ -x "$cxx" ] || fail "missing packaged C++ compiler: $cxx"
 
 	msg "$arch: preparing isolated tests tree"
-	rm -rf "$arch_work"
-	mkdir -p "$tests_work" "$logroot"
-	cp -a "$ROOT/tests/." "$tests_work/"
-	cp -a "$ROOT/inc" "$arch_work/inc"
+	stage_test_sources "$arch_work"
 
 	cd "$tests_work"
 

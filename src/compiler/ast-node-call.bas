@@ -266,6 +266,11 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 				regarg_target(regarg_count) = lreg
 				regarg_length(regarg_count) = arg->arg.lgt
 				regarg_count += 1
+
+				'' The deferred ECX/EDX load keeps this value live while
+				'' later arguments are evaluated.  Spill it now so those
+				'' expressions cannot reuse its physical register.
+				irEmitSPILLREGS( )
 			else
 				irEmitPUSHARG( arg->sym, v1, arg->arg.lgt, reclevel, NULL )
 			end if
@@ -352,6 +357,13 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 	end if
 
 	if( ast.doemit ) then
+		if( regarg_count > 0 ) then
+			'' Profiling and function-pointer evaluation happen after the
+			'' arguments.  Preserve any values they leave live before ECX and
+			'' EDX are assigned for the call.
+			irEmitSPILLREGS( )
+		end if
+
 		'' Load EDX first and ECX last. The register loads are adjacent to the
 		'' call, so no intervening expression can overwrite either argument.
 		for regnum as integer = 2 to 1 step -1

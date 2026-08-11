@@ -109,7 +109,7 @@ build() {
     CFLAGS="${sysroot_cppflags}" \
     CXXFLAGS="${sysroot_cppflags}" \
     LDFLAGS="${sysroot_ldflags}" \
-    rtlib fbrt gfxlib2 sfxlib
+    rtlib fbrt gfxlib2 gfxlib3 sfxlib
 
   make \
     TARGET_TRIPLET="${FBC_ARCH_TARGET_TRIPLET}" \

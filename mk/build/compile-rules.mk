@@ -131,18 +131,6 @@ endif
 ifneq ($(filter aarch64 linux-aarch64,$(BUILD_FBC_COMPAT_TARGET)),)
 BUILD_FBC_COMPAT_DEFINES += -d __FB_AARCH64__
 endif
-ifneq ($(filter riscv32 linux-riscv32,$(BUILD_FBC_COMPAT_TARGET)),)
-BUILD_FBC_COMPAT_DEFINES += -d __FB_RISCV32__
-endif
-ifneq ($(filter riscv64 linux-riscv64,$(BUILD_FBC_COMPAT_TARGET)),)
-BUILD_FBC_COMPAT_DEFINES += -d __FB_RISCV64__
-endif
-ifneq ($(filter s390x linux-s390x,$(BUILD_FBC_COMPAT_TARGET)),)
-BUILD_FBC_COMPAT_DEFINES += -d __FB_S390X__
-endif
-ifneq ($(filter loongarch64 linux-loongarch64,$(BUILD_FBC_COMPAT_TARGET)),)
-BUILD_FBC_COMPAT_DEFINES += -d __FB_LOONGARCH64__
-endif
 
 BUILD_FBCFLAGS ?=
 

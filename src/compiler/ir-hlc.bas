@@ -104,6 +104,7 @@
 #include once "flist.bi"
 #include once "lex.bi"
 #include once "ir-private.bi"
+#include once "crt/string.bi"
 
 '' The stack of nested sections allows us to go back and emit text to
 '' the headers of parent sections, while already working on emitting
@@ -130,11 +131,15 @@
 '' so the global declarations can't be emitted from there already.
 
 const MAX_SECTIONS = FB_MAXSCOPEDEPTH + 1
+const SECTION_BUFFER_INITIAL_CAPACITY = 8192
+const SECTION_TAB_BUFFER_LENGTH = 64
 
 type SECTIONENTRY
-	text        as string
-	old         as integer '' old junk text (that is only kept around to keep the string allocated)?
-	indent      as integer '' current indendation level to be used when emitting lines into this section
+	buffer          as ubyte ptr
+	bufferlen       as uinteger
+	buffercapacity  as uinteger
+	old             as integer '' old junk text (that is only kept around to keep the buffer allocated)?
+	indent          as integer '' current indendation level to be used when emitting lines into this section
 end type
 
 enum
@@ -284,6 +289,23 @@ private sub _init( )
 end sub
 
 private sub _end( )
+	''
+	'' Section buffers are retained while the compiler processes input modules so
+	'' later modules can reuse their capacity.  The backend owns these allocations
+	'' and releases them when the backend itself shuts down.
+	''
+	for i as integer = 0 to MAX_SECTIONS-1
+		with( ctx.sections(i) )
+			if( .buffer <> NULL ) then
+				deallocate( .buffer )
+				.buffer = NULL
+			end if
+			.bufferlen = 0
+			.buffercapacity = 0
+			.old = TRUE
+		end with
+	next
+
 	listEnd( @ctx.exprcache )
 	listEnd( @ctx.exprnodes )
 	listEnd( @ctx.anonstack )
@@ -296,7 +318,7 @@ private sub sectionBegin( )
 	ctx.section += 1
 	assert( ctx.section < MAX_SECTIONS )
 	'' Tell next hWriteLine() to overwrite instead of appending,
-	'' to overwrite pre-existing string data, keeping the string allocated
+	'' to overwrite pre-existing data while keeping the buffer allocated
 	with( ctx.sections(ctx.section) )
 		.old = TRUE
 		if( ctx.section > 0 ) then
@@ -311,25 +333,97 @@ private sub sectionBegin( )
 	end with
 end sub
 
+'' Append bytes to a section while growing its buffer geometrically.
+private sub sectionAppend _
+	( _
+		byval e as SECTIONENTRY ptr, _
+		byval src as const any ptr, _
+		byval bytes as uinteger _
+	)
+	dim as uinteger required = any
+	dim as uinteger newcapacity = any
+	dim as uinteger doubledcapacity = any
+	dim as ubyte ptr newbuffer = any
+
+	if( bytes = 0 ) then
+		exit sub
+	end if
+
+	'' Unsigned wrap would otherwise turn the capacity check into an undersized
+	'' allocation followed by an out-of-bounds copy.
+	required = e->bufferlen + bytes
+	if( required < e->bufferlen ) then
+		error( 4 )
+		exit sub
+	end if
+
+	if( required > e->buffercapacity ) then
+		newcapacity = e->buffercapacity
+		if( newcapacity = 0 ) then
+			'' Eight KiB avoids repeated startup allocations without retaining a
+			'' significant block for the many short-lived nested sections.
+			newcapacity = SECTION_BUFFER_INITIAL_CAPACITY
+		end if
+
+		do while( newcapacity < required )
+			doubledcapacity = newcapacity shl 1
+
+			'' Once doubling would wrap, grow only to the exact final request.
+			if( doubledcapacity <= newcapacity ) then
+				newcapacity = required
+				exit do
+			end if
+
+			newcapacity = doubledcapacity
+		loop
+
+		'' Keep the old pointer intact until Reallocate succeeds.  This avoids
+		'' leaking the existing section and copying through NULL on failure.
+		newbuffer = reallocate( e->buffer, newcapacity )
+		if( newbuffer = NULL ) then
+			error( 4 )
+			exit sub
+		end if
+
+		e->buffer = newbuffer
+		e->buffercapacity = newcapacity
+	end if
+
+	memcpy( e->buffer + e->bufferlen, src, bytes )
+	e->bufferlen = required
+end sub
+
 '' Write line to current section (indentation & newline are automatically added)
 private sub sectionWriteLine( byref s as string )
-	with( ctx.sections(ctx.section) )
-		if( .old ) then
-			if( .indent > 0 ) then
-				.text = string( .indent, TABCHAR )
-				.text += s
-			else
-				.text = s
-			end if
-			.old = FALSE
-		else
-			if( .indent > 0 ) then
-				.text += string( .indent, TABCHAR )
-			end if
-			.text += s
-		end if
-		.text += NEWLINE
-	end with
+	static as zstring * (SECTION_TAB_BUFFER_LENGTH + 1) tabs
+	dim as SECTIONENTRY ptr e = @ctx.sections(ctx.section)
+	dim as integer indentation = e->indent
+
+	'' Reuse one fixed tab block instead of allocating a temporary STRING for
+	'' every indented output line.
+	if( tabs[0] = 0 ) then
+		for i as integer = 0 to SECTION_TAB_BUFFER_LENGTH-1
+			tabs[i] = asc( TABCHAR )
+		next
+		tabs[SECTION_TAB_BUFFER_LENGTH] = 0
+	end if
+
+	if( e->old ) then
+		e->bufferlen = 0
+		e->old = FALSE
+	end if
+
+	do while( indentation > SECTION_TAB_BUFFER_LENGTH )
+		sectionAppend( e, @tabs[0], SECTION_TAB_BUFFER_LENGTH )
+		indentation -= SECTION_TAB_BUFFER_LENGTH
+	loop
+
+	if( indentation > 0 ) then
+		sectionAppend( e, @tabs[0], indentation )
+	end if
+
+	sectionAppend( e, strptr( s ), len( s ) )
+	sectionAppend( e, @NEWLINE, len( NEWLINE ) )
 end sub
 
 private sub sectionIndent( )
@@ -357,11 +451,10 @@ private sub sectionEnd( )
 		child = @ctx.sections(ctx.section)
 		if( child->old = FALSE ) then
 			if( parent->old ) then
-				parent->text = child->text
+				parent->bufferlen = 0
 				parent->old = FALSE
-			else
-				parent->text += child->text
 			end if
+			sectionAppend( parent, child->buffer, child->bufferlen )
 		end if
 	end if
 
@@ -850,8 +943,8 @@ private function hEmitProcHeader _
 	end if
 
 	'' Function result type (is 'void' for subs)
-	ln += hEmitType( symbGetProcRealType( proc ), _
-					symbGetProcRealSubtype( proc ) )
+	ln += hEmitType( typeUnsetIsConst( symbGetProcRealType( proc ) ), _
+					symbGetProcRealSubtype( proc ), TRUE )
 
 	'' Calling convention if needed (for function pointers it's usually not
 	'' put in this place, but should work nonetheless)
@@ -1170,7 +1263,9 @@ private sub hEmitVarDecl _
 	dim subtype as FBSYMBOL ptr
 	symbGetRealType( sym, dtype, subtype )
 
-	ln += hEmitType( dtype, sym->subtype )
+	'' C permits the pointee of a local pointer to remain const even though
+	'' top-level const on the BASIC variable itself is not emitted here.
+	ln += hEmitType( typeUnsetIsConst( dtype ), sym->subtype, TRUE )
 	ln += " " + *symbGetMangledName( sym )
 	ln += hEmitArrayDecl( sym )
 
@@ -1553,7 +1648,7 @@ private sub hEmitStruct( byval s as FBSYMBOL ptr, byval is_ptr as integer )
 	'' Currently we prefer emitting fields explicitly. Bitfields are the
 	'' only case where it's currently not possible, because FB's bitfields
 	'' are currently not ABI-compatible to GCC's.
-	'' TODO: Emit ABI-compatible C bitfields so field-level debug information
+	'' Future work: emit ABI-compatible C bitfields so field-level debug information
 	'' remains available for UDTs which contain bitfield members.
 	'' This sacrifices field-level debug information for bitfield members.
 	emit_fields = not symbGetUdtHasBitfield( s )
@@ -1867,8 +1962,10 @@ private sub _emitEnd( )
 	sectionEnd( )
 
 	'' Emit & close the main section
-	if( ctx.sections(0).old = FALSE ) then
-		if( put( #env.outf.num, , ctx.sections(0).text ) <> 0 ) then
+	if( (ctx.sections(0).old = FALSE) andalso _
+	    (ctx.sections(0).bufferlen > 0) ) then
+		if( put( #env.outf.num, , *ctx.sections(0).buffer, _
+		         ctx.sections(0).bufferlen ) <> 0 ) then
 		end if
 	end if
 	sectionEnd( )
@@ -3782,7 +3879,7 @@ private sub exprSTORE _
 			'' (no cast needed, the assignment has the same effect)
 			tempvar = "vr$" + str( vr->reg )
 
-			ln = hEmitType( vr->dtype, vr->subtype )
+			ln = hEmitType( typeUnsetIsConst( vr->dtype ), vr->subtype, TRUE )
 			ln += " " + tempvar + " = "
 			ln += exprFlush( r )
 			ln += ";"

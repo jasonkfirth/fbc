@@ -6,7 +6,7 @@
 #include "../rtlib/fb.h"
 #include "../rtlib/fb_gfx_private.h"
 
-#ifdef HOST_DOS
+#if defined(HOST_DOS) && !defined(DISABLE_OPENGL)
 	/* No OpenGL support on DOS */
 	#define DISABLE_OPENGL
 #endif
@@ -65,7 +65,7 @@ SCREEN_EXIT             0x80000000    yes  no   no   no   no
 PRINT_SCROLL_WAS_OFF    0x00000004    no   yes  no   no   no
 ALPHA_PRIMITIVES        0x00000008    no   yes  no   yes  yes
 OPENGL_PRIMITIVES       0x00000010    no   no   no   no   no
-HIGH_PRIORITY           0x00000020    no   yes  no   yes  yes
+GFX_HIGH_PRIORITY       0x00000020    no   yes  no   yes  yes
 QB_COMPATIBILITY        0x10000000    no   no   no   no   no
 OPENGL_SUPPORT          0x20000000    no   yes  no   yes  yes
 
@@ -92,7 +92,7 @@ OPENGL_SUPPORT          0x20000000    no   yes  no   yes  yes
 #define PRINT_SCROLL_WAS_OFF    0x00000004
 #define ALPHA_PRIMITIVES        0x00000008
 #define OPENGL_PRIMITIVES       0x00000010
-#define HIGH_PRIORITY           0x00000020
+#define GFX_HIGH_PRIORITY       0x00000020
 #define QB_COMPATIBILITY        0x10000000
 #define OPENGL_SUPPORT          0x20000000
 
@@ -567,7 +567,7 @@ extern void *fb_hMemCpyMMX(void *dest, const void *src, size_t size);
 extern void *fb_hMemSetMMX(void *dest, int value, size_t size);
 extern void fb_hResetCharCells(FB_GFXCTX *context, int do_alloc);
 extern void fb_hClearCharCells(int x1, int y1, int x2, int y2, int page, FB_WCHAR ch, unsigned fg, unsigned bg);
-extern void fb_hSoftCursorInit(void);
+extern int fb_hSoftCursorInit(void);
 extern void fb_hSoftCursorExit(void);
 extern void fb_hSoftCursorPut(int x, int y);
 extern void fb_hSoftCursorUnput(int x, int y);

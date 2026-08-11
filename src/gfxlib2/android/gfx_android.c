@@ -418,7 +418,6 @@ static jobject android_install_input_view_jni(ANativeActivity *activity)
 	jmethodID set_focusable_in_touch_mode = NULL;
 	jmethodID set_background_color = NULL;
 	jmethodID set_alpha = NULL;
-	jmethodID request_focus = NULL;
 	jmethodID set_input_type = NULL;
 	jmethodID set_ime_options = NULL;
 	jmethodID set_single_line = NULL;

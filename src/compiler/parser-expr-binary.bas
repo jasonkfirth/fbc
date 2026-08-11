@@ -54,7 +54,7 @@ end function
 ''BoolExpression      =   LogExpression ( (ANDALSO | ORELSE ) LogExpression )* .
 ''
 function cBoolExpression( ) as ASTNODE ptr
-	dim as integer op = any, dtorlistcookie = any
+	dim as integer op = any, dtorlistcookie = any, hideconsterrors = any
 	dim as ASTNODE ptr expr = any, logexpr = any
 
 	'' LogExpression
@@ -85,9 +85,27 @@ function cBoolExpression( ) as ASTNODE ptr
 
 		'' LogExpression
 		'' The second operand expression however only conditionally
+		hideconsterrors = FALSE
+		if( astIsCONST( logexpr ) ) then
+			if( op = AST_OP_ANDALSO ) then
+				hideconsterrors = astConstEqZero( logexpr )
+			else
+				hideconsterrors = not astConstEqZero( logexpr )
+			end if
+		end if
+
+		if( hideconsterrors ) then
+			astBeginHideConstErrors( )
+		end if
+
 		astDtorListScopeBegin( )
 		expr = cLogExpression( )
 		dtorlistcookie = astDtorListScopeEnd( )
+
+		if( hideconsterrors ) then
+			astEndHideConstErrors( )
+		end if
+
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 			exit do

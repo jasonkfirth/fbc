@@ -180,18 +180,10 @@ install_host_deps() {
 ##############################################################################
 
 DISTRO_TARGETS=(
-    "ubuntu|ubuntu:22.04|jammy"
-    "ubuntu|ubuntu:24.04|noble"
-    "ubuntu|ubuntu:24.10|oracular"
-    "ubuntu|ubuntu:25.04|plucky"
-    "ubuntu|ubuntu:25.10|questing"
     "ubuntu|ubuntu:26.04|resolute"
-    "debian|debian:12|bookworm"
     "debian|debian:13|trixie"
     "debian|debian:sid|sid"
     "raspbian|badaix/raspios-lite:trixie|trixie"
-    "raspbian|badaix/raspios-lite:bookworm|bookworm"
-    "raspbian|badaix/raspios-buster-armhf-lite:latest|buster"
 )
 
 docker_platform_for_target() {
@@ -200,14 +192,6 @@ docker_platform_for_target() {
     local arch="$3"
 
     case "$distro/$codename/$arch" in
-        raspbian/bookworm/armhf)
-            echo "linux/arm/v8"
-            return 0
-            ;;
-        raspbian/buster/armhf)
-            echo ""
-            return 0
-            ;;
         raspbian/*/armhf)
             echo "linux/arm/v7"
             return 0
@@ -297,17 +281,14 @@ image_for_nondeb_target() {
     local arch="${3:-}"
 
     case "$distro/$codename" in
-        alpine/3.23) echo "alpine:3.23" ;;
-        alpine/3.22) echo "alpine:3.22" ;;
-        alpine/3.21) echo "alpine:3.21" ;;
+        alpine/3.24) echo "alpine:3.24" ;;
         alpine/edge) echo "alpine:edge" ;;
         postmarketos/edge) echo "adamthiede/postmarketos:edge" ;;
         fedora/44) echo "fedora:44" ;;
         fedora/rawhide) echo "fedora:rawhide" ;;
-        rocky/10) echo "rockylinux:10" ;;
-        rocky/9) echo "rockylinux:9" ;;
+        rocky/10) echo "rockylinux/rockylinux:10" ;;
         almalinux/10) echo "almalinux:10" ;;
-        almalinux/9) echo "almalinux:9" ;;
+        opensuse/leap-16.0) echo "opensuse/leap:16.0" ;;
         opensuse/tumbleweed) echo "opensuse/tumbleweed" ;;
         archlinux/current) archlinux_image_for_arch "$arch" ;;
         slackware/15.0) echo "vbatts/slackware:15.0" ;;

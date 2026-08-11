@@ -1,0 +1,75 @@
+.\" FreeBASIC NuttX SDK
+.\" -------------------
+.\" File: nuttx-riscv32-qemu-smoke.1
+.\" Purpose: Document the installed RISC-V NuttX QEMU smoke-test driver.
+.\" Responsibilities: Describe program selection, workspace control, and emulation.
+.\" This file intentionally does not list every specialized device assertion.
+.\"
+.TH NUTTX-RISCV32-QEMU-SMOKE 1 "2026-07-30" "FreeBASIC NuttX SDK" "User Commands"
+.SH NAME
+nuttx-riscv32-qemu-smoke \- build and test a FreeBASIC NuttX program in QEMU
+.SH SYNOPSIS
+.B nuttx-riscv32-qemu-smoke
+[\fIoptions\fR]
+.SH DESCRIPTION
+.B nuttx-riscv32-qemu-smoke
+prepares a RISC-V NuttX workspace, builds a selected FreeBASIC program into
+the firmware image, runs the image with qemu-system-riscv32, and checks the
+captured console output for the requested smoke-test conditions.
+.SH OPTIONS
+.TP
+.BI --nuttx-workdir " DIR"
+Use the specified NuttX and apps workspace.
+.TP
+.B --update
+Update existing NuttX source trees.
+.TP
+.B --no-bootstrap
+Require an already prepared workspace.
+.TP
+.B --prepare-only
+Prepare the workspace without building or running QEMU.
+.TP
+.BI --bas " FILE"
+Compile the selected FreeBASIC source file.
+.TP
+.BI --generated-c " FILE"
+Use existing generated C instead of invoking the FreeBASIC compiler.
+.TP
+.BI --extra-c " FILE"
+Add a C support source to the NuttX application. This option may be repeated.
+.TP
+.BI --extra-cxx " FILE"
+Add a C++ support source to the application.
+.TP
+.BI --extra-asm " FILE"
+Add an assembly support source to the application.
+.TP
+.BI --app-name " NAME"
+Set the NuttX application name.
+.TP
+.B --with-gfxlib
+Link the selected NuttX graphics support objects.
+.TP
+.B --sfx-no-media-decoders
+Link sound support without bundled media decoders.
+.TP
+.BI --qemu-storage-root " DIR"
+Exercise a temporary NuttX storage mount at the selected path.
+.TP
+.BR --qemu-storage-backend " " tmpfs | virtio-blk
+Select the emulated storage backend.
+.TP
+.B --qemu-usb-root-devices
+Attach the supported USB smoke devices directly to xHCI root ports.
+.TP
+.B --qemu-usb-hub-devices
+Attach the supported USB smoke devices through an emulated hub.
+.TP
+.B --help
+Show the complete device, network, timeout, and assertion option reference.
+.SH SEE ALSO
+.BR fbc (1),
+.BR fbc-nuttx-esp32p4 (1)
+.\"
+.\" end of nuttx-riscv32-qemu-smoke.1

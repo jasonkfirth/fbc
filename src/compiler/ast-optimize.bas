@@ -991,12 +991,9 @@ private function hOptBOP32 _
 		return n
 	end if
 
-	'' This rewrite depends on native 64-bit integer registers, not on a
-	'' particular CPU family. Query the active backend's declared capability.
-	'' TODO: Set IR_OPT_64BITCPUREGS in each backend which actually provides
-	'' 64-bit integer registers. Until then this capability check disables
-	'' the rewrite for every backend.
-	if( irGetOption( IR_OPT_64BITCPUREGS ) = FALSE ) then
+	'' This rewrite is only enabled by backends that have verified the
+	'' narrower SHL, MOD, and INTDIV forms used below.
+	if( irGetOption( IR_OPT_32BITBOPS ) = FALSE ) then
 		return n
 	end if
 
@@ -1564,7 +1561,8 @@ private function hOptStrMultConcat _
 		byval lnk as ASTNODE ptr, _
 		byval dst as ASTNODE ptr, _
 		byval n as ASTNODE ptr, _
-		byval is_wstr as integer _
+		byval is_wstr as integer, _
+		byval is_ini as integer = FALSE _
 	) as ASTNODE ptr
 
 	if( n = NULL ) then
@@ -1580,7 +1578,7 @@ private function hOptStrMultConcat _
 	'' lowest node first..
 	if( n->l <> NULL ) then
 		if( n->l->class = AST_NODECLASS_BOP ) then
-			lnk = hOptStrMultConcat( lnk, dst, n->l, is_wstr )
+			lnk = hOptStrMultConcat( lnk, dst, n->l, is_wstr, is_ini )
 			n->l = NULL
 		end if
 	end if
@@ -1591,9 +1589,9 @@ private function hOptStrMultConcat _
 			'' first concatenation? do an assignment..
 			if( lnk = NULL ) then
 				if( is_wstr = FALSE ) then
-					lnk = rtlStrAssign( astCloneTree( dst ), n->l )
+					lnk = rtlStrAssign( astCloneTree( dst ), n->l, is_ini )
 				else
-					lnk = rtlWstrAssign( astCloneTree( dst ), n->l )
+					lnk = rtlWstrAssign( astCloneTree( dst ), n->l, is_ini )
 				end if
 			else
 				if( is_wstr = FALSE ) then
@@ -1626,9 +1624,9 @@ private function hOptStrMultConcat _
 	else
 		if( lnk = NULL ) then
 			if( is_wstr = FALSE ) then
-				lnk = rtlStrAssign( astCloneTree( dst ), n )
+				lnk = rtlStrAssign( astCloneTree( dst ), n, is_ini )
 			else
-				lnk = rtlWstrAssign( astCloneTree( dst ), n )
+				lnk = rtlWstrAssign( astCloneTree( dst ), n, is_ini )
 			end if
 		else
 			if( is_wstr = FALSE ) then
@@ -1785,7 +1783,7 @@ private function hOptStrAssignment _
 				astDtorListAdd( tmp )
 
 				dim as ASTNODE ptr concat_tree = _
-					hOptStrMultConcat( NULL, astNewVAR( tmp ), r, FALSE )
+					hOptStrMultConcat( NULL, astNewVAR( tmp ), r, FALSE, TRUE )
 
 				n->l = NULL
 				n->r = NULL

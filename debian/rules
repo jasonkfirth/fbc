@@ -5,20 +5,21 @@
 
 export DH_VERBOSE=1
 export DEB_BUILD_MAINT_OPTIONS=hardening=+all optimize=-lto
+export DISABLE_NO_PLT := yes
 DEB_BUILD_PROFILES ?=
 
-DEB_BUILD_ARCH := $(shell dpkg-architecture -qDEB_BUILD_ARCH)
-DEB_HOST_ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
+include /usr/share/dpkg/architecture.mk
+
 BUILD_JS := yes
-ifneq ($(filter nojs,$(DEB_BUILD_PROFILES)),)
+ifneq ($(filter pkg.freebasic.nojs,$(DEB_BUILD_PROFILES)),)
 BUILD_JS := no
 endif
 BUILD_ANDROID := no
-ifneq ($(filter android,$(DEB_BUILD_PROFILES)),)
+ifneq ($(filter pkg.freebasic.android,$(DEB_BUILD_PROFILES)),)
 BUILD_ANDROID := yes
 endif
 BUILD_WII := no
-ifneq ($(filter wii,$(DEB_BUILD_PROFILES)),)
+ifneq ($(filter pkg.freebasic.wii,$(DEB_BUILD_PROFILES)),)
 BUILD_WII := yes
 endif
 
@@ -26,7 +27,10 @@ endif
 # Parallelism
 # ------------------------------------------------------------
 
-JOBS ?= $(shell nproc)
+JOBS ?= $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+ifeq ($(strip $(JOBS)),)
+JOBS := 1
+endif
 PARMAKE := $(MAKE) -j$(JOBS)
 
 # ------------------------------------------------------------
@@ -263,11 +267,24 @@ DPKG_BUILD_CFLAGS_RAW   := $(shell DEB_HOST_ARCH=$(DEB_BUILD_ARCH) dpkg-buildfla
 DPKG_BUILD_CPPFLAGS     := $(shell DEB_HOST_ARCH=$(DEB_BUILD_ARCH) dpkg-buildflags --get CPPFLAGS)
 DPKG_BUILD_LDFLAGS_RAW  := $(shell DEB_HOST_ARCH=$(DEB_BUILD_ARCH) dpkg-buildflags --get LDFLAGS)
 
+ifneq ($(strip $(FBC_PACKAGE_SYSROOT)),)
+DPKG_CFLAGS_RAW  += --sysroot=$(FBC_PACKAGE_SYSROOT)
+DPKG_LDFLAGS_RAW += --sysroot=$(FBC_PACKAGE_SYSROOT)
+
+export PKG_CONFIG_PATH :=
+export PKG_CONFIG_SYSROOT_DIR := $(FBC_PACKAGE_SYSROOT)
+export PKG_CONFIG_LIBDIR := $(FBC_PACKAGE_SYSROOT)/usr/lib/$(TARGET_TRIPLET)/pkgconfig:$(FBC_PACKAGE_SYSROOT)/usr/lib/pkgconfig:$(FBC_PACKAGE_SYSROOT)/usr/share/pkgconfig
+endif
+
 # The FreeBASIC bootstrap/compiler build does not currently survive Debian's
-# LTO flags reliably. Keep hardening, but drop -flto/-ffat-lto-objects here.
-DPKG_CFLAGS  := $(filter-out -flto=% -ffat-lto-objects,$(DPKG_CFLAGS_RAW))
+# LTO flags reliably. GCC 14 also emits a non-relaxable GOT relocation for a
+# function address pushed on the stack when -fno-plt is enabled. Trixie's
+# linker relaxes that instruction as a function call, which corrupts callback
+# arguments used by the file runtime. Keep the remaining hardening flags, but
+# drop the incompatible options here.
+DPKG_CFLAGS  := $(filter-out -flto=% -ffat-lto-objects -fno-plt,$(DPKG_CFLAGS_RAW))
 DPKG_LDFLAGS := $(filter-out -flto=% -ffat-lto-objects,$(DPKG_LDFLAGS_RAW))
-DPKG_BUILD_CFLAGS  := $(filter-out -flto=% -ffat-lto-objects,$(DPKG_BUILD_CFLAGS_RAW))
+DPKG_BUILD_CFLAGS  := $(filter-out -flto=% -ffat-lto-objects -fno-plt,$(DPKG_BUILD_CFLAGS_RAW))
 DPKG_BUILD_LDFLAGS := $(filter-out -flto=% -ffat-lto-objects,$(DPKG_BUILD_LDFLAGS_RAW))
 
 # Force recursive make invocations to use the same sanitized Debian flags.
@@ -344,7 +361,7 @@ endif
 
 	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
 		$(ARM_CPU_MAKE_ARGS) \
-		rtlib fbrt gfxlib2 sfxlib \
+		rtlib fbrt gfxlib2 gfxlib3 sfxlib \
 		FBC="$(PACKAGE_FBC)" \
 		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
 		BUILD_FBC_TARGET="$(FBC_TARGET_KEY)" \
@@ -430,7 +447,7 @@ ifeq ($(BUILD_ANDROID),yes)
 			LD="$$cc" \
 			AR="$(ANDROID_AR)" \
 			RANLIB="$(ANDROID_RANLIB)" \
-			rtlib fbrt gfxlib2 sfxlib \
+			rtlib fbrt gfxlib2 gfxlib3 sfxlib \
 			FBC="$(PACKAGE_FBC)" \
 			BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
 			BUILD_FBC_TARGET="$$target_key" \
@@ -463,6 +480,7 @@ ifeq ($(BUILD_WII),yes)
 		CXXFLAGS="$(CXXFLAGS)" \
 		LDFLAGS="$(LDFLAGS)"
 
+	PATH="$(WII_DEVKITPPC)/bin:$(WII_DEVKITPRO)/tools/bin:$$PATH" \
 	$(PARMAKE) TARGET_OS=wii TARGET_TRIPLET="$(WII_TARGET_TRIPLET)" TARGET="$(WII_TARGET_TRIPLET)" MULTILIB="" \
 		FBTARGET_DIR_OVERRIDE="$(WII_FBTARGET_KEY)" \
 		BUILD_PREFIX=powerpc-eabi- \
@@ -480,9 +498,9 @@ ifeq ($(BUILD_WII),yes)
 		BUILD_FBC="$(PACKAGE_BUILD_FBC)" \
 		BUILD_FBC_TARGET="$(WII_FBTARGET_KEY)" \
 		BUILD_FBC_BUILDPREFIX= \
-		CPPFLAGS= \
-		CFLAGS= \
-		CXXFLAGS= \
+		CPPFLAGS="-I$(WII_DEVKITPRO)/libogc/include" \
+		CFLAGS="-O2" \
+		CXXFLAGS="-O2" \
 		LDFLAGS=
 endif
 
@@ -595,8 +613,6 @@ endif
 		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/
 	cp -a build_scripts/fbc-nuttx-esp32p4-firmware.sh \
 		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/
-	cp -a build_scripts/fbc-nuttx-rp2350-pizero-firmware.sh \
-		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/
 	cp -a build_scripts/nuttx-rp2350-* \
 		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/
 	cp -a build_scripts/nuttx-riscv32-qemu-smoke.sh \
@@ -607,6 +623,11 @@ endif
 		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/
 	cp -a build_scripts/nuttx-patches \
 		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/
+	chmod 755 \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/fbc-nuttx-esp32p4.sh \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/fbc-nuttx-esp32p4-firmware.sh \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/nuttx-rp2350-build-fbmodule.sh \
+		debian/tmp/usr/share/freebasic/nuttx-sdk/build_scripts/nuttx-riscv32-qemu-smoke.sh
 	cp -a examples/nuttx \
 		debian/tmp/usr/share/freebasic/nuttx-sdk/examples/
 	cp -a src/rtlib \
@@ -619,6 +640,7 @@ endif
 		\( -name '*.o' -o -name '*.obj' -o -name '*.a' -o -name '*.dll' \
 		   -o -name '*.exe' -o -name '*.so' -o -name '*.d' \) \
 		-delete
+	find debian/tmp/usr/share/freebasic/nuttx-sdk -type d -empty -delete
 	mkdir -p debian/tmp/usr/bin
 	printf '%s\n' \
 		'#!/usr/bin/env bash' \
@@ -628,10 +650,6 @@ endif
 		'#!/usr/bin/env bash' \
 		'exec bash /usr/share/freebasic/nuttx-sdk/build_scripts/fbc-nuttx-esp32p4-firmware.sh "$$@"' \
 		> debian/tmp/usr/bin/fbc-nuttx-esp32p4-firmware
-	printf '%s\n' \
-		'#!/usr/bin/env bash' \
-		'exec bash /usr/share/freebasic/nuttx-sdk/build_scripts/fbc-nuttx-rp2350-pizero-firmware.sh "$$@"' \
-		> debian/tmp/usr/bin/fbc-nuttx-rp2350-pizero-firmware
 	printf '%s\n' \
 		'#!/usr/bin/env bash' \
 		'exec bash /usr/share/freebasic/nuttx-sdk/build_scripts/nuttx-riscv32-qemu-smoke.sh "$$@"' \
@@ -673,7 +691,6 @@ endif
 	chmod 755 \
 		debian/tmp/usr/bin/fbc-nuttx-esp32p4 \
 		debian/tmp/usr/bin/fbc-nuttx-esp32p4-firmware \
-		debian/tmp/usr/bin/fbc-nuttx-rp2350-pizero-firmware \
 		debian/tmp/usr/bin/nuttx-riscv32-qemu-smoke \
 		debian/tmp/usr/bin/nuttx-remote-console \
 		debian/tmp/usr/bin/nuttx-http-server
@@ -721,6 +738,14 @@ ifeq ($(DEB_HOST_ARCH),s390x)
 	dh_strip --no-automatic-dbgsym
 else
 	dh_strip
+endif
+
+ifneq ($(strip $(FBC_PACKAGE_TARGET_SHLIBS)),)
+override_dh_shlibdeps:
+	dh_shlibdeps \
+		-l$(FBC_PACKAGE_SYSROOT)/lib/$(TARGET_TRIPLET) \
+		-l$(FBC_PACKAGE_SYSROOT)/usr/lib/$(TARGET_TRIPLET) \
+		-- -L$(FBC_PACKAGE_TARGET_SHLIBS)
 endif
 
 execute_after_dh_installdocs:

@@ -6,9 +6,12 @@ usr/include/freebasic/crt.bi
 usr/include/freebasic/datetime.bi
 usr/include/freebasic/dir.bi
 usr/include/freebasic/dos
+usr/include/freebasic/emscripten_websocket.bi
 usr/include/freebasic/fbc-int
 usr/include/freebasic/fberror.bi
 usr/include/freebasic/fbgfx.bi
+usr/include/freebasic/fbgfx3-option.bi
+usr/include/freebasic/fbgfx3.bi
 usr/include/freebasic/fbio.bi
 usr/include/freebasic/fblimits.bi
 usr/include/freebasic/fbnetwire.bi
@@ -17,6 +20,7 @@ usr/include/freebasic/fbthread.bi
 usr/include/freebasic/file.bi
 usr/include/freebasic/gpiopins.bi
 usr/include/freebasic/nuttx
+usr/include/freebasic/sfxlib_effects.bi
 usr/include/freebasic/sfxlib_raw.bi
 usr/include/freebasic/string.bi
 usr/include/freebasic/utf_conv.bi

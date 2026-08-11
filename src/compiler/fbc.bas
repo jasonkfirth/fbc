@@ -452,6 +452,32 @@ end function
 '' normal: Will check lib/ and query gcc if not found. Querying gcc may fail,
 ''         because of that an empty string may be returned.
 ''
+private function fbcFindFreeBsdSystemLib( byval file as zstring ptr ) as string
+	if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_FREEBSD ) then
+		exit function
+	end if
+
+	''
+	'' FreeBSD keeps the system startup objects in /usr/lib, but its compiler
+	'' driver can return only the input filename for -print-file-name.  That
+	'' response means "not found", so try the documented system directory.
+	'' Cross-compilers must provide a sysroot to keep the lookup off the host.
+	''
+	#ifndef __FB_FREEBSD__
+		if( len( fbc.sysroot ) = 0 ) then
+			exit function
+		end if
+	#endif
+
+	dim as string found = pathStripDiv( fbc.sysroot )
+	found += FB_HOST_PATHDIV + "usr" + FB_HOST_PATHDIV + _
+		"lib" + FB_HOST_PATHDIV + *file
+
+	if( hFileExists( found ) ) then
+		function = found
+	end if
+end function
+
 private function fbcBuildPathToLibFile( byval file as zstring ptr ) as string
 	dim as string found
 
@@ -511,11 +537,11 @@ private function fbcBuildPathToLibFile( byval file as zstring ptr ) as string
 
 	found = hGet1stOutputLineFromCommand( path )
 	if( len( found ) = 0 ) then
-		exit function
+		return fbcFindFreeBsdSystemLib( file )
 	end if
 
 	if( found = hStripPath( found ) ) then
-		exit function
+		return fbcFindFreeBsdSystemLib( file )
 	end if
 
 	function = found
@@ -754,13 +780,35 @@ private function hGetTempFileTag( ) as string
 	function = tag
 end function
 
+#ifdef __FB_DOS__
+private function hGetDosTempFileStem _
+	( _
+		byref reference as string, _
+		byref key as string _
+	) as string
+
+	''
+	'' Plain DOS does not necessarily provide long filename services.  Keep
+	'' compiler-owned files within the 8.3 limit while retaining the full path
+	'' and per-invocation tag as inputs to the name.
+	''
+	dim as string hashinput = reference + key + hGetTempFileTag( )
+	function = hStripFilename( reference ) + _
+		hex( hashHash( strptr( hashinput ) ), 8 )
+end function
+#endif
+
 #if defined( __FB_WIN32__ ) or defined( __FB_DOS__ )
 private function hPutLdArgsIntoFile( byref ldcline as string ) as integer
 	dim as string argsfile, ln
 	dim as integer f = any
 
+#ifdef __FB_DOS__
+	argsfile = hGetDosTempFileStem( fbc.outname, ldcline ) + ".tmp"
+#else
 	argsfile = hStripFilename( fbc.outname ) + _
 		"ldopt" + hGetTempFileTag( ) + ".tmp"
+#endif
 
 	f = freefile( )
 	if( open( argsfile, for output, as #f ) ) then
@@ -1276,7 +1324,13 @@ private sub hAddJsLinkOptions( byref ldcline as string )
 	ldcline += *emscripten_args.data
 	DZstrAllocate( emscripten_args, 0 )
 
-	ldcline += " --shell-file" + hFindLib( "fb_shell.html" )
+	''
+	'' Emscripten only consumes a shell template when it is producing HTML.
+	'' Supplying one for a JavaScript output is ignored and emits a warning.
+	''
+	if( hGetFileExt( fbc.outname ) = "html" ) then
+		ldcline += " --shell-file" + hFindLib( "fb_shell.html" )
+	end if
 	ldcline += " --post-js" + hFindLib( "fb_rtlib.js" )
 	if( ((len( fbc.subsystem ) = 0) and _
 	     (fbGetOption( FB_COMPOPT_MODEVIEW ) = FB_MODEVIEW_CONSOLE)) or _
@@ -3964,11 +4018,19 @@ private function hGetAsmName _
 
 	if( stage = 1 ) then
 		if( (fbc.keepasm = FALSE) and (fbc.emitasmonly = FALSE) ) then
+#ifdef __FB_DOS__
+			asmfile = hGetDosTempFileStem( *module->objfile, "module" )
+#else
 			asmfile += hGetTempFileTag( )
+#endif
 		end if
 	elseif( hCompileStage2DirectlyToObj( ) = FALSE ) then
 		if( (fbc.keepfinalasm = FALSE) and (fbc.emitfinalasmonly = FALSE) ) then
+#ifdef __FB_DOS__
+			asmfile = hGetDosTempFileStem( *module->objfile, "module" )
+#else
 			asmfile += hGetTempFileTag( )
+#endif
 		end if
 	end if
 
@@ -4493,6 +4555,13 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 		'' more strictly.  The generated C is an intermediate representation owned
 		'' by fbc, so keep that compatibility detail out of user programs.
 		ln += "-Wno-incompatible-pointer-types "
+
+		if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GCC ) then
+			'' GCC 6 added -Wmisleading-indentation to -Wall.  The check is not
+			'' useful for machine-generated C and has severe scaling costs in GCC 9
+			'' and older when the generated translation unit is large.
+			ln += "-Wno-misleading-indentation "
+		end if
 
 		if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG ) then
 			ln += "-Wno-builtin-requires-header "

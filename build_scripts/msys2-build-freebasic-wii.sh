@@ -7,7 +7,7 @@
 #
 #   Purpose:
 #
-#       Build a Windows/MSYS2 install tree and NSIS installer for the
+#       Build a Windows/MSYS2 install tree, zip archive, and NSIS installer for the
 #       FreeBASIC Wii target.
 #
 #   Responsibilities:
@@ -16,7 +16,7 @@
 #       * build the Wii runtime, gfxlib2, and sfxlib libraries
 #       * stage the FreeBASIC Wii files into a relocatable package tree
 #       * optionally bundle the devkitPro Wii toolchain
-#       * emit command-line launchers and an NSIS installer
+#       * emit command-line launchers, a zip archive, and an NSIS installer
 #
 #   This file intentionally does NOT contain:
 #
@@ -42,6 +42,7 @@ DISTDIR="${DISTDIR:-${BUILDROOT}/dist}"
 INSTALL_SUBDIR="${INSTALL_SUBDIR:-FreeBASIC-${FBVERSION}-fbc-wii}"
 PACKAGE_ROOT="${PACKAGE_ROOT:-${DISTDIR}/${INSTALL_SUBDIR}}"
 OUT="${OUT:-${ROOT_DIR}/out/mingw32-wii}"
+ARCHIVE_PATH="${ARCHIVE_PATH:-${OUT}/FreeBASIC-${FBVERSION}-fbc-wii.zip}"
 INSTALLER_PATH="${INSTALLER_PATH:-${OUT}/FreeBASIC-${FBVERSION}-fbc-wii-setup.exe}"
 NSIS_EXE="${NSIS_EXE:-/mingw64/bin/makensis.exe}"
 JOBS="${JOBS:-}"
@@ -92,20 +93,22 @@ usage()
     cat <<EOF
 Usage: $(basename "$0") [options]
 
-Build a Windows installer containing the FreeBASIC Wii compiler driver,
+Build a Windows package containing the FreeBASIC Wii compiler driver,
 Wii runtime libraries, and optionally a bundled devkitPro toolchain.
 
 Options:
   --buildroot DIR          Temporary build root [${BUILDROOT}]
   --package-root DIR       Package directory to create [${PACKAGE_ROOT}]
+  --archive PATH           Zip archive output [${ARCHIVE_PATH}]
   --installer PATH         NSIS installer output [${INSTALLER_PATH}]
-  --out DIR                Output directory for the default installer [${OUT}]
+  --out DIR                Output directory for default artifacts [${OUT}]
   --devkitpro DIR          devkitPro root [/opt/devkitpro or DEVKITPRO]
   --devkitppc DIR          devkitPPC root [DEVKITPRO/devkitPPC]
   --jobs N                 Parallel make jobs
   --no-bundle-devkitpro    Do not copy devkitPro into the installer tree
   --skip-deps              Do not install MSYS2 build dependencies
   --skip-source-sync       Build in the repository directly
+  --reuse-worktree         Reuse WORKTREE without synchronizing the source
   --skip-build             Reuse an existing build tree
   --skip-package           Do not assemble the package tree
   --skip-installer         Do not build the NSIS installer
@@ -313,12 +316,17 @@ while [ "$#" -gt 0 ]; do
             PACKAGE_ROOT="$(normalize_path "$2")"
             shift 2
             ;;
+        --archive)
+            ARCHIVE_PATH="$(normalize_path "$2")"
+            shift 2
+            ;;
         --installer)
             INSTALLER_PATH="$(normalize_path "$2")"
             shift 2
             ;;
         --out)
             OUT="$(normalize_path "$2")"
+            ARCHIVE_PATH="${OUT}/FreeBASIC-${FBVERSION}-fbc-wii.zip"
             INSTALLER_PATH="${OUT}/FreeBASIC-${FBVERSION}-fbc-wii-setup.exe"
             shift 2
             ;;
@@ -345,6 +353,10 @@ while [ "$#" -gt 0 ]; do
         --skip-source-sync)
             DO_SOURCE_SYNC=0
             WORKTREE="${ROOT_DIR}"
+            shift
+            ;;
+        --reuse-worktree)
+            DO_SOURCE_SYNC=0
             shift
             ;;
         --skip-build)
@@ -389,11 +401,11 @@ DEVKITPRO="$(normalize_path "${DEVKITPRO_ARG:-${DEVKITPRO:-/opt/devkitpro}}")"
 DEVKITPPC="$(normalize_path "${DEVKITPPC_ARG:-${DEVKITPPC:-${DEVKITPRO}/devkitPPC}}")"
 HOST_CC="$(first_command "${HOST_CC:-}" x86_64-pc-cygwin-gcc gcc || true)"
 HOST_CXX="$(first_command "${HOST_CXX:-}" x86_64-pc-cygwin-g++ g++ || true)"
-HOST_AS="$(first_command "${HOST_AS:-}" as || true)"
-HOST_AR="$(first_command "${HOST_AR:-}" ar || true)"
-HOST_LD="$(first_command "${HOST_LD:-}" ld || true)"
-HOST_RANLIB="$(first_command "${HOST_RANLIB:-}" ranlib || true)"
-HOST_STRIP="$(first_command "${HOST_STRIP:-}" strip || true)"
+HOST_AS="$(first_command "${HOST_AS:-}" /usr/bin/as as || true)"
+HOST_AR="$(first_command "${HOST_AR:-}" /usr/bin/ar ar || true)"
+HOST_LD="$(first_command "${HOST_LD:-}" /usr/bin/ld ld || true)"
+HOST_RANLIB="$(first_command "${HOST_RANLIB:-}" /usr/bin/ranlib ranlib || true)"
+HOST_STRIP="$(first_command "${HOST_STRIP:-}" /usr/bin/strip strip || true)"
 POWERPC_GCC="$(first_existing "${DEVKITPPC}/bin/powerpc-eabi-gcc.exe" "${DEVKITPPC}/bin/powerpc-eabi-gcc" || true)"
 POWERPC_GXX="$(first_existing "${DEVKITPPC}/bin/powerpc-eabi-g++.exe" "${DEVKITPPC}/bin/powerpc-eabi-g++" || true)"
 POWERPC_AS="$(first_existing "${DEVKITPPC}/bin/powerpc-eabi-as.exe" "${DEVKITPPC}/bin/powerpc-eabi-as" || true)"
@@ -542,8 +554,10 @@ build_wii_freebasic()
 
     if [ "${DO_SOURCE_SYNC}" -ne 0 ]; then
         sync_source_tree
-    else
+    elif [ "${WORKTREE}" = "${ROOT_DIR}" ]; then
         msg "Building directly in repository tree"
+    else
+        msg "Reusing isolated source tree"
     fi
 
     build_fbc="$(detect_host_fbc)" || fail "could not find a host fbc; set HOST_FBC=/path/to/fbc"
@@ -633,7 +647,12 @@ write_launchers()
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]//\\//}"
+case "${SCRIPT_PATH}" in
+    */*) SCRIPT_DIR="${SCRIPT_PATH%/*}" ;;
+    *) SCRIPT_DIR="." ;;
+esac
+SCRIPT_DIR="$(cd "${SCRIPT_DIR}" && pwd)"
 
 if [ -d "${SCRIPT_DIR}/toolchain/devkitpro/devkitPPC" ]; then
     export DEVKITPRO="${FBWII_DEVKITPRO:-${SCRIPT_DIR}/toolchain/devkitpro}"
@@ -659,7 +678,12 @@ EOF
     cat > "${root}/freebasic-wii-env.sh" <<'EOF'
 #!/usr/bin/env bash
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]//\\//}"
+case "${SCRIPT_PATH}" in
+    */*) SCRIPT_DIR="${SCRIPT_PATH%/*}" ;;
+    *) SCRIPT_DIR="." ;;
+esac
+SCRIPT_DIR="$(cd "${SCRIPT_DIR}" && pwd)"
 
 if [ -d "${SCRIPT_DIR}/toolchain/devkitpro/devkitPPC" ]; then
     export DEVKITPRO="${FBWII_DEVKITPRO:-${SCRIPT_DIR}/toolchain/devkitpro}"
@@ -738,7 +762,7 @@ copy_msys2_runtime()
 
     mkdir -p "${bindir}" "${root}/toolchain/msys2/tmp"
 
-    for tool in bash sh env dirname pwd cygpath realpath sed tr mkdir cp rm mv find uname make; do
+    for tool in bash sh env dirname pwd cygpath realpath sed tr mkdir cp rm mv find uname make cat chmod; do
         copy_tool "${tool}" "${bindir}"
     done
 }
@@ -838,7 +862,8 @@ print "hello from wii"
 sleep
 EOF
 
-    run cmd.exe //C "$(windows_path "${PACKAGE_ROOT}/fbc-wii.cmd")" "$(windows_path "${src}")" -x "$(windows_path "${out}")"
+    run env PATH="/c/Windows/System32:/c/Windows" \
+        cmd.exe //C "$(windows_path "${PACKAGE_ROOT}/fbc-wii.cmd")" "$(windows_path "${src}")" -x "$(windows_path "${out}")"
 
     if [ ! -f "${out}" ]; then
         fail "packaged fbc-wii did not produce ${out}"
@@ -847,7 +872,8 @@ EOF
     mkdir -p "${assetdir}"
     printf 'asset smoke\n' > "${assetdir}/readme.txt"
 
-    run cmd.exe //C "$(windows_path "${PACKAGE_ROOT}/fbc-wii.cmd")" \
+    run env PATH="/c/Windows/System32:/c/Windows" \
+        cmd.exe //C "$(windows_path "${PACKAGE_ROOT}/fbc-wii.cmd")" \
         --bundle "$(windows_path "${bundledir}")" \
         --assets "$(windows_path "${assetdir}")" \
         "$(windows_path "${src}")"
@@ -859,6 +885,31 @@ EOF
     if [ ! -f "${bundledir}/readme.txt" ]; then
         fail "packaged fbc-wii --assets did not copy ${bundledir}/readme.txt"
     fi
+}
+
+# ---------------------------------------------------------------------------
+# Archive
+# ---------------------------------------------------------------------------
+
+build_archive()
+{
+    local package_name
+
+    if [ "${DO_PACKAGE}" -eq 0 ]; then
+        return 0
+    fi
+
+    have zip || fail "zip was not found"
+
+    package_name="$(basename "${PACKAGE_ROOT}")"
+    mkdir -p "$(dirname "${ARCHIVE_PATH}")"
+
+    msg "Creating Wii distribution zip"
+    rm -f "${ARCHIVE_PATH}"
+    (
+        cd "$(dirname "${PACKAGE_ROOT}")"
+        run zip -qr "${ARCHIVE_PATH}" "${package_name}"
+    )
 }
 
 # ---------------------------------------------------------------------------
@@ -883,7 +934,7 @@ Name "\${PRODUCT_NAME} \${PRODUCT_VERSION}"
 OutFile "${installer_win}"
 InstallDir "\$PROGRAMFILES64\\FreeBASIC-Wii"
 RequestExecutionLevel admin
-SetCompressor /SOLID lzma
+SetCompressor zlib
 
 Page directory
 Page instfiles
@@ -1002,6 +1053,7 @@ msg "FreeBASIC Wii Windows package"
 printf 'source root : %s\n' "${ROOT_DIR}"
 printf 'work tree   : %s\n' "${WORKTREE}"
 printf 'package     : %s\n' "${PACKAGE_ROOT}"
+printf 'archive     : %s\n' "${ARCHIVE_PATH}"
 printf 'installer   : %s\n' "${INSTALLER_PATH}"
 printf 'devkitPro   : %s\n' "${DEVKITPRO}"
 printf 'devkitPPC   : %s\n' "${DEVKITPPC}"
@@ -1013,11 +1065,15 @@ ensure_devkitpro
 build_wii_freebasic
 assemble_package
 validate_package
+build_archive
 build_installer
 validate_installer
 
 msg "Wii package complete"
 printf 'package tree: %s\n' "${PACKAGE_ROOT}"
+if [ "${DO_PACKAGE}" -ne 0 ]; then
+    printf 'archive     : %s\n' "${ARCHIVE_PATH}"
+fi
 if [ "${DO_INSTALLER}" -ne 0 ]; then
     printf 'installer   : %s\n' "${INSTALLER_PATH}"
 fi

@@ -46,4 +46,22 @@ FBCALL int fb_Gfx3RunOnRenderThread(FB_GFX3_INTEROP_CALLBACK callback,
 	return fb_ErrorSetNum(fb_gfx3_api_runtime_error(result));
 }
 
+/* ------------------------------------------------------------------------- */
+/* External native presentation                                              */
+/* ------------------------------------------------------------------------- */
+
+FBCALL int fb_Gfx3SetExternalPresentation(int enabled)
+{
+	FB_GFX3_DRAW_STATE *state;
+	int result = FB_GFX3_INVALID;
+
+	FB_GRAPHICS_LOCK();
+	state = fb_gfx3_api_get_draw_state_locked();
+	if (state != NULL)
+		result = fb_gfx3_context_set_external_presentation(
+			&state->mode->context, enabled != 0);
+	FB_GRAPHICS_UNLOCK();
+	return fb_ErrorSetNum(fb_gfx3_api_runtime_error(result));
+}
+
 /* end of gfx3_interop_api.c */

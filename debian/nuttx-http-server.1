@@ -1,0 +1,36 @@
+.\" FreeBASIC NuttX SDK
+.\" -------------------
+.\" File: nuttx-http-server.1
+.\" Purpose: Document the installed temporary NuttX file server.
+.\" Responsibilities: Describe the bounded HTTP service used for board transfers.
+.\" This file intentionally does not describe general-purpose web hosting.
+.\"
+.TH NUTTX-HTTP-SERVER 1 "2026-07-30" "FreeBASIC NuttX SDK" "User Commands"
+.SH NAME
+nuttx-http-server \- serve NuttX module files over HTTP
+.SH SYNOPSIS
+.B nuttx-http-server
+.BI --directory " DIR"
+[\fIoptions\fR]
+.SH DESCRIPTION
+.B nuttx-http-server
+serves files from one directory for the temporary HTTP transfer used by the
+FreeBASIC ESP32-P4 workflow. Requests are restricted to that directory.
+.SH OPTIONS
+.TP
+.BI --directory " DIR"
+Select the directory to serve.
+.TP
+.BI --bind " ADDRESS"
+Set the listening address. The default is 0.0.0.0.
+.TP
+.BI --port " PORT"
+Set the listening TCP port. The default is 8008.
+.TP
+.B --help
+Show command help.
+.SH SEE ALSO
+.BR fbc-nuttx-esp32p4 (1),
+.BR nuttx-remote-console (1)
+.\"
+.\" end of nuttx-http-server.1

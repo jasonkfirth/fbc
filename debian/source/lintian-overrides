@@ -1,0 +1,3 @@
+# termlib_min.js is the upstream terminal runtime consumed by the Emscripten
+# target. The unminified third-party source is not part of this source tree.
+freebasic source: source-is-missing [lib/termlib_min.js]

@@ -611,6 +611,24 @@ static int platform_win32_register_class(void)
 {
 	WNDCLASSA window_class;
 	ATOM atom;
+	static int dpi_awareness_attempted;
+
+	/*
+		Window and drawable size contract
+
+		A DPI-unaware process receives virtualized Win32 client dimensions. On a
+		200 percent desktop, a requested 1920 by 1080 graphics mode can therefore
+		produce a 960-pixel client coordinate space while the renderer continues
+		using the requested surface size. Direct OpenGL users then clip valid
+		viewport coordinates against the smaller native drawable. Select physical
+		pixel coordinates before the first gfxlib3 window is registered. The call
+		is intentionally best effort because older compatibility hosts may already
+		have fixed the process policy through their manifest.
+	*/
+	if (!dpi_awareness_attempted) {
+		SetProcessDPIAware();
+		dpi_awareness_attempted = TRUE;
+	}
 
 	memset(&window_class, 0, sizeof(window_class));
 	window_class.style = CS_OWNDC | CS_DBLCLKS;
@@ -812,6 +830,7 @@ static int platform_win32_create_window_base(void **destination, void *input,
 	FB_GFX3_PLATFORM_WIN32 *platform;
 	MONITORINFO monitor_info;
 	RECT window_rect;
+	RECT client_rect;
 	DWORD style;
 	int window_x;
 	int window_y;
@@ -871,6 +890,31 @@ static int platform_win32_create_window_base(void **destination, void *input,
 	}
 	window_width = window_rect.right - window_rect.left;
 	window_height = window_rect.bottom - window_rect.top;
+	if ((flags & FB_GFX3_WINDOW_FULLSCREEN) == 0u) {
+		/*
+			CW_USEDEFAULT selects both a system position and a system size for an
+			overlapped window. Passing requested width and height beside it does
+			not preserve a fixed SCREENRES client. Choose an explicit centered
+			position so CreateWindowEx must honor the adjusted dimensions. An
+			oversized diagnostic mode starts at the work-area origin and may extend
+			past it, retaining the requested drawable instead of silently shrinking.
+		*/
+		memset(&monitor_info, 0, sizeof(monitor_info));
+		monitor_info.cbSize = sizeof(monitor_info);
+		if (!GetMonitorInfoA(MonitorFromPoint((POINT){ 0, 0 },
+		    MONITOR_DEFAULTTOPRIMARY), &monitor_info))
+			goto fail;
+		window_x = monitor_info.rcWork.left;
+		window_y = monitor_info.rcWork.top;
+		if (window_width < monitor_info.rcWork.right -
+		    monitor_info.rcWork.left)
+			window_x += ((monitor_info.rcWork.right -
+				monitor_info.rcWork.left) - window_width) / 2;
+		if (window_height < monitor_info.rcWork.bottom -
+		    monitor_info.rcWork.top)
+			window_y += ((monitor_info.rcWork.bottom -
+				monitor_info.rcWork.top) - window_height) / 2;
+	}
 	platform->window = CreateWindowExA(0, FB_GFX3_WIN32_WINDOW_CLASS,
 		(title != NULL) ? title : "FreeBASIC gfxlib3",
 		style, window_x, window_y, window_width,
@@ -878,6 +922,28 @@ static int platform_win32_create_window_base(void **destination, void *input,
 	if (platform->window == NULL)
 		goto fail;
 	SetWindowLongPtrA(platform->window, GWLP_USERDATA, (LONG_PTR)platform);
+	if ((flags & FB_GFX3_WINDOW_FULLSCREEN) == 0u) {
+		/*
+			Some desktop policies still cap the initial overlapped window to the
+			work area. Correct the outer extent by the observed client difference
+			after creation. This preserves SCREENRES's fixed client-size contract
+			without assuming a particular DPI, border, or caption metric.
+		*/
+		if (!GetClientRect(platform->window, &client_rect))
+			goto fail;
+		window_width += (int)width -
+			(client_rect.right - client_rect.left);
+		window_height += (int)height -
+			(client_rect.bottom - client_rect.top);
+		if ((window_width <= 0) || (window_height <= 0) ||
+		    !SetWindowPos(platform->window, NULL, window_x, window_y,
+		     window_width, window_height, SWP_NOACTIVATE | SWP_NOOWNERZORDER |
+		     SWP_NOZORDER) ||
+		    !GetClientRect(platform->window, &client_rect) ||
+		    (client_rect.right - client_rect.left != (LONG)width) ||
+		    (client_rect.bottom - client_rect.top != (LONG)height))
+			goto fail;
+	}
 	if (GetWindowRect(platform->window, &window_rect)) {
 		fb_gfx3_input_platform_window_info(platform->input,
 			(uintptr_t)platform->window, 0, window_rect.left,

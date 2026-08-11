@@ -951,7 +951,8 @@ static const GFXDRIVER fb_gfxDriverWii =
 	driver_fetch_modes,
 	NULL,
 	driver_poll_events,
-	driver_update
+	driver_update,
+	NULL
 };
 
 const GFXDRIVER *__fb_gfx_drivers_list[] = {

@@ -14,11 +14,13 @@ static void poll_events(void)
 	FB_GRAPHICS_UNLOCK( );
 }
 
+#ifndef HOST_JS
 static void update_display(void)
 {
 	if ((__fb_gfx) && (__fb_gfx->driver->update))
 		__fb_gfx->driver->update();
 }
+#endif
 
 void fb_GfxSleep ( int msecs )
 {

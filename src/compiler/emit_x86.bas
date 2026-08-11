@@ -7673,6 +7673,10 @@ private function _init _
 		iroptions or= IR_OPT_FPUCONV
 	end if
 
+	if( fbIs64bit( ) ) then
+		iroptions or= IR_OPT_32BITBOPS
+	end if
+
 	irSetOption( iroptions )
 
 	edbgInit( )
@@ -8200,9 +8204,18 @@ private function _getSectionString _
 	select case as const section
 	case IR_SECTION_CONST
 		select case as const fbGetOption( FB_COMPOPT_TARGET )
-		case FB_COMPTARGET_CYGWIN, FB_COMPTARGET_DOS, _
-		     FB_COMPTARGET_WIN32, FB_COMPTARGET_XBOX
+		case FB_COMPTARGET_CYGWIN, FB_COMPTARGET_WIN32, FB_COMPTARGET_XBOX
 			ostr += "rdata"
+
+		case FB_COMPTARGET_DOS
+			''
+			'' DJGPP's linker does not merge .rdata into its normal load
+			'' sections.  The resulting COFF file has virtual addresses
+			'' offset from its file positions, which the DOS stub rejects
+			'' as a corrupt packed executable.  It does merge .rodata into
+			'' the executable's text section.
+			''
+			ostr += "rodata"
 
 		case FB_COMPTARGET_DARWIN
 			ostr += "const"

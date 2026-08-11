@@ -159,7 +159,7 @@ FBCALL void fb_GfxControl_i( int what, ssize_t *param1, ssize_t *param2, ssize_t
 
 	case GET_HIGH_PRIORITY:
 		if (__fb_gfx)
-			res1 = (__fb_gfx->flags & HIGH_PRIORITY) ? FB_TRUE : FB_FALSE;
+			res1 = (__fb_gfx->flags & GFX_HIGH_PRIORITY) ? FB_TRUE : FB_FALSE;
 		break;
 
 	case GET_SCANLINE_SIZE:

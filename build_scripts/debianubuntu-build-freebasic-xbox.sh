@@ -253,7 +253,6 @@ build_xbox_target() {
         TARGET_TRIPLET="$XBOX_TARGET_TRIPLET" \
         TARGET_OS=xbox \
         TARGET_ARCH=x86 \
-        DISABLE_MT=YesPlease \
         FBTARGET_DIR_OVERRIDE="$XBOX_TARGET_KEY" \
         BUILD_PREFIX= \
         CC=nxdk-cc \

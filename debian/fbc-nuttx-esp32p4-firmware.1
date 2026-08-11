@@ -1,0 +1,75 @@
+.\" FreeBASIC NuttX SDK
+.\" -------------------
+.\" File: fbc-nuttx-esp32p4-firmware.1
+.\" Purpose: Document the installed ESP32-P4 NuttX firmware builder.
+.\" Responsibilities: Describe workspace preparation, configuration, and flashing.
+.\" This file intentionally does not document application module deployment.
+.\"
+.TH FBC-NUTTX-ESP32P4-FIRMWARE 1 "2026-07-30" "FreeBASIC NuttX SDK" "User Commands"
+.SH NAME
+fbc-nuttx-esp32p4-firmware \- prepare and build NuttX firmware for ESP32-P4
+.SH SYNOPSIS
+.B fbc-nuttx-esp32p4-firmware
+[\fIoptions\fR]
+.SH DESCRIPTION
+.B fbc-nuttx-esp32p4-firmware
+fetches or reuses the Apache NuttX source trees, applies the compatibility
+patches supplied by FreeBASIC, configures the selected ESP32-P4 board, and
+builds firmware suitable for the FreeBASIC module workflow.
+.SH OPTIONS
+.TP
+.BI --workdir " DIR"
+Set the directory containing the NuttX and apps source trees.
+.TP
+.BI --nuttx-ref " REF"
+Check out the selected NuttX branch, tag, or commit.
+.TP
+.BI --apps-ref " REF"
+Check out the selected NuttX apps revision.
+.TP
+.B --update
+Fetch and fast-forward existing source trees.
+.TP
+.BI --board-config " NAME"
+Select the NuttX board configuration.
+.TP
+.BI --out-dir " DIR"
+Copy completed firmware artifacts to the specified directory.
+.TP
+.B --skip-patches
+Do not apply the bundled compatibility patches.
+.TP
+.B --skip-config
+Reuse the existing NuttX configuration.
+.TP
+.B --no-build
+Stop after source preparation and configuration.
+.TP
+.B --flash
+Flash the completed firmware.
+.TP
+.BI --port " DEVICE"
+Select the serial or programming port used for flashing.
+.TP
+.BI --baud " RATE"
+Set the flash transfer rate.
+.TP
+.B --menuconfig
+Open NuttX menuconfig after scripted configuration.
+.TP
+.B --help
+Show the complete option and environment reference.
+.SH ENVIRONMENT
+.TP
+.B FB_NUTTX_ESP32P4_WORKDIR, NUTTX_WORKDIR
+Default workspace.
+.TP
+.B ESPTOOL_PORT, ESPTOOL_BAUD
+Default flash device and transfer rate.
+.TP
+.B JOBS
+Parallel build job count.
+.SH SEE ALSO
+.BR fbc-nuttx-esp32p4 (1)
+.\"
+.\" end of fbc-nuttx-esp32p4-firmware.1

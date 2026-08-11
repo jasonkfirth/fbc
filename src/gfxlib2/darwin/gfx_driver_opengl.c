@@ -139,6 +139,7 @@ const GFXDRIVER fb_gfxDriverDarwinOpenGL = {
 	fb_hDarwinFetchModes,
 	driver_flip,
 	fb_hDarwinPollEvents,
+	NULL,
 	NULL
 };
 

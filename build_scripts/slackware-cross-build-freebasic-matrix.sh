@@ -323,6 +323,7 @@ EOF
     run "$MAKE_CMD" \
         FBC_TARGET="$fbc_target" \
         FBTARGET_DIR_OVERRIDE="$dir_key" \
+        BOOTSTRAP_DIST_WORKTREE=1 \
         bootstrap-dist-target \
         -j"$MAKE_JOBS"
 

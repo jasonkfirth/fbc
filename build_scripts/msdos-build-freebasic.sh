@@ -70,6 +70,7 @@ Environment:
   DOSBOX_X_URL           DOSBox-X portable asset URL
   DOSBOX_X_ROOT          DOSBox-X download/cache directory
   DOSBOX_TIMEOUT         DOSBox timeout in seconds (default: 60)
+  DOSBOX_IMAGE_SIZE      DOSBox smoke disk size in MiB (default: 512)
   SKIP_DOSBOX            Set to 1 to skip DOSBox even without --skip-dosbox
 EOF
 }
@@ -144,6 +145,7 @@ DOSBOX_X_URL="${DOSBOX_X_URL:-https://github.com/joncampbell123/dosbox-x/release
 DOSBOX_X_ROOT="${DOSBOX_X_ROOT:-$ROOT/.build-msdos/dosbox-x}"
 
 DOSBOX_TIMEOUT="${DOSBOX_TIMEOUT:-60}"
+DOSBOX_IMAGE_SIZE="${DOSBOX_IMAGE_SIZE:-512}"
 KEEP_BUILDROOT="${KEEP_BUILDROOT:-0}"
 SKIP_DOSBOX="${SKIP_DOSBOX:-0}"
 
@@ -214,6 +216,11 @@ done
 if [ "$SKIP_DOSBOX" = "1" ]; then
 	DO_DOSBOX_TEST=0
 fi
+
+case "$DOSBOX_IMAGE_SIZE" in
+	*[!0-9]*|'') die "DOSBOX_IMAGE_SIZE must be a positive integer" ;;
+	0) die "DOSBOX_IMAGE_SIZE must be greater than zero" ;;
+esac
 
 HOST_MAKE_TOOL_ARGS=()
 if [ "$HOST_KIND" = "msys2" ]; then
@@ -554,10 +561,11 @@ configure_make_parallelism() {
 
 prepare_dos_runtime_layout() {
 	local root="$1"
+	local djgpp_root="${2:-$root/djgpp}"
 	local compat_libdir="$root/lib/dos"
 	local legacy_libdir="$root/lib/freebas/dos"
 	local host_libdir="$root/lib/freebasic/dos"
-	local djgpp_ldscript="$root/djgpp/lib/ldscripts/i386go32.x"
+	local djgpp_ldscript="$djgpp_root/lib/ldscripts/i386go32.x"
 
 	[ -d "$compat_libdir" ] || return 0
 
@@ -573,6 +581,50 @@ prepare_dos_runtime_layout() {
 		cp -f "$djgpp_ldscript" "$compat_libdir/i386go32.x"
 		cp -f "$djgpp_ldscript" "$host_libdir/i386go32.x"
 	fi
+}
+
+stage_dos_compiler_tools() {
+	local root="$1"
+	local bindir="$root/bin/dos"
+	local libdir="$root/lib/dos"
+	local source
+	local tool
+
+	mkdir -p "$bindir" "$libdir"
+
+	#
+	# A standalone DOS fbc resolves its assembler and linker below bin/dos.
+	# Falling back to PATH makes fbc run the DJGPP tool through COMMAND.COM;
+	# that extra protected-mode process layer cannot reliably start binutils.
+	# This also matches the layout of the upstream DOS distribution.
+	#
+	for tool in ar as dxe3gen gprof ld; do
+		source="$DJGPP_DOS_CACHE/bin/$tool.exe"
+		[ -f "$source" ] || die "missing DOS compiler tool: $source"
+		cp -f "$source" "$bindir/$tool.exe"
+	done
+
+	if [ -f "$DJGPP_DOS_CACHE/bin/gdb.exe" ]; then
+		cp -f "$DJGPP_DOS_CACHE/bin/gdb.exe" "$bindir/gdb.exe"
+	fi
+
+	#
+	# Keep the DJGPP startup objects and default libraries beside the
+	# FreeBASIC libraries.  The separate DJGPP tree is still included for
+	# mixed C builds, but a normal fbc link must be self-contained.
+	#
+	for source in \
+		"$DJGPP_DOS_CACHE/lib/"*.a \
+		"$DJGPP_DOS_CACHE/lib/"*.o \
+		"$DJGPP_DOS_CACHE/lib/"*.ld
+	do
+		[ -f "$source" ] || continue
+		cp -f "$source" "$libdir/"
+	done
+
+	source="$(find "$DJGPP_DOS_CACHE/lib/gcc" -name libgcc.a -type f -print -quit)"
+	[ -n "$source" ] || die "missing DOS libgcc.a"
+	cp -f "$source" "$libdir/libgcc.a"
 }
 
 cleanup_successful_buildroot() {
@@ -889,7 +941,9 @@ if [ "$DO_DOS_BUILD" = "1" ]; then
 	export PATH="$(dirname "$HOST_FBC"):$PATH"
 
 	msg "cleaning DOS cross-build tree"
-	run make clean TARGET_TRIPLET="$TARGET_TRIPLET" "${CROSS_MAKE_TOOL_ARGS[@]}" || true
+	run make clean-compiler clean-libs clean-build clean-bootstrap \
+		TARGET_TRIPLET="$TARGET_TRIPLET" \
+		"${CROSS_MAKE_TOOL_ARGS[@]}" || true
 
 	msg "emitting DOS bootstrap sources"
 	run make bootstrap-emit \
@@ -904,13 +958,20 @@ if [ "$DO_DOS_BUILD" = "1" ]; then
 		"${CROSS_MAKE_TOOL_ARGS[@]}" \
 		BUILD_FBC="$HOST_FBC"
 
-	msg "rebuilding DOS compiler and runtime with host compiler"
+	msg "resetting compiler and runtime outputs for standalone packaging"
+	run make clean-compiler clean-libs \
+		TARGET_TRIPLET="$TARGET_TRIPLET" \
+		"${CROSS_MAKE_TOOL_ARGS[@]}" \
+		ENABLE_STANDALONE=1
+
+	msg "rebuilding standalone DOS compiler and runtime with host compiler"
 	run make compiler runtime \
 		TARGET_TRIPLET="$TARGET_TRIPLET" \
 		"${CROSS_MAKE_TOOL_ARGS[@]}" \
+		ENABLE_STANDALONE=1 \
 		BUILD_FBC="$HOST_FBC"
 else
-	[ -x "$DOS_WORKTREE/bin/fbc.exe" ] || die "missing DOS compiler: $DOS_WORKTREE/bin/fbc.exe"
+	[ -x "$DOS_WORKTREE/fbc.exe" ] || die "missing standalone DOS compiler: $DOS_WORKTREE/fbc.exe"
 fi
 
 ##############################################################################
@@ -921,7 +982,7 @@ if [ "$DO_STAGE_INSTALL" = "1" ]; then
 	cd "$DOS_WORKTREE"
 
 	msg "assembling DOS distribution tree"
-	rm -rf "$DISTROOT/fb" "$DISTROOT/djgpp" "$DISTROOT/lib/freebas"
+	rm -rf "$DISTROOT/fb" "$DISTROOT/djgpp" "$DISTROOT/inc" "$DISTROOT/lib"
 	rm -f "$DISTROOT/fbdos.bat"
 
 	run make install \
@@ -929,16 +990,28 @@ if [ "$DO_STAGE_INSTALL" = "1" ]; then
 		prefix="$PREFIX" \
 		TARGET_TRIPLET="$TARGET_TRIPLET" \
 		"${CROSS_MAKE_TOOL_ARGS[@]}" \
+		ENABLE_STANDALONE=1 \
 		BUILD_FBC="$HOST_FBC"
-
-	run rsync -a "$DJGPP_DOS_CACHE"/ "$DISTROOT/djgpp"/
 
 	mkdir -p "$DISTROOT/fb"
 	if [ -f "$DISTROOT/fbc.exe" ]; then
 		mv -f "$DISTROOT/fbc.exe" "$DISTROOT/fb/fbc.exe"
 	fi
+	[ -d "$DISTROOT/inc" ] || die "installed DOS include tree is missing"
+	[ -d "$DISTROOT/lib" ] || die "installed DOS library tree is missing"
+	mv "$DISTROOT/inc" "$DISTROOT/fb/inc"
+	mv "$DISTROOT/lib" "$DISTROOT/fb/lib"
 
-	prepare_dos_runtime_layout "$DISTROOT"
+	run rsync -a "$DJGPP_DOS_CACHE"/ "$DISTROOT/djgpp"/
+	stage_dos_compiler_tools "$DISTROOT/fb"
+	prepare_dos_runtime_layout "$DISTROOT/fb" "$DISTROOT/djgpp"
+
+	run rsync -a "$ROOT/doc"/ "$DISTROOT/fb/doc"/
+	run rsync -a --delete --delete-excluded --prune-empty-dirs \
+		--exclude-from "$ROOT/mk/example-copy-excludes.rsync" \
+		"$ROOT/examples/" "$DISTROOT/fb/examples/"
+	cp -f "$ROOT/changelog.txt" "$DISTROOT/fb/changelog.txt"
+	cp -f "$ROOT/readme.txt" "$DISTROOT/fb/readme.txt"
 
 	cat > "$DISTROOT/fbdos.bat" <<'EOF'
 @echo off
@@ -948,6 +1021,7 @@ echo FreeBASIC DOS environment ready.
 EOF
 else
 	[ -x "$DISTROOT/fb/fbc.exe" ] || die "missing DOS distribution tree: $DISTROOT/fb/fbc.exe"
+	[ -x "$DISTROOT/fb/bin/dos/as.exe" ] || die "missing DOS assembler: $DISTROOT/fb/bin/dos/as.exe"
 fi
 
 ##############################################################################
@@ -1019,6 +1093,8 @@ run_dosbox_test() {
 	if [ -f "$test_root/fbc.exe" ]; then
 		mv -f "$test_root/fbc.exe" "$test_root/fb/fbc.exe"
 	fi
+	prepare_dos_runtime_layout "$test_root/fb" "$test_root/djgpp"
+	[ -f "$test_root/fb/bin/dos/as.exe" ] || die "DOS smoke-test assembler is missing"
 
 	if [ "$dosbox_kind" = "dosbox-x" ] && have mcopy && have sfdisk; then
 		local dosbox_image_file
@@ -1030,9 +1106,8 @@ print #1, "FreeBASIC DOS OK"
 close #1
 EOF
 
-		# DOSBox-X does not expose long file names consistently for mounted
-		# FAT images or host directories.  -R -RR keeps fbc's intermediate
-		# file names at HELLO.* instead of using its long temporary tag.
+		# Exercise the compiler's 8.3-safe temporary names and normal cleanup
+		# while the source and final executable remain on the host mount.
 		autoexec_bat="$test_root/fbtest.bat"
 		cat > "$autoexec_bat" <<'EOF'
 @echo off
@@ -1046,7 +1121,7 @@ if not exist C:\DJGPP\BIN\GCC.EXE echo missing-gcc>>D:\TRACE.LOG
 if not exist C:\DJGPP\DJGPP.ENV echo missing-env>>D:\TRACE.LOG
 C:\DJGPP\BIN\CWSDPMI.EXE -p >>D:\TRACE.LOG
 echo cwsdpmi-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD.LOG C:\FB\FBC.EXE -v -R -RR D:\HELLO.BAS -x D:\HELLO.EXE
+C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD.LOG C:\FB\FBC.EXE -v D:\HELLO.BAS -x D:\HELLO.EXE
 echo fbc-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 dir D:\HELLO.* >>D:\TRACE.LOG
 if exist D:\HELLO.EXE goto runhello
@@ -1074,7 +1149,7 @@ EOF
 			-nomenu \
 			-exit \
 			-set "cpu cputype=ppro_slow" \
-			-c "imgmake \"$dosbox_image_file\" -t hd -size 256 -fat 16" \
+			-c "imgmake \"$dosbox_image_file\" -t hd -size $DOSBOX_IMAGE_SIZE -fat 16" \
 			-c "exit" \
 			|| die "DOSBox image creation failed"
 
@@ -1203,6 +1278,13 @@ EOF
 	fi
 
 	grep -q "FreeBASIC DOS OK" "$result_txt" || die "DOSBox smoke test produced unexpected output"
+
+	if find "$test_root" -maxdepth 1 -type f \
+		\( -iname '*.asm' -o -iname '*.o' -o -iname '*.tmp' \) \
+		-print -quit | grep -q .
+	then
+		die "DOSBox smoke test left compiler temporary files behind"
+	fi
 }
 
 if [ "$DO_DOSBOX_TEST" = "1" ]; then

@@ -28,7 +28,8 @@ const GFXDRIVER fb_gfxDriverDarwin = {
 	fb_hDarwinFetchModes,
 	NULL,
 	fb_hDarwinPollEvents,
-	fb_hDarwinUpdate
+	fb_hDarwinUpdate,
+	NULL
 };
 
 #endif

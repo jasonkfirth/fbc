@@ -142,6 +142,7 @@ extern "C" const GFXDRIVER fb_gfxDriverHaikuOpenGL =
     fb_hHaikuFetchModes,
     driver_flip,
     fb_hHaikuPollEvents,
+    NULL,
     NULL
 };
 

@@ -347,15 +347,65 @@ function lexEatWhitespace( ) as integer
 
 	function = FALSE
 
-	if( lex.ctx->currchar = UINVALID ) then
-		lex.ctx->currchar = hReadChar( )
-	end if
+	do
+		select case as const lexCurrentChar( )
+		case CHAR_TAB, CHAR_SPACE
+			lex.ctx->after_space = TRUE
+			lexEatChar( )
+			function = TRUE
 
-	do while( (lex.ctx->currchar = CHAR_TAB) or (lex.ctx->currchar = CHAR_SPACE) )
-		lex.ctx->after_space = TRUE
-		lexEatChar( )
-		lex.ctx->currchar = hReadChar( )
-		function = TRUE
+		case CHAR_SLASH
+			'' A multiline comment is lexical whitespace between a
+			'' function-like macro name and its argument list.
+			if( lexGetLookAheadChar( ) <> CHAR_APOST ) then
+				exit do
+			end if
+
+			lexEatChar( )
+			hMultiLineComment( )
+			lex.ctx->after_space = TRUE
+			function = TRUE
+
+		case CHAR_UNDER
+			'' An underscore belonging to an identifier is not a line
+			'' continuation.  Preserve the same distinction as tokenization.
+			select case as const lexGetLookAheadChar( )
+			case CHAR_AUPP to CHAR_ZUPP, CHAR_ALOW to CHAR_ZLOW, _
+				CHAR_0 to CHAR_9, CHAR_UNDER
+				exit do
+			case CHAR_SHARP
+				if( lexGetLookAheadChar2( ) = CHAR_SHARP ) then
+					exit do
+				end if
+			end select
+
+			lexEatChar( )
+			do
+				select case as const lexCurrentChar( )
+				case 0
+					exit function
+				case CHAR_CR
+					lexEatChar( )
+					if( lexCurrentChar( ) = CHAR_LF ) then
+						lexEatChar( )
+					end if
+					UPDATE_LINENUM( )
+					exit do
+				case CHAR_LF
+					lexEatChar( )
+					UPDATE_LINENUM( )
+					exit do
+				case else
+					lexEatChar( )
+				end select
+			loop
+
+			lex.ctx->after_space = TRUE
+			function = TRUE
+
+		case else
+			exit do
+		end select
 	loop
 
 end function

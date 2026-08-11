@@ -1,0 +1,3 @@
+# The DOS locale table stores byte 0x84 for the code-page encoding of "a"
+# with diaeresis. Converting the source to UTF-8 would change the runtime data.
+freebasic-nuttx: national-encoding [usr/share/freebasic/nuttx-sdk/src/rtlib/dos/drv_intl_data.c]

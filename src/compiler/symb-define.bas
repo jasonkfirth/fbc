@@ -1939,10 +1939,10 @@ function symbDelDefineTok _
 end function
 
 '':::::
-private sub hDelDefineParams( byval s as FBSYMBOL ptr )
+private sub hDelDefineParamList( byval paramhead as FB_DEFPARAM ptr )
 	dim as FB_DEFPARAM ptr param, nxt
 
-	param = s->def.paramhead
+	param = paramhead
 	do while( param <> NULL )
 		nxt = param->next
 		ZstrFree( param->name )
@@ -1955,18 +1955,51 @@ private sub hDelDefineParams( byval s as FBSYMBOL ptr )
 end sub
 
 '':::::
-private sub hDelDefineTokens( byval s as FBSYMBOL ptr )
-	dim as FB_DEFTOK ptr tok, nxt
+private sub hDelDefineParams( byval s as FBSYMBOL ptr )
+	hDelDefineParamList( s->def.paramhead )
+end sub
 
-	tok = s->def.tokhead
-	do while( tok <> NULL )
-		nxt = tok->next
+'':::::
+private sub hDelDefineTokenList( byval tokhead as FB_DEFTOK ptr )
+	dim as FB_DEFTOK ptr tok
 
-		symbDelDefineTok( tok )
+	'' symbDelDefineTok() unlinks a token from the tail.  Find that tail first
+	'' so no surviving token retains a prev pointer to a released node.
+	tok = tokhead
+	if( tok = NULL ) then
+		exit sub
+	end if
 
-		tok = nxt
+	do while( tok->next <> NULL )
+		tok = tok->next
 	loop
 
+	do while( tok <> NULL )
+		tok = symbDelDefineTok( tok )
+	loop
+end sub
+
+'':::::
+private sub hDelDefineTokens( byval s as FBSYMBOL ptr )
+	hDelDefineTokenList( s->def.tokhead )
+
+end sub
+
+'':::::
+sub symbDelDefineMacroData _
+	( _
+		byval tokhead as FB_DEFTOK ptr, _
+		byval paramhead as FB_DEFPARAM ptr _
+	)
+
+	'' These are the parameters most recently parsed by ppDefine(), so their
+	'' temporary lookup entries must be removed before the nodes are released.
+	if( symb.def.param > 0 ) then
+		hResetDefHash( )
+	end if
+
+	hDelDefineTokenList( tokhead )
+	hDelDefineParamList( paramhead )
 end sub
 
 '':::::

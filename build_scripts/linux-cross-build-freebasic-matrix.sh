@@ -227,29 +227,18 @@ ARCHLINUX_ARCHES=(
 ##############################################################################
 
 TARGETS=(
-    "deb|ubuntu|ubuntu:22.04|jammy|debianubuntu-cross-build-freebasic-matrix.sh"
-    "deb|ubuntu|ubuntu:24.04|noble|debianubuntu-cross-build-freebasic-matrix.sh"
-    "deb|ubuntu|ubuntu:24.10|oracular|debianubuntu-cross-build-freebasic-matrix.sh"
-    "deb|ubuntu|ubuntu:25.04|plucky|debianubuntu-cross-build-freebasic-matrix.sh"
-    "deb|ubuntu|ubuntu:25.10|questing|debianubuntu-cross-build-freebasic-matrix.sh"
     "deb|ubuntu|ubuntu:26.04|resolute|debianubuntu-cross-build-freebasic-matrix.sh"
-    "deb|debian|debian:12|bookworm|debianubuntu-cross-build-freebasic-matrix.sh"
     "deb|debian|debian:13|trixie|debianubuntu-cross-build-freebasic-matrix.sh"
     "deb|debian|debian:sid|sid|debianubuntu-cross-build-freebasic-matrix.sh"
     "deb|raspbian|badaix/raspios-lite:trixie|trixie|debianubuntu-cross-build-freebasic-matrix.sh"
-    "deb|raspbian|badaix/raspios-lite:bookworm|bookworm|debianubuntu-cross-build-freebasic-matrix.sh"
-    "deb|raspbian|badaix/raspios-buster-armhf-lite:latest|buster|debianubuntu-cross-build-freebasic-matrix.sh"
-    "apk|alpine|alpine:3.23|3.23|apk-cross-build-freebasic-matrix.sh"
-    "apk|alpine|alpine:3.22|3.22|apk-cross-build-freebasic-matrix.sh"
-    "apk|alpine|alpine:3.21|3.21|apk-cross-build-freebasic-matrix.sh"
+    "apk|alpine|alpine:3.24|3.24|apk-cross-build-freebasic-matrix.sh"
     "apk|alpine|alpine:edge|edge|apk-cross-build-freebasic-matrix.sh"
     "apk|postmarketos|adamthiede/postmarketos:edge|edge|apk-cross-build-freebasic-matrix.sh"
     "rpm|fedora|fedora:44|44|rpm-cross-build-freebasic-matrix.sh"
     "rpm|fedora|fedora:rawhide|rawhide|rpm-cross-build-freebasic-matrix.sh"
-    "rpm|rocky|rockylinux:10|10|rpm-cross-build-freebasic-matrix.sh"
-    "rpm|rocky|rockylinux:9|9|rpm-cross-build-freebasic-matrix.sh"
+    "rpm|rocky|rockylinux/rockylinux:10|10|rpm-cross-build-freebasic-matrix.sh"
     "rpm|almalinux|almalinux:10|10|rpm-cross-build-freebasic-matrix.sh"
-    "rpm|almalinux|almalinux:9|9|rpm-cross-build-freebasic-matrix.sh"
+    "rpm|opensuse|opensuse/leap:16.0|leap-16.0|rpm-cross-build-freebasic-matrix.sh"
     "rpm|opensuse|opensuse/tumbleweed|tumbleweed|rpm-cross-build-freebasic-matrix.sh"
     "slackware|slackware|vbatts/slackware:15.0|15.0|slackware-cross-build-freebasic-matrix.sh"
     "slackware|slackware|vbatts/slackware:current|current|slackware-cross-build-freebasic-matrix.sh"
@@ -268,9 +257,6 @@ arches_for_target() {
     local release="$3"
 
     case "$family/$distro/$release" in
-        deb/raspbian/bookworm)
-            printf '%s\n' armhf arm64
-            ;;
         deb/debian/trixie)
             printf '%s\n' "${DEB_EXTENDED_ARCHES[@]}"
             ;;
@@ -282,6 +268,9 @@ arches_for_target() {
             ;;
         deb/*)
             printf '%s\n' "${DEB_ARCHES[@]}"
+            ;;
+        apk/postmarketos/*)
+            printf '%s\n' x86_64 aarch64
             ;;
         apk/*)
             printf '%s\n' "${APK_ARCHES[@]}"

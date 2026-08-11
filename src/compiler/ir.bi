@@ -472,6 +472,7 @@ enum IR_OPT
 	IR_OPT_CPUBOPFLAGS   = &h00000100  '' Integer BOPs set flags for conditional jumps (x86)?
 	IR_OPT_CPUSELFBOPS   = &h00000200  '' Integer self-BOPs available?
 	IR_OPT_64BITCPUREGS  = &h00000400  '' 64-bit wide registers?
+	IR_OPT_32BITBOPS     = &h00000800  '' Can selected wide integer BOPs be narrowed to 32 bits?
 
 	IR_OPT_ADDRCISC      = &h00010000  '' complex addressing modes (base+idx*disp)
 	IR_OPT_MISSINGOPS    = &h00020000  '' Some "complex" math operators unavailable? (call irSupportsOp() for details)

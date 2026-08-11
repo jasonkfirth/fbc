@@ -61,7 +61,8 @@ const GFXDRIVER fb_gfxDriverFBDev =
 	driver_fetch_modes, /* int *(*fetch_modes)(void); */
 	NULL,               /* void (*flip)(void); */
 	NULL,               /* void (*poll_events)(void); */
-	NULL                /* void (*update)(void); */
+	NULL,               /* void (*update)(void); */
+	NULL                /* int (*resize)(int width, int height); */
 };
 
 
@@ -668,7 +669,10 @@ got_mode:
 		fbdev_sync_mouse_screen_pos();
 		mouse_buttons = mouse_z = 0;
 		mouse_shown = TRUE;
-		fb_hSoftCursorInit();
+		if (fb_hSoftCursorInit() != 0) {
+			close(mouse_fd);
+			mouse_fd = -1;
+		}
 	}
 
 	palette = (unsigned short *)malloc(sizeof(unsigned short) * 1536);

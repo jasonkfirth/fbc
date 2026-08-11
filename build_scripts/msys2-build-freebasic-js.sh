@@ -64,7 +64,7 @@ Environment:
   UCRT64_ROOT         UCRT64 root used for Emscripten/Node (default: /ucrt64)
   NSIS_EXE            Explicit makensis path (default: /mingw64/bin/makensis.exe)
   BINARYEN_OVERLAY    Overlay official Binaryen Windows tools (default: 1)
-  BINARYEN_RELEASE    Official Binaryen release to overlay (default: version_129)
+  BINARYEN_RELEASE    Official Binaryen release to overlay (default: version_131)
   BINARYEN_SHA256     Expected SHA256 for the Binaryen archive
   NODE_OVERLAY        Overlay official Node.js Windows executable (default: 1)
   NODE_RELEASE        Official Node.js release to overlay (default: v24.14.1)
@@ -298,10 +298,10 @@ INSTALL_SUBDIR="${INSTALL_SUBDIR:-freebasic-js}"
 UCRT64_ROOT="${UCRT64_ROOT:-/ucrt64}"
 NSIS_EXE="${NSIS_EXE:-/mingw64/bin/makensis.exe}"
 BINARYEN_OVERLAY="${BINARYEN_OVERLAY:-1}"
-BINARYEN_RELEASE="${BINARYEN_RELEASE:-version_129}"
+BINARYEN_RELEASE="${BINARYEN_RELEASE:-version_131}"
 BINARYEN_ARCHIVE="${BINARYEN_ARCHIVE:-binaryen-${BINARYEN_RELEASE}-x86_64-windows.tar.gz}"
 BINARYEN_URL="${BINARYEN_URL:-https://github.com/WebAssembly/binaryen/releases/download/${BINARYEN_RELEASE}/${BINARYEN_ARCHIVE}}"
-BINARYEN_SHA256="${BINARYEN_SHA256:-1405d2f51377859ccf5fcd2c59c0a8c5756373e691ca0eeb5219f646b743e3aa}"
+BINARYEN_SHA256="${BINARYEN_SHA256:-2f4edac1703a2f695254d6ff52ede03481e67db1f094915763d863158c17d9bc}"
 NODE_OVERLAY="${NODE_OVERLAY:-1}"
 NODE_RELEASE="${NODE_RELEASE:-v24.14.1}"
 NODE_VERSION="${NODE_RELEASE#v}"
@@ -351,13 +351,21 @@ install_dependencies() {
 }
 
 ensure_emscripten_toolchain() {
+	local runtime_dir
 	local tool
 
 	for tool in emcc em++ emar emranlib node python; do
 		have "$tool" || fail "$tool not found after loading the UCRT64 Emscripten environment"
 	done
 
-	emcc -v >/dev/null 2>&1 || fail "emcc is present but could not start"
+	for runtime_dir in "${EMCC_TEMP_DIR:-}" "${EM_CACHE:-}"; do
+		if [ -n "$runtime_dir" ]; then
+			mkdir -p "$runtime_dir" ||
+				fail "could not create Emscripten runtime directory: $runtime_dir"
+		fi
+	done
+
+	emcc -v >/dev/null || fail "emcc is present but could not start"
 }
 
 ##############################################################################
@@ -370,6 +378,7 @@ build_freebasic_js() {
 	local bootstrap_sources_dir="$worktree/bootstrap/win64"
 	local saved_path="$PATH"
 	local host_fbc=""
+	local clean_fbc=""
 	local build_fbc=""
 	local cc="$UCRT64_ROOT/bin/gcc.exe"
 	local cxx="$UCRT64_ROOT/bin/g++.exe"
@@ -469,8 +478,14 @@ EOF
 			CC="$cc" CXX="$cxx" AR="$ar" AS="$as" LD="$ld" RANLIB="$ranlib" STRIP="$strip" DLLTOOL="$dlltool"
 	fi
 
+	clean_fbc="$host_fbc"
+	if [[ "$clean_fbc" == "$worktree/bin/"* ]]; then
+		run cp "$clean_fbc" "$worktree/tools/clean-fbc.exe"
+		clean_fbc="$worktree/tools/clean-fbc.exe"
+	fi
+
 	msg "Cleaning fbc-js worktree"
-	run make clean TARGET_TRIPLET="$HOST_TRIPLET" || true
+	run make clean FBC="$clean_fbc" TARGET_TRIPLET="$HOST_TRIPLET" || true
 
 	msg "Building host bootstrap compiler ($JOBS threads)"
 	run make -j"$JOBS" \
@@ -1076,6 +1091,7 @@ create_installer() {
 	local installer_payload_zip="$BUILDROOT/${DISTNAME}-installer-payload.zip"
 	local out_win
 	local payload_win
+	local refresh_environment_win
 
 	[ -x "$NSIS_EXE" ] || fail "makensis not found at $NSIS_EXE; install the nsis package or set NSIS_EXE"
 	have cygpath || fail "cygpath not found"
@@ -1090,6 +1106,7 @@ create_installer() {
 	)
 
 	payload_win="$(cygpath -aw "$installer_payload_zip")"
+	refresh_environment_win="$(cygpath -aw "$ROOT/build_scripts/windows-refresh-environment.ps1")"
 
 	msg "Generating NSIS installer script"
 	cat > "$installer_nsi" <<EOF
@@ -1107,6 +1124,7 @@ ShowUninstDetails show
 !include "StrFunc.nsh"
 !include "WinMessages.nsh"
 
+
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -1117,11 +1135,15 @@ ShowUninstDetails show
 \${Using:StrFunc} UnStrRep
 
 Function RefreshEnvironment
-	System::Call 'User32::SendMessageTimeoutA(i 0xffff, i \${WM_SETTINGCHANGE}, i 0, t "Environment", i 0, i 5000, *i .r0)'
+	SetOutPath "\$TEMP"
+	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
+	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
 FunctionEnd
 
 Function un.RefreshEnvironment
-	System::Call 'User32::SendMessageTimeoutA(i 0xffff, i \${WM_SETTINGCHANGE}, i 0, t "Environment", i 0, i 5000, *i .r0)'
+	SetOutPath "\$TEMP"
+	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
+	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
 FunctionEnd
 
 Function AddOnePath
@@ -1382,6 +1404,11 @@ EOF
 		-File "$(cygpath -aw "$validate_ps1")" \
 		-CommandPath "$(cygpath -aw "$validate_cmd")" \
 		-TimeoutSeconds 1200
+	if grep -Eiq '(^|[[:space:]])(warning|error):' \
+		"$validate_dir/compile.err" "$validate_dir/app-compile.err"; then
+		cat "$validate_dir/compile.err" "$validate_dir/app-compile.err" >&2
+		fail "packaged fbc-js emitted compiler warnings or errors"
+	fi
 	[ -f "$validate_dir/hello.js" ] || fail "packaged fbc-js did not produce hello.js"
 	[ -f "$validate_dir/app/index.html" ] || fail "packaged fbc-js-app did not produce app/index.html"
 	grep -q "freebasic-js package test OK" "$validate_dir/output.txt" || fail "generated JavaScript output was wrong"

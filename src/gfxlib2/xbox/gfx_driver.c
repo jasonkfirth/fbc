@@ -565,7 +565,8 @@ static const GFXDRIVER fb_gfxDriverXbox =
 	driver_fetch_modes,      /* int *(*fetch_modes)(int depth, int *size); */
 	NULL,                    /* void (*flip)(void); */
 	NULL,                    /* void (*poll_events)(void); */
-	driver_update            /* void (*update)(void); */
+	driver_update,           /* void (*update)(void); */
+	NULL                     /* int (*resize)(int width, int height); */
 };
 
 const GFXDRIVER *__fb_gfx_drivers_list[] = {

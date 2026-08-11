@@ -314,7 +314,7 @@ def fbc_package_path_entries(args: argparse.Namespace) -> list[str]:
     if fbc_path.is_absolute():
         entries.append(str(fbc_path.parent))
 
-    if host_uses_windows_executables():
+    if host_uses_windows_executables() and args.prefix is not None:
         compiler_name = fbc_path.name.lower()
         arch_dir = ""
 
@@ -697,14 +697,16 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
 
     prepare_run_directory(path.parent, compile_cwd, copy_directories)
 
-    cmd = args.fbc + [
-        "-prefix",
-        str(args.prefix),
+    cmd = list(args.fbc)
+    if args.prefix is not None:
+        cmd.extend(["-prefix", str(args.prefix)])
+
+    cmd.extend([
         "-i",
         str(args.include_dir),
         "-p",
         str(compile_cwd),
-    ]
+    ])
     if args.main_module_from_source:
         cmd.extend(["-m", path.stem])
     cmd.extend(str(source) for source in compile_inputs(path, root, compile_cwd))
@@ -900,7 +902,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Compile and run FreeBASIC examples")
     parser.add_argument("--root", type=Path, default=root)
     parser.add_argument("--outdir", type=Path, default=root / "out" / "exampleageddon")
-    parser.add_argument("--prefix", type=Path, default=None)
+    prefix_group = parser.add_mutually_exclusive_group()
+    prefix_group.add_argument("--prefix", type=Path, default=None)
+    prefix_group.add_argument(
+        "--no-prefix",
+        action="store_true",
+        help="Let the selected compiler discover its installed runtime and toolchain",
+    )
     parser.add_argument("--include-dir", type=Path, default=None)
     parser.add_argument("--fbc", default=str(root / "bin" / "fbc"))
     parser.add_argument("--jobs", type=int, default=cpu_count)
@@ -916,7 +924,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     args = parser.parse_args(argv)
     args.root = args.root.resolve()
     args.outdir = args.outdir.resolve()
-    args.prefix = (args.prefix or args.root).resolve()
+    if args.no_prefix:
+        args.prefix = None
+    else:
+        args.prefix = (args.prefix or args.root).resolve()
     args.include_dir = (args.include_dir or (args.root / "inc")).resolve()
     args.remote_shell = shlex.split(args.remote_shell)
 

@@ -247,7 +247,8 @@ static int fb_dos_mouse_init(void)
 	fb_dos.regs.x.ax = 0x2;
 	__dpmi_int(0x33, &fb_dos.regs);
 	
-	fb_hSoftCursorInit();
+	if (fb_hSoftCursorInit() != 0)
+		return 0;
 
 	/* allocate real-mode callback */
 	if (__dpmi_allocate_real_mode_callback(fb_dos_mouse_isr, &fb_dos_mouse_regs, &fb_dos_mouse_isr_rmcb))

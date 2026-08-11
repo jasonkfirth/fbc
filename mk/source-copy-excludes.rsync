@@ -11,8 +11,12 @@
 /freebasic-package.tar
 /freebasic-package.zip
 FreeBASIC-*-source-bootstrap-*.tar.*
+*.apk
+*.apk.idsig
 *.install_manifest
 *.log
+*.pid
+*.status
 *.tmp
 .maketests-tmp/
 xbox_emulator/
@@ -21,11 +25,13 @@ bin/fbc*
 bootstrap/fbc*
 /build/
 dist/
+/generated/
 /lib/freebasic/
 # Local probe and packaging output can be extremely large.  They are not
 # source inputs and must not be copied into isolated cross-build worktrees.
 /remote_probe_temp/
 /$out/
+/out-*/
 examples/**/*.a
 examples/**/*.asm
 examples/**/*.dll
@@ -36,6 +42,36 @@ examples/**/*.stderr.txt
 examples/**/*.stdout.txt
 examples/**/obj/
 examples/manual/proguide/hello.txt
+# Documentation tools and rendered manuals are host build products.  Copying
+# them into another host's worktree can make make reuse incompatible objects.
+doc/**/*.a
+doc/**/*.o
+doc/**/*.exe
+/doc/fbdoc/fbdoc
+/doc/fbchkdoc/chkdocs
+/doc/fbchkdoc/delextra
+/doc/fbchkdoc/getimage
+/doc/fbchkdoc/getindex
+/doc/fbchkdoc/getpage
+/doc/fbchkdoc/insert
+/doc/fbchkdoc/mkerrlst
+/doc/fbchkdoc/mkerrtxt
+/doc/fbchkdoc/mkimglst
+/doc/fbchkdoc/mkprntoc
+/doc/fbchkdoc/pretty
+/doc/fbchkdoc/putpage
+/doc/fbchkdoc/rebuild
+/doc/fbchkdoc/replace
+/doc/fbchkdoc/samps
+/doc/fbchkdoc/spell
+/doc/fbchkdoc/spellit
+/doc/makefbhelp/makefbhelp
+/doc/manual/cache/
+/doc/manual/fbhelp/
+/doc/manual/html/
+/doc/manual/txt/
+/doc/manual/FB-manual-*
+/doc/manual/updatelinks
 maketests-log/
 obj/
 out/
@@ -58,5 +94,19 @@ tests/**/*.o
 tests/**/*.obj
 tests/warnings/r/**/*.txt
 tests/**/*.tmp
+tests/*.asm
+tests/*.dol
+tests/*.exe
+tests/*.o
+tests/*.obj
+tests/*.xml
+tests/log-tests-*.inc
+tests/log-tests-*.lst
+tests/unit-tests.inc
+tests/unit-tests-obj.lst
 tests/*.log
 tests/*.tmp
+/tools/
+__pycache__/
+
+# end of source-copy-excludes.rsync

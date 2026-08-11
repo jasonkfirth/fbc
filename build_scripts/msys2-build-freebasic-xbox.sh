@@ -303,6 +303,7 @@ install_dependencies() {
 	run pacman -Syu --needed --noconfirm
 	run pacman -S --needed --noconfirm \
 		base-devel \
+		patch \
 		rsync \
 		unzip \
 		zip \
@@ -357,6 +358,30 @@ ensure_nxdk() {
 	fi
 
 	[ -x "$NXDK_DIR/bin/activate" ] || fail "nxdk activation script not found: $NXDK_DIR/bin/activate"
+}
+
+apply_nxdk_patches() {
+	local extract_patch="$ROOT/build_scripts/xbox-patches/extract-xiso-mingw-clean.patch"
+	local pdclib_patch="$ROOT/build_scripts/xbox-patches/nxdk-pdclib-noreturn.patch"
+	local winapi_patch="$ROOT/build_scripts/xbox-patches/nxdk-winapi-wait-timeout.patch"
+
+	msg "Applying nxdk warning-cleanup patches"
+	have patch || fail "patch not found"
+	[ -f "$extract_patch" ] || fail "nxdk patch not found: $extract_patch"
+	[ -f "$pdclib_patch" ] || fail "nxdk patch not found: $pdclib_patch"
+	[ -f "$winapi_patch" ] || fail "nxdk patch not found: $winapi_patch"
+
+	if ! grep -q 'write_directory_callback' "$NXDK_DIR/tools/extract-xiso/extract-xiso.c"; then
+		run patch -d "$NXDK_DIR/tools/extract-xiso" -p1 < "$extract_patch"
+	fi
+
+	if ! grep -q '#if defined( __cplusplus )' "$NXDK_DIR/lib/pdclib/include/pdclib/_PDCLIB_aux.h"; then
+		run patch -d "$NXDK_DIR/lib/pdclib" -p1 < "$pdclib_patch"
+	fi
+
+	if ! grep -q '#ifndef WAIT_TIMEOUT' "$NXDK_DIR/lib/winapi/synchapi.h"; then
+		run patch -d "$NXDK_DIR/lib/winapi" -p1 < "$winapi_patch"
+	fi
 }
 
 ensure_nxdk_tools() {
@@ -478,13 +503,14 @@ build_xbox_target() {
 		CXX=nxdk-cxx \
 		LD=nxdk-link \
 		AR=llvm-ar \
+		ARFLAGS=rcs \
 		RANLIB=llvm-ranlib \
 		CXBE="$cxbe" \
 		BUILD_FBC="$host_fbc" \
 		BUILD_FBC_TARGET=xbox \
 		BUILD_FBC_BUILDPREFIX= \
 		CPPFLAGS="-DHOST_XBOX -DDISABLE_FFI -DDISABLE_OPENGL -I$NXDK_DIR/lib -I$NXDK_DIR/lib/net/lwip/src/include -I$NXDK_DIR/lib/net/nforceif/include -I$NXDK_DIR/lib/net/nvnetdrv" \
-		CFLAGS="-DHOST_XBOX -DDISABLE_FFI -DDISABLE_OPENGL -I$NXDK_DIR/lib -I$NXDK_DIR/lib/net/lwip/src/include -I$NXDK_DIR/lib/net/nforceif/include -I$NXDK_DIR/lib/net/nvnetdrv" \
+		CFLAGS="-Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration -Wfatal-errors -fno-strict-aliasing -DHOST_XBOX -DDISABLE_FFI -DDISABLE_OPENGL -I$NXDK_DIR/lib -I$NXDK_DIR/lib/net/lwip/src/include -I$NXDK_DIR/lib/net/nforceif/include -I$NXDK_DIR/lib/net/nvnetdrv" \
 		CXXFLAGS= \
 		LDFLAGS= \
 		rtlib fbrt gfxlib2 sfxlib \
@@ -950,6 +976,7 @@ create_installer() {
 	local installer_payload_zip="$BUILDROOT/${DISTNAME}-installer-payload.zip"
 	local out_win
 	local payload_win
+	local refresh_environment_win
 
 	[ "$SKIP_INSTALLER" -eq 0 ] || return 0
 	[ "$SKIP_PACKAGE" -eq 0 ] || return 0
@@ -966,6 +993,7 @@ create_installer() {
 	)
 
 	payload_win="$(cygpath -aw "$installer_payload_zip")"
+	refresh_environment_win="$(cygpath -aw "$ROOT/build_scripts/windows-refresh-environment.ps1")"
 
 	msg "Generating NSIS installer script"
 	cat > "$installer_nsi" <<EOF
@@ -993,11 +1021,15 @@ ShowUninstDetails show
 \${Using:StrFunc} UnStrRep
 
 Function RefreshEnvironment
-	System::Call 'User32::SendMessageTimeoutA(i 0xffff, i \${WM_SETTINGCHANGE}, i 0, t "Environment", i 0, i 5000, *i .r0)'
+	SetOutPath "\$TEMP"
+	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
+	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
 FunctionEnd
 
 Function un.RefreshEnvironment
-	System::Call 'User32::SendMessageTimeoutA(i 0xffff, i \${WM_SETTINGCHANGE}, i 0, t "Environment", i 0, i 5000, *i .r0)'
+	SetOutPath "\$TEMP"
+	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
+	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
 FunctionEnd
 
 Function AddOnePath
@@ -1169,6 +1201,7 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
 fi
 
 ensure_nxdk
+apply_nxdk_patches
 ensure_nxdk_tools
 build_nxdk_runtime_libs
 prepare_worktree

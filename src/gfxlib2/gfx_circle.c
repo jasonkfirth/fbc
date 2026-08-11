@@ -102,7 +102,7 @@ FBCALL void fb_GfxEllipse(void *target, float fx, float fy, float radius, unsign
 	FB_GFXCTX *context;
 	int x, y, x1, y1, top, bottom;
 	unsigned int orig_color;
-	float a, b, orig_x, orig_y, increment;
+	float a, b, orig_x, orig_y;
 
 	FB_GRAPHICS_LOCK( );
 
@@ -146,6 +146,8 @@ FBCALL void fb_GfxEllipse(void *target, float fx, float fy, float radius, unsign
 	}
 
 	if ((start != 0.0) || (end != 3.141593f * 2.0)) {
+		float increment;
+
 		if (start < 0) {
 			start = -start;
 			get_arc_point(start, a, b, &x1, &y1);
@@ -202,6 +204,12 @@ FBCALL void fb_GfxEllipse(void *target, float fx, float fy, float radius, unsign
 		SWAP( top, bottom );
 
 	SET_DIRTY(context, top, bottom - top + 1);
+
+	/* QuickBASIC leaves the graphics pen at the center of a circle or arc.
+	   Negative arc angles draw radial lines through fb_GfxLine(), which updates
+	   the pen to each endpoint, so restore the logical center afterwards. */
+	context->last_x = fx;
+	context->last_y = fy;
 
 	DRIVER_UNLOCK();
 	FB_GRAPHICS_UNLOCK( );

@@ -281,6 +281,7 @@ build_bootstrap_tarball() {
     run "$MAKE_CMD" \
         FBC_TARGET="$FBC_TARGET" \
         FBTARGET_DIR_OVERRIDE="$BOOTKEY" \
+        BOOTSTRAP_DIST_WORKTREE=1 \
         bootstrap-dist-target \
         -j"$JOBS"
 
@@ -382,6 +383,13 @@ write_apkbuild() {
         echo '	sleep 50'
         echo '	screen 0'
         echo '	EOF'
+        echo '	cat > .package-smoke/gfx3-screen13.bas <<-EOF'
+        echo '	screen 13'
+        echo '	screenset 0, 0'
+        echo '	pset (8, 8), 12'
+        echo '	print "gfxlib3 screen 13"'
+        echo '	screen 0'
+        echo '	EOF'
         echo '	cat > .package-smoke/sfx.bas <<-EOF'
         echo '	print "sfx-start"'
         echo '	play "ABCDEFG"'
@@ -389,6 +397,7 @@ write_apkbuild() {
         echo '	EOF'
         echo '	bin/fbc -v -prefix "$builddir" .package-smoke/console.bas -x .package-smoke/console > .package-smoke/console.link.log 2>&1 || { cat .package-smoke/console.link.log; return 1; }'
         echo '	bin/fbc -v -prefix "$builddir" .package-smoke/gfx.bas -x .package-smoke/gfx > .package-smoke/gfx.link.log 2>&1 || { cat .package-smoke/gfx.link.log; return 1; }'
+        echo '	bin/fbc -v -prefix "$builddir" -i inc -gfx3 .package-smoke/gfx3-screen13.bas -x .package-smoke/gfx3-screen13 > .package-smoke/gfx3-screen13.link.log 2>&1 || { cat .package-smoke/gfx3-screen13.link.log; return 1; }'
         echo '	bin/fbc -v -prefix "$builddir" .package-smoke/sfx.bas -x .package-smoke/sfx > .package-smoke/sfx.link.log 2>&1 || { cat .package-smoke/sfx.link.log; return 1; }'
         echo '	{'
         echo '		printf "%s\n" crt1.o crti.o crtn.o'
@@ -416,7 +425,7 @@ write_apkbuild() {
         echo '	glu-dev'
         echo '	EOF'
         echo '	sort -u -o .package-smoke/link-depends .package-smoke/link-depends'
-        echo '	scanelf --needed --nobanner --format "%n" .package-smoke/console .package-smoke/gfx .package-smoke/sfx | tr "," "\n" | awk "/^lib.*\\.so/ {print \"so:\"\$1}" | sort -u > .package-smoke/so-depends'
+        echo '	scanelf --needed --nobanner --format "%n" .package-smoke/console .package-smoke/gfx .package-smoke/gfx3-screen13 .package-smoke/sfx | tr "," "\n" | awk "/^lib.*\\.so/ {print \"so:\"\$1}" | sort -u > .package-smoke/so-depends'
         echo '}'
         echo
         echo 'package() {'

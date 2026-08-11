@@ -166,9 +166,7 @@ install_host_deps() {
 ##############################################################################
 
 APK_TARGETS=(
-    "alpine|3.23|alpine:3.23"
-    "alpine|3.22|alpine:3.22"
-    "alpine|3.21|alpine:3.21"
+    "alpine|3.24|alpine:3.24"
     "alpine|edge|alpine:edge"
     "postmarketos|edge|adamthiede/postmarketos:edge"
 )

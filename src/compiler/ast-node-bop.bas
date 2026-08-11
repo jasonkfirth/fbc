@@ -594,7 +594,9 @@ private function hConstBop _
 			'' Division by zero?
 			if( r->val.i = 0 ) then
 				l->val.i = 0
-				errReport( FB_ERRMSG_DIVBYZERO )
+				if( astShouldShowConstErrors( ) ) then
+					errReport( FB_ERRMSG_DIVBYZERO )
+				end if
 
 			'' Avoid incorrect result (x86) or SIGFPE crash (x86_64) for:
 			'' -9223372036854775808 \ -1 = 9223372036854775808,
@@ -650,7 +652,9 @@ private function hConstBop _
 			'' Division by zero?
 			if( r->val.i = 0 ) then
 				l->val.i = 0
-				errReport( FB_ERRMSG_DIVBYZERO )
+				if( astShouldShowConstErrors( ) ) then
+					errReport( FB_ERRMSG_DIVBYZERO )
+				end if
 			elseif( op = AST_OP_INTDIV ) then
 				l->val.i = cunsg( l->val.i ) \   cunsg( r->val.i )
 			else

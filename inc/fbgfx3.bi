@@ -13,6 +13,7 @@
 ''     - create, load, and destroy opaque renderer-owned surfaces
 ''     - explicitly upload, download, map, clear, blit, transform, and present
 ''       surfaces
+''     - allow an application renderer to own native window presentation
 ''     - define usage flags without exposing backend GPU handles
 ''
 '' This file intentionally does NOT contain:
@@ -201,6 +202,14 @@ namespace fb
 		alias "fb_Gfx3RunOnRenderThread" _
 		( byval callback as Gfx3RenderCallback ptr, _
 		  byval user_data as any ptr = 0 ) as long
+	''
+	'' External presentation keeps gfxlib3's window, input, and GPU surfaces
+	'' alive while another context owns the native front and back buffers.
+	'' Surface work remains ordered, but page presentation commands become
+	'' synchronization boundaries without swapping the window.
+	declare function Gfx3SetExternalPresentation GFX3CALL _
+		alias "fb_Gfx3SetExternalPresentation" _
+		( byval enabled as long ) as long
 	end extern
 
 end namespace

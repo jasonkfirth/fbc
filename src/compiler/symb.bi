@@ -1192,6 +1192,12 @@ declare function symbDelDefineTok _
 		byval tok as FB_DEFTOK ptr _
 	) as FB_DEFTOK ptr
 
+declare sub symbDelDefineMacroData _
+	( _
+		byval tokhead as FB_DEFTOK ptr, _
+		byval paramhead as FB_DEFPARAM ptr _
+	)
+
 declare function symbAddFwdRef _
 	( _
 		byval id as zstring ptr _

@@ -185,10 +185,9 @@ RPM_RISCV_ARCHES=(
 RPM_TARGETS=(
     "fedora|fedora:44|44"
     "fedora|fedora:rawhide|rawhide"
-    "rocky|rockylinux:10|10"
-    "rocky|rockylinux:9|9"
+    "rocky|rockylinux/rockylinux:10|10"
     "almalinux|almalinux:10|10"
-    "almalinux|almalinux:9|9"
+    "opensuse|opensuse/leap:16.0|leap-16.0"
     "opensuse|opensuse/tumbleweed|tumbleweed"
 )
 
@@ -356,6 +355,7 @@ EOF
     run "$MAKE_CMD" \
         FBC_TARGET="$fbc_target" \
         FBTARGET_DIR_OVERRIDE="$dir_key" \
+        BOOTSTRAP_DIST_WORKTREE=1 \
         bootstrap-dist-target \
         -j"$MAKE_JOBS"
 

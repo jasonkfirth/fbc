@@ -405,6 +405,12 @@ type ASTCTX
 	''   0 => show warnings
 	'' > 0 => hide warnings
 	hidewarningslevel   as integer
+
+	'' Constant expressions in an operand skipped by ANDALSO or ORELSE must
+	'' still be parsed, but diagnostics caused only by evaluating that operand
+	'' are not observable at runtime.  Keep this as a nesting level because a
+	'' skipped operand may contain another short-circuit expression.
+	hideconsterrorslevel as integer
 end type
 
 enum AST_OPFLAGS
@@ -1446,6 +1452,10 @@ declare function astLoadMACRO( byval n as ASTNODE ptr ) as IRVREG ptr
 #define astBeginHideWarnings( ) ast.hidewarningslevel += 1
 #define astEndHideWarnings( )   ast.hidewarningslevel -= 1
 #define astShouldShowWarnings( ) (ast.hidewarningslevel = 0)
+
+#define astBeginHideConstErrors( ) ast.hideconsterrorslevel += 1
+#define astEndHideConstErrors( )   ast.hideconsterrorslevel -= 1
+#define astShouldShowConstErrors( ) (ast.hideconsterrorslevel = 0)
 
 #macro astInitNode( n, class_, dtype_, subtype_ )
 	(n)->class = class_

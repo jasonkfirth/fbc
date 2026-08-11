@@ -1,0 +1,5 @@
+debian/fbc-nuttx-esp32p4.1
+debian/fbc-nuttx-esp32p4-firmware.1
+debian/nuttx-riscv32-qemu-smoke.1
+debian/nuttx-remote-console.1
+debian/nuttx-http-server.1

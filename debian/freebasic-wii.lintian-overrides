@@ -1,0 +1,6 @@
+# The Wii package intentionally installs PowerPC startup objects for fbc-wii.
+freebasic-wii: binary-from-other-architecture [usr/lib/freebasic-wii/wii-powerpc/fbrt0.o]
+freebasic-wii: binary-from-other-architecture [usr/lib/freebasic-wii/wii-powerpc/fbrt1.o]
+freebasic-wii: binary-from-other-architecture [usr/lib/freebasic-wii/wii-powerpc/fbrt2.o]
+
+# end of freebasic-wii.lintian-overrides

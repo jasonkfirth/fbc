@@ -45,7 +45,8 @@ const GFXDRIVER fb_gfxDriverAndroidModern =
 	fb_hAndroidFetchModes,
 	NULL,
 	fb_hAndroidPollEvents,
-	fb_hAndroidUpdate
+	fb_hAndroidUpdate,
+	NULL
 };
 
 const GFXDRIVER fb_gfxDriverAndroidLegacy =
@@ -66,7 +67,8 @@ const GFXDRIVER fb_gfxDriverAndroidLegacy =
 	fb_hAndroidFetchModes,
 	NULL,
 	fb_hAndroidPollEvents,
-	fb_hAndroidUpdate
+	fb_hAndroidUpdate,
+	NULL
 };
 
 const GFXDRIVER fb_gfxDriverAndroidOpenGLESModern =
@@ -87,6 +89,7 @@ const GFXDRIVER fb_gfxDriverAndroidOpenGLESModern =
 	fb_hAndroidFetchModes,
 	fb_hAndroidOpenGLFlip,
 	fb_hAndroidPollEvents,
+	NULL,
 	NULL
 };
 
@@ -108,6 +111,7 @@ const GFXDRIVER fb_gfxDriverAndroidOpenGLESLegacy =
 	fb_hAndroidFetchModes,
 	fb_hAndroidOpenGLFlip,
 	fb_hAndroidPollEvents,
+	NULL,
 	NULL
 };
 

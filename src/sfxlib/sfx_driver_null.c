@@ -42,10 +42,10 @@
 /* ------------------------------------------------------------------------- */
 
 static int null_initialized = 0;
-static int null_rate = FB_SFX_DEFAULT_RATE;
 static int null_channels = FB_SFX_DEFAULT_CHANNELS;
-static int null_buffer_frames = FB_SFX_DEFAULT_BUFFER;
 #ifdef FB_NUTTX_QEMU_MOCK_DEVICES
+static int null_rate = FB_SFX_DEFAULT_RATE;
+static int null_buffer_frames = FB_SFX_DEFAULT_BUFFER;
 static unsigned int null_qemu_write_count = 0;
 static uint32_t null_qemu_last_checksum = 0;
 static uint32_t null_qemu_last_pcm_checksum = 0;
@@ -60,9 +60,14 @@ static int null_driver_init(int rate, int channels, int buffer_size, int flags)
 {
     (void)flags;
 
+#ifdef FB_NUTTX_QEMU_MOCK_DEVICES
     null_rate = (rate > 0) ? rate : FB_SFX_DEFAULT_RATE;
-    null_channels = (channels > 0) ? channels : FB_SFX_DEFAULT_CHANNELS;
     null_buffer_frames = (buffer_size > 0) ? buffer_size : FB_SFX_DEFAULT_BUFFER;
+#else
+    (void)rate;
+    (void)buffer_size;
+#endif
+    null_channels = (channels > 0) ? channels : FB_SFX_DEFAULT_CHANNELS;
     null_initialized = 1;
 
     SFX_DEBUG("sfx_driver_null: initialized");
@@ -78,10 +83,10 @@ static int null_driver_init(int rate, int channels, int buffer_size, int flags)
 static void null_driver_shutdown(void)
 {
     null_initialized = 0;
-    null_rate = FB_SFX_DEFAULT_RATE;
     null_channels = FB_SFX_DEFAULT_CHANNELS;
-    null_buffer_frames = FB_SFX_DEFAULT_BUFFER;
 #ifdef FB_NUTTX_QEMU_MOCK_DEVICES
+    null_rate = FB_SFX_DEFAULT_RATE;
+    null_buffer_frames = FB_SFX_DEFAULT_BUFFER;
     null_qemu_write_count = 0;
     null_qemu_last_checksum = 0;
     null_qemu_last_pcm_checksum = 0;

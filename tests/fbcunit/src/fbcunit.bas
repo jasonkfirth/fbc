@@ -1,7 +1,7 @@
 ''  fbcunit - FreeBASIC Compiler Unit Testing Component
 ''	Copyright (C) 2017-2020 Jeffery R. Marshall (coder[at]execulink[dot]com)
 ''
-''  License: GNU Lesser General Public License 
+''  License: GNU Lesser General Public License
 ''           version 2.1 (or any later version) plus
 ''           linking exception, see license.txt
 
@@ -9,7 +9,7 @@
 | fbcunit - FreeBASIC Compiler Unit testing module        |
 ----------------------------------------------------------/
 
-     XXX                                   
+     XXX
     XX    XX                               XX    XX
     XX    XX                                     XX
   XXXXXX  XXXXX    XXXX   XX  XX  XXXXX   XXX   XXXX
@@ -41,7 +41,7 @@
 #endif
 
 '' ------------------
-'' module level stuff
+'' module state
 '' ------------------
 
 #include once "fbcunit_types.bi"
@@ -75,8 +75,8 @@ dim shared fbcu_brief_summary as boolean = false
 private sub print_output( byref s as const string = "" )
 
 	/'
-		1)	the crt call to fprintf is in another module, just 
-			personal preference that we don't include "crt.bi" 
+		1)	the crt call to fprintf is in another module, just
+			personal preference that we don't include "crt.bi"
 			and all it's symbols in this module and keep this
 			source mostly basic like
 
@@ -95,7 +95,7 @@ private sub print_output( byref s as const string = "" )
 end sub
 
 '' --------------------
-'' hash for suite names
+'' suite-name hash module state
 '' --------------------
 
 declare function hash_compute ( byval s as const zstring ptr ) as uinteger
@@ -112,7 +112,8 @@ dim shared hash_size as integer = 0
 dim shared hash_count as integer = 0
 
 private function hash_compute ( byval s as const zstring ptr ) as uinteger
-	dim index as uinteger = 0, n as integer = len( *s )
+	dim index as uinteger = 0
+	dim n as integer = len( *s )
 	for i as integer = 0 to n-1
 		index += s[i] + ( index shl 3 )
 	next i
@@ -126,12 +127,15 @@ private sub hash_grow()
 		hash_size *= 2
 	end if
 	redim hash(0 to hash_size-1) as integer
+	'' Reinsertions below rebuild the count for the new table.  Keeping the
+	'' old count can recursively grow a half-empty table and corrupt its state.
+	hash_count = 0
 	for index as integer = 0 to hash_size-1
 		hash(index) = 0
 	next
 	for index as integer = 1 to fbcu_suites_count
 		hash_add( strptr(fbcu_suites(index).name_nocase), index )
-	next 
+	next
 end sub
 
 '' returns index in to hash()
@@ -207,17 +211,18 @@ namespace fbcu
 			byval init_proc as function cdecl ( ) as long = FBCU_NULL, _
 			byval term_proc as function cdecl ( ) as long = FBCU_NULL _
 		)
-		
+
 		fbcu_suite_index = find_suite( suite_name )
 
 		if( fbcu_suite_index <> INVALID_INDEX ) then
 			with fbcu_suites( fbcu_suite_index )
 				if( init_proc ) then
-					'' !!! FIXME !!! - if suite was already added we should generate an error or keep a list of init procs
+					'' A repeated suite declaration replaces its initialization
+					'' callback because each suite stores only one callback.
 					.init_proc = init_proc
 				end if
 				if( term_proc ) then
-					'' !!! FIXME !!! - if suite was already added we should generate an error or keep a list of cleanup procs
+					'' Cleanup callbacks follow the same single-owner rule.
 					.term_proc = term_proc
 				end if
 			end with
@@ -283,11 +288,11 @@ namespace fbcu
 			byval test_proc as sub cdecl ( ), _
 			byval is_global as boolean = false _
 		)
-		
+
 		if( is_global ) then
 			fbcu_suite_index = fbcu_suite_default_index
 		end if
-		
+
 		fbcu_suite_index = find_suite( suite_name )
 
 		if( fbcu_suite_index = INVALID_INDEX ) then
@@ -301,7 +306,7 @@ namespace fbcu
 			fbcu_tests_max = fbcu_tests_max * 2
 			redim preserve fbcu_tests( 1 to fbcu_tests_max ) as FBCU_TEST
 		end if
-			
+
 		fbcu_tests_count += 1
 		fbcu_test_index = fbcu_tests_count
 
@@ -352,11 +357,11 @@ namespace fbcu
 			byval msg as zstring ptr _
 		)
 
-		if( fbcu_suite_index = INVALID_INDEX ) then	
+		if( fbcu_suite_index = INVALID_INDEX ) then
 			add_suite( )
 		end if
 
-		if( fbcu_test_index = INVALID_INDEX ) then	
+		if( fbcu_test_index = INVALID_INDEX ) then
 			add_test( )
 		end if
 
@@ -459,8 +464,8 @@ namespace fbcu
 		if( fbcu_tests_count > 0 ) then
 
 			dim test_suite_index(1 to fbcu_tests_count) as integer
-			for fbcu_tests_count as integer = 1 to fbcu_tests_count
-				test_suite_index(fbcu_tests_count) = INVALID_INDEX
+			for initial_test_index as integer = 1 to fbcu_tests_count
+				test_suite_index(initial_test_index) = INVALID_INDEX
 			next
 
 			for suite_index as integer = 1 to fbcu_suites_count
@@ -497,7 +502,7 @@ namespace fbcu
 
 	''
 	function write_report_xml _
-		( _ 
+		( _
 			byval filename as const zstring ptr _
 		) as boolean
 
@@ -634,7 +639,7 @@ namespace fbcu
 
 						with fbcu_tests( fbcu_test_index )
 
-							'' reset stats							
+							'' reset stats
 							.assert_count = 0
 							.assert_pass_count = 0
 							.assert_fail_count = 0
@@ -707,9 +712,9 @@ namespace fbcu
 		print_output( " Asserts    Passed    Failed  Suite                                      Tests" )
 		print_output( "--------  --------  --------  --------------------------------------  --------" )
 
-		for fbcu_suite_index as integer = 1 to fbcu_suites_count
+		for summary_suite_index as integer = 1 to fbcu_suites_count
 
-			with fbcu_suites( fbcu_suite_index )
+			with fbcu_suites( summary_suite_index )
 
 				t_test_count += .test_count
 				t_assert_count += .assert_count
@@ -739,7 +744,7 @@ namespace fbcu
 
 			end with
 
-		next 
+		next
 
 		print_output( "--------  --------  --------  --------------------------------------  --------" )
 
@@ -801,7 +806,7 @@ namespace fbcu
 		ia -= 1
 
 		return a - *cast( single ptr, @ia )
-		
+
 	end function
 
 	''
@@ -832,9 +837,9 @@ namespace fbcu
 
 			'' assume big diff
 			return &h7fffffff
-		
+
 		end if
-			
+
 		'' signs are the same, return |ia-ib|
 		ia and= &h7fffffff
 		ib and= &h7fffffff
@@ -916,7 +921,7 @@ namespace fbcu
 		if( dblIsNan(b) ) then
 			return &h7fffffffffffffffll
 		end if
-		
+
 		'' signs different?
 		if( (ia and &h8000000000000000ll) <> (ib and &h8000000000000000ll) ) then
 
@@ -927,9 +932,9 @@ namespace fbcu
 
 			'' assume big diff
 			return &h7fffffffffffffffll
-		
+
 		end if
-			
+
 		'' signs are the same, return |ia-ib|
 		ia and= &h7fffffffffffffffll
 		ib and= &h7fffffffffffffffll

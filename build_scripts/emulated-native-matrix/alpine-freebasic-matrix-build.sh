@@ -257,6 +257,7 @@ EOF
     run "$MAKE_CMD" \
         FBC_TARGET="$fbc_target" \
         FBTARGET_DIR_OVERRIDE="$dir_key" \
+        BOOTSTRAP_DIST_WORKTREE=1 \
         bootstrap-dist-target \
         -j"$MAKE_JOBS"
 
@@ -277,12 +278,21 @@ ALPINE_ARCHES=(
 )
 
 APK_TARGETS=(
-    "alpine|alpine:3.23|3.23|3.23|alpine-freebasic-build.sh"
-    "alpine|alpine:3.22|3.22|3.22|alpine-freebasic-build.sh"
-    "alpine|alpine:3.21|3.21|3.21|alpine-freebasic-build.sh"
+    "alpine|alpine:3.24|3.24|3.24|alpine-freebasic-build.sh"
     "alpine|alpine:edge|edge|edge|alpine-freebasic-build.sh"
     "postmarketos|adamthiede/postmarketos:edge|edge|edge|alpine-freebasic-build.sh"
 )
+
+target_arches() {
+    case "$1" in
+        postmarketos)
+            printf '%s\n' x86_64 aarch64
+            ;;
+        *)
+            printf '%s\n' "${ALPINE_ARCHES[@]}"
+            ;;
+    esac
+}
 
 docker_platform_for_arch() {
     case "$1" in
@@ -337,12 +347,12 @@ EOF
         if [ -n "$RELEASE_FILTER" ] && [ "$RELEASE_FILTER" != "$codename" ]; then
             continue
         fi
-        for arch in "${ALPINE_ARCHES[@]}"; do
+        while IFS= read -r arch; do
             if [ -n "$ARCH_FILTER" ] && [ "$ARCH_FILTER" != "$arch" ]; then
                 continue
             fi
             echo "apk|${distro}|${codename}|${arch}|${image}|${script_name}|$ROOT/out/linux/${distro}/${codename}/${arch}"
-        done
+        done < <(target_arches "$distro")
     done
     exit 0
 fi
@@ -484,9 +494,9 @@ for distro_entry in "${APK_TARGETS[@]}"; do
 $distro_entry
 EOF
 
-    for arch in "${ALPINE_ARCHES[@]}"; do
+    while IFS= read -r arch; do
         BUILD_MATRIX+=("${distro}|${image}|${tag}|${codename}|${script_name}|${arch}")
-    done
+    done < <(target_arches "$distro")
 done
 
 failures=0

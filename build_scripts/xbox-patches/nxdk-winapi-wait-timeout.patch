@@ -1,0 +1,14 @@
+diff --git a/synchapi.h b/synchapi.h
+index 582fcb3..43d352b 100644
+--- a/synchapi.h
++++ b/synchapi.h
+@@ -49,7 +49,9 @@
+ #define WAIT_ABANDONED     ((DWORD)0x00000080L) // same as STATUS_ABANDONED_WAIT_0
+ #define WAIT_IO_COMPLETION ((DWORD)0x000000C0L) // same as STATUS_USER_APC
+ #define WAIT_OBJECT_0      ((DWORD)0x00000000L) // same as STATUS_WAIT_0
++#ifndef WAIT_TIMEOUT
+ #define WAIT_TIMEOUT       ((DWORD)0x00000102L) // same as STATUS_TIMEOUT
++#endif
+ #define WAIT_FAILED        ((DWORD)0xFFFFFFFFL)
+ 
+ VOID Sleep (DWORD dwMilliseconds);

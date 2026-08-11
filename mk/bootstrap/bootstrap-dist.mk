@@ -64,34 +64,29 @@ bootstrap-dist-target: bootstrap-check bootstrap-emit
 	@$(MAKE) clean-example-artifacts
 
 	#
-	# The rsync fallback is used when the source tree is not a git checkout.
-	# In that mode we must avoid staging generated build output such as
-	# previous package trees, test scratch directories, and prior bootstrap
-	# staging roots. Including them makes the archive much larger than the
-	# real source bootstrap payload and can recursively drag prior staging
-	# content into new archives.
+	# Worktree releases and trees without Git metadata are copied through the
+	# source filter.  This includes modified, added, untracked, and deleted
+	# source exactly as it exists while keeping generated build output out of
+	# the archive.
 	#
 	rm -rf "$(BOOTSTRAP_STAGE_ROOT)"
 	mkdir -p "$(BOOTSTRAP_STAGE_ROOT)"
 
-	@if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
-		if [ "$(BOOTSTRAP_DIST_WORKTREE)" = "1" ]; then \
-			echo "==> Packaging sources via git archive plus worktree changes"; \
-			changed="$$(mktemp)"; \
-			git archive --format=tar --prefix="$(BOOTSTRAP_TITLE)/" HEAD | tar -C "$(BOOTSTRAP_STAGE_ROOT)" -xf -; \
-			git diff --name-only -z --diff-filter=ACMRT HEAD -- > "$$changed"; \
-			if [ -s "$$changed" ]; then \
-				tar -cf - --null -T "$$changed" | tar -C "$(BOOTSTRAP_STAGE_DIR)" -xf -; \
-			fi; \
-			rm -f "$$changed"; \
-		else \
-			echo "==> Packaging sources via git archive"; \
-			git archive --format=tar --prefix="$(BOOTSTRAP_TITLE)/" HEAD | tar -C "$(BOOTSTRAP_STAGE_ROOT)" -xf -; \
-		fi; \
+	@if [ "$(BOOTSTRAP_DIST_WORKTREE)" = "1" ]; then \
+		echo "==> Packaging sources via filtered working tree"; \
+		mkdir -p "$(BOOTSTRAP_STAGE_DIR)"; \
+		rsync -a $(BOOTSTRAP_RSYNC_EXCLUDES) \
+			--exclude="/bootstrap/*/" \
+			./ "$(BOOTSTRAP_STAGE_DIR)/"; \
+	elif command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
+		echo "==> Packaging sources via git archive"; \
+		git archive --format=tar --prefix="$(BOOTSTRAP_TITLE)/" HEAD | tar -C "$(BOOTSTRAP_STAGE_ROOT)" -xf -; \
 	else \
 		echo "==> Packaging sources via rsync"; \
 		mkdir -p "$(BOOTSTRAP_STAGE_DIR)"; \
-		rsync -a $(BOOTSTRAP_RSYNC_EXCLUDES) ./ "$(BOOTSTRAP_STAGE_DIR)/"; \
+		rsync -a $(BOOTSTRAP_RSYNC_EXCLUDES) \
+			--exclude="/bootstrap/*/" \
+			./ "$(BOOTSTRAP_STAGE_DIR)/"; \
 	fi
 
 	mkdir -p "$(BOOTSTRAP_STAGE_DIR)/bootstrap/$(BOOTSTRAP_DIR)"

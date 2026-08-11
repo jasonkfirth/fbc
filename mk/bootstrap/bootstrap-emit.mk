@@ -120,18 +120,6 @@ BOOTSTRAP_COMPAT_DEFINES :=
 ifeq ($(BOOTSTRAP_ARCH),aarch64)
 BOOTSTRAP_COMPAT_DEFINES += -d __FB_AARCH64__
 endif
-ifeq ($(BOOTSTRAP_ARCH),riscv32)
-BOOTSTRAP_COMPAT_DEFINES += -d __FB_RISCV32__
-endif
-ifeq ($(BOOTSTRAP_ARCH),riscv64)
-BOOTSTRAP_COMPAT_DEFINES += -d __FB_RISCV64__
-endif
-ifeq ($(BOOTSTRAP_ARCH),s390x)
-BOOTSTRAP_COMPAT_DEFINES += -d __FB_S390X__
-endif
-ifeq ($(BOOTSTRAP_ARCH),loongarch64)
-BOOTSTRAP_COMPAT_DEFINES += -d __FB_LOONGARCH64__
-endif
 
 ##############################################################################
 # Determine emission target

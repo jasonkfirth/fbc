@@ -312,6 +312,7 @@ build_bootstrap_tarball() {
     run "$MAKE_CMD" \
         FBC_TARGET="$FBC_TARGET" \
         FBTARGET_DIR_OVERRIDE="$BOOTKEY" \
+        BOOTSTRAP_DIST_WORKTREE=1 \
         bootstrap-dist-target \
         -j"$JOBS"
 
@@ -403,6 +404,13 @@ pset (8, 8), 12
 print "gfx screen 13"
 screen 0
 EOF
+        cat > .package-smoke/gfx3-screen13.bas <<'EOF'
+screen 13
+screenset 0, 0
+pset (8, 8), 12
+print "gfxlib3 screen 13"
+screen 0
+EOF
         cat > .package-smoke/sfx.bas <<'EOF'
 print "sfx-start"
 play "ABCDEFG"
@@ -411,6 +419,7 @@ EOF
         run bin/fbc -v -prefix "$BUILDDIR" .package-smoke/console.bas -x .package-smoke/console
         run bin/fbc -v -prefix "$BUILDDIR" .package-smoke/gfx.bas -x .package-smoke/gfx
         run bin/fbc -v -prefix "$BUILDDIR" .package-smoke/gfx-screen13.bas -x .package-smoke/gfx-screen13
+        run bin/fbc -v -prefix "$BUILDDIR" -i inc -gfx3 .package-smoke/gfx3-screen13.bas -x .package-smoke/gfx3-screen13
         run bin/fbc -v -prefix "$BUILDDIR" .package-smoke/sfx.bas -x .package-smoke/sfx
         (
             cd examples/sfxlib

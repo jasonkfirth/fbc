@@ -7,37 +7,32 @@ Build-Depends:
  binutils,
  dos2unix,
  git,
- make,
  pkgconf,
  xz-utils,
  libncurses-dev,
- libtinfo-dev,
  libgpm-dev,
  libffi-dev,
  libasound2-dev,
  libpulse-dev,
- libgl1-mesa-dev | libgl-dev,
+ libgl-dev,
  libx11-dev,
  libxext-dev,
  libxrender-dev,
  libxrandr-dev,
  libxpm-dev,
- emscripten <!nojs>,
- nodejs <!nojs>,
- openjdk-17-jdk-headless <android>,
- android-sdk <android>,
- android-sdk-platform-tools <android>,
- android-sdk-build-tools <android>,
- dalvik-exchange <android>,
- android-sdk-platform-23 <android> | google-android-platform-26-installer <android>,
- google-android-ndk-r28-installer <android>,
- aapt <android>,
- apksigner <android>,
- zip <android>,
- unzip <android>,
- devkitppc <wii>,
- libogc <wii>,
- gamecube-tools <wii>
+ emscripten <!pkg.freebasic.nojs>,
+ nodejs <!pkg.freebasic.nojs>,
+ openjdk-17-jdk-headless <pkg.freebasic.android>,
+ android-sdk <pkg.freebasic.android>,
+ android-sdk-platform-tools <pkg.freebasic.android>,
+ android-sdk-build-tools <pkg.freebasic.android>,
+ dalvik-exchange <pkg.freebasic.android>,
+ android-sdk-platform-23 <pkg.freebasic.android> | google-android-platform-26-installer <pkg.freebasic.android>,
+ google-android-ndk-r28-installer <pkg.freebasic.android>,
+ aapt <pkg.freebasic.android>,
+ apksigner <pkg.freebasic.android>,
+ zip <pkg.freebasic.android>,
+ unzip <pkg.freebasic.android>
 Standards-Version: 4.6.2
 Homepage: https://freebasic.net/
 Vcs-Browser: https://github.com/freebasic/fbc
@@ -51,7 +46,9 @@ Depends:
  ${misc:Depends},
  gcc,
  libc-dev,
- libncurses-dev
+ libncurses-dev,
+ libasound2-dev,
+ libpulse-dev
 Recommends:
  freebasic-bindings (= ${binary:Version})
 Breaks:
@@ -73,7 +70,7 @@ Section: oldlibs
 Architecture: all
 Depends:
  ${misc:Depends},
- freebasic (= ${binary:Version})
+ freebasic (>= ${source:Version})
 Description: transitional package for the FreeBASIC runtime
  This transitional package depends on freebasic, which now contains the
  compiler, runtime libraries, startup objects, and core include files needed
@@ -95,7 +92,7 @@ Section: libdevel
 Architecture: all
 Depends:
  ${misc:Depends},
- freebasic (= ${binary:Version})
+ freebasic (>= ${source:Version})
 Breaks:
  freebasic-dev (<< ${binary:Version})
 Replaces:
@@ -220,7 +217,7 @@ Description: FreeBASIC documentation and manual
 
 Package: freebasic-js
 Architecture: any
-Build-Profiles: <!nojs>
+Build-Profiles: <!pkg.freebasic.nojs>
 Depends:
  ${shlibs:Depends},
  ${misc:Depends},
@@ -235,7 +232,7 @@ Description: FreeBASIC compiler driver for Emscripten/JavaScript
 
 Package: freebasic-android
 Architecture: any
-Build-Profiles: <android>
+Build-Profiles: <pkg.freebasic.android>
 Depends:
  ${shlibs:Depends},
  ${misc:Depends},
@@ -262,13 +259,10 @@ Description: FreeBASIC compiler driver for Android APKs
 
 Package: freebasic-wii
 Architecture: any
-Build-Profiles: <wii>
+Build-Profiles: <pkg.freebasic.wii>
 Depends:
  ${shlibs:Depends},
- ${misc:Depends},
- devkitppc,
- libogc,
- gamecube-tools
+ ${misc:Depends}
 Recommends:
  dolphin-emu
 Description: FreeBASIC compiler driver for Nintendo Wii homebrew
@@ -276,12 +270,15 @@ Description: FreeBASIC compiler driver for Nintendo Wii homebrew
  defaults to the Nintendo Wii/powerpc target, plus Wii runtime libraries
  and headers needed to build libogc homebrew programs. The driver can also
  stage a boot.dol folder with relative-path assets for older game code.
+ .
+ Building programs requires devkitPPC, libogc, and gamecube-tools from an
+ official devkitPro installation under /opt/devkitpro or DEVKITPRO.
 
 Package: freebasic-nuttx
-Architecture: any
+Architecture: all
 Depends:
  ${misc:Depends},
- freebasic (= ${binary:Version}),
+ freebasic (>= ${source:Version}),
  make,
  python3,
  git,
@@ -306,7 +303,7 @@ Package: freebasic-full
 Section: metapackages
 Architecture: all
 Depends:
- freebasic (= ${binary:Version}),
+ freebasic (>= ${source:Version}),
  freebasic-bindings (= ${binary:Version}),
  freebasic-examples (= ${binary:Version}),
  freebasic-doc (= ${binary:Version}),

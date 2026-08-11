@@ -4,10 +4,12 @@
 
 FBCALL int fb_ExecEx( FBSTRING *program, FBSTRING *args, int do_fork )
 {
-    char buffer[MAX_PATH+1], empty_arguments[] = "", *arguments;
+    char buffer[MAX_PATH+1], *arguments;
     int	res = 0, got_program;
     size_t len_arguments;
-#ifndef HOST_MINGW
+#ifdef HOST_MINGW
+    char empty_arguments[] = "";
+#else
     size_t len_program;
 #endif
 

@@ -697,6 +697,7 @@ copy_msys_runtime() {
 	copy_msys_tool uname "$dst"
 	copy_msys_tool env "$dst"
 	copy_msys_tool sh "$dst"
+	copy_msys_tool bsdtar "$dst"
 	mkdir -p "$DISTROOT/toolchain/msys2/tmp"
 }
 
@@ -875,11 +876,16 @@ $androidHome = Join-Path $root "toolchain\android-sdk"
 $cmdlineTools = Join-Path $androidHome "cmdline-tools"
 $cmdlineRoot = Join-Path $cmdlineTools "latest"
 $sdkmanager = Join-Path $cmdlineRoot "bin\sdkmanager.bat"
+$archiveTool = Join-Path $root "toolchain\msys2\usr\bin\bsdtar.exe"
 $javaHome = Join-Path $root "toolchain\java"
 $javaExe = Join-Path $javaHome "bin\java.exe"
 
 if (-not (Test-Path -LiteralPath $javaExe)) {
 	Die "Java runtime is missing: $javaHome"
+}
+
+if (-not (Test-Path -LiteralPath $archiveTool)) {
+	Die "Android SDK archive tool is missing: $archiveTool"
 }
 
 $downloadUrl = EnvOrDefault "ANDROID_CMDLINE_TOOLS_URL" "https://dl.google.com/android/repository/commandlinetools-win-13114758_latest.zip"
@@ -896,7 +902,17 @@ if (-not (Test-Path -LiteralPath $sdkmanager)) {
 
 		Remove-Item -Recurse -Force -ErrorAction SilentlyContinue -LiteralPath $cmdlineTools
 		New-Item -ItemType Directory -Force -Path $cmdlineTools | Out-Null
-		Expand-Archive -Force -Path $zipFile -DestinationPath $cmdlineTools
+
+		<#
+			Google's archive contains paths that exceed the legacy Windows
+			MAX_PATH limit when the package is installed in a deep directory.
+			The bundled bsdtar handles those paths and explicit ZIP directory
+			entries correctly on Windows PowerShell 5.1.
+		#>
+		& $archiveTool -xf $zipFile -C $cmdlineTools
+		if ($LASTEXITCODE -ne 0) {
+			exit $LASTEXITCODE
+		}
 
 		$innerRoot = Join-Path $cmdlineTools "cmdline-tools"
 		if (Test-Path -LiteralPath $innerRoot) {
@@ -1121,6 +1137,7 @@ create_installer() {
 	local terms_notice="$BUILDROOT/android-sdk-terms-notice.txt"
 	local out_win
 	local payload_win
+	local refresh_environment_win
 	local terms_notice_win
 
 	[ "$SKIP_INSTALLER" -eq 0 ] || return 0
@@ -1164,6 +1181,7 @@ EOF
 	)
 
 	payload_win="$(cygpath -aw "$installer_payload_zip")"
+	refresh_environment_win="$(cygpath -aw "$ROOT/build_scripts/windows-refresh-environment.ps1")"
 	terms_notice_win="$(cygpath -aw "$terms_notice")"
 
 	msg "Generating NSIS installer script"
@@ -1194,11 +1212,15 @@ ShowUninstDetails show
 \${Using:StrFunc} UnStrRep
 
 Function RefreshEnvironment
-	System::Call 'User32::SendMessageTimeoutA(i 0xffff, i \${WM_SETTINGCHANGE}, i 0, t "Environment", i 0, i 5000, *i .r0)'
+	SetOutPath "\$TEMP"
+	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
+	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
 FunctionEnd
 
 Function un.RefreshEnvironment
-	System::Call 'User32::SendMessageTimeoutA(i 0xffff, i \${WM_SETTINGCHANGE}, i 0, t "Environment", i 0, i 5000, *i .r0)'
+	SetOutPath "\$TEMP"
+	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
+	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
 FunctionEnd
 
 Function AddOnePath

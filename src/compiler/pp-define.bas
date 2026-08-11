@@ -181,15 +181,24 @@ private sub hTrimMacroArg _
 		if( is_wide ) then
 			if( .textw.data ) then
 				if( (.textw.data[0][0] = CHAR_SPACE) or _
-				    (.textw.data[0][len( *.textw.data )-1] = CHAR_SPACE) ) then
-					DWstrAssign( .textw, trim( *.textw.data ) )
+				    (.textw.data[0][0] = CHAR_TAB) or _
+				    (.textw.data[0][len( *.textw.data )-1] = CHAR_SPACE) or _
+				    (.textw.data[0][len( *.textw.data )-1] = CHAR_TAB) ) then
+					'' Macro indentation is lexical whitespace.  Preserve internal
+					'' tabs, but do not let leading or trailing indentation become
+					'' part of an argument expanded across a line continuation.
+					DWstrAssign( .textw, trim( *.textw.data, _
+					                          any wchr( CHAR_SPACE, CHAR_TAB ) ) )
 				end if
 			end if
 		else
 			if( .text.data ) then
 				if( (.text.data[0][0] = CHAR_SPACE) or _
-				    (.text.data[0][len( *.text.data )-1] = CHAR_SPACE) ) then
-					DZstrAssign( .text, trim( *.text.data ) )
+				    (.text.data[0][0] = CHAR_TAB) or _
+				    (.text.data[0][len( *.text.data )-1] = CHAR_SPACE) or _
+				    (.text.data[0][len( *.text.data )-1] = CHAR_TAB) ) then
+					DZstrAssign( .text, trim( *.text.data, _
+					                         any chr( CHAR_SPACE, CHAR_TAB ) ) )
 				end if
 			end if
 		end if
@@ -1477,6 +1486,55 @@ private function hMatchParamEllipsis( ) as integer
 
 end function
 
+private function hMacroDefinitionsMatch _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byval tokhead as FB_DEFTOK ptr, _
+		byval params as integer, _
+		byval flags as FB_DEFINE_FLAGS _
+	) as integer
+
+	if( symbGetDefineParams( sym ) <> params ) then
+		return FALSE
+	end if
+
+	if( symbGetDefineFlags( sym ) <> flags ) then
+		return FALSE
+	end if
+
+	var oldtok = symbGetDefineHeadToken( sym )
+	var newtok = tokhead
+
+	while( (oldtok <> NULL) and (newtok <> NULL) )
+		if( symbGetDefTokType( oldtok ) <> symbGetDefTokType( newtok ) ) then
+			return FALSE
+		end if
+
+		select case as const symbGetDefTokType( oldtok )
+		case FB_DEFTOK_TYPE_PARAM, FB_DEFTOK_TYPE_PARAMSTR
+			if( symbGetDefTokParamNum( oldtok ) <> _
+			    symbGetDefTokParamNum( newtok ) ) then
+				return FALSE
+			end if
+
+		case FB_DEFTOK_TYPE_TEX
+			if( *symbGetDefTokText( oldtok ) <> *symbGetDefTokText( newtok ) ) then
+				return FALSE
+			end if
+
+		case FB_DEFTOK_TYPE_TEXW
+			if( *symbGetDefTokTextW( oldtok ) <> *symbGetDefTokTextW( newtok ) ) then
+				return FALSE
+			end if
+		end select
+
+		oldtok = symbGetDefTokNext( oldtok )
+		newtok = symbGetDefTokNext( newtok )
+	wend
+
+	return (oldtok = NULL) and (newtok = NULL)
+end function
+
 '':::::
 '' Define           =   DEFINE ID (!WHITESPC '(' ID (',' ID)* ')')? LITERAL+
 ''                  |   MACRO ID '?'? '(' ID (',' ID)* ')' Comment? EOL
@@ -1563,6 +1621,16 @@ sub ppDefine( byval ismultiline as integer )
 		if( lexGetToken( LEXCHECK_NODEFINE or LEXCHECK_NOSYMBOL ) <> CHAR_RPRNT ) then
 			lastparam = NULL
 			do
+				'' Check before allocating the next parameter.  The parameter
+				'' hash table has exactly FB_MAXDEFINEARGS entries.
+				if( params >= FB_MAXDEFINEARGS ) then
+					errReport( FB_ERRMSG_TOOMANYPARAMS )
+					'' error recovery: skip until next ')'
+					hSkipUntil( CHAR_RPRNT, TRUE )
+					symbDelDefineMacroData( NULL, paramhead )
+					exit sub
+				end if
+
 				select case as const lexGetClass( )
 				case FB_TKCLASS_IDENTIFIER, FB_TKCLASS_KEYWORD, FB_TKCLASS_QUIRKWD
 					lastparam = symbAddDefineParam( lastparam, lexGetText( ) )
@@ -1580,12 +1648,6 @@ sub ppDefine( byval ismultiline as integer )
 				lexSkipToken( LEXCHECK_NODEFINE or LEXCHECK_NOSYMBOL )
 
 				params += 1
-				if( params >= FB_MAXDEFINEARGS ) then
-					errReport( FB_ERRMSG_TOOMANYPARAMS )
-					'' error recovery: skip until next ')'
-					hSkipUntil( CHAR_RPRNT, TRUE )
-					exit sub
-				end if
 
 				if( paramhead = NULL ) then
 					paramhead = lastparam
@@ -1632,13 +1694,20 @@ sub ppDefine( byval ismultiline as integer )
 	end if
 
 	'' macro..
-	'' already defined? can't check..
+	tokhead = hReadMacroText( params, paramhead, ismultiline )
+
+	'' Parameter names are represented by argument numbers in the replacement
+	'' token list, so equivalent definitions can be compared directly even when
+	'' the repeated declaration uses different parameter names.
 	if( sym <> NULL ) then
-		errReportEx( FB_ERRMSG_DUPDEFINITION, defname )
+		if( hMacroDefinitionsMatch( sym, tokhead, params, define_flags ) = FALSE ) then
+			errReportEx( FB_ERRMSG_DUPDEFINITION, defname )
+		end if
+		symbDelDefineMacroData( tokhead, paramhead )
 	else
-		tokhead = hReadMacroText( params, paramhead, ismultiline )
 		if( symbAddDefineMacro( @defname, tokhead, params, paramhead, define_flags ) = NULL ) then
 			hReportRedefinition( NULL, @defname )
+			symbDelDefineMacroData( tokhead, paramhead )
 		end if
 	end if
 end sub

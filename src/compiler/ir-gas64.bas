@@ -885,7 +885,12 @@ private sub hOptimRewriteFromXmm _
 	)
 			if instr(prevpart1,"[")<>0 then
 				''OPTIMIZATION 3-1
-				if previnstruc="movss" orelse part1[0]=asc("e") orelse right(part1,1)="d" then
+				if part1[0]=asc("x") then
+					'' MOVD has no XMM-to-XMM form.  A store followed by a load
+					'' may collapse to a register copy when the stored value is
+					'' still live in its source XMM register.
+					instruc="movaps"
+				elseif previnstruc="movss" orelse part1[0]=asc("e") orelse right(part1,1)="d" then
 					instruc="movd"
 				else
 					instruc="movq"
@@ -2780,7 +2785,8 @@ private sub _init( )
 
 	irhlInit( )
 	'' IR_OPT_CPUSELFBOPS disabled, to prevent AST from producing self-ops.
-	irSetOption(IR_OPT_CPUBOPFLAGS or IR_OPT_MISSINGOPS or IR_OPT_CPUSELFBOPS or IR_OPT_ADDRCISC)'
+	irSetOption(IR_OPT_CPUBOPFLAGS or IR_OPT_MISSINGOPS or IR_OPT_CPUSELFBOPS or _
+	            IR_OPT_ADDRCISC or IR_OPT_64BITCPUREGS or IR_OPT_32BITBOPS)'
 
 	' dtypeName(FB_DATATYPE_INTEGER) = dtypeName(FB_DATATYPE_LONGINT)
 	'dtypeName(FB_DATATYPE_UINT   ) = dtypeName(FB_DATATYPE_ULONGINT)
@@ -7223,7 +7229,7 @@ private sub hCallQueueSystemVStackArgument _
 			if lgt>8 then
 				ofst=lgt mod 8
 				if  ofst=0 then ofst=8
-				'' TODO: Use a bounded stack allocation and memcopy() for
+				'' Future work: use a bounded stack allocation and memcopy() for
 				'' sufficiently large structures instead of emitting one
 				'' push instruction for every eight-byte chunk.
 				'' Keep structure arguments in the same reverse-emitted

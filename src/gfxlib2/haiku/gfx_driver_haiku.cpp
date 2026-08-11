@@ -95,7 +95,8 @@ extern "C" const GFXDRIVER fb_gfxDriverHaiku =
     NULL,
 
     fb_hHaikuPollEvents,
-    fb_hHaikuUpdate
+    fb_hHaikuUpdate,
+    NULL
 };
 
 #endif

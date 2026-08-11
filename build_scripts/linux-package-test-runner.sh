@@ -310,6 +310,14 @@ print "gfx screen 13"
 screen 0
 FBEOF
 
+    cat > "$smoke_dir/gfx3-screen13.bas" <<'FBEOF'
+screen 13
+screenset 0, 0
+pset (8, 8), 12
+print "gfxlib3 screen 13"
+screen 0
+FBEOF
+
     cat > "$smoke_dir/sfx.bas" <<'FBEOF'
 extern "C"
 declare function fb_sfxDeviceCurrent() as long
@@ -346,6 +354,9 @@ FBEOF
 
     echo "==> compiling gfxlib SCREEN 13 smoke"
     run fbc "$smoke_dir/gfx-screen13.bas" -x "$smoke_dir/gfx-screen13"
+
+    echo "==> compiling gfxlib3 SCREEN 13 smoke"
+    run fbc -gfx3 "$smoke_dir/gfx3-screen13.bas" -x "$smoke_dir/gfx3-screen13"
 
     echo "==> running gfxlib smoke"
     if command -v xvfb-run >/dev/null 2>&1; then

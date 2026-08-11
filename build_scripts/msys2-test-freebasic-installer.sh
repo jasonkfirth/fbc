@@ -204,11 +204,20 @@ param(
 	[string] $Installer,
 	[string] $InstallDir,
 	[string] $WorkDir,
-	[string] $Kind
+	[string] $Kind,
+	[string] $ElevationArguments
 )
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = "Stop"
+
+if ($ElevationArguments) {
+	$savedArguments = Import-Clixml -LiteralPath $ElevationArguments
+	$Installer = [string] $savedArguments.Installer
+	$InstallDir = [string] $savedArguments.InstallDir
+	$WorkDir = [string] $savedArguments.WorkDir
+	$Kind = [string] $savedArguments.Kind
+}
 
 function Fail {
 	param([string] $Message)
@@ -513,7 +522,57 @@ function Test-Xbox {
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = New-Object Security.Principal.WindowsPrincipal($identity)
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-	Fail "installer smoke tests must run from an elevated MSYS2 shell"
+	if ($ElevationArguments) {
+		Fail "installer smoke test elevation did not produce an administrator token"
+	}
+
+	#
+	# The release installers update the machine PATH and MSYS2 profile hooks,
+	# so testing the shipped executable requires the same administrator token
+	# that a normal installation requests.  Serialize the original arguments
+	# instead of rebuilding a quoted Windows command line from arbitrary paths.
+	#
+	$scriptDirectory = Split-Path -Parent $PSCommandPath
+	$elevationFile = Join-Path $scriptDirectory "installer-smoke-elevation.xml"
+	$transcriptFile = Join-Path $scriptDirectory "installer-smoke-elevated.log"
+	$currentPowerShell = (Get-Process -Id $PID).Path
+	$arguments = [pscustomobject] @{
+		Installer = $Installer
+		InstallDir = $InstallDir
+		WorkDir = $WorkDir
+		Kind = $Kind
+	}
+
+	$arguments | Export-Clixml -LiteralPath $elevationFile
+	Remove-Item -LiteralPath $transcriptFile -Force -ErrorAction SilentlyContinue
+
+	$childArguments = @(
+		"-NoProfile",
+		"-ExecutionPolicy", "Bypass",
+		"-File", $PSCommandPath,
+		"-ElevationArguments", $elevationFile
+	)
+
+	Write-Host "Requesting administrator access for the installer smoke test."
+	$child = Start-Process -FilePath $currentPowerShell `
+		-Verb RunAs `
+		-WindowStyle Hidden `
+		-ArgumentList $childArguments `
+		-Wait `
+		-PassThru
+
+	if (Test-Path -LiteralPath $transcriptFile) {
+		Get-Content -LiteralPath $transcriptFile
+	}
+	Remove-Item -LiteralPath $elevationFile -Force -ErrorAction SilentlyContinue
+
+	exit $child.ExitCode
+}
+
+$transcriptFile = $null
+if ($ElevationArguments) {
+	$transcriptFile = Join-Path (Split-Path -Parent $PSCommandPath) "installer-smoke-elevated.log"
+	Start-Transcript -LiteralPath $transcriptFile -Force | Out-Null
 }
 
 $envKeyName = "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
@@ -598,6 +657,10 @@ try {
 
 Write-Host ""
 Write-Host "Installer smoke test passed: $Installer"
+
+if ($transcriptFile) {
+	Stop-Transcript | Out-Null
+}
 EOF
 
 msg "Running installer smoke test for $(basename "$INSTALLER")"
@@ -609,7 +672,18 @@ msg "Running installer smoke test for $(basename "$INSTALLER")"
 	-Kind "$KIND"
 
 if [ "$KEEP_WORK" -eq 0 ]; then
-	rm -rf "$TESTROOT" 2>/dev/null || echo "WARNING: could not remove installer smoke workroot: $TESTROOT" >&2
+	# Compiler and antivirus processes can retain handles briefly after the
+	# elevated smoke process exits.  Give Windows time to release them before
+	# reporting that the isolated test directory could not be removed.
+	for cleanup_attempt in $(seq 1 120); do
+		rm -rf "$TESTROOT" 2>/dev/null || true
+		[ ! -e "$TESTROOT" ] && break
+		sleep 1
+	done
+
+	if [ -e "$TESTROOT" ]; then
+		echo "WARNING: could not remove installer smoke workroot: $TESTROOT" >&2
+	fi
 else
 	msg "Keeping installer smoke workroot: $TESTROOT"
 fi

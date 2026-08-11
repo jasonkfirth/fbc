@@ -981,6 +981,11 @@ fi
 
 asset_root="$tmp/assets"
 mkdir -p "$tmp/assets" "$tmp/apk/lib" "$tmp/res/values"
+if [ -d "$template/res" ]; then
+	# Project templates may contribute ordinary Android drawables and XML
+	# resources. The generated values file below remains driver-owned.
+	cp -a "$template/res/." "$tmp/res"/
+fi
 if [ -n "$asset_dir" ]; then
 	cp -a "$asset_dir/." "$asset_root"/
 	(
@@ -1026,7 +1031,7 @@ mkdir -p "$tmp/java/org/freebasic/android" "$tmp/classes" "$tmp/dex"
 cp "$template/FreeBasicNativeActivity.java" "$tmp/java/org/freebasic/android/FreeBasicNativeActivity.java"
 cp "$template/FreeBasicInputBridge.java" "$tmp/java/org/freebasic/android/FreeBasicInputBridge.java"
 cp "$template/FreeBasicInputView.java" "$tmp/java/org/freebasic/android/FreeBasicInputView.java"
-"$javac" -source 8 -target 8 -bootclasspath "$platform_jar" \
+"$javac" -source 8 -target 8 -Xlint:-options -bootclasspath "$platform_jar" \
 	-d "$tmp/classes" \
 	"$tmp/java/org/freebasic/android/FreeBasicNativeActivity.java" \
 	"$tmp/java/org/freebasic/android/FreeBasicInputBridge.java" \

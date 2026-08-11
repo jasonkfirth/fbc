@@ -204,11 +204,15 @@ BMK_MAKE_COMMON_ARGS = FBC="$(FBC)" FBC_EXTRA_CFLAGS="$(FBC_EXTRA_CFLAGS)" GCC="
 all : $(LOGLIST_ALL)
 
 # ------------------------------------------------------------------------
+# Keep one output handle open for each complete test record.  File-system
+# indexers and synchronization tools can briefly claim a newly closed file,
+# making an immediate second open for append fail even in a serial test run.
 ifneq ($(LOGLIST_COMPILE_ONLY_OK),)
 $(LOGLIST_COMPILE_ONLY_OK) : %.log : %.bas
 	@$(ECHO) "$< : TEST_MODE=COMPILE_ONLY_OK"
-	@$(ECHO) "$< : TEST_MODE=COMPILE_ONLY_OK" > $@
-	@if $(FBC) $(FBC_CFLAGS) -c $< \
+	@{ \
+	$(ECHO) "$< : TEST_MODE=COMPILE_ONLY_OK"; \
+	if $(FBC) $(FBC_CFLAGS) -c $< \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -216,7 +220,8 @@ $(LOGLIST_COMPILE_ONLY_OK) : %.log : %.bas
 		$(ECHO) "$< : RESULT=FAILED" && \
 		$(ECHO) "SRCLIST_COMPILE_ONLY_OK += $<" >> $(FAILED_LOG_TESTS_INC) && \
 		$(ABORT_CMD) \
-	; fi >> $@ 2>&1
+	; fi; \
+	} > $@ 2>&1
 endif
 
 # ------------------------------------------------------------------------
@@ -234,30 +239,33 @@ endif
 ifneq ($(LOGLIST_COMPILE_ONLY_FAIL),)
 $(LOGLIST_COMPILE_ONLY_FAIL) : %.log : %.bas
 	@$(ECHO) "$< : TEST_MODE=COMPILE_ONLY_FAIL"
-	@$(ECHO) "$< : TEST_MODE=COMPILE_ONLY_FAIL" > $@
-	@$(FBC) $(FBC_CFLAGS) -c $< >> $@ 2>&1; \
+	@{ \
+		$(ECHO) "$< : TEST_MODE=COMPILE_ONLY_FAIL"; \
+		$(FBC) $(FBC_CFLAGS) -c $<; \
 		exitcode=$$?; \
 		if [ $$exitcode -eq 0 ]; then \
-			$(ECHO) "$< : RESULT=FAILED" >> $@; \
+			$(ECHO) "$< : RESULT=FAILED"; \
 			$(RM) -f $(patsubst %.bas,%.o,$<); \
 			$(ECHO) "SRCLIST_COMPILE_ONLY_FAIL += $<" >> $(FAILED_LOG_TESTS_INC); \
 			$(ABORT_CMD); \
 		elif [ $$exitcode -eq 1 ]; then \
-			$(ECHO) "$< : RESULT=PASSED" >> $@; \
+			$(ECHO) "$< : RESULT=PASSED"; \
 		else \
-			$(ECHO) "$< : RESULT=FAILED (unexpected fbc exit code $$exitcode)" >> $@; \
+			$(ECHO) "$< : RESULT=FAILED (unexpected fbc exit code $$exitcode)"; \
 			$(RM) -f $(patsubst %.bas,%.o,$<); \
 			$(ECHO) "SRCLIST_COMPILE_ONLY_FAIL += $<" >> $(FAILED_LOG_TESTS_INC); \
 			$(ABORT_CMD); \
-		fi
+		fi; \
+	} > $@ 2>&1
 endif
 
 # ------------------------------------------------------------------------
 ifneq ($(LOGLIST_COMPILE_AND_RUN_OK),)
 $(LOGLIST_COMPILE_AND_RUN_OK) : %.log : %.bas
 	@$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_OK"
-	@$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_OK" > $@
-	@if cd . && $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_OK LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
+	@{ \
+	$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_OK"; \
+	if cd . && $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_OK LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -265,15 +273,17 @@ $(LOGLIST_COMPILE_AND_RUN_OK) : %.log : %.bas
 		$(ECHO) "$< : RESULT=FAILED" && \
 		$(ECHO) "SRCLIST_COMPILE_AND_RUN_OK += $<" >> $(FAILED_LOG_TESTS_INC) && \
 		$(ABORT_CMD) \
-	; fi >> $@ 2>&1
+	; fi; \
+	} > $@ 2>&1
 endif
 
 # ------------------------------------------------------------------------
 ifneq ($(LOGLIST_COMPILE_AND_RUN_FAIL),)
 $(LOGLIST_COMPILE_AND_RUN_FAIL) : %.log : %.bas
 	@$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_FAIL"
-	@$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_FAIL" > $@
-	@if cd . && $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_FAIL LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
+	@{ \
+	$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_FAIL"; \
+	if cd . && $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_FAIL LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -281,15 +291,17 @@ $(LOGLIST_COMPILE_AND_RUN_FAIL) : %.log : %.bas
 		$(ECHO) "$< : RESULT=FAILED" && \
 		$(ECHO) "SRCLIST_COMPILE_AND_RUN_FAIL += $<" >> $(FAILED_LOG_TESTS_INC) && \
 		$(ABORT_CMD) \
-	; fi >> $@ 2>&1
+	; fi; \
+	} > $@ 2>&1
 endif
 
 # ------------------------------------------------------------------------
 ifneq ($(LOGLIST_MULTI_MODULE_OK),)
 $(LOGLIST_MULTI_MODULE_OK)  : %.log : %.bmk
 	@$(ECHO) "$< : TEST_MODE=MULTI_MODULE_OK"
-	@$(ECHO) "$< : TEST_MODE=MULTI_MODULE_OK" > $@
-	@if cd . && $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_OK LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
+	@{ \
+	$(ECHO) "$< : TEST_MODE=MULTI_MODULE_OK"; \
+	if cd . && $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_OK LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -297,15 +309,17 @@ $(LOGLIST_MULTI_MODULE_OK)  : %.log : %.bmk
 		$(ECHO) "$< : RESULT=FAILED" && \
 		$(ECHO) "SRCLIST_MULTI_MODULE_OK += $<" >> $(FAILED_LOG_TESTS_INC) && \
 		$(ABORT_CMD) \
-	; fi >> $@ 2>&1
+	; fi; \
+	} > $@ 2>&1
 endif
 
 # ------------------------------------------------------------------------
 ifneq ($(LOGLIST_MULTI_MODULE_FAIL),)
 $(LOGLIST_MULTI_MODULE_FAIL)  : %.log : %.bmk
 	@$(ECHO) "$< : TEST_MODE=MULTI_MODULE_FAIL"
-	@$(ECHO) "$< : TEST_MODE=MULTI_MODULE_FAIL" > $@
-	@if cd . && $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_FAIL LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
+	@{ \
+	$(ECHO) "$< : TEST_MODE=MULTI_MODULE_FAIL"; \
+	if cd . && $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_FAIL LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -313,7 +327,8 @@ $(LOGLIST_MULTI_MODULE_FAIL)  : %.log : %.bmk
 		$(ECHO) "$< : RESULT=FAILED" && \
 		$(ECHO) "SRCLIST_MULTI_MODULE_FAIL += $<" >> $(FAILED_LOG_TESTS_INC) && \
 		$(ABORT_CMD) \
-	; fi >> $@ 2>&1
+	; fi; \
+	} > $@ 2>&1
 endif
 
 # ------------------------------------------------------------------------

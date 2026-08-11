@@ -141,9 +141,7 @@ public class FreeBasicNativeActivity extends NativeActivity {
 					keyboardInputView.setFocusable(true);
 					keyboardInputView.setFocusableInTouchMode(true);
 					keyboardInputView.requestFocus();
-					inputManager.showSoftInput(keyboardInputView,
-						InputMethodManager.SHOW_IMPLICIT |
-						InputMethodManager.SHOW_FORCED);
+					inputManager.showSoftInput(keyboardInputView, 0);
 				} else {
 					inputManager.hideSoftInputFromWindow(
 						keyboardInputView.getWindowToken(), 0);

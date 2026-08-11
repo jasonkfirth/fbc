@@ -298,6 +298,7 @@ EOF
         TARGET_TRIPLET="$target_triplet" \
         FBC_TARGET="$fbc_target" \
         FBTARGET_DIR_OVERRIDE="$dir_key" \
+        BOOTSTRAP_DIST_WORKTREE=1 \
         "${extra_make_args[@]}" \
         bootstrap-dist-target \
         -j"$MAKE_JOBS"
@@ -329,18 +330,10 @@ RASPBIAN_ARCHES=(
 )
 
 DISTRO_TARGETS=(
-    "ubuntu|ubuntu:22.04|22.04|jammy|debianubuntu-build-freebasic.sh"
-    "ubuntu|ubuntu:24.04|24.04|noble|debianubuntu-build-freebasic.sh"
-    "ubuntu|ubuntu:24.10|24.10|oracular|debianubuntu-build-freebasic.sh"
-    "ubuntu|ubuntu:25.04|25.04|plucky|debianubuntu-build-freebasic.sh"
-    "ubuntu|ubuntu:25.10|25.10|questing|debianubuntu-build-freebasic.sh"
     "ubuntu|ubuntu:26.04|26.04|resolute|debianubuntu-build-freebasic.sh"
-    "debian|debian:12|12|bookworm|debianubuntu-build-freebasic.sh"
     "debian|debian:13|13|trixie|debianubuntu-build-freebasic.sh"
     "debian|debian:sid|sid|sid|debianubuntu-build-freebasic.sh"
     "raspbian|badaix/raspios-lite:trixie|trixie|trixie|debianubuntu-build-freebasic.sh"
-    "raspbian|badaix/raspios-lite:bookworm|bookworm|bookworm|debianubuntu-build-freebasic.sh"
-    "raspbian|badaix/raspios-buster-armhf-lite:latest|buster|buster|debianubuntu-build-freebasic.sh"
 )
 
 docker_platform_for_arch() {

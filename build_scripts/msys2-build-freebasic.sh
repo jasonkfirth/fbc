@@ -1167,6 +1167,7 @@ create_installer() {
 	local display_name="FreeBASIC ${FBVERSION}"
 	local out_win
 	local payload_win
+	local refresh_environment_win
 
 	[ -x "$NSIS_EXE" ] || fail "makensis not found at $NSIS_EXE; install the nsis package or set NSIS_EXE"
 	have cygpath || fail "cygpath not found"
@@ -1191,6 +1192,7 @@ create_installer() {
 		run zip -qr "$installer_payload_zip" .
 	)
 	payload_win="$(cygpath -aw "$installer_payload_zip")"
+	refresh_environment_win="$(cygpath -aw "$ROOT/build_scripts/windows-refresh-environment.ps1")"
 
 	msg "Generating $package_name NSIS installer script"
 	cat > "$installer_nsi" <<EOF
@@ -1222,13 +1224,17 @@ ShowUninstDetails show
 Function RefreshEnvironment
 	;
 	; Explorer caches the environment block that new console windows inherit.
-	; After changing the registry PATH, broadcast WM_SETTINGCHANGE through
-	; user32 so newly opened shells see the updated PATH without logoff.
-	System::Call 'User32::SendMessageTimeoutA(i 0xffff, i \${WM_SETTINGCHANGE}, i 0, t "Environment", i 0, i 5000, *i .r0)'
+	; Run the bounded notification outside the installer because window-message
+	; delivery can otherwise keep an elevated NSIS process from exiting.
+	SetOutPath "\$TEMP"
+	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
+	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
 FunctionEnd
 
 Function un.RefreshEnvironment
-	System::Call 'User32::SendMessageTimeoutA(i 0xffff, i \${WM_SETTINGCHANGE}, i 0, t "Environment", i 0, i 5000, *i .r0)'
+	SetOutPath "\$TEMP"
+	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
+	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
 FunctionEnd
 
 Function AddInstallDirToPath
