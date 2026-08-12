@@ -185,6 +185,7 @@ target_platform() {
 		*darwin*) printf 'darwin\n' ;;
 		*mingw*|*windows*) printf 'win32\n' ;;
 		*xbox*) printf 'xbox\n' ;;
+		*wii*) printf 'wii\n' ;;
 		*js*|*emscripten*) printf 'js\n' ;;
 		*nuttx*) printf 'nuttx\n' ;;
 		*linux*|'')
@@ -466,7 +467,7 @@ cleanup_objects() {
 		"$ROOT/src/gfxlib3/obj/$key" \
 		"$ROOT/src/sfxlib/obj/$key" \
 		"$ROOT/lib/freebasic/$key" \
-		"$ROOT/lib/$key"
+		"$ROOT/lib/${key:?}"
 }
 
 main() {

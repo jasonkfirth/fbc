@@ -11,8 +11,8 @@ trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 # package tree, each with its own .zip archive and NSIS installer.
 ##############################################################################
 
-SELF_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
-ROOT="$(CDPATH= cd -- "$SELF_DIR/.." && pwd)"
+SELF_DIR="$(CDPATH='' cd -- "$(dirname "$0")" && pwd)"
+ROOT="$(CDPATH='' cd -- "$SELF_DIR/.." && pwd)"
 
 cd "$ROOT"
 
@@ -928,7 +928,7 @@ copy_arch_toolchain() {
 	fi
 
 	if [ -x "$mingw_root/bin/gcc.exe" ]; then
-		gcc_version="$($mingw_root/bin/gcc -dumpfullversion -dumpversion)"
+		gcc_version="$("$mingw_root/bin/gcc" -dumpfullversion -dumpversion)"
 		[ -n "$gcc_version" ] || fail "could not determine GCC version for $arch"
 		gcc_libdir="$mingw_root/lib/gcc/$triplet/$gcc_version"
 		gcc_support_dir="$package_root/bin/lib/gcc/$triplet/$gcc_version"
@@ -1228,13 +1228,14 @@ Function RefreshEnvironment
 	; delivery can otherwise keep an elevated NSIS process from exiting.
 	SetOutPath "\$TEMP"
 	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
-	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
+	; Start PowerShell directly so Windows shell activation cannot block NSIS.
+	Exec '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"'
 FunctionEnd
 
 Function un.RefreshEnvironment
 	SetOutPath "\$TEMP"
 	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
-	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
+	Exec '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"'
 FunctionEnd
 
 Function AddInstallDirToPath

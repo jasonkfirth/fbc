@@ -16,8 +16,8 @@ trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 # accepts Google's Android SDK terms.
 ##############################################################################
 
-SELF_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
-ROOT="$(CDPATH= cd -- "$SELF_DIR/.." && pwd)"
+SELF_DIR="$(CDPATH='' cd -- "$(dirname "$0")" && pwd)"
+ROOT="$(CDPATH='' cd -- "$SELF_DIR/.." && pwd)"
 
 cd "$ROOT"
 
@@ -1214,13 +1214,14 @@ ShowUninstDetails show
 Function RefreshEnvironment
 	SetOutPath "\$TEMP"
 	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
-	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
+	; Launch directly so Windows shell activation cannot hold the installer open.
+	Exec '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"'
 FunctionEnd
 
 Function un.RefreshEnvironment
 	SetOutPath "\$TEMP"
 	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
-	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
+	Exec '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"'
 FunctionEnd
 
 Function AddOnePath

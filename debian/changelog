@@ -3,7 +3,18 @@ freebasic (1.20.3-1) unstable; urgency=medium
   * Package the 1.20.3 release with the new gfxlib3 runtime, expanded
     QuickBASIC SCREEN compatibility, dependency-free PNG I/O, and current
     sfxlib MIDI and mixer work.
+  * Use SDL dummy video and audio drivers for automated DOSBox-X package
+    tests on headless Linux release builders, and accept DOS executable
+    payloads without irrelevant Unix execute bits during resumed tests;
+    install the package providing sfdisk and exercise normal compiler cleanup
+    rather than preserving intermediates.  Use DOSBox-X shell redirection for
+    suite logs, verify all compiled test executables before audio analysis,
+    use deterministic capture cycles and uninterruptible delays for continuous
+    DMA evidence, and test the supported MUSIC and raw-stream APIs instead of
+    nonexistent AUDIO and STREAM commands.
   * Stop the NuttX SDK package referencing a retired RP2350 firmware wrapper.
+  * Keep release architecture selection, package discovery, cleanup roots,
+    compiler flag arrays, and path setup clean under strict ShellCheck.
   * Skip the unavailable Ubuntu Jammy riscv64 multiarch package lane.
   * Avoid duplicate target CPU-family definitions in RISC-V, s390x, and
     LoongArch cross-compiler builds.
@@ -20,10 +31,18 @@ freebasic (1.20.3-1) unstable; urgency=medium
     compiler so packaged SOUND and sfxlib programs link on a fresh install.
   * Elevate machine-wide Windows installer smoke tests automatically while
     retaining their validation transcript and restoring PATH/profile state.
+  * Launch the bounded Explorer environment-refresh helper directly from NSIS
+    so Windows shell activation cannot leave a completed installer hung.
   * Keep generated APKs, NuttX test output, probe tools, and Python caches out
     of isolated source and bootstrap worktrees.
   * Keep generated test executables and release output backups out of source
     packages, and package filtered working-tree changes in bootstrap archives.
+  * Validate normal Debian and Ubuntu armhf packages against their ARMv7
+    hard-float baseline while reserving the ARMv6 check for Raspbian.
+  * Serialize gfxlib2 BMP headers and pixels in little-endian order and decode
+    BMP pixels and bitfield masks without host-endian loads, fixing BSAVE and
+    BLOAD on big-endian targets such as s390x.  Keep the union and BMP command
+    sweeps endian-neutral and verify the loaded pixel value.
   * Keep release-monitor PID and status files out of source packages, and
     reject an archive if transient process state bypasses staging filters.
   * Limit release package matrices to each distribution's current stable and
@@ -33,6 +52,10 @@ freebasic (1.20.3-1) unstable; urgency=medium
   * Require NuttX, Wii, and Xbox artifacts from the Resolute x86_64 row,
     staging Wii build tools from a pinned official devkitPPC image when
     Ubuntu does not package devkitPro.
+  * Mount a resolved shared artifact directory at /work/out so Docker builds
+    work when the release tree uses an out symlink to conserve disk space.
+  * Exclude that root out path when it is a symlink as well as a directory,
+    and reject any source archive that still contains it.
   * Expose staged devkitPPC binaries to the makefile's early cross-toolchain
     probe, retain the libogc include path while clearing host build flags, and
     keep optimization enabled for libogc's always-inline clock helpers.
@@ -43,10 +66,25 @@ freebasic (1.20.3-1) unstable; urgency=medium
     those generated files bypass cleanup.
   * Build the multithreaded Xbox runtime selected by the compiler's default
     Xbox mode so installed packages link normal programs successfully.
+  * Complete Wii runtime support for condition variables, file copying, FRE,
+    serial stubs, EXEC/RUN/CHAIN, SHELL, and date/time setters, and make the
+    Wii Exampleageddon sweep exercise the multithreaded runtime while
+    classifying NuttX and unavailable libffi THREADCALL examples correctly.
+  * Invoke native Wii archive tools directly from their Windows trampolines
+    so packaged builds do not depend on a second MSYS drive-mount table, and
+    isolate generated tool trampolines between parallel compiler processes;
+    include mktemp in the bundled command set required by those trampolines.
+  * Keep unrelated PATH entries from contaminating the packaged Xbox Clang
+    runtime, stage sfxlib sources and regenerate log-test manifests in the
+    isolated tree, compile and link Xbox single-module tests in one invocation
+    so automatic gfxlib and sfxlib selection reaches the XBE link, and preserve
+    the actual failure result in shortened test reports.
   * Complete every gfxlib2 platform driver callback table with an explicit
     resize slot, removing strict GCC missing-initializer warnings.
   * Run pedantic Lintian on complete package sets and fail release rows on
     errors or warnings.
+  * Install nested Xbox sidecar packages during Linux package validation,
+    check the installed NuttX and Wii launchers, and link an Xbox smoke XBE.
   * Group Android cross-architecture runtime overrides so host-matching
     Android targets do not leave unused Lintian overrides.
   * Set each staged package's target distribution, use Jammy's supported
@@ -81,6 +119,28 @@ freebasic (1.20.3-1) unstable; urgency=medium
     validation so tests link the installed package archives being qualified.
   * Restrict the Ubuntu Android package to amd64, the only architecture for
     which Ubuntu publishes Google's required Android NDK host toolchain.
+  * Use Termux's absolute Bash path in the public Android bootstrap so a
+    curl-downloaded copy can be executed directly on the phone.
+  * Build Android APKs on ARM64 phones with a native ARM64 Ubuntu compiler
+    and Termux's Clang, NDK sysroot, AAPT2, D8, APK signer, and Java tools,
+    removing the QEMU and x86_64 host-tool requirement; keep the launch smoke
+    alive with an uninterruptible FreeBASIC delay.
+  * Repair dependency-forced Android package state before adding Ubuntu host
+    tools, install the checksum utility required by fresh SDK downloads, and
+    use Termux's CA bundle on Android releases with obsolete system roots.
+  * Pause the sfxlib worker while the MIDI rate test records exact mixer frame
+    offsets, removing a scheduling-dependent ARM64 validation failure.
+  * Include failed fbctest detail logs and required sfxlib source inputs in
+    emulated package-test worktrees.
+  * Compile and link the threaded TCP test in one multithreaded invocation.
+  * Use unique Windows installer-test roots, retry transient cleanup, and
+    remove generated compiler files while the elevated token still owns them.
+  * Prefer the bundled devkitPPC over stale host settings, resolve Windows
+    tool names to their real .exe paths, and clean target-neutral fbcunit
+    objects with Wii settings before package validation so desktop objects
+    cannot reach the PowerPC linker.
+  * Restrict the gas64 single-precision branch regression test to x86-64 so
+    native ARM64 package validation does not select an incompatible backend.
 
  -- SJ_Zero <sj@fbxl.net>  Thu, 30 Jul 2026 05:06:38 -0400
 

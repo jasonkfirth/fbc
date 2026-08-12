@@ -27,8 +27,8 @@
 set -euo pipefail
 trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 
-SELF_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
-ROOT="$(CDPATH= cd -- "$SELF_DIR/.." && pwd)"
+SELF_DIR="$(CDPATH='' cd -- "$(dirname "$0")" && pwd)"
+ROOT="$(CDPATH='' cd -- "$SELF_DIR/.." && pwd)"
 
 cd "$ROOT"
 
@@ -146,6 +146,23 @@ safe_name()
 	printf '%s\n' "$1" | sed -e 's/[^A-Za-z0-9_.-]/_/g'
 }
 
+remove_tree_with_retry()
+{
+	local path="$1"
+	local _cleanup_attempt
+
+	# Windows compiler and antivirus processes can retain generated files for
+	# a short time after their parent exits.  Treat that as transient both when
+	# entering and leaving a reused installer-test directory.
+	for _cleanup_attempt in $(seq 1 120); do
+		rm -rf -- "$path" 2>/dev/null || true
+		[ ! -e "$path" ] && return 0
+		sleep 1
+	done
+
+	return 1
+}
+
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--installer)
@@ -187,7 +204,10 @@ case "$KIND" in
 	*) fail "unsupported installer kind: $KIND" ;;
 esac
 
-TESTROOT="$WORKROOT/$(safe_name "$(basename "$INSTALLER" .exe)")"
+# A previous elevated compiler may have left files that the unelevated caller
+# cannot inspect or remove.  Give every invocation its own root so stale ACLs
+# cannot block a later release test or a concurrent package lane.
+TESTROOT="$WORKROOT/$(safe_name "$(basename "$INSTALLER" .exe)")-${BASHPID}"
 INSTALLDIR="$TESTROOT/install"
 TESTDIR="$TESTROOT/work"
 PS1="$TESTROOT/installer-smoke.ps1"
@@ -196,7 +216,8 @@ case "$INSTALLDIR" in
 	*" "*) fail "installer smoke workroot cannot contain spaces: $INSTALLDIR" ;;
 esac
 
-rm -rf "$TESTROOT"
+remove_tree_with_retry "$TESTROOT" || \
+	fail "could not remove stale installer smoke workroot: $TESTROOT"
 mkdir -p "$TESTDIR"
 
 cat > "$PS1" <<'EOF'
@@ -637,6 +658,11 @@ try {
 	if (Test-Path -LiteralPath $InstallDir) {
 		Remove-PathWithRetry $InstallDir -Recurse -NonFatal
 	}
+	if (Test-Path -LiteralPath $WorkDir) {
+		# Generated Emscripten files can inherit the elevated compiler's ACL.
+		# Remove them while this administrator token still owns the tree.
+		Remove-PathWithRetry $WorkDir -Recurse -NonFatal
+	}
 
 	if ($null -ne $oldPath) {
 		$envKey.SetValue("Path", $oldPath, $oldPathKind)
@@ -672,16 +698,7 @@ msg "Running installer smoke test for $(basename "$INSTALLER")"
 	-Kind "$KIND"
 
 if [ "$KEEP_WORK" -eq 0 ]; then
-	# Compiler and antivirus processes can retain handles briefly after the
-	# elevated smoke process exits.  Give Windows time to release them before
-	# reporting that the isolated test directory could not be removed.
-	for cleanup_attempt in $(seq 1 120); do
-		rm -rf "$TESTROOT" 2>/dev/null || true
-		[ ! -e "$TESTROOT" ] && break
-		sleep 1
-	done
-
-	if [ -e "$TESTROOT" ]; then
+	if ! remove_tree_with_retry "$TESTROOT"; then
 		echo "WARNING: could not remove installer smoke workroot: $TESTROOT" >&2
 	fi
 else

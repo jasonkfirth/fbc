@@ -192,7 +192,7 @@ if [ ! -f "${PACKAGE_ROOT}/freebasic-wii-env.sh" ]; then
     fail "missing FreeBASIC Wii package tree: ${PACKAGE_ROOT}"
 fi
 
-# shellcheck disable=SC1090
+# shellcheck disable=SC1090,SC1091
 . "${PACKAGE_ROOT}/freebasic-wii-env.sh"
 
 FBC_WII="${PACKAGE_ROOT}/fbc-wii-package.sh"
@@ -210,6 +210,20 @@ build_fbcunit()
 
     (
         cd "${ROOT_DIR}/tests"
+
+        # unit-tests.mk keeps target-neutral object names.  A desktop test run
+        # can therefore leave objects that the PowerPC linker cannot consume.
+        # Clean with the same target settings before starting the Wii build.
+        run make -f unit-tests.mk \
+            FBC="${FBC_WII}" \
+            ARCH=powerpc \
+            GEN=gcc \
+            TARGET_OS=wii \
+            TARGET_EXEEXT=.dol \
+            ENABLE_CONSOLE_OUTPUT=1 \
+            WII_DEVKITPRO="${DEVKITPRO}" \
+            WII_FB_PREFIX="${PACKAGE_ROOT}" \
+            clean
 
         run make -f unit-tests.mk -j"${JOBS}" \
             FBC="${FBC_WII}" \

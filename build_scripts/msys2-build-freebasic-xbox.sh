@@ -14,8 +14,8 @@ trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 # examples, and the nxdk tree used to build original Xbox binaries.
 ##############################################################################
 
-SELF_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
-ROOT="$(CDPATH= cd -- "$SELF_DIR/.." && pwd)"
+SELF_DIR="$(CDPATH='' cd -- "$(dirname "$0")" && pwd)"
+ROOT="$(CDPATH='' cd -- "$SELF_DIR/.." && pwd)"
 
 cd "$ROOT"
 
@@ -537,7 +537,7 @@ case "$script_path" in
 	*) script_dir="." ;;
 esac
 
-root="$(CDPATH= cd -- "$script_dir" && pwd)"
+root="$(CDPATH='' cd -- "$script_dir" && pwd)"
 NXDK_DIR="$root/nxdk"
 PATH="$root/toolchain/msys2/usr/bin:$root/bin:$NXDK_DIR/bin:$PATH"
 CLANG="$NXDK_DIR/bin/nxdk-cc"
@@ -837,7 +837,7 @@ copy_msys_runtime() {
 		llvm-ar \
 		llvm-ranlib
 	do
-		copy_tool_exe "$tool" "$bindir"
+		PATH="/usr/bin" copy_tool_exe "$tool" "$bindir"
 	done
 
 	copy_clang_resource_dir
@@ -861,7 +861,7 @@ copy_clang_resource_dir() {
 	local src
 	local dst
 
-	src="$(clang -print-resource-dir 2>/dev/null || true)"
+	src="$(PATH="/usr/bin" clang -print-resource-dir 2>/dev/null || true)"
 	if [ -n "$src" ] && have cygpath; then
 		src="$(cygpath -u "$src" 2>/dev/null || printf '%s' "$src")"
 	fi
@@ -1023,13 +1023,14 @@ ShowUninstDetails show
 Function RefreshEnvironment
 	SetOutPath "\$TEMP"
 	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
-	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
+	; Launch directly so Windows shell activation cannot hold the installer open.
+	Exec '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"'
 FunctionEnd
 
 Function un.RefreshEnvironment
 	SetOutPath "\$TEMP"
 	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
-	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
+	Exec '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"'
 FunctionEnd
 
 Function AddOnePath

@@ -117,6 +117,20 @@ static int read_bgr24_color(FILE *f, unsigned int *value)
 	return TRUE;
 }
 
+static uint16_t load_le16_bytes(const unsigned char *src)
+{
+	return (uint16_t)((uint16_t)src[0] |
+	                  ((uint16_t)src[1] << 8));
+}
+
+static uint32_t load_le32_bytes(const unsigned char *src)
+{
+	return (uint32_t)src[0] |
+	       ((uint32_t)src[1] << 8) |
+	       ((uint32_t)src[2] << 16) |
+	       ((uint32_t)src[3] << 24);
+}
+
 static int read_le32_bytes(FILE *f, unsigned int *value)
 {
 	unsigned int b0, b1, b2, b3;
@@ -165,36 +179,36 @@ static void convert_8to32(const unsigned char *src, unsigned char *dest, int w, 
 
 static void convert_bf_16to16(const unsigned char *src, unsigned char *dest, int w, const uint32_t *masks, const int *shifts, const int *bits)
 {
-	uint32_t r, g, b;
-	uint16_t *s = (uint16_t *)src;
+	uint32_t r, g, b, value;
 	uint16_t *d = (uint16_t *)dest;
 	for (; w; w--) {
-		r = (*s >> shifts[0]) & masks[0];
-		g = (*s >> shifts[1]) & masks[1];
-		b = (*s >> shifts[2]) & masks[2];
+		value = load_le16_bytes(src);
+		r = (value >> shifts[0]) & masks[0];
+		g = (value >> shifts[1]) & masks[1];
+		b = (value >> shifts[2]) & masks[2];
 		r = CONVERT_DEPTH(r, bits[0], 5);
 		g = CONVERT_DEPTH(g, bits[1], 6);
 		b = CONVERT_DEPTH(b, bits[2], 5);
 		*d = (r << 11) | (g << 5) | b;
-		s++;
+		src += 2;
 		d++;
 	}
 }
 
 static void convert_bf_16to32(const unsigned char *src, unsigned char *dest, int w, const uint32_t *masks, const int *shifts, const int *bits)
 {
-	uint32_t r, g, b;
-	uint16_t *s = (uint16_t *)src;
+	uint32_t r, g, b, value;
 	uint32_t *d = (uint32_t *)dest;
 	for (; w; w--) {
-		r = (*s >> shifts[0]) & masks[0];
-		g = (*s >> shifts[1]) & masks[1];
-		b = (*s >> shifts[2]) & masks[2];
+		value = load_le16_bytes(src);
+		r = (value >> shifts[0]) & masks[0];
+		g = (value >> shifts[1]) & masks[1];
+		b = (value >> shifts[2]) & masks[2];
 		r = CONVERT_DEPTH(r, bits[0], 8);
 		g = CONVERT_DEPTH(g, bits[1], 8);
 		b = CONVERT_DEPTH(b, bits[2], 8);
 		*d = (255 << 24) | (r << 16) | (g << 8) | b;
-		s++;
+		src += 2;
 		d++;
 	}
 }
@@ -239,37 +253,37 @@ static void convert_bf_24to32(const unsigned char *src, unsigned char *dest, int
 
 static void convert_bf_32to16(const unsigned char *src, unsigned char *dest, int w, const uint32_t *masks, const int *shifts, const int *bits)
 {
-	uint32_t r, g, b;
-	uint32_t *s = (uint32_t *)src;
+	uint32_t r, g, b, value;
 	uint16_t *d = (uint16_t *)dest;
 	for (; w; w--) {
-		r = (*s >> shifts[0]) & masks[0];
-		g = (*s >> shifts[1]) & masks[1];
-		b = (*s >> shifts[2]) & masks[2];
+		value = load_le32_bytes(src);
+		r = (value >> shifts[0]) & masks[0];
+		g = (value >> shifts[1]) & masks[1];
+		b = (value >> shifts[2]) & masks[2];
 		r = CONVERT_DEPTH(r, bits[0], 5);
 		g = CONVERT_DEPTH(g, bits[1], 6);
 		b = CONVERT_DEPTH(b, bits[2], 5);
 		*d++ = (r << 11) | (g << 5) | b;
-		s++;
+		src += 4;
 	}
 }
 
 static void convert_bf_32to32(const unsigned char *src, unsigned char *dest, int w, const uint32_t *masks, const int *shifts, const int *bits)
 {
-	uint32_t r, g, b, a;
-	uint32_t *s = (uint32_t *)src;
+	uint32_t r, g, b, a, value;
 	uint32_t *d = (uint32_t *)dest;
 	for (; w; w--) {
-		r = (*s >> shifts[0]) & masks[0];
-		g = (*s >> shifts[1]) & masks[1];
-		b = (*s >> shifts[2]) & masks[2];
-		a = (*s >> shifts[3]) & masks[3];
+		value = load_le32_bytes(src);
+		r = (value >> shifts[0]) & masks[0];
+		g = (value >> shifts[1]) & masks[1];
+		b = (value >> shifts[2]) & masks[2];
+		a = (value >> shifts[3]) & masks[3];
 		r = CONVERT_DEPTH(r, bits[0], 8);
 		g = CONVERT_DEPTH(g, bits[1], 8);
 		b = CONVERT_DEPTH(b, bits[2], 8);
 		if (masks[3]) a = CONVERT_DEPTH(a, bits[3], 8);
 		*d++ = (a << 24) | (r << 16) | (g << 8) | b;
-		s++;
+		src += 4;
 	}
 }
 
@@ -459,7 +473,9 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 	expand = (biBitCount < 8) ? biBitCount : 0;
 	if (biCompression == BI_BITFIELDS) {
 		if (biSize < 56) {
-			if (!fread(rgba, 12, 1, f))
+			if (!fread_32_le(&rgba[0], f) ||
+			    !fread_32_le(&rgba[1], f) ||
+			    !fread_32_le(&rgba[2], f))
 				return FB_RTERROR_FILEIO;
 		}
 	} else if (biBitCount <= 16) {

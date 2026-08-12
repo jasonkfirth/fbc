@@ -28,6 +28,8 @@
 
 declare function fb_sfxTestSetSampleRate cdecl alias "fb_sfxTestSetSampleRate" _
 	( byval sample_rate as long ) as long
+declare sub fb_sfxForegroundFeedBegin cdecl alias "fb_sfxForegroundFeedBegin" ( )
+declare sub fb_sfxForegroundFeedEnd cdecl alias "fb_sfxForegroundFeedEnd" ( )
 
 const DUMP_FILE = "sfx/midi-fm-rates.tmp"
 const DUMP_FRAMES = 250000
@@ -46,6 +48,11 @@ dim as integer window_index = 0
 SfxTestUseNullDriver()
 SfxTestSetMixerDump( DUMP_FILE, DUMP_FRAMES )
 setenviron "SFXLIB_MIDI_DRIVER=fm"
+
+' The Linux audio worker normally advances the mixer in the background.  This
+' test records exact frame offsets, so reserve the feed before initialization
+' starts that worker and keep every rendered frame under the test's control.
+fb_sfxForegroundFeedBegin()
 
 ASSERT( midi open( 0 ) = 0 )
 
@@ -95,6 +102,7 @@ for rate_index as integer = 0 to RATE_COUNT - 1
 next
 
 ASSERT( midi close() = 0 )
+fb_sfxForegroundFeedEnd()
 
 dim as integer frames = SfxTestLoadDump( DUMP_FILE, samples() )
 

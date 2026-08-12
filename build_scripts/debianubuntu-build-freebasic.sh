@@ -283,8 +283,6 @@ map_debian_arch() {
 
 map_debian_arch "$HOST_ARCH"
 TARGET_TRIPLET="$MAP_TARGET_TRIPLET"
-BOOTKEY="$MAP_BOOTKEY"
-FBC_TARGET="$MAP_FBC_TARGET"
 
 map_debian_arch "$BUILD_ARCH"
 BUILD_TARGET_TRIPLET="$MAP_TARGET_TRIPLET"
@@ -765,6 +763,7 @@ assert_orig_tarball_clean() {
                 lib/freebasic/*|\
                 lib/freebasic-wii/*/*.a|\
                 lib/freebasic-wii/*/*.o|\
+                out|\
                 out/*|\
                 package-root*/*|\
                 packages/*|\
@@ -1179,8 +1178,8 @@ package_current_target() {
         assert_removable_tree "$WORKDIR/bootstrap-from-tar"
         run mkdir -p "$WORKDIR/bootstrap-from-tar"
         run tar -xJf "$BOOTSTRAP_TAR" -C "$WORKDIR/bootstrap-from-tar" \
-            "FreeBASIC-${VERSION}-source-bootstrap-${BUILD_BOOTKEY}/bootstrap/${BUILD_BOOTKEY}"
-        bootstrap_srcdir="$WORKDIR/bootstrap-from-tar/FreeBASIC-${VERSION}-source-bootstrap-${BUILD_BOOTKEY}/bootstrap/${BUILD_BOOTKEY}"
+            "FreeBASIC-${upver}-source-bootstrap-${BUILD_BOOTKEY}/bootstrap/${BUILD_BOOTKEY}"
+        bootstrap_srcdir="$WORKDIR/bootstrap-from-tar/FreeBASIC-${upver}-source-bootstrap-${BUILD_BOOTKEY}/bootstrap/${BUILD_BOOTKEY}"
     fi
 
     run mkdir -p "$BUILDDIR/$srcdir"
@@ -1403,7 +1402,7 @@ package_current_target() {
     lintian_help="$(lintian --help 2>&1)" || die "could not query Lintian command-line options"
 
     if grep -Eq -- '(^|[[:space:]])--fail-on([=[:space:]]|$)' <<< "$lintian_help"; then
-        lintian_fail_args=(--fail-on error,warning)
+        lintian_fail_args=(--fail-on "error,warning")
     elif grep -q -- '--fail-on-warnings' <<< "$lintian_help"; then
         #
         # Raspbian Buster provides Lintian 2.15. It predates --fail-on, but

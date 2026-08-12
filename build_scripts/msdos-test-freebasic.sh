@@ -1,4 +1,28 @@
 #!/usr/bin/env bash
+#
+# Project: FreeBASIC DOS Package Validation
+# -----------------------------------------
+#
+# File: msdos-test-freebasic.sh
+#
+# Purpose:
+#
+#     Validate the packaged DOS compiler, graphics runtime, sound runtime, and
+#     media-command surface inside DOSBox-X.
+#
+# Responsibilities:
+#
+#     * stage the self-contained DOS package in a reproducible disk image
+#     * compile and execute console, SCREEN 13, Sound Blaster, and PC-speaker tests
+#     * capture emulator audio and check frequency, continuity, and completion data
+#     * reject missing compiler outputs before starting audio analysis
+#
+# This file intentionally does NOT contain:
+#
+#     * the DOS compiler or runtime build
+#     * package publication
+#     * configuration of a developer's interactive DOSBox-X installation
+#
 
 set -euo pipefail
 
@@ -31,7 +55,7 @@ compile test programs inside DOS using the packaged compiler, and verify:
   - no-BLASTER PC speaker fallback test
   - FFT, continuity, and spectral-purity checks for captured Sound Blaster and PC speaker tones
   - DOS sfxlib command and file playback coverage for BEEP, SOUND, NOTE, PLAY, TONE, NOISE,
-    SFX, MUSIC, AUDIO, STREAM, WAV playback, and MP3 playback
+    SFX, MUSIC, raw output, WAV playback, and MP3 playback
 
 Options:
   --skip-deps      Skip host dependency installation
@@ -48,6 +72,7 @@ Environment:
   DOSBOX_X_URL      DOSBox-X portable asset URL
   DOSBOX_X_ROOT     DOSBox-X download/cache directory
   DOSBOX_TIMEOUT    DOSBox-X timeout in seconds (default: 120)
+  DOSBOX_CAPTURE_CYCLES Fixed emulated CPU cycles during WAV capture (default: 20000)
   DOSBOX_CAPTURE_DIR Directory for captured WAVs (default: <workdir>/capture)
   FFMPEG_BIN        ffmpeg executable used to generate deterministic MP3 test media
 EOF
@@ -112,11 +137,34 @@ esac
 OUT="${OUT:-$ROOT/out/msdos}"
 WORKDIR="${WORKDIR:-/tmp/fbdos-test}"
 DOSBOX_TIMEOUT="${DOSBOX_TIMEOUT:-120}"
+DOSBOX_CAPTURE_CYCLES="${DOSBOX_CAPTURE_CYCLES:-20000}"
 DOSBOX_CAPTURE_DIR="${DOSBOX_CAPTURE_DIR:-$WORKDIR/capture}"
 DOSBOX_X_RELEASE_TAG="${DOSBOX_X_RELEASE_TAG:-dosbox-x-v2026.05.02-osfree}"
 DOSBOX_X_ASSET="${DOSBOX_X_ASSET:-dosbox-x-mingw64-${DOSBOX_X_RELEASE_TAG}-portable.zip}"
 DOSBOX_X_URL="${DOSBOX_X_URL:-https://github.com/joncampbell123/dosbox-x/releases/download/${DOSBOX_X_RELEASE_TAG}/${DOSBOX_X_ASSET}}"
 DOSBOX_X_ROOT="${DOSBOX_X_ROOT:-$ROOT/.build-msdos/dosbox-x}"
+
+case "$DOSBOX_CAPTURE_CYCLES" in
+	''|*[!0-9]*)
+		die "DOSBOX_CAPTURE_CYCLES must be a positive integer"
+		;;
+esac
+
+[ "$DOSBOX_CAPTURE_CYCLES" -gt 0 ] || \
+	die "DOSBOX_CAPTURE_CYCLES must be greater than zero"
+
+DOSBOX_RUN_ENV=()
+if [ "$HOST_KIND" = "linux" ] &&
+	[ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
+	# -nogui disables DOSBox-X's own controls, but SDL still initializes its
+	# video and audio backends.  Use SDL's non-rendering drivers on package
+	# builders that do not have a desktop session.
+	DOSBOX_RUN_ENV=(
+		env
+		"SDL_VIDEODRIVER=${SDL_VIDEODRIVER:-dummy}"
+		"SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-dummy}"
+	)
+fi
 
 if [ -z "${CURL_BIN+x}" ]; then
 	if [ "$HOST_KIND" = "msys2" ] && [ -x /usr/bin/curl ]; then
@@ -575,12 +623,13 @@ capture_wav_audio() {
 	fi
 
 	msg "capturing $label audio"
-	run timeout "$DOSBOX_TIMEOUT" "$DOSBOX_BIN" \
+	run timeout "$DOSBOX_TIMEOUT" "${DOSBOX_RUN_ENV[@]}" "$DOSBOX_BIN" \
 		-conf "$DOSBOX_CONF_PATH" \
 		-fastlaunch \
 		-nogui \
 		-nomenu \
 		-exit \
+		-c "cycles fixed $DOSBOX_CAPTURE_CYCLES" \
 		-c "mount d \"$DOSBOX_TEST_ROOT_PATH\"" \
 		-c "imgmount c \"$DOSBOX_IMAGE_FILE_PATH\"" \
 		-c "c:" \
@@ -588,7 +637,7 @@ capture_wav_audio() {
 		-c "set PATH=C:\\FB;C:\\DJGPP\\BIN;%PATH%" \
 		-c "set SFXLIB_DEBUG=1" \
 		"${capture_cmds[@]}" \
-		-c "DX-CAPTURE /A C:\\DJGPP\\BIN\\REDIR.EXE -eo -o D:\\$log_name C:\\$exe_name" \
+		-c "DX-CAPTURE /A C:\\$exe_name > D:\\$log_name" \
 		-c "if exist C:\\$result_name copy C:\\$result_name D:\\$result_name >NUL" \
 		-c "exit" \
 		>"$capture_log" 2>&1
@@ -608,6 +657,7 @@ install_linux_dependencies() {
 	msg "installing Linux DOS test dependencies"
 	run_root env DEBIAN_FRONTEND=noninteractive apt-get install -y \
 		dosbox-x \
+		fdisk \
 		file \
 		mtools \
 		perl \
@@ -691,16 +741,14 @@ rm -f "$IMAGE_FILE" "$TRACE_LOG" "$HELLO_LOG" "$HELLO_TXT" "$GFX_LOG" "$GFX_TXT"
 rm -f "$TEST_ROOT"/SBBEEP.* "$TEST_ROOT"/SBSOUND.* "$TEST_ROOT"/SBSNDCH.* \
 	"$TEST_ROOT"/SBNOTE.* "$TEST_ROOT"/SBPLAY.* "$TEST_ROOT"/SBPLY2.* \
 	"$TEST_ROOT"/SBNOISE.* "$TEST_ROOT"/SBSFXW.* "$TEST_ROOT"/SBSFXM.* \
-	"$TEST_ROOT"/SBMUSW.* "$TEST_ROOT"/SBMUSM.* "$TEST_ROOT"/SBAUDW.* \
-	"$TEST_ROOT"/SBAUDM.* "$TEST_ROOT"/SBSTRW.* "$TEST_ROOT"/SBSTRM.* \
+	"$TEST_ROOT"/SBMUSW.* "$TEST_ROOT"/SBMUSM.* "$TEST_ROOT"/SBRAW.* \
 	"$TEST_ROOT"/SFXCMD.BI "$TEST_ROOT"/SINE440.WAV "$TEST_ROOT"/SINE440.MP3
 rm -f "$WORKDIR/SBFFT.wav" "$WORKDIR/SBDUAL.wav" \
 	"$WORKDIR/PCSPKFFT.wav" "$WORKDIR/PCDUAL.wav"
 rm -f "$WORKDIR"/SBBEEP.wav "$WORKDIR"/SBSOUND.wav "$WORKDIR"/SBSNDCH.wav \
 	"$WORKDIR"/SBNOTE.wav "$WORKDIR"/SBPLAY.wav "$WORKDIR"/SBPLY2.wav \
 	"$WORKDIR"/SBNOISE.wav "$WORKDIR"/SBSFXW.wav "$WORKDIR"/SBSFXM.wav \
-	"$WORKDIR"/SBMUSW.wav "$WORKDIR"/SBMUSM.wav "$WORKDIR"/SBAUDW.wav \
-	"$WORKDIR"/SBAUDM.wav "$WORKDIR"/SBSTRW.wav "$WORKDIR"/SBSTRM.wav \
+	"$WORKDIR"/SBMUSW.wav "$WORKDIR"/SBMUSM.wav "$WORKDIR"/SBRAW.wav \
 	"$WORKDIR"/sb*-audio.txt
 rm -f "$DOSBOX_CAPTURE_DIR"/*.wav
 
@@ -845,7 +893,7 @@ INSTRUMENT 1, 1, 0
 INSTRUMENT 0, 1
 print "tone-begin"
 TONE 0, 440, 1.20
-SLEEP 1300
+SLEEP 1300, 1
 print "tone-end"
 
 open "C:\SBFFT.TXT" for output as #1
@@ -878,7 +926,7 @@ INSTRUMENT 1, 1
 print "tone-begin"
 TONE 0, 440, 1.20
 TONE 1, 660, 1.20
-SLEEP 1300
+SLEEP 1300, 1
 print "tone-end"
 
 open "C:\SBDUAL.TXT" for output as #1
@@ -900,7 +948,7 @@ INSTRUMENT 1, 1, 0
 INSTRUMENT 0, 1
 print "tone-begin"
 TONE 0, 523, 1.20
-SLEEP 1300
+SLEEP 1300, 1
 print "tone-end"
 
 open "C:\PCSPKFFT.TXT" for output as #1
@@ -925,7 +973,7 @@ INSTRUMENT 1, 1
 print "tone-begin"
 TONE 0, 440, 1.20
 TONE 1, 523, 1.20
-SLEEP 1300
+SLEEP 1300, 1
 print "tone-end"
 
 open "C:\PCDUAL.TXT" for output as #1
@@ -985,7 +1033,7 @@ SFX_SINE_SETUP()
 print "tone-hz=440"
 print "sound-begin"
 SOUND 440, 1.20
-SLEEP 1300
+SLEEP 1300, 1
 print "sound-end"
 SFX_DONE("C:\SBSOUND.TXT", "sbsound-done")
 print "sbsound-end"
@@ -1000,7 +1048,7 @@ SFX_SINE_SETUP()
 print "tone-hz=440"
 print "sound-channel-begin"
 SOUND 0, 440, 1.20, 0.8
-SLEEP 1300
+SLEEP 1300, 1
 print "sound-channel-end"
 SFX_DONE("C:\SBSNDCH.TXT", "sbsndch-done")
 print "sbsndch-end"
@@ -1015,7 +1063,7 @@ SFX_SINE_SETUP()
 print "tone-hz=440"
 print "note-begin"
 NOTE "A", 4, 1.20
-SLEEP 1300
+SLEEP 1300, 1
 print "note-end"
 SFX_DONE("C:\SBNOTE.TXT", "sbnote-done")
 print "sbnote-end"
@@ -1057,7 +1105,7 @@ print "sbnoise-start"
 SFX_SELECT_SB()
 print "noise-begin"
 NOISE 0, 440, 1.20, 0.8
-SLEEP 1300
+SLEEP 1300, 1
 print "noise-end"
 SFX_DONE("C:\SBNOISE.TXT", "sbnoise-done")
 print "sbnoise-end"
@@ -1072,7 +1120,7 @@ print "tone-hz=440"
 print "sfx-wav-begin"
 SFX LOAD 1, "C:\SINE440.WAV"
 SFX PLAY 1
-SLEEP 1300
+SLEEP 1300, 1
 SFX STOP
 print "sfx-wav-end"
 SFX_DONE("C:\SBSFXW.TXT", "sbsfxw-done")
@@ -1088,7 +1136,7 @@ print "tone-hz=440"
 print "sfx-mp3-begin"
 SFX LOAD 1, "C:\SINE440.MP3"
 SFX PLAY 1
-SLEEP 1300
+SLEEP 1300, 1
 SFX STOP
 print "sfx-mp3-end"
 SFX_DONE("C:\SBSFXM.TXT", "sbsfxm-done")
@@ -1098,20 +1146,20 @@ EOF
 cat > "$TEST_ROOT/SBMUSW.BAS" <<'EOF'
 #include "SFXCMD.BI"
 
-dim as long music_id
+dim as long result
 
 print "sbmusw-start"
 SFX_SELECT_SB()
 print "tone-hz=440"
-music_id = MUSIC LOAD("C:\SINE440.WAV")
-print "music-id="; music_id
-if music_id < 0 then
+result = MUSIC LOAD("C:\SINE440.WAV")
+print "music-load="; result
+if result < 0 then
 	end 1
 end if
 print "music-wav-begin"
-MUSIC PLAY music_id
-SLEEP 1300
-MUSIC STOP music_id
+MUSIC PLAY
+SLEEP 1300, 1
+MUSIC STOP
 print "music-wav-end"
 SFX_DONE("C:\SBMUSW.TXT", "sbmusw-done")
 print "sbmusw-end"
@@ -1120,116 +1168,68 @@ EOF
 cat > "$TEST_ROOT/SBMUSM.BAS" <<'EOF'
 #include "SFXCMD.BI"
 
-dim as long music_id
+dim as long result
 
 print "sbmusm-start"
 SFX_SELECT_SB()
 print "tone-hz=440"
-music_id = MUSIC PLAY("C:\SINE440.MP3")
-print "music-id="; music_id
-if music_id < 0 then
+result = MUSIC PLAY("C:\SINE440.MP3")
+print "music-play="; result
+if result < 0 then
 	end 1
 end if
 print "music-mp3-begin"
-SLEEP 1300
-MUSIC STOP music_id
+SLEEP 1300, 1
+MUSIC STOP
 print "music-mp3-end"
 SFX_DONE("C:\SBMUSM.TXT", "sbmusm-done")
 print "sbmusm-end"
 EOF
 
-cat > "$TEST_ROOT/SBAUDW.BAS" <<'EOF'
+cat > "$TEST_ROOT/SBRAW.BAS" <<'EOF'
 #include "SFXCMD.BI"
+#include once "sfxlib_raw.bi"
 
-dim as long result
+const RAW_FREQUENCY = 440.0
+const PI_VALUE = 3.14159265358979323846
 
-print "sbaudw-start"
+print "sbraw-start"
 SFX_SELECT_SB()
+dim as long sample_rate = sfxlib.RawOpen()
+print "raw-open="; sample_rate
+if sample_rate <= 0 then
+	end 1
+end if
+
+dim as long frames = sample_rate
+redim samples(0 to frames - 1) as single
+dim as long frame_index
+dim as long written
+
 print "tone-hz=440"
-result = AUDIO PLAY("C:\SINE440.WAV")
-print "audio-play="; result
-if result <> 0 then
-	end 1
-end if
-print "audio-wav-begin"
-SLEEP 1300
-AUDIO STOP
-print "audio-wav-end"
-SFX_DONE("C:\SBAUDW.TXT", "sbaudw-done")
-print "sbaudw-end"
-EOF
+for frame_index = 0 to frames - 1
+	dim as double phase = _
+		(2.0 * PI_VALUE * RAW_FREQUENCY * frame_index) / sample_rate
+	samples(frame_index) = csng(sin(phase) * 0.25)
+next
 
-cat > "$TEST_ROOT/SBAUDM.BAS" <<'EOF'
-#include "SFXCMD.BI"
+frame_index = 0
+while frame_index < frames
+	written = sfxlib.RawWrite(@samples(frame_index), frames - frame_index, 1)
+	if written < 0 then
+		end 1
+	end if
+	if written = 0 then
+		sleep 10, 1
+	else
+		frame_index += written
+	end if
+wend
 
-dim as long result
-
-print "sbaudm-start"
-SFX_SELECT_SB()
-print "tone-hz=440"
-result = AUDIO PLAY("C:\SINE440.MP3")
-print "audio-play="; result
-if result <> 0 then
-	end 1
-end if
-print "audio-mp3-begin"
-SLEEP 1300
-AUDIO STOP
-print "audio-mp3-end"
-SFX_DONE("C:\SBAUDM.TXT", "sbaudm-done")
-print "sbaudm-end"
-EOF
-
-cat > "$TEST_ROOT/SBSTRW.BAS" <<'EOF'
-#include "SFXCMD.BI"
-
-dim as long result
-
-print "sbstrw-start"
-SFX_SELECT_SB()
-print "tone-hz=440"
-result = STREAM OPEN("C:\SINE440.WAV")
-print "stream-open="; result
-if result <> 0 then
-	end 1
-end if
-result = STREAM PLAY()
-print "stream-play="; result
-if result <> 0 then
-	end 1
-end if
-print "stream-wav-begin"
-SLEEP 1300
-STREAM STOP
-print "stream-wav-end"
-SFX_DONE("C:\SBSTRW.TXT", "sbstrw-done")
-print "sbstrw-end"
-EOF
-
-cat > "$TEST_ROOT/SBSTRM.BAS" <<'EOF'
-#include "SFXCMD.BI"
-
-dim as long result
-
-print "sbstrm-start"
-SFX_SELECT_SB()
-print "tone-hz=440"
-result = STREAM OPEN("C:\SINE440.MP3")
-print "stream-open="; result
-if result <> 0 then
-	end 1
-end if
-result = STREAM PLAY()
-print "stream-play="; result
-if result <> 0 then
-	end 1
-end if
-print "stream-mp3-begin"
-SLEEP 1300
-STREAM STOP
-print "stream-mp3-end"
-SFX_DONE("C:\SBSTRM.TXT", "sbstrm-done")
-print "sbstrm-end"
+sleep 1150, 1
+sfxlib.RawClose()
+SFX_DONE("C:\SBRAW.TXT", "sbraw-done")
+print "sbraw-end"
 EOF
 
 cat > "$RUN_BAT" <<'EOF'
@@ -1241,93 +1241,83 @@ set PATH=C:\FB;C:\DJGPP\BIN;%PATH%
 echo path=%PATH%>>D:\TRACE.LOG
 echo blaster=%BLASTER%>>D:\TRACE.LOG
 if not exist C:\FB\FBC.EXE echo missing-fbc>>D:\TRACE.LOG
-if not exist C:\DJGPP\BIN\REDIR.EXE echo missing-redir>>D:\TRACE.LOG
 C:\DJGPP\BIN\CWSDPMI.EXE -p >>D:\TRACE.LOG
 echo cwsdpmi-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 set SFXLIB_DEBUG=1
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-HELLO.LOG C:\FB\FBC.EXE C:\HELLO.BAS -x C:\HELLO.EXE
+C:\FB\FBC.EXE C:\HELLO.BAS -x C:\HELLO.EXE >D:\BUILD-HELLO.LOG
 echo build-hello-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
-if exist C:\HELLO.EXE C:\DJGPP\BIN\REDIR.EXE -eo -o D:\HELLO.LOG C:\HELLO.EXE
+if exist C:\HELLO.EXE C:\HELLO.EXE >D:\HELLO.LOG
 echo hello-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 if exist C:\HELLO.TXT copy C:\HELLO.TXT D:\HELLO.TXT >NUL
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-GFX13.LOG C:\FB\FBC.EXE C:\GFX13.BAS -x C:\GFX13.EXE
+C:\FB\FBC.EXE C:\GFX13.BAS -x C:\GFX13.EXE >D:\BUILD-GFX13.LOG
 echo build-gfx13-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
-if exist C:\GFX13.EXE C:\DJGPP\BIN\REDIR.EXE -eo -o D:\GFX13.LOG C:\GFX13.EXE
+if exist C:\GFX13.EXE C:\GFX13.EXE >D:\GFX13.LOG
 echo gfx13-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 if exist C:\GFX13.TXT copy C:\GFX13.TXT D:\GFX13.TXT >NUL
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SOUND.LOG C:\FB\FBC.EXE C:\SOUND.BAS -x C:\SOUND.EXE
+C:\FB\FBC.EXE C:\SOUND.BAS -x C:\SOUND.EXE >D:\BUILD-SOUND.LOG
 echo build-sound-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\SOUND.LOG C:\SOUND.EXE
+C:\SOUND.EXE >D:\SOUND.LOG
 echo sound-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 if exist C:\SOUND.TXT copy C:\SOUND.TXT D:\SOUND.TXT >NUL
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBFFT.LOG C:\FB\FBC.EXE C:\SBFFT.BAS -x C:\SBFFT.EXE
+C:\FB\FBC.EXE C:\SBFFT.BAS -x C:\SBFFT.EXE >D:\BUILD-SBFFT.LOG
 echo build-sbfft-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBDUAL.LOG C:\FB\FBC.EXE C:\SBDUAL.BAS -x C:\SBDUAL.EXE
+C:\FB\FBC.EXE C:\SBDUAL.BAS -x C:\SBDUAL.EXE >D:\BUILD-SBDUAL.LOG
 echo build-sbdual-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-NOBLAST.LOG C:\FB\FBC.EXE C:\NOBLAST.BAS -x C:\NOBLAST.EXE
+C:\FB\FBC.EXE C:\NOBLAST.BAS -x C:\NOBLAST.EXE >D:\BUILD-NOBLAST.LOG
 echo build-noblast-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 set BLASTER=
 echo cleared-blaster=%BLASTER%>>D:\TRACE.LOG
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\NOBLAST.LOG C:\NOBLAST.EXE
+C:\NOBLAST.EXE >D:\NOBLAST.LOG
 echo noblast-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 if exist C:\NOBLAST.TXT copy C:\NOBLAST.TXT D:\NOBLAST.TXT >NUL
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-PCSPKFFT.LOG C:\FB\FBC.EXE C:\PCSPKFFT.BAS -x C:\PCSPKFFT.EXE
+C:\FB\FBC.EXE C:\PCSPKFFT.BAS -x C:\PCSPKFFT.EXE >D:\BUILD-PCSPKFFT.LOG
 echo build-pcspkfft-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BLDPCD.LOG C:\FB\FBC.EXE C:\PCDUAL.BAS -x C:\PCDUAL.EXE
+C:\FB\FBC.EXE C:\PCDUAL.BAS -x C:\PCDUAL.EXE >D:\BLDPCD.LOG
 echo build-pcspkdual-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBBEEP.LOG C:\FB\FBC.EXE C:\SBBEEP.BAS -x C:\SBBEEP.EXE
+C:\FB\FBC.EXE C:\SBBEEP.BAS -x C:\SBBEEP.EXE >D:\BUILD-SBBEEP.LOG
 echo build-sbbeep-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBSOUND.LOG C:\FB\FBC.EXE C:\SBSOUND.BAS -x C:\SBSOUND.EXE
+C:\FB\FBC.EXE C:\SBSOUND.BAS -x C:\SBSOUND.EXE >D:\BUILD-SBSOUND.LOG
 echo build-sbsound-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBSNDCH.LOG C:\FB\FBC.EXE C:\SBSNDCH.BAS -x C:\SBSNDCH.EXE
+C:\FB\FBC.EXE C:\SBSNDCH.BAS -x C:\SBSNDCH.EXE >D:\BUILD-SBSNDCH.LOG
 echo build-sbsndch-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBNOTE.LOG C:\FB\FBC.EXE C:\SBNOTE.BAS -x C:\SBNOTE.EXE
+C:\FB\FBC.EXE C:\SBNOTE.BAS -x C:\SBNOTE.EXE >D:\BUILD-SBNOTE.LOG
 echo build-sbnote-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBPLAY.LOG C:\FB\FBC.EXE C:\SBPLAY.BAS -x C:\SBPLAY.EXE
+C:\FB\FBC.EXE C:\SBPLAY.BAS -x C:\SBPLAY.EXE >D:\BUILD-SBPLAY.LOG
 echo build-sbplay-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBPLY2.LOG C:\FB\FBC.EXE C:\SBPLY2.BAS -x C:\SBPLY2.EXE
+C:\FB\FBC.EXE C:\SBPLY2.BAS -x C:\SBPLY2.EXE >D:\BUILD-SBPLY2.LOG
 echo build-sbply2-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBNOISE.LOG C:\FB\FBC.EXE C:\SBNOISE.BAS -x C:\SBNOISE.EXE
+C:\FB\FBC.EXE C:\SBNOISE.BAS -x C:\SBNOISE.EXE >D:\BUILD-SBNOISE.LOG
 echo build-sbnoise-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBSFXW.LOG C:\FB\FBC.EXE C:\SBSFXW.BAS -x C:\SBSFXW.EXE
+C:\FB\FBC.EXE C:\SBSFXW.BAS -x C:\SBSFXW.EXE >D:\BUILD-SBSFXW.LOG
 echo build-sbsfxw-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBSFXM.LOG C:\FB\FBC.EXE C:\SBSFXM.BAS -x C:\SBSFXM.EXE
+C:\FB\FBC.EXE C:\SBSFXM.BAS -x C:\SBSFXM.EXE >D:\BUILD-SBSFXM.LOG
 echo build-sbsfxm-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBMUSW.LOG C:\FB\FBC.EXE C:\SBMUSW.BAS -x C:\SBMUSW.EXE
+C:\FB\FBC.EXE C:\SBMUSW.BAS -x C:\SBMUSW.EXE >D:\BUILD-SBMUSW.LOG
 echo build-sbmusw-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBMUSM.LOG C:\FB\FBC.EXE C:\SBMUSM.BAS -x C:\SBMUSM.EXE
+C:\FB\FBC.EXE C:\SBMUSM.BAS -x C:\SBMUSM.EXE >D:\BUILD-SBMUSM.LOG
 echo build-sbmusm-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBAUDW.LOG C:\FB\FBC.EXE C:\SBAUDW.BAS -x C:\SBAUDW.EXE
-echo build-sbaudw-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
-
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBAUDM.LOG C:\FB\FBC.EXE C:\SBAUDM.BAS -x C:\SBAUDM.EXE
-echo build-sbaudm-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
-
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBSTRW.LOG C:\FB\FBC.EXE C:\SBSTRW.BAS -x C:\SBSTRW.EXE
-echo build-sbstrw-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
-
-C:\DJGPP\BIN\REDIR.EXE -eo -o D:\BUILD-SBSTRM.LOG C:\FB\FBC.EXE C:\SBSTRM.BAS -x C:\SBSTRM.EXE
-echo build-sbstrm-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
+C:\FB\FBC.EXE C:\SBRAW.BAS -x C:\SBRAW.EXE >D:\BUILD-SBRAW.LOG
+echo build-sbraw-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 exit
 EOF
 
@@ -1336,7 +1326,7 @@ EOF
 ##############################################################################
 
 msg "creating DOS test image"
-run "$DOSBOX_BIN" \
+run "${DOSBOX_RUN_ENV[@]}" "$DOSBOX_BIN" \
 	-conf "$DOSBOX_CONF_PATH" \
 	-fastlaunch \
 	-nogui \
@@ -1361,7 +1351,7 @@ fi
 run env MTOOLS_SKIP_CHECK=1 mcopy -i "${MTOOLS_IMAGE_FILE_PATH}@@${PARTITION_OFFSET}" -s "${MTOOLS_SOURCE_PATHS[@]}" ::
 
 msg "running DOSBox-X FreeBASIC test suite"
-run timeout "$DOSBOX_TIMEOUT" "$DOSBOX_BIN" \
+run timeout "$DOSBOX_TIMEOUT" "${DOSBOX_RUN_ENV[@]}" "$DOSBOX_BIN" \
 	-conf "$DOSBOX_CONF_PATH" \
 	-fastlaunch \
 	-nogui \
@@ -1373,6 +1363,44 @@ run timeout "$DOSBOX_TIMEOUT" "$DOSBOX_BIN" \
 	-c "RUNTESTS.BAT" \
 	-c "exit" \
 	>"$DOSBOX_RUN_LOG" 2>&1
+
+# Audio capture is intentionally a later phase.  Confirm every compiler output
+# first so a build failure cannot be misreported as a silent-audio failure.
+DOS_TEST_EXECUTABLES=(
+	HELLO.EXE
+	GFX13.EXE
+	SOUND.EXE
+	SBFFT.EXE
+	SBDUAL.EXE
+	NOBLAST.EXE
+	PCSPKFFT.EXE
+	PCDUAL.EXE
+	SBBEEP.EXE
+	SBSOUND.EXE
+	SBSNDCH.EXE
+	SBNOTE.EXE
+	SBPLAY.EXE
+	SBPLY2.EXE
+	SBNOISE.EXE
+	SBSFXW.EXE
+	SBSFXM.EXE
+	SBMUSW.EXE
+	SBMUSM.EXE
+	SBRAW.EXE
+)
+
+for dos_executable in "${DOS_TEST_EXECUTABLES[@]}"; do
+	if ! env MTOOLS_SKIP_CHECK=1 mdir \
+		-i "${MTOOLS_IMAGE_FILE_PATH}@@${PARTITION_OFFSET}" \
+		"::${dos_executable}" >/dev/null 2>&1; then
+		die "DOS package test did not build ${dos_executable}; inspect $DOSBOX_RUN_LOG and $TEST_ROOT/BUILD-*.LOG"
+	fi
+done
+
+for initial_result in HELLO.TXT GFX13.TXT SOUND.TXT NOBLAST.TXT; do
+	[ -f "$TEST_ROOT/$initial_result" ] || \
+		die "DOS package test did not produce $initial_result before audio capture"
+done
 
 capture_wav_audio "Sound Blaster" "SBFFT.EXE" "SBFFT.LOG" "SBFFT.TXT" "$SBFFT_REPORT" "sb" 440
 SB_CAPTURE_WAV="$SELECTED_CAPTURE_WAV"
@@ -1417,10 +1445,7 @@ capture_sfx_command_audio "Sound Blaster media WAV SFX" "SBSFXW.EXE" "SBSFXW.LOG
 capture_sfx_command_audio "Sound Blaster media MP3 SFX" "SBSFXM.EXE" "SBSFXM.LOG" "SBSFXM.TXT" "$WORKDIR/sbsfxm-audio.txt" "${MP3_EXPECTED_ARGS[@]}"
 capture_sfx_command_audio "Sound Blaster media WAV MUSIC" "SBMUSW.EXE" "SBMUSW.LOG" "SBMUSW.TXT" "$WORKDIR/sbmusw-audio.txt" 440
 capture_sfx_command_audio "Sound Blaster media MP3 MUSIC" "SBMUSM.EXE" "SBMUSM.LOG" "SBMUSM.TXT" "$WORKDIR/sbmusm-audio.txt" "${MP3_EXPECTED_ARGS[@]}"
-capture_sfx_command_audio "Sound Blaster media WAV AUDIO" "SBAUDW.EXE" "SBAUDW.LOG" "SBAUDW.TXT" "$WORKDIR/sbaudw-audio.txt" 440
-capture_sfx_command_audio "Sound Blaster media MP3 AUDIO" "SBAUDM.EXE" "SBAUDM.LOG" "SBAUDM.TXT" "$WORKDIR/sbaudm-audio.txt" "${MP3_EXPECTED_ARGS[@]}"
-capture_sfx_command_audio "Sound Blaster media WAV STREAM" "SBSTRW.EXE" "SBSTRW.LOG" "SBSTRW.TXT" "$WORKDIR/sbstrw-audio.txt" 440
-capture_sfx_command_audio "Sound Blaster media MP3 STREAM" "SBSTRM.EXE" "SBSTRM.LOG" "SBSTRM.TXT" "$WORKDIR/sbstrm-audio.txt" "${MP3_EXPECTED_ARGS[@]}"
+capture_sfx_command_audio "Sound Blaster raw output" "SBRAW.EXE" "SBRAW.LOG" "SBRAW.TXT" "$WORKDIR/sbraw-audio.txt" 440
 
 ##############################################################################
 # Validate results
@@ -1501,17 +1526,9 @@ require_sfx_command_result "SBSFXW" 'sbsfxw-end' 'sbsfxw-done'
 require_sfx_command_result "SBSFXM" 'sbsfxm-end' 'sbsfxm-done'
 require_sfx_command_result "SBMUSW" 'sbmusw-end' 'sbmusw-done'
 require_sfx_command_result "SBMUSM" 'sbmusm-end' 'sbmusm-done'
-require_sfx_command_result "SBAUDW" 'sbaudw-end' 'sbaudw-done'
-require_sfx_command_result "SBAUDM" 'sbaudm-end' 'sbaudm-done'
-require_sfx_command_result "SBSTRW" 'sbstrw-end' 'sbstrw-done'
-require_sfx_command_result "SBSTRM" 'sbstrm-end' 'sbstrm-done'
-
-require_log_line "$TEST_ROOT/SBAUDW.LOG" 'audio-play=[[:space:]]*0' "AUDIO WAV playback start"
-require_log_line "$TEST_ROOT/SBAUDM.LOG" 'audio-play=[[:space:]]*0' "AUDIO MP3 playback start"
-require_log_line "$TEST_ROOT/SBSTRW.LOG" 'stream-open=[[:space:]]*0' "STREAM WAV open"
-require_log_line "$TEST_ROOT/SBSTRW.LOG" 'stream-play=[[:space:]]*0' "STREAM WAV playback start"
-require_log_line "$TEST_ROOT/SBSTRM.LOG" 'stream-open=[[:space:]]*0' "STREAM MP3 open"
-require_log_line "$TEST_ROOT/SBSTRM.LOG" 'stream-play=[[:space:]]*0' "STREAM MP3 playback start"
+require_sfx_command_result "SBRAW" 'sbraw-end' 'sbraw-done'
+require_log_line "$TEST_ROOT/SBRAW.LOG" 'raw-open=[[:space:]]*[1-9][0-9]*' \
+	"raw output sample rate"
 
 SB_FIRST_NONZERO_SAMPLE="$(validate_wav_audio "$SB_CAPTURE_WAV")"
 SBDUAL_FIRST_NONZERO_SAMPLE="$(validate_wav_audio "$SBDUAL_CAPTURE_WAV")"
@@ -1555,3 +1572,5 @@ run file "$PCSPKDUAL_CAPTURE_WAV"
 for wav in "${SFX_CAPTURE_WAVS[@]}"; do
 	run file "$wav"
 done
+
+# end of msdos-test-freebasic.sh

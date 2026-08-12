@@ -154,6 +154,8 @@ end if
 
 if( bload( filename, image_b ) <> 0 ) then
 	record_failure "bload image failed"
+else
+	expect_long "bload image pixel", point( 0, 0, image_b ), rgb( 16, 32, 48 )
 end if
 
 delete_file_if_present filename

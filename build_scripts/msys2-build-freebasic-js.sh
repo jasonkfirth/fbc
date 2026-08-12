@@ -11,8 +11,8 @@ trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 # into C:\freebasic-js with the Emscripten/Node toolchain needed by fbc-js.
 ##############################################################################
 
-SELF_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
-ROOT="$(CDPATH= cd -- "$SELF_DIR/.." && pwd)"
+SELF_DIR="$(CDPATH='' cd -- "$(dirname "$0")" && pwd)"
+ROOT="$(CDPATH='' cd -- "$SELF_DIR/.." && pwd)"
 
 cd "$ROOT"
 
@@ -304,7 +304,6 @@ BINARYEN_URL="${BINARYEN_URL:-https://github.com/WebAssembly/binaryen/releases/d
 BINARYEN_SHA256="${BINARYEN_SHA256:-2f4edac1703a2f695254d6ff52ede03481e67db1f094915763d863158c17d9bc}"
 NODE_OVERLAY="${NODE_OVERLAY:-1}"
 NODE_RELEASE="${NODE_RELEASE:-v24.14.1}"
-NODE_VERSION="${NODE_RELEASE#v}"
 NODE_ARCHIVE="${NODE_ARCHIVE:-node-${NODE_RELEASE}-win-x64.zip}"
 NODE_URL="${NODE_URL:-https://nodejs.org/dist/${NODE_RELEASE}/${NODE_ARCHIVE}}"
 NODE_SHA256="${NODE_SHA256:-6e50ce5498c0cebc20fd39ab3ff5df836ed2f8a31aa093cecad8497cff126d70}"
@@ -511,7 +510,7 @@ EOF
 		# The MSYS2 Emscripten package publishes emcc through this profile
 		# fragment instead of only dropping standalone commands on PATH.
 		# Source it here so non-login build shells behave like UCRT64 shells.
-		# shellcheck disable=SC1090
+		# shellcheck disable=SC1090,SC1091
 		. "$UCRT64_ROOT/etc/profile.d/emscripten.sh"
 	fi
 	ensure_emscripten_toolchain
@@ -1137,13 +1136,14 @@ ShowUninstDetails show
 Function RefreshEnvironment
 	SetOutPath "\$TEMP"
 	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
-	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
+	; Launch directly so Windows shell activation cannot hold the installer open.
+	Exec '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"'
 FunctionEnd
 
 Function un.RefreshEnvironment
 	SetOutPath "\$TEMP"
 	File /oname=FreeBASIC-refresh-environment.ps1 "$refresh_environment_win"
-	ExecShell "" "\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"' SW_HIDE
+	Exec '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$TEMP\\FreeBASIC-refresh-environment.ps1"'
 FunctionEnd
 
 Function AddOnePath

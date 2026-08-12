@@ -281,11 +281,11 @@ sanitize_build_tree()
     local tree="$1"
 
     rm -rf \
-        "${tree}/bin" \
-        "${tree}/lib/freebasic" \
-        "${tree}/obj" \
-        "${tree}/.fbtmp" \
-        "${tree}/tmp"
+        "${tree:?}/bin" \
+        "${tree:?}/lib/freebasic" \
+        "${tree:?}/obj" \
+        "${tree:?}/.fbtmp" \
+        "${tree:?}/tmp"
 }
 
 sync_source_tree()
@@ -656,11 +656,12 @@ SCRIPT_DIR="$(cd "${SCRIPT_DIR}" && pwd)"
 
 if [ -d "${SCRIPT_DIR}/toolchain/devkitpro/devkitPPC" ]; then
     export DEVKITPRO="${FBWII_DEVKITPRO:-${SCRIPT_DIR}/toolchain/devkitpro}"
+    export DEVKITPPC="${FBWII_DEVKITPPC:-${DEVKITPRO}/devkitPPC}"
 else
     export DEVKITPRO="${FBWII_DEVKITPRO:-${DEVKITPRO:-/opt/devkitpro}}"
+    export DEVKITPPC="${FBWII_DEVKITPPC:-${DEVKITPPC:-${DEVKITPRO}/devkitPPC}}"
 fi
 
-export DEVKITPPC="${FBWII_DEVKITPPC:-${DEVKITPPC:-${DEVKITPRO}/devkitPPC}}"
 export FBWII_PREFIX="${SCRIPT_DIR}"
 export FBWII_LIBROOT="${SCRIPT_DIR}/lib/freebasic-wii"
 export FBWII_COMPILER="${SCRIPT_DIR}/lib/freebasic-wii/bin/fbc-wii-compiler.exe"
@@ -687,11 +688,12 @@ SCRIPT_DIR="$(cd "${SCRIPT_DIR}" && pwd)"
 
 if [ -d "${SCRIPT_DIR}/toolchain/devkitpro/devkitPPC" ]; then
     export DEVKITPRO="${FBWII_DEVKITPRO:-${SCRIPT_DIR}/toolchain/devkitpro}"
+    export DEVKITPPC="${FBWII_DEVKITPPC:-${DEVKITPRO}/devkitPPC}"
 else
     export DEVKITPRO="${FBWII_DEVKITPRO:-${DEVKITPRO:-/opt/devkitpro}}"
+    export DEVKITPPC="${FBWII_DEVKITPPC:-${DEVKITPPC:-${DEVKITPRO}/devkitPPC}}"
 fi
 
-export DEVKITPPC="${FBWII_DEVKITPPC:-${DEVKITPPC:-${DEVKITPRO}/devkitPPC}}"
 export FBWII_PREFIX="${SCRIPT_DIR}"
 export FBWII_LIBROOT="${SCRIPT_DIR}/lib/freebasic-wii"
 export FBWII_COMPILER="${SCRIPT_DIR}/lib/freebasic-wii/bin/fbc-wii-compiler.exe"
@@ -762,7 +764,7 @@ copy_msys2_runtime()
 
     mkdir -p "${bindir}" "${root}/toolchain/msys2/tmp"
 
-    for tool in bash sh env dirname pwd cygpath realpath sed tr mkdir cp rm mv find uname make cat chmod; do
+    for tool in bash sh env dirname pwd cygpath realpath sed tr mkdir mktemp cp rm mv find uname make cat chmod; do
         copy_tool "${tool}" "${bindir}"
     done
 }

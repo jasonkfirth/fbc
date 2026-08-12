@@ -1,0 +1,10 @@
+# TEST_MODE : MULTI_MODULE_OK
+
+# The TCP test creates several worker threads. Compile and link in one
+# invocation so the multithreaded runtime selection cannot be lost between
+# the object and executable stages.
+MAIN := tcp.bas
+COMPILE_AND_LINK := 1
+FBC_CFLAGS += -mt
+
+# end of tcp.bmk

@@ -304,11 +304,10 @@ docker_platform_for_nondeb_target() {
         x86_64) echo "linux/amd64" ;;
         i586|x86) echo "linux/386" ;;
         aarch64|arm64) echo "linux/arm64" ;;
-        armv7|armhf) echo "linux/arm/v7" ;;
+        armv7|armv7h|armhf) echo "linux/arm/v7" ;;
         ppc64le|ppc64el) echo "linux/ppc64le" ;;
         s390x) echo "linux/s390x" ;;
         riscv64) echo "linux/riscv64" ;;
-        armv7|armv7h) echo "linux/arm/v7" ;;
         *)
             die "unsupported Docker platform arch: $arch"
             ;;
@@ -436,9 +435,11 @@ exampleageddon_jobs() {
 run_fbctests() {
     local jobs
     local failed_log
+    local detail_log
 
     [ -d /source-tests ] || fail "tests/ tree was not mounted at /source-tests"
     [ -d /source-inc ] || fail "inc/ tree was not mounted at /source-inc"
+    [ -d /source-sfxlib ] || fail "src/sfxlib/ was not mounted at /source-sfxlib"
 
     jobs="$(fbctests_jobs)"
 
@@ -447,7 +448,7 @@ run_fbctests() {
 
     echo "==> copying fbctests source"
     rm -rf /tmp/fbctests-source
-    mkdir -p /tmp/fbctests-source/tests /tmp/fbctests-source/inc
+    mkdir -p /tmp/fbctests-source/tests /tmp/fbctests-source/inc /tmp/fbctests-source/src/sfxlib
     (
         cd /source-tests
         tar \
@@ -472,6 +473,13 @@ run_fbctests() {
         cd /tmp/fbctests-source/inc
         tar xf -
     )
+    (
+        cd /source-sfxlib
+        tar --exclude='obj' -cf - .
+    ) | (
+        cd /tmp/fbctests-source/src/sfxlib
+        tar xf -
+    )
 
     cd /tmp/fbctests-source/tests
 
@@ -491,6 +499,13 @@ run_fbctests() {
         [ -f "$failed_log" ] || fail "missing log-tests summary: $failed_log"
         if ! grep -qi 'None Found' "$failed_log"; then
             cat "$failed_log"
+            while IFS=: read -r detail_log _; do
+                [ -n "$detail_log" ] || continue
+                [ -f "$detail_log" ] || continue
+                echo
+                echo "==> $detail_log"
+                cat "$detail_log"
+            done < "$failed_log"
             fail "log-tests reported failures in $failed_log"
         fi
     done
@@ -544,7 +559,7 @@ else
 fi
 
 shopt -s nullglob
-debs=(/packages/*.deb)
+debs=(/packages/*.deb /packages/xbox/*.deb)
 [ "${#debs[@]}" -gt 0 ] || fail "no .deb packages mounted at /packages"
 
 echo "==> installing FreeBASIC packages"
@@ -638,6 +653,24 @@ end if
 print "sfx-end"
 FBEOF
 
+if command -v nuttx-riscv32-qemu-smoke >/dev/null 2>&1; then
+    echo "==> checking installed NuttX SDK launcher"
+    run nuttx-riscv32-qemu-smoke --help
+fi
+
+if command -v fbc-wii >/dev/null 2>&1; then
+    echo "==> checking installed Wii compiler launcher"
+    run fbc-wii --help
+fi
+
+if command -v fbc-xbox >/dev/null 2>&1; then
+    echo "==> compiling installed Xbox package smoke"
+    run fbc-xbox \
+        /tmp/fb-package-smoke/console.bas \
+        -x /tmp/fb-package-smoke/console.xbe
+    [ -s /tmp/fb-package-smoke/console.xbe ] || fail "Xbox package smoke XBE was not created"
+fi
+
 echo "==> compiling console smoke"
 run fbc /tmp/fb-package-smoke/console.bas -x /tmp/fb-package-smoke/console
 [ -x /tmp/fb-package-smoke/console ] || fail "console binary was not created"
@@ -650,8 +683,15 @@ echo "$console_output"
 if [ "$(dpkg --print-architecture)" = "armhf" ] && command -v readelf >/dev/null 2>&1; then
     echo "==> checking ARM ELF attributes"
     readelf -A /tmp/fb-package-smoke/console | tee /tmp/fb-package-smoke/console.elf-attrs
-    grep -Eq 'Tag_CPU_arch:.*v6' /tmp/fb-package-smoke/console.elf-attrs ||
-        fail "armhf smoke binary is not tagged as ARMv6-compatible"
+    if [ "${QEMU_CPU:-}" = "arm1176" ]; then
+        # Raspbian preserves ARMv6 compatibility for older Raspberry Pi boards.
+        grep -Eq 'Tag_CPU_arch:.*v6' /tmp/fb-package-smoke/console.elf-attrs ||
+            fail "Raspbian armhf smoke binary is not tagged as ARMv6-compatible"
+    else
+        # Debian and Ubuntu armhf use the ARMv7 hard-float baseline.
+        grep -Eq 'Tag_CPU_arch:.*v7' /tmp/fb-package-smoke/console.elf-attrs ||
+            fail "Debian/Ubuntu armhf smoke binary is not tagged for ARMv7"
+    fi
     grep -Eq 'Tag_ABI_VFP_args:.*VFP registers' /tmp/fb-package-smoke/console.elf-attrs ||
         fail "armhf smoke binary is not tagged for hard-float VFP calling convention"
 fi
@@ -750,9 +790,9 @@ EOF
         if ! glob="$(package_glob_for_family "$family")"; then
             glob="*"
         fi
-        shopt -s nullglob
-        packages=("$dir"/$glob)
-        shopt -u nullglob
+        mapfile -d '' -t packages < <(
+            find "$dir" -maxdepth 1 -type f -name "$glob" -print0
+        )
         echo "${distro}|${codename}|${arch}|${family}|${#packages[@]} package(s)|${dir}"
     done
     exit 0
@@ -850,9 +890,9 @@ EOF
             return 0
         fi
 
-        shopt -s nullglob
-        packages=("$dir"/$package_glob)
-        shopt -u nullglob
+        mapfile -d '' -t packages < <(
+            find "$dir" -maxdepth 1 -type f -name "$package_glob" -print0
+        )
 
         if [ "${#packages[@]}" -eq 0 ]; then
             echo "SKIPPED: ${distro}/${codename} (${arch}) has no ${package_glob} packages in $dir"
@@ -903,6 +943,7 @@ EOF
                 -v "$dir:/target" \
                 -v "$ROOT/tests:/source-tests:ro" \
                 -v "$ROOT/inc:/source-inc:ro" \
+                -v "$ROOT/src/sfxlib:/source-sfxlib:ro" \
                 -v "$ROOT/examples:/source-root/examples:ro" \
                 -v "$ROOT/build_scripts/exampleageddon-freebasic.py:/exampleageddon-freebasic.py:ro" \
                 -v "$ROOT/build_scripts/linux-package-test-runner.sh:/linux-package-test-runner.sh:ro" \
@@ -979,6 +1020,7 @@ EOF
             -v "$ROOT/examples:/source-root/examples:ro" \
             -v "$ROOT/tests:/source-tests:ro" \
             -v "$ROOT/inc:/source-inc:ro" \
+            -v "$ROOT/src/sfxlib:/source-sfxlib:ro" \
             -v "$ROOT/build_scripts/exampleageddon-freebasic.py:/exampleageddon-freebasic.py:ro" \
             -v "$TEST_RUNNER:/test-freebasic-packages.sh:ro" \
             "$image" \

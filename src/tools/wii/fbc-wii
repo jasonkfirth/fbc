@@ -57,10 +57,10 @@ find_tool() {
 	local candidate
 
 	for candidate in \
-		"${DEVKITPPC:-}/bin/$name" \
 		"${DEVKITPPC:-}/bin/$name.exe" \
-		"${DEVKITPRO:-}/tools/bin/$name" \
-		"${DEVKITPRO:-}/tools/bin/$name.exe"
+		"${DEVKITPPC:-}/bin/$name" \
+		"${DEVKITPRO:-}/tools/bin/$name.exe" \
+		"${DEVKITPRO:-}/tools/bin/$name"
 	do
 		[ -n "$candidate" ] || continue
 		[ -x "$candidate" ] || continue
@@ -192,8 +192,15 @@ elf2dol="$(find_tool elf2dol)" || die "elf2dol not found"
 
 export PATH="$DEVKITPPC/bin:$DEVKITPRO/tools/bin:$PATH"
 
-tmpdir="${FBWII_TMPDIR:-$PWD/.fbwii-tmp}"
-mkdir -p "$tmpdir"
+tmpbase="${FBWII_TMPDIR:-$PWD/.fbwii-tmp}"
+mkdir -p "$tmpbase"
+tmpdir="$(mktemp -d "$tmpbase/fbc-wii.XXXXXX")" || die "could not create a temporary tool directory"
+
+cleanup_tmpdir() {
+	rm -rf "$tmpdir"
+}
+
+trap cleanup_tmpdir EXIT
 
 host_prefix="$prefix"
 host_incdir="$incdir"
@@ -251,7 +258,6 @@ case "$(uname -s)" in
 			esac
 			host_devkitpro="$(cygpath -am "$DEVKITPRO")"
 			host_devkitppc="$(cygpath -am "$DEVKITPPC")"
-			native_bash="$(cygpath -am "$(command -v bash)")"
 			gcc_trampoline="$tmpdir/fbc-wii-gcc.cmd"
 			native_gcc="$(cygpath -am "$cc")"
 			native_gcc_trampoline="$(cygpath -am "$gcc_trampoline")"
@@ -266,32 +272,20 @@ EOF
 			fbc_ld="$native_gcc_trampoline"
 			fbc_as="$(cygpath -am "$as")"
 			fbc_elf2dol="$(cygpath -am "$elf2dol")"
-			ar_script="$tmpdir/fbc-wii-ar.sh"
 			ar_trampoline="$tmpdir/fbc-wii-ar.cmd"
-			native_ar_script="$(cygpath -am "$ar_script")"
+			native_ar="$(cygpath -am "$ar")"
 			native_ar_trampoline="$(cygpath -am "$ar_trampoline")"
-			cat > "$ar_script" <<EOF
-#!/usr/bin/env bash
-exec "$ar" "\$@"
-EOF
-			chmod +x "$ar_script"
 			cat > "$ar_trampoline" <<EOF
 @echo off
-"$native_bash" "$native_ar_script" %*
+"$native_ar" %*
 EOF
 			fbc_ar="$native_ar_trampoline"
-			ranlib_script="$tmpdir/fbc-wii-ranlib.sh"
 			ranlib_trampoline="$tmpdir/fbc-wii-ranlib.cmd"
-			native_ranlib_script="$(cygpath -am "$ranlib_script")"
+			native_ranlib="$(cygpath -am "$ranlib")"
 			native_ranlib_trampoline="$(cygpath -am "$ranlib_trampoline")"
-			cat > "$ranlib_script" <<EOF
-#!/usr/bin/env bash
-exec "$ranlib" "\$@"
-EOF
-			chmod +x "$ranlib_script"
 			cat > "$ranlib_trampoline" <<EOF
 @echo off
-"$native_bash" "$native_ranlib_script" %*
+"$native_ranlib" %*
 EOF
 			fbc_ranlib="$native_ranlib_trampoline"
 		else

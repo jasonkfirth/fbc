@@ -30,7 +30,7 @@ dist/
 # Local probe and packaging output can be extremely large.  They are not
 # source inputs and must not be copied into isolated cross-build worktrees.
 /remote_probe_temp/
-/$out/
+/out
 /out-*/
 examples/**/*.a
 examples/**/*.asm
@@ -74,7 +74,6 @@ doc/**/*.exe
 /doc/manual/updatelinks
 maketests-log/
 obj/
-out/
 # Local game corpora sometimes live beside this source tree. They are not
 # inputs to compiler package builds.
 /OMA/

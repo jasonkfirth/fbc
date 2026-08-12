@@ -456,11 +456,19 @@ void fb_hAndroidTouch(float x, float y, int action)
 		(action != AMOTION_EVENT_ACTION_CANCEL);
 	previous_count = fb_gfx3_input_platform_touch_replace(android_input,
 		active ? &contact : NULL, active ? 1u : 0u);
-	if ((previous_count == 0) && active)
-		fb_gfx3_input_platform_mouse_button(android_input, BUTTON_LEFT, TRUE,
-			FALSE);
-	if (active)
+	if (active) {
+		/*
+			The compatibility mouse position must be visible before its button
+			event is queued.  FreeBASIC programs commonly call GetMouse while
+			handling EVENT_MOUSE_BUTTON_PRESS, including after Android has already
+			delivered the corresponding release.  Publishing the button first
+			made that query fail with the initial (-1, -1) position.
+		*/
 		fb_gfx3_input_platform_mouse_move(android_input, logical_x, logical_y);
+		if (previous_count == 0)
+			fb_gfx3_input_platform_mouse_button(android_input, BUTTON_LEFT, TRUE,
+				FALSE);
+	}
 	else if (previous_count > 0)
 		fb_gfx3_input_platform_mouse_button(android_input, BUTTON_LEFT, FALSE,
 			FALSE);
@@ -843,6 +851,12 @@ static int android_allocate_platform(void **platform, void *input,
 	}
 	pthread_mutex_lock(&android_window_mutex);
 	android_input = state->input;
+	/*
+		The activity can receive its focus callback before SCREENRES creates the
+		gfxlib3 input state.  Apply the saved lifecycle value here so GetMouse and
+		GetTouch do not reject valid contacts until another focus transition occurs.
+	*/
+	fb_gfx3_input_platform_focus(android_input, android_focused);
 	pthread_mutex_unlock(&android_window_mutex);
 	*platform = state;
 	*created = state;

@@ -656,6 +656,8 @@ patch_linux_build_djgpp() {
 	[ -f "$djlsr_patch" ] || die "missing build-djgpp djlsr patch: $djlsr_patch"
 
 	msg "patching Linux build-djgpp bootstrap for modern GCC"
+	# The dollar expressions below belong to the downloaded build script.
+	# shellcheck disable=SC2016
 	run sed -i \
 		's@env -u CFLAGS ./configure --enable-fat --prefix=$BUILDDIR/tmpinst --enable-static --disable-shared || exit 1@env -u CFLAGS CC="${CC} -std=gnu17" ./configure --enable-fat --prefix=$BUILDDIR/tmpinst --enable-static --disable-shared || exit 1@' \
 		"$version_script"
@@ -679,6 +681,8 @@ EOF
 	fi
 
 	msg "patching Linux build-djgpp djlsr makefiles for parallel make"
+	# $(DIRS) is literal GNU make syntax in the patch being inspected.
+	# shellcheck disable=SC2016
 	if ! grep -Fq 'config $(DIRS) : misc.exe' "$djlsr_patch"; then
 		cat >> "$djlsr_patch" <<'EOF'
 diff -ur djlsr205-orig/src/makefile djlsr205/src/makefile
@@ -696,7 +700,10 @@ diff -ur djlsr205-orig/src/makefile djlsr205/src/makefile
 EOF
 	fi
 
+	# $(DIRS) is literal GNU make syntax in the patch being generated.
+	# shellcheck disable=SC2016
 	if ! grep -Fq 'subs: config $(DIRS) makemake.exe' "$djlsr_patch"; then
+		# shellcheck disable=SC2016
 		{
 			printf '%s\n' 'diff -ur djlsr205-orig/src/makefile djlsr205/src/makefile'
 			printf '%s\n' '--- djlsr205-orig/src/makefile	2017-04-29 14:32:47.000000000 +0800'
@@ -725,6 +732,7 @@ install_linux_dependencies() {
 		curl \
 		dos2unix \
 		dosbox-x \
+		fdisk \
 		flex \
 		freebasic \
 		g++ \
@@ -938,7 +946,8 @@ fi
 if [ "$DO_DOS_BUILD" = "1" ]; then
 	cd "$DOS_WORKTREE"
 
-	export PATH="$(dirname "$HOST_FBC"):$PATH"
+	PATH="$(dirname "$HOST_FBC"):$PATH"
+	export PATH
 
 	msg "cleaning DOS cross-build tree"
 	run make clean-compiler clean-libs clean-build clean-bootstrap \
@@ -971,7 +980,7 @@ if [ "$DO_DOS_BUILD" = "1" ]; then
 		ENABLE_STANDALONE=1 \
 		BUILD_FBC="$HOST_FBC"
 else
-	[ -x "$DOS_WORKTREE/fbc.exe" ] || die "missing standalone DOS compiler: $DOS_WORKTREE/fbc.exe"
+	[ -f "$DOS_WORKTREE/fbc.exe" ] || die "missing standalone DOS compiler: $DOS_WORKTREE/fbc.exe"
 fi
 
 ##############################################################################
@@ -982,7 +991,11 @@ if [ "$DO_STAGE_INSTALL" = "1" ]; then
 	cd "$DOS_WORKTREE"
 
 	msg "assembling DOS distribution tree"
-	rm -rf "$DISTROOT/fb" "$DISTROOT/djgpp" "$DISTROOT/inc" "$DISTROOT/lib"
+	rm -rf \
+		"${DISTROOT:?}/fb" \
+		"${DISTROOT:?}/djgpp" \
+		"${DISTROOT:?}/inc" \
+		"${DISTROOT:?}/lib"
 	rm -f "$DISTROOT/fbdos.bat"
 
 	run make install \
@@ -1020,8 +1033,10 @@ set PATH=C:\FB;C:\DJGPP\BIN;%PATH%
 echo FreeBASIC DOS environment ready.
 EOF
 else
-	[ -x "$DISTROOT/fb/fbc.exe" ] || die "missing DOS distribution tree: $DISTROOT/fb/fbc.exe"
-	[ -x "$DISTROOT/fb/bin/dos/as.exe" ] || die "missing DOS assembler: $DISTROOT/fb/bin/dos/as.exe"
+	# DOS executables do not require, and archive extraction does not retain,
+	# a Unix execute bit.  The smoke test runs these files inside DOSBox-X.
+	[ -f "$DISTROOT/fb/fbc.exe" ] || die "missing DOS distribution tree: $DISTROOT/fb/fbc.exe"
+	[ -f "$DISTROOT/fb/bin/dos/as.exe" ] || die "missing DOS assembler: $DISTROOT/fb/bin/dos/as.exe"
 fi
 
 ##############################################################################
@@ -1031,6 +1046,7 @@ fi
 run_dosbox_test() {
 	local dosbox_bin
 	local dosbox_kind
+	local -a dosbox_run_env
 	local test_root
 	local mount_root
 	local autoexec_bat
@@ -1074,6 +1090,20 @@ run_dosbox_test() {
 	if [ -z "$dosbox_bin" ]; then
 		msg "DOSBox-X not found; skipping DOSBox smoke test"
 		return 0
+	fi
+
+	dosbox_run_env=()
+	if [ "$HOST_KIND" = "linux" ] &&
+		[ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
+		# DOSBox-X still initializes SDL when -nogui is used.  A release host
+		# without X11 or Wayland therefore needs SDL's non-rendering drivers
+		# even though every DOS command is supplied on the command line.
+		dosbox_run_env=(
+			env
+			"SDL_VIDEODRIVER=${SDL_VIDEODRIVER:-dummy}"
+			"SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-dummy}"
+		)
+		msg "using SDL dummy video and audio drivers for headless DOSBox-X"
 	fi
 
 	msg "running DOSBox-X smoke test"
@@ -1143,7 +1173,7 @@ EOF
 			mtools_image_file="$dosbox_image_file"
 		fi
 		rm -f "$image_file"
-		run_timeout_checked "$DOSBOX_TIMEOUT" "$dosbox_bin" \
+		run_timeout_checked "$DOSBOX_TIMEOUT" "${dosbox_run_env[@]}" "$dosbox_bin" \
 			-fastlaunch \
 			-nogui \
 			-nomenu \
@@ -1167,7 +1197,7 @@ EOF
 		run env MTOOLS_SKIP_CHECK=1 mcopy -i "${mtools_image_file}@@${partition_offset}" -s "${mtools_source_paths[@]}" ::
 
 		dosbox_status=0
-		run_timeout_checked "$DOSBOX_TIMEOUT" "$dosbox_bin" \
+		run_timeout_checked "$DOSBOX_TIMEOUT" "${dosbox_run_env[@]}" "$dosbox_bin" \
 			-fastlaunch \
 			-nogui \
 			-nomenu \
@@ -1191,7 +1221,8 @@ print #1, "FreeBASIC DOS OK"
 close #1
 EOF
 
-		# Keep the compiler's temporary assembly files 8.3-safe under DOSBox.
+		# Compile normally so the smoke test exercises the compiler's 8.3-safe
+		# intermediate names and its successful-link cleanup path.
 		autoexec_bat="$test_root/fbtest.bat"
 		cat > "$autoexec_bat" <<'EOF'
 @echo off
@@ -1205,7 +1236,7 @@ if not exist C:\DJGPP\BIN\GCC.EXE echo missing-gcc>>trace.log
 if not exist C:\DJGPP\DJGPP.ENV echo missing-env>>trace.log
 C:\DJGPP\BIN\CWSDPMI.EXE -p >>trace.log
 echo cwsdpmi-errorlevel=%ERRORLEVEL%>>trace.log
-C:\FB\FBC.EXE -R -RR hello.bas >>trace.log
+C:\FB\FBC.EXE hello.bas >>trace.log
 echo fbc-errorlevel=%ERRORLEVEL%>>trace.log
 dir hello.* >>trace.log
 if exist hello.exe goto runhello
@@ -1222,7 +1253,7 @@ EOF
 		dosbox_status=0
 		case "$dosbox_kind" in
 			dosbox-x)
-				run_timeout_checked "$DOSBOX_TIMEOUT" "$dosbox_bin" \
+				run_timeout_checked "$DOSBOX_TIMEOUT" "${dosbox_run_env[@]}" "$dosbox_bin" \
 					-fastlaunch \
 					-nogui \
 					-nomenu \
@@ -1235,7 +1266,7 @@ EOF
 					|| dosbox_status=$?
 				;;
 			*)
-				run_timeout_checked "$DOSBOX_TIMEOUT" "$dosbox_bin" \
+				run_timeout_checked "$DOSBOX_TIMEOUT" "${dosbox_run_env[@]}" "$dosbox_bin" \
 					-set "cpu cputype=pentium_pro" \
 					-exit \
 					-c "mount c \"$mount_root\"" \

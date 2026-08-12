@@ -28,29 +28,55 @@
 	#include <windows.h>
 #endif
 
-typedef struct BMP_HEADER
+static int write_byte(FILE *f, unsigned int value)
 {
-	unsigned short bfType;
-	unsigned int   bfSize;
-	unsigned short bfReserved1;
-	unsigned short bfReserved2;
-	unsigned int   bfOffBits;
-	unsigned int   biSize;
-	unsigned int   biWidth;
-	unsigned int   biHeight;
-	unsigned short biPlanes;
-	unsigned short biBitCount;
-	unsigned int   biCompression;
-	unsigned int   biSizeImage;
-	unsigned int   biXPelsPerMeter;
-	unsigned int   biYPelsPerMeter;
-	unsigned int   biClrUsed;
-	unsigned int   biClrImportant;
-} FBPACKED BMP_HEADER;
+	return (fputc((int)(value & 0xFF), f) != EOF);
+}
+
+static int write_le16(FILE *f, unsigned int value)
+{
+	return write_byte(f, value) &&
+	       write_byte(f, value >> 8);
+}
+
+static int write_le32(FILE *f, unsigned int value)
+{
+	return write_byte(f, value) &&
+	       write_byte(f, value >> 8) &&
+	       write_byte(f, value >> 16) &&
+	       write_byte(f, value >> 24);
+}
+
+static int write_bmp_header(FILE *f, unsigned int bfSize,
+	unsigned int bfOffBits, unsigned int width, unsigned int height,
+	unsigned int bitsperpixel, unsigned int biSizeImage,
+	unsigned int biClrUsed)
+{
+	/*
+		BMP integers are always little-endian.  Writing the old packed C
+		structure directly produced an "MB" signature and reversed every
+		header field on big-endian targets such as s390x.
+	*/
+	return write_le16(f, 0x4D42) && /* 'B' 'M' */
+	       write_le32(f, bfSize) &&
+	       write_le16(f, 0) &&
+	       write_le16(f, 0) &&
+	       write_le32(f, bfOffBits) &&
+	       write_le32(f, 40) &&
+	       write_le32(f, width) &&
+	       write_le32(f, height) &&
+	       write_le16(f, 1) &&
+	       write_le16(f, bitsperpixel) &&
+	       write_le32(f, 0) &&
+	       write_le32(f, biSizeImage) &&
+	       write_le32(f, 0xB12) &&
+	       write_le32(f, 0xB12) &&
+	       write_le32(f, biClrUsed) &&
+	       write_le32(f, biClrUsed);
+}
 
 static int save_bmp(FB_GFXCTX *ctx, FILE *f, void *src, void *pal, int outbpp)
 {
-	BMP_HEADER header;
 	PUT_HEADER *put_header;
 	int w, h, i, bfSize, biSizeImage, bfOffBits, biClrUsed, inbpp, inpitch, outpitch, color;
 	unsigned char *s, *buffer, *p;
@@ -136,21 +162,10 @@ static int save_bmp(FB_GFXCTX *ctx, FILE *f, void *src, void *pal, int outbpp)
 		break;
 	}
 
-	fb_hMemSet(&header, 0, sizeof(header));
-	header.bfType = 0x4D42; /* 'B' 'M' */
-	header.bfSize = bfSize;
-	header.bfOffBits = bfOffBits;
-	header.biSize = 40;
-	header.biWidth = w;
-	header.biHeight = h;
-	header.biPlanes = 1;
-	header.biBitCount = outbpp * 8;
-	header.biSizeImage = biSizeImage;
-	header.biXPelsPerMeter = 0xB12;
-	header.biYPelsPerMeter = 0xB12;
-	header.biClrUsed = biClrUsed;
-	header.biClrImportant = biClrUsed;
-	if (!fwrite(&header, 54, 1, f))
+	if (!write_bmp_header(f, (unsigned int)bfSize,
+	    (unsigned int)bfOffBits, (unsigned int)w, (unsigned int)h,
+	    (unsigned int)(outbpp * 8), (unsigned int)biSizeImage,
+	    (unsigned int)biClrUsed))
 		return FB_RTERROR_FILEIO;
 
 	if (inbpp == 1) {
@@ -218,8 +233,12 @@ static int save_bmp(FB_GFXCTX *ctx, FILE *f, void *src, void *pal, int outbpp)
 				DBG_ASSERT(inbpp == 4);
 				DBG_ASSERT(outbpp == 3 || outbpp == 4);
 				for (i = 0; i < w; i++) {
-					*(unsigned int *)p = ((unsigned int *)s)[i];
-					p += outbpp;
+					color = ((unsigned int *)s)[i];
+					*p++ = color & 0xFF;
+					*p++ = (color >> 8) & 0xFF;
+					*p++ = (color >> 16) & 0xFF;
+					if (outbpp == 4)
+						*p++ = (color >> 24) & 0xFF;
 				}
 				break;
 		}

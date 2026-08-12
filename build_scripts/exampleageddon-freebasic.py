@@ -242,6 +242,7 @@ INTERACTIVE_RE = re.compile(
 )
 
 NETWORK_RE = re.compile(r"\b(open\s+tcp|http-get|http_get|ftp|gethostbyname)\b", re.IGNORECASE)
+THREADCALL_RE = re.compile(r"\bthreadcall\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -358,7 +359,7 @@ def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="ignore")
 
 
-def classify(path: Path, root: Path) -> Classification:
+def classify(path: Path, root: Path, target_os: str) -> Classification:
     rel = relpath(path, root)
     lowered_path = "/" + rel.lower()
     text = read_text(path)
@@ -369,6 +370,12 @@ def classify(path: Path, root: Path) -> Classification:
 
     if rel in HELPER_MODULES:
         return Classification("helper-module", "source is built through a multi-file or library rule", False)
+
+    if rel.startswith("examples/nuttx/") and target_os != "nuttx":
+        return Classification("platform-specific", "example requires the NuttX runtime", False)
+
+    if target_os == "wii" and THREADCALL_RE.search(text):
+        return Classification("platform-specific", "Wii intentionally builds without libffi THREADCALL support", False)
 
     if rel in PLATFORM_SOURCES:
         return Classification("platform-specific", "example contains platform-specific ABI or OS assumptions", False)
@@ -685,7 +692,7 @@ def run_command(
 
 def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     rel = relpath(path, root)
-    classification = classify(path, root)
+    classification = classify(path, root, args.target_os)
     stem = safe_name(rel[:-4])
     binary = args.outdir / "bin" / executable_name(stem)
     compile_log = args.outdir / "logs" / (stem + ".compile.log")
@@ -700,6 +707,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     cmd = list(args.fbc)
     if args.prefix is not None:
         cmd.extend(["-prefix", str(args.prefix)])
+    cmd.extend(args.fbc_arg)
 
     cmd.extend([
         "-i",
@@ -911,6 +919,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--include-dir", type=Path, default=None)
     parser.add_argument("--fbc", default=str(root / "bin" / "fbc"))
+    parser.add_argument("--fbc-arg", action="append", default=[], help="Pass an additional argument to every compiler invocation")
+    parser.add_argument("--target-os", default=platform.system().lower(), help="Classify target-specific examples for this OS")
     parser.add_argument("--jobs", type=int, default=cpu_count)
     parser.add_argument("--compile-timeout", type=int, default=60)
     parser.add_argument("--run-timeout", type=int, default=15)
@@ -929,6 +939,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     else:
         args.prefix = (args.prefix or args.root).resolve()
     args.include_dir = (args.include_dir or (args.root / "inc")).resolve()
+    args.target_os = args.target_os.strip().lower()
     args.remote_shell = shlex.split(args.remote_shell)
 
     if args.remote_shell:
@@ -951,6 +962,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
     if args.jobs < 1:
         parser.error("--jobs must be positive")
+
+    if not args.target_os:
+        parser.error("--target-os must not be empty")
 
     return args
 

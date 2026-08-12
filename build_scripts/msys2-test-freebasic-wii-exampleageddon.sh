@@ -13,7 +13,7 @@
 #
 #       * locate the packaged FreeBASIC Wii install tree
 #       * configure the devkitPro environment used by fbc-wii
-#       * compile the example tree for Wii in no-run mode
+#       * compile the example tree for Wii in multithreaded no-run mode
 #       * fail when self-contained examples stop compiling
 #
 #   This file intentionally does NOT contain:
@@ -163,7 +163,8 @@ if ! have python; then
     fail "python is required for exampleageddon"
 fi
 
-# shellcheck disable=SC1090
+# The environment file is supplied by the package selected at runtime.
+# shellcheck disable=SC1091
 . "${PACKAGE_ROOT}/freebasic-wii-env.sh"
 
 FBC_WII="${PACKAGE_ROOT}/fbc-wii-package.sh"
@@ -195,6 +196,8 @@ args=(
     --fbc "${FBC_WII}"
     --prefix "${PACKAGE_ROOT}"
     --include-dir "${PACKAGE_ROOT}/include/freebasic-wii"
+    --target-os wii
+    --fbc-arg=-mt
     --jobs "${JOBS}"
     --compile-timeout "${COMPILE_TIMEOUT}"
     --no-run

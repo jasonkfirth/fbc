@@ -10,7 +10,7 @@ trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 #
 # Responsibilities:
 #   - locate a packaged fbc-xbox distribution
-#   - copy tests/ into an isolated work directory
+#   - copy tests/, inc/, and test-facing sfxlib sources into an isolated tree
 #   - compile every log-test source in every dialect
 #   - link the compile-and-run log tests as XBEs without host execution
 #   - build the aggregate fbcunit test XBE
@@ -22,8 +22,8 @@ trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 #   - per-test xemu execution
 ##############################################################################
 
-SELF_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
-ROOT="$(CDPATH= cd -- "$SELF_DIR/.." && pwd)"
+SELF_DIR="$(CDPATH='' cd -- "$(dirname "$0")" && pwd)"
+ROOT="$(CDPATH='' cd -- "$SELF_DIR/.." && pwd)"
 
 cd "$ROOT"
 
@@ -50,6 +50,7 @@ DIST_DIR=""
 WORKROOT="${WORKROOT:-$ROOT/.build-msys2/freebasic-xbox-tests}"
 LANGS="fb,fblite,qb,deprecated"
 KEEP_WORKROOT=0
+MAX_REPORTED_FAILURES=40
 
 usage() {
 	cat <<EOF
@@ -186,6 +187,69 @@ run_logged() {
 	"$@" > "$log" 2>&1
 }
 
+stage_test_sources() {
+	local workroot="$1"
+	local tests_work="$workroot/tests"
+
+	rm -rf "$workroot"
+	mkdir -p "$tests_work" "$workroot/logs"
+
+	# Generated Windows executables can occupy the same MSYS path as tracked
+	# extensionless Unix fixtures.  Stage tracked and non-ignored files so
+	# those aliases cannot replace a real test input during the copy.
+	if command -v git >/dev/null 2>&1 &&
+		git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+		git -C "$ROOT" ls-files -co --exclude-standard -z -- tests inc src/sfxlib |
+			while IFS= read -r -d '' source_path; do
+				[ -e "$ROOT/$source_path" ] || continue
+				printf '%s\0' "$source_path"
+			done |
+			rsync -a --from0 --files-from=- "$ROOT/" "$workroot/"
+	else
+		rsync -a --delete \
+			--exclude='*.a' \
+			--exclude='*.asm' \
+			--exclude='*.dylib' \
+			--exclude='*.exe' \
+			--exclude='*.lib' \
+			--exclude='*.log' \
+			--exclude='*.o' \
+			--exclude='*.obj' \
+			--exclude='*.so' \
+			--exclude='*.tmp' \
+			--exclude='.fbwii-tmp/' \
+			--exclude='.maketests-tmp/' \
+			--exclude='fbc-tests' \
+			--exclude='unit-tests.inc' \
+			--exclude='unit-tests-obj.lst' \
+			--exclude='log-tests-*.inc' \
+			--exclude='failed-log-tests-*.inc' \
+			--exclude='log-tests-*.lst' \
+			--exclude='log-tests-results-*.log' \
+			"$ROOT/tests/" "$tests_work/"
+
+		rsync -a --delete "$ROOT/inc/" "$workroot/inc/"
+		rsync -a --delete "$ROOT/src/sfxlib/" "$workroot/src/sfxlib/"
+	fi
+}
+
+generate_log_test_lists() {
+	local lang
+	local log
+	local generated_langs=()
+
+	IFS=',' read -r -a generated_langs <<< "$LANGS"
+	for lang in "${generated_langs[@]}"; do
+		[ -n "$lang" ] || continue
+		log="$LOG_DIR/log-tests-list-$lang.log"
+		msg "generating Xbox log-test list for -lang $lang"
+		if ! run_logged "$log" \
+			make -f log-tests.mk "log-tests-$lang.inc" FB_LANG="$lang"; then
+			fail "could not generate log-tests-$lang.inc; see $log"
+		fi
+	done
+}
+
 list_tests() {
 	local inc="$1"
 	local key="$2"
@@ -205,6 +269,9 @@ compile_only_ok() {
 	local safe
 	local log
 	local obj
+	local fbc_flags=()
+
+	mapfile -t fbc_flags < <(fbc_flags_for_lang "$lang")
 
 	safe="$(safe_name "$lang-COMPILE_ONLY_OK-$src")"
 	log="$LOG_DIR/$safe.log"
@@ -213,7 +280,7 @@ compile_only_ok() {
 	TEST_COUNT=$((TEST_COUNT + 1))
 	mkdir -p "$(dirname "$obj")"
 
-	if run_logged "$log" "$FBC_XBOX" $(fbc_flags_for_lang "$lang") -c "$src" -o "$obj"; then
+	if run_logged "$log" "$FBC_XBOX" "${fbc_flags[@]}" -c "$src" -o "$obj"; then
 		record_pass "COMPILE_ONLY_OK" "$src"
 	else
 		record_fail "COMPILE_ONLY_OK" "$src" "$log"
@@ -227,6 +294,9 @@ compile_only_fail() {
 	local log
 	local obj
 	local status
+	local fbc_flags=()
+
+	mapfile -t fbc_flags < <(fbc_flags_for_lang "$lang")
 
 	safe="$(safe_name "$lang-COMPILE_ONLY_FAIL-$src")"
 	log="$LOG_DIR/$safe.log"
@@ -236,7 +306,7 @@ compile_only_fail() {
 	mkdir -p "$(dirname "$obj")"
 
 	set +e
-	"$FBC_XBOX" $(fbc_flags_for_lang "$lang") -c "$src" -o "$obj" > "$log" 2>&1
+	"$FBC_XBOX" "${fbc_flags[@]}" -c "$src" -o "$obj" > "$log" 2>&1
 	status=$?
 	set -e
 
@@ -261,10 +331,14 @@ build_single_module() {
 
 	TEST_COUNT=$((TEST_COUNT + 1))
 
+	# Xbox is always a cross target.  Compile and link each single-module
+	# test in one fbc invocation so automatic gfxlib, sfxlib, and runtime
+	# selection is still available when the final XBE is linked.
 	if run_logged "$log" \
 		make -f bmk-make.mk \
 			FILE="$src" \
 			TEST_MODE="$mode" \
+			COMPILE_AND_LINK=1 \
 			FBC="$FBC_XBOX" \
 			CC="$NXDK_CC" \
 			CXX="$TEST_CXX" \
@@ -384,7 +458,7 @@ if [ -z "$DIST_DIR" ]; then
 fi
 
 [ -n "$DIST_DIR" ] || fail "could not locate fbc-xbox distribution; pass --dist-dir"
-DIST_DIR="$(CDPATH= cd -- "$DIST_DIR" && pwd)"
+DIST_DIR="$(CDPATH='' cd -- "$DIST_DIR" && pwd)"
 FBC_XBOX="$DIST_DIR/fbc-xbox-package.sh"
 NXDK_CC="$DIST_DIR/nxdk/bin/nxdk-cc"
 NXDK_CXX="$DIST_DIR/nxdk/bin/nxdk-cxx"
@@ -397,10 +471,13 @@ TEST_CXX="$NXDK_CXX"
 [ -f "$NXDK_CXX" ] || fail "missing nxdk-cxx in $DIST_DIR"
 have make || fail "make was not found"
 have awk || fail "awk was not found"
+have rsync || fail "rsync was not found"
 
 [ -n "$MINGW32_GXX" ] || fail "32-bit MinGW g++ was not found; set MINGW32_CXX or install mingw-w64-i686-gcc"
 
-export PATH="$(dirname "$MINGW32_GXX"):$PATH"
+MINGW32_GXX_DIR="$(dirname "$MINGW32_GXX")"
+PATH="$MINGW32_GXX_DIR:$PATH"
+export PATH
 case "$("$MINGW32_GXX" -dumpmachine 2>/dev/null || true)" in
 	i?86-*-mingw*) ;;
 	*)
@@ -410,18 +487,14 @@ esac
 
 TEST_CXX="$MINGW32_GXX"
 
-rm -rf "$WORKROOT"
-mkdir -p "$WORKROOT"
-
 TEST_WORKDIR="$WORKROOT/tests"
 LOG_DIR="$WORKROOT/logs"
 OBJ_DIR="$WORKROOT/obj"
 SUMMARY_LOG="$WORKROOT/xbox-tests-summary.log"
 
+msg "copying tests and test-facing sources into isolated work directory"
+stage_test_sources "$WORKROOT"
 mkdir -p "$TEST_WORKDIR" "$LOG_DIR" "$OBJ_DIR"
-
-msg "copying tests/ into isolated work directory"
-cp -a "$ROOT/tests/." "$TEST_WORKDIR/"
 
 cd "$TEST_WORKDIR"
 
@@ -433,6 +506,8 @@ find . -type f \( \
 	-name '*.a' -o \
 	-name 'failed-*.inc' -o \
 	-name 'failed-*.log' -o \
+	-name 'log-tests-*.inc' -o \
+	-name 'log-tests-*.lst' -o \
 	-name 'log-tests-results-*.log' -o \
 	-name 'unit-tests-obj.lst' -o \
 	-name 'unit-tests.inc' \
@@ -442,6 +517,8 @@ find . -type f \( \
 TEST_COUNT=0
 PASS_COUNT=0
 FAIL_COUNT=0
+
+generate_log_test_lists
 
 ##############################################################################
 # Test execution
@@ -468,7 +545,15 @@ echo "log:    $SUMMARY_LOG"
 if [ "$FAIL_COUNT" -ne 0 ]; then
 	echo ""
 	echo "First failures:"
-	grep '^FAIL ' "$SUMMARY_LOG" | head -40
+	awk -v max="$MAX_REPORTED_FAILURES" '
+		/^FAIL / {
+			print
+			shown++
+			if (shown >= max) {
+				exit
+			}
+		}
+	' "$SUMMARY_LOG"
 	echo ""
 	echo "Full logs are under: $LOG_DIR"
 	exit 1

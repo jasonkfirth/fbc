@@ -1,4 +1,4 @@
-' TEST_MODE : COMPILE_AND_RUN_OK
+' Build metadata and the required multithreaded link mode are in tcp.bmk.
 
 #if defined(__FB_DOS__) or defined(__FB_JS__) or defined(__FB_XBOX__)
 	end 0

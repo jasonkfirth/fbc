@@ -52,7 +52,7 @@ type SweepPair
 end type
 
 union SweepUnion
-	i as integer
+	i as ulong
 	b(0 to 3) as ubyte
 end union
 
@@ -168,7 +168,8 @@ expect_int "operator second", c.second, 6
 
 dim as SweepUnion u
 u.i = &h01020304
-expect_true "union alias", u.b(0) <> 0 orelse u.b(1) <> 0
+expect_int "union alias", _
+	u.b(0) + u.b(1) + u.b(2) + u.b(3), 10
 
 dim as NestedType nested = type<NestedType>( 9 )
 expect_int "namespace type", nested.value, 9

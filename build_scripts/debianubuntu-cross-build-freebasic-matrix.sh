@@ -49,6 +49,19 @@ done
 cd "$ROOT"
 . "$ROOT/build_scripts/build-success-cleanup.sh"
 
+#
+# Release worktrees may share a large artifact directory through an out
+# symlink.  The source bind mount alone cannot expose a sibling symlink target
+# inside Docker, so mount the resolved output directory explicitly at
+# /work/out.  This also keeps ordinary in-tree output directories working.
+#
+mkdir -p "$ROOT/out"
+HOST_OUTPUT_ROOT="$(readlink -f "$ROOT/out")"
+[ -n "$HOST_OUTPUT_ROOT" ] && [ -d "$HOST_OUTPUT_ROOT" ] || {
+    echo "ERROR: could not resolve output directory: $ROOT/out" >&2
+    exit 1
+}
+
 CLEANUP_SUCCESS=0
 CLEANUP_DIRS=(
     "$ROOT/.build-debianubuntu-cross"
@@ -369,13 +382,13 @@ list_plan() {
     local entry
     local distro
     local image
-    local tag
+    local _tag
     local codename
     local arch
     local outdir
 
     for entry in "${DISTRO_TARGETS[@]}"; do
-        IFS="|" read -r distro image tag codename <<EOF
+        IFS="|" read -r distro image _tag codename <<EOF
 $entry
 EOF
 
@@ -633,13 +646,13 @@ selected_entries() {
     local entry
     local distro
     local image
-    local tag
+    local _tag
     local codename
     local arch
     local outdir
 
     for entry in "${DISTRO_TARGETS[@]}"; do
-        IFS="|" read -r distro image tag codename <<EOF
+        IFS="|" read -r distro image _tag codename <<EOF
 $entry
 EOF
 
@@ -775,6 +788,7 @@ EOF
             -e JOBS="$MAKE_JOBS" \
             "${docker_env_args[@]}" \
             -v "$ROOT:/work" \
+            -v "$HOST_OUTPUT_ROOT:/work/out" \
             -w /work \
             "$image" \
             bash -lc "${build_cmd}${xbox_cmd}"
