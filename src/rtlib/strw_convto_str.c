@@ -72,11 +72,6 @@ FBCALL FBSTRING *fb_WstrToStr( const FB_WCHAR *src )
 	if( src == NULL )
 		return &__fb_ctx.null_desc;
 
-#if defined HOST_DOS
-	/* on DOS, wcstombs() simply calls memcpy() and won't compute
-	   length, see fb_unicode.h */
-	chars = fb_wstr_Len( src );
-#else
 	chars = wcstombs( NULL, src, 0 );
 	if( chars < 0 )
 	{
@@ -89,7 +84,6 @@ FBCALL FBSTRING *fb_WstrToStr( const FB_WCHAR *src )
 		 */
 		chars = fb_wstr_Len( src );
 	}
-#endif
 	if( chars == 0 )
 		return &__fb_ctx.null_desc;
 

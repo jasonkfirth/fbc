@@ -11,12 +11,7 @@
 private function hFloatConstIsZero( byval expr as ASTNODE ptr ) as integer
 	assert( astIsCONST( expr ) )
 
-	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
-		dim as ulongint bits = *cptr( ulongint ptr, @expr->val.f )
-		function = ((bits and &h7FFFFFFFFFFFFFFFull) = 0)
-	#else
-		function = (expr->val.f = 0.0)
-	#endif
+	function = (expr->val.f = 0.0)
 end function
 
 '':::::

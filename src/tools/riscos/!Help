@@ -1,0 +1,39 @@
+FreeBASIC RISC OS application help
+==================================
+
+File: !Help
+
+Purpose:
+
+  Explain how to activate the installed compiler and build a program.
+
+Responsibilities:
+
+  - identify the required GCC4 package
+  - show the compiler activation and command-line workflow
+  - describe the native executable format
+
+This file intentionally does not contain build-host or emulator setup.
+
+FreeBASIC for RISC OS
+---------------------
+
+This application supplies the native FreeBASIC compiler, runtime libraries,
+headers, and small examples for RISC OS.
+
+Before compiling, install and boot the GCC4 RiscPkg package. Then boot
+!FreeBASIC or double-click it once to add fbc to Run$Path.
+
+Example command:
+
+  fbc hello.bas -x hello
+
+The native compiler links static UnixLib programs and converts them to RISC OS
+AIF executables. The bundled elf2aif is the open GCCSDK converter with the
+UnixLib path handling needed by this port.
+
+Project documentation and source code:
+
+  https://www.freebasic.net/
+
+end of !Help

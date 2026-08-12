@@ -2,7 +2,7 @@
 
 #include "fb.h"
 
-#if !defined( HOST_DOS ) && !defined( HOST_ANDROID ) && !defined( HOST_JS )
+#if !defined( HOST_ANDROID ) && !defined( HOST_JS )
 
 static ssize_t fb_wstr_ConvFromA_nomultibyte(FB_WCHAR *dst, ssize_t dst_chars, const char *src)
 {
@@ -91,11 +91,7 @@ FBCALL FB_WCHAR *fb_StrToWstr( const char *src )
 	if( src == NULL )
 		return NULL;
 
-#if defined HOST_DOS
-	/* on DOS, mbstowcs() simply calls memcpy() and won't compute
-	length  see fb_unicode.h */
-	chars = strlen( src );
-#elif defined HOST_ANDROID || defined HOST_JS
+#if defined HOST_ANDROID || defined HOST_JS
 	/*
 	 * See fb_wstr_ConvFromA(): Android and JavaScript program text is
 	 * UTF-8, and relying on mbsrtowcs() makes conversion depend on early

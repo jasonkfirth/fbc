@@ -1,0 +1,42 @@
+| FreeBASIC native RISC OS compile smoke test
+| --------------------------------------------
+|
+| File: Compile
+|
+| Purpose:
+|
+|     Compile the staged hello.bas program entirely inside RISC OS.
+|
+| Responsibilities:
+|
+|     - invoke the native FreeBASIC compiler with its HostFS prefix
+|     - run the resulting AIF executable when compilation succeeds
+|     - leave compiler diagnostics visible in the RISC OS TaskWindow
+|
+| This file intentionally does NOT configure !GCC or FreeBASIC paths.  Run
+| !GCC and SetPaths before this file.
+
+| UnixLib tools use return codes below this limit.  Keeping the limit high
+| lets this diagnostic script print their errors instead of closing the
+| TaskWindow at the first failed command.
+Set Sys$RCLimit 2147483647
+| GCC's compiler stages need more than the desktop's default task slot.
+WimpSlot -min 32M
+Spool HostFS:$.FreeBASIC.compile-log
+Echo Starting native FreeBASIC compile.
+Show GCC$Dir
+Show GCCbin$Path
+Show Run$Path
+Echo Checking native GCC driver startup.
+gcc --version
+Echo GCC startup return code: <Sys$ReturnCode>
+fbc -v -prefix /HostFS:$/FreeBASIC /HostFS:$/FreeBASIC/examples/hello.bas -x /HostFS:$/FreeBASIC/examples/hello
+Set FreeBASIC$CompileStatus <Sys$ReturnCode>
+Echo Native compile return code: <FreeBASIC$CompileStatus>
+If "<FreeBASIC$CompileStatus>" = "0" Then Run HostFS:$.FreeBASIC.examples.hello
+Set FreeBASIC$RunStatus <Sys$ReturnCode>
+Echo Native run return code: <FreeBASIC$RunStatus>
+Spool
+Type HostFS:$.FreeBASIC.compile-log
+
+| end of Compile

@@ -83,7 +83,8 @@ quick-test-body: sanity \
 	compiler-loongarch64-smoke \
 	compiler-ppc-smoke \
 	compiler-ppc64-smoke \
-	compiler-ppc64le-smoke
+	compiler-ppc64le-smoke \
+	compiler-riscos-smoke
 
 .PHONY: full-test full-test-body
 full-test: full-test-body
@@ -119,6 +120,7 @@ full-test-body: sanity \
 	compiler-ppc-smoke \
 	compiler-ppc64-smoke \
 	compiler-ppc64le-smoke \
+	compiler-riscos-smoke \
 	tests-test
 
 MAKETEST_HOST_FBC_TARGETS := \
@@ -151,6 +153,7 @@ MAKETEST_HOST_FBC_TARGETS := \
 	compiler-ppc-smoke \
 	compiler-ppc64-smoke \
 	compiler-ppc64le-smoke \
+	compiler-riscos-smoke \
 	tests-test
 
 $(MAKETEST_HOST_FBC_TARGETS): | maketests-preserve-host-fbc

@@ -1,4 +1,4 @@
-'' main module, front-end
+'' DOS main module, front-end
 ''
 '' Ownership: The driver owns its shared context, command-line temporary state,
 '' and generated temporary files until fbcEnd() releases them.
@@ -143,6 +143,7 @@ enum FBCTOOL
 	FBCTOOL_EMLD
 	FBCTOOL_EMCC
 	FBCTOOL_ELF2DOL
+	FBCTOOL_ELF2AIF
 	FBCTOOL__COUNT
 end enum
 
@@ -186,7 +187,8 @@ static shared as FBCTOOLINFO fbctoolTB(0 to FBCTOOL__COUNT-1) = _
 	/' FBCTOOL_EMAR    '/ ( "emar"   , "EMAR"   , FBCTOOLFLAG_DEFAULT  ), _
 	/' FBCTOOL_EMLD    '/ ( "emcc"   , "EMLD"   , FBCTOOLFLAG_DEFAULT  ), _
 	/' FBCTOOL_EMCC    '/ ( "emcc"   , "EMCC"   , FBCTOOLFLAG_DEFAULT  ), _
-	/' FBCTOOL_ELF2DOL '/ ( "elf2dol", "ELF2DOL", FBCTOOLFLAG_DEFAULT  )  _
+	/' FBCTOOL_ELF2DOL '/ ( "elf2dol", "ELF2DOL", FBCTOOLFLAG_DEFAULT  ), _
+	/' FBCTOOL_ELF2AIF '/ ( "elf2aif", "ELF2AIF", FBCTOOLFLAG_DEFAULT  )  _
 }
 
 declare sub fbcFindBin _
@@ -194,6 +196,15 @@ declare sub fbcFindBin _
 		byval tool as integer, _
 		byref path as string _
 	)
+
+declare function fbcRiscosHostMayQueryCcForTool( ) as integer
+declare function fbcRiscosHostRunTool _
+	( _
+		byval tool as integer, _
+		byref path as string, _
+		byref arguments as string, _
+		byref was_handled as integer _
+	) as integer
 
 declare sub hPrintVersion( byval verbose as integer )
 declare sub hAddDarwinFrameworks( byref ldcline as string )
@@ -644,10 +655,12 @@ private sub fbcFindBin _
 				case FB_BACKEND_GCC, FB_BACKEND_CLANG
 					'' c) Ask GCC where it is, if applicable (GCC might have its
 					'' own copy which we must use instead of the system one)
-					if( tool = FBCTOOL_AS ) then
-						path = fbcQueryCC( " -print-prog-name=as" )
-					elseif( tool = FBCTOOL_LD ) then
-						path = fbcQueryCC( " -print-prog-name=ld" )
+					if( fbcRiscosHostMayQueryCcForTool( ) ) then
+						if( tool = FBCTOOL_AS ) then
+							path = fbcQueryCC( " -print-prog-name=as" )
+						elseif( tool = FBCTOOL_LD ) then
+							path = fbcQueryCC( " -print-prog-name=ld" )
+						end if
 					end if
 				case FB_BACKEND_GAS, FB_BACKEND_GAS64
 					#if defined( __FB_FREEBSD__ )
@@ -734,21 +747,25 @@ private function fbcRunBin _
 		print *action + ": ", path + " " + ln
 	end if
 
-	'' Always use exec() on Unix or for standalone because
-	'' - Unix exec() already searches the PATH, so shell() isn't needed,
-	'' - standalone doesn't use system-wide tools
-	#if defined( __FB_UNIX__ ) or defined( ENABLE_STANDALONE )
-		result = exec( path, ln )
-	#else
-		'' Found at bin/?
-		if( fbctoolGetFlags( tool, FBCTOOLFLAG_RELYING_ON_SYSTEM ) = FALSE ) then
+	dim as integer was_handled
+	result = fbcRiscosHostRunTool( tool, path, ln, was_handled )
+	if( was_handled = FALSE ) then
+		'' Always use exec() on Unix hosts or for standalone because
+		'' - Unix exec() searches PATH on those hosts, so shell() isn't needed,
+		'' - standalone doesn't use system-wide tools.
+		#if defined( __FB_UNIX__ ) or defined( ENABLE_STANDALONE )
 			result = exec( path, ln )
-		else
-			'' System-provided tools must be resolved through the host PATH; Exec()
-			'' cannot reproduce that platform-specific command lookup.
-			result = shell( path + " " + ln )
-		end if
-	#endif
+		#else
+			'' Found at bin/?
+			if( fbctoolGetFlags( tool, FBCTOOLFLAG_RELYING_ON_SYSTEM ) = FALSE ) then
+				result = exec( path, ln )
+			else
+				'' System-provided tools must be resolved through the host PATH; Exec()
+				'' cannot reproduce that platform-specific command lookup.
+				result = shell( path + " " + ln )
+			end if
+		#endif
+	end if
 
 	if( result = 0 ) then
 		function = TRUE
@@ -780,35 +797,13 @@ private function hGetTempFileTag( ) as string
 	function = tag
 end function
 
-#ifdef __FB_DOS__
-private function hGetDosTempFileStem _
-	( _
-		byref reference as string, _
-		byref key as string _
-	) as string
-
-	''
-	'' Plain DOS does not necessarily provide long filename services.  Keep
-	'' compiler-owned files within the 8.3 limit while retaining the full path
-	'' and per-invocation tag as inputs to the name.
-	''
-	dim as string hashinput = reference + key + hGetTempFileTag( )
-	function = hStripFilename( reference ) + _
-		hex( hashHash( strptr( hashinput ) ), 8 )
-end function
-#endif
-
-#if defined( __FB_WIN32__ ) or defined( __FB_DOS__ )
+#if defined( __FB_WIN32__ )
 private function hPutLdArgsIntoFile( byref ldcline as string ) as integer
 	dim as string argsfile, ln
 	dim as integer f = any
 
-#ifdef __FB_DOS__
-	argsfile = hGetDosTempFileStem( fbc.outname, ldcline ) + ".tmp"
-#else
 	argsfile = hStripFilename( fbc.outname ) + _
 		"ldopt" + hGetTempFileTag( ) + ".tmp"
-#endif
 
 	f = freefile( )
 	if( open( argsfile, for output, as #f ) ) then
@@ -1079,6 +1074,9 @@ private sub hPrepareLinkTarget _
 		'' The compiler driver supplies native architecture and startup defaults.
 	case FB_COMPTARGET_WII
 		'' The devkitPPC driver supplies newlib and libgcc startup support.
+	case FB_COMPTARGET_RISCOS
+		'' GCCSDK's driver supplies the RISC OS ELF startup objects, UnixLib,
+		'' libgcc, and the correct armelf_riscos linker emulation.
 	case FB_COMPTARGET_NETBSD
 		ldcline += " -rpath /usr/X11R7/lib/ "
 		ldcline += " -rpath /usr/pkg/lib/ "
@@ -1141,14 +1139,6 @@ private function hLinkDosDxe _
 		end if
 		DZstrAllocate( args, 0 )
 	end scope
-
-#ifdef __FB_DOS__
-	'' DOS dxe3gen accepts the response-file form used to avoid its short
-	'' process command line. Windows-hosted versions do not accept it.
-	if( hPutLdArgsIntoFile( ldcline ) = FALSE ) then
-		return FALSE
-	end if
-#endif
 
 #ifdef ENABLE_STANDALONE
 	dim as string dxepath = environ( "DXE_LD_LIBRARY_PATH" )
@@ -1339,6 +1329,32 @@ private sub hAddJsLinkOptions( byref ldcline as string )
 	end if
 end sub
 
+private sub hAddRiscosLinkOptions _
+	( _
+		byref ldcline as string, _
+		byref dllname as string _
+	)
+	''
+	'' RISC OS links through GCCSDK's GCC driver.  Options intended for GNU ld
+	'' therefore need the -Wl, prefix here.  Shared objects use the ELFLoader and
+	'' SOManager model; the final leaf name is also their soname.
+	''
+	if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then
+		dllname = hStripPath( hStripExt( fbc.outname ) )
+		ldcline += " -shared -Wl,-soname," + hStripPath( fbc.outname )
+
+		'' Keep the library's own name out of the final dependency list.
+		if( left( dllname, 3 ) = "lib" ) then
+			dllname = right( dllname, len( dllname ) - 3 )
+		end if
+	end if
+
+	if( (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB) or _
+	    fbGetOption( FB_COMPOPT_EXPORT ) ) then
+		ldcline += " -Wl,--export-dynamic"
+	end if
+end sub
+
 private function hAddPlatformLinkOptions _
 	( _
 		byref ldcline as string, _
@@ -1404,6 +1420,9 @@ private function hAddPlatformLinkOptions _
 
 	case FB_COMPTARGET_JS
 		hAddJsLinkOptions( ldcline )
+
+	case FB_COMPTARGET_RISCOS
+		hAddRiscosLinkOptions( ldcline, dllname )
 	end select
 
 	function = TRUE
@@ -1429,6 +1448,7 @@ private sub hAddGeneralLinkOptions _
 		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
 		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) and _
 		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_WII) and _
+		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_RISCOS) and _
 		    (not fbcUseLldLinker( )) and _
 		    (not fbcIsUsingGoldLinker( )) ) then
 			ldcline += " -T """ + fbc.libpath + (FB_HOST_PATHDIV + "fbextra.x""")
@@ -1461,7 +1481,12 @@ private sub hAddGeneralLinkOptions _
 
 	if( fbc.staticlink and _
 	    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
-		ldcline += " -Bstatic"
+		if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_RISCOS ) then
+			'' This command is passed to GCCSDK's compiler driver, not raw ld.
+			ldcline += " -static"
+		else
+			ldcline += " -Bstatic"
+		end if
 	end if
 
 	if( fbGetOption( FB_COMPOPT_PIC ) and _
@@ -1474,7 +1499,8 @@ private sub hAddGeneralLinkOptions _
 	if( len( fbc.mapfile ) > 0 ) then
 		if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
 			ldcline += " -map:" + fbc.mapfile
-		elseif( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII ) then
+		elseif( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII) or _
+		        (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_RISCOS) ) then
 			ldcline += " -Wl,-Map," + fbc.mapfile
 		else
 			ldcline += " -Map " + fbc.mapfile
@@ -1672,11 +1698,7 @@ private function hRunLinkCommand( byref ldcline as string ) as integer
 	'' DOS process command lines are limited to 127 characters. Windows
 	'' also needs a response file when cmd.exe's 2047-character legacy
 	'' limit may be reached, or when DOS/JS cross tools require one.
-#ifdef __FB_DOS__
-	if( hPutLdArgsIntoFile( ldcline ) = FALSE ) then
-		return FALSE
-	end if
-#elseif defined( __FB_WIN32__ )
+#if defined( __FB_WIN32__ )
 	dim as long forcefile
 	dim as ulong targetprefixlen
 #ifdef ENABLE_STANDALONE
@@ -1784,6 +1806,11 @@ private function hFinishLinkedOutput _
 		if( kill( fbc.outname ) <> 0 ) then
 			return FALSE
 		end if
+
+	case FB_COMPTARGET_RISCOS
+		if( fbcRiscosHostFinishExecutable( ) = FALSE ) then
+			return FALSE
+		end if
 	end select
 
 	function = TRUE
@@ -1849,7 +1876,8 @@ private function hLinkFiles( ) as integer
 	if ( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN ) then
 		if( (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
 		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
-			if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII ) then
+			if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII) or _
+			    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_RISCOS) ) then
 				ldcline += " -Wl,--start-group"
 			elseif( fbcUseLldLinker( ) ) then
 				ldcline += " --start-group"
@@ -1924,7 +1952,8 @@ private function hLinkFiles( ) as integer
 		if( (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
 		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
 			'' End of lib group
-			if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII ) then
+			if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII) or _
+			    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_RISCOS) ) then
 				ldcline += " -Wl,--end-group"
 			elseif( fbcUseLldLinker( ) ) then
 				ldcline += " --end-group"
@@ -2189,6 +2218,7 @@ dim shared as FBGNUOSINFO gnuosmap(0 to ...) => _
 { _
 	(@"android"    , FB_COMPTARGET_ANDROID  ), _ '' Must appear before linux
 	(@"nuttx"      , FB_COMPTARGET_NUTTX    ), _
+	(@"riscos"     , FB_COMPTARGET_RISCOS   ), _
 	(@"linux"      , FB_COMPTARGET_LINUX    ), _
 	(@"haiku"      , FB_COMPTARGET_HAIKU    ), _
 	(@"mingw"      , FB_COMPTARGET_WIN32    ), _
@@ -2217,6 +2247,8 @@ dim shared as FBGNUARCHINFO gnuarchmap(0 to ...) => _
 	(@"x86"        , FB_DEFAULT_CPUTYPE_X86    ), _
 	(@"x86_64"     , FB_DEFAULT_CPUTYPE_X86_64 ), _
 	(@"amd64"      , FB_DEFAULT_CPUTYPE_X86_64 ), _
+	(@"armv4"      , FB_CPUTYPE_ARMV4          ), _
+	(@"armv4l"     , FB_CPUTYPE_ARMV4          ), _
 	(@"armv5te"    , FB_CPUTYPE_ARMV5TE        ), _
 	(@"armv6"      , FB_CPUTYPE_ARMV6          ), _
 	(@"armv6+fp"   , FB_CPUTYPE_ARMV6_FP       ), _
@@ -2278,6 +2310,13 @@ private sub hParseGnuTriplet _
 				exit for
 			end if
 		next
+
+		'' The unqualified "arm" triplet component normally follows the host
+		'' compiler's ARM default.  RISC OS instead has a stable compatibility
+		'' contract with StrongARM-equipped RiscPC machines.
+		if( (os = FB_COMPTARGET_RISCOS) and (arch = "arm") ) then
+			cputype = FB_CPUTYPE_ARMV4
+		end if
 	end if
 
 end sub
@@ -2327,7 +2366,8 @@ dim shared as FBOSARCHINFO fbosarchmap(0 to ...) => _
 	(@"netbsd" , FB_COMPTARGET_NETBSD , FB_DEFAULT_CPUTYPE       ), _
 	(@"openbsd", FB_COMPTARGET_OPENBSD, FB_DEFAULT_CPUTYPE       ), _
 	(@"wii"    , FB_COMPTARGET_WII    , FB_DEFAULT_CPUTYPE_PPC   ), _
-	(@"nuttx"  , FB_COMPTARGET_NUTTX  , FB_DEFAULT_CPUTYPE_RISCV32)  _
+	(@"nuttx"  , FB_COMPTARGET_NUTTX  , FB_DEFAULT_CPUTYPE_RISCV32), _
+	(@"riscos" , FB_COMPTARGET_RISCOS , FB_CPUTYPE_ARMV4         )  _
 }
 
 ''
@@ -2412,13 +2452,20 @@ private sub hParseTargetArg _
 	'' <os>-<cpufamily>
 	var separator = instr( arg, "-" )
 	if( separator > 0 ) then
+		var arch = right( lcasearg, len( lcasearg ) - separator )
 		os = fbIdentifyOs( left( lcasearg, separator - 1 ) )
-		cputype = fbDefaultCpuTypeFromCpuFamilyId( os, right( lcasearg, len( lcasearg ) - separator ) )
+		cputype = fbDefaultCpuTypeFromCpuFamilyId( os, arch )
+
+		'' The canonical riscos-arm target has the same StrongARM-compatible
+		'' baseline as an arm-unknown-riscos GNU triplet.
+		if( (os = FB_COMPTARGET_RISCOS) and (arch = "arm") ) then
+			cputype = FB_CPUTYPE_ARMV4
+		end if
 
 		'' allow normalizing on gnu arch types to determine the standalone targetid
 		#ifdef ENABLE_STANDALONE
 			if( (os < 0) and (cputype < 0) ) then
-				cputype = fbCpuTypeFromGNUArchInfo( right( lcasearg, len( lcasearg ) - separator ) )
+				cputype = fbCpuTypeFromGNUArchInfo( arch )
 			end if
 		#endif
 	end if
@@ -2990,7 +3037,15 @@ private sub hHandleOptPipeline _
 		if( (os <> FB_DEFAULT_TARGET) or _
 		    (cputype <> FB_DEFAULT_CPUTYPE) or _
 		    is_gnu_triplet ) then
-			fbc.target = arg
+			'' GCCSDK installs the canonical GNU-prefixed tools.  The friendly
+			'' RISC OS aliases describe the same target, so resolve them to that
+			'' tool prefix instead of looking for riscos-gcc or riscos-arm-gcc.
+			if( (os = FB_COMPTARGET_RISCOS) and _
+			    (is_gnu_triplet = FALSE) ) then
+				fbc.target = "arm-unknown-riscos"
+			else
+				fbc.target = arg
+			end if
 			fbc.targetprefix = fbc.target + "-"
 		end if
 #endif
@@ -3402,9 +3457,7 @@ private sub handleArg _
 		'' Input file, get its extension to determine what it is
 		dim as string ext = hGetFileExt(arg)
 
-		#if defined(__FB_WIN32__) or _
-			defined(__FB_DOS__) or _
-			defined(__FB_CYGWIN__)
+		#if defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
 			'' For case in-sensitive file systems
 			ext = lcase(ext)
 		#endif
@@ -3536,7 +3589,7 @@ private function hTargetNeedsPIC( ) as integer
 		     FB_COMPTARGET_NETBSD, _
 		     FB_COMPTARGET_DRAGONFLY, FB_COMPTARGET_SOLARIS, _
 		     FB_COMPTARGET_ILLUMOS, _
-		     FB_COMPTARGET_ANDROID
+		     FB_COMPTARGET_ANDROID, FB_COMPTARGET_RISCOS
 			function = TRUE
 		end select
 	else
@@ -3885,14 +3938,7 @@ private sub fbcSetupCompilerPaths( )
 	fbc.libpath = fbc.prefix + "lib" + FB_HOST_PATHDIV + targetid
 #else
 	dim as string fbname
-	#ifdef __FB_DOS__
-		'' Our subdirectory in include/ and lib/ is usually called
-		'' freebasic/, but on DOS that's too long... of course almost
-		'' no targetid or suffix can be used either.
-		fbname = "freebas"
-	#else
-		fbname = "freebasic"
-	#endif
+	fbname = "freebasic"
 	#ifdef ENABLE_SUFFIX
 		fbname += ENABLE_SUFFIX
 	#endif
@@ -4018,19 +4064,11 @@ private function hGetAsmName _
 
 	if( stage = 1 ) then
 		if( (fbc.keepasm = FALSE) and (fbc.emitasmonly = FALSE) ) then
-#ifdef __FB_DOS__
-			asmfile = hGetDosTempFileStem( *module->objfile, "module" )
-#else
 			asmfile += hGetTempFileTag( )
-#endif
 		end if
 	elseif( hCompileStage2DirectlyToObj( ) = FALSE ) then
 		if( (fbc.keepfinalasm = FALSE) and (fbc.emitfinalasmonly = FALSE) ) then
-#ifdef __FB_DOS__
-			asmfile = hGetDosTempFileStem( *module->objfile, "module" )
-#else
 			asmfile += hGetTempFileTag( )
-#endif
 		end if
 	end if
 
@@ -4976,7 +5014,7 @@ private function hArchiveFiles( ) as integer
 	end if
 
 '' See comment in hLinkFiles about command line lengths
-#if defined( __FB_WIN32__ ) or defined( __FB_DOS__ )
+#if defined( __FB_WIN32__ )
 	dim targetprefixlen as ulong
 	#ifndef ENABLE_STANDALONE
 		targetprefixlen = len( fbc.targetprefix )
@@ -5201,7 +5239,7 @@ private sub hPrintOptions( byval verbose as integer )
 	print "  -t <value>       Set .exe stack size in kbytes, default: 1024 (win32/dos/xbox)"
 	if( verbose ) then
 	print "  -target <name>   Set cross-compilation target"
-	print "                   Examples: win64, linux-x86_64, android, nuttx"
+	print "                   Examples: win64, linux-x86_64, android, nuttx, riscos"
 	else
 	print "  -target <name>   Set cross-compilation target"
 	end if
@@ -5321,6 +5359,11 @@ end sub
 
 		'' Tell the compiler about the default include path (added after
 		'' the command line ones, so those will be searched first)
+		if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_RISCOS ) then
+			'' RISC OS headers are complete replacements for generic headers.
+			'' Search the target overlay first, then fall back to shared headers.
+			fbAddIncludePath( fbc.incpath + FB_HOST_PATHDIV + "riscos" )
+		end if
 		fbAddIncludePath( fbc.incpath )
 
 		var have_input_files = (listGetHead( @fbc.modules   ) <> NULL) or _

@@ -4,7 +4,7 @@
 
 static const char *pszDefaultQuestion = "? ";
 
-#if defined( HOST_WIN32 ) || defined( HOST_DOS )
+#if defined( HOST_WIN32 )
 
 int fb_ConsoleLineInputWstr
 	(

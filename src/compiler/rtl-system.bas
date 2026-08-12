@@ -794,6 +794,9 @@ private function hThreadCall_cb _
 
 	if( libsadded = FALSE ) then
 		libsAdded = TRUE
+		'' Xbox builds fb_ThreadCall() with DISABLE_FFI because its target SDK
+		'' does not provide libffi. Keep compiler link policy aligned with that
+		'' runtime fallback instead of adding an unavailable target library.
 		if( env.clopt.target <> FB_COMPTARGET_XBOX ) then
 			fbAddLib( "ffi" )
 		end if
@@ -822,5 +825,3 @@ function rtlAtExit _
 	function = proc
 
 end function
-
-

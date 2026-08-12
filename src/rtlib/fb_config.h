@@ -31,6 +31,11 @@
 	/* Omit HOST_LINUX; Android isn't GNU/Linux. */
 	#define HOST_ANDROID
 	#define HOST_UNIX
+#elif defined __riscos__
+	/* GCCSDK/UnixLib presents RISC OS as an ELF Unix-like target. */
+	#define HOST_RISCOS
+	#define HOST_UNIX
+	#define FB_UNICODE_HEADER "riscos/fb_unicode.h"
 #elif defined __linux__
 	/* GNU/Linux, i.e. glibc */
 	#define HOST_LINUX

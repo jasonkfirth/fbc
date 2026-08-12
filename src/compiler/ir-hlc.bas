@@ -1560,7 +1560,18 @@ private sub hEmitStructWithFields( byval s as FBSYMBOL ptr )
 
 			'' Field alignment (FIELD = N)?
 			align = symbGetUDTAlign( s )
-			if( align > 0 ) then
+			if( env.clopt.target = FB_COMPTARGET_RISCOS ) then
+				'' The enclosing RISC OS structure is packed to remove GCC's
+				'' four-byte aggregate minimum. Restore each field's effective
+				'' FreeBASIC alignment explicitly inside that packed body.
+				var effectivealign = typeCalcNaturalAlign( dtype, subtype )
+				if( (hFieldNeedsRuntimeAlignment( fld ) = FALSE) andalso _
+				    (align > 0) andalso (align < effectivealign) ) then
+					effectivealign = align
+				end if
+				DZstrConcatAssign( ln, _
+					" __attribute__((aligned(" + str( effectivealign ) + ")))" )
+			elseif( align > 0 ) then
 				'' The aligned(N) attribute alone increases the alignment,
 				'' together with packed it decreases it.
 				'' FIELD = N in FB only decreases alignment, but never increases it.
@@ -1688,9 +1699,21 @@ private sub hEmitStruct( byval s as FBSYMBOL ptr, byval is_ptr as integer )
 		hWriteLine( "uint8 __fb_struct_body[" & symbGetSizeOf( s ) & "];", TRUE )
 	end if
 
-	'' Close UDT body
+	'' Close the UDT body. Give RISC OS aggregates the effective alignment
+	'' already used for FreeBASIC's size calculation. The packed attribute
+	'' removes GCC's otherwise unavoidable four-byte aggregate minimum.
 	sectionUnindent( )
-	hWriteLine( "};", TRUE )
+	if( env.clopt.target = FB_COMPTARGET_RISCOS ) then
+		var effectivealign = s->udt.natalign
+		if( (symbGetUDTAlign( s ) > 0) andalso _
+		    (symbGetUDTAlign( s ) < effectivealign) ) then
+			effectivealign = symbGetUDTAlign( s )
+		end if
+		hWriteLine( "} __attribute__((packed, aligned(" + _
+		            str( effectivealign ) + ")));", TRUE )
+	else
+		hWriteLine( "};", TRUE )
+	end if
 
 	symbResetIsBeingEmitted( s )
 
@@ -1772,12 +1795,42 @@ private sub hWriteGenericF2I _
 		callname = "nearbyint"
 	end if
 
-	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_NUTTX ) then
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_RISCOS ) then
+		'' GCC 4.7's nearbyint expansion loses exact odd integers at the
+		'' APCS precision boundary. Round through UnixLib floor() without
+		'' the large floating-point bias used by nearbyint().
+		hWriteLine( "double floor( double );", TRUE )
+		hWriteLine( "static inline " + hEmitType( rtype, NULL ) + _
+			" fb_" + fname + "( " + hEmitType( ptype, NULL ) + " value )", TRUE )
+		hWriteLine( "{", TRUE )
+		sectionIndent( )
+			hWriteLine( "double rounded = floor( (double)value );", TRUE )
+			hWriteLine( "double fraction = (double)value - rounded;", TRUE )
+			hWriteLine( "if( fraction > 0.5 )", TRUE )
+			sectionIndent( )
+				hWriteLine( "rounded += 1.0;", TRUE )
+			sectionUnindent( )
+			hWriteLine( "else if( fraction == 0.5 ) {", TRUE )
+			sectionIndent( )
+				hWriteLine( "if( rounded >= 0.0 ) {", TRUE )
+				sectionIndent( )
+					hWriteLine( "if( ((uint64)rounded & 1ull) != 0 ) rounded += 1.0;", TRUE )
+				sectionUnindent( )
+				hWriteLine( "} else {", TRUE )
+				sectionIndent( )
+					hWriteLine( "if( ((int64)rounded & 1ll) != 0 ) rounded += 1.0;", TRUE )
+				sectionUnindent( )
+				hWriteLine( "}", TRUE )
+			sectionUnindent( )
+			hWriteLine( "}", TRUE )
+			hWriteLine( "return (" + hEmitType( rtype, NULL ) + ")rounded;", TRUE )
+		sectionUnindent( )
+		hWriteLine( "}", TRUE )
+	elseif( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_NUTTX ) then
 		''
 		'' The NuttX loadable-module path supplies small local math helpers
-		'' from the FreeBASIC runtime.  Calling them by name keeps generated
-		'' code away from target libm/fenv paths that may not be module-safe
-		'' on the small board images.
+		'' from the FreeBASIC runtime. Calling them by name keeps generated
+		'' code away from target libm/fenv paths that may not be module-safe.
 		hWriteLine( hEmitType( ptype, NULL ) + " " + callname + "( " + hEmitType( ptype, NULL ) + " );", TRUE )
 		hWriteLine( "#define fb_" + fname +  "( value ) ((" + hEmitType( rtype, NULL ) + ")" + callname + "( value ))", TRUE )
 	else

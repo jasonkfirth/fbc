@@ -103,6 +103,7 @@ tests/syntax/r/dos/*.txt
 OMA_old
 pkgroot/
 .maketests-tmp
+.maketests-host
 dist
 generated
 obj

@@ -58,6 +58,10 @@ endif
 ifneq ($(TARGET),)
 	FBCFLAGS += -target $(TARGET)
 endif
+ifneq ($(findstring riscos,$(TARGET)),)
+	FBCFLAGS += -i ../../inc/riscos
+	SRCS := src/riscos/fbcunit.bas $(filter-out src/fbcunit.bas,$(SRCS))
+endif
 ifneq ($(FPU),)
 	FBCFLAGS += -fpu $(FPU)
 endif

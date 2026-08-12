@@ -118,6 +118,9 @@ FBC_INCDIR := $(prefixincdir)
 
 FBC_BOOTSTRAP_I := -i $(BOOTSTRAP_INCDIR)
 FBC_INCLUDE_FLAGS := -i $(SRC_INCDIR)
+ifeq ($(TARGET_OS),riscos)
+FBC_INCLUDE_FLAGS := -i $(SRC_INCDIR)/riscos $(FBC_INCLUDE_FLAGS)
+endif
 
 ##############################################################################
 # end of layout.mk

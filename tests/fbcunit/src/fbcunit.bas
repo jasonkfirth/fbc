@@ -860,12 +860,32 @@ namespace fbcu
 	end function
 
 	''
+	private function dblToBits _
+		( _
+			byval a as double _
+		) as ulongint
+
+		return *cast( ulongint ptr, @a )
+
+	end function
+
+	''
+	private function dblFromBits _
+		( _
+			byval bits as ulongint _
+		) as double
+
+		return *cast( double ptr, @bits )
+
+	end function
+
+	''
 	function dblIsNan _
 		( _
 			byval a as double _
 		) as boolean
 
-		dim ia as longint = *cast( longint ptr, @a )
+		dim ia as longint = clngint(dblToBits(a))
 
 		'' NAN = exponent all 1's and mantissa not zero
 		return cbool( ((ia and &h7ff0000000000000ll) = &h7ff0000000000000ll ) _
@@ -879,7 +899,7 @@ namespace fbcu
 			byval a as double _
 		) as boolean
 
-		dim ia as longint = *cast( longint ptr, @a )
+		dim ia as longint = clngint(dblToBits(a))
 
 		'' INF = exponent all 1's and mantissa zero
 		return cbool( ((ia and &h7ff0000000000000ll) = &h7ff0000000000000ll ) _
@@ -897,10 +917,10 @@ namespace fbcu
 			return a
 		end if
 
-		dim ia as longint = *cast( longint ptr, @a )
+		dim ia as longint = clngint(dblToBits(a))
 		ia -= 1
 
-		return a - *cast( double ptr, @ia )
+		return a - dblFromBits(culngint(ia))
 
 	end function
 
@@ -911,8 +931,8 @@ namespace fbcu
 			byval b as double _
 		) as longint
 
-		dim ia as longint = *cast( longint ptr, @a )
-		dim ib as longint = *cast( longint ptr, @b )
+		dim ia as longint = clngint(dblToBits(a))
+		dim ib as longint = clngint(dblToBits(b))
 
 		if( dblIsNan(a) ) then
 			return &h7fffffffffffffffll

@@ -39,7 +39,11 @@ type ssize_t as __ssize_t
 
 #include once "crt/stddef.bi"
 
+#ifndef intptr_t
+'' sys/socket.bi can make intptr_t visible through the fixed-width headers.
+'' Keep the Linux declaration independent of CRT header include order.
 type intptr_t as __intptr_t
+#endif
 
 #ifndef socklen_t
 type socklen_t as __socklen_t
@@ -70,7 +74,11 @@ type socklen_t as __socklen_t
 
 extern "c"
 declare function access_ alias "access" (byval __name as zstring ptr, byval __type as long) as long
+#ifndef __crt_close_declared__
+#define __crt_close_declared__
+'' sys/socket.bi also exposes the POSIX close() function.
 declare function close_ alias "close" (byval __fd as long) as long
+#endif
 declare function read_ alias "read" (byval __fd as long, byval __buf as any ptr, byval __nbytes as size_t) as ssize_t
 declare function write_ alias "write" (byval __fd as long, byval __buf as any ptr, byval __n as size_t) as ssize_t
 declare function pipe_ alias "pipe" (byval __pipedes as long ptr) as long

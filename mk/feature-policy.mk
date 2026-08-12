@@ -131,6 +131,20 @@ ifeq ($(TARGET_OS),wii)
 endif
 
 # ---------------------------------------------------------------------------
+# RISC OS / GCCSDK
+#
+# UnixLib supplies pthreads, termios/termcap, sockets, iconv, and the normal
+# hosted C surface.  The RISC OS workflow builds GCC's bundled ARM libffi for
+# THREADCALL because GCCSDK does not install it by default. Linux gpm remains
+# unavailable. The graphics feature macros come from platform-features.mk.
+# ---------------------------------------------------------------------------
+
+ifeq ($(TARGET_OS),riscos)
+  ALLCFLAGS += \
+    -DDISABLE_GPM
+endif
+
+# ---------------------------------------------------------------------------
 # Windows console stack size
 #
 # Keep console stack conservative but non-fragile.

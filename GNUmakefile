@@ -215,6 +215,7 @@ compiler-riscv64-smoke: | maybe-build-fbc
 compiler-s390x-smoke: | maybe-build-fbc
 compiler-loongarch64-smoke: | maybe-build-fbc
 compiler-ppc64le-smoke: | maybe-build-fbc
+compiler-riscos-smoke: | maybe-build-fbc
 
 ##############################################################################
 # Build ordering
@@ -341,6 +342,7 @@ help:
 	@echo "  compiler-s390x-smoke    Check linux-s390x target codegen/compile"
 	@echo "  compiler-loongarch64-smoke Check linux-loongarch64 target codegen/compile"
 	@echo "  compiler-ppc64le-smoke  Check linux-powerpc64le target codegen/compile"
+	@echo "  compiler-riscos-smoke   Check RISC OS ARMv4 target codegen/compile"
 	@echo "  tests-test              Run compiler language tests through tests/"
 	@echo "  bootstrap-*-test        Run bootstrap-specific test targets"
 	@echo "  packaging-test          Check packaging target behavior"

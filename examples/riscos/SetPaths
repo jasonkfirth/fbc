@@ -1,0 +1,26 @@
+| FreeBASIC RISC OS command-line environment
+| -------------------------------------------
+|
+| File: SetPaths
+|
+| Purpose:
+|
+|     Make the staged native FreeBASIC compiler available to RISC OS command
+|     lines after the GCCSDK !GCC application has been run.
+|
+| Responsibilities:
+|
+|     - identify the FreeBASIC staging directory
+|     - add the compiler directory to Run$Path
+|     - define the UnixLib suffix mappings used by fbc
+|
+| This file intentionally does NOT boot !GCC or compile a program.
+
+Set FreeBASIC$Dir <Obey$Dir>
+If "<FreeBASICbin$Path>" = "" Then Set Run$Path <Run$Path>,FreeBASICbin:
+Set FreeBASICbin$Path <FreeBASIC$Dir>.bin.
+Set UnixEnv$fbc$sfix "bas:bi:c:asm:s:o:a:x"
+Set fbc$heap ""
+Echo FreeBASIC command-line environment configured.
+
+| end of SetPaths

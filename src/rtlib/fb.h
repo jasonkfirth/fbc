@@ -356,7 +356,10 @@ void                fb_hListDynInit         ( FB_LIST *list );
 void                fb_hListDynElemAdd      ( FB_LIST *list, FB_LISTELEM *elem );
 void                fb_hListDynElemRemove   ( FB_LIST *list, FB_LISTELEM *elem );
 
-#include "fb_unicode.h"
+#ifndef FB_UNICODE_HEADER
+	#define FB_UNICODE_HEADER "fb_unicode.h"
+#endif
+#include FB_UNICODE_HEADER
 #include "fb_error.h"
 #include "fb_string.h"
 #include "fb_array.h"

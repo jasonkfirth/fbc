@@ -68,7 +68,12 @@ declare function setsockopt (byval __fd as long, byval __level as long, byval __
 declare function listen (byval __fd as long, byval __n as long) as long
 declare function accept (byval __fd as long, byval __addr as sockaddr ptr, byval __addr_len as socklen_t ptr) as long
 declare function shutdown (byval __fd as long, byval __how as long) as long
+#ifndef __crt_close_declared__
+#define __crt_close_declared__
+'' Platform unistd headers may expose close() before this shared socket
+'' header is included.  Keep the declaration independent of include order.
 declare function close_ alias "close" (byval __fd as long) as long
+#endif
 #if defined(__FB_DARWIN__)
 declare function sockatmark (byval __fd as long) as long
 #else

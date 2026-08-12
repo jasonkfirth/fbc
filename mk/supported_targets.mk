@@ -104,6 +104,9 @@ DOS_BOOTSTRAP_TARGETS := \
 NUTTX_BOOTSTRAP_TARGETS := \
 	$(call _fb_bootstrap_spec,nuttx-riscv32,nuttx-riscv32,riscv32-unknown-nuttx)
 
+RISCOS_BOOTSTRAP_TARGETS := \
+	$(call _fb_bootstrap_spec,riscos-arm,riscos-arm,arm-unknown-riscos)
+
 ##############################################################################
 # Final supported bootstrap targets
 ##############################################################################
@@ -118,7 +121,8 @@ SUPPORTED_BOOTSTRAP_TARGETS := \
 	$(SOLARIS_BOOTSTRAP_TARGETS) \
 	$(ILLUMOS_BOOTSTRAP_TARGETS) \
 	$(DOS_BOOTSTRAP_TARGETS) \
-	$(NUTTX_BOOTSTRAP_TARGETS)
+	$(NUTTX_BOOTSTRAP_TARGETS) \
+	$(RISCOS_BOOTSTRAP_TARGETS)
 
 SUPPORTED_BOOTSTRAP_DIRS := $(foreach spec,$(SUPPORTED_BOOTSTRAP_TARGETS),$(word 2,$(subst :, ,$(spec))))
 

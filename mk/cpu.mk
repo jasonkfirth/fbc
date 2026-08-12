@@ -36,6 +36,15 @@ ifeq ($(TARGET_ARCH),arm)
     ARM_VER := v6
   else ifneq ($(filter armv5%,$(TARGET_ARCH_RAW)),)
     ARM_VER := v5
+  else ifneq ($(filter armv4%,$(TARGET_ARCH_RAW)),)
+    ARM_VER := v4
+  endif
+
+  # GCCSDK targets classic APCS-32 machines.  Keep an unqualified
+  # arm-unknown-riscos triplet on the StrongARM-compatible baseline defined by
+  # this port instead of inheriting a newer host compiler default.
+  ifeq ($(TARGET_OS),riscos)
+    ARM_VER := v4
   endif
 
 endif
@@ -94,7 +103,11 @@ ifndef DEFAULT_CPUTYPE_ARM
 
   else
 
-    ifeq ($(ARM_VER),v6)
+    ifeq ($(ARM_VER),v4)
+      DEFAULT_CPUTYPE_ARM := FB_CPUTYPE_ARMV4
+    else ifeq ($(ARM_VER),v5)
+      DEFAULT_CPUTYPE_ARM := FB_CPUTYPE_ARMV5TE
+    else ifeq ($(ARM_VER),v6)
       DEFAULT_CPUTYPE_ARM := FB_CPUTYPE_ARMV6
     else
       DEFAULT_CPUTYPE_ARM := FB_CPUTYPE_ARMV7A

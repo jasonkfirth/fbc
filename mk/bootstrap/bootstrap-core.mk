@@ -60,6 +60,11 @@ ifeq ($(TARGET_OS),dos)
 BOOTSTRAP_TERM_LIB :=
 endif
 
+# UnixLib contains the termcap entry points used by the console layer.
+ifeq ($(TARGET_OS),riscos)
+BOOTSTRAP_TERM_LIB :=
+endif
+
 ##############################################################################
 # Bootstrap emission target
 ##############################################################################

@@ -1,0 +1,24 @@
+| FreeBASIC RISC OS application boot file
+| ----------------------------------------
+|
+| File: !Boot
+|
+| Purpose:
+|
+|     Register an installed !FreeBASIC application with the command line.
+|
+| Responsibilities:
+|
+|     - publish the application and binary paths
+|     - add the native compiler to Run$Path once
+|     - configure UnixLib suffix directories used by fbc
+|
+| This file intentionally does NOT boot GCC or compile a program.
+
+Set FreeBASIC$Dir <Obey$Dir>
+If "<FreeBASICbin$Path>" = "" Then Set Run$Path <Run$Path>,FreeBASICbin:
+Set FreeBASICbin$Path <FreeBASIC$Dir>.bin.
+Set UnixEnv$fbc$sfix "bas:bi:c:asm:s:o:a:x"
+Set fbc$heap ""
+
+| end of !Boot

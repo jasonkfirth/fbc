@@ -1,0 +1,52 @@
+# Project: FreeBASIC native RISC OS compiler workflow
+# -------------------------------------------------
+#
+# File: gccsdk-elf2aif-unix-path.patch
+#
+# Purpose:
+#
+#     Let GCCSDK elf2aif set a RISC OS filetype when its input was named with
+#     a UnixLib pathname.
+#
+# Responsibilities:
+#
+#     - translate the AIF output pathname before passing it to OS_File
+#     - preserve Unix-style paths for the converter's standard file I/O
+#
+# This file intentionally does NOT change the ELF-to-AIF byte conversion.
+#
+--- a/elf2aif.c
++++ b/elf2aif.c
+@@ -29,0 +30 @@
++#  include <limits.h>
+@@ -30,0 +32 @@
++#  include <unixlib/local.h>
+@@ -566,0 +569,2 @@
++      char riscos_filename[_POSIX_PATH_MAX];
++      const char *filetype_filename;
+@@ -572,3 +576,3 @@
+-      regs.r[1] = (int) aiffilename;
+-      regs.r[2] = 0xFF8;	/* Absolute.  */
+-      if ((swierror = _kernel_swi (OS_File, &regs, &regs)) != NULL)
++
++      if (__riscosify_std (aiffilename, 0, riscos_filename,
++                           sizeof (riscos_filename), NULL) == NULL)
+@@ -576,2 +580,3 @@
+-	  fprintf (stderr, "Cannot set filetype of '%s' (%s)", aiffilename,
+-		   swierror->errmess);
++	  fprintf (stderr,
++		   "Cannot convert filename '%s' to RISC OS syntax\n",
++		   aiffilename);
+@@ -578,0 +584,12 @@
++	}
++      else
++	{
++	  filetype_filename = riscos_filename;
++	  regs.r[1] = (int) filetype_filename;
++	  regs.r[2] = 0xFF8;	/* Absolute.  */
++	  if ((swierror = _kernel_swi (OS_File, &regs, &regs)) != NULL)
++	    {
++	      fprintf (stderr, "Cannot set filetype of '%s' (%s)",
++		       filetype_filename, swierror->errmess);
++	      status = EXIT_FAILURE;
++	    }

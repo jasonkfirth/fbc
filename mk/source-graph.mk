@@ -19,7 +19,7 @@
 # Search directories
 ##############################################################################
 
-UNIX_LAYER_OS := linux android darwin freebsd netbsd openbsd dragonfly solaris illumos haiku
+UNIX_LAYER_OS := linux android darwin freebsd netbsd openbsd dragonfly solaris illumos haiku riscos
 
 SOURCE_OS := $(TARGET_OS)
 ifeq ($(TARGET_OS),illumos)
@@ -92,12 +92,34 @@ SFXLIB_DIRS += $(srcdir)/sfxlib/$(SOURCE_OS)
 # Compiler sources
 ##############################################################################
 
-FBC_BI := $(wildcard $(srcdir)/compiler/*.bi)
-FBC_SRC := $(wildcard $(srcdir)/compiler/*.bas)
-FBC_OBJS := $(patsubst $(srcdir)/compiler/%.bas,$(fbcobjdir)/%.o,$(FBC_SRC))
-FBC_JS_OBJS := $(patsubst $(srcdir)/compiler/%.bas,$(fbcjsobjdir)/%.o,$(FBC_SRC))
-FBC_ANDROID_OBJS := $(patsubst $(srcdir)/compiler/%.bas,$(fbcandroidobjdir)/%.o,$(FBC_SRC))
-FBC_WII_OBJS := $(patsubst $(srcdir)/compiler/%.bas,$(fbcwiiobjdir)/%.o,$(FBC_SRC))
+# Compiler platform directory names follow FB_COMPTARGET identifiers.  Keep
+# TARGET_OS here instead of SOURCE_OS: the latter intentionally aliases Cygwin
+# to Win32 and illumos to Solaris for their runtime source layers.
+FBC_PLATFORM_DIRS := $(sort $(dir \
+$(wildcard $(srcdir)/compiler/*/fbc-platform.bi)))
+
+FBC_DIRS := \
+$(srcdir)/compiler/$(TARGET_OS) \
+$(srcdir)/compiler
+
+FBC_BI := \
+$(wildcard $(srcdir)/compiler/*.bi) \
+$(foreach directory,$(FBC_PLATFORM_DIRS),$(wildcard $(directory)*.bi))
+
+FBC_SRC_GENERIC := $(wildcard $(srcdir)/compiler/*.bas)
+FBC_SRC_TARGET := $(wildcard $(srcdir)/compiler/$(TARGET_OS)/*.bas)
+FBC_BASE_TARGET := $(notdir $(FBC_SRC_TARGET))
+
+FBC_SRC_GENERIC := $(filter-out \
+$(addprefix $(srcdir)/compiler/,$(FBC_BASE_TARGET)), \
+$(FBC_SRC_GENERIC))
+
+FBC_SRC := $(FBC_SRC_GENERIC) $(FBC_SRC_TARGET)
+FBC_OBJNAMES := $(patsubst %.bas,%.o,$(notdir $(FBC_SRC)))
+FBC_OBJS := $(addprefix $(fbcobjdir)/,$(FBC_OBJNAMES))
+FBC_JS_OBJS := $(addprefix $(fbcjsobjdir)/,$(FBC_OBJNAMES))
+FBC_ANDROID_OBJS := $(addprefix $(fbcandroidobjdir)/,$(FBC_OBJNAMES))
+FBC_WII_OBJS := $(addprefix $(fbcwiiobjdir)/,$(FBC_OBJNAMES))
 
 ##############################################################################
 # RTLIB sources

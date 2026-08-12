@@ -11,7 +11,7 @@
 ##############################################################################
 
 VPATH := \
-$(srcdir)/compiler \
+$(FBC_DIRS) \
 $(RTLIB_DIRS) \
 $(FBRT_DIRS) \
 $(GFXLIB2_DIRS) \
@@ -134,36 +134,36 @@ endif
 
 BUILD_FBCFLAGS ?=
 
-$(fbcobjdir)/%.o: $(srcdir)/compiler/%.bas $(FBC_BI) | $(fbcobjdir)
+$(fbcobjdir)/%.o: %.bas $(FBC_BI) | $(fbcobjdir)
 	@mkdir -p "$(dir $@)"
-	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) -i $(rootdir)/inc -c $< -o $@
+	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) -i $(srcdir)/compiler $(FBC_INCLUDE_FLAGS) -c $< -o $@
 
 FBC_JS_DEFINES := \
 	-d BUILD_FB_DEFAULT_TARGET=FB_COMPTARGET_JS \
 	-d BUILD_FB_DEFAULT_CPUTYPE=FB_CPUTYPE_ASMJS \
 	-d ENABLE_SUFFIX=\"-js\"
 
-$(fbcjsobjdir)/%.o: $(srcdir)/compiler/%.bas $(FBC_BI) | $(fbcjsobjdir)
+$(fbcjsobjdir)/%.o: %.bas $(FBC_BI) | $(fbcjsobjdir)
 	@mkdir -p "$(dir $@)"
-	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) $(FBC_JS_DEFINES) -i $(rootdir)/inc -c $< -o $@
+	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) $(FBC_JS_DEFINES) -i $(srcdir)/compiler -i $(rootdir)/inc -c $< -o $@
 
 FBC_ANDROID_DEFINES := \
 	-d BUILD_FB_DEFAULT_TARGET=FB_COMPTARGET_ANDROID \
 	-d BUILD_FB_DEFAULT_CPUTYPE=FB_CPUTYPE_AARCH64 \
 	-d ENABLE_SUFFIX=\"-android\"
 
-$(fbcandroidobjdir)/%.o: $(srcdir)/compiler/%.bas $(FBC_BI) | $(fbcandroidobjdir)
+$(fbcandroidobjdir)/%.o: %.bas $(FBC_BI) | $(fbcandroidobjdir)
 	@mkdir -p "$(dir $@)"
-	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) $(FBC_ANDROID_DEFINES) -i $(rootdir)/inc -c $< -o $@
+	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) $(FBC_ANDROID_DEFINES) -i $(srcdir)/compiler -i $(rootdir)/inc -c $< -o $@
 
 FBC_WII_DEFINES := \
 	-d BUILD_FB_DEFAULT_TARGET=FB_COMPTARGET_WII \
 	-d BUILD_FB_DEFAULT_CPUTYPE=FB_CPUTYPE_PPC \
 	-d ENABLE_SUFFIX=\"-wii\"
 
-$(fbcwiiobjdir)/%.o: $(srcdir)/compiler/%.bas $(FBC_BI) | $(fbcwiiobjdir)
+$(fbcwiiobjdir)/%.o: %.bas $(FBC_BI) | $(fbcwiiobjdir)
 	@mkdir -p "$(dir $@)"
-	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) $(FBC_WII_DEFINES) -i $(rootdir)/inc -c $< -o $@
+	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) $(FBC_WII_DEFINES) -i $(srcdir)/compiler -i $(rootdir)/inc -c $< -o $@
 
 ##############################################################################
 # rtlib (C runtime)
@@ -258,19 +258,19 @@ $(libdir)/fbrt2pic.o: $(srcdir)/rtlib/static/fbrt2.c $(LIBFB_H) | $(libdir)
 
 $(libfbrtobjdir)/%.o: $(srcdir)/fbrt/%.bas $(LIBFBRT_BI) | $(libfbrtobjdir)
 	@mkdir -p "$(dir $@)"
-	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBRTCFLAGS) -i $(rootdir)/inc -c $< -o $@
+	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBRTCFLAGS) $(FBC_INCLUDE_FLAGS) -c $< -o $@
 
 $(libfbrtpicobjdir)/%.o: $(srcdir)/fbrt/%.bas $(LIBFBRT_BI) | $(libfbrtpicobjdir)
 	@mkdir -p "$(dir $@)"
-	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBRTCFLAGS) -pic -i $(rootdir)/inc -c $< -o $@
+	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBRTCFLAGS) -pic $(FBC_INCLUDE_FLAGS) -c $< -o $@
 
 $(libfbrtmtobjdir)/%.o: $(srcdir)/fbrt/%.bas $(LIBFBRT_BI) | $(libfbrtmtobjdir)
 	@mkdir -p "$(dir $@)"
-	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBRTCFLAGS) -mt -d ENABLE_MT -i $(rootdir)/inc -c $< -o $@
+	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBRTCFLAGS) -mt -d ENABLE_MT $(FBC_INCLUDE_FLAGS) -c $< -o $@
 
 $(libfbrtmtpicobjdir)/%.o: $(srcdir)/fbrt/%.bas $(LIBFBRT_BI) | $(libfbrtmtpicobjdir)
 	@mkdir -p "$(dir $@)"
-	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBRTCFLAGS) -mt -pic -d ENABLE_MT -i $(rootdir)/inc -c $< -o $@
+	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBRTCFLAGS) -mt -pic -d ENABLE_MT $(FBC_INCLUDE_FLAGS) -c $< -o $@
 
 ##############################################################################
 # gfxlib2 (C sources)

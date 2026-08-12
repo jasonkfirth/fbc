@@ -1,0 +1,20 @@
+| FreeBASIC RISC OS application run file
+| ---------------------------------------
+|
+| File: !Run
+|
+| Purpose:
+|
+|     Boot !FreeBASIC and open its installation directory.
+|
+| Responsibilities:
+|
+|     - apply the command-line environment from !Boot
+|     - show the compiler, examples, and help files to the user
+|
+| This file intentionally does NOT start an interactive compiler process.
+
+Obey <Obey$Dir>.!Boot
+Filer_OpenDir <Obey$Dir>
+
+| end of !Run

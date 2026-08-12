@@ -45,7 +45,9 @@ SUITE( fbc_tests.gfx.image_expr )
 
 		function = TRUE
 		for i as integer = 0 to (img->width * img->height)-1
-			if( cptr( ulong ptr, img + 1 )[i] <> col ) then
+			dim as ulong pixel
+			memcpy( @pixel, cptr( ubyte ptr, img + 1 ) + (i * sizeof(ulong)), sizeof(pixel) )
+			if( pixel <> col ) then
 				function = FALSE
 				exit for
 			end if

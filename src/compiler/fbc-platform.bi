@@ -11,7 +11,7 @@
 ''
 '' Responsibilities:
 ''
-''     - define the standard hooks implemented by fbc-*-platform.bi files
+''     - define the standard hooks implemented by platform subdirectories
 ''     - include every platform file matching an FB_COMPTARGET entry
 ''     - run platform hooks in a predictable order
 ''     - choose target-specific linker tools
@@ -28,7 +28,7 @@
 ''
 ''     One OS compile target maps to one file named:
 ''
-''         fbc-[target-id]-platform.bi
+''         [target-id]/fbc-platform.bi
 ''
 ''     The [target-id] part must match the target id from fb.bas:targetinfo().
 ''     Each platform file exports the hook names listed in FBC_PLATFORM_HOOKS
@@ -100,23 +100,24 @@ private sub fbcPlatformAddX11GfxLibs( )
 	#endif
 end sub
 
-#include once "fbc-win32-platform.bi"
-#include once "fbc-cygwin-platform.bi"
-#include once "fbc-linux-platform.bi"
-#include once "fbc-android-platform.bi"
-#include once "fbc-haiku-platform.bi"
-#include once "fbc-dos-platform.bi"
-#include once "fbc-xbox-platform.bi"
-#include once "fbc-freebsd-platform.bi"
-#include once "fbc-dragonfly-platform.bi"
-#include once "fbc-solaris-platform.bi"
-#include once "fbc-illumos-platform.bi"
-#include once "fbc-openbsd-platform.bi"
-#include once "fbc-darwin-platform.bi"
-#include once "fbc-netbsd-platform.bi"
-#include once "fbc-js-platform.bi"
-#include once "fbc-wii-platform.bi"
-#include once "fbc-nuttx-platform.bi"
+#include once "win32/fbc-platform.bi"
+#include once "cygwin/fbc-platform.bi"
+#include once "linux/fbc-platform.bi"
+#include once "android/fbc-platform.bi"
+#include once "haiku/fbc-platform.bi"
+#include once "dos/fbc-platform.bi"
+#include once "xbox/fbc-platform.bi"
+#include once "freebsd/fbc-platform.bi"
+#include once "dragonfly/fbc-platform.bi"
+#include once "solaris/fbc-platform.bi"
+#include once "illumos/fbc-platform.bi"
+#include once "openbsd/fbc-platform.bi"
+#include once "darwin/fbc-platform.bi"
+#include once "netbsd/fbc-platform.bi"
+#include once "js/fbc-platform.bi"
+#include once "wii/fbc-platform.bi"
+#include once "nuttx/fbc-platform.bi"
+#include once "riscos/fbc-platform.bi"
 
 '' must be same order as enum FB_COMPTARGET
 static shared as FBC_PLATFORM_HOOKS fbcplatforms(0 to FB_COMPTARGETS-1) = _
@@ -171,7 +172,10 @@ static shared as FBC_PLATFORM_HOOKS fbcplatforms(0 to FB_COMPTARGETS-1) = _
 	  @fbcWiiPlatformAddDefaultLibs, @fbcWiiPlatformAddLinkerFrameworks ), _
 	( @fbcPlatformGetDefaultLinkerTool, @fbcNuttxPlatformAddDefaultLibPaths, _
 	  @fbcNuttxPlatformAddGfxLibs, @fbcNuttxPlatformAddSfxLibs, _
-	  @fbcNuttxPlatformAddDefaultLibs, @fbcNuttxPlatformAddLinkerFrameworks )  _
+	  @fbcNuttxPlatformAddDefaultLibs, @fbcNuttxPlatformAddLinkerFrameworks ), _
+	( @fbcRiscosPlatformGetLinkerTool, @fbcRiscosPlatformAddDefaultLibPaths, _
+	  @fbcRiscosPlatformAddGfxLibs, @fbcRiscosPlatformAddSfxLibs, _
+	  @fbcRiscosPlatformAddDefaultLibs, @fbcRiscosPlatformAddLinkerFrameworks )  _
 }
 
 private function fbcPlatformGetLinkerTool( ) as integer
@@ -182,6 +186,8 @@ private function fbcPlatformGetLinkerTool( ) as integer
 		return fbcJsPlatformGetLinkerTool( )
 	case FB_COMPTARGET_WII
 		return fbcWiiPlatformGetLinkerTool( )
+	case FB_COMPTARGET_RISCOS
+		return fbcRiscosPlatformGetLinkerTool( )
 	case else
 		'' Most targets link through the normal linker.  Keep this hook
 		'' explicit instead of dispatching through the platform procptr table:

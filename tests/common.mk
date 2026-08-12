@@ -27,7 +27,7 @@ include $(mkpath)/compiler-config.mk
 endif
 
 ifneq ($(TESTS_INPUT_TARGET),)
-TARGET := $(TESTS_INPUT_TARGET)
+override TARGET := $(TESTS_INPUT_TARGET)
 endif
 
 .DEFAULT_GOAL := all

@@ -50,12 +50,23 @@ endif
 UNIT_TESTS_INC := unit-tests.inc
 UNIT_TESTS_OBJ_LST := unit-tests-obj.lst
 UNIT_TESTS_OBJ_LIB := unit-tests-obj.a
-UNIT_TESTS_EXPLICIT_SRCS := \
+UNIT_TESTS_EXPLICIT_SRCS :=
+ifeq ($(filter console,$(DIRLIST)),)
+UNIT_TESTS_EXPLICIT_SRCS += ./console/common.bas
+endif
+UNIT_TESTS_EXPLICIT_SRCS += \
 ./pp/macro-arg-listexpand-utf16le.bas \
 ./pp/macro-eval-str-utf16le.bas \
 ./pp/quote-utf16be.bas \
 ./pp/quote-utf16le.bas \
 ./string/asc-utf16le.bas
+ifeq ($(TESTS_TARGET_OS),dos)
+UNIT_TESTS_EXPLICIT_SRCS += \
+./dos/compound/select_const2-part1.bas \
+./dos/compound/select_const2-part2.bas \
+./dos/compound/select_const2-part3.bas \
+./dos/compound/select_const2-part4.bas
+endif
 UNIT_TESTS_EXPLICIT_OBJS := $(UNIT_TESTS_EXPLICIT_SRCS:%.bas=%.o)
 
 SRCLIST :=
@@ -70,7 +81,7 @@ SRCLIST := $(patsubst .bmk,.bas,$(SRCLIST))
 SRCLIST_DOS_FILTER_OUT :=
 ifeq ($(TARGET_OS),dos)
 # The monolithic select_const2 test produces a huge DOS assembly unit.
-# DOS runs the same coverage through smaller select_const2-dos-*.bas shards.
+# DOS runs the same coverage through smaller tests/dos/compound shards.
 SRCLIST_DOS_FILTER_OUT := \
 ./interactive/% interactive/% \
 ./threads/% threads/% \
@@ -100,7 +111,19 @@ ifeq ($(TARGET_OS),win32)
     FBCU_LIBS += -l user32
 endif
 
+# Unit sources are compiled separately, so a THREADCALL source's automatic
+# libffi dependency is not retained for the final aggregate link. RISC OS has
+# a target libffi build and enables that ARM coverage explicitly.
+ifeq ($(TESTS_TARGET_OS),riscos)
+ifneq ($(filter threads,$(DIRLIST)),)
+    FBCU_LIBS += -l ffi
+endif
+endif
+
 FBC_CFLAGS := -c -w 3 -i $(FBCU_INC) -m $(MAINBAS)
+ifeq ($(TESTS_TARGET_OS),riscos)
+FBC_CFLAGS += -i $(abspath ../inc/riscos)
+endif
 FBC_CFLAGS += -i $(abspath ../inc)
 ifneq ($(TARGET_OS),dos)
 	FBC_CFLAGS += -Wc -Wno-tautological-compare
@@ -188,6 +211,19 @@ endif
 
 %.o : %.bas
 	$(FBC) $(FBC_CFLAGS) $^
+
+ifeq ($(TESTS_TARGET_OS),riscos)
+./numbers/infnan.o: ./riscos/numbers/infnan.bas
+	$(FBC) $(FBC_CFLAGS) $< -o $@
+./numbers/limits.o: ./riscos/numbers/limits.bas
+	$(FBC) $(FBC_CFLAGS) $< -o $@
+./structs/anon-align.o: ./riscos/structs/anon-align.bas
+	$(FBC) $(FBC_CFLAGS) $< -o $@
+./structs/padding.o: ./riscos/structs/padding.bas
+	$(FBC) $(FBC_CFLAGS) $< -o $@
+./threads/threadcall.o: ./riscos/threads/threadcall.bas
+	$(FBC) $(FBC_CFLAGS) $< -o $@
+endif
 
 #
 #: targets

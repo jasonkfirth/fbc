@@ -19,6 +19,7 @@ FreeBASIC-*-source-bootstrap-*.tar.*
 *.status
 *.tmp
 .maketests-tmp/
+.maketests-host/
 xbox_emulator/
 xbox_emulator_xemu/
 bin/fbc*

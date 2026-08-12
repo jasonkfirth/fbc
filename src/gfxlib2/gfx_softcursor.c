@@ -88,14 +88,6 @@ int fb_hSoftCursorInit(void)
 	if (!cursor_area)
 		return -1;
 
-#ifdef HOST_DOS
-	if (fb_dos_lock_data(cursor_area, cursor_size) != 0) {
-		free(cursor_area);
-		cursor_area = NULL;
-		return -1;
-	}
-#endif
-
 	if (__fb_gfx->bpp == 1) {
 		white = 15;
 		black = 0;
@@ -113,9 +105,6 @@ void fb_hSoftCursorExit(void)
 	if (!cursor_area)
 		return;
 
-#ifdef HOST_DOS
-	fb_dos_unlock_data(cursor_area, CURSOR_W * CURSOR_H * __fb_gfx->bpp);
-#endif
 	free(cursor_area);
 	cursor_area = NULL;
 }

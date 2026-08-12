@@ -22,29 +22,8 @@ private function hSgnLongInt( byval x as longint ) as longint
 	end if
 end function
 
-private sub hResetDosFpuStack( )
-	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
-		'' DJGPP/DPMI can leave stale x87 stack entries between helper calls.
-		asm
-			fninit
-		end asm
-	#endif
-end sub
-
 private function hFloatConstSgn( byval f as double ) as double
-	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
-		dim as ulongint bits = *cptr( ulongint ptr, @f )
-
-		if( (bits and &h7FFFFFFFFFFFFFFFull) = 0 ) then
-			function = 0.0
-		elseif( (bits and &h8000000000000000ull) <> 0 ) then
-			function = -1.0
-		else
-			function = 1.0
-		end if
-	#else
-		function = sgn( f )
-	#endif
+	function = sgn( f )
 end function
 
 private function hFloatConstFix _
@@ -53,64 +32,12 @@ private function hFloatConstFix _
 		byref hadfrac as integer _
 	) as double
 
-	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
-		dim as ulongint bits = *cptr( ulongint ptr, @f )
-		dim as ulongint signbit = bits and &h8000000000000000ull
-		'' IEEE-754 DOUBLE has an 11-bit exponent at bit 52, biased by 1023.
-		const DOUBLE_EXPONENT_SHIFT = 52
-		const DOUBLE_EXPONENT_MASK = &h7FF
-		const DOUBLE_EXPONENT_BIAS = 1023
-		const DOUBLE_MANTISSA_BITS = 52
-		dim as integer expraw = (bits shr DOUBLE_EXPONENT_SHIFT) and DOUBLE_EXPONENT_MASK
-		dim as integer expnt = expraw - DOUBLE_EXPONENT_BIAS
-
-		hadfrac = FALSE
-
-		if( expraw = &h7FF ) then
-			return f
-		end if
-
-		if( expnt < 0 ) then
-			hadfrac = ((bits and &h7FFFFFFFFFFFFFFFull) <> 0)
-			bits = signbit
-			return *cptr( double ptr, @bits )
-		end if
-
-		if( expnt >= DOUBLE_MANTISSA_BITS ) then
-			return f
-		end if
-
-		dim as ulongint mant = (bits and &h000FFFFFFFFFFFFFull) or &h0010000000000000ull
-		dim as ulongint fracmask = (1ull shl (DOUBLE_MANTISSA_BITS - expnt)) - 1
-
-		hadfrac = ((mant and fracmask) <> 0)
-		if( hadfrac ) then
-			mant and= not fracmask
-			bits = signbit or (culngint( expraw ) shl DOUBLE_EXPONENT_SHIFT) or (mant and &h000FFFFFFFFFFFFFull)
-			function = *cptr( double ptr, @bits )
-		else
-			function = f
-		end if
-	#else
-		hadfrac = (frac( f ) <> 0.0)
-		function = fix( f )
-	#endif
+	hadfrac = (frac( f ) <> 0.0)
+	function = fix( f )
 end function
 
 private function hFloatConstFloor( byval f as double ) as double
-	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
-		dim as integer hadfrac = any
-		dim as double d = hFloatConstFix( f, hadfrac )
-		dim as ulongint bits = *cptr( ulongint ptr, @f )
-
-		if( hadfrac andalso ((bits and &h8000000000000000ull) <> 0) ) then
-			d -= 1.0
-		end if
-
-		function = d
-	#else
-		function = int( f )
-	#endif
+	function = int( f )
 end function
 
 private sub hApplyFloatConstResultType( byval dtype as integer, byref f as double )
@@ -158,8 +85,6 @@ private function hConstUop _
 	dim as longint i = any
 
 	if( typeGetClass( l->dtype ) = FB_DATACLASS_FPOINT ) then
-		hResetDosFpuStack( )
-
 		d = l->val.f
 		dim as integer hadfrac = any
 		if( typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_SINGLE ) then

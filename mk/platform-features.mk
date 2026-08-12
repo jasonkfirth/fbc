@@ -92,7 +92,7 @@ endif
 # Platform families
 # ---------------------------------------------------------------------------
 
-ELF_UNIX_OS := linux freebsd netbsd openbsd dragonfly solaris illumos haiku android
+ELF_UNIX_OS := linux freebsd netbsd openbsd dragonfly solaris illumos haiku android riscos
 BSD_OS      := freebsd netbsd openbsd dragonfly
 WINDOWS_OS  := win32 cygwin xbox
 DOS_OS      := dos
@@ -153,6 +153,10 @@ else ifeq ($(TARGET_OS),cygwin)
   THREAD_MODEL := posix
 else ifneq ($(filter linux android darwin freebsd netbsd openbsd dragonfly solaris illumos haiku,$(TARGET_OS)),)
   THREAD_MODEL := posix
+else ifeq ($(TARGET_OS),riscos)
+  # UnixLib implements pthreads inside libc; GCCSDK 4.7 has no -pthread
+  # driver option and needs no separate thread library.
+  THREAD_MODEL := unixlib
 endif
 
 ifeq ($(TARGET_OS),js)
@@ -250,6 +254,17 @@ ifeq ($(TARGET_OS),nuttx)
   DISABLE_OPENGL := YesPlease
   DISABLE_FBDEV := YesPlease
   DISABLE_TCP := YesPlease
+endif
+
+# RISC OS uses the UnixLib console, file, and socket layer.  The initial port
+# has no native graphics backend, and desktop Unix backends do not apply.
+ifeq ($(TARGET_OS),riscos)
+  ENABLE_X11 :=
+  ENABLE_SDL :=
+  DISABLE_X11 := YesPlease
+  DISABLE_XPM := YesPlease
+  DISABLE_OPENGL := YesPlease
+  DISABLE_FBDEV := YesPlease
 endif
 
 # DOS -> no hosted sockets in the current runtime
@@ -375,6 +390,22 @@ endif
 ifneq ($(filter win32 xbox,$(TARGET_OS)),)
 
   ENABLE_REPRODUCIBLE := YesPlease
+
+endif
+
+# ---- RISC OS / GCCSDK ----
+#
+# GCCSDK 4.7 predates the modern hardening driver flags selected elsewhere in
+# this file.  Do not pass host-compiler options that the cross driver rejects.
+ifeq ($(TARGET_OS),riscos)
+
+  ENABLE_STACK_PROTECTOR :=
+  ENABLE_FORTIFY         :=
+  ENABLE_STACK_CLASH     :=
+  ENABLE_FORMAT_SECURITY :=
+  ENABLE_CET             :=
+  ENABLE_NO_PLT          :=
+  ENABLE_TRIVIAL_INIT    :=
 
 endif
 

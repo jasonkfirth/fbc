@@ -6,11 +6,6 @@
 #include "../rtlib/fb.h"
 #include "../rtlib/fb_gfx_private.h"
 
-#if defined(HOST_DOS) && !defined(DISABLE_OPENGL)
-	/* No OpenGL support on DOS */
-	#define DISABLE_OPENGL
-#endif
-
 #define PI			3.1415926535897932384626
 
 #define BYTES_PER_PIXEL(d)		(((d) + 7) / 8)

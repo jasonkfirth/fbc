@@ -1,4 +1,5 @@
 #include "fbcunit.bi"
+#include once "crt/string.bi"
 
 SUITE( fbc_tests.pointers.casting2 )
 
@@ -10,11 +11,13 @@ SUITE( fbc_tests.pointers.casting2 )
 		pt = @array(1)
 
 		cptr(short ptr, pt) += 1
+		dim as long value
+		memcpy( @value, pt, sizeof(value) )
 
 #if defined( __FB_BIGENDIAN__ )
-		CU_ASSERT_EQUAL( *pt, (array(1) and &hffff) shl 16 or (array(2) shr 16) )
+		CU_ASSERT_EQUAL( value, (array(1) and &hffff) shl 16 or (array(2) shr 16) )
 #else
-		CU_ASSERT_EQUAL( *pt, (array(2) and &hffff) shl 16 or (array(1) shr 16) )
+		CU_ASSERT_EQUAL( value, (array(2) and &hffff) shl 16 or (array(1) shr 16) )
 #endif
 	END_TEST
 

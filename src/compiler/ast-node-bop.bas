@@ -396,30 +396,8 @@ private sub hToStr(byref l as ASTNODE ptr, byref r as ASTNODE ptr)
 	end select
 end sub
 
-private sub hResetDosFpuStack( )
-	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
-		'' DJGPP/DPMI can leave stale x87 stack entries between helper calls.
-		asm
-			fninit
-		end asm
-	#endif
-end sub
-
 private function hFloatConstIsZero( byval f as double ) as integer
-	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
-		dim as ulongint bits = *cptr( ulongint ptr, @f )
-		function = ((bits and &h7FFFFFFFFFFFFFFFull) = 0)
-	#else
-		function = (f = 0.0)
-	#endif
-end function
-
-private function hFloatConstOrderKey( byval bits as ulongint ) as ulongint
-	if( (bits and &h8000000000000000ull) <> 0 ) then
-		function = not bits
-	else
-		function = bits xor &h8000000000000000ull
-	end if
+	function = (f = 0.0)
 end function
 
 private function hFloatConstCompare _
@@ -429,72 +407,14 @@ private function hFloatConstCompare _
 		byval rf as double _
 	) as longint
 
-	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
-		dim as ulongint lbits = *cptr( ulongint ptr, @lf )
-		dim as ulongint rbits = *cptr( ulongint ptr, @rf )
-		dim as integer lnan = any, rnan = any, eq = any
-
-		lnan = ((lbits and &h7FF0000000000000ull) = &h7FF0000000000000ull) andalso _
-		       ((lbits and &h000FFFFFFFFFFFFFull) <> 0)
-		rnan = ((rbits and &h7FF0000000000000ull) = &h7FF0000000000000ull) andalso _
-		       ((rbits and &h000FFFFFFFFFFFFFull) <> 0)
-
-		if( lnan or rnan ) then
-			function = iif( op = AST_OP_NE, -1, 0 )
-			exit function
-		end if
-
-		if( (((lbits or rbits) and &h7FFFFFFFFFFFFFFFull) = 0) ) then
-			eq = TRUE
-		else
-			eq = (lbits = rbits)
-		end if
-
-		select case as const op
-		case AST_OP_NE
-			function = iif( eq, 0, -1 )
-		case AST_OP_EQ
-			function = iif( eq, -1, 0 )
-		case AST_OP_GT
-			if( eq = FALSE ) then
-				function = iif( hFloatConstOrderKey( lbits ) > hFloatConstOrderKey( rbits ), -1, 0 )
-			end if
-		case AST_OP_LT
-			if( eq = FALSE ) then
-				function = iif( hFloatConstOrderKey( lbits ) < hFloatConstOrderKey( rbits ), -1, 0 )
-			end if
-		case AST_OP_LE
-			if( eq ) then
-				function = -1
-			else
-				function = iif( hFloatConstOrderKey( lbits ) < hFloatConstOrderKey( rbits ), -1, 0 )
-			end if
-		case AST_OP_GE
-			if( eq ) then
-				function = -1
-			else
-				function = iif( hFloatConstOrderKey( lbits ) > hFloatConstOrderKey( rbits ), -1, 0 )
-			end if
-		end select
-	#else
-		select case as const op
-		case AST_OP_NE  : function = (lf <> rf)
-		case AST_OP_EQ  : function = (lf =  rf)
-		case AST_OP_GT  : function = (lf >  rf)
-		case AST_OP_LT  : function = (lf <  rf)
-		case AST_OP_LE  : function = (lf <= rf)
-		case AST_OP_GE  : function = (lf >= rf)
-		end select
-	#endif
-end function
-
-private function hFloatConstPositiveInf( ) as double
-	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
-		dim as ulongint bits = &h7FF0000000000000ull
-		function = *cptr( double ptr, @bits )
-	#else
-		function = 1.0 / 0.0
-	#endif
+	select case as const op
+	case AST_OP_NE  : function = (lf <> rf)
+	case AST_OP_EQ  : function = (lf =  rf)
+	case AST_OP_GT  : function = (lf >  rf)
+	case AST_OP_LT  : function = (lf <  rf)
+	case AST_OP_LE  : function = (lf <= rf)
+	case AST_OP_GE  : function = (lf >= rf)
+	end select
 end function
 
 private function hConstBop _
@@ -510,8 +430,6 @@ private function hConstBop _
 		'' Float BOP
 		dim as double lf = any, rf = any
 
-		hResetDosFpuStack( )
-
 		lf = l->val.f
 		rf = r->val.f
 
@@ -522,17 +440,7 @@ private function hConstBop _
 		'' Note: no division by zero error here - we should return
 		'' INF instead, just like with (l / r) at runtime
 		case AST_OP_DIV : l->val.f = lf /  rf
-		case AST_OP_POW
-			#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
-				if( hFloatConstIsZero( lf ) andalso _
-				    (hFloatConstCompare( AST_OP_LT, rf, 0.0 ) <> 0) ) then
-					l->val.f = hFloatConstPositiveInf( )
-				else
-					l->val.f = lf ^ rf
-				end if
-			#else
-				l->val.f = lf ^  rf
-			#endif
+		case AST_OP_POW : l->val.f = lf ^  rf
 		case AST_OP_NE, AST_OP_EQ, AST_OP_GT, AST_OP_LT, AST_OP_LE, AST_OP_GE
 			l->val.i = hFloatConstCompare( op, lf, rf )
 		case AST_OP_ATAN2 : l->val.f = atan2( lf, rf )

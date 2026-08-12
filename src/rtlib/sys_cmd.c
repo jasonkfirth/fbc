@@ -51,22 +51,5 @@ FBCALL FBSTRING *fb_Command ( int arg )
 
 	memcpy( dst->data, __fb_ctx.argv[arg], len + 1 );
 
-#ifdef HOST_DOS
-	if( arg == 0 )
-	{
-		/* make drive letter uppercase */
-		if( dst->data[1] == ':' )
-			dst->data[0] = toupper( dst->data[0] );
-
-		/* DOS gives us argv[0] with '/' path separators -
-		 * change them to the more DOS-like '\'. */
-		for( i = 0; i < len; ++i )
-		{
-			if( dst->data[i] == '/' )
-				dst->data[i] = '\\';
-		}
-	}
-#endif
-
 	return dst;
 }

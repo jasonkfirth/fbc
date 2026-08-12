@@ -158,6 +158,7 @@ endif
 ##############################################################################
 
 BOOTSTRAP_COMPILER_SRC := $(FBC_SRC)
+BOOTSTRAP_COMPILER_SRC_DIRS := $(sort $(dir $(BOOTSTRAP_COMPILER_SRC)))
 BOOTSTRAP_INC_DIR := $(rootdir)/inc
 
 ##############################################################################
@@ -196,7 +197,9 @@ bootstrap-emit: bootstrap-check
 	rm -f "$(BOOTSTRAP_OUT)"/*.c "$(BOOTSTRAP_OUT)"/*.asm "$(BOOTSTRAP_SRC_RSP)"
 
 	@echo "==> Clearing temporary compiler emission"
-	rm -f "$(srcdir)/compiler/"*.c "$(srcdir)/compiler/"*.asm
+	@for source_dir in $(BOOTSTRAP_COMPILER_SRC_DIRS); do \
+		rm -f "$$source_dir"*.c "$$source_dir"*.asm; \
+	done
 
 	@echo "==> Writing bootstrap source response file"
 	@$(MAKE) bootstrap-emit-source-response
@@ -211,19 +214,21 @@ bootstrap-emit: bootstrap-check
 		-target $(BOOT_FBC_TARGET) \
 		$(if $(BOOTSTRAP_ARCH),-arch $(BOOTSTRAP_ARCH)) \
 		$(BOOTSTRAP_COMPAT_DEFINES) \
+		-i "$(srcdir)/compiler" \
 		-i "$$bootstrap_inc" \
 		-e -r -v \
 		$(BOOTFBCFLAGS)
 
 	@echo "==> Collecting emitted sources"
 
-	@if ls $(srcdir)/compiler/*.c >/dev/null 2>&1; then \
-		mv $(srcdir)/compiler/*.c "$(BOOTSTRAP_OUT)/"; \
-	fi
-
-	@if ls $(srcdir)/compiler/*.asm >/dev/null 2>&1; then \
-		mv $(srcdir)/compiler/*.asm "$(BOOTSTRAP_OUT)/"; \
-	fi
+	@for source_dir in $(BOOTSTRAP_COMPILER_SRC_DIRS); do \
+		if ls "$$source_dir"*.c >/dev/null 2>&1; then \
+			mv "$$source_dir"*.c "$(BOOTSTRAP_OUT)/"; \
+		fi; \
+		if ls "$$source_dir"*.asm >/dev/null 2>&1; then \
+			mv "$$source_dir"*.asm "$(BOOTSTRAP_OUT)/"; \
+		fi; \
+	done
 
 	@if ! ls "$(BOOTSTRAP_OUT)"/* >/dev/null 2>&1; then \
 		echo "ERROR: bootstrap emission produced no sources"; \

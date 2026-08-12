@@ -10,55 +10,7 @@
 #include once "ast.bi"
 
 private function hConstCastFloatToULongint( byval f as double ) as ulongint
-	#if defined( __FB_DOS__ ) and defined( __FB_X86__ )
-		dim as ulongint bits = *cptr( ulongint ptr, @f )
-		'' IEEE-754 DOUBLE has an 11-bit exponent at bit 52, biased by 1023.
-		const DOUBLE_EXPONENT_SHIFT = 52
-		const DOUBLE_EXPONENT_MASK = &h7FF
-		const DOUBLE_EXPONENT_BIAS = 1023
-		const DOUBLE_MANTISSA_BITS = 52
-		const ULONGINT_MAX_EXPONENT = 63
-		dim as integer rawexp = (bits shr DOUBLE_EXPONENT_SHIFT) and DOUBLE_EXPONENT_MASK
-		dim as integer expnt = rawexp - DOUBLE_EXPONENT_BIAS
-
-		'' DJGPP's direct DOUBLE -> ULONGINT conversion does not match
-		'' FreeBASIC's round-to-nearest rules on all DOS hosts.  For
-		'' positive finite constants, round the IEEE mantissa directly.
-		if( ((bits and &h8000000000000000ull) = 0) andalso _
-		    (rawexp <> 0) andalso (rawexp <> &h7FF) ) then
-			dim as ulongint mant = (bits and &h000FFFFFFFFFFFFFull) or &h0010000000000000ull
-
-			if( expnt < -1 ) then
-				function = 0
-			elseif( expnt = -1 ) then
-				if( mant > &h0010000000000000ull ) then
-					function = 1
-				else
-					function = 0
-				end if
-			elseif( expnt < DOUBLE_MANTISSA_BITS ) then
-				dim as integer shift = DOUBLE_MANTISSA_BITS - expnt
-				dim as ulongint result = mant shr shift
-				dim as ulongint remainder = mant and ((1ull shl shift) - 1ull)
-				dim as ulongint half = 1ull shl (shift - 1)
-
-				if( (remainder > half) or _
-				    ((remainder = half) andalso ((result and 1ull) <> 0)) ) then
-					result += 1
-				end if
-
-				function = result
-			elseif( expnt <= ULONGINT_MAX_EXPONENT ) then
-				function = mant shl (expnt - DOUBLE_MANTISSA_BITS)
-			else
-				function = 0
-			end if
-		else
-			function = hCastFloatToULongint( f )
-		end if
-	#else
-		function = hCastFloatToULongint( f )
-	#endif
+	function = hCastFloatToULongint( f )
 end function
 
 private sub hConstConv( byval todtype as integer, byval l as ASTNODE ptr )

@@ -383,6 +383,10 @@ ifeq ($(THREAD_MODEL),wii)
 MT_CFLAGS := -DENABLE_MT
 endif
 
+ifeq ($(THREAD_MODEL),unixlib)
+MT_CFLAGS := -DENABLE_MT
+endif
+
 ifdef DISABLE_MT
 MT_CFLAGS :=
 endif
@@ -459,6 +463,16 @@ TOOLCHAIN_FBLFLAGS :=
 TOOLCHAIN_FBRTCFLAGS :=
 TOOLCHAIN_FBRTLFLAGS :=
 TOOLCHAIN_FBC_ENV :=
+
+
+# RISC OS / GCCSDK
+#
+# The initial port deliberately uses static UnixLib links. This avoids the
+# separate SharedLibs dynamic-loader environment while still using the
+# SharedUnixLibrary module required by UnixLib at run time.
+ifeq ($(TARGET_OS),riscos)
+TOOLCHAIN_LDFLAGS += -static
+endif
 
 
 ifeq ($(TARGET_OS),win32)

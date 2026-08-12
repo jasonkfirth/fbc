@@ -12,27 +12,7 @@
 
 '' split the test so we can modify test generation here separately   
 
-#ifndef SELECT_CONST2_DOS_PART
-	#define SELECT_CONST2_DOS_PART 0
-#endif
-
-#if (not defined( __FB_DOS__ )) or (SELECT_CONST2_DOS_PART <> 0)
-
-#ifdef __FB_DOS__
-	#if SELECT_CONST2_DOS_PART = 1
-		SUITE( fbc_tests.compound.select_const2_part1 )
-	#elseif SELECT_CONST2_DOS_PART = 2
-		SUITE( fbc_tests.compound.select_const2_part2 )
-	#elseif SELECT_CONST2_DOS_PART = 3
-		SUITE( fbc_tests.compound.select_const2_part3 )
-	#elseif SELECT_CONST2_DOS_PART = 4
-		SUITE( fbc_tests.compound.select_const2_part4 )
-	#else
-		SUITE( fbc_tests.compound.select_const2 )
-	#endif
-#else
 SUITE( fbc_tests.compound.select_const2 )
-#endif
 
 	const FALSE = 0
 	const TRUE = not FALSE
@@ -112,7 +92,6 @@ SUITE( fbc_tests.compound.select_const2 )
 	#endmacro
 
 	#macro TEST_RANGES()
-		#if (SELECT_CONST2_DOS_PART = 0) or (SELECT_CONST2_DOS_PART = 1)
 			'' byte range edges and near zero
 			TEST_RANGE_EDGES( byte, -128, 127 )
 			TEST_RANGE_EDGES( byte, -2, 2 )
@@ -126,9 +105,7 @@ SUITE( fbc_tests.compound.select_const2 )
 			TEST_RANGE_EDGES( integer, -1, 256 )
 			TEST_RANGE_EDGES( longint, -129, 128 )
 			TEST_RANGE_EDGES( longint, -1, 256 )
-		#endif
 
-		#if (SELECT_CONST2_DOS_PART = 0) or (SELECT_CONST2_DOS_PART = 2)
 			'' short range edges and near zero
 			TEST_RANGE_EDGES( short, -32768, 32767 )
 			TEST_RANGE_EDGES( short, -2, 2 )
@@ -140,9 +117,7 @@ SUITE( fbc_tests.compound.select_const2 )
 			TEST_RANGE_EDGES( integer, 0, 65536 )
 			TEST_RANGE_EDGES( longint, -32769, 32768 )
 			TEST_RANGE_EDGES( longint, 0, 65536 )
-		#endif
 
-		#if (SELECT_CONST2_DOS_PART = 0) or (SELECT_CONST2_DOS_PART = 3)
 			'' long range edges and near zero
 			TEST_RANGE_EDGES( long, -2147483648, 2147483647 )
 			TEST_RANGE_EDGES( long, -2, 2 )
@@ -163,14 +138,11 @@ SUITE( fbc_tests.compound.select_const2 )
 				TEST_RANGE_EDGES( longint, -2147483649ll, 2147483648ll )
 				TEST_RANGE_EDGES( longint, 0, 4294967296ll )
 			#endif
-		#endif
 
-		#if (SELECT_CONST2_DOS_PART = 0) or (SELECT_CONST2_DOS_PART = 4)
 			'' longint range edges and near zero
 			TEST_RANGE_EDGES( longint, -9223372036854775807ll-1ll, 9223372036854775807ll  )
 			TEST_RANGE_EDGES( longint, -2ll, 2ll )
 			TEST_RANGE_EDGES( ulongint, 0, 18446744073709551615ull )
-		#endif
 	#endmacro
 
 	'' generate tests for Test Ranges using literal values
@@ -203,5 +175,3 @@ SUITE( fbc_tests.compound.select_const2 )
 	END_TEST
 
 END_SUITE
-
-#endif

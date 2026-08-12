@@ -204,6 +204,10 @@ PLATFORM_SOURCES = {
     "examples/manual/proguide/variadic_arguments/va_.bas",
     "examples/manual/proguide/variadic_arguments/va_2.bas",
     "examples/manual/proguide/variadic_arguments/va_3.bas",
+    # RUN replaces the current process with a named executable. This manual
+    # sample deliberately names program.exe, so both its path and failure
+    # behaviour depend on the host operating system's executable conventions.
+    "examples/manual/system/run.bas",
     # Recovering from SIGSEGV through signal()/longjmp() is platform behavior.
     "examples/misc/trycatch/test.bas",
 }

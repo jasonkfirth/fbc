@@ -109,6 +109,7 @@ endef
 
 $(eval $(call _set_os_if_token,android,android))
 $(eval $(call _set_os_if_token,nuttx,nuttx))
+$(eval $(call _set_os_if_token,riscos,riscos))
 $(eval $(call _set_os_if_token,linux,linux))
 $(eval $(call _set_os_if_token,emscripten,js))
 $(eval $(call _set_os_if_token,js,js))
