@@ -283,7 +283,12 @@ else
   BOOTSTRAP_RTL := $(libdir)/libfb.a
 endif
 
-$(BOOTSTRAP_FBC): rtlib $(BOOTSTRAP_OBJ) | $(BOOTSTRAP_PATH)
+#
+# The bootstrap compiler links one runtime variant.  Depending on the rtlib
+# aggregate here also builds the unused PIC/non-PIC and multithreaded archives,
+# only for bootstrap-minimal to delete them immediately after the link.
+#
+$(BOOTSTRAP_FBC): $(BOOTSTRAP_RT0) $(BOOTSTRAP_RTL) $(BOOTSTRAP_OBJ) | $(BOOTSTRAP_PATH)
 
 	$(RUN_CC) $(ALLLDFLAGS) -o $@ \
 	$(BOOTSTRAP_RT0) \
