@@ -88,7 +88,7 @@ install_apk_packages() {
         mesa-dev \
         glu-dev
 
-    mapfile -t packages < <(find "$packages_dir" -type f -name '*.apk' | sort)
+    mapfile -t packages < <(find "$packages_dir" -maxdepth 1 -type f -name '*.apk' | sort)
     [ "${#packages[@]}" -gt 0 ] || fail "no .apk packages found in $packages_dir"
 
     echo "==> installing FreeBASIC APK package(s)"
