@@ -19,6 +19,8 @@ freebasic (1.20.3-1) unstable; urgency=medium
     second stage so package post-install scripts retain a working procfs.
   * Stage the private sfxlib source headers used by strict MIDI/FM fbctest
     helpers when validating Debian Ports packages.
+  * Stage those private sfxlib headers for APK, RPM, Arch Linux, and Slackware
+    package validation as well, keeping their isolated fbctests complete.
   * Bootstrap Sid loong64 package tests from Debian's main archive now that
     the architecture is no longer served by Debian Ports.
   * Retry the initial threaded TCP loopback connection under QEMU instead of

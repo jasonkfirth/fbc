@@ -418,12 +418,13 @@ run_fbctests() {
 
     [ -d /source-tests ] || fail "tests/ tree was not mounted at /source-tests"
     [ -d /source-inc ] || fail "inc/ tree was not mounted at /source-inc"
+    [ -d /source-sfxlib ] || fail "src/sfxlib/ was not mounted at /source-sfxlib"
 
     jobs="$(job_count "${FBCTESTS_JOBS:-}")"
 
     echo "==> copying fbctests source"
     rm -rf /tmp/fbctests-source
-    mkdir -p /tmp/fbctests-source/tests /tmp/fbctests-source/inc
+    mkdir -p /tmp/fbctests-source/tests /tmp/fbctests-source/inc /tmp/fbctests-source/src/sfxlib
     (
         cd /source-tests
         tar \
@@ -446,6 +447,13 @@ run_fbctests() {
         tar cf - .
     ) | (
         cd /tmp/fbctests-source/inc
+        tar xf -
+    )
+    (
+        cd /source-sfxlib
+        tar cf - .
+    ) | (
+        cd /tmp/fbctests-source/src/sfxlib
         tar xf -
     )
 
