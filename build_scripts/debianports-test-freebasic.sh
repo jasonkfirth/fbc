@@ -444,6 +444,12 @@ prepare_chroot() {
         mount_chroot_filesystems
         verify_chroot_filesystems
         chroot_run /bin/sh /debootstrap/debootstrap --second-stage
+
+        # The foreign second stage may unmount procfs while completing the
+        # base system.  Package post-install scripts such as OpenJDK require
+        # it, so restore and verify every chroot filesystem before testing.
+        mount_chroot_filesystems
+        verify_chroot_filesystems
     else
         msg "reusing Debian $SUITE chroot for $ARCH"
         run_root install -m 755 "$QEMU_HOST_PATH" "$ROOTFS/usr/bin/$QEMU_BIN"
@@ -477,8 +483,14 @@ stage_sources_for_fbctests() {
     [ "$RUN_FBCTESTS" -eq 1 ] || return 0
 
     msg "staging fbctests source"
-    run_root rm -rf "$ROOTFS/source-tests" "$ROOTFS/source-inc"
-    run_root mkdir -p "$ROOTFS/source-tests" "$ROOTFS/source-inc"
+    run_root rm -rf \
+        "$ROOTFS/source-tests" \
+        "$ROOTFS/source-inc" \
+        "$ROOTFS/source-sfxlib"
+    run_root mkdir -p \
+        "$ROOTFS/source-tests" \
+        "$ROOTFS/source-inc" \
+        "$ROOTFS/source-sfxlib"
 
     root_cmd rsync -a --delete \
         --exclude='*.o' \
@@ -493,6 +505,8 @@ stage_sources_for_fbctests() {
         "$ROOT/tests/" "$ROOTFS/source-tests/"
 
     root_cmd rsync -a --delete "$ROOT/inc/" "$ROOTFS/source-inc/"
+    root_cmd rsync -a --delete --exclude='obj' \
+        "$ROOT/src/sfxlib/" "$ROOTFS/source-sfxlib/"
 }
 
 stage_sources_for_exampleageddon() {
@@ -596,6 +610,7 @@ run_fbctests() {
 
     [ -d /source-tests ] || fail "tests/ tree was not staged at /source-tests"
     [ -d /source-inc ] || fail "inc/ tree was not staged at /source-inc"
+    [ -d /source-sfxlib ] || fail "src/sfxlib/ was not staged at /source-sfxlib"
 
     jobs="$(fbctests_jobs)"
 
@@ -604,7 +619,10 @@ run_fbctests() {
 
     echo "==> copying fbctests source"
     rm -rf /tmp/fbctests-source
-    mkdir -p /tmp/fbctests-source/tests /tmp/fbctests-source/inc
+    mkdir -p \
+        /tmp/fbctests-source/tests \
+        /tmp/fbctests-source/inc \
+        /tmp/fbctests-source/src/sfxlib
     (
         cd /source-tests
         tar -cf - .
@@ -617,6 +635,13 @@ run_fbctests() {
         tar -cf - .
     ) | (
         cd /tmp/fbctests-source/inc
+        tar xf -
+    )
+    (
+        cd /source-sfxlib
+        tar --exclude='obj' -cf - .
+    ) | (
+        cd /tmp/fbctests-source/src/sfxlib
         tar xf -
     )
 

@@ -15,6 +15,14 @@ freebasic (1.20.3-1) unstable; urgency=medium
   * Stop the NuttX SDK package referencing a retired RP2350 firmware wrapper.
   * Keep release architecture selection, package discovery, cleanup roots,
     compiler flag arrays, and path setup clean under strict ShellCheck.
+  * Restore the Debian Ports chroot filesystems after debootstrap's foreign
+    second stage so package post-install scripts retain a working procfs.
+  * Stage the private sfxlib source headers used by strict MIDI/FM fbctest
+    helpers when validating Debian Ports packages.
+  * Retry the initial threaded TCP loopback connection under QEMU instead of
+    letting a transient refusal strand the listening test thread.
+  * Avoid the public sfxlib TEMPO intrinsic in the anti-flickering example's
+    local timing variable so the packaged example compiles again.
   * Skip the unavailable Ubuntu Jammy riscv64 multiarch package lane.
   * Avoid duplicate target CPU-family definitions in RISC-V, s390x, and
     LoongArch cross-compiler builds.

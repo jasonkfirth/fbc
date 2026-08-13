@@ -144,10 +144,23 @@ sub client_thread( byval userdata as any ptr )
 	end if
 
 	client = freefile()
-	if( OPEN TCP( "host=127.0.0.1,port=" & str( TEST_PORT ) AS #client ) <> 0 ) then
-		client_error = 2
-		exit sub
-	end if
+	tries = 0
+	do
+		if( OPEN TCP( "host=127.0.0.1,port=" & str( TEST_PORT ) AS #client ) = 0 ) then
+			exit do
+		end if
+
+		' Some emulated architectures can briefly refuse a connection even after
+		' the listening thread has completed OPEN TCP SERVER.  Use the same
+		' bounded retry policy as the burst-transfer test below.
+		tries += 1
+		if( tries >= 5000 ) then
+			client_error = 2
+			exit sub
+		end if
+
+		sleep 1, 1
+	loop
 
 	client_step = 2
 	print #client, "client-print"

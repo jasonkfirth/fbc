@@ -12,8 +12,8 @@ Dim I As Integer = 0
 Dim Inc As Integer
 Dim Key As String
 Dim Code As Integer = 1
-Dim Tempo As Integer = 3
-Dim T As Single = Tempo
+Dim TempoSetting As Integer = 3
+Dim T As Single = TempoSetting
 Dim p0 As Integer = 0
 Dim p1 As Integer = 1
 
@@ -120,13 +120,13 @@ Do
 		End If
 		I = I + Inc
 		Key = Inkey
-		If Key = "+" And Tempo < 10 Then
-			Tempo = Tempo + 1
-		ElseIf Key = "-" And Tempo > 0 Then
-			Tempo = Tempo - 1
+		If Key = "+" And TempoSetting < 10 Then
+			TempoSetting = TempoSetting + 1
+		ElseIf Key = "-" And TempoSetting > 0 Then
+			TempoSetting = TempoSetting - 1
 		End If
-		If Tempo > 0 Then
-			T = Tempo
+		If TempoSetting > 0 Then
+			T = TempoSetting
 		Else
 			T = 0.5
 		End If
@@ -154,4 +154,3 @@ Sub Draw_circle_recursion ( ByVal x As Integer, ByVal y As Integer, ByVal r As I
 		Draw_circle_recursion(x - r Shr 1, y - r Shr 1, r Shr 2, rmin)
 	End If
 End Sub
-
