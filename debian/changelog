@@ -63,7 +63,8 @@ freebasic (1.20.3-1) unstable; urgency=medium
     staging Wii build tools from a pinned official devkitPPC image when
     Ubuntu does not package devkitPro.
   * Mount a resolved shared artifact directory at /work/out so Docker builds
-    work when the release tree uses an out symlink to conserve disk space.
+    for Debian/Ubuntu, APK-family, and RPM-family packages work when the
+    release tree uses an out symlink to conserve disk space.
   * Exclude that root out path when it is a symlink as well as a directory,
     and reject any source archive that still contains it.
   * Expose staged devkitPPC binaries to the makefile's early cross-toolchain

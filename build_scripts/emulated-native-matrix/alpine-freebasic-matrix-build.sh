@@ -371,6 +371,8 @@ need_cmd "$MAKE_CMD"
 run_root docker run --rm --privileged tonistiigi/binfmt --install all
 
 mkdir -p out/linux
+mkdir -p "$ROOT/out"
+OUT_ROOT="$(cd "$ROOT/out" && pwd -P)"
 HOST_PLATFORM="$(host_docker_platform)"
 echo "==> host Docker platform: $HOST_PLATFORM"
 echo "==> native make jobs: $MAKE_JOBS"
@@ -443,6 +445,7 @@ EOF
             -e BUILDROOT="/work/.build-alpine/${distro}/${codename}/${arch}" \
             -e JOBS="$build_jobs" \
             -v "$ROOT:/work" \
+            -v "$OUT_ROOT:/work/out" \
             -w /work \
             "$image" \
             sh -lc "apk add --no-cache bash && /work/build_scripts/${script_name} --no-build"

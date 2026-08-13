@@ -393,7 +393,6 @@ EOF
 
 build_one() {
     local row="$1"
-    local family
     local distro
     local release
     local arch
@@ -401,7 +400,7 @@ build_one() {
     local outdir
     local platform
 
-    IFS="|" read -r family distro release arch image outdir <<EOF
+    IFS="|" read -r _ distro release arch image outdir <<EOF
 $row
 EOF
 
@@ -425,6 +424,7 @@ EOF
             -e BUILDROOT="/work/.build-rpm/${distro}/${release}/${arch}" \
             -e JOBS="$MAKE_JOBS" \
             -v "$ROOT:/work" \
+            -v "$OUT_ROOT:/work/out" \
             -w /work \
             "$image" \
             bash -lc "/work/build_scripts/rpm-build-freebasic.sh --no-build"
@@ -452,6 +452,9 @@ install_host_deps
 need_cmd docker
 need_cmd "$MAKE_CMD"
 run_root docker run --rm --privileged tonistiigi/binfmt --install all
+
+mkdir -p "$ROOT/out"
+OUT_ROOT="$(cd "$ROOT/out" && pwd -P)"
 
 prepare_bootstraps
 
