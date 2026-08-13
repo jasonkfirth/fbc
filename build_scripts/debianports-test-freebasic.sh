@@ -187,7 +187,7 @@ case "$ARCH" in
     loong64)
         QEMU_BIN="qemu-loongarch64"
         DEFAULT_SUITE="sid"
-        APT_SOURCE_KIND="ports-with-main"
+        APT_SOURCE_KIND="debian"
         ;;
     *)
         die "unsupported Debian arch: $ARCH"

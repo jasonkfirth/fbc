@@ -19,6 +19,8 @@ freebasic (1.20.3-1) unstable; urgency=medium
     second stage so package post-install scripts retain a working procfs.
   * Stage the private sfxlib source headers used by strict MIDI/FM fbctest
     helpers when validating Debian Ports packages.
+  * Bootstrap Sid loong64 package tests from Debian's main archive now that
+    the architecture is no longer served by Debian Ports.
   * Retry the initial threaded TCP loopback connection under QEMU instead of
     letting a transient refusal strand the listening test thread.
   * Avoid the public sfxlib TEMPO intrinsic in the anti-flickering example's
