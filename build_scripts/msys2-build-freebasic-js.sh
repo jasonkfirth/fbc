@@ -1277,11 +1277,15 @@ Section "Install"
 	FileWrite \$0 "\$\$ErrorActionPreference = 'Stop'$\r$\n"
 	FileWrite \$0 "Expand-Archive -LiteralPath \$\$PayloadZip -DestinationPath \$\$Destination -Force -ErrorAction Stop$\r$\n"
 	FileClose \$0
-	nsExec::ExecToLog '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "\$PLUGINSDIR\\extract-payload.ps1" "\$PLUGINSDIR\\freebasic-js-payload.zip" "\$INSTDIR"'
-	Pop \$0
+	ExecWait '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "\$PLUGINSDIR\\extract-payload.ps1" "\$PLUGINSDIR\\freebasic-js-payload.zip" "\$INSTDIR"' \$0
 	StrCmp \$0 "0" payload_done
 		Abort "Failed to extract the FreeBASIC JS payload. PowerShell exit code: \$0"
 	payload_done:
+	; Remove the large payload explicitly before NSIS performs its plug-in
+	; directory cleanup.  Leaving this file for automatic cleanup can strand a
+	; silent installer after all package files have already been written.
+	Delete "\$PLUGINSDIR\\freebasic-js-payload.zip"
+	Delete "\$PLUGINSDIR\\extract-payload.ps1"
 	WriteUninstaller "\$INSTDIR\\uninstall.exe"
 	Call AddInstallDirsToPath
 	Call AddInstallDirsToMsys2
