@@ -1261,7 +1261,13 @@ FunctionEnd
 
 Section "Install"
 	InitPluginsDir
-	SetOutPath "\$PLUGINSDIR"
+	System::Call 'kernel32::GetCurrentProcessId() i.r1'
+	System::Call 'kernel32::GetTickCount() i.r2'
+	StrCpy \$0 "\$TEMP\\FreeBASIC-${FBVERSION}-js-payload-\$1-\$2"
+	ClearErrors
+	CreateDirectory "\$0"
+	IfErrors payload_temp_failed
+	SetOutPath "\$0"
 	SetCompress off
 	File /oname=freebasic-js-payload.zip "$payload_win"
 	SetCompress auto
@@ -1272,24 +1278,45 @@ Section "Install"
 	; Python support, and UCRT runtime files.  Passing that expanded tree to
 	; NSIS File /r can hit makensis datablock limits, so store it as a normal
 	; zip payload and extract it through Windows PowerShell during install.
-	FileOpen \$0 "\$PLUGINSDIR\\extract-payload.ps1" w
-	FileWrite \$0 "param([string] \$\$PayloadZip, [string] \$\$Destination)$\r$\n"
-	FileWrite \$0 "\$\$ErrorActionPreference = 'Stop'$\r$\n"
-	FileWrite \$0 "Expand-Archive -LiteralPath \$\$PayloadZip -DestinationPath \$\$Destination -Force -ErrorAction Stop$\r$\n"
-	FileClose \$0
-	ExecWait '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "\$PLUGINSDIR\\extract-payload.ps1" "\$PLUGINSDIR\\freebasic-js-payload.zip" "\$INSTDIR"' \$0
-	StrCmp \$0 "0" payload_done
-		Abort "Failed to extract the FreeBASIC JS payload. PowerShell exit code: \$0"
+	FileOpen \$3 "\$0\\extract-payload.ps1" w
+	FileWrite \$3 "param([string] \$\$PayloadZip, [string] \$\$Destination)$\r$\n"
+	FileWrite \$3 "\$\$ErrorActionPreference = 'Stop'$\r$\n"
+	FileWrite \$3 "Expand-Archive -LiteralPath \$\$PayloadZip -DestinationPath \$\$Destination -Force -ErrorAction Stop$\r$\n"
+	FileClose \$3
+	ExecWait '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "\$0\\extract-payload.ps1" "\$0\\freebasic-js-payload.zip" "\$INSTDIR"' \$3
+	StrCmp \$3 "0" payload_done
+		Abort "Failed to extract the FreeBASIC JS payload. PowerShell exit code: \$3"
 	payload_done:
-	; Remove the large payload explicitly before NSIS performs its plug-in
-	; directory cleanup.  Leaving this file for automatic cleanup can strand a
-	; silent installer after all package files have already been written.
-	Delete "\$PLUGINSDIR\\freebasic-js-payload.zip"
-	Delete "\$PLUGINSDIR\\extract-payload.ps1"
+	;
+	; Deleting a multi-gigabyte archive synchronously can remain blocked in a
+	; Windows filesystem filter after Expand-Archive has exited.  Keep the
+	; payload outside NSIS's automatically removed plug-in directory, schedule
+	; it for deletion at reboot, and let an elevated helper remove it after this
+	; installer has exited.  The installer can then finish even if a scanner
+	; delays the final archive deletion.
+	FileOpen \$3 "\$0\\cleanup-payload.ps1" w
+	FileWrite \$3 "param([int] \$\$ParentProcessId, [string] \$\$PayloadDir)$\r$\n"
+	FileWrite \$3 "\$\$ErrorActionPreference = 'SilentlyContinue'$\r$\n"
+	FileWrite \$3 "\$\$Deadline = [DateTime]::UtcNow.AddMinutes(5)$\r$\n"
+	FileWrite \$3 "while ([DateTime]::UtcNow -lt \$\$Deadline -and (Get-Process -Id \$\$ParentProcessId -ErrorAction SilentlyContinue)) {$\r$\n"
+	FileWrite \$3 "  Start-Sleep -Milliseconds 250$\r$\n"
+	FileWrite \$3 "}$\r$\n"
+	FileWrite \$3 "try { [IO.File]::Delete((Join-Path \$\$PayloadDir 'freebasic-js-payload.zip')) } catch {}$\r$\n"
+	FileWrite \$3 "try { [IO.File]::Delete((Join-Path \$\$PayloadDir 'extract-payload.ps1')) } catch {}$\r$\n"
+	FileWrite \$3 "try { [IO.File]::Delete(\$\$PSCommandPath) } catch {}$\r$\n"
+	FileWrite \$3 "try { [IO.Directory]::Delete(\$\$PayloadDir, \$\$false) } catch {}$\r$\n"
+	FileClose \$3
+	System::Call 'kernel32::MoveFileExW(w "\$0\\freebasic-js-payload.zip", p 0, i 4) i.r4'
+	System::Call 'kernel32::MoveFileExW(w "\$0\\extract-payload.ps1", p 0, i 4) i.r4'
+	System::Call 'kernel32::MoveFileExW(w "\$0\\cleanup-payload.ps1", p 0, i 4) i.r4'
+	System::Call 'kernel32::MoveFileExW(w "\$0", p 0, i 4) i.r4'
+	Exec '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$0\\cleanup-payload.ps1" "\$1" "\$0"'
 	WriteUninstaller "\$INSTDIR\\uninstall.exe"
 	Call AddInstallDirsToPath
 	Call AddInstallDirsToMsys2
 	Goto install_done
+	payload_temp_failed:
+		Abort "Could not create the temporary FreeBASIC JS payload directory."
 	no_powershell:
 		Abort "Windows PowerShell is required to extract this installer."
 	install_done:
