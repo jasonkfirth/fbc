@@ -7,7 +7,7 @@
 
 /* command$ */
 
-#include "fb.h"
+#include "../fb.h"
 
 FBCALL FBSTRING *fb_Command ( int arg )
 {

@@ -7,7 +7,7 @@
 
 /* ascii to unicode string convertion function */
 
-#include "fb.h"
+#include "../fb.h"
 
 /* dst_chars == room in dst buffer without null terminator. Thus, the dst buffer
    must be at least (dst_chars + 1) * sizeof(FB_WCHAR).

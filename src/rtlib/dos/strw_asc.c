@@ -7,7 +7,7 @@
 
 /* ascw function */
 
-#include "fb.h"
+#include "../fb.h"
 
 FBCALL unsigned int fb_WstrAsc( const FB_WCHAR *str, ssize_t pos )
 {

@@ -7,7 +7,7 @@
 
 /* Software cursor helper routines */
 
-#include "fb_gfx.h"
+#include "../fb_gfx.h"
 
 #define CURSOR_W	13
 #define CURSOR_H	22

@@ -7,7 +7,7 @@
 
 /* console line input function for wstrings */
 
-#include "fb.h"
+#include "../fb.h"
 
 static const char *pszDefaultQuestion = "? ";
 

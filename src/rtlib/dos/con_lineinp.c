@@ -7,7 +7,7 @@
 
 /* console line input function */
 
-#include "fb.h"
+#include "../fb.h"
 
 static const char *pszDefaultQuestion = "? ";
 

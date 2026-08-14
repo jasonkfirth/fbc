@@ -16,8 +16,8 @@
 /* TODO: share reporting code with src/rtlib/profile.c */
 /* TODO: add a report option for binary output */
 
-#include "fb.h"
-#include "fb_profile.h"
+#include "../fb.h"
+#include "../fb_profile.h"
 
 #ifdef HOST_WIN32
 	#include <windows.h>
