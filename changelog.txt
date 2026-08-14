@@ -84,6 +84,7 @@ Version 1.20.3
 - tests: added regression coverage for embedded-NUL constant string comparisons, IEEE NaN comparisons, invalid and duplicate command-line defines, SUB type-suffix diagnostics, 32-bit cdecl caller cleanup, FreeBSD/Haiku/illumos socket ABI layouts, Haiku errno, non-interactive curses initialization, and compiler header/object cases exposed by the maintenance pass.
 
 [fixed]
+- build/exampleageddon: use the POSIX timeout utility around compiler and example processes so a child stuck during QEMU user-mode cleanup cannot strand an emulated package qualification run.
 - gfxlib2/xbox: keep the controller backend's private header include relative after moving the backend into its platform directory.
 - build/exampleageddon: classify RISC OS examples as platform-specific during non-RISC OS package validation instead of reporting their expected compile failure as a portable example fault.
 - gfxlib2/BMP: serialize BMP headers and 32-bit pixels explicitly in little-endian order and decode 16/32-bit BMP pixels and bitfield masks without host-endian or unaligned loads, fixing BSAVE/BLOAD on big-endian targets such as s390x; make the union and BMP command-sweep regressions endian-neutral and verify loaded pixel values.

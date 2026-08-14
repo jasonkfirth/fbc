@@ -118,6 +118,8 @@ EXTERNAL_TEXT_MARKERS = (
 
 REMOTE_RETRY_ATTEMPTS = 3
 REMOTE_RETRY_DELAY = 2
+LOCAL_TIMEOUT_KILL_DELAY = 5
+LOCAL_TIMEOUT_FALLBACK_DELAY = 5
 REMOTE_RETRY_MARKERS = (
     "banner exchange",
     "connection closed",
@@ -494,6 +496,32 @@ def remote_retry_note(attempt: int) -> str:
     return f"\nremote shell transport failed, retrying ({attempt}/{REMOTE_RETRY_ATTEMPTS})\n"
 
 
+def bounded_local_command(cmd: list[str], timeout: int) -> tuple[list[str], int, bool]:
+    """Use the system timeout utility as the first guard on POSIX hosts.
+
+    Python normally enforces the same limit below.  A compiler launched through
+    QEMU user-mode emulation can, however, become stuck in guest process cleanup
+    after its output has been linked.  Keeping the outer timeout in a separate
+    process lets the test runner recover from that condition.
+    """
+    if os.name == "nt":
+        return cmd, timeout, False
+
+    timeout_path = shutil.which("timeout")
+    if timeout_path is None:
+        return cmd, timeout, False
+
+    bounded_cmd = [
+        timeout_path,
+        "-k",
+        str(LOCAL_TIMEOUT_KILL_DELAY),
+        str(timeout),
+        *cmd,
+    ]
+    fallback_timeout = timeout + LOCAL_TIMEOUT_KILL_DELAY + LOCAL_TIMEOUT_FALLBACK_DELAY
+    return bounded_cmd, fallback_timeout, True
+
+
 def run_remote_script(
     args: argparse.Namespace,
     script: str,
@@ -668,16 +696,23 @@ def run_command(
                     timeout=timeout,
                 )
             else:
+                local_cmd, local_timeout, uses_external_timeout = bounded_local_command(
+                    cmd, timeout
+                )
                 completed = subprocess.run(
-                    cmd,
+                    local_cmd,
                     cwd=str(cwd),
                     env=command_environment(args, env),
                     stdout=log,
                     stderr=subprocess.STDOUT,
-                    timeout=timeout,
+                    timeout=local_timeout,
                     check=False,
                 )
                 returncode = completed.returncode
+                if uses_external_timeout and returncode in (124, 137, 143):
+                    elapsed = time.monotonic() - started
+                    log.write(f"\nTIMEOUT after {timeout}s\n")
+                    return "timeout", elapsed
         except subprocess.TimeoutExpired:
             elapsed = time.monotonic() - started
             log.write(f"\nTIMEOUT after {timeout}s\n")
@@ -967,6 +1002,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
     if args.jobs < 1:
         parser.error("--jobs must be positive")
+
+    if args.compile_timeout < 1:
+        parser.error("--compile-timeout must be positive")
+
+    if args.run_timeout < 1:
+        parser.error("--run-timeout must be positive")
 
     if not args.target_os:
         parser.error("--target-os must not be empty")
