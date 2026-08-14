@@ -1292,8 +1292,13 @@ Section "Install"
 	; Windows filesystem filter after Expand-Archive has exited.  Keep the
 	; payload outside NSIS's automatically removed plug-in directory, schedule
 	; it for deletion at reboot, and let an elevated helper remove it after this
-	; installer has exited.  The installer can then finish even if a scanner
-	; delays the final archive deletion.
+	; installer has exited.  The helper delegates the deletion to a bounded
+	; worker because a filesystem filter can block even the File.Delete call.
+	FileOpen \$3 "\$0\\remove-payload.ps1" w
+	FileWrite \$3 "param([string] \$\$PayloadDir)$\r$\n"
+	FileWrite \$3 "\$\$ErrorActionPreference = 'SilentlyContinue'$\r$\n"
+	FileWrite \$3 "try { [IO.Directory]::Delete(\$\$PayloadDir, \$\$true) } catch {}$\r$\n"
+	FileClose \$3
 	FileOpen \$3 "\$0\\cleanup-payload.ps1" w
 	FileWrite \$3 "param([int] \$\$ParentProcessId, [string] \$\$PayloadDir)$\r$\n"
 	FileWrite \$3 "\$\$ErrorActionPreference = 'SilentlyContinue'$\r$\n"
@@ -1301,13 +1306,23 @@ Section "Install"
 	FileWrite \$3 "while ([DateTime]::UtcNow -lt \$\$Deadline -and (Get-Process -Id \$\$ParentProcessId -ErrorAction SilentlyContinue)) {$\r$\n"
 	FileWrite \$3 "  Start-Sleep -Milliseconds 250$\r$\n"
 	FileWrite \$3 "}$\r$\n"
-	FileWrite \$3 "try { [IO.File]::Delete((Join-Path \$\$PayloadDir 'freebasic-js-payload.zip')) } catch {}$\r$\n"
-	FileWrite \$3 "try { [IO.File]::Delete((Join-Path \$\$PayloadDir 'extract-payload.ps1')) } catch {}$\r$\n"
-	FileWrite \$3 "try { [IO.File]::Delete(\$\$PSCommandPath) } catch {}$\r$\n"
-	FileWrite \$3 "try { [IO.Directory]::Delete(\$\$PayloadDir, \$\$false) } catch {}$\r$\n"
+	FileWrite \$3 "\$\$WorkerScript = Join-Path \$\$PayloadDir 'remove-payload.ps1'$\r$\n"
+	FileWrite \$3 "\$\$PowerShell = Join-Path \$\$env:SystemRoot 'System32\\WindowsPowerShell\\v1.0\\powershell.exe'$\r$\n"
+	FileWrite \$3 "\$\$WorkerArgs = '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $\"' + \$\$WorkerScript + '$\" $\"' + \$\$PayloadDir + '$\"'$\r$\n"
+	FileWrite \$3 "\$\$StartInfo = New-Object System.Diagnostics.ProcessStartInfo$\r$\n"
+	FileWrite \$3 "\$\$StartInfo.FileName = \$\$PowerShell$\r$\n"
+	FileWrite \$3 "\$\$StartInfo.Arguments = \$\$WorkerArgs$\r$\n"
+	FileWrite \$3 "\$\$StartInfo.UseShellExecute = \$\$false$\r$\n"
+	FileWrite \$3 "\$\$StartInfo.CreateNoWindow = \$\$true$\r$\n"
+	FileWrite \$3 "\$\$Worker = [Diagnostics.Process]::Start(\$\$StartInfo)$\r$\n"
+	FileWrite \$3 "if (\$\$Worker -and -not \$\$Worker.WaitForExit(30000)) {$\r$\n"
+	FileWrite \$3 "  try { \$\$Worker.Kill() } catch {}$\r$\n"
+	FileWrite \$3 "  \$\$null = \$\$Worker.WaitForExit(5000)$\r$\n"
+	FileWrite \$3 "}$\r$\n"
 	FileClose \$3
 	System::Call 'kernel32::MoveFileExW(w "\$0\\freebasic-js-payload.zip", p 0, i 4) i.r4'
 	System::Call 'kernel32::MoveFileExW(w "\$0\\extract-payload.ps1", p 0, i 4) i.r4'
+	System::Call 'kernel32::MoveFileExW(w "\$0\\remove-payload.ps1", p 0, i 4) i.r4'
 	System::Call 'kernel32::MoveFileExW(w "\$0\\cleanup-payload.ps1", p 0, i 4) i.r4'
 	System::Call 'kernel32::MoveFileExW(w "\$0", p 0, i 4) i.r4'
 	Exec '"\$SYSDIR\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "\$0\\cleanup-payload.ps1" "\$1" "\$0"'
