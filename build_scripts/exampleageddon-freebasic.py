@@ -130,6 +130,7 @@ REMOTE_RETRY_MARKERS = (
 
 PLATFORM_PATH_MARKERS = (
     "/dos/",
+    "/riscos/",
     "/win32/",
     "/manual/hardware/",
     "/network/win32/",
