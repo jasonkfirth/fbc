@@ -20,7 +20,7 @@
         - platform-selection branches
 */
 
-#include "fb_gfx.h"
+#include "../fb_gfx.h"
 #include <stdint.h>
 
 #define XPAD_MAX_DEVICES 16
