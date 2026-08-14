@@ -182,6 +182,7 @@ target_platform() {
 		*haiku*) printf 'haiku\n' ;;
 		*netbsd*) printf 'netbsd\n' ;;
 		*openbsd*) printf 'openbsd\n' ;;
+		*solaris*) printf 'solaris\n' ;;
 		*darwin*) printf 'darwin\n' ;;
 		*mingw*|*windows*) printf 'win32\n' ;;
 		*xbox*) printf 'xbox\n' ;;
@@ -190,11 +191,13 @@ target_platform() {
 		*nuttx*) printf 'nuttx\n' ;;
 		*linux*|'')
 			case "$(uname -s)" in
+				MINGW*|MSYS*|CYGWIN*) printf 'win32\n' ;;
 				DragonFly) printf 'dragonfly\n' ;;
 				FreeBSD) printf 'freebsd\n' ;;
 				Haiku) printf 'haiku\n' ;;
 				NetBSD) printf 'netbsd\n' ;;
 				OpenBSD) printf 'openbsd\n' ;;
+				SunOS) printf 'solaris\n' ;;
 				Darwin) printf 'darwin\n' ;;
 				*) printf 'linux\n' ;;
 			esac
@@ -231,7 +234,7 @@ collect_clang_tidy_paths() {
 		case "$path" in
 			"$ROOT/src/rtlib/unix/"*|"$ROOT/src/gfxlib2/unix/"*|"$ROOT/src/sfxlib/unix/"*)
 				case "$platform" in
-					android|darwin|dragonfly|freebsd|haiku|linux|netbsd|openbsd)
+					android|darwin|dragonfly|freebsd|haiku|linux|netbsd|openbsd|solaris)
 						;;
 					*)
 						continue
