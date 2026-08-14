@@ -11,6 +11,7 @@ Version 1.20.3
 - examples/NuttX: added hello, graphics, HID input, SD card, file-copy, math, string, sound, DVI, register-dump, and BOOTSEL smoke programs for board and emulator validation.
 - RP2350 image flow: added a BOOTSEL command so a running NuttX image can reboot the RP2350 into UF2 programming mode, plus an image builder for USB CDC console, MicroSD, DVI smoke/register tools, and optional USB host hub/HID/MSC/CDC-ECM support.
 - build/exampleageddon: added no-run reporting, safer package PATH setup for Windows-hosted package compilers, and clearer handling for self-contained compile-only sweeps.
+- build/exampleageddon: run parallel compiler and example launches in isolated worker processes so POSIX subprocesses cannot deadlock between fork and exec under QEMU user-mode emulation.
 - build/exampleageddon: added target-OS classification and repeatable compiler arguments so Wii sweeps exercise the multithreaded runtime while excluding NuttX-only sources and Wii's intentionally unavailable libffi THREADCALL facility.
 - build/release scripts: made architecture selection, package discovery, cleanup roots, compiler flag arrays, and path setup pass strict ShellCheck without relying on duplicate cases, unsafe glob expansion, or implicit word splitting.
 - build/Debian Ports validation: remount and verify the chroot filesystems after debootstrap's foreign second stage so package post-install scripts retain a working procfs.

@@ -40,7 +40,7 @@ import shutil
 import subprocess
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -1033,7 +1033,13 @@ def main(argv: list[str]) -> int:
     print(f"Compiling {len(sources)} example source files with {args.jobs} job(s)")
 
     results: list[Result] = []
-    with ThreadPoolExecutor(max_workers=args.jobs) as executor:
+    #
+    # Each worker launches compilers and test programs.  A subprocess started
+    # from a Python thread can occasionally stop between fork() and exec() under
+    # QEMU user-mode emulation, before either timeout guard can observe it.
+    # Separate worker processes keep those launch paths single-threaded.
+    #
+    with ProcessPoolExecutor(max_workers=args.jobs) as executor:
         futures = [executor.submit(compile_one, source, args.root, args) for source in sources]
         for index, future in enumerate(as_completed(futures), start=1):
             result = future.result()
