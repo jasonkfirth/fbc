@@ -223,12 +223,12 @@ fi
 
 USE_GPM=1
 case "$DISTRO_ID/$CODENAME" in
-    almalinux/10)
-        # AlmaLinux 10 does not currently ship gpm-devel in the default
-        # BaseOS/AppStream/CRB repository set.  The Linux console mouse path
-        # is optional and already has a build-time DISABLE_GPM switch, so keep
-        # the package buildable there without pretending that dependency
-        # exists.
+    almalinux/10|rocky/10)
+        # Enterprise Linux 10 does not currently ship gpm-devel in the
+        # default BaseOS/AppStream/CRB repository set.  The Linux console
+        # mouse path is optional and already has a build-time DISABLE_GPM
+        # switch, so keep the package buildable there without pretending
+        # that dependency exists.
         USE_GPM=0
         ;;
 esac
