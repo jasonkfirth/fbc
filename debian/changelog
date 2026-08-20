@@ -1,3 +1,12 @@
+freebasic (1.20.3-2) unstable; urgency=medium
+
+  * Link ncurses directly on Linux systems that do not provide a libcurses
+    linker alias.
+  * Publish the qualified 1.20.3 package set under a new Debian revision so
+    package managers do not retain the earlier repository snapshot.
+
+ -- SJ_Zero <sj@fbxl.net>  Thu, 20 Aug 2026 18:30:00 -0400
+
 freebasic (1.20.3-1) unstable; urgency=medium
 
   * Package the 1.20.3 release with the new gfxlib3 runtime, expanded
