@@ -12,6 +12,8 @@ freebasic (1.20.3-2) unstable; urgency=medium
     matrix.
   * Let apk append its architecture to the repository URL while retaining
     architecture-specific direct-package fallback downloads.
+  * Apply the package installer's explicit untrusted-local-package policy
+    when refreshing the unsigned APK repository index too.
 
  -- SJ_Zero <sj@fbxl.net>  Thu, 20 Aug 2026 18:30:00 -0400
 

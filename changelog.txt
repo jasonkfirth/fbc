@@ -22,6 +22,7 @@ Version 1.20.3
 - build/Debian packaging: publish the qualified package set as revision 1.20.3-2 so apt clients replace the earlier repository snapshot, including the corrected Linux ncurses binding.
 - build/repository publishing: keep generated installation examples aligned with the trimmed Alpine 3.24 and openSUSE Tumbleweed package matrix.
 - build/APK installation: publish the release-level repository URL expected by apk, which appends the running architecture when it requests APKINDEX, while retaining architecture-specific direct-package fallback downloads.
+- build/APK installation: apply the existing untrusted-local-package policy while refreshing the unsigned release index so apk does not mark the repository unavailable before installation.
 - build/Xbox packaging: read the Debian revision without depending on dpkg-dev already being installed, keeping standalone Xbox package filenames in sync with the release.
 - build/Debian Ports validation: bootstrap Sid loong64 from Debian's main archive after the architecture graduated from Debian Ports.
 - Android/Termux packaging: added a public bootstrap that creates a native ARM64 Ubuntu PRoot on ARM64 Android devices, installs an ARM64 FreeBASIC host compiler plus Termux's native Clang, NDK sysroot, AAPT2, D8, APK signer, and Java tools, and verifies the setup by building an arm64-v8a APK entirely on the phone without QEMU or x86_64 host binaries.

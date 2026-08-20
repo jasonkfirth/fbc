@@ -245,7 +245,7 @@ fb_install_apk() {
 	if [ "$skip_repo" -eq 0 ]; then
 		fb_msg "adding apk source: $repo_url"
 		fb_run_root sh -c "grep -qx '$repo_url' /etc/apk/repositories 2>/dev/null || printf '%s\n' '$repo_url' >> /etc/apk/repositories"
-		fb_run_root apk update || true
+		fb_run_root apk --allow-untrusted update || true
 	fi
 
 	if [ "$skip_install" -eq 0 ]; then
