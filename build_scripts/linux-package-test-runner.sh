@@ -98,6 +98,7 @@ install_apk_packages() {
 install_rpm_packages() {
     local packages
     local package_path
+    local zypper_args
 
     packages=()
 
@@ -139,10 +140,21 @@ install_rpm_packages() {
     fi
 
     if command -v zypper >/dev/null 2>&1; then
-        run zypper --non-interactive install -y --allow-unsigned-rpm "${packages[@]}"
-        run zypper --non-interactive install -y \
+        zypper_args=(--non-interactive install -y)
+
+        if [ "${FBC_PACKAGE_CODENAME:-}" = "tumbleweed" ]; then
+            #
+            # A rolling container image can be one snapshot ahead of the
+            # repository mirror.  Let zypper align its installed libraries
+            # with the development packages used by this test environment.
+            #
+            zypper_args+=(--allow-downgrade)
+        fi
+
+        run zypper "${zypper_args[@]}" --allow-unsigned-rpm "${packages[@]}"
+        run zypper "${zypper_args[@]}" \
             gcc gcc-c++ make python3 tar xz findutils diffutils which
-        run zypper --non-interactive install -y \
+        run zypper "${zypper_args[@]}" \
             ncurses-devel gpm-devel libffi-devel \
             alsa-devel libpulse-devel \
             libX11-devel libXext-devel libXpm-devel libXrandr-devel \

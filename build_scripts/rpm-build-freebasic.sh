@@ -305,8 +305,20 @@ install_deps() {
 
     if command -v zypper >/dev/null 2>&1; then
         local deps
+        local zypper_args
 
         msg "installing RPM build dependencies via zypper"
+        zypper_args=(--non-interactive install -y)
+
+        if [ "$CODENAME" = "tumbleweed" ]; then
+            #
+            # Tumbleweed's rolling container image and repository mirrors can
+            # briefly expose adjacent snapshots.  Permit the solver to align
+            # image libraries with the matching development packages.
+            #
+            zypper_args+=(--allow-downgrade)
+        fi
+
         deps=(
             rpm-build gcc gcc-c++ make pkgconf-pkg-config rsync tar xz gzip \
             findutils file dos2unix diffutils which \
@@ -318,7 +330,7 @@ install_deps() {
         if [ "$USE_GPM" -ne 0 ]; then
             deps+=(gpm-devel)
         fi
-        run zypper --non-interactive install -y "${deps[@]}"
+        run zypper "${zypper_args[@]}" "${deps[@]}"
         return 0
     fi
 
