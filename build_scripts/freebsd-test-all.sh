@@ -4,10 +4,7 @@ set -euo pipefail
 trap 'echo "ERROR at line $LINENO: $BASH_COMMAND" >&2' ERR
 
 RELEASES=(
-  "15.0-RELEASE"
-  "14.4-RELEASE"
-  "14.3-RELEASE"
-  "13.5-RELEASE"
+  "15.1-RELEASE"
 )
 
 JAIL_BASE="/usr/jails"
@@ -31,7 +28,7 @@ for REL in "${RELEASES[@]}"; do
         exit 1
     fi
 
-    PKGFILE="$(ls "$PKGDIR"/freebasic-*.pkg | head -n1)"
+    PKGFILE="$(find "$PKGDIR" -maxdepth 1 -type f -name 'freebasic-*.pkg' -print | sort | head -n1)"
     [ -f "$PKGFILE" ] || {
         echo "ERROR: package not found for $REL"
         exit 1
@@ -153,4 +150,3 @@ echo
 echo "=================================================="
 echo "==> ALL TESTS PASSED"
 echo "=================================================="
-

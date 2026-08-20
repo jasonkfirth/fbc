@@ -34,8 +34,7 @@ RUN_DIR="$WORKROOT/run"
 LOG_DIR="$WORKROOT/logs"
 ARCHIVE_DIR="$ROOT/out/freebsd/x86-64"
 
-RELEASE="14.3-RELEASE"
-ARCH="amd64"
+RELEASE="15.1-RELEASE"
 IMAGE_URL=""
 IMAGE_FILE=""
 PACKAGE_FILE=""
@@ -345,32 +344,6 @@ stop_vm() {
 	fi
 }
 
-ssh_opts() {
-	local key="$1"
-	local port="$2"
-
-	printf '%s\n' \
-		-i "$key" \
-		-o BatchMode=yes \
-		-o StrictHostKeyChecking=no \
-		-o UserKnownHostsFile=/dev/null \
-		-o ConnectTimeout=5 \
-		-p "$port"
-}
-
-scp_opts() {
-	local key="$1"
-	local port="$2"
-
-	printf '%s\n' \
-		-i "$key" \
-		-o BatchMode=yes \
-		-o StrictHostKeyChecking=no \
-		-o UserKnownHostsFile=/dev/null \
-		-o ConnectTimeout=5 \
-		-P "$port"
-}
-
 rsync_ssh() {
 	local key="$1"
 	local port="$2"
@@ -384,7 +357,15 @@ ssh_guest() {
 	local port="$2"
 	shift 2
 
-	ssh $(ssh_opts "$key" "$port") "$GUEST_USER"@127.0.0.1 "$@"
+	# The remaining words are the caller's intended guest command.
+	# shellcheck disable=SC2029
+	ssh -i "$key" \
+		-o BatchMode=yes \
+		-o StrictHostKeyChecking=no \
+		-o UserKnownHostsFile=/dev/null \
+		-o ConnectTimeout=5 \
+		-p "$port" \
+		"$GUEST_USER"@127.0.0.1 "$@"
 }
 
 scp_to_guest() {
@@ -393,7 +374,13 @@ scp_to_guest() {
 	local source="$3"
 	local target="$4"
 
-	scp $(scp_opts "$key" "$port") "$source" "$GUEST_USER@127.0.0.1:$target"
+	scp -i "$key" \
+		-o BatchMode=yes \
+		-o StrictHostKeyChecking=no \
+		-o UserKnownHostsFile=/dev/null \
+		-o ConnectTimeout=5 \
+		-P "$port" \
+		"$source" "$GUEST_USER@127.0.0.1:$target"
 }
 
 scp_from_guest() {
@@ -402,7 +389,13 @@ scp_from_guest() {
 	local source="$3"
 	local target="$4"
 
-	scp $(scp_opts "$key" "$port") "$GUEST_USER@127.0.0.1:$source" "$target"
+	scp -i "$key" \
+		-o BatchMode=yes \
+		-o StrictHostKeyChecking=no \
+		-o UserKnownHostsFile=/dev/null \
+		-o ConnectTimeout=5 \
+		-P "$port" \
+		"$GUEST_USER@127.0.0.1:$source" "$target"
 }
 
 wait_for_ssh() {
@@ -413,7 +406,13 @@ wait_for_ssh() {
 
 	msg "Waiting for FreeBSD SSH on localhost:$port"
 	for _ in $(seq 1 "$attempts"); do
-		if timeout 5 ssh $(ssh_opts "$key" "$port") "$GUEST_USER"@127.0.0.1 \
+		if timeout 5 ssh -i "$key" \
+				-o BatchMode=yes \
+				-o StrictHostKeyChecking=no \
+				-o UserKnownHostsFile=/dev/null \
+				-o ConnectTimeout=5 \
+				-p "$port" \
+				"$GUEST_USER"@127.0.0.1 \
 				'echo freebsd-ready' \
 				> "$vm_dir/ssh-ready.out" 2> "$vm_dir/ssh-ready.err"; then
 			return 0

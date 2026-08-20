@@ -44,7 +44,7 @@ PACKAGE_DIR="$WORKROOT/packages"
 ARCHIVE_DIR="$ROOT/out/netbsd/x86-64"
 ANITA_WORKDIR=""
 
-RELEASE="10.1"
+RELEASE="11.0"
 ARCH="amd64"
 PKG_ARCH="x86_64"
 DIST_URL=""
@@ -72,7 +72,7 @@ usage() {
 Usage: ./build_scripts/netbsd-vm-build-freebasic.sh [options]
 
 Options:
-  --release N            NetBSD release. Default: 10.1
+  --release N            NetBSD release. Default: 11.0
   --dist-url URL         NetBSD distribution URL. Default: official release URL
   --package FILE         Existing NetBSD package to test.
   --test-only            Test --package without rebuilding FreeBASIC.

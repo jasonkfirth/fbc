@@ -4,10 +4,7 @@ set -euo pipefail
 trap 'echo "ERROR at line $LINENO: $BASH_COMMAND" >&2' ERR
 
 RELEASES=(
-  "15.0-RELEASE"
-  "14.4-RELEASE"
-  "14.3-RELEASE"
-  "13.5-RELEASE"
+  "15.1-RELEASE"
 )
 
 JAIL_BASE="/usr/jails"

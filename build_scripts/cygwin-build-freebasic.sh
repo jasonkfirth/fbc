@@ -17,8 +17,8 @@ trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 # small local setup.ini alongside the package and hint file.
 ##############################################################################
 
-SELF_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
-ROOT="$(CDPATH= cd -- "$SELF_DIR/.." && pwd)"
+SELF_DIR="$(CDPATH='' cd -- "$(dirname "$0")" && pwd)"
+ROOT="$(CDPATH='' cd -- "$SELF_DIR/.." && pwd)"
 
 cd "$ROOT"
 
@@ -144,6 +144,7 @@ resolve_windows_powershell() {
 
 remove_inherited_compilers() {
 	local worktree="$1"
+	[ -n "$worktree" ] || fail "isolated worktree path is empty"
 
 	#
 	# An isolated worktree must prove that it built its own compiler.
@@ -152,9 +153,9 @@ remove_inherited_compilers() {
 	# source tree, later checks can produce a false positive and treat
 	# that inherited binary as the new bootstrap result.
 	#
-	rm -rf "$worktree/bin"
-	rm -f "$worktree/bootstrap/fbc" "$worktree/bootstrap/fbc.exe"
-	find "$worktree/bootstrap" -mindepth 2 -maxdepth 2 -type f -name '*.o' -delete 2>/dev/null || true
+	rm -rf "${worktree:?}/bin"
+	rm -f "${worktree:?}/bootstrap/fbc" "${worktree:?}/bootstrap/fbc.exe"
+	find "${worktree:?}/bootstrap" -mindepth 2 -maxdepth 2 -type f -name '*.o' -delete 2>/dev/null || true
 }
 
 copy_tree() {
@@ -337,6 +338,7 @@ resolve_setup_exe() {
 	mkdir -p "$(dirname "$SETUP_EXE")"
 	if have curl; then
 		if curl -L --fail -o "$SETUP_EXE" "https://cygwin.com/setup-x86_64.exe"; then
+			chmod +x "$SETUP_EXE" || fail "unable to make Cygwin setup executable: $SETUP_EXE"
 			return 0
 		fi
 		echo "==> curl download failed, retrying via PowerShell"
@@ -347,6 +349,7 @@ resolve_setup_exe() {
 	run "$powershell_exe" \
 		-NoProfile -Command \
 		"Invoke-WebRequest -Uri 'https://cygwin.com/setup-x86_64.exe' -OutFile '$setup_win'"
+	chmod +x "$SETUP_EXE" || fail "unable to make Cygwin setup executable: $SETUP_EXE"
 }
 
 install_dependencies() {
@@ -373,7 +376,6 @@ install_dependencies() {
 ##############################################################################
 
 build_freebasic() {
-	local bootstrap_fbc
 	local build_fbc
 	local bootstrap_sources_dir="$WORKTREE/bootstrap/cygwin-x86_64"
 	local host_fbc=""
@@ -435,7 +437,7 @@ build_freebasic() {
 
 	msg "Building Cygwin bootstrap compiler ($JOBS threads)"
 	run make -j"$JOBS" bootstrap-minimal TARGET_TRIPLET="$TARGET_TRIPLET"
-	bootstrap_fbc="$(find_fbc "$WORKTREE/bootstrap/fbc")" || fail "bootstrap compiler not found"
+	find_fbc "$WORKTREE/bootstrap/fbc" >/dev/null || fail "bootstrap compiler not found"
 	build_fbc="$(find_fbc "$WORKTREE/bin/fbc")" || fail "bootstrap-minimal did not install bin/fbc"
 	is_cygwin_fbc "$build_fbc" || fail "bootstrap-minimal did not produce a native Cygwin compiler"
 
