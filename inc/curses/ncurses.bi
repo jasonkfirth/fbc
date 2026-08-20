@@ -38,10 +38,10 @@
 	'' HaikuPorts installs the wide-character ncurses library without the
 	'' traditional libcurses linker alias.
 	#inclib "ncursesw"
-#elseif defined(__FB_DRAGONFLY__) or defined(__FB_NETBSD__) or defined(__FB_ILLUMOS__)
-	'' DragonFly's ncurses package has no libcurses linker alias.  NetBSD uses
-	'' pkgsrc ncurses, and illumos also ships separate curses and ncurses ABIs.
-	'' Link ncurses directly so programs do not load both implementations.
+#elseif defined(__FB_LINUX__) or defined(__FB_DRAGONFLY__) or defined(__FB_NETBSD__) or defined(__FB_ILLUMOS__)
+	'' Some Linux distributions and DragonFly have no libcurses linker alias.
+	'' NetBSD uses pkgsrc ncurses, and illumos ships separate curses and ncurses
+	'' ABIs.  Link ncurses directly so programs use the selected implementation.
 	#inclib "ncurses"
 #else
 	#inclib "curses"
