@@ -139,7 +139,7 @@ install_rpm_packages() {
     fi
 
     if command -v zypper >/dev/null 2>&1; then
-        run zypper --non-interactive install -y "${packages[@]}"
+        run zypper --non-interactive install -y --allow-unsigned-rpm "${packages[@]}"
         run zypper --non-interactive install -y \
             gcc gcc-c++ make python3 tar xz findutils diffutils which
         run zypper --non-interactive install -y \

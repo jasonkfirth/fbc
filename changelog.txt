@@ -17,7 +17,7 @@ Version 1.20.3
 - build/Debian Ports validation: remount and verify the chroot filesystems after debootstrap's foreign second stage so package post-install scripts retain a working procfs.
 - build/Debian Ports validation: stage the private sfxlib source headers required by the strict MIDI/FM fbctest helpers, matching the normal Linux package test runner.
 - build/Linux package validation: stage the private sfxlib source headers in APK, RPM, Arch Linux, and Slackware package tests so strict MIDI/FM fbctest helpers compile from isolated trees; install only the normalized top-level APK instead of also passing abuild's duplicate repository copy to apk.
-- build/Linux package validation: discover RPM payloads with Bash path expansion so minimal openSUSE images can install the package before findutils is available.
+- build/Linux package validation: discover RPM payloads with Bash path expansion so minimal openSUSE images can install the package before findutils is available, and narrowly permit unsigned local RPMs without disabling repository signature checks.
 - build/Debian Ports validation: bootstrap Sid loong64 from Debian's main archive after the architecture graduated from Debian Ports.
 - Android/Termux packaging: added a public bootstrap that creates a native ARM64 Ubuntu PRoot on ARM64 Android devices, installs an ARM64 FreeBASIC host compiler plus Termux's native Clang, NDK sysroot, AAPT2, D8, APK signer, and Java tools, and verifies the setup by building an arm64-v8a APK entirely on the phone without QEMU or x86_64 host binaries.
 - MSYS2 package matrix: include the Android package with the Windows, JavaScript, Wii, Xbox, and DOS release packages instead of requiring a separate untracked Android build.
