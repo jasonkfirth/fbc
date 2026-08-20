@@ -97,8 +97,20 @@ install_apk_packages() {
 
 install_rpm_packages() {
     local packages
+    local package_path
 
-    mapfile -t packages < <(find "$packages_dir" -maxdepth 1 -type f -name '*.rpm' ! -name '*src.rpm' | sort)
+    packages=()
+
+    for package_path in "$packages_dir"/*.rpm; do
+        [ -f "$package_path" ] || continue
+
+        case "$package_path" in
+            *src.rpm) continue ;;
+        esac
+
+        packages+=("$package_path")
+    done
+
     [ "${#packages[@]}" -gt 0 ] || fail "no .rpm packages found in $packages_dir"
 
     if command -v dnf >/dev/null 2>&1; then
