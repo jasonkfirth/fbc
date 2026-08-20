@@ -299,8 +299,8 @@ Examples:
 
     sh install-freebasic-ubuntu.sh
     sh install-freebasic-debian.sh --release trixie --arch amd64
-    sh install-freebasic-alpine.sh --release 3.23 --arch x86_64
-    sh install-freebasic-fedora.sh --release 44 --arch x86_64
+    sh install-freebasic-alpine.sh --release 3.24 --arch x86_64
+    sh install-freebasic-opensuse.sh --release tumbleweed --arch x86_64
     sh install-freebasic-macos.sh --arch arm64
 
 Override the repository root while testing:

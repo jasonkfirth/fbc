@@ -8,6 +8,8 @@ freebasic (1.20.3-2) unstable; urgency=medium
     build dependencies are installed.
   * Point the native Termux bootstrap at the qualified Resolute Android
     package retained by the trimmed release matrix.
+  * Keep generated installer examples aligned with the trimmed package
+    matrix.
 
  -- SJ_Zero <sj@fbxl.net>  Thu, 20 Aug 2026 18:30:00 -0400
 
