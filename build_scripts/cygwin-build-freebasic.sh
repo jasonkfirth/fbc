@@ -418,15 +418,15 @@ build_freebasic() {
 		host_fbc=""
 	fi
 
-	if [ -n "$host_fbc" ]; then
+	if [ -d "$bootstrap_sources_dir" ] && find "$bootstrap_sources_dir" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .; then
+		msg "Bootstrap sources already present for cygwin"
+	elif [ -n "$host_fbc" ]; then
 		msg "Emitting cygwin bootstrap sources"
 		rm -rf "$bootstrap_sources_dir"
 		run make -j"$JOBS" \
 			bootstrap-emit \
 			BUILD_FBC="$host_fbc" \
 			TARGET_TRIPLET="$TARGET_TRIPLET"
-	elif [ -d "$bootstrap_sources_dir" ] && find "$bootstrap_sources_dir" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .; then
-		msg "Bootstrap sources already present for cygwin"
 	else
 		msg "No direct bootstrap compiler available for cygwin; seeding from peer bootstrap sources"
 		run make -j"$JOBS" bootstrap-seed-peer TARGET_TRIPLET="$TARGET_TRIPLET"

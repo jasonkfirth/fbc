@@ -96,6 +96,7 @@ Version 1.20.3
 [fixed]
 - build/Cygwin: mark a freshly downloaded Cygwin setup program executable before invoking it, allowing package builds from a new dependency cache.
 - build/Cygwin: install missing build dependencies without forcing an in-place Cygwin runtime upgrade that terminates the shell which launched setup.
+- build/Cygwin: prefer the checked-in current Cygwin bootstrap sources over regenerating them with an older installed compiler that cannot parse newer language declarations.
 - build/BSD package validation: advance the trimmed FreeBSD and NetBSD emulator defaults to the current 15.1 and 11.0 releases and stop rebuilding superseded FreeBSD release rows.
 - build/package scripts: tighten isolated-worktree removal guards, package discovery, and FreeBSD guest command arguments so the current Cygwin and BSD release paths remain clean under strict ShellCheck.
 - DOS runtime and graphics backends: use parent-relative private header includes after moving target overrides into their platform directories, restoring strict DJGPP builds.
