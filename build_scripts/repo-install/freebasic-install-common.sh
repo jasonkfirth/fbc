@@ -112,8 +112,12 @@ fb_detect_arch() {
 
 fb_package_url() {
 	case "$family" in
-	deb|rpm|apk|slackware)
+	deb|rpm|slackware)
 		printf '%s/linux/%s/%s/%s\n' "$repo_base" "$distro" "$release" "$arch"
+		;;
+	apk)
+		# apk appends the running architecture before requesting APKINDEX.tar.gz.
+		printf '%s/linux/%s/%s\n' "$repo_base" "$distro" "$release"
 		;;
 	freebsd|dragonfly|openbsd|netbsd|haiku)
 		printf '%s/%s/%s\n' "$repo_base" "$distro" "$arch"
@@ -248,7 +252,7 @@ fb_install_apk() {
 		fb_run_root apk add --allow-untrusted freebasic && return
 
 		tmpdir="$(fb_make_temp_dir)"
-		pkg="$(fb_download_remote_package "$repo_url" 'freebasic.*[.]apk$' "$tmpdir")"
+		pkg="$(fb_download_remote_package "$repo_url/$arch" 'freebasic.*[.]apk$' "$tmpdir")"
 		fb_run_root apk add --allow-untrusted "$pkg"
 	fi
 }
