@@ -6,6 +6,8 @@ freebasic (1.20.3-2) unstable; urgency=medium
     package managers do not retain the earlier repository snapshot.
   * Read the Xbox package revision directly from debian/changelog before
     build dependencies are installed.
+  * Point the native Termux bootstrap at the qualified Resolute Android
+    package retained by the trimmed release matrix.
 
  -- SJ_Zero <sj@fbxl.net>  Thu, 20 Aug 2026 18:30:00 -0400
 

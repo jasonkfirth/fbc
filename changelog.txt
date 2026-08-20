@@ -23,6 +23,7 @@ Version 1.20.3
 - build/Xbox packaging: read the Debian revision without depending on dpkg-dev already being installed, keeping standalone Xbox package filenames in sync with the release.
 - build/Debian Ports validation: bootstrap Sid loong64 from Debian's main archive after the architecture graduated from Debian Ports.
 - Android/Termux packaging: added a public bootstrap that creates a native ARM64 Ubuntu PRoot on ARM64 Android devices, installs an ARM64 FreeBASIC host compiler plus Termux's native Clang, NDK sysroot, AAPT2, D8, APK signer, and Java tools, and verifies the setup by building an arm64-v8a APK entirely on the phone without QEMU or x86_64 host binaries.
+- Android/Termux packaging: download the qualified Resolute Android package from the trimmed release repository while retaining the tested Noble ARM64 host compiler used inside the phone's native Ubuntu PRoot.
 - MSYS2 package matrix: include the Android package with the Windows, JavaScript, Wii, Xbox, and DOS release packages instead of requiring a separate untracked Android build.
 - Windows package tests: stage tracked and non-ignored test inputs without copying generated `.exe` files over extensionless Unix outputs on MSYS filesystems, and tolerate intentionally deleted tracked paths while release cleanup is pending.
 - Windows package tests: include the test-facing sfxlib C sources and headers in isolated worktrees so MIDI/FM log tests exercise the packaged compiler instead of failing on missing source inputs.
