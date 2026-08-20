@@ -4,6 +4,8 @@ freebasic (1.20.3-2) unstable; urgency=medium
     linker alias.
   * Publish the qualified 1.20.3 package set under a new Debian revision so
     package managers do not retain the earlier repository snapshot.
+  * Read the Xbox package revision directly from debian/changelog before
+    build dependencies are installed.
 
  -- SJ_Zero <sj@fbxl.net>  Thu, 20 Aug 2026 18:30:00 -0400
 

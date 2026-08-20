@@ -128,8 +128,15 @@ CLEANUP_DIRS=("$BUILDROOT")
 
 VERSION="$(sed -n 's/^FBVERSION[[:space:]]*:=[[:space:]]*//p' mk/version.mk | head -n1)"
 [ -n "$VERSION" ] || die "could not determine FBVERSION"
-PACKAGE_VERSION="$(dpkg-parsechangelog --file "$ROOT/debian/changelog" --show-field Version 2>/dev/null || true)"
+PACKAGE_VERSION="$(
+    sed -n 's/^freebasic[[:space:]]*(\([^)]*\)).*$/\1/p' \
+        "$ROOT/debian/changelog" | head -n1
+)"
 [ -n "$PACKAGE_VERSION" ] || PACKAGE_VERSION="${VERSION}-1"
+case "$PACKAGE_VERSION" in
+    "$VERSION"-*) ;;
+    *) die "Debian package version does not match FreeBASIC $VERSION: $PACKAGE_VERSION" ;;
+esac
 
 ARCH="$(dpkg --print-architecture 2>/dev/null || true)"
 [ -n "$ARCH" ] || die "could not detect Debian architecture"
