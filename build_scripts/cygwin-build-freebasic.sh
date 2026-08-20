@@ -361,7 +361,7 @@ install_dependencies() {
 	msg "Installing required Cygwin packages"
 	run "$SETUP_EXE" \
 		-W \
-		-q -n -N -g \
+		-q -n -N \
 		-s "$CYGWIN_MIRROR" \
 		-l "$SETUP_CACHE_WIN" \
 		-R "$CYGROOT_WIN" \
