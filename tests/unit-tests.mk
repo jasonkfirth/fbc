@@ -112,24 +112,32 @@ ifeq ($(TARGET_OS),win32)
 endif
 
 # Unit sources are compiled separately, so a THREADCALL source's automatic
-# libffi dependency is not retained for the final aggregate link. RISC OS has
-# a target libffi build and enables that ARM coverage explicitly.
-ifeq ($(TESTS_TARGET_OS),riscos)
+# libffi dependency is not retained for the final aggregate link. Linux,
+# RISC OS, and AROS provide libffi and enable that coverage explicitly.
+ifneq ($(filter aros linux riscos wince,$(TESTS_TARGET_OS)),)
 ifneq ($(filter threads,$(DIRLIST)),)
     FBCU_LIBS += -l ffi
 endif
 endif
 
 FBC_CFLAGS := -c -w 3 -i $(FBCU_INC) -m $(MAINBAS)
+ifeq ($(TESTS_TARGET_OS),aros)
+FBC_CFLAGS += -i $(abspath ../inc/aros)
+endif
 ifeq ($(TESTS_TARGET_OS),riscos)
 FBC_CFLAGS += -i $(abspath ../inc/riscos)
+endif
+ifeq ($(TESTS_TARGET_OS),wince)
+FBC_CFLAGS += -i $(abspath ../inc/wince)
 endif
 FBC_CFLAGS += -i $(abspath ../inc)
 ifneq ($(TARGET_OS),dos)
 	FBC_CFLAGS += -Wc -Wno-tautological-compare
 endif
 ifneq ($(TARGET_OS),dos)
+ifneq ($(TARGET),wince-mips)
 	FBC_CFLAGS += -mt
+endif
 endif
 ifeq ($(TARGET_OS),js)
 # Need to do some optimisations to reduce the number of local variables,
@@ -137,7 +145,9 @@ ifeq ($(TARGET_OS),js)
 	FBC_CFLAGS += -O 1
 endif
 ifdef DEBUG
+ifneq ($(TARGET),wince-mips)
 	FBC_CFLAGS += -g
+endif
 endif
 ifdef EXTRAERR
 	FBC_CFLAGS += -exx
@@ -158,12 +168,19 @@ ifneq ($(GEN),)
 	FBC_CFLAGS += -gen $(GEN)
 endif
 
-FBC_LFLAGS := $(FBCU_LIBS) -p $(FBCU_LIB) -fbgfx -x $(MAINEXE) -v
+FBC_LFLAGS := $(FBCU_LIBS) -p $(FBCU_LIB) -x $(MAINEXE) -v
+ifneq ($(TARGET),wince-mips)
+	FBC_LFLAGS += -fbgfx
+endif
 ifneq ($(TARGET_OS),dos)
+ifneq ($(TARGET),wince-mips)
 	FBC_LFLAGS += -mt
 endif
+endif
 ifdef DEBUG
+ifneq ($(TARGET),wince-mips)
 	FBC_LFLAGS += -g
+endif
 endif
 ifdef ARCH
 	FBC_LFLAGS += -arch $(ARCH)
@@ -225,6 +242,24 @@ ifeq ($(TESTS_TARGET_OS),riscos)
 	$(FBC) $(FBC_CFLAGS) $< -o $@
 endif
 
+ifeq ($(TESTS_TARGET_OS),aros)
+./threads/threadcall.o: ./aros/threads/threadcall.bas
+	$(FBC) $(FBC_CFLAGS) $< -o $@
+endif
+
+ifeq ($(TESTS_TARGET_OS),wince)
+./fbc-tests.o: ./wince/fbc-tests.bas
+	$(FBC) $(FBC_CFLAGS) $< -o $@
+./threads/racecondition.o: ./wince/threads/racecondition.bas
+	$(FBC) $(FBC_CFLAGS) $< -o $@
+./threads/self.o: ./wince/threads/self.bas
+	$(FBC) $(FBC_CFLAGS) $< -o $@
+./threads/stress.o: ./wince/threads/stress.bas
+	$(FBC) $(FBC_CFLAGS) $< -o $@
+./virtual/virtual.o: ./wince/virtual/virtual.bas
+	$(FBC) $(FBC_CFLAGS) $< -o $@
+endif
+
 #
 #: targets
 #
@@ -244,6 +279,15 @@ $(FBCU_BIN) :
 # from all dirs listed in DIRLIST from DIRLIST_INC
 #
 #
+ifneq ($(UNIT_TEST_SOURCE_LIST),)
+$(UNIT_TESTS_INC) : $(DIRLIST_INC) $(UNIT_TEST_SOURCE_LIST)
+	@$(PRINTF) "Generating $(UNIT_TESTS_INC) from host-selected shard: "
+	@$(ECHO) "# This file automatically generated - DO NOT EDIT" > $(UNIT_TESTS_INC)
+	@$(ECHO) "#" >> $(UNIT_TESTS_INC)
+	@$(SED) -e 's/\(^.*\)/\SRCLIST \+\= \.\/\1/g' $(UNIT_TEST_SOURCE_LIST) \
+>> $(UNIT_TESTS_INC)
+	@$(ECHO) "Done"
+else
 $(UNIT_TESTS_INC) : $(DIRLIST_INC)
 	@$(PRINTF) "Generating $(UNIT_TESTS_INC) : "
 	@$(ECHO) "# This file automatically generated - DO NOT EDIT" > $(UNIT_TESTS_INC)
@@ -254,6 +298,7 @@ $(UNIT_TESTS_INC) : $(DIRLIST_INC)
 | $(SED) -e 's/\(^.*\)/\SRCLIST \+\= \.\/\1/g' \
 >> $(UNIT_TESTS_INC)
 	@$(ECHO) "Done"
+endif
 
 # hack: generate the file UNIT_TESTS_OBJ_LST from UNIT_TESTS_INC
 # Use the auto-generated list of tests to create a temporary file

@@ -37,7 +37,12 @@ SUITE( fbc_tests.gfx.image_expr )
 	end function
 
 	private function hImageIsFilledWithColor( byval buffer as any ptr, byval col as ulong ) as integer
-		dim as fb.IMAGE ptr img = buffer
+		'' Several cases below deliberately place an image at ARRAY(1).  Copy the
+		'' header before reading its fields so strict-alignment CPUs can validate
+		'' the same byte-buffer API that x86 accepts directly.
+		dim as fb.IMAGE header
+		memcpy( @header, buffer, sizeof( header ) )
+		dim as fb.IMAGE ptr img = @header
 		CU_ASSERT( img->width = SCREEN_W )
 		CU_ASSERT( img->height = SCREEN_H )
 		CU_ASSERT( img->bpp = 4 )
@@ -46,7 +51,7 @@ SUITE( fbc_tests.gfx.image_expr )
 		function = TRUE
 		for i as integer = 0 to (img->width * img->height)-1
 			dim as ulong pixel
-			memcpy( @pixel, cptr( ubyte ptr, img + 1 ) + (i * sizeof(ulong)), sizeof(pixel) )
+			memcpy( @pixel, cptr( ubyte ptr, buffer ) + sizeof( header ) + (i * sizeof(ulong)), sizeof(pixel) )
 			if( pixel <> col ) then
 				function = FALSE
 				exit for

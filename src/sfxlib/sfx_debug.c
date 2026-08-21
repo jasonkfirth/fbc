@@ -16,7 +16,7 @@ void fb_sfxDebugInit(void)
 
     g_sfx_debug_initialized = 1;
 
-    env = getenv("SFXLIB_DEBUG");
+    env = fb_sfxGetEnv("SFXLIB_DEBUG");
     g_sfx_debug_enabled = (env && *env && *env != '0');
 }
 

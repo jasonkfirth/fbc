@@ -124,6 +124,72 @@ function SfxTestLoadDump( byref filename as string, samples() as single ) as int
 	return count
 end function
 
+function SfxTestReadDumpSamples _
+	( _
+		byval f as integer, _
+		samples() as single, _
+		byval frames as integer _
+	) as integer
+
+	dim as integer capacity = ubound( samples ) - lbound( samples ) + 1
+	dim as integer count = 0
+	dim as string line_text
+
+	if( frames <= 0 or capacity <= 0 ) then
+		return 0
+	end if
+
+	if( frames > capacity ) then
+		frames = capacity
+	end if
+
+	do while( eof( f ) = 0 and count < frames )
+		line input #f, line_text
+
+		if( len( line_text ) > 0 ) then
+			samples( lbound( samples ) + count ) = val( line_text )
+			count += 1
+		end if
+	loop
+
+	return count
+end function
+
+function SfxTestLoadDumpPrefix _
+	( _
+		byref filename as string, _
+		samples() as single, _
+		byref total_frames as integer _
+	) as integer
+
+	dim as integer f = freefile()
+	dim as integer capacity = ubound( samples ) - lbound( samples ) + 1
+	dim as integer stored_frames = 0
+	dim as string line_text
+
+	total_frames = 0
+
+	if( capacity <= 0 or open( filename for input as #f ) <> 0 ) then
+		return 0
+	end if
+
+	do while( eof( f ) = 0 )
+		line input #f, line_text
+
+		if( len( line_text ) > 0 ) then
+			if( stored_frames < capacity ) then
+				samples( lbound( samples ) + stored_frames ) = val( line_text )
+				stored_frames += 1
+			end if
+
+			total_frames += 1
+		end if
+	loop
+
+	close #f
+	return stored_frames
+end function
+
 function SfxTestRms( samples() as single, byval first_frame as integer, byval frames as integer ) as double
 	dim as integer i
 	dim as double sum_squares = 0.0

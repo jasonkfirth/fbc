@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+#
+# FreeBASIC Windows CE MIPS cross-compiler wrapper
+# ------------------------------------------------
+#
+# File: fbc-wince-mips
+#
+# Purpose:
+#
+#     Invoke a relocatable FreeBASIC installation as a little-endian MIPS II
+#     Windows CE cross-compiler.
+#
+# Responsibilities:
+#
+#     - locate the packaged FreeBASIC compiler and runtime
+#     - require a host Clang with MIPS Windows COFF support
+#     - preserve WinCE declaration-overlay precedence in a source checkout
+#     - select the WinCE MIPS Clang backend and bundled GNU PE linker
+#     - preserve caller-supplied FreeBASIC options and source paths
+#
+# This file intentionally does NOT contain:
+#
+#     - LLVM or GNU binutils acquisition policy
+#     - runtime, gfxlib2, or sfxlib construction
+#     - application packaging or emulator startup
+#     - Windows CE ARM target selection
+
+set -euo pipefail
+
+##############################################################################
+# Package discovery
+##############################################################################
+
+SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+PACKAGE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+COMPILER="$SCRIPT_DIR/fbc"
+TOOLCHAIN_BIN="$PACKAGE_ROOT/toolchain/mips-wince-pe/bin"
+CLANG_TOOL="${WINCE_MIPS_CLANG:-clang}"
+REPOSITORY_LAYOUT=0
+
+die() {
+	echo "fbc-wince-mips: $*" >&2
+	exit 1
+}
+
+##############################################################################
+# Toolchain contract
+##############################################################################
+
+if [ ! -x "$COMPILER" ]; then
+	REPOSITORY_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+	if [ -x "$REPOSITORY_ROOT/bin/fbc" ]; then
+		PACKAGE_ROOT="$REPOSITORY_ROOT"
+		COMPILER="$REPOSITORY_ROOT/bin/fbc"
+		TOOLCHAIN_BIN="${WINCE_MIPS_TOOLCHAIN_BIN:-$REPOSITORY_ROOT/out/wince/mips-toolchain/bin}"
+		REPOSITORY_LAYOUT=1
+	fi
+fi
+
+[ -x "$COMPILER" ] || die "packaged compiler not found: $COMPILER"
+command -v "$CLANG_TOOL" >/dev/null 2>&1 ||
+	die "required Clang tool not found: $CLANG_TOOL"
+[ -x "$TOOLCHAIN_BIN/mips-wince-pe-ld" ] ||
+	die "bundled MIPS PE linker not found: $TOOLCHAIN_BIN/mips-wince-pe-ld"
+[ -x "$TOOLCHAIN_BIN/mips-wince-pe-ar" ] ||
+	die "bundled MIPS PE archiver not found: $TOOLCHAIN_BIN/mips-wince-pe-ar"
+
+if [ "$REPOSITORY_LAYOUT" -eq 1 ]; then
+	[ -d "$PACKAGE_ROOT/inc" ] || die "repository FreeBASIC headers are missing"
+else
+	[ -d "$PACKAGE_ROOT/include/freebasic" ] ||
+		die "packaged FreeBASIC headers are missing"
+fi
+[ -d "$PACKAGE_ROOT/lib/freebasic/wince-mips32el" ] ||
+	die "packaged Windows CE MIPS runtime is missing"
+
+##############################################################################
+# Compiler invocation
+##############################################################################
+
+COMPILER_ARGUMENTS=(
+	-prefix "$PACKAGE_ROOT"
+	-target wince-mips
+	-gen clang
+	-Wc -mcpu=mips2
+	-Wc -mno-check-zero-division
+	-Wl --section-alignment,4096
+	-buildprefix "$TOOLCHAIN_BIN/mips-wince-pe-"
+)
+if [ "$REPOSITORY_LAYOUT" -eq 1 ]; then
+	COMPILER_ARGUMENTS+=(
+		-i "$PACKAGE_ROOT/inc/wince"
+		-i "$PACKAGE_ROOT/inc"
+	)
+fi
+
+export CLANG="$CLANG_TOOL"
+export LD="$TOOLCHAIN_BIN/mips-wince-pe-ld"
+export AR="$TOOLCHAIN_BIN/mips-wince-pe-ar"
+export DLLTOOL="$TOOLCHAIN_BIN/mips-wince-pe-dlltool"
+exec "$COMPILER" "${COMPILER_ARGUMENTS[@]}" "$@"
+
+# end of src/tools/wince/fbc-wince-mips

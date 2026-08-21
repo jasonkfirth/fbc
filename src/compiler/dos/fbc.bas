@@ -144,6 +144,7 @@ enum FBCTOOL
 	FBCTOOL_EMCC
 	FBCTOOL_ELF2DOL
 	FBCTOOL_ELF2AIF
+	FBCTOOL_ELF2HUNK
 	FBCTOOL__COUNT
 end enum
 
@@ -188,7 +189,8 @@ static shared as FBCTOOLINFO fbctoolTB(0 to FBCTOOL__COUNT-1) = _
 	/' FBCTOOL_EMLD    '/ ( "emcc"   , "EMLD"   , FBCTOOLFLAG_DEFAULT  ), _
 	/' FBCTOOL_EMCC    '/ ( "emcc"   , "EMCC"   , FBCTOOLFLAG_DEFAULT  ), _
 	/' FBCTOOL_ELF2DOL '/ ( "elf2dol", "ELF2DOL", FBCTOOLFLAG_DEFAULT  ), _
-	/' FBCTOOL_ELF2AIF '/ ( "elf2aif", "ELF2AIF", FBCTOOLFLAG_DEFAULT  )  _
+	/' FBCTOOL_ELF2AIF '/ ( "elf2aif", "ELF2AIF", FBCTOOLFLAG_DEFAULT  ), _
+	/' FBCTOOL_ELF2HUNK'/ ( "elf2hunk", "ELF2HUNK", FBCTOOLFLAG_DEFAULT )  _
 }
 
 declare sub fbcFindBin _
@@ -358,6 +360,10 @@ private sub hAppendTargetCcQueryOptions( byref path as string )
 		path += " -m32"
 	case FB_CPUFAMILY_PPC64, FB_CPUFAMILY_PPC64LE
 		path += " -m64"
+	case FB_CPUFAMILY_MIPS32, FB_CPUFAMILY_MIPS32EL
+		path += " -mabi=32"
+	case FB_CPUFAMILY_MIPS64, FB_CPUFAMILY_MIPS64EL
+		path += " -mabi=64"
 	end select
 
 	if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG ) then
@@ -1273,6 +1279,26 @@ private sub hAddUnixDynamicLinker( byref ldcline as string )
 #else
 			ldcline += " -dynamic-linker /lib64/ld-linux-loongarch-lp64d.so.1"
 #endif
+		case FB_CPUFAMILY_MIPS32, FB_CPUFAMILY_MIPS32EL
+#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+			if( fbGetCpuFamily( ) = FB_CPUFAMILY_MIPS32EL ) then
+				ldcline += " -dynamic-linker /lib/ld-musl-mipsel.so.1"
+			else
+				ldcline += " -dynamic-linker /lib/ld-musl-mips.so.1"
+			end if
+#else
+			ldcline += " -dynamic-linker /lib/ld.so.1"
+#endif
+		case FB_CPUFAMILY_MIPS64, FB_CPUFAMILY_MIPS64EL
+#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+			if( fbGetCpuFamily( ) = FB_CPUFAMILY_MIPS64EL ) then
+				ldcline += " -dynamic-linker /lib/ld-musl-mips64el.so.1"
+			else
+				ldcline += " -dynamic-linker /lib/ld-musl-mips64.so.1"
+			end if
+#else
+			ldcline += " -dynamic-linker /lib64/ld.so.1"
+#endif
 		end select
 	case FB_COMPTARGET_HAIKU
 		'' Haiku executables use the shared-object path. Bind definitions
@@ -1847,6 +1873,11 @@ private function hFinishLinkedOutput _
 		if( fbcRiscosHostFinishExecutable( ) = FALSE ) then
 			return FALSE
 		end if
+
+	case FB_COMPTARGET_AROS
+		if( fbcArosHostFinishExecutable( ) = FALSE ) then
+			return FALSE
+		end if
 	end select
 
 	function = TRUE
@@ -2053,7 +2084,8 @@ private function hLinkFiles( ) as integer
 		if outtype = FB_OUTTYPE_EXECUTABLE OrElse outtype = FB_OUTTYPE_DYNAMICLIB Then
 			dim as long cpufamily = fbGetCpuFamily( )
 			if cpufamily = FB_CPUFAMILY_X86_64 OrElse cpufamily = FB_CPUFAMILY_AARCH64 OrElse _
-				cpuFamily = FB_CPUFAMILY_PPC64 OrElse cpufamily = FB_CPUFAMILY_PPC64LE Then
+				cpuFamily = FB_CPUFAMILY_PPC64 OrElse cpufamily = FB_CPUFAMILY_PPC64LE OrElse _
+				cpufamily = FB_CPUFAMILY_MIPS64 OrElse cpufamily = FB_CPUFAMILY_MIPS64EL Then
 				ldcline += " --eh-frame-hdr"
 			end if
 		end if
@@ -2306,7 +2338,17 @@ dim shared as FBGNUARCHINFO gnuarchmap(0 to ...) => _
 	(@"rv64"       , FB_DEFAULT_CPUTYPE_RISCV64), _
 	(@"rv64gc"     , FB_DEFAULT_CPUTYPE_RISCV64), _
 	(@"s390x"      , FB_DEFAULT_CPUTYPE_S390X  ), _
-	(@"loongarch64", FB_DEFAULT_CPUTYPE_LOONGARCH64)  _
+	(@"loongarch64", FB_DEFAULT_CPUTYPE_LOONGARCH64), _
+	(@"mips"       , FB_DEFAULT_CPUTYPE_MIPS32 ), _
+	(@"mips32"     , FB_DEFAULT_CPUTYPE_MIPS32 ), _
+	(@"mipsisa32"  , FB_DEFAULT_CPUTYPE_MIPS32 ), _
+	(@"mipsel"     , FB_DEFAULT_CPUTYPE_MIPS32EL), _
+	(@"mips32el"   , FB_DEFAULT_CPUTYPE_MIPS32EL), _
+	(@"mipsisa32el", FB_DEFAULT_CPUTYPE_MIPS32EL), _
+	(@"mips64"     , FB_DEFAULT_CPUTYPE_MIPS64 ), _
+	(@"mipsisa64"  , FB_DEFAULT_CPUTYPE_MIPS64 ), _
+	(@"mips64el"   , FB_DEFAULT_CPUTYPE_MIPS64EL), _
+	(@"mipsisa64el", FB_DEFAULT_CPUTYPE_MIPS64EL)  _
 }
 
 '' Identify OS (FB_COMPTARGET_*) and architecture (FB_CPUTYPE_*) in a GNU
@@ -4108,7 +4150,11 @@ private function hGetAsmName _
 	asmfile = hStripExt( *module->objfile )
 
 	if( stage = 1 ) then
-		if( (fbc.keepasm = FALSE) and (fbc.emitasmonly = FALSE) ) then
+		if( (fbc.keepasm = FALSE) and (fbc.emitasmonly = FALSE) and _
+			(((fbGetOption( FB_COMPOPT_BACKEND ) <> FB_BACKEND_GAS) and _
+			  (fbGetOption( FB_COMPOPT_BACKEND ) <> FB_BACKEND_GAS64)) or _
+			 ((fbc.keepfinalasm = FALSE) and _
+			  (fbc.emitfinalasmonly = FALSE))) ) then
 #ifdef __FB_DOS__
 			asmfile = hGetDosTempFileStem( *module->objfile, "module" )
 #else
@@ -4514,7 +4560,8 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 			ism64Target = True
 		case FB_CPUFAMILY_AARCH64, FB_CPUFAMILY_PPC64, _
 		     FB_CPUFAMILY_PPC64LE, FB_CPUFAMILY_RISCV64, _
-		     FB_CPUFAMILY_S390X, FB_CPUFAMILY_LOONGARCH64
+		     FB_CPUFAMILY_S390X, FB_CPUFAMILY_LOONGARCH64, _
+		     FB_CPUFAMILY_MIPS64, FB_CPUFAMILY_MIPS64EL
 			ism64Target = True
 		end select
 
@@ -4538,6 +4585,12 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 
 			if( fbGetCpuFamily( ) = FB_CPUFAMILY_RISCV32 ) then
 				ln += "-mabi=ilp32 "
+			elseif( (fbGetCpuFamily( ) = FB_CPUFAMILY_MIPS32) or _
+			        (fbGetCpuFamily( ) = FB_CPUFAMILY_MIPS32EL) ) then
+				ln += "-mabi=32 "
+			elseif( (fbGetCpuFamily( ) = FB_CPUFAMILY_MIPS64) or _
+			        (fbGetCpuFamily( ) = FB_CPUFAMILY_MIPS64EL) ) then
+				ln += "-mabi=64 "
 			end if
 		end if
 
@@ -5410,13 +5463,9 @@ end sub
 			fbcPrintTargetInfo( )
 		end if
 
-		'' Tell the compiler about the default include path (added after
-		'' the command line ones, so those will be searched first)
-		if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_RISCOS ) then
-			'' RISC OS headers are complete replacements for generic headers.
-			'' Search the target overlay first, then fall back to shared headers.
-			fbAddIncludePath( fbc.incpath + FB_HOST_PATHDIV + "riscos" )
-		end if
+		'' Tell the compiler about the default include paths (added after
+		'' the command line ones, so those will be searched first).
+		fbcPlatformAddDefaultIncludePaths( fbc.incpath )
 		fbAddIncludePath( fbc.incpath )
 
 		var have_input_files = (listGetHead( @fbc.modules   ) <> NULL) or _

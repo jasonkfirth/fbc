@@ -20,12 +20,17 @@
 #include <pthread.h>
 #endif
 
+#ifndef DISABLE_ALSA
 extern const FB_SFX_DRIVER fb_sfxDriverAlsa;
-extern const FB_SFX_DRIVER fb_sfxDriverPulse;
 
 int fb_sfxCaptureAlsaStart(void);
 void fb_sfxCaptureAlsaStop(void);
 int fb_sfxCaptureAlsaRead(float *buffer, int frames);
+#endif
+
+#ifndef DISABLE_PULSE
+extern const FB_SFX_DRIVER fb_sfxDriverPulse;
+#endif
 
 FB_SFX_LINUX_STATE fb_sfx_linux =
 {
@@ -214,6 +219,7 @@ int fb_sfxLinuxRunning(void)
     return fb_sfx_linux.running;
 }
 
+#ifndef DISABLE_ALSA
 int fb_sfxPlatformCaptureStart(void)
 {
     return fb_sfxCaptureAlsaStart();
@@ -228,11 +234,16 @@ int fb_sfxPlatformCaptureRead(float *buffer, int frames)
 {
     return fb_sfxCaptureAlsaRead(buffer, frames);
 }
+#endif
 
 const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
 {
+#ifndef DISABLE_PULSE
     &fb_sfxDriverPulse,
+#endif
+#ifndef DISABLE_ALSA
     &fb_sfxDriverAlsa,
+#endif
     &__fb_sfxDriverNull,
     NULL
 };

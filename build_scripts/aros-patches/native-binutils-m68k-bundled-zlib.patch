@@ -1,0 +1,36 @@
+# FreeBASIC AROS native m68k tool support
+# --------------------------------------
+#
+# File: native-binutils-m68k-bundled-zlib.patch
+#
+# Purpose:
+#
+#     Keep native m68k binutils independent of the shared z1.library during
+#     process startup.
+#
+# Responsibilities:
+#
+#     - use binutils' bundled zlib for native AROS m68k tools
+#     - preserve the established system-zlib policy on ARM and x86_64
+#     - keep compressed-object support available without an extra guest library
+#
+# This file intentionally does NOT change target binutils or other AROS
+# architectures.
+#
+--- a/contrib/gnu/binutils/mmakefile.src
++++ b/contrib/gnu/binutils/mmakefile.src
+@@ -17,7 +17,14 @@ BINUTILS_EXTRAOPTS := --with-sysroot=/$(AROS_DIR_DEVELOPER)
+ BINUTILS_EXTRAOPTS += --with-build-sysroot=$(AROS_DEVELOPER)
+ BINUTILS_EXTRAOPTS += --libdir=$(AROS_LIB)
++
++# Classic m68k starts shared-library clients before their program entry point.
++# Keeping zlib inside binutils avoids a z1.library startup dependency in native
++# command-line tools while retaining compressed-object support.
++ifeq (,$(findstring m68k,$(AROS_TARGET_CPU)))
+ BINUTILS_EXTRAOPTS += --with-system-zlib
++endif
++
+ BINUTILS_EXTRAOPTS += --disable-gprofng
+ BINUTILS_EXTRAOPTS += --disable-silent-rules
+ 
+# end of native-binutils-m68k-bundled-zlib.patch

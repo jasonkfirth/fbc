@@ -3,6 +3,8 @@
 #include "../fb.h"
 #include "fb_private_console.h"
 
+#include <limits.h>
+
 typedef struct _fb_PrintInfo {
     fb_Rect         rWindow;
     fb_Coord        BufferSize;
@@ -164,16 +166,43 @@ void fb_ConsolePrintBufferWstrEx
     /* is the output redirected? */
     if( FB_CONSOLE_WINDOW_EMPTY() )
     {
-        DWORD dwBytesWritten,
-        	  bytes = chars * sizeof( FB_WCHAR );
+        int bytes;
 
-        while( bytes !=0 )
-        {
-			if( WriteFile( __fb_out_handle, pachText, bytes, &dwBytesWritten, NULL ) != TRUE )
-				break;
+        /*
+            A redirected Windows handle is a byte stream, not a console
+            screen buffer.  Writing FB_WCHAR values directly would produce
+            UTF-16LE bytes in pipes and files, so tools such as MORE display
+            the embedded zero bytes instead of the requested text.
 
-            pachText += dwBytesWritten;
-            bytes -= dwBytesWritten;
+            Keep the console path wide, but use UTF-8 for redirected output.
+            This matches the runtime's other Windows text conversion paths
+            and keeps the output usable by both pipes and regular files.
+        */
+        if( chars <= INT_MAX )
+            bytes = WideCharToMultiByte( CP_UTF8, 0, pachText, (int)chars,
+                                         NULL, 0, NULL, NULL );
+        else
+            bytes = 0;
+
+        if( bytes > 0 ) {
+            char *text = (char *) malloc( (size_t)bytes );
+            if( text != NULL ) {
+                if( WideCharToMultiByte( CP_UTF8, 0, pachText, (int)chars,
+                                         text, bytes, NULL, NULL ) == bytes ) {
+                    DWORD dwBytesWritten;
+                    DWORD remaining = (DWORD)bytes;
+                    char *p = text;
+
+                    while( remaining != 0 &&
+                           WriteFile( __fb_out_handle, p, remaining,
+                                      &dwBytesWritten, NULL ) == TRUE &&
+                           dwBytesWritten != 0 ) {
+                        p += dwBytesWritten;
+                        remaining -= dwBytesWritten;
+                    }
+                }
+                free( text );
+            }
         }
 
         FB_UNLOCK();

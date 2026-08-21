@@ -139,8 +139,9 @@ Environment:
 The installable archive is written to:
   out/riscos/packages/FreeBASIC_<version>-<revision>.zip
 
-The package installs Apps.Development.!FreeBASIC and declares its native GCC4
-dependency. RPCEmu uses the open RISC OS Open 5.30 ROM and HardDisc4 image.
+The package installs Apps.Development.!FreeBASIC and declares its native GCC4,
+SharedUnixLibrary, and DigitalRenderer dependencies. RPCEmu uses the open
+RISC OS Open 5.30 ROM and HardDisc4 image.
 EOF
 }
 
@@ -298,6 +299,7 @@ package_freebasic() {
     local package_path
     local source_stage="$HOSTFS_ROOT/FreeBASIC"
     local app_stage
+    local libffi_file
 
     [ -d "$source_stage" ] ||
         die "native FreeBASIC staging tree not found: $source_stage"
@@ -305,7 +307,14 @@ package_freebasic() {
         die "native FreeBASIC AIF not found: $source_stage/fbc,ff8"
     [ -s "$source_stage/bin/elf2aif,ff8" ] ||
         die "patched native elf2aif not found: $source_stage/bin/elf2aif,ff8"
-    [ -s "$source_stage/lib/freebasic/riscos-arm/a/libffi" ] ||
+    libffi_file="$source_stage/lib/freebasic/riscos-arm/a/libffi"
+    if [ ! -s "$libffi_file" ] && [ -s "$libffi_file,fff" ]; then
+        # `unzip -F` restores a ZIP member's Acorn type as a comma suffix.
+        # Accept that representation so a previously published package can
+        # be reassembled for a metadata-only release update.
+        libffi_file="$libffi_file,fff"
+    fi
+    [ -s "$libffi_file" ] ||
         die "RISC OS libffi not found in the native staging tree"
     [ -s "$source_stage/doc/libffi-license,fff" ] ||
         die "libffi licence not found in the native staging tree"
@@ -322,6 +331,13 @@ package_freebasic() {
 
     mkdir -p "$PACKAGE_STAGE/Apps/Development" "$PACKAGE_STAGE/RiscPkg"
     cp -a "$source_stage" "$app_stage"
+
+    # The media example intentionally tests a case-insensitive wildcard
+    # within a suffix directory.  This data belongs to the example itself,
+    # rather than to an emulator-only acceptance fixture.
+    mkdir -p "$app_stage/examples/dir-smoke/bmp/bmp"
+    cp "$ROOT/examples/riscos/hello.bas" \
+        "$app_stage/examples/dir-smoke/bmp/bmp/UPPER,fff"
 
     # HostFS diagnostic helpers are useful while developing the port but are
     # replaced by the application's normal boot, run, and help files here.
@@ -344,7 +360,7 @@ package_freebasic() {
         'Standards-Version: 0.4.0' \
         'Licence: Free' \
         'Environment: arm' \
-        'Depends: GCC4' \
+        'Depends: GCC4, SharedUnixLibrary (>= 1.12), DRenderer (>= 0.56)' \
         'Components: Apps.Development.!FreeBASIC (Movable LookAt)' \
         'Description: FreeBASIC compiler, runtime, and headers for RISC OS' \
         'Homepage: https://www.freebasic.net/' \
@@ -387,10 +403,23 @@ package_freebasic() {
         --require 'Apps/Development/!FreeBASIC/fbc=ff8' \
         --require 'Apps/Development/!FreeBASIC/bin/elf2aif=ff8' \
         --require 'Apps/Development/!FreeBASIC/doc/libffi-license=fff' \
+        --require 'Apps/Development/!FreeBASIC/examples/dir-smoke/bmp/bmp/UPPER=fff' \
+        --require 'Apps/Development/!FreeBASIC/lib/freebasic/riscos-arm/a/libfbgfx=fff' \
+        --require 'Apps/Development/!FreeBASIC/lib/freebasic/riscos-arm/a/libsfx=fff' \
         --require 'Apps/Development/!FreeBASIC/lib/freebasic/riscos-arm/a/libffi=fff'
 
     echo
     echo "==> RISC OS package ready: $package_path"
+}
+
+package_runtime_dependencies() {
+    # Keep these modules and GCC in independent archives.  RiscPkg can then
+    # share one tested toolchain between FreeBASIC and every packaged game,
+    # instead of duplicating global system modules in each application.
+    run "$SCRIPT_DIR/riscos-build-support-packages.sh" \
+        --hostfs-root "$HOSTFS_ROOT" \
+        --package-dir "$PACKAGE_OUTDIR" \
+        --revision "$PACKAGE_REVISION"
 }
 
 ##############################################################################
@@ -405,6 +434,7 @@ fi
 
 if [ "$NO_PACKAGE" -eq 0 ]; then
     package_freebasic
+    package_runtime_dependencies
 fi
 
 prepare_emulator

@@ -36,9 +36,13 @@ declare function __p__timezone () as long ptr
 declare function __p__tzname () as byte ptr ptr
 #endif
 
-extern import _daylight as long
-extern import _timezone as long
-extern import _tzname as zstring * 2
+'' MinGW's import-pointer names for these legacy CRT data symbols are
+'' based on daylight, timezone and tzname without the C identifier '_'.
+'' Keeping the BASIC identifiers separate from their linker aliases avoids
+'' an extra underscore in Win64 references such as _imp___timezone.
+extern import _daylight alias "daylight" as long
+extern import _timezone alias "timezone" as long
+extern import _tzname alias "tzname" as zstring * 2
 
 end extern
 

@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+#
+# FreeBASIC Windows CE cross-compiler dispatcher
+# ------------------------------------------------
+#
+# File: fbc-wince
+#
+# Purpose:
+#
+#     Provide one stable command for compiling Windows CE applications for
+#     every architecture carried by the installed FreeBASIC WinCE SDK.
+#
+# Responsibilities:
+#
+#     - default to the broadly compatible ARM target
+#     - select ARM or little-endian MIPS through an explicit option
+#     - preserve every compiler argument after dispatcher option processing
+#     - invoke the architecture-specific driver from the same SDK
+#
+# This file intentionally does NOT contain:
+#
+#     - compiler or runtime implementation
+#     - target linker flags
+#     - emulator or deployment policy
+#     - package installation logic
+#
+
+set -euo pipefail
+
+SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+TARGET_ARCH="${FBC_WINCE_ARCH:-arm}"
+COMPILER_ARGUMENTS=()
+
+die() {
+	echo "fbc-wince: $*" >&2
+	exit 1
+}
+
+usage() {
+	cat <<EOF
+Usage: fbc-wince [--arch arm|mips] [FreeBASIC options] program.bas
+
+Options:
+  --arch arm       Build an ARMv4T software-float Windows CE executable.
+  --arch mips      Build a little-endian MIPS II Windows CE executable.
+  --list-arches    Print the installed architecture names.
+  -h, --help       Show this help text.
+
+Environment:
+  FBC_WINCE_ARCH   Default architecture when --arch is omitted (default: arm)
+
+The direct fbc-wince-arm and fbc-wince-mips commands remain available for
+build systems that prefer an architecture-specific executable name.
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+	case "$1" in
+		--arch)
+			[ "$#" -ge 2 ] || die "--arch requires arm or mips"
+			TARGET_ARCH="$2"
+			shift 2
+			;;
+		--arch=*)
+			TARGET_ARCH="${1#--arch=}"
+			shift
+			;;
+		--list-arches)
+			printf '%s\n' arm mips
+			exit 0
+			;;
+		-h|--help)
+			usage
+			exit 0
+			;;
+		--)
+			COMPILER_ARGUMENTS+=( "$1" )
+			shift
+			while [ "$#" -gt 0 ]; do
+				COMPILER_ARGUMENTS+=( "$1" )
+				shift
+			done
+			;;
+		*)
+			COMPILER_ARGUMENTS+=( "$1" )
+			shift
+			;;
+	esac
+done
+
+case "$TARGET_ARCH" in
+	arm|mips) ;;
+	*) die "unsupported Windows CE architecture: $TARGET_ARCH" ;;
+esac
+
+DRIVER="$SCRIPT_DIR/fbc-wince-$TARGET_ARCH"
+[ -x "$DRIVER" ] || die "installed target driver not found: $DRIVER"
+
+exec "$DRIVER" "${COMPILER_ARGUMENTS[@]}"
+
+# end of src/tools/wince/fbc-wince

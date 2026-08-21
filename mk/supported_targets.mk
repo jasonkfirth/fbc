@@ -16,7 +16,11 @@
 # CPU family helpers
 ##############################################################################
 
-BOOTSTRAP_CPU_FAMILIES := \
+# Architecture identity is deliberately independent of the OS emission matrix.
+# In particular, m68k is reusable by future ports even though the only current
+# bootstrap target for it is AROS.  AROS-specific ISA and soft-float policy
+# belongs in mk/toolchain-flags.mk and src/compiler/aros/fbc-platform.bi.
+GENERIC_CPU_FAMILIES := \
 	x86 \
 	x86_64 \
 	arm \
@@ -27,7 +31,16 @@ BOOTSTRAP_CPU_FAMILIES := \
 	riscv32 \
 	riscv64 \
 	s390x \
-	loongarch64
+	loongarch64 \
+	m68k \
+	mips32 \
+	mips32el \
+	mips64 \
+	mips64el
+
+# These operating systems currently share the established broad bootstrap
+# matrix.  Do not infer an OS port merely because its CPU is recognized.
+MULTIARCH_OS_CPU_FAMILIES := $(filter-out m68k mips32 mips32el mips64 mips64el,$(GENERIC_CPU_FAMILIES))
 
 define _fb_triplet_arch
 $(if $(filter x86,$(1)),i686,$(1))
@@ -38,7 +51,7 @@ $(1):$(2):$(3)
 endef
 
 define _fb_os_arch_specs
-$(foreach arch,$(BOOTSTRAP_CPU_FAMILIES),$(call _fb_bootstrap_spec,$(1)-$(arch),$(1)-$(arch),$(call _fb_triplet_arch,$(arch))-unknown-$(1)))
+$(foreach arch,$(MULTIARCH_OS_CPU_FAMILIES),$(call _fb_bootstrap_spec,$(1)-$(arch),$(1)-$(arch),$(call _fb_triplet_arch,$(arch))-unknown-$(1)))
 endef
 
 ##############################################################################
@@ -56,7 +69,11 @@ LINUX_BOOTSTRAP_TARGETS := \
 	$(call _fb_bootstrap_spec,linux-riscv32,linux-riscv32,riscv32-linux-gnu) \
 	$(call _fb_bootstrap_spec,linux-riscv64,linux-riscv64,riscv64-linux-gnu) \
 	$(call _fb_bootstrap_spec,linux-s390x,linux-s390x,s390x-linux-gnu) \
-	$(call _fb_bootstrap_spec,linux-loongarch64,linux-loongarch64,loongarch64-linux-gnu)
+	$(call _fb_bootstrap_spec,linux-loongarch64,linux-loongarch64,loongarch64-linux-gnu) \
+	$(call _fb_bootstrap_spec,linux-mips32,linux-mips32,mips-linux-gnu) \
+	$(call _fb_bootstrap_spec,linux-mips32el,linux-mips32el,mipsel-linux-gnu) \
+	$(call _fb_bootstrap_spec,linux-mips64,linux-mips64,mips64-linux-gnuabi64) \
+	$(call _fb_bootstrap_spec,linux-mips64el,linux-mips64el,mips64el-linux-gnuabi64)
 
 ##############################################################################
 # BSD family and Haiku
@@ -107,6 +124,11 @@ NUTTX_BOOTSTRAP_TARGETS := \
 RISCOS_BOOTSTRAP_TARGETS := \
 	$(call _fb_bootstrap_spec,riscos-arm,riscos-arm,arm-unknown-riscos)
 
+AROS_BOOTSTRAP_TARGETS := \
+	$(call _fb_bootstrap_spec,aros-m68k,aros-m68k,m68k-aros) \
+	$(call _fb_bootstrap_spec,aros-arm,aros-arm,arm-aros) \
+	$(call _fb_bootstrap_spec,aros-x86_64,aros-x86_64,x86_64-aros)
+
 ##############################################################################
 # Final supported bootstrap targets
 ##############################################################################
@@ -122,7 +144,8 @@ SUPPORTED_BOOTSTRAP_TARGETS := \
 	$(ILLUMOS_BOOTSTRAP_TARGETS) \
 	$(DOS_BOOTSTRAP_TARGETS) \
 	$(NUTTX_BOOTSTRAP_TARGETS) \
-	$(RISCOS_BOOTSTRAP_TARGETS)
+	$(RISCOS_BOOTSTRAP_TARGETS) \
+	$(AROS_BOOTSTRAP_TARGETS)
 
 SUPPORTED_BOOTSTRAP_DIRS := $(foreach spec,$(SUPPORTED_BOOTSTRAP_TARGETS),$(word 2,$(subst :, ,$(spec))))
 

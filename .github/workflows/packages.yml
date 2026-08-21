@@ -1,0 +1,324 @@
+# Project: FreeBASIC XL
+# ---------------------
+#
+# File: .github/workflows/packages.yml
+#
+# Purpose:
+#
+#     Build installable FreeBASIC XL packages from the repository's existing
+#     package workflows and preserve them as Actions artifacts or release
+#     assets.
+#
+# Responsibilities:
+#
+#     * build Debian/Ubuntu, Windows, macOS, and MIPS package sets
+#     * retain successful package output for manual download
+#     * attach package files to version-tagged GitHub Releases
+#
+# This file intentionally does NOT contain:
+#
+#     * compiler or runtime implementation
+#     * package-format implementation
+#     * publishing credentials other than the scoped GitHub token
+
+name: FreeBASIC XL packages
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      full_linux_matrix:
+        description: Build the complete Linux distro and architecture matrix
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: fbc-xl-packages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  BOOTSTRAP_VERSION: "1.10.1"
+
+jobs:
+  linux-debian:
+    name: Debian package
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') && !(github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install package build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates curl rsync tar xz-utils gzip dos2unix \
+            build-essential pkg-config dpkg-dev debhelper devscripts fakeroot \
+            lintian quilt python3 git
+
+      - name: Seed host compiler bootstrap sources
+        run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
+
+      - name: Build Debian package
+        env:
+          BUILDROOT: ${{ runner.temp }}/debian-build
+          WORKDIR: ${{ runner.temp }}/debian-build/work
+          OUTBASE: ${{ runner.temp }}/packages
+          FBC_PACKAGE_OUTDIR: ${{ runner.temp }}/packages/debian
+          JOBS: 4
+        run: |
+          set -euo pipefail
+          # Sidecar SDKs have dedicated package lanes below. Keep this job
+          # focused on the native Debian/Ubuntu compiler package.
+          bash build_scripts/debianubuntu-build-freebasic.sh \
+            --no-js \
+            --no-android \
+            --no-wii
+
+      - name: Upload Debian packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-packages-linux-debian
+          if-no-files-found: error
+          retention-days: 30
+          path: ${{ runner.temp }}/packages/debian/
+
+  linux-release-matrix:
+    name: Complete Linux release package matrix
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Linux matrix host dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            docker.io qemu-user-static binfmt-support \
+            ca-certificates curl wget git \
+            build-essential make pkg-config rsync \
+            tar xz-utils gzip zip unzip dos2unix \
+            jq python3 perl bc
+
+      - name: Seed host compiler bootstrap sources
+        run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
+
+      - name: Build the complete Linux package matrix
+        env:
+          JOBS: 4
+        run: |
+          set -euo pipefail
+          bash build_scripts/linux-build-freebasic-matrix.sh \
+            --jobs 4 \
+            --skip-docs
+
+      - name: Upload complete Linux packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-packages-linux-matrix
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            out/linux/
+            out/raspbian/
+
+  windows:
+    name: Windows package matrix
+    runs-on: windows-latest
+    timeout-minutes: 240
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            make
+            git
+            curl
+            rsync
+            tar
+            xz
+            gzip
+            pkgconf
+
+      - name: Seed Windows package bootstrap sources
+        run: |
+          bash build_scripts/ci-seed-source-bootstrap.sh win32 win64
+          bash build_scripts/ci-seed-source-bootstrap.sh win64 win64
+          bash build_scripts/ci-seed-source-bootstrap.sh win32-aarch64 win64
+
+      - name: Build Windows, Android, JavaScript, Wii, Xbox, and DOS packages
+        env:
+          JOBS: 4
+        run: bash build_scripts/msys2-build-freebasic-matrix.sh
+
+      - name: Upload Windows packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-packages-windows
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            out/mingw32*/
+            out/msdos/
+
+  macos:
+    name: macOS package matrix
+    runs-on: macos-15
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Seed Darwin package bootstrap sources
+        run: |
+          bash build_scripts/ci-seed-source-bootstrap.sh darwin-aarch64 linux-x86_64
+          bash build_scripts/ci-seed-source-bootstrap.sh darwin-x86_64 linux-x86_64
+
+      - name: Build macOS arm64 and x86_64 packages
+        env:
+          BUILDROOT: ${{ runner.temp }}/macos-build
+          OUTBASE: ${{ runner.temp }}/packages/macos
+          JOBS: 4
+        run: bash build_scripts/macos-build-freebasic.sh --arch all
+
+      - name: Upload macOS packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-packages-macos
+          if-no-files-found: error
+          retention-days: 30
+          path: ${{ runner.temp }}/packages/macos/
+
+  mips:
+    name: MIPS package matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install MIPS package workflow dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends docker.io rsync curl
+
+      - name: Seed host bootstrap sources
+        run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
+
+      - name: Build and qualify MIPS packages
+        env:
+          JOBS: 2
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mips/work" "$RUNNER_TEMP/mips/output"
+          bash build_scripts/debianubuntu-build-freebasic-mips.sh \
+            --jobs 2 \
+            --work-dir "$RUNNER_TEMP/mips/work" \
+            --out-dir "$RUNNER_TEMP/mips/output"
+
+      - name: Upload MIPS packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-packages-mips
+          if-no-files-found: error
+          retention-days: 30
+          path: ${{ runner.temp }}/mips/output/
+
+  publish-release:
+    name: Publish tagged release packages
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - linux-release-matrix
+      - windows
+      - macos
+      - mips
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Linux package matrix
+        uses: actions/download-artifact@v8
+        with:
+          name: fbc-xl-packages-linux-matrix
+          path: release-assets/linux-matrix
+
+      - name: Download Windows packages
+        uses: actions/download-artifact@v8
+        with:
+          name: fbc-xl-packages-windows
+          path: release-assets/windows
+
+      - name: Download macOS packages
+        uses: actions/download-artifact@v8
+        with:
+          name: fbc-xl-packages-macos
+          path: release-assets/macos
+
+      - name: Download MIPS packages
+        uses: actions/download-artifact@v8
+        with:
+          name: fbc-xl-packages-mips
+          path: release-assets/mips
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" \
+              --title "FreeBASIC XL $tag" \
+              --generate-notes
+          fi
+
+          mapfile -d '' assets < <(
+            find release-assets -type f \( \
+              -name '*.deb' -o \
+              -name '*.rpm' -o \
+              -name '*.apk' -o \
+              -name '*.zip' -o \
+              -name '*.tar.xz' -o \
+              -name '*.pkg' -o \
+              -name '*-setup.exe' \
+            \) -print0
+          )
+          [ "${#assets[@]}" -gt 0 ] || {
+            echo "ERROR: no package files were downloaded" >&2
+            exit 1
+          }
+
+          gh release upload "$tag" "${assets[@]}" --clobber
+
+# end of .github/workflows/packages.yml

@@ -1457,7 +1457,7 @@ int fb_sfxDriverInit(void)
         audio device.
     */
 
-    requested_driver = getenv("SFXLIB_DRIVER");
+    requested_driver = fb_sfxGetEnv("SFXLIB_DRIVER");
     if (requested_driver &&
         *requested_driver &&
         !fb_sfxDriverNameEquals(requested_driver, "default"))

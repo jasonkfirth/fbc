@@ -1,0 +1,49 @@
+diff --git a/cegcc/src/binutils/bfd/config.bfd b/cegcc/src/binutils/bfd/config.bfd
+index 551d44c0..2251c8c8 100644
+--- a/cegcc/src/binutils/bfd/config.bfd
++++ b/cegcc/src/binutils/bfd/config.bfd
+@@ -133,11 +133,6 @@ case "${targ}" in
+     exit 1
+     ;;
+ 
+-  mips*-*-pe*)
+-    echo "This target is obsolete and has been removed."
+-    exit 1
+-    ;;
+-
+   plugin)
+     targ_defvec=plugin_vec
+     targ_selvecs="plugin_vec"
+@@ -951,6 +946,10 @@ case "${targ}" in
+     targ_defvec=ecoff_big_vec
+     targ_selvecs=ecoff_little_vec
+     ;;
++  mips*-*-pe*)
++    targ_defvec=mipslpe_vec
++    targ_selvecs=mipslpei_vec
++    ;;
+ #ifdef BFD64
+   mips*el-*-vxworks*)
+     targ_defvec=bfd_elf32_littlemips_vxworks_vec
+diff --git a/cegcc/src/binutils/bfd/pe-mips.c b/cegcc/src/binutils/bfd/pe-mips.c
+--- a/cegcc/src/binutils/bfd/pe-mips.c
++++ b/cegcc/src/binutils/bfd/pe-mips.c
+@@ -783,8 +783,17 @@ coff_pe_mips_relocate_section (bfd *output_bfd,
+ 	      return FALSE;
+ 	    }
+ 	  tmp &= 0xffff0000;
+-	  tmp |= (targ >> 16) & 0xffff;
++	  /* REFLO is consumed by a sign-extending MIPS instruction.  Round the
++	     high half when bit 15 of the resolved address is set, matching the
++	     BFD_RELOC_HI16_S contract used to create REFHI relocations.  Without
++	     this carry, addresses in the upper half of a 64 KiB region point one
++	     region too low.  */
++	  tmp |= ((targ + 0x8000) >> 16) & 0xffff;
+ 	  bfd_put_32 (input_bfd, tmp, mem);
++	  /* The PAIR or same-address GNU REFLO record supplied the low addend
++	     above.  Skip it so the relocation loop does not apply that metadata
++	     to the high instruction a second time.  */
++	  ++rel;
+ 	  break;
+
+ 	case MIPS_R_REFLO:

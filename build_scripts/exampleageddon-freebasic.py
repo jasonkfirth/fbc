@@ -243,7 +243,7 @@ INTERACTIVE_SOURCES = {
 INTERACTIVE_RE = re.compile(
     r"\b("
     r"getkey|inkey|input|line\s+input|messagebox|open\s+lpt|sleep|screen|screenres|"
-    r"multikey|getmouse|setmouse|open\s+cons|open\s+tcp\s+server"
+    r"multikey|getmouse|setmouse|open\s+com|open\s+cons|open\s+tcp\s+server"
     r")\b",
     re.IGNORECASE,
 )

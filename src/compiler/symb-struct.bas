@@ -142,6 +142,15 @@ function typeCalcNaturalAlign _
 		align = typeGetSize( dtype )
 	end select
 
+	'' Classic m68k ABIs use word alignment for scalar and aggregate fields.
+	'' This is an architecture ABI property shared by m68k operating systems;
+	'' processor baselines such as 68000 remain platform policy.
+	if( fbGetCpuFamily( ) = FB_CPUFAMILY_M68K ) then
+		if( align > 2 ) then
+			align = 2
+		end if
+	end if
+
 	'' LONGINT/DOUBLE are 4-byte aligned on 32bit x86 Linux/DOS/BSD and
 	'' RISC OS APCS-32. They are 8-byte aligned on other systems, including
 	'' Win32/Win64, 64bit Linux/BSD, ARM Linux and JS/wasm.

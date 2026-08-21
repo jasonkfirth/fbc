@@ -32,6 +32,7 @@ const MIDI_FILE = "sfx/midi-fm-playback.mid"
 const DUMP_FILE = "sfx/midi-fm-playback.tmp"
 const MAX_FRAMES = 50000
 const RELEASE_FRAMES = 12000
+const TAIL_FRAMES = 4096
 
 sub WriteMidi16BE( byval f as integer, byval value as integer )
 	SfxTestWriteByte( f, value \ 256 )
@@ -83,7 +84,7 @@ sub WriteTestMidi()
 	close #f
 end sub
 
-redim as single samples( 0 to MAX_FRAMES - 1 )
+redim as single tail_samples( 0 to TAIL_FRAMES - 1 )
 
 SfxTestUseNullDriver()
 SfxTestSetMixerDump( DUMP_FILE, MAX_FRAMES )
@@ -108,14 +109,49 @@ ASSERT( fb_sfxMidiPlaying() = 0 )
 fb_sfxUpdate( RELEASE_FRAMES )
 ASSERT( midi close() = 0 )
 
-dim as integer frames = SfxTestLoadDump( DUMP_FILE, samples() )
+dim as integer dump_input = freefile()
+dim as integer frames = 0
+dim as integer body_frames = 0
+dim as double body_sum_squares = 0.0
+dim as string line_text
+
+ASSERT( open( DUMP_FILE for input as #dump_input ) = 0 )
+
+do while( eof( dump_input ) = 0 )
+	line input #dump_input, line_text
+
+	if( len( line_text ) > 0 ) then
+		dim as single sample = val( line_text )
+		dim as integer tail_index = frames mod TAIL_FRAMES
+
+		if( frames >= TAIL_FRAMES ) then
+			body_sum_squares += cdbl( tail_samples( tail_index ) ) * _
+			                    cdbl( tail_samples( tail_index ) )
+			body_frames += 1
+		end if
+
+		tail_samples( tail_index ) = sample
+		frames += 1
+	end if
+loop
+
+close #dump_input
 
 ' Mixer diagnostics are deliberately simple text output.  Slow filesystems
 ' can let the wall-clock MIDI worker finish after fewer update calls, but at
 ' least one block must have been generated while the note was playing.
 ASSERT( frames > RELEASE_FRAMES )
-ASSERT( SfxTestRms( samples(), 0, frames - 4096 ) > 0.025 )
-ASSERT( SfxTestRms( samples(), frames - 4096, 4096 ) < 0.0005 )
+ASSERT( body_frames = frames - TAIL_FRAMES )
+ASSERT( sqr( body_sum_squares / cdbl( body_frames ) ) > 0.025 )
+
+dim as double tail_sum_squares = 0.0
+
+for frame as integer = 0 to TAIL_FRAMES - 1
+	tail_sum_squares += cdbl( tail_samples( frame ) ) * _
+	                    cdbl( tail_samples( frame ) )
+next
+
+ASSERT( sqr( tail_sum_squares / cdbl( TAIL_FRAMES ) ) < 0.0005 )
 
 SfxTestDeleteFile( MIDI_FILE )
 

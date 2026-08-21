@@ -65,6 +65,11 @@ ifeq ($(TARGET_OS),riscos)
 BOOTSTRAP_TERM_LIB :=
 endif
 
+# AROS console support is native and does not use ncurses.
+ifeq ($(TARGET_OS),aros)
+BOOTSTRAP_TERM_LIB :=
+endif
+
 ##############################################################################
 # Bootstrap emission target
 ##############################################################################

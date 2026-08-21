@@ -1,0 +1,47 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-binutils-aros-host-runtime.patch
+#
+# Purpose:
+#
+#     Keep AROS-hosted binutils from calling process-timing interfaces that
+#     the native AROS C library does not implement.
+#
+# Responsibilities:
+#
+#     - disable optional process-time accounting on AROS
+#     - leave cross-host and non-AROS binutils behavior unchanged
+#
+# This file intentionally does NOT alter assembler or linker output.
+#
+--- a/libiberty/getruntime.c
++++ b/libiberty/getruntime.c
+@@ -22,6 +22,11 @@
+ #include "ansidecl.h"
+ #include "libiberty.h"
+ 
++#ifdef __AROS__
++#undef HAVE_TIMES
++#undef HAVE_CLOCK
++#endif
++
+ /* On some systems (such as WindISS), you must include <sys/types.h>
+    to get the definition of "time_t" before you include <time.h>.  */
+ #include <sys/types.h>
+@@ -111,10 +116,14 @@ get_run_time (void)
+ #else /* ! HAVE_TIMES */
++#ifdef HAVE_CLOCK
+   /* Fall back on clock and hope it's correctly implemented. */
+   const long clocks_per_sec = CLOCKS_PER_SEC;
+   if (clocks_per_sec <= 1000000)
+     return clock () * (1000000 / clocks_per_sec);
+   else
+     return clock () / clocks_per_sec;
++#else
++  return 0;
++#endif
+ #endif  /* HAVE_TIMES */
+ #endif  /* HAVE_GETRUSAGE */
+ }
+# end of native-binutils-aros-host-runtime.patch

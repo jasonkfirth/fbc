@@ -1,0 +1,189 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-gcc-m68k-process-boundary.patch
+#
+# Purpose:
+#
+#     Run AROS m68k GCC child programs in independent processes.
+#
+# Responsibilities:
+#
+#     - retain GCC's configured libexec prefix for AROS assign command names
+#     - launch m68k child tools through an independent DOS process
+#     - release child segments while completed task records remain retained
+#     - avoid corrupt m68k teardown of copied shell-local-variable lists
+#     - release children through AROS's child lifecycle API
+#     - preserve the established RunCommand bridge on ARM and x86 hosts
+#     - avoid re-entering m68k POSIXC inside the GCC driver process
+#
+# This file intentionally does NOT alter GCC target or multilib policy.
+#
+--- a/gcc/gcc.c
++++ b/gcc/gcc.c
+@@ -4173,6 +4173,17 @@ process_command (unsigned int decoded_options_count,
+   gcc_libexec_prefix = standard_libexec_prefix;
+ #ifndef VMS
+   /* FIXME: make_relative_prefix doesn't yet work for VMS.  */
++#if defined (__AROS__) && defined (__mc68000__)
++  /*
++     Native AROS command names use assigns such as Developer:bin/gcc.
++     GCC's Unix relocation helper interprets the assign separator as part of
++     a relative filename and drops the configured libexec search prefix.
++     Use an AROS assign for program discovery and do not relocate it from
++     the driver's native command name.
++  */
++  gcc_libexec_prefix = "Developer:libexec/gcc/";
++  gcc_exec_prefix = NULL;
++#else
+   if (!gcc_exec_prefix)
+     {
+       gcc_exec_prefix = get_relative_prefix (decoded_options[0].arg,
+@@ -4201,6 +4212,7 @@ process_command (unsigned int decoded_options_count,
+ 
+       free (tmp_prefix);
+     }
++#endif
+ #else
+ #endif
+   /* From this point onward, gcc_exec_prefix is non-null if the toolchain
+@@ -4484,7 +4496,7 @@ process_command (unsigned int decoded_options_count,
+   if (!gcc_exec_prefix)
+     {
+ #ifndef OS2
+-      add_prefix (&exec_prefixes, standard_libexec_prefix, "GCC",
++      add_prefix (&exec_prefixes, gcc_libexec_prefix, "GCC",
+ 		  PREFIX_PRIORITY_LAST, 1, 0);
+       add_prefix (&exec_prefixes, standard_libexec_prefix, "BINUTILS",
+ 		  PREFIX_PRIORITY_LAST, 2, 0);
+--- a/libiberty/pex-unix.c
++++ b/libiberty/pex-unix.c
+@@ -64,6 +64,7 @@
+ #include <dos/dosextens.h>
+ #include <dos/dostags.h>
+ #include <proto/dos.h>
++#include <proto/exec.h>
+ #endif
+ 
+ #ifdef vfork /* Autoconf may define this to fork for us. */
+@@ -130,6 +131,23 @@
+ 
+ static pid_t aros_next_pid = 1;
+ 
++#ifdef __mc68000__
++struct pex_aros_child_result
++{
++  LONG result;
++};
++
++static void
++pex_aros_child_exit (IPTR data, IPTR result)
++{
++  struct pex_aros_child_result *child_result;
++
++  /* AROS m68k's DosEntry stack shim exposes D1 before D0 to C code.  */
++  child_result = (struct pex_aros_child_result *) data;
++  child_result->result = (LONG) result;
++}
++#endif
++
+ static char *
+ pex_aros_filename (const char *source)
+ {
+@@ -787,12 +805,23 @@ pex_unix_exec_child (struct pex_obj *obj, int flags, const char *executable,
+ {
+ #ifdef __AROS__
+   struct aros_status_list *entry;
+-  struct CommandLineInterface *cli;
+   char *arguments;
+   char *filename;
+-  BPTR seglist;
+   int result;
++#ifdef __mc68000__
++  struct CommandLineInterface *cli;
++  struct pex_aros_child_result child_result;
++  struct Process *child;
++  struct Process *parent;
++  BPTR error_output;
++  BPTR seglist;
++  IPTR child_id;
++  ULONG stack_size = AROS_STACKSIZE;
++#else
++  struct CommandLineInterface *cli;
++  BPTR seglist;
+   ULONG stack_size = AROS_STACKSIZE;
++#endif
+ 
+   if (in != STDIN_FILE_NO || out != STDOUT_FILE_NO
+       || errdes != STDERR_FILE_NO || toclose >= 0
+@@ -812,6 +841,61 @@ pex_unix_exec_child (struct pex_obj *obj, int flags, const char *executable,
+ 
+   filename = pex_aros_filename (executable);
+   arguments = pex_aros_arguments (argv);
++#ifdef __mc68000__
++  seglist = LoadSeg ((CONST_STRPTR) filename);
++  if (seglist == BNULL)
++    {
++      free (filename);
++      free (arguments);
++      *err = ENOENT;
++      *errmsg = "LoadSeg";
++      return (pid_t) -1;
++    }
++
++  parent = (struct Process *) FindTask (NULL);
++  cli = Cli ();
++  if (cli != NULL && cli->cli_DefaultStack > 0)
++    stack_size = cli->cli_DefaultStack * CLI_DEFAULTSTACK_UNIT;
++
++  child_result.result = RETURN_FAIL;
++  error_output = parent->pr_CES != BNULL ? parent->pr_CES : Output ();
++
++  /* GCC stages consume named input files, not the parent CLI stream.  */
++  child = CreateNewProcTags (
++      NP_Seglist, (IPTR) seglist,
++      NP_FreeSeglist, FALSE,
++      NP_Arguments, (IPTR) arguments,
++      NP_Input, (IPTR) BNULL,
++      NP_CloseInput, FALSE,
++      NP_Output, (IPTR) Output (),
++      NP_CloseOutput, FALSE,
++      NP_Error, (IPTR) error_output,
++      NP_CloseError, FALSE,
++      NP_StackSize, (IPTR) stack_size,
++      NP_Name, (IPTR) filename,
++      NP_Cli, TRUE,
++      NP_CommandName, (IPTR) filename,
++      NP_ExitCode, (IPTR) pex_aros_child_exit,
++      NP_ExitData, (IPTR) &child_result,
++      NP_CopyVars, FALSE,
++      NP_NotifyOnDeath, TRUE,
++      TAG_DONE);
++  free (filename);
++  free (arguments);
++  if (child == NULL)
++    {
++      UnLoadSeg (seglist);
++      *err = ENOMEM;
++      *errmsg = "CreateNewProcTags";
++      return (pid_t) -1;
++    }
++
++  child_id = GetETask ((struct Task *) child)->et_UniqueID;
++  ChildWait (child_id);
++  UnLoadSeg (seglist);
++  ChildFree (child_id);
++  result = child_result.result;
++#else
+   seglist = LoadSeg ((CONST_STRPTR) filename);
+   free (filename);
+   if (seglist == BNULL)
+@@ -830,6 +914,7 @@ pex_unix_exec_child (struct pex_obj *obj, int flags, const char *executable,
+   Flush (Output ());
+   UnLoadSeg (seglist);
+   free (arguments);
++#endif
+   if (result < 0)
+     {
+       *err = errno;
+# end of native-gcc-m68k-process-boundary.patch

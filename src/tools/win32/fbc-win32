@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+#
+# FreeBASIC Win32 cross-compiler wrapper
+# --------------------------------------
+#
+# File: fbc-win32
+#
+# Purpose:
+#
+#     Compile 32-bit Windows applications from an installed Linux x86_64
+#     FreeBASIC cross-target package.
+#
+# Responsibilities:
+#
+#     - locate the relocatable compiler, headers, and Win32 runtime
+#     - require Ubuntu's maintained i686 MinGW-w64 tools
+#     - select the Win32 x86 GCC backend and linker prefix
+#     - preserve caller-supplied FreeBASIC options and paths
+#
+# This file intentionally does NOT contain:
+#
+#     - MinGW-w64 installation or download policy
+#     - Win64 or Windows ARM64 target selection
+#     - Wine execution or application installer generation
+#     - compiler or runtime implementation
+#
+
+set -euo pipefail
+
+##############################################################################
+# Package discovery
+##############################################################################
+
+SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+PACKAGE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+COMPILER="$SCRIPT_DIR/fbc"
+TOOL_PREFIX="${FBWIN32_TOOL_PREFIX:-i686-w64-mingw32-}"
+REPOSITORY_LAYOUT=0
+
+die() {
+	echo "fbc-win32: $*" >&2
+	exit 1
+}
+
+if [ ! -x "$COMPILER" ]; then
+	REPOSITORY_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+	if [ -x "$REPOSITORY_ROOT/bin/fbc" ]; then
+		PACKAGE_ROOT="$REPOSITORY_ROOT"
+		COMPILER="$REPOSITORY_ROOT/bin/fbc"
+		REPOSITORY_LAYOUT=1
+	fi
+fi
+
+[ -x "$COMPILER" ] || die "FreeBASIC compiler not found: $COMPILER"
+if [ "$REPOSITORY_LAYOUT" -eq 1 ]; then
+	[ -d "$PACKAGE_ROOT/inc" ] || die "repository FreeBASIC headers are missing"
+else
+	[ -d "$PACKAGE_ROOT/include/freebasic" ] ||
+		die "packaged FreeBASIC headers are missing"
+fi
+[ -d "$PACKAGE_ROOT/lib/freebasic/win32-x86" ] ||
+	die "packaged Win32 x86 runtime is missing"
+
+for tool in gcc as ld ar windres; do
+	command -v "${TOOL_PREFIX}${tool}" >/dev/null 2>&1 ||
+		die "required MinGW-w64 tool not found: ${TOOL_PREFIX}${tool}"
+done
+
+##############################################################################
+# Compiler invocation
+##############################################################################
+
+COMPILER_ARGUMENTS=(
+	-prefix "$PACKAGE_ROOT"
+	-target win32
+	-arch 686
+	-gen gcc
+	-buildprefix "$TOOL_PREFIX"
+)
+if [ "$REPOSITORY_LAYOUT" -eq 1 ]; then
+	COMPILER_ARGUMENTS+=( -i "$PACKAGE_ROOT/inc" )
+fi
+
+exec "$COMPILER" "${COMPILER_ARGUMENTS[@]}" "$@"
+
+# end of src/tools/win32/fbc-win32

@@ -1,0 +1,58 @@
+# FreeBASIC AROS native m68k tool support
+# --------------------------------------
+#
+# File: native-posixc-m68k-transfer.patch
+#
+# Purpose:
+#
+#     Keep ordinary m68k POSIX transfers reliable on filesystems whose 64-bit
+#     packet interface reports support but does not transfer data correctly.
+#
+# Responsibilities:
+#
+#     - use the established DOS calls for representable file sizes
+#     - use the established DOS calls for normal read and write requests
+#     - retain dos64.library for requests outside the signed 32-bit range
+#     - leave ARM, x86_64, and other AROS architectures unchanged
+#
+# This file intentionally does NOT disable large-file support on AROS m68k.
+#
+--- a/compiler/crt/posixc/__dos64.c
++++ b/compiler/crt/posixc/__dos64.c
+@@ -113,6 +113,11 @@ QUAD __dos64_setfilesize(fcb *fcb, QUAD size, LONG mode)
+     struct Library *DOS64Base = __dos64_base_for(fcb);
+     BPTR fh = fcb->handle;
+ 
++#ifdef __mc68000__
++    if (size == (QUAD)(LONG)size)
++        return SetFileSize(fh, (LONG)size, mode);
++#endif
++
+     if (DOS64Base != NULL)
+         return SetFileSize64(fh, mode, size);
+ 
+@@ -129,6 +134,11 @@ QUAD __dos64_read(fcb *fcb, APTR buf, QUAD len)
+     struct Library *DOS64Base = __dos64_base_for(fcb);
+     BPTR fh = fcb->handle;
+ 
++#ifdef __mc68000__
++    if (len <= 0x7FFFF000LL)
++        return Read(fh, buf, (LONG)len);
++#endif
++
+     if (DOS64Base != NULL)
+         return Read64(fh, buf, len);
+ 
+@@ -143,6 +153,11 @@ QUAD __dos64_write(fcb *fcb, CONST_APTR buf, QUAD len)
+     struct Library *DOS64Base = __dos64_base_for(fcb);
+     BPTR fh = fcb->handle;
+ 
++#ifdef __mc68000__
++    if (len <= 0x7FFFF000LL)
++        return Write(fh, buf, (LONG)len);
++#endif
++
+     if (DOS64Base != NULL)
+         return Write64(fh, buf, len);
+ 
+# end of native-posixc-m68k-transfer.patch

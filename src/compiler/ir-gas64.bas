@@ -3205,12 +3205,7 @@ private function _emitbegin( ) as integer
 	ctx.dtorcount = 0
 	ctx.roundfloat=false
 	ctx.target=fbgetoption(FB_COMPOPT_TARGET) ''linux or windows
-	select case ctx.target
-	case FB_COMPTARGET_LINUX, FB_COMPTARGET_FREEBSD, FB_COMPTARGET_HAIKU
-		ctx.systemv = true
-	case else
-		ctx.systemv = false
-	end select
+	ctx.systemv = ((env.target.options and FB_TARGETOPT_GAS64_SYSV_ABI) <> 0)
 	ctx.opereg=0
 
 	for ireg as integer = 0 to KREGUPPER

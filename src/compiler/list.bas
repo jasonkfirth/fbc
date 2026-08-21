@@ -1,7 +1,30 @@
-'' generic double-linked list
+'' FreeBASIC compiler memory lists
+'' --------------------------------
 ''
-'' Ownership: Lists own their node storage, but not caller payloads.  The
-'' LIST_FLAGS_CLEARNODES option clears payload storage before a node is reused.
+'' File: src/compiler/list.bas
+''
+'' Purpose:
+''
+''     Provide pooled list storage and checked allocation helpers used by the
+''     compiler's internal tables.
+''
+'' Responsibilities:
+''
+''     - allocate and release list-owned node blocks
+''     - maintain free-node and used-node links
+''     - return naturally aligned caller payloads
+''     - stop compilation immediately when an allocation fails
+''
+'' This file intentionally does NOT contain:
+''
+''     - ownership policy for pointers stored inside caller payloads
+''     - compiler subsystem-specific node layouts
+''     - general-purpose container templates
+''
+'' Ownership:
+''
+''     Lists own their node storage, but not caller payloads. The
+''     LIST_FLAGS_CLEARNODES option clears payload storage before reuse.
 ''
 '' chng: jan/2005 written [v1ctor]
 ''
@@ -44,11 +67,20 @@ sub listInit _
 		byval nodelen as integer, _
 		byval flags as LIST_FLAGS _
 	)
+	dim as integer nodealignment = len( any ptr )
+
+	assert( nodelen >= 0 )
+	assert( (nodealignment and (nodealignment - 1)) = 0 )
 
 	'' fill ctrl struct
 	list->tbhead = NULL
 	list->tbtail = NULL
 	list->nodes = 0
+
+	'' Every block contains adjacent nodes. malloc aligns the first node, but
+	'' the stride must also preserve natural pointer alignment. MIPS64 traps on
+	'' the misaligned loads that x86_64 historically tolerated here.
+	nodelen = (nodelen + (nodealignment - 1)) and (not (nodealignment - 1))
 	list->nodelen = nodelen + len( TLISTNODE )
 	list->head = NULL
 	list->tail = NULL
@@ -300,3 +332,5 @@ end sub
 sub strlistInit(byval list as TLIST ptr, byval nodes as integer)
 	listInit(list, nodes, sizeof(string))
 end sub
+
+'' end of src/compiler/list.bas

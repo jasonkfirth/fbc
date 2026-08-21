@@ -36,7 +36,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 /* ------------------------------------------------------------------------- */
 /* Output capture state                                                      */
 /* ------------------------------------------------------------------------- */
@@ -96,10 +95,13 @@ static int fb_sfxOutputCaptureEnsureCapacityLocked(int wanted_frames)
 
     if (new_capacity <= 0)
     {
-        new_capacity = g_output_capture.samplerate;
-
-        if (new_capacity <= 0)
-            new_capacity = FB_SFX_DEFAULT_RATE;
+        /*
+            Reserve only what the caller requested on the first allocation.
+            A one-second minimum made tiny captures consume hundreds of
+            kilobytes and fail on memory-constrained targets such as WinCE.
+            Later growth still doubles the established capacity below.
+        */
+        new_capacity = wanted_frames;
     }
 
     while (new_capacity < wanted_frames)
@@ -384,7 +386,7 @@ int fb_sfxOutputCaptureSave(const char *filename)
         return -1;
     }
 
-    file = fopen(filename, "wb");
+    file = fb_sfxOpenFile(filename, "wb");
     if (!file)
     {
         fb_sfxRuntimeUnlock();

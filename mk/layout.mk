@@ -5,7 +5,7 @@
 libdirname := lib
 
 ifdef ENABLE_LIB64
-  ifneq ($(filter x86_64 aarch64 arm64 ppc64 ppc64le s390x,$(ISA_FAMILY)),)
+  ifneq ($(filter x86_64 aarch64 arm64 ppc64 ppc64le s390x mips64 mips64el,$(TARGET_ARCH)),)
     libdirname := lib64
   endif
 endif
@@ -118,8 +118,14 @@ FBC_INCDIR := $(prefixincdir)
 
 FBC_BOOTSTRAP_I := -i $(BOOTSTRAP_INCDIR)
 FBC_INCLUDE_FLAGS := -i $(SRC_INCDIR)
+ifeq ($(TARGET_OS),aros)
+FBC_INCLUDE_FLAGS := -i $(SRC_INCDIR)/aros $(FBC_INCLUDE_FLAGS)
+endif
 ifeq ($(TARGET_OS),riscos)
 FBC_INCLUDE_FLAGS := -i $(SRC_INCDIR)/riscos $(FBC_INCLUDE_FLAGS)
+endif
+ifeq ($(TARGET_OS),wince)
+FBC_INCLUDE_FLAGS := -i $(SRC_INCDIR)/wince $(FBC_INCLUDE_FLAGS)
 endif
 
 ##############################################################################

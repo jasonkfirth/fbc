@@ -192,6 +192,8 @@ dim shared as ubyte elfmagic(0 to 15) = _
 
 const ET_REL = 1
 const EM_386 = 3
+const EM_M68K = 4
+const EM_MIPS = 8
 const EM_X86_64 = &h3e
 const EM_ARM32 = &h28
 const EM_AARCH64 = &hb7
@@ -921,6 +923,15 @@ private sub hLoadFbctinfFromObj( )
 		case FB_CPUFAMILY_LOONGARCH64
 			INFO( "reading loongarch64 ELF: " + parser.filename )
 			hLoadFbctinfFromELF64_H( EM_LOONGARCH )
+		case FB_CPUFAMILY_M68K
+			INFO( "reading m68k ELF: " + parser.filename )
+			hLoadFbctinfFromELF32_H( EM_M68K )
+		case FB_CPUFAMILY_MIPS32, FB_CPUFAMILY_MIPS32EL
+			INFO( "reading mips32 ELF: " + parser.filename )
+			hLoadFbctinfFromELF32_H( EM_MIPS )
+		case FB_CPUFAMILY_MIPS64, FB_CPUFAMILY_MIPS64EL
+			INFO( "reading mips64 ELF: " + parser.filename )
+			hLoadFbctinfFromELF64_H( EM_MIPS )
 		end select
 	elseif( fbTargetSupportsMachO( ) ) then
 		INFO( "reading Mach-O: " + parser.filename )

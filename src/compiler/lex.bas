@@ -77,6 +77,108 @@ sub lexPopCtx( )
 
 end sub
 
+'':::::
+'' Start an isolated token probe.  Lexer contexts contain owned dynamic
+'' strings, so a plain UDT copy would let lookahead overwrite the active
+'' parser state when debug line collection is enabled.
+sub lexProbeBegin _
+	( _
+		byref probe as LEX_PROBE_CTX _
+	)
+
+	dim as LEX_TKCTX ptr parent = lex.ctx
+	dim as integer i
+
+	probe.parent = parent
+	probe.insidemacro = lex.insidemacro
+	probe.hostfilepos = seek( env.inf.num )
+	probe.defptr_offset = -1
+	probe.defptrw_offset = -1
+
+	probe.ctx = *parent
+
+	'' Point the circular token list into the probe's own storage.
+	probe.ctx.head = @probe.ctx.tokenTB( parent->head - @parent->tokenTB( 0 ) )
+	probe.ctx.tail = @probe.ctx.tokenTB( parent->tail - @parent->tokenTB( 0 ) )
+	for i = 0 to FB_LEX_MAXK - 1
+		probe.ctx.tokenTB( i ).next = @probe.ctx.tokenTB( i + 1 )
+	next
+	probe.ctx.tokenTB( FB_LEX_MAXK ).next = @probe.ctx.tokenTB( 0 )
+
+	'' Keep the active input pointer local to the probe.  The narrow and wide
+	'' pointers share a union, so only the pointer matching the file format may
+	'' be adjusted.
+	if( env.inf.format = FBFILE_FORMAT_ASCII ) then
+		if( parent->buffptr <> NULL ) then
+			probe.ctx.buffptr = @probe.ctx.buff + (parent->buffptr - @parent->buff)
+		end if
+	else
+		if( parent->buffptrw <> NULL ) then
+			probe.ctx.buffptrw = @probe.ctx.buffw + (parent->buffptrw - @parent->buffw)
+		end if
+	end if
+
+	'' Copy the dynamic source line instead of sharing its allocation.
+	DZstrZero( probe.ctx.currline )
+	if( parent->currline.data <> NULL ) then
+		DZstrAssign( probe.ctx.currline, parent->currline.data )
+	end if
+
+	'' Copy the active preprocessor definition buffer and retain its offset.
+	if( env.inf.format = FBFILE_FORMAT_ASCII ) then
+		if( parent->defptr <> NULL ) and (parent->deftext.data <> NULL) then
+			probe.defptr_offset = parent->defptr - parent->deftext.data
+		end if
+		DZstrZero( probe.ctx.deftext )
+		if( parent->deftext.data <> NULL ) then
+			DZstrAssign( probe.ctx.deftext, parent->deftext.data )
+		end if
+		if( probe.defptr_offset >= 0 ) then
+			probe.ctx.defptr = probe.ctx.deftext.data + probe.defptr_offset
+		else
+			probe.ctx.defptr = parent->defptr
+		end if
+	else
+		if( parent->defptrw <> NULL ) and (parent->deftextw.data <> NULL) then
+			probe.defptrw_offset = parent->defptrw - parent->deftextw.data
+		end if
+		DWstrZero( probe.ctx.deftextw )
+		if( parent->deftextw.data <> NULL ) then
+			DWstrAssign( probe.ctx.deftextw, parent->deftextw.data )
+		end if
+		if( probe.defptrw_offset >= 0 ) then
+			probe.ctx.defptrw = probe.ctx.deftextw.data + probe.defptrw_offset
+		else
+			probe.ctx.defptrw = parent->defptrw
+		end if
+	end if
+
+	lex.ctx = @probe.ctx
+
+end sub
+
+'':::::
+'' Release an isolated token probe and restore the active lexer context.
+sub lexProbeEnd _
+	( _
+		byref probe as LEX_PROBE_CTX _
+	)
+
+	assert( lex.ctx = @probe.ctx )
+
+	if( env.inf.format = FBFILE_FORMAT_ASCII ) then
+		DZstrAllocate( probe.ctx.deftext, 0 )
+	else
+		DWstrAllocate( probe.ctx.deftextw, 0 )
+	end if
+	DZstrAllocate( probe.ctx.currline, 0 )
+
+	lex.ctx = probe.parent
+	lex.insidemacro = probe.insidemacro
+	seek #env.inf.num, probe.hostfilepos
+
+end sub
+
 
 '':::::
 sub lexInit _

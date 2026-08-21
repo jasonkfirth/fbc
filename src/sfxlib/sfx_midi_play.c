@@ -64,6 +64,21 @@
 static FILE *g_midi_file = NULL;
 int g_midi_playing = 0;
 
+#if defined(_WIN32_WCE)
+/*
+    Windows CE process slots are small, while PE images commonly request a
+    one-megabyte default stack.  The MIDI worker keeps track data on the heap
+    and needs only a modest call stack, so reserve 16 KiB instead.  The
+    reservation flag is required; without it, CreateThread interprets a small
+    value as the initial commit while retaining the executable's full reserve.
+*/
+#define FB_SFX_MIDI_THREAD_STACK_SIZE  (16u * 1024u)
+#define FB_SFX_MIDI_THREAD_FLAGS       STACK_SIZE_PARAM_IS_A_RESERVATION
+#else
+#define FB_SFX_MIDI_THREAD_STACK_SIZE  0u
+#define FB_SFX_MIDI_THREAD_FLAGS       0u
+#endif
+
 #if FB_SFX_MT_ENABLED
 #if defined(_WIN32)
 static HANDLE g_midi_thread = NULL;
@@ -638,7 +653,7 @@ int fb_sfxMidiPlay(const char *filename)
         SFX_DEBUG("sfx_midi_play: no MIDI device open");
         return -1;
     }
-    g_midi_file = fopen(filename, "rb");
+    g_midi_file = fb_sfxOpenFile(filename, "rb");
 
     if (!g_midi_file)
     {
@@ -706,7 +721,12 @@ int fb_sfxMidiPlay(const char *filename)
     playdata->size = read_size;
 
 #if defined(_WIN32)
-    thread = CreateThread(NULL, 0, fb_sfxMidiWorkerEntry, playdata, 0, NULL);
+    thread = CreateThread(NULL,
+                          FB_SFX_MIDI_THREAD_STACK_SIZE,
+                          fb_sfxMidiWorkerEntry,
+                          playdata,
+                          FB_SFX_MIDI_THREAD_FLAGS,
+                          NULL);
     if (!thread)
 #elif defined(HOST_WII)
     if (LWP_CreateThread(&thread, fb_sfxMidiWorkerEntry, playdata,

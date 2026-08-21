@@ -1,0 +1,40 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-gcc-m68k-no-posix-startup.patch
+#
+# Purpose:
+#
+#     Configure AROS m68k native GCC without the unavailable PosixC process
+#     initializer.
+#
+# Responsibilities:
+#
+#     - retain PosixC startup and translated diagnostics on ARM and x86_64
+#     - use ordinary AROS startup and English diagnostics on m68k
+#     - leave the compiler's generated target code unchanged
+#
+# This file intentionally does NOT change the m68k ABI or compiler defaults.
+#
+--- a/contrib/gnu/gcc/mmakefile.src
++++ b/contrib/gnu/gcc/mmakefile.src
+@@ -96,5 +96,11 @@ GCC_EXTRA_OPTS += --disable-build-with-cxx
+ GCC_EXTRA_OPTS += --disable-build-poststage1-with-cxx
+ 
++GCC_NIX := yes
++ifneq (,$(findstring m68k,$(AROS_TARGET_CPU)))
++GCC_NIX := no
++GCC_EXTRA_OPTS += --disable-nls
++endif
++
+ # Make sure iconv is not used...
+ GCC_HOST_VARS += \
+ 	am_cv_lib_iconv=no \
+@@ -124,4 +130,5 @@ development-gcc--CROSS_SYSROOT:=$(TARGET_SYSROOT)
+     config_env_extra=$(GCC_HOST_VARS) extraoptions=$(GCC_EXTRA_OPTS) \
+     usecppflags=no usecflags=no usecxxflags=no \
+     kernelisaflags= targetisaflags= \
++    nix=$(GCC_NIX) nix_dir_layout=yes \
+     postinstall=contrib-gnu-gcc-postinstall nlsflag= xflag=
+
+# end of native-gcc-m68k-no-posix-startup.patch

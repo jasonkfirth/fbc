@@ -74,7 +74,7 @@ static int fb_sfxMidiSoftwareRequested(void)
 {
     const char *driver;
 
-    driver = getenv("SFXLIB_MIDI_DRIVER");
+    driver = fb_sfxGetEnv("SFXLIB_MIDI_DRIVER");
     if (!driver)
         return 0;
 

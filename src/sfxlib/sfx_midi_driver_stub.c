@@ -31,7 +31,7 @@
 #if !defined(_WIN32) && \
     !defined(__CYGWIN__) && \
     !defined(__DJGPP__) && \
-    (!defined(__linux__) || defined(__ANDROID__)) && \
+    (!defined(__linux__) || defined(__ANDROID__) || defined(DISABLE_ALSA)) && \
     !defined(__APPLE__) && \
     !defined(__FreeBSD__) && \
     !defined(__NetBSD__) && \

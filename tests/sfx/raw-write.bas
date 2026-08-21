@@ -90,4 +90,8 @@ close #file_num
 
 SfxTestDeleteFile( output_file )
 
+'' Failed ASSERT calls terminate before this point.  Keep the successful path
+'' independent from any residual file status left by the platform runtime.
+end 0
+
 '' end of raw-write.bas

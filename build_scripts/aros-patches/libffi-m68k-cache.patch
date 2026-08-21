@@ -1,0 +1,46 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: libffi-m68k-cache.patch
+#
+# Purpose:
+#
+#     Use the native AROS executable-cache API for m68k libffi closures.
+#
+# Responsibilities:
+#
+#     - avoid Linux syscall and cachectl headers on AROS
+#     - flush generated closure trampolines through exec.library
+#
+# This file intentionally does NOT change m68k argument or result marshalling.
+#
+--- a/src/m68k/ffi.c
++++ b/src/m68k/ffi.c
+@@ -10,6 +10,9 @@
+ #ifdef __rtems__
+ void rtems_cache_flush_multiple_data_lines( const void *, size_t );
+ #else
++#ifdef __AROS__
++#include <proto/exec.h>
++#else
+ #include <sys/syscall.h>
+ #ifdef __MINT__
+ #include <mint/mintbind.h>
+@@ -18,6 +21,7 @@
+ #include <asm/cachectl.h>
+ #endif
+ #endif
++#endif
+ 
+ void ffi_call_SYSV (extended_cif *,
+ 		    unsigned, unsigned,
+@@ -346,6 +350,9 @@
+ 
+ #ifdef __rtems__
+   rtems_cache_flush_multiple_data_lines( codeloc, FFI_TRAMPOLINE_SIZE );
++#elif defined(__AROS__)
++  CacheClearE(codeloc, FFI_TRAMPOLINE_SIZE,
++              CACRF_ClearI | CACRF_ClearD);
+ #elif defined(__MINT__)
+   Ssystem(S_FLUSHCACHE, codeloc, FFI_TRAMPOLINE_SIZE);
+ #else

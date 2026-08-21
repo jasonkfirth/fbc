@@ -438,9 +438,13 @@ int fb_hX11EnterFullscreen(int *h)
 	while (XGrabPointer(fb_x11.display, fb_x11.window, True, 0,
 			    GrabModeAsync, GrabModeAsync, fb_x11.window, None, CurrentTime) != GrabSuccess)
 		usleep(10000);
-	if (XGrabKeyboard(fb_x11.display, root_window, False,
-	    GrabModeAsync, GrabModeAsync, CurrentTime) != GrabSuccess)
-		return -1;
+	/*
+		Do not grab the keyboard for fullscreen windows.  The window manager
+		must retain control of global shortcuts such as Alt+Tab; a keyboard
+		grab here prevents the user from switching away from an OpenGL
+		fullscreen program.  The fullscreen window receives normal keyboard
+		events while it owns input focus.
+	*/
 
 	current_size = target_size;
 	*h = real_h;
@@ -457,7 +461,6 @@ void fb_hX11LeaveFullscreen(void)
 		if ((target_rate <= 0) || (XRRSetScreenConfigAndRate(fb_x11.display, fb_x11.config, root_window, orig_size, orig_rotation, orig_rate, CurrentTime) == BadValue))
 			XRRSetScreenConfig(fb_x11.display, fb_x11.config, root_window, orig_size, orig_rotation, CurrentTime);
 		XUngrabPointer(fb_x11.display, CurrentTime);
-		XUngrabKeyboard(fb_x11.display, CurrentTime);
 		current_size = orig_size;
 		__fb_gfx->refresh_rate = fb_x11.refresh_rate = orig_rate;
 	}
@@ -612,10 +615,12 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	fb_hX11SetWindowTitle( title );
 #ifndef DISABLE_XPM
 	if (fb_program_icon) {
+		Window icon_window = (flags & DRIVER_NO_FRAME) ? fb_x11.window : fb_x11.wmwindow;
+
 		hints.flags = IconPixmapHint | IconMaskHint;
 		xpm_attribs.valuemask = XpmReturnAllocPixels | XpmReturnExtensions;
-		XpmCreatePixmapFromData(fb_x11.display, fb_x11.window, fb_program_icon, &hints.icon_pixmap, &hints.icon_mask, &xpm_attribs);
-		XSetWMHints(fb_x11.display, fb_x11.wmwindow, &hints);
+		XpmCreatePixmapFromData(fb_x11.display, icon_window, fb_program_icon, &hints.icon_pixmap, &hints.icon_mask, &xpm_attribs);
+		XSetWMHints(fb_x11.display, icon_window, &hints);
 	}
 #endif
 

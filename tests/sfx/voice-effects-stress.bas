@@ -35,8 +35,6 @@ const TAIL_FRAMES = 22050
 const TOTAL_FRAMES = ( STAGE_FRAMES * 3 ) + ( GAP_FRAMES * 2 ) + TAIL_FRAMES
 const MAX_FRAMES = TOTAL_FRAMES + 4096
 
-redim as single samples( 0 to MAX_FRAMES - 1 )
-
 function VoiceStressFrequency _
 	( _
 		byval voice_index as integer, _
@@ -60,6 +58,36 @@ function VoiceStressFrequency _
 	end select
 
 	return base_frequency + detune
+end function
+
+function VoiceStressReadRms _
+	( _
+		byval f as integer, _
+		byval requested_frames as integer, _
+		byref read_frames as integer _
+	) as double
+
+	dim as double sum_squares = 0.0
+	dim as string line_text
+
+	read_frames = 0
+
+	do while( eof( f ) = 0 and read_frames < requested_frames )
+		line input #f, line_text
+
+		if( len( line_text ) > 0 ) then
+			dim as double sample = val( line_text )
+
+			sum_squares += sample * sample
+			read_frames += 1
+		end if
+	loop
+
+	if( read_frames = 0 ) then
+		return 0.0
+	end if
+
+	return sqr( sum_squares / cdbl( read_frames ) )
 end function
 
 sub VoiceStressConfigureSynth()
@@ -119,7 +147,11 @@ if( temp_dir = "" ) then
 end if
 
 if( temp_dir = "" ) then
-	temp_dir = "/tmp"
+	temp_dir = curdir()
+
+	if( temp_dir = "" ) then
+		temp_dir = "."
+	end if
 end if
 
 if( right( temp_dir, 1 ) <> "/" andalso right( temp_dir, 1 ) <> "\\" ) then
@@ -155,12 +187,50 @@ fb_sfxUpdate( STAGE_FRAMES )
 ASSERT( fb_sfxVoiceActiveCount() = 0 )
 fb_sfxUpdate( TAIL_FRAMES )
 
-dim as integer frames = SfxTestLoadDump( dump_file, samples() )
 dim as zstring * 5 null_name = "null"
 dim as FB_SFX_DRIVER_STATS stats
-dim as integer stage_16_start = STAGE_FRAMES + GAP_FRAMES
-dim as integer stage_32_start = stage_16_start + STAGE_FRAMES + GAP_FRAMES
-dim as integer tail_start = stage_32_start + STAGE_FRAMES
+dim as integer dump_input = freefile()
+dim as integer frames = 0
+dim as integer read_frames
+dim as double stage_rms( 0 to 2 )
+dim as double tail_rms
+
+ASSERT( open( dump_file for input as #dump_input ) = 0 )
+
+for stage as integer = 0 to 2
+	dim as integer leading_frames = 4096
+	dim as integer trailing_frames = 4096
+
+	VoiceStressReadRms( dump_input, leading_frames, read_frames )
+	ASSERT( read_frames = leading_frames )
+	frames += read_frames
+
+	stage_rms( stage ) = VoiceStressReadRms( _
+		dump_input, STAGE_FRAMES - leading_frames - trailing_frames, read_frames )
+	ASSERT( read_frames = STAGE_FRAMES - leading_frames - trailing_frames )
+	frames += read_frames
+
+	VoiceStressReadRms( dump_input, trailing_frames, read_frames )
+	ASSERT( read_frames = trailing_frames )
+	frames += read_frames
+
+	if( stage < 2 ) then
+		VoiceStressReadRms( dump_input, GAP_FRAMES, read_frames )
+		ASSERT( read_frames = GAP_FRAMES )
+		frames += read_frames
+	end if
+next
+
+tail_rms = VoiceStressReadRms( dump_input, 12000, read_frames )
+ASSERT( read_frames = 12000 )
+frames += read_frames
+
+do
+	VoiceStressReadRms( dump_input, 4096, read_frames )
+	frames += read_frames
+loop while( read_frames > 0 )
+
+close #dump_input
 
 ASSERT( frames >= TOTAL_FRAMES )
 ASSERT( fb_sfxDriverStatsSnapshot( @null_name, @stats ) = 0 )
@@ -172,13 +242,13 @@ ASSERT( stats.short_writes = 0 )
 ASSERT( stats.zero_writes = 0 )
 ASSERT( stats.errors = 0 )
 
-ASSERT( SfxTestRms( samples(), 4096, STAGE_FRAMES - 8192 ) > 0.005 )
-ASSERT( SfxTestRms( samples(), stage_16_start + 4096, STAGE_FRAMES - 8192 ) > 0.005 )
-ASSERT( SfxTestRms( samples(), stage_32_start + 4096, STAGE_FRAMES - 8192 ) > 0.005 )
+ASSERT( stage_rms( 0 ) > 0.005 )
+ASSERT( stage_rms( 1 ) > 0.005 )
+ASSERT( stage_rms( 2 ) > 0.005 )
 
 '' SOUND ends exactly at the tail boundary. Nonzero energy afterward can only
 '' come from the delay line, so this also proves that the effect was processed.
-ASSERT( SfxTestRms( samples(), tail_start, 12000 ) > 0.0001 )
+ASSERT( tail_rms > 0.0001 )
 
 sfxlib.EchoReset()
 ASSERT( sfxlib.EchoEnabled() = 0 )

@@ -1,0 +1,687 @@
+# Project: FreeBASIC XL
+# ---------------------
+#
+# File: .github/workflows/ci.yml
+#
+# Purpose:
+#
+#     Build FreeBASIC XL from a clean checkout and run the compiler and
+#     runtime validation that should protect normal commits and pull requests.
+#
+# Responsibilities:
+#
+#     * seed a reproducible source bootstrap compiler
+#     * build the current XL compiler and runtime libraries
+#     * run build-system, compiler, language, and example validation
+#     * exercise native Linux, Darwin, and MSYS2 Windows environments
+#     * exercise the broader target CPU and bootstrap-emission matrix
+#
+# This file intentionally does NOT contain:
+#
+#     * release packaging or publication
+#     * full-system VM or hardware qualification; the MIPS lane uses the
+#       repository's contained user-mode QEMU qualification only
+#     * credentials or repository write operations
+
+name: FreeBASIC XL CI
+
+on:
+  # Run for direct commits on every branch. Pull requests get their own
+  # protected-branch check below, including changes from forked repositories.
+  push:
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: fbc-xl-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # 1.10.1 is the last upstream source-bootstrap release and is used only to
+  # create a runnable compiler. The compiler tested below is built from this
+  # checkout, not taken from the bootstrap archive.
+  BOOTSTRAP_VERSION: "1.10.1"
+
+jobs:
+  linux:
+    name: Linux ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: x86_64
+            runner: ubuntu-24.04
+            bootstrap_target: linux-x86_64
+          - name: arm64
+            runner: ubuntu-24.04-arm
+            bootstrap_target: linux-aarch64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install build and test dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc g++ make binutils pkg-config rsync curl \
+            tar xz-utils gzip dos2unix python3 \
+            libncurses-dev libffi-dev libgpm-dev \
+            libasound2-dev libpulse-dev \
+            libx11-dev libxext-dev libxpm-dev \
+            libxrender-dev libxrandr-dev \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            libcairo2-dev libcunit1-dev \
+            libcurl4-openssl-dev libpcre3-dev libpcre2-dev
+
+      - name: Select parallelism
+        run: echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
+
+      - name: Seed Linux source bootstrap
+        run: bash build_scripts/ci-seed-source-bootstrap.sh "${{ matrix.bootstrap_target }}" linux-x86_64
+
+      - name: Build the bootstrap compiler
+        run: make -j"$JOBS" bootstrap-minimal </dev/null
+
+      - name: Build the compiler with the bootstrap seed
+        run: make -j"$JOBS" compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
+
+      - name: Rebuild the compiler self-hosted
+        run: |
+          make clean-compiler
+          make -j"$JOBS" compiler </dev/null
+
+      - name: Build the XL runtime libraries
+        run: make -j"$JOBS" all </dev/null
+
+      - name: Run build-system and compiler smoke tests
+        # quick-test shares one temporary directory across its prerequisites.
+        # Keep the meta-target serial until those tests have isolated state.
+        run: make quick-test </dev/null
+
+      - name: Run fbctests
+        run: make -j"$JOBS" tests-test </dev/null
+
+      - name: Run syntax tests
+        run: |
+          set -euo pipefail
+          cd tests/syntax
+          FBC="$GITHUB_WORKSPACE/bin/fbc -i $GITHUB_WORKSPACE/inc" ./test.sh </dev/null
+
+      - name: Run Exampleageddon
+        env:
+          FB_GFX_DRIVER: none
+          SFXLIB_DRIVER: null
+        run: |
+          python3 build_scripts/exampleageddon-freebasic.py \
+            --fbc "$GITHUB_WORKSPACE/bin/fbc" \
+            --outdir "$GITHUB_WORKSPACE/out/exampleageddon" \
+            --include-dir "$GITHUB_WORKSPACE/inc" \
+            --jobs "$JOBS" \
+            --compile-timeout 180 \
+            --run-timeout 15 \
+            --fail-on-self-contained
+
+      - name: Upload Linux diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-linux-${{ matrix.name }}-diagnostics
+          if-no-files-found: warn
+          path: |
+            out/exampleageddon/
+            maketests-log/
+            tests/failed-*.log
+            tests/log-tests-results-*.log
+
+  windows:
+    name: Windows ${{ matrix.name }}
+    runs-on: windows-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: x86
+            msystem: MINGW32
+            package_prefix: mingw-w64-i686
+            bootstrap_target: win32
+          - name: x86_64
+            msystem: MINGW64
+            package_prefix: mingw-w64-x86_64
+            bootstrap_target: win64
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msystem }}
+          update: true
+          install: >-
+            make
+            tar
+            xz
+            gzip
+            rsync
+            curl
+            pkgconf
+            ${{ matrix.package_prefix }}-gcc
+            ${{ matrix.package_prefix }}-binutils
+            ${{ matrix.package_prefix }}-libffi
+
+      - name: Select parallelism
+        run: echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
+
+      - name: Seed Windows source bootstrap
+        run: bash build_scripts/ci-seed-source-bootstrap.sh "${{ matrix.bootstrap_target }}" "${{ matrix.bootstrap_target }}"
+
+      - name: Build the bootstrap compiler
+        run: make -j"$JOBS" bootstrap-minimal </dev/null
+
+      - name: Build the compiler with the bootstrap seed
+        run: make -j"$JOBS" compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
+
+      - name: Rebuild the compiler self-hosted
+        run: |
+          make clean-compiler
+          make -j"$JOBS" compiler </dev/null
+
+      - name: Build the XL runtime libraries
+        run: make -j"$JOBS" all </dev/null
+
+      - name: Run build-system and compiler smoke tests
+        # quick-test shares one temporary directory across its prerequisites.
+        # Keep the meta-target serial until those tests have isolated state.
+        run: make quick-test </dev/null
+
+      - name: Run fbctests
+        run: make -j"$JOBS" tests-test </dev/null
+
+      - name: Upload Windows diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-windows-${{ matrix.msystem }}-diagnostics
+          if-no-files-found: warn
+          path: |
+            maketests-log/
+            tests/failed-*.log
+            tests/log-tests-results-*.log
+
+  linux-targets:
+    name: Linux target matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install host and cross-target toolchains
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc g++ make binutils pkg-config rsync curl \
+            tar xz-utils gzip dos2unix python3 \
+            libncurses-dev libffi-dev libgpm-dev \
+            libasound2-dev libpulse-dev \
+            libx11-dev libxext-dev libxpm-dev \
+            libxrender-dev libxrandr-dev \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            libcairo2-dev libcunit1-dev \
+            libcurl4-openssl-dev libpcre3-dev libpcre2-dev \
+            gcc-i686-linux-gnu \
+            gcc-arm-linux-gnueabi gcc-arm-linux-gnueabihf \
+            gcc-aarch64-linux-gnu \
+            gcc-riscv64-linux-gnu \
+            gcc-s390x-linux-gnu \
+            gcc-loongarch64-linux-gnu \
+            gcc-powerpc-linux-gnu \
+            gcc-powerpc64-linux-gnu \
+            gcc-powerpc64le-linux-gnu
+
+      - name: Select parallelism
+        run: echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
+
+      - name: Seed Linux source bootstrap
+        run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
+
+      - name: Build the bootstrap compiler
+        run: make -j"$JOBS" bootstrap-minimal </dev/null
+
+      - name: Build the compiler with the bootstrap seed
+        run: make -j"$JOBS" compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
+
+      - name: Rebuild the compiler self-hosted
+        run: |
+          make clean-compiler
+          make -j"$JOBS" compiler </dev/null
+
+      - name: Build the XL runtime libraries
+        run: make -j"$JOBS" all </dev/null
+
+      - name: Run compiler target smoke tests
+        run: |
+          set -euo pipefail
+          # These targets share .maketests-tmp, so invoke them one at a time.
+          for target in \
+            compiler-riscv32-smoke \
+            compiler-riscv64-smoke \
+            compiler-s390x-smoke \
+            compiler-loongarch64-smoke \
+            compiler-mips-smoke \
+            compiler-ppc-smoke \
+            compiler-ppc64-smoke \
+            compiler-ppc64le-smoke \
+            compiler-riscos-smoke; do
+            make -j"$JOBS" "$target" </dev/null
+          done
+
+      - name: Compile additional Linux target objects
+        run: |
+          set -euo pipefail
+          smoke_dir="$RUNNER_TEMP/linux-target-smoke"
+          mkdir -p "$smoke_dir"
+          cat > "$smoke_dir/target-smoke.bas" <<'EOF'
+          #if not defined(__FB_LINUX__)
+          #error expected Linux target
+          #endif
+          print "target smoke"
+          EOF
+
+          # readelf validates that the selected target driver really produced
+          # the requested object instead of silently using the host compiler.
+          while IFS='|' read -r target machine; do
+            object="$smoke_dir/${target}.o"
+            echo "==> compiling $target"
+            env -u GCC -u CLANG "$GITHUB_WORKSPACE/bin/fbc" \
+              -i "$GITHUB_WORKSPACE/inc" \
+              -target "$target" -gen gcc -c \
+              "$smoke_dir/target-smoke.bas" -o "$object"
+            readelf -h "$object" | grep -Eiq "Machine:.*${machine}" || {
+              echo "ERROR: $target object has the wrong machine type" >&2
+              readelf -h "$object" >&2
+              exit 1
+            }
+          done <<'EOF'
+          i686-linux-gnu|Intel 80386
+          arm-linux-gnueabi|ARM
+          arm-linux-gnueabihf|ARM
+          aarch64-linux-gnu|AArch64
+          powerpc-linux-gnu|PowerPC
+          powerpc64-linux-gnu|PowerPC64
+          powerpc64le-linux-gnu|PowerPC64
+          EOF
+
+      - name: Verify non-Linux bootstrap emission targets
+        run: make bootstrap-emit-matrix-test </dev/null
+
+      - name: Emit the complete supported target matrix
+        run: |
+          set -euo pipefail
+          smoke_dir="$RUNNER_TEMP/all-target-emission"
+          mkdir -p "$smoke_dir"
+          printf '%s\n' 'print "target emission"' > "$smoke_dir/target-smoke.bas"
+
+          # The makefile owns this list.  Extracting it here keeps CI aligned
+          # with newly added OS and CPU combinations instead of maintaining a
+          # second, slowly diverging matrix in YAML.
+          target_specs="$(make -s -pn | awk -F ' := ' '$1 == "SUPPORTED_BOOTSTRAP_TARGETS" { print $2; exit }')"
+          test -n "$target_specs" || {
+            echo "ERROR: supported target matrix was not found" >&2
+            exit 1
+          }
+
+          count=0
+          for spec in $target_specs; do
+            target="${spec%%:*}"
+            count=$((count + 1))
+            echo "==> emitting $target"
+            "$GITHUB_WORKSPACE/bin/fbc" \
+              -i "$GITHUB_WORKSPACE/inc" \
+              -target "$target" -gen gcc -r \
+              "$smoke_dir/target-smoke.bas" \
+              -o "$smoke_dir/$count.c"
+            test -s "$smoke_dir/$count.c" || {
+              echo "ERROR: $target emitted no C source" >&2
+              exit 1
+            }
+          done
+          echo "==> emitted $count supported OS/CPU targets"
+
+          # These driver targets are platform package variants rather than
+          # entries in the bootstrap compiler matrix, but they still need to
+          # keep emitting valid target C when shared compiler code changes.
+          for target in \
+            android-arm \
+            android-aarch64 \
+            android-x86 \
+            android-x86_64 \
+            js-asmjs \
+            wii-powerpc \
+            xbox; do
+            count=$((count + 1))
+            echo "==> emitting $target"
+            "$GITHUB_WORKSPACE/bin/fbc" \
+              -i "$GITHUB_WORKSPACE/inc" \
+              -target "$target" -gen gcc -r \
+              "$smoke_dir/target-smoke.bas" \
+              -o "$smoke_dir/$count.c"
+            test -s "$smoke_dir/$count.c" || {
+              echo "ERROR: $target emitted no C source" >&2
+              exit 1
+            }
+          done
+          echo "==> emitted $count total OS/CPU targets"
+
+      - name: Upload Linux target diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-linux-target-diagnostics
+          if-no-files-found: warn
+          path: |
+            maketests-log/
+            tests/failed-*.log
+            tests/log-tests-results-*.log
+            bootstrap/
+
+  macos:
+    name: macOS ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: arm64
+            runner: macos-15
+            bootstrap_target: darwin-aarch64
+          - name: x86_64
+            runner: macos-15-intel
+            bootstrap_target: darwin-x86_64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          brew update
+          brew install make pkg-config xz dos2unix gnu-sed coreutils rsync gcc libffi ncurses
+
+      - name: Select parallelism
+        run: echo "JOBS=$(sysctl -n hw.logicalcpu)" >> "$GITHUB_ENV"
+
+      - name: Seed Darwin source bootstrap
+        run: bash build_scripts/ci-seed-source-bootstrap.sh "${{ matrix.bootstrap_target }}" linux-x86_64
+
+      - name: Build the bootstrap compiler
+        run: gmake -j"$JOBS" bootstrap-minimal </dev/null
+
+      - name: Build the compiler with the bootstrap seed
+        run: gmake -j"$JOBS" compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
+
+      - name: Rebuild the compiler self-hosted
+        run: |
+          gmake clean-compiler
+          gmake -j"$JOBS" compiler </dev/null
+
+      - name: Build the XL runtime libraries
+        run: gmake -j"$JOBS" all </dev/null
+
+      - name: Run build-system and compiler smoke tests
+        # quick-test shares one temporary directory across its prerequisites.
+        # Keep the meta-target serial until those tests have isolated state.
+        run: gmake quick-test </dev/null
+
+      - name: Run fbctests
+        run: gmake -j"$JOBS" tests-test </dev/null
+
+      - name: Run Darwin binding and graphics smoke tests
+        env:
+          FBC: ${{ github.workspace }}/bin/fbc
+          OUT_DIR: ${{ runner.temp }}/macos-smoke
+        run: bash build_scripts/macos-smoke-freebasic.sh
+
+      - name: Run syntax tests
+        run: |
+          set -euo pipefail
+          cd tests/syntax
+          FBC="$GITHUB_WORKSPACE/bin/fbc -i $GITHUB_WORKSPACE/inc" ./test.sh </dev/null
+
+      - name: Run Exampleageddon
+        env:
+          FB_GFX_DRIVER: none
+          SFXLIB_DRIVER: null
+        run: |
+          python3 build_scripts/exampleageddon-freebasic.py \
+            --fbc "$GITHUB_WORKSPACE/bin/fbc" \
+            --target-os darwin \
+            --outdir "$RUNNER_TEMP/exampleageddon" \
+            --include-dir "$GITHUB_WORKSPACE/inc" \
+            --jobs "$JOBS" \
+            --compile-timeout 180 \
+            --run-timeout 15 \
+            --fail-on-self-contained
+
+      - name: Upload macOS diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-macos-${{ matrix.name }}-diagnostics
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/exampleageddon/
+            ${{ runner.temp }}/macos-smoke/
+            maketests-log/
+            tests/failed-*.log
+            tests/log-tests-results-*.log
+
+  windows-arm64:
+    name: Windows ARM64 cross target
+    runs-on: windows-latest
+    timeout-minutes: 120
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up MSYS2 host environment
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            make
+            tar
+            xz
+            gzip
+            rsync
+            curl
+            pkgconf
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-libffi
+            mingw-w64-x86_64-binutils
+
+      - name: Select parallelism
+        run: echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
+
+      - name: Seed Windows host bootstrap
+        run: bash build_scripts/ci-seed-source-bootstrap.sh win64 win64
+
+      - name: Build the Windows host compiler
+        run: make -j"$JOBS" bootstrap-minimal </dev/null
+
+      - name: Build the host compiler with the bootstrap seed
+        run: make -j"$JOBS" compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
+
+      - name: Rebuild the host compiler self-hosted
+        run: |
+          make clean-compiler
+          make -j"$JOBS" compiler </dev/null
+
+      - name: Build the Windows ARM64 compiler and runtime
+        run: |
+          HOST_FBC_ROOT="$GITHUB_WORKSPACE" \
+            JOBS="$JOBS" \
+            bash build_scripts/msys2-build-freebasic.sh \
+              --only-arm64 \
+              --skip-package \
+              --skip-installer \
+              --skip-validate
+
+      - name: Upload Windows ARM64 diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-windows-arm64-diagnostics
+          if-no-files-found: warn
+          path: |
+            .build-msys2/
+            out/mingw32/
+            maketests-log/
+            tests/failed-*.log
+            tests/log-tests-results-*.log
+
+  windows-arm64-native:
+    name: Windows ARM64 native
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up native ARM64 MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANGARM64
+          update: true
+          install: >-
+            make
+            tar
+            xz
+            gzip
+            rsync
+            curl
+            pkgconf
+            mingw-w64-clang-aarch64-clang
+            mingw-w64-clang-aarch64-compiler-rt
+            mingw-w64-clang-aarch64-crt
+            mingw-w64-clang-aarch64-headers
+            mingw-w64-clang-aarch64-lld
+            mingw-w64-clang-aarch64-llvm
+            mingw-w64-clang-aarch64-llvm-tools
+            mingw-w64-clang-aarch64-libunwind
+            mingw-w64-clang-aarch64-libwinpthread
+            mingw-w64-clang-aarch64-tools
+            mingw-w64-clang-aarch64-winpthreads
+
+      - name: Select parallelism
+        run: echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
+
+      - name: Seed native ARM64 source bootstrap
+        run: bash build_scripts/ci-seed-source-bootstrap.sh win32-aarch64 win64
+
+      - name: Build the bootstrap compiler
+        run: make -j"$JOBS" bootstrap-minimal </dev/null
+
+      - name: Build the compiler with the bootstrap seed
+        run: make -j"$JOBS" compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
+
+      - name: Rebuild the compiler self-hosted
+        run: |
+          make clean-compiler
+          make -j"$JOBS" compiler </dev/null
+
+      - name: Build the XL runtime libraries
+        run: make -j"$JOBS" all </dev/null
+
+      - name: Run build-system and compiler smoke tests
+        # quick-test shares one temporary directory across its prerequisites.
+        # Keep the meta-target serial until those tests have isolated state.
+        run: make quick-test </dev/null
+
+      - name: Run fbctests
+        run: make -j"$JOBS" tests-test </dev/null
+
+      - name: Run syntax tests
+        run: |
+          set -euo pipefail
+          cd tests/syntax
+          FBC="$GITHUB_WORKSPACE/bin/fbc -i $GITHUB_WORKSPACE/inc" ./test.sh </dev/null
+
+      - name: Upload native Windows ARM64 diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-windows-arm64-native-diagnostics
+          if-no-files-found: warn
+          path: |
+            maketests-log/
+            tests/failed-*.log
+            tests/log-tests-results-*.log
+
+  mips:
+    name: Linux MIPS QEMU qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install MIPS workflow dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends docker.io rsync curl
+
+      - name: Seed host bootstrap for the contained build
+        run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
+
+      - name: Build and qualify all MIPS Linux targets
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mips/work" "$RUNNER_TEMP/mips/output"
+          JOBS=2 bash build_scripts/debianubuntu-build-freebasic-mips.sh \
+            --jobs 2 \
+            --skip-package \
+            --work-dir "$RUNNER_TEMP/mips/work" \
+            --out-dir "$RUNNER_TEMP/mips/output"
+
+      - name: Upload MIPS diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-mips-diagnostics
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/mips/
+
+# end of .github/workflows/ci.yml

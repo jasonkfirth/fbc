@@ -658,8 +658,7 @@ run_batch() {
 # Main guest workflow
 ##############################################################################
 
-if pgrep -x rpcemu-recompiler >/dev/null 2>&1 ||
-   pgrep -x rpcemu-interpreter >/dev/null 2>&1; then
+if pgrep -f '(^|/)rpcemu-(recompiler|interpreter)( |$)' >/dev/null 2>&1; then
     die "an RPCEmu process is already running; close it before Exampleageddon"
 fi
 

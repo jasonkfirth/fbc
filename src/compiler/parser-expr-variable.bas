@@ -1036,6 +1036,49 @@ private function hMakeArrayIdx( byval sym as FBSYMBOL ptr ) as ASTNODE ptr
 	function = astNewCONSTi( symbArrayLbound( sym, 0 ) )
 end function
 
+private function hRedimArrayIndexHasFieldSuffix( ) as integer
+	dim as integer depth = 0
+
+	'' REDIM bounds are normally hidden from the expression parser.  An
+	'' indexed dynamic array must be the exception only when its closing ')'
+	'' is followed by a field access.  This keeps 'this.array(l to u)' on the
+	'' existing REDIM-bound path while allowing 'items(0, 0).values(...)'.
+	if( lexGetToken( ) <> CHAR_LPRNT ) then
+		return FALSE
+	end if
+
+	dim as LEX_PROBE_CTX probe
+	lexProbeBegin( probe )
+
+	do
+		select case lexGetToken( )
+		case CHAR_LPRNT
+			depth += 1
+
+		case CHAR_RPRNT
+			if( depth = 0 ) then
+				exit do
+			end if
+			depth -= 1
+			if( depth = 0 ) then
+				lexSkipToken( )
+				if( lexGetToken( LEXCHECK_NOPERIOD ) = CHAR_DOT ) then
+					function = TRUE
+				end if
+				exit do
+			end if
+
+		case FB_TK_EOL, FB_TK_EOF
+			exit do
+		end select
+		lexSkipToken( )
+	loop
+
+	'' This was only a probe.  The actual expression parser must see the
+	'' original current token and source position.
+	lexProbeEnd( probe )
+end function
+
 '':::::
 ''Variable        =   ID ArrayIdx? UdtMember? FuncPtrOrMemberDeref? .
 ''
@@ -1068,9 +1111,18 @@ function cVariableEx overload _
 	idxexpr = NULL
 
 	dim as integer check_fields = TRUE, is_nidxarray = TRUE
+	dim as integer allow_redim_array_index = FALSE
 
 	'' check for '()', it's not an array, just passing bydesc
-	if( (lexGetToken( ) = CHAR_LPRNT) and (not fbGetIdxInParensOnly( )) ) then
+	''
+	'' REDIM expression parsing suppresses the index on the final dynamic
+	'' array field so the declaration can consume its bounds.  The containing
+	'' variable still needs to consume its own indices, for example in
+	'' 'redim items(0, 0).values(0 to 2)'.
+	allow_redim_array_index = is_array and symbGetIsDynamic( sym ) andalso _
+		hRedimArrayIndexHasFieldSuffix( )
+	if( (lexGetToken( ) = CHAR_LPRNT) and _
+		((not fbGetIdxInParensOnly( )) or allow_redim_array_index) ) then
 		if( lexGetLookAhead( 1 ) <> CHAR_RPRNT ) then
 			'' ArrayIdx?
 			if( is_array ) then

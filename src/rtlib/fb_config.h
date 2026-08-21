@@ -11,6 +11,17 @@
 #elif defined __DJGPP__
 	#define HOST_DOS
 	#define HOST_DJGPP
+#elif defined __MINGW32CE__
+	/*
+	 * CeGCC defines the normal MinGW symbols in addition to its WinCE
+	 * identity.  Detect it first so platform headers and source replacements
+	 * do not accidentally select the desktop Win32 implementation.
+	 */
+	#define HOST_WINCE
+	#define HOST_MINGW
+	#define HOST_WIN32
+	#define WIN32_LEAN_AND_MEAN
+	#define FB_UNICODE_HEADER "wince/fb_unicode.h"
 #elif defined __MINGW32__ /* MinGW, MinGW-w64, TDM-GCC */
 	#define HOST_MINGW
 	#define HOST_WIN32
@@ -30,6 +41,10 @@
 #elif defined __ANDROID__
 	/* Omit HOST_LINUX; Android isn't GNU/Linux. */
 	#define HOST_ANDROID
+	#define HOST_UNIX
+#elif defined __AROS__
+	/* AROS exposes a POSIX compatibility surface around native Exec/DOS APIs. */
+	#define HOST_AROS
 	#define HOST_UNIX
 #elif defined __riscos__
 	/* GCCSDK/UnixLib presents RISC OS as an ELF Unix-like target. */
@@ -89,11 +104,18 @@
 	#define HOST_64BIT
 #elif defined __loongarch64
 	#define HOST_64BIT
+#elif defined __mips__ || defined __mips || defined mips
+	#define HOST_MIPS
+	#if defined __mips64 || defined __mips64__ || defined __LP64__
+		#define HOST_64BIT
+	#endif
+#elif defined __mc68000__ || defined __m68k__
+	#define HOST_M68K
 #elif defined __aarch64__
 	#define HOST_64BIT
 #endif
 
-#ifdef HOST_MINGW
+#if defined HOST_MINGW && !defined HOST_WINCE
 	/* work around gcc bug 52991 */
 	/* Since MinGW gcc 4.7, structs default to "ms_struct" instead of
 	   "gcc_struct" as on Linux, and it seems like "packed" is broken in

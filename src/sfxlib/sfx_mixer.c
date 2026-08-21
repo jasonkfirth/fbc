@@ -41,7 +41,9 @@
 */
 
 #include <math.h>
+#if !defined(_WIN32_WCE)
 #include <errno.h>
+#endif
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -150,7 +152,7 @@ static float fb_sfxMixerVoiceSample(FB_SFXVOICE *voice)
 
 static int fb_sfxMixerEnvEnabled(const char *name)
 {
-    const char *value = getenv(name);
+    const char *value = fb_sfxGetEnv(name);
 
     return (value && *value && *value != '0');
 }
@@ -176,12 +178,12 @@ static FILE *fb_sfxMixerDumpFile(void)
 
     if (!initialized)
     {
-        const char *path = getenv("SFXLIB_MIXER_DUMP");
+        const char *path = fb_sfxGetEnv("SFXLIB_MIXER_DUMP");
 
         initialized = 1;
 
         if (path && *path)
-            file = fopen(path, "w");
+            file = fb_sfxOpenFile(path, "w");
     }
 
     return file;
@@ -194,7 +196,7 @@ static int fb_sfxMixerDumpFrameLimit(void)
 
     if (!initialized)
     {
-        const char *value = getenv("SFXLIB_MIXER_DUMP_FRAMES");
+        const char *value = fb_sfxGetEnv("SFXLIB_MIXER_DUMP_FRAMES");
 
         initialized = 1;
 
@@ -203,10 +205,16 @@ static int fb_sfxMixerDumpFrameLimit(void)
             char *endptr;
             long parsed;
 
+#if !defined(_WIN32_WCE)
             errno = 0;
+#endif
             parsed = strtol(value, &endptr, 10);
 
-            if ((errno == 0) && (endptr != value) && (*endptr == '\0') &&
+            if (
+#if !defined(_WIN32_WCE)
+                (errno == 0) &&
+#endif
+                (endptr != value) && (*endptr == '\0') &&
                 (parsed > 0) && (parsed <= INT_MAX))
             {
                 limit = (int)parsed;

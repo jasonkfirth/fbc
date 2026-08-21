@@ -46,6 +46,11 @@ ifeq ($(TARGET_OS),riscos)
 TERM_LIB :=
 endif
 
+# AROS console support is native and does not use ncurses.
+ifeq ($(TARGET_OS),aros)
+TERM_LIB :=
+endif
+
 ##############################################################################
 # Phony targets
 ##############################################################################
@@ -101,7 +106,10 @@ else
   COMPILER_RTL := $(libdir)/libfb.a
 endif
 
-$(FBC_EXE): $(FBC_OBJS) | libs
+# The compiler only links against rtlib.  Keeping optional graphics and sound
+# libraries out of this order-only prerequisite lets a compiler be rebuilt on
+# a small bootstrap host before those platform backends are available.
+$(FBC_EXE): $(FBC_OBJS) | rtlib
 	@mkdir -p "$(dir $@)"
 	@echo "Linking compiler: $@"
 	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o $@ \
@@ -112,7 +120,7 @@ $(FBC_EXE): $(FBC_OBJS) | libs
 		$(THREAD_FLAGS) \
 		$(TERM_LIB)
 
-$(FBC_JS_EXE): $(FBC_JS_OBJS) | libs
+$(FBC_JS_EXE): $(FBC_JS_OBJS) | rtlib
 	@mkdir -p "$(dir $@)"
 	@echo "Linking JS-targeting compiler: $@"
 	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o $@ \
@@ -123,7 +131,7 @@ $(FBC_JS_EXE): $(FBC_JS_OBJS) | libs
 		$(THREAD_FLAGS) \
 		$(TERM_LIB)
 
-$(FBC_ANDROID_EXE): $(FBC_ANDROID_OBJS) | libs
+$(FBC_ANDROID_EXE): $(FBC_ANDROID_OBJS) | rtlib
 	@mkdir -p "$(dir $@)"
 	@echo "Linking Android-targeting compiler: $@"
 	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o $@ \
@@ -134,7 +142,7 @@ $(FBC_ANDROID_EXE): $(FBC_ANDROID_OBJS) | libs
 		$(THREAD_FLAGS) \
 		$(TERM_LIB)
 
-$(FBC_WII_EXE): $(FBC_WII_OBJS) | libs
+$(FBC_WII_EXE): $(FBC_WII_OBJS) | rtlib
 	@mkdir -p "$(dir $@)"
 	@echo "Linking Wii-targeting compiler: $@"
 	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o $@ \

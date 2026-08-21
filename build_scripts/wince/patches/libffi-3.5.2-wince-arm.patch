@@ -1,0 +1,86 @@
+From: FreeBASIC Windows CE port
+Subject: Adapt libffi 3.5.2 ARM_WIN32 to ARMv4T Windows CE
+
+The maintained CeGCC toolchain defines _WIN32, but it targets the older
+ARMv4T soft-float Windows CE ABI.  Modern Windows ARM is Thumb-only and uses
+the VFP ABI by default, so libffi's shared ARM_WIN32 implementation needs a
+small target distinction.
+
+This patch also retains libffi's historical Windows CE four-byte alignment
+behavior through _WIN32_WCE and avoids a CeGCC header forwarding bug.  The
+errno header is only used by the non-Windows closure allocator selected out
+by the preprocessor for this target.
+
+--- a/src/arm/ffitarget.h
++++ b/src/arm/ffitarget.h
+@@ -43,7 +43,8 @@
+   FFI_SYSV,
+   FFI_VFP,
+   FFI_LAST_ABI,
+-#if defined(__ARM_PCS_VFP) || defined(_WIN32)
++#if defined(__ARM_PCS_VFP) \
++    || (defined(_WIN32) && !defined(__MINGW32CE__))
+   FFI_DEFAULT_ABI = FFI_VFP,
+ #else
+   FFI_DEFAULT_ABI = FFI_SYSV,
+--- a/src/arm/sysv.S
++++ b/src/arm/sysv.S
+@@ -94,7 +94,7 @@
+ 
+ 	.text
+ 	.syntax unified
+-#if defined(_WIN32)
++#if defined(_WIN32) && !defined(__MINGW32CE__)
+ 	/* Windows on ARM is thumb-only */
+ 	.thumb
+ #else
+@@ -119,11 +119,25 @@
+ 	.endif
+ #endif
+ 
++/* ARMv4T has BX for interworking but does not have BLX register. */
++#if defined(__MINGW32CE__) && (__ARM_ARCH < 5)
++# define FFI_CALL_REGISTER(reg) \
++	mov	ip, reg; \
++	mov	lr, pc; \
++	bx	ip
++#else
++# define FFI_CALL_REGISTER(reg) blx reg
++#endif
++
+ 
+ #ifndef __clang__
+ 	/* We require interworking on LDM, which implies ARMv5T,
+ 	   which implies the existance of BLX.  */
++# if defined(__MINGW32CE__) && (__ARM_ARCH < 5)
++	.arch	armv4t
++# else
+  	.arch	armv5t
++# endif
+ #endif
+ 
+ 	/* Note that we use STC and LDC to encode VFP instructions,
+@@ -164,6 +178,6 @@
+ 	ldr	ip, [fp, #16]	@ install the static chain
+ 	ldmia	sp!, {r0-r3}	@ move first 4 parameters in registers.
+-	blx	lr		@ call fn
++	FFI_CALL_REGISTER(lr)	@ call fn
+ 
+ 	@ Load r2 with the pointer to storage for the return value
+ 	@ Load r3 with the return type code
+--- a/src/closures.c
++++ b/src/closures.c
+@@ -418,7 +418,13 @@
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <fcntl.h>
++/*
++ * CeGCC's errno.h delegates to a missing next header.  The Windows closure
++ * allocator below uses VirtualAlloc and never references errno.
++ */
++#if !defined(__MINGW32CE__)
+ #include <errno.h>
++#endif
+ #ifndef _MSC_VER
+ #include <unistd.h>
+ #endif

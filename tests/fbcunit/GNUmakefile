@@ -62,14 +62,24 @@ ifneq ($(findstring riscos,$(TARGET)),)
 	FBCFLAGS += -i ../../inc/riscos
 	SRCS := src/riscos/fbcunit.bas $(filter-out src/fbcunit.bas,$(SRCS))
 endif
+ifneq ($(findstring aros,$(TARGET)),)
+	FBCFLAGS += -i ../../inc/aros
+endif
+ifneq ($(findstring wince,$(TARGET)),)
+	FBCFLAGS += -i ../../inc/wince
+endif
 ifneq ($(FPU),)
 	FBCFLAGS += -fpu $(FPU)
 endif
 
 ifneq ($(TARGET),dos)
+ifneq ($(TARGET),wince-mips)
 FBCFLAGS += -mt
 endif
+endif
+ifneq ($(TARGET),wince-mips)
 FBCFLAGS += -g
+endif
 FBCFLAGS += -i ../../inc -i inc
 FBCFLAGS += -i src
 

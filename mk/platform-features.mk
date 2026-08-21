@@ -43,6 +43,8 @@
 #   DISABLE_XPM
 #   DISABLE_OPENGL
 #   DISABLE_FBDEV
+#   DISABLE_ALSA
+#   DISABLE_PULSE
 #   DISABLE_D3D10
 #   DISABLE_TCP
 ########################
@@ -64,6 +66,8 @@ DISABLE_X11    :=
 DISABLE_XPM    :=
 DISABLE_OPENGL :=
 DISABLE_FBDEV  :=
+DISABLE_ALSA   :=
+DISABLE_PULSE  :=
 DISABLE_D3D10  :=
 DISABLE_TCP    :=
 
@@ -92,9 +96,9 @@ endif
 # Platform families
 # ---------------------------------------------------------------------------
 
-ELF_UNIX_OS := linux freebsd netbsd openbsd dragonfly solaris illumos haiku android riscos
+ELF_UNIX_OS := linux freebsd netbsd openbsd dragonfly solaris illumos haiku android aros riscos
 BSD_OS      := freebsd netbsd openbsd dragonfly
-WINDOWS_OS  := win32 cygwin xbox
+WINDOWS_OS  := win32 wince cygwin xbox
 DOS_OS      := dos
 JS_OS       := js
 CONSOLE_OS  := wii nuttx
@@ -145,7 +149,7 @@ endif
 # Threading policy
 # ---------------------------------------------------------------------------
 
-ifeq ($(TARGET_OS),win32)
+ifneq ($(filter win32 wince,$(TARGET_OS)),)
   THREAD_MODEL := win32
 else ifeq ($(TARGET_OS),xbox)
   THREAD_MODEL := win32
@@ -157,6 +161,12 @@ else ifeq ($(TARGET_OS),riscos)
   # UnixLib implements pthreads inside libc; GCCSDK 4.7 has no -pthread
   # driver option and needs no separate thread library.
   THREAD_MODEL := unixlib
+else ifeq ($(TARGET_OS),aros)
+  # AROS supplies pthreads as a target library, but its GCC does not use the
+  # hosted Unix -pthread driver convention.  The AROS runtime uses pthread
+  # mutexes even without the public -mt option, so the compiler's AROS module
+  # always adds libpthread.
+  THREAD_MODEL := aros
 endif
 
 ifeq ($(TARGET_OS),js)
@@ -217,7 +227,7 @@ ifeq ($(TARGET_OS),darwin)
 endif
 
 # Windows / Xbox -> native backend, not X11
-ifneq ($(filter win32 xbox,$(TARGET_OS)),)
+ifneq ($(filter win32 wince xbox,$(TARGET_OS)),)
   ENABLE_X11 :=
 endif
 
@@ -259,6 +269,18 @@ endif
 # RISC OS uses the UnixLib console, file, and socket layer.  The initial port
 # has no native graphics backend, and desktop Unix backends do not apply.
 ifeq ($(TARGET_OS),riscos)
+  ENABLE_X11 :=
+  ENABLE_SDL :=
+  DISABLE_X11 := YesPlease
+  DISABLE_XPM := YesPlease
+  DISABLE_OPENGL := YesPlease
+  DISABLE_FBDEV := YesPlease
+endif
+
+# AROS uses native Intuition/CyberGraphX presentation and AHI sound.  Desktop
+# Unix graphics backends are not applicable even though the runtime reuses the
+# portable POSIX source layer where AROS posixc provides the required API.
+ifeq ($(TARGET_OS),aros)
   ENABLE_X11 :=
   ENABLE_SDL :=
   DISABLE_X11 := YesPlease
@@ -387,7 +409,7 @@ endif
 # ---- Native Windows / Xbox ----
 #
 # These do not use ELF hardening knobs. Keep reproducibility support only.
-ifneq ($(filter win32 xbox,$(TARGET_OS)),)
+ifneq ($(filter win32 wince xbox,$(TARGET_OS)),)
 
   ENABLE_REPRODUCIBLE := YesPlease
 
@@ -406,6 +428,28 @@ ifeq ($(TARGET_OS),riscos)
   ENABLE_CET             :=
   ENABLE_NO_PLT          :=
   ENABLE_TRIVIAL_INIT    :=
+
+endif
+
+# AROS toolchains and loader images are intentionally static.  Keep generic
+# hosted ELF hardening and PIE flags out of this platform contract.
+ifeq ($(TARGET_OS),aros)
+
+  ENABLE_PIC             :=
+  ENABLE_NONPIC          := YesPlease
+  ENABLE_PIE             :=
+  ENABLE_STACK_PROTECTOR :=
+  ENABLE_FORTIFY         :=
+  ENABLE_STACK_CLASH     :=
+  ENABLE_FORMAT_SECURITY :=
+  ENABLE_RELRO           :=
+  ENABLE_NOW             :=
+  ENABLE_NOEXECSTACK     :=
+  ENABLE_SEPARATE_CODE   :=
+  ENABLE_CET             :=
+  ENABLE_NO_PLT          :=
+  ENABLE_AUTO_VAR_INIT   :=
+  ENABLE_REPRODUCIBLE    :=
 
 endif
 
@@ -461,7 +505,7 @@ ifneq ($(filter linux freebsd solaris illumos haiku,$(TARGET_OS)),)
 endif
 
 # DOS / JS / Windows-family should never advertise CET / no-plt / auto-init.
-ifneq ($(filter dos js win32 cygwin xbox android wii,$(TARGET_OS)),)
+ifneq ($(filter dos js win32 wince cygwin xbox android wii,$(TARGET_OS)),)
   ENABLE_CET           :=
   ENABLE_NO_PLT        :=
   ENABLE_AUTO_VAR_INIT :=

@@ -656,11 +656,69 @@ end type
 type WAIT_CONTEXT_BLOCK as _WAIT_CONTEXT_BLOCK
 type PWAIT_CONTEXT_BLOCK as _WAIT_CONTEXT_BLOCK ptr
 
-type _DISPATCHER_HEADER
+type _DISPATCHER_HEADER_EVENT_VIEW
 	Type as UCHAR
-	Absolute as UCHAR
+	Signalling as UCHAR
 	Size as UCHAR
-	Inserted as UCHAR
+	Reserved1 as UCHAR
+end type
+
+type _DISPATCHER_HEADER_TIMER_VIEW
+	TimerType as UCHAR
+	TimerControlFlags as UCHAR
+	Hand as UCHAR
+	TimerMiscFlags as UCHAR
+end type
+
+type _DISPATCHER_HEADER_TIMER2_VIEW
+	Timer2Type as UCHAR
+	Timer2Flags as UCHAR
+	Timer2ComponentId as UCHAR
+	Timer2RelativeId as UCHAR
+end type
+
+type _DISPATCHER_HEADER_QUEUE_VIEW
+	QueueType as UCHAR
+	QueueControlFlags as UCHAR
+	QueueSize as UCHAR
+	QueueReserved as UCHAR
+end type
+
+type _DISPATCHER_HEADER_THREAD_VIEW
+	ThreadType as UCHAR
+	ThreadReserved as UCHAR
+	ThreadControlFlags as UCHAR
+	DebugActive as UCHAR
+end type
+
+type _DISPATCHER_HEADER_MUTANT_VIEW
+	MutantType as UCHAR
+	MutantSize as UCHAR
+	DpcActive as UCHAR
+	MutantReserved as UCHAR
+end type
+
+type _DISPATCHER_HEADER
+	union
+		Lock as LONG
+		LockNV as LONG
+
+		'' Keep the original four-byte view available to existing callers.
+		type
+			Type as UCHAR
+			Absolute as UCHAR
+			Size as UCHAR
+			Inserted as UCHAR
+		end type
+
+		'' The Windows header uses the same four bytes for several object types.
+		Event as _DISPATCHER_HEADER_EVENT_VIEW
+		Timer as _DISPATCHER_HEADER_TIMER_VIEW
+		Timer2 as _DISPATCHER_HEADER_TIMER2_VIEW
+		Queue as _DISPATCHER_HEADER_QUEUE_VIEW
+		Thread as _DISPATCHER_HEADER_THREAD_VIEW
+		Mutant as _DISPATCHER_HEADER_MUTANT_VIEW
+	end union
 	SignalState as LONG
 	WaitListHead as LIST_ENTRY
 end type
@@ -747,8 +805,13 @@ type TIMER_TYPE as _TIMER_TYPE
 
 
 type IRP__Tail__Overlay__u__s
-	DriverContext(0 to 4-1) as PVOID
+	DriverContext(0 to 3) as PVOID
 end type
+
+union IRP__Tail__Overlay__u
+	DeviceQueueEntry as KDEVICE_QUEUE_ENTRY
+	s as IRP__Tail__Overlay__u__s
+end union
 
 union IRP__Tail__Overlay__s__u
 	CurrentStackLocation as PIO_STACK_LOCATION
@@ -760,17 +823,12 @@ type IRP__Tail__Overlay__s
 	u as IRP__Tail__Overlay__s__u
 end type
 
-union IRP__Tail__Overlay__u
-	DeviceQueueEntry as KDEVICE_QUEUE_ENTRY
-	s as IRP__Tail__Overlay__u__s
-end union
-
 type IRP__Tail__Overlay
+	u as IRP__Tail__Overlay__u
 	Thread as PETHREAD
 	AuxiliaryBuffer as PCHAR
-	OriginalFileObject as PFILE_OBJECT
 	s as IRP__Tail__Overlay__s
-	u as IRP__Tail__Overlay__u
+	OriginalFileObject as PFILE_OBJECT
 end type
 
 union IRP__Tail
@@ -780,8 +838,14 @@ union IRP__Tail
 end union
 
 type IRP__Overlay__AsynchronousParameters
-	UserApcRoutine as PIO_APC_ROUTINE
-	UserApcContext as PVOID
+	union
+		UserApcRoutine as PIO_APC_ROUTINE
+		IssuingProcess as PVOID
+	end union
+	union
+		UserApcContext as PVOID
+		IoRing as PVOID
+	end union
 end type
 
 union IRP__Overlay
@@ -801,6 +865,7 @@ type _IRP
 	Size as USHORT
 	MdlAddress as PMDL
 	Flags as ULONG
+	AssociatedIrp as IRP__AssociatedIrp
 	ThreadListEntry as LIST_ENTRY
 	IoStatus as IO_STATUS_BLOCK
 	RequestorMode as KPROCESSOR_MODE
@@ -811,13 +876,15 @@ type _IRP
 	CancelIrql as KIRQL
 	ApcEnvironment as CCHAR
 	AllocationFlags as UCHAR
-	UserIosb as PIO_STATUS_BLOCK
+	union
+		UserIosb as PIO_STATUS_BLOCK
+		IoRingContext as PVOID
+	end union
 	UserEvent as PKEVENT
+	Overlay as IRP__Overlay
 	CancelRoutine as PDRIVER_CANCEL
 	UserBuffer as PVOID
 	Tail as IRP__Tail
-	Overlay as IRP__Overlay
-	AssociatedIrp as IRP__AssociatedIrp
 end type
 
 

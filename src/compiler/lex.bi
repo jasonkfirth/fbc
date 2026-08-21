@@ -147,6 +147,18 @@ type LEX_TKCTX
 	after_space     as integer
 end type
 
+'' Temporary lexer state used by parser lookahead that must not consume input.
+'' The token buffers and owned dynamic strings are copied into the probe
+'' context so debug line collection cannot mutate the active parser context.
+type LEX_PROBE_CTX
+	ctx             as LEX_TKCTX
+	parent          as LEX_TKCTX ptr
+	insidemacro     as integer
+	hostfilepos     as integer
+	defptr_offset   as integer
+	defptrw_offset  as integer
+end type
+
 type LEX_CTX
 	ctxTB( 0 TO FB_MAXINCRECLEVEL-0 ) as LEX_TKCTX
 	ctx             as LEX_TKCTX ptr
@@ -171,6 +183,16 @@ end type
 declare sub lexInit _
 	( _
 		byval ctx_kind as LEX_TKCTX_CONTEXT _
+	)
+
+declare sub lexProbeBegin _
+	( _
+		byref probe as LEX_PROBE_CTX _
+	)
+
+declare sub lexProbeEnd _
+	( _
+		byref probe as LEX_PROBE_CTX _
 	)
 
 declare sub lexReinitEvalCtx _

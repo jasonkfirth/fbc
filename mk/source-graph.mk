@@ -4,7 +4,7 @@
 # Source discovery with override precedence
 #
 # precedence:
-#   target_os > unix > generic
+#   target_os/target_arch > target_os > unix > generic
 #
 # The shared unix layer only applies to Unix-family targets such as Linux,
 # BSD, Solaris, Haiku, and Android. Cygwin uses the Win32 target-specific
@@ -19,7 +19,7 @@
 # Search directories
 ##############################################################################
 
-UNIX_LAYER_OS := linux android darwin freebsd netbsd openbsd dragonfly solaris illumos haiku riscos
+UNIX_LAYER_OS := linux android aros darwin freebsd netbsd openbsd dragonfly solaris illumos haiku riscos
 
 SOURCE_OS := $(TARGET_OS)
 ifeq ($(TARGET_OS),illumos)
@@ -59,6 +59,7 @@ ifneq ($(USE_UNIX_LAYER),)
 RTLIB_DIRS += $(srcdir)/rtlib/unix
 endif
 RTLIB_DIRS += $(srcdir)/rtlib/$(SOURCE_OS)
+RTLIB_DIRS += $(srcdir)/rtlib/$(SOURCE_OS)/$(TARGET_ARCH)
 ifeq ($(TARGET_ARCH),x86)
 RTLIB_DIRS += $(srcdir)/rtlib/x86
 endif
@@ -131,26 +132,35 @@ ifneq ($(USE_UNIX_LAYER),)
 RTLIB_SRC_UNIX := $(wildcard $(srcdir)/rtlib/unix/*.c)
 endif
 RTLIB_SRC_TARGET := $(wildcard $(srcdir)/rtlib/$(SOURCE_OS)/*.c)
+RTLIB_SRC_TARGET_ARCH := $(wildcard $(srcdir)/rtlib/$(SOURCE_OS)/$(TARGET_ARCH)/*.c)
 RTLIB_SRC_ARCH :=
 ifeq ($(TARGET_ARCH),x86)
 RTLIB_SRC_ARCH := $(wildcard $(srcdir)/rtlib/x86/*.s)
 endif
 RTLIB_SRC_TARGET_ASM := $(wildcard $(srcdir)/rtlib/$(SOURCE_OS)/*.s)
+RTLIB_SRC_TARGET_ARCH_ASM := $(wildcard $(srcdir)/rtlib/$(SOURCE_OS)/$(TARGET_ARCH)/*.s)
 
 RTLIB_BASE_GENERIC := $(notdir $(RTLIB_SRC_GENERIC))
 RTLIB_BASE_UNIX := $(notdir $(RTLIB_SRC_UNIX))
 RTLIB_BASE_TARGET := $(notdir $(RTLIB_SRC_TARGET))
+RTLIB_BASE_TARGET_ARCH := $(notdir $(RTLIB_SRC_TARGET_ARCH))
+
+RTLIB_SRC_TARGET := $(filter-out \
+$(addprefix $(srcdir)/rtlib/$(SOURCE_OS)/,$(RTLIB_BASE_TARGET_ARCH)), \
+$(RTLIB_SRC_TARGET))
 
 RTLIB_SRC_UNIX := $(filter-out \
-$(addprefix $(srcdir)/rtlib/unix/,$(RTLIB_BASE_TARGET)), \
+$(addprefix $(srcdir)/rtlib/unix/,$(RTLIB_BASE_TARGET)) \
+$(addprefix $(srcdir)/rtlib/unix/,$(RTLIB_BASE_TARGET_ARCH)), \
 $(RTLIB_SRC_UNIX))
 
 RTLIB_SRC_GENERIC := $(filter-out \
 $(addprefix $(srcdir)/rtlib/,$(RTLIB_BASE_UNIX)) \
-$(addprefix $(srcdir)/rtlib/,$(RTLIB_BASE_TARGET)), \
+$(addprefix $(srcdir)/rtlib/,$(RTLIB_BASE_TARGET)) \
+$(addprefix $(srcdir)/rtlib/,$(RTLIB_BASE_TARGET_ARCH)), \
 $(RTLIB_SRC_GENERIC))
 
-RTLIB_SRC := $(RTLIB_SRC_GENERIC) $(RTLIB_SRC_UNIX) $(RTLIB_SRC_TARGET) $(RTLIB_SRC_ARCH) $(RTLIB_SRC_TARGET_ASM)
+RTLIB_SRC := $(RTLIB_SRC_GENERIC) $(RTLIB_SRC_UNIX) $(RTLIB_SRC_TARGET) $(RTLIB_SRC_TARGET_ARCH) $(RTLIB_SRC_ARCH) $(RTLIB_SRC_TARGET_ASM) $(RTLIB_SRC_TARGET_ARCH_ASM)
 
 ifdef DISABLE_X11
 RTLIB_SRC := $(filter-out \
@@ -192,6 +202,13 @@ ifneq ($(USE_RUNTIME_CXX),)
 GFX_SRC_TARGET += $(wildcard $(srcdir)/gfxlib2/$(SOURCE_OS)/*.cpp)
 endif
 
+GFX_SRC_TARGET_ARCH := \
+$(wildcard $(srcdir)/gfxlib2/$(SOURCE_OS)/$(TARGET_ARCH)/*.c)
+
+ifneq ($(USE_RUNTIME_CXX),)
+GFX_SRC_TARGET_ARCH += $(wildcard $(srcdir)/gfxlib2/$(SOURCE_OS)/$(TARGET_ARCH)/*.cpp)
+endif
+
 GFX_SRC_ARCH :=
 ifeq ($(TARGET_ARCH),x86)
 GFX_SRC_ARCH := $(wildcard $(srcdir)/gfxlib2/x86/*.s)
@@ -202,6 +219,11 @@ GFX_SRC_TARGET_ASM := $(wildcard $(srcdir)/gfxlib2/$(SOURCE_OS)/*.s)
 GFX_BASE_GENERIC := $(notdir $(GFX_SRC_GENERIC))
 GFX_BASE_UNIX := $(notdir $(GFX_SRC_UNIX))
 GFX_BASE_TARGET := $(notdir $(GFX_SRC_TARGET))
+GFX_BASE_TARGET_ARCH := $(notdir $(GFX_SRC_TARGET_ARCH))
+
+GFX_SRC_TARGET := $(filter-out \
+$(addprefix $(srcdir)/gfxlib2/$(SOURCE_OS)/,$(GFX_BASE_TARGET_ARCH)), \
+$(GFX_SRC_TARGET))
 
 GFX_SRC_UNIX := $(filter-out \
 $(addprefix $(srcdir)/gfxlib2/unix/,$(GFX_BASE_TARGET)), \
@@ -209,10 +231,11 @@ $(GFX_SRC_UNIX))
 
 GFX_SRC_GENERIC := $(filter-out \
 $(addprefix $(srcdir)/gfxlib2/,$(GFX_BASE_UNIX)) \
-$(addprefix $(srcdir)/gfxlib2/,$(GFX_BASE_TARGET)), \
+$(addprefix $(srcdir)/gfxlib2/,$(GFX_BASE_TARGET)) \
+$(addprefix $(srcdir)/gfxlib2/,$(GFX_BASE_TARGET_ARCH)), \
 $(GFX_SRC_GENERIC))
 
-GFX_SRC := $(GFX_SRC_GENERIC) $(GFX_SRC_UNIX) $(GFX_SRC_TARGET) $(GFX_SRC_ARCH) $(GFX_SRC_TARGET_ASM)
+GFX_SRC := $(GFX_SRC_GENERIC) $(GFX_SRC_UNIX) $(GFX_SRC_TARGET) $(GFX_SRC_TARGET_ARCH) $(GFX_SRC_ARCH) $(GFX_SRC_TARGET_ASM)
 
 ifdef DISABLE_X11
 GFX_SRC := $(filter-out \
@@ -291,7 +314,7 @@ $(addprefix $(srcdir)/sfxlib/,$(SFX_BASE_UNIX)) \
 $(addprefix $(srcdir)/sfxlib/,$(SFX_BASE_TARGET)), \
 $(SFX_SRC_GENERIC))
 
-SFX_MIDI_TARGET_OS := linux darwin haiku dos win32 cygwin xbox
+SFX_MIDI_TARGET_OS := linux darwin haiku dos win32 wince cygwin xbox
 SFX_MIDI_UNIX_OS := freebsd netbsd openbsd dragonfly solaris illumos
 
 ifneq ($(filter $(SFX_MIDI_TARGET_OS) $(SFX_MIDI_UNIX_OS),$(TARGET_OS)),)
@@ -327,6 +350,23 @@ ifeq ($(TARGET_OS),haiku)
 endif
 
 SFX_SRC := $(SFX_SRC_TARGET) $(SFX_SRC_UNIX) $(SFX_SRC_GENERIC)
+
+ifdef DISABLE_ALSA
+SFX_SRC := $(filter-out \
+$(srcdir)/sfxlib/linux/sfx_capture_alsa.c \
+$(srcdir)/sfxlib/linux/sfx_driver_alsa.c \
+$(srcdir)/sfxlib/linux/sfx_midi_alsa.c, \
+$(SFX_SRC))
+ifeq ($(TARGET_OS),linux)
+SFX_SRC += $(srcdir)/sfxlib/sfx_midi_driver_stub.c
+endif
+endif
+
+ifdef DISABLE_PULSE
+SFX_SRC := $(filter-out \
+$(srcdir)/sfxlib/linux/sfx_driver_pulse.c, \
+$(SFX_SRC))
+endif
 
 ##############################################################################
 # Canonical object lists

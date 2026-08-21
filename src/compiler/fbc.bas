@@ -144,6 +144,7 @@ enum FBCTOOL
 	FBCTOOL_EMCC
 	FBCTOOL_ELF2DOL
 	FBCTOOL_ELF2AIF
+	FBCTOOL_ELF2HUNK
 	FBCTOOL__COUNT
 end enum
 
@@ -188,7 +189,8 @@ static shared as FBCTOOLINFO fbctoolTB(0 to FBCTOOL__COUNT-1) = _
 	/' FBCTOOL_EMLD    '/ ( "emcc"   , "EMLD"   , FBCTOOLFLAG_DEFAULT  ), _
 	/' FBCTOOL_EMCC    '/ ( "emcc"   , "EMCC"   , FBCTOOLFLAG_DEFAULT  ), _
 	/' FBCTOOL_ELF2DOL '/ ( "elf2dol", "ELF2DOL", FBCTOOLFLAG_DEFAULT  ), _
-	/' FBCTOOL_ELF2AIF '/ ( "elf2aif", "ELF2AIF", FBCTOOLFLAG_DEFAULT  )  _
+	/' FBCTOOL_ELF2AIF '/ ( "elf2aif", "ELF2AIF", FBCTOOLFLAG_DEFAULT  ), _
+	/' FBCTOOL_ELF2HUNK'/ ( "elf2hunk", "ELF2HUNK", FBCTOOLFLAG_DEFAULT )  _
 }
 
 declare sub fbcFindBin _
@@ -196,6 +198,9 @@ declare sub fbcFindBin _
 		byval tool as integer, _
 		byref path as string _
 	)
+
+declare sub fbcPlatformAddCcQueryOptions( byref path as string )
+declare function fbcPlatformGetClangTargetOption( ) as string
 
 declare function fbcRiscosHostMayQueryCcForTool( ) as integer
 declare function fbcRiscosHostRunTool _
@@ -335,6 +340,11 @@ private function hGet1stOutputLineFromCommand( byref cmd as string ) as string
 end function
 
 private function hGetClangTargetOption( ) as string
+	var platformoption = fbcPlatformGetClangTargetOption( )
+	if( len( platformoption ) > 0 ) then
+		return platformoption
+	end if
+
 	if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32) and _
 		(fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64) ) then
 		''
@@ -358,7 +368,13 @@ private sub hAppendTargetCcQueryOptions( byref path as string )
 		path += " -m32"
 	case FB_CPUFAMILY_PPC64, FB_CPUFAMILY_PPC64LE
 		path += " -m64"
+	case FB_CPUFAMILY_MIPS32, FB_CPUFAMILY_MIPS32EL
+		path += " -mabi=32"
+	case FB_CPUFAMILY_MIPS64, FB_CPUFAMILY_MIPS64EL
+		path += " -mabi=64"
 	end select
+
+	fbcPlatformAddCcQueryOptions( path )
 
 	if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG ) then
 		path += " " + hGetClangTargetOption( )
@@ -1077,6 +1093,12 @@ private sub hPrepareLinkTarget _
 	case FB_COMPTARGET_RISCOS
 		'' GCCSDK's driver supplies the RISC OS ELF startup objects, UnixLib,
 		'' libgcc, and the correct armelf_riscos linker emulation.
+	case FB_COMPTARGET_AROS
+		'' The generated AROS GCC specs supply startup objects, collect-aros,
+		'' system libraries, and the architecture's linker emulation.
+	case FB_COMPTARGET_WINCE
+		'' CeGCC's driver supplies the Windows CE startup object, import
+		'' libraries, and PE/COFF linker emulation.
 	case FB_COMPTARGET_NETBSD
 		ldcline += " -rpath /usr/X11R7/lib/ "
 		ldcline += " -rpath /usr/pkg/lib/ "
@@ -1240,6 +1262,26 @@ private sub hAddUnixDynamicLinker( byref ldcline as string )
 			ldcline += " -dynamic-linker /lib/ld-musl-loongarch64.so.1"
 #else
 			ldcline += " -dynamic-linker /lib64/ld-linux-loongarch-lp64d.so.1"
+#endif
+		case FB_CPUFAMILY_MIPS32, FB_CPUFAMILY_MIPS32EL
+#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+			if( fbGetCpuFamily( ) = FB_CPUFAMILY_MIPS32EL ) then
+				ldcline += " -dynamic-linker /lib/ld-musl-mipsel.so.1"
+			else
+				ldcline += " -dynamic-linker /lib/ld-musl-mips.so.1"
+			end if
+#else
+			ldcline += " -dynamic-linker /lib/ld.so.1"
+#endif
+		case FB_CPUFAMILY_MIPS64, FB_CPUFAMILY_MIPS64EL
+#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+			if( fbGetCpuFamily( ) = FB_CPUFAMILY_MIPS64EL ) then
+				ldcline += " -dynamic-linker /lib/ld-musl-mips64el.so.1"
+			else
+				ldcline += " -dynamic-linker /lib/ld-musl-mips64.so.1"
+			end if
+#else
+			ldcline += " -dynamic-linker /lib64/ld.so.1"
 #endif
 		end select
 	case FB_COMPTARGET_HAIKU
@@ -1423,6 +1465,9 @@ private function hAddPlatformLinkOptions _
 
 	case FB_COMPTARGET_RISCOS
 		hAddRiscosLinkOptions( ldcline, dllname )
+
+	case FB_COMPTARGET_WINCE
+		fbcWincePlatformAddLinkOptions( ldcline, dllname )
 	end select
 
 	function = TRUE
@@ -1448,7 +1493,8 @@ private sub hAddGeneralLinkOptions _
 		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
 		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) and _
 		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_WII) and _
-		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_RISCOS) and _
+		    fbcPlatformSupportsSupplementaryLinkerScript( ) and _
+		    (fbcPlatformGetLinkerTool( ) = FBCTOOL_LD) and _
 		    (not fbcUseLldLinker( )) and _
 		    (not fbcIsUsingGoldLinker( )) ) then
 			ldcline += " -T """ + fbc.libpath + (FB_HOST_PATHDIV + "fbextra.x""")
@@ -1481,8 +1527,8 @@ private sub hAddGeneralLinkOptions _
 
 	if( fbc.staticlink and _
 	    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
-		if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_RISCOS ) then
-			'' This command is passed to GCCSDK's compiler driver, not raw ld.
+		if( fbcPlatformGetLinkerTool( ) = FBCTOOL_GCC ) then
+			'' These commands are passed to the target GCC driver, not raw ld.
 			ldcline += " -static"
 		else
 			ldcline += " -Bstatic"
@@ -1499,8 +1545,7 @@ private sub hAddGeneralLinkOptions _
 	if( len( fbc.mapfile ) > 0 ) then
 		if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_XBOX ) then
 			ldcline += " -map:" + fbc.mapfile
-		elseif( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII) or _
-		        (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_RISCOS) ) then
+		elseif( fbcPlatformGetLinkerTool( ) = FBCTOOL_GCC ) then
 			ldcline += " -Wl,-Map," + fbc.mapfile
 		else
 			ldcline += " -Map " + fbc.mapfile
@@ -1646,6 +1691,9 @@ private sub hAddCrtBeginObjects( byref ldcline as string )
 
 	case FB_COMPTARGET_XBOX
 		'' nxdk's CRT startup object is supplied by libpdclib.lib.
+
+	case FB_COMPTARGET_WINCE
+		fbcWincePlatformAddCrtBeginObjects( ldcline )
 	end select
 end sub
 
@@ -1811,6 +1859,11 @@ private function hFinishLinkedOutput _
 		if( fbcRiscosHostFinishExecutable( ) = FALSE ) then
 			return FALSE
 		end if
+
+	case FB_COMPTARGET_AROS
+		if( fbcArosHostFinishExecutable( ) = FALSE ) then
+			return FALSE
+		end if
 	end select
 
 	function = TRUE
@@ -1876,8 +1929,7 @@ private function hLinkFiles( ) as integer
 	if ( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DARWIN ) then
 		if( (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
 		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
-			if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII) or _
-			    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_RISCOS) ) then
+			if( fbcPlatformGetLinkerTool( ) = FBCTOOL_GCC ) then
 				ldcline += " -Wl,--start-group"
 			elseif( fbcUseLldLinker( ) ) then
 				ldcline += " --start-group"
@@ -1952,8 +2004,7 @@ private function hLinkFiles( ) as integer
 		if( (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
 		    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
 			'' End of lib group
-			if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WII) or _
-			    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_RISCOS) ) then
+			if( fbcPlatformGetLinkerTool( ) = FBCTOOL_GCC ) then
 				ldcline += " -Wl,--end-group"
 			elseif( fbcUseLldLinker( ) ) then
 				ldcline += " --end-group"
@@ -2017,7 +2068,8 @@ private function hLinkFiles( ) as integer
 		if outtype = FB_OUTTYPE_EXECUTABLE OrElse outtype = FB_OUTTYPE_DYNAMICLIB Then
 			dim as long cpufamily = fbGetCpuFamily( )
 			if cpufamily = FB_CPUFAMILY_X86_64 OrElse cpufamily = FB_CPUFAMILY_AARCH64 OrElse _
-				cpuFamily = FB_CPUFAMILY_PPC64 OrElse cpufamily = FB_CPUFAMILY_PPC64LE Then
+				cpuFamily = FB_CPUFAMILY_PPC64 OrElse cpufamily = FB_CPUFAMILY_PPC64LE OrElse _
+				cpufamily = FB_CPUFAMILY_MIPS64 OrElse cpufamily = FB_CPUFAMILY_MIPS64EL Then
 				ldcline += " --eh-frame-hdr"
 			end if
 		end if
@@ -2135,7 +2187,12 @@ private sub hCollectObjinfo( )
 	'' Search libs given as *.a input files instead of -l or #inclib
 	s = listGetHead( @fbc.libfiles )
 	while( s )
-		objinfoReadLibfile( *s )
+		'' Compile-time metadata is stored in static/import archives.  A
+		'' dynamically linked library is a linker input only and is not an
+		'' ar archive that can contain .fbctinf data.
+		if( hGetFileExt( *s ) = "a" ) then
+			objinfoReadLibfile( *s )
+		end if
 		hReadObjinfo( )
 		s = listGetNext( s )
 	wend
@@ -2217,8 +2274,10 @@ end type
 dim shared as FBGNUOSINFO gnuosmap(0 to ...) => _
 { _
 	(@"android"    , FB_COMPTARGET_ANDROID  ), _ '' Must appear before linux
+	(@"mingw32ce"  , FB_COMPTARGET_WINCE    ), _ '' Must appear before mingw
 	(@"nuttx"      , FB_COMPTARGET_NUTTX    ), _
 	(@"riscos"     , FB_COMPTARGET_RISCOS   ), _
+	(@"aros"       , FB_COMPTARGET_AROS     ), _
 	(@"linux"      , FB_COMPTARGET_LINUX    ), _
 	(@"haiku"      , FB_COMPTARGET_HAIKU    ), _
 	(@"mingw"      , FB_COMPTARGET_WIN32    ), _
@@ -2270,7 +2329,19 @@ dim shared as FBGNUARCHINFO gnuarchmap(0 to ...) => _
 	(@"rv64"       , FB_DEFAULT_CPUTYPE_RISCV64), _
 	(@"rv64gc"     , FB_DEFAULT_CPUTYPE_RISCV64), _
 	(@"s390x"      , FB_DEFAULT_CPUTYPE_S390X  ), _
-	(@"loongarch64", FB_DEFAULT_CPUTYPE_LOONGARCH64)  _
+	(@"loongarch64", FB_DEFAULT_CPUTYPE_LOONGARCH64), _
+	(@"m68k"       , FB_DEFAULT_CPUTYPE_M68K   ), _
+	(@"m68000"     , FB_DEFAULT_CPUTYPE_M68K   ), _
+	(@"mips"       , FB_DEFAULT_CPUTYPE_MIPS32 ), _
+	(@"mips32"     , FB_DEFAULT_CPUTYPE_MIPS32 ), _
+	(@"mipsisa32"  , FB_DEFAULT_CPUTYPE_MIPS32 ), _
+	(@"mipsel"     , FB_DEFAULT_CPUTYPE_MIPS32EL), _
+	(@"mips32el"   , FB_DEFAULT_CPUTYPE_MIPS32EL), _
+	(@"mipsisa32el", FB_DEFAULT_CPUTYPE_MIPS32EL), _
+	(@"mips64"     , FB_DEFAULT_CPUTYPE_MIPS64 ), _
+	(@"mipsisa64"  , FB_DEFAULT_CPUTYPE_MIPS64 ), _
+	(@"mips64el"   , FB_DEFAULT_CPUTYPE_MIPS64EL), _
+	(@"mipsisa64el", FB_DEFAULT_CPUTYPE_MIPS64EL)  _
 }
 
 '' Identify OS (FB_COMPTARGET_*) and architecture (FB_CPUTYPE_*) in a GNU
@@ -2311,12 +2382,7 @@ private sub hParseGnuTriplet _
 			end if
 		next
 
-		'' The unqualified "arm" triplet component normally follows the host
-		'' compiler's ARM default.  RISC OS instead has a stable compatibility
-		'' contract with StrongARM-equipped RiscPC machines.
-		if( (os = FB_COMPTARGET_RISCOS) and (arch = "arm") ) then
-			cputype = FB_CPUTYPE_ARMV4
-		end if
+		fbcPlatformAdjustParsedCpuType( os, arch, cputype )
 	end if
 
 end sub
@@ -2343,6 +2409,10 @@ dim shared as FBOSARCHINFO fbosarchmap(0 to ...) => _
 	(@"win32"  , FB_COMPTARGET_WIN32  , FB_DEFAULT_CPUTYPE_X86   ), _
 	(@"win64"  , FB_COMPTARGET_WIN32  , FB_DEFAULT_CPUTYPE_X86_64), _
 	(@"win32-aarch64", FB_COMPTARGET_WIN32, FB_DEFAULT_CPUTYPE_AARCH64), _
+	(@"wince-arm", FB_COMPTARGET_WINCE, FB_CPUTYPE_ARMV4), _
+	(@"wince-mips", FB_COMPTARGET_WINCE, FB_DEFAULT_CPUTYPE_MIPS32EL), _
+	(@"wince-mipsel", FB_COMPTARGET_WINCE, FB_DEFAULT_CPUTYPE_MIPS32EL), _
+	(@"wince-mips32el", FB_COMPTARGET_WINCE, FB_DEFAULT_CPUTYPE_MIPS32EL), _
 	_ '' dragonfly is 64 bit only
 	(@"dragonfly", FB_COMPTARGET_DRAGONFLY, FB_DEFAULT_CPUTYPE_X86_64), _
 	_ '' solaris is 64 bit only
@@ -2367,7 +2437,8 @@ dim shared as FBOSARCHINFO fbosarchmap(0 to ...) => _
 	(@"openbsd", FB_COMPTARGET_OPENBSD, FB_DEFAULT_CPUTYPE       ), _
 	(@"wii"    , FB_COMPTARGET_WII    , FB_DEFAULT_CPUTYPE_PPC   ), _
 	(@"nuttx"  , FB_COMPTARGET_NUTTX  , FB_DEFAULT_CPUTYPE_RISCV32), _
-	(@"riscos" , FB_COMPTARGET_RISCOS , FB_CPUTYPE_ARMV4         )  _
+	(@"riscos" , FB_COMPTARGET_RISCOS , FB_CPUTYPE_ARMV4         ), _
+	(@"aros"   , FB_COMPTARGET_AROS   , FB_DEFAULT_CPUTYPE       )  _
 }
 
 ''
@@ -2456,11 +2527,7 @@ private sub hParseTargetArg _
 		os = fbIdentifyOs( left( lcasearg, separator - 1 ) )
 		cputype = fbDefaultCpuTypeFromCpuFamilyId( os, arch )
 
-		'' The canonical riscos-arm target has the same StrongARM-compatible
-		'' baseline as an arm-unknown-riscos GNU triplet.
-		if( (os = FB_COMPTARGET_RISCOS) and (arch = "arm") ) then
-			cputype = FB_CPUTYPE_ARMV4
-		end if
+		fbcPlatformAdjustParsedCpuType( os, arch, cputype )
 
 		'' allow normalizing on gnu arch types to determine the standalone targetid
 		#ifdef ENABLE_STANDALONE
@@ -3037,12 +3104,11 @@ private sub hHandleOptPipeline _
 		if( (os <> FB_DEFAULT_TARGET) or _
 		    (cputype <> FB_DEFAULT_CPUTYPE) or _
 		    is_gnu_triplet ) then
-			'' GCCSDK installs the canonical GNU-prefixed tools.  The friendly
-			'' RISC OS aliases describe the same target, so resolve them to that
-			'' tool prefix instead of looking for riscos-gcc or riscos-arm-gcc.
-			if( (os = FB_COMPTARGET_RISCOS) and _
-			    (is_gnu_triplet = FALSE) ) then
-				fbc.target = "arm-unknown-riscos"
+			'' Friendly platform aliases resolve through their platform module;
+			'' GNU triplets remain exact user-supplied tool prefixes.
+			var platformprefix = fbcPlatformGetToolPrefix( cputype )
+			if( (is_gnu_triplet = FALSE) and (len( platformprefix ) > 0) ) then
+				fbc.target = platformprefix
 			else
 				fbc.target = arg
 			end if
@@ -3470,6 +3536,11 @@ private sub handleArg _
 			fbcAddObj( arg )
 
 		case "a"
+			strlistAppend( @fbc.libfiles, arg )
+
+		case "so", "dylib"
+			'' Dynamic libraries are passed to the linker by their full path.
+			'' Unlike .a files, they do not contain FreeBASIC object metadata.
 			strlistAppend( @fbc.libfiles, arg )
 
 		case "rc", "res"
@@ -4030,6 +4101,10 @@ private sub fbcDetermineMainName( )
 end sub
 
 private function hCompileStage2DirectlyToObj( ) as integer
+	if( fbcPlatformCompilesDirectlyToObject( ) ) then
+		return TRUE
+	end if
+
 	select case( fbGetOption( FB_COMPOPT_TARGET ) )
 	case FB_COMPTARGET_JS, FB_COMPTARGET_XBOX
 		function = TRUE
@@ -4063,7 +4138,11 @@ private function hGetAsmName _
 	asmfile = hStripExt( *module->objfile )
 
 	if( stage = 1 ) then
-		if( (fbc.keepasm = FALSE) and (fbc.emitasmonly = FALSE) ) then
+		if( (fbc.keepasm = FALSE) and (fbc.emitasmonly = FALSE) and _
+			(((fbGetOption( FB_COMPOPT_BACKEND ) <> FB_BACKEND_GAS) and _
+			  (fbGetOption( FB_COMPOPT_BACKEND ) <> FB_BACKEND_GAS64)) or _
+			 ((fbc.keepfinalasm = FALSE) and _
+			  (fbc.emitfinalasmonly = FALSE))) ) then
 			asmfile += hGetTempFileTag( )
 		end if
 	elseif( hCompileStage2DirectlyToObj( ) = FALSE ) then
@@ -4453,39 +4532,60 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 			ln += hGetClangTargetOption( )
 		end if
 
-		select case( fbGetCpuFamily( ) )
-		case FB_CPUFAMILY_X86
-			ln += "-m32 "
-		case FB_CPUFAMILY_X86_64
-			ln += "-m64 "
-			ism64Target = True
-		case FB_CPUFAMILY_AARCH64, FB_CPUFAMILY_PPC64, _
-		     FB_CPUFAMILY_PPC64LE, FB_CPUFAMILY_RISCV64, _
-		     FB_CPUFAMILY_S390X, FB_CPUFAMILY_LOONGARCH64
-			ism64Target = True
-		end select
+		dim as integer platformcpuoptions = _
+			fbcPlatformAddCCompilerCpuOptions( ln )
 
-		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
-			'' GCC doesn't recognize the -march option and PowerPC combination
-			'' and recommendeds the -mcpu option be used for PowerPC.
-			select case fbGetCpuFamily( )
-			case FB_CPUFAMILY_PPC, FB_CPUFAMILY_PPC64, FB_CPUFAMILY_PPC64LE
-				if( fbc.cputype_is_native ) then
-					ln += "-mcpu=native "
-				else
-					ln += "-mcpu=" + *fbGetGccArch( ) + " "
-				end if
-			case else
-				if( fbc.cputype_is_native ) then
-					ln += "-march=native "
-				else
-					ln += "-march=" + *fbGetGccArch( ) + " "
-				end if
+		if( platformcpuoptions = FALSE ) then
+			select case( fbGetCpuFamily( ) )
+			case FB_CPUFAMILY_X86
+				ln += "-m32 "
+			case FB_CPUFAMILY_X86_64
+				ln += "-m64 "
+				ism64Target = True
+			case FB_CPUFAMILY_AARCH64, FB_CPUFAMILY_PPC64, _
+			     FB_CPUFAMILY_PPC64LE, FB_CPUFAMILY_RISCV64, _
+			     FB_CPUFAMILY_S390X, FB_CPUFAMILY_LOONGARCH64, _
+			     FB_CPUFAMILY_MIPS64, FB_CPUFAMILY_MIPS64EL
+				ism64Target = True
 			end select
 
-			if( fbGetCpuFamily( ) = FB_CPUFAMILY_RISCV32 ) then
-				ln += "-mabi=ilp32 "
+			if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS ) then
+				'' GCC doesn't recognize the -march option and PowerPC combination
+				'' and recommends the -mcpu option be used for PowerPC.
+				select case fbGetCpuFamily( )
+				case FB_CPUFAMILY_PPC, FB_CPUFAMILY_PPC64, FB_CPUFAMILY_PPC64LE
+					if( fbc.cputype_is_native ) then
+						ln += "-mcpu=native "
+					else
+						ln += "-mcpu=" + *fbGetGccArch( ) + " "
+					end if
+				case FB_CPUFAMILY_M68K
+					'' The m68k family describes the reusable ABI, not a processor
+					'' baseline. Platform replacements select a baseline when their
+					'' SDK requires one; otherwise GCC's configured default is used.
+					if( fbc.cputype_is_native ) then
+						ln += "-march=native "
+					end if
+				case else
+					if( fbc.cputype_is_native ) then
+						ln += "-march=native "
+					else
+						ln += "-march=" + *fbGetGccArch( ) + " "
+					end if
+				end select
+
+				if( fbGetCpuFamily( ) = FB_CPUFAMILY_RISCV32 ) then
+					ln += "-mabi=ilp32 "
+				elseif( (fbGetCpuFamily( ) = FB_CPUFAMILY_MIPS32) or _
+				        (fbGetCpuFamily( ) = FB_CPUFAMILY_MIPS32EL) ) then
+					ln += "-mabi=32 "
+				elseif( (fbGetCpuFamily( ) = FB_CPUFAMILY_MIPS64) or _
+				        (fbGetCpuFamily( ) = FB_CPUFAMILY_MIPS64EL) ) then
+					ln += "-mabi=64 "
+				end if
 			end if
+		elseif( fbIs64bit( ) ) then
+			ism64Target = TRUE
 		end if
 
 		if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_ANDROID) and _
@@ -4760,7 +4860,13 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 			'' to re-enable assembly, change to FBCTOOL_EMAS
 			assembler = FBCTOOL_NONE
 		case else
-			assembler = FBCTOOL_AS
+			'' Some targets require the compiler driver to apply its assembler
+			'' specs and platform architecture options.
+			if( fbcPlatformUsesCompilerDriverAssembler( ) ) then
+				assembler = FBCTOOL_GCC
+			else
+				assembler = FBCTOOL_AS
+			end if
 		end select
 	end if
 
@@ -4781,6 +4887,11 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 				ln += "-masm=intel "
 			end if
 		end select
+	case FBCTOOL_GCC
+		'' The compiler uses an .asm suffix for all stage-two assembly.  GCC
+		'' does not infer GNU assembly input from that suffix, so name it.
+		ln += "-x assembler -c "
+		fbcPlatformAddAssemblerOptions( ln )
 	case else
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86
@@ -5142,7 +5253,7 @@ private sub hPrintOptions( byval verbose as integer )
 
 	print "usage: fbc [options] <input files>"
 	print "input files:"
-	print "  *.a = static library, *.o = object file, *.bas = source"
+	print "  *.a = static library, *.so/*.dylib = dynamic library, *.o = object file, *.bas = source"
 	print "  *.rc = resource script, *.res = compiled resource (win32)"
 	print "  *.xpm = icon resource (*nix/*bsd)"
 	print "options:"
@@ -5239,7 +5350,7 @@ private sub hPrintOptions( byval verbose as integer )
 	print "  -t <value>       Set .exe stack size in kbytes, default: 1024 (win32/dos/xbox)"
 	if( verbose ) then
 	print "  -target <name>   Set cross-compilation target"
-	print "                   Examples: win64, linux-x86_64, android, nuttx, riscos"
+	print "                   Examples: win64, linux-x86_64, android, nuttx, riscos, aros-m68k"
 	else
 	print "  -target <name>   Set cross-compilation target"
 	end if
@@ -5351,19 +5462,16 @@ end sub
 
 	do
 		fbcDeterminePrefix( )
+		fbcPlatformAdjustPrefix( fbc.prefix )
 		fbcSetupCompilerPaths( )
 
 		if( fbc.verbose ) then
 			fbcPrintTargetInfo( )
 		end if
 
-		'' Tell the compiler about the default include path (added after
-		'' the command line ones, so those will be searched first)
-		if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_RISCOS ) then
-			'' RISC OS headers are complete replacements for generic headers.
-			'' Search the target overlay first, then fall back to shared headers.
-			fbAddIncludePath( fbc.incpath + FB_HOST_PATHDIV + "riscos" )
-		end if
+		'' Tell the compiler about the default include paths (added after
+		'' the command line ones, so those will be searched first).
+		fbcPlatformAddDefaultIncludePaths( fbc.incpath )
 		fbAddIncludePath( fbc.incpath )
 
 		var have_input_files = (listGetHead( @fbc.modules   ) <> NULL) or _

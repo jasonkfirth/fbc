@@ -32,7 +32,8 @@ const PROGRAM_COUNT = 128
 const PROGRAM_FRAMES = 4096
 const TOTAL_FRAMES = PROGRAM_COUNT * PROGRAM_FRAMES
 
-redim as single samples( 0 to TOTAL_FRAMES - 1 )
+redim as single current_samples( 0 to PROGRAM_FRAMES - 1 )
+redim as single previous_samples( 0 to PROGRAM_FRAMES - 1 )
 
 SfxTestUseNullDriver()
 SfxTestSetMixerDump( DUMP_FILE, TOTAL_FRAMES )
@@ -52,18 +53,23 @@ next
 
 ASSERT( midi close() = 0 )
 
-dim as integer frames = SfxTestLoadDump( DUMP_FILE, samples() )
+dim as integer dump_file_num = freefile()
+dim as integer frames = 0
 
-ASSERT( frames >= TOTAL_FRAMES )
+ASSERT( open( DUMP_FILE for input as #dump_file_num ) = 0 )
 
 for program as integer = 0 to PROGRAM_COUNT - 1
-	dim as integer first_frame = program * PROGRAM_FRAMES
-	dim as double rms = SfxTestRms( samples(), first_frame, PROGRAM_FRAMES )
+	dim as integer loaded_frames = _
+		SfxTestReadDumpSamples( dump_file_num, current_samples(), PROGRAM_FRAMES )
+	dim as double rms = SfxTestRms( current_samples(), 0, PROGRAM_FRAMES )
 	dim as single peak = 0.0
 	dim as integer finite_samples = 1
 
+	ASSERT( loaded_frames = PROGRAM_FRAMES )
+	frames += loaded_frames
+
 	for frame as integer = 0 to PROGRAM_FRAMES - 1
-		dim as single sample = samples( first_frame + frame )
+		dim as single sample = current_samples( frame )
 
 		if( sample <> sample ) then
 			finite_samples = 0
@@ -78,21 +84,27 @@ for program as integer = 0 to PROGRAM_COUNT - 1
 	ASSERT( rms > 0.00025 )
 	ASSERT( rms < 0.25 )
 	ASSERT( peak < 0.50 )
-	ASSERT( SfxTestCountChanges( samples(), first_frame, PROGRAM_FRAMES, 0.00001 ) > 256 )
+	ASSERT( SfxTestCountChanges( current_samples(), 0, PROGRAM_FRAMES, 0.00001 ) > 256 )
 
 	if( program > 0 ) then
 		dim as integer differences = 0
-		dim as integer previous_frame = first_frame - PROGRAM_FRAMES
 
 		for frame as integer = 0 to PROGRAM_FRAMES - 1
-			if( abs( samples( first_frame + frame ) - _
-			         samples( previous_frame + frame ) ) > 0.00001 ) then
+			if( abs( current_samples( frame ) - _
+			         previous_samples( frame ) ) > 0.00001 ) then
 				differences += 1
 			end if
 		next
 
 		ASSERT( differences > 256 )
 	end if
+
+	for frame as integer = 0 to PROGRAM_FRAMES - 1
+		previous_samples( frame ) = current_samples( frame )
+	next
 next
+
+close #dump_file_num
+ASSERT( frames >= TOTAL_FRAMES )
 
 ' end of midi-fm-programs.bas

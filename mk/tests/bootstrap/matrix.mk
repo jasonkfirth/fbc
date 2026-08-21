@@ -35,6 +35,10 @@ BOOTSTRAP_REQUIRED_EMIT_MATRIX := \
 	win32-aarch64:win32-aarch64:aarch64-w64-mingw32 \
 	darwin-aarch64:darwin-aarch64:aarch64-apple-darwin \
 	freebsd-aarch64:freebsd-aarch64:aarch64-unknown-freebsd \
+	linux-mips32:linux-mips32:mips-linux-gnu \
+	linux-mips32el:linux-mips32el:mipsel-linux-gnu \
+	linux-mips64:linux-mips64:mips64-linux-gnuabi64 \
+	linux-mips64el:linux-mips64el:mips64el-linux-gnuabi64 \
 	netbsd-aarch64:netbsd-aarch64:aarch64-unknown-netbsd \
 	openbsd-aarch64:openbsd-aarch64:aarch64-unknown-openbsd \
 	dragonfly-aarch64:dragonfly-aarch64:aarch64-unknown-dragonfly \

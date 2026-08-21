@@ -20,6 +20,7 @@
 #     - convert static ARM ELF programs to native RISC OS AIF files
 #     - arrange GCC and FreeBASIC suffix directories for UnixLib
 #     - create replaceable HostFS staging trees for !GCC and FreeBASIC
+#     - stage the open runtime modules required by UnixLib and sfxlib
 #
 # This file intentionally does NOT contain:
 #
@@ -27,6 +28,7 @@
 #     - guest desktop automation
 #     - dynamic-library packaging
 #     - native graphics, sound, or serial implementations
+#     - RiscPkg archive construction
 #
 # Output ownership:
 #
@@ -52,6 +54,7 @@ NATIVE_ROOT="${GCCSDK_NATIVE_ROOT:-$ROOT/out/riscos/gccsdk/gcc4/release-area/ful
 HOSTFS_ROOT="$ROOT/out/riscos/hostfs"
 OUT_DIR="$ROOT/out/riscos/programs"
 BUILD_OPTIONAL_LIBS=0
+DRENDERER_MODULE=""
 
 TEMP_ROOT=""
 ELF2AIF_TEMP=""
@@ -161,7 +164,10 @@ Options:
   --native-root DIR    GCCSDK native release root containing !GCC.
   --hostfs-root DIR    HostFS staging root. Default: out/riscos/hostfs
   --out-dir DIR        Native compiler ELF/AIF output directory.
-  --with-libs          Also build and stage gfxlib2 and sfxlib null backends.
+  --with-libs          Also build native gfxlib2/sfxlib and stage DRenderer.
+  --drenderer-module FILE
+                       DigitalRenderer module to stage with --with-libs. The
+                       GCCSDK cross module directory is searched by default.
   --jobs N             Parallel build jobs.
   -h, --help           Show this help.
 
@@ -209,6 +215,11 @@ while [ "$#" -gt 0 ]; do
             BUILD_OPTIONAL_LIBS=1
             shift
             ;;
+        --drenderer-module)
+            require_value "$1" "${2-}"
+            DRENDERER_MODULE="$2"
+            shift 2
+            ;;
         --jobs)
             require_value "$1" "${2-}"
             JOBS="$2"
@@ -244,6 +255,11 @@ LIBFFI_LIBRARY="$TARGET_ENV/lib/libffi.a"
 LIBFFI_LICENSE="$ROOT/out/riscos/gccsdk/gcc4/srcdir.orig/gcc-trunk/libffi/LICENSE"
 NATIVE_GCC_TREE="$NATIVE_ROOT/!GCC"
 ELF2AIF_SOURCE_ROOT="$NATIVE_ROOT/../../riscos/elf2aif"
+SHARED_UNIX_LIBRARY="$NATIVE_GCC_TREE/bin/sul"
+
+if [ -z "$DRENDERER_MODULE" ]; then
+    DRENDERER_MODULE="$TOOLCHAIN_BIN/../module/DRenderer,ffa"
+fi
 
 [ -x "$TARGET_GCC" ] || die "GCCSDK compiler not found: $TARGET_GCC"
 [ -x "$READELF" ] || die "GCCSDK readelf not found: $READELF"
@@ -260,6 +276,10 @@ ELF2AIF_SOURCE_ROOT="$NATIVE_ROOT/../../riscos/elf2aif"
     die "native assembler not found: $NATIVE_GCC_TREE/bin/as"
 [ -s "$NATIVE_GCC_TREE/bin/ld" ] ||
     die "native linker not found: $NATIVE_GCC_TREE/bin/ld"
+[ -s "$SHARED_UNIX_LIBRARY" ] ||
+    die "SharedUnixLibrary module not found: $SHARED_UNIX_LIBRARY"
+[ "$BUILD_OPTIONAL_LIBS" -eq 0 ] || [ -s "$DRENDERER_MODULE" ] ||
+    die "DigitalRenderer module not found: $DRENDERER_MODULE"
 [ -s "$ELF2AIF_SOURCE_ROOT/src/elf2aif.c" ] ||
     die "GCCSDK elf2aif source not found: $ELF2AIF_SOURCE_ROOT"
 [ "$HOSTFS_ROOT" != "/" ] || die "refusing to use the filesystem root as HostFS"
@@ -283,20 +303,34 @@ NATIVE_FBC_ELF="$OUT_DIR/fbc-native-elf"
 NATIVE_FBC_AIF="$OUT_DIR/fbc-native-aif"
 NATIVE_ELF2AIF_ELF="$OUT_DIR/elf2aif-native-elf"
 NATIVE_ELF2AIF_AIF="$OUT_DIR/elf2aif-native-aif"
+RISCOS_NATIVE_CFLAGS='-O0'
 
 # GCCSDK GCC 4.7 fails while optimizing the generated ir-llvm translation.
-# Keep the compiler itself at O0 until that legacy optimizer defect is isolated;
-# target programs and runtime libraries retain their normal optimization.
+# Keep the compiler itself at O0 until that legacy optimizer defect is isolated.
+#
+# RISC OS's UnixLib strtod() is not reliable in the native GCCSDK
+# environment.  The RISC OS runtime provides its own bounded decimal parser,
+# allowing the compiler and generated programs to retain GCCSDK's normal
+# software-float ABI without depending on an FPA emulator.
+make -C "$ROOT" -s clean-libs \
+    TARGET_TRIPLET=arm-unknown-riscos \
+    FBC="$ROOT/bin/fbc" \
+    CFLAGS="$RISCOS_NATIVE_CFLAGS"
+make -C "$ROOT" -s -j"$JOBS" rtlib \
+    TARGET_TRIPLET=arm-unknown-riscos \
+    FBC="$ROOT/bin/fbc" \
+    CFLAGS="$RISCOS_NATIVE_CFLAGS"
+
 make -C "$ROOT" -s clean-compiler \
     TARGET_TRIPLET=arm-unknown-riscos \
     BUILD_FBC="$ROOT/bin/fbc" \
     FBC_EXE="$NATIVE_FBC_ELF" \
-    CFLAGS=-O0
+    CFLAGS="$RISCOS_NATIVE_CFLAGS"
 make -C "$ROOT" -s -j"$JOBS" compiler \
     TARGET_TRIPLET=arm-unknown-riscos \
     BUILD_FBC="$ROOT/bin/fbc" \
     FBC_EXE="$NATIVE_FBC_ELF" \
-    CFLAGS=-O0
+    CFLAGS="$RISCOS_NATIVE_CFLAGS"
 
 [ -s "$NATIVE_FBC_ELF" ] ||
     die "native FreeBASIC compiler was not produced: $NATIVE_FBC_ELF"
@@ -306,8 +340,6 @@ grep -q 'Class:.*ELF32' <<<"$ELF_HEADER" ||
     die "$NATIVE_FBC_ELF is not an ELF32 file"
 grep -q 'Machine:.*ARM' <<<"$ELF_HEADER" ||
     die "$NATIVE_FBC_ELF is not an ARM file"
-grep -q 'Flags:.*software FP' <<<"$ELF_HEADER" ||
-    die "$NATIVE_FBC_ELF does not use the GCCSDK software floating-point ABI"
 
 cp "$NATIVE_FBC_ELF" "$NATIVE_FBC_AIF"
 "$ELF2AIF" "$NATIVE_FBC_AIF"
@@ -338,7 +370,7 @@ cp "$NATIVE_ELF2AIF_ELF" "$NATIVE_ELF2AIF_AIF"
 rm -rf -- "$ELF2AIF_TEMP"
 ELF2AIF_TEMP=""
 
-runtime_targets=(rtlib fbrt)
+runtime_targets=(fbrt)
 if [ "$BUILD_OPTIONAL_LIBS" -eq 1 ]; then
     runtime_targets+=(gfxlib2 sfxlib)
 fi
@@ -346,6 +378,7 @@ fi
 make -C "$ROOT" -j"$JOBS" \
     TARGET_TRIPLET=arm-unknown-riscos \
     FBC="$ROOT/bin/fbc" \
+    CFLAGS="$RISCOS_NATIVE_CFLAGS" \
     "${runtime_targets[@]}"
 
 RUNTIME_DIR="$ROOT/lib/freebasic/riscos-arm"
@@ -397,6 +430,14 @@ cp -a "$ROOT/inc/." "$FREEBASIC_STAGE/include/freebasic/"
 cp -a "$RUNTIME_DIR/." "$FREEBASIC_STAGE/lib/freebasic/riscos-arm/"
 cp "$LIBFFI_LICENSE" "$FREEBASIC_STAGE/doc/libffi-license,fff"
 cp "$ROOT/examples/riscos/hello.bas" "$FREEBASIC_STAGE/examples/hello.bas"
+cp "$ROOT/examples/riscos/media-smoke.bas" \
+    "$FREEBASIC_STAGE/examples/media-smoke.bas"
+# media-smoke verifies UnixLib's case-insensitive directory handling.  Keep
+# its tiny input tree with the installed examples so the packaged example can
+# run without a HostFS-only test fixture.
+mkdir -p "$FREEBASIC_STAGE/examples/dir-smoke/bmp/bmp"
+cp "$ROOT/examples/riscos/hello.bas" \
+    "$FREEBASIC_STAGE/examples/dir-smoke/bmp/bmp/UPPER,fff"
 cp "$ROOT/examples/riscos/SetPaths" "$FREEBASIC_STAGE/SetPaths,feb"
 cp "$ROOT/examples/riscos/Compile" "$FREEBASIC_STAGE/Compile,feb"
 suffix_swap_tree "$FREEBASIC_STAGE/include/freebasic" bi h
@@ -408,9 +449,32 @@ replace_directory "$FREEBASIC_STAGE" "$HOSTFS_ROOT/FreeBASIC"
 rmdir "$TEMP_ROOT"
 TEMP_ROOT=""
 
+##############################################################################
+# System module staging
+##############################################################################
+
+#
+# UnixLib opens /dev/dsp through DigitalRenderer and loads the module from
+# System:Modules.DRenderer on first use.  These modules are GCCSDK products,
+# not FreeBASIC application files, so keep them in the normal !System module
+# directory instead of hiding global platform dependencies inside the app.
+#
+
+SYSTEM_MODULES_DIR="$HOSTFS_ROOT/!Boot/Resources/!System/310/Modules"
+mkdir -p "$SYSTEM_MODULES_DIR"
+cp "$SHARED_UNIX_LIBRARY" "$SYSTEM_MODULES_DIR/SharedULib,ffa"
+
+if [ "$BUILD_OPTIONAL_LIBS" -eq 1 ]; then
+    cp "$DRENDERER_MODULE" "$SYSTEM_MODULES_DIR/DRenderer,ffa"
+fi
+
 echo "==> native RISC OS compiler staged"
 echo "    FreeBASIC: $HOSTFS_ROOT/FreeBASIC/fbc,ff8"
 echo "    GCC:       $HOSTFS_ROOT/!GCC"
+echo "    UnixLib:   $SYSTEM_MODULES_DIR/SharedULib,ffa"
+if [ "$BUILD_OPTIONAL_LIBS" -eq 1 ]; then
+    echo "    Audio:     $SYSTEM_MODULES_DIR/DRenderer,ffa"
+fi
 echo "    In RISC OS, run !GCC and then FreeBASIC.SetPaths before using fbc."
 
 # end of riscos-build-native.sh

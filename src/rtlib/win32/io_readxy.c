@@ -5,8 +5,13 @@
 
 FBCALL unsigned int fb_ConsoleReadXY( int col, int row, int colorflag )
 {
-    TCHAR character;
-    WORD attribute;
+    /*
+        ReadConsoleOutput* can fail without writing its output argument.
+        SCREEN still needs a deterministic value in that case, especially
+        when the requested coordinate is outside the current buffer.
+    */
+    TCHAR character = 0;
+    WORD attribute = 0;
     DWORD res;
     COORD coord;
 

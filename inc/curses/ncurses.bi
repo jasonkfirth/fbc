@@ -567,14 +567,14 @@ const NCURSES_ATTR_SHIFT = 8
 	declare function getpary(byval win as const WINDOW_ ptr) as long
 #else
 	#define getattrs(win) clng(iif((win), (win)->_attrs, A_NORMAL))
-	#define getcurx(win) iif((win), (win)->_curx, ERR_)
-	#define getcury(win) iif((win), (win)->_cury, ERR_)
-	#define getbegx(win) iif((win), (win)->_begx, ERR_)
-	#define getbegy(win) iif((win), (win)->_begy, ERR_)
-	#define getmaxx(win) iif((win), (win)->_maxx + 1, ERR_)
-	#define getmaxy(win) iif((win), (win)->_maxy + 1, ERR_)
-	#define getparx(win) iif((win), (win)->_parx, ERR_)
-	#define getpary(win) iif((win), (win)->_pary, ERR_)
+	#define getcurx(win) iif((win), NCURSES_CAST(long, (win)->_curx), NCURSES_CAST(long, ERR_))
+	#define getcury(win) iif((win), NCURSES_CAST(long, (win)->_cury), NCURSES_CAST(long, ERR_))
+	#define getbegx(win) iif((win), NCURSES_CAST(long, (win)->_begx), NCURSES_CAST(long, ERR_))
+	#define getbegy(win) iif((win), NCURSES_CAST(long, (win)->_begy), NCURSES_CAST(long, ERR_))
+	#define getmaxx(win) iif((win), NCURSES_CAST(long, (win)->_maxx + 1), NCURSES_CAST(long, ERR_))
+	#define getmaxy(win) iif((win), NCURSES_CAST(long, (win)->_maxy + 1), NCURSES_CAST(long, ERR_))
+	#define getparx(win) iif((win), NCURSES_CAST(long, (win)->_parx), NCURSES_CAST(long, ERR_))
+	#define getpary(win) iif((win), NCURSES_CAST(long, (win)->_pary), NCURSES_CAST(long, ERR_))
 #endif
 #define wstandout(win) wattrset(win, A_STANDOUT)
 #define wstandend(win) wattrset(win, A_NORMAL)
@@ -653,26 +653,120 @@ const NCURSES_ATTR_SHIFT = 8
 #define timeout(delay) wtimeout(stdscr, delay)
 #define wdeleteln(win) winsdelln(win, -1)
 #define winsertln(win) winsdelln(win, 1)
-#define mvwaddch(win, y, x, ch) iif(wmove(win, y, x) = ERR_, ERR_, waddch(win, ch))
-#define mvwaddchnstr(win, y, x, str, n) iif(wmove(win, y, x) = ERR_, ERR_, waddchnstr(win, str, n))
-#define mvwaddchstr(win, y, x, str) iif(wmove(win, y, x) = ERR_, ERR_, waddchnstr(win, str, -1))
-#define mvwaddnstr(win, y, x, str, n) iif(wmove(win, y, x) = ERR_, ERR_, waddnstr(win, str, n))
-#define mvwaddstr(win, y, x, str) iif(wmove(win, y, x) = ERR_, ERR_, waddnstr(win, str, -1))
-#define mvwdelch(win, y, x) iif(wmove(win, y, x) = ERR_, ERR_, wdelch(win))
-#define mvwchgat(win, y, x, n, a, c, o) iif(wmove(win, y, x) = ERR_, ERR_, wchgat(win, n, a, c, o))
-#define mvwgetch(win, y, x) iif(wmove(win, y, x) = ERR_, ERR_, wgetch(win))
-#define mvwgetnstr(win, y, x, str, n) iif(wmove(win, y, x) = ERR_, ERR_, wgetnstr(win, str, n))
-#define mvwgetstr(win, y, x, str) iif(wmove(win, y, x) = ERR_, ERR_, wgetstr(win, str))
-#define mvwhline(win, y, x, c, n) iif(wmove(win, y, x) = ERR_, ERR_, whline(win, c, n))
-#define mvwinch(win, y, x) iif(wmove(win, y, x) = ERR_, NCURSES_CAST(chtype, ERR_), winch(win))
-#define mvwinchnstr(win, y, x, s, n) iif(wmove(win, y, x) = ERR_, ERR_, winchnstr(win, s, n))
-#define mvwinchstr(win, y, x, s) iif(wmove(win, y, x) = ERR_, ERR_, winchstr(win, s))
-#define mvwinnstr(win, y, x, s, n) iif(wmove(win, y, x) = ERR_, ERR_, winnstr(win, s, n))
-#define mvwinsch(win, y, x, c) iif(wmove(win, y, x) = ERR_, ERR_, winsch(win, c))
-#define mvwinsnstr(win, y, x, s, n) iif(wmove(win, y, x) = ERR_, ERR_, winsnstr(win, s, n))
-#define mvwinsstr(win, y, x, s) iif(wmove(win, y, x) = ERR_, ERR_, winsstr(win, s))
-#define mvwinstr(win, y, x, s) iif(wmove(win, y, x) = ERR_, ERR_, winstr(win, s))
-#define mvwvline(win, y, x, c, n) iif(wmove(win, y, x) = ERR_, ERR_, wvline(win, c, n))
+private function fb_ncurses_mvwaddch(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval ch as const chtype) as long
+	if( wmove(win, y, x) = ERR_ ) then return ERR_
+	return waddch(win, ch)
+end function
+
+private function fb_ncurses_mvwaddchnstr(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval text as const chtype ptr, byval n as long) as long
+	if( wmove(win, y, x) = ERR_ ) then return ERR_
+	return waddchnstr(win, text, n)
+end function
+
+private function fb_ncurses_mvwaddchstr(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval text as const chtype ptr) as long
+	return fb_ncurses_mvwaddchnstr(win, y, x, text, -1)
+end function
+
+private function fb_ncurses_mvwaddnstr(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval text as const zstring ptr, byval n as long) as long
+	if( wmove(win, y, x) = ERR_ ) then return ERR_
+	return waddnstr(win, text, n)
+end function
+
+private function fb_ncurses_mvwaddstr(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval text as const zstring ptr) as long
+	return fb_ncurses_mvwaddnstr(win, y, x, text, -1)
+end function
+
+private function fb_ncurses_mvwdelch(byval win as WINDOW_ ptr, byval y as long, byval x as long) as long
+	if( wmove(win, y, x) = ERR_ ) then return ERR_
+	return wdelch(win)
+end function
+
+private function fb_ncurses_mvwchgat(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval n as long, byval a as attr_t, byval c as short, byval o as const any ptr) as long
+	if( wmove(win, y, x) = ERR_ ) then return ERR_
+	return wchgat(win, n, a, c, o)
+end function
+
+private function fb_ncurses_mvwgetch(byval win as WINDOW_ ptr, byval y as long, byval x as long) as long
+	if( wmove(win, y, x) = ERR_ ) then return ERR_
+	return wgetch(win)
+end function
+
+private function fb_ncurses_mvwgetnstr(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval buffer as zstring ptr, byval n as long) as long
+	if( wmove(win, y, x) = ERR_ ) then return ERR_
+	return wgetnstr(win, buffer, n)
+end function
+
+private function fb_ncurses_mvwgetstr(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval buffer as zstring ptr) as long
+	return fb_ncurses_mvwgetnstr(win, y, x, buffer, -1)
+end function
+
+private function fb_ncurses_mvwhline(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval c as chtype, byval n as long) as long
+	if( wmove(win, y, x) = ERR_ ) then return ERR_
+	return whline(win, c, n)
+end function
+
+private function fb_ncurses_mvwinch(byval win as WINDOW_ ptr, byval y as long, byval x as long) as chtype
+	if( wmove(win, y, x) = ERR_ ) then return NCURSES_CAST(chtype, ERR_)
+	return winch(win)
+end function
+
+private function fb_ncurses_mvwinchnstr(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval s as chtype ptr, byval n as long) as long
+	if( wmove(win, y, x) = ERR_ ) then return ERR_
+	return winchnstr(win, s, n)
+end function
+
+private function fb_ncurses_mvwinchstr(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval s as chtype ptr) as long
+	return fb_ncurses_mvwinchnstr(win, y, x, s, -1)
+end function
+
+private function fb_ncurses_mvwinnstr(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval buffer as zstring ptr, byval n as long) as long
+	if( wmove(win, y, x) = ERR_ ) then return ERR_
+	return winnstr(win, buffer, n)
+end function
+
+private function fb_ncurses_mvwinsch(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval c as chtype) as long
+	if( wmove(win, y, x) = ERR_ ) then return ERR_
+	return winsch(win, c)
+end function
+
+private function fb_ncurses_mvwinsnstr(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval s as const zstring ptr, byval n as long) as long
+	if( wmove(win, y, x) = ERR_ ) then return ERR_
+	return winsnstr(win, s, n)
+end function
+
+private function fb_ncurses_mvwinsstr(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval s as const zstring ptr) as long
+	return fb_ncurses_mvwinsnstr(win, y, x, s, -1)
+end function
+
+private function fb_ncurses_mvwinstr(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval buffer as zstring ptr) as long
+	return fb_ncurses_mvwinnstr(win, y, x, buffer, -1)
+end function
+
+private function fb_ncurses_mvwvline(byval win as WINDOW_ ptr, byval y as long, byval x as long, byval c as chtype, byval n as long) as long
+	if( wmove(win, y, x) = ERR_ ) then return ERR_
+	return wvline(win, c, n)
+end function
+
+#define mvwaddch(win, y, x, ch) fb_ncurses_mvwaddch(win, y, x, ch)
+#define mvwaddchnstr(win, y, x, str, n) fb_ncurses_mvwaddchnstr(win, y, x, str, n)
+#define mvwaddchstr(win, y, x, str) fb_ncurses_mvwaddchstr(win, y, x, str)
+#define mvwaddnstr(win, y, x, str, n) fb_ncurses_mvwaddnstr(win, y, x, str, n)
+#define mvwaddstr(win, y, x, str) fb_ncurses_mvwaddstr(win, y, x, str)
+#define mvwdelch(win, y, x) fb_ncurses_mvwdelch(win, y, x)
+#define mvwchgat(win, y, x, n, a, c, o) fb_ncurses_mvwchgat(win, y, x, n, a, c, o)
+#define mvwgetch(win, y, x) fb_ncurses_mvwgetch(win, y, x)
+#define mvwgetnstr(win, y, x, str, n) fb_ncurses_mvwgetnstr(win, y, x, str, n)
+#define mvwgetstr(win, y, x, str) fb_ncurses_mvwgetstr(win, y, x, str)
+#define mvwhline(win, y, x, c, n) fb_ncurses_mvwhline(win, y, x, c, n)
+#define mvwinch(win, y, x) fb_ncurses_mvwinch(win, y, x)
+#define mvwinchnstr(win, y, x, s, n) fb_ncurses_mvwinchnstr(win, y, x, s, n)
+#define mvwinchstr(win, y, x, s) fb_ncurses_mvwinchstr(win, y, x, s)
+#define mvwinnstr(win, y, x, s, n) fb_ncurses_mvwinnstr(win, y, x, s, n)
+#define mvwinsch(win, y, x, c) fb_ncurses_mvwinsch(win, y, x, c)
+#define mvwinsnstr(win, y, x, s, n) fb_ncurses_mvwinsnstr(win, y, x, s, n)
+#define mvwinsstr(win, y, x, s) fb_ncurses_mvwinsstr(win, y, x, s)
+#define mvwinstr(win, y, x, s) fb_ncurses_mvwinstr(win, y, x, s)
+#define mvwvline(win, y, x, c, n) fb_ncurses_mvwvline(win, y, x, c, n)
 #define mvaddch(y, x, ch) mvwaddch(stdscr, y, x, ch)
 #define mvaddchnstr(y, x, str, n) mvwaddchnstr(stdscr, y, x, str, n)
 #define mvaddchstr(y, x, str) mvwaddchstr(stdscr, y, x, str)
@@ -693,8 +787,8 @@ const NCURSES_ATTR_SHIFT = 8
 #define mvinsstr(y, x, s) mvwinsstr(stdscr, y, x, s)
 #define mvinstr(y, x, s) mvwinstr(stdscr, y, x, s)
 #define mvvline(y, x, c, n) mvwvline(stdscr, y, x, c, n)
-#define slk_attr_off_(a, v) iif((v), ERR_, slk_attroff(a))
-#define slk_attr_on_(a, v) iif((v), ERR_, slk_attron(a))
+#define slk_attr_off_(a, v) iif((v), NCURSES_CAST(long, ERR_), NCURSES_CAST(long, slk_attroff(a)))
+#define slk_attr_on_(a, v) iif((v), NCURSES_CAST(long, ERR_), NCURSES_CAST(long, slk_attron(a)))
 #ifdef __FB_DARWIN__
 	declare function getbkgd(byval win as WINDOW_ ptr) as chtype
 	declare function wattr_set(byval win as WINDOW_ ptr, byval attrs as attr_t, byval color_pair as short, byval opts as any ptr) as long

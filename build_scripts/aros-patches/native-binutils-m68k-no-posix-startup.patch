@@ -1,0 +1,35 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-binutils-m68k-no-posix-startup.patch
+#
+# Purpose:
+#
+#     Build AROS m68k native binutils without the PosixC process initializer.
+#
+# Responsibilities:
+#
+#     - retain normal PosixC startup on ARM and x86_64
+#     - avoid the m68k relative-library startup deadlock
+#     - preserve native AROS directory layout during installation
+#
+# This file intentionally does NOT change binutils target formats or generated
+# object code.
+#
+--- a/contrib/gnu/binutils/mmakefile.src
++++ b/contrib/gnu/binutils/mmakefile.src
+@@ -29,5 +29,11 @@ BINUTILS_EXTRAOPTS += --disable-silent-rules
+ 
+ BINUTILS_CFLAGS := -DPOSIXC_NO_VAARGS
+ 
++BINUTILS_NIX := yes
++ifneq (,$(findstring m68k,$(AROS_TARGET_CPU)))
++BINUTILS_NIX := no
++endif
++
+ %fetch_and_build_gnu_development package=binutils version=$(BINUTILS_VERSION) patch=yes \
+-    extraoptions=$(BINUTILS_EXTRAOPTS) extracflags="$(BINUTILS_CFLAGS)"
++    extraoptions=$(BINUTILS_EXTRAOPTS) extracflags="$(BINUTILS_CFLAGS)" \
++    nix=$(BINUTILS_NIX) nix_dir_layout=yes
+
+# end of native-binutils-m68k-no-posix-startup.patch

@@ -105,6 +105,7 @@
 #include once "lex.bi"
 #include once "ir-private.bi"
 #include once "crt/string.bi"
+#include once "ir-hlc-platform.bi"
 
 '' The stack of nested sections allows us to go back and emit text to
 '' the headers of parent sections, while already working on emitting
@@ -674,6 +675,19 @@ private sub hAppendProcAsmClobbers( byref ln as string )
 		hAppendClobber( ln, @"t4" )
 		hAppendClobber( ln, @"t5" )
 		hAppendClobber( ln, @"t6" )
+
+	case FB_CPUFAMILY_MIPS32, FB_CPUFAMILY_MIPS32EL, _
+	     FB_CPUFAMILY_MIPS64, FB_CPUFAMILY_MIPS64EL
+		'' Registers 26 and 27 are kernel-reserved, 28 is the ABI global
+		'' pointer, 29 is the stack pointer, and 30 is the frame pointer.
+		'' GCC rejects the ABI pointers in a clobber list, including for
+		'' non-PIC translation units because MIPS abicalls use register 28.
+		dim regname as string
+		for regnum as integer = 1 to 25
+			regname = "$" + str( regnum )
+			hAppendClobber( ln, strptr( regname ) )
+		next
+		hAppendClobber( ln, @"$31" )
 
 	case FB_CPUFAMILY_S390X
 		hAppendClobber( ln, @"r0" )
@@ -2746,17 +2760,20 @@ private function hEmitFloat _
 
 	'' +/- NaN? Quiet-NaN's only
 	case &h7FF80000UL, &hFFF80000UL
-		if( dtype = FB_DATATYPE_DOUBLE ) then
-			if( expval and &h80000000ul ) then
-				s += "(-__builtin_nan( """" ))"
+		if( irHlcPlatformEmitNan _
+			( dtype, (expval and &h80000000ul), s ) = FALSE ) then
+			if( dtype = FB_DATATYPE_DOUBLE ) then
+				if( expval and &h80000000ul ) then
+					s += "(-__builtin_nan( """" ))"
+				else
+					s += "__builtin_nan( """" )"
+				end if
 			else
-				s += "__builtin_nan( """" )"
-			end if
-		else
-			if( expval and &h80000000ul ) then
-				s += "(-__builtin_nanf( """" ))"
-			else
-				s += "__builtin_nanf( """" )"
+				if( expval and &h80000000ul ) then
+					s += "(-__builtin_nanf( """" ))"
+				else
+					s += "__builtin_nanf( """" )"
+				end if
 			end if
 		end if
 
@@ -3022,6 +3039,18 @@ private sub hBuildWstrLit _
 		end if
 
 		ch = hReadWstrChar( src, src_end )
+
+		'' A UTF-16 target needs two C wide-literal code units for a
+		'' supplementary Unicode code point. The compiler's host WSTRING may
+		'' hold that code point in one UTF-32 element, so split it explicitly.
+		if( (wcharsize = 2) and (ch >= &h10000ul) and (ch <= &h10FFFFul) ) then
+			ch -= &h10000ul
+			DZstrConcatAssign( buffer, $"\x" + hex( (ch shr 10) + &hD800ul, 4 ) )
+			DZstrConcatAssign( buffer, chr( 34 ) + " " + *strstart )
+			DZstrConcatAssign( buffer, $"\x" + hex( (ch and &h3FFul) + &hDC00ul, 4 ) )
+			DZstrConcatAssign( buffer, chr( 34 ) + " " + *strstart )
+			continue for
+		end if
 
 		if( hCharNeedsEscaping( ch, asc( """" ) ) ) then
 			DZstrConcatAssign( buffer, $"\x" + hex( ch, wcharsize * 2 ) )
@@ -3484,11 +3513,14 @@ private function hSymBaseMayBeUnaligned _
 		end select
 	end if
 
-	if( typeGet( symbGetFullType( sym ) ) <> FB_DATATYPE_STRUCT ) then
+	if( symbGetSubType( sym ) = NULL ) then
 		return FALSE
 	end if
 
-	if( symbGetSubType( sym ) = NULL ) then
+	'' Constructors and methods receive their UDT through a hidden pointer whose
+	'' encoded datatype is not necessarily STRUCT at this backend stage.  The
+	'' subtype symbol remains authoritative.
+	if( symbGetClass( symbGetSubType( sym ) ) <> FB_SYMBCLASS_STRUCT ) then
 		return FALSE
 	end if
 
@@ -3496,7 +3528,11 @@ private function hSymBaseMayBeUnaligned _
 		return FALSE
 	end if
 
-	function = (symbGetUDTAlign( symbGetSubType( sym ) ) < symbGetSubType( sym )->udt.natalign)
+	'' The UDT's recorded natural alignment already reflects FIELD=N packing,
+	'' so comparing against it can hide a reduced alignment.  Treat any
+	'' explicitly field-aligned UDT conservatively; memcpy-based scalar access
+	'' remains correct when N happens to satisfy the scalar's natural alignment.
+	function = TRUE
 end function
 
 private function hVregBaseMayBeUnaligned _
@@ -3513,6 +3549,31 @@ private function hVregBaseMayBeUnaligned _
 	end if
 
 	function = hSymBaseMayBeUnaligned( vreg->sym )
+end function
+
+private function hExprBaseMayBeUnaligned _
+	( _
+		byval n as EXPRNODE ptr _
+	) as integer
+
+	if( n = NULL ) then
+		return FALSE
+	end if
+
+	select case as const n->class
+	case EXPRCLASS_SYM
+		function = hSymBaseMayBeUnaligned( n->sym )
+
+	case EXPRCLASS_CAST, EXPRCLASS_UOP
+		function = hExprBaseMayBeUnaligned( n->l )
+
+	case EXPRCLASS_BOP
+		function = hExprBaseMayBeUnaligned( n->l ) or _
+		           hExprBaseMayBeUnaligned( n->r )
+
+	case else
+		function = FALSE
+	end select
 end function
 
 private function hAddrNeedsUnalignedAccess _
@@ -3534,7 +3595,7 @@ private function hAddrNeedsUnalignedAccess _
 		return FALSE
 	end if
 
-	if( base_may_be_unaligned ) then
+	if( base_may_be_unaligned or hExprBaseMayBeUnaligned( addr ) ) then
 		return TRUE
 	end if
 
@@ -4964,6 +5025,35 @@ private sub _emitVarIniStr _
 
 end sub
 
+private sub hAppendWstrVarIniCodeUnit _
+	( _
+		byref initializer as DZSTRING, _
+		byval codeunit as uinteger, _
+		byval wcharsize as integer, _
+		byval use_numeric as integer _
+	)
+
+	if( use_numeric ) then
+		DZstrConcatAssign( initializer, hEmitInt( env.target.wchar, codeunit ) )
+	else
+		'' On targets with 1-byte wstring data, C wide strings/chars are too
+		'' wide, so don't use them.
+		if( wcharsize = 1 ) then
+			DZstrConcatAssign( initializer, "'" )
+		else
+			DZstrConcatAssign( initializer, "L'" )
+		end if
+
+		if( hCharNeedsEscaping( codeunit, asc( "'" ) ) ) then
+			DZstrConcatAssign( initializer, $"\x" + hex( codeunit, wcharsize * 2 ) )
+		else
+			DZstrConcatAssignC( initializer, codeunit )
+		end if
+
+		DZstrConcatAssign( initializer, "'" )
+	end if
+end sub
+
 private sub _emitVarIniWstr _
 	( _
 		byval varlength as longint, _  '' without null terminator
@@ -5012,24 +5102,15 @@ private sub _emitVarIniWstr _
 
 		ch = hReadWstrChar( src, src_end )
 
-		if( use_numeric ) then
-			DZstrConcatAssign( initializer, hEmitInt( env.target.wchar, ch ) )
+		if( (wcharsize = 2) and (ch >= &h10000ul) and (ch <= &h10FFFFul) ) then
+			ch -= &h10000ul
+			hAppendWstrVarIniCodeUnit( initializer, (ch shr 10) + &hD800ul, _
+			                               wcharsize, use_numeric )
+			DZstrConcatAssign( initializer, ", " )
+			hAppendWstrVarIniCodeUnit( initializer, (ch and &h3FFul) + &hDC00ul, _
+			                               wcharsize, use_numeric )
 		else
-			'' On targets with 1-byte wstring data, C wide strings/chars are too
-			'' wide, so don't use them.
-			if( wcharsize = 1 ) then
-				DZstrConcatAssign( initializer, "'" )
-			else
-				DZstrConcatAssign( initializer, "L'" )
-			end if
-
-			if( hCharNeedsEscaping( ch, asc( "'" ) ) ) then
-				DZstrConcatAssign( initializer, $"\x" + hex( ch, wcharsize * 2 ) )
-			else
-				DZstrConcatAssignC( initializer, ch )
-			end if
-
-			DZstrConcatAssign( initializer, "'" )
+			hAppendWstrVarIniCodeUnit( initializer, ch, wcharsize, use_numeric )
 		end if
 	next
 

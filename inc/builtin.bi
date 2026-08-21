@@ -25,6 +25,19 @@
 '' GCC and clang check builtin declarations against the target C ABI.  On LP64
 '' targets both C long and size_t are based on long, while Win64 keeps C long at
 '' 32bit and uses unsigned long long for size_t.
+#ifdef __FB_BOOTSTRAP_COMPAT__
+	type __fb_builtin_bool as boolean
+
+	#if defined( __FB_64BIT__ ) and defined( __FB_UNIX__ )
+		type __fb_builtin_clong as integer
+		type __fb_builtin_culong as uinteger
+		type __fb_builtin_size_t as uinteger
+	#else
+		type __fb_builtin_clong as long
+		type __fb_builtin_culong as ulong
+		type __fb_builtin_size_t as uinteger
+	#endif
+#else
 type __fb_builtin_bool as boolean alias "_Bool"
 
 #if defined( __FB_64BIT__ ) and defined( __FB_UNIX__ )
@@ -35,6 +48,7 @@ type __fb_builtin_bool as boolean alias "_Bool"
 	type __fb_builtin_clong as long alias "long"
 	type __fb_builtin_culong as ulong alias "long"
 	type __fb_builtin_size_t as uinteger
+#endif
 #endif
 
 extern "C"

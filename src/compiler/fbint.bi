@@ -579,6 +579,9 @@ enum FB_TARGETOPT
 	FB_TARGETOPT_COFF                = &h00000100
 	FB_TARGETOPT_MACHO               = &h00000200
 	FB_TARGETOPT_GAS64_SYSV_STRUCTRET = &h00000400
+	'' Whether GAS64 uses the SysV register, stack, and call-preservation ABI.
+	'' This is independent of a target's aggregate return convention.
+	FB_TARGETOPT_GAS64_SYSV_ABI       = &h00000800
 end enum
 
 enum FB_WCHARCONV

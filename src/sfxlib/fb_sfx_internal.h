@@ -38,9 +38,29 @@
 #include "fb_sfx_buffer.h"
 #include "fb_sfx_capture.h"
 #include <stddef.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+/* ------------------------------------------------------------------------- */
+/* Platform file access                                                      */
+/* ------------------------------------------------------------------------- */
+
+/*
+    Windows CE has no process current-directory API.  FreeBASIC resolves
+    relative paths against the executable directory before entering Coredll,
+    so sfxlib must use the same wrapper for files named by BASIC programs.
+*/
+#if defined(_WIN32_WCE)
+FILE *fb_hOpenFile(const char *path, const char *mode);
+const char *fb_hWinCEGetEnv(const char *name);
+#define fb_sfxOpenFile(path, mode) fb_hOpenFile(path, mode)
+#define fb_sfxGetEnv(name) fb_hWinCEGetEnv(name)
+#else
+#define fb_sfxOpenFile(path, mode) fopen(path, mode)
+#define fb_sfxGetEnv(name) getenv(name)
 #endif
 
 /*
@@ -118,6 +138,7 @@ int fb_sfxEnsureInit(void);
     threaded here.
 */
 
+#ifndef FB_SFX_MT_ENABLED
 #if defined(_WIN32) || \
     defined(__linux__) || \
     defined(__ANDROID__) || \
@@ -130,11 +151,13 @@ int fb_sfxEnsureInit(void);
     defined(__sun) || \
     defined(__HAIKU__) || \
     defined(__NuttX__) || \
+    defined(__riscos__) || \
     defined(HOST_XBOX) || \
     defined(HOST_WII)
 #define FB_SFX_MT_ENABLED 1
 #else
 #define FB_SFX_MT_ENABLED 0
+#endif
 #endif
 
 void fb_sfxRuntimeLockInit(void);

@@ -2,14 +2,14 @@
 
 SUITE( fbc_tests.structs.anon_align )
 
-	'' On 32bit Win32/MinGW, ARM, JS/wasm, Xbox and PowerPC,
+	'' On 32bit Win32/MinGW, ARM, JS/wasm, Xbox, PowerPC and MIPS,
 	'' doubles/longints are aligned to 8, but on 32bit x86 Linux, BSD
 	'' and DOS, doubles/longints are aligned to 4.
 	'' (This often results in tighter packing, and only few cases are
 	'' the same as on MinGW)
 	''
 	'' On 64bit, doubles/longints are aligned to 8 everywhere.
-	#if defined( __FB_64BIT__ ) or defined( __FB_WIN32__ ) or defined( __FB_ARM__ ) or defined( __FB_JS__ ) or defined( __FB_XBOX__ ) or defined( __FB_PPC__ )
+	#if defined( __FB_64BIT__ ) or defined( __FB_WIN32__ ) or defined( __FB_ARM__ ) or defined( __FB_JS__ ) or defined( __FB_XBOX__ ) or defined( __FB_PPC__ ) or defined( __FB_MIPS__ )
 		#define QWORD_ALIGN 8
 	#else
 		#define QWORD_ALIGN 4
@@ -108,7 +108,14 @@ SUITE( fbc_tests.structs.anon_align )
 				as byte c
 			end type
 		end union
-		CU_ASSERT( sizeof( C ) = 8 )
+		'' Classic m68k ABIs cap aggregate alignment at a word.  FIELD=1
+		'' still packs the inner anonymous type, but the outer union rounds
+		'' its six-byte payload only to that two-byte natural alignment.
+		#ifdef __FB_M68K__
+			CU_ASSERT( sizeof( C ) = 6 )
+		#else
+			CU_ASSERT( sizeof( C ) = 8 )
+		#endif
 		CU_ASSERT( offsetof( C, b ) = 1 )
 		CU_ASSERT( offsetof( C, c ) = 5 )
 

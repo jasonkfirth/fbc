@@ -34,6 +34,22 @@
 #define BI_BITFIELDS    3
 #endif
 
+/*
+    Platform decoders may supply a source-byte contract without duplicating
+    the format validation and image allocation logic below.  The default is
+    the conventional BMP BGR byte sequence.
+*/
+#ifndef FB_GFX_BMP24_PACK
+#define FB_GFX_BMP24_PACK(source) \
+	((uint32_t)(source)[0] | ((uint32_t)(source)[1] << 8) | \
+	 ((uint32_t)(source)[2] << 16))
+#endif
+
+#ifndef FB_GFX_BLOAD_REWIND
+#define FB_GFX_BLOAD_REWIND(file, first_byte) \
+	(fseek((file), 0L, SEEK_SET) != 0)
+#endif
+
 static inline uint16_t host_from_le16(uint16_t value)
 {
 #if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
@@ -220,7 +236,7 @@ static void convert_bf_24to16(const unsigned char *src, unsigned char *dest, int
 	uint32_t c;
 	uint16_t *d = (uint16_t *)dest;
 	for (; w; w--) {
-		c = src[0] | (src[1] << 8) | (src[2] << 16);
+		c = FB_GFX_BMP24_PACK(src);
 		r = (c >> shifts[0]) & masks[0];
 		g = (c >> shifts[1]) & masks[1];
 		b = (c >> shifts[2]) & masks[2];
@@ -239,7 +255,7 @@ static void convert_bf_24to32(const unsigned char *src, unsigned char *dest, int
 	uint32_t c;
 	uint32_t *d = (uint32_t *)dest;
 	for (; w; w--) {
-		c = src[0] | (src[1] << 8) | (src[2] << 16);
+		c = FB_GFX_BMP24_PACK(src);
 		r = (c >> shifts[0]) & masks[0];
 		g = (c >> shifts[1]) & masks[1];
 		b = (c >> shifts[2]) & masks[2];
@@ -654,7 +670,7 @@ static int gfx_bload(FBSTRING *filename, void *dest, void *pal, int usenewheader
 
 		case 'B':
 			/* Can be a BMP */
-			if (fseek(f, 0L, SEEK_SET) != 0) {
+			if (FB_GFX_BLOAD_REWIND(f, id)) {
 				result = FB_RTERROR_FILEIO;
 				break;
 			}
@@ -666,7 +682,7 @@ static int gfx_bload(FBSTRING *filename, void *dest, void *pal, int usenewheader
 
 		case 0x89:
 			/* Can be a PNG */
-			if (fseek(f, 0L, SEEK_SET) != 0) {
+			if (FB_GFX_BLOAD_REWIND(f, id)) {
 				result = FB_RTERROR_FILEIO;
 				break;
 			}

@@ -64,6 +64,8 @@ ifeq ($(TESTS_TARGET_OS),dos)
 	TARGET_OS := dos
 else ifeq ($(TESTS_TARGET_OS),js)
 	TARGET_OS := js
+else ifeq ($(TESTS_TARGET_OS),wince)
+	TARGET_OS := wince
 else ifneq ($(filter win32 cygwin xbox,$(TESTS_TARGET_OS)),)
 	TARGET_OS := win32
 else ifneq ($(TESTS_TARGET_OS),)
@@ -82,6 +84,8 @@ else
 endif
 ifeq ($(TARGET_OS),unix)
 	TARGET_EXEEXT :=
+else ifeq ($(TARGET_OS),wince)
+	TARGET_EXEEXT := .exe
 else ifeq ($(TARGET_OS),js)
 	ifeq ($(NODEJS),)
 		TARGET_EXEEXT := .html

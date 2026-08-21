@@ -26,6 +26,16 @@
 #define DR_MP3_IMPLEMENTATION
 
 /*
+    stb_vorbis uses alloca() internally but not every GCC target SDK exposes
+    the non-standard declaration through a public header.  Use the compiler's
+    architecture-neutral intrinsic at this third-party boundary.  This keeps
+    the decoder portable without placing an AROS conditional in shared code.
+*/
+#if defined(__GNUC__) && !defined(alloca)
+#define alloca __builtin_alloca
+#endif
+
+/*
     Bundled decoder boundary
 
     dr_wav, dr_mp3, and stb_vorbis are maintained as upstream source drops.

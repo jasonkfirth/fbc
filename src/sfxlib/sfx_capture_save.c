@@ -111,7 +111,7 @@ int fb_sfxCaptureSave(const char *filename, int seconds)
     buffer_bytes = sample_count * sizeof(*buffer);
     pcm_bytes = sample_count * sizeof(*pcm);
 
-    f = fopen(filename, "wb");
+    f = fb_sfxOpenFile(filename, "wb");
     if (!f)
     {
         SFX_DEBUG("sfx_capture_save: failed to open file");

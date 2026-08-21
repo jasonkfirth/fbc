@@ -110,6 +110,7 @@ endef
 $(eval $(call _set_os_if_token,android,android))
 $(eval $(call _set_os_if_token,nuttx,nuttx))
 $(eval $(call _set_os_if_token,riscos,riscos))
+$(eval $(call _set_os_if_token,aros,aros))
 $(eval $(call _set_os_if_token,linux,linux))
 $(eval $(call _set_os_if_token,emscripten,js))
 $(eval $(call _set_os_if_token,js,js))
@@ -125,10 +126,14 @@ $(eval $(call _set_os_if_token,illumos,illumos))
 $(eval $(call _set_os_if_token,solaris,solaris))
 $(eval $(call _set_os_if_token,sunos,solaris))
 $(eval $(call _set_os_if_token,cygwin,cygwin))
+$(eval $(call _set_os_if_token,wince,wince))
 $(eval $(call _set_os_if_token,msdosdjgpp,dos))
 $(eval $(call _set_os_if_token,djgpp,dos))
 
 # MinGW-like triplets show up in a bunch of forms
+ifneq ($(findstring mingw32ce,$(TARGET_TRIPLET_LC)),)
+  TARGET_OS := wince
+endif
 $(eval $(call _set_os_if_token,mingw,win32))
 $(eval $(call _set_os_if_token,mingw32,win32))
 $(eval $(call _set_os_if_token,mingw64,win32))
@@ -158,6 +163,26 @@ endif
 # x86_64
 ifneq ($(filter x86_64 amd64 x86-64,$(TARGET_ARCH_RAW)),)
   TARGET_ARCH := x86_64
+endif
+
+# Motorola 68000 family
+ifneq ($(filter m68k m68000 m68010 m68020 m68030 m68040 m68060,$(TARGET_ARCH_RAW)),)
+  TARGET_ARCH := m68k
+endif
+
+# MIPS O32 and N64 ABIs. Endianness is part of the architecture identity so
+# runtime directories cannot accidentally mix incompatible object files.
+ifneq ($(filter mips,$(TARGET_ARCH_RAW)),)
+  TARGET_ARCH := mips32
+endif
+ifneq ($(filter mipsel,$(TARGET_ARCH_RAW)),)
+  TARGET_ARCH := mips32el
+endif
+ifneq ($(filter mips64,$(TARGET_ARCH_RAW)),)
+  TARGET_ARCH := mips64
+endif
+ifneq ($(filter mips64el,$(TARGET_ARCH_RAW)),)
+  TARGET_ARCH := mips64el
 endif
 
 # ARM 32-bit (arm, armv6l, armv7l, armhf/armel sometimes appear in non-GNU ids)
@@ -240,6 +265,11 @@ ifneq ($(filter riscv32 riscv64,$(TARGET_ARCH)),)
   ISA_FAMILY := riscv
 endif
 
+# All ABI and endian variants share reusable MIPS architecture sources.
+ifneq ($(filter mips32 mips32el mips64 mips64el,$(TARGET_ARCH)),)
+  ISA_FAMILY := mips
+endif
+
 # s390x uses s390 directory
 ifeq ($(TARGET_ARCH),s390x)
   ISA_FAMILY := s390
@@ -257,7 +287,12 @@ endif
 
 ARM_FLOAT_ABI :=
 ifeq ($(TARGET_ARCH),arm)
-  ifneq ($(findstring eabihf,$(TARGET_TRIPLET_LC)),)
+  # AROS names its hard-float Raspberry Pi toolchain arm-aros.  Unlike GNU
+  # Linux triplets, the ABI is carried by the target configuration rather
+  # than an eabihf suffix.
+  ifeq ($(TARGET_OS),aros)
+    ARM_FLOAT_ABI := hf
+  else ifneq ($(findstring eabihf,$(TARGET_TRIPLET_LC)),)
     ARM_FLOAT_ABI := hf
   else
     ARM_FLOAT_ABI := sf
@@ -290,7 +325,7 @@ ifdef FBC_TARGET
   else ifneq ($(filter 3 4 5 6,$(_fbc_target_ntok)),)
     # If it’s multi-token and not a known fbc target family, treat as suspicious
     # (this catches powerpc64le-linux-gnu, arm-linux-gnueabihf, etc.)
-    ifeq ($(filter win32 win64 dos cygwin wii,$(FBC_TARGET)),)
+    ifeq ($(filter win32 win64 wince-% dos cygwin wii,$(FBC_TARGET)),)
       override FBC_TARGET :=
     endif
   endif
@@ -368,6 +403,18 @@ ifeq ($(TARGET_OS),linux)
   else ifeq ($(TARGET_ARCH),loongarch64)
     FBPACK_DIR := linux-loongarch64
 
+  else ifeq ($(TARGET_ARCH),mips32)
+    FBPACK_DIR := linux-mips
+
+  else ifeq ($(TARGET_ARCH),mips32el)
+    FBPACK_DIR := linux-mipsel
+
+  else ifeq ($(TARGET_ARCH),mips64)
+    FBPACK_DIR := linux-mips64
+
+  else ifeq ($(TARGET_ARCH),mips64el)
+    FBPACK_DIR := linux-mips64el
+
   else
     FBPACK_DIR := linux-$(TARGET_ARCH)
   endif
@@ -382,6 +429,10 @@ else ifeq ($(TARGET_OS),win32)
     FBPACK_DIR := mingw-x86
   endif
 
+else ifeq ($(TARGET_OS),wince)
+
+  FBPACK_DIR := wince-$(TARGET_ARCH)
+
 else
   FBPACK_DIR := $(TARGET_OS)-$(TARGET_ARCH)
 endif
@@ -392,7 +443,7 @@ endif
 ##############################################################################
 
 EXEEXT :=
-ifneq ($(filter win32 win64 cygwin dos,$(TARGET_OS)),)
+ifneq ($(filter win32 win64 wince cygwin dos,$(TARGET_OS)),)
   EXEEXT := .exe
 endif
 

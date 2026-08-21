@@ -1110,6 +1110,46 @@ private function hIdxInParensOnlyExpr( ) as ASTNODE ptr
 	fbSetIdxInParensOnly( old_idxinparensonly )
 end function
 
+private function hRedimExpressionHasFieldSuffix( ) as integer
+	dim as LEX_PROBE_CTX probe
+	dim as integer depth = 0
+
+	lexProbeBegin( probe )
+
+	'' The first identifier is the ambiguous part of REDIM.  Walk the tokens
+	'' directly so the normal three-token lexer cache is not changed.  A
+	'' matching ')' followed by '.' proves that the parentheses belong to an
+	'' expression such as 'array(0, 0).field', rather than to REDIM bounds.
+	lexSkipToken( )
+	do
+		select case lexGetToken( )
+		case CHAR_LPRNT
+			depth += 1
+
+		case CHAR_RPRNT
+			if( depth = 0 ) then
+				exit do
+			end if
+			depth -= 1
+			if( depth = 0 ) then
+				lexSkipToken( )
+				if( lexGetToken( LEXCHECK_NOPERIOD ) = CHAR_DOT ) then
+					function = TRUE
+				end if
+				exit do
+			end if
+
+		case FB_TK_EOL, FB_TK_EOF
+			exit do
+		end select
+		lexSkipToken( )
+	loop
+
+	'' This was only a probe.  The actual REDIM expression parser must see
+	'' the original current token and source position.
+	lexProbeEnd( probe )
+end function
+
 private function hCheckDynamicArrayExpr( byval varexpr as ASTNODE ptr ) as ASTNODE ptr
 	if( varexpr andalso astIsNIDXARRAY( varexpr ) ) then
 		if( astIsVAR( varexpr->l ) or astIsFIELD( varexpr->l ) ) then
@@ -1536,7 +1576,9 @@ function cVarDecl _
 				maybe_expr = TRUE
 			else
 				select case( lexGetLookAhead( 1 ) )
-				case CHAR_LPRNT, CHAR_COMMA, FB_TK_AS, FB_TK_STMTSEP, FB_TK_EOL, FB_TK_EOF
+				case CHAR_LPRNT
+					maybe_expr = hRedimExpressionHasFieldSuffix( )
+				case CHAR_COMMA, FB_TK_AS, FB_TK_STMTSEP, FB_TK_EOL, FB_TK_EOF
 
 				case else
 					maybe_expr = TRUE

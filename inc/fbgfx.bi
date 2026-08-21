@@ -26,21 +26,6 @@
 	#inclib "fbgfx?"
 #endif
 
-#ifdef __FB_WIN32__
-	#inclib "gdi32"
-	#inclib "winmm"
-	#inclib "user32"
-#elseif defined(__FB_LINUX__) and not defined(__FB_JS__)
-	#libpath "/usr/X11R6/lib"
-	#inclib "X11"
-	#inclib "Xext"
-	#inclib "Xpm"
-	#inclib "Xrandr"
-	#inclib "Xrender"
-	#inclib "pthread"
-#endif
-
-
 #if __FB_LANG__ = "fb"
 namespace FB
 #endif

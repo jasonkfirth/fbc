@@ -17,13 +17,14 @@
 #     - link a static ARM executable and inspect its ELF metadata
 #     - stage non-conflicting ELF and, when possible, AIF output for HostFS
 #     - stage the SharedUnixLibrary module required by UnixLib programs
+#     - stage DigitalRenderer when the native sfxlib backend is requested
 #
 # This file intentionally does NOT contain:
 #
 #     - GCCSDK construction
 #     - RPCEmu construction or launch
 #     - RISC OS guest automation
-#     - native graphics or sound tests
+#     - guest-side graphics or sound correctness assertions
 #
 # Output ownership:
 #
@@ -49,6 +50,7 @@ OUT_DIR="$ROOT/out/riscos/programs"
 HOSTFS_DIR="$ROOT/out/riscos/hostfs/FreeBASIC"
 PROGRAM_NAME="fbhello"
 SHARED_UNIX_LIBRARY=""
+DRENDERER_MODULE=""
 SYSTEM_MODULES_DIR=""
 BUILD_OPTIONAL_LIBS=0
 
@@ -102,7 +104,10 @@ Options:
   --system-modules-dir DIR
                        HostFS !System.310.Modules staging directory. Default:
                        !Boot/Resources/!System/310/Modules beside FreeBASIC
-  --with-libs          Also build the null-backend gfxlib2 and sfxlib.
+  --with-libs          Also build native gfxlib2/sfxlib and stage DRenderer.
+  --drenderer-module FILE
+                       DigitalRenderer module to include with --with-libs.
+                       GCCSDK's cross module directory is searched by default.
   --jobs N             Parallel runtime build jobs.
   -h, --help           Show this help.
 EOF
@@ -159,6 +164,11 @@ while [ "$#" -gt 0 ]; do
         --with-libs)
             BUILD_OPTIONAL_LIBS=1
             shift
+            ;;
+        --drenderer-module)
+            require_value "$1" "${2-}"
+            DRENDERER_MODULE="$2"
+            shift 2
             ;;
         --jobs)
             require_value "$1" "${2-}"
@@ -221,6 +231,17 @@ else
     done
 fi
 
+if [ -z "$DRENDERER_MODULE" ]; then
+    DRENDERER_MODULE="$TOOLCHAIN_BIN/../module/DRenderer,ffa"
+fi
+
+if [ "$BUILD_OPTIONAL_LIBS" -eq 1 ]; then
+    [ -f "$DRENDERER_MODULE" ] ||
+        die "DigitalRenderer module not found: $DRENDERER_MODULE"
+    grep -a -q 'DigitalRenderer' "$DRENDERER_MODULE" ||
+        die "$DRENDERER_MODULE is not a DigitalRenderer module"
+fi
+
 # The FreeBASIC makefiles use these environment variable names for compiler
 # overrides.  Host values would silently bypass TARGET_TRIPLET selection.
 unset GCC CLANG
@@ -253,6 +274,7 @@ ELF_FILE="$OUT_DIR/$PROGRAM_NAME"
 "$ROOT/bin/fbc" \
     -target arm-unknown-riscos \
     -static \
+    -i "$ROOT/inc" \
     "$SOURCE" \
     -x "$ELF_FILE"
 
@@ -316,6 +338,12 @@ if [ -n "$SHARED_UNIX_LIBRARY" ]; then
 else
     echo "==> SharedUnixLibrary not found; the staged program cannot run yet"
     echo "    Pass --shared-unix-library with the GCCSDK sul module."
+fi
+
+if [ "$BUILD_OPTIONAL_LIBS" -eq 1 ]; then
+    mkdir -p "$SYSTEM_MODULES_DIR"
+    cp "$DRENDERER_MODULE" "$SYSTEM_MODULES_DIR/DRenderer,ffa"
+    echo "==> staged DigitalRenderer: $SYSTEM_MODULES_DIR/DRenderer,ffa"
 fi
 
 echo "==> RISC OS smoke build complete"

@@ -107,3 +107,4 @@ pkgroot/
 dist
 generated
 obj
+winCE/

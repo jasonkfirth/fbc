@@ -1606,6 +1606,11 @@ sub symbDefineInit _
 
 	'' Add __FB_<target>__ define
 	symbAddDefine( "__FB_" + ucase( *env.target.id ) + "__", NULL, 0 )
+	if( env.clopt.target = FB_COMPTARGET_WINCE ) then
+		'' Windows-family headers still need their shared data model branch,
+		'' while __FB_WINCE__ remains available for CE-only API decisions.
+		symbAddDefine( @"__FB_WIN32__", NULL, 0 )
+	end if
 	if( env.clopt.target = FB_COMPTARGET_ILLUMOS ) then
 		symbAddDefine( @"__FB_SOLARIS__", NULL, 0 )
 	end if
@@ -1640,6 +1645,14 @@ sub symbDefineInit _
 		symbAddDefine( @"__FB_S390X__", NULL, 0 )
 	case FB_CPUFAMILY_LOONGARCH64
 		symbAddDefine( @"__FB_LOONGARCH64__", NULL, 0 )
+	case FB_CPUFAMILY_M68K
+		symbAddDefine( @"__FB_M68K__", NULL, 0 )
+	case FB_CPUFAMILY_MIPS32, FB_CPUFAMILY_MIPS32EL
+		symbAddDefine( @"__FB_MIPS__", NULL, 0 )
+		symbAddDefine( @"__FB_MIPS32__", NULL, 0 )
+	case FB_CPUFAMILY_MIPS64, FB_CPUFAMILY_MIPS64EL
+		symbAddDefine( @"__FB_MIPS__", NULL, 0 )
+		symbAddDefine( @"__FB_MIPS64__", NULL, 0 )
 	end select
 
 	if( fbIsHostBigEndian( ) ) then

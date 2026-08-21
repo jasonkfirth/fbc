@@ -4,7 +4,7 @@
 # Compiler smoke test
 ##############################################################################
 
-.PHONY: compiler-smoke compiler-indirect-goto-smoke compiler-riscv32-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-ppc-smoke compiler-ppc64-smoke compiler-ppc64le-smoke compiler-riscos-smoke
+.PHONY: compiler-smoke compiler-indirect-goto-smoke compiler-riscv32-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-mips-smoke compiler-ppc-smoke compiler-ppc64-smoke compiler-ppc64le-smoke compiler-riscos-smoke
 compiler-smoke: libs
 	$(call _mt_echo,Compiler smoke test)
 	@mkdir -p "$(TEST_TMP)"
@@ -133,6 +133,35 @@ compiler-loongarch64-smoke:
 	else \
 		echo "==> SKIP: loongarch64-linux-gnu-gcc not found; target C emission only"; \
 	fi
+	@rm -rf "$(TEST_TMP)" "$(LOG_DIR)"
+
+compiler-mips-smoke:
+	@test -n "$(TEST_FBC)" || { echo "ERROR: no usable fbc found"; exit 1; }
+	$(call _mt_echo,MIPS32 and MIPS64 compiler target smoke test)
+	@mkdir -p "$(TEST_TMP)"
+	@set -e; \
+	for spec in \
+		mips-linux-gnu:ELF32:big:mips32:32 \
+		mipsel-linux-gnu:ELF32:little:mips32:32 \
+		mips64-linux-gnuabi64:ELF64:big:mips64:64 \
+		mips64el-linux-gnuabi64:ELF64:little:mips64:64; do \
+		oldifs=$$IFS; IFS=:; set -- $$spec; IFS=$$oldifs; \
+		target=$$1; elfclass=$$2; endian=$$3; march=$$4; abi=$$5; \
+		stem="$(TEST_TMP)/$$target-smoke"; \
+		cp tests/mips/target-defines.bas "$$stem.bas"; \
+		$(TEST_FBC_TRIPLET_CMD) -target $$target -r "$$stem.bas" -x "$$stem"; \
+		test -s "$$stem.c" || { echo "ERROR: $$target C output was not produced"; exit 1; }; \
+		$(TEST_FBC_TRIPLET_CMD) -target $$target -v -c "$$stem.bas" -o "$$stem.o" > "$$stem.args" 2>&1 || true; \
+		grep -q -- "-march=$$march" "$$stem.args" || { echo "ERROR: $$target did not select -march=$$march"; exit 1; }; \
+		grep -q -- "-mabi=$$abi" "$$stem.args" || { echo "ERROR: $$target did not select -mabi=$$abi"; exit 1; }; \
+		cc="$$target-gcc"; \
+		if command -v "$$cc" >/dev/null 2>&1; then \
+			$(TEST_FBC_TRIPLET_CMD) -target $$target -c "$$stem.bas" -o "$$stem.o"; \
+			readelf -h "$$stem.o" | grep -q "Class:.*$$elfclass" || { echo "ERROR: $$target object has the wrong ELF class"; exit 1; }; \
+			readelf -h "$$stem.o" | grep -q "Data:.*$$endian endian" || { echo "ERROR: $$target object has the wrong byte order"; exit 1; }; \
+			readelf -h "$$stem.o" | grep -q 'Machine:.*MIPS' || { echo "ERROR: $$target object is not MIPS"; exit 1; }; \
+		fi; \
+	done
 	@rm -rf "$(TEST_TMP)" "$(LOG_DIR)"
 
 compiler-ppc-smoke:

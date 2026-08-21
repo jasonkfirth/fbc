@@ -35,7 +35,7 @@ FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, 
  * first.  Define it to the value the preprocessor would otherwise use so
  * strict -Wundef builds can include the system header cleanly.
  */
-#ifndef FFI_GO_CLOSURES
+#if defined(__APPLE__) && !defined(FFI_GO_CLOSURES)
 #define FFI_GO_CLOSURES 0
 #endif
 

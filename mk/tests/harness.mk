@@ -40,6 +40,14 @@ TEST_TOOLCHAIN_ENV := env \
 	DXEGEN="$(DXEGEN)"
 TEST_FBC_CMD := $(TEST_TOOLCHAIN_ENV) "$(TEST_FBC)" $(TEST_FBC_TARGET_ARGS) $(TEST_FBC_BUILDPREFIX_ARGS)
 
+# GNU-triplet smoke tests exercise fbc's automatic tool-prefix selection.
+# Empty overrides prevent the active Make toolchain from masking that behavior.
+TEST_FBC_TRIPLET_CMD := env \
+	BUILD_FBC="$(TEST_HOST_FBC)" \
+	PATH="$(TEST_HOST_BINDIR):$(if $(strip $(TEST_TOOLCHAIN_BINDIR)),$(TEST_TOOLCHAIN_BINDIR):)$$PATH" \
+	AS= AR= LD= GCC= CLANG= LLC= \
+	"$(TEST_FBC)" $(TEST_FBC_TARGET_ARGS) $(TEST_FBC_BUILDPREFIX_ARGS)
+
 ##############################################################################
 # Helpers
 ##############################################################################

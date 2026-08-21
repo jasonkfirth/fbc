@@ -39,6 +39,7 @@ AR      ?= ar
 ARFLAGS = rcs
 RANLIB  ?= ranlib
 ELF2DOL ?= elf2dol
+ELF2HUNK ?= elf2hunk
 
 tool_cmd = $(firstword $(strip $(1)))
 tool_args = $(wordlist 2,$(words $(strip $(1))),$(strip $(1)))
@@ -387,6 +388,10 @@ ifeq ($(THREAD_MODEL),unixlib)
 MT_CFLAGS := -DENABLE_MT
 endif
 
+ifeq ($(THREAD_MODEL),aros)
+MT_CFLAGS := -D_REENTRANT -DENABLE_MT
+endif
+
 ifdef DISABLE_MT
 MT_CFLAGS :=
 endif
@@ -473,6 +478,11 @@ TOOLCHAIN_FBC_ENV :=
 ifeq ($(TARGET_OS),riscos)
 TOOLCHAIN_LDFLAGS += -static
 endif
+
+
+# Platform-specific flag fragments own complete SDK contracts. This shared
+# layer provides only the dispatch point and generic toolchain realization.
+-include $(mkpath)/$(TARGET_OS)/toolchain-flags.mk
 
 
 ifeq ($(TARGET_OS),win32)

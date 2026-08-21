@@ -6,8 +6,9 @@ const MAX_FRAMES = 240000
 const VOICE_COUNT = 64
 const CHANNEL_COUNT = 16
 const BURSTS = 4
+const ANALYSIS_FRAMES = 12000
 
-redim as single samples( 0 to MAX_FRAMES - 1 )
+redim as single samples( 0 to ANALYSIS_FRAMES - 1 )
 
 dim as integer burst
 dim as integer voice_index
@@ -28,7 +29,11 @@ if( temp_dir = "" ) then
 end if
 
 if( temp_dir = "" ) then
-    temp_dir = "/tmp"
+	temp_dir = curdir()
+
+	if( temp_dir = "" ) then
+		temp_dir = "."
+	end if
 end if
 
 if( right( temp_dir, 1 ) <> "/" andalso right( temp_dir, 1 ) <> "\\" ) then
@@ -56,11 +61,14 @@ next
 '' after all bursts have been queued.
 fb_sfxUpdate( 60000 )
 
-dim as integer frames = SfxTestLoadDump( dump_file, samples() )
+dim as integer total_frames
+dim as integer frames = _
+	SfxTestLoadDumpPrefix( dump_file, samples(), total_frames )
 dim as zstring * 5 null_name = "null"
 dim as FB_SFX_DRIVER_STATS stats
 
-ASSERT( frames >= 60000 )
+ASSERT( frames >= ANALYSIS_FRAMES )
+ASSERT( total_frames >= 60000 )
 ASSERT( fb_sfxDriverStatsSnapshot( @null_name, @stats ) = 0 )
 ASSERT( stats.write_calls > 0 )
 ASSERT( stats.frames_requested > 0 )
@@ -73,7 +81,7 @@ ASSERT( stats.errors = 0 )
 
 '' The early output should contain noticeable activity; lockups or drops usually
 '' look like long quiet stretches in this smoke test.
-ASSERT( SfxTestRms( samples(), 0, 12000 ) > 0.002 )
-ASSERT( SfxTestCountChanges( samples(), 0, 12000, 0.001 ) > 100 )
+ASSERT( SfxTestRms( samples(), 0, ANALYSIS_FRAMES ) > 0.002 )
+ASSERT( SfxTestCountChanges( samples(), 0, ANALYSIS_FRAMES, 0.001 ) > 100 )
 
 '' end of play-64-voice-smoke.bas

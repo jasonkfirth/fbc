@@ -40,11 +40,11 @@ ifeq ($(TARGET_ARCH),arm)
     ARM_VER := v4
   endif
 
-  # GCCSDK targets classic APCS-32 machines.  Keep an unqualified
-  # arm-unknown-riscos triplet on the StrongARM-compatible baseline defined by
-  # this port instead of inheriting a newer host compiler default.
-  ifeq ($(TARGET_OS),riscos)
-    ARM_VER := v4
+  # GCCSDK and classic Windows CE target ARMv4-class devices.  Keep their
+  # unqualified ARM triplets on each port's documented compatibility baseline
+  # instead of inheriting a newer host compiler default.
+  ifneq ($(filter riscos wince,$(TARGET_OS)),)
+	ARM_VER := v4
   endif
 
 endif

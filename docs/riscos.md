@@ -8,17 +8,31 @@ historical APCS-32 ABI required by GCCSDK, soft floating point, little-endian
 ARM code, and an ARMv4 instruction baseline suitable for StrongARM-equipped
 RiscPC systems as well as newer RISC OS machines.
 
-The initial platform builds console programs, file and string code, maths,
+The platform builds console programs, file and string code, maths,
 sockets, and pthread-backed FreeBASIC threads. UnixLib provides pthread entry
 points in libc, so GCCSDK does not need a separate thread library or a
 `-pthread` driver option. The build also compiles GCC's bundled ARM libffi with
 the port's ARMv4 soft-float ABI, enabling FreeBASIC's argument-marshalling
 `THREADCALL` form.
 
-PC port I/O, serial ports, console mouse polling, and `MULTIKEY` return the
-normal unsupported-operation error. gfxlib2 and sfxlib build with deterministic
-null backends. Native Wimp screen/input and SoundDMA drivers remain separate
-follow-up work; no partial desktop driver is registered in the meantime.
+gfxlib2 provides native windowed and fullscreen software backends. `SCREENRES`
+uses an ordinary Wimp window by default: it keeps the desktop mode, converts
+the framebuffer into a private native-format sprite, and redraws only through
+Wimp clipping rectangles. `GFX_FULLSCREEN` retains the direct-screen path: it
+selects a supported 16bpp or 32bpp physical mode and centres the requested
+FreeBASIC framebuffer when the monitor needs a larger container. Both modes
+implement `INKEY`, graphical `MULTIKEY`, mouse input, and mouse positioning.
+sfxlib streams signed 16-bit PCM through UnixLib `/dev/dsp`, DigitalRenderer,
+and SoundDMA on its own mixer worker. Both libraries retain their null drivers
+as last-resort fallbacks.
+
+PC port I/O, serial ports, and console-mode mouse polling retain the normal
+unsupported-operation result. Windowed rendering supports 8bpp, 16bpp, and
+32bpp desktop modes. In an 8bpp desktop, the backend uses ColourTrans to map
+the framebuffer through the desktop palette, so colours are represented by the
+closest palette entry. It deliberately keeps the Wimp-owned pointer visible
+above the game. OpenGL, joystick, MIDI-device, and audio-capture backends have
+not been added.
 
 ## Target replacement layout
 
@@ -59,12 +73,13 @@ reuse its checkout and build products. Useful development options include:
 The installable result is
 `out/riscos/packages/FreeBASIC_<version>-<revision>.zip`. The archive uses
 Acorn-origin ZIP entries and SparkFS metadata, so its RISC OS file types survive
-installation. Its RiscPkg control record declares `GCC4` as a dependency and
-installs a movable `Apps.Development.!FreeBASIC` component.
+installation. Its RiscPkg control record declares `GCC4`,
+`SharedUnixLibrary`, and `DRenderer` as dependencies and installs a movable
+`Apps.Development.!FreeBASIC` component.
 
 Install the archive with a RiscPkg-compatible package manager such as PackMan.
-Install and boot its GCC4 dependency first, then double-click `!FreeBASIC` once
-to add `fbc` to `Run$Path`. The compiler discovers its movable installation
+Install and boot its dependencies first, then double-click `!FreeBASIC` once to
+add `fbc` to `Run$Path`. The compiler discovers its movable installation
 directory, so a normal command does not need an explicit prefix:
 
 ```text
@@ -76,6 +91,12 @@ suite with:
 
 ```sh
 ./build_scripts/riscos-run-fbctests.sh
+```
+
+The focused native display, pointer, and audio acceptance test is:
+
+```sh
+./build_scripts/riscos-run-media-smoke.sh
 ```
 
 ## Emulator and ROM choices
@@ -151,7 +172,8 @@ with a RISC OS filetype suffix for RPCEmu HostFS:
 ./build_scripts/riscos-build-smoke.sh
 ```
 
-Use `--with-libs` to compile the current null-backend gfxlib2 and sfxlib too.
+Use `--with-libs` to compile native gfxlib2 and sfxlib and stage the
+DigitalRenderer module too.
 To build another program:
 
 ```sh
@@ -168,6 +190,12 @@ ELFLoader on RISC OS. UnixLib programs also require the open SharedUnixLibrary
 module. The helper finds the GCCSDK `sul` build product in the cross-bin
 directory and stages it as `!System.310.Modules.SharedULib`. Use
 `--shared-unix-library FILE` if the module is stored elsewhere.
+
+Native sfxlib additionally requires DigitalRenderer. With `--with-libs`, the
+helpers find GCCSDK's open `DRenderer` build product and stage it as
+`!System.310.Modules.DRenderer`; use `--drenderer-module FILE` to override the
+module path. The RiscPkg archive declares the packaged `DRenderer` dependency
+instead of redistributing the module inside FreeBASIC.
 
 Dynamic ELF programs additionally require SOManager and their shared objects.
 The shared-library linker path has not yet completed guest acceptance testing,
@@ -276,7 +304,51 @@ run, or to reduce the memory used by each linked test image, use:
 ./build_scripts/riscos-run-fbctests.sh --batch-size 1 --resume
 ```
 
-## 6. Run Exampleageddon under RISC OS
+## 6. Verify native graphics and sound
+
+The media acceptance runner builds `examples/riscos/media-smoke.bas` with both
+optional libraries, stages SharedUnixLibrary and DigitalRenderer, boots RISC OS
+Open, and verifies that the program:
+
+- resolves case-insensitive wildcard files below a UnixLib suffix directory;
+- registered the `RISC OS` gfxlib2 driver;
+- copied a known logical pixel into the Wimp sprite and fullscreen memory;
+- kept the native pointer visible and reported an in-bounds position in both
+  display modes;
+- registered the `RISC OS DigitalRenderer` sfxlib driver; and
+- submitted a generated tone before restoring the desktop mode.
+
+Run it with:
+
+```sh
+./build_scripts/riscos-run-media-smoke.sh
+```
+
+RISC OS diagnostics are file-only because VDU output would overwrite a direct
+fullscreen framebuffer. Set `GFXLIB_DEBUG=1` with `GFXLIB_DEBUG_LOG=<path>`, or
+`SFXLIB_DEBUG=1` with `SFXLIB_DEBUG_LOG=<path>`, to enable the corresponding
+centralized diagnostics. The automated media smoke saves its acceptance
+transcript and separate debug files below `out/riscos/media-smoke/`.
+
+## 7. Build, package, and test the OMA games
+
+The OMA workflow builds each locally available game as a static RISC OS AIF,
+creates an installable RiscPkg ZIP below `out/riscos/packages/`, and records
+missing source trees in `out/riscos/oma/manifest.tsv`:
+
+```sh
+./build_scripts/riscos-build-oma-games.sh
+./build_scripts/riscos-run-oma-games.sh --skip-build
+```
+
+The runtime sweep launches each game as a native RISC OS task. `WimpSlot` only
+reserves its application memory; windowed games register their own Wimp task
+when `SCREENRES` is selected, while games that request `GFX_FULLSCREEN` retain
+the direct framebuffer path. The game tests leave graphics and sound diagnostics off,
+qualify foreground process liveness, and capture a screenshot for each game.
+Use `--game starphalanx` to repeat a single manifest entry.
+
+## 8. Run Exampleageddon under RISC OS
 
 The RISC OS Exampleageddon runner cross-compiles and classifies every `.bas`
 file in `examples/`. It then converts each successfully built self-contained
@@ -300,8 +372,8 @@ process. A batch timeout can be isolated without discarding completed logs:
 The combined report is written to
 `out/riscos/exampleageddon/riscos-report.md`; per-example data is in
 `riscos-results.csv`, and raw RISC OS transcripts are retained under `logs/`.
-The current accepted run cross-compiled 660 self-contained programs and ran
-all 660 successfully under RISC OS, with no failure, timeout, or missing result.
+The current accepted run cross-compiled 655 self-contained programs and ran
+all 655 successfully under RISC OS, with no failure, timeout, or missing result.
 
 Named directories are useful while repairing a focused area:
 
@@ -312,7 +384,7 @@ Named directories are useful while repairing a focused area:
 Resume records include the exact directory list, so a successful log from a
 different selection cannot accidentally skip a batch.
 
-## 7. Run on a Raspberry Pi Zero
+## 8. Run on a Raspberry Pi Zero
 
 The Raspberry Pi Imager catalogue includes an official RISC OS 5.30 SD-card
 image for the original Raspberry Pi and Pi Zero family.  Write that image with
@@ -354,8 +426,8 @@ patches.
 The port boundary is intentionally explicit.  The next platform-specific
 increments are:
 
-1. A Wimp or direct-screen gfxlib2 driver, with keyboard and mouse state.
-2. A SoundDMA sfxlib driver.
+1. Resizable Wimp windows and an OpenGL backend.
+2. Native joystick, MIDI-device, and audio-capture backends.
 3. Native serial-device handling.
 4. Cross-target execution of the separate compiler diagnostic log harness.
 5. The missing Raspberry Pi mailbox and peripheral behaviour needed for a
@@ -369,6 +441,9 @@ Relevant upstream projects and setup references:
 - [RPCEmu](https://www.marutan.net/rpcemu/)
 - [RISC OS Open packaged software and PackMan](https://packages.riscosopen.org/packages/)
 - [RISC OS Open RiscPC downloads](https://www.riscosopen.org/content/downloads/riscpc)
+- [RISC OS video programming reference](https://www.riscos.com/support/developers/prm/video.html)
+- [RISC OS character input reference](https://www.riscos.com/support/developers/prm/charinput.html)
+- [SDL RISC OS platform notes](https://wiki.libsdl.org/SDL3/README-riscos)
 - [QEMU Raspberry Pi machine documentation](https://www.qemu.org/docs/master/system/arm/raspi.html)
 - [Raspberry Pi Imager operating-system catalogue](https://downloads.raspberrypi.com/os_list_imagingutility_v4.json)
 - [Raspberry Pi firmware licence](https://github.com/raspberrypi/firmware)

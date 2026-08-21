@@ -60,6 +60,18 @@ ifneq ($(strip $(DISABLE_NCURSES)),)
   ALLCFLAGS += -DDISABLE_NCURSES
 endif
 
+ifneq ($(strip $(DISABLE_GPM)),)
+  ALLCFLAGS += -DDISABLE_GPM
+endif
+
+ifneq ($(strip $(DISABLE_ALSA)),)
+  ALLCFLAGS += -DDISABLE_ALSA
+endif
+
+ifneq ($(strip $(DISABLE_PULSE)),)
+  ALLCFLAGS += -DDISABLE_PULSE
+endif
+
 # ---------------------------------------------------------------------------
 # DOS (djgpp)
 # ---------------------------------------------------------------------------
@@ -99,6 +111,22 @@ endif
 ifeq ($(TARGET_OS),xbox)
   ALLCFLAGS += \
     -DDISABLE_FFI \
+    -DDISABLE_OPENGL
+endif
+
+# ---------------------------------------------------------------------------
+# Windows CE
+#
+# The CE SDK has native window, sound, socket, and threading APIs, but not the
+# desktop terminal and locale integrations used by the hosted Unix runtimes.
+# ---------------------------------------------------------------------------
+
+ifeq ($(TARGET_OS),wince)
+  CPPFLAGS += -I$(rootdir)/lib/freebasic/wince-$(TARGET_ARCH)/include
+  ALLCFLAGS += \
+    -DDISABLE_NCURSES \
+    -DDISABLE_LANGINFO \
+    -DDISABLE_GPM \
     -DDISABLE_OPENGL
 endif
 
@@ -144,13 +172,26 @@ ifeq ($(TARGET_OS),riscos)
     -DDISABLE_GPM
 endif
 
+# AROS exposes its native desktop and device APIs directly. The AROS runtime
+# replacements own console handling, so Linux-specific ncurses, gpm, and
+# locale discovery must not be pulled into target builds. The release workflow
+# stages the matching static libffi and its generated architecture header in
+# the target runtime directory so THREADCALL remains fully functional.
+ifeq ($(TARGET_OS),aros)
+  CPPFLAGS += -I$(rootdir)/lib/freebasic/aros-$(TARGET_ARCH)/include
+  ALLCFLAGS += \
+    -DDISABLE_NCURSES \
+    -DDISABLE_LANGINFO \
+    -DDISABLE_GPM
+endif
+
 # ---------------------------------------------------------------------------
 # Windows console stack size
 #
 # Keep console stack conservative but non-fragile.
 # ---------------------------------------------------------------------------
 
-ifneq ($(filter win32 cygwin,$(TARGET_OS)),)
+ifneq ($(filter win32 wince cygwin,$(TARGET_OS)),)
   ALLFBLFLAGS += -t 2048
 endif
 

@@ -1,0 +1,69 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-autotools-explicit-nix-layout.patch
+#
+# Purpose:
+#
+#     Let GNU development ports select the AROS installation layout without
+#     requiring PosixC process startup.
+#
+# Responsibilities:
+#
+#     - pass nix_dir_layout through the GNU fetch-and-build wrappers
+#     - keep the existing default tied to the nix setting
+#     - allow individual ports to request the Developer/bin layout explicitly
+#
+# This file intentionally does NOT change any port's defaults by itself.
+#
+--- a/config/make-autotools.tmpl
++++ b/config/make-autotools.tmpl
+@@ -114,6 +114,10 @@
+ 
+ BD_NIXFLAG ?= -nix
+ 
++ifneq (%(nix_dir_layout),)
++    %(mmake)-nix_dir_layout := %(nix_dir_layout)
++endif
++
+ ifeq (%(nix),yes)
+     %(mmake)-nix    := $(BD_NIXFLAG)
+     %(mmake)-volpfx := /
+@@ -724,7 +724,7 @@
+ 
+ %define fetch_and_build_gnu mmake=/A package=/A subpackage= version=/A crossbuild=no suffixes="tar.bz2 tar.gz" \
+     srcdir= package_repo= patch=no patch_repo= prefix="$(GNUDIR)" \
+-    aros_prefix=/GNU config_env_extra= preconfigure= postconfigure= postinstall= \
++    aros_prefix=/GNU nix_dir_layout= config_env_extra= preconfigure= postconfigure= postinstall= \
+     touch=yes extraoptions= \
+     usecppflags=yes extracppflags= \
+     usecflags=yes extracflags="$(OPTIMIZATION_CFLAGS)" \
+@@ -744,6 +744,7 @@
+     config_env_extra="%(config_env_extra)" preconfigure="%(preconfigure)" postconfigure="%(postconfigure)" postinstall="%(postinstall)" \
+     hostisaflags="%(hostisaflags)" kernelisaflags="%(kernelisaflags)" targetisaflags="%(targetisaflags)" \
+-    use_build_env=%(use_build_env) nix=%(nix) buildflags=%(buildflags) gnuflags=%(gnuflags) nlsflag=%(nlsflag) xflag=%(xflag)
++    use_build_env=%(use_build_env) nix=%(nix) nix_dir_layout=%(nix_dir_layout) \
++    buildflags=%(buildflags) gnuflags=%(gnuflags) nlsflag=%(nlsflag) xflag=%(xflag)
+ 
+ %end
+ #------------------------------------------------------------------------------
+@@ -766,7 +767,7 @@
+ 
+ %define fetch_and_build_gnu_development package=/A subpackage= version=/A  crossbuild=no suffixes="tar.bz2 tar.gz" \
+     srcdir= package_repo= patch=no patch_repo= prefix="$(AROS_DEVELOPER)" \
+-    aros_prefix=/Developer config_env_extra= preconfigure= postconfigure= postinstall= \
++    aros_prefix=/Developer nix_dir_layout= config_env_extra= preconfigure= postconfigure= postinstall= \
+     touch=yes extraoptions= \
+     usecppflags=yes extracppflags= \
+     usecflags=yes extracflags="$(OPTIMIZATION_CFLAGS)" \
+@@ -787,6 +788,7 @@
+    config_env_extra="%(config_env_extra)" preconfigure="%(preconfigure)" postconfigure="%(postconfigure)" postinstall="postinstall-%(package)-delete-la-files %(postinstall)" \
+    hostisaflags="%(hostisaflags)" kernelisaflags="%(kernelisaflags)" targetisaflags="%(targetisaflags)" \
+-   use_build_env=%(use_build_env) nix=%(nix) buildflags=%(buildflags) gnuflags=%(gnuflags) nlsflag=%(nlsflag) xflag=%(xflag)
++   use_build_env=%(use_build_env) nix=%(nix) nix_dir_layout=%(nix_dir_layout) \
++   buildflags=%(buildflags) gnuflags=%(gnuflags) nlsflag=%(nlsflag) xflag=%(xflag)
+ 
+ #MM
+ postinstall-%(package)-delete-la-files:
+
+# end of native-autotools-explicit-nix-layout.patch

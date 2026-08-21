@@ -1,0 +1,551 @@
+#!/usr/bin/env bash
+#
+# Project: FreeBASIC Windows CE MIPS fbctests workflow
+# ---------------------------------------------------
+#
+# File: build_scripts/wince/run-mips-fbctests.sh
+#
+# Purpose:
+#
+#     Cross-build and execute the complete FreeBASIC fbcunit suite in bounded
+#     Windows CE MIPS batches under CERF.
+#
+# Responsibilities:
+#
+#     - select all or named top-level fbctests directories
+#     - build one MIPS R4000 Windows CE executable per directory at -O 0
+#     - stage tracked test resources into CERF shared storage
+#     - launch each batch through the guest-side fbctests runner
+#     - validate the child exit status and fbcunit XML report
+#     - preserve per-directory build and emulator evidence
+#
+# This file intentionally does NOT contain:
+#
+#     - MIPS PE toolchain or target-runtime construction
+#     - Windows CE ROM acquisition or redistribution
+#     - ARM Windows CE support
+#     - test-source baseline overrides
+#
+# Memory policy:
+#
+#     Each executable contains one top-level directory. This bounds compiler,
+#     linker, and guest memory use on older MIPS devices while preserving the
+#     complete test inventory.
+
+set -euo pipefail
+trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
+
+##############################################################################
+# Defaults
+##############################################################################
+
+SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+WORK_ROOT="${WINCE_WORK_ROOT:-$ROOT/out/wince/work-mips}"
+CERF_ROOT="${WINCE_CERF_ROOT:-$ROOT/out/wince/emulator/cerf-mips}"
+OUTPUT_ROOT="${WINCE_FBCTESTS_OUTDIR:-$ROOT/out/wince/fbctests/mips}"
+TOOLCHAIN_ROOT="${WINCE_MIPS_TOOLCHAIN_ROOT:-$ROOT/out/wince/mips-toolchain}"
+SELECTED_DIRS_TEXT=""
+BOOT_SECONDS=20
+TIMEOUT_SECONDS=180
+BUILD_ONLY=0
+RESUME=0
+JOBS=""
+BATCH_SIZE=0
+
+##############################################################################
+# Helpers
+##############################################################################
+
+die() {
+	echo "ERROR: $*" >&2
+	exit 1
+}
+
+msg() {
+	echo
+	echo "==> $*"
+}
+
+detect_jobs() {
+	local jobs=1
+
+	if command -v nproc >/dev/null 2>&1; then
+		jobs="$(nproc)"
+	elif getconf _NPROCESSORS_ONLN >/dev/null 2>&1; then
+		jobs="$(getconf _NPROCESSORS_ONLN)"
+	fi
+
+	case "$jobs" in
+		''|*[!0-9]*|0) jobs=1 ;;
+	esac
+
+	# Two compiler processes avoid host pressure while CERF is also resident.
+	if [ "$jobs" -gt 2 ]; then
+		jobs=2
+	fi
+	printf '%s\n' "$jobs"
+}
+
+require_value() {
+	local option="$1"
+	local value="${2-}"
+
+	[ -n "$value" ] || die "$option requires a value"
+}
+
+require_command() {
+	command -v "$1" >/dev/null 2>&1 ||
+		die "required host tool not found: $1"
+}
+
+report_passed() {
+	local result_file="$1"
+	local xml_file="$2"
+
+	[ -f "$result_file" ] || return 1
+	[ -f "$xml_file" ] || return 1
+	grep -a -E -q '^[[:space:]]*0[[:space:]]*$' "$result_file" || return 1
+	grep -a -q '</testsuites>' "$xml_file" || return 1
+	! grep -a -E -q '<testsuite[^>]+(errors|failures)="[1-9]' "$xml_file"
+}
+
+binary_is_mips_pe() {
+	local executable="$1"
+
+	[ -s "$executable" ] || return 1
+	"$TOOLCHAIN_ROOT/bin/mips-wince-pe-objdump" -f "$executable" |
+		grep -F 'file format pei-mips' >/dev/null
+}
+
+copy_if_present() {
+	local source="$1"
+	local destination="$2"
+
+	if [ -f "$source" ]; then
+		cp "$source" "$destination"
+	fi
+}
+
+remove_batch_outputs() {
+	local batch_id="$1"
+	local candidate
+
+	for candidate in \
+		"$CERF_ROOT/share/fbctests-$batch_id.xml" \
+		"$CERF_ROOT/share/fbctests-$batch_id.result"; do
+		case "$candidate" in
+			"$CERF_ROOT"/share/fbctests-*) ;;
+			*) die "refusing to remove unexpected path: $candidate" ;;
+		esac
+
+		if [ -f "$candidate" ]; then
+			rm -f -- "$candidate"
+		fi
+	done
+}
+
+usage() {
+	cat <<EOF
+Usage: ./build_scripts/wince/run-mips-fbctests.sh [options]
+
+Options:
+  --dirs LIST       Comma-separated directories from tests/dirlist.mk
+  --boot-seconds N  Windows CE shell initialization wait. Default: 20
+  --timeout N       Per-batch execution timeout. Default: 180
+  --jobs N          Parallel cross-build jobs. Default: detected, capped at 2
+  --batch-size N    Maximum source modules per executable. Default: aggregate
+  --build-only      Cross-build every selected batch without running CERF
+  --resume          Reuse validated executables or passing guest reports
+  --work-dir DIR    Prepared source tree. Default: out/wince/work-mips
+  --out-dir DIR     Result directory. Default: out/wince/fbctests/mips
+  --cerf-dir DIR    Prepared MIPS CERF tree. Default: out/wince/emulator/cerf-mips
+  -h, --help        Show this help
+
+The MIPS PE binutils and target libraries are prepared by
+build_scripts/wince/build-mips-libraries.sh. Guest execution additionally
+requires a user-supplied MIPS Windows CE ROM in the selected CERF tree.
+EOF
+}
+
+##############################################################################
+# Command-line parsing
+##############################################################################
+
+JOBS="${JOBS:-$(detect_jobs)}"
+
+while [ "$#" -gt 0 ]; do
+	case "$1" in
+		--dirs)
+			require_value "$1" "${2-}"
+			SELECTED_DIRS_TEXT="$2"
+			shift 2
+			;;
+		--boot-seconds)
+			require_value "$1" "${2-}"
+			BOOT_SECONDS="$2"
+			shift 2
+			;;
+		--timeout)
+			require_value "$1" "${2-}"
+			TIMEOUT_SECONDS="$2"
+			shift 2
+			;;
+		--jobs)
+			require_value "$1" "${2-}"
+			JOBS="$2"
+			shift 2
+			;;
+		--batch-size)
+			require_value "$1" "${2-}"
+			BATCH_SIZE="$2"
+			shift 2
+			;;
+		--build-only)
+			BUILD_ONLY=1
+			shift
+			;;
+		--resume)
+			RESUME=1
+			shift
+			;;
+		--work-dir)
+			require_value "$1" "${2-}"
+			WORK_ROOT="$2"
+			shift 2
+			;;
+		--out-dir)
+			require_value "$1" "${2-}"
+			OUTPUT_ROOT="$2"
+			shift 2
+			;;
+		--cerf-dir)
+			require_value "$1" "${2-}"
+			CERF_ROOT="$2"
+			shift 2
+			;;
+		-h|--help)
+			usage
+			exit 0
+			;;
+		*)
+			die "unknown option: $1"
+			;;
+	esac
+done
+
+for numeric_value in "$BOOT_SECONDS" "$TIMEOUT_SECONDS" "$JOBS"; do
+	case "$numeric_value" in
+		''|*[!0-9]*|0)
+			die "boot wait, timeout, and jobs must be positive integers"
+			;;
+	esac
+done
+
+case "$BATCH_SIZE" in
+	''|*[!0-9]*)
+		die "batch size must be zero or a positive integer"
+		;;
+esac
+
+##############################################################################
+# Validation and directory selection
+##############################################################################
+
+for tool in awk clang cp find git grep make mkdir sort split xargs; do
+	require_command "$tool"
+done
+
+MIPS_FBC="$WORK_ROOT/src/tools/wince/fbc-wince-mips"
+MIPS_OBJDUMP="$TOOLCHAIN_ROOT/bin/mips-wince-pe-objdump"
+RUNTIME_ROOT="$WORK_ROOT/lib/freebasic/wince-mips32el"
+SOURCE_MIPS_FBC="$ROOT/src/tools/wince/fbc-wince-mips"
+SOURCE_RUNTIME_ROOT="$ROOT/lib/freebasic/wince-mips32el"
+SOURCE_HOST_FBC="$ROOT/bin/fbc"
+
+[ -d "$WORK_ROOT/tests" ] || die "prepared MIPS work tree not found"
+[ -x "$WORK_ROOT/bin/fbc" ] || die "prepared host compiler not found"
+[ -x "$MIPS_FBC" ] || die "Windows CE MIPS compiler wrapper not found"
+[ -x "$MIPS_OBJDUMP" ] || die "Windows CE MIPS object inspector not found"
+[ -x "$SOURCE_MIPS_FBC" ] || die "source Windows CE MIPS compiler wrapper not found"
+[ -x "$SOURCE_HOST_FBC" ] || die "source host compiler not found"
+for library in libfb.a libfbmt.a libfbgfx.a libfbgfxmt.a libffi.a; do
+	[ -f "$SOURCE_RUNTIME_ROOT/$library" ] ||
+		die "source Windows CE MIPS runtime is missing $library"
+	[ -f "$RUNTIME_ROOT/$library" ] ||
+		die "Windows CE MIPS runtime is missing $library"
+done
+
+EMULATOR_RUNNER="$SCRIPT_DIR/run-mips-emulator.sh"
+if [ "$BUILD_ONLY" -eq 0 ]; then
+	[ -d "$CERF_ROOT/share" ] || die "CERF shared directory not found"
+	[ -x "$EMULATOR_RUNNER" ] || die "MIPS emulator runner is not executable"
+fi
+
+mapfile -t ALL_DIRS < <(
+	awk '
+		/^DIRLIST_FB[[:space:]]*:=/ { capture = 1; next }
+		capture {
+			sub(/[[:space:]]*\\[[:space:]]*$/, "")
+			if ($0 ~ /^[[:space:]]*$/) exit
+			for (field = 1; field <= NF; field++) print $field
+		}
+	' "$ROOT/tests/dirlist.mk"
+)
+
+[ "${#ALL_DIRS[@]}" -gt 0 ] || die "tests/dirlist.mk contains no directories"
+
+if [ -n "$SELECTED_DIRS_TEXT" ]; then
+	IFS=',' read -r -a SELECTED_DIRS <<< "$SELECTED_DIRS_TEXT"
+else
+	SELECTED_DIRS=("${ALL_DIRS[@]}")
+fi
+
+for test_directory in "${SELECTED_DIRS[@]}"; do
+	case "$test_directory" in
+		''|*[!A-Za-z0-9._-]*)
+			die "invalid fbctests directory name: $test_directory"
+			;;
+	esac
+	[[ " ${ALL_DIRS[*]} " == *" $test_directory "* ]] ||
+		die "unknown fbctests directory: $test_directory"
+done
+
+mkdir -p "$OUTPUT_ROOT/bin" "$OUTPUT_ROOT/build-logs" \
+	"$OUTPUT_ROOT/run-logs" "$OUTPUT_ROOT/xml" "$OUTPUT_ROOT/results" \
+	"$OUTPUT_ROOT/screenshots"
+OUTPUT_ROOT="$(cd "$OUTPUT_ROOT" && pwd)"
+
+##############################################################################
+# Harness and resource preparation
+##############################################################################
+
+msg "synchronizing Windows CE MIPS fbctests harness"
+cp "$SOURCE_HOST_FBC" "$WORK_ROOT/bin/fbc"
+cp "$SOURCE_MIPS_FBC" "$MIPS_FBC"
+cp -R "$SOURCE_RUNTIME_ROOT/." "$RUNTIME_ROOT/"
+cp "$ROOT/tests/common.mk" "$WORK_ROOT/tests/common.mk"
+cp "$ROOT/tests/unit-tests.mk" "$WORK_ROOT/tests/unit-tests.mk"
+cp "$ROOT/tests/fbcunit/GNUmakefile" "$WORK_ROOT/tests/fbcunit/GNUmakefile"
+mkdir -p "$WORK_ROOT/tests/fbcunit/src" "$WORK_ROOT/tests/fbcunit/inc"
+cp -R "$ROOT/tests/fbcunit/src/." "$WORK_ROOT/tests/fbcunit/src/"
+cp -R "$ROOT/tests/fbcunit/inc/." "$WORK_ROOT/tests/fbcunit/inc/"
+mkdir -p "$WORK_ROOT/tests/wince" "$WORK_ROOT/inc/wince/crt"
+cp -R "$ROOT/tests/wince/." "$WORK_ROOT/tests/wince/"
+cp "$ROOT/inc/wince/crt.bi" "$WORK_ROOT/inc/wince/crt.bi"
+cp "$ROOT/inc/wince/crt/stdio.bi" "$WORK_ROOT/inc/wince/crt/stdio.bi"
+
+export WINCE_MIPS_TOOLCHAIN_BIN="$TOOLCHAIN_ROOT/bin"
+export WINCE_MIPS_CLANG="${WINCE_MIPS_CLANG:-clang}"
+
+if [ "$BUILD_ONLY" -eq 0 ]; then
+	"$MIPS_FBC" -O 0 "$WORK_ROOT/tests/wince/fbctests_runner.bas" \
+		-x "$WORK_ROOT/tests/wince/fbctests-runner.exe"
+	binary_is_mips_pe "$WORK_ROOT/tests/wince/fbctests-runner.exe" ||
+		die "guest fbctests runner is not a MIPS PE executable"
+	cp "$WORK_ROOT/tests/wince/fbctests-runner.exe" \
+		"$CERF_ROOT/share/fbctests-runner.exe"
+
+	msg "staging tracked fbctests resources"
+	while IFS= read -r -d '' tracked_file; do
+		relative_path="${tracked_file#tests/}"
+		destination="$CERF_ROOT/share/$relative_path"
+
+		# Tracked deletions must not leave stale guest files that hide changes.
+		if [ ! -e "$ROOT/$tracked_file" ]; then
+			rm -f -- "$destination"
+			continue
+		fi
+
+		mkdir -p "$(dirname "$destination")"
+		cp "$ROOT/$tracked_file" "$destination"
+	done < <(git -C "$ROOT" ls-files -z -- tests)
+fi
+
+##############################################################################
+# Bounded build and guest execution
+##############################################################################
+
+MIPS_CC="clang --target=mipsel-pc-windows-msvc -D__GNUC__=4 -D__GNUC_MINOR__=2 -isystem $TOOLCHAIN_ROOT/include"
+MIPS_FBC_COMMAND="$MIPS_FBC -O 0"
+MAKE_ARGUMENTS=(
+	FBC="$MIPS_FBC_COMMAND"
+	TARGET=wince-mips
+	TARGET_TRIPLET=mipsel-wince-pe
+	CC="$MIPS_CC"
+	CLANG=clang
+	AR="$TOOLCHAIN_ROOT/bin/mips-wince-pe-ar"
+	RANLIB="$TOOLCHAIN_ROOT/bin/mips-wince-pe-ranlib"
+	DEBUG=1
+	ENABLE_CONSOLE_OUTPUT=1
+)
+
+SUMMARY="$OUTPUT_ROOT/build-summary.tsv"
+SOURCE_LIST_ROOT="$OUTPUT_ROOT/source-lists"
+mkdir -p "$SOURCE_LIST_ROOT"
+printf '%s\n' $'id\tstatus\tdirectory' > "$SUMMARY"
+passed_batches=0
+built_batches=0
+
+for test_directory in "${SELECTED_DIRS[@]}"; do
+
+	# These directories exercise runtime variants that fbc normally selects
+	# from source-level language features.  The aggregate fbcunit executable
+	# does not contain those top-level features itself, so select the matching
+	# libraries explicitly for the whole shard.
+	directory_make_arguments=( "${MAKE_ARGUMENTS[@]}" )
+	case "$test_directory" in
+		gfx)
+			directory_make_arguments+=( FBC="$MIPS_FBC_COMMAND -fbgfx" )
+			;;
+		threads)
+			directory_make_arguments+=( FBC="$MIPS_FBC_COMMAND -mt" )
+			;;
+	esac
+
+	batch_lists=()
+	if [ "$BATCH_SIZE" -gt 0 ]; then
+		all_sources="$SOURCE_LIST_ROOT/$test_directory-all.lst"
+		find "$SOURCE_LIST_ROOT" -maxdepth 1 -type f \
+			-name "$test_directory-[0-9][0-9][0-9].lst" -delete
+		{
+			find "$WORK_ROOT/tests/$test_directory" -type f \
+				\( -name '*.bas' -o -name '*.bmk' \) -print0 \
+			| xargs -0 -r grep -l -i -E \
+				'(#[[:space:]]*include[[:space:]]*(once)*[[:space:]]*"fbcu(nit)?\.bi")|([[:space:]]*.[[:space:]]*TEST_MODE[[:space:]]*:[[:space:]]*FBCUNIT_COMPATIBLE)' \
+			|| true
+		} | sed -e "s#^$WORK_ROOT/tests/##" | sort > "$all_sources"
+
+		if [ ! -s "$all_sources" ]; then
+			printf '%s\tfail\t%s\n' "$test_directory" "$test_directory" >> "$SUMMARY"
+			echo "==> SKIPPED: $test_directory (no compatible sources found)" >&2
+			continue
+		fi
+
+		split --numeric-suffixes=0 --suffix-length=3 \
+			--lines="$BATCH_SIZE" --additional-suffix=.lst \
+			"$all_sources" "$SOURCE_LIST_ROOT/$test_directory-"
+
+		case "$test_directory" in
+			udt-wstring)
+				support_source="udt-wstring/uwstring-fixed.bas"
+				;;
+			udt-zstring)
+				support_source="udt-zstring/uzstring-fixed.bas"
+				;;
+			*)
+				support_source=""
+				;;
+		esac
+
+		if [ -n "$support_source" ]; then
+			for batch_list in "$SOURCE_LIST_ROOT/$test_directory-"[0-9][0-9][0-9].lst; do
+				if ! grep -F -x -q "$support_source" "$batch_list"; then
+					printf '%s\n' "$support_source" >> "$batch_list"
+				fi
+			done
+		fi
+
+		mapfile -t batch_lists < <(
+			find "$SOURCE_LIST_ROOT" -maxdepth 1 -type f \
+				-name "$test_directory-[0-9][0-9][0-9].lst" | sort
+		)
+	else
+		batch_lists=("")
+	fi
+
+	for batch_list in "${batch_lists[@]}"; do
+		if [ -n "$batch_list" ]; then
+			shard_id="$(basename "$batch_list" .lst)"
+			source_list_argument=(UNIT_TEST_SOURCE_LIST="$batch_list")
+		else
+			shard_id="$test_directory"
+			source_list_argument=()
+		fi
+
+		build_log="$OUTPUT_ROOT/build-logs/$shard_id.log"
+		saved_binary="$OUTPUT_ROOT/bin/$shard_id.exe"
+		saved_result="$OUTPUT_ROOT/results/$shard_id.result"
+		saved_xml="$OUTPUT_ROOT/xml/$shard_id.xml"
+
+		if [ "$RESUME" -eq 1 ]; then
+			if [ "$BUILD_ONLY" -eq 1 ] && binary_is_mips_pe "$saved_binary"; then
+				echo "==> BUILT (saved): $shard_id"
+				printf '%s\tpass\t%s\n' "$shard_id" "$test_directory" >> "$SUMMARY"
+				built_batches=$((built_batches + 1))
+				continue
+			fi
+			if [ "$BUILD_ONLY" -eq 0 ] && report_passed "$saved_result" "$saved_xml"; then
+				echo "==> PASS (saved): $shard_id"
+				printf '%s\tpass\t%s\n' "$shard_id" "$test_directory" >> "$SUMMARY"
+				passed_batches=$((passed_batches + 1))
+				continue
+			fi
+		fi
+
+		msg "cross-building Windows CE MIPS fbctests: $shard_id"
+		if ! make -C "$WORK_ROOT/tests" -f unit-tests.mk clean \
+			"${directory_make_arguments[@]}" DIRLIST_FB="$test_directory" \
+			"${source_list_argument[@]}" > "$build_log" 2>&1; then
+			printf '%s\tfail\t%s\n' "$shard_id" "$test_directory" >> "$SUMMARY"
+			die "clean failed for $shard_id; see $build_log"
+		fi
+		if ! make -C "$WORK_ROOT/tests" -f unit-tests.mk -j"$JOBS" build_tests \
+			"${directory_make_arguments[@]}" DIRLIST_FB="$test_directory" \
+			"${source_list_argument[@]}" >> "$build_log" 2>&1; then
+			printf '%s\tfail\t%s\n' "$shard_id" "$test_directory" >> "$SUMMARY"
+			echo "==> SKIPPED: $shard_id (build failed; see $build_log)" >&2
+			continue
+		fi
+
+		binary_is_mips_pe "$WORK_ROOT/tests/fbc-tests.exe" ||
+			die "$shard_id did not produce a MIPS PE executable"
+		cp "$WORK_ROOT/tests/fbc-tests.exe" "$saved_binary"
+		printf '%s\tpass\t%s\n' "$shard_id" "$test_directory" >> "$SUMMARY"
+		built_batches=$((built_batches + 1))
+
+		if [ "$BUILD_ONLY" -eq 1 ]; then
+			echo "==> BUILT: $shard_id"
+			continue
+		fi
+
+		cp "$WORK_ROOT/tests/fbc-tests.exe" "$CERF_ROOT/share/fbc-tests.exe"
+		printf '%s\r\n' "$shard_id" > "$CERF_ROOT/share/fbctests-current.txt"
+		remove_batch_outputs "$shard_id"
+
+		msg "running Windows CE MIPS fbctests: $shard_id"
+		"$EMULATOR_RUNNER" \
+			--program fbctests-runner.exe \
+			--completion "fbctests-$shard_id.result" \
+			--log-stem "fbctests-mips-$shard_id" \
+			--boot-seconds "$BOOT_SECONDS" \
+			--run-seconds "$TIMEOUT_SECONDS"
+
+		guest_result="$CERF_ROOT/share/fbctests-$shard_id.result"
+		guest_xml="$CERF_ROOT/share/fbctests-$shard_id.xml"
+		copy_if_present "$guest_result" "$saved_result"
+		copy_if_present "$guest_xml" "$saved_xml"
+		copy_if_present "$CERF_ROOT/logs/fbctests-mips-$shard_id.log" \
+			"$OUTPUT_ROOT/run-logs/$shard_id.log"
+		copy_if_present "$CERF_ROOT/logs/fbctests-mips-$shard_id.png" \
+			"$OUTPUT_ROOT/screenshots/$shard_id.png"
+
+		if ! report_passed "$saved_result" "$saved_xml"; then
+			die "fbctests failed for $shard_id; see $saved_xml"
+		fi
+
+		test_cases="$(grep -a -o '<testcase ' "$saved_xml" | wc -l)"
+		passed_batches=$((passed_batches + 1))
+		echo "==> PASS: $shard_id ($test_cases cases)"
+	done
+done
+
+if [ "$BUILD_ONLY" -eq 1 ]; then
+	msg "cross-built $built_batches Windows CE MIPS fbctests batches"
+else
+	msg "Windows CE MIPS fbctests passed: $passed_batches shards"
+fi
+
+# end of build_scripts/wince/run-mips-fbctests.sh

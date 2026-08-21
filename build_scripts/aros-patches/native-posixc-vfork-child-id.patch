@@ -1,0 +1,44 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-posixc-vfork-child-id.patch
+#
+# Purpose:
+#
+#     Preserve the child process identifier while AROS completes vfork().
+#
+# Responsibilities:
+#
+#     - read the child task identifier before releasing vfork bookkeeping
+#     - return that saved identifier to callers on every CPU architecture
+#
+# This file intentionally does NOT alter AROS process creation or scheduling.
+#
+--- a/compiler/crt/posixc/__vfork.c
++++ b/compiler/crt/posixc/__vfork.c
+@@ -397,6 +397,7 @@ static __attribute__((noinline)) void __vfork_exit_controlled_stack(struct vfork
+ {
+     jmp_buf dummy;
+     jmp_buf env;
++    pid_t child_pid;
+ 
+     D(bug("__vfork: ParentPretendingChild: freeing parent signal\n"));
+     FreeSignal(udata->parent_signal);
+@@ -423,6 +424,7 @@ static __attribute__((noinline)) void __vfork_exit_controlled_stack(struct vfork
+ 
+     /* Save some data from udata before udata is being freed */
+     _VFORK_COPYENV(env,udata->vfork_jmp);
++    child_pid = GetETaskID(udata->child);
+ 
+     D(bug("__vfork: Parent: freeing udata\n"));
+     FreeMem(udata, sizeof(struct vfork_data));
+@@ -430,7 +432,7 @@ static __attribute__((noinline)) void __vfork_exit_controlled_stack(struct vfork
+ 
+     D(bug("__vfork: Parent jumping to jmp_buf %p\n", env));
+     D(bug("__vfork: ip: %p, stack: %p\n", env->retaddr, env->regs[SP]));
+-    vfork_longjmp(env, GetETaskID(udata->child));
++    vfork_longjmp(env, child_pid);
+ }
+ 
+ static void parent_createchild(struct vfork_data *udata)
+# end of native-posixc-vfork-child-id.patch

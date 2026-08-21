@@ -5,7 +5,9 @@
 #ifdef __FB_FREEBSD__
 	#inclib "c++"
 #else
-	#ifdef __FB_DOS__
+	#ifdef __FB_DARWIN__
+		#inclib "c++"
+	#elseif defined( __FB_DOS__ )
 		#inclib "stdcxx"
 	#else
 		#inclib "stdc++"

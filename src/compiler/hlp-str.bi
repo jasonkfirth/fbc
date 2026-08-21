@@ -100,6 +100,11 @@ declare function hUnescapeW _
 		byref textlen as integer = 0 _
 	) as wstring ptr
 
+declare function hGetTargetWstrLength _
+	( _
+		byval text as wstring ptr _
+	) as integer
+
 declare function hHasEscape _
 	( _
 		byval text as zstring ptr _

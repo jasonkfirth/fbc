@@ -32,9 +32,10 @@ const DUMP_FRAMES = 145000
 const DRUM_FIRST_NOTE = 35
 const DRUM_COUNT = 47
 const DRUM_FRAMES = 2048
+const ANALYSIS_FRAMES = 12000
 
-dim as integer drum_offsets( 0 to DRUM_COUNT - 1 )
-redim as single samples( 0 to DUMP_FRAMES - 1 )
+redim as single samples( 0 to ANALYSIS_FRAMES - 1 )
+redim as single previous_drum( 0 to DRUM_FRAMES - 1 )
 dim as integer cursor = 0
 
 SfxTestUseNullDriver()
@@ -45,7 +46,6 @@ ASSERT( midi open( 0 ) = 0 )
 
 ' Channel 10 is MIDI channel index 9.
 for drum as integer = 0 to DRUM_COUNT - 1
-	drum_offsets( drum ) = cursor
 	ASSERT( midi send( &h99, DRUM_FIRST_NOTE + drum, 112 ) = 0 )
 	fb_sfxUpdate( DRUM_FRAMES )
 	cursor += DRUM_FRAMES
@@ -106,16 +106,22 @@ cursor += 12000
 
 ASSERT( midi close() = 0 )
 
-dim as integer frames = SfxTestLoadDump( DUMP_FILE, samples() )
+dim as integer dump_input = freefile()
+dim as integer frames = 0
+dim as integer read_frames
 
-ASSERT( frames >= cursor )
+ASSERT( open( DUMP_FILE for input as #dump_input ) = 0 )
 
 for drum as integer = 0 to DRUM_COUNT - 1
 	dim as single peak = 0.0
 	dim as integer finite_samples = 1
 
+	read_frames = SfxTestReadDumpSamples( dump_input, samples(), DRUM_FRAMES )
+	ASSERT( read_frames = DRUM_FRAMES )
+	frames += read_frames
+
 	for frame as integer = 0 to DRUM_FRAMES - 1
-		dim as single sample = samples( drum_offsets( drum ) + frame )
+		dim as single sample = samples( frame )
 
 		if( sample <> sample ) then
 			finite_samples = 0
@@ -128,38 +134,84 @@ for drum as integer = 0 to DRUM_COUNT - 1
 
 	ASSERT( finite_samples <> 0 )
 	ASSERT( peak < 0.50 )
-	ASSERT( SfxTestRms( samples(), drum_offsets( drum ), DRUM_FRAMES ) > 0.001 )
-	ASSERT( SfxTestCountChanges( samples(), drum_offsets( drum ), DRUM_FRAMES, 0.00001 ) > 256 )
+	ASSERT( SfxTestRms( samples(), 0, DRUM_FRAMES ) > 0.001 )
+	ASSERT( SfxTestCountChanges( samples(), 0, DRUM_FRAMES, 0.00001 ) > 256 )
 
 	if( drum > 0 ) then
 		dim as integer differences = 0
 
 		for frame as integer = 0 to DRUM_FRAMES - 1
-			if( abs( samples( drum_offsets( drum ) + frame ) - _
-			         samples( drum_offsets( drum - 1 ) + frame ) ) > 0.00001 ) then
+			if( abs( samples( frame ) - previous_drum( frame ) ) > 0.00001 ) then
 				differences += 1
 			end if
 		next
 
 		ASSERT( differences > 256 )
 	end if
+
+	for frame as integer = 0 to DRUM_FRAMES - 1
+		previous_drum( frame ) = samples( frame )
+	next
 next
 
-dim as double loud_rms = SfxTestRms( samples(), loud_offset, 2048 )
-dim as double quiet_rms = SfxTestRms( samples(), quiet_offset, 2048 )
+' Skip the organ attack before measuring the two volume levels.
+read_frames = SfxTestReadDumpSamples( dump_input, samples(), 4096 )
+ASSERT( read_frames = 4096 )
+frames += read_frames
+
+read_frames = SfxTestReadDumpSamples( dump_input, samples(), 2048 )
+ASSERT( read_frames = 2048 )
+frames += read_frames
+dim as double loud_rms = SfxTestRms( samples(), 0, read_frames )
+
+read_frames = SfxTestReadDumpSamples( dump_input, samples(), 2048 )
+ASSERT( read_frames = 2048 )
+frames += read_frames
+dim as double quiet_rms = SfxTestRms( samples(), 0, read_frames )
 
 ASSERT( loud_rms > 0.01 )
 ASSERT( quiet_rms < loud_rms * 0.40 )
 
-dim as double center_pitch = SfxTestEstimateZeroCrossHz( _
-	samples(), center_pitch_offset, 4096 )
-dim as double bent_pitch = SfxTestEstimateZeroCrossHz( _
-	samples(), bent_pitch_offset, 4096 )
+' Skip the flute attack before measuring center and bent pitch.
+read_frames = SfxTestReadDumpSamples( dump_input, samples(), 4096 )
+ASSERT( read_frames = 4096 )
+frames += read_frames
+
+read_frames = SfxTestReadDumpSamples( dump_input, samples(), 4096 )
+ASSERT( read_frames = 4096 )
+frames += read_frames
+dim as double center_pitch = SfxTestEstimateZeroCrossHz( samples(), 0, read_frames )
+
+read_frames = SfxTestReadDumpSamples( dump_input, samples(), 4096 )
+ASSERT( read_frames = 4096 )
+frames += read_frames
+dim as double bent_pitch = SfxTestEstimateZeroCrossHz( samples(), 0, read_frames )
 
 ASSERT( center_pitch > 350.0 )
 ASSERT( center_pitch < 550.0 )
 ASSERT( bent_pitch > center_pitch * 1.05 )
-ASSERT( SfxTestRms( samples(), sustained_offset, 4096 ) > 0.01 )
-ASSERT( SfxTestRms( samples(), release_offset + 9952, 2048 ) < 0.0005 )
+
+' Skip the sustain attack, then measure the held note and release tail.
+read_frames = SfxTestReadDumpSamples( dump_input, samples(), 2048 )
+ASSERT( read_frames = 2048 )
+frames += read_frames
+
+read_frames = SfxTestReadDumpSamples( dump_input, samples(), 4096 )
+ASSERT( read_frames = 4096 )
+frames += read_frames
+ASSERT( SfxTestRms( samples(), 0, read_frames ) > 0.01 )
+
+read_frames = SfxTestReadDumpSamples( dump_input, samples(), 12000 )
+ASSERT( read_frames = 12000 )
+frames += read_frames
+ASSERT( SfxTestRms( samples(), 9952, 2048 ) < 0.0005 )
+
+do
+	read_frames = SfxTestReadDumpSamples( dump_input, samples(), ANALYSIS_FRAMES )
+	frames += read_frames
+loop while( read_frames > 0 )
+
+close #dump_input
+ASSERT( frames >= cursor )
 
 ' end of midi-fm-controls.bas

@@ -1,0 +1,507 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-gcc-aros-host-runtime-gcc10.patch
+#
+# Purpose:
+#
+#     Make GCC 10 programs hosted by AROS usable as the native FreeBASIC
+#     backend on x86_64 systems.
+#
+# Responsibilities:
+#
+#     - optimize AROS-hosted GCC programs and select the Unix-style entry point
+#     - avoid unavailable AROS random-device and process-timing interfaces
+#     - avoid POSIX stream and install-prefix probes that are invalid on AROS
+#     - avoid POSIX path canonicalization for native AROS command names
+#     - run GCC child programs synchronously through dos.library
+#     - resolve native child tools below the Developer: assign
+#
+# This file intentionally does NOT alter generated target code or cross-host
+# GCC process behavior.
+#
+--- a/gcc/config/x-aros
++++ b/gcc/config/x-aros
+@@ -0,0 +1,11 @@
++# AROS-hosted GCC programs are release tools, not bootstrap diagnostics.
++# The generated makefiles receive empty command-line optimization variables,
++# so override them here after GCC has processed those command-line values.
++override CFLAGS += -O2
++override CXXFLAGS += -O2
++
++# AROS's POSIX compatibility startup supplies argv, environment handling, and
++# Unix-style path conversion used throughout GCC and libiberty.
++override LDFLAGS += -nix
++
++# end of x-aros
+--- a/gcc/config.host
++++ b/gcc/config.host
+@@ -290,6 +290,7 @@
+   *-*-aros*)
+     host_can_use_collect2=no
+     host_xm_file=xm-aros.h
++    host_xmake_file="${host_xmake_file} x-aros"
+     ;;
+   *-*-*vms*)
+     host_xm_file="vms/xm-vms.h"
+--- a/gcc/diagnostic.c
++++ b/gcc/diagnostic.c
+@@ -134,9 +134,14 @@
+ diagnostic_set_caret_max_width (diagnostic_context *context, int value)
+ {
+   /* One minus to account for the leading empty space.  */
++#ifdef __AROS__
++  /* AROS command streams are not necessarily POSIX file descriptors.  */
++  value = value ? value - 1 : INT_MAX;
++#else
+   value = value ? value - 1 
+     : (isatty (fileno (pp_buffer (context->printer)->stream))
+        ? get_terminal_width () - 1: INT_MAX);
++#endif
+   
+   if (value <= 0) 
+     value = INT_MAX;
+--- a/gcc/gcc.c
++++ b/gcc/gcc.c
+@@ -4380,6 +4380,11 @@
+      decoded_options[0].arg.  */
+ 
+   gcc_libexec_prefix = standard_libexec_prefix;
++#ifdef __AROS__
++  /* AROS native paths use volume names and do not need relocation here.  */
++  if (!gcc_exec_prefix)
++    gcc_exec_prefix = standard_exec_prefix;
++#else
+ #ifndef VMS
+   /* FIXME: make_relative_prefix doesn't yet work for VMS.  */
+   if (!gcc_exec_prefix)
+@@ -4412,6 +4417,7 @@
+     }
+ #else
+ #endif
++#endif
+   /* From this point onward, gcc_exec_prefix is non-null if the toolchain
+      is relocated. The toolchain was either relocated using GCC_EXEC_PREFIX
+      or an automatically created GCC_EXEC_PREFIX from
+@@ -4727,7 +4733,8 @@
+              "BINUTILS", PREFIX_PRIORITY_LAST, 0, 1);
+   free (tooldir_prefix);
+ 
+-#if defined(TARGET_SYSTEM_ROOT_RELOCATABLE) && !defined(VMS)
++#if defined(TARGET_SYSTEM_ROOT_RELOCATABLE) && !defined(VMS) \
++    && !defined(__AROS__)
+   /* If the normal TARGET_SYSTEM_ROOT is inside of $exec_prefix,
+      then consider it to relocate with the rest of the GCC installation
+      if GCC_EXEC_PREFIX is set.
+--- a/gcc/toplev.c
++++ b/gcc/toplev.c
+@@ -277,7 +277,10 @@
+ {
+   if (!random_seed && !noinit)
+     {
+-      int fd = open ("/dev/urandom", O_RDONLY);
++      int fd = -1;
++#ifndef __AROS__
++      fd = open ("/dev/urandom", O_RDONLY);
++#endif
+       if (fd >= 0)
+         {
+           if (read (fd, &random_seed, sizeof (random_seed))
+--- a/gcc/timevar.c
++++ b/gcc/timevar.c
+@@ -24,6 +24,11 @@
+ #include "timevar.h"
+ #include "options.h"
+ 
++#ifdef __AROS__
++#undef HAVE_TIMES
++#undef HAVE_CLOCK
++#endif
++
+ #ifndef HAVE_CLOCK_T
+ typedef int clock_t;
+ #endif
+--- a/libiberty/getruntime.c
++++ b/libiberty/getruntime.c
+@@ -22,6 +22,11 @@
+ #include "ansidecl.h"
+ #include "libiberty.h"
+ 
++#ifdef __AROS__
++#undef HAVE_TIMES
++#undef HAVE_CLOCK
++#endif
++
+ /* On some systems (such as WindISS), you must include <sys/types.h>
+    to get the definition of "time_t" before you include <time.h>.  */
+ #include <sys/types.h>
+@@ -111,10 +116,14 @@ get_run_time (void)
+ #else /* ! HAVE_TIMES */
++#ifdef HAVE_CLOCK
+   /* Fall back on clock and hope it's correctly implemented. */
+   const long clocks_per_sec = CLOCKS_PER_SEC;
+   if (clocks_per_sec <= 1000000)
+     return clock () * (1000000 / clocks_per_sec);
+   else
+     return clock () / clocks_per_sec;
++#else
++  return 0;
++#endif
+ #endif  /* HAVE_TIMES */
+ #endif  /* HAVE_GETRUSAGE */
+ }
+--- a/libiberty/pex-unix.c
++++ b/libiberty/pex-unix.c
+@@ -58,6 +58,12 @@
+ #ifdef HAVE_PROCESS_H
+ #include <process.h>
+ #endif
++#ifdef __AROS__
++#include <dos/dos.h>
++#include <dos/dosextens.h>
++#include <dos/dostags.h>
++#include <proto/dos.h>
++#endif
+ 
+ #ifdef vfork /* Autoconf may define this to fork for us. */
+ # define VFORK_STRING "fork"
+@@ -113,6 +119,192 @@
+ #define PUBLIC_MODE 0666
+ #endif
+ 
++#ifdef __AROS__
++struct aros_status_list
++{
++  struct aros_status_list *next;
++  pid_t pid;
++  int status;
++};
++
++static pid_t aros_next_pid = 1;
++
++static char *
++pex_aros_filename (const char *source)
++{
++  char *filename;
++  char *cursor;
++  char *search_candidate = NULL;
++  size_t size;
++
++  if (strstr (source, "/../") != NULL)
++    {
++      BPTR developer_lock;
++      const char *basename = strrchr (source, '/');
++
++      search_candidate = XNEWVEC (char, strlen (basename + 1) + 15);
++      sprintf (search_candidate, "Developer:bin/%s", basename + 1);
++      developer_lock = Lock ((CONST_STRPTR) search_candidate, SHARED_LOCK);
++      if (developer_lock != BNULL)
++        {
++          UnLock (developer_lock);
++          source = search_candidate;
++        }
++    }
++
++  if (strchr (source, '/') == NULL && strchr (source, ':') == NULL)
++    {
++      BPTR developer_lock;
++      const char *path;
++
++      search_candidate = XNEWVEC (char, strlen (source) + 15);
++      sprintf (search_candidate, "Developer:bin/%s", source);
++      developer_lock = Lock ((CONST_STRPTR) search_candidate, SHARED_LOCK);
++      if (developer_lock != BNULL)
++        {
++          UnLock (developer_lock);
++          source = search_candidate;
++        }
++
++      path = getenv ("PATH");
++
++      if (developer_lock == BNULL && path != NULL)
++        {
++          char *path_copy = XNEWVEC (char, strlen (path) + 1);
++          char *path_cursor;
++          char *path_entry;
++
++          strcpy (path_copy, path);
++          path_cursor = path_copy;
++          while ((path_entry = strsep (&path_cursor, ",:")) != NULL)
++            {
++              BPTR lock;
++              size_t candidate_size = strlen (path_entry) + strlen (source) + 2;
++
++              free (search_candidate);
++              search_candidate = XNEWVEC (char, candidate_size);
++              snprintf (search_candidate, candidate_size, "%s/%s",
++                        *path_entry != '\0' ? path_entry : ".", source);
++              lock = Lock ((CONST_STRPTR) search_candidate, SHARED_LOCK);
++              if (lock != BNULL)
++                {
++                  UnLock (lock);
++                  source = search_candidate;
++                  break;
++                }
++            }
++          free (path_copy);
++        }
++    }
++
++  size = strlen (source) + 1;
++
++  filename = XNEWVEC (char, size);
++  cursor = filename;
++  if (source[0] == '/' && strchr (source + 1, '/') != NULL)
++    {
++      const char *separator;
++
++      ++source;
++      separator = strchr (source, '/');
++      memcpy (cursor, source, separator - source);
++      cursor += separator - source;
++      *cursor++ = ':';
++      source = separator + 1;
++    }
++  while (*source != '\0')
++    *cursor++ = *source++;
++  *cursor = '\0';
++
++  /*
++   * GCC builds subordinate-program paths relative to its driver directory.
++   * AROS Lock() does not resolve those parent components, so remove them
++   * lexically before asking dos.library for the canonical native path.
++   */
++  while ((cursor = strstr (filename, "/../")) != NULL)
++    {
++      char *component = cursor;
++
++      while (component > filename
++             && component[-1] != ':' && component[-1] != '/')
++        --component;
++      if (component == cursor)
++        break;
++      memmove (component, cursor + 4, strlen (cursor + 4) + 1);
++    }
++  while ((cursor = strstr (filename, "/./")) != NULL)
++    memmove (cursor, cursor + 2, strlen (cursor + 2) + 1);
++
++  {
++    BPTR lock = Lock ((CONST_STRPTR) filename, SHARED_LOCK);
++
++    if (lock != BNULL)
++      {
++        char *canonical = XNEWVEC (char, 4096);
++
++        if (NameFromLock (lock, (STRPTR) canonical, 4096))
++          {
++            free (filename);
++            filename = canonical;
++          }
++        else
++          free (canonical);
++        UnLock (lock);
++      }
++  }
++
++  free (search_candidate);
++
++  return filename;
++}
++
++static char *
++pex_aros_arguments (char * const *argv)
++{
++  char *arguments;
++  char *cursor;
++  char * const *argument;
++  size_t size = 2;
++
++  for (argument = argv + 1; *argument != NULL; ++argument)
++    {
++      const char *source;
++
++      size += strlen (*argument) + 3;
++      for (source = *argument; *source != '\0'; ++source)
++	if (*source == '\n' || *source == '"' || *source == '*')
++	  ++size;
++    }
++
++  arguments = XNEWVEC (char, size);
++  cursor = arguments;
++  for (argument = argv + 1; *argument != NULL; ++argument)
++    {
++      const char *source;
++
++      if (argument != argv + 1)
++	*cursor++ = ' ';
++
++      *cursor++ = '"';
++      for (source = *argument; *source != '\0'; ++source)
++	{
++	  if (*source == '\n' || *source == '"' || *source == '*')
++	    {
++	      *cursor++ = '*';
++	      *cursor++ = (*source == '\n') ? 'N' : *source;
++	    }
++	  else
++	    *cursor++ = *source;
++	}
++      *cursor++ = '"';
++    }
++  *cursor++ = '\n';
++  *cursor = '\0';
++
++  return arguments;
++}
++#endif
++
+ /* Get the exit status of a particular process, and optionally get the
+    time that it took.  This is simple if we have wait4, slightly
+    harder if we have waitpid, and is a pain if we only have wait.  */
+@@ -305,8 +497,8 @@
+ 				 int, int, int, int,
+ 				 const char **, int *);
+ static int pex_unix_close (struct pex_obj *, int);
+-static int pex_unix_wait (struct pex_obj *, pid_t, int *, struct pex_time *,
+-			  int, const char **, int *);
++static pid_t pex_unix_wait (struct pex_obj *, pid_t, int *, struct pex_time *,
++                           int, const char **, int *);
+ static int pex_unix_pipe (struct pex_obj *, int *, int);
+ static FILE *pex_unix_fdopenr (struct pex_obj *, int, int);
+ static FILE *pex_unix_fdopenw (struct pex_obj *, int, int);
+@@ -568,6 +760,67 @@
+                      int in, int out, int errdes,
+ 		     int toclose, const char **errmsg, int *err)
+ {
++#ifdef __AROS__
++  struct aros_status_list *entry;
++  struct CommandLineInterface *cli;
++  char *arguments;
++  char *filename;
++  BPTR seglist;
++  int result;
++  ULONG stack_size = AROS_STACKSIZE;
++
++  if (in != STDIN_FILE_NO || out != STDOUT_FILE_NO
++      || errdes != STDERR_FILE_NO || toclose >= 0
++      || (flags & PEX_STDERR_TO_STDOUT) != 0)
++    {
++      *err = ENOSYS;
++      *errmsg = "AROS native pipelines are unsupported";
++      return (pid_t) -1;
++    }
++
++  if (env != NULL && env != environ)
++    {
++      *err = ENOSYS;
++      *errmsg = "AROS native child environments are unsupported";
++      return (pid_t) -1;
++    }
++
++  filename = pex_aros_filename (executable);
++  arguments = pex_aros_arguments (argv);
++  seglist = LoadSeg ((CONST_STRPTR) filename);
++  free (filename);
++  if (seglist == BNULL)
++    {
++      free (arguments);
++      *err = ENOENT;
++      *errmsg = "LoadSeg";
++      return (pid_t) -1;
++    }
++
++  cli = Cli ();
++  if (cli != NULL && cli->cli_DefaultStack > 0)
++    stack_size = cli->cli_DefaultStack * CLI_DEFAULTSTACK_UNIT;
++
++  result = RunCommand (seglist, stack_size, arguments, strlen (arguments));
++  Flush (Output ());
++  UnLoadSeg (seglist);
++  free (arguments);
++  if (result < 0)
++    {
++      *err = errno;
++      *errmsg = "system";
++      return (pid_t) -1;
++    }
++
++  entry = XNEW (struct aros_status_list);
++  entry->pid = aros_next_pid++;
++  if (aros_next_pid <= 0)
++    aros_next_pid = 1;
++  entry->status = (result & 0xff) << 8;
++  entry->next = (struct aros_status_list *) obj->sysdep;
++  obj->sysdep = entry;
++  return entry->pid;
++#else
+   pid_t pid = -1;
+   /* Tuple to communicate error from child to parent.  We can safely
+      transfer string literal pointers as both run with identical
+@@ -761,16 +1014,39 @@
+       }
+       return pid;
+     }
++#endif
+ }
+ #endif /* SPAWN */
+ 
+ /* Wait for a child process to complete.  */
+ 
+-static int
++static pid_t
+ pex_unix_wait (struct pex_obj *obj, pid_t pid, int *status,
+ 	       struct pex_time *time, int done, const char **errmsg,
+ 	       int *err)
+ {
++#ifdef __AROS__
++  struct aros_status_list **link;
++
++  for (link = (struct aros_status_list **) &obj->sysdep;
++       *link != NULL;
++       link = &(*link)->next)
++    if ((*link)->pid == pid)
++      {
++	struct aros_status_list *entry = *link;
++
++	*status = entry->status;
++	if (time != NULL)
++	  memset (time, 0, sizeof (*time));
++	*link = entry->next;
++	free (entry);
++	return 0;
++      }
++
++  *err = ECHILD;
++  *errmsg = "wait";
++  return -1;
++#else
+   /* If we are cleaning up when the caller didn't retrieve process
+      status for some reason, encourage the process to go away.  */
+   if (done)
+@@ -784,6 +1060,7 @@
+     }
+ 
+   return 0;
++#endif
+ }
+ 
+ /* Create a pipe.  */
+@@ -816,7 +1093,16 @@
+ static void
+ pex_unix_cleanup (struct pex_obj *obj ATTRIBUTE_UNUSED)
+ {
+-#if !defined (HAVE_WAIT4) && !defined (HAVE_WAITPID)
++#ifdef __AROS__
++  while (obj->sysdep != NULL)
++    {
++      struct aros_status_list *entry;
++
++      entry = (struct aros_status_list *) obj->sysdep;
++      obj->sysdep = entry->next;
++      free (entry);
++    }
++#elif !defined (HAVE_WAIT4) && !defined (HAVE_WAITPID)
+   while (obj->sysdep != NULL)
+     {
+       struct status_list *this;
+# end of native-gcc-aros-host-runtime-gcc10.patch

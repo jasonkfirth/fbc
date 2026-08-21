@@ -10,7 +10,7 @@
 ''
 '' Responsibilities:
 ''
-''     - add Linux gfx and sound library dependencies
+''     - add Linux gfx and sound dependencies present in the target sysroot
 ''     - choose ncurses or tinfo for the runtime library dependency
 ''     - add Linux default system libraries
 ''
@@ -28,6 +28,24 @@ private function fbcLinuxPlatformIsSelected( ) as integer
 	function = (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_LINUX)
 end function
 
+private function fbcLinuxPlatformHasLibrary( byval libname as zstring ptr ) as integer
+	dim as string filename
+
+	filename = "lib" + *libname + ".a"
+	if( len( fbcFindLibFile( strptr( filename ) ) ) > 0 ) then
+		return TRUE
+	end if
+
+	filename = "lib" + *libname + ".so"
+	function = (len( fbcFindLibFile( strptr( filename ) ) ) > 0)
+end function
+
+private sub fbcLinuxPlatformAddLibraryIfPresent( byval libname as zstring ptr )
+	if( fbcLinuxPlatformHasLibrary( libname ) ) then
+		fbcAddDefLib( libname )
+	end if
+end sub
+
 private sub fbcLinuxPlatformAddDefaultLibPaths( )
 	if( fbcLinuxPlatformIsSelected( ) = FALSE ) then
 		exit sub
@@ -39,7 +57,16 @@ private sub fbcLinuxPlatformAddGfxLibs( )
 		exit sub
 	end if
 
-	fbcPlatformAddX11GfxLibs( )
+	'' Cross sysroots are commonly framebuffer-only.  Query the target compiler
+	'' instead of making a host-side X11 installation part of the target ABI.
+	if( fbcLinuxPlatformHasLibrary( "X11" ) ) then
+		fbcAddDefLibPath( "/usr/X11R6/lib" )
+		fbcLinuxPlatformAddLibraryIfPresent( "X11" )
+		fbcLinuxPlatformAddLibraryIfPresent( "Xext" )
+		fbcLinuxPlatformAddLibraryIfPresent( "Xpm" )
+		fbcLinuxPlatformAddLibraryIfPresent( "Xrandr" )
+		fbcLinuxPlatformAddLibraryIfPresent( "Xrender" )
+	end if
 end sub
 
 private sub fbcLinuxPlatformAddSfxLibs( )
@@ -47,9 +74,11 @@ private sub fbcLinuxPlatformAddSfxLibs( )
 		exit sub
 	end if
 
-	fbcAddDefLib( "asound" )
-	fbcAddDefLib( "pulse-simple" )
-	fbcAddDefLib( "pulse" )
+	'' A headless cross package still provides the mixer and null driver.  Add
+	'' native transports only when their target development libraries exist.
+	fbcLinuxPlatformAddLibraryIfPresent( "asound" )
+	fbcLinuxPlatformAddLibraryIfPresent( "pulse-simple" )
+	fbcLinuxPlatformAddLibraryIfPresent( "pulse" )
 end sub
 
 private sub fbcLinuxPlatformAddDefaultLibs( )

@@ -1906,7 +1906,14 @@ private sub hEmitStore( byval l as IRVREG ptr, byval r as IRVREG ptr )
 
 	var ln = "store "
 	ln += hEmitType( typeDeref( l->dtype ), l->subtype ) + " "
-	ln += hVregToStr( r ) + ", "
+	var rhs = hVregToStr( r )
+	'' LLVM uses the 'null' token for a pointer constant.  An integer zero
+	'' is not a valid pointer operand even after the vreg type is changed.
+	if( typeIsPtr( typeDeref( l->dtype ) ) andalso _
+		irIsIMM( r ) andalso (r->value.i = 0) ) then
+		rhs = "null"
+	end if
+	ln += rhs + ", "
 	ln += hEmitType( l->dtype, l->subtype ) + " "
 	ln += hVregToStr( l )
 	hWriteLine( ln )

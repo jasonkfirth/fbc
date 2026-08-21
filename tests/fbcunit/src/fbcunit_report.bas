@@ -177,6 +177,7 @@ namespace fbcu
 			x = "name=""" & convert_name ( .name ) & """"
 			x &= " errors=""" & 0 & """"
 			x &= " tests=""" & .test_count & """"
+			x &= " assertions=""" & .assert_count & """"
 			x &= " failures=""" & .test_fail_count & """"
 			x &= " time=""" & 0 & """"
 

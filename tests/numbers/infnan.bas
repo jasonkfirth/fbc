@@ -30,6 +30,22 @@ private function hReadDoubleBits( byref d as double ) as ulongint
 	function = bits
 end function
 
+private function hIsSingleNan( byval bits as ulong ) as boolean
+	const EXPONENT_MASK = &h7F800000u
+	const FRACTION_MASK = &h007FFFFFu
+
+	function = ((bits and EXPONENT_MASK) = EXPONENT_MASK) andalso _
+	           ((bits and FRACTION_MASK) <> 0)
+end function
+
+private function hIsDoubleNan( byval bits as ulongint ) as boolean
+	const EXPONENT_MASK = &h7FF0000000000000ull
+	const FRACTION_MASK = &h000FFFFFFFFFFFFFull
+
+	function = ((bits and EXPONENT_MASK) = EXPONENT_MASK) andalso _
+	           ((bits and FRACTION_MASK) <> 0)
+end function
+
 SUITE( fbc_tests.numbers.infnan )
 
 	TEST( double_ )
@@ -44,10 +60,11 @@ SUITE( fbc_tests.numbers.infnan )
 
 		#macro checkD( d, x )
 			'' The sign bit for NaN results is unspecified by IEEE754,
-			'' and targets differ in its selection.  The helper reads
-			'' bytes explicitly to avoid unaligned pointer loads on ARM.
+			'' and MIPS legacy mode reverses the quiet NaN fraction bit.
+			'' Accept every NaN representation while retaining exact
+			'' checks for infinities and their signs.
 			#if( (x = NEGNAND) or (x = POSNAND) )
-				CU_ASSERT( (hReadDoubleBits( d ) and SGNMASK) = POSNAND )
+				CU_ASSERT( hIsDoubleNan( hReadDoubleBits( d ) ) )
 			#else
 				CU_ASSERT( hReadDoubleBits( d ) = x )
 			#endif
@@ -147,10 +164,11 @@ SUITE( fbc_tests.numbers.infnan )
 
 		#macro checkF( f, x )
 			'' The sign bit for NaN results is unspecified by IEEE754,
-			'' and targets differ in its selection.  The helper reads
-			'' bytes explicitly to avoid unaligned pointer loads on ARM.
+			'' and MIPS legacy mode reverses the quiet NaN fraction bit.
+			'' Accept every NaN representation while retaining exact
+			'' checks for infinities and their signs.
 			#if( (x = NEGNANF) or (x = POSNANF) )
-				CU_ASSERT( (hReadSingleBits( f ) and SGNMASK) = POSNANF )
+				CU_ASSERT( hIsSingleNan( hReadSingleBits( f ) ) )
 			#else
 				CU_ASSERT( hReadSingleBits( f ) = x )
 			#endif

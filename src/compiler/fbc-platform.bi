@@ -15,6 +15,7 @@
 ''     - include every platform file matching an FB_COMPTARGET entry
 ''     - run platform hooks in a predictable order
 ''     - choose target-specific linker tools
+''     - add target declaration overlays before the shared include tree
 ''     - keep shared platform helpers out of fbc.bas
 ''
 '' This file intentionally does NOT contain:
@@ -42,6 +43,7 @@
 ''         - target-specific linker flags and startup/shutdown objects
 ''         - target-specific resource, package, or post-link conversion steps
 ''         - target toolchain quirks
+''         - native-host path rules that differ from Unix path traversal
 ''         - target validation that depends on OS rules
 ''
 ''     Platform files should not own parser behavior, AST behavior, ABI layout,
@@ -101,6 +103,7 @@ private sub fbcPlatformAddX11GfxLibs( )
 end sub
 
 #include once "win32/fbc-platform.bi"
+#include once "wince/fbc-platform.bi"
 #include once "cygwin/fbc-platform.bi"
 #include once "linux/fbc-platform.bi"
 #include once "android/fbc-platform.bi"
@@ -118,6 +121,14 @@ end sub
 #include once "wii/fbc-platform.bi"
 #include once "nuttx/fbc-platform.bi"
 #include once "riscos/fbc-platform.bi"
+#include once "aros/fbc-platform.bi"
+
+private sub fbcPlatformAdjustPrefix( byref prefix as string )
+	select case as const fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_AROS
+		fbcArosPlatformAdjustPrefix( prefix )
+	end select
+end sub
 
 '' must be same order as enum FB_COMPTARGET
 static shared as FBC_PLATFORM_HOOKS fbcplatforms(0 to FB_COMPTARGETS-1) = _
@@ -125,6 +136,9 @@ static shared as FBC_PLATFORM_HOOKS fbcplatforms(0 to FB_COMPTARGETS-1) = _
 	( @fbcPlatformGetDefaultLinkerTool, @fbcWin32PlatformAddDefaultLibPaths, _
 	  @fbcWin32PlatformAddGfxLibs, @fbcWin32PlatformAddSfxLibs, _
 	  @fbcWin32PlatformAddDefaultLibs, @fbcWin32PlatformAddLinkerFrameworks ), _
+	( @fbcWincePlatformGetLinkerTool, @fbcWincePlatformAddDefaultLibPaths, _
+	  @fbcWincePlatformAddGfxLibs, @fbcWincePlatformAddSfxLibs, _
+	  @fbcWincePlatformAddDefaultLibs, @fbcWincePlatformAddLinkerFrameworks ), _
 	( @fbcPlatformGetDefaultLinkerTool, @fbcCygwinPlatformAddDefaultLibPaths, _
 	  @fbcCygwinPlatformAddGfxLibs, @fbcCygwinPlatformAddSfxLibs, _
 	  @fbcCygwinPlatformAddDefaultLibs, @fbcCygwinPlatformAddLinkerFrameworks ), _
@@ -175,7 +189,10 @@ static shared as FBC_PLATFORM_HOOKS fbcplatforms(0 to FB_COMPTARGETS-1) = _
 	  @fbcNuttxPlatformAddDefaultLibs, @fbcNuttxPlatformAddLinkerFrameworks ), _
 	( @fbcRiscosPlatformGetLinkerTool, @fbcRiscosPlatformAddDefaultLibPaths, _
 	  @fbcRiscosPlatformAddGfxLibs, @fbcRiscosPlatformAddSfxLibs, _
-	  @fbcRiscosPlatformAddDefaultLibs, @fbcRiscosPlatformAddLinkerFrameworks )  _
+	  @fbcRiscosPlatformAddDefaultLibs, @fbcRiscosPlatformAddLinkerFrameworks ), _
+	( @fbcArosPlatformGetLinkerTool, @fbcArosPlatformAddDefaultLibPaths, _
+	  @fbcArosPlatformAddGfxLibs, @fbcArosPlatformAddSfxLibs, _
+	  @fbcArosPlatformAddDefaultLibs, @fbcArosPlatformAddLinkerFrameworks )  _
 }
 
 private function fbcPlatformGetLinkerTool( ) as integer
@@ -188,6 +205,10 @@ private function fbcPlatformGetLinkerTool( ) as integer
 		return fbcWiiPlatformGetLinkerTool( )
 	case FB_COMPTARGET_RISCOS
 		return fbcRiscosPlatformGetLinkerTool( )
+	case FB_COMPTARGET_AROS
+		return fbcArosPlatformGetLinkerTool( )
+	case FB_COMPTARGET_WINCE
+		return fbcWincePlatformGetLinkerTool( )
 	case else
 		'' Most targets link through the normal linker.  Keep this hook
 		'' explicit instead of dispatching through the platform procptr table:
@@ -196,6 +217,117 @@ private function fbcPlatformGetLinkerTool( ) as integer
 		return FBCTOOL_LD
 	end select
 end function
+
+private function fbcPlatformGetToolPrefix( byval cputype as integer ) as string
+	select case as const fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_RISCOS
+		return fbcRiscosPlatformGetToolPrefix( cputype )
+	case FB_COMPTARGET_AROS
+		return fbcArosPlatformGetToolPrefix( cputype )
+	case FB_COMPTARGET_WINCE
+		return fbcWincePlatformGetToolPrefix( cputype )
+	end select
+
+	function = ""
+end function
+
+private sub fbcPlatformAddDefaultIncludePaths( byref incpath as string )
+	select case as const fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_AROS
+		fbcArosPlatformAddDefaultIncludePaths( incpath )
+	case FB_COMPTARGET_RISCOS
+		fbcRiscosPlatformAddDefaultIncludePaths( incpath )
+	case FB_COMPTARGET_WINCE
+		fbcWincePlatformAddDefaultIncludePaths( incpath )
+	end select
+end sub
+
+private function fbcPlatformCompilesDirectlyToObject( ) as integer
+	select case as const fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_WINCE
+		return fbcWincePlatformCompilesDirectlyToObject( )
+	end select
+
+	function = FALSE
+end function
+
+private function fbcPlatformGetClangTargetOption( ) as string
+	select case as const fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_WINCE
+		return fbcWincePlatformGetClangTargetOption( )
+	end select
+
+	function = ""
+end function
+
+private function fbcPlatformSupportsSupplementaryLinkerScript( ) as integer
+	select case as const fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_RISCOS
+		return fbcRiscosPlatformSupportsSupplementaryLinkerScript( )
+	case FB_COMPTARGET_WINCE
+		return fbcWincePlatformSupportsSupplementaryLinkerScript( )
+	end select
+
+	function = TRUE
+end function
+
+private sub fbcPlatformAdjustParsedCpuType _
+	( _
+		byval os as integer, _
+		byref arch as string, _
+		byref cputype as integer _
+	)
+	select case as const os
+	case FB_COMPTARGET_RISCOS
+		fbcRiscosPlatformAdjustParsedCpuType( arch, cputype )
+	case FB_COMPTARGET_AROS
+		fbcArosPlatformAdjustParsedCpuType( arch, cputype )
+	case FB_COMPTARGET_WINCE
+		fbcWincePlatformAdjustParsedCpuType( arch, cputype )
+	end select
+end sub
+
+private sub fbcPlatformAddCcQueryOptions( byref path as string )
+	select case as const fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_AROS
+		fbcArosPlatformAddCcQueryOptions( path )
+	end select
+end sub
+
+private function fbcPlatformAddCCompilerCpuOptions _
+	( _
+		byref ccline as string _
+	) as integer
+
+	select case as const fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_AROS
+		return fbcArosPlatformAddCCompilerCpuOptions( ccline )
+	case FB_COMPTARGET_WINCE
+		return fbcWincePlatformAddCCompilerCpuOptions( ccline )
+	end select
+
+	function = FALSE
+end function
+
+private function fbcPlatformUsesCompilerDriverAssembler( ) as integer
+	select case as const fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_AROS
+		return fbcArosPlatformUsesCompilerDriverAssembler( )
+	case FB_COMPTARGET_WINCE
+		return fbcWincePlatformUsesCompilerDriverAssembler( )
+	end select
+
+	function = FALSE
+end function
+
+private sub fbcPlatformAddAssemblerOptions( byref ascline as string )
+	select case as const fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_AROS
+		fbcArosPlatformAddAssemblerOptions( ascline )
+	case FB_COMPTARGET_WINCE
+		fbcWincePlatformAddAssemblerOptions( ascline )
+	end select
+end sub
 
 private sub fbcPlatformAddDefaultLibPaths( )
 	for i as integer = 0 to ubound( fbcplatforms )

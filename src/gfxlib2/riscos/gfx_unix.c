@@ -6,44 +6,47 @@
 
     Purpose:
 
-        Define the RISC OS gfxlib2 platform boundary for the initial port.
+        Register the RISC OS gfxlib2 driver at the Unix platform boundary.
 
     Responsibilities:
 
-        - expose an empty native graphics-driver list
-        - return defined zero values from SCREENINFO
-        - keep gfxlib2 linkable without selecting an unrelated Unix backend
+        - expose the native driver before the shared null fallback
+        - implement SCREENINFO using RISC OS VDU state
+        - replace the unrelated shared Unix registration module
 
     This file intentionally does NOT contain:
 
-        - Wimp window management
-        - framebuffer conversion or redraw handling
-        - keyboard or mouse event processing
-
-    Driver behavior:
-
-        A list containing only NULL tells shared gfxlib2 code that no graphics
-        mode can be opened.  This is preferable to registering a partial driver
-        that could leave global graphics state half-initialized.
+        - display lifecycle code
+        - screen-memory conversion
+        - input polling
 */
 
-#include "../fb_gfx.h"
+#include "fb_gfx_riscos.h"
 
-const GFXDRIVER *__fb_gfx_drivers_list[] = {
-	NULL
+extern const GFXDRIVER fb_gfxDriverRiscos;
+
+const GFXDRIVER *__fb_gfx_drivers_list[] =
+{
+    &fb_gfxDriverRiscos,
+    &__fb_gfxDriverNull,
+    NULL
 };
 
-void fb_hScreenInfo( ssize_t *width, ssize_t *height, ssize_t *depth,
-	ssize_t *refresh )
+void fb_hScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth,
+    ssize_t *refresh)
 {
-	if( width != NULL )
-		*width = 0;
-	if( height != NULL )
-		*height = 0;
-	if( depth != NULL )
-		*depth = 0;
-	if( refresh != NULL )
-		*refresh = 0;
+    fb_riscosGfxReadScreenInfo(width, height, depth, refresh);
+}
+
+ssize_t fb_hGetWindowHandle(void)
+{
+    return fb_riscosGfxWindowHandle();
+}
+
+ssize_t fb_hGetDisplayHandle(void)
+{
+    /* RISC OS has no desktop display object equivalent to X11 Display. */
+    return 0;
 }
 
 /* end of gfx_unix.c */

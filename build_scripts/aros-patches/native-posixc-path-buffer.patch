@@ -1,0 +1,49 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-posixc-path-buffer.patch
+#
+# Purpose:
+#
+#     Prevent native development tools from reusing an AROS POSIX path buffer
+#     after the stdc.library allocation pool that owned it has been replaced.
+#
+# Responsibilities:
+#
+#     - clear inherited path-conversion state when posixc.library is opened
+#     - clear task-local path-conversion state before a new Unix-style command
+#
+# This file intentionally does NOT change general AROS path conversion rules.
+#
+--- a/compiler/crt/posixc/__posixc_init.c
++++ b/compiler/crt/posixc/__posixc_init.c
+@@ -25,6 +25,12 @@ static int __posixc_open(struct PosixCIntBase *PosixCBase)
+ {
+     D(bug("[posixc] %s(0x%p)\n", __func__, PosixCBase));
+ 
++    /*
++     * A per-opener library base can be cloned from its parent.  The path
++     * conversion buffer belongs to the parent's stdc.library allocation
++     * pool, so the child must not pass that inherited pointer to realloc().
++     */
++    PosixCBase->upathbuf = NULL;
+     PosixCBase->internalpool = CreatePool(MEMF_PUBLIC|MEMF_CLEAR, 256, 256);
+ 
+     return PosixCBase->internalpool != NULL;
+--- a/compiler/crt/posixc/__posixc_nixmain.c
++++ b/compiler/crt/posixc/__posixc_nixmain.c
+@@ -44,6 +44,13 @@ int __posixc_nixmain(int (*main)(int argc, char *argv[]), int argc, char *argv[]
+     /* Trigger *nix path handling on.  */
+     PosixCBase->doupath = 1;
+ 
++    /*
++     * A shell can run multiple commands on one task while each command gets
++     * a fresh stdc.library allocation pool.  Never reuse the conversion
++     * buffer allocated by the preceding command's stdc.library instance.
++     */
++    PosixCBase->upathbuf = NULL;
++
+     /* argv[0] usually contains the name of the program, possibly with the full
+        path to it. Here we translate that path, which is an AmigaDOS-style path,
+        into a unix-style one.  */
+# end of native-posixc-path-buffer.patch

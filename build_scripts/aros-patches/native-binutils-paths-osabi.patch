@@ -1,0 +1,105 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-binutils-paths-osabi.patch
+#
+# Purpose:
+#
+#     Make AROS-hosted binutils honor assign-based paths and emit loadable AROS
+#     ELF headers when constructing programs inside an AROS guest.
+#
+# Responsibilities:
+#
+#     - preserve AROS assign paths instead of applying Unix realpath semantics
+#     - use the configured native linker-script and sysroot directories
+#     - write the AROS ABI version together with the ELF OSABI byte
+#
+# This file intentionally does NOT change cross-host binutils behavior.
+#
+--- a/libiberty/lrealpath.c
++++ b/libiberty/lrealpath.c
+@@ -75,5 +75,12 @@ char *
+ lrealpath (const char *filename)
+ {
++#if defined (__AROS__)
++  /* AROS installations use assigns rather than symbolic links.  Preserving
++     the supplied path also avoids routing native tool prefix discovery
++     through POSIX realpath emulation, which cannot improve the result.  */
++  return strdup (filename);
++#endif
++
+   /* Method 1: The system has a compile time upper bound on a filename
+      path.  Use that and realpath() to canonicalize the name.  This is
+      the most common case.  Note that, if there isn't a compile time
+--- a/ld/ldfile.c
++++ b/ld/ldfile.c
+@@ -498,5 +498,11 @@ static char *
+ find_scripts_dir (void)
+ {
++#ifdef __AROS__
++  /* Native AROS tools live below the fixed Developer: assign.  Searching
++     PATH for a relocatable Unix prefix misinterprets assign-name colons as
++     path separators, so use the configured script directory directly.  */
++  return xstrdup (SCRIPTDIR);
++#else
+   char *dir;
+ 
+   dir = make_relative_prefix (program_name, BINDIR, SCRIPTDIR);
+@@ -526,6 +532,7 @@ find_scripts_dir (void)
+     }
+ 
+   return NULL;
++#endif
+ }
+ 
+ /* If DEFAULT_ONLY is false, try to open NAME; if that fails, look for
+--- a/ld/ldmain.c
++++ b/ld/ldmain.c
+@@ -564,5 +564,10 @@ static char *
+ get_relative_sysroot (const char *from ATTRIBUTE_UNUSED)
+ {
++#ifdef __AROS__
++  /* Developer: is an AROS assign and is intentionally stable.  GNU prefix
++     relocation treats assign-name colons as PATH separators.  */
++  return xstrdup (TARGET_SYSTEM_ROOT);
++#else
+ #ifdef TARGET_SYSTEM_ROOT_RELOCATABLE
+   char *path;
+   struct stat s;
+@@ -577,6 +582,7 @@ get_relative_sysroot (const char *from ATTRIBUTE_UNUSED)
+     }
+ #endif
+   return 0;
++#endif
+ }
+ 
+ /* Return the sysroot directory.  Return "" if no sysroot is being used.  */
+--- a/binutils/elfedit.c
++++ b/binutils/elfedit.c
+@@ -385,7 +385,11 @@ update_elf_header (const char *file_name, FILE *file)
+       if (output_elf_type != -1)
+ 	BYTE_PUT (ehdr32.e_type, output_elf_type);
+       if (output_elf_osabi != -1)
+-	ehdr32.e_ident[EI_OSABI] = output_elf_osabi;
++	{
++	  ehdr32.e_ident[EI_OSABI] = output_elf_osabi;
++	  if (output_elf_osabi == ELFOSABI_AROS)
++	    ehdr32.e_ident[EI_ABIVERSION] = 1;
++	}
+       status = fwrite (&ehdr32, sizeof (ehdr32), 1, file) == 1;
+       break;
+     case ELFCLASS64:
+@@ -394,7 +398,11 @@ update_elf_header (const char *file_name, FILE *file)
+       if (output_elf_type != -1)
+ 	BYTE_PUT (ehdr64.e_type, output_elf_type);
+       if (output_elf_osabi != -1)
+-	ehdr64.e_ident[EI_OSABI] = output_elf_osabi;
++	{
++	  ehdr64.e_ident[EI_OSABI] = output_elf_osabi;
++	  if (output_elf_osabi == ELFOSABI_AROS)
++	    ehdr64.e_ident[EI_ABIVERSION] = 1;
++	}
+       status = fwrite (&ehdr64, sizeof (ehdr64), 1, file) == 1;
+       break;
+     }
+# end of native-binutils-paths-osabi.patch

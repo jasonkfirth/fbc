@@ -36,12 +36,12 @@ const DUMP_FRAMES = 250000
 const RATE_COUNT = 9
 const CASE_COUNT = 5
 const WINDOW_COUNT = RATE_COUNT * CASE_COUNT
+const MAX_WINDOW_FRAMES = 192000 \ 10
 
 dim as integer sample_rates( 0 to RATE_COUNT - 1 ) = _
 	{ 8000, 11025, 16000, 22050, 32000, 44100, 48000, 96000, 192000 }
-dim as integer offsets( 0 to WINDOW_COUNT - 1 )
 dim as integer lengths( 0 to WINDOW_COUNT - 1 )
-redim as single samples( 0 to DUMP_FRAMES - 1 )
+redim as single samples( 0 to MAX_WINDOW_FRAMES - 1 )
 dim as integer cursor = 0
 dim as integer window_index = 0
 
@@ -63,7 +63,6 @@ for rate_index as integer = 0 to RATE_COUNT - 1
 	ASSERT( fb_sfxTestSetSampleRate( sample_rate ) = 0 )
 
 	for sound_case as integer = 0 to CASE_COUNT - 1
-		offsets( window_index ) = cursor
 		lengths( window_index ) = case_frames
 
 		select case sound_case
@@ -104,20 +103,25 @@ next
 ASSERT( midi close() = 0 )
 fb_sfxForegroundFeedEnd()
 
-dim as integer frames = SfxTestLoadDump( DUMP_FILE, samples() )
+dim as integer dump_file_num = freefile()
+dim as integer frames = 0
 
 ASSERT( cursor <= DUMP_FRAMES )
-ASSERT( frames >= cursor )
+ASSERT( open( DUMP_FILE for input as #dump_file_num ) = 0 )
 
 for window_index = 0 to WINDOW_COUNT - 1
-	dim as integer first_frame = offsets( window_index )
 	dim as integer window_frames = lengths( window_index )
-	dim as double rms = SfxTestRms( samples(), first_frame, window_frames )
+	dim as integer loaded_frames = _
+		SfxTestReadDumpSamples( dump_file_num, samples(), window_frames )
+	dim as double rms = SfxTestRms( samples(), 0, window_frames )
 	dim as single peak = 0.0
 	dim as integer finite_samples = 1
 
+	ASSERT( loaded_frames = window_frames )
+	frames += loaded_frames
+
 	for frame as integer = 0 to window_frames - 1
-		dim as single sample = samples( first_frame + frame )
+		dim as single sample = samples( frame )
 
 		if( sample <> sample ) then
 			finite_samples = 0
@@ -132,7 +136,10 @@ for window_index = 0 to WINDOW_COUNT - 1
 	ASSERT( rms > 0.00020 )
 	ASSERT( rms < 0.25 )
 	ASSERT( peak < 0.50 )
-	ASSERT( SfxTestCountChanges( samples(), first_frame, window_frames, 0.000001 ) > window_frames \ 10 )
+	ASSERT( SfxTestCountChanges( samples(), 0, window_frames, 0.000001 ) > window_frames \ 10 )
 next
+
+close #dump_file_num
+ASSERT( frames >= cursor )
 
 ' end of midi-fm-rates.bas

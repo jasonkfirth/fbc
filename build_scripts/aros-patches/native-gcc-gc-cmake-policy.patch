@@ -1,0 +1,31 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-gcc-gc-cmake-policy.patch
+#
+# Purpose:
+#
+#     Keep AROS's native GCC prerequisite build usable with current CMake.
+#
+# Responsibilities:
+#
+#     - select the oldest policy level supported by CMake 4 for legacy BDWGC
+#     - leave the bundled BDWGC source and AROS target flags unchanged
+#
+# This file intentionally does NOT update or otherwise alter the GC port.
+#
+--- a/contrib/development/libs/gc/mmakefile.src
++++ b/contrib/development/libs/gc/mmakefile.src
+@@ -33,3 +33,4 @@ else
+ GC_EXTRA_OPTS := \
++        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+         -DCMAKE_CXX_FLAGS="$(USER_CXXFLAGS)"
+ endif
+@@ -48,4 +49,5 @@ PATCHSPEC := $(ARCHBASE)-aros.diff:$(ARCHSRCDIR):-p1
+ 
+ %build_with_cmake mmake=contrib-development-libs-gc		\
+-	srcdir=$(GC_SOURCE) prefix="$(AROS_DEVELOPER)"
++	srcdir=$(GC_SOURCE) prefix="$(AROS_DEVELOPER)" \
++	extraoptions="$(GC_EXTRA_OPTS)"
+ 
+# end of native-gcc-gc-cmake-policy.patch

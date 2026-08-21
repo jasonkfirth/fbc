@@ -1,0 +1,28 @@
+# FreeBASIC AROS native GCC support
+# ---------------------------------
+#
+# File: native-gcc-no-common.patch
+#
+# Purpose:
+#
+#     Build AROS-hosted GCC programs without tentative common symbols.
+#
+# Responsibilities:
+#
+#     - place tentative C definitions in ordinary BSS sections
+#     - keep native development programs compatible with m68k Hunk delivery
+#
+# This file intentionally does NOT change the GCC target ABI or user flags.
+#
+--- a/contrib/gnu/gcc/mmakefile.src
++++ b/contrib/gnu/gcc/mmakefile.src
+@@ -105,7 +105,7 @@ USER_CPPFLAGS := -DNO_AMIGA_LINKAGE_TYPES
+ USER_CFLAGS := $(NOWARN_FLAGS) $(USER_CPPFLAGS)
+ development-gcc--CROSS_CXXFLAGS := $(USER_CPPFLAGS)
+ 
+-development-gcc--CROSS_CC:=$(TARGET_CC) $(TARGET_ISA_CFLAGS)
++development-gcc--CROSS_CC:=$(TARGET_CC) $(TARGET_ISA_CFLAGS) -fno-common
+ development-gcc--CROSS_CXX:=$(TARGET_CXX) $(TARGET_ISA_CXXFLAGS)
+ development-gcc--CROSS_SYSROOT:=$(TARGET_SYSROOT)
+ 
+# end of native-gcc-no-common.patch

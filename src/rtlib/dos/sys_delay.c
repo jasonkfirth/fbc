@@ -5,9 +5,9 @@
 
  
 /* __fb_dos_no_dpmi_yield
- * - 0 (default), __dpmi_yield() is called in the busy loop for delays
- * - non-zero, do not call __dpmi_yield() which seems will prevent
- *   crashes under some dos extenders
+ * - 0, __dpmi_yield() is called in the busy loop for delays
+ * - non-zero (default), do not call __dpmi_yield().  This avoids crashes
+ *   under DOSBox and other DOS extenders that cannot safely yield here.
  *
  * in fb:
  *   extern "c"
@@ -17,7 +17,7 @@
  */
 
 extern unsigned int __fb_dos_no_dpmi_yield;
-unsigned int __fb_dos_no_dpmi_yield = 0;
+unsigned int __fb_dos_no_dpmi_yield = 1;
 
 /* usleep() copied from djgpp libc implementation */
 static unsigned int usleep_private(unsigned int _useconds)

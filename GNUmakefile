@@ -214,6 +214,7 @@ compiler-riscv32-smoke: | maybe-build-fbc
 compiler-riscv64-smoke: | maybe-build-fbc
 compiler-s390x-smoke: | maybe-build-fbc
 compiler-loongarch64-smoke: | maybe-build-fbc
+compiler-mips-smoke: | maybe-build-fbc
 compiler-ppc64le-smoke: | maybe-build-fbc
 compiler-riscos-smoke: | maybe-build-fbc
 
@@ -322,6 +323,8 @@ help:
 	@echo "  dist-zip                Zip staged native distribution"
 	@echo "  pkg-tar                 Install to pkgroot and tar it"
 	@echo "  pkg-zip                 Install to pkgroot and zip it"
+	@echo "  build_scripts/debianubuntu-build-freebasic-aros.sh"
+	@echo "                          Build AROS SDKs, compiler packages, and boot media"
 	@echo ""
 	@echo "Install:"
 	@echo "  install                 Install native compiler, headers, and runtime"

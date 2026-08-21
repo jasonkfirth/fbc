@@ -1,0 +1,43 @@
+# FreeBASIC AROS native m68k tool support
+# --------------------------------------
+#
+# File: native-posixc-m68k-seek.patch
+#
+# Purpose:
+#
+#     Keep ordinary m68k stdio seeks reliable on filesystems whose 64-bit
+#     packet interface reports success without changing the file position.
+#
+# Responsibilities:
+#
+#     - use the established 32-bit dos.library seek for representable offsets
+#     - retain dos64.library for positions outside the signed 32-bit range
+#     - leave ARM, x86_64, and other AROS architectures unchanged
+#
+# This file intentionally does NOT disable large-file support on AROS m68k.
+#
+--- a/compiler/crt/posixc/__dos64.c
++++ b/compiler/crt/posixc/__dos64.c
+@@ -53,10 +53,22 @@ QUAD __dos64_seek(fcb *fcb, QUAD position, LONG mode)
+ {
+     struct Library *DOS64Base = __dos64_base_for(fcb);
+     BPTR fh = fcb->handle;
+ 
++#ifdef __mc68000__
++    /*
++     * Some classic m68k filesystem handlers accept the OS4-style 64-bit
++     * change-position packet but leave the position unchanged.  Ordinary
++     * compiler inputs and outputs fit the original signed 32-bit API, whose
++     * behavior is reliable on those handlers.  Keep the 64-bit path below
++     * for offsets that actually require it.
++     */
++    if (position == (QUAD)(LONG)position)
++        return Seek(fh, (LONG)position, mode);
++#endif
++
+     if (DOS64Base != NULL)
+         return Seek64(fh, mode, position);
+ 
+     if (position != (QUAD)(LONG)position)
+     {
+# end of native-posixc-m68k-seek.patch

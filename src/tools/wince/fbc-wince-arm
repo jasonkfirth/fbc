@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+#
+# FreeBASIC Windows CE ARM cross-compiler wrapper
+# ------------------------------------------------
+#
+# File: fbc-wince-arm
+#
+# Purpose:
+#
+#     Invoke a relocatable FreeBASIC installation as a Windows CE ARM
+#     cross-compiler.
+#
+# Responsibilities:
+#
+#     - locate the packaged FreeBASIC compiler relative to this script
+#     - require the maintained ARM CeGCC tools before starting compilation
+#     - preserve WinCE declaration-overlay precedence in a source checkout
+#     - select the Windows CE ARM target and GCC backend
+#     - preserve caller-supplied FreeBASIC options and source paths
+#
+# This file intentionally does NOT contain:
+#
+#     - CeGCC installation or download policy
+#     - runtime, gfxlib2, or sfxlib construction
+#     - application packaging or emulator startup
+#     - Windows CE MIPS target selection
+#
+
+set -euo pipefail
+
+##############################################################################
+# Package discovery
+##############################################################################
+
+SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+PACKAGE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+COMPILER="$SCRIPT_DIR/fbc"
+TOOL_PREFIX=""
+REPOSITORY_LAYOUT=0
+
+die() {
+	echo "fbc-wince-arm: $*" >&2
+	exit 1
+}
+
+##############################################################################
+# Toolchain contract
+##############################################################################
+
+# The checked-in wrapper lives below src/tools/wince, while release packages
+# place it beside bin/fbc.  Supporting both layouts keeps the same target
+# policy usable during development and after extraction.
+if [ ! -x "$COMPILER" ]; then
+	REPOSITORY_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+	if [ -x "$REPOSITORY_ROOT/bin/fbc" ]; then
+		PACKAGE_ROOT="$REPOSITORY_ROOT"
+		COMPILER="$REPOSITORY_ROOT/bin/fbc"
+		REPOSITORY_LAYOUT=1
+	fi
+fi
+
+[ -x "$COMPILER" ] || die "packaged compiler not found: $COMPILER"
+if [ "$REPOSITORY_LAYOUT" -eq 1 ]; then
+	[ -d "$PACKAGE_ROOT/inc" ] || die "repository FreeBASIC headers are missing"
+else
+	[ -d "$PACKAGE_ROOT/include/freebasic" ] ||
+		die "packaged FreeBASIC headers are missing"
+fi
+[ -d "$PACKAGE_ROOT/lib/freebasic/wince-arm" ] ||
+	die "packaged Windows CE ARM runtime is missing"
+
+if [ -n "${WINCE_ARM_TOOL_PREFIX:-}" ]; then
+	TOOL_PREFIX="$WINCE_ARM_TOOL_PREFIX"
+elif [ -x "$PACKAGE_ROOT/toolchain/cegcc-arm/bin/arm-mingw32ce-gcc" ]; then
+	# Installer packages carry the pinned CeGCC tree so the driver remains
+	# useful on current Ubuntu releases where no mingw32ce package exists.
+	TOOL_PREFIX="$PACKAGE_ROOT/toolchain/cegcc-arm/bin/arm-mingw32ce-"
+else
+	TOOL_PREFIX="arm-mingw32ce-"
+fi
+
+for tool in gcc as ld ar; do
+	command -v "${TOOL_PREFIX}${tool}" >/dev/null 2>&1 ||
+		die "required CeGCC tool not found: ${TOOL_PREFIX}${tool}"
+done
+
+# The explicit package prefix keeps the wrapper relocatable even when invoked
+# through PATH or a symbolic link.  A source checkout has inc/ rather than an
+# installed include/freebasic tree, so only that development layout needs an
+# additional include path.
+COMPILER_ARGUMENTS=(
+	-prefix "$PACKAGE_ROOT"
+	-target wince-arm
+	-gen gcc
+	-buildprefix "$TOOL_PREFIX"
+)
+if [ "$REPOSITORY_LAYOUT" -eq 1 ]; then
+	COMPILER_ARGUMENTS+=(
+		-i "$PACKAGE_ROOT/inc/wince"
+		-i "$PACKAGE_ROOT/inc"
+	)
+fi
+
+# The platform compiler hook supplies the ARMv4T software-float ABI and the
+# CeGCC startup/import-library policy.
+exec "$COMPILER" "${COMPILER_ARGUMENTS[@]}" "$@"
+
+# end of src/tools/wince/fbc-wince-arm

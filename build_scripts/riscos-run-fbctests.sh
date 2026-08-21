@@ -543,11 +543,10 @@ msg "refreshing RISC OS runtime libraries"
 make -s -C "$ROOT" -j"$JOBS" \
     TARGET_TRIPLET=arm-unknown-riscos \
     FBC="$FBC" \
-    rtlib fbrt gfxlib2
+    rtlib fbrt gfxlib2 sfxlib
 
 if [ "$COMPILE_ONLY" -eq 0 ]; then
-    if pgrep -x rpcemu-recompiler >/dev/null 2>&1 ||
-       pgrep -x rpcemu-interpreter >/dev/null 2>&1; then
+    if pgrep -f '(^|/)rpcemu-(recompiler|interpreter)( |$)' >/dev/null 2>&1; then
         die "an RPCEmu process is already running; close it before fbctests"
     fi
 

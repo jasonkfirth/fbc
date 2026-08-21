@@ -36,6 +36,7 @@ const SMOKE_NEWTERM_FAILED = 3
 const SMOKE_NEWWIN_FAILED = 4
 const SMOKE_WRITE_FAILED = 5
 const SMOKE_CLEANUP_FAILED = 6
+const SMOKE_MOVE_WRITE_FAILED = 7
 
 dim result as long
 dim version as const zstring ptr = curses_version()
@@ -71,6 +72,10 @@ end if
 
 if waddch(current_window, cast(chtype, asc("F"))) = ERR_ then
 	result = SMOKE_WRITE_FAILED
+end if
+
+if mvwaddstr(current_window, 0, 1, @"B") = ERR_ andalso result = 0 then
+	result = SMOKE_MOVE_WRITE_FAILED
 end if
 
 cleanup:

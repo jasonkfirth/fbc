@@ -3161,7 +3161,8 @@ private function hAllocTargetWstrConstFromStrLit _
 	dim as wstring ptr wtext = any
 	dim as integer i, internalchars, textchars
 
-	if( env.clopt.target <> FB_COMPTARGET_XBOX ) then
+	if( (env.clopt.target <> FB_COMPTARGET_XBOX) and _
+	    (env.clopt.target <> FB_COMPTARGET_WINCE) ) then
 		return symbAllocWstrConst( wstr( *symbGetVarLitText( litsym ) ), _
 		                           symbGetStrLength( litsym ) )
 	end if

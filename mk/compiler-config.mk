@@ -113,6 +113,10 @@ ifneq ($(filter x86_64 amd64 x86-64,$(HOST_ARCH_RAW)),)
   HOST_ARCH := x86_64
 endif
 
+ifneq ($(filter m68k m68000 m68010 m68020 m68030 m68040 m68060,$(HOST_ARCH_RAW)),)
+  HOST_ARCH := m68k
+endif
+
 ifneq ($(filter arm%,$(HOST_ARCH_RAW)),)
   HOST_ARCH := arm
 endif
@@ -148,11 +152,30 @@ ifneq ($(filter loongarch64 loong64,$(HOST_ARCH_RAW)),)
   HOST_ARCH := loongarch64
 endif
 
+ifneq ($(filter mips,$(HOST_ARCH_RAW)),)
+  HOST_ARCH := mips32
+endif
+
+ifneq ($(filter mipsel,$(HOST_ARCH_RAW)),)
+  HOST_ARCH := mips32el
+endif
+
+ifneq ($(filter mips64,$(HOST_ARCH_RAW)),)
+  HOST_ARCH := mips64
+endif
+
+ifneq ($(filter mips64el,$(HOST_ARCH_RAW)),)
+  HOST_ARCH := mips64el
+endif
+
 ifneq ($(findstring linux,$(HOST_TRIPLET_LC)),)
   HOST_OS := linux
 endif
 ifneq ($(findstring android,$(HOST_TRIPLET_LC)),)
   HOST_OS := android
+endif
+ifneq ($(findstring aros,$(HOST_TRIPLET_LC)),)
+  HOST_OS := aros
 endif
 ifneq ($(or $(findstring darwin,$(HOST_TRIPLET_LC)),$(findstring apple,$(HOST_TRIPLET_LC))),)
   HOST_OS := darwin
@@ -542,6 +565,10 @@ endif
 
 ifeq ($(THREAD_MODEL),win32)
   THREAD_FLAGS := -mthreads
+endif
+
+ifeq ($(THREAD_MODEL),aros)
+  THREAD_FLAGS := -lpthread
 endif
 
 ifdef DISABLE_MT

@@ -119,6 +119,15 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		    or FB_TARGETOPT_COFF _
 	), _
 	( _
+		@"wince", _
+		FB_DATATYPE_USHORT, _
+		FB_FUNCMODE_STDCALL, _
+		FB_FUNCMODE_STDCALL, _
+		0   or FB_TARGETOPT_EXPORT _
+		    or FB_TARGETOPT_RETURNINREGS _
+		    or FB_TARGETOPT_COFF _
+	), _
+	( _
 		@"cygwin", _
 		FB_DATATYPE_USHORT, _
 		FB_FUNCMODE_STDCALL, _
@@ -137,6 +146,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		    or FB_TARGETOPT_CALLEEPOPSHIDDENPTR _
 		    or FB_TARGETOPT_STACKALIGN16 _
 		    or FB_TARGETOPT_GAS64_SYSV_STRUCTRET _
+		    or FB_TARGETOPT_GAS64_SYSV_ABI _
 		    or FB_TARGETOPT_ELF _
 	), _
 	( _
@@ -157,6 +167,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		0   or FB_TARGETOPT_UNIX _
 		    or FB_TARGETOPT_CALLEEPOPSHIDDENPTR _
 		    or FB_TARGETOPT_STACKALIGN16 _
+		    or FB_TARGETOPT_GAS64_SYSV_ABI _
 		    or FB_TARGETOPT_ELF _
 	), _
 	( _
@@ -185,6 +196,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		    or FB_TARGETOPT_RETURNINREGS _
 		    or FB_TARGETOPT_RETURNINFLTS _
 		    or FB_TARGETOPT_GAS64_SYSV_STRUCTRET _
+		    or FB_TARGETOPT_GAS64_SYSV_ABI _
 		    or FB_TARGETOPT_ELF _
 	), _
 	( _
@@ -282,6 +294,18 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 		0   or FB_TARGETOPT_UNIX _
 		    or FB_TARGETOPT_CALLEEPOPSHIDDENPTR _
 		    or FB_TARGETOPT_ELF _
+	), _
+	( _
+		@"aros", _
+		FB_DATATYPE_ULONG, _
+		FB_FUNCMODE_CDECL, _
+		FB_FUNCMODE_STDCALL_MS, _
+		0   or FB_TARGETOPT_UNIX _
+		    or FB_TARGETOPT_CALLEEPOPSHIDDENPTR _
+		    or FB_TARGETOPT_STACKALIGN16 _
+		    or FB_TARGETOPT_GAS64_SYSV_STRUCTRET _
+		    or FB_TARGETOPT_GAS64_SYSV_ABI _
+		    or FB_TARGETOPT_ELF _
 	) _
 }
 
@@ -306,7 +330,12 @@ dim shared as FBCPUFAMILYINFO cpufamilyinfo(0 to FB_CPUFAMILY__COUNT-1) = _
 	(@"riscv64"    , FB_DEFAULT_CPUTYPE_RISCV64), _
 	(@"s390x"      , FB_DEFAULT_CPUTYPE_S390X  ), _
 	(@"loongarch64", FB_DEFAULT_CPUTYPE_LOONGARCH64), _
-	(@"asmjs"      , FB_DEFAULT_CPUTYPE_ASMJS  )  _
+	(@"asmjs"      , FB_DEFAULT_CPUTYPE_ASMJS  ), _
+	(@"m68k"       , FB_DEFAULT_CPUTYPE_M68K   ), _
+	(@"mips32"     , FB_DEFAULT_CPUTYPE_MIPS32 ), _
+	(@"mips32el"   , FB_DEFAULT_CPUTYPE_MIPS32EL), _
+	(@"mips64"     , FB_DEFAULT_CPUTYPE_MIPS64 ), _
+	(@"mips64el"   , FB_DEFAULT_CPUTYPE_MIPS64EL)  _
 }
 
 type FBCPUTYPEINFO
@@ -336,9 +365,9 @@ dim shared as FBCPUTYPEINFO cputypeinfo(0 to FB_CPUTYPE__COUNT-1) = _
 	( NULL       , @"armv4"        , FB_CPUFAMILY_ARM    , 32, FALSE ), _ '' FB_CPUTYPE_ARMV4
 	( NULL       , @"armv5te"      , FB_CPUFAMILY_ARM    , 32, FALSE ), _ '' FB_CPUTYPE_ARMV5TE
 	( NULL       , @"armv6"        , FB_CPUFAMILY_ARM    , 32, FALSE ), _ '' FB_CPUTYPE_ARMV6
-	( NULL       , @"armv6+fp"     , FB_CPUFAMILY_ARM    , 32, FALSE ), _ '' FB_CPUTYPE_ARMV6_FP
+	( @"armv6"  , @"armv6+fp"     , FB_CPUFAMILY_ARM    , 32, FALSE ), _ '' FB_CPUTYPE_ARMV6_FP
 	( NULL       , @"armv7-a"      , FB_CPUFAMILY_ARM    , 32, FALSE ), _ '' FB_CPUTYPE_ARMV7A
-	( NULL       , @"armv7-a+fp"   , FB_CPUFAMILY_ARM    , 32, FALSE ), _ '' FB_CPUTYPE_ARMV7A_FP
+	( @"armv7-a", @"armv7-a+fp"   , FB_CPUFAMILY_ARM    , 32, FALSE ), _ '' FB_CPUTYPE_ARMV7A_FP
 	( @"armv8-a" , @"aarch64"      , FB_CPUFAMILY_AARCH64, 64, FALSE ), _ '' FB_CPUTYPE_AARCH64
 	( NULL       , @"powerpc"      , FB_CPUFAMILY_PPC    , 32, TRUE  ), _ '' FB_CPUTYPE_PPC
 	( NULL       , @"powerpc64"    , FB_CPUFAMILY_PPC64  , 64, TRUE  ), _ '' FB_CPUTYPE_PPC64
@@ -347,7 +376,12 @@ dim shared as FBCPUTYPEINFO cputypeinfo(0 to FB_CPUTYPE__COUNT-1) = _
 	( @"rv64gc"  , @"riscv64"      , FB_CPUFAMILY_RISCV64, 64, FALSE ), _ '' FB_CPUTYPE_RISCV64
 	( @"z900"    , @"s390x"        , FB_CPUFAMILY_S390X  , 64, TRUE  ), _ '' FB_CPUTYPE_S390X
 	( NULL       , @"loongarch64"  , FB_CPUFAMILY_LOONGARCH64, 64, FALSE ), _ '' FB_CPUTYPE_LOONGARCH64
-	( NULL       , @"asmjs"        , FB_CPUFAMILY_ASMJS  , 32, FALSE )  _ '' FB_CPUTYPE_ASMJS
+	( NULL       , @"asmjs"        , FB_CPUFAMILY_ASMJS  , 32, FALSE ), _ '' FB_CPUTYPE_ASMJS
+	( NULL       , @"m68k"         , FB_CPUFAMILY_M68K   , 32, TRUE  ), _ '' FB_CPUTYPE_M68K
+	( NULL       , @"mips32"       , FB_CPUFAMILY_MIPS32 , 32, TRUE  ), _ '' FB_CPUTYPE_MIPS32
+	( @"mips32" , @"mips32el"     , FB_CPUFAMILY_MIPS32EL, 32, FALSE ), _ '' FB_CPUTYPE_MIPS32EL
+	( @"mips64" , @"mips64"       , FB_CPUFAMILY_MIPS64 , 64, TRUE  ), _ '' FB_CPUTYPE_MIPS64
+	( @"mips64" , @"mips64el"     , FB_CPUFAMILY_MIPS64EL, 64, FALSE )  _ '' FB_CPUTYPE_MIPS64EL
 }
 
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -563,6 +597,18 @@ sub fbInit _
 	'' enabled lets constant wstr() expressions fold without teaching every
 	'' caller about each UTF-32 target.
 	if( (env.wcharconv = FB_WCHARCONV_NEVER) and fbTargetWcharIsUtf32( ) ) then
+		env.wcharconv = FB_WCHARCONV_WARNING
+	end if
+
+	'' Windows-family cross compilers use a 16-bit wchar_t even when fbc is
+	'' hosted on a system with a 32-bit WSTRING.  The literal representation
+	'' stores Unicode code points independently of either width, and the HLC
+	'' emitter serializes them through env.target.wchar.  Permit folding across
+	'' that width boundary just as we do for UTF-32 targets.  Xbox remains on
+	'' its existing runtime UTF-8 path and must not use this conversion mode.
+	if( (env.wcharconv = FB_WCHARCONV_NEVER) and _
+	    (fbGetTargetWcharSize( ) = 2) and _
+	    (env.clopt.target <> FB_COMPTARGET_XBOX) ) then
 		env.wcharconv = FB_WCHARCONV_WARNING
 	end if
 
@@ -1182,6 +1228,14 @@ function fbIdentifyFbcArch( byref fbcarch as string ) as integer
 		function = FB_CPUTYPE_RISCV32
 	case "rv64", "rv64gc"
 		function = FB_CPUTYPE_RISCV64
+	case "mips", "mips32be"
+		function = FB_CPUTYPE_MIPS32
+	case "mipsel", "mips32le"
+		function = FB_CPUTYPE_MIPS32EL
+	case "mips64be"
+		function = FB_CPUTYPE_MIPS64
+	case "mips64le"
+		function = FB_CPUTYPE_MIPS64EL
 	case else
 		function = -1
 	end select
@@ -1200,6 +1254,13 @@ function fbTargetCanFoldStrLitToWstr( byval allow_litconst as integer ) as integ
 		return FALSE
 	end if
 
+	'' Windows CE program strings are UTF-8, but the compiler host's WSTR()
+	'' conversion follows its process locale.  Keep mixed expressions as
+	'' runtime conversions unless the language requires an addressable literal.
+	if( env.clopt.target = FB_COMPTARGET_WINCE ) then
+		return (allow_litconst <> FALSE)
+	end if
+
 	return ((allow_litconst <> FALSE) or (not fbTargetWcharIsUtf32( )))
 end function
 
@@ -1210,11 +1271,12 @@ function fbTargetCanFoldStrLitTextToWstr _
 		byval allow_litconst as integer _
 	) as integer
 
-	'' Xbox program strings are UTF-8 at runtime.  The compiler has to use
-	'' the same rule when it creates an addressable WSTRING literal for
-	'' WSTR("..."), otherwise @WSTR(...) cannot be represented as a runtime
-	'' conversion call.
-	if( env.clopt.target = FB_COMPTARGET_XBOX ) then
+	'' Xbox and Windows CE program strings are UTF-8 at runtime.  The compiler
+	'' has to use the target-aware decoder when it creates an addressable
+	'' WSTRING literal for WSTR("...").  Besides preserving Unicode, folding
+	'' here retains the literal's fixed length for LEN() and SIZEOF().
+	if( (env.clopt.target = FB_COMPTARGET_XBOX) or _
+	    (env.clopt.target = FB_COMPTARGET_WINCE) ) then
 		return TRUE
 	end if
 
@@ -1952,6 +2014,11 @@ function fbGetBackendValistType _
 			typedef = FB_CVA_LIST_BUILTIN_POINTER
 
 		case FB_CPUFAMILY_RISCV32, FB_CPUFAMILY_RISCV64
+			typedef = FB_CVA_LIST_BUILTIN_VOID_POINTER
+
+		case FB_CPUFAMILY_MIPS32, FB_CPUFAMILY_MIPS32EL, _
+		     FB_CPUFAMILY_MIPS64, FB_CPUFAMILY_MIPS64EL
+			'' GCC represents va_list as void pointer for the O32 and N64 ABIs.
 			typedef = FB_CVA_LIST_BUILTIN_VOID_POINTER
 
 		case FB_CPUFAMILY_LOONGARCH64

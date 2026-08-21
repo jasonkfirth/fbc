@@ -1,0 +1,155 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-gcc-m68k-host-runtime-gcc6.patch
+#
+# Purpose:
+#
+#     Supply the small native-host services GCC 6 needs when AROS m68k cannot
+#     enter through the PosixC process initializer.
+#
+# Responsibilities:
+#
+#     - keep m68k host policy in GCC's AROS configuration directory
+#     - read shell environment variables without consulting global ENV storage
+#     - report redirected diagnostic streams as non-terminal streams
+#     - remove the generic AROS -nix link flag only for the m68k host
+#
+# This file intentionally does NOT alter generated m68k code, GCC specs, or
+# non-m68k AROS hosts.
+#
+--- a/gcc/config.host
++++ b/gcc/config.host
+@@ -288,6 +288,9 @@
+     host_can_use_collect2=no
+     host_xm_file=xm-aros.h
+     host_xmake_file="${host_xmake_file} x-aros"
++    case ${host} in
++      m68k*-*-aros*) host_xmake_file="${host_xmake_file} aros/x-m68k" ;;
++    esac
+     case ${host}:${target} in
+       arm*-*-aros*:arm*-*-aros*)
+         host_extra_gcc_objs="driver-arm.o"
+--- /dev/null
++++ b/gcc/config/aros/x-m68k
+@@ -0,0 +1,21 @@
++# AROS m68k cannot enter through PosixC's relative-library initializer.
++# Remove the generic AROS host link flag after x-aros has added it.
++override LDFLAGS := $(filter-out -nix,$(LDFLAGS))
++
++# GCC reads environment variables and asks whether diagnostics use a terminal
++# before it can process even --version.  Keep those m68k services together in
++# one platform object and link it into every native GCC program.
++LIBDEPS += aros-m68k-host-runtime.o
++LIBS += aros-m68k-host-runtime.o
++
++aros-m68k-host-runtime.o: $(srcdir)/config/aros/host-runtime.c \
++  $(CONFIG_H) $(SYSTEM_H)
++	$(COMPILER) -c $(ALL_COMPILERFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $< \
++	  -o $@
++
++# GCC generates the C front end checksum before it builds cc1.  The host
++# runtime is linked into that checksum, so this edge must exist before the
++# language makefile starts its link step.
++cc1-checksum.c: aros-m68k-host-runtime.o
++
++# end of x-m68k
+--- /dev/null
++++ b/gcc/config/aros/host-runtime.c
+@@ -0,0 +1,94 @@
++/*
++    Project: GCC native host support for AROS m68k
++    ------------------------------------------------
++
++    File: host-runtime.c
++
++    Purpose:
++
++        Provide the native AROS services required by GCC before it can parse
++        a command line.
++
++    Responsibilities:
++
++        - read process-local shell variables through dos.library
++        - return environment values with process-lifetime storage
++        - identify diagnostic streams as non-terminal streams
++
++    This file intentionally does NOT modify environment variables, translate
++    path syntax, or implement process creation.
++*/
++
++#include <exec/memory.h>
++#include <dos/var.h>
++#include <proto/dos.h>
++#include <proto/exec.h>
++
++static char *
++aros_m68k_getenv(const char *name)
++{
++    char byte;
++    char *value;
++    LONG length;
++
++    if (name == NULL || name[0] == '\0')
++        return NULL;
++
++    /*
++        Shell variables are local to the current AROS process.  Searching the
++        global ENV filesystem is both semantically wrong for compiler control
++        variables and can open a missing-volume requester during startup.
++    */
++    if (GetVar((CONST_STRPTR)name, &byte, 1,
++               GVF_LOCAL_ONLY | GVF_BINARY_VAR) != 0)
++        return NULL;
++
++    length = IoErr();
++    if (length < 0)
++        return NULL;
++
++    /*
++        GCC expects earlier getenv results to remain valid while it builds its
++        search paths.  A process-lifetime allocation provides that contract;
++        AROS reclaims the address space when the command exits.
++    */
++    value = (char *)AllocVec((ULONG)length + 1, MEMF_ANY);
++    if (value == NULL)
++        return NULL;
++
++    if (GetVar((CONST_STRPTR)name, value, length + 1,
++               GVF_LOCAL_ONLY | GVF_BINARY_VAR) < 0)
++    {
++        FreeVec(value);
++        return NULL;
++    }
++
++    return value;
++}
++
++char *
++getenv(const char *name)
++{
++    return aros_m68k_getenv(name);
++}
++
++char *
++__posixc_getenv(const char *name)
++{
++    return aros_m68k_getenv(name);
++}
++
++int
++isatty(int descriptor)
++{
++    (void)descriptor;
++    return 0;
++}
++
++int
++__posixc_isatty(int descriptor)
++{
++    return isatty(descriptor);
++}
++
++/* end of host-runtime.c */
+
+# end of native-gcc-m68k-host-runtime-gcc6.patch

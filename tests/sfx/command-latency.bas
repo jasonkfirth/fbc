@@ -44,7 +44,11 @@ if( temp_dir = "" ) then
 end if
 
 if( temp_dir = "" ) then
-	temp_dir = "/tmp"
+	temp_dir = curdir()
+
+	if( temp_dir = "" ) then
+		temp_dir = "."
+	end if
 end if
 
 if( right( temp_dir, 1 ) <> "/" andalso right( temp_dir, 1 ) <> "\\" ) then

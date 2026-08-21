@@ -81,6 +81,7 @@ quick-test-body: sanity \
 	compiler-riscv64-smoke \
 	compiler-s390x-smoke \
 	compiler-loongarch64-smoke \
+	compiler-mips-smoke \
 	compiler-ppc-smoke \
 	compiler-ppc64-smoke \
 	compiler-ppc64le-smoke \
@@ -117,6 +118,7 @@ full-test-body: sanity \
 	compiler-riscv64-smoke \
 	compiler-s390x-smoke \
 	compiler-loongarch64-smoke \
+	compiler-mips-smoke \
 	compiler-ppc-smoke \
 	compiler-ppc64-smoke \
 	compiler-ppc64le-smoke \
@@ -150,6 +152,7 @@ MAKETEST_HOST_FBC_TARGETS := \
 	compiler-riscv64-smoke \
 	compiler-s390x-smoke \
 	compiler-loongarch64-smoke \
+	compiler-mips-smoke \
 	compiler-ppc-smoke \
 	compiler-ppc64-smoke \
 	compiler-ppc64le-smoke \

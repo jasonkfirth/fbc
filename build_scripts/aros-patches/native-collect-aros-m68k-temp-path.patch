@@ -1,0 +1,72 @@
+# FreeBASIC AROS native m68k tool support
+# --------------------------------------
+#
+# File: native-collect-aros-m68k-temp-path.patch
+#
+# Purpose:
+#
+#     Give collect-aros temporary files names that remain valid across the
+#     isolated m68k process boundary.
+#
+# Responsibilities:
+#
+#     - replace local-assign or relative TMPDIR values with the current
+#       directory's absolute POSIX path
+#     - let the m68k command bridge translate that path for the child linker
+#     - preserve explicit absolute TMPDIR policy
+#     - leave ARM, x86_64, and cross-host collect-aros behavior unchanged
+#
+# This file intentionally does NOT restore NP_CopyVars or choose a fixed
+# volume for compiler temporary files.
+#
+--- a/tools/collect-aros/collect-aros.c
++++ b/tools/collect-aros/collect-aros.c
+@@ -7,6 +7,7 @@
+ #include <errno.h>
+ #include <fcntl.h>
+ #include <unistd.h>
++#include <sys/param.h>
+ #include <sys/stat.h>
+ 
+ #include "env.h"
+@@ -28,6 +29,29 @@ static char *ldscriptname, *tempoutput, *ld_name, *strip_name;
+ 
+ int have_gnunm = 0;
+ 
++#if defined(__AROS__) && defined(__mc68000__)
++static void configure_m68k_temp_directory(void)
++{
++    const char *temp_directory = getenv("TMPDIR");
++    char current_directory[PATH_MAX];
++
++    /*
++     * The m68k process bridge deliberately excludes NP_CopyVars because
++     * freeLocalVars can corrupt the allocator while tearing down copied shell
++     * locals.  Therefore a child linker cannot rely on a parent-local T:
++     * assign.  Give libiberty an absolute POSIX path; the bridge converts that
++     * path to an AmigaDOS volume path when launching the linker.
++     */
++    if (temp_directory != NULL && temp_directory[0] == '/')
++        return;
++
++    if (getcwd(current_directory, sizeof(current_directory)) == NULL)
++        fatal("getcwd()", strerror(errno));
++    if (setenv("TMPDIR", current_directory, 1) != 0)
++        fatal("setenv(TMPDIR)", strerror(errno));
++}
++#endif
++
+ static void exitfunc(void)
+ {
+     if (ldscriptfile != NULL)
+@@ -294,6 +318,9 @@ int main(int argc, char *argv[])
+ 
+     if (incremental != 1)
+     {
++#if defined(__AROS__) && defined(__mc68000__)
++        configure_m68k_temp_directory();
++#endif
+         atexit(exitfunc);
+         if
+         (
+# end of native-collect-aros-m68k-temp-path.patch

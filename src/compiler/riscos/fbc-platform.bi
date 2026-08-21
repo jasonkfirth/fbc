@@ -10,6 +10,7 @@
 ''
 '' Responsibilities:
 ''
+''     - place the RISC OS declaration overlay before shared headers
 ''     - select GCCSDK's GCC driver for the final link
 ''     - select static executable linking while the port ships static runtimes
 ''     - provide the platform hook entry points used by fbc-platform.bi
@@ -36,6 +37,34 @@ private function fbcRiscosPlatformIsSelected( ) as integer
 	function = (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_RISCOS)
 end function
 
+private sub fbcRiscosPlatformAddDefaultIncludePaths( byref incpath as string )
+	if( fbcRiscosPlatformIsSelected( ) = FALSE ) then
+		exit sub
+	end if
+
+	'' RISC OS headers are complete replacements for generic headers.
+	fbAddIncludePath( incpath + FB_HOST_PATHDIV + "riscos" )
+end sub
+
+private function fbcRiscosPlatformGetToolPrefix( byval cputype as integer ) as string
+	if( cputype = FB_CPUTYPE_ARMV4 ) then
+		return "arm-unknown-riscos"
+	end if
+
+	function = ""
+end function
+
+private sub fbcRiscosPlatformAdjustParsedCpuType _
+	( _
+		byref arch as string, _
+		byref cputype as integer _
+	)
+	if( arch = "arm" ) then
+		'' GCCSDK's supported baseline remains compatible with StrongARM RiscPCs.
+		cputype = FB_CPUTYPE_ARMV4
+	end if
+end sub
+
 private function fbcRiscosPlatformGetLinkerTool( ) as integer
 	if( fbcRiscosPlatformIsSelected( ) = FALSE ) then
 		function = FBCTOOL_LD
@@ -43,6 +72,12 @@ private function fbcRiscosPlatformGetLinkerTool( ) as integer
 	end if
 
 	function = FBCTOOL_GCC
+end function
+
+private function fbcRiscosPlatformSupportsSupplementaryLinkerScript( ) as integer
+	'' GCCSDK's driver owns its complete linker script.  An INSERT fragment is
+	'' neither required nor portable to the older RISC OS linker releases.
+	function = FALSE
 end function
 
 '' A native UnixLib compiler must let !GCC's Run$Path resolve system tools.
@@ -71,6 +106,15 @@ private function fbcRiscosHostRunTool _
 				was_handled = TRUE
 				return shell( path + " " + arguments )
 			end if
+
+			if( tool = FBCTOOL_ELF2AIF ) then
+				'' UnixLib's exec() cannot start the bundled &FF8 converter through
+				'' its Unix-style absolute path.  !FreeBASIC registers bin/ on
+				'' Run$Path, so let the RISC OS command resolver load elf2aif by
+				'' its native file type, just as a user starts it at the CLI.
+				was_handled = TRUE
+				return shell( "elf2aif " + arguments )
+			end if
 		#endif
 	#endif
 
@@ -81,8 +125,26 @@ private function fbcRiscosHostFinishExecutable( ) as integer
 	#ifdef __FB_RISCOS__
 		if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_RISCOS) and _
 		    (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_EXECUTABLE) ) then
-			return fbcRunBin( "making AIF", FBCTOOL_ELF2AIF, _
-			                  QUOTE + fbc.outname + QUOTE )
+			dim as string aifname = fbc.outname + "-aif"
+
+			'' elf2aif's one-path mode converts through its own temporary name.
+			'' On UnixLib, that replacement can leave the original ELF behind
+			'' while still returning success.  Use its documented input/output
+			'' form, then replace the ELF only after a separate AIF exists.
+			'' The hyphenated temporary leaf deliberately avoids a new UnixLib
+			'' suffix mapping and therefore keeps the final file type as &FF8.
+			safeKill( aifname )
+			if( fbcRunBin( "making AIF", FBCTOOL_ELF2AIF, _
+			               QUOTE + fbc.outname + QUOTE + " " + _
+			               QUOTE + aifname + QUOTE ) = FALSE ) then
+				return FALSE
+			end if
+
+			if( kill( fbc.outname ) <> 0 ) then
+				safeKill( aifname )
+				return FALSE
+			end if
+			name aifname as fbc.outname
 		end if
 	#endif
 

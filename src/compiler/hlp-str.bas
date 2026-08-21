@@ -1462,6 +1462,54 @@ function hUnescapeW _
 
 end function
 
+'' Return the number of wchar code units needed by an internally escaped
+'' WSTRING literal on the selected target. This is distinct from the host
+'' compiler's LEN() whenever a cross compiler bridges UTF-16 and UTF-32.
+function hGetTargetWstrLength _
+	( _
+		byval text as wstring ptr _
+	) as integer
+
+	const UTF16_HIGH_MIN = &hD800ul
+	const UTF16_HIGH_MAX = &hDBFFul
+	const UTF16_LOW_MIN = &hDC00ul
+	const UTF16_LOW_MAX = &hDFFFul
+	const UNICODE_SUPPLEMENTARY_MIN = &h10000ul
+	const UNICODE_MAX = &h10FFFFul
+	dim as integer source_chars
+	dim as wstring ptr source = hUnescapeW( text, source_chars )
+	dim as integer target_chars = 0
+	dim as integer target_wchar_size = fbGetTargetWcharSize( )
+	dim as integer index = 0
+
+	while( index < source_chars )
+		dim as ulong codepoint = culng( (*source)[index] )
+
+		if( target_wchar_size = 2 ) then
+			if( (codepoint >= UNICODE_SUPPLEMENTARY_MIN) and _
+			    (codepoint <= UNICODE_MAX) ) then
+				target_chars += 2
+			else
+				target_chars += 1
+			end if
+		elseif( (target_wchar_size = 4) and _
+		        (codepoint >= UTF16_HIGH_MIN) and _
+		        (codepoint <= UTF16_HIGH_MAX) and _
+		        (index + 1 < source_chars) and _
+		        (culng( (*source)[index + 1] ) >= UTF16_LOW_MIN) and _
+		        (culng( (*source)[index + 1] ) <= UTF16_LOW_MAX) ) then
+			target_chars += 1
+			index += 1
+		else
+			target_chars += 1
+		end if
+
+		index += 1
+	wend
+
+	function = target_chars
+end function
+
 function hCharNeedsEscaping _
 	( _
 		byval ch as integer, _

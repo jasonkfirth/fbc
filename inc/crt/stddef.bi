@@ -9,6 +9,11 @@
 #ifndef __crt_stddef_bi__
 #define __crt_stddef_bi__
 
+'' Older source-bootstrap compilers do not understand the type-alias form.
+'' Keep their temporary bootstrap build on the equivalent FreeBASIC types.
+#ifdef __FB_BOOTSTRAP_COMPAT__
+	type ptrdiff_t as integer
+#else
 '' On LP64 targets, C's ptrdiff_t and size_t are long/unsigned long rather
 '' than long long.  Clang checks built-in CRT declarations against that spelling.
 #if defined( __FB_64BIT__ ) and defined( __FB_UNIX__ )
@@ -16,16 +21,28 @@
 #else
 	type ptrdiff_t as integer
 #endif
+#endif
 
 #ifdef __FB_DOS__
+	#ifdef __FB_BOOTSTRAP_COMPAT__
+		type size_t as ulong
+	#else
 	type size_t as ulong alias "long"
+	#endif
 	#ifndef ssize_t
 	type ssize_t as long
 	#endif
 #elseif defined( __FB_64BIT__ ) and defined( __FB_UNIX__ )
+	#ifdef __FB_BOOTSTRAP_COMPAT__
+		type size_t as uinteger
+		#ifndef ssize_t
+		type ssize_t as integer
+		#endif
+	#else
 	type size_t as uinteger alias "long"
 	#ifndef ssize_t
 	type ssize_t as integer alias "long"
+	#endif
 	#endif
 #else
 	type size_t as uinteger

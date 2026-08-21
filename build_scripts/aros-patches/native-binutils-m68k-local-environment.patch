@@ -1,0 +1,39 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-binutils-m68k-local-environment.patch
+#
+# Purpose:
+#
+#     Keep GNU option parsing independent of unavailable PosixC environment
+#     startup in native AROS m68k tools.
+#
+# Responsibilities:
+#
+#     - skip the optional POSIXLY_CORRECT lookup on AROS m68k
+#     - preserve GNU option ordering used by the assembler and linker
+#     - leave every other binutils host unchanged
+#
+# This file intentionally does NOT change accepted options or target behavior.
+#
+--- a/libiberty/getopt.c
++++ b/libiberty/getopt.c
+@@ -409,6 +409,16 @@ _getopt_initialize (int argc ATTRIBUTE_UNUSED,
+ 
+   nextchar = NULL;
+ 
++#if defined (__AROS__) && defined (__mc68000__)
++  /*
++     PosixC environment access requires an initializer which cannot run in
++     the classic m68k relative-library configuration.  This optional variable
++     only selects the default argument ordering, and gas supplies that policy
++     explicitly through the first character of its option string.
++  */
++  posixly_correct = NULL;
++#else
+   posixly_correct = getenv ("POSIXLY_CORRECT");
++#endif
+ 
+   /* Determine how to handle the ordering of options and nonoptions.  */
+
+# end of native-binutils-m68k-local-environment.patch

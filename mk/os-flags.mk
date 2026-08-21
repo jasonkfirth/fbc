@@ -36,7 +36,7 @@ endif
 # noise across toolchains.
 # ---------------------------------------------------------------------------
 
-ifeq ($(TARGET_OS),win32)
+ifneq ($(filter win32 wince,$(TARGET_OS)),)
   ALLCFLAGS += -fno-ident
 endif
 

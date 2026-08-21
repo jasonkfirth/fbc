@@ -1,0 +1,264 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-collect-aros-runcommand.patch
+#
+# Purpose:
+#
+#     Make the AROS-hosted collect-aros linker driver execute the native
+#     linker through dos.library rather than the unavailable vfork interface.
+#
+# Responsibilities:
+#
+#     - translate POSIX absolute command paths into AROS assign paths
+#     - quote linker arguments according to AmigaDOS command-line rules
+#     - execute m68k linkers in independent AROS processes
+#     - release child segments while completed task records remain retained
+#     - wait for m68k child resource cleanup before continuing
+#     - avoid corrupt m68k teardown of copied shell-local-variable lists
+#     - preserve the established RunCommand bridge on ARM and x86 hosts
+#     - preserve the existing cross-host vfork implementation
+#
+# This file intentionally does NOT alter collection or linking policy.
+#
+--- a/tools/collect-aros/docommand-exec.c
++++ b/tools/collect-aros/docommand-exec.c
+@@ -10,9 +10,228 @@
+ #include <fcntl.h>
+ #include <sys/param.h>
+ 
++#ifdef __AROS__
++#include <dos/dosextens.h>
++#include <dos/dostags.h>
++#include <proto/dos.h>
++#include <proto/exec.h>
++#endif
++
+ #include "docommand.h"
+ #include "misc.h"
+ 
++#ifdef __AROS__
++
++#ifdef __mc68000__
++struct aros_child_result
++{
++    volatile LONG result;
++};
++
++static void aros_child_exit(IPTR data, IPTR result)
++{
++    struct aros_child_result *child_result;
++
++    /* AROS m68k's DosEntry stack shim exposes D1 before D0 to C code. */
++    child_result = (struct aros_child_result *)data;
++    child_result->result = (LONG)result;
++}
++#endif
++
++static char *aros_command_name(const char *command)
++{
++    char *result;
++    char *write_cursor;
++
++    result = xmalloc(strlen(command) + 1);
++    write_cursor = result;
++
++    if (command[0] == '/' && strchr(command + 1, '/') != NULL)
++    {
++        const char *separator = strchr(command + 1, '/');
++
++        memcpy(write_cursor, command + 1, separator - command - 1);
++        write_cursor += separator - command - 1;
++        *write_cursor++ = ':';
++        command = separator + 1;
++    }
++
++    strcpy(write_cursor, command);
++    return result;
++}
++
++static const char *aros_argument_path(const char *argument)
++{
++    const char *equals;
++
++    if (argument[0] == '/')
++        return argument;
++
++    if (argument[0] == '-' &&
++        (argument[1] == 'L' || argument[1] == 'R' || argument[1] == 'T') &&
++        argument[2] == '/')
++        return argument + 2;
++
++    equals = strchr(argument, '=');
++    if (equals != NULL && equals[1] == '/')
++        return equals + 1;
++
++    return NULL;
++}
++
++static char *aros_write_argument_character(char *write_cursor, char character)
++{
++    if (character == '\n' || character == '"' || character == '*')
++    {
++        *write_cursor++ = '*';
++        *write_cursor++ = character == '\n' ? 'N' : character;
++    }
++    else
++        *write_cursor++ = character;
++
++    return write_cursor;
++}
++
++static char *aros_write_argument(char *write_cursor, const char *argument)
++{
++    const char *path;
++    const char *separator;
++
++    path = aros_argument_path(argument);
++    while (argument != path && *argument != '\0')
++        write_cursor = aros_write_argument_character(write_cursor, *argument++);
++
++    if (path != NULL)
++    {
++        path++;
++        separator = strchr(path, '/');
++        if (separator == NULL)
++            separator = path + strlen(path);
++
++        while (path != separator)
++            write_cursor = aros_write_argument_character(write_cursor, *path++);
++        *write_cursor++ = ':';
++        argument = *separator == '/' ? separator + 1 : separator;
++    }
++
++    while (*argument != '\0')
++        write_cursor = aros_write_argument_character(write_cursor, *argument++);
++
++    return write_cursor;
++}
++
++static char *aros_command_arguments(char *argv[])
++{
++    char *arguments;
++    char *write_cursor;
++    char **argument;
++    size_t size = 2;
++
++    for (argument = argv + 1; *argument != NULL; argument++)
++    {
++        const char *read_cursor;
++
++        size += strlen(*argument) + 3;
++        for (read_cursor = *argument; *read_cursor != '\0'; read_cursor++)
++            if (*read_cursor == '\n' || *read_cursor == '"' || *read_cursor == '*')
++                size++;
++    }
++
++    arguments = xmalloc(size);
++    write_cursor = arguments;
++    for (argument = argv + 1; *argument != NULL; argument++)
++    {
++        if (argument != argv + 1)
++            *write_cursor++ = ' ';
++        *write_cursor++ = '"';
++        write_cursor = aros_write_argument(write_cursor, *argument);
++        *write_cursor++ = '"';
++    }
++
++    *write_cursor++ = '\n';
++    *write_cursor = '\0';
++    return arguments;
++}
++
++static void _docommandv(const char *command, char *argv[], int do_path)
++{
++    struct CommandLineInterface *cli;
++#ifdef __mc68000__
++    struct aros_child_result child_result;
++    struct Process *child;
++    struct Process *parent;
++    BPTR error_output;
++    IPTR child_id;
++#endif
++    char *arguments;
++    char *filename;
++    BPTR segment;
++    LONG result;
++    ULONG stack_size = 65536;
++
++    if (do_path)
++        set_compiler_path();
++
++    filename = aros_command_name(command);
++    arguments = aros_command_arguments(argv);
++    segment = LoadSeg(filename);
++    if (segment == BNULL)
++        fatal(filename, "LoadSeg failed");
++
++    cli = Cli();
++    if (cli != NULL && cli->cli_DefaultStack > 0)
++        stack_size = cli->cli_DefaultStack * CLI_DEFAULTSTACK_UNIT;
++
++#ifdef __mc68000__
++    parent = (struct Process *)FindTask(NULL);
++    child_result.result = RETURN_FAIL;
++    error_output = parent->pr_CES != BNULL ? parent->pr_CES : Output();
++    /* The linker consumes named input files, not the parent CLI stream. */
++    child = CreateNewProcTags(
++        NP_Seglist, (IPTR)segment,
++        NP_FreeSeglist, FALSE,
++        NP_Arguments, (IPTR)arguments,
++        NP_Input, (IPTR)BNULL,
++        NP_CloseInput, FALSE,
++        NP_Output, (IPTR)Output(),
++        NP_CloseOutput, FALSE,
++        NP_Error, (IPTR)error_output,
++        NP_CloseError, FALSE,
++        NP_StackSize, (IPTR)stack_size,
++        NP_Name, (IPTR)filename,
++        NP_Cli, TRUE,
++        NP_CommandName, (IPTR)filename,
++        NP_ExitCode, (IPTR)aros_child_exit,
++        NP_ExitData, (IPTR)&child_result,
++        NP_CopyVars, FALSE,
++        NP_NotifyOnDeath, TRUE,
++        TAG_DONE);
++    free(arguments);
++    free(filename);
++    if (child == NULL)
++    {
++        UnLoadSeg(segment);
++        fatal(command, "CreateNewProcTags failed");
++    }
++
++    child_id = GetETask((struct Task *)child)->et_UniqueID;
++    ChildWait(child_id);
++    UnLoadSeg(segment);
++    ChildFree(child_id);
++    result = child_result.result;
++#else
++    result = RunCommand(segment, stack_size, arguments, strlen(arguments));
++    UnLoadSeg(segment);
++    free(arguments);
++    free(filename);
++#endif
++
++    if (result != RETURN_OK)
++        exit(EXIT_FAILURE);
++}
++
++#else
++
+ static void _docommandv(const char *command, char *argv[], int do_path)
+ {
+     pid_t pid = vfork();
+@@ -35,6 +254,8 @@ static void _docommandv(const char *command, char *argv[], int do_path)
+         exit(EXIT_FAILURE);
+ }
+ 
++#endif
++
+ void docommandv(const char *command, char *argv[])
+ {
+     _docommandv(command, argv, 0);
+# end of native-collect-aros-runcommand.patch

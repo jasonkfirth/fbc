@@ -47,6 +47,7 @@ FBC_ENV_EMCC := $(EMCC)
 FBC_ENV_CXBE := $(CXBE)
 FBC_ENV_DXEGEN := $(DXEGEN)
 FBC_ENV_ELF2DOL := $(ELF2DOL)
+FBC_ENV_ELF2HUNK := $(ELF2HUNK)
 ifneq ($(filter MSYS% MINGW% CYGWIN%,$(shell uname -s 2>/dev/null)),)
 #
 # BUILD_FBC is often a native Windows executable even when make is running
@@ -72,6 +73,7 @@ FBC_ENV_EMCC := $(call fbc_msys_tool,$(EMCC))
 FBC_ENV_CXBE := $(call fbc_msys_tool,$(CXBE))
 FBC_ENV_DXEGEN := $(call fbc_msys_tool,$(DXEGEN))
 FBC_ENV_ELF2DOL := $(call fbc_msys_tool,$(ELF2DOL))
+FBC_ENV_ELF2HUNK := $(call fbc_msys_tool,$(ELF2HUNK))
 endif
 FBC_TOOL_PATH_ENV := $(if $(strip $(FBC_ENV_TOOLCHAIN_BINDIR)),$(FBC_ENV_TOOLCHAIN_BINDIR)$(FBC_ENV_PATH_SEP),)$(FBC_ENV_PATH)
 TOOLCHAIN_PATH_ENV :=
@@ -99,7 +101,8 @@ FBC_TOOL_ENV := env \
 	EMCC='$(FBC_ENV_EMCC)' \
 	CXBE='$(FBC_ENV_CXBE)' \
 	DXEGEN='$(FBC_ENV_DXEGEN)' \
-	ELF2DOL='$(FBC_ENV_ELF2DOL)'
+	ELF2DOL='$(FBC_ENV_ELF2DOL)' \
+	ELF2HUNK='$(FBC_ENV_ELF2HUNK)'
 RUN_CC := $(TOOLCHAIN_PATH_ENV) $(CC)
 RUN_CXX := $(TOOLCHAIN_PATH_ENV) $(CXX)
 DARWIN_CLANG ?= clang
@@ -228,27 +231,34 @@ $(libfbmtpicobjdir)/%.o: $(srcdir)/rtlib/%.s $(LIBFB_H) | $(libfbmtpicobjdir)
 # Static runtime startup
 ##############################################################################
 
-$(libdir)/fbrt0.o: $(srcdir)/rtlib/static/fbrt0.c $(LIBFB_H) | $(libdir)
+# Platform directories may replace the complete startup source.  Startup is
+# intentionally selected by filename, matching the replacement model used by
+# rtlib, gfxlib2, and sfxlib instead of accumulating OS conditionals here.
+FBRT0_SOURCE := $(or $(wildcard $(srcdir)/rtlib/$(SOURCE_OS)/static/fbrt0.c),$(srcdir)/rtlib/static/fbrt0.c)
+FBRT1_SOURCE := $(or $(wildcard $(srcdir)/rtlib/$(SOURCE_OS)/static/fbrt1.c),$(srcdir)/rtlib/static/fbrt1.c)
+FBRT2_SOURCE := $(or $(wildcard $(srcdir)/rtlib/$(SOURCE_OS)/static/fbrt2.c),$(srcdir)/rtlib/static/fbrt2.c)
+
+$(libdir)/fbrt0.o: $(FBRT0_SOURCE) $(LIBFB_H) | $(libdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) -c $< -o $@
 
-$(libdir)/fbrt0pic.o: $(srcdir)/rtlib/static/fbrt0.c $(LIBFB_H) | $(libdir)
+$(libdir)/fbrt0pic.o: $(FBRT0_SOURCE) $(LIBFB_H) | $(libdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) -c $< -o $@
 
-$(libdir)/fbrt1.o: $(srcdir)/rtlib/static/fbrt1.c $(LIBFB_H) | $(libdir)
+$(libdir)/fbrt1.o: $(FBRT1_SOURCE) $(LIBFB_H) | $(libdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) -c $< -o $@
 
-$(libdir)/fbrt1pic.o: $(srcdir)/rtlib/static/fbrt1.c $(LIBFB_H) | $(libdir)
+$(libdir)/fbrt1pic.o: $(FBRT1_SOURCE) $(LIBFB_H) | $(libdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) -c $< -o $@
 
-$(libdir)/fbrt2.o: $(srcdir)/rtlib/static/fbrt2.c $(LIBFB_H) | $(libdir)
+$(libdir)/fbrt2.o: $(FBRT2_SOURCE) $(LIBFB_H) | $(libdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) -c $< -o $@
 
-$(libdir)/fbrt2pic.o: $(srcdir)/rtlib/static/fbrt2.c $(LIBFB_H) | $(libdir)
+$(libdir)/fbrt2pic.o: $(FBRT2_SOURCE) $(LIBFB_H) | $(libdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) -c $< -o $@
 

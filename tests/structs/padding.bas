@@ -2,14 +2,14 @@
 
 SUITE( fbc_tests.structs.padding )
 
-	'' On 32bit Win32/MinGW, ARM, JS/wasm, Xbox and PowerPC,
+	'' On 32bit Win32/MinGW, ARM, JS/wasm, Xbox, PowerPC and MIPS,
 	'' doubles/longints are aligned to 8, but on 32bit x86 Linux, BSD
 	'' and DOS, doubles/longints are aligned to 4.
 	'' (This often results in tighter packing, and only few cases are
 	'' the same as on MinGW)
 	''
 	'' On 64bit, doubles/longints are aligned to 8 everywhere.
-	#if defined( __FB_64BIT__ ) or defined( __FB_WIN32__ ) or defined( __FB_ARM__ ) or defined( __FB_JS__ ) or defined( __FB_XBOX__ ) or defined( __FB_PPC__ )
+	#if defined( __FB_64BIT__ ) or defined( __FB_WIN32__ ) or defined( __FB_ARM__ ) or defined( __FB_JS__ ) or defined( __FB_XBOX__ ) or defined( __FB_PPC__ ) or defined( __FB_MIPS__ )
 		#define QWORD_ALIGN 8
 	#else
 		#define QWORD_ALIGN 4
@@ -54,6 +54,21 @@ SUITE( fbc_tests.structs.padding )
 				sizeof(double)		+ _ '' 32
 				sizeof(ubyte)		+ _ '' 33
 				7			)   '' 40
+		#elseif defined( __FB_M68K__ )
+			'' Classic m68k ABIs align pointers, integers, and doubles to a
+			'' two-byte word boundary.
+			CU_ASSERT( sizeof( S ) = _
+				sizeof(ubyte)        + _ '' 1
+				1                    + _ '' 2
+				sizeof(ushort)       + _ '' 4
+				sizeof(ubyte)        + _ '' 5
+				1                    + _ '' 6
+				sizeof(any ptr)      + _ '' 10
+				sizeof(uinteger)     + _ '' 14
+				sizeof(uinteger)     + _ '' 18
+				sizeof(double)       + _ '' 26
+				sizeof(ubyte)        + _ '' 27
+				1                    )   '' 28
 		#else
 			CU_ASSERT( sizeof( S ) = _
 				sizeof(ubyte)		+ _ '' 1
@@ -108,6 +123,20 @@ SUITE( fbc_tests.structs.padding )
 				sizeof(double)		+ _ '' 40
 				sizeof(ubyte)		+ _ '' 41
 				3			)   '' 44
+		#elseif defined( __FB_M68K__ )
+			'' FIELD=4 cannot increase the m68k ABI's natural alignment.
+			CU_ASSERT( sizeof( S4 ) = _
+				sizeof(ubyte)        + _ '' 1
+				1                    + _ '' 2
+				sizeof(ushort)       + _ '' 4
+				sizeof(ubyte)        + _ '' 5
+				1                    + _ '' 6
+				sizeof(any ptr)      + _ '' 10
+				sizeof(uinteger)     + _ '' 14
+				sizeof(uinteger)     + _ '' 18
+				sizeof(double)       + _ '' 26
+				sizeof(ubyte)        + _ '' 27
+				1                    )   '' 28
 		#else
 			'' FIELD=4 makes the padding equal across 32bit platforms
 			'' (win32/arm 8-byte alignments are lowered to 4; linux & co stay
@@ -369,6 +398,7 @@ SUITE( fbc_tests.structs.padding )
 	END_TEST
 
 	'' default mod 4 padding
+	#ifndef __FB_M68K__
 	TEST( defaultPad4 )
 		'' Simple:
 
@@ -724,6 +754,7 @@ SUITE( fbc_tests.structs.padding )
 		CU_ASSERT(offsetof(H8, s2) = sizeof(integer) * 2)
 		CU_ASSERT(offsetof(H8, b) = sizeof(integer) * 3)
 	END_TEST
+	#endif
 
 	'' default mod 8 padding
 	TEST( defaultPad8 )
@@ -1262,6 +1293,9 @@ SUITE( fbc_tests.structs.padding )
 		#elseif QWORD_ALIGN = 8
 			CU_ASSERT(sizeof(Nested) = 72)
 			CU_ASSERT(sizeof(TestType) = 168)
+		#elseif defined( __FB_M68K__ )
+			CU_ASSERT(sizeof(Nested) = 66)
+			CU_ASSERT(sizeof(TestType) = 152)
 		#else
 			CU_ASSERT(sizeof(Nested) = 68)
 			CU_ASSERT(sizeof(TestType) = 156)
