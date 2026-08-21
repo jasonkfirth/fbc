@@ -102,6 +102,7 @@ Version 1.20.3
 - repository installers: use the case-sensitive public BSD and Haiku directory names, and select Haiku's native x86_64 and x86 package paths instead of applying the BSD x86-64 alias to Haiku.
 - repository installers: added the missing illumos IPS installer dispatched by the universal installer, including publisher refresh, package installation, and compiler verification.
 - build/illumos/VM: preserve the guest build and validation exit status across the host log pipeline so a copied IPS repository and valid audio capture cannot mask a failed fbctest, and allow focused fbctest or resumed Exampleageddon runs without repeating already-passing stages.
+- build/illumos/VM: keep downloaded GNU Make and OpenIndiana compiler/runtime bootstrap archives in the persistent VM cache, add a dependency-only preparation mode that leaves a retained VM untouched, use RSA guest login keys accepted by current OpenIndiana images, expand the guest root pool to the resized disk, and build GNU Make from source when the image incorporation cannot install it.
 - gfxlib2/Haiku: give the software and OpenGL views one matching opaque event-bridge signature, fixing undefined input-handler references when ordinary graphics programs link the packaged library.
 - build/Cygwin: mark a freshly downloaded Cygwin setup program executable before invoking it, allowing package builds from a new dependency cache.
 - build/Cygwin: install missing build dependencies without forcing an in-place Cygwin runtime upgrade that terminates the shell which launched setup.

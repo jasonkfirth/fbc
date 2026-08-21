@@ -54,6 +54,7 @@ PKG_PROXY_PORT=""
 HOST_FILE_SERVER_PORT=""
 HOST_FILE_SERVER_PID=""
 KEEP_VM=0
+PREPARE_DEPENDENCIES_ONLY=0
 GUEST_DISPLAY=""
 GUEST_XAUTHORITY=""
 GUEST_HTTP_HOST_PORT=""
@@ -86,6 +87,9 @@ Options:
   --ssh-port N         Host SSH forward port. Default: auto
   --pkg-proxy-port N   Host package proxy port. Default: auto
   --keep-vm            Keep VM run artifacts on success.
+  --prepare-dependencies-only
+                       Cache compiler/runtime files and GNU Make source without
+                       starting, stopping, or changing a VM.
   --ttya               Force ttya build path (use console command channel).
   -h, --help           Show this help.
 EOF
@@ -120,6 +124,7 @@ while [ "$#" -gt 0 ]; do
 		--pkg-proxy-port) PKG_PROXY_PORT="$2"; shift 2 ;;
 		--ttya) FORCE_TTYA_BUILD=1; shift ;;
 		--keep-vm) KEEP_VM=1; shift ;;
+		--prepare-dependencies-only) PREPARE_DEPENDENCIES_ONLY=1; shift ;;
 		-h|--help) usage; exit 0 ;;
 		*) die "unknown option: $1" ;;
 	esac
@@ -676,7 +681,7 @@ stop_host_file_server() {
 
 prepare_gnu_make_source() {
 	local version="${FBC_GMAKE_BOOTSTRAP_VERSION:-4.4.1}"
-	local tarball="$RUN_DIR/make-${version}.tar.gz"
+	local tarball="$CACHE_DIR/make-${version}.tar.gz"
 	local tmp="${tarball}.tmp"
 	local url
 
@@ -697,7 +702,14 @@ prepare_gnu_make_source() {
 		elif command -v wget >/dev/null 2>&1; then
 			wget -O "$tmp" "$url" || true
 		else
-			break
+			python3 - "$url" "$tmp" <<'PY_MAKE_DOWNLOAD' || true
+import sys
+from urllib.request import urlopen
+
+with urlopen(sys.argv[1], timeout=600) as source:
+    with open(sys.argv[2], "wb") as destination:
+        destination.write(source.read())
+PY_MAKE_DOWNLOAD
 		fi
 
 		if [ -s "$tmp" ] && tar -tzf "$tmp" >/dev/null 2>&1; then
@@ -712,7 +724,7 @@ prepare_gnu_make_source() {
 }
 
 prepare_crt_objects_archive() {
-	local archive="$RUN_DIR/openindiana-crt-objects.tar.gz"
+	local archive="$CACHE_DIR/openindiana-crt-objects.tar.gz"
 
 	if [ -s "$archive" ] &&
 		tar -tzf "$archive" >/dev/null 2>&1 &&
@@ -1001,6 +1013,31 @@ PY
 		msg "WARN: could not prepare C runtime startup object archive"
 		return 1
 	}
+}
+
+stage_cached_dependency() {
+	local source="$1"
+	local destination
+
+	destination="$RUN_DIR/$(basename "$source")"
+
+	[ -s "$source" ] || die "cached dependency is missing: $source"
+	rm -f "$destination"
+	ln "$source" "$destination" 2>/dev/null || cp -p "$source" "$destination"
+}
+
+prepare_dependencies() {
+	local make_source="$CACHE_DIR/make-${FBC_GMAKE_BOOTSTRAP_VERSION:-4.4.1}.tar.gz"
+	local crt_archive="$CACHE_DIR/openindiana-crt-objects.tar.gz"
+
+	mkdir -p "$CACHE_DIR"
+	prepare_gnu_make_source || die "could not prepare GNU Make bootstrap source"
+	prepare_crt_objects_archive || die "could not prepare OpenIndiana compiler/runtime archive"
+
+	if [ "$PREPARE_DEPENDENCIES_ONLY" -eq 0 ]; then
+		stage_cached_dependency "$make_source"
+		stage_cached_dependency "$crt_archive"
+	fi
 }
 
 run_ttya_command() {
@@ -1553,9 +1590,11 @@ run_guest_build() {
 	guest_env="ILLUMOS_PKG_PROXY=http://10.0.2.2:${PKG_PROXY_PORT} NATIVE_JOBS=${JOBS}"
 	[ -n "$HOST_FILE_SERVER_PID" ] || start_host_file_server
 	if prepare_gnu_make_source; then
+		stage_cached_dependency "$CACHE_DIR/make-${FBC_GMAKE_BOOTSTRAP_VERSION:-4.4.1}.tar.gz"
 		guest_env="$guest_env FBC_GMAKE_TARBALL_URL=http://10.0.2.2:${HOST_FILE_SERVER_PORT}/make-${FBC_GMAKE_BOOTSTRAP_VERSION:-4.4.1}.tar.gz"
 	fi
 	if prepare_crt_objects_archive; then
+		stage_cached_dependency "$CACHE_DIR/openindiana-crt-objects.tar.gz"
 		guest_env="$guest_env FBC_CRT_OBJECTS_URL=http://10.0.2.2:${HOST_FILE_SERVER_PORT}/openindiana-crt-objects.tar.gz"
 	fi
 
@@ -1844,6 +1883,14 @@ PY
 }
 
 main() {
+	if [ "$PREPARE_DEPENDENCIES_ONLY" -eq 1 ]; then
+		require_tool python3
+		require_tool tar
+		prepare_dependencies
+		msg "Dependency cache is ready: $CACHE_DIR"
+		return 0
+	fi
+
 	check_host_tools
 	rm -rf "$RUN_DIR"
 	mkdir -p "$RUN_DIR" "$LOG_DIR" "$ARCHIVE_DIR"
@@ -1903,3 +1950,5 @@ main() {
 }
 
 main "$@"
+
+# end of illumos-vm-build-freebasic.sh

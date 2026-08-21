@@ -872,8 +872,19 @@ resolve_repo_dir() {
 
 make_ssh_key() {
 	local key="$RUN_DIR/id_ed25519"
+	local pub="$key.pub"
+	local key_info
+
+	if [ -f "$key" ] && [ -f "$pub" ]; then
+		key_info="$(ssh-keygen -l -f "$pub" 2>/dev/null || true)"
+		if [ -n "$key_info" ] && echo "$key_info" | grep -q ' ED25519 '; then
+			rm -f "$key" "$pub"
+		fi
+	fi
+
 	if [ ! -f "$key" ]; then
-		ssh-keygen -q -t ed25519 -N '' -f "$key"
+		# Current OpenIndiana cloud images do not accept Ed25519 login keys.
+		ssh-keygen -q -t rsa -b 3072 -N '' -f "$key"
 	fi
 }
 
@@ -992,6 +1003,90 @@ resolve_make() {
 		return 0
 	done
 	return 1
+}
+
+grow_root_pool() {
+	local disk
+	local pool
+	local short_vdev
+	local vdev
+
+	pool="$(zpool list -H -o name 2>/dev/null | sed -n '1p')" || return 0
+	[ -n "$pool" ] || return 0
+
+	echo "==> expanding root pool if the VM disk is larger than the image"
+	zpool set autoexpand=on "$pool" >/dev/null 2>&1 || true
+
+	zpool status -P "$pool" 2>/dev/null |
+		awk '
+			$1 ~ /^\/dev\/dsk\// { print $1; next }
+			$1 ~ /^c[0-9].*[sp][0-9]+$/ { print $1; next }
+		' |
+		while read -r vdev; do
+			[ -n "$vdev" ] || continue
+
+			short_vdev="${vdev#/dev/dsk/}"
+			disk="$short_vdev"
+			case "$short_vdev" in
+			*s[0-9]) disk="${short_vdev%s[0-9]}" ;;
+			*p[0-9]) disk="${short_vdev%p[0-9]}" ;;
+			esac
+
+			if [ -n "$disk" ] && command -v format >/dev/null 2>&1; then
+				printf 'partition\nexpand\nlabel\ny\nquit\nquit\n' |
+					format -e "$disk" >/tmp/freebasic-format-grow.log 2>&1 || true
+			fi
+
+			zpool online -e "$pool" "$vdev" >/tmp/freebasic-zpool-grow.log 2>&1 ||
+				zpool online -e "$pool" "$short_vdev" >>/tmp/freebasic-zpool-grow.log 2>&1 ||
+				true
+		done
+
+	df -h / || true
+}
+
+bootstrap_gnu_make() {
+	local prefix="/var/tmp/freebasic-gnu-make"
+	local srcdir
+	local tarball="/var/tmp/make-4.4.1.tar.gz"
+	local workdir="/var/tmp/freebasic-gmake-bootstrap.$$"
+
+	if resolve_make >/dev/null 2>&1; then
+		return 0
+	fi
+
+	echo "==> bootstrapping GNU Make 4.4.1"
+	rm -f "$tarball"
+	if command -v curl >/dev/null 2>&1; then
+		curl -fL --retry 3 --connect-timeout 20 --max-time 600 \
+			-o "$tarball" http://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz
+	elif command -v wget >/dev/null 2>&1; then
+		wget -O "$tarball" http://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz
+	else
+		python3 - "$tarball" <<'PY_MAKE'
+import sys
+from urllib.request import urlopen
+
+with urlopen("http://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz", timeout=600) as source:
+    with open(sys.argv[1], "wb") as destination:
+        destination.write(source.read())
+PY_MAKE
+	fi
+
+	tar -tzf "$tarball" >/dev/null 2>&1 || fail "downloaded GNU Make archive is invalid"
+	rm -rf "$workdir"
+	mkdir -p "$workdir" "$prefix"
+	tar -xzf "$tarball" -C "$workdir"
+	srcdir="$workdir/make-4.4.1"
+	[ -d "$srcdir" ] || fail "GNU Make source directory was not extracted"
+	(
+		cd "$srcdir"
+		./configure --prefix="$prefix" CC="$CC"
+		./build.sh
+		./make install
+	)
+	rm -rf "$workdir"
+	resolve_make >/dev/null 2>&1 || fail "bootstrapped GNU Make did not pass validation"
 }
 
 install_pkg_candidates() {
@@ -1267,6 +1362,7 @@ TLS_CFG
 
 run_main_tests() {
 	prepare_tls_policy
+	grow_root_pool
 
 	echo "==> installing test dependencies"
 	run echo "==> proxy port in guest: ${PKG_PROXY_PORT:-<unset>}"
@@ -1299,16 +1395,6 @@ run_main_tests() {
 				fail "make package unavailable in OpenIndiana repositories"
 		fi
 	fi
-	if ! resolve_make >/dev/null 2>&1; then
-		if [ "$OFFLINE_TEST_MODE" -eq 1 ]; then
-			fail "GNU Make missing in guest image and offline mode does not allow package refresh installs"
-		else
-			install_pkg_candidates developer/build/gnu-make ||
-				fail "GNU Make package unavailable in OpenIndiana repositories"
-		fi
-	fi
-	resolve_make >/dev/null 2>&1 || fail "GNU Make is required for fbctests"
-
 	if ! find_cmd_or_path gcc cc clang /usr/gnu/bin/gcc /usr/gnu/bin/cc /usr/bin/cc /usr/local/bin/cc /usr/bin/clang /usr/local/bin/clang >/dev/null 2>&1; then
 		PKG_INSTALL_HAD_TIMEOUT=0
 		if [ "$OFFLINE_TEST_MODE" -eq 1 ]; then
@@ -1351,6 +1437,8 @@ run_main_tests() {
 		esac
 		echo "==> using CXX=$CXX"
 	fi
+
+	bootstrap_gnu_make
 
 	if ! command -v gmake >/dev/null 2>&1 && command -v make >/dev/null 2>&1; then
 		export PATH="/usr/gnu/bin:$PATH"
