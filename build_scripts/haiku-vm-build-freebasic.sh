@@ -425,6 +425,15 @@ write_bootstrap_files() {
 	cat > "$boot_script" <<EOF
 #!/bin/sh
 LOG="\$HOME/config/settings/boot/freebasic-bootstrap.log"
+
+# Keep Haiku's stock boot-folder launcher.  The anyboot image places its
+# FirstBootPrompt entry there, and the user session does not finish starting
+# if the bootstrap replaces this loop.
+for file in "\$HOME"/config/settings/boot/launch/*
+do
+	[ -e "\$file" ] && /bin/open "\$file" &
+done
+
 (
 export PATH=/boot/system/bin:/bin:\$PATH
 mkdir -p "\$HOME/config/settings/ssh"
