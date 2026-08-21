@@ -1279,6 +1279,19 @@ run_gfx_smoke() {
 run_fbctests() {
 	jobs="$(fbctests_jobs)"
 	fbc_cmd="$(fbc_make_command)"
+	cc_cmd="cc"
+	cxx_cmd="g++"
+
+	# The x86_gcc2 image keeps GCC 2 as its primary compiler for ABI
+	# compatibility and exposes the modern 32-bit toolchain through the
+	# -x86 command aliases.  Multi-module tests use C and C++ helpers which
+	# require options such as -m32 and therefore must use those aliases too.
+	if using_secondary_x86; then
+		cc_cmd="cc-x86"
+		cxx_cmd="g++-x86"
+		command -v "$cc_cmd" >/dev/null 2>&1 || fail "missing secondary x86 C compiler: $cc_cmd"
+		command -v "$cxx_cmd" >/dev/null 2>&1 || fail "missing secondary x86 C++ compiler: $cxx_cmd"
+	fi
 
 	[ -d /Work/fbctests-source/tests ] || fail "tests source was not staged"
 	[ -d /Work/fbctests-source/inc ] || fail "inc source was not staged"
@@ -1286,16 +1299,16 @@ run_fbctests() {
 	cd /Work/fbctests-source/tests
 
 	echo "==> cleaning fbctests tree"
-	run make clean FBC="$fbc_cmd"
+	run make clean FBC="$fbc_cmd" CC="$cc_cmd" CXX="$cxx_cmd" GCC="$cc_cmd"
 
 	echo "==> checking installed compiler through fbctests"
-	run make check FBC="$fbc_cmd"
+	run make check FBC="$fbc_cmd" CC="$cc_cmd" CXX="$cxx_cmd" GCC="$cc_cmd"
 
 	echo "==> running unit-tests with ${jobs} job(s)"
-	run make -j "$jobs" unit-tests FBC="$fbc_cmd" UNITTEST_RUN_ARGS="${FBCTESTS_UNIT_ARGS:-}"
+	run make -j "$jobs" unit-tests FBC="$fbc_cmd" CC="$cc_cmd" CXX="$cxx_cmd" GCC="$cc_cmd" UNITTEST_RUN_ARGS="${FBCTESTS_UNIT_ARGS:-}"
 
 	echo "==> running log-tests with ${jobs} job(s)"
-	run make -j "$jobs" log-tests FBC="$fbc_cmd"
+	run make -j "$jobs" log-tests FBC="$fbc_cmd" CC="$cc_cmd" CXX="$cxx_cmd" GCC="$cc_cmd"
 
 	for failed_log in failed-fb.log failed-fblite.log failed-qb.log failed-deprecated.log; do
 		[ -f "$failed_log" ] || fail "missing log-tests summary: $failed_log"
