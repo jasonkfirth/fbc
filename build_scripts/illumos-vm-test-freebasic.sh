@@ -1105,18 +1105,18 @@ install_pkg_candidates() {
 
 	case "${PKG_INSTALL_TIMEOUT:-1200}" in
 		''|*[!0-9]*|0) timeout_s="" ;;
-		*) timeout_s="$PKG_INSTALL_TIMEOUT" ;;
+		*) timeout_s="${PKG_INSTALL_TIMEOUT:-1200}" ;;
 	esac
 	timeout_cmd="$(resolve_timeout 2>/dev/null || true)"
 	[ -n "$timeout_cmd" ] || timeout_s=""
 
 	case "${PKG_INSTALL_ATTEMPTS:-3}" in
 		''|*[!0-9]*|0) attempts=3 ;;
-		*) attempts="$PKG_INSTALL_ATTEMPTS" ;;
+		*) attempts="${PKG_INSTALL_ATTEMPTS:-3}" ;;
 	esac
 	case "${PKG_INSTALL_RETRY_DELAY:-6}" in
 		''|*[!0-9]*|0) delay_s=6 ;;
-		*) delay_s="$PKG_INSTALL_RETRY_DELAY" ;;
+		*) delay_s="${PKG_INSTALL_RETRY_DELAY:-6}" ;;
 	esac
 	for pkg in "$@"; do
 		attempt=1
