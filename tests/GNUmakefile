@@ -199,25 +199,25 @@ failed-tests : $(REQ_FAILED)
 failed-tests-fb :
 	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) mostlyclean FAILED_ONLY=1 FB_LANG=fb
 	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) all FAILED_ONLY=1 FB_LANG=fb
-	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) results FB_LANG=fb
+	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) results FAILED_ONLY=1 FB_LANG=fb
 
 .PHONY: failed-tests-fblite
 failed-tests-fblite :
 	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) mostlyclean FAILED_ONLY=1 FB_LANG=fblite
 	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) all FAILED_ONLY=1 FB_LANG=fblite
-	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) results FB_LANG=fblite
+	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) results FAILED_ONLY=1 FB_LANG=fblite
 
 .PHONY: failed-tests-qb
 failed-tests-qb :
 	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) mostlyclean FAILED_ONLY=1 FB_LANG=qb
 	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) all FAILED_ONLY=1 FB_LANG=qb
-	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) results FB_LANG=qb
+	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) results FAILED_ONLY=1 FB_LANG=qb
 
 .PHONY: failed-tests-deprecated
 failed-tests-deprecated :
 	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) mostlyclean FAILED_ONLY=1 FB_LANG=deprecated
 	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) all FAILED_ONLY=1 FB_LANG=deprecated
-	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) results FB_LANG=deprecated
+	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) results FAILED_ONLY=1 FB_LANG=deprecated
 
 # ------------------------------------------------------------------------
 # clean-up

@@ -680,8 +680,9 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 	memset( &hints, 0, sizeof( hints ) );
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
-#if defined(HOST_HAIKU) || defined(HOST_FREEBSD) || defined(HOST_NETBSD) || \
-    defined(HOST_OPENBSD) || defined(HOST_DRAGONFLY) || defined(HOST_SOLARIS) || \
+#if defined(HOST_CYGWIN) || defined(HOST_HAIKU) || defined(HOST_FREEBSD) || \
+    defined(HOST_NETBSD) || defined(HOST_OPENBSD) || defined(HOST_DRAGONFLY) || \
+    defined(HOST_SOLARIS) || \
     (defined(HOST_WIN32) && !defined(HOST_CYGWIN))
 	/*
 		Some stacks return an IPv6-only passive AF_UNSPEC listener first.

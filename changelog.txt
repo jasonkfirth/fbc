@@ -101,6 +101,9 @@ Version 1.20.3
 - build/Cygwin: add installed-package validation covering compiler smoke tests, fbctests, and Exampleageddon with preserved reports.
 - build/Cygwin: skip the expensive full fbctests cleanup for a newly synchronized worktree while retaining it for explicit worktree reuse.
 - build/Cygwin: let installed-package validation recover an incomplete parallel fbcunit build by rebuilding only missing objects serially before reporting a test failure.
+- tests: keep failed-only log-test result generation on the failed subset instead of rescanning the complete test manifest after an incremental retry.
+- rtlib/Cygwin: prefer an IPv4 wildcard TCP listener when no server host is specified, matching the other supported desktop targets and allowing IPv4 clients to reach OPEN TCP SERVER sockets.
+- tests/sfx: validate MIDI/FM playback by its audible output and completed release tail instead of requiring a host-speed-dependent number of diagnostic text frames.
 - build/BSD, Haiku, and illumos validation: stage the private sfxlib headers and C helpers required by isolated MIDI and mixer fbctests.
 - build/OpenBSD and Haiku validation: pass SSH, SCP, and QEMU arguments as explicit words, avoiding unsafe option splitting and accidental comma interpretation under strict ShellCheck.
 - build/BSD package validation: advance the trimmed FreeBSD and NetBSD emulator defaults to the current 15.1 and 11.0 releases and stop rebuilding superseded FreeBSD release rows.
