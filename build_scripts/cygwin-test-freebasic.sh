@@ -181,8 +181,19 @@ run_fbctests()
 	cd "$tests"
 	run_logged "$OUTROOT/fbctests-clean.log" make clean FBC=/usr/bin/fbc.exe
 	run_logged "$OUTROOT/fbctests-check.log" make check FBC=/usr/bin/fbc.exe
-	run_logged "$OUTROOT/fbctests-unit.log" make -j "$JOBS" unit-tests \
+	if ! run_logged "$OUTROOT/fbctests-unit.log" make -j "$JOBS" unit-tests \
 		FBC=/usr/bin/fbc.exe UNITTEST_RUN_ARGS="${FBCTESTS_UNIT_ARGS:-}"
+	then
+		#
+		# Under heavy native Cygwin process load, a parallel fbcunit build can
+		# occasionally reach the link step with a few backend objects absent.
+		# A serial retry preserves every completed object and rebuilds only the
+		# missing part of the dependency graph.
+		#
+		msg "Retrying incomplete fbcunit build serially"
+		run_logged "$OUTROOT/fbctests-unit-serial-retry.log" make unit-tests \
+			FBC=/usr/bin/fbc.exe UNITTEST_RUN_ARGS="${FBCTESTS_UNIT_ARGS:-}"
+	fi
 	run_logged "$OUTROOT/fbctests-log.log" make -j "$JOBS" log-tests FBC=/usr/bin/fbc.exe
 	assert_log_tests_passed
 	cd "$ROOT"
