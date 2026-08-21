@@ -1736,6 +1736,11 @@ cleanup_vm() {
 		rm -f "$RUN_DIR/x11-forward.pid"
 	fi
 
+	if [ -f "$RUN_DIR/host-xvfb.pid" ]; then
+		kill "$(cat "$RUN_DIR/host-xvfb.pid")" >/dev/null 2>&1 || true
+		rm -f "$RUN_DIR/host-xvfb.pid"
+	fi
+
 	if [ -f "$RUN_DIR/pkg_proxy.pid" ]; then
 		kill "$(cat "$RUN_DIR/pkg_proxy.pid")" >/dev/null 2>&1 || true
 		rm -f "$RUN_DIR/pkg_proxy.pid"
@@ -1747,6 +1752,51 @@ cleanup_vm() {
 	fi
 }
 
+start_host_xvfb() {
+	local cookie
+	local display_number
+	local xauth_file="$RUN_DIR/host-Xauthority"
+
+	[ -z "${DISPLAY:-}" ] || return 0
+	command -v Xvfb >/dev/null 2>&1 || return 0
+	require_tool xauth
+
+	for display_number in 90 91 92 93 94 95 96 97 98 99; do
+		if [ ! -S "/tmp/.X11-unix/X${display_number}" ] &&
+			[ ! -e "/tmp/.X${display_number}-lock" ]; then
+			break
+		fi
+	done
+	if [ -S "/tmp/.X11-unix/X${display_number}" ] ||
+		[ -e "/tmp/.X${display_number}-lock" ]; then
+		msg "No unused host X display was available; gfx smoke will need guest Xvfb"
+		return 0
+	fi
+
+	cookie="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
+	rm -f "$xauth_file"
+	touch "$xauth_file"
+	xauth -f "$xauth_file" add ":${display_number}" . "$cookie"
+
+	msg "Starting host Xvfb on :${display_number} for the illumos gfx smoke"
+	XAUTHORITY="$xauth_file" Xvfb ":${display_number}" \
+		-screen 0 1024x768x24 \
+		-auth "$xauth_file" \
+		-nolisten tcp \
+		> "$LOG_DIR/host-xvfb.log" 2>&1 &
+	echo $! > "$RUN_DIR/host-xvfb.pid"
+	sleep 2
+	if ! kill -0 "$(cat "$RUN_DIR/host-xvfb.pid")" >/dev/null 2>&1; then
+		cat "$LOG_DIR/host-xvfb.log" >&2 || true
+		rm -f "$RUN_DIR/host-xvfb.pid"
+		msg "Host Xvfb failed to start; gfx smoke will need guest Xvfb"
+		return 0
+	fi
+
+	export DISPLAY=":${display_number}"
+	export XAUTHORITY="$xauth_file"
+}
+
 start_x11_forward() {
 	local display_number
 	local socket
@@ -1754,6 +1804,7 @@ start_x11_forward() {
 	local xauth_file
 	local remote_port
 
+	start_host_xvfb
 	[ -n "${DISPLAY:-}" ] || return 0
 
 	display_number="$(printf '%s\n' "$DISPLAY" |
