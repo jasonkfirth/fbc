@@ -295,7 +295,9 @@ REV="$(extract_var REV)"
 [ -n "$REV" ] || fail "missing REV in mk/version.mk"
 
 JOBS="${JOBS:-$(max_jobs)}"
-BUILDROOT="${BUILDROOT:-$ROOT/.build-cygwin}"
+# Keep compiler objects outside synchronized source trees.  Cloud clients on
+# Windows can briefly lock replaced files and make rsync report EBUSY.
+BUILDROOT="${BUILDROOT:-/tmp/freebasic-cygwin-${FBVERSION}-${REV}}"
 WORKTREE="$BUILDROOT/work"
 STAGE="$BUILDROOT/stage"
 SETUP_CACHE="$BUILDROOT/setup-cache"
