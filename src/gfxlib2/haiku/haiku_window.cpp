@@ -17,15 +17,6 @@ extern BBitmap *g_bmp;
 extern BWindow *g_win;
 extern BView   *g_view;
 
-extern void fb_hHaikuHandleKeyDown(BView*, const char*, int32);
-extern void fb_hHaikuHandleKeyUp(BView*, const char*, int32);
-
-extern void fb_hHaikuHandleMouseMoved(BView*, int, int);
-extern void fb_hHaikuHandleMouseDown(BView*, int, int, int);
-extern void fb_hHaikuHandleMouseUp(BView*, int, int, int);
-
-extern void fb_hHaikuPostQuitEvent(void);
-
 #define FB_HAIKU_REDRAW_MSG 'fbrd'
 #define FB_HAIKU_FORCE_EXIT_DELAY_US 500000
 

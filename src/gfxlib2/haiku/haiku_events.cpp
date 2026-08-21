@@ -26,7 +26,7 @@ void fb_hHaikuPostQuitEvent(void)
 /* Keyboard                                                                  */
 /* ------------------------------------------------------------------------- */
 
-void fb_hHaikuHandleKeyDown(BView*, const char *bytes, int32 key)
+void fb_hHaikuHandleKeyDown(void *, const char *bytes, int32_t key)
 {
     unsigned char sc = fb_hHaikuTranslateScancode((unsigned char)key);
 
@@ -46,7 +46,7 @@ void fb_hHaikuHandleKeyDown(BView*, const char *bytes, int32 key)
 }
 
 
-void fb_hHaikuHandleKeyUp(BView*, const char*, int32 key)
+void fb_hHaikuHandleKeyUp(void *, const char *, int32_t key)
 {
     unsigned char sc = fb_hHaikuTranslateScancode((unsigned char)key);
 
@@ -59,14 +59,14 @@ void fb_hHaikuHandleKeyUp(BView*, const char*, int32 key)
 /* Mouse                                                                     */
 /* ------------------------------------------------------------------------- */
 
-void fb_hHaikuHandleMouseMoved(BView*, int x, int y)
+void fb_hHaikuHandleMouseMoved(void *, int x, int y)
 {
     fb_haiku.mouse_x = x;
     fb_haiku.mouse_y = y;
 }
 
 
-void fb_hHaikuHandleMouseDown(BView*, int x, int y, int buttons)
+void fb_hHaikuHandleMouseDown(void *, int x, int y, int buttons)
 {
     fb_haiku.mouse_x = x;
     fb_haiku.mouse_y = y;
@@ -77,7 +77,7 @@ void fb_hHaikuHandleMouseDown(BView*, int x, int y, int buttons)
 }
 
 
-void fb_hHaikuHandleMouseUp(BView*, int x, int y, int buttons)
+void fb_hHaikuHandleMouseUp(void *, int x, int y, int buttons)
 {
     fb_haiku.mouse_x = x;
     fb_haiku.mouse_y = y;

@@ -170,6 +170,11 @@ int *fb_hHaikuFetchModes(int depth, int *size);
 /* Event bridge                                                              */
 /* ------------------------------------------------------------------------- */
 
+/*
+    The event bridge does not inspect the originating BView.  Keep that
+    argument opaque so the software and OpenGL views share one C++ signature
+    without exposing a Haiku interface type through this common header.
+*/
 void fb_hHaikuHandleKeyDown(void *view, const char *bytes, int32_t numBytes);
 void fb_hHaikuHandleKeyUp(void *view, const char *bytes, int32_t numBytes);
 
