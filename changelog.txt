@@ -99,6 +99,7 @@ Version 1.20.3
 - build/Cygwin: regenerate Cygwin bootstrap sources from a matching native or qualified Windows compiler, reject stale stage-zero compilers, and translate paths for a Windows compiler launched by Cygwin.
 - build/Cygwin: keep disposable compiler and staging trees under Cygwin's local temporary directory so cloud-synchronized source checkouts cannot lock rsync output files.
 - build/Cygwin: add installed-package validation covering compiler smoke tests, fbctests, and Exampleageddon with preserved reports.
+- build/Cygwin: skip the expensive full fbctests cleanup for a newly synchronized worktree while retaining it for explicit worktree reuse.
 - build/BSD, Haiku, and illumos validation: stage the private sfxlib headers and C helpers required by isolated MIDI and mixer fbctests.
 - build/OpenBSD and Haiku validation: pass SSH, SCP, and QEMU arguments as explicit words, avoiding unsafe option splitting and accidental comma interpretation under strict ShellCheck.
 - build/BSD package validation: advance the trimmed FreeBSD and NetBSD emulator defaults to the current 15.1 and 11.0 releases and stop rebuilding superseded FreeBSD release rows.

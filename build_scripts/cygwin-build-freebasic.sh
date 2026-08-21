@@ -458,8 +458,13 @@ build_freebasic() {
 		run make -j"$JOBS" bootstrap-seed-peer TARGET_TRIPLET="$TARGET_TRIPLET"
 	fi
 
-	msg "Cleaning worktree"
-	run make clean TARGET_TRIPLET="$TARGET_TRIPLET"
+	# A normal build just replaced WORKTREE with a sanitized source copy, so a
+	# full clean would only regenerate and walk every fbctests manifest.  Clean
+	# only when the caller explicitly retained and reused the previous tree.
+	if [ "$SKIP_SOURCE_SYNC" -ne 0 ]; then
+		msg "Cleaning retained worktree"
+		run make clean TARGET_TRIPLET="$TARGET_TRIPLET"
+	fi
 
 	msg "Building Cygwin bootstrap compiler ($JOBS threads)"
 	run make -j"$JOBS" bootstrap-minimal TARGET_TRIPLET="$TARGET_TRIPLET"
