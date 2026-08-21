@@ -13,6 +13,7 @@ set -eu
 
 repo_base=${FREEBASIC_REPO_URL:-https://deb.fbxl.net}
 repo_url=${FREEBASIC_ILLUMOS_REPO_URL:-$repo_base/illumos/5.11/amd64/repo}
+compiler=/usr/local/bin/fbc
 
 if ! command -v pkg >/dev/null 2>&1; then
 	printf '%s\n' 'ERROR: the illumos pkg command is required' >&2
@@ -39,7 +40,17 @@ else
 fi
 
 printf '%s\n' '==> verifying FreeBASIC'
-command -v fbc >/dev/null 2>&1
-fbc -version
+if command -v fbc >/dev/null 2>&1; then
+	compiler=$(command -v fbc)
+elif [ ! -x "$compiler" ]; then
+	printf 'ERROR: the installed compiler is missing: %s\n' "$compiler" >&2
+	exit 1
+fi
+
+"$compiler" -version
+
+if ! command -v fbc >/dev/null 2>&1; then
+	printf '%s\n' 'NOTE: add /usr/local/bin to PATH to invoke fbc by name.'
+fi
 
 # end of install-freebasic-illumos.sh
