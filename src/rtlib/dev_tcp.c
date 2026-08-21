@@ -78,7 +78,8 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#define FB_TCP_CLOSESOCKET(s) closesocket( s )
 	#define FB_TCP_SOCKET_ERROR(s) ((s) == FB_TCP_INVALID_SOCKET)
 	#define FB_TCP_ERRNO() WSAGetLastError( )
-	#define FB_TCP_WOULDBLOCK(err) ((err) == WSAEWOULDBLOCK)
+	#define FB_TCP_WOULDBLOCK(err) \
+		((err) == WSAEWOULDBLOCK || (err) == WSAETIMEDOUT)
 	#define FB_TCP_SHUT_WR SD_SEND
 	#define FB_TCP_SHUT_RDWR SD_BOTH
 	#define FB_TCP_SELECT(n, r, w, e, t) select( 0, r, w, e, t )
@@ -382,8 +383,14 @@ static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int tim
 	if( timeout != 0 ) {
 		#if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
 			DWORD value = (DWORD)timeout;
-			DWORD send_value = (socket_role == FB_TCP_SOCKET_ACCEPTED) ? 0 : value;
-			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&value, sizeof( value ) );
+			DWORD receive_value = value;
+			DWORD send_value = (socket_role == FB_TCP_SOCKET_LISTENER) ? value : 0;
+			/*
+				Connected reads retain the protocol timeout so a GET following
+				EOF cannot block forever if readiness changes between the two
+				calls. The TCP device reports that timeout as an idle read.
+			*/
+			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&receive_value, sizeof( receive_value ) );
 			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_SNDTIMEO, (const char *)&send_value, sizeof( send_value ) );
 		#else
 			struct timeval value;
@@ -392,7 +399,7 @@ static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int tim
 			value.tv_usec = (timeout % 1000) * 1000;
 
 			#if !defined(HOST_WII)
-				FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&value, sizeof( value ) );
+			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&value, sizeof( value ) );
 			#else
 				/*
 					On Wii, connected sockets are drained by the receive pump.
@@ -405,23 +412,20 @@ static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int tim
 
 			#if !defined(HOST_WII)
 				/*
-					OPEN TCP SERVER timeout is useful on the listening socket
-					because old threaded games poll TCP ACCEPT from their main
-					server loop.  The accepted data socket must still allow a
-					large startup packet to drain.  Inheriting timeout=1 as a
-					send timeout can otherwise make byte-wise PUT code fail on
-					stacks that enforce SO_SNDTIMEO strictly.
+				OPEN TCP SERVER timeout is useful on the listening socket
+				because old threaded games poll TCP ACCEPT from their main
+				server loop. Connected sockets retain a receive timeout so
+				EOF followed by a read remains bounded. Sends stay blocking
+				because a complete framed packet may be larger than one TCP
+				write.
 				*/
-				if( socket_role != FB_TCP_SOCKET_ACCEPTED )
+				if( socket_role == FB_TCP_SOCKET_LISTENER )
 					FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_SNDTIMEO, (const char *)&value, sizeof( value ) );
 				else {
 					struct timeval no_timeout;
 
-					/*
-						Some BSD stacks inherit SO_SNDTIMEO from the listener.
-						Clear it explicitly so an accepted data socket can
-						block while the peer drains byte-wise PUT traffic.
-					*/
+					/* Connected writes must not time out while a peer drains a
+					   bounded but potentially large frame. */
 					no_timeout.tv_sec = 0;
 					no_timeout.tv_usec = 0;
 					FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_SNDTIMEO, (const char *)&no_timeout, sizeof( no_timeout ) );
@@ -567,6 +571,25 @@ static void fb_hDevTcpSetNoDelay( FB_TCP_SOCKET hSocket )
 	(void)hSocket;
 #endif
 }
+
+static void fb_hDevTcpSetConnectedNonBlocking( FB_TCP_SOCKET hSocket )
+{
+	/*
+		EOF is the readiness probe for a connected BASIC TCP handle. A second
+		thread or a peer-side packet boundary can change readiness before GET
+		runs, so connected reads must return a transient no-data result rather
+		than block at the socket syscall.
+	*/
+#if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
+	u_long mode = 1;
+	FB_TCP_IOCTL( hSocket, FIONBIO, &mode );
+#elif !defined(HOST_DOS) && !defined(HOST_JS) && !defined(HOST_WII)
+	int mode = 1;
+	FB_TCP_IOCTL( hSocket, FIONBIO, &mode );
+#else
+	(void)hSocket;
+#endif
+}
 #endif
 #endif
 
@@ -590,6 +613,7 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 	fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, FB_TCP_SOCKET_CLIENT );
 
 	if( connect( hSocket, (struct sockaddr *)&addr, sizeof( addr ) ) == 0 ) {
+		fb_hDevTcpSetConnectedNonBlocking( hSocket );
 		fb_hDevTcpSetNoDelay( hSocket );
 		*hSocketOut = hSocket;
 		return FB_RTERROR_OK;
@@ -622,6 +646,7 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 		fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, FB_TCP_SOCKET_CLIENT );
 
 		if( connect( hSocket, it->ai_addr, (int)it->ai_addrlen ) == 0 ) {
+			fb_hDevTcpSetConnectedNonBlocking( hSocket );
 			fb_hDevTcpSetNoDelay( hSocket );
 			*hSocketOut = hSocket;
 			freeaddrinfo( result );
@@ -1377,6 +1402,28 @@ int fb_DevTcpAcceptHandle( FB_FILE *server_handle, FB_FILE *client_handle )
 	if( server_info == NULL || server_handle->type != FB_FILE_TYPE_TCPSERVER )
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
+	/*
+		The listener timeout is expressed in milliseconds by the OPEN TCP
+		SERVER protocol.  SO_RCVTIMEO does not make accept() interruptible on
+		Windows, so use the same readiness wait explicitly before accepting.
+		Without this step a threaded server cannot poll for shutdown and the
+		timeout option behaves differently on Windows and POSIX hosts.
+	*/
+	if( server_info->timeout != 0 ) {
+		fd_set set;
+		struct timeval tv;
+		int ready;
+
+		FD_ZERO( &set );
+		FD_SET( server_info->hSocket, &set );
+		tv.tv_sec = server_info->timeout / 1000;
+		tv.tv_usec = (server_info->timeout % 1000) * 1000;
+
+		ready = FB_TCP_SELECT( server_info->hSocket + 1, &set, NULL, NULL, &tv );
+		if( ready <= 0 )
+			return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+	}
+
 	#if defined(HOST_WII)
 	{
 		struct sockaddr_in addr;
@@ -1397,6 +1444,7 @@ int fb_DevTcpAcceptHandle( FB_FILE *server_handle, FB_FILE *client_handle )
 	}
 
 	fb_hDevTcpSetNoDelay( hSocket );
+	fb_hDevTcpSetConnectedNonBlocking( hSocket );
 
 	/*
 		fb_TcpAccept() reserves this file number before doing the blocking
