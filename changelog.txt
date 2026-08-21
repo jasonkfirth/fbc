@@ -95,6 +95,7 @@ Version 1.20.3
 - tests: added regression coverage for embedded-NUL constant string comparisons, IEEE NaN comparisons, invalid and duplicate command-line defines, SUB type-suffix diagnostics, 32-bit cdecl caller cleanup, FreeBSD/Haiku/illumos socket ABI layouts, Haiku errno, non-interactive curses initialization, and compiler header/object cases exposed by the maintenance pass.
 
 [fixed]
+- build/illumos repository: expose current pkgrepo's sharded package payloads through the flat file/0 hash paths required by static HTTP IPS clients, without duplicating payload data.
 - build/illumos installer: accept the IPS "no changes necessary" status when the current FreeBASIC package is already installed, and verify the standard /usr/local/bin compiler path when that directory is absent from the caller's PATH, so repeated public installer runs remain safe.
 - build/Haiku: emit the required architecture-specific Haiku bootstrap C snapshot on the Linux VM host before staging source, and select the matching i386 snapshot for x86_gcc2 package builds instead of depending on ignored local files.
 - build/Haiku: preserve the stock user boot-folder launcher when injecting the VM SSH bootstrap so current anyboot images start FirstBootPrompt and complete user-session initialization, allow the current nightly enough time to finish its first package activation, and reject an oversized replacement before patching or booting the VM.

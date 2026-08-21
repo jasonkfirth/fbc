@@ -1170,6 +1170,10 @@ prepare_static_repository_layout() {
 	local catalog_index="$REPO/catalog/0/index.html"
 	local decoded_version
 	local encoded_version
+	local file_count=0
+	local file_hash
+	local file_source
+	local flat_file_dir="$REPO/file/0"
 	local link_path
 	local link_target
 	local manifest_source
@@ -1178,6 +1182,7 @@ prepare_static_repository_layout() {
 	local package_dir="$REPO/publisher/local/pkg/lang%2Ffreebasic"
 	local proxy_link
 	local publisher_file="$REPO/publisher/local/pub.p5i"
+	local publisher_files="$REPO/publisher/local/file"
 
 	[ -d "$package_dir" ] || {
 		echo "ERROR: published package manifests missing: $package_dir" >&2
@@ -1185,6 +1190,10 @@ prepare_static_repository_layout() {
 	}
 	[ -f "$publisher_file" ] || {
 		echo "ERROR: publisher metadata missing: $publisher_file" >&2
+		return 1
+	}
+	[ -d "$publisher_files" ] || {
+		echo "ERROR: published package payloads missing: $publisher_files" >&2
 		return 1
 	}
 
@@ -1212,8 +1221,6 @@ IPS_VERSIONS
 
 	for proxy_link in \
 		"catalog/1:../publisher/local/catalog" \
-		"file/0:../publisher/local/file" \
-		"file/1:../publisher/local/file" \
 		"pkg/0:../publisher/local/pkg" \
 		"pkg/1:../publisher/local/pkg" \
 		"tmp/0:../publisher/local/tmp" \
@@ -1227,6 +1234,51 @@ IPS_VERSIONS
 		rm -f "$link_path"
 		ln -s "$link_target" "$link_path"
 	done
+
+	# Current pkgrepo versions shard payloads by the first two hash digits,
+	# while the HTTP protocol requests file/0/<full-hash>.  A flat directory
+	# of relative links preserves the native repository without duplicating
+	# payload data and remains portable when the repository is moved.
+	if [ -L "$flat_file_dir" ]; then
+		rm -f "$flat_file_dir"
+	elif [ -e "$flat_file_dir" ] && [ ! -d "$flat_file_dir" ]; then
+		echo "ERROR: static IPS file endpoint is not a directory: $flat_file_dir" >&2
+		return 1
+	elif [ -d "$flat_file_dir" ]; then
+		for link_path in "$flat_file_dir/"*; do
+			[ -e "$link_path" ] || [ -L "$link_path" ] || continue
+			if [ ! -L "$link_path" ]; then
+				echo "ERROR: unexpected regular file in IPS facade: $link_path" >&2
+				return 1
+			fi
+			rm -f "$link_path"
+		done
+	fi
+	mkdir -p "$flat_file_dir"
+
+	for file_source in "$publisher_files/"* "$publisher_files/"*/*; do
+		[ -f "$file_source" ] || continue
+		file_hash="${file_source##*/}"
+		if [ "${#file_hash}" -ne 40 ] || [ -n "${file_hash//[0-9a-f]/}" ]; then
+			continue
+		fi
+		link_target="../../${file_source#"$REPO/"}"
+		ln -s "$link_target" "$flat_file_dir/$file_hash"
+		file_count=$((file_count + 1))
+	done
+
+	[ "$file_count" -gt 0 ] || {
+		echo "ERROR: no package payloads found in $publisher_files" >&2
+		return 1
+	}
+
+	link_path="$REPO/file/1"
+	if [ -d "$link_path" ] && [ ! -L "$link_path" ]; then
+		echo "ERROR: static IPS proxy path is unexpectedly a directory: $link_path" >&2
+		return 1
+	fi
+	rm -f "$link_path"
+	ln -s 0 "$link_path"
 
 	: > "$catalog_index"
 	printf 'S Last-Modified: %s.000000\n' "$(date -u '+%Y-%m-%dT%H:%M:%S')" >> "$catalog_index"
