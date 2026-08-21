@@ -262,12 +262,13 @@ check_host_tools() {
 
 configure_qemu_acceleration() {
 	# Current x86_gcc2h anyboot images reset at the kernel handoff under KVM on
-	# an x86_64 host.  An untouched copy of the same image boots under TCG, so
-	# use multi-threaded TCG for this legacy kernel unless the caller chose a
-	# different accelerator explicitly.
+	# an x86_64 host.  They also reset with multiple TCG CPUs.  An untouched copy
+	# of the same image boots with one TCG CPU, so use that proven legacy profile
+	# unless the caller chose a different accelerator explicitly.
 	if [ "$ARCH" = "x86" ] && [ "$QEMU_ACCEL" = "kvm" ]; then
-		QEMU_ACCEL="tcg,thread=multi"
+		QEMU_ACCEL="tcg"
 		QEMU_CPU="max"
+		CPUS=1
 	elif [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
 		QEMU_ACCEL="tcg"
 		QEMU_CPU="max"
