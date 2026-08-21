@@ -538,7 +538,7 @@ send_tests_tree() {
 
 	msg "Copying fbctests source to FreeBSD"
 	ssh_guest "$key" "$port" \
-		"su -m root -c 'rm -rf /work/fbctests-source && mkdir -p /work/fbctests-source/tests /work/fbctests-source/inc && chown -R freebsd:freebsd /work/fbctests-source'"
+		"su -m root -c 'rm -rf /work/fbctests-source && mkdir -p /work/fbctests-source/tests /work/fbctests-source/inc /work/fbctests-source/src/sfxlib && chown -R freebsd:freebsd /work/fbctests-source'"
 
 	rsync -a --delete \
 		--exclude='*.o' \
@@ -556,6 +556,13 @@ send_tests_tree() {
 	rsync -a --delete \
 		-e "$(rsync_ssh "$key" "$port")" \
 		"$ROOT/inc/" "$GUEST_USER@127.0.0.1:/work/fbctests-source/inc/"
+
+	rsync -a --delete \
+		--exclude='obj' \
+		--exclude='*.o' \
+		--exclude='*.a' \
+		-e "$(rsync_ssh "$key" "$port")" \
+		"$ROOT/src/sfxlib/" "$GUEST_USER@127.0.0.1:/work/fbctests-source/src/sfxlib/"
 }
 
 build_package_in_vm() {

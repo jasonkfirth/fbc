@@ -37,7 +37,6 @@ RUN_DIR="$WORKROOT/run"
 LOG_DIR="$WORKROOT/logs"
 CACHE_DIR="$WORKROOT/cache"
 PACKAGE_DIR=""
-PACKAGE_REPO_DIR=""
 RELEASE="20251026"
 PKG_PROXY_PORT=""
 PKG_PROXY_ENABLED=1
@@ -64,7 +63,6 @@ PKG_INSTALL_TIMEOUT="1200"
 SSH_TIMEOUT="${SSH_TIMEOUT:-7200}"
 SKIP_PACKAGE_INSTALL=0
 KEEP_VM=0
-GUEST_IMAGE_DIR="/work"
 WORK_ROOT_DIR="/work/freebasic-test"
 PKG_CACHE_DIR="/work/freebasic-package"
 SERIAL_TTY_HOST="127.0.0.1"
@@ -313,7 +311,6 @@ start_vm() {
 	local disk="$1"
 	local iso="$2"
 	local pidfile="$RUN_DIR/qemu.pid"
-	local serial="$LOG_DIR/serial.log"
 
 	if [ -z "$SERIAL_TTY_PORT" ]; then
 		SERIAL_TTY_PORT="$(find_free_port 4300)"
@@ -862,7 +859,7 @@ send_test_payload() {
 	local repo_dir="$1"
 
 	msg "preparing guest test workspace"
-	ssh_illumos "rm -rf '$WORK_ROOT_DIR' '$PKG_CACHE_DIR' && mkdir -p '$WORK_ROOT_DIR' '$PKG_CACHE_DIR' '$PKG_CACHE_DIR/repo'"
+	ssh_illumos "rm -rf '$WORK_ROOT_DIR' '$PKG_CACHE_DIR' && mkdir -p '$WORK_ROOT_DIR/src' '$PKG_CACHE_DIR' '$PKG_CACHE_DIR/repo'"
 
 	if [ "$SKIP_PACKAGE_INSTALL" -eq 0 ] && [ -n "$repo_dir" ] && [ -d "$repo_dir" ]; then
 		msg "copying package repository into VM"
@@ -872,6 +869,7 @@ send_test_payload() {
 
 	scp_to_illumos -r "$ROOT/tests" "root@127.0.0.1:$WORK_ROOT_DIR/"
 	scp_to_illumos -r "$ROOT/inc" "root@127.0.0.1:$WORK_ROOT_DIR/"
+	scp_to_illumos -r "$ROOT/src/sfxlib" "root@127.0.0.1:$WORK_ROOT_DIR/src/"
 	scp_to_illumos -r "$ROOT/examples" "root@127.0.0.1:$WORK_ROOT_DIR/"
 	scp_to_illumos "$ROOT/build_scripts/exampleageddon-freebasic.py" "root@127.0.0.1:$WORK_ROOT_DIR/exampleageddon-freebasic.py"
 }

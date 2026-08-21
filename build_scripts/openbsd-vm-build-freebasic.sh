@@ -463,32 +463,6 @@ stop_vm() {
 	fi
 }
 
-ssh_opts() {
-	local key="$1"
-	local port="$2"
-
-	printf '%s\n' \
-		-i "$key" \
-		-o BatchMode=yes \
-		-o StrictHostKeyChecking=no \
-		-o UserKnownHostsFile=/dev/null \
-		-o ConnectTimeout=5 \
-		-p "$port"
-}
-
-scp_opts() {
-	local key="$1"
-	local port="$2"
-
-	printf '%s\n' \
-		-i "$key" \
-		-o BatchMode=yes \
-		-o StrictHostKeyChecking=no \
-		-o UserKnownHostsFile=/dev/null \
-		-o ConnectTimeout=5 \
-		-P "$port"
-}
-
 rsync_ssh() {
 	local key="$1"
 	local port="$2"
@@ -502,7 +476,15 @@ ssh_guest() {
 	local port="$2"
 	shift 2
 
-	ssh $(ssh_opts "$key" "$port") "$GUEST_USER"@127.0.0.1 "$@"
+	# The remaining words are the caller's intended guest command.
+	# shellcheck disable=SC2029
+	ssh -i "$key" \
+		-o BatchMode=yes \
+		-o StrictHostKeyChecking=no \
+		-o UserKnownHostsFile=/dev/null \
+		-o ConnectTimeout=5 \
+		-p "$port" \
+		"$GUEST_USER"@127.0.0.1 "$@"
 }
 
 scp_to_guest() {
@@ -511,7 +493,13 @@ scp_to_guest() {
 	local source="$3"
 	local target="$4"
 
-	scp $(scp_opts "$key" "$port") "$source" "$GUEST_USER@127.0.0.1:$target"
+	scp -i "$key" \
+		-o BatchMode=yes \
+		-o StrictHostKeyChecking=no \
+		-o UserKnownHostsFile=/dev/null \
+		-o ConnectTimeout=5 \
+		-P "$port" \
+		"$source" "$GUEST_USER@127.0.0.1:$target"
 }
 
 scp_from_guest() {
@@ -520,7 +508,13 @@ scp_from_guest() {
 	local source="$3"
 	local target="$4"
 
-	scp $(scp_opts "$key" "$port") "$GUEST_USER@127.0.0.1:$source" "$target"
+	scp -i "$key" \
+		-o BatchMode=yes \
+		-o StrictHostKeyChecking=no \
+		-o UserKnownHostsFile=/dev/null \
+		-o ConnectTimeout=5 \
+		-P "$port" \
+		"$GUEST_USER@127.0.0.1:$source" "$target"
 }
 
 wait_for_ssh() {
@@ -531,7 +525,13 @@ wait_for_ssh() {
 
 	msg "Waiting for OpenBSD SSH on localhost:$port"
 	for _ in $(seq 1 "$attempts"); do
-		if timeout 5 ssh $(ssh_opts "$key" "$port") "$GUEST_USER"@127.0.0.1 \
+		if timeout 5 ssh -i "$key" \
+				-o BatchMode=yes \
+				-o StrictHostKeyChecking=no \
+				-o UserKnownHostsFile=/dev/null \
+				-o ConnectTimeout=5 \
+				-p "$port" \
+				"$GUEST_USER"@127.0.0.1 \
 				'uname -a' > "$vm_dir/ssh-ready.out" 2> "$vm_dir/ssh-ready.err"; then
 			return 0
 		fi
@@ -597,7 +597,7 @@ send_tests_tree() {
 	local port="$2"
 
 	msg "Copying fbctests source to OpenBSD"
-	ssh_guest "$key" "$port" "rm -rf /home/fbc/work/fbctests-source && mkdir -p /home/fbc/work/fbctests-source/tests /home/fbc/work/fbctests-source/inc"
+	ssh_guest "$key" "$port" "rm -rf /home/fbc/work/fbctests-source && mkdir -p /home/fbc/work/fbctests-source/tests /home/fbc/work/fbctests-source/inc /home/fbc/work/fbctests-source/src/sfxlib"
 
 	rsync -a --delete \
 		--exclude='*.o' \
@@ -615,6 +615,13 @@ send_tests_tree() {
 	rsync -a --delete \
 		-e "$(rsync_ssh "$key" "$port")" \
 		"$ROOT/inc/" "$GUEST_USER@127.0.0.1:/home/fbc/work/fbctests-source/inc/"
+
+	rsync -a --delete \
+		--exclude='obj' \
+		--exclude='*.o' \
+		--exclude='*.a' \
+		-e "$(rsync_ssh "$key" "$port")" \
+		"$ROOT/src/sfxlib/" "$GUEST_USER@127.0.0.1:/home/fbc/work/fbctests-source/src/sfxlib/"
 }
 
 send_exampleageddon_tree() {

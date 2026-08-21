@@ -515,7 +515,7 @@ start_vm() {
 		-drive "file=$boot_image,format=raw,if=ide,index=0"
 		-drive "file=$work_disk,format=raw,if=ide,index=1"
 		-netdev "user,id=net0,hostfwd=tcp:127.0.0.1:$ssh_port-:22"
-		-device e1000,netdev=net0
+		-device "e1000,netdev=net0"
 	)
 
 	if [ -n "$audio_wav" ]; then
@@ -523,15 +523,15 @@ start_vm() {
 		qemu_args+=(
 			-audiodev "wav,id=audio0,path=$audio_wav"
 			-device intel-hda
-			-device hda-duplex,audiodev=audio0
+			-device "hda-duplex,audiodev=audio0"
 		)
 	fi
 
 	qemu_args+=(
-		-vga std \
-		-display "vnc=127.0.0.1:$vnc_display" \
-		-serial "file:$vm_dir/serial.log" \
-		-pidfile "$vm_dir/qemu.pid" \
+		-vga std
+		-display "vnc=127.0.0.1:$vnc_display"
+		-serial "file:$vm_dir/serial.log"
+		-pidfile "$vm_dir/qemu.pid"
 		-daemonize
 	)
 
@@ -566,32 +566,6 @@ stop_vm() {
 	fi
 }
 
-ssh_opts() {
-	local key="$1"
-	local port="$2"
-
-	printf '%s\n' \
-		-i "$key" \
-		-o BatchMode=yes \
-		-o StrictHostKeyChecking=no \
-		-o UserKnownHostsFile=/dev/null \
-		-o ConnectTimeout=5 \
-		-p "$port"
-}
-
-scp_opts() {
-	local key="$1"
-	local port="$2"
-
-	printf '%s\n' \
-		-i "$key" \
-		-o BatchMode=yes \
-		-o StrictHostKeyChecking=no \
-		-o UserKnownHostsFile=/dev/null \
-		-o ConnectTimeout=5 \
-		-P "$port"
-}
-
 wait_for_ssh() {
 	local key="$1"
 	local port="$2"
@@ -600,7 +574,13 @@ wait_for_ssh() {
 
 	msg "Waiting for Haiku SSH on localhost:$port"
 	for _ in $(seq 1 "$attempts"); do
-		if timeout 4 ssh $(ssh_opts "$key" "$port") user@127.0.0.1 \
+		if timeout 4 ssh -i "$key" \
+				-o BatchMode=yes \
+				-o StrictHostKeyChecking=no \
+				-o UserKnownHostsFile=/dev/null \
+				-o ConnectTimeout=5 \
+				-p "$port" \
+				user@127.0.0.1 \
 				'test -f ~/config/settings/boot/freebasic-ssh-ready' \
 				> "$vm_dir/ssh-ready.out" 2> "$vm_dir/ssh-ready.err"; then
 			return 0
@@ -624,7 +604,15 @@ ssh_guest() {
 	local port="$2"
 	shift 2
 
-	ssh $(ssh_opts "$key" "$port") user@127.0.0.1 "$@"
+	# The remaining words are the caller's intended guest command.
+	# shellcheck disable=SC2029
+	ssh -i "$key" \
+		-o BatchMode=yes \
+		-o StrictHostKeyChecking=no \
+		-o UserKnownHostsFile=/dev/null \
+		-o ConnectTimeout=5 \
+		-p "$port" \
+		user@127.0.0.1 "$@"
 }
 
 scp_to_guest() {
@@ -633,7 +621,13 @@ scp_to_guest() {
 	local source="$3"
 	local target="$4"
 
-	scp $(scp_opts "$key" "$port") "$source" "user@127.0.0.1:$target"
+	scp -i "$key" \
+		-o BatchMode=yes \
+		-o StrictHostKeyChecking=no \
+		-o UserKnownHostsFile=/dev/null \
+		-o ConnectTimeout=5 \
+		-P "$port" \
+		"$source" "user@127.0.0.1:$target"
 }
 
 scp_from_guest() {
@@ -642,7 +636,13 @@ scp_from_guest() {
 	local source="$3"
 	local target="$4"
 
-	scp $(scp_opts "$key" "$port") "user@127.0.0.1:$source" "$target"
+	scp -i "$key" \
+		-o BatchMode=yes \
+		-o StrictHostKeyChecking=no \
+		-o UserKnownHostsFile=/dev/null \
+		-o ConnectTimeout=5 \
+		-P "$port" \
+		"user@127.0.0.1:$source" "$target"
 }
 
 tar_directory_to_guest() {
@@ -942,6 +942,11 @@ send_tests_tree() {
 		--exclude='./log-tests-results-*.log'
 
 	tar_directory_to_guest "$key" "$port" "$ROOT/inc" "/Work/fbctests-source/inc"
+
+	tar_directory_to_guest "$key" "$port" "$ROOT/src/sfxlib" "/Work/fbctests-source/src/sfxlib" \
+		--exclude='./obj' \
+		--exclude='./*.o' \
+		--exclude='./*.a'
 }
 
 send_exampleageddon_tree() {
