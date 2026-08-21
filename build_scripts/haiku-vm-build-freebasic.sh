@@ -688,7 +688,10 @@ prepare_vm() {
 	start_http_server "$vm_dir" "$http_port" || die "could not start the Haiku file server"
 	start_vm "$vm_dir" "$ssh_port" "$vnc_display" "$audio_wav" ||
 		die "could not start the Haiku VM"
-	if ! wait_for_ssh "$key" "$ssh_port" "$vm_dir" 45 >&2; then
+	# A current nightly can spend more than five minutes completing its initial
+	# package activation and user-session setup.  Do not interrupt that work
+	# with an early warm restart.
+	if ! wait_for_ssh "$key" "$ssh_port" "$vm_dir" 120 >&2; then
 		warn "first Haiku boot did not reach SSH; restarting the warmed image" >&2
 		if [ -f "$vm_dir/qemu.pid" ]; then
 			kill "$(cat "$vm_dir/qemu.pid")" 2>/dev/null || true
