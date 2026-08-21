@@ -62,7 +62,7 @@ Options:
   --help              Show this help text
 
 Environment:
-  BUILDROOT           Temporary build root (default: <repo>/.build-cygwin)
+  BUILDROOT           Temporary build root (default: /tmp/freebasic-cygwin-<version>-<revision>)
   OUT                 Output directory (default: <repo>/out/cygwin)
   CYGWIN_MIRROR       Mirror URL for dependency installation
   SETUP_EXE           Explicit path to setup-x86_64.exe
