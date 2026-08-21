@@ -424,7 +424,9 @@ write_bootstrap_files() {
 
 	# Keep Haiku's stock boot-folder launcher.  The anyboot image places its
 	# FirstBootPrompt entry there, and the user session does not finish starting
-	# if the bootstrap replaces this loop.
+	# if the bootstrap replaces this loop.  Package transactions can deadlock if
+	# they begin while FirstBootPrompt is still completing the user session, so
+	# SSH is advertised only after that process exits and services settle.
 	cat > "$boot_script" <<EOF
 #!/bin/sh
 LOG="\$HOME/config/settings/boot/freebasic-bootstrap.log"
@@ -435,6 +437,9 @@ done
 
 (
 export PATH=/boot/system/bin:/bin:\$PATH
+sleep 5
+while ps | grep -q '[F]irstBootPrompt'; do sleep 1; done
+sleep 15
 mkdir -p "\$HOME/config/settings/ssh"
 cat > "\$HOME/config/settings/ssh/authorized_keys" <<'KEYEOF'
 $(cat "$key_pub")
@@ -747,22 +752,9 @@ run_limited() {
 	limit="$1"
 	shift
 
-	"$@" &
-	pid=$!
-	elapsed=0
-
-	while kill -0 "$pid" >/dev/null 2>&1; do
-		if [ "$elapsed" -ge "$limit" ]; then
-			kill "$pid" >/dev/null 2>&1 || true
-			wait "$pid" >/dev/null 2>&1 || true
-			return 124
-		fi
-
-		sleep 1
-		elapsed=$((elapsed + 1))
-	done
-
-	wait "$pid"
+	# Haiku can retain a terminated team in ps until its parent reaps it.  The
+	# hand-written kill -0 loop therefore never completed after a pkgman timeout.
+	timeout -k 5 "$limit" "$@"
 }
 
 install_image_package() {
@@ -863,22 +855,9 @@ run_limited() {
 	limit="$1"
 	shift
 
-	"$@" &
-	pid=$!
-	elapsed=0
-
-	while kill -0 "$pid" >/dev/null 2>&1; do
-		if [ "$elapsed" -ge "$limit" ]; then
-			kill "$pid" >/dev/null 2>&1 || true
-			wait "$pid" >/dev/null 2>&1 || true
-			return 124
-		fi
-
-		sleep 1
-		elapsed=$((elapsed + 1))
-	done
-
-	wait "$pid"
+	# Haiku can retain a terminated team in ps until its parent reaps it.  The
+	# hand-written kill -0 loop therefore never completed after a pkgman timeout.
+	timeout -k 5 "$limit" "$@"
 }
 
 for package in python3 python312 python311 python310; do
@@ -1119,22 +1098,9 @@ run_limited() {
 	limit="$1"
 	shift
 
-	"$@" &
-	pid=$!
-	elapsed=0
-
-	while kill -0 "$pid" >/dev/null 2>&1; do
-		if [ "$elapsed" -ge "$limit" ]; then
-			kill "$pid" >/dev/null 2>&1 || true
-			wait "$pid" >/dev/null 2>&1 || true
-			return 124
-		fi
-
-		sleep 1
-		elapsed=$((elapsed + 1))
-	done
-
-	wait "$pid"
+	# Haiku can retain a terminated team in ps until its parent reaps it.  The
+	# hand-written kill -0 loop therefore never completed after a pkgman timeout.
+	timeout -k 5 "$limit" "$@"
 }
 
 install_image_package() {
