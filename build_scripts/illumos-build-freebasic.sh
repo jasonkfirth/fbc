@@ -1166,6 +1166,97 @@ manifest_dependency_fmri() {
 	return 1
 }
 
+prepare_static_repository_layout() {
+	local catalog_index="$REPO/catalog/0/index.html"
+	local decoded_version
+	local encoded_version
+	local link_path
+	local link_target
+	local manifest_source
+	local manifest_target
+	local package_count=0
+	local package_dir="$REPO/publisher/local/pkg/lang%2Ffreebasic"
+	local proxy_link
+	local publisher_file="$REPO/publisher/local/pub.p5i"
+
+	[ -d "$package_dir" ] || {
+		echo "ERROR: published package manifests missing: $package_dir" >&2
+		return 1
+	}
+	[ -f "$publisher_file" ] || {
+		echo "ERROR: publisher metadata missing: $publisher_file" >&2
+		return 1
+	}
+
+	echo "==> preparing static IPS protocol endpoints"
+	mkdir -p \
+		"$REPO/catalog/0" \
+		"$REPO/file" \
+		"$REPO/manifest/0/lang" \
+		"$REPO/pkg" \
+		"$REPO/publisher/0" \
+		"$REPO/tmp" \
+		"$REPO/versions/0"
+
+	cat > "$REPO/versions/0/index.html" <<'IPS_VERSIONS'
+pkg-server 4e1d42c7
+catalog 0
+file 0
+info 0
+manifest 0
+pkg 0
+publisher 0
+versions 0
+IPS_VERSIONS
+	cp "$publisher_file" "$REPO/publisher/0/index.html"
+
+	for proxy_link in \
+		"catalog/1:../publisher/local/catalog" \
+		"file/0:../publisher/local/file" \
+		"file/1:../publisher/local/file" \
+		"pkg/0:../publisher/local/pkg" \
+		"pkg/1:../publisher/local/pkg" \
+		"tmp/0:../publisher/local/tmp" \
+		"tmp/1:../publisher/local/tmp"; do
+		link_path="$REPO/${proxy_link%%:*}"
+		link_target="${proxy_link#*:}"
+		if [ -d "$link_path" ] && [ ! -L "$link_path" ]; then
+			echo "ERROR: static IPS proxy path is unexpectedly a directory: $link_path" >&2
+			return 1
+		fi
+		rm -f "$link_path"
+		ln -s "$link_target" "$link_path"
+	done
+
+	: > "$catalog_index"
+	printf 'S Last-Modified: %s.000000\n' "$(date -u '+%Y-%m-%dT%H:%M:%S')" >> "$catalog_index"
+	printf '%s\n' 'S prefix: local' >> "$catalog_index"
+
+	for manifest_source in "$package_dir/"*; do
+		[ -f "$manifest_source" ] || continue
+		encoded_version="${manifest_source##*/}"
+		decoded_version="${encoded_version//%2C/,}"
+		decoded_version="${decoded_version//%3A/:}"
+		manifest_target="$REPO/manifest/0/lang/freebasic@${decoded_version}"
+		cp "$manifest_source" "$manifest_target"
+		printf 'V pkg://local/lang/freebasic@%s\n' "$decoded_version" >> "$catalog_index"
+		package_count=$((package_count + 1))
+	done
+
+	[ "$package_count" -gt 0 ] || {
+		echo "ERROR: no FreeBASIC package manifests found in $package_dir" >&2
+		return 1
+	}
+
+	# The IPS catalog header must precede its version records.
+	{
+		sed -n '1,2p' "$catalog_index"
+		printf 'S npkgs: %s\n' "$package_count"
+		sed -n '3,$p' "$catalog_index"
+	} > "${catalog_index}.new"
+	mv "${catalog_index}.new" "$catalog_index"
+}
+
 run_with_timeout() {
 	local seconds
 	local timeout_cmd
@@ -1600,6 +1691,7 @@ if [ "$DO_PACKAGE" -eq 1 ]; then
 
     echo "==> publishing"
     pkgsend -s "file://$REPO" publish -d "$STAGE" "$MANIFEST"
+	prepare_static_repository_layout
 
     echo "==> package dependencies"
     pkg contents -r -g "file://$REPO" -t depend "$FMRI"
