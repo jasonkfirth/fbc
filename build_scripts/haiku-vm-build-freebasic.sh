@@ -422,13 +422,12 @@ write_bootstrap_files() {
 
 	mkdir -p "$serve_dir"
 
+	# Keep Haiku's stock boot-folder launcher.  The anyboot image places its
+	# FirstBootPrompt entry there, and the user session does not finish starting
+	# if the bootstrap replaces this loop.
 	cat > "$boot_script" <<EOF
 #!/bin/sh
 LOG="\$HOME/config/settings/boot/freebasic-bootstrap.log"
-
-# Keep Haiku's stock boot-folder launcher.  The anyboot image places its
-# FirstBootPrompt entry there, and the user session does not finish starting
-# if the bootstrap replaces this loop.
 for file in "\$HOME"/config/settings/boot/launch/*
 do
 	[ -e "\$file" ] && /bin/open "\$file" &
@@ -681,12 +680,14 @@ prepare_vm() {
 	rm -rf "$vm_dir"
 	mkdir -p "$vm_dir"
 
-	make_ssh_key "$key"
-	write_bootstrap_files "$vm_dir" "$http_port" "$key.pub"
-	patch_boot_image "$vm_dir"
-	create_blank_work_disk "$vm_dir"
-	start_http_server "$vm_dir" "$http_port"
-	start_vm "$vm_dir" "$ssh_port" "$vnc_display" "$audio_wav"
+	make_ssh_key "$key" || die "could not create the Haiku VM SSH key"
+	write_bootstrap_files "$vm_dir" "$http_port" "$key.pub" ||
+		die "could not create the Haiku VM bootstrap"
+	patch_boot_image "$vm_dir" || die "could not patch the Haiku boot image"
+	create_blank_work_disk "$vm_dir" || die "could not create the Haiku work disk"
+	start_http_server "$vm_dir" "$http_port" || die "could not start the Haiku file server"
+	start_vm "$vm_dir" "$ssh_port" "$vnc_display" "$audio_wav" ||
+		die "could not start the Haiku VM"
 	if ! wait_for_ssh "$key" "$ssh_port" "$vm_dir" 45 >&2; then
 		warn "first Haiku boot did not reach SSH; restarting the warmed image" >&2
 		if [ -f "$vm_dir/qemu.pid" ]; then
