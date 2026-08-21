@@ -24,7 +24,19 @@ pkg set-publisher --no-refresh -G '*' -M '*' -g "$repo_url" local
 pkg refresh local
 
 printf '%s\n' '==> installing FreeBASIC'
-pkg install --accept pkg://local/lang/freebasic
+if pkg install --accept pkg://local/lang/freebasic; then
+	:
+else
+	install_status=$?
+
+	# IPS returns 4 when the requested package is already current.  The
+	# verification below still confirms that the installed compiler works.
+	if [ "$install_status" -ne 4 ]; then
+		exit "$install_status"
+	fi
+
+	printf '%s\n' '==> FreeBASIC is already current'
+fi
 
 printf '%s\n' '==> verifying FreeBASIC'
 command -v fbc >/dev/null 2>&1
