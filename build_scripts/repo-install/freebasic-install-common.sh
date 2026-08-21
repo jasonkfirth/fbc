@@ -98,9 +98,16 @@ fb_detect_arch() {
 		*) uname -m ;;
 		esac
 		;;
-	freebsd|dragonfly|openbsd|netbsd|haiku)
+	freebsd|dragonfly|openbsd|netbsd)
 		case "$(uname -m)" in
 		x86_64|amd64) printf '%s\n' "x86-64" ;;
+		*) uname -m ;;
+		esac
+		;;
+	haiku)
+		case "$(uname -m)" in
+		x86_64|amd64) printf '%s\n' "x86_64" ;;
+		i?86|x86) printf '%s\n' "x86" ;;
 		*) uname -m ;;
 		esac
 		;;
@@ -119,8 +126,20 @@ fb_package_url() {
 		# apk appends the running architecture before requesting APKINDEX.tar.gz.
 		printf '%s/linux/%s/%s\n' "$repo_base" "$distro" "$release"
 		;;
-	freebsd|dragonfly|openbsd|netbsd|haiku)
-		printf '%s/%s/%s\n' "$repo_base" "$distro" "$arch"
+	freebsd)
+		printf '%s/FreeBSD/%s\n' "$repo_base" "$arch"
+		;;
+	dragonfly)
+		printf '%s/Dragonfly/%s\n' "$repo_base" "$arch"
+		;;
+	openbsd)
+		printf '%s/OpenBSD/%s\n' "$repo_base" "$arch"
+		;;
+	netbsd)
+		printf '%s/NetBSD/%s\n' "$repo_base" "$arch"
+		;;
+	haiku)
+		printf '%s/Haiku/%s\n' "$repo_base" "$arch"
 		;;
 	macos)
 		printf '%s/macos/%s\n' "$repo_base" "$arch"
