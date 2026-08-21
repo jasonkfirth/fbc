@@ -56,6 +56,9 @@ DISK_SIZE="32G"
 JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
 FBCTESTS_JOBS=""
 FBCTESTS_UNIT_ARGS=""
+FBCTESTS_FOCUSED_BMK=""
+RUN_FBCTESTS=1
+RUN_EXAMPLEAGEDDON=1
 EXAMPLEAGEDDON_JOBS=""
 EXAMPLEAGEDDON_COMPILE_TIMEOUT="180"
 EXAMPLEAGEDDON_RUN_TIMEOUT="10"
@@ -93,6 +96,9 @@ Options:
   --ssh-port N          Host SSH forward port. Default: auto
   --fbctests-jobs N     fbctests job count. Default: --jobs value
   --fbctests-unit-args S Extra UNITTEST_RUN_ARGS for fbctests.
+  --fbctests-focused BMK Run one multi-module .bmk test instead of all fbctests.
+  --skip-fbctests       Skip fbctests for a resumed Exampleageddon run.
+  --skip-exampleageddon Skip Exampleageddon for a focused diagnostic run.
   --exampleageddon-jobs N  exampleageddon job count. Default: --jobs value
   --exampleageddon-compile-timeout N Example compile timeout.
   --exampleageddon-run-timeout N Example run timeout.
@@ -134,6 +140,9 @@ while [ "$#" -gt 0 ]; do
 		--ssh-port) SSH_PORT="$2"; shift 2 ;;
 		--fbctests-jobs) FBCTESTS_JOBS="$2"; shift 2 ;;
 		--fbctests-unit-args) FBCTESTS_UNIT_ARGS="$2"; shift 2 ;;
+		--fbctests-focused) FBCTESTS_FOCUSED_BMK="$2"; shift 2 ;;
+		--skip-fbctests) RUN_FBCTESTS=0; shift ;;
+		--skip-exampleageddon) RUN_EXAMPLEAGEDDON=0; shift ;;
 		--exampleageddon-jobs) EXAMPLEAGEDDON_JOBS="$2"; shift 2 ;;
 		--exampleageddon-compile-timeout) EXAMPLEAGEDDON_COMPILE_TIMEOUT="$2"; shift 2 ;;
 		--exampleageddon-run-timeout) EXAMPLEAGEDDON_RUN_TIMEOUT="$2"; shift 2 ;;
@@ -157,6 +166,19 @@ mkdir -p "$RUN_DIR" "$LOG_DIR" "$CACHE_DIR" "$ARCHIVE_RESULTS"
 [ "$JOBS" -gt 0 ] 2>/dev/null || die "--jobs must be a positive integer"
 [ -n "$CPUS" ] || CPUS="$JOBS"
 [ "$CPUS" -gt 0 ] 2>/dev/null || die "--cpus must be a positive integer"
+
+if [ -n "$FBCTESTS_FOCUSED_BMK" ]; then
+	case "$FBCTESTS_FOCUSED_BMK" in
+	/*|*..*|*[!A-Za-z0-9_./-]*)
+		die "--fbctests-focused must name a relative .bmk file under tests"
+		;;
+	esac
+	case "$FBCTESTS_FOCUSED_BMK" in
+	*.bmk) ;;
+	*) die "--fbctests-focused must name a .bmk file" ;;
+	esac
+	RUN_FBCTESTS=1
+fi
 
 if [ -z "$PACKAGE_DIR" ]; then
 	PACKAGE_DIR="$WORKROOT_PACKAGE"
@@ -1166,6 +1188,28 @@ run_fbctests() {
 	done
 }
 
+run_focused_fbctest() {
+	local bmk
+	local make
+
+	bmk="$FBCTESTS_FOCUSED_BMK"
+	make="$(resolve_make)" || fail "missing gmake/make"
+	[ -f "/work/freebasic-test/tests/$bmk" ] ||
+		fail "focused fbctest does not exist: $bmk"
+
+	prepare_xargs
+	cd /work/freebasic-test/tests
+	run "$make" -f bmk-make.mk clean \
+		BMK="$bmk" \
+		TEST_MODE=MULTI_MODULE_OK
+	run "$make" -f bmk-make.mk \
+		BMK="$bmk" \
+		TEST_MODE=MULTI_MODULE_OK \
+		FB_LANG=fb \
+		FBC="$FBC_BIN" \
+		GCC="${CC:-gcc}"
+}
+
 run_exampleageddon() {
 	local jobs
 	local compile_timeout
@@ -1344,8 +1388,20 @@ run_main_tests() {
 	command -v "$FBC_BIN" >/dev/null 2>&1 || fail "fbc not installed"
 
 	run_socket_smoke
-	run_fbctests
-	run_exampleageddon
+	if [ "${RUN_FBCTESTS:-1}" -eq 1 ]; then
+		if [ -n "${FBCTESTS_FOCUSED_BMK:-}" ]; then
+			run_focused_fbctest
+		else
+			run_fbctests
+		fi
+	else
+		echo "==> fbctests skipped for resumed validation"
+	fi
+	if [ "${RUN_EXAMPLEAGEDDON:-1}" -eq 1 ]; then
+		run_exampleageddon
+	else
+		echo "==> exampleageddon skipped for focused validation"
+	fi
 	echo "==> TEST PASSED"
 }
 
@@ -1374,6 +1430,9 @@ run_test_in_guest() {
 		"SKIP_PACKAGE_INSTALL=$SKIP_PACKAGE_INSTALL \
 FBCTESTS_JOBS=${FBCTESTS_JOBS:-} \
 FBCTESTS_UNIT_ARGS=$escaped_unit_args \
+FBCTESTS_FOCUSED_BMK=$FBCTESTS_FOCUSED_BMK \
+RUN_FBCTESTS=$RUN_FBCTESTS \
+RUN_EXAMPLEAGEDDON=$RUN_EXAMPLEAGEDDON \
 EXAMPLEAGEDDON_JOBS=${EXAMPLEAGEDDON_JOBS:-} \
 EXAMPLEAGEDDON_COMPILE_TIMEOUT=$EXAMPLEAGEDDON_COMPILE_TIMEOUT \
 EXAMPLEAGEDDON_RUN_TIMEOUT=$EXAMPLEAGEDDON_RUN_TIMEOUT \

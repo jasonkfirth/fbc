@@ -1543,6 +1543,7 @@ run_guest_build() {
 	local guest_build_dir
 	local guest_build_root
 	local guest_mode="ssh"
+	local guest_status=0
 	local build_log="$LOG_DIR/build.log"
 	local download_url=""
 	local prebuild_log="$LOG_DIR/ttya-prepare.log"
@@ -1649,8 +1650,17 @@ tar -tzf source.tar.gz >/dev/null 2>&1 || {
 
 	msg "Running illumos build"
 		if [ "$guest_mode" = "ssh" ]; then
+			#
+			# A function invoked from an "or" command list does not inherit
+			# Bash's normal errexit behaviour.  Save the SSH member's status
+			# explicitly so tee cannot turn a failed guest test into a
+			# successful VM build.
+			#
+			set +e
 			SSH_TIMEOUT=14400 ssh_illumos "cd ${guest_build_dir} && $guest_env bash build_scripts/illumos-build-freebasic.sh" \
 				2>&1 | tee "$build_log"
+			guest_status=${PIPESTATUS[0]}
+			set -e
 		else
 			if ! run_ttya_command "cd ${guest_build_dir} && $guest_env bash build_scripts/illumos-build-freebasic.sh" 14400 "$build_log"; then
 				return 1
@@ -1669,6 +1679,11 @@ tar -tzf source.tar.gz >/dev/null 2>&1 || {
 		run_ttya_command "cd ${guest_build_dir} && ls -la out/illumos/x86-64 2>/dev/null || true; \
 			[ -f out/illumos/x86-64/build.log ] && cat out/illumos/x86-64/build.log" 180 "$artifact_log" || true
 		cp "$artifact_log" "$ARCHIVE_DIR/ttya-artifacts.log" 2>/dev/null || true
+	fi
+
+	if [ "$guest_status" -ne 0 ]; then
+		msg "Illumos guest build or validation failed with status $guest_status"
+		return "$guest_status"
 	fi
 }
 
