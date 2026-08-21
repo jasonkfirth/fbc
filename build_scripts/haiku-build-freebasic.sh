@@ -236,6 +236,12 @@ if [ "$NOBUILD" -eq 0 ]; then
 			run_build_arch make -j"$JOBS" HAVE_PREREQS_MK= \
 				FBTARGET_DIR_OVERRIDE=haiku-amd64 \
 				FBCFLAGS="$PACKAGE_FBCFLAGS" bootstrap-minimal
+		elif [ "$ARCH" = "x86_gcc2" ] && [ -d bootstrap/haiku-i386 ]; then
+			# The primary x86_gcc2 system uses the secondary GCC x86 tools for
+			# FreeBASIC.  Select the matching host-emitted bootstrap snapshot.
+			run_build_arch make -j"$JOBS" HAVE_PREREQS_MK= \
+				FBTARGET_DIR_OVERRIDE=haiku-i386 \
+				FBCFLAGS="$PACKAGE_FBCFLAGS" bootstrap-minimal
 		else
 			run_build_arch make -j"$JOBS" HAVE_PREREQS_MK= \
 				FBCFLAGS="$PACKAGE_FBCFLAGS" bootstrap-minimal

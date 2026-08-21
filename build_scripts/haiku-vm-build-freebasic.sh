@@ -936,6 +936,60 @@ send_source_tree() {
 		--exclude='./*.a'
 }
 
+prepare_haiku_bootstrap_sources() {
+	local bootstrap_dir
+	local bootstrap_fbc
+	local bootstrap_path
+	local fbc_target
+
+	case "$ARCH" in
+		x86_64)
+			bootstrap_dir='haiku-amd64'
+			fbc_target='haiku-x86_64'
+			;;
+		x86)
+			bootstrap_dir='haiku-i386'
+			fbc_target='haiku-x86'
+			;;
+		*)
+			die "unsupported Haiku bootstrap architecture: $ARCH"
+			;;
+	esac
+
+	bootstrap_path="$ROOT/bootstrap/$bootstrap_dir"
+	bootstrap_fbc="${BOOT_FBC:-}"
+
+	if [ -z "$bootstrap_fbc" ] && command -v fbc >/dev/null 2>&1; then
+		bootstrap_fbc="$(command -v fbc)"
+	fi
+
+	if [ -n "$bootstrap_fbc" ]; then
+		[ -x "$bootstrap_fbc" ] ||
+			die "Haiku bootstrap compiler is not executable: $bootstrap_fbc"
+
+		case "$bootstrap_path" in
+			"$ROOT"/bootstrap/*) ;;
+			*) die "unsafe Haiku bootstrap path: $bootstrap_path" ;;
+		esac
+
+		msg "Emitting $ARCH Haiku bootstrap sources with $bootstrap_fbc"
+		rm -rf -- "$bootstrap_path"
+		make -C "$ROOT" -j1 \
+			HAVE_PREREQS_MK= \
+			BOOT_FBC="$bootstrap_fbc" \
+			BUILD_FBC="$bootstrap_fbc" \
+			FBC_TARGET="$fbc_target" \
+			FBTARGET_DIR_OVERRIDE="$bootstrap_dir" \
+			bootstrap-emit
+	fi
+
+	if ! [ -d "$bootstrap_path" ] ||
+		! find "$bootstrap_path" -maxdepth 1 -type f \
+			\( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .; then
+		die "Haiku bootstrap sources are missing; install fbc or set BOOT_FBC"
+	fi
+}
+
 send_tests_tree() {
 	local key="$1"
 	local port="$2"
@@ -1809,6 +1863,9 @@ main() {
 
 	download_image
 	extract_iso
+	if [ "$TEST_ONLY" -eq 0 ]; then
+		prepare_haiku_bootstrap_sources
+	fi
 
 	rm -rf "$RUN_DIR"
 	mkdir -p "$RUN_DIR" "$PACKAGE_DIR" "$LOG_DIR"

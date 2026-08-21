@@ -94,6 +94,7 @@ Version 1.20.3
 - tests: added regression coverage for embedded-NUL constant string comparisons, IEEE NaN comparisons, invalid and duplicate command-line defines, SUB type-suffix diagnostics, 32-bit cdecl caller cleanup, FreeBSD/Haiku/illumos socket ABI layouts, Haiku errno, non-interactive curses initialization, and compiler header/object cases exposed by the maintenance pass.
 
 [fixed]
+- build/Haiku: emit the required architecture-specific Haiku bootstrap C snapshot on the Linux VM host before staging source, and select the matching i386 snapshot for x86_gcc2 package builds instead of depending on ignored local files.
 - build/Haiku: preserve the stock user boot-folder launcher when injecting the VM SSH bootstrap so current anyboot images start FirstBootPrompt and complete user-session initialization, allow the current nightly enough time to finish its first package activation, and reject an oversized replacement before patching or booting the VM.
 - build/Cygwin: mark a freshly downloaded Cygwin setup program executable before invoking it, allowing package builds from a new dependency cache.
 - build/Cygwin: install missing build dependencies without forcing an in-place Cygwin runtime upgrade that terminates the shell which launched setup.
