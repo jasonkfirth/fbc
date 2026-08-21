@@ -271,6 +271,20 @@ is_cygwin_fbc() {
 	"$candidate" -version 2>&1 | grep -qi 'cygwin'
 }
 
+fbc_matches_release() {
+	local candidate="$1"
+	[ -n "$candidate" ] || return 1
+	[ -f "$candidate" ] || return 1
+	"$candidate" -version 2>&1 | grep -Fq "Version $FBVERSION-"
+}
+
+is_windows_fbc() {
+	local candidate="$1"
+	[ -n "$candidate" ] || return 1
+	[ -f "$candidate" ] || return 1
+	"$candidate" -version 2>&1 | grep -Eqi 'built for win(32|64)'
+}
+
 ##############################################################################
 # Build configuration
 ##############################################################################
@@ -407,26 +421,36 @@ build_freebasic() {
 		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/fbc.exe}" \
 		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/bin/fbc.exe}" \
 		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/bin/fbc}" \
+		"$ROOT/bin/fbc.exe" \
+		"$ROOT/bin/fbc" \
 		"$WORKTREE/bin/fbc.exe" \
 		"$WORKTREE/bin/fbc" \
 		"$WORKTREE/bootstrap/fbc.exe" \
 		"$WORKTREE/bootstrap/fbc" \
 		|| true)"
 
-	if [ -n "$host_fbc" ] && ! is_cygwin_fbc "$host_fbc"; then
-		msg "Ignoring non-Cygwin host compiler for bootstrap emission: $host_fbc"
+	if [ -n "$host_fbc" ] && ! fbc_matches_release "$host_fbc"; then
+		msg "Ignoring stale host compiler for bootstrap emission: $host_fbc"
 		host_fbc=""
 	fi
 
-	if [ -d "$bootstrap_sources_dir" ] && find "$bootstrap_sources_dir" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .; then
-		msg "Bootstrap sources already present for cygwin"
-	elif [ -n "$host_fbc" ]; then
+	if [ -n "$host_fbc" ]; then
 		msg "Emitting cygwin bootstrap sources"
 		rm -rf "$bootstrap_sources_dir"
-		run make -j"$JOBS" \
-			bootstrap-emit \
-			BUILD_FBC="$host_fbc" \
-			TARGET_TRIPLET="$TARGET_TRIPLET"
+		if is_windows_fbc "$host_fbc"; then
+			run make -j"$JOBS" \
+				bootstrap-emit \
+				FBC_EXE="$host_fbc" \
+				BOOTSTRAP_HOST_IS_MSYS=yes \
+				TARGET_TRIPLET="$TARGET_TRIPLET"
+		else
+			run make -j"$JOBS" \
+				bootstrap-emit \
+				FBC_EXE="$host_fbc" \
+				TARGET_TRIPLET="$TARGET_TRIPLET"
+		fi
+	elif [ -d "$bootstrap_sources_dir" ] && find "$bootstrap_sources_dir" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .; then
+		msg "Bootstrap sources already present for cygwin"
 	else
 		msg "No direct bootstrap compiler available for cygwin; seeding from peer bootstrap sources"
 		run make -j"$JOBS" bootstrap-seed-peer TARGET_TRIPLET="$TARGET_TRIPLET"

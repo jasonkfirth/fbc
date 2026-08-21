@@ -96,7 +96,7 @@ Version 1.20.3
 [fixed]
 - build/Cygwin: mark a freshly downloaded Cygwin setup program executable before invoking it, allowing package builds from a new dependency cache.
 - build/Cygwin: install missing build dependencies without forcing an in-place Cygwin runtime upgrade that terminates the shell which launched setup.
-- build/Cygwin: prefer the checked-in current Cygwin bootstrap sources over regenerating them with an older installed compiler that cannot parse newer language declarations.
+- build/Cygwin: regenerate Cygwin bootstrap sources from a matching native or qualified Windows compiler, reject stale stage-zero compilers, and translate paths for a Windows compiler launched by Cygwin.
 - build/BSD, Haiku, and illumos validation: stage the private sfxlib headers and C helpers required by isolated MIDI and mixer fbctests.
 - build/OpenBSD and Haiku validation: pass SSH, SCP, and QEMU arguments as explicit words, avoiding unsafe option splitting and accidental comma interpretation under strict ShellCheck.
 - build/BSD package validation: advance the trimmed FreeBSD and NetBSD emulator defaults to the current 15.1 and 11.0 releases and stop rebuilding superseded FreeBSD release rows.
