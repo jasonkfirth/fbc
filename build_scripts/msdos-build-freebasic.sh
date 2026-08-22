@@ -898,7 +898,8 @@ else
 	if [ ! -d "$DJGPP_DOS_CACHE/bin" ] && [ -d "$DISTROOT/djgpp/bin" ]; then
 		msg "seeding DOS-side DJGPP payload cache from distribution tree"
 		mkdir -p "$DJGPP_DOS_CACHE"
-		run rsync -a "$DISTROOT/djgpp"/ "$DJGPP_DOS_CACHE"/
+		run rsync -a --no-perms --no-owner --no-group \
+			"$DISTROOT/djgpp"/ "$DJGPP_DOS_CACHE"/
 	fi
 	[ -d "$DJGPP_DOS_CACHE/bin" ] || die "missing DOS-side DJGPP payload cache: $DJGPP_DOS_CACHE"
 fi
@@ -1015,12 +1016,16 @@ if [ "$DO_STAGE_INSTALL" = "1" ]; then
 	mv "$DISTROOT/inc" "$DISTROOT/fb/inc"
 	mv "$DISTROOT/lib" "$DISTROOT/fb/lib"
 
-	run rsync -a "$DJGPP_DOS_CACHE"/ "$DISTROOT/djgpp"/
+	# DOS package payloads on Windows do not need POSIX metadata replay.
+	run rsync -a --no-perms --no-owner --no-group \
+		"$DJGPP_DOS_CACHE"/ "$DISTROOT/djgpp"/
 	stage_dos_compiler_tools "$DISTROOT/fb"
 	prepare_dos_runtime_layout "$DISTROOT/fb" "$DISTROOT/djgpp"
 
-	run rsync -a "$ROOT/doc"/ "$DISTROOT/fb/doc"/
-	run rsync -a --delete --delete-excluded --prune-empty-dirs \
+	run rsync -a --no-perms --no-owner --no-group \
+		"$ROOT/doc"/ "$DISTROOT/fb/doc"/
+	run rsync -a --no-perms --no-owner --no-group \
+		--delete --delete-excluded --prune-empty-dirs \
 		--exclude-from "$ROOT/mk/example-copy-excludes.rsync" \
 		"$ROOT/examples/" "$DISTROOT/fb/examples/"
 	cp -f "$ROOT/changelog.txt" "$DISTROOT/fb/changelog.txt"
@@ -1116,7 +1121,8 @@ run_dosbox_test() {
 
 	rm -rf "$test_root"
 	mkdir -p "$test_root"
-	run rsync -a "$DISTROOT"/ "$test_root"/
+	run rsync -a --no-perms --no-owner --no-group \
+		"$DISTROOT"/ "$test_root"/
 	prepare_dos_runtime_layout "$test_root"
 
 	mkdir -p "$test_root/fb"

@@ -185,7 +185,8 @@ copy_tree() {
 	local dst="$2"
 	mkdir -p "$dst"
 	if have rsync; then
-		run rsync -a "$src/" "$dst/"
+		# Windows package trees do not need POSIX ownership or permissions.
+		run rsync -a --no-perms --no-owner --no-group "$src/" "$dst/"
 	else
 		run cp -a "$src"/. "$dst/"
 	fi
@@ -195,7 +196,8 @@ copy_examples_tree() {
 	local dst="$1"
 	mkdir -p "$dst"
 	if have rsync; then
-		run rsync -a --delete --delete-excluded --prune-empty-dirs \
+		run rsync -a --no-perms --no-owner --no-group \
+			--delete --delete-excluded --prune-empty-dirs \
 			--exclude-from "$ROOT/mk/example-copy-excludes.rsync" \
 			"$ROOT/examples/" "$dst/"
 	else
@@ -581,7 +583,8 @@ copy_ucrt64_toolchain() {
 	msg "Bundling UCRT64 Emscripten/Node toolchain"
 	mkdir -p "$dst"
 	if have rsync; then
-		run rsync -a --delete \
+		# Hosted NTFS volumes can reject chmod while rsync creates payload files.
+		run rsync -a --no-perms --no-owner --no-group --delete \
 			--exclude '/share/doc/' \
 			--exclude '/share/info/' \
 			--exclude '/share/man/' \

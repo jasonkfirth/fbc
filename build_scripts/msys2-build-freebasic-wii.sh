@@ -782,7 +782,8 @@ copy_devkitpro_tree()
 
     mkdir -p "${root}/toolchain"
 
-    run rsync -a --delete \
+    # Package data is copied to NTFS and does not need POSIX metadata replay.
+    run rsync -a --no-perms --no-owner --no-group --delete \
         --exclude '.git' \
         --exclude 'var/cache/pacman/pkg' \
         --exclude 'packages' \
@@ -795,7 +796,8 @@ copy_optional_tree()
     local dest="$2"
 
     if [ -d "${source}" ]; then
-        run rsync -a --delete "${source}/" "${dest}/"
+        run rsync -a --no-perms --no-owner --no-group --delete \
+            "${source}/" "${dest}/"
     fi
 }
 
@@ -816,7 +818,8 @@ assemble_package()
     remove_if_requested "${PACKAGE_ROOT}"
     mkdir -p "${PACKAGE_ROOT}"
 
-    run rsync -a --delete "${stage_prefix}/" "${PACKAGE_ROOT}/"
+    run rsync -a --no-perms --no-owner --no-group --delete \
+        "${stage_prefix}/" "${PACKAGE_ROOT}/"
 
     mkdir -p "${PACKAGE_ROOT}/doc" "${PACKAGE_ROOT}/examples"
     copy_optional_tree "${WORKTREE}/doc" "${PACKAGE_ROOT}/doc"
