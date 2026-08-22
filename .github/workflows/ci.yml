@@ -632,6 +632,22 @@ jobs:
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-libffi
             mingw-w64-x86_64-binutils
+            mingw-w64-x86_64-clang
+            mingw-w64-x86_64-lld
+            mingw-w64-x86_64-llvm
+            mingw-w64-x86_64-llvm-tools
+            mingw-w64-x86_64-tools
+            mingw-w64-clang-aarch64-clang
+            mingw-w64-clang-aarch64-compiler-rt
+            mingw-w64-clang-aarch64-crt
+            mingw-w64-clang-aarch64-headers
+            mingw-w64-clang-aarch64-lld
+            mingw-w64-clang-aarch64-llvm
+            mingw-w64-clang-aarch64-llvm-tools
+            mingw-w64-clang-aarch64-libunwind
+            mingw-w64-clang-aarch64-libwinpthread
+            mingw-w64-clang-aarch64-tools
+            mingw-w64-clang-aarch64-winpthreads
 
       - name: Select parallelism
         run: echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
@@ -652,10 +668,13 @@ jobs:
 
       - name: Build the Windows ARM64 compiler and runtime
         run: |
+          # The setup step provides the build toolchains.  The packaging
+          # script's optional binding sweep is not part of this qualification.
           HOST_FBC_ROOT="$GITHUB_WORKSPACE" \
             JOBS="$JOBS" \
             bash build_scripts/msys2-build-freebasic.sh \
               --only-arm64 \
+              --skip-deps \
               --skip-package \
               --skip-installer \
               --skip-validate
