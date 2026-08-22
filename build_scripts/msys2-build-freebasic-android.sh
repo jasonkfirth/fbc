@@ -869,6 +869,8 @@ function AcceptSdkManagerLicenses {
 	param([string] $sdkmanagerPath, [string] $sdkRoot)
 
 	$commandProcessor = [Environment]::GetEnvironmentVariable("ComSpec")
+	$answerFile = Join-Path $sdkRoot ("sdkmanager-license-answers-" + [Guid]::NewGuid().ToString("N") + ".txt")
+	$process = $null
 	if ([string]::IsNullOrWhiteSpace($commandProcessor)) {
 		$commandProcessor = Join-Path $env:SystemRoot "System32\cmd.exe"
 	}
@@ -879,19 +881,21 @@ function AcceptSdkManagerLicenses {
 
 	<#
 		PowerShell 5.1 does not reliably pipe text through a .bat launcher to the
-		native Java process behind sdkmanager.  Start cmd.exe explicitly and write
-		to its redirected standard input so every license prompt receives an
-		answer.  Environment variables keep package paths out of cmd.exe's command
-		line parsing and quoting rules.
+		native Java process behind sdkmanager.  Redirecting a real file through
+		cmd.exe gives the Java child an input handle it can inherit reliably on
+		hosted Windows runners.  Environment variables keep package paths out of
+		cmd.exe's command line parsing and quoting rules.
 	#>
+	[IO.File]::WriteAllText($answerFile, ("y`r`n" * 1000), [Text.Encoding]::ASCII)
+
 	$startInfo = New-Object System.Diagnostics.ProcessStartInfo
 	$startInfo.FileName = $commandProcessor
-	$startInfo.Arguments = '/d /s /c ""%FBANDROID_SDKMANAGER%" "--sdk_root=%FBANDROID_SDK_ROOT%" --licenses"'
+	$startInfo.Arguments = '/d /s /c ""%FBANDROID_SDKMANAGER%" "--sdk_root=%FBANDROID_SDK_ROOT%" --licenses < "%FBANDROID_LICENSE_INPUT%""'
 	$startInfo.UseShellExecute = $false
 	$startInfo.CreateNoWindow = $true
-	$startInfo.RedirectStandardInput = $true
 	$startInfo.EnvironmentVariables["FBANDROID_SDKMANAGER"] = $sdkmanagerPath
 	$startInfo.EnvironmentVariables["FBANDROID_SDK_ROOT"] = $sdkRoot
+	$startInfo.EnvironmentVariables["FBANDROID_LICENSE_INPUT"] = $answerFile
 
 	$process = New-Object System.Diagnostics.Process
 	$process.StartInfo = $startInfo
@@ -901,14 +905,13 @@ function AcceptSdkManagerLicenses {
 			Die "Could not start sdkmanager license acceptance"
 		}
 
-		for ($answer = 0; $answer -lt 1000; $answer++) {
-			$process.StandardInput.WriteLine("y")
-		}
-		$process.StandardInput.Close()
 		$process.WaitForExit()
 		return $process.ExitCode
 	} finally {
-		$process.Dispose()
+		if ($null -ne $process) {
+			$process.Dispose()
+		}
+		Remove-Item -LiteralPath $answerFile -Force -ErrorAction SilentlyContinue
 	}
 }
 
