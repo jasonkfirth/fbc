@@ -197,6 +197,16 @@ make -j"$JOBS" rtlib \
     BUILD_FBC="$ROOT/bin/fbc" \
     "${HEADLESS_FEATURE_ARGS[@]}" \
     > "$OUTPUT_ROOT/build-logs/host-runtime.log" 2>&1
+
+# The release bootstrap compiler predates the type alias syntax in the
+# current headers.  Build the current compiler once through the compatibility
+# definitions, then use that compiler for the ordinary self-hosted build.
+make -j"$JOBS" -o libs compiler \
+    BUILD_FBC="$ROOT/bin/fbc" \
+    BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" \
+    "${HEADLESS_FEATURE_ARGS[@]}" \
+    > "$OUTPUT_ROOT/build-logs/host-compiler-bootstrap.log" 2>&1
+make clean-compiler
 make -j"$JOBS" -o libs compiler \
     BUILD_FBC="$ROOT/bin/fbc" \
     "${HEADLESS_FEATURE_ARGS[@]}" \

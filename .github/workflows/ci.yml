@@ -63,7 +63,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             gcc g++ make binutils pkg-config rsync curl \
-            tar xz-utils gzip dos2unix libncurses-dev libffi-dev
+            tar xz-utils gzip dos2unix \
+            libncurses-dev libffi-dev libgpm-dev \
+            libasound2-dev libpulse-dev \
+            libx11-dev libxext-dev libxpm-dev \
+            libxrender-dev libxrandr-dev \
+            libgl1-mesa-dev libglu1-mesa-dev
 
       - name: Seed and build the source compiler
         run: |
@@ -362,10 +367,19 @@ jobs:
           # the requested object instead of silently using the host compiler.
           while IFS='|' read -r target machine; do
             object="$smoke_dir/${target}.o"
+            target_flags=()
+
+            # GNU armhf selects the hard-float ABI through its compiler
+            # defaults.  Pair it with the oldest ARMv7 VFP baseline used by
+            # the supported Linux packages so GCC has a valid FPU target.
+            if [ "$target" = arm-linux-gnueabihf ]; then
+              target_flags=(-arch armv7-a+fp -Wc -mfpu=vfpv3-d16)
+            fi
+
             echo "==> compiling $target"
             env -u GCC -u CLANG "$GITHUB_WORKSPACE/bin/fbc" \
               -i "$GITHUB_WORKSPACE/inc" \
-              -target "$target" -gen gcc -c \
+              -target "$target" "${target_flags[@]}" -gen gcc -c \
               "$smoke_dir/target-smoke.bas" -o "$object"
             readelf -h "$object" | grep -Eiq "Machine:.*${machine}" || {
               echo "ERROR: $target object has the wrong machine type" >&2

@@ -1042,13 +1042,23 @@ if [ "$DO_BUILD" -eq 1 ]; then
         msg "building bootstrap compiler for ${FBC_TARGET}"
         run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "CC=$BOOTSTRAP_CC" "CXX=$BOOTSTRAP_CXX" "BOOT_FBC=${BOOT_FBC}" "BUILD_FBC=${BOOT_FBC}" bootstrap-minimal
 
+        # Build the current compiler through the compatibility definitions
+        # before asking it to parse the current headers without them.  The
+        # pinned 1.10.1 compiler predates the type alias syntax used there.
+        msg "building source-compatible compiler for ${FBC_TARGET}"
+        run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "CC=$BOOTSTRAP_CC" "CXX=$BOOTSTRAP_CXX" "BOOT_FBC=$ROOT/bootstrap/fbc" "BUILD_FBC=$ROOT/bootstrap/fbc" "BUILD_FBCFLAGS=-d __FB_BOOTSTRAP_COMPAT__" compiler
+        run "$MAKE_CMD" -f GNUmakefile clean-compiler
+
+        msg "self-hosting source compiler for ${FBC_TARGET}"
+        run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" compiler
+
         # Release source-bootstrap archives only contain a small set of donor
         # platforms.  The first native compiler is runnable, but still carries
         # that donor's default OS and CPU.  Re-emit from the current tree for
         # the actual Darwin target, then rebuild stage0 before self-hosting.
         msg "refreshing bootstrap sources for ${FBC_TARGET}"
-        run "$MAKE_CMD" -f GNUmakefile "${MAKE_VARS[@]}" "CC=$BOOTSTRAP_CC" "CXX=$BOOTSTRAP_CXX" "BOOT_FBC=$ROOT/bin/fbc" "BUILD_FBC=$ROOT/bin/fbc" bootstrap-emit
-        run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "CC=$BOOTSTRAP_CC" "CXX=$BOOTSTRAP_CXX" "BOOT_FBC=$ROOT/bin/fbc" "BUILD_FBC=$ROOT/bin/fbc" bootstrap-minimal
+        run "$MAKE_CMD" -f GNUmakefile "${MAKE_VARS[@]}" "BOOT_FBC=$ROOT/bin/fbc" "BUILD_FBC=$ROOT/bin/fbc" bootstrap-emit
+        run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "BOOT_FBC=$ROOT/bin/fbc" "BUILD_FBC=$ROOT/bin/fbc" bootstrap-minimal
 
         BUILD_COMPILER="$ROOT/bootstrap/fbc"
         [ -x "$BUILD_COMPILER" ] || die "bootstrap compiler was not produced at $BUILD_COMPILER"

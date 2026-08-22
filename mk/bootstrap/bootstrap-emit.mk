@@ -159,7 +159,18 @@ endif
 
 BOOTSTRAP_COMPILER_SRC := $(FBC_SRC)
 BOOTSTRAP_COMPILER_SRC_DIRS := $(sort $(dir $(BOOTSTRAP_COMPILER_SRC)))
+BOOTSTRAP_COMPILER_INC_DIR := $(srcdir)/compiler
 BOOTSTRAP_INC_DIR := $(rootdir)/inc
+
+# MSYS make uses POSIX paths, but the selected host compiler is a native
+# Windows executable.  Keep shell-facing paths unchanged and translate only
+# the source and include arguments that fbc itself opens.
+ifeq ($(BOOTSTRAP_HOST_IS_MSYS),yes)
+BOOTSTRAP_COMPILER_INC_DIR := $(shell cygpath -m "$(BOOTSTRAP_COMPILER_INC_DIR)")
+bootstrap_response_source = $(patsubst $(rootdir)/%,$(BOOT_FBC_BUILD_ROOT)/%,$(1))
+else
+bootstrap_response_source = $(1)
+endif
 
 ##############################################################################
 # Bootstrap emission
@@ -170,7 +181,7 @@ BOOTSTRAP_INC_DIR := $(rootdir)/inc
 # can execute it, leaving Bash with a truncated and invalid loop.
 bootstrap-emit-source-response: | $(BOOTSTRAP_OUT)
 	$(file >$(BOOTSTRAP_SRC_RSP))
-	$(foreach f,$(BOOTSTRAP_COMPILER_SRC),$(file >>$(BOOTSTRAP_SRC_RSP),-b $(f)))
+	$(foreach f,$(BOOTSTRAP_COMPILER_SRC),$(file >>$(BOOTSTRAP_SRC_RSP),-b $(call bootstrap_response_source,$(f))))
 	@test -s "$(BOOTSTRAP_SRC_RSP)" || { \
 		echo "ERROR: no compiler sources found for bootstrap emission"; \
 		exit 1; \
@@ -211,7 +222,7 @@ bootstrap-emit: bootstrap-check
 		-target $(BOOT_FBC_TARGET) \
 		$(if $(BOOTSTRAP_ARCH),-arch $(BOOTSTRAP_ARCH)) \
 		$(BOOTSTRAP_COMPAT_DEFINES) \
-		-i "$(srcdir)/compiler" \
+		-i "$(BOOTSTRAP_COMPILER_INC_DIR)" \
 		-i "$$bootstrap_inc" \
 		-e -r -v \
 		$(BOOTFBCFLAGS)
