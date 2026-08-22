@@ -151,9 +151,16 @@ copy_tree() {
 	local dst="$2"
 	mkdir -p "$dst"
 	if have rsync; then
-		run rsync -a "$src/" "$dst/"
+		#
+		# These trees become Windows package payloads.  MSYS2 cannot reliably
+		# replay POSIX ownership and modes for every file on NTFS; in particular,
+		# hosted runners reject chmod on JDK class-sharing archives.  Preserve the
+		# file contents, links and timestamps without copying POSIX metadata that
+		# has no meaning to the resulting Windows package.
+		#
+		run rsync -a --no-perms --no-owner --no-group "$src/" "$dst/"
 	else
-		run cp -a "$src"/. "$dst/"
+		run cp -R "$src"/. "$dst/"
 	fi
 }
 
