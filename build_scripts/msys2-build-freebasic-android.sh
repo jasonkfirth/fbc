@@ -352,6 +352,7 @@ install_dependencies() {
 		p7zip \
 		wget \
 		mingw-w64-ucrt-x86_64-gcc \
+		mingw-w64-ucrt-x86_64-libffi \
 		mingw-w64-x86_64-nsis
 }
 
