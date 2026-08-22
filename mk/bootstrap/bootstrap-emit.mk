@@ -165,15 +165,12 @@ BOOTSTRAP_INC_DIR := $(rootdir)/inc
 # Bootstrap emission
 ##############################################################################
 
+# Write each response entry through GNU make.  Expanding the complete source
+# list into a shell loop exceeds the Windows command-line limit before MSYS2
+# can execute it, leaving Bash with a truncated and invalid loop.
 bootstrap-emit-source-response: | $(BOOTSTRAP_OUT)
-	@rm -f "$(BOOTSTRAP_SRC_RSP)"
-	@msys="$(BOOTSTRAP_HOST_IS_MSYS)"; \
-	for f in $(BOOTSTRAP_COMPILER_SRC); do \
-		if [ "$$msys" = yes ]; then \
-			f="$$(cygpath -m "$$f")"; \
-		fi; \
-		printf '%s\n' "-b $$f" >> "$(BOOTSTRAP_SRC_RSP)"; \
-	done
+	$(file >$(BOOTSTRAP_SRC_RSP))
+	$(foreach f,$(BOOTSTRAP_COMPILER_SRC),$(file >>$(BOOTSTRAP_SRC_RSP),-b $(f)))
 	@test -s "$(BOOTSTRAP_SRC_RSP)" || { \
 		echo "ERROR: no compiler sources found for bootstrap emission"; \
 		exit 1; \

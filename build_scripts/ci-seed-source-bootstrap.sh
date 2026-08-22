@@ -80,6 +80,20 @@ esac
 PACKAGE="FreeBASIC-${BOOTSTRAP_VERSION}-source-bootstrap"
 ARCHIVE="${BOOTSTRAP_ARCHIVE:-${RUNNER_TEMP:-/tmp}/${PACKAGE}.tar.xz}"
 
+# GitHub exposes RUNNER_TEMP as a native drive-letter path on Windows.  GNU
+# tar treats the colon in that spelling as a remote-host separator, even when
+# the command is running inside MSYS2.  Convert it once so every later archive
+# operation sees an ordinary POSIX path.
+case "$(uname -s 2>/dev/null || true)" in
+	MSYS*|MINGW*|CYGWIN*)
+		command -v cygpath >/dev/null 2>&1 || {
+			echo "ERROR: cygpath is required for Windows archive paths" >&2
+			exit 1
+		}
+		ARCHIVE="$(cygpath -u "$ARCHIVE")"
+		;;
+esac
+
 if [ ! -f "$ARCHIVE" ]; then
 	command -v curl >/dev/null 2>&1 || {
 		echo "ERROR: curl is required to download the source bootstrap archive" >&2

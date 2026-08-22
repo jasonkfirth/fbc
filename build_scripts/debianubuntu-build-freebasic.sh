@@ -1106,6 +1106,9 @@ ensure_host_compiler() {
     if [ ! -x "./bin/fbc" ]; then
         msg "building host compiler"
         run "$MAKE_CMD" clean
+        run "$MAKE_CMD" bootstrap-minimal -j"$JOBS"
+        run "$MAKE_CMD" compiler -j"$JOBS" BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__"
+        run "$MAKE_CMD" clean-compiler
         run "$MAKE_CMD" compiler -j"$JOBS"
     fi
 

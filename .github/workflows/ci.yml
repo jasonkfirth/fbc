@@ -89,7 +89,12 @@ jobs:
         run: bash build_scripts/ci-seed-source-bootstrap.sh "${{ matrix.bootstrap_target }}" linux-x86_64
 
       - name: Build the bootstrap compiler
-        run: make -j"$JOBS" bootstrap-minimal </dev/null
+        run: |
+          make -j"$JOBS" bootstrap-minimal </dev/null
+          if [ "${{ matrix.name }}" = "arm64" ]; then
+            make bootstrap-emit </dev/null
+            make -j"$JOBS" bootstrap-minimal </dev/null
+          fi
 
       - name: Build the compiler with the bootstrap seed
         run: make -j"$JOBS" compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
@@ -251,7 +256,6 @@ jobs:
             gcc-aarch64-linux-gnu \
             gcc-riscv64-linux-gnu \
             gcc-s390x-linux-gnu \
-            gcc-loongarch64-linux-gnu \
             gcc-powerpc-linux-gnu \
             gcc-powerpc64-linux-gnu \
             gcc-powerpc64le-linux-gnu
@@ -417,6 +421,12 @@ jobs:
             runner: macos-15-intel
             bootstrap_target: darwin-x86_64
 
+    env:
+      # Homebrew GCC does not support the Intel assembly spelling used by
+      # fbc-generated C on Darwin.  Keep native builds on Apple's compiler.
+      CC: clang
+      CXX: clang++
+
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -425,7 +435,7 @@ jobs:
         run: |
           set -euo pipefail
           brew update
-          brew install make pkg-config xz dos2unix gnu-sed coreutils rsync gcc libffi ncurses
+          brew install make pkg-config xz dos2unix gnu-sed coreutils rsync libffi ncurses
 
       - name: Select parallelism
         run: echo "JOBS=$(sysctl -n hw.logicalcpu)" >> "$GITHUB_ENV"
@@ -434,7 +444,10 @@ jobs:
         run: bash build_scripts/ci-seed-source-bootstrap.sh "${{ matrix.bootstrap_target }}" linux-x86_64
 
       - name: Build the bootstrap compiler
-        run: gmake -j"$JOBS" bootstrap-minimal </dev/null
+        run: |
+          gmake -j"$JOBS" bootstrap-minimal </dev/null
+          gmake bootstrap-emit </dev/null
+          gmake -j"$JOBS" bootstrap-minimal </dev/null
 
       - name: Build the compiler with the bootstrap seed
         run: gmake -j"$JOBS" compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
@@ -610,7 +623,10 @@ jobs:
         run: bash build_scripts/ci-seed-source-bootstrap.sh win32-aarch64 win64
 
       - name: Build the bootstrap compiler
-        run: make -j"$JOBS" bootstrap-minimal </dev/null
+        run: |
+          make -j"$JOBS" bootstrap-minimal </dev/null
+          make bootstrap-emit </dev/null
+          make -j"$JOBS" bootstrap-minimal </dev/null
 
       - name: Build the compiler with the bootstrap seed
         run: make -j"$JOBS" compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
@@ -661,7 +677,8 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends docker.io rsync curl
+          sudo apt-get install -y --no-install-recommends rsync curl
+          docker version
 
       - name: Seed host bootstrap for the contained build
         run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64

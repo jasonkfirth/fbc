@@ -239,7 +239,7 @@ esac
 
 run_arch_matrix() {
     local other_arch matrix_buildroot matrix_outbase host_cache status
-    local -a common_args host_args cross_args
+    local -a host_args cross_args
 
     if [ "$HOST_ARCH" = "arm64" ]; then
         other_arch="x86_64"
@@ -251,16 +251,23 @@ run_arch_matrix() {
     matrix_outbase="${OUTBASE:-$ROOT/out/macos}"
     host_cache="${matrix_buildroot}/host-tools/${HOST_ARCH}/fbc"
 
-    common_args=()
-    [ "$DO_BUILD" -eq 1 ] || common_args+=(--no-build)
-    [ "$DO_PACKAGE" -eq 1 ] || common_args+=(--no-package)
+    # macOS still ships Bash 3.2.  With nounset enabled, expanding a declared
+    # but empty array fails there.  Build the two argument lists directly so
+    # the default all-mode path never expands an empty intermediate array.
+    host_args=(--arch "$HOST_ARCH")
+    cross_args=(--arch "$other_arch" --skip-deps)
+    if [ "$DO_BUILD" -ne 1 ]; then
+        host_args+=(--no-build)
+        cross_args+=(--no-build)
+    fi
+    if [ "$DO_PACKAGE" -ne 1 ]; then
+        host_args+=(--no-package)
+        cross_args+=(--no-package)
+    fi
 
-    host_args=("${common_args[@]}")
     if [ "$SKIP_DEPS" -eq 1 ]; then
         host_args+=(--skip-deps)
     fi
-
-    cross_args=("${common_args[@]}" --skip-deps)
 
     msg "building macOS package matrix"
     echo "Host architecture: $HOST_ARCH"
@@ -271,7 +278,7 @@ run_arch_matrix() {
         OUTBASE="${matrix_outbase}/${HOST_ARCH}" \
         HOST_FBC_CACHE="$host_cache" \
         "$ROOT/build_scripts/macos-build-freebasic.sh" \
-        --arch "$HOST_ARCH" "${host_args[@]}"
+        "${host_args[@]}"
 
     if [ "$DO_BUILD" -eq 1 ]; then
         [ -x "$ROOT/bin/fbc" ] || die "native matrix build did not produce bin/fbc"
@@ -285,7 +292,7 @@ run_arch_matrix() {
         OUTBASE="${matrix_outbase}/${other_arch}" \
         HOST_FBC_CACHE="$host_cache" \
         "$ROOT/build_scripts/macos-build-freebasic.sh" \
-        --arch "$other_arch" "${cross_args[@]}"; then
+        "${cross_args[@]}"; then
         status=0
     else
         status=$?
@@ -568,11 +575,13 @@ EOF
 }
 
 select_build_toolchain() {
-    if ! resolve_gcc_toolchain; then
-        TOOL_CC="$(xcrun --find clang)"
-        TOOL_CXX="$(xcrun --find clang++)"
-        HOST_TRIPLET="$HOST_ARCH_RAW-apple-darwin"
-    fi
+    # Apple Clang is the native Darwin system compiler and accepts the inline
+    # assembly options emitted by fbc.  Homebrew GCC rejects -masm=intel on
+    # Darwin, so merely having that optional package installed must not change
+    # which compiler a native build selects.
+    TOOL_CC="$(xcrun --find clang)"
+    TOOL_CXX="$(xcrun --find clang++)"
+    HOST_TRIPLET="$HOST_ARCH_RAW-apple-darwin"
 
     if [ "$TARGET_ARCH" = "$HOST_ARCH" ]; then
         return 0
@@ -1021,6 +1030,14 @@ if [ "$DO_BUILD" -eq 1 ]; then
 
         msg "building bootstrap compiler for ${FBC_TARGET}"
         run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "BOOT_FBC=${BOOT_FBC}" "BUILD_FBC=${BOOT_FBC}" bootstrap-minimal
+
+        # Release source-bootstrap archives only contain a small set of donor
+        # platforms.  The first native compiler is runnable, but still carries
+        # that donor's default OS and CPU.  Re-emit from the current tree for
+        # the actual Darwin target, then rebuild stage0 before self-hosting.
+        msg "refreshing bootstrap sources for ${FBC_TARGET}"
+        run "$MAKE_CMD" -f GNUmakefile "${MAKE_VARS[@]}" "BOOT_FBC=$ROOT/bin/fbc" "BUILD_FBC=$ROOT/bin/fbc" bootstrap-emit
+        run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "BOOT_FBC=$ROOT/bin/fbc" "BUILD_FBC=$ROOT/bin/fbc" bootstrap-minimal
 
         BUILD_COMPILER="$ROOT/bootstrap/fbc"
         [ -x "$BUILD_COMPILER" ] || die "bootstrap compiler was not produced at $BUILD_COMPILER"
