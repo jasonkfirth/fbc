@@ -1046,7 +1046,7 @@ if [ "$DO_BUILD" -eq 1 ]; then
         # before asking it to parse the current headers without them.  The
         # pinned 1.10.1 compiler predates the type alias syntax used there.
         msg "building source-compatible compiler for ${FBC_TARGET}"
-        run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "CC=$BOOTSTRAP_CC" "CXX=$BOOTSTRAP_CXX" "BOOT_FBC=$ROOT/bootstrap/fbc" "BUILD_FBC=$ROOT/bootstrap/fbc" "BUILD_FBCFLAGS=-d __FB_BOOTSTRAP_COMPAT__ -target darwin -arch $TARGET_ARCH" compiler
+        run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "CC=$BOOTSTRAP_CC" "CXX=$BOOTSTRAP_CXX" "BOOT_FBC=$ROOT/bootstrap/fbc" "BUILD_FBC=$ROOT/bootstrap/fbc" "BUILD_FBCFLAGS=-d __FB_BOOTSTRAP_COMPAT__ -target $FBC_TARGET" compiler
         run "$MAKE_CMD" -f GNUmakefile clean-compiler
 
         msg "self-hosting source compiler for ${FBC_TARGET}"

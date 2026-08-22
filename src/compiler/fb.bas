@@ -2001,7 +2001,8 @@ function fbGetBackendValistType _
 
 		case FB_CPUFAMILY_AARCH64
 			select case env.clopt.target
-			case FB_COMPTARGET_WIN32
+			case FB_COMPTARGET_WIN32, FB_COMPTARGET_DARWIN
+				'' Windows and Darwin expose __builtin_va_list as a pointer.
 				typedef = FB_CVA_LIST_BUILTIN_POINTER
 			case else
 				typedef = FB_CVA_LIST_BUILTIN_AARCH64

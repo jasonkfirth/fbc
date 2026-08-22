@@ -812,7 +812,13 @@ build_target() {
 	[ -f "$worktree/bootstrap/fbc.exe" ] || fail "bootstrap-minimal did not produce bootstrap/fbc.exe for $target"
 	build_fbc="$worktree/bin/fbc.exe"
 	[ -f "$build_fbc" ] || fail "bootstrap-minimal did not install bin/fbc.exe for $target"
-	if "$build_fbc" -version >/dev/null 2>&1; then
+	if [ "$target" = "win32" ] && [ -n "$host_fbc" ]; then
+		# Keep the 32-bit compiler as a package output and test subject.  Using
+		# the 64-bit host for the full build avoids exhausting a 32-bit process
+		# while it compiles the two largest compiler modules.
+		msg "Using host compiler for the full $target build"
+		build_fbc="$host_fbc"
+	elif "$build_fbc" -version >/dev/null 2>&1; then
 		:
 	elif [ -n "$host_fbc" ]; then
 		msg "$target bootstrap compiler is not runnable on this host; using host compiler for the full target build"

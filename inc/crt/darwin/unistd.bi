@@ -51,7 +51,11 @@
 
 extern "c"
 declare function access_ alias "access" (byval __path as const zstring ptr, byval __mode as long) as long
+#ifndef __crt_close_declared__
+#define __crt_close_declared__
+'' sys/socket.bi also exposes the POSIX close() function.
 declare function close_ alias "close" (byval __fd as long) as long
+#endif
 declare function read_ alias "read" (byval __fd as long, byval __buffer as any ptr, byval __bytes as size_t) as ssize_t
 declare function write_ alias "write" (byval __fd as long, byval __buffer as const any ptr, byval __bytes as size_t) as ssize_t
 declare function pipe_ alias "pipe" (byval __fds as long ptr) as long

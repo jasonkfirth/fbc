@@ -213,11 +213,13 @@ jobs:
       matrix:
         include:
           - name: x86
-            msystem: MINGW32
-            package_prefix: mingw-w64-i686
+            target_triplet: i686-w64-mingw32
+            fbc_target: win32
+            tool_root: /mingw32/bin
           - name: x86_64
-            msystem: MINGW64
-            package_prefix: mingw-w64-x86_64
+            target_triplet: x86_64-w64-mingw32
+            fbc_target: win64
+            tool_root: /mingw64/bin
 
     defaults:
       run:
@@ -230,7 +232,10 @@ jobs:
       - name: Set up MSYS2
         uses: msys2/setup-msys2@v2
         with:
-          msystem: ${{ matrix.msystem }}
+          # The 64-bit compiler is also the host for the x86 target.  A 32-bit
+          # compiler cannot reliably rebuild the largest compiler modules in
+          # the memory-constrained hosted runner.
+          msystem: MINGW64
           update: true
           install: >-
             make
@@ -241,9 +246,12 @@ jobs:
             curl
             dos2unix
             pkgconf
-            ${{ matrix.package_prefix }}-gcc
-            ${{ matrix.package_prefix }}-binutils
-            ${{ matrix.package_prefix }}-libffi
+            mingw-w64-i686-gcc
+            mingw-w64-i686-binutils
+            mingw-w64-i686-libffi
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-binutils
+            mingw-w64-x86_64-libffi
 
       - name: Select parallelism
         run: echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
@@ -254,33 +262,51 @@ jobs:
           name: fbc-xl-native-bootstrap-sources
           path: bootstrap
 
-      - name: Build the bootstrap compiler
+      - name: Build the 64-bit host bootstrap compiler
         run: make -j"$JOBS" bootstrap-minimal </dev/null
 
-      - name: Build the compiler with the bootstrap seed
+      - name: Build the 64-bit host compiler with the bootstrap seed
         run: make -j"$JOBS" compiler </dev/null
 
-      - name: Rebuild the compiler self-hosted
+      - name: Preserve the host compiler and select the target toolchain
         run: |
-          make clean-compiler
-          make -j"$JOBS" compiler </dev/null
+          mkdir -p .ci-host
+          cp bin/fbc.exe .ci-host/fbc.exe
+          {
+            echo "TARGET_TRIPLET=${{ matrix.target_triplet }}"
+            echo "BUILD_FBC_TARGET=${{ matrix.fbc_target }}"
+            echo "BUILD_FBC_BUILDPREFIX=${{ matrix.target_triplet }}-"
+            echo "CC=${{ matrix.tool_root }}/gcc.exe"
+            echo "CXX=${{ matrix.tool_root }}/g++.exe"
+            echo "AR=${{ matrix.tool_root }}/ar.exe"
+            echo "AS=${{ matrix.tool_root }}/as.exe"
+            echo "LD=${{ matrix.tool_root }}/ld.exe"
+            echo "RANLIB=${{ matrix.tool_root }}/ranlib.exe"
+            echo "STRIP=${{ matrix.tool_root }}/strip.exe"
+            echo "DLLTOOL=${{ matrix.tool_root }}/dlltool.exe"
+            echo "WINDRES=${{ matrix.tool_root }}/windres.exe"
+          } >> "$GITHUB_ENV"
 
-      - name: Build the XL runtime libraries
-        run: make -j"$JOBS" all </dev/null
+      - name: Build the target compiler and XL runtime libraries
+        run: |
+          make clean-compiler clean-libs
+          make -j"$JOBS" all BUILD_FBC="$PWD/.ci-host/fbc.exe" </dev/null
 
       - name: Run build-system and compiler smoke tests
         # quick-test shares one temporary directory across its prerequisites.
         # Keep the meta-target serial until those tests have isolated state.
-        run: make quick-test </dev/null
+        # The x86 target remains runnable on this host, while BUILD_FBC keeps
+        # destructive rebuild checks on the preserved 64-bit compiler.
+        run: make quick-test BUILD_FBC="$PWD/.ci-host/fbc.exe" CROSS_BUILD= </dev/null
 
       - name: Run fbctests
-        run: make -j"$JOBS" tests-test </dev/null
+        run: make -j"$JOBS" tests-test BUILD_FBC="$PWD/.ci-host/fbc.exe" CROSS_BUILD= </dev/null
 
       - name: Upload Windows diagnostics
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: fbc-xl-windows-${{ matrix.msystem }}-diagnostics
+          name: fbc-xl-windows-${{ matrix.name }}-diagnostics
           if-no-files-found: warn
           path: |
             maketests-log/
