@@ -19,6 +19,7 @@ include $(mkpath)/supported_targets.mk
 
 BOOTSTRAP_DIR := $(if $(strip $(FBTARGET_DIR_OVERRIDE)),$(FBTARGET_DIR_OVERRIDE),$(FBTARGET))
 BOOTSTRAP_MATRIX := $(SUPPORTED_BOOTSTRAP_TARGETS)
+BOOTSTRAP_MATRIX_FBC := $(BOOT_FBC)
 
 #
 # BOOTSTRAP_MATRIX accepts either modern matrix entries:
@@ -105,6 +106,7 @@ bootstrap-dist-target: bootstrap-check bootstrap-emit
 
 bootstrap-emit-matrix:
 	@set -e; \
+	test -n "$(BOOTSTRAP_MATRIX_FBC)" || { echo "ERROR: bootstrap matrix emission requires a runnable host compiler"; exit 1; }; \
 	for spec in $(BOOTSTRAP_MATRIX); do \
 		fbc_target=; \
 		dir=; \
@@ -131,7 +133,7 @@ bootstrap-emit-matrix:
 		make_args="FBTARGET_DIR_OVERRIDE=$$dir"; \
 		test -z "$$fbc_target" || make_args="$$make_args FBC_TARGET=$$fbc_target"; \
 		test -z "$$target_triplet" || make_args="$$make_args TARGET_TRIPLET=$$target_triplet"; \
-		$(MAKE) bootstrap-emit $$make_args; \
+		$(MAKE) bootstrap-emit BOOT_FBC="$(BOOTSTRAP_MATRIX_FBC)" $$make_args; \
 	done
 
 ##############################################################################
@@ -146,6 +148,7 @@ bootstrap-dist: bootstrap-dist-target
 
 bootstrap-dist-arm:
 	@set -e; \
+	test -n "$(BOOTSTRAP_MATRIX_FBC)" || { echo "ERROR: ARM bootstrap distribution requires a runnable host compiler"; exit 1; }; \
 	for spec in \
 		linux-arm:linux-armel:arm-linux-gnueabi \
 		linux-arm:linux-armhf:arm-linux-gnueabihf \
@@ -156,6 +159,7 @@ bootstrap-dist-arm:
 		target_triplet=$${rest#*:}; \
 		echo "==> Generating bootstrap archive for $$dir"; \
 		$(MAKE) bootstrap-dist-target \
+			BOOT_FBC="$(BOOTSTRAP_MATRIX_FBC)" \
 			FBC_TARGET="$$fbc_target" \
 			FBTARGET_DIR_OVERRIDE="$$dir" \
 			TARGET_TRIPLET="$$target_triplet"; \
@@ -167,6 +171,7 @@ bootstrap-dist-arm:
 
 bootstrap-dist-all:
 	@set -e; \
+	test -n "$(BOOTSTRAP_MATRIX_FBC)" || { echo "ERROR: bootstrap distribution matrix requires a runnable host compiler"; exit 1; }; \
 	for spec in $(BOOTSTRAP_MATRIX); do \
 		fbc_target=; \
 		dir=; \
@@ -193,7 +198,7 @@ bootstrap-dist-all:
 		make_args="FBTARGET_DIR_OVERRIDE=$$dir"; \
 		test -z "$$fbc_target" || make_args="$$make_args FBC_TARGET=$$fbc_target"; \
 		test -z "$$target_triplet" || make_args="$$make_args TARGET_TRIPLET=$$target_triplet"; \
-		$(MAKE) bootstrap-dist-target $$make_args; \
+		$(MAKE) bootstrap-dist-target BOOT_FBC="$(BOOTSTRAP_MATRIX_FBC)" $$make_args; \
 	done
 
 ##############################################################################

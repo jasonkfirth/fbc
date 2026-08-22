@@ -83,7 +83,7 @@ jobs:
         run: |
           set -euo pipefail
           make bootstrap-emit-matrix \
-            BOOTSTRAP_MATRIX='linux-aarch64:linux-aarch64:aarch64-linux-gnu darwin-aarch64:darwin-aarch64:aarch64-apple-darwin darwin-x86_64:darwin-x86_64:x86_64-apple-darwin win32-aarch64:win32-aarch64:aarch64-w64-mingw32' \
+            BOOTSTRAP_MATRIX='linux-aarch64:linux-aarch64:aarch64-linux-gnu darwin-aarch64:darwin-aarch64:aarch64-apple-darwin darwin-x86_64:darwin-x86_64:x86_64-apple-darwin win32:win32:i686-w64-mingw32 win64:win64:x86_64-w64-mingw32 win32-aarch64:win32-aarch64:aarch64-w64-mingw32' \
             </dev/null
 
       - name: Upload native runner bootstrap sources
@@ -96,6 +96,8 @@ jobs:
             bootstrap/linux-aarch64/
             bootstrap/darwin-aarch64/
             bootstrap/darwin-x86_64/
+            bootstrap/win32/
+            bootstrap/win64/
             bootstrap/win32-aarch64/
 
   linux:
@@ -203,6 +205,7 @@ jobs:
 
   windows:
     name: Windows ${{ matrix.name }}
+    needs: bootstrap-sources
     runs-on: windows-latest
     timeout-minutes: 90
     strategy:
@@ -212,11 +215,9 @@ jobs:
           - name: x86
             msystem: MINGW32
             package_prefix: mingw-w64-i686
-            bootstrap_target: win32
           - name: x86_64
             msystem: MINGW64
             package_prefix: mingw-w64-x86_64
-            bootstrap_target: win64
 
     defaults:
       run:
@@ -238,6 +239,7 @@ jobs:
             gzip
             rsync
             curl
+            dos2unix
             pkgconf
             ${{ matrix.package_prefix }}-gcc
             ${{ matrix.package_prefix }}-binutils
@@ -246,14 +248,17 @@ jobs:
       - name: Select parallelism
         run: echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
 
-      - name: Seed Windows source bootstrap
-        run: bash build_scripts/ci-seed-source-bootstrap.sh "${{ matrix.bootstrap_target }}" "${{ matrix.bootstrap_target }}"
+      - name: Download Windows source bootstrap
+        uses: actions/download-artifact@v8
+        with:
+          name: fbc-xl-native-bootstrap-sources
+          path: bootstrap
 
       - name: Build the bootstrap compiler
         run: make -j"$JOBS" bootstrap-minimal </dev/null
 
       - name: Build the compiler with the bootstrap seed
-        run: make -j"$JOBS" compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
+        run: make -j"$JOBS" compiler </dev/null
 
       - name: Rebuild the compiler self-hosted
         run: |
@@ -409,7 +414,7 @@ jobs:
           # The makefile owns this list.  Extracting it here keeps CI aligned
           # with newly added OS and CPU combinations instead of maintaining a
           # second, slowly diverging matrix in YAML.
-          target_specs="$(make -s -pn | awk -F ' := ' '$1 == "SUPPORTED_BOOTSTRAP_TARGETS" { print $2; exit }')"
+          target_specs="$(make -s -pn | awk -F ' := ' '$1 == "SUPPORTED_BOOTSTRAP_TARGETS" && !found { print $2; found=1 }')"
           test -n "$target_specs" || {
             echo "ERROR: supported target matrix was not found" >&2
             exit 1
@@ -668,6 +673,7 @@ jobs:
             gzip
             rsync
             curl
+            dos2unix
             pkgconf
             mingw-w64-clang-aarch64-clang
             mingw-w64-clang-aarch64-compiler-rt

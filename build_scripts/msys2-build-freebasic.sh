@@ -1517,7 +1517,7 @@ if [ "$SKIP_PACKAGE" -eq 0 ]; then
 	else
 		assemble_distribution
 	fi
-else
+elif [ "$SKIP_INSTALLER" -eq 0 ] || [ "$SKIP_VALIDATE" -eq 0 ]; then
 	collect_existing_distribution_roots
 fi
 
