@@ -64,7 +64,7 @@ Environment:
   UCRT64_ROOT         UCRT64 root used for Emscripten/Node (default: /ucrt64)
   NSIS_EXE            Explicit makensis path (default: /mingw64/bin/makensis.exe)
   BINARYEN_OVERLAY    Overlay official Binaryen Windows tools (default: 1)
-  BINARYEN_RELEASE    Official Binaryen release to overlay (default: version_131)
+  BINARYEN_RELEASE    Official Binaryen release to overlay (default: version_132)
   BINARYEN_SHA256     Expected SHA256 for the Binaryen archive
   NODE_OVERLAY        Overlay official Node.js Windows executable (default: 1)
   NODE_RELEASE        Official Node.js release to overlay (default: v24.14.1)
@@ -319,10 +319,10 @@ INSTALL_SUBDIR="${INSTALL_SUBDIR:-freebasic-js}"
 UCRT64_ROOT="${UCRT64_ROOT:-/ucrt64}"
 NSIS_EXE="${NSIS_EXE:-/mingw64/bin/makensis.exe}"
 BINARYEN_OVERLAY="${BINARYEN_OVERLAY:-1}"
-BINARYEN_RELEASE="${BINARYEN_RELEASE:-version_131}"
+BINARYEN_RELEASE="${BINARYEN_RELEASE:-version_132}"
 BINARYEN_ARCHIVE="${BINARYEN_ARCHIVE:-binaryen-${BINARYEN_RELEASE}-x86_64-windows.tar.gz}"
 BINARYEN_URL="${BINARYEN_URL:-https://github.com/WebAssembly/binaryen/releases/download/${BINARYEN_RELEASE}/${BINARYEN_ARCHIVE}}"
-BINARYEN_SHA256="${BINARYEN_SHA256:-2f4edac1703a2f695254d6ff52ede03481e67db1f094915763d863158c17d9bc}"
+BINARYEN_SHA256="${BINARYEN_SHA256:-2089428ec98c899b45ee5d00636ddd6e2da8636cc473ef50b165cc25793ef7cb}"
 NODE_OVERLAY="${NODE_OVERLAY:-1}"
 NODE_RELEASE="${NODE_RELEASE:-v24.14.1}"
 NODE_ARCHIVE="${NODE_ARCHIVE:-node-${NODE_RELEASE}-win-x64.zip}"
