@@ -865,6 +865,53 @@ function DownloadFile {
 	}
 }
 
+function AcceptSdkManagerLicenses {
+	param([string] $sdkmanagerPath, [string] $sdkRoot)
+
+	$commandProcessor = [Environment]::GetEnvironmentVariable("ComSpec")
+	if ([string]::IsNullOrWhiteSpace($commandProcessor)) {
+		$commandProcessor = Join-Path $env:SystemRoot "System32\cmd.exe"
+	}
+
+	if (-not (Test-Path -LiteralPath $commandProcessor)) {
+		Die "Windows command processor is missing: $commandProcessor"
+	}
+
+	<#
+		PowerShell 5.1 does not reliably pipe text through a .bat launcher to the
+		native Java process behind sdkmanager.  Start cmd.exe explicitly and write
+		to its redirected standard input so every license prompt receives an
+		answer.  Environment variables keep package paths out of cmd.exe's command
+		line parsing and quoting rules.
+	#>
+	$startInfo = New-Object System.Diagnostics.ProcessStartInfo
+	$startInfo.FileName = $commandProcessor
+	$startInfo.Arguments = '/d /s /c ""%FBANDROID_SDKMANAGER%" "--sdk_root=%FBANDROID_SDK_ROOT%" --licenses"'
+	$startInfo.UseShellExecute = $false
+	$startInfo.CreateNoWindow = $true
+	$startInfo.RedirectStandardInput = $true
+	$startInfo.EnvironmentVariables["FBANDROID_SDKMANAGER"] = $sdkmanagerPath
+	$startInfo.EnvironmentVariables["FBANDROID_SDK_ROOT"] = $sdkRoot
+
+	$process = New-Object System.Diagnostics.Process
+	$process.StartInfo = $startInfo
+
+	try {
+		if (-not $process.Start()) {
+			Die "Could not start sdkmanager license acceptance"
+		}
+
+		for ($answer = 0; $answer -lt 1000; $answer++) {
+			$process.StandardInput.WriteLine("y")
+		}
+		$process.StandardInput.Close()
+		$process.WaitForExit()
+		return $process.ExitCode
+	} finally {
+		$process.Dispose()
+	}
+}
+
 $acceptTerms = $false
 $withEmulatorTools = $false
 foreach ($arg in $args) {
@@ -972,10 +1019,14 @@ if ((EnvOrDefault "ANDROID_WITH_EMULATOR_TOOLS" "0") -eq "1") {
 }
 
 Write-Host "Accepting Android SDK package licenses with sdkmanager..."
-$licenseInput = ("y`n" * 1000)
-$licenseInput | & $sdkmanager "--sdk_root=$androidHome" "--licenses"
-if ($LASTEXITCODE -ne 0) {
-	exit $LASTEXITCODE
+$licenseExitCode = AcceptSdkManagerLicenses $sdkmanager $androidHome
+if ($licenseExitCode -ne 0) {
+	exit $licenseExitCode
+}
+
+$licenseFiles = @(Get-ChildItem -LiteralPath (Join-Path $androidHome "licenses") -File -ErrorAction SilentlyContinue)
+if ($licenseFiles.Count -eq 0) {
+	Die "sdkmanager did not record any accepted Android SDK licenses"
 }
 
 Write-Host "Installing Android SDK packages..."
