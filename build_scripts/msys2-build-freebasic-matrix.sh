@@ -74,6 +74,19 @@ case "$(uname -s)" in
 		;;
 esac
 
+# GitHub supplies its workspace with a native drive-letter path.  Child build
+# scripts pass the host compiler through make recipes, where backslashes would
+# be interpreted as shell escapes.  Export one MSYS path for the whole matrix.
+if [ -n "${HOST_FBC_ROOT:-}" ]; then
+	if ! command -v cygpath >/dev/null 2>&1; then
+		echo "ERROR: cygpath is required to normalize HOST_FBC_ROOT." >&2
+		exit 1
+	fi
+
+	HOST_FBC_ROOT="$(cygpath -u "$HOST_FBC_ROOT")"
+	export HOST_FBC_ROOT
+fi
+
 msg() {
 	echo ""
 	echo "==> $1"
