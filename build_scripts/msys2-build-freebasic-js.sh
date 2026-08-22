@@ -183,9 +183,28 @@ cache_download() {
 copy_tree() {
 	local src="$1"
 	local dst="$2"
+	local src_win
+	local dst_win
+	local copy_status
+
 	mkdir -p "$dst"
-	if have rsync; then
-		# Windows package trees do not need POSIX ownership or permissions.
+	if have robocopy.exe && have cygpath; then
+		# Native copying avoids MSYS2 chmod calls on hosted NTFS volumes.
+		src_win="$(cygpath -aw "$src")"
+		dst_win="$(cygpath -aw "$dst")"
+		if run env MSYS2_ARG_CONV_EXCL='*' robocopy.exe \
+			"$src_win" "$dst_win" /E /COPY:DT /DCOPY:DT \
+			/R:3 /W:1 /NFL /NDL /NJH /NJS /NP; then
+			copy_status=0
+		else
+			copy_status=$?
+		fi
+
+		# Robocopy uses exit codes 0 through 7 for successful copy variants.
+		if [ "$copy_status" -ge 8 ]; then
+			fail "robocopy failed with exit code $copy_status"
+		fi
+	elif have rsync; then
 		run rsync -a --no-perms --no-owner --no-group "$src/" "$dst/"
 	else
 		run cp -a "$src"/. "$dst/"
@@ -581,18 +600,13 @@ copy_ucrt64_toolchain() {
 	[ -d "$UCRT64_ROOT" ] || fail "UCRT64 root not found: $UCRT64_ROOT"
 
 	msg "Bundling UCRT64 Emscripten/Node toolchain"
-	mkdir -p "$dst"
-	if have rsync; then
-		# Hosted NTFS volumes can reject chmod while rsync creates payload files.
-		run rsync -a --no-perms --no-owner --no-group --delete \
-			--exclude '/share/doc/' \
-			--exclude '/share/info/' \
-			--exclude '/share/man/' \
-			--exclude '/var/cache/' \
-			"$UCRT64_ROOT/" "$dst/"
-	else
-		copy_tree "$UCRT64_ROOT" "$dst"
-	fi
+	rm -rf "$dst"
+	copy_tree "$UCRT64_ROOT" "$dst"
+	rm -rf \
+		"$dst/share/doc" \
+		"$dst/share/info" \
+		"$dst/share/man" \
+		"$dst/var/cache"
 }
 
 repair_emscripten_windows_launchers() {

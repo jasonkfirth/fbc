@@ -18,6 +18,38 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 msg() { echo ""; echo "==> $1"; }
 
+copy_tree() {
+	local source="$1"
+	local dest="$2"
+	local source_win
+	local dest_win
+	local copy_status
+
+	mkdir -p "$dest"
+	if have robocopy.exe && have cygpath; then
+		# Native copying avoids MSYS2 chmod calls on hosted NTFS volumes.
+		source_win="$(cygpath -aw "$source")"
+		dest_win="$(cygpath -aw "$dest")"
+		if run env MSYS2_ARG_CONV_EXCL='*' robocopy.exe \
+			"$source_win" "$dest_win" /E /COPY:DT /DCOPY:DT \
+			/R:3 /W:1 /NFL /NDL /NJH /NJS /NP; then
+			copy_status=0
+		else
+			copy_status=$?
+		fi
+
+		# Robocopy uses exit codes 0 through 7 for successful copy variants.
+		if [ "$copy_status" -ge 8 ]; then
+			die "robocopy failed with exit code $copy_status"
+		fi
+	elif have rsync; then
+		run rsync -a --no-perms --no-owner --no-group \
+			"$source/" "$dest/"
+	else
+		run cp -a "$source"/. "$dest/"
+	fi
+}
+
 run_root() {
 	if [ "$(id -u)" -eq 0 ]; then
 		run "$@"
@@ -897,9 +929,7 @@ if [ "$DO_DJGPP_PAYLOAD" = "1" ]; then
 else
 	if [ ! -d "$DJGPP_DOS_CACHE/bin" ] && [ -d "$DISTROOT/djgpp/bin" ]; then
 		msg "seeding DOS-side DJGPP payload cache from distribution tree"
-		mkdir -p "$DJGPP_DOS_CACHE"
-		run rsync -a --no-perms --no-owner --no-group \
-			"$DISTROOT/djgpp"/ "$DJGPP_DOS_CACHE"/
+		copy_tree "$DISTROOT/djgpp" "$DJGPP_DOS_CACHE"
 	fi
 	[ -d "$DJGPP_DOS_CACHE/bin" ] || die "missing DOS-side DJGPP payload cache: $DJGPP_DOS_CACHE"
 fi
@@ -1016,14 +1046,11 @@ if [ "$DO_STAGE_INSTALL" = "1" ]; then
 	mv "$DISTROOT/inc" "$DISTROOT/fb/inc"
 	mv "$DISTROOT/lib" "$DISTROOT/fb/lib"
 
-	# DOS package payloads on Windows do not need POSIX metadata replay.
-	run rsync -a --no-perms --no-owner --no-group \
-		"$DJGPP_DOS_CACHE"/ "$DISTROOT/djgpp"/
+	copy_tree "$DJGPP_DOS_CACHE" "$DISTROOT/djgpp"
 	stage_dos_compiler_tools "$DISTROOT/fb"
 	prepare_dos_runtime_layout "$DISTROOT/fb" "$DISTROOT/djgpp"
 
-	run rsync -a --no-perms --no-owner --no-group \
-		"$ROOT/doc"/ "$DISTROOT/fb/doc"/
+	copy_tree "$ROOT/doc" "$DISTROOT/fb/doc"
 	run rsync -a --no-perms --no-owner --no-group \
 		--delete --delete-excluded --prune-empty-dirs \
 		--exclude-from "$ROOT/mk/example-copy-excludes.rsync" \
@@ -1120,9 +1147,7 @@ run_dosbox_test() {
 	fi
 
 	rm -rf "$test_root"
-	mkdir -p "$test_root"
-	run rsync -a --no-perms --no-owner --no-group \
-		"$DISTROOT"/ "$test_root"/
+	copy_tree "$DISTROOT" "$test_root"
 	prepare_dos_runtime_layout "$test_root"
 
 	mkdir -p "$test_root/fb"

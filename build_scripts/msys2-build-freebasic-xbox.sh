@@ -128,9 +128,28 @@ have() {
 copy_tree() {
 	local src="$1"
 	local dst="$2"
+	local src_win
+	local dst_win
+	local copy_status
+
 	mkdir -p "$dst"
-	if have rsync; then
-		# Windows package trees do not need POSIX ownership or permissions.
+	if have robocopy.exe && have cygpath; then
+		# Native copying avoids MSYS2 chmod calls on hosted NTFS volumes.
+		src_win="$(cygpath -aw "$src")"
+		dst_win="$(cygpath -aw "$dst")"
+		if run env MSYS2_ARG_CONV_EXCL='*' robocopy.exe \
+			"$src_win" "$dst_win" /E /COPY:DT /DCOPY:DT \
+			/R:3 /W:1 /NFL /NDL /NJH /NJS /NP; then
+			copy_status=0
+		else
+			copy_status=$?
+		fi
+
+		# Robocopy uses exit codes 0 through 7 for successful copy variants.
+		if [ "$copy_status" -ge 8 ]; then
+			fail "robocopy failed with exit code $copy_status"
+		fi
+	elif have rsync; then
 		run rsync -a --no-perms --no-owner --no-group "$src/" "$dst/"
 	else
 		run cp -a "$src"/. "$dst/"
@@ -752,15 +771,8 @@ assemble_distribution() {
 	copy_tree "$WORKTREE/lib/freebasic/$XBOX_TARGET_KEY" "$DISTROOT/lib/freebasic/$XBOX_TARGET_KEY"
 
 	msg "Copying nxdk"
-	if have rsync; then
-		run rsync -a --no-perms --no-owner --no-group --delete \
-			--exclude '/.git/' \
-			--exclude '/**/.git/' \
-			"$NXDK_DIR/" "$DISTROOT/nxdk/"
-	else
-		copy_tree "$NXDK_DIR" "$DISTROOT/nxdk"
-		find "$DISTROOT/nxdk" -name .git -type d -prune -exec rm -rf {} + || true
-	fi
+	copy_tree "$NXDK_DIR" "$DISTROOT/nxdk"
+	find "$DISTROOT/nxdk" -name .git -type d -prune -exec rm -rf {} + || true
 
 	copy_nxdk_host_tool_runtimes
 	build_nxdk_tool_shims

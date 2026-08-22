@@ -88,6 +88,39 @@ run()
     "$@"
 }
 
+copy_tree()
+{
+    local source="$1"
+    local dest="$2"
+    local source_win
+    local dest_win
+    local copy_status
+
+    mkdir -p "${dest}"
+    if have robocopy.exe && have cygpath; then
+        # Native copying avoids MSYS2 chmod calls on hosted NTFS volumes.
+        source_win="$(cygpath -aw "${source}")"
+        dest_win="$(cygpath -aw "${dest}")"
+        if run env MSYS2_ARG_CONV_EXCL='*' robocopy.exe \
+            "${source_win}" "${dest_win}" /E /COPY:DT /DCOPY:DT \
+            /R:3 /W:1 /NFL /NDL /NJH /NJS /NP; then
+            copy_status=0
+        else
+            copy_status=$?
+        fi
+
+        # Robocopy uses exit codes 0 through 7 for successful copy variants.
+        if [ "${copy_status}" -ge 8 ]; then
+            fail "robocopy failed with exit code ${copy_status}"
+        fi
+    elif have rsync; then
+        run rsync -a --no-perms --no-owner --no-group \
+            "${source}/" "${dest}/"
+    else
+        run cp -a "${source}"/. "${dest}/"
+    fi
+}
+
 usage()
 {
     cat <<EOF
@@ -780,14 +813,11 @@ copy_devkitpro_tree()
 
     msg "Copying devkitPro Wii toolchain"
 
-    mkdir -p "${root}/toolchain"
-
-    # Package data is copied to NTFS and does not need POSIX metadata replay.
-    run rsync -a --no-perms --no-owner --no-group --delete \
-        --exclude '.git' \
-        --exclude 'var/cache/pacman/pkg' \
-        --exclude 'packages' \
-        "${DEVKITPRO}/" "${root}/toolchain/devkitpro/"
+    copy_tree "${DEVKITPRO}" "${root}/toolchain/devkitpro"
+    rm -rf \
+        "${root}/toolchain/devkitpro/.git" \
+        "${root}/toolchain/devkitpro/var/cache/pacman/pkg" \
+        "${root}/toolchain/devkitpro/packages"
 }
 
 copy_optional_tree()
@@ -796,8 +826,7 @@ copy_optional_tree()
     local dest="$2"
 
     if [ -d "${source}" ]; then
-        run rsync -a --no-perms --no-owner --no-group --delete \
-            "${source}/" "${dest}/"
+        copy_tree "${source}" "${dest}"
     fi
 }
 
@@ -818,8 +847,7 @@ assemble_package()
     remove_if_requested "${PACKAGE_ROOT}"
     mkdir -p "${PACKAGE_ROOT}"
 
-    run rsync -a --no-perms --no-owner --no-group --delete \
-        "${stage_prefix}/" "${PACKAGE_ROOT}/"
+    copy_tree "${stage_prefix}" "${PACKAGE_ROOT}"
 
     mkdir -p "${PACKAGE_ROOT}/doc" "${PACKAGE_ROOT}/examples"
     copy_optional_tree "${WORKTREE}/doc" "${PACKAGE_ROOT}/doc"
