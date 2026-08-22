@@ -45,11 +45,11 @@ compiler-riscv32-smoke:
 		'#endif' \
 		'print "riscv32 ok"' \
 		> "$(TEST_TMP)/riscv32-smoke.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -target riscv32-linux-gnu -r "$(TEST_TMP)/riscv32-smoke.bas" -x "$(TEST_TMP)/riscv32-smoke")
+	$(call _mt_run,$(TEST_FBC_TRIPLET_CMD) -target riscv32-linux-gnu -r "$(TEST_TMP)/riscv32-smoke.bas" -x "$(TEST_TMP)/riscv32-smoke")
 	@test -s "$(TEST_TMP)/riscv32-smoke.c" || { echo "ERROR: riscv32 C output was not produced"; exit 1; }
 	@if command -v riscv32-linux-gnu-gcc >/dev/null 2>&1; then \
 		echo "==> riscv32-linux-gnu-gcc found; compiling riscv32 object"; \
-		$(TEST_FBC_CMD) -target riscv32-linux-gnu -c "$(TEST_TMP)/riscv32-smoke.bas" -o "$(TEST_TMP)/riscv32-smoke.o"; \
+		$(TEST_FBC_TRIPLET_CMD) -target riscv32-linux-gnu -c "$(TEST_TMP)/riscv32-smoke.bas" -o "$(TEST_TMP)/riscv32-smoke.o"; \
 		readelf -h "$(TEST_TMP)/riscv32-smoke.o" | grep -q 'Machine:.*RISC-V' || { echo "ERROR: object is not RISC-V"; exit 1; }; \
 		echo "==> RISCV32 OBJECT OK"; \
 	else \
@@ -70,11 +70,11 @@ compiler-riscv64-smoke:
 		'#endif' \
 		'print "riscv64 ok"' \
 		> "$(TEST_TMP)/riscv64-smoke.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -target riscv64-linux-gnu -r "$(TEST_TMP)/riscv64-smoke.bas" -x "$(TEST_TMP)/riscv64-smoke")
+	$(call _mt_run,$(TEST_FBC_TRIPLET_CMD) -target riscv64-linux-gnu -r "$(TEST_TMP)/riscv64-smoke.bas" -x "$(TEST_TMP)/riscv64-smoke")
 	@test -s "$(TEST_TMP)/riscv64-smoke.c" || { echo "ERROR: riscv64 C output was not produced"; exit 1; }
 	@if command -v riscv64-linux-gnu-gcc >/dev/null 2>&1; then \
 		echo "==> riscv64-linux-gnu-gcc found; compiling riscv64 object"; \
-		$(TEST_FBC_CMD) -target riscv64-linux-gnu -c "$(TEST_TMP)/riscv64-smoke.bas" -o "$(TEST_TMP)/riscv64-smoke.o"; \
+		$(TEST_FBC_TRIPLET_CMD) -target riscv64-linux-gnu -c "$(TEST_TMP)/riscv64-smoke.bas" -o "$(TEST_TMP)/riscv64-smoke.o"; \
 		readelf -h "$(TEST_TMP)/riscv64-smoke.o" | grep -q 'Machine:.*RISC-V' || { echo "ERROR: object is not RISC-V"; exit 1; }; \
 		echo "==> RISCV64 OBJECT OK"; \
 	else \
@@ -95,14 +95,14 @@ compiler-s390x-smoke:
 		'#endif' \
 		'print "s390x ok"' \
 		> "$(TEST_TMP)/s390x-smoke.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -target s390x-linux-gnu -r "$(TEST_TMP)/s390x-smoke.bas" -x "$(TEST_TMP)/s390x-smoke")
+	$(call _mt_run,$(TEST_FBC_TRIPLET_CMD) -target s390x-linux-gnu -r "$(TEST_TMP)/s390x-smoke.bas" -x "$(TEST_TMP)/s390x-smoke")
 	@test -s "$(TEST_TMP)/s390x-smoke.c" || { echo "ERROR: s390x C output was not produced"; exit 1; }
-	@$(TEST_FBC_CMD) -target s390x-linux-gnu -v -c "$(TEST_TMP)/s390x-smoke.bas" -o "$(TEST_TMP)/s390x-smoke.o" > "$(TEST_TMP)/s390x-gcc.args" 2>&1 || true
+	@$(TEST_FBC_TRIPLET_CMD) -target s390x-linux-gnu -v -c "$(TEST_TMP)/s390x-smoke.bas" -o "$(TEST_TMP)/s390x-smoke.o" > "$(TEST_TMP)/s390x-gcc.args" 2>&1 || true
 	@grep -q -- '-march=z900' "$(TEST_TMP)/s390x-gcc.args" || { echo "ERROR: s390x gcc command did not use -march=z900"; exit 1; }
 	@! grep -q -- '-march=s390x' "$(TEST_TMP)/s390x-gcc.args" || { echo "ERROR: s390x gcc command used invalid -march=s390x"; exit 1; }
 	@if command -v s390x-linux-gnu-gcc >/dev/null 2>&1; then \
 		echo "==> s390x-linux-gnu-gcc found; compiling s390x object"; \
-		$(TEST_FBC_CMD) -target s390x-linux-gnu -c "$(TEST_TMP)/s390x-smoke.bas" -o "$(TEST_TMP)/s390x-smoke.o"; \
+		$(TEST_FBC_TRIPLET_CMD) -target s390x-linux-gnu -c "$(TEST_TMP)/s390x-smoke.bas" -o "$(TEST_TMP)/s390x-smoke.o"; \
 		readelf -h "$(TEST_TMP)/s390x-smoke.o" | grep -q 'Machine:.*IBM S/390' || { echo "ERROR: object is not S390"; exit 1; }; \
 		echo "==> S390X OBJECT OK"; \
 	else \
@@ -123,11 +123,11 @@ compiler-loongarch64-smoke:
 		'#endif' \
 		'print "loongarch64 ok"' \
 		> "$(TEST_TMP)/loongarch64-smoke.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -target loongarch64-linux-gnu -r "$(TEST_TMP)/loongarch64-smoke.bas" -x "$(TEST_TMP)/loongarch64-smoke")
+	$(call _mt_run,$(TEST_FBC_TRIPLET_CMD) -target loongarch64-linux-gnu -r "$(TEST_TMP)/loongarch64-smoke.bas" -x "$(TEST_TMP)/loongarch64-smoke")
 	@test -s "$(TEST_TMP)/loongarch64-smoke.c" || { echo "ERROR: loongarch64 C output was not produced"; exit 1; }
 	@if command -v loongarch64-linux-gnu-gcc >/dev/null 2>&1; then \
 		echo "==> loongarch64-linux-gnu-gcc found; compiling loongarch64 object"; \
-		$(TEST_FBC_CMD) -target loongarch64-linux-gnu -c "$(TEST_TMP)/loongarch64-smoke.bas" -o "$(TEST_TMP)/loongarch64-smoke.o"; \
+		$(TEST_FBC_TRIPLET_CMD) -target loongarch64-linux-gnu -c "$(TEST_TMP)/loongarch64-smoke.bas" -o "$(TEST_TMP)/loongarch64-smoke.o"; \
 		readelf -h "$(TEST_TMP)/loongarch64-smoke.o" | grep -q 'Machine:.*LoongArch' || { echo "ERROR: object is not LoongArch"; exit 1; }; \
 		echo "==> LOONGARCH64 OBJECT OK"; \
 	else \
@@ -180,11 +180,11 @@ compiler-ppc-smoke:
 		'#endif' \
 		'print "ppc ok"' \
 		> "$(TEST_TMP)/ppc-smoke.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -target powerpc-linux-gnu -r "$(TEST_TMP)/ppc-smoke.bas" -x "$(TEST_TMP)/ppc-smoke")
+	$(call _mt_run,$(TEST_FBC_TRIPLET_CMD) -target powerpc-linux-gnu -r "$(TEST_TMP)/ppc-smoke.bas" -x "$(TEST_TMP)/ppc-smoke")
 	@test -s "$(TEST_TMP)/ppc-smoke.c" || { echo "ERROR: ppc C output was not produced"; exit 1; }
 	@if command -v powerpc-linux-gnu-gcc >/dev/null 2>&1; then \
 		echo "==> powerpc-linux-gnu-gcc found; compiling ppc object"; \
-		$(TEST_FBC_CMD) -target powerpc-linux-gnu -c "$(TEST_TMP)/ppc-smoke.bas" -o "$(TEST_TMP)/ppc-smoke.o"; \
+		$(TEST_FBC_TRIPLET_CMD) -target powerpc-linux-gnu -c "$(TEST_TMP)/ppc-smoke.bas" -o "$(TEST_TMP)/ppc-smoke.o"; \
 		readelf -h "$(TEST_TMP)/ppc-smoke.o" | grep -q 'Machine:.*PowerPC' || { echo "ERROR: object is not PowerPC"; exit 1; }; \
 		echo "==> PPC OBJECT OK"; \
 	else \
@@ -211,11 +211,11 @@ compiler-ppc64-smoke:
 		'#endif' \
 		'print "ppc64 ok"' \
 		> "$(TEST_TMP)/ppc64-smoke.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -target powerpc64-linux-gnu -r "$(TEST_TMP)/ppc64-smoke.bas" -x "$(TEST_TMP)/ppc64-smoke")
+	$(call _mt_run,$(TEST_FBC_TRIPLET_CMD) -target powerpc64-linux-gnu -r "$(TEST_TMP)/ppc64-smoke.bas" -x "$(TEST_TMP)/ppc64-smoke")
 	@test -s "$(TEST_TMP)/ppc64-smoke.c" || { echo "ERROR: ppc64 C output was not produced"; exit 1; }
 	@if command -v powerpc64-linux-gnu-gcc >/dev/null 2>&1; then \
 		echo "==> powerpc64-linux-gnu-gcc found; compiling ppc64 object"; \
-		$(TEST_FBC_CMD) -target powerpc64-linux-gnu -c "$(TEST_TMP)/ppc64-smoke.bas" -o "$(TEST_TMP)/ppc64-smoke.o"; \
+		$(TEST_FBC_TRIPLET_CMD) -target powerpc64-linux-gnu -c "$(TEST_TMP)/ppc64-smoke.bas" -o "$(TEST_TMP)/ppc64-smoke.o"; \
 		readelf -h "$(TEST_TMP)/ppc64-smoke.o" | grep -q 'Machine:.*PowerPC64' || { echo "ERROR: object is not PowerPC64"; exit 1; }; \
 		echo "==> PPC64 OBJECT OK"; \
 	else \
@@ -239,11 +239,11 @@ compiler-ppc64le-smoke:
 		'#endif' \
 		'print "ppc64le ok"' \
 		> "$(TEST_TMP)/ppc64le-smoke.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -target powerpc64le-linux-gnu -r "$(TEST_TMP)/ppc64le-smoke.bas" -x "$(TEST_TMP)/ppc64le-smoke")
+	$(call _mt_run,$(TEST_FBC_TRIPLET_CMD) -target powerpc64le-linux-gnu -r "$(TEST_TMP)/ppc64le-smoke.bas" -x "$(TEST_TMP)/ppc64le-smoke")
 	@test -s "$(TEST_TMP)/ppc64le-smoke.c" || { echo "ERROR: ppc64le C output was not produced"; exit 1; }
 	@if command -v powerpc64le-linux-gnu-gcc >/dev/null 2>&1; then \
 		echo "==> powerpc64le-linux-gnu-gcc found; compiling ppc64le object"; \
-		$(TEST_FBC_CMD) -target powerpc64le-linux-gnu -c "$(TEST_TMP)/ppc64le-smoke.bas" -o "$(TEST_TMP)/ppc64le-smoke.o"; \
+		$(TEST_FBC_TRIPLET_CMD) -target powerpc64le-linux-gnu -c "$(TEST_TMP)/ppc64le-smoke.bas" -o "$(TEST_TMP)/ppc64le-smoke.o"; \
 		readelf -h "$(TEST_TMP)/ppc64le-smoke.o" | grep -q 'Machine:.*PowerPC64' || { echo "ERROR: object is not PowerPC64"; exit 1; }; \
 		echo "==> PPC64LE OBJECT OK"; \
 	else \

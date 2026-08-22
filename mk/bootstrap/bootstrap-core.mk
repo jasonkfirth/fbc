@@ -70,6 +70,10 @@ ifeq ($(TARGET_OS),aros)
 BOOTSTRAP_TERM_LIB :=
 endif
 
+ifneq ($(strip $(DISABLE_NCURSES)),)
+BOOTSTRAP_TERM_LIB :=
+endif
+
 ##############################################################################
 # Bootstrap emission target
 ##############################################################################

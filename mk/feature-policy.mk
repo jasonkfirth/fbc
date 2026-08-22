@@ -36,11 +36,11 @@ endif
 
 ifneq ($(strip $(filter bootstrap-minimal,$(MAKECMDGOALS)) $(BOOTSTRAP_MINIMAL)),)
   DISABLE_X11 := YesPlease
+  DISABLE_NCURSES := YesPlease
   ALLCFLAGS += \
     -DDISABLE_GPM \
     -DDISABLE_FFI \
     -DDISABLE_X11 \
-    -DDISABLE_NCURSES \
     -DDISABLE_LANGINFO
 endif
 

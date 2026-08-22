@@ -48,8 +48,54 @@ env:
   BOOTSTRAP_VERSION: "1.10.1"
 
 jobs:
+  bootstrap-sources:
+    name: Generate native bootstrap sources
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install bootstrap dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc g++ make binutils pkg-config rsync curl \
+            tar xz-utils gzip dos2unix libncurses-dev libffi-dev
+
+      - name: Seed and build the source compiler
+        run: |
+          set -euo pipefail
+          bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
+          make -j"$(nproc)" bootstrap-minimal </dev/null
+          make -j"$(nproc)" compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
+          make clean-compiler
+          make -j"$(nproc)" compiler </dev/null
+
+      - name: Emit native runner bootstrap sources
+        run: |
+          set -euo pipefail
+          make bootstrap-emit-matrix \
+            BOOTSTRAP_MATRIX='linux-aarch64:linux-aarch64:aarch64-linux-gnu darwin-aarch64:darwin-aarch64:aarch64-apple-darwin darwin-x86_64:darwin-x86_64:x86_64-apple-darwin win32-aarch64:win32-aarch64:aarch64-w64-mingw32' \
+            </dev/null
+
+      - name: Upload native runner bootstrap sources
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-native-bootstrap-sources
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            bootstrap/linux-aarch64/
+            bootstrap/darwin-aarch64/
+            bootstrap/darwin-x86_64/
+            bootstrap/win32-aarch64/
+
   linux:
     name: Linux ${{ matrix.name }}
+    needs: bootstrap-sources
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     strategy:
@@ -86,15 +132,18 @@ jobs:
         run: echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
 
       - name: Seed Linux source bootstrap
+        if: matrix.name == 'x86_64'
         run: bash build_scripts/ci-seed-source-bootstrap.sh "${{ matrix.bootstrap_target }}" linux-x86_64
 
+      - name: Download native bootstrap sources
+        if: matrix.name == 'arm64'
+        uses: actions/download-artifact@v8
+        with:
+          name: fbc-xl-native-bootstrap-sources
+          path: bootstrap
+
       - name: Build the bootstrap compiler
-        run: |
-          make -j"$JOBS" bootstrap-minimal </dev/null
-          if [ "${{ matrix.name }}" = "arm64" ]; then
-            make bootstrap-emit </dev/null
-            make -j"$JOBS" bootstrap-minimal </dev/null
-          fi
+        run: make -j"$JOBS" bootstrap-minimal </dev/null
 
       - name: Build the compiler with the bootstrap seed
         run: make -j"$JOBS" compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
@@ -408,6 +457,7 @@ jobs:
 
   macos:
     name: macOS ${{ matrix.name }}
+    needs: bootstrap-sources
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     strategy:
@@ -440,14 +490,14 @@ jobs:
       - name: Select parallelism
         run: echo "JOBS=$(sysctl -n hw.logicalcpu)" >> "$GITHUB_ENV"
 
-      - name: Seed Darwin source bootstrap
-        run: bash build_scripts/ci-seed-source-bootstrap.sh "${{ matrix.bootstrap_target }}" linux-x86_64
+      - name: Download Darwin source bootstrap
+        uses: actions/download-artifact@v8
+        with:
+          name: fbc-xl-native-bootstrap-sources
+          path: bootstrap
 
       - name: Build the bootstrap compiler
-        run: |
-          gmake -j"$JOBS" bootstrap-minimal </dev/null
-          gmake bootstrap-emit </dev/null
-          gmake -j"$JOBS" bootstrap-minimal </dev/null
+        run: gmake -j"$JOBS" bootstrap-minimal </dev/null
 
       - name: Build the compiler with the bootstrap seed
         run: gmake -j"$JOBS" compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
@@ -580,6 +630,7 @@ jobs:
 
   windows-arm64-native:
     name: Windows ARM64 native
+    needs: bootstrap-sources
     runs-on: windows-11-arm
     timeout-minutes: 120
 
@@ -619,14 +670,14 @@ jobs:
       - name: Select parallelism
         run: echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
 
-      - name: Seed native ARM64 source bootstrap
-        run: bash build_scripts/ci-seed-source-bootstrap.sh win32-aarch64 win64
+      - name: Download native ARM64 source bootstrap
+        uses: actions/download-artifact@v8
+        with:
+          name: fbc-xl-native-bootstrap-sources
+          path: bootstrap
 
       - name: Build the bootstrap compiler
-        run: |
-          make -j"$JOBS" bootstrap-minimal </dev/null
-          make bootstrap-emit </dev/null
-          make -j"$JOBS" bootstrap-minimal </dev/null
+        run: make -j"$JOBS" bootstrap-minimal </dev/null
 
       - name: Build the compiler with the bootstrap seed
         run: make -j"$JOBS" compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
@@ -686,11 +737,11 @@ jobs:
       - name: Build and qualify all MIPS Linux targets
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/mips/work" "$RUNNER_TEMP/mips/output"
+          mkdir -p "$RUNNER_TEMP/mips/output/work"
           JOBS=2 bash build_scripts/debianubuntu-build-freebasic-mips.sh \
             --jobs 2 \
             --skip-package \
-            --work-dir "$RUNNER_TEMP/mips/work" \
+            --work-dir "$RUNNER_TEMP/mips/output/work" \
             --out-dir "$RUNNER_TEMP/mips/output"
 
       - name: Upload MIPS diagnostics

@@ -470,6 +470,15 @@ INSTALL_DIR_WIN='C:\FreeBASIC'
 HOST_FBC_ROOT="${HOST_FBC_ROOT:-}"
 PACKAGED_DISTROOTS=()
 
+# GitHub exposes GITHUB_WORKSPACE and values derived from it with native
+# drive-letter separators.  Those backslashes survive as make variable text
+# and are then consumed as shell escapes when bootstrap-emit runs the host
+# compiler.  Keep host compiler paths in MSYS form throughout this script.
+if [ -n "$HOST_FBC_ROOT" ]; then
+	have cygpath || fail "cygpath is required to normalize HOST_FBC_ROOT"
+	HOST_FBC_ROOT="$(cygpath -u "$HOST_FBC_ROOT")"
+fi
+
 MINGW32_ROOT="/mingw32"
 MINGW64_ROOT="/mingw64"
 CLANGARM64_ROOT="/clangarm64"

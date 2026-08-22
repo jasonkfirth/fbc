@@ -459,6 +459,8 @@ TOOL_AR=""
 TOOL_RANLIB=""
 TOOL_DARWIN_CLANG=""
 HOST_TRIPLET=""
+BOOTSTRAP_CC=""
+BOOTSTRAP_CXX=""
 
 resolve_gcc_toolchain() {
     local brew_bin gcc_bin gxx_bin
@@ -575,6 +577,15 @@ EOF
 }
 
 select_build_toolchain() {
+    # The pinned release bootstrap was emitted by an older HLC backend.  Its
+    # generated C contains GNU computed gotos that Apple Clang will not accept
+    # in functions without a visible label address.  Homebrew GCC builds that
+    # one stage0 compiler; the refreshed compiler then uses Apple Clang for the
+    # supported Darwin build and package.
+    resolve_gcc_toolchain || die "Homebrew GCC and G++ are required to build the source bootstrap compiler"
+    BOOTSTRAP_CC="$TOOL_CC"
+    BOOTSTRAP_CXX="$TOOL_CXX"
+
     # Apple Clang is the native Darwin system compiler and accepts the inline
     # assembly options emitted by fbc.  Homebrew GCC rejects -masm=intel on
     # Darwin, so merely having that optional package installed must not change
@@ -1029,15 +1040,15 @@ if [ "$DO_BUILD" -eq 1 ]; then
         BOOT_FBC="$BOOT_FBC_RESULT"
 
         msg "building bootstrap compiler for ${FBC_TARGET}"
-        run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "BOOT_FBC=${BOOT_FBC}" "BUILD_FBC=${BOOT_FBC}" bootstrap-minimal
+        run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "CC=$BOOTSTRAP_CC" "CXX=$BOOTSTRAP_CXX" "BOOT_FBC=${BOOT_FBC}" "BUILD_FBC=${BOOT_FBC}" bootstrap-minimal
 
         # Release source-bootstrap archives only contain a small set of donor
         # platforms.  The first native compiler is runnable, but still carries
         # that donor's default OS and CPU.  Re-emit from the current tree for
         # the actual Darwin target, then rebuild stage0 before self-hosting.
         msg "refreshing bootstrap sources for ${FBC_TARGET}"
-        run "$MAKE_CMD" -f GNUmakefile "${MAKE_VARS[@]}" "BOOT_FBC=$ROOT/bin/fbc" "BUILD_FBC=$ROOT/bin/fbc" bootstrap-emit
-        run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "BOOT_FBC=$ROOT/bin/fbc" "BUILD_FBC=$ROOT/bin/fbc" bootstrap-minimal
+        run "$MAKE_CMD" -f GNUmakefile "${MAKE_VARS[@]}" "CC=$BOOTSTRAP_CC" "CXX=$BOOTSTRAP_CXX" "BOOT_FBC=$ROOT/bin/fbc" "BUILD_FBC=$ROOT/bin/fbc" bootstrap-emit
+        run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "CC=$BOOTSTRAP_CC" "CXX=$BOOTSTRAP_CXX" "BOOT_FBC=$ROOT/bin/fbc" "BUILD_FBC=$ROOT/bin/fbc" bootstrap-minimal
 
         BUILD_COMPILER="$ROOT/bootstrap/fbc"
         [ -x "$BUILD_COMPILER" ] || die "bootstrap compiler was not produced at $BUILD_COMPILER"

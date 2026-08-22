@@ -164,6 +164,8 @@ jobs:
             xz
             gzip
             pkgconf
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-libffi
 
       - name: Seed Windows package bootstrap sources
         run: |
@@ -171,9 +173,17 @@ jobs:
           bash build_scripts/ci-seed-source-bootstrap.sh win64 win64
           bash build_scripts/ci-seed-source-bootstrap.sh win32-aarch64 win64
 
+      - name: Build the Windows host compiler
+        run: |
+          make -j"$(nproc)" bootstrap-minimal </dev/null
+          make -j"$(nproc)" compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
+          make clean-compiler
+          make -j"$(nproc)" compiler </dev/null
+
       - name: Build Windows, Android, JavaScript, Wii, Xbox, and DOS packages
         env:
           JOBS: 4
+          HOST_FBC_ROOT: ${{ github.workspace }}
         run: bash build_scripts/msys2-build-freebasic-matrix.sh
 
       - name: Upload Windows packages
@@ -239,10 +249,10 @@ jobs:
           JOBS: 2
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/mips/work" "$RUNNER_TEMP/mips/output"
+          mkdir -p "$RUNNER_TEMP/mips/output/work"
           bash build_scripts/debianubuntu-build-freebasic-mips.sh \
             --jobs 2 \
-            --work-dir "$RUNNER_TEMP/mips/work" \
+            --work-dir "$RUNNER_TEMP/mips/output/work" \
             --out-dir "$RUNNER_TEMP/mips/output"
 
       - name: Upload MIPS packages
