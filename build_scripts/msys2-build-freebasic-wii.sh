@@ -463,7 +463,7 @@ install_dependencies()
 
     msg "Installing MSYS2 build dependencies"
 
-    run pacman --needed --noconfirm -S \
+    run bash "$SELF_DIR/msys2-pacman-retry.sh" --needed --noconfirm -S \
         base-devel \
         binutils \
         libffi-devel \

@@ -597,24 +597,24 @@ install_dependencies() {
 	fi
 
 	msg "Updating MSYS2 package database"
-	run pacman -Sy --noconfirm
+	run bash "$SELF_DIR/msys2-pacman-retry.sh" -Sy --noconfirm
 
 	msg "Installing MSYS2 packaging dependencies"
-	run pacman -S --needed --noconfirm "${msys_packages[@]}"
+	run bash "$SELF_DIR/msys2-pacman-retry.sh" -S --needed --noconfirm "${msys_packages[@]}"
 
 	if [ "$QEMU_ARM64_VALIDATE" -ne 0 ]; then
 		msg "Installing QEMU for Windows ARM64 validation"
-		run pacman -S --needed --noconfirm mingw-w64-x86_64-qemu
+		run bash "$SELF_DIR/msys2-pacman-retry.sh" -S --needed --noconfirm mingw-w64-x86_64-qemu
 	fi
 
 	msg "Installing MinGW toolchain groups"
-	run pacman -S --needed --noconfirm \
+	run bash "$SELF_DIR/msys2-pacman-retry.sh" -S --needed --noconfirm \
 		mingw-w64-i686-toolchain \
 		mingw-w64-x86_64-toolchain
 
 	if [ "$SKIP_BUILDARM64" -eq 0 ]; then
 		msg "Installing Windows ARM64 cross-build toolchains"
-		run pacman -S --needed --noconfirm \
+		run bash "$SELF_DIR/msys2-pacman-retry.sh" -S --needed --noconfirm \
 			mingw-w64-x86_64-clang \
 			mingw-w64-x86_64-lld \
 			mingw-w64-x86_64-llvm \
@@ -643,7 +643,7 @@ install_dependencies() {
 			# but do not make the whole Windows package build fail because
 			# an optional binding library was dropped from one repository.
 			if pacman -Si "$fullpkg" >/dev/null 2>&1; then
-				run pacman -S --needed --noconfirm "$fullpkg"
+				run bash "$SELF_DIR/msys2-pacman-retry.sh" -S --needed --noconfirm "$fullpkg"
 			else
 				echo "NOTE: optional MSYS2 package not found: $fullpkg" >&2
 			fi
@@ -653,7 +653,7 @@ install_dependencies() {
 			local fullpkg="mingw-w64-clang-aarch64-${pkg}"
 
 			if pacman -Si "$fullpkg" >/dev/null 2>&1; then
-				run pacman -S --needed --noconfirm "$fullpkg"
+				run bash "$SELF_DIR/msys2-pacman-retry.sh" -S --needed --noconfirm "$fullpkg"
 			else
 				echo "NOTE: optional MSYS2 package not found: $fullpkg" >&2
 			fi

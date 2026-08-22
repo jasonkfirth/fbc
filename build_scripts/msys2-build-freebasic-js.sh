@@ -355,8 +355,8 @@ trap cleanup EXIT
 install_dependencies() {
 	msg "Installing MSYS2 packages needed for fbc-js"
 
-	run pacman -Syu --needed --noconfirm
-	run pacman -S --needed --noconfirm \
+	run bash "$SELF_DIR/msys2-pacman-retry.sh" -Syu --needed --noconfirm
+	run bash "$SELF_DIR/msys2-pacman-retry.sh" -S --needed --noconfirm \
 		base-devel \
 		curl \
 		rsync \
