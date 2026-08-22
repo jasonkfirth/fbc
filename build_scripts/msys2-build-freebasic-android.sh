@@ -149,16 +149,32 @@ have() {
 copy_tree() {
 	local src="$1"
 	local dst="$2"
+	local src_win
+	local dst_win
+	local copy_status
+
 	mkdir -p "$dst"
-	if have rsync; then
+	if have robocopy.exe && have cygpath; then
 		#
-		# These trees become Windows package payloads.  MSYS2 cannot reliably
-		# replay POSIX ownership and modes for every file on NTFS; in particular,
-		# hosted runners reject chmod on JDK class-sharing archives.  Preserve the
-		# file contents, links and timestamps without copying POSIX metadata that
-		# has no meaning to the resulting Windows package.
+		# These trees become Windows package payloads.  Native copying avoids
+		# MSYS2's POSIX permission emulation, which cannot chmod the JDK's
+		# class-sharing archives reliably on hosted NTFS volumes.  Copy data and
+		# timestamps without asking a POSIX tool to translate NTFS metadata.
 		#
-		run rsync -a --no-perms --no-owner --no-group "$src/" "$dst/"
+		src_win="$(cygpath -aw "$src")"
+		dst_win="$(cygpath -aw "$dst")"
+		if run env MSYS2_ARG_CONV_EXCL='*' robocopy.exe \
+			"$src_win" "$dst_win" /E /COPY:DT /DCOPY:DT \
+			/R:3 /W:1 /NFL /NDL /NJH /NJS /NP; then
+			copy_status=0
+		else
+			copy_status=$?
+		fi
+
+		# Robocopy uses exit codes 0 through 7 for successful copy variants.
+		if [ "$copy_status" -ge 8 ]; then
+			fail "robocopy failed with exit code $copy_status"
+		fi
 	else
 		run cp -R "$src"/. "$dst/"
 	fi
