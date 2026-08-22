@@ -1058,6 +1058,10 @@ if [ "$DO_BUILD" -eq 1 ]; then
         # the actual Darwin target, then rebuild stage0 before self-hosting.
         msg "refreshing bootstrap sources for ${FBC_TARGET}"
         run "$MAKE_CMD" -f GNUmakefile "${MAKE_VARS[@]}" "BOOT_FBC=$ROOT/bin/fbc" "BUILD_FBC=$ROOT/bin/fbc" bootstrap-emit
+        # The source compiler build above populated the normal runtime archive
+        # with ncurses support.  bootstrap-minimal disables that dependency,
+        # so it must not reuse the full runtime's objects and archive.
+        run "$MAKE_CMD" -f GNUmakefile "${MAKE_VARS[@]}" clean-libs
         run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "BOOT_FBC=$ROOT/bin/fbc" "BUILD_FBC=$ROOT/bin/fbc" bootstrap-minimal
 
         BUILD_COMPILER="$ROOT/bootstrap/fbc"
