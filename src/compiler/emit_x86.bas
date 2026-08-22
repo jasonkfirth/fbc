@@ -1193,7 +1193,18 @@ private sub hCreateFrame _
 			end if
 
 			if( bytestoalloc > 0 ) then
-				outp( "sub esp, " + str( bytestoalloc ) )
+				const WIN32_STACK_PAGE_BYTES = 4096
+
+				if( (env.clopt.target = FB_COMPTARGET_WIN32) and _
+				    (bytestoalloc >= WIN32_STACK_PAGE_BYTES) ) then
+					'' Windows commits stack pages on demand through a guard page.
+					'' Probe large frames before moving esp across that guard page.
+					outp( "mov eax, " + str( bytestoalloc ) )
+					outp( "call ___chkstk_ms" )
+					outp( "sub esp, eax" )
+				else
+					outp( "sub esp, " + str( bytestoalloc ) )
+				end if
 			end if
 
 		end if
