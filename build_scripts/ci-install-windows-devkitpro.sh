@@ -144,9 +144,9 @@ EOF
 	libs_server="$(pacman-conf --repo dkp-libs Server)"
 	windows_server="$(pacman-conf --repo dkp-windows Server)"
 
-	[ "$libs_server" = "$DKP_LIBS_SERVER" ] ||
+	[ "${libs_server%/}" = "${DKP_LIBS_SERVER%/}" ] ||
 		fail "unexpected dkp-libs server: $libs_server"
-	[ "$windows_server" = "$DKP_WINDOWS_SERVER" ] ||
+	[ "${windows_server%/}" = "${DKP_WINDOWS_SERVER%/}" ] ||
 		fail "unexpected dkp-windows server: $windows_server"
 }
 
