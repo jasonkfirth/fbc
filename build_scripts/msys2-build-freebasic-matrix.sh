@@ -14,7 +14,8 @@
 #
 #       * build the standard Windows win32/win64 package
 #       * build the separate Windows ARM64 package
-#       * build the Android, JavaScript, Wii, Xbox, and DOS packages
+#       * build the Android, JavaScript, Xbox, and DOS packages
+#       * build the Wii package when its external toolchain is available
 #       * leave each artifact in the output directory owned by its script
 #
 #   This file intentionally does NOT contain:
@@ -29,6 +30,7 @@ trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 
 SELF_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
 ROOT="$(CDPATH= cd -- "$SELF_DIR/.." && pwd)"
+BUILD_WII=1
 
 cd "$ROOT"
 
@@ -40,30 +42,34 @@ fi
 
 usage() {
 	cat <<EOF
-Usage: $0
+Usage: $0 [--no-wii]
 
 Builds the complete FreeBASIC MSYS2 package matrix.
 
-This script intentionally accepts no build options.  Each package script owns
-its own defaults so it can also be run independently.
+Options:
+  --no-wii  Skip the Wii package when the official Windows devkitPro
+            toolchain could not be installed.
 EOF
 }
 
-if [ "$#" -gt 0 ]; then
+while [ "$#" -gt 0 ]; do
 	case "$1" in
+		--no-wii)
+			BUILD_WII=0
+			shift
+			;;
 		-h|--help)
-			if [ "$#" -eq 1 ]; then
-				usage
-				exit 0
-			fi
+			usage
+			exit 0
+			;;
+		*)
+			echo ""
+			echo "ERROR: unknown option: $1"
+			usage >&2
+			exit 1
 			;;
 	esac
-
-	echo ""
-	echo "ERROR: this script does not accept build options."
-	usage >&2
-	exit 1
-fi
+done
 
 case "$(uname -s)" in
 	MINGW*|MSYS*) ;;
@@ -104,7 +110,11 @@ msg "Building FreeBASIC MSYS2 package matrix"
 run_script "$ROOT/build_scripts/msys2-build-freebasic.sh"
 run_script "$ROOT/build_scripts/msys2-build-freebasic-android.sh"
 run_script "$ROOT/build_scripts/msys2-build-freebasic-js.sh"
-run_script "$ROOT/build_scripts/msys2-build-freebasic-wii.sh"
+if [ "$BUILD_WII" -eq 1 ]; then
+	run_script "$ROOT/build_scripts/msys2-build-freebasic-wii.sh"
+else
+	msg "Skipping the Wii package because its external toolchain is unavailable"
+fi
 run_script "$ROOT/build_scripts/msys2-build-freebasic-xbox.sh"
 run_script "$ROOT/build_scripts/msdos-build-freebasic.sh"
 
@@ -112,7 +122,9 @@ msg "MSYS2 package matrix complete"
 echo "Windows packages : $ROOT/out/mingw32"
 echo "Android package  : $ROOT/out/mingw32-android"
 echo "JavaScript package: $ROOT/out/mingw32-js"
-echo "Wii package      : $ROOT/out/mingw32-wii"
+if [ "$BUILD_WII" -eq 1 ]; then
+	echo "Wii package      : $ROOT/out/mingw32-wii"
+fi
 echo "Xbox package     : $ROOT/out/mingw32-xbox"
 echo "DOS package      : $ROOT/out/msdos"
 
