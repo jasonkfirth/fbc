@@ -55,7 +55,6 @@ RESUME=0
 RPCEMU_PID=""
 BOOT_TASK=""
 TEMP_STAGE=""
-BOOT_CONFIGURATION_ATTEMPTED=0
 
 ##############################################################################
 # Helpers
@@ -508,15 +507,6 @@ run_batch() {
     ) &
     RPCEMU_PID="$!"
 
-    if [ ! -f "$BOOT_READY_MARKER" ] &&
-       [ "$BOOT_CONFIGURATION_ATTEMPTED" -eq 0 ]; then
-        "$SCRIPT_DIR/riscos-bootstrap-rpcemu-boot.sh" \
-            --pid "$RPCEMU_PID" \
-            --workdir "$RPCEMU_WORKDIR" \
-            --evidence-dir "$OUTPUT_ROOT/boot-evidence"
-        BOOT_CONFIGURATION_ATTEMPTED=1
-    fi
-
     while [ "$elapsed" -lt "$TIMEOUT_SECONDS" ]; do
         runtime_log="$(find_runtime_log "$batch_id")"
         if [ -n "$runtime_log" ] &&
@@ -545,8 +535,8 @@ run_batch() {
         die "$batch_id failed; see $saved_log"
     fi
 
-    # A guest completion log proves both CMOS settings took effect and the
-    # Choices task ran.  Later batches can boot without keyboard automation.
+    # A guest completion log proves the managed HostFS selection took effect
+    # and the Choices task ran. Later batches use the same private runtime.
     : > "$BOOT_READY_MARKER"
 }
 
@@ -573,7 +563,7 @@ if [ "$COMPILE_ONLY" -eq 0 ]; then
 
     [ -x "$RPCEMU_BINARY" ] || die "RPCEmu binary not found: $RPCEMU_BINARY"
     [ -f "$RPCEMU_SOURCE/cmos.ram" ] ||
-        die "RPCEmu CMOS state not found; launch RPCEmu once to configure RISC OS"
+        die "RPCEmu CMOS state is unavailable after runtime preparation"
     [ -f "$RUNTIME_HOSTFS/!Boot/Choices/Boot/Tasks/PinSetup,feb" ] ||
         die "RISC OS Choices are incomplete; launch RPCEmu once and complete desktop setup"
 fi

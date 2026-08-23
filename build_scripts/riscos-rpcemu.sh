@@ -17,6 +17,7 @@
 #     - install the pinned RISC OS Open 5.30 IOMD ROM by default
 #     - install the matching RISC OS Open HardDisc4 boot tree in HostFS
 #     - seed a fresh Choices tree from the matching RISC OS boot template
+#     - select HostFS in the private RPCEmu CMOS image
 #     - validate and install an optional user-supplied RISC OS ROM
 #     - select a CPU model compatible with the FreeBASIC ARM baseline
 #     - select enough emulated RAM for the native compiler toolchain
@@ -25,7 +26,7 @@
 #
 # This file intentionally does NOT contain:
 #
-#     - interactive guest configuration beyond the boot-supplied defaults
+#     - interactive guest configuration
 #     - FreeBASIC runtime compilation
 #     - Raspberry Pi or QEMU machine setup
 #
@@ -72,6 +73,16 @@ RISCOS_HARDDISC_SHA256="2d0ae90df9412622950b05d1b95dbb07ed95c144213e7d677401a75c
 RISCOS_HARDDISC_ROOT="HardDisc4"
 RISCOS_BOOT_HOOK="RO${RISCOS_HARDDISC_VERSION/./}Hook"
 
+# RISC OS NVRAM location 5 contains the default filing-system number. RPCEmu
+# stores the 240 RISC OS NVRAM bytes after its 16 RTC registers, placing that
+# value at file offset 0x45. Its pinned HostFS module registers filing system
+# 0x99. The original image selects ADFS, filing system 8.
+RPCEMU_CMOS_LENGTH=256
+RPCEMU_CMOS_CHECKSUM_OFFSET=63
+RPCEMU_CMOS_FILE_SYSTEM_OFFSET=69
+RPCEMU_ADFS_FILE_SYSTEM_NUMBER=8
+RPCEMU_HOSTFS_FILE_SYSTEM_NUMBER=153
+
 TEMP_DOWNLOAD=""
 TEMP_ROM=""
 EXTRACT_DIR=""
@@ -107,6 +118,78 @@ require_value() {
     local value="${2-}"
 
     [ -n "$value" ] || die "$option requires a value"
+}
+
+read_cmos_byte() {
+    local cmos_file="$1"
+    local offset="$2"
+
+    od -An -tu1 -j"$offset" -N1 "$cmos_file" | tr -d '[:space:]'
+}
+
+configure_hostfs_boot() {
+    local cmos_file="$1"
+    local cmos_size
+    local file_system
+    local checksum
+    local checksum_octal
+    local stored_checksum
+
+    [ -f "$cmos_file" ] || die "RPCEmu CMOS image not found: $cmos_file"
+
+    cmos_size="$(wc -c < "$cmos_file" | tr -d '[:space:]')"
+    [ "$cmos_size" = "$RPCEMU_CMOS_LENGTH" ] ||
+        die "RPCEmu CMOS image must be exactly $RPCEMU_CMOS_LENGTH bytes: $cmos_file"
+
+    file_system="$(read_cmos_byte "$cmos_file" "$RPCEMU_CMOS_FILE_SYSTEM_OFFSET")"
+    case "$file_system" in
+        "$RPCEMU_ADFS_FILE_SYSTEM_NUMBER")
+            # Decimal 153 is octal 231. printf emits the single binary byte
+            # without depending on a host-specific text encoding.
+            printf '\231' |
+                dd of="$cmos_file" bs=1 \
+                    seek="$RPCEMU_CMOS_FILE_SYSTEM_OFFSET" \
+                    conv=notrunc status=none
+            ;;
+        "$RPCEMU_HOSTFS_FILE_SYSTEM_NUMBER")
+            ;;
+        *)
+            die "refusing to replace unexpected configured filing system $file_system in $cmos_file"
+            ;;
+    esac
+
+    file_system="$(read_cmos_byte "$cmos_file" "$RPCEMU_CMOS_FILE_SYSTEM_OFFSET")"
+    [ "$file_system" = "$RPCEMU_HOSTFS_FILE_SYSTEM_NUMBER" ] ||
+        die "failed to select HostFS in $cmos_file"
+
+    # RPCEmu calculates the RISC OS checksum across offsets 0x40..0xff and
+    # 0x10..0x3e, then stores one more than the low byte at offset 0x3f.
+    checksum="$(
+        {
+            od -An -v -tu1 -j64 -N192 "$cmos_file"
+            od -An -v -tu1 -j16 -N47 "$cmos_file"
+        } | awk '
+            {
+                for (field = 1; field <= NF; field++)
+                    sum += $field
+            }
+            END { print (sum + 1) % 256 }
+        '
+    )"
+
+    case "$checksum" in
+        ''|*[!0-9]*) die "failed to calculate RPCEmu CMOS checksum" ;;
+    esac
+
+    checksum_octal="$(printf '%03o' "$checksum")"
+    printf '%b' "\\$checksum_octal" |
+        dd of="$cmos_file" bs=1 \
+            seek="$RPCEMU_CMOS_CHECKSUM_OFFSET" \
+            conv=notrunc status=none
+
+    stored_checksum="$(read_cmos_byte "$cmos_file" "$RPCEMU_CMOS_CHECKSUM_OFFSET")"
+    [ "$stored_checksum" = "$checksum" ] ||
+        die "failed to store RPCEmu CMOS checksum in $cmos_file"
 }
 
 download_verified() {
@@ -281,7 +364,7 @@ esac
 # Host tools and paths
 ##############################################################################
 
-for tool in curl sha256sum tar unzip find make sed; do
+for tool in awk curl dd find make od sed sha256sum tar tr unzip wc; do
     command -v "$tool" >/dev/null 2>&1 || die "required host tool not found: $tool"
 done
 
@@ -482,6 +565,8 @@ fi
 
 [ -f "$CHOICES_PIN_SETUP" ] ||
     die "failed to seed the RISC OS Choices boot tasks"
+
+configure_hostfs_boot "$SOURCE_DIR/cmos.ram"
 
 for staged_leaf in FreeBASIC '!GCC'; do
     if [ -d "$HOSTFS_DIR/$staged_leaf" ]; then

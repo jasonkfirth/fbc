@@ -230,7 +230,7 @@ msg "synchronizing the RPCEmu runtime"
 
 [ -x "$RPCEMU_BINARY" ] || die "RPCEmu binary not found: $RPCEMU_BINARY"
 [ -f "$RPCEMU_SOURCE/cmos.ram" ] ||
-    die "RPCEmu CMOS state not found; launch RPCEmu once to configure RISC OS"
+    die "RPCEmu CMOS state is unavailable after runtime preparation"
 [ -f "$RUNTIME_HOSTFS/!Boot/Choices/Boot/Tasks/PinSetup,feb" ] ||
     die "RISC OS Choices are incomplete; launch RPCEmu once and complete desktop setup"
 [ -s "$RUNTIME_PROGRAM" ] ||

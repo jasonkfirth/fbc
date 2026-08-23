@@ -29,14 +29,31 @@
 	end 0
 #else
 
+' -------------------------------------------------------------------------
+' Test configuration and shared state
+' -------------------------------------------------------------------------
+
 const TEST_PORT = 19091
 const BURST_PORT = TEST_PORT + 1
 const WILDCARD_PORT = TEST_PORT + 2
 
 ' Keep enough one-byte runtime calls to exercise sustained socket traffic
 ' without turning the correctness test into a performance test under QEMU.
-const BURST_BYTES = 4096
-const STREAM_WAIT_ITERATIONS = 5000
+' DragonFlyBSD under TCG takes several host scheduling round trips for each
+' unlocked send, readiness check, and read.  One complete byte-value cycle
+' preserves the data and repeated-call coverage there without measuring the
+' emulator rather than the TCP device.
+#if defined(__FB_DRAGONFLY__)
+	const BURST_BYTES = 256
+#else
+	const BURST_BYTES = 4096
+#endif
+
+' Formatted transfers and peer-closure notification can be delayed when the
+' hosted VM is busy.  Give each network state change twenty seconds while the
+' controller retains a separate one-minute deadlock bound for both workers.
+const STREAM_WAIT_ITERATIONS = 20000
+const CONTROLLER_WAIT_ITERATIONS = STREAM_WAIT_ITERATIONS * 3
 
 ' The burst performs one runtime call per byte. Allow two minutes of requested
 ' millisecond sleeps so slower kernels and emulators do not create a false
@@ -73,6 +90,10 @@ dim shared as integer burst_client_error
 dim shared as integer burst_server_step
 dim shared as integer burst_client_step
 dim shared as integer burst_stop
+
+' -------------------------------------------------------------------------
+' Bounded TCP helpers and worker threads
+' -------------------------------------------------------------------------
 
 ' TCP EOF reports whether bytes are available immediately; it can therefore
 ' be true while a live connection is waiting for its next packet.  EOC is the
@@ -176,7 +197,8 @@ sub server_thread( byval userdata as any ptr )
 	server_reply_ready = TRUE
 
 	tries = 0
-	do while( (saw_client_eof = FALSE) andalso (tries < 2000) )
+	do while( (saw_client_eof = FALSE) andalso _
+	          (tries < STREAM_WAIT_ITERATIONS) )
 		sleep 1, 1
 		tries += 1
 	loop
@@ -191,7 +213,8 @@ sub server_thread( byval userdata as any ptr )
 
 	server_step = 8
 	tries = 0
-	do while( (client_received_reply = FALSE) andalso (tries < 5000) )
+	do while( (client_received_reply = FALSE) andalso _
+	          (tries < STREAM_WAIT_ITERATIONS) )
 		sleep 1, 1
 		tries += 1
 	loop
@@ -233,7 +256,7 @@ sub client_thread( byval userdata as any ptr )
 		' the listening thread has completed OPEN TCP SERVER.  Use the same
 		' bounded retry policy as the burst-transfer test below.
 		tries += 1
-		if( tries >= 5000 ) then
+		if( tries >= STREAM_WAIT_ITERATIONS ) then
 			client_error = 2
 			exit sub
 		end if
@@ -253,7 +276,8 @@ sub client_thread( byval userdata as any ptr )
 
 	client_step = 3
 	tries = 0
-	do while( (server_reply_ready = FALSE) andalso (tries < 5000) )
+	do while( (server_reply_ready = FALSE) andalso _
+	          (tries < STREAM_WAIT_ITERATIONS) )
 		sleep 1, 1
 		tries += 1
 	loop
@@ -299,7 +323,8 @@ sub client_thread( byval userdata as any ptr )
 
 	client_step = 8
 	tries = 0
-	do while( (eoc( client ) = 0) andalso (tries < 2000) )
+	do while( (eoc( client ) = 0) andalso _
+	          (tries < STREAM_WAIT_ITERATIONS) )
 		sleep 1, 1
 		tries += 1
 	loop
@@ -434,6 +459,10 @@ sub burst_client_thread( byval userdata as any ptr )
 	burst_client_done = TRUE
 end sub
 
+' -------------------------------------------------------------------------
+' Runtime qualification
+' -------------------------------------------------------------------------
+
 scope
 	dim as any ptr server_id
 	dim as any ptr client_id
@@ -445,7 +474,7 @@ scope
 	tries = 0
 	do while( (server_done = FALSE or client_done = FALSE) andalso _
 	          (server_error = 0) andalso (client_error = 0) andalso _
-	          (tries < 20000) )
+	          (tries < CONTROLLER_WAIT_ITERATIONS) )
 		sleep 1, 1
 		tries += 1
 	loop
