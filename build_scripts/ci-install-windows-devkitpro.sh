@@ -46,7 +46,8 @@ KEYRING_FINGERPRINT="BC26F752D25B92CE272E0F44F7FD5492264BB9D0"
 
 DKP_LIBS_SERVER="https://pkg.devkitpro.org/packages"
 DKP_WINDOWS_SERVER="https://pkg.devkitpro.org/packages/windows/$(uname -m)"
-PACMAN_XFER_COMMAND="XferCommand = /usr/bin/curl --fail --location --retry 5 --user-agent FreeBASIC-XL-CI/1.0 --output %o %u"
+DEVKITPRO_USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"
+PACMAN_XFER_COMMAND="XferCommand = /usr/bin/curl --fail --location --retry 5 --user-agent \"$DEVKITPRO_USER_AGENT\" --output %o %u"
 
 ##############################################################################
 # Validation helpers
@@ -94,7 +95,7 @@ install_keyring()
 
 	echo "==> Downloading the pinned devkitPro signing keyring"
 	curl --fail --location --retry 5 \
-		--user-agent 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) FreeBASIC-XL-CI' \
+		--user-agent "$DEVKITPRO_USER_AGENT" \
 		--output "$keyring_file" \
 		"$KEYRING_URL"
 
@@ -128,9 +129,10 @@ configure_downloader()
 		return 0
 	fi
 
-	# devkitPro's package host rejects pacman's anonymous built-in downloader.
-	# Pacman documents XferCommand for exactly this class of HTTP compatibility
-	# problem.  Signatures remain mandatory after curl retrieves each file.
+	# devkitPro's package host has rejected pacman's downloader and partial
+	# browser user agents with HTTP 403 responses. Pacman documents XferCommand
+	# for this class of HTTP compatibility problem. Signatures remain mandatory
+	# after curl retrieves each file.
 	sed -i "/^\[options\]$/a $PACMAN_XFER_COMMAND" "$PACMAN_CONF"
 	[ "$(pacman-conf XferCommand)" = "${PACMAN_XFER_COMMAND#XferCommand = }" ] ||
 		fail "failed to configure pacman's identified curl downloader"
