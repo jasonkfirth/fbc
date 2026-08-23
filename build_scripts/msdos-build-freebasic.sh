@@ -791,7 +791,7 @@ install_msys2_dependencies() {
 	configure_msys2_path
 
 	msg "updating package database"
-	run bash "$SELF_DIR/msys2-pacman-retry.sh" -Sy --noconfirm
+	run bash "$ROOT/build_scripts/msys2-pacman-retry.sh" -Sy --noconfirm
 
 	packages=(
 		base-devel
@@ -813,7 +813,7 @@ install_msys2_dependencies() {
 	)
 
 	msg "installing MSYS2 build dependencies"
-	run bash "$SELF_DIR/msys2-pacman-retry.sh" -S --needed --noconfirm "${packages[@]}"
+	run bash "$ROOT/build_scripts/msys2-pacman-retry.sh" -S --needed --noconfirm "${packages[@]}"
 }
 
 if [ "$HOST_KIND" = "msys2" ]; then
