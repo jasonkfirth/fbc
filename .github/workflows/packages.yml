@@ -167,6 +167,9 @@ jobs:
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-libffi
 
+      - name: Install the Windows Wii toolchain
+        run: bash build_scripts/ci-install-windows-devkitpro.sh
+
       - name: Seed Windows package bootstrap sources
         run: |
           bash build_scripts/ci-seed-source-bootstrap.sh win32 win64
