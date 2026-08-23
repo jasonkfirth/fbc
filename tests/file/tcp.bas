@@ -1,4 +1,29 @@
-' Build metadata and the required multithreaded link mode are in tcp.bmk.
+' Project: FreeBASIC TCP runtime tests
+' ------------------------------------
+'
+' File: tests/file/tcp.bas
+'
+' Purpose:
+'
+'     Exercise TCP file I/O, connection state, and loopback transfers.
+'
+' Responsibilities:
+'
+'     - verify client and server text, binary, EOF, and EOC behavior
+'     - verify a sustained byte-at-a-time loopback transfer
+'     - verify wildcard listener behavior with an IPv4 client
+'
+' This file intentionally does NOT contain:
+'
+'     - build metadata or multithreaded link selection, which remain in tcp.bmk
+'     - external network dependencies
+'
+' Thread synchronization and ownership:
+'
+'     Worker threads own and close the file handles that they open or accept.
+'     The controlling scope waits for both workers before closing each listener.
+'     Shared integer flags provide monotonic progress and failure reporting for
+'     this bounded loopback test.
 
 #if defined(__FB_DOS__) or defined(__FB_JS__) or defined(__FB_XBOX__)
 	end 0
@@ -8,6 +33,11 @@ const TEST_PORT = 19091
 const BURST_PORT = TEST_PORT + 1
 const WILDCARD_PORT = TEST_PORT + 2
 const BURST_BYTES = 65536
+
+' The burst performs one runtime call per byte. Allow two minutes of requested
+' millisecond sleeps so slower kernels and emulators do not create a false
+' timeout while retaining a finite bound for deadlocks.
+const BURST_WAIT_ITERATIONS = 120000
 
 dim shared as integer server_ready
 dim shared as integer server_open_ok
@@ -413,7 +443,7 @@ scope
 	tries = 0
 	do while( (burst_server_done = FALSE or burst_client_done = FALSE) andalso _
 	          (burst_server_error = 0) andalso (burst_client_error = 0) andalso _
-	          (tries < 20000) )
+	          (tries < BURST_WAIT_ITERATIONS) )
 		sleep 1, 1
 		tries += 1
 	loop
@@ -458,3 +488,5 @@ scope
 end scope
 
 #endif
+
+' end of tests/file/tcp.bas

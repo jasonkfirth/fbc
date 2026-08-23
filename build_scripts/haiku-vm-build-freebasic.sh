@@ -429,11 +429,13 @@ write_bootstrap_files() {
 
 	mkdir -p "$serve_dir"
 
-	# Keep Haiku's stock boot-folder launcher.  The anyboot image places its
-	# FirstBootPrompt entry there, and the user session does not finish starting
-	# if the bootstrap replaces this loop.  Package transactions can deadlock if
-	# they begin while FirstBootPrompt is still completing the user session, so
-	# SSH is advertised only after that process exits and services settle.
+	# Keep Haiku's stock boot-folder launcher.  The anyboot image enters the
+	# interactive first_boot target before this desktop UserBootscript runs.  The
+	# host selects FirstBootPrompt's default "Try Haiku" action through QEMU, then
+	# this script lets the stock desktop launch entries finish.  Package
+	# transactions can deadlock if they begin while FirstBootPrompt is still
+	# completing the user session, so SSH is advertised only after that process
+	# exits and services settle.
 	cat > "$boot_script" <<EOF
 #!/bin/sh
 LOG="\$HOME/config/settings/boot/freebasic-bootstrap.log"
@@ -524,7 +526,10 @@ start_vm() {
 	local audio_wav="${4:-}"
 	local boot_image="$vm_dir/haiku-boot.raw"
 	local work_disk="$vm_dir/work.raw"
+	local monitor_socket="$vm_dir/monitor.sock"
 	local qemu_args
+
+	rm -f "$monitor_socket"
 
 	qemu_args=(
 		"$QEMU_BIN"
@@ -550,12 +555,37 @@ start_vm() {
 	qemu_args+=(
 		-vga std
 		-display "vnc=127.0.0.1:$vnc_display"
+		-monitor "unix:$monitor_socket,server=on,wait=off"
 		-serial "file:$vm_dir/serial.log"
 		-pidfile "$vm_dir/qemu.pid"
 		-daemonize
 	)
 
 	"${qemu_args[@]}"
+}
+
+select_haiku_live_desktop() {
+	local vm_dir="$1"
+	local monitor_socket="$vm_dir/monitor.sock"
+
+	[ -S "$monitor_socket" ] || return 1
+
+	# The live image's FirstBootPrompt gives its "Try Haiku" button keyboard
+	# focus by default.  QEMU's monitor injects Enter without depending on a VNC
+	# client or changing Haiku's first-boot services.
+	python3 - "$monitor_socket" <<'PY'
+import socket
+import sys
+
+with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as monitor:
+    monitor.settimeout(2)
+    monitor.connect(sys.argv[1])
+    try:
+        monitor.recv(4096)
+    except TimeoutError:
+        pass
+    monitor.sendall(b"sendkey ret\n")
+PY
 }
 
 stop_vm() {
@@ -591,9 +621,10 @@ wait_for_ssh() {
 	local port="$2"
 	local vm_dir="$3"
 	local attempts="${4:-120}"
+	local attempt
 
 	msg "Waiting for Haiku SSH on localhost:$port"
-	for _ in $(seq 1 "$attempts"); do
+	for attempt in $(seq 1 "$attempts"); do
 		if timeout 4 ssh -i "$key" \
 				-o BatchMode=yes \
 				-o StrictHostKeyChecking=no \
@@ -605,6 +636,13 @@ wait_for_ssh() {
 				> "$vm_dir/ssh-ready.out" 2> "$vm_dir/ssh-ready.err"; then
 			return 0
 		fi
+
+		# The live image cannot reach the desktop UserBootscript until its
+		# interactive first-boot prompt is accepted.  Repeat conservatively
+		# because package activation may delay the prompt by several minutes.
+		if [ $((attempt % 10)) -eq 0 ]; then
+			select_haiku_live_desktop "$vm_dir" >/dev/null 2>&1 || true
+		fi
 		sleep 2
 	done
 
@@ -613,6 +651,18 @@ wait_for_ssh() {
 
 print_vm_failure_logs() {
 	local vm_dir="$1"
+	local vm_name
+	local source
+
+	vm_name="$(basename "$vm_dir")"
+	mkdir -p "$LOG_DIR"
+
+	for source in serial-first-boot.log serial.log http.log ssh-ready.err; do
+		if [ -f "$vm_dir/$source" ]; then
+			cp -f "$vm_dir/$source" \
+				"$LOG_DIR/freebasic-haiku-$vm_name-$source"
+		fi
+	done
 
 	tail -n 80 "$vm_dir/serial.log" >&2 || true
 	cat "$vm_dir/http.log" >&2 || true

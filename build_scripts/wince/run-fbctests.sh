@@ -111,9 +111,9 @@ Options:
   --out-dir DIR        Result directory. Default: out/wince/fbctests
   -h, --help           Show this help.
 
-The script expects the prepared source tree at out/wince/work and the CERF
-installation at out/wince/emulator/cerf. Override those paths with
-WINCE_WORK_ROOT and WINCE_CERF_ROOT.
+The script expects the prepared source tree at out/wince/work. Guest execution
+also requires the CERF installation at out/wince/emulator/cerf. Override those
+paths with WINCE_WORK_ROOT and WINCE_CERF_ROOT.
 EOF
 }
 
@@ -230,9 +230,11 @@ done
     die "Windows CE ARM gfxlib2 runtime not found"
 [ -f "$WORK_ROOT/lib/freebasic/wince-arm/libffi.a" ] ||
     die "Windows CE ARM libffi runtime not found"
-[ -d "$CERF_ROOT/share" ] || die "CERF shared directory not found"
-[ -x "$SCRIPT_DIR/run-arm-emulator.sh" ] ||
-    die "ARM emulator runner is not executable"
+if [ "$BUILD_ONLY" -eq 0 ]; then
+    [ -d "$CERF_ROOT/share" ] || die "CERF shared directory not found"
+    [ -x "$SCRIPT_DIR/run-arm-emulator.sh" ] ||
+        die "ARM emulator runner is not executable"
+fi
 
 mapfile -t ALL_DIRS < <(
     awk '
@@ -291,24 +293,26 @@ docker run --rm \
         tests/wince/fbctests_runner.bas \
         -x tests/wince/fbctests-runner.exe
 
-cp "$WORK_ROOT/tests/wince/fbctests-runner.exe" \
-    "$CERF_ROOT/share/fbctests-runner.exe"
+if [ "$BUILD_ONLY" -eq 0 ]; then
+    cp "$WORK_ROOT/tests/wince/fbctests-runner.exe" \
+        "$CERF_ROOT/share/fbctests-runner.exe"
 
-msg "staging tracked fbctests resources"
-while IFS= read -r -d '' tracked_file; do
-    relative_path="${tracked_file#tests/}"
-    destination="$CERF_ROOT/share/$relative_path"
+    msg "staging tracked fbctests resources"
+    while IFS= read -r -d '' tracked_file; do
+        relative_path="${tracked_file#tests/}"
+        destination="$CERF_ROOT/share/$relative_path"
 
-    # Intent: honor tracked deletions in the working tree and do not let a
-    # stale resource in the isolated guest share mask the source checkout.
-    if [ ! -e "$ROOT/$tracked_file" ]; then
-        rm -f -- "$destination"
-        continue
-    fi
+        # Intent: honor tracked deletions in the working tree and do not let a
+        # stale resource in the isolated guest share mask the source checkout.
+        if [ ! -e "$ROOT/$tracked_file" ]; then
+            rm -f -- "$destination"
+            continue
+        fi
 
-    mkdir -p "$(dirname "$destination")"
-    cp "$ROOT/$tracked_file" "$destination"
-done < <(git -C "$ROOT" ls-files -z -- tests)
+        mkdir -p "$(dirname "$destination")"
+        cp "$ROOT/$tracked_file" "$destination"
+    done < <(git -C "$ROOT" ls-files -z -- tests)
+fi
 
 ##############################################################################
 # Bounded build and guest execution

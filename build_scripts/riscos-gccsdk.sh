@@ -25,7 +25,7 @@
 #     - serialize legacy install rules which race under parallel make
 #     - skip legacy GCC manuals rejected by current Texinfo releases
 #     - disable the optional PPL/CLooG optimizer whose upstream archive is gone
-#     - use GNU's canonical archive host instead of a random mirror redirect
+#     - fetch and verify historical GNU archives from the canonical host
 #     - build GCC's bundled ARM libffi for FreeBASIC THREADCALL support
 #     - run build-world and write a reusable environment file
 #
@@ -61,6 +61,9 @@ UPDATE=0
 BUILD_NATIVE=0
 
 GCCSDK_URL="svn://svn.riscos.info/gccsdk/trunk/gcc4"
+GMP_ARCHIVE_NAME="gmp-5.0.1.tar.bz2"
+GMP_ARCHIVE_URL="https://ftp.gnu.org/gnu/gmp/$GMP_ARCHIVE_NAME"
+GMP_ARCHIVE_SHA256="a2a610f01fd3298dc08c87bf30498c2402590e1bcb227fc40b15ee6d280939fb"
 
 ##############################################################################
 # Helpers
@@ -101,6 +104,44 @@ quote_for_shell() {
     printf "'%s'" "$value"
 }
 
+archive_sha256_matches() {
+    local archive="$1"
+    local expected_sha256="$2"
+    local actual_sha256
+
+    [ -f "$archive" ] || return 1
+
+    actual_sha256="$(sha256sum "$archive")"
+    actual_sha256="${actual_sha256%% *}"
+    [ "$actual_sha256" = "$expected_sha256" ]
+}
+
+download_verified_archive() {
+    local url="$1"
+    local archive="$2"
+    local expected_sha256="$3"
+    local temporary
+
+    if archive_sha256_matches "$archive" "$expected_sha256"; then
+        return 0
+    fi
+
+    mkdir -p "$(dirname "$archive")"
+    temporary="$(mktemp "$archive.download.XXXXXX")"
+
+    if ! wget --timeout=30 --tries=3 -O "$temporary" "$url"; then
+        rm -f -- "$temporary"
+        die "could not download $url"
+    fi
+
+    if ! archive_sha256_matches "$temporary" "$expected_sha256"; then
+        rm -f -- "$temporary"
+        die "downloaded archive has the wrong SHA-256: $url"
+    fi
+
+    mv -f -- "$temporary" "$archive"
+}
+
 usage() {
     cat <<EOF
 Usage: ./build_scripts/riscos-gccsdk.sh [options]
@@ -125,7 +166,8 @@ The result is installed below:
 
 This script does not install host packages. On Debian/Ubuntu, GCCSDK normally
 requires build-essential, subversion, m4, bison, flex, autogen, gperf, texinfo,
-wget, bzip2, unzip, xsltproc, cmake, and their normal development tools.
+wget, sha256sum, bzip2, unzip, xsltproc, cmake, and their normal development
+tools.
 EOF
 }
 
@@ -179,7 +221,7 @@ esac
 ##############################################################################
 
 for tool in svn make gcc g++ m4 bison flex autogen gperf makeinfo wget \
-    bzip2 unzip xsltproc cmake sed; do
+    bzip2 unzip xsltproc cmake sed sha256sum; do
     command -v "$tool" >/dev/null 2>&1 ||
         die "required host tool not found: $tool"
 done
@@ -225,6 +267,26 @@ fi
 if grep -Fq 'https://ftpmirror.gnu.org/' "$GCC4_DIR/Makefile"; then
     die "failed to select GNU's canonical archive host"
 fi
+
+# GCCSDK's historical GMP host currently accepts a connection from GitHub's
+# network but never completes it. Point interrupted builds at GNU as well as
+# prefetching the exact archive before make can enter wget's long retry loop.
+if grep -Fq 'https://gmplib.org/download/gmp-5.0.1/' \
+    "$GCC4_DIR/Makefile"; then
+    sed -i \
+        's|https://gmplib.org/download/gmp-5.0.1/|https://ftp.gnu.org/gnu/gmp/|g' \
+        "$GCC4_DIR/Makefile"
+fi
+
+if grep -Fq 'https://gmplib.org/download/gmp-5.0.1/' \
+    "$GCC4_DIR/Makefile"; then
+    die "failed to select GNU's canonical GMP archive"
+fi
+
+download_verified_archive \
+    "$GMP_ARCHIVE_URL" \
+    "$GCC4_DIR/srcdir.orig/$GMP_ARCHIVE_NAME" \
+    "$GMP_ARCHIVE_SHA256"
 
 ##############################################################################
 # Host compatibility preparation

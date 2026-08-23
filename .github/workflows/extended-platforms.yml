@@ -57,6 +57,7 @@ jobs:
           - id: haiku-x86_64
             name: Haiku x86_64
             script: build_scripts/haiku-vm-build-freebasic.sh
+            qemu_cpu: host
             bootstrap_target: haiku-x86_64
             bootstrap_dir: haiku-amd64
             archive_path: out/haiku/x86_64
@@ -65,6 +66,7 @@ jobs:
           - id: freebsd-amd64
             name: FreeBSD amd64
             script: build_scripts/freebsd-vm-build-freebasic.sh
+            qemu_cpu: host
             bootstrap_target: freebsd-x86_64
             bootstrap_dir: freebsd-x86_64
             archive_path: out/freebsd/x86-64
@@ -73,6 +75,7 @@ jobs:
           - id: netbsd-amd64
             name: NetBSD amd64
             script: build_scripts/netbsd-vm-build-freebasic.sh
+            qemu_cpu: host
             bootstrap_target: netbsd-x86_64
             bootstrap_dir: netbsd-x86_64
             archive_path: out/netbsd/x86-64
@@ -81,6 +84,7 @@ jobs:
           - id: openbsd-amd64
             name: OpenBSD amd64
             script: build_scripts/openbsd-vm-build-freebasic.sh
+            qemu_cpu: host
             bootstrap_target: openbsd-x86_64
             bootstrap_dir: openbsd-x86_64
             archive_path: out/openbsd/x86-64
@@ -89,6 +93,9 @@ jobs:
           - id: dragonfly-amd64
             name: DragonFlyBSD amd64
             script: build_scripts/dragonfly-vm-build-freebasic.sh
+            # DragonFly 6.4.2 traps while initializing the full AMD CPU model
+            # exposed by GitHub's KVM hosts. Keep KVM with generic qemu64.
+            qemu_cpu: qemu64,-svm
             bootstrap_target: dragonfly-x86_64
             bootstrap_dir: dragonfly-x86_64
             archive_path: out/dragonfly/x86-64
@@ -150,6 +157,8 @@ jobs:
             bootstrap-emit </dev/null
 
       - name: Build and qualify guest
+        env:
+          QEMU_CPU: ${{ matrix.qemu_cpu }}
         run: |
           set -euo pipefail
           bash "${{ matrix.script }}" --jobs "$JOBS"
@@ -260,6 +269,7 @@ jobs:
           path: |
             out/riscos/fbctests/
             out/riscos/exampleageddon/
+            out/riscos/gccsdk/gcc4/build-*-output.txt
 
   wince:
     name: Windows CE ARM ROM-free compile qualification
