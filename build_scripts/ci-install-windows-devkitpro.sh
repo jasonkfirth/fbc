@@ -13,6 +13,7 @@
 # Responsibilities:
 #
 #     * install and verify devkitPro's pinned signing keyring
+#     * identify repository downloads through pacman's external curl support
 #     * add the official library and Windows package repositories
 #     * install the wii-dev package group with bounded retries
 #     * verify the tools and library layout required by the Wii package script
@@ -45,6 +46,7 @@ KEYRING_FINGERPRINT="BC26F752D25B92CE272E0F44F7FD5492264BB9D0"
 
 DKP_LIBS_SERVER="https://pkg.devkitpro.org/packages"
 DKP_WINDOWS_SERVER="https://pkg.devkitpro.org/packages/windows/$(uname -m)"
+PACMAN_XFER_COMMAND="XferCommand = /usr/bin/curl --fail --location --retry 5 --user-agent FreeBASIC-XL-CI/1.0 --output %o %u"
 
 ##############################################################################
 # Validation helpers
@@ -112,6 +114,28 @@ pacman-key --list-keys "$KEYRING_FINGERPRINT" >/dev/null 2>&1 ||
 # Official devkitPro repositories
 ##############################################################################
 
+configure_downloader()
+{
+	local configured_command
+
+	grep -Fxq '[options]' "$PACMAN_CONF" ||
+		fail "pacman configuration has no [options] section"
+
+	if grep -Eq '^[[:space:]]*XferCommand[[:space:]]*=' "$PACMAN_CONF"; then
+		configured_command="$(pacman-conf XferCommand)"
+		[ "$configured_command" = "${PACMAN_XFER_COMMAND#XferCommand = }" ] ||
+			fail "unexpected pacman XferCommand: $configured_command"
+		return 0
+	fi
+
+	# devkitPro's package host rejects pacman's anonymous built-in downloader.
+	# Pacman documents XferCommand for exactly this class of HTTP compatibility
+	# problem.  Signatures remain mandatory after curl retrieves each file.
+	sed -i "/^\[options\]$/a $PACMAN_XFER_COMMAND" "$PACMAN_CONF"
+	[ "$(pacman-conf XferCommand)" = "${PACMAN_XFER_COMMAND#XferCommand = }" ] ||
+		fail "failed to configure pacman's identified curl downloader"
+}
+
 configure_repositories()
 {
 	local has_libs=0
@@ -150,6 +174,7 @@ EOF
 		fail "unexpected dkp-windows server: $windows_server"
 }
 
+configure_downloader
 configure_repositories
 
 ##############################################################################

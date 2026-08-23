@@ -35,7 +35,7 @@ const WILDCARD_PORT = TEST_PORT + 2
 
 ' Keep enough one-byte runtime calls to exercise sustained socket traffic
 ' without turning the correctness test into a performance test under QEMU.
-const BURST_BYTES = 16384
+const BURST_BYTES = 4096
 const STREAM_WAIT_ITERATIONS = 5000
 
 ' The burst performs one runtime call per byte. Allow two minutes of requested

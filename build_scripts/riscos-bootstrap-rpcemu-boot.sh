@@ -168,16 +168,14 @@ done
 # RISC OS CMOS configuration
 ##############################################################################
 
-# The window can exist while the ROM is still initialising.  F12 is only
-# meaningful after RISC OS has installed its keyboard and command-line paths.
+# The window can exist while the ROM is still initialising.  Wait for the
+# failed default ADFS desktop attempt to leave RISC OS at its supervisor prompt.
 sleep "$GUEST_STARTUP_SECONDS"
 kill -0 "$RPCEMU_PID" 2>/dev/null ||
     die "RPCEmu exited during RISC OS startup"
 
 capture_screen "before-hostfs-configuration"
 xdotool windowfocus --sync "$window_id"
-xdotool key F12
-sleep 1
 
 xdotool type --delay 20 --clearmodifiers 'Configure FileSystem HostFS'
 xdotool key Return
