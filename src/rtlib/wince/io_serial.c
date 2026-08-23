@@ -327,6 +327,7 @@ int fb_SerialOpen( FB_FILE *handle,
         pInfo->hDevice = hDevice;
         pInfo->iPort = iPort;
         pInfo->pOptions = options;
+        pInfo->output_lines = FB_COM_LINE_DTR;
     }
 
     return res;

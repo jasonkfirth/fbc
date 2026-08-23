@@ -10,6 +10,7 @@ usr/include/freebasic/dos
 usr/include/freebasic/emscripten_websocket.bi
 usr/include/freebasic/fbc-int
 usr/include/freebasic/fberror.bi
+usr/include/freebasic/fbcom.bi
 usr/include/freebasic/fbgfx.bi
 usr/include/freebasic/fbgfx3-option.bi
 usr/include/freebasic/fbgfx3.bi
