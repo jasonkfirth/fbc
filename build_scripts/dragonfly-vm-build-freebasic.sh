@@ -500,7 +500,11 @@ while kill -0 "\$pid" 2>/dev/null; do
 	fi
 done
 
-wait "\$pid"
+if ! wait "\$pid"; then
+	echo "DragonFly package build failed; final guest log follows:" >&2
+	tail -n 160 "\$log" >&2 || true
+	exit 1
+fi
 EOF
 }
 

@@ -57,30 +57,40 @@ jobs:
           - id: haiku-x86_64
             name: Haiku x86_64
             script: build_scripts/haiku-vm-build-freebasic.sh
+            bootstrap_target: haiku-x86_64
+            bootstrap_dir: haiku-amd64
             archive_path: out/haiku/x86_64
             cache_path: out/haiku-vm/cache
             log_path: out/haiku-vm/logs
           - id: freebsd-amd64
             name: FreeBSD amd64
             script: build_scripts/freebsd-vm-build-freebasic.sh
+            bootstrap_target: freebsd-x86_64
+            bootstrap_dir: freebsd-x86_64
             archive_path: out/freebsd/x86-64
             cache_path: out/freebsd-vm/cache
             log_path: out/freebsd-vm/logs
           - id: netbsd-amd64
             name: NetBSD amd64
             script: build_scripts/netbsd-vm-build-freebasic.sh
+            bootstrap_target: netbsd-x86_64
+            bootstrap_dir: netbsd-x86_64
             archive_path: out/netbsd/x86-64
             cache_path: out/netbsd-vm/tools
             log_path: out/netbsd-vm/logs
           - id: openbsd-amd64
             name: OpenBSD amd64
             script: build_scripts/openbsd-vm-build-freebasic.sh
+            bootstrap_target: openbsd-x86_64
+            bootstrap_dir: openbsd-x86_64
             archive_path: out/openbsd/x86-64
             cache_path: out/openbsd-vm/cache
             log_path: out/openbsd-vm/logs
           - id: dragonfly-amd64
             name: DragonFlyBSD amd64
             script: build_scripts/dragonfly-vm-build-freebasic.sh
+            bootstrap_target: dragonfly-x86_64
+            bootstrap_dir: dragonfly-x86_64
             archive_path: out/dragonfly/x86-64
             cache_path: out/dragonfly-vm/cache
             log_path: out/dragonfly-vm/logs
@@ -94,7 +104,8 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            bzip2 ca-certificates curl openssh-client \
+            binutils bzip2 ca-certificates curl g++ gcc libncurses-dev make \
+            openssh-client \
             python3 python3-pexpect qemu-system-x86 qemu-utils \
             rsync tar unzip xorriso xz-utils
 
@@ -109,6 +120,20 @@ jobs:
         with:
           path: ${{ matrix.cache_path }}
           key: extended-platform-image-v1-${{ matrix.id }}-${{ hashFiles(matrix.script) }}
+
+      - name: Emit guest bootstrap sources
+        run: |
+          set -euo pipefail
+          bash build_scripts/ci-seed-source-bootstrap.sh \
+            linux-x86_64 linux-x86_64
+          make -j"$JOBS" bootstrap-minimal </dev/null
+          make -j1 \
+            HAVE_PREREQS_MK= \
+            BOOT_FBC="$GITHUB_WORKSPACE/bin/fbc" \
+            BUILD_FBC="$GITHUB_WORKSPACE/bin/fbc" \
+            FBC_TARGET="${{ matrix.bootstrap_target }}" \
+            FBTARGET_DIR_OVERRIDE="${{ matrix.bootstrap_dir }}" \
+            bootstrap-emit </dev/null
 
       - name: Build and qualify guest
         run: |
@@ -134,6 +159,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Seed host bootstrap sources
+        run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
 
       - name: Build AROS and FreeBASIC
         run: |
@@ -184,6 +212,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends xauth xvfb
 
+      - name: Seed host bootstrap sources
+        run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
+
       - name: Build RISC OS toolchains, FreeBASIC, and RPCEmu
         run: |
           set -euo pipefail
@@ -232,6 +263,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends rsync
           docker version
 
+      - name: Seed host bootstrap sources
+        run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
+
       - name: Build the Windows CE compiler and libraries
         run: |
           set -euo pipefail
@@ -265,6 +299,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
           path: |
+            out/wince/build-logs/
             out/wince/fbctests/
             out/wince/exampleageddon/arm/
 

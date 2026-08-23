@@ -25,6 +25,7 @@
 #     - serialize legacy install rules which race under parallel make
 #     - skip legacy GCC manuals rejected by current Texinfo releases
 #     - disable the optional PPL/CLooG optimizer whose upstream archive is gone
+#     - use GNU's canonical archive host instead of a random mirror redirect
 #     - build GCC's bundled ARM libffi for FreeBASIC THREADCALL support
 #     - run build-world and write a reusable environment file
 #
@@ -210,6 +211,19 @@ elif [ -n "$GCCSDK_REVISION" ]; then
     svn update -r "$GCCSDK_REVISION" "$GCC4_DIR"
 elif [ "$UPDATE" -eq 1 ]; then
     svn update "$GCC4_DIR"
+fi
+
+# ftpmirror.gnu.org redirects each request to a randomly selected mirror.
+# One expired mirror certificate can therefore break an otherwise reproducible
+# toolchain build. The canonical HTTPS archive serves the same GNU release
+# files without delegating certificate trust to a third-party mirror.
+if grep -Fq 'https://ftpmirror.gnu.org/' "$GCC4_DIR/Makefile"; then
+    sed -i 's|https://ftpmirror.gnu.org/|https://ftp.gnu.org/gnu/|g' \
+        "$GCC4_DIR/Makefile"
+fi
+
+if grep -Fq 'https://ftpmirror.gnu.org/' "$GCC4_DIR/Makefile"; then
+    die "failed to select GNU's canonical archive host"
 fi
 
 ##############################################################################

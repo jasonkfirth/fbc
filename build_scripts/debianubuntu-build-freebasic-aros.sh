@@ -935,11 +935,14 @@ build_libffi_target() {
 
 build_host_compiler() {
     if [ ! -x "$ROOT/bin/fbc" ]; then
-        msg "building host FreeBASIC compiler"
-        run make -C "$ROOT" -j"$JOBS" compiler
+        msg "building bootstrap host FreeBASIC compiler"
+        run make -C "$ROOT" -j"$JOBS" bootstrap-minimal
     fi
 
     [ -x "$ROOT/bin/fbc" ] || die "host FreeBASIC compiler is unavailable"
+
+    msg "refreshing host FreeBASIC compiler"
+    run make -C "$ROOT" -j"$JOBS" compiler BUILD_FBC="$ROOT/bin/fbc"
 }
 
 build_freebasic_target() {
@@ -1071,7 +1074,9 @@ install_dependencies
 
 if [ "$SKIP_AROS_BUILD" -eq 0 ]; then
     prepare_aros_source
-    prepare_native_prerequisites
+    if [ "$SKIP_NATIVE_TOOLCHAIN" -eq 0 ]; then
+        prepare_native_prerequisites
+    fi
     for_each_target configure_aros_target
     for_each_target build_aros_target
     for_each_target build_native_toolchain_target
