@@ -1,4 +1,32 @@
-/* serial port driver for Dos */
+/*
+    Project: FreeBASIC Runtime Library
+    ----------------------------------
+
+    File: dos/io_serial.c
+
+    Purpose:
+
+        Implement OPEN COM and raw modem control through PC-compatible UARTs
+        under 32-bit DOS.
+
+    Responsibilities:
+
+        - discover and configure COM UART base addresses and IRQs
+        - buffer interrupt-driven receive and transmit data
+        - expose modem lines, line errors, break, and queue purging
+
+    This file intentionally does NOT contain:
+
+        - OPEN COM option-string parsing
+        - Windows communications handles
+        - POSIX termios support
+
+    Hardware interaction:
+
+        UART registers and the interrupt controller are accessed directly.
+        Shared buffer and register state is inspected only while interrupts are
+        disabled so the IRQ handlers cannot mutate it concurrently.
+*/
 
 #include "../fb.h"
 #include "../io_serial_private.h"
@@ -31,6 +59,7 @@
 #define UART_DL_MSB 0x01  /* DLAB = 1 */
 
 #define LCR_DLAB 0x80
+#define LCR_BREAK 0x40
 
 #define MCR_OUT2 8
 #define MCR_OUT1 4
@@ -232,6 +261,14 @@ static void BUFFER_reset( buffer_t * buf )
 			memset( buf->data, 0, buf->size);
 		buf->head = buf->tail = buf->length = 0;
 	}
+}
+
+/* Discard queued bytes without clearing the allocation while interrupts are
+   disabled. Future writes overwrite the inaccessible buffer contents. */
+static void BUFFER_discard( buffer_t *buf )
+{
+	if( buf != NULL )
+		buf->head = buf->tail = buf->length = 0;
 }
 
 static int BUFFER_alloc( buffer_t * buf, int size )
@@ -999,6 +1036,164 @@ int comm_bytes_remaining( int com_num )
 	return bytes;
 }
 
+/* ------------------------------------------------------------------------- */
+/* Raw UART controls used by fbcom.bi                                        */
+/* ------------------------------------------------------------------------- */
+
+int fb_dos_SerialGetStatus( int com_num, FB_COM_STATUS *status )
+{
+	comm_props_t *cp;
+	int line_status;
+	int modem_control;
+	int modem_status;
+
+	if( (com_num < 1) || (com_num > MAX_COMM) || (status == NULL) )
+		return FB_RTERROR_ILLEGALFUNCTIONCALL;
+
+	cp = COMM_PROPS( com_num );
+	if( !cp->inuse )
+		return FB_RTERROR_ILLEGALFUNCTIONCALL;
+
+	memset( status, 0, sizeof( *status ) );
+	status->capabilities = FB_COM_CAP_INPUT_LINES |
+		FB_COM_CAP_OUTPUT_LINES | FB_COM_CAP_BREAK |
+		FB_COM_CAP_PURGE_RX | FB_COM_CAP_PURGE_TX |
+		FB_COM_CAP_RX_QUEUE | FB_COM_CAP_TX_QUEUE |
+		FB_COM_CAP_ERRORS;
+
+	DISABLE();
+
+	modem_control = inportb( cp->baseaddr + UART_MCR );
+	modem_status = inportb( cp->baseaddr + UART_MSR );
+	line_status = inportb( cp->baseaddr + UART_LSR );
+
+	if( (modem_status & 0x10) != 0 )
+		status->lines |= FB_COM_LINE_CTS;
+	if( (modem_status & 0x20) != 0 )
+		status->lines |= FB_COM_LINE_DSR;
+	if( (modem_status & 0x40) != 0 )
+		status->lines |= FB_COM_LINE_RI;
+	if( (modem_status & 0x80) != 0 )
+		status->lines |= FB_COM_LINE_DCD;
+	if( (modem_control & MCR_RTS) != 0 )
+		status->lines |= FB_COM_LINE_RTS;
+	if( (modem_control & MCR_DTR) != 0 )
+		status->lines |= FB_COM_LINE_DTR;
+
+	if( (line_status & 0x10) != 0 )
+		status->errors |= FB_COM_ERROR_BREAK;
+	if( (line_status & 0x08) != 0 )
+		status->errors |= FB_COM_ERROR_FRAMING;
+	if( (line_status & 0x04) != 0 )
+		status->errors |= FB_COM_ERROR_PARITY;
+	if( (line_status & 0x02) != 0 )
+		status->errors |= FB_COM_ERROR_OVERRUN;
+
+	status->rx_queued = (unsigned int)cp->rxbuf.length;
+	status->tx_queued = (unsigned int)cp->txbuf.length;
+	if( !cp->txclear )
+		status->tx_queued++;
+
+	ENABLE();
+
+	return FB_RTERROR_OK;
+}
+
+int fb_dos_SerialSetLines( int com_num, unsigned int mask,
+	unsigned int values )
+{
+	comm_props_t *cp;
+	int modem_control;
+
+	if( (com_num < 1) || (com_num > MAX_COMM) )
+		return FB_RTERROR_ILLEGALFUNCTIONCALL;
+
+	cp = COMM_PROPS( com_num );
+	if( !cp->inuse )
+		return FB_RTERROR_ILLEGALFUNCTIONCALL;
+
+	DISABLE();
+	modem_control = inportb( cp->baseaddr + UART_MCR );
+
+	if( (mask & FB_COM_LINE_RTS) != 0 ) {
+		if( (values & FB_COM_LINE_RTS) != 0 )
+			modem_control |= MCR_RTS;
+		else
+			modem_control &= ~MCR_RTS;
+	}
+
+	if( (mask & FB_COM_LINE_DTR) != 0 ) {
+		if( (values & FB_COM_LINE_DTR) != 0 )
+			modem_control |= MCR_DTR;
+		else
+			modem_control &= ~MCR_DTR;
+	}
+
+	outportb( cp->baseaddr + UART_MCR, modem_control );
+	ENABLE();
+
+	return FB_RTERROR_OK;
+}
+
+int fb_dos_SerialSetBreak( int com_num, int enabled )
+{
+	comm_props_t *cp;
+	int line_control;
+
+	if( (com_num < 1) || (com_num > MAX_COMM) )
+		return FB_RTERROR_ILLEGALFUNCTIONCALL;
+
+	cp = COMM_PROPS( com_num );
+	if( !cp->inuse )
+		return FB_RTERROR_ILLEGALFUNCTIONCALL;
+
+	DISABLE();
+	line_control = inportb( cp->baseaddr + UART_LCR );
+	if( enabled )
+		line_control |= LCR_BREAK;
+	else
+		line_control &= ~LCR_BREAK;
+	outportb( cp->baseaddr + UART_LCR, line_control );
+	ENABLE();
+
+	return FB_RTERROR_OK;
+}
+
+int fb_dos_SerialPurge( int com_num, unsigned int queues )
+{
+	comm_props_t *cp;
+	int fifo_control = 0;
+
+	if( (com_num < 1) || (com_num > MAX_COMM) )
+		return FB_RTERROR_ILLEGALFUNCTIONCALL;
+
+	cp = COMM_PROPS( com_num );
+	if( !cp->inuse )
+		return FB_RTERROR_ILLEGALFUNCTIONCALL;
+
+	DISABLE();
+
+	if( (queues & FB_COM_PURGE_RX) != 0 ) {
+		BUFFER_discard( &cp->rxbuf );
+		fifo_control |= 0x02;
+	}
+
+	if( (queues & FB_COM_PURGE_TX) != 0 ) {
+		BUFFER_discard( &cp->txbuf );
+		cp->txclear = TRUE;
+		fifo_control |= 0x04;
+	}
+
+	if( fifo_control != 0 ) {
+		outportb( cp->baseaddr + UART_FCR, 0x01 | fifo_control );
+		outportb( cp->baseaddr + UART_FCR, 0x00 );
+	}
+
+	ENABLE();
+
+	return FB_RTERROR_OK;
+}
+
 int fb_SerialOpen
 	(
 		FB_FILE *handle,
@@ -1042,6 +1237,12 @@ int fb_SerialOpen
 	{
 		DOS_SERIAL_INFO *pInfo = (DOS_SERIAL_INFO *) calloc( 1, sizeof(DOS_SERIAL_INFO) );
 		DBG_ASSERT( ppvHandle!=NULL );
+		if( pInfo == NULL )
+		{
+			comm_close( iPort );
+			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+		}
+
 		*ppvHandle = pInfo;
 		pInfo->com_num = iPort;
 		pInfo->pOptions = options;
@@ -1149,3 +1350,5 @@ int fb_SerialClose( FB_FILE *handle, void *pvHandle )
 	free(pInfo);
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }
+
+/* end of dos/io_serial.c */

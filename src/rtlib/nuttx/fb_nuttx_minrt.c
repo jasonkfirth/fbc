@@ -13,6 +13,7 @@
 
         - expose enough runtime symbols to keep generated-C smoke tests useful
         - map those symbols onto simple C and NuttX behavior
+        - own compact file, TCP, serial, and process-wide runtime state
         - provide a staging point while the real NuttX target is moved toward
           the normal rtlib, gfxlib2, and sfxlib build paths
 
@@ -21,7 +22,6 @@
         - a permanent replacement for the normal FreeBASIC runtime
         - graphics or audio command implementations
         - board-specific hardware drivers
-        - networking or threading support
 
     Maintenance note:
 
@@ -44,18 +44,27 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+
+#if defined(CONFIG_SERIAL_TERMIOS) && (CONFIG_SERIAL_TERMIOS != 0)
+#include <termios.h>
+#define FB_NUTTX_HAVE_SERIAL_TERMIOS 1
+#else
+#define FB_NUTTX_HAVE_SERIAL_TERMIOS 0
+#endif
 
 #if defined(__has_include)
 # if __has_include(<nuttx/ioexpander/gpio.h>)
@@ -100,6 +109,7 @@ char __fb_errmsg[FB_ERRMSG_SIZE] FB_NUTTX_WEAK;
 #define FB_NUTTX_FILE_KIND_FILE 1
 #define FB_NUTTX_FILE_KIND_TCP 2
 #define FB_NUTTX_FILE_KIND_TCP_SERVER 3
+#define FB_NUTTX_FILE_KIND_COM 4
 #define FB_NUTTX_DATA_END -1
 #define FB_NUTTX_DATA_TEXT 2
 #define FB_NUTTX_DATA_DOUBLE 4
@@ -139,6 +149,11 @@ static FILE *fb_nuttx_files[FB_NUTTX_MAX_FILES];
 static int fb_nuttx_file_kind[FB_NUTTX_MAX_FILES];
 static int fb_nuttx_tcp_timeout_ms[FB_NUTTX_MAX_FILES];
 static int32 fb_nuttx_file_record_len[FB_NUTTX_MAX_FILES];
+static unsigned int fb_nuttx_serial_output_lines[FB_NUTTX_MAX_FILES];
+#if FB_NUTTX_HAVE_SERIAL_TERMIOS
+static struct termios fb_nuttx_serial_old_termios[FB_NUTTX_MAX_FILES];
+static unsigned char fb_nuttx_serial_old_termios_valid[FB_NUTTX_MAX_FILES];
+#endif
 static int fb_nuttx_input_file_num;
 static char fb_nuttx_input_line[FB_NUTTX_INPUT_BUFFER_SIZE];
 static size_t fb_nuttx_input_pos;

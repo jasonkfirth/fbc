@@ -9,6 +9,19 @@
         Provide one section of the small NuttX runtime used by the
         generated-C RISC-V smoke target.
 
+    Responsibilities:
+
+        - implement BASIC file-number and C stdio operations
+        - open and configure NuttX serial character devices for OPEN COM
+        - expose fbcom.bi modem, queue, break, and purge controls
+        - preserve and restore per-handle terminal configuration
+
+    This file intentionally does NOT contain:
+
+        - board-specific UART drivers or pin assignments
+        - serial-device discovery
+        - the normal hosted rtlib VFS and DEV_COM_INFO layers
+
     This file is included by fb_nuttx_minrt.c while the target is still
     being brought up. Keeping the command bodies in smaller files makes
     the code easier to compare with the normal rtlib layout.
@@ -53,6 +66,15 @@ int32 fb_FileClose(const int32 file_num)
 
     file_kind = fb_nuttx_file_kind[file_num];
 
+#if FB_NUTTX_HAVE_SERIAL_TERMIOS
+    if ((file_kind == FB_NUTTX_FILE_KIND_COM) &&
+        (fb_nuttx_files[file_num] != NULL) &&
+        (fb_nuttx_serial_old_termios_valid[file_num] != 0)) {
+        (void)tcsetattr(fileno(fb_nuttx_files[file_num]), TCSAFLUSH,
+                       &fb_nuttx_serial_old_termios[file_num]);
+    }
+#endif
+
 #if FB_NUTTX_HAVE_TCP
     if (fb_nuttx_files[file_num] != NULL) {
         if ((file_kind == FB_NUTTX_FILE_KIND_TCP) ||
@@ -82,6 +104,10 @@ int32 fb_FileClose(const int32 file_num)
     fb_nuttx_file_kind[file_num] = FB_NUTTX_FILE_KIND_NONE;
     fb_nuttx_tcp_timeout_ms[file_num] = 0;
     fb_nuttx_file_record_len[file_num] = 0;
+    fb_nuttx_serial_output_lines[file_num] = 0;
+#if FB_NUTTX_HAVE_SERIAL_TERMIOS
+    fb_nuttx_serial_old_termios_valid[file_num] = 0;
+#endif
 
     return 0;
 }
@@ -883,6 +909,19 @@ int32 fb_FileEof(const int32 file_num)
     if (stream == NULL)
         return -1;
 
+    if ((file_num > 0) && (file_num < FB_NUTTX_MAX_FILES) &&
+        (fb_nuttx_file_kind[file_num] == FB_NUTTX_FILE_KIND_COM)) {
+#ifdef TIOCINQ
+        int queued = 0;
+
+        if (ioctl(fileno(stream), TIOCINQ,
+                  (unsigned long)(uintptr_t)&queued) == 0)
+            return queued == 0 ? -1 : 0;
+#endif
+
+        return -1;
+    }
+
 #if FB_NUTTX_HAVE_TCP
     if ((file_num > 0) && (file_num < FB_NUTTX_MAX_FILES) &&
         ((fb_nuttx_file_kind[file_num] == FB_NUTTX_FILE_KIND_TCP) ||
@@ -1141,29 +1180,636 @@ int32 fb_FileCopy(const char *src_path, const char *dst_path)
 }
 #endif
 
+/* ------------------------------------------------------------------------- */
+/* NuttX serial devices                                                      */
+/* ------------------------------------------------------------------------- */
+
+#define FB_NUTTX_SERIAL_PATH_MAX 256
+
+static char *fb_nuttx_serial_trim(char *text)
+{
+    char *end;
+
+    while ((*text == ' ') || (*text == '\t'))
+        text++;
+
+    end = text + strlen(text);
+
+    while ((end > text) && ((end[-1] == ' ') || (end[-1] == '\t')))
+        end--;
+
+    *end = '\0';
+    return text;
+}
+
+static int fb_nuttx_serial_parse_uint(const char *text, unsigned int *value)
+{
+    unsigned long parsed;
+    char *end;
+
+    if ((text == NULL) || (*text == '\0') || (value == NULL))
+        return -1;
+
+    errno = 0;
+    parsed = strtoul(text, &end, 10);
+
+    if ((errno != 0) || (*end != '\0') || (parsed > UINT_MAX))
+        return -1;
+
+    *value = (unsigned int)parsed;
+    return 0;
+}
+
+static int fb_nuttx_serial_parse_extended(char *option,
+    FB_SERIAL_OPTIONS *serial_options)
+{
+    unsigned int value;
+
+    if (strcasecmp(option, "RS") == 0)
+        serial_options->SuppressRTS = 1;
+    else if ((strcasecmp(option, "LF") == 0) ||
+             (strcasecmp(option, "ASC") == 0))
+        serial_options->AddLF = 1;
+    else if (strcasecmp(option, "BIN") == 0)
+        serial_options->AddLF = 0;
+    else if (strcasecmp(option, "PE") == 0)
+        serial_options->CheckParity = 1;
+    else if (strcasecmp(option, "DT") == 0)
+        serial_options->KeepDTREnabled = 1;
+    else if (strcasecmp(option, "FE") == 0)
+        serial_options->DiscardOnError = 1;
+    else if (strcasecmp(option, "ME") == 0)
+        serial_options->IgnoreAllErrors = 1;
+    else if ((strncasecmp(option, "CS", 2) == 0) &&
+             (fb_nuttx_serial_parse_uint(option + 2, &value) == 0))
+        serial_options->DurationCTS = value;
+    else if ((strncasecmp(option, "DS", 2) == 0) &&
+             (fb_nuttx_serial_parse_uint(option + 2, &value) == 0))
+        serial_options->DurationDSR = value;
+    else if ((strncasecmp(option, "CD", 2) == 0) &&
+             (fb_nuttx_serial_parse_uint(option + 2, &value) == 0))
+        serial_options->DurationCD = value;
+    else if ((strncasecmp(option, "OP", 2) == 0) &&
+             (fb_nuttx_serial_parse_uint(option + 2, &value) == 0))
+        serial_options->OpenTimeout = value;
+    else if ((strncasecmp(option, "TB", 2) == 0) &&
+             (fb_nuttx_serial_parse_uint(option + 2, &value) == 0))
+        serial_options->TransmitBuffer = value;
+    else if ((strncasecmp(option, "RB", 2) == 0) &&
+             (fb_nuttx_serial_parse_uint(option + 2, &value) == 0))
+        serial_options->ReceiveBuffer = value;
+    else if ((strncasecmp(option, "IR", 2) == 0) &&
+             (fb_nuttx_serial_parse_uint(option + 2, &value) == 0))
+        serial_options->IRQNumber = value;
+    else
+        return -1;
+
+    return 0;
+}
+
+static int fb_nuttx_serial_parse_options(char *text,
+    FB_SERIAL_OPTIONS *serial_options)
+{
+    unsigned int option_index;
+    int stop_bits_set;
+    char *cursor;
+
+    if ((text == NULL) || (serial_options == NULL))
+        return -1;
+
+    memset(serial_options, 0, sizeof(*serial_options));
+    serial_options->uiSpeed = 300;
+    serial_options->Parity = FB_SERIAL_PARITY_EVEN;
+    serial_options->uiDataBits = 7;
+    serial_options->DurationCTS = 1000;
+    serial_options->DurationDSR = 1000;
+    stop_bits_set = 0;
+    option_index = 0;
+    cursor = text;
+
+    for (;;) {
+        char *next = strchr(cursor, ',');
+        char *option;
+
+        if (next != NULL)
+            *next = '\0';
+
+        option = fb_nuttx_serial_trim(cursor);
+
+        if (*option != '\0') {
+            switch (option_index) {
+            case 0:
+                if (fb_nuttx_serial_parse_uint(option,
+                        &serial_options->uiSpeed) != 0)
+                    return -1;
+                break;
+
+            case 1:
+                if (strcasecmp(option, "N") == 0)
+                    serial_options->Parity = FB_SERIAL_PARITY_NONE;
+                else if (strcasecmp(option, "E") == 0)
+                    serial_options->Parity = FB_SERIAL_PARITY_EVEN;
+                else if (strcasecmp(option, "PE") == 0) {
+                    serial_options->Parity = FB_SERIAL_PARITY_EVEN;
+                    serial_options->CheckParity = 1;
+                } else if (strcasecmp(option, "O") == 0)
+                    serial_options->Parity = FB_SERIAL_PARITY_ODD;
+                else if (strcasecmp(option, "S") == 0)
+                    serial_options->Parity = FB_SERIAL_PARITY_SPACE;
+                else if (strcasecmp(option, "M") == 0)
+                    serial_options->Parity = FB_SERIAL_PARITY_MARK;
+                else
+                    return -1;
+                break;
+
+            case 2:
+                if (fb_nuttx_serial_parse_uint(option,
+                        &serial_options->uiDataBits) != 0)
+                    return -1;
+                break;
+
+            case 3:
+                if (strcmp(option, "1") == 0)
+                    serial_options->StopBits = FB_SERIAL_STOP_BITS_1;
+                else if (strcmp(option, "1.5") == 0)
+                    serial_options->StopBits = FB_SERIAL_STOP_BITS_1_5;
+                else if (strcmp(option, "2") == 0)
+                    serial_options->StopBits = FB_SERIAL_STOP_BITS_2;
+                else
+                    return -1;
+
+                stop_bits_set = 1;
+                break;
+
+            default:
+                if (fb_nuttx_serial_parse_extended(option,
+                        serial_options) != 0)
+                    return -1;
+                break;
+            }
+        }
+
+        option_index++;
+
+        if (next == NULL)
+            break;
+
+        cursor = next + 1;
+    }
+
+    if (stop_bits_set == 0) {
+        if (serial_options->uiSpeed <= 110)
+            serial_options->StopBits = (serial_options->uiDataBits == 5) ?
+                FB_SERIAL_STOP_BITS_1_5 : FB_SERIAL_STOP_BITS_2;
+        else
+            serial_options->StopBits = FB_SERIAL_STOP_BITS_1;
+    }
+
+    if ((serial_options->uiDataBits < 5) ||
+        (serial_options->uiDataBits > 8))
+        return -1;
+
+    return 0;
+}
+
+static int fb_nuttx_serial_device_path(const char *requested, char *path,
+    size_t path_size)
+{
+    unsigned int port;
+    int written;
+
+    if ((requested == NULL) || (*requested == '\0') ||
+        (path == NULL) || (path_size == 0))
+        return -1;
+
+    if (strncasecmp(requested, "COM", 3) == 0) {
+        if (requested[3] == '\0')
+            port = 1;
+        else if (fb_nuttx_serial_parse_uint(requested + 3, &port) != 0)
+            return -1;
+
+        if (port == 0)
+            return -1;
+
+        written = snprintf(path, path_size, "/dev/ttyS%u", port - 1);
+    } else {
+        written = snprintf(path, path_size, "%s", requested);
+    }
+
+    if ((written < 0) || ((size_t)written >= path_size))
+        return -1;
+
+    return 0;
+}
+
+#if FB_NUTTX_HAVE_SERIAL_TERMIOS
+static int fb_nuttx_serial_configure(int fd,
+    const FB_SERIAL_OPTIONS *serial_options, struct termios *old_termios)
+{
+    struct termios configured;
+
+    if ((serial_options == NULL) || (old_termios == NULL))
+        return -1;
+
+    if (tcgetattr(fd, old_termios) != 0)
+        return -1;
+
+    configured = *old_termios;
+    cfmakeraw(&configured);
+    configured.c_cflag |= CREAD;
+    configured.c_cflag &= ~CSIZE;
+
+    switch (serial_options->uiDataBits) {
+    case 5:
+        configured.c_cflag |= CS5;
+        break;
+    case 6:
+        configured.c_cflag |= CS6;
+        break;
+    case 7:
+        configured.c_cflag |= CS7;
+        break;
+    case 8:
+        configured.c_cflag |= CS8;
+        break;
+    default:
+        return -1;
+    }
+
+    configured.c_cflag &= ~(PARENB | PARODD | CSTOPB);
+    configured.c_iflag &= ~(INPCK | IGNPAR);
+
+    switch (serial_options->Parity) {
+    case FB_SERIAL_PARITY_NONE:
+        break;
+    case FB_SERIAL_PARITY_EVEN:
+        configured.c_cflag |= PARENB;
+        break;
+    case FB_SERIAL_PARITY_ODD:
+        configured.c_cflag |= PARENB | PARODD;
+        break;
+    default:
+        /* NuttX termios has no portable mark/space parity flag. */
+        return -1;
+    }
+
+    if (serial_options->StopBits != FB_SERIAL_STOP_BITS_1)
+        configured.c_cflag |= CSTOPB;
+
+    if ((serial_options->StopBits == FB_SERIAL_STOP_BITS_1_5) &&
+        (serial_options->uiDataBits != 5))
+        return -1;
+
+    if (serial_options->CheckParity)
+        configured.c_iflag |= INPCK;
+
+    if (serial_options->DiscardOnError || serial_options->IgnoreAllErrors)
+        configured.c_iflag |= IGNPAR;
+
+    if (serial_options->KeepDTREnabled)
+        configured.c_cflag &= ~HUPCL;
+    else
+        configured.c_cflag |= HUPCL;
+
+    if (serial_options->DurationDSR || serial_options->DurationCD)
+        configured.c_cflag &= ~CLOCAL;
+    else
+        configured.c_cflag |= CLOCAL;
+
+#ifdef CRTSCTS
+    if (serial_options->DurationCTS && !serial_options->SuppressRTS)
+        configured.c_cflag |= CRTSCTS;
+    else
+        configured.c_cflag &= ~CRTSCTS;
+#else
+    if (serial_options->DurationCTS && !serial_options->SuppressRTS)
+        return -1;
+#endif
+
+    if (serial_options->AddLF)
+        configured.c_oflag |= OPOST | ONLCR;
+
+    configured.c_cc[VMIN] = 0;
+    configured.c_cc[VTIME] = 1;
+
+    if (cfsetspeed(&configured, (speed_t)serial_options->uiSpeed) != 0)
+        return -1;
+
+    if (tcsetattr(fd, TCSAFLUSH, &configured) != 0)
+        return -1;
+
+    return 0;
+}
+#endif
+
 int32 fb_FileOpenCom(const FBSTRING *device, const uint32 mode,
     const uint32 access, const uint32 lock, const int32 file_num,
     const int32 reclen, const char *encoding)
 {
-    /*
-        NuttX boards expose serial devices through board-specific paths such
-        as /dev/ttyS0 rather than DOS-style COM1: names.  Until there is a
-        real mapping layer, report a normal open failure so BASIC programs can
-        use ERR to choose a fallback path.
-    */
-    (void)device;
+    FB_SERIAL_OPTIONS serial_options;
+    char path[FB_NUTTX_SERIAL_PATH_MAX];
+    char *device_text;
+    char *options_text;
+    FILE *stream;
+    int fd;
+    int open_flags;
+
     (void)mode;
     (void)access;
     (void)lock;
-    (void)file_num;
     (void)reclen;
     (void)encoding;
 
-    fb_nuttx_error_num = 2;
+    if ((file_num <= 0) || (file_num >= FB_NUTTX_MAX_FILES)) {
+        fb_nuttx_error_num = FB_RTERROR_ILLEGALFUNCTIONCALL;
+        return -1;
+    }
 
-    return -1;
+    device_text = fb_nuttx_string_to_cstr(device);
+
+    if (device_text == NULL) {
+        fb_nuttx_error_num = FB_RTERROR_OUTOFMEM;
+        return -1;
+    }
+
+    options_text = strchr(device_text, ':');
+
+    if (options_text == NULL) {
+        free(device_text);
+        fb_nuttx_error_num = FB_RTERROR_ILLEGALFUNCTIONCALL;
+        return -1;
+    }
+
+    *options_text = '\0';
+    options_text++;
+
+    if ((fb_nuttx_serial_device_path(device_text, path, sizeof(path)) != 0) ||
+        (fb_nuttx_serial_parse_options(options_text, &serial_options) != 0)) {
+        free(device_text);
+        fb_nuttx_error_num = FB_RTERROR_ILLEGALFUNCTIONCALL;
+        return -1;
+    }
+
+    free(device_text);
+    fb_FileClose(file_num);
+
+    open_flags = O_RDWR;
+#ifdef O_NOCTTY
+    open_flags |= O_NOCTTY;
+#endif
+    fd = open(path, open_flags);
+
+    if (fd < 0) {
+        fb_nuttx_error_num = FB_RTERROR_FILENOTFOUND;
+        return -1;
+    }
+
+#if FB_NUTTX_HAVE_SERIAL_TERMIOS
+    if (fb_nuttx_serial_configure(fd, &serial_options,
+            &fb_nuttx_serial_old_termios[file_num]) != 0) {
+        close(fd);
+        fb_nuttx_error_num = FB_RTERROR_FILEIO;
+        return -1;
+    }
+
+    fb_nuttx_serial_old_termios_valid[file_num] = 1;
+#else
+    /*
+        A board built without CONFIG_SERIAL_TERMIOS may still expose a UART as
+        a preconfigured character device. Keep byte I/O available while making
+        the absence of framing control explicit through the build option.
+    */
+    (void)serial_options;
+#endif
+
+    stream = fdopen(fd, "r+");
+
+    if (stream == NULL) {
+#if FB_NUTTX_HAVE_SERIAL_TERMIOS
+        (void)tcsetattr(fd, TCSAFLUSH,
+                       &fb_nuttx_serial_old_termios[file_num]);
+        fb_nuttx_serial_old_termios_valid[file_num] = 0;
+#endif
+        close(fd);
+        fb_nuttx_error_num = FB_RTERROR_FILEIO;
+        return -1;
+    }
+
+    (void)setvbuf(stream, NULL, _IONBF, 0);
+    fb_nuttx_files[file_num] = stream;
+    fb_nuttx_file_kind[file_num] = FB_NUTTX_FILE_KIND_COM;
+    fb_nuttx_file_record_len[file_num] = 0;
+    fb_nuttx_serial_output_lines[file_num] = 0;
+    fb_nuttx_error_num = FB_RTERROR_OK;
+
+    return 0;
 }
 
-/* ------------------------------------------------------------------------- */
-/* DATA/READ support                                                         */
-/* ------------------------------------------------------------------------- */
+static int fb_nuttx_serial_fd(const int file_number)
+{
+    if ((file_number <= 0) || (file_number >= FB_NUTTX_MAX_FILES) ||
+        (fb_nuttx_file_kind[file_number] != FB_NUTTX_FILE_KIND_COM) ||
+        (fb_nuttx_files[file_number] == NULL))
+        return -1;
+
+    return fileno(fb_nuttx_files[file_number]);
+}
+
+static unsigned int fb_nuttx_serial_lines_from_native(int native_lines)
+{
+    unsigned int lines = 0;
+
+#ifdef TIOCM_CTS
+    if ((native_lines & TIOCM_CTS) != 0)
+        lines |= FB_COM_LINE_CTS;
+#endif
+#ifdef TIOCM_DSR
+    if ((native_lines & TIOCM_DSR) != 0)
+        lines |= FB_COM_LINE_DSR;
+#endif
+#ifdef TIOCM_CAR
+    if ((native_lines & TIOCM_CAR) != 0)
+        lines |= FB_COM_LINE_DCD;
+#endif
+#ifdef TIOCM_RI
+    if ((native_lines & TIOCM_RI) != 0)
+        lines |= FB_COM_LINE_RI;
+#endif
+#ifdef TIOCM_RTS
+    if ((native_lines & TIOCM_RTS) != 0)
+        lines |= FB_COM_LINE_RTS;
+#endif
+#ifdef TIOCM_DTR
+    if ((native_lines & TIOCM_DTR) != 0)
+        lines |= FB_COM_LINE_DTR;
+#endif
+
+    return lines;
+}
+
+static int fb_nuttx_serial_lines_to_native(unsigned int lines)
+{
+    int native_lines = 0;
+
+#ifdef TIOCM_RTS
+    if ((lines & FB_COM_LINE_RTS) != 0)
+        native_lines |= TIOCM_RTS;
+#endif
+#ifdef TIOCM_DTR
+    if ((lines & FB_COM_LINE_DTR) != 0)
+        native_lines |= TIOCM_DTR;
+#endif
+
+    return native_lines;
+}
+
+FBCALL int fb_ComGetStatus(int file_number, FB_COM_STATUS *status)
+{
+    int fd;
+    int native_lines;
+    int queued;
+
+    if (status == NULL)
+        return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+
+    memset(status, 0, sizeof(*status));
+    fd = fb_nuttx_serial_fd(file_number);
+
+    if (fd < 0)
+        return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+
+    status->lines = fb_nuttx_serial_output_lines[file_number];
+
+#if FB_NUTTX_HAVE_SERIAL_TERMIOS
+    status->capabilities |= FB_COM_CAP_PURGE_RX | FB_COM_CAP_PURGE_TX;
+#endif
+#if defined(TIOCSBRK) && defined(TIOCCBRK)
+    status->capabilities |= FB_COM_CAP_BREAK;
+#endif
+#if defined(TIOCMGET) && defined(TIOCMSET)
+    native_lines = 0;
+
+    if (ioctl(fd, TIOCMGET, (unsigned long)(uintptr_t)&native_lines) == 0) {
+        status->lines = fb_nuttx_serial_lines_from_native(native_lines);
+        status->capabilities |= FB_COM_CAP_INPUT_LINES |
+                                FB_COM_CAP_OUTPUT_LINES;
+    }
+#else
+    (void)native_lines;
+#endif
+#ifdef TIOCINQ
+    queued = 0;
+
+    if (ioctl(fd, TIOCINQ, (unsigned long)(uintptr_t)&queued) == 0) {
+        status->rx_queued = queued > 0 ? (unsigned int)queued : 0;
+        status->capabilities |= FB_COM_CAP_RX_QUEUE;
+    }
+#else
+    (void)queued;
+#endif
+#ifdef TIOCOUTQ
+    queued = 0;
+
+    if (ioctl(fd, TIOCOUTQ, (unsigned long)(uintptr_t)&queued) == 0) {
+        status->tx_queued = queued > 0 ? (unsigned int)queued : 0;
+        status->capabilities |= FB_COM_CAP_TX_QUEUE;
+    }
+#endif
+
+    return fb_ErrorSetNum(FB_RTERROR_OK);
+}
+
+FBCALL int fb_ComSetLines(int file_number, unsigned int mask,
+    unsigned int values)
+{
+    const unsigned int valid_lines = FB_COM_LINE_RTS | FB_COM_LINE_DTR;
+    int native_lines;
+    int native_mask;
+    int fd;
+
+    if ((mask == 0) || ((mask & ~valid_lines) != 0) ||
+        ((values & ~valid_lines) != 0))
+        return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+
+    fd = fb_nuttx_serial_fd(file_number);
+
+    if (fd < 0)
+        return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+
+#if defined(TIOCMGET) && defined(TIOCMSET) && \
+    defined(TIOCM_RTS) && defined(TIOCM_DTR)
+    native_lines = 0;
+    native_mask = fb_nuttx_serial_lines_to_native(mask);
+
+    if (ioctl(fd, TIOCMGET, (unsigned long)(uintptr_t)&native_lines) != 0)
+        return fb_ErrorSetNum(FB_RTERROR_FILEIO);
+
+    native_lines &= ~native_mask;
+    native_lines |= fb_nuttx_serial_lines_to_native(values & mask);
+
+    if (ioctl(fd, TIOCMSET, (unsigned long)(uintptr_t)&native_lines) != 0)
+        return fb_ErrorSetNum(FB_RTERROR_FILEIO);
+
+    fb_nuttx_serial_output_lines[file_number] &= ~mask;
+    fb_nuttx_serial_output_lines[file_number] |= values & mask;
+
+    return fb_ErrorSetNum(FB_RTERROR_OK);
+#else
+    (void)values;
+    (void)native_lines;
+    (void)native_mask;
+    return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+#endif
+}
+
+FBCALL int fb_ComSetBreak(int file_number, int enabled)
+{
+    int fd = fb_nuttx_serial_fd(file_number);
+
+    if (fd < 0)
+        return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+
+#if defined(TIOCSBRK) && defined(TIOCCBRK)
+    if (ioctl(fd, enabled ? TIOCSBRK : TIOCCBRK, 0ul) != 0)
+        return fb_ErrorSetNum(FB_RTERROR_FILEIO);
+
+    return fb_ErrorSetNum(FB_RTERROR_OK);
+#else
+    (void)enabled;
+    return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+#endif
+}
+
+FBCALL int fb_ComPurge(int file_number, unsigned int queues)
+{
+    const unsigned int valid_queues = FB_COM_PURGE_RX | FB_COM_PURGE_TX;
+    int selector;
+    int fd;
+
+    if ((queues == 0) || ((queues & ~valid_queues) != 0))
+        return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+
+    fd = fb_nuttx_serial_fd(file_number);
+
+    if (fd < 0)
+        return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+
+#if FB_NUTTX_HAVE_SERIAL_TERMIOS
+    if (queues == valid_queues)
+        selector = TCIOFLUSH;
+    else if (queues == FB_COM_PURGE_RX)
+        selector = TCIFLUSH;
+    else
+        selector = TCOFLUSH;
+
+    if (tcflush(fd, selector) != 0)
+        return fb_ErrorSetNum(FB_RTERROR_FILEIO);
+
+    return fb_ErrorSetNum(FB_RTERROR_OK);
+#else
+    (void)selector;
+    return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+#endif
+}
+
+/* end of fb_nuttx_file.c */

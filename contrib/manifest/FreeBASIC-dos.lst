@@ -1409,6 +1409,7 @@ inc/fbc-int/math.bi
 inc/fbc-int/memory.bi
 inc/fbc-int/symbol.bi
 inc/fbc-int/system.bi
+inc/fbcom.bi
 inc/fbgfx.bi
 inc/fbio.bi
 inc/fblimits.bi

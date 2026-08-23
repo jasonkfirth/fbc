@@ -646,6 +646,9 @@ if [ "$SKIP_CONFIG" -eq 0 ]; then
     kconfig_enable CONFIG_SYSTEM_DD
     kconfig_enable CONFIG_SYSTEM_HEXDUMP
     kconfig_enable CONFIG_NSH_CMDOPT_HEXDUMP
+    # The portable OPEN COM backend configures board UART devices through the
+    # standard NuttX termios interface.
+    kconfig_enable CONFIG_SERIAL_TERMIOS
     kconfig_disable CONFIG_STACK_USAGE
     kconfig_set_val CONFIG_ARCH_INTERRUPTSTACK 4096
 
@@ -660,6 +663,7 @@ if [ "$SKIP_CONFIG" -eq 0 ]; then
     require_config_enabled CONFIG_NET_TCP
     require_config_enabled CONFIG_NETUTILS_DHCPC
     require_config_enabled CONFIG_NETUTILS_WEBCLIENT
+    require_config_enabled CONFIG_SERIAL_TERMIOS
 
     if [ "$WITH_TELNET" -eq 1 ]; then
         require_config_enabled CONFIG_NETUTILS_TELNETD

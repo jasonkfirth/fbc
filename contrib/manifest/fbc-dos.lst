@@ -109,6 +109,7 @@ include/freebas/fbc-int/math.bi
 include/freebas/fbc-int/memory.bi
 include/freebas/fbc-int/symbol.bi
 include/freebas/fbc-int/system.bi
+include/freebas/fbcom.bi
 include/freebas/fbgfx.bi
 include/freebas/fbio.bi
 include/freebas/fblimits.bi

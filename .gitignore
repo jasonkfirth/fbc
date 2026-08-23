@@ -108,3 +108,5 @@ dist
 generated
 obj
 winCE/
+!/src/rtlib/wince/
+!/src/rtlib/wince/**

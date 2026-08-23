@@ -883,6 +883,10 @@ extern_asm(_fb_DevPrinterGetOffset);
 extern_asm(_fb_CVL);
 extern_asm(_fb_hStrDelTemp);
 extern_asm(_fb_DevFileUnlock);
+extern_asm(_fb_ComGetStatus);
+extern_asm(_fb_ComSetLines);
+extern_asm(_fb_ComSetBreak);
+extern_asm(_fb_ComPurge);
 
 DXE_EXPORT_TABLE (libfb_symbol_table)
     DXE_EXPORT_ASM (_fb_WstrInstrAny)
@@ -1770,4 +1774,8 @@ DXE_EXPORT_TABLE (libfb_symbol_table)
     DXE_EXPORT_ASM (_fb_CVL)
     DXE_EXPORT_ASM (_fb_hStrDelTemp)
     DXE_EXPORT_ASM (_fb_DevFileUnlock)
+    DXE_EXPORT_ASM (_fb_ComGetStatus)
+    DXE_EXPORT_ASM (_fb_ComSetLines)
+    DXE_EXPORT_ASM (_fb_ComSetBreak)
+    DXE_EXPORT_ASM (_fb_ComPurge)
 DXE_EXPORT_END

@@ -3058,6 +3058,11 @@ if [ "$REUSE_CONFIG" -eq 0 ]; then
     run kconfig-tweak --enable CONFIG_ARCH_TOOLCHAIN_GNU
     run kconfig-tweak --set-val CONFIG_16550_REGINCR 1
     run kconfig-tweak --set-val CONFIG_16550_REGWIDTH 8
+    # OPEN COM uses NuttX's termios layer for baud and framing changes. Keep
+    # that code enabled in the standard smoke image so it is compiled whenever
+    # the mini runtime is qualified, even when a test does not open the console
+    # UART as a second stream.
+    run kconfig-tweak --enable CONFIG_SERIAL_TERMIOS
     run kconfig-tweak --enable CONFIG_LIBM
 
     run kconfig-tweak --enable CONFIG_FS_TMPFS
