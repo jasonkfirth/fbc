@@ -570,21 +570,52 @@ select_haiku_live_desktop() {
 
 	[ -S "$monitor_socket" ] || return 1
 
-	# The live image's FirstBootPrompt gives its "Try Haiku" button keyboard
-	# focus by default.  QEMU's monitor injects Enter without depending on a VNC
-	# client or changing Haiku's first-boot services.
-	python3 - "$monitor_socket" <<'PY'
+	# FirstBootPrompt makes "Try Haiku" the window's default button.  Reading the
+	# monitor response ensures QEMU processed Enter before this short-lived
+	# control connection closes.
+	python3 - \
+		"$monitor_socket" \
+		"$vm_dir/first-boot-before.ppm" \
+		"$vm_dir/first-boot-after.ppm" <<'PY'
 import socket
 import sys
+import time
+
+
+def run_command(monitor, command):
+    monitor.sendall(command.encode("utf-8") + b"\n")
+    response = bytearray()
+
+    while b"(qemu)" not in response:
+        chunk = monitor.recv(4096)
+        if not chunk:
+            raise RuntimeError("QEMU monitor closed before acknowledging command")
+        response.extend(chunk)
+
+    if b"unknown command" in response or b"Error" in response:
+        raise RuntimeError(response.decode("utf-8", "replace"))
 
 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as monitor:
-    monitor.settimeout(2)
+    monitor.settimeout(5)
     monitor.connect(sys.argv[1])
+
+    banner = bytearray()
+    while b"(qemu)" not in banner:
+        chunk = monitor.recv(4096)
+        if not chunk:
+            raise RuntimeError("QEMU monitor closed during greeting")
+        banner.extend(chunk)
+
     try:
-        monitor.recv(4096)
-    except TimeoutError:
+        run_command(monitor, "screendump " + sys.argv[2])
+    except RuntimeError:
         pass
-    monitor.sendall(b"sendkey ret\n")
+    run_command(monitor, "sendkey ret")
+    time.sleep(0.25)
+    try:
+        run_command(monitor, "screendump " + sys.argv[3])
+    except RuntimeError:
+        pass
 PY
 }
 
@@ -657,7 +688,8 @@ print_vm_failure_logs() {
 	vm_name="$(basename "$vm_dir")"
 	mkdir -p "$LOG_DIR"
 
-	for source in serial-first-boot.log serial.log http.log ssh-ready.err; do
+	for source in serial-first-boot.log serial.log http.log ssh-ready.err \
+		first-boot-before.ppm first-boot-after.ppm; do
 		if [ -f "$vm_dir/$source" ]; then
 			cp -f "$vm_dir/$source" \
 				"$LOG_DIR/freebasic-haiku-$vm_name-$source"

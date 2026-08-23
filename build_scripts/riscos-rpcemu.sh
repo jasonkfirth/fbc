@@ -16,6 +16,7 @@
 #     - build the Qt 5 interpreter or dynamic recompiler
 #     - install the pinned RISC OS Open 5.30 IOMD ROM by default
 #     - install the matching RISC OS Open HardDisc4 boot tree in HostFS
+#     - seed a fresh Choices tree from the matching RISC OS boot template
 #     - validate and install an optional user-supplied RISC OS ROM
 #     - select a CPU model compatible with the FreeBASIC ARM baseline
 #     - select enough emulated RAM for the native compiler toolchain
@@ -24,7 +25,7 @@
 #
 # This file intentionally does NOT contain:
 #
-#     - unattended guest configuration
+#     - interactive guest configuration beyond the boot-supplied defaults
 #     - FreeBASIC runtime compilation
 #     - Raspberry Pi or QEMU machine setup
 #
@@ -69,6 +70,7 @@ RISCOS_HARDDISC_VERSION="5.30"
 RISCOS_HARDDISC_URL="https://www.riscosopen.org/zipfiles/platform/common/HardDisc4.5.30.zip"
 RISCOS_HARDDISC_SHA256="2d0ae90df9412622950b05d1b95dbb07ed95c144213e7d677401a75c330c570e"
 RISCOS_HARDDISC_ROOT="HardDisc4"
+RISCOS_BOOT_HOOK="RO${RISCOS_HARDDISC_VERSION/./}Hook"
 
 TEMP_DOWNLOAD=""
 TEMP_ROM=""
@@ -453,6 +455,33 @@ fi
 
 [ -f "$RUNTIME_BOOT_FILE" ] ||
     die "HardDisc4 marker exists but the boot tree is incomplete"
+
+# On its first desktop boot, RISC OS copies this versioned template into the
+# writable Choices directory.  RPCEmu CI has to install its launch task before
+# that first boot, so perform the same copy here while Choices is still empty.
+# Existing machine choices are never replaced or completed silently.
+CHOICES_ROOT="$SOURCE_DIR/hostfs/!Boot/Choices"
+CHOICES_BOOT="$CHOICES_ROOT/Boot"
+CHOICES_TEMPLATE="$SOURCE_DIR/hostfs/!Boot/$RISCOS_BOOT_HOOK/Boot"
+CHOICES_PIN_SETUP="$CHOICES_BOOT/Tasks/PinSetup,feb"
+
+if [ ! -f "$CHOICES_PIN_SETUP" ]; then
+    [ -d "$CHOICES_TEMPLATE" ] ||
+        die "HardDisc4 does not contain the $RISCOS_BOOT_HOOK Choices template"
+    [ ! -e "$CHOICES_ROOT" ] || [ -d "$CHOICES_ROOT" ] ||
+        die "RISC OS Choices path is not a directory: $CHOICES_ROOT"
+    mkdir -p "$CHOICES_ROOT"
+
+    if find "$CHOICES_ROOT" -mindepth 1 -print -quit | grep -q .; then
+        die "RISC OS Choices exist but are incomplete; preserve them and complete desktop setup"
+    fi
+
+    mkdir -p "$CHOICES_BOOT"
+    cp -a "$CHOICES_TEMPLATE/." "$CHOICES_BOOT/"
+fi
+
+[ -f "$CHOICES_PIN_SETUP" ] ||
+    die "failed to seed the RISC OS Choices boot tasks"
 
 for staged_leaf in FreeBASIC '!GCC'; do
     if [ -d "$HOSTFS_DIR/$staged_leaf" ]; then

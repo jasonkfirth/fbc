@@ -425,6 +425,18 @@ finally:
 PY
 }
 
+collect_guest_logs() {
+	local name
+
+	mkdir -p "$LOG_DIR"
+
+	for name in freebasic-dragonfly-build.log freebasic-dragonfly-test.log; do
+		if [ -f "$UPLOAD_DIR/$name" ]; then
+			cp -f "$UPLOAD_DIR/$name" "$LOG_DIR/$name"
+		fi
+	done
+}
+
 write_guest_build_script() {
 	cat > "$SERVE_DIR/dragonfly-build-run.sh" <<EOF
 #!/bin/sh
@@ -921,7 +933,10 @@ echo "==> compiling threaded TCP runtime smoke"
 run fbc -mt /work/freebasic-source/tests/file/tcp.bas -x /work/smoke/tcp
 
 echo "==> running threaded TCP runtime smoke"
-run timeout 30 /work/smoke/tcp
+# The burst test performs one guest runtime call per byte.  DragonFly's generic
+# KVM CPU is deliberately conservative, so keep the outer process guard beyond
+# the test's documented five-minute internal deadlock bound.
+run timeout 360 /work/smoke/tcp
 
 echo "==> compiling gfxlib smoke"
 run fbc /work/smoke/gfx-truecolor.bas -x /work/smoke/gfx-truecolor
@@ -989,7 +1004,12 @@ build_package() {
 	mapfile -t qemu_cmd < <(qemu_args "$vm_dir")
 
 	msg "Building DragonFly package in QEMU"
-	run_qemu_guest_script "$console_log" "$guest_command" "${qemu_cmd[@]}"
+	if ! run_qemu_guest_script \
+		"$console_log" "$guest_command" "${qemu_cmd[@]}"; then
+		collect_guest_logs
+		return 1
+	fi
+	collect_guest_logs
 
 	PACKAGE_FILE="$(find "$UPLOAD_DIR" -maxdepth 1 -type f -name 'freebasic-*.pkg' | sort | tail -n 1)"
 	[ -n "$PACKAGE_FILE" ] && [ -f "$PACKAGE_FILE" ] || die "DragonFly package was not uploaded"
@@ -1014,7 +1034,12 @@ test_package() {
 	mapfile -t qemu_cmd < <(qemu_args "$vm_dir" "$audio_wav")
 
 	msg "Running DragonFly package smoke tests and fbctests"
-	run_qemu_guest_script "$console_log" "$guest_command" "${qemu_cmd[@]}"
+	if ! run_qemu_guest_script \
+		"$console_log" "$guest_command" "${qemu_cmd[@]}"; then
+		collect_guest_logs
+		return 1
+	fi
+	collect_guest_logs
 }
 
 verify_audio_capture() {

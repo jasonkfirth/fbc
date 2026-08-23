@@ -33,11 +33,12 @@ const TEST_PORT = 19091
 const BURST_PORT = TEST_PORT + 1
 const WILDCARD_PORT = TEST_PORT + 2
 const BURST_BYTES = 65536
+const STREAM_WAIT_ITERATIONS = 5000
 
-' The burst performs one runtime call per byte. Allow two minutes of requested
+' The burst performs one runtime call per byte. Allow five minutes of requested
 ' millisecond sleeps so slower kernels and emulators do not create a false
 ' timeout while retaining a finite bound for deadlocks.
-const BURST_WAIT_ITERATIONS = 120000
+const BURST_WAIT_ITERATIONS = 300000
 
 dim shared as integer server_ready
 dim shared as integer server_open_ok
@@ -70,6 +71,29 @@ dim shared as integer burst_server_step
 dim shared as integer burst_client_step
 dim shared as integer burst_stop
 
+' TCP EOF reports whether bytes are available immediately; it can therefore
+' be true while a live connection is waiting for its next packet.  EOC is the
+' distinct peer-closure test.  Poll both with a finite bound before each read
+' so scheduler timing cannot turn an otherwise valid exchange into empty data.
+function wait_for_tcp_data( byval handle as integer ) as integer
+	dim as integer tries = 0
+
+	do while( eof( handle ) <> 0 )
+		if( eoc( handle ) <> 0 ) then
+			return FALSE
+		end if
+
+		if( tries >= STREAM_WAIT_ITERATIONS ) then
+			return FALSE
+		end if
+
+		sleep 1, 1
+		tries += 1
+	loop
+
+	return TRUE
+end function
+
 sub server_thread( byval userdata as any ptr )
 	dim as integer server
 	dim as integer client
@@ -100,12 +124,22 @@ sub server_thread( byval userdata as any ptr )
 	end if
 
 	server_step = 3
+	' The flag confirms every client write has returned.  The EOF poll below
+	' separately confirms that the network stack has made those bytes readable.
 	tries = 0
-	do while( (client_request_ready = FALSE) andalso (tries < 5000) )
+	do while( (client_request_ready = FALSE) andalso _
+	          (tries < STREAM_WAIT_ITERATIONS) )
 		sleep 1, 1
 		tries += 1
 	loop
 	if( client_request_ready = FALSE ) then
+		server_error = 2
+		close #client
+		close #server
+		exit sub
+	end if
+
+	if( wait_for_tcp_data( client ) = FALSE ) then
 		server_error = 2
 		close #client
 		close #server
@@ -117,10 +151,22 @@ sub server_thread( byval userdata as any ptr )
 	server_line = s
 
 	server_step = 5
+	if( wait_for_tcp_data( client ) = FALSE ) then
+		server_error = 4
+		close #client
+		close #server
+		exit sub
+	end if
 	input #client, server_write_num, s
 	server_write_text = s
 
 	server_step = 6
+	if( wait_for_tcp_data( client ) = FALSE ) then
+		server_error = 5
+		close #client
+		close #server
+		exit sub
+	end if
 	get #client, , client_put_recv()
 
 	server_step = 7
@@ -231,10 +277,20 @@ sub client_thread( byval userdata as any ptr )
 	client_line = s
 
 	client_step = 6
+	if( wait_for_tcp_data( client ) = FALSE ) then
+		client_error = 6
+		close #client
+		exit sub
+	end if
 	input #client, client_write_num, s
 	client_write_text = s
 
 	client_step = 7
+	if( wait_for_tcp_data( client ) = FALSE ) then
+		client_error = 7
+		close #client
+		exit sub
+	end if
 	get #client, , server_put_recv()
 	client_received_reply = TRUE
 
