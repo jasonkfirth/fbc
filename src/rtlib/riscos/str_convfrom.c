@@ -41,13 +41,12 @@
 static long double hPow10Limited( int exponent )
 {
 	long double scale = 1.0L;
-	long double factor;
+	long double factor = 10.0L;
+	int reciprocal = FALSE;
 
 	if( exponent < 0 ) {
 		exponent = -exponent;
-		factor = 0.1L;
-	} else {
-		factor = 10.0L;
+		reciprocal = TRUE;
 	}
 
 	while( exponent > 0 ) {
@@ -57,7 +56,12 @@ static long double hPow10Limited( int exponent )
 		exponent >>= 1;
 	}
 
-	return scale;
+	/*
+	   Squaring the rounded 0.1 representation compounds enough error to move
+	   values such as 9.9e-100 by several binary64 units.  Starting with the
+	   exact integer factor 10 confines the reciprocal rounding to one step.
+	*/
+	return reciprocal ? (1.0L / scale) : scale;
 }
 
 static long double hScaleByPow10Limited( long double value, int exponent )
