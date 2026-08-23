@@ -941,6 +941,15 @@ build_host_compiler() {
 
     [ -x "$ROOT/bin/fbc" ] || die "host FreeBASIC compiler is unavailable"
 
+    # The release bootstrap compiler predates the type alias syntax in the
+    # current headers. Build the current compiler through the compatibility
+    # definitions before asking it to self-host without them.
+    msg "building source-compatible host FreeBASIC compiler"
+    run make -C "$ROOT" -j"$JOBS" compiler \
+        BUILD_FBC="$ROOT/bin/fbc" \
+        BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__"
+    run make -C "$ROOT" clean-compiler
+
     msg "refreshing host FreeBASIC compiler"
     run make -C "$ROOT" -j"$JOBS" compiler BUILD_FBC="$ROOT/bin/fbc"
 }

@@ -127,6 +127,10 @@ jobs:
           bash build_scripts/ci-seed-source-bootstrap.sh \
             linux-x86_64 linux-x86_64
           make -j"$JOBS" bootstrap-minimal </dev/null
+          make -j"$JOBS" compiler \
+            BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
+          make clean-compiler
+          make -j"$JOBS" compiler </dev/null
           make -j1 \
             HAVE_PREREQS_MK= \
             BOOT_FBC="$GITHUB_WORKSPACE/bin/fbc" \

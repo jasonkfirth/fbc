@@ -269,8 +269,17 @@ build_freebasic() {
         run make -C "$ROOT" -j"$JOBS" bootstrap-minimal
     fi
 
+    # The release bootstrap compiler predates the type alias syntax in the
+    # current headers. Build the current compiler through the compatibility
+    # definitions before asking it to self-host without them.
+    msg "building source-compatible host FreeBASIC compiler"
+    run make -C "$ROOT" -j"$JOBS" compiler \
+        BUILD_FBC="$ROOT/bin/fbc" \
+        BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__"
+    run make -C "$ROOT" clean-compiler
+
     msg "refreshing the host FreeBASIC compiler"
-    run make -C "$ROOT" -j"$JOBS" compiler FBC="$ROOT/bin/fbc"
+    run make -C "$ROOT" -j"$JOBS" compiler BUILD_FBC="$ROOT/bin/fbc"
 
     msg "building and staging native FreeBASIC"
     run "$SCRIPT_DIR/riscos-build-native.sh" \

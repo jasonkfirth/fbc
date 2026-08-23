@@ -140,6 +140,16 @@ make -j"$JOBS" rtlib \
 	BUILD_FBC="$ROOT/bin/fbc" \
 	"${HOST_FEATURE_ARGS[@]}" \
 	> "$OUTPUT_ROOT/build-logs/host-runtime.log" 2>&1
+
+# The release bootstrap compiler predates the type alias syntax in the
+# current headers. Build the current compiler through the compatibility
+# definitions before asking it to self-host without them.
+make -j"$JOBS" -o libs compiler \
+	BUILD_FBC="$ROOT/bin/fbc" \
+	BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" \
+	"${HOST_FEATURE_ARGS[@]}" \
+	> "$OUTPUT_ROOT/build-logs/host-compiler-bootstrap.log" 2>&1
+make clean-compiler
 make -j"$JOBS" -o libs compiler \
 	BUILD_FBC="$ROOT/bin/fbc" \
 	"${HOST_FEATURE_ARGS[@]}" \
