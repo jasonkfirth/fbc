@@ -1,0 +1,271 @@
+# Project: FreeBASIC XL
+# ---------------------
+#
+# File: .github/workflows/extended-platforms.yml
+#
+# Purpose:
+#
+#     Qualify FreeBASIC XL on operating systems that require a complete VM,
+#     an emulator, or a cross-compilation environment on GitHub Actions.
+#
+# Responsibilities:
+#
+#     * build and test Haiku and the supported BSD guests under QEMU
+#     * run fbctests and Exampleageddon on AROS and RISC OS emulators
+#     * compile fbctests and Exampleageddon for Windows CE without a licensed ROM
+#     * retain platform reports and failure evidence as workflow artifacts
+#
+# This file intentionally does NOT contain:
+#
+#     * native Linux, Windows, or macOS validation covered by ci.yml
+#     * release publication or repository write operations
+#     * proprietary Windows CE ROM images or runtime claims without a guest
+
+name: FreeBASIC XL extended platforms
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  schedule:
+    # Exercise the external OS images even during quiet development periods.
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: fbc-xl-extended-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  JOBS: 4
+
+jobs:
+  qemu-guests:
+    name: ${{ matrix.name }} VM (fbctests + Exampleageddon)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: haiku-x86_64
+            name: Haiku x86_64
+            script: build_scripts/haiku-vm-build-freebasic.sh
+            archive_path: out/haiku/x86_64
+            cache_path: out/haiku-vm/cache
+            log_path: out/haiku-vm/logs
+          - id: freebsd-amd64
+            name: FreeBSD amd64
+            script: build_scripts/freebsd-vm-build-freebasic.sh
+            archive_path: out/freebsd/x86-64
+            cache_path: out/freebsd-vm/cache
+            log_path: out/freebsd-vm/logs
+          - id: netbsd-amd64
+            name: NetBSD amd64
+            script: build_scripts/netbsd-vm-build-freebasic.sh
+            archive_path: out/netbsd/x86-64
+            cache_path: out/netbsd-vm/tools
+            log_path: out/netbsd-vm/logs
+          - id: openbsd-amd64
+            name: OpenBSD amd64
+            script: build_scripts/openbsd-vm-build-freebasic.sh
+            archive_path: out/openbsd/x86-64
+            cache_path: out/openbsd-vm/cache
+            log_path: out/openbsd-vm/logs
+          - id: dragonfly-amd64
+            name: DragonFlyBSD amd64
+            script: build_scripts/dragonfly-vm-build-freebasic.sh
+            archive_path: out/dragonfly/x86-64
+            cache_path: out/dragonfly-vm/cache
+            log_path: out/dragonfly-vm/logs
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install VM host dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bzip2 ca-certificates curl openssh-client \
+            python3 python3-pexpect qemu-system-x86 qemu-utils \
+            rsync tar unzip xorriso xz-utils
+
+          # GitHub exposes KVM to standard Linux runners when host support is
+          # available. The guest scripts retain their tested TCG fallback.
+          if [ -c /dev/kvm ]; then
+            sudo chmod 0666 /dev/kvm
+          fi
+
+      - name: Restore installer cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ matrix.cache_path }}
+          key: extended-platform-image-v1-${{ matrix.id }}-${{ hashFiles(matrix.script) }}
+
+      - name: Build and qualify guest
+        run: |
+          set -euo pipefail
+          bash "${{ matrix.script }}" --jobs "$JOBS"
+
+      - name: Upload guest qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-${{ matrix.id }}-evidence
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            ${{ matrix.archive_path }}/
+            ${{ matrix.log_path }}/
+
+  aros:
+    name: AROS x86_64 (fbctests + Exampleageddon)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build AROS and FreeBASIC
+        run: |
+          set -euo pipefail
+          bash build_scripts/debianubuntu-build-freebasic-aros.sh \
+            --targets x86_64 \
+            --skip-native-tools \
+            --no-package \
+            --jobs "$JOBS"
+
+      - name: Run AROS fbctests
+        run: |
+          set -euo pipefail
+          bash build_scripts/aros-run-fbctests.sh \
+            --targets x86_64 \
+            --jobs "$JOBS"
+
+      - name: Run AROS Exampleageddon
+        run: |
+          set -euo pipefail
+          bash build_scripts/aros-run-exampleageddon.sh \
+            --targets x86_64 \
+            --jobs "$JOBS"
+
+      - name: Upload AROS qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-aros-x86_64-evidence
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            out/aros/fbctests/
+            out/aros/exampleageddon/
+
+  riscos:
+    name: RISC OS ARM (fbctests + Exampleageddon)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install headless display support
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xauth xvfb
+
+      - name: Build RISC OS toolchains, FreeBASIC, and RPCEmu
+        run: |
+          set -euo pipefail
+          bash build_scripts/debianubuntu-build-freebasic-riscos.sh \
+            --no-package \
+            --jobs "$JOBS"
+
+      - name: Run RISC OS fbctests
+        run: |
+          set -euo pipefail
+          xvfb-run -a -s '-screen 0 1280x1024x24' \
+            bash build_scripts/riscos-run-fbctests.sh \
+              --jobs "$JOBS"
+
+      - name: Run RISC OS Exampleageddon
+        run: |
+          set -euo pipefail
+          xvfb-run -a -s '-screen 0 1280x1024x24' \
+            bash build_scripts/riscos-run-exampleageddon.sh \
+              --jobs "$JOBS"
+
+      - name: Upload RISC OS qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-riscos-arm-evidence
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            out/riscos/fbctests/
+            out/riscos/exampleageddon/
+
+  wince:
+    name: Windows CE ARM ROM-free compile qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Windows CE host dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rsync
+          docker version
+
+      - name: Build the Windows CE compiler and libraries
+        run: |
+          set -euo pipefail
+          bash build_scripts/debianubuntu-build-freebasic-wince.sh \
+            --jobs 2 \
+            --skip-package \
+            --skip-fbctests \
+            --skip-exampleageddon \
+            --skip-oma
+
+      - name: Cross-build every Windows CE fbctests batch
+        run: |
+          set -euo pipefail
+          bash build_scripts/wince/run-fbctests.sh \
+            --build-only \
+            --jobs 2
+
+      - name: Compile Windows CE Exampleageddon
+        run: |
+          set -euo pipefail
+          bash build_scripts/wince/run-exampleageddon.sh \
+            --arch arm \
+            --compile-only \
+            --jobs 2
+
+      - name: Upload Windows CE compile evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-wince-arm-compile-evidence
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            out/wince/fbctests/
+            out/wince/exampleageddon/arm/
+
+# end of .github/workflows/extended-platforms.yml

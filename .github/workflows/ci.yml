@@ -245,6 +245,7 @@ jobs:
             rsync
             curl
             dos2unix
+            python
             pkgconf
             mingw-w64-i686-gcc
             mingw-w64-i686-binutils
@@ -302,6 +303,24 @@ jobs:
       - name: Run fbctests
         run: make -j"$JOBS" tests-test BUILD_FBC="$PWD/.ci-host/fbc.exe" CROSS_BUILD= </dev/null
 
+      - name: Run Exampleageddon
+        env:
+          FB_GFX_DRIVER: none
+          SFXLIB_DRIVER: null
+        run: |
+          # fbc invokes the target linker by its unprefixed name. Put the
+          # matrix toolchain first so the x86 job cannot select the x64 ld.
+          export PATH="${{ matrix.tool_root }}:$PATH"
+          python3 build_scripts/exampleageddon-freebasic.py \
+            --fbc "$PWD/bin/fbc.exe" \
+            --target-os windows \
+            --outdir "$PWD/out/exampleageddon" \
+            --include-dir "$PWD/inc" \
+            --jobs "$JOBS" \
+            --compile-timeout 180 \
+            --run-timeout 15 \
+            --fail-on-self-contained
+
       - name: Upload Windows diagnostics
         if: failure()
         uses: actions/upload-artifact@v7
@@ -309,6 +328,7 @@ jobs:
           name: fbc-xl-windows-${{ matrix.name }}-diagnostics
           if-no-files-found: warn
           path: |
+            out/exampleageddon/
             maketests-log/
             tests/failed-*.log
             tests/log-tests-results-*.log
@@ -719,6 +739,7 @@ jobs:
             rsync
             curl
             dos2unix
+            python
             pkgconf
             mingw-w64-clang-aarch64-clang
             mingw-w64-clang-aarch64-compiler-rt
@@ -769,6 +790,21 @@ jobs:
           cd tests/syntax
           FBC="$GITHUB_WORKSPACE/bin/fbc -i $GITHUB_WORKSPACE/inc" ./test.sh </dev/null
 
+      - name: Run Exampleageddon
+        env:
+          FB_GFX_DRIVER: none
+          SFXLIB_DRIVER: null
+        run: |
+          python3 build_scripts/exampleageddon-freebasic.py \
+            --fbc "$PWD/bin/fbc.exe" \
+            --target-os windows \
+            --outdir "$PWD/out/exampleageddon" \
+            --include-dir "$PWD/inc" \
+            --jobs "$JOBS" \
+            --compile-timeout 180 \
+            --run-timeout 15 \
+            --fail-on-self-contained
+
       - name: Upload native Windows ARM64 diagnostics
         if: failure()
         uses: actions/upload-artifact@v7
@@ -776,6 +812,7 @@ jobs:
           name: fbc-xl-windows-arm64-native-diagnostics
           if-no-files-found: warn
           path: |
+            out/exampleageddon/
             maketests-log/
             tests/failed-*.log
             tests/log-tests-results-*.log
