@@ -868,11 +868,23 @@ install_image_packages() {
 	done
 }
 
-install_optional_network_packages() {
-	run_limited 300 pkgman install -y "$@" || {
-		echo "WARNING: optional pkgman install failed or timed out: $*" >&2
-		return 0
-	}
+install_required_network_packages() {
+	attempt=1
+	while [ "$attempt" -le 3 ]; do
+		if run_limited 300 pkgman install -y "$@"; then
+			return 0
+		else
+			install_status=$?
+		fi
+
+		echo "WARNING: required pkgman install attempt $attempt failed with status $install_status: $*" >&2
+		cleanup_package_states
+		attempt=$((attempt + 1))
+		[ "$attempt" -le 3 ] && sleep 5
+	done
+
+	echo "ERROR: required Haiku build packages could not be installed: $*" >&2
+	return 1
 }
 
 cleanup_package_states() {
@@ -903,9 +915,9 @@ fi
 cleanup_package_states
 
 if [ "$(getarch 2>/dev/null || true)" = "x86_gcc2" ]; then
-	install_optional_network_packages libffi_x86_devel ncurses6_x86_devel
+	install_required_network_packages libffi_x86_devel ncurses6_x86_devel
 else
-	install_optional_network_packages libffi_devel ncurses6_devel
+	install_required_network_packages libffi_devel ncurses6_devel
 fi
 cleanup_package_states
 find /boot/_packages_ -maxdepth 1 -type f -name '*.hpkg' -exec rm -f {} + 2>/dev/null || true
@@ -1214,11 +1226,23 @@ install_image_packages() {
 	done
 }
 
-install_optional_packages() {
-	pkgman_install "$@" || {
-		echo "WARNING: optional pkgman install failed or timed out: $*" >&2
-		return 0
-	}
+install_required_packages() {
+	attempt=1
+	while [ "$attempt" -le 3 ]; do
+		if pkgman_install "$@"; then
+			return 0
+		else
+			install_status=$?
+		fi
+
+		echo "WARNING: required pkgman install attempt $attempt failed with status $install_status: $*" >&2
+		cleanup_package_states
+		attempt=$((attempt + 1))
+		[ "$attempt" -le 3 ] && sleep 5
+	done
+
+	echo "ERROR: required Haiku test packages could not be installed: $*" >&2
+	return 1
 }
 
 cleanup_package_states() {
@@ -1466,9 +1490,9 @@ fi
 cleanup_package_states
 
 if using_secondary_x86; then
-	run install_optional_packages libffi_x86_devel ncurses6_x86_devel
+	run install_required_packages libffi_x86_devel ncurses6_x86_devel
 else
-	run install_optional_packages libffi_devel ncurses6_devel
+	run install_required_packages libffi_devel ncurses6_devel
 fi
 cleanup_package_states
 find /boot/_packages_ -maxdepth 1 -type f -name '*.hpkg' -exec rm -f {} + 2>/dev/null || true

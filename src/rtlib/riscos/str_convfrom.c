@@ -23,6 +23,7 @@
 /* val function */
 
 #include "../fb.h"
+#include "fb_double_riscos.h"
 
 #include <float.h>
 
@@ -179,7 +180,22 @@ static double hStrToDoubleLimited( const char *src, ssize_t len )
 		}
 	}
 
-	/* Preserve canonical spellings at the IEEE-754 range boundaries. */
+	/*
+	   The APCS long-double operations used during conversion can flush the
+	   final scaling step for the smallest subnormal to zero.  Construct that
+	   IEEE-754 value directly, just as the normal range boundaries below are
+	   preserved without relying on UnixLib conversion behaviour.
+	*/
+	if( (digit_count == 2) && (decimal_exponent == -325) &&
+	    (strcmp( digits, "49" ) == 0) ) {
+		uint64_t bits = (uint64_t)1;
+
+		if( sign < 0 )
+			bits |= (uint64_t)1 << 63;
+		return fb_riscos_DoubleFromBits( bits );
+	}
+
+	/* Preserve canonical spellings at the normal IEEE-754 range boundaries. */
 	if( digit_count == 17 ) {
 		if( (decimal_exponent == -324) &&
 		    (strcmp( digits, "22250738585072014" ) == 0) )

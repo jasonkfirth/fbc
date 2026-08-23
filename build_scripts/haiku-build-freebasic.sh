@@ -1,5 +1,27 @@
 #!/bin/sh
 
+##############################################################################
+# FreeBASIC Haiku native package builder
+##############################################################################
+#
+# Purpose:
+#
+#   Build and optionally install a FreeBASIC package on a Haiku system.
+#
+# Responsibilities:
+#
+#   * prepare the native Haiku compiler dependencies
+#   * bootstrap and rebuild the FreeBASIC compiler and runtime
+#   * create a Haiku package from the completed build
+#
+# This script intentionally does NOT contain:
+#
+#   * QEMU virtual-machine lifecycle management
+#   * host-side Haiku image preparation
+#   * fbctests or Exampleageddon orchestration
+#
+##############################################################################
+
 set -e
 
 ##############################################################################
@@ -90,13 +112,25 @@ install_image_packages() {
 	done
 }
 
-install_optional_network_packages() {
+install_required_network_packages() {
 	[ "${HAIKU_SKIP_NET_DEPS:-0}" = "1" ] && return 0
 
-	run_limited 300 pkgman install -y "$@" || {
-		echo "WARNING: optional pkgman install failed or timed out: $*" >&2
-		return 0
-	}
+	attempt=1
+	while [ "$attempt" -le 3 ]; do
+		if run_limited 300 pkgman install -y "$@"; then
+			return 0
+		else
+			install_status=$?
+		fi
+
+		echo "WARNING: required pkgman install attempt $attempt failed with status $install_status: $*" >&2
+		cleanup_package_states
+		attempt=$((attempt + 1))
+		[ "$attempt" -le 3 ] && sleep 5
+	done
+
+	echo "ERROR: required Haiku build packages could not be installed: $*" >&2
+	return 1
 }
 
 cleanup_package_states() {
@@ -210,9 +244,9 @@ if [ "$NOBUILD" -eq 0 ]; then
 
 		cleanup_package_states
 		if [ "$USE_X86_SECONDARY" -eq 1 ]; then
-			install_optional_network_packages libffi_x86_devel ncurses6_x86_devel
+			install_required_network_packages libffi_x86_devel ncurses6_x86_devel
 		else
-			install_optional_network_packages libffi_devel ncurses6_devel
+			install_required_network_packages libffi_devel ncurses6_devel
 		fi
 		cleanup_package_states
 	fi
@@ -261,6 +295,7 @@ if [ "$NOBUILD" -eq 0 ]; then
 	run_build_arch make -j"$JOBS" HAVE_PREREQS_MK= FBCFLAGS="$PACKAGE_FBCFLAGS"
 
 fi
+
 ##############################################################################
 # Packaging phase
 ##############################################################################
@@ -387,3 +422,7 @@ META
 	echo "Compiler installed at: /boot/system/bin/fbc"
 
 fi
+
+##############################################################################
+# end of haiku-build-freebasic.sh
+##############################################################################
