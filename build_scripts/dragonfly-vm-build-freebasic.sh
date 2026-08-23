@@ -935,8 +935,8 @@ run fbc -mt /work/freebasic-source/tests/file/tcp.bas -x /work/smoke/tcp
 echo "==> running threaded TCP runtime smoke"
 # The burst test performs one guest runtime call per byte.  DragonFly's generic
 # KVM CPU is deliberately conservative, so keep the outer process guard beyond
-# the test's documented five-minute internal deadlock bound.
-run timeout 360 /work/smoke/tcp
+# the test's documented two-minute internal deadlock bound.
+run timeout 180 /work/smoke/tcp
 
 echo "==> compiling gfxlib smoke"
 run fbc /work/smoke/gfx-truecolor.bas -x /work/smoke/gfx-truecolor

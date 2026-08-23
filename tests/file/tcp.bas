@@ -32,13 +32,16 @@
 const TEST_PORT = 19091
 const BURST_PORT = TEST_PORT + 1
 const WILDCARD_PORT = TEST_PORT + 2
-const BURST_BYTES = 65536
+
+' Keep enough one-byte runtime calls to exercise sustained socket traffic
+' without turning the correctness test into a performance test under QEMU.
+const BURST_BYTES = 16384
 const STREAM_WAIT_ITERATIONS = 5000
 
-' The burst performs one runtime call per byte. Allow five minutes of requested
+' The burst performs one runtime call per byte. Allow two minutes of requested
 ' millisecond sleeps so slower kernels and emulators do not create a false
 ' timeout while retaining a finite bound for deadlocks.
-const BURST_WAIT_ITERATIONS = 300000
+const BURST_WAIT_ITERATIONS = 120000
 
 dim shared as integer server_ready
 dim shared as integer server_open_ok

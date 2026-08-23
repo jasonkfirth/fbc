@@ -55,6 +55,7 @@ RESUME=0
 RPCEMU_PID=""
 BOOT_TASK=""
 TEMP_STAGE=""
+BOOT_CONFIGURATION_ATTEMPTED=0
 
 ##############################################################################
 # Helpers
@@ -242,6 +243,7 @@ RUNTIME_HOSTFS="$RPCEMU_SOURCE/hostfs"
 TEST_WORK="$RUNTIME_HOSTFS/FreeBASIC/fbctests/work"
 RUNTIME_LOGS="$RUNTIME_HOSTFS/FreeBASIC/fbctests/logs"
 BOOT_TASK="$RUNTIME_HOSTFS/!Boot/Choices/Boot/Tasks/RunFBTests,feb"
+BOOT_READY_MARKER="$RPCEMU_WORKDIR/hostfs-boot.ready"
 
 [ -x "$FBC" ] || die "host FreeBASIC compiler not found: $FBC"
 [ -f "$ENV_FILE" ] || die "GCCSDK environment not found: $ENV_FILE"
@@ -506,6 +508,15 @@ run_batch() {
     ) &
     RPCEMU_PID="$!"
 
+    if [ ! -f "$BOOT_READY_MARKER" ] &&
+       [ "$BOOT_CONFIGURATION_ATTEMPTED" -eq 0 ]; then
+        "$SCRIPT_DIR/riscos-bootstrap-rpcemu-boot.sh" \
+            --pid "$RPCEMU_PID" \
+            --workdir "$RPCEMU_WORKDIR" \
+            --evidence-dir "$OUTPUT_ROOT/boot-evidence"
+        BOOT_CONFIGURATION_ATTEMPTED=1
+    fi
+
     while [ "$elapsed" -lt "$TIMEOUT_SECONDS" ]; do
         runtime_log="$(find_runtime_log "$batch_id")"
         if [ -n "$runtime_log" ] &&
@@ -533,6 +544,10 @@ run_batch() {
     if ! grep -q '^FreeBASIC fbctests return code: 0$' "$saved_log"; then
         die "$batch_id failed; see $saved_log"
     fi
+
+    # A guest completion log proves both CMOS settings took effect and the
+    # Choices task ran.  Later batches can boot without keyboard automation.
+    : > "$BOOT_READY_MARKER"
 }
 
 ##############################################################################

@@ -61,6 +61,7 @@ RESUME=0
 RPCEMU_PID=""
 BOOT_TASK=""
 TEMP_STAGE=""
+BOOT_CONFIGURATION_ATTEMPTED=0
 
 ##############################################################################
 # Helpers
@@ -254,6 +255,7 @@ RUNTIME_HOSTFS="$RPCEMU_SOURCE/hostfs"
 EXAMPLE_WORK="$RUNTIME_HOSTFS/FreeBASIC/exampleageddon/work"
 RUNTIME_LOGS="$RUNTIME_HOSTFS/FreeBASIC/exampleageddon/logs"
 BOOT_TASK="$RUNTIME_HOSTFS/!Boot/Choices/Boot/Tasks/RunExamples,feb"
+BOOT_READY_MARKER="$RPCEMU_WORKDIR/hostfs-boot.ready"
 
 COMPILE_RESULTS="$OUTPUT_ROOT/results.csv"
 MANIFEST="$OUTPUT_ROOT/riscos-manifest.tsv"
@@ -621,6 +623,15 @@ run_batch() {
     ) &
     RPCEMU_PID="$!"
 
+    if [ ! -f "$BOOT_READY_MARKER" ] &&
+       [ "$BOOT_CONFIGURATION_ATTEMPTED" -eq 0 ]; then
+        "$SCRIPT_DIR/riscos-bootstrap-rpcemu-boot.sh" \
+            --pid "$RPCEMU_PID" \
+            --workdir "$RPCEMU_WORKDIR" \
+            --evidence-dir "$OUTPUT_ROOT/boot-evidence"
+        BOOT_CONFIGURATION_ATTEMPTED=1
+    fi
+
     while [ "$elapsed" -lt "$TIMEOUT_SECONDS" ]; do
         runtime_log="$(find_runtime_log "$batch_id")"
         if [ -n "$runtime_log" ] &&
@@ -646,6 +657,9 @@ run_batch() {
     fi
 
     if [ "$completed" -eq 1 ]; then
+        # The completion marker proves that HostFS booted and launched the
+        # installed Choices task, so later batches need no key automation.
+        : > "$BOOT_READY_MARKER"
         record_batch_results "$batch_id" "$saved_log" "fail"
     else
         echo "RISC OS batch did not complete within $TIMEOUT_SECONDS seconds." >> "$saved_log"
