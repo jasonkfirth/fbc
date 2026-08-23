@@ -402,8 +402,10 @@ if [ "$SKIP_OMA" -eq 0 ]; then
 fi
 
 msg "Windows CE ARM release workflow completed"
-find "$OUTPUT_REAL/packages" -type f \
-	\( -name '*.tar.xz' -o -name '*.zip' -o -name '*.SHA256SUMS' \) \
-	-printf '%P\n' | sort
+if [ -d "$OUTPUT_REAL/packages" ]; then
+	find "$OUTPUT_REAL/packages" -type f \
+		\( -name '*.tar.xz' -o -name '*.zip' -o -name '*.SHA256SUMS' \) \
+		-printf '%P\n' | sort
+fi
 
 # end of build_scripts/debianubuntu-build-freebasic-wince.sh

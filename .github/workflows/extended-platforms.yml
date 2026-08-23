@@ -124,13 +124,23 @@ jobs:
       - name: Emit guest bootstrap sources
         run: |
           set -euo pipefail
+          host_feature_args=(
+            DISABLE_GPM=YesPlease
+            DISABLE_X11=YesPlease
+            DISABLE_OPENGL=YesPlease
+            DISABLE_ALSA=YesPlease
+            DISABLE_PULSE=YesPlease
+          )
           bash build_scripts/ci-seed-source-bootstrap.sh \
             linux-x86_64 linux-x86_64
-          make -j"$JOBS" bootstrap-minimal </dev/null
+          make -j"$JOBS" bootstrap-minimal \
+            "${host_feature_args[@]}" </dev/null
           make -j"$JOBS" compiler \
-            BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
+            BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" \
+            "${host_feature_args[@]}" </dev/null
           make clean-compiler
-          make -j"$JOBS" compiler </dev/null
+          make -j"$JOBS" compiler \
+            "${host_feature_args[@]}" </dev/null
           make -j1 \
             HAVE_PREREQS_MK= \
             BOOT_FBC="$GITHUB_WORKSPACE/bin/fbc" \

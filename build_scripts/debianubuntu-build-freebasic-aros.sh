@@ -934,9 +934,18 @@ build_libffi_target() {
 ##############################################################################
 
 build_host_compiler() {
+    local host_feature_args=(
+        DISABLE_GPM=YesPlease
+        DISABLE_X11=YesPlease
+        DISABLE_OPENGL=YesPlease
+        DISABLE_ALSA=YesPlease
+        DISABLE_PULSE=YesPlease
+    )
+
     if [ ! -x "$ROOT/bin/fbc" ]; then
         msg "building bootstrap host FreeBASIC compiler"
-        run make -C "$ROOT" -j"$JOBS" bootstrap-minimal
+        run make -C "$ROOT" -j"$JOBS" bootstrap-minimal \
+            "${host_feature_args[@]}"
     fi
 
     [ -x "$ROOT/bin/fbc" ] || die "host FreeBASIC compiler is unavailable"
@@ -947,11 +956,14 @@ build_host_compiler() {
     msg "building source-compatible host FreeBASIC compiler"
     run make -C "$ROOT" -j"$JOBS" compiler \
         BUILD_FBC="$ROOT/bin/fbc" \
-        BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__"
+        BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" \
+        "${host_feature_args[@]}"
     run make -C "$ROOT" clean-compiler
 
     msg "refreshing host FreeBASIC compiler"
-    run make -C "$ROOT" -j"$JOBS" compiler BUILD_FBC="$ROOT/bin/fbc"
+    run make -C "$ROOT" -j"$JOBS" compiler \
+        BUILD_FBC="$ROOT/bin/fbc" \
+        "${host_feature_args[@]}"
 }
 
 build_freebasic_target() {
