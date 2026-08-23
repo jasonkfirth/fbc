@@ -1630,6 +1630,12 @@ static unsigned int fb_nuttx_serial_lines_from_native(int native_lines)
 #ifdef TIOCM_CAR
     if ((native_lines & TIOCM_CAR) != 0)
         lines |= FB_COM_LINE_DCD;
+#elif defined(TIOCM_CD)
+    if ((native_lines & TIOCM_CD) != 0)
+        lines |= FB_COM_LINE_DCD;
+#elif defined(TIOCM_DCD)
+    if ((native_lines & TIOCM_DCD) != 0)
+        lines |= FB_COM_LINE_DCD;
 #endif
 #ifdef TIOCM_RI
     if ((native_lines & TIOCM_RI) != 0)
@@ -1686,13 +1692,15 @@ FBCALL int fb_ComGetStatus(int file_number, FB_COM_STATUS *status)
 #if defined(TIOCSBRK) && defined(TIOCCBRK)
     status->capabilities |= FB_COM_CAP_BREAK;
 #endif
-#if defined(TIOCMGET) && defined(TIOCMSET)
+#ifdef TIOCMGET
     native_lines = 0;
 
     if (ioctl(fd, TIOCMGET, (unsigned long)(uintptr_t)&native_lines) == 0) {
         status->lines = fb_nuttx_serial_lines_from_native(native_lines);
-        status->capabilities |= FB_COM_CAP_INPUT_LINES |
-                                FB_COM_CAP_OUTPUT_LINES;
+        status->capabilities |= FB_COM_CAP_INPUT_LINES;
+#if defined(TIOCMSET) && defined(TIOCM_RTS) && defined(TIOCM_DTR)
+        status->capabilities |= FB_COM_CAP_OUTPUT_LINES;
+#endif
     }
 #else
     (void)native_lines;
