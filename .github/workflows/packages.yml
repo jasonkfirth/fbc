@@ -115,6 +115,11 @@ jobs:
             tar xz-utils gzip zip unzip dos2unix \
             jq python3 perl bc
 
+          # Hosted runners already provide Docker Engine and containerd.io.
+          # Installing Ubuntu's docker.io package would replace that runtime
+          # and conflicts with the runner's containerd.io package.
+          docker version
+
       - name: Seed host compiler bootstrap sources
         run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
 
@@ -125,6 +130,7 @@ jobs:
           set -euo pipefail
           bash build_scripts/linux-build-freebasic-matrix.sh \
             --jobs 4 \
+            --skip-host-deps \
             --skip-docs
 
       - name: Upload complete Linux packages
