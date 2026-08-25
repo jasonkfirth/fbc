@@ -129,6 +129,7 @@ Version 1.20.3
 
 [fixed]
 - build/Linux release matrix: use the Docker Engine already installed on GitHub's hosted runners and skip the child scripts' host-dependency installation, avoiding the `docker.io` versus `containerd.io` package conflict before tagged release builds start.
+- build/Linux release matrix: build a current headless host compiler through the compatibility bootstrap before emitting per-architecture package sources, instead of entering the matrix without a runnable `bin/fbc`.
 - compiler/Win32 x86: probe every large stack frame through `___chkstk_ms` before allocating 4096 bytes or more, preventing large local variables from skipping Windows guard-page commitment.
 - compiler/inc/Darwin: model AArch64 `__builtin_va_list` with Darwin's pointer representation and guard the shared POSIX `close` declaration, fixing native compiler bootstrap and programs that include both `unistd.bi` and `sys/socket.bi`.
 - rtlib/RISC OS numeric conversion: build negative decimal scaling from exact powers of ten before taking one reciprocal and construct the minimum binary64 subnormal directly, preventing accumulated rounding error in values such as `9.9e-100` and unintended zero underflow at `4.9e-324`.
