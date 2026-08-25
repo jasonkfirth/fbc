@@ -8,6 +8,7 @@ Version 1.20.4
 Version 1.20.3
 
 [fixed]
+- build/release: refresh APT indexes and retry the complete dependency transaction when a rolling Ubuntu or Debian mirror temporarily advertises package files that its pool has not finished publishing.
 - build/release: replace pre-existing distro QEMU binfmt registrations with a pinned QEMU 10.2.3 installer before emulated package and test matrices run, preventing Ubuntu 26.04 archive extraction from failing when an older interpreter returns ENOSYS for openat2().
 - build/release: split the complete Linux release matrix into independently gated GitHub Actions jobs with bounded parallelism, preserve each row's Docker log as a diagnostic artifact, print the useful tail on failure, and permit Docker-group users to run the Debian/Ubuntu matrix without passwordless sudo.
 - build/release: qualify duplicate package basenames with their matrix path while staging GitHub Release assets so packages from different distributions cannot replace one another.

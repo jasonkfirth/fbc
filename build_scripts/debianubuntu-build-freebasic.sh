@@ -84,6 +84,40 @@ run_root_apt() {
         "$@"
 }
 
+run_root_apt_install() {
+    local attempt=1
+    local max_attempts=3
+    local retry_delay_seconds=15
+
+    while [ "$attempt" -le "$max_attempts" ]; do
+        if run_root_apt install "$@"; then
+            return 0
+        fi
+
+        if [ "$attempt" -eq "$max_attempts" ]; then
+            return 1
+        fi
+
+        #
+        # A rolling mirror can publish a Packages index before every pool
+        # file named by that index reaches the same server.  apt does not
+        # retry a 404 even when Acquire::Retries is set.  Give the mirror a
+        # short synchronization window, refresh the indexes, then repeat the
+        # complete idempotent install transaction.
+        #
+        echo "==> APT dependency installation failed; refreshing package indexes before retry $((attempt + 1)) of $max_attempts"
+        sleep "$retry_delay_seconds"
+
+        if ! run_root_apt update -y; then
+            echo "WARNING: APT index refresh failed before dependency retry" >&2
+        fi
+
+        attempt=$((attempt + 1))
+    done
+
+    return 1
+}
+
 usage() {
     cat <<EOF
 Usage: ./build_scripts/debianubuntu-build-freebasic.sh [options]
@@ -1077,7 +1111,7 @@ install_deps() {
         fi
     fi
 
-    run_root_apt install -y --allow-downgrades --no-install-recommends \
+    run_root_apt_install -y --allow-downgrades --no-install-recommends \
         ca-certificates \
         build-essential gcc g++ binutils make \
         pkgconf rsync \
