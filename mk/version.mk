@@ -1,7 +1,7 @@
 ##############
 # version.mk #
 ##############
-FBVERSION 	:= 1.20.3
+FBVERSION 	:= 1.20.4
 REV		:= 1
 #####################
 # End of version.mk #
