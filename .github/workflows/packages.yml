@@ -123,6 +123,25 @@ jobs:
       - name: Seed host compiler bootstrap sources
         run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
 
+      - name: Build the current host compiler
+        run: |
+          set -euo pipefail
+          host_feature_args=(
+            DISABLE_FFI=YesPlease
+            DISABLE_GPM=YesPlease
+            DISABLE_NCURSES=YesPlease
+            DISABLE_X11=YesPlease
+            DISABLE_OPENGL=YesPlease
+            DISABLE_ALSA=YesPlease
+            DISABLE_PULSE=YesPlease
+          )
+          make -j4 bootstrap-minimal "${host_feature_args[@]}" </dev/null
+          make -j4 compiler \
+            BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" \
+            "${host_feature_args[@]}" </dev/null
+          make clean-compiler
+          make -j4 compiler "${host_feature_args[@]}" </dev/null
+
       - name: Build the complete Linux package matrix
         env:
           JOBS: 4
