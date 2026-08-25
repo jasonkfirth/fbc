@@ -48,6 +48,7 @@ done
 
 cd "$ROOT"
 . "$ROOT/build_scripts/build-success-cleanup.sh"
+. "$ROOT/build_scripts/qemu-binfmt.sh"
 
 #
 # Release worktrees may share a large artifact directory through an out
@@ -823,7 +824,7 @@ execute_plan() {
     need_cmd docker
     need_cmd dpkg
 
-    run_root docker run --rm --privileged tonistiigi/binfmt --install all
+    fb_install_qemu_binfmt
 
     while IFS= read -r selected; do
         [ -n "$selected" ] || continue

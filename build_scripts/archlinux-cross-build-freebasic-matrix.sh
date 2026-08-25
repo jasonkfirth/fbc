@@ -46,6 +46,7 @@ done
 [ -n "$ROOT" ] || { echo "ERROR: could not locate FreeBASIC root"; exit 1; }
 cd "$ROOT"
 . "$ROOT/build_scripts/build-success-cleanup.sh"
+. "$ROOT/build_scripts/qemu-binfmt.sh"
 
 CLEANUP_SUCCESS=0
 CLEANUP_DIRS=("$ROOT/.build-archlinux")
@@ -462,7 +463,7 @@ install_host_deps
 
 need_cmd docker
 need_cmd "$MAKE_CMD"
-run_root docker run --rm --privileged tonistiigi/binfmt --install all
+fb_install_qemu_binfmt
 
 prepare_bootstraps
 
