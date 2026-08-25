@@ -1189,6 +1189,7 @@ package_current_target() {
     local override_file
     local target_standards_version=""
     local unexpected_lintian
+    local build_source_package=0
 
     msg "preparing Debian package build"
 
@@ -1203,6 +1204,10 @@ package_current_target() {
 
     [ -n "$pkgname" ] || die "could not parse package name"
     [ -n "$fullver" ] || die "could not parse package version"
+
+    if [ "$BUILD_ARCH" = "amd64" ] && [ "$CROSS_PACKAGE_BUILD" -eq 0 ]; then
+        build_source_package=1
+    fi
 
     upver="${fullver%%-*}"
     srcdir="${pkgname}-${upver}"
@@ -1350,11 +1355,15 @@ package_current_target() {
 
     origtar="${pkgname}_${upver}.orig.tar.xz"
     rm -f "$origtar"
-    run tar -cJf "$origtar" \
-        --exclude="$srcdir/debian" \
-        "$srcdir"
+    if [ "$build_source_package" -eq 1 ]; then
+        run tar -cJf "$origtar" \
+            --exclude="$srcdir/debian" \
+            "$srcdir"
 
-    assert_orig_tarball_clean "$origtar"
+        assert_orig_tarball_clean "$origtar"
+    else
+        echo "==> source package: skipped for binary architecture $BUILD_ARCH"
+    fi
 
     cd "$srcdir"
 
@@ -1386,6 +1395,9 @@ package_current_target() {
 
     set +e
     local dpkg_args=(-us -uc)
+    if [ "$build_source_package" -eq 0 ]; then
+        dpkg_args=(-b "${dpkg_args[@]}")
+    fi
     if [ "$CROSS_PACKAGE_BUILD" -eq 1 ]; then
         dpkg_args=(-a "$HOST_ARCH" -d "${dpkg_args[@]}")
     elif [ "${FBC_PACKAGE_SKIP_BUILD_DEPENDS:-0}" -eq 1 ]; then
