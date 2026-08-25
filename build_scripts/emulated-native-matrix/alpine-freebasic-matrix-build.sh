@@ -57,6 +57,16 @@ log_has_missing_manifest() {
     grep -Eq 'no matching manifest|manifest unknown|not found: manifest' "$log"
 }
 
+show_failure_log() {
+    local log="$1"
+
+    [ -f "$log" ] || return 0
+
+    echo
+    echo "Last 200 lines of $log:"
+    tail -n 200 "$log" || true
+}
+
 run_root() {
     if [ "$(id -u)" -eq 0 ]; then
         run "$@"
@@ -458,6 +468,7 @@ EOF
 
         echo "BUILD FAILED: ${distro}/${codename} (${arch})"
         echo "Log: $outdir/docker_build.log"
+        show_failure_log "$outdir/docker_build.log"
 
         return 1
     fi

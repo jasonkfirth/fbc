@@ -95,8 +95,48 @@ jobs:
           path: ${{ runner.temp }}/packages/debian/
 
   linux-release-matrix:
-    name: Complete Linux release package matrix
+    name: Linux ${{ matrix.name }} package
     if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) }}
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        include:
+          - { name: ubuntu-resolute-amd64, family: debian, distro: ubuntu, release: resolute, arch: amd64 }
+          - { name: ubuntu-resolute-arm64, family: debian, distro: ubuntu, release: resolute, arch: arm64 }
+          - { name: ubuntu-resolute-armhf, family: debian, distro: ubuntu, release: resolute, arch: armhf }
+          - { name: ubuntu-resolute-ppc64el, family: debian, distro: ubuntu, release: resolute, arch: ppc64el }
+          - { name: ubuntu-resolute-s390x, family: debian, distro: ubuntu, release: resolute, arch: s390x }
+          - { name: ubuntu-resolute-riscv64, family: debian, distro: ubuntu, release: resolute, arch: riscv64 }
+          - { name: debian-trixie-amd64, family: debian, distro: debian, release: trixie, arch: amd64 }
+          - { name: debian-trixie-arm64, family: debian, distro: debian, release: trixie, arch: arm64 }
+          - { name: debian-trixie-armhf, family: debian, distro: debian, release: trixie, arch: armhf }
+          - { name: debian-trixie-ppc64el, family: debian, distro: debian, release: trixie, arch: ppc64el }
+          - { name: debian-trixie-s390x, family: debian, distro: debian, release: trixie, arch: s390x }
+          - { name: debian-trixie-riscv64, family: debian, distro: debian, release: trixie, arch: riscv64 }
+          - { name: debian-trixie-armel, family: debian, distro: debian, release: trixie, arch: armel }
+          - { name: debian-trixie-loong64, family: debian, distro: debian, release: trixie, arch: loong64 }
+          - { name: debian-sid-amd64, family: debian, distro: debian, release: sid, arch: amd64 }
+          - { name: debian-sid-arm64, family: debian, distro: debian, release: sid, arch: arm64 }
+          - { name: debian-sid-armhf, family: debian, distro: debian, release: sid, arch: armhf }
+          - { name: debian-sid-ppc64el, family: debian, distro: debian, release: sid, arch: ppc64el }
+          - { name: debian-sid-s390x, family: debian, distro: debian, release: sid, arch: s390x }
+          - { name: debian-sid-riscv64, family: debian, distro: debian, release: sid, arch: riscv64 }
+          - { name: raspbian-trixie-armhf, family: debian, distro: raspbian, release: trixie, arch: armhf }
+          - { name: alpine-3_24-x86_64, family: alpine, distro: alpine, release: '3.24', arch: x86_64 }
+          - { name: alpine-3_24-aarch64, family: alpine, distro: alpine, release: '3.24', arch: aarch64 }
+          - { name: alpine-3_24-armv7, family: alpine, distro: alpine, release: '3.24', arch: armv7 }
+          - { name: alpine-3_24-ppc64le, family: alpine, distro: alpine, release: '3.24', arch: ppc64le }
+          - { name: alpine-3_24-s390x, family: alpine, distro: alpine, release: '3.24', arch: s390x }
+          - { name: alpine-3_24-riscv64, family: alpine, distro: alpine, release: '3.24', arch: riscv64 }
+          - { name: alpine-edge-x86_64, family: alpine, distro: alpine, release: edge, arch: x86_64 }
+          - { name: alpine-edge-aarch64, family: alpine, distro: alpine, release: edge, arch: aarch64 }
+          - { name: alpine-edge-armv7, family: alpine, distro: alpine, release: edge, arch: armv7 }
+          - { name: alpine-edge-ppc64le, family: alpine, distro: alpine, release: edge, arch: ppc64le }
+          - { name: alpine-edge-s390x, family: alpine, distro: alpine, release: edge, arch: s390x }
+          - { name: alpine-edge-riscv64, family: alpine, distro: alpine, release: edge, arch: riscv64 }
+          - { name: postmarketos-edge-x86_64, family: alpine, distro: postmarketos, release: edge, arch: x86_64 }
+          - { name: postmarketos-edge-aarch64, family: alpine, distro: postmarketos, release: edge, arch: aarch64 }
     runs-on: ubuntu-24.04
     timeout-minutes: 360
 
@@ -142,25 +182,51 @@ jobs:
           make clean-compiler
           make -j4 compiler "${host_feature_args[@]}" </dev/null
 
-      - name: Build the complete Linux package matrix
+      - name: Build Linux package row
         env:
+          MATRIX_ARCH: ${{ matrix.arch }}
+          MATRIX_DISTRO: ${{ matrix.distro }}
+          MATRIX_FAMILY: ${{ matrix.family }}
+          MATRIX_RELEASE: ${{ matrix.release }}
           JOBS: 4
         run: |
           set -euo pipefail
-          bash build_scripts/linux-build-freebasic-matrix.sh \
-            --jobs 4 \
-            --skip-host-deps \
-            --skip-docs
+          if [[ "$MATRIX_FAMILY" == "debian" ]]; then
+            bash build_scripts/debianubuntu-build-freebasic-matrix.sh \
+              --distro "$MATRIX_DISTRO" \
+              --release "$MATRIX_RELEASE" \
+              --arch "$MATRIX_ARCH" \
+              --jobs 4 \
+              --skip-host-deps
+          else
+            bash build_scripts/alpine-freebasic-matrix-build.sh \
+              --distro "$MATRIX_DISTRO" \
+              --release "$MATRIX_RELEASE" \
+              --arch "$MATRIX_ARCH" \
+              --jobs 4 \
+              --skip-host-deps
+          fi
 
-      - name: Upload complete Linux packages
+      - name: Upload Linux package row
         uses: actions/upload-artifact@v7
         with:
-          name: fbc-xl-packages-linux-matrix
+          name: fbc-xl-linux-package-${{ matrix.name }}
           if-no-files-found: error
           retention-days: 30
           path: |
             out/linux/
             out/raspbian/
+
+      - name: Upload Linux row diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-linux-diagnostic-${{ matrix.name }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            out/linux/**/docker_build.log
+            out/raspbian/**/docker_build.log
 
   windows:
     name: Windows package matrix
@@ -309,7 +375,8 @@ jobs:
       - name: Download Linux package matrix
         uses: actions/download-artifact@v8
         with:
-          name: fbc-xl-packages-linux-matrix
+          pattern: fbc-xl-linux-package-*
+          merge-multiple: true
           path: release-assets/linux-matrix
 
       - name: Download Windows packages
@@ -343,7 +410,7 @@ jobs:
               --generate-notes
           fi
 
-          mapfile -d '' assets < <(
+          mapfile -d '' source_assets < <(
             find release-assets -type f \( \
               -name '*.deb' -o \
               -name '*.rpm' -o \
@@ -354,10 +421,41 @@ jobs:
               -name '*-setup.exe' \
             \) -print0
           )
-          [ "${#assets[@]}" -gt 0 ] || {
+          [ "${#source_assets[@]}" -gt 0 ] || {
             echo "ERROR: no package files were downloaded" >&2
             exit 1
           }
+
+          # GitHub Release assets share one flat namespace. Keep familiar
+          # package names when they are unique, and qualify only duplicate
+          # basenames with their matrix path so no distro replaces another.
+          declare -A asset_name_counts=()
+          for asset in "${source_assets[@]}"; do
+            name="${asset##*/}"
+            count="${asset_name_counts[$name]:-0}"
+            asset_name_counts["$name"]=$((count + 1))
+          done
+
+          mkdir -p release-upload
+          for asset in "${source_assets[@]}"; do
+            name="${asset##*/}"
+            upload_name="$name"
+
+            if (( asset_name_counts["$name"] > 1 )); then
+              relative="${asset#release-assets/}"
+              qualifier="${relative%/*}"
+              qualifier="${qualifier//\//-}"
+              upload_name="${qualifier}-${name}"
+            fi
+
+            [ ! -e "release-upload/$upload_name" ] || {
+              echo "ERROR: release asset name collision: $upload_name" >&2
+              exit 1
+            }
+            cp -- "$asset" "release-upload/$upload_name"
+          done
+
+          mapfile -d '' assets < <(find release-upload -maxdepth 1 -type f -print0)
 
           gh release upload "$tag" "${assets[@]}" --clobber
 
