@@ -23,6 +23,7 @@ done
 [ -n "$ROOT" ] || { echo "ERROR: could not locate FreeBASIC root"; exit 1; }
 
 cd "$ROOT"
+. "$ROOT/build_scripts/qemu-binfmt.sh"
 
 ##############################################################################
 # Helpers
@@ -532,7 +533,7 @@ fi
 install_host_deps
 
 need_cmd docker
-run_root docker run --rm --privileged tonistiigi/binfmt --install all
+fb_install_qemu_binfmt
 
 ##############################################################################
 # Test execution

@@ -24,6 +24,7 @@ done
 
 cd "$ROOT"
 . "$ROOT/build_scripts/build-success-cleanup.sh"
+. "$ROOT/build_scripts/qemu-binfmt.sh"
 
 CLEANUP_SUCCESS=0
 CLEANUP_DIRS=(
@@ -614,7 +615,7 @@ need_cmd tar
 need_cmd rsync
 need_cmd "$MAKE_CMD"
 
-run_root docker run --rm --privileged tonistiigi/binfmt --install all
+fb_install_qemu_binfmt
 
 mkdir -p out/linux out/raspbian
 HOST_PLATFORM="$(host_docker_platform)"
