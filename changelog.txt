@@ -7,6 +7,10 @@ Version 1.20.4
 
 Version 1.20.3
 
+[fixed]
+- build/release: split the complete Linux release matrix into independently gated GitHub Actions jobs with bounded parallelism, preserve each row's Docker log as a diagnostic artifact, print the useful tail on failure, and permit Docker-group users to run the Debian/Ubuntu matrix without passwordless sudo.
+- build/release: qualify duplicate package basenames with their matrix path while staging GitHub Release assets so packages from different distributions cannot replace one another.
+
 [changed]
 - examples/Cairo: use cairo_format_stride_for_width() when wrapping FreeBASIC screen buffers, so the examples follow Cairo's format-specific row-stride requirements.
 - tests/C++/Darwin: link the C++ interop tests with Apple's c++ runtime instead of the unavailable stdc++ name.

@@ -60,8 +60,20 @@ log_has_missing_manifest() {
     grep -Eq 'no matching manifest|manifest unknown|not found: manifest' "$log"
 }
 
+show_failure_log() {
+    local log="$1"
+
+    [ -f "$log" ] || return 0
+
+    echo
+    echo "Last 200 lines of $log:"
+    tail -n 200 "$log" || true
+}
+
 run_root() {
     if [ "$(id -u)" -eq 0 ]; then
+        run "$@"
+    elif [ "${1:-}" = "docker" ] && docker ps >/dev/null 2>&1; then
         run "$@"
     elif command -v sudo >/dev/null 2>&1; then
         run sudo "$@"
@@ -76,6 +88,7 @@ Usage: ./build_scripts/debianubuntu-build-freebasic-matrix.sh [options]
 
 Options:
   --distro NAME     Limit the matrix to one distro family (debian, ubuntu, raspbian)
+  --release NAME    Limit the matrix to one distro release or codename
   --arch ARCH       Limit the matrix to one Debian-style CPU arch (amd64, arm64, ...)
   --jobs N          Maximum make jobs for native Docker builds
   --keep-going      Continue after per-entry failures
@@ -97,6 +110,7 @@ EOF
 ##############################################################################
 
 DISTRO_FILTER=""
+RELEASE_FILTER=""
 ARCH_FILTER=""
 KEEP_GOING=0
 SKIP_HOST_DEPS=0
@@ -114,6 +128,7 @@ fi
 while [ $# -gt 0 ]; do
     case "$1" in
         --distro) DISTRO_FILTER="$2"; shift 2 ;;
+        --release) RELEASE_FILTER="$2"; shift 2 ;;
         --arch) ARCH_FILTER="$2"; shift 2 ;;
         --jobs) MAKE_JOBS="$2"; shift 2 ;;
         --serial) shift ;;
@@ -442,6 +457,9 @@ EOF
         if [ -n "$DISTRO_FILTER" ] && [ "$DISTRO_FILTER" != "$distro" ]; then
             continue
         fi
+        if [ -n "$RELEASE_FILTER" ] && [ "$RELEASE_FILTER" != "$codename" ] && [ "$RELEASE_FILTER" != "$tag" ]; then
+            continue
+        fi
 
         while IFS= read -r arch; do
             if [ -n "$ARCH_FILTER" ] && [ "$ARCH_FILTER" != "$arch" ]; then
@@ -577,6 +595,9 @@ EOF
         if [ -n "$DISTRO_FILTER" ] && [ "$DISTRO_FILTER" != "$distro" ]; then
             continue
         fi
+        if [ -n "$RELEASE_FILTER" ] && [ "$RELEASE_FILTER" != "$codename" ] && [ "$RELEASE_FILTER" != "$tag" ]; then
+            continue
+        fi
         echo "${distro}|${image}|${tag}|${codename}|${script_name}"
     done
     exit 0
@@ -675,6 +696,10 @@ EOF
         return 0
     fi
 
+    if [ -n "$RELEASE_FILTER" ] && [ "$RELEASE_FILTER" != "$codename" ] && [ "$RELEASE_FILTER" != "$tag" ]; then
+        return 0
+    fi
+
     if [ -n "$ARCH_FILTER" ] && [ "$ARCH_FILTER" != "$arch" ]; then
         return 0
     fi
@@ -753,6 +778,7 @@ EOF
 
         echo "BUILD FAILED: ${distro}/${codename} (${arch})"
         echo "Log: $outdir/docker_build.log"
+        show_failure_log "$outdir/docker_build.log"
 
         return 1
     fi
@@ -773,6 +799,10 @@ $entry
 EOF
 
     if [ -n "$DISTRO_FILTER" ] && [ "$DISTRO_FILTER" != "$distro" ]; then
+        return 1
+    fi
+
+    if [ -n "$RELEASE_FILTER" ] && [ "$RELEASE_FILTER" != "$codename" ] && [ "$RELEASE_FILTER" != "$tag" ]; then
         return 1
     fi
 
