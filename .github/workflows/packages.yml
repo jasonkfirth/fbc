@@ -192,14 +192,6 @@ jobs:
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-libffi
 
-      - name: Install the Windows Wii toolchain
-        id: wii_toolchain
-        # The official devkitPro package service rejects some GitHub runner
-        # addresses. Branch CI can still qualify every independent package,
-        # but a tagged release must never omit its advertised Wii package.
-        continue-on-error: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        run: bash build_scripts/ci-install-windows-devkitpro.sh
-
       - name: Seed Windows package bootstrap sources
         run: |
           bash build_scripts/ci-seed-source-bootstrap.sh win32 win64
@@ -213,17 +205,15 @@ jobs:
           make clean-compiler
           make -j"$(nproc)" compiler </dev/null
 
-      - name: Build Windows, Android, JavaScript, Wii, Xbox, and DOS packages
+      - name: Build Windows, Android, JavaScript, Xbox, and DOS packages
         env:
           JOBS: 4
           HOST_FBC_ROOT: ${{ github.workspace }}
         run: |
-          matrix_args=()
-          if [ "${{ steps.wii_toolchain.outcome }}" != success ]; then
-            echo "::warning::The official devkitPro service rejected this runner; omitting only the Wii package."
-            matrix_args+=(--no-wii)
-          fi
-          bash build_scripts/msys2-build-freebasic-matrix.sh "${matrix_args[@]}"
+          # devkitPro asks CI users to consume its Docker images instead of
+          # synchronizing the pacman repositories. The tagged Linux matrix
+          # builds freebasic-wii from the pinned official devkitPPC image.
+          bash build_scripts/msys2-build-freebasic-matrix.sh --no-wii
 
       - name: Upload Windows packages
         uses: actions/upload-artifact@v7
