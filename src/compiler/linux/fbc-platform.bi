@@ -13,12 +13,13 @@
 ''     - add Linux gfx and sound dependencies present in the target sysroot
 ''     - choose ncurses or tinfo for the runtime library dependency
 ''     - add Linux default system libraries
+''     - select explicit FPU baselines for 32-bit ARM floating-point targets
 ''
 '' This file intentionally does NOT contain:
 ''
 ''     - generic linker command construction
 ''     - command-line option parsing
-''     - Linux ABI or code generation rules
+''     - generic CPU or code generation rules
 ''
 
 #ifndef __FBC_LINUX_PLATFORM_BI__
@@ -26,6 +27,38 @@
 
 private function fbcLinuxPlatformIsSelected( ) as integer
 	function = (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_LINUX)
+end function
+
+private function fbcLinuxPlatformAddCCompilerCpuOptions _
+	( _
+		byref ccline as string _
+	) as integer
+
+	if( fbcLinuxPlatformIsSelected( ) = FALSE ) then
+		return FALSE
+	end if
+
+	'' Preserve -arch native for local tuning instead of replacing it with the
+	'' reusable package baseline selected when this compiler was built.
+	if( fbc.cputype_is_native ) then
+		return FALSE
+	end if
+
+	select case as const fbGetOption( FB_COMPOPT_CPUTYPE )
+	case FB_CPUTYPE_ARMV6_FP
+		'' ARMv6 hard-float systems such as the original Raspberry Pi provide
+		'' VFPv2.  Recent GCC versions no longer infer that FPU from -march.
+		ccline += "-march=armv6 -mfpu=vfp "
+		return TRUE
+
+	case FB_CPUTYPE_ARMV7A_FP
+		'' Debian's armhf baseline is ARMv7-A with the 16-register VFPv3
+		'' profile.  Naming it explicitly keeps GCC's hard-float ABI valid.
+		ccline += "-march=armv7-a -mfpu=vfpv3-d16 "
+		return TRUE
+	end select
+
+	function = FALSE
 end function
 
 private function fbcLinuxPlatformHasLibrary( byval libname as zstring ptr ) as integer
