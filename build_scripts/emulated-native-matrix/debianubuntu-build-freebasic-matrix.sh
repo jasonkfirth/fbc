@@ -407,6 +407,17 @@ make_jobs_for_platform() {
     fi
 }
 
+platform_needs_inode_safe_buildroot() {
+    case "$1" in
+        linux/386|linux/arm/v5|linux/arm/v6|linux/arm/v7)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 target_arches() {
     local distro="$1"
     local codename="$2"
@@ -687,6 +698,7 @@ build_one() {
     local platform
     local outdir
     local container_outdir
+    local container_buildroot
     local arm_arch
     local build_jobs
     local android_arg
@@ -716,6 +728,7 @@ EOF
     build_jobs="$(make_jobs_for_platform "$platform" "$HOST_PLATFORM")"
     outdir="$(host_outdir_for_target "$distro" "$codename" "$arch")"
     container_outdir="$(container_outdir_for_target "$distro" "$codename" "$arch")"
+    container_buildroot="/work/.build-debianubuntu/${distro}/${codename}/${arch}"
     arm_arch="$(arm_arch_for_target "$distro" "$arch")"
     android_arg=""
     if [ "$NO_ANDROID" -eq 1 ] || ! android_supported_for_target "$distro" "$arch"; then
@@ -730,6 +743,19 @@ EOF
         if [ "$XBOX_NXDK_NEEDS_MOUNT" -eq 1 ]; then
             docker_extra_mounts+=(-v "$XBOX_NXDK_HOST:$XBOX_NXDK_CONTAINER")
         fi
+    fi
+
+    if platform_needs_inode_safe_buildroot "$platform"; then
+        #
+        # GitHub's 64-bit bind-mounted workspace can expose inode values that
+        # do not fit in the metadata types used by 32-bit guest tools.  Keep
+        # the disposable build tree on tmpfs so recursive dpkg and debhelper
+        # operations cannot fail with EOVERFLOW.  Source inputs and completed
+        # package output remain on /work and survive the container.
+        #
+        docker_extra_mounts+=(
+            --tmpfs "${container_buildroot}:rw,exec,size=4g"
+        )
     fi
 
     mkdir -p "$outdir"
@@ -769,7 +795,7 @@ EOF
             -e FBC_PACKAGE_CODENAME="$codename" \
             -e FBC_PACKAGE_OUTDIR="$container_outdir" \
             -e FBC_PACKAGE_ARM_ARCH="$arm_arch" \
-            -e BUILDROOT="/work/.build-debianubuntu/${distro}/${codename}/${arch}" \
+            -e BUILDROOT="$container_buildroot" \
             -e JOBS="$build_jobs" \
             -v "$ROOT:/work" \
             "${docker_extra_mounts[@]}" \

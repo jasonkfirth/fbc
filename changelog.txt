@@ -1,6 +1,7 @@
 Version 1.20.3
 
 [fixed]
+- build/release: place emulated 32-bit Debian package workspaces on an inode-safe tmpfs, preventing ARMHF, ARMEL, and Raspbian debhelper metadata walks from failing with `Value too large for defined data type` on 64-bit GitHub runner filesystems.
 - compiler/Linux ARM: retain explicit VFP baselines when the `armv6+fp` and `armv7-a+fp` target names are translated for GCC, preventing armhf package builds from combining the hard-float ABI with an FPU-less architecture selection.
 - build/release: allow two parallel compiler processes for emulated RISC-V package rows, keeping Ubuntu riscv64 package construction and strict Lintian validation within GitHub's six-hour hosted-job limit.
 - build/release: create Debian-format source packages only in native amd64 rows and use binary-only builds elsewhere, avoiding duplicate source artifacts and a 32-bit QEMU recursive-chmod metadata overflow during dpkg-source extraction.
