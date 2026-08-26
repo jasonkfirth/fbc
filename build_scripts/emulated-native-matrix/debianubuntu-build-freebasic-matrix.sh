@@ -396,6 +396,12 @@ make_jobs_for_platform() {
 
     if [ "$platform" = "$host_platform" ]; then
         echo "$MAKE_JOBS"
+    elif [ "$platform" = "linux/riscv64" ] && [ "$MAKE_JOBS" -gt 1 ]; then
+        # A serial Ubuntu riscv64 package build reaches the hosted runner's
+        # six-hour job limit during Lintian.  Two independent compiler
+        # processes keep the row below that limit without exposing the full
+        # host parallelism to QEMU user-mode emulation.
+        echo 2
     else
         echo 1
     fi

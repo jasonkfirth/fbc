@@ -8,6 +8,8 @@ Version 1.20.4
 Version 1.20.3
 
 [fixed]
+- compiler/Linux ARM: retain explicit VFP baselines when the `armv6+fp` and `armv7-a+fp` target names are translated for GCC, preventing armhf package builds from combining the hard-float ABI with an FPU-less architecture selection.
+- build/release: allow two parallel compiler processes for emulated RISC-V package rows, keeping Ubuntu riscv64 package construction and strict Lintian validation within GitHub's six-hour hosted-job limit.
 - build/release: create Debian-format source packages only in native amd64 rows and use binary-only builds elsewhere, avoiding duplicate source artifacts and a 32-bit QEMU recursive-chmod metadata overflow during dpkg-source extraction.
 - build/release: refresh APT indexes and retry the complete dependency transaction when a rolling Ubuntu or Debian mirror temporarily advertises package files that its pool has not finished publishing.
 - build/release: replace pre-existing distro QEMU binfmt registrations with a pinned QEMU 10.2.3 installer before emulated package and test matrices run, preventing Ubuntu 26.04 archive extraction from failing when an older interpreter returns ENOSYS for openat2().

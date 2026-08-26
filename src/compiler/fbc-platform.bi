@@ -300,6 +300,8 @@ private function fbcPlatformAddCCompilerCpuOptions _
 	) as integer
 
 	select case as const fbGetOption( FB_COMPOPT_TARGET )
+	case FB_COMPTARGET_LINUX
+		return fbcLinuxPlatformAddCCompilerCpuOptions( ccline )
 	case FB_COMPTARGET_AROS
 		return fbcArosPlatformAddCCompilerCpuOptions( ccline )
 	case FB_COMPTARGET_WINCE
