@@ -88,6 +88,8 @@ mapfile -d '' SOURCE_ASSETS < <(
         -name '*.deb' -o \
         -name '*.rpm' -o \
         -name '*.apk' -o \
+        -name '*.hpkg' -o \
+        -name '*.tgz' -o \
         -name '*.zip' -o \
         -name '*.tar.xz' -o \
         -name '*.pkg' -o \

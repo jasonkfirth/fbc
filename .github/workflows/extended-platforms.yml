@@ -11,6 +11,7 @@
 # Responsibilities:
 #
 #     * build and test Haiku and the supported BSD guests under QEMU
+#     * provide their installable packages to version-tagged release workflows
 #     * run fbctests and Exampleageddon on AROS and RISC OS emulators
 #     * compile fbctests and Exampleageddon for Windows CE without a licensed ROM
 #     * retain platform reports and failure evidence as workflow artifacts
@@ -24,6 +25,18 @@
 name: FreeBASIC XL extended platforms
 
 on:
+  workflow_call:
+    inputs:
+      package_guests_only:
+        description: Build only installable BSD and Haiku guest packages
+        required: false
+        default: false
+        type: boolean
+      source_ref:
+        description: Optional source ref to build instead of the caller ref
+        required: false
+        default: ''
+        type: string
   push:
     branches:
       - master
@@ -34,6 +47,17 @@ on:
     # Exercise the external OS images even during quiet development periods.
     - cron: '23 5 * * 1'
   workflow_dispatch:
+    inputs:
+      package_guests_only:
+        description: Build only installable BSD and Haiku guest packages
+        required: true
+        default: false
+        type: boolean
+      source_ref:
+        description: Optional source ref to build instead of the selected workflow ref
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: fbc-xl-extended-${{ github.workflow }}-${{ github.ref }}
@@ -61,6 +85,16 @@ jobs:
             bootstrap_target: haiku-x86_64
             bootstrap_dir: haiku-amd64
             archive_path: out/haiku/x86_64
+            cache_path: out/haiku-vm/cache
+            log_path: out/haiku-vm/logs
+          - id: haiku-x86
+            name: Haiku x86
+            script: build_scripts/haiku-vm-build-freebasic.sh
+            guest_arch: x86
+            qemu_cpu: host
+            bootstrap_target: haiku-x86
+            bootstrap_dir: haiku-i386
+            archive_path: out/haiku/x86
             cache_path: out/haiku-vm/cache
             log_path: out/haiku-vm/logs
           - id: freebsd-amd64
@@ -105,6 +139,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_ref || github.ref }}
 
       - name: Install VM host dependencies
         run: |
@@ -158,10 +194,27 @@ jobs:
 
       - name: Build and qualify guest
         env:
+          GUEST_ARCH: ${{ matrix.guest_arch }}
           QEMU_CPU: ${{ matrix.qemu_cpu }}
         run: |
           set -euo pipefail
-          bash "${{ matrix.script }}" --jobs "$JOBS"
+          guest_args=()
+          if [ -n "$GUEST_ARCH" ]; then
+            guest_args+=(--arch "$GUEST_ARCH")
+          fi
+          bash "${{ matrix.script }}" --jobs "$JOBS" "${guest_args[@]}"
+
+      - name: Upload installable guest package
+        if: ${{ success() && inputs.package_guests_only }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-platform-package-${{ matrix.id }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            ${{ matrix.archive_path }}/freebasic*.hpkg
+            ${{ matrix.archive_path }}/freebasic-*.pkg
+            ${{ matrix.archive_path }}/freebasic-*.tgz
 
       - name: Upload guest qualification evidence
         if: always()
@@ -176,12 +229,15 @@ jobs:
 
   aros:
     name: AROS x86_64 (fbctests + Exampleageddon)
+    if: ${{ !inputs.package_guests_only }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_ref || github.ref }}
 
       - name: Seed host bootstrap sources
         run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
@@ -222,12 +278,15 @@ jobs:
 
   riscos:
     name: RISC OS ARM (fbctests + Exampleageddon)
+    if: ${{ !inputs.package_guests_only }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_ref || github.ref }}
 
       - name: Install headless display support
         run: |
@@ -273,12 +332,15 @@ jobs:
 
   wince:
     name: Windows CE ARM ROM-free compile qualification
+    if: ${{ !inputs.package_guests_only }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_ref || github.ref }}
 
       - name: Install Windows CE host dependencies
         run: |

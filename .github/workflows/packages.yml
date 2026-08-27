@@ -11,7 +11,7 @@
 #
 # Responsibilities:
 #
-#     * build Debian/Ubuntu, Windows, macOS, and MIPS package sets
+#     * build Linux, Windows, macOS, BSD, and Haiku package sets
 #     * retain successful package output for manual download
 #     * attach package files to version-tagged GitHub Releases
 #
@@ -228,6 +228,15 @@ jobs:
             out/linux/**/docker_build.log
             out/raspbian/**/docker_build.log
 
+  extended-platform-packages:
+    name: BSD and Haiku package matrix
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+    uses: ./.github/workflows/extended-platforms.yml
+    with:
+      package_guests_only: true
+
   windows:
     name: Windows package matrix
     runs-on: windows-latest
@@ -320,52 +329,14 @@ jobs:
           retention-days: 30
           path: ${{ runner.temp }}/packages/macos/
 
-  mips:
-    name: MIPS package matrix
-    runs-on: ubuntu-24.04
-    timeout-minutes: 240
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Install MIPS package workflow dependencies
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends rsync curl
-          docker version
-
-      - name: Seed host bootstrap sources
-        run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
-
-      - name: Build and qualify MIPS packages
-        env:
-          JOBS: 2
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/mips/output/work"
-          bash build_scripts/debianubuntu-build-freebasic-mips.sh \
-            --jobs 2 \
-            --work-dir "$RUNNER_TEMP/mips/output/work" \
-            --out-dir "$RUNNER_TEMP/mips/output"
-
-      - name: Upload MIPS packages
-        uses: actions/upload-artifact@v7
-        with:
-          name: fbc-xl-packages-mips
-          if-no-files-found: error
-          retention-days: 30
-          path: ${{ runner.temp }}/mips/output/
-
   publish-release:
     name: Publish tagged release packages
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
       - linux-release-matrix
+      - extended-platform-packages
       - windows
       - macos
-      - mips
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     permissions:
@@ -388,17 +359,17 @@ jobs:
           name: fbc-xl-packages-windows
           path: release-assets/windows
 
+      - name: Download BSD and Haiku packages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: fbc-xl-platform-package-*
+          path: release-assets/extended-platforms
+
       - name: Download macOS packages
         uses: actions/download-artifact@v8
         with:
           name: fbc-xl-packages-macos
           path: release-assets/macos
-
-      - name: Download MIPS packages
-        uses: actions/download-artifact@v8
-        with:
-          name: fbc-xl-packages-mips
-          path: release-assets/mips
 
       - name: Create or update GitHub Release
         env:
