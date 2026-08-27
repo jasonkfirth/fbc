@@ -87,16 +87,6 @@ jobs:
             archive_path: out/haiku/x86_64
             cache_path: out/haiku-vm/cache
             log_path: out/haiku-vm/logs
-          - id: haiku-x86
-            name: Haiku x86
-            script: build_scripts/haiku-vm-build-freebasic.sh
-            guest_arch: x86
-            qemu_cpu: host
-            bootstrap_target: haiku-x86
-            bootstrap_dir: haiku-i386
-            archive_path: out/haiku/x86
-            cache_path: out/haiku-vm/cache
-            log_path: out/haiku-vm/logs
           - id: freebsd-amd64
             name: FreeBSD amd64
             script: build_scripts/freebsd-vm-build-freebasic.sh
@@ -194,15 +184,10 @@ jobs:
 
       - name: Build and qualify guest
         env:
-          GUEST_ARCH: ${{ matrix.guest_arch }}
           QEMU_CPU: ${{ matrix.qemu_cpu }}
         run: |
           set -euo pipefail
-          guest_args=()
-          if [ -n "$GUEST_ARCH" ]; then
-            guest_args+=(--arch "$GUEST_ARCH")
-          fi
-          bash "${{ matrix.script }}" --jobs "$JOBS" "${guest_args[@]}"
+          bash "${{ matrix.script }}" --jobs "$JOBS"
 
       - name: Upload installable guest package
         if: ${{ success() && inputs.package_guests_only }}

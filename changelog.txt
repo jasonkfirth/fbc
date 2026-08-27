@@ -1,7 +1,7 @@
 Version 1.20.4
 
 [changed]
-- build/release: run the qualified FreeBSD, OpenBSD, NetBSD, DragonFlyBSD, and Haiku x86_64/x86 VM package builders as part of tagged GitHub releases, publish their native package formats with the main asset set, and allow those guest packages to be rebuilt and attached independently to an existing release.
+- build/release: run the qualified FreeBSD, OpenBSD, NetBSD, DragonFlyBSD, and Haiku x86_64 VM package builders as part of tagged GitHub releases, publish their native package formats with the main asset set, and allow those guest packages to be rebuilt and attached independently to an existing release.
 - build/release: stop treating the Linux MIPS cross-compiler archives as complete platform packages or publishing them with tagged releases; MIPS compiler and runtime qualification remains in the test workflows.
 
 [fixed]
