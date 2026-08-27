@@ -1,0 +1,96 @@
+# Project: FreeBASIC XL
+# ---------------------
+#
+# File: .github/workflows/recover-release.yml
+#
+# Purpose:
+#
+#     Publish package artifacts from a completed GitHub Actions run without
+#     rebuilding the release matrix.
+#
+# Responsibilities:
+#
+#     * download package artifacts from an explicitly selected workflow run
+#     * publish those artifacts to an explicitly selected GitHub Release tag
+#
+# This file intentionally does NOT contain:
+#
+#     * compiler or package build jobs
+#     * automatic tag-trigger policy
+#     * artifact selection outside the FreeBASIC XL package set
+
+name: FreeBASIC XL release recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Completed package workflow run ID
+        required: true
+        type: string
+      release_tag:
+        description: Existing repository tag to publish
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish-release:
+    name: Publish packages from completed run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout publisher
+        uses: actions/checkout@v7
+
+      - name: Download Linux package matrix
+        uses: actions/download-artifact@v8
+        with:
+          pattern: fbc-xl-linux-package-*
+          merge-multiple: true
+          path: release-assets/linux-matrix
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+
+      - name: Download Windows packages
+        uses: actions/download-artifact@v8
+        with:
+          name: fbc-xl-packages-windows
+          path: release-assets/windows
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+
+      - name: Download macOS packages
+        uses: actions/download-artifact@v8
+        with:
+          name: fbc-xl-packages-macos
+          path: release-assets/macos
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+
+      - name: Download MIPS packages
+        uses: actions/download-artifact@v8
+        with:
+          name: fbc-xl-packages-mips
+          path: release-assets/mips
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bash build_scripts/publish-github-release.sh \
+            "${{ inputs.release_tag }}" \
+            release-assets \
+            "$GITHUB_REPOSITORY"
+
+# end of .github/workflows/recover-release.yml

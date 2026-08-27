@@ -3,6 +3,7 @@ Version 1.20.4
 [changed]
 
 [fixed]
+- build/release: make GitHub Release publication independent of an implicit checkout, stage multi-gigabyte uploads with hard links, allow enough time for the complete asset set, and provide a publish-only recovery workflow that reuses artifacts from a completed package run.
 
 
 Version 1.20.3

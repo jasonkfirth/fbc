@@ -367,11 +367,14 @@ jobs:
       - macos
       - mips
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 120
     permissions:
       contents: write
 
     steps:
+      - name: Checkout publisher
+        uses: actions/checkout@v7
+
       - name: Download Linux package matrix
         uses: actions/download-artifact@v8
         with:
@@ -401,62 +404,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
-          tag="$GITHUB_REF_NAME"
-
-          if ! gh release view "$tag" >/dev/null 2>&1; then
-            gh release create "$tag" \
-              --title "FreeBASIC XL $tag" \
-              --generate-notes
-          fi
-
-          mapfile -d '' source_assets < <(
-            find release-assets -type f \( \
-              -name '*.deb' -o \
-              -name '*.rpm' -o \
-              -name '*.apk' -o \
-              -name '*.zip' -o \
-              -name '*.tar.xz' -o \
-              -name '*.pkg' -o \
-              -name '*-setup.exe' \
-            \) -print0
-          )
-          [ "${#source_assets[@]}" -gt 0 ] || {
-            echo "ERROR: no package files were downloaded" >&2
-            exit 1
-          }
-
-          # GitHub Release assets share one flat namespace. Keep familiar
-          # package names when they are unique, and qualify only duplicate
-          # basenames with their matrix path so no distro replaces another.
-          declare -A asset_name_counts=()
-          for asset in "${source_assets[@]}"; do
-            name="${asset##*/}"
-            count="${asset_name_counts[$name]:-0}"
-            asset_name_counts["$name"]=$((count + 1))
-          done
-
-          mkdir -p release-upload
-          for asset in "${source_assets[@]}"; do
-            name="${asset##*/}"
-            upload_name="$name"
-
-            if (( asset_name_counts["$name"] > 1 )); then
-              relative="${asset#release-assets/}"
-              qualifier="${relative%/*}"
-              qualifier="${qualifier//\//-}"
-              upload_name="${qualifier}-${name}"
-            fi
-
-            [ ! -e "release-upload/$upload_name" ] || {
-              echo "ERROR: release asset name collision: $upload_name" >&2
-              exit 1
-            }
-            cp -- "$asset" "release-upload/$upload_name"
-          done
-
-          mapfile -d '' assets < <(find release-upload -maxdepth 1 -type f -print0)
-
-          gh release upload "$tag" "${assets[@]}" --clobber
+          bash build_scripts/publish-github-release.sh \
+            "$GITHUB_REF_NAME" \
+            release-assets \
+            "$GITHUB_REPOSITORY"
 
 # end of .github/workflows/packages.yml
