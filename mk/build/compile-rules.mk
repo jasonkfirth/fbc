@@ -286,6 +286,25 @@ $(libfbrtmtpicobjdir)/%.o: $(srcdir)/fbrt/%.bas $(LIBFBRT_BI) | $(libfbrtmtpicob
 # gfxlib2 (C sources)
 ##############################################################################
 
+GFXLIB2_ARCH_CFLAGS :=
+GFXLIB2_SIMD_CFLAGS :=
+ifeq ($(TARGET_ARCH),arm)
+  # ARMv6 is still supported and does not have NEON.  ARMv7 kernels are
+  # compiled separately and selected through AT_HWCAP at run time, so generic
+  # gfxlib2 objects retain the package's normal baseline and floating ABI.
+  ifneq ($(filter v7 v8,$(ARM_VER)),)
+GFXLIB2_ARCH_CFLAGS := -DFB_GFX_ARM_NEON
+GFXLIB2_SIMD_CFLAGS := -march=armv7-a -mfpu=neon
+  endif
+endif
+
+GFXLIB2_SIMD_OBJECTS := \
+$(filter %/arm/gfx_simd.o %/aarch64/gfx_simd.o %/x86_64/gfx_simd.o, \
+$(GFX_OBJ) $(GFX_PIC_OBJ) $(GFX_MT_OBJ) $(GFX_MT_PIC_OBJ))
+
+$(GFXLIB2_SIMD_OBJECTS): private GFXLIB2_OBJECT_CFLAGS := \
+$(GFXLIB2_SIMD_CFLAGS)
+
 ifeq ($(TARGET_OS),darwin)
 
 $(libfbgfxobjdir)/darwin/%.o: $(srcdir)/gfxlib2/darwin/%.c $(LIBFBGFX_H) | $(libfbgfxobjdir)
@@ -308,19 +327,19 @@ endif
 
 $(libfbgfxobjdir)/%.o: $(srcdir)/gfxlib2/%.c $(LIBFBGFX_H) | $(libfbgfxobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(GFXLIB2_ARCH_CFLAGS) $(GFXLIB2_OBJECT_CFLAGS) -MMD -MP -c $< -o $@
 
 $(libfbgfxpicobjdir)/%.o: $(srcdir)/gfxlib2/%.c $(LIBFBGFX_H) | $(libfbgfxpicobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) $(GFXLIB2_ARCH_CFLAGS) $(GFXLIB2_OBJECT_CFLAGS) -MMD -MP -c $< -o $@
 
 $(libfbgfxmtobjdir)/%.o: $(srcdir)/gfxlib2/%.c $(LIBFBGFX_H) | $(libfbgfxmtobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MT_CFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MT_CFLAGS) $(GFXLIB2_ARCH_CFLAGS) $(GFXLIB2_OBJECT_CFLAGS) -MMD -MP -c $< -o $@
 
 $(libfbgfxmtpicobjdir)/%.o: $(srcdir)/gfxlib2/%.c $(LIBFBGFX_H) | $(libfbgfxmtpicobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MTPIC_CFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MTPIC_CFLAGS) $(GFXLIB2_ARCH_CFLAGS) $(GFXLIB2_OBJECT_CFLAGS) -MMD -MP -c $< -o $@
 
 ##############################################################################
 # gfxlib2 (C++ sources)
@@ -386,6 +405,36 @@ $(libfbgfx3mtpicobjdir)/%.o: $(srcdir)/gfxlib3/%.c $(LIBFBGFX3_H) | $(libfbgfx3m
 # sfxlib (C sources)
 ##############################################################################
 
+SFXLIB_ARCH_CFLAGS :=
+SFXLIB_NEON_CFLAGS :=
+ifeq ($(TARGET_ARCH),x86)
+SFXLIB_ARCH_CFLAGS := -DFB_SFX_X86_SIMD
+endif
+ifeq ($(TARGET_ARCH),arm)
+  # Keep ordinary sfxlib objects on the selected ARM baseline.  ARMv7 NEON
+  # code is isolated in one object and protected by the runtime HWCAP test.
+  ifneq ($(filter v7 v8,$(ARM_VER)),)
+SFXLIB_ARCH_CFLAGS := -DFB_SFX_ARM_NEON
+SFXLIB_NEON_CFLAGS := -march=armv7-a -mfpu=neon
+  endif
+endif
+
+SFXLIB_NEON_OBJECTS := \
+$(filter %/arm/sfx_simd.o, \
+$(SFX_OBJ) $(SFX_PIC_OBJ) $(SFX_MT_OBJ) $(SFX_MT_PIC_OBJ))
+SFXLIB_MMX_OBJECTS := \
+$(filter %/x86/sfx_mmx.o, \
+$(SFX_OBJ) $(SFX_PIC_OBJ) $(SFX_MT_OBJ) $(SFX_MT_PIC_OBJ))
+SFXLIB_SSE2_OBJECTS := \
+$(filter %/x86/sfx_sse2.o, \
+$(SFX_OBJ) $(SFX_PIC_OBJ) $(SFX_MT_OBJ) $(SFX_MT_PIC_OBJ))
+
+$(SFXLIB_NEON_OBJECTS): private SFXLIB_OBJECT_CFLAGS := \
+$(SFXLIB_NEON_CFLAGS)
+$(SFXLIB_MMX_OBJECTS): private SFXLIB_OBJECT_CFLAGS := \
+-mmmx -msse -mno-sse2
+$(SFXLIB_SSE2_OBJECTS): private SFXLIB_OBJECT_CFLAGS := -msse2
+
 ifeq ($(TARGET_OS),darwin)
 
 $(libsfxobjdir)/darwin/%.o: $(srcdir)/sfxlib/darwin/%.c $(LIBSFX_H) | $(libsfxobjdir)
@@ -408,19 +457,19 @@ endif
 
 $(libsfxobjdir)/%.o: $(srcdir)/sfxlib/%.c $(LIBSFX_H) | $(libsfxobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(SFXLIB_ARCH_CFLAGS) $(SFXLIB_OBJECT_CFLAGS) -MMD -MP -c $< -o $@
 
 $(libsfxpicobjdir)/%.o: $(srcdir)/sfxlib/%.c $(LIBSFX_H) | $(libsfxpicobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) $(SFXLIB_ARCH_CFLAGS) $(SFXLIB_OBJECT_CFLAGS) -MMD -MP -c $< -o $@
 
 $(libsfxmtobjdir)/%.o: $(srcdir)/sfxlib/%.c $(LIBSFX_H) | $(libsfxmtobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MT_CFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MT_CFLAGS) $(SFXLIB_ARCH_CFLAGS) $(SFXLIB_OBJECT_CFLAGS) -MMD -MP -c $< -o $@
 
 $(libsfxmtpicobjdir)/%.o: $(srcdir)/sfxlib/%.c $(LIBSFX_H) | $(libsfxmtpicobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MTPIC_CFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MTPIC_CFLAGS) $(SFXLIB_ARCH_CFLAGS) $(SFXLIB_OBJECT_CFLAGS) -MMD -MP -c $< -o $@
 
 ##############################################################################
 # sfxlib (C++ sources)

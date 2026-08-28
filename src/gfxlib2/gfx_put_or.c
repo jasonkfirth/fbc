@@ -1,6 +1,7 @@
 /* OR drawing method for PUT statement */
 
 #include "fb_gfx.h"
+#include "gfx_simd.h"
 
 #ifdef HOST_X86
 #include "x86/fb_gfx_mmx.h"
@@ -37,22 +38,34 @@ void fb_hPutOrC(unsigned char *src, unsigned char *dest, int w, int h, int src_p
    take care of the synchronization */
 void fb_hPutOr(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param)
 {
-	static PUTTER *all_putters[] = {
+	static PUTTER *c_putters[] = {
 		fb_hPutOrC, fb_hPutOrC, NULL, fb_hPutOrC,
-#ifdef HOST_X86
-		fb_hPutOrMMX, fb_hPutOrMMX, NULL, fb_hPutOrMMX,
-#endif
 	};
+#ifdef FB_GFX_HAS_SIMD
+	static PUTTER *simd_putters[] = {
+		fb_hPutOrSIMD, fb_hPutOrSIMD, NULL, fb_hPutOrSIMD,
+	};
+#endif
+#ifdef HOST_X86
+	static PUTTER *mmx_putters[] = {
+		fb_hPutOrMMX, fb_hPutOrMMX, NULL, fb_hPutOrMMX,
+	};
+#endif
 	PUTTER *putter;
 	FB_GFXCTX *context = fb_hGetContext();
 	
 	if (!context->putter[PUT_MODE_OR]) {
-#ifdef HOST_X86
-		if (__fb_gfx->flags & X86_MMX_ENABLED)
-			context->putter[PUT_MODE_OR] = &all_putters[4];
+#ifdef FB_GFX_HAS_SIMD
+		if (fb_hSimdAvailable())
+			context->putter[PUT_MODE_OR] = simd_putters;
 		else
 #endif
-			context->putter[PUT_MODE_OR] = &all_putters[0];
+#ifdef HOST_X86
+		if (__fb_gfx->flags & X86_MMX_ENABLED)
+			context->putter[PUT_MODE_OR] = mmx_putters;
+		else
+#endif
+			context->putter[PUT_MODE_OR] = c_putters;
 	}
 	putter = context->putter[PUT_MODE_OR][context->target_bpp - 1];
 	

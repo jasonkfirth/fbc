@@ -8,14 +8,16 @@
 ''
 '' Purpose:
 ''
-''     Verify the shared float-to-signed-16 conversion helper used by
-''     platform audio drivers.
+''     Verify the shared PCM conversion helpers used by platform audio
+''     drivers and architecture-specific SIMD backends.
 ''
 '' Responsibilities:
 ''
 ''     - check clipping for values outside the mixer range
 ''     - check the deliberate -1.0 to -32767 mapping
 ''     - check NaN and infinity handling
+''     - compare vector-sized buffers and scalar tails with scalar helpers
+''     - exhaustively verify every signed 16-bit input value
 ''
 '' This file intentionally does NOT contain:
 ''
@@ -30,15 +32,31 @@ declare sub fb_sfxConvertFloatToS16 cdecl alias "fb_sfxConvertFloatToS16" _
 	( _
 		byval src as single ptr, _
 		byval dst as short ptr, _
-		byval samples as integer _
+		byval samples as long _
+	)
+
+declare sub fb_sfxConvertFloatToS32 cdecl alias "fb_sfxConvertFloatToS32" _
+	( _
+		byval src as single ptr, _
+		byval dst as long ptr, _
+		byval samples as long _
 	)
 
 declare sub fb_sfxConvertS16ToFloat cdecl alias "fb_sfxConvertS16ToFloat" _
 	( _
 		byval src as short ptr, _
 		byval dst as single ptr, _
-		byval samples as integer _
+		byval samples as long _
 	)
+
+declare function fb_sfxFloatToS16 cdecl alias "fb_sfxFloatToS16" _
+	( byval value as single ) as short
+
+declare function fb_sfxFloatToS32 cdecl alias "fb_sfxFloatToS32" _
+	( byval value as single ) as long
+
+declare function fb_sfxS16ToFloat cdecl alias "fb_sfxS16ToFloat" _
+	( byval value as short ) as single
 
 function near_equal( byval lhs as single, byval rhs as single ) as integer
 	function = ( abs( lhs - rhs ) < 0.00001f )
@@ -86,5 +104,46 @@ ASSERT( near_equal( restored(1), -32767.0f / 32768.0f ) )
 ASSERT( near_equal( restored(2), 0.0f ) )
 ASSERT( near_equal( restored(3), 32766.0f / 32768.0f ) )
 ASSERT( near_equal( restored(4), 1.0f ) )
+
+const sample_count = 4099
+
+dim source_many(0 to sample_count - 1) as single
+dim pcm16_many(0 to sample_count - 1) as short
+dim pcm32_many(0 to sample_count - 1) as long
+
+for i as integer = 0 to sample_count - 1
+	dim pattern as integer = ((i * 7919) mod 20001) - 10000
+	source_many(i) = csng(pattern) / 4096.0f
+next
+
+source_many(0) = 0.0f / 0.0f
+source_many(1) = 1.0f / 0.0f
+source_many(2) = -1.0f / 0.0f
+source_many(3) = -1.0f
+source_many(4) = 1.0f
+source_many(5) = -0.0f
+
+fb_sfxConvertFloatToS16( @source_many(0), @pcm16_many(0), sample_count )
+fb_sfxConvertFloatToS32( @source_many(0), @pcm32_many(0), sample_count )
+
+for i as integer = 0 to sample_count - 1
+	ASSERT( pcm16_many(i) = fb_sfxFloatToS16(source_many(i)) )
+	ASSERT( pcm32_many(i) = fb_sfxFloatToS32(source_many(i)) )
+next
+
+const pcm_value_count = 65536
+
+dim pcm_all(0 to pcm_value_count - 1) as short
+dim restored_all(0 to pcm_value_count - 1) as single
+
+for i as integer = 0 to pcm_value_count - 1
+	pcm_all(i) = cshort(i - 32768)
+next
+
+fb_sfxConvertS16ToFloat( @pcm_all(0), @restored_all(0), pcm_value_count )
+
+for i as integer = 0 to pcm_value_count - 1
+	ASSERT( restored_all(i) = fb_sfxS16ToFloat(pcm_all(i)) )
+next
 
 '' end of convert-float-s16.bas

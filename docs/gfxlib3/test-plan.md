@@ -311,6 +311,11 @@ pages to BMP, including the public 24-bit override. It reloads each output to
 a 32-bit GPU page and checks palette BGR ordering and true-colour conversion
 through the same backend and Android matrix.
 
+`tests/gfx3/png-screen-smoke.bas` saves and reloads RGBA and indexed Null
+GPU pages. It checks exact alpha, index, palette, and case-insensitive filename
+handling. The unchanged `tests/gfx/png-roundtrip.bas` compiled with `-gfx3`
+adds CPU-image RGB565, forced true-colour, and damaged-CRC coverage.
+
 `tests/gfx3/console-depth-smoke.bas` writes graphical-console cells in 8-bit
 and RGB565 modes. It verifies SCREEN's character result, the packed indexed
 foreground/background attribute, and expanded RGB565 foreground/background
@@ -701,7 +706,7 @@ unless their documented result actually depends on rendered pixels.
 
 The extension has two focused correctness programs:
 
-- `gpu-asset-smoke.bas` creates a small bitmap fixture, loads it with
+- `gpu-asset-smoke.bas` creates small BMP and PNG fixtures, loads both with
   `Gfx3SurfaceLoad`, uses the opaque result as an ordinary PUT source, and
   requires exact POINT results. This detects a hidden GPU-to-CPU-to-GPU path as
   well as descriptor/source regressions.

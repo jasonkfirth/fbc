@@ -1,6 +1,7 @@
 /* XOR drawing method for PUT statement */
 
 #include "fb_gfx.h"
+#include "gfx_simd.h"
 
 #ifdef HOST_X86
 #include "x86/fb_gfx_mmx.h"
@@ -37,22 +38,34 @@ static void fb_hPutXorC(unsigned char *src, unsigned char *dest, int w, int h, i
    take care of the synchronization */
 void fb_hPutXor(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param)
 {
-	static PUTTER *all_putters[] = {
+	static PUTTER *c_putters[] = {
 		fb_hPutXorC, fb_hPutXorC, NULL, fb_hPutXorC,
-#ifdef HOST_X86
-		fb_hPutXorMMX, fb_hPutXorMMX, NULL, fb_hPutXorMMX,
-#endif
 	};
+#ifdef FB_GFX_HAS_SIMD
+	static PUTTER *simd_putters[] = {
+		fb_hPutXorSIMD, fb_hPutXorSIMD, NULL, fb_hPutXorSIMD,
+	};
+#endif
+#ifdef HOST_X86
+	static PUTTER *mmx_putters[] = {
+		fb_hPutXorMMX, fb_hPutXorMMX, NULL, fb_hPutXorMMX,
+	};
+#endif
 	PUTTER *putter;
 	FB_GFXCTX *context = fb_hGetContext();
 	
 	if (!context->putter[PUT_MODE_XOR]) {
-#ifdef HOST_X86
-		if (__fb_gfx->flags & X86_MMX_ENABLED)
-			context->putter[PUT_MODE_XOR] = &all_putters[4];
+#ifdef FB_GFX_HAS_SIMD
+		if (fb_hSimdAvailable())
+			context->putter[PUT_MODE_XOR] = simd_putters;
 		else
 #endif
-			context->putter[PUT_MODE_XOR] = &all_putters[0];
+#ifdef HOST_X86
+		if (__fb_gfx->flags & X86_MMX_ENABLED)
+			context->putter[PUT_MODE_XOR] = mmx_putters;
+		else
+#endif
+			context->putter[PUT_MODE_XOR] = c_putters;
 	}
 	putter = context->putter[PUT_MODE_XOR][context->target_bpp - 1];
 	

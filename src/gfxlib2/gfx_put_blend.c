@@ -1,6 +1,7 @@
 /* BLEND drawing method for PUT statement */
 
 #include "fb_gfx.h"
+#include "gfx_simd.h"
 
 extern void fb_hPutTrans1C(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param);
 
@@ -96,12 +97,19 @@ static void fb_hPutBlend4C(unsigned char *src, unsigned char *dest, int w, int h
    take care of the synchronization */
 void fb_hPutBlend(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param)
 {
-	static PUTTER *all_putters[] = {
+	static PUTTER *c_putters[] = {
 		fb_hPutTrans1C, fb_hPutBlend2C, NULL, fb_hPutBlend4C,
-#ifdef HOST_X86
-		fb_hPutTrans1MMX, fb_hPutBlend2MMX, NULL, fb_hPutBlend4MMX,
-#endif
 	};
+#ifdef FB_GFX_HAS_SIMD
+	static PUTTER *simd_putters[] = {
+		fb_hPutTrans1SIMD, fb_hPutBlend2SIMD, NULL, fb_hPutBlend4SIMD,
+	};
+#endif
+#ifdef HOST_X86
+	static PUTTER *mmx_putters[] = {
+		fb_hPutTrans1MMX, fb_hPutBlend2MMX, NULL, fb_hPutBlend4MMX,
+	};
+#endif
 	PUTTER *putter;
 	FB_GFXCTX *context;
 	
@@ -112,12 +120,17 @@ void fb_hPutBlend(unsigned char *src, unsigned char *dest, int w, int h, int src
 	context = fb_hGetContext();
 	
 	if (!context->putter[PUT_MODE_BLEND]) {
-#ifdef HOST_X86
-		if (__fb_gfx->flags & X86_MMX_ENABLED)
-			context->putter[PUT_MODE_BLEND] = &all_putters[4];
+#ifdef FB_GFX_HAS_SIMD
+		if (fb_hSimdAvailable())
+			context->putter[PUT_MODE_BLEND] = simd_putters;
 		else
 #endif
-			context->putter[PUT_MODE_BLEND] = &all_putters[0];
+#ifdef HOST_X86
+		if (__fb_gfx->flags & X86_MMX_ENABLED)
+			context->putter[PUT_MODE_BLEND] = mmx_putters;
+		else
+#endif
+			context->putter[PUT_MODE_BLEND] = c_putters;
 	}
 	putter = context->putter[PUT_MODE_BLEND][context->target_bpp - 1];
 	alpha &= 0xFF;

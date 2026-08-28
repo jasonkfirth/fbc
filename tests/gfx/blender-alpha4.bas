@@ -1,3 +1,26 @@
+''
+'' Project: FreeBASIC gfxlib2 tests
+'' --------------------------------
+''
+'' File: blender-alpha4.bas
+''
+'' Purpose:
+''
+''     Compare gfxlib2's scalar, MMX, and modern SIMD alpha pixel fills.
+''
+'' Responsibilities:
+''
+''     - calculate the alpha-fill result with a readable reference routine
+''     - compare the public C helper against that reference
+''     - compare architecture-specific acceleration when it is available
+''
+'' This file intentionally does NOT contain:
+''
+''     - PUT mode coverage
+''     - timing thresholds
+''     - framebuffer presentation checks
+''
+
 #include "fbcunit.bi"
 #include once "fbgfx.bi"
 #include once "fbc-int/system.bi"
@@ -38,6 +61,18 @@ extern "c"
 		( _
 			byval dest as any ptr, byval clr as long, byval size as ulong _
 		) as any ptr
+
+	#if defined(__FB_64BIT__) and _
+	    (defined(__FB_X86__) or defined(__FB_ARM__))
+	declare function fb_hSimdAvailable cdecl alias "fb_hSimdAvailable" () _
+		as long
+
+	declare function fb_hPixelSetAlpha4SIMD cdecl _
+		alias "fb_hPixelSetAlpha4SIMD" _
+		( _
+			byval dest as any ptr, byval clr as long, byval size as ulong _
+		) as any ptr
+	#endif
 
 #if 0
 	'' !!!TODO!!!- we can't actually declare this to test because it is static in GFX
@@ -118,6 +153,19 @@ SUITE( fbc_tests.gfx.blender_alpha4 )
 				for i as integer = 0 to length-1
 					CU_ASSERT_EQUAL( dc1(i), dc2(i) )
 				next
+
+#if defined(__FB_64BIT__) and _
+    (defined(__FB_X86__) or defined(__FB_ARM__))
+				if fb_hSimdAvailable() then
+					for i as integer = 0 to length-1
+						dc2(i) = dc
+					next
+					fb_hPixelSetAlpha4SIMD( @dc2(0), sc, length )
+					for i as integer = 0 to length-1
+						CU_ASSERT_EQUAL( dc1(i), dc2(i) )
+					next
+				endif
+#endif
 
 #ifdef __FB_X86__
 #ifndef __FB_64BIT__
@@ -242,3 +290,5 @@ SUITE( fbc_tests.gfx.blender_alpha4 )
 	END_TEST
 
 END_SUITE
+
+'' end of blender-alpha4.bas

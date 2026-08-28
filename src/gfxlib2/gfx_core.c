@@ -1,6 +1,7 @@
 /* core internal routines */
 
 #include "fb_gfx.h"
+#include "gfx_simd.h"
 
 static void (*fb_hPutPixelSolid)(FB_GFXCTX *ctx, int x, int y, unsigned int color);
 static void *(*fb_hPixelSetSolid)(void *dest, int color, size_t size);
@@ -319,36 +320,44 @@ void fb_hSetupFuncs(int bpp)
 		case 2:
 			fb_hPutPixelSolid = fb_hPutPixelAlpha = fb_hPutPixel2;
 			fb_hGetPixel = fb_hGetPixel2;
+			fb_hPixelSetSolid = fb_hPixelSetAlpha = fb_hPixelSet2;
 #ifdef HOST_X86
 			if (__fb_gfx->flags & X86_MMX_ENABLED)
 				fb_hPixelSetSolid = fb_hPixelSetAlpha = fb_hPixelSet2MMX;
-			else
 #endif
-				fb_hPixelSetSolid = fb_hPixelSetAlpha = fb_hPixelSet2;
+#ifdef FB_GFX_HAS_SIMD
+			if (fb_hSimdAvailable())
+				fb_hPixelSetSolid = fb_hPixelSetAlpha =
+					fb_hPixelSet2SIMD;
+#endif
 			fb_hPixelCpy = fb_hPixelCpy2;
 			break;
 		
 		default:
 			fb_hPutPixelSolid = fb_hPutPixel4;
 			fb_hGetPixel = fb_hGetPixel4;
+			fb_hPixelSetSolid = fb_hPixelSet4;
 #ifdef HOST_X86
 			if (__fb_gfx->flags & X86_MMX_ENABLED)
 				fb_hPixelSetSolid = fb_hPixelSet4MMX;
-			else
 #endif
-				fb_hPixelSetSolid = fb_hPixelSet4;
+#ifdef FB_GFX_HAS_SIMD
+			if (fb_hSimdAvailable())
+				fb_hPixelSetSolid = fb_hPixelSet4SIMD;
+#endif
 			fb_hPixelCpy = fb_hPixelCpy4;
 			if (__fb_gfx->flags & ALPHA_PRIMITIVES) {
+				fb_hPutPixelAlpha = fb_hPutPixelAlpha4;
+				fb_hPixelSetAlpha = fb_hPixelSetAlpha4;
 #ifdef HOST_X86
 				if (__fb_gfx->flags & X86_MMX_ENABLED) {
 					fb_hPutPixelAlpha = fb_hPutPixelAlpha4MMX;
 					fb_hPixelSetAlpha = fb_hPixelSetAlpha4MMX;
-				} else {
-#endif
-					fb_hPutPixelAlpha = fb_hPutPixelAlpha4;
-					fb_hPixelSetAlpha = fb_hPixelSetAlpha4;
-#ifdef HOST_X86
 				}
+#endif
+#ifdef FB_GFX_HAS_SIMD
+				if (fb_hSimdAvailable())
+					fb_hPixelSetAlpha = fb_hPixelSetAlpha4SIMD;
 #endif
 			} else {
 				fb_hPutPixelAlpha = fb_hPutPixelSolid;

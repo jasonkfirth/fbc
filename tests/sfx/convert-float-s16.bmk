@@ -8,7 +8,7 @@
 #
 # Purpose:
 #
-#     Build the shared float-to-signed-16 conversion test.
+#     Build the shared PCM conversion and SIMD compatibility test.
 #
 # Responsibilities:
 #

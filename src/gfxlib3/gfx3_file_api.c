@@ -12,6 +12,7 @@
     Responsibilities:
 
         - implement FreeBASIC and QB-compatible raw BSAVE/BLOAD blocks
+        - identify BMP and PNG files and route PNG work to its codec module
         - save 8, 16, and 32-bit images and screen pages as BMP files
         - decode bounded Windows RLE4/RLE8 palette streams before upload
         - load 1/4/8-bit indexed and direct-color Windows/OS2 BMP files
@@ -19,14 +20,15 @@
 
     This file intentionally does NOT contain:
 
-        - JPEG, PNG, and non-RLE BMP codecs
-        - general-purpose image formats such as PNG or JPEG
+        - PNG codec internals
+        - JPEG and non-RLE BMP codecs
         - drawing or presentation logic
 */
 
 #include "gfx3_api_internal.h"
 #include "gfx3_file_api.h"
 #include "gfx3_image.h"
+#include "gfx3_png.h"
 
 enum {
 	FB_GFX3_FILE_PATH_MAX = 1024,
@@ -231,22 +233,12 @@ failed:
 /* Shared image and screen views                                             */
 /* ------------------------------------------------------------------------- */
 
-typedef struct FB_GFX3_FILE_VIEW {
-	unsigned char *pixels;
-	uint32_t width;
-	uint32_t height;
-	uint32_t pitch;
-	uint32_t bytes_per_pixel;
-	unsigned char *allocation;
-	FB_GFX3_DRAW_STATE *state;
-} FB_GFX3_FILE_VIEW;
-
 static uint32_t file_api_bytes_per_pixel(uint32_t depth)
 {
 	return (depth + 7u) / 8u;
 }
 
-static int file_api_prepare_view(void *image, int read_screen,
+int fb_gfx3_file_prepare_view_locked(void *image, int read_screen,
 	FB_GFX3_FILE_VIEW *view)
 {
 	FB_GFX3_IMAGE_VIEW image_view;
@@ -291,6 +283,17 @@ static int file_api_prepare_view(void *image, int read_screen,
 		return FB_GFX3_OUT_OF_MEMORY;
 	view->pixels = view->allocation;
 	if (read_screen) {
+		/*
+			PSET operations are deliberately batched until an ordering boundary.
+			A file save is such a boundary: the downloaded page must include every
+			graphics command that precedes BSAVE in the BASIC program.
+		*/
+		result = fb_gfx3_compat_flush_points_graphics_locked(state);
+		if (result != FB_GFX3_OK) {
+			free(view->allocation);
+			memset(view, 0, sizeof(*view));
+			return result;
+		}
 		result = fb_gfx3_surface_download(
 			&state->mode->pages[state->work_page], 0, 0,
 			view->width, view->height, view->pitch, view->pixels);
@@ -305,7 +308,7 @@ static int file_api_prepare_view(void *image, int read_screen,
 	return FB_GFX3_OK;
 }
 
-static void file_api_release_view(FB_GFX3_FILE_VIEW *view)
+void fb_gfx3_file_release_view(FB_GFX3_FILE_VIEW *view)
 {
 	if (view == NULL)
 		return;
@@ -313,7 +316,7 @@ static void file_api_release_view(FB_GFX3_FILE_VIEW *view)
 	memset(view, 0, sizeof(*view));
 }
 
-static int file_api_commit_screen(FB_GFX3_FILE_VIEW *view,
+int fb_gfx3_file_commit_screen_locked(FB_GFX3_FILE_VIEW *view,
 	uint32_t width, uint32_t height)
 {
 	FB_GFX3_MODE *mode;
@@ -773,7 +776,8 @@ static int file_api_load_bmp(FILE *file, void *destination,
 		view.pixels = view.allocation;
 		result = FB_GFX3_OK;
 	} else {
-		result = file_api_prepare_view(destination, destination == NULL, &view);
+		result = fb_gfx3_file_prepare_view_locked(destination,
+			destination == NULL, &view);
 	}
 	if (result != FB_GFX3_OK)
 		return result;
@@ -782,26 +786,26 @@ static int file_api_load_bmp(FILE *file, void *destination,
 	copy_height = ((uint32_t)signed_height < view.height) ?
 		(uint32_t)signed_height : view.height;
 	if ((view.bytes_per_pixel == 1) && (bits_per_pixel > 8)) {
-		file_api_release_view(&view);
+		fb_gfx3_file_release_view(&view);
 		return FB_GFX3_UNSUPPORTED;
 	}
 	source_row = NULL;
 	if ((pixel_offset > (uint32_t)LONG_MAX) ||
 	    (fseek(file, (long)pixel_offset, SEEK_SET) != 0)) {
-		file_api_release_view(&view);
+		fb_gfx3_file_release_view(&view);
 		return FB_GFX3_FAILED;
 	}
 	if (rle_compressed) {
 		result = file_api_decode_rle(file, (uint32_t)signed_width,
 			(uint32_t)signed_height, bits_per_pixel, &rle_indices);
 		if (result != FB_GFX3_OK) {
-			file_api_release_view(&view);
+			fb_gfx3_file_release_view(&view);
 			return result;
 		}
 	} else {
 		source_row = (unsigned char *)malloc(source_row_pitch);
 		if (source_row == NULL) {
-			file_api_release_view(&view);
+			fb_gfx3_file_release_view(&view);
 			return FB_GFX3_OUT_OF_MEMORY;
 		}
 	}
@@ -897,13 +901,15 @@ static int file_api_load_bmp(FILE *file, void *destination,
 		free(source_row);
 	free(rle_indices);
 	if ((result == FB_GFX3_OK) && (output_view == NULL))
-		result = file_api_commit_screen(&view, copy_width, copy_height);
+		result = fb_gfx3_file_commit_screen_locked(&view, copy_width,
+			copy_height);
 	if ((result == FB_GFX3_OK) && (output_view == NULL) &&
 	    (destination != NULL)) {
 		FB_GFX3_IMAGE_VIEW destination_view;
 
 		/*
-			file_api_prepare_view() already accepted this as a gfxlib3 image.
+			The shared file view helper already accepted this as a gfxlib3
+			image.
 			Advance its cache generation so a later PUT cannot reuse the
 			pre-BLOAD GPU texture.
 		*/
@@ -914,7 +920,7 @@ static int file_api_load_bmp(FILE *file, void *destination,
 		*output_view = view;
 		memset(&view, 0, sizeof(view));
 	}
-	file_api_release_view(&view);
+	fb_gfx3_file_release_view(&view);
 	return result;
 }
 
@@ -925,6 +931,7 @@ int fb_gfx3_file_load_bitmap_pixels_locked(FBSTRING *filename,
 	FB_GFX3_FILE_VIEW view;
 	FILE *file = NULL;
 	char path[FB_GFX3_FILE_PATH_MAX];
+	uint8_t identifier;
 	int result = FB_GFX3_INVALID;
 
 	memset(&view, 0, sizeof(view));
@@ -948,7 +955,22 @@ int fb_gfx3_file_load_bitmap_pixels_locked(FBSTRING *filename,
 		result = FB_GFX3_FAILED;
 		goto done;
 	}
-	result = file_api_load_bmp(file, NULL, NULL, depth, &view);
+	result = FB_GFX3_FAILED;
+	if (file_api_read_u8(file, &identifier) &&
+	    (fseek(file, 0, SEEK_SET) == 0)) {
+		if (identifier == 'B') {
+			result = file_api_load_bmp(file, NULL, NULL, depth, &view);
+		} else if (identifier == 0x89u) {
+			result = fb_gfx3_png_load_pixels_locked(file, depth,
+				&view.allocation, &view.width, &view.height,
+				&view.pitch);
+			if (result == FB_GFX3_OK) {
+				view.pixels = view.allocation;
+				view.bytes_per_pixel =
+					file_api_bytes_per_pixel(depth);
+			}
+		}
+	}
 	if ((fclose(file) != 0) && (result == FB_GFX3_OK))
 		result = FB_GFX3_FAILED;
 	file = NULL;
@@ -964,7 +986,7 @@ int fb_gfx3_file_load_bitmap_pixels_locked(FBSTRING *filename,
 done:
 	if (file != NULL)
 		fclose(file);
-	file_api_release_view(&view);
+	fb_gfx3_file_release_view(&view);
 	if (filename != NULL)
 		fb_hStrDelTemp(filename);
 	return result;
@@ -974,28 +996,24 @@ done:
 /* Public BSAVE/BLOAD ABI                                                    */
 /* ------------------------------------------------------------------------- */
 
-static int file_api_has_bmp_extension(const char *path)
+static int file_api_has_extension(const char *path, const char expected[4])
 {
 	const char *extension;
-	char first;
-	char second;
-	char third;
+	char actual[4];
+	uint32_t i;
 
-	if (path == NULL)
+	if ((path == NULL) || (expected == NULL))
 		return FALSE;
 	extension = strrchr(path, '.');
 	if ((extension == NULL) || (strlen(extension) != 4u))
 		return FALSE;
-	first = extension[1];
-	second = extension[2];
-	third = extension[3];
-	if ((first >= 'A') && (first <= 'Z'))
-		first = (char)(first + ('a' - 'A'));
-	if ((second >= 'A') && (second <= 'Z'))
-		second = (char)(second + ('a' - 'A'));
-	if ((third >= 'A') && (third <= 'Z'))
-		third = (char)(third + ('a' - 'A'));
-	return (first == 'b') && (second == 'm') && (third == 'p');
+	for (i = 0; i < 3u; ++i) {
+		actual[i] = extension[i + 1u];
+		if ((actual[i] >= 'A') && (actual[i] <= 'Z'))
+			actual[i] = (char)(actual[i] + ('a' - 'A'));
+	}
+	actual[3] = '\0';
+	return memcmp(actual, expected, sizeof(actual)) == 0;
 }
 
 FBCALL int fb_GfxBsaveEx(FBSTRING *filename, void *source,
@@ -1022,12 +1040,18 @@ FBCALL int fb_GfxBsaveEx(FBSTRING *filename, void *source,
 		FB_GRAPHICS_UNLOCK();
 		return fb_ErrorSetNum(FB_RTERROR_FILENOTFOUND);
 	}
-	if (file_api_has_bmp_extension(path)) {
-		result = file_api_prepare_view(source, TRUE, &view);
+	if (file_api_has_extension(path, "bmp")) {
+		result = fb_gfx3_file_prepare_view_locked(source, TRUE, &view);
 		if (result == FB_GFX3_OK)
 			result = file_api_save_bmp(file, &view, palette,
 				bits_per_pixel);
-		file_api_release_view(&view);
+		fb_gfx3_file_release_view(&view);
+	} else if (file_api_has_extension(path, "png")) {
+		result = fb_gfx3_file_prepare_view_locked(source, TRUE, &view);
+		if (result == FB_GFX3_OK)
+			result = fb_gfx3_png_save_locked(file, &view, palette,
+				bits_per_pixel);
+		fb_gfx3_file_release_view(&view);
 	} else if ((source != NULL) && (size == 0)) {
 		result = FB_GFX3_INVALID;
 	} else {
@@ -1039,7 +1063,7 @@ FBCALL int fb_GfxBsaveEx(FBSTRING *filename, void *source,
 		    (fwrite(source, 1, size, file) != size))
 			result = FB_GFX3_FAILED;
 		if ((result == FB_GFX3_OK) && (source == NULL)) {
-			result = file_api_prepare_view(NULL, TRUE, &view);
+			result = fb_gfx3_file_prepare_view_locked(NULL, TRUE, &view);
 			if (result == FB_GFX3_OK) {
 				size_t available =
 					(size_t)view.pitch * view.height;
@@ -1050,7 +1074,7 @@ FBCALL int fb_GfxBsaveEx(FBSTRING *filename, void *source,
 				    write_size)
 					result = FB_GFX3_FAILED;
 			}
-			file_api_release_view(&view);
+			fb_gfx3_file_release_view(&view);
 		}
 	}
 	if ((fclose(file) != 0) && (result == FB_GFX3_OK))
@@ -1086,7 +1110,7 @@ static int file_api_load_raw(FILE *file, void *destination,
 			return FB_GFX3_FAILED;
 		return FB_GFX3_OK;
 	}
-	result = file_api_prepare_view(NULL, TRUE, &view);
+	result = fb_gfx3_file_prepare_view_locked(NULL, TRUE, &view);
 	if (result != FB_GFX3_OK)
 		return result;
 	available = (size_t)view.pitch * view.height;
@@ -1095,8 +1119,9 @@ static int file_api_load_raw(FILE *file, void *destination,
 	    (fread(view.pixels, 1, read_size, file) != read_size))
 		result = FB_GFX3_FAILED;
 	if (result == FB_GFX3_OK)
-		result = file_api_commit_screen(&view, view.width, view.height);
-	file_api_release_view(&view);
+		result = fb_gfx3_file_commit_screen_locked(&view, view.width,
+			view.height);
+	fb_gfx3_file_release_view(&view);
 	return result;
 }
 
@@ -1132,6 +1157,10 @@ static int file_api_bload(FBSTRING *filename, void *destination,
 		if (identifier == 'B') {
 			if (fseek(file, 0, SEEK_SET) == 0)
 				result = file_api_load_bmp(file, destination, palette, 0u, NULL);
+		} else if (identifier == 0x89u) {
+			if (fseek(file, 0, SEEK_SET) == 0)
+				result = fb_gfx3_png_load_locked(file, destination,
+					palette);
 		} else if (identifier == 0xFEu) {
 			if (file_api_read_u32(file, &byte_count))
 				result = file_api_load_raw(file, destination,

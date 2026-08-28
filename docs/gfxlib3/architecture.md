@@ -1003,12 +1003,14 @@ executes arbitrary hardware I/O itself.
 ### Graphics files
 
 BSAVE and BLOAD use the runtime path abstraction. Raw FreeBASIC and QB blocks
-are supported. BMP save handles indexed, RGB565, and 32-bit inputs. Indexed
-mode palette entries are converted from gfxlib's in-memory RGB layout to BMP's
-on-disk BGR records. BMP load
-currently accepts uncompressed 1, 4, 8, 16, 24, and 32-bit Windows information
-headers. Screen raw blocks synchronize through an explicit GPU download before
-the file write and upload only after the file read completes. Path conversion
+are supported. BMP and PNG save handle indexed, RGB565, and 32-bit inputs. PNG
+files use gfxlib3's independent copy of the dependency-free codec, including
+checked chunks, DEFLATE streams, scanline filters, alpha, and Adam7 input.
+Indexed mode palette entries are converted from gfxlib's in-memory RGB layout
+to BMP's on-disk BGR records. BMP load currently accepts uncompressed 1, 4, 8,
+16, 24, and 32-bit Windows information headers. Screen raw blocks synchronize
+through an explicit GPU download before the file write and upload only after
+the file read completes. Path conversion
 copies the bounded FreeBASIC string directly instead of importing a host CRT
 formatter, keeping the runtime archive compatible with the compiler toolchain.
 Contiguous 16/32-bit Windows `BI_BITFIELDS` RGB masks are decoded with checked
@@ -1443,13 +1445,13 @@ route.
 ## GPU asset and transformed-surface path
 
 `Gfx3SurfaceLoad` gives asset-oriented code a one-call residency transition.
-The runtime decodes the same bitmap family used by BLOAD into temporary staging
-pixels, creates a surface with the requested checked usage bits, queues one
-upload, and releases the staging allocation. The returned pointer is still an
-opaque mode-owned surface descriptor. It is not an `FB.IMAGE` header and has no
-CPU pixel address. `GFX3_SURFACE_ASSET` therefore requests only sampled and
-transfer-destination authority by default. A caller that needs later readback
-must ask for transfer-source authority explicitly.
+The runtime decodes the same BMP or PNG family used by BLOAD into temporary
+staging pixels, creates a surface with the requested checked usage bits, queues
+one upload, and releases the staging allocation. The returned pointer is still
+an opaque mode-owned surface descriptor. It is not an `FB.IMAGE` header and
+has no CPU pixel address. `GFX3_SURFACE_ASSET` therefore requests only sampled
+and transfer-destination authority by default. A caller that needs later
+readback must ask for transfer-source authority explicitly.
 
 Ordinary `PUT (x, y), gpu_surface, mode` recognizes the descriptor through the
 mode's resource registry. It sends the existing GPU-to-GPU blit command and

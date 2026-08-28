@@ -260,7 +260,7 @@ while it is mapped. The returned pointer becomes invalid at unmap or `SCREEN
 
 ### Loading and transforming GPU assets
 
-`Gfx3SurfaceLoad` decodes a BLOAD-compatible bitmap, uploads it once, and
+`Gfx3SurfaceLoad` decodes a BLOAD-compatible BMP or PNG, uploads it once, and
 returns an opaque sampled surface. The temporary decoder pixels are released
 before the function returns. Ordinary PUT accepts this GPU surface directly:
 

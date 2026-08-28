@@ -3,6 +3,9 @@ Version 1.20.4
 [changed]
 - build/release: run the qualified FreeBSD, OpenBSD, NetBSD, DragonFlyBSD, and Haiku x86_64 VM package builders as part of tagged GitHub releases, publish their native package formats with the main asset set, and allow those guest packages to be rebuilt and attached independently to an existing release.
 - build/release: stop treating the Linux MIPS cross-compiler archives as complete platform packages or publishing them with tagged releases; MIPS compiler and runtime qualification remains in the test workflows.
+- gfxlib3/files: added an independent copy of the dependency-free PNG codec for BLOAD, BSAVE, screen pages, and direct GPU asset loading, including checked chunks and CRCs, DEFLATE streams, scanline filters, indexed/RGB/RGBA images, alpha, Adam7 input, case-insensitive `.png` selection, GPU ordering boundaries, documentation, and exact CPU/GPU round-trip tests.
+- gfxlib2/SIMD: added SSE2 acceleration on x86_64 and NEON/Advanced SIMD acceleration on ARMv7 and AArch64 for logical, transparent, alpha, blend, additive, preset, and alpha-mask pixel operations; ARMv7 checks AT_HWCAP before selecting its isolated NEON object, ARMv6 remains scalar, and the existing 32-bit x86 MMX fallback is retained.
+- sfxlib/SIMD: added exact PCM buffer conversion kernels for 32-bit x86 MMX/SSE and SSE2, x86_64 SSE2, ARMv7 NEON, and AArch64 Advanced SIMD; optional instruction sets are isolated in separately flagged objects and selected only after CPUID or AT_HWCAP checks, while pre-CPUID x86, incomplete MMX/SSE feature sets, ARMv6, and unsupported ARM systems retain scalar conversion with the existing NaN, clipping, and x87 evaluation behavior.
 
 [fixed]
 - build/release: make GitHub Release publication independent of an implicit checkout, stage multi-gigabyte uploads with hard links, allow enough time for the complete asset set, and provide a publish-only recovery workflow that reuses artifacts from a completed package run.

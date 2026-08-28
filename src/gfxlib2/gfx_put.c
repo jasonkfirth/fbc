@@ -1,6 +1,7 @@
 /* PUT statement */
 
 #include "fb_gfx.h"
+#include "gfx_simd.h"
 
 #ifdef HOST_X86
 #include "x86/fb_gfx_mmx.h"
@@ -14,6 +15,13 @@ static void fb_hPutAlphaMask(unsigned char *src, unsigned char *dest, int w, int
 	unsigned int dc, sc;
 	int x;
 
+#ifdef FB_GFX_HAS_SIMD
+	if (fb_hSimdAvailable()) {
+		fb_hPutAlphaMaskSIMD(src, dest, w, h, src_pitch, dest_pitch,
+			alpha, blender, param);
+		return;
+	}
+#endif
 #ifdef HOST_X86
 	if (__fb_gfx->flags & X86_MMX_ENABLED) {
 		fb_hPutAlphaMaskMMX(src, dest, w, h, src_pitch, dest_pitch, alpha, blender, param);

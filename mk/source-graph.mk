@@ -75,6 +75,14 @@ GFXLIB2_DIRS += $(srcdir)/gfxlib2/$(SOURCE_OS)
 ifeq ($(TARGET_ARCH),x86)
 GFXLIB2_DIRS += $(srcdir)/gfxlib2/x86
 endif
+ifneq ($(filter x86_64 aarch64,$(TARGET_ARCH)),)
+GFXLIB2_DIRS += $(srcdir)/gfxlib2/$(TARGET_ARCH)
+endif
+ifeq ($(TARGET_ARCH),arm)
+  ifneq ($(filter v7 v8,$(ARM_VER)),)
+GFXLIB2_DIRS += $(srcdir)/gfxlib2/arm
+  endif
+endif
 
 GFXLIB3_PLATFORM_OS := android linux win32
 
@@ -88,6 +96,14 @@ ifneq ($(USE_UNIX_LAYER),)
 SFXLIB_DIRS += $(srcdir)/sfxlib/unix
 endif
 SFXLIB_DIRS += $(srcdir)/sfxlib/$(SOURCE_OS)
+ifneq ($(filter x86 x86_64 aarch64,$(TARGET_ARCH)),)
+SFXLIB_DIRS += $(srcdir)/sfxlib/$(TARGET_ARCH)
+endif
+ifeq ($(TARGET_ARCH),arm)
+  ifneq ($(filter v7 v8,$(ARM_VER)),)
+SFXLIB_DIRS += $(srcdir)/sfxlib/arm
+  endif
+endif
 
 ##############################################################################
 # Compiler sources
@@ -214,12 +230,23 @@ ifeq ($(TARGET_ARCH),x86)
 GFX_SRC_ARCH := $(wildcard $(srcdir)/gfxlib2/x86/*.s)
 endif
 
+GFX_SRC_ARCH_C :=
+ifneq ($(filter x86_64 aarch64,$(TARGET_ARCH)),)
+GFX_SRC_ARCH_C := $(wildcard $(srcdir)/gfxlib2/$(TARGET_ARCH)/*.c)
+endif
+ifeq ($(TARGET_ARCH),arm)
+  ifneq ($(filter v7 v8,$(ARM_VER)),)
+GFX_SRC_ARCH_C := $(wildcard $(srcdir)/gfxlib2/arm/*.c)
+  endif
+endif
+
 GFX_SRC_TARGET_ASM := $(wildcard $(srcdir)/gfxlib2/$(SOURCE_OS)/*.s)
 
 GFX_BASE_GENERIC := $(notdir $(GFX_SRC_GENERIC))
 GFX_BASE_UNIX := $(notdir $(GFX_SRC_UNIX))
 GFX_BASE_TARGET := $(notdir $(GFX_SRC_TARGET))
 GFX_BASE_TARGET_ARCH := $(notdir $(GFX_SRC_TARGET_ARCH))
+GFX_BASE_ARCH_C := $(notdir $(GFX_SRC_ARCH_C))
 
 GFX_SRC_TARGET := $(filter-out \
 $(addprefix $(srcdir)/gfxlib2/$(SOURCE_OS)/,$(GFX_BASE_TARGET_ARCH)), \
@@ -232,10 +259,13 @@ $(GFX_SRC_UNIX))
 GFX_SRC_GENERIC := $(filter-out \
 $(addprefix $(srcdir)/gfxlib2/,$(GFX_BASE_UNIX)) \
 $(addprefix $(srcdir)/gfxlib2/,$(GFX_BASE_TARGET)) \
-$(addprefix $(srcdir)/gfxlib2/,$(GFX_BASE_TARGET_ARCH)), \
+$(addprefix $(srcdir)/gfxlib2/,$(GFX_BASE_TARGET_ARCH)) \
+$(addprefix $(srcdir)/gfxlib2/,$(GFX_BASE_ARCH_C)), \
 $(GFX_SRC_GENERIC))
 
-GFX_SRC := $(GFX_SRC_GENERIC) $(GFX_SRC_UNIX) $(GFX_SRC_TARGET) $(GFX_SRC_TARGET_ARCH) $(GFX_SRC_ARCH) $(GFX_SRC_TARGET_ASM)
+GFX_SRC := $(GFX_SRC_GENERIC) $(GFX_SRC_UNIX) $(GFX_SRC_TARGET) \
+$(GFX_SRC_TARGET_ARCH) $(GFX_SRC_ARCH_C) $(GFX_SRC_ARCH) \
+$(GFX_SRC_TARGET_ASM)
 
 ifdef DISABLE_X11
 GFX_SRC := $(filter-out \
@@ -301,9 +331,20 @@ ifneq ($(USE_RUNTIME_CXX),)
 SFX_SRC_TARGET += $(wildcard $(srcdir)/sfxlib/$(SOURCE_OS)/*.cpp)
 endif
 
+SFX_SRC_ARCH_C :=
+ifneq ($(filter x86 x86_64 aarch64,$(TARGET_ARCH)),)
+SFX_SRC_ARCH_C := $(wildcard $(srcdir)/sfxlib/$(TARGET_ARCH)/*.c)
+endif
+ifeq ($(TARGET_ARCH),arm)
+  ifneq ($(filter v7 v8,$(ARM_VER)),)
+SFX_SRC_ARCH_C := $(wildcard $(srcdir)/sfxlib/arm/*.c)
+  endif
+endif
+
 SFX_BASE_GENERIC := $(notdir $(SFX_SRC_GENERIC))
 SFX_BASE_UNIX := $(notdir $(SFX_SRC_UNIX))
 SFX_BASE_TARGET := $(notdir $(SFX_SRC_TARGET))
+SFX_BASE_ARCH_C := $(notdir $(SFX_SRC_ARCH_C))
 
 SFX_SRC_UNIX := $(filter-out \
 $(addprefix $(srcdir)/sfxlib/unix/,$(SFX_BASE_TARGET)), \
@@ -311,7 +352,8 @@ $(SFX_SRC_UNIX))
 
 SFX_SRC_GENERIC := $(filter-out \
 $(addprefix $(srcdir)/sfxlib/,$(SFX_BASE_UNIX)) \
-$(addprefix $(srcdir)/sfxlib/,$(SFX_BASE_TARGET)), \
+$(addprefix $(srcdir)/sfxlib/,$(SFX_BASE_TARGET)) \
+$(addprefix $(srcdir)/sfxlib/,$(SFX_BASE_ARCH_C)), \
 $(SFX_SRC_GENERIC))
 
 SFX_MIDI_TARGET_OS := linux darwin haiku dos win32 wince cygwin xbox
@@ -349,7 +391,8 @@ ifeq ($(TARGET_OS),haiku)
     $(SFX_SRC_TARGET))
 endif
 
-SFX_SRC := $(SFX_SRC_TARGET) $(SFX_SRC_UNIX) $(SFX_SRC_GENERIC)
+SFX_SRC := $(SFX_SRC_TARGET) $(SFX_SRC_UNIX) $(SFX_SRC_GENERIC) \
+$(SFX_SRC_ARCH_C)
 
 ifdef DISABLE_ALSA
 SFX_SRC := $(filter-out \
