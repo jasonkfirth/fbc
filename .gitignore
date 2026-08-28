@@ -71,6 +71,7 @@
 !/tests/
 !/tests/**/*.*
 !/tests/**/
+!/tests/**/GNUmakefile
 
 # Ignore test build outputs and compiler products.
 /tests/**/*.o

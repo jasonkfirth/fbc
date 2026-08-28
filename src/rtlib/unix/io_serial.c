@@ -7,7 +7,7 @@
     Purpose:
 
         Implement OPEN COM stream I/O for POSIX-style termios devices shared
-        by Android, Darwin, the BSDs, and Haiku.
+        by Linux, Android, Darwin, the BSDs, and Haiku.
 
     Responsibilities:
 
@@ -19,7 +19,7 @@
     This file intentionally does NOT contain:
 
         - modem-line control exposed by fbcom.bi
-        - Linux lockdev integration
+        - UUCP-style lock files
         - AROS serial.device or RISC OS DeviceFS handling
 
     Platform behavior:
@@ -315,10 +315,12 @@ static int fb_hSerialConfigure( int fd, const FB_SERIAL_OPTIONS *options,
 	else
 		tty.c_cflag |= CSTOPB;
 
-	if( options->SuppressRTS ) {
-		tty.c_iflag &= ~(IXON | IXOFF | IXANY);
-		tty.c_iflag |= IXON | IXANY;
-	}
+	/*
+	    RS releases RTS ownership; it does not request XON/XOFF flow control.
+	    The Win32 backend also leaves software flow control disabled, and a
+	    binary serial stream must never consume XON or XOFF data bytes.
+	*/
+	tty.c_iflag &= ~(IXON | IXOFF | IXANY);
 
 	if( (cfsetispeed( &tty, speed ) != 0) ||
 	    (cfsetospeed( &tty, speed ) != 0) )
