@@ -6,18 +6,18 @@
 
     Purpose:
 
-        Provide Advanced SIMD PCM conversion kernels for the AArch64 ABI.
+        Provide Advanced SIMD conversion and mixer kernels for AArch64.
 
     Responsibilities:
 
         - declare Advanced SIMD available on every AArch64 target
-        - compile the shared NEON sample conversion kernels
+        - compile the shared NEON conversion and mixer kernels
 
     This file intentionally does NOT contain:
 
         - optional CPU feature probing
         - ARM32 auxiliary-vector handling
-        - audio-driver or mixer logic
+        - audio-driver or high-level mixer policy
 */
 
 #include "../sfx_simd.h"

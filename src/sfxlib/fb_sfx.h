@@ -216,6 +216,8 @@ typedef struct FB_SFXVOICE
 
     int frequency;
     float phase;
+    float phase_step;
+    int phase_rate;
     int waveform;
     int type;
     int sfx_id;

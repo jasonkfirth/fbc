@@ -179,6 +179,23 @@ Main routines:
 ### `sfx_mixer.c`
 Combines voices into stereo output.
 
+The ordinary mixer is voice-major and processes a complete driver block at a
+time. This avoids scanning all 64 voice slots once per output frame. Sustained
+square, triangle, and saw voices use SSE2 on x86 or NEON on ARM. Contiguous
+sample playback, resampled sample accumulation, and final output clamping use
+the same SIMD dispatch. Sine voices use an interpolated lookup table because
+SSE2 has no efficient table gather operation.
+
+The 32-bit x86 path checks CPUID before entering SSE2 code. ARMv7 keeps NEON in
+a separately compiled object and checks `AT_HWCAP`; ARMv6 remains scalar.
+x86_64 and AArch64 use the SIMD level required by their application ABI. Set
+`SFXLIB_MIXER_SIMD=0` before initializing sfxlib to select the scalar mixer for
+diagnosis or reference benchmarks.
+
+Noise currently retains the frame-major compatibility path. Its generator
+uses the process-wide `rand()` sequence, so changing its voice/frame order
+would change which random value belongs to each voice.
+
 Main routines:
 - `fb_sfxMixerInit()`, `fb_sfxMixerShutdown()`
 - `fb_sfxMixerClear()`
@@ -189,6 +206,12 @@ Main routines:
 - `fb_sfxMixerOscillator()`
 - `fb_sfxMixerClamp()`
 - `fb_sfxMixerProcess()`
+- `fb_sfxMixerSimdEnabled()`
+
+### `sfx_simd.h`, `sfx_simd_sse2.inc`, and `sfx_simd_neon.inc`
+Define and implement the private architecture-specific conversion and mixer
+kernels. The include files contain arithmetic only; CPU feature detection and
+target build policy remain in the architecture source files and make rules.
 
 ### `sfx_oscillator.c`
 Generates raw waveform samples for a voice.
@@ -238,9 +261,14 @@ Main routines:
 ### `sfx_echo.c`
 Owns the optional whole-mix stereo ping-pong echo.
 
+Echo feedback makes each frame depend on the previous frame, so the time axis
+cannot be vectorized without changing the effect. The mixer still processes it
+as a block so state and validation are not reloaded for every stereo frame.
+
 Main routines:
 - `fb_sfxEchoCmd()` validates settings and creates the delay line
 - `fb_sfxEchoProcess()` applies delay and bounded cross-channel feedback
+- `fb_sfxEchoProcessBlock()` applies the same recurrence to a mixer block
 - `fb_sfxEchoReset()` clears and disables the effect
 - `fb_sfxEchoEnabled()` reports whether the effect is active
 
@@ -484,7 +512,10 @@ program numbers compact individual presets, implements common channel
 controls, and provides noise-assisted channel 10 presets for the standard
 General MIDI percussion range. High-note brightness is reduced when necessary
 to keep FM sidebands controlled at low output sample rates. Its stereo output
-is added to the normal mixer before effects and the output ring buffer.
+is added to the normal mixer before effects and the output ring buffer. The
+renderer works in 64-frame, voice-major batches, caches oscillator increments,
+and retains a per-frame voice count so expiring notes keep the established
+polyphony normalization.
 
 Main routines:
 - `fb_sfxMidiSoftwareOpen()`, `fb_sfxMidiSoftwareClose()`
@@ -492,6 +523,27 @@ Main routines:
 - `fb_sfxMidiSoftwareSilence()`, `fb_sfxMidiSoftwareReleaseAll()`
 - `fb_sfxMidiSoftwarePause()`
 - `fb_sfxMidiSoftwareMixFrame()`
+- `fb_sfxMidiSoftwareMixBlock()`
+
+## Mixer Performance Benchmark
+
+`tests/sfx/mixer-simd-benchmark.bas` exercises idle mixing, generated
+waveforms, contiguous and fractional sample playback, software FM, and echo
+through the null driver. It reports rendered frames per second, real-time
+capacity, and the percentage of one CPU core needed for real-time playback.
+
+From the repository root, a worktree build can be measured with:
+
+```sh
+fbc -O 2 -exx -w all -p lib/freebasic/linux-x86_64 \
+    tests/sfx/mixer-simd-benchmark.bas \
+    -x tests/sfx/mixer-simd-benchmark
+taskset -c 0 tests/sfx/mixer-simd-benchmark 8192
+```
+
+Run the same executable with `SFXLIB_MIXER_SIMD=0` to isolate the scalar and
+SIMD mixer paths. CPU pinning is optional, but it reduces scheduler noise when
+two revisions are compared.
 
 ### `sfx_midi_close.c`
 Closes the MIDI device.

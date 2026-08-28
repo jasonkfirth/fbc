@@ -39,6 +39,7 @@
         mixer
 */
 
+#include <float.h>
 #include <math.h>
 #include <stdlib.h>
 
@@ -46,6 +47,38 @@
 #include "fb_sfx_internal.h"
 
 #define FB_SFX_PI 3.14159265358979323846f
+
+/*
+    A 4096-entry table with linear interpolation keeps approximation error
+    below the useful precision of the audio path while avoiding one libm call
+    per voice and output frame.  Its 16 KB footprint also remains practical on
+    SRAM-limited targets.  The table is built lazily while the runtime mixer
+    lock is held, so initialization needs no second synchronization system.
+*/
+
+#define FB_SFX_SINE_TABLE_BITS 12
+#define FB_SFX_SINE_TABLE_SIZE (1 << FB_SFX_SINE_TABLE_BITS)
+#define FB_SFX_SINE_TABLE_MASK (FB_SFX_SINE_TABLE_SIZE - 1)
+
+static float g_fb_sfx_sine_table[FB_SFX_SINE_TABLE_SIZE];
+static int g_fb_sfx_sine_table_ready = 0;
+
+static void fb_sfxOscillatorBuildSineTable(void)
+{
+    int index;
+
+    if (g_fb_sfx_sine_table_ready)
+        return;
+
+    for (index = 0; index < FB_SFX_SINE_TABLE_SIZE; index++)
+    {
+        float phase = (float)index / (float)FB_SFX_SINE_TABLE_SIZE;
+
+        g_fb_sfx_sine_table[index] = sinf(phase * 2.0f * FB_SFX_PI);
+    }
+
+    g_fb_sfx_sine_table_ready = 1;
+}
 
 
 /* ------------------------------------------------------------------------- */
@@ -67,7 +100,7 @@ void fb_sfxOscillatorReset(FB_SFXVOICE *voice)
 /* Phase step calculation                                                    */
 /* ------------------------------------------------------------------------- */
 
-static float fb_sfxOscillatorStep(FB_SFXVOICE *voice)
+float fb_sfxOscillatorPhaseStep(FB_SFXVOICE *voice)
 {
     if (!voice)
         return 0.0f;
@@ -78,7 +111,22 @@ static float fb_sfxOscillatorStep(FB_SFXVOICE *voice)
     if (__fb_sfx->samplerate <= 0)
         return 0.0f;
 
-    return (float)voice->frequency / (float)__fb_sfx->samplerate;
+    if (voice->frequency <= 0)
+    {
+        voice->phase_step = 0.0f;
+        voice->phase_rate = 0;
+        return 0.0f;
+    }
+
+    if (voice->phase_step <= 0.0f ||
+        voice->phase_rate != __fb_sfx->samplerate)
+    {
+        voice->phase_step =
+            (float)voice->frequency / (float)__fb_sfx->samplerate;
+        voice->phase_rate = __fb_sfx->samplerate;
+    }
+
+    return voice->phase_step;
 }
 
 
@@ -93,7 +141,7 @@ static void fb_sfxOscillatorAdvance(FB_SFXVOICE *voice)
     if (!voice)
         return;
 
-    step = fb_sfxOscillatorStep(voice);
+    step = fb_sfxOscillatorPhaseStep(voice);
 
     voice->phase += step;
 
@@ -110,7 +158,7 @@ static float fb_sfxOscillatorSine(FB_SFXVOICE *voice)
 {
     float sample;
 
-    sample = sinf(voice->phase * 2.0f * FB_SFX_PI);
+    sample = fb_sfxOscillatorWaveSample(FB_SFX_WAVE_SINE, voice->phase);
 
     fb_sfxOscillatorAdvance(voice);
 
@@ -212,7 +260,7 @@ static float fb_sfxOscillatorNoise(FB_SFXVOICE *voice)
         voice->noise_ready = 1;
     }
 
-    step = fb_sfxOscillatorStep(voice);
+    step = fb_sfxOscillatorPhaseStep(voice);
 
     voice->phase += step;
 
@@ -265,6 +313,62 @@ float fb_sfxOscillatorSample(FB_SFXVOICE *voice)
 
 
 /* ------------------------------------------------------------------------- */
+/* Stateless waveform lookup                                                 */
+/* ------------------------------------------------------------------------- */
+
+float fb_sfxOscillatorWaveSample(int waveform, float phase)
+{
+    /* NaN and infinity must not reach floorf() or an integer table index. */
+    if (!(phase >= -FLT_MAX && phase <= FLT_MAX))
+        return 0.0f;
+
+    if (phase < 0.0f || phase >= 1.0f)
+    {
+        phase -= floorf(phase);
+        if (phase < 0.0f)
+            phase += 1.0f;
+    }
+
+    switch (waveform)
+    {
+        case FB_SFX_WAVE_SINE:
+        {
+            float table_position;
+            float fraction;
+            int index;
+            int next_index;
+
+            fb_sfxOscillatorBuildSineTable();
+            table_position = phase * (float)FB_SFX_SINE_TABLE_SIZE;
+            index = (int)table_position;
+            next_index = (index + 1) & FB_SFX_SINE_TABLE_MASK;
+            fraction = table_position - (float)index;
+
+            return g_fb_sfx_sine_table[index] +
+                   (g_fb_sfx_sine_table[next_index] -
+                    g_fb_sfx_sine_table[index]) * fraction;
+        }
+
+        case FB_SFX_WAVE_SQUARE:
+            return (phase < 0.5f) ? 1.0f : -1.0f;
+
+        case FB_SFX_WAVE_TRIANGLE:
+            if (phase < 0.25f)
+                return phase * 4.0f;
+            if (phase < 0.75f)
+                return 2.0f - phase * 4.0f;
+            return phase * 4.0f - 4.0f;
+
+        case FB_SFX_WAVE_SAW:
+            return phase * 2.0f - 1.0f;
+
+        default:
+            return 0.0f;
+    }
+}
+
+
+/* ------------------------------------------------------------------------- */
 /* Frequency control                                                         */
 /* ------------------------------------------------------------------------- */
 
@@ -277,6 +381,14 @@ void fb_sfxVoiceSetFrequency(FB_SFXVOICE *voice, int freq)
         freq = 0;
 
     voice->frequency = freq;
+    voice->phase_step = 0.0f;
+    voice->phase_rate = 0;
+
+    if (__fb_sfx && __fb_sfx->samplerate > 0 && freq > 0)
+    {
+        voice->phase_step = (float)freq / (float)__fb_sfx->samplerate;
+        voice->phase_rate = __fb_sfx->samplerate;
+    }
 
     SFX_DEBUG("sfx_oscillator: frequency set to %d", freq);
 }

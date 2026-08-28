@@ -660,20 +660,19 @@ void fb_hPutAlphaMaskSIMD(unsigned char *src, unsigned char *dest,
 		unsigned int *destination = (unsigned int *)dest;
 		int x = 0;
 
-		for (; x <= (w - 4); x += 4) {
-			uint32_t alpha_values[4];
-			uint32x4_t source_alpha;
-			uint32x4_t destination_pixels;
+		for (; x <= (w - 8); x += 8) {
+			uint16x8_t source_16 = vmovl_u8(vld1_u8(src + x));
+			uint32x4_t alpha_low = vshlq_n_u32(
+				vmovl_u16(vget_low_u16(source_16)), 24);
+			uint32x4_t alpha_high = vshlq_n_u32(
+				vmovl_u16(vget_high_u16(source_16)), 24);
+			uint32x4_t destination_low = vld1q_u32(destination + x);
+			uint32x4_t destination_high = vld1q_u32(destination + x + 4);
 
-			alpha_values[0] = (uint32_t)src[x] << 24;
-			alpha_values[1] = (uint32_t)src[x + 1] << 24;
-			alpha_values[2] = (uint32_t)src[x + 2] << 24;
-			alpha_values[3] = (uint32_t)src[x + 3] << 24;
-			source_alpha = vld1q_u32(alpha_values);
-			destination_pixels = vld1q_u32(destination + x);
 			vst1q_u32(destination + x,
-				vorrq_u32(vandq_u32(destination_pixels, rgb_mask),
-					source_alpha));
+				vorrq_u32(vandq_u32(destination_low, rgb_mask), alpha_low));
+			vst1q_u32(destination + x + 4,
+				vorrq_u32(vandq_u32(destination_high, rgb_mask), alpha_high));
 		}
 		for (; x < w; ++x) {
 			destination[x] =

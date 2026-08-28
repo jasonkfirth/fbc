@@ -330,7 +330,10 @@ void fb_sfxConvertS16ToFloat(const short *src, float *dst, int samples);
 
 float fb_sfxClampSample(float v);
 float fb_sfxOscillatorSample(FB_SFXVOICE *voice);
+float fb_sfxOscillatorPhaseStep(FB_SFXVOICE *voice);
+float fb_sfxOscillatorWaveSample(int waveform, float phase);
 float fb_sfxWaveformSample(FB_SFXVOICE *voice);
+int fb_sfxMixerSimdEnabled(void);
 
 void fb_sfxVoiceInit(FB_SFXVOICE *voice);
 void fb_sfxVoiceSetWaveform(FB_SFXVOICE *voice, int waveform);
@@ -351,6 +354,7 @@ int fb_sfxEchoCmd(float wet, float delay_seconds, float feedback);
 void fb_sfxEchoReset(void);
 int fb_sfxEchoEnabled(void);
 void fb_sfxEchoProcess(float *left, float *right);
+void fb_sfxEchoProcessBlock(float *buffer, int frames);
 void fb_sfxEnvelopeDefine(int id, float attack, float decay, float sustain, float release);
 void fb_sfxEnvelopeRelease(FB_SFXVOICE *voice);
 float fb_sfxEnvelopeProcess(FB_SFXVOICE *voice, float dt);
@@ -491,6 +495,7 @@ int fb_sfxMidiSoftwareSend(unsigned char status,
                            unsigned char data1,
                            unsigned char data2);
 void fb_sfxMidiSoftwareMixFrame(float *left, float *right);
+void fb_sfxMidiSoftwareMixBlock(float *buffer, int frames);
 
 /*
     Shared MIDI state

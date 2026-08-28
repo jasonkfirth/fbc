@@ -38,6 +38,7 @@
 
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
+#include "sfx_simd.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -52,6 +53,7 @@
 #define FB_SFX_MIDI_FM_VOICES         32
 #define FB_SFX_MIDI_FM_SINE_SAMPLES 1024
 #define FB_SFX_MIDI_FM_DRUM_CHANNEL    9
+#define FB_SFX_MIDI_FM_BLOCK_FRAMES   64
 
 #define FB_SFX_MIDI_FM_ATTACK          1
 #define FB_SFX_MIDI_FM_DECAY           2
@@ -103,6 +105,9 @@ typedef struct FB_SFX_MIDI_FM_VOICE
     uint32_t noise_state;
 
     float frequency;
+    float carrier_increment;
+    float modulator_increment;
+    int increment_rate;
     float carrier_phase;
     float modulator_phase;
     float modulator_ratio;
@@ -124,6 +129,7 @@ typedef struct FB_SFX_MIDI_FM_STATE
     unsigned long next_age;
 
     float sine_table[FB_SFX_MIDI_FM_SINE_SAMPLES];
+    float normalizer[FB_SFX_MIDI_FM_VOICES + 1];
     FB_SFX_MIDI_FM_CHANNEL channels[FB_SFX_MIDI_FM_CHANNELS];
     FB_SFX_MIDI_FM_VOICE voices[FB_SFX_MIDI_FM_VOICES];
 } FB_SFX_MIDI_FM_STATE;
@@ -433,12 +439,20 @@ static void fb_sfxMidiFmResetChannel(FB_SFX_MIDI_FM_CHANNEL *channel,
 static void fb_sfxMidiFmResetState(void)
 {
     int channel;
+    int voices;
 
     memset(g_fb_sfx_midi_fm.voices, 0,
            sizeof(g_fb_sfx_midi_fm.voices));
 
     for (channel = 0; channel < FB_SFX_MIDI_FM_CHANNELS; ++channel)
         fb_sfxMidiFmResetChannel(&g_fb_sfx_midi_fm.channels[channel], 1);
+
+    g_fb_sfx_midi_fm.normalizer[0] = 0.0f;
+    for (voices = 1; voices <= FB_SFX_MIDI_FM_VOICES; voices++)
+    {
+        g_fb_sfx_midi_fm.normalizer[voices] =
+            0.34f / (float)sqrt((double)voices);
+    }
 
     g_fb_sfx_midi_fm.paused = 0;
     g_fb_sfx_midi_fm.next_age = 1;
@@ -520,6 +534,28 @@ static int fb_sfxMidiFmSampleRate(void)
         return FB_SFX_DEFAULT_RATE;
 
     return __fb_sfx->samplerate;
+}
+
+static void fb_sfxMidiFmUpdateIncrements(FB_SFX_MIDI_FM_VOICE *voice)
+{
+    float sample_rate;
+
+    if (!voice)
+        return;
+
+    sample_rate = (float)fb_sfxMidiFmSampleRate();
+    if (sample_rate <= 0.0f || voice->frequency <= 0.0f)
+    {
+        voice->carrier_increment = 0.0f;
+        voice->modulator_increment = 0.0f;
+        voice->increment_rate = 0;
+        return;
+    }
+
+    voice->carrier_increment = voice->frequency / sample_rate;
+    voice->modulator_increment =
+        voice->carrier_increment * voice->modulator_ratio;
+    voice->increment_rate = (int)sample_rate;
 }
 
 static float fb_sfxMidiFmNoteFrequency(int channel, int note)
@@ -634,6 +670,7 @@ static void fb_sfxMidiFmConfigureVoiceTimbre(
     voice->output_gain = timbre->output_gain;
 
     fb_sfxMidiFmLimitModulation(voice);
+    fb_sfxMidiFmUpdateIncrements(voice);
 }
 
 static void fb_sfxMidiFmReleaseVoice(FB_SFX_MIDI_FM_VOICE *voice)
@@ -1069,6 +1106,7 @@ static void fb_sfxMidiFmConfigureDrum(FB_SFX_MIDI_FM_VOICE *voice, int note)
     voice->drum_frames = (int)(duration * (float)sample_rate);
 
     fb_sfxMidiFmLimitModulation(voice);
+    fb_sfxMidiFmUpdateIncrements(voice);
 
     if (voice->drum_frames < 1)
         voice->drum_frames = 1;
@@ -1409,20 +1447,18 @@ int fb_sfxMidiSoftwareSend(unsigned char status,
 static float fb_sfxMidiFmRenderVoice(FB_SFX_MIDI_FM_VOICE *voice)
 {
     const FB_SFX_MIDI_FM_TIMBRE *timbre;
-    float carrier_increment;
-    float modulator_increment;
     float modulation;
     float tonal_sample;
     float sample;
-    float sample_rate;
 
     if (!voice || !voice->active)
         return 0.0f;
 
     timbre = fb_sfxMidiFmVoiceTimbre(voice);
-    sample_rate = (float)fb_sfxMidiFmSampleRate();
-    carrier_increment = voice->frequency / sample_rate;
-    modulator_increment = carrier_increment * voice->modulator_ratio;
+
+    if (voice->carrier_increment <= 0.0f ||
+        voice->increment_rate != fb_sfxMidiFmSampleRate())
+        fb_sfxMidiFmUpdateIncrements(voice);
 
     modulation = fb_sfxMidiFmSine(voice->modulator_phase) *
                  voice->modulation_index *
@@ -1439,9 +1475,9 @@ static float fb_sfxMidiFmRenderVoice(FB_SFX_MIDI_FM_VOICE *voice)
     }
 
     voice->carrier_phase = fb_sfxMidiFmWrapPhase(
-        voice->carrier_phase + carrier_increment);
+        voice->carrier_phase + voice->carrier_increment);
     voice->modulator_phase = fb_sfxMidiFmWrapPhase(
-        voice->modulator_phase + modulator_increment);
+        voice->modulator_phase + voice->modulator_increment);
 
     if (voice->percussion)
     {
@@ -1462,72 +1498,158 @@ static float fb_sfxMidiFmRenderVoice(FB_SFX_MIDI_FM_VOICE *voice)
            voice->output_gain;
 }
 
-void fb_sfxMidiSoftwareMixFrame(float *left, float *right)
+static int fb_sfxMidiFmUseSimd(void)
 {
-    float synth_left;
-    float synth_right;
-    float normalizer;
+    return fb_sfxMixerSimdEnabled();
+}
+
+static void fb_sfxMidiFmAccumulateVoice(const float *source,
+                                        float *destination,
+                                        int frames,
+                                        float left_gain,
+                                        float right_gain,
+                                        int use_simd)
+{
+    int frame;
+
+#ifdef FB_SFX_HAS_SIMD
+    if (use_simd)
+    {
+        fb_sfxMixMonoToStereoSIMD(source,
+                                  destination,
+                                  frames,
+                                  left_gain,
+                                  right_gain);
+        return;
+    }
+#else
+    (void)use_simd;
+#endif
+
+    for (frame = 0; frame < frames; frame++)
+    {
+        destination[frame * 2] += source[frame] * left_gain;
+        destination[frame * 2 + 1] += source[frame] * right_gain;
+    }
+}
+
+void fb_sfxMidiSoftwareMixBlock(float *buffer, int frames)
+{
     float master_volume;
     float balance;
-    int active_voices;
-    int index;
+    int block_start;
+    int use_simd;
 
-    if (!left || !right || !g_fb_sfx_midi_fm.active ||
+    if (!buffer || frames <= 0 || !g_fb_sfx_midi_fm.active ||
         g_fb_sfx_midi_fm.paused)
     {
         return;
     }
 
-    synth_left = 0.0f;
-    synth_right = 0.0f;
-    active_voices = 0;
     master_volume = (__fb_sfx) ? __fb_sfx->master_volume : 1.0f;
     balance = (__fb_sfx) ? __fb_sfx->balance : 0.0f;
+    use_simd = fb_sfxMidiFmUseSimd();
 
-    for (index = 0; index < FB_SFX_MIDI_FM_VOICES; ++index)
+    for (block_start = 0; block_start < frames;
+         block_start += FB_SFX_MIDI_FM_BLOCK_FRAMES)
     {
-        FB_SFX_MIDI_FM_CHANNEL *channel;
-        FB_SFX_MIDI_FM_VOICE *voice;
-        float channel_gain;
-        float pan;
-        float sample;
+        float mixed[FB_SFX_MIDI_FM_BLOCK_FRAMES * 2];
+        float voice_samples[FB_SFX_MIDI_FM_BLOCK_FRAMES];
+        unsigned char active_voices[FB_SFX_MIDI_FM_BLOCK_FRAMES];
+        int block_frames = frames - block_start;
+        int frame;
+        int index;
 
-        voice = &g_fb_sfx_midi_fm.voices[index];
-        if (!voice->active)
-            continue;
+        if (block_frames > FB_SFX_MIDI_FM_BLOCK_FRAMES)
+            block_frames = FB_SFX_MIDI_FM_BLOCK_FRAMES;
 
-        channel = &g_fb_sfx_midi_fm.channels[voice->channel];
-        sample = fb_sfxMidiFmRenderVoice(voice);
-        active_voices++;
+        memset(mixed, 0, (size_t)block_frames * 2u * sizeof(float));
+        memset(active_voices, 0, (size_t)block_frames);
 
-        channel_gain = ((float)channel->volume / 127.0f) *
-                       ((float)channel->expression / 127.0f);
-        sample *= channel_gain;
+        for (index = 0; index < FB_SFX_MIDI_FM_VOICES; index++)
+        {
+            FB_SFX_MIDI_FM_CHANNEL *channel;
+            FB_SFX_MIDI_FM_VOICE *voice;
+            float channel_gain;
+            float left_gain;
+            float pan;
+            float right_gain;
+            int rendered_frames;
 
-        pan = ((float)channel->pan - 64.0f) / 63.0f;
-        pan += balance;
+            voice = &g_fb_sfx_midi_fm.voices[index];
+            if (!voice->active || voice->channel < 0 ||
+                voice->channel >= FB_SFX_MIDI_FM_CHANNELS)
+            {
+                continue;
+            }
 
-        if (pan < -1.0f)
-            pan = -1.0f;
-        if (pan > 1.0f)
-            pan = 1.0f;
+            channel = &g_fb_sfx_midi_fm.channels[voice->channel];
+            channel_gain = ((float)channel->volume / 127.0f) *
+                           ((float)channel->expression / 127.0f);
+            pan = ((float)channel->pan - 64.0f) / 63.0f + balance;
 
-        synth_left += sample * (1.0f - pan) * 0.5f;
-        synth_right += sample * (1.0f + pan) * 0.5f;
+            if (pan < -1.0f)
+                pan = -1.0f;
+            if (pan > 1.0f)
+                pan = 1.0f;
+
+            left_gain = channel_gain * (1.0f - pan) * 0.5f;
+            right_gain = channel_gain * (1.0f + pan) * 0.5f;
+            rendered_frames = 0;
+
+            while (rendered_frames < block_frames && voice->active)
+            {
+                voice_samples[rendered_frames] =
+                    fb_sfxMidiFmRenderVoice(voice);
+                active_voices[rendered_frames]++;
+                rendered_frames++;
+            }
+
+            if (rendered_frames > 0)
+            {
+                fb_sfxMidiFmAccumulateVoice(voice_samples,
+                                             mixed,
+                                             rendered_frames,
+                                             left_gain,
+                                             right_gain,
+                                             use_simd);
+            }
+        }
+
+        /*
+            Voice expiration can change polyphony within a block.  Keep one
+            small count per frame so normalization follows the established
+            behavior without rescanning all 32 voice slots for every sample.
+        */
+        for (frame = 0; frame < block_frames; frame++)
+        {
+            int voices = active_voices[frame];
+
+            if (voices > 0)
+            {
+                float gain = g_fb_sfx_midi_fm.normalizer[voices] *
+                             master_volume;
+                int destination = (block_start + frame) * 2;
+
+                buffer[destination] += mixed[frame * 2] * gain;
+                buffer[destination + 1] += mixed[frame * 2 + 1] * gain;
+            }
+        }
     }
+}
 
-    if (active_voices <= 0)
+void fb_sfxMidiSoftwareMixFrame(float *left, float *right)
+{
+    float frame[2];
+
+    if (!left || !right)
         return;
 
-    /*
-        Square-root normalization keeps a solo voice audible while leaving
-        useful headroom for ordinary chords. The final mixer clamp remains
-        the last line of defense for unusually dense files.
-    */
-
-    normalizer = 0.34f / (float)sqrt((double)active_voices);
-    *left += synth_left * normalizer * master_volume;
-    *right += synth_right * normalizer * master_volume;
+    frame[0] = *left;
+    frame[1] = *right;
+    fb_sfxMidiSoftwareMixBlock(frame, 1);
+    *left = frame[0];
+    *right = frame[1];
 }
 
 /* end of sfx_midi_fm.c */

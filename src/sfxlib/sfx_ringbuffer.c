@@ -180,30 +180,50 @@ int fb_sfxRingBufferWrite(
     const float *src,
     int frames)
 {
-    int written = 0;
-    int ch;
+    int first_frames;
+    int writable;
+    int written;
+    size_t first_samples;
+    size_t remaining_samples;
 
-    if (!rb || !src)
+    if (!rb || !src || !rb->data || frames <= 0 ||
+        rb->frames <= 0 || rb->channels <= 0 ||
+        rb->frames > INT_MAX / rb->channels ||
+        rb->read_pos < 0 || rb->read_pos >= rb->frames ||
+        rb->write_pos < 0 || rb->write_pos >= rb->frames ||
+        rb->count < 0 || rb->count > rb->frames)
+    {
+        return 0;
+    }
+
+    writable = rb->frames - rb->count;
+    written = (frames < writable) ? frames : writable;
+    if (written <= 0)
         return 0;
 
-    while (written < frames && rb->count < rb->frames)
+    first_frames = rb->frames - rb->write_pos;
+    if (first_frames > written)
+        first_frames = written;
+
+    first_samples = (size_t)first_frames * (size_t)rb->channels;
+    memcpy(rb->data + ((size_t)rb->write_pos * (size_t)rb->channels),
+           src,
+           first_samples * sizeof(float));
+
+    remaining_samples = (size_t)(written - first_frames) *
+                        (size_t)rb->channels;
+    if (remaining_samples > 0)
     {
-        int index = rb->write_pos * rb->channels;
-
-        for (ch = 0; ch < rb->channels; ch++)
-        {
-            rb->data[index + ch] =
-                src[(written * rb->channels) + ch];
-        }
-
-        rb->write_pos++;
-
-        if (rb->write_pos >= rb->frames)
-            rb->write_pos = 0;
-
-        rb->count++;
-        written++;
+        memcpy(rb->data,
+               src + first_samples,
+               remaining_samples * sizeof(float));
     }
+
+    rb->write_pos += written;
+    if (rb->write_pos >= rb->frames)
+        rb->write_pos -= rb->frames;
+
+    rb->count += written;
 
     return written;
 }
@@ -218,30 +238,48 @@ int fb_sfxRingBufferRead(
     float *dst,
     int frames)
 {
-    int read = 0;
-    int ch;
+    int first_frames;
+    int read;
+    size_t first_samples;
+    size_t remaining_samples;
 
-    if (!rb || !dst)
+    if (!rb || !dst || !rb->data || frames <= 0 ||
+        rb->frames <= 0 || rb->channels <= 0 ||
+        rb->frames > INT_MAX / rb->channels ||
+        rb->read_pos < 0 || rb->read_pos >= rb->frames ||
+        rb->write_pos < 0 || rb->write_pos >= rb->frames ||
+        rb->count < 0 || rb->count > rb->frames)
+    {
+        return 0;
+    }
+
+    read = (frames < rb->count) ? frames : rb->count;
+    if (read <= 0)
         return 0;
 
-    while (read < frames && rb->count > 0)
+    first_frames = rb->frames - rb->read_pos;
+    if (first_frames > read)
+        first_frames = read;
+
+    first_samples = (size_t)first_frames * (size_t)rb->channels;
+    memcpy(dst,
+           rb->data + ((size_t)rb->read_pos * (size_t)rb->channels),
+           first_samples * sizeof(float));
+
+    remaining_samples = (size_t)(read - first_frames) *
+                        (size_t)rb->channels;
+    if (remaining_samples > 0)
     {
-        int index = rb->read_pos * rb->channels;
-
-        for (ch = 0; ch < rb->channels; ch++)
-        {
-            dst[(read * rb->channels) + ch] =
-                rb->data[index + ch];
-        }
-
-        rb->read_pos++;
-
-        if (rb->read_pos >= rb->frames)
-            rb->read_pos = 0;
-
-        rb->count--;
-        read++;
+        memcpy(dst + first_samples,
+               rb->data,
+               remaining_samples * sizeof(float));
     }
+
+    rb->read_pos += read;
+    if (rb->read_pos >= rb->frames)
+        rb->read_pos -= rb->frames;
+
+    rb->count -= read;
 
     return read;
 }

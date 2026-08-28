@@ -23,6 +23,14 @@
 ''     - image file decoding, allocation, or presentation timing
 ''     - vendor-specific performance thresholds
 ''
+'' Build-time measurement controls:
+''
+''     TRANSFER_BENCHMARK_COUNT
+''         Override the number of PUT operations measured for each mode.
+''
+''     TRANSFER_BENCHMARK_GET_COUNT
+''         Override the number of GET operations measured.
+''
 
 #ifdef __FB_ANDROID__
 	#ifndef __FB_GFXLIB3__
@@ -42,13 +50,29 @@
 #ifdef __FB_ANDROID__
 	const screen_width = 320
 	const screen_height = 240
-	const transfer_count = 512
-	const get_count = 64
 #else
 	const screen_width = 1024
 	const screen_height = 768
-	const transfer_count = 4096
-	const get_count = 512
+#endif
+
+#ifndef TRANSFER_BENCHMARK_COUNT
+	#ifdef __FB_ANDROID__
+		const transfer_count = 512
+	#else
+		const transfer_count = 4096
+	#endif
+#else
+	const transfer_count = TRANSFER_BENCHMARK_COUNT
+#endif
+
+#ifndef TRANSFER_BENCHMARK_GET_COUNT
+	#ifdef __FB_ANDROID__
+		const get_count = 64
+	#else
+		const get_count = 512
+	#endif
+#else
+	const get_count = TRANSFER_BENCHMARK_GET_COUNT
 #endif
 
 dim as any ptr sprite_image

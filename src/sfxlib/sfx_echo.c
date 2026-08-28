@@ -201,4 +201,53 @@ void fb_sfxEchoProcess(float *left, float *right)
         g_echo.position = 0;
 }
 
+void fb_sfxEchoProcessBlock(float *buffer, int frames)
+{
+    float feedback;
+    float wet;
+    int delay_frames;
+    int frame;
+    int position;
+
+    if (!buffer || frames <= 0 || !g_echo.enabled || !g_echo.samples ||
+        g_echo.frames <= 0)
+    {
+        return;
+    }
+
+    /*
+        Echo feedback makes successive frames dependent, so vectorizing the
+        time axis would change the effect.  A block loop still removes two
+        pointer checks, several state loads, and one function call per frame
+        while preserving the established sample order exactly.
+    */
+    delay_frames = g_echo.frames;
+    position = g_echo.position;
+    wet = g_echo.wet;
+    feedback = g_echo.feedback;
+
+    for (frame = 0; frame < frames; frame++)
+    {
+        int delay_index = position * 2;
+        int sample_index = frame * 2;
+        float delayed_left = g_echo.samples[delay_index];
+        float delayed_right = g_echo.samples[delay_index + 1];
+        float input_left = buffer[sample_index];
+        float input_right = buffer[sample_index + 1];
+
+        g_echo.samples[delay_index] =
+            input_left + delayed_right * feedback;
+        g_echo.samples[delay_index + 1] =
+            input_right + delayed_left * feedback;
+        buffer[sample_index] = input_left + delayed_left * wet;
+        buffer[sample_index + 1] = input_right + delayed_right * wet;
+
+        position++;
+        if (position >= delay_frames)
+            position = 0;
+    }
+
+    g_echo.position = position;
+}
+
 /* end of sfx_echo.c */

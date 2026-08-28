@@ -107,7 +107,7 @@ void fb_sfxNoisePitch(int channel, int frequency, float duration, float volume)
         noise behavior.
     */
 
-    voice->frequency = frequency;
+    fb_sfxVoiceSetFrequency(voice, frequency);
 
     /* compute duration in samples */
 

@@ -78,6 +78,8 @@ void fb_sfxVoiceInit(FB_SFXVOICE *v)
     v->pan = 0.0f;
 
     v->frequency = 0;
+    v->phase_step = 0.0f;
+    v->phase_rate = 0;
 
     v->position = 0;
     v->pos = 0;
@@ -202,7 +204,7 @@ void fb_sfxVoiceStartTone(FB_SFXVOICE *v, int freq, float volume)
     if (!v)
         return;
 
-    v->frequency = freq;
+    fb_sfxVoiceSetFrequency(v, freq);
     v->volume = volume;
 
     v->position = 0;

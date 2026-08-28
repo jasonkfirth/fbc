@@ -6,8 +6,8 @@
 
     Purpose:
 
-        Provide runtime-gated NEON PCM conversion kernels for 32-bit ARMv7
-        or newer.
+        Provide runtime-gated NEON conversion and mixer kernels for 32-bit
+        ARMv7 or newer.
 
     Responsibilities:
 
@@ -19,7 +19,7 @@
 
         - assumptions that hard-float ARM always includes NEON
         - AArch64 feature policy
-        - audio-driver or mixer logic
+        - audio-driver or high-level mixer policy
 */
 
 #include "../sfx_simd.h"

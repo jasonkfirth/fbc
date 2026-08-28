@@ -6,8 +6,8 @@
 
     Purpose:
 
-        Compile the complete PCM conversion backend for SSE2-capable 32-bit
-        x86 processors.
+        Compile the complete conversion and mixer backend for SSE2-capable
+        32-bit x86 processors.
 
     Responsibilities:
 
@@ -18,7 +18,7 @@
 
         - CPU feature probing
         - MMX/SSE fallback conversion
-        - audio-driver or mixer logic
+        - audio-driver or high-level mixer policy
 */
 
 #include "../sfx_simd.h"

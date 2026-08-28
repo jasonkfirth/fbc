@@ -78,6 +78,10 @@ Environment:
   NSIS_EXE            Explicit makensis path (default: /mingw64/bin/makensis.exe)
   JOBS                Parallel make job count (default: detected CPU core count)
   ANDROID_API         NDK API level used for runtime build (default: 26)
+  ANDROID_RUNTIME_CFLAGS
+                      C flags used for Android runtimes (default: -O2)
+  ANDROID_RUNTIME_CXXFLAGS
+                      C++ flags used for Android runtimes (default: C flags)
   ANDROID_PLATFORM    SDK platform package (default: platforms;android-35)
   ANDROID_BUILDTOOLS  SDK build-tools package (default: build-tools;35.0.0)
   ANDROID_NDK_PACKAGE SDK NDK package (default: ndk;27.2.12479018)
@@ -318,6 +322,8 @@ NSIS_EXE="${NSIS_EXE:-/mingw64/bin/makensis.exe}"
 JOBS="${JOBS:-$(max_jobs)}"
 
 ANDROID_API="${ANDROID_API:-26}"
+ANDROID_RUNTIME_CFLAGS="${ANDROID_RUNTIME_CFLAGS:--O2}"
+ANDROID_RUNTIME_CXXFLAGS="${ANDROID_RUNTIME_CXXFLAGS:-$ANDROID_RUNTIME_CFLAGS}"
 ANDROID_PLATFORM="${ANDROID_PLATFORM:-platforms;android-35}"
 ANDROID_BUILDTOOLS="${ANDROID_BUILDTOOLS:-build-tools;35.0.0}"
 ANDROID_NDK_PACKAGE="${ANDROID_NDK_PACKAGE:-ndk;27.2.12479018}"
@@ -652,8 +658,8 @@ build_android_target() {
 			BUILD_FBC_TARGET="$target_key" \
 			BUILD_FBC_BUILDPREFIX= \
 			CPPFLAGS= \
-			CFLAGS= \
-			CXXFLAGS= \
+			CFLAGS="$ANDROID_RUNTIME_CFLAGS" \
+			CXXFLAGS="$ANDROID_RUNTIME_CXXFLAGS" \
 			LDFLAGS= \
 			rtlib fbrt gfxlib2 gfxlib3 sfxlib \
 			-j"$JOBS"

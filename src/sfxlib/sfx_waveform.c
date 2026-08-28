@@ -80,7 +80,7 @@ static void fb_sfxWaveAdvance(FB_SFXVOICE *v)
     if (__fb_sfx->samplerate <= 0)
         return;
 
-    step = (float)v->frequency / (float)__fb_sfx->samplerate;
+    step = fb_sfxOscillatorPhaseStep(v);
 
     v->phase += step;
 
