@@ -151,6 +151,12 @@ void fb_sfxMixerDiagnostics(const float *buffer, int frames)
     (void)frames;
 }
 
+int fb_sfxMixerSimdEnabled(void)
+{
+    /* The supported Windows CE ARM and MIPS baselines have no SIMD backend. */
+    return 0;
+}
+
 
 /* ------------------------------------------------------------------------- */
 /* Mixer initialization                                                      */

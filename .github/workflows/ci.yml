@@ -549,8 +549,13 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          brew update
-          brew install make pkg-config xz dos2unix gnu-sed coreutils rsync libffi ncurses
+          # Hosted runners can retain unrelated third-party taps whose stale
+          # formulae fail during an update.  The image already carries current
+          # Homebrew metadata, so keep this job isolated from those taps.
+          # dos2unix is optional in bootstrap-emit.mk and has no Intel macOS 15
+          # bottle, so it is intentionally absent from this required set.
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          brew install make pkg-config xz gnu-sed coreutils rsync libffi ncurses
 
       - name: Select parallelism
         run: echo "JOBS=$(sysctl -n hw.logicalcpu)" >> "$GITHUB_ENV"
