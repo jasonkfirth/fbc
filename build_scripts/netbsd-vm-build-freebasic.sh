@@ -73,7 +73,7 @@ Usage: ./build_scripts/netbsd-vm-build-freebasic.sh [options]
 
 Options:
   --release N            NetBSD release. Default: 11.0
-  --dist-url URL         NetBSD distribution URL. Default: official release URL
+  --dist-url URL         NetBSD distribution tree or ISO URL. Default: official ISO
   --package FILE         Existing NetBSD package to test.
   --test-only            Test --package without rebuilding FreeBASIC.
   --workroot DIR         Work directory. Default: out/netbsd-vm
@@ -142,7 +142,14 @@ if [ "$TEST_ONLY" -eq 1 ] && [ -z "$PACKAGE_FILE" ]; then
 fi
 
 if [ -z "$DIST_URL" ]; then
-	DIST_URL="https://cdn.netbsd.org/pub/NetBSD/NetBSD-$RELEASE/$ARCH/"
+	#
+	# NetBSD 11 no longer publishes installation/cdrom/boot-com.iso in the
+	# per-architecture release tree.  Anita 2.16 treats that missing file as
+	# optional while downloading, but still passes it to QEMU and fails before
+	# the guest can boot.  The complete release ISO is an Anita-supported
+	# distribution source and contains both the boot loader and selected sets.
+	#
+	DIST_URL="https://cdn.netbsd.org/pub/NetBSD/images/$RELEASE/NetBSD-$RELEASE-$ARCH.iso"
 fi
 
 PKG_REPO="https://cdn.netbsd.org/pub/pkgsrc/packages/NetBSD/$PKG_ARCH/$RELEASE/All"
