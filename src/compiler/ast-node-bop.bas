@@ -407,6 +407,8 @@ private function hFloatConstCompare _
 		byval rf as double _
 	) as longint
 
+	function = FALSE
+
 	select case as const op
 	case AST_OP_NE  : function = (lf <> rf)
 	case AST_OP_EQ  : function = (lf =  rf)

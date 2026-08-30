@@ -12,6 +12,7 @@
 #
 #     * seed a reproducible source bootstrap compiler
 #     * build the current XL compiler and runtime libraries
+#     * statically check every tracked first-party C and C++ source file
 #     * run build-system, compiler, language, and example validation
 #     * exercise native Linux, Darwin, and MSYS2 Windows environments
 #     * exercise the broader target CPU and bootstrap-emission matrix
@@ -48,6 +49,25 @@ env:
   BOOTSTRAP_VERSION: "1.10.1"
 
 jobs:
+  c-lint:
+    name: C/C++ whole-tree lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Cppcheck
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cppcheck
+          cppcheck --version
+
+      - name: Lint all first-party C and C++ sources
+        run: bash build_scripts/lint-c-sources.sh
+
   bootstrap-sources:
     name: Generate native bootstrap sources
     runs-on: ubuntu-24.04

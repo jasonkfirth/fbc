@@ -150,19 +150,16 @@ static int set_mode
 		int text_w, int text_h
 	);
 
+static unsigned char *allocate_aligned_page(size_t page_size);
+static void free_aligned_pages(unsigned char **pages, int page_count);
+
 static void release_gfx_mem(void)
 {
 	if (__fb_gfx) {
 		if ((__fb_gfx->driver) && (__fb_gfx->driver->exit))
             __fb_gfx->driver->exit();
         fb_hResetCharCells(NULL, FALSE);
-        if (__fb_gfx->page) {
-            int i;
-            for (i = 0; i < __fb_gfx->num_pages; i++) {
-                free(((void **)(__fb_gfx->page[i]))[-1]);
-            }
-            free((void *)__fb_gfx->page);
-		}
+		free_aligned_pages(__fb_gfx->page, __fb_gfx->num_pages);
 		if (__fb_gfx->device_palette)
 			free(__fb_gfx->device_palette);
 		if (__fb_gfx->palette)
@@ -173,10 +170,10 @@ static void release_gfx_mem(void)
 			free(__fb_gfx->dirty);
 		if (__fb_gfx->key)
 			free(__fb_gfx->key);
-		if (__fb_gfx->event_queue) {
+		if (__fb_gfx->event_queue)
 			free(__fb_gfx->event_queue);
+		if (__fb_gfx->event_mutex)
 			fb_MutexDestroy(__fb_gfx->event_mutex);
-		}
 		free(__fb_gfx);
         __fb_gfx = NULL;
 	}
@@ -564,6 +561,7 @@ static int set_mode
     int i, j, try_count;
     char *c, *driver_name;
     unsigned char *dest;
+	size_t page_size;
 
 	/* normalize flags */
 	if ((flags >= 0) && (flags & DRIVER_SHAPED_WINDOW))
@@ -620,6 +618,8 @@ static int set_mode
     }
 
 	FB_UNLOCK( );
+	if ((mode != 0) && (w != 0) && (__fb_gfx == NULL))
+		goto allocation_failed;
 
     if (__fb_gfx) {
     	__fb_gfx->id = screen_id++;
@@ -647,21 +647,33 @@ static int set_mode
         }
 
         __fb_gfx->bpp = BYTES_PER_PIXEL(__fb_gfx->depth);
+		if ((__fb_gfx->bpp <= 0) || (num_pages <= 0) ||
+		    ((size_t)__fb_gfx->w > ((size_t)INT_MAX /
+		                            (size_t)__fb_gfx->bpp)))
+			goto allocation_failed;
+
         __fb_gfx->pitch = __fb_gfx->w * __fb_gfx->bpp;
-        __fb_gfx->page = (unsigned char **)malloc(sizeof(unsigned char *) * num_pages);
+		if ((size_t)__fb_gfx->pitch >
+		    ((size_t)-1 / (size_t)__fb_gfx->h))
+			goto allocation_failed;
+		page_size = (size_t)__fb_gfx->pitch * (size_t)__fb_gfx->h;
+
+		__fb_gfx->num_pages = num_pages;
+        __fb_gfx->page = (unsigned char **)calloc((size_t)num_pages,
+			sizeof(__fb_gfx->page[0]));
+		if (!__fb_gfx->page)
+			goto allocation_failed;
         for (i = 0; i < num_pages; i++) {
-		/* 0xF for the para alignment, p_size is sizeof(void *) rounded up to % 16 for the storage for the original pointer */
-		int p_size = (sizeof(void *) + 0xF) & 0xF;
-		void *tmp = malloc((__fb_gfx->pitch * __fb_gfx->h) + p_size + 0xF);
-		__fb_gfx->page[i] = (unsigned char *)(((intptr_t)tmp + p_size + 0xF) & ~0xF);
-		((void **)(__fb_gfx->page[i]))[-1] = tmp;
+			__fb_gfx->page[i] = allocate_aligned_page(page_size);
+			if (!__fb_gfx->page[i])
+				goto allocation_failed;
 	}
-        __fb_gfx->num_pages = num_pages;
         __fb_gfx->framebuffer = __fb_gfx->page[0];
 
         /* dirty lines array may be bigger than needed; this is to please the
          gfx driver which is not aware of the scanline size */
-        __fb_gfx->dirty = (char *)calloc(1, __fb_gfx->h * __fb_gfx->scanline_size);
+		__fb_gfx->dirty = (char *)calloc((size_t)__fb_gfx->h,
+			(size_t)__fb_gfx->scanline_size);
         __fb_gfx->device_palette = (unsigned int *)calloc(1, sizeof(unsigned int) * 256);
         __fb_gfx->palette = (unsigned int *)calloc(1, sizeof(unsigned int) * 256);
         __fb_gfx->color_association = (unsigned char *)malloc(16);
@@ -669,6 +681,12 @@ static int set_mode
         __fb_gfx->event_queue = (EVENT *)malloc(sizeof(EVENT) * MAX_EVENTS);
         __fb_gfx->event_mutex = fb_MutexCreate();
         __fb_color_conv_16to32 = (unsigned int *)malloc(sizeof(unsigned int) * 512);
+
+		if (!__fb_gfx->dirty || !__fb_gfx->device_palette ||
+		    !__fb_gfx->palette || !__fb_gfx->color_association ||
+		    !__fb_gfx->key || !__fb_gfx->event_queue ||
+		    !__fb_gfx->event_mutex || !__fb_color_conv_16to32)
+			goto allocation_failed;
 
 		if (flags != DRIVER_NULL) {
 			if (flags & DRIVER_ALPHA_PRIMITIVES) {
@@ -788,6 +806,17 @@ static int set_mode
             __fb_ctx.exit_gfxlib2 = exit_proc;
         }
     }
+
+	goto allocation_complete;
+
+allocation_failed:
+	release_gfx_mem();
+	FB_LOCK( );
+	memset(&__fb_ctx.hooks, 0, sizeof(__fb_ctx.hooks));
+	FB_UNLOCK( );
+	return fb_ErrorSetNum(FB_RTERROR_OUTOFMEM);
+
+allocation_complete:
 
     if( flags != SCREEN_EXIT ) {
         /* Reset VIEW PRINT

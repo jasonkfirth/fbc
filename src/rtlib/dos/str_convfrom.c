@@ -116,7 +116,6 @@ static double fb_hDosParseDecimal( const char *p, ssize_t len )
 		return 0.0;
 
 	if( (p < end) && ((*p == 'e') || (*p == 'E') || (*p == 'd') || (*p == 'D')) ) {
-		const char *exp_start = p;
 		int have_exponent_digit = 0;
 
 		++p;
@@ -139,7 +138,6 @@ static double fb_hDosParseDecimal( const char *p, ssize_t len )
 		}
 
 		if( !have_exponent_digit ) {
-			p = exp_start;
 			exponent = 0;
 			exponent_sign = 1;
 		}

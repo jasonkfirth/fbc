@@ -8,6 +8,7 @@ int fb_DevFileReadWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
     size_t chars, read_chars, converted_chars;
     char *buffer;
     FB_WCHAR *wbuffer;
+    int heap_allocated;
 
     FB_LOCK();
 
@@ -27,6 +28,7 @@ int fb_DevFileReadWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
     }
 
 	chars = *pchars;
+	heap_allocated = FALSE;
 
 	if( (chars > (((size_t)-1) - 1)) ||
 	    (chars > ((((size_t)-1) / sizeof( FB_WCHAR )) - 1)) )
@@ -57,6 +59,8 @@ int fb_DevFileReadWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
 			FB_UNLOCK();
 			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 		}
+
+		heap_allocated = TRUE;
 	}
 
 	memset( buffer, 0, chars + 1 );
@@ -74,7 +78,7 @@ int fb_DevFileReadWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
 
 	memcpy( dst, wbuffer, converted_chars * sizeof( FB_WCHAR ) );
 
-	if( *pchars >= FB_LOCALBUFF_MAXLEN )
+	if( heap_allocated )
 	{
 		free( buffer );
 		free( wbuffer );

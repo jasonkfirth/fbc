@@ -1,4 +1,26 @@
-/* float to string, internal usage */
+/*
+    FreeBASIC runtime Xbox floating-point formatting
+    ------------------------------------------------
+
+    File: xbox/str_ftoa.c
+
+    Purpose:
+
+        Format floating-point values for the Xbox runtime and its host-side
+        compatibility builds.
+
+    Responsibilities:
+
+        - provide the native Xbox formatter where the C runtime is incomplete
+        - preserve the host-side snprintf-based compatibility path
+        - implement FreeBASIC's optional leading-space convention
+
+    This file intentionally does NOT contain:
+
+        - string descriptor allocation
+        - PRINT or WRITE statement handling
+        - floating-point parsing
+*/
 
 #include "../fb.h"
 
@@ -223,7 +245,8 @@ char *fb_hFloat2Str( double val, char *buffer, int digits, int mask )
 #else
 	ssize_t len, maxlen;
 	char *p;
-	char fmtstr[16], *fstr;
+	char fmtstr[16];
+	const char *fstr;
 
 	if( mask & FB_F2A_ADDBLANK )
 		p = &buffer[1];
@@ -233,10 +256,10 @@ char *fb_hFloat2Str( double val, char *buffer, int digits, int mask )
 	switch( digits )
 	{
 	case 7:
-		fstr = (char *)&"%.7g";
+		fstr = "%.7g";
 		break;
 	case 16:
-		fstr = (char *)&"%.16g";
+		fstr = "%.16g";
 		break;
 	default:
 		sprintf( fmtstr, "%%.%dg", digits );
@@ -276,3 +299,5 @@ char *fb_hFloat2Str( double val, char *buffer, int digits, int mask )
 		return p;
 #endif
 }
+
+/* end of xbox/str_ftoa.c */

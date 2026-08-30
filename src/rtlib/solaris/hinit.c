@@ -250,6 +250,8 @@ void fb_hRecheckConsoleSize( int requery_cursorpos )
 	}
 
 	unsigned char *char_buffer = calloc(1, win.ws_row * win.ws_col * 2);
+	if( char_buffer == NULL )
+		return;
 	unsigned char *attr_buffer = char_buffer + (win.ws_row * win.ws_col);
 	if (__fb_con.char_buffer) {
 		int h = (__fb_con.h < win.ws_row) ? __fb_con.h : win.ws_row;
@@ -309,7 +311,8 @@ int fb_hTermOut( int code, int param1, int param2 )
 	if (!__fb_con.inited)
 		return FALSE;
 
-	if (code > SEQ_MAX) {
+	if (code >= SEQ_EXTRA) {
+		int extra_index = code - SEQ_EXTRA;
 
 		/* Is use of the VT100 escape sequences disallowed? */
 		if (!__fb_enable_vt100_escapes)
@@ -321,11 +324,16 @@ int fb_hTermOut( int code, int param1, int param2 )
 				return FALSE;
 			break;
 		default:
-			if( fputs( extra_seq[code - SEQ_EXTRA], stdout ) == EOF )
+			if( (extra_index < 0) ||
+			    (extra_index >= (int)(sizeof(extra_seq) / sizeof(extra_seq[0]))) )
+				return FALSE;
+			if( fputs( extra_seq[extra_index], stdout ) == EOF )
 				return FALSE;
 			break;
 		}
 	} else {
+		if( (code < 0) || (code >= SEQ_MAX) )
+			return FALSE;
 		if (!__fb_con.seq[code])
 			return FALSE;
 		str = tgoto(__fb_con.seq[code], param1, param2);

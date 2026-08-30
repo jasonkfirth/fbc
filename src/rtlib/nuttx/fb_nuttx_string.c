@@ -602,9 +602,11 @@ void fb_StrDelete(const FBSTRING *s)
     }
 }
 
-void fb_hStrDelTemp(const FBSTRING *s)
+int fb_hStrDelTemp(FBSTRING *s)
 {
     (void)s;
+
+    return 0;
 }
 
 FBSTRING *fb_hStrAllocTemp_NoLock(FBSTRING *str, const ssize_t size)

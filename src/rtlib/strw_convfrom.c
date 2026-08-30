@@ -10,6 +10,9 @@ FBCALL double fb_WstrToDouble( const FB_WCHAR *src, ssize_t len )
 	FB_WCHAR *q, c;
 	double ret;
 
+	if( (src == NULL) || (len <= 0) )
+		return 0.0;
+
 	/* skip white spc */
 	p = fb_wstr_SkipChar( src, len, 32 );
 

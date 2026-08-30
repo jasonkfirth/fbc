@@ -217,28 +217,34 @@ void fb_hGetNumberParts
 	len_frac = hSnprintf( pachFracPart, frac_part_size, "%.*f", precision, dblFrac );
 #endif
 
-	/* Remove trailing zeroes and - if it completely consists of zeroes -
-	 * also remove the decimal point */
-	pszFracStart = pachFracPart;
-	if( *pszFracStart=='-' )
-		++pszFracStart;       /* Required for -0.0 value */
-	++pszFracStart;
-	pszFracEnd = pachFracPart + len_frac;
-	while( pszFracEnd!=pszFracStart ) {
-		--pszFracEnd;
-		if( *pszFracEnd!='0' ) {
-			if( *pszFracEnd!=chDecimalPoint ) {
-				++pszFracStart;
-				++pszFracEnd;
+	if( len_frac <= 0 ) {
+		if( frac_part_size > 0 )
+			pachFracPart[0] = '\0';
+		len_frac = 0;
+	} else {
+		/* Remove trailing zeroes and - if it completely consists of zeroes -
+		 * also remove the decimal point */
+		pszFracStart = pachFracPart;
+		if( *pszFracStart=='-' )
+			++pszFracStart;       /* Required for -0.0 value */
+		++pszFracStart;
+		pszFracEnd = pachFracPart + len_frac;
+		while( pszFracEnd!=pszFracStart ) {
+			--pszFracEnd;
+			if( *pszFracEnd!='0' ) {
+				if( *pszFracEnd!=chDecimalPoint ) {
+					++pszFracStart;
+					++pszFracEnd;
+				}
+				break;
 			}
-			break;
 		}
-	}
 
-	/* Move usable fractional part of number to begin of buffer */
-	len_frac = pszFracEnd - pszFracStart;
-	memmove( pachFracPart, pszFracStart, len_frac );
-	pachFracPart[len_frac] = 0;
+		/* Move usable fractional part of number to begin of buffer */
+		len_frac = pszFracEnd - pszFracStart;
+		memmove( pachFracPart, pszFracStart, len_frac );
+		pachFracPart[len_frac] = 0;
+	}
 
 	/* Store fix part of the number into buffer */
 	if( ullFix==0 && neg ) {

@@ -7,6 +7,9 @@ FBCALL unsigned long long fb_WstrToULongint( const FB_WCHAR *src, ssize_t len )
     const FB_WCHAR *p, *r;
 	int radix;
 
+	if( (src == NULL) || (len <= 0) )
+		return 0;
+
 	/* skip white spc */
 	p = fb_wstr_SkipChar( src, len, 32 );
 

@@ -267,7 +267,7 @@ int32 fb_FileOpen(const FBSTRING *filename, const uint32 mode,
     fb_nuttx_file_kind[file_num] = FB_NUTTX_FILE_KIND_FILE;
     fb_nuttx_file_record_len[file_num] = 0;
 
-    if ((mode == 0) || (mode == 1)) {
+    if (c_mode == NULL) {
         /*
             FreeBASIC's binary mode is read/write byte access.  C does not
             have one fopen mode that both preserves an existing file and

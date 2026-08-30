@@ -1,13 +1,17 @@
 /* image create/destroy functions */
 
 #include "fb_gfx.h"
+#include <limits.h>
 
 static void *gfx_imagecreate(int width, int height, unsigned int color, int depth, int flags, int usenewheader)
 {
 	FB_GFXCTX *context;
 	PUT_HEADER *image;
-	int size, pitch, header_size = 4;
+	size_t size, allocation_size;
+	int pitch, header_size = 4;
 	int bpp;
+	int p_size;
+	void *tmp;
 
 	FB_GRAPHICS_LOCK( );
 
@@ -41,16 +45,37 @@ static void *gfx_imagecreate(int width, int height, unsigned int color, int dept
 			color = ((color & 0xF8) >> 3) | ((color & 0xFC00) >> 5) | ((color & 0xF80000) >> 8);
 	}
 
+	if ((size_t)width > ((size_t)INT_MAX / (size_t)bpp)) {
+		FB_GRAPHICS_UNLOCK( );
+		fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+		return NULL;
+	}
 	pitch = width * bpp;
 	if (usenewheader) {
 		header_size = sizeof(PUT_HEADER);
+		if (pitch > (INT_MAX - 0xF)) {
+			FB_GRAPHICS_UNLOCK( );
+			fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+			return NULL;
+		}
 		pitch = (pitch + 0xF) & ~0xF;
 	}
-	size = pitch * height;
+	if ((size_t)pitch > ((size_t)-1 / (size_t)height)) {
+		FB_GRAPHICS_UNLOCK( );
+		fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+		return NULL;
+	}
+	size = (size_t)pitch * (size_t)height;
 
 	/* 0xF for the para alignment, p_size is sizeof(void *) rounded up to % 16 for the storage for the original pointer */
-	int p_size = (sizeof(void *) + 0xF) & 0xF;
-	void *tmp = malloc(size + header_size + p_size + 0xF);
+	p_size = (sizeof(void *) + 0xF) & 0xF;
+	if (size > ((size_t)-1 - (size_t)header_size - (size_t)p_size - 0xFu)) {
+		FB_GRAPHICS_UNLOCK( );
+		fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+		return NULL;
+	}
+	allocation_size = size + (size_t)header_size + (size_t)p_size + 0xFu;
+	tmp = malloc(allocation_size);
 	if (tmp == NULL) {
 		FB_GRAPHICS_UNLOCK( );
 		fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
@@ -76,7 +101,8 @@ static void *gfx_imagecreate(int width, int height, unsigned int color, int dept
 
 	fb_hPrepareTarget(context, (void *)image);
 	fb_hSetPixelTransfer(context, MASK_A_32);
-	context->pixel_set((unsigned char *)image + header_size, color, (pitch * height) / bpp);
+	context->pixel_set((unsigned char *)image + header_size, color,
+		size / (size_t)bpp);
 
 	FB_GRAPHICS_UNLOCK( );
 	fb_ErrorSetNum( FB_RTERROR_OK );

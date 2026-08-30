@@ -1,5 +1,5 @@
 /'
-    Small tool to test the fbportio driver. You can 
+    Small tool to test the fbportio driver. You can
 '/
 
 #include "windows.bi"
@@ -8,6 +8,22 @@
 
 #define INFO(message) print __FUNCTION__ & "(): " & message
 #define APIFAILED(func) print_winapi_error(__FUNCTION__, func)
+
+private function command_line_argument _
+    ( _
+        byval index as integer, _
+        byval argument_count as integer, _
+        byval arguments as zstring ptr ptr _
+    ) as zstring ptr
+
+    if (arguments = NULL) or (index < 0) or (index >= argument_count) then
+        return NULL
+    end if
+
+    '' The runtime guarantees one non-null argument pointer for each index below argc.
+    '' fblint: disable-next-line FBL525
+    return arguments[index]
+end function
 
 private sub print_winapi_error(byval parent as zstring ptr, byval func as zstring ptr)
     dim as DWORD e = GetLastError()
@@ -21,8 +37,12 @@ private sub print_winapi_error(byval parent as zstring ptr, byval func as zstrin
                       cptr(LPTSTR, @p), _
                       0, _
                       NULL)) then
-        print *p
-        LocalFree(p)
+        if (p <> NULL) then
+            '' FORMAT_MESSAGE_ALLOCATE_BUFFER transfers this buffer to the caller.
+            '' fblint: disable-next-line FBL-PTR-001
+            print *p
+            LocalFree(p)
+        end if
     end if
 
     end(1)
@@ -64,6 +84,8 @@ end sub
 private sub create_fbportio_sys()
     INFO("Copying fbportio.sys into the system's driver directory...")
 
+    '' A fixed-size ZSTRING has inline storage and no configurable array lower bound.
+    '' fblint: disable-next-line FBL-OPT-003
     dim as zstring * (MAX_PATH+1) filename
     dim as integer needed = GetSystemDirectory(@filename, MAX_PATH)
     if ((needed = 0) or (needed > MAX_PATH)) then
@@ -180,6 +202,8 @@ end sub
 private sub write_driver(byval port as short, byval dat as byte)
     INFO("Writing...")
     '' __asm__ volatile("outb %0, %1" : : "a"(dat), "d"(port));
+    '' This test tool is built only for the 32-bit x86 fbportio backend.
+    '' fblint: disable-next-line FBL972
     asm
         mov al, [dat]
         mov dx, [port]
@@ -192,6 +216,8 @@ private sub read_driver(byval port as short, byval pdat as byte ptr)
     dim as byte dat = 0
 
     '' __asm__ volatile("inb %1, %0" : "=a"(value) : "d"(port));
+    '' This test tool is built only for the 32-bit x86 fbportio backend.
+    '' fblint: disable-next-line FBL972
     asm
         mov dx, [port]
         in al, dx
@@ -219,7 +245,11 @@ end sub
     dim as integer show_help = (__FB_ARGC__ < 2)
 
     for i as integer = 1 to (__FB_ARGC__ - 1)
-        dim as zstring ptr arg = __FB_ARGV__[i]
+        dim as zstring ptr arg = command_line_argument(i, __FB_ARGC__, __FB_ARGV__)
+        if (arg = NULL) then
+            show_help = TRUE
+            exit for
+        end if
 
         select case (*arg)
         case "-h", "--help"
@@ -240,21 +270,27 @@ end sub
             stop_service(manager)
 
         case "-w", "--write"
+            dim as zstring ptr port = command_line_argument(i + 1, __FB_ARGC__, __FB_ARGV__)
+            dim as zstring ptr dat = command_line_argument(i + 2, __FB_ARGC__, __FB_ARGV__)
+            if (port = NULL) or (dat = NULL) then
+                show_help = TRUE
+                exit for
+            end if
             i += 2
-            if (i >= __FB_ARGC__) then exit for
-            dim as zstring ptr port = __FB_ARGV__[i-1]
-            dim as zstring ptr dat = __FB_ARGV__[i]
             init_driver()
             write_driver(valuint(*port), valuint(*dat))
 
         case "-r", "--read"
+            dim as zstring ptr port = command_line_argument(i + 1, __FB_ARGC__, __FB_ARGV__)
+            if (port = NULL) then
+                show_help = TRUE
+                exit for
+            end if
             i += 1
-            if (i >= __FB_ARGC__) then exit for
-            dim as zstring ptr port = __FB_ARGV__[i]
             dim as byte dat = 0
             init_driver()
             read_driver(valuint(*port), @dat)
-            print "Data recieved: " + str(dat)
+            print "Data received: " + str(dat)
 
         case else
             print "Unexpected command line argument: '" + *arg + "'"
@@ -272,7 +308,7 @@ end sub
         print "-i, --install"
         print "-u, --uninstall"
         print "-s, --start"
-        print "-e, --stop" 
+        print "-e, --stop"
         print "{-w|--write} <port> <data>"
         print "{-r|--read} <port>"
         end(1)

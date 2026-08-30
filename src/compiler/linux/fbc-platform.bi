@@ -62,15 +62,17 @@ private function fbcLinuxPlatformAddCCompilerCpuOptions _
 end function
 
 private function fbcLinuxPlatformHasLibrary( byval libname as zstring ptr ) as integer
-	dim as string filename
+	dim as string filename, found
 
 	filename = "lib" + *libname + ".a"
-	if( len( fbcFindLibFile( strptr( filename ) ) ) > 0 ) then
+	found = fbcFindLibFile( strptr( filename ) )
+	if( len( found ) > 0 ) then
 		return TRUE
 	end if
 
 	filename = "lib" + *libname + ".so"
-	function = (len( fbcFindLibFile( strptr( filename ) ) ) > 0)
+	found = fbcFindLibFile( strptr( filename ) )
+	function = (len( found ) > 0)
 end function
 
 private sub fbcLinuxPlatformAddLibraryIfPresent( byval libname as zstring ptr )

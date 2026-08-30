@@ -23,6 +23,8 @@ FBCALL FB_WCHAR *fb_WstrConcat ( const FB_WCHAR *str1, const FB_WCHAR *str2 )
 
 	/* alloc temp string */
     dst = fb_wstr_AllocTemp( str1_len + str2_len );
+	if( dst == NULL )
+		return NULL;
 
 	/* do the concatenation */
     d = fb_wstr_Move( dst, str1, str1_len );

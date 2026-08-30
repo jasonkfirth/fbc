@@ -144,7 +144,13 @@ private function fbcRiscosHostFinishExecutable( ) as integer
 				safeKill( aifname )
 				return FALSE
 			end if
-			name aifname as fbc.outname
+
+			'' Keep the converted AIF when the final rename fails.  The compiler
+			'' reports failure, but the generated executable remains available
+			'' under aifname for inspection or recovery.
+			if( name( aifname, fbc.outname ) <> 0 ) then
+				return FALSE
+			end if
 		end if
 	#endif
 

@@ -46,7 +46,8 @@ static void *threadproc(void *param)
 	if (threadFlags & FBTHREAD_DETACHED)
 		free(thread);
 
-	return (void *)1;
+	/* fb_ThreadWait does not consume the libogc thread result. */
+	return NULL;
 }
 
 FBCALL FBTHREAD *fb_ThreadCreate(FB_THREADPROC proc, void *param, ssize_t stack_size)

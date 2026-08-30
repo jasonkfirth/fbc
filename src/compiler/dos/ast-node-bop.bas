@@ -413,6 +413,8 @@ end sub
 
 private sub hResetDosFpuStack( )
 		'' DJGPP/DPMI can leave stale x87 stack entries between helper calls.
+		'' This file is compiled only for the x86 DOS compiler target.
+		'' fblint: disable-next-line FBL972
 		asm
 			fninit
 		end asm
@@ -437,6 +439,8 @@ private function hFloatConstCompare _
 		byval lf as double, _
 		byval rf as double _
 	) as longint
+
+		function = FALSE
 
 		dim as ulongint lbits = *cptr( ulongint ptr, @lf )
 		dim as ulongint rbits = *cptr( ulongint ptr, @rf )

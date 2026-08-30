@@ -200,6 +200,8 @@ FBCALL double fb_hStr2Double( char *src, ssize_t len )
 	 * This would be bad for hex strings, but those should be handled above already.
 	 */
 	q = malloc( len + 1 );
+	if( q == NULL )
+		return 0.0;
 	for( i = 0; i < len; i++ )
 	{
 		c = p[i];

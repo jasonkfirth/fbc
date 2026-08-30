@@ -87,6 +87,8 @@ static void add_key(NODE **node, const char *key, short code)
 		}
 	}
 	n = malloc(sizeof(NODE));
+	if( n == NULL )
+		return;
 	n->child = NULL;
 	n->next = *node;
 	n->key = *key;

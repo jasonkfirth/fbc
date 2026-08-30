@@ -1,5 +1,6 @@
 '' Small program to embed the fbportio.sys binary into a C module, as an array
 '' of bytes.
+'' fileLoad transfers ownership of its returned buffer to the caller.
 
 #define NULL 0
 
@@ -15,14 +16,30 @@ function fileLoad(byref filename as string, byval psize as integer ptr) as ubyte
     end if
 
     dim as ubyte ptr p = NULL
-    dim as integer size = lof(f)
+    dim as longint file_size = lof(f)
+    if (file_size < 0) orelse (file_size > clngint(&h7FFFFFFF)) then
+        close #f
+        fatalCantAccessFile(filename)
+    end if
+    dim as integer size = cint(file_size)
 
     if (size > 0) then
         p = allocate(size)
+        if (p = NULL) then
+            close #f
+            fatalCantAccessFile(filename)
+            return NULL
+        end if
 
+        '' The allocation was checked above and remains valid through GET.
+        '' fblint: disable-next-line FBL-PTR-001
         dim as integer result = get(#f, , *p, size, size)
         if (result or (size <= 0)) then
+            deallocate(p)
+            p = NULL
+            close #f
             fatalCantAccessFile(filename)
+            return NULL
         end if
     end if
 
@@ -59,6 +76,8 @@ end sub
     for i as integer = 0 to (size - 1)
         if ((i mod 16) = 0) then
             '' Indent at line begin
+            '' The driver is a small build-time input kept in one output buffer.
+            '' fblint: disable-next-line FBL503
             emit += "    "
         end if
 
@@ -80,3 +99,8 @@ end sub
     emit += !"};\n"
 
     writeOut(outputfile, emit)
+
+    if (p <> NULL) then
+        deallocate(p)
+        p = NULL
+    end if

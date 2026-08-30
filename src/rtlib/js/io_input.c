@@ -288,7 +288,8 @@ static unsigned int js_multikey_handler(unsigned long key, unsigned long locatio
                 break;
         }
 
-        __fb_con.multikey[scancode] = isKeyDown? 1: 0;
+        if( scancode < (sizeof(__fb_con.multikey) / sizeof(__fb_con.multikey[0])) )
+            __fb_con.multikey[scancode] = isKeyDown? 1: 0;
     }
 
     return scancode;

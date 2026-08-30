@@ -127,7 +127,13 @@ private function fbcArosHostFinishExecutable( ) as integer
 				safeKill( hunkname )
 				return FALSE
 			end if
-			name hunkname as fbc.outname
+
+			'' Keep the converted Hunk file when the final rename fails.  The
+			'' compiler reports failure, but the generated executable remains
+			'' available under hunkname for inspection or recovery.
+			if( name( hunkname, fbc.outname ) <> 0 ) then
+				return FALSE
+			end if
 		end if
 	#endif
 

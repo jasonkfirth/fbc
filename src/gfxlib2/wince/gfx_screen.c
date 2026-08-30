@@ -562,6 +562,8 @@ static int set_mode
     }
 
 	FB_UNLOCK( );
+	if ((mode != 0) && (w != 0) && (__fb_gfx == NULL))
+		goto allocation_failed;
 
     if (__fb_gfx) {
     	__fb_gfx->id = screen_id++;
@@ -614,7 +616,8 @@ static int set_mode
 
         /* dirty lines array may be bigger than needed; this is to please the
          gfx driver which is not aware of the scanline size */
-        __fb_gfx->dirty = (char *)calloc(1, __fb_gfx->h * __fb_gfx->scanline_size);
+		__fb_gfx->dirty = (char *)calloc((size_t)__fb_gfx->h,
+			(size_t)__fb_gfx->scanline_size);
         __fb_gfx->device_palette = (unsigned int *)calloc(1, sizeof(unsigned int) * 256);
         __fb_gfx->palette = (unsigned int *)calloc(1, sizeof(unsigned int) * 256);
         __fb_gfx->color_association = (unsigned char *)malloc(16);

@@ -1,6 +1,8 @@
 Version 1.20.4
 
 [changed]
+- build/CI: added an independent Cppcheck job that derives its manifest from every tracked first-party C and C++ source file, currently 1,479 files, excludes only an explicit set of vendored and generated compiler-output sources, and fails on new warning, performance, or portability diagnostics.
+- build/tools: hardened the gfxlib2 font and palette generator, DOS DXE export-table generator, and Win32/Windows CE fbportio generator and tester with bounded argument handling, validated file sizes and reads, checked allocations, and explicit owned-buffer cleanup.
 - build/release: run the qualified FreeBSD, OpenBSD, NetBSD, DragonFlyBSD, and Haiku x86_64 VM package builders as part of tagged GitHub releases, publish their native package formats with the main asset set, and allow those guest packages to be rebuilt and attached independently to an existing release.
 - build/release: stop treating the Linux MIPS cross-compiler archives as complete platform packages or publishing them with tagged releases; MIPS compiler and runtime qualification remains in the test workflows.
 - gfxlib3/files: added an independent copy of the dependency-free PNG codec for BLOAD, BSAVE, screen pages, and direct GPU asset loading, including checked chunks and CRCs, DEFLATE streams, scanline filters, indexed/RGB/RGBA images, alpha, Adam7 input, case-insensitive `.png` selection, GPU ordering boundaries, documentation, and exact CPU/GPU round-trip tests.
@@ -9,6 +11,11 @@ Version 1.20.4
 - sfxlib/mixer: changed ordinary voice rendering, software FM, echo, diagnostics, and ring-buffer transfers to operate in blocks; added SSE2/NEON waveform generation, sample accumulation, and final clamping with runtime-safe dispatch; replaced per-sample sine calls with an interpolated table; and added a null-driver benchmark plus a scalar reference switch for measuring each optimized workload.
 
 [fixed]
+- compiler/platform backends: initialize unsupported constant-folded floating comparisons deterministically, retain Linux library-search results before inspecting them, and report failed AROS Hunk or RISC OS AIF final renames while leaving the converted output available for recovery.
+- gfxlib2/gfxlib3: reject overflowing image and framebuffer sizes, unwind initial and partial allocation failures including event-mutex state, make Windows CE dirty-buffer allocation overflow-safe, and initialize and validate dynamically loaded XRandR function pointers before use.
+- rtlib/string and file I/O: track temporary wide-file read-buffer ownership explicitly, handle failed or empty fractional formatting, bound Boyer-Moore table allocation and suffix indexing, and validate wide-string inputs and temporary allocations before conversion or concatenation.
+- rtlib/platform backends: bounds-check JavaScript keyboard state and use the correct wide-output argument type; correct NuttX generic file-mode selection and temporary-string helper ABI; validate Solaris console allocations and terminal sequence indices; return a neutral Wii thread result; and handle Xbox conversion allocations and format-string literals safely.
+- examples/manual: make the module IMPORT example valid C by replacing its Basic-style comments with a C file header and footer.
 - build/release: make GitHub Release publication independent of an implicit checkout, stage multi-gigabyte uploads with hard links, allow enough time for the complete asset set, and provide a publish-only recovery workflow that reuses artifacts from a completed package run.
 - build/Android runtimes: build packaged runtime archives with optimization enabled, and keep generic ARMv7 C and C++ objects on the armeabi-v7a VFPv3-D16 baseline even when a recent NDK Clang driver enables NEON by default; the isolated gfxlib2 and sfxlib NEON objects still use runtime AT_HWCAP checks.
 

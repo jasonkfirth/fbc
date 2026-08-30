@@ -196,6 +196,8 @@ FBCALL double fb_WstrToDouble( const FB_WCHAR *src, ssize_t len )
 	 * 'd's with 'e'
 	 */
 	q = malloc( (len + 1) * sizeof(FB_WCHAR) );
+	if( q == NULL )
+		return 0.0;
 	for( i = 0; i < len; i++ )
 	{
 		c = p[i];

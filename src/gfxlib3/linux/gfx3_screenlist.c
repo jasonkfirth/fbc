@@ -67,9 +67,9 @@ static int screenlist_x11_load_function(void *library, const char *name,
 int fb_gfx3_platform_screenlist_modes(int depth, int **modes,
 	size_t *mode_count)
 {
-	FB_GFX3_XRR_GET_SCREEN_INFO get_screen_info;
-	FB_GFX3_XRR_CONFIG_SIZES config_sizes;
-	FB_GFX3_XRR_FREE_SCREEN_INFO free_screen_info;
+	FB_GFX3_XRR_GET_SCREEN_INFO get_screen_info = NULL;
+	FB_GFX3_XRR_CONFIG_SIZES config_sizes = NULL;
+	FB_GFX3_XRR_FREE_SCREEN_INFO free_screen_info = NULL;
 	FB_GFX3_XRR_CONFIGURATION *configuration = NULL;
 	FB_GFX3_XRR_SCREEN_SIZE *sizes;
 	Display *display = NULL;
@@ -96,13 +96,19 @@ int fb_gfx3_platform_screenlist_modes(int depth, int **modes,
 	library = dlopen("libXrandr.so.2", RTLD_LAZY | RTLD_LOCAL);
 	if (library == NULL)
 		library = dlopen("libXrandr.so", RTLD_LAZY | RTLD_LOCAL);
-	if ((library == NULL) ||
-	    (screenlist_x11_load_function(library, "XRRGetScreenInfo",
-	     &get_screen_info, sizeof(get_screen_info)) != FB_GFX3_OK) ||
-	    (screenlist_x11_load_function(library, "XRRConfigSizes",
-	     &config_sizes, sizeof(config_sizes)) != FB_GFX3_OK) ||
-	    (screenlist_x11_load_function(library, "XRRFreeScreenConfigInfo",
-	     &free_screen_info, sizeof(free_screen_info)) != FB_GFX3_OK))
+	if (library == NULL)
+		goto cleanup;
+	if (screenlist_x11_load_function(library, "XRRGetScreenInfo",
+	    &get_screen_info, sizeof(get_screen_info)) != FB_GFX3_OK)
+		goto cleanup;
+	if (screenlist_x11_load_function(library, "XRRConfigSizes",
+	    &config_sizes, sizeof(config_sizes)) != FB_GFX3_OK)
+		goto cleanup;
+	if (screenlist_x11_load_function(library, "XRRFreeScreenConfigInfo",
+	    &free_screen_info, sizeof(free_screen_info)) != FB_GFX3_OK)
+		goto cleanup;
+	if ((get_screen_info == NULL) || (config_sizes == NULL) ||
+	    (free_screen_info == NULL))
 		goto cleanup;
 
 	configuration = get_screen_info(display,

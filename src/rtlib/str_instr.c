@@ -85,17 +85,23 @@ static ssize_t fb_hFindBM
 	ssize_t bm_bc[256];
 	ssize_t *bm_gc, *suffixes;
 	ssize_t ret;
+	size_t table_elements;
 
-	bm_gc = (ssize_t*) malloc(sizeof(ssize_t) * (len_pattern + 1));
-	suffixes = (ssize_t*) malloc(sizeof(ssize_t) * (len_pattern + 1));
+	if( (len_pattern <= 0) ||
+		((size_t)len_pattern >= (SIZE_MAX / sizeof(ssize_t))) )
+		return 0;
+
+	table_elements = (size_t)len_pattern + 1;
+	bm_gc = (ssize_t*) malloc(sizeof(ssize_t) * table_elements);
+	suffixes = (ssize_t*) malloc(sizeof(ssize_t) * table_elements);
 	if( (bm_gc == NULL) || (suffixes == NULL) ) {
 		free( bm_gc );
 		free( suffixes );
 		return 0;
 	}
 
-	memset( bm_gc, 0, sizeof(ssize_t) * (len_pattern+1) );
-	memset( suffixes, 0, sizeof(ssize_t) * (len_pattern+1) );
+	memset( bm_gc, 0, sizeof(ssize_t) * table_elements );
+	memset( suffixes, 0, sizeof(ssize_t) * table_elements );
 
 	/* create "bad character" shifts */
 	memset(bm_bc, -1, sizeof(bm_bc));
@@ -109,7 +115,8 @@ static ssize_t fb_hFindBM
 	while ( i!=0 ) 
 	{
 		char ch1 = pachPattern[i-1];
-		while ( j<=len_pattern && ch1!=pachPattern[j-1] ) 
+		while( (j > 0) && ((size_t)j < table_elements) &&
+			ch1 != pachPattern[j-1] )
 		{
 			if( bm_gc[j]==0 )
 				bm_gc[j] = j - i;
