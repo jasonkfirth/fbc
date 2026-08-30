@@ -562,7 +562,7 @@ static int32 fb_nuttx_wstr_current_len(const uint32_t *text)
 
     len = 0;
 
-    while ((text[len] != 0) && (len < INT32_MAX))
+    while ((len < INT32_MAX) && (text[len] != 0))
         len++;
 
     return len;

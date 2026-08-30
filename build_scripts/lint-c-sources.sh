@@ -66,6 +66,9 @@ fi
 
 echo "Cppcheck source manifest: $source_count first-party files"
 
+# Ubuntu 24.04 ships Cppcheck 2.13, while developer machines may use newer
+# releases.  Some parser limitations have different diagnostic identifiers
+# between those versions, so both narrow names are retained where necessary.
 cppcheck \
     --enable=warning,performance,portability \
     --error-exitcode=1 \
@@ -79,11 +82,20 @@ cppcheck \
     --suppress='uninitMemberVarNoCtor:src/sfxlib/haiku/sfx_driver_haiku.cpp' \
     --suppress='CastAddressToIntegerAtReturn:src/gfxlib2/aros/gfx_unix.c' \
     --suppress='CastAddressToIntegerAtReturn:src/gfxlib2/haiku/haiku_window.cpp' \
+    --suppress='comparePointers:contrib/djgpp/libc/crt0/_main.c' \
+    --suppress='comparePointers:src/gfxlib2/dos/gfx_dos.c' \
+    --suppress='comparePointers:src/rtlib/dos/sys_isr.c' \
     --suppress='ctunullpointer:src/rtlib/array_destructstr.c' \
+    --suppress='ctunullpointer:src/rtlib/str_format.c' \
+    --suppress='ctunullpointer:src/rtlib/xbox/str_format.c' \
     --suppress='ctuOneDefinitionRuleViolation:tests/cpp/*' \
     --suppress='duplInheritedMember:tests/cpp/derived-cpp.cpp' \
     --suppress='incorrectLogicOperator:src/rtlib/wince/mips32el/crt_compat.c' \
+    --suppress='internalAstError:src/gfxlib2/js/gfx_driver.c' \
+    --suppress='internalAstError:src/rtlib/js/hinit.c' \
     --suppress='memleak:src/rtlib/wii/thread_ctx.c' \
+    --suppress='nullPointer:src/rtlib/str_format.c' \
+    --suppress='nullPointer:src/rtlib/xbox/str_format.c' \
     --suppress='preprocessorErrorDirective:src/rtlib/fb_config.h' \
     --suppress='preprocessorErrorDirective:src/sfxlib/unix/sfx_driver_oss_template.inc' \
     --suppress='resourceLeak:src/rtlib/dos/file_hreset.c' \

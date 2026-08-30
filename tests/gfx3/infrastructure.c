@@ -1097,6 +1097,12 @@ static int submit_and_wait(FB_GFX3_RENDERER *renderer,
 		return result;
 	}
 
+	/*
+	 * Submission and completion waiting are one synchronous operation here.
+	 * The renderer signals this object before the wait returns, so the worker
+	 * cannot retain the stack address after this function exits.
+	 */
+	/* cppcheck-suppress autoVariables */
 	command->completion = &completion;
 	result = fb_gfx3_renderer_submit(renderer, command, sequence);
 	if (result != FB_GFX3_OK) {

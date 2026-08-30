@@ -77,7 +77,7 @@ static void fb_nuttx_print_wstr_lossy( const FB_WCHAR *text )
 	    code point on tiny NuttX boards, so non-ASCII characters are shown as
 	    '?' instead of building a temporary converted string.
 	*/
-	for( length = 0; (text[length] != 0) && (length < 1024); length++ ) {
+	for( length = 0; (length < 1024) && (text[length] != 0); length++ ) {
 		FB_WCHAR ch = text[length];
 
 		if( (ch >= 32) && (ch <= 126) )

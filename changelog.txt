@@ -11,6 +11,7 @@ Version 1.20.4
 - sfxlib/mixer: changed ordinary voice rendering, software FM, echo, diagnostics, and ring-buffer transfers to operate in blocks; added SSE2/NEON waveform generation, sample accumulation, and final clamping with runtime-safe dispatch; replaced per-sample sine calls with an interpolated table; and added a null-driver benchmark plus a scalar reference switch for measuring each optimized workload.
 
 [fixed]
+- build/CI and rtlib/NuttX: support Ubuntu 24.04's Cppcheck 2.13 diagnostic identifiers, document the bounded lifetime of synchronous gfxlib3 test completions, and check wide-string scan limits before indexing input on NuttX.
 - compiler/platform backends: initialize unsupported constant-folded floating comparisons deterministically, retain Linux library-search results before inspecting them, and report failed AROS Hunk or RISC OS AIF final renames while leaving the converted output available for recovery.
 - gfxlib2/gfxlib3: reject overflowing image and framebuffer sizes, unwind initial and partial allocation failures including event-mutex state, make Windows CE dirty-buffer allocation overflow-safe, and initialize and validate dynamically loaded XRandR function pointers before use.
 - rtlib/string and file I/O: track temporary wide-file read-buffer ownership explicitly, handle failed or empty fractional formatting, bound Boyer-Moore table allocation and suffix indexing, and validate wide-string inputs and temporary allocations before conversion or concatenation.
