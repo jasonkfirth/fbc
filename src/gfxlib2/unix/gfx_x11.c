@@ -225,8 +225,19 @@ static void *window_thread(void *arg)
 	pthread_cond_signal(&cond);
 	pthread_mutex_unlock(&mutex);
 
-	while (is_running) {
+	for (;;) {
 		fb_hX11Lock();
+
+		/*
+		 * The main thread changes is_running while shutting down the driver.
+		 * Check it while holding the same mutex used by fb_hX11Exit(), or an
+		 * optimized build may keep using a stale value and wait forever in
+		 * pthread_join().
+		 */
+		if (!is_running) {
+			fb_hX11Unlock();
+			break;
+		}
 
 		fb_x11.update();
 
@@ -757,7 +768,9 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 void fb_hX11Exit(void)
 {
 	if (is_running) {
+		pthread_mutex_lock(&mutex);
 		is_running = FALSE;
+		pthread_mutex_unlock(&mutex);
 		pthread_join(thread, NULL);
 		pthread_mutex_destroy(&mutex);
 		pthread_cond_destroy(&cond);

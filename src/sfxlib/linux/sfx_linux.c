@@ -188,11 +188,18 @@ void fb_sfxLinuxExit(void)
     if (g_linux_audio_thread_valid)
     {
         g_linux_audio_thread_stop = 1;
+
+        /*
+            The worker can be inside a PulseAudio or ALSA write while it owns
+            sfxlib's driver-I/O mutex.  Cancelling it there abandons the locked
+            mutex, and the following driver shutdown waits on it forever.
+
+            Shutdown marks the runtime inactive before reaching this point.
+            Let the current device write finish and join the worker normally
+            so it releases every sfxlib lock through the ordinary update path.
+        */
         if (!pthread_equal(g_linux_audio_thread, pthread_self()))
-        {
-            pthread_cancel(g_linux_audio_thread);
             pthread_join(g_linux_audio_thread, NULL);
-        }
         g_linux_audio_thread_valid = 0;
     }
 #endif
