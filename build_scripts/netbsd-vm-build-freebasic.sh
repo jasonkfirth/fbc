@@ -31,7 +31,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKROOT="$ROOT/out/netbsd-vm"
 TOOLS_DIR="$WORKROOT/tools"
-ANITA_VERSION="2.16"
+ANITA_VERSION="2.18"
 ANITA_DIR="$TOOLS_DIR/anita-$ANITA_VERSION"
 ANITA="$ANITA_DIR/anita"
 ANITA_URL="https://www.gson.org/netbsd/anita/download/anita-$ANITA_VERSION.tar.gz"
@@ -73,7 +73,7 @@ Usage: ./build_scripts/netbsd-vm-build-freebasic.sh [options]
 
 Options:
   --release N            NetBSD release. Default: 11.0
-  --dist-url URL         NetBSD distribution tree or ISO URL. Default: official ISO
+  --dist-url URL         NetBSD distribution URL. Default: official release URL
   --package FILE         Existing NetBSD package to test.
   --test-only            Test --package without rebuilding FreeBASIC.
   --workroot DIR         Work directory. Default: out/netbsd-vm
@@ -142,14 +142,7 @@ if [ "$TEST_ONLY" -eq 1 ] && [ -z "$PACKAGE_FILE" ]; then
 fi
 
 if [ -z "$DIST_URL" ]; then
-	#
-	# NetBSD 11 no longer publishes installation/cdrom/boot-com.iso in the
-	# per-architecture release tree.  Anita 2.16 treats that missing file as
-	# optional while downloading, but still passes it to QEMU and fails before
-	# the guest can boot.  The complete release ISO is an Anita-supported
-	# distribution source and contains both the boot loader and selected sets.
-	#
-	DIST_URL="https://cdn.netbsd.org/pub/NetBSD/images/$RELEASE/NetBSD-$RELEASE-$ARCH.iso"
+	DIST_URL="https://cdn.netbsd.org/pub/NetBSD/NetBSD-$RELEASE/$ARCH/"
 fi
 
 PKG_REPO="https://cdn.netbsd.org/pub/pkgsrc/packages/NetBSD/$PKG_ARCH/$RELEASE/All"
@@ -216,6 +209,35 @@ install_anita() {
 exec xorriso -as mkisofs "$@"
 EOF
 	chmod +x "$TOOL_BIN/mkisofs"
+}
+
+prepare_install_boot_iso() {
+	local relative_path="installation/cdrom/boot-com.iso"
+	local boot_iso="$ANITA_WORKDIR/download/$ARCH/$relative_path"
+	local boot_iso_tmp="$boot_iso.tmp"
+
+	if [ -s "$boot_iso" ]; then
+		return 0
+	fi
+
+	#
+	# Anita considers the serial-console boot ISO optional because some old
+	# releases do not provide it.  Its amd64 QEMU path still requires that ISO,
+	# so a transient CDN error otherwise becomes a misleading missing-file
+	# failure after the download phase.  Curl supplies bounded retries and the
+	# temporary name prevents a partial download from looking reusable.
+	#
+	msg "Downloading NetBSD serial-console boot ISO"
+	mkdir -p "$(dirname "$boot_iso")"
+	rm -f "$boot_iso_tmp"
+	curl -fsSL \
+		--retry 5 \
+		--retry-all-errors \
+		--connect-timeout 30 \
+		"$DIST_URL$relative_path" \
+		-o "$boot_iso_tmp"
+	[ -s "$boot_iso_tmp" ] || die "downloaded NetBSD boot ISO is empty"
+	mv "$boot_iso_tmp" "$boot_iso"
 }
 
 make_source_archive() {
@@ -889,6 +911,7 @@ install_base_vm() {
 
 	msg "Installing NetBSD $RELEASE amd64 base VM"
 	rm -rf "$ANITA_WORKDIR"
+	prepare_install_boot_iso
 
 	run_anita "$LOG_DIR/freebasic-netbsd-install.log" \
 		--workdir="$ANITA_WORKDIR" \
