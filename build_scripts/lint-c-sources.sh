@@ -86,14 +86,14 @@ cppcheck \
     --suppress='comparePointers:src/gfxlib2/dos/gfx_dos.c' \
     --suppress='comparePointers:src/rtlib/dos/sys_isr.c' \
     --suppress='ctunullpointer:src/rtlib/array_destructstr.c' \
-    --suppress='ctunullpointer:src/rtlib/str_format.c' \
-    --suppress='ctunullpointer:src/rtlib/xbox/str_format.c' \
+    --suppress='ctunullpointer:src/rtlib/fb_string.h:141' \
     --suppress='ctuOneDefinitionRuleViolation:tests/cpp/*' \
     --suppress='duplInheritedMember:tests/cpp/derived-cpp.cpp' \
     --suppress='incorrectLogicOperator:src/rtlib/wince/mips32el/crt_compat.c' \
     --suppress='internalAstError:src/gfxlib2/js/gfx_driver.c' \
     --suppress='internalAstError:src/rtlib/js/hinit.c' \
     --suppress='memleak:src/rtlib/wii/thread_ctx.c' \
+    --suppress='nullPointer:src/rtlib/fb_string.h:141' \
     --suppress='nullPointer:src/rtlib/str_format.c' \
     --suppress='nullPointer:src/rtlib/xbox/str_format.c' \
     --suppress='preprocessorErrorDirective:src/rtlib/fb_config.h' \
