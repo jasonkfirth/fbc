@@ -239,9 +239,12 @@ jobs:
       - name: Run AROS fbctests
         run: |
           set -euo pipefail
+          # The heaviest shard normally needs about 3.5 minutes.  Keep the
+          # deadline bounded while allowing for hosted-runner timing variance.
           bash build_scripts/aros-run-fbctests.sh \
             --targets x86_64 \
-            --jobs "$JOBS"
+            --jobs "$JOBS" \
+            --timeout 420
 
       - name: Run AROS Exampleageddon
         run: |
