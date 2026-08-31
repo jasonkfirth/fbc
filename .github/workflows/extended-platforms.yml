@@ -100,6 +100,9 @@ jobs:
             name: NetBSD amd64
             script: build_scripts/netbsd-vm-build-freebasic.sh
             qemu_cpu: host
+            # NetBSD 11 can intermittently return EINVAL when GNU make scans
+            # a test directory while parallel compiler workers add objects.
+            fbctests_jobs: 1
             bootstrap_target: netbsd-x86_64
             bootstrap_dir: netbsd-x86_64
             archive_path: out/netbsd/x86-64
@@ -187,7 +190,9 @@ jobs:
           QEMU_CPU: ${{ matrix.qemu_cpu }}
         run: |
           set -euo pipefail
-          bash "${{ matrix.script }}" --jobs "$JOBS"
+          bash "${{ matrix.script }}" \
+            --jobs "$JOBS" \
+            --fbctests-jobs "${{ matrix.fbctests_jobs || env.JOBS }}"
 
       - name: Upload installable guest package
         if: ${{ success() && inputs.package_guests_only }}

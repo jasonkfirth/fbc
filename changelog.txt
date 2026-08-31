@@ -11,6 +11,7 @@ Version 1.20.4
 - sfxlib/mixer: changed ordinary voice rendering, software FM, echo, diagnostics, and ring-buffer transfers to operate in blocks; added SSE2/NEON waveform generation, sample accumulation, and final clamping with runtime-safe dispatch; replaced per-sample sine calls with an interpolated table; and added a null-driver benchmark plus a scalar reference switch for measuring each optimized workload.
 
 [fixed]
+- build/NetBSD validation: serialize the fbctest object build inside NetBSD 11 guests, avoiding intermittent GNU make `readdir` EINVAL failures while retaining parallel package and Exampleageddon work.
 - build/AROS validation: allow seven minutes for each x86_64 fbctest VM batch, keeping the heavy expressions/fbc-int/file/functions batch within a bounded deadline when hosted-runner timing exceeds the former four-minute limit.
 - build/CI and rtlib/NuttX: support Ubuntu 24.04's Cppcheck 2.13 diagnostic identifiers, document the bounded lifetime of synchronous gfxlib3 test completions, and check wide-string scan limits before indexing input on NuttX.
 - compiler/platform backends: initialize unsupported constant-folded floating comparisons deterministically, retain Linux library-search results before inspecting them, and report failed AROS Hunk or RISC OS AIF final renames while leaving the converted output available for recovery.
