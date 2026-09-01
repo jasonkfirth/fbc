@@ -231,7 +231,7 @@ int fb_sfxPlatformCaptureStart(void)
     capture_release_interfaces();
     g_capture_active = 0;
 
-    hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    hr = fb_sfxWin32InitializeCom();
     if (FAILED(hr) && hr != RPC_E_CHANGED_MODE)
         return -1;
 

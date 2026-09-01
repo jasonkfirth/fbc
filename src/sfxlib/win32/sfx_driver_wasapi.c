@@ -158,7 +158,7 @@ static DWORD WINAPI wasapi_audio_worker(LPVOID unused)
 
     (void)unused;
 
-    hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    hr = fb_sfxWin32InitializeCom();
     if (SUCCEEDED(hr))
         com_ready = 1;
 
@@ -308,7 +308,7 @@ static int wasapi_init(int rate, int channels, int buffer_size, int flags)
 
     WASAPI_DBG("Initializing WASAPI driver\n");
 
-    hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    hr = fb_sfxWin32InitializeCom();
     if (FAILED(hr) && hr != RPC_E_CHANGED_MODE)
         return -1;
 

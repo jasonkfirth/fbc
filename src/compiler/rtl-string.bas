@@ -1,4 +1,24 @@
-'' intrinsic runtime lib string functions (MID, LEFT, STR, VAL, HEX, ...)
+''
+'' FreeBASIC compiler
+'' ------------------
+''
+'' File: rtl-string.bas
+''
+'' Purpose:
+''
+''     Build compiler calls to the string services provided by the runtime.
+''
+'' Responsibilities:
+''
+''     - describe intrinsic string runtime procedures
+''     - construct string and WSTRING conversion calls
+''     - fold target-safe string literals where their contents are known
+''
+'' This file intentionally does NOT contain:
+''
+''     - runtime string implementations
+''     - parser grammar
+''     - platform filesystem conversion policy
 ''
 '' chng: oct/2004 written [v1ctor]
 
@@ -2685,7 +2705,8 @@ function rtlWstrAssign _
 		byval is_ini as integer _
 	) as ASTNODE ptr
 
-	dim as ASTNODE ptr proc = any
+	dim as ASTNODE ptr proc = any, folded = any
+	dim as FBSYMBOL ptr litsym = any
 	dim as integer ddtype = any, sdtype = any
 	dim as longint lgt = any
 
@@ -2693,6 +2714,28 @@ function rtlWstrAssign _
 
 	ddtype = astGetDataType( dst )
 	sdtype = astGetDataType( src )
+
+	'' A source literal already has a stable encoding known to the compiler.
+	'' Convert it into a target WSTRING literal here instead of asking the
+	'' target C runtime to interpret those bytes through its process locale.
+	'' This matters on Windows 9x, whose CRT has no UTF-8 locale, and also makes
+	'' cross-compiled programs independent of the locale installed on target.
+	if( (ddtype = FB_DATATYPE_WCHAR) and (sdtype = FB_DATATYPE_CHAR) ) then
+		litsym = astGetStrLitSymbol( src )
+		if( litsym <> NULL ) then
+			if( (env.wcharconv <> FB_WCHARCONV_NEVER) and _
+		    fbTargetCanFoldStrLitTextToWstr( symbGetVarLitText( litsym ), _
+		                                     symbGetStrLength( litsym ), TRUE ) ) then
+				folded = rtlToWstr( src, TRUE )
+				if( folded = NULL ) then
+					exit function
+				end if
+
+				src = folded
+				sdtype = astGetDataType( src )
+			end if
+		end if
+	end if
 
 	'' both not wstrings?
 	if( ddtype <> sdtype ) then
@@ -4272,3 +4315,5 @@ function rtlWstrSwap _
 
 	function = TRUE
 end function
+
+'' end of rtl-string.bas

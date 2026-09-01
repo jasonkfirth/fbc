@@ -1,30 +1,49 @@
-/* str$ routines for longint, ulongint
- *
- * the result string's len is being "faked" to appear as if it were shorter
- * than the one that has to be allocated to fit _itoa and _gvct buffers.
- */
+/*
+    FreeBASIC Runtime Library
+    -------------------------
+
+    File: str_convto_lng.c
+
+    Purpose:
+
+        Convert signed and unsigned 64-bit integers to decimal strings.
+
+    Responsibilities:
+
+        - allocate temporary FreeBASIC string results
+        - perform bounded decimal formatting
+        - record the actual string length after conversion
+
+    This file intentionally does NOT contain:
+
+        - QuickBASIC leading-space behavior
+        - floating-point formatting
+        - arbitrary-radix conversion
+*/
 
 #include "fb.h"
 
 
-/*:::::*/
+/* ------------------------------------------------------------------------- */
+/* Decimal conversion                                                        */
+/* ------------------------------------------------------------------------- */
+
 FBCALL FBSTRING *fb_LongintToStr ( long long num )
 {
 	FBSTRING 	*dst;
+	int written;
 
 	/* alloc temp string */
 	dst = fb_hStrAllocTemp( NULL, sizeof( long long ) * 3 );
 	if( dst != NULL )
 	{
-		/* convert */
-#ifdef HOST_MINGW
-		_i64toa( num, dst->data, 10 );
-#else
-		if( snprintf( dst->data, (size_t)dst->size + 1, "%lld", num ) < 0 )
-			dst->data[0] = '\0';
-#endif
+		written = snprintf( dst->data, (size_t)dst->size + 1, "%lld", num );
+		if( (written < 0) || (written > dst->size) ) {
+			fb_hStrDelTemp( dst );
+			return &__fb_ctx.null_desc;
+		}
 
-		fb_hStrSetLength( dst, strlen( dst->data ) );
+		fb_hStrSetLength( dst, (size_t)written );
 	}
 	else
 		dst = &__fb_ctx.null_desc;
@@ -36,23 +55,24 @@ FBCALL FBSTRING *fb_LongintToStr ( long long num )
 FBCALL FBSTRING *fb_ULongintToStr ( unsigned long long num )
 {
 	FBSTRING 	*dst;
+	int written;
 
 	/* alloc temp string */
 	dst = fb_hStrAllocTemp( NULL, sizeof( long long ) * 3 );
 	if( dst != NULL )
 	{
-		/* convert */
-#ifdef HOST_MINGW
-		_ui64toa( num, dst->data, 10 );
-#else
-		if( snprintf( dst->data, (size_t)dst->size + 1, "%llu", num ) < 0 )
-			dst->data[0] = '\0';
-#endif
+		written = snprintf( dst->data, (size_t)dst->size + 1, "%llu", num );
+		if( (written < 0) || (written > dst->size) ) {
+			fb_hStrDelTemp( dst );
+			return &__fb_ctx.null_desc;
+		}
 
-		fb_hStrSetLength( dst, strlen( dst->data ) );
+		fb_hStrSetLength( dst, (size_t)written );
 	}
 	else
 		dst = &__fb_ctx.null_desc;
 
 	return dst;
 }
+
+/* end of str_convto_lng.c */

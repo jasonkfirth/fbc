@@ -143,6 +143,23 @@ void fb_sfxWin32InitDebug(void);
 int fb_sfxWin32DebugEnabled(void);
 
 
+/* ------------------------------------------------------------------------- */
+/* Windows API compatibility                                                 */
+/* ------------------------------------------------------------------------- */
+
+/*
+    Initialize COM for a multithreaded audio worker.
+
+    CoInitializeEx is absent from unmodified Windows 95 installations.  The
+    platform helper resolves it only when the host exports it and otherwise
+    uses the original CoInitialize entry point.  Keeping the lookup here
+    prevents Vista-only WASAPI modules from raising the minimum loader
+    requirement for WinMM applications.
+*/
+
+HRESULT fb_sfxWin32InitializeCom(void);
+
+
 #ifdef __cplusplus
 }
 #endif

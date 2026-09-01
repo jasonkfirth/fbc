@@ -10,8 +10,8 @@
 #
 # Responsibilities:
 #
-#     * build and test Haiku and the supported BSD guests under QEMU
-#     * provide their installable packages to version-tagged release workflows
+#     * build native packages for Haiku and the supported BSD guests under QEMU
+#     * install and test those packages, then retain them as workflow artifacts
 #     * run fbctests and Exampleageddon on AROS and RISC OS emulators
 #     * compile fbctests and Exampleageddon for Windows CE without a licensed ROM
 #     * retain platform reports and failure evidence as workflow artifacts
@@ -28,7 +28,7 @@ on:
   workflow_call:
     inputs:
       package_guests_only:
-        description: Build only installable BSD and Haiku guest packages
+        description: Run only BSD and Haiku native package qualification
         required: false
         default: false
         type: boolean
@@ -49,7 +49,7 @@ on:
   workflow_dispatch:
     inputs:
       package_guests_only:
-        description: Build only installable BSD and Haiku guest packages
+        description: Run only BSD and Haiku native package qualification
         required: true
         default: false
         type: boolean
@@ -71,7 +71,7 @@ env:
 
 jobs:
   qemu-guests:
-    name: ${{ matrix.name }} VM (fbctests + Exampleageddon)
+    name: ${{ matrix.name }} native package (fbctests + Exampleageddon)
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     strategy:
@@ -85,6 +85,7 @@ jobs:
             bootstrap_target: haiku-x86_64
             bootstrap_dir: haiku-amd64
             archive_path: out/haiku/x86_64
+            package_pattern: freebasic*.hpkg
             cache_path: out/haiku-vm/cache
             log_path: out/haiku-vm/logs
           - id: freebsd-amd64
@@ -94,6 +95,7 @@ jobs:
             bootstrap_target: freebsd-x86_64
             bootstrap_dir: freebsd-x86_64
             archive_path: out/freebsd/x86-64
+            package_pattern: freebasic-*.pkg
             cache_path: out/freebsd-vm/cache
             log_path: out/freebsd-vm/logs
           - id: netbsd-amd64
@@ -106,6 +108,7 @@ jobs:
             bootstrap_target: netbsd-x86_64
             bootstrap_dir: netbsd-x86_64
             archive_path: out/netbsd/x86-64
+            package_pattern: freebasic-*.tgz
             cache_path: out/netbsd-vm/tools
             log_path: out/netbsd-vm/logs
           - id: openbsd-amd64
@@ -115,6 +118,7 @@ jobs:
             bootstrap_target: openbsd-x86_64
             bootstrap_dir: openbsd-x86_64
             archive_path: out/openbsd/x86-64
+            package_pattern: freebasic-*.tgz
             cache_path: out/openbsd-vm/cache
             log_path: out/openbsd-vm/logs
           - id: dragonfly-amd64
@@ -126,6 +130,7 @@ jobs:
             bootstrap_target: dragonfly-x86_64
             bootstrap_dir: dragonfly-x86_64
             archive_path: out/dragonfly/x86-64
+            package_pattern: freebasic-*.pkg
             cache_path: out/dragonfly-vm/cache
             log_path: out/dragonfly-vm/logs
 
@@ -194,8 +199,27 @@ jobs:
             --jobs "$JOBS" \
             --fbctests-jobs "${{ matrix.fbctests_jobs || env.JOBS }}"
 
+      - name: Verify installable guest package
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_dir="${{ matrix.archive_path }}"
+          package_pattern="${{ matrix.package_pattern }}"
+
+          mapfile -t package_files < <(
+            find "$package_dir" -maxdepth 1 -type f \
+              -name "$package_pattern" -print | sort
+          )
+
+          if (( ${#package_files[@]} == 0 )); then
+            echo "The guest build did not produce $package_dir/$package_pattern" >&2
+            find "$package_dir" -maxdepth 1 -type f -print 2>/dev/null || true
+            exit 1
+          fi
+
+          printf 'Verified installable package: %s\n' "${package_files[@]}"
+
       - name: Upload installable guest package
-        if: ${{ success() && inputs.package_guests_only }}
         uses: actions/upload-artifact@v7
         with:
           name: fbc-xl-platform-package-${{ matrix.id }}

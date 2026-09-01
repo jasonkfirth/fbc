@@ -111,3 +111,4 @@ obj
 winCE/
 !/src/rtlib/wince/
 !/src/rtlib/wince/**
+win95/

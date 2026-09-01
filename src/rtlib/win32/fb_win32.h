@@ -1,3 +1,27 @@
+/*
+    FreeBASIC Runtime Library
+    -------------------------
+
+    File: fb_win32.h
+
+    Purpose:
+
+        Define the common types, constants and helper interfaces used by the
+        desktop Windows runtime.
+
+    Responsibilities:
+
+        - map portable runtime names to the Microsoft C runtime
+        - define Windows-specific calling and formatting conventions
+        - declare helpers shared by Windows runtime modules
+
+    This file intentionally does NOT contain:
+
+        - Windows runtime implementations
+        - graphics or sound driver declarations
+        - Windows CE compatibility definitions
+*/
+
 #ifdef HOST_MINGW
 #include <malloc.h> /* for _alloca() */
 
@@ -56,6 +80,13 @@
 
 #define FB_CONSOLE_MAXPAGES 4
 
+/*
+   Windows 95, 98 and ME do not provide the Unicode filesystem semantics used
+   by the NT family.  Runtime modules use this common test when selecting an
+   ANSI or wide-character Windows API.
+*/
+int fb_hWin32IsWin9x( void );
+
 #ifdef HOST_CYGWIN
 typedef off_t fb_off_t;
 #else
@@ -93,3 +124,5 @@ typedef long long fb_off_t;
 	#define FB_MTLOCK()
 	#define FB_MTUNLOCK()
 #endif
+
+/* end of fb_win32.h */
