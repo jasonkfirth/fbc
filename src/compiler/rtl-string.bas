@@ -2718,9 +2718,10 @@ function rtlWstrAssign _
 	'' A source literal already has a stable encoding known to the compiler.
 	'' Convert it into a target WSTRING literal here instead of asking the
 	'' target C runtime to interpret those bytes through its process locale.
-	'' This matters on Windows 9x, whose CRT has no UTF-8 locale, and also makes
-	'' cross-compiled programs independent of the locale installed on target.
-	if( (ddtype = FB_DATATYPE_WCHAR) and (sdtype = FB_DATATYPE_CHAR) ) then
+	'' This matters on Windows 9x, whose CRT has no UTF-8 locale, and keeps
+	'' cross-compiled Windows programs independent of the target locale.
+	if( (env.clopt.target = FB_COMPTARGET_WIN32) and _
+	    (ddtype = FB_DATATYPE_WCHAR) and (sdtype = FB_DATATYPE_CHAR) ) then
 		litsym = astGetStrLitSymbol( src )
 		if( litsym <> NULL ) then
 			if( (env.wcharconv <> FB_WCHARCONV_NEVER) and _

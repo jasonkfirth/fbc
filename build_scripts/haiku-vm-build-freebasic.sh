@@ -248,12 +248,18 @@ PY
 check_host_tools() {
 	require_tool bash
 	require_tool curl
+	require_tool find
+	require_tool grep
+	require_tool make
 	require_tool python3
 	require_tool "$QEMU_BIN"
 	require_tool ssh
 	require_tool scp
-	require_tool tar
 	require_tool sha256sum
+	require_tool sort
+	require_tool wc
+	require_tool xargs
+	require_tool zip
 
 	if ! command -v 7z >/dev/null 2>&1 && ! command -v unzip >/dev/null 2>&1; then
 		die "required tool not found: 7z or unzip"
@@ -747,19 +753,59 @@ scp_from_guest() {
 		"user@127.0.0.1:$source" "$target"
 }
 
-tar_directory_to_guest() {
+zip_directory_to_guest() {
 	local key="$1"
 	local port="$2"
 	local source="$3"
 	local target="$4"
+	local archive
+	local exclude
+	local option
+	local remote_archive
+	local zip_args=()
 	shift 4
 
-	ssh_guest "$key" "$port" "rm -rf '$target' && mkdir -p '$target'"
+	for option in "$@"; do
+		case "$option" in
+			--exclude=*)
+				exclude="${option#--exclude=}"
+				exclude="${exclude#./}"
+				# Unlike tar, zip does not treat an excluded directory name as
+				# excluding the entire directory tree.
+				zip_args+=( -x "$exclude" -x "${exclude%/}/*" )
+				;;
+			*)
+				die "unsupported Haiku source archive option: $option"
+				;;
+		esac
+	done
 
-	(
+	archive="$(mktemp "$RUN_DIR/haiku-transfer.XXXXXX.zip")"
+	remote_archive="/Work/$(basename "$archive")"
+
+	if ! (
 		cd "$source"
-		tar "$@" -cf - .
-	) | ssh_guest "$key" "$port" "cd '$target' && tar -xf -"
+		# Haiku hrev60059's GNU tar 1.35 cannot create files on BFS and
+		# returns EBADF.  The base image's unzip preserves Unix modes and
+		# symbolic links, so it is suitable for source and test staging.
+		# Writing the archive to standard output also lets mktemp keep the
+		# destination allocated without zip parsing its initial empty file.
+		zip -qry - . "${zip_args[@]}" > "$archive"
+	); then
+		rm -f "$archive"
+		die "could not archive $source for the Haiku guest"
+	fi
+
+	if ! scp_to_guest "$key" "$port" "$archive" "$remote_archive"; then
+		rm -f "$archive"
+		die "could not copy the source archive to the Haiku guest"
+	fi
+	rm -f "$archive"
+
+	if ! ssh_guest "$key" "$port" \
+		"rm -rf '$target' && mkdir -p '$target' && unzip -q '$remote_archive' -d '$target'; result=\$?; rm -f '$remote_archive'; exit \$result"; then
+		die "could not extract the source archive in the Haiku guest"
+	fi
 }
 
 prepare_vm() {
@@ -936,7 +982,8 @@ install_test_staging_dependencies() {
 ssh_guest "$key" "$port" 'bash -s' <<'EOF'
 set -e
 export PATH=/boot/system/bin:/bin:$PATH
-command -v tar
+command -v awk
+command -v unzip
 EOF
 }
 
@@ -987,13 +1034,15 @@ send_source_tree() {
 	local target="$3"
 
 	msg "Copying source tree to Haiku"
-	tar_directory_to_guest "$key" "$port" "$ROOT" "$target" \
+	zip_directory_to_guest "$key" "$port" "$ROOT" "$target" \
 		--exclude='./.git' \
 		--exclude='./out' \
 		--exclude='./build' \
 		--exclude='./.build*' \
 		--exclude='./OMA' \
 		--exclude='./OMA_old' \
+		--exclude='./win95' \
+		--exclude='./winCE' \
 		--exclude='./remote_probe_temp' \
 		--exclude='./nuttx-suite-logs' \
 		--exclude='./package-root' \
@@ -1073,11 +1122,14 @@ prepare_haiku_bootstrap_sources() {
 send_tests_tree() {
 	local key="$1"
 	local port="$2"
+	local source_count
+	local source_list
+	local unit_dirs=()
 
 	msg "Copying fbctests source to Haiku"
 	ssh_guest "$key" "$port" "rm -rf /Work/fbctests-source && mkdir -p /Work/fbctests-source"
 
-	tar_directory_to_guest "$key" "$port" "$ROOT/tests" "/Work/fbctests-source/tests" \
+	zip_directory_to_guest "$key" "$port" "$ROOT/tests" "/Work/fbctests-source/tests" \
 		--exclude='./*.o' \
 		--exclude='./*.a' \
 		--exclude='./fbc-tests' \
@@ -1088,12 +1140,43 @@ send_tests_tree() {
 		--exclude='./log-tests-*.lst' \
 		--exclude='./log-tests-results-*.log'
 
-	tar_directory_to_guest "$key" "$port" "$ROOT/inc" "/Work/fbctests-source/inc"
+	zip_directory_to_guest "$key" "$port" "$ROOT/inc" "/Work/fbctests-source/inc"
 
-	tar_directory_to_guest "$key" "$port" "$ROOT/src/sfxlib" "/Work/fbctests-source/src/sfxlib" \
+	zip_directory_to_guest "$key" "$port" "$ROOT/src/sfxlib" "/Work/fbctests-source/src/sfxlib" \
 		--exclude='./obj' \
 		--exclude='./*.o' \
 		--exclude='./*.a'
+
+	mapfile -t unit_dirs < <(
+		make -s -C "$ROOT/tests" -f dirlist.mk \
+			--eval='print:;@printf "%s\n" $(DIRLIST_FB)' print
+	)
+	[ "${#unit_dirs[@]}" -gt 0 ] || die "could not read the fbctests unit directory list"
+
+	source_list="$(mktemp "$RUN_DIR/haiku-unit-sources.XXXXXX.lst")"
+	if ! (
+		cd "$ROOT/tests"
+		find "${unit_dirs[@]}" -type f \( -name '*.bas' -o -name '*.bmk' \) -print0 \
+			| xargs -0 grep -l -i -E \
+				'(#[[:space:]]*include[[:space:]](once)*[[:space:]]*"fbcu(nit)?\.bi")|([[:space:]]*.[[:space:]]*TEST_MODE[[:space:]]*:[[:space:]]*FBCUNIT_COMPATIBLE)' \
+			| sort -u > "$source_list"
+	); then
+		rm -f "$source_list"
+		die "could not generate the Haiku fbctests unit source list"
+	fi
+
+	source_count="$(wc -l < "$source_list")"
+	if [ "$source_count" -lt 600 ]; then
+		rm -f "$source_list"
+		die "Haiku fbctests unit source list is unexpectedly short: $source_count"
+	fi
+
+	if ! scp_to_guest "$key" "$port" "$source_list" \
+		"/Work/fbctests-source/unit-test-sources.lst"; then
+		rm -f "$source_list"
+		die "could not copy the Haiku fbctests unit source list"
+	fi
+	rm -f "$source_list"
 }
 
 send_exampleageddon_tree() {
@@ -1108,7 +1191,7 @@ send_exampleageddon_tree() {
 		"$ROOT/build_scripts/exampleageddon-freebasic.py" \
 		"/Work/exampleageddon-source/build_scripts/exampleageddon-freebasic.py"
 
-	tar_directory_to_guest "$key" "$port" "$ROOT/examples" "/Work/exampleageddon-source/examples" \
+	zip_directory_to_guest "$key" "$port" "$ROOT/examples" "/Work/exampleageddon-source/examples" \
 		--exclude='./*.o' \
 		--exclude='./*.obj' \
 		--exclude='./*.asm' \
@@ -1116,7 +1199,7 @@ send_exampleageddon_tree() {
 		--exclude='./gmon.out' \
 		--exclude='./prof-*.txt'
 
-	tar_directory_to_guest "$key" "$port" "$ROOT/inc" "/Work/exampleageddon-source/inc"
+	zip_directory_to_guest "$key" "$port" "$ROOT/inc" "/Work/exampleageddon-source/inc"
 }
 
 build_package_in_vm() {
@@ -1387,6 +1470,9 @@ run_fbctests() {
 	fbc_cmd="$(fbc_make_command)"
 	cc_cmd="cc"
 	cxx_cmd="g++"
+	grep_cmd="/Work/fbctests-source/tests/haiku/grep.sh"
+	unit_log="/Work/fbctests-source/fbctests-unit.log"
+	unit_source_list="/Work/fbctests-source/unit-test-sources.lst"
 
 	# The x86_gcc2 image keeps GCC 2 as its primary compiler for ABI
 	# compatibility and exposes the modern 32-bit toolchain through the
@@ -1401,24 +1487,59 @@ run_fbctests() {
 
 	[ -d /Work/fbctests-source/tests ] || fail "tests source was not staged"
 	[ -d /Work/fbctests-source/inc ] || fail "inc source was not staged"
+	[ -x "$grep_cmd" ] || fail "Haiku grep compatibility helper was not staged"
+	[ -s "$unit_source_list" ] || fail "Haiku unit-test source list was not staged"
+	unit_source_count="$(wc -l < "$unit_source_list")"
+	[ "$unit_source_count" -ge 600 ] ||
+		fail "Haiku unit-test source list is unexpectedly short: $unit_source_count"
+	"$grep_cmd" -q -i -e 'fbcunit.bi' /Work/fbctests-source/tests/boolean/boolean.bas ||
+		fail "Haiku grep compatibility helper cannot read the fbctests tree"
 
 	cd /Work/fbctests-source/tests
+	log_source_count="$(
+		find . -type f \( -name '*.bas' -o -name '*.bmk' \) -print \
+			| xargs "$grep_cmd" -l -i -E \
+				'[[:space:]]*.[[:space:]]*TEST_MODE[[:space:]]*:' \
+			| wc -l
+	)"
+	[ "$log_source_count" -ge 1500 ] ||
+		fail "Haiku log-test source scan is unexpectedly short: $log_source_count"
+	echo "==> selected $unit_source_count unit sources and $log_source_count log-test sources"
 
 	echo "==> cleaning fbctests tree"
-	run make clean FBC="$fbc_cmd" CC="$cc_cmd" CXX="$cxx_cmd" GCC="$cc_cmd"
+	run make clean FBC="$fbc_cmd" CC="$cc_cmd" CXX="$cxx_cmd" GCC="$cc_cmd" GREP="$grep_cmd" UNIT_TEST_SOURCE_LIST="$unit_source_list"
 
 	echo "==> checking installed compiler through fbctests"
-	run make check FBC="$fbc_cmd" CC="$cc_cmd" CXX="$cxx_cmd" GCC="$cc_cmd"
+	run make check FBC="$fbc_cmd" CC="$cc_cmd" CXX="$cxx_cmd" GCC="$cc_cmd" GREP="$grep_cmd"
 
 	echo "==> running unit-tests with ${jobs} job(s)"
-	run make -j "$jobs" unit-tests FBC="$fbc_cmd" CC="$cc_cmd" CXX="$cxx_cmd" GCC="$cc_cmd" UNITTEST_RUN_ARGS="${FBCTESTS_UNIT_ARGS:-}"
+	echo "==> make -j $jobs unit-tests"
+	if make -j "$jobs" unit-tests FBC="$fbc_cmd" CC="$cc_cmd" CXX="$cxx_cmd" GCC="$cc_cmd" GREP="$grep_cmd" UNIT_TEST_SOURCE_LIST="$unit_source_list" UNITTEST_RUN_ARGS="${FBCTESTS_UNIT_ARGS:-}" > "$unit_log" 2>&1; then
+		cat "$unit_log"
+	else
+		cat "$unit_log"
+		fail "Haiku unit tests failed"
+	fi
+
+	[ -s unit-tests-obj.lst ] || fail "Haiku unit-test object list was not generated"
+	unit_object_count="$(wc -l < unit-tests-obj.lst)"
+	[ "$unit_object_count" -ge 600 ] ||
+		fail "Haiku unit-test object list is unexpectedly short: $unit_object_count"
+
+	unit_assert_count="$(awk '$4 == "Total" { total = $1 } END { if (total != "") print total }' "$unit_log")"
+	case "$unit_assert_count" in
+		''|*[!0-9]*) fail "could not read the Haiku unit-test assertion total" ;;
+	esac
+	[ "$unit_assert_count" -ge 10000 ] ||
+		fail "Haiku unit-test assertion total is unexpectedly low: $unit_assert_count"
+	echo "==> validated $unit_object_count linked unit objects and $unit_assert_count assertions"
 
 	echo "==> running log-tests with ${jobs} job(s)"
-	run make -j "$jobs" log-tests FBC="$fbc_cmd" CC="$cc_cmd" CXX="$cxx_cmd" GCC="$cc_cmd"
+	run make -j "$jobs" log-tests FBC="$fbc_cmd" CC="$cc_cmd" CXX="$cxx_cmd" GCC="$cc_cmd" GREP="$grep_cmd"
 
 	for failed_log in failed-fb.log failed-fblite.log failed-qb.log failed-deprecated.log; do
 		[ -f "$failed_log" ] || fail "missing log-tests summary: $failed_log"
-		if ! grep -qi 'None Found' "$failed_log"; then
+		if ! "$grep_cmd" -q -i -e 'None Found' "$failed_log"; then
 			cat "$failed_log"
 			fail "log-tests reported failures in $failed_log"
 		fi
@@ -1430,6 +1551,7 @@ run_fbctests() {
 run_exampleageddon() {
 	jobs="$(exampleageddon_jobs)"
 	fbc_cmd="$(fbc_make_command)"
+	grep_cmd="/Work/fbctests-source/tests/haiku/grep.sh"
 
 	[ -d /Work/exampleageddon-source/examples ] || fail "examples source was not staged"
 	[ -d /Work/exampleageddon-source/inc ] || fail "inc source was not staged for exampleageddon"
@@ -1452,7 +1574,7 @@ run_exampleageddon() {
 	[ -f /Work/exampleageddon/report.md ] || fail "exampleageddon report was not created"
 	[ -f /Work/exampleageddon/results.csv ] || fail "exampleageddon results CSV was not created"
 
-	if ! grep -qx -- '- Self-contained problems: 0' /Work/exampleageddon/report.md; then
+	if ! "$grep_cmd" -q -x -- '- Self-contained problems: 0' /Work/exampleageddon/report.md; then
 		sed -n '1,80p' /Work/exampleageddon/report.md
 		fail "exampleageddon reported self-contained example problems"
 	fi
@@ -1745,9 +1867,9 @@ SFXLIB_DRIVER=Haiku timeout 20 /Work/smoke/sfx > /Work/smoke/sfx.out 2> /Work/sm
 	fail "sfx smoke failed"
 }
 cat /Work/smoke/sfx.out || true
-grep -qx 'sfx-start' /Work/smoke/sfx.out || fail "sfx smoke did not start"
-grep -qx 'sfx-end' /Work/smoke/sfx.out || fail "sfx smoke did not finish"
-grep -qi '^sfx-driver=haiku' /Work/smoke/sfx.out || fail "sfx smoke did not use Haiku"
+/Work/fbctests-source/tests/haiku/grep.sh -q -x 'sfx-start' /Work/smoke/sfx.out || fail "sfx smoke did not start"
+/Work/fbctests-source/tests/haiku/grep.sh -q -x 'sfx-end' /Work/smoke/sfx.out || fail "sfx smoke did not finish"
+/Work/fbctests-source/tests/haiku/grep.sh -q -i '^sfx-driver=haiku' /Work/smoke/sfx.out || fail "sfx smoke did not use Haiku"
 [ ! -s /Work/smoke/sfx.err ] || {
 	cat /Work/smoke/sfx.err
 	fail "sfx smoke wrote stderr"

@@ -148,7 +148,7 @@ jobs:
             binutils bzip2 ca-certificates curl g++ gcc libncurses-dev make \
             openssh-client \
             python3 python3-pexpect qemu-system-x86 qemu-utils \
-            rsync tar unzip xorriso xz-utils
+            rsync tar unzip xorriso xz-utils zip
 
           # GitHub exposes KVM to standard Linux runners when host support is
           # available. The guest scripts retain their tested TCG fallback.
