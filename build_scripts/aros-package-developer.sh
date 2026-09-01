@@ -284,8 +284,8 @@ rm -f -- "$PACKAGE_PATH" "$ZIP_PATH"
 run python3 "$PKG_TOOL" create "$PACKAGE_ROOT" "$PACKAGE_PATH"
 
 [ -s "$PACKAGE_PATH" ] || die "package tool did not create $PACKAGE_PATH"
-[ "$(head -c 3 "$PACKAGE_PATH")" = "PKG" ] ||
-    die "package does not have a PKG1 header: $PACKAGE_PATH"
+[ "$(head -c 3 "$PACKAGE_PATH")" = "BZh" ] ||
+    die "package does not have the bzip2 wrapper required by C:Unpack: $PACKAGE_PATH"
 
 msg "verifying package contents"
 run python3 "$PKG_TOOL" extract "$PACKAGE_PATH" "$EXTRACT_ROOT"

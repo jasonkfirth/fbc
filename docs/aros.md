@@ -78,13 +78,15 @@ On Debian or Ubuntu, run:
 ./build_scripts/debianubuntu-build-freebasic-aros.sh
 ```
 
-The script installs its host prerequisites, checks out the pinned AROS source
-revision, builds all three SDKs and cross toolchains, builds target libffi,
-builds FreeBASIC and its libraries, builds the AROS-hosted development tools,
-creates native compiler packages, and builds AROS boot media. The complete
-native compile-and-link path is qualified on x86_64, ARM, and m68k. The m68k
-cross toolchain also builds the compiler, runtime, graphics, sound, tests,
-examples, and game packages used for the larger release qualification runs.
+The script installs its host prerequisites, checks out the pinned AROS core
+and contrib revisions, builds all three SDKs and cross toolchains, builds
+target libffi, builds FreeBASIC and its libraries, builds the AROS-hosted
+development tools, creates native compiler packages, and builds AROS boot
+media. The complete native compile-and-link path is qualified on x86_64 and
+m68k. ARM packages are built and installed in a clean guest, but the complete
+native driver chain remains experimental as described below. The m68k cross
+toolchain also builds the compiler, runtime, graphics, sound, tests, examples,
+and game packages used for the larger release qualification runs.
 
 Useful development forms are:
 
@@ -109,18 +111,42 @@ headers, normal and multithreaded runtime libraries, gfxlib2, sfxlib, and
 libffi. The companion package installs the matching `SYS:Developer` tree with
 GCC, binutils, headers, libraries, and GCC support programs.
 
+The `.pkg` file is a bzip2-wrapped PKG1 stream, matching the input expected by
+the native AROS `C:Unpack` command. Package construction decompresses every
+finished archive, validates its record boundaries, and compares the extracted
+tree with the staged input before creating the download ZIP.
+
 Install the matching Developer package before the FreeBASIC package. This
 keeps GCC and binutils in AROS's standard `Developer:` location while keeping
 the FreeBASIC compiler package independently downloadable.
 
-Native-compilation qualification covers x86_64, ARM, and m68k. After assigning
-the matching `Developer:` and `FreeBASIC:` trees, each guest builds and runs a
-new BASIC program with the normal compiler interface:
+Native-compilation qualification covers x86_64 and m68k. After assigning the
+matching `Developer:` and `FreeBASIC:` trees, those guests build and run a new
+BASIC program with the normal compiler interface:
 
 ```text
 fbc -target aros -m hello hello.bas
 hello
 ```
+
+On ARM, use `SYS:FreeBASIC/bin/fbc` instead of the bare command. The current
+ARM FAT handler can block while `Path` compares a newly installed directory
+lock. The package startup file therefore leaves the shell path alone and sets
+absolute GCC, assembler, linker, and GCC support-program paths. x86_64 and
+m68k retain the ordinary `fbc` command shown above. The native ARM compiler
+and GCC front end also need a larger shell stack:
+
+```text
+Stack 16777216
+SYS:FreeBASIC/bin/fbc -target aros -m hello hello.bas
+```
+
+This ARM command is not yet a qualified end-to-end path. The installed fbc
+front end and the individual GCC stages work, but a nested `fbc -> gcc -> cc1`
+invocation can lose or stall its command stream at the AROS process boundary.
+The package is published so the ARM port and its separate tools can be tested,
+but it should be treated as experimental until an ordinary fbc invocation can
+compile and link in a clean guest.
 
 The x86_64 and ARM paths retain the native GCC C and C++ front ends. The m68k
 path converts fbc, GCC, assembler, linker, collect-aros, and cc1 into loadable
@@ -128,6 +154,15 @@ Hunk programs. AROS process-boundary ownership and collect-aros temporary-file
 handling are patched at the AROS delivery boundary. This lets one ordinary fbc
 invocation compile C, assemble it, link it, convert the output to Hunk, and run
 the result inside the m68k guest.
+
+On ARM, GCC locates its private compiler stages below
+`SYS:Developer/libexec/gcc`, probes executables and directories through native
+dos.library locks instead of the POSIX `stat()` bridge, and runs each stage
+synchronously with `SystemTags()`. These changes remove the path-probe failures
+and let the compiler components run directly, but they do not solve the nested
+command-stream failure described above. The ARM console teardown also emits
+reset sequences only when the output handle is interactive, so it does not ask
+the POSIX stdout bridge to seek through a redirected FAT file.
 
 The checked native m68k smoke test is:
 
@@ -146,8 +181,39 @@ On x86_64, qualification also exercises the lower-level GAS64 diagnostic path
 directly. That path caught an otherwise silent Microsoft-versus-SysV x86-64
 calling-convention mismatch, but it is no longer a fallback for an unreliable
 driver. The ordinary one-command `fbc` path is the native compiler criterion
-on all three architectures. Cross-built guest execution remains the scalable
-criterion for the full fbctests, Exampleageddon, and OMA matrices.
+on x86_64 and m68k. ARM retains the failed nested-driver evidence alongside its
+successful package-install and direct-component checks. Cross-built guest
+execution remains the scalable criterion for the full fbctests,
+Exampleageddon, and OMA matrices.
+
+## Clean package installation
+
+Test the actual package pair, rather than files copied from the build tree,
+with:
+
+```sh
+./build_scripts/aros-test-packages.sh \
+  --targets x86_64,m68k,arm
+```
+
+The runner removes the prebuilt `Developer` tree from fresh x86_64 and m68k
+boot media and constructs the ARM SD image without `Developer` or FreeBASIC.
+Inside each new guest, the native `C:Unpack` command installs the matching
+Developer and FreeBASIC packages. On x86_64 and m68k, the installed `fbc`, GCC,
+assembler, linker, and m68k Hunk converter then build a new BASIC program. A
+full pass requires the program's distinctive return status, its host-visible
+marker, the expected AROS executable format, the package hashes, and the guest
+installation logs. ARM currently passes both native package installations and
+the installed-tree checks, then records the known nested-driver failure rather
+than reporting a complete compiler pass. The test medium includes two small
+target-native helpers for serial evidence and bounded file copies because the
+minimal ARM image does not supply the ordinary `Copy` or `Type` shell commands.
+
+The emulated Raspberry Pi currently has no usable AROS public screen. The AROS
+source patch used by the build therefore lets `C:Unpack` omit its progress
+window when no public screen exists. Desktop systems retain the normal window;
+only the presentation is skipped in the serial-only case. Test evidence is
+kept below `out/aros/package-test/`.
 
 ## Full fbctests qualification
 

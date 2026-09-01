@@ -40,6 +40,8 @@
 #include <dos/dos.h>
 #include <proto/dos.h>
 
+#include <sys/stat.h>
+
 /*
  * Resolve the native handle instead of depending on FILE's implementation
  * layout.  __get_default_file() is the public POSIXC compatibility bridge
@@ -216,26 +218,59 @@ int fb_hDevFileSeekStart( FILE *fp, int mode, FB_FILE_ENCOD encod,
 		offset = 0;
 	}
 
+	#if defined(__arm__)
+	/*
+	 * ARM's FAT handler can receive a corrupt port when either the native
+	 * handle bridge or POSIXC issues Seek() on a freshly opened stream.  File
+	 * open calls this routine while the stream is still at byte zero, so the
+	 * ordinary case needs no positioning operation.  Encoded input advances
+	 * over its short byte-order mark without asking the handler to seek.
+	 */
+	if( offset == 0 )
+		return 0;
+
+	while( offset > 0 )
+	{
+		if( fgetc( fp ) == EOF )
+			return -1;
+		--offset;
+	}
+	return 0;
+	#else
 	return fb_hArosSetFilePosition( fp, offset, SEEK_SET );
+	#endif
 }
 
 fb_off_t fb_DevFileGetSize( FILE *fp, int mode, FB_FILE_ENCOD encod,
 			    int seek_back )
 {
+	#if !defined(__arm__)
 	BPTR file_handle;
+	#else
+	struct stat status;
+	#endif
 	fb_off_t size;
 
+	#if !defined(__arm__)
 	if( fb_hArosGetFileHandle( fp, &file_handle ) != 0 )
 		return -1;
+	#endif
 
 	switch( mode )
 	{
 	case FB_FILE_MODE_BINARY:
 	case FB_FILE_MODE_RANDOM:
 	case FB_FILE_MODE_INPUT:
+	#if defined(__arm__)
+		if( fstat( fileno( fp ), &status ) != 0 )
+			return -1;
+
+		size = (fb_off_t)status.st_size;
+	#else
 		size = fb_hArosGetFileSize( file_handle );
 		if( size < 0 )
 			return -1;
+	#endif
 
 		if( seek_back && fb_hDevFileSeekStart( fp, mode, encod, TRUE ) != 0 )
 			return -1;
@@ -244,7 +279,16 @@ fb_off_t fb_DevFileGetSize( FILE *fp, int mode, FB_FILE_ENCOD encod,
 
 	case FB_FILE_MODE_APPEND:
 	case FB_FILE_MODE_OUTPUT:
+	#if defined(__arm__)
+		if( mode == FB_FILE_MODE_OUTPUT )
+			return 0;
+
+		if( fstat( fileno( fp ), &status ) != 0 )
+			return -1;
+		return (fb_off_t)status.st_size;
+	#else
 		return fb_hArosGetFilePosition( fp );
+	#endif
 
 	default:
 		return 0;

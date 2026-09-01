@@ -7,18 +7,19 @@ File: aros-pkg.py
 
 Purpose:
 
-    Create and validate the PKG1 archives understood by AROS C:Unpack.
+    Create and validate the bzip2-wrapped PKG1 archives understood by AROS
+    C:Unpack.
 
 Responsibilities:
 
     - encode paths and lengths with the AROS PKG1 byte layout
+    - wrap the PKG1 stream in the bzip2 layer required by C:Unpack
     - recursively package a deterministic directory tree
     - validate record boundaries, package size, and path padding
     - extract only safe relative paths for host-side verification
 
 This file intentionally does NOT contain:
 
-    - bzip2 compression
     - AROS package installation policy
     - FreeBASIC-specific staging rules
 
@@ -27,12 +28,15 @@ Format note:
     A PKG1 path-length field stores the number of bytes before the final
     padding byte.  The following path field is path_length + 1 bytes long and
     contains a NUL-terminated ISO-8859-1 name padded to a four-byte boundary.
-    AROS ignores the padding after the first NUL.
+    AROS ignores the padding after the first NUL. C:Unpack passes the whole
+    file through its bzip2 reader before parsing this PKG1 stream, so a raw
+    file beginning with PKG is not a directly installable .pkg archive.
 """
 
 from __future__ import annotations
 
 import argparse
+import bz2
 import os
 from pathlib import Path, PurePosixPath
 import shutil
@@ -123,9 +127,10 @@ def create_package(source_root: Path, destination: Path) -> None:
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_name(destination.name + ".new")
+    raw_temporary = destination.with_name(destination.name + ".raw")
 
     try:
-        with temporary.open("wb") as stream:
+        with raw_temporary.open("wb") as stream:
             stream.write(MAGIC)
             stream.write(bytes((VERSION,)))
             _write_uint32(stream, 0)
@@ -149,17 +154,25 @@ def create_package(source_root: Path, destination: Path) -> None:
             stream.seek(4)
             _write_uint32(stream, package_size)
 
+        with raw_temporary.open("rb") as source:
+            with bz2.open(temporary, "wb", compresslevel=9) as target:
+                shutil.copyfileobj(source, target, length=1024 * 1024)
+
         temporary.replace(destination)
     except BaseException:
         temporary.unlink(missing_ok=True)
         raise
+    finally:
+        raw_temporary.unlink(missing_ok=True)
 
 
 def extract_package(source: Path, destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
-    package_size = source.stat().st_size
+    with source.open("rb") as probe:
+        is_compressed = probe.read(3) == b"BZh"
 
-    with source.open("rb") as stream:
+    open_stream = bz2.open if is_compressed else Path.open
+    with open_stream(source, "rb") as stream:
         magic = _read_exact(stream, len(MAGIC), "package magic")
         version = _read_exact(stream, 1, "package version")[0]
         declared_size = _read_uint32(stream, "package size")
@@ -168,20 +181,23 @@ def extract_package(source: Path, destination: Path) -> None:
             raise PackageError("archive does not have a PKG header")
         if version != VERSION:
             raise PackageError(f"unsupported PKG version: {version}")
-        if declared_size != package_size:
+        if declared_size < HEADER_SIZE:
+            raise PackageError(f"declared package size is too small: {declared_size}")
+        if not is_compressed and declared_size != source.stat().st_size:
             raise PackageError(
-                f"declared package size {declared_size} does not match {package_size}"
+                f"declared package size {declared_size} does not match "
+                f"{source.stat().st_size}"
             )
 
-        while stream.tell() < package_size:
+        while stream.tell() < declared_size:
             path_length = _read_uint32(stream, "path length")
-            if path_length > package_size - stream.tell() - 1:
+            if path_length > declared_size - stream.tell() - 1:
                 raise PackageError("package path extends beyond the archive")
             path_field = _read_exact(stream, path_length + 1, "path field")
             relative = _safe_relative_path(path_field)
 
             data_length = _read_uint32(stream, "file length")
-            if data_length > package_size - stream.tell():
+            if data_length > declared_size - stream.tell():
                 raise PackageError(f"file data extends beyond the archive: {relative}")
 
             output = destination.joinpath(*relative.parts)
@@ -197,8 +213,10 @@ def extract_package(source: Path, destination: Path) -> None:
                     target.write(chunk)
                     remaining -= len(chunk)
 
-        if stream.tell() != package_size:
+        if stream.tell() != declared_size:
             raise PackageError("package parser did not stop at the archive boundary")
+        if stream.read(1):
+            raise PackageError("package has data beyond its declared boundary")
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -225,7 +243,7 @@ def main() -> int:
             create_package(arguments.source, arguments.destination)
         else:
             extract_package(arguments.source, arguments.destination)
-    except (OSError, PackageError) as error:
+    except (EOFError, OSError, PackageError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1
     return 0

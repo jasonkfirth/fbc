@@ -1,0 +1,35 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-collect-aros-arm-process-boundary.patch
+#
+# Purpose:
+#
+#     Run the AROS ARM linker in an independent native process.
+#
+# Responsibilities:
+#
+#     - keep ld out of the ARM collect-aros driver process
+#     - use the non-m68k AROS exit-callback argument order
+#     - preserve the retained-child cleanup order proven by the m68k build
+#
+# This file intentionally does NOT alter linker arguments or target layout.
+#
+--- a/tools/collect-aros/docommand-exec.c
++++ b/tools/collect-aros/docommand-exec.c
+@@ -23 +23 @@
+-#ifdef __mc68000__
++#if defined(__mc68000__) || defined(__arm__)
+@@ -29 +29,5 @@
++#ifdef __mc68000__
+ static void aros_child_exit(IPTR data, IPTR result)
++#else
++static void aros_child_exit(IPTR result, IPTR data)
++#endif
+@@ -154 +158 @@ static void _docommandv(const char *command, char *argv[], int do_path)
+-#ifdef __mc68000__
++#if defined(__mc68000__) || defined(__arm__)
+@@ -184 +188 @@ static void _docommandv(const char *command, char *argv[], int do_path)
+-#ifdef __mc68000__
++#if defined(__mc68000__) || defined(__arm__)
+# end of native-collect-aros-arm-process-boundary.patch

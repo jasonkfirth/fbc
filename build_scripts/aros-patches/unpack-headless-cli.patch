@@ -1,0 +1,63 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: unpack-headless-cli.patch
+#
+# Purpose:
+#
+#     Let the native AROS Unpack command install packages without a public
+#     screen, as required by serial-only ARM and automated package tests.
+#
+# Responsibilities:
+#
+#     - retain the normal progress window when a public screen is available
+#     - continue package extraction without a progress window otherwise
+#     - avoid drawing through a missing RastPort in headless operation
+#
+# This file intentionally does NOT change the PKG1 or bzip2 archive format.
+#
+--- a/workbench/c/Unpack/gui.c
++++ b/workbench/c/Unpack/gui.c
+@@ -17,5 +17,12 @@ BOOL GUI_Open()
+ {
+     screen = LockPubScreen( NULL );
++
++    /* A serial-only system has no public screen but can still unpack files. */
++    if( screen == NULL )
++    {
++        return TRUE;
++    }
++
+     if( screen != NULL )
+     {
+         width  = screen->Width / 3;
+@@ -79,9 +86,16 @@ void GUI_Close()
+ {
+     if( window != NULL ) CloseWindow( window );
+     if( background != NULL ) CloseWindow( background );
+-    if( screen != NULL ) UnlockPubScreen( NULL, screen );
+-    
+-    CloseWorkBench();
++    if( screen != NULL )
++    {
++        UnlockPubScreen( NULL, screen );
++        CloseWorkBench();
++    }
++
++    window = NULL;
++    background = NULL;
++    screen = NULL;
++    rp = NULL;
+ }
+ 
+ void GUI_Update( LONG position, LONG max )
+@@ -91,5 +105,7 @@ void GUI_Update( LONG position, LONG max )
+     WORD        newx;
+     
++    if( rp == NULL || max <= 0 ) return;
++
+     newx = (position * width) / max;
+     if( newx > oldx )
+     {
+
+# end of unpack-headless-cli.patch

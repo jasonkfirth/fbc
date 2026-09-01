@@ -228,67 +228,83 @@ void fb_hRecheckConsoleSize(int requery_cursorpos)
 
 int fb_hTermOut(int code, int param1, int param2)
 {
+    char sequence[64];
+    int length;
+    BPTR output;
+
     if (__fb_con.inited == FALSE)
         return FALSE;
 
     switch (code) {
     case SEQ_LOCATE:
-        fprintf(stdout, FB_AROS_CSI "%d;%dH", param2 + 1, param1 + 1);
+        length = snprintf(sequence, sizeof(sequence),
+            FB_AROS_CSI "%d;%dH", param2 + 1, param1 + 1);
         break;
     case SEQ_HOME:
-        fputs(FB_AROS_CSI "H", stdout);
+        length = snprintf(sequence, sizeof(sequence), FB_AROS_CSI "H");
         break;
     case SEQ_SCROLL_REGION:
         return TRUE;
     case SEQ_CLS:
-        fputc('\f', stdout);
+        length = snprintf(sequence, sizeof(sequence), "\f");
         break;
     case SEQ_CLEOL:
-        fputs(FB_AROS_CSI "K", stdout);
+        length = snprintf(sequence, sizeof(sequence), FB_AROS_CSI "K");
         break;
     case SEQ_WINDOW_SIZE:
-        fprintf(stdout, FB_AROS_CSI "%dt" FB_AROS_CSI "%du",
+        length = snprintf(sequence, sizeof(sequence),
+            FB_AROS_CSI "%dt" FB_AROS_CSI "%du",
             param1, param2);
         break;
     case SEQ_BEEP:
-        fputc('\a', stdout);
+        length = snprintf(sequence, sizeof(sequence), "\a");
         break;
     case SEQ_FG_COLOR:
-        fprintf(stdout, FB_AROS_CSI "%dm", 30 + param2);
+        length = snprintf(sequence, sizeof(sequence),
+            FB_AROS_CSI "%dm", 30 + param2);
         break;
     case SEQ_BG_COLOR:
-        fprintf(stdout, FB_AROS_CSI "%dm", 40 + param2);
+        length = snprintf(sequence, sizeof(sequence),
+            FB_AROS_CSI "%dm", 40 + param2);
         break;
     case SEQ_RESET_COLOR:
-        fputs(FB_AROS_CSI "0m", stdout);
+        length = snprintf(sequence, sizeof(sequence), FB_AROS_CSI "0m");
         break;
     case SEQ_BRIGHT_COLOR:
-        fputs(FB_AROS_CSI "1m", stdout);
+        length = snprintf(sequence, sizeof(sequence), FB_AROS_CSI "1m");
         break;
     case SEQ_SCROLL:
-        fprintf(stdout, FB_AROS_CSI "%dS", param2);
+        length = snprintf(sequence, sizeof(sequence),
+            FB_AROS_CSI "%dS", param2);
         break;
     case SEQ_SHOW_CURSOR:
-        fputs(FB_AROS_CSI "1 p", stdout);
+        length = snprintf(sequence, sizeof(sequence), FB_AROS_CSI "1 p");
         break;
     case SEQ_HIDE_CURSOR:
-        fputs(FB_AROS_CSI "0 p", stdout);
+        length = snprintf(sequence, sizeof(sequence), FB_AROS_CSI "0 p");
         break;
     case SEQ_DEL_CHAR:
-        fputs(FB_AROS_CSI "P", stdout);
+        length = snprintf(sequence, sizeof(sequence), FB_AROS_CSI "P");
         break;
     case SEQ_INIT_KEYPAD:
     case SEQ_EXIT_KEYPAD:
         return TRUE;
     case SEQ_SET_COLOR_EX:
-        fprintf(stdout, FB_AROS_CSI "%dm", param1);
+        length = snprintf(sequence, sizeof(sequence),
+            FB_AROS_CSI "%dm", param1);
         break;
     default:
         return FALSE;
     }
 
-    fflush(stdout);
-    return TRUE;
+    if (length < 0 || (size_t)length >= sizeof(sequence))
+        return FALSE;
+
+    output = Output();
+    if (output == BNULL)
+        return FALSE;
+
+    return (Write(output, (APTR)sequence, length) == length) ? TRUE : FALSE;
 }
 
 int fb_hInitConsole(void)
@@ -315,6 +331,7 @@ int fb_hInitConsole(void)
 void fb_hExitConsole(void)
 {
     BPTR input;
+    BPTR output;
 
     if (__fb_con.inited == FALSE)
         return;
@@ -329,8 +346,15 @@ void fb_hExitConsole(void)
         __fb_con.mouse_exit();
     BG_UNLOCK();
 
-    fb_hTermOut(SEQ_RESET_COLOR, 0, 0);
-    fb_hTermOut(SEQ_SHOW_CURSOR, 0, 0);
+    /*
+        Terminal reset sequences only belong on an interactive output handle;
+        writing them to a redirected compiler log corrupts its contents.
+    */
+    output = Output();
+    if (output != BNULL && IsInteractive(output) != DOSFALSE) {
+        fb_hTermOut(SEQ_RESET_COLOR, 0, 0);
+        fb_hTermOut(SEQ_SHOW_CURSOR, 0, 0);
+    }
 
     input = Input();
     if (input != BNULL && console_raw_mode != FALSE)

@@ -267,15 +267,46 @@ fi
 printf '%s\n' 'SYS:FreeBASIC' \
     > "$PACKAGE_ROOT/Prefs/Env-Archive/SYS/Packages/FreeBASIC"
 
-printf '%s\n' \
-    'Assign EXISTS "FreeBASIC:" >NIL:' \
-    'If WARN' \
-    '    Assign "FreeBASIC:" "SYS:FreeBASIC" >NIL:' \
-	'EndIf' \
-	'Path ADD FreeBASIC:bin' \
-	'SetEnv GCC Developer:bin/gcc' \
-	'SetEnv ELF2HUNK Developer:bin/elf2hunk' \
-	> "$FREEBASIC_ROOT/S/FreeBASIC-Startup"
+STARTUP_LINES=(
+    'Assign EXISTS "FreeBASIC:" >NIL:'
+    'If WARN'
+    '    Assign "FreeBASIC:" "SYS:FreeBASIC" >NIL:'
+    'EndIf'
+)
+
+if [ "$TARGET" = arm ]; then
+    STARTUP_LINES+=(
+        'SetEnv GCC SYS:Developer/bin/gcc'
+        'SetEnv AS SYS:Developer/bin/as'
+        'SetEnv LD SYS:Developer/bin/ld'
+        'SetEnv AR SYS:Developer/bin/ar'
+        'SetEnv GCC_EXEC_PREFIX SYS:Developer/libexec/gcc/arm-aros/6.5.0/'
+        'SetEnv COMPILER_PATH SYS:Developer/bin'
+    )
+else
+    STARTUP_LINES+=(
+        'Path ADD FreeBASIC:bin'
+        'SetEnv GCC Developer:bin/gcc'
+        'SetEnv ELF2HUNK Developer:bin/elf2hunk'
+    )
+fi
+
+printf '%s\n' "${STARTUP_LINES[@]}" \
+    > "$FREEBASIC_ROOT/S/FreeBASIC-Startup"
+
+ARM_INVOKE_NOTE=""
+if [ "$TARGET" = arm ]; then
+    ARM_INVOKE_NOTE="$(cat <<'EOF'
+On ARM, invoke the compiler as SYS:FreeBASIC/bin/fbc. The current ARM FAT
+handler can block while adding an installed directory to the shell Path, so
+the startup file configures absolute tool paths and deliberately leaves Path
+unchanged. Use Stack 16777216 before invoking fbc. The installed front end and
+individual GCC tools work, but the nested fbc -> gcc -> cc1 command chain is
+not reliable yet. Treat this package as experimental until that complete path
+passes in a clean ARM guest.
+EOF
+)"
+fi
 
 cat > "$FREEBASIC_ROOT/README" <<EOF
 FreeBASIC $FBVERSION for AROS $TARGET
@@ -290,12 +321,16 @@ matching FreeBASIC-Developer-${FBVERSION}-r${PACKAGE_REVISION}-aros-${TARGET}
 package first when it is supplied. GCC and binutils remain in that separate
 SYS:Developer package rather than being duplicated under SYS:FreeBASIC.
 
-The normal native fbc compile-and-link path is qualified inside x86_64, ARM,
-and m68k AROS guests. The m68k qualification compiles generated C at -O0,
-links with the AROS-hosted GCC supply chain, converts the result to Hunk, and
-runs that Hunk inside AROS. Larger m68k-native work may still need to be split
-into batches because the current AROS allocator exposes less memory than the
-full Zorro III board configured in FS-UAE.
+$ARM_INVOKE_NOTE
+
+The normal native fbc compile-and-link path is qualified inside x86_64 and
+m68k AROS guests. The ARM package passes clean installation and direct
+compiler-component checks, but not the complete nested driver path described
+above. The m68k qualification compiles generated C at -O0, links with the
+AROS-hosted GCC supply chain, converts the result to Hunk, and runs that Hunk
+inside AROS. Larger m68k-native work may still need to be split into batches
+because the current AROS allocator exposes less memory than the full Zorro III
+board configured in FS-UAE.
 
 This package includes the normal and multithreaded FreeBASIC runtime, gfxlib2,
 sfxlib, and the target libffi used by THREADCALL. AROS graphics use Intuition
@@ -316,8 +351,8 @@ rm -f -- "$PACKAGE_PATH" "$ZIP_PATH"
 run python3 "$PKG_TOOL" create "$PACKAGE_ROOT" "$PACKAGE_PATH"
 
 [ -s "$PACKAGE_PATH" ] || die "package tool did not create $PACKAGE_PATH"
-[ "$(head -c 3 "$PACKAGE_PATH")" = "PKG" ] ||
-    die "package does not have a PKG1 header: $PACKAGE_PATH"
+[ "$(head -c 3 "$PACKAGE_PATH")" = "BZh" ] ||
+    die "package does not have the bzip2 wrapper required by C:Unpack: $PACKAGE_PATH"
 
 msg "verifying package contents"
 run python3 "$PKG_TOOL" extract "$PACKAGE_PATH" "$EXTRACT_ROOT"

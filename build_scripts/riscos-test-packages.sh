@@ -414,6 +414,13 @@ else
     echo 'WARNING: neither gnome-screenshot nor ImageMagick import is available; screenshots are disabled' >&2
 fi
 
+# The command-line contract says that an interval of zero disables screenshots.
+# Keep the initial and final game captures under the same policy so a headless
+# run does not accidentally require ImageMagick frame comparison.
+if [ "$SCREENSHOT_INTERVAL_SECONDS" -eq 0 ]; then
+    SCREENSHOT_TOOL=""
+fi
+
 BASE_SOURCE="$BASE_WORKDIR/source"
 BASE_BINARY="$BASE_SOURCE/rpcemu-recompiler"
 HARDDISC_ARCHIVE="$BASE_WORKDIR/riscos-open-harddisc4-5.30.zip"

@@ -1,0 +1,27 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-gcc-gc-target-cxxflags.patch
+#
+# Purpose:
+#
+#     Preserve the selected AROS target ABI when CMake configures the
+#     garbage collector required by native GCC.
+#
+# Responsibilities:
+#
+#     - retain the architecture and ABI flags supplied by AROS
+#     - add the C++ language-level flag required by the legacy BDWGC source
+#
+# This file intentionally does NOT select a target ABI or alter BDWGC source.
+#
+--- a/contrib/development/libs/gc/mmakefile.src
++++ b/contrib/development/libs/gc/mmakefile.src
+@@ -33,5 +33,5 @@ else
+ GC_EXTRA_OPTS := \
+         -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+-        -DCMAKE_CXX_FLAGS="$(USER_CXXFLAGS)"
++        -DCMAKE_CXX_FLAGS="$(CXXFLAGS) $(USER_CXXFLAGS)"
+ endif
+ 
+# end of native-gcc-gc-target-cxxflags.patch

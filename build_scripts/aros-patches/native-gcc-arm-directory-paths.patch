@@ -1,0 +1,203 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-gcc-arm-directory-paths.patch
+#
+# Purpose:
+#
+#     Keep native ARM GCC from blocking while it prepares include paths.
+#
+# Responsibilities:
+#
+#     - convert configured Unix SDK paths to paths rooted at SYS:Developer
+#     - remove unresolved parent components from GCC's private include path
+#     - use native DOS probes for ARM files and directories
+#     - compare normalized directory names when removing duplicate paths
+#
+# This file intentionally does NOT alter cross-hosted GCC or code generation.
+#
+--- a/gcc/gcc.c
++++ b/gcc/gcc.c
+@@ -41,6 +41,11 @@
+ #include "filenames.h"
+ #include "spellcheck.h"
+ 
++#if defined (__AROS__) && defined (__arm__)
++#include <dos/dos.h>
++#include <proto/dos.h>
++#endif
++
+ 
+ 
+ /* Manage the manipulation of env vars.
+@@ -2710,5 +2715,36 @@ static int
+ access_check (const char *name, int mode)
+ {
++#if defined (__AROS__) && defined (__arm__)
++  BPTR lock;
++  struct FileInfoBlock *fib;
++  int result = -1;
++
++  lock = Lock ((CONST_STRPTR) name, SHARED_LOCK);
++  if (lock == BNULL)
++    return -1;
++
++  fib = (struct FileInfoBlock *) AllocDosObject (DOS_FIB, NULL);
++  if (fib == NULL)
++    {
++      UnLock (lock);
++      return -1;
++    }
++
++  if (Examine (lock, fib) == DOSTRUE)
++    {
++      if ((mode & X_OK) != 0)
++        result = (fib->fib_DirEntryType < 0
++                  && (fib->fib_Protection & FIBF_EXECUTE) == 0) ? 0 : -1;
++      else if ((mode & R_OK) != 0)
++        result = (fib->fib_Protection & FIBF_READ) == 0 ? 0 : -1;
++      else
++        result = 0;
++    }
++
++  FreeDosObject (DOS_FIB, fib);
++  UnLock (lock);
++  return result;
++#else
+   if (mode == X_OK)
+     {
+       struct stat st;
+@@ -2728,6 +2764,7 @@ access_check (const char *name, int mode)
+     }
+ 
+   return access (name, mode);
++#endif
+ }
+ 
+ /* Callback for find_a_file.  Appends the file name to the directory
+@@ -7029,4 +7066,28 @@ is_directory (const char *path1, bool linker)
+ {
++#if defined (__AROS__) && defined (__arm__)
++  BPTR lock;
++  struct FileInfoBlock *fib;
++  int result = 0;
++
++  (void) linker;
++  lock = Lock ((CONST_STRPTR) path1, SHARED_LOCK);
++  if (lock == BNULL)
++    return 0;
++
++  fib = (struct FileInfoBlock *) AllocDosObject (DOS_FIB, NULL);
++  if (fib == NULL)
++    {
++      UnLock (lock);
++      return 0;
++    }
++
++  if (Examine (lock, fib) == DOSTRUE && fib->fib_DirEntryType >= 0)
++    result = 1;
++
++  FreeDosObject (DOS_FIB, fib);
++  UnLock (lock);
++  return result;
++#else
+   int len1;
+   char *path;
+   char *cp;
+@@ -7060,6 +7121,7 @@ is_directory (const char *path1, bool linker)
+     return 0;
+ 
+   return (stat (path, &st) >= 0 && S_ISDIR (st.st_mode));
++#endif
+ }
+ 
+ /* Set up the various global variables to indicate that we're processing
+--- a/gcc/incpath.c
++++ b/gcc/incpath.c
+@@ -27,6 +27,29 @@
+ #include "incpath.h"
+ #include "cppdefault.h"
+ 
++#if defined (__AROS__) && defined (__arm__)
++#include <dos/dos.h>
++#include <proto/dos.h>
++
++static int
++aros_directory_stat (const char *path, struct stat *st)
++{
++  BPTR lock;
++
++  lock = Lock ((CONST_STRPTR) path, SHARED_LOCK);
++  if (lock == BNULL)
++    {
++      errno = ENOENT;
++      return -1;
++    }
++
++  UnLock (lock);
++  memset (st, 0, sizeof (*st));
++  st->st_mode = S_IFDIR;
++  return 0;
++}
++#endif
++
+ /* Microsoft Windows does not natively support inodes.
+    VMS has non-numeric inodes.  */
+ #ifdef VMS
+@@ -38,7 +61,9 @@
+ # define INO_T_COPY(DEST, SRC) (DEST) = (SRC)
+ #endif
+ 
+-#if defined INO_T_EQ
++#if defined (__AROS__) && defined (__arm__)
++#define DIRS_EQ(A, B) (!filename_cmp ((A)->name, (B)->name))
++#elif defined INO_T_EQ
+ #define DIRS_EQ(A, B) ((A)->dev == (B)->dev \
+ 	&& INO_T_EQ ((A)->ino, (B)->ino))
+ #else
+@@ -242,7 +267,11 @@ remove_duplicates (cpp_reader *pfile, struct cpp_dir *head,
+ 
+       cur = *pcur;
+ 
++#if defined (__AROS__) && defined (__arm__)
++      if (aros_directory_stat (cur->name, &st))
++#else
+       if (stat (cur->name, &st))
++#endif
+ 	{
+ 	  /* Dirs that don't exist or have denied permissions are 
+ 	     silently ignored, unless verbose.  */
+@@ -423,6 +452,32 @@ add_path (char *path, int chain, int cxx_aware, bool user_supplied_p)
+ {
+   cpp_dir *p;
+ 
++#if defined (__AROS__) && defined (__arm__)
++  const char developer_prefix[] = "/Developer/";
++  const char configured_prefix[] = "/Aros/Developer/";
++  const char *suffix = NULL;
++
++  if (strncmp (path, developer_prefix, sizeof (developer_prefix) - 1) == 0)
++    suffix = path + sizeof (developer_prefix) - 1;
++  else if (strncmp (path, configured_prefix,
++                    sizeof (configured_prefix) - 1) == 0)
++    suffix = path + sizeof (configured_prefix) - 1;
++
++  if (suffix != NULL)
++    {
++      const char *gcc_library = strstr (path, "/lib/gcc/");
++      char *aros_path;
++
++      /* GCC's relocated private include path still contains ../ elements. */
++      if (gcc_library != NULL)
++        suffix = gcc_library + 1;
++
++      aros_path = concat ("SYS:Developer/", suffix, NULL);
++      free (path);
++      path = aros_path;
++    }
++#endif
++
+ #if defined (HAVE_DOS_BASED_FILE_SYSTEM)
+   /* Remove unnecessary trailing slashes.  On some versions of MS
+      Windows, trailing  _forward_ slashes cause no problems for stat().
+# end of native-gcc-arm-directory-paths.patch

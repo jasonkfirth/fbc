@@ -38,9 +38,23 @@ int fb_DevFileSeek( FB_FILE *handle, fb_off_t offset, int whence )
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}
 
+	#if defined(__arm__)
+	/* Keep ARM's POSIXC stream and its native handle paired internally. */
+	result = fseeko( fp, offset, whence );
+	#else
 	result = fb_hArosSetFilePosition( fp, offset, whence );
+	#endif
 	if( result == 0 )
+	#if defined(__arm__)
+	{
+		fb_off_t position = ftello( fp );
+
+		if( position > handle->size )
+			handle->size = position;
+	}
+	#else
 		fb_hArosGrowFileSize( handle );
+	#endif
 	result = fb_ErrorSetNum( result == 0
 				 ? FB_RTERROR_OK
 				 : FB_RTERROR_FILEIO );

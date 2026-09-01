@@ -46,9 +46,11 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 AROS_ROOT="${AROS_ROOT:-$ROOT/out/aros}"
-AROS_SOURCE="${AROS_SOURCE:-$AROS_ROOT/source}"
+AROS_SOURCE="${AROS_SOURCE:-}"
 AROS_REPOSITORY="${AROS_REPOSITORY:-https://github.com/aros-development-team/AROS.git}"
 AROS_REVISION="${AROS_REVISION:-b224b192a50d406820c822b6e619d6d1bbadc221}"
+AROS_CONTRIB_REPOSITORY="${AROS_CONTRIB_REPOSITORY:-https://github.com/aros-development-team/contrib.git}"
+AROS_CONTRIB_REVISION="${AROS_CONTRIB_REVISION:-f6e32c8f30f0be7ee4a02ff01d3deb221d8b1ab6}"
 TARGETS="${AROS_TARGETS:-x86_64,m68k,arm}"
 SKIP_DEPS=0
 SKIP_AROS_BUILD=0
@@ -125,8 +127,9 @@ Options:
   --no-images          Do not create AROS boot media.
   --no-package         Do not create FreeBASIC .pkg and .zip files.
   --aros-root DIR      AROS workspace. Default: out/aros
-  --aros-source DIR    AROS source checkout. Default: out/aros/source
+  --aros-source DIR    AROS source checkout. Default: AROS_ROOT/source
   --aros-revision REV  AROS commit or tag. Default: $AROS_REVISION
+  --contrib-revision R AROS contrib commit or tag. Default: $AROS_CONTRIB_REVISION
   --update-aros        Fetch the selected revision in an existing checkout.
   --jobs N             Parallel build jobs. Default: detected CPU count
   -h, --help           Show this help.
@@ -239,6 +242,11 @@ while [ "$#" -gt 0 ]; do
             AROS_REVISION="$2"
             shift 2
             ;;
+        --contrib-revision)
+            require_value "$1" "${2-}"
+            AROS_CONTRIB_REVISION="$2"
+            shift 2
+            ;;
         --update-aros)
             UPDATE_AROS=1
             shift
@@ -257,6 +265,11 @@ while [ "$#" -gt 0 ]; do
             ;;
     esac
 done
+
+# Resolve dependent defaults after command-line parsing.  Otherwise changing
+# --aros-root would leave the source checkout under the original workspace.
+AROS_SOURCE="${AROS_SOURCE:-$AROS_ROOT/source}"
+AROS_CONTRIB_SOURCE="$AROS_SOURCE/contrib"
 
 case "$JOBS" in
     ''|*[!0-9]*|0) die "--jobs must be a positive integer" ;;
@@ -290,6 +303,8 @@ install_dependencies() {
     msg "installing Debian/Ubuntu AROS build dependencies"
     export DEBIAN_FRONTEND=noninteractive
     run_root apt-get update
+    # The ARM cross-GCC build configures a 32-bit x86 host zlib multilib.  A
+    # compiler-only -m32 probe is not enough; its configure test must also link.
     run_root apt-get install -y --no-install-recommends \
         autoconf \
         automake \
@@ -305,11 +320,14 @@ install_dependencies() {
         dosfstools \
         dos2unix \
         e2tools \
+        fdisk \
         file \
         flex \
         fs-uae \
         g++ \
+        g++-multilib \
         gawk \
+        gcc-multilib \
         genisoimage \
         git \
         gperf \
@@ -379,6 +397,34 @@ prepare_aros_source() {
     fi
 
     run git -C "$AROS_SOURCE" submodule update --init --recursive
+
+    # AROS keeps the third-party ports used for native GCC and binutils in a
+    # separate official repository.  Old build trees already had this checkout,
+    # which hid the dependency until the release was built in a clean workspace.
+    if [ ! -d "$AROS_CONTRIB_SOURCE/.git" ]; then
+        [ ! -e "$AROS_CONTRIB_SOURCE" ] ||
+            die "AROS contrib path exists but is not a Git checkout: $AROS_CONTRIB_SOURCE"
+        run mkdir -p "$(dirname "$AROS_CONTRIB_SOURCE")"
+        run git clone "$AROS_CONTRIB_REPOSITORY" "$AROS_CONTRIB_SOURCE"
+    fi
+
+    if [ "$UPDATE_AROS" -eq 1 ]; then
+        run git -C "$AROS_CONTRIB_SOURCE" fetch --tags origin
+    fi
+
+    if ! git -C "$AROS_CONTRIB_SOURCE" rev-parse --verify \
+        "$AROS_CONTRIB_REVISION^{commit}" >/dev/null 2>&1; then
+        run git -C "$AROS_CONTRIB_SOURCE" fetch origin "$AROS_CONTRIB_REVISION"
+    fi
+
+    if [ "$(git -C "$AROS_CONTRIB_SOURCE" rev-parse HEAD)" != \
+         "$(git -C "$AROS_CONTRIB_SOURCE" rev-parse "$AROS_CONTRIB_REVISION^{commit}")" ]; then
+        [ -z "$(git -C "$AROS_CONTRIB_SOURCE" status --short)" ] ||
+            die "AROS contrib checkout has local changes; refusing to switch revisions"
+        run git -C "$AROS_CONTRIB_SOURCE" checkout --detach "$AROS_CONTRIB_REVISION"
+    fi
+
+    run git -C "$AROS_CONTRIB_SOURCE" submodule update --init --recursive
 }
 
 apply_patch_once() {
@@ -403,13 +449,26 @@ native_gcc_runtime_patch_is_applied() {
     local source_dir="$1"
 
     [ -f "$source_dir/gcc/config/x-aros" ] &&
-        rg -q 'host_xmake_file=.*x-aros' "$source_dir/gcc/config.host" &&
-        rg -q 'pex_aros_filename' "$source_dir/libiberty/pex-unix.c" &&
-        rg -q '#undef HAVE_TIMES' "$source_dir/gcc/timevar.c" &&
-        rg -q '#undef HAVE_CLOCK' "$source_dir/libiberty/getruntime.c"
+        grep -q 'host_xmake_file=.*x-aros' "$source_dir/gcc/config.host" &&
+        grep -q 'pex_aros_filename' "$source_dir/libiberty/pex-unix.c" &&
+        grep -q '#undef HAVE_TIMES' "$source_dir/gcc/timevar.c" &&
+        grep -q '#undef HAVE_CLOCK' "$source_dir/libiberty/getruntime.c"
+}
+
+native_gcc_process_patch_is_applied() {
+    local source_dir="$1"
+
+    grep -q 'struct pex_aros_child_result' \
+        "$source_dir/libiberty/pex-unix.c" &&
+        grep -q 'NP_NotifyOnDeath' "$source_dir/libiberty/pex-unix.c" &&
+        grep -q 'gcc_libexec_prefix = "Developer:libexec/gcc/"' \
+            "$source_dir/gcc/gcc.c"
 }
 
 prepare_native_prerequisites() {
+    apply_patch_once \
+        "$SCRIPT_DIR/aros-patches/unpack-headless-cli.patch" \
+        "$AROS_SOURCE"
     apply_patch_once \
         "$SCRIPT_DIR/aros-patches/native-autotools-explicit-nix-layout.patch" \
         "$AROS_SOURCE"
@@ -431,14 +490,27 @@ prepare_native_prerequisites() {
     apply_patch_once \
         "$SCRIPT_DIR/aros-patches/native-posixc-vfork-child-id.patch" \
         "$AROS_SOURCE"
+    if grep -q 'static char \*aros_command_name' \
+        "$AROS_SOURCE/tools/collect-aros/docommand-exec.c" &&
+        grep -q 'NP_NotifyOnDeath' \
+            "$AROS_SOURCE/tools/collect-aros/docommand-exec.c"; then
+        msg "native-collect-aros-runcommand.patch is already applied"
+    else
+        apply_patch_once \
+            "$SCRIPT_DIR/aros-patches/native-collect-aros-runcommand.patch" \
+            "$AROS_SOURCE"
+    fi
     apply_patch_once \
-        "$SCRIPT_DIR/aros-patches/native-collect-aros-runcommand.patch" \
+        "$SCRIPT_DIR/aros-patches/native-collect-aros-arm-process-boundary.patch" \
         "$AROS_SOURCE"
     apply_patch_once \
         "$SCRIPT_DIR/aros-patches/native-collect-aros-m68k-temp-path.patch" \
         "$AROS_SOURCE"
     apply_patch_once \
         "$SCRIPT_DIR/aros-patches/native-gcc-gc-cmake-policy.patch" \
+        "$AROS_SOURCE"
+    apply_patch_once \
+        "$SCRIPT_DIR/aros-patches/native-gcc-gc-target-cxxflags.patch" \
         "$AROS_SOURCE"
     apply_patch_once \
         "$SCRIPT_DIR/aros-patches/native-gcc-no-common.patch" \
@@ -548,6 +620,8 @@ build_native_toolchain_target() {
     local gcc_installed
     local host_elf2hunk
     local native_elf2hunk
+    local native_collect_aros
+    local native_collect_aros_description
     local patches_applied=0
     local sdk_root
     local stripped_elf2hunk
@@ -623,14 +697,30 @@ build_native_toolchain_target() {
         apply_patch_once "$gcc_runtime_patch" "$gcc_source"
         [ "$PATCH_WAS_APPLIED" -eq 0 ] || gcc_patches_applied=1
     fi
+    if [ "$target" = "m68k" ] || [ "$target" = "arm" ]; then
+        if native_gcc_process_patch_is_applied "$gcc_source"; then
+            msg "native-gcc-m68k-process-boundary.patch is already applied"
+        else
+            apply_patch_once \
+                "$SCRIPT_DIR/aros-patches/native-gcc-m68k-process-boundary.patch" \
+                "$gcc_source"
+            [ "$PATCH_WAS_APPLIED" -eq 0 ] || gcc_patches_applied=1
+        fi
+    fi
     if [ "$target" = "m68k" ]; then
         run mkdir -p "$gcc_source/gcc/config/aros"
         apply_patch_once \
             "$SCRIPT_DIR/aros-patches/native-gcc-m68k-host-runtime-gcc6.patch" \
             "$gcc_source"
         [ "$PATCH_WAS_APPLIED" -eq 0 ] || gcc_patches_applied=1
+    fi
+    if [ "$target" = "arm" ]; then
         apply_patch_once \
-            "$SCRIPT_DIR/aros-patches/native-gcc-m68k-process-boundary.patch" \
+            "$SCRIPT_DIR/aros-patches/native-gcc-arm-process-boundary.patch" \
+            "$gcc_source"
+        [ "$PATCH_WAS_APPLIED" -eq 0 ] || gcc_patches_applied=1
+        apply_patch_once \
+            "$SCRIPT_DIR/aros-patches/native-gcc-arm-directory-paths.patch" \
             "$gcc_source"
         [ "$PATCH_WAS_APPLIED" -eq 0 ] || gcc_patches_applied=1
     fi
@@ -659,6 +749,23 @@ build_native_toolchain_target() {
     if [ ! -e "$gcc_files_touched" ]; then
         run mkdir -p "$(dirname "$gcc_files_touched")"
         run touch "$gcc_files_touched"
+    fi
+
+    if [ "$target" = "m68k" ]; then
+        native_collect_aros="$sdk_root/Developer/bin/collect-aros"
+        if [ -f "$native_collect_aros" ] &&
+            ! readelf -h "$native_collect_aros" >/dev/null 2>&1; then
+            native_collect_aros_description="$(file -b "$native_collect_aros")"
+            [[ "$native_collect_aros_description" == \
+                *"AmigaOS loadseg()ble executable/binary"* ]] ||
+                die "unexpected native m68k collect-aros format: $native_collect_aros_description"
+
+            # Final packaging converts the installed collector from ELF to
+            # Hunk.  A later AROS make pass strips this target before checking
+            # whether it needs relinking, so remove the delivered Hunk copy
+            # and let its normal recipe regenerate the ELF intermediate.
+            run rm -f "$native_collect_aros"
+        fi
     fi
 
     msg "building native AROS development supply chain for $target"
@@ -1004,6 +1111,10 @@ build_freebasic_target() {
         libs
 
     msg "building native FreeBASIC compiler for AROS $target"
+    # FBC_EXE can name an output outside bin/. Remove it explicitly because
+    # make's normal compiler target may otherwise leave that existing file in
+    # place even after target runtime objects have changed.
+    run rm -f -- "$compiler_output"
     PATH="$toolchain_dir:$PATH" run make -C "$ROOT" -j"$JOBS" \
         "TARGET_TRIPLET=$MAP_TOOL_PREFIX" \
         "BUILD_FBC=$ROOT/bin/fbc" \
@@ -1109,9 +1220,9 @@ if [ "$SKIP_FREEBASIC_BUILD" -eq 0 ]; then
     for_each_target build_freebasic_target
 fi
 
-if [ "$SKIP_AROS_BUILD" -eq 0 ]; then
-    for_each_target package_developer_target
-fi
+# Reuse mode skips construction of the SDKs, but the existing Developer trees
+# are still release inputs and must be packaged alongside the compiler.
+for_each_target package_developer_target
 
 for_each_target package_freebasic_target
 

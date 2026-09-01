@@ -1,0 +1,81 @@
+# Project: FreeBASIC AROS release workflow
+# ----------------------------------------
+#
+# File: native-gcc-arm-process-boundary.patch
+#
+# Purpose:
+#
+#     Run native GCC child programs safely on AROS ARM.
+#
+# Responsibilities:
+#
+#     - keep the working m68k child-process implementation unchanged
+#     - use a SYS: libexec path that the ARM FAT handler resolves reliably
+#     - run ARM compiler stages through dos.library's synchronous process API
+#     - preserve each child command's return code for GCC
+#
+# This file intentionally does NOT alter GCC target-code generation.
+#
+--- a/gcc/gcc.c
++++ b/gcc/gcc.c
+@@ -4175,7 +4175,8 @@ process_command (unsigned int decoded_options_count,
+   gcc_libexec_prefix = standard_libexec_prefix;
+ #ifndef VMS
+   /* FIXME: make_relative_prefix doesn't yet work for VMS.  */
+-#if defined (__AROS__) && defined (__mc68000__)
++#if defined (__AROS__) && \
++    (defined (__mc68000__) || defined (__arm__))
+   /*
+      Native AROS command names use assigns such as Developer:bin/gcc.
+      GCC's Unix relocation helper interprets the assign separator as part of
+@@ -4184,7 +4185,11 @@ process_command (unsigned int decoded_options_count,
+      Use an AROS assign for program discovery and do not relocate it from
+      the driver's native command name.
+   */
++#ifdef __arm__
++  gcc_libexec_prefix = "SYS:Developer/libexec/gcc/";
++#else
+   gcc_libexec_prefix = "Developer:libexec/gcc/";
++#endif
+   gcc_exec_prefix = NULL;
+ #else
+   if (!gcc_exec_prefix)
+--- a/libiberty/pex-unix.c
++++ b/libiberty/pex-unix.c
+@@ -803,7 +803,7 @@ pex_unix_exec_child (struct pex_obj *obj, int flags, const char *executable,
+   BPTR seglist;
+   IPTR child_id;
+   ULONG stack_size = AROS_STACKSIZE;
+-#else
++#elif !defined (__arm__)
+   struct CommandLineInterface *cli;
+   BPTR seglist;
+   ULONG stack_size = AROS_STACKSIZE;
+@@ -841,7 +841,25 @@ pex_unix_exec_child (struct pex_obj *obj, int flags, const char *executable,
+ 
+   filename = pex_aros_filename (executable);
+   arguments = pex_aros_arguments (argv);
+-#ifdef __mc68000__
++#ifdef __arm__
++  {
++    char *command;
++    size_t command_size = strlen (filename) + strlen (arguments) + 2;
++
++    command = XNEWVEC (char, command_size);
++    snprintf (command, command_size, "%s %s", filename, arguments);
++    result = SystemTags (
++        (CONST_STRPTR) command,
++        SYS_Input, (IPTR) Input (),
++        SYS_Output, (IPTR) Output (),
++        SYS_Error, (IPTR) Output (),
++        SYS_Asynch, FALSE,
++        TAG_DONE);
++    free (command);
++    free (filename);
++    free (arguments);
++  }
++#elif defined (__mc68000__)
+   seglist = LoadSeg ((CONST_STRPTR) filename);
+   if (seglist == BNULL)
+     {
+# end of native-gcc-arm-process-boundary.patch
