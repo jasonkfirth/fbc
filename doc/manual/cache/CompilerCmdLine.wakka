@@ -177,6 +177,8 @@ Using the **fbc** command-line.
 		Set subsystem (##gui##, ##console##)
 	=={{fbdoc item="keyword" value="CompilerOptt|-t < value >"}}==
 		Set stack size in kbytes (default: 1 MB or 2 MB)
+	=={{fbdoc item="keyword" value="CompilerOpttitle|-title < name >"}}==
+		Set the display title embedded in an original Xbox XBE
 
 {{fbdoc item="section" value="Meta"}}
 	=={{fbdoc item="keyword" value="CompilerOptoptfile|@< file >"}}==

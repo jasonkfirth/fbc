@@ -1,7 +1,7 @@
 FreeBASIC Manual
 ------------------------------------------------------------
 
-This document last compiled : 2026-09-04 11:59:07
+This document last compiled : 2026-09-04 13:57:59
 from https://www.freebasic.net/wiki/
 
 
@@ -21,10 +21,11 @@ Language Documentation
       __DATE_ISO__
       __FB_64BIT__
       __FB_ANDROID__
+      __FB_AROS__
       __FB_ARG_COUNT__
       __FB_ARG_EXTRACT__
       __FB_ARG_LEFTOF__
-      __Fb_Arg_Listexpand__
+      __FB_ARG_LISTEXPAND__
       __FB_ARG_RIGHTOF__
       __FB_ARGC__
       __FB_ARGV__
@@ -38,7 +39,7 @@ Language Documentation
       __FB_BUILD_SHA1__
       __FB_CYGWIN__
       __FB_DARWIN__
-      __Fb_Dragonfly__
+      __FB_DRAGONFLY__
       __FB_DEBUG__
       __FB_DOS__
       __FB_ERR__
@@ -46,21 +47,26 @@ Language Documentation
       __FB_FPMODE__
       __FB_FPU__
       __FB_FREEBSD__
-      __Fb_Haiku__
+      __FB_HAIKU__
       __FB_GCC__
       __FB_GFXLIB3__
       __FB_GUI__
       __FB_IIF__
-      __Fb_Illumos__
+      __FB_ILLUMOS__
       __FB_JOIN__
       __FB_JS__
       __FB_LANG__
       __FB_LINUX__
-      __Fb_Loongarch64__
+      __FB_LOONGARCH64__
+      __FB_M68K__
       __FB_MAIN__
       __FB_MIN_VERSION__
+      __FB_MIPS__
+      __FB_MIPS32__
+      __FB_MIPS64__
       __FB_MT__
       __FB_NETBSD__
+      __FB_NUTTX__
       __FB_OPENBSD__
       __FB_OPTIMIZE__
       __FB_OPTION_BYVAL__
@@ -79,9 +85,11 @@ Language Documentation
       __FB_PROFILE__
       __Fb_Query_Symbol__
       __FB_QUOTE__
-      __Fb_Riscv64__
-      __Fb_S390X__
-      __Fb_Solaris__
+      __FB_RISCOS__
+      __FB_RISCV32__
+      __FB_RISCV64__
+      __FB_S390X__
+      __FB_SOLARIS__
       __FB_SIGNATURE__
       __FB_SSE__
       __FB_UNIQUEID__
@@ -95,9 +103,10 @@ Language Documentation
       __FB_VER_PATCH__
       __FB_VERSION__
       __FB_WIN32__
+      __FB_WINCE__
       __FB_X86__
       __FB_XBOX__
-      __Fb_Wii__
+      __FB_WII__
       __FILE__
       __FILE_NQ__
       __FUNCTION__
@@ -986,6 +995,13 @@ Tutorials
       Embed and Access binary Data in Executable
       Use Implicit / Overload New([]) and Delete([]) Operators with Inheritance Polymorphism
       Emulate a TLS (Thread Local Storage) and a TP (Thread Pooling) feature
+      fberror.bi runtime error constants
+      fbcom.bi portable serial controls
+      fbnetwire.bi portable wire helpers
+      gpiopins.bi digital GPIO interface
+      emscripten_websocket.bi browser WebSocket interface
+      vbdos.bi DOS interrupt compatibility header
+      Advanced sfxlib headers
 
    Community Tutorials
 
@@ -996,6 +1012,7 @@ External Libraries Index
    Graphical/test-based user interfaces
       CGUI
       Curses
+      FLTK
       GTK+
       IUP
       wxC
@@ -1043,6 +1060,7 @@ External Libraries Index
 
    Database
       GDBM
+      MariaDB Connector/C
       MySQL
       PostgreSQL
       SQLite
@@ -1109,6 +1127,7 @@ External Libraries Index
 Using the FreeBASIC compiler
    Installing FreeBASIC
    What's new in FreeBASIC 1.20.4
+   FreeBASIC 1.10 to 1.20 development history
    Requirements
    Running FreeBASIC
    Using the Command Line
@@ -1178,6 +1197,7 @@ Using the FreeBASIC compiler
       -sysroot < path >
       -t < value >
       -target < platform >
+      -title < name >
       -v
       -vec < level >
       -version
@@ -1228,19 +1248,19 @@ knowledge.  Enjoy your surfing and we hope this will be the first of many
 visits.
 
 Introduction
-   FreeBASIC is a free, BASIC compiler for Windows (32-bit and 64-bit), 32 
-   bit protected-mode DOS (COFF executables, like DJGPP), and Linux (x86, 
-   x86_64, and ARM).  It is open source and licensed under the GPL. It is 
-   designed to be syntax compatible with QuickBASIC, while expanding on the 
-   language and capabilities. It can create programs for MS-Windows, DOS 
-   and Linux, and is being ported to other platforms. See About FreeBASIC 
-   and Main Features.
+   FreeBASIC is a free, open-source BASIC compiler designed for QuickBASIC 
+   source compatibility while extending the language for modern systems 
+   programming.  The current tree builds native or cross-target programs 
+   for desktop, Unix, DOS, mobile, browser, embedded, and homebrew-console 
+   environments across several 32-bit and 64-bit CPU families.  See 
+   About FreeBASIC, Main Features, and the current target list.
 
 Latest Version
-   FreeBASIC is a beta release compiler and development is ongoing.  With 
-   each full update, many features are added, and bugs from previous 
-   releases are fixed.  To see the latest version available, visit 
-   the News section on the forum.
+   This manual accompanies the 1.20.4 source tree.  Development is ongoing 
+   and package availability differs between the official upstream project 
+   and the experimental FBXL target packages.  Read What's new in 1.20.4, 
+   the 1.10 to 1.20 development history, and the package repository guide 
+   before assuming that every target is available from every host.
 
 Requirements and Installation
    Minimum hardware is listed on the Requirements page.  Visit our 
@@ -1572,6 +1592,34 @@ See also
 
 
 
+--------------------------------------------------------- KeyPgDdfbaros ----
+__FB_AROS__
+
+Intrinsic define set for the AROS target.
+
+Syntax
+   __FB_AROS__
+
+Description
+   Define without a value created at compile time when an AROS target is 
+   selected.  The current target forms cover x86-64, ARM hard-float, and 
+   big-endian m68k.  Use the CPU-family defines when code also depends on 
+   the selected architecture.
+
+Example
+   #ifdef __FB_AROS__
+      Print "AROS target"
+   #endif
+
+Version
+   * Since fbc 1.20.3
+
+See also
+   * __FB_M68K__
+   * Compiler Option: -target
+
+
+
 ----------------------------------------------------- KeyPgDdfbargcount ----
 __FB_ARG_COUNT__
 
@@ -1661,7 +1709,7 @@ See also
    * __FB_ARG_LEFTOF__
    * __FB_ARG_RIGHTOF__
    * __FB_ARG_EXTRACT__
-   * __Fb_Arg_Listexpand__
+   * __FB_ARG_LISTEXPAND__
 
 
 
@@ -1722,7 +1770,7 @@ See also
    * __FB_ARG_LEFTOF__
    * __FB_ARG_RIGHTOF__
    * __FB_ARG_COUNT__
-   * __Fb_Arg_Listexpand__
+   * __FB_ARG_LISTEXPAND__
 
 
 
@@ -1785,12 +1833,12 @@ See also
    * __FB_ARG_RIGHTOF__
    * __FB_ARG_COUNT__
    * __FB_ARG_EXTRACT__
-   * __Fb_Arg_Listexpand__
+   * __FB_ARG_LISTEXPAND__
 
 
 
 ------------------------------------------------ KeyPgDdfbarglistexpand ----
-__Fb_Arg_Listexpand__
+__FB_ARG_LISTEXPAND__
 
 Intrinsic define (macro) performed by the compiler.
 
@@ -1956,7 +2004,7 @@ See also
    * __FB_ARG_LEFTOF__
    * __FB_ARG_COUNT__
    * __FB_ARG_EXTRACT__
-   * __Fb_Arg_Listexpand__
+   * __FB_ARG_LISTEXPAND__
 
 
 
@@ -2323,7 +2371,7 @@ See also
 
 
 ---------------------------------------------------- KeyPgDdfbdragonfly ----
-__Fb_Dragonfly__
+__FB_DRAGONFLY__
 
 Syntax
    __FB_DRAGONFLY__
@@ -2716,7 +2764,7 @@ See also
 
 
 -------------------------------------------------------- KeyPgDdfbhaiku ----
-__Fb_Haiku__
+__FB_HAIKU__
 
 Syntax
    __FB_HAIKU__
@@ -2894,7 +2942,7 @@ See also
 
 
 ------------------------------------------------------ KeyPgDdfbillumos ----
-__Fb_Illumos__
+__FB_ILLUMOS__
 
 Syntax
    __FB_ILLUMOS__
@@ -2904,7 +2952,7 @@ Description
    is
    being used.  The sunos target spelling also selects the illumos target.
 
-   When compiling for illumos, the compiler also defines __Fb_Solaris__ for 
+   When compiling for illumos, the compiler also defines __FB_SOLARIS__ for 
    Solaris-family compatibility.
 
 Example
@@ -2913,7 +2961,7 @@ Example
    #endif
 
 See also
-   __Fb_Solaris__
+   __FB_SOLARIS__
    Compiler Option: -target
 
 
@@ -3102,7 +3150,7 @@ See also
 
 
 -------------------------------------------------- KeyPgDdfbloongarch64 ----
-__Fb_Loongarch64__
+__FB_LOONGARCH64__
 
 Intrinsic define set by the compiler
 
@@ -3129,6 +3177,35 @@ Differences from QB
 See also
    * __FB_64BIT__
    * __FB_LINUX__
+   * Compiler Option: -target
+
+
+
+--------------------------------------------------------- KeyPgDdfbm68k ----
+__FB_M68K__
+
+Intrinsic define set for Motorola 68000-family targets.
+
+Syntax
+   __FB_M68K__
+
+Description
+   Define without a value created at compile time when the target CPU 
+   family is m68k.  The current target form is AROS m68k.  It also defines 
+   __FB_BIGENDIAN__ because the target stores multi-byte values in 
+   big-endian order.
+
+Example
+   #ifdef __FB_M68K__
+      Print "m68k target"
+   #endif
+
+Version
+   * Since fbc 1.20.3
+
+See also
+   * __FB_AROS__
+   * __FB_BIGENDIAN__
    * Compiler Option: -target
 
 
@@ -3209,6 +3286,94 @@ See also
 
 
 
+--------------------------------------------------------- KeyPgDdfbmips ----
+__FB_MIPS__
+
+Intrinsic define shared by 32-bit and 64-bit MIPS targets.
+
+Syntax
+   __FB_MIPS__
+
+Description
+   Define without a value created at compile time for every MIPS CPU-family 
+   target.  The compiler also defines exactly one of __FB_MIPS32__ or 
+   __FB_MIPS64__.  Big-endian MIPS targets additionally define 
+   __FB_BIGENDIAN__.
+
+Example
+   #ifdef __FB_MIPS__
+      Print "MIPS target"
+   #endif
+
+Version
+   * Since fbc 1.20.3
+
+See also
+   * __FB_MIPS32__
+   * __FB_MIPS64__
+   * Compiler Option: -target
+
+
+
+------------------------------------------------------- KeyPgDdfbmips32 ----
+__FB_MIPS32__
+
+Intrinsic define set for 32-bit MIPS targets.
+
+Syntax
+   __FB_MIPS32__
+
+Description
+   Define without a value created at compile time for MIPS32 and MIPS32 
+   little-endian targets.  __FB_MIPS__ is defined at the same time.  Test 
+   __FB_BIGENDIAN__ if byte order changes a data format or hardware 
+   interface.
+
+Example
+   #ifdef __FB_MIPS32__
+      Print "32-bit MIPS target"
+   #endif
+
+Version
+   * Since fbc 1.20.3
+
+See also
+   * __FB_MIPS__
+   * __FB_MIPS64__
+   * Compiler Option: -target
+
+
+
+------------------------------------------------------- KeyPgDdfbmips64 ----
+__FB_MIPS64__
+
+Intrinsic define set for 64-bit MIPS targets.
+
+Syntax
+   __FB_MIPS64__
+
+Description
+   Define without a value created at compile time for MIPS64 and MIPS64 
+   little-endian targets.  __FB_MIPS__ and __FB_64BIT__ are defined at the 
+   same time.  Test __FB_BIGENDIAN__ if byte order changes a data format or 
+   hardware interface.
+
+Example
+   #ifdef __FB_MIPS64__
+      Print "64-bit MIPS target"
+   #endif
+
+Version
+   * Since fbc 1.20.3
+
+See also
+   * __FB_MIPS__
+   * __FB_MIPS32__
+   * __FB_64BIT__
+   * Compiler Option: -target
+
+
+
 ----------------------------------------------------------- KeyPgDdfbmt ----
 __FB_MT__
 
@@ -3270,6 +3435,36 @@ See also
    * __FB_LINUX__
    * __FB_WIN32__
    * __FB_UNIX__
+   * Compiler Option: -target
+
+
+
+-------------------------------------------------------- KeyPgDdfbnuttx ----
+__FB_NUTTX__
+
+Intrinsic define set for the NuttX target.
+
+Syntax
+   __FB_NUTTX__
+
+Description
+   Define without a value created at compile time when the experimental 
+   NuttX target is selected.  The current compiler target is nuttx-riscv32. 
+   Board, driver, and Kconfig availability must still be checked separately 
+   because the define identifies the operating-system target, not a 
+   particular board configuration.
+
+Example
+   #ifdef __FB_NUTTX__
+      Print "NuttX target"
+   #endif
+
+Version
+   * Since fbc 1.20.2
+
+See also
+   * __FB_RISCV32__
+   * NuttX and RISC-V board workflow
    * Compiler Option: -target
 
 
@@ -4071,8 +4266,64 @@ See also
 
 
 
+------------------------------------------------------- KeyPgDdfbriscos ----
+__FB_RISCOS__
+
+Intrinsic define set for the RISC OS target.
+
+Syntax
+   __FB_RISCOS__
+
+Description
+   Define without a value created at compile time when the RISC OS target 
+   is selected.  It can guard code that uses RISC OS system calls, 
+   filesystem rules, package layout, or direct-screen behavior.
+
+Example
+   #ifdef __FB_RISCOS__
+      Print "RISC OS target"
+   #endif
+
+Version
+   * Since fbc 1.20.3
+
+See also
+   * __FB_ARM__
+   * Compiler Option: -target
+
+
+
+------------------------------------------------------ KeyPgDdfbriscv32 ----
+__FB_RISCV32__
+
+Intrinsic define set for 32-bit RISC-V targets.
+
+Syntax
+   __FB_RISCV32__
+
+Description
+   Define without a value created at compile time when the target CPU 
+   family is 32-bit RISC-V.  The current use is the experimental 
+   nuttx-riscv32 target.  This define identifies the CPU family; use 
+   __FB_NUTTX__ when code depends on NuttX.
+
+Example
+   #ifdef __FB_RISCV32__
+      Print "32-bit RISC-V target"
+   #endif
+
+Version
+   * Since fbc 1.20.2
+
+See also
+   * __FB_RISCV64__
+   * __FB_NUTTX__
+   * Compiler Option: -target
+
+
+
 ------------------------------------------------------ KeyPgDdfbriscv64 ----
-__Fb_Riscv64__
+__FB_RISCV64__
 
 Intrinsic define set by the compiler
 
@@ -4104,7 +4355,7 @@ See also
 
 
 -------------------------------------------------------- KeyPgDdfbs390x ----
-__Fb_S390X__
+__FB_S390X__
 
 Intrinsic define set by the compiler
 
@@ -4137,7 +4388,7 @@ See also
 
 
 ------------------------------------------------------ KeyPgDdfbsolaris ----
-__Fb_Solaris__
+__FB_SOLARIS__
 
 Syntax
    __FB_SOLARIS__
@@ -4148,7 +4399,7 @@ Description
    being used.
 
    The compiler also defines FB_SOLARIS for the illumos target as
-   a Solaris-family compatibility symbol.  Use __Fb_Illumos__ when code 
+   a Solaris-family compatibility symbol.  Use __FB_ILLUMOS__ when code 
    must detect illumos specifically.
 
 Example
@@ -4157,7 +4408,7 @@ Example
    #endif
 
 See also
-   __Fb_Illumos__
+   __FB_ILLUMOS__
    Compiler Option: -target
 
 
@@ -4820,6 +5071,35 @@ See also
 
 
 
+-------------------------------------------------------- KeyPgDdfbwince ----
+__FB_WINCE__
+
+Intrinsic define set for the Windows CE target.
+
+Syntax
+   __FB_WINCE__
+
+Description
+   Define without a value created at compile time for the wince-arm and 
+   wince-mips targets.  Windows CE also defines __FB_WIN32__ so shared 
+   Windows data-model declarations remain available.  Use FB_WINCE when 
+   code depends specifically on the CE API or its reduced CRT.
+
+Example
+   #ifdef __FB_WINCE__
+      Print "Windows CE target"
+   #endif
+
+Version
+   * Since fbc 1.20.3
+
+See also
+   * __FB_ARM__
+   * __FB_MIPS__
+   * Compiler Option: -target
+
+
+
 ---------------------------------------------------------- KeyPgDdfbx86 ----
 __FB_X86__
 
@@ -4875,7 +5155,7 @@ See also
 
 
 ---------------------------------------------------------- KeyPgDdfbwii ----
-__Fb_Wii__
+__FB_WII__
 
 Syntax
    __FB_WII__
@@ -56543,6 +56823,8 @@ Constants
 Platform Information
    __FB_WIN32__
       Defined if compiling for Windows.
+   __FB_WINCE__
+      Defined if compiling for Windows CE.
    __FB_LINUX__
       Defined if compiling for Linux.
    __FB_DOS__
@@ -56557,19 +56839,25 @@ Platform Information
       Defined if compiling for OpenBSD.
    __FB_DARWIN__
       Defined if compiling for Darwin.
-   __Fb_Haiku__
+   __FB_HAIKU__
       Defined if compiling for Haiku.
-   __Fb_Dragonfly__
+   __FB_DRAGONFLY__
       Defined if compiling for DragonFly BSD.
-   __Fb_Solaris__
+   __FB_SOLARIS__
       Defined if compiling for Solaris or a Solaris-family compatibility 
       target.
-   __Fb_Illumos__
+   __FB_ILLUMOS__
       Defined if compiling for illumos.
    __FB_XBOX__
       Defined if compiling for Xbox.
-   __Fb_Wii__
+   __FB_WII__
       Defined if compiling for Wii.
+   __FB_AROS__
+      Defined if compiling for AROS.
+   __FB_RISCOS__
+      Defined if compiling for RISC OS.
+   __FB_NUTTX__
+      Defined if compiling for NuttX.
    __FB_BIGENDIAN__
       Defined if compiling on a system using big-endian byte-order.
    __FB_PCOS__
@@ -56582,12 +56870,22 @@ Platform Information
       Defined if compiling for the ARM architecture.
    __FB_PPC__
       Defined if compiling for the PowerPC architecture.
-   __Fb_Riscv64__
+   __FB_RISCV32__
+      Defined if compiling for the 32-bit RISC-V architecture.
+   __FB_RISCV64__
       Defined if compiling for the 64-bit RISC-V architecture.
-   __Fb_S390X__
+   __FB_S390X__
       Defined if compiling for the s390x architecture.
-   __Fb_Loongarch64__
+   __FB_LOONGARCH64__
       Defined if compiling for the 64-bit LoongArch architecture.
+   __FB_M68K__
+      Defined if compiling for the Motorola 68000 family.
+   __FB_MIPS__
+      Defined if compiling for any MIPS architecture.
+   __FB_MIPS32__
+      Defined if compiling for a 32-bit MIPS architecture.
+   __FB_MIPS64__
+      Defined if compiling for a 64-bit MIPS architecture.
    __FB_X86__
       Defined if compiling for the X86 / X86_64 architecture.
    __FB_JS__
@@ -56718,7 +57016,7 @@ Basic-macros
       Returns nth argument from an argument list.
    __FB_ARG_LEFTOF__
       Returns left token based on separator.
-   __Fb_Arg_Listexpand__
+   __FB_ARG_LISTEXPAND__
       Expands a macro one or more time on an argument list
    __FB_ARG_RIGHTOF__
       Returns right token based on separator.
@@ -82354,6 +82652,8 @@ Constants
 Platform Information
    __FB_WIN32__
       Defined if compiling for Windows.
+   __FB_WINCE__
+      Defined if compiling for Windows CE.
    __FB_LINUX__
       Defined if compiling for Linux.
    __FB_DOS__
@@ -82368,19 +82668,25 @@ Platform Information
       Defined if compiling for OpenBSD.
    __FB_DARWIN__
       Defined if compiling for Darwin.
-   __Fb_Haiku__
+   __FB_HAIKU__
       Defined if compiling for Haiku.
-   __Fb_Dragonfly__
+   __FB_DRAGONFLY__
       Defined if compiling for DragonFly BSD.
-   __Fb_Solaris__
+   __FB_SOLARIS__
       Defined if compiling for Solaris or a Solaris-family compatibility 
       target.
-   __Fb_Illumos__
+   __FB_ILLUMOS__
       Defined if compiling for illumos.
    __FB_XBOX__
       Defined if compiling for Xbox.
-   __Fb_Wii__
+   __FB_WII__
       Defined if compiling for Wii.
+   __FB_AROS__
+      Defined if compiling for AROS.
+   __FB_RISCOS__
+      Defined if compiling for RISC OS.
+   __FB_NUTTX__
+      Defined if compiling for NuttX.
    __FB_BIGENDIAN__
       Defined if compiling on a system using big-endian byte-order.
    __FB_PCOS__
@@ -82393,12 +82699,22 @@ Platform Information
       Defined if compiling for the ARM architecture.
    __FB_PPC__
       Defined if compiling for the PowerPC architecture.
-   __Fb_Riscv64__
+   __FB_RISCV32__
+      Defined if compiling for the 32-bit RISC-V architecture.
+   __FB_RISCV64__
       Defined if compiling for the 64-bit RISC-V architecture.
-   __Fb_S390X__
+   __FB_S390X__
       Defined if compiling for the s390x architecture.
-   __Fb_Loongarch64__
+   __FB_LOONGARCH64__
       Defined if compiling for the 64-bit LoongArch architecture.
+   __FB_M68K__
+      Defined if compiling for the Motorola 68000 family.
+   __FB_MIPS__
+      Defined if compiling for any MIPS architecture.
+   __FB_MIPS32__
+      Defined if compiling for a 32-bit MIPS architecture.
+   __FB_MIPS64__
+      Defined if compiling for a 64-bit MIPS architecture.
    __FB_X86__
       Defined if compiling for the X86 / X86_64 architecture.
    __FB_JS__
@@ -82529,7 +82845,7 @@ Basic-macros
       Returns nth argument from an argument list.
    __FB_ARG_LEFTOF__
       Returns left token based on separator.
-   __Fb_Arg_Listexpand__
+   __FB_ARG_LISTEXPAND__
       Expands a macro one or more time on an argument list
    __FB_ARG_RIGHTOF__
       Returns right token based on separator.
@@ -90510,6 +90826,447 @@ See also
 
 
 
+---------------------------------------------------------- ProPgFberror ----
+fberror.bi runtime error constants
+
+Public names for the error values returned by the FreeBASIC runtime.
+
+Syntax
+   #include Once "fberror.bi"
+
+Description
+   The header defines the FB_RTERROR enumeration used by Err and by runtime 
+   interfaces that return a FreeBASIC error number.  In the default FB 
+   dialect the names are members of the fb namespace.  They remain 
+   unqualified in dialects that do not support namespaces.
+
+   The defined values are FB_RTERROR_OK, FB_RTERROR_ILLEGALFUNCTIONCALL, 
+   FB_RTERROR_FILENOTFOUND, FB_RTERROR_FILEIO, FB_RTERROR_OUTOFMEM, 
+   FB_RTERROR_ILLEGALRESUME, FB_RTERROR_OUTOFBOUNDS, FB_RTERROR_NULLPTR, 
+   FB_RTERROR_NOPRIVILEGES, the supported signal errors, 
+   FB_RTERROR_RETURNWITHOUTGOSUB, FB_RTERROR_ENDOFFILE, 
+   FB_RTERROR_NOTDIMENSIONED, and FB_RTERROR_WRONGDIMENSIONS.
+
+   Use these names instead of copying numeric error values into application 
+   code.  The header mirrors the runtime's public error enumeration; it 
+   does not install an error handler or change ERR.
+
+Example
+   #include Once "fberror.bi"
+
+   If Err = fb.FB_RTERROR_FILENOTFOUND Then
+      Print "The requested file was not found"
+   End If
+
+Version
+   * Since fbc 1.20.0
+
+See also
+   * Err
+   * Error Handling
+
+
+
+------------------------------------------------------------ ProPgFbcom ----
+fbcom.bi portable serial control API
+
+Queries and controls a serial port already opened with OPEN COM.
+
+Syntax
+   #include once "fbcom.bi"
+   using FB
+
+   result = ComGetStatus( file_number, status )
+   result = ComSetLines( file_number, mask, values )
+   result = ComSetBreak( file_number, enabled )
+   result = ComPurge( file_number, queues )
+
+Description
+   OPEN COM owns the serial byte stream and its file number.  fbcom.bi adds 
+   portable modem status, queue information, break control, purge, and 
+   RTS/DTR control without exposing a native operating-system handle.
+
+   Every field in ComStatus has a fixed unsigned 32-bit representation.  
+   The fields are capabilities, lines, errors, rx_queued, and tx_queued.  A 
+   capability bit is set only when the current operating system and device 
+   driver support the associated value or operation.  Unsupported fields 
+   remain zero, so programs must test the capability mask before 
+   interpreting them.
+
+   The input and output line flags are COM_LINE_CTS, COM_LINE_DSR, 
+   COM_LINE_DCD, COM_LINE_RI, COM_LINE_RTS, and COM_LINE_DTR.  ComSetLines 
+   changes only the RTS and DTR bits selected by its mask.  A selected bit 
+   present in values is driven high.
+
+   ComSetBreak asserts or clears the transmitter break condition.  ComPurge 
+   accepts COM_PURGE_RX, COM_PURGE_TX, or both.  The error flags report 
+   break, framing, parity, overrun, and receive overflow when 
+   COM_CAP_ERRORS is available.
+
+   All four functions return zero on success and a nonzero runtime error on 
+   failure.  A closed file, a file that is not an OPEN COM stream, or an 
+   operation missing from the capability mask is an error.
+
+Example
+   #include Once "fbcom.bi"
+   Using FB
+
+   Dim As Integer port = FreeFile
+   Open Com "COM1:115200,N,8,1" For Binary As #port
+   If Err <> 0 Then End 1
+
+   Dim As ComStatus status
+   If ComGetStatus( port, status ) = 0 Then
+      Print "RX queued:"; status.rx_queued
+      Print "TX queued:"; status.tx_queued
+   End If
+
+   Close #port
+
+Platform Differences
+   * The API is implemented by the supported DOS, Windows/Windows CE, 
+     Unix-family, AROS, RISC OS, and NuttX serial backends.
+   * Capabilities vary by operating system, serial adapter, device driver, 
+     and emulator.  Portable code must not assume that modem lines or queue 
+     lengths are available.
+
+See also
+   * Open Com
+   * Close
+   * Portable serial control guide
+
+
+
+-------------------------------------------------------- ProPgFbnetwire ----
+fbnetwire.bi portable wire helpers
+
+﻿
+
+fbnetwire.bi provides small source-level helpers for writing fixed-size 
+values to files or Open Tcp handles in a predictable byte order.
+
+It is meant for simple binary protocols where both sides need to agree on 
+exactly how numbers and strings are represented on the wire. The helpers 
+use little-endian byte order and fixed-width value sizes instead of relying 
+on the target CPU's native byte order or native Integer size.
+
+Syntax
+   #include once "fbnetwire.bi"
+
+Description
+   The include supplies private helper procedures and functions. Because 
+   they are declared private, each source file that includes fbnetwire.bi 
+   gets its own local helpers without exporting public symbols.
+
+   The helpers work with normal FreeBASIC file numbers. That means they can 
+   be used with ordinary binary files, pipes, or TCP sockets opened through 
+   Open Tcp and Open Tcp Server.
+
+   fbnetwire.bi does not create sockets, accept clients, decide whether EOF 
+   or Eoc should be used, or implement a full packet protocol. It only 
+   provides byte encoding and small read/write helpers.
+
+Wire format
+
+Values are encoded in little-endian order:
+
+   * Short and UShort values use 2 bytes.
+   * Long and ULong values use 4 bytes.
+   * LongInt and ULongInt values use 8 bytes.
+   * Single values use 4 bytes.
+   * Double values use 8 bytes.
+   * Strings are stored as a 32-bit little-endian byte length followed by 
+     that many string bytes.
+
+The string helpers store bytes, not characters. If the text has to be 
+portable across machines and languages, choose an explicit encoding such as 
+UTF-8 before sending it.
+
+Helpers
+
+Encoding and decoding helpers:
+
+   * FbNetEncodeInt16LE / FbNetDecodeInt16LE
+   * FbNetEncodeUInt16LE / FbNetDecodeUInt16LE
+   * FbNetEncodeInt32LE / FbNetDecodeInt32LE
+   * FbNetEncodeUInt32LE / FbNetDecodeUInt32LE
+   * FbNetEncodeInt64LE / FbNetDecodeInt64LE
+   * FbNetEncodeUInt64LE / FbNetDecodeUInt64LE
+   * FbNetEncodeSingleLE / FbNetDecodeSingleLE
+   * FbNetEncodeDoubleLE / FbNetDecodeDoubleLE
+
+File-number helpers:
+
+   * FbNetPutBytes / FbNetGetBytes
+   * FbNetPutInt16LE / FbNetGetInt16LE
+   * FbNetPutInt32LE / FbNetGetInt32LE
+   * FbNetPutInt64LE / FbNetGetInt64LE
+   * FbNetPutSingleLE / FbNetGetSingleLE
+   * FbNetPutDoubleLE / FbNetGetDoubleLE
+   * FbNetPutStringLE / FbNetGetStringLE
+
+The file-number helpers return 1 for success and 0 for failure.
+
+Examples
+
+Writing and reading a small binary record:
+
+   #include Once "fbnetwire.bi"
+
+   Dim As Integer f = FreeFile()
+
+   If Open( "packet.bin" For Binary As #f ) <> 0 Then
+      End 1
+   End If
+
+   If FbNetPutInt32LE( f, 12345 ) = 0 Then End 1
+   If FbNetPutDoubleLE( f, 3.14159 ) = 0 Then End 1
+   If FbNetPutStringLE( f, "hello", 1024 ) = 0 Then End 1
+
+   Close #f
+
+   f = FreeFile()
+   If Open( "packet.bin" For Binary As #f ) <> 0 Then
+      End 1
+   End If
+
+   Dim As Long id
+   Dim As Double value
+   Dim As String text
+
+   If FbNetGetInt32LE( f, id ) = 0 Then End 1
+   If FbNetGetDoubleLE( f, value ) = 0 Then End 1
+   If FbNetGetStringLE( f, text, 1024 ) = 0 Then End 1
+
+   Close #f
+
+   Print id, value, text
+
+The same helpers can be used with a TCP client file number:
+
+   #include Once "fbnetwire.bi"
+
+   Dim As Integer sock = FreeFile()
+
+   If Open tcp( "host=127.0.0.1,port=9000,timeout=5000", As #sock ) <> 0 Then
+      End 1
+   End If
+
+   If FbNetPutStringLE( sock, "ping", 4096 ) = 0 Then
+      Close #sock
+      End 1
+   End If
+
+   Close #sock
+
+Limits and policy
+
+The string helpers take a max_bytes argument. On write, text longer than 
+max_bytes is truncated before being sent. On read, any incoming string 
+length below zero or above max_bytes is rejected and the helper returns 0.
+
+These helpers deliberately do not define a whole message protocol. Real 
+protocols usually need message types, versioning, limits, timeout policy, 
+and recovery behavior. fbnetwire.bi gives you predictable primitive values 
+to build on.
+
+Platform Differences
+   * The byte encoding helpers are source-level and do not depend on a 
+     particular operating system.
+   * TCP examples require targets with Open Tcp support. Some targets, 
+     including DOS and JavaScript, do not provide TCP support.
+   * Floating-point helpers assume the target stores Single and Double in 
+     the normal IEEE-style layout used by supported FreeBASIC targets.
+
+Differences from QB
+   * New to FreeBASIC.
+
+See also
+   * Open Tcp
+   * Open Tcp Server
+   * Tcp Accept
+   * Get #
+   * Put #
+   * File I/O Functions
+
+
+
+--------------------------------------------------------- ProPgGpiopins ----
+gpiopins.bi digital GPIO interface
+
+A small portable-facing interface to target GPIO character devices.
+
+Syntax
+   #include Once "gpiopins.bi"
+
+Description
+   GpioPinOpen(pin) opens the NuttX device named /dev/gpioN.  
+   GpioPinOpenDevice(device) opens an explicit device path.  Both return a 
+   non-negative handle or -1 on failure.
+
+   GpioPinRead(handle) returns GPIOPIN_LOW, GPIOPIN_HIGH, or -1.  
+   GpioPinWrite(handle, value) and GpioPinClose(handle) return zero on 
+   success and -1 on failure.  GpioPinGetType and GpioPinSetType query or 
+   request one of the GPIOPIN_* input, output, open-drain, or interrupt 
+   modes declared by the header.
+
+   The current hardware implementation is the NuttX GPIO character-device 
+   backend.  Other targets export predictable unsupported-operation stubs 
+   so a portable source can link.  Hosted targets report ENOSYS through 
+   errno; Windows CE reports ERROR_CALL_NOT_IMPLEMENTED through 
+   GetLastError.  Device numbering, pin mux, electrical limits, and 
+   interrupt registration remain board responsibilities.
+
+Example
+   #include Once "gpiopins.bi"
+
+   Dim As Integer pin = GpioPinOpen( 0 )
+   If pin < 0 Then
+      Print "GPIO 0 is unavailable"
+      End 1
+   End If
+
+   If GpioPinSetType( pin, GPIOPIN_OUTPUT ) = 0 Then
+      GpioPinWrite( pin, GPIOPIN_HIGH )
+   End If
+
+   GpioPinClose( pin )
+
+Version
+   * Since fbc 1.20.2
+
+See also
+   * NuttX and RISC-V board workflow
+   * __FB_NUTTX__
+
+
+
+---------------------------------------------- ProPgEmscriptenWebsocket ----
+emscripten_websocket.bi browser WebSocket interface
+
+FreeBASIC declarations for Emscripten's asynchronous WebSocket API.
+
+Syntax
+   #include Once "emscripten_websocket.bi"
+
+Description
+   This header is available only to the __FB_JS__ target.  It declares 
+   socket creation, state and metadata queries, text and binary sends, 
+   close/delete operations, and open, message, error, and close callbacks.  
+   The socket value is an Emscripten handle, not a file number and not a 
+   native socket descriptor.
+
+   Add -Wl -lwebsocket to the fbc-js command so Emscripten links its 
+   optional WebSocket implementation.  Callbacks are asynchronous.  The 
+   program must continue yielding to the browser event loop after it 
+   creates the socket, normally through Sleep or another application loop.
+
+   The event records contain borrowed data owned by Emscripten.  Copy 
+   message or close-reason data inside the callback if it must outlive that 
+   callback.  Check every function result against EMSCRIPTEN_RESULT_SUCCESS 
+   and call emscripten_websocket_delete after a socket is closed and no 
+   callback can still use it.
+
+Example
+   The complete example is examples/network/emscripten-websocket.bas in the 
+   source tree.  Build it with:
+
+   (sh)
+   fbc-js examples/network/emscripten-websocket.bas -Wl -lwebsocket -x websocket.html
+
+Version
+   * Since fbc 1.20.2
+
+See also
+   * Building for JavaScript
+   * Open Tcp for the portable stream-oriented TCP interface
+
+
+
+---------------------------------------------------------- ProPgVbdosBi ----
+vbdos.bi DOS interrupt compatibility header
+
+Compatibility declarations for older Visual Basic for DOS and QB-style 
+interrupt code.
+
+Syntax
+   #include Once "vbdos.bi"
+
+Description
+   The header defines the 16-bit register records RegType and RegTypeX and 
+   maps INTERRUPT and INTERRUPTX onto the FreeBASIC DOS runtime.  RegTypeX 
+   adds the ds and es segment registers to the common general-register and 
+   flags fields.
+
+   This interface is only available when compiling for __FB_DOS__.  
+   Including it for another target is an error.  It is intended to make 
+   existing VBDOS and QB sources easier to port; new code should prefer a 
+   typed library or operating-system interface when one exists.  Callers 
+   remain responsible for using a valid interrupt number, initializing 
+   every input register consumed by the interrupt, and checking the 
+   returned flags and registers.
+
+Version
+   * Since fbc 1.20.1
+
+See also
+   * DOS FAQ
+   * DOS API
+
+
+
+------------------------------------------------------ ProPgSfxAdvanced ----
+Advanced sfxlib headers
+
+Optional raw-output, diagnostics, recording, and whole-mix effect 
+interfaces.
+
+Syntax
+   #include Once "sfxlib_raw.bi"
+   #include Once "sfxlib_effects.bi"
+
+Description
+   The ordinary sfxlib commands are the stable BASIC-facing interface.  
+   These two headers expose lower-level controls in the sfxlib namespace 
+   for programs that generate their own sample stream, verify final output, 
+   or need the built-in whole-mix echo.
+
+Raw output and recording
+   * RawOpen() starts an exclusive caller-clocked stream and returns its 
+     sample rate.  RawClose() ends it.
+   * RawWrite(samples, frames, channels) accepts interleaved SINGLE 
+     samples in the range -1.0 through 1.0.  It returns accepted frames, 
+     zero when the queue is full, or -1 for invalid input or initialization 
+     failure.
+   * RawUnderruns() and OutputUnderruns() report device starvation.  
+     OutputSampleRate() reports the active device rate.
+   * OutputCaptureStart(), OutputCaptureReserve(frames), 
+     OutputCaptureStop(), and OutputCaptureSave(filename) record the final 
+     driver-accepted output and save 16-bit PCM WAV.  This is output 
+     recording, not microphone capture.
+
+   The sample pointer passed to RawWrite must address at least frames * 
+   channels values.  Producers should handle partial or zero-frame 
+   acceptance without overwriting or discarding the unaccepted tail.
+
+Whole-mix echo
+   Echo(wet, delay_seconds, feedback) enables stereo ping-pong echo.  Wet 
+   and feedback are in the range 0.0 through 1.0, feedback is limited to 
+   0.95, and delay is 0.01 through 2.0 seconds.  A wet value of zero 
+   disables the effect.  EchoReset() clears the delay line and 
+   EchoEnabled() reports the current state.
+
+Version
+   * Since fbc 1.20.1; output recording and echo were expanded during 
+     1.20.2 through 1.20.4 development
+
+See also
+   * Sound Library Reference
+   * Capture for input-device capture
+   * sfxlib examples and diagnostics
+
+
+
 ---------------------------------------------------- CommunityTutorials ----
 Community Tutorials
 
@@ -90807,6 +91564,46 @@ Example
    endwin()
 
    
+
+
+------------------------------------------------------------ ExtLibFltk ----
+FLTK
+
+FreeBASIC bindings for the Fast Light Toolkit C user-interface library.
+
+Description
+   The inc/FLTK directory contains class-by-class declarations for FLTK 
+   widgets, windows, menus, images, text controls, file choosers, OpenGL 
+   windows, printing, and related helpers.  Include the header for each 
+   class used by the program.  The declarations use extern "c" and link the 
+   FLTK and C runtime libraries automatically.
+
+   A binding supplies declarations, not the FLTK implementation.  The 
+   matching FLTK development library and its platform dependencies must be 
+   installed for the selected target.  Some optional headers also require 
+   the corresponding FLTK forms, images, OpenGL, or Cairo component.  The 
+   binding is intended for a compatible FLTK 1.3 C ABI; mixing headers and 
+   libraries from incompatible FLTK builds can fail at link time or corrupt 
+   objects at runtime.
+
+Example
+   #include Once "FLTK/Fl_Window.bi"
+   #include Once "FLTK/Fl_Button.bi"
+
+   Dim As Fl_Window main_window = Fl_Window( 320, 120, "FreeBASIC FLTK" )
+   Dim As Fl_Button status_button = Fl_Button( 80, 40, 160, 30, "FLTK is ready" )
+
+   main_window.end_()
+   main_window.show()
+   Fl.run_()
+
+Version
+   * Binding added during fbc 1.20.0 development
+
+See also
+   * Creating bindings
+   * External Library Bindings
+
 
 
 ------------------------------------------------------------- ExtLibgtk ----
@@ -91917,6 +92714,35 @@ Website: http://www.gnu.org.ua/software/gdbm/
 Platforms supported: Win32, Linux
 Headers to include: gdbm.bi
 Header version: from 2010
+
+
+
+--------------------------------------------------------- ExtLibmariadb ----
+MariaDB Connector/C
+
+FreeBASIC binding for MariaDB Connector/C 3.3.1.
+
+Syntax
+   #include Once "mariadb.bi"
+
+Description
+   The header declares the Connector/C client structures, constants, and 
+   mysql_* functions and links the mariadb client library.  The target 
+   system must still provide a compatible MariaDB Connector/C development 
+   library and its runtime dependencies.
+
+   The API owns several opaque handles and result buffers.  Check every 
+   connection and query result, release result sets with the matching 
+   Connector/C function, and close each connection on every exit path.  
+   Database credentials, TLS policy, character set, query construction, and 
+   recovery remain application responsibilities.
+
+Version
+   * Since fbc 1.10.1
+
+See also
+   * MySQL
+   * External Library Bindings
 
 
 
@@ -94110,6 +94936,7 @@ Experimental boundaries
      firmware.
 
 See also
+   * FreeBASIC 1.10 to 1.20 development history
    * Installing FreeBASIC
    * gfxlib3 overview
    * Sound Library Reference
@@ -94119,90 +94946,204 @@ See also
 
 
 
+--------------------------------------------- CompilerRelease120History ----
+FreeBASIC 1.10 to 1.20 development history
+
+An overview of the complete development path from the 1.10.0 release 
+through the current 1.20.4 tree.
+
+Description
+   The documentation audit covered all 804 commits after tag 1.10.0 through 
+   commit 26fe670a9.  The 1.10 maintenance branch and 1.20 main line 
+   developed in parallel, and the FBXL 1.10.4 development branch was 
+   imported into 1.20.1 rather than released here as a separate 1.10.4 tag.
+
+   Version 1.20.2 was a real development identifier used from July 1 
+   through August 11, 2026, but it was not tagged.  Its detailed changes 
+   were carried into the next tagged release, 1.20.3.
+
+1.10 maintenance releases
+   * 1.10.1: corrected GCC array descriptors, GAS64 debug and NaN 
+     behavior, OpenGL scaling, preprocessor macro contexts, and Emscripten 
+     archive, WSTRING, path, and Asyncify behavior; added -fbgfx and the 
+     MariaDB binding.
+   * 1.10.2: added ARM hard-float and default-CPU selection, ARM bootstrap 
+     distribution support, package-target naming, and a refreshed BASS 
+     binding.
+   * 1.10.3: corrected UDT pointer casts, DOS wide-character termination, 
+     array reallocation diagnostics, and package scripts; refreshed WinAPI 
+     and other bindings.
+
+1.20.0
+   * Made NaN comparisons and floating conditional behavior consistent 
+     across compiler backends.
+   * Defined bounded STRING * N storage, initialization, argument, 
+     copyback, LEN, SWAP, LSET, and RSET behavior.
+   * Added #ELSEIFDEF, #ELSEIFNDEF, #pragma private, #pragma profile, END 
+     WHILE, the built-in profiler, and the related intrinsic defines.
+   * Added -earraydims, -sysroot, -gen clang, -fpu neon, -nolib, -z 
+     nobuiltins, -z optabstract, fork identification, FB_ARG_LISTEXPAND, 
+     and extended symbol queries.
+   * Added Android compiler groundwork, new ARM selections, 
+     position-independent executables, runtime error constants, builtin.bi, 
+     and architecture support used by later ports.
+   * Added the FLTK 1.3 C binding for desktop user-interface programs.
+
+1.20.1
+   * Added the built-in sfxlib command family and portable audio backends.
+   * Added Open Tcp, Open Tcp Server, Tcp Accept, Eoc, modern controller 
+     polling, and touch input.
+   * Added or revived Android APK, JavaScript/Emscripten, Wii homebrew, 
+     original Xbox/nxdk, Haiku, Darwin, BSD, Solaris, and illumos target 
+     paths.
+   * Added vbdos.bi for compatible DOS interrupt and register 
+     declarations.
+   * Expanded Linux architecture support and replaced the old monolithic 
+     build logic with platform-aware build, package, test, and bootstrap 
+     modules.
+   * Added package builders, clean-install validation, fbctests, 
+     Exampleageddon, command sweeps, strict diagnostics, emulation, and 
+     retained evidence across the expanded target set.
+
+1.20.2 development baseline
+   * Added the experimental nuttx-riscv32 compiler, NuttX runtime, 
+     sockets, GPIO, low-memory graphics, sound, QEMU checks, and 
+     ESP32-P4/RP2350 workflows.
+   * Completed substantial Darwin/macOS CRT, socket, pthread, regex, stat, 
+     curl, curses, libffi, framework, and ownership testing.
+   * Consolidated Unix platform code and repaired BSD, Haiku, Solaris, and 
+     illumos runtime and package behavior.
+   * Introduced the opt-in gfxlib3 Vulkan/OpenGL/OpenGL ES runtime, 
+     checked PNG support, and historical SCREEN modes 3 through 6.
+   * Added direct Emscripten WebSocket declarations and a browser example.
+   * Added the software FM MIDI fallback and used strict compiler, 
+     static-analysis, fbctests, and example sweeps to fix bounds, 
+     ownership, alignment, and lifetime defects.
+
+1.20.3
+   * Added RISC OS, AROS x86-64/ARM/m68k, Linux MIPS32/MIPS64 in both byte 
+     orders, and Windows CE ARM/MIPS.
+   * Isolated target-specific compiler hooks in per-platform source 
+     directories and added architecture-sensitive runtime replacement 
+     layers.
+   * Added portable fbcom.bi serial status and control over Open Com 
+     handles.
+   * Added broad GitHub Actions build, package, emulation, 
+     release-publication, and failure-evidence workflows.
+   * Added the native ARM64 Termux plus Ubuntu PRoot Android APK 
+     development path.
+
+1.20.4
+   The current tree adds checked PNG and SIMD media paths, whole-tree C 
+   diagnostics, Windows 95 compatibility and native qualification, and 
+   further AROS, RISC OS, NetBSD, Haiku, package, and repository fixes.  
+   See What's new in FreeBASIC 1.20.4.
+
+See also
+   * Expanded 1.10 to 1.20 history
+   * Complete per-change changelog
+   * -target compiler option
+   * Intrinsic Defines
+   * Developer pages
+
+
+
 -------------------------------------------------- CompilerRequirements ----
 Requirements
 
-Windows version
-   * The FreeBASIC compiler (fbc.exe) and the executables generated by it, 
-     need at least Windows 98 to run.
-   * The msvcrt.dll (the Microsoft's C runtime library) must be present 
-     (note: it wasn't shipped with Windows 95, but it's installed by many 
-     applications and can be also downloaded at: Microsoft).
-   * The gfx routines will use Direct2D if found on the host system, 
-     otherwise they'll fall back on DirectX, and as last resort on standard 
-     Win32 GDI which will work on any Windows system.
-   * Unicode wide strings (WSTRING's) only work in Windows 
-     NT/2000/XP/2003/Vista or above. Applications that depend on 
-     wide-strings will run in Windows 98/Me, but no input/output will work 
-     if the character set isn't Latin-based, because those platforms don't 
-     support Unicode strings. Windows 95 has most Unicode API functions 
-     missing; applications using wide strings won't even be loaded by this 
-     specific OS.
+FreeBASIC's requirements depend on whether the compiler runs natively on 
+the host or produces code for another target.  A compiler package, its 
+target runtime archives, C compiler or assembler/linker tools, and external 
+development libraries must all match the selected target ABI.
 
-Linux version
-   * The FreeBASIC compiler (fbc) and the executable generated by it 
-     depend on libc, libm, libpthread, libdl and libncurses. These are all 
-     standard Linux libraries and should be available by default on all 
-     modern distros.
-   * When using the gfx routines, the dependencies will increase. 
-     FreeBASIC gfx programs will also need libX11, libXext, libXpm, 
-     libXrender and libXrandr to be installed on the host system to be 
-     executed. This is usually not a problem as long as there's a recent 
-     X11 server installed in the system (at least XFree86 4.3.0 or any 
-     X.org version).
-   * If having a working X11 installation is enough to run FreeBASIC gfx 
-     programs, it may be not enough to compile them; you may need to 
-     install the X11 development libraries from your Linux packages 
-     repository.
-   * Unicode wide-strings (WSTRING's) with non-ASCII character sets can 
-     only be displayed in console if the locale is set to an UTF-8 version 
-     - most modern distros come with support that and char sets other than 
-     latin may work only in xterm.
+Packaged installations
+   Use a package or standalone archive built for the host whenever 
+   possible.  The package metadata supplies the compiler's ordinary 
+   runtime, graphics, sound, and linker dependencies.  Optional examples 
+   and third-party bindings can need additional development packages.
 
-DOS version
-   * Official requirement: A DPMI (DOS Protected-Mode Interface) server 
-     must be present to run fbc.exe and any executable generated by it. 
-     This is not as bad as it looks.  It simply means, that the 
-     "CWSDPMI.EXE" file (cca 20 KiB) must be present in the same directory 
-     or a place where the PATH environment variable points to. CWSDPMI 
-     package: homer.rice.edu...cwsdpmi (note: FreeDOS comes with it already 
-     installed). Further, there is a possibility to bypass this problem, 
-     and to use alternatively HDPMI, for details see DOS related FAQ .
-   * You need a 80386 or newer CPU and cca 4 MiB of RAM. For compiling of 
-     large programs or libraries, you will need more. Similar applies to 
-     executables generated by FBC, those using FB's graphics library 
-     however will need a better/faster CPU (200 MHz (?), work in progress, 
-     code not yet fully optimized, and exact minimum not known by now). FBC 
-     and executables generated by it need an FPU (80387, 80487, always 
-     built-in since Pentium). This requirement can by bypassed using 
-     "EMU387" (auto-loaded if needed, but not included in FB packages, see 
-     delorie.com/djgpp/... ), or by avoiding floats and (non-trivial) 
-     removing float-related startup code.
-   * The DOS version should run in any DOS, like FreeDOS, 
-     [Enhanced-]DR-DOS (do not use the DR-EMM386's included DPMI, use 
-     CWSDPMI or HDPMI), or MS-DOS.  It also works properly under a number 
-     of "DOS box" environments that emulate a DOS system, such as the 
-     Windows NTVDM; however, some of these environments are not implemented 
-     faithfully and contain bugs, so caution should be exercised.
-   * Long filenames are supported under systems that supply the long 
-     filename API defined by Windows 95, including DOS with an LFN TSR (for 
-     example DOSLFN (1) (2)).  Long filename support is not required to use 
-     the compiler; however, care must be taken in unpacking the 
-     distribution, for example, with a Windows program which creates short 
-     names with numeric tails (FREEBA~1) instead of truncating to 8 
-     characters (FREEBASI).  The filenames of all files in the distribution 
-     should be truncated to 8.3 if the compiler is to be used without long 
-     filename support.
-   * There are a few limitations, see DOS related FAQ .
+   The FBXL package repository guide records current host and target 
+   packages, checksums, and known limits.  A binding file in inc/ does not 
+   prove that the matching external library exists on every target.
+
+Windows
+   * Current packages cover x86, x86-64, and Windows-on-ARM64 host or 
+     target combinations.  The selected package must contain a matching 
+     MinGW or clang toolchain and runtime archives.
+   * The separate Windows 95 package includes the older CRT and binutils 
+     pieces needed by that system.  Normal modern Windows packages must not 
+     be assumed to run on Windows 95, 98, or ME.
+   * gfxlib2 selects an available Direct2D, OpenGL, DirectX, or GDI 
+     backend.  The Windows 95 path uses the compatible GDI and WinMM 
+     implementations.  gfxlib3 requires a supported modern OpenGL or Vulkan 
+     environment.
+   * Windows 95/98/ME use the documented ANSI filesystem and reduced 
+     wide-character compatibility paths.  NT-family Windows retains native 
+     Unicode paths.
+
+Linux and hosted Unix systems
+   * Console programs normally need the platform C runtime, math, 
+     threading, dynamic-loading, and terminal libraries selected by the 
+     package.  Building from source also needs GNU make and a supported GCC 
+     or clang toolchain.
+   * gfxlib2 desktop programs normally use X11 and the X extension 
+     libraries installed by the package.  gfxlib3 additionally needs a 
+     working OpenGL or Vulkan loader and driver on its supported Linux/X11 
+     hosts.
+   * sfxlib links the platform audio interfaces selected at package build 
+     time.  Linux packages commonly use ALSA and PulseAudio development 
+     link interfaces; BSD, Haiku, Darwin, Solaris/illumos, and other 
+     targets use their own backends.
+   * Cross-architecture packages need a target sysroot, linker, and 
+     development libraries for the target architecture.  Host libraries 
+     with the same names are not substitutes.
+
+DOS
+   * The DOS compiler and generated programs are 32-bit protected-mode 
+     DJGPP applications.  A 80386 or newer CPU and a DPMI server such as 
+     CWSDPMI or HDPMI are required.
+   * About 4 MiB of memory is a practical minimum for small programs; 
+     compiler and graphics workloads need more.  Floating-point code needs 
+     a hardware FPU or a compatible emulator.
+   * Long filenames require the Windows 95 LFN API or a DOS LFN provider.  
+     Otherwise the package and working directory must remain valid under 
+     8.3 filename rules.
+   * DOS graphics and Sound Blaster, MIDI, serial, and PC-speaker behavior 
+     depend on the emulator or hardware configuration.  See the DOS FAQ.
+
+Cross and experimental targets
+   * Android APK creation needs the matching Android SDK, NDK, platform 
+     jar, resource packager, dexer, Java tools, and signing tool.  The 
+     packaged fbc-android wrapper checks these components.
+   * JavaScript builds need the packaged Emscripten toolchain used by 
+     fbc-js.  Browser graphics, audio, input, WebSockets, and asynchronous 
+     sleep must be tested in a browser, not only under Node.js.
+   * Wii builds need devkitPPC and libogc.  Original Xbox builds need nxdk 
+     and the packaged XBE/XISO tools.  These are homebrew targets and do 
+     not use proprietary SDK contents from this tree.
+   * NuttX needs an external Apache NuttX and apps workspace configured 
+     for the selected board or QEMU machine.  RISC OS, AROS, Windows CE, 
+     MIPS Linux, BSD, Haiku, illumos, and Solaris builds need the target 
+     toolchain, system image or emulator, and libraries named by their 
+     build guide.
+   * A successful cross link proves the compiler and toolchain path.  
+     Hardware graphics, audio, GPIO, controller, serial, firmware, and 
+     driver behavior still needs the corresponding device or a faithful 
+     emulator.
+
+Memory, disk, and build capacity
+   Large source files, generated C, bootstrap matrices, package roots, 
+   emulated guests, and complete fbctests or Exampleageddon runs can use 
+   substantial memory, disk space, and inodes.  Use a 64-bit build host 
+   where possible, keep release output outside temporary source copies, and 
+   preserve failed test logs before cleaning a workspace.
 
 See also
    * Installing FreeBASIC
-   * Compiler Command Line Options
-and
-   * Compiler FAQ
-   * Win32 related FAQ
-   * DOS related FAQ
-   * LINUX related FAQ
+   * Compiler Option: -target
+   * Building FreeBASIC from source
+   * FreeBASIC 1.10 to 1.20 development history
+   * FBXL package repository guide
 
 
 
@@ -94531,6 +95472,8 @@ Target specific
       Set subsystem (gui, console)
    -t < value >
       Set stack size in kbytes (default: 1 MB or 2 MB)
+   -title < name >
+      Set the display title embedded in an original Xbox XBE
 
 Meta
    @< file >
@@ -95751,9 +96694,11 @@ Syntax
 
 Description
    The -gfx3 option selects gfxlib3 instead of the default gfxlib2 runtime 
-   and defines __FB_GFXLIB3__ before the source is parsed.  It is 
-   equivalent to defining that selector before the first inclusion of 
-   fbgfx.bi.
+   and defines __FB_GFXLIB3__ before the source is parsed.  The compiler 
+   does this by pre-including fbgfx3-option.bi.  Applications normally use 
+   -gfx3 or define the selector directly instead of including that small 
+   internal selection header.  It is equivalent to defining the selector 
+   before the first inclusion of fbgfx.bi.
 
    The compiler records the selection in object metadata, so a separately 
    compiled object carries the correct normal, multithreaded, PIC, or 
@@ -96798,6 +97743,10 @@ Description
       dos
       win32
       win64
+      win32-aarch64
+      wince-arm
+      wince-mips
+      cygwin
       linux
       haiku
       freebsd
@@ -96811,6 +97760,9 @@ Description
       js-asmjs
       xbox
       wii
+      nuttx
+      riscos
+      aros
 
    Some targets may also be selected through a GNU-style target triplet 
    such
@@ -96836,6 +97788,9 @@ Example
    fbc -target js-asmjs hello.bas
    fbc -target xbox hello.bas
    fbc -target wii hello.bas
+   fbc -target nuttx hello.bas
+   fbc -target riscos hello.bas
+   fbc -target aros-m68k hello.bas
 
 Predefined target symbols
 
@@ -96850,6 +97805,9 @@ Predefined target symbols
       -target js-asmjs defines FB_JS
       -target xbox defines FB_XBOX
       -target wii defines FB_WII
+      -target nuttx defines FB_NUTTX
+      -target riscos defines FB_RISCOS
+      -target aros defines FB_AROS
 
    Portable programs should use these predefined symbols when 
    platform-specific
@@ -96860,6 +97818,37 @@ See also
    Compiling FB for Android
    Compiling FB for Wii
    Compiling FB for Xbox
+
+
+
+------------------------------------------------------ CompilerOpttitle ----
+Compiler Option: -title
+
+Set the display title embedded in an original Xbox executable.
+
+Syntax
+   -title < name >
+
+Parameters
+   name
+      Title passed to the XBE conversion tool.
+
+Description
+   The -title compiler option sets the display title stored in an XBE 
+   produced for the xbox target.  If the option is omitted, the compiler 
+   uses the XBE output filename without its directory or extension.
+
+   The title changes XBE metadata, not the output filename.  Use -x to 
+   select the executable filename.  Supplying -title for any target other 
+   than xbox is an invalid compiler option.
+
+Platform Differences
+   * Supported on the original Xbox target only.
+
+See also
+   * Compiling FB for Xbox
+   * -target
+   * -x
 
 
 
@@ -98379,12 +99368,13 @@ See also
 FreeBASIC questions
 
 What is FreeBASIC?
-   FreeBASIC is a free, BASIC compiler for Windows (32-bit and 64-bit), 32 
-   bit protected-mode DOS (COFF executables, like DJGPP), and Linux (x86, 
-   x86_64, and ARM). It began as an attempt to create a code-compatible, 
-   free alternative to Microsoft QuickBASIC, but has quickly grown into a 
-   powerful development tool, already including support for libraries such 
-   as Allegro, SDL, OpenGL, and many others with its default installation.
+   FreeBASIC is a free, self-hosting BASIC compiler with native and 
+   cross-target support for desktop, Unix, DOS, mobile, browser, embedded, 
+   and homebrew-console environments.  It began as an attempt to create a 
+   code-compatible, free alternative to Microsoft QuickBASIC, but has grown 
+   into a systems-capable language with C interoperability, built-in 
+   graphics, sound and networking, and many optional library bindings.  See 
+   About FreeBASIC and -target for the current scope.
 
    Aside from having a syntax mostly compatible with QuickBASIC, FreeBASIC 
    introduces several new features to the aged language, including pointers 
@@ -98410,8 +99400,8 @@ Why should I use FreeBASIC rather than QBasic?
    Visual Basic for DOS. 
       * It supports 32-bit and 64-bit processors, where QBasic is designed 
         for 16-bit CPU's.
-      * It supports modern OSes. It has ports to Windows, Linux, and 
-        32-bit DOS.
+      * It supports modern and historical operating systems through native 
+        and cross-target ports rather than being limited to 16-bit DOS.
       * It supports modern APIs such as SDL, Direct2D or DirectX, Win32, 
         and OpenGL.
       * It is distributed under the GPL, meaning it's free and legal to 
@@ -98441,8 +99431,9 @@ Why should I use FreeBASIC rather than some other newer BASIC ?
       * FreeBASIC utilizes standard methods of accessing common C 
         libraries. SDL, for example, is standard C SDL, not a new set of 
         intrinsic commands.
-      * FreeBASIC has ports to Windows, Linux, and 32-bit DOS. It retains 
-        consistent syntax between the three ports.
+      * FreeBASIC retains a consistent core language across its desktop, 
+        Unix, DOS, mobile, browser, embedded, and homebrew-console targets 
+        while documenting platform-specific limits.
 
 Back to top
 
@@ -98465,9 +99456,11 @@ How fast is FreeBASIC?
 Back to top
 
 How compatible is FreeBASIC with QuickBASIC?
-   The FreeBASIC built in graphics library emulates the most used QB 
-   graphics modes (modes 7,12,13) and implements all the drawing primitives 
-   featured in QB. 
+   The FreeBASIC built-in graphics libraries implement the QB drawing 
+   primitives and the supported historical SCREEN modes.  gfxlib2 remains 
+   the portable default; gfxlib3 also implements SCREEN 3 through 6 on its 
+   supported windowed targets.  See Screen for the exact mode table and 
+   platform boundary.
    Most compatibility problems arise from the use of 8086-DOS-hardware 
    specific low-level techniques in the old QB programs. VGA port 
    programming, DOS interrupts, memory segment switching, poking to the 
@@ -101567,6 +102560,10 @@ Headers, bindings, and libraries
 <li> Translating C headers
 <li> Header style guide
 <li> External library bindings
+<li> Runtime error constants
+<li> Digital GPIO interface
+<li> Emscripten WebSocket interface
+<li> Advanced sfxlib headers
 </ul></td></tr></table>
 
 Compiler internals

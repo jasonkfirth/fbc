@@ -77,5 +77,7 @@ sleep 1000, 1
 		Summarizes the output backends used on supported targets.
 	=={{fbdoc item="keyword" value="KeyPgCapture|CAPTURE"}}==
 		Starts, pauses, resumes, stops, reads, and saves audio capture where available.
+	=={{fbdoc item="keyword" value="ProPgSfxAdvanced|Advanced sfxlib headers"}}==
+		Documents raw PCM output, underrun and sample-rate queries, final-output WAV recording, and whole-mix echo.
 
 {{fbdoc item="back" value="DocToc|Table of Contents"}}

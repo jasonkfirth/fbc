@@ -8,6 +8,8 @@ platform backends, and a much broader qualification system.
 
 The detailed chronological record remains in [changelog.txt](../changelog.txt).
 This page groups the important user-visible changes by subject.
+The earlier 1.10 maintenance and 1.20 development work is summarized in the
+[1.10 to 1.20 development history](release-history-1.10-to-1.20.md).
 
 ## Compiler and runtime
 

@@ -3,7 +3,22 @@
 The Android port builds FreeBASIC programs into Android application packages
 using the Android SDK/NDK tools. The current tree keeps the Android application
 template under ##share/freebasic-android/template## and drives package creation
-through the build scripts.
+through the packaged ##fbc-android## wrapper and build scripts.
+
+{{fbdoc item="subsect" value="Building an APK"}}
+
+%%(sh)
+fbc-android program.bas -x program.apk
+fbc-android program.bas --assets game-data --runOnPhone -x program.apk
+%%
+
+##--assets DIR## copies a directory into the APK so its files appear in the
+program's current directory. ##--runOnPhone## installs and launches the result
+through the attached ##adb## device. ##--hideKeyboardButton##, the
+##FBANDROID_ASSETS## environment variable, and the source defines
+##FB_ANDROID_HIDE_KEYBOARD_BUTTON## and ##FB_ANDROID_LANDSCAPE## provide the
+matching package and source-level controls. The wrapper also recognizes common
+##SCREEN## and ##SCREENRES## forms when choosing the initial orientation.
 
 {{fbdoc item="subsect" value="Build scripts"}}
 
@@ -21,3 +36,20 @@ and the runtime package layout.
 Android changes should be tested with normal command-line programs and with
 application-style smoke tests. Graphics, touch input, audio, lifecycle exit, and
 asset packaging are all Android-specific enough to deserve explicit tests.
+
+On an ARM64 Android phone, the public Termux bootstrap creates a native ARM64
+Ubuntu PRoot, installs the host compiler and Termux's native Android tools, and
+builds a signed smoke APK without QEMU or an x86-64 host toolchain:
+
+%%(sh)
+curl -fLO https://deb.fbxl.net/install/termux-ubuntu-android-bootstrap.sh
+chmod 700 termux-ubuntu-android-bootstrap.sh
+./termux-ubuntu-android-bootstrap.sh
+%%
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDdfbandroid|__FB_ANDROID__]]##
+	- ##[[ProPgEmscriptenWebsocket|emscripten_websocket.bi]]## for the separate JavaScript target
+	- [[https://deb.fbxl.net/docs/guides/packages.md|Package repository guide]]
+
+{{fbdoc item="back" value="DevToc|Developer pages"}}

@@ -45,7 +45,7 @@
 @@**""FreeBASIC"" questions**@@
 
 {{anchor name="item1"}}==What is ""FreeBASIC""?==
-	""FreeBASIC"" is a free, BASIC compiler for Windows (32-bit and 64-bit), 32 bit protected-mode DOS (COFF executables, like DJGPP), and Linux (x86, x86_64, and ARM). It began as an attempt to create a code-compatible, free alternative to Microsoft ""QuickBASIC"", but has quickly grown into a powerful development tool, already including support for libraries such as Allegro, SDL, ""OpenGL"", and many others with its default installation.
+	""FreeBASIC"" is a free, self-hosting BASIC compiler with native and cross-target support for desktop, Unix, DOS, mobile, browser, embedded, and homebrew-console environments.  It began as an attempt to create a code-compatible, free alternative to Microsoft ""QuickBASIC"", but has grown into a systems-capable language with C interoperability, built-in graphics, sound and networking, and many optional library bindings.  See ##[[CompilerAbout|About FreeBASIC]]## and ##[[CompilerOpttarget|-target]]## for the current scope.
 	
 	Aside from having a syntax mostly compatible with ""QuickBASIC"", ""FreeBASIC"" introduces several new features to the aged language, including pointers to variables and functions, and unsigned data types.
 	
@@ -63,7 +63,7 @@
 {{anchor name="item3"}}==Why should I use ""FreeBASIC"" rather than ""QBasic""?==
 	""FreeBASIC"" has innumerable advantages over ""QBasic"", ""QuickBASIC"", PDS, and Visual Basic for DOS. 
 		- It supports 32-bit and 64-bit processors, where ""QBasic"" is designed for 16-bit CPU's.
-		- It supports modern OSes. It has ports to Windows, Linux, and 32-bit DOS.
+		- It supports modern and historical operating systems through native and cross-target ports rather than being limited to 16-bit DOS.
 		- It supports modern APIs such as SDL, ""Direct2D"" or ""DirectX"", ""Win32"", and ""OpenGL"".
 		- It is distributed under the GPL, meaning it's free and legal to use, unlike most copies of ""QuickBASIC"" / other BASICs.
 		- The library is distributed under the LGPL with additional exception, meaning you may do whatever you want with your compiled programs, including selling them.
@@ -79,7 +79,7 @@
 		- ""FreeBASIC"" is compiled to actual programs (executables), not bytecode.
 		- ""FreeBASIC"" has a large, dedicated community which has actively participated in the development of ""FreeBASIC"".
 		- ""FreeBASIC"" utilizes standard methods of accessing common C libraries. SDL, for example, is standard C SDL, not a new set of intrinsic commands.
-		- ""FreeBASIC"" has ports to Windows, Linux, and 32-bit DOS. It retains consistent syntax between the three ports.
+		- ""FreeBASIC"" retains a consistent core language across its desktop, Unix, DOS, mobile, browser, embedded, and homebrew-console targets while documenting platform-specific limits.
 
 {{anchor name="item0|Back to top"}}
 
@@ -91,7 +91,7 @@
 {{anchor name="item0|Back to top"}}
 
 {{anchor name="item6"}}==How compatible is ""FreeBASIC"" with ""QuickBASIC""?==
-	The ""FreeBASIC"" built in graphics library emulates the most used QB graphics modes (modes 7,12,13) and implements all the drawing primitives featured in QB. 
+	The ""FreeBASIC"" built-in graphics libraries implement the QB drawing primitives and the supported historical SCREEN modes.  gfxlib2 remains the portable default; gfxlib3 also implements SCREEN 3 through 6 on its supported windowed targets.  See ##[[KeyPgScreengraphics|SCREEN]]## for the exact mode table and platform boundary.
 	Most compatibility problems arise from the use of 8086-DOS-hardware specific low-level techniques in the old QB programs. VGA port programming, DOS interrupts, memory segment switching, poking to the screen memory or music playing using the PC speaker are not directly supported, even if they can be supported/emulated by external libraries. 
 	Other issues in porting old QB programs, like variable name clashes with new FB keywords, variables with the name of a QB keyword plus a type suffix, default integer size being 32 bits in FB, are addressed by running ""FreeBASIC"" with the commandline switch ##-lang qb## .
 	

@@ -14,9 +14,27 @@ target-specific library, include, and tool paths.
 The package scripts use the same version metadata as the rest of the tree and
 the install/uninstall layout rules in ##mk/inst_uninst.mk##.
 
+{{fbdoc item="subsect" value="Building a homebrew bundle"}}
+
+%%(sh)
+fbc-wii program.bas -x program.dol
+fbc-wii program.bas --bundle my-program --assets game-data
+%%
+
+##--bundle DIR## writes ##DIR/boot.dol## in the layout expected by the Homebrew
+Channel and Dolphin. ##--assets DIR## copies data beside the DOL after a
+successful build. The package must contain a matching devkitPPC/libogc
+toolchain; a desktop PowerPC compiler is not a substitute.
+
 {{fbdoc item="subsect" value="Runtime testing"}}
 
 Wii graphics, sound, input, and program startup should be tested with emulator
 or hardware smoke tests when the toolchain is available. This target is close
 enough to the graphics and sound internals that backend changes can affect it
 even when desktop tests pass.
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDdfbwii|__FB_WII__]]##
+	- ##[[CompilerOpttarget|-target compiler option]]##
+
+{{fbdoc item="back" value="DevToc|Developer pages"}}

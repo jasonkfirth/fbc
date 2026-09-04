@@ -1,7 +1,7 @@
 Version 1.20.4
 
 [changed]
-- documentation: added a 1.20.4 release guide and documentation index, current package-repository and Termux installation notes, a NuttX workflow guide, a portable fbcom.bi reference, gfxlib3 selection, compiler-option, and intrinsic-define pages, and the complete SCREEN 1 through 13 compatibility-mode table; repaired all external-library index targets and two malformed email links, and rebuilt the manual formats with the current release version.
+- documentation: added a 1.20.4 release guide and documentation index, audited all 804 commits after 1.10.0, recorded the complete 1.10-to-1.20 release history and the untagged 1.20.2 development baseline, updated the introductory platform and requirements pages, added references for previously undocumented public headers, FLTK, MariaDB, the Xbox -title option, and target/CPU defines, added current package-repository and Termux installation notes, a NuttX workflow guide, a portable fbcom.bi reference, gfxlib3 selection, compiler-option, and intrinsic-define pages, and the complete SCREEN 1 through 13 compatibility-mode table; repaired all external-library index targets and two malformed email links, and rebuilt the manual formats with the current release version.
 - build/CI: added an independent Cppcheck job that derives its manifest from every tracked first-party C and C++ source file, currently 1,479 files, excludes only an explicit set of vendored and generated compiler-output sources, and fails on new warning, performance, or portability diagnostics.
 - build/CI BSD and Haiku: make every QEMU qualification explicitly verify the native `.pkg`, `.tgz`, or `.hpkg` produced and installed by the guest scripts, and retain each installable package as a 30-day artifact on push, pull-request, scheduled, manual, and release runs instead of exposing dedicated package artifacts only for version tags.
 - build/tools: hardened the gfxlib2 font and palette generator, DOS DXE export-table generator, and Win32/Windows CE fbportio generator and tester with bounded argument handling, validated file sizes and reads, checked allocations, and explicit owned-buffer cleanup.
@@ -324,6 +324,18 @@ Version 1.20.3
 - rtlib/TCP tests: retry the burst client's loopback connection while the listener thread starts, removing a scheduler-sensitive false failure on slower emulated hosts without weakening the transfer checks.
 - build/illumos: refresh and prefer the local IPS publisher explicitly, work around the Solaris xargs implementation's missing -r option, and use the resolved GNU make consistently for installed-package fbctests.
 
+Version 1.20.2 (development baseline; not tagged)
+
+[changed]
+- versioning: the source tree reported 1.20.2 from 2026-07-01 through 2026-08-11; there is no 1.20.2 release tag in this repository, and the detailed records for this development baseline were carried into the 1.20.3 changelog above.
+- portability and quality: strict GCC and Clang builds, Cppcheck, Clang-Tidy, ShellCheck, fblint, fbctests, and Exampleageddon passes corrected bounds, ownership, alignment, lifetime, compiler, library, tool, and example problems across the expanding target set.
+
+[added]
+- NuttX: added the nuttx-riscv32 target, RISC-V 32-bit identity, runtime, sockets, GPIO declarations, constrained graphics and sound support, QEMU tests, and ESP32-P4/RP2350 workflows.
+- gfxlib3: added the opt-in Vulkan/OpenGL/OpenGL ES graphics runtime, checked PNG support, FreeBASIC/QB graphics compatibility, and historical SCREEN modes 3 through 6.
+- JavaScript: added direct Emscripten WebSocket declarations in inc/emscripten_websocket.bi and the browser example.
+- platform support: completed or consolidated Unix, BSD, Haiku, macOS, Solaris, and illumos socket, curses, terminal, package, graphics, sound, and binding paths.
+
 Version 1.20.1
 
 [changed]
@@ -549,6 +561,7 @@ Version 1.20.1
 - build/Solaris: added clean Solaris 11.3/11.4 IPS package validation that installs the locally published package into a fresh VM, verifies package dependencies, and runs fbctests plus exampleageddon against the installed compiler.
 - gfxlib2/solaris: added a GETJOYSTICK missing-device fallback so Solaris/illumos gfxlib programs link and report the normal unsupported joystick values when no native joystick backend is present.
 - inc: added builtin.bi with GCC/Clang-compatible declarations for common memory/string, bit-operation, byte-swap, object-size, fixed-type overflow, and branch/codegen builtins
+- inc: added vbdos.bi declarations for the VBDOS-compatible interrupt, register, flags, and address helper interface
 - examples: added self-contained compiler builtin examples so exampleageddon validates builtin.bi through memory/string and numeric builtin use
 - tests: added C backend and builtin regression coverage for const pointer prototype emission, exact C ABI spelling, and GCC/Clang builtin declaration compatibility
 - gfxlib2: added GetTouchCount(), GetTouch(), and GetTouchHit() commands for logical-coordinate touch polling, with rectangular/circular hit testing, mouse-button fallback on drivers without native touch state, and native active-contact support on Android, JavaScript, and Windows
@@ -837,6 +850,7 @@ Version 1.20.0
 - gas64: optimizations: multiplication for small constants -1,-2,3,5,6,9,10 (SARG)
 - gas64: optimizations: enable IR_OPT_ADDRCISC optimizations to use complex addressing (base + offset*multiplier) optimization for indexes (SARG)
 - fbc headers: add ./inc/fberror.bi for runtime library error constants
+- bindings: added FLTK 1.3 C++ declarations for windows, widgets, menus, images, text controls, file choosers, OpenGL, printing, and related helpers
 - rtlib: ./inc/fbc-int/string.bi - for string descriptor and low level string functions
 - gfxlib2: added fb.GFX_NO_X86_MMX = &h00000100 constant to fbgfx.bi - when passed as flag to SCREEN[RES] disable MMX blitters on x86 32-bit
 - gfxlib2: added fb.GET_X86_MMX_ENABLED = 18 constant to fbgfx.bi - used with ScreenControl to determine if MMX blitters are selected on x86 32 bit.  If returned value is non-zero, then MMX is enabled.  If zero, then MMX is disabled.  All other platforms return zero.

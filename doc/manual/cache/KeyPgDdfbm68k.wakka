@@ -1,0 +1,25 @@
+{{fbdoc item="title" value="__FB_M68K__"}}----
+Intrinsic define set for Motorola 68000-family targets.
+
+{{fbdoc item="syntax"}}
+	""__FB_M68K__""
+
+{{fbdoc item="desc"}}
+	Define without a value created at compile time when the target CPU family is m68k.  The current target form is AROS m68k.  It also defines ##[[KeyPgDdFBBigEndian|__FB_BIGENDIAN__]]## because the target stores multi-byte values in big-endian order.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#ifdef __FB_M68K__
+	print "m68k target"
+#endif
+%%
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.3
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDdfbaros|__FB_AROS__]]##
+	- ##[[KeyPgDdFBBigEndian|__FB_BIGENDIAN__]]##
+	- ##[[CompilerOpttarget|Compiler Option: -target]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

@@ -9,6 +9,7 @@
     GitHub mirror:      https://github.com/freebasic/fbc
     Package repository: https://deb.fbxl.net/
     Release documents:  https://deb.fbxl.net/docs/
+    1.10-1.20 history:   https://deb.fbxl.net/docs/guides/release-history-1.10-to-1.20.md
     Discord:            https://discord.gg/286rSdK
     IRC channel:        ##freebasic at https://webchat.freenode.net
     Features:           https://freebasic.net/wiki/CompilerFeatures

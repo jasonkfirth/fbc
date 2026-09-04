@@ -1,0 +1,25 @@
+{{fbdoc item="title" value="__FB_NUTTX__"}}----
+Intrinsic define set for the NuttX target.
+
+{{fbdoc item="syntax"}}
+	""__FB_NUTTX__""
+
+{{fbdoc item="desc"}}
+	Define without a value created at compile time when the experimental NuttX target is selected.  The current compiler target is ##nuttx-riscv32##.  Board, driver, and Kconfig availability must still be checked separately because the define identifies the operating-system target, not a particular board configuration.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#ifdef __FB_NUTTX__
+	print "NuttX target"
+#endif
+%%
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.2
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDdfbriscv32|__FB_RISCV32__]]##
+	- ##[[DevNuttX|NuttX and RISC-V board workflow]]##
+	- ##[[CompilerOpttarget|Compiler Option: -target]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

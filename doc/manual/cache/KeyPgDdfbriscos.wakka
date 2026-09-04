@@ -1,0 +1,24 @@
+{{fbdoc item="title" value="__FB_RISCOS__"}}----
+Intrinsic define set for the RISC OS target.
+
+{{fbdoc item="syntax"}}
+	""__FB_RISCOS__""
+
+{{fbdoc item="desc"}}
+	Define without a value created at compile time when the RISC OS target is selected.  It can guard code that uses RISC OS system calls, filesystem rules, package layout, or direct-screen behavior.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#ifdef __FB_RISCOS__
+	print "RISC OS target"
+#endif
+%%
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.3
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDdfbarm|__FB_ARM__]]##
+	- ##[[CompilerOpttarget|Compiler Option: -target]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

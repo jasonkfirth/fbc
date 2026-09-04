@@ -33,6 +33,7 @@ The user-visible compiler, runtime, graphics, sound, target, and package work co
 	- Hardware-dependent graphics, serial, controller, audio, and firmware paths still require the named hardware, SDK, ROM, or legal console firmware.
 
 {{fbdoc item="see"}}
+	- ##[[CompilerRelease120History|FreeBASIC 1.10 to 1.20 development history]]##
 	- ##[[CompilerInstalling|Installing FreeBASIC]]##
 	- ##[[GfxLib3|gfxlib3 overview]]##
 	- ##[[CatPgSfx|Sound Library Reference]]##

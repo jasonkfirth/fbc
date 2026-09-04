@@ -131,6 +131,15 @@
 	{{fbdoc item="keyword" value="CatPgDddefines|Intrinsic Defines"}}
 	{{fbdoc item="keyword" value="ProPgIdentifierLookup|Identifier Look-ups in namespaces and types"}}
 
+	{{fbdoc item="subsect" value="Public runtime headers"}}
+		{{fbdoc item="keyword" value="ProPgFberror|fberror.bi runtime error constants"}}
+		{{fbdoc item="keyword" value="ProPgFbcom|fbcom.bi portable serial controls"}}
+		{{fbdoc item="keyword" value="ProPgFbnetwire|fbnetwire.bi portable wire helpers"}}
+		{{fbdoc item="keyword" value="ProPgGpiopins|gpiopins.bi digital GPIO interface"}}
+		{{fbdoc item="keyword" value="ProPgEmscriptenWebsocket|emscripten_websocket.bi browser WebSocket interface"}}
+		{{fbdoc item="keyword" value="ProPgVbdosBi|vbdos.bi DOS interrupt compatibility header"}}
+		{{fbdoc item="keyword" value="ProPgSfxAdvanced|Advanced sfxlib headers"}}
+
 {{fbdoc item="section" value="Technical Articles"}}
 	{{fbdoc item="keyword" value="KeyPgAsm|Inline ASM"}}
 	{{fbdoc item="keyword" value="ProPgCruntime|C Standard Library Functions"}}

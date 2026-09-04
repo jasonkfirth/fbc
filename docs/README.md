@@ -1,15 +1,18 @@
 # FreeBASIC 1.20.4 documentation
 
-This directory collects the documentation added or substantially revised for
-the 1.20.2 through 1.20.4 development cycle. The generated language manual
-remains under `doc/manual`; these guides cover release, package, port, and
-experimental runtime subjects that do not fit naturally in the language
+This directory collects the documentation added or substantially revised from
+the 1.10.0 release through the current 1.20.4 tree. The generated language
+manual remains under `doc/manual`; these guides cover release, package, port,
+and experimental runtime subjects that do not fit naturally in the language
 reference.
 
 ## Start here
 
 - [1.20.4 release notes](release-1.20.4.md) summarize the user-visible work
   completed since the 1.20.2 development baseline.
+- [1.10 to 1.20 development history](release-history-1.10-to-1.20.md) records
+  the actual version boundaries and groups the work from all 804 audited
+  commits after the 1.10.0 tag.
 - [Package repository and installation](packages.md) explains the packages at
   `deb.fbxl.net`, installation choices, target packages, and checksums.
 - [NuttX and RISC-V](nuttx.md) describes the QEMU, ESP32-P4, and RP2350-PiZero

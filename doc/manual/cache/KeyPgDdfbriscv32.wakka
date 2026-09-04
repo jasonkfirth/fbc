@@ -1,0 +1,25 @@
+{{fbdoc item="title" value="__FB_RISCV32__"}}----
+Intrinsic define set for 32-bit RISC-V targets.
+
+{{fbdoc item="syntax"}}
+	""__FB_RISCV32__""
+
+{{fbdoc item="desc"}}
+	Define without a value created at compile time when the target CPU family is 32-bit RISC-V.  The current use is the experimental ##nuttx-riscv32## target.  This define identifies the CPU family; use ##[[KeyPgDdfbnuttx|__FB_NUTTX__]]## when code depends on NuttX.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#ifdef __FB_RISCV32__
+	print "32-bit RISC-V target"
+#endif
+%%
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.2
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDdfbriscv64|__FB_RISCV64__]]##
+	- ##[[KeyPgDdfbnuttx|__FB_NUTTX__]]##
+	- ##[[CompilerOpttarget|Compiler Option: -target]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

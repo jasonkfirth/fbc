@@ -1,0 +1,24 @@
+{{fbdoc item="title" value="Compiler Option: -title"}}----
+Set the display title embedded in an original Xbox executable.
+
+{{fbdoc item="syntax"}}##
+	**-title** < //name// >
+##
+{{fbdoc item="param"}}
+	##//name//##
+		Title passed to the XBE conversion tool.
+
+{{fbdoc item="desc"}}
+	The ##-title## compiler option sets the display title stored in an XBE produced for the ##xbox## target.  If the option is omitted, the compiler uses the XBE output filename without its directory or extension.
+
+	The title changes XBE metadata, not the output filename.  Use ##[[CompilerOptx|-x]]## to select the executable filename.  Supplying ##-title## for any target other than ##xbox## is an invalid compiler option.
+
+{{fbdoc item="target"}}
+	- Supported on the original Xbox target only.
+
+{{fbdoc item="see"}}
+	- ##[[DevBuildXbox|Compiling FB for Xbox]]##
+	- ##[[CompilerOpttarget|-target]]##
+	- ##[[CompilerOptx|-x]]##
+
+{{fbdoc item="back" value="CatPgCompOpt|Compiler Options"}}

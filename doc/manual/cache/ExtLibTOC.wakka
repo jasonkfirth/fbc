@@ -42,13 +42,13 @@ The examples directory contains notes from current example sweeps.  Those notes 
 
 {{fbdoc item="section" value="GUI and platform user-interface libraries"}}
 
-* {{fbdoc item="keyword" value="ExtLibcgui|CGUI"}}, {{fbdoc item="keyword" value="ExtLibgtk|GTK+"}}, {{fbdoc item="keyword" value="ExtLibIUP|IUP"}}, {{fbdoc item="keyword" value="ExtLibjapi|JAPI"}}, and {{fbdoc item="keyword" value="ExtLibwxc|wx-c"}} - GUI bindings.  Some are useful, but they are among the bindings most likely to need extra runtime libraries.
+* {{fbdoc item="keyword" value="ExtLibcgui|CGUI"}}, {{fbdoc item="keyword" value="ExtLibFltk|FLTK"}}, {{fbdoc item="keyword" value="ExtLibgtk|GTK+"}}, {{fbdoc item="keyword" value="ExtLibIUP|IUP"}}, {{fbdoc item="keyword" value="ExtLibjapi|JAPI"}}, and {{fbdoc item="keyword" value="ExtLibwxc|wx-c"}} - GUI bindings.  Some are useful, but they are among the bindings most likely to need extra runtime libraries.
 * {{fbdoc item="keyword" value="ExtLibcurses|Curses"}} - Terminal UI support.
 * {{fbdoc item="keyword" value="ExtLibX11|X11"}} and {{fbdoc item="keyword" value="ExtLibwindows|Windows API"}} - Platform APIs.  These are not portable abstractions.
 
 {{fbdoc item="section" value="Data, database, and web libraries"}}
 
-* {{fbdoc item="keyword" value="ExtLibGDBM|GDBM"}}, {{fbdoc item="keyword" value="ExtLibmysql|MySQL"}}, {{fbdoc item="keyword" value="ExtLibpostgresql|PostgreSQL"}}, and {{fbdoc item="keyword" value="ExtLibsqlite|SQLite"}} - Database bindings.  SQLite is usually the easiest dependency to satisfy; client/server databases need the matching client development package.
+* {{fbdoc item="keyword" value="ExtLibGDBM|GDBM"}}, {{fbdoc item="keyword" value="ExtLibmariadb|MariaDB Connector/C"}}, {{fbdoc item="keyword" value="ExtLibmysql|MySQL"}}, {{fbdoc item="keyword" value="ExtLibpostgresql|PostgreSQL"}}, and {{fbdoc item="keyword" value="ExtLibsqlite|SQLite"}} - Database bindings.  SQLite is usually the easiest dependency to satisfy; client/server databases need the matching client development package.
 * {{fbdoc item="keyword" value="ExtLibcgiutil|CGI utility"}}, {{fbdoc item="keyword" value="ExtLibFastCGI|FastCGI"}}, {{fbdoc item="keyword" value="ExtLibcurl|curl"}}, and {{fbdoc item="keyword" value="ExtLibZeroMQ|ZeroMQ"}} - Web, HTTP, and messaging support.  These are practical where the OS provides the libraries, but they are not automatically available on every cross target.
 * {{fbdoc item="keyword" value="ExtLibexpat|Expat"}}, {{fbdoc item="keyword" value="ExtLiblibxml|libxml"}}, {{fbdoc item="keyword" value="ExtLiblibxslt|libxslt"}}, and {{fbdoc item="keyword" value="ExtLibmxml|mxml"}} - XML parsers and transformation libraries.
 * {{fbdoc item="keyword" value="ExtLibjsonc|json-c"}} - JSON support through json-c.

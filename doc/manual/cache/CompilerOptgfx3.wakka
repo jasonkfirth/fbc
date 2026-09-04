@@ -5,7 +5,7 @@ Selects the opt-in gfxlib3 GPU graphics runtime.
 	**-gfx3**
 ##
 {{fbdoc item="desc"}}
-	The ##-gfx3## option selects gfxlib3 instead of the default gfxlib2 runtime and defines ##[[KeyPgDdfbgfxlib3|__FB_GFXLIB3__]]## before the source is parsed.  It is equivalent to defining that selector before the first inclusion of ##fbgfx.bi##.
+	The ##-gfx3## option selects gfxlib3 instead of the default gfxlib2 runtime and defines ##[[KeyPgDdfbgfxlib3|__FB_GFXLIB3__]]## before the source is parsed.  The compiler does this by pre-including ##fbgfx3-option.bi##.  Applications normally use ##-gfx3## or define the selector directly instead of including that small internal selection header.  It is equivalent to defining the selector before the first inclusion of ##fbgfx.bi##.
 
 	The compiler records the selection in object metadata, so a separately compiled object carries the correct normal, multithreaded, PIC, or multithreaded PIC gfxlib3 dependency into the final link.
 

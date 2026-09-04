@@ -1,0 +1,55 @@
+{{fbdoc item="title" value="FreeBASIC 1.10 to 1.20 development history"}}----
+An overview of the complete development path from the 1.10.0 release through the current 1.20.4 tree.
+
+{{fbdoc item="desc"}}
+	The documentation audit covered all 804 commits after tag ##1.10.0## through commit ##26fe670a9##.  The 1.10 maintenance branch and 1.20 main line developed in parallel, and the FBXL 1.10.4 development branch was imported into 1.20.1 rather than released here as a separate 1.10.4 tag.
+
+	Version 1.20.2 was a real development identifier used from July 1 through August 11, 2026, but it was not tagged.  Its detailed changes were carried into the next tagged release, 1.20.3.
+
+{{fbdoc item="section" value="1.10 maintenance releases"}}
+	- **1.10.1:** corrected GCC array descriptors, GAS64 debug and NaN behavior, OpenGL scaling, preprocessor macro contexts, and Emscripten archive, WSTRING, path, and Asyncify behavior; added ##-fbgfx## and the MariaDB binding.
+	- **1.10.2:** added ARM hard-float and default-CPU selection, ARM bootstrap distribution support, package-target naming, and a refreshed BASS binding.
+	- **1.10.3:** corrected UDT pointer casts, DOS wide-character termination, array reallocation diagnostics, and package scripts; refreshed WinAPI and other bindings.
+
+{{fbdoc item="section" value="1.20.0"}}
+	- Made NaN comparisons and floating conditional behavior consistent across compiler backends.
+	- Defined bounded ##STRING * N## storage, initialization, argument, copyback, ##LEN##, ##SWAP##, ##LSET##, and ##RSET## behavior.
+	- Added ###ELSEIFDEF##, ###ELSEIFNDEF##, ###pragma private##, ###pragma profile##, ##END WHILE##, the built-in profiler, and the related intrinsic defines.
+	- Added ##-earraydims##, ##-sysroot##, ##-gen clang##, ##-fpu neon##, ##-nolib##, ##-z nobuiltins##, ##-z optabstract##, fork identification, ##__FB_ARG_LISTEXPAND__##, and extended symbol queries.
+	- Added Android compiler groundwork, new ARM selections, position-independent executables, runtime error constants, ##builtin.bi##, and architecture support used by later ports.
+	- Added the FLTK 1.3 C++ binding for desktop user-interface programs.
+
+{{fbdoc item="section" value="1.20.1"}}
+	- Added the built-in ##[[CatPgSfx|sfxlib]]## command family and portable audio backends.
+	- Added ##[[KeyPgOpenTcp|OPEN TCP]]##, ##[[KeyPgOpenTcpServer|OPEN TCP SERVER]]##, ##[[KeyPgTcpAccept|TCP ACCEPT]]##, ##[[KeyPgEoc|EOC]]##, modern controller polling, and touch input.
+	- Added or revived Android APK, JavaScript/Emscripten, Wii homebrew, original Xbox/nxdk, Haiku, Darwin, BSD, Solaris, and illumos target paths.
+	- Added ##vbdos.bi## for compatible DOS interrupt and register declarations.
+	- Expanded Linux architecture support and replaced the old monolithic build logic with platform-aware build, package, test, and bootstrap modules.
+	- Added package builders, clean-install validation, fbctests, Exampleageddon, command sweeps, strict diagnostics, emulation, and retained evidence across the expanded target set.
+
+{{fbdoc item="section" value="1.20.2 development baseline"}}
+	- Added the experimental ##nuttx-riscv32## compiler, NuttX runtime, sockets, GPIO, low-memory graphics, sound, QEMU checks, and ESP32-P4/RP2350 workflows.
+	- Completed substantial Darwin/macOS CRT, socket, pthread, regex, stat, curl, curses, libffi, framework, and ownership testing.
+	- Consolidated Unix platform code and repaired BSD, Haiku, Solaris, and illumos runtime and package behavior.
+	- Introduced the opt-in ##[[GfxLib3|gfxlib3]]## Vulkan/OpenGL/OpenGL ES runtime, checked PNG support, and historical SCREEN modes 3 through 6.
+	- Added direct Emscripten WebSocket declarations and a browser example.
+	- Added the software FM MIDI fallback and used strict compiler, static-analysis, fbctests, and example sweeps to fix bounds, ownership, alignment, and lifetime defects.
+
+{{fbdoc item="section" value="1.20.3"}}
+	- Added RISC OS, AROS x86-64/ARM/m68k, Linux MIPS32/MIPS64 in both byte orders, and Windows CE ARM/MIPS.
+	- Isolated target-specific compiler hooks in per-platform source directories and added architecture-sensitive runtime replacement layers.
+	- Added portable ##[[ProPgFbcom|fbcom.bi]]## serial status and control over ##[[KeyPgOpenCom|OPEN COM]]## handles.
+	- Added broad GitHub Actions build, package, emulation, release-publication, and failure-evidence workflows.
+	- Added the native ARM64 Termux plus Ubuntu PRoot Android APK development path.
+
+{{fbdoc item="section" value="1.20.4"}}
+	The current tree adds checked PNG and SIMD media paths, whole-tree C diagnostics, Windows 95 compatibility and native qualification, and further AROS, RISC OS, NetBSD, Haiku, package, and repository fixes.  See ##[[CompilerRelease1204|What's new in FreeBASIC 1.20.4]]##.
+
+{{fbdoc item="see"}}
+	- [[https://deb.fbxl.net/docs/guides/release-history-1.10-to-1.20.md|Expanded 1.10 to 1.20 history]]
+	- [[https://github.com/jasonkfirth/fbc/blob/master/changelog.txt|Complete per-change changelog]]
+	- ##[[CompilerOpttarget|-target compiler option]]##
+	- ##[[CatPgDddefines|Intrinsic Defines]]##
+	- ##[[DevToc|Developer pages]]##
+
+{{fbdoc item="back" value="DocToc|Table of Contents"}}

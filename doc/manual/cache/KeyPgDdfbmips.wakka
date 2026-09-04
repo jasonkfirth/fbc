@@ -1,0 +1,25 @@
+{{fbdoc item="title" value="__FB_MIPS__"}}----
+Intrinsic define shared by 32-bit and 64-bit MIPS targets.
+
+{{fbdoc item="syntax"}}
+	""__FB_MIPS__""
+
+{{fbdoc item="desc"}}
+	Define without a value created at compile time for every MIPS CPU-family target.  The compiler also defines exactly one of ##[[KeyPgDdfbmips32|__FB_MIPS32__]]## or ##[[KeyPgDdfbmips64|__FB_MIPS64__]]##.  Big-endian MIPS targets additionally define ##[[KeyPgDdFBBigEndian|__FB_BIGENDIAN__]]##.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#ifdef __FB_MIPS__
+	print "MIPS target"
+#endif
+%%
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.3
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDdfbmips32|__FB_MIPS32__]]##
+	- ##[[KeyPgDdfbmips64|__FB_MIPS64__]]##
+	- ##[[CompilerOpttarget|Compiler Option: -target]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

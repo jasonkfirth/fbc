@@ -15,6 +15,10 @@
 		##dos##
 		##win32##
 		##win64##
+		##win32-aarch64##
+		##wince-arm##
+		##wince-mips##
+		##cygwin##
 		##linux##
 		##haiku##
 		##freebsd##
@@ -28,6 +32,9 @@
 		##js-asmjs##
 		##xbox##
 		##wii##
+		##nuttx##
+		##riscos##
+		##aros##
 
 	Some targets may also be selected through a GNU-style target triplet such
 	as ##linux-x86_64##, ##linux-arm##, ##android-aarch64##, or
@@ -52,6 +59,9 @@ fbc -target android hello.bas
 fbc -target js-asmjs hello.bas
 fbc -target xbox hello.bas
 fbc -target wii hello.bas
+fbc -target nuttx hello.bas
+fbc -target riscos hello.bas
+fbc -target aros-m68k hello.bas
 %%
 
 ==Predefined target symbols==
@@ -67,6 +77,9 @@ fbc -target wii hello.bas
 		##-target js-asmjs## defines ##__FB_JS__##
 		##-target xbox## defines ##__FB_XBOX__##
 		##-target wii## defines ##__FB_WII__##
+		##-target nuttx## defines ##__FB_NUTTX__##
+		##-target riscos## defines ##__FB_RISCOS__##
+		##-target aros## defines ##__FB_AROS__##
 
 	Portable programs should use these predefined symbols when platform-specific
 	code is required.

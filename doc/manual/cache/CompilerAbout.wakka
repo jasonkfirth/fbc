@@ -1,8 +1,17 @@
 {{fbdoc item="title" value="About"}}----
 About the ""FreeBASIC"" project.
 
-	The ""FreeBASIC"" project is a set of cross-platform development tools initially created by Andre Victor, consisting of a compiler, GNU-based assembler, linker and archiver, and supporting runtime libraries, including a software-based graphics library. The compiler, //##fbc##//, currently supports building for i386-based architectures on the DOS, Linux, Windows and Xbox platforms. The project also contains thin bindings (header files) to some popular 3rd party libraries such as the [[http://en.wikipedia.org/wiki/C_standard_library|C runtime library]], [[http://www.talula.demon.co.uk/allegro/|Allegro]], [[http://libsdl.org|SDL]], [[http://opengl.org|OpenGL]], [[http://gtk.org|GTK+]], [[http://msdn2.microsoft.com/en-us/library/aa383750.aspx|the Windows API]] and many others, as well as example programs for many of these libraries.
+	The ""FreeBASIC"" project is a set of cross-platform development tools initially created by Andre Victor.  It consists of the self-hosting ##fbc## compiler, target assembler/linker/archive tools, the runtime library, the portable gfxlib2 graphics runtime, the optional GPU-oriented gfxlib3 runtime, and the sfxlib sound runtime.
+
+	The current source tree contains native or cross-target support for DOS, Windows, Windows CE, Linux, Android, JavaScript/Emscripten, Darwin/macOS, Cygwin, FreeBSD, OpenBSD, NetBSD, DragonFly BSD, Haiku, Solaris, illumos, NuttX, RISC OS, AROS, Wii homebrew, and the original Xbox.  Supported CPU families include x86, x86-64, ARM, AArch64, PowerPC, RISC-V, s390x, LoongArch64, m68k, and MIPS.  Package availability and runtime completeness vary by target; ##[[CompilerOpttarget|-target]]## and the platform guides record the current boundaries.
+
+	The project also contains thin bindings (header files) for the C runtime and many third-party libraries and operating-system APIs.  A binding supplies declarations, but the matching external library still has to be installed for the selected target.  See ##[[ExtLibTOC|External Library Bindings]]## and the examples supplied with the source tree.
 	
 	""FreeBASIC"" is a high-level programming language supporting procedural, object-oriented and meta-programming paradigms, with a syntax compatible to [[http://en.wikipedia.org/wiki/QuickBASIC|Microsoft QuickBASIC]]. In fact, the ""FreeBASIC"" project originally began as an attempt to create a code-compatible, free alternative to ""QuickBASIC"", but it has since grown into a powerful development tool. ""FreeBASIC"" can be seen to extend the capabilities of ""QuickBASIC"" in a number of ways, supporting more data types, language constructs, programming styles, and modern platforms and APIs.
+
+{{fbdoc item="see"}}
+	- ##[[CompilerRelease120History|FreeBASIC 1.10 to 1.20 development history]]##
+	- ##[[CompilerRequirements|Requirements]]##
+	- ##[[CompilerInstalling|Installing FreeBASIC]]##
 
 {{fbdoc item="back" value="FBWiki|Main Page"}}

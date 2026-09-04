@@ -1,0 +1,30 @@
+{{fbdoc item="title" value="emscripten_websocket.bi browser WebSocket interface"}}----
+FreeBASIC declarations for Emscripten's asynchronous WebSocket API.
+
+{{fbdoc item="syntax"}}
+%%(freebasic)
+#include once "emscripten_websocket.bi"
+%%
+
+{{fbdoc item="desc"}}
+	This header is available only to the ##[[KeyPgDdfbjs|__FB_JS__]]## target.  It declares socket creation, state and metadata queries, text and binary sends, close/delete operations, and open, message, error, and close callbacks.  The socket value is an Emscripten handle, not a file number and not a native socket descriptor.
+
+	Add ##-Wl -lwebsocket## to the ##fbc-js## command so Emscripten links its optional WebSocket implementation.  Callbacks are asynchronous.  The program must continue yielding to the browser event loop after it creates the socket, normally through ##[[KeyPgSleep|SLEEP]]## or another application loop.
+
+	The event records contain borrowed data owned by Emscripten.  Copy message or close-reason data inside the callback if it must outlive that callback.  Check every function result against ##EMSCRIPTEN_RESULT_SUCCESS## and call ##emscripten_websocket_delete## after a socket is closed and no callback can still use it.
+
+{{fbdoc item="ex"}}
+	The complete example is ##examples/network/emscripten-websocket.bas## in the source tree.  Build it with:
+
+%%(sh)
+fbc-js examples/network/emscripten-websocket.bas -Wl -lwebsocket -x websocket.html
+%%
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.2
+
+{{fbdoc item="see"}}
+	- ##[[DevBuildEmscripten|Building for JavaScript]]##
+	- ##[[KeyPgOpenTcp|OPEN TCP]]## for the portable stream-oriented TCP interface
+
+{{fbdoc item="back" value="CatPgProgrammer|Programmer's Guide"}}

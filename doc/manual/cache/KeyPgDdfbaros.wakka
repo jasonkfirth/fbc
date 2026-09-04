@@ -1,0 +1,24 @@
+{{fbdoc item="title" value="__FB_AROS__"}}----
+Intrinsic define set for the AROS target.
+
+{{fbdoc item="syntax"}}
+	""__FB_AROS__""
+
+{{fbdoc item="desc"}}
+	Define without a value created at compile time when an AROS target is selected.  The current target forms cover x86-64, ARM hard-float, and big-endian m68k.  Use the CPU-family defines when code also depends on the selected architecture.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#ifdef __FB_AROS__
+	print "AROS target"
+#endif
+%%
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.3
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDdfbm68k|__FB_M68K__]]##
+	- ##[[CompilerOpttarget|Compiler Option: -target]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

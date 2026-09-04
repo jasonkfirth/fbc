@@ -13,8 +13,9 @@
 	- The official distribution comes with several bindings to existing C libraries already, see [[ExtLibTOC|External Libraries TOC]] for a complete up-to-date list
 
 {{fbdoc item="section" value="Multi-platform"}}
-	- ""FreeBASIC"" currently runs on 32-bit Windows, Linux, and DOS (a 16-bit DOS is good enough, although ""FreeBASIC"" itself and compiler output are 32-bit) and also creates applications for the Xbox console. More platforms to come.
-	- The runtime library was written with portability in mind. All third-party tools used exist on most operating systems already as they are from the GNU binutils. The compiler is written in 100% ""FreeBASIC"" code (that is, ""FreeBASIC"" compiles itself.), which makes it simple to be bootstrapped as it doesn't depend on non-portable tools.
+	- ""FreeBASIC"" supports native or cross-target builds for DOS, Windows, Windows CE, Linux, Android, JavaScript/Emscripten, Darwin/macOS, Cygwin, BSD systems, Haiku, Solaris/illumos, NuttX, RISC OS, AROS, Wii homebrew, and the original Xbox.  See ##[[CompilerOpttarget|-target]]## for the current target identifiers and limits.
+	- The compiler and runtime support x86, x86-64, ARM, AArch64, PowerPC, RISC-V, s390x, LoongArch64, m68k, and MIPS families where the selected operating-system target provides a working toolchain and runtime layer.
+	- The runtime library was written with portability in mind.  Target-specific compiler, runtime, graphics, and sound work is kept in platform directories.  The compiler is self-hosting, and the build system can emit bootstrap sources for targets that cannot run the build-host compiler.
 
 {{fbdoc item="section" value="Unicode support"}}
 	- Besides ASCII files with [[Unicode|Unicode]] escape sequences (\u), ""FreeBASIC"" can parse UTF-8, UTF-16LE, UTF-16BE, UTF-32LE and UTF-32BE source (.bas) or header (.bi) files, they can be freely mixed with other sources/headers in the same project (also with other ASCII files).
@@ -86,12 +87,17 @@
 	- You are in no way locked to an IDE or editor of any kind.
 	- You can create static and dynamic/shared libraries adding just one command-line option (##-lib## or ##-dylib/-dll##).
 
-{{fbdoc item="section" value="As a 32-bit application"}}
-	- ""FreeBASIC"" can compile source code files up to 2 GB in size.
-	- The number of symbols (variables, constants, et cetera) is only limited by the total memory available during compile time. (You can, for example, include ""OpenGL"", GTK/SDL, BASS, simultaneously in your source code.)
+{{fbdoc item="section" value="Capacity and native word sizes"}}
+	- Native integer and pointer sizes follow the selected target.  Both 32-bit and 64-bit targets are supported, and cross compilation must use headers and libraries built for the same ABI.
+	- Source size, symbol count, generated output, and link capacity are bounded by available address space, memory, filesystem limits, and the selected backend and toolchain.  Large programs are better built with a 64-bit host compiler when one is available.
 
 {{fbdoc item="section" value="Optimized code generation"}}
-	- While ""FreeBASIC"" is not an optimizing compiler, it does many kinds of general optimizations to generate the fastest possible code on x86 CPU's, not losing to other BASIC alternatives, including the commercial ones.
+	- ""FreeBASIC"" performs language-level and backend-specific optimizations.  The GCC and clang C backends can use the target compiler's optimizer across the wider architecture set; the native GAS and GAS64 backends retain specialized x86 and x86-64 code generation.
+
+{{fbdoc item="section" value="Built-in graphics, sound, and networking"}}
+	- gfxlib2 provides the portable graphics command set.  The optional ##[[GfxLib3|gfxlib3]]## runtime adds render-threaded Vulkan/OpenGL/OpenGL ES operation on its supported hosts.
+	- ##[[CatPgSfx|sfxlib]]## provides generated sound, PLAY strings, samples, music, MIDI, device selection, and capture through platform audio backends.
+	- ##[[KeyPgOpenTcp|OPEN TCP]]## and ##[[KeyPgOpenTcpServer|OPEN TCP SERVER]]## provide portable stream networking, with optional serial, wire-format, GPIO, and browser WebSocket headers for their supported targets.
 
 {{fbdoc item="section" value="Completely free"}}
 	- All third-party tools are also free. No piece of abandoned or copyrighted software is used (except ""GoRC"" on ""Win32""). The assembler, linker, librarian/archiver, and other command-line applications come from the GNU binutils programming tools.

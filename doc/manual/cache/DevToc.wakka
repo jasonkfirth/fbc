@@ -39,6 +39,10 @@ runtime libraries, build system, package scripts, and platform ports.
 <li> [[DevTranslateHeader|Translating C headers]]
 <li> [[DevHeaderStyleGuide|Header style guide]]
 <li> [[ExtLibTOC|External library bindings]]
+<li> [[ProPgFberror|Runtime error constants]]
+<li> [[ProPgGpiopins|Digital GPIO interface]]
+<li> [[ProPgEmscriptenWebsocket|Emscripten WebSocket interface]]
+<li> [[ProPgSfxAdvanced|Advanced sfxlib headers]]
 </ul></td></tr></table>
 >>::c::
 

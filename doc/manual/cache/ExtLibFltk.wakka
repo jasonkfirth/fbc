@@ -1,0 +1,29 @@
+{{fbdoc item="title" value="FLTK"}}----
+FreeBASIC bindings for the Fast Light Toolkit C++ user-interface library.
+
+{{fbdoc item="desc"}}
+	The ##inc/FLTK## directory contains class-by-class declarations for FLTK widgets, windows, menus, images, text controls, file choosers, OpenGL windows, printing, and related helpers.  Include the header for each class used by the program.  The declarations use ##extern "c++"## and link the FLTK and C++ runtime libraries automatically.
+
+	A binding supplies declarations, not the FLTK implementation.  The matching FLTK development library and its platform dependencies must be installed for the selected target.  Some optional headers also require the corresponding FLTK forms, images, OpenGL, or Cairo component.  The binding is intended for a compatible FLTK 1.3 C++ ABI; mixing headers and libraries from incompatible FLTK builds can fail at link time or corrupt objects at runtime.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#include once "FLTK/Fl_Window.bi"
+#include once "FLTK/Fl_Button.bi"
+
+dim as Fl_Window main_window = Fl_Window( 320, 120, "FreeBASIC FLTK" )
+dim as Fl_Button status_button = Fl_Button( 80, 40, 160, 30, "FLTK is ready" )
+
+main_window.end_()
+main_window.show()
+Fl.run_()
+%%
+
+{{fbdoc item="ver"}}
+	- Binding added during fbc 1.20.0 development
+
+{{fbdoc item="see"}}
+	- ##[[DevBindingCreation|Creating bindings]]##
+	- ##[[ExtLibTOC|External Library Bindings]]##
+
+{{fbdoc item="back" value="ExtLibTOC|External Library Bindings"}}

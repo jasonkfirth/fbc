@@ -1,0 +1,25 @@
+{{fbdoc item="title" value="__FB_WINCE__"}}----
+Intrinsic define set for the Windows CE target.
+
+{{fbdoc item="syntax"}}
+	""__FB_WINCE__""
+
+{{fbdoc item="desc"}}
+	Define without a value created at compile time for the ##wince-arm## and ##wince-mips## targets.  Windows CE also defines ##[[KeyPgDdfbwin32|__FB_WIN32__]]## so shared Windows data-model declarations remain available.  Use ##__FB_WINCE__## when code depends specifically on the CE API or its reduced CRT.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#ifdef __FB_WINCE__
+	print "Windows CE target"
+#endif
+%%
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.3
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDdfbarm|__FB_ARM__]]##
+	- ##[[KeyPgDdfbmips|__FB_MIPS__]]##
+	- ##[[CompilerOpttarget|Compiler Option: -target]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

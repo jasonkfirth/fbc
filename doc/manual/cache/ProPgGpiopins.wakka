@@ -1,0 +1,40 @@
+{{fbdoc item="title" value="gpiopins.bi digital GPIO interface"}}----
+A small portable-facing interface to target GPIO character devices.
+
+{{fbdoc item="syntax"}}
+%%(freebasic)
+#include once "gpiopins.bi"
+%%
+
+{{fbdoc item="desc"}}
+	##GpioPinOpen(pin)## opens the NuttX device named ##/dev/gpioN##.  ##GpioPinOpenDevice(device)## opens an explicit device path.  Both return a non-negative handle or ##-1## on failure.
+
+	##GpioPinRead(handle)## returns ##GPIOPIN_LOW##, ##GPIOPIN_HIGH##, or ##-1##.  ##GpioPinWrite(handle, value)## and ##GpioPinClose(handle)## return zero on success and ##-1## on failure.  ##GpioPinGetType## and ##GpioPinSetType## query or request one of the ##GPIOPIN_*## input, output, open-drain, or interrupt modes declared by the header.
+
+	The current hardware implementation is the NuttX GPIO character-device backend.  Other targets export predictable unsupported-operation stubs so a portable source can link.  Hosted targets report ##ENOSYS## through ##errno##; Windows CE reports ##ERROR_CALL_NOT_IMPLEMENTED## through ##GetLastError##.  Device numbering, pin mux, electrical limits, and interrupt registration remain board responsibilities.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#include once "gpiopins.bi"
+
+dim as integer pin = GpioPinOpen( 0 )
+if pin < 0 then
+	print "GPIO 0 is unavailable"
+	end 1
+end if
+
+if GpioPinSetType( pin, GPIOPIN_OUTPUT ) = 0 then
+	GpioPinWrite( pin, GPIOPIN_HIGH )
+end if
+
+GpioPinClose( pin )
+%%
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.2
+
+{{fbdoc item="see"}}
+	- ##[[DevNuttX|NuttX and RISC-V board workflow]]##
+	- ##[[KeyPgDdfbnuttx|__FB_NUTTX__]]##
+
+{{fbdoc item="back" value="CatPgProgrammer|Programmer's Guide"}}

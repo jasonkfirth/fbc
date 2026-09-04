@@ -1,0 +1,32 @@
+{{fbdoc item="title" value="Advanced sfxlib headers"}}----
+Optional raw-output, diagnostics, recording, and whole-mix effect interfaces.
+
+{{fbdoc item="syntax"}}
+%%(freebasic)
+#include once "sfxlib_raw.bi"
+#include once "sfxlib_effects.bi"
+%%
+
+{{fbdoc item="desc"}}
+	The ordinary ##[[CatPgSfx|sfxlib commands]]## are the stable BASIC-facing interface.  These two headers expose lower-level controls in the ##sfxlib## namespace for programs that generate their own sample stream, verify final output, or need the built-in whole-mix echo.
+
+{{fbdoc item="section" value="Raw output and recording"}}
+	- ##RawOpen()## starts an exclusive caller-clocked stream and returns its sample rate.  ##RawClose()## ends it.
+	- ##RawWrite(samples, frames, channels)## accepts interleaved ##SINGLE## samples in the range ##-1.0## through ##1.0##.  It returns accepted frames, zero when the queue is full, or ##-1## for invalid input or initialization failure.
+	- ##RawUnderruns()## and ##OutputUnderruns()## report device starvation.  ##OutputSampleRate()## reports the active device rate.
+	- ##OutputCaptureStart()##, ##OutputCaptureReserve(frames)##, ##OutputCaptureStop()##, and ##OutputCaptureSave(filename)## record the final driver-accepted output and save 16-bit PCM WAV.  This is output recording, not microphone capture.
+
+	The sample pointer passed to ##RawWrite## must address at least ##frames * channels## values.  Producers should handle partial or zero-frame acceptance without overwriting or discarding the unaccepted tail.
+
+{{fbdoc item="section" value="Whole-mix echo"}}
+	##Echo(wet, delay_seconds, feedback)## enables stereo ping-pong echo.  Wet and feedback are in the range ##0.0## through ##1.0##, feedback is limited to ##0.95##, and delay is ##0.01## through ##2.0## seconds.  A wet value of zero disables the effect.  ##EchoReset()## clears the delay line and ##EchoEnabled()## reports the current state.
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.1; output recording and echo were expanded during 1.20.2 through 1.20.4 development
+
+{{fbdoc item="see"}}
+	- ##[[CatPgSfx|Sound Library Reference]]##
+	- ##[[KeyPgCapture|CAPTURE]]## for input-device capture
+	- [[https://github.com/jasonkfirth/fbc/tree/master/examples/sfxlib|sfxlib examples and diagnostics]]
+
+{{fbdoc item="back" value="CatPgSfx|Sound Library Reference"}}

@@ -22,6 +22,8 @@ Preprocessor symbols defined by the compiler.
 <<{{anchor name="PLATFORM"}}{{fbdoc item="section" value="Platform Information"}}
 	=={{fbdoc item="keyword" value="KeyPgDdfbwin32|__FB_WIN32__"}}==
 		Defined if compiling for Windows.
+	=={{fbdoc item="keyword" value="KeyPgDdfbwince|__FB_WINCE__"}}==
+		Defined if compiling for Windows CE.
 	=={{fbdoc item="keyword" value="KeyPgDdfblinux|__FB_LINUX__"}}==
 		Defined if compiling for Linux.
 	=={{fbdoc item="keyword" value="KeyPgDdfbdos|__FB_DOS__"}}==
@@ -48,6 +50,12 @@ Preprocessor symbols defined by the compiler.
 		Defined if compiling for Xbox.
 	=={{fbdoc item="keyword" value="KeyPgDdfbwii|__FB_WII__"}}==
 		Defined if compiling for Wii.
+	=={{fbdoc item="keyword" value="KeyPgDdfbaros|__FB_AROS__"}}==
+		Defined if compiling for AROS.
+	=={{fbdoc item="keyword" value="KeyPgDdfbriscos|__FB_RISCOS__"}}==
+		Defined if compiling for RISC OS.
+	=={{fbdoc item="keyword" value="KeyPgDdfbnuttx|__FB_NUTTX__"}}==
+		Defined if compiling for NuttX.
 	=={{fbdoc item="keyword" value="KeyPgDdFBBigEndian|__FB_BIGENDIAN__"}}==
 		Defined if compiling on a system using big-endian byte-order.
 	=={{fbdoc item="keyword" value="KeyPgDdfbpcos|__FB_PCOS__"}}==
@@ -60,12 +68,22 @@ Preprocessor symbols defined by the compiler.
 		Defined if compiling for the ARM architecture.
 	=={{fbdoc item="keyword" value="KeyPgDdfbppc|__FB_PPC__"}}==
 		Defined if compiling for the ""PowerPC"" architecture.
+	=={{fbdoc item="keyword" value="KeyPgDdfbriscv32|__FB_RISCV32__"}}==
+		Defined if compiling for the 32-bit RISC-V architecture.
 	=={{fbdoc item="keyword" value="KeyPgDdfbriscv64|__FB_RISCV64__"}}==
 		Defined if compiling for the 64-bit RISC-V architecture.
 	=={{fbdoc item="keyword" value="KeyPgDdfbs390x|__FB_S390X__"}}==
 		Defined if compiling for the s390x architecture.
 	=={{fbdoc item="keyword" value="KeyPgDdfbloongarch64|__FB_LOONGARCH64__"}}==
 		Defined if compiling for the 64-bit LoongArch architecture.
+	=={{fbdoc item="keyword" value="KeyPgDdfbm68k|__FB_M68K__"}}==
+		Defined if compiling for the Motorola 68000 family.
+	=={{fbdoc item="keyword" value="KeyPgDdfbmips|__FB_MIPS__"}}==
+		Defined if compiling for any MIPS architecture.
+	=={{fbdoc item="keyword" value="KeyPgDdfbmips32|__FB_MIPS32__"}}==
+		Defined if compiling for a 32-bit MIPS architecture.
+	=={{fbdoc item="keyword" value="KeyPgDdfbmips64|__FB_MIPS64__"}}==
+		Defined if compiling for a 64-bit MIPS architecture.
 	=={{fbdoc item="keyword" value="KeyPgDdfbx86|__FB_X86__"}}==
 		Defined if compiling for the X86 / X86_64 architecture.
 	=={{fbdoc item="keyword" value="KeyPgDdfbjs|__FB_JS__"}}==

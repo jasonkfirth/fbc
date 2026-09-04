@@ -1,0 +1,32 @@
+{{fbdoc item="title" value="fberror.bi runtime error constants"}}----
+Public names for the error values returned by the FreeBASIC runtime.
+
+{{fbdoc item="syntax"}}
+%%(freebasic)
+#include once "fberror.bi"
+%%
+
+{{fbdoc item="desc"}}
+	The header defines the ##FB_RTERROR## enumeration used by ##[[KeyPgErr|ERR]]## and by runtime interfaces that return a FreeBASIC error number.  In the default FB dialect the names are members of the ##fb## namespace.  They remain unqualified in dialects that do not support namespaces.
+
+	The defined values are ##FB_RTERROR_OK##, ##FB_RTERROR_ILLEGALFUNCTIONCALL##, ##FB_RTERROR_FILENOTFOUND##, ##FB_RTERROR_FILEIO##, ##FB_RTERROR_OUTOFMEM##, ##FB_RTERROR_ILLEGALRESUME##, ##FB_RTERROR_OUTOFBOUNDS##, ##FB_RTERROR_NULLPTR##, ##FB_RTERROR_NOPRIVILEGES##, the supported signal errors, ##FB_RTERROR_RETURNWITHOUTGOSUB##, ##FB_RTERROR_ENDOFFILE##, ##FB_RTERROR_NOTDIMENSIONED##, and ##FB_RTERROR_WRONGDIMENSIONS##.
+
+	Use these names instead of copying numeric error values into application code.  The header mirrors the runtime's public error enumeration; it does not install an error handler or change ##ERR##.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#include once "fberror.bi"
+
+if err = fb.FB_RTERROR_FILENOTFOUND then
+	print "The requested file was not found"
+end if
+%%
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.0
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgErr|ERR]]##
+	- ##[[ProPgErrorHandling|Error Handling]]##
+
+{{fbdoc item="back" value="CatPgProgrammer|Programmer's Guide"}}

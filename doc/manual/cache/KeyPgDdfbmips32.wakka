@@ -1,0 +1,25 @@
+{{fbdoc item="title" value="__FB_MIPS32__"}}----
+Intrinsic define set for 32-bit MIPS targets.
+
+{{fbdoc item="syntax"}}
+	""__FB_MIPS32__""
+
+{{fbdoc item="desc"}}
+	Define without a value created at compile time for MIPS32 and MIPS32 little-endian targets.  ##[[KeyPgDdfbmips|__FB_MIPS__]]## is defined at the same time.  Test ##[[KeyPgDdFBBigEndian|__FB_BIGENDIAN__]]## if byte order changes a data format or hardware interface.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#ifdef __FB_MIPS32__
+	print "32-bit MIPS target"
+#endif
+%%
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.3
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDdfbmips|__FB_MIPS__]]##
+	- ##[[KeyPgDdfbmips64|__FB_MIPS64__]]##
+	- ##[[CompilerOpttarget|Compiler Option: -target]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

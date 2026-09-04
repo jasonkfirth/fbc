@@ -1,0 +1,21 @@
+{{fbdoc item="title" value="vbdos.bi DOS interrupt compatibility header"}}----
+Compatibility declarations for older Visual Basic for DOS and QB-style interrupt code.
+
+{{fbdoc item="syntax"}}
+%%(freebasic)
+#include once "vbdos.bi"
+%%
+
+{{fbdoc item="desc"}}
+	The header defines the 16-bit register records ##RegType## and ##RegTypeX## and maps ##INTERRUPT## and ##INTERRUPTX## onto the FreeBASIC DOS runtime.  ##RegTypeX## adds the ##ds## and ##es## segment registers to the common general-register and flags fields.
+
+	This interface is only available when compiling for ##[[KeyPgDdfbdos|__FB_DOS__]]##.  Including it for another target is an error.  It is intended to make existing VBDOS and QB sources easier to port; new code should prefer a typed library or operating-system interface when one exists.  Callers remain responsible for using a valid interrupt number, initializing every input register consumed by the interrupt, and checking the returned flags and registers.
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.1
+
+{{fbdoc item="see"}}
+	- ##[[FaqDOS|DOS FAQ]]##
+	- ##[[ExtLibdos|DOS API]]##
+
+{{fbdoc item="back" value="CatPgProgrammer|Programmer's Guide"}}

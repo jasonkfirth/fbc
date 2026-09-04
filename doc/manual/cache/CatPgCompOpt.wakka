@@ -128,6 +128,8 @@ Command line compiler options for the fbc compiler:
 		- Set stack size in kbytes (default: 1 MB or 2 MB)
 	{{fbdoc item="keyword" value="CompilerOpttarget|-target < platform >"}}
 		- Set the target platform for cross compilation
+	{{fbdoc item="keyword" value="CompilerOpttitle|-title < name >"}}
+		- Set the display title embedded in an original Xbox XBE
 	{{fbdoc item="keyword" value="CompilerOptv|-v"}}
 		- Be verbose
 	{{fbdoc item="keyword" value="CompilerOptvec|-vec < level >"}}

@@ -1,0 +1,21 @@
+{{fbdoc item="title" value="MariaDB Connector/C"}}----
+FreeBASIC binding for MariaDB Connector/C 3.3.1.
+
+{{fbdoc item="syntax"}}
+%%(freebasic)
+#include once "mariadb.bi"
+%%
+
+{{fbdoc item="desc"}}
+	The header declares the Connector/C client structures, constants, and ##mysql_*## functions and links the ##mariadb## client library.  The target system must still provide a compatible MariaDB Connector/C development library and its runtime dependencies.
+
+	The API owns several opaque handles and result buffers.  Check every connection and query result, release result sets with the matching Connector/C function, and close each connection on every exit path.  Database credentials, TLS policy, character set, query construction, and recovery remain application responsibilities.
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.10.1
+
+{{fbdoc item="see"}}
+	- ##[[ExtLibmysql|MySQL]]##
+	- ##[[ExtLibTOC|External Library Bindings]]##
+
+{{fbdoc item="back" value="ExtLibTOC|External Library Bindings"}}
