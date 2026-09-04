@@ -15,6 +15,8 @@ Version 1.20.4
 - build/tests/Windows 95: qualified FreeBASIC inside an actual Windows 95 OSR2 guest at an i486 baseline; native `fbc.exe` successfully compiled, assembled, linked, and ran a console/file-I/O smoke test, all 37 fbctest executables passed, and all 651 unattended Exampleageddon cases passed with no failures, timeouts, or invalid results.
 
 [fixed]
+- build/repositories: allow unsigned CI-produced Alpine and postmarketOS packages while generating local APK indexes.
+- build/Termux Android: update the default Android target package to the qualified 1.20.4-1 Resolute artifact, verify its exact checksum, and reject an unexpected package version before extracting it.
 - packaging/Debian: advance Debian, Ubuntu, Raspbian, and Android packages to 1.20.4-1 and reject package builds whose Debian upstream version differs from mk/version.mk.
 - build/packages/Resolute: stage the pinned official devkitPPC toolchain, allow the Xbox package builder to create its own nxdk tree, and require NuttX, Wii, and Xbox Debian artifacts from the Ubuntu Resolute amd64 Actions row.
 - build/Windows, Haiku, and RISC OS validation: restrict the Windows 95 CRT adapters and literal-folding policy to their intended Windows targets, avoid collisions with the current x86, x64, and ARM64 MinGW CRT, stage Haiku source trees with ZIP when current GNU tar cannot write BFS files, use explicit coverage-checked fbctests manifests plus linked-object and assertion-count guards, provide an awk-backed basic/extended expression scanner when GNU grep returns `EBADF` on populated BFS volumes, and preserve RISC OS runtime UTF-8 conversion semantics.

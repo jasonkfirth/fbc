@@ -258,7 +258,7 @@ prepare_apk_dir() {
 	msg "generating apk metadata for ${dir#"$OUT_BASE/"}"
 	(
 		cd "$dir"
-		apk index -o APKINDEX.tar.gz ./*.apk
+		apk index --allow-untrusted -o APKINDEX.tar.gz ./*.apk
 	)
 }
 

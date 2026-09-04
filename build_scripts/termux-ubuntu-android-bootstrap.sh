@@ -35,8 +35,8 @@ SCRIPT_NAME="${0##*/}"
 TERMUX_ROOT="${HOME}/.cache/freebasic-termux-android"
 CONTAINER_NAME="freebasic-android-arm64"
 
-ANDROID_PACKAGE_URL="${FBANDROID_DEB_URL:-https://deb.fbxl.net/linux/ubuntu/resolute/amd64/freebasic-android_1.20.3-2_amd64.deb}"
-ANDROID_PACKAGE_SHA256="${FBANDROID_DEB_SHA256:-788423a0eb849bc35265e3ee908e33142652ee30547a3cbb1ee88557677c7397}"
+ANDROID_PACKAGE_URL="${FBANDROID_DEB_URL:-https://deb.fbxl.net/linux/ubuntu/resolute/amd64/freebasic-android_1.20.4-1_amd64.deb}"
+ANDROID_PACKAGE_SHA256="${FBANDROID_DEB_SHA256:-9fc9e0ce7264b4d2ecf82db7f91abe3878c1d173fb9a1288399833cd32cdc9da}"
 HOST_PACKAGE_URL="${FBANDROID_HOST_DEB_URL:-https://deb.fbxl.net/install/assets/freebasic-host-noble-arm64_1.20.3-1_arm64.deb}"
 HOST_PACKAGE_SHA256="${FBANDROID_HOST_DEB_SHA256:-f58f32f564eefc2cb223c5e011861e256a3012a96b0bdc18ed6b3361d359fc6d}"
 PLATFORM_JAR_URL="${FBANDROID_PLATFORM_JAR_URL:-https://deb.fbxl.net/install/assets/android-platform-35.jar}"
@@ -297,6 +297,8 @@ ANDROID_PREFIX="$ANDROID_PACKAGE_ROOT/usr"
 FBC_ANDROID="$ANDROID_PREFIX/bin/fbc-android"
 
 [ -x "$FBC_ANDROID" ] || die "the Android package did not contain fbc-android"
+[ "$(dpkg-deb -f "$ANDROID_PACKAGE" Version)" = "1.20.4-1" ] || \
+	die "the FreeBASIC Android 1.20.4-1 target package is unavailable"
 [ -f "$SDK_ROOT/platforms/android-35/android.jar" ] || \
 	die "the Android API 35 platform jar is missing"
 [ -x "$SDK_ROOT/ndk/termux-native/toolchains/llvm/prebuilt/linux-aarch64/bin/aarch64-linux-android26-clang" ] || \
