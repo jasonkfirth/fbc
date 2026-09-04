@@ -1,3 +1,12 @@
+freebasic (1.20.4-1) unstable; urgency=medium
+
+  * Package the 1.20.4 compiler, runtime, graphics, sound, platform, and
+    release-validation updates under a new upstream package version.
+  * Keep the Debian-family package version synchronized with mk/version.mk so
+    current source cannot silently replace an older package revision.
+
+ -- SJ_Zero <sj@fbxl.net>  Thu, 03 Sep 2026 23:30:00 -0400
+
 freebasic (1.20.3-2) unstable; urgency=medium
 
   * Link ncurses directly on Linux systems that do not provide a libcurses

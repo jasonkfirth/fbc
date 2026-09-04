@@ -1178,6 +1178,7 @@ package_current_target() {
     local srcdir
     local pkgname
     local fullver
+    local project_version
     local upver
     local origtar
     local rc
@@ -1205,11 +1206,20 @@ package_current_target() {
     [ -n "$pkgname" ] || die "could not parse package name"
     [ -n "$fullver" ] || die "could not parse package version"
 
+    project_version="$(
+        sed -n 's/^FBVERSION[[:space:]]*:=[[:space:]]*//p' \
+            "$ROOT/mk/version.mk" | head -n1
+    )"
+    [ -n "$project_version" ] || die "could not determine FreeBASIC version"
+
+    upver="${fullver%%-*}"
+    [ "$upver" = "$project_version" ] || \
+        die "Debian package version $fullver does not match FreeBASIC $project_version"
+
     if [ "$BUILD_ARCH" = "amd64" ] && [ "$CROSS_PACKAGE_BUILD" -eq 0 ]; then
         build_source_package=1
     fi
 
-    upver="${fullver%%-*}"
     srcdir="${pkgname}-${upver}"
     bootstrap_srcdir="$ROOT/bootstrap/$BUILD_BOOTKEY"
 
