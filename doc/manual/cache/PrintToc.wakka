@@ -39,6 +39,7 @@
 		[[KeyPgDdfbfreebsd|__FB_FREEBSD__]]
 		[[KeyPgDdfbhaiku|__FB_HAIKU__]]
 		[[KeyPgDdfbgcc|__FB_GCC__]]
+		[[KeyPgDdfbgfxlib3|__FB_GFXLIB3__]]
 		[[KeyPgDdfbgui|__FB_GUI__]]
 		[[KeyPgDdfbiif|__FB_IIF__]]
 		[[KeyPgDdfbillumos|__FB_ILLUMOS__]]
@@ -200,6 +201,7 @@
 		[[KeyPgCls|CLS]]
 		[[KeyPgColor|COLOR]]
 		[[KeyPgCommand|COMMAND]]
+		[[ProPgFbcom|COMGETSTATUS, COMSETLINES, COMSETBREAK, and COMPURGE]]
 		[[KeyPgCommon|COMMON]]
 		[[KeyPgCondBroadcast|CONDBROADCAST]]
 		[[KeyPgCondCreate|CONDCREATE]]
@@ -832,6 +834,7 @@
 	[[CatPgGfxInput|User Input Functions]]
 	[[CatPgGfxScreen|Screen Functions]]
 	[[GfxLib|Supported graphics drivers (backends)]]
+	[[GfxLib3|gfxlib3 opt-in GPU runtime]]
 	[[GfxScancodes|Keyboard Scan Codes]]
 	[[GfxDefPalettes|Default Palettes]]
 
@@ -928,6 +931,7 @@
 
 	{{fbdoc item="subsect" value="Graphics"}}
 		[[GfxLib|FreeBASIC GfxLib overview]]
+		[[GfxLib3|gfxlib3 opt-in GPU runtime]]
 		[[ProPgAntiFlickering|Graphics Mode Refresh and Anti-Flickering]]
 		[[GfxInternalFormats|Internal Graphics Formats]]
 		[[ProPgExternalFormats|External Graphics File Formats]]
@@ -1095,6 +1099,7 @@
 
 {{fbdoc item="section" value="Using the FreeBASIC compiler"}}
 	[[CompilerInstalling|Installing FreeBASIC]]
+	[[CompilerRelease1204|What's new in FreeBASIC 1.20.4]]
 	[[CompilerRequirements|Requirements]]
 	[[CompilerRunning|Running FreeBASIC]]
 	[[CompilerCmdLine|Using the Command Line]]
@@ -1129,6 +1134,7 @@
 		[[CompilerOptfpu|-fpu < type >]]
 		[[CompilerOptg|-g]]
 		[[CompilerOptgen|-gen < backend >]]
+		[[CompilerOptgfx3|-gfx3]]
 		[[CompilerOpti|-i < name >]]
 		[[CompilerOptinclude|-include < name >]]
 		[[CompilerOptl|-l < name >]]
@@ -1203,3 +1209,4 @@
 
 {{fbdoc item="section" value="Hacking on FreeBASIC"}}
 	[[DevToc|Developer's Table of Contents]]
+	[[DevNuttX|NuttX and RISC-V board workflow]]

@@ -1,0 +1,138 @@
+<!--
+    Project: FreeBASIC Documentation
+    --------------------------------
+
+    File: site-index.html
+
+    Purpose:
+
+        Provide the versioned documentation landing page deployed at
+        deb.fbxl.net/docs/.
+
+    Responsibilities:
+
+        - link the generated 1.20.4 manual and downloadable formats
+        - expose the new release, package, graphics, serial, and NuttX pages
+        - retain the simple FBXL repository visual style
+
+    This file intentionally does NOT contain:
+
+        - generated manual content
+        - JavaScript
+        - server-side logic
+-->
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+  <title>FreeBASIC 1.20.4 Documentation</title>
+</head>
+<body style="background-color: rgb(0, 0, 0); color: rgb(192, 192, 255);" alink="#c0c0ff" link="#c0c0ff" vlink="#c0c0ff">
+
+<table style="text-align: left; color: rgb(192, 192, 255); height: 100%; width: 100%;" border="0" cellpadding="0" cellspacing="0">
+  <tbody>
+    <tr>
+      <td style="vertical-align: top; width: 279px;">
+        <table style="margin-left: auto; margin-right: auto; text-align: left; width: 279px; height: 100%;" border="0" cellpadding="0" cellspacing="0">
+          <tbody>
+            <tr>
+              <td style="height: 129px; vertical-align: top; text-align: left;"><img alt="" src="/graphics/menuswirl.png" style="width: 203px; height: 129px; border: 0;"><br></td>
+            </tr>
+            <tr>
+              <td style="vertical-align: top; background-image: url(../graphics/menubackground.png);">
+                <br>
+                <table valign="top" style="margin-left: auto; margin-right: auto; text-align: left; width: 216px;" border="1" cellpadding="0" cellspacing="0" frame="box" rules="none">
+                  <tbody>
+                    <tr>
+                      <td style="text-align: center; vertical-align: top; background-color: rgb(0, 0, 0);">
+                        <span style="font-weight: bold;"><font size="+2">Docs</font></span><br><br>
+                        <a href="00index.html">Online HTML Manual</a><br>
+                        <a href="CompilerRelease1204.html">What is new in 1.20.4</a><br>
+                        <a href="FB-manual-1.20.4.chm">Windows CHM</a><br>
+                        <a href="FB-manual-1.20.4-html.zip">HTML Zip</a><br>
+                        <a href="FB-manual-1.20.4.txt">Text Manual</a><br>
+                        <a href="fbhelp.daz">fbhelp.daz</a><br>
+                        <br>
+                        <a href="GfxLib3.html">gfxlib3</a><br>
+                        <a href="CatPgSfx.html">Sound Library</a><br>
+                        <a href="ProPgFbcom.html">Serial Control</a><br>
+                        <a href="DevNuttX.html">NuttX</a><br>
+                        <br>
+                        <a href="../">Back to Repository</a><br>
+                        <br>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <br>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
+
+      <td style="vertical-align: top;">
+        <table style="width: 95%; text-align: left; margin-left: auto; margin-right: auto;" border="0" cellpadding="10" cellspacing="0">
+          <tbody>
+            <tr>
+              <td style="vertical-align: top;">
+                <h1 style="color: rgb(192, 192, 255);">FreeBASIC 1.20.4 Documentation</h1>
+
+                <p>This is the documentation shelf for the FreeBASIC 1.20.4 packages hosted here. The manual and guides include the compiler, runtime, graphics, sound, serial, NuttX, platform, and package work completed since the 1.20.2 development baseline.</p>
+
+                <p>Start with the <a href="00index.html">online HTML manual</a> or the <a href="CompilerRelease1204.html">1.20.4 manual release page</a>. The expanded <a href="guides/release-1.20.4.md">release guide</a> groups the same development cycle by subject.</p>
+
+                <h2 style="color: rgb(192, 192, 255);">Documentation Formats</h2>
+                <table style="color: rgb(192, 192, 255); width: 90%;" border="1" cellpadding="6" cellspacing="0">
+                  <tbody>
+                    <tr><td style="width: 28%;"><a href="00index.html">Online HTML manual</a></td><td>Browse the complete generated language and library manual.</td></tr>
+                    <tr><td><a href="FB-manual-1.20.4-html.zip">HTML manual zip</a></td><td>Download the generated HTML manual for offline use.</td></tr>
+                    <tr><td><a href="FB-manual-1.20.4.chm">Windows CHM help</a></td><td>Compiled HTML Help for Windows help viewers.</td></tr>
+                    <tr><td><a href="FB-manual-1.20.4-chm.zip">Windows CHM zip</a></td><td>The CHM file in a zip archive.</td></tr>
+                    <tr><td><a href="FB-manual-1.20.4.txt">Plain text manual</a></td><td>A searchable single-file text manual.</td></tr>
+                    <tr><td><a href="FB-manual-1.20.4-txt.zip">Plain text zip</a></td><td>The text manual in a zip archive.</td></tr>
+                    <tr><td><a href="fbhelp.daz">fbhelp.daz</a></td><td>Portable data for the FreeBASIC help viewer.</td></tr>
+                    <tr><td><a href="FB-manual-1.20.4-fbhelp.zip">fbhelp zip</a></td><td>The help-viewer data in a zip archive.</td></tr>
+                    <tr><td><a href="FB-manual-1.20.4-wakka.zip">Wakka source zip</a></td><td>The checked-in manual source pages.</td></tr>
+                  </tbody>
+                </table>
+
+                <h2 style="color: rgb(192, 192, 255);">New and Revised Subjects</h2>
+                <table style="color: rgb(192, 192, 255); width: 90%;" border="1" cellpadding="6" cellspacing="0">
+                  <tbody>
+                    <tr><td style="width: 28%;"><a href="CompilerRelease1204.html">FreeBASIC 1.20.4</a></td><td>The major compiler, runtime, target, and qualification changes since the 1.20.2 development baseline.</td></tr>
+                    <tr><td><a href="CompilerInstalling.html">Packages and installation</a></td><td>The current FBXL package repository and universal installer.</td></tr>
+                    <tr><td><a href="GfxLib3.html">gfxlib3</a></td><td>The opt-in GPU graphics runtime, its selection rules, platforms, and GPU surfaces.</td></tr>
+                    <tr><td><a href="CompilerOptgfx3.html">Compiler option: -gfx3</a></td><td>Select gfxlib3 without changing the program source.</td></tr>
+                    <tr><td><a href="KeyPgScreengraphics.html">QB SCREEN modes</a></td><td>The complete SCREEN 1 through 13 compatibility table, including gfxlib3 modes 3 through 6.</td></tr>
+                    <tr><td><a href="CatPgSfx.html">Sound library</a></td><td>Generated sound, PLAY, effects, music, MIDI, devices, capture, and diagnostics.</td></tr>
+                    <tr><td><a href="ProPgFbcom.html">Portable serial control</a></td><td>Status, queue, modem-line, break, and purge operations for OPEN COM streams.</td></tr>
+                    <tr><td><a href="DevNuttX.html">NuttX and RISC-V</a></td><td>QEMU, ESP32-P4, and RP2350-PiZero workflows.</td></tr>
+                  </tbody>
+                </table>
+
+                <h2 style="color: rgb(192, 192, 255);">Expanded Guides</h2>
+                <table style="color: rgb(192, 192, 255); width: 90%;" border="1" cellpadding="6" cellspacing="0">
+                  <tbody>
+                    <tr><td style="width: 28%;"><a href="guides/README.md">Guide index</a></td><td>Release, package, target, and verification documentation.</td></tr>
+                    <tr><td><a href="guides/packages.md">Package repository</a></td><td>Package groups, installation, Termux Android development, and checksums.</td></tr>
+                    <tr><td><a href="guides/gfxlib3/README.md">gfxlib3 design documents</a></td><td>Architecture, platform boundaries, test plan, performance, and verification records.</td></tr>
+                    <tr><td><a href="guides/serial.md">Serial control guide</a></td><td>The complete fbcom.bi programming model.</td></tr>
+                    <tr><td><a href="guides/nuttx.md">NuttX guide</a></td><td>Installation, QEMU, firmware, module, and hardware workflows.</td></tr>
+                    <tr><td><a href="guides/aros.md">AROS</a>, <a href="guides/riscos.md">RISC OS</a>, <a href="guides/wince.md">Windows CE</a>, <a href="guides/mips.md">Linux MIPS</a></td><td>Port-specific build and qualification notes.</td></tr>
+                  </tbody>
+                </table>
+
+                <p>Package and documentation downloads are covered by the checksum files published at the repository root.</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+</body>
+</html>
+<!-- end of site-index.html -->

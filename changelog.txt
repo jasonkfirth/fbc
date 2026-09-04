@@ -1,6 +1,7 @@
 Version 1.20.4
 
 [changed]
+- documentation: added a 1.20.4 release guide and documentation index, current package-repository and Termux installation notes, a NuttX workflow guide, a portable fbcom.bi reference, gfxlib3 selection, compiler-option, and intrinsic-define pages, and the complete SCREEN 1 through 13 compatibility-mode table; repaired all external-library index targets and two malformed email links, and rebuilt the manual formats with the current release version.
 - build/CI: added an independent Cppcheck job that derives its manifest from every tracked first-party C and C++ source file, currently 1,479 files, excludes only an explicit set of vendored and generated compiler-output sources, and fails on new warning, performance, or portability diagnostics.
 - build/CI BSD and Haiku: make every QEMU qualification explicitly verify the native `.pkg`, `.tgz`, or `.hpkg` produced and installed by the guest scripts, and retain each installable package as a 30-day artifact on push, pull-request, scheduled, manual, and release runs instead of exposing dedicated package artifacts only for version tags.
 - build/tools: hardened the gfxlib2 font and palette generator, DOS DXE export-table generator, and Win32/Windows CE fbportio generator and tester with bounded argument handling, validated file sizes and reads, checked allocations, and explicit owned-buffer cleanup.

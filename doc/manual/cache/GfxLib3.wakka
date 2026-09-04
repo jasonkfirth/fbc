@@ -1,0 +1,45 @@
+{{fbdoc item="title" value="gfxlib3 - opt-in GPU graphics runtime"}}----
+An opt-in render-threaded implementation of the FreeBASIC graphics interface.
+
+{{fbdoc item="desc"}}
+	gfxlib3 preserves the existing FreeBASIC and QB graphics command surface while moving ordinary rendering and presentation onto a dedicated render thread.  gfxlib2 remains the default runtime.
+
+	On Windows and Linux/X11, an ordinary mode tries Vulkan first and then OpenGL.  Android uses its NativeActivity adapter and OpenGL ES 3.0 fallback.  The Null backend provides deterministic headless drawing and image tests without opening a display.
+
+	The public compatibility surface includes graphics pages, palettes, the graphical console and line input, keyboard, mouse, touch and controller input, VIEW, WINDOW, PMAP, primitives, DRAW, PAINT, text, CPU images, GET, PUT, BLOAD, BSAVE, SCREENPTR, SCREENLOCK, SCREENINFO, and SCREENCONTROL.
+
+{{fbdoc item="section" value="Selection"}}
+	Use the compiler option when one build setting should select gfxlib3 for unchanged source:
+
+		%%fbc -gfx3 game.bas%%
+
+	Source can select the same runtime before graphics declarations are loaded:
+
+%%(freebasic)
+#define __FB_GFXLIB3__
+#include once "fbgfx.bi"
+%%
+
+	Including ##fbgfx3.bi## also selects the runtime and declares its extension API.  Do not link gfxlib2 and gfxlib3 into the same program.
+
+{{fbdoc item="section" value="GPU surfaces"}}
+	The extension API can create, load, transfer, map, scale, rotate, project, and present GPU-resident surfaces.  A returned surface pointer is an opaque descriptor, not pixel memory.  Code that needs CPU access must use ##Gfx3SurfaceMap## or a transfer call and must stop using the returned mapping after unmap or ##Screen 0##.
+
+	GPU operations stay ordered with ordinary graphics commands.  POINT, GET, DOWNLOAD, MAP, SCREENPTR, and CPU-only custom blenders can require a synchronization and readback boundary, so they should not be placed in a per-pixel render loop.
+
+{{fbdoc item="section" value="Legacy SCREEN modes"}}
+	gfxlib3 adds historical modes that gfxlib2 still leaves undefined: SCREEN 3 Hercules 720 by 348 monochrome, SCREEN 4 Olivetti/AT&T 640 by 400 monochrome, SCREEN 5 PCjr/Tandy 320 by 200 with 16 colours, and SCREEN 6 PCjr/Tandy 640 by 200 with 4 colours.
+
+{{fbdoc item="target"}}
+	- Windowed gfxlib3 adapters are currently implemented for Windows, Linux/X11, and Android.
+	- DOS, Haiku, JavaScript, NuttX, Wii, Xbox, and the other ports continue to use gfxlib2.
+	- An explicit Vulkan request fails if Vulkan cannot create the requested mode.  It does not silently fall back to the Null driver.
+
+{{fbdoc item="see"}}
+	- ##[[CompilerOptgfx3|-gfx3 compiler option]]##
+	- ##[[GfxLib|GfxLib overview]]##
+	- ##[[KeyPgScreengraphics|Screen (Graphics)]]##
+	- ##[[KeyPgScreenres|ScreenRes]]##
+	- [[https://deb.fbxl.net/docs/guides/gfxlib3/README.md|Complete gfxlib3 design and verification documents]]
+
+{{fbdoc item="back" value="DocToc|Table of Contents"}}

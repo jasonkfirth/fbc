@@ -87,5 +87,6 @@ OPEN COM "COM1:115200" as 1
 
 {{fbdoc item="see"}}
 	- ##[[KeyPgOpen|Open]]##
+	- ##[[ProPgFbcom|fbcom.bi portable serial control API]]##
 
 {{fbdoc item="back" value="CatPgFile|File I/O Functions"}}

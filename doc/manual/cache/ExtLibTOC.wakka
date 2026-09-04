@@ -1,4 +1,4 @@
-﻿External Library Bindings
+External Library Bindings
 
 FreeBASIC includes many .bi files that let BASIC programs call libraries written in C or other languages.  These pages describe the bindings and the examples that use them.
 
@@ -23,49 +23,49 @@ The examples directory contains notes from current example sweeps.  Those notes 
 
 {{fbdoc item="section" value="Sound and media"}}
 
-* {{fbdoc item="keyword" value="sfxlib command set" link="CatPgSfx"}} - Built-in BASIC-oriented sound commands.  Start here for SOUND, PLAY, SFX, MUSIC, MIDI, waveform, envelope, channel, panning, and capture commands.
-* {{fbdoc item="keyword" value="OpenAL" link="ExtLibal"}} - 3D audio API.  Optional on most systems.
-* {{fbdoc item="keyword" value="BASS" link="ExtLibbass"}} and {{fbdoc item="keyword" value="BASSMOD" link="ExtLibbassmod"}} - Third-party audio libraries.  Useful when you provide the vendor runtime, but not something every FreeBASIC package can ship.
-* {{fbdoc item="keyword" value="FMOD" link="ExtLibfmod"}} - Old FMOD binding.  Treat this as legacy unless you already have the matching SDK/runtime.
-* {{fbdoc item="keyword" value="Flite" link="ExtLibFlite"}} - Speech synthesis library.
-* {{fbdoc item="keyword" value="mpg123" link="ExtLibmpg123"}}, {{fbdoc item="keyword" value="Ogg" link="ExtLibogg"}}, {{fbdoc item="keyword" value="Vorbis" link="ExtLibvorbis"}}, and {{fbdoc item="keyword" value="sndfile" link="ExtLibsndfile"}} - Audio decoding and file-format libraries.
-* {{fbdoc item="keyword" value="PortAudio" link="ExtLibPortAudio"}} - Cross-platform audio I/O library.
-* {{fbdoc item="keyword" value="VLC" link="ExtLibVLC"}} - Media playback through libVLC.
-* {{fbdoc item="keyword" value="old sfx binding page" link="ExtLibsfx"}} - Historical page kept for compatibility.  New code should normally read the sfxlib command pages instead.
+* {{fbdoc item="keyword" value="CatPgSfx|sfxlib command set"}} - Built-in BASIC-oriented sound commands.  Start here for SOUND, PLAY, SFX, MUSIC, MIDI, waveform, envelope, channel, panning, and capture commands.
+* {{fbdoc item="keyword" value="ExtLibal|OpenAL"}} - 3D audio API.  Optional on most systems.
+* {{fbdoc item="keyword" value="ExtLibbass|BASS"}} and {{fbdoc item="keyword" value="ExtLibbassmod|BASSMOD"}} - Third-party audio libraries.  Useful when you provide the vendor runtime, but not something every FreeBASIC package can ship.
+* {{fbdoc item="keyword" value="ExtLibfmod|FMOD"}} - Old FMOD binding.  Treat this as legacy unless you already have the matching SDK/runtime.
+* {{fbdoc item="keyword" value="ExtLibFlite|Flite"}} - Speech synthesis library.
+* {{fbdoc item="keyword" value="ExtLibmpg123|mpg123"}}, {{fbdoc item="keyword" value="ExtLibogg|Ogg"}}, {{fbdoc item="keyword" value="ExtLibvorbis|Vorbis"}}, and {{fbdoc item="keyword" value="ExtLibsndfile|sndfile"}} - Audio decoding and file-format libraries.
+* {{fbdoc item="keyword" value="ExtLibPortAudio|PortAudio"}} - Cross-platform audio I/O library.
+* {{fbdoc item="keyword" value="ExtLibVLC|VLC"}} - Media playback through libVLC.
+* {{fbdoc item="keyword" value="ExtLibsfx|old sfx binding page"}} - Historical page kept for compatibility.  New code should normally read the sfxlib command pages instead.
 
 {{fbdoc item="section" value="Graphics, image, and display libraries"}}
 
-* {{fbdoc item="keyword" value="Allegro" link="ExtLiballegro"}}, {{fbdoc item="keyword" value="SDL" link="ExtLibSDL"}}, {{fbdoc item="keyword" value="TinyPTC" link="ExtLibtinyptc"}}, {{fbdoc item="keyword" value="DUGL" link="ExtLibDUGL"}}, and {{fbdoc item="keyword" value="GRX" link="ExtLibgrx"}} - Game, framebuffer, and graphics libraries.  Several are useful for old examples, but some are legacy on modern Windows packages.
-* {{fbdoc item="keyword" value="OpenGL" link="ExtLibOpenGL"}}, {{fbdoc item="keyword" value="GLUT" link="ExtLibGLUT"}}, {{fbdoc item="keyword" value="freeglut" link="ExtLibfreeglut"}}, and {{fbdoc item="keyword" value="GLFW" link="ExtLibGLFW"}} - OpenGL-related bindings.  Good desktop targets, but not generally expected on JavaScript, Android, Xbox, or DOS package installs.
-* {{fbdoc item="keyword" value="Cairo" link="ExtLibcairo"}}, {{fbdoc item="keyword" value="caca" link="ExtLibcaca"}}, {{fbdoc item="keyword" value="DISLIN" link="ExtLibdislin"}}, and {{fbdoc item="keyword" value="PDFLib" link="ExtLibpdflib"}} - Drawing, terminal graphics, plotting, and document-generation libraries.
-* {{fbdoc item="keyword" value="DevIL" link="ExtLibIL"}}, {{fbdoc item="keyword" value="FreeImage" link="ExtLibfreeimage"}}, {{fbdoc item="keyword" value="FreeType2" link="ExtLibfreetype2"}}, {{fbdoc item="keyword" value="GD" link="ExtLibgd"}}, {{fbdoc item="keyword" value="GIFLIB" link="ExtLibgiflib"}}, {{fbdoc item="keyword" value="jpeglib" link="ExtLibjpeglib"}}, {{fbdoc item="keyword" value="jpgalleg" link="ExtLibjpgalleg"}}, and {{fbdoc item="keyword" value="libpng" link="ExtLiblibpng"}} - Image loading, image writing, font, and raster helpers.  These are often practical when the OS package manager provides matching development libraries.
+* {{fbdoc item="keyword" value="ExtLiballegro|Allegro"}}, {{fbdoc item="keyword" value="ExtLibSDL|SDL"}}, {{fbdoc item="keyword" value="ExtLibtinyptc|TinyPTC"}}, {{fbdoc item="keyword" value="ExtLibDUGL|DUGL"}}, and {{fbdoc item="keyword" value="ExtLibgrx|GRX"}} - Game, framebuffer, and graphics libraries.  Several are useful for old examples, but some are legacy on modern Windows packages.
+* {{fbdoc item="keyword" value="ExtLibOpenGL|OpenGL"}}, {{fbdoc item="keyword" value="ExtLibGLUT|GLUT"}}, {{fbdoc item="keyword" value="ExtLibfreeglut|freeglut"}}, and {{fbdoc item="keyword" value="ExtLibGLFW|GLFW"}} - OpenGL-related bindings.  Good desktop targets, but not generally expected on JavaScript, Android, Xbox, or DOS package installs.
+* {{fbdoc item="keyword" value="ExtLibcairo|Cairo"}}, {{fbdoc item="keyword" value="ExtLibcaca|caca"}}, {{fbdoc item="keyword" value="ExtLibdislin|DISLIN"}}, and {{fbdoc item="keyword" value="ExtLibpdflib|PDFLib"}} - Drawing, terminal graphics, plotting, and document-generation libraries.
+* {{fbdoc item="keyword" value="ExtLibIL|DevIL"}}, {{fbdoc item="keyword" value="ExtLibfreeimage|FreeImage"}}, {{fbdoc item="keyword" value="ExtLibfreetype2|FreeType2"}}, {{fbdoc item="keyword" value="ExtLibgd|GD"}}, {{fbdoc item="keyword" value="ExtLibgiflib|GIFLIB"}}, {{fbdoc item="keyword" value="ExtLibjpeglib|jpeglib"}}, {{fbdoc item="keyword" value="ExtLibjpgalleg|jpgalleg"}}, and {{fbdoc item="keyword" value="ExtLiblibpng|libpng"}} - Image loading, image writing, font, and raster helpers.  These are often practical when the OS package manager provides matching development libraries.
 
 {{fbdoc item="section" value="GUI and platform user-interface libraries"}}
 
-* {{fbdoc item="keyword" value="CGUI" link="ExtLibcgui"}}, {{fbdoc item="keyword" value="GTK+" link="ExtLibgtk"}}, {{fbdoc item="keyword" value="IUP" link="ExtLibIUP"}}, {{fbdoc item="keyword" value="JAPI" link="ExtLibjapi"}}, and {{fbdoc item="keyword" value="wx-c" link="ExtLibwxc"}} - GUI bindings.  Some are useful, but they are among the bindings most likely to need extra runtime libraries.
-* {{fbdoc item="keyword" value="Curses" link="ExtLibcurses"}} - Terminal UI support.
-* {{fbdoc item="keyword" value="X11" link="ExtLibX11"}} and {{fbdoc item="keyword" value="Windows API" link="ExtLibwindows"}} - Platform APIs.  These are not portable abstractions.
+* {{fbdoc item="keyword" value="ExtLibcgui|CGUI"}}, {{fbdoc item="keyword" value="ExtLibgtk|GTK+"}}, {{fbdoc item="keyword" value="ExtLibIUP|IUP"}}, {{fbdoc item="keyword" value="ExtLibjapi|JAPI"}}, and {{fbdoc item="keyword" value="ExtLibwxc|wx-c"}} - GUI bindings.  Some are useful, but they are among the bindings most likely to need extra runtime libraries.
+* {{fbdoc item="keyword" value="ExtLibcurses|Curses"}} - Terminal UI support.
+* {{fbdoc item="keyword" value="ExtLibX11|X11"}} and {{fbdoc item="keyword" value="ExtLibwindows|Windows API"}} - Platform APIs.  These are not portable abstractions.
 
 {{fbdoc item="section" value="Data, database, and web libraries"}}
 
-* {{fbdoc item="keyword" value="GDBM" link="ExtLibGDBM"}}, {{fbdoc item="keyword" value="MySQL" link="ExtLibmysql"}}, {{fbdoc item="keyword" value="PostgreSQL" link="ExtLibpostgresql"}}, and {{fbdoc item="keyword" value="SQLite" link="ExtLibsqlite"}} - Database bindings.  SQLite is usually the easiest dependency to satisfy; client/server databases need the matching client development package.
-* {{fbdoc item="keyword" value="CGI utility" link="ExtLibcgiutil"}}, {{fbdoc item="keyword" value="FastCGI" link="ExtLibFastCGI"}}, {{fbdoc item="keyword" value="curl" link="ExtLibcurl"}}, and {{fbdoc item="keyword" value="ZeroMQ" link="ExtLibZeroMQ"}} - Web, HTTP, and messaging support.  These are practical where the OS provides the libraries, but they are not automatically available on every cross target.
-* {{fbdoc item="keyword" value="Expat" link="ExtLibexpat"}}, {{fbdoc item="keyword" value="libxml" link="ExtLiblibxml"}}, {{fbdoc item="keyword" value="libxslt" link="ExtLiblibxslt"}}, and {{fbdoc item="keyword" value="mxml" link="ExtLibmxml"}} - XML parsers and transformation libraries.
-* {{fbdoc item="keyword" value="json-c" link="ExtLibjsonc"}} - JSON support through json-c.
+* {{fbdoc item="keyword" value="ExtLibGDBM|GDBM"}}, {{fbdoc item="keyword" value="ExtLibmysql|MySQL"}}, {{fbdoc item="keyword" value="ExtLibpostgresql|PostgreSQL"}}, and {{fbdoc item="keyword" value="ExtLibsqlite|SQLite"}} - Database bindings.  SQLite is usually the easiest dependency to satisfy; client/server databases need the matching client development package.
+* {{fbdoc item="keyword" value="ExtLibcgiutil|CGI utility"}}, {{fbdoc item="keyword" value="ExtLibFastCGI|FastCGI"}}, {{fbdoc item="keyword" value="ExtLibcurl|curl"}}, and {{fbdoc item="keyword" value="ExtLibZeroMQ|ZeroMQ"}} - Web, HTTP, and messaging support.  These are practical where the OS provides the libraries, but they are not automatically available on every cross target.
+* {{fbdoc item="keyword" value="ExtLibexpat|Expat"}}, {{fbdoc item="keyword" value="ExtLiblibxml|libxml"}}, {{fbdoc item="keyword" value="ExtLiblibxslt|libxslt"}}, and {{fbdoc item="keyword" value="ExtLibmxml|mxml"}} - XML parsers and transformation libraries.
+* {{fbdoc item="keyword" value="ExtLibjsonc|json-c"}} - JSON support through json-c.
 
 {{fbdoc item="section" value="Development, language, and helper libraries"}}
 
-* {{fbdoc item="keyword" value="ASpell" link="ExtLibaspell"}}, {{fbdoc item="keyword" value="BFD" link="ExtLibbfd"}}, {{fbdoc item="keyword" value="CUnit" link="ExtLibCUnit"}}, {{fbdoc item="keyword" value="GDSL" link="ExtLibgdsl"}}, {{fbdoc item="keyword" value="gettext" link="ExtLibgettext"}}, {{fbdoc item="keyword" value="MediaInfo" link="ExtLibMediaInfo"}}, and {{fbdoc item="keyword" value="UUID" link="ExtLibUUID"}} - Helper and developer libraries.  These are useful, but mostly depend on optional OS packages.
-* {{fbdoc item="keyword" value="libffi" link="ExtLibFfi"}}, {{fbdoc item="keyword" value="libjit" link="ExtLibJit"}}, {{fbdoc item="keyword" value="JNI" link="ExtLibjni"}}, {{fbdoc item="keyword" value="Lua" link="ExtLibLua"}}, and {{fbdoc item="keyword" value="SpiderMonkey" link="ExtLibspidermonkey"}} - Language runtimes and foreign-function interfaces.  libjit and old SpiderMonkey are special-case bindings on current Windows package builds.
+* {{fbdoc item="keyword" value="ExtLibaspell|ASpell"}}, {{fbdoc item="keyword" value="ExtLibbfd|BFD"}}, {{fbdoc item="keyword" value="ExtLibCUnit|CUnit"}}, {{fbdoc item="keyword" value="ExtLibgdsl|GDSL"}}, {{fbdoc item="keyword" value="ExtLibgettext|gettext"}}, {{fbdoc item="keyword" value="ExtLibMediaInfo|MediaInfo"}}, and {{fbdoc item="keyword" value="ExtLibUUID|UUID"}} - Helper and developer libraries.  These are useful, but mostly depend on optional OS packages.
+* {{fbdoc item="keyword" value="ExtLibFfi|libffi"}}, {{fbdoc item="keyword" value="ExtLibJit|libjit"}}, {{fbdoc item="keyword" value="ExtLibjni|JNI"}}, {{fbdoc item="keyword" value="ExtLibLua|Lua"}}, and {{fbdoc item="keyword" value="ExtLibspidermonkey|SpiderMonkey"}} - Language runtimes and foreign-function interfaces.  libjit and old SpiderMonkey are special-case bindings on current Windows package builds.
 
 {{fbdoc item="section" value="Math, physics, compression, regex, and system APIs"}}
 
-* {{fbdoc item="keyword" value="big_int" link="ExtLibbigint"}}, {{fbdoc item="keyword" value="GMP" link="ExtLibgmp"}}, and {{fbdoc item="keyword" value="GSL" link="ExtLibgsl"}} - Big-number and scientific/math libraries.
-* {{fbdoc item="keyword" value="Chipmunk" link="ExtLibChipmunk"}}, {{fbdoc item="keyword" value="Newton" link="ExtLibnewton"}}, and {{fbdoc item="keyword" value="ODE" link="ExtLibode"}} - Physics libraries.  Expect package availability to vary by platform.
-* {{fbdoc item="keyword" value="cryptlib" link="ExtLibcryptlib"}} - Cryptography library binding.  Treat licensing and redistributability as part of the dependency decision.
-* {{fbdoc item="keyword" value="bzip2" link="ExtLibbzip2"}}, {{fbdoc item="keyword" value="LZMA" link="ExtLibLzma"}}, {{fbdoc item="keyword" value="LZO" link="ExtLibLzo"}}, {{fbdoc item="keyword" value="QuickLZ" link="ExtLibquicklz"}}, {{fbdoc item="keyword" value="Zip" link="ExtLibZip"}}, and {{fbdoc item="keyword" value="zlib" link="ExtLibzlib"}} - Compression libraries.
-* {{fbdoc item="keyword" value="PCRE" link="ExtLibpcre"}} and {{fbdoc item="keyword" value="TRE" link="ExtLibtre"}} - Regular-expression libraries.
-* {{fbdoc item="keyword" value="C runtime" link="ExtLibCRT"}}, {{fbdoc item="keyword" value="DOS API" link="ExtLibdos"}}, {{fbdoc item="keyword" value="DispHelper" link="ExtLibdisphelper"}}, and {{fbdoc item="keyword" value="GLib" link="ExtLibGLib"}} - System/runtime bindings.  These should be read with the target platform in mind.
+* {{fbdoc item="keyword" value="ExtLibbigint|big_int"}}, {{fbdoc item="keyword" value="ExtLibgmp|GMP"}}, and {{fbdoc item="keyword" value="ExtLibgsl|GSL"}} - Big-number and scientific/math libraries.
+* {{fbdoc item="keyword" value="ExtLibChipmunk|Chipmunk"}}, {{fbdoc item="keyword" value="ExtLibnewton|Newton"}}, and {{fbdoc item="keyword" value="ExtLibode|ODE"}} - Physics libraries.  Expect package availability to vary by platform.
+* {{fbdoc item="keyword" value="ExtLibcryptlib|cryptlib"}} - Cryptography library binding.  Treat licensing and redistributability as part of the dependency decision.
+* {{fbdoc item="keyword" value="ExtLibbzip2|bzip2"}}, {{fbdoc item="keyword" value="ExtLibLzma|LZMA"}}, {{fbdoc item="keyword" value="ExtLibLzo|LZO"}}, {{fbdoc item="keyword" value="ExtLibquicklz|QuickLZ"}}, {{fbdoc item="keyword" value="ExtLibZip|Zip"}}, and {{fbdoc item="keyword" value="ExtLibzlib|zlib"}} - Compression libraries.
+* {{fbdoc item="keyword" value="ExtLibpcre|PCRE"}} and {{fbdoc item="keyword" value="ExtLibtre|TRE"}} - Regular-expression libraries.
+* {{fbdoc item="keyword" value="ExtLibCRT|C runtime"}}, {{fbdoc item="keyword" value="ExtLibdos|DOS API"}}, {{fbdoc item="keyword" value="ExtLibdisphelper|DispHelper"}}, and {{fbdoc item="keyword" value="ExtLibGLib|GLib"}} - System/runtime bindings.  These should be read with the target platform in mind.
 
 {{fbdoc item="section" value="Practical advice"}}
 

@@ -1,0 +1,51 @@
+{{fbdoc item="title" value="fbcom.bi portable serial control API"}}----
+Queries and controls a serial port already opened with OPEN COM.
+
+{{fbdoc item="syntax"}}##
+	#include once "fbcom.bi"
+	using FB
+
+	result = ComGetStatus( file_number, status )
+	result = ComSetLines( file_number, mask, values )
+	result = ComSetBreak( file_number, enabled )
+	result = ComPurge( file_number, queues )
+##
+{{fbdoc item="desc"}}
+	##OPEN COM## owns the serial byte stream and its file number.  ##fbcom.bi## adds portable modem status, queue information, break control, purge, and RTS/DTR control without exposing a native operating-system handle.
+
+	Every field in ##ComStatus## has a fixed unsigned 32-bit representation.  The fields are ##capabilities##, ##lines##, ##errors##, ##rx_queued##, and ##tx_queued##.  A capability bit is set only when the current operating system and device driver support the associated value or operation.  Unsupported fields remain zero, so programs must test the capability mask before interpreting them.
+
+	The input and output line flags are ##COM_LINE_CTS##, ##COM_LINE_DSR##, ##COM_LINE_DCD##, ##COM_LINE_RI##, ##COM_LINE_RTS##, and ##COM_LINE_DTR##.  ##ComSetLines## changes only the RTS and DTR bits selected by its mask.  A selected bit present in ##values## is driven high.
+
+	##ComSetBreak## asserts or clears the transmitter break condition.  ##ComPurge## accepts ##COM_PURGE_RX##, ##COM_PURGE_TX##, or both.  The error flags report break, framing, parity, overrun, and receive overflow when ##COM_CAP_ERRORS## is available.
+
+	All four functions return zero on success and a nonzero runtime error on failure.  A closed file, a file that is not an ##OPEN COM## stream, or an operation missing from the capability mask is an error.
+
+{{fbdoc item="ex"}}
+{{fbdoc item="filename" value="examples/manual/fileio/fbcom.bas"}}%%(freebasic)
+#include once "fbcom.bi"
+using FB
+
+dim as integer port = freefile
+open com "COM1:115200,N,8,1" for binary as #port
+if err <> 0 then end 1
+
+dim as ComStatus status
+if ComGetStatus( port, status ) = 0 then
+	print "RX queued:"; status.rx_queued
+	print "TX queued:"; status.tx_queued
+end if
+
+close #port
+%%
+
+{{fbdoc item="target"}}
+	- The API is implemented by the supported DOS, Windows/Windows CE, Unix-family, AROS, RISC OS, and NuttX serial backends.
+	- Capabilities vary by operating system, serial adapter, device driver, and emulator.  Portable code must not assume that modem lines or queue lengths are available.
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgOpenCom|OPEN COM]]##
+	- ##[[KeyPgClose|CLOSE]]##
+	- [[https://deb.fbxl.net/docs/guides/serial.md|Portable serial control guide]]
+
+{{fbdoc item="back" value="CatPgFile|File I/O Functions"}}

@@ -1,0 +1,45 @@
+{{fbdoc item="title" value="NuttX and RISC-V board workflow"}}----
+Builds FreeBASIC programs for NuttX QEMU, ESP32-P4, and RP2350-PiZero targets.
+
+{{fbdoc item="desc"}}
+	FreeBASIC provides the experimental ##nuttx-riscv32## compiler target, a NuttX runtime, low-memory gfxlib2 support, sfxlib integration, examples, compatibility patches, and host workflow tools.  The compiler emits C that is compiled inside the matching Apache NuttX application or loadable-module build.
+
+	The source tree does not vendor NuttX.  The helpers clone or reuse an external ##nuttx/## and ##apps/## workspace so the NuttX version, board, and configuration remain explicit.
+
+{{fbdoc item="section" value="Installed SDK"}}
+	The ##freebasic-nuttx## Debian package installs the runtime source SDK and these commands:
+
+		- ##nuttx-riscv32-qemu-smoke##
+		- ##fbc-nuttx-esp32p4##
+		- ##fbc-nuttx-esp32p4-firmware##
+		- ##nuttx-remote-console##
+		- ##nuttx-http-server##
+
+	Use each command's ##--help## output and installed manual page for its complete option list.
+
+{{fbdoc item="section" value="QEMU"}}
+	The shortest end-to-end compiler and runtime check is:
+
+		%%nuttx-riscv32-qemu-smoke%%
+
+	It prepares the workspace, builds the default FreeBASIC example into a RISC-V NuttX image, runs ##qemu-system-riscv32##, and checks the console result.  Use ##--bas program.bas## to select a program, ##--prepare-only## to stop after workspace setup, and ##--with-gfxlib## to link the NuttX graphics support.
+
+{{fbdoc item="section" value="ESP32-P4 and RP2350-PiZero"}}
+	Firmware preparation is separate from application deployment:
+
+		%%fbc-nuttx-esp32p4-firmware
+fbc-nuttx-esp32p4 --bas program.bas --serial-port /dev/ttyACM0 --run%%
+
+	The firmware command builds the configured NuttX image.  The application command builds a loadable module, transfers it to ##/data/fb## or ##/mnt/sd0/fb##, and can start it through a telnet or serial NSH console.  ##--no-upload## keeps the operation local.
+
+	The RP2350-PiZero helper builds an ELF intended for ##/mnt/sd0/bin##.  A separate PowerShell YMODEM helper can transfer it through an already configured NSH console.  Rebuilding one program does not require reflashing the firmware.
+
+{{fbdoc item="section" value="Limits"}}
+	Small boards impose real limits on framebuffer pages, heap, thread stacks, media decoders, and network buffers.  DVI, USB host, SD, Ethernet, serial, GPIO, and audio paths need the matching physical board.  QEMU can prove compiler, runtime, filesystem, and network paths but cannot replace those hardware checks.
+
+{{fbdoc item="see"}}
+	- [[https://deb.fbxl.net/docs/guides/nuttx.md|Complete NuttX guide]]
+	- ##[[CompilerOpttarget|-target compiler option]]##
+	- ##[[CompilerRelease1204|What's new in FreeBASIC 1.20.4]]##
+
+{{fbdoc item="back" value="DevToc|Developer pages"}}

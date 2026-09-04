@@ -3,6 +3,23 @@ Installing ""FreeBASIC"", any additionally needed packages, and perhaps a text e
 
 //Note: If the user specifies directory names during the installation of the different components, it is recommended in the chosen names to use only alphanumeric ASCII characters without accent and preferably not any space, otherwise some paths might not work as expected.//
 
+{{fbdoc item="section" value="FBXL 1.20.4 package repository"}}
+
+	The unofficial and experimental package repository at [[https://deb.fbxl.net/|deb.fbxl.net]] contains the current 1.20.4 packages, per-directory SHA-256 files, and a release-wide checksum manifest.  The official upstream downloads remain at SourceForge.
+
+	On a supported Unix-like host, download and run the dispatcher:
+
+		%%$ curl -fsSLO https://deb.fbxl.net/install.sh
+$ sh install.sh%%
+
+	The dispatcher recognizes the current Debian, Ubuntu, Raspbian, Alpine, postmarketOS, Fedora, AlmaLinux, Rocky Linux, openSUSE, Slackware, BSD, Haiku, illumos, Solaris, macOS, and Cygwin package layouts.  Its platform installer accepts ##--release## and ##--arch## when automatic detection is not suitable.
+
+	The repository also has standalone Windows, DOS, Android, JavaScript, Wii, Xbox, NuttX, AROS, RISC OS, and Windows CE output where that target has a current package.  Consult the repository index instead of assuming that every retained file was rebuilt for every release.
+
+	On Debian and Ubuntu, ##freebasic-full## installs the compiler, bindings, examples, documentation, and the target packages recommended for that distribution.  Android remains a separately selected package.  The compiler, runtime, development files, bindings, examples, documentation, JavaScript, Android, Wii, and NuttX SDK can also be selected as individual packages.
+
+	See [[https://deb.fbxl.net/docs/guides/packages.md|Package repository and installation]] for package locations, the native ARM64 Termux Android workflow, and integrity checks.
+
 {{fbdoc item="section" value="Windows 32bit"}}
 
 	1) Download the latest [[https://sourceforge.net/projects/fbc/files/Binaries%20-%20Windows/|FreeBASIC-x.xx.x-win32.zip]] package, or the latest [[https://sourceforge.net/projects/fbc/files/Binaries%20-%20Windows/|FreeBASIC-x.xx.x-win32.exe]] installer (not recommended for Windows 7 and later versions).

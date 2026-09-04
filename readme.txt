@@ -1,22 +1,25 @@
 
     FreeBASIC - A multi-platform BASIC Compiler
-    Copyright (C) 2004-2025 The FreeBASIC development team.
+    Copyright (C) 2004-2026 The FreeBASIC development team.
 
     Official site:      https://freebasic.net/
     Forum:              https://freebasic.net/forum/
     Online manual:      https://freebasic.net/wiki/DocToc
     fbc project page:   https://sourceforge.net/projects/fbc/
     GitHub mirror:      https://github.com/freebasic/fbc
+    Package repository: https://deb.fbxl.net/
+    Release documents:  https://deb.fbxl.net/docs/
     Discord:            https://discord.gg/286rSdK
     IRC channel:        ##freebasic at https://webchat.freenode.net
     Features:           https://freebasic.net/wiki/CompilerFeatures
     Requirements:       https://freebasic.net/wiki/CompilerRequirements
 
-    FreeBASIC consists of fbc (the command line compiler), the runtime libraries
-    (libfb and libfbgfx), and FreeBASIC header files for third-party libraries.
-    In order to produce executables, fbc uses the GNU binutils (assembler,
-    linker). When compiling for architectures other than 32bit, fbc depends
-    on gcc to generate assembly.
+    FreeBASIC consists of fbc (the command line compiler), the core runtime
+    library (libfb), the default graphics library (libfbgfx), the opt-in GPU
+    graphics library (libfbgfx3), the sound library (libsfx), and FreeBASIC
+    header files for third-party libraries. In order to produce executables,
+    fbc normally uses the GNU binutils and GCC or a target-specific compiler
+    driver. Some packages include the required cross-target tools.
 
     Documentation of language features, compiler options and many other details
     is available in the FB manual. For help & support, visit the FB forum!
@@ -33,36 +36,19 @@
     text editors, from a terminal or command prompt, or through build-systems
     such as makefiles. fbc itself is not a graphical code editor or IDE!
 
-    Win32 (similar for Win64):
-      Combined 32-bit and 64-bit standalone packages:
-        Download and extract latest:
-           - FreeBASIC-x.xx.x-winlibs-gcc-9.3.0.7z or
-           - FreeBASIC-x.xx.x-gcc-5.2.0.7z
-           - fbc32.exe and fbc64.exe are used instead of fbc.exe
-      Separate 32-bit and 64-bit standalone packages (based on winlibs-gcc-9.3.0):
-        Download and extract latest:
-           - FreeBASIC-x.xx.x-win32.zip or FreeBASIC-x.xx.x-win32.7z for 32-bit
-           - FreeBASIC-x.xx.x-win64.zip or FreeBASIC-x.xx.x-win64.7z for 64-bit
+    Windows:
+      Download the current Win32, Win64, or Win32-on-ARM64 package from
+      https://deb.fbxl.net/mingw32/ or use an official upstream package.
+      Android, JavaScript, Wii, and Xbox target packages have their own
+      mingw32-* directories at the same site. Extract a standalone archive or
+      run its installer, then compile from a command prompt:
 
-      Now you can use fbc.exe from the installation directory to compile FB
-      programs (*.bas files) into executables (*.exe files). Open a command
-      prompt (cmd.exe) and run fbc.exe from there, for example:
-        1. In the opened command prompt, type in the following command and
-           press ENTER:
-             > fbc.exe examples\hello.bas
-        2. This should have created examples\hello.exe in the FreeBASIC
-           installation directory. You can run it by entering:
-             > examples\hello.exe
+        > fbc.exe examples\hello.bas
+        > examples\hello.exe
 
-      A FreeBASIC-x.xx.x-win32.exe installer is also available but should
-      only be installed on win32 platforms.
-        1. Click Start -> FreeBASIC -> Open console (installer only)
-        2. In the opened command prompt, type in the following command and
-           press ENTER:
-             > fbc.exe examples\hello.bas
-        3. This should have created examples\hello.exe in the FreeBASIC
-           installation directory. You can run it by entering:
-             > examples\hello.exe
+      The separate Windows 95 package carries an i486-compatible compiler,
+      runtime libraries, and old GNU tools. Do not replace those tools with a
+      current MinGW toolchain when targeting Windows 95.
 
       Optionally, you can install a text editor or IDE which will invoke fbc.exe
       for you, for example:
@@ -71,36 +57,39 @@
        Or even though is older and unmaintained will work (with some effort):
         FBIDE:         https://fbide.freebasic.net/
 
-    Linux (if FreeBASIC is not available through your package manager):
-      Download and extract the latest FreeBASIC-x.xx.x-linux.tar.gz. Open a
-      terminal and cd into the extracted FreeBASIC-x.xx.x-linux directory, and
-      run "sudo ./install.sh -i" to copy the FB setup into /usr/local.
-      To compile FB programs, please install the following packages (names may
-      vary depending on your Linux distribution):
-        Debian/Ubuntu:
-          gcc libncurses5-dev libffi-dev libgl1-mesa-dev
-          libx11-dev libxext-dev libxrender-dev libxrandr-dev libxpm-dev
-          libtinfo5 libgpm-dev
-        Fedora:
-          gcc ncurses-devel ncurses-compat-libs libffi-devel mesa-libGL-devel
-          libX11-devel libXext-devel libXrender-devel libXrandr-devel
-          libXpm-devel
-      If you want to use the 32bit version of FB on a 64bit system, it is
-      necessary to have the gcc 32bit multilib support and 32bit versions
-      of the libraries installed.
-        Debian/Ubuntu:
-          gcc-multilib lib32ncurses5-dev libx11-dev:i386 libxext-dev:i386
-          libxrender-dev:i386 libxrandr-dev:i386 libxpm-dev:i386 libtinfo5:i386
+    Linux and other Unix-like systems:
+      The experimental package repository can detect the current system and
+      install a matching package:
 
-      Now you can use fbc to compile FB programs (*.bas files) into executables.
-      For example:
-        $ cd FreeBASIC-x.xx.x-linux/examples
-        $ fbc hello.bas
-      This should have created the hello program. You can run it by entering:
-        $ ./hello
+        $ curl -fsSLO https://deb.fbxl.net/install.sh
+        $ sh install.sh
+
+      The repository currently qualifies selected Debian, Ubuntu, Raspbian,
+      Alpine/postmarketOS, RPM, BSD, Haiku, illumos, macOS, and Cygwin hosts.
+      Package presence alone does not mean that an older retained release is
+      still tested. See https://deb.fbxl.net/docs/ for the current matrix,
+      package names, checksums, and optional target SDKs.
+
+      An official standalone Linux archive can still be installed with its
+      included "sudo ./install.sh -i" command. Its compiler requires the host
+      GCC/binutils and the development libraries used by each program.
+
+      After either installation method:
+
+        $ fbc examples/hello.bas
+        $ ./examples/hello
+
+    Android phone development:
+      A Termux script can provision a native ARM64 Ubuntu PRoot and build a
+      signed Android APK entirely on the phone. It uses Termux's native Clang,
+      NDK sysroot, Java, and APK tools instead of QEMU or x86-64 host tools:
+
+        $ curl -fLO https://deb.fbxl.net/install/termux-ubuntu-android-bootstrap.sh
+        $ chmod 700 termux-ubuntu-android-bootstrap.sh
+        $ ./termux-ubuntu-android-bootstrap.sh
 
       Optionally, you can install a text editor or IDE which will invoke fbc for
-      your, for example:
+      you, for example:
         Geany: https://geany.org (sudo apt-get install geany)
 
     DOS:

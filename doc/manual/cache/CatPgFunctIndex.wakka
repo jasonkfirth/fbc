@@ -473,6 +473,7 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgDdfbfreebsd|__FB_FREEBSD__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbhaiku|__FB_HAIKU__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbgcc|__FB_GCC__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbgfxlib3|__FB_GFXLIB3__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbgui|__FB_GUI__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbiif|__FB_IIF__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbillumos|__FB_ILLUMOS__"}}

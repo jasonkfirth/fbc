@@ -1,0 +1,43 @@
+{{fbdoc item="title" value="What's new in FreeBASIC 1.20.4"}}----
+The user-visible compiler, runtime, graphics, sound, target, and package work completed since the 1.20.2 development baseline.
+
+{{fbdoc item="section" value="Compiler and runtime"}}
+	- Added compiler and runtime paths for NuttX RISC-V, RISC OS, AROS x86-64/ARM/m68k, Windows CE ARM/MIPS, and four Linux MIPS ABI and endian combinations.
+	- Added an isolated ANSI filesystem and older CRT compatibility path for Windows 95, 98, and ME.  A Windows 95 OSR2 i486 guest passed the native compiler smoke, all 37 fbctest executables, and 651 unattended examples.
+	- Corrected cross-target WSTRING parsing, constants, file I/O, and conversion when the compiler host and target use different wchar widths.
+	- Added portable ##[[ProPgFbcom|fbcom.bi]]## status and line control for ports opened with ##[[KeyPgOpenCom|OPEN COM]]##.
+	- Completed or corrected OPEN TCP SERVER, bounded TCP ACCEPT, EOF/EOC separation, socket declarations, REDIM lookahead, packed data, Win32 stack probing, DOS input, and many platform ABI paths.
+
+{{fbdoc item="section" value="Graphics"}}
+	- gfxlib2 remains the default and adds touch helpers, ##[[KeyPgGetxpad|GETXPAD]]## controller polling, new platform backends, and runtime-selected SSE2 or NEON pixel operations.
+	- ##[[GfxLib3|gfxlib3]]## is a new opt-in render-threaded GPU runtime for Windows, Linux/X11, and Android.  It uses Vulkan with OpenGL fallback on desktop, OpenGL ES on Android, and a headless reference backend.
+	- gfxlib3 implements the normal FreeBASIC and QB graphics surface and adds GPU-resident surfaces, mapping and transfer, scaled and rotated blits, Mode 7 projection, render-thread callbacks, resizable-screen events, and checked PNG loading and saving.
+	- Historical SCREEN modes 3 through 6 are now implemented by gfxlib3.  The ##[[KeyPgScreengraphics|SCREEN reference]]## lists all QB mode numbers and the runtime boundary.
+
+{{fbdoc item="section" value="Sound"}}
+	- sfxlib covers generated sound, PLAY strings, short effects, music, MIDI, device selection, and capture.  The generated manual contains the complete command forms.
+	- A bounded 32-voice FM synthesizer supplies all General MIDI program families, common channel controls, pitch bend, sustain, and percussion when native MIDI is unavailable.
+	- Optional headers add raw float output, final-output WAV capture, underrun counters, sample-rate queries, and whole-mix ping-pong echo.
+	- Mixer, FM, echo, buffer conversion, and diagnostics now use block processing and runtime-selected x86 or ARM SIMD where the CPU supports it.
+
+{{fbdoc item="section" value="Packages and qualification"}}
+	- Current package flows cover selected Debian, Ubuntu, Raspbian, Alpine/postmarketOS, rpm-based Linux, BSD, Haiku, illumos, Cygwin, Windows, DOS, macOS, JavaScript, Android, Wii, Xbox, and NuttX targets.
+	- Strict GCC and Clang builds, Cppcheck, Clang-Tidy, fblint, fbctests, Exampleageddon, package installation tests, and platform smokes now cover much more of the first-party source tree.
+	- More than 700 examples received portability, ownership, bounds, callback, and error-handling work while intentional negative tests were preserved.
+
+{{fbdoc item="section" value="Experimental boundaries"}}
+	- gfxlib3 is opt-in and currently windowed only on Windows, Linux/X11, and Android.  The other targets continue to use gfxlib2.
+	- The AROS ARM compiler components are qualified individually, but its nested fbc-to-GCC driver path remains limited.
+	- Windows CE is qualified through ROM-free cross-build and static checks unless a suitable licensed image is supplied.
+	- Linux MIPS is retained as a compiler and runtime qualification target rather than a complete primary release package.
+	- Hardware-dependent graphics, serial, controller, audio, and firmware paths still require the named hardware, SDK, ROM, or legal console firmware.
+
+{{fbdoc item="see"}}
+	- ##[[CompilerInstalling|Installing FreeBASIC]]##
+	- ##[[GfxLib3|gfxlib3 overview]]##
+	- ##[[CatPgSfx|Sound Library Reference]]##
+	- ##[[DevNuttX|NuttX and RISC-V board workflow]]##
+	- [[https://deb.fbxl.net/docs/guides/release-1.20.4.md|Expanded 1.20.4 release notes]]
+	- [[https://github.com/jasonkfirth/fbc/blob/master/changelog.txt|Complete changelog]]
+
+{{fbdoc item="back" value="DocToc|Table of Contents"}}

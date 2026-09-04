@@ -1,0 +1,40 @@
+{{fbdoc item="title" value="Compiler Option: -gfx3"}}----
+Selects the opt-in gfxlib3 GPU graphics runtime.
+
+{{fbdoc item="syntax"}}##
+	**-gfx3**
+##
+{{fbdoc item="desc"}}
+	The ##-gfx3## option selects gfxlib3 instead of the default gfxlib2 runtime and defines ##[[KeyPgDdfbgfxlib3|__FB_GFXLIB3__]]## before the source is parsed.  It is equivalent to defining that selector before the first inclusion of ##fbgfx.bi##.
+
+	The compiler records the selection in object metadata, so a separately compiled object carries the correct normal, multithreaded, PIC, or multithreaded PIC gfxlib3 dependency into the final link.
+
+	gfxlib3 currently supplies windowed backends for Windows, Linux/X11, and Android, plus the headless Null backend.  Desktop mode selection tries Vulkan first and then OpenGL.  Android uses OpenGL ES when Vulkan is unavailable.  A program can request a specific renderer with the corresponding constants from ##fbgfx.bi##.
+
+	gfxlib3 and gfxlib2 must not be linked into one process.  Their public graphics entry points and process-global state are alternatives, not an interoperability boundary.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+' Compile with: fbc -gfx3 program.bas
+screenres 640, 480, 32
+line (0, 0)-(639, 479), rgb(32, 96, 192), bf
+sleep
+%%
+
+	A source-level selection is also possible:
+
+%%(freebasic)
+#define __FB_GFXLIB3__
+#include once "fbgfx.bi"
+%%
+
+	Programs that need the GPU-resident surface extensions can include ##fbgfx3.bi##, which selects gfxlib3 automatically.
+
+{{fbdoc item="see"}}
+	- ##[[GfxLib3|gfxlib3 overview]]##
+	- ##[[KeyPgDdfbgfxlib3|__FB_GFXLIB3__]]##
+	- ##[[GfxLib|GfxLib overview]]##
+	- ##[[KeyPgScreenres|ScreenRes]]##
+	- [[CompilerCmdLine|Using the Command Line]]
+
+{{fbdoc item="back" value="CatPgCompOpt|Compiler Options"}}

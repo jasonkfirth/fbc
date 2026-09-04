@@ -58,6 +58,8 @@ Command line compiler options for the fbc compiler:
 		- Add debug info, enable""##__FB_DEBUG__##"", and enable asserts
 	{{fbdoc item="keyword" value="CompilerOptgen|-gen < backend >"}}
 		- Sets the compiler backend (default is 'gas' for x86 and 'gcc' for x86_64)
+	{{fbdoc item="keyword" value="CompilerOptgfx3|-gfx3"}}
+		- Select the opt-in gfxlib3 GPU graphics runtime
 	{{fbdoc item="keyword" value="CompilerOpti|-i < name >"}}
 		- Add a path to search for include files
 	{{fbdoc item="keyword" value="CompilerOptinclude|-include < name >"}}

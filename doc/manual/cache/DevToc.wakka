@@ -15,6 +15,7 @@ runtime libraries, build system, package scripts, and platform ports.
 <li> [[DevBuildAndroid|Building for Android]]
 <li> [[DevBuildWii|Building for Wii]]
 <li> [[DevBuildXbox|Building for Xbox]]
+<li> [[DevNuttX|NuttX and RISC-V board workflow]]
 <li> [[DevRebuildAfterUpdates|Getting source code updates and rebuilding FreeBASIC]]
 </ul></td><td><ul>
 <li> [[DevDebuggingFb|Debugging FreeBASIC]]

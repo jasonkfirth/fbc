@@ -513,6 +513,7 @@ __FB_FPMODE__
 __FB_FPU__
 __FB_FREEBSD__
 __FB_GCC__
+__FB_GFXLIB3__
 __FB_GUI__
 __FB_IIF__
 __FB_JOIN__

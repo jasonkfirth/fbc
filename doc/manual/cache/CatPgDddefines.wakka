@@ -102,6 +102,8 @@ Preprocessor symbols defined by the compiler.
 		Defined to either ##"gas"## or ##"gcc"## depending on [[CompilerOptgen|-gen]].
 	=={{fbdoc item="keyword" value="KeyPgDdfbgcc|__FB_GCC__"}}==
 		True (##-1##) if -gen gcc is used, false (##0##) otherwise.
+	=={{fbdoc item="keyword" value="KeyPgDdfbgfxlib3|__FB_GFXLIB3__"}}==
+		Defined when the opt-in gfxlib3 runtime is selected.
 	=={{fbdoc item="keyword" value="KeyPgDdfboptimize|__FB_OPTIMIZE__"}}==
 		Defined to the optimization level depending on [[CompilerOptoptimization|-O]].
 	=={{fbdoc item="keyword" value="KeyPgDdfbgui|__FB_GUI__"}}==

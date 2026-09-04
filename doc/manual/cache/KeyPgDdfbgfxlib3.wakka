@@ -1,0 +1,29 @@
+{{fbdoc item="title" value="__FB_GFXLIB3__"}}----
+Intrinsic define set when gfxlib3 is selected.
+
+{{fbdoc item="syntax"}}##
+	#ifdef ""__FB_GFXLIB3__""
+##
+{{fbdoc item="desc"}}
+	The compiler defines ##""__FB_GFXLIB3__""## when the ##[[CompilerOptgfx3|-gfx3]]## option selects the opt-in gfxlib3 runtime.  A source file can make the same selection by defining the symbol before it first includes ##fbgfx.bi##.  Including ##fbgfx3.bi## also defines it before loading the common graphics declarations.
+
+	The symbol is defined without a value.  Test it with ##ifdef## or ##defined()## instead of treating it as a numeric expression.
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#ifdef __FB_GFXLIB3__
+	print "gfxlib3 selected"
+#else
+	print "gfxlib2 selected"
+#endif
+%%
+
+{{fbdoc item="diff"}}
+	- New to ""FreeBASIC"" 1.20.
+
+{{fbdoc item="see"}}
+	- ##[[CompilerOptgfx3|-gfx3 compiler option]]##
+	- ##[[GfxLib3|gfxlib3 overview]]##
+	- ##[[KeyPgPpifdef|#ifdef]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}
