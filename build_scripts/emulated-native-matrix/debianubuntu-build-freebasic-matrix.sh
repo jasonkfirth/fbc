@@ -29,6 +29,7 @@ cd "$ROOT"
 CLEANUP_SUCCESS=0
 CLEANUP_DIRS=(
     "$ROOT/.build-debianubuntu"
+    "$ROOT/.build-debianubuntu-wii"
     "$ROOT/.build-debianubuntu-xbox"
 )
 
@@ -97,6 +98,9 @@ Options:
   --skip-bootstrap  Reuse existing source bootstrap tarballs
   --no-android      Build packages without the freebasic-android profile
   --no-xbox         Do not auto-build freebasic-xbox even if nxdk is present
+  --required-console-ports
+                     Build and require NuttX, Wii, and Xbox packages for the
+                     Ubuntu Resolute amd64 release row
   --list            Show the currently configured distro targets
   --help            Show this help text
 
@@ -118,6 +122,7 @@ SKIP_HOST_DEPS=0
 SKIP_BOOTSTRAP=0
 NO_ANDROID=0
 NO_XBOX=0
+REQUIRE_CONSOLE_PORTS=0
 LIST_ONLY=0
 
 if command -v nproc >/dev/null 2>&1; then
@@ -138,6 +143,7 @@ while [ $# -gt 0 ]; do
         --skip-bootstrap) SKIP_BOOTSTRAP=1; shift ;;
         --no-android) NO_ANDROID=1; shift ;;
         --no-xbox) NO_XBOX=1; shift ;;
+        --required-console-ports) REQUIRE_CONSOLE_PORTS=1; shift ;;
         --list) LIST_ONLY=1; shift ;;
         -h|--help)
             usage
@@ -553,6 +559,62 @@ xbox_supported_for_arch() {
     esac
 }
 
+required_console_port_target() {
+    local distro="$1"
+    local codename="$2"
+    local arch="$3"
+
+    [ "$distro/$codename/$arch" = "ubuntu/resolute/amd64" ]
+}
+
+WII_TOOLCHAIN_IMAGE="${FBC_WII_TOOLCHAIN_IMAGE:-devkitpro/devkitppc@sha256:44cb1a920e1ec3ec7c06767493c3b85f8d643d6137cc4661f0201895ac6e4967}"
+
+wii_toolchain_available() {
+    local devkitpro="$ROOT/.build-debianubuntu-wii/devkitpro"
+
+    [ -x "$devkitpro/devkitPPC/bin/powerpc-eabi-gcc" ] || return 1
+    [ -x "$devkitpro/devkitPPC/bin/powerpc-eabi-ar" ] || return 1
+    [ -x "$devkitpro/devkitPPC/bin/powerpc-eabi-ranlib" ] || return 1
+    [ -x "$devkitpro/tools/bin/elf2dol" ] || return 1
+    [ -d "$devkitpro/libogc/include" ] || return 1
+    [ -d "$devkitpro/libogc/lib/wii" ] || return 1
+}
+
+prepare_wii_toolchain() {
+    local devkitpro="$ROOT/.build-debianubuntu-wii/devkitpro"
+
+    if wii_toolchain_available; then
+        echo "==> reusing staged Wii toolchain: $devkitpro"
+        return 0
+    fi
+
+    fb_remove_build_tree "$ROOT" "$devkitpro" ||
+        die "could not reset Wii toolchain staging directory"
+    mkdir -p "$devkitpro"
+
+    echo "==> staging the pinned official devkitPPC toolchain"
+    run_root docker pull --platform linux/amd64 "$WII_TOOLCHAIN_IMAGE"
+    run_root docker run --rm --platform linux/amd64 \
+        --user "$(id -u):$(id -g)" \
+        -v "$devkitpro:/export" \
+        "$WII_TOOLCHAIN_IMAGE" \
+        bash -lc 'set -e; tar -C /opt/devkitpro -cf - devkitPPC libogc tools | tar -C /export -xf -'
+
+    wii_toolchain_available ||
+        die "the staged devkitPPC image is missing required Wii tools or libogc files"
+}
+
+require_package_output() {
+    local dir="$1"
+    local pattern="$2"
+    local description="$3"
+
+    if ! find "$dir" -maxdepth 1 -type f -name "$pattern" -print -quit |
+        grep -q .; then
+        die "the required $description package was not produced in $dir"
+    fi
+}
+
 path_is_under_root() {
     local path="$1"
 
@@ -645,7 +707,11 @@ XBOX_NXDK_CONTAINER=""
 XBOX_NXDK_NEEDS_MOUNT=0
 
 if [ "$NO_XBOX" -eq 0 ]; then
-    if XBOX_NXDK_HOST="$(find_host_nxdk)"; then
+    if [ "$REQUIRE_CONSOLE_PORTS" -eq 1 ]; then
+        XBOX_NXDK_HOST="$ROOT/.build-debianubuntu-xbox/nxdk"
+        XBOX_NXDK_CONTAINER="/work/.build-debianubuntu-xbox/nxdk"
+        echo "==> Xbox package build: required for Ubuntu Resolute amd64"
+    elif XBOX_NXDK_HOST="$(find_host_nxdk)"; then
         if path_is_under_root "$XBOX_NXDK_HOST"; then
             XBOX_NXDK_CONTAINER="/work${XBOX_NXDK_HOST#"$ROOT"}"
         else
@@ -702,9 +768,11 @@ build_one() {
     local arm_arch
     local build_jobs
     local android_arg
+    local wii_arg
     local native_build_cmd
     local xbox_build_cmd
     local xbox_enabled
+    local docker_env_args=()
     local docker_extra_mounts=()
 
     IFS="|" read -r distro image tag codename script_name arch <<EOF
@@ -734,10 +802,20 @@ EOF
     if [ "$NO_ANDROID" -eq 1 ] || ! android_supported_for_target "$distro" "$arch"; then
         android_arg=" --no-android"
     fi
-    native_build_cmd="/work/build_scripts/${script_name} --no-build${android_arg}"
+    wii_arg=" --no-wii"
+    if [ "$REQUIRE_CONSOLE_PORTS" -eq 1 ] && required_console_port_target "$distro" "$codename" "$arch"; then
+        prepare_wii_toolchain
+        wii_arg=" --wii"
+        docker_env_args+=(
+            -e DEVKITPRO=/work/.build-debianubuntu-wii/devkitpro
+            -e DEVKITPPC=/work/.build-debianubuntu-wii/devkitpro/devkitPPC
+        )
+    fi
+    native_build_cmd="/work/build_scripts/${script_name} --no-build${android_arg}${wii_arg}"
     xbox_build_cmd=""
     xbox_enabled=0
-    if [ -n "$XBOX_NXDK_HOST" ] && xbox_supported_for_arch "$arch"; then
+    if [ -n "$XBOX_NXDK_HOST" ] && xbox_supported_for_arch "$arch" &&
+       { [ "$REQUIRE_CONSOLE_PORTS" -eq 0 ] || required_console_port_target "$distro" "$codename" "$arch"; }; then
         xbox_enabled=1
         xbox_build_cmd=" && FBC_PACKAGE_OUTDIR=${container_outdir}/xbox BUILDROOT=/work/.build-debianubuntu-xbox/${distro}/${codename}/${arch} NXDK_DIR=${XBOX_NXDK_CONTAINER} /work/build_scripts/debianubuntu-build-freebasic-xbox.sh --nxdk-dir ${XBOX_NXDK_CONTAINER}"
         if [ "$XBOX_NXDK_NEEDS_MOUNT" -eq 1 ]; then
@@ -797,6 +875,7 @@ EOF
             -e FBC_PACKAGE_ARM_ARCH="$arm_arch" \
             -e BUILDROOT="$container_buildroot" \
             -e JOBS="$build_jobs" \
+            "${docker_env_args[@]}" \
             -v "$ROOT:/work" \
             "${docker_extra_mounts[@]}" \
             -w /work \
@@ -814,6 +893,12 @@ EOF
         show_failure_log "$outdir/docker_build.log"
 
         return 1
+    fi
+
+    if [ "$REQUIRE_CONSOLE_PORTS" -eq 1 ] && required_console_port_target "$distro" "$codename" "$arch"; then
+        require_package_output "$outdir" 'freebasic-nuttx_*.deb' "NuttX"
+        require_package_output "$outdir" 'freebasic-wii_*.deb' "Wii"
+        require_package_output "$outdir/xbox" 'freebasic-xbox_*.deb' "Xbox"
     fi
 
     echo "SUCCESS: ${distro}/${codename} (${arch})"

@@ -184,6 +184,7 @@ jobs:
 
       - name: Build Linux package row
         env:
+          MATRIX_NAME: ${{ matrix.name }}
           MATRIX_ARCH: ${{ matrix.arch }}
           MATRIX_DISTRO: ${{ matrix.distro }}
           MATRIX_FAMILY: ${{ matrix.family }}
@@ -192,12 +193,18 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$MATRIX_FAMILY" == "debian" ]]; then
-            bash build_scripts/debianubuntu-build-freebasic-matrix.sh \
-              --distro "$MATRIX_DISTRO" \
-              --release "$MATRIX_RELEASE" \
-              --arch "$MATRIX_ARCH" \
-              --jobs 4 \
+            matrix_args=(
+              --distro "$MATRIX_DISTRO"
+              --release "$MATRIX_RELEASE"
+              --arch "$MATRIX_ARCH"
+              --jobs 4
               --skip-host-deps
+            )
+            if [[ "$MATRIX_NAME" == "ubuntu-resolute-amd64" ]]; then
+              matrix_args+=(--required-console-ports)
+            fi
+            bash build_scripts/debianubuntu-build-freebasic-matrix.sh \
+              "${matrix_args[@]}"
           else
             bash build_scripts/alpine-freebasic-matrix-build.sh \
               --distro "$MATRIX_DISTRO" \
