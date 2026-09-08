@@ -517,6 +517,15 @@ void fb_hX11InitWindow(int x, int y)
 		XMapRaised(fb_x11.display, fb_x11.window);
 		XSync(fb_x11.display, False);
 		XRaiseWindow(fb_x11.display, fb_x11.window);
+		/*
+			The fullscreen parent is override-redirect, so the window manager
+			does not select it as the active window after mapping.  Assign focus
+			once to the newly mapped drawing child.  This is deliberately not a
+			keyboard grab: subsequent Alt+Tab focus changes remain under window
+			manager control.
+		*/
+		XSetInputFocus(fb_x11.display, fb_x11.window, RevertToParent,
+			CurrentTime);
 	}
 
 	if (fb_x11.flags & DRIVER_ALWAYS_ON_TOP) {

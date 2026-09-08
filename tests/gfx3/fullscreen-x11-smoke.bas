@@ -12,6 +12,8 @@
 '' Responsibilities:
 ''
 ''     - require fullscreen client bounds to match the current X11 root
+''     - require new fullscreen windows to own keyboard focus
+''     - recreate a fullscreen window and repeat the focus check
 ''     - require GFX_NO_FRAME to preserve the requested client dimensions
 ''     - exercise the public screenres flag path for a GPU backend
 ''
@@ -56,6 +58,20 @@ function wait_for_client_size( byval display as Display ptr, _
 	return 0
 end function
 
+function wait_for_input_focus( byval display as Display ptr, _
+	byval window_handle as Window ) as integer
+	dim as Window focused_window
+	dim as long revert_to
+
+	for attempt as integer = 1 to 50
+		screensync
+		XGetInputFocus( display, @focused_window, @revert_to )
+		if focused_window = window_handle then return -1
+		sleep 20, 1
+	next
+	return 0
+end function
+
 if screenres( 96, 64, 32, 1, renderer_flags or fb.GFX_FULLSCREEN ) <> 0 then end 1
 screensync
 
@@ -68,14 +84,23 @@ if display = 0 then end 3
 dim as integer screen_number = XDefaultScreen( display )
 if wait_for_client_size( display, window_handle, XDisplayWidth( display, _
 	screen_number ), XDisplayHeight( display, screen_number ) ) = 0 then end 4
+if wait_for_input_focus( display, window_handle ) = 0 then end 5
 screen 0
 
-if screenres( 96, 64, 32, 1, renderer_flags or fb.GFX_NO_FRAME ) <> 0 then end 5
+if screenres( 96, 64, 32, 1, renderer_flags or fb.GFX_NO_FRAME ) <> 0 then end 6
 screensync
 screencontrol fb.GET_WINDOW_HANDLE, native_window_value, native_display_value
-if native_window_value = 0 orelse native_display_value = 0 then end 6
+if native_window_value = 0 orelse native_display_value = 0 then end 7
 window_handle = cast( Window, native_window_value )
-if wait_for_client_size( display, window_handle, 96, 64 ) = 0 then end 7
+if wait_for_client_size( display, window_handle, 96, 64 ) = 0 then end 8
+screen 0
+
+if screenres( 96, 64, 32, 1, renderer_flags or fb.GFX_FULLSCREEN ) <> 0 then end 9
+screensync
+screencontrol fb.GET_WINDOW_HANDLE, native_window_value, native_display_value
+if native_window_value = 0 orelse native_display_value = 0 then end 10
+window_handle = cast( Window, native_window_value )
+if wait_for_input_focus( display, window_handle ) = 0 then end 11
 XCloseDisplay( display )
 screen 0
 

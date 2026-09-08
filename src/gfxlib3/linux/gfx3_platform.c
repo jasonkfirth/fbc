@@ -122,6 +122,7 @@ typedef struct FB_GFX3_PLATFORM_X11 {
 	Time last_click_time;
 	int owns_colormap;
 	int shown;
+	int focus_pending;
 	int close_requested;
 	int cursor_visible;
 	int mouse_clip;
@@ -824,6 +825,20 @@ static void platform_x11_pump_events(void *state)
 	while (XPending(platform->display)) {
 		XNextEvent(platform->display, &event);
 		switch (event.type) {
+		case MapNotify:
+			/*
+				A window manager may defer a top-level map request.  Wait until the
+				server confirms this fullscreen window is viewable before assigning
+				its initial focus.  Clear the request before calling Xlib so later
+				Alt+Tab focus changes are never overridden here.
+			*/
+			if (platform->focus_pending &&
+			    (event.xmap.window == platform->window)) {
+				platform->focus_pending = FALSE;
+				XSetInputFocus(platform->display, platform->window,
+					RevertToParent, CurrentTime);
+			}
+			break;
 		case FocusIn:
 			fb_gfx3_input_platform_focus(platform->input, TRUE);
 			if (platform->mouse_clip)
@@ -1006,6 +1021,14 @@ static int platform_x11_show_window(void *state)
 	if (!platform->shown) {
 		XMapRaised(platform->display, platform->window);
 		platform_x11_request_fullscreen(platform);
+		/*
+			Fullscreen needs an initial focus request after MapNotify confirms the
+			window is viewable.  This is deliberately a one-shot request, not a
+			keyboard grab: the window manager retains Alt+Tab and every later
+			focus transition.
+		*/
+		platform->focus_pending =
+			(platform->flags & FB_GFX3_WINDOW_FULLSCREEN) != 0;
 		XFlush(platform->display);
 		platform->shown = TRUE;
 	}
