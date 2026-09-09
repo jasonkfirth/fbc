@@ -1064,6 +1064,14 @@ if [ "$DO_BUILD" -eq 1 ]; then
         run "$MAKE_CMD" -f GNUmakefile "${MAKE_VARS[@]}" clean-libs
         run "$MAKE_CMD" -f GNUmakefile -j"$JOBS" "${MAKE_VARS[@]}" "BOOT_FBC=$ROOT/bin/fbc" "BUILD_FBC=$ROOT/bin/fbc" bootstrap-minimal
 
+        # bootstrap-minimal installs the compiler assembled from the emitted C
+        # sources into bin/fbc.  Those portable sources intentionally retain
+        # Darwin's architecture baseline rather than this package build's
+        # dependency-adjusted deployment target.  Remove that temporary copy
+        # so the final all target rebuilds the source compiler with the same
+        # deployment target as the packaged runtime libraries.
+        run "$MAKE_CMD" -f GNUmakefile "${MAKE_VARS[@]}" clean-compiler
+
         BUILD_COMPILER="$ROOT/bootstrap/fbc"
         [ -x "$BUILD_COMPILER" ] || die "bootstrap compiler was not produced at $BUILD_COMPILER"
         BUILD_COMPILER_ARGS=(

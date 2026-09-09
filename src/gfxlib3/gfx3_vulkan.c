@@ -72,7 +72,8 @@ uint64_t fb_gfx3_vulkan_device_score(uint32_t device_type,
 	return score;
 }
 
-#if defined(HOST_WIN32) || defined(HOST_LINUX) || defined(HOST_ANDROID)
+#if defined(HOST_WIN32) || defined(HOST_LINUX) || defined(HOST_ANDROID) || \
+	defined(HOST_DARWIN)
 
 #define FB_GFX3_VK_CALL FBCALL
 
@@ -3633,11 +3634,12 @@ static int vulkan_runtime_open_internal(FB_GFX3_VULKAN_RUNTIME *runtime,
 	int device_is_forced = FALSE;
 	int windowed = (native_instance != 0) || (native_window != 0);
 	float queue_priority = 1.0f;
-	const char *instance_extensions[2] = {
-		"VK_KHR_surface",
-		fb_gfx3_vulkan_platform_instance_extension()
-	};
-	const char *device_extensions[1] = { "VK_KHR_swapchain" };
+	const char *instance_extensions[3];
+	const char *device_extensions[2];
+	const char *portability_instance_extension;
+	const char *portability_device_extension;
+	uint32_t instance_extension_count = 0u;
+	uint32_t device_extension_count = 0u;
 	int result;
 
 	if ((runtime == NULL) || (runtime->implementation != NULL) ||
@@ -3716,12 +3718,27 @@ static int vulkan_runtime_open_internal(FB_GFX3_VULKAN_RUNTIME *runtime,
 	instance_create_info.structure_type =
 		FB_GFX3_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	instance_create_info.application_info = &application_info;
+	instance_create_info.flags =
+		fb_gfx3_vulkan_platform_instance_create_flags();
 	if (windowed) {
-		instance_create_info.enabled_extension_count =
-			sizeof(instance_extensions) /
-			sizeof(instance_extensions[0]);
-		instance_create_info.enabled_extension_names = instance_extensions;
+		instance_extensions[instance_extension_count++] = "VK_KHR_surface";
+		instance_extensions[instance_extension_count++] =
+			fb_gfx3_vulkan_platform_instance_extension();
+		device_extensions[device_extension_count++] = "VK_KHR_swapchain";
 	}
+	portability_instance_extension =
+		fb_gfx3_vulkan_platform_portability_instance_extension();
+	if (portability_instance_extension != NULL)
+		instance_extensions[instance_extension_count++] =
+			portability_instance_extension;
+	portability_device_extension =
+		fb_gfx3_vulkan_platform_portability_device_extension();
+	if (portability_device_extension != NULL)
+		device_extensions[device_extension_count++] =
+			portability_device_extension;
+	instance_create_info.enabled_extension_count = instance_extension_count;
+	instance_create_info.enabled_extension_names =
+		(instance_extension_count != 0u) ? instance_extensions : NULL;
 	if (create_instance(&instance_create_info, NULL,
 	    &implementation->instance) != FB_GFX3_VK_SUCCESS) {
 		vulkan_implementation_close(implementation);
@@ -3861,9 +3878,8 @@ static int vulkan_runtime_open_internal(FB_GFX3_VULKAN_RUNTIME *runtime,
 		FB_GFX3_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	device_create_info.queue_create_info_count = 1;
 	device_create_info.queue_create_infos = &queue_create_info;
-	if (windowed) {
-		device_create_info.enabled_extension_count =
-			sizeof(device_extensions) / sizeof(device_extensions[0]);
+	if (device_extension_count != 0u) {
+		device_create_info.enabled_extension_count = device_extension_count;
 		device_create_info.enabled_extension_names = device_extensions;
 	}
 	result = FB_GFX3_UNSUPPORTED;

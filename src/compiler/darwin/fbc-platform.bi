@@ -603,6 +603,9 @@ private sub fbcDarwinPlatformAddLinkerFrameworks( byref ldcline as string )
 		ldcline += " -framework AppKit"
 		ldcline += " -framework Foundation"
 		ldcline += " -framework CoreGraphics"
+		if( fbGetOption( FB_COMPOPT_FBGFX ) = FB_GFXLIB_GFX3 ) then
+			ldcline += " -framework QuartzCore"
+		end if
 	end if
 
 	if( fbGetOption( FB_COMPOPT_FBSFX ) ) then

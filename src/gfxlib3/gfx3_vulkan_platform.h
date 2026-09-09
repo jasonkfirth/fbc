@@ -44,6 +44,9 @@ int fb_gfx3_vulkan_platform_load_library_function(
 	FB_GFX3_VULKAN_LIBRARY library, const char *name, void *destination,
 	size_t destination_size);
 const char *fb_gfx3_vulkan_platform_instance_extension(void);
+const char *fb_gfx3_vulkan_platform_portability_instance_extension(void);
+const char *fb_gfx3_vulkan_platform_portability_device_extension(void);
+uint32_t fb_gfx3_vulkan_platform_instance_create_flags(void);
 const char *fb_gfx3_vulkan_platform_create_surface_function(void);
 int fb_gfx3_vulkan_platform_window_valid(uintptr_t native_instance,
 	uintptr_t native_window, uint32_t width, uint32_t height);

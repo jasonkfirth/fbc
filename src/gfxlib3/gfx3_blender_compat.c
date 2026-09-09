@@ -13,6 +13,7 @@
 
         - apply gfxlib2-compatible constant-alpha blending to 32-bit pixels
         - accept unaligned destination storage without undefined behavior
+        - preserve legacy SIMD symbol availability with a scalar fallback
 
     This file intentionally does NOT contain:
 
@@ -62,6 +63,17 @@ void *fb_hPixelSetAlpha4(void *destination, int color, size_t count)
 		output += sizeof(destination_color);
 	}
 	return destination;
+}
+
+int fb_hSimdAvailable(void)
+{
+	/* gfxlib3 keeps CPU compatibility helpers portable and renderer-neutral. */
+	return FALSE;
+}
+
+void *fb_hPixelSetAlpha4SIMD(void *destination, int color, size_t count)
+{
+	return fb_hPixelSetAlpha4(destination, color, count);
 }
 
 /* end of gfx3_blender_compat.c */

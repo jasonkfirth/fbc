@@ -25,7 +25,9 @@ include unit-tests.mk
 
 # unit-tests.mk passes FBC to its nested fbcunit make. An absolute path keeps
 # that submake correct while its current working directory is tests/fbcunit.
-override FBC := $(abspath ../bin/fbc.exe)
+# Native Unix builds do not use the .exe suffix used by MinGW and Cygwin.
+GFX3_TEST_FBC := $(firstword $(wildcard ../bin/fbc.exe ../bin/fbc))
+override FBC := $(abspath $(GFX3_TEST_FBC))
 
 # Do not put -gfx3 inside FBC. GNU make treats a whitespace-containing command
 # variable as a shell fragment in some recursive paths. An ordinary compiler

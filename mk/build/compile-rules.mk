@@ -385,6 +385,26 @@ $(libfbgfxmtpicobjdir)/%.o: $(srcdir)/gfxlib2/%.s $(LIBFBGFX_H) | $(libfbgfxmtpi
 # gfxlib3 common core (C sources)
 ##############################################################################
 
+ifeq ($(TARGET_OS),darwin)
+
+$(libfbgfx3objdir)/darwin/%.o: $(srcdir)/gfxlib3/darwin/%.c $(LIBFBGFX3_H) | $(libfbgfx3objdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_DARWIN_CLANG) $(CPPFLAGS) $(ALLCFLAGS) $(DARWIN_BLOCKS_CFLAGS) -MMD -MP -c $< -o $@
+
+$(libfbgfx3picobjdir)/darwin/%.o: $(srcdir)/gfxlib3/darwin/%.c $(LIBFBGFX3_H) | $(libfbgfx3picobjdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_DARWIN_CLANG) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) $(DARWIN_BLOCKS_CFLAGS) -MMD -MP -c $< -o $@
+
+$(libfbgfx3mtobjdir)/darwin/%.o: $(srcdir)/gfxlib3/darwin/%.c $(LIBFBGFX3_H) | $(libfbgfx3mtobjdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_DARWIN_CLANG) $(CPPFLAGS) $(ALLCFLAGS) $(MT_CFLAGS) $(DARWIN_BLOCKS_CFLAGS) -MMD -MP -c $< -o $@
+
+$(libfbgfx3mtpicobjdir)/darwin/%.o: $(srcdir)/gfxlib3/darwin/%.c $(LIBFBGFX3_H) | $(libfbgfx3mtpicobjdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_DARWIN_CLANG) $(CPPFLAGS) $(ALLCFLAGS) $(MTPIC_CFLAGS) $(DARWIN_BLOCKS_CFLAGS) -MMD -MP -c $< -o $@
+
+endif
+
 $(libfbgfx3objdir)/%.o: $(srcdir)/gfxlib3/%.c $(LIBFBGFX3_H) | $(libfbgfx3objdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) -MMD -MP -c $< -o $@

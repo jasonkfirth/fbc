@@ -50,6 +50,21 @@ const char *fb_gfx3_vulkan_platform_instance_extension(void)
 	return NULL;
 }
 
+const char *fb_gfx3_vulkan_platform_portability_instance_extension(void)
+{
+	return NULL;
+}
+
+const char *fb_gfx3_vulkan_platform_portability_device_extension(void)
+{
+	return NULL;
+}
+
+uint32_t fb_gfx3_vulkan_platform_instance_create_flags(void)
+{
+	return 0u;
+}
+
 const char *fb_gfx3_vulkan_platform_create_surface_function(void)
 {
 	return NULL;
