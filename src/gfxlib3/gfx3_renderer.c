@@ -28,15 +28,67 @@
 #include "gfx3_debug.h"
 #include "gfx3_protocol.h"
 
+#if !FB_GFX3_NATIVE_TLS
+	#include <pthread.h>
+#endif
+
 #define FB_GFX3_RENDER_THREAD_STACK_BYTES (4u * 1024u * 1024u)
 
 /*
-	This thread-local pointer has a deliberately tiny lifetime.  It is set only
+	This thread-local pointer has a deliberately tiny lifetime. It is set only
 	while the renderer invokes a user-requested interop callback, which makes a
 	SCREENGLPROC result useful without falsely implying that OpenGL is safe from
 	the BASIC application thread.
+
+	macOS before 10.7 has pthread-specific storage but no native C TLS. Keep one
+	process-lifetime key on that target so the same wrong-thread protection is
+	available without raising FreeBASIC's deployment target.
 */
-static _Thread_local FB_GFX3_RENDERER *renderer_callback_owner;
+#if FB_GFX3_NATIVE_TLS
+	static _Thread_local FB_GFX3_RENDERER *renderer_callback_owner;
+
+	static FB_GFX3_RENDERER *renderer_callback_owner_get(void)
+	{
+		return renderer_callback_owner;
+	}
+
+	static int renderer_callback_owner_set(FB_GFX3_RENDERER *renderer)
+	{
+		renderer_callback_owner = renderer;
+		return FB_GFX3_OK;
+	}
+#else
+	static pthread_key_t renderer_callback_owner_key;
+	static pthread_once_t renderer_callback_owner_once = PTHREAD_ONCE_INIT;
+	static int renderer_callback_owner_key_status = -1;
+
+	static void renderer_callback_owner_init(void)
+	{
+		renderer_callback_owner_key_status = pthread_key_create(
+			&renderer_callback_owner_key, NULL);
+	}
+
+	static FB_GFX3_RENDERER *renderer_callback_owner_get(void)
+	{
+		if ((pthread_once(&renderer_callback_owner_once,
+		    renderer_callback_owner_init) != 0) ||
+		    (renderer_callback_owner_key_status != 0))
+			return NULL;
+		return (FB_GFX3_RENDERER *)pthread_getspecific(
+			renderer_callback_owner_key);
+	}
+
+	static int renderer_callback_owner_set(FB_GFX3_RENDERER *renderer)
+	{
+		if ((pthread_once(&renderer_callback_owner_once,
+		    renderer_callback_owner_init) != 0) ||
+		    (renderer_callback_owner_key_status != 0))
+			return FB_GFX3_FAILED;
+		if (pthread_setspecific(renderer_callback_owner_key, renderer) != 0)
+			return FB_GFX3_FAILED;
+		return FB_GFX3_OK;
+	}
+#endif
 
 /*
 	A 1024-command drain keeps the render thread responsive to input, readback,
@@ -339,7 +391,7 @@ static int fb_gfx3_renderer_backend_init(FB_GFX3_RENDERER *renderer)
 
 void *fb_gfx3_renderer_callback_gl_proc(const char *name)
 {
-	FB_GFX3_RENDERER *renderer = renderer_callback_owner;
+	FB_GFX3_RENDERER *renderer = renderer_callback_owner_get();
 
 	if ((name == NULL) || (name[0] == '\0') || (renderer == NULL) ||
 	    !renderer->backend_initialized ||
@@ -371,9 +423,13 @@ static int fb_gfx3_renderer_execute_interop_callback(
 	result = renderer->backend_vtable->wait_idle(&renderer->backend);
 	if (result != FB_GFX3_OK)
 		return result;
-	renderer_callback_owner = renderer;
+	result = renderer_callback_owner_set(renderer);
+	if (result != FB_GFX3_OK)
+		return result;
 	callback((void *)(uintptr_t)payload->user_data);
-	renderer_callback_owner = NULL;
+	result = renderer_callback_owner_set(NULL);
+	if (result != FB_GFX3_OK)
+		return result;
 
 	/* Make callback GL writes visible before gfxlib3 resumes ordered drawing. */
 	return renderer->backend_vtable->wait_idle(&renderer->backend);

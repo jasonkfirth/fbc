@@ -2225,7 +2225,7 @@ done:
 /* PUT callback ABI                                                          */
 /* ------------------------------------------------------------------------- */
 
-static _Thread_local uint32_t image_api_putter_bpp = 4;
+#define FB_GFX3_PUTTER_BYTES_PER_PIXEL 4u
 
 static void image_api_putter(unsigned char *source,
 	unsigned char *destination, int width, int height, int source_pitch,
@@ -2237,8 +2237,8 @@ static void image_api_putter(unsigned char *source,
 		return;
 	fb_gfx3_image_put_pixels(source, destination, (uint32_t)width,
 		(uint32_t)height, (uint32_t)source_pitch,
-		(uint32_t)destination_pitch, image_api_putter_bpp, mode, alpha,
-		blender, parameter);
+		(uint32_t)destination_pitch, FB_GFX3_PUTTER_BYTES_PER_PIXEL,
+		mode, alpha, blender, parameter);
 }
 
 #define FB_GFX3_DEFINE_PUTTER(name, put_mode) \

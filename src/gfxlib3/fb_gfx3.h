@@ -12,6 +12,7 @@
 
         - include the FreeBASIC runtime services used by gfxlib3
         - define fixed-width gfxlib3 result and handle types
+        - select portable TLS storage for legacy Darwin targets
         - provide checked size-arithmetic helpers
 
     This file intentionally does NOT contain:
@@ -51,6 +52,20 @@
 #include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
+
+/*
+	Clang cannot emit native thread-local storage when targeting macOS before
+	10.7. FreeBASIC retains a 10.5 deployment target on x86_64, so gfxlib3 uses
+	its runtime or POSIX TLS fallback on those builds. If an older Darwin
+	compiler does not publish the deployment macro, select the compatible path.
+*/
+#if defined(HOST_DARWIN) && \
+	(!defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) || \
+	 (__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 1070))
+	#define FB_GFX3_NATIVE_TLS 0
+#else
+	#define FB_GFX3_NATIVE_TLS 1
+#endif
 
 typedef uint64_t FB_GFX3_HANDLE;
 
