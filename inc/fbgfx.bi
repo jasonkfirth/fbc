@@ -1,5 +1,7 @@
 ''
-'' FreeBASIC gfx library constants
+'' FreeBASIC graphics libraries: fbgfx.bi
+'' Constants, image/event layouts and optional graphics service declarations.
+'' Drawing implementations and platform drivers are not defined here.
 ''
 #ifndef __fbgfx_bi__
 #define __fbgfx_bi__
@@ -28,6 +30,35 @@
 
 #if __FB_LANG__ = "fb"
 namespace FB
+#endif
+
+	'' Pixel dimensions of DRAW STRING, independent of VIEW/WINDOW and clipping.
+	'' Empty text has zero width and the full font height. Explicit font images
+	'' may be measured without a display. Errors return nonzero and zero outputs.
+#if __FB_LANG__ = "qb"
+	declare function DrawStringSize alias "fb_GfxDrawStringSize" _
+		( byref text as const string, byref pixel_width as long, _
+		  byref pixel_height as long, byval font_image as any __ptr = 0 ) as long
+	declare function PaintPattern alias "fb_GfxPaintPattern" _
+		( byval target as any __ptr, byval x as single, byval y as single, _
+		  byref pattern as const string, byval foreground as __ulong = 1, _
+		  byval background as __ulong = 0, byval border as __ulong = 1, _
+		  byval relative as long = 0 ) as long
+#else
+	extern "rtlib"
+	declare function DrawStringSize alias "fb_GfxDrawStringSize" _
+		( byref text as const string, byref pixel_width as long, _
+		  byref pixel_height as long, byval font_image as any ptr = 0 ) as long
+	'' One packed byte per row, 1..64 rows; bit 7 is the leftmost pixel.
+	'' Target 0 selects the work page. Nonzero relative uses STEP coordinates.
+	'' Pattern phase follows physical target coordinates. Colors are ordinary
+	'' gfxlib colors, written directly without alpha blending.
+	declare function PaintPattern alias "fb_GfxPaintPattern" _
+		( byval target as any ptr, byval x as single, byval y as single, _
+		  byref pattern as const string, byval foreground as ulong = 1, _
+		  byval background as ulong = 0, byval border as ulong = 1, _
+		  byval relative as long = 0 ) as long
+	end extern
 #endif
 
 	'' Flags accepted by Screen and ScreenRes
@@ -419,3 +450,5 @@ end namespace
 #endif
 
 #endif
+
+'' end of fbgfx.bi

@@ -14,7 +14,7 @@
         - resolve PAINT coordinates and default colors
         - route bounded desktop screen fills to the renderer's GPU shader
         - perform bounded flood discovery without recursive C calls
-        - support solid and 8 by 8 pattern fills
+        - support solid, 8 by 8 raw-pixel and 1..64-row packed pattern fills
         - synchronize CPU-compatibility targets through one download and a
           tightly bounded dirty-rectangle upload
 
@@ -26,6 +26,7 @@
 */
 
 #include "gfx3_api_internal.h"
+#include "../gfxlib2/gfx_paint_pattern.h"
 #include "gfx3_backend_gles.h"
 #include "gfx3_backend_opengl.h"
 #include "gfx3_backend_vulkan.h"
@@ -244,11 +245,16 @@ static int paint_flood(FB_GFX3_IMAGE_VIEW *view,
 		} else {
 			for (scan_x = left; scan_x <= right; scan_x++) {
 				index = ((size_t)y * view->width) + scan_x;
-				color = (paint_mode == FB_GFX3_PAINT_PATTERN) ?
-					paint_pattern_color(pattern, pattern_size,
-						view->bytes_per_pixel, scan_x + pattern_origin_x,
-						y + pattern_origin_y) : fill_color;
-				if (paint_mode == FB_GFX3_PAINT_PATTERN)
+				if (paint_mode == FB_GFX_PAINT_PACKED)
+					color = fb_gfx3_image_fix_color(view->bytes_per_pixel,
+						fb_hGfxPackedPatternColor(pattern, pattern_size,
+							scan_x + pattern_origin_x, y + pattern_origin_y));
+				else
+					color = (paint_mode == FB_GFX3_PAINT_PATTERN) ?
+						paint_pattern_color(pattern, pattern_size,
+							view->bytes_per_pixel, scan_x + pattern_origin_x,
+							y + pattern_origin_y) : fill_color;
+				if (paint_mode != FB_GFX3_PAINT_FILL)
 					fb_gfx3_image_set_pixel_raw(view, (int)scan_x, (int)y, color);
 				else
 					fb_gfx3_image_set_primitive_pixel(view, state, (int)scan_x,
@@ -717,29 +723,15 @@ static int paint_gpu_surface(FB_GFX3_SURFACE *surface,
 /* Public PAINT ABI                                                          */
 /* ------------------------------------------------------------------------- */
 
-FBCALL void fb_GfxPaint(void *target, float x, float y, unsigned int color,
-	unsigned int border_color, FBSTRING *pattern, int paint_mode, int flags)
+static int paint(void *target, float x, float y, unsigned int color,
+	unsigned int border_color, const unsigned char *pattern_data,
+	size_t pattern_size, int paint_mode, int flags)
 {
 	FB_GFX3_DRAW_STATE *state;
 	FB_GFX3_SURFACE *gpu_surface;
 	FB_GFX3_IMAGE_VIEW image;
-	unsigned char pattern_data[FB_GFX3_PAINT_PATTERN_MAX];
-	size_t pattern_size = 0;
-	ssize_t string_size;
 	int result = FB_GFX3_INVALID;
 
-	memset(pattern_data, 0, sizeof(pattern_data));
-	if ((paint_mode == FB_GFX3_PAINT_PATTERN) && (pattern != NULL) &&
-	    (pattern->data != NULL)) {
-		string_size = FB_STRSIZE(pattern);
-		if (string_size > 0) {
-			pattern_size = ((size_t)string_size < sizeof(pattern_data)) ?
-				(size_t)string_size : sizeof(pattern_data);
-			memcpy(pattern_data, pattern->data, pattern_size);
-		}
-	}
-	if (pattern != NULL)
-		fb_hStrDelTemp(pattern);
 	FB_GRAPHICS_LOCK();
 	state = fb_gfx3_api_get_draw_state_locked();
 	if (state != NULL) {
@@ -751,8 +743,7 @@ FBCALL void fb_GfxPaint(void *target, float x, float y, unsigned int color,
 		result = fb_gfx3_compat_flush_points(state);
 		if (result != FB_GFX3_OK) {
 			FB_GRAPHICS_UNLOCK();
-			fb_ErrorSetNum(fb_gfx3_api_runtime_error(result));
-			return;
+			return fb_gfx3_api_runtime_error(result);
 		}
 		if (target == NULL) {
 			result = paint_screen(state, x, y, color, border_color,
@@ -775,7 +766,41 @@ FBCALL void fb_GfxPaint(void *target, float x, float y, unsigned int color,
 		}
 	}
 	FB_GRAPHICS_UNLOCK();
-	fb_ErrorSetNum(fb_gfx3_api_runtime_error(result));
+	return fb_gfx3_api_runtime_error(result);
+}
+
+FBCALL void fb_GfxPaint(void *target, float x, float y, unsigned int color,
+	unsigned int border_color, FBSTRING *pattern, int paint_mode, int flags)
+{
+	unsigned char data[FB_GFX3_PAINT_PATTERN_MAX] = { 0 };
+	ssize_t string_size;
+	size_t size = 0;
+	if (paint_mode == FB_GFX3_PAINT_PATTERN && pattern && pattern->data) {
+		string_size = FB_STRSIZE(pattern);
+		if (string_size > 0) {
+			size = (size_t)string_size;
+			if (size > sizeof(data)) size = sizeof(data);
+			memcpy(data, pattern->data, size);
+		}
+	}
+	fb_hStrDelTemp(pattern);
+	fb_ErrorSetNum(paint(target, x, y, color, border_color, data, size,
+		paint_mode, flags));
+}
+
+FBCALL int fb_GfxPaintPattern(void *target, float x, float y, FBSTRING *pattern,
+	unsigned int foreground, unsigned int background, unsigned int border,
+	int relative)
+{
+	unsigned char data[FB_GFX_PAINT_PACKED_HEADER + FB_GFX_PAINT_PACKED_MAX_ROWS];
+	int size = fb_hGfxPackPattern(data, pattern, foreground, background);
+	fb_hStrDelTemp(pattern);
+	if (!size || !isfinite(x) || !isfinite(y))
+		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+	/* Packed rows use the checked CPU flood and the existing surface barriers.
+	   The native GPU pattern command has a fixed 8x8 raw-pixel layout. */
+	return fb_ErrorSetNum(paint(target, x, y, foreground, border, data, size,
+		FB_GFX_PAINT_PACKED, relative ? FB_GFX3_COORDINATE_R : FB_GFX3_COORDINATE_A));
 }
 
 /* end of gfx3_paint_api.c */

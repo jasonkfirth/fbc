@@ -19,6 +19,10 @@ reference.
   development workflows.
 - [Portable serial control](serial.md) documents the `fbcom.bi` API layered on
   top of `OPEN COM`.
+- [Optical FreeBASIC runtime review](optical-freebasic-runtime.md) maps the
+  Visual Basic command inventories to existing services and documents the
+  added string, pathname-attribute, bitmap-font measurement and packed-fill
+  APIs, related runtime fixes, and the remaining PLAY queue gap.
 - [gfxlib3](gfxlib3/README.md) describes the opt-in render-threaded GPU graphics
   runtime and links to its architecture, parity, performance, and verification
   records.

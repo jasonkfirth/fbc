@@ -1,0 +1,13 @@
+# TEST_MODE : MULTI_MODULE_OK
+# paint-alloc.bmk: instrument only PAINT's allocations, then run the ABI fixture.
+MAIN := paint-alloc.bas
+SRCS :=
+EXTRA_OBJS := paint-alloc-hooks.o paint-alloc-core.o
+
+$(SRCDIR)paint-alloc-hooks.o: $(SRCDIR)paint-alloc.c
+	$(CC) -c $(CFLAGS) -o $@ $<
+
+$(SRCDIR)paint-alloc-core.o: $(SRCDIR)../../src/gfxlib2/gfx_paint.c
+	$(CC) -c $(CFLAGS) -Dmalloc=fb_test_paint_malloc -Dcalloc=fb_test_paint_calloc -Dfree=fb_test_paint_free -o $@ $<
+
+# end of paint-alloc.bmk

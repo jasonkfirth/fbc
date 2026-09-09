@@ -1,3 +1,11 @@
+/*
+    FreeBASIC Runtime Library
+    File: fb_file.h
+    Purpose: Define the runtime file ABI and device interface.
+    Responsibilities: File state, callbacks, constants, and I/O declarations.
+    This file does not implement platform filesystems or compiler grammar.
+*/
+
 #include <stdio.h>
 
 #define FB_FILE_MODE_BINARY             0
@@ -392,6 +400,18 @@ extern const UTF_8 __fb_utf8_bmarkTb[7];
 FBCALL int          fb_FileCopy         ( const char *source, const char *destination );
 FBCALL int          fb_CrtFileCopy      ( const char *source, const char *destination );
 
+/* Pathname attributes, distinct from FileAttr's open-handle information.
+   These bits match dir.bi and the corresponding DOS/Windows attributes. */
+#define FB_FILE_ATTR_READONLY  0x01
+#define FB_FILE_ATTR_HIDDEN    0x02
+#define FB_FILE_ATTR_SYSTEM    0x04
+#define FB_FILE_ATTR_DIRECTORY 0x10
+#define FB_FILE_ATTR_ARCHIVE   0x20
+#define FB_FILE_ATTR_SETTABLE  0x27
+
+FBCALL int          fb_FileGetAttr      ( const char *filename );
+FBCALL int          fb_FileSetAttr      ( const char *filename, int attributes );
+
 
 
 #define FREAD_CHUNK_SIZE 1048576
@@ -452,3 +472,5 @@ static __inline__ size_t FB_FWRITE_LARGE( const void *ptr, size_t nbytes, FILE *
 
    return total;
 }
+
+/* end of fb_file.h */

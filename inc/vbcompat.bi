@@ -1,3 +1,10 @@
+/'
+    FreeBASIC Runtime Library
+    File: vbcompat.bi
+    Purpose: Collect optional Visual Basic compatibility declarations.
+    Responsibilities: Include runtime helpers and expose VB constant aliases.
+    This file does not implement a VB dialect, Variant, or an object model.
+'/
 #ifndef __VBCOMPAT_BI__
 #define __VBCOMPAT_BI__
 
@@ -27,6 +34,9 @@ const vbSaturday        = fbSaturday
 '' STRING
 #include once "string.bi"
 
+const vbBinaryCompare = fbBinaryCompare
+const vbTextCompare = fbTextCompare
+
 '' DIR
 #include once "dir.bi"
 
@@ -35,25 +45,36 @@ const vbHidden			= fbHidden
 const vbSystem			= fbSystem
 const vbDirectory		= fbDirectory
 const vbArchive			= fbArchive
+'' Keep the historical FreeBASIC alias. Use fbFileAttrNormal with SetAttr.
 const vbNormal			= fbNormal
 
 '' CHAR
-const vbBack			= chr( 08 )
-const vbCr				= chr( 13 )
-const vbCrLf			= chr( 13, 10 )
-const vbLf				= chr( 10 )
+#if __FB_LANG__ = "qb"
+	#define __FB_VBCHR__ chr$
+	#define vbNullChar chr$( 0 )
+#else
+	#define __FB_VBCHR__ chr
+	#define vbNullChar chr( 0 )
+#endif
+const vbBack			= __FB_VBCHR__( 08 )
+const vbCr				= __FB_VBCHR__( 13 )
+const vbCrLf			= __FB_VBCHR__( 13, 10 )
+const vbLf				= __FB_VBCHR__( 10 )
 #if defined(__FB_DOS__) or defined(__FB_WIN32__)
 const vbNewLine			= vbCrLf
 #else
 const vbNewLine			= vbLf
 #endif
-#define vbNullChar		chr( 0 )
+
 const vbNullString		= ""
-const vbFormFeed		= chr( 12 )
-const vbTab				= chr( 09 )
-const vbVerticalTab		= chr( 11 )
+const vbFormFeed		= __FB_VBCHR__( 12 )
+const vbTab				= __FB_VBCHR__( 09 )
+const vbVerticalTab		= __FB_VBCHR__( 11 )
+#undef __FB_VBCHR__
 
 '' FILE
 #include once "file.bi"
 
 #endif
+
+' end of vbcompat.bi

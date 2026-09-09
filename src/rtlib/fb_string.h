@@ -1,4 +1,10 @@
-/* strings */
+/*
+    FreeBASIC Runtime Library
+    File: fb_string.h
+    Purpose: Define the runtime string ABI and internal string services.
+    Responsibilities: Descriptors, ownership flags, and narrow/wide declarations.
+    This file does not contain the compiler's string expression rules.
+*/
 
 /** Flag to identify a string as a temporary string.
  *
@@ -314,6 +320,11 @@ FBCALL ssize_t      fb_StrInstrRevAny   ( FBSTRING *src, FBSTRING *patt, ssize_t
 FBCALL FBSTRING    *fb_StrMid           ( FBSTRING *src, ssize_t start, ssize_t len );
 FBCALL void         fb_StrAssignMid     ( FBSTRING *dst, ssize_t start, ssize_t len, FBSTRING *src );
 
+/* Optional string.bi helpers. Text comparison folds ASCII A-Z only. */
+FBCALL int          fb_StrComp          ( FBSTRING *str1, FBSTRING *str2, int compare );
+FBCALL FBSTRING    *fb_StrReplace       ( FBSTRING *src, FBSTRING *find, FBSTRING *replacement, ssize_t start, ssize_t count, int compare );
+FBCALL FBSTRING    *fb_StrReverse       ( FBSTRING *src );
+
 /**************************************************************************************************
  * Unicode strings
  **************************************************************************************************/
@@ -401,3 +412,5 @@ FBCALL int          fb_VALINT           ( FBSTRING *str );
 FBCALL long long    fb_VALLNG           ( FBSTRING *str );
 FBCALL unsigned int fb_VALUINT          ( FBSTRING *str );
 FBCALL unsigned long long fb_VALULNG    ( FBSTRING *str );
+
+/* end of fb_string.h */

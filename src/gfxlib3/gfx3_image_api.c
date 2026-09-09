@@ -474,9 +474,10 @@ static void image_api_order_coordinates(int *x1, int *y1, int *x2, int *y2)
 	public screen write invalidates shadow_valid, and SCREENLOCK owns the same
 	buffer when it is writable. Therefore a valid shadow is precisely the
 	current work page, while a stale shadow is refreshed once as a complete
-	page. RGB565 and BGRA pages both have a directly representable FB.IMAGE
-	layout. Indexed modes still require palette-aware conversion. The caller
-	holds the runtime graphics lock.
+	page. Indexed pages store one palette index per byte, just like FB.IMAGE;
+	GET must preserve those indices instead of translating them through the
+	palette. RGB565 and BGRA pages also have a directly representable layout.
+	The caller holds the runtime graphics lock.
 */
 static int image_api_ensure_work_shadow_locked(FB_GFX3_DRAW_STATE *state,
 	FB_GFX3_MODE *mode)
@@ -488,7 +489,6 @@ static int image_api_ensure_work_shadow_locked(FB_GFX3_DRAW_STATE *state,
 	int result;
 
 	if ((state == NULL) || (mode == NULL) ||
-	    ((mode->depth != 16u) && (mode->depth != 32u)) ||
 	    (mode->width == 0u) || (mode->height == 0u) ||
 	    (mode->shadow_pages == NULL) || (mode->shadow_valid == NULL))
 		return FB_GFX3_UNSUPPORTED;

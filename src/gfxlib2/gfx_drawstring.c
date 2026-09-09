@@ -1,6 +1,13 @@
-/* advanced graphical string drawing routine */
+/*
+    FreeBASIC gfxlib2: gfx_drawstring.c
+
+    Draw and measure byte strings using built-in or image-based fonts.
+    This file owns font-image validation, glyph spacing and clipped drawing.
+    It does not implement console layout, scalable fonts or GUI text units.
+*/
 
 #include "fb_gfx.h"
+#include "gfx_font.h"
 
 /*
  *	User font format:
@@ -22,11 +29,76 @@
  *
  */
 
-typedef struct FBGFX_CHAR
+static int parse_font(void *image, int target_bpp, FB_GFX_FONT *font,
+	unsigned char **pixels, int *pitch)
 {
-	unsigned int width;
-	unsigned char *data;
-} FBGFX_CHAR;
+	PUT_HEADER header;
+	uint32_t first_word, width, height, bpp, row_pitch;
+	size_t header_size;
+
+	if (!image)
+		return 0;
+	memcpy(&first_word, image, sizeof(first_word));
+	if (first_word == PUT_HEADER_NEW) {
+		memcpy(&header, image, sizeof(header));
+		bpp = header.bpp;
+		width = header.width;
+		height = header.height;
+		row_pitch = header.pitch;
+		header_size = sizeof(header);
+	} else {
+		bpp = first_word & 7;
+		if (!bpp)
+			bpp = target_bpp;
+		width = (first_word >> 3) & 0x1FFF;
+		height = first_word >> 16;
+		row_pitch = width * bpp;
+		header_size = 4;
+	}
+	if ((bpp != 1 && bpp != 2 && bpp != 4) ||
+	    (target_bpp && bpp != (unsigned int)target_bpp) ||
+	    !width || width > INT_MAX / bpp || height > INT_MAX ||
+	    row_pitch > INT_MAX || row_pitch < width * bpp ||
+	    (height && row_pitch > (SIZE_MAX - header_size) / height))
+		return 0;
+	*pixels = (unsigned char *)image + header_size;
+	*pitch = row_pitch;
+	return fb_hGfxParseFont(*pixels, width, height, row_pitch, font);
+}
+
+FBCALL int fb_GfxDrawStringSize(FBSTRING *string, int *width, int *height,
+	void *font_image)
+{
+	FB_GFX_FONT font;
+	unsigned char *pixels;
+	int pitch, measured_width, measured_height;
+	int result = FB_RTERROR_ILLEGALFUNCTIONCALL;
+
+	if (width) *width = 0;
+	if (height) *height = 0;
+	FB_GRAPHICS_LOCK();
+	if (!width || !height || width == height || !string ||
+	    (!string->data && FB_STRSIZE(string)))
+		goto done;
+	/* Explicit fonts do not require an active display or matching screen depth. */
+	if (font_image) {
+		if (!parse_font(font_image, 0, &font, &pixels, &pitch))
+			goto done;
+	} else if (!__fb_gfx) {
+		goto done;
+	}
+	if (fb_hGfxMeasureFont((unsigned char *)string->data, FB_STRSIZE(string),
+	    font_image ? &font : NULL, __fb_gfx ? __fb_gfx->font->w : 0,
+	    __fb_gfx ? __fb_gfx->font->h : 0, &measured_width, &measured_height)) {
+		*width = measured_width;
+		*height = measured_height;
+		result = FB_RTERROR_OK;
+	}
+done:
+	fb_hStrDelTemp(string);
+	FB_GRAPHICS_UNLOCK();
+	return fb_ErrorSetNum(result);
+}
 
 FBCALL int fb_GfxDrawString
 	(
@@ -44,11 +116,11 @@ FBCALL int fb_GfxDrawString
 	)
 {
 	FB_GFXCTX *context;
-	FBGFX_CHAR char_data[256], *ch;
-	PUT_HEADER *header;
-	int font_height, x, y, px, py, i, w, h, pitch, bpp, first, last;
+	FB_GFX_FONT custom_font;
+	int font_height, full_font_height, x, y, px, py, i, w, h, pitch, bpp, first, last;
 	int offset, bytes_count, res = fb_ErrorSetNum( FB_RTERROR_OK );
-	unsigned char *data, *width;
+	unsigned char *data, *glyph_pixels;
+	unsigned int code, advance;
 
 	FB_GRAPHICS_LOCK( );
 
@@ -80,85 +152,59 @@ FBCALL int fb_GfxDrawString
 	if (font) {
 		/* user passed a custom font */
 
-		header = (PUT_HEADER *)font;
-		if (header->type == PUT_HEADER_NEW) {
-			bpp = header->bpp;
-			font_height = header->height - 1;
-			pitch = header->pitch;
-			data = (unsigned char *)font + sizeof(PUT_HEADER);
-		}
-		else {
-			bpp = header->old.bpp;
-			if (!bpp)
-				bpp = context->target_bpp;
-			font_height = header->old.height - 1;
-			pitch = header->old.width * bpp;
-			data = (unsigned char *)font + 4;
-		}
-
-		if ((y + font_height <= context->view_y) || (y >= context->view_y + context->view_h))
-			goto exit_error;
-
-		if ((bpp != context->target_bpp) || (pitch < 4) || (font_height <= 0) || (data[0] != 0)) {
+		bpp = context->target_bpp;
+		if (!parse_font(font, bpp, &custom_font, &data, &pitch)) {
 			res = FB_RTERROR_ILLEGALFUNCTIONCALL;
 			goto exit_error;
 		}
-
-		first = (int)data[1];
-		last = (int)data[2];
-		width = &data[3];
-		if (first > last)
-			SWAP(first, last);
-		fb_hMemSet(char_data, 0, sizeof(FBGFX_CHAR) * 256);
+		font_height = full_font_height = custom_font.font_height;
+		if (((int64_t)y + font_height <= context->view_y) ||
+		    (y >= context->view_y + context->view_h))
+			goto exit_error;
 		data += pitch;
 		if (y < context->view_y) {
-			data += (pitch * (context->view_y - y));
+			data += (size_t)pitch * (context->view_y - y);
 			font_height -= (context->view_y - y);
 			y = context->view_y;
 		}
-		if (y + font_height > context->view_y + context->view_h)
-			font_height -= ((y + font_height) - (context->view_y + context->view_h));
-
-		for (w = 0, i = first; i <= last; i++) {
-			char_data[i].width = (unsigned int)width[i - first];
-			char_data[i].data = data;
-			data += (char_data[i].width * bpp);
-			w += char_data[i].width;
-		}
-		if (w > (pitch / __fb_gfx->bpp)) {
-			res = FB_RTERROR_ILLEGALFUNCTIONCALL;
-			goto exit_error;
-		}
+		if ((int64_t)y + font_height > context->view_y + context->view_h)
+			font_height = context->view_y + context->view_h - y;
+		glyph_pixels = data;
 
 		for (i = 0; i < (int)FB_STRSIZE(string); i++) {
 
 			if (x >= context->view_x + context->view_w)
 				break;
 
-			ch = &char_data[(unsigned char)string->data[i]];
-			data = ch->data;
-			if (!data) {
+			code = (unsigned char)string->data[i];
+			if (code < custom_font.first || code > custom_font.last) {
 				/* character not found */
-				x += font_height;
+				if (x > INT_MAX - full_font_height)
+					break;
+				x += full_font_height;
 				continue;
 			}
-			w = ch->width;
+			advance = custom_font.glyph_widths[code];
+			data = glyph_pixels + (size_t)custom_font.glyph_offsets[code] * bpp;
+			w = advance;
 			h = font_height;
 			px = x;
 
-			if (x + w >= context->view_x) {
+			if (w && (int64_t)x + w > context->view_x) {
 
 				if (x < context->view_x) {
 					data += ((context->view_x - x) * bpp);
 					w -= (context->view_x - x);
 					px = context->view_x;
 				}
-				if (x + w > context->view_x + context->view_w)
-					w -= ((x + w) - (context->view_x + context->view_w));
+				if ((int64_t)px + w > context->view_x + context->view_w)
+					w = context->view_x + context->view_w - px;
 				putter(data, context->line[y] + (px * bpp), w, h, pitch, context->target_pitch, color, blender, param);
 
 			}
-			x += ch->width;
+			if (x > INT_MAX - (int)advance)
+				break;
+			x += advance;
 		}
 	} else {
 		/* use default font */
@@ -225,3 +271,5 @@ exit_error_unlocked:
 	else
 		return res;
 }
+
+/* end of gfx_drawstring.c */

@@ -1,3 +1,10 @@
+/'
+    FreeBASIC Runtime Library
+    File: file.bi
+    Purpose: Declare optional file and pathname operations.
+    Responsibilities: Public signatures, modes, and encoding constants.
+    This file does not implement filesystem policy or compiler statements.
+'/
 #ifndef __FILE_BI__
 #define __FILE_BI__
 
@@ -10,6 +17,10 @@ const fbFileModeOutput   = 2
 const fbFileModeRandom   = 4
 const fbFileModeAppend   = 8
 const fbFileModeBinary   = 32
+
+'' Pathname attribute value used by SetAttr to clear writable attributes.
+'' This is distinct from dir.bi's historical fbNormal search mask.
+const fbFileAttrNormal   = 0
 
 const fbFileEncodASCII   = 0
 const fbFileEncodUTF8    = 1
@@ -27,6 +38,8 @@ declare function FileCopy alias "fb_FileCopy" ( byval source as __zstring __ptr,
 declare function FileLen alias "fb_FileLen" ( byval filename as __zstring __ptr ) as __longint
 declare function FileExists alias "fb_FileExists" ( byval filename as __zstring __ptr ) as long
 declare function FileDateTime alias "fb_FileDateTime" ( byval filename as __zstring __ptr ) as double
+declare function GetAttr alias "fb_FileGetAttr" ( byval filename as const __zstring __ptr ) as long
+declare function SetAttr alias "fb_FileSetAttr" ( byval filename as const __zstring __ptr, byval attributes as long ) as long
 
 #else
 
@@ -35,6 +48,8 @@ declare function FileAttr alias "fb_FileAttr" ( byval filenumber as long, byval 
 declare function FileLen alias "fb_FileLen" ( byval filename as zstring ptr ) as longint
 declare function FileExists alias "fb_FileExists" ( byval filename as zstring ptr ) as long
 declare function FileDateTime alias "fb_FileDateTime" ( byval filename as zstring ptr ) as double
+declare function GetAttr alias "fb_FileGetAttr" ( byval filename as const zstring ptr ) as long
+declare function SetAttr alias "fb_FileSetAttr" ( byval filename as const zstring ptr, byval attributes as long ) as long
 
 #endif
 
@@ -42,3 +57,5 @@ declare function FileFlush alias "fb_FileFlush" ( byval filenumber as long = -1,
 declare function FileSetEof alias "fb_FileSetEof" ( byval filenumber as long ) as long
 
 #endif
+
+' end of file.bi

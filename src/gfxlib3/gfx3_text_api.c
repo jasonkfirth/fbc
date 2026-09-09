@@ -15,6 +15,7 @@
         - draw the same glyphs directly into explicit CPU images
         - validate and assemble custom FreeBASIC font images
         - preserve PUT modes and custom blenders for user fonts
+        - measure byte-font advances without changing drawing state
 
     This file intentionally does NOT contain:
 
@@ -29,6 +30,7 @@
 #include "gfx3_data.h"
 #include "gfx3_gpu_surface.h"
 #include "gfx3_image.h"
+#include "../gfxlib2/gfx_font.h"
 
 #include <math.h>
 
@@ -384,52 +386,18 @@ static uint32_t text_custom_font_transparent_color(
 
 typedef struct FB_GFX3_CUSTOM_FONT {
 	const FB_GFX3_IMAGE_VIEW *image;
-	uint32_t font_height;
-	uint32_t first;
-	uint32_t last;
-	uint32_t glyph_offsets[256];
-	uint32_t glyph_widths[256];
+	FB_GFX_FONT metrics;
 } FB_GFX3_CUSTOM_FONT;
 
 static int text_parse_custom_font(const FB_GFX3_IMAGE_VIEW *font,
 	uint32_t target_bytes_per_pixel, FB_GFX3_CUSTOM_FONT *custom_font)
 {
-	uint32_t first;
-	uint32_t last;
-	uint32_t glyph_count;
-	uint32_t glyph_x = 0;
-	uint32_t character_width;
-	uint32_t code;
-
 	if ((font == NULL) || (custom_font == NULL) ||
-	    (font->height <= 1u) ||
 	    (font->bytes_per_pixel != target_bytes_per_pixel) ||
-	    (font->pitch < 4u) || (font->pixels[0] != 0))
+	    !fb_hGfxParseFont(font->pixels, font->width, font->height,
+		font->pitch, &custom_font->metrics))
 		return FB_GFX3_INVALID;
-	first = font->pixels[1];
-	last = font->pixels[2];
-	if (first > last) {
-		uint32_t temporary = first;
-
-		first = last;
-		last = temporary;
-	}
-	glyph_count = last - first + 1u;
-	if ((size_t)glyph_count + 3u > font->pitch)
-		return FB_GFX3_INVALID;
-	memset(custom_font, 0, sizeof(*custom_font));
 	custom_font->image = font;
-	custom_font->font_height = font->height - 1u;
-	custom_font->first = first;
-	custom_font->last = last;
-	for (code = first; code <= last; ++code) {
-		character_width = font->pixels[3u + code - first];
-		if ((uint64_t)glyph_x + character_width > font->width)
-			return FB_GFX3_INVALID;
-		custom_font->glyph_offsets[code] = glyph_x;
-		custom_font->glyph_widths[code] = character_width;
-		glyph_x += character_width;
-	}
 	return FB_GFX3_OK;
 }
 
@@ -461,13 +429,13 @@ static int text_create_custom_string_image(
 	if (!((target_bytes_per_pixel == 1u) ||
 	      (target_bytes_per_pixel == 2u) ||
 	      (target_bytes_per_pixel == 4u)) ||
-	    (custom_font->font_height == 0u))
+	    (custom_font->metrics.font_height == 0u))
 		return FB_GFX3_INVALID;
 	for (character = 0; character < length; ++character) {
 		code = (unsigned char)text[character];
-		character_width = ((code >= custom_font->first) &&
-			(code <= custom_font->last)) ? custom_font->glyph_widths[code] :
-			custom_font->font_height;
+		character_width = ((code >= custom_font->metrics.first) &&
+			(code <= custom_font->metrics.last)) ? custom_font->metrics.glyph_widths[code] :
+			custom_font->metrics.font_height;
 		if (output_width > UINT32_MAX - character_width)
 			return FB_GFX3_INVALID;
 		output_width += character_width;
@@ -477,7 +445,7 @@ static int text_create_custom_string_image(
 	if ((output_width > (UINT32_MAX - 15u) / target_bytes_per_pixel))
 		return FB_GFX3_INVALID;
 	output_pitch = (output_width * target_bytes_per_pixel + 15u) & ~15u;
-	if ((fb_gfx3_size_multiply(output_pitch, custom_font->font_height,
+	if ((fb_gfx3_size_multiply(output_pitch, custom_font->metrics.font_height,
 	     &pixel_size) !=
 	     FB_GFX3_OK) ||
 	    (fb_gfx3_size_add(FB_GFX3_IMAGE_NEW_HEADER_SIZE, pixel_size,
@@ -488,14 +456,14 @@ static int text_create_custom_string_image(
 	if (image == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	if (fb_gfx3_image_initialize_header(image, TRUE, output_width,
-	    custom_font->font_height, target_bytes_per_pixel, output_pitch) !=
+	    custom_font->metrics.font_height, target_bytes_per_pixel, output_pitch) !=
 	    FB_GFX3_OK) {
 		free(image);
 		return FB_GFX3_INVALID;
 	}
 	transparent_color = text_custom_font_transparent_color(
 		target_bytes_per_pixel);
-	for (row = 0; row < custom_font->font_height; ++row) {
+	for (row = 0; row < custom_font->metrics.font_height; ++row) {
 		unsigned char *row_pixels = image + FB_GFX3_IMAGE_NEW_HEADER_SIZE +
 			((size_t)row * output_pitch);
 		uint32_t column;
@@ -520,14 +488,14 @@ static int text_create_custom_string_image(
 	output_width = 0;
 	for (character = 0; character < length; ++character) {
 		code = (unsigned char)text[character];
-		if ((code < custom_font->first) || (code > custom_font->last)) {
-			output_width += custom_font->font_height;
+		if ((code < custom_font->metrics.first) || (code > custom_font->metrics.last)) {
+			output_width += custom_font->metrics.font_height;
 			continue;
 		}
-		character_width = custom_font->glyph_widths[code];
-		for (row = 0; row < custom_font->font_height; ++row) {
+		character_width = custom_font->metrics.glyph_widths[code];
+		for (row = 0; row < custom_font->metrics.font_height; ++row) {
 			source = font->pixels + ((size_t)(row + 1u) * font->pitch) +
-				((size_t)custom_font->glyph_offsets[code] *
+				((size_t)custom_font->metrics.glyph_offsets[code] *
 				 target_bytes_per_pixel);
 			destination = image + FB_GFX3_IMAGE_NEW_HEADER_SIZE +
 				((size_t)row * output_pitch) +
@@ -551,7 +519,7 @@ static int text_custom_font_has_unsupported(
 	for (character = 0; character < length; ++character) {
 		uint32_t code = (unsigned char)text[character];
 
-		if ((code < custom_font->first) || (code > custom_font->last))
+		if ((code < custom_font->metrics.first) || (code > custom_font->metrics.last))
 			return TRUE;
 	}
 	return FALSE;
@@ -655,26 +623,26 @@ static int text_draw_custom_font_runs(FB_GFX3_DRAW_STATE *state,
 		uint32_t code = (unsigned char)text[character];
 		int64_t destination_x;
 
-		if ((code < custom_font->first) || (code > custom_font->last)) {
-			if (horizontal_offset > UINT32_MAX - custom_font->font_height) {
+		if ((code < custom_font->metrics.first) || (code > custom_font->metrics.last)) {
+			if (horizontal_offset > UINT32_MAX - custom_font->metrics.font_height) {
 				result = FB_GFX3_INVALID;
 				break;
 			}
-			horizontal_offset += custom_font->font_height;
+			horizontal_offset += custom_font->metrics.font_height;
 			character++;
 			continue;
 		}
 		run_start = character;
 		while (character < length) {
 			code = (unsigned char)text[character];
-			if ((code < custom_font->first) || (code > custom_font->last))
+			if ((code < custom_font->metrics.first) || (code > custom_font->metrics.last))
 				break;
 			if (horizontal_offset > UINT32_MAX -
-			    custom_font->glyph_widths[code]) {
+			    custom_font->metrics.glyph_widths[code]) {
 				result = FB_GFX3_INVALID;
 				break;
 			}
-			horizontal_offset += custom_font->glyph_widths[code];
+			horizontal_offset += custom_font->metrics.glyph_widths[code];
 			character++;
 		}
 		if (result != FB_GFX3_OK)
@@ -724,6 +692,42 @@ static int text_draw_custom_font_runs(FB_GFX3_DRAW_STATE *state,
 /* ------------------------------------------------------------------------- */
 /* Public DRAW STRING ABI                                                    */
 /* ------------------------------------------------------------------------- */
+
+FBCALL int fb_GfxDrawStringSize(FBSTRING *string, int *width, int *height,
+	void *font_image)
+{
+	FB_GFX3_IMAGE_VIEW image;
+	FB_GFX3_CUSTOM_FONT font;
+	int measured_width, measured_height;
+	int result = FB_RTERROR_ILLEGALFUNCTIONCALL;
+
+	if (width) *width = 0;
+	if (height) *height = 0;
+	FB_GRAPHICS_LOCK();
+	if (!width || !height || width == height || !string ||
+	    (!string->data && FB_STRSIZE(string)))
+		goto done;
+	if (font_image) {
+		if (fb_gfx3_image_parse(font_image, &image) != FB_GFX3_OK ||
+		    text_parse_custom_font(&image, image.bytes_per_pixel, &font) !=
+		    FB_GFX3_OK)
+			goto done;
+	} else if (!fb_gfx3_api_get_draw_state_locked()) {
+		goto done;
+	}
+	/* DRAW STRING uses the canonical 8x8 font, independently of PRINT rows. */
+	if (fb_hGfxMeasureFont((unsigned char *)string->data, FB_STRSIZE(string),
+	    font_image ? &font.metrics : NULL, 8, 8,
+	    &measured_width, &measured_height)) {
+		*width = measured_width;
+		*height = measured_height;
+		result = FB_RTERROR_OK;
+	}
+done:
+	fb_hStrDelTemp(string);
+	FB_GRAPHICS_UNLOCK();
+	return fb_ErrorSetNum(result);
+}
 
 FBCALL int fb_GfxDrawString(void *target, float x, float y, int flags,
 	FBSTRING *string, unsigned int color, void *font_image, int mode,

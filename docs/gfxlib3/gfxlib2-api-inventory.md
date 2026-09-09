@@ -55,8 +55,10 @@ platform and GPU backend split.
 | `LINE`, `LINE ... B`, `LINE ... BF` | `fb_GfxLine` | `gfx_line.c` draws styled CPU lines; boxes are delegated to `gfx_box.c`. |
 | `CIRCLE` | `fb_GfxEllipse` | `gfx_circle.c` rasterizes circles, ellipses, arcs, and filled ellipses on the CPU. |
 | `PAINT` | `fb_GfxPaint` | `gfx_paint.c` builds flood-fill spans on the CPU, then paints them. |
+| `FB.PaintPattern` | `fb_GfxPaintPattern` | Both libraries accept 1..64 packed two-color rows; gfxlib3 uses its CPU flood and surface transfer path. See [the Optical runtime guide](../optical-freebasic-runtime.md). |
 | `DRAW` | `fb_GfxDraw` | `gfx_draw.c` parses the QB DRAW command language and calls primitive routines. |
 | `DRAW STRING` | `fb_GfxDrawString` | `gfx_drawstring.c` draws the built-in font or image-based custom fonts. |
+| `FB.DrawStringSize` | `fb_GfxDrawStringSize` | Both libraries measure native byte-font advances, sharing width-table validation with rendering. See [the Optical runtime guide](../optical-freebasic-runtime.md). |
 | `VIEW` | `fb_GfxView` | `gfx_view.c` stores the clip rectangle and optional fill/border. |
 | `WINDOW` | `fb_GfxWindow` | `gfx_window.c` stores logical coordinate mapping and Y direction. |
 | `PALETTE` | `fb_GfxPalette` | `gfx_palette.c` updates emulated and device palettes. |

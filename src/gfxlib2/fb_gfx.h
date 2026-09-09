@@ -1,4 +1,8 @@
-/* internal gfx definitions */
+/*
+    FreeBASIC gfxlib2: fb_gfx.h
+    Internal graphics state, driver contracts and runtime entry points.
+    Rendering algorithms and platform implementations belong to their modules.
+*/
 
 #ifndef __FB_GFX_H__
 #define __FB_GFX_H__
@@ -613,6 +617,8 @@ extern FBCALL int fb_GfxWaitVSync(void);
 extern FBCALL void fb_GfxPaint(void *target, float fx, float fy, unsigned int color, unsigned int border_color, FBSTRING *pattern, int mode, int coord_type);
 extern FBCALL void fb_GfxDraw(void *target, FBSTRING *command);
 extern FBCALL int fb_GfxDrawString(void *target, float fx, float fy, int coord_type, FBSTRING *string, unsigned int color, void *font, int mode, PUTTER *putter, BLENDER *blender, void *param);
+extern FBCALL int fb_GfxDrawStringSize(FBSTRING *string, int *width, int *height, void *font);
+extern FBCALL int fb_GfxPaintPattern(void *target, float x, float y, FBSTRING *pattern, unsigned int foreground, unsigned int background, unsigned int border, int relative);
 extern FBCALL int fb_GfxFlip(int from_page, int to_page);
 extern FBCALL void fb_GfxLock(void);
 extern FBCALL void fb_GfxUnlock(int start_line, int end_line);
@@ -726,3 +732,5 @@ void fb_hPutCustom(unsigned char *src, unsigned char *dest, int w, int h, int sr
     "CP437"
 
 #endif
+
+/* end of fb_gfx.h */
