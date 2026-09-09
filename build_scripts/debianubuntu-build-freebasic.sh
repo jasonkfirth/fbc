@@ -1,4 +1,26 @@
 #!/usr/bin/env bash
+#
+# Project: FreeBASIC Linux Package Factory
+# ----------------------------------------
+#
+# File: debianubuntu-build-freebasic.sh
+#
+# Purpose:
+#
+#     Build one Debian-family FreeBASIC package set for the selected CPU.
+#
+# Responsibilities:
+#
+#     * install package build dependencies
+#     * prepare bootstrap sources and Debian package metadata
+#     * build, collect, and optionally validate package artifacts
+#
+# This file intentionally does NOT contain:
+#
+#     * Docker matrix orchestration
+#     * repository publication
+#     * package installation on end-user systems
+#
 
 set -euo pipefail
 trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
@@ -47,7 +69,10 @@ trap cleanup_build_roots EXIT
 
 run() { echo "==> $*"; "$@"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
-msg() { echo ""; echo "==> $1"; }
+msg() {
+    echo ""
+    printf '==> [%s] %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$1"
+}
 
 assert_removable_tree() {
     local path="$1"
@@ -133,6 +158,7 @@ Options:
   --no-wii        Build packages without DEB_BUILD_PROFILES=pkg.freebasic.wii
   --host-arch A   Build a package for Debian architecture A
   --no-package    Stop after ensuring the bootstrap tarball exists
+  --no-lintian    Collect packages without running Lintian
   --skip-deps     Skip apt dependency installation
   --help          Show this help text
 
@@ -172,6 +198,7 @@ ANDROID_EXPLICIT=0
 WII=0
 WII_EXPLICIT=0
 NO_PACKAGE=0
+NO_LINTIAN=0
 SKIP_DEPS=0
 HOST_ARCH_OPT="${FBC_PACKAGE_HOST_ARCH:-}"
 
@@ -189,6 +216,7 @@ while [ $# -gt 0 ]; do
             shift 2
             ;;
         --no-package) NO_PACKAGE=1; shift ;;
+        --no-lintian) NO_LINTIAN=1; shift ;;
         --skip-deps) SKIP_DEPS=1; shift ;;
         -h|--help)
             usage
@@ -930,6 +958,10 @@ install_deps() {
     disable_wii_if_sdk_unavailable
 
     local js_deps=()
+    local lintian_deps=()
+    if [ "$NO_LINTIAN" -eq 0 ]; then
+        lintian_deps=(lintian)
+    fi
     if [ "$NO_JS" -eq 0 ]; then
         js_deps=(emscripten nodejs)
     fi
@@ -1115,7 +1147,7 @@ install_deps() {
         ca-certificates \
         build-essential gcc g++ binutils make \
         pkgconf rsync \
-        debhelper dpkg-dev devscripts fakeroot lintian \
+        debhelper dpkg-dev devscripts fakeroot "${lintian_deps[@]}" \
         quilt dos2unix \
         tar xz-utils \
         "${native_library_deps[@]}" \
@@ -1184,12 +1216,9 @@ package_current_target() {
     local rc
     local bootstrap_srcdir
     local deb_build_options
-    local lintian_log
-    local lintian_help
-    local lintian_fail_args=()
+    local changes_files=()
     local override_file
     local target_standards_version=""
-    local unexpected_lintian
     local build_source_package=0
 
     msg "preparing Debian package build"
@@ -1445,77 +1474,19 @@ package_current_target() {
     done
     shopt -u nullglob
 
-    local changes_files=()
-    local changes_file=""
-    local lintian_rc=0
-
     shopt -s nullglob
     changes_files=("$OUTDIR"/*.changes)
     shopt -u nullglob
 
     if [ "${#changes_files[@]}" -eq 0 ]; then
-        echo "ERROR: no .changes file was produced for Lintian"
-        exit 1
+        die "no .changes file was produced in $OUTDIR"
     fi
 
-    lintian_help="$(lintian --help 2>&1)" || die "could not query Lintian command-line options"
-
-    if grep -Eq -- '(^|[[:space:]])--fail-on([=[:space:]]|$)' <<< "$lintian_help"; then
-        lintian_fail_args=(--fail-on "error,warning")
-    elif grep -q -- '--fail-on-warnings' <<< "$lintian_help"; then
-        #
-        # Raspbian Buster provides Lintian 2.15. It predates --fail-on, but
-        # its deprecated --fail-on-warnings option returns failure for either
-        # warnings or errors. This keeps archived package rows as strict as
-        # rows validated by current Lintian releases.
-        #
-        lintian_fail_args=(--fail-on-warnings)
+    if [ "$NO_LINTIAN" -eq 1 ]; then
+        echo "==> Lintian validation deferred to the package matrix driver"
     else
-        die "installed Lintian cannot be configured to fail on warnings"
+        bash "$ROOT/build_scripts/debianubuntu-lintian.sh" "$OUTDIR"
     fi
-
-    for changes_file in "${changes_files[@]}"; do
-        lintian_log="$OUTDIR/lintian-$(basename "$changes_file").log"
-
-        set +e
-        lintian -IE --pedantic "${lintian_fail_args[@]}" "$changes_file" 2>&1 |
-            tee "$lintian_log"
-        lintian_rc=${PIPESTATUS[0]}
-        set -e
-
-        unexpected_lintian="$(
-            grep -E '^[EW]:' "$lintian_log" |
-                grep -Ev '^W: freebasic-dbgsym: elf-error In program headers: Unable to find program interpreter name \[usr/lib/debug/\.build-id/[[:xdigit:]]{2}/[[:xdigit:]]+\.debug\]$' ||
-                true
-        )"
-
-        if [ -n "$unexpected_lintian" ]; then
-            echo "ERROR: Lintian reported errors or warnings for $(basename "$changes_file")"
-            printf '%s\n' "$unexpected_lintian"
-
-            if [ "$lintian_rc" -eq 0 ]; then
-                lintian_rc=1
-            fi
-
-            exit "$lintian_rc"
-        fi
-
-        if [ "$lintian_rc" -ne 0 ]; then
-            #
-            # Binutils debug files retain the executable's program headers
-            # while objcopy removes the interpreter bytes. Jammy's Lintian
-            # reports that normal dbgsym layout as an elf-error. Accept only
-            # that exact warning; every other error or warning still fails.
-            #
-            if grep -Eq '^W: freebasic-dbgsym: elf-error In program headers: Unable to find program interpreter name \[usr/lib/debug/\.build-id/[[:xdigit:]]{2}/[[:xdigit:]]+\.debug\]$' "$lintian_log"
-            then
-                echo "==> accepted Jammy Lintian's known dbgsym interpreter warning"
-            else
-                echo "ERROR: Lintian failed for $(basename "$changes_file") (exit=$lintian_rc)"
-                exit "$lintian_rc"
-            fi
-        fi
-    done
 
     echo
     echo "==> build completed"
@@ -1544,3 +1515,5 @@ fi
 
 package_current_target
 CLEANUP_SUCCESS=1
+
+# end of debianubuntu-build-freebasic.sh

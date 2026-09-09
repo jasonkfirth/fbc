@@ -1,4 +1,27 @@
 #!/usr/bin/env bash
+#
+# Project: FreeBASIC Linux Package Factory
+# ----------------------------------------
+#
+# File: emulated-native-matrix/debianubuntu-build-freebasic-matrix.sh
+#
+# Purpose:
+#
+#     Build Debian-family packages inside target-architecture containers.
+#
+# Responsibilities:
+#
+#     * select distro, release, and CPU rows
+#     * prepare binfmt/QEMU and bootstrap inputs
+#     * run package builds and native-CPU Lintian validation
+#     * retain build logs and package artifacts
+#
+# This file intentionally does NOT contain:
+#
+#     * Debian package metadata or compiler implementation
+#     * package repository publication
+#     * end-user package installation
+#
 
 set -euo pipefail
 trap 'echo "ERROR: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
@@ -54,6 +77,10 @@ run() { echo "==> $*"; "$@"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
 msg() { echo ""; echo "==> $1"; }
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "missing command: $1"; }
+
+phase() {
+    printf '==> [%s] %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$*"
+}
 
 log_has_missing_manifest() {
     local log="$1"
@@ -402,14 +429,25 @@ make_jobs_for_platform() {
 
     if [ "$platform" = "$host_platform" ]; then
         echo "$MAKE_JOBS"
-    elif [ "$platform" = "linux/riscv64" ] && [ "$MAKE_JOBS" -gt 1 ]; then
-        # A serial Ubuntu riscv64 package build reaches the hosted runner's
-        # six-hour job limit during Lintian.  Two independent compiler
-        # processes keep the row below that limit without exposing the full
-        # host parallelism to QEMU user-mode emulation.
-        echo 2
     else
-        echo 1
+        case "$platform" in
+            linux/arm64|linux/riscv64)
+                if [ "$MAKE_JOBS" -gt 1 ]; then
+                    #
+                    # Two compiler processes use the hosted runner's available
+                    # CPUs without exposing full host parallelism to QEMU.
+                    # Serial arm64 and riscv64 package builds can otherwise
+                    # consume the complete six-hour row limit.
+                    #
+                    echo 2
+                else
+                    echo 1
+                fi
+                ;;
+            *)
+                echo 1
+                ;;
+        esac
     fi
 }
 
@@ -462,6 +500,67 @@ docker_image_for_target() {
             echo "$default_image"
             ;;
     esac
+}
+
+lintian_image_for_target() {
+    local distro="$1"
+    local default_image="$2"
+
+    case "$distro" in
+        raspbian)
+            #
+            # The Raspbian image has no native x86-64 variant. Debian Trixie
+            # supplies the matching Lintian generation and can inspect foreign
+            # .deb files without executing their payloads.
+            #
+            echo "debian:13"
+            ;;
+        *)
+            echo "$default_image"
+            ;;
+    esac
+}
+
+run_native_lintian() {
+    local image="$1"
+    local outdir="$2"
+    local log="$3"
+    local rc=0
+
+    if {
+        phase "pulling native Lintian image: $image ($HOST_PLATFORM)"
+        run_root docker pull --platform "$HOST_PLATFORM" "$image" &&
+        phase "starting native Lintian validation for $outdir" &&
+        run_root docker run --rm \
+            --platform "$HOST_PLATFORM" \
+            -e DEBIAN_FRONTEND=noninteractive \
+            -e FBC_PACKAGE_LINTIAN_TIMEOUT_SECONDS="${FBC_PACKAGE_LINTIAN_TIMEOUT_SECONDS:-1800}" \
+            -v "$ROOT:/work" \
+            -w /work \
+            "$image" \
+            bash -lc '
+                set -euo pipefail
+                apt-get \
+                    -o Acquire::Retries=5 \
+                    -o Acquire::http::Timeout=30 \
+                    -o Acquire::https::Timeout=30 \
+                    update -y
+                apt-get \
+                    -o Acquire::Retries=5 \
+                    -o Acquire::http::Timeout=30 \
+                    -o Acquire::https::Timeout=30 \
+                    install -y --no-install-recommends lintian
+                bash /work/build_scripts/debianubuntu-lintian.sh "$1"
+            ' fbc-lintian "$outdir" &&
+        phase "native Lintian validation completed for $outdir"
+    } 2>&1 | tee -a "$log"
+    then
+        rc=0
+    else
+        rc=${PIPESTATUS[0]}
+    fi
+
+    return "$rc"
 }
 
 bootstrap_arches_for_filters() {
@@ -690,7 +789,9 @@ fi
 install_host_deps
 
 need_cmd docker
+need_cmd date
 need_cmd tar
+need_cmd tee
 need_cmd rsync
 need_cmd "$MAKE_CMD"
 
@@ -757,6 +858,7 @@ build_one() {
     local entry="$1"
     local distro
     local image
+    local lintian_image
     local tag
     local codename
     local script_name
@@ -767,6 +869,7 @@ build_one() {
     local container_buildroot
     local arm_arch
     local build_jobs
+    local build_rc
     local android_arg
     local wii_arg
     local native_build_cmd
@@ -791,6 +894,7 @@ EOF
         return 0
     fi
 
+    lintian_image="$(lintian_image_for_target "$distro" "$image")"
     image="$(docker_image_for_target "$distro" "$codename" "$arch" "$image")"
     platform="$(docker_platform_for_arch "$arch")"
     build_jobs="$(make_jobs_for_platform "$platform" "$HOST_PLATFORM")"
@@ -812,6 +916,9 @@ EOF
         )
     fi
     native_build_cmd="/work/build_scripts/${script_name} --no-build${android_arg}${wii_arg}"
+    if [ "$platform" != "$HOST_PLATFORM" ]; then
+        native_build_cmd="${native_build_cmd} --no-lintian"
+    fi
     xbox_build_cmd=""
     xbox_enabled=0
     if [ -n "$XBOX_NXDK_HOST" ] && xbox_supported_for_arch "$arch" &&
@@ -864,8 +971,10 @@ EOF
         die "cannot write build log: $outdir/docker_build.log"
     fi
 
-    if ! {
+    if {
+        phase "pulling target build image: $image ($platform)"
         run_root docker pull --platform "$platform" "$image" &&
+        phase "starting target package build for ${distro}/${codename} (${arch})" &&
         run_root docker run --rm \
             --platform "$platform" \
             -e DEBIAN_FRONTEND=noninteractive \
@@ -873,6 +982,7 @@ EOF
             -e FBC_PACKAGE_CODENAME="$codename" \
             -e FBC_PACKAGE_OUTDIR="$container_outdir" \
             -e FBC_PACKAGE_ARM_ARCH="$arm_arch" \
+            -e FBC_PACKAGE_LINTIAN_TIMEOUT_SECONDS="${FBC_PACKAGE_LINTIAN_TIMEOUT_SECONDS:-1800}" \
             -e BUILDROOT="$container_buildroot" \
             -e JOBS="$build_jobs" \
             "${docker_env_args[@]}" \
@@ -880,8 +990,16 @@ EOF
             "${docker_extra_mounts[@]}" \
             -w /work \
             "$image" \
-            bash -lc "${native_build_cmd}${xbox_build_cmd}"
-    } > "$outdir/docker_build.log" 2>&1; then
+            bash -lc "${native_build_cmd}${xbox_build_cmd}" &&
+        phase "target package build completed for ${distro}/${codename} (${arch})"
+    } 2>&1 | tee "$outdir/docker_build.log"
+    then
+        build_rc=0
+    else
+        build_rc=${PIPESTATUS[0]}
+    fi
+
+    if [ "$build_rc" -ne 0 ]; then
         if log_has_missing_manifest "$outdir/docker_build.log"; then
             echo "SKIPPED: ${distro}/${codename} (${arch}) has no Docker image for ${platform}"
             echo "Log: $outdir/docker_build.log"
@@ -893,6 +1011,15 @@ EOF
         show_failure_log "$outdir/docker_build.log"
 
         return 1
+    fi
+
+    if [ "$platform" != "$HOST_PLATFORM" ]; then
+        if ! run_native_lintian "$lintian_image" "$container_outdir" "$outdir/docker_build.log"; then
+            echo "LINTIAN FAILED: ${distro}/${codename} (${arch})"
+            echo "Log: $outdir/docker_build.log"
+            show_failure_log "$outdir/docker_build.log"
+            return 1
+        fi
     fi
 
     if [ "$REQUIRE_CONSOLE_PORTS" -eq 1 ] && required_console_port_target "$distro" "$codename" "$arch"; then
@@ -973,3 +1100,5 @@ echo "============================================================"
 ls -R out/linux out/raspbian 2>/dev/null || true
 
 CLEANUP_SUCCESS=1
+
+# end of emulated-native-matrix/debianubuntu-build-freebasic-matrix.sh

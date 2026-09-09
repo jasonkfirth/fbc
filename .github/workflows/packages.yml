@@ -36,6 +36,11 @@ on:
         required: true
         default: false
         type: boolean
+      linux_matrix_target:
+        description: Build one named Linux matrix row, or all rows
+        required: true
+        default: all
+        type: string
 
 concurrency:
   group: fbc-xl-packages-${{ github.ref }}
@@ -142,9 +147,11 @@ jobs:
 
     steps:
       - name: Checkout
+        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         uses: actions/checkout@v7
 
       - name: Install Linux matrix host dependencies
+        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         run: |
           set -euo pipefail
           sudo apt-get update
@@ -161,9 +168,11 @@ jobs:
           docker version
 
       - name: Seed host compiler bootstrap sources
+        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
 
       - name: Build the current host compiler
+        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         run: |
           set -euo pipefail
           host_feature_args=(
@@ -183,6 +192,7 @@ jobs:
           make -j4 compiler "${host_feature_args[@]}" </dev/null
 
       - name: Build Linux package row
+        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         env:
           MATRIX_NAME: ${{ matrix.name }}
           MATRIX_ARCH: ${{ matrix.arch }}
@@ -215,6 +225,7 @@ jobs:
           fi
 
       - name: Upload Linux package row
+        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         uses: actions/upload-artifact@v7
         with:
           name: fbc-xl-linux-package-${{ matrix.name }}
@@ -225,7 +236,7 @@ jobs:
             out/raspbian/
 
       - name: Upload Linux row diagnostics
-        if: ${{ always() }}
+        if: ${{ always() && (inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name) }}
         uses: actions/upload-artifact@v7
         with:
           name: fbc-xl-linux-diagnostic-${{ matrix.name }}

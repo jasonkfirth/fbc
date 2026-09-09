@@ -29,6 +29,27 @@ Debian Trixie and Sid, Raspbian Trixie, current postmarketOS, Rocky Linux 10,
 AlmaLinux 10, openSUSE Leap 16.0, and openSUSE Tumbleweed. Other retained files
 remain downloadable, but their presence does not imply current qualification.
 
+## Debian-family matrix maintenance
+
+The Debian, Ubuntu, and Raspbian release matrix builds each package in a
+target-architecture container. Foreign arm64 and riscv64 containers use two
+make workers. Other foreign containers remain serial to limit QEMU pressure.
+
+Lintian does not execute package payloads. For a foreign-architecture row, the
+matrix therefore collects the packages in the target container and validates
+the resulting `.changes` file in a native-CPU container from the same distro
+release. Raspbian uses Debian Trixie's native validator because the Raspbian
+image has no x86-64 variant. This keeps the distro's Lintian policy while
+avoiding Perl and package analysis under QEMU. Each Lintian invocation has a
+30-minute limit controlled by `FBC_PACKAGE_LINTIAN_TIMEOUT_SECONDS`.
+
+The matrix streams Docker output to the Actions log and also retains it in
+`out/linux/.../docker_build.log` or `out/raspbian/.../docker_build.log`. UTC
+markers identify image pull, package build, and Lintian phases. A manual Actions
+run can set `full_linux_matrix` and name one row in `linux_matrix_target`, such
+as `debian-sid-arm64`, to troubleshoot that row without rebuilding the other
+targets. Use `all` for release qualification.
+
 ## Package groups
 
 On Debian and Ubuntu, `freebasic-full` installs the normal compiler plus the
