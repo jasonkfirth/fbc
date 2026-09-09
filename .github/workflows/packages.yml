@@ -66,7 +66,7 @@ jobs:
       - name: Install package build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo bash build_scripts/github-actions-apt-update.sh
           sudo apt-get install -y --no-install-recommends \
             ca-certificates curl rsync tar xz-utils gzip dos2unix \
             build-essential pkg-config dpkg-dev debhelper devscripts fakeroot \
@@ -154,7 +154,7 @@ jobs:
         if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo bash build_scripts/github-actions-apt-update.sh
           sudo apt-get install -y --no-install-recommends \
             qemu-user-static binfmt-support \
             ca-certificates curl wget git \
