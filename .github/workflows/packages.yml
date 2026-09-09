@@ -257,6 +257,7 @@ jobs:
 
   windows:
     name: Windows package matrix
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' }}
     runs-on: windows-latest
     timeout-minutes: 240
 
@@ -320,6 +321,7 @@ jobs:
 
   macos:
     name: macOS package matrix
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' }}
     runs-on: macos-15
     timeout-minutes: 180
 
