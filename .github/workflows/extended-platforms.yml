@@ -253,6 +253,9 @@ jobs:
         with:
           ref: ${{ inputs.source_ref || github.ref }}
 
+      - name: Prepare Ubuntu package indexes
+        run: sudo bash build_scripts/github-actions-apt-update.sh
+
       - name: Seed host bootstrap sources
         run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
 
