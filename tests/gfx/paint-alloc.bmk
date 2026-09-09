@@ -2,12 +2,21 @@
 # paint-alloc.bmk: instrument only PAINT's allocations, then run the ABI fixture.
 MAIN := paint-alloc.bas
 SRCS :=
+PAINT_ALLOC_CORE := $(SRCDIR)../../src/gfxlib2/gfx_paint.c
+
+ifneq ($(wildcard $(PAINT_ALLOC_CORE)),)
 EXTRA_OBJS := paint-alloc-hooks.o paint-alloc-core.o
+PAINT_ALLOC_HOOK_FLAGS :=
+else
+EXTRA_OBJS := paint-alloc-hooks.o
+PAINT_ALLOC_HOOK_FLAGS := -DFB_TEST_LINKER_WRAP
+override FBC_LFLAGS += -Wl --wrap=malloc,--wrap=calloc,--wrap=free
+endif
 
 $(SRCDIR)paint-alloc-hooks.o: $(SRCDIR)paint-alloc.c
-	$(CC) -c $(CFLAGS) -o $@ $<
+	$(CC) -c $(CFLAGS) $(PAINT_ALLOC_HOOK_FLAGS) -o $@ $<
 
-$(SRCDIR)paint-alloc-core.o: $(SRCDIR)../../src/gfxlib2/gfx_paint.c
+$(SRCDIR)paint-alloc-core.o: $(PAINT_ALLOC_CORE)
 	$(CC) -c $(CFLAGS) -Dmalloc=fb_test_paint_malloc -Dcalloc=fb_test_paint_calloc -Dfree=fb_test_paint_free -o $@ $<
 
 # end of paint-alloc.bmk

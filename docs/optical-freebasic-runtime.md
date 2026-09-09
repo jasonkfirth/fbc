@@ -413,9 +413,11 @@ The automated tests are:
   so exhaustive checks do not issue a GPU readback for every pixel.
 - `tests/gfx/font-metrics-limits.c`: malformed width tables and integer overflow
   without enormous allocations.
-- `tests/gfx/paint-alloc.bas`, `.c`, `.bmk`: compile only gfxlib2's PAINT object
-  with allocator wrappers, fail every row-table/span allocation in a small
-  fill, and check unchanged pixels plus zero outstanding allocations.
+- `tests/gfx/paint-alloc.bas`, `.c`, `.bmk`: instrument gfxlib2's PAINT
+  allocations, fail every row-table/span allocation in a small fill, and check
+  unchanged pixels plus zero outstanding allocations. Source-tree runs compile
+  the PAINT object with redirected allocators; staged package tests use linker
+  wrapping because they intentionally omit the runtime source tree.
 - `tests/qb/graphics-helpers.bas`: QB spelling, declarations and runtime calls
   for both helpers.
 
