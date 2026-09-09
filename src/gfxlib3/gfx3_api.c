@@ -76,6 +76,21 @@ static const FB_GFX3_STANDARD_MODE standard_modes[] = {
 static FB_GFX3_MODE active_mode;
 static int mode_is_active;
 static char window_title[128] = "FreeBASIC gfxlib3";
+
+/*
+	Clang cannot emit native thread-local storage when targeting macOS before
+	10.7.  FreeBASIC still supports a 10.5 deployment target on x86_64, so those
+	builds use the runtime GFX TLS slot directly.  The cache only avoids a
+	repeated fb_TlsGetCtx() lookup; it does not own the drawing state.
+*/
+#if defined(HOST_DARWIN) && \
+	defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && \
+	(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 1070)
+	#define FB_GFX3_API_NATIVE_TLS 0
+#else
+	#define FB_GFX3_API_NATIVE_TLS 1
+#endif
+
 /*
 	The runtime GFX TLS slot owns the complete caller-local drawing state. Most
 	graphics calls come from the same BASIC thread, however, so asking the
@@ -85,8 +100,10 @@ static char window_title[128] = "FreeBASIC gfxlib3";
 	Closing or replacing a mode therefore invalidates the cache without reading
 	a state object which its TLS destructor may already have released.
 */
-static _Thread_local FB_GFX3_DRAW_STATE *api_cached_draw_state;
-static _Thread_local uint64_t api_cached_draw_state_generation;
+#if FB_GFX3_API_NATIVE_TLS
+	static _Thread_local FB_GFX3_DRAW_STATE *api_cached_draw_state;
+	static _Thread_local uint64_t api_cached_draw_state_generation;
+#endif
 
 #define FB_GFX3_SCREEN_FULLSCREEN 0x00000001u
 #define FB_GFX3_SCREEN_NO_FRAME   0x00000008u
@@ -165,8 +182,10 @@ static void api_tls_destructor(void *data)
 {
 	FB_GFXCTX *runtime_context = (FB_GFXCTX *)data;
 
+	#if FB_GFX3_API_NATIVE_TLS
 	api_cached_draw_state = NULL;
 	api_cached_draw_state_generation = 0;
+	#endif
 	fb_gfx3_draw_state_destroy(
 		(FB_GFX3_DRAW_STATE *)runtime_context->line);
 	free((void *)runtime_context->line);
@@ -208,16 +227,16 @@ FB_GFX3_DRAW_STATE *fb_gfx3_api_get_draw_state_locked(void)
 {
 	FB_GFXCTX *runtime_context;
 	FB_GFX3_DRAW_STATE *state;
-	uint64_t generation;
 
 	if (!mode_is_active)
 		return NULL;
-	generation = active_mode.generation;
+	#if FB_GFX3_API_NATIVE_TLS
 	if ((api_cached_draw_state != NULL) &&
-	    (api_cached_draw_state_generation == generation)) {
+	    (api_cached_draw_state_generation == active_mode.generation)) {
 		fb_gfx3_api_apply_pending_resize_locked(api_cached_draw_state);
 		return api_cached_draw_state;
 	}
+	#endif
 	runtime_context = (FB_GFXCTX *)fb_TlsGetCtx(FB_TLSKEY_GFX,
 		sizeof(*runtime_context), api_tls_destructor);
 	if (runtime_context == NULL)
@@ -240,8 +259,10 @@ FB_GFX3_DRAW_STATE *fb_gfx3_api_get_draw_state_locked(void)
 		runtime_context->line = (unsigned char **)state;
 		runtime_context->id = (int)(active_mode.generation & INT_MAX);
 	}
+	#if FB_GFX3_API_NATIVE_TLS
 	api_cached_draw_state = state;
-	api_cached_draw_state_generation = generation;
+	api_cached_draw_state_generation = active_mode.generation;
+	#endif
 	fb_gfx3_api_apply_pending_resize_locked(state);
 	return state;
 }
