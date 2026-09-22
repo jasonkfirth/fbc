@@ -12,6 +12,7 @@
 # Responsibilities:
 #
 #     * build Linux, Windows, macOS, BSD, and Haiku package sets
+#     * audit every Linux package-factory row on the scheduled full matrix
 #     * retain successful package output for manual download
 #     * attach package files to version-tagged GitHub Releases
 #
@@ -29,6 +30,10 @@ on:
       - master
     tags:
       - 'v*'
+  schedule:
+    # The full package-factory audit catches distribution image and packaging
+    # drift without making normal source commits wait for every Linux row.
+    - cron: '17 4 * * 4'
   workflow_dispatch:
     inputs:
       full_linux_matrix:
@@ -55,7 +60,7 @@ env:
 jobs:
   linux-debian:
     name: Debian package
-    if: ${{ !startsWith(github.ref, 'refs/tags/v') && !(github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) }}
+    if: ${{ github.event_name != 'schedule' && !startsWith(github.ref, 'refs/tags/v') && !(github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 180
 
@@ -99,49 +104,91 @@ jobs:
           retention-days: 30
           path: ${{ runner.temp }}/packages/debian/
 
+  linux-package-plan:
+    name: Linux package-factory plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Export the canonical Linux package matrix
+        id: plan
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          import sys
+
+          result = subprocess.run(
+              ["bash", "build_scripts/linux-cross-build-freebasic-matrix.sh", "--list"],
+              check=False,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.PIPE,
+              text=True,
+          )
+          if result.returncode != 0:
+              sys.stderr.write(result.stderr)
+              raise SystemExit(result.returncode)
+
+          rows = []
+          # Each package family needs its own runner below. Refuse a new
+          # family until it has an explicit build path instead of skipping it.
+          expected_families = {"deb", "apk", "rpm", "archlinux", "slackware"}
+          seen_families = set()
+
+          for line in result.stdout.splitlines():
+              fields = line.split("|", 6)
+              if len(fields) != 7:
+                  raise SystemExit(f"unexpected package-factory row: {line!r}")
+
+              family, distro, release, arch, _image, _builder, _outdir = fields
+              if family == "vm":
+                  # BSD and Haiku guests are qualified by extended-platforms.
+                  continue
+              if family not in expected_families:
+                  raise SystemExit(f"unexpected Linux package family: {family}")
+
+              row_name = f"{distro}-{release.replace('.', '_')}-{arch}"
+              rows.append(
+                  {
+                      "name": row_name,
+                      "family": family,
+                      "distro": distro,
+                      "release": release,
+                      "arch": arch,
+                  }
+              )
+              seen_families.add(family)
+
+          if not rows:
+              raise SystemExit("the Linux package factory reported no package rows")
+
+          missing_families = expected_families - seen_families
+          if missing_families:
+              names = ", ".join(sorted(missing_families))
+              raise SystemExit(f"the Linux package factory omitted: {names}")
+
+          matrix = json.dumps({"include": rows}, separators=(",", ":"))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              print(f"matrix={matrix}", file=output)
+
+          print(f"Prepared {len(rows)} Linux package rows.")
+          PY
+
   linux-release-matrix:
     name: Linux ${{ matrix.name }} package
-    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) }}
+    needs: linux-package-plan
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) }}
     strategy:
       fail-fast: false
       max-parallel: 6
-      matrix:
-        include:
-          - { name: ubuntu-resolute-amd64, family: debian, distro: ubuntu, release: resolute, arch: amd64 }
-          - { name: ubuntu-resolute-arm64, family: debian, distro: ubuntu, release: resolute, arch: arm64 }
-          - { name: ubuntu-resolute-armhf, family: debian, distro: ubuntu, release: resolute, arch: armhf }
-          - { name: ubuntu-resolute-ppc64el, family: debian, distro: ubuntu, release: resolute, arch: ppc64el }
-          - { name: ubuntu-resolute-s390x, family: debian, distro: ubuntu, release: resolute, arch: s390x }
-          - { name: ubuntu-resolute-riscv64, family: debian, distro: ubuntu, release: resolute, arch: riscv64 }
-          - { name: debian-trixie-amd64, family: debian, distro: debian, release: trixie, arch: amd64 }
-          - { name: debian-trixie-arm64, family: debian, distro: debian, release: trixie, arch: arm64 }
-          - { name: debian-trixie-armhf, family: debian, distro: debian, release: trixie, arch: armhf }
-          - { name: debian-trixie-ppc64el, family: debian, distro: debian, release: trixie, arch: ppc64el }
-          - { name: debian-trixie-s390x, family: debian, distro: debian, release: trixie, arch: s390x }
-          - { name: debian-trixie-riscv64, family: debian, distro: debian, release: trixie, arch: riscv64 }
-          - { name: debian-trixie-armel, family: debian, distro: debian, release: trixie, arch: armel }
-          - { name: debian-trixie-loong64, family: debian, distro: debian, release: trixie, arch: loong64 }
-          - { name: debian-sid-amd64, family: debian, distro: debian, release: sid, arch: amd64 }
-          - { name: debian-sid-arm64, family: debian, distro: debian, release: sid, arch: arm64 }
-          - { name: debian-sid-armhf, family: debian, distro: debian, release: sid, arch: armhf }
-          - { name: debian-sid-ppc64el, family: debian, distro: debian, release: sid, arch: ppc64el }
-          - { name: debian-sid-s390x, family: debian, distro: debian, release: sid, arch: s390x }
-          - { name: debian-sid-riscv64, family: debian, distro: debian, release: sid, arch: riscv64 }
-          - { name: raspbian-trixie-armhf, family: debian, distro: raspbian, release: trixie, arch: armhf }
-          - { name: alpine-3_24-x86_64, family: alpine, distro: alpine, release: '3.24', arch: x86_64 }
-          - { name: alpine-3_24-aarch64, family: alpine, distro: alpine, release: '3.24', arch: aarch64 }
-          - { name: alpine-3_24-armv7, family: alpine, distro: alpine, release: '3.24', arch: armv7 }
-          - { name: alpine-3_24-ppc64le, family: alpine, distro: alpine, release: '3.24', arch: ppc64le }
-          - { name: alpine-3_24-s390x, family: alpine, distro: alpine, release: '3.24', arch: s390x }
-          - { name: alpine-3_24-riscv64, family: alpine, distro: alpine, release: '3.24', arch: riscv64 }
-          - { name: alpine-edge-x86_64, family: alpine, distro: alpine, release: edge, arch: x86_64 }
-          - { name: alpine-edge-aarch64, family: alpine, distro: alpine, release: edge, arch: aarch64 }
-          - { name: alpine-edge-armv7, family: alpine, distro: alpine, release: edge, arch: armv7 }
-          - { name: alpine-edge-ppc64le, family: alpine, distro: alpine, release: edge, arch: ppc64le }
-          - { name: alpine-edge-s390x, family: alpine, distro: alpine, release: edge, arch: s390x }
-          - { name: alpine-edge-riscv64, family: alpine, distro: alpine, release: edge, arch: riscv64 }
-          - { name: postmarketos-edge-x86_64, family: alpine, distro: postmarketos, release: edge, arch: x86_64 }
-          - { name: postmarketos-edge-aarch64, family: alpine, distro: postmarketos, release: edge, arch: aarch64 }
+      matrix: ${{ fromJSON(needs.linux-package-plan.outputs.matrix) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
 
@@ -202,27 +249,61 @@ jobs:
           JOBS: 4
         run: |
           set -euo pipefail
-          if [[ "$MATRIX_FAMILY" == "debian" ]]; then
-            matrix_args=(
-              --distro "$MATRIX_DISTRO"
-              --release "$MATRIX_RELEASE"
-              --arch "$MATRIX_ARCH"
-              --jobs 4
-              --skip-host-deps
-            )
-            if [[ "$MATRIX_NAME" == "ubuntu-resolute-amd64" ]]; then
-              matrix_args+=(--required-console-ports)
-            fi
-            bash build_scripts/debianubuntu-build-freebasic-matrix.sh \
-              "${matrix_args[@]}"
-          else
-            bash build_scripts/alpine-freebasic-matrix-build.sh \
-              --distro "$MATRIX_DISTRO" \
-              --release "$MATRIX_RELEASE" \
-              --arch "$MATRIX_ARCH" \
-              --jobs 4 \
-              --skip-host-deps
-          fi
+          case "$MATRIX_FAMILY" in
+            deb)
+              matrix_args=(
+                --distro "$MATRIX_DISTRO"
+                --release "$MATRIX_RELEASE"
+                --arch "$MATRIX_ARCH"
+                --jobs 4
+                --skip-host-deps
+              )
+              if [[ "$MATRIX_NAME" == "ubuntu-resolute-amd64" ]]; then
+                matrix_args+=(--required-console-ports)
+              fi
+              bash build_scripts/debianubuntu-build-freebasic-matrix.sh \
+                "${matrix_args[@]}"
+              ;;
+            apk)
+              bash build_scripts/alpine-freebasic-matrix-build.sh \
+                --distro "$MATRIX_DISTRO" \
+                --release "$MATRIX_RELEASE" \
+                --arch "$MATRIX_ARCH" \
+                --jobs 4 \
+                --skip-host-deps
+              ;;
+            rpm)
+              bash build_scripts/rpm-cross-build-freebasic-matrix.sh \
+                --distro "$MATRIX_DISTRO" \
+                --release "$MATRIX_RELEASE" \
+                --arch "$MATRIX_ARCH" \
+                --jobs 4 \
+                --skip-host-deps \
+                --execute
+              ;;
+            archlinux)
+              bash build_scripts/archlinux-cross-build-freebasic-matrix.sh \
+                --distro "$MATRIX_DISTRO" \
+                --release "$MATRIX_RELEASE" \
+                --arch "$MATRIX_ARCH" \
+                --jobs 4 \
+                --skip-host-deps \
+                --execute
+              ;;
+            slackware)
+              bash build_scripts/slackware-cross-build-freebasic-matrix.sh \
+                --distro "$MATRIX_DISTRO" \
+                --release "$MATRIX_RELEASE" \
+                --arch "$MATRIX_ARCH" \
+                --jobs 4 \
+                --skip-host-deps \
+                --execute
+              ;;
+            *)
+              echo "ERROR: unsupported Linux package family: $MATRIX_FAMILY" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Upload Linux package row
         if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
