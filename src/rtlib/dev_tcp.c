@@ -1619,12 +1619,14 @@ int fb_DevTcpAcceptHandle( FB_FILE *server_handle, FB_FILE *client_handle )
 		tv.tv_sec = server_info->timeout / 1000;
 		tv.tv_usec = (server_info->timeout % 1000) * 1000;
 
+		/* Watt-32 treats a zero-timeout select as an immediate poll. Its
+		   listener must instead block when OPEN TCP SERVER omitted TIMEOUT. */
+		#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
 		ready = FB_TCP_SELECT( server_info->hSocket + 1, &set, NULL, NULL,
-#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
-		                      server_info->timeout ? &tv : NULL );
-#else
-		                      &tv );
-#endif
+		                       server_info->timeout ? &tv : NULL );
+		#else
+		ready = FB_TCP_SELECT( server_info->hSocket + 1, &set, NULL, NULL, &tv );
+		#endif
 		if( ready <= 0 )
 			return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 	}

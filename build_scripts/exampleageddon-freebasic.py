@@ -463,7 +463,7 @@ def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="ignore")
 
 
-def classify(path: Path, root: Path, target_os: str) -> Classification:
+def classify(path: Path, root: Path, target_os: str, supports_gas64: bool) -> Classification:
     rel = relpath(path, root)
     lowered_path = "/" + rel.lower()
     text = read_text(path)
@@ -471,6 +471,13 @@ def classify(path: Path, root: Path, target_os: str) -> Classification:
 
     if rel in INTENTIONAL_FAILURES:
         return Classification("intentional-failure", "example intentionally demonstrates an error path", False)
+
+    if rel in GAS64_VARIADIC_SOURCES and not supports_gas64:
+        return Classification(
+            "platform-specific",
+            "example requires the native x86-64 ASM backend",
+            False,
+        )
 
     if rel in HELPER_MODULES:
         return Classification("helper-module", "source is built through a multi-file or library rule", False)
@@ -829,7 +836,7 @@ def run_command(
 
 def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     rel = relpath(path, root)
-    classification = classify(path, root, args.target_os)
+    classification = classify(path, root, args.target_os, compiler_supports_gas64(args))
     stem = safe_name(rel[:-4])
     binary = args.outdir / "bin" / executable_name(stem)
     compile_log = args.outdir / "logs" / (stem + ".compile.log")
