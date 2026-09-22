@@ -320,9 +320,10 @@ jobs:
       - name: Build RISC OS toolchains, FreeBASIC, and RPCEmu
         run: |
           set -euo pipefail
+          mkdir -p out/riscos
           bash build_scripts/debianubuntu-build-freebasic-riscos.sh \
             --no-package \
-            --jobs "$JOBS"
+            --jobs "$JOBS" 2>&1 | tee out/riscos/build-riscos.log
 
       - name: Run RISC OS fbctests
         run: |
@@ -346,6 +347,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
           path: |
+            out/riscos/build-riscos.log
             out/riscos/fbctests/
             out/riscos/exampleageddon/
             out/riscos/gccsdk/gcc4/build-*-output.txt

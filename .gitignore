@@ -9,6 +9,11 @@
 *.zip
 *.log
 
+# Example compilation can retain intermediate assembler or C beside the source.
+# Those outputs must not become example source files in version control.
+/examples/**/*.asm
+/examples/**/*.fbc-*.c
+
 # Legacy Windows import libraries and runtime DLLs intentionally bundled for
 # examples that still depend on libraries not provided by current MSYS2.
 !/contrib/winlibs-legacy/

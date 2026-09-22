@@ -28,6 +28,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source_list="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/fbc-cppcheck-sources.txt"
+lint_log="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/fbc-cppcheck.log"
 
 cd "$repo_root"
 
@@ -69,7 +70,7 @@ echo "Cppcheck source manifest: $source_count first-party files"
 # Ubuntu 24.04 ships Cppcheck 2.13, while developer machines may use newer
 # releases.  Some parser limitations have different diagnostic identifiers
 # between those versions, so both narrow names are retained where necessary.
-cppcheck \
+if ! cppcheck \
     --enable=warning,performance,portability \
     --error-exitcode=1 \
     --inline-suppr \
@@ -121,7 +122,11 @@ cppcheck \
     -Isrc/gfxlib2 \
     -Isrc/gfxlib3 \
     -Isrc/sfxlib \
-    --file-list="$source_list"
+    --file-list="$source_list" \
+    2> "$lint_log"; then
+    cat "$lint_log" >&2
+    exit 1
+fi
 
 ##############################################################################
 # end of lint-c-sources.sh

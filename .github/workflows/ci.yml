@@ -68,6 +68,15 @@ jobs:
       - name: Lint all first-party C and C++ sources
         run: bash build_scripts/lint-c-sources.sh
 
+      - name: Upload C/C++ lint diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-cppcheck-diagnostics
+          if-no-files-found: warn
+          retention-days: 7
+          path: ${{ runner.temp }}/fbc-cppcheck.log
+
   bootstrap-sources:
     name: Generate native bootstrap sources
     runs-on: ubuntu-24.04

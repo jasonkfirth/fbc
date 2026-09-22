@@ -353,19 +353,35 @@ def compiler_supports_gas64(args: argparse.Namespace) -> bool:
     if compiler_name in ("fbc32.exe", "fbcarm64.exe", "fbcarm64"):
         return False
 
-    compiler_arguments = [str(argument).lower() for argument in args.fbc_arg]
+    # --fbc accepts a complete command, not just the compiler executable.
+    # Cross-target wrappers such as Windows CE put -target and -gen there;
+    # adding gas64 after an explicit non-x86-64 generator is invalid.
+    compiler_arguments = [str(argument).lower() for argument in args.fbc[1:]]
+    compiler_arguments.extend(str(argument).lower() for argument in args.fbc_arg)
     for index, argument in enumerate(compiler_arguments):
         if argument.startswith("-target="):
             target = argument.split("=", 1)[1]
-            if target in ("win32", "dos", "x86", "i386"):
+            if target in ("win32", "dos", "x86", "i386") or any(
+                architecture in target
+                for architecture in ("arm", "aarch", "mips", "riscv", "ppc", "s390", "loongarch")
+            ):
                 return False
         elif argument in ("-target", "--target") and index + 1 < len(compiler_arguments):
             target = compiler_arguments[index + 1]
-            if target in ("win32", "dos", "x86", "i386"):
+            if target in ("win32", "dos", "x86", "i386") or any(
+                architecture in target
+                for architecture in ("arm", "aarch", "mips", "riscv", "ppc", "s390", "loongarch")
+            ):
                 return False
         elif argument in ("-arch", "-cpu") and index + 1 < len(compiler_arguments):
             cpu = compiler_arguments[index + 1]
             if cpu in ("x86", "i386", "i686", "386", "x86_32"):
+                return False
+        elif argument.startswith("-gen="):
+            if argument.split("=", 1)[1] != "gas64":
+                return False
+        elif argument in ("-gen", "--gen") and index + 1 < len(compiler_arguments):
+            if compiler_arguments[index + 1] != "gas64":
                 return False
 
     return True
