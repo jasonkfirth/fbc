@@ -20,6 +20,12 @@
 #inclib "variant"
 #libpath "libvariant"
 
+#ifdef NOTHING
+	'' ntdef.bi keeps this C compatibility macro, but the public VARIANT
+	'' sentinel uses the same name as an enum member.
+	#undef NOTHING
+#endif
+
 enum VARIANT_NOTHING
 	NOTHING = -1
 end enum
@@ -30,8 +36,8 @@ end enum
 type VARIANT
 	as VARIANT_ var_
 
- 	declare constructor ( )
- 	declare constructor ( byref rhs as VARIANT )
+	declare constructor ( )
+	declare constructor ( byref rhs as VARIANT )
 	declare constructor ( byref rhs as VARIANT, byval deep_copy as integer )
 	declare constructor ( byref rhs as VARIANT_ )
 	declare constructor ( byref rhs as VARIANT_, byval deep_copy as integer )
@@ -44,7 +50,7 @@ type VARIANT
 	declare constructor ( byval rhs as zstring ptr )
 	declare constructor ( byval rhs as wstring ptr )
 
- 	declare destructor ( )
+	declare destructor ( )
 
  #ifndef VARIANT_NOASSIGNMENT
 	declare operator let ( byval rhs as VARIANT_NOTHING )

@@ -45,7 +45,7 @@ Declare Sub wxMDIChildFrame_Maximize WXCALL Alias "wxMDIChildFrame_Maximize" (se
 
 ' class wxMDIClientWindow
 Declare Function wxMDIClientWindow_ctor WXCALL Alias "wxMDIClientWindow_ctor" () As wxMDIClientWindow Ptr
-Declare Function wxMDIClientWindow_CreateClient WXCALL Alias "wxMDIClientWindow_CreateClient" (self As wxMDIClientWindow Ptr, parent As wxMDIParentFrame Ptr, style As wxUint) As wxBool 
+Declare Function wxMDIClientWindow_CreateClient WXCALL Alias "wxMDIClientWindow_CreateClient" (self As wxMDIClientWindow Ptr, parent As wxMDIParentFrame Ptr, style As wxUint) As wxBool
 
 #EndIf ' __mdi_bi__
 

@@ -46,6 +46,44 @@ mk-structure-test:
 		exit 1; \
 	}
 
+	@dos_default="$$( $(MAKE) --no-print-directory -s print-config \
+		HAVE_PREREQS_MK= TARGET_OS=dos \
+		| sed -n 's/^ALLCFLAGS=//p' )"; \
+	printf '%s\n' "$$dos_default" | grep -F -- '-DDISABLE_TCP' >/dev/null || { \
+		echo "ERROR: DOS default unexpectedly enabled TCP"; \
+		exit 1; \
+	}; \
+	printf '%s\n' "$$dos_default" | grep -F -- '-DFB_DOS_DPMI_YIELD' >/dev/null && { \
+		echo "ERROR: DOS default unexpectedly enabled DPMI yielding"; \
+		exit 1; \
+	}; \
+	dos_yield_config="$$( $(MAKE) --no-print-directory -s print-config \
+		HAVE_PREREQS_MK= TARGET_OS=dos DOS_DPMI_YIELD=YesPlease \
+		)"; \
+	dos_yield="$$(printf '%s\n' "$$dos_yield_config" | sed -n 's/^ALLCFLAGS=//p')"; \
+	printf '%s\n' "$$dos_yield" | grep -F -- '-DFB_DOS_DPMI_YIELD' >/dev/null || { \
+		echo "ERROR: DOS_DPMI_YIELD did not enable the DPMI yield macro"; \
+		exit 1; \
+	}; \
+	dos_yield_mt="$$(printf '%s\n' "$$dos_yield_config" | sed -n 's/^DISABLE_MT=//p')"; \
+	[ "$$dos_yield_mt" = "YesPlease" ] || { \
+		echo "ERROR: DOS_DPMI_YIELD unexpectedly enabled the MT archives"; \
+		exit 1; \
+	}; \
+	printf '%s\n' "$$dos_yield" | grep -F -- '-DDISABLE_TCP' >/dev/null || { \
+		echo "ERROR: DOS_DPMI_YIELD changed the DOS TCP default"; \
+		exit 1; \
+	}
+
+	@dos_threads="$$( $(MAKE) --no-print-directory -s print-config \
+		HAVE_PREREQS_MK= TARGET_TRIPLET=i586-pc-msdosdjgpp \
+		DOS_THREAD_PROVIDER=pdmlwp )"; \
+	printf '%s\n' "$$dos_threads" | grep -Fx 'THREAD_MODEL=pdmlwp' >/dev/null && \
+	printf '%s\n' "$$dos_threads" | grep -Fx 'DISABLE_MT=' >/dev/null || { \
+		echo "ERROR: explicit DOS thread provider did not enable MT archives"; \
+		exit 1; \
+	}
+
 	$(call _mt_echo,$(mkpath)/ structure OK)
 
 ##############################################################################

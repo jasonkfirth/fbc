@@ -8,6 +8,8 @@
 
 Dim n As Double
 n = 6
+'' The floating right operand intentionally demonstrates that \= truncates its input.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL405 FBL-NUM-017
 n \= 2.2
 Print n
 Sleep

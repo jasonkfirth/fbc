@@ -6,6 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtCriticalSectionsFAQ
 '' --------
 
+'' Thread synchronization: the mutex lock protects the condition predicate and its signal.
+
 #define while_loop_on_predicate
 
 Dim As Any Ptr handle
@@ -80,4 +82,3 @@ Color 7 : Print "Thread#1 finished": Print
 MutexDestroy(mutex)
 CondDestroy(cond)
 Sleep
-

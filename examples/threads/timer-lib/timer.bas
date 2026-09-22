@@ -34,6 +34,10 @@ sub CTimer.threadcb( byval ctx as CTimer ptr ) export
 			if( interval <= 0 ) then
 				ctx->callback( ctx->userdata )
 			end if
+
+		case else
+			'' An invalid state must not leave the worker in a tight polling loop.
+			sleep 1, 1
 		end select
 	loop
 end sub
@@ -50,7 +54,7 @@ constructor CTimer _
 	this.userdata   = userdata
 	this.cond       = condcreate( )
 	this.cond_mutex = mutexcreate( )
-	this.thread     = threadcreate( cast(sub(byval as any ptr), @threadcb), cast( any ptr, @this ) )
+	this.thread     = threadcreate( cast(sub(byval as any ptr), @CTimer.threadcb), cast( any ptr, @this ) )
 	this.waiting    = -1
 end constructor
 

@@ -6,9 +6,11 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgGetfileio
 '' --------
 
-Dim Shared f As Integer
+'' Resource policy:
+'' The caller owns the binary file handle. get_mem owns its temporary buffer
+'' only after Allocate succeeds and clears it after Deallocate.
 
-Sub get_long()
+Sub get_long(ByVal f As Integer)
 
 	Dim buffer As Long ' Long variable
 
@@ -21,7 +23,7 @@ Sub get_long()
 
 End Sub
 
-Sub get_array()
+Sub get_array(ByVal f As Integer)
 
 	Dim an_array(0 To 10-1) As Long ' array of Longs
 
@@ -36,12 +38,17 @@ Sub get_array()
 
 End Sub
 
-Sub get_mem
+Sub get_mem(ByVal f As Integer)
 
 	Dim pmem As Long Ptr
 
 	' allocate memory for 5 Longs
 	pmem = Allocate(5 * SizeOf(Long))
+	If pmem = 0 Then
+		Print "Could not allocate memory for 5 Longs"
+		Print
+		Exit Sub
+	End If
 
 	' Read 5 Longs (5 * 4 = 20 bytes) from the file into allocated memory
 	Get #f, , *pmem, 5 ' Note pmem must be dereferenced (*pmem, or pmem[0])
@@ -54,20 +61,25 @@ Sub get_mem
 
 	' free pointer memory to prevent memory leak
 	Deallocate pmem
+	pmem = 0
 
 End Sub
 
 ' Find the first free file file number.
+Dim f As Integer
 f = FreeFile
 
 ' Open the file "file.ext" for binary usage, using the file number "f".
-Open "file.ext" For Binary As #f
+If Open("file.ext" For Binary As #f) <> 0 Then
+	Print "Could not open file.ext"
+Else
 
-  get_long()
+  get_long(f)
 
-  get_array()
+  get_array(f)
 
-  get_mem()
+  get_mem(f)
 
-' Close the file.
-Close #f
+	' Close the file.
+	Close #f
+End If

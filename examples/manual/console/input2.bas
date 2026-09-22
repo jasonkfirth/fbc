@@ -14,6 +14,8 @@ Do
 	Input   "Please enter a number: ", a
 	Input ; "And another: ", b
 	Print , "Thank you"
+	'' Keep this teaching pause visible before the next prompt.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL602
 	Sleep 500
 	Print
 	Print "The total is "; a + b

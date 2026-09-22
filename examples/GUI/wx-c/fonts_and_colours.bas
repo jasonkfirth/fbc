@@ -3,6 +3,8 @@
 Declare Function App_OnInit WXCALL ( ) As wxBool
 Declare Function App_OnExit WXCALL ( ) As wxInt
 
+' wxWidgets callbacks own and use this application widget graph.
+' FB-LINTER: DISABLE-NEXT-LINE FBL301
 Dim Shared As wxApp Ptr wx_app
 Dim Shared As wxFrame Ptr wx_frame
 Dim Shared As wxPanel Ptr wx_panel

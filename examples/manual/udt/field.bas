@@ -6,6 +6,7 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgField
 '' --------
 
+'' Layout: bytes 0-13 are the BMP file header; bytes 14-53 are its DIB header.
 Type bitmap_header Field = 1
 	bfType          As UShort
 	bfsize          As ULong
@@ -26,16 +27,24 @@ Type bitmap_header Field = 1
 End Type
 
 Dim bmp_header As bitmap_header
+Dim file_number As Integer
 
 'Open up bmp.bmp and get its header data:
 'Note: Will not work without a bmp.bmp to load . . .
-Open "bmp.bmp" For Binary As #1
+file_number = FreeFile
 
-	Get #1, , bmp_header
+If Open("bmp.bmp" For Binary As #file_number) <> 0 Then
+	Print "Could not open bmp.bmp"
+Else
+	' The bitmap_header layout above is the BMP file-format contract.
+	' FB-LINTER: DISABLE-NEXT-LINE FBL-DOC-BIN-003
+	If Get(#file_number, , bmp_header) <> 0 Then
+		Print "Could not read the BMP header"
+	Else
+		Print bmp_header.biWidth, bmp_header.biHeight
+	End If
 
-Close #1
-
-Print bmp_header.biWidth, bmp_header.biHeight
+	Close #file_number
+End If
 
 Sleep
-

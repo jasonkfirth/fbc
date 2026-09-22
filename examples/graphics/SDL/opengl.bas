@@ -1,11 +1,19 @@
+'' Project: FreeBASIC SDL and OpenGL examples
+'' File: opengl.bas
+''
+'' Purpose:
+''     Demonstrate SDL-managed OpenGL context setup and a simple rotating scene.
+''
+'' Ownership:
+''     A successful SDL_Init owns process-level SDL state until the one display
+''     loop finishes and calls SDL_Quit.  SDL owns the video surface.
+''
+'' This file intentionally does NOT contain:
+''     - a reusable SDL window abstraction
+''     - application-owned OpenGL resource objects
 ''
 '' SDL + Opengl example
-''
 '' Opengl code ported from nehe's gl tutorials
-''
-
-
-
 #include  "SDL/SDL.bi"
 #include  "GL/gl.bi"
 #include  "GL/glu.bi"
@@ -17,9 +25,9 @@ declare sub doRender ()
 	dim event as SDL_Event
 
 	dim i as integer
-	dim lightAmb(3) as single
-	dim lightDif(3) as single
-	dim lightPos(3) as single
+	dim lightAmb(0 to 3) as single
+	dim lightDif(0 to 3) as single
+	dim lightPos(0 to 3) as single
 	dim w as integer
 	dim h as integer
 
@@ -28,20 +36,21 @@ declare sub doRender ()
 
 	result = SDL_Init(SDL_INIT_EVERYTHING)
 	if result <> 0 then
-  		end 1
+			end 1
 	end if
+
+	'' SDL uses these requests while it creates the OpenGL context below.
+	SDL_GL_SetAttribute SDL_GL_RED_SIZE, 5
+	SDL_GL_SetAttribute SDL_GL_GREEN_SIZE, 5
+	SDL_GL_SetAttribute SDL_GL_BLUE_SIZE, 5
+	SDL_GL_SetAttribute SDL_GL_DEPTH_SIZE, 16
+	SDL_GL_SetAttribute SDL_GL_DOUBLEBUFFER, 1
 
 	video = SDL_SetVideoMode( w, h, 16, SDL_DOUBLEBUF or SDL_OPENGL or SDL_OPENGLBLIT or SDL_FULLSCREEN)
 	if video = 0 then
 		SDL_Quit
 		end 1
 	end if
-
-	SDL_GL_SetAttribute SDL_GL_RED_SIZE, 5
-	SDL_GL_SetAttribute SDL_GL_GREEN_SIZE, 5
-	SDL_GL_SetAttribute SDL_GL_BLUE_SIZE, 5
-	SDL_GL_SetAttribute SDL_GL_DEPTH_SIZE, 16
-	SDL_GL_SetAttribute SDL_GL_DOUBLEBUFFER, 1
 
 
 	glViewport 0, 0, w, h
@@ -65,9 +74,9 @@ declare sub doRender ()
 	'' Light setup ( not used at the moment )
 	''
 	for i = 0 to 3
-  		lightAmb(i) = 0.5
-  		lightDif(i) = 1.0
-  		lightPos(i) = 0.0
+			lightAmb(i) = 0.5
+			lightDif(i) = 1.0
+			lightPos(i) = 0.0
 	next i
 
 	lightAmb(3) = 1.0
@@ -76,7 +85,7 @@ declare sub doRender ()
 
 	glLightfv GL_LIGHT1, GL_AMBIENT, @lightAmb(0)
 	glLightfv GL_LIGHT1, GL_DIFFUSE, @lightDif(0)
-	glLightfv GL_LIGHT1, GL_POSITION,@lightPos(0)
+	glLightfv GL_LIGHT1, GL_POSITION, @lightPos(0)
 	glEnable GL_LIGHT1
 
 	''
@@ -89,7 +98,7 @@ declare sub doRender ()
 
 	do
 
-  		doRender
+			doRender
 
 		SDL_GL_SwapBuffers
 
@@ -114,40 +123,40 @@ sub doRender
 		glColor3f   1.0, 0.0, 0.0			'' Red
 		glVertex3f  0.0, 1.0, 0.0			'' Top Of Triangle  Front)
 		glColor3f   0.0, 1.0, 0.0			'' Green
-		glVertex3f -1.0,-1.0, 1.0			'' Left Of Triangle  Front)
+		glVertex3f -1.0, -1.0, 1.0			'' Left Of Triangle  Front)
 		glColor3f   0.0, 0.0, 1.0			'' Blue
-		glVertex3f  1.0,-1.0, 1.0			'' Right Of Triangle  Front)
+		glVertex3f  1.0, -1.0, 1.0			'' Right Of Triangle  Front)
 		glColor3f   1.0, 0.0, 0.0			'' Red
 		glVertex3f  0.0, 1.0, 0.0			'' Top Of Triangle  Right)
 		glColor3f   0.0, 0.0, 1.0			'' Blue
-		glVertex3f  1.0,-1.0, 1.0			'' Left Of Triangle  Right)
+		glVertex3f  1.0, -1.0, 1.0			'' Left Of Triangle  Right)
 		glColor3f   0.0, 1.0, 0.0			'' Green
-		glVertex3f  1.0,-1.0,-1.0			'' Right Of Triangle  Right)
-        glColor3f   1.0, 0.0, 0.0			'' Red
+		glVertex3f  1.0, -1.0, -1.0			'' Right Of Triangle  Right)
+    glColor3f   1.0, 0.0, 0.0			'' Red
 		glVertex3f  0.0, 1.0, 0.0			'' Top Of Triangle  Back)
 		glColor3f   0.0, 1.0, 0.0			'' Green
-		glVertex3f  1.0,-1.0,-1.0			'' Left Of Triangle  Back)
+		glVertex3f  1.0, -1.0, -1.0			'' Left Of Triangle  Back)
 		glColor3f   0.0, 0.0, 1.0			'' Blue
-		glVertex3f -1.0,-1.0,-1.0			'' Right Of Triangle  Back)
+		glVertex3f -1.0, -1.0, -1.0			'' Right Of Triangle  Back)
 		glColor3f   1.0, 0.0, 0.0			'' Red
 		glVertex3f  0.0, 1.0, 0.0			'' Top Of Triangle  Left)
 		glColor3f   0.0, 0.0, 1.0			'' Blue
-		glVertex3f -1.0,-1.0,-1.0			'' Left Of Triangle  Left)
+		glVertex3f -1.0, -1.0, -1.0			'' Left Of Triangle  Left)
 		glColor3f   0.0, 1.0, 0.0			'' Green
-		glVertex3f -1.0,-1.0, 1.0			'' Right Of Triangle  Left)
+		glVertex3f -1.0, -1.0, 1.0			'' Right Of Triangle  Left)
     glEnd
 
     glColor3f 0.5, 0.5, 1.0
     glLoadIdentity
     glTranslatef -1.5, 0.0, -6.0
-	glTranslatef 3.0,0.0,0.0
+	glTranslatef 3.0, 0.0, 0.0
 	glRotatef rqud, 1.0, 0.0, 0.0
 
 	glBegin GL_QUADS
 		glVertex3f -1.0, 1.0, 0.0
 		glVertex3f  1.0, 1.0, 0.0
-		glVertex3f  1.0,-1.0, 0.0
-		glVertex3f -1.0,-1.0, 0.0
+		glVertex3f  1.0, -1.0, 0.0
+		glVertex3f -1.0, -1.0, 0.0
 	glEnd
 
     glPopMatrix
@@ -157,3 +166,4 @@ sub doRender
 
 end sub
 
+'' End of opengl.bas

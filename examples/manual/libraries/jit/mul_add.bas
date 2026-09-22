@@ -39,7 +39,10 @@ jit_function_compile(mul_add)
 jit_context_build_end(context)
 
 ' call function
-Dim As Integer a=3, b=5, c=2, result
+Dim As Integer a = 3
+Dim As Integer b = 5
+Dim As Integer c = 2
+Dim As Integer result
 Dim args(0 To 2) As Integer Ptr = {@a, @b, @c}
 jit_function_apply(mul_add, @args(0), @result)
 Print Using "mul__add(&, &, &) = &"; a; b; c; result

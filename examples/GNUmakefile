@@ -79,8 +79,15 @@ LOCAL_MODULES := \
 	win32/winmm/winmmhlp \
 	$(subst .bas,,$(wildcard win32/variants/libvariant/*.bas))
 
+# Source-built helper archives use the selected compiler target, so a clean
+# examples build can provide usable target libraries without copying stale
+# products from an installed package.
 LOCAL_LIBS := \
 	network/curl/CHttp/libCHttp.a \
+	regex/PCRE/CRegex/libCRegex.a \
+	graphics/OpenGL/fbgl/libfbgl.a \
+	manual/proguide/static-lib/libvarZstring.a \
+	threads/timer-lib/libtimer.a \
 	win32/COM/MoviePlayer/libmovctrl.a \
 	win32/COM/WebBrowser/libwebctrl.a \
 	win32/variants/libvariant.a
@@ -205,11 +212,23 @@ manual/proguide/hello_txt.o: manual/proguide/hello.txt
 manual/proguide/embed-access-data-in-executable: manual/proguide/embed-access-data-in-executable.bas manual/proguide/hello_txt.o
 	$(FBC) -p $(dir $@) $< manual/proguide/hello_txt.o -x $@
 
-network/curl/CHttp/libCHttp.a: network/curl/CHttp/CHttp.bas network/curl/CHttp/CHttpStream.bas network/curl/CHttp/CHttpForm.bas
-	$(FBC) -lib -p $(dir $@) $^ -x $@
+network/curl/CHttp/libCHttp.a: network/curl/CHttp/CHttp.bas network/curl/CHttp/CHttp.bi network/curl/CHttp/CHttpStream.bas network/curl/CHttp/CHttpStream.bi network/curl/CHttp/CHttpForm.bas network/curl/CHttp/CHttpForm.bi
+	cd $(dir $@) && $(FBC) -lib CHttp.bas CHttpStream.bas CHttpForm.bas -x libCHttp.a
 
 network/curl/CHttp/test: network/curl/CHttp/test.bas network/curl/CHttp/libCHttp.a
 	$(FBC) -p $(dir $@) $< -x $@
+
+regex/PCRE/CRegex/libCRegex.a: regex/PCRE/CRegex/CRegex.bas regex/PCRE/CRegex/CRegex.bi
+	cd $(dir $@) && $(FBC) -lib CRegex.bas -x libCRegex.a
+
+graphics/OpenGL/fbgl/libfbgl.a: graphics/OpenGL/fbgl/fbgl.bas graphics/OpenGL/fbgl/fbgl.bi
+	cd $(dir $@) && $(FBC) -lib fbgl.bas -x libfbgl.a
+
+manual/proguide/static-lib/libvarZstring.a: manual/proguide/static-lib/varZstring.bas manual/proguide/static-lib/varZstring.bi
+	cd $(dir $@) && $(FBC) -lib varZstring.bas -x libvarZstring.a
+
+threads/timer-lib/libtimer.a: threads/timer-lib/timer.bas threads/timer-lib/timer.bi
+	cd $(dir $@) && $(FBC) -lib -mt timer.bas -x libtimer.a
 
 win32/COM/DropTarget/test: win32/COM/DropTarget/test.bas win32/COM/DropTarget/CDropTarget.bas win32/COM/DropTarget/CDropTarget.bi
 	$(FBC) -p $(dir $@) $< win32/COM/DropTarget/CDropTarget.bas -x $@

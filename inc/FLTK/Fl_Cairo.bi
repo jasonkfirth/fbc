@@ -8,7 +8,7 @@ public:
 	declare const function cc() as cairo_t ptr
 	declare const function autolink() as boolean
 
-	declare sub cc(c as cairo_t ptr, own as boolean=true)  
+	declare sub cc(c as cairo_t ptr, own as boolean=true)
 	declare sub autolink(b as boolean)
 	declare sub window(w as any ptr)
 	declare const function window() as any ptr
@@ -37,7 +37,7 @@ private function Fl_Cairo_State.autolink() as boolean
 	return autolink_
 end function
 
-private sub Fl_Cairo_State.cc(c as cairo_t ptr, own as boolean=true)  
+private sub Fl_Cairo_State.cc(c as cairo_t ptr, own as boolean=true)
 	if cc_<>0 andalso own_cc_<>0 then cairo_destroy(cc_)
 	cc_=c
 	if cc_=0 then window_=0

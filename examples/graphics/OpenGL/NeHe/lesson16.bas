@@ -1,4 +1,19 @@
 ''
+'' Project: FreeBASIC OpenGL examples
+'' File: lesson16.bas
+''
+'' Purpose:
+''     Demonstrate OpenGL texture filters, fog modes, and keyboard-controlled
+''     lighting on a rotating cube.
+''
+'' Ownership:
+''     The module owns its three OpenGL texture names from creation until the
+''     render loop ends.  The temporary BLOAD array is owned by the runtime.
+''
+'' This file intentionally does NOT contain:
+''     - a general texture asset loader
+''     - persistent graphics state outside its one display loop
+''
 '' This Code Was Created By Jeff Molofee 2000
 '' A HUGE Thanks To Fredric Echols For Cleaning Up
 '' And Optimizing The Base Code, Making It More Flexible!
@@ -58,13 +73,20 @@
 	glLoadIdentity                                 '' Reset The Modelview Matrix
 
 	'' Use BLOAD to load the bitmaps.
-	redim buffer(256*256*4+4) as ubyte             '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
-	bload exepath + "/data/Crate.bmp", @buffer(0)
-	texture(0) = CreateTexture(@buffer(0),TEX_NOFILTER)  '' Nearest Texture
-	texture(1) = CreateTexture(@buffer(0))               '' Linear Texture (default)
-	texture(2) = CreateTexture(@buffer(0),TEX_MIPMAP)    '' MipMapped Texture
+	redim buffer(0 to 256*256*4+4) as ubyte        '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
+	if ubound(buffer) < lbound(buffer) then end 1
+	bload exepath + "/data/Crate.bmp", @buffer(lbound(buffer))
+	'' BLOAD reports a failed file transfer through FreeBASIC's immediate Err value.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL613
+	if err <> 0 then end 1
+	texture(0) = CreateTexture(@buffer(lbound(buffer)), TEX_NOFILTER)  '' Nearest Texture
+	texture(1) = CreateTexture(@buffer(lbound(buffer)))               '' Linear Texture (default)
+	texture(2) = CreateTexture(@buffer(lbound(buffer)), TEX_MIPMAP)    '' MipMapped Texture
 	'' Exit if error loading textures
-	if texture(0) = 0 or texture(1) = 0 or texture(2) = 0 then end 1
+	if texture(0) = 0 or texture(1) = 0 or texture(2) = 0 then
+		glDeleteTextures(3, @texture(0))
+		end 1
+	end if
 
 	'' All Setup For OpenGL Goes Here
 	glEnable GL_TEXTURE_2D                             '' Enable Texture Mapping ( NEW
@@ -79,7 +101,7 @@
 
 	glLightfv GL_LIGHT1, GL_AMBIENT, @LightAmbient(0)  '' Setup The Ambient Light
 	glLightfv GL_LIGHT1, GL_DIFFUSE, @LightDiffuse(0)  '' Setup The Diffuse Light
-	glLightfv GL_LIGHT1, GL_POSITION,@LightPosition(0) '' Position The Light
+	glLightfv GL_LIGHT1, GL_POSITION, @LightPosition(0) '' Position The Light
 	glEnable GL_LIGHT1                                 '' Enable Light One
 
 	glFogi GL_FOG_MODE, fogMode(fogfilter)             '' Fog Mode
@@ -94,10 +116,10 @@
 	do
 		glClear GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT      '' Clear Screen And Depth Buffer
 		glLoadIdentity                                          '' Reset The View
-		glTranslatef 0.0,0.0,z                                  '' Translate Into/Out Of The Screen By z
+		glTranslatef 0.0, 0.0, z                                  '' Translate Into/Out Of The Screen By z
 
-		glRotatef xrot,1.0,0.0,0.0                              '' Rotate On The X Axis By xrot
-		glRotatef yrot,0.0,1.0,0.0                              '' Rotate On The Y Axis By yrot
+		glRotatef xrot, 1.0, 0.0, 0.0                              '' Rotate On The X Axis By xrot
+		glRotatef yrot, 0.0, 1.0, 0.0                              '' Rotate On The Y Axis By yrot
 
 		glBindTexture GL_TEXTURE_2D, texture(filter)            '' Select A Texture Based On filter
 
@@ -109,7 +131,7 @@
 			glTexCoord2f 1.0, 1.0 : glVertex3f  1.0,  1.0,  1.0   '' Point 3
 			glTexCoord2f 0.0, 1.0 : glVertex3f -1.0,  1.0,  1.0   '' Point 4
 			'' Back Face
-			glNormal3f  0.0, 0.0,-1.0                             '' Normal Pointing Away From Viewer
+			glNormal3f  0.0, 0.0, -1.0                             '' Normal Pointing Away From Viewer
 			glTexCoord2f 1.0, 0.0 : glVertex3f -1.0, -1.0, -1.0   '' Point 1 (Back)
 			glTexCoord2f 1.0, 1.0 : glVertex3f -1.0,  1.0, -1.0   '' Point 2
 			glTexCoord2f 0.0, 1.0 : glVertex3f  1.0,  1.0, -1.0   '' Point 3
@@ -121,7 +143,7 @@
 			glTexCoord2f 1.0, 0.0 : glVertex3f  1.0,  1.0,  1.0
 			glTexCoord2f 1.0, 1.0 : glVertex3f  1.0,  1.0, -1.0
 			'' Bottom Face
-			glNormal3f  0.0,-1.0, 0.0                             '' Normal Pointing Down
+			glNormal3f  0.0, -1.0, 0.0                             '' Normal Pointing Down
 			glTexCoord2f 1.0, 1.0 : glVertex3f -1.0, -1.0, -1.0   '' (Bottom)
 			glTexCoord2f 0.0, 1.0 : glVertex3f  1.0, -1.0, -1.0
 			glTexCoord2f 0.0, 0.0 : glVertex3f  1.0, -1.0,  1.0
@@ -153,14 +175,14 @@
 				glEnable(GL_LIGHTING)              '' enable lighting
 			end if
 		end if
-		if not MULTIKEY(FB.SC_L) then lp = false      '' L key up
+		if MULTIKEY(FB.SC_L) = 0 then lp = false      '' L key up
 
 		if MULTIKEY(FB.SC_F) and not fp then          '' F Key down
 			fp = true
 			filter += 1                            '' Cycle filter 0 -> 1 -> 2
 			if (filter > 2) then filter = 0        '' 2 -> 0
 		end if
-		if not MULTIKEY(FB.SC_F) then fp = false      '' F Key Up
+		if MULTIKEY(FB.SC_F) = 0 then fp = false      '' F Key Up
 
 		if MULTIKEY(FB.SC_G) and not gp then          '' G Key down
 			gp = true
@@ -168,7 +190,7 @@
 			if (fogfilter > 2) then fogfilter = 0  '' 2 -> 0
 			glFogi GL_FOG_MODE, fogMode(fogfilter) '' Fog Mode
 		end if
-		if not MULTIKEY(FB.SC_G) then gp = false      '' G Key Up
+		if MULTIKEY(FB.SC_G) = 0 then gp = false      '' G Key Up
 
 		if MULTIKEY(FB.SC_PAGEUP) then z-=0.02        '' If Page Up is Being Pressed, Move Into The Screen
 		if MULTIKEY(FB.SC_PAGEDOWN) then z+=0.02      '' If Page Down is Being Pressed, Move Towards The Viewer
@@ -182,5 +204,7 @@
 	loop while MULTIKEY(FB.SC_ESCAPE) = 0             '' exit if EXC is pressed
 	'' Empty keyboard buffer
 	while inkey <> "": wend
+	glDeleteTextures(3, @texture(0))
 	end
 
+'' End of lesson16.bas

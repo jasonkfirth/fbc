@@ -2946,11 +2946,10 @@ private function hReadWstrChar _
 end function
 
 private function hUseNumericWstrLit( ) as integer
-	'' Some COFF targets, currently Xbox via nxdk/clang, use a 32-bit
-	'' FreeBASIC WCHAR while the C compiler's L"..." literals are not
-	'' 32-bit wchar_t strings.  Emit numeric target-WCHAR arrays there so
-	'' WSTRING literals are described by FreeBASIC's target table instead
-	'' of the host C wide-character ABI.
+	'' Some COFF targets may use a 32-bit FreeBASIC WCHAR while the C
+	'' compiler's L"..." literals are not 32-bit wchar_t strings.  Emit
+	'' numeric target-WCHAR arrays there so WSTRING literals are described
+	'' by FreeBASIC's target table instead of the host C wide-character ABI.
 	function = fbTargetWcharIsUtf32( ) and fbTargetSupportsCOFF( )
 end function
 

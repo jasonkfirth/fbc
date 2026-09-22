@@ -26,7 +26,7 @@ dim fl_eventnames(...) as const zstring const ptr ={_
   @"FL_SCREEN_CONFIGURATION_CHANGED",_
   @"FL_FULLSCREEN",_
   @"FL_ZOOM_GESTURE",_
-  @"FL_EVENT_27",_  
+  @"FL_EVENT_27",_
   @"FL_EVENT_28",_
   @"FL_EVENT_29",_
   @"FL_EVENT_30"}

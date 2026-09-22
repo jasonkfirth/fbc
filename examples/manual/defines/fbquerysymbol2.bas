@@ -14,7 +14,9 @@ Function dataclassToStr( ByVal classid As fbc.FB_DATACLASS ) As String
 		( FB_DATACLASS.FB_DATACLASS_INTEGER To FB_DATACLASS.FB_DATACLASS_UDT ) _
 		= { @"integer", @"float", @"string", @"udt" }
 
+	'' This Static initializer fixes the lookup table's non-empty bounds.
 	Select Case classid
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
 	Case LBound(classnames) To UBound(classnames)
 		Return *classnames(classid)
 	Case Else

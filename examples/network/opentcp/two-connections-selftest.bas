@@ -1,4 +1,18 @@
 ''
+'' Project: FreeBASIC networking examples
+'' File: two-connections-selftest.bas
+''
+'' Purpose:
+''     Verify that one local TCP listener can accept and serve two connections.
+''
+'' Ownership:
+''     Each successfully opened TCP file handle is closed by the main routine.
+''     Accepted handles are closed immediately after their one-line transfer.
+''
+'' This file intentionally does NOT contain:
+''     - a production TCP service loop
+''     - retry or reconnection policy
+''
 '' Self-contained OPEN TCP demo:
 '' - opens a listening socket
 '' - opens two client connections to that listener
@@ -20,6 +34,7 @@
 
 const DEFAULT_HOST = "127.0.0.1"
 const DEFAULT_PORT = "31876"
+const SOCKET_TIMEOUT_MS = "5000"
 const FIRST_MESSAGE = "first connection: hello from the OPEN TCP server"
 const SECOND_MESSAGE = "second connection: this is a different message"
 
@@ -57,7 +72,7 @@ print "Port:"; port
 '' two pending connections, which matches this example.
 ''
 server_file = freefile()
-if( OPEN TCP SERVER( "host=" & host & ",port=" & port & ",backlog=2" AS #server_file ) <> 0 ) then
+if( OPEN TCP SERVER( "host=" & host & ",port=" & port & ",backlog=2,timeout=" & SOCKET_TIMEOUT_MS AS #server_file ) <> 0 ) then
 	print "OPEN TCP SERVER failed, ERR="; err
 	end 1
 end if
@@ -70,7 +85,7 @@ print "Server socket is listening."
 '' client connects right back into the server we just opened above.
 ''
 client_file_1 = freefile()
-if( OPEN TCP( "host=" & host & ",port=" & port AS #client_file_1 ) <> 0 ) then
+if( OPEN TCP( "host=" & host & ",port=" & port & ",timeout=" & SOCKET_TIMEOUT_MS AS #client_file_1 ) <> 0 ) then
 	print "OPEN TCP client 1 failed, ERR="; err
 	close #server_file
 	end 1
@@ -83,6 +98,8 @@ end if
 '' on the server side.
 ''
 accepted_file_1 = TCP ACCEPT( #server_file )
+'' TCP ACCEPT reports its failure code through Err when it returns zero.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL613
 hRequire( accepted_file_1 <> 0, "TCP ACCEPT for client 1 failed, ERR=" & str( err ) )
 
 ''
@@ -103,7 +120,7 @@ hRequire( received_1 = FIRST_MESSAGE, "client 1 received the wrong message" )
 '' listening socket can accept more than one connection.
 ''
 client_file_2 = freefile()
-if( OPEN TCP( "host=" & host & ",port=" & port AS #client_file_2 ) <> 0 ) then
+if( OPEN TCP( "host=" & host & ",port=" & port & ",timeout=" & SOCKET_TIMEOUT_MS AS #client_file_2 ) <> 0 ) then
 	print "OPEN TCP client 2 failed, ERR="; err
 	close #client_file_1
 	close #server_file
@@ -111,6 +128,8 @@ if( OPEN TCP( "host=" & host & ",port=" & port AS #client_file_2 ) <> 0 ) then
 end if
 
 accepted_file_2 = TCP ACCEPT( #server_file )
+'' TCP ACCEPT reports its failure code through Err when it returns zero.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL613
 hRequire( accepted_file_2 <> 0, "TCP ACCEPT for client 2 failed, ERR=" & str( err ) )
 
 ''

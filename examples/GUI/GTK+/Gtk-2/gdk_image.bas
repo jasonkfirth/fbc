@@ -8,7 +8,9 @@
 #define IMAGE_WIDTH  256
 #define IMAGE_HEIGHT 256
 
-dim shared rgbbuf(IMAGE_WIDTH * IMAGE_HEIGHT * 3) as byte
+'' The main module fills this buffer before GTK invokes the expose callback.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
+dim shared rgbbuf(0 to IMAGE_WIDTH * IMAGE_HEIGHT * 3) as byte
 
 declare function on_darea_expose cdecl( byval widget as GtkWidget ptr, _
                                         byval event as GdkEventExpose ptr, _

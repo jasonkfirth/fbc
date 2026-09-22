@@ -7,7 +7,7 @@
 '' --------
 
 '' initialize a 5-element array
-Dim array(4) As Integer = { 0, 1, 2, 3, 4 }
+Dim array(0 To 4) As Integer = { 0, 1, 2, 3, 4 }
 
 '' point to the first element
 Dim p As Integer Ptr = @array(0)

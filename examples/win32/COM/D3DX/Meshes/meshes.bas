@@ -56,11 +56,11 @@ function InitD3D( byval hWnd as HWND ) as HRESULT
     '' using more complex geometry, we will create a device with a zbuffer.
     dim as D3DPRESENT_PARAMETERS d3dpp
     with d3dpp
-    	.Windowed = TRUE
-    	.SwapEffect = D3DSWAPEFFECT_DISCARD
-    	.BackBufferFormat = d3ddm.Format
-    	.EnableAutoDepthStencil = TRUE
-    	.AutoDepthStencilFormat = D3DFMT_D16
+        .Windowed = TRUE
+        .SwapEffect = D3DSWAPEFFECT_DISCARD
+        .BackBufferFormat = d3ddm.Format
+        .EnableAutoDepthStencil = TRUE
+        .AutoDepthStencilFormat = D3DFMT_D16
     end with
 
     '' Create the D3DDevice
@@ -175,7 +175,7 @@ sub SetupMatrices()
     '' eye five units back along the z-axis and up three units, look at the
     '' origin, and define "up" to be in the y-direction.
     dim as D3DXMATRIX matView
-    D3DXMatrixLookAtLH( @matView, @type<D3DVECTOR>( 0.0, 2.0,-2.0 ), _
+    D3DXMatrixLookAtLH( @matView, @type<D3DVECTOR>( 0.0, 2.0, -2.0 ), _
                                   @type<D3DVECTOR>( 0.0, 0.0, 0.0 ), _
                                   @type<D3DVECTOR>( 0.0, 1.0, 0.0 ) )
     IDirect3DDevice9_SetTransform( g_pd3dDevice, D3DTS_VIEW, @matView )
@@ -236,7 +236,7 @@ function MsgProc( byval hWnd as HWND, byval msg as UINT, byval wParam as WPARAM,
 
     select case msg
 	case WM_DESTROY
-    	PostQuitMessage( 0 )
+        PostQuitMessage( 0 )
         return 0
     end select
 
@@ -289,4 +289,3 @@ end function
     Cleanup()
     UnregisterClass( "D3D Tutorial", wc.hInstance )
 	end 0
-

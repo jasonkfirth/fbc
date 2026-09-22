@@ -9,7 +9,7 @@
 	' Startup SDL
 	If ( SDL_Init( SDL_INIT_VIDEO ) = -1) Then
 		Print "SDL_Init: "; *SDL_GetError()
-   		End 1
+		End 1
 	End If
 
 	Video = SDL_GetVideoInfo

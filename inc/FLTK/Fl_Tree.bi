@@ -6,13 +6,13 @@
 #include once "Fl_Tree_Item.bi"
 #include once "Fl_Tree_Prefs.bi"
 
-enum Fl_Tree_Reason 
+enum Fl_Tree_Reason
 	FL_TREE_REASON_NONE=0
 	FL_TREE_REASON_SELECTED
 	FL_TREE_REASON_DESELECTED
 	FL_TREE_REASON_OPENED
 	FL_TREE_REASON_CLOSED
-	FL_TREE_REASON_DRAGGED	
+	FL_TREE_REASON_DRAGGED
 end enum
 
 type Fl_Preferences_ as Fl_Preferences
@@ -53,7 +53,7 @@ public:
 	declare sub root_label(new_label as const zstring ptr)
 	declare function root() as Fl_Tree_Item ptr
 	declare sub root(newitem as Fl_Tree_Item ptr)
- 	declare const function prefs() byref as const Fl_Tree_Prefs 
+	declare const function prefs() byref as const Fl_Tree_Prefs
 
 	declare function add(path as const zstring ptr) as Fl_Tree_Item ptr
 	declare function add(path as const zstring ptr, newitem as  Fl_Tree_Item ptr) as Fl_Tree_Item
@@ -186,7 +186,6 @@ end type
 
 end extern
 
-private function Fl_Tree.prefs() byref as const Fl_Tree_Prefs 
+private function Fl_Tree.prefs() byref as const Fl_Tree_Prefs
 	return _prefs
 end function
-

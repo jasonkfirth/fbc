@@ -70,7 +70,15 @@ sample1 = point(320, 200)
 sample2 = point(500, 350)
 
 marker_file = freefile
+'' GfxSmoke is the AROS test volume supplied by the runner, not a host temporary path.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
 open "GfxSmoke:gfx-colour-smoke.drawn" for output as #marker_file
+if err <> 0 then
+    print "Could not create gfx-colour-smoke.drawn"
+    imagedestroy image
+    screen 0
+    end 1
+end if
 print #marker_file, "AROS_GFX_COLOUR_SMOKE: DRAWN"
 print #marker_file, "AROS_GFX_BMP_SMOKE: P50_50="; hex(sample0, 8)
 print #marker_file, "AROS_GFX_BMP_SMOKE: P320_200="; hex(sample1, 8)

@@ -10,7 +10,7 @@ private:
 	_total as long
 	_size as long
 	_chunksize as long
-	enum 			
+	enum
 		MANAGE_ITEM = 1
 	end enum
 	_flags as ubyte

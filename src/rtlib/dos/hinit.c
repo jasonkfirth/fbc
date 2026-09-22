@@ -1,8 +1,12 @@
-/* libfb initialization for DOS */
+/* FreeBASIC DOS runtime: hinit.c
+ * Initialize process state before BASIC global constructors, including the
+ * optional TCP clock profile. This does not initialize graphics or networking.
+ */
 
 #include "../fb.h"
 #include "fb_private_console.h"
 #include "../fb_private_thread.h"
+#include "dev_tcp_watt.h"
 #include <float.h>
 #include <unistd.h>
 #include <conio.h>
@@ -31,6 +35,10 @@ void fb_hInit( void )
 	__fb_startup_cwd = getcwd(NULL, 1024);
 	fb_hConvertPath( __fb_startup_cwd );
 
+#if defined(FB_DOS_WATT32) && !defined(DISABLE_TCP)
+	fb_DosTcpInitClock();
+#endif
+
 }
 
 void fb_hEnd( int unused )
@@ -38,3 +46,5 @@ void fb_hEnd( int unused )
 	(void)unused;
 
 }
+
+/* end of hinit.c */

@@ -39,6 +39,13 @@ Dim As Integer castIndex1 = ProcPtr(UDT.cast, Virtual)
 Dim As Integer castIndex2 = ProcPtr(UDT.cast, Virtual Any)
 Dim As Integer castIndex3 = ProcPtr(UDT.cast, Virtual Function() As String)
 
+#define VirtualProcPtr(instance, procedure, signature...) _
+	__FB_IIF__(ProcPtr(procedure, Virtual signature) >= 0, _
+			   CPtr(TypeOf(ProcPtr(procedure, signature)), _
+					CPtr(Any Ptr Ptr Ptr, @(instance)) _
+					[0][ProcPtr(procedure, Virtual signature)]), _
+			   ProcPtr(procedure, signature))
+
 Print testPtr1  '' absolue address value of UDT.test pointer
 Print testPtr2  '' absolue address value of UDT.test pointer
 Print testPtr3  '' absolue address value of UDT.test pointer
@@ -73,14 +80,14 @@ Print castPtr2(u)  '' execute Cast(UDT, u) through its procedure pointer
 Print castPtr3(u)  '' execute Cast(UDT, u) through its procedure pointer
 Print
 
-CPtr(Sub(ByRef As UDT), CPtr(Any Ptr Ptr Ptr, @u)[0][testIndex1])(u)  '' execute u.test() through its vtable index
-CPtr(Sub(ByRef As UDT), CPtr(Any Ptr Ptr Ptr, @u)[0][testIndex2])(u)  '' execute u.test() through its vtable index
-CPtr(Sub(ByRef As UDT), CPtr(Any Ptr Ptr Ptr, @u)[0][testIndex3])(u)  '' execute u.test() through its vtable index
+VirtualProcPtr(u, UDT.test)(u)  '' execute u.test() through its vtable index
+VirtualProcPtr(u, UDT.test, Any)(u)  '' execute u.test() through its vtable index
+VirtualProcPtr(u, UDT.test, Sub())(u)  '' execute u.test() through its vtable index
 Print
 
-Print CPtr(Function(ByRef As UDT) As String, CPtr(Any Ptr Ptr Ptr, @u)[0][castIndex1])(u)  '' execute Cast(UDT, u) through its vtable index
-Print CPtr(Function(ByRef As UDT) As String, CPtr(Any Ptr Ptr Ptr, @u)[0][castIndex2])(u)  '' execute Cast(UDT, u) through its vtable index
-Print CPtr(Function(ByRef As UDT) As String, CPtr(Any Ptr Ptr Ptr, @u)[0][castIndex3])(u)  '' execute Cast(UDT, u) through its vtable index
+Print VirtualProcPtr(u, UDT.cast)(u)  '' execute Cast(UDT, u) through its vtable index
+Print VirtualProcPtr(u, UDT.cast, Any)(u)  '' execute Cast(UDT, u) through its vtable index
+Print VirtualProcPtr(u, UDT.cast, Function() As String)(u)  '' execute Cast(UDT, u) through its vtable index
 Print
 
 Sleep

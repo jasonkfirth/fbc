@@ -46,17 +46,21 @@ End Sub
 
 UDT.numberMax = 6
 ReDim UDT.pMutex(UDT.numberMax)
-Dim As UDT u(0 To UDT.numberMax)
-For I As Integer = 0 To UDT.numberMax
+'' The literal maximum establishes a nonempty mutex array before querying bounds.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
+Dim As UDT u(LBound(UDT.pMutex) To UBound(UDT.pMutex))
+For I As Integer = LBound(UDT.pMutex) To UBound(UDT.pMutex)
 	u(I).number = i
 	u(I).tempo = 100 + 15 * I - 95 * Sgn(I)
 	UDT.pMutex(I) = MutexCreate
 	MutexLock(UDT.pMutex(I))
 Next I
-MutexUnlock(UDT.pMutex(u(0).number))
+'' The same completed ReDim establishes the first mutex slot used for unlock.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
+MutexUnlock(UDT.pMutex(u(LBound(UDT.pMutex)).number))
 
 Dim As Single t = Timer
-For I As Integer = 1 To UDT.numberMax
+For I As Integer = LBound(UDT.pMutex) + 1 To UBound(UDT.pMutex)
 	u(I).pThread = ThreadCreate(@Thread, @u(I))
 Next I
 
@@ -71,20 +75,19 @@ Do
 	Sleep u(0).tempo, 1
 Loop Until s <> ""
 
-For I As Integer = 1 To UDT.numberMax
+For I As Integer = LBound(UDT.pMutex) + 1 To UBound(UDT.pMutex)
 	ThreadWait(u(I).pThread)
 Next I
 t = Timer - t
 
-For I As Integer = 0 To UDT.numberMax
+For I As Integer = LBound(UDT.pMutex) To UBound(UDT.pMutex)
 	MutexDestroy(UDT.pMutex(I))
 Next I
 Dim As ULongInt c
-For I As Integer = 1 To UDT.numberMax
+For I As Integer = LBound(UDT.pMutex) + 1 To UBound(UDT.pMutex)
 	c += u(I).count
 Next I
 Locate UDT.numberMax+2, 1
 Print CULngInt(c / t) & " increments per second"
 
 Sleep
-

@@ -3195,6 +3195,24 @@ private function hDecodeUtf8Char _
 	function = c
 end function
 
+'':::::
+private function hDosStrLitHasNonAscii _
+	( _
+		byval litsym as FBSYMBOL ptr _
+	) as integer
+
+	dim as const ubyte ptr text = cptr( const ubyte ptr, symbGetVarLitText( litsym ) )
+	dim as integer textlen = len( *text )
+
+	for i as integer = 0 to textlen - 1
+		if( text[i] > &h7F ) then
+			return TRUE
+		end if
+	next
+
+	function = FALSE
+end function
+
 private function hAllocTargetWstrConstFromStrLit _
 	( _
 		byval litsym as FBSYMBOL ptr _
@@ -3244,6 +3262,21 @@ function rtlToWstr _
 	function = NULL
 
 	dtype = astGetDataType( expr )
+
+	'' DJGPP represents WSTRING as bytes. Keep raw non-ASCII source bytes in a
+	'' narrow literal symbol so AST users retain the target WSTRING type while
+	'' the emitter writes the same byte sequence as the native DOS compiler.
+	if( (env.clopt.target = FB_COMPTARGET_DOS) and _
+	    (dtype = FB_DATATYPE_CHAR) ) then
+		litsym = astGetStrLitSymbol( expr )
+		if( (litsym <> NULL) andalso hDosStrLitHasNonAscii( litsym ) ) then
+			litsym = symbAllocStrConst( *symbGetVarLitText( litsym ), _
+			                           symbGetStrLength( litsym ) )
+			var doswstr = astNewVAR( litsym )
+			astSetType( doswstr, FB_DATATYPE_WCHAR, NULL )
+			return doswstr
+		end if
+	end if
 
 	'' constant? evaluate
 	if( astIsCONST( expr ) ) then

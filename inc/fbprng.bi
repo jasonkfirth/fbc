@@ -1,4 +1,4 @@
-#ifndef __FBPRNG_BI__ 
+#ifndef __FBPRNG_BI__
 #define __FBPRNG_BI__
 
 # if __FB_LANG__ = "qb"
@@ -42,7 +42,7 @@ namespace FB
 	''
 	'' Middle Square Weyl Sequence PRNG / Bernard Widynski / 20 May 2020
 	'' https://arxiv.org/abs/1704.00358v5
-	'' 
+	''
 	''
 	type RndMSWS32
 		s as ulongint = &hb5ad4eceda1ce2a9ull
@@ -126,14 +126,14 @@ namespace FB
 	''
 	'' Note the extra outer parentheses
 	'' also note: #define's won't respect namespaces
-	#define __FB_ROTL__(x,k) ( (x shl k) or (x shr(64-k)) ) 
- 
+	#define __FB_ROTL__(x,k) ( (x shl k) or (x shr(64-k)) )
+
 	type Rndxoroshiro128
 		as ulongint s(0 To 1) = { 1, 0 }
 		declare function rnd() as double
 		declare function rnd64() as ulongint
 	end type
- 
+
 	private function Rndxoroshiro128.rnd64() as ulongint
 		dim as ulongint s0, s1, result
 		s0 = this.s(0)
@@ -144,7 +144,7 @@ namespace FB
 		this.s(1) = __FB_ROTL__(s1,37)
 		return result
 	end function
- 
+
 	private function Rndxoroshiro128.rnd() as double
 		return cdbl(this.rnd64() shr 11)/cdbl(2^53)
 	end function

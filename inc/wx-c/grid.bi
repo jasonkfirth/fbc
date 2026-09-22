@@ -36,7 +36,7 @@ Type Virtual_SetValueAsCustom    As Sub      WXCALL ( As wxInt, As wxInt, As wxS
 Type Virtual_GetColLabelValue    As Function WXCALL ( As wxInt) As _DisposableStringBox Ptr
 Type Virtual_SetView             As Sub      WXCALL (As wxGrid Ptr)
 Type Virtual_GetView             As Function WXCALL As wxGrid Ptr
-Type Virtual_Clear               As Sub      WXCALL 
+Type Virtual_Clear               As Sub      WXCALL
 Type Virtual_InsertRows          As Function WXCALL (As wxInt, As wxInt) As wxBool
 Type Virtual_AppendRows          As Function WXCALL (As wxInt) As wxBool
 Type Virtual_SetRowLabelValue    As Sub      WXCALL (As wxInt, As wxString Ptr)
@@ -334,7 +334,7 @@ Declare Function wxGrid_GetGridRowLabelWindow WXCALL Alias "wxGrid_GetGridRowLab
 Declare Function wxGrid_GetGridColLabelWindow WXCALL Alias "wxGrid_GetGridColLabelWindow" (self As wxGrid Ptr) As wxWindow Ptr
 Declare Function wxGrid_GetGridCornerLabelWindow WXCALL Alias "wxGrid_GetGridCornerLabelWindow" (self As wxGrid Ptr) As wxWindow Ptr
 Declare Sub wxGrid_UpdateDimensions WXCALL Alias "wxGrid_UpdateDimensions" (self As wxGrid Ptr)
-Declare Function wxGrid_GetRows WXCALL Alias "wxGrid_GetRows" (self As wxGrid Ptr) As wxInt 
+Declare Function wxGrid_GetRows WXCALL Alias "wxGrid_GetRows" (self As wxGrid Ptr) As wxInt
 Declare Function wxGrid_GetCols WXCALL Alias "wxGrid_GetCols" (self As wxGrid Ptr) As wxInt
 Declare Function wxGrid_GetCursorRow WXCALL Alias "wxGrid_GetCursorRow" (self As wxGrid Ptr) As wxInt
 Declare Function wxGrid_GetCursorColumn WXCALL Alias "wxGrid_GetCursorColumn" (self As wxGrid Ptr) As wxInt
@@ -417,7 +417,7 @@ Declare Sub wxGridCellAttr_GetSize WXCALL Alias "wxGridCellAttr_GetSize" (sel As
 Declare Function wxGridCellAttr_GetOverflow WXCALL Alias "wxGridCellAttr_GetOverflow" (sel As wxGridCellAttr Ptr) As wxBool
 Declare Function wxGridCellAttr_GetRenderer WXCALL Alias "wxGridCellAttr_GetRenderer" (sel As wxGridCellAttr Ptr, grid As wxGrid Ptr, row As wxInt, col As wxInt) As wxGridCellRenderer Ptr
 Declare Function wxGridCellAttr_GetEditor WXCALL Alias "wxGridCellAttr_GetEditor" (sel As wxGridCellAttr Ptr, grid As wxGrid Ptr, row As wxInt, col As wxInt) As wxGridCellEditor Ptr
-Declare Function wxGridCellAttr_IsReadOnly WXCALL Alias "wxGridCellAttr_IsReadOnly" (sel As wxGridCellAttr Ptr) As wxBool 
+Declare Function wxGridCellAttr_IsReadOnly WXCALL Alias "wxGridCellAttr_IsReadOnly" (sel As wxGridCellAttr Ptr) As wxBool
 Declare Sub wxGridCellAttr_SetDefAttr WXCALL Alias "wxGridCellAttr_SetDefAttr" (sel As wxGridCellAttr Ptr, attr As wxGridCellAttr Ptr)
 
 ' class wxGridSizeEvent
@@ -499,7 +499,7 @@ Declare Sub wxGridTableBase_RegisterVirtual WXCALL Alias "wxGridTableBase_Regist
                                      fClear             As Virtual_Clear, _
                                      fInsertRows        As Virtual_InsertRows, _
                                      fAppendRows        As Virtual_AppendRows, _
-                                     fDeleteRows        As Virtual_InsertRows, _ 
+                                     fDeleteRows        As Virtual_InsertRows, _
                                      fInsertCols        As Virtual_InsertRows, _
                                      fAppendCols        As Virtual_AppendRows, _
                                      fDeleteCols        As Virtual_InsertRows, _

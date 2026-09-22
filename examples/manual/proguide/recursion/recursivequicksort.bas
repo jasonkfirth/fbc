@@ -6,10 +6,14 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgRecursion
 '' --------
 
-Dim Shared As UByte t(99)
+' The recursive routine below uses the same fixed data set as the display code.
+' fblint: disable-next-line FBL301 -- Module scope is intentional in this compact recursion example.
+Dim Shared As UByte t(0 To 99)
 
 Sub recursiveQuicksort (ByVal L As Integer, ByVal R As Integer)
-	Dim As Integer pivot = L, I = L, J = R
+	Dim As Integer pivot = L
+	Dim As Integer I = L
+	Dim As Integer J = R
 	Do
 		If t(I) >= t(J) Then
 			Swap t(I), t(J)
@@ -40,7 +44,9 @@ For K As Integer = LBound(t) To UBound(t)
 Next K
 Print
 
-recursiveQuicksort(LBound(t), UBound(t))
+If UBound(t) >= LBound(t) Then
+	recursiveQuicksort(LBound(t), UBound(t))
+End If
 
 Print "sorted memory:"
 For K As Integer = LBound(t) To UBound(t)
@@ -49,3 +55,5 @@ Next K
 Print
 
 Sleep
+
+'' end of recursivequicksort.bas

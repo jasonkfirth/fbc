@@ -111,6 +111,8 @@ End Sub
 
 '------------------------------------------------------------------------------
 
+' The initializer creates exactly two cats and two dogs for this operator lesson.
+' FB-LINTER: DISABLE-NEXT-LINE FBL525
 Dim As Animal Ptr pa(0 To ...) = {New Cat[2], New Dog[2]}
 
 'pa(0)[0].Init("Tiger", "Salmon")   '' does not work

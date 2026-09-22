@@ -52,9 +52,9 @@ deallocate str2
 {{fbdoc item="target"}}
 	##**Wstring**## follows the target wide-character model used by the runtime and C/CRT declarations.
 		- On DOS, ##**Wstring**## elements are byte-sized. The DOS port does not provide a full Unicode wide-character environment, so portable Unicode code should not rely on DOS ##**Wstring**## storage.
-		- On Android in this tree, ##wchar_t## and ##**Wstring**## elements are byte-sized. Prefer UTF-8 ##[[KeyPgString|String]]## or ##[[KeyPgZstring|Zstring]]## storage for portable Android text unless a specific API requires otherwise.
+		- On Android in this tree, ##wchar_t## and ##**Wstring**## elements are 32-bit UTF-32 code units. Android string conversion paths use UTF-8 explicitly, but portable Android text should still prefer UTF-8 ##[[KeyPgString|String]]## or ##[[KeyPgZstring|Zstring]]## storage unless a specific API requires ##**Wstring**##.
 		- On Windows targets, including Win32, Win64, and Windows ARM64, ##**Wstring**## elements are 16-bit UTF-16 code units. Xbox and Cygwin also use 16-bit wide-character elements in this tree. ##[[KeyPgLen|Len]]## and indexing count code units, not user-perceived characters.
-		- On most other Unix-like targets, including Linux, the BSD targets, macOS/Darwin, Solaris/illumos, Haiku, and Wii, ##**Wstring**## elements are 32-bit signed wide-character values.
+		- On other 32-bit wide-character targets, including Linux, JavaScript, the BSD targets, macOS/Darwin, Solaris/illumos, Haiku, Wii, NuttX, RISC OS, and AROS, ##**Wstring**## elements are 32-bit code units. The C ##wchar_t## signedness and the completeness of locale-aware conversion remain target-specific.
 		- For C interop, include the appropriate CRT headers and use the target's ##wchar_t## declarations instead of assuming a fixed width.
 
 {{fbdoc item="lang"}}

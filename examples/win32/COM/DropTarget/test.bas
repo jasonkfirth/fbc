@@ -35,7 +35,7 @@ private function win_cb _
 		                           cast( HINSTANCE, GetWindowLongPtr( hwnd, GWLP_HINSTANCE ) ), _
 		                           0 )
 
-		SendMessage( hwndEdit, WM_SETFONT, cast(WPARAM,GetStockObject(ANSI_FIXED_FONT)), 0)
+		SendMessage( hwndEdit, WM_SETFONT, cast(WPARAM, GetStockObject(ANSI_FIXED_FONT)), 0)
 
 		'' make the Edit control into a DropTarget
 		dropTarget = new CDropTarget( hwndEdit )

@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include once "iup.bi"
+
 extern "C"
 
 #define IUP_CONFIG_H

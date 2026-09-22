@@ -6,6 +6,9 @@
 #define ENABLE_CHECK_BUGS 0
 #endif
 
+' PDMLWP provides worker scheduling but does not provide libffi's closure ABI.
+' ThreadCall therefore remains unavailable on DOS, as it was before the
+' optional provider was added. The other DOS thread suites use ThreadCreate.
 #if (not defined( __FB_DOS__ )) and (not defined( __FB_WII__ )) and ((not (defined( __FB_ARM__ ) or defined( __FB_JS__ ))) or ( ENABLE_CHECK_BUGS <> 0 ))
 
 '' fbcunit is not thread-safe - wrap the CU_ASSERT_TRUE in a mutex
@@ -41,8 +44,8 @@ SUITE( fbc_tests.threads.threadcall_ )
 		'' return success
 		return 0
 	END_SUITE_CLEANUP
-    
-    type SimpleSubUDT 
+
+    type SimpleSubUDT
         dim aa as byte
     end type
 
@@ -56,10 +59,10 @@ SUITE( fbc_tests.threads.threadcall_ )
         d as string
         e:1 as integer
     end type
-        
+
     sub SmallInt stdcall( byval b as byte, byval ub as ubyte, _
         byval s as short, byval us as ushort )
-        
+
         CU_ASSERT_TRUE( b = 20 )
         CU_ASSERT_TRUE( ub = 1 )
         CU_ASSERT_TRUE( s = 19 )
@@ -75,7 +78,7 @@ SUITE( fbc_tests.threads.threadcall_ )
         byref l as longint, byref ul as ulongint, _
         byref i4 as long, byref ui4 as ulong _
 		 )
-        
+
         ' Output by reference
         i = 17
         ui = 3
@@ -91,12 +94,12 @@ SUITE( fbc_tests.threads.threadcall_ )
 
         ' Output by reference
         s1 = "five"
-        d = 13.00    
+        d = 13.00
     end sub
 
     sub TypeArray ( byval su as SimpleUDT, byref cu as ComplexUDT, _
         AnArray() as string, byref bv as integer, opt as integer = 13 )
-        
+
         CU_ASSERT_TRUE( su.a.aa = 10 )
         CU_ASSERT_TRUE( su.b > 7.99 and su.b < 8.01 )
         CU_ASSERT_TRUE( opt = 13 )
@@ -130,12 +133,12 @@ SUITE( fbc_tests.threads.threadcall_ )
     end sub
 
     namespace ThreadCallNS
-        sub ns 
+        sub ns
             Namespace_Executed = -1
         end sub
     end namespace
     namespace ThreadCallONS
-        sub ns 
+        sub ns
             OtherNamespace_Executed = -1
         end sub
     end namespace
@@ -148,7 +151,7 @@ SUITE( fbc_tests.threads.threadcall_ )
         dim as string s1, s2
         dim bv as integer ptr, cu as ComplexUDT, AnArray( 0 to 1 ) as string
         dim su as SimpleUDT = Type( Type<SimpleSubUDT>( 10 ), 8.0 )
-        dim as any ptr SmallInt_Thread, BigInt_Thread, FloatStr_Thread 
+        dim as any ptr SmallInt_Thread, BigInt_Thread, FloatStr_Thread
         dim as any ptr TypeArray_Thread, NoArgsA_Thread, NoArgsB_Thread
         dim as any ptr OvlInt_Thread, OvlStr_Thread
         dim as any ptr Namespace_Thread, ONamespace_Thread

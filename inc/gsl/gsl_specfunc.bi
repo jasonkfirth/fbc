@@ -1,7 +1,7 @@
 '' FreeBASIC binding for gsl-1.16
 ''
 '' based on the C header files:
-''    Author:  G. Jungman 
+''    Author:  G. Jungman
 ''
 ''   This program is free software; you can redistribute it and/or modify
 ''   it under the terms of the GNU General Public License as published by

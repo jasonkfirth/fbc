@@ -58,7 +58,7 @@ Declare Function wxConfigBase_WriteStr WXCALL Alias "wxConfigBase_WriteStr" (sel
 Declare Function wxConfigBase_RenameEntry WXCALL Alias "wxConfigBase_RenameEntry" (self As wxConfigBase Ptr, oldName As wxString Ptr, newName As wxString Ptr) As wxBool
 Declare Function wxConfigBase_RenameGroup WXCALL Alias "wxConfigBase_RenameGroup" (self As wxConfigBase Ptr, oldName As wxString Ptr, newName As wxString Ptr) As wxBool
 
-' delete 
+' delete
 Declare Function wxConfigBase_DeleteEntry WXCALL Alias "wxConfigBase_DeleteEntry" (self As wxConfigBase Ptr, key As wxString Ptr, DeleteIfEmpty As wxBool) As wxBool
 Declare Function wxConfigBase_DeleteGroup WXCALL Alias "wxConfigBase_DeleteGroup" (self As wxConfigBase Ptr, key As wxString Ptr) As wxBool
 Declare Function wxConfigBase_DeleteAll WXCALL Alias "wxConfigBase_DeleteAll" (self As wxConfigBase Ptr) As wxBool

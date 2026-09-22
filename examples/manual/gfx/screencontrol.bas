@@ -17,13 +17,16 @@ Dim As Long x0, y0, x, y
 Dim As Integer shakes = 0
 Dim As Any Ptr img
 
-ScreenRes 320, 200, 32
-Print "Click to shake window"
+Randomize
+If ScreenRes(320, 200, 32) <> 0 Then
+	Print "Could not set the graphics mode"
+Else
+	Print "Click to shake window"
 
-'' find window coordinates
-ScreenControl GET_WINDOW_POS, x0, y0
+	'' find window coordinates
+	ScreenControl GET_WINDOW_POS, x0, y0
 
-Do
+	Do
 
 	If (shakes > 0) Then
 
@@ -69,8 +72,9 @@ Do
 		End Select
 	End If
 
-	'' free up CPU for other programs
-	Sleep 5
+		'' The event loop yields between non-blocking ScreenEvent polls.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL602
+		Sleep 5
 
-Loop
-
+	Loop
+End If

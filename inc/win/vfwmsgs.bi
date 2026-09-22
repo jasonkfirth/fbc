@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include once "winerror.bi"
+
 const VFW_S_NO_MORE_ITEMS = cast(HRESULT, &h00040103)
 const VFW_S_DUPLICATE_NAME = cast(HRESULT, &h0004022D)
 const VFW_S_STATE_INTERMEDIATE = cast(HRESULT, &h00040237)

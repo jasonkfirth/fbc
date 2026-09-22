@@ -6,6 +6,10 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgCtorsAssignDtors
 '' --------
 
+'' Each ZstringChain owns pz when it is non-NULL.  Copy construction and
+'' assignment allocate independent storage, while assignment leaves the old
+'' value intact if a replacement allocation cannot be made.
+
 Type ZstringChain                                    '' implement a zstring chain
 	Dim As ZString Ptr pz                            '' define a pointer to the chain
 	Declare Constructor ()                           '' declare the explicit default constructor
@@ -20,21 +24,35 @@ Constructor ZstringChain ()
 End Constructor
 
 Constructor ZstringChain (ByVal size As Integer)
-	This.pz = CAllocate(size + 1, SizeOf(ZString))  '' allocate memory for the chain
+	This.pz = 0
+	If size >= 0 Then
+		This.pz = CAllocate(size + 1, SizeOf(ZString))  '' allocate memory for the chain
+		If This.pz = 0 Then Exit Constructor
+	End If
 End Constructor
 
 Constructor ZstringChain (ByRef zc As ZstringChain)
-	This.pz = CAllocate(Len(*zc.pz) + 1, SizeOf(ZString))  '' allocate memory for the new chain
-	*This.pz = *zc.pz                                      '' initialize the new chain
+	This.pz = 0
+	If zc.pz <> 0 Then
+		This.pz = CAllocate(Len(*zc.pz) + 1, SizeOf(ZString))  '' allocate memory for the new chain
+		If This.pz <> 0 Then
+			*This.pz = *zc.pz                                    '' initialize the new chain
+		End If
+	End If
 End Constructor
 
 Operator ZstringChain.Let (ByRef zc As ZstringChain)
-	If @zc <> @This Then                                       '' avoid self assignment destroying the chain
-		If This.pz <> 0 Then
-			Deallocate This.pz                                 '' free the allocated memory if necessary
+	If @zc <> @This Then  '' avoid self assignment destroying the chain
+		Dim As ZString Ptr replacement = 0
+		If zc.pz <> 0 Then
+			replacement = CAllocate(Len(*zc.pz) + 1, SizeOf(ZString))  '' allocate the replacement first
+			If replacement = 0 Then Exit Operator
+			*replacement = *zc.pz                                      '' initialize the replacement before ownership changes
 		End If
-		This.pz = CAllocate(Len(*zc.pz) + 1, SizeOf(ZString))  '' allocate memory for the new chain
-		*This.pz = *zc.pz                                      '' initialize the new chain
+		If This.pz <> 0 Then
+			Deallocate This.pz                                          '' free the old chain after a successful replacement
+		End If
+		This.pz = replacement
 	End If
 End Operator
 
@@ -50,11 +68,21 @@ Dim As ZstringChain zc1  '' instantiate a non initialized chain : useless
 
 Dim As ZstringChain zc2 = ZstringChain(9)           '' instantiate a szstring chain of 9 useful characters
 '                                                   '' shortcut: Dim As ZstringChain zc2 = 9
+If zc2.pz = 0 Then
+	Print "Unable to allocate zc2 chain"
+	Sleep
+	End 1
+End If
 *zc2.pz = "FreeBASIC"                               '' fill up the chain with 9 characters
 Print "zc2 chain:"
 Print "'" & *zc2.pz & "'"                           '' print the chain
 Print
 Dim As ZstringChain zc3 = zc2                       '' instantiate a new szstring chain by copy construction
+If zc3.pz = 0 Then
+	Print "Unable to allocate zc3 chain"
+	Sleep
+	End 1
+End If
 Print "zc3 chain (zc3 copy constructed from zc2):"
 Print "'" & *zc3.pz & "'"                           '' print the chain
 Print
@@ -78,3 +106,4 @@ Print "'" & *zc2.pz & "'"                           '' print the copied chain (n
 
 Sleep
 
+'' end of ctordtor-zstringchain3.bas

@@ -6,10 +6,14 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgRecursionIteration
 '' --------
 
-Dim Shared As UByte t(99)
+'' Both sorting implementations share this fixed 100-byte demonstration buffer.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
+Dim Shared As UByte t(0 To 99)
 
 Sub recursiveQuicksort (ByVal L As Integer, ByVal R As Integer)
-	Dim As Integer pivot = L, I = L, J = R
+	Dim As Integer pivot = L
+	Dim As Integer I = L
+	Dim As Integer J = R
 	Do
 		If t(I) >= t(J) Then
 			Swap t(I), t(J)
@@ -37,7 +41,9 @@ Sub translationToIteraticeQuicksortStack (ByVal L As Integer, ByVal R As Integer
 	S.push = L : S.push = R
 	While S.used > 0
 		R = S.pop : L = S.pop
-		Dim As Integer pivot = L, I = L, J = R
+		Dim As Integer pivot = L
+		Dim As Integer I = L
+		Dim As Integer J = R
 		Do
 			If t(I) >= t(J) Then
 				Swap t(I), t(J)
@@ -70,7 +76,7 @@ For K As Integer = LBound(t) To UBound(t)
 Next K
 Print
 
-recursiveQuicksort(LBound(t), UBound(t))
+recursiveQuicksort(0, 99)
 
 Print "sorted memory by recursion:"
 For K As Integer = LBound(t) To UBound(t)
@@ -89,7 +95,7 @@ For K As Integer = LBound(t) To UBound(t)
 Next K
 Print
 
-translationToIteraticeQuicksortStack(LBound(t), UBound(t))
+translationToIteraticeQuicksortStack(0, 99)
 
 Print "sorted memory by iteration with stack:"
 For K As Integer = LBound(t) To UBound(t)
@@ -98,4 +104,3 @@ Next K
 Print
 
 Sleep
-

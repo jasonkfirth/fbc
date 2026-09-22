@@ -15,6 +15,12 @@
 '     - write and read a file through the mounted USB mass-storage path
 '     - report a stable marker for the device-lab audit
 '
+' Ownership:
+'
+'     Screen 13 remains active only while the device checks run.  The storage
+'     file handle owns one successful Open at a time, and the fixed fixture is
+'     removed only after DIR confirms that it exists.
+'
 ' This file intentionally does NOT contain:
 '
 '     - board-specific HDMI setup
@@ -25,7 +31,9 @@
 
 const USB_ROOT = "/mnt/sd0"
 const USB_FILE = USB_ROOT + "/fb_combo_smoke.txt"
+const USB_TEXT = "FreeBASIC combo storage"
 
+' Screen 13 is the NuttX DVI device-lab contract. FB-LINTER: DISABLE-NEXT-LINE FBL734
 screen 13
 
 if screenptr = 0 then
@@ -47,6 +55,7 @@ dim mb as integer
 dim mc as integer
 
 if getmouse(start_x, start_y, start_z, start_buttons, start_clip) <> 0 then
+    screen 0
     end 21
 end if
 
@@ -77,40 +86,67 @@ for i = 1 to 250
 next
 
 if saw_key = 0 then
+    screen 0
     end 22
 end if
 
 if saw_mouse = 0 then
+    screen 0
     end 23
 end if
 
+sub CleanupUsbFile()
+
+    if dir(USB_FILE) <> "" then
+        kill USB_FILE
+    end if
+
+end sub
+
 dim as string line_text
+dim as integer storage_file_handle = freefile
 
-on error goto StorageFailure
+if storage_file_handle <= 0 then
+    screen 0
+    print "fbdevice_combo: FreeFile failed"
+    end 25
+end if
 
-open USB_FILE for output as #1
-print #1, "FreeBASIC combo storage"
-close #1
+'' Fixed NuttX mass-storage fixture; the Open result is checked immediately below. FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
+open USB_FILE for output as #storage_file_handle
+if err <> 0 then
+    screen 0
+    print "fbdevice_combo: output open failed with ERR ="; err
+    end 25
+end if
 
-open USB_FILE for input as #1
-line input #1, line_text
-close #1
+print #storage_file_handle, USB_TEXT
+close #storage_file_handle
 
-if line_text <> "FreeBASIC combo storage" then
+open USB_FILE for input as #storage_file_handle
+if err <> 0 then
+    CleanupUsbFile()
+    screen 0
+    print "fbdevice_combo: input open failed with ERR ="; err
+    end 25
+end if
+
+line input #storage_file_handle, line_text
+close #storage_file_handle
+
+if line_text <> USB_TEXT then
+    CleanupUsbFile()
+    screen 0
+    print "fbdevice_combo: unexpected readback: "; line_text
     end 24
 end if
 
-kill USB_FILE
+CleanupUsbFile()
 
 screen 0
 
 print "FB_NUTTX_DEVICE_COMBO_SMOKE_OK"
 
 end 0
-
-StorageFailure:
-    screen 0
-    print "fbdevice_combo: failed with ERR ="; err
-    end 25
 
 ' end of fbdevice_combo_smoke.bas

@@ -27,6 +27,8 @@
 
 #include once "_mingw_unicode.bi"
 #include once "objbase.bi"
+#include once "mmsystem.bi"
+#include once "d3dtypes.bi"
 
 extern "Windows"
 

@@ -27,6 +27,9 @@
 
 #pragma once
 
+#include once "cd.bi"
+#include once "lua/lua.bi"
+
 #include once "crt/long.bi"
 
 extern "C"

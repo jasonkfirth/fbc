@@ -72,7 +72,7 @@ Do
 		'' The delay intentionally makes each protected main-thread update visible.
 		'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 		Sleep 100, 1
-		Locate 15,40
+		Locate 15, 40
 		Print Using "######"; c;
 		ScreenSet p0, p1
 		Swap p0, p1

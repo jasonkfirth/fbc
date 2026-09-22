@@ -20,9 +20,9 @@ operator mod _
 
 	dim as VARIANT_ res = any
 
+	VariantInit( @res )
 	VarMod( @lhs, @rhs.var_, @res )
 
 	return VARIANT( res, FALSE )
 
 end operator
-

@@ -1,6 +1,10 @@
 /' example.c -- usage example of the zlib compression library
  * Copyright (C) 1995-2006, 2011 Jean-loup Gailly.
  * For conditions of distribution and use, see copyright notice in zlib.h
+ *
+ * Ownership: mymain owns its checked standard-error file handle and its two
+ * compression buffers until its final cleanup. Each zlib stream is ended by
+ * the test that initialized it.
 '/
 
 /' @(#) $Id$ '/
@@ -13,6 +17,10 @@
 
 #define TESTFILE @"foo.gz"
 
+' -------------------------------------------------------------------------
+' Shared test data and declarations
+' -------------------------------------------------------------------------
+
 #macro CHECK_ERR(err_, msg)
     if (err_ <> Z_OK) then
         print #stderr_,msg;" error : ";err_
@@ -20,6 +28,8 @@
     end if
 #endmacro
 
+/' The single-threaded test sequence reads these values but never modifies them. '/
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared hello as zstring ptr = @"hello, hello!"
 /' "hello world" would be more standard, but the repeated "hello"
  * stresses the compression code better, sorry...
@@ -29,26 +39,27 @@ dim shared dictionary as zstring ptr = @"hello"
 dim shared dictId as uLong_ /' Adler32 value of the dictionary '/
 
 declare sub test_deflate (byval compr as Bytef ptr, byval comprLen as uLong_)
-declare sub test_inflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
+declare sub test_inflate (byval compr as Bytef ptr, byval comprLen as uLong_, _
                           byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
-declare sub test_large_deflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
+declare sub test_large_deflate (byval compr as Bytef ptr, byval comprLen as uLong_, _
                                 byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
-declare sub test_large_inflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
+declare sub test_large_inflate (byval compr as Bytef ptr, byval comprLen as uLong_, _
                                 byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 declare sub test_flush (byval compr as Bytef ptr, byval comprLen as uLong_ ptr)
-declare sub test_sync  (byval compr as Bytef ptr, byval comprLen as uLong_,_
+declare sub test_sync  (byval compr as Bytef ptr, byval comprLen as uLong_, _
                         byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 declare sub test_dict_deflate  (byval compr as Bytef ptr, byval comprLen as uLong_)
-declare sub test_dict_inflate  (byval compr as Bytef ptr, byval comprLen as uLong_,_
+declare sub test_dict_inflate  (byval compr as Bytef ptr, byval comprLen as uLong_, _
                                 byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 
-declare sub test_compress (byval compr as Bytef ptr, byval comprLen as uLong_,_
+declare sub test_compress (byval compr as Bytef ptr, byval comprLen as uLong_, _
                            byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
-declare sub test_gzio     (byval fname as const zstring ptr,_
+declare sub test_gzio     (byval fname as const zstring ptr, _
                            byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 declare function mymain() as integer
 
-''used as replacement for fprintf(stderr_,...)
+'' Used as replacement for fprintf(stderr_,...).
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared stderr_ as integer
 stderr_ = freefile()
 
@@ -57,7 +68,7 @@ mymain()
 /' ===========================================================================
  * Test compress() and uncompress()
  '/
-sub test_compress (byval compr as Bytef ptr, byval comprLen as uLong_,_
+sub test_compress (byval compr as Bytef ptr, byval comprLen as uLong_, _
                    byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 
     dim err_ as integer
@@ -75,7 +86,7 @@ sub test_compress (byval compr as Bytef ptr, byval comprLen as uLong_,_
         print #stderr_, "bad uncompress"
         exit_(1)
     else
-        print "uncompress(): ";*cast(zstring ptr,uncompr)
+        print "uncompress(): ";*cast(zstring ptr, uncompr)
     end if
 
 end sub
@@ -83,7 +94,7 @@ end sub
 /' ===========================================================================
  * Test read/write of .gz files
  '/
-sub test_gzio     (byval fname as const zstring ptr,_
+sub test_gzio     (byval fname as const zstring ptr, _
                    byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 
 
@@ -123,10 +134,10 @@ sub test_gzio     (byval fname as const zstring ptr,_
         exit_(1)
     end if
     if (*uncompr <> *hello) then
-        print #stderr_, "bad gzread: ", *cast(zstring ptr,uncompr)
+        print #stderr_, "bad gzread: ", *cast(zstring ptr, uncompr)
         exit_(1)
     else
-        print "gzread(): ";*cast(zstring ptr,uncompr)
+        print "gzread(): ";*cast(zstring ptr, uncompr)
     end if
 
     pos_ = gzseek(file_, -8L, SEEK_CUR)
@@ -136,7 +147,7 @@ sub test_gzio     (byval fname as const zstring ptr,_
     end if
 
     if (gzgetc_(file_) <> asc(" ")) then
-        print #stderr_,"gzgetc error"
+        print #stderr_, "gzgetc error"
         exit_(1)
     end if
 
@@ -146,16 +157,16 @@ sub test_gzio     (byval fname as const zstring ptr,_
     end if
 
     gzgets(file_, cast(zstring ptr, uncompr), uncomprLen)
-    if (len(*cast(zstring ptr,uncompr)) <> 7) then /' " hello!" '/
-      print #stderr_, "gzgets err after gzseek: "; gzerror(file_, @err_)
-      exit_(1)
+    if (len(*cast(zstring ptr, uncompr)) <> 7) then /' " hello!" '/
+        print #stderr_, "gzgets err after gzseek: "; gzerror(file_, @err_)
+        exit_(1)
     end if
 
-    if (*cast(zstring ptr,uncompr) <> *(hello + 6))  then
-      print #stderr_, "bad gzgets after gzseek"
-      exit_(1)
+    if (*cast(zstring ptr, uncompr) <> *(hello + 6))  then
+        print #stderr_, "bad gzgets after gzseek"
+        exit_(1)
     else
-      print "gzgets() after gzseek: ";*cast(zstring ptr,uncompr)
+        print "gzgets() after gzseek: ";*cast(zstring ptr, uncompr)
     end if
 
     gzclose(file_)
@@ -192,7 +203,7 @@ sub test_deflate (byval compr as Bytef ptr, byval comprLen as uLong_)
         c_stream.avail_out = 1
         err_ = deflate(@c_stream, Z_FINISH)
         if (err_ = Z_STREAM_END) then
-          exit while
+            exit while
         end if
         CHECK_ERR(err_, "deflate")
     wend
@@ -205,13 +216,13 @@ end sub
 /' ===========================================================================
  * Test inflate() with small buffers
  '/
-sub test_inflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
+sub test_inflate (byval compr as Bytef ptr, byval comprLen as uLong_, _
                   byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 
     dim err_ as integer
     dim d_stream as z_stream    /' decompression stream '/
 
-    strcpy(cast(zstring ptr,uncompr), @"garbage")
+    strcpy(cast(zstring ptr, uncompr), @"garbage")
 
     d_stream.zalloc = NULL
     d_stream.zfree = NULL
@@ -228,7 +239,7 @@ sub test_inflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
         d_stream.avail_in = 1:d_stream.avail_out = 1 /' force small buffers '/
         err_ = inflate(@d_stream, Z_NO_FLUSH)
         if (err_ = Z_STREAM_END) then
-          exit while
+            exit while
         end if
         CHECK_ERR(err_, @"inflate")
     wend
@@ -236,11 +247,11 @@ sub test_inflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
     err_ = inflateEnd(@d_stream)
     CHECK_ERR(err_, "inflateEnd")
 
-    if (*cast(zstring ptr,uncompr) <> *hello) then
+    if (*cast(zstring ptr, uncompr) <> *hello) then
         print #stderr_, "bad inflate"
         exit_(1)
     else
-        print "inflate(): ";*cast(zstring ptr,uncompr)
+        print "inflate(): ";*cast(zstring ptr, uncompr)
     end if
 
 end sub
@@ -248,7 +259,7 @@ end sub
 /' ===========================================================================
  * Test deflate() with large buffers and dynamic change of compression level
  '/
-sub test_large_deflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
+sub test_large_deflate (byval compr as Bytef ptr, byval comprLen as uLong_, _
                         byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 
     dim as z_stream c_stream /' compression stream '/
@@ -303,13 +314,13 @@ end sub
 /' ===========================================================================
  * Test inflate() with large buffers
  '/
-sub test_large_inflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
+sub test_large_inflate (byval compr as Bytef ptr, byval comprLen as uLong_, _
                         byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 
     dim as integer err_
     dim as z_stream d_stream /' decompression stream '/
 
-    strcpy(cast(zstring ptr,uncompr), @"garbage")
+    strcpy(cast(zstring ptr, uncompr), @"garbage")
 
     d_stream.zalloc = NULL
     d_stream.zfree = NULL
@@ -326,7 +337,7 @@ sub test_large_inflate (byval compr as Bytef ptr, byval comprLen as uLong_,_
         d_stream.avail_out = uncomprLen
         err_ = inflate(@d_stream, Z_NO_FLUSH)
         if (err_ = Z_STREAM_END) then
-          exit while
+            exit while
         end if
         CHECK_ERR(err_, "large inflate")
     wend
@@ -359,7 +370,7 @@ sub test_flush (byval compr as Bytef ptr, byval comprLen as uLong_ ptr)
     err_ = deflateInit(@c_stream, Z_DEFAULT_COMPRESSION)
     CHECK_ERR(err_, "deflateInit")
 
-    c_stream.next_in  = cast(Bytef ptr,hello)
+    c_stream.next_in  = cast(Bytef ptr, hello)
     c_stream.next_out = compr
     c_stream.avail_in = 3
     c_stream.avail_out = *comprLen
@@ -383,17 +394,17 @@ end sub
 /' ===========================================================================
  * Test inflateSync()
  '/
-sub test_sync  (byval compr as Bytef ptr, byval comprLen as uLong_,_
+sub test_sync  (byval compr as Bytef ptr, byval comprLen as uLong_, _
                 byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 
     dim err_ as integer
     dim as z_stream d_stream /' decompression stream '/
 
-    strcpy(cast(zstring ptr,uncompr), @"garbage")
+    strcpy(cast(zstring ptr, uncompr), @"garbage")
 
     d_stream.zalloc = 0
     d_stream.zfree = 0
-    d_stream.opaque = cast(voidpf,0)
+    d_stream.opaque = cast(voidpf, 0)
 
     d_stream.next_in  = compr
     d_stream.avail_in = 2 /' just read the zlib header '/
@@ -426,7 +437,7 @@ sub test_sync  (byval compr as Bytef ptr, byval comprLen as uLong_,_
     err_ = inflateEnd(@d_stream)
     CHECK_ERR(err_, "inflateEnd")
 
-    print "after inflateSync(): hel";*cast(zstring ptr,uncompr)
+    print "after inflateSync(): hel";*cast(zstring ptr, uncompr)
 
 end sub
 
@@ -445,20 +456,20 @@ sub test_dict_deflate  (byval compr as Bytef ptr, byval comprLen as uLong_)
     err_ = deflateInit(@c_stream, Z_BEST_COMPRESSION)
     CHECK_ERR(err_, "deflateInit")
 
-    err_ = deflateSetDictionary(@c_stream,_
-                cast(const Bytef ptr,dictionary), cast(integer,sizeof(dictionary)))
+    err_ = deflateSetDictionary(@c_stream, _
+                cast(const Bytef ptr, dictionary), cast(uInt, len(*dictionary)))
     CHECK_ERR(err_, "deflateSetDictionary")
 
     dictId = c_stream.adler
     c_stream.next_out = compr
-    c_stream.avail_out = cast(uInt,comprLen)
+    c_stream.avail_out = cast(uInt, comprLen)
 
-    c_stream.next_in = cast(Bytef ptr,hello)
+    c_stream.next_in = cast(Bytef ptr, hello)
     c_stream.avail_in = len(*hello)+1
 
     err_ = deflate(@c_stream, Z_FINISH)
     if (err_ <> Z_STREAM_END) then
-        print #stderr_,"deflate should report Z_STREAM_END"
+        print #stderr_, "deflate should report Z_STREAM_END"
         exit_(1)
     end if
     err_ = deflateEnd(@c_stream)
@@ -469,20 +480,20 @@ end sub
 /' ===========================================================================
  * Test inflate() with a preset dictionary
  '/
-sub test_dict_inflate  (byval compr as Bytef ptr, byval comprLen as uLong_,_
+sub test_dict_inflate  (byval compr as Bytef ptr, byval comprLen as uLong_, _
                         byval uncompr as Bytef ptr, byval uncomprLen as uLong_)
 
     dim err_ as integer
     dim as z_stream d_stream /' decompression stream '/
 
-    strcpy(cast(zstring ptr,uncompr), @"garbage")
+    strcpy(cast(zstring ptr, uncompr), @"garbage")
 
     d_stream.zalloc = 0
     d_stream.zfree = 0
     d_stream.opaque = 0
 
     d_stream.next_in  = compr
-    d_stream.avail_in = cast(uInt,comprLen)
+    d_stream.avail_in = cast(uInt, comprLen)
 
     err_ = inflateInit(@d_stream)
     CHECK_ERR(err_, "inflateInit")
@@ -493,15 +504,15 @@ sub test_dict_inflate  (byval compr as Bytef ptr, byval comprLen as uLong_,_
     while(1)
         err_ = inflate(@d_stream, Z_NO_FLUSH)
         if (err_ = Z_STREAM_END) then
-          exit while
+            exit while
         end if
         if (err_ = Z_NEED_DICT) then
             if (d_stream.adler <> dictId) then
                 print #stderr_, "unexpected dictionary"
                 exit_(1)
             end if
-            err_ = inflateSetDictionary(@d_stream, cast(const Bytef ptr,dictionary),_
-                                       cast(integer,sizeof(dictionary)))
+            err_ = inflateSetDictionary(@d_stream, cast(const Bytef ptr, dictionary), _
+                                       cast(uInt, len(*dictionary)))
         end if
         CHECK_ERR(err_, "inflate with dict")
     wend
@@ -509,11 +520,11 @@ sub test_dict_inflate  (byval compr as Bytef ptr, byval comprLen as uLong_,_
     err_ = inflateEnd(@d_stream)
     CHECK_ERR(err_, "inflateEnd")
 
-    if (*cast(zstring ptr,uncompr) <> *hello) then
+    if (*cast(zstring ptr, uncompr) <> *hello) then
         print #stderr_, "bad inflate with dict"
         exit_(1)
     else
-        print "inflate with dictionary: ";*cast(zstring ptr,uncompr)
+        print "inflate with dictionary: ";*cast(zstring ptr, uncompr)
     end if
 
 end sub
@@ -527,8 +538,10 @@ function mymain() as integer
     open err for input as #stderr_
     var err_ = err()
     if (err_ <> 0) then
-      print "could not open stderr_"
-      return -1
+        print "could not open stderr_"
+	  '' A failed Open does not acquire the FreeFile unit, so it must not be closed.
+	  '' FB-LINTER: DISABLE-NEXT-LINE FBL-IO-004
+        return -1
     end if
 
     dim as Bytef ptr compr
@@ -538,10 +551,10 @@ function mymain() as integer
     dim myVersion as zstring ptr = @ZLIB_VERSION
 
     if (zlibVersion()[0][0] <> myVersion[0][0]) then
-        print #stderr_,"incompatible zlib version"
+        print #stderr_, "incompatible zlib version"
         exit_(1)
     elseif (*zlibVersion() <> ZLIB_VERSION) then
-        print #stderr_,"warning: different zlib version"
+        print #stderr_, "warning: different zlib version"
     end if
 
     print "zlib version ";ZLIB_VERSION;" = ";hex(ZLIB_VERNUM);" compile flags = ";hex(zlibCompileFlags())
@@ -559,10 +572,10 @@ function mymain() as integer
     test_compress(compr, comprLen, uncompr, uncomprLen)
 
     if (command(1) <> "") then
-      dim s as string = command(1)
-      test_gzio(strptr(s),uncompr,uncomprLen)
+        dim s as string = command(1)
+        test_gzio(strptr(s), uncompr, uncomprLen)
     else
-      test_gzio(TESTFILE,uncompr,uncomprLen)
+        test_gzio(TESTFILE, uncompr, uncomprLen)
     end if
 
     test_deflate(compr, comprLen)
@@ -579,7 +592,10 @@ function mymain() as integer
     test_dict_inflate(compr, comprLen, uncompr, uncomprLen)
 
     deallocate(compr)
+    compr = NULL
     deallocate(uncompr)
+    uncompr = NULL
+    close #stderr_
 
     return 0
 

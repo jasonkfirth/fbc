@@ -11,7 +11,7 @@ Declare Function wxGridCellDateTimeRenderer_ctor WXCALL Alias "wxGridCellDateTim
 Declare Sub wxGridCellDateTimeRenderer_dtor WXCALL Alias "wxGridCellDateTimeRenderer_dtor" (self As wxGridCellDateTimeRenderer Ptr)
 Declare Sub wxGridCellDateTimeRenderer_Draw WXCALL Alias "wxGridCellDateTimeRenderer_Draw" (self As wxGridCellDateTimeRenderer Ptr, grid As wxGrid Ptr, attr As wxGridCellAttr Ptr, dc As wxDC Ptr, r As wxRect Ptr, row As wxInt, col As wxInt, IsSelected As wxBool)
 Declare Sub wxGridCellDateTimeRenderer_GetBestSize WXCALL Alias "wxGridCellDateTimeRenderer_GetBestSize" (self As wxGridCellDateTimeRenderer Ptr, grid As wxGrid Ptr, attr As wxGridCellAttr Ptr, dc As wxDC Ptr, row As wxInt, col As wxInt, size As wxSize Ptr)
-Declare Function wxGridCellDateTimeRenderer_Clone WXCALL Alias "wxGridCellDateTimeRenderer_Clone" (self As wxGridCellDateTimeRenderer Ptr) As wxGridCellRenderer Ptr 
+Declare Function wxGridCellDateTimeRenderer_Clone WXCALL Alias "wxGridCellDateTimeRenderer_Clone" (self As wxGridCellDateTimeRenderer Ptr) As wxGridCellRenderer Ptr
 Declare Sub wxGridCellDateTimeRenderer_SetParameters WXCALL Alias "wxGridCellDateTimeRenderer_SetParameters" (self As wxGridCellDateTimeRenderer Ptr, params As wxString Ptr)
 
 ' class wxGridCellEnumRenderer

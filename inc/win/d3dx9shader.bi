@@ -24,7 +24,11 @@
 #pragma once
 
 #include once "_mingw_unicode.bi"
-#include once "d3dx9.bi"
+#include once "d3d9.bi"
+#include once "d3dx9math.bi"
+#include once "d3dx9core.bi"
+#include once "d3dx9effect.bi"
+#include once "d3dx9effecttypes.bi"
 
 extern "Windows"
 
@@ -48,9 +52,6 @@ const D3DXSHADER_OPTIMIZATION_LEVEL2 = &hC000
 const D3DXSHADER_OPTIMIZATION_LEVEL3 = &h8000
 const D3DXSHADER_USE_LEGACY_D3DX9_31_DLL = &h10000
 const D3DXCONSTTABLE_LARGEADDRESSAWARE = &h20000
-type D3DXHANDLE as const zstring ptr
-type LPD3DXHANDLE as D3DXHANDLE ptr
-
 type _D3DXREGISTER_SET as long
 enum
 	D3DXRS_BOOL
@@ -62,46 +63,6 @@ end enum
 
 type D3DXREGISTER_SET as _D3DXREGISTER_SET
 type LPD3DXREGISTER_SET as _D3DXREGISTER_SET ptr
-
-type D3DXPARAMETER_CLASS as long
-enum
-	D3DXPC_SCALAR
-	D3DXPC_VECTOR
-	D3DXPC_MATRIX_ROWS
-	D3DXPC_MATRIX_COLUMNS
-	D3DXPC_OBJECT
-	D3DXPC_STRUCT
-	D3DXPC_FORCE_DWORD = &h7fffffff
-end enum
-
-type LPD3DXPARAMETER_CLASS as D3DXPARAMETER_CLASS ptr
-
-type D3DXPARAMETER_TYPE as long
-enum
-	D3DXPT_VOID
-	D3DXPT_BOOL
-	D3DXPT_INT
-	D3DXPT_FLOAT
-	D3DXPT_STRING
-	D3DXPT_TEXTURE
-	D3DXPT_TEXTURE1D
-	D3DXPT_TEXTURE2D
-	D3DXPT_TEXTURE3D
-	D3DXPT_TEXTURECUBE
-	D3DXPT_SAMPLER
-	D3DXPT_SAMPLER1D
-	D3DXPT_SAMPLER2D
-	D3DXPT_SAMPLER3D
-	D3DXPT_SAMPLERCUBE
-	D3DXPT_PIXELSHADER
-	D3DXPT_VERTEXSHADER
-	D3DXPT_PIXELFRAGMENT
-	D3DXPT_VERTEXFRAGMENT
-	D3DXPT_UNSUPPORTED
-	D3DXPT_FORCE_DWORD = &h7fffffff
-end enum
-
-type LPD3DXPARAMETER_TYPE as D3DXPARAMETER_TYPE ptr
 
 type _D3DXCONSTANTTABLE_DESC
 	Creator as const zstring ptr
@@ -230,14 +191,6 @@ type ID3DXTextureShaderVtbl_
 	SetMatrixTransposeArray as function(byval This as ID3DXTextureShader ptr, byval hConstant as D3DXHANDLE, byval pMatrix as const D3DXMATRIX ptr, byval Count as UINT) as HRESULT
 	SetMatrixTransposePointerArray as function(byval This as ID3DXTextureShader ptr, byval hConstant as D3DXHANDLE, byval ppMatrix as const D3DXMATRIX ptr ptr, byval Count as UINT) as HRESULT
 end type
-
-type _D3DXMACRO
-	Name as const zstring ptr
-	Definition as const zstring ptr
-end type
-
-type D3DXMACRO as _D3DXMACRO
-type LPD3DXMACRO as _D3DXMACRO ptr
 
 type _D3DXSEMANTIC
 	Usage as UINT

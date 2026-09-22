@@ -27,6 +27,11 @@
 #include once "objidl.bi"
 #include once "ddraw.bi"
 
+#ifndef __REFERENCE_TIME_DEFINED
+#define __REFERENCE_TIME_DEFINED
+type REFERENCE_TIME as LONGLONG
+#endif
+
 extern "Windows"
 
 #define __amvideo_h__

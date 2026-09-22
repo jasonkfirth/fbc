@@ -11,14 +11,23 @@ end extern
 
 __fb_dos_no_dpmi_yield = 1
 
+'' DOS mode 13 is the compatibility mode exercised by this extender example.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL734
 screen 13
 
 dim as long w, h
 ScreenControl fb.GET_SCREEN_SIZE, w, h
 
 dim as single maxtime = 100
-dim as single x = 10, y = 10, dx = 50, dy = 0, r = 10
-dim as double t0 = timer, t1 = t0, t2 = 0, td = 0.0001
+dim as single x = 10
+dim as single y = 10
+dim as single dx = 50
+dim as single dy = 0
+dim as single r = 10
+dim as double t0 = timer
+dim as double t1 = t0
+dim as double t2 = 0
+dim as double td = 0.0001
 dim as string k
 
 do while( t1 - t0 < maxtime )

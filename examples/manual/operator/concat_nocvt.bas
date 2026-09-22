@@ -6,7 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgOpConcat
 '' --------
 
-Dim As String a = "Hello, ", b = "World!"
+Dim As String a = "Hello, "
+Dim As String b = "World!"
 Dim As String c
 c = a + b
 Print c

@@ -24,8 +24,8 @@
     declare sub FBDriver_Unload(byval as PDRIVER_OBJECT)
 
 
-    function DriverEntry(byval pDriverObject as PDRIVER_OBJECT, _
-                         byval pRegistryPath as PUNICODE_STRING) as NTSTATUS
+    function DriverEntry stdcall alias "DriverEntry" (byval pDriverObject as PDRIVER_OBJECT, _
+                                                       byval pRegistryPath as PUNICODE_STRING) as NTSTATUS
 
         dim Status as NTSTATUS = STATUS_SUCCESS
         dim pDeviceObject as PDEVICE_OBJECT = NULL
@@ -75,14 +75,14 @@
 
     end function
 
-    sub fb_RtInit()
+    sub fb_RtInit stdcall alias "fb_RtInit"()
         DbgPrint(@!"FBExample: fb_RtInit Called \r\n")
         return
     end sub
 
     declare function KeTickCount stdcall alias "KeTickCount" () as PLARGE_INTEGER
 
-    function KeTickCount () as LARGE_INTEGER ptr
+    function KeTickCount stdcall alias "KeTickCount" () as PLARGE_INTEGER
         static as LARGE_INTEGER c
         KeQueryTickCount(@c)
         return @c

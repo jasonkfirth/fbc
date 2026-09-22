@@ -7,10 +7,17 @@
 '' --------
 
 Sub printArrayDimensions( array() As Integer )
-	Print "dimensions: " & UBound( array, 0 )
+	'' The dimension-count query is defined as zero for an undimensioned array.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
+	Dim As Integer dimensions = UBound(array, 0)
+	Print "dimensions: " & dimensions
+
+	If dimensions = 0 Then Exit Sub
 
 	'' For each dimension...
-	For d As Integer = LBound( array, 0 ) To UBound( array, 0 )
+	For d As Integer = 1 To dimensions
+		'' dimensions is non-zero here, so this indexes a known dimension.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
 		Print "dimension " & d & ": " & LBound( array, d ) & " to " & UBound( array, d )
 	Next
 End Sub

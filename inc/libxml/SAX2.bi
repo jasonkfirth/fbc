@@ -26,6 +26,8 @@
 
 #pragma once
 
+#include once "libxml/tree.bi"
+
 #include once "crt/stdio.bi"
 #include once "crt/stdlib.bi"
 #include once "libxml/xmlversion.bi"

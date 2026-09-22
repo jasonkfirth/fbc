@@ -1,3 +1,17 @@
+'' Project: FreeBASIC Win32 COM examples
+'' File: test.bas
+''
+'' Purpose:
+''     Host an embedded browser control with a two-button Win32 toolbar.
+''
+'' Ownership:
+''     WinMain initializes COM before creating the browser and deletes the
+''     browser after the message loop, before calling OleUninitialize.
+''
+'' This file intentionally does NOT contain:
+''     - browser-engine implementation
+''     - a multithreaded COM apartment
+''
 
 
 #include once "windows.bi"
@@ -20,6 +34,7 @@ enum
 end enum
 
 const WIN_TOOLBAR_BUTTONS = 2
+const WIN_TOOLBAR_EDIT = WIN_TOOLBAR_FIRSTID + WIN_TOOLBAR_BUTTONS
 
 '' globals
 	dim shared as webctrl ptr browser = NULL
@@ -90,8 +105,8 @@ private function win_cb _
 
 	select case uMsg
 	case WM_SIZE
-		dim as integer wdt = LOWORD( lParam ), _
-					   hgt = HIWORD( lParam )
+		dim as integer wdt = LOWORD( lParam )
+		dim as integer hgt = HIWORD( lParam )
 
 		browser_onresize( wdt, hgt )
 
@@ -130,21 +145,22 @@ private function toolbar_editbox_oncreate _
 	dim as TEXTMETRIC tm
 	GetTextMetrics( GetDC( parent ), @tm )
 	dim as integer h = tm.tmHeight + 4
-	dim as integer x = tbsize->cx + LOWORD( pad ), y = HIWORD( pad )
+	dim as integer x = tbsize->cx + LOWORD( pad )
+	dim as integer y = HIWORD( pad )
 
 	dim as HWND hwnd
 	hwnd = CreateWindowEx( 0, _
 						   "Edit", _
 						   NULL, _
 						   WS_CHILD or WS_BORDER or WS_VISIBLE or ES_LEFT or ES_AUTOHSCROLL, _
-   						   x, _
-   						   y, _
-   						   400, _
-   						   h, _
-   						   cast( GetWindowLongPtr( parent, GWLP_HWNDPARENT ) ), _
-   						   cast( HMENU, WIN_TOOLBAR_EDIT ), _
-   						   cast( HINSTANCE, GetWindowLongPtr( parent, GWLP_HINSTANCE ) ), _
-   						   NULL )
+						   x, _
+						   y, _
+						   400, _
+						   h, _
+						   cast( GetWindowLongPtr( parent, GWLP_HWNDPARENT ) ), _
+						   cast( HMENU, WIN_TOOLBAR_EDIT ), _
+						   cast( HINSTANCE, GetWindowLongPtr( parent, GWLP_HINSTANCE ) ), _
+						   NULL )
 
 	SetParent( hwnd, parent )
 
@@ -168,14 +184,14 @@ private function toolbar_oncreate _
     hwnd = CreateWindowEx( WS_EX_DLGMODALFRAME, _
 						   TOOLBARCLASSNAME, _
 						   NULL, _
-                       	   WS_CHILD or WS_VISIBLE or WIN_TOOLBAR_STYLE, _
-                       	   0, _
-                       	   0, _
-                       	   CW_USEDEFAULT, _
+						   WS_CHILD or WS_VISIBLE or WIN_TOOLBAR_STYLE, _
+						   0, _
+						   0, _
 						   CW_USEDEFAULT, _
-                       	   parent, _
+						   CW_USEDEFAULT, _
+						   parent, _
 						   NULL, _
-                       	   cast( HINSTANCE, GetWindowLongPtr( parent, GWLP_HINSTANCE ) ), _
+						   cast( HINSTANCE, GetWindowLongPtr( parent, GWLP_HINSTANCE ) ), _
 						   NULL )
 
 	if( hwnd = NULL ) then
@@ -266,31 +282,31 @@ private function browser_oncreate _
 		byval parent as HWND _
 	) as webctrl ptr
 
-	dim as webctrl ptr browser
+	dim as webctrl ptr createdBrowser
 
-	browser = new webctrl( parent, _
+	createdBrowser = new webctrl( parent, _
 						   0, _
 						   WIN_TOOLBAR_HEIGHT, _
 						   WIN_WIDTH, _
 						   WIN_HEIGHT-WIN_TOOLBAR_HEIGHT, _
 						   WIN_BROWSER )
 
-	if( browser <> NULL ) then
-		browser->navigate( "file://" + curdir + "/frameset.html" )
+	if( createdBrowser <> NULL ) then
+		createdBrowser->navigate( "file://" + curdir + "/frameset.html" )
 	end if
 
-	function = browser
+	function = createdBrowser
 
 end function
 
 ''::::
 private sub browser_ondestroy _
 	( _
-		byval browser as webctrl ptr _
+		byval targetBrowser as webctrl ptr _
 	)
 
-	if( browser <> NULL ) then
-		delete browser
+	if( targetBrowser <> NULL ) then
+		delete targetBrowser
 	end if
 
 end sub
@@ -341,3 +357,5 @@ end function
 
 
 	end WinMain( GetModuleHandle( NULL ), NULL, Command( ), SW_NORMAL )
+
+'' End of test.bas

@@ -420,7 +420,7 @@ private function fl_color_cube(r as long, g as long, b as long) as Fl_Color
 	return cast(Fl_Color,(b*FL_NUM_RED + r) * FL_NUM_GREEN + g + _FL_COLOR_CUBE)
 end function
 
-enum Fl_Cursor 
+enum Fl_Cursor
 	FL_CURSOR_DEFAULT    =  0
 	FL_CURSOR_ARROW      = 35
 	FL_CURSOR_CROSS      = 66
@@ -452,7 +452,7 @@ enum
 	FL_EXCEPT = 8
 end enum
 
-enum Fl_Mode  
+enum Fl_Mode
 	FL_RGB		= 0
 	FL_INDEX	= 1
 	FL_SINGLE	= 0
@@ -470,7 +470,7 @@ end enum
 
 #define FL_IMAGE_WITH_ALPHA &h40000000
 
-enum Fl_Damage 
+enum Fl_Damage
 	FL_DAMAGE_CHILD    = &h01
 	FL_DAMAGE_EXPOSE   = &h02
 	FL_DAMAGE_SCROLL   = &h04

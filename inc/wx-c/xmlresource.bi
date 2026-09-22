@@ -8,7 +8,7 @@ Enum XmlResourceFlags
   XRC_NO_SUBCLASSING = 2
 End Enum
 
-Type XmlSubclassCreate As Function WXCALL (nam As wxString Ptr) As wxObject Ptr 
+Type XmlSubclassCreate As Function WXCALL (nam As wxString Ptr) As wxObject Ptr
 
 ' class wxXmlSubclassFactory
 Declare Sub wxXmlSubclassFactory_ctor WXCALL Alias "wxXmlSubclassFactory_ctor" (create As XmlSubclassCreate)

@@ -28,9 +28,9 @@ al_register_event_source(eventqueue, al_get_display_event_source(display))
 al_register_event_source(eventqueue, al_get_keyboard_event_source())
 
 do
-	al_clear_to_color(al_map_rgb(0,0,255))
-	al_draw_text(font, al_map_rgb(255,255,255), 100, 100, 0, "Hello!")
-	al_draw_text(font, al_map_rgb(0,255,0), 100, 200, 0, "Press any key to exit.")
+	al_clear_to_color(al_map_rgb(0, 0, 255))
+	al_draw_text(font, al_map_rgb(255, 255, 255), 100, 100, 0, "Hello!")
+	al_draw_text(font, al_map_rgb(0, 255, 0), 100, 200, 0, "Press any key to exit.")
 
 	al_flip_display()
 

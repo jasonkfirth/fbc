@@ -15,6 +15,8 @@
 
 #define TIMEOUT_INTERVAL 10
 
+'' GTK callbacks share these animation values with the render routine.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared as gboolean animate = TRUE
 dim shared as GLfloat angle
 dim shared as GLfloat pos_y
@@ -76,11 +78,11 @@ function configure_event cdecl (byval widget as GtkWidget ptr, _
   glMatrixMode (GL_PROJECTION)
   glLoadIdentity ()
   if (w > h) then
-      aspect = w / h
-      glFrustum (-aspect, aspect, -1.0, 1.0, 5.0, 60.0)
+    aspect = w / h
+    glFrustum (-aspect, aspect, -1.0, 1.0, 5.0, 60.0)
   else
-      aspect = h / w
-      glFrustum (-1.0, 1.0, -aspect, aspect, 5.0, 60.0)
+    aspect = h / w
+    glFrustum (-1.0, 1.0, -aspect, aspect, 5.0, 60.0)
   end if
 
   glMatrixMode (GL_MODELVIEW)
@@ -115,13 +117,13 @@ function expose_event cdecl (byval widget as GtkWidget ptr, _
   glTranslatef (0.0, 0.0, -10.0)
 
   glPushMatrix ()
-    glTranslatef (0.0, pos_y, 0.0)
-    glRotatef (angle, 0.0, 1.0, 0.0)
-    glMaterialfv (GL_FRONT, GL_AMBIENT, @ambient(0))
-    glMaterialfv (GL_FRONT, GL_DIFFUSE, @diffuse(0))
-    glMaterialfv (GL_FRONT, GL_SPECULAR, @specular(0))
-    glMaterialf (GL_FRONT, GL_SHININESS, shininess)
-    gdk_gl_draw_torus (TRUE, 0.3, 0.6, 30, 30)
+  glTranslatef (0.0, pos_y, 0.0)
+  glRotatef (angle, 0.0, 1.0, 0.0)
+  glMaterialfv (GL_FRONT, GL_AMBIENT, @ambient(0))
+  glMaterialfv (GL_FRONT, GL_DIFFUSE, @diffuse(0))
+  glMaterialfv (GL_FRONT, GL_SPECULAR, @specular(0))
+  glMaterialf (GL_FRONT, GL_SHININESS, shininess)
+  gdk_gl_draw_torus (TRUE, 0.3, 0.6, 30, 30)
   glPopMatrix ()
 
   if (gdk_gl_drawable_is_double_buffered (gldrawable) <> 0 ) then
@@ -160,18 +162,20 @@ function timeout cdecl (byval widget as gpointer) as gboolean
   return TRUE
 end function
 
+'' GTK timeout setup and removal share this registered timeout identifier.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared as guint timeout_id = 0
 
 sub timeout_add cdecl (byval widget as GtkWidget ptr)
   if (timeout_id = 0) then
-      timeout_id = gtk_timeout_add (TIMEOUT_INTERVAL, @timeout, widget)
+    timeout_id = gtk_timeout_add (TIMEOUT_INTERVAL, @timeout, widget)
   end if
 end sub
 
 sub timeout_remove cdecl (byval widget as GtkWidget ptr)
   if (timeout_id <> 0) then
-      gtk_timeout_remove (timeout_id)
-      timeout_id = 0
+    gtk_timeout_remove (timeout_id)
+    timeout_id = 0
   end if
 end sub
 
@@ -202,9 +206,9 @@ function visibility_notify_event cdecl (byval widget as GtkWidget ptr, _
                     			  		byval event as GdkEventVisibility ptr, _
                     			  		byval userdata as gpointer) as gboolean
   if (animate) then
-      if (event->state = GDK_VISIBILITY_FULLY_OBSCURED) then
+    if (event->state = GDK_VISIBILITY_FULLY_OBSCURED) then
 		timeout_remove (widget)
-      else
+    else
 		timeout_add (widget)
 	  end if
   end if
@@ -215,16 +219,16 @@ end function
 sub toggle_animation cdecl (byval widget as GtkWidget ptr)
 
   if( animate ) then
-  	animate = FALSE
+    animate = FALSE
   else
-  	animate = TRUE
+    animate = TRUE
   end if
 
   if (animate) then
-      timeout_add (widget)
+    timeout_add (widget)
   else
-      timeout_remove (widget)
-      gdk_window_invalidate_rect (widget->window, @widget->allocation, FALSE)
+    timeout_remove (widget)
+    gdk_window_invalidate_rect (widget->window, @widget->allocation, FALSE)
   end if
 end sub
 
@@ -312,16 +316,16 @@ end function
                                         GDK_GL_MODE_DEPTH  or _
                                         GDK_GL_MODE_DOUBLE)
   if (glconfig = NULL) then
-      g_print( !"*** Cannot find the double-buffered visual.\n" )
-      g_print( !"*** Trying single-buffered visual.\n" )
+    g_print( !"*** Cannot find the double-buffered visual.\n" )
+    g_print( !"*** Trying single-buffered visual.\n" )
 
       '' Try single-buffered visual
-      glconfig = gdk_gl_config_new_by_mode (GDK_GL_MODE_RGB   or _
+    glconfig = gdk_gl_config_new_by_mode (GDK_GL_MODE_RGB   or _
                                             GDK_GL_MODE_DEPTH)
-      if (glconfig = NULL) then
-          g_print( !"*** No appropriate OpenGL-capable visual found.\n" )
-          end 1
-      end if
+    if (glconfig = NULL) then
+      g_print( !"*** No appropriate OpenGL-capable visual found.\n" )
+      end 1
+    end if
   end if
 
   ''

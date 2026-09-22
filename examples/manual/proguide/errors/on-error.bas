@@ -10,9 +10,14 @@
 
 '$lang: "qb"
 
+Dim file_number As Integer
+'' This QB example intentionally keeps the handler active only for OPEN.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-ERR-004 FBL-ERR-005
 On Error Goto FAILED
-Open "xzxwz.zwz" For Input As #1
+file_number = FreeFile
+Open "xzxwz.zwz" For Input As #file_number
 On Error Goto 0
+Close #file_number
 Sleep
 End
 
@@ -22,4 +27,3 @@ e = Err
 Print e
 Sleep
 End
-

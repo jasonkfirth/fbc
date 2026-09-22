@@ -16,10 +16,11 @@ operator VARIANT.imp= _
 
 	dim as VARIANT_ res = any
 
-	VarImp( @this.var_, @rhs.var_, @res )
-
-	VariantClear( @this.var_ )
-	this.var_ = res
+	VariantInit( @res )
+	if VarImp( @this.var_, @rhs.var_, @res ) = 0 then
+		VariantClear( @this.var_ )
+		this.var_ = res
+	end if
 
 end operator
 
@@ -31,10 +32,10 @@ operator VARIANT.imp= _
 
 	dim as VARIANT_ res = any
 
-	VarImp( @this.var_, @rhs, @res )
-
-	VariantClear( @this.var_ )
-	this.var_ = res
+	VariantInit( @res )
+	if VarImp( @this.var_, @rhs, @res ) = 0 then
+		VariantClear( @this.var_ )
+		this.var_ = res
+	end if
 
 end operator
-

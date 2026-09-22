@@ -10,7 +10,7 @@ Declare Function wxPrintPreview_SetCurrentPage WXCALL Alias "wxPrintPreview_SetC
 Declare Function wxPrintPreview_GetCurrentPage WXCALL Alias "wxPrintPreview_GetCurrentPage" (self As wxPrintPreview Ptr) As wxInt
 Declare Sub wxPrintPreview_SetPrintout WXCALL Alias "wxPrintPreview_SetPrintout" (self As wxPrintPreview Ptr, printout As wxPrintout Ptr)
 Declare Function wxPrintPreview_GetPrintout WXCALL Alias "wxPrintPreview_GetPrintout" (self As wxPrintPreview Ptr) As wxPrintout Ptr
-Declare Function wxPrintPreview_GetPrintoutForPrinting WXCALL Alias "wxPrintPreview_GetPrintoutForPrinting" (self As wxPrintPreview Ptr) As wxPrintout Ptr 
+Declare Function wxPrintPreview_GetPrintoutForPrinting WXCALL Alias "wxPrintPreview_GetPrintoutForPrinting" (self As wxPrintPreview Ptr) As wxPrintout Ptr
 Declare Sub wxPrintPreview_SetFrame WXCALL Alias "wxPrintPreview_SetFrame" (self As wxPrintPreview Ptr, frame As wxFrame Ptr)
 Declare Sub wxPrintPreview_SetCanvas WXCALL Alias "wxPrintPreview_SetCanvas" (self As wxPrintPreview Ptr, canvas As wxPreviewCanvas Ptr)
 Declare Function wxPrintPreview_GetFrame WXCALL Alias "wxPrintPreview_GetFrame" (self As wxPrintPreview Ptr) As wxFrame Ptr

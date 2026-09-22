@@ -58,7 +58,8 @@ END SUB
 
 VAR app = g_application_new ("org.gtk.TestApplication", 0)
 g_signal_connect (app, "activate", G_CALLBACK (@activate), NULL)
-g_application_set_inactivity_timeout (app, 10000)
+const INACTIVITY_TIMEOUT_MILLISECONDS = 10000
+g_application_set_inactivity_timeout (app, INACTIVITY_TIMEOUT_MILLISECONDS)
 
 add_actions (app)
 

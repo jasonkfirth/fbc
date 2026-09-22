@@ -13,7 +13,7 @@ extern "windows"
 
 	declare function GdipAlloc (byval size as long) as any ptr
 	declare sub GdipFree (byval ptr as any ptr)
-	
+
 end extern
 
 #endif

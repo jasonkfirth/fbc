@@ -24,6 +24,12 @@
 ''   samples based on platform DOS, LINUX, WIN32, etc
 ''
 '' --------------------------------------------------------
+''
+'' Capacity policy:
+''
+'' The sample builder keeps an explicit active count for every capacity-backed
+'' dynamic array.  The arrays grow geometrically, so their UBound is capacity,
+'' not the number of valid entries.
 
 #include once "dir.bi"
 
@@ -106,7 +112,7 @@ function AdjustPath( byref s as string, byref p as string = "" ) as string
 		ret = lcase(s)
 	#endif
 	if( len(p) > 0 ) then
-		select case right(ret,1)
+		select case right(ret, 1)
 		case FWD_SLASH, BACK_SLASH
 		case else
 			ret = ret & p
@@ -123,7 +129,8 @@ function ReplaceSubStr _
 		byref rep as string _
 	) as string
 
-	dim i as integer = 1, ret as string
+	dim i as integer = 1
+	dim ret as string
 	ret = src
 	do
 	  i = instr(i, ret, old)
@@ -133,6 +140,13 @@ function ReplaceSubStr _
 	loop
 	return ret
 
+end function
+
+''
+function TrimIniField( byref value as string ) as string
+	'' samples.ini ignores whitespace around each key and value, on both ends.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL516
+	function = trim( value, any chr(9, 32) )
 end function
 
 '' --------------------------------------------------------
@@ -159,6 +173,8 @@ type SpecialBuildCmdT
 end type
 
 '' Special Build Information
+'' The special-build parser owns these capacity-backed tables for this module.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared sbFiles() as SpecialBuildFileT
 dim shared nsbFiles as integer
 dim shared sbCmds() as SpecialBuildCmdT
@@ -182,29 +198,32 @@ sub ReadSampleIni( byref filename as string )
 		skiptonext = FALSE
 		while eof(h) = 0
 			line input #h, x
-			x = trim( x, any chr(9,32) )
+			x = TrimIniField( x )
 			if( (x > "") and (left(x, 1) <> "#") ) then
 				if( (left(x, 1) = "[") and (right(x, 1) = "]") ) then
 					skiptonext = FALSE
 					nsbfiles += 1
-					redim preserve sbFiles( 0 to nsbFiles - 1 )
+					if( nsbFiles > ubound( sbFiles ) ) then
+						'' Doubling capacity keeps large special-build files amortized linear.
+						redim preserve sbFiles( 0 to ubound( sbFiles ) * 2 + 1 )
+					end if
 					with sbFiles( nsbFiles - 1 )
-						.source = SetPathChars( trim( mid( x, 2, len(x) - 2), any chr(9,32) ), FWD_SLASH )
+						.source = SetPathChars( TrimIniField( mid( x, 2, len(x) - 2) ), FWD_SLASH )
 						.index1 = nsbCmds
 						.index2 = nsbCmds
 					end with
 				else
 					i = instr( x, "=" )
 					if( i > 0 ) then
-						v = trim( left( x, i - 1 ), any chr(9,32) )
-						t = trim( mid( x, i + 1 ), any chr(9,32) )
+						v = TrimIniField( left( x, i - 1 ) )
+						t = TrimIniField( mid( x, i + 1 ) )
 						t = SetPathChars( t, FWD_SLASH )
 
 						'' Does v have a conditional target
 						i = instr( v, "," )
 						if( i > 0 ) then
-							p = ucase( trim( mid( v, i + 1 ), any chr(9,32) ) )
-							v = trim( left( v, i - 1 ), any chr(9,32) )
+							p = ucase( TrimIniField( mid( v, i + 1 ) ) )
+							v = TrimIniField( left( v, i - 1 ) )
 
 						else
 							p = PLATFORM
@@ -236,7 +255,10 @@ sub ReadSampleIni( byref filename as string )
 							end if
 
 							nsbCmds += 1
-							redim preserve sbCmds( 0 to nsbCmds - 1 )
+							if( nsbCmds > ubound( sbCmds ) ) then
+								'' Doubling capacity keeps large special-build files amortized linear.
+								redim preserve sbCmds( 0 to ubound( sbCmds ) * 2 + 1 )
+							end if
 							with sbCmds( nsbCmds - 1 )
 								.buildstep = buildstep
 								.value = t
@@ -287,9 +309,12 @@ sub AddDir( byref d as string, dirs() as string, byref ndirs as integer )
 	if( i > ndirs ) then
 		ndirs += 1
 		if ndirs = 1 then
-			redim dirs( 1 to ndirs )
+			redim dirs( 1 to 2 )
 		else
-			redim preserve dirs( 1 to ndirs )
+			if( ndirs > ubound( dirs ) ) then
+				'' Directory capacity doubles so recursive discovery stays amortized linear.
+				redim preserve dirs( 1 to ubound( dirs ) * 2 )
+			end if
 		end if
 		dirs( ndirs ) = d
 	end if
@@ -307,6 +332,8 @@ sub ScanDirectories _
 
 	'' get directories
 	start = ndirs + 1
+	'' This DIR pattern enumerates a source tree; it is not a release-package input.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-BUILD-003
 	d = dir( sourcedir & sourcedir2 & "*.*", fbDirectory )
 	while( d > "" )
 		if(( d <> "." ) and ( d <> ".." )) then
@@ -343,14 +370,19 @@ sub ScanFiles _
 	'' get files
 	nfiles = 0
 	for i = 1 to ndirs
+		'' This DIR pattern enumerates candidate sources before the explicit suffix filter.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-BUILD-003
 		d = dir( sourcedir & dirs(i) & "*.*" )
 		while( d > "" )
 			if( lcase( right( d, 2 )) = ".c" or lcase(right( d, 4 )) = ".bas" ) then
 				nfiles += 1
 				if nfiles = 1 then
-					redim files( 1 to nfiles)
+					redim files( 1 to 2 )
 				else
-					redim preserve files( 1 to nfiles )
+					if( nfiles > ubound( files ) ) then
+						'' File capacity doubles so source discovery stays amortized linear.
+						redim preserve files( 1 to ubound( files ) * 2 )
+					end if
 				end if
 				files( nfiles ) = dirs(i) & d
 			end if
@@ -388,7 +420,7 @@ end function
 function DoCompile _
 	( _
 		byref sourcedir as string, _
-		byref fbc as string, _
+		byref compilerPath as string, _
 		byref source as string, _
 		byref target as string, _
 		byref opts as string _
@@ -399,21 +431,23 @@ function DoCompile _
 
 	if( IsFileNewer( sourcedir, source, target ) = TRUE ) then
 
-		dim h as integer = freefile, idx as integer, ret as integer
+		dim h as integer = freefile
+		dim idx as integer
+		dim ret as integer
 
 		if open( sourcedir & source for binary access read as #h ) = 0 then
 
 			dim body as string
 			body = space( lof( h ))
-			get #h,,body
+			get #h,, body
 			close #h
 
 			args = sourcedir & source
 
 			args += " " & opts & " -x " & sourcedir & target
 
-			print fbc & " " & args
-			ret = exec( fbc, args )
+			print compilerPath & " " & args
+			ret = exec( compilerPath, args )
 			print
 
 			function = iif( ret = 0, BUILD_SUCCESS, BUILD_FAIL )
@@ -459,7 +493,7 @@ function DoSpecialBuild _
 	( _
 		byval cmd as COMMAND_ID, _
 		byref sourcedir as string, _
-		byref fbc as string, _
+		byref compilerPath as string, _
 		byref source as string, _
 		byref newest as double = 0 _
 	) as integer
@@ -492,7 +526,7 @@ function DoSpecialBuild _
 	'' Do the dependencies first
 	for j = first to last
 		if( sbCmds(j).buildstep = SBS_DEP ) then
-			ret = DoSpecialBuild( cmd, sourcedir, fbc, sbCmds(j).value, newest )
+			ret = DoSpecialBuild( cmd, sourcedir, compilerPath, sbCmds(j).value, newest )
 			if( ret = BUILD_FAIL ) then
 				haderror = TRUE
 				if( opt_error ) then
@@ -594,8 +628,8 @@ function DoSpecialBuild _
 					args = ReplaceSubStr( args, "$(EXEEXT)", exe_ext )
 					args = ReplaceSubStr( args, "$(DLLEXT)", dll_ext )
 
-					print fbc & " " & args
-					ret = exec( fbc, args )
+					print compilerPath & " " & args
+					ret = exec( compilerPath, args )
 					if( ret <> 0 ) then
 						haderror = TRUE
 						if( opt_error ) then
@@ -658,7 +692,7 @@ end function
 '' MAIN
 '' --------------------------------------------------------
 
-dim fbc as string, sourcedir as string, i as integer
+dim compilerPath as string, sourcedir as string, i as integer
 dim opt_specialonly as integer
 dim dirs() as string, ndirs as integer
 dim files() as string, nfiles as integer
@@ -716,6 +750,8 @@ case else
 	print "      -opts options"
 	print "         Add options to the command line"
 	print
+	'' This is the module-level usage exit for an omitted command.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-CF-005
 	end
 end select
 
@@ -727,8 +763,8 @@ while( command(i) > "" )
 		select case lcase(command(i))
 		case "-fbc"
 			i += 1
-			fbc = SetPathChars( command(i), psc )
-			fbc = AdjustPath( fbc )
+			compilerPath = SetPathChars( command(i), psc )
+			compilerPath = AdjustPath( compilerPath )
 
 		case "-srcdir"
 			i += 1
@@ -770,12 +806,12 @@ end if
 
 if( cmd = CMD_COMPILE ) then
 
-	if( fbc = "" ) then
-		fbc = ".." & FWD_SLASH & ".." & FWD_SLASH & "fbc" & exe_ext
+	if( compilerPath = "" ) then
+		compilerPath = ".." & FWD_SLASH & ".." & FWD_SLASH & "fbc" & exe_ext
 	end if
 
-	if( fileexists( fbc ) = 0 ) then
-		print "'" & fbc & "' not found"
+	if( fileexists( compilerPath ) = 0 ) then
+		print "'" & compilerPath & "' not found"
 		end 1
 	end if
 
@@ -809,7 +845,7 @@ case CMD_COMPILE, CMD_CLEAN
 	for i = 1 to nfiles
 		if( IsSpecialBuild( files(i) ) ) then
 
-			if( DoSpecialBuild( cmd, sourcedir, fbc, files(i) ) = BUILD_FAIL ) then
+			if( DoSpecialBuild( cmd, sourcedir, compilerPath, files(i) ) = BUILD_FAIL ) then
 				haderror = TRUE
 				if( opt_error ) then
 					exit for
@@ -822,7 +858,7 @@ case CMD_COMPILE, CMD_CLEAN
 			target = left(files(i), len(files(i))-4) & exe_ext
 
 			if( cmd = CMD_COMPILE ) then
-				if( DoCompile( sourcedir, fbc, files(i), target, extra_opts ) = BUILD_FAIL ) then
+				if( DoCompile( sourcedir, compilerPath, files(i), target, extra_opts ) = BUILD_FAIL ) then
 					haderror = TRUE
 					if( opt_error ) then
 						exit for

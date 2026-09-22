@@ -6,12 +6,12 @@
 ' class wxSashEdge
 Declare Function wxSashEdge_ctor WXCALL Alias "wxSashEdge_ctor" () As wxSashEdge Ptr
 Declare Sub wxSashEdge_dtor WXCALL Alias "wxSashEdge_dtor" (self As wxSashEdge Ptr)
-Declare Function wxSashEdge_m_show WXCALL Alias "wxSashEdge_m_show" (self As wxSashEdge Ptr) As wxBool 
+Declare Function wxSashEdge_m_show WXCALL Alias "wxSashEdge_m_show" (self As wxSashEdge Ptr) As wxBool
 Declare Function wxSashEdge_m_border WXCALL Alias "wxSashEdge_m_border" (self As wxSashEdge Ptr) As wxBool
 Declare Function wxSashEdge_m_margin WXCALL Alias "wxSashEdge_m_margin" (self As wxSashEdge Ptr) As wxInt
 
 ' class wxSashWindow
-Declare Function wxSashWindow_ctor WXCALL Alias "wxSashWindow_ctor" () As wxSashWindow Ptr  
+Declare Function wxSashWindow_ctor WXCALL Alias "wxSashWindow_ctor" () As wxSashWindow Ptr
 Declare Function wxSashWindow_Create WXCALL Alias "wxSashWindow_Create" (self As wxSashWindow Ptr, _
                          parent  As wxWindow     Ptr     , _
                          id      As  wxWindowID       = -1, _

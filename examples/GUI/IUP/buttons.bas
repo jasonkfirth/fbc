@@ -16,7 +16,7 @@ declare function close_onclick cdecl (byval handler as Ihandle ptr) as long
 	ok_button = IupButton( "Open", "ok_act" )
 	close_button = IupButton( "Close", "close_act" )
 
-  	main_dlg = IupDialog( _
+	main_dlg = IupDialog( _
   						  IupVbox( _
 								   IupHbox( IupLabel( "" ), NULL ), _
   						  		   IupHbox( IupFill(), ok_button, IupFill(), close_button, IupFill(), NULL ), _
@@ -54,4 +54,3 @@ function close_onclick cdecl (byval handler as Ihandle ptr) as long
   function = IUP_CLOSE
 
 end function
-

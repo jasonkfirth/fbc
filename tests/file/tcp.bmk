@@ -6,5 +6,15 @@
 MAIN := tcp.bas
 COMPILE_AND_LINK := 1
 FBC_CFLAGS += -mt
+ifeq ($(TARGET_OS),dos)
+	# The DOS TCP test needs both supported opt-in providers. The runtime
+	# archive supplies the Watt-32 implementation; these switches select its
+	# public code path and the PDMLWP scheduler for the loopback workers.
+	ifeq ($(DOS_THREAD_PROVIDER),pdmlwp)
+		ifeq ($(DOS_TCP_PROVIDER),watt32)
+			FBC_CFLAGS += -dos-threads pdmlwp -d FB_DOS_WATT32 -l watt
+		endif
+	endif
+endif
 
 # end of tcp.bmk

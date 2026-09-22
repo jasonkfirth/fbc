@@ -390,6 +390,8 @@ FUNCTION create_canvas_arrowhead() AS GtkWidget PTR
   VAR root = goo_canvas_get_root_item (GOO_CANVAS (canvas))
 
   gtk_widget_set_size_request (canvas, 500, 350)
+	' These bounds intentionally match the fixed arrowhead demonstration viewport.
+	' FB-LINTER: DISABLE-NEXT-LINE FBL-NUM-009
   goo_canvas_set_bounds (GOO_CANVAS (canvas), 0, 0, 500, 350)
   gtk_container_add (GTK_CONTAINER (frame), canvas)
   gtk_widget_show (canvas)

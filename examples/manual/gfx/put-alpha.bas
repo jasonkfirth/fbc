@@ -7,7 +7,11 @@
 '' --------
 
 '' Set up a 32-bit screen
-ScreenRes 320, 200, 32
+If ScreenRes(320, 200, 32) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 '' Draw checkered background
 For y As Integer = 0 To 199
@@ -18,6 +22,13 @@ Next y
 
 '' Make image sprite for Putting
 Dim img As Any Ptr = ImageCreate(32, 32, RGBA(0, 0, 0, 0))
+
+If img = 0 Then
+	Print "Could not create the image sprite"
+	Sleep
+	End 1
+End If
+
 For y As Single = -15.5 To 15.5
 	For x As Single = -15.5 To 15.5
 		Dim As Integer r, g, b, a

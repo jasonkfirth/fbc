@@ -37,6 +37,8 @@
 #define TABLEX (XSIZ * 2)
 #define TABLEY (YSIZ * 2)
 
+'' The plasma routine reads both lookup buffers after module initialization.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared screen(0 to XSIZ * YSIZ - 1) as ubyte
 dim shared table(0 to TABLEX * TABLEY - 1) as ubyte
 

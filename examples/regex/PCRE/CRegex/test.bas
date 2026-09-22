@@ -21,6 +21,8 @@ function load_textfile( filename as string ) as string
 
 	do until eof( f )
 		line input #f, ln
+		'' The bundled regression input is short; line input preserves its text form.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL503
 		text += ln + chr( 13, 10 )
 	loop
 

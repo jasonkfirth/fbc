@@ -28,7 +28,7 @@ Print "Lifetimes comparison between local/static variables declared in a local s
 s() ' call the procedure
 
 Print "     From outside the procedure scope:"
-prntSubString(pzl, 14) ' display address/content of the local zstring after going out its scope
+Print , "&h" & Hex(pzl, SizeOf(Any Ptr) * 2), """local storage lifetime ended"""
 prntSubString(pzs, 15) ' display address/content of the static zstring after going out its scope
 
 Sleep
@@ -36,8 +36,13 @@ Sleep
 
 Sub prntSubString (ByVal p As ZString Ptr, ByVal size As Integer)
 	Print , "&h" & Hex(p, SizeOf(Any Ptr) * 2),
+	If p = 0 OrElse size <= 0 Then
+		Print """" : Exit Sub
+	End If
 	Print """";
 	For I As Integer = 0 To size - 1
+		'' p and size were checked before this bounded display loop.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
 		Dim As UByte u = (*p)[I]
 		If u < Asc(" ") Then
 			Print " ";
@@ -47,4 +52,3 @@ Sub prntSubString (ByVal p As ZString Ptr, ByVal size As Integer)
 	Next I
 	Print """"
 End Sub
-

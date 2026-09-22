@@ -5,6 +5,12 @@
 ''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgDim
 '' --------
+''
+'' Ownership:
+''
+'' s3 owns the dynamically allocated ZSTRING storage used for the final size
+'' demonstration.  It is checked before use and released before the program
+'' ends.
 
 Dim a As Byte
 Dim b As Short
@@ -25,7 +31,11 @@ Dim s3 As ZString Ptr   '' zstring
 s1 = "Hello World!"
 s2 = "Hello World from FreeBASIC!"
 s3 = Allocate( Len( s2 ) + 1 )
-*s3 = s2
+If s3 <> 0 Then
+	*s3 = s2
+Else
+	Print "Unable to allocate the ZSTRING value."
+End If
 
 Print "Byte: "; Len(a)
 Print "Short: "; Len(b)
@@ -41,6 +51,11 @@ Print "Integer Pointer: "; Len(g)
 Print "Byte Pointer: "; Len(h)
 Print "Fixed String: "; Len(s1)
 Print "Variable String: "; Len(s2)
-Print "ZString: "; Len(*s3)
 
-Deallocate(s3)
+If s3 <> 0 Then
+	Print "ZString: "; Len(*s3)
+	Deallocate(s3)
+	s3 = 0
+End If
+
+'' end of examples/manual/variable/dim.bas

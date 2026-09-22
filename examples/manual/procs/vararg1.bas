@@ -21,6 +21,6 @@ Function average cdecl(count As Integer, ... ) As Double
 	Return sum / count
 End Function
 
-Print average(4, 3.4,5.0,3.2,4.1)  '' all passed variable arguments must be of type double
-Print average(2, 65.2,454.65481)   '' all passed variable arguments must be of type double
+Print average(4, 3.4, 5.0, 3.2, 4.1)  '' all passed variable arguments must be of type double
+Print average(2, 65.2, 454.65481)   '' all passed variable arguments must be of type double
 Sleep

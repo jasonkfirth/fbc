@@ -38,8 +38,8 @@ type xmlRegExecCtxtPtr as xmlRegExecCtxt ptr
 
 end extern
 
-#include once "libxml/tree.bi"
 #include once "libxml/dict.bi"
+#include once "libxml/tree.bi"
 
 extern "C"
 

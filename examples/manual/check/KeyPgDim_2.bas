@@ -14,6 +14,8 @@
 '' All other variables default to the SINGLE data type
 DefInt I-N
 
+'' T$ shows QB's suffix declaration while D AS DOUBLE contrasts DEFINT defaults.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-001 FBL-DECL-002
 Dim I, J, X, Y, T$, D As Double
 '' I and J are INTEGERs
 '' X and Y are SINGLEs

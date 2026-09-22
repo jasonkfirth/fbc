@@ -13,7 +13,8 @@
 ''   - As the viewport coordinates get larger, the figure appears smaller on the screen.
 
 Declare Sub Zoom (ByVal X As Integer)
-Dim As Integer X = 500, Xdelta = 50
+Dim As Integer X = 500
+Dim As Integer Xdelta = 50
 
 Screen 12
 Do
@@ -21,6 +22,8 @@ Do
 	X += Xdelta                      '' Change window size.
 	Zoom(X)
 	If Inkey <> "" Then Exit Do, Do  '' Stop if key pressed.
+	'' This is the visible zoom-animation cadence, not a blocking synchronization wait.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL602
 	Sleep 100
   Loop
   X -= Xdelta
@@ -28,9 +31,9 @@ Do
 Loop
 
 Sub Zoom (ByVal X As Integer)
-  Window (-X,-X)-(X,X)               '' Define new window.
+  Window (-X, -X)-(X, X)               '' Define new window.
   ScreenLock
   Cls
-  Circle (0,0), 60, 11, , , 0.5, F   '' Draw ellipse with x-radius 60.
+  Circle (0, 0), 60, 11, , , 0.5, F   '' Draw ellipse with x-radius 60.
   ScreenUnlock
 End Sub

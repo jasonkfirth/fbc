@@ -29,7 +29,11 @@ Dim As Const String petal = _
 
 
 '' set screen
-ScreenRes 320, 240, 8
+If ScreenRes( 320, 240, 8 ) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 '' move to center
 Draw "BM 160, 120"

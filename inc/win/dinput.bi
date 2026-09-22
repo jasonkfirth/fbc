@@ -25,6 +25,7 @@
 #inclib "uuid"
 
 #include once "objbase.bi"
+#include once "d3d9types.bi"
 
 extern "Windows"
 

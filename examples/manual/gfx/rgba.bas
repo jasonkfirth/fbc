@@ -7,13 +7,22 @@
 '' --------
 
 'open a graphics screen (320 * 240, 32-bit)
-ScreenRes 320, 240, 32
+If ScreenRes( 320, 240, 32 ) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 Dim As Any Ptr img
 Dim As Integer x, y
 
 'make an image that varies in transparency and color
 img = ImageCreate(64, 64)
+If img = 0 Then
+	Print "Could not create the image buffer"
+	Sleep
+	End 1
+End If
 For x = 0 To 63
   For y = 0 To 63
 	PSet img, (x, y), RGBA(x * 4, 0, y * 4, (x + y) * 2)
@@ -47,4 +56,3 @@ ImageDestroy img
 
 'Keep the window open until the user presses a key
 Sleep
-

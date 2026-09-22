@@ -4,6 +4,8 @@
 '' Functions:   LoadTGA(texture, filename)
 ''              LoadCompressedTGA(texture, filename, fTGA)
 ''              LoadUncompressedTGA(texture, filename, fTGA)
+'' Ownership:   Each loader transfers texture->imageData only on success.
+''              LoadCompressedTGA owns colorbuffer until it is released.
 ''******************************************************************************
 #include once "crt.bi"
 
@@ -16,6 +18,7 @@ type structTexture
 	textype	as uinteger					'' Image Type (GL_RGB, GL_RGBA)
 end type
 
+'' Layout: bytes 0-11 are the TGA type-selection header read from the file.
 type structTGAHeader
 	Header(0 to 11) as ubyte			'' TGA File Header
 end type
@@ -32,13 +35,15 @@ type structTGA
 end type
 
 
+'' The loaders share the current TGA parse state within one module.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared as structTGAHeader tgaheader		'' TGA header
 dim shared as structTGA tga					'' TGA image data
 
 
 
-dim shared as ubyte uTGAcompare(0 to 11) => {0,0,2, 0,0,0,0,0,0,0,0,0}	'' Uncompressed TGA Header
-dim shared as ubyte cTGAcompare(0 to 11) => {0,0,10,0,0,0,0,0,0,0,0,0}	'' Compressed TGA Header
+dim shared as ubyte uTGAcompare(0 to 11) => {0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0}	'' Uncompressed TGA Header
+dim shared as ubyte cTGAcompare(0 to 11) => {0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0}	'' Compressed TGA Header
 
 declare function LoadUncompressedTGA(byval as structTexture ptr, byref fname as string, byval filenumber as integer) as integer
 declare function LoadCompressedTGA(byval as structTexture ptr, byref fname as string, byval filenumber as integer) as integer
@@ -63,10 +68,13 @@ function LoadTGA(byval texture as structTexture ptr, byref filename as string) a
 	get #fTGA, , tgaheader
 
 	''  See if header matches the predefined header of
-	if memcmp (@uTGAcompare(0), @tgaheader, len(tgaheader)) = 0 then     '' an Uncompressed TGA image
+	'' Both operands are exact 12-byte TGA header arrays, not enclosing UDTs.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-MEM-005
+	if memcmp (@uTGAcompare(0), @tgaheader.Header(0), SizeOf(tgaheader.Header)) = 0 then     '' an Uncompressed TGA image
 		LoadUncompressedTGA (texture, filename, fTGA)   '' If so, jump to Uncompressed TGA loading code
 		''  See if header matches the predefined header of
-	elseif memcmp (@cTGAcompare(0), @tgaheader, len(tgaheader)) = 0 then '' an RLE compressed TGA image
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-MEM-005
+	elseif memcmp (@cTGAcompare(0), @tgaheader.Header(0), SizeOf(tgaheader.Header)) = 0 then '' an RLE compressed TGA image
 		LoadCompressedTGA (texture, filename, fTGA)     '' If so, jump to Compressed TGA loading code
 		''  If header matches neither type
 	else
@@ -183,13 +191,19 @@ function LoadCompressedTGA(byval texture as structTexture ptr, byref fname as st
 	dim colorbuffer as ubyte ptr                               '' Storage for 1 pixel
 
 	colorbuffer = allocate (tga.bytesPerPixel)
+	if colorbuffer = NULL then
+		close fTGA
+		deallocate texture->imageData
+		texture->imageData = NULL
+		return false
+	end if
 
 	do
 		dim as ubyte chunkheader = 0                           '' Storage for "chunk" header
 		dim as short counter = 0
 
 		''  Read in the 1 byte header
-		get #fTGA,,chunkheader
+		get #fTGA,, chunkheader
 		''  If the header is < 128, it means the that is the number of RAW color packets minus 1
 		if chunkheader < 128 then                              '' that follow the header
 			chunkheader+=1                                     '' add 1 to get number of following color values
@@ -222,10 +236,12 @@ function LoadCompressedTGA(byval texture as structTexture ptr, byref fname as st
 					''  If there is data in colorbuffer
 					if colorbuffer <> NULL then
 						deallocate (colorbuffer)           '' Delete it
+						colorbuffer = NULL
 					end if
 					''  If there is Image data
 					if texture->imageData <> NULL then
 						deallocate (texture->imageData)    '' delete it
+						texture->imageData = NULL
 					end if
 					return false                           '' Return failed
 				end if
@@ -263,10 +279,12 @@ function LoadCompressedTGA(byval texture as structTexture ptr, byref fname as st
 					''  If there is data in colorbuffer
 					if colorbuffer <> NULL then
 						deallocate (colorbuffer)             '' Delete it
+						colorbuffer = NULL
 					end if
 					''  If there is Image data
 					if texture->imageData <> NULL then
 						deallocate (texture->imageData)      '' delete it
+						texture->imageData = NULL
 					end if
 					return false                             '' Return failed
 				end if
@@ -275,6 +293,8 @@ function LoadCompressedTGA(byval texture as structTexture ptr, byref fname as st
 		end if
 	loop while (currentpixel < pixelcount)                   '' Loop while there are still pixels left
 
+	deallocate colorbuffer
+	colorbuffer = NULL
 	close fTGA                                               '' Close the file
 	return true                                              '' return success
 end function

@@ -4,8 +4,8 @@ extern "c++"
 
 type Fl_Counter extends Fl_Valuator
 private:
-	textfont_ as Fl_Font 
-	textsize_ as Fl_Fontsize 
+	textfont_ as Fl_Font
+	textsize_ as Fl_Fontsize
 	textcolor_ as Fl_Color
 	lstep_ as double
 	mouseobj as unsigned byte
@@ -64,7 +64,7 @@ private sub Fl_Counter.textfont(f as Fl_Font)
 	textfont_ = f
 end sub
 
-private function Fl_Counter.textsize() as Fl_Fontsize 
+private function Fl_Counter.textsize() as Fl_Fontsize
 	return textsize_
 end function
 

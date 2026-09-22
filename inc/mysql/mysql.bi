@@ -11,9 +11,12 @@
 
 #inclib "mysqlclient"
 
+#ifndef __MYSQL_BASIC_TYPES__
+#define __MYSQL_BASIC_TYPES__
 type my_bool as byte
 type gptr as byte ptr
 type my_socket as integer
+#endif
 type charset_info_st as any
 
 #include once "mysql/mysql_com.bi"
@@ -268,7 +271,7 @@ declare function mysql_fetch_field alias "mysql_fetch_field" (byval result as MY
 declare function mysql_escape_string alias "mysql_escape_string" (byval to as zstring ptr, byval from as zstring ptr, byval from_length as uinteger) as uinteger
 declare function mysql_real_escape_string alias "mysql_real_escape_string" (byval mysql as MYSQL ptr, byval to as zstring ptr, byval from as zstring ptr, byval length as uinteger) as uinteger
 declare sub mysql_debug alias "mysql_debug" (byval debug as zstring ptr)
-declare function mysql_odbc_escape_string alias "mysql_odbc_escape_string" (byval mysql as MYSQL ptr, byval to as zstring ptr, byval to_length as uinteger, byval from as zstring ptr, byval from_length as uinteger, byval param as any ptr, byval extend_buffer as function(byval as any ptr, byval as zstring ptr, byval as uinteger ptr) as byte) as zstring ptr
+declare function mysql_odbc_escape_string alias "mysql_odbc_escape_string" (byval mysql as MYSQL ptr, byval to as zstring ptr, byval to_length as uinteger, byval from as zstring ptr, byval from_length as uinteger, byval param as any ptr, byval extend_buffer as function cdecl(byval as any ptr, byval as zstring ptr, byval as uinteger ptr) as byte) as zstring ptr
 declare sub myodbc_remove_escape alias "myodbc_remove_escape" (byval mysql as MYSQL ptr, byval name as zstring ptr)
 declare function mysql_thread_safe alias "mysql_thread_safe" () as uinteger
 declare function mysql_manager_init alias "mysql_manager_init" (byval con as MYSQL_MANAGER ptr) as MYSQL_MANAGER ptr

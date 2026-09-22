@@ -12,7 +12,7 @@ Dim driver_name As String
 
 Screen 15, 32
 ' Obtain info about current mode
-ScreenInfo w, h, depth,,,,driver_name
+ScreenInfo w, h, depth,,,, driver_name
 Print Str(w) + "x" + Str(h) + "x" + Str(depth);
 Print " using " + driver_name + " driver"
 Sleep

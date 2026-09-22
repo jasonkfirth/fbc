@@ -9,6 +9,17 @@
 #ifndef __win_GdiplusImaging_bi__
 #define __win_GdiplusImaging_bi__
 
+#include once "windows.bi"
+
+#ifndef __FB_GDIPLUS_NAMESPACE_ACTIVE__
+#define __FB_GDIPLUS_NAMESPACE_ACTIVE__
+#define __FB_GDIPLUS_LOCAL_NAMESPACE__
+namespace Gdiplus
+#endif
+
+#include once "wtypes.bi"
+#include once "GdiplusPixelFormats.bi"
+
 type ImageCodecInfo
 	Clsid as CLSID
 	FormatID as GUID
@@ -106,7 +117,7 @@ type PropertyItem
 	type as WORD
 	value as any ptr
 end type
-	
+
 #define PropertyTagTypeByte 1
 #define PropertyTagTypeASCII 2
 #define PropertyTagTypeShort 3
@@ -329,5 +340,11 @@ end type
 #define PropertyTagGpsDestBear &h0018
 #define PropertyTagGpsDestDistRef &h0019
 #define PropertyTagGpsDestDist &h001A
+
+#ifdef __FB_GDIPLUS_LOCAL_NAMESPACE__
+end namespace
+#undef __FB_GDIPLUS_LOCAL_NAMESPACE__
+#undef __FB_GDIPLUS_NAMESPACE_ACTIVE__
+#endif
 
 #endif

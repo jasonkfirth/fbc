@@ -10,6 +10,8 @@
 #lang "qb"
 
 '' DIM based on $ suffix
+'' The suffix is the subject of this QB compatibility example.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-002
 Dim a$
 a$ = "Hello"
 

@@ -7,8 +7,8 @@
 '' --------
 
 ' Create an 2 arrays of integers and a 2 strings to hold the data.
-Dim h(4) As Integer
-Dim h2(4) As Integer
+Dim h(0 To 4) As Integer
+Dim h2(0 To 4) As Integer
 Dim hs As String
 Dim hs2 As String
 Dim read_data1 As Integer
@@ -40,8 +40,6 @@ Print  "Bloc 1 string = " + hs
 ' Spacers.
 Print
 Print
-
-
 ' Set the data read to the label 'dat1:'
 Restore dat1
 
@@ -68,11 +66,6 @@ Print  "Bloc 2 string = " + hs2
 ' Await a keypress.
 Sleep
 
-' Exit program.
-End
-
-
-
 ' First block of data.
 dat1:
 Data 3, 234, 4354, 23433, 87643, "Bye!"
@@ -81,7 +74,4 @@ Data 3, 234, 4354, 23433, 87643, "Bye!"
 dat2:
 Data 546, 7894, 4589, 64657, 34554, "Hi!"
 
-
-
-
-
+'' end of restore.bas

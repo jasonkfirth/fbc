@@ -12,15 +12,15 @@ public:
 	declare function handle(as long) as long
 	declare constructor(X as long, Y as long, W as long, H as long, L as const zstring ptr=0)
 
-	declare const function value() as long 
+	declare const function value() as long
 
-	declare function value(v as long) as long 
+	declare function value(v as long) as long
 
-	declare function value(v as const Fl_Menu_Item ptr) as long 
+	declare function value(v as const Fl_Menu_Item ptr) as long
 end type
-end extern 
+end extern
 
-private function Fl_Choice.value() as long 
+private function Fl_Choice.value() as long
 	return base.value()
 end function
 

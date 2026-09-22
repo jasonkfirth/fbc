@@ -13,6 +13,8 @@ operator shr _
 
 	dim as VARIANT_ res = any, tmp = any
 
+	VariantInit( @res )
+	VariantInit( @tmp )
 	V_VT(@tmp) = VT_I4
 	V_I4(@tmp) = 1 shl cint( rhs )
 
@@ -33,6 +35,8 @@ operator shr _
 
 	dim as VARIANT_ res = any, tmp = any
 
+	VariantInit( @res )
+	VariantInit( @tmp )
 	V_VT(@tmp) = VT_I4
 	V_I4(@tmp) = 1 shl rhs
 
@@ -43,4 +47,3 @@ operator shr _
 	return VARIANT( res, FALSE )
 
 end operator
-

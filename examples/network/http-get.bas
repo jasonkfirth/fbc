@@ -51,7 +51,7 @@ declare sub reportError( byref msg as string )
 
 	'' open socket
 	s = opensocket( AF_INET, SOCK_STREAM, IPPROTO_TCP )
-	if( s = SOCKET_ERROR ) then
+	if( s = Cast(SOCKET, SOCKET_ERROR) ) then
 		reportError( "socket()" )
 		end 1
 	end if
@@ -61,7 +61,9 @@ declare sub reportError( byref msg as string )
 #if defined(__FB_DARWIN__) or defined(__FB_DRAGONFLY__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)
 	sa.sin_len         = sizeof( sa )
 #endif
-	sa.sin_port        = htons( 80 )
+	'' HTTP's standard TCP service port.
+	const HTTP_PORT = 80
+	sa.sin_port        = htons( HTTP_PORT )
 	sa.sin_family      = AF_INET
 	sa.sin_addr.S_addr = ip
 

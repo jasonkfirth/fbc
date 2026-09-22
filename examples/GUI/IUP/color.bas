@@ -60,7 +60,7 @@ end function
   green_text = IupText(NULL)
   blue_text = IupText(NULL)
   color_text = IupText(NULL)
-  ok_button = IupButton("Apply","ok_act")
+  ok_button = IupButton("Apply", "ok_act")
 
   main_dlg = IupDialog _
 	  ( IupVbox _
@@ -70,7 +70,7 @@ end function
 		  IupFill(), red_text, NULL _
 		), _
                IupHbox _
-  	        ( IupVbox ( IupFill(), green_label, IupFill(), NULL), _
+	        ( IupVbox ( IupFill(), green_label, IupFill(), NULL), _
 		  IupFill(), green_text, NULL _
 		), _
 	       IupHbox _

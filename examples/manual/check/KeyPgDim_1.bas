@@ -16,7 +16,7 @@ Dim x As Double
 Dim k As Single, factor As Double, s As String
 
 '' More than one variable declared, all same data types
-Dim As Integer mx, my, mz ,mb
+Dim As Integer mx, my, mz , mb
 
 '' Variable having an initializer
 Dim px As Double Ptr = @x

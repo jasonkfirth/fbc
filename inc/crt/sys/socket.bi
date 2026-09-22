@@ -42,7 +42,7 @@ type osockaddr
 end type
 
 #if not defined(__FB_NUTTX__)
-enum 
+enum
 	SHUT_RD = 0
 	SHUT_WR
 	SHUT_RDWR
@@ -51,7 +51,7 @@ end enum
 
 extern "c"
 declare function socket_ alias "socket" (byval __domain as long, byval __type as long, byval __protocol as long) as long
-#define opensocket socket_ 
+#define opensocket socket_
 declare function socketpair (byval __domain as long, byval __type as long, byval __protocol as long, byval __fds as long ptr) as long
 declare function bind (byval __fd as long, byval __addr as const sockaddr ptr, byval __len as socklen_t) as long
 declare function getsockname (byval __fd as long, byval __addr as sockaddr ptr, byval __len as socklen_t ptr) as long

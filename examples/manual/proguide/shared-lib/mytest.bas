@@ -9,4 +9,4 @@
 '' mytest.bas
 '' compile with: fbc mytest.bas
 #include Once "mylib.bi"
-Print Add2(1,2)
+Print Add2(1, 2)

@@ -9,6 +9,23 @@
 #ifndef __win_GdiplusFlat_bi__
 #define __win_GdiplusFlat_bi__
 
+#include once "windows.bi"
+#include once "objidl.bi"
+#include once "GdiplusEnums.bi"
+#include once "GdiplusTypes.bi"
+#include once "GdiplusPixelFormats.bi"
+#include once "GdiplusColor.bi"
+#include once "GdiplusColorMatrix.bi"
+#include once "GdiplusImaging.bi"
+#include once "GdiplusMetaHeader.bi"
+#include once "GdiplusGpStubs.bi"
+
+#ifndef __FB_GDIPLUS_NAMESPACE_ACTIVE__
+#define __FB_GDIPLUS_NAMESPACE_ACTIVE__
+#define __FB_GDIPLUS_LOCAL_NAMESPACE__
+namespace Gdiplus
+#endif
+
 extern "windows"
 declare function GdipCreatePath (byval brushMode as GpFillMode, byval path as GpPath ptr ptr) as GpStatus
 declare function GdipCreatePath2 (byval as GpPointF ptr, byval as UBYTE ptr, byval as INT_, byval as GpFillMode, byval path as GpPath ptr ptr) as GpStatus
@@ -625,6 +642,12 @@ declare function GdipGetLogFont alias "GdipGetLogFontW" (byval font as GpFont pt
 #else
 declare function GdipCreateFontFromLogfont alias "GdipCreateFontFromLogfontA" (byval hdc as HDC, byval logfont as LOGFONTA ptr, byval font as GpFont ptr ptr) as GpStatus
 declare function GdipGetLogFont alias "GdipGetLogFontA" (byval font as GpFont ptr, byval graphics as GpGraphics ptr, byval logfontA as LOGFONTA ptr) as GpStatus
+#endif
+
+#ifdef __FB_GDIPLUS_LOCAL_NAMESPACE__
+end namespace
+#undef __FB_GDIPLUS_LOCAL_NAMESPACE__
+#undef __FB_GDIPLUS_NAMESPACE_ACTIVE__
 #endif
 
 #endif

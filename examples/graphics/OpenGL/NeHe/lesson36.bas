@@ -1,4 +1,17 @@
 ''------------------------------------------------------------------------------
+'' Project: FreeBASIC OpenGL examples
+'' File: lesson36.bas
+''
+'' Purpose:
+''     Demonstrate a rendered-to-texture radial blur around a lit helix.
+''
+'' Ownership:
+''     EmptyTexture allocates temporary CPU pixels and transfers them to the
+''     module-owned blur texture.  The render loop deletes that texture at exit.
+''
+'' This file intentionally does NOT contain:
+''     - a reusable framebuffer abstraction
+''     - persistent graphics state outside this lesson
 ''
 ''   Jeff Molofee''s Basecode Example
 ''          nehe.gamedev.net
@@ -19,7 +32,7 @@ const null = 0
 #include once "GL/glu.bi"
 #include once "fbgfx.bi"                       '' for Scan code constants
 
-declare sub Initialize ()
+declare function Initialize () as integer
 declare sub drawscr ()
 declare sub DrawBlur (byval times as integer, byval inc as single)
 declare sub RenderToTexture ()
@@ -31,6 +44,8 @@ declare sub ReduceToUnit (vector() as single)
 declare function EmptyTexture () as GLuint
 
 '' User Defined Variables
+'' The render loop and drawing helpers share only this module's helix state.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared angle as single                            '' Used To Rotate The Helix
 dim shared vertexes(0 to 3, 0 to 2) as single         '' Holds single Info For 4 Sets Of Vertices
 dim shared normal(0 to 2) as single                   '' An Array To Store The Normal Data
@@ -40,7 +55,7 @@ dim shared BlurTexture as GLuint                      '' Texture ID
 
 	windowtitle "rIO And NeHe's RadialBlur Tutorial." '' Set window title
 	screen 18, 32, , 2
-	Initialize ()
+	if Initialize () = false then end 1
 	lastTickCount  = timer * 1000
 	do
 		tickCount = timer * 1000			          '' Convert timer to ms
@@ -61,12 +76,17 @@ dim shared BlurTexture as GLuint                      '' Texture ID
 '' ------------------------------------------------------------------------
 function EmptyTexture () as GLuint                        '' Create An Empty Texture
 	dim txtnumber as GLuint                                '' Texture ID
-	dim ddata as unsigned integer ptr                     '' Stored Data
+	dim ddata as ubyte ptr                                '' RGBA Texture Storage
 
 	''  Create Storage Space For Texture Data (128x128x4)
-	ddata = callocate ((128 *128)*4* sizeof (integer))    '' callocate clear Storage Memory
+	ddata = callocate (128 * 128 * 4)                      '' Callocate Clear Storage Memory
+	if ddata = NULL then exit function
 
 	glGenTextures (1, @txtnumber)                         '' Create 1 Texture
+	if txtnumber = 0 then
+		deallocate (ddata)
+		exit function
+	end if
 	glBindTexture (GL_TEXTURE_2D, txtnumber)              '' Bind The Texture
 	glTexImage2D (GL_TEXTURE_2D, 0, 4, 128, 128, 0, GL_RGBA, GL_UNSIGNED_BYTE, ddata)  '' Build Texture Using Information In data
 	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
@@ -87,7 +107,7 @@ sub ReduceToUnit (vector() as single)                     '' Reduces A Normal Ve
 	length = sqr ((vector(0)* vector(0)) + (vector(1)* vector(1)) + (vector(2)* vector(2)))
 
 	''  Prevents Divide By 0 Error By Providing
-	if length = 0.0f then                                 '' An Acceptable Value For Vectors To Close To 0.
+	if length < 0.000001f then                            '' Treat near-zero normals as a safe unit divisor.
 		length = 1.0f
 	end if
 	vector(0) / = length                                  '' Dividing Each Element By
@@ -106,13 +126,13 @@ sub calcNormal (v() as single, oout() as single)          '' Calculates Normal F
 	''  The x,y,z Coordinates From One Point To Another.
 
 	''  Calculate The Vector From Point 1 To Point 0
-	v1(x) = v(0,x) - v(1,x)                               '' Vector 1.x=Vertex(0).x-Vertex(1).x
-	v1(y) = v(0,y) - v(1,y)                               '' Vector 1.y=Vertex(0).y-Vertex(1).y
-	v1(z) = v(0,z) - v(1,z)                               '' Vector 1.z=Vertex(0).y-Vertex(1).z
+	v1(x) = v(0, x) - v(1, x)                               '' Vector 1.x=Vertex(0).x-Vertex(1).x
+	v1(y) = v(0, y) - v(1, y)                               '' Vector 1.y=Vertex(0).y-Vertex(1).y
+	v1(z) = v(0, z) - v(1, z)                               '' Vector 1.z=Vertex(0).y-Vertex(1).z
 	''  Calculate The Vector From Point 2 To Point 1
-	v2(x) = v(1,x) - v(2,x)                               '' Vector 2.x=Vertex(0).x-Vertex(1).x
-	v2(y) = v(1,y) - v(2,y)                               '' Vector 2.y=Vertex(0).y-Vertex(1).y
-	v2(z) = v(1,z) - v(2,z)                               '' Vector 2.z=Vertex(0).z-Vertex(1).z
+	v2(x) = v(1, x) - v(2, x)                               '' Vector 2.x=Vertex(0).x-Vertex(1).x
+	v2(y) = v(1, y) - v(2, y)                               '' Vector 2.y=Vertex(0).y-Vertex(1).y
+	v2(z) = v(1, z) - v(2, z)                               '' Vector 2.z=Vertex(0).z-Vertex(1).z
 	''  Compute The Cross Product To Give Us A Surface Normal
 	oout(x) = v1(y)*v2(z) - v1(z)*v2(y)                   '' Cross Product For Y - Z
 	oout(y) = v1(z)*v2(x) - v1(x)*v2(z)                   '' Cross Product For X - Z
@@ -178,9 +198,9 @@ sub ProcessHelix ()                                    '' Draws A Helix
 					y = sin (u)*(2.0f + cos (v))*r             '' Calculate y Position (2nd Point)
 					z = ((u - (2.0f*3.142f)) + sin (v))*r      '' Calculate z Position (2nd Point)
 
-					vertexes(1,0) = x                          '' Set x Value Of Second Vertex
-					vertexes(1,1) = y                          '' Set y Value Of Second Vertex
-					vertexes(1,2) = z                          '' Set z Value Of Second Vertex
+					vertexes(1, 0) = x                          '' Set x Value Of Second Vertex
+					vertexes(1, 1) = y                          '' Set y Value Of Second Vertex
+					vertexes(1, 2) = z                          '' Set z Value Of Second Vertex
 
 					v = ((phi + 20) / 180.0f*3.142f)           '' Calculate Angle Of Third Point   ( 20 )
 					u = ((theta + 20) / 180.0f*3.142f)         '' Calculate Angle Of Third Point   ( 20 )
@@ -189,9 +209,9 @@ sub ProcessHelix ()                                    '' Draws A Helix
 					y = sin (u)*(2.0f + cos (v))*r             '' Calculate y Position (3rd Point)
 					z = ((u - (2.0f*3.142f)) + sin (v))*r      '' Calculate z Position (3rd Point)
 
-					vertexes(2,0) = x                          '' Set x Value Of Third Vertex
-					vertexes(2,1) = y                          '' Set y Value Of Third Vertex
-					vertexes(2,2) = z                          '' Set z Value Of Third Vertex
+					vertexes(2, 0) = x                          '' Set x Value Of Third Vertex
+					vertexes(2, 1) = y                          '' Set y Value Of Third Vertex
+					vertexes(2, 2) = z                          '' Set z Value Of Third Vertex
 
 					v = ((phi + 20) / 180.0f*3.142f)           '' Calculate Angle Of Fourth Point   ( 20 )
 					u = ((theta) / 180.0f*3.142f)              '' Calculate Angle Of Fourth Point   (  0 )
@@ -200,19 +220,19 @@ sub ProcessHelix ()                                    '' Draws A Helix
 					y = sin (u)*(2.0f + cos (v))*r             '' Calculate y Position (4th Point)
 					z = ((u - (2.0f*3.142f)) + sin (v))*r      '' Calculate z Position (4th Point)
 
-					vertexes(3,0) = x                          '' Set x Value Of Fourth Vertex
-					vertexes(3,1) = y                          '' Set y Value Of Fourth Vertex
-					vertexes(3,2) = z                          '' Set z Value Of Fourth Vertex
+					vertexes(3, 0) = x                          '' Set x Value Of Fourth Vertex
+					vertexes(3, 1) = y                          '' Set y Value Of Fourth Vertex
+					vertexes(3, 2) = z                          '' Set z Value Of Fourth Vertex
 
 					calcNormal (vertexes(), normal())               '' Calculate The Quad Normal
 
 					glNormal3f (normal(0), normal(1), normal(2))    '' Set The Normal
 
 					''  Render The Quad
-					glVertex3f (vertexes(0,0), vertexes(0,1), vertexes(0,2))
-					glVertex3f (vertexes(1,0), vertexes(1,1), vertexes(1,2))
-					glVertex3f (vertexes(2,0), vertexes(2,1), vertexes(2,2))
-					glVertex3f (vertexes(3,0), vertexes(3,1), vertexes(3,2))
+					glVertex3f (vertexes(0, 0), vertexes(0, 1), vertexes(0, 2))
+					glVertex3f (vertexes(1, 0), vertexes(1, 1), vertexes(1, 2))
+					glVertex3f (vertexes(2, 0), vertexes(2, 1), vertexes(2, 2))
+					glVertex3f (vertexes(3, 0), vertexes(3, 1), vertexes(3, 2))
 					theta+=20.0
 				wend
 				phi+=20.0
@@ -262,7 +282,9 @@ end sub
 '' Draw The Blurred Image
 sub DrawBlur (byval times as integer, byval inc as single)
 	dim as single spost = 0.0f                              '' Starting Texture Coordinate Offset
-	dim as single alphainc = 0.9f / times                   '' Fade Speed For Alpha Blending
+	dim as single alphainc
+	if times <= 0 then exit sub
+	alphainc = 0.9f / times                                  '' Fade Speed For Alpha Blending
 	dim as single alpha = 0.2f                              '' Starting Alpha Value
 
 	''  Disable AutoTexture Coordinates
@@ -311,14 +333,16 @@ end sub
 
 '' ------------------------------------------------------------------------
 '' Any GL Init Code & User Initialiazation Goes Here
-sub Initialize ()
+function Initialize () as integer
 	dim as integer w, h
 	screeninfo w, h
+	if w <= 0 or h <= 0 then exit function
 
 	'' Start Of User Initialization
 	angle = 0.0f                                            '' Set Starting Angle To Zero
 
 	BlurTexture = EmptyTexture ()                           '' Create Our Empty Texture
+	if BlurTexture = 0 then exit function
 
 	glViewport (0, 0, w, h)                                 '' Set Up A Viewport
 	glMatrixMode (GL_PROJECTION)                            '' Select The Projection Matrix
@@ -364,7 +388,8 @@ sub Initialize ()
 	glMateriali (GL_FRONT, GL_SHININESS, 128)
 	glClearColor (0.0f, 0.0f, 0.0f, 0.5)                        '' Set The Clear Color To Black
 
-end sub
+	Initialize = true
+end function
 
 '' ------------------------------------------------------------------------
 sub drawscr ()                                              '' Draw The Scene
@@ -376,3 +401,5 @@ sub drawscr ()                                              '' Draw The Scene
 	DrawBlur (25, 0.02f)                                    '' Draw The Blur Effect
 	glFlush ()                                              '' Flush The GL Rendering Pipeline
 end sub
+
+'' End of lesson36.bas

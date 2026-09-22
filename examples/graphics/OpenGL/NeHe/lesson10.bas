@@ -13,11 +13,10 @@
 '' UpArrow, DnArrow, RightArrow, Left Arrow to move around
 ''
 ''------------------------------------------------------------------------------
+'' Ownership: SetupWorld allocates the sector triangle array; the main lesson
+'' releases it after the render loop. The texture-transfer buffer is local.
 
 '' compile as: fbc -s gui lesson10.bas
-
-
-
 
 #include once "GL/gl.bi"
 #include once "GL/glu.bi"
@@ -52,6 +51,8 @@ declare sub readstr(byval f as integer, byref Buffer as string)
 declare sub SetupWorld()
 
 
+'' The render loop owns this parsed sector and releases it when the lesson ends.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared sector1 as SECTOR                   '' Our Model Goes Here
 
 dim shared filter as uinteger                  '' Which Filter To Use
@@ -95,11 +96,15 @@ dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 	glLoadIdentity                                 '' Reset The Modelview Matrix
 
 	'' This Lesson is the first to demonstrate the use of BLOAD to load the bitmaps.
-	redim buffer(256*256*4+4) as ubyte                    '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
-	bload exepath + "/data/Mud.bmp", @buffer(0)                      '' BLOAD data from bitmap
-	texture(0) = CreateTexture(@buffer(0),TEX_NOFILTER)   '' Nearest Texture
-	texture(1) = CreateTexture(@buffer(0))                '' Linear Texture (default)
-	texture(2) = CreateTexture(@buffer(0),TEX_MIPMAP)     '' MipMapped Texture
+	redim buffer(0 to 256*256*4+4) as ubyte               '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
+	if ubound(buffer) < lbound(buffer) then end 1
+	bload exepath + "/data/Mud.bmp", @buffer(lbound(buffer)) '' BLOAD data from bitmap
+	'' BLOAD reports a failed file transfer through FreeBASIC's immediate Err value.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL613
+	if err <> 0 then end 1
+	texture(0) = CreateTexture(@buffer(lbound(buffer)), TEX_NOFILTER) '' Nearest Texture
+	texture(1) = CreateTexture(@buffer(lbound(buffer)))   '' Linear Texture (default)
+	texture(2) = CreateTexture(@buffer(lbound(buffer)), TEX_MIPMAP) '' MipMapped Texture
 	'' Exit if error loading textures
 	if texture(0) = 0 or texture(1) = 0 or texture(2) = 0 then end 1
 
@@ -124,7 +129,7 @@ dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 		ytrans = - walkbias - 0.25                      '' Used For Bouncing Motion Up And Down
 		sceneroty = 360.0 - yrot                        '' 360 Degree Angle For Player Direction
 
-		glRotatef lookupdown, 1.0, 0,0                  '' Rotate Up And Down To Look Up And Down
+		glRotatef lookupdown, 1.0, 0, 0                  '' Rotate Up And Down To Look Up And Down
 		glRotatef sceneroty, 0, 1.0, 0                  '' Rotate Depending On Direction Player Is Facing
 
 		glTranslatef xtrans, ytrans, ztrans             '' Translate The Scene Based On Player Position
@@ -161,16 +166,16 @@ dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 		next
 
 		'' Keyboard handlers
-		if MULTIKEY(FB.SC_F) and not fp then           '' F Key down
+		if (MULTIKEY(FB.SC_F) <> 0) andalso (fp = 0) then '' F Key down
 			fp = true
 			filter += 1                             '' Cycle filter 0 -> 1 -> 2
 			if (filter > 2) then filter = 0         '' 2 -> 0
 		end if
-		if not MULTIKEY(FB.SC_F) then fp = false       '' F Key Up
+		if MULTIKEY(FB.SC_F) = 0 then fp = false       '' F Key Up
 
-		if MULTIKEY(FB.SC_B) and not blendpressed then '' B Key down
+		if (MULTIKEY(FB.SC_B) <> 0) andalso (blendpressed = 0) then '' B Key down
 			blendpressed = true
-			blend = not blend                       '' toggle blending On/Off
+			blend = (blend = 0)                     '' toggle blending On/Off
 			if blend then
 				glEnable(GL_BLEND)                  '' Turn Blending On
 				glDisable(GL_DEPTH_TEST)            '' Turn Depth Testing Off
@@ -179,7 +184,7 @@ dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 				glEnable(GL_DEPTH_TEST)             '' Turn Depth Testing On
 			end if
 		end if
-		if not MULTIKEY(FB.SC_B) then blendpressed = false '' B Key up
+		if MULTIKEY(FB.SC_B) = 0 then blendpressed = false '' B Key up
 
 		if MULTIKEY(FB.SC_UP) then
 			xpos = xpos - sin(heading*piover180) * 0.05    '' Move On The X-Plane Based On Player Direction
@@ -228,13 +233,19 @@ dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 	'' Empty keyboard buffer
 	while inkey <> "": wend
 
+	if sector1.triangle <> NULL then
+		deallocate sector1.triangle
+		sector1.triangle = NULL
+		sector1.numtriangles = 0
+	end if
+
 	end
 
 ''------------------------------------------------------------------------------
 sub readstr(byval f as integer, byref Buffer as string)
 	do
 		line input #f, Buffer        '' Get one line
-	loop while (left(Buffer,1) = "/") or (Buffer = "")   '' See If It Is Worthy Of Processing
+	loop while (left(Buffer, 1) = "/") or (Buffer = "")   '' See If It Is Worthy Of Processing
 end sub
 
 '-------------------------------------------------------------------------------
@@ -251,7 +262,15 @@ sub SetupWorld()
 	readstr(fp, oneline)                                      '' Get Single Line Of Data
 	if oneline = "" then end 1                                '' Data file error, exit
 	sscanf(strptr(oneline), !"NUMPOLLIES %d\n", @numtriangles) '' Read In Number Of Triangles
-	sector1.triangle = allocate(len(TRIANGLE)*numtriangles)   '' Allocate Memory For numtriangles And Set Pointer
+	if numtriangles <= 0 or numtriangles > 2147483647 \ sizeof(TRIANGLE) then
+		close #fp
+		end 1
+	end if
+	sector1.triangle = allocate(sizeof(TRIANGLE) * numtriangles) '' Allocate Memory For numtriangles And Set Pointer
+	if sector1.triangle = NULL then
+		close #fp
+		end 1
+	end if
 	sector1.numtriangles = numtriangles                       '' Define The Number Of Triangles In Sector 1
 	for gl_loop = 0 to numtriangles-1                         '' Loop Through All The Triangles
 		for vert = 0 to 2                                     '' Loop Through All The Vertices

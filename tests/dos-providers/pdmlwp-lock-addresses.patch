@@ -1,0 +1,58 @@
+--- a/src/lwp.c
++++ b/src/lwp.c
+@@ -217,7 +217,7 @@
+ #endif
+       return (0);
+     }
+-  if (_lwp_lock_data (&_lwp_cur, sizeof (lwp)))
++  if (_lwp_lock_data (_lwp_cur, sizeof (lwp)))
+     {
+ #ifdef DEBUG
+       cprintf ("couldn't lock _lwp_cur\n\r");
+@@ -485,8 +485,8 @@
+ // V. 2.1: calloc() instead of malloc() allocates zeroed memory
+   tmp->stack = (unsigned int *) calloc (stack_length, 1);
+   if ((tmp->stack == NULL) ||
+-      _lwp_lock_data (&tmp, sizeof (lwp)) ||
+-      _lwp_lock_data (&tmp->stack, stack_length)
++      _lwp_lock_data (tmp, sizeof (lwp)) ||
++      _lwp_lock_data (tmp->stack, stack_length)
+     )
+     {
+       _lwp_enable = tmp2;
+@@ -674,7 +674,7 @@
+               trailer->next = curs->next;
+               /* Free everything that thread owns */
+               _lwp_unlock_data (curs->stackTop, curs->stklen);
+-              _lwp_unlock_data (&curs, sizeof (lwp));
++              _lwp_unlock_data (curs, sizeof (lwp));
+               free (curs->stackTop);
+               free (curs);
+               lwp_active_threads--;
+@@ -778,7 +778,7 @@
+             trail->next = curs->next;
+ /* Free everything that thread owns */
+             _lwp_unlock_data (curs->stackTop, curs->stklen);
+-            _lwp_unlock_data (&curs, sizeof (lwp));
++            _lwp_unlock_data (curs, sizeof (lwp));
+             free (curs->stackTop);
+             free (curs);
+ #ifdef DEBUG
+@@ -794,7 +794,7 @@
+       stopIRQ8 ();
+       __dpmi_set_protected_mode_interrupt_vector (IRQ8, &_lwp_pm_old_handler);
+       signal (SIGILL, _lwp_old_handler);
+-      _lwp_unlock_data (&_lwp_cur, sizeof (lwp));
++      _lwp_unlock_data (_lwp_cur, sizeof (lwp));
+       free (_lwp_cur);
+ 
+ #ifdef DEBUG
+@@ -810,7 +810,7 @@
+       outportb (PIT0, 0x00);
+       __dpmi_set_protected_mode_interrupt_vector (IRQ0, &_lwp_pm_old_handler);
+       signal (SIGILL, _lwp_old_handler);
+-      _lwp_unlock_data (&_lwp_cur, sizeof (lwp));
++      _lwp_unlock_data (_lwp_cur, sizeof (lwp));
+       free (_lwp_cur);
+       cmostime = get_cmostime ();
+       tick = PIT0DEF *

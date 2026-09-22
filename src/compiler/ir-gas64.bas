@@ -4754,7 +4754,11 @@ private sub hBopEmitSimple _
 		end if
 	end select
 
-	if( (op <> AST_OP_MUL) andalso (vr <> NULL) ) then
+	if( (vr <> NULL) andalso _
+		((op <> AST_OP_MUL) orelse (op1prev = "")) ) then
+		'' A multiply whose first operand was materialized keeps its result
+		'' in the allocated register.  Re-establish that mapping after the
+		'' materializing move has released the register from the liveness map.
 		restore_vrreg( vr, vrreg )
 	end if
 end sub

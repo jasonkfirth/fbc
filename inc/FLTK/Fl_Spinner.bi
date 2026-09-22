@@ -84,7 +84,7 @@ private sub Fl_Spinner.sb_cb(w as Fl_Widget ptr, sb as Fl_Spinner ptr)
 	elseif w = @sb->down_button_ then
 		v = sb->value_ - sb->step__
 
-		if v < sb->minimum_ then 
+		if v < sb->minimum_ then
 			sb->value_ = sb->maximum_
 		else
 			sb->value_ = v
@@ -111,7 +111,7 @@ private sub Fl_Spinner.update()
 		do while sp>@temp andalso *sp=asc("0"): sp-=1:loop
 		do while sp>@temp andalso (*sp>=asc("0") andalso *sp<=asc("9") ):  sp-=1: c+=1: loop
 		sprintf(s, format_, c, value_)
-	else 
+	else
 		sprintf(s, format_, value_)
 	end if
 	input_.value(s)
@@ -130,8 +130,8 @@ end sub
 
 
 private function Fl_Spinner.handle(event as long) as long
-	select case (event) 
-	case FL_KEYDOWN,  FL_SHORTCUT 
+	select case (event)
+	case FL_KEYDOWN,  FL_SHORTCUT
 		if Fl.event_key() = _FL_Up then
 			up_button_.do_callback()
 			return 1
@@ -184,7 +184,7 @@ end function
 
 private sub Fl_Spinner.step_(s as double)
 	step__ = s
-	if step__ <>cast(long, step__) then 
+	if step__ <>cast(long, step__) then
 			input_.type_(FL_FLOAT_INPUT_)
 	else
 		 input_.type_(FL_INT_INPUT_)

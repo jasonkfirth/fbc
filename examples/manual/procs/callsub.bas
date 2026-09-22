@@ -14,5 +14,5 @@ Declare Sub foobar(ByVal x As Integer, ByVal y As Integer)
 Call foobar(35, 42)
 
 Sub foobar(ByVal x As Integer, ByVal y As Integer)
-Print x; y
+	Print x; y
 End Sub

@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include once "cd.bi"
+
 #ifdef __FB_WIN32__
 	extern "C"
 #endif

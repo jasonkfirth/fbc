@@ -276,11 +276,11 @@ $(libfbrtpicobjdir)/%.o: $(srcdir)/fbrt/%.bas $(LIBFBRT_BI) | $(libfbrtpicobjdir
 
 $(libfbrtmtobjdir)/%.o: $(srcdir)/fbrt/%.bas $(LIBFBRT_BI) | $(libfbrtmtobjdir)
 	@mkdir -p "$(dir $@)"
-	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBRTCFLAGS) -mt -d ENABLE_MT $(FBC_INCLUDE_FLAGS) -c $< -o $@
+	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBRTCFLAGS) $(DOS_THREAD_FBCFLAGS) -mt -d ENABLE_MT $(FBC_INCLUDE_FLAGS) -c $< -o $@
 
 $(libfbrtmtpicobjdir)/%.o: $(srcdir)/fbrt/%.bas $(LIBFBRT_BI) | $(libfbrtmtpicobjdir)
 	@mkdir -p "$(dir $@)"
-	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBRTCFLAGS) -mt -pic -d ENABLE_MT $(FBC_INCLUDE_FLAGS) -c $< -o $@
+	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBRTCFLAGS) $(DOS_THREAD_FBCFLAGS) -mt -pic -d ENABLE_MT $(FBC_INCLUDE_FLAGS) -c $< -o $@
 
 ##############################################################################
 # gfxlib2 (C sources)

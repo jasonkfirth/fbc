@@ -32,6 +32,8 @@ Dim As Any Ptr threadUDT.pCond
 
 Sub threadUDT.threadCreate ()
 	If This.pThread = 0 Then
+	  '' The vtable's first procedure slot is the class's abstract thread entry.
+	  '' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-019
 	  This.pThread = .ThreadCreate(Cast(Any Ptr Ptr Ptr, @This)[0][0], @This)
 	End If
 End Sub
@@ -192,4 +194,3 @@ Locate UDT.numberMax+2, 1
 Print CULngInt(c / t) & " increments per second"
 
 Sleep
-

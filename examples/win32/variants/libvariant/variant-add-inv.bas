@@ -20,6 +20,7 @@ operator + _
 
 	dim as VARIANT_ res = any
 
+	VariantInit( @res )
 	VarAdd( @lhs, @rhs.var_, @res )
 
 	return VARIANT( res, FALSE )
@@ -36,6 +37,7 @@ operator + _
 	dim as VARIANT_ tmp = any, res = any
 
 	VariantInit( @tmp )
+	VariantInit( @res )
 	V_VT(@tmp) = VT_BSTR
 	V_BSTR(@tmp) = SysAllocStringByteLen( lhs, len( *lhs ) )
 
@@ -57,6 +59,7 @@ operator + _
 	dim as VARIANT_ tmp = any, res = any
 
 	VariantInit( @tmp )
+	VariantInit( @res )
 	V_VT(@tmp) = VT_BSTR
 	V_BSTR(@tmp) = SysAllocStringLen( lhs, len( *lhs ) )
 
@@ -67,4 +70,3 @@ operator + _
 	return VARIANT( res, FALSE )
 
 end operator
-

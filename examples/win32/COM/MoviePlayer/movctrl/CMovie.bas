@@ -37,16 +37,16 @@ constructor CMovie _
 
     hr = IGraphBuilder_QueryInterface( ctx->graph, @IID_IMediaControl, cast( PVOID ptr, @ctx->medctrl ) )
     if( SUCCEEDED( hr ) ) then
-    	hr = IGraphBuilder_QueryInterface( ctx->graph, @IID_IMediaEvent, cast( PVOID ptr, @ctx->medevent ) )
-    	if( SUCCEEDED( hr ) ) then
-    		hr = IGraphBuilder_QueryInterface( ctx->graph, @IID_IMediaSeeking, cast( PVOID ptr, @ctx->medseek ) )
-    		if( SUCCEEDED( hr ) ) then
-    			hr = IGraphBuilder_QueryInterface( ctx->graph, @IID_IVideoWindow, cast( PVOID ptr, @ctx->vidwindow ) )
-    			if( SUCCEEDED( hr ) ) then
-    				hr = IGraphBuilder_QueryInterface( ctx->graph, @IID_IBasicVideo, cast( PVOID ptr, @ctx->basvideo ) )
-    			end if
-    		end if
-    	end if
+        hr = IGraphBuilder_QueryInterface( ctx->graph, @IID_IMediaEvent, cast( PVOID ptr, @ctx->medevent ) )
+        if( SUCCEEDED( hr ) ) then
+            hr = IGraphBuilder_QueryInterface( ctx->graph, @IID_IMediaSeeking, cast( PVOID ptr, @ctx->medseek ) )
+            if( SUCCEEDED( hr ) ) then
+                hr = IGraphBuilder_QueryInterface( ctx->graph, @IID_IVideoWindow, cast( PVOID ptr, @ctx->vidwindow ) )
+                if( SUCCEEDED( hr ) ) then
+                    hr = IGraphBuilder_QueryInterface( ctx->graph, @IID_IBasicVideo, cast( PVOID ptr, @ctx->basvideo ) )
+                end if
+            end if
+        end if
     end if
 
 	if( FAILED( hr ) ) then
@@ -64,9 +64,9 @@ destructor CMovie _
 	remove( )
 
 	if( ctx->graph <> NULL ) then
-	    if( ctx->basvideo <> NULL ) then
-	    	IBasicVideo_Release( ctx->basvideo )
-	    	ctx->basvideo = NULL
+		if( ctx->basvideo <> NULL ) then
+			IBasicVideo_Release( ctx->basvideo )
+			ctx->basvideo = NULL
 		end if
 
 		if( ctx->vidwindow <> NULL ) then
@@ -89,7 +89,7 @@ destructor CMovie _
 			ctx->medctrl = NULL
 		end if
 
-    	IGraphBuilder_Release( ctx->graph )
+		IGraphBuilder_Release( ctx->graph )
 		ctx->graph = NULL
 	end if
 
@@ -241,13 +241,13 @@ function CMovie.stop _
 
     hr = IMediaControl_Stop( ctx->medctrl )
     if( FAILED( hr ) ) then
-    	exit function
+        exit function
     end if
 
 	dim as OAFilterState fs
     hr = IMediaControl_GetState( ctx->medctrl, 100, @fs )
     if( FAILED( hr ) ) then
-    	exit function
+        exit function
     end if
 
     hr = IMediaControl_StopWhenReady( ctx->medctrl )
@@ -255,4 +255,3 @@ function CMovie.stop _
     function = SUCCEEDED( hr )
 
 end function
-

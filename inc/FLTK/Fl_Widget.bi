@@ -1,3 +1,6 @@
+'' Fl_Widget uses the scalar types and enumerations declared by FLTK itself.
+#include once "Enumerations.bi"
+
 type Fl_Image_ as Fl_Image
 type Fl_Font_ as Fl_Font
 type Fl_Window_ as Fl_Window
@@ -14,7 +17,7 @@ type Fl_Callback as sub(as Fl_Widget_ ptr, as any ptr)
 type Fl_Callback0 as sub(as Fl_Widget_ ptr)
 type Fl_Callback1 as sub(as Fl_Widget_ ptr, as integer)
 
-type Fl_Label 
+type Fl_Label
 	value as const zstring ptr
 
 	image as Fl_Image_ ptr
@@ -88,11 +91,11 @@ protected:
 	declare const sub draw_box()
 	declare const sub draw_box(t as Fl_Boxtype, c as ulong)
 	declare const sub draw_box(t as Fl_Boxtype, x as long, y as long, w as long, h as long, c as ulong)
-	declare const sub draw_backdrop() 
+	declare const sub draw_backdrop()
 	declare const sub draw_focus()
 	declare const sub draw_focus(t as Fl_Boxtype, x as long, y as long, w as long, h as long)
-	declare const sub draw_label() 
-	declare const sub draw_label(x as long, y as long, w as long, h as long) 
+	declare const sub draw_label()
+	declare const sub draw_label(x as long, y as long, w as long, h as long)
 
 
 public:
@@ -218,7 +221,7 @@ public:
 
 	declare const sub draw_label(x as long, y as long, w as long, h as long, Fl_Align as ulong)
 
-	declare const sub measure_label(byref ww as long, byref hh as long) 
+	declare const sub measure_label(byref ww as long, byref hh as long)
 
 	declare const function window as Fl_Window_ ptr
 	declare const function top_window() as Fl_Window_ ptr
@@ -527,7 +530,7 @@ end sub
 
 private sub Fl_Widget.do_callback(o as Fl_Widget ptr, arg as integer)
 	this.do_callback(o, cast(any ptr, arg))
-	
+
 end sub
 
 private const function Fl_Widget.inside(wgt as const Fl_Widget ptr) as long
@@ -542,7 +545,7 @@ private sub Fl_Widget.clear_damage(c as ubyte)
 	this.damage_=c
 end sub
 
-private const sub Fl_Widget.measure_label(byref ww as long, byref hh as long) 
+private const sub Fl_Widget.measure_label(byref ww as long, byref hh as long)
 	this.label_.measure(ww, hh)
 end sub
 

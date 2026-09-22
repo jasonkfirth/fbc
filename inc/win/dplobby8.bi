@@ -23,6 +23,7 @@
 #pragma once
 
 #include once "ole2.bi"
+#include once "dplay8.bi"
 
 extern "Windows"
 

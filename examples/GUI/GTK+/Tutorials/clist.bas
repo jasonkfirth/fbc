@@ -14,8 +14,8 @@ Sub button_add_clicked Cdecl( Byval user_data As gpointer )
 
 	Dim drink(1 To 4, 1 To 2) As Zstring Ptr => {_
 	{@"Milk", @"3 Oz"}, _
-	{@"Water", @"6 l"},_
-	{@"Carrots", @"2"},_
+	{@"Water", @"6 l"}, _
+	{@"Carrots", @"2"}, _
 	{@"Snakes", @"55"}_
 	}
 

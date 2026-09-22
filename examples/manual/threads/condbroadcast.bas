@@ -6,6 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgCondBroadcast
 '' --------
 
+'' Thread synchronization: mutex locks protect each shared predicate and condition handle.
+
 '' How can all threads wait for each other before continuing to execute their concomitant sections of code ?
 ''
 '' This is the main code that manages the synchronization of concomitant sections of code:
@@ -32,7 +34,7 @@ Dim threadnumber As Integer = 4
 
 Sub mythread(ByVal p As Any Ptr)
 
-	Dim id As Integer = Cast(Integer, p)
+	Dim id As Integer = CInt(Cast(UInteger, p))
 
 	'' for visualizing thread status
 		Print "   Thread #" & id & " is started..."

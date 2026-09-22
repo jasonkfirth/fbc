@@ -21,7 +21,7 @@ End Enum
 #Define wxTraceMemAlloc &H0001  ' trace memory allocation (new/delete)
 #Define wxTraceMessages &H0002  ' trace window messages/X callbacks
 #Define wxTraceResAlloc &H0004  ' trace GDI resource allocation
-#Define wxTraceRefCount &H0008 
+#Define wxTraceRefCount &H0008
 
 Type wxTraceMask As wxUint
 

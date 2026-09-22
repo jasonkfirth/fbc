@@ -1,3 +1,9 @@
+/* FreeBASIC DOS runtime: fb_dos.h
+ * Platform ABI and shared DOS hardware helpers. No scheduler implementation.
+ */
+#ifndef FB_DOS_H
+#define FB_DOS_H
+
 #define FBCALL
 
 /* newline for console/file I/O */
@@ -94,3 +100,7 @@ extern void (*__fb_dos_multikey_hook)(int scancode, int flags);
 
 void fb_hFarMemSet ( unsigned short selector, unsigned long dest, unsigned char char_to_set, size_t bytes );
 void fb_hFarMemSetW( unsigned short selector, unsigned long dest, unsigned short word_to_set, size_t words );
+
+#endif
+
+/* end of fb_dos.h */

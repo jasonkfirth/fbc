@@ -12,16 +12,24 @@
 #include "disphelper/disphelper.bi"
 
 Sub navigate(ByRef url As String)
-	DISPATCH_OBJ(ieApp)
-	dhInitialize(True)
-	dhToggleExceptions(True)
+	'' DISPATCH_OBJ expands to this nullable IDispatch declaration.  Spelling
+	'' it out keeps the ownership and each HRESULT boundary visible.
+	Dim As IDispatch Ptr ieApp = NULL
 
-	dhCreateObject("InternetExplorer.Application", NULL, @ieApp)
-	dhPutValue(ieApp, "Visible = %b", True)
-	dhCallMethod(ieApp, ".Navigate(%s)", url)
+	If SUCCEEDED( dhInitialize( True ) ) Then
+		If SUCCEEDED( dhToggleExceptions( True ) ) Then
+			If SUCCEEDED( dhCreateObject( "InternetExplorer.Application", NULL, @ieApp ) ) Then
+				If SUCCEEDED( dhPutValue( ieApp, "Visible = %b", True ) ) Then
+					dhCallMethod( ieApp, ".Navigate(%s)", url )
+				End If
+			End If
+		End If
 
-	SAFE_RELEASE(ieApp)
-	dhUninitialize(True)
+		SAFE_RELEASE( ieApp )
+		dhUninitialize( True )
+	End If
 End Sub
 
 	navigate("www.freebasic.net")
+
+' end of disphelper2.bas

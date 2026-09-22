@@ -28,6 +28,11 @@ libsubdir := $(FBTARGET)
 # Object subdir mirrors runtime identity
 objsubdir := $(libsubdir)
 
+ifeq ($(THREAD_MODEL),pdmlwp)
+# Provider objects must not reuse cached objects from the default DOS build.
+objsubdir := $(libsubdir)/pdmlwp
+endif
+
 
 ##############################################################################
 # BUILD TREE LAYOUT

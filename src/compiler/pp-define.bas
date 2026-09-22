@@ -1357,13 +1357,7 @@ private function hGetRedefinitionErr _
 		byval sym as FBSYMBOL ptr _
 	) as FB_ERRMSG
 
-	if( sym <> NULL ) then
-		if( symbIsKeyword( sym ) ) then
-			return symbKeywordGetIllegalRedefErr( sym->key.id )
-		end if
-	end if
-
-	function = FB_ERRMSG_DUPDEFINITION
+	function = symbGetIllegalRedefErr( sym )
 end function
 
 private function hLookupRedefinition _
@@ -1396,13 +1390,14 @@ private sub hReportRedefinition _
 	errReportEx( hGetRedefinitionErr( sym ), defname )
 end sub
 
-private function hFindDisabledCommandDefine _
+private function hFindDisabledCommandReplacement _
 	( _
 		byval sym as FBSYMBOL ptr _
 	) as FBSYMBOL ptr
 
 	while( sym <> NULL )
-		if( symbIsDefine( sym ) ) then
+		'' Keep active symbols visible when a disabled intrinsic shares its name.
+		if( symbIsDefine( sym ) or (symbIsDisabledCommand( sym ) = FALSE) ) then
 			return sym
 		end if
 
@@ -1574,10 +1569,8 @@ sub ppDefine( byval ismultiline as integer )
 
 	if( chain_ <> NULL ) then
 		sym = chain_->sym
-		if( symbIsKeyword( sym ) ) then
-			if( symbKeywordIsDisabledCommand( sym->key.id ) ) then
-				sym = hFindDisabledCommandDefine( sym )
-			end if
+		if( symbIsDisabledCommand( sym ) ) then
+			sym = hFindDisabledCommandReplacement( sym )
 		end if
 		if( (sym <> NULL) andalso (symbIsDefine( sym ) = FALSE) ) then
 			'' defines have no dups or respect namespaces

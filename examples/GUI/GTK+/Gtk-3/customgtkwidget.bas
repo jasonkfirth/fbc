@@ -1,3 +1,18 @@
+' Project: FreeBASIC GTK3 examples
+' File: customgtkwidget.bas
+'
+' Purpose:
+'     Demonstrate a GtkWidget subclass with drawing, input, and IM context
+'     handling.
+'
+' Ownership:
+'     The GObject dispose handler owns the IM context reference, while finalize
+'     owns the custom private allocation.  GTK owns attached widget instances.
+'
+' This file intentionally does NOT contain:
+'     - a reusable widget library
+'     - cross-thread GTK access
+'
 #include "customgtkwidget.bi"
 
 type MyCustomWidgetPrivate
@@ -10,7 +25,7 @@ G_DEFINE_TYPE(MyCustomWidget, mycustomwidget, GTK_TYPE_WIDGET)
 
 '' realize(): Allocate a GdkWindow for the widget, setup everything needed to
 '' show the widget
-private sub widget_realize(byval widget as GtkWidget ptr)
+private sub widget_realize cdecl(byval widget as GtkWidget ptr)
 	dim allocation as GtkAllocation
 	gtk_widget_get_allocation(widget, @allocation)
 
@@ -37,7 +52,7 @@ private sub widget_realize(byval widget as GtkWidget ptr)
 end sub
 
 '' unrealize(): Deallocate the GdkWindow
-private sub widget_unrealize(byval widget as GtkWidget ptr)
+private sub widget_unrealize cdecl(byval widget as GtkWidget ptr)
 	var win = gtk_widget_get_window(widget)
 
 	gtk_widget_set_window(widget, NULL)
@@ -50,7 +65,7 @@ end sub
 
 '' dispose(): called 1st during GObject cleanup, may be called repeatedly, other
 '' methods may be called after this. Unref GObject's from here, if any.
-private sub widget_dispose(byval obj as GObject ptr)
+private sub widget_dispose cdecl(byval obj as GObject ptr)
 	dim priv as MyCustomWidgetPrivate ptr = MY_CUSTOM_WIDGET(obj)->priv
 	if priv->imcontext then
 		g_object_unref(priv->imcontext)
@@ -60,7 +75,7 @@ private sub widget_dispose(byval obj as GObject ptr)
 end sub
 
 '' finalize(): called last during GObject cleanup
-private sub widget_finalize(byval obj as GObject ptr)
+private sub widget_finalize cdecl(byval obj as GObject ptr)
 	var widget = MY_CUSTOM_WIDGET(obj)
 
 	'' Clean up private data
@@ -72,7 +87,7 @@ private sub widget_finalize(byval obj as GObject ptr)
 	G_OBJECT_CLASS(mycustomwidget_parent_class)->finalize(obj)
 end sub
 
-private function widget_draw(byval widget as GtkWidget ptr, byval cr as cairo_t ptr) as gboolean
+private function widget_draw cdecl(byval widget as GtkWidget ptr, byval cr as cairo_t ptr) as gboolean
 	dim priv as MyCustomWidgetPrivate ptr = MY_CUSTOM_WIDGET(widget)->priv
 
 	var w = gtk_widget_get_allocated_width(widget)
@@ -86,8 +101,9 @@ private function widget_draw(byval widget as GtkWidget ptr, byval cr as cairo_t 
 
 	cairo_set_source_rgb(cr, 1.0, 0.0, 0.0)
 	const BoxWidth = 100
-	cairo_rectangle(cr, priv->mousex - (BoxWidth \ 2) + 0.5, _
-	                    priv->mousey - (BoxWidth \ 2) + 0.5, _
+	const BoxHalfWidth = 50 '' Half the fixed pixel width keeps the box centered.
+	cairo_rectangle(cr, priv->mousex - BoxHalfWidth + 0.5, _
+	                    priv->mousey - BoxHalfWidth + 0.5, _
 	                    BoxWidth - 1, BoxWidth - 1)
 	cairo_stroke(cr)
 
@@ -99,11 +115,14 @@ private function widget_draw(byval widget as GtkWidget ptr, byval cr as cairo_t 
 	return CTRUE '' event was handled here, don't propagate to children
 end function
 
-private function widget_focus_in(byval widget as GtkWidget ptr, byval event as GdkEventFocus ptr) as gboolean
+private function widget_focus_in cdecl(byval widget as GtkWidget ptr, byval event as GdkEventFocus ptr) as gboolean
+	'' G_DEFINE_TYPE creates this parent-class storage during compilation.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL310
 	return GTK_WIDGET_CLASS(mycustomwidget_parent_class)->focus_in_event(widget, event)
 end function
 
-private function widget_focus_out(byval widget as GtkWidget ptr, byval event as GdkEventFocus ptr) as gboolean
+private function widget_focus_out cdecl(byval widget as GtkWidget ptr, byval event as GdkEventFocus ptr) as gboolean
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL310
 	return GTK_WIDGET_CLASS(mycustomwidget_parent_class)->focus_out_event(widget, event)
 end function
 
@@ -111,7 +130,7 @@ private sub imcontext_commit(byval imcontext as GtkIMContext ptr, byval s as con
 	print "typed text: <" + *s + ">"
 end sub
 
-private function widget_key_press(byval widget as GtkWidget ptr, byval event as GdkEventKey ptr) as gboolean
+private function widget_key_press cdecl(byval widget as GtkWidget ptr, byval event as GdkEventKey ptr) as gboolean
 	dim priv as MyCustomWidgetPrivate ptr = MY_CUSTOM_WIDGET(widget)->priv
 
 	if gtk_im_context_filter_keypress(priv->imcontext, event) then
@@ -128,7 +147,7 @@ private function widget_key_press(byval widget as GtkWidget ptr, byval event as 
 	return CTRUE '' we handled it, stop propagating
 end function
 
-private function widget_motion_notify(byval widget as GtkWidget ptr, byval event as GdkEventMotion ptr) as gboolean
+private function widget_motion_notify cdecl(byval widget as GtkWidget ptr, byval event as GdkEventMotion ptr) as gboolean
 	dim priv as MyCustomWidgetPrivate ptr = MY_CUSTOM_WIDGET(widget)->priv
 	priv->mousex = event->x
 	priv->mousey = event->y
@@ -190,3 +209,5 @@ gtk_container_add(GTK_CONTAINER(win), mycustomwidget)
 
 gtk_widget_show_all(win)
 gtk_main()
+
+' End of customgtkwidget.bas

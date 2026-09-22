@@ -59,7 +59,7 @@ Do
 	'' The delay intentionally makes the main thread's page update visible.
 	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 	Sleep 100, 1
-	Locate 15,40
+	Locate 15, 40
 	Print Using "######"; Counter();
 	ScreenCopy
 	s = Inkey

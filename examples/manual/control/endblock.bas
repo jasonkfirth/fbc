@@ -12,12 +12,12 @@ Dim variable As Integer
 
 Input "Give me a number: ", variable
 If variable = 1 Then
-Print "You gave me a 1"
+	Print "You gave me a 1"
 Else
-Print "You gave me a big number!"
+	Print "You gave me a big number!"
 End If
 checkvalue(variable)
 
 Sub checkvalue( n As Integer )
-Print "Value is: " & n
+	Print "Value is: " & n
 End Sub

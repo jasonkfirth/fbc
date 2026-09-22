@@ -3,7 +3,7 @@
 '' based on the C header files:
 ''     ______   ___    ___
 ''    /\  _  \ /\_ \  /\_ \
-''    \ \ \L\ \\//\ \ \//\ \      __     __   _ __   ___ 
+''    \ \ \L\ \\//\ \ \//\ \      __     __   _ __   ___
 ''     \ \  __ \ \ \ \  \ \ \   /'__`\ /'_ `\/\`'__\/ __`\
 ''      \ \ \/\ \ \_\ \_ \_\ \_/\  __//\ \L\ \ \ \//\ \L\ \
 ''       \ \_\ \_\/\____\/\____\ \____\ \____ \ \_\\ \____/
@@ -16,16 +16,16 @@
 ''
 ''             By Shawn Hargreaves, May 19, 2011.
 ''
-''   Allegro is gift-ware. It was created by a number of people working in 
-''   cooperation, and is given to you freely as a gift. You may use, modify, 
-''   redistribute, and generally hack it about in any way you like, and you do 
-''   not have to give us anything in return. However, if you like this product 
-''   you are encouraged to thank us by making a return gift to the Allegro 
-''   community. This could be by writing an add-on package, providing a useful 
-''   bug report, making an improvement to the library, or perhaps just 
-''   releasing the sources of your program so that other people can learn from 
-''   them. If you redistribute parts of this code or make a game using it, it 
-''   would be nice if you mentioned Allegro somewhere in the credits, but you 
+''   Allegro is gift-ware. It was created by a number of people working in
+''   cooperation, and is given to you freely as a gift. You may use, modify,
+''   redistribute, and generally hack it about in any way you like, and you do
+''   not have to give us anything in return. However, if you like this product
+''   you are encouraged to thank us by making a return gift to the Allegro
+''   community. This could be by writing an add-on package, providing a useful
+''   bug report, making an improvement to the library, or perhaps just
+''   releasing the sources of your program so that other people can learn from
+''   them. If you redistribute parts of this code or make a game using it, it
+''   would be nice if you mentioned Allegro somewhere in the credits, but you
 ''   are not required to do this. We trust you not to abuse our generosity.
 ''
 ''   Disclaimer:

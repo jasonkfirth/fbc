@@ -83,7 +83,9 @@ jit_function_compile(gcd)
 jit_context_build_end(context)
 
 ' call function
-Dim As jit_uint a=21, b=14, result
+Dim As jit_uint a = 21
+Dim As jit_uint b = 14
+Dim As jit_uint result
 Dim As jit_uint Ptr args(0 To 1) = {@a, @b}
 jit_function_apply(gcd, @args(0), @result)
 Print Using "gcd(&, &) = &"; a; b; result

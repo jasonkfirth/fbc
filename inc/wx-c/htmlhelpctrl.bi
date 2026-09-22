@@ -17,7 +17,7 @@ Declare Sub wxHtmlHelpController_ReadCustomization WXCALL Alias "wxHtmlHelpContr
 Declare Sub wxHtmlHelpController_WriteCustomization WXCALL Alias "wxHtmlHelpController_WriteCustomization" (self As wxHtmlHelpController Ptr, cfg As wxConfigBase Ptr, path As wxString Ptr)
 
 ' class wxHtmlHelpFrame
-Declare Function wxHtmlHelpController_GetFrame WXCALL Alias "wxHtmlHelpController_GetFrame" (self As wxHtmlHelpController Ptr) As wxHtmlHelpFrame Ptr 
+Declare Function wxHtmlHelpController_GetFrame WXCALL Alias "wxHtmlHelpController_GetFrame" (self As wxHtmlHelpController Ptr) As wxHtmlHelpFrame Ptr
 Declare Sub wxHtmlHelpController_OnCloseFrame WXCALL Alias "wxHtmlHelpController_OnCloseFrame" (self As wxHtmlHelpController Ptr, closeEvent As wxCloseEvent Ptr)
 
 #EndIf ' __htmlhelpctrl_bi__

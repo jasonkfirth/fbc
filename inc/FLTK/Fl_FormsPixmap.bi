@@ -1,4 +1,5 @@
 #include once "Fl_Pixmap.bi"
+#include once "Fl_Widget.bi"
 
 extern "c++"
 type Fl_FormsPixmap extends Fl_Widget

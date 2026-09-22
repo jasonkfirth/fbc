@@ -68,6 +68,8 @@ Do
 
 	ScreenUnlock()
 
+	'' This is the clock's one-second redraw cadence.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL602
 	Sleep 1000
 Loop While (Len(Inkey()) = 0)
 

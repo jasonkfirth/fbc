@@ -7,7 +7,7 @@
 
 extern "c++"
 
-type Fl_Table extends Fl_Group 
+type Fl_Table extends Fl_Group
 	enum TableContext
 		CONTEXT_NONE       = 0
 		CONTEXT_STARTPAGE  = &H01
@@ -24,21 +24,21 @@ private:
 	_col_header_h as long
 	_row_position as long
 	_col_position as long
-  
+
 	_row_header as ubyte
 	_col_header as ubyte
 	_row_resize as ubyte
 	_col_resize as ubyte
 	_row_resize_min as long
 	_col_resize_min as long
-  
+
 	_redraw_toprow as long
 	_redraw_botrow as long
 	_redraw_leftcol as long
 	_redraw_rightcol as long
 	_row_header_color as Fl_Color
 	_col_header_color as Fl_Color
-  
+
 	auto_drag as long
 	_selecting as long
 
@@ -46,7 +46,7 @@ private:
 	private:
 		arr as long ptr
 		_size as unsigned long
-		'declare sub init() 
+		'declare sub init()
 		declare sub copy(newarr as long ptr, newsize as unsigned long)
 	public:
 		declare constructor
@@ -63,20 +63,20 @@ private:
 
 	_colwidths as IntVector
 	_rowheights as IntVector
-  
+
 	_last_cursor as long'Fl_Cursor
 
 	_callback_context as long'TableContext
 	as long _callback_row, _callback_col
-  
+
 	_resizing_col as long
 	_resizing_row as long
 	_dragging_x as long
 	_dragging_y as long
 	_last_row as long
-  
+
 	declare sub _redraw_cell(context as TableContext, R as long, C as long)
-  
+
 	declare sub _start_auto_drag()
 	declare sub _stop_auto_drag()
 	declare sub _auto_drag_cb()
@@ -92,26 +92,26 @@ protected:
 		RESIZE_ROW_ABOVE = 3
 		RESIZE_ROW_BELOW = 4
 	end enum
-  
+
 	as long table_w, table_h
 	as long toprow, botrow, leftcol, rightcol
-  
+
 	as long current_row, current_col
 	as long select_row, select_col
-  
+
 	toprow_scrollpos as long
 	leftcol_scrollpos as long
-  
+
 	as long tix, tiy, tiw, tih
 	as long tox, toy, tow, toh
 	as long wix, wiy, wiw, wih
-  
+
 	table as Fl_Scroll ptr
 	vscrollbar as Fl_Scrollbar ptr
 	hscrollbar as Fl_Scrollbar ptr
 
 	declare function handle(e as long) as long
-  
+
 	declare sub recalc_dimensions()
 	declare sub table_resized()
 	declare sub table_scrolled()
@@ -122,16 +122,16 @@ protected:
 	declare function row_col_clamp(context as TableContext, byref R as long, byref C as long) as long
 
 	declare virtual sub draw_cell(context as TableContext, R as long=0, C as long=0, X as long=0, Y as long=0, W as long=0, H as long=0)
-  
+
 	declare function row_scroll_position(row as long) as integer
 	declare function col_scroll_position(col as long) as integer
-  
+
 	declare function is_fltk_container() as long
-  
+
 	declare static sub scroll_cb(as Fl_Widget ptr, as any ptr)
-  
+
 	declare sub damage_zone(r1 as long, c1 as long, r2 as long, c2 as long, r3 as long = 0, c3 as long = 0)
-  
+
 	declare sub redraw_range(topRow as long, botRow as long, leftCol as long, rightCol as long)
 public:
 	declare constructor(X as long, Y as long, W as long, H as long, l as const zstring ptr=0)
@@ -147,7 +147,7 @@ public:
 	declare virtual sub cols(val_ as long)
 	declare function cols() as long
 
-	declare sub visible_cells(byref r1 as long, byref r2 as long, byref c1 as long, byref c2 as long) 
+	declare sub visible_cells(byref r1 as long, byref r2 as long, byref c1 as long, byref c2 as long)
 	declare function is_interactive_resize() as long
 	declare function row_resize() as long
 	declare sub row_resize(flag as long)
@@ -201,7 +201,7 @@ public:
 	declare sub end_()
 
 	declare function array() as Fl_Widget ptr const ptr
-	declare const function child(n as long) as Fl_Widget ptr 
+	declare const function child(n as long) as Fl_Widget ptr
 	declare const function children() as long
 	declare const function find(wgt as const Fl_Widget ptr) as long
 	declare const function find(byref wgt as const Fl_Widget) as long
@@ -231,7 +231,7 @@ private sub Fl_Table.redraw_range(topRow as long, botRow as long, leftCol as lon
 		if botRow > _redraw_botrow then _redraw_botrow = botRow
 		if leftCol < _redraw_leftcol then _redraw_leftcol = leftCol
 		if rightCol > _redraw_rightcol then _redraw_rightcol = rightCol
-	end if    
+	end if
 
 	damage(FL_DAMAGE_CHILD)
 end sub
@@ -257,7 +257,7 @@ private function Fl_Table.cols() as long
 	return _cols
 end function
 
-private sub Fl_Table.visible_cells(byref r1 as long, byref r2 as long, byref c1 as long, byref c2 as long) 
+private sub Fl_Table.visible_cells(byref r1 as long, byref r2 as long, byref c1 as long, byref c2 as long)
 	r1 = toprow
 	r2 = botrow
 	c1 = leftcol
@@ -403,7 +403,7 @@ private sub Fl_Table.add(byref wgt as Fl_Widget)
 	table->add(wgt)
 	if  table->children() > 2 then
 		table->show()
-	else 
+	else
 		table->hide()
 	end if
 
@@ -443,7 +443,7 @@ private function Fl_Table.array() as Fl_Widget ptr const ptr
 	return table->array()
 end function
 
-private function Fl_Table.child(n as long) as Fl_Widget ptr 
+private function Fl_Table.child(n as long) as Fl_Widget ptr
 	return table->child(n)
 end function
 

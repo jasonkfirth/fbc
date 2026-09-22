@@ -35,22 +35,46 @@ function loadImageFile( filename as string ) as any ptr
 	end if
 
 	'' flip the image so it matches fb's coordinate system
-	FreeImage_FlipVertical( image )
+	If FreeImage_FlipVertical(image) = 0 Then
+		FreeImage_Unload image
+		Return NULL
+	End If
 
 	'' convert to 32 bits per pixel
 	dim as FIBITMAP ptr image32 = FreeImage_ConvertTo32bits( image )
+	If image32 = NULL Then
+		FreeImage_Unload image
+		Return NULL
+	End If
 
 	'' get the image's size
 	dim as integer w = FreeImage_GetWidth( image )
 	dim as integer h = FreeImage_GetHeight( image )
+	If w <= 0 Or h <= 0 Then
+		FreeImage_Unload image32
+		FreeImage_Unload image
+		Return NULL
+	End If
 
 	'' create an fb image of the same size
 	dim as fb.Image ptr sprite = imagecreate( w, h )
+	If sprite = NULL Then
+		FreeImage_Unload image32
+		FreeImage_Unload image
+		Return NULL
+	End If
 
 	dim as byte ptr target = cptr( byte ptr, sprite + 1 )
 	dim as integer target_pitch = sprite->pitch
 
-	dim as any ptr source = FreeImage_GetBits( image32 )
+	dim as byte ptr source = FreeImage_GetBits( image32 )
+	If source = NULL Then
+		ImageDestroy sprite
+		FreeImage_Unload image32
+		FreeImage_Unload image
+		Return NULL
+	End If
+
 	dim as integer source_pitch = FreeImage_GetPitch( image32 )
 
 	'' and copy over the pixels, row by row
@@ -67,7 +91,12 @@ function loadImageFile( filename as string ) as any ptr
 	return sprite
 end function
 
-	screenres 640, 480, 32
+	if screenres(640, 480, 32) <> 0 then
+		print "could not set the requested graphics mode"
+		sleep
+		end 1
+	end if
+
 	FreeImage_Initialise( )
 
 	dim as string filename = exepath() + "/../../fblogo.bmp"
@@ -80,5 +109,8 @@ end function
 	end if
 
 	sleep
-	imagedestroy( image )
+	if image <> NULL then
+		imagedestroy( image )
+	end if
+
 	FreeImage_DeInitialise( )

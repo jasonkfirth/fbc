@@ -13,7 +13,7 @@
 
 private function get_bit_length cdecl alias "get_bit_length" (byval num as big_int_word) as integer
     dim as integer n_bits
-	n_bits = 0    
+	n_bits = 0
     do while( num <> 0 )
         num shr= 1
         n_bits += 1

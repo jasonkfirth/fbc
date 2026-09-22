@@ -34,6 +34,7 @@
 #include once "dmdls.bi"
 #include once "dsound.bi"
 #include once "dmusbuff.bi"
+#include once "strmif.bi"
 
 extern "Windows"
 

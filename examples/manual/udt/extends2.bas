@@ -111,12 +111,23 @@ End Destructor
 
 
 Sub PrintInfo (ByVal p As root Ptr) ' must be put after definition of animal type, dog type and cat type
+	If p = 0 Then
+		Print "  allocation failed"
+		Exit Sub
+	End If
   Print "  " & p->Name, "  " & p->ObjectRealType, "           ";
+	'' p was checked at this procedure boundary before each type test.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
   If *p Is dog Then ' 'Is' allows to check compatibility with type symbol
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
 	Print  Cast(dog Ptr, p)->ObjectHierarchy
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
   ElseIf *p Is cat Then ' 'Is' allows to check compatibility with type symbol
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
 	Print Cast(cat Ptr, p)->ObjectHierarchy
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
   ElseIf *p Is animal Then ' 'Is' allows to check compatibility with type symbol
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
 	Print Cast(animal Ptr, p)->ObjectHierarchy
   End If
 End Sub

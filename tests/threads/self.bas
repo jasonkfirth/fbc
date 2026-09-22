@@ -5,7 +5,7 @@
 #define ENABLE_CHECK_BUGS 0
 #endif
 
-#if defined( __FB_DOS__ )
+#if defined( __FB_DOS__ ) and ( __FB_MT__ = 0 )
 #define ENABLE_TEST 0
 #elseif defined( __FB_JS__ )
 #define ENABLE_TEST ENABLE_CHECK_BUGS
@@ -17,7 +17,7 @@
 
 SUITE( fbc_tests.threads.self )
 
-	'' Tests whether ThreadSelf in a created thread is equal to the 
+	'' Tests whether ThreadSelf in a created thread is equal to the
 	'' return of ThreadCreate, which it should
 	TEST_GROUP( idBasic )
 		const NUM_THREADS = 100
@@ -58,8 +58,9 @@ SUITE( fbc_tests.threads.self )
 
 	END_TEST_GROUP
 
-'' Dos doesn't have detach
-#ifndef __FB_DOS__
+'' The ordinary DOS runtime has no scheduler. The PDMLWP profile supports
+'' detached workers and shares the normal lifecycle coverage.
+#if (not defined( __FB_DOS__ )) or ( __FB_MT__ <> 0 )
 	'' Test that detached threads still have a self that
 	'' is valid
 	TEST_GROUP( idsDetach )
@@ -92,7 +93,7 @@ SUITE( fbc_tests.threads.self )
 			next i
 
 			MutexUnlock(g_waitForDetachMutex)
-			
+
 			while (finished < NUM_THREADS)
 				Sleep 1000
 				MutexLock(g_incrementMutex)
@@ -163,7 +164,7 @@ SUITE( fbc_tests.threads.self )
 #endif
 
 	END_TEST_GROUP
-#endif '' FB_DOS
+#endif '' ordinary non-threaded DOS
 
 	'' These test that ThreadDetach/Wait still work after the
 	'' threads have actually exited
@@ -194,7 +195,7 @@ SUITE( fbc_tests.threads.self )
 					end
 				end if
 			next i
-			
+
 			while (finished < NUM_THREADS)
 				Sleep 1000
 				MutexLock(g_incrementMutex)
@@ -217,7 +218,7 @@ SUITE( fbc_tests.threads.self )
 			MutexUnlock(g_incrementMutex)
 		end sub
 
-#ifndef __FB_DOS__
+#if (not defined( __FB_DOS__ )) or ( __FB_MT__ <> 0 )
 		TEST(detachThreads)
 			test_proc3(@ThreadDetach)
 		END_TEST

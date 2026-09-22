@@ -16,6 +16,11 @@
 ''     - read the destination back and verify the copied content
 ''     - remove temporary files before returning to NSH
 ''
+'' Ownership:
+''
+''     copy_file_handle owns at most one successful Open at a time.  The two
+''     fixed RAM fixtures are removed only if DIR confirms that they exist.
+''
 '' This file intentionally does NOT contain:
 ''
 ''     - filesystem formatting logic
@@ -26,38 +31,68 @@
 declare function FileCopy alias "fb_FileCopy" _
     (byval source as zstring ptr, byval destination as zstring ptr) as long
 
-const COPY_SOURCE = "fb_filecopy_source.txt"
-const COPY_DEST = "fb_filecopy_dest.txt"
+const COPY_SOURCE = "/ram/fb_filecopy_source.txt"
+const COPY_DEST = "/ram/fb_filecopy_dest.txt"
 const COPY_TEXT = "FreeBASIC generic FileCopy smoke"
 
+sub CleanupCopyFiles()
+
+    if dir(COPY_DEST) <> "" then
+        kill COPY_DEST
+    end if
+
+    if dir(COPY_SOURCE) <> "" then
+        kill COPY_SOURCE
+    end if
+
+end sub
+
 dim as string line_text
+dim as integer copy_file_handle = freefile
+dim as long copy_result
 
-on error goto CopyFailure
+if copy_file_handle <= 0 then
+    print "fbfilecopy: FreeFile failed"
+    end 30
+end if
 
-open COPY_SOURCE for output as #1
-print #1, COPY_TEXT
-close #1
+'' Fixed NuttX RAM fixture; the Open result is checked immediately below. FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
+open COPY_SOURCE for output as #copy_file_handle
+if err <> 0 then
+    print "fbfilecopy: source open failed with ERR ="; err
+    end 30
+end if
 
-FileCopy COPY_SOURCE, COPY_DEST
+print #copy_file_handle, COPY_TEXT
+close #copy_file_handle
 
-open COPY_DEST for input as #1
-line input #1, line_text
-close #1
+copy_result = FileCopy(COPY_SOURCE, COPY_DEST)
+
+if copy_result <> 0 then
+    CleanupCopyFiles()
+    print "fbfilecopy: FileCopy failed ="; copy_result
+    end 30
+end if
+
+open COPY_DEST for input as #copy_file_handle
+if err <> 0 then
+    CleanupCopyFiles()
+    print "fbfilecopy: destination open failed with ERR ="; err
+    end 30
+end if
+
+line input #copy_file_handle, line_text
+close #copy_file_handle
 
 if line_text <> COPY_TEXT then
+    CleanupCopyFiles()
     print "fbfilecopy: unexpected readback: "; line_text
     end 31
 end if
 
-kill COPY_DEST
-kill COPY_SOURCE
+CleanupCopyFiles()
 
 print "FB_NUTTX_FILECOPY_SMOKE_OK"
 end 0
-
-CopyFailure:
-    close
-    print "fbfilecopy: failed with ERR ="; err
-    end 30
 
 '' end of fbfilecopy_smoke.bas

@@ -11,8 +11,8 @@ Dim As UByte numeric_value1, numeric_value2
 numeric_value1 = 15
 numeric_value2 = 25
 
-If Not numeric_value1 = 10 Then Print "Numeric_Value1 is not equal to 10"
-If Not numeric_value2 = 25 Then Print "Numeric_Value2 is not equal to 25"
+If Not (numeric_value1 = 10) Then Print "Numeric_Value1 is not equal to 10"
+If Not (numeric_value2 = 25) Then Print "Numeric_Value2 is not equal to 25"
 
 ' This will output "Numeric_Value1 is not equal to 10" because
 ' the first IF statement is false.

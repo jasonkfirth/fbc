@@ -28,7 +28,7 @@ data 0
 
 Dim regs As __dpmi_regs
 
-Dim buffer(320 * 240 - 1) As UByte
+Dim buffer(0 To 320 * 240 - 1) As UByte
 
 Dim i As Integer
 
@@ -69,6 +69,7 @@ do
 	outportw(CRTC_INDEX, i)
 loop until i = 0
 
+Randomize Timer
 
 Do While Len(InKey) = 0
 

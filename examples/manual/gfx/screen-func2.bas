@@ -7,7 +7,11 @@
 '' --------
 
 '' open a graphics screen with 8 bits per pixel
-ScreenRes 320, 200, 8
+If ScreenRes( 320, 200, 8 ) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 '' print a character
 Color 30, 16

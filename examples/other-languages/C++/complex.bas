@@ -23,8 +23,8 @@ end extern
 
 using cpp
 
-dim a as complex = complex(1,2)
-dim b as complex = complex(3,4)
+dim a as complex = complex(1, 2)
+dim b as complex = complex(3, 4)
 
 dim c as complex
 c = a * b

@@ -16,7 +16,7 @@ dim as JavaVMOption vm_options(0 to ...) = _
 dim as JavaVMInitArgs vm_args
 vm_args.version = JNI_VERSION_1_4
 vm_args.options = @vm_options(0)
-vm_args.nOptions = ubound(vm_options) - lbound(vm_options) + 1
+vm_args.nOptions = SizeOf(vm_options) \ SizeOf(vm_options(0))
 vm_args.ignoreUnrecognized = JNI_TRUE
 
 dim as JavaVM ptr vm = NULL

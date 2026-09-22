@@ -38,6 +38,10 @@ End Operator
 
 Function UDTdisplayer.allocation (ByRef N As String, ByVal size As UInteger) As Any Ptr
   Dim As Any Ptr p = Allocate(size)
+  If p = 0 Then
+    Print "memory allocation failed for " & size & " bytes from '" & N & "'"
+    Return 0
+  End If
   Print "memory allocation for " & size & " bytes from '" & N & "' at address: " & p
   Return p
 End Function

@@ -11,7 +11,7 @@
 
 Dim regs As __dpmi_regs
 
-Dim buffer(320 * 200 - 1) As UByte
+Dim buffer(0 To 320 * 200 - 1) As UByte
 
 Dim i As Integer
 
@@ -22,6 +22,8 @@ Dim i As Integer
 
 regs.x.ax = &H13
 __dpmi_int(&H10, @regs)
+
+Randomize Timer
 
 Do While Len(InKey) = 0
 

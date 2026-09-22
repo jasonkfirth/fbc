@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include once "cd.bi"
+
 extern "C"
 
 #define __CDMF_PRIVATE_H

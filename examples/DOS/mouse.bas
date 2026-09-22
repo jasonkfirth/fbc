@@ -13,6 +13,8 @@ dim x as integer, y as integer, b as integer
 
 width 80, 25
 
+Randomize Timer
+
 for y = 1 to 25
 	for x = 1 to 80
 		locate y, x
@@ -40,7 +42,7 @@ do until len(inkey)
 	y = regs.x.dx \ 8 ' divide by 8 - char height = 8
 	b = regs.x.bx
 	locate 1, 1
-	print using "### ### //"; x, y, bin(b)
+	print using "### ### //"; x; y; bin(b)
 loop
 
 ' hide mouse

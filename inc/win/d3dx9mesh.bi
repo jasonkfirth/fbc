@@ -24,7 +24,10 @@
 #pragma once
 
 #include once "_mingw_unicode.bi"
-#include once "d3dx9.bi"
+#include once "d3d9.bi"
+#include once "d3dx9math.bi"
+#include once "d3dx9core.bi"
+#include once "d3dx9xof.bi"
 
 extern "Windows"
 

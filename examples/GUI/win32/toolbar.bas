@@ -7,6 +7,8 @@
 
 const TBSTYLES = TBSTYLE_FLAT or CCS_ADJUSTABLE or CCS_NODIVIDER
 
+	'' The window procedure uses this module-owned application instance.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 	dim shared hInstance as HINSTANCE
 
 	hInstance = GetModuleHandle( null )
@@ -64,7 +66,7 @@ function WndProc ( byval hWnd as HWND, _
 				for i = 0 to 6
 					.iBitmap   = tbBmp(i)
 					.fsState   = TBSTATE_ENABLED
-                	.fsStyle   = iif( i = 3, TBSTYLE_SEP, TBSTYLE_BUTTON )
+					.fsStyle   = iif( i = 3, TBSTYLE_SEP, TBSTYLE_BUTTON )
 					.idCommand = -1
 					.dwData    = 0
 					SendMessage( hTools, TB_ADDBUTTONS, 1, cint( @tbb ) )
@@ -107,12 +109,14 @@ end function
 		.hCursor       = LoadCursor( null, IDC_ARROW )
 		.hbrBackground = cast( HGDIOBJ, 16 )  ' btnface color
 		.lpszMenuName  = null
+		'' appName remains alive through this synchronous RegisterClass call.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL427
 		.lpszClassName = strptr( appName )
 	end with
 
 	if ( RegisterClass( @wcls ) = false ) then
-   		MessageBox( null, "Failed to register wcls!", appName, MB_ICONERROR )
-   		end 1
+		MessageBox( null, "Failed to register wcls!", appName, MB_ICONERROR )
+		end 1
 	end if
 
 	hWnd = CreateWindowEx( 0, _
@@ -126,7 +130,7 @@ end function
 	''
 	do until( GetMessage( @wMsg, null, 0, 0 ) = FALSE )
 		TranslateMessage( @wMsg )
-   		DispatchMessage( @wMsg )
+		DispatchMessage( @wMsg )
 	loop
 
 	end 0

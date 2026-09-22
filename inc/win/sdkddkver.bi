@@ -5,9 +5,9 @@
 ''   This file has no copyright assigned and is placed in the Public Domain.
 ''   This file is part of the mingw-w64 runtime package.
 ''
-''   The mingw-w64 runtime package and its code is distributed in the hope that it 
-''   will be useful but WITHOUT ANY WARRANTY.  ALL WARRANTIES, EXPRESSED OR 
-''   IMPLIED ARE HEREBY DISCLAIMED.  This includes but is not limited to 
+''   The mingw-w64 runtime package and its code is distributed in the hope that it
+''   will be useful but WITHOUT ANY WARRANTY.  ALL WARRANTIES, EXPRESSED OR
+''   IMPLIED ARE HEREBY DISCLAIMED.  This includes but is not limited to
 ''   warranties of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ''
 '' translated to FreeBASIC by:
@@ -154,7 +154,26 @@
 '' Choose NTDDI Version
 #ifndef NTDDI_VERSION
 #ifdef _WIN32_WINNT
-#define NTDDI_VERSION   NTDDI_VERSION_FROM_WIN32_WINNT(_WIN32_WINNT)
+	'' FreeBASIC does not implement C's token-pasting operator in a
+	'' preprocessor expression.  Keep the SDK mapping explicit so the
+	'' version value can be used by later #if checks.
+	#if _WIN32_WINNT <= _WIN32_WINNT_NT4
+		#define NTDDI_VERSION NTDDI_WIN2K - &h01000000
+	#elseif _WIN32_WINNT <= _WIN32_WINNT_WIN2K
+		#define NTDDI_VERSION NTDDI_WIN2K
+	#elseif _WIN32_WINNT <= _WIN32_WINNT_WINXP
+		#define NTDDI_VERSION NTDDI_WINXP
+	#elseif _WIN32_WINNT <= _WIN32_WINNT_WS03
+		#define NTDDI_VERSION NTDDI_WS03
+	#elseif _WIN32_WINNT <= _WIN32_WINNT_WIN6
+		#define NTDDI_VERSION NTDDI_WIN6
+	#elseif _WIN32_WINNT <= _WIN32_WINNT_WIN7
+		#define NTDDI_VERSION NTDDI_WIN7
+	#elseif _WIN32_WINNT <= _WIN32_WINNT_WIN8
+		#define NTDDI_VERSION NTDDI_WIN8
+	#else
+		#define NTDDI_VERSION NTDDI_WS03
+	#endif
 #else
 #define NTDDI_VERSION   NTDDI_WS03
 #endif

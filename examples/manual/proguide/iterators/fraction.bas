@@ -26,7 +26,8 @@ End Constructor
 
 Operator fraction.Cast () As String
 	' search for the highest common factor (a) between numerator and denominator
-		Dim As Integer a = Abs(This.num), b = Abs(This.den)
+		Dim As Integer a = Abs(This.num)
+		Dim As Integer b = Abs(This.den)
 		If a <> 0 Then
 			While a <> b
 				If a > b Then
@@ -48,7 +49,10 @@ End Operator
 
 Operator fraction.For (ByRef iterateStep As fraction)
 	' search for the least common multiple (a) between the two denominators
-		Dim As Integer a = Abs(This.den), b = Abs(iterateStep.den), c = a, d = b
+		Dim As Integer a = Abs(This.den)
+		Dim As Integer b = Abs(iterateStep.den)
+		Dim As Integer c = a
+		Dim As Integer d = b
 		While a <> b
 			If a > b Then
 				b += d
@@ -89,4 +93,3 @@ Next
 Print
 
 Sleep
-

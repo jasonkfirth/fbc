@@ -139,7 +139,8 @@ int fb_sfxEnsureInit(void);
 */
 
 #ifndef FB_SFX_MT_ENABLED
-#if defined(_WIN32) || \
+#if (defined(__DJGPP__) && defined(ENABLE_MT) && defined(FB_DOS_PDMLWP)) || \
+    defined(_WIN32) || \
     defined(__linux__) || \
     defined(__ANDROID__) || \
     defined(__CYGWIN__) || \
@@ -158,6 +159,15 @@ int fb_sfxEnsureInit(void);
 #else
 #define FB_SFX_MT_ENABLED 0
 #endif
+#endif
+
+#if defined(__DJGPP__) && defined(ENABLE_MT) && defined(FB_DOS_PDMLWP)
+#define FB_SFX_DOS_THREADS 1
+#include "../rtlib/fb.h"
+int fb_sfxMsdosStartWorker(void);
+int fb_sfxMsdosWorkerActive(void);
+#else
+#define FB_SFX_DOS_THREADS 0
 #endif
 
 void fb_sfxRuntimeLockInit(void);

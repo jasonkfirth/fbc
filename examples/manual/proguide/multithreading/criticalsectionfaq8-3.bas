@@ -6,6 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtCriticalSectionsFAQ
 '' --------
 
+'' Thread synchronization: the mutex lock serializes each shared screen update.
+
 #include "vbcompat.bi"
 
 Screen 12, , 2
@@ -24,7 +26,7 @@ Sub thread1 (ByVal param As Any Ptr)
 		'' The delay intentionally makes the protected screen update visible.
 		'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 		Sleep 200, 1
-		Draw String (24, 432), Format(Now,"dd/mm/yyyy"), 0
+		Draw String (24, 432), Format(Now, "dd/mm/yyyy"), 0
 		ScreenCopy
 		MutexUnlock(mutex)
 		Sleep 100, 1
@@ -39,7 +41,7 @@ Sub thread2 (ByVal param As Any Ptr)
 		'' The delay intentionally makes the protected clock update visible.
 		'' FB-LINTER: DISABLE-NEXT-LINE FBL-PAIR-002
 		Sleep 100, 1
-		Draw String (32, 448), Format(Now,"hh:mm:ss"), 0
+		Draw String (32, 448), Format(Now, "hh:mm:ss"), 0
 		ScreenCopy
 		MutexUnlock(mutex)
 		Sleep 100, 1

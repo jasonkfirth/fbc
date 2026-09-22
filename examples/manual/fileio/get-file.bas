@@ -10,17 +10,21 @@
 
 Function LoadFile(ByRef filename As String) As String
 
+	Const MAX_TEXT_FILE_BYTES = 4 * 1024 * 1024
 	Dim h As Integer
+	Dim file_size As LongInt
 	Dim txt As String
 
 	h = FreeFile
 
 	If Open( filename For Binary Access Read As #h ) <> 0 Then Return ""
 
-	If LOF(h) > 0 Then
+	file_size = LOF(h)
 
-		txt = String(LOF(h), 0)
-		If Get( #h, ,txt ) <> 0 Then txt = ""
+	If file_size > 0 AndAlso file_size <= MAX_TEXT_FILE_BYTES Then
+
+		txt = String(file_size, 0)
+		If Get( #h, , txt ) <> 0 Then txt = ""
 
 	End If
 

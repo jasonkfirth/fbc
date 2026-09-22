@@ -8,24 +8,51 @@
 
 Sub _bsave( file As String, p As Any Ptr, sz As Integer )
 
-  Dim As Long ff
+  '' Resource ownership:
+  '' This routine owns ff only after OPEN succeeds. The caller owns the byte
+  '' buffer and provides its validated length.
+  Dim As Integer ff
+  If p = 0 OrElse sz <= 0 Then
+    Print "Invalid output buffer"
+    Exit Sub
+  End If
+
   ff = FreeFile
 
-  Open file For Binary As ff
-	fb_fileput( ff, 0, ByVal p, sz )
+  If Open(file For Binary As #ff) <> 0 Then
+    Print "Could not open " & file
+  Else
+	If fb_fileput(ff, 0, ByVal p, sz) <> 0 Then Print "Could not write " & file
 
-  Close
+    Close #ff
+  End If
 
 End Sub
 
 Sub _bload( file As String, p As Any Ptr )
 
-  Dim As Long ff
+  '' The caller owns p and must provide storage large enough for the file.
+  '' This wrapper checks the file handle and rejects empty inputs before GET.
+  Dim As Integer ff
+  Dim As LongInt file_length
+  If p = 0 Then
+    Print "Invalid input buffer"
+    Exit Sub
+  End If
+
   ff = FreeFile
 
-  Open file For Binary As ff
-	fb_fileget( ff, 0, ByVal p, LOF( ff ) )
+  If Open(file For Binary As #ff) <> 0 Then
+    Print "Could not open " & file
+  Else
+    file_length = LOF(ff)
+    If file_length <= 0 Then
+      Print "Could not read bytes from " & file
+    ElseIf fb_fileget(ff, 0, ByVal p, file_length) <> 0 Then
+      Print "Could not read " & file
+    End If
 
-  Close
+    Close #ff
+  End If
 
 End Sub

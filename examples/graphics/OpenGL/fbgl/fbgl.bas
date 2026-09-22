@@ -41,7 +41,7 @@ constructor fbgl _
 
 		screenres w, h, depth, , mode
 		if (screenptr = 0) then
-       		return
+			return
 		end if
 	end if
 
@@ -70,7 +70,7 @@ destructor fbgl
 	init_cnt -= 1
 	if( init_cnt < 0 ) then
 		return
-   	end if
+	end if
 
 	screen 0
 
@@ -134,6 +134,9 @@ property fbgl.blendMode _
 	case ANTIALISED
 		glBlendFunc GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
 		hEnableBlend( )
+
+	case else
+		hDisableBlend( )
 	end select
 
 end property

@@ -56,8 +56,19 @@ ifeq ($(FB_LANG),deprecated)
 DIRLIST := $(DIRLIST_DEPRECATED)
 endif
 
+DOS_LOG_THREADS :=
+DOS_LOG_TCP :=
 ifeq ($(TARGET_OS),dos)
-DIRLIST := $(filter-out threads,$(DIRLIST))
+	ifeq ($(DOS_THREAD_PROVIDER),pdmlwp)
+		DOS_LOG_THREADS := yes
+	else
+		DIRLIST := $(filter-out threads,$(DIRLIST))
+	endif
+	ifeq ($(DOS_THREAD_PROVIDER),pdmlwp)
+		ifeq ($(DOS_TCP_PROVIDER),watt32)
+			DOS_LOG_TCP := yes
+		endif
+	endif
 endif
 
 ifeq ($(DIRLIST),)
@@ -112,12 +123,17 @@ endif
 endif
 
 ifeq ($(TARGET_OS),dos)
+	ifneq ($(DOS_LOG_THREADS),yes)
 SRCLIST_COMPILE_ONLY_OK := $(filter-out ./threads/% threads/%,$(SRCLIST_COMPILE_ONLY_OK))
 SRCLIST_COMPILE_ONLY_FAIL := $(filter-out ./threads/% threads/%,$(SRCLIST_COMPILE_ONLY_FAIL))
 SRCLIST_COMPILE_AND_RUN_OK := $(filter-out ./threads/% threads/%,$(SRCLIST_COMPILE_AND_RUN_OK))
 SRCLIST_COMPILE_AND_RUN_FAIL := $(filter-out ./threads/% threads/%,$(SRCLIST_COMPILE_AND_RUN_FAIL))
 SRCLIST_MULTI_MODULE_OK := $(filter-out ./threads/% threads/%,$(SRCLIST_MULTI_MODULE_OK))
 SRCLIST_MULTI_MODULE_FAIL := $(filter-out ./threads/% threads/%,$(SRCLIST_MULTI_MODULE_FAIL))
+	endif
+	ifneq ($(DOS_LOG_TCP),yes)
+		SRCLIST_MULTI_MODULE_OK := $(filter-out ./file/tcp.bmk file/tcp.bmk,$(SRCLIST_MULTI_MODULE_OK))
+	endif
 endif
 
 # COMPILE_ONLY_OK
@@ -172,6 +188,12 @@ ABORT_CMD := true
 
 FBC_CFLAGS := -w 3
 FBC_CFLAGS += -i $(abspath ../inc)
+ifeq ($(DOS_LOG_THREADS),yes)
+	FBC_CFLAGS += -mt -dos-threads pdmlwp
+endif
+ifeq ($(DOS_LOG_TCP),yes)
+	FBC_CFLAGS += -d FB_DOS_WATT32
+endif
 ifneq ($(TARGET_OS),dos)
 	FBC_CFLAGS += -Wc -Wno-tautological-compare
 endif
@@ -197,7 +219,10 @@ endif
 # set as direct compile-only tests. Object metadata is selected during module
 # compilation, so forwarding only FBC_LFLAGS is not sufficient for wrappers
 # such as gfxlib3 that choose a runtime through a compiler define.
-BMK_MAKE_COMMON_ARGS = FBC="$(FBC)" FBC_EXTRA_CFLAGS="$(FBC_EXTRA_CFLAGS)" GCC="$(GCC)"
+# bmk-make.mk parses platform conditions independently. Forward the resolved target
+# OS as well as provider names so a recursive DOS TCP test selects its own
+# DOS-only compile and link flags.
+BMK_MAKE_COMMON_ARGS = FBC="$(FBC)" FBC_EXTRA_CFLAGS="$(FBC_EXTRA_CFLAGS)" GCC="$(GCC)" TARGET="$(TARGET)" TARGET_OS="$(TARGET_OS)" DOS_THREAD_PROVIDER="$(DOS_THREAD_PROVIDER)" DOS_TCP_PROVIDER="$(DOS_TCP_PROVIDER)"
 
 # ------------------------------------------------------------------------
 

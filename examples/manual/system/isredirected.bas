@@ -13,22 +13,34 @@
 
 '' Quotation marks wrapping for compatibility with spaces in path name
 Dim As String pathExe = """" & ExePath & """"
-Dim As String fileExe = Mid(Command(0), InStrRev(Command(0), "\") + 1)
-Dim As String redirection = " < """ & Command(0)
-If LCase(Right(Command(0), 4)) = ".exe" Then
-  redirection &= """"
-Else
-  redirection &= ".exe"""
+Dim As String executablePath = Command(0)
+If Len(executablePath) = 0 Then
+  Print "The executable path is unavailable"
+  Sleep
+  End 1
 End If
+If LCase(Right(executablePath, 4)) <> ".exe" Then executablePath &= ".exe"
+Dim As String quotedExecutable = """" & executablePath & """"
+Dim As String launchCommand = "start """" /d " & pathExe & " /b " & _
+  quotedExecutable & " < " & quotedExecutable & " secondprocess"
 
 If Command() = "" Then  '' First process without stdin redirection
   '' Check stdin redirection
   Print "First process without stdin redirection: IsRedirected(-1) = "; IsRedirected(-1)
   '' Creation of asynchronous second process with stdin redirected from file.exe
-  Shell("start /d " & pathExe & " /b " & fileExe & redirection & " secondprocess")
+  '' Both interpolated paths are derived from the current executable and are quoted.
+  '' FB-LINTER: DISABLE-NEXT-LINE FBL-SEC-001 FBL-SEC-002
+  Dim As Long launchResult = Shell(launchCommand)
+  If launchResult <> 0 Then
+    Print "Unable to start the redirected process: "; launchResult
+    Sleep
+    End 1
+  End If
   '' Waiting for termination of asynchronous second process
   Sleep
 ElseIf Command() = "secondprocess" Then  '' Second process with stdin redirection
   '' Check stdin redirection
   Print "Second process with stdin redirection  : IsRedirected(-1) = "; IsRedirected(-1)
 End If
+
+'' end of isredirected.bas

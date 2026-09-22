@@ -7,15 +7,23 @@
 '' --------
 
 '' Read entire contents of a file to a string
+Const MAX_TEXT_FILE_BYTES = 4 * 1024 * 1024
+Dim h As Integer
 Dim txt As String
 
-Open "myfile.txt" For Binary Access Read As #1
-  If LOF(1) > 0 Then
-	'' our string has as many characters as the file has in bytes
-	txt = String(LOF(1), 0)
+h = FreeFile
+
+If Open("myfile.txt" For Binary Access Read As #h) = 0 Then
+  Dim As LongInt file_size = LOF(h)
+
+  If file_size > 0 AndAlso file_size <= MAX_TEXT_FILE_BYTES Then
+	'' our string has as many characters as the checked file size in bytes
+	txt = String(file_size, 0)
 	'' size of txt is known.  entire string filled with file data
-	Get #1, , txt
+	If Get(#h, , txt) <> 0 Then txt = ""
   End If
-Close #1
+
+  Close #h
+End If
 
 Print txt

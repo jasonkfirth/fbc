@@ -44,9 +44,9 @@ public:
 
 	declare sub clear()
 	declare sub draw(x as long, y as long, w as long, h as long, ic as Fl_Color, active as long = 1)
-	declare sub label(w as Fl_Widget ptr)
+	declare sub label(w as Fl_Widget_ ptr)
 
-	declare static sub labeltype(o as const Fl_Label ptr, x as long, y as long, w as long, h as long, a as Fl_Align)
+	declare static sub labeltype(o as const Fl_Label_ ptr, x as long, y as long, w as long, h as long, a as Fl_Align)
 	declare sub load(f as const zstring ptr)
 	declare function load_fti(fti as const zstring ptr) as long
 	declare function load_image(i as const zstring ptr) as long

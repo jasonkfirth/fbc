@@ -12,6 +12,8 @@
 
 Dim As Single i, j
 
+'' This legacy handler is the subject of the RESUME example.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-ERR-004 FBL-ERR-005
 On Error Goto ErrHandler
 
 i = 0
@@ -21,6 +23,8 @@ Print j ' after the value of i is corrected, prints 0.5
 
 End ' end the program so that execution does not fall through to the error handler again
 
+'' END above prevents normal execution from entering this teaching handler.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-ERR-006 FBL-CF-004
 ErrHandler:
 
 i = 2

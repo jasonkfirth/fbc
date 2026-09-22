@@ -12,7 +12,8 @@ Dim array() As Integer
 '' ReDim array to have 3*4 elements
 ReDim array(1 To 3, 1 To 4)
 
-Dim As Integer n = 1, i, j
+Dim As Integer n = 1
+Dim As Integer i, j
 
 Print "3 * 4:"
 Print

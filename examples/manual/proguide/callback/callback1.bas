@@ -28,7 +28,7 @@ Sub PlotF( ByVal f As MathFunction )
 End Sub
 
 Screen 19
-Window (-15,-10)-(15,10)
+Window (-15, -10)-(15, 10)
 
 PlotF( @Linear )
 PlotF( @Sinusoidal )

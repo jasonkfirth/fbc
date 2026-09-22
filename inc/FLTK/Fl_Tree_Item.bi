@@ -65,7 +65,7 @@ public:
 
 	declare sub draw(X as long, byref Y as long, W as long, tree as Fl_Widget ptr, itemfocus as Fl_Tree_Item ptr, byref prefs as const Fl_Tree_Prefs , lastchild as long=1)
 
-	declare const sub show_self(indent as const zstring ptr =@"") 
+	declare const sub show_self(indent as const zstring ptr =@"")
 
 	declare sub label(val_ as const zstring ptr)
 	declare const function label() as const zstring ptr
@@ -284,15 +284,15 @@ private function Fl_Tree_Item.is_close() as long
 	return (iif(is_flag(OPEN),0,1))
 end function
 
-private sub Fl_Tree_Item.open_toggle() 
+private sub Fl_Tree_Item.open_toggle()
 	if is_open() then close_() else open_()
 end sub
 
-private sub Fl_Tree_Item.select_(val_ as long) 
+private sub Fl_Tree_Item.select_(val_ as long)
 	set_flag(SELECTED, val_)
 end sub
 
-private sub Fl_Tree_Item.select_toggle() 
+private sub Fl_Tree_Item.select_toggle()
 	if is_selected() then deselect() else select_()
 end sub
 
@@ -328,7 +328,7 @@ private function Fl_Tree_Item.is_selected() as byte
 	return(is_flag(SELECTED))
 end function
 
-private sub Fl_Tree_Item.activate(val_ as long) 
+private sub Fl_Tree_Item.activate(val_ as long)
 	set_flag(ACTIVE,val_)
 	if  _widget AndAlso val_ <> cast(long,_widget->active()) then
 		if  val_ then
@@ -366,7 +366,7 @@ private sub Fl_Tree_Item.usericon(val_ as Fl_Image ptr)
 end sub
 
 private function Fl_Tree_Item.usericon() as Fl_Image ptr
-	return _usericon 
+	return _usericon
 end function
 
 private function Fl_Tree_Item.is_root() as long
@@ -384,7 +384,7 @@ private sub Fl_Tree_Item.set_flag(flag as unsigned short, val_ as long)
 	case SELECTED
 		_selected = val_
 	end select
-	
+
 end sub
 
 private function Fl_Tree_Item.is_flag(flag as unsigned short) as long

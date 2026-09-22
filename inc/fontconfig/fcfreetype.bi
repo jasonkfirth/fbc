@@ -3,6 +3,7 @@
 '' based on the C header files:
 ''   fontconfig/fontconfig/fcfreetype.h
 ''
+'' FB-LINTER: DISABLE-NEXT-LINE FBL004
 ''   Copyright © 2001 Keith Packard
 ''
 ''   Permission to use, copy, modify, distribute, and sell this software and its
@@ -28,6 +29,7 @@
 
 #pragma once
 
+#include once "fontconfig.bi"
 #include once "freetype2/freetype.bi"
 
 extern "C"

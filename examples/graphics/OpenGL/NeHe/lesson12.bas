@@ -23,6 +23,8 @@
 
 declare sub BuildLists()
 
+'' BuildLists initializes these display-list handles for the draw loop.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared box as uinteger               '' Storage For The Box Display List
 dim shared top as uinteger               '' Storage For The Top Display List
 
@@ -37,12 +39,12 @@ dim shared top as uinteger               '' Storage For The Top Display List
 		{1.0, 0.0, 0.0}, _     '' Bright: Red,
 		{1.0, 0.5, 0.0}, _     '' Bright: Orange,
 		{1.0, 1.0, 0.0}, _     '' Bright: Yellow,
-		{0.0 ,1.0, 0.0}, _     '' Bright: Green,
+		{0.0 , 1.0, 0.0}, _     '' Bright: Green,
 		{0.0, 1.0, 1.0}}       '' Bright: Blue
 
 	dim topcol(0 to 4, 0 to 2) as single => { _   '' Array For Top Colors
 		{ .5, 0.0, 0.0}, _     '' Dark: Red,
-		{0.5, 0.25,0.0}, _     '' Dark: Orange,
+		{0.5, 0.25, 0.0}, _     '' Dark: Orange,
 		{0.5, 0.5, 0.0}, _     '' Dark: Yellow,
 		{0.0, 0.5, 0.0}, _     '' Dark: Green,
 		{0.0, 0.5, 0.5}}       '' Dark: Blue
@@ -58,7 +60,7 @@ dim shared top as uinteger               '' Storage For The Top Display List
 	glLoadIdentity                                 '' Reset The Modelview Matrix
 
 	'' Use BLOAD to load the bitmaps.
-	redim buffer(128*128*4+4) as ubyte             '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
+	redim buffer(0 to 128*128*4+4) as ubyte        '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
 	bload exepath + "/data/Cube.bmp", @buffer(0)
 	texture(0) = CreateTexture(@buffer(0))         '' Cube Texture
 	if texture(0) = 0 then end 1                   '' Exit if error loading data file
@@ -88,9 +90,9 @@ dim shared top as uinteger               '' Storage For The Top Display List
 				glTranslatef 1.4+(xloop*2.8)-(yloop*1.4), ((6.0-yloop)*2.4)-7.0, -20.0
 				glRotatef 45.0-(2.0*yloop) + xrot, 1.0, 0.0, 0.0    '' Tilt The Cubes Up And Down
 				glRotatef 45.0 + yrot, 0.0, 1.0, 0.0                '' Spin Cubes Left And Right
-				glColor3fv @boxcol(yloop-1,0)                       '' Select A Box Color
+				glColor3fv @boxcol(yloop-1, 0)                       '' Select A Box Color
 				glCallList box                                      '' Draw The Box
-				glColor3fv @topcol(yloop-1,0)                       '' Select The Top Color
+				glColor3fv @topcol(yloop-1, 0)                       '' Select The Top Color
 				glCallList top                                      '' Draw The Top
 			next
 		next
@@ -115,7 +117,7 @@ sub BuildLists()
 	glNewList box, GL_COMPILE                 '' Start With The Box List
 	glBegin GL_QUADS            '' Start Drawing Quads
 		'' Bottom Face
-		glNormal3f 0.0,-1.0, 0.0  '' This line of code is not in the HTML version of the tutorial!
+		glNormal3f 0.0, -1.0, 0.0  '' This line of code is not in the HTML version of the tutorial!
 		glTexCoord2f 1.0, 1.0 : glVertex3f -1.0, -1.0, -1.0   '' Top Right Of The Texture and Quad
 		glTexCoord2f 0.0, 1.0 : glVertex3f  1.0, -1.0, -1.0   '' Top Left Of The Texture and Quad
 		glTexCoord2f 0.0, 0.0 : glVertex3f  1.0, -1.0,  1.0   '' Bottom Left Of The Texture and Quad
@@ -127,7 +129,7 @@ sub BuildLists()
 		glTexCoord2f 1.0, 1.0 : glVertex3f  1.0,  1.0,  1.0   '' Top Right Of The Texture and Quad
 		glTexCoord2f 0.0, 1.0 : glVertex3f -1.0,  1.0,  1.0   '' Top Left Of The Texture and Quad
 		'' Back Face
-		glNormal3f 0.0, 0.0,-1.0  '' This line of code is not in the HTML version of the tutorial!
+		glNormal3f 0.0, 0.0, -1.0  '' This line of code is not in the HTML version of the tutorial!
 		glTexCoord2f 1.0, 0.0 : glVertex3f -1.0, -1.0, -1.0   '' Bottom Right Of The Texture and Quad
 		glTexCoord2f 1.0, 1.0 : glVertex3f -1.0,  1.0, -1.0   '' Top Right Of The Texture and Quad
 		glTexCoord2f 0.0, 1.0 : glVertex3f  1.0,  1.0, -1.0   '' Top Left Of The Texture and Quad

@@ -1,3 +1,16 @@
+'' Project: FreeBASIC Win32 GUI examples
+'' File: fileopen.bas
+''
+'' Purpose:
+''     Demonstrate a Win32 file-open dialog from a menu-driven application.
+''
+'' Ownership:
+''     Windows owns the created window and its attached menu.  file_getname
+''     owns the synchronous OPENFILENAME buffers until GetOpenFileName returns.
+''
+'' This file intentionally does NOT contain:
+''     - asynchronous dialog use
+''     - custom file decoding
 ''
 '' file open dialog demo
 '' This demo displays a window containing some explanation text and a File menu.
@@ -32,7 +45,8 @@ declare function WinMain     	( byval hInstance as HINSTANCE, _
                                   byval iCmdShow as integer ) as integer
 
 
-	''
+	'' The menu table is shared only by the menu construction helpers.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 	dim shared submenuTB(0 to MAXMENUS) as TMENU
 
     ''
@@ -48,12 +62,17 @@ function file_getname( byval hWnd as HWND ) as string
 
 	dim ofn as OPENFILENAME
 	dim filename as zstring * MAX_PATH+1
+	'' A FreeBASIC String retains the embedded NUL separators that Win32 requires.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-BUILD-003 FBL-STR-004
+	dim filterText as string = !"All Files, (*.*)\0*.*\0Bas Files, (*.BAS)\0*.bas\0\0"
 
 	with ofn
 		.lStructSize 		= sizeof( OPENFILENAME )
 		.hwndOwner	 		= hWnd
 		.hInstance	 		= GetModuleHandle( NULL )
-		.lpstrFilter 		= strptr( !"All Files, (*.*)\0*.*\0Bas Files, (*.BAS)\0*.bas\0\0" )
+		'' GetOpenFileName is synchronous; filterText owns this storage through the call.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL427
+		.lpstrFilter 		= strptr( filterText )
 		.lpstrCustomFilter 	= NULL
 		.nMaxCustFilter 	= 0
 		.nFilterIndex 		= 1
@@ -135,18 +154,18 @@ function WndProc ( byval hWnd as HWND, _
 
 	''on getting a repaint command, draw the explaning text into the window
     case WM_PAINT
-    	hDC = BeginPaint( hWnd, @pnt )
+        hDC = BeginPaint( hWnd, @pnt )
         GetClientRect( hWnd, @rct )
 
         if( len( filetoopen ) = 0 ) then
-       		filetoopen = "Select a file using the File->Open... menu"
-    	end if
+                filetoopen = "Select a file using the File->Open... menu"
+        end if
 
         DrawText( hDC, _
-           		  !"\"" & filetoopen & !"\"", _
-           		  -1, _
-           		  @rct, _
-           		  DT_SINGLELINE or DT_CENTER or DT_VCENTER )
+                          !"\"" & filetoopen & !"\"", _
+                          -1, _
+                          @rct, _
+                          DT_SINGLELINE or DT_CENTER or DT_VCENTER )
 
         EndPaint( hWnd, @pnt )
 
@@ -161,7 +180,7 @@ function WndProc ( byval hWnd as HWND, _
 
 	''on getting a destroy window request, post the quit message
     case WM_DESTROY
-    	PostQuitMessage( 0 )
+        PostQuitMessage( 0 )
         exit function
     end select
 
@@ -186,40 +205,38 @@ function WinMain ( byval hInstance as HINSTANCE, _
 
     dim wMsg as MSG
     dim wcls as WNDCLASS
-    dim appName as string
+	dim appName as zstring * 32 = "FileOpenTest"
     dim hWnd as HWND
 
     function = 0
 
     ''set application name
 
-    appName = "FileOpenTest"
-
-    '' fill parameters for wcls
+	'' fill parameters for wcls
 
     with wcls
-    	.style         = CS_HREDRAW or CS_VREDRAW
+        .style         = CS_HREDRAW or CS_VREDRAW
 		.lpfnWndProc   = cast( WNDPROC, @WndProc )
-    	.cbClsExtra    = 0
-    	.cbWndExtra    = 0
-    	.hInstance     = hInstance
-    	.hIcon         = LoadIcon( NULL, IDI_APPLICATION )
-    	.hCursor       = LoadCursor( NULL, IDC_ARROW )
-    	.hbrBackground = GetStockObject( WHITE_BRUSH )
-    	.lpszMenuName  = NULL
-    	.lpszClassName = strptr( appName )
+        .cbClsExtra    = 0
+        .cbWndExtra    = 0
+        .hInstance     = hInstance
+        .hIcon         = LoadIcon( NULL, IDI_APPLICATION )
+        .hCursor       = LoadCursor( NULL, IDC_ARROW )
+        .hbrBackground = GetStockObject( WHITE_BRUSH )
+        .lpszMenuName  = NULL
+		.lpszClassName = @appName
     end with
 
     ''Try to register the wcl class and exit if unsuccessful
 
     if( RegisterClass( @wcls ) = FALSE ) then
-       	exit function
+        exit function
     end if
 
     ''create the window, show and update it
 
     hWnd = CreateWindowEx( 0, _
-    			 		   appName, _
+                                           appName, _
                            "File Open", _
                            WS_OVERLAPPEDWINDOW, _
                            CW_USEDEFAULT, _
@@ -228,11 +245,12 @@ function WinMain ( byval hInstance as HINSTANCE, _
                            CW_USEDEFAULT, _
                            NULL, _
                            NULL, _
-                           hInstance, _
-                           NULL )
+						   hInstance, _
+						   NULL )
 
+	if hWnd = NULL then exit function
 
-    ShowWindow( hWnd, iCmdShow )
+	ShowWindow( hWnd, iCmdShow )
     UpdateWindow( hWnd )
 
     ''look for messages, translate and dispatch them
@@ -261,9 +279,9 @@ sub menu_insert( byval hmenu as HMENU, byval submenu as integer, byref title as 
 
     with submenuTB(submenu)
 
-    	.hnd 	= CreatePopupMenu( )
+        .hnd 	= CreatePopupMenu( )
 
-    	InsertMenu( hmenu, submenu, MF_BYPOSITION Or MF_POPUP Or MF_STRING or flags, cuint( .hnd ), title )
+        InsertMenu( hmenu, submenu, MF_BYPOSITION Or MF_POPUP Or MF_STRING or flags, cuint( .hnd ), title )
 
     end with
 
@@ -301,11 +319,11 @@ end sub
 sub init_menus( byval hWnd as HWND )
 	dim menu as HMENU '' menu in its creation stage
 
- 	menu = CreateMenu( )
+    menu = CreateMenu( )
 
- 	'' add File menu, consisting of Open, separator and Exit
+        '' add File menu, consisting of Open, separator and Exit
 
- 	menu_insert( menu, 0, "&File" )
+    menu_insert( menu, 0, "&File" )
 
     menu_append( 0, MENUID_FILE_OPEN, "&Open..." )
     menu_separator( 0 )
@@ -318,3 +336,5 @@ sub init_menus( byval hWnd as HWND )
     DrawMenuBar( hWnd )
 
 end sub
+
+'' End of fileopen.bas

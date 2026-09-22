@@ -14,10 +14,10 @@ Function maxPtr (ByVal p1 As Integer Ptr, ByVal p2 As Integer Ptr) As Integer Pt
 	End If
 End Function
 
-Dim As Integer i1 = 1, i2 = 2
+Dim As Integer i1 = 1
+Dim As Integer i2 = 2
 Print i1, i2
 *maxPtr(@i1, @i2) = 3
 Print i1, i2
 
 Sleep
-

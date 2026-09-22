@@ -6,7 +6,11 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgPmap
 '' --------
 
-ScreenRes 640, 480
+If ScreenRes( 640, 480 ) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 Window Screen (0, 0)-(100, 100)
 Print "Logical x=50, Physical x="; PMap(50, 0)   '' 320
 Print "Logical y=50, Physical y="; PMap(50, 1)   '' 240

@@ -19,16 +19,16 @@ end type
 
 private operator GdiplusBase.delete(byval in_pVoid as any ptr)
     GdipFree(in_pVoid)
-end operator    
-    
+end operator
+
 private operator GdiplusBase.new(byval in_size as long) as any ptr
     return GdipAlloc(in_size)
-end operator    
-    
+end operator
+
 private operator GdiplusBase.delete[](byval in_pVoid as any ptr)
     GdipFree(in_pVoid)
 end operator
-    
+
 private operator GdiplusBase.new[](byval in_size as long) as any ptr
 	return GdipAlloc(in_size)
 end operator

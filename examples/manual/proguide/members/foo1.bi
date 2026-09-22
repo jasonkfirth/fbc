@@ -6,6 +6,9 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMemberProcedures
 '' --------
 
+#ifndef FB_EXAMPLES_MANUAL_PROGUIDE_MEMBERS_FOO1_BI
+#define FB_EXAMPLES_MANUAL_PROGUIDE_MEMBERS_FOO1_BI
+
 '' foo1.bi
 
 Type foo
@@ -22,3 +25,5 @@ End Sub
 Function foo.g As Integer
 	Return 420
 End Function
+
+#endif

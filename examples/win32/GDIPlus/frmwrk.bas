@@ -3,6 +3,8 @@
 
 namespace frmwrk
 
+	'' The framework owns this process-wide GUI context and GDI+ token.  This
+	'' shared state is serialized by the Win32 message loop on the GUI thread.
 	dim shared as Context ptr g_ctx = NULL
 	dim shared as ULONG_PTR g_token = NULL
 
@@ -42,15 +44,16 @@ namespace frmwrk
 	        case WM_PAINT
 				dim as HDC hDC = any
 				dim as PAINTSTRUCT pntst = any
-				dim as GdiPlus.GpGraphics ptr gfx = any
+				dim as GdiPlus.GpGraphics ptr gfx = NULL
 
 				hDC = BeginPaint( hWnd, @pntst )
 
-				GdiPlus.GdipCreateFromHDC( hdc, @gfx )
-
-	            g_ctx->doPaint( g_ctx, hwnd, gfx )
-
-				GdiPlus.GdipDeleteGraphics( gfx )
+				If hDC <> NULL Then
+					If GdiPlus.GdipCreateFromHDC( hdc, @gfx ) = 0 Then
+						g_ctx->doPaint( g_ctx, hwnd, gfx )
+						GdiPlus.GdipDeleteGraphics( gfx )
+					End If
+				End If
 				EndPaint( hWnd, @pntst )
 
 	            exit function
@@ -149,4 +152,3 @@ namespace frmwrk
 end namespace
 
 '':::::
-

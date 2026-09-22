@@ -27,6 +27,7 @@
 #include once "windows.bi"
 #include once "objbase.bi"
 #include once "mmsystem.bi"
+#include once "dmusici.bi"
 
 #define __WINE_DMUSIC_FILEFORMATS_H
 #define DMUS_FOURCC_GUID_CHUNK mmioFOURCC(asc("g"), asc("u"), asc("i"), asc("d"))

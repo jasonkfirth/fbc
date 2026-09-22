@@ -6,6 +6,9 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgRecursionIteration
 '' --------
 
+#ifndef FB_EXAMPLES_MANUAL_PROGUIDE_RECURSION_ITERATION_DYNAMIC_USER_STACK_TYPE_CREATE_MACRO_BI
+#define FB_EXAMPLES_MANUAL_PROGUIDE_RECURSION_ITERATION_DYNAMIC_USER_STACK_TYPE_CREATE_MACRO_BI
+
 '' save as file: "DynamicUserStackTypeCreateMacro.bi"
 
 #macro DynamicUserStackTypeCreate(typename, datatype)
@@ -38,12 +41,16 @@
 			This.nae *= 2
 			ReDim Preserve This.ae(This.nae - 1)  '' allocating user stack memory for double used elements at least
 		End If
-		This.ae(This.nue - 1) = i
+		'' The constructor allocates ae before push can advance nue.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
+		This.ae(LBound(This.ae) + This.nue - 1) = i
 	End Property
 
 	Property typename.pop () ByRef As datatype  '' popping from the user stack
 		If This.nue > 0 Then
-			Property = This.ae(This.nue - 1)
+			'' nue > 0 means this constructed stack has a valid current element.
+			'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
+			Property = This.ae(LBound(This.ae) + This.nue - 1)
 			This.nue -= 1
 			If This.nue > This.nae0 And This.nae > This.nue * 2 Then
 				This.nae \= 2
@@ -74,3 +81,4 @@
 
 #endmacro
 
+#endif

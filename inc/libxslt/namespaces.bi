@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include once "libxml/tree.bi"
+#include once "libxslt/transform.bi"
+
 #include once "crt/long.bi"
 #include once "libxml/tree.bi"
 #include once "xsltexports.bi"

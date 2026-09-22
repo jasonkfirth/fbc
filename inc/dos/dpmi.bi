@@ -1,3 +1,25 @@
+' Project: FreeBASIC DOS bindings
+' -----------------------------
+'
+' File: dpmi.bi
+'
+' Purpose:
+'
+'     Declare the DJGPP DPMI and legacy go32 interfaces used by DOS
+'     applications and the FreeBASIC DOS runtime.
+'
+' Responsibilities:
+'
+'     * preserve the DJGPP ABI names and data layouts
+'     * document the DPMI service represented by each binding
+'     * retain source compatibility with older go32 callers
+'
+' This file intentionally does NOT contain:
+'
+'     * a DPMI host implementation
+'     * a DOS scheduler or thread provider
+'     * platform-independent FreeBASIC runtime policy
+'
 ' Copyright (C) 1999 DJ Delorie, see COPYING.DJ for details
 ' Copyright (C) 1995 DJ Delorie, see COPYING.DJ for details
 #ifndef __dj_include_dpmi_h_
@@ -151,7 +173,7 @@ end type
 
 ' Unless otherwise noted, all functions return -1 on error, setting __dpmi_error to the DPMI error code
 
-declare sub		__dpmi_yield cdecl alias "__dpmi_yield"										( )													' INT 0x2F AX=1680
+declare sub		__dpmi_yield cdecl alias "__dpmi_yield"										( )													' INT 0x2F AX=1680; release the current virtual-machine time slice
 
 declare function	__dpmi_allocate_ldt_descriptors cdecl alias "__dpmi_allocate_ldt_descriptors" 					( byval _count as integer ) as integer									' DPMI 0.9 AX=0000
 declare function	__dpmi_free_ldt_descriptor cdecl alias "__dpmi_free_ldt_descriptor"						( byval _descriptor as integer ) as integer								' DPMI 0.9 AX=0001
@@ -255,8 +277,8 @@ declare function	__dpmi_get_coprocessor_status cdecl alias "__dpmi_get_coprocess
 declare function	__dpmi_set_coprocessor_emulation cdecl alias "__dpmi_set_coprocessor_emulation"					( byval _flags as integer ) as integer									' DPMI 1.0 AX=0e01
 
 
-' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-' Backwards compatibility stuff						       
+' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+' Backwards compatibility stuff
 
 #define _go32_dpmi_registers            __dpmi_regs
 
@@ -324,7 +346,7 @@ declare function	_go32_dpmi_allocate_iret_wrapper cdecl alias "_go32_dpmi_alloca
 declare function	_go32_dpmi_free_iret_wrapper cdecl alias "_go32_dpmi_free_iret_wrapper"		( byval info as _go32_dpmi_seginfo ptr ) as integer
 	' assumes pm_offset points to wrapper, frees it
 
-' RMCB functions, automatically restructure the real-mode stack for the 
+' RMCB functions, automatically restructure the real-mode stack for the
 '   proper return type and set up correct PM stack.  The callback
 '   (info->pm_offset) is called as (*pmcb)(_go32_dpmi_registers *regs);
 declare function	_go32_dpmi_allocate_real_mode_callback_retf cdecl alias "_go32_dpmi_allocate_real_mode_callback_retf"	( byval info as _go32_dpmi_seginfo ptr, byval regs as _go32_dpmi_registers ptr ) as integer
@@ -355,3 +377,5 @@ declare function	__djgpp_set_page_attributes cdecl alias "__djgpp_set_page_attri
 declare function	__djgpp_map_physical_memory cdecl alias "__djgpp_map_physical_memory"	( byval our_addr as any ptr, byval num_bytes as uinteger, byval phys_addr as uinteger ) as integer
 
 #endif ' !__dj_include_dpmi_h_
+
+' end of dpmi.bi

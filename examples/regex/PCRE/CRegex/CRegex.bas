@@ -15,16 +15,34 @@ constructor CRegex _
 	dim as const zstring ptr err_msg = any
 	dim as long err_ofs = any
 
+	reg = NULL
+	extra = NULL
+	vectb = NULL
+	subject = NULL
+	sublen = 0
+	substrcnt = 0
+	substrlist = NULL
+
+	if( pattern = NULL ) then
+		return
+	end if
+
 	reg = pcre_compile( pattern, opt, @err_msg, @err_ofs, NULL )
 	if( reg = NULL ) then
 		return
 	end if
 
 	extra = pcre_study( reg, 0, @err_msg )
-	pcre_fullinfo( reg, extra, PCRE_INFO_CAPTURECOUNT, @substrcnt )
+	if( pcre_fullinfo( reg, extra, PCRE_INFO_CAPTURECOUNT, @substrcnt ) <> 0 ) then
+		substrcnt = 0
+		return
+	end if
 	substrcnt += 1
-	vectb = allocate( len( long ) * (3 * substrcnt) )
-	substrlist = NULL
+	vectb = callocate( 3 * substrcnt, len( long ) )
+	if( vectb = NULL ) then
+		substrcnt = 0
+		return
+	end if
 end constructor
 
 sub CRegex.clearSubstrlist()
@@ -66,6 +84,10 @@ function CRegex.search _
 
 	clearsubstrlist( )
 
+	if( reg = NULL orelse vectb = NULL orelse subject = NULL ) then
+		return 0
+	end if
+
 	this.subject = subject
 	sublen = iif( lgt >= 0, lgt, len( *subject ) )
 
@@ -78,6 +100,10 @@ function CRegex.searchNext _
 	) as integer
 
 	clearsubstrlist( )
+
+	if( reg = NULL orelse vectb = NULL orelse subject = NULL ) then
+		return 0
+	end if
 
 	function = ( pcre_exec( reg, extra, subject, sublen, vectb[1], opt, vectb, 3 * substrcnt ) > 0 )
 end function
@@ -95,10 +121,19 @@ function CRegex.getStr _
 		return NULL
 	end if
 
-	if( substrlist = NULL ) then
-		pcre_get_substring_list( subject, vectb, substrcnt, @substrlist )
+	if( subject = NULL orelse vectb = NULL ) then
+		return NULL
 	end if
 
+	if( substrlist = NULL ) then
+		if( pcre_get_substring_list( subject, vectb, substrcnt, @substrlist ) <> 0 ) then
+			return NULL
+		end if
+	end if
+
+	if( substrlist = NULL ) then return NULL
+	'' i is bounded by substrcnt before indexing PCRE's returned substring list.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL525
 	function = cast(zstring ptr, substrlist[i])
 end function
 
@@ -115,6 +150,7 @@ function CRegex.getOfs _
 		return -1
 	end if
 
+	if( vectb = NULL ) then return -1
 	function = vectb[i * 2 + 0]
 end function
 
@@ -131,5 +167,6 @@ function CRegex.getLen _
 		return -1
 	end if
 
+	if( vectb = NULL ) then return -1
 	function = vectb[i * 2 + 1] - vectb[i * 2 + 0]
 end function

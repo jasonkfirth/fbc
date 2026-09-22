@@ -114,22 +114,22 @@ Operator fraction.Next( ByRef end_cond As fraction, ByRef step_var As fraction )
 	End If
 End Operator
 
-For i As fraction = fraction(1,1) To fraction(4,1)
+For i As fraction = fraction(1, 1) To fraction(4, 1)
 	Print i; " ";
 Next
 Print "done"
 
-For i As fraction = fraction(1,4) To fraction(1,1) Step fraction(1,4)
+For i As fraction = fraction(1, 4) To fraction(1, 1) Step fraction(1, 4)
 	Print i; " ";
 Next
 Print "done"
 
-For i As fraction = fraction(4,4) To fraction(1,4) Step fraction(-1,4)
+For i As fraction = fraction(4, 4) To fraction(1, 4) Step fraction(-1, 4)
 	Print i; " ";
 Next
 Print "done"
 
-For i As fraction = fraction(4,4) To fraction(1,4)
+For i As fraction = fraction(4, 4) To fraction(1, 4)
 	Print i; " ";
 Next
 Print "done"

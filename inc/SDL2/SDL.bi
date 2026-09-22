@@ -502,7 +502,7 @@ type SDL_ThreadFunction as function(byval data as any ptr) as long
 
 #ifdef __FB_WIN32__
 	#ifdef __FB_64BIT__
-		declare function SDL_beginthread alias "_beginthreadex"(byval _Security as any ptr, byval _StackSize as ulong, byval _StartAddress as function(byval as any ptr) as ulong, byval _ArgList as any ptr, byval _InitFlag as ulong, byval _ThrdAddr as ulong ptr) as uinteger
+		declare function SDL_beginthread alias "_beginthreadex"(byval _Security as any ptr, byval _StackSize as ulong, byval _StartAddress as function cdecl(byval as any ptr) as ulong, byval _ArgList as any ptr, byval _InitFlag as ulong, byval _ThrdAddr as ulong ptr) as uinteger
 	#else
 		declare function SDL_beginthread alias "_beginthreadex"(byval _Security as any ptr, byval _StackSize as ulong, byval _StartAddress as function stdcall(byval as any ptr) as ulong, byval _ArgList as any ptr, byval _InitFlag as ulong, byval _ThrdAddr as ulong ptr) as uinteger
 	#endif
@@ -517,7 +517,7 @@ type SDL_Thread as SDL_Thread_
 
 #if defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
 	declare function SDL_CreateThread_ alias "SDL_CreateThread"(byval fn as SDL_ThreadFunction, byval name as const zstring ptr, byval data as any ptr, byval pfnBeginThread as pfnSDL_CurrentBeginThread, byval pfnEndThread as pfnSDL_CurrentEndThread) as SDL_Thread ptr
-	declare function SDL_CreateThreadWithStackSize_ alias "SDL_CreateThreadWithStackSize"(byval fn as function(byval as any ptr) as long, byval name as const zstring ptr, byval stacksize as const uinteger, byval data as any ptr, byval pfnBeginThread as pfnSDL_CurrentBeginThread, byval pfnEndThread as pfnSDL_CurrentEndThread) as SDL_Thread ptr
+	declare function SDL_CreateThreadWithStackSize_ alias "SDL_CreateThreadWithStackSize"(byval fn as function cdecl(byval as any ptr) as long, byval name as const zstring ptr, byval stacksize as const uinteger, byval data as any ptr, byval pfnBeginThread as pfnSDL_CurrentBeginThread, byval pfnEndThread as pfnSDL_CurrentEndThread) as SDL_Thread ptr
 	#define SDL_CreateThread(fn, name, data) SDL_CreateThread_(fn, name, data, cast(pfnSDL_CurrentBeginThread, SDL_beginthread), cast(pfnSDL_CurrentEndThread, SDL_endthread))
 	#define SDL_CreateThreadWithStackSize(fn, name, stacksize, data) SDL_CreateThreadWithStackSize_(fn, name, data, cast(pfnSDL_CurrentBeginThread, _beginthreadex), cast(pfnSDL_CurrentEndThread, SDL_endthread))
 #else

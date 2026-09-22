@@ -5,7 +5,8 @@
 
 #define NULL 0
 
-' Backing pixmap for drawing area
+' Backing pixmap for drawing area, shared by the GTK drawing handlers.
+' FB-LINTER: DISABLE-NEXT-LINE FBL301
 Dim Shared pixmap As GdkPixmap Ptr
 
 ' Create a new backing pixmap of the appropriate size

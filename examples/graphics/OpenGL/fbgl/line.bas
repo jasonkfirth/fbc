@@ -15,6 +15,8 @@ const YRES = 240
 	win.blendMode = fbgl.ANTIALISED
 	win.lineSmooth = TRUE
 
+	Randomize Timer
+
 	do
 		'' clear the working page
 		win.cls
@@ -24,11 +26,11 @@ const YRES = 240
 			'' use 255 (100%) for alpha
 			win.color = rgba(rnd * 255, rnd * 255, rnd * 255, 255)
 
-	   		'' line x1, y2, x2, y2
-	   		win.line rnd * XRES, rnd * YRES, rnd * XRES, rnd * YRES
+			'' line x1, y2, x2, y2
+			win.line rnd * XRES, rnd * YRES, rnd * XRES, rnd * YRES
 		next
 
-	   '' copy the working page to the visible one
-	   win.flip
+		'' copy the working page to the visible one
+		win.flip
 
 	loop while len( inkey ) = 0

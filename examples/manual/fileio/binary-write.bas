@@ -8,9 +8,15 @@
 
 '' Create a binary data file with one number in it
 Dim x As Single = 17.164
+Dim f As Integer
 
-Open "MyFile.Dat" For Binary As #1
+f = FreeFile
+
+If Open("MyFile.Dat" For Binary As #f) <> 0 Then
+  Print "Could not open MyFile.Dat"
+Else
   '' put without a position setting will put from the last known file position
   '' in this case, the very beginning of the file.
-  Put #1, , x
-Close #1
+  If Put(#f, , x) <> 0 Then Print "Could not write MyFile.Dat"
+  Close #f
+End If

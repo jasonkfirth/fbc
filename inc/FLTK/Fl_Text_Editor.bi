@@ -11,7 +11,7 @@ protected:
 public:
 	type Key_Func as function(key as long, editor as Fl_Text_Editor ptr) as long
 
-	type Key_Binding 
+	type Key_Binding
 	      key as long
 	      state as long
 	      function_ as Key_Func
@@ -72,7 +72,7 @@ private destructor Fl_Text_Editor()
 	'remove_all_key_bindings()
 end destructor
 
-private sub Fl_Text_Editor.insert_mode(b as long) 
+private sub Fl_Text_Editor.insert_mode(b as long)
 	insert_mode_=b
 end sub
 

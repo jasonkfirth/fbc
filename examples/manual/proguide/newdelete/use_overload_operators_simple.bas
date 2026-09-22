@@ -9,6 +9,11 @@
 ' Code for using overload 'New'/'Delete' operators from base-typed pointer array in polymorphic inheritance context
 '    Added member procedure to workaround unexpected behavior:
 '       - Abstract/Virtual 'Delete_launcher()' to call the overload Delete operator of the derived type from a base-typed pointer
+'
+' Resource ownership:
+'
+' Each Cat or Dog owns the buffer returned from its corresponding overload New.
+' The caller releases every successful allocation through Delete_launcher().
 
 Type Animal Extends Object
 	Public:
@@ -64,6 +69,10 @@ End Destructor
 
 Operator Cat.New(ByVal size As UInteger) As Any Ptr
 	Dim As Any Ptr p = CAllocate(size)
+	If p = 0 Then
+		Print "Cat New operator: allocation failed"
+		Return 0
+	End If
 	Print "Cat New operator: ", "buffer address: " & p
 	Return p
 End Operator
@@ -110,6 +119,10 @@ End Destructor
 
 Operator Dog.New(ByVal size As UInteger) As Any Ptr
 	Dim As Any Ptr p = CAllocate(size)
+	If p = 0 Then
+		Print "Dog New operator: allocation failed"
+		Return 0
+	End If
 	Print "Dog New operator: ", "buffer address: " & p
 	Return p
 End Operator
@@ -127,6 +140,17 @@ End Sub
 
 Dim As Animal Ptr pa(0 To ...) = {New Cat(), New Cat(), New Dog(), New Dog()}
 
+For I As Integer = LBound(pa) To UBound(pa)
+	If pa(I) = 0 Then
+		Print "Object allocation failed"
+		For J As Integer = LBound(pa) To I - 1
+			If pa(J) <> 0 Then pa(J)->Delete_launcher()
+		Next J
+		Sleep
+		End 1
+	End If
+Next I
+
 pa(0)->Init("Tiger", "Salmon")
 pa(1)->Init("Kitty", "Sardine")
 pa(2)->Init("Buddy", "Lamb")
@@ -142,3 +166,5 @@ For I As Integer = LBound(pa) To UBound(pa)
 Next I
 
 Sleep
+
+'' end of use_overload_operators_simple.bas

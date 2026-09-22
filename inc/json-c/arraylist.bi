@@ -27,6 +27,8 @@ type array_list_
 	free_fn as sub(byval data as any ptr)
 end type
 
+type array_list as array_list_
+
 declare function array_list_new(byval free_fn as sub(byval data as any ptr)) as array_list ptr
 declare sub array_list_free(byval al as array_list ptr)
 declare function array_list_get_idx(byval al as array_list ptr, byval i as long) as any ptr

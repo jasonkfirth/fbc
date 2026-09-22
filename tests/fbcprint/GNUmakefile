@@ -31,6 +31,8 @@ all:
 	$(call test,-print target -target openbsd-x86)
 	$(call test,-print target -target openbsd-x86_64)
 	$(call test,-print target -target win32)
+	$(call test,-print target -target dos-hx)
+	$(call test,-print target -target dos-hx -mt)
 	$(call test,-print target -target win32-aarch64)
 	$(call test,-print target -target win32-arm64)
 	$(call test,-print target -target win64)

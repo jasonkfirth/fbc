@@ -89,6 +89,7 @@ End Sub
 ''
 
 	Dim As String filename = Command(1)
+	Dim As Integer file_number = FreeFile
 	If (Len(filename) = 0) Then
 		Print "Usage: expat <xmlfilename>"
 		End 1
@@ -102,10 +103,10 @@ End Sub
 
 	''XML_SetUserData(parser, userdata_pointer)
 	XML_SetElementHandler(parser, @elementBegin, @elementEnd)
-	XML_SetCharacterDataHandler(parser, @charData)
+	XML_SetCharacterDataHandler(parser, Cast(XML_CharacterDataHandler, @charData))
 
 
-	If (Open(filename, For Input, As #1)) Then
+	If (Open(filename, For Input, As #file_number)) Then
 		Print "Could not open file: '";filename;"'"
 		End 1
 	End If
@@ -115,13 +116,13 @@ End Sub
 	Dim As Integer reached_eof = False
 	Do
 		Dim As Integer size = BUFFER_SIZE
-		Dim As Integer result = Get(#1, , buffer(0), size, size)
+		Dim As Integer result = Get(#file_number, , buffer(0), size, size)
 		If (result Or (size <= 0)) Then
 			Print "File input error"
 			End 1
 		End If
 
-		reached_eof = (EOF(1) <> False)
+		reached_eof = (EOF(file_number) <> False)
 
 		If (XML_Parse(parser, @buffer(0), size, reached_eof) = False) Then
 			Print filename & "(" & XML_GetCurrentLineNumber(parser) & "): Error from XML parser: "
@@ -130,4 +131,5 @@ End Sub
 		End If
 	Loop While (reached_eof = False)
 
+	Close #file_number
 	XML_ParserFree(parser)

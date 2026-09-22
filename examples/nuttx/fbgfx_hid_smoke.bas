@@ -21,9 +21,10 @@
 '     - broad graphics drawing coverage
 '     - board-specific HDMI setup
 '     - USB host controller initialization
-'     - serial-console input fallback checks
+''     - serial-console input fallback checks
 '
 
+' Screen 13 is the NuttX DVI device-lab mode. FB-LINTER: DISABLE-NEXT-LINE FBL734
 screen 13
 
 if screenptr = 0 then
@@ -45,6 +46,7 @@ dim mb as integer
 dim mc as integer
 
 if getmouse(start_x, start_y, start_z, start_buttons, start_clip) <> 0 then
+    screen 0
     end 21
 end if
 
@@ -75,10 +77,12 @@ for i = 1 to 250
 next
 
 if saw_key = 0 then
+    screen 0
     end 22
 end if
 
 if saw_mouse = 0 then
+    screen 0
     end 23
 end if
 

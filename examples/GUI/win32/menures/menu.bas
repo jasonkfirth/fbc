@@ -27,8 +27,6 @@ declare function        WinMain     ( byval hInstance as HINSTANCE, _
 
 
 
-
-
 '' ::::::::
 '' name: WndProc
 '' desc: Processes windows messages
@@ -61,9 +59,9 @@ function WndProc ( byval hWnd as HWND, _
             init_menus( )
             exit function
 
-    	''
-    	'' menu item selected
-    	''
+        ''
+        '' menu item selected
+        ''
 		case WM_COMMAND
 			wmId    = loword( wParam )
 			wmEvent = hiword( wParam )
@@ -96,7 +94,7 @@ function WndProc ( byval hWnd as HWND, _
             GetClientRect( hWnd, @rct )
 
             if( lastmenuid <> 0 ) then
-            	DrawText( hDC, _
+                DrawText( hDC, _
             			 "Last menu selected: id(" & lastmenuid & ") title(" & menutitleTB(lastmenuid-IDM_BASE) & ")", _
             			 -1, _
             			 @rct, _
@@ -183,9 +181,11 @@ function WinMain ( byval hInstance as HINSTANCE, _
 		.hInstance     = hInstance
 		.hIcon         = LoadIcon( null, IDI_APPLICATION )
 		.hCursor       = LoadCursor( null, IDC_ARROW )
-     	.hbrBackground = GetStockObject( WHITE_BRUSH )
-     	.lpszMenuName  = cast(zstring ptr, IDC_MAINMENU)
-     	.lpszClassName = strptr( appName )
+        .hbrBackground = GetStockObject( WHITE_BRUSH )
+        .lpszMenuName  = cast(zstring ptr, IDC_MAINMENU)
+		'' appName remains alive through this synchronous RegisterClass call.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL427
+	.lpszClassName = strptr( appName )
     end with
 
     ''
@@ -193,7 +193,7 @@ function WinMain ( byval hInstance as HINSTANCE, _
     ''
     if ( RegisterClass( @wcls ) = false ) then
 		MessageBox( null, "Could not register the window class", appName, MB_ICONERROR )
-       	exit function
+        exit function
     end if
 
     ''
@@ -225,8 +225,8 @@ function WinMain ( byval hInstance as HINSTANCE, _
     ''
     while ( GetMessage( @wMsg, null, 0, 0 ) <> FALSE )
 		if( TranslateAccelerator( wMsg.hwnd, hAccelTable, @wMsg ) = 0 ) then
-        	TranslateMessage( @wMsg )
-        	DispatchMessage( @wMsg )
+            TranslateMessage( @wMsg )
+            DispatchMessage( @wMsg )
         end if
     wend
 
@@ -236,7 +236,3 @@ function WinMain ( byval hInstance as HINSTANCE, _
     function = wMsg.wParam
 
 end function
-
-
-
-

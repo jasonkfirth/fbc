@@ -4,7 +4,7 @@
 #Include Once "common.bi"
 
 ' class wxTextAttr
-Declare Function wxTextAttr_ctor WXCALL Alias "wxTextAttr_ctor" (fg As wxColour Ptr, bg As wxColour Ptr, font As wxFont Ptr, alignment As wxTextAttrAlignment) As wxTextAttr Ptr 
+Declare Function wxTextAttr_ctor WXCALL Alias "wxTextAttr_ctor" (fg As wxColour Ptr, bg As wxColour Ptr, font As wxFont Ptr, alignment As wxTextAttrAlignment) As wxTextAttr Ptr
 Declare Function wxTextAttr_ctor2 WXCALL Alias "wxTextAttr_ctor2" () As wxTextAttr Ptr
 Declare Sub wxTextAttr_dtor WXCALL Alias "wxTextAttr_dtor" (self As wxTextAttr Ptr)
 Declare Sub wxTextAttr_Init WXCALL Alias "wxTextAttr_Init" (self As wxTextAttr Ptr)

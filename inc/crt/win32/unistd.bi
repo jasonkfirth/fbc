@@ -12,7 +12,9 @@
 #include "crt/io.bi"
 #include "crt/process.bi"
 
-#include "crt/getopt.bi"
+' The Windows CRT headers shipped with FreeBASIC do not provide a getopt.bi
+' binding. Keep this header usable on Windows instead of including a missing
+' file; callers that need getopt can use the DOS or platform C declaration.
 
 #ifndef	SEEK_SET
 #define SEEK_SET 0

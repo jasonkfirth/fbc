@@ -105,7 +105,7 @@ public:
 	declare sub scrollbar_size(newSize as long)
 	declare const function scrollbar_width() as long
 	declare sub scrollbar_width(width_ as long)
-	declare sub scrollbar_right() 
+	declare sub scrollbar_right()
 	declare sub scrollbar_left()
 	declare sub sort(flags as long=0)
 
@@ -114,7 +114,7 @@ end type
 
 end extern
 
-private function Fl_Browser_.item_last() as any ptr 
+private function Fl_Browser_.item_last() as any ptr
 	return 0
 end function
 

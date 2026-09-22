@@ -26,15 +26,20 @@
 
 #pragma once
 
+'' Parser contexts contain hash table pointers while parser.bi is part of
+'' this header's dependency cycle, so publish the opaque aliases first.
+#define __XML_HASH_H__
+type xmlHashTable as _xmlHashTable
+type xmlHashTablePtr as xmlHashTable ptr
+
+#include once "libxml/tree.bi"
+
 #include once "libxml/xmlversion.bi"
 #include once "libxml/parser.bi"
 #include once "libxml/dict.bi"
 
 extern "C"
 
-#define __XML_HASH_H__
-type xmlHashTable as _xmlHashTable
-type xmlHashTablePtr as xmlHashTable ptr
 #define XML_CAST_FPTR(fptr) fptr
 type xmlHashDeallocator as sub(byval payload as any ptr, byval name as xmlChar ptr)
 type xmlHashCopier as function(byval payload as any ptr, byval name as xmlChar ptr) as any ptr

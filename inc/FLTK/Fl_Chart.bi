@@ -43,7 +43,7 @@ public:
 	declare sub add(val_ as double, str_ as const zstring ptr = 0, col as unsigned long = 0)
 	declare sub insert(ind as long, val_ as double, str_ as const zstring ptr = 0, col as unsigned long = 0)
 	declare sub replace(ind as long, val_ as double, str_ as const zstring ptr = 0, col as unsigned long = 0)
-	declare const sub bounds(a as double ptr, b as double ptr) 
+	declare const sub bounds(a as double ptr, b as double ptr)
 	declare sub bounds(a as double, b as double)
 	declare const function size() as long
 	declare sub size(W as long, H as long)

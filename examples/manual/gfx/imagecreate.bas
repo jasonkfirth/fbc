@@ -7,7 +7,11 @@
 '' --------
 
 '' Create a graphics screen.
-ScreenRes 320, 200, 32
+If ScreenRes(320, 200, 32) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 '' Create a 64x64 pixel image with a darkish green background.
 Dim image As Any Ptr = ImageCreate( 64, 64, RGB(0, 128, 0) )

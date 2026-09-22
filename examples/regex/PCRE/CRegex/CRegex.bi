@@ -1,3 +1,6 @@
+#ifndef FB_EXAMPLES_REGEX_PCRE_CREGEX_BI
+#define FB_EXAMPLES_REGEX_PCRE_CREGEX_BI
+
 #inclib "CRegex"
 
 #include once "pcre.bi"
@@ -71,3 +74,5 @@ private:
 	as integer substrcnt
 	as const zstring ptr ptr substrlist
 end type
+
+#endif

@@ -4,8 +4,8 @@
 ''   This file is part of the Generic Data Structures Library (GDSL).
 ''   Copyright (C) 1998-2006 Nicolas Darnis <ndarnis@free.fr>.
 ''
-''   The GDSL library is free software; you can redistribute it and/or 
-''   modify it under the terms of the GNU General Public License as 
+''   The GDSL library is free software; you can redistribute it and/or
+''   modify it under the terms of the GNU General Public License as
 ''   published by the Free Software Foundation; either version 2 of
 ''   the License, or (at your option) any later version.
 ''
@@ -16,7 +16,7 @@
 ''
 ''   You should have received a copy of the GNU General Public License
 ''   along with the GDSL library; see the file COPYING.
-''   If not, write to the Free Software Foundation, Inc., 
+''   If not, write to the Free Software Foundation, Inc.,
 ''   51 Franklin Street, Fifth Floor, Boston, MA  02111-1301, USA.
 ''
 '' translated to FreeBASIC by:
@@ -25,6 +25,7 @@
 #pragma once
 
 #include once "crt/long.bi"
+#include once "gdsl_types.bi"
 
 extern "C"
 

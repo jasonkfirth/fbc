@@ -283,10 +283,12 @@ private function hAddVar _
 		byref dimensions as integer, _
 		byref have_bounds as integer, _
 		dTB() as FBARRAYDIM, _
+		byval chain_ as FBSYMCHAIN ptr, _
 		byval token as integer _
 	) as FBSYMBOL ptr
 
 	dim as integer is_declared = any
+	dim as FBSYMBOL ptr redefinition = NULL
 
 	'' Have an existing variable with this name?
 	if( sym ) then
@@ -422,7 +424,10 @@ private function hAddVar _
 	end if
 
 	if( sym = NULL ) then
-		errReportEx( FB_ERRMSG_DUPDEFINITION, id )
+		if( chain_ <> NULL ) then
+			redefinition = chain_->sym
+		end if
+		errReportEx( symbGetIllegalRedefErr( redefinition ), id )
 	end if
 
 	function = sym
@@ -1801,7 +1806,7 @@ function cVarDecl _
 		'' definition, etc.
 		''
 		sym = hAddVar( sym, parent, id, palias, dtype, subtype, lgt, addsuffix, _
-		               attrib, dimensions, have_bounds, dTB(), token )
+		               attrib, dimensions, have_bounds, dTB(), chain_, token )
 
 		if( hEmitVarDecl( sym, token, is_fordecl, attrib, dimensions, _
 		    have_bounds, varexpr, exprTB(), dopreserve ) = FALSE ) then
@@ -2152,7 +2157,7 @@ private sub cAutoVarDecl( byval baseattrib as FB_SYMBATTRIB )
 
 		'' add var after parsing the expression, or the the var itself could be used
 		sym = hAddVar( sym, parent, id, NULL, dtype, subtype, _
-		               lgt, FALSE, attrib, 0, FALSE, dTB(), FB_TK_VAR )
+		               lgt, FALSE, attrib, 0, FALSE, dTB(), chain_, FB_TK_VAR )
 
 		if( sym <> NULL ) then
 			if( symbIsRef( sym ) ) then

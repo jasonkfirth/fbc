@@ -6,6 +6,9 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgStaticLibraries
 '' --------
 
+#ifndef FB_EXAMPLES_MANUAL_PROGUIDE_STATIC_LIB_VARZSTRING_BI
+#define FB_EXAMPLES_MANUAL_PROGUIDE_STATIC_LIB_VARZSTRING_BI
+
 '' header file: 'varZstring.bi'
 
 Type varZstring Extends ZString
@@ -21,6 +24,7 @@ Type varZstring Extends ZString
 End Type
 
 Declare Operator Len (ByRef v As varZstring) As Integer  '' mandatory for the user code to call
-														 ''    the overload Len operator and
-														 ''    not the prebuilt-in Len operator
+									 ''    the overload Len operator and
+									 ''    not the prebuilt-in Len operator
 
+#endif

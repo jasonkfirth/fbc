@@ -32,7 +32,7 @@
 	text_mode(-1)
 
 	' write some text to the screen with black letters
-	textout_centre(screen, font, "Hello, world!", SCREEN_W\2, SCREEN_H\2, makecol(0,0,0))
+	textout_centre(screen, font, "Hello, world!", SCREEN_W\2, SCREEN_H\2, makecol(0, 0, 0))
 
 	' you must always release bitmaps before calling any input functions
 	release_screen()

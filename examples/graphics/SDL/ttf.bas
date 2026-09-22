@@ -56,8 +56,10 @@ sub main()
 		end 1
 	end if
 
-	dim w as integer, h as integer
+	dim w as long, h as long
 	TTF_SizeText( Font1, FONTTEXT, @w, @h )
+
+	Randomize Timer
 
 	do
 		for i as integer = 1 to 25

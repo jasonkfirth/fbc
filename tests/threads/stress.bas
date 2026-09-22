@@ -1,6 +1,6 @@
 #include "fbcunit.bi"
 
-#if not defined( __FB_DOS__ ) and not defined( __FB_JS__ )
+#if ((not defined( __FB_DOS__ )) or ( __FB_MT__ <> 0 )) and not defined( __FB_JS__ )
 
 ''
 '' FreeBASIC thread runtime tests

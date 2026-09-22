@@ -5,9 +5,9 @@
 ''   This file has no copyright assigned and is placed in the Public Domain.
 ''   This file is part of the mingw-w64 runtime package.
 ''
-''   The mingw-w64 runtime package and its code is distributed in the hope that it 
-''   will be useful but WITHOUT ANY WARRANTY.  ALL WARRANTIES, EXPRESSED OR 
-''   IMPLIED ARE HEREBY DISCLAIMED.  This includes but is not limited to 
+''   The mingw-w64 runtime package and its code is distributed in the hope that it
+''   will be useful but WITHOUT ANY WARRANTY.  ALL WARRANTIES, EXPRESSED OR
+''   IMPLIED ARE HEREBY DISCLAIMED.  This includes but is not limited to
 ''   warranties of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ''
 '' translated to FreeBASIC by:
@@ -60,7 +60,9 @@ extern _XcptActTabCount as long
 extern _XcptActTabSize as long
 extern _First_FPE_Indx as long
 extern _Num_FPE as long
+#ifndef __WINNT_EXCEPTION_POINTERS_DEFINED
 type _EXCEPTION_POINTERS as _EXCEPTION_POINTERS_
+#endif
 declare function __CppXcptFilter(byval _ExceptionNum as ulong, byval _ExceptionPtr as _EXCEPTION_POINTERS ptr) as long
 declare function _XcptFilter(byval _ExceptionNum as ulong, byval _ExceptionPtr as _EXCEPTION_POINTERS ptr) as long
 

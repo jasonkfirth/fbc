@@ -6,6 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtConditionalVariables
 '' --------
 
+'' Thread synchronization: the mutex lock protects both predicates around each conditional wait.
+
 Declare Sub thread (ByVal userdata As Any Ptr)
 
 Dim As Any Ptr threadID             '' declaration of an 'Any Ptr' thread-ID of the child thread

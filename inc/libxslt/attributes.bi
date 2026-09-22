@@ -30,6 +30,9 @@
 #pragma once
 
 #include once "libxml/tree.bi"
+#include once "libxslt/transform.bi"
+
+#include once "libxml/tree.bi"
 #include once "xsltexports.bi"
 
 extern "C"

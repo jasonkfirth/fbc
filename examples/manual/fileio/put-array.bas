@@ -13,14 +13,19 @@ For i As Integer = 1 To 10
 Next
 
 ' Find the first free file file number
-Dim f As Long
+Dim f As Integer
 f = FreeFile()
 
 ' Open the file "file.ext" for binary usage, using the file number "f"
-Open "file.ext" For Binary As #f
-' Write the array into the file, using file number "f"
-' starting at the beginning of the file (position 1)
-Put #f, 1, buffer()
+If Open("file.ext" For Binary As #f) <> 0 Then
+  Print "Could not open file.ext"
+Else
+  ' Write the array into the file, using file number "f"
+  ' starting at the beginning of the file (position 1).
+  ' file.ext contains this same-target Integer array record.
+  ' FB-LINTER: DISABLE-NEXT-LINE FBL-DOC-BIN-003
+  If Put(#f, 1, buffer()) <> 0 Then Print "Could not write file.ext"
 
-' Close the file
-Close #f
+  ' Close the file
+  Close #f
+End If

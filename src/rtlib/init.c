@@ -55,6 +55,10 @@ void fb_hRtExit( void )
 	if( __fb_is_inicnt != 0 )
 		return;
 
+#if defined(HOST_DOS) && defined(ENABLE_MT) && defined(FB_DOS_PDMLWP)
+	fb_DosThreadExit();
+#endif
+
 	/* Doing clean-up here in the rtlib's global dtor, instead of using
 	   atexit().
 

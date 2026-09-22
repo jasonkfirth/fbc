@@ -1,5 +1,21 @@
+/* FreeBASIC runtime: fb_private_thread.h
+ * Private thread handles, startup records and platform mutex storage.
+ * Public threading declarations and scheduler implementations live elsewhere.
+ */
+
 #if defined HOST_CYGWIN
 	#include <pthread.h>
+#endif
+
+#if defined(HOST_DOS) && defined(ENABLE_MT) && defined(FB_DOS_PDMLWP)
+	#include "dos/fb_dos_thread.h"
+	struct FB_DOS_MUTEX_WAITER;
+	struct _FBMUTEX {
+		int owner;
+		unsigned int depth;
+		struct FB_DOS_MUTEX_WAITER *head;
+		struct FB_DOS_MUTEX_WAITER *tail;
+	};
 #endif
 
 #if defined HOST_UNIX
@@ -108,3 +124,5 @@ FBTHREADFLAGS fb_AtomicSetThreadFlags( volatile FBTHREADFLAGS *flags, FBTHREADFL
 #ifdef ENABLE_MT
 void          fb_CloseAtomicFBThreadFlagMutex( void );
 #endif
+
+/* end of fb_private_thread.h */

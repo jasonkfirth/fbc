@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include once "iup.bi"
+
 '' The following symbols have been renamed:
 ''     typedef IFnIi => IFnIi_
 ''     typedef IFniIIII => IFniIIII_

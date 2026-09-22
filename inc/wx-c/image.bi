@@ -14,7 +14,7 @@ Declare Function wxNode_GetPrevious WXCALL Alias "wxNode_GetPrevious" (node As w
 Declare Sub wxImage_AddHandler WXCALL Alias "wxImage_AddHandler" (handler As wxImageHandler Ptr)
 Declare Sub wxImage_InsertHandler WXCALL Alias "wxImage_InsertHandler" (handler As wxImageHandler Ptr)
 Declare Function wxImage_RemoveHandler WXCALL Alias "wxImage_RemoveHandler" (nam As wxString Ptr) As wxBool
-Declare Function wxImage_GetImageExtWildcard WXCALL Alias "wxImage_GetImageExtWildcard" () As wxString Ptr 
+Declare Function wxImage_GetImageExtWildcard WXCALL Alias "wxImage_GetImageExtWildcard" () As wxString Ptr
 
 ' class wxImage
 Declare Function wxImage_ctor WXCALL Alias "wxImage_ctor" () As wxImage Ptr

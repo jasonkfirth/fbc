@@ -63,6 +63,8 @@ FUNCTION create_canvas_features() AS GtkWidget PTR
   VAR root = goo_canvas_get_root_item (GOO_CANVAS (canvas))
 
   gtk_widget_set_size_request (canvas, 400, 200)
+	' These bounds match the compact feature demonstration viewport.
+	' FB-LINTER: DISABLE-NEXT-LINE FBL-NUM-009
   goo_canvas_set_bounds (GOO_CANVAS (canvas), 0, 0, 400, 200)
   gtk_container_add (GTK_CONTAINER (frame), canvas)
   gtk_widget_show (canvas)

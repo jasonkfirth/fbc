@@ -7,6 +7,8 @@
 #include once "win/commctrl.bi"
 #include once "win/shellapi.bi"
 
+'' Module state shared by the window callback and this program's setup code.
+'' The example is single-threaded, so these handles have one GUI-thread owner.
 	dim shared hInstance as HINSTANCE
 	dim shared rc as RECT
 	dim shared htv as HWND
@@ -16,10 +18,10 @@
     hInstance = GetModuleHandle( null )
 
     ilist  = ImageList_Create( GetSystemMetrics(SM_CXSMICON), _
-    						   GetSystemMetrics(SM_CYSMICON), _
-    						   ILC_COLOR8 or ILC_MASK, _
-    						   1, _
-							   1 )
+                                GetSystemMetrics(SM_CYSMICON), _
+                                ILC_COLOR8 or ILC_MASK, _
+                                1, _
+                                1 )
 
     iccx.dwSize = len( INITCOMMONCONTROLSEX )
     iccx.dwICC  = ICC_TREEVIEW_CLASSES or ICC_WIN95_CLASSES
@@ -42,20 +44,21 @@ function WndProc ( byval hWnd as HWND, _
 
 		dim tvis as TVINSERTSTRUCT
 
-        dim i     as long, _
-            hico  as HICON, _
-            hPrev as HTREEITEM, _
-            tlib  as long
+        dim i as long
+        dim hico as HICON
+        dim hPrev as HTREEITEM
+        dim tlib as long
 
-        dim as string ico, text
+        dim as string ico
+        dim as string text
 
         GetClientRect( hWnd, @rc )
 
-        htv = CreateWindowEx( WS_EX_CLIENTEDGE, WC_TREEVIEW, "",_
+        htv = CreateWindowEx( WS_EX_CLIENTEDGE, WC_TREEVIEW, "", _
                               WS_CHILD or WS_VISIBLE or TVS_HASLINES _
-							  or TVS_LINESATROOT or TVS_HASBUTTONS,_
-							  0, 18, 160, rc.bottom-20,_
-							  hWnd, 0, hInstance, 0 )
+                              or TVS_LINESATROOT or TVS_HASBUTTONS, _
+                              0, 18, 160, rc.bottom-20, _
+                              hWnd, 0, hInstance, 0 )
 
         TreeView_SetBkColor( htv, &hfff0e1 )
 
@@ -68,11 +71,16 @@ function WndProc ( byval hWnd as HWND, _
 
         TreeView_SetImageList( htv, ilist, TVSIL_NORMAL )
 
-        clear tvis, 0, len(tvis)
+        '' TVINSERTSTRUCT contains only the raw Win32 message fields used below.
+        '' FB-LINTER: DISABLE-NEXT-LINE FBL808
+        clear tvis, 0, sizeof(tvis)
         tvis.Item.Mask = TVIF_TEXT or TVIF_IMAGE or TVIF_SELECTEDIMAGE
 
+        '' SNDMSG sends TVM_INSERTITEM synchronously; text owns the buffer for
+        '' every insertion call and is not retained as an application pointer.
         '-- Root: tv.additem -> tv.item(0)
         text                    	= "FreeBasic"
+        '' FB-LINTER: DISABLE-NEXT-LINE FBL427
         tvis.item.pszText          	= strptr(text)
         tvis.item.cchTextMax       	= len(text)
         tvis.item.iImage         	= 0
@@ -83,6 +91,7 @@ function WndProc ( byval hWnd as HWND, _
 
         '-- tv.additem -> tv.item(1) | tv.children=0
         text            	  		= "Inc"
+        '' FB-LINTER: DISABLE-NEXT-LINE FBL427
         tvis.item.pszText   		= strptr(text)
         tvis.item.cchTextMax		= len(text)
         tvis.hParent        		= hPrev
@@ -90,6 +99,7 @@ function WndProc ( byval hWnd as HWND, _
 
         '-- tv.additem -> tv.item(2) | tv.children=1
         text            			= "Win"
+        '' FB-LINTER: DISABLE-NEXT-LINE FBL427
         tvis.item.pszText   		= strptr(text)
         tvis.item.cchTextMax		= len(text)
         tvis.hParent      			= hPrev
@@ -97,6 +107,7 @@ function WndProc ( byval hWnd as HWND, _
 
         '-- tv.additem -> tv.item(3) | tv.children=2
         text            = "Gui"
+        '' FB-LINTER: DISABLE-NEXT-LINE FBL427
         tvis.item.pszText   		= strptr(text)
         tvis.item.cchTextMax		= len(text)
         tvis.hParent      			= hPrev
@@ -104,6 +115,7 @@ function WndProc ( byval hWnd as HWND, _
 
         '-- tv.additem -> tv.item(4) | tv.children=0
         text            			= "Assembler"
+        '' FB-LINTER: DISABLE-NEXT-LINE FBL427
         tvis.item.pszText   		= strptr(text)
         tvis.item.cchTextMax		= len(text)
         tvis.hParent      			= TVI_ROOT
@@ -111,12 +123,14 @@ function WndProc ( byval hWnd as HWND, _
 
         '-- tv.additem -> tv.item(5) | tv.children=0
         text            			= "Tutorials"
+        '' FB-LINTER: DISABLE-NEXT-LINE FBL427
         tvis.item.pszText   		= strptr(text)
         tvis.item.cchTextMax		= len(text)
         hPrev            			= TreeView_InsertItem( htv, @tvis )
 
         '-- tv.additem -> tv.item(6) | tv.children=0
         text            			= "Object Oriented"
+        '' FB-LINTER: DISABLE-NEXT-LINE FBL427
         tvis.item.pszText   		= strptr(text)
         tvis.item.cchTextMax		= len(text)
         hPrev            			= TreeView_InsertItem( htv, @tvis )
@@ -129,7 +143,7 @@ function WndProc ( byval hWnd as HWND, _
 
 	case WM_KEYDOWN
 		if( lobyte( wParam ) = 27 ) then
-          PostMessage( hWnd, WM_CLOSE, 0, 0 )
+            PostMessage( hWnd, WM_CLOSE, 0, 0 )
         end if
 
 	case WM_DESTROY
@@ -148,7 +162,7 @@ end function
 	''
 	dim wMsg as MSG
 	dim wcls as WNDCLASS
-  	dim hWnd as HWND
+	dim hWnd as HWND
 
 	dim appName as string
 	appName = "WinTreeView"
@@ -163,6 +177,8 @@ end function
         .hCursor       = LoadCursor( null, IDC_ARROW )
         .hbrBackground = cast( HGDIOBJ, 16 ) ' btnface color
         .lpszMenuName  = null
+        '' RegisterClass consumes the class-name buffer before appName changes.
+        '' FB-LINTER: DISABLE-NEXT-LINE FBL427
         .lpszClassName = strptr( appName )
     end with
 
@@ -172,9 +188,9 @@ end function
 	end if
 
     hWnd = CreateWindowEx( 0, appName, "Treeview Demo", _
-						   WS_OVERLAPPEDWINDOW or WS_VISIBLE, _
-						   100, 100, 420, 240, _
-						   null, null, hInstance, null )
+                           WS_OVERLAPPEDWINDOW or WS_VISIBLE, _
+                           100, 100, 420, 240, _
+                           null, null, hInstance, null )
 
 	''
     '' messages loop
@@ -183,5 +199,3 @@ end function
 		TranslateMessage( @wMsg )
         DispatchMessage( @wMsg )
 	loop
-
-    end

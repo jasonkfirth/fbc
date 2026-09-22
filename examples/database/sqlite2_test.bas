@@ -40,15 +40,15 @@ declare function callback cdecl ( byval NotUsed as any ptr, _
 	db = sqlite_open( database_name, 666, @errMsg )
 
 	if db = 0 then
-  		print "Can't open database: "; *errMsg
-  		end 1
+		print "Can't open database: "; *errMsg
+		end 1
 	end if
 
 	print "Using database: "; database_name
 	print
 
 	if sqlite_exec( db, query, @callback, 0, @errMsg ) <> SQLITE_OK then
-  		print "SQL error: "; *errMsg
+		print "SQL error: "; *errMsg
 	end if
 
 	sqlite_close(db)

@@ -6,12 +6,25 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgAddGfx
 '' --------
 
+#include Once "fbgfx.bi"
+
 ''open a graphics window
-ScreenRes 320, 200, 16
+If ScreenRes(320, 200, 16) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 ''create a sprite containing a circle
 Const As Integer r = 32
-Dim c As Any Ptr = ImageCreate(r * 2 + 1, r * 2 + 1, 0)
+Dim c As fb.Image Ptr = ImageCreate(r * 2 + 1, r * 2 + 1, 0)
+
+If c = 0 Then
+	Print "Could not create the sprite"
+	Sleep
+	End 1
+End If
+
 Circle c, (r, r), r, RGB(255, 255, 192), , , 1, f
 
 ''put the sprite at three different multipier

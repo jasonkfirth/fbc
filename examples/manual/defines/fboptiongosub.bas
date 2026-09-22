@@ -8,5 +8,7 @@
 
 #if( __FB_OPTION_GOSUB__ <> 0 )
 	'' turn off gosub support
+	'' This conditional definition lesson deliberately changes the option after inspection.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-OPT-001
 	Option nogosub
 #endif

@@ -19,6 +19,8 @@ private function CInPlaceFrame_QueryInterface _
 
 	LOG_FUNC()
 
+	'' COM interface IDs are fixed binary GUID values, compared across all 16 bytes.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-MEM-005
 	if( memcmp( riid, @IID_IOleInPlaceFrame, len( GUID ) ) = 0 ) then
 		*ppvObj = @self_->interface
 		return S_OK

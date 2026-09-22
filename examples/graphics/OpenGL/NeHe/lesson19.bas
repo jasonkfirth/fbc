@@ -26,6 +26,8 @@ const SCREEN_BPP    =  16
 const MAX_PARTICLES = 1000
 
 '' This is our SDL surface
+'' The main SDL event loop owns the surface and releases it through Quit().
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared as SDL_Surface ptr surface
 
 dim shared as integer rainbow = TRUE    '' Toggle rainbow effect
@@ -63,6 +65,8 @@ type particle
 end type
 
 '' Rainbow of colors
+'' The render loop reads this immutable palette while it updates particles.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared as GLfloat colors(0 to 11, 0 to 2) = { _
     { 1.0f,  0.5f,  0.5f}, _
 	{ 1.0f,  0.75f, 0.5f}, _
@@ -78,8 +82,11 @@ dim shared as GLfloat colors(0 to 11, 0 to 2) = { _
 	{ 1.0f,  0.5f,  0.75f} }
 
 '' Our beloved array of particles
+'' The main loop owns particle lifetime; event callbacks update only shared controls.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared as particle particles(0 to MAX_PARTICLES-1)
 
+randomize timer
 
 '' function to release/destroy our resources and restoring the old desktop
 sub Quit( byval returnCode as integer )
@@ -115,8 +122,8 @@ function LoadGLTextures( ) as integer
 
 	    '' Generate The Texture
 	    glTexImage2D( GL_TEXTURE_2D, 0, 3, TextureImage(0)->w, _
-			  		  TextureImage(0)->h, 0, GL_BGR, _
-			  		  GL_UNSIGNED_BYTE, TextureImage(0)->pixels )
+		TextureImage(0)->h, 0, GL_BGR, _
+		GL_UNSIGNED_BYTE, TextureImage(0)->pixels )
 
 	    '' Linear Filtering
 	    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR )
@@ -276,7 +283,7 @@ sub handleKeyPress( byval keysym as SDL_keysym ptr )
 
 	    for i = 0 to MAX_PARTICLES-1
 			if ( particles(i).yg < 1.5f ) then _
-		    	particles(i).yg += 0.5f
+			particles(i).yg += 0.5f
 		next
 
 	case SDLK_KP2
@@ -285,7 +292,7 @@ sub handleKeyPress( byval keysym as SDL_keysym ptr )
 
 	    for i = 0 to MAX_PARTICLES-1
 			if ( particles(i).yg > -1.5f ) then _
-		    	particles(i).yg -= 0.5f
+			particles(i).yg -= 0.5f
 	    next
 
 	case SDLK_KP6
@@ -294,7 +301,7 @@ sub handleKeyPress( byval keysym as SDL_keysym ptr )
 
 	    for i = 0 to MAX_PARTICLES-1
 			if ( particles(i).xg < 1.5f ) then _
-		    	particles(i).xg += 0.5f
+			particles(i).xg += 0.5f
 	    next
 
 	case SDLK_KP4
@@ -303,7 +310,7 @@ sub handleKeyPress( byval keysym as SDL_keysym ptr )
 
 	    for i = 0 to MAX_PARTICLES-1
 			if ( particles(i).xg > -1.5f ) then _
-		    	particles(i).xg -= 0.5f
+			particles(i).xg -= 0.5f
 	    next
 
 	case SDLK_TAB
@@ -488,7 +495,7 @@ end function
     '' used to collect events
     dim as SDL_Event event
     '' this holds some info about our display
-    dim as SDL_VideoInfo ptr videoInfo
+    dim as const SDL_VideoInfo ptr videoInfo
     '' whether or not the window is active
     dim as integer isActive = TRUE
 

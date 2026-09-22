@@ -29,6 +29,11 @@
 
 #pragma once
 
+#include once "libvlc_media_player.bi"
+#include once "libvlc_media_list.bi"
+
+#include once "libvlc.bi"
+
 extern "C"
 
 const LIBVLC_MEDIA_LIST_PLAYER_H = 1

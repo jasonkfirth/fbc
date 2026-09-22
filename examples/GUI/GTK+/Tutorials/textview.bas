@@ -88,12 +88,20 @@ End Sub
   gtk_text_buffer_insert (buffer, @iter, !" and ...\n\n\n", -1)
 
   ' Load the file text.bas into the text window
+  Const MAX_TEXT_FILE_BYTES = 4 * 1024 * 1024
   Var inbuf = "", fnam = "textview.bas", infile = Freefile
   If Open (fnam For Input As #infile) Then
     inbuf = "Cannot open " & fnam & "!"
   Else
-    inbuf = String(Lof(infile), 0)
-    Get #infile, , inbuf
+    Dim As LongInt file_size = Lof(infile)
+
+    If file_size > MAX_TEXT_FILE_BYTES Then
+      inbuf = fnam & " is too large to display!"
+    ElseIf file_size > 0 Then
+      inbuf = String(file_size, 0)
+      If Get(#infile, , inbuf) <> 0 Then inbuf = "Cannot read " & fnam & "!"
+    End If
+
     Close #infile
   End If
   gtk_text_buffer_insert (buffer, @iter, inbuf, -1)

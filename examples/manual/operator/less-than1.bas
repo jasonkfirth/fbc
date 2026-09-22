@@ -7,7 +7,7 @@
 '' --------
 
 Const size As Integer = 4
-Dim array(size - 1) As Integer = { 1, 2, 3, 4 }
+Dim array(0 To size - 1) As Integer = { 1, 2, 3, 4 }
 
 Dim index As Integer = 0
 While (index < size)

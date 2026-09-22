@@ -1,7 +1,7 @@
 #include once "Fl_Widget.bi"
 
-#define FL_VERTICAL	0 
-#define FL_HORIZONTAL	1 
+#define FL_VERTICAL	0
+#define FL_HORIZONTAL	1
 
 extern "c++"
 type Fl_Valuator extends Fl_Widget field=4

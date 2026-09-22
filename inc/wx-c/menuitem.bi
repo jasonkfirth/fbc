@@ -3,7 +3,7 @@
 
 #Include Once "common.bi"
 
-Declare Function wxMenuItem_ctor WXCALL Alias "wxMenuItem_ctor" (parentMenu As wxMenu Ptr, _ 
+Declare Function wxMenuItem_ctor WXCALL Alias "wxMenuItem_ctor" (parentMenu As wxMenu Ptr, _
                      id         As  wxInt, _
                      txt        As wxString Ptr, _
                      helpString As wxString Ptr, _

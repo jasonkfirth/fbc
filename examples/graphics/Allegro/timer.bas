@@ -5,6 +5,8 @@
 
 #include "allegro.bi"
 
+'' Allegro timer callbacks update the three displayed counters.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared as integer x, y, z
 
 '' timer interrupt handler
@@ -14,12 +16,12 @@ end sub
 
 '' timer interrupt handler
 sub inc_y cdecl ()
-   	y += 1
+	y += 1
 end sub
 
 '' timer interrupt handler
 sub inc_z cdecl ()
-   	z += 1
+	z += 1
 end sub
 
 	allegro_init()

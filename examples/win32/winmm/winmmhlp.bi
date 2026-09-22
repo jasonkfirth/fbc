@@ -1,3 +1,5 @@
+#ifndef FB_EXAMPLES_WIN32_WINMM_WINMMHLP_BI
+#define FB_EXAMPLES_WIN32_WINMM_WINMMHLP_BI
 
 
 declare function winmmCreate as integer
@@ -11,3 +13,5 @@ declare function winmmInitWave as integer
 declare function winmmEndWave as integer
 declare function winmmPlayWave( byval filename as string ) as integer
 declare function winmmStopWave as integer
+
+#endif

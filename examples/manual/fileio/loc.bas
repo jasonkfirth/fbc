@@ -17,7 +17,7 @@ Print "Sending command: AT"
 
 Print #1, "AT" + Chr(13, 10);
 
-Sleep 500,1
+Sleep 500, 1
 
 Print "Response:"
 

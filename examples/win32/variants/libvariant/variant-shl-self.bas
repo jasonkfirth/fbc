@@ -11,13 +11,15 @@ operator VARIANT.shl= _
 
 	dim as VARIANT_ res = any, tmp = any
 
+	VariantInit( @res )
+	VariantInit( @tmp )
 	V_VT(@tmp) = VT_I4
 	V_I4(@tmp) = 1 shl cint( rhs )
 
-	VarMul( @this.var_, @tmp, @res )
-
-	VariantClear( @this.var_ )
-	this.var_ = res
+	if VarMul( @this.var_, @tmp, @res ) = 0 then
+		VariantClear( @this.var_ )
+		this.var_ = res
+	end if
 
 	VariantClear( @tmp )
 
@@ -31,13 +33,15 @@ operator VARIANT.shl= _
 
 	dim as VARIANT_ res = any, tmp = any
 
+	VariantInit( @res )
+	VariantInit( @tmp )
 	V_VT(@tmp) = VT_I4
 	V_I4(@tmp) = 1 shl rhs
 
-	VarMul( @this.var_, @tmp, @res )
-
-	VariantClear( @this.var_ )
-	this.var_ = res
+	if VarMul( @this.var_, @tmp, @res ) = 0 then
+		VariantClear( @this.var_ )
+		this.var_ = res
+	end if
 
 	VariantClear( @tmp )
 

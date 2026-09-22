@@ -10,7 +10,7 @@ type Fl_Menu_ extends Fl_Widget
 private:
 	menu_ as Fl_Menu_Item ptr
 	value_ as const Fl_Menu_Item ptr
-	
+
 	declare constructor (byref w as const Fl_Menu_)
 	declare operator let (byref w as const Fl_Menu_)
 protected:
@@ -50,8 +50,8 @@ public:
 	declare function clear_submenu(index as long) as long
 	declare sub replace(as long,as const zstring ptr)
 	declare sub remove(as long)
-	declare sub shortcut(i as long, s as long) 
-	declare sub mode(i as long, fl as long) 
+	declare sub shortcut(i as long, s as long)
+	declare sub mode(i as long, fl as long)
 	declare const function mode(i as long) as long
 	declare const function mvalue() as const Fl_Menu_Item ptr
 	declare const function value() as long

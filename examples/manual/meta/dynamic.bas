@@ -14,3 +14,8 @@
 Dim a(100)
 '......
 ReDim a(200)
+
+'' Dynamic storage has the current ReDim bounds rather than fixed DIM bounds.
+'' ReDim a(200) above establishes a nonempty zero-based array for this query.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
+Print LBound(a), UBound(a)

@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include once "iup.bi"
+
 #inclib "iupgl"
 
 extern "C"

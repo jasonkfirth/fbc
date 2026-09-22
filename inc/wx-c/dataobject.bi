@@ -8,7 +8,7 @@ Declare Sub wxDataObject_dtor WXCALL Alias "wxDataObject_dtor" (self As wxDataOb
 Declare Sub wxDataObject_GetPreferredFormat WXCALL Alias "wxDataObject_GetPreferredFormat" (self As wxDataObject Ptr, datadir As wxDataObjectDirection, datafmt As wxDataFormat Ptr)
 Declare Function wxDataObject_GetFormatCount WXCALL Alias "wxDataObject_GetFormatCount" (self As wxDataObject Ptr, datadir As wxDataObjectDirection) As size_t
 Declare Sub wxDataObject_GetAllFormats WXCALL Alias "wxDataObject_GetAllFormats" (self As wxDataObject Ptr, formats As wxDataFormat Ptr, datadir As wxDataObjectDirection)
-Declare Function wxDataObject_GetDataSize WXCALL Alias "wxDataObject_GetDataSize" (self As wxDataObject Ptr, datafmt As wxDataFormat Ptr) As size_t 
+Declare Function wxDataObject_GetDataSize WXCALL Alias "wxDataObject_GetDataSize" (self As wxDataObject Ptr, datafmt As wxDataFormat Ptr) As size_t
 Declare Function wxDataObject_GetDataHere WXCALL Alias "wxDataObject_GetDataHere" (self As wxDataObject Ptr, datafmt As wxDataFormat Ptr, pBuffer As Any Ptr) As wxBool
 Declare Function wxDataObject_SetData WXCALL Alias "wxDataObject_SetData" (self As wxDataObject Ptr, datafmt As wxDataFormat Ptr, length As size_t, pBuffer As Any Ptr) As wxBool
 Declare Function wxDataObject_IsSupported WXCALL Alias "wxDataObject_IsSupported" (self As wxDataObject Ptr, datafmt As wxDataFormat Ptr, datadir As wxDataObjectDirection) As wxBool

@@ -12,10 +12,17 @@
 
 Option Escape
 
+'' These backslashes are the values demonstrated by OPTION ESCAPE.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-OPT-005
 Print "Warning \a\t The path is:\r\n c:\\Freebasic\\Examples"
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-OPT-005
 Print $"This string doesn't have expanded escape sequences: \r\n\t"
 
 #include "crt.bi"
 
-Dim As Integer a = 2, b = 3
-printf("%d * %d = %d\r\n", a, b, a * b)
+Dim As Long a = 2
+Dim As Long b = 3
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-OPT-005
+printf("%d * %d = %d\r\n", a, b, CLng(a * b))
+
+'' end of option-escape.bas

@@ -29,7 +29,11 @@
 #include once "windows.bi"
 #include once "objbase.bi"
 #include once "mmsystem.bi"
-#include once "dmusici.bi"
+
+#ifndef __REFERENCE_TIME_DEFINED
+#define __REFERENCE_TIME_DEFINED
+type REFERENCE_TIME as LONGLONG
+#endif
 
 extern "Windows"
 

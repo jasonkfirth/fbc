@@ -760,7 +760,8 @@ private function hMultithread_cb _
 		byval sym as FBSYMBOL ptr _
 	) as integer
 
-	if( (env.clopt.target = FB_COMPTARGET_DOS) or _
+	'' The driver accepts DOS -mt only with an explicit native provider.
+	if( ((env.clopt.target = FB_COMPTARGET_DOS) and (env.clopt.multithreaded = FALSE)) or _
 		(env.clopt.target = FB_COMPTARGET_JS) ) then
 		errReport( FB_ERRMSG_UNSUPPORTEDFUNCTION )
 		return FALSE
@@ -787,6 +788,12 @@ private function hThreadCall_cb _
 
 	'' minor optimization to avoid having to lookup env.libs hash
 	fbRestartableStaticVariable( integer, libsAdded, FALSE )
+
+	'' The native DOS provider supports ThreadCreate, but has no libffi ABI.
+	if( env.clopt.target = FB_COMPTARGET_DOS ) then
+		errReport( FB_ERRMSG_UNSUPPORTEDFUNCTION )
+		return FALSE
+	end if
 
 	if( hMultithread_cb( sym ) = FALSE ) then
 		return FALSE

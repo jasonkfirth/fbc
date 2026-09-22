@@ -72,7 +72,8 @@ function InitDirectDraw( byval hWnd as HWND ) as long
 	end if
 
 	' create the primary surface with 1 back-buffer
-	clear ddsd, 0, len( ddsd )
+	' DirectDraw expects every undocumented field in this C ABI structure to be zero.
+	memset( @ddsd, 0, sizeof( ddsd ) )
 	with ddsd
 		.dwSize             = len( ddsd )
 		.dwFlags            = DDSD_CAPS or DDSD_BACKBUFFERCOUNT
@@ -85,7 +86,8 @@ function InitDirectDraw( byval hWnd as HWND ) as long
 	end if
 
 	'' get a pointer to the back buffer
-	clear ddscaps, 0, len( ..ddscaps )
+	' DDSCAPS2 is likewise a plain DirectDraw ABI structure, not an FB managed object.
+	memset( @ddscaps, 0, sizeof( DDSCAPS2 ) )
 	ddscaps.dwCaps          = DDSCAPS_BACKBUFFER
 
 	if( IDirectDrawSurface7_GetAttachedSurface( pDDSFront, @ddscaps, @pDDSBack ) <> DD_OK ) then
@@ -249,6 +251,8 @@ function WinMain _
 		.hCursor        = LoadCursor( NULL, IDC_ARROW )
 		.hbrBackground  = GetStockObject( BLACK_BRUSH )
 		.lpszMenuName   = NULL
+		'' appName remains alive through this synchronous RegisterClass call.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL427
 		.lpszClassName  = strptr( appName )
 	end with
 

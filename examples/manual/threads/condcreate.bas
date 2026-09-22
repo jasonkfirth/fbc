@@ -19,7 +19,7 @@ Dim Shared hmutexready As Any Ptr
 Dim Shared hcondready As Any Ptr
 
 Sub mythread(ByVal id_ptr As Any Ptr)
-	Dim id As Integer = Cast(Integer, id_ptr)
+	Dim id As Integer = CInt(Cast(UInteger, id_ptr))
 
 	'' signal that this thread is ready
 	MutexLock hmutexready

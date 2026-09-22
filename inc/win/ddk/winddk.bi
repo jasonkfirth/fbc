@@ -15,29 +15,29 @@
 #include once "win/ntdef.bi"
 #include once "win/basetyps.bi"
 #include once "ddk_ntstatus.bi"
+#include once "win/rpcbase.bi"
 
 #define DDKAPI stdcall
 #undef Absolute
 
-type PCSZ as zstring ptr
 type _CSHORT as short
 type PADAPTER_OBJECT as _ADAPTER_OBJECT ptr
 type PDMA_ADAPTER as _DMA_ADAPTER ptr
 type PIO_STATUS_BLOCK as _IO_STATUS_BLOCK ptr
 type PSECTION_OBJECT as _SECTION_OBJECT ptr
-type WAIT_TYPE as ULONG
 type TRACEHANDLE as HANDLE
 type PWMILIB_CONTEXT as PVOID
 type PSYSCTL_IRP_DISPOSITION as PVOID
-type LOGICAL as ULONG
 type KPRIORITY as LONG
 type KIRQL as UCHAR
 type PKIRQL as UCHAR ptr
-type KSPIN_LOCK as ULONG_PTR
-type PKSPIN_LOCK as ULONG_PTR ptr
-type KAFFINITY as ULONG
-type PKAFFINITY as ULONG ptr
-type KPROCESSOR_MODE as CCHAR
+'' CCHAR is a string alias in the shared legacy binding.  Kernel mode and
+'' stack-count fields are one-byte integer values in the DDK ABI.
+type KPROCESSOR_MODE as byte
+enum SECTION_INHERIT
+	ViewShare = 1
+	ViewUnmap
+end enum
 type DEVICE_OBJECT as _DEVICE_OBJECT
 type PDEVICE_OBJECT as DEVICE_OBJECT ptr
 type IRP as _IRP
@@ -123,8 +123,6 @@ type PPNP_DEVICE_STATE as ULONG ptr
 type IO_ALLOCATION_ACTION as _IO_ALLOCATION_ACTION
 type PIO_ALLOCATION_ACTION as IO_ALLOCATION_ACTION ptr
 
-#define MAXIMUM_PROCESSORS 32
-#define MAXIMUM_WAIT_OBJECTS 64
 #define METHOD_BUFFERED 0
 #define METHOD_IN_DIRECT 1
 #define METHOD_OUT_DIRECT 2
@@ -139,81 +137,11 @@ type PIO_ALLOCATION_ACTION as IO_ALLOCATION_ACTION ptr
 #define FILE_OVERWRITTEN &h00000003
 #define FILE_EXISTS &h00000004
 #define FILE_DOES_NOT_EXIST &h00000005
-#define FILE_LIST_DIRECTORY &h00000001
-#define FILE_READ_DATA &h00000001
-#define FILE_ADD_FILE &h00000002
-#define FILE_WRITE_DATA &h00000002
-#define FILE_ADD_SUBDIRECTORY &h00000004
-#define FILE_APPEND_DATA &h00000004
-#define FILE_CREATE_PIPE_INSTANCE &h00000004
-#define FILE_READ_EA &h00000008
-#define FILE_WRITE_EA &h00000010
-#define FILE_EXECUTE &h00000020
-#define FILE_TRAVERSE &h00000020
-#define FILE_DELETE_CHILD &h00000040
-#define FILE_READ_ATTRIBUTES &h00000080
-#define FILE_WRITE_ATTRIBUTES &h00000100
-#define FILE_SHARE_READ &h00000001
-#define FILE_SHARE_WRITE &h00000002
-#define FILE_SHARE_DELETE &h00000004
-#define FILE_SHARE_VALID_FLAGS &h00000007
-#define FILE_ATTRIBUTE_READONLY &h00000001
-#define FILE_ATTRIBUTE_HIDDEN &h00000002
-#define FILE_ATTRIBUTE_SYSTEM &h00000004
-#define FILE_ATTRIBUTE_DIRECTORY &h00000010
-#define FILE_ATTRIBUTE_ARCHIVE &h00000020
-#define FILE_ATTRIBUTE_DEVICE &h00000040
-#define FILE_ATTRIBUTE_NORMAL &h00000080
-#define FILE_ATTRIBUTE_TEMPORARY &h00000100
-#define FILE_ATTRIBUTE_SPARSE_FILE &h00000200
-#define FILE_ATTRIBUTE_REPARSE_POINT &h00000400
-#define FILE_ATTRIBUTE_COMPRESSED &h00000800
-#define FILE_ATTRIBUTE_OFFLINE &h00001000
-#define FILE_ATTRIBUTE_NOT_CONTENT_INDEXED &h00002000
-#define FILE_ATTRIBUTE_ENCRYPTED &h00004000
-#define FILE_ATTRIBUTE_VALID_FLAGS &h00007fb7
-#define FILE_ATTRIBUTE_VALID_SET_FLAGS &h000031a7
-#define FILE_COPY_STRUCTURED_STORAGE &h00000041
-#define FILE_STRUCTURED_STORAGE &h00000441
-#define FILE_VALID_OPTION_FLAGS &h00ffffff
-#define FILE_VALID_PIPE_OPTION_FLAGS &h00000032
-#define FILE_VALID_MAILSLOT_OPTION_FLAGS &h00000032
-#define FILE_VALID_SET_FLAGS &h00000036
-#define FILE_SUPERSEDE &h00000000
-#define FILE_OPEN &h00000001
-#define FILE_CREATE &h00000002
-#define FILE_OPEN_IF &h00000003
-#define FILE_OVERWRITE &h00000004
-#define FILE_OVERWRITE_IF &h00000005
-#define FILE_MAXIMUM_DISPOSITION &h00000005
-#define FILE_DIRECTORY_FILE &h00000001
-#define FILE_WRITE_THROUGH &h00000002
-#define FILE_SEQUENTIAL_ONLY &h00000004
-#define FILE_NO_INTERMEDIATE_BUFFERING &h00000008
-#define FILE_SYNCHRONOUS_IO_ALERT &h00000010
-#define FILE_SYNCHRONOUS_IO_NONALERT &h00000020
-#define FILE_NON_DIRECTORY_FILE &h00000040
-#define FILE_CREATE_TREE_CONNECTION &h00000080
-#define FILE_COMPLETE_IF_OPLOCKED &h00000100
-#define FILE_NO_EA_KNOWLEDGE &h00000200
 #define FILE_OPEN_FOR_RECOVERY &h00000400
-#define FILE_RANDOM_ACCESS &h00000800
-#define FILE_DELETE_ON_CLOSE &h00001000
-#define FILE_OPEN_BY_FILE_ID &h00002000
-#define FILE_OPEN_FOR_BACKUP_INTENT &h00004000
-#define FILE_NO_COMPRESSION &h00008000
-#define FILE_RESERVE_OPFILTER &h00100000
-#define FILE_OPEN_REPARSE_POINT &h00200000
-#define FILE_OPEN_NO_RECALL &h00400000
-#define FILE_OPEN_FOR_FREE_SPACE_QUERY &h00800000
 #define FILE_ANY_ACCESS &h00000000
 #define FILE_SPECIAL_ACCESS &h00000000
 #define FILE_READ_ACCESS &h00000001
 #define FILE_WRITE_ACCESS &h00000002
-#define FILE_ALL_ACCESS (&hF0000 or &h100000L or &h1FF)
-#define FILE_GENERIC_EXECUTE (&h20000 or &h00000080 or &h00000020 or &h100000L)
-#define FILE_GENERIC_READ (&h20000 or &h00000001 or &h00000080 or &h00000008 or &h100000L)
-#define FILE_GENERIC_WRITE (&h20000 or &h00000002 or &h00000100 or &h00000010 or &h00000004 or &h100000L)
 #define DIRECTORY_QUERY (&h0001)
 #define DIRECTORY_TRAVERSE (&h0002)
 #define DIRECTORY_CREATE_OBJECT (&h0004)
@@ -528,8 +456,6 @@ end enum
 
 #define SYMBOLIC_LINK_QUERY &h0001
 #define SYMBOLIC_LINK_ALL_ACCESS (&hF0000 or &h1)
-#define DUPLICATE_CLOSE_SOURCE &h00000001
-#define DUPLICATE_SAME_ACCESS &h00000002
 #define DUPLICATE_SAME_ATTRIBUTES &h00000004
 
 type _OBJECT_NAME_INFORMATION
@@ -563,7 +489,7 @@ type _KAPC
 	NormalContext as PVOID
 	SystemArgument1 as PVOID
 	SystemArgument2 as PVOID
-	ApcStateIndex as CCHAR
+	ApcStateIndex as byte
 	ApcMode as KPROCESSOR_MODE
 	Inserted as BOOLEAN
 end type
@@ -781,13 +707,6 @@ type KMUTEX as _KMUTANT
 type PKMUTEX as _KMUTANT ptr
 type PRKMUTEX as _KMUTANT ptr
 
-enum _TIMER_TYPE
-	NotificationTimer
-	SynchronizationTimer
-end enum
-
-type TIMER_TYPE as _TIMER_TYPE
-
 #define EVENT_INCREMENT 1
 #define IO_NO_INCREMENT 0
 #define IO_CD_ROM_INCREMENT 1
@@ -874,7 +793,7 @@ type _IRP
 	CurrentLocation as CHAR
 	Cancel as BOOLEAN
 	CancelIrql as KIRQL
-	ApcEnvironment as CCHAR
+	ApcEnvironment as byte
 	AllocationFlags as UCHAR
 	union
 		UserIosb as PIO_STATUS_BLOCK
@@ -906,7 +825,7 @@ end type
 #define SL_WATCH_TREE &h01
 #define SL_ALLOW_RAW_MOUNT &h01
 
-enum 
+enum
 	IRP_NOCACHE = &h1
 	IRP_PAGING_IO = &h2
 	IRP_MOUNT_COMPLETION = &h2
@@ -1361,29 +1280,6 @@ end type
 type CM_MCA_POS_DATA as _CM_MCA_POS_DATA
 type PCM_MCA_POS_DATA as _CM_MCA_POS_DATA ptr
 
-type CM_Power_Data_s
-	PD_Size as ULONG
-	PD_MostRecentPowerState as DEVICE_POWER_STATE
-	PD_Capabilities as ULONG
-	PD_D1Latency as ULONG
-	PD_D2Latency as ULONG
-	PD_D3Latency as ULONG
-	PD_PowerStateMapping(0 to PowerSystemMaximum-1) as DEVICE_POWER_STATE
-end type
-
-type CM_POWER_DATA as CM_Power_Data_s
-type PCM_POWER_DATA as CM_Power_Data_s ptr
-
-#define PDCAP_D0_SUPPORTED &h00000001
-#define PDCAP_D1_SUPPORTED &h00000002
-#define PDCAP_D2_SUPPORTED &h00000004
-#define PDCAP_D3_SUPPORTED &h00000008
-#define PDCAP_WAKE_FROM_D0_SUPPORTED &h00000010
-#define PDCAP_WAKE_FROM_D1_SUPPORTED &h00000020
-#define PDCAP_WAKE_FROM_D2_SUPPORTED &h00000040
-#define PDCAP_WAKE_FROM_D3_SUPPORTED &h00000080
-#define PDCAP_WARM_EJECT_SUPPORTED &h00000100
-
 type _CM_SCSI_DEVICE_DATA
 	Version as USHORT
 	Revision as USHORT
@@ -1695,7 +1591,7 @@ type _DEVICE_OBJECT
 	Vpb as PVPB
 	DeviceExtension as PVOID
 	DeviceType as ULONG
-	StackSize as CCHAR
+	StackSize as byte
 	AlignmentRequirement as ULONG
 	DeviceQueue as KDEVICE_QUEUE
 	Dpc as KDPC
@@ -2619,20 +2515,6 @@ end enum
 
 type KEY_VALUE_INFORMATION_CLASS as _KEY_VALUE_INFORMATION_CLASS
 
-#define REG_NONE 0
-#define REG_SZ 1
-#define REG_EXPAND_SZ 2
-#define REG_BINARY 3
-#define REG_DWORD 4
-#define REG_DWORD_LITTLE_ENDIAN 4
-#define REG_DWORD_BIG_ENDIAN 5
-#define REG_LINK 6
-#define REG_MULTI_SZ 7
-#define REG_RESOURCE_LIST 8
-#define REG_FULL_RESOURCE_DESCRIPTOR 9
-#define REG_RESOURCE_REQUIREMENTS_LIST 10
-#define REG_QWORD 11
-#define REG_QWORD_LITTLE_ENDIAN 11
 #define PCI_TYPE0_ADDRESSES 6
 #define PCI_TYPE1_ADDRESSES 2
 #define PCI_TYPE2_ADDRESSES 5
@@ -2809,57 +2691,6 @@ enum _EX_POOL_PRIORITY
 end enum
 
 type EX_POOL_PRIORITY as _EX_POOL_PRIORITY
-
-#define PRIVILEGE_SET_ALL_NECESSARY 1
-
-type _RTL_OSVERSIONINFOW
-	dwOSVersionInfoSize as ULONG
-	dwMajorVersion as ULONG
-	dwMinorVersion as ULONG
-	dwBuildNumber as ULONG
-	dwPlatformId as ULONG
-	szCSDVersion(0 to 128-1) as WCHAR
-end type
-
-type RTL_OSVERSIONINFOW as _RTL_OSVERSIONINFOW
-type PRTL_OSVERSIONINFOW as _RTL_OSVERSIONINFOW ptr
-
-type _RTL_OSVERSIONINFOEXW
-	dwOSVersionInfoSize as ULONG
-	dwMajorVersion as ULONG
-	dwMinorVersion as ULONG
-	dwBuildNumber as ULONG
-	dwPlatformId as ULONG
-	szCSDVersion(0 to 128-1) as WCHAR
-	wServicePackMajor as USHORT
-	wServicePackMinor as USHORT
-	wSuiteMask as USHORT
-	wProductType as UCHAR
-	wReserved as UCHAR
-end type
-
-type RTL_OSVERSIONINFOEXW as _RTL_OSVERSIONINFOEXW
-type PRTL_OSVERSIONINFOEXW as _RTL_OSVERSIONINFOEXW ptr
-
-
-
-#define VER_MINORVERSION &h0000001
-#define VER_MAJORVERSION &h0000002
-#define VER_BUILDNUMBER &h0000004
-#define VER_PLATFORMID &h0000008
-#define VER_SERVICEPACKMINOR &h0000010
-#define VER_SERVICEPACKMAJOR &h0000020
-#define VER_SUITENAME &h0000040
-#define VER_PRODUCT_TYPE &h0000080
-#define VER_EQUAL 1
-#define VER_GREATER 2
-#define VER_GREATER_EQUAL 3
-#define VER_LESS 4
-#define VER_LESS_EQUAL 5
-#define VER_AND 6
-#define VER_OR 7
-#define VER_CONDITION_MASK 7
-#define VER_NUM_BITS_PER_CONDITION_MASK 3
 
 type _RTL_BITMAP
 	SizeOfBitMap as ULONG
@@ -3040,13 +2871,6 @@ type PPAGED_LOOKASIDE_LIST as _PAGED_LOOKASIDE_LIST ptr
 
 type PCALLBACK_OBJECT as _CALLBACK_OBJECT ptr
 type PCALLBACK_FUNCTION as sub DDKAPI(byval as PVOID, byval as PVOID, byval as PVOID)
-
-enum _EVENT_TYPE
-	NotificationEvent
-	SynchronizationEvent
-end enum
-
-type EVENT_TYPE as _EVENT_TYPE
 
 enum _KWAIT_REASON
 	Executive
@@ -3458,12 +3282,6 @@ end enum
 
 type THREADINFOCLASS as _THREADINFOCLASS
 
-#define ES_SYSTEM_REQUIRED &h00000001
-#define ES_DISPLAY_REQUIRED &h00000002
-#define ES_USER_PRESENT &h00000004
-#define ES_CONTINUOUS &h80000000
-
-type EXECUTION_STATE as ULONG
 type PREQUEST_POWER_COMPLETE as sub DDKAPI(byval as PDEVICE_OBJECT, byval as UCHAR, byval as POWER_STATE, byval as PVOID, byval as PIO_STATUS_BLOCK)
 
 enum _TRACE_INFORMATION_CLASS
@@ -3792,17 +3610,15 @@ declare function InterlockedIncrement DDKAPI alias "InterlockedIncrement" (byval
 #ifndef InterlockedDecrement
 declare function InterlockedDecrement DDKAPI alias "InterlockedDecrement" (byval Addend as PLONG) as LONG
 #endif
-#ifndef InterlockedCompareExchange 
+#ifndef InterlockedCompareExchange
 declare function InterlockedCompareExchange DDKAPI alias "InterlockedCompareExchange" (byval Destination as PLONG, byval Exchange as LONG, byval Comparand as LONG) as LONG
 #endif
-#ifndef InterlockedExchange 
+#ifndef InterlockedExchange
 declare function InterlockedExchange DDKAPI alias "InterlockedExchange" (byval Target as PLONG, byval Value as LONG) as LONG
 #endif
-#ifndef InterlockedExchangeAdd 
+#ifndef InterlockedExchangeAdd
 declare function InterlockedExchangeAdd DDKAPI alias "InterlockedExchangeAdd" (byval Addend as PLONG, byval Value as LONG) as LONG
 #endif
-declare function InterlockedPopEntrySList DDKAPI alias "InterlockedPopEntrySList" (byval ListHead as PSLIST_HEADER) as PSINGLE_LIST_ENTRY
-declare function InterlockedPushEntrySList DDKAPI alias "InterlockedPushEntrySList" (byval ListHead as PSLIST_HEADER, byval ListEntry as PSINGLE_LIST_ENTRY) as PSINGLE_LIST_ENTRY
 declare sub KefAcquireSpinLockAtDpcLevel DDKAPI alias "KefAcquireSpinLockAtDpcLevel" (byval SpinLock as PKSPIN_LOCK)
 declare sub KefReleaseSpinLockFromDpcLevel DDKAPI alias "KefReleaseSpinLockFromDpcLevel" (byval SpinLock as PKSPIN_LOCK)
 declare sub RtlAssert DDKAPI alias "RtlAssert" (byval FailedAssertion as PVOID, byval FileName as PVOID, byval LineNumber as ULONG, byval Message as PCHAR)
@@ -3822,7 +3638,6 @@ declare function RtlCheckRegistryKey DDKAPI alias "RtlCheckRegistryKey" (byval R
 declare sub RtlClearAllBits DDKAPI alias "RtlClearAllBits" (byval BitMapHeader as PRTL_BITMAP)
 declare sub RtlClearBit DDKAPI alias "RtlClearBit" (byval BitMapHeader as PRTL_BITMAP, byval BitNumber as ULONG)
 declare sub RtlClearBits DDKAPI alias "RtlClearBits" (byval BitMapHeader as PRTL_BITMAP, byval StartingIndex as ULONG, byval NumberToClear as ULONG)
-declare function RtlCompareMemory DDKAPI alias "RtlCompareMemory" (byval Source1 as any ptr, byval Source2 as any ptr, byval Length as SIZE_T) as SIZE_T
 declare function RtlCompareString DDKAPI alias "RtlCompareString" (byval String1 as PSTRING, byval String2 as PSTRING, byval CaseInSensitive as BOOLEAN) as LONG
 declare function RtlCompareUnicodeString DDKAPI alias "RtlCompareUnicodeString" (byval String1 as PUNICODE_STRING, byval String2 as PUNICODE_STRING, byval CaseInSensitive as BOOLEAN) as LONG
 declare function RtlConvertLongToLargeInteger DDKAPI alias "RtlConvertLongToLargeInteger" (byval SignedInteger as LONG) as LARGE_INTEGER
@@ -3846,9 +3661,9 @@ declare function RtlFindClearBitsAndSet DDKAPI alias "RtlFindClearBitsAndSet" (b
 declare function RtlFindClearRuns DDKAPI alias "RtlFindClearRuns" (byval BitMapHeader as PRTL_BITMAP, byval RunArray as PRTL_BITMAP_RUN, byval SizeOfRunArray as ULONG, byval LocateLongestRuns as BOOLEAN) as ULONG
 declare function RtlFindFirstRunClear DDKAPI alias "RtlFindFirstRunClear" (byval BitMapHeader as PRTL_BITMAP, byval StartingIndex as PULONG) as ULONG
 declare function RtlFindLastBackwardRunClear DDKAPI alias "RtlFindLastBackwardRunClear" (byval BitMapHeader as PRTL_BITMAP, byval FromIndex as ULONG, byval StartingRunIndex as PULONG) as ULONG
-declare function RtlFindLeastSignificantBit DDKAPI alias "RtlFindLeastSignificantBit" (byval Set as ULONGLONG) as CCHAR
+declare function RtlFindLeastSignificantBit DDKAPI alias "RtlFindLeastSignificantBit" (byval Set as ULONGLONG) as byte
 declare function RtlFindLongestRunClear DDKAPI alias "RtlFindLongestRunClear" (byval BitMapHeader as PRTL_BITMAP, byval StartingIndex as PULONG) as ULONG
-declare function RtlFindMostSignificantBit DDKAPI alias "RtlFindMostSignificantBit" (byval Set as ULONGLONG) as CCHAR
+declare function RtlFindMostSignificantBit DDKAPI alias "RtlFindMostSignificantBit" (byval Set as ULONGLONG) as byte
 declare function RtlFindNextForwardRunClear DDKAPI alias "RtlFindNextForwardRunClear" (byval BitMapHeader as PRTL_BITMAP, byval FromIndex as ULONG, byval StartingRunIndex as PULONG) as ULONG
 declare function RtlFindRange DDKAPI alias "RtlFindRange" (byval RangeList as PRTL_RANGE_LIST, byval Minimum as ULONGLONG, byval Maximum as ULONGLONG, byval Length as ULONG, byval Alignment as ULONG, byval Flags as ULONG, byval AttributeAvailableMask as UCHAR, byval Context as PVOID, byval Callback as PRTL_CONFLICT_RANGE_CALLBACK, byval Start as PULONGLONG) as NTSTATUS
 declare function RtlFindSetBits DDKAPI alias "RtlFindSetBits" (byval BitMapHeader as PRTL_BITMAP, byval NumberToFind as ULONG, byval HintIndex as ULONG) as ULONG
@@ -3979,7 +3794,6 @@ declare sub ExSystemTimeToLocalTime DDKAPI alias "ExSystemTimeToLocalTime" (byva
 declare function ExTryToAcquireFastMutex DDKAPI alias "ExTryToAcquireFastMutex" (byval FastMutex as PFAST_MUTEX) as BOOLEAN
 declare function ExTryToAcquireResourceExclusiveLite DDKAPI alias "ExTryToAcquireResourceExclusiveLite" (byval Resource as PERESOURCE) as BOOLEAN
 declare sub ExUnregisterCallback DDKAPI alias "ExUnregisterCallback" (byval CbRegistration as PVOID)
-declare function ExUuidCreate DDKAPI alias "ExUuidCreate" (byval Uuid as UUID ptr) as NTSTATUS
 declare function ExVerifySuite DDKAPI alias "ExVerifySuite" (byval SuiteType as SUITE_TYPE) as BOOLEAN
 declare sub ProbeForRead DDKAPI alias "ProbeForRead" (byval Address as any ptr, byval Length as ULONG, byval Alignment as ULONG)
 declare sub ProbeForWrite DDKAPI alias "ProbeForWrite" (byval Address as any ptr, byval Length as ULONG, byval Alignment as ULONG)
@@ -4016,7 +3830,7 @@ declare function IoAcquireRemoveLockEx DDKAPI alias "IoAcquireRemoveLockEx" (byv
 declare sub IoAllocateController DDKAPI alias "IoAllocateController" (byval ControllerObject as PCONTROLLER_OBJECT, byval DeviceObject as PDEVICE_OBJECT, byval ExecutionRoutine as PDRIVER_CONTROL, byval Context as PVOID)
 declare function IoAllocateDriverObjectExtension DDKAPI alias "IoAllocateDriverObjectExtension" (byval DriverObject as PDRIVER_OBJECT, byval ClientIdentificationAddress as PVOID, byval DriverObjectExtensionSize as ULONG, byval DriverObjectExtension as PVOID ptr) as NTSTATUS
 declare function IoAllocateErrorLogEntry DDKAPI alias "IoAllocateErrorLogEntry" (byval IoObject as PVOID, byval EntrySize as UCHAR) as PVOID
-declare function IoAllocateIrp DDKAPI alias "IoAllocateIrp" (byval StackSize as CCHAR, byval ChargeQuota as BOOLEAN) as PIRP
+declare function IoAllocateIrp DDKAPI alias "IoAllocateIrp" (byval StackSize as byte, byval ChargeQuota as BOOLEAN) as PIRP
 declare function IoAllocateMdl DDKAPI alias "IoAllocateMdl" (byval VirtualAddress as PVOID, byval Length as ULONG, byval SecondaryBuffer as BOOLEAN, byval ChargeQuota as BOOLEAN, byval Irp as PIRP) as PMDL
 declare function IoAllocateWorkItem DDKAPI alias "IoAllocateWorkItem" (byval DeviceObject as PDEVICE_OBJECT) as PIO_WORKITEM
 declare function IoAttachDevice DDKAPI alias "IoAttachDevice" (byval SourceDevice as PDEVICE_OBJECT, byval TargetDevice as PUNICODE_STRING, byval AttachedDevice as PDEVICE_OBJECT ptr) as NTSTATUS
@@ -4029,7 +3843,7 @@ declare function IofCallDriver DDKAPI alias "IofCallDriver" (byval DeviceObject 
 declare sub IoCancelFileOpen DDKAPI alias "IoCancelFileOpen" (byval DeviceObject as PDEVICE_OBJECT, byval FileObject as PFILE_OBJECT)
 declare function IoCancelIrp DDKAPI alias "IoCancelIrp" (byval Irp as PIRP) as BOOLEAN
 declare function IoCheckShareAccess DDKAPI alias "IoCheckShareAccess" (byval DesiredAccess as ACCESS_MASK, byval DesiredShareAccess as ULONG, byval FileObject as PFILE_OBJECT, byval ShareAccess as PSHARE_ACCESS, byval Update as BOOLEAN) as NTSTATUS
-declare sub IofCompleteRequest DDKAPI alias "IofCompleteRequest" (byval Irp as PIRP, byval PriorityBoost as CCHAR)
+declare sub IofCompleteRequest DDKAPI alias "IofCompleteRequest" (byval Irp as PIRP, byval PriorityBoost as byte)
 declare function IoConnectInterrupt DDKAPI alias "IoConnectInterrupt" (byval InterruptObject as PKINTERRUPT ptr, byval ServiceRoutine as PKSERVICE_ROUTINE, byval ServiceContext as PVOID, byval SpinLock as PKSPIN_LOCK, byval Vector as ULONG, byval Irql as KIRQL, byval SynchronizeIrql as KIRQL, byval InterruptMode as KINTERRUPT_MODE, byval ShareVector as BOOLEAN, byval ProcessorEnableMask as KAFFINITY, byval FloatingSave as BOOLEAN) as NTSTATUS
 declare function IoCreateController DDKAPI alias "IoCreateController" (byval Size as ULONG) as PCONTROLLER_OBJECT
 declare function IoCreateDevice DDKAPI alias "IoCreateDevice" (byval DriverObject as PDRIVER_OBJECT, byval DeviceExtensionSize as ULONG, byval DeviceName as PUNICODE_STRING, byval DeviceType as ULONG, byval DeviceCharacteristics as ULONG, byval Exclusive as BOOLEAN, byval DeviceObject as PDEVICE_OBJECT ptr) as NTSTATUS
@@ -4072,14 +3886,14 @@ declare function IoGetRelatedDeviceObject DDKAPI alias "IoGetRelatedDeviceObject
 declare function IoGetRemainingStackSize DDKAPI alias "IoGetRemainingStackSize" () as ULONG
 declare sub IoGetStackLimits DDKAPI alias "IoGetStackLimits" (byval LowLimit as PULONG_PTR, byval HighLimit as PULONG_PTR)
 declare sub KeInitializeDpc DDKAPI alias "KeInitializeDpc" (byval Dpc as PRKDPC, byval DeferredRoutine as PKDEFERRED_ROUTINE, byval DeferredContext as PVOID)
-declare sub IoInitializeIrp DDKAPI alias "IoInitializeIrp" (byval Irp as PIRP, byval PacketSize as USHORT, byval StackSize as CCHAR)
+declare sub IoInitializeIrp DDKAPI alias "IoInitializeIrp" (byval Irp as PIRP, byval PacketSize as USHORT, byval StackSize as byte)
 declare sub IoInitializeRemoveLockEx DDKAPI alias "IoInitializeRemoveLockEx" (byval Lock as PIO_REMOVE_LOCK, byval AllocateTag as ULONG, byval MaxLockedMinutes as ULONG, byval HighWatermark as ULONG, byval RemlockSize as ULONG)
 declare function IoInitializeTimer DDKAPI alias "IoInitializeTimer" (byval DeviceObject as PDEVICE_OBJECT, byval TimerRoutine as PIO_TIMER_ROUTINE, byval Context as PVOID) as NTSTATUS
 declare sub IoInvalidateDeviceRelations DDKAPI alias "IoInvalidateDeviceRelations" (byval DeviceObject as PDEVICE_OBJECT, byval Type as DEVICE_RELATION_TYPE)
 declare sub IoInvalidateDeviceState DDKAPI alias "IoInvalidateDeviceState" (byval PhysicalDeviceObject as PDEVICE_OBJECT)
 declare function IoIs32bitProcess DDKAPI alias "IoIs32bitProcess" (byval Irp as PIRP) as BOOLEAN
 declare function IoIsWdmVersionAvailable DDKAPI alias "IoIsWdmVersionAvailable" (byval MajorVersion as UCHAR, byval MinorVersion as UCHAR) as BOOLEAN
-declare function IoMakeAssociatedIrp DDKAPI alias "IoMakeAssociatedIrp" (byval Irp as PIRP, byval StackSize as CCHAR) as PIRP
+declare function IoMakeAssociatedIrp DDKAPI alias "IoMakeAssociatedIrp" (byval Irp as PIRP, byval StackSize as byte) as PIRP
 declare function IoOpenDeviceInterfaceRegistryKey DDKAPI alias "IoOpenDeviceInterfaceRegistryKey" (byval SymbolicLinkName as PUNICODE_STRING, byval DesiredAccess as ACCESS_MASK, byval DeviceInterfaceKey as PHANDLE) as NTSTATUS
 declare function IoOpenDeviceRegistryKey DDKAPI alias "IoOpenDeviceRegistryKey" (byval DeviceObject as PDEVICE_OBJECT, byval DevInstKeyType as ULONG, byval DesiredAccess as ACCESS_MASK, byval DevInstRegKey as PHANDLE) as NTSTATUS
 declare function IoQueryDeviceDescription DDKAPI alias "IoQueryDeviceDescription" (byval BusType as PINTERFACE_TYPE, byval BusNumber as PULONG, byval ControllerType as PCONFIGURATION_TYPE, byval ControllerNumber as PULONG, byval PeripheralType as PCONFIGURATION_TYPE, byval PeripheralNumber as PULONG, byval CalloutRoutine as PIO_QUERY_DEVICE_ROUTINE, byval Context as PVOID) as NTSTATUS
@@ -4198,7 +4012,7 @@ declare function KeSetBasePriorityThread DDKAPI alias "KeSetBasePriorityThread" 
 declare function KeSetEvent DDKAPI alias "KeSetEvent" (byval Event as PRKEVENT, byval Increment as KPRIORITY, byval Wait as BOOLEAN) as LONG
 declare sub KeSetImportanceDpc DDKAPI alias "KeSetImportanceDpc" (byval Dpc as PRKDPC, byval Importance as KDPC_IMPORTANCE)
 declare function KeSetPriorityThread DDKAPI alias "KeSetPriorityThread" (byval Thread as PKTHREAD, byval Priority as KPRIORITY) as KPRIORITY
-declare sub KeSetTargetProcessorDpc DDKAPI alias "KeSetTargetProcessorDpc" (byval Dpc as PRKDPC, byval Number as CCHAR)
+declare sub KeSetTargetProcessorDpc DDKAPI alias "KeSetTargetProcessorDpc" (byval Dpc as PRKDPC, byval Number as byte)
 declare function KeSetTimer DDKAPI alias "KeSetTimer" (byval Timer as PKTIMER, byval DueTime as LARGE_INTEGER, byval Dpc as PKDPC) as BOOLEAN
 declare function KeSetTimerEx DDKAPI alias "KeSetTimerEx" (byval Timer as PKTIMER, byval DueTime as LARGE_INTEGER, byval Period as LONG, byval Dpc as PKDPC) as BOOLEAN
 declare sub KeSetTimeUpdateNotifyRoutine DDKAPI alias "KeSetTimeUpdateNotifyRoutine" (byval NotifyRoutine as PTIME_UPDATE_NOTIFY_ROUTINE)
@@ -4315,8 +4129,6 @@ declare function ZwEnumerateKey DDKAPI alias "ZwEnumerateKey" (byval KeyHandle a
 declare function ZwEnumerateValueKey DDKAPI alias "ZwEnumerateValueKey" (byval KeyHandle as HANDLE, byval Index as ULONG, byval KeyValueInformationClass as KEY_VALUE_INFORMATION_CLASS, byval KeyValueInformation as PVOID, byval Length as ULONG, byval ResultLength as PULONG) as NTSTATUS
 declare function ZwFlushKey DDKAPI alias "ZwFlushKey" (byval KeyHandle as HANDLE) as NTSTATUS
 declare function ZwMakeTemporaryObject DDKAPI alias "ZwMakeTemporaryObject" (byval Handle as HANDLE) as NTSTATUS
-declare function NtMapViewOfSection DDKAPI alias "NtMapViewOfSection" (byval SectionHandle as HANDLE, byval ProcessHandle as HANDLE, byval BaseAddress as PVOID ptr, byval ZeroBits as ULONG, byval CommitSize as ULONG, byval SectionOffset as PLARGE_INTEGER, byval ViewSize as PSIZE_T, byval InheritDisposition as SECTION_INHERIT, byval AllocationType as ULONG, byval Protect as ULONG) as NTSTATUS
-declare function ZwMapViewOfSection DDKAPI alias "ZwMapViewOfSection" (byval SectionHandle as HANDLE, byval ProcessHandle as HANDLE, byval BaseAddress as PVOID ptr, byval ZeroBits as ULONG, byval CommitSize as ULONG, byval SectionOffset as PLARGE_INTEGER, byval ViewSize as PSIZE_T, byval InheritDisposition as SECTION_INHERIT, byval AllocationType as ULONG, byval Protect as ULONG) as NTSTATUS
 declare function NtOpenFile DDKAPI alias "NtOpenFile" (byval FileHandle as PHANDLE, byval DesiredAccess as ACCESS_MASK, byval ObjectAttributes as POBJECT_ATTRIBUTES, byval IoStatusBlock as PIO_STATUS_BLOCK, byval ShareAccess as ULONG, byval OpenOptions as ULONG) as NTSTATUS
 declare function ZwOpenFile DDKAPI alias "ZwOpenFile" (byval FileHandle as PHANDLE, byval DesiredAccess as ACCESS_MASK, byval ObjectAttributes as POBJECT_ATTRIBUTES, byval IoStatusBlock as PIO_STATUS_BLOCK, byval ShareAccess as ULONG, byval OpenOptions as ULONG) as NTSTATUS
 declare function ZwOpenKey DDKAPI alias "ZwOpenKey" (byval KeyHandle as PHANDLE, byval DesiredAccess as ACCESS_MASK, byval ObjectAttributes as POBJECT_ATTRIBUTES) as NTSTATUS
@@ -4351,7 +4163,7 @@ declare function PoSetPowerState DDKAPI alias "PoSetPowerState" (byval DeviceObj
 declare sub PoSetSystemState DDKAPI alias "PoSetSystemState" (byval Flags as EXECUTION_STATE)
 declare sub PoStartNextPowerIrp DDKAPI alias "PoStartNextPowerIrp" (byval Irp as PIRP)
 declare sub PoUnregisterSystemState DDKAPI alias "PoUnregisterSystemState" (byval StateHandle as PVOID)
-declare function WmiCompleteRequest DDKAPI alias "WmiCompleteRequest" (byval DeviceObject as PDEVICE_OBJECT, byval Irp as PIRP, byval Status as NTSTATUS, byval BufferUsed as ULONG, byval PriorityBoost as CCHAR) as NTSTATUS
+declare function WmiCompleteRequest DDKAPI alias "WmiCompleteRequest" (byval DeviceObject as PDEVICE_OBJECT, byval Irp as PIRP, byval Status as NTSTATUS, byval BufferUsed as ULONG, byval PriorityBoost as byte) as NTSTATUS
 declare function WmiFireEvent DDKAPI alias "WmiFireEvent" (byval DeviceObject as PDEVICE_OBJECT, byval Guid as LPGUID, byval InstanceIndex as ULONG, byval EventDataSize as ULONG, byval EventData as PVOID) as NTSTATUS
 declare function WmiQueryTraceInformation DDKAPI alias "WmiQueryTraceInformation" (byval TraceInformationClass as TRACE_INFORMATION_CLASS, byval TraceInformation as PVOID, byval TraceInformationLength as ULONG, byval RequiredLength as PULONG, byval Buffer as PVOID) as NTSTATUS
 declare function WmiSystemControl DDKAPI alias "WmiSystemControl" (byval WmiLibInfo as PWMILIB_CONTEXT, byval DeviceObject as PDEVICE_OBJECT, byval Irp as PIRP, byval IrpDisposition as PSYSCTL_IRP_DISPOSITION) as NTSTATUS
@@ -4366,7 +4178,7 @@ declare function DbgPrintReturnControlC cdecl alias "DbgPrintReturnControlC" (by
 declare function DbgQueryDebugFilterState DDKAPI alias "DbgQueryDebugFilterState" (byval ComponentId as ULONG, byval Level as ULONG) as NTSTATUS
 declare function DbgSetDebugFilterState DDKAPI alias "DbgSetDebugFilterState" (byval ComponentId as ULONG, byval Level as ULONG, byval State as BOOLEAN) as NTSTATUS
 declare function KeGetCurrentKPCR DDKAPI alias "KeGetCurrentKPCR" () as _KPCR ptr
-#ifndef VerSetConditionMask 
+#ifndef VerSetConditionMask
 declare function VerSetConditionMask DDKAPI alias "VerSetConditionMask" (byval ConditionMask as ULONGLONG, byval TypeMask as ULONG, byval Condition as UCHAR) as ULONGLONG
 #endif
 
@@ -4387,7 +4199,7 @@ extern IoFileObjectType alias "IoFileObjectType" as POBJECT_TYPE
 extern LpcPortObjectType alias "LpcPortObjectType" as POBJECT_TYPE
 extern MmSectionObjectType alias "MmSectionObjectType" as POBJECT_TYPE
 extern SeTokenObjectType alias "SeTokenObjectType" as POBJECT_TYPE
-extern KeNumberProcessors alias "KeNumberProcessors" as CCHAR
+extern KeNumberProcessors alias "KeNumberProcessors" as byte
 extern HalDispatchTable alias "HalDispatchTable" as PHAL_DISPATCH_TABLE
 extern HalPrivateDispatchTable alias "HalPrivateDispatchTable" as PHAL_PRIVATE_DISPATCH_TABLE
 extern MmHighestUserAddress alias "MmHighestUserAddress" as PVOID ptr

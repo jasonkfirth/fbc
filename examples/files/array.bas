@@ -8,7 +8,7 @@
 
 sub test
 
-const ENTRIES = 10
+    const ENTRIES = 10
 
 	'' save array
 	dim as byte outarray(0 to ENTRIES-1)

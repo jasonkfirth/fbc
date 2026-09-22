@@ -1,7 +1,7 @@
 #include once "Fl_Input_.bi"
 
 extern "c++"
-type Fl_Input extends Fl_Input_ 
+type Fl_Input extends Fl_Input_
 private:
 	declare constructor (byref b as const Fl_Input)
 	declare operator let (byref b as const Fl_Input)

@@ -28,6 +28,7 @@ Print
 
 '' And the pointer acts like pointers to other types
 myString = "MyString has now changed"
+toMyString = StrPtr(myString)
 Print myString
 Print *toMyString
 Print

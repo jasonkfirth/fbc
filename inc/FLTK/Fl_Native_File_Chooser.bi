@@ -18,7 +18,7 @@ public:
 		USE_FILTER_EXT = &h0008
 	end enum
 	static file_exists_message as const zstring ptr
-  
+
 public:
 	declare constructor(val_ as long=BROWSE_FILE)
 	declare destructor()

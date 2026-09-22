@@ -21,6 +21,12 @@
 	#else
 		#define FB_TLSFREE(key)   pthread_key_delete( (key) )
 	#endif
+#elif defined ENABLE_MT && defined HOST_DOS && defined FB_DOS_PDMLWP
+	#define FB_TLSENTRY           int
+	#define FB_TLSALLOC(key)      ((key) = i)
+	#define FB_TLSFREE(key)       (void)(key)
+	#define FB_TLSSET(key,value)  fb_DosTlsSet( (key), (void *)(value) )
+	#define FB_TLSGET(key)        fb_DosTlsGet( (key) )
 #elif defined ENABLE_MT && ( defined HOST_WIN32 || defined HOST_XBOX )
 	#define FB_TLSENTRY           DWORD
 	#define FB_TLSALLOC(key)      key = TlsAlloc( )
@@ -51,7 +57,7 @@ FBCALL void *fb_TlsGetCtx( int index, size_t len, FB_TLS_DESTRUCTOR destructorFn
 			ctxHeader->destructor = destructorFn;
 			ctx = FB_TLS_HEADER_TO_DATA( ctxHeader );
 
-			#if defined ENABLE_MT && defined HOST_UNIX
+			#if defined ENABLE_MT && (defined HOST_UNIX || (defined HOST_DOS && defined FB_DOS_PDMLWP))
 				if( FB_TLSSET( __fb_tls_ctxtb[index], ctx ) != 0 ) {
 					free( ctxHeader );
 					ctx = NULL;

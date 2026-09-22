@@ -7,7 +7,7 @@
 '' --------
 
 ' Create an array of 5 integers and a string to hold the data.
-Dim As Integer h(4)
+Dim As Integer h(0 To 4)
 Dim As String hs
 Dim As Integer readindex
 
@@ -34,8 +34,7 @@ Print  "String = " + hs
 ' Await a keypress.
 Sleep
 
-' Exit program.
-End
-
 ' Block of data.
 Data 3, 234, 4354, 23433, 87643, "Bye!"
+
+'' end of read.bas

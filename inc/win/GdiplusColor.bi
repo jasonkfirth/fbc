@@ -9,6 +9,16 @@
 #ifndef __win_GdiplusColor_bi__
 #define __win_GdiplusColor_bi__
 
+#include once "windows.bi"
+
+#ifndef __FB_GDIPLUS_NAMESPACE_ACTIVE__
+#define __FB_GDIPLUS_NAMESPACE_ACTIVE__
+#define __FB_GDIPLUS_LOCAL_NAMESPACE__
+namespace Gdiplus
+#endif
+
+#include once "GdiplusPixelFormats.bi"
+
 enum ColorMode
 	ColorModeARGB32 = 0
 	ColorModeARGB64 = 1
@@ -40,7 +50,7 @@ type Color
 	declare sub SetFromCOLORREF(byval rgb_ as COLORREF)
 	declare function ToCOLORREF() as COLORREF
 
-	enum 
+	enum
 		AliceBlue = &hFFF0F8FF
 		AntiqueWhite = &hFFFAEBD7
 		Aqua = &hFF00FFFF
@@ -183,21 +193,21 @@ type Color
 		Yellow = &hFFFFFF00
 		YellowGreen = &hFF9ACD32
 	end enum
-	
-	enum 
+
+	enum
 		AlphaShift = 24
 		RedShift = 16
 		GreenShift = 8
 		BlueShift = 0
 	end enum
-	
-	enum 
+
+	enum
 		AlphaMask = &hff000000
 		RedMask = &h00ff0000
 		GreenMask = &h0000ff00
 		BlueMask = &h000000ff
 	end enum
-	
+
 	Argb_ as ARGB
 
 end type
@@ -269,5 +279,11 @@ end sub
 private function Color.ToCOLORREF() as COLORREF
 	function = RGB(GetRed(), GetGreen(), GetBlue())
 end function
+
+#ifdef __FB_GDIPLUS_LOCAL_NAMESPACE__
+end namespace
+#undef __FB_GDIPLUS_LOCAL_NAMESPACE__
+#undef __FB_GDIPLUS_NAMESPACE_ACTIVE__
+#endif
 
 #endif

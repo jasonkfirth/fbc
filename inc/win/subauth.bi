@@ -5,15 +5,17 @@
 ''   This file has no copyright assigned and is placed in the Public Domain.
 ''   This file is part of the mingw-w64 runtime package.
 ''
-''   The mingw-w64 runtime package and its code is distributed in the hope that it 
-''   will be useful but WITHOUT ANY WARRANTY.  ALL WARRANTIES, EXPRESSED OR 
-''   IMPLIED ARE HEREBY DISCLAIMED.  This includes but is not limited to 
+''   The mingw-w64 runtime package and its code is distributed in the hope that it
+''   will be useful but WITHOUT ANY WARRANTY.  ALL WARRANTIES, EXPRESSED OR
+''   IMPLIED ARE HEREBY DISCLAIMED.  This includes but is not limited to
 ''   warranties of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ''
 '' translated to FreeBASIC by:
 ''   FreeBASIC development team
 
 #pragma once
+
+#include once "ntdef.bi"
 
 extern "Windows"
 
@@ -26,7 +28,9 @@ end type
 
 type OLD_LARGE_INTEGER as _OLD_LARGE_INTEGER
 type POLD_LARGE_INTEGER as _OLD_LARGE_INTEGER ptr
+#ifndef NT_SUCCESS
 #define NT_SUCCESS(Status) (cast(NTSTATUS, (Status)) >= 0)
+#endif
 type SAM_HANDLE as PVOID
 type PSAM_HANDLE as PVOID ptr
 #define _NTSAM_SAM_HANDLE_

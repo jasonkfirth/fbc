@@ -27,12 +27,11 @@
 
     Design note:
 
-        This driver still performs synchronous block playback.  The
-        important improvement over the original direct-DAC path is that
-        each write submits a whole DMA block instead of pushing one DSP
-        sample at a time.  That greatly reduces CPU overhead and makes
-        playback timing less fragile even before a future IRQ-refill
-        design is introduced.
+        Each write submits a DMA block. The optional DOS thread profile
+        feeds these writes from a worker and waits for the completion IRQ,
+        allowing the application to continue running. Ordinary DOS builds
+        retain synchronous timing. DMA is still single-cycle; automatic
+        DMA buffer refill is not implemented here.
 */
 
 #ifndef DISABLE_MSDOS
@@ -41,6 +40,9 @@
 #include "../fb_sfx_internal.h"
 #include "../fb_sfx_driver.h"
 #include "fb_sfx_msdos.h"
+#if FB_SFX_DOS_THREADS
+#include "../../rtlib/dos/fb_dos_thread.h"
+#endif
 
 #include <ctype.h>
 #include <dpmi.h>
@@ -59,6 +61,9 @@ static int g_fb_sfx_msdos_rate = 0;
 static int g_fb_sfx_msdos_dma_channel = -1;
 static int g_fb_sfx_msdos_dma_buffer_frames = 0;
 static int g_fb_sfx_msdos_dma_buffer_bytes = 0;
+#if FB_SFX_DOS_THREADS
+static int g_fb_sfx_msdos_irq_enabled;
+#endif
 
 int fb_sfxMsdosParseBlaster(FB_SFX_MSDOS_CONFIG *config)
 {
@@ -189,6 +194,9 @@ static int fb_sfxMsdosDspWrite(int base_port, unsigned char value)
 static int fb_sfxMsdosResetDsp(int base_port)
 {
     outportb(base_port + 0x06, 1);
+    /* The DOS thread profile wraps delay() with a PIT-based wait because
+     * DJGPP's BIOS wait would disable the scheduler's RTC interrupt.
+     */
     delay(3);
     outportb(base_port + 0x06, 0);
 
@@ -256,7 +264,7 @@ static int fb_sfxMsdosAllocDmaBuffer(int bytes)
 
     paragraphs = (bytes + 65535 + 15) >> 4;
     segment = __dpmi_allocate_dos_memory(paragraphs, &selector);
-    if (segment == 0)
+    if (segment < 0)
         return -1;
 
     linear = ((unsigned long)segment) << 4;
@@ -486,6 +494,11 @@ static int msdos_sb_init(int rate, int channels, int buffer, int flags)
     g_fb_sfx_msdos_dma_buffer_frames = dma_frames;
     g_fb_sfx_msdos_dma_buffer_bytes = dma_bytes;
     g_fb_sfx_msdos.valid = 1;
+#if FB_SFX_DOS_THREADS
+    g_fb_sfx_msdos_irq_enabled =
+        fb_sfxMsdosIrqInit(g_fb_sfx_msdos.base_port, g_fb_sfx_msdos.irq) == 0;
+#endif
+
     SFX_DEBUG("msdos_sb: initialized at A%X I%d D%d H%d rate=%d dma=%d block=%d",
               g_fb_sfx_msdos.base_port,
               g_fb_sfx_msdos.irq,
@@ -504,6 +517,10 @@ static void msdos_sb_exit(void)
         fb_sfxMsdosDspWrite(g_fb_sfx_msdos.base_port, 0xD0);
         fb_sfxMsdosDspWrite(g_fb_sfx_msdos.base_port, 0xD3);
     }
+#if FB_SFX_DOS_THREADS
+    fb_sfxMsdosIrqExit();
+    g_fb_sfx_msdos_irq_enabled = 0;
+#endif
 
     g_fb_sfx_msdos.valid = 0;
     g_fb_sfx_msdos_rate = 0;
@@ -559,12 +576,35 @@ static int msdos_sb_write(const float *samples, int frames)
             return -1;
         }
 
+#if FB_SFX_DOS_THREADS
+        if (g_fb_sfx_msdos_irq_enabled)
+            fb_sfxMsdosIrqBegin();
+#endif
         if (fb_sfxMsdosStartDmaPlayback(g_fb_sfx_msdos.base_port, (unsigned int)chunk_bytes) != 0)
             return -1;
 
         playback_ticks = ((double)UCLOCKS_PER_SEC * (double)chunk_frames) /
                          (double)g_fb_sfx_msdos_rate;
-        fb_sfxMsdosWaitForPlaybackTicks(playback_ticks);
+#if FB_SFX_DOS_THREADS
+        if (g_fb_sfx_msdos_irq_enabled)
+        {
+            uclock_t started = uclock();
+            /* A missing IRQ must not hang shutdown. Allow one second beyond
+             * the block duration, then let normal driver fallback handle it.
+             */
+            while (!fb_sfxMsdosIrqDone())
+            {
+                if ((double)(uclock() - started) > playback_ticks + UCLOCKS_PER_SEC)
+                    return -1;
+                /* Do not reenter the cooperative mixer if worker creation
+                 * failed and this write is being driven by the idle hook.
+                 */
+                fb_DosThreadDelay(1);
+            }
+        }
+        else
+#endif
+            fb_sfxMsdosWaitForPlaybackTicks(playback_ticks);
 
         /*
             Reading the DSP status port acknowledges completion on the
@@ -617,13 +657,20 @@ const FB_SFX_DRIVER fb_sfxDriverSoundBlaster =
 };
 
 extern const FB_SFX_DRIVER fb_sfxDriverPcSpeaker;
+extern const FB_SFX_DRIVER fb_sfxDriverAc97;
 
 const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
 {
+    /* A working BLASTER configuration keeps ISA Sound Blaster first.
+     * AC'97 must discover its own PCI controller and codec before use.
+     */
     &fb_sfxDriverSoundBlaster,
+    &fb_sfxDriverAc97,
     &fb_sfxDriverPcSpeaker,
     &__fb_sfxDriverNull,
     NULL
 };
 
 #endif
+
+/* end of sfx_driver_sb.c */

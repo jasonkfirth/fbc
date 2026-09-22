@@ -9,6 +9,8 @@
 #ifndef __win_GdiplusEnums_bi__
 #define __win_GdiplusEnums_bi__
 
+#include once "windows.bi"
+
 const FlatnessDefault = 1.0 / 4.0
 
 type GraphicsState as UINT

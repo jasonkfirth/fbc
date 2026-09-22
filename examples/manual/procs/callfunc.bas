@@ -11,7 +11,7 @@
 #lang "fblite"
 
 Function f ( ) As Integer
-f = 42
+	f = 42
 End Function
 
 Call f ' execute function f, but ignore the answer

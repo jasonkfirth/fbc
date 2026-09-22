@@ -8,7 +8,7 @@ extern "c++"
 type Fl_Image_ as Fl_Image
 type Fl_RGB_Image_ as Fl_RGB_Image
 type Fl_Window_ as Fl_Window
-type icon_data_ 
+type icon_data_
 	legacy_icon as const any ptr
 	icons as Fl_RGB_Image_ ptr ptr
 	count as long
@@ -17,7 +17,7 @@ type icon_data_
 	small_icon as any ptr
 #endif
 end type
-type shape_data_type 
+type shape_data_type
 	lw_ as long
 	lh_ as long
 	shape_ as Fl_Image_ ptr
@@ -97,7 +97,7 @@ public:
 	declare virtual destructor
 
 	declare virtual function handle(h as long) as long
-	declare virtual sub resize(x as long, y as long, w as long, x as long) 
+	declare virtual sub resize(x as long, y as long, w as long, x as long)
 	declare sub border (b as long)
 	declare sub clear_border ()
 	declare function border () as unsigned long
@@ -189,7 +189,7 @@ private function Fl_Window.force_position() as long
 	return iif(flags() and FORCE_POSITION_,1,0)
 end function
 
-private sub Fl_Window.clear_border() 
+private sub Fl_Window.clear_border()
 	flags_ = flags_ or 1 shl 3
 end sub
 
@@ -197,7 +197,7 @@ private function Fl_Window.border() as unsigned long
 	return (flags_ and 1 shl 3)=0
 end function
 
-private sub Fl_Window.set_override () 
+private sub Fl_Window.set_override ()
 	flags_ = flags_ or 1 shl 3 or 1 shl 8
 end sub
 
@@ -205,7 +205,7 @@ private function Fl_Window.override() as unsigned long
 	return flags_ and 1 shl 8
 end function
 
-private sub Fl_Window.set_modal () 
+private sub Fl_Window.set_modal ()
 	flags_ = flags_ or 1 shl 14
 end sub
 
@@ -213,7 +213,7 @@ private function Fl_Window.modal() as unsigned long
 	return flags_ and 1 shl 14
 end function
 
-private sub Fl_Window.set_non_modal () 
+private sub Fl_Window.set_non_modal ()
 	flags_ = flags_ or 1 shl 5
 end sub
 
@@ -221,11 +221,11 @@ private function Fl_Window.non_modal() as unsigned long
 	return flags_ and (1 shl 14 or 1 shl 5)
 end function
 
-private sub Fl_Window.clear_modal_states () 
+private sub Fl_Window.clear_modal_states ()
 	flags_ = flags_ and not (1 shl 14 or 1 shl 5)
 end sub
 
-private sub Fl_Window.set_menu_window () 
+private sub Fl_Window.set_menu_window ()
 	flags_ = flags_ or 1 shl 12
 end sub
 
@@ -233,7 +233,7 @@ private function Fl_Window.menu_window() as unsigned long
 	return flags_ and (1 shl 12)
 end function
 
-private sub Fl_Window.set_tooltip_window () 
+private sub Fl_Window.set_tooltip_window ()
 	flags_ = (flags_ or 1 shl 13) and not (1 shl 12)
 end sub
 
@@ -287,6 +287,6 @@ end function
 
 
 
-private sub Fl.grab(byref win as Fl_Window_)	'moved to 
+private sub Fl.grab(byref win as Fl_Window_)	'moved to
 	grab(@win)
 end sub

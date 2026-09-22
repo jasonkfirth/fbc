@@ -2,11 +2,11 @@ extern "c++"
 
 type Fl_Preferences extends object
 
-public: 
+public:
 	enum Root
 		SYSTEM=0
 		USER
-	end enum  
+	end enum
 
 	type ID as any ptr
 
@@ -21,15 +21,15 @@ public:
 	declare constructor( byref as const Fl_Preferences)
 	declare constructor( _id as ID)
 	declare virtual destructor()
-  
+
 	declare function id() as ID
-  
+
 	declare static function remove(_id as ID) as byte
 
 	declare function name() as const zstring ptr
-  
+
 	declare function path() as const zstring ptr
-  
+
 	declare function groups() as long
 	declare function group(num_group as long)as const zstring ptr
 	declare function groupExists( key_ as const zstring ptr ) as byte alias "char"
@@ -41,7 +41,7 @@ public:
 	declare function entryExists( key as const zstring ptr ) as byte alias "char"
 	declare function deleteEntry( entry as const zstring ptr ) as byte alias "char"
 	declare function deleteAllEntries() as byte alias "char"
-  
+
 	declare function clear() as byte alias "char"
 
 	declare function set( entry as const zstring ptr, value as long ) as byte alias "char"
@@ -51,7 +51,7 @@ public:
 	declare function set( entry as const zstring ptr, value as double, precision as long ) as byte alias "char"
 	declare function set( entry as const zstring ptr, value as const zstring ptr ) as byte alias "char"
 	declare function set( entry as const zstring ptr, value as const any ptr, size as long ) as byte alias "char"
-  
+
 	declare function get( entry as const zstring ptr, byref value as long, defaultValue as long ) as byte alias "char"
 	declare function get( entry as const zstring ptr, byref value as single, defaultValue as single ) as byte alias "char"
 	declare function get( entry as const zstring ptr, byref value as double, defaultValue as double ) as byte alias "char"
@@ -73,7 +73,7 @@ public:
 
 protected:
 	declare constructor()
-private: 
+private:
 	declare operator @ as Fl_Preferences ptr
 
 	static nameBuffer(127) as byte
@@ -86,7 +86,7 @@ public:
 		enum Root
 			SYSTEM=0
 			USER
-		end enum  
+		end enum
 
 		prefs_ as Fl_Preferences ptr
 		filename_ as zstring ptr
@@ -163,7 +163,7 @@ end constructor
 
 private function Fl_Preferences.Node.name() as const zstring ptr
 	if path_=0 then return 0
-	dim r as integer= instrrev(*path_,"/") 
+	dim r as integer= instrrev(*path_,"/")
 	return path_+r
 end function
 

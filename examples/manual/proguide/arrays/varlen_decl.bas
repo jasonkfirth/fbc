@@ -14,6 +14,8 @@ ReDim a(0 To 1) As Integer
 Dim b(Any) As Integer
 
 '' Same, but 2-dimensional
+'' Both `Any` dimensions are unsized dynamic declarations.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-OPT-003
 Dim c(Any, Any) As Integer
 
 Dim myLowerBound As Integer = -5

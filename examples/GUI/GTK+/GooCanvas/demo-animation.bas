@@ -62,7 +62,7 @@ SUB on_animation_finished CDECL(BYVAL item AS GooCanvasItem PTR, _
 
 #IF 0
   '/* Test starting another animation. */
-  goo_canvas_item_animate (ellipse1, 500, 200, 2, 720, TRUE, 2000, 40,
+  goo_canvas_item_animate (ellipse1, 500, 200, 2, 720, TRUE, 2000, 40, _
          GOO_CANVAS_ANIMATE_BOUNCE)
 #ENDIF
 END SUB
@@ -136,6 +136,8 @@ FUNCTION create_animation_page() AS GtkWidget PTR
 
   VAR canvas = goo_canvas_new ()
   gtk_widget_set_size_request (canvas, 600, 450)
+	' The logical canvas remains 1000 units square while the widget is scrollable.
+	' FB-LINTER: DISABLE-NEXT-LINE FBL-NUM-009
   goo_canvas_set_bounds (GOO_CANVAS (canvas), 0, 0, 1000, 1000)
   gtk_widget_show (canvas)
   gtk_container_add (GTK_CONTAINER (scrolled_win), canvas)

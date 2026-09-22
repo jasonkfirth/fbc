@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include once "d3d9types.bi"
+
 #define __WINE_D3D9CAPS_H
 const D3DCAPS_READ_SCANLINE = &h20000
 const D3DCURSORCAPS_COLOR = 1

@@ -6,11 +6,16 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgAlphaGfx
 '' --------
 
-Dim As Any Ptr img8, img32
+Dim As Any Ptr img8 = 0, img32 = 0
 Dim As Integer x, y, i
 
 '' Set up an 8-bit graphics screen
-ScreenRes 320, 200, 8
+If ScreenRes(320, 200, 8) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
+
 For i = 0 To 255
 	Palette i,  i, i, i
 Next i
@@ -18,9 +23,17 @@ Color 255, 0
 
 '' Create an 8-bit image
 img8 = ImageCreate(64, 64, 0,  8)
+
+If img8 = 0 Then
+	Print "Could not create the 8-bit image"
+	Sleep
+	End 1
+End If
+
 For y = 0 To 63
 	For x = 0 To 63
-		Dim As Single x2 = x - 31.5, y2 = y - 31.5
+		Dim As Single x2 = x - 31.5
+		Dim As Single y2 = y - 31.5
 		Dim As Single t = Sqr(x2 ^ 2 + y2 ^ 2) / 5
 		PSet img8, (x, y), Sin(t) ^ 2 * 255
 	Next x
@@ -32,7 +45,13 @@ Sleep
 
 
 '' Set up a 32-bit graphics screen
-ScreenRes 320, 200, 32
+If ScreenRes(320, 200, 32) <> 0 Then
+	ImageDestroy img8
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
+
 For y = 0 To 199
 	For x = 0 To 319
 		PSet (x, y), IIf(x - y And 3, RGB(160, 160, 160), RGB(128, 128, 128))
@@ -41,6 +60,14 @@ Next y
 
 '' Create a 32-bit, fully opaque sprite
 img32 = ImageCreate(64, 64, 0, 32)
+
+If img32 = 0 Then
+	ImageDestroy img8
+	Print "Could not create the 32-bit image"
+	Sleep
+	End 1
+End If
+
 For y = 0 To 63
 	For x = 0 To 63
 		PSet img32, (x, y), RGB(x * 4, y * 4, 128)

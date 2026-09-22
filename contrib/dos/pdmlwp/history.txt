@@ -1,0 +1,60 @@
+LWP 1.1
+
+Date: Who knows?
+
+Original code by Sengan Short and Josh Turpen
+
+PDMLWP 01 : version 1.2
+May 15th, 1997 (more or less)
+
+Modified lwpasm.S to call back a new function,
+      lwp_findnext(), to implement semaphores and waiting threads.
+      Added ex novo lwp_wait_true,lwp_wait_false, lwp_wait_semaphore,
+      lwp_release_semaphore, and related data types (lwp_semaphore,
+      lwp_time). Minor modifications to _lwp_dead_thread.
+
+May 22nd, 1997       Made a few speedups, and added C++ support.
+
+October 1997
+PDMLWP 02  : Version 2.0
+Added priority support.
+Bugs Fixed:
+        Stack allocation for lwp_spawn'ed threads.
+        Lots of memory leaks. Code checked using Simon Bullen's (Z)FORTIFY.
+        Now, there seems to be none.
+        Corrected that problem about the hundreds of warnings at compile
+        time.
+        Suicide now handled correctly by lwp_kill.
+
+New Featues:
+        Thread priorities support added, in a slightly different manner from
+        LWP 1.2.
+        lwp_kill written anew. There was a serious bug in the processing of
+        suicide, so I solved it by creating an always dormant thread (lwp_tcp)
+        that frees the stack of the lwp_kill'ed thread.
+        This way, there has to be no special processing for the suicide.
+
+December 1997 : Version 2.1
+PDMLWP03
+New Features:
+        Parameters can be passed to newly spawned threads via a void*.
+        The new syntax is lwp_spawn( void (*proc)(void*),void *args,int stack,
+        uint priority). I modified the C++ section, too: the Thread
+        constructor has been simplified a lot.
+		  Added lwp_atkill() support. Pay attention: the procedure passed to
+		  lwp_atkill() shouldn't call any of the lwp functions! It is called by
+		  lwp_tcp, so all the lwp_ related data this function can access is
+		  just noise. I didn't find any better way of implementing this.
+Bugs Fixed:
+        Due to a silly error, atexit() was not called by lwp_init(). I had
+        commented the lines out for debugging purposes.
+
+Note:   For unknown reasons, IRQ0 (ZERO) doesn't look like working under Win95.
+        Perhaps it's used by Win95 for the same purpose.
+Note:   I changed my E-Mail address, due to UNBELIEVABLE problems with my
+        server. It is now "paolodemarino@usa.net".
+
+Note - see LWP.H line 153
+
+February 02, 1998 : Release 2.2
+LOTS of subtle bugs fixing. HTML docs added.

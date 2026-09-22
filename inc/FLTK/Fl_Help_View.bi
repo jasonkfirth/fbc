@@ -8,7 +8,7 @@
 extern "c++"
 type Fl_Help_Func as function (as Fl_Widget ptr, as const zstring ptr) as const zstring ptr
 
-type Fl_Help_Block 
+type Fl_Help_Block
 	start as const zstring ptr
 	end as const zstring ptr
 	border as unsigned byte
@@ -17,7 +17,7 @@ type Fl_Help_Block
 	line(31) as long
 end type
 
-type Fl_Help_Link 
+type Fl_Help_Link
 	filename as zstring*192
 	name as zstring*32
 	as long	x, y, w, h
@@ -52,10 +52,10 @@ const MAX_FL_HELP_FS_ELTS = 100
 
 type Fl_Help_Font_Stack
 	declare constructor()
-	declare sub init(f as Fl_Font, s as Fl_Fontsize, c as Fl_Color) 
-	declare sub top(byref f as Fl_Font, byref s as Fl_Fontsize, byref c as Fl_Color) 
-	declare sub push(f as Fl_Font, s as Fl_Fontsize, c as Fl_Color) 
-	declare sub pop(byref f as Fl_Font, byref s as Fl_Fontsize, byref c as Fl_Color) 
+	declare sub init(f as Fl_Font, s as Fl_Fontsize, c as Fl_Color)
+	declare sub top(byref f as Fl_Font, byref s as Fl_Fontsize, byref c as Fl_Color)
+	declare sub push(f as Fl_Font, s as Fl_Fontsize, c as Fl_Color)
+	declare sub pop(byref f as Fl_Font, byref s as Fl_Fontsize, byref c as Fl_Color)
 	declare const function count() as unsigned integer
 protected:
 	nfonts_ as unsigned integer
@@ -67,24 +67,24 @@ constructor Fl_Help_Font_Stack()
 	nfonts_=0
 end constructor
 
-private sub Fl_Help_Font_Stack.init(f as Fl_Font, s as Fl_Fontsize, c as Fl_Color) 
+private sub Fl_Help_Font_Stack.init(f as Fl_Font, s as Fl_Fontsize, c as Fl_Color)
 	nfonts_ = 0
 	elts_(nfonts_).set(f, s, c)
 	fl_font(f, s)
 	fl_color(c)
 end sub
 
-private sub Fl_Help_Font_Stack.top(byref f as Fl_Font, byref s as Fl_Fontsize, byref c as Fl_Color) 
+private sub Fl_Help_Font_Stack.top(byref f as Fl_Font, byref s as Fl_Fontsize, byref c as Fl_Color)
 	elts_(nfonts_).get(f, s, c)
 end sub
 
-private sub Fl_Help_Font_Stack.push(f as Fl_Font, s as Fl_Fontsize, c as Fl_Color) 
+private sub Fl_Help_Font_Stack.push(f as Fl_Font, s as Fl_Fontsize, c as Fl_Color)
 	if nfonts_ <  (MAX_FL_HELP_FS_ELTS-1) then nfonts_ +=1
 	elts_(nfonts_).set(f, s, c)
-	fl_font(f, s): fl_color(c) 
+	fl_font(f, s): fl_color(c)
 end sub
 
-private sub Fl_Help_Font_Stack.pop(byref f as Fl_Font, byref s as Fl_Fontsize, byref c as Fl_Color) 
+private sub Fl_Help_Font_Stack.pop(byref f as Fl_Font, byref s as Fl_Fontsize, byref c as Fl_Color)
 	if nfonts_ > 0 then nfonts_ -=1
 	top(f, s, c)
 	fl_font(f, s): fl_color(c)
@@ -101,7 +101,7 @@ end type
 
 type Fl_Help_View extends Fl_Group
 private:
-  
+
 	enum
 		RIGHT_ = -1
 		CENTER_
@@ -204,7 +204,7 @@ public:
 	declare sub resize(as long, as long, as long, as long)
 
 	declare const function size() as long
-	declare sub size(W as long, H as long) 
+	declare sub size(W as long, H as long)
 	declare sub textcolor(c as Fl_Color)
 	declare const function textcolor() as Fl_Color
 	declare sub textfont(f as Fl_Font)

@@ -53,14 +53,14 @@ end sub
     c = big_int_create(1)
     if (a = NULL or b = NULL or c = NULL) then
         print "error when creating [a], [b] or [c]"
-    	end 1
+        end 1
     end if
 
     '' calculate 3000!
     print "Start of calculating 3000!... ";
     if( big_int_fact(3000, a) ) then
         print "error during calculating 3000!"
-    	end 2
+        end 2
     end if
     print_num( "3000! = ", a )
     print
@@ -69,12 +69,12 @@ end sub
     print "Start of calculating 17^3000... ";
     if( big_int_from_int( 17, a ) ) then
         print "error in big_int_from_int"
-    	end 3
+        end 3
     end if
 
     if( big_int_pow(a, 3000, a) ) then
         print "error during calculating 17^3000"
-    	end 4
+        end 4
     end if
 
     print_num( "17^3000 = ", a )
@@ -90,7 +90,7 @@ end sub
     print "Start of finding nextprime(2^1024)... ";
     if (big_int_from_int(2, a)) then
         print "error in big_int_from_int"
-    	end 5
+        end 5
     end if
     if (big_int_pow(a, 1024, a)) then
         print "error during calculating 2^1024"
@@ -117,7 +117,7 @@ end sub
     print "Start of calculating 65537^p (mod p), where p = 2^2048... ";
     if (big_int_from_int(2, a)) then
         print "error in big_int_from_int"
-    	end 8
+        end 8
     end if
     if (big_int_pow(a, 2048, a)) then
         print "error during calculating 2^2048"

@@ -36,7 +36,7 @@ private:
 	static m0 as const matrix
 	font_ as Fl_Font
 	size_ as Fl_Fontsize
-	color_ as Fl_Color 
+	color_ as Fl_Color
 	sptr as long
 	static matrix_stack_size as const long' = FL_MATRIX_STACK_SIZE
 	stack(FL_MATRIX_STACK_SIZE - 1) as matrix
@@ -121,18 +121,18 @@ protected:
 	declare sub clip_region(r as Fl_Region)
 	declare sub restore_clip()
 
-	declare virtual sub draw_image(buf as const ubyte ptr, X as long, Y as long, W as long, H as long, D as long=3, L as long=0) 
-	declare virtual sub draw_image_mono(buf as const ubyte ptr, X as long, Y as long, W as long, H as long, D as long=1, L as long=0) 
-	declare virtual sub draw_image(cb as Fl_Draw_Image_Cb, data_ as any ptr, X as long, Y as long, W as long, H as long, D as long=3) 
-	declare virtual sub draw_image_mono(cb as Fl_Draw_Image_Cb, data_ as any ptr, X as long, Y as long, W as long, H as long, D as long=1) 
+	declare virtual sub draw_image(buf as const ubyte ptr, X as long, Y as long, W as long, H as long, D as long=3, L as long=0)
+	declare virtual sub draw_image_mono(buf as const ubyte ptr, X as long, Y as long, W as long, H as long, D as long=1, L as long=0)
+	declare virtual sub draw_image(cb as Fl_Draw_Image_Cb, data_ as any ptr, X as long, Y as long, W as long, H as long, D as long=3)
+	declare virtual sub draw_image_mono(cb as Fl_Draw_Image_Cb, data_ as any ptr, X as long, Y as long, W as long, H as long, D as long=1)
 
-	declare virtual sub draw(rgb_ as Fl_RGB_Image ptr, XP as long, YP as long, WP as long, HP as long, cx as long, cy as long) 
-	declare virtual sub draw(pxm as Fl_Pixmap ptr, XP as long, YP as long, WP as long, HP as long, cx as long, cy as long) 
-	declare virtual sub draw(bm as Fl_Bitmap ptr, XP as long, YP as long, WP as long, HP as long, cx as long, cy as long) 
+	declare virtual sub draw(rgb_ as Fl_RGB_Image ptr, XP as long, YP as long, WP as long, HP as long, cx as long, cy as long)
+	declare virtual sub draw(pxm as Fl_Pixmap ptr, XP as long, YP as long, WP as long, HP as long, cx as long, cy as long)
+	declare virtual sub draw(bm as Fl_Bitmap ptr, XP as long, YP as long, WP as long, HP as long, cx as long, cy as long)
 
 	declare sub copy_offscreen(x as long, y as long, w as long, h as long, pixmap as Fl_Offscreen, srcx as long, srcy as long)
 public:
-	static class_id as const zstring ptr 
+	static class_id as const zstring ptr
 	declare virtual function class_name() as const zstring ptr
 	declare virtual sub font(face as Fl_Font, fsize as Fl_Fontsize)
 	declare function font() as Fl_Font
@@ -159,14 +159,14 @@ end function
 
 
 extern "c"	'empty destructor
-extern fl_graphics_driver_ alias "fl_graphics_driver"  as Fl_Graphics_Driver ptr 
+extern fl_graphics_driver_ alias "fl_graphics_driver"  as Fl_Graphics_Driver ptr
 sub _ZN9Fl_DeviceD0Ev (d as Fl_Device ptr)
 	delete d
 end sub
-end extern 
+end extern
 
 destructor Fl_Device()
-end destructor 
+end destructor
 
 private sub Fl_Graphics_Driver.color(c as Fl_Color)
 	color_= c
@@ -242,7 +242,7 @@ type Fl_Surface_Device extends Fl_Device
 	static _surface as Fl_Surface_Device ptr
 	declare static function default_surface() as Fl_Surface_Device ptr
 protected:
-	declare constructor (graphics_driver as Fl_Graphics_Driver ptr) 
+	declare constructor (graphics_driver as Fl_Graphics_Driver ptr)
 public:
 	static class_id as const zstring ptr
 	declare function class_name() as const zstring ptr
@@ -251,7 +251,7 @@ public:
 	declare function driver() as Fl_Graphics_Driver ptr
 	declare static function surface() as Fl_Surface_Device ptr
 	declare virtual destructor()
-	
+
 end type
 
 end extern

@@ -26,17 +26,19 @@
 
 #pragma once
 
-#include once "libxml/xmlversion.bi"
-#include once "libxml/tree.bi"
-#include once "libxml/xmlregexp.bi"
-
-extern "C"
-
+'' Validity declarations refer to the opaque automaton type during the
+'' include cycle, so define its aliases before loading dependent headers.
 #define __XML_AUTOMATA_H__
 type xmlAutomata as _xmlAutomata
 type xmlAutomataPtr as xmlAutomata ptr
 type xmlAutomataState as _xmlAutomataState
 type xmlAutomataStatePtr as xmlAutomataState ptr
+
+#include once "libxml/xmlversion.bi"
+#include once "libxml/tree.bi"
+#include once "libxml/xmlregexp.bi"
+
+extern "C"
 
 declare function xmlNewAutomata() as xmlAutomataPtr
 declare sub xmlFreeAutomata(byval am as xmlAutomataPtr)

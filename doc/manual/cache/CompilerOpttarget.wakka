@@ -13,6 +13,7 @@
 	Common target names include:
 
 		##dos##
+		##dos-hx##
 		##win32##
 		##win64##
 		##win32-aarch64##
@@ -50,6 +51,12 @@
 
 	Those commands supply the SDK, linker, runtime, and packaging options
 	expected by their platform.
+
+	##dos-hx## selects the x86 Win32 ABI for a 32-bit PE program intended for
+	the HX DOS extender.  It uses the normal Win32 runtime, including its
+	preemptive thread and Winsock calls; it is not the DJGPP DOS ABI.  Build the
+	program with an x86 Win32 toolchain, then apply HX's ##PatchPE## packaging
+	step before running it under DOS.
 
 {{fbdoc item="ex"}}
 %%(sh)

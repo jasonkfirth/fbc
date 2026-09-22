@@ -7,4 +7,6 @@
 '' --------
 
 Print Int(1.9)  '' will print  1
+'' A negative input is necessary to demonstrate INT's rounding toward minus infinity.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL408 FBL-NUM-014
 Print Int(-1.9) '' will print -2

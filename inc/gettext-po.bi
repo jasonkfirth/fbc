@@ -19,8 +19,12 @@
 #define __gettext_po_bi__
 
 #define _GETTEXT_PO_H 1
+#include once "crt/stddef.bi"
+
 #define LIBGETTEXTPO_VERSION &h001100
-extern libgettextpo_version alias "libgettextpo_version" as integer
+' FreeBASIC identifiers are case-insensitive.  The suffixed FB name keeps the
+' C variable distinct from the public LIBGETTEXTPO_VERSION macro.
+extern libgettextpo_version_ alias "libgettextpo_version" as integer
 
 '/* A po_file_t represents the contents of a PO file.  */
 type po_file_t as po_file ptr

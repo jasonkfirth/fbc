@@ -29,9 +29,9 @@ function BrowseCallbackProc(byval hWnd as HWND, _
         end if
 
         SendMessage( hWnd, BFFM_SETSTATUSTEXT, 0, cuint( @sPath ) )
-   end select
+    end select
 
-   function = 0
+    function = 0
 
 end function
 
@@ -54,10 +54,12 @@ function BrowseForFolder(byval hWnd as HWND, _
     with bi
 	    .pidlRoot   = pidlStart
 	    .hwndOwner  = hWnd
+	    '' Prompt remains alive until the synchronous folder dialog returns.
+	    '' FB-LINTER: DISABLE-NEXT-LINE FBL427
 	    .lpszTitle  = strptr(Prompt)
 	    .ulFlags    = Flags
 		.lpfn       = @BrowseCallbackProc
-	   	.lParam		= cuint( strptr( sFolder ) )
+	    .lParam		= cuint( strptr( sFolder ) )
 	end with
 
 	pidlReturn = SHBrowseForFolder( @bi )
@@ -70,7 +72,7 @@ function BrowseForFolder(byval hWnd as HWND, _
         CoTaskMemFree( pidlReturn )
         function = path
     else
-    	function = ""
+        function = ""
     end if
 
     CoUninitialize( )

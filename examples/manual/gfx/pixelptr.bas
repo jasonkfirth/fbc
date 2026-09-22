@@ -29,7 +29,11 @@ End Function
 '' usage example:
 
 '' 320*200 graphics screen, 8 bits per pixel
-ScreenRes 320, 200, 8
+If ScreenRes(320, 200, 8) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 Dim As Any Ptr ip '' image pointer
 
@@ -67,4 +71,3 @@ Else
 End If
 
 Sleep
-

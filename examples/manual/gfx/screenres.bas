@@ -7,12 +7,16 @@
 '' --------
 
 ' Set the screen mode to 320*200, with 8 bits per pixel
-ScreenRes 320, 200, 8
+If ScreenRes(320, 200, 8) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 ' Draw color bands in a diagonal pattern over the whole screen
 For y As Long = 0 To 200-1
 	For x As Long = 0 To 320-1
-		PSet (x,y),(x + y) And 255
+		PSet (x, y), (x + y) And 255
 	Next x
 Next y
 

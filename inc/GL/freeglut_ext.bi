@@ -32,6 +32,7 @@
 #pragma once
 
 #include once "crt/stdarg.bi"
+#include once "gl.bi"
 
 #if defined(__FB_WIN32__) and (not defined(FREEGLUT_STATIC))
 	extern "Windows"

@@ -41,16 +41,16 @@ declare function callback cdecl _
 	end if
 
 	if sqlite3_open( database_name, @db ) then
-  		print "Can't open database: "; *sqlite3_errmsg( db )
+		print "Can't open database: "; *sqlite3_errmsg( db )
 		sqlite3_close( db )
-  		end 1
+		end 1
 	end if
 
 	print "Using database: "; database_name
 	print
 
 	if sqlite3_exec( db, query, @callback, 0, @errMsg ) <> SQLITE_OK then
-  		print "SQL error: "; *errMsg
+		print "SQL error: "; *errMsg
 	end if
 
 	sqlite3_close(db)

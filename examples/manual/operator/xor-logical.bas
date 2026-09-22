@@ -11,7 +11,9 @@ Dim As UByte numeric_value1, numeric_value2
 numeric_value1 = 10
 numeric_value2 = 15
 
-If numeric_value1 = 10 Xor numeric_value2 = 20 Then Print "Numeric_Value1 equals 10 or Numeric_Value2 equals 20"
+'' The parenthesized comparisons are XOR operands, not assignments.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-BOOL-005
+If (numeric_value1 = 10) Xor (numeric_value2 = 20) Then Print "Numeric_Value1 equals 10 or Numeric_Value2 equals 20"
 Sleep
 
 ' This will output "Numeric_Value1 equals 10 or Numeric_Value2 equals 20"

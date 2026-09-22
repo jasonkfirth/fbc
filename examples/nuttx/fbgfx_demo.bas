@@ -20,9 +20,10 @@
 '     - SD card tests
 '     - sound tests
 '     - USB keyboard setup
-'     - broad gfxlib2 conformance coverage
+''     - broad gfxlib2 conformance coverage
 '
 
+' Screen 13 is the NuttX DVI bring-up mode. FB-LINTER: DISABLE-NEXT-LINE FBL734
 screen 13
 
 if screenptr = 0 then
@@ -77,6 +78,7 @@ do
 loop while len(key_text) > 0
 
 do
+' Bounded key polling keeps this visible board demo responsive. FB-LINTER: DISABLE-NEXT-LINE FBL602
     sleep 25
     key_text = inkey$
 loop while (key_text <> "q") and (key_text <> "Q")

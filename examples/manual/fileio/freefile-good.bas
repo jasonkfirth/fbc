@@ -6,10 +6,20 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgFreefile
 '' --------
 
-Dim As Long fr, fs
+Dim As Integer fr, fs
 ' The CORRECT way:
 fr = FreeFile
-Open "File1" For Input As #fr
 
-fs = FreeFile
-Open "File2" For Input As #fs
+If Open("File1" For Input As #fr) <> 0 Then
+	Print "Could not open File1"
+Else
+	fs = FreeFile
+
+	If Open("File2" For Input As #fs) <> 0 Then
+		Print "Could not open File2"
+	Else
+		Close #fs
+	End If
+
+	Close #fr
+End If

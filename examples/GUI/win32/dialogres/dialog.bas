@@ -54,13 +54,13 @@ function DlgProc (byval hwnd as HWND, byval umsg as UINT, byval wparam as WPARAM
 
         select case id
         case IDC_BTN1
-        	EndDialog( hwnd, 0 )
-    	end select
+            EndDialog( hwnd, 0 )
+        end select
 
     case else
-    	return FALSE
+        return FALSE
 
     end select
 
-   return TRUE
+    return TRUE
 end function

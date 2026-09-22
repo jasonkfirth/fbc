@@ -29,6 +29,8 @@
 '' for the named XPAD_*, d-pad, and keyboard scancode constants.
 ''
 #include "fbgfx.bi"
+'' This example-private header intentionally re-exports the FB graphics constants.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-INC-010
 using fb
 
 const XPAD_EXAMPLE_MAX_PADS = 16

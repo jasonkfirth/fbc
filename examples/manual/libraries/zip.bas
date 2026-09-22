@@ -16,12 +16,19 @@ Sub create_parent_dirs(ByVal file As ZString Ptr)
 	''	foo
 	''	foo/bar
 	''	foo/bar/baz
+	If file = NULL Then Exit Sub
+
 	Dim As UByte Ptr p = file
+	If p = NULL Then Exit Sub
 	Do
+		'' p advances within file's checked NUL-terminated ZSTRING storage.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
 		Select Case (*p)
 		Case Asc("/")
+			'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
 			*p = 0
 			MkDir(*file)
+			'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
 			*p = Asc("/")
 		Case 0
 			Exit Do
@@ -37,8 +44,14 @@ Private Sub unpack_zip_file(ByVal zip As Any Ptr, ByVal i As Integer)
 	Static As UByte chunk(0 To (BUFFER_SIZE - 1))
 	#define buffer (@chunk(0))
 
-	'' Retrieve the filename.
-	Dim As String filename = *zip_get_name(zip, i, 0)
+	'' Retrieve the filename. libzip may have no usable name for a malformed entry.
+	Dim As Const ZString Ptr archive_name = zip_get_name(zip, i, 0)
+	If archive_name = NULL Then
+		Print "could not retrieve the archive entry name"
+		Return
+	End If
+
+	Dim As String filename = *archive_name
 	Print "file: " & filename & ", ";
 
 	'' Retrieve the file size via a zip_stat().
@@ -66,7 +79,13 @@ Private Sub unpack_zip_file(ByVal zip As Any Ptr, ByVal i As Integer)
 	End If
 
 	'' Input for the file comes from libzip
-	Dim As Any Ptr fi = zip_fopen_index(zip, i, 0)
+	Dim As zip_file_t Ptr fi = zip_fopen_index(zip, i, 0)
+	If fi = NULL Then
+		Print "could not open the archive entry"
+		Close #fo
+		Return
+	End If
+
 	Do
 		'' Write out the file content as returned by zip_fread(), which
 		'' also does the decoding and everything.

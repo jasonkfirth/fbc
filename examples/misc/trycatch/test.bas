@@ -1,3 +1,9 @@
+' Try/catch signal demonstration
+'
+' This executable deliberately writes through null pointers to demonstrate that
+' the companion runtime converts SIGSEGV into the documented catch paths. It
+' does not use those pointers after the faulting statements.
+
 #include once "trycatch.bi"
 
 ''to compile: fbc test.bas trycatch.bas
@@ -27,6 +33,8 @@ sub fun3()
 		catch ex as Exception
 			print "fun3.2:" & *ex
 			dim as integer ptr p = 0
+			' Deliberate SIGSEGV input for the nested-catch demonstration.
+			'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
 			*p = 2
 			throw "never executed"
 		end_try
@@ -44,11 +52,16 @@ sub fun2()
 		print "Begin try2"
 		fun3()
 		dim as integer ptr p = 0
+		' Deliberate SIGSEGV input for the outer-catch demonstration.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
 		*p = 2
 		print "End try2"
 	catch ex as Exception
 		print "fun2:" & *ex
 		return
+	' END_TRY closes a generated ElseIf body. The following module code remains
+	' reachable when the preceding Try body completes without an exception.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-CF-001 FBL610
 	end_try
 
 	print "end fun2"
@@ -87,8 +100,12 @@ end destructor
 	try
 		dim f as foo
 		dim as integer ptr p = 0
+		' Deliberate SIGSEGV input verifies the missing-stack-unwind note below.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
 		*p = 2
 		'' NOTE: without proper stack unwinding the foo's destructor will never be called :/
 	catch ex as exception
 		print *ex
 	end_try
+
+' End of test.bas

@@ -9,7 +9,7 @@
 Dim a As Long
 #if __FB_ASM__ = "intel"
 	Asm
- 		inc dword Ptr [a]
+		inc dword Ptr [a]
 	End Asm
 #else
 	Asm

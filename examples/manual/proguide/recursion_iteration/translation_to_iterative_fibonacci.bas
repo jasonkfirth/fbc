@@ -14,7 +14,8 @@ Function translationToIterativeFibonacci (ByVal n As UInteger, ByVal a As UInteg
 		n = n - 1
 		Swap a, b
 		b = b + a
+		'' This translation lesson uses GOTO to expose the recursion-to-loop step.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL101
 		Goto begin    '' iterative jump
 	End If
 End Function
-

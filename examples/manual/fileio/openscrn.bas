@@ -6,10 +6,19 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgOpenScrn
 '' --------
 
+'' Resource ownership:
+'' The SCRN device handle is closed after the example's input/output pass.
 Dim a As String
-Open Scrn For Input  As #1
-Print #1,"Please write something and press ENTER"
-Line Input #1,a
-Print #1, "You wrote";a
-Close
+Dim file_number As Integer
+
+file_number = FreeFile
+Open Scrn For Input As #file_number
+If Err <> 0 Then
+  Print "Could not open SCRN"
+Else
+  Print #file_number, "Please write something and press ENTER"
+  Line Input #file_number, a
+  Print #file_number, "You wrote"; a
+  Close #file_number
+End If
 Sleep

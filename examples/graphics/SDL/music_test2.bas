@@ -10,8 +10,14 @@
 #include  "SDL\SDL_mixer.bi"
 
 	' Mix_Chunk is like Mix_Music, only it's for ordinary sounds.
+	' The key handler and module loop share this loaded mixer chunk.
+	' FB-LINTER: DISABLE-NEXT-LINE FBL301
 	dim shared phaser as Mix_Chunk ptr
 	phaser = NULL
+
+	' The key handler records the active mixer channel here.
+	' FB-LINTER: DISABLE-NEXT-LINE FBL301
+	dim shared phaserChannel as integer
 
 	' Every sound that gets played is assigned to a channel.  Note that
 	' this is different from the number of channels you request when you
@@ -19,7 +25,6 @@
 	' about a sound sample that is playing, while the number of channels
 	' you request when opening the device is dependant on what sort of
 	' sound you want (1 channel = mono, 2 = stereo, etc)
-	dim shared phaserChannel as integer
 	phaserChannel = -1
 
 declare sub handleKey(byval key as SDL_KeyboardEvent ptr)
@@ -42,8 +47,8 @@ declare sub handleKey(byval key as SDL_KeyboardEvent ptr)
 	SDL_Init(SDL_INIT_VIDEO or SDL_INIT_AUDIO)
 
 	if(Mix_OpenAudio(audio_rate, audio_format, audio_channels, audio_buffers)) then
-   		print "Unable to open audio!"
-   		end 1
+		print "Unable to open audio!"
+		end 1
 	end if
 
 	' We're going to pre-load the sound effects that we need right here
@@ -68,19 +73,19 @@ declare sub handleKey(byval key as SDL_KeyboardEvent ptr)
 
 	do while (done = 0)
 
-   		do while (SDL_PollEvent(@event))
-      		select case (event.type)
-      		case SDL_QUIT_
-         		done = 1
-      		case SDL_KEYDOWN
-         		if( event.key.keysym.sym = SDLK_ESCAPE ) then
-         			done = -1
-         		end if
-         		handleKey @event.key
-      		end select
-   		loop
+		do while (SDL_PollEvent(@event))
+			select case (event.type)
+			case SDL_QUIT_
+				done = 1
+			case SDL_KEYDOWN
+				if( event.key.keysym.sym = SDLK_ESCAPE ) then
+					done = -1
+				end if
+				handleKey @event.key
+			end select
+		loop
 
-   		SDL_Delay(50)
+		SDL_Delay(50)
 
 	loop
 
@@ -88,8 +93,8 @@ declare sub handleKey(byval key as SDL_KeyboardEvent ptr)
 	SDL_Quit
 
 sub handleKey (byval key as SDL_KeyboardEvent ptr)
-   	dim keyEvent as SDL_KeyboardEvent
-   	keyEvent = *key
+	dim keyEvent as SDL_KeyboardEvent
+	keyEvent = *key
 
     if (phaserChannel < 0) then
 

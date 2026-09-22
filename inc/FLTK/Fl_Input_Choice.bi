@@ -8,7 +8,7 @@
 
 extern "c++"
 
-type Fl_Input_Choice extends Fl_Group 
+type Fl_Input_Choice extends Fl_Group
 private:
 	declare constructor (byref w as const Fl_Input_Choice)
 	declare operator let (byref w as const Fl_Input_Choice)
@@ -80,7 +80,7 @@ private sub Fl_Input_Choice.menu_cb(a as Fl_Widget ptr, data_ as any ptr)
 		cast(Fl_Widget ptr,o)->set_changed()
 		if o->when() and (FL_WHEN_CHANGED or FL_WHEN_RELEASE) then o->do_callback()
 	end if
-    
+
 	if wp.deleted() then return
 
 	if o->callback() <> @default_callback then
@@ -105,7 +105,7 @@ private sub Fl_Input_Choice.inp_cb(a as Fl_Widget ptr, data_ as any ptr)
 	if o->callback() <> @default_callback then cast(Fl_Widget ptr,o)->clear_changed()
 end sub
 
-private sub Fl_Input_Choice.InputMenuButton.draw() 
+private sub Fl_Input_Choice.InputMenuButton.draw()
 	draw_box(FL_UP_BOX, color())
 	fl_color(iif(active_r(), labelcolor() , fl_inactive(labelcolor())))
 	dim as long xc = x()+w()/2, yc=y()+h()/2

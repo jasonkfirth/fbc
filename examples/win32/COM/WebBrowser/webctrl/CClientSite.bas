@@ -19,8 +19,12 @@ private function CClientSite_QueryInterface _
 
 	LOG_FUNC()
 
-	if( (memcmp( riid, @IID_IUnknown, len( GUID ) ) = 0) or _
-		(memcmp( riid, @IID_IOleClientSite, len( GUID ) ) = 0) ) then
+	'' COM interface IDs are fixed binary GUID values, compared across all 16 bytes.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-MEM-005
+	dim as integer is_iunknown = (memcmp( riid, @IID_IUnknown, len( GUID ) ) = 0)
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-MEM-005
+	dim as integer is_ioleclientsite = (memcmp( riid, @IID_IOleClientSite, len( GUID ) ) = 0)
+	if( is_iunknown or is_ioleclientsite ) then
 		*ppvObj = @self_->interface
 		return S_OK
 	end if

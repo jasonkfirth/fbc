@@ -1,3 +1,6 @@
+#ifndef FB_EXAMPLES_THREADS_TIMER_LIB_TIMER_BI
+#define FB_EXAMPLES_THREADS_TIMER_LIB_TIMER_BI
+
 #ifdef __FB_DOS__
 # error "Unsupported platform"
 #endif
@@ -36,3 +39,5 @@ private:
 	as any ptr        cond_mutex
 	as any ptr        thread
 end type
+
+#endif

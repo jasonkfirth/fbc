@@ -18,9 +18,9 @@ operator xor _
 
 	dim as VARIANT_ res = any
 
+	VariantInit( @res )
 	VarXor( @lhs, @rhs.var_, @res )
 
 	return VARIANT( res, FALSE )
 
 end operator
-

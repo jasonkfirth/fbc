@@ -14,7 +14,12 @@ Using fb '' constants and structures are stored in the FB namespace in lang fb
 
 Dim e As Event
 
-ScreenRes 640, 480
+If ScreenRes(640, 480) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
+
 Do
 	If (ScreenEvent(@e)) Then
 		Select Case e.type
@@ -88,5 +93,8 @@ Do
 		End Select
 	End If
 
+	'' Yield briefly when no event is queued, so this polling demonstration does
+	'' not consume a CPU core while it waits for the next event.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL602
 	Sleep 1
 Loop

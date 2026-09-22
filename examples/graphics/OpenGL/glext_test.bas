@@ -41,7 +41,7 @@ declare sub shutdown ()
 ''
 	dim shared ctx as CONTEXT = ( WIN_WIDTH, WIN_HEIGHT, TRUE, (WIN_WIDTH\2, WIN_HEIGHT\2), TRUE )
 
-	dim shared TexID(1) as GLuint		'our Texture Objects
+	dim shared TexID(0 to 1) as GLuint		'our Texture Objects
 
 	dim shared glActiveTextureARB_ as PFNGLACTIVETEXTUREARBPROC
 	dim shared glMultiTexCoord2iARB_ as PFNGLMULTITEXCOORD2IARBPROC
@@ -94,7 +94,7 @@ sub initGL
 
 	''
 	dim x as integer, y as integer, i as integer
-	dim Img(16383) as ubyte
+	dim Img(0 to 16383) as ubyte
 	dim DistSq as single, Falloff as single
 
     glGenTextures 2, @TexID(0)
@@ -152,15 +152,15 @@ sub initGLFW
 
     '' init
     if( glfwInit( ) = 0 ) then
-    	end 1
+        end 1
     end if
 
     '' create window
     glfw_window = glfwCreateWindow( WIN_WIDTH, WIN_HEIGHT, _
     	"FreeBASIC OpenGL Extension example", NULL, NULL )
     if( glfw_window = NULL ) then
-    	glfwTerminate( )
-    	end 1
+        glfwTerminate( )
+        end 1
     end if
 
     glfwMakeContextCurrent( glfw_window )
@@ -216,20 +216,20 @@ sub renderScene
 
 	''
 	if( ctx.updviewport ) then
-    	ctx.updviewport = FALSE
+        ctx.updviewport = FALSE
 
-    	glViewport 0, 0, ctx.width, ctx.height
-    	glMatrixMode GL_PROJECTION
-    	glLoadIdentity
+        glViewport 0, 0, ctx.width, ctx.height
+        glMatrixMode GL_PROJECTION
+        glLoadIdentity
 
-    	if ( ctx.height = 0 ) then
+        if ( ctx.height = 0 ) then
 			gluPerspective 60, ctx.width, 1.0, 100.0
-    	else
-        	gluPerspective 60, ctx.width / ctx.height, 1.0, 100.0
-    	end if
+        else
+            gluPerspective 60, ctx.width / ctx.height, 1.0, 100.0
+        end if
 
-    	glMatrixMode GL_MODELVIEW
-    	glLoadIdentity
+        glMatrixMode GL_MODELVIEW
+        glLoadIdentity
 
     end if
 
@@ -272,16 +272,16 @@ sub main
     ''
     do
 
-    	if( ctx.redraw ) then
-    		ctx.redraw = FALSE
+        if( ctx.redraw ) then
+            ctx.redraw = FALSE
 
-    		'' render the scene
-    		renderScene( )
+            '' render the scene
+            renderScene( )
 
         else
 
-        	'' Idle process
-        	sleep 50, 1
+            '' Idle process
+            sleep 50, 1
 
         end if
 

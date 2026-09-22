@@ -7,6 +7,8 @@
 '' --------
 
 '' draws a diagonal red line with a white box, and waits for 3 seconds
+'' Mode 13 is the documented compatibility mode for this LINE lesson.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL734
 Screen 13
 Line (20, 20)-(300, 180), 4
 Line (140, 80)-(180, 120), 15, b

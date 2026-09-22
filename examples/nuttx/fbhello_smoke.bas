@@ -2,7 +2,7 @@
 '' Project: FreeBASIC NuttX examples
 '' ---------------------------------
 ''
-'' File: fbhello.bas
+'' File: fbhello_smoke.bas
 ''
 '' Purpose:
 ''
@@ -12,12 +12,21 @@
 ''
 ''     - prove that generated C from a BASIC source can run as a NuttX app
 ''     - cover core scalar, string, array, heap, file, and filesystem helpers
+''     - demonstrate one-owner file-handle cleanup across the file-operation checks
+
+'' Ownership:
+
+''     file_handle is acquired through FreeFile once and each successful Open is
+''     closed before the next operation.  An Open failure owns no handle and ends
+''     the smoke before a later operation could use an invalid file number.
 ''
 '' This file intentionally does NOT contain:
 ''
 ''     - graphics, audio, threads, or networking
 ''     - target-specific compiler switches
 ''
+
+#include once "dir.bi"
 
 sample_data:
 data 10, 20
@@ -46,6 +55,7 @@ print "sin sample ="; iif(sin(math_x) > 0.47 and sin(math_x) < 0.49, 1, 0)
 print "cos sample ="; iif(cos(math_x) > 0.87 and cos(math_x) < 0.88, 1, 0)
 print "sqr sample ="; iif(sqr(math_y) = 3.0, 1, 0)
 print "int sample ="; iif(int(math_x + 3.2) = 3.0, 1, 0)
+'' Fix deliberately demonstrates truncation toward zero for a negative value. FB-LINTER: DISABLE-NEXT-LINE FBL408 FBL-NUM-014
 print "fix sample ="; iif(fix(-math_x - 3.2) = -3.0, 1, 0)
 
 dim as byte width_b = -7
@@ -234,8 +244,14 @@ redim as integer grid(1 to 2, 1 to 3)
 grid(1, 1) = 7
 grid(2, 3) = 11
 
-if lbound(grid, 1) = 1 and ubound(grid, 1) = 2 and _
-    lbound(grid, 2) = 1 and ubound(grid, 2) = 3 then
+if ubound(grid, 1) < lbound(grid, 1) orelse _
+    ubound(grid, 2) < lbound(grid, 2) then
+    print "redim2 bounds bad"
+    end 1
+end if
+
+if lbound(grid, 1) = 1 andalso ubound(grid, 1) = 2 andalso _
+    lbound(grid, 2) = 1 andalso ubound(grid, 2) = 3 then
     print "redim2 bounds ok"
 else
     print "redim2 bounds bad"
@@ -257,118 +273,212 @@ dim as string time_sample = time
 print "time sample ="; iif(len(time_sample) = 8, 1, 0)
 
 dim as string file_line
+dim as integer file_handle = freefile
 
-open "/ram/fbhello.txt" for output as #1
-print #1, "file line"
-close #1
+if file_handle <= 0 then
+    print "freefile allocation failed"
+    end 1
+end if
 
-open "/ram/fbhello.txt" for input as #1
-print "file eof start ="; iif(eof(1), 1, 0)
-print "file size ="; lof(1)
-print "file loc start ="; loc(1)
-seek #1, 1
-print "file seek ="; seek(1)
-line input #1, file_line
-print "file eof end ="; iif(eof(1), 1, 0)
-close #1
+/'
+    File-operation smoke tests depend on NuttX's RAM filesystem.  Once an
+    Open fails, the assigned file number has no valid resource, so the test
+    stops rather than reporting misleading results from later operations.
+
+    Every absolute test path is a literal below /ram.  Relative fixture paths
+    are used only after the test verifies its /ram/fbdir working directory.
+'/
+
+'' Fixed NuttX RAM fixture; the Open result is checked immediately below. FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
+open "/ram/fbhello.txt" for output as #file_handle
+if err <> 0 then
+    print "open fbhello output failed ="; err
+    end 1
+end if
+print #file_handle, "file line"
+close #file_handle
+
+open "/ram/fbhello.txt" for input as #file_handle
+if err <> 0 then
+    print "open fbhello input failed ="; err
+    end 1
+end if
+print "file eof start ="; iif(eof(file_handle), 1, 0)
+print "file size ="; lof(file_handle)
+print "file loc start ="; loc(file_handle)
+seek #file_handle, 1
+print "file seek ="; seek(file_handle)
+line input #file_handle, file_line
+print "file eof end ="; iif(eof(file_handle), 1, 0)
+close #file_handle
 
 print "file sample = "; file_line
 
-open "/ram/fbappend.txt" for output as #1
-print #1, "one"
-close #1
+'' Fixed NuttX RAM fixture; the Open result is checked immediately below. FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
+open "/ram/fbappend.txt" for output as #file_handle
+if err <> 0 then
+    print "open append output failed ="; err
+    end 1
+end if
+print #file_handle, "one"
+close #file_handle
 
-open "/ram/fbappend.txt" for append as #1
-print #1, "two"
-close #1
+open "/ram/fbappend.txt" for append as #file_handle
+if err <> 0 then
+    print "open append append failed ="; err
+    end 1
+end if
+print #file_handle, "two"
+close #file_handle
 
 dim as string append_a, append_b
 
-open "/ram/fbappend.txt" for input as #1
-line input #1, append_a
-line input #1, append_b
-close #1
+open "/ram/fbappend.txt" for input as #file_handle
+if err <> 0 then
+    print "open append input failed ="; err
+    end 1
+end if
+line input #file_handle, append_a
+line input #file_handle, append_b
+close #file_handle
 
 print "append sample = "; append_a; ":"; append_b
 kill "/ram/fbappend.txt"
 
-open "/ram/fbreset.txt" for output as #1
-print #1, "reset ok"
+'' Fixed NuttX RAM fixture; the Open result is checked immediately below. FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
+open "/ram/fbreset.txt" for output as #file_handle
+if err <> 0 then
+    print "open reset output failed ="; err
+    end 1
+end if
+print #file_handle, "reset ok"
 reset
 
-open "/ram/fbreset.txt" for input as #1
-line input #1, file_line
-close #1
+open "/ram/fbreset.txt" for input as #file_handle
+if err <> 0 then
+    print "open reset input failed ="; err
+    end 1
+end if
+line input #file_handle, file_line
+close #file_handle
 
 print "reset sample = "; file_line
 kill "/ram/fbreset.txt"
 
-open "/ram/fblock.bin" for binary as #1
-lock #1, 1 to 1
-unlock #1, 1 to 1
-close #1
+open "/ram/fblock.bin" for binary as #file_handle
+if err <> 0 then
+    print "open lock binary failed ="; err
+    end 1
+end if
+lock #file_handle, 1 to 1
+unlock #file_handle, 1 to 1
+close #file_handle
 print "lock sample ok"
 kill "/ram/fblock.bin"
 
-open "/ram/fbinputdollar.txt" for output as #1
-print #1, "abcdef";
-close #1
+'' Fixed NuttX RAM fixture; the Open result is checked immediately below. FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
+open "/ram/fbinputdollar.txt" for output as #file_handle
+if err <> 0 then
+    print "open input dollar output failed ="; err
+    end 1
+end if
+print #file_handle, "abcdef";
+close #file_handle
 
-open "/ram/fbinputdollar.txt" for input as #1
-dim as string input_dollar_sample = input$(3, #1)
-close #1
+open "/ram/fbinputdollar.txt" for input as #file_handle
+if err <> 0 then
+    print "open input dollar input failed ="; err
+    end 1
+end if
+dim as string input_dollar_sample = input$(3, #file_handle)
+close #file_handle
 
 print "input dollar sample = "; input_dollar_sample
 kill "/ram/fbinputdollar.txt"
 
-open "/ram/inputfile.txt" for output as #1
-print #1, "from file"
-print #1, "456"
-print #1, "7.5"
-close #1
+'' Fixed NuttX RAM fixture; the Open result is checked immediately below. FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
+open "/ram/inputfile.txt" for output as #file_handle
+if err <> 0 then
+    print "open input file output failed ="; err
+    end 1
+end if
+print #file_handle, "from file"
+print #file_handle, "456"
+print #file_handle, "7.5"
+close #file_handle
 
 dim as string file_input_string
 dim as integer file_input_int
 dim as double file_input_double
 
-open "/ram/inputfile.txt" for input as #1
-input #1, file_input_string, file_input_int, file_input_double
-close #1
+open "/ram/inputfile.txt" for input as #file_handle
+if err <> 0 then
+    print "open input file input failed ="; err
+    end 1
+end if
+'' Typed Input # parsing is intentional smoke coverage. FB-LINTER: DISABLE-NEXT-LINE FBL517
+input #file_handle, file_input_string, file_input_int, file_input_double
+close #file_handle
 
 print "file input string = "; file_input_string
 print "file input int ="; file_input_int
 print "file input double ="; file_input_double
 kill "/ram/inputfile.txt"
 
-open "/ram/fbwrite.txt" for output as #1
-write #1, "abc", 123, 4.5
-close #1
+'' Fixed NuttX RAM fixture; the Open result is checked immediately below. FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
+open "/ram/fbwrite.txt" for output as #file_handle
+if err <> 0 then
+    print "open write output failed ="; err
+    end 1
+end if
+'' Write # record encoding is intentional smoke coverage. FB-LINTER: DISABLE-NEXT-LINE FBL517
+write #file_handle, "abc", 123, 4.5
+close #file_handle
 
-open "/ram/fbwrite.txt" for input as #1
-line input #1, file_line
-close #1
+open "/ram/fbwrite.txt" for input as #file_handle
+if err <> 0 then
+    print "open write line input failed ="; err
+    end 1
+end if
+line input #file_handle, file_line
+close #file_handle
 print "write sample = "; file_line
 
 dim as string write_input_string
 dim as integer write_input_int
 dim as double write_input_double
 
-open "/ram/fbwrite.txt" for input as #1
-input #1, write_input_string, write_input_int, write_input_double
-close #1
+open "/ram/fbwrite.txt" for input as #file_handle
+if err <> 0 then
+    print "open write typed input failed ="; err
+    end 1
+end if
+'' Write # record decoding is intentional smoke coverage. FB-LINTER: DISABLE-NEXT-LINE FBL517
+input #file_handle, write_input_string, write_input_int, write_input_double
+close #file_handle
 print "write input string = "; write_input_string
 print "write input int ="; write_input_int
 print "write input double ="; write_input_double
 kill "/ram/fbwrite.txt"
 
-open "/ram/fbwritetypes.txt" for output as #1
-write #1, cbyte(-1), cubyte(2), cshort(-3), cushort(4), cuint(5), _
+'' Fixed NuttX RAM fixture; the Open result is checked immediately below. FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
+open "/ram/fbwritetypes.txt" for output as #file_handle
+if err <> 0 then
+    print "open write types output failed ="; err
+    end 1
+end if
+'' Typed Write # encoding is intentional smoke coverage. FB-LINTER: DISABLE-NEXT-LINE FBL517
+write #file_handle, cbyte(-1), cubyte(2), cshort(-3), cushort(4), cuint(5), _
     clngint(-6), culngint(7), csng(1.25), true
-close #1
+close #file_handle
 
-open "/ram/fbwritetypes.txt" for input as #1
-line input #1, file_line
-close #1
+open "/ram/fbwritetypes.txt" for input as #file_handle
+if err <> 0 then
+    print "open write types line input failed ="; err
+    end 1
+end if
+line input #file_handle, file_line
+close #file_handle
 print "write types sample = "; file_line
 
 dim as byte write_byte
@@ -381,99 +491,183 @@ dim as ulongint write_ulongint
 dim as single write_single
 dim as boolean write_bool
 
-open "/ram/fbwritetypes.txt" for input as #1
-input #1, write_byte, write_ubyte, write_short, write_ushort, write_uint, _
+open "/ram/fbwritetypes.txt" for input as #file_handle
+if err <> 0 then
+    print "open write types typed input failed ="; err
+    end 1
+end if
+'' Typed Write # decoding is intentional smoke coverage. FB-LINTER: DISABLE-NEXT-LINE FBL517
+input #file_handle, write_byte, write_ubyte, write_short, write_ushort, write_uint, _
     write_longint, write_ulongint, write_single, write_bool
-close #1
+close #file_handle
 
-print "write input types ok ="; iif(write_byte = -1 and write_ubyte = 2 and _
-    write_short = -3 and write_ushort = 4 and write_uint = 5 and _
-    write_longint = -6 and write_ulongint = 7 and _
-    abs(write_single - 1.25) < 0.01 and (write_bool <> 0), 1, 0)
+print "write input types ok ="; iif(write_byte = -1 andalso write_ubyte = 2 andalso _
+    write_short = -3 andalso write_ushort = 4 andalso write_uint = 5 andalso _
+    write_longint = -6 andalso write_ulongint = 7 andalso _
+    abs(write_single - 1.25) < 0.01 andalso (write_bool <> 0), 1, 0)
 kill "/ram/fbwritetypes.txt"
 
 dim as integer binary_value = &h12345678
 
-open "/ram/fbhello.bin" for binary as #1
-put #1, , binary_value
-seek #1, 1
+open "/ram/fbhello.bin" for binary as #file_handle
+if err <> 0 then
+    print "open binary sample failed ="; err
+    end 1
+end if
+/'
+    Binary integer fixture:
+
+        byte 1 through SizeOf(Integer): native Integer bit pattern
+
+    This is a same-build NuttX round trip, not a portable file format.
+'/
+'' The binary contract above is intentional smoke coverage. FB-LINTER: DISABLE-NEXT-LINE FBL-DOC-BIN-003
+put #file_handle, , binary_value
+seek #file_handle, 1
 binary_value = 0
-get #1, , binary_value
-close #1
+get #file_handle, , binary_value
+close #file_handle
 
 print "binary sample ="; iif(binary_value = &h12345678, 1, 0)
 
+/'
+    Random-record fixture layout on this NuttX build:
+
+        first native Integer field
+        then six fixed text bytes
+
+    The record uses the same compiler and target for its complete round trip.
+'/
 type sample_rec
     as integer n
-    as string * 6 text
+    as string * 6 text '' Fixed same-build record field. FB-LINTER: DISABLE-LINE FBL-STR-009
 end type
 
 dim as sample_rec rec
 rec.n = 77
 rec.text = "nuttx"
 
-open "/ram/fbrandom.dat" for random as #1 len = len(sample_rec)
-put #1, 1, rec
+open "/ram/fbrandom.dat" for random as #file_handle len = len(sample_rec)
+if err <> 0 then
+    print "open random record failed ="; err
+    end 1
+end if
+put #file_handle, 1, rec
 rec.n = 0
 rec.text = ""
-get #1, 1, rec
-close #1
+get #file_handle, 1, rec
+close #file_handle
 
 print "random file sample ="; iif(rec.n = 77 and trim(rec.text) = "nuttx", 1, 0)
 kill "/ram/fbrandom.dat"
 
 dim as string binary_text = "xyz"
 
-open "/ram/fbrandomstr.dat" for random as #1 len = 8
+open "/ram/fbrandomstr.dat" for random as #file_handle len = 8
+if err <> 0 then
+    print "open random string failed ="; err
+    end 1
+end if
 binary_text = "qqqq"
-put #1, 2, "nuttx"
+put #file_handle, 2, "nuttx"
 binary_text = space(5)
-get #1, 2, binary_text
-close #1
+get #file_handle, 2, binary_text
+close #file_handle
 
 print "random string sample = "; trim(binary_text)
 kill "/ram/fbrandomstr.dat"
 
 binary_text = "xyz"
 
-open "/ram/fbhello-str.bin" for binary as #1
-put #1, , binary_text
-seek #1, 1
+open "/ram/fbhello-str.bin" for binary as #file_handle
+if err <> 0 then
+    print "open binary string failed ="; err
+    end 1
+end if
+/'
+    Binary string fixture has no length field or header.  The following Put
+    and Get transfer the three bytes in binary_text within this same process.
+'/
+'' The binary contract above is intentional smoke coverage. FB-LINTER: DISABLE-NEXT-LINE FBL-DOC-BIN-003
+put #file_handle, , binary_text
+seek #file_handle, 1
 binary_text = space(3)
-get #1, , binary_text
-close #1
+get #file_handle, , binary_text
+close #file_handle
 
 print "binary string sample = "; binary_text
 kill "/ram/fbhello-str.bin"
 
 mkdir "/ram/fbdir"
 chdir "/ram/fbdir"
-print "curdir sample ="; iif(instr(curdir, "fbdir") > 0, 1, 0)
+dim as string smoke_directory = curdir
 
-open "killme.txt" for output as #1
-print #1, "x"
-close #1
+if smoke_directory <> "/ram/fbdir" then
+    print "smoke working directory failed = "; smoke_directory
+    end 1
+end if
+
+print "curdir sample ="; iif(smoke_directory = "/ram/fbdir", 1, 0)
+
+'' Verified NuttX RAM working directory; the Open result is checked below. FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
+open "killme.txt" for output as #file_handle
+if err <> 0 then
+    print "open kill sample failed ="; err
+    end 1
+end if
+print #file_handle, "x"
+close #file_handle
 kill "killme.txt"
 print "kill sample ok"
 
-open "oldname.txt" for output as #1
-print #1, "x"
-close #1
+'' Verified NuttX RAM working directory; the Open result is checked below. FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
+open "oldname.txt" for output as #file_handle
+if err <> 0 then
+    print "open rename sample failed ="; err
+    end 1
+end if
+print #file_handle, "x"
+close #file_handle
 name "oldname.txt" as "newname.txt"
 kill "newname.txt"
 print "rename sample ok"
 
-mkdir "remove-me"
-rmdir "remove-me"
+dim as string safe_remove_directory = "remove-me"
+mkdir safe_remove_directory
+
+if dir(safe_remove_directory, fbDirectory) <> "" then
+    rmdir safe_remove_directory
+
+    if err <> 0 then
+        print "remove directory failed ="; err
+        end 1
+    end if
+else
+    print "remove directory fixture missing"
+    end 1
+end if
+
 print "rmdir sample ok"
 
-mkdir "dirprobe"
-open "dirprobe/one.txt" for output as #1
-print #1, "x"
-close #1
-open "dirprobe/two.txt" for output as #1
-print #1, "x"
-close #1
+dim as string safe_probe_directory = "dirprobe"
+mkdir safe_probe_directory
+
+'' Verified NuttX RAM working directory; the Open result is checked below. FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
+open "dirprobe/one.txt" for output as #file_handle
+if err <> 0 then
+    print "open first directory sample failed ="; err
+    end 1
+end if
+print #file_handle, "x"
+close #file_handle
+'' Verified NuttX RAM working directory; the Open result is checked below. FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
+open "dirprobe/two.txt" for output as #file_handle
+if err <> 0 then
+    print "open second directory sample failed ="; err
+    end 1
+end if
+print #file_handle, "x"
+close #file_handle
 dim as string dir_first = dir("dirprobe/*.txt")
 dim as string dir_second = dir()
 dim as string dir_third = dir()
@@ -486,10 +680,26 @@ end if
 print "dir sample ="; dir_ok
 kill "dirprobe/one.txt"
 kill "dirprobe/two.txt"
-rmdir "dirprobe"
+
+if dir(safe_probe_directory, fbDirectory) <> "" then
+    rmdir safe_probe_directory
+
+    if err <> 0 then
+        print "directory probe removal failed ="; err
+        end 1
+    end if
+else
+    print "directory probe fixture missing"
+    end 1
+end if
 
 dim as integer free_handle = freefile
+'' Verified NuttX RAM working directory; the Open result is checked below. FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
 open "freefile.txt" for output as #free_handle
+if err <> 0 then
+    print "open freefile sample failed ="; err
+    end 1
+end if
 print #free_handle, "free"
 close #free_handle
 print "freefile sample ="; iif(free_handle > 0, 1, 0)
@@ -530,4 +740,4 @@ deallocate zero_values
 
 chdir "/"
 
-'' end of fbhello.bas
+'' end of fbhello_smoke.bas

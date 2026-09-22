@@ -30,7 +30,8 @@
 #include once "crt/string.bi"
 #include once "CUnit/Basic.bi"
 
-'' Pointer to the file used by the tests.
+'' The suite owns this temporary stream for the complete test run.  This
+'' shared state follows CUnit's serialized setup, test, and cleanup order.
 dim shared as FILE ptr temp_file = NULL
 
 /' The suite initialization function.
@@ -38,7 +39,7 @@ dim shared as FILE ptr temp_file = NULL
  ' Returns zero on success, non-zero otherwise.
  '/
 function init_suite1 cdecl() as long
-   temp_file = fopen("temp.txt", "w+")
+   temp_file = tmpfile()
    if temp_file = NULL then
       return -1
    else
@@ -54,7 +55,6 @@ function clean_suite1 cdecl() as long
    if fclose(temp_file) <> 0 then
       return -1
    else
-      remove( "temp.txt" )
       temp_file = NULL
       return 0
    end if
@@ -65,10 +65,10 @@ end function
  ' whether the expected number of bytes were written.
  '/
 sub testFPRINTF cdecl()
-   dim as integer i1 = 10
+   dim as long i1 = 10
 
    if temp_file <> NULL then
-      CU_ASSERT( fprintf(temp_file, "") = 0)
+      CU_ASSERT( fprintf(temp_file, "%s", "") = 0)
       CU_ASSERT( fprintf(temp_file, !"Q\n") = 2 )
       CU_ASSERT( fprintf(temp_file, "i1 = %d", i1) = 7 )
    end if
@@ -121,3 +121,5 @@ end sub
 
    CU_cleanup_registry()
    end CU_get_error()
+
+' end of simple.bas

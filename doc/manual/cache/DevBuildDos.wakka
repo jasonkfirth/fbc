@@ -26,6 +26,41 @@ make TARGET_TRIPLET=i586-pc-msdosdjgpp
 {{fbdoc item="subsect" value="Known DOS limits"}}
 
 Most normal compiler and runtime work is usable on DOS, but DOS-specific limits
-remain important. The DOS runtime does not provide thread support, TCP support
-is not available there, and audio playback is blocking compared with the more
-modern hosted ports.
+remain important. The default DJGPP DOS runtime leaves threads and TCP
+disabled. An explicit
+##DOS_TCP_PROVIDER=watt32## build can add IPv4 TCP through Watt-32 when a packet
+driver and ##WATTCP.CFG## are present, but it does not enable ##-mt##.
+
+FreeDOS programs built with DJGPP need a DPMI host such as CWSDPMI or HDPMI.
+JEMM is an expanded memory manager/V86 monitor, not a DPMI host.
+If the DPMI host has been tested with the target DOSBox or machine, add
+##DOS_DPMI_YIELD=YesPlease## to make the DJGPP delay path issue the DPMI
+release-time-slice request. A host that implements this request can run other
+activities while a program is in ##SLEEP## or ##DELAY##. It does not create
+parallel FreeBASIC threads, and the default remains disabled because some DOS
+extenders do not safely implement the yield path. The existing
+##__fb_dos_no_dpmi_yield## variable can still force the conservative behavior at
+run time.
+
+The separate ##-target dos-hx## workflow is an experimental route for testing
+Win32 programs with HX's preemptive scheduler under DOS. It emits an ordinary x86
+Win32 PE image for HX, so the existing Win32 ##CreateThread##, wait, mutex,
+condition-variable, and Winsock runtime paths remain in use. Run HX's
+##PatchPE## tool on the image and ship the matching HX files. The HX route is a
+Win32-under-DOS deployment profile, not an extension of the DJGPP DOS ABI.
+The target alias does not establish that HX supports every imported API.
+
+An optional native thread runtime is available with
+##DOS_THREAD_PROVIDER=pdmlwp##. Compile and link programs using
+##-target dos -dos-threads pdmlwp##. It provides RTC-preempted shared-memory
+threads on one CPU, TLS, mutexes and condition variables. Threaded sfxlib
+feeds Sound Blaster DMA from a worker and uses completion interrupts where
+available. PC speaker output can use a worker-fed queue with an 8192 Hz RTC
+consumer while thread scheduling stays at 128 Hz. Conflicting RTC use retains
+synchronous speaker writes. Ordinary ##-mt## alone is still rejected on DOS.
+
+This profile requires x87 code and exclusive periodic RTC ownership; it does
+not support SSE, ThreadCall or multicore execution. Foreign libraries still
+need reentrancy review. The source tree's ##docs/freedos-providers.md## records
+the provider license, build instructions, limitations and DOSBox-X tests with
+FreeDOS 1.4/CWSDPMI r7. The default DOS/QB profile remains separate.

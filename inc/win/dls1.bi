@@ -24,6 +24,9 @@
 
 #pragma once
 
+#include once "windows.bi"
+#include once "mmsystem.bi"
+
 #define __WINE_INCLUDE_DLS1_H
 #define FOURCC_DLS mmioFOURCC(asc("D"), asc("L"), asc("S"), asc(" "))
 #define FOURCC_DLID mmioFOURCC(asc("d"), asc("l"), asc("i"), asc("d"))

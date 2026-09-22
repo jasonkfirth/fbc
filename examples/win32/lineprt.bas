@@ -10,7 +10,7 @@ if len(printer_name)=0 then end 1
 
 line input "What's the documents title"; doc_title
 if len(doc_title)>0 then
-    if instr(doc_title,",")>0 then
+    if instr(doc_title, ",")>0 then
         print "The document title must not contain a comma"
         end 1
     end if
@@ -18,6 +18,10 @@ if len(doc_title)>0 then
 end if
 
 open lpt "LPT:" + printer_name + ",EMU=TTY" + doc_title as 1
+if err <> 0 then
+    print "Could not open the selected printer"
+    end 1
+end if
 print #1, "Hello World !"
 print #1, chr(12); ' start a new page
 print #1, "I say ""Hello World !"" on page 2"

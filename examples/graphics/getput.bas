@@ -44,29 +44,29 @@ declare sub redraw(byref title as string)
 
 	dim as integer i = 0
 
-	redraw "array": clear array(0),,IMAGE_BUFFER_BYTES
-	get (0,0)-(IMAGE_WIDTH-1,IMAGE_HEIGHT-1), array
-	cls: put (0,0), array, pset: sleep
+	redraw "array": clear array(0),, IMAGE_BUFFER_BYTES
+	get (0, 0)-(IMAGE_WIDTH-1, IMAGE_HEIGHT-1), array
+	cls: put (0, 0), array, pset: sleep
 	k = inkey
 
-	redraw "array(i)": clear array(0),,IMAGE_BUFFER_BYTES
-	get (0,0)-(IMAGE_WIDTH-1,IMAGE_HEIGHT-1), array(i)
-	cls: put (0,0), array(i), pset: sleep
+	redraw "array(i)": clear array(0),, IMAGE_BUFFER_BYTES
+	get (0, 0)-(IMAGE_WIDTH-1, IMAGE_HEIGHT-1), array(i)
+	cls: put (0, 0), array(i), pset: sleep
 	k = inkey
 
-	redraw "@array(i)": clear array(0),,IMAGE_BUFFER_BYTES
-	get (0,0)-(IMAGE_WIDTH-1,IMAGE_HEIGHT-1), @array(i)
-	cls: put (0,0), @array(i), pset: sleep
+	redraw "@array(i)": clear array(0),, IMAGE_BUFFER_BYTES
+	get (0, 0)-(IMAGE_WIDTH-1, IMAGE_HEIGHT-1), @array(i)
+	cls: put (0, 0), @array(i), pset: sleep
 	k = inkey
 
-	redraw "array_ptr": clear array(0),,IMAGE_BUFFER_BYTES
-	get (0,0)-(IMAGE_WIDTH-1,IMAGE_HEIGHT-1), array_ptr
-	cls: put (0,0), array_ptr, pset: sleep
+	redraw "array_ptr": clear array(0),, IMAGE_BUFFER_BYTES
+	get (0, 0)-(IMAGE_WIDTH-1, IMAGE_HEIGHT-1), array_ptr
+	cls: put (0, 0), array_ptr, pset: sleep
 	k = inkey
 
 	redraw "@udt": clear udt,, IMAGE_BUFFER_BYTES
-	get (0,0)-(IMAGE_WIDTH-1,IMAGE_HEIGHT-1), @udt
-	cls: put (0,0), @udt, pset: sleep
+	get (0, 0)-(IMAGE_WIDTH-1, IMAGE_HEIGHT-1), @udt
+	cls: put (0, 0), @udt, pset: sleep
 	k = inkey
 
 	'redraw "udt_ptr": clear udt,,IMAGE_BUFFER_BYTES
@@ -74,9 +74,9 @@ declare sub redraw(byref title as string)
 	'cls: put (0,0), udt_ptr, pset: sleep
 	'k = inkey
 
-	redraw "@array_ptr[i]": clear array(0),,IMAGE_BUFFER_BYTES
-	get (0,0)-(IMAGE_WIDTH-1,IMAGE_HEIGHT-1), @array_ptr[i]
-	cls: put (0,0), @array_ptr[i], pset: sleep
+	redraw "@array_ptr[i]": clear array(0),, IMAGE_BUFFER_BYTES
+	get (0, 0)-(IMAGE_WIDTH-1, IMAGE_HEIGHT-1), @array_ptr[i]
+	cls: put (0, 0), @array_ptr[i], pset: sleep
 	k = inkey
 
 	'redraw "@udt_ptr[i]": clear udt,,IMAGE_BUFFER_BYTES
@@ -84,32 +84,32 @@ declare sub redraw(byref title as string)
 	'cls: put (0,0), @udt_ptr[i], pset: sleep
 	'k = inkey
 
-	redraw "udt.array": clear udtf.array(0),,IMAGE_BUFFER_BYTES
-	get (0,0)-(IMAGE_WIDTH-1,IMAGE_HEIGHT-1), udtf.array
-	cls: put (0,0), udtf.array, pset: sleep
+	redraw "udt.array": clear udtf.array(0),, IMAGE_BUFFER_BYTES
+	get (0, 0)-(IMAGE_WIDTH-1, IMAGE_HEIGHT-1), udtf.array
+	cls: put (0, 0), udtf.array, pset: sleep
 	k = inkey
 
-	redraw "udt.array(i)": clear udtf.array(0),,IMAGE_BUFFER_BYTES
-	get (0,0)-(IMAGE_WIDTH-1,IMAGE_HEIGHT-1), udtf.array(i)
-	cls: put (0,0), udtf.array(i), pset: sleep
+	redraw "udt.array(i)": clear udtf.array(0),, IMAGE_BUFFER_BYTES
+	get (0, 0)-(IMAGE_WIDTH-1, IMAGE_HEIGHT-1), udtf.array(i)
+	cls: put (0, 0), udtf.array(i), pset: sleep
 	k = inkey
 
-	redraw "@udt.array(i)": clear udtf.array(0),,IMAGE_BUFFER_BYTES
-	get (0,0)-(IMAGE_WIDTH-1,IMAGE_HEIGHT-1), @udtf.array(i)
-	cls: put (0,0), @udtf.array(i), pset: sleep
+	redraw "@udt.array(i)": clear udtf.array(0),, IMAGE_BUFFER_BYTES
+	get (0, 0)-(IMAGE_WIDTH-1, IMAGE_HEIGHT-1), @udtf.array(i)
+	cls: put (0, 0), @udtf.array(i), pset: sleep
 	k = inkey
 
-	redraw "udt->array(i)": clear udtf.array(0),,IMAGE_BUFFER_BYTES
-	get (0,0)-(IMAGE_WIDTH-1,IMAGE_HEIGHT-1), pudtf->array(i)
-	cls: put (0,0), pudtf->array(i), pset: sleep
+	redraw "udt->array(i)": clear udtf.array(0),, IMAGE_BUFFER_BYTES
+	get (0, 0)-(IMAGE_WIDTH-1, IMAGE_HEIGHT-1), pudtf->array(i)
+	cls: put (0, 0), pudtf->array(i), pset: sleep
 	k = inkey
 
 
 sub redraw(byref title as string)
 	static as integer c = 1
 	cls
-	line (0,0)-(IMAGE_WIDTH-1,IMAGE_HEIGHT-1), c
-	line (0,IMAGE_HEIGHT-1)-(IMAGE_WIDTH-1,0), c+1
+	line (0, 0)-(IMAGE_WIDTH-1, IMAGE_HEIGHT-1), c
+	line (0, IMAGE_HEIGHT-1)-(IMAGE_WIDTH-1, 0), c+1
 	print title
 	c += 1
 end sub

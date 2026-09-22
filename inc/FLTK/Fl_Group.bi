@@ -4,7 +4,7 @@
 
 extern "c++"
 
-type Fl_Group_ as Fl_Group 
+type Fl_Group_ as Fl_Group
 
 type Fl_Group extends Fl_Widget
 private:
@@ -22,9 +22,9 @@ protected:
 	declare const sub draw_child(byref widget as Fl_Widget)
 	declare sub draw_children()
 	declare const sub draw_outside_label(byref widget as const Fl_Widget)
-	declare const sub update_child(byref widget as Fl_Widget) 
+	declare const sub update_child(byref widget as Fl_Widget)
 	declare function sizes() as long ptr
-	
+
 
 public:
 	declare constructor (byref w as const Fl_Group)

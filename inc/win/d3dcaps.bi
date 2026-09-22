@@ -23,6 +23,7 @@
 #pragma once
 
 #include once "ddraw.bi"
+#include once "d3dtypes.bi"
 
 extern "Windows"
 

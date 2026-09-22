@@ -332,13 +332,15 @@ sub DrawAllViews( )
         glMatrixMode( GL_MODELVIEW )
         glLoadIdentity()
         glColor3f( 1.0, 1.0, 0.6 )
+        '' Each pair of views shares a row, so integer division selects row zero or one.
+        '' FB-LINTER: DISABLE-NEXT-LINE FBL405 FBL-NUM-017
         glTranslatef( (active_view-1) and 1, 1-(active_view-1)\2, 0.0 )
         glBegin( GL_LINE_STRIP )
-          glVertex2i( 0, 0 )
-          glVertex2i( 1, 0 )
-          glVertex2i( 1, 1 )
-          glVertex2i( 0, 1 )
-          glVertex2i( 0, 0 )
+        glVertex2i( 0, 0 )
+        glVertex2i( 1, 0 )
+        glVertex2i( 1, 1 )
+        glVertex2i( 0, 1 )
+        glVertex2i( 0, 0 )
         glEnd()
     end if
 end sub
@@ -383,7 +385,7 @@ sub MousePosFun cdecl( byval window_handle as GLFWwindow ptr, byval x as double,
     ypos = mouse_y
 
     if( active_view <> 0 ) then
-    	doredraw = TRUE
+        doredraw = TRUE
     end if
 end sub
 
@@ -398,20 +400,20 @@ sub MouseButtonFun cdecl( byval window_handle as GLFWwindow ptr, byval button as
     select case button
     case GLFW_MOUSE_BUTTON_LEFT
 
-    	if( action = GLFW_PRESS ) then
-        	'' Detect which of the four views was clicked
-        	active_view = 1
-        	if( xpos >= width_\2 ) then
-	            active_view += 1
-			end if
-        	if( ypos >= height\2 ) then
-            	active_view += 2
-        	end if
+        if( action = GLFW_PRESS ) then
+            '' Detect which of the four views was clicked
+            active_view = 1
+            if( xpos >= width_\2 ) then
+                active_view += 1
+            end if
+            if( ypos >= height\2 ) then
+                active_view += 2
+            end if
 
-    	'' Button released?
-    	else
-        	'' Deselect any previously selected view
-        	active_view = 0
+        '' Button released?
+        else
+            '' Deselect any previously selected view
+            active_view = 0
         end if
 
         doredraw = TRUE
@@ -429,14 +431,14 @@ end sub
 
     '' Initialise GLFW
     if( glfwInit( ) = 0 ) then
-    	end 1
+        end 1
     end if
 
     '' Open OpenGL window
     glfw_window = glfwCreateWindow( 500, 500, "Split view demo", NULL, NULL )
     if( glfw_window = NULL ) then
         glfwTerminate()
-    	end 0
+        end 0
     end if
 
     glfwMakeContextCurrent( glfw_window )
@@ -458,15 +460,15 @@ end sub
 
     do
         if( doredraw ) then
-        	doredraw = FALSE
+            doredraw = FALSE
 
-        	'' Draw all views
-        	DrawAllViews( )
+            '' Draw all views
+            DrawAllViews( )
 
         else
 
-        	'' Idle process
-        	sleep 25, 1
+            '' Idle process
+            sleep 25, 1
 
         end if
 

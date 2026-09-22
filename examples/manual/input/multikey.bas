@@ -13,7 +13,11 @@ Using FB '' Scan code constants are stored in the FB namespace in lang FB
 
 Dim As Integer x, y
 
-ScreenRes 640, 480
+If ScreenRes(640, 480) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 Color 2, 15
 
@@ -29,7 +33,7 @@ Do
 	ScreenLock
 		' Clear the screen and draw a circle at the position (x, y)
 		Cls
-		Circle(x, y), 30, , , , ,F
+		Circle(x, y), 30, , , , , F
 	ScreenUnlock
 
 	Sleep 15, 1
@@ -44,9 +48,10 @@ While Inkey <> "": Wend
 Print "Press CTRL and H to exit..."
 
 Do
+	'' Yield while the teaching loop waits for the key chord, avoiding a busy poll.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL602
 	Sleep 25
 
 	'' Stay in loop until user holds down CTRL and H at the same time
 	If MultiKey(SC_CONTROL) And MultiKey(SC_H) Then Exit Do
 Loop
-

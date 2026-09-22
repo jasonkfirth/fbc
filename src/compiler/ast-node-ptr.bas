@@ -65,8 +65,8 @@ function astNewDEREF _
 			case AST_NODECLASS_PTRCHK
 
 				'' convert *PTRCHK(@expr) to (expr)
-				'' TODO: Remove redundant null-pointer checks introduced by
-				'' pointer indexing when the indexed base is provably valid.
+				'' Direct address bases are handled here. Pointer-indexing bases
+				'' are handled through hRemoveRedundantPtrCheckFromIndex() below.
 
 				if( (t->l->class = AST_NODECLASS_ADDROF) or _
 					(t->l->class = AST_NODECLASS_OFFSET and t->l->ofs.ofs = 0) ) then

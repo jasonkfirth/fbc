@@ -441,8 +441,6 @@ end type
 
 type DPNMSG_DESTROY_PLAYER as _DPNMSG_DESTROY_PLAYER
 type PDPNMSG_DESTROY_PLAYER as _DPNMSG_DESTROY_PLAYER ptr
-type IDirectPlay8Address as IDirectPlay8Address_
-
 type _DPNMSG_ENUM_HOSTS_QUERY
 	dwSize as DWORD
 	pAddressSender as IDirectPlay8Address ptr

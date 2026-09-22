@@ -45,7 +45,7 @@ extern "c++"
 type Fl_Label_Draw_F as sub(label as const Fl_Label_ ptr, x as long, y as long, w as long, h as long, align as Fl_Align)
 type Fl_Label_Measure_F as sub(label as const Fl_Label_ ptr, byref width_ as long, byref height as long)
 type Fl_Box_Draw_F as sub(x as long, y as long, w as long, h as long, color_ as  Fl_Color)
-type Fl_Timeout_Handler as sub(as any ptr) 
+type Fl_Timeout_Handler as sub(as any ptr)
 type Fl_Awake_Handler as sub(as any ptr)
 type Fl_Idle_Handler as sub(as any ptr)
 type Fl_Old_Idle_Handler as sub()
@@ -102,11 +102,11 @@ public:
 		OPTION_FNFC_USES_GTK
 		OPTION_LAST
 	end enum
-private:  
+private:
 	static options_(OPTION_LAST-1) as ubyte
 	static options_read_ as ubyte
-  
-public:  
+
+public:
 
 	declare static function option(opt as Fl_Option) as boolean
 	declare static sub option(opt as Fl_Option, val_ as boolean)
@@ -536,7 +536,7 @@ private sub Fl.set_idle(cb as Fl_Old_Idle_Handler)
 	idle = cb
 end sub
 
-'private sub Fl.grab(byref win as Fl_Window_)	'moved to 
+'private sub Fl.grab(byref win as Fl_Window_)	'moved to
 '	grab(@win)
 'end sub
 

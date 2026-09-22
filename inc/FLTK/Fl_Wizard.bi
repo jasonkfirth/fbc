@@ -5,7 +5,7 @@
 
 extern "c++"
 
-type Fl_Wizard  extends Fl_Group 
+type Fl_Wizard  extends Fl_Group
 private:
 	value_ as Fl_Widget ptr
 	declare operator let (byref w as const Fl_Wizard)

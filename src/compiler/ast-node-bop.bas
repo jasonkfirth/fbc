@@ -122,6 +122,21 @@ private function hWstrLiteralCanFoldCompare _
 end function
 
 '':::::
+private function hDosWstrLiteralCanFold _
+	( _
+		byval n as ASTNODE ptr _
+	) as integer
+
+	dim as FBSYMBOL ptr s = astGetSymbol( n )
+
+	if( symbGetType( s ) = FB_DATATYPE_WCHAR ) then
+		return TRUE
+	end if
+
+	function = hStrLiteralIsAscii( symbGetVarLitText( s ) )
+end function
+
+'':::::
 private function hStrLiteralCmp _
 	( _
 		byval ltext as const zstring ptr, _
@@ -977,7 +992,9 @@ private function hCheckBopStrings _
 					'' ok to convert at compile-time?
 					if( (typeGetDtAndPtrOnly( ldtype ) = typeGetDtAndPtrOnly( rdtype )) or _
 					    ((env.wcharconv <> FB_WCHARCONV_NEVER) and _
-					     fbTargetCanFoldStrLitToWstr( FALSE )) ) then
+					     fbTargetCanFoldStrLitToWstr( FALSE ) and _
+					     ((env.clopt.target <> FB_COMPTARGET_DOS) or _
+					      (hDosWstrLiteralCanFold( l ) and hDosWstrLiteralCanFold( r )))) ) then
 						result = hWstrLiteralConcat( l, r )
 						return H_BOP_STRING_RETURN
 					end if
@@ -1004,7 +1021,9 @@ private function hCheckBopStrings _
 				'' both literals?
 				if( litsym <> NULL ) then
 					if( (typeGetDtAndPtrOnly( ldtype ) = typeGetDtAndPtrOnly( rdtype )) or _
-					    fbTargetCanFoldStrLitToWstr( FALSE ) or _
+					    (fbTargetCanFoldStrLitToWstr( FALSE ) and _
+					     ((env.clopt.target <> FB_COMPTARGET_DOS) or _
+					      (hDosWstrLiteralCanFold( l ) and hDosWstrLiteralCanFold( r )))) or _
 					    (hWstrLiteralCanFoldCompare( l ) and hWstrLiteralCanFoldCompare( r )) ) then
 						result = hWstrLiteralCompare( op, l, r )
 						return H_BOP_STRING_RETURN

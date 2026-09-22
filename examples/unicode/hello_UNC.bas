@@ -8,6 +8,8 @@
 #endif
 
 const LANG = "Chinese"
+	'' The six Unicode code points fit the fixed twenty-code-unit lesson buffer.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL510
 	dim helloworld as wstring * 20 => !"\u4f60\u597d\uff0c\u4e16\u754c!"
 
 	print """Hello World!"" in "; LANG; ": "; helloworld

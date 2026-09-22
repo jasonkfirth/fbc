@@ -442,7 +442,8 @@ void fb_sfxRunForeground(int frames)
 /*
     DOS cooperative delay
 
-    The DOS drivers are synchronous and do not own a worker thread.  Background
+    Ordinary DOS drivers are synchronous. The optional provider supplies a
+    worker and bypasses this idle pump while that worker is active. Background
     sound commands still need time to advance while a program is waiting in
     SLEEP/DELAY.  fb_Delay() calls this hook before entering the normal DOS
     sleep path, allowing sfxlib to turn that wait time into generated audio.
@@ -455,6 +456,10 @@ void fb_sfxRunForeground(int frames)
 int fb_sfxCooperativeDelay(int msecs)
 {
 #if defined(__DJGPP__)
+#if FB_SFX_DOS_THREADS
+    if (fb_sfxMsdosWorkerActive())
+        return 0;
+#endif
     if (msecs <= 0)
         return 0;
 
@@ -752,6 +757,8 @@ static void fb_sfxSleepMs(unsigned long milliseconds)
 
 #if defined(_WIN32)
     Sleep((DWORD)milliseconds);
+#elif FB_SFX_DOS_THREADS
+    fb_Delay((int)milliseconds);
 #elif defined(__DJGPP__)
     delay((unsigned)milliseconds);
 #else
@@ -1506,6 +1513,11 @@ int fb_sfxDriverFeedsAudio(void)
     int result;
 
     result = 0;
+
+#if FB_SFX_DOS_THREADS
+    if (fb_sfxMsdosWorkerActive())
+        return 1;
+#endif
 
     fb_sfxRuntimeLock();
 

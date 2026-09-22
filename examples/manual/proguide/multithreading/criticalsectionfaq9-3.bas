@@ -6,21 +6,28 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtCriticalSectionsFAQ
 '' --------
 
+'' Thread mutex synchronization:
+''
+'' Every Color call and console update is protected by mutex. The worker
+'' argument carries only the documented small thread number 1 through 9, which
+'' is converted through a pointer-sized integer before use.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 Dim Shared As Any Ptr mutex
 
 Sub Thread (ByVal p As Any Ptr)
+	Dim As Integer threadNumber = CInt(CLngInt(p))
 	MutexLock(mutex)
-	Dim As ULong c0 = Color(Cast(Integer, p) + 8, Cast(Integer, p))
+	Dim As ULong c0 = Color(threadNumber + 8, threadNumber)
 	Dim As ULong c = Color()
 	Color(LoWord(c0), HiWord(c0))
 	MutexUnlock(mutex)
-	For I As Integer = 1 To 50 - 2 * Cast(Integer, p)
+	For I As Integer = 1 To 50 - 2 * threadNumber
 		MutexLock(mutex)
 		c0 = Color(LoWord(c), HiWord(c))
-		Print " " & Cast(Integer, p) & " ";
+		Print " " & threadNumber & " ";
 		Color(LoWord(c0), HiWord(c0))
 		MutexUnlock(mutex)
-		Sleep 20 * Cast(Integer, p), 1
+		Sleep 20 * threadNumber, 1
 	Next I
 End Sub
 
@@ -50,4 +57,3 @@ Print "Any key to quit"
 Sleep
 
 MutexDestroy(mutex)
-

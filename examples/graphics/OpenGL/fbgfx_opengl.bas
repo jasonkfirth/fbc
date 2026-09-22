@@ -15,7 +15,9 @@
 
 	screen 18, 32, , FB.GFX_OPENGL or FB.GFX_MULTISAMPLE
 
-	glViewport 0, 0, 640, 480
+	const VIEWPORT_WIDTH = 640
+	const VIEWPORT_HEIGHT = 480
+	glViewport 0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT
 	glMatrixMode GL_PROJECTION
 	glLoadIdentity
 	gluPerspective 45.0, 640.0/480.0, 0.1, 100.0

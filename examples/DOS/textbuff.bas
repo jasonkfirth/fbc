@@ -20,12 +20,14 @@ Const ScreenWidth As Integer = 80
 Const ScreenHeight As Integer = 50
 Const ScreenBytes As Integer = ScreenWidth * ScreenHeight * 2
 
-Dim buffer(ScreenBytes - 1) As UByte
+Dim buffer(0 To ScreenBytes - 1) As UByte
 Dim i As Integer
 
 Width ScreenWidth, ScreenHeight
 
 Locate , , 0	' turn off cursor
+
+Randomize Timer
 
 Do Until Len(Inkey)
 

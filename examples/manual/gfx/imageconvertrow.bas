@@ -12,22 +12,56 @@ Using FB
 #endif
 
 Const As Long w = 64, h = 64
-Dim As IMAGE Ptr img8, img32
+Dim As IMAGE Ptr img8 = 0, img32 = 0
 Dim As Integer x, y
+
+Sub releaseImages(ByRef image8 As IMAGE Ptr, ByRef image32 As IMAGE Ptr)
+
+	If image8 <> 0 Then
+		ImageDestroy image8
+		image8 = 0
+	End If
+
+	If image32 <> 0 Then
+		ImageDestroy image32
+		image32 = 0
+	End If
+
+End Sub
 
 
 '' create a 32-bit image, size w*h:
-ScreenRes 1, 1, 32, , GFX_NULL
+If ScreenRes(1, 1, 32, , GFX_NULL) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
+
 img32 = ImageCreate(w, h)
 
-If img32 = 0 Then Print "Imagecreate failed on img32!": Sleep: End
+If img32 = 0 Then
+	Print "ImageCreate failed on img32!"
+	Sleep
+	End 1
+End If
 
 
 '' create an 8-bit image, size w*h:
-ScreenRes 1, 1, 8, , GFX_NULL
+If ScreenRes(1, 1, 8, , GFX_NULL) <> 0 Then
+	releaseImages img8, img32
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
+
 img8 = ImageCreate(w, h)
 
-If img8 = 0 Then Print "Imagecreate failed on img8!": Sleep: End
+If img8 = 0 Then
+	releaseImages img8, img32
+	Print "ImageCreate failed on img8!"
+	Sleep
+	End 1
+End If
 
 
 '' fill 8-bit image with a pattern
@@ -39,7 +73,13 @@ Next y
 
 
 '' open a graphics window in 8-bit mode, and PUT the image into it:
-ScreenRes 320, 200, 8
+If ScreenRes(320, 200, 8) <> 0 Then
+	releaseImages img8, img32
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
+
 WindowTitle "8-bit color mode"
 Put (10, 10), img8
 
@@ -68,7 +108,13 @@ Next y
 
 
 '' open a graphics window in 32-bit mode and PUT the image into it:
-ScreenRes 320, 200, 32
+If ScreenRes(320, 200, 32) <> 0 Then
+	releaseImages img8, img32
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
+
 WindowTitle "32-bit color mode"
 Put (10, 10), img32
 
@@ -76,5 +122,4 @@ Sleep
 
 
 '' free the images from memory:
-ImageDestroy img8
-ImageDestroy img32
+releaseImages img8, img32

@@ -6,8 +6,10 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgOpNotEqual
 '' --------
 
-Dim As String a = "hello", b = "world"
-Dim As Integer i = 10, j = i
+Dim As String a = "hello"
+Dim As String b = "world"
+Dim As Integer i = 10
+Dim As Integer j = i
 
 If (a <> b) Then
   Print a & " does not equal " & b

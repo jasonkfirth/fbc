@@ -76,11 +76,11 @@ destructor CHttpStream _
 	ctx->stream.buffer = NULL
 	ctx->stream.owns_buffer = FALSE
 
- 	if( ctx->http <> NULL ) then
- 		if( ctx->delcon ) then
- 			delete ctx->http
- 		end if
- 		ctx->http = NULL
+	if( ctx->http <> NULL ) then
+		if( ctx->delcon ) then
+			delete ctx->http
+		end if
+		ctx->http = NULL
 	end if
 
 	delete ctx
@@ -187,7 +187,7 @@ function CHttpStream.receive _
 		return FALSE
 	end if
 
- 	''
+	''
 	if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
 		deallocate( ctx->stream.buffer )
 	end if
@@ -196,7 +196,7 @@ function CHttpStream.receive _
 	ctx->stream.pos = 0
 	ctx->stream.owns_buffer = FALSE
 
- 	''
+	''
 	if( doreset ) then
 		curl_easy_reset( curl )
 	end if
@@ -216,7 +216,7 @@ function CHttpStream.receive _
 	curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, @recv_cb )
 	curl_easy_setopt( curl, CURLOPT_WRITEDATA, @ctx->stream )
 
- 	if( curl_easy_perform( curl ) <> 0 ) then
+	if( curl_easy_perform( curl ) <> 0 ) then
 		if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
 			deallocate( ctx->stream.buffer )
 		end if
@@ -225,7 +225,7 @@ function CHttpStream.receive _
 		ctx->stream.pos = 0
 		ctx->stream.owns_buffer = FALSE
 		return FALSE
- 	end if
+	end if
 
 	if( ctx->stream.buffer <> NULL ) then
 		ctx->stream.buffer[ctx->stream.pos] = 0
@@ -332,7 +332,7 @@ function CHttpStream.send _
 		return FALSE
 	end if
 
- 	''
+	''
 	if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
 		deallocate( ctx->stream.buffer )
 	end if
@@ -341,7 +341,7 @@ function CHttpStream.send _
 	ctx->stream.pos = 0
 	ctx->stream.owns_buffer = FALSE
 
- 	''
+	''
 	if( doreset ) then
 		curl_easy_reset( curl )
 	end if

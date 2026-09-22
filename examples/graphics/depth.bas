@@ -25,9 +25,9 @@ FOR i = LBOUND(depth) to UBOUND(depth)
 		CONTINUE FOR
 	END IF
 
-	SCREENINFO w, h, d,,,rate, driver
-	LINE(0,0)-(w-1,h-1),IIF(i = 0, EIGHT_BIT_BORDER_COLOR, CINT(RGB(255, 0, 0))),B
-	LOCATE 2,2: PRINT "Mode: " + STR(w) + "x" + STR(h) + "x" + STR(d);
+	SCREENINFO w, h, d,,, rate, driver
+	LINE(0, 0)-(w-1, h-1), IIF(i = 0, EIGHT_BIT_BORDER_COLOR, CINT(RGB(255, 0, 0))), B
+	LOCATE 2, 2: PRINT "Mode: " + STR(w) + "x" + STR(h) + "x" + STR(d);
 	IF (rate > 0) THEN
 		PRINT " @ " + STR(rate) + " Hz";
 	END IF

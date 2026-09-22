@@ -7,5 +7,5 @@
 '' --------
 
 ' Take Care while initializing multi-dimensional array
-Dim As Integer multidim(1 To 2,1 To 5) = {{0,0,0,0,0},{0,0,0,0,0}}
+Dim As Integer multidim(1 To 2, 1 To 5) = {{0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}}
 

@@ -20,6 +20,12 @@
 '   Remark:
 '      Voluntarily, there is no Sleep in the loop of each thread (normally strongly discouraged),
 '      but this is just in this special case to amplify the behavior effects to observe.
+'
+'   Threading:
+'      This FAQ deliberately leaves the Point2D transfer and quit flag
+'      unsynchronized. Uncommenting the adjacent MutexLock/MutexUnlock pairs is
+'      the corrected variant; the visible duplicate or missed points are the
+'      point of this demonstration.
 
 
 Union Point2D
@@ -31,6 +37,9 @@ Union Point2D
 End Union
 
 Dim As Any Ptr handle
+' The FAQ keeps the mutex and quit flag module-visible for its worker and main
+' thread. Their deliberately unsynchronized accesses are documented above.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 Dim Shared As Any Ptr mutex
 Dim Shared As Integer quit
 
@@ -51,6 +60,7 @@ End Sub
 
 
 Screen 12
+Randomize Timer
 
 Dim As Point2D P2D
 P2D.x = 520
@@ -74,4 +84,3 @@ Loop Until Inkey <> ""
 quit = 1
 ThreadWait(handle)
 MutexDestroy(mutex)
-

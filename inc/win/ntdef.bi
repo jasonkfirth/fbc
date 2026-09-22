@@ -27,7 +27,9 @@
 #include once "_mingw.bi"
 #include once "crt/ctype.bi"
 #include once "basetsd.bi"
-#include once "excpt.bi"
+#ifndef _INC_WINDOWS
+	#include once "excpt.bi"
+#endif
 #include once "sdkddkver.bi"
 #include once "crt/stdarg.bi"
 
@@ -62,19 +64,27 @@ const NULL64 = 0
 
 #ifdef __FB_64BIT__
 	#define ALIGNMENT_MACHINE
-	#define MAX_NATURAL_ALIGNMENT sizeof(ULONGLONG)
+	#ifndef MAX_NATURAL_ALIGNMENT
+		#define MAX_NATURAL_ALIGNMENT sizeof(ULONGLONG)
+	#endif
 	const MEMORY_ALLOCATION_ALIGNMENT = 16
 #else
 	#undef ALIGNMENT_MACHINE
-	#define MAX_NATURAL_ALIGNMENT sizeof(ULONG)
+	#ifndef MAX_NATURAL_ALIGNMENT
+		#define MAX_NATURAL_ALIGNMENT sizeof(ULONG)
+	#endif
 	const MEMORY_ALLOCATION_ALIGNMENT = 8
 #endif
 
 #define ARGUMENT_PRESENT(ArgumentPointer) (cptr(CHAR ptr, cast(ULONG_PTR, (ArgumentPointer))) <> cptr(CHAR ptr, NULL))
-#define CONTAINING_RECORD(address, type, field) cptr(type ptr, cast(ULONG_PTR, address) - cast(ULONG_PTR, @cptr(type ptr, 0)->field))
+#ifndef __WINNT_CONTAINING_RECORD_DEFINED
+	#define CONTAINING_RECORD(address, type, field) cptr(type ptr, cast(ULONG_PTR, address) - cast(ULONG_PTR, @cptr(type ptr, 0)->field))
+#endif
 const SYSTEM_CACHE_ALIGNMENT_SIZE = 64
-#define min(a, b) iif((a) < (b), (a), (b))
-#define max(a, b) iif((a) > (b), (a), (b))
+#ifndef __WINDEF_MINMAX_DEFINED
+	#define min(a, b) iif((a) < (b), (a), (b))
+	#define max(a, b) iif((a) > (b), (a), (b))
+#endif
 #define BASETYPES
 
 type PVOID as any ptr
@@ -161,7 +171,9 @@ type CCHAR as zstring
 type PCCHAR as zstring ptr
 type CSHORT_ as short
 type PCSHORT as short ptr
-type CLONG as ULONG
+#ifndef _WINNT_
+	type CLONG as ULONG
+#endif
 type PCLONG as ULONG ptr
 type LCID as ULONG
 type PLCID as PULONG
@@ -178,51 +190,53 @@ type QUAD as _QUAD
 type PQUAD as _QUAD ptr
 type UQUAD as _QUAD
 type PUQUAD as _QUAD ptr
+#ifndef _LARGE_INTEGER_DEFINED
 #define _LARGE_INTEGER_DEFINED
 
-type _LARGE_INTEGER_u
-	LowPart as ULONG
-	HighPart as LONG
-end type
-
-union _LARGE_INTEGER
-	type
+	type _LARGE_INTEGER_u
 		LowPart as ULONG
 		HighPart as LONG
 	end type
 
-	u as _LARGE_INTEGER_u
-	QuadPart as LONGLONG
-end union
+	union _LARGE_INTEGER
+		type
+			LowPart as ULONG
+			HighPart as LONG
+		end type
 
-type LARGE_INTEGER as _LARGE_INTEGER
-type PLARGE_INTEGER as _LARGE_INTEGER ptr
+		u as _LARGE_INTEGER_u
+		QuadPart as LONGLONG
+	end union
 
-type _ULARGE_INTEGER_u
-	LowPart as ULONG
-	HighPart as ULONG
-end type
+	type LARGE_INTEGER as _LARGE_INTEGER
+	type PLARGE_INTEGER as _LARGE_INTEGER ptr
 
-union _ULARGE_INTEGER
-	type
+	type _ULARGE_INTEGER_u
 		LowPart as ULONG
 		HighPart as ULONG
 	end type
 
-	u as _ULARGE_INTEGER_u
-	QuadPart as ULONGLONG
-end union
+	union _ULARGE_INTEGER
+		type
+			LowPart as ULONG
+			HighPart as ULONG
+		end type
 
-type ULARGE_INTEGER as _ULARGE_INTEGER
-type PULARGE_INTEGER as _ULARGE_INTEGER ptr
+		u as _ULARGE_INTEGER_u
+		QuadPart as ULONGLONG
+	end union
 
-type _LUID
-	LowPart as ULONG
-	HighPart as LONG
-end type
+	type ULARGE_INTEGER as _ULARGE_INTEGER
+	type PULARGE_INTEGER as _ULARGE_INTEGER ptr
 
-type LUID as _LUID
-type PLUID as _LUID ptr
+	type _LUID
+		LowPart as ULONG
+		HighPart as LONG
+	end type
+
+	type LUID as _LUID
+	type PLUID as _LUID ptr
+#endif
 type PHYSICAL_ADDRESS as LARGE_INTEGER
 type PPHYSICAL_ADDRESS as LARGE_INTEGER ptr
 
@@ -298,15 +312,19 @@ type PUNICODE_STRING64 as _STRING64 ptr
 type ANSI_STRING64 as _STRING64
 type PANSI_STRING64 as _STRING64 ptr
 
+#ifndef __WINNT_LANGID_MACROS_DEFINED
 #define MAKELANGID(p, s) ((cast(USHORT, (s)) shl 10) or cast(USHORT, (p)))
 #define PRIMARYLANGID(lgid) (cast(USHORT, (lgid)) and &h3ff)
 #define SUBLANGID(lgid) (cast(USHORT, (lgid)) shr 10)
+#endif
 const NLS_VALID_LOCALE_MASK = &h000fffff
+#ifndef __WINNT_LANGID_MACROS_DEFINED
 #define MAKELCID(lgid, srtid) cast(ULONG, (cast(ULONG, cast(USHORT, (srtid))) shl 16) or cast(ULONG, cast(USHORT, (lgid))))
 #define MAKESORTLCID(lgid, srtid, ver) cast(ULONG, MAKELCID(lgid, srtid) or (cast(ULONG, cast(USHORT, (ver))) shl 20))
 #define LANGIDFROMLCID(lcid) cast(USHORT, (lcid))
 #define SORTIDFROMLCID(lcid) cast(USHORT, (cast(ULONG, (lcid)) shr 16) and &hf)
 #define SORTVERSIONFROMLCID(lcid) cast(USHORT, (cast(ULONG, (lcid)) shr 20) and &hf)
+#endif
 #define __OBJECT_ATTRIBUTES_DEFINED
 
 type _OBJECT_ATTRIBUTES
@@ -375,6 +393,7 @@ enum
 end enum
 
 type WAIT_TYPE as _WAIT_TYPE
+#ifndef _LIST_ENTRY_DEFINED
 #define _LIST_ENTRY_DEFINED
 
 type _LIST_ENTRY
@@ -406,6 +425,7 @@ end type
 
 type SINGLE_LIST_ENTRY as _SINGLE_LIST_ENTRY
 type PSINGLE_LIST_ENTRY as _SINGLE_LIST_ENTRY ptr
+#endif
 #define ___PROCESSOR_NUMBER_DEFINED
 
 type _PROCESSOR_NUMBER
@@ -418,6 +438,7 @@ type PROCESSOR_NUMBER as _PROCESSOR_NUMBER
 type PPROCESSOR_NUMBER as _PROCESSOR_NUMBER ptr
 #define __PEXCEPTION_ROUTINE_DEFINED
 type PEXCEPTION_ROUTINE as function(byval ExceptionRecord as _EXCEPTION_RECORD ptr, byval EstablisherFrame as PVOID, byval ContextRecord as _CONTEXT ptr, byval DispatcherContext as PVOID) as long
+#ifndef ___GROUP_AFFINITY_DEFINED
 #define ___GROUP_AFFINITY_DEFINED
 
 type _GROUP_AFFINITY
@@ -428,17 +449,38 @@ end type
 
 type GROUP_AFFINITY as _GROUP_AFFINITY
 type PGROUP_AFFINITY as _GROUP_AFFINITY ptr
+#endif
+#ifndef RTL_FIELD_TYPE
 #define RTL_FIELD_TYPE(type, field) cptr(type ptr, 0)->field
+#endif
+#ifndef RTL_BITS_OF
 #define RTL_BITS_OF(sizeOfArg) (sizeof(sizeOfArg) * 8)
+#endif
+#ifndef RTL_BITS_OF_FIELD
 #define RTL_BITS_OF_FIELD(type, field) RTL_BITS_OF(RTL_FIELD_TYPE(type, field))
+#endif
 #define RTL_CONSTANT_STRING(s) (sizeof(s) - sizeof((s)[0]), sizeof(s), s)
+#ifndef RTL_FIELD_SIZE
 #define RTL_FIELD_SIZE(type, field) sizeof(cptr(type ptr, 0)->field)
+#endif
+#ifndef RTL_SIZEOF_THROUGH_FIELD
 #define RTL_SIZEOF_THROUGH_FIELD(type, field) (FIELD_OFFSET(type, field) + RTL_FIELD_SIZE(type, field))
+#endif
+#ifndef RTL_CONTAINS_FIELD
 #define RTL_CONTAINS_FIELD(Struct, Size, Field) ((cast(PCHAR, @(Struct)->Field) + sizeof((Struct)->Field)) <= (cast(PCHAR, (Struct)) + (Size)))
+#endif
+#ifndef RTL_NUMBER_OF_V1
 #define RTL_NUMBER_OF_V1(A) (ubound(A) - lbound(A) + 1)
+#endif
+#ifndef RTL_NUMBER_OF_V2
 #define RTL_NUMBER_OF_V2(A) RTL_NUMBER_OF_V1(A)
+#endif
+#ifndef RTL_NUMBER_OF
 #define RTL_NUMBER_OF(A) RTL_NUMBER_OF_V1(A)
+#endif
+#ifndef ARRAYSIZE
 #define ARRAYSIZE(A) RTL_NUMBER_OF_V2(A)
+#endif
 const MINCHAR = &h80
 const MAXCHAR = &h7f
 const MINSHORT = &h8000
@@ -449,11 +491,21 @@ const MAXUCHAR = &hff
 const MAXUSHORT = &hffff
 const MAXULONG = &hffffffff
 const MAXLONGLONG = &h7fffffffffffffffll
+#ifndef Int32x32To64
 #define Int32x32To64(a, b) (cast(LONGLONG, (a)) * cast(LONGLONG, (b)))
+#endif
+#ifndef UInt32x32To64
 #define UInt32x32To64(a, b) (cast(ULONGLONG, (a)) * cast(ULONGLONG, (b)))
+#endif
+#ifndef Int64ShllMod32
 #define Int64ShllMod32(a, b) (cast(ULONGLONG, (a)) shl (b))
+#endif
+#ifndef Int64ShraMod32
 #define Int64ShraMod32(a, b) (cast(LONGLONG, (a)) shr (b))
+#endif
+#ifndef Int64ShrlMod32
 #define Int64ShrlMod32(a, b) (cast(ULONGLONG, (a)) shr (b))
+#endif
 const VER_WORKSTATION_NT = &h40000000
 const VER_SERVER_NT = &h80000000
 const VER_SUITE_SMALLBUSINESS = &h00000001
@@ -601,7 +653,9 @@ const LANG_YI = &h78
 const LANG_YORUBA = &h6a
 const LANG_ZULU = &h35
 const FILE_ATTRIBUTE_VALID_FLAGS = &h00007fb7
+#ifndef FILE_SHARE_VALID_FLAGS
 #define FILE_SHARE_VALID_FLAGS ((FILE_SHARE_READ or FILE_SHARE_WRITE) or FILE_SHARE_DELETE)
+#endif
 const FILE_SUPERSEDE = &h00000000
 const FILE_OPEN = &h00000001
 const FILE_CREATE = &h00000002

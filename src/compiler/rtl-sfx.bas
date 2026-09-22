@@ -837,8 +837,8 @@ declare function hSfxlib_cb _
 
 sub rtlSfxModInit( )
 
-	rtlAddIntrinsicProcs( @funcdata(0) )
-	rtlAddIntrinsicProcs( @cmddata(0) )
+	rtlAddIntrinsicProcs( @funcdata(0), TRUE )
+	rtlAddIntrinsicProcs( @cmddata(0), TRUE )
 
 end sub
 

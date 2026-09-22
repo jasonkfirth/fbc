@@ -7,6 +7,14 @@
 '' --------
 
 #include Once "crt/string.bi"
+#include Once "fberror.bi"
+
+'' Thread and resource ownership:
+''
+'' Each generated TLS accessor owns matching thread-handle and data slots.  The
+'' zero slot remains a sentinel, while positive indices are live thread values.
+'' Old runtime emulation serializes ThreadSelf refresh, access, and destruction
+'' with threadData.mutex; current runtimes use their native ThreadSelf support.
 
 #if __FB_VERSION__ < "1.08"
 	' Emulation of the function Threadself() of FreeBASIC
@@ -33,27 +41,41 @@
 			Static As variable_datatype TLSdata(bound)
 			Dim As Any Ptr Threadhandle = ThreadSelf()
 			Dim As Integer index = 0
-			For I As Integer = 1 To UBound(TLSindex)  ' search existing TLS variable (existing array element) for the running thread
+			For I As Integer = LBound(TLSindex) + 1 To UBound(TLSindex)  ' search existing TLS variable (existing array element) for the running thread
 				If TLSindex(I) = Threadhandle Then
 					index = I
 					Exit For
 				End If
 			Next I
 			If index = 0 And cd = True Then  ' create a new TLS variable (new array element) for a new thread
+				'' The static zero slot is a sentinel, so this is capacity growth rather than traversal.
+				'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
 				index = UBound(TLSindex) + 1
 				ReDim Preserve TLSindex(index)
 				TLSindex(index) = Threadhandle
 				ReDim Preserve TLSdata(index)
 			ElseIf index > 0 And cd = False Then  ' destroy a TLS variable (array element) and compact the array
+				'' index is a live positive slot, and the sentinel keeps the dynamic arrays nonempty.
+				'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
 				If index < UBound(TLSindex) Then  ' reorder the array elements
+					'' The live TLS slot bounds the handle-table compaction move.
+					'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004 FBL-PTR-013
 					memmove(@TLSindex(index), @TLSindex(index + 1), (UBound(TLSindex) - index) * SizeOf(Any Ptr))
 					Dim As variable_datatype Ptr p = Allocate(SizeOf(variable_datatype))  ' for compatibility to object with destructor
+					If p = 0 Then Error FB.FB_RTERROR_OUTOFMEM
+					'' The live TLS slot bounds all three byte moves below.
+					'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004 FBL-PTR-013
 					memmove(p, @TLSdata(index), SizeOf(variable_datatype))                ' for compatibility to object with destructor
+					'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
 					memmove(@TLSdata(index), @TLSdata(index + 1), (UBound(TLSdata) - index) * SizeOf(variable_datatype))
+					'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
 					memmove(@TLSdata(UBound(TLSdata)), p, SizeOf(variable_datatype))      ' for compatibility to object with destructor
 					Deallocate(p)                                                         ' for compatibility to object with destructor
 				End If
+				'' The sentinel leaves one valid slot after removing a thread value.
+				'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
 				ReDim Preserve TLSindex(UBound(TLSindex) - 1)
+				'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
 				ReDim Preserve TLSdata(UBound(TLSdata) - 1)
 				index = 0
 			End If
@@ -76,6 +98,11 @@ End Type
 #if __FB_VERSION__ < "1.08"
 	Dim As Any Ptr threadData.mutex
 #endif
+
+Namespace TLS
+	'' The macro below defines this accessor; the declaration exposes its generated namespace to tools.
+	Declare Function count (ByVal cd As Boolean = True) ByRef As Integer
+End Namespace
 
 CreateTLSdatatypeVariableFunction (count, Integer)  ' create a TLS static integer function
 
@@ -168,4 +195,3 @@ Print
 Print "end of threads"
 
 Sleep
-

@@ -1,7 +1,7 @@
 #include once "Fl_Image.bi"
 
 extern "c++"
-type Fl_Tiled_Image extends Fl_Image 
+type Fl_Tiled_Image extends Fl_Image
 private:
 	declare operator let (byref w as const Fl_Tiled_Image)
 	declare constructor (byref w as const Fl_Tiled_Image)
@@ -34,6 +34,6 @@ private sub Fl_Tiled_Image.draw(X as long, Y as long)
 	draw(X, Y, w(), h(), 0, 0)
 end sub
 
-private function Fl_Tiled_Image.image() as Fl_Image ptr 
+private function Fl_Tiled_Image.image() as Fl_Image ptr
 	return image_
 end function

@@ -112,7 +112,7 @@ public:
 	declare function driver() as Fl_Graphics_Driver ptr
 
 	declare destructor()
- 
+
 	static dialog_title as const zstring ptr
 	static dialog_printer as const zstring ptr
 	static dialog_range as const zstring ptr

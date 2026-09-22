@@ -269,6 +269,53 @@ function symbKeywordIsDisabledCommand _
 	end select
 end function
 
+function symbIsDisabledCommand _
+	( _
+		byval sym as FBSYMBOL ptr _
+	) as integer
+
+	function = FALSE
+
+	if( sym = NULL ) then
+		exit function
+	end if
+
+	if( symbIsKeyword( sym ) ) then
+		function = symbKeywordIsDisabledCommand( sym->key.id )
+	elseif( symbIsSfxlibProc( sym ) ) then
+		function = symbIsDefineSet( @"FB_NO_SFXLIB" )
+	elseif( symbIsGfxlibProc( sym ) ) then
+		function = symbIsDefineSet( @"FB_NO_GFXLIB" )
+	end if
+end function
+
+function symbGetIllegalRedefErr _
+	( _
+		byval sym as FBSYMBOL ptr _
+	) as FB_ERRMSG
+
+	function = FB_ERRMSG_DUPDEFINITION
+
+	if( sym = NULL ) then
+		exit function
+	end if
+
+	'' A disabled library symbol is no longer the active conflict.  This
+	'' matters for names such as BEEP, which also has an always-enabled
+	'' system runtime overload.
+	if( symbIsDisabledCommand( sym ) ) then
+		exit function
+	end if
+
+	if( symbIsKeyword( sym ) ) then
+		function = symbKeywordGetIllegalRedefErr( sym->key.id )
+	elseif( symbIsSfxlibProc( sym ) ) then
+		function = FB_ERRMSG_ILLEGALSFXLIBCOMMANDREDEF
+	elseif( symbIsGfxlibProc( sym ) ) then
+		function = FB_ERRMSG_ILLEGALGFXLIBCOMMANDREDEF
+	end if
+end function
+
 '':::::
 private function hCanDuplicateConstOrProc _
 	( _
@@ -292,11 +339,9 @@ private function hCanDuplicateConstOrProc _
 
 		'' only if the keyword or the rtl-proc has a string suffix
 		case FB_SYMBCLASS_KEYWORD, FB_SYMBCLASS_PROC
-			if( head_sym->class = FB_SYMBCLASS_KEYWORD ) then
-				if( symbKeywordIsDisabledCommand( head_sym->key.id ) ) then
-					head_sym = head_sym->hash.next
-					continue do
-				end if
+			if( symbIsDisabledCommand( head_sym ) ) then
+				head_sym = head_sym->hash.next
+				continue do
 			end if
 
 			if( env.clopt.lang <> FB_LANG_QB ) then
@@ -350,11 +395,9 @@ function symbCanDuplicate _
 	'' adding a define?
 	case FB_SYMBCLASS_DEFINE
 		do
-			if( head_sym->class = FB_SYMBCLASS_KEYWORD ) then
-				if( symbKeywordIsDisabledCommand( head_sym->key.id ) ) then
-					head_sym = head_sym->hash.next
-					continue do
-				end if
+			if( symbIsDisabledCommand( head_sym ) ) then
+				head_sym = head_sym->hash.next
+				continue do
 			end if
 
 			exit function
@@ -432,11 +475,9 @@ function symbCanDuplicate _
 
 			'' only if the keyword or the rtl-proc has a string suffix
 			case FB_SYMBCLASS_KEYWORD, FB_SYMBCLASS_PROC
-				if( head_sym->class = FB_SYMBCLASS_KEYWORD ) then
-					if( symbKeywordIsDisabledCommand( head_sym->key.id ) ) then
-						head_sym = head_sym->hash.next
-						continue do
-					end if
+				if( symbIsDisabledCommand( head_sym ) ) then
+					head_sym = head_sym->hash.next
+					continue do
 				end if
 
 				if( env.clopt.lang <> FB_LANG_QB ) then
@@ -1029,6 +1070,44 @@ private function hLookupActiveEnumImports _
 		byval imports as FBSYMCHAIN ptr _
 	) as FBSYMCHAIN ptr
 
+	'' Namespace hash tables are not kept on the active hash-list while a
+	'' procedure is parsed.  Walk the current namespace chain explicitly so
+	'' an enum imported by an enclosing namespace still shadows a global name.
+	dim as FBSYMBOL ptr current_ns = symbGetCurrentNamespc( )
+	do while( (current_ns <> NULL) andalso _
+	          (current_ns <> @symbGetGlobalNamespc( )) )
+		dim as FBSYMCHAIN ptr head = NULL
+		dim as FBSYMCHAIN ptr tail = NULL
+		dim as FBSYMCHAIN ptr import_ = imports
+
+		do while( import_ <> NULL )
+			dim as FBSYMBOL ptr enum_ = symbGetParent( import_->sym )
+			if( (enum_ <> NULL) andalso _
+			    (symbGetType( enum_ ) = FB_DATATYPE_ENUM) andalso _
+			    (symbGetParent( enum_ ) = current_ns) ) then
+				dim as FBSYMCHAIN ptr match = chainpoolNext( )
+				match->sym = import_->sym
+				match->next = NULL
+				match->isimport = TRUE
+
+				if( head = NULL ) then
+					head = match
+				else
+					tail->next = match
+				end if
+				tail = match
+			end if
+
+			import_ = import_->next
+		loop
+
+		if( head <> NULL ) then
+			return head
+		end if
+
+		current_ns = symbGetNamespace( current_ns )
+	loop
+
 	dim as FBHASHTB ptr hashtb = symb.hashlist.tail
 
 	do while( hashtb <> NULL )
@@ -1287,7 +1366,7 @@ function symbLookup _
 		dim as FBSYMBOL ptr sym = hashLookupEx( @hashtb->tb, id, index )
 		while( sym )
 			if( sym->class = FB_SYMBCLASS_KEYWORD ) then
-				if( symbKeywordIsDisabledCommand( sym->key.id ) = FALSE ) then
+				if( symbIsDisabledCommand( sym ) = FALSE ) then
 					tk = sym->key.id
 					tk_class = sym->key.tkclass
 					'' return if it's a KEYWORD or a OPERATOR token, they

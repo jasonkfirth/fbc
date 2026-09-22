@@ -6,8 +6,11 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgLof
 '' --------
 
-Dim f As Long
+Dim f As Integer
 f = FreeFile
-Open "file.ext" For Binary As #f
-Print LOF(f)
-Close #f
+If Open("file.ext" For Binary As #f) <> 0 Then
+  Print "Could not open file.ext"
+Else
+  Print LOF(f)
+  Close #f
+End If

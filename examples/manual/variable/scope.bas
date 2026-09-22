@@ -6,7 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgScope
 '' --------
 
-Dim As Integer x = 5, y = 2
+Dim As Integer x = 5
+Dim As Integer y = 2
 Print "x ="; x; ", "; "y ="; y
 Scope
 	Dim x As Integer = 3

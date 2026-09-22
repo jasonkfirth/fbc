@@ -37,8 +37,24 @@ DIRLIST_INC ?= dirlist.mk
 
 include $(DIRLIST_INC)
 DIRLIST := $(DIRLIST_FB)
+DOS_UNIT_THREADS :=
+DOS_UNIT_TCP :=
 ifeq ($(TARGET_OS),dos)
-DIRLIST := $(filter-out interactive threads,$(DIRLIST))
+	# The ordinary DOS archive intentionally has no scheduler. Keep interactive
+	# tests out of every DOS run, but include thread coverage when the caller
+	# explicitly selected the maintained PDMLWP provider.
+	DIRLIST := $(filter-out interactive,$(DIRLIST))
+	ifeq ($(DOS_THREAD_PROVIDER),pdmlwp)
+		DOS_UNIT_THREADS := yes
+		# The TCP loopback case is a separately built bmk. Keep this unit profile
+		# enabled only when its matching Watt-32 runtime archive and scheduler are
+		# selected by the caller.
+		ifeq ($(DOS_TCP_PROVIDER),watt32)
+			DOS_UNIT_TCP := yes
+		endif
+	else
+		DIRLIST := $(filter-out threads,$(DIRLIST))
+	endif
 endif
 
 ifeq ($(DIRLIST),)
@@ -80,13 +96,15 @@ SRCLIST := $(sort $(SRCLIST))
 SRCLIST := $(patsubst .bmk,.bas,$(SRCLIST))
 SRCLIST_DOS_FILTER_OUT :=
 ifeq ($(TARGET_OS),dos)
-# The monolithic select_const2 test produces a huge DOS assembly unit.
-# DOS runs the same coverage through smaller tests/dos/compound shards.
-SRCLIST_DOS_FILTER_OUT := \
-./interactive/% interactive/% \
-./threads/% threads/% \
-./compound/select_const2.bas compound/select_const2.bas
-SRCLIST := $(filter-out $(SRCLIST_DOS_FILTER_OUT),$(SRCLIST))
+	# The monolithic select_const2 test produces a huge DOS assembly unit.
+	# DOS runs the same coverage through smaller tests/dos/compound shards.
+	SRCLIST_DOS_FILTER_OUT := \
+		./interactive/% interactive/% \
+		./compound/select_const2.bas compound/select_const2.bas
+	ifneq ($(DOS_UNIT_THREADS),yes)
+		SRCLIST_DOS_FILTER_OUT += ./threads/% threads/%
+	endif
+	SRCLIST := $(filter-out $(SRCLIST_DOS_FILTER_OUT),$(SRCLIST))
 endif
 
 # ------------------------------------------------------------------------
@@ -103,6 +121,22 @@ FBCU_BIN := $(FBCU_LIB)/libfbcunit.a
 FBCU_MAKE := $(MAKE)
 ifeq ($(HOST),dos)
 	FBCU_MAKE := make.exe
+endif
+
+# A DOS test tree can carry a fbcunit archive built by a different host or
+# target. Archives have no target metadata, so record the native build once
+# beside the archive. An absent stamp means the archive and its objects must
+# be rebuilt, while an existing DOS stamp leaves later suite invocations fast.
+ifeq ($(HOST),dos)
+FBCU_DOS_TARGET_STAMP := $(FBCU_LIB)/.fbcunit-dos-target
+
+.PHONY: check_fbcunit_dos_target
+check_fbcunit_dos_target:
+	@if test ! -f $(FBCU_DOS_TARGET_STAMP); then \
+		$(RM) $(FBCU_BIN) $(FBCU_DIR)/src/*.o; \
+	fi
+
+$(FBCU_BIN): check_fbcunit_dos_target
 endif
 
 FBCU_LIBS := -l fbcunit
@@ -138,6 +172,16 @@ ifneq ($(TARGET_OS),dos)
 ifneq ($(TARGET),wince-mips)
 	FBC_CFLAGS += -mt
 endif
+endif
+ifeq ($(DOS_UNIT_THREADS),yes)
+	# fbc rejects -mt on DOS unless the provider is selected on every compile
+	# and the final link. This produces the PDMLWP runtime selection explicitly.
+	FBC_CFLAGS += -mt -dos-threads pdmlwp
+endif
+ifeq ($(DOS_UNIT_TCP),yes)
+	# Keep the provider signal available to unit sources and pair the linked
+	# runtime archive with Watt-32's external library at the final link.
+	FBC_CFLAGS += -d FB_DOS_WATT32
 endif
 ifeq ($(TARGET_OS),js)
 # Need to do some optimisations to reduce the number of local variables,
@@ -176,6 +220,12 @@ ifneq ($(TARGET_OS),dos)
 ifneq ($(TARGET),wince-mips)
 	FBC_LFLAGS += -mt
 endif
+endif
+ifeq ($(DOS_UNIT_THREADS),yes)
+	FBC_LFLAGS += -mt -dos-threads pdmlwp
+endif
+ifeq ($(DOS_UNIT_TCP),yes)
+	FBC_LFLAGS += -l watt
 endif
 ifdef DEBUG
 ifneq ($(TARGET),wince-mips)
@@ -216,7 +266,13 @@ endif
 
 OBJLIST := $(SRCLIST:%.bas=%.o)
 
+# DJGPP does not provide a host C compiler during native DOS test runs.  The
+# probe only selects host-Clang warning suppressions, which do not apply to
+# the DOS compiler invocation, and its shell pipeline is not portable there.
+TESTS_CC_IS_CLANG :=
+ifneq ($(HOST),dos)
 TESTS_CC_IS_CLANG := $(strip $(shell $(CC) -dM -E -x c /dev/null 2>/dev/null | grep -q __clang__ && echo yes || true))
+endif
 ifeq ($(TESTS_CC_IS_CLANG),yes)
 ./functions/var_args-gcc.o functions/var_args-gcc.o: FBC_CFLAGS += -Wc -Wno-varargs
 ./optimizations/consteval.o optimizations/consteval.o: FBC_CFLAGS += -Wc -Wno-absolute-value
@@ -271,7 +327,10 @@ all : make_fbcunit $(UNIT_TESTS_OBJ_LST) build_tests run_tests
 make_fbcunit : $(FBCU_BIN)
 
 $(FBCU_BIN) :
-	+$(FBCU_MAKE) -C $(FBCU_DIR) FBC="$(FBC)" FPU=$(FPU) ARCH=$(ARCH) TARGET=$(TARGET)
+	+$(FBCU_MAKE) -C $(FBCU_DIR) FBC="$(FBC)" FPU=$(FPU) ARCH=$(ARCH) TARGET=$(TARGET) DOS_THREAD_PROVIDER="$(DOS_THREAD_PROVIDER)" DOS_TCP_PROVIDER="$(DOS_TCP_PROVIDER)"
+ifeq ($(HOST),dos)
+	@$(ECHO) dos > $(FBCU_DOS_TARGET_STAMP)
+endif
 
 # ------------------------------------------------------------------------
 # Auto-generate the file UNIT_TESTS_INC - needed by this makefile

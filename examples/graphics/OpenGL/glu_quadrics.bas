@@ -35,7 +35,7 @@ declare sub drawscene ()
 
 	result = SDL_Init(SDL_INIT_EVERYTHING)
 	if result <> 0 then
-  		end 1
+		end 1
 	end if
 
 	vpage = SDL_SetVideoMode(SCR_WIDTH, SCR_HEIGHT, BPP, SDL_OPENGL or SDL_OPENGLBLIT)
@@ -69,8 +69,8 @@ declare sub drawscene ()
 
     'lighting
     'Materials (objects)
-    dim Mat_Ambient(3) as single = {0.5, 0.5, 0.5, 1.0}
-    dim Mat_Specular(3) as single = {1.0, 1.0, 1.0, 1.0}
+    dim Mat_Ambient(0 to 3) as single = {0.5, 0.5, 0.5, 1.0}
+    dim Mat_Specular(0 to 3) as single = {1.0, 1.0, 1.0, 1.0}
     dim Mat_Shininess as single = 50.0
 
     glMaterialfv GL_FRONT, GL_AMBIENT, @Mat_Ambient(0)
@@ -79,11 +79,11 @@ declare sub drawscene ()
 
 
     'Light
-    dim Light_Ambient(3) as single = {0.0, 0.5, 0.2, 0.0}
-    dim Light_Diffuse(3) as single = {1.0, 0.5, 1.0, 1.0}
-    dim Light_Specular(3) as single = {1.0, 1.0, 1.0, 1.0}
-    dim Light_Position(3) as single = {1.0, 1.0, 1.0, 0.0}
-    dim Model_Ambient(3) as single = {0.5, 0.5, 0.5, 1.0}
+    dim Light_Ambient(0 to 3) as single = {0.0, 0.5, 0.2, 0.0}
+    dim Light_Diffuse(0 to 3) as single = {1.0, 0.5, 1.0, 1.0}
+    dim Light_Specular(0 to 3) as single = {1.0, 1.0, 1.0, 1.0}
+    dim Light_Position(0 to 3) as single = {1.0, 1.0, 1.0, 0.0}
+    dim Model_Ambient(0 to 3) as single = {0.5, 0.5, 0.5, 1.0}
 
     'Load light parameters to GL states
     glLightfv GL_LIGHT0, GL_AMBIENT, @Light_Ambient(0)
@@ -104,17 +104,19 @@ declare sub drawscene ()
     dim k as integer
     ImageW = 64
     ImageH = 64
-    redim shared Texture(ImageW - 1, ImageH - 1, 2) as ubyte
-    for i = 0  to ImageW - 1
-        for j = 0 to ImageH - 1
-            for k = 0 to 2
+    '' The single SDL event loop owns this texture; DrawScene reads it only while drawing.
+    '' FB-LINTER: DISABLE-NEXT-LINE FBL301
+    redim shared Texture(0 to ImageW - 1, 0 to ImageH - 1, 0 to 2) as ubyte
+    for i = lbound(Texture, 1) to ubound(Texture, 1)
+        for j = lbound(Texture, 2) to ubound(Texture, 2)
+            for k = lbound(Texture, 3) to ubound(Texture, 3)
                 texture(i, j, k) = (i xor j * k) * 2
             next k
         next j
     next i
-    glTexImage2D GL_TEXTURE_2D, 0, 3, Imagew,_
-                 Imageh, 0, GL_RGB, GL_UNSIGNED_BYTE,_
-                 @texture(0,0,0)
+    glTexImage2D GL_TEXTURE_2D, 0, 3, Imagew, _
+                 Imageh, 0, GL_RGB, GL_UNSIGNED_BYTE, _
+                 @texture(0, 0, 0)
     glTexParameterf GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP
     glTexParameterf GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP
     glTexParameterf GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST
@@ -125,7 +127,8 @@ declare sub drawscene ()
 
     'Quadric stuff
     'Intialize quadric pointers
-    'Share through modules
+    '' The single SDL event loop owns these handles until it destroys the GL context.
+    '' FB-LINTER: DISABLE-NEXT-LINE FBL301
     dim shared qobj_sphere as GLUquadricObj ptr
     dim shared qobj_Cylinder as GLUquadricObj ptr
     dim shared qobj_Disk as GLUquadricObj ptr
@@ -167,7 +170,7 @@ declare sub drawscene ()
 	dim event as SDL_Event
 	do
 
-  		drawscene
+		drawscene
 		SDL_GL_SwapBuffers
 
 		SDL_PumpEvents
@@ -196,12 +199,12 @@ private sub DrawScene
     glPushMatrix                    'word matrix
 
     if( z = 0 ) then
-    	z = -10.0
-    	zdir = 0.5
+        z = -10.0
+        zdir = 0.5
     elseif( z > -5.0 ) then
-    	zdir = -0.5
+        zdir = -0.5
     elseif( z < -10.0 ) then
-    	zdir = 0.5
+        zdir = 0.5
     end if
 
     z = z + zdir
@@ -212,10 +215,10 @@ private sub DrawScene
     glShadeModel GL_SMOOTH
     glTranslatef -1.4, -1.0, -10.0  'move
     glPushMatrix                    'sphere matrix
-      glRotatef 110.0 + Theta,  1.0, 0.0, 0.0       'rotate x
-      glRotatef 10    + Theta,  0.0, 1.0, 0.0       'rotate y
-      glRotatef 120.0 + Theta,  0.0, 0.0, 1.0       'rotate z
-      gluSphere qobj_sphere, 0.75, 25, 20           'draw sphere
+    glRotatef 110.0 + Theta,  1.0, 0.0, 0.0       'rotate x
+    glRotatef 10    + Theta,  0.0, 1.0, 0.0       'rotate y
+    glRotatef 120.0 + Theta,  0.0, 0.0, 1.0       'rotate z
+    gluSphere qobj_sphere, 0.75, 25, 20           'draw sphere
     glPopMatrix                     'pop sphere matrix
                                     'word matrix still in effect
     glDisable GL_TEXTURE_2D         'Texture OFF
@@ -224,10 +227,10 @@ private sub DrawScene
     glShadeModel GL_SMOOTH
     glTranslatef 0.0, 2.0, 0.0
     glPushMatrix
-      glRotatef 210.0 + Theta,  1.0, 0.0, 0.0
-      glRotatef 10    + Theta,  0.0, 1.0, 0.0
-      glRotatef 120.0 + Theta,  0.0, 0.0, 1.0
-      gluCylinder qobj_Cylinder, 0.5, 0.5, 1.0, 25, 15
+    glRotatef 210.0 + Theta,  1.0, 0.0, 0.0
+    glRotatef 10    + Theta,  0.0, 1.0, 0.0
+    glRotatef 120.0 + Theta,  0.0, 0.0, 1.0
+    gluCylinder qobj_Cylinder, 0.5, 0.5, 1.0, 25, 15
     glPopMatrix
 
     'disk
@@ -235,10 +238,10 @@ private sub DrawScene
     glColor3f 0.0, 1.0, 1.0
     glTranslatef 2.0, -2.0, 0.0
     glPushMatrix
-      glRotatef 10.0 + Theta,  1.0, 0.0, 0.0
-      glRotatef 100  + Theta,  0.0, 1.0, 0.0
-      glRotatef 20.0 + Theta,  0.0, 0.0, 1.0
-      gluDisk qobj_Disk, 0.25, 1.0, 20, 4
+    glRotatef 10.0 + Theta,  1.0, 0.0, 0.0
+    glRotatef 100  + Theta,  0.0, 1.0, 0.0
+    glRotatef 20.0 + Theta,  0.0, 0.0, 1.0
+    gluDisk qobj_Disk, 0.25, 1.0, 20, 4
     glPopMatrix
 
 
@@ -246,10 +249,10 @@ private sub DrawScene
     glColor3f 1.0, 1.0, 0.0
     glTranslatef 0.0, 2.0, 0.0
     glPushMatrix
-      glRotatef 20.0 + Theta,  1.0, 0.0, 0.0
-      glRotatef Theta,         0.0, 1.0, 0.0
-      glRotatef 120.0 + Theta, 0.0, 0.0, 1.0
-      gluPartialDisk qobj_Pdisk, 0.0, 1.0, 20, 4, 0.0, 225.0
+    glRotatef 20.0 + Theta,  1.0, 0.0, 0.0
+    glRotatef Theta,         0.0, 1.0, 0.0
+    glRotatef 120.0 + Theta, 0.0, 0.0, 1.0
+    gluPartialDisk qobj_Pdisk, 0.0, 1.0, 20, 4, 0.0, 225.0
     glPopMatrix
 
 
@@ -258,11 +261,11 @@ private sub DrawScene
     glShadeModel GL_SMOOTH
     glTranslatef 1.5, -0.7, 0.0
     glPushMatrix
-      glTranslatef 0, 0, z  'move
-      glRotatef 10.0  + Theta,  1.0, 0.0, 0.0
-      glRotatef 10    + Theta,  0.0, 1.0, 0.0
-      glRotatef 120.0 + Theta,  0.0, 0.0, 1.0
-      gluSphere qobj_sphere2, 1.25, 35, 25           'draw sphere
+    glTranslatef 0, 0, z  'move
+    glRotatef 10.0  + Theta,  1.0, 0.0, 0.0
+    glRotatef 10    + Theta,  0.0, 1.0, 0.0
+    glRotatef 120.0 + Theta,  0.0, 0.0, 1.0
+    gluSphere qobj_sphere2, 1.25, 35, 25           'draw sphere
     glPopMatrix
 
     glPopMatrix
@@ -273,4 +276,3 @@ private sub DrawScene
     theta = theta + 1       'increase rotval
 
 end sub
-

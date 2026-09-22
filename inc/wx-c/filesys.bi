@@ -39,7 +39,7 @@ Declare Sub wxInputStreamWrapper_ReadIntoStream WXCALL Alias "wxInputStreamWrapp
 Declare Function wxInputStreamWrapper_LastRead WXCALL Alias "wxInputStreamWrapper_LastRead" (self As wxInputStream Ptr) As size_t
 Declare Function wxInputStreamWrapper_CanRead WXCALL Alias "wxInputStreamWrapper_CanRead" (self As wxInputStream Ptr) As wxBool
 Declare Function wxInputStreamWrapper_Eof WXCALL Alias "wxInputStreamWrapper_Eof" (self As wxInputStream Ptr) As wxBool
-Declare Function wxInputStreamWrapper_UngetBuffer WXCALL Alias "wxInputStreamWrapper_UngetBuffer" (self As wxInputStream Ptr, pBuffer As Any Ptr, size As size_t) As size_t 
+Declare Function wxInputStreamWrapper_UngetBuffer WXCALL Alias "wxInputStreamWrapper_UngetBuffer" (self As wxInputStream Ptr, pBuffer As Any Ptr, size As size_t) As size_t
 Declare Function wxInputStreamWrapper_Ungetch WXCALL Alias "wxInputStreamWrapper_Ungetch" (self As wxInputStream Ptr, c As wxChar) As wxChar
 Declare Function wxInputStreamWrapper_SeekI WXCALL Alias "wxInputStreamWrapper_SeekI" (self As wxInputStream Ptr, p As wxFileOffset, mode As wxSeekMode) As wxFileOffset
 Declare Function wxInputStreamWrapper_TellI WXCALL Alias "wxInputStreamWrapper_TellI" (self As wxInputStream Ptr) As wxFileOffset

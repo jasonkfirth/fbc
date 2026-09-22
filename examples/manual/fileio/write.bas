@@ -18,6 +18,14 @@ Dim i As Integer = 10
 Dim d As Double = 123.456
 Dim s As String = "text"
 
+'' This manual page intentionally demonstrates WRITE #'s formatted record syntax.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL517
 Write #filenum, 123, "text", -.45600
+'' This manual page intentionally demonstrates an empty WRITE # record.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL517
 Write #filenum,
+'' This manual page intentionally demonstrates WRITE #'s typed field syntax.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL517
 Write #filenum, i, d, s
+
+Close #filenum

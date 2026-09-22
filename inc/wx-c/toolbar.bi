@@ -10,7 +10,7 @@ Declare Function wxToolBar_ctor WXCALL Alias "wxToolBar_ctor" ( _
                     pos    As  wxPoint Ptr, _
                     size   As  wxSize  Ptr, _
                     style  As  wxUInt     =  0) As wxToolBar Ptr
-Declare Function wxToolBar_AddTool1 WXCALL Alias "wxToolBar_AddTool1" (self As wxToolBar Ptr, toolID As wxInt, labelArg As wxString Ptr, bitmap As wxBitmap Ptr, bitmapDisabled As wxBitmap Ptr, kind As wxItemKind, shortHelpArg As wxString Ptr, helpArg As wxString Ptr, pData As wxObject Ptr) As wxToolBarToolBase Ptr 
+Declare Function wxToolBar_AddTool1 WXCALL Alias "wxToolBar_AddTool1" (self As wxToolBar Ptr, toolID As wxInt, labelArg As wxString Ptr, bitmap As wxBitmap Ptr, bitmapDisabled As wxBitmap Ptr, kind As wxItemKind, shortHelpArg As wxString Ptr, helpArg As wxString Ptr, pData As wxObject Ptr) As wxToolBarToolBase Ptr
 Declare Function wxToolBar_AddTool2 WXCALL Alias "wxToolBar_AddTool2" (self As wxToolBar Ptr, toolID As wxInt, labelArg As wxString Ptr, bitmap As wxBitmap Ptr, shortHelpArg As wxString Ptr, kind As wxItemKind) As wxToolBarToolBase Ptr
 Declare Function wxToolBar_AddTool3 WXCALL Alias "wxToolBar_AddTool3" (self As wxToolBar Ptr, toolID As wxInt, bitmap As wxBitmap Ptr, bitmapDisabled As wxBitmap Ptr, toggle As wxBool, clientData As wxObject Ptr, shortHelpArg As wxString Ptr, helpArg As wxString Ptr) As wxToolBarToolBase Ptr
 Declare Function wxToolBar_AddTool4 WXCALL Alias "wxToolBar_AddTool4" (self As wxToolBar Ptr, toolID As wxInt, bitmap As wxBitmap Ptr, shortHelpArg As wxString Ptr, helpArg As wxString Ptr) As wxToolBarToolBase Ptr
@@ -19,7 +19,7 @@ Declare Function wxToolBar_AddCheckTool WXCALL Alias "wxToolBar_AddCheckTool" (s
 Declare Function wxToolBar_AddRadioTool WXCALL Alias "wxToolBar_AddRadioTool" (self As wxToolBar Ptr, toolID As wxInt, labelArg As wxString Ptr, bitmap As wxBitmap Ptr, bitmapDisabled As wxBitmap Ptr, shortHelpArg As wxString Ptr, helpArg As wxString Ptr, pData As wxObject Ptr) As wxToolBarToolBase Ptr
 Declare Function wxToolBar_AddControl WXCALL Alias "wxToolBar_AddControl" (self As wxToolBar Ptr, control As wxControl Ptr) As wxToolBarToolBase Ptr
 Declare Function wxToolBar_InsertControl WXCALL Alias "wxToolBar_InsertControl" (self As wxToolBar Ptr, sPos As size_t, control As wxControl Ptr) As wxToolBarToolBase Ptr
-Declare Function wxToolBar_FindControl WXCALL Alias "wxToolBar_FindControl" (self As wxToolBar Ptr, toolID As wxInt) As wxControl Ptr 
+Declare Function wxToolBar_FindControl WXCALL Alias "wxToolBar_FindControl" (self As wxToolBar Ptr, toolID As wxInt) As wxControl Ptr
 Declare Function wxToolBar_AddSeparator WXCALL Alias "wxToolBar_AddSeparator" (self As wxToolBar Ptr) As wxToolBarToolBase Ptr
 Declare Function wxToolBar_InsertSeparator WXCALL Alias "wxToolBar_InsertSeparator" (self As wxToolBar Ptr, sPos As size_t) As wxToolBarToolBase Ptr
 Declare Function wxToolBar_RemoveTool WXCALL Alias "wxToolBar_RemoveTool" (self As wxToolBar Ptr, toolID As wxInt) As wxToolBarToolBase Ptr
@@ -57,7 +57,7 @@ Declare Sub wxToolBar_GetMargins WXCALL Alias "wxToolBar_GetMargins" (self As wx
 Declare Function wxToolBar_GetToolsCount WXCALL Alias "wxToolBar_GetToolsCount" (self As wxToolBar Ptr) As size_t
 Declare Function wxToolBar_AcceptsFocus WXCALL Alias "wxToolBar_AcceptsFocus" (self As wxToolBar Ptr) As wxBool
 
-' class wxToolBarToolBase 
+' class wxToolBarToolBase
 Declare Function wxToolBarToolBase_ctor WXCALL Alias "wxToolBarToolBase_ctor" (tBar As wxToolBar Ptr, toolID As wxInt, labelArg As wxString Ptr, bitmap As wxBitmap Ptr, bitmapDisabled As wxBitmap Ptr, kind As wxItemKind, clientData As wxObject Ptr, shortHelpArg As wxString Ptr, helpStringArg As wxString Ptr) As wxToolBarToolBase Ptr
 Declare Function wxToolBarToolBase_ctorCtrl WXCALL Alias "wxToolBarToolBase_ctorCtrl" (tBar As wxToolBar Ptr, control As wxControl Ptr) As wxToolBarBase Ptr
 Declare Function wxToolBarToolBase_GetId WXCALL Alias "wxToolBarToolBase_GetId" (self As wxToolBarToolBase Ptr) As wxInt

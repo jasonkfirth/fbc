@@ -4,7 +4,7 @@
 #Include Once "common.bi"
 
 Type Virtual_voidDcRectSizeT As Sub      WXCALL (As wxDC Ptr, As wxRect Ptr, As size_t)
-Type Virtual_IntInt          As Function WXCALL (As wxInt) As wxInt 
+Type Virtual_IntInt          As Function WXCALL (As wxInt) As wxInt
 
 Declare Function wxVListBox_ctor WXCALL Alias "wxVListBox_ctor" (parent As wxWindow Ptr, _
                      id      As wxWindowID    = -1, _

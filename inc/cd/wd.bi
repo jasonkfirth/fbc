@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include once "cd.bi"
+
 #include once "crt/long.bi"
 #include once "wd_old.bi"
 

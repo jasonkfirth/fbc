@@ -109,6 +109,8 @@ End Destructor
 
 Scope
 	Print "Construction: 'Dim As UDTderived a, b : a.i1 = 1 : a.i2 = 2'"
+	'' The one-line construction sequence is the lesson being printed above.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL104
 	Dim As UDTderived a, b : a.i1 = 1 : a.i2 = 2
 	Print "      " & a.i1
 	Print "      " & a.i2
@@ -127,4 +129,3 @@ Scope
 End Scope
 
 Sleep
-

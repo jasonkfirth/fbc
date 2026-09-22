@@ -4,7 +4,7 @@
 ''   BASSMOD 2.0 C/C++ header file, copyright (c) 1999-2004 Ian Luck.
 ''   Please report bugs/suggestions/etc... to bassmod@un4seen.com
 ''
-''   See the BASSMOD.CHM/PDF file for more complete documentation 
+''   See the BASSMOD.CHM/PDF file for more complete documentation
 ''
 ''   The BASSMOD library is free for non-money making use... if you are
 ''   not charging for the software, then you can use BASS in it for free.

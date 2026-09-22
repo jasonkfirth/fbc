@@ -7,8 +7,7 @@
 '' --------
 
 '' Defines a one-dimensional fixed-length array of type INTEGER having automatic storage.
-Dim arrayOfIntegers(69) As Integer
+Dim arrayOfIntegers(0 To 69) As Integer
 
 '' Defines a one-dimensional fixed-length array of type SHORT having static storage.
-Static arrayOfShorts(420) As Short
-
+Static arrayOfShorts(0 To 420) As Short

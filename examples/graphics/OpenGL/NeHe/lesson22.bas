@@ -25,6 +25,9 @@
 ''
 '' compile as: fbc -s gui lesson22.bas
 ''
+'' Ownership: LoadGLTextures releases each BMP image and its pixel buffer after
+'' upload. The generated RGBA buffers remain local to the upload operation.
+''
 
 #include once "GL/gl.bi"
 #include once "GL/glu.bi"
@@ -46,9 +49,14 @@ const null = 0
 '' Maximum Emboss-Translate. Increase To Get Higher Immersion
 '' At A Cost Of Lower Quality (More Artifacts Will Occur!)
 const MAX_EMBOSS = 0.008
-''-------------------------------------------------------------------------------
+'' -------------------------------------------------------------------------
+'' Multitexture state
+'' -------------------------------------------------------------------------
 declare sub ReSizeGLScene GLFWCALL( byval w as long, byval h as long )
 declare function LoadGLTextures() as integer
+declare sub FreeBMPImage(byref Image as BITMAP_RGBImageRec ptr)
+declare function LoadLogoTexture(byref textureId as GLuint, byref alphaFilename as string, _
+	byref colorFilename as string) as integer
 declare function initMultitexture() as integer
 declare sub initLights()
 declare function DrawGLScene() as integer
@@ -73,6 +81,8 @@ declare function doMeshNoBumps() as integer
 const MAX_EXTENSION_SPACE = 10240                          '' Characters for Extension-Strings
 const MAX_EXTENSION_LENGTH = 256                           '' Maximum Of Characters In One Extension-String
 
+'' The GLFW main loop initializes these extension handles before DrawGLScene uses them.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared multitextureSupported as integer                '' Flag Indicating Whether Multitexturing Is Supported
 dim shared useMultitexture as integer = true               '' Use It If It Is Supported?
 dim shared maxTexelUnits as GLint = 1                      '' Number Of Texel-Pipelines. This Is At Least 1.
@@ -88,6 +98,8 @@ dim shared glClientActiveTextureARB as PFNGLCLIENTACTIVETEXTUREARBPROC
 
 '' CubeData Contains The Faces For The Cube In Format 2xTexCoord, 3xVertex;
 '' Note That The Tesselation Of The Cube Is Only Absolute Minimum.
+'' The GLFW main loop owns this draw state; no worker or callback writes it.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared CubeData(0 to 119) as single => { _
 	0.0, 0.0,     -1.0, -1.0, +1.0, _   '' Front Face
 	1.0, 0.0,     +1.0, -1.0, +1.0, _
@@ -114,9 +126,12 @@ dim shared CubeData(0 to 119) as single => { _
 	1.0, 1.0,     -1.0,  1.0,  1.0, _
 	0.0, 1.0,     -1.0,  1.0, -1.0}
 
+'' The GLFW main loop owns the texture, lighting, and camera state below.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared LightAmbient(0 to 2) as single => {0.2, 0.2, 0.2}   '' Ambient Light is 20% white
 dim shared LightDiffuse(0 to 2) as single => {1.0, 1.0, 1.0}   '' Diffuse Light is white
 dim shared LightPosition(0 to 2) as single => {0.0, 0.0, 2.0}  '' Position is somewhat in front of screen
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared texture(0 to 2) as GLuint                       '' Storage For 3 Textures
 dim shared Gray(0 to 3) as single => {0.5, 0.5, 0.5, 1.0}
 dim shared bump(0 to 2) as GLuint                          '' Our Bumpmappings
@@ -141,7 +156,7 @@ dim shared filter as integer =1                                '' Which Filter T
 	'' Initialize GLFW
 	glfwInit()
 	'' Open an OpenGL window
-	if( glfwOpenWindow( 640,480, 0,0,0,0,16,0, GLFW_WINDOW )= 0 ) then
+	if( glfwOpenWindow( 640, 480, 0, 0, 0, 0, 16, 0, GLFW_WINDOW )= 0 ) then
 		glfwTerminate()
 		end 1
 	end if
@@ -236,14 +251,16 @@ function initMultitexture() as integer
 	extensions = *glGetString(GL_EXTENSIONS)   '' Fetch Extension String (glGetString returns a zstring ptr)
 
 	#if EXT_INFO
-	MessageBox (0,extensions, "supported GL extensions", MB_OK or MB_ICONINFORMATION)
+		'' This diagnostic path is compiled only when the Windows-only extension dialog is enabled.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL310
+	MessageBox (0, extensions, "supported GL extensions", MB_OK or MB_ICONINFORMATION)
 	#endif
 
 	if (glfwExtensionSupported( "GL_ARB_multitexture" ) = GL_TRUE and _       '' Is Multitexturing Supported?
 		__ARB_ENABLE = 1 and _                                                '' Override-Flag
 		glfwExtensionSupported("GL_EXT_texture_env_combine") = GL_TRUE) then  '' Is texture_env_combining Supported?
 
-		glGetIntegerv(GL_MAX_TEXTURE_UNITS_ARB,@maxTexelUnits)
+		glGetIntegerv(GL_MAX_TEXTURE_UNITS_ARB, @maxTexelUnits)
 
 		'' Set addresses of functions we will use
 		glMultiTexCoord1fARB = cast( PFNGLMULTITEXCOORD1FARBPROC, glfwGetProcAddress( "glMultiTexCoord1fARB" ) )
@@ -254,7 +271,9 @@ function initMultitexture() as integer
 		glClientActiveTextureARB = cast( PFNGLCLIENTACTIVETEXTUREARBPROC, glfwGetProcAddress( "glClientActiveTextureARB" ) )
 
 		#if EXT_INFO
-		MessageBox(0,"The GL_ARB_multitexture extension will be used.","feature supported!",MB_OK or MB_ICONINFORMATION)
+		'' This diagnostic path is compiled only when the Windows-only extension dialog is enabled.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL310
+		MessageBox(0, "The GL_ARB_multitexture extension will be used.", "feature supported!", MB_OK or MB_ICONINFORMATION)
 		#endif
 
 		return true
@@ -273,13 +292,92 @@ sub initLights()
 	glEnable(GL_LIGHT1)
 end sub
 
-''------------------------------------------------------------------------
-'' Load Bitmaps And Convert To Textures
+'' -------------------------------------------------------------------------
+'' Bitmap resource helpers
+'' -------------------------------------------------------------------------
+
+sub FreeBMPImage(byref Image as BITMAP_RGBImageRec ptr)
+	if Image = NULL then exit sub
+
+	if Image->buffer <> NULL then
+		deallocate Image->buffer
+		Image->buffer = NULL
+	end if
+
+	deallocate Image
+	Image = NULL
+end sub
+
+function LoadLogoTexture(byref textureId as GLuint, byref alphaFilename as string, _
+	byref colorFilename as string) as integer
+
+	const MAX_RGBA_BYTES as longint = 2147483647
+
+	dim alphaImage as BITMAP_RGBImageRec ptr
+	dim colorImage as BITMAP_RGBImageRec ptr
+	dim alpha as ubyte ptr
+	dim imageWidth as integer
+	dim imageHeight as integer
+	dim pixelCount as longint
+	dim a as longint
+	dim success as integer
+
+	success = false
+
+	alphaImage = LoadBMP(alphaFilename)
+	if alphaImage = NULL then goto load_failed
+	if alphaImage->buffer = NULL then goto load_failed
+
+	imageWidth = alphaImage->sizeX
+	imageHeight = alphaImage->sizeY
+	if imageWidth <= 0 or imageHeight <= 0 then goto load_failed
+
+	pixelCount = clngint(imageWidth) * clngint(imageHeight)
+	if pixelCount > MAX_RGBA_BYTES \ 4 then goto load_failed
+
+	alpha = allocate(pixelCount * 4)
+	if alpha = NULL then goto load_failed
+
+	for a = 0 to pixelCount - 1
+		alpha[4 * a + 3] = alphaImage->buffer[3 * a]
+	next
+
+	FreeBMPImage(alphaImage)
+	colorImage = LoadBMP(colorFilename)
+	if colorImage = NULL then goto load_failed
+	if colorImage->buffer = NULL then goto load_failed
+	if colorImage->sizeX <> imageWidth or colorImage->sizeY <> imageHeight then goto load_failed
+
+	for a = 0 to pixelCount - 1
+		alpha[4 * a] = colorImage->buffer[3 * a]
+		alpha[4 * a + 1] = colorImage->buffer[3 * a + 1]
+		alpha[4 * a + 2] = colorImage->buffer[3 * a + 2]
+	next
+
+	glGenTextures(1, @textureId)
+	glBindTexture(GL_TEXTURE_2D, textureId)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, imageWidth, imageHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, alpha)
+	success = true
+
+load_failed:
+	if alpha <> NULL then
+		deallocate alpha
+		alpha = NULL
+	end if
+	FreeBMPImage(alphaImage)
+	FreeBMPImage(colorImage)
+	return success
+end function
+
+'' -------------------------------------------------------------------------
+'' Load bitmaps and convert to textures
+'' -------------------------------------------------------------------------
 function LoadGLTextures() as integer
 	dim status as integer = true                      '' Status Indicator
 	dim Image as BITMAP_RGBImageRec ptr               '' Create Storage Space For The Texture
-	dim alpha as byte ptr
-	dim as integer i, a
+	dim i as integer
 
 	'' Load The Tile-Bitmap For Base-Texture
 	Image = LoadBMP(exepath + "/data/Base.bmp")
@@ -288,8 +386,8 @@ function LoadGLTextures() as integer
 
 		'' Create Nearest Filtered Texture
 		glBindTexture(GL_TEXTURE_2D, texture(0))
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST)
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, Image->sizeX, Image->sizeY, 0, GL_RGB, GL_UNSIGNED_BYTE, Image->buffer)
 		''                              ========
 		'' Use GL_RGB8 Instead Of "3" In glTexImage2D. Also Defined By GL: GL_RGBA8 Etc.
@@ -297,53 +395,50 @@ function LoadGLTextures() as integer
 
 		'' Create Linear Filtered Texture
 		glBindTexture(GL_TEXTURE_2D, texture(1))
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR)
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, Image->sizeX, Image->sizeY, 0, GL_RGB, GL_UNSIGNED_BYTE, Image->buffer)
 
 		'' Create MipMapped Texture
 		glBindTexture(GL_TEXTURE_2D, texture(2))
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR)
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_NEAREST)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST)
 		gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGB8, Image->sizeX, Image->sizeY, GL_RGB, GL_UNSIGNED_BYTE, Image->buffer)
 
 	else
 		status=false
 	end if
-	if (Image) then                                         '' If Texture Exists
-		if (Image->buffer) then deallocate(Image->buffer)   '' If Texture Image Exists
-		deallocate(Image)
-	end if
+	FreeBMPImage(Image)
 
 	'' Load The Bumpmaps
 	Image = LoadBMP(exepath + "/data/Bump.bmp")
 	if (Image) then
-		glPixelTransferf(GL_RED_SCALE,0.5)                  '' Scale RGB By 50%, So That We Have Only
-		glPixelTransferf(GL_GREEN_SCALE,0.5)                '' Half Intenstity
-		glPixelTransferf(GL_BLUE_SCALE,0.5)
+		glPixelTransferf(GL_RED_SCALE, 0.5)                  '' Scale RGB By 50%, So That We Have Only
+		glPixelTransferf(GL_GREEN_SCALE, 0.5)                '' Half Intenstity
+		glPixelTransferf(GL_BLUE_SCALE, 0.5)
 
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP)      '' No Wrapping, Please!
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP)
-		glTexParameterfv(GL_TEXTURE_2D,GL_TEXTURE_BORDER_COLOR,@Gray(0))
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP)      '' No Wrapping, Please!
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP)
+		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, @Gray(0))
 
 		glGenTextures(3, @bump(0))                                     '' Create Three Textures
 
 		'' Create Nearest Filtered Texture
 		glBindTexture(GL_TEXTURE_2D, bump(0))
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST)
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, Image->sizeX, Image->sizeY, 0, GL_RGB, GL_UNSIGNED_BYTE, Image->buffer)
 
 		'' Create Linear Filtered Texture
 		glBindTexture(GL_TEXTURE_2D, bump(1))
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR)
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, Image->sizeX, Image->sizeY, 0, GL_RGB, GL_UNSIGNED_BYTE, Image->buffer)
 
 		'' Create MipMapped Texture
 		glBindTexture(GL_TEXTURE_2D, bump(2))
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR)
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_NEAREST)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST)
 		gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGB8, Image->sizeX, Image->sizeY, GL_RGB, GL_UNSIGNED_BYTE, Image->buffer)
 
 		for i = 0 to 3*Image->sizeX*Image->sizeY -1            '' Invert The Bumpmap
@@ -354,102 +449,40 @@ function LoadGLTextures() as integer
 
 		'' Create Nearest Filtered Texture
 		glBindTexture(GL_TEXTURE_2D, invbump(0))
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST)
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, Image->sizeX, Image->sizeY, 0, GL_RGB, GL_UNSIGNED_BYTE, Image->buffer)
 
 		'' Create Linear Filtered Texture
 		glBindTexture(GL_TEXTURE_2D, invbump(1))
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR)
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, Image->sizeX, Image->sizeY, 0, GL_RGB, GL_UNSIGNED_BYTE, Image->buffer)
 
 		'' Create MipMapped Texture
 		glBindTexture(GL_TEXTURE_2D, invbump(2))
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR)
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_NEAREST)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST)
 		gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGB8, Image->sizeX, Image->sizeY, GL_RGB, GL_UNSIGNED_BYTE, Image->buffer)
 
-		glPixelTransferf(GL_RED_SCALE,1.0)                  '' Scale RGB Back To 100% Again
-		glPixelTransferf(GL_GREEN_SCALE,1.0)
-		glPixelTransferf(GL_BLUE_SCALE,1.0)
+		glPixelTransferf(GL_RED_SCALE, 1.0)                  '' Scale RGB Back To 100% Again
+		glPixelTransferf(GL_GREEN_SCALE, 1.0)
+		glPixelTransferf(GL_BLUE_SCALE, 1.0)
 
 	else
 		status=false
 	end if
-	if (Image) then                                         '' If Texture Exists
-		if (Image->buffer) then deallocate(Image->buffer)   '' If Texture Image Exists
-		deallocate(Image)
+	FreeBMPImage(Image)
+
+	'' Load the logo bitmaps. Each helper call owns its BMP images and RGBA buffer.
+	if LoadLogoTexture(glLogo, exepath + "/data/OpenGL_Alpha.bmp", _
+			exepath + "/data/OpenGL.bmp") = false then
+		status = false
 	end if
 
-	''   sector1.triangle = (TRIANGLE *) malloc(sizeof(TRIANGLE)*numtriangles)
-	'' sector1.triangle = new TRIANGLE(numtriangles)
-
-	'' Load The Logo-Bitmaps
-	Image=LoadBMP(exepath + "/data/OpenGL_Alpha.bmp")
-	if (Image) then
-		alpha = allocate( 4*Image->sizeX*Image->sizeY)      '' Create Memory For RGBA8-Texture
-		for a=0 to Image->sizeX*Image->sizeY - 1
-			alpha[4*a+3]=Image->buffer[a*3]                 '' Pick Only Red Value As Alpha!
-		next
-
-		Image=LoadBMP(exepath + "/data/OpenGL.bmp")
-		if (Image = NULL) then status=false
-		for a=0 to Image->sizeX*Image->sizeY - 1
-			alpha[4*a] = Image->buffer[a*3]                 '' R
-			alpha[4*a+1] = Image->buffer[a*3+1]             '' G
-			alpha[4*a+2] = Image->buffer[a*3+2]             '' B
-		next
-
-		glGenTextures(1, @glLogo)                           '' Create One Textures
-
-		'' Create Linear Filtered RGBA8-Texture
-		glBindTexture(GL_TEXTURE_2D, glLogo)
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR)
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR)
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, Image->sizeX, Image->sizeY, 0, GL_RGBA, GL_UNSIGNED_BYTE, alpha)
-		deallocate (alpha)
-	else
-		status=false
-	end if
-
-	if (Image) then                                         '' If Texture Exists
-		if (Image->buffer) then deallocate(Image->buffer)   '' If Texture Image Exists
-		deallocate (Image)
-		Image=NULL
-	end if
-
-	'' Load The "Extension Enabled"-Logo
-	Image=LoadBMP(exepath + "/data/Multi_On_Alpha.bmp")
-	if Image then
-		alpha = allocate(4*Image->sizeX*Image->sizeY)       '' Create Memory For RGBA8-Texture
-		for a=0 to Image->sizeX*Image->sizeY - 1
-			alpha[4*a+3] = Image->buffer[a*3]               '' Pick Only Red Value As Alpha!
-		next
-		Image=LoadBMP(exepath + "/data/Multi_On.bmp")
-		if (Image = NULL) then status=false
-		for a=0 to Image->sizeX*Image->sizeY -1
-			alpha[4*a] = Image->buffer[a*3]                 '' R
-			alpha[4*a+1] = Image->buffer[a*3+1]             '' G
-			alpha[4*a+2] = Image->buffer[a*3+2]             '' B
-		next
-
-		glGenTextures(1, @multiLogo)                        '' Create One Textures
-
-		'' Create Linear Filtered RGBA8-Texture
-		glBindTexture(GL_TEXTURE_2D, multiLogo)
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR)
-		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR)
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, Image->sizeX, Image->sizeY, 0, GL_RGBA, GL_UNSIGNED_BYTE, alpha)
-		deallocate( alpha)
-
-	else
-		status=false
-	end if
-	if (Image) then                                         '' If Texture Exists
-		if (Image->buffer) then deallocate (Image->buffer)  '' If Texture Image Exists
-		deallocate( Image)
-		Image=NULL
+	if LoadLogoTexture(multiLogo, exepath + "/data/Multi_On_Alpha.bmp", _
+			exepath + "/data/Multi_On.bmp") = false then
+		status = false
 	end if
 
 	return status                                           '' Return The Status
@@ -462,38 +495,38 @@ sub doCube ()
 		'' Front Face
 		glNormal3f( 0.0, 0.0, +1.0)
 		for i=0 to 3
-			glTexCoord2f(CubeData(5*i),CubeData(5*i+1))
-			glVertex3f(CubeData(5*i+2),CubeData(5*i+3),CubeData(5*i+4))
+			glTexCoord2f(CubeData(5*i), CubeData(5*i+1))
+			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 		'' Back Face
-		glNormal3f( 0.0, 0.0,-1.0)
+		glNormal3f( 0.0, 0.0, -1.0)
 		for i=4 to 7
-			glTexCoord2f(CubeData(5*i),CubeData(5*i+1))
-			glVertex3f(CubeData(5*i+2),CubeData(5*i+3),CubeData(5*i+4))
+			glTexCoord2f(CubeData(5*i), CubeData(5*i+1))
+			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 		'' Top Face
 		glNormal3f( 0.0, 1.0, 0.0)
 		for i=8 to 11
-			glTexCoord2f(CubeData(5*i),CubeData(5*i+1))
-			glVertex3f(CubeData(5*i+2),CubeData(5*i+3),CubeData(5*i+4))
+			glTexCoord2f(CubeData(5*i), CubeData(5*i+1))
+			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 		'' Bottom Face
-		glNormal3f( 0.0,-1.0, 0.0)
+		glNormal3f( 0.0, -1.0, 0.0)
 		for i=12 to 15
-			glTexCoord2f(CubeData(5*i),CubeData(5*i+1))
-			glVertex3f(CubeData(5*i+2),CubeData(5*i+3),CubeData(5*i+4))
+			glTexCoord2f(CubeData(5*i), CubeData(5*i+1))
+			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 		'' Right face
 		glNormal3f( 1.0, 0.0, 0.0)
 		for i=16 to 19
-			glTexCoord2f(CubeData(5*i),CubeData(5*i+1))
-			glVertex3f(CubeData(5*i+2),CubeData(5*i+3),CubeData(5*i+4))
+			glTexCoord2f(CubeData(5*i), CubeData(5*i+1))
+			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 		'' Left Face
 		glNormal3f(-1.0, 0.0, 0.0)
 		for i=20 to 23
-			glTexCoord2f(CubeData(5*i),CubeData(5*i+1))
-			glVertex3f(CubeData(5*i+2),CubeData(5*i+3),CubeData(5*i+4))
+			glTexCoord2f(CubeData(5*i), CubeData(5*i+1))
+			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 	glEnd()
 end sub
@@ -516,6 +549,8 @@ end sub
 ''
 ''    On http:'www.nvidia.com/marketing/Developer/DevRel.nsf/TechnicalDemosFrame?OpenPage
 ''    You Can Find A Demo Called GL_BUMP That Is A Little Bit More Complicated.
+''    This original third-party attribution retains an encoded accented name.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL004
 ''    GL_BUMP:   Copyright Diego Tártara, 1999.
 ''             -  diego_tartara@ciudad.com.ar  -
 ''
@@ -580,24 +615,24 @@ end sub
 '' MUST CALL THIS LAST!!!, Billboards The Two Logos.
 sub doLogo()
 	glDepthFunc(GL_ALWAYS)
-	glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA)
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
 	glDisable(GL_LIGHTING)
 	glLoadIdentity()
-	glBindTexture(GL_TEXTURE_2D,glLogo)
+	glBindTexture(GL_TEXTURE_2D, glLogo)
 	glBegin(GL_QUADS)
-		glTexCoord2f(0.0,0.0): glVertex3f(0.23, -0.4,-1.0)
-		glTexCoord2f(1.0,0.0): glVertex3f(0.53, -0.4,-1.0)
-		glTexCoord2f(1.0,1.0): glVertex3f(0.53, -0.25,-1.0)
-		glTexCoord2f(0.0,1.0): glVertex3f(0.23, -0.25,-1.0)
+		glTexCoord2f(0.0, 0.0): glVertex3f(0.23, -0.4, -1.0)
+		glTexCoord2f(1.0, 0.0): glVertex3f(0.53, -0.4, -1.0)
+		glTexCoord2f(1.0, 1.0): glVertex3f(0.53, -0.25, -1.0)
+		glTexCoord2f(0.0, 1.0): glVertex3f(0.23, -0.25, -1.0)
 	glEnd()
 	if (useMultitexture) then
-		glBindTexture(GL_TEXTURE_2D,multiLogo)
+		glBindTexture(GL_TEXTURE_2D, multiLogo)
 		glBegin(GL_QUADS)
-			glTexCoord2f(0.0,0.0): glVertex3f(-0.53, -0.4,-1.0)
-			glTexCoord2f(1.0,0.0): glVertex3f(-0.33, -0.4,-1.0)
-			glTexCoord2f(1.0,1.0): glVertex3f(-0.33, -0.3,-1.0)
-			glTexCoord2f(0.0,1.0): glVertex3f(-0.53, -0.3,-1.0)
+			glTexCoord2f(0.0, 0.0): glVertex3f(-0.53, -0.4, -1.0)
+			glTexCoord2f(1.0, 0.0): glVertex3f(-0.33, -0.4, -1.0)
+			glTexCoord2f(1.0, 1.0): glVertex3f(-0.33, -0.3, -1.0)
+			glTexCoord2f(0.0, 1.0): glVertex3f(-0.53, -0.3, -1.0)
 		glEnd()
 	end if
 	glDepthFunc(GL_LEQUAL)
@@ -606,13 +641,13 @@ end sub
 ''------------------------------------------------------------------------
 function doMesh1TexelUnits() as integer
 
-	dim c(0 to 3) as single => {0.0,0.0,0.0,1.0}         '' Holds Current Vertex
-	dim n(0 to 3) as single => {0.0,0.0,0.0,1.0}         '' Normalized Normal Of Current Surface
-	dim s(0 to 3) as single => {0.0,0.0,0.0,1.0}         '' s-Texture Coordinate Direction, Normalized
-	dim t(0 to 3) as single => {0.0,0.0,0.0,1.0}         '' t-Texture Coordinate Direction, Normalized
+	dim c(0 to 3) as single => {0.0, 0.0, 0.0, 1.0}         '' Holds Current Vertex
+	dim n(0 to 3) as single => {0.0, 0.0, 0.0, 1.0}         '' Normalized Normal Of Current Surface
+	dim s(0 to 3) as single => {0.0, 0.0, 0.0, 1.0}         '' s-Texture Coordinate Direction, Normalized
+	dim t(0 to 3) as single => {0.0, 0.0, 0.0, 1.0}         '' t-Texture Coordinate Direction, Normalized
 
 	dim l(0 to 3) as single                              '' Holds Our Lightposition To Be Transformed Into Object Space
-	dim Minv(15) as single                               '' Holds The Inverted Modelview Matrix To Do So.
+	dim Minv(0 to 15) as single                          '' Holds The Inverted Modelview Matrix To Do So.
 	dim i as integer
 
 	glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)  '' Clear The Screen And The Depth Buffer
@@ -620,22 +655,22 @@ function doMesh1TexelUnits() as integer
 	'' Build Inverse Modelview Matrix First. This Substitutes One Push/Pop With One glLoadIdentity();
 	'' Simply Build It By Doing All Transformations Negated And In Reverse Order.
 	glLoadIdentity()
-	glRotatef(-yrot,0.0,1.0,0.0)
-	glRotatef(-xrot,1.0,0.0,0.0)
-	glTranslatef(0.0,0.0,-z)
-	glGetFloatv(GL_MODELVIEW_MATRIX,@Minv(0))
+	glRotatef(-yrot, 0.0, 1.0, 0.0)
+	glRotatef(-xrot, 1.0, 0.0, 0.0)
+	glTranslatef(0.0, 0.0, -z)
+	glGetFloatv(GL_MODELVIEW_MATRIX, @Minv(0))
 	glLoadIdentity()
-	glTranslatef(0.0,0.0,z)
+	glTranslatef(0.0, 0.0, z)
 
-	glRotatef(xrot,1.0,0.0,0.0)
-	glRotatef(yrot,0.0,1.0,0.0)
+	glRotatef(xrot, 1.0, 0.0, 0.0)
+	glRotatef(yrot, 0.0, 1.0, 0.0)
 
 	'' Transform The Lightposition Into Object Coordinates:
 	l(0)=LightPosition(0)
 	l(1)=LightPosition(1)
 	l(2)=LightPosition(2)
 	l(3)=1.0                                             '' Homogenous Coordinate
-	VMatMult(@Minv(0),@l(0))
+	VMatMult(@Minv(0), @l(0))
 
 	''    PASS#1: Use Texture "Bump"
 	''            No Blend
@@ -650,8 +685,8 @@ function doMesh1TexelUnits() as integer
 	''            Blend GL_ONE To GL_ONE
 	''            No Lighting
 	''            Offset Texture Coordinates
-	glBindTexture(GL_TEXTURE_2D,invbump(filter))
-	glBlendFunc(GL_ONE,GL_ONE)
+	glBindTexture(GL_TEXTURE_2D, invbump(filter))
+	glBlendFunc(GL_ONE, GL_ONE)
 	glDepthFunc(GL_LEQUAL)
 	glEnable(GL_BLEND)
 
@@ -664,7 +699,7 @@ function doMesh1TexelUnits() as integer
 			c(0)=CubeData(5*i+2)
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
-			SetUpBumps(@n(0),@c(0),@l(0),@s(0),@t(0))
+			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
 			glTexCoord2f(CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
@@ -676,7 +711,7 @@ function doMesh1TexelUnits() as integer
 			c(0)=CubeData(5*i+2)
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
-			SetUpBumps(@n(0),@c(0),@l(0),@s(0),@t(0))
+			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
 			glTexCoord2f(CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
@@ -688,7 +723,7 @@ function doMesh1TexelUnits() as integer
 			c(0)=CubeData(5*i+2)
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
-			SetUpBumps(@n(0),@c(0),@l(0),@s(0),@t(0))
+			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
 			glTexCoord2f(CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
@@ -700,7 +735,7 @@ function doMesh1TexelUnits() as integer
 			c(0)=CubeData(5*i+2)
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
-			SetUpBumps(@n(0),@c(0),@l(0),@s(0),@t(0))
+			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
 			glTexCoord2f(CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
@@ -712,7 +747,7 @@ function doMesh1TexelUnits() as integer
 			c(0)=CubeData(5*i+2)
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
-			SetUpBumps(@n(0),@c(0),@l(0),@s(0),@t(0))
+			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
 			glTexCoord2f(CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
@@ -724,7 +759,7 @@ function doMesh1TexelUnits() as integer
 			c(0)=CubeData(5*i+2)
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
-			SetUpBumps(@n(0),@c(0),@l(0),@s(0),@t(0))
+			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
 			glTexCoord2f(CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
@@ -737,8 +772,8 @@ function doMesh1TexelUnits() as integer
 
 	if (not emboss) then
 		glTexEnvf (GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE)
-		glBindTexture(GL_TEXTURE_2D,texture(filter))
-		glBlendFunc(GL_DST_COLOR,GL_SRC_COLOR)
+		glBindTexture(GL_TEXTURE_2D, texture(filter))
+		glBlendFunc(GL_DST_COLOR, GL_SRC_COLOR)
 		glEnable(GL_LIGHTING)
 		doCube()
 	end if
@@ -763,8 +798,8 @@ function doMesh2TexelUnits() as integer
 	dim s(0 to 3) as single => {0.0, 0.0, 0.0, 1.0}      '' s-texture coordinate direction, normalized
 	dim t(0 to 3) as single=> {0.0, 0.0, 0.0, 1.0}       '' t-texture coordinate direction, normalized
 
-	dim l(3) as single                                   '' holds our lightposition to be transformed into object space
-	dim Minv(15) as single                               '' holds the inverted modelview matrix to do so.
+	dim l(0 to 3) as single                              '' holds our lightposition to be transformed into object space
+	dim Minv(0 to 15) as single                          '' holds the inverted modelview matrix to do so.
 	dim i as integer
 
 	glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)  '' Clear The Screen And The Depth Buffer
@@ -772,22 +807,22 @@ function doMesh2TexelUnits() as integer
 	'' Build Inverse Modelview Matrix First. This Substitutes One Push/Pop With One glLoadIdentity();
 	'' Simply Build It By Doing All Transformations Negated And In Reverse Order.
 	glLoadIdentity()
-	glRotatef(-yrot,0.0,1.0,0.0)
-	glRotatef(-xrot,1.0,0.0,0.0)
-	glTranslatef(0.0,0.0,-z)
-	glGetFloatv(GL_MODELVIEW_MATRIX,@Minv(0))
+	glRotatef(-yrot, 0.0, 1.0, 0.0)
+	glRotatef(-xrot, 1.0, 0.0, 0.0)
+	glTranslatef(0.0, 0.0, -z)
+	glGetFloatv(GL_MODELVIEW_MATRIX, @Minv(0))
 	glLoadIdentity()
-	glTranslatef(0.0,0.0,z)
+	glTranslatef(0.0, 0.0, z)
 
-	glRotatef(xrot,1.0,0.0,0.0)
-	glRotatef(yrot,0.0,1.0,0.0)
+	glRotatef(xrot, 1.0, 0.0, 0.0)
+	glRotatef(yrot, 0.0, 1.0, 0.0)
 
 	'' Transform The Lightposition Into Object Coordinates:
 	l(0)=LightPosition(0)
 	l(1)=LightPosition(1)
 	l(2)=LightPosition(2)
 	l(3)=1.0                                             '' Homogenous Coordinate
-	VMatMult(@Minv(0),@l(0))
+	VMatMult(@Minv(0), @l(0))
 
 	''    PASS#1: Texel-Unit 0:   Use Texture "Bump"
 	''                            No Blend
@@ -823,9 +858,9 @@ function doMesh2TexelUnits() as integer
 			c(0)=CubeData(5*i+2)
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
-			SetUpBumps(@n(0),@c(0),@l(0),@s(0),@t(0))
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB,CubeData(5*i), CubeData(5*i+1))
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB,CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
+			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
+			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
+			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 		'' Back Face
@@ -836,9 +871,9 @@ function doMesh2TexelUnits() as integer
 			c(0)=CubeData(5*i+2)
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
-			SetUpBumps(@n(0),@c(0),@l(0),@s(0),@t(0))
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB,CubeData(5*i), CubeData(5*i+1))
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB,CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
+			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
+			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
+			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 		'' Top Face
@@ -849,9 +884,9 @@ function doMesh2TexelUnits() as integer
 			c(0)=CubeData(5*i+2)
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
-			SetUpBumps(@n(0),@c(0),@l(0),@s(0),@t(0))
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB,CubeData(5*i), CubeData(5*i+1))
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB,CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
+			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
+			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
+			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 		'' Bottom Face
@@ -862,9 +897,9 @@ function doMesh2TexelUnits() as integer
 			c(0)=CubeData(5*i+2)
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
-			SetUpBumps(@n(0),@c(0),@l(0),@s(0),@t(0))
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB,CubeData(5*i), CubeData(5*i+1))
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB,CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
+			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
+			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
+			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 		'' Right Face
@@ -875,9 +910,9 @@ function doMesh2TexelUnits() as integer
 			c(0)=CubeData(5*i+2)
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
-			SetUpBumps(@n(0),@c(0),@l(0),@s(0),@t(0))
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB,CubeData(5*i), CubeData(5*i+1))
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB,CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
+			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
+			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
+			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 		'' Left Face
@@ -888,9 +923,9 @@ function doMesh2TexelUnits() as integer
 			c(0)=CubeData(5*i+2)
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
-			SetUpBumps(@n(0),@c(0),@l(0),@s(0),@t(0))
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB,CubeData(5*i), CubeData(5*i+1))
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB,CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
+			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
+			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
+			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 	glEnd()
@@ -905,8 +940,8 @@ function doMesh2TexelUnits() as integer
 	glActiveTextureARB(GL_TEXTURE0_ARB)
 	if not emboss then
 		glTexEnvf (GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE)
-		glBindTexture(GL_TEXTURE_2D,texture(filter))
-		glBlendFunc(GL_DST_COLOR,GL_SRC_COLOR)
+		glBindTexture(GL_TEXTURE_2D, texture(filter))
+		glBlendFunc(GL_DST_COLOR, GL_SRC_COLOR)
 		glEnable(GL_BLEND)
 		glEnable(GL_LIGHTING)
 		doCube()
@@ -930,18 +965,18 @@ function doMeshNoBumps() as integer
 
 	glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)  '' Clear The Screen And The Depth Buffer
 	glLoadIdentity()                                     '' Reset The View
-	glTranslatef(0.0,0.0,z)
+	glTranslatef(0.0, 0.0, z)
 
-	glRotatef(xrot,1.0,0.0,0.0)
-	glRotatef(yrot,0.0,1.0,0.0)
+	glRotatef(xrot, 1.0, 0.0, 0.0)
+	glRotatef(yrot, 0.0, 1.0, 0.0)
 	if (useMultitexture) then
 		glActiveTextureARB(GL_TEXTURE1_ARB)
 		glDisable(GL_TEXTURE_2D)
 		glActiveTextureARB(GL_TEXTURE0_ARB)
 	end if
 	glDisable(GL_BLEND)
-	glBindTexture(GL_TEXTURE_2D,texture(filter))
-	glBlendFunc(GL_DST_COLOR,GL_SRC_COLOR)
+	glBindTexture(GL_TEXTURE_2D, texture(filter))
+	glBlendFunc(GL_DST_COLOR, GL_SRC_COLOR)
 	glEnable(GL_LIGHTING)
 	doCube()
 

@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include once "iup.bi"
+
 extern "C"
 
 #define __IUPWEB_H

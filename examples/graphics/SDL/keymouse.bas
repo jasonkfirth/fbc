@@ -10,6 +10,8 @@ declare sub doQuit ( )
 declare sub doMain ( )
 declare sub exitError ( byref msg as string )
 
+'' Setup stores the video surface for the module's SDL procedures.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared video as SDL_Surface ptr
 
 doInit
@@ -67,5 +69,7 @@ end sub
 sub exitError ( byref msg as string )
 	print "error: " + msg
 	SDL_Quit
+	'' Initialization failed; returning would let the caller continue with no SDL video surface.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-CF-005
 	end
 end sub

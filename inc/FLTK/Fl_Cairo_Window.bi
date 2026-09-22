@@ -17,7 +17,7 @@ public:
 
 	declare sub set_draw_cb(cb as cairo_draw_cb)
 private:
-	draw_cb_ as cairo_draw_cb 
+	draw_cb_ as cairo_draw_cb
 end type
 
 end extern

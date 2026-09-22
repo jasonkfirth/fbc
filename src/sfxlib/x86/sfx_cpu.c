@@ -28,6 +28,12 @@ extern unsigned int fb_CpuDetect(void);
 
 unsigned int fb_sfxSimdCapabilities(void)
 {
+#if defined(__DJGPP__) && defined(ENABLE_MT) && defined(FB_DOS_PDMLWP)
+    /* PDMLWP preserves x87/MMX state but has no XMM context. Both sound SIMD
+     * tiers use SSE registers, so this profile must use scalar conversions.
+     */
+    return 0u;
+#else
     const unsigned int mmx = 1u << 23;
     const unsigned int sse = 1u << 25;
     const unsigned int sse2 = 1u << 26;
@@ -41,6 +47,7 @@ unsigned int fb_sfxSimdCapabilities(void)
         capabilities |= FB_SFX_SIMD_SSE2;
 
     return capabilities;
+#endif
 }
 
 /* end of sfx_cpu.c */

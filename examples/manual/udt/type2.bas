@@ -9,7 +9,7 @@
 '' Example showing the problems with fixed length string fields in UDTs and fbc version < 1.20.0
 '' Suppose we have read a GIF header from a file
 ''                        signature         width        height
-Dim As ZString*(10+1) z => "GIF89a" + MKShort(10) + MKShort(11)
+Dim As ZString * 11 z => "GIF89a" + MKShort(10) + MKShort(11)
 
 Print "Using fixed-length string"
 
@@ -33,9 +33,21 @@ If Left(h1->sig, 5) = "GIF89" Then Print "ok" Else Print "error"
 
 '' Using a ubyte array, we need an auxiliary function to convert it to a string
 Function ub2str( ub() As UByte ) As String
-	Dim As String res = Space(UBound(ub) - LBound(ub) + 1)
-	For i As Integer = LBound(ub) To UBound(ub)
-		res[i - LBound(ub)] = ub(i)
+	'' The bounds are captured solely to test for the documented empty-array
+	'' range before they are used for allocation or indexing.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
+	Dim As Integer lower_bound = LBound( ub )
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
+	Dim As Integer upper_bound = UBound( ub )
+
+	If upper_bound < lower_bound Then
+		Function = ""
+		Exit Function
+	End If
+
+	Dim As String res = Space( upper_bound - lower_bound + 1 )
+	For i As Integer = lower_bound To upper_bound
+		res[i - lower_bound] = ub(i)
 	Next
 	Function = res
 End Function
@@ -54,3 +66,5 @@ Dim As hdr2 Ptr h2 = CPtr(hdr2 Ptr, @z)
 
 Print ub2str(h2->sig()), h2->wid, h2->hei '' Prints GIF89a  10  11 (ok)
 If ub2str(h2->sig()) = "GIF89a" Then Print "ok" Else Print "error" '' Prints ok
+
+' end of type2.bas

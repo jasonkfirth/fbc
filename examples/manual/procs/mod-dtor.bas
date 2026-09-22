@@ -17,7 +17,8 @@ Sub pauseonexit Destructor
 End Sub
 
 Dim array(0 To 10, 0 To 10) As Integer
-Dim As Integer i = 0, j = 11
+Dim As Integer i = 0
+Dim As Integer j = 11
 
 '' this next line will cause the program to abort with an
 '' error if you compile with array bounds checking enabled (fbc -exx ...)

@@ -283,7 +283,9 @@ type IDirect3DRMObject2Vtbl_
 	Clone as function(byval This as IDirect3DRMObject2 ptr, byval outer as IUnknown ptr, byval iid as const IID const ptr, byval out as any ptr ptr) as HRESULT
 	DeleteDestroyCallback as function(byval This as IDirect3DRMObject2 ptr, byval cb as D3DRMOBJECTCALLBACK, byval ctx as any ptr) as HRESULT
 	GetClientData as function(byval This as IDirect3DRMObject2 ptr, byval id as DWORD, byval data as any ptr ptr) as HRESULT
-	GetDirect3DRM as function(byval This as IDirect3DRMObject2 ptr, byval d3drm as IDirect3DRM ptr ptr) as HRESULT
+	'' IDirect3DRM is declared by d3drm.bi, which includes this component.
+	'' Keep the component independently includable; the COM pointer ABI is unchanged.
+	GetDirect3DRM as function(byval This as IDirect3DRMObject2 ptr, byval d3drm as any ptr ptr) as HRESULT
 	GetName as function(byval This as IDirect3DRMObject2 ptr, byval size as DWORD ptr, byval name as zstring ptr) as HRESULT
 	SetClientData as function(byval This as IDirect3DRMObject2 ptr, byval id as DWORD, byval data as any ptr, byval flags as DWORD) as HRESULT
 	SetName as function(byval This as IDirect3DRMObject2 ptr, byval name as const zstring ptr) as HRESULT

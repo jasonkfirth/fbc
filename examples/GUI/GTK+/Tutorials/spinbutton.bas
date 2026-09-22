@@ -8,6 +8,8 @@
 #include once "gtk/gtk.bi"
 #include once "vbcompat.bi"
 
+' The spin-button callbacks update this module-owned widget.
+' FB-LINTER: DISABLE-NEXT-LINE FBL301
 Dim Shared As GtkWidget Ptr spinner1
 
 Sub toggle_snap Cdecl(Byval widget As GtkWidget Ptr, Byval spin As GtkSpinButton Ptr)
@@ -57,11 +59,7 @@ Sub get_value Cdecl(Byval widget As GtkWidget Ptr, Byval user_data As gpointer)
         val_spin_dbl = gtk_spin_button_get_value (spin)
         num_digit = gtk_spin_button_get_digits (spin)
         If num_digit > 0 Then
-            str_format += "."
-            Dim As Integer j
-            For j = 1 To num_digit
-                str_format += "0"
-            Next
+            str_format += "." + String(num_digit, Asc("0"))
         End If
         buf = format(val_spin_dbl, str_format)
     End If
@@ -239,4 +237,3 @@ End Sub
     gtk_main ()
 
     End 0
-

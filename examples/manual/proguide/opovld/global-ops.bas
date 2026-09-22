@@ -19,7 +19,7 @@ Operator * (ByRef lhs As Rational, ByRef rhs As Rational) As Rational
 		lhs.denominator * rhs.denominator)
 End Operator
 
-Dim As Rational r1 = (2, 3), r2 = (3, 4)
+Dim As Rational r1 = (2, 3)
+Dim As Rational r2 = (3, 4)
 Dim As Rational r3 = -(r1 * r2)
 Print r3.numerator & "/" & r3.denominator
-

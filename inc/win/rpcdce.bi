@@ -5,9 +5,9 @@
 ''   This file has no copyright assigned and is placed in the Public Domain.
 ''   This file is part of the mingw-w64 runtime package.
 ''
-''   The mingw-w64 runtime package and its code is distributed in the hope that it 
-''   will be useful but WITHOUT ANY WARRANTY.  ALL WARRANTIES, EXPRESSED OR 
-''   IMPLIED ARE HEREBY DISCLAIMED.  This includes but is not limited to 
+''   The mingw-w64 runtime package and its code is distributed in the hope that it
+''   will be useful but WITHOUT ANY WARRANTY.  ALL WARRANTIES, EXPRESSED OR
+''   IMPLIED ARE HEREBY DISCLAIMED.  This includes but is not limited to
 ''   warranties of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ''
 '' translated to FreeBASIC by:
@@ -17,17 +17,13 @@
 
 #include once "_mingw_unicode.bi"
 #include once "guiddef.bi"
+#include once "rpcbase.bi"
 
 extern "Windows"
 
 #define __RPCDCE_H__
-type RPC_CSTR as ubyte ptr
-type RPC_WSTR as ushort ptr
-type RPC_BINDING_HANDLE as I_RPC_HANDLE
 type handle_t as RPC_BINDING_HANDLE
 type rpc_binding_handle_t as RPC_BINDING_HANDLE
-#define UUID_DEFINED
-type UUID as GUID
 type uuid_t as UUID
 
 type _RPC_BINDING_VECTOR
@@ -45,7 +41,6 @@ end type
 
 type UUID_VECTOR as _UUID_VECTOR
 type uuid_vector_t as UUID_VECTOR
-type RPC_IF_HANDLE as any ptr
 #define IFID_DEFINED
 
 type _RPC_IF_ID
@@ -606,16 +601,6 @@ type PRPC_SECURITY_QOS_V3_A as _RPC_SECURITY_QOS_V3_A ptr
 	type _RPC_SECURITY_QOS_V3 as _RPC_SECURITY_QOS_V3_A
 #endif
 
-type _RPC_HTTP_REDIRECTOR_STAGE as long
-enum
-	RPCHTTP_RS_REDIRECT = 1
-	RPCHTTP_RS_ACCESS_1
-	RPCHTTP_RS_SESSION
-	RPCHTTP_RS_ACCESS_2
-	RPCHTTP_RS_INTERFACE
-end enum
-
-type RPC_HTTP_REDIRECTOR_STAGE as _RPC_HTTP_REDIRECTOR_STAGE
 type RPC_NEW_HTTP_PROXY_CHANNEL as function(byval RedirectorStage as RPC_HTTP_REDIRECTOR_STAGE, byval ServerName as ushort ptr, byval ServerPort as ushort ptr, byval RemoteUser as ushort ptr, byval AuthType as ushort ptr, byval ResourceUuid as any ptr, byval Metadata as any ptr, byval SessionId as any ptr, byval Interface as any ptr, byval Reserved as any ptr, byval Flags as ulong, byval NewServerName as ushort ptr ptr, byval NewServerPort as ushort ptr ptr) as RPC_STATUS
 type RPC_HTTP_PROXY_FREE_STRING as sub(byval String as ushort ptr)
 

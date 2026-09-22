@@ -27,4 +27,6 @@
 
 #pragma once
 
+#include once "iup.bi"
+
 #include once "iupcontrols.bi"

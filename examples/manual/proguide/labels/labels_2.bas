@@ -11,11 +11,11 @@
 '$lang: "qb"
 
 '' Labels can be used to "bookmark" DATA blocks, allowing RESTORE to alter the READ sequence.
-Read a,b,c
+Read a, b, c
 Restore here
-Read d,e
-Print a,b,c,d,e
+Read d, e
+Print a, b, c, d, e
 
-Data 1,2,3,4,5
+Data 1, 2, 3, 4, 5
 here:
-Data 6,7,8
+Data 6, 7, 8

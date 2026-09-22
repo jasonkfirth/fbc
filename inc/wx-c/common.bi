@@ -2,6 +2,7 @@
 #Define __common_bi__
 
 #Include Once "crt/stddef.bi"
+#Include Once "defs.bi"
 
 
 #Ifdef __FB_WIN32__
@@ -392,7 +393,6 @@ Type wxFileOffset As Integer
 
 Type _wxWidget As Any  : Type wxWidget As _wxWidget
 ' callbacks used by many wx classes
-Type Virtual_Dispose   As Sub      WXCALL 
+Type Virtual_Dispose   As Sub      WXCALL
 
 #EndIf ' __common_bi__
-

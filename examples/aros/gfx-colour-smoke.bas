@@ -54,29 +54,30 @@ end if
 ''
 screenlock
 framebuffer = screenptr
-if framebuffer = 0 then
-    screenunlock
-    end 1
+
+if framebuffer <> 0 then
+    for y = 0 to TEST_HEIGHT - 1
+        scanline_offset = y * TEST_WIDTH
+        for x = 0 to TEST_WIDTH - 1
+            if x < 120 then
+                primary_colour = rgb(255, 0, 0)
+            elseif x < 240 then
+                primary_colour = rgb(0, 255, 0)
+            else
+                primary_colour = rgb(0, 0, 255)
+            end if
+            framebuffer[scanline_offset + x] = primary_colour
+        next x
+    next y
+
+    draw string (34, 18), "RED", rgb(255, 255, 255)
+    draw string (145, 18), "GREEN", rgb(255, 255, 255)
+    draw string (275, 18), "BLUE", rgb(255, 255, 255)
 end if
-
-for y = 0 to TEST_HEIGHT - 1
-    scanline_offset = y * TEST_WIDTH
-    for x = 0 to TEST_WIDTH - 1
-        if x < 120 then
-            primary_colour = rgb(255, 0, 0)
-        elseif x < 240 then
-            primary_colour = rgb(0, 255, 0)
-        else
-            primary_colour = rgb(0, 0, 255)
-        end if
-        framebuffer[scanline_offset + x] = primary_colour
-    next x
-next y
-
-draw string (34, 18), "RED", rgb(255, 255, 255)
-draw string (145, 18), "GREEN", rgb(255, 255, 255)
-draw string (275, 18), "BLUE", rgb(255, 255, 255)
 screenunlock
+
+if framebuffer = 0 then end 1
+
 sleep 0
 
 ''
@@ -84,7 +85,12 @@ sleep 0
 '' is written only after all three rectangles have reached the framebuffer.
 ''
 marker_file = freefile
-open "GfxSmoke:gfx-colour-smoke.drawn" for output as #marker_file
+'' GfxSmoke: is the test runner's fixed, non-temporary rendezvous path.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
+if open( "GfxSmoke:gfx-colour-smoke.drawn" for output as #marker_file ) <> 0 then
+    screen 0
+    end 1
+end if
 print #marker_file, "AROS_GFX_COLOUR_SMOKE: DRAWN"
 close #marker_file
 

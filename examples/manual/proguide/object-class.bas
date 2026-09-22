@@ -206,10 +206,14 @@ Declare Operator Sgn ( ByRef arg As UDT ) As Double
 '' subs/funcs.  Use USING or prefix the namespace name
 
 Operator T.new ( ByVal size As UInteger ) As Any Ptr
+	'' A class allocator must propagate a null result so New can report failure.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL800
 	Operator = Allocate( size )
 End Operator
 
 Operator T.new[] ( ByVal size As UInteger ) As Any Ptr
+	'' A class allocator must propagate a null result so New[] can report failure.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL800
 	Operator = Allocate( size )
 End Operator
 
@@ -544,4 +548,3 @@ Dim Xlist As T Ptr = New T[10]
 
 '' Deallocate object vector
 Delete[] Xlist
-

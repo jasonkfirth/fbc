@@ -1,0 +1,73 @@
+--- a/src/internals.h
++++ b/src/internals.h
+@@ -170,7 +170,7 @@
+ 	((q)->head = (q)->tail = NO_TIMER)
+ #endif
+ 
+-pthread_mutexattr_t pthread_mutexattr_default;
++extern pthread_mutexattr_t pthread_mutexattr_default;
+ 
+ #ifdef _POSIX_THREADS_PRIO_PROTECT 
+ #ifdef SRP 
+@@ -183,7 +183,7 @@
+ #define NO_MUTEX      ((pthread_mutex_t *)0)
+ #define MUTEX_VALID 0x1
+ 
+-pthread_condattr_t pthread_condattr_default;
++extern pthread_condattr_t pthread_condattr_default;
+ 
+ #define	CONDITION_INITIALIZER	{ QUEUE_INITIALIZER, 1, 0 }
+ #define NO_COND       ((pthread_cond_t *) 0)
+@@ -201,7 +201,7 @@
+ 
+ #define	NO_PTHREAD	((pthread_t) 0)
+ 
+-pthread_attr_t pthread_attr_default;
++extern pthread_attr_t pthread_attr_default;
+ 
+ #define NO_ATTRIBUTE ((pthread_attr_t *)0)
+ 
+--- a/src/pthread.c
++++ b/src/pthread.c
+@@ -50,6 +50,11 @@
+ #ifdef STAND_ALONE
+ extern struct pthread tcb[MAX_THREADS];
+ #endif
++
++/* Default attributes are initialized once by pthread_init(). */
++pthread_mutexattr_t pthread_mutexattr_default;
++pthread_condattr_t pthread_condattr_default;
++pthread_attr_t pthread_attr_default;
+ 
+ volatile int pthread_started = FALSE;
+ static volatile int n_pthreads = 0;
+@@ -946,7 +951,7 @@
+ #endif
+   thread->attr.sched = policy;
+ #ifdef DEF_RR
+-  if (policy != oldsched && p == thread)
++  if (policy != oldsched && mac_pthread_self() == thread)
+     switch (oldsched) {
+     case SCHED_FIFO:
+       pthread_timed_sigwait(thread, NULL, RR_TIME, NULL, thread);
+--- a/src/queue.c
++++ b/src/queue.c
+@@ -30,6 +30,7 @@
+  * Implementation of queues
+  */
+ 
++#include <stdlib.h>
+ #include "internals.h"
+ 
+ extern pthread_timer_q pthread_timer;
+--- a/src/disp.c
++++ b/src/disp.c
+@@ -129,7 +129,7 @@
+     extern pthread_timer_q pthread_timer;
+ #endif
+     for (tmr = pthread_timer.head; tmr; tmr = tmr->next[TIMER_QUEUE])
+-      if (tmr->thread == old && (tmr->mode & DEF_RR))
++      if (tmr->thread == old && (tmr->mode & RR_TIME))
+ 	break;
+     if (tmr) {
+       old->state &= ~T_ASYNCTIMER;

@@ -24,6 +24,7 @@
 
 print "fbcombo: starting"
 
+' Screen 13 is the NuttX framebuffer contract for this combined smoke. FB-LINTER: DISABLE-NEXT-LINE FBL734
 screen 13
 
 if screenptr = 0 then
@@ -38,6 +39,7 @@ paint (160, 100), 2, 14
 pset (10, 10), 5
 
 if point(10, 10) <> 5 then
+    screen 0
     end 31
 end if
 

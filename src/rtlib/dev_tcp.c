@@ -1,4 +1,9 @@
-/* TCP device */
+/* FreeBASIC rtlib: dev_tcp.c
+ *
+ * Implements the TCP file device and adapts platform socket operations to
+ * FreeBASIC's file hooks. Compiler syntax and external network stack
+ * implementations belong to their respective subsystems.
+ */
 
 #include "fb.h"
 #include <strings.h>
@@ -67,7 +72,45 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#endif
 #endif
 
-#if defined(HOST_DOS) || defined(HOST_JS)
+#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+	/* Watt-32 supplies the BSD socket and resolver headers.  Its portable
+	   select entry point is select_s(), because its DJGPP build does not
+	   export the Win32-only select wrapper. */
+	#include <errno.h>
+	#include <netdb.h>
+	#include <sys/ioctl.h>
+	#include <sys/socket.h>
+	#include <sys/types.h>
+	#include <netinet/in.h>
+	#include <netinet/tcp.h>
+	#include <tcp.h>
+	#include "dos/dev_tcp_watt.h"
+
+	/*
+		Watt-32 normally terminates the process when its packet-driver
+		initialization fails.  The FreeBASIC device must report that failure
+		through the normal FILEIO path instead, so temporarily disable Watt's
+		private fatal-error switch while sock_init() runs.
+	*/
+	extern int _watt_do_exit;
+#endif
+
+#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+	#define FB_TCP_CLOSESOCKET(s) fb_DosTcpClose( s )
+	#define FB_TCP_SOCKET_ERROR(s) ((s) == FB_TCP_INVALID_SOCKET)
+	#define FB_TCP_ERRNO() errno
+	#define FB_TCP_WOULDBLOCK(err) ((err) == EAGAIN || (err) == EWOULDBLOCK)
+	/* The published DJGPP Watt-32 headers omit SHUT_* names. Its shutdown.c
+	   defines the BSD values privately: 1 disables sends, 2 both directions. */
+	#define FB_TCP_SHUT_WR 1
+	#define FB_TCP_SHUT_RDWR 2
+	#define FB_TCP_SELECT(n, r, w, e, t) fb_DosTcpSelect( n, r, w, e, t )
+	#define FB_TCP_IOCTL(s, cmd, argp) ioctlsocket( s, cmd, (char *)(argp) )
+	#define FB_TCP_RECV(s, b, l, f) fb_DosTcpRecv( s, b, l, f )
+	#define FB_TCP_SEND(s, b, l, f) fb_DosTcpSend( s, b, l, f )
+	#define FB_TCP_SETSOCKOPT(s, l, o, v, n) setsockopt( s, l, o, v, n )
+	#define FB_TCP_CAN_QUERY_BYTES TRUE
+#elif defined(HOST_DOS) || defined(HOST_JS)
 	#define FB_TCP_CLOSESOCKET(s) (0)
 	#define FB_TCP_SOCKET_ERROR(s) TRUE
 	#define FB_TCP_ERRNO() 0
@@ -132,7 +175,7 @@ static int fb_DevTcpWriteWstr( FB_FILE *handle, const FB_WCHAR *value, size_t va
 static int fb_DevTcpTell( FB_FILE *handle, fb_off_t *pOffset );
 static int fb_DevTcpEof( FB_FILE *handle );
 static int fb_DevTcpServerEof( FB_FILE *handle );
-#if !defined(HOST_DOS) && !defined(HOST_JS) && !defined(HOST_WII)
+#if (!defined(HOST_DOS) || defined(FB_DOS_WATT32)) && !defined(HOST_JS) && !defined(HOST_WII)
 static void fb_hDevTcpFormatService( char *service, size_t service_len, unsigned int port );
 #endif
 
@@ -295,6 +338,54 @@ static int fb_hDevTcpInit( void )
 
 	return init_result;
 }
+#elif defined(HOST_DOS) && defined(FB_DOS_WATT32)
+static void fb_hDevTcpShutdownWatt( void )
+{
+	sock_exit( );
+}
+
+static int fb_hDevTcpInit( void )
+{
+	static int is_init = FALSE;
+	static int init_result = FB_RTERROR_OK;
+
+	if( is_init )
+		return init_result;
+
+	FB_LOCK();
+	if( is_init == FALSE ) {
+		int old_do_exit = _watt_do_exit;
+		int restore_noexcept = (getenv( "WATT32-NOEXC" ) == NULL);
+
+		/*
+			Watt-32 normally replaces SIGILL and other exception handlers.
+			PDMLWP uses SIGILL to dispatch threads, so that replacement makes
+			the next scheduling interrupt terminate the program. Use Watt's
+			supported startup option to leave the runtime's handlers intact.
+			It also prevents sock_exit() from resetting them later. Preserve
+			an existing environment entry; our temporary entry is removed
+			before releasing the runtime lock, including on startup failure.
+		*/
+		if( restore_noexcept && setenv( "WATT32-NOEXC", "1", 1 ) != 0 ) {
+			init_result = fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+		} else {
+			/* Watt-32 discovers the packet driver and reads WATTCP.CFG here. */
+			_watt_do_exit = FALSE;
+			if( sock_init( ) != 0 ) {
+				init_result = fb_ErrorSetNum( FB_RTERROR_FILEIO );
+			} else {
+				atexit( fb_hDevTcpShutdownWatt );
+			}
+			_watt_do_exit = old_do_exit;
+			if( restore_noexcept )
+				unsetenv( "WATT32-NOEXC" );
+		}
+		is_init = TRUE;
+	}
+	FB_UNLOCK();
+
+	return init_result;
+}
 #else
 static int fb_hDevTcpInit( void )
 {
@@ -343,7 +434,7 @@ static DEV_TCP_INFO *fb_hDevTcpAllocInfo( FB_TCP_SOCKET hSocket, const char *psz
 
 static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int timeout, int socket_role )
 {
-#if defined(HOST_DOS) || defined(HOST_JS)
+#if (defined(HOST_DOS) && !defined(FB_DOS_WATT32)) || defined(HOST_JS)
 	(void)hSocket;
 	(void)timeout;
 	(void)socket_role;
@@ -392,6 +483,20 @@ static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int tim
 			*/
 			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&receive_value, sizeof( receive_value ) );
 			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_SNDTIMEO, (const char *)&send_value, sizeof( send_value ) );
+		#elif defined(HOST_DOS) && defined(FB_DOS_WATT32)
+			/* Watt-32 stores SO_RCVTIMEO in whole seconds.  The listener also
+			   has an explicit millisecond select() wait in TCP ACCEPT, so do not
+			   turn a sub-second BASIC timeout into an accidental zero timeout. */
+			if( socket_role == FB_TCP_SOCKET_LISTENER ) {
+				struct timeval value;
+
+				value.tv_sec = timeout / 1000;
+				if( (timeout % 1000) != 0 )
+					value.tv_sec++;
+				value.tv_usec = 0;
+				FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_RCVTIMEO,
+				                   (const char *)&value, sizeof( value ) );
+			}
 		#else
 			struct timeval value;
 
@@ -447,7 +552,7 @@ static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int tim
 #endif
 }
 
-#if !defined(HOST_DOS) && !defined(HOST_JS) && !defined(HOST_WII)
+#if (!defined(HOST_DOS) || defined(FB_DOS_WATT32)) && !defined(HOST_JS) && !defined(HOST_WII)
 static void fb_hDevTcpFormatService( char *service, size_t service_len, unsigned int port )
 {
 	char tmp[16];
@@ -520,7 +625,34 @@ static int fb_hDevTcpBuildWiiAddress( const char *host, unsigned int port, int p
 }
 #endif
 
-#if !defined(HOST_DOS) && !defined(HOST_JS)
+#if (!defined(HOST_DOS) || defined(FB_DOS_WATT32)) && !defined(HOST_JS)
+#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+/* Called with the file lock held. Connected Watt sockets are nonblocking;
+ * recv pumps queued packets and returns EWOULDBLOCK if none are available.
+ * Keep bytes read by EOF/EOC until GET consumes them, including a peer's final
+ * packet. A closed transport must not hide data already owned by the handle.
+ */
+static int fb_hDevTcpDosFill( DEV_TCP_INFO *info )
+{
+	int bytes;
+	if( info->dos_read_begin < info->dos_read_end )
+		return 1;
+	if( info->is_closed )
+		return -1;
+	bytes = FB_TCP_RECV( info->hSocket, info->dos_read_buffer,
+	                     sizeof( info->dos_read_buffer ), 0 );
+	if( bytes > 0 ) {
+		info->dos_read_begin = 0;
+		info->dos_read_end = bytes;
+		return 1;
+	}
+	if( bytes < 0 && FB_TCP_WOULDBLOCK( FB_TCP_ERRNO() ) )
+		return 0;
+	info->is_closed = TRUE;
+	return bytes < 0 ? -2 : -1;
+}
+#endif
+
 /*
 	TCP device hooks are called by the generic file layer while FB_LOCK()
 	is held.  Blocking socket syscalls must not keep that lock, because a
@@ -530,6 +662,25 @@ static int fb_hDevTcpBuildWiiAddress( const char *host, unsigned int port, int p
 #if !defined(HOST_WII)
 static int fb_hDevTcpRecvUnlocked( DEV_TCP_INFO *info, void *buffer, size_t length, int flags, int *err )
 {
+#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+	int state = fb_hDevTcpDosFill( info );
+	size_t bytes;
+	(void)flags;
+	*err = 0;
+	if( state < -1 ) {
+		*err = FB_TCP_ERRNO();
+		return -1;
+	}
+	if( state < 0 ) return 0;
+	if( state == 0 ) {
+		*err = EWOULDBLOCK;
+		return -1;
+	}
+	bytes = MIN( length, info->dos_read_end - info->dos_read_begin );
+	memcpy( buffer, info->dos_read_buffer + info->dos_read_begin, bytes );
+	info->dos_read_begin += bytes;
+	return (int)bytes;
+#else
 	FB_TCP_SOCKET hSocket = info->hSocket;
 	int bytes;
 
@@ -539,6 +690,7 @@ static int fb_hDevTcpRecvUnlocked( DEV_TCP_INFO *info, void *buffer, size_t leng
 	FB_LOCK();
 
 	return bytes;
+#endif
 }
 #endif
 
@@ -555,7 +707,7 @@ static int fb_hDevTcpSendUnlocked( DEV_TCP_INFO *info, const char *buffer, size_
 	return bytes;
 }
 
-#if !defined(HOST_DOS) && !defined(HOST_JS)
+#if (!defined(HOST_DOS) || defined(FB_DOS_WATT32)) && !defined(HOST_JS)
 static void fb_hDevTcpSetNoDelay( FB_TCP_SOCKET hSocket )
 {
 #ifdef TCP_NODELAY
@@ -583,7 +735,7 @@ static void fb_hDevTcpSetConnectedNonBlocking( FB_TCP_SOCKET hSocket )
 #if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
 	u_long mode = 1;
 	FB_TCP_IOCTL( hSocket, FIONBIO, &mode );
-#elif !defined(HOST_DOS) && !defined(HOST_JS) && !defined(HOST_WII)
+#elif (!defined(HOST_DOS) || defined(FB_DOS_WATT32)) && !defined(HOST_JS) && !defined(HOST_WII)
 	int mode = 1;
 	FB_TCP_IOCTL( hSocket, FIONBIO, &mode );
 #else
@@ -595,7 +747,7 @@ static void fb_hDevTcpSetConnectedNonBlocking( FB_TCP_SOCKET hSocket )
 
 static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOCKET *hSocketOut )
 {
-#if defined(HOST_DOS) || defined(HOST_JS)
+#if (defined(HOST_DOS) && !defined(FB_DOS_WATT32)) || defined(HOST_JS)
 	(void)tcp_proto;
 	(void)hSocketOut;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
@@ -631,7 +783,12 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 
 	memset( &hints, 0, sizeof( hints ) );
 	hints.ai_socktype = SOCK_STREAM;
+#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+	/* Watt-32 deployments use the IPv4 packet-driver stack. */
+	hints.ai_family = AF_INET;
+#else
 	hints.ai_family = AF_UNSPEC;
+#endif
 
 	fb_hDevTcpFormatService( service, sizeof( service ), tcp_proto->port );
 	res = getaddrinfo( tcp_proto->host, service, &hints, &result );
@@ -663,7 +820,7 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 
 static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOCKET *hSocketOut )
 {
-#if defined(HOST_DOS) || defined(HOST_JS)
+#if (defined(HOST_DOS) && !defined(FB_DOS_WATT32)) || defined(HOST_JS)
 	(void)tcp_proto;
 	(void)hSocketOut;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
@@ -705,7 +862,12 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 	memset( &hints, 0, sizeof( hints ) );
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
-#if defined(HOST_CYGWIN) || defined(HOST_HAIKU) || defined(HOST_FREEBSD) || \
+	#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+	/* Watt-32's IPv6 support is optional and uncommon in packet-driver
+	   deployments.  Keep the DOS provider on the IPv4 path used by its
+	   standard configuration files. */
+	hints.ai_family = AF_INET;
+	#elif defined(HOST_CYGWIN) || defined(HOST_HAIKU) || defined(HOST_FREEBSD) || \
     defined(HOST_NETBSD) || defined(HOST_OPENBSD) || defined(HOST_DRAGONFLY) || \
     defined(HOST_SOLARIS) || \
     (defined(HOST_WIN32) && !defined(HOST_CYGWIN))
@@ -732,7 +894,7 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 		if( FB_TCP_SOCKET_ERROR( hSocket ) )
 			continue;
 
-		setsockopt( hSocket, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof( yes ) );
+		FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof( yes ) );
 		fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, FB_TCP_SOCKET_LISTENER );
 
 		if( bind( hSocket, it->ai_addr, (int)it->ai_addrlen ) != 0 ) {
@@ -745,6 +907,12 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 			continue;
 		}
 
+#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+		/* Readiness can change between select and accept. Keep the Watt
+		 * accept call short while its shared state is locked.
+		 */
+		fb_hDevTcpSetConnectedNonBlocking( hSocket );
+#endif
 		*hSocketOut = hSocket;
 		freeaddrinfo( result );
 		return FB_RTERROR_OK;
@@ -757,9 +925,13 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 
 static int fb_hDevTcpPeekState( DEV_TCP_INFO *info )
 {
-#if defined(HOST_DOS) || defined(HOST_JS)
+#if (defined(HOST_DOS) && !defined(FB_DOS_WATT32)) || defined(HOST_JS)
 	(void)info;
 	return -1;
+#elif defined(HOST_DOS) && defined(FB_DOS_WATT32)
+	if( info == NULL || FB_TCP_SOCKET_ERROR( info->hSocket ) )
+		return -1;
+	return fb_hDevTcpDosFill( info );
 #elif defined(HOST_WII)
 	int state;
 
@@ -812,7 +984,7 @@ static int fb_hDevTcpPeekState( DEV_TCP_INFO *info )
 		return 0;
 	}
 
-	res = recv( info->hSocket, &ch, 1, MSG_PEEK );
+	res = FB_TCP_RECV( info->hSocket, &ch, 1, MSG_PEEK );
 	err = fb_hDevTcpSocketError( res );
 	FB_LOCK();
 
@@ -875,7 +1047,7 @@ static int fb_hDevTcpEocState( DEV_TCP_INFO *info )
 
 static int fb_hDevTcpSendAll( DEV_TCP_INFO *info, const char *buffer, size_t length )
 {
-#if defined(HOST_DOS) || defined(HOST_JS)
+#if (defined(HOST_DOS) && !defined(FB_DOS_WATT32)) || defined(HOST_JS)
 	(void)info;
 	(void)buffer;
 	(void)length;
@@ -894,6 +1066,24 @@ static int fb_hDevTcpSendAll( DEV_TCP_INFO *info, const char *buffer, size_t len
 		#endif
 
 		sent = fb_hDevTcpSendUnlocked( info, buffer + total, chunk, flags, &err );
+#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+		if( sent < 0 && FB_TCP_WOULDBLOCK( err ) ) {
+			fd_set writers;
+			struct timeval timeout = { 0, 100000 };
+			int ready;
+			FD_ZERO( &writers );
+			FD_SET( info->hSocket, &writers );
+			/* A full Watt transmit queue is backpressure, not a disconnect.
+			 * Preserve complete PUT semantics while letting the peer thread
+			 * and audio worker run between bounded readiness polls.
+			 */
+			FB_UNLOCK();
+			ready = FB_TCP_SELECT( info->hSocket + 1, NULL, &writers, NULL, &timeout );
+			FB_LOCK();
+			if( ready >= 0 )
+				continue;
+		}
+#endif
 		if( sent <= 0 ) {
 			info->is_closed = TRUE;
 			return fb_ErrorSetNum( FB_RTERROR_FILEIO );
@@ -909,7 +1099,7 @@ static int fb_hDevTcpSendAll( DEV_TCP_INFO *info, const char *buffer, size_t len
 #if !defined(HOST_WII)
 static void fb_hDevTcpShutdownConnectedSocket( DEV_TCP_INFO *info )
 {
-#if defined(HOST_DOS) || defined(HOST_JS)
+#if (defined(HOST_DOS) && !defined(FB_DOS_WATT32)) || defined(HOST_JS)
 	(void)info;
 #else
 	unsigned int timeout = 1000;
@@ -922,7 +1112,11 @@ static void fb_hDevTcpShutdownConnectedSocket( DEV_TCP_INFO *info )
 		timeout = info->timeout;
 
 	FB_UNLOCK();
+	#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+	fb_DosTcpShutdown( info->hSocket, FB_TCP_SHUT_WR );
+	#else
 	shutdown( info->hSocket, FB_TCP_SHUT_WR );
+	#endif
 	FB_LOCK();
 
 	while( timeout > 0 ) {
@@ -944,7 +1138,7 @@ static void fb_hDevTcpShutdownConnectedSocket( DEV_TCP_INFO *info )
 			break;
 		}
 
-		res = recv( info->hSocket, buffer, sizeof( buffer ), 0 );
+		res = FB_TCP_RECV( info->hSocket, buffer, sizeof( buffer ), 0 );
 		FB_LOCK();
 		if( res <= 0 )
 			break;
@@ -1044,7 +1238,7 @@ static int fb_DevTcpRead( FB_FILE *handle, void *value, size_t *pValuelen )
 		return FB_RTERROR_OK;
 	}
 
-#if defined(HOST_DOS) || defined(HOST_JS)
+	#if (defined(HOST_DOS) && !defined(FB_DOS_WATT32)) || defined(HOST_JS)
 	*pValuelen = 0;
 	res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 #elif defined(HOST_WII)
@@ -1106,7 +1300,7 @@ static int fb_DevTcpTell( FB_FILE *handle, fb_off_t *pOffset )
 	if( info == NULL ) {
 		res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	} else {
-#if defined(HOST_DOS) || defined(HOST_JS)
+	#if (defined(HOST_DOS) && !defined(FB_DOS_WATT32)) || defined(HOST_JS)
 		*pOffset = 0;
 		res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 #elif FB_TCP_CAN_QUERY_BYTES == FALSE
@@ -1129,6 +1323,9 @@ static int fb_DevTcpTell( FB_FILE *handle, fb_off_t *pOffset )
 			res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		}
 		*pOffset = bytes;
+#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+		*pOffset += info->dos_read_end - info->dos_read_begin;
+#endif
 #endif
 	}
 
@@ -1197,7 +1394,7 @@ static int fb_hDevTcpReadByte( FB_FILE *handle, DEV_TCP_INFO *info, char *ch, si
 	if( info->is_closed )
 		return FB_RTERROR_OK;
 
-#if defined(HOST_DOS) || defined(HOST_JS)
+	#if (defined(HOST_DOS) && !defined(FB_DOS_WATT32)) || defined(HOST_JS)
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 #elif defined(HOST_WII)
 	{
@@ -1362,7 +1559,7 @@ static int fb_hDevTcpOpenCommon( FB_FILE *handle, const char *filename, size_t f
 
 int fb_DevTcpOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 {
-#if defined(HOST_DOS) || defined(HOST_JS)
+#if (defined(HOST_DOS) && !defined(FB_DOS_WATT32)) || defined(HOST_JS)
 	(void)handle;
 	(void)filename;
 	(void)filename_len;
@@ -1374,7 +1571,7 @@ int fb_DevTcpOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 
 int fb_DevTcpOpenServer( FB_FILE *handle, const char *filename, size_t filename_len )
 {
-#if defined(HOST_DOS) || defined(HOST_JS)
+#if (defined(HOST_DOS) && !defined(FB_DOS_WATT32)) || defined(HOST_JS)
 	(void)handle;
 	(void)filename;
 	(void)filename_len;
@@ -1386,7 +1583,7 @@ int fb_DevTcpOpenServer( FB_FILE *handle, const char *filename, size_t filename_
 
 int fb_DevTcpAcceptHandle( FB_FILE *server_handle, FB_FILE *client_handle )
 {
-#if defined(HOST_DOS) || defined(HOST_JS)
+#if (defined(HOST_DOS) && !defined(FB_DOS_WATT32)) || defined(HOST_JS)
 	(void)server_handle;
 	(void)client_handle;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
@@ -1409,7 +1606,10 @@ int fb_DevTcpAcceptHandle( FB_FILE *server_handle, FB_FILE *client_handle )
 		Without this step a threaded server cannot poll for shutdown and the
 		timeout option behaves differently on Windows and POSIX hosts.
 	*/
-	if( server_info->timeout != 0 ) {
+#if !defined(HOST_DOS) || !defined(FB_DOS_WATT32)
+	if( server_info->timeout != 0 )
+#endif
+	{
 		fd_set set;
 		struct timeval tv;
 		int ready;
@@ -1419,11 +1619,22 @@ int fb_DevTcpAcceptHandle( FB_FILE *server_handle, FB_FILE *client_handle )
 		tv.tv_sec = server_info->timeout / 1000;
 		tv.tv_usec = (server_info->timeout % 1000) * 1000;
 
-		ready = FB_TCP_SELECT( server_info->hSocket + 1, &set, NULL, NULL, &tv );
+		ready = FB_TCP_SELECT( server_info->hSocket + 1, &set, NULL, NULL,
+#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+		                      server_info->timeout ? &tv : NULL );
+#else
+		                      &tv );
+#endif
 		if( ready <= 0 )
 			return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 	}
 
+#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+	/* ACCEPT and its socket options also touch Watt's shared socket table.
+	 * The listener is nonblocking; the wait above runs without this lock.
+	 */
+	FB_LOCK();
+#endif
 	#if defined(HOST_WII)
 	{
 		struct sockaddr_in addr;
@@ -1434,17 +1645,27 @@ int fb_DevTcpAcceptHandle( FB_FILE *server_handle, FB_FILE *client_handle )
 	#else
 	hSocket = (FB_TCP_SOCKET)accept( server_info->hSocket, NULL, NULL );
 	#endif
-	if( FB_TCP_SOCKET_ERROR( hSocket ) )
+	if( FB_TCP_SOCKET_ERROR( hSocket ) ) {
+#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+		FB_UNLOCK();
+#endif
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+	}
 
 	res = fb_hDevTcpApplySocketOptions( hSocket, server_info->timeout, FB_TCP_SOCKET_ACCEPTED );
 	if( res != FB_RTERROR_OK ) {
 		FB_TCP_CLOSESOCKET( hSocket );
+#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+		FB_UNLOCK();
+#endif
 		return res;
 	}
 
 	fb_hDevTcpSetNoDelay( hSocket );
 	fb_hDevTcpSetConnectedNonBlocking( hSocket );
+#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+	FB_UNLOCK();
+#endif
 
 	/*
 		fb_TcpAccept() reserves this file number before doing the blocking
@@ -1496,3 +1717,5 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 }
 
 #endif /* DISABLE_TCP */
+
+/* end of dev_tcp.c */

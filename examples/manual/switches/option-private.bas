@@ -14,6 +14,8 @@ Sub ProcWithExternalLinkage()
    ' ...
 End Sub
 
+'' This FBlite lesson contrasts linkage before and after Option Private.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-OPT-001
 Option Private
 
 Sub ProcWithInternalLinkage()

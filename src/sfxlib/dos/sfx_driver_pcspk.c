@@ -1,10 +1,10 @@
 /*
-    DOS PC speaker fallback driver.
+    FreeBASIC Sound Library: dos/sfx_driver_pcspk.c
 
     This backend uses the direct PC speaker data bit as a 1-bit
-    output device. It is intentionally simple and heavily
-    bandwidth-limited, but it gives DOS builds a real fallback
-    backend when BLASTER is not available.
+    output device. An optional RTC queue keeps output moving between worker
+    time slices. Ordinary DOS retains synchronous playback. This file owns
+    driver selection and speaker state, not the mixer or interrupt handler.
 */
 
 #ifndef DISABLE_MSDOS
@@ -12,8 +12,10 @@
 #include "../fb_sfx.h"
 #include "../fb_sfx_driver.h"
 #include "../fb_sfx_internal.h"
+#include "fb_sfx_msdos.h"
 
 #include <time.h>
+#include <limits.h>
 
 #ifdef __DJGPP__
 #include <dos.h>
@@ -26,7 +28,6 @@ static int g_fb_sfx_pcspk_rate = 0;
 static double g_fb_sfx_pcspk_ticks_per_sample = 0.0;
 static double g_fb_sfx_pcspk_next_tick = 0.0;
 static unsigned char g_fb_sfx_pcspk_saved_port61 = 0;
-static unsigned char g_fb_sfx_pcspk_base_port61 = 0;
 
 #ifdef __DJGPP__
 
@@ -64,7 +65,7 @@ static void fb_sfxPcSpeakerWriteLevel(int high)
         speaker data line.
     */
 
-    port_value = (unsigned char)(g_fb_sfx_pcspk_base_port61 & ~0x03u);
+    port_value = (unsigned char)(inportb(FB_SFX_MSDOS_SPEAKER_PORT) & ~0x03u);
     if (high)
         port_value |= 0x02u;
 
@@ -87,8 +88,16 @@ static int msdos_pcspk_init(int rate, int channels, int buffer, int flags)
 
     g_fb_sfx_pcspk_saved_port61 = inportb(FB_SFX_MSDOS_SPEAKER_PORT);
 
-    g_fb_sfx_pcspk_base_port61 = (unsigned char)(g_fb_sfx_pcspk_saved_port61 & ~0x03u);
-    outportb(FB_SFX_MSDOS_SPEAKER_PORT, g_fb_sfx_pcspk_base_port61);
+    fb_sfxPcSpeakerWriteLevel(0);
+
+#if FB_SFX_DOS_THREADS
+    /* The RTC's fastest distinct periodic rate is 8192 Hz. Tell the mixer
+     * the actual rate before any voices start generating samples.
+     * A conflicting RTC consumer retains the existing synchronous path.
+     */
+    if (fb_sfxMsdosPcSpeakerIrqInit() == 0)
+        rate = 8192;
+#endif
 
     g_fb_sfx_pcspk_rate = rate;
     g_fb_sfx_pcspk_ticks_per_sample = (double)UCLOCKS_PER_SEC / (double)rate;
@@ -107,13 +116,19 @@ static void msdos_pcspk_exit(void)
     if (!g_fb_sfx_pcspk_active)
         return;
 
-    outportb(FB_SFX_MSDOS_SPEAKER_PORT, g_fb_sfx_pcspk_saved_port61);
+#if FB_SFX_DOS_THREADS
+    fb_sfxMsdosPcSpeakerIrqExit();
+#endif
+    /* Only bits 0/1 belong to the speaker. Preserve changes to the other
+     * port-61 controls made while playback was active.
+     */
+    outportb(FB_SFX_MSDOS_SPEAKER_PORT,
+        (inportb(FB_SFX_MSDOS_SPEAKER_PORT) & ~3U) | (g_fb_sfx_pcspk_saved_port61 & 3U));
 
     g_fb_sfx_pcspk_active = 0;
     g_fb_sfx_pcspk_rate = 0;
     g_fb_sfx_pcspk_ticks_per_sample = 0.0;
     g_fb_sfx_pcspk_next_tick = 0.0;
-    g_fb_sfx_pcspk_base_port61 = 0;
 
     SFX_DEBUG("msdos_pcspk: shutdown");
 }
@@ -129,6 +144,15 @@ static int msdos_pcspk_write(const float *samples, int frames)
     channels = (__fb_sfx && __fb_sfx->output_channels > 0)
         ? __fb_sfx->output_channels
         : 2;
+
+    if (channels > INT_MAX / frames)
+        return -1;
+
+#if FB_SFX_DOS_THREADS
+    if (fb_sfxMsdosPcSpeakerIrqActive())
+        return fb_sfxMsdosPcSpeakerIrqWrite(samples, frames, channels,
+            fb_sfxForegroundFeedActive() || !fb_sfxMsdosWorkerActive());
+#endif
 
     for (i = 0; i < frames; ++i)
     {
@@ -190,3 +214,5 @@ const FB_SFX_DRIVER fb_sfxDriverPcSpeaker =
 };
 
 #endif
+
+/* end of sfx_driver_pcspk.c */

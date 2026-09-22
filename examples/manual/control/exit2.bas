@@ -11,6 +11,8 @@ For i = 1 To 10
 
 	For j = 1 To 10
 
+		'' This syntax intentionally exits both nested loops.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-LOOP-007
 		Exit For, For
 
 	Next j

@@ -16,6 +16,8 @@ Print "Back from Gosub!"
 Sleep
 End
 
+'' The preceding END prevents normal fall-through into this QB GOSUB target.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-CF-006
 MyGosub:
 Print "In Gosub!"
 Return

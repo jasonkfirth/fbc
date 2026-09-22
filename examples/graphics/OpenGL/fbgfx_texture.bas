@@ -22,21 +22,20 @@ Declare function load_texture(byref image_file as string, byval w as integer, by
 'Main code
 '*******************************************************************************************
     RANDOMIZE TIMER
+    '' The main render loop owns the currently bound terrain texture.
+    '' FB-LINTER: DISABLE-NEXT-LINE FBL301
     dim shared g_texture as GLuint
 
     Init_GL_SCREEN                          'init GL stuff
     g_texture = load_texture("terrain.bmp", 256, 256)
+	if g_texture = 0 then end 1
 
 	do
         draw_scene                          'Draw something
         flip
 	loop until Inkey <>""
 
-
-    end
-
-
-
+	' Module execution ends naturally after the data declarations below.
 '*******************************************************************************************
 'DATA
 '*******************************************************************************************
@@ -130,7 +129,7 @@ SUB Init_GL_SCREEN()
 	dim zfar as double            'z-far clip distance
 
     'Set 640*480*16 OpenGL
-    screen 18, 16, ,&h2
+    screen 18, 16, , &h2
 
 	'get info of current screen
 	screeninfo w, h
@@ -181,7 +180,7 @@ SUB Init_GL_SCREEN()
 
 
     'Set blending parameters
-    glBlendFunc GL_SRC_ALPHA,GL_ONE
+    glBlendFunc GL_SRC_ALPHA, GL_ONE
 
 
 	'Tell openGL that we want the best possible perspective transform
@@ -281,69 +280,90 @@ end sub
 
 Sub Draw_Cube()
         'loop counters
-        dim i as integer, j as integer
+    dim i as integer, j as integer
 
         'variable to check if colors and cube are already initialized
-        static color_init as integer
+    static color_init as integer
 		'make static arrays for cube and colors
         '(23, 2) means 23 vertices and 3 elements per vertex
         '3 because:
         'x, y, z for verts
         'r, g, b for colors
-        static colors(23, 2) as GLfloat
-        static cube(23, 2) as GLfloat
-        static coords(23, 1) as GLfloat
+    static colors(23, 2) as GLfloat
+    static cube(23, 2) as GLfloat
+    static coords(23, 1) as GLfloat
 
         'initialize color and cube arrays
-        if color_init = 0 then                          'is it initialized already?
+    if color_init = 0 then                          'is it initialized already?
                                                             'nope so...
 
             'put values to each elements by looping
-            for i = 0 to 23
-                for j = 0 to 2
+        for i = 0 to 23
+            for j = 0 to 2
                     'Color range are from 0 to 1
-                    colors(i, j) = rnd          'I'm lazy so I just randomized the colors
+                colors(i, j) = rnd          'I'm lazy so I just randomized the colors
                     'read cubes coords from data statements
-                    read cube(i,j)
-                next
+                read cube(i, j)
             next
+        next
 
             'put values to coords
-            Restore TEXTURECOORDS
-            for i = 0 to 23
-                for j = 0 to 1
+        Restore TEXTURECOORDS
+        for i = 0 to 23
+            for j = 0 to 1
                     'read cubes coords from data statements
-                    read coords(i,j)
-                next
+                read coords(i, j)
             next
+        next
 
 
-            color_init = -1
-        end if
+        color_init = -1
+    end if
 
 
         'Draw the cube using VECTOR forms of GL commands
-        glBegin GL_QUADS
-    		'Draw the cube with smooth colors
-   		    for i = 0 to 23
-   		    	  	  'unrem if you want to combine colors and texture
+    glBegin GL_QUADS
+		'Draw the cube with smooth colors
+		for i = 0 to 23
+			'unrem if you want to combine colors and texture
 		              'glColor3fv   @colors(i,0)   'Pass the addy of first element
-		              glTexCoord2fv @coords(i,0)
-		              glVertex3fv   @cube(i,0)
+		              glTexCoord2fv @coords(i, 0)
+		              glVertex3fv   @cube(i, 0)
 		    next i
-    	glEnd
+	glEnd
 
 End Sub
-
-
-
-
 function load_texture(byref image_file as string, byval w as integer, byval h as integer) as GLuint
-	dim image(w * h * 2 + 4) as ushort   ' set up a big enough array for our image
-	bload image_file, @image(0)			 'load it
-	dim ret as GLuint 					 'return value
+	const MAX_IMAGE_ELEMENTS as longint = 2147483647 \ sizeof(ushort)
+	dim image() as ushort
+	dim imageElements as longint
+	dim ret as GLuint                    'return value
+
+	if w <= 0 or h <= 0 then
+		load_texture = 0
+		exit function
+	end if
+
+	imageElements = clngint(w) * clngint(h) * 2 + 4
+	if imageElements < 1 or imageElements > MAX_IMAGE_ELEMENTS then
+		load_texture = 0
+		exit function
+	end if
+
+	redim image(0 to imageElements) as ushort ' Set up a big enough array for the image
+	if ubound(image) < lbound(image) then
+		load_texture = 0
+		exit function
+	end if
+	bload image_file, @image(lbound(image)) 'load it
+	'' BLOAD reports a failed file transfer through FreeBASIC's immediate Err value.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL613
+	if err <> 0 then
+		load_texture = 0
+		exit function
+	end if
 	'create and bind the texture ( courtesy of lillo )
-	ret = CreateTexture(@image(0), TEX_MASKED or TEX_MIPMAP )
+	ret = CreateTexture(@image(lbound(image)), TEX_MASKED or TEX_MIPMAP )
 	'return value in case we need multiple texture
 	load_texture = ret
 end function

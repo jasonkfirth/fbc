@@ -42,6 +42,11 @@ const MIDI_DEFAULT_TEMPO_US = 500000
 const MIDI_CHANNEL_COUNT = 16
 const MIDI_KEY_COUNT = 128
 const MIDI_DRUM_CHANNEL = 9
+const MIDI_BYTE_BITS = 8
+const MIDI_BE16_HIGH_SHIFT = MIDI_BYTE_BITS
+const MIDI_BE32_MSB_SHIFT = MIDI_BYTE_BITS * 3
+const MIDI_BE32_SECOND_SHIFT = MIDI_BYTE_BITS * 2
+const MIDI_BE32_THIRD_SHIFT = MIDI_BYTE_BITS
 
 const MIDI_EVENT_NOTE_OFF = 1
 const MIDI_EVENT_NOTE_ON = 2
@@ -75,6 +80,8 @@ type MidiNoteRow
 	key_released as ubyte
 end type
 
+'' The parser and renderer operate as one module-owned MIDI session.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared as ubyte midi_data()
 dim shared as integer midi_data_size
 dim shared as MidiEventRow midi_events()
@@ -86,6 +93,8 @@ dim shared as integer midi_note_count
 dim shared as integer midi_note_capacity
 dim shared as integer midi_active_head( 0 to MIDI_CHANNEL_COUNT - 1, _
 	                                    0 to MIDI_KEY_COUNT - 1 )
+'' Per-channel controller state belongs to the same single render session.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared as integer midi_program( 0 to MIDI_CHANNEL_COUNT - 1 )
 dim shared as integer midi_channel_volume( 0 to MIDI_CHANNEL_COUNT - 1 )
 dim shared as integer midi_expression( 0 to MIDI_CHANNEL_COUNT - 1 )
@@ -106,14 +115,14 @@ sub MidiSetError( byval text as string )
 end sub
 
 function MidiReadBe16( byval offset as integer ) as ushort
-	return ( cushort( midi_data( offset ) ) shl 8 ) or _
+	return ( cushort( midi_data( offset ) ) shl MIDI_BE16_HIGH_SHIFT ) or _
 	       cushort( midi_data( offset + 1 ) )
 end function
 
 function MidiReadBe32( byval offset as integer ) as ulong
-	return ( culng( midi_data( offset ) ) shl 24 ) or _
-	       ( culng( midi_data( offset + 1 ) ) shl 16 ) or _
-	       ( culng( midi_data( offset + 2 ) ) shl 8 ) or _
+	return ( culng( midi_data( offset ) ) shl MIDI_BE32_MSB_SHIFT ) or _
+	       ( culng( midi_data( offset + 1 ) ) shl MIDI_BE32_SECOND_SHIFT ) or _
+	       ( culng( midi_data( offset + 2 ) ) shl MIDI_BE32_THIRD_SHIFT ) or _
 	       culng( midi_data( offset + 3 ) )
 end function
 
@@ -1121,7 +1130,8 @@ end if
 
 dim as longint render_end_frame = song_end_frame
 if( maximum_seconds > 0.0 ) then
-	dim as longint requested_end = clngint( maximum_seconds * sample_rate )
+	dim as double requested_frames = maximum_seconds * cdbl( sample_rate )
+	dim as longint requested_end = clngint( requested_frames )
 	if( requested_end < render_end_frame ) then render_end_frame = requested_end
 end if
 

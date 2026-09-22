@@ -43,6 +43,8 @@ declare sub Bernstein (byval u as single, byval p as POINT_3D ptr, byref ret as 
 declare function genBezier (byref patch as BEZIER_PATCH, byval divs as integer) as uinteger
 declare sub initBezier()
 
+'' The main render loop is the sole owner of the patch and its display list.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared as BEZIER_PATCH mybezier            '' The bezier patch we're going to use (NEW)
 
 	dim as integer showCPoints = true          '' Toggles displaying the control point grid (NEW)
@@ -50,6 +52,7 @@ dim shared as BEZIER_PATCH mybezier            '' The bezier patch we're going t
 	dim i as integer, j as integer
 	dim as single rotz = 0.0                   '' Rotation about the Z axis
 	dim as integer upp, dnp, sp                '' key pressed flags
+	dim as uinteger newList
 
 	windowtitle "David Nikdel & NeHe's Bezier Tutorial"   '' Set window title
 	screen 18, 16, , 2
@@ -72,11 +75,16 @@ dim shared as BEZIER_PATCH mybezier            '' The bezier patch we're going t
 	glHint (GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)     '' Really Nice Perspective Calculations
 
 	initBezier ()                              '' Initialize the Bezier's control grid
-	redim buffer(256*256*4+4) as ubyte         '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
-	bload exepath + "/data/NeHe.bmp", @buffer(0)        '' BLOAD data from bitmap
-	mybezier.texture = CreateTexture(@buffer(0))           '' Linear Texture (default)
+	redim buffer(0 to 256*256*4+4) as ubyte    '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
+	if ubound(buffer) < lbound(buffer) then end 1
+	bload exepath + "/data/NeHe.bmp", @buffer(lbound(buffer)) '' BLOAD data from bitmap
+	'' BLOAD reports a failed file transfer through FreeBASIC's immediate Err value.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL613
+	if err <> 0 then end 1
+	mybezier.texture = CreateTexture(@buffer(lbound(buffer))) '' Linear Texture (default)
 	if mybezier.texture = 0 then end 1                     '' exit if texture did not load
 	mybezier.dlBPatch = genBezier (mybezier, divs)         '' Generate the patch
+	if mybezier.dlBPatch = 0 then end 1
 
 	do
 		glClear (GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)  '' Clear Screen And Depth Buffer
@@ -92,14 +100,14 @@ dim shared as BEZIER_PATCH mybezier            '' The bezier patch we're going t
 			for i= 0 to 3                      '' draw the horizontal lines
 				glBegin (GL_LINE_STRIP)
 					for j= 0 to 3
-						glVertex3d (mybezier.anchors(i,j).x, mybezier.anchors(i,j).y, mybezier.anchors(i,j).z)
+						glVertex3d (mybezier.anchors(i, j).x, mybezier.anchors(i, j).y, mybezier.anchors(i, j).z)
 					next
 				glEnd ()
 			next
 			for i = 0 to 3                     '' draw the vertical lines
 				glBegin (GL_LINE_STRIP)
 					for j = 0 to 3
-						glVertex3d (mybezier.anchors(j,i).x, mybezier.anchors(j,i).y, mybezier.anchors(j,i).z)
+						glVertex3d (mybezier.anchors(j, i).x, mybezier.anchors(j, i).y, mybezier.anchors(j, i).z)
 					next
 				glEnd ()
 			next
@@ -115,25 +123,27 @@ dim shared as BEZIER_PATCH mybezier            '' The bezier patch we're going t
 		if MULTIKEY(FB.SC_RIGHT) then                          '' rotate right
 			rotz += 0.8f
 		end if
-		if MULTIKEY(FB.SC_UP) and not upp then                 '' resolution up
+		if (MULTIKEY(FB.SC_UP) <> 0) andalso (upp = 0) then    '' resolution up
 			upp = true
 			divs = divs +1
-			mybezier.dlBPatch = genBezier (mybezier, divs)  '' Update the patch
+			newList = genBezier (mybezier, divs)            '' Update the patch
+			if newList <> 0 then mybezier.dlBPatch = newList
 		end if
-		if not MULTIKEY(FB.SC_UP) then upp = false
+		if MULTIKEY(FB.SC_UP) = 0 then upp = false
 
-		if MULTIKEY(FB.SC_DOWN) and  divs > 1 and not dnp then
+		if (MULTIKEY(FB.SC_DOWN) <> 0) andalso divs > 1 andalso (dnp = 0) then
 			dnp = true
 			divs = divs -1
-			mybezier.dlBPatch = genBezier (mybezier, divs)  '' Update the patch
+			newList = genBezier (mybezier, divs)            '' Update the patch
+			if newList <> 0 then mybezier.dlBPatch = newList
 		end if
-		if not MULTIKEY(FB.SC_DOWN) then dnp = false
+		if MULTIKEY(FB.SC_DOWN) = 0 then dnp = false
 
-		if MULTIKEY(FB.SC_SPACE) and not sp then               '' SPACE toggles showCPoints
+		if (MULTIKEY(FB.SC_SPACE) <> 0) andalso (sp = 0) then  '' SPACE toggles showCPoints
 			sp = true
-			showCPoints =  not  showCPoints
+			showCPoints = (showCPoints = 0)
 		end if
-		if not MULTIKEY(FB.SC_SPACE) then sp = false
+		if MULTIKEY(FB.SC_SPACE) = 0 then sp = false
 
 		flip  '' flip or crash
 		if inkey = chr(255)+"k" then exit do              '' exit if close box is clicked
@@ -173,8 +183,12 @@ end sub
 '' Calculates 3rd degree polynomial based on array of 4 points
 '' and a single variable (u) which is generally between 0 and 1
 sub Bernstein (byval u as single, byval p as POINT_3D ptr, byref ret as POINT_3D)
-	dim  as POINT_3D a, b, c, d
-	dim as POINT_3D r1, r2
+	dim as POINT_3D a
+	dim as POINT_3D b
+	dim as POINT_3D c
+	dim as POINT_3D d
+	dim as POINT_3D r1
+	dim as POINT_3D r2
 
 	pointTimes ((u^3), p[0], a)
 	pointTimes (3 * (u^2) * (1 - u), p[1], b)
@@ -191,25 +205,34 @@ end sub
 '' Generates a display list based on the data in the patch
 '' and the number of divisions
 function genBezier (byref patch as BEZIER_PATCH, byval divs as integer) as uinteger
-	dim as integer u = 0, v
+	const MAX_BEZIER_POINTS as longint = 2147483647 \ sizeof(POINT_3D)
+	dim as integer u = 0
+	dim as integer v
 	dim as single py, px, pyold
 	dim drawlist as uinteger                         '' make the display list
 	dim temp(0 to 3) as POINT_3D
 	dim last as POINT_3D ptr
 
-	drawlist = glGenLists(1)
+	if divs < 1 or divs > MAX_BEZIER_POINTS - 1 then return 0
 
-	last = allocate(len(POINT_3D)*(divs + 1))        '' array of points to mark the first line of polys
+	drawlist = glGenLists(1)
+	if drawlist = 0 then return 0
+
+	last = allocate(sizeof(POINT_3D) * (clngint(divs) + 1)) '' First line of generated points
+	if last = NULL then
+		glDeleteLists(drawlist, 1)
+		return 0
+	end if
 
 	'' get rid of any old display lists
 	if (patch.dlBPatch <> 0) then
 		glDeleteLists (patch.dlBPatch, 1)
 	end if
 
-	temp(0)= patch.anchors(0,3)                      '' the first derived curve (along x axis)
-	temp(1)= patch.anchors(1,3)
-	temp(2)= patch.anchors(2,3)
-	temp(3)= patch.anchors(3,3)
+	temp(0)= patch.anchors(0, 3)                      '' the first derived curve (along x axis)
+	temp(1)= patch.anchors(1, 3)
+	temp(2)= patch.anchors(2, 3)
+	temp(3)= patch.anchors(3, 3)
 
 	v=0
 	while v<=divs            '' create the first line of points
@@ -227,10 +250,10 @@ function genBezier (byref patch as BEZIER_PATCH, byval divs as integer) as uinte
 		py = u/divs                 '' Percent along Y axis
 		pyold = (u - 1.0)/divs      '' Percent along old Y axis
 
-		Bernstein (py, @patch.anchors(0,0), temp(0))           '' Calculate new bezier points
-		Bernstein (py, @patch.anchors(1,0), temp(1))
-		Bernstein (py, @patch.anchors(2,0), temp(2))
-		Bernstein (py, @patch.anchors(3,0), temp(3))
+		Bernstein (py, @patch.anchors(0, 0), temp(0))           '' Calculate new bezier points
+		Bernstein (py, @patch.anchors(1, 0), temp(1))
+		Bernstein (py, @patch.anchors(2, 0), temp(2))
+		Bernstein (py, @patch.anchors(3, 0), temp(3))
 
 		glBegin (GL_TRIANGLE_STRIP) '' Begin a new triangle strip
 			v=0
@@ -249,6 +272,7 @@ function genBezier (byref patch as BEZIER_PATCH, byval divs as integer) as uinte
 	glEndList ()                    '' END the list
 
 	deallocate (last)               '' Free the old vertices array
+	last = NULL
 
 	return drawlist                 '' Return the display list
 end function
@@ -257,21 +281,21 @@ end function
 sub initBezier ()
 	dim r as POINT_3D
 	'' set the bezier vertices
-	makePoint (- 0.75, - 0.75, - 0.5, r)  : mybezier.anchors(0,0)= r
-	makePoint (- 0.25, - 0.75, 0.0, r)    : mybezier.anchors(0,1)= r
-	makePoint (0.25, - 0.75, 0.0, r)      : mybezier.anchors(0,2)= r
-	makePoint (0.75, - 0.75, - 0.5, r)    : mybezier.anchors(0,3)= r
-	makePoint (- 0.75, - 0.25, - 0.75, r) : mybezier.anchors(1,0)= r
-	makePoint (- 0.25, - 0.25, 0.5, r)    : mybezier.anchors(1,1)= r
-	makePoint (0.25, - 0.25, 0.5, r)      : mybezier.anchors(1,2)= r
-	makePoint (0.75, - 0.25, - 0.75, r)   : mybezier.anchors(1,3)= r
-	makePoint (- 0.75, 0.25, 0.0, r)      : mybezier.anchors(2,0)= r
-	makePoint (- 0.25, 0.25, - 0.5, r)    : mybezier.anchors(2,1)= r
-	makePoint (0.25, 0.25, - 0.5, r)      : mybezier.anchors(2,2)= r
-	makePoint (0.75, 0.25, 0.0, r)        : mybezier.anchors(2,3)= r
-	makePoint (- 0.75, 0.75, - 0.5, r)    : mybezier.anchors(3,0)= r
-	makePoint (- 0.25, 0.75, - 1.0, r)    : mybezier.anchors(3,1)= r
-	makePoint (0.25, 0.75, - 1.0, r)      : mybezier.anchors(3,2)= r
-	makePoint (0.75, 0.75, - 0.5, r)      : mybezier.anchors(3,3)= r
+	makePoint (- 0.75, - 0.75, - 0.5, r)  : mybezier.anchors(0, 0)= r
+	makePoint (- 0.25, - 0.75, 0.0, r)    : mybezier.anchors(0, 1)= r
+	makePoint (0.25, - 0.75, 0.0, r)      : mybezier.anchors(0, 2)= r
+	makePoint (0.75, - 0.75, - 0.5, r)    : mybezier.anchors(0, 3)= r
+	makePoint (- 0.75, - 0.25, - 0.75, r) : mybezier.anchors(1, 0)= r
+	makePoint (- 0.25, - 0.25, 0.5, r)    : mybezier.anchors(1, 1)= r
+	makePoint (0.25, - 0.25, 0.5, r)      : mybezier.anchors(1, 2)= r
+	makePoint (0.75, - 0.25, - 0.75, r)   : mybezier.anchors(1, 3)= r
+	makePoint (- 0.75, 0.25, 0.0, r)      : mybezier.anchors(2, 0)= r
+	makePoint (- 0.25, 0.25, - 0.5, r)    : mybezier.anchors(2, 1)= r
+	makePoint (0.25, 0.25, - 0.5, r)      : mybezier.anchors(2, 2)= r
+	makePoint (0.75, 0.25, 0.0, r)        : mybezier.anchors(2, 3)= r
+	makePoint (- 0.75, 0.75, - 0.5, r)    : mybezier.anchors(3, 0)= r
+	makePoint (- 0.25, 0.75, - 1.0, r)    : mybezier.anchors(3, 1)= r
+	makePoint (0.25, 0.75, - 1.0, r)      : mybezier.anchors(3, 2)= r
+	makePoint (0.75, 0.75, - 0.5, r)      : mybezier.anchors(3, 3)= r
 	mybezier.dlBPatch = 0
 end sub

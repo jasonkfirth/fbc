@@ -3,7 +3,7 @@
 
 
 extern "c++"
-type Fl_Value_Input extends Fl_Valuator 
+type Fl_Value_Input extends Fl_Valuator
 	input as Fl_Input = any
 private:
 	declare constructor (byref b as const Fl_Value_Input)

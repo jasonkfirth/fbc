@@ -13,7 +13,7 @@ Type MathFunction As Function( ByVal x As Double ) As Double
 Sub ThreadPlot( ByVal p As Any Ptr )
 	Sleep 1500, 1  '' sleep added only to check the asynchronous way of the callback
 	Dim f As MathFunction = p
-	Window (-15,-10)-(15,10)
+	Window (-15, -10)-(15, 10)
 	PSet( -15, f(-15) )
 	For x As Double = -15 To 15 Step 0.1
 		Line -( x, f(x) )

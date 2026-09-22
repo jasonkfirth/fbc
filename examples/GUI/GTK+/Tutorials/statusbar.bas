@@ -7,6 +7,8 @@
 '#DEFINE __USE_GTK3__
 #include once "gtk/gtk.bi"
 
+' The button callbacks write to this module-owned status bar.
+' FB-LINTER: DISABLE-NEXT-LINE FBL301
 Dim Shared As GtkWidget Ptr status_bar
 
 Sub push_item Cdecl( Byval widget As GtkWidget Ptr, Byval user_data As gpointer )

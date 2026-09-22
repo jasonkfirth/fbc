@@ -10,6 +10,8 @@
 
 '' Setup our booleans
 const null = 0
+'' The byte-at-a-time load loop uses an INTEGER index.
+const MAX_TGA_IMAGE_BYTES as ulongint = &h7fffffff
 
 
 #include once "GL/gl.bi"
@@ -30,6 +32,8 @@ end type
 #endif
 
 '' User Defined Variables
+'' The main loop owns this game state; no callbacks or worker threads mutate it.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared bbase as GLuint              '' Font Display List
 dim shared roll as single               '' Rolling Clouds
 dim shared as integer level = 1         '' Current Level
@@ -59,6 +63,8 @@ type TextureImage                       '' Create A Structure
 end type
 
 
+'' The texture and object arrays are owned by Initialize(), Update(), and Deinitialize().
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared textures(0 to 9) as TextureImage   '' Storage For 10 Textures
 dim shared object_(0 to 29) as objects        '' Storage For 30 Objects
 
@@ -76,9 +82,13 @@ dim shared size(0 to 4) as dimensions => { _
 		(0.75f, 1.5f) _                       '' Vase
 		}
 
+'' The main loop updates input state before Selection() consumes it.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared as integer mouse_x, mouse_y, mouse_b, mouse_down
 
-'------------------------------------------------------------------------
+' -------------------------------------------------------------------------
+' Demo interface and main loop
+' -------------------------------------------------------------------------
 declare function LoadTGA(byval texture as TEXTUREIMAGE ptr, byref filename as string) as integer
 declare sub BuildFont ()
 declare sub glPrint cdecl(byval x as integer, byval y as integer, byref fmt as string, ...)
@@ -110,13 +120,13 @@ declare sub drawscr ()
 	lastTickCount  = timer
 	do
 		SETMOUSE , , 0
-		getmouse mouse_x, mouse_y , ,mouse_b
+		getmouse mouse_x, mouse_y , , mouse_b
 		if mouse_x = -1 then SETMOUSE , , 1
 		if (mouse_b and 1 ) and not mouse_down then
 			Selection()
 			mouse_down = true
 		end if
-		if not (mouse_b and 1) then mouse_down = FALSE
+		if (mouse_b and 1) = 0 then mouse_down = FALSE
 
 		tickCount = timer
 		Update ((tickCount - lastTickCount)*1000)	'' Update The Counter
@@ -134,11 +144,12 @@ declare sub drawscr ()
 '' Loads A TGA File Into Memory
 function LoadTGA(byval texture as TEXTUREIMAGE ptr, byref filename as string) as integer
 	dim i as integer
-	dim TGAheader (0 to 11) as ubyte => {0,0,2,0,0,0,0,0,0,0,0,0} '' Uncompressed TGA Header
+	dim TGAheader (0 to 11) as ubyte => {0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0} '' Uncompressed TGA Header
 	dim TGAcompare(0 to 11) as ubyte           '' Used To Compare TGA Header
 	dim header(0 to 5) as ubyte                '' First 6 Useful Bytes From The Header
 	dim bytesPerPixel as uinteger              '' Holds Number Of Bytes Per Pixel Used In The TGA File
 	dim imageSize as integer                   '' Used To Store The Image Size When Setting Aside Ram
+	dim imageBytes as ulongint                 '' Checked allocation size before narrowing for the load loop
 	dim temp as ubyte                          '' Temporary Variable
 	dim gtype as GLenum  = GL_RGBA             '' Set The Default GL Mode To RBGA (32 BPP)
 	dim hFile as integer
@@ -152,7 +163,9 @@ function LoadTGA(byval texture as TEXTUREIMAGE ptr, byref filename as string) as
 
 	if lof(hFile) > 18 then                    '' Are There 12+6 Bytes To Read?
 		get #hFile, , TGAcompare()             '' If So Read First 12 Header Bytes
-		if memcmp(@TGAheader(0),@TGAcompare(0),len(TGAheader)) = 0 then     '' Does The Header Match What We Want?
+		'' Both values are fixed byte arrays, so this comparison has no UDT padding.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-MEM-005
+		if memcmp(@TGAheader(0), @TGAcompare(0), len(TGAheader)) = 0 then     '' Does The Header Match What We Want?
 			get #hFile, , header()             '' If So Read Next 6 Header Bytes
 		else
 			'Header does not match
@@ -170,15 +183,34 @@ function LoadTGA(byval texture as TEXTUREIMAGE ptr, byref filename as string) as
 
 	if (texture->wwidth <=0 or _                         '' Is The Width Less Than Or Equal To Zero
 			texture->height <=0 or _                     '' Is The Height Less Than Or Equal To Zero
-			(header(4) <> 24 and header(4) <> 32)) then  '' Is The TGA 24 or 32 Bit?
+			(header(4) <> 24 andalso header(4) <> 32)) then  '' Is The TGA 24 or 32 Bit?
 		close hFile                                      '' If Anything Failed, Close The File
 		return FALSE                                     '' Return FALSE
 	end if
 
 	texture->bpp = header(4)                             '' Grab The TGA's Bits Per Pixel (24 or 32)
 
-	bytesPerPixel = texture->bpp/8                       '' Divide By 8 To Get The Bytes Per Pixel
-	imageSize = texture->wwidth*texture->height*bytesPerPixel  '' Calculate The Memory Required For The TGA Data
+	bytesPerPixel = texture->bpp/8                          '' Divide By 8 To Get The Bytes Per Pixel
+
+	'' Reject dimensions that overflow the signed load-loop index or do not fit in the file.
+	if culngint(texture->wwidth) > MAX_TGA_IMAGE_BYTES / culngint(texture->height) then
+		close hFile
+		return FALSE
+	end if
+
+	imageBytes = culngint(texture->wwidth) * culngint(texture->height)
+	if imageBytes > MAX_TGA_IMAGE_BYTES / culngint(bytesPerPixel) then
+		close hFile
+		return FALSE
+	end if
+
+	imageBytes *= culngint(bytesPerPixel)
+	if culngint(lof(hFile) - 18) < imageBytes then
+		close hFile
+		return FALSE
+	end if
+
+	imageSize = cint(imageBytes)                            '' Safe after the signed-range check above
 
 	texture->imageData=allocate(imageSize)               '' Reserve Memory To Hold The TGA Data
 
@@ -213,6 +245,8 @@ function LoadTGA(byval texture as TEXTUREIMAGE ptr, byref filename as string) as
 	end if
 
 	glTexImage2D(GL_TEXTURE_2D, 0, gtype, texture[0].wwidth, texture[0].height, 0, gtype, GL_UNSIGNED_BYTE, texture[0].imageData)
+	deallocate texture->imageData                           '' OpenGL has copied the texture pixels
+	texture->imageData = NULL
 
 	return TRUE                                          '' Texture Building Went Ok, Return True
 end function
@@ -230,6 +264,8 @@ sub BuildFont ()
 
 	while iLoop<95
 		cx = (iLoop mod 16) / 16.0f
+		'' Font atlas rows use integer division before the normalized coordinate.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL405 FBL-NUM-017
 		cy = (iLoop \ 16) / 8.0f
 		glNewList (bbase + iLoop, GL_COMPILE)          '' Start Building A List
 		glBegin (GL_QUADS)                             '' Use A Quad For Each Character
@@ -325,7 +361,7 @@ sub InitObject (byval num as integer)                '' Initialize An Object
 	''                      Number Of Elements To Sort
 	''                      Size Of Each Element
 	''                      Pointer To Our Compare Function
-	QSORT (@object_(0), level, sizeof (objects),  cast(any ptr,@Compare))
+	QSORT (@object_(0), level, sizeof (objects),  cast(any ptr, @Compare))
 end sub
 
 '------------------------------------------------------------------------
@@ -376,7 +412,7 @@ end sub
 
 '------------------------------------------------------------------------
 sub Selection ()                                         '' This Is Where Selection Is Done
-	dim buffer(512) as GLuint                            '' Set Up A Selection Buffer
+	dim buffer(0 to 512) as GLuint                       '' Set Up A Selection Buffer
 	dim hits as integer                                  '' The Number Of Objects That We Selected
 	if mouse_x = -1 then exit sub
 	'' Is Game Over?
@@ -387,7 +423,7 @@ sub Selection ()                                         '' This Is Where Select
 		PlaySound ("data/shot.wav", NULL, SND_ASYNC)     '' Play Gun Shot Sound
 	#endif
 	'' The Size Of The Viewport. (0) Is <x>, (1) Is <y>, (2) Is <length>, (3) Is <width>
-	dim viewport(4) as GLint
+	dim viewport(0 to 4) as GLint
 
 	'' This Sets The Array <viewport> To The Size And Location Of The Screen Relative To The Window
 	glGetIntegerv (GL_VIEWPORT, @viewport(0))
@@ -538,8 +574,11 @@ end sub
 '------------------------------------------------------------------------
 sub Explosion (byval num as integer)                     '' Draws An Animated Explosion For Object "num"
 	dim ex as single                                     '' Calculate Explosion X Frame (0.0f - 0.75f)
+	'' The explosion atlas selects one integer cell before converting to texture space.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL405 FBL-NUM-017
 	ex =  ((object_(num).frame \ 4) mod 4) / 4.0f
 	dim ey as single                                     '' Calculate Explosion Y Frame (0.0f - 0.75f)
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL405 FBL-NUM-017
 	ey =  ((object_(num).frame \ 4) \ 4) / 4.0f
 
 	glBindTexture (GL_TEXTURE_2D, textures(5).texID)     '' Select The Explosion Texture

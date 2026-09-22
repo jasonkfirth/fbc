@@ -25,7 +25,7 @@ public:
 	declare sub replace(index as long, name as const zstring ptr)
 	declare sub clear()
 	declare function clear_submenu(index as long) as long
-	declare sub global() 
+	declare sub global()
 	declare sub mode (i as long, fl as long)
 	declare const function mode(i as long) as long
 	declare sub shortcut (i as long, s as long)

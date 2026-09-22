@@ -8,7 +8,7 @@
 
 ' Setting a single color, form 1.
 Screen 15
-Locate 1,1: Color 15
+Locate 1, 1: Color 15
 Print "Press any key to change my color!"
 Sleep
 ' Now change color 15 hues to bright red

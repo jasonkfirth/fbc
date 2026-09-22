@@ -11,16 +11,23 @@
 '$lang: "qb"
 
 '' A string variable using the $ type suffix
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-002
 Dim strVariable$
 
 '' An integer variable using the % type suffix
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-002
 Dim intVariable%
 
 '' A long variable using the & type suffix
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-002
 Dim lngVariable&
 
 '' A single precision floating point variable using the ! type suffix
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-002
 Dim sngVariable!
 
 '' A double precision floating point variable using the # type suffix
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-002
 Dim dblVariable#
+
+'' End of KeyPgDim_7.bas

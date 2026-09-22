@@ -136,6 +136,12 @@ int fb_sfxInit(void)
     SFX_DEBUG("sfx_init: sound subsystem ready");
 
     fb_sfxRuntimeUnlock();
+#if FB_SFX_DOS_THREADS
+    /* The worker must see fully initialized buffers and driver state. A
+     * failed scheduler/stack allocation leaves cooperative playback usable.
+     */
+    (void)fb_sfxMsdosStartWorker();
+#endif
     return 0;
 }
 

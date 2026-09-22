@@ -6,7 +6,11 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgInputfilemode
 '' --------
 
-Dim ff As UByte
+'' Resource policy:
+'' Each successful Open owns ff until its matching Close. The input phase runs
+'' only after the sample data was written successfully.
+
+Dim ff As Integer
 Dim randomvar As Integer
 Dim name_str As String
 Dim age As Integer
@@ -18,20 +22,31 @@ Randomize
 Print
 
 ff = FreeFile
-Open "testfile" For Output As #ff
-Write #ff, Int(Rnd*42), name_str, age
-Close #ff
 
-'' clear variables
-randomvar = 0
-name_str = ""
-age = 0
+If Open("testfile" For Output As #ff) <> 0 Then
+	Print "Could not write testfile"
+Else
+	'' This example intentionally demonstrates BASIC's formatted record syntax.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL517
+	Write #ff, Int(Rnd*42), name_str, age
+	Close #ff
 
-'' input the variables, using Input #
-ff = FreeFile
-Open "testfile" For Input As #ff
-Input #ff, randomvar, name_str, age
-Close #ff
+	'' clear variables
+	randomvar = 0
+	name_str = ""
+	age = 0
+
+	'' input the variables, using Input #
+	ff = FreeFile
+	If Open("testfile" For Input As #ff) <> 0 Then
+		Print "Could not read testfile"
+	Else
+		'' This example intentionally demonstrates BASIC's formatted record syntax.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL517
+		Input #ff, randomvar, name_str, age
+		Close #ff
+	End If
+End If
 
 Print "Random Number was: " & randomvar
 Print "Your name is: " & name_str

@@ -6,6 +6,12 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgOpLet
 '' --------
 
+#Include Once "fberror.bi"
+
+'' Ownership:
+'' Each UDT owns zp after its constructor succeeds. Assignment obtains the
+'' replacement string before releasing the previous owned storage.
+
 Type UDT
   Public:
 	Declare Constructor (ByVal zp As Const ZString Ptr)  ''constructor with string initializer
@@ -17,15 +23,20 @@ Type UDT
 End Type
 
 Constructor UDT (ByVal zp As Const ZString Ptr)
-  This.zp = CAllocate(Len(*zp) + 1)
+  This.zp = Callocate(Len(*zp) + 1)
+  If This.zp = 0 Then Error FB.FB_RTERROR_OUTOFMEM
   *This.zp = *zp
 End Constructor
 
 Operator UDT.Let (ByRef rhs As UDT)
+  Dim replacement As ZString Ptr
+
   If @This <> @rhs Then  '' check for self-assignment to avoid object destruction
+	replacement = Callocate(Len(*rhs.zp) + 1)
+	If replacement = 0 Then Error FB.FB_RTERROR_OUTOFMEM
+	*replacement = *rhs.zp
 	Deallocate(This.zp)
-	This.zp = CAllocate(Len(*rhs.zp) + 1)
-	*This.zp = *rhs.zp
+	This.zp = replacement
   End If
 End Operator
 

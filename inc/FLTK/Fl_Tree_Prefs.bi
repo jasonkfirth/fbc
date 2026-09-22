@@ -1,6 +1,7 @@
 #include once "Fl.bi"
+#include once "Fl_Image.bi"
 
-enum Fl_Tree_Sort 
+enum Fl_Tree_Sort
   FL_TREE_SORT_NONE=0
   FL_TREE_SORT_ASCENDING=1
   FL_TREE_SORT_DESCENDING=2
@@ -28,7 +29,7 @@ end enum
 enum Fl_Tree_Item_Draw_Mode
   FL_TREE_ITEM_DRAW_DEFAULT=0
   FL_TREE_ITEM_DRAW_LABEL_AND_WIDGET=1
-  FL_TREE_ITEM_HEIGHT_FROM_WIDGET=2	
+  FL_TREE_ITEM_HEIGHT_FROM_WIDGET=2
 end enum
 
 type Fl_Tree_Item_ as Fl_Tree_Item
@@ -48,10 +49,10 @@ private:
 	_connectorwidth as long
 	_linespacing as long
 
-	_labelfgcolor as Fl_Color 
-	_labelbgcolor as Fl_Color 
-	_connectorcolor as Fl_Color 
-	_connectorstyle as long'Fl_Tree_Connector 
+	_labelfgcolor as Fl_Color
+	_labelbgcolor as Fl_Color
+	_connectorcolor as Fl_Color
+	_connectorstyle as long'Fl_Tree_Connector
 	_openimage as Fl_Image ptr
 	_closeimage as Fl_Image ptr
 	_userimage as Fl_Image ptr
@@ -332,4 +333,3 @@ end function
 private sub Fl_Tree_Prefs.selectmode(val_ as Fl_Tree_Select)
 	_selectmode=val_
 end sub
-

@@ -40,7 +40,7 @@ Declare Sub wxQueryLayoutInfoEvent_SetAlignment WXCALL Alias "wxQueryLayoutInfoE
 Declare Function wxQueryLayoutInfoEvent_GetAlignment WXCALL Alias "wxQueryLayoutInfoEvent_GetAlignment" (self As wxQueryLayoutInfoEvent Ptr) As wxLayoutAlignment
 
 ' class wxCalculateLayoutEvent
-Declare Function wxCalculateLayoutEvent_ctor WXCALL Alias "wxCalculateLayoutEvent_ctor" (id As wxWindowID) As wxCalculateLayoutEvent Ptr 
+Declare Function wxCalculateLayoutEvent_ctor WXCALL Alias "wxCalculateLayoutEvent_ctor" (id As wxWindowID) As wxCalculateLayoutEvent Ptr
 Declare Sub wxCalculateLayoutEvent_SetFlags WXCALL Alias "wxCalculateLayoutEvent_SetFlags" (self As wxCalculateLayoutEvent Ptr, flags As wxInt)
 Declare Function wxCalculateLayoutEvent_GetFlags WXCALL Alias "wxCalculateLayoutEvent_GetFlags" (self As wxCalculateLayoutEvent Ptr) As wxInt
 Declare Sub wxCalculateLayoutEvent_SetRect WXCALL Alias "wxCalculateLayoutEvent_SetRect" (self As wxCalculateLayoutEvent Ptr, r As wxRect Ptr)

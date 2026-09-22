@@ -23,7 +23,11 @@ IF gtk_init_check (@__FB_ARGC__, @__FB_ARGV__) THEN
   v3 = 44 : WHILE gtk_check_version_(v1, v2, v3) : v3 -= 1 : WEND
   GtkVersion = !"\n" & v1 & "." & v2 & "." & v3 & !"\n"
 ELSE
-  SCREENRES 300, 70
+  IF SCREENRES(300, 70) <> 0 THEN
+    ?"GTK init failed, and the requested graphics mode is unavailable."
+    END -1
+  END IF
+
   ?!"\n\nGTK init failed!\n\nPress a key to finish."
   SLEEP
   END -1

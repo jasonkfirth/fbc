@@ -5,6 +5,8 @@
 #include once "windows.bi"
 #include once "win/commctrl.bi"
 
+	'' The window procedure uses these module-owned calendar handles.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 	dim shared hInstance as HINSTANCE
 	dim shared calClass as string
 	dim shared hCal as HWND
@@ -44,7 +46,7 @@ function WndProc ( byval hWnd as HWND, _
         end if
 
 	case WM_DESTROY
-    	PostQuitMessage( 0 )
+        PostQuitMessage( 0 )
         exit function
     end select
 
@@ -73,12 +75,14 @@ end function
 		.hCursor       = LoadCursor( null, IDC_ARROW )
 		.hbrBackground = cast( HGDIOBJ, 6 )  ' default color
 		.lpszMenuName  = null
+		'' appName remains alive through this synchronous RegisterClass call.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL427
 		.lpszClassName = strptr( appName )
 	end with
 
 	if( RegisterClass( @wcls ) = FALSE ) then
-   		MessageBox( null, "Failed to register wcls!", appName, MB_ICONERROR )
-   		end 1
+		MessageBox( null, "Failed to register wcls!", appName, MB_ICONERROR )
+		end 1
 	end if
 
 	hWnd = CreateWindowEx( 0, _

@@ -28,7 +28,7 @@ End Sub
     Dim As GtkStyle Ptr style
 
     ' XPM data of Open-File icon
-    Dim As Zstring Ptr xpm_data(20) => { _
+    Dim As Zstring Ptr xpm_data(0 To 20) => { _
     @"16 16 3 1", _
     @"       c None", _
     @".      c #000000000000", _

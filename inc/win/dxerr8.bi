@@ -20,6 +20,8 @@
 '' translated to FreeBASIC by:
 ''   FreeBASIC development team
 
+#include once "windows.bi"
+
 #pragma once
 
 #inclib "dxerr8"

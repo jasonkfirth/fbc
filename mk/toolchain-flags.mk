@@ -384,6 +384,10 @@ ifeq ($(THREAD_MODEL),wii)
 MT_CFLAGS := -DENABLE_MT
 endif
 
+ifeq ($(THREAD_MODEL),pdmlwp)
+MT_CFLAGS := -DENABLE_MT -DFB_DOS_PDMLWP -mno-sse -mno-mmx
+endif
+
 ifeq ($(THREAD_MODEL),unixlib)
 MT_CFLAGS := -DENABLE_MT
 endif

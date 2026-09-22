@@ -98,6 +98,8 @@ DO
   SCREENUNLOCK
   wi += 1.73 * M_PI / 180
   WHILE wi > M_PI * 2 : wi -= M_PI * 2 : WEND
+  '' Keep the animation responsive without a busy render loop.
+  '' FB-LINTER: DISABLE-NEXT-LINE FBL602
   SLEEP 35
 LOOP UNTIL LEN(INKEY)
 cairo_surface_destroy(c_s_t)

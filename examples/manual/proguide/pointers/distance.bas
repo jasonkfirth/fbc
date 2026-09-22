@@ -8,7 +8,7 @@
 
 Type T As Single
 
-Dim array(5) As T = { 32, 43, 66, 348, 112, 0 }
+Dim array(0 To 5) As T = { 32, 43, 66, 348, 112, 0 }
 Dim p As T Ptr = @array(0)
 
 While (*p <> 0)

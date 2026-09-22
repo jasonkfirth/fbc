@@ -7,17 +7,30 @@
 '' --------
 
 '' set up a screen: 320 * 200, 16 bits per pixel
-ScreenRes 320, 200, 16
+If ScreenRes(320, 200, 16) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
+
 Line (0, 0)-(319, 199), RGB(0, 128, 255), bf
 
 '' set up an image with the mask color as the background.
 Dim img As Any Ptr = ImageCreate( 33, 33, RGB(255, 0, 255) )
+
+If img = 0 Then
+	Print "Could not create the image buffer"
+	Sleep
+	End 1
+End If
+
 Circle img, (16, 16), 15, RGB(255, 255, 0),     ,     , 1, f
 Circle img, (10, 10), 3,  RGB(  0,   0, 0),     ,     , 2, f
 Circle img, (23, 10), 3,  RGB(  0,   0, 0),     ,     , 2, f
 Circle img, (16, 18), 10, RGB(  0,   0, 0), 3.14, 6.28
 
-Dim As Integer x = 160 - 16, y = 100 - 16
+Dim As Integer x = 160 - 16
+Dim As Integer y = 100 - 16
 
 '' Put the image with PSET
 Put (x, y), img, PSet

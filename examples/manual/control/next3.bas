@@ -7,6 +7,6 @@
 '' --------
 
 For i As Integer = 1 To 10
-For j As Integer = 1 To 2
-	' ...
-Next j,i
+	For j As Integer = 1 To 2
+		' The two identifiers close the nested loops from inner to outer.
+Next j, i

@@ -22,10 +22,14 @@
 
 '' compile as: fbc -s gui lesson25.bas
 
+'' Ownership: objload allocates each OBJECT_.points buffer, and objfree releases
+'' it after the render loop or when a malformed model line aborts loading.
+
 
 
 '' Setup our booleans
 const null = 0
+const MAX_OBJECT_POINT_BYTES as ulongint = &h7fffffff
 #include once "GL/gl.bi"
 #include once "GL/glu.bi"
 #include once "fbgfx.bi"                   '' for Scan code constants
@@ -44,19 +48,24 @@ type OBJECT_                               '' Structure Called OBJECT For An Obj
 end type
 
 ''------------------------------------------------------------------------------
-declare sub objallocate (byval k as OBJECT_ ptr, byval n as integer)
+declare function objallocate (byval k as OBJECT_ ptr, byval n as integer) as integer
 declare sub objfree (byval k as OBJECT_ ptr)
 declare sub readstr(byval f as integer, byref sstring as string)
-declare sub objload (byref fname as string, byval k as OBJECT_ ptr)
+declare function objload (byref fname as string, byval k as OBJECT_ ptr) as integer
 declare sub calculate (byval i as integer, byval v as VERTEX ptr)
 
+'' The loader and the render loop share these module-level scene values because
+'' this tutorial keeps both flows at module scope.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared maxver as integer                     '' Will Eventually Hold The Maximum Number Of Vertices
 dim shared as integer steps = 200                '' Maximum Number Of Steps
 dim shared as OBJECT_ ptr sour, dest              '' Source Object, Destination Object
 
 	dim as single xrot, yrot, zrot               '' X, Y & Z Rotation
 	dim as single xspeed, yspeed, zspeed         '' X, Y & Z Spin Speed
-	dim as single cx, cy, cz = - 15              '' X, Y & Z Position
+	dim as single cx                              '' X Position
+	dim as single cy                              '' Y Position
+	dim as single cz = - 15                       '' Z Position
 
 	dim as integer key = 1                       '' Used To Make Sure Same Morph Key Is Not Pressed
 	dim as integer iSTEP = 0 '' Step Counter
@@ -70,6 +79,7 @@ dim shared as OBJECT_ ptr sour, dest              '' Source Object, Destination 
 
 	windowtitle "Piotr Cieslak & NeHe's Morphing Points Tutorial"   '' Set window title
 	screen 18, 16, , 2
+	randomize timer
 
 	'' ReSizeGLScene
 	glViewport 0, 0, 640, 480                      '' Reset The Current Viewport
@@ -80,20 +90,32 @@ dim shared as OBJECT_ ptr sour, dest              '' Source Object, Destination 
 	glLoadIdentity
 
 	'' All Setup For OpenGL Goes Here
-	glBlendFunc (GL_SRC_ALPHA , GL_ONE)                     '' Set The Blending Function For Translucency
-	glClearColor (0.0f , 0.0f , 0.0f , 0.0f)                '' This Will Clear The Background Color To Black
+	glBlendFunc (GL_SRC_ALPHA, GL_ONE)                     '' Set The Blending Function For Translucency
+	glClearColor (0.0f, 0.0f, 0.0f, 0.0f)                '' This Will Clear The Background Color To Black
 	glClearDepth (1.0)                                      '' Enables Clearing Of The Depth Buffer
 	glDepthFunc (GL_LESS)                                   '' The Type Of Depth Test To Do
 	glEnable (GL_DEPTH_TEST)                                '' Enables Depth Testing
 	glShadeModel (GL_SMOOTH)                                '' Enables Smooth Color Shading
-	glHint (GL_PERSPECTIVE_CORRECTION_HINT , GL_NICEST)     '' Really Nice Perspective Calculations
+	glHint (GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)     '' Really Nice Perspective Calculations
 
 	maxver = 0                                              '' Sets Max Vertices To 0 By Default
-	objload (exepath + "/data/Sphere.txt" , @morph1)                   '' Load The First Object Into morph1 From File sphere.txt
-	objload (exepath + "/data/Torus.txt" , @morph2)                    '' Load The Second Object Into morph2 From File torus.txt
-	objload (exepath + "/data/Tube.txt" , @morph3)                     '' Load The Third Object Into morph3 From File tube.txt
+	if objload (exepath + "/data/Sphere.txt", @morph1) = false then  '' Load The First Object Into morph1 From File sphere.txt
+		print "Could not load Sphere.txt"
+		end 1
+	end if
+	if objload (exepath + "/data/Torus.txt", @morph2) = false then   '' Load The Second Object Into morph2 From File torus.txt
+		print "Could not load Torus.txt"
+		end 1
+	end if
+	if objload (exepath + "/data/Tube.txt", @morph3) = false then    '' Load The Third Object Into morph3 From File tube.txt
+		print "Could not load Tube.txt"
+		end 1
+	end if
 
-	objallocate (@morph4 , 486)                             '' Manually Reserver Ram For A 4th 468 Vertice Object (morph4)
+	if objallocate (@morph4, 486) = false then              '' Manually Reserver Ram For A 4th 468 Vertice Object (morph4)
+		print "Could not allocate morph4"
+		end 1
+	end if
 
 	'' Loop Through All 468 Vertices
 	dim as integer i=0
@@ -104,7 +126,10 @@ dim shared as OBJECT_ ptr sour, dest              '' Source Object, Destination 
 		i = i + 1
 	wend
 
-	objload (exepath + "/data/Sphere.txt" , @helper)   '' Load sphere.txt Object Into Helper (Used As Starting Point)
+	if objload (exepath + "/data/Sphere.txt", @helper) = false then  '' Load sphere.txt Object Into Helper (Used As Starting Point)
+		print "Could not load Sphere.txt"
+		end 1
+	end if
 	dest = @morph1          '' Source & Destination Are Set To Equal First Object (morph1)
 	sour = @morph1
 
@@ -137,10 +162,10 @@ dim shared as OBJECT_ ptr sour, dest              '' Source Object, Destination 
 				glColor3f (0, 1, 1)                         '' Set Color To A Bright Shade Of Off Blue
 				glVertex3f (tx, ty, tz)                     '' Draw A Point At The Current Temp Values (Vertex)
 				glColor3f (0, 0.5, 1)                       '' Darken Color A Bit
-				tx -= 2 * q.x : ty -= 2 * q.y : ty -= 2 * q.y  '' Calculate Two Positions Ahead
+				tx -= 2 * q.x : ty -= 2 * q.y : tz -= 2 * q.z  '' Calculate Two Positions Ahead
 				glVertex3f (tx, ty, tz)                        '' Draw A Second Point At The Newly Calculate Position
 				glColor3f (0, 0, 1)                            '' Set Color To A Very Dark Blue
-				tx -= 2 * q.x : ty -= 2 * q.y : ty -= 2 * q.y  '' Calculate Two More Positions Ahead
+				tx -= 2 * q.x : ty -= 2 * q.y : tz -= 2 * q.z  '' Calculate Two More Positions Ahead
 				glVertex3f (tx, ty, tz)                        '' Draw A Third Point At The Second New Position
 				i= i + 1
 			wend
@@ -248,13 +273,23 @@ dim shared as OBJECT_ ptr sour, dest              '' Source Object, Destination 
 
 
 '---------------------------------------------------
-sub objallocate (byval k as OBJECT_ ptr, byval n as integer)  '' Allocate Memory For Each Object and Defines points
+function objallocate (byval k as OBJECT_ ptr, byval n as integer) as integer  '' Allocate Memory For Each Object and Defines points
+	if k = 0 or n <= 0 then return false
+	if culngint(n) > MAX_OBJECT_POINT_BYTES / culngint(len(VERTEX)) then return false
+
 	k->points = allocate(len(VERTEX)* n)          '' Sets points Equal To VERTEX * Number Of Vertices
-end sub                                           '' (3 Points For Each Vertice)
+	if k->points = 0 then return false
+
+	k->verts = n
+	return true
+end function                                        '' (3 Points For Each Vertice)
 
 '---------------------------------------------------
 sub objfree (byval k as OBJECT_ ptr)              '' Frees The Object (Releasing The Memory)
-	deallocate(k->points)                         '' Frees Points
+	if k = 0 then exit sub
+	if k->points then deallocate(k->points)       '' Frees Points
+	k->points = 0
+	k->verts = 0
 end sub
 
 '---------------------------------------------------
@@ -269,24 +304,46 @@ end sub
 
 '---------------------------------------------------
 '' Loads Object From File (name)
-sub objload (byref fname as string, byval k as OBJECT_ ptr)
-	dim ver as integer                                  '' Will Hold Vertice Count
+function objload (byref fname as string, byval k as OBJECT_ ptr) as integer
+	dim ver as long                                     '' sscanf "%d" writes a C 32-bit int
 	dim as single rx, ry, rz                            '' Hold Vertex X, Y & Z Position
 	dim oneline as string * 256                         '' Holds One Line Of Text
 	dim filein as integer
 
+	if k = 0 then return false
+
 	filein = freefile
-	open fname for input as #filein
+	if open(fname for input as #filein) <> 0 then return false
+	if eof(filein) then
+		close #filein
+		return false
+	end if
+
 	readstr(filein, oneline)                            '' Jumps To Code That Reads One Line Of Text From The File
-	sscanf (strptr(oneline), !"Vertices: %d\n", @ver)   '' Scans Text For "Vertices: ".  Number After Is Stored In ver
-	k->verts = ver                                      '' Sets Objects verts Variable To Equal The Value Of ver
-	objallocate (k, ver)                                '' Jumps To Code That Allocates Ram To Hold The Object
+	if sscanf (strptr(oneline), !"Vertices: %d\n", @ver) <> 1 or ver <= 0 then
+		close #filein
+		return false
+	end if
+	if objallocate (k, ver) = false then                '' Jumps To Code That Allocates Ram To Hold The Object
+		close #filein
+		return false
+	end if
 
 	'' Loops Through The Vertices
 	dim as integer i=0
 	while i < ver
+		if eof(filein) then
+			objfree(k)
+			close #filein
+			return false
+		end if
+
 		readstr (filein, oneline)                       '' Reads In The Next Line Of Text
-		sscanf (strptr(oneline), "%f %f %f", @rx, @ry, @rz)      '' Searches For 3 Floating Point Numbers, Store In rx,ry & rz
+		if sscanf (strptr(oneline), "%f %f %f", @rx, @ry, @rz) <> 3 then
+			objfree(k)
+			close #filein
+			return false
+		end if
 		k->points[i].x = rx                             '' Sets Objects (k) points.x Value To rx
 		k->points[i].y = ry                             '' Sets Objects (k) points.y Value To ry
 		k->points[i].z = rz                             '' Sets Objects (k) points.z Value To rz)
@@ -298,7 +355,8 @@ sub objload (byref fname as string, byval k as OBJECT_ ptr)
 		maxver = ver                                    '' Keeps Track Of Highest Number Of Vertices Used In Any Of The
 	end if                                              '' Objects
 
-end sub
+	return true
+end function
 
 '---------------------------------------------------
 '' Calculates Movement Of Points During Morphing

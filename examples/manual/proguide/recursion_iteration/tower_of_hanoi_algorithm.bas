@@ -10,7 +10,7 @@ Sub recursiveHanoi (ByVal n As Integer, ByVal departure As String, ByVal middle 
 	If n > 0 Then
 		recursiveHanoi(n - 1, departure, arrival, middle)
 		Print "  move one disk from " & departure & " to " & arrival
-		recursiveHanoi(n -1 , middle, departure, arrival)
+		recursiveHanoi(n - 1, middle, departure, arrival)
 	End If
 End Sub
 
@@ -26,7 +26,8 @@ End Sub
 DynamicUserStackTypeCreate(DynamicUserStackTypeForString, String)
 
 Sub translationToIterativeHanoi (ByVal n As Integer, ByVal departure As String, ByVal middle As String, ByVal arrival As String)
-	Dim As String dep = "", arr = ""
+	Dim As String dep = ""
+	Dim As String arr = ""
 	Dim As DynamicUserStackTypeForString S
 	S.push = Str(n) : S.push = departure : S.push = middle : S.push = arrival : S.push = dep : S.push = arr
 	While S.used > 0
@@ -54,4 +55,3 @@ translationToIterativeHanoi(3, "A", "B", "C")
 Print
 
 Sleep
-

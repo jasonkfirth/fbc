@@ -8,9 +8,15 @@
 
 '' Now read the number from the file
 Dim x As Single = 0
+Dim f As Integer
 
-Open "MyFile.Dat" For Binary As #1
-  Get #1, , x
-Close #1
+f = FreeFile
+
+If Open("MyFile.Dat" For Binary As #f) <> 0 Then
+  Print "Could not open MyFile.Dat"
+Else
+  If Get(#f, , x) <> 0 Then Print "Could not read MyFile.Dat"
+  Close #f
+End If
 
 Print x

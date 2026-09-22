@@ -1,3 +1,6 @@
+#ifndef FB_EXAMPLES_GRAPHICS_OPENGL_NEHE_CREATETEX_BI
+#define FB_EXAMPLES_GRAPHICS_OPENGL_NEHE_CREATETEX_BI
+
 #include "fbgfx.bi"
 const TEX_MASKED = &h1
 const TEX_MIPMAP = &h2
@@ -88,3 +91,5 @@ private function CreateTexture( byval buffer as any ptr, byval flags as integer 
 	function = tex
 
 end function
+
+#endif

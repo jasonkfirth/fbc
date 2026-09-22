@@ -25,13 +25,17 @@
 #pragma once
 
 #include once "dls1.bi"
+#include once "mmsystem.bi"
 
 #define __WINE_DMUSIC_DLS_H
 type GCENT as LONG
 type PCENT as LONG
 type PERCENT as LONG
 type TCENT as LONG
+#ifndef __REFERENCE_TIME_DEFINED
+#define __REFERENCE_TIME_DEFINED
 type REFERENCE_TIME as LONGLONG
+#endif
 type LPREFERENCE_TIME as LONGLONG ptr
 
 const DMUS_DEFAULT_SIZE_OFFSETTABLE = &h1

@@ -7,14 +7,42 @@
 '' --------
 
 ''open a graphics window
-ScreenRes 320, 200, 16
+If ScreenRes(320, 200, 16) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 ''create 3 sprites containing red, green and blue circles
 Const As Long r = 32
 Dim As Any Ptr cr, cg, cb
 cr = ImageCreate(r * 2 + 1, r * 2 + 1, RGBA(0, 0, 0, 0))
+
+If cr = 0 Then
+	Print "Could not create the red sprite"
+	Sleep
+	End 1
+End If
+
 cg = ImageCreate(r * 2 + 1, r * 2 + 1, RGBA(0, 0, 0, 0))
+
+If cg = 0 Then
+	ImageDestroy cr
+	Print "Could not create the green sprite"
+	Sleep
+	End 1
+End If
+
 cb = ImageCreate(r * 2 + 1, r * 2 + 1, RGBA(0, 0, 0, 0))
+
+If cb = 0 Then
+	ImageDestroy cr
+	ImageDestroy cg
+	Print "Could not create the blue sprite"
+	Sleep
+	End 1
+End If
+
 Circle cr, (r, r), r, RGB(255, 0, 0), , , 1, f
 Circle cg, (r, r), r, RGB(0, 255, 0), , , 1, f
 Circle cb, (r, r), r, RGB(0, 0, 255), , , 1, f

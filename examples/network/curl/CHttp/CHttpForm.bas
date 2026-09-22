@@ -18,8 +18,8 @@ constructor CHttpForm _
 
 	ctx = new CHttpFormCtx_
 
-  	ctx->formpost = NULL
-  	ctx->lastptr = NULL
+	ctx->formpost = NULL
+	ctx->lastptr = NULL
 
 end constructor
 
@@ -30,7 +30,7 @@ destructor CHttpForm _
 	)
 
 	if( ctx->formpost <> NULL ) then
-    	curl_formfree( ctx->formpost )
+		curl_formfree( ctx->formpost )
 		ctx->formpost = NULL
 	end if
 

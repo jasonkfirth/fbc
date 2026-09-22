@@ -23,7 +23,8 @@
 #pragma once
 
 #include once "_mingw_unicode.bi"
-#include once "d3dx9.bi"
+#include once "d3d9.bi"
+#include once "d3dx9mesh.bi"
 
 extern "Windows"
 

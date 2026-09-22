@@ -18,7 +18,7 @@ protected:
 	declare sub draw()
 public:
 	declare constructor(x as long, y as long, w as long, h as long, l as const zstring ptr=0)
-	declare const function spacing() as long 
+	declare const function spacing() as long
 	declare sub spacing(i as long)
 	declare const function horizontal() as ubyte
 

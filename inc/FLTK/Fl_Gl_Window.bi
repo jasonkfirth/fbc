@@ -67,12 +67,12 @@ public:
 	declare sub make_overlay_current()
 
 	declare virtual function as_gl_window() as Fl_Gl_Window_ ptr
-  
+
 	declare function pixels_per_unit() as single
 
 	declare function pixel_w() as long
 	declare function pixel_h() as long
-  
+
 	declare virtual destructor()
 
 

@@ -9,12 +9,17 @@
 Dim As Long x, y, buttons
 
 ' create a screen 640*480
-ScreenRes 640, 480
+If ScreenRes(640, 480) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
+
 Print "Click the mouse button to center the mouse"
 
 Do
 	' get mouse x, y and button state (wait until mouse is onscreen)
-	Do: Sleep 1: Loop While GetMouse( x, y , , buttons) <> 0
+	Do: Sleep 1: Loop While GetMouse( x, y, , buttons) <> 0
 
 	If buttons And 1 Then
 		' on left mouse click, center mouse

@@ -1,4 +1,19 @@
-'' examples/manual/extras/gfx-null.bas
+'' Project: FreeBASIC manual examples
+'' File: gfx-null.bas
+''
+'' Purpose:
+''     Demonstrate a GFX_NULL framebuffer presented through a Win32 paint
+''     handler.
+''
+'' Ownership:
+''     The module owns the GFX_NULL screen until normal process shutdown. The
+''     Win32 window owns its paint lifecycle and receives the shared bitmap data.
+''
+'' This file intentionally does NOT contain:
+''     - a reusable Win32 graphics backend
+''     - resize support for the fixed GFX_NULL screen
+''
+'' Example extracted from the FreeBASIC Manual
 ''
 '' Example extracted from the FreeBASIC Manual
 '' from topic 'GFX_NULL'
@@ -16,12 +31,14 @@
 
 Using fb
 
+'' The window procedures use the one GFX_NULL bitmap header and client rectangle.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 Dim Shared bmi As bitmapv4header
 Dim Shared mywin As rect
 
 ''
 ''--------------------------------------------------------------------------
-Function on_paint(ByVal hwnd As HWND,ByVal wparam As WPARAM,ByVal lparam As LPARAM) As Integer
+Function on_paint(ByVal hwnd As HWND, ByVal wparam As WPARAM, ByVal lparam As LPARAM) As Integer
 
 	Dim rct As RECT
 	Dim pnt As PAINTSTRUCT
@@ -31,8 +48,8 @@ Function on_paint(ByVal hwnd As HWND,ByVal wparam As WPARAM,ByVal lparam As LPAR
 	hDC = BeginPaint(hWnd, @pnt)
 	GetClientRect( hWnd, @rct )
 	With rct
-		StretchDIBits hDC, 0, 0,.Right-.Left+1,.bottom-.top+1, 0, 0, .Right-.Left+1,_
-			.bottom-.top+1,ScreenPtr,CPtr(bitmapinfo Ptr, @bmi), DIB_RGB_COLORS, SRCCOPY
+		StretchDIBits hDC, 0, 0, .Right-.Left+1, .bottom-.top+1, 0, 0, .Right-.Left+1, _
+			.bottom-.top+1, ScreenPtr, CPtr(bitmapinfo Ptr, @bmi), DIB_RGB_COLORS, SRCCOPY
 	End With
 
 	EndPaint hWnd, @pnt
@@ -43,11 +60,11 @@ End Function
 
 ''
 ''---------------------------------------------------------------------------
-Function on_Create(ByVal hwnd As HWND,ByVal wparam As WPARAM,ByVal lparam As LPARAM) As Integer
+Function on_Create(ByVal hwnd As HWND, ByVal wparam As WPARAM, ByVal lparam As LPARAM) As Integer
 	Dim rct As RECT
 	'set a gfxscreen of the size of the client area
 	GetClientRect( hWnd, @mywin)
-	ScreenRes mywin.right+1,mywin.bottom+1, 32, 1, GFX_NULL
+	ScreenRes mywin.right+1, mywin.bottom+1, 32, 1, GFX_NULL
 	'and create a bmp header,required to paint it yo screen
 	With bmi
 	  .bV4Size = Len(BITMAPV4HEADER)
@@ -70,7 +87,7 @@ End Function
 
 ''
 ''---------------------------------------------------------------------------
-Function on_Destroy(ByVal hwnd As HWND,ByVal wparam As WPARAM,ByVal lparam As LPARAM) As Integer
+Function on_Destroy(ByVal hwnd As HWND, ByVal wparam As WPARAM, ByVal lparam As LPARAM) As Integer
 	'clear arrays....
 	PostQuitMessage( 0 )
 
@@ -80,18 +97,18 @@ End Function
 
 ''
 ''----------------------------------------------------------------------------
-Function WndProc ( ByVal hWnd As HWND,ByVal message As UINT, _
-				   ByVal wParam As WPARAM,ByVal lParam As LPARAM ) As LRESULT
+Function WndProc ( ByVal hWnd As HWND, ByVal message As UINT, _
+				   ByVal wParam As WPARAM, ByVal lParam As LPARAM ) As LRESULT
 
 	Function = 0
 
 	Select Case As Const  message
 	Case WM_CREATE
-		Function = On_create(hwnd,wparam,lparam)
+		Function = On_create(hwnd, wparam, lparam)
 	Case WM_PAINT
-		Function = On_paint(hwnd,wparam,lparam)
+		Function = On_paint(hwnd, wparam, lparam)
 	Case WM_DESTROY
-		Function = On_destroy(hwnd,wparam,lparam)
+		Function = On_destroy(hwnd, wparam, lparam)
 	Case Else
 		Function = DefWindowProc( hWnd, message, wParam, lParam )
 	End Select
@@ -107,6 +124,7 @@ End Function
 	Dim szAppName As ZString * 30 => "Random Rectangles"
 	Dim hWnd As HWND
 	Dim i As Integer
+	Randomize Timer
 
 	With wcls
 		.style         = CS_HREDRAW Or CS_VREDRAW
@@ -122,20 +140,22 @@ End Function
 	End With
 
 	If( RegisterClass( @wcls ) = False ) Then
+		'' Module-level startup cannot continue without a registered window class.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-CF-005
 		End
 	End If
 
 	'make a non-resizable screen
-	hWnd = CreateWindowEx( 0,szAppName,"Example of GFX_NULL",_
-		WS_OVERLAPPEDWINDOW And Not (WS_sizebox Or ws_maximizebox),_
-		CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT, CW_USEDEFAULT, _
-		NULL,NULL, wcls.hinstance,NULL )
+	hWnd = CreateWindowEx( 0, szAppName, "Example of GFX_NULL", _
+		WS_OVERLAPPEDWINDOW And Not (WS_sizebox Or ws_maximizebox), _
+		CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, _
+		NULL, NULL, wcls.hinstance, NULL )
 
 	ShowWindow( hWnd, SW_NORMAL )
 	UpdateWindow( hWnd )
 
 	While 1
-		If PeekMessage( @wMsg, NULL, 0,0, PM_Remove) Then
+		If PeekMessage( @wMsg, NULL, 0, 0, PM_Remove) Then
 			If wmsg.message=WM_QUIT Then
 				Exit While
 			End If
@@ -143,10 +163,12 @@ End Function
 			DispatchMessage( @wMsg )
 		Else
 			'update the gfx buffer
-			Line (Rnd*mywin.right,Rnd*mywin.bottom)-(Rnd*mywin.right,Rnd*mywin.bottom),_
-			RGB(Rnd*255,Rnd*255,Rnd*255),bf
-			redrawwindow (hwnd,0,0,rdw_invalidate)
+			Line (Rnd*mywin.right, Rnd*mywin.bottom)-(Rnd*mywin.right, Rnd*mywin.bottom), _
+			RGB(Rnd*255, Rnd*255, Rnd*255), bf
+			redrawwindow (hwnd, 0, 0, rdw_invalidate)
 		End If
 	Wend
 
 	End wMsg.wparam
+
+'' End of gfx-null.bas

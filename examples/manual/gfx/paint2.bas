@@ -34,7 +34,11 @@ End Function
 
 
 '' open a graphics window at the chosen bit depth
-ScreenRes 320, 200, bit_depth
+If ScreenRes( 320, 200, bit_depth ) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 '' declare variables for holding colors
 Dim As ULong c, c1, c2, cb

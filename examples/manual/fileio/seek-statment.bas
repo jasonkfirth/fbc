@@ -8,11 +8,14 @@
 
 ' e.g. if you want to skip to the 100th byte in the file for reading/writing:
 
-Dim f As Long
+Dim f As Integer
 
 f = FreeFile
-Open "file.ext" For Binary As #f
+If Open("file.ext" For Binary As #f) <> 0 Then
+  Print "Could not open file.ext"
+Else
 
-Seek f, 100
+  Seek f, 100
 
-Close #f
+  Close #f
+End If

@@ -37,7 +37,7 @@
 ''   OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
 ''   EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY DIRECT, INDIRECT,
 ''   INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-''   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
+''   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
 ''   OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
 ''   LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 ''   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
@@ -55,6 +55,8 @@
 #include once "windows.bi"
 #include once "wtypes.bi"
 #include once "winapifamily.bi"
+#include once "objidlbase.bi"
+#include once "unknwnbase.bi"
 
 extern "Windows"
 
@@ -1984,7 +1986,3 @@ declare function FLAG_STGMEDIUM_UserUnmarshal(byval as ULONG ptr, byval as ubyte
 declare sub FLAG_STGMEDIUM_UserFree(byval as ULONG ptr, byval as FLAG_STGMEDIUM ptr)
 
 end extern
-
-#include once "ole-common.bi"
-#include once "ole2.bi"
-#include once "unknwn.bi"

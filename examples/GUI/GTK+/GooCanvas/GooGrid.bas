@@ -1,3 +1,17 @@
+' Project: FreeBASIC GTK and GooCanvas examples
+' File: GooGrid.bas
+'
+' Purpose:
+'     Draw a GTK GooCanvas sine grid with interactive item animation.
+'
+' Ownership:
+'     GTK owns the window, canvas, and canvas items after they are attached.
+'     The process exits only after gtk_main returns from the window callback.
+'
+' This file intentionally does NOT contain:
+'     - a reusable graph widget
+'     - background-thread GTK access
+'
 ' An FB example by TJF
 ' Details: http://library.gnome.org/devel/goocanvas/unstable/
 ' (en) http://www.freebasic.net/forum/viewtopic.php?t=18535
@@ -69,10 +83,10 @@ FOR i AS INTEGER = 0 TO n STEP 2
   copo[i + 1] = oy - SIN(i/sx) * fy
 NEXT
 VAR poly = goo_canvas_polyline_new(group, 0, 0, _
-                                   "stroke-color", "red",_
-                                   "line-width", line_group * 4,_
+                                   "stroke-color", "red", _
+                                   "line-width", line_group * 4, _
                                    "tooltip", "Test Polyline", _
-                                   "points", CanPoi,_
+                                   "points", CanPoi, _
                                    NULL)
 goo_canvas_points_unref(CanPoi)
 
@@ -102,7 +116,7 @@ text = goo_canvas_text_new(group, "0", _
                            GOO_CANVAS_ANCHOR_E, _
                            NULL)
 ox -= 35
-text = goo_canvas_text_new(group, "f(<i>φ</i>) = sin(<i>φ</i>)", _
+text = goo_canvas_text_new(group, "f(<i>&#x03C6;</i>) = sin(<i>&#x03C6;</i>)", _
                            ox, oy, -1, _
                            GOO_CANVAS_ANCHOR_S, _
                            "use-markup", 1, _
@@ -116,35 +130,35 @@ text = goo_canvas_text_new(group, "0", _
                            GOO_CANVAS_ANCHOR_N, _
                            NULL)
 ox += dx
-text = goo_canvas_text_new(group, "<small>0.5π</small>", _
+text = goo_canvas_text_new(group, "<small>0.5&#x03C0;</small>", _
                            ox, oy, -1, _
                            GOO_CANVAS_ANCHOR_N, _
                            "use-markup", 1, _
                            NULL)
 ox += dx
-text = goo_canvas_text_new(group, "π", _
+text = goo_canvas_text_new(group, "&#x03C0;", _
                            ox, oy, -1, _
                            GOO_CANVAS_ANCHOR_N, _
                            NULL)
-text = goo_canvas_text_new(group, "This <i>φ</i> looks like an <i>angel</i>", _
+text = goo_canvas_text_new(group, "This <i>&#x03C6;</i> looks like an <i>angel</i>", _
                            ox, oy + 25, -1, _
                            GOO_CANVAS_ANCHOR_N, _
                            "use-markup", 1, _
                            NULL)
 ox += dx
-text = goo_canvas_text_new(group, "<small>1.5π</small>", _
+text = goo_canvas_text_new(group, "<small>1.5&#x03C0;</small>", _
                            ox, oy, -1, _
                            GOO_CANVAS_ANCHOR_N, _
                            "use-markup", 1, _
                            NULL)
 ox += dx
-text = goo_canvas_text_new(group, "2π", _
+text = goo_canvas_text_new(group, "2&#x03C0;", _
                            ox, oy, -1, _
                            GOO_CANVAS_ANCHOR_N, _
                            NULL)
 text = goo_canvas_text_new(group, "<span size=""x-small""><span foreground=""blue"">" _
                            !"Click me!</span>\n<span background=""yellow"">" _
-                           " l · m · r </span></span>", _
+                           " l &#x00B7; m &#x00B7; r </span></span>", _
                            ox - 0.5 * dx, GridY + .05 * GridH + 0.5 * fy, -1, _
                            GOO_CANVAS_ANCHOR_CENTER, _
                            "use-markup", 1, _
@@ -201,3 +215,5 @@ g_signal_connect (group, "button_press_event", _
 gtk_main ()
 
 END 0
+
+' End of GooGrid.bas

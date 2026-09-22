@@ -24,20 +24,20 @@ Declare Function checkered_blend( ByVal src As ULong, ByVal dest As ULong, ByVal
 
    Cls
    Dim As Integer i : For i = 0 To 63              '' draw the background
-	  Line( i,0 )-( i,240 ), RGB( i * 4, i * 4, i * 4 )
+	  Line( i, 0 )-( i, 240 ), RGB( i * 4, i * 4, i * 4 )
    Next i
 
    '' demonstrate all drawing methods ...
-   Put( 8,14 ), sprite, PSet
-   Put Step( 16,20 ), sprite, PReset
-   Put Step( -16,20 ), sprite, And
-   Put Step( 16,20 ), sprite, Or
-   Put Step( -16,20 ), sprite, Xor
-   Put Step( 16,20 ), sprite, Trans
-   Put Step( -16,20 ), sprite, Alpha, 96
-   Put Step( 16,20 ), sprite, Alpha
-   Put Step( -16,20 ), sprite, Add, 192
-   Put Step( 16,20 ), sprite, Custom, @checkered_blend, @counter
+   Put( 8, 14 ), sprite, PSet
+   Put Step( 16, 20 ), sprite, PReset
+   Put Step( -16, 20 ), sprite, And
+   Put Step( 16, 20 ), sprite, Or
+   Put Step( -16, 20 ), sprite, Xor
+   Put Step( 16, 20 ), sprite, Trans
+   Put Step( -16, 20 ), sprite, Alpha, 96
+   Put Step( 16, 20 ), sprite, Alpha
+   Put Step( -16, 20 ), sprite, Add, 192
+   Put Step( 16, 20 ), sprite, Custom, @checkered_blend, @counter
 
    '' print a description near each demo
    Draw String (100, 26), "<- pset"

@@ -6,7 +6,7 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgOpConcatConvert
 '' --------
 
-Dim As String A,C
+Dim As String A, C
 Dim As Single B
 A="The result is: "
 B=124.3

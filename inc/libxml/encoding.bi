@@ -28,12 +28,11 @@
 
 #include once "libxml/xmlversion.bi"
 #include once "libiconv.bi"
-#include once "libxml/tree.bi"
-
-extern "C"
 
 #define __XML_CHAR_ENCODING_H__
 
+'' xmlIO.bi refers to the encoding enum and handler pointer while the libxml
+'' headers include one another. Define those public aliases before tree.bi.
 type xmlCharEncoding as long
 enum
 	XML_CHAR_ENCODING_ERROR = -1
@@ -74,6 +73,10 @@ type _xmlCharEncodingHandler
 	iconv_in as iconv_t
 	iconv_out as iconv_t
 end type
+
+#include once "libxml/tree.bi"
+
+extern "C"
 
 declare sub xmlInitCharEncodingHandlers()
 declare sub xmlCleanupCharEncodingHandlers()

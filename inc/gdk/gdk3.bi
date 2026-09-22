@@ -3915,6 +3915,7 @@ declare function gdk_utf8_to_string_target(byval str as const gchar ptr) as gcha
 #define __GDK_RECTANGLE_H__
 declare function gdk_rectangle_intersect(byval src1 as const GdkRectangle ptr, byval src2 as const GdkRectangle ptr, byval dest as GdkRectangle ptr) as gboolean
 declare sub gdk_rectangle_union(byval src1 as const GdkRectangle ptr, byval src2 as const GdkRectangle ptr, byval dest as GdkRectangle ptr)
+declare function gdk_rectangle_equal(byval rect1 as const GdkRectangle ptr, byval rect2 as const GdkRectangle ptr) as gboolean
 declare function gdk_rectangle_get_type() as GType
 
 #define GDK_TYPE_RECTANGLE gdk_rectangle_get_type()

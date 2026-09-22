@@ -23,9 +23,10 @@ end type
 #define SCR_WIDTH			320*1
 #define SCR_HEIGHT			240*1
 
-dim shared stars(NUM_STARS-1) as VECTOR
-dim shared star_x(NUM_STARS-1) as single
-dim shared star_y(NUM_STARS-1) as single
+'' Module state shared by this single-threaded renderer's update and draw code.
+dim shared stars(0 to NUM_STARS-1) as VECTOR
+dim shared star_x(0 to NUM_STARS-1) as single
+dim shared star_y(0 to NUM_STARS-1) as single
 
 dim shared delta as VECTOR
 
@@ -48,8 +49,8 @@ type FACE              '' for triangular models
 end type
 
 type MODEL
-	points(NUM_VERTS-1) as VECTOR
-	faces(NUM_FACES-1) as FACE
+	points(0 to NUM_VERTS-1) as VECTOR
+	faces(0 to NUM_FACES-1) as FACE
 	x as single
 	y as single
 	z as single
@@ -64,6 +65,7 @@ type MODEL
 	velocity as integer
 end type
 
+'' Module state shared by the ship update, draw, and screen-copy routines.
 dim shared ship as MODEL
 dim shared direction as VECTOR
 dim shared buffer as BITMAP ptr
@@ -85,7 +87,7 @@ end sub
 sub draw_stars()
 	dim c as integer
 	dim m as MATRIX_f
-	dim outs(NUM_STARS-1) as VECTOR
+	dim outs(0 to NUM_STARS-1) as VECTOR
 
 	for i as integer = 0 to NUM_STARS-1
 		get_translation_matrix_f(@m, delta.x, delta.y, delta.z)
@@ -133,7 +135,7 @@ end sub
 '' initialises the ship model
 sub init_ship()
 	dim v1 as VECTOR, v2 as VECTOR, pts as VECTOR ptr
-	dim face as FACE ptr
+	dim face_ptr as FACE ptr
 	dim i as integer
 
 	ship.points(0).x = 0
@@ -156,50 +158,50 @@ sub init_ship()
 	ship.faces(0).v2 = 0
 	ship.faces(0).v3 = 1
 	pts = @ship.points(0)
-	face = @ship.faces(0)
-	v1.x = pts[face->v2].x - pts[face->v1].x
-	v1.y = pts[face->v2].y - pts[face->v1].y
-	v1.z = pts[face->v2].z - pts[face->v1].z
-	v2.x = pts[face->v3].x - pts[face->v1].x
-	v2.y = pts[face->v3].y - pts[face->v1].y
-	v2.z = pts[face->v3].z - pts[face->v1].z
-	cross_product_f(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, @face->normal.x, @face->normal.y, @face->normal.z)
+	face_ptr = @ship.faces(0)
+	v1.x = pts[face_ptr->v2].x - pts[face_ptr->v1].x
+	v1.y = pts[face_ptr->v2].y - pts[face_ptr->v1].y
+	v1.z = pts[face_ptr->v2].z - pts[face_ptr->v1].z
+	v2.x = pts[face_ptr->v3].x - pts[face_ptr->v1].x
+	v2.y = pts[face_ptr->v3].y - pts[face_ptr->v1].y
+	v2.z = pts[face_ptr->v3].z - pts[face_ptr->v1].z
+	cross_product_f(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, @face_ptr->normal.x, @face_ptr->normal.y, @face_ptr->normal.z)
 
 	ship.faces(1).v1 = 2
 	ship.faces(1).v2 = 0
 	ship.faces(1).v3 = 3
-	face = @ship.faces(1)
-	v1.x = pts[face->v2].x - pts[face->v1].x
-	v1.y = pts[face->v2].y - pts[face->v1].y
-	v1.z = pts[face->v2].z - pts[face->v1].z
-	v2.x = pts[face->v3].x - pts[face->v1].x
-	v2.y = pts[face->v3].y - pts[face->v1].y
-	v2.z = pts[face->v3].z - pts[face->v1].z
-	cross_product_f(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, @face->normal.x, @face->normal.y, @face->normal.z)
+	face_ptr = @ship.faces(1)
+	v1.x = pts[face_ptr->v2].x - pts[face_ptr->v1].x
+	v1.y = pts[face_ptr->v2].y - pts[face_ptr->v1].y
+	v1.z = pts[face_ptr->v2].z - pts[face_ptr->v1].z
+	v2.x = pts[face_ptr->v3].x - pts[face_ptr->v1].x
+	v2.y = pts[face_ptr->v3].y - pts[face_ptr->v1].y
+	v2.z = pts[face_ptr->v3].z - pts[face_ptr->v1].z
+	cross_product_f(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, @face_ptr->normal.x, @face_ptr->normal.y, @face_ptr->normal.z)
 
 	ship.faces(2).v1 = 1
 	ship.faces(2).v2 = 0
 	ship.faces(2).v3 = 2
-	face = @ship.faces(2)
-	v1.x = pts[face->v2].x - pts[face->v1].x
-	v1.y = pts[face->v2].y - pts[face->v1].y
-	v1.z = pts[face->v2].z - pts[face->v1].z
-	v2.x = pts[face->v3].x - pts[face->v1].x
-	v2.y = pts[face->v3].y - pts[face->v1].y
-	v2.z = pts[face->v3].z - pts[face->v1].z
-	cross_product_f(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, @face->normal.x, @face->normal.y, @face->normal.z)
+	face_ptr = @ship.faces(2)
+	v1.x = pts[face_ptr->v2].x - pts[face_ptr->v1].x
+	v1.y = pts[face_ptr->v2].y - pts[face_ptr->v1].y
+	v1.z = pts[face_ptr->v2].z - pts[face_ptr->v1].z
+	v2.x = pts[face_ptr->v3].x - pts[face_ptr->v1].x
+	v2.y = pts[face_ptr->v3].y - pts[face_ptr->v1].y
+	v2.z = pts[face_ptr->v3].z - pts[face_ptr->v1].z
+	cross_product_f(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, @face_ptr->normal.x, @face_ptr->normal.y, @face_ptr->normal.z)
 
 	ship.faces(3).v1 = 2
 	ship.faces(3).v2 = 3
 	ship.faces(3).v3 = 1
-	face = @ship.faces(3)
-	v1.x = pts[face->v2].x - pts[face->v1].x
-	v1.y = pts[face->v2].y - pts[face->v1].y
-	v1.z = pts[face->v2].z - pts[face->v1].z
-	v2.x = pts[face->v3].x - pts[face->v1].x
-	v2.y = pts[face->v3].y - pts[face->v1].y
-	v2.z = pts[face->v3].z - pts[face->v1].z
-	cross_product_f(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, @face->normal.x, @face->normal.y, @face->normal.z)
+	face_ptr = @ship.faces(3)
+	v1.x = pts[face_ptr->v2].x - pts[face_ptr->v1].x
+	v1.y = pts[face_ptr->v2].y - pts[face_ptr->v1].y
+	v1.z = pts[face_ptr->v2].z - pts[face_ptr->v1].z
+	v2.x = pts[face_ptr->v3].x - pts[face_ptr->v1].x
+	v2.y = pts[face_ptr->v3].y - pts[face_ptr->v1].y
+	v2.z = pts[face_ptr->v3].z - pts[face_ptr->v1].z
+	cross_product_f(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, @face_ptr->normal.x, @face_ptr->normal.y, @face_ptr->normal.z)
 
 	for i = 0 to NUM_FACES-1
 		ship.faces(i).colour = 32
@@ -222,7 +224,7 @@ end sub
 
 '' draws the ship model
 sub draw_ship()
-	dim outs(NUM_VERTS-1) as VECTOR
+	dim outs(0 to NUM_VERTS-1) as VECTOR
 	dim m as MATRIX_f
 	dim col as integer
 
@@ -277,7 +279,7 @@ sub erase_ship()
    rectfill( buffer, ship.minx, ship.miny, ship.maxx, ship.maxy, palette_color[0] )
 end sub
 
-	dim pal(PAL_SIZE - 1) as RGB
+	dim pal(0 to PAL_SIZE - 1) as RGB
 	dim buf as string
 
 	allegro_init()
@@ -318,6 +320,10 @@ end sub
 	set_palette(@pal(0))
 
 	buffer = create_bitmap(SCREEN_W, SCREEN_H)
+	if (buffer = 0) then
+		set_gfx_mode(GFX_TEXT, 0, 0, 0, 0)
+		end 1
+	end if
 	clear_bitmap(buffer)
 
 	set_projection_viewport(0, 0, SCREEN_W, SCREEN_H)

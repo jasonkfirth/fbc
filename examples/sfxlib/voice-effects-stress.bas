@@ -34,6 +34,8 @@ const STAGE_MILLISECONDS = 1150
 const GAP_MILLISECONDS = 300
 const ECHO_TAIL_MILLISECONDS = 650
 
+'' Module helpers use this selected driver mode while rendering each stage.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared as integer use_null_driver
 
 function VoiceStressFrequency _

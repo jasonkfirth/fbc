@@ -48,6 +48,7 @@ private sub cConstAssign _
 	dim as integer doskip = any, suffix = any
 	dim as ASTNODE ptr expr = any
 	dim as FBSYMBOL ptr litsym = any
+	dim as FBSYMBOL ptr redefinition = NULL
 	dim as FBVALUE value = any
 
 	'' Namespace identifier if it matches the current namespace
@@ -92,6 +93,15 @@ private sub cConstAssign _
 	end select
 
 	id = *lexGetText( )
+
+	'' Keep the original symbol so duplicate diagnostics can identify
+	'' compiler-registered intrinsics that are not keyword tokens.
+	dim as FB_TOKEN lookup_tk = any
+	dim as FB_TKCLASS lookup_class = any
+	dim as FBSYMCHAIN ptr chain_ = symbLookup( @id, lookup_tk, lookup_class )
+	if( chain_ <> NULL ) then
+		redefinition = chain_->sym
+	end if
 
 	'' ID
 	lexCheckToken( LEXCHECK_POST_LANG_SUFFIX )
@@ -157,7 +167,7 @@ private sub cConstAssign _
 
 		value.s = litsym
 		if( symbReuseOrAddConst( @id, exprdtype, NULL, @value, attrib ) = NULL ) then
-			errReportEx( FB_ERRMSG_DUPDEFINITION, id )
+			errReportEx( symbGetIllegalRedefErr( redefinition ), id )
 		end if
 	'' anything else..
 	else
@@ -203,7 +213,7 @@ private sub cConstAssign _
 		end if
 
 		if( symbReuseOrAddConst( @id, dtype, subtype, astConstGetVal( expr ), attrib ) = NULL ) then
-			errReportEx( FB_ERRMSG_DUPDEFINITION, id )
+			errReportEx( symbGetIllegalRedefErr( redefinition ), id )
 		end if
 	end if
 

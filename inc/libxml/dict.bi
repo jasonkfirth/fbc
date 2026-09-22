@@ -26,15 +26,19 @@
 
 #pragma once
 
+'' Declare the opaque dictionary type before tree.bi enters the regexp
+'' dependency.  That dependency refers back to xmlDictPtr while the C header
+'' graph is being translated.
+#define __XML_DICT_H__
+type xmlDict as _xmlDict
+type xmlDictPtr as xmlDict ptr
+
 #include once "crt/limits.bi"
 #include once "libxml/xmlversion.bi"
 #include once "libxml/tree.bi"
 
 extern "C"
 
-#define __XML_DICT_H__
-type xmlDict as _xmlDict
-type xmlDictPtr as xmlDict ptr
 declare function xmlInitializeDict() as long
 declare function xmlDictCreate() as xmlDictPtr
 declare function xmlDictSetLimit(byval dict as xmlDictPtr, byval limit as uinteger) as uinteger

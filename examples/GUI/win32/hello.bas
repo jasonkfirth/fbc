@@ -23,9 +23,9 @@ function WndProc ( byval hWnd as HWND, _
             exit function
 
         case WM_PAINT
-    		dim rct as RECT
-    		dim pnt as PAINTSTRUCT
-    		dim hDC as HDC
+            dim rct as RECT
+            dim pnt as PAINTSTRUCT
+            dim hDC as HDC
 
             hDC = BeginPaint( hWnd, @pnt )
             GetClientRect( hWnd, @rct )
@@ -45,7 +45,7 @@ function WndProc ( byval hWnd as HWND, _
 				PostMessage( hWnd, WM_CLOSE, 0, 0 )
 			end if
 
-    	case WM_DESTROY
+        case WM_DESTROY
             PostQuitMessage( 0 )
             exit function
     end select
@@ -67,21 +67,21 @@ function WinMain ( byval hInstance as HINSTANCE, _
     function = 0
 
     with wcls
-    	.style         = CS_HREDRAW or CS_VREDRAW
+        .style         = CS_HREDRAW or CS_VREDRAW
 		.lpfnWndProc   = cast( WNDPROC, @WndProc )
-    	.cbClsExtra    = 0
-    	.cbWndExtra    = 0
-    	.hInstance     = hInstance
-    	.hIcon         = LoadIcon( NULL, IDI_APPLICATION )
-    	.hCursor       = LoadCursor( NULL, IDC_ARROW )
-    	.hbrBackground = GetStockObject( WHITE_BRUSH )
-    	.lpszMenuName  = NULL
-    	.lpszClassName = @"HelloWin"
+        .cbClsExtra    = 0
+        .cbWndExtra    = 0
+        .hInstance     = hInstance
+        .hIcon         = LoadIcon( NULL, IDI_APPLICATION )
+        .hCursor       = LoadCursor( NULL, IDC_ARROW )
+        .hbrBackground = GetStockObject( WHITE_BRUSH )
+        .lpszMenuName  = NULL
+        .lpszClassName = @"HelloWin"
     end with
 
     if( RegisterClass( @wcls ) = FALSE ) then
-       MessageBox( null, "Failed to register wcls", "Error", MB_ICONERROR )
-       exit function
+        MessageBox( null, "Failed to register wcls", "Error", MB_ICONERROR )
+        exit function
     end if
 
     hWnd = CreateWindowEx( 0, _

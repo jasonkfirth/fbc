@@ -9,7 +9,7 @@ dim OVECCOUNT as const long = 30        '' should be a multiple of 3
 		dim as pcre ptr re
 		dim as const zstring ptr error_
 		dim as long erroffset
-		dim as long ovector(OVECCOUNT-1)
+		dim as long ovector(0 to OVECCOUNT-1)
 		dim as long rc, i
 
 	dim as string pattern, buffer
@@ -47,7 +47,7 @@ dim OVECCOUNT as const long = 30        '' should be a multiple of 3
 	        print "no match"
 	    'handle other special cases if you like
 	    case else
-	    	print "matching error"; rc
+	        print "matching error"; rc
 	    end select
 	    end
 	end if

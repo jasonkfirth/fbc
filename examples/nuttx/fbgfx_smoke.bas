@@ -26,27 +26,32 @@
 screen 1
 
 if screenptr = 0 then
+    screen 0
     end 20
 end if
 
 pset (2, 2), 3
 
 if point(2, 2) <> 3 then
+    screen 0
     end 21
 end if
 
 screen 7
 
 if screenptr = 0 then
+    screen 0
     end 22
 end if
 
 pset (3, 3), 12
 
 if point(3, 3) <> 12 then
+    screen 0
     end 23
 end if
 
+' Screen 13 is the NuttX QEMU framebuffer mode. FB-LINTER: DISABLE-NEXT-LINE FBL734
 screen 13
 
 print "gfx print ok"
@@ -58,6 +63,7 @@ dim i as integer
 framebuffer = screenptr
 
 if framebuffer = 0 then
+    screen 0
     end 10
 end if
 
@@ -68,12 +74,14 @@ for i = 0 to (320 * 16) - 1
 next
 
 if nonzero_pixels = 0 then
+    screen 0
     end 11
 end if
 
 pset (10, 10), 4
 
 if point(10, 10) <> 4 then
+    screen 0
     end 12
 end if
 
@@ -84,10 +92,12 @@ dim mb as integer
 dim mc as integer
 
 if getmouse(mx, my, mz, mb, mc) <> 0 then
+    screen 0
     end 13
 end if
 
 if (mx < 0) or (my < 0) then
+    screen 0
     end 14
 end if
 
@@ -104,6 +114,7 @@ for i = 1 to 1000
 next
 
 if key_text <> "z" then
+    screen 0
     end 15
 end if
 

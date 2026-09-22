@@ -13,7 +13,7 @@
 #include once "crt/sys/socket.bi"
 #include once "crt/sys/types.bi"
 
-enum 
+enum
 	IPPROTO_IP = 0
 	IPPROTO_HOPOPTS = 0
 	IPPROTO_ICMP = 1
@@ -46,7 +46,7 @@ end enum
 
 type in_port_t as uint16_t
 
-enum 
+enum
 	IPPORT_ECHO = 7
 	IPPORT_DISCARD = 9
 	IPPORT_SYSTAT = 11

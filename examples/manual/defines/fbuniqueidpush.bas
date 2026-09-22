@@ -11,6 +11,8 @@
 
 #macro go
 	__FB_UNIQUEID_PUSH__( stk )
+	' The macro intentionally jumps to its generated unique label.
+	' FB-LINTER: DISABLE-NEXT-LINE FBL101
 	Goto __FB_UNIQUEID__( stk )
 	End If
 #endmacro
@@ -45,4 +47,3 @@ Do
 Loop
 
 Sleep
-

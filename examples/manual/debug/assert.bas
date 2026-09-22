@@ -7,9 +7,9 @@
 '' --------
 
 Sub foo
- Dim a As Integer
- a=0
- Assert(a=1)
+  Dim a As Integer
+  a=0
+  Assert(a=1)
 End Sub
 
 foo

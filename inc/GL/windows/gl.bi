@@ -5,9 +5,9 @@
 ''   This file has no copyright assigned and is placed in the Public Domain.
 ''   This file is part of the mingw-w64 runtime package.
 ''
-''   The mingw-w64 runtime package and its code is distributed in the hope that it 
-''   will be useful but WITHOUT ANY WARRANTY.  ALL WARRANTIES, EXPRESSED OR 
-''   IMPLIED ARE HEREBY DISCLAIMED.  This includes but is not limited to 
+''   The mingw-w64 runtime package and its code is distributed in the hope that it
+''   will be useful but WITHOUT ANY WARRANTY.  ALL WARRANTIES, EXPRESSED OR
+''   IMPLIED ARE HEREBY DISCLAIMED.  This includes but is not limited to
 ''   warranties of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ''
 '' translated to FreeBASIC by:
@@ -568,6 +568,9 @@ const GL_EXT_bgra = 1
 const GL_EXT_paletted_texture = 1
 const GL_WIN_swap_hint = 1
 const GL_WIN_draw_range_elements = 1
+'' BGR and BGRA are core pixel formats exposed by OpenGL 1.2.
+const GL_BGR = &h80E0
+const GL_BGRA = &h80E1
 const GL_VERTEX_ARRAY_EXT = &h8074
 const GL_NORMAL_ARRAY_EXT = &h8075
 const GL_COLOR_ARRAY_EXT = &h8076

@@ -45,6 +45,8 @@ function createDestopShortcut( byval TargetName as zstring ptr, _
 	''
 	IShellLinkA_QueryInterface( ISLink, @IID_IPersistFile, @IPFile )
 
+	'' IPersistFile receives a Windows path, whose required separator is a backslash.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-IO-012
 	IPersistFile_Save( IPFile, InFolder + "\" + *LinkName, 0 )
 
 	''
@@ -68,7 +70,7 @@ private function hStripFilePath( byval filename as zstring ptr ) as string stati
 	do
 		p = instr( lp+1, *filename, "\" )
         if p=0 then
-	    	exit do
+            exit do
 	    end if
 	    lp = p
 	loop
@@ -89,7 +91,7 @@ private function hStripFileExt( byval filename as zstring ptr ) as string static
 	do
 		p = instr( lp+1, *filename, "." )
 	    if( p = 0 ) then
-	    	exit do
+            exit do
 	    end if
 	    lp = p
 	loop

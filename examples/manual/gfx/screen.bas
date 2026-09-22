@@ -7,6 +7,7 @@
 '' --------
 
 ' Sets screen mode 13 (320*200, 8bpp)
+'' FB-LINTER: DISABLE-NEXT-LINE FBL734
 Screen 13
 Print "Screen mode 13 set"
 

@@ -6,6 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtCriticalSectionsFAQ
 '' --------
 
+'' Thread synchronization: this contrast intentionally uses no mutex lock around terminate.
+
 #include "vbcompat.bi"
 
 Screen 12, , 2
@@ -20,8 +22,8 @@ Sub thread (ByVal param As Any Ptr)
 	Do
 		Line (16, 432)-Step(96, 32), 11, BF  'clear the print area
 		Sleep 100, 1
-		Draw String (24, 432), Format(Now,"dd/mm/yyyy"), 0
-		Draw String (32, 448), Format(Now,"hh:mm:ss"), 0
+		Draw String (24, 432), Format(Now, "dd/mm/yyyy"), 0
+		Draw String (32, 448), Format(Now, "hh:mm:ss"), 0
 		ScreenCopy
 		Sleep 100, 1
 	Loop Until terminate = 1
@@ -49,4 +51,3 @@ Print " Thread terminated"
 ScreenCopy
 
 Sleep
-

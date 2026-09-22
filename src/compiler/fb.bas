@@ -600,6 +600,14 @@ sub fbInit _
 		env.wcharconv = FB_WCHARCONV_WARNING
 	end if
 
+	'' DJGPP stores WSTRING elements as target bytes. The DOS literal path
+	'' retains raw non-ASCII source bytes while ordinary constants use the
+	'' normal target WSTRING conversion.
+	if( (env.wcharconv = FB_WCHARCONV_NEVER) and _
+	    (env.clopt.target = FB_COMPTARGET_DOS) ) then
+		env.wcharconv = FB_WCHARCONV_WARNING
+	end if
+
 	'' Windows-family cross compilers use a 16-bit wchar_t even when fbc is
 	'' hosted on a system with a 32-bit WSTRING.  The literal representation
 	'' stores Unicode code points independently of either width, and the HLC
@@ -1403,7 +1411,14 @@ private sub fbParsePreDefines()
 		if( hIsValidSymbolName( defid ) = FALSE ) then
 			errReportEx( FB_ERRMSG_EXPECTEDIDENTIFIER, defid, -1 )
 		elseif( symbAddDefine( defid, deftext, len(deftext) ) = NULL ) then
-			errReportEx( FB_ERRMSG_DUPDEFINITION, defid, -1 )
+			dim as FB_TOKEN tk = any
+			dim as FB_TKCLASS tk_class = any
+			dim as FBSYMCHAIN ptr chain_ = symbLookup( strptr( defid ), tk, tk_class )
+			dim as FB_ERRMSG errmsg = FB_ERRMSG_DUPDEFINITION
+			if( chain_ <> NULL ) then
+				errmsg = symbGetIllegalRedefErr( chain_->sym )
+			end if
+			errReportEx( errmsg, defid, -1 )
 		end if
 
 		def = listGetNext(def)

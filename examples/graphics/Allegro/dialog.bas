@@ -13,8 +13,10 @@ type xPOINT
 	y as integer
 end type
 
-dim shared midpoint As xPOINT = (30,50)
-dim shared five_midpoints(4) As xPOINT = {(30,50), (62,19), (11,15), (38,30), (27,82)}
+'' Allegro's dialog callback reads this module-level dialog state.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
+dim shared midpoint As xPOINT = (30, 50)
+dim shared five_midpoints(0 to 4) As xPOINT = {(30, 50), (62, 19), (11, 15), (38, 30), (27, 82)}
 
 dim shared color_builder(0 TO 5) As DIALOG = _
 { _

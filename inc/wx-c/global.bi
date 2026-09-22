@@ -57,7 +57,7 @@ Declare Sub wxArrayString_dtor WXCALL Alias "wxArrayString_dtor" (self As wxArra
 Declare Function wxArrayString_GetCount WXCALL Alias "wxArrayString_GetCount" (self As wxArrayString Ptr) As wxInt
 Declare Sub wxArrayString_Add WXCALL Alias "wxArrayString_Add" (self As wxArrayString Ptr, item As wxString Ptr)
 Declare Function wxArrayString_Item WXCALL Alias "wxArrayString_Item" (self As wxArrayString Ptr, ind As wxInt) As wxString Ptr
-Declare Function wxArrayString_Index WXCALL Alias "wxArrayString_Index" (self As wxArrayString Ptr, sz As wxString Ptr, bCase As wxBool, bFromEnd As wxBool) As wxInt 
+Declare Function wxArrayString_Index WXCALL Alias "wxArrayString_Index" (self As wxArrayString Ptr, sz As wxString Ptr, bCase As wxBool, bFromEnd As wxBool) As wxInt
 Declare Sub wxArrayString_Remove WXCALL Alias "wxArrayString_Remove" (self As wxArrayString Ptr, sz As wxString Ptr)
 Declare Sub wxArrayString_RemoveAt WXCALL Alias "wxArrayString_RemoveAt" (self As wxArrayString Ptr, ind As wxInt)
 Declare Sub wxArrayString_Clear WXCALL Alias "wxArrayString_Clear" (self As wxArrayString Ptr)
@@ -68,7 +68,7 @@ Declare Function wxWindowDisabler_ctor WXCALL Alias "wxWindowDisabler_ctor" (win
 Declare Sub wxWindowDisabler_dtor WXCALL Alias "wxWindowDisabler_dtor" (self As wxWindowDisabler Ptr)
 
 ' class wxBusyInfo
-Declare Function wxBusyInfo_ctor WXCALL Alias "wxBusyInfo_ctor" (msg As wxString Ptr, parent As wxWindow Ptr) As wxBusyInfo Ptr 
+Declare Function wxBusyInfo_ctor WXCALL Alias "wxBusyInfo_ctor" (msg As wxString Ptr, parent As wxWindow Ptr) As wxBusyInfo Ptr
 Declare Sub wxBusyInfo_dtor WXCALL Alias "wxBusyInfo_dtor" (self As wxBusyInfo Ptr)
 
 ' wxMutex

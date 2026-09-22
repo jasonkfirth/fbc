@@ -13,8 +13,10 @@ Sub BadAllocateExample()
 
 	Dim p As Byte Ptr
 
+	'' This unchecked allocation is intentionally retained for the leak demonstration. FB-LINTER: DISABLE-NEXT-LINE FBL800
 	p = Allocate(420)   '' assign pointer to new memory
 
+	'' This second unchecked allocation intentionally loses the first owner. FB-LINTER: DISABLE-NEXT-LINE FBL800
 	p = Allocate(420)   '' reassign same pointer to different memory,
 						'' old address is lost and that memory is leaked
 

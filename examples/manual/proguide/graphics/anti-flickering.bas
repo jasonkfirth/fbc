@@ -133,6 +133,8 @@ Do
 		Static As Integer K
 		K += 1
 		If K >= 25 / T Then
+			'' This throttles the demonstration frame cadence.
+			'' FB-LINTER: DISABLE-NEXT-LINE FBL602
 			Sleep 25
 			K = 0
 		End If

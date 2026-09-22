@@ -11,9 +11,9 @@ sub createsprite( sprite() as byte, byval w as integer, byval h as integer, byva
 		next
 	next
 
-	line (0,0)-(w-1, h-1), 0, B
+	line (0, 0)-(w-1, h-1), 0, B
 
-	get (0, 0)-(w-1,h-1), sprite(0)
+	get (0, 0)-(w-1, h-1), sprite(0)
 
 	cls
 end sub
@@ -41,7 +41,7 @@ end if
 randomize timer
 
 window (0, 0)-(xres-1, yres-1)
-view (4,4)-(xres-4,yres-4)
+view (4, 4)-(xres-4, yres-4)
 
 dim as integer mypal(0 to PALETTE_LAST)
 for i as integer = 0 to PALETTE_LAST

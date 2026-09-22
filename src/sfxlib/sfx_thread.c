@@ -15,7 +15,25 @@
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
 
-#if FB_SFX_MT_ENABLED
+#if FB_SFX_DOS_THREADS
+
+#include "../rtlib/fb_private_thread.h"
+
+static FBMUTEX dos_driver_io_lock;
+
+/* Mixing and sound commands may enter nonreentrant DJGPP routines. Keep
+ * those bounded operations under rtlib's recursive scheduler exclusion.
+ * Driver writes release that exclusion and use a real mutex, so DMA waits
+ * do not stop the application or other workers from running.
+ */
+void fb_sfxRuntimeLockInit(void) { }
+void fb_sfxRuntimeLockShutdown(void) { }
+void fb_sfxRuntimeLock(void) { fb_Lock(); }
+void fb_sfxRuntimeUnlock(void) { fb_Unlock(); }
+void fb_sfxDriverIoLock(void) { fb_MutexLock(&dos_driver_io_lock); }
+void fb_sfxDriverIoUnlock(void) { fb_MutexUnlock(&dos_driver_io_lock); }
+
+#elif FB_SFX_MT_ENABLED
 
 #if defined(_WIN32) || defined(HOST_XBOX)
 

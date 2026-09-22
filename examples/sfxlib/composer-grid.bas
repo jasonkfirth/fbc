@@ -22,6 +22,12 @@
 ''     - a full tracker or notation editor
 ''     - MIDI, sampled music, or external libraries
 ''
+'' Resource ownership:
+''
+''     The module owns its dynamic note grid and its sfxlib configuration for
+''     the single event-loop lifetime. Opened arrangement files are closed by
+''     their load or save routine before control returns to the loop.
+''
 
 #include "fbgfx.bi"
 #include once "sfxlib_raw.bi"
@@ -97,6 +103,8 @@ type UiMouse
 	last_buttons as integer
 end type
 
+'' The event loop and its helpers share one module-local editor model.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared notes() as integer
 dim shared pitch_name(0 to PITCH_COUNT - 1) as string
 dim shared pitch_freq(0 to PITCH_COUNT - 1) as integer
@@ -1170,6 +1178,9 @@ sub HandleEntryKey( byref event_info as Event )
 			SaveArrangementEntry()
 		case ENTRY_EXPORT_WAV
 			ExportSongWavEntry()
+		case else
+			entry_mode = ENTRY_NONE
+			status_text = "File entry cancelled."
 		end select
 
 		exit sub
@@ -1468,7 +1479,10 @@ InitTables()
 InitSound()
 SeedPattern()
 
-ScreenRes SCREEN_W, SCREEN_H, 32
+if ScreenRes( SCREEN_W, SCREEN_H, 32 ) <> 0 then
+	print "ERROR: could not create the composer display"
+	end 1
+end if
 WindowTitle "sfxlib composer grid"
 
 dim as UiMouse mouse

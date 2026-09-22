@@ -15,6 +15,7 @@
 #include once "basetyps.bi"
 #include once "ddraw.bi"
 
+#define __FB_GDIPLUS_NAMESPACE_ACTIVE__
 namespace Gdiplus
 
 #define __FB_GDIPLUS_C_NO_INCLUDES__
@@ -22,6 +23,7 @@ namespace Gdiplus
 #undef __FB_GDIPLUS_C_NO_INCLUDES__
 
 end namespace
+#undef __FB_GDIPLUS_NAMESPACE_ACTIVE__
 
 #else
 
@@ -36,6 +38,7 @@ end namespace
 
 #include once "win/ole2.bi"
 
+#define __FB_GDIPLUS_NAMESPACE_ACTIVE__
 namespace Gdiplus
 
 type INT16 as short
@@ -56,5 +59,6 @@ type UINT16 as ushort
 #include once "win/GdiplusFlat.bi"
 
 end namespace
+#undef __FB_GDIPLUS_NAMESPACE_ACTIVE__
 
 #endif

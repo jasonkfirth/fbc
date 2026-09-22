@@ -27,6 +27,7 @@
 #pragma once
 
 #include once "crt/stddef.bi"
+#include once "json_object.bi"
 
 extern "C"
 

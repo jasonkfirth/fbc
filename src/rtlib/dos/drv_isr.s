@@ -1,3 +1,9 @@
+/* FreeBASIC DOS runtime: drv_isr.s
+ * Dispatch hardware IRQs on private stacks and preserve interrupted state.
+ * The optional scheduler must not suspend these interrupt stacks. Device
+ * processing and thread selection belong to their respective subsystems.
+ */
+
         .intel_syntax noprefix
         
         /* This is the ISR handler for DOS. It has to be written in ASM because
@@ -83,6 +89,7 @@ FUNC(\INT_HANDLER_NAME)
 	mov al, 0x0B
 	out \PIC_PORT_BASE, al
 	in al, \PIC_PORT_BASE
+	movzx eax, al         /* Only the PIC's eight status bits are valid. */
 
 	/* Find the first bit set */
 	bsf ebx, eax
@@ -162,6 +169,17 @@ FUNC(\INT_HANDLER_NAME)
 	 * don't enable IF acciedentally */
 	inc dword ptr [GLOBL(__fb_dos_cli_level)]
 
+#if defined(ENABLE_MT) && defined(FB_DOS_PDMLWP)
+	/* An ISR can call a runtime helper which takes and releases FB_LOCK().
+	 * Its unlock must never yield from this private interrupt stack, even
+	 * if a nested RTC tick requested a deferred switch. Save the interrupted
+	 * scheduler state on this IRQ's stack, independently of nested IRQs.
+	 */
+	mov eax, 1
+	xchg eax, [GLOBL(_lwp_enable)]
+	push eax
+#endif
+
 	/* Save FPU state */
 	sub esp, 108
 	fnsave [esp]
@@ -172,6 +190,7 @@ FUNC(\INT_HANDLER_NAME)
 
 	/* The ISR's CS is the same as the applications CS so it's OK to
 	 * do a near call here ... */
+	cld                   /* C requires forward string operations. */
 	call edx
 
 	/* Remove all arguments from stack */
@@ -180,6 +199,15 @@ FUNC(\INT_HANDLER_NAME)
 	/* Restore FPU state */
 	frstor [esp]
 	add esp, 108
+
+#if defined(ENABLE_MT) && defined(FB_DOS_PDMLWP)
+	/* Restore without calling fb_DosThreadLeave(): rescheduling is only
+	 * safe after returning to application code, never inside an ISR.
+	 */
+	cli
+	pop edx
+	mov [GLOBL(_lwp_enable)], edx
+#endif
 
 	pop ebx               /* Restore the IRQ number */
 
@@ -266,4 +294,5 @@ __fb_hDrvIntHandler_STD  __fb_hDrvIntHandler_PIC2, 0xA0
 
 FUNC(__fb_hDrvIntHandler_end)
 
+/* end of drv_isr.s */
 .end

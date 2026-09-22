@@ -1,33 +1,50 @@
+/'
+    NeHe BMP texture loader
+
+    Resource ownership:
+
+    LoadBMP owns the file handle and temporary image storage until it returns.
+    A nonzero result transfers the image record and its RGB buffer to the
+    caller, which releases both after the OpenGL upload.
+
+    Only packed BITMAPFILEHEADER/BITMAPINFOHEADER records and uncompressed
+    8-bit or 24-bit BI_RGB pixels are accepted here.
+'/
+
+#ifndef __nehe_bmpload_bi__
+#define __nehe_bmpload_bi__
 
 const BITMAP_ID = &H4D42
 
+'' Layout: bytes 0-39 are the fixed-size BMP DIB information header.
 type BITMAPINFOHEADER Field = 1
-  biSize          as integer
-  biWidth         as integer
-  biHeight        as integer
-  biPlanes        as short
-  biBitCount      as short
-  biCompression   as integer
-  biSizeImage     as integer
-  biXPelsPerMeter as integer
-  biYPelsPerMeter as integer
-  biClrUsed       as integer
-  biClrImportant  as integer
+  biSize          as ulong
+  biWidth         as long
+  biHeight        as long
+  biPlanes        as ushort
+  biBitCount      as ushort
+  biCompression   as ulong
+  biSizeImage     as ulong
+  biXPelsPerMeter as long
+  biYPelsPerMeter as long
+  biClrUsed       as ulong
+  biClrImportant  as ulong
 end type
 
 type PALETTEENTRY Field = 1
-  peRed   as byte
-  peGreen as byte
-  peBlue  as byte
-  peFlags as byte
+  peRed   as ubyte
+  peGreen as ubyte
+  peBlue  as ubyte
+  peFlags as ubyte
 end type
 
+'' Layout: bytes 0-13 are the fixed-size BMP file header.
 type BITMAPFILEHEADER FIELD = 1
-  bfType as short
-  bfSize as integer
-  bfReserved1 as short
-  bfReserved2 as short
-  bfOffBits as integer
+  bfType as ushort
+  bfSize as ulong
+  bfReserved1 as ushort
+  bfReserved2 as ushort
+  bfOffBits as ulong
 end type
 
 'This is a replacement for AUX_RGBImageRec because GLAUX lib is not part of
@@ -41,87 +58,161 @@ end type
 
 declare function LoadBMP(byref Filename as string) as BITMAP_RGBImageRec ptr
 
-'' Loads A Bitmap Image. Only uncompressed 8 or 24 bit BITMAP immages supported
+private sub StoreRGB(byref destination as ubyte ptr, byval red as ubyte, _
+  byval green as ubyte, byval blue as ubyte)
+
+  if destination = 0 then exit sub
+  destination[0] = red
+  destination[1] = green
+  destination[2] = blue
+  destination += 3
+end sub
+
+
+'' Loads an uncompressed 8-bit or 24-bit BMP into an RGB buffer.
+'' The validation branches map directly to distinct BMP header constraints.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL111
 private function LoadBMP(byref Filename as string) as BITMAP_RGBImageRec ptr
-  dim bitmapfileheader as BITMAPFILEHEADER '' this contains the bitmapfile header
-  dim bitmapinfoheader as BITMAPINFOHEADER '' this is all the info including the palette
-  dim bmpalette(256) as PALETTEENTRY       '' we will store the palette here
+  const MAX_BITMAP_BYTES as longint = 2147483647
+
+  dim bitmapfileheader as BITMAPFILEHEADER
+  dim bitmapinfoheader as BITMAPINFOHEADER
+  dim bmpalette(0 to 255) as PALETTEENTRY
 
   dim index as integer
+  dim rowIndex as integer
+  dim paddingIndex as integer
+  dim imageWidth as integer
+  dim imageHeight as integer
   dim noofpixels as integer
+  dim rgbBytes as integer
+  dim sourceRowBytes as integer
+  dim sourceRowStride as integer
+  dim paletteEntries as integer
+  dim fileOpen as integer
+  dim fileSize as longint
+  dim requiredSourceBytes as longint
   dim p as ubyte ptr
   dim r as ubyte, g as ubyte, b as ubyte
+  dim paddingByte as ubyte
   dim pbmpdata as BITMAP_RGBImageRec ptr
   dim f as integer
+
   f = freefile
+  open Filename for binary as #f
+  if err <> 0 then return 0
+  fileOpen = true
 
-  if (open (Filename, for binary, as #f) = 0) then             '' Does The File Exist?
+  fileSize = lof(f)
+  if fileSize < sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) then goto load_failed
 
-    get #f, , bitmapfileheader
-    if bitmapfileheader.bfType <> BITMAP_ID then
-      close #f
-      return 0
-    end if
+  '' The fixed headers define the byte layout and pixel-stream offset below.
+  '' FB-LINTER: DISABLE-NEXT-LINE FBL-DOC-BIN-003
+  get #f, , bitmapfileheader
+  if err <> 0 then goto load_failed
+  if bitmapfileheader.bfType <> BITMAP_ID then goto load_failed
 
-    get #f, , bitmapinfoheader
+  get #f, , bitmapinfoheader
+  if err <> 0 then goto load_failed
+  if bitmapinfoheader.biSize <> sizeof(BITMAPINFOHEADER) then goto load_failed
+  if bitmapinfoheader.biPlanes <> 1 then goto load_failed
+  if bitmapinfoheader.biCompression <> 0 then goto load_failed
+  if bitmapinfoheader.biBitCount <> 8 and bitmapinfoheader.biBitCount <> 24 then goto load_failed
+  if bitmapinfoheader.biWidth <= 0 or bitmapinfoheader.biHeight = 0 then goto load_failed
+  if bitmapinfoheader.biHeight = (-2147483647 - 1) then goto load_failed
 
-    if bitmapinfoheader.biBitCount=8 or bitmapinfoheader.biBitCount=24 then
+  imageWidth = bitmapinfoheader.biWidth
+  imageHeight = bitmapinfoheader.biHeight
+  if imageHeight < 0 then imageHeight = -imageHeight
 
-      if bitmapinfoheader.biBitCount = 8 then
-        for index = 0 to 255
-          get #f, , bmpalette(index)
-        next
-      end if
+  if imageWidth > MAX_BITMAP_BYTES \ 3 then goto load_failed
+  if imageHeight > (MAX_BITMAP_BYTES \ 3) \ imageWidth then goto load_failed
+  noofpixels = imageWidth * imageHeight
+  rgbBytes = noofpixels * 3
 
-      noofpixels = bitmapinfoheader.biWidth*bitmapinfoheader.biHeight
+  if bitmapinfoheader.biBitCount = 24 then
+    sourceRowBytes = imageWidth * 3
+  else
+    sourceRowBytes = imageWidth
+  end if
+  if sourceRowBytes > MAX_BITMAP_BYTES - 3 then goto load_failed
+  sourceRowStride = (sourceRowBytes + 3) and not 3
+  requiredSourceBytes = clngint(sourceRowStride) * imageHeight
 
-      '' allocate the memory for the image (24 bit memory image)
-      pbmpdata = allocate(len(BITMAP_RGBImageRec))
-      if pbmpdata = 0 then
-        '' close the file
-        close #f
-        return 0
-      end if
-      pbmpdata->sizeX  = bitmapinfoheader.biWidth
-      pbmpdata->sizeY  = bitmapinfoheader.biHeight
-      pbmpdata->buffer = allocate(noofpixels*3)
-      if pbmpdata->buffer = 0 then
-        '' close the file
-        close #f
-        deallocate (pbmpdata)
-        return 0
-      end if
+  if culngint(bitmapfileheader.bfOffBits) > culngint(fileSize) then goto load_failed
+  if requiredSourceBytes > fileSize - clngint(bitmapfileheader.bfOffBits) then goto load_failed
 
-      '' now read it in
-      p = pbmpdata->buffer
-      if bitmapinfoheader.biBitCount=24 then
-        for index = 0 to noofpixels -1
-          '' Change from BGR to RGB format
-          get #f, , b
-          get #f, , g
-          get #f, , r
-          *p = r : p += 1
-          *p = g : p += 1
-          *p = b : p += 1
-        next
-      else
-        for index = 0 to noofpixels -1
-          '' Change from BGR to RGB format while converting to 24 bit
-          get #f, , b
-          *p = bmpalette(b).peBlue  : p += 1
-          *p = bmpalette(b).peGreen : p += 1
-          *p = bmpalette(b).peRed   : p += 1
-        next
-      end if
+  if bitmapinfoheader.biBitCount = 8 then
+    if bitmapinfoheader.biClrUsed = 0 then
+      paletteEntries = 256
+    elseif bitmapinfoheader.biClrUsed > 256 then
+      '' One cleanup label keeps every failed parse path releasing the same owners.
+      '' FB-LINTER: DISABLE-NEXT-LINE FBL101 FBL-CF-003
+      goto load_failed
     else
-      close #f
-      return 0
+      paletteEntries = cint(bitmapinfoheader.biClrUsed)
     end if
-    '' Success!
-    close #f
-    return pbmpdata
+
+    for index = 0 to paletteEntries - 1
+      get #f, , bmpalette(index)
+      if err <> 0 then goto load_failed
+    next
   end if
 
-  return 0                      '' If Load Failed Return FALSE (NULL)
+  '' bfOffBits is zero-based in the BMP header; FreeBASIC binary Seek is one-based.
+  seek #f, cint(bitmapfileheader.bfOffBits) + 1
+  '' Seek reports a malformed position through Err even without ON ERROR state.
+  '' FB-LINTER: DISABLE-NEXT-LINE FBL613
+  if err <> 0 then goto load_failed
+
+  pbmpdata = callocate(sizeof(BITMAP_RGBImageRec))
+  if pbmpdata = 0 then goto load_failed
+  pbmpdata->sizeX = imageWidth
+  pbmpdata->sizeY = imageHeight
+  pbmpdata->buffer = callocate(rgbBytes)
+  if pbmpdata->buffer = 0 then goto load_failed
+
+  p = pbmpdata->buffer
+  if p = 0 then goto load_failed
+  for rowIndex = 0 to imageHeight - 1
+    for index = 0 to imageWidth - 1
+      if bitmapinfoheader.biBitCount = 24 then
+        get #f, , b
+        if err <> 0 then goto load_failed
+        get #f, , g
+        if err <> 0 then goto load_failed
+        get #f, , r
+        if err <> 0 then goto load_failed
+        StoreRGB p, r, g, b
+      else
+        get #f, , b
+        if err <> 0 then goto load_failed
+        if b >= paletteEntries then goto load_failed
+        StoreRGB p, bmpalette(b).peBlue, bmpalette(b).peGreen, bmpalette(b).peRed
+      end if
+    next
+
+    for paddingIndex = sourceRowBytes to sourceRowStride - 1
+      get #f, , paddingByte
+      if err <> 0 then goto load_failed
+    next
+  next
+
+  close #f
+  fileOpen = false
+  return pbmpdata
+
+load_failed:
+  if fileOpen then close #f
+  if pbmpdata <> 0 then
+    if pbmpdata->buffer <> 0 then
+      deallocate(pbmpdata->buffer)
+      pbmpdata->buffer = 0
+    end if
+    deallocate(pbmpdata)
+    pbmpdata = 0
+  end if
+  return 0
 end function
 
+#endif

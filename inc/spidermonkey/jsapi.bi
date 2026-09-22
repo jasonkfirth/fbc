@@ -225,7 +225,7 @@ private function JSPRINCIPALS_DROP( byval cx as JSContext ptr, byval principals 
     if principals->refcount = 0 then
     	principals->destroy(cx, principals)
     	function = 0
-    else 
+    else
     	function = principals->refcount
     end if
 end function

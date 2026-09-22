@@ -37,6 +37,6 @@ Declare Sub wxTabEvent_Allow WXCALL Alias "wxTabEvent_Allow" (self As wxTabEvent
 Declare Function wxTabEvent_IsAllowed WXCALL Alias "wxTabEvent_IsAllowed" (self As wxTabEvent Ptr) As wxBool
 
 #EndIf '__FB_WIN32__
- 
+
 #EndIf ' __tabctrl_bi__
 

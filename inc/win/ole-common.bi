@@ -40,16 +40,19 @@
 ''   OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
 ''   EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY DIRECT, INDIRECT,
 ''   INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-''   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
+''   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
 ''   OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
 ''   LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 ''   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 ''   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ''
 '' translated to FreeBASIC by:
-''   Copyright © 2015 FreeBASIC development team
+''   Copyright (C) 2015 FreeBASIC development team
 
 #pragma once
+
+#include once "windows.bi"
+#include once "wtypes.bi"
 
 extern "Windows"
 
@@ -93,10 +96,12 @@ declare sub HWND_UserFree(byval as ULONG ptr, byval as HWND ptr)
 declare function HWND_UserMarshal(byval as ULONG ptr, byval as ubyte ptr, byval as HWND ptr) as ubyte ptr
 declare function HWND_UserSize(byval as ULONG ptr, byval as ULONG, byval as HWND ptr) as ULONG
 declare function HWND_UserUnmarshal(byval as ULONG ptr, byval as ubyte ptr, byval as HWND ptr) as ubyte ptr
+#ifdef __objidl_h__
 declare sub STGMEDIUM_UserFree(byval as ULONG ptr, byval as STGMEDIUM ptr)
 declare function STGMEDIUM_UserMarshal(byval as ULONG ptr, byval as ubyte ptr, byval as STGMEDIUM ptr) as ubyte ptr
 declare function STGMEDIUM_UserSize(byval as ULONG ptr, byval as ULONG, byval as STGMEDIUM ptr) as ULONG
 declare function STGMEDIUM_UserUnmarshal(byval as ULONG ptr, byval as ubyte ptr, byval as STGMEDIUM ptr) as ubyte ptr
+#endif
 type VARIANT as tagVARIANT
 declare function VARIANT_UserSize(byval as ULONG ptr, byval as ULONG, byval as VARIANT ptr) as ULONG
 declare function VARIANT_UserMarshal(byval as ULONG ptr, byval as ubyte ptr, byval as VARIANT ptr) as ubyte ptr

@@ -6,6 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtThreads
 '' --------
 
+'' Thread synchronization: this basic flag example intentionally uses no mutex lock.
+
 #include "fbthread.bi"
 
 Declare Sub thread (ByVal userdata As Any Ptr)
@@ -41,4 +43,3 @@ Sub thread (ByVal userdata As Any Ptr)  '' sub executed by the child thread
 	Next I
 	threadEnd = True                    '' set the thrend-End flag to 'True'
 End Sub
-

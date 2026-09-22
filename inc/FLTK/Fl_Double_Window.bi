@@ -15,7 +15,7 @@ public:
 	declare virtual sub resize(as long, as long, as long, as long)
 	declare virtual sub hide()
 	declare virtual destructor
-  
+
 
 	declare constructor(W as long, H as long, l as const zstring ptr=0)
 

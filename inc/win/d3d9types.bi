@@ -1,7 +1,7 @@
 '' FreeBASIC binding for mingw-w64-v4.0.4
 ''
 '' based on the C header files:
-''   Copyright (C) 2002-2003 Jason Edmeades 
+''   Copyright (C) 2002-2003 Jason Edmeades
 ''   Copyright (C) 2002-2003 Raphael Junqueira
 ''   Copyright (C) 2005 Oliver Stieber
 ''
@@ -21,6 +21,8 @@
 ''
 '' translated to FreeBASIC by:
 ''   FreeBASIC development team
+
+#include once "windows.bi"
 
 #pragma once
 

@@ -19,5 +19,5 @@ Print "The time now is: "
 Print Format(a, "yyyy/mm/dd hh:mm:ss")
 Print
 
-b = DateSerial(2000,1,1)
+b = DateSerial(2000, 1, 1)
 Print Int(a-b) & " days have passed since 2000/01/01"

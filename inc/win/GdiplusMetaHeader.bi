@@ -9,6 +9,15 @@
 #ifndef __win_GdiplusMetaHeader_bi__
 #define __win_GdiplusMetaHeader_bi__
 
+#include once "windows.bi"
+#include once "GdiplusTypes.bi"
+
+#ifndef __FB_GDIPLUS_NAMESPACE_ACTIVE__
+#define __FB_GDIPLUS_NAMESPACE_ACTIVE__
+#define __FB_GDIPLUS_LOCAL_NAMESPACE__
+namespace Gdiplus
+#endif
+
 type ENHMETAHEADER3
 	iType as DWORD
 	nSize as DWORD
@@ -151,5 +160,11 @@ end function
 private function MetafileHeader.GetEmfHeader () as ENHMETAHEADER3 ptr
 	return NULL
 end function
+
+#ifdef __FB_GDIPLUS_LOCAL_NAMESPACE__
+end namespace
+#undef __FB_GDIPLUS_LOCAL_NAMESPACE__
+#undef __FB_GDIPLUS_NAMESPACE_ACTIVE__
+#endif
 
 #endif

@@ -9,8 +9,9 @@
 #include "regulateLite.bi"
 
 #if defined(__FB_WIN32__)
-Declare Function _setTimer Lib "winmm" Alias "timeBeginPeriod"(ByVal As ULong = 1) As Long
-Declare Function _resetTimer Lib "winmm" Alias "timeEndPeriod"(ByVal As ULong = 1) As Long
+' WinMM uses 32-bit UINT and MMRESULT values on both Win32 and Win64.
+Declare Function _setTimer CDecl Lib "winmm" Alias "timeBeginPeriod"(ByVal period As ULong = 1) As ULong
+Declare Function _resetTimer CDecl Lib "winmm" Alias "timeEndPeriod"(ByVal period As ULong = 1) As ULong
 #endif
 
 Screen 12, , 2

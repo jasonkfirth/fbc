@@ -9,6 +9,8 @@
 '' determining whether an array is empty
 Dim array() As Integer
 
+'' This output intentionally shows the empty-array bound convention below.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
 Print "lbound: "; LBound( array ), "ubound: "; UBound( array )  ''  0 and -1
 
 If LBound( array ) > UBound( array ) Then

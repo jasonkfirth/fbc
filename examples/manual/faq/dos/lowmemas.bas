@@ -23,8 +23,12 @@ DDS=_dos_ds
 ? "This is just a tEst - abcd ABCD XYZ xyz @[`{ - press any key ..."
 
 Do
+	' Periodic input polling deliberately yields instead of spinning.
+	' FB-LINTER: DISABLE-NEXT-LINE FBL602
   Sleep 1000
   If Inkey$<>"" Then Exit Do
+  ' This FAQ is a DOS low-memory inline-assembly demonstration.
+  ' FB-LINTER: DISABLE-NEXT-LINE FBL972
   Asm
 	mov  eax,[DDS] '' Directly using "_dos_ds" won't work here !!!
 	push eax

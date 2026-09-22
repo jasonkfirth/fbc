@@ -20,7 +20,7 @@ Declare Function wxListItemAttr_GetTextColour WXCALL Alias "wxListItemAttr_GetTe
 Declare Sub wxListItemAttr_SetBackgroundColour WXCALL Alias "wxListItemAttr_SetBackgroundColour" (self As wxListItemAttr Ptr, bg As wxColour Ptr)
 Declare Function wxListItemAttr_GetBackgroundColour WXCALL Alias "wxListItemAttr_GetBackgroundColour" (self As wxListItemAttr Ptr) As wxColour Ptr
 Declare Sub wxListItemAttr_SetFont WXCALL Alias "wxListItemAttr_SetFont" (self As wxListItemAttr Ptr, font As wxFont Ptr)
-Declare Function wxListItemAttr_GetFont WXCALL Alias "wxListItemAttr_GetFont" (self As wxListItemAttr Ptr) As wxFont Ptr 
+Declare Function wxListItemAttr_GetFont WXCALL Alias "wxListItemAttr_GetFont" (self As wxListItemAttr Ptr) As wxFont Ptr
 Declare Function wxListItemAttr_HasTextColour WXCALL Alias "wxListItemAttr_HasTextColour" (self As wxListItemAttr Ptr) As wxBool
 Declare Function wxListItemAttr_HasBackgroundColour WXCALL Alias "wxListItemAttr_HasBackgroundColour" (self As wxListItemAttr Ptr) As wxBool
 Declare Function wxListItemAttr_HasFont WXCALL Alias "wxListItemAttr_HasFont" (self As wxListItemAttr Ptr) As wxBool

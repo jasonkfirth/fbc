@@ -1,6 +1,6 @@
-'' 
+''
 '' Enum copied from FBC compiler src/compiler/fbint.bi
-'' 
+''
 
 #pragma once
 

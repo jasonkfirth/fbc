@@ -3,7 +3,6 @@
 ''
 
 #include once "CDropTarget.bi"
-#include once "crt/string.bi"
 
 ''
 '' Constructor for the CDropTarget class
@@ -59,13 +58,16 @@ private function CDropTarget.QueryInterface _
 	(byval pInst as IDropTarget ptr, _
 	 byval iid as REFIID, byval ppvObject as any ptr ptr) as HRESULT
 
-	if( (memcmp( iid, @IID_IUnknown, len( GUID ) ) = 0) or _
-		(memcmp( iid, @IID_IDropTarget, len( GUID ) ) = 0) ) then
+	if(ppvObject = NULL) then return E_POINTER
+
+	*ppvObject = NULL
+
+	if( InlineIsEqualGUID(iid, @IID_IUnknown) or _
+		InlineIsEqualGUID(iid, @IID_IDropTarget) ) then
 		CDropTarget.AddRef( pInst )
 		*ppvObject = pInst
 		return S_OK
 	else
-		*ppvObject = NULL
 		return E_NOINTERFACE
 	end if
 
@@ -199,6 +201,8 @@ end sub
 private sub CDropTarget.DropData _
 	(byval pDataObject as IDataObject ptr)
 
+	if(pDataObject = NULL) then exit sub
+
 	'' construct a FORMATETC object
 	dim as FORMATETC fmtetc = ( CF_TEXT, 0, DVASPECT_CONTENT, -1, TYMED_HGLOBAL )
 	dim as STGMEDIUM stgmed
@@ -210,9 +214,11 @@ private sub CDropTarget.DropData _
 			'' we asked for the data as a HGLOBAL, so access it appropriately
 			dim as PVOID data_ = GlobalLock(stgmed.hGlobal)
 
-			SetWindowText(m_hWnd, cast(zstring ptr, data_))
+			if(data_ <> NULL) then
+				SetWindowText(m_hWnd, cast(zstring ptr, data_))
 
-			GlobalUnlock(stgmed.hGlobal)
+				GlobalUnlock(stgmed.hGlobal)
+			end if
 
 			'' release the data using the COM API
 			ReleaseStgMedium(@stgmed)

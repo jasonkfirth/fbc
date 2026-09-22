@@ -37,6 +37,8 @@ end type
 
 declare function LoadGLTextures() as integer
 
+	'' The texture loader and draw loop share these render controls.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 	dim shared texture(0) as GLuint                '' Storage For One Texture
 	dim shared twinkle as integer                  '' Twinkling Stars
 	dim shared tp as integer                       '' T Pressed?
@@ -70,7 +72,7 @@ declare function LoadGLTextures() as integer
 	glClearColor 0.0, 0.0, 0.0, 0.5                     '' Black Background
 	glClearDepth 1.0                                    '' Depth Buffer Setup
 	glHint GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST    '' Really Nice Perspective Calculations
-	glBlendFunc(GL_SRC_ALPHA,GL_ONE)                    '' Set The Blending Function For Translucency
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE)                    '' Set The Blending Function For Translucency
 	glEnable(GL_BLEND)
 
 	randomize timer
@@ -134,7 +136,7 @@ declare function LoadGLTextures() as integer
 			tp = true
 			twinkle = not twinkle                 '' toggle twinkle on /off
 		end if
-		if not MULTIKEY(FB.SC_T) then tp = false   '' T key up
+		if not (MULTIKEY(FB.SC_T)) then tp = false   '' T key up
 
 		if MULTIKEY(FB.SC_UP) then tilt = tilt - 0.5          '' If Up Arrow is Being Pressed, Tilt The Screen Up
 		if MULTIKEY(FB.SC_DOWN) then tilt = tilt + 0.5        '' If Down Arrow Being Pressed, Tilt The Screen Down
@@ -164,8 +166,8 @@ function LoadGLTextures() as integer
 
     ' Create Linear Filtered Texture
     glBindTexture GL_TEXTURE_2D, texture(0)
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR
+    glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR
+    glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR
     glTexImage2D GL_TEXTURE_2D, 0, 3, TextureImage(0)->sizeX, TextureImage(0)->sizeY, 0, GL_RGB, GL_UNSIGNED_BYTE, TextureImage(0)->buffer
 
   end if

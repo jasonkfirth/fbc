@@ -3,7 +3,7 @@
 #include once "Fl_Shared_Image.bi"
 
 extern "c++"
-type Fl_Image_Surface extends Fl_Surface_Device 
+type Fl_Image_Surface extends Fl_Surface_Device
 private:
 	declare sub prepare_(w as long, h as long, highres as long)
 	offscreen as Fl_Offscreen

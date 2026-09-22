@@ -11,7 +11,11 @@ Const w = 320, h = 200 '' screen dimensions
 Dim x As Integer, y As Integer, s As String
 
 '' Open a graphics window
-ScreenRes w, h
+If ScreenRes(w, h) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 '' Draw a string in the centre of the screen:
 

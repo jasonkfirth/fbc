@@ -7,12 +7,13 @@
 '' --------
 
 #define pi 4 * Atn(1)
+#define pi_over_six (pi / 6)
 
-Dim Shared As Double d = Sqr(2)
+Dim As Double d = Sqr(2)
 
 Type pt
-	Dim As Integer x = 300 * Cos(pi / 6)
-	Dim As Integer y = 300 * Sin(pi / 6)
+	Dim As Integer x = CInt(300 * Cos(pi_over_six))
+	Dim As Integer y = CInt(300 * Sin(pi_over_six))
 End Type
 
 Dim As pt p
@@ -23,3 +24,4 @@ Print p.x, p.y  ''  260           150
 
 Sleep
 
+'' end of constant_expressions.bas

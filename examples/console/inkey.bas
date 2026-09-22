@@ -15,5 +15,7 @@ do
 		end if
 	end if
 
+	'' Limit the polling cadence while waiting for input.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL602
 	sleep 25
 loop until k = chr( 27 )

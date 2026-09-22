@@ -8,7 +8,8 @@
 
 Dim scrbuf As Byte Ptr, scrsize As Integer
 Dim As Long scrhei, scrpitch
-Dim As Integer r = 0, dr = 1
+Dim As Integer r = 0
+Dim As Integer dr = 1
 
 ScreenRes 640, 480, 8
 

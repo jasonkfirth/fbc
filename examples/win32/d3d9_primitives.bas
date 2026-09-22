@@ -41,6 +41,13 @@ dim shared as LPDIRECT3DVERTEXBUFFER9 g_pTriangleFan_VB   = NULL
 
 #define D3DFVF_MY_VERTEX ( D3DFVF_XYZ or D3DFVF_DIFFUSE )
 
+const POINT_LIST_VERTEX_COUNT = 5
+const LINE_LIST_VERTEX_COUNT = 6
+const LINE_STRIP_VERTEX_COUNT = 6
+const TRIANGLE_LIST_VERTEX_COUNT = 6
+const TRIANGLE_STRIP_VERTEX_COUNT = 8
+const TRIANGLE_FAN_VERTEX_COUNT = 6
+
 type Vertex
 	as single x, y, z '' Position of vertex in 3D space
     as DWORD color    '' Color of vertex
@@ -56,64 +63,64 @@ dim shared as D3DPRIMITIVETYPE g_currentPrimitive = D3DPT_TRIANGLEFAN
 '' passed to be considered valid for each primitive type.
 ''
 
-dim shared as Vertex g_pointList(0 to 5-1) => _
+dim shared as Vertex g_pointList(0 to POINT_LIST_VERTEX_COUNT - 1) => _
 {_
-    ( 0.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ),_
-    ( 0.5f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) ),_
-    (-0.5f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 0.0, 1.0, 1.0 ) ),_
-	( 0.0f,-0.5f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 1.0, 0.0, 1.0 ) ),_
+    ( 0.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ), _
+    ( 0.5f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) ), _
+    (-0.5f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 0.0, 1.0, 1.0 ) ), _
+	( 0.0f, -0.5f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 1.0, 0.0, 1.0 ) ), _
     ( 0.0f, 0.5f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 1.0, 1.0 ) )_
 }
 
-dim shared as Vertex g_lineList(0 to 6-1) => _
+dim shared as Vertex g_lineList(0 to LINE_LIST_VERTEX_COUNT - 1) => _
 {_
-    (-1.0f,  0.0f, 0.0f, D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ),_ '' Line #1
-    ( 0.0f,  1.0f, 0.0f, D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ),_
-    ( 0.5f,  1.0f, 0.0f, D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) ),_ '' Line #2
-    ( 0.5f, -1.0f, 0.0f, D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) ),_
-    ( 1.0f, -0.5f, 0.0f, D3DCOLOR_COLORVALUE( 0.0, 0.0, 1.0, 1.0 ) ),_ '' Line #3
+    (-1.0f,  0.0f, 0.0f, D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ), _ '' Line #1
+    ( 0.0f,  1.0f, 0.0f, D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ), _
+    ( 0.5f,  1.0f, 0.0f, D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) ), _ '' Line #2
+    ( 0.5f, -1.0f, 0.0f, D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) ), _
+    ( 1.0f, -0.5f, 0.0f, D3DCOLOR_COLORVALUE( 0.0, 0.0, 1.0, 1.0 ) ), _ '' Line #3
     (-1.0f, -0.5f, 0.0f, D3DCOLOR_COLORVALUE( 0.0, 0.0, 1.0, 1.0 ) )_
 }
 
-dim shared as Vertex g_lineStrip(0 to 6-1) => _
+dim shared as Vertex g_lineStrip(0 to LINE_STRIP_VERTEX_COUNT - 1) => _
 {_
-    ( 0.5f, 0.5f, 0.0f, D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ),_
-    ( 1.0f, 0.0f, 0.0f, D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) ),_
-    ( 0.0f,-1.0f, 0.0f, D3DCOLOR_COLORVALUE( 0.0, 0.0, 1.0, 1.0 ) ),_
-    (-1.0f, 0.0f, 0.0f, D3DCOLOR_COLORVALUE( 1.0, 1.0, 0.0, 1.0 ) ),_
-    ( 0.0f, 0.0f, 0.0f, D3DCOLOR_COLORVALUE( 0.0, 1.0, 1.0, 1.0 ) ),_
+    ( 0.5f, 0.5f, 0.0f, D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ), _
+    ( 1.0f, 0.0f, 0.0f, D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) ), _
+    ( 0.0f, -1.0f, 0.0f, D3DCOLOR_COLORVALUE( 0.0, 0.0, 1.0, 1.0 ) ), _
+    (-1.0f, 0.0f, 0.0f, D3DCOLOR_COLORVALUE( 1.0, 1.0, 0.0, 1.0 ) ), _
+    ( 0.0f, 0.0f, 0.0f, D3DCOLOR_COLORVALUE( 0.0, 1.0, 1.0, 1.0 ) ), _
     ( 0.0f, 1.0f, 0.0f, D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) )_
 }
 
-dim shared as Vertex g_triangleList(0 to 6-1) => _
+dim shared as Vertex g_triangleList(0 to TRIANGLE_LIST_VERTEX_COUNT - 1) => _
 {_
-    (-1.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ),_ '' Triangle #1
-    ( 0.0f, 1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) ),_
-    ( 1.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 0.0, 1.0, 1.0 ) ),_
-    (-0.5f,-1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 1.0, 0.0, 1.0 ) ),_ '' Triangle #2
-    ( 0.0f,-0.5f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 1.0, 1.0 ) ),_
-    ( 0.5f,-1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) )_
+    (-1.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ), _ '' Triangle #1
+    ( 0.0f, 1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) ), _
+    ( 1.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 0.0, 1.0, 1.0 ) ), _
+    (-0.5f, -1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 1.0, 0.0, 1.0 ) ), _ '' Triangle #2
+    ( 0.0f, -0.5f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 1.0, 1.0 ) ), _
+    ( 0.5f, -1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) )_
 }
 
-dim shared as Vertex g_triangleStrip(0 to 8-1) => _
+dim shared as Vertex g_triangleStrip(0 to TRIANGLE_STRIP_VERTEX_COUNT - 1) => _
 {_
-    (-2.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ),_
-    (-1.0f, 1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) ),_
-    (-1.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 0.0, 1.0, 1.0 ) ),_
-    ( 0.0f, 1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 1.0, 0.0, 1.0 ) ),_
-    ( 0.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 1.0, 1.0 ) ),_
-    ( 1.0f, 1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 1.0, 1.0 ) ),_
-    ( 1.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ),_
+    (-2.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ), _
+    (-1.0f, 1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) ), _
+    (-1.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 0.0, 1.0, 1.0 ) ), _
+    ( 0.0f, 1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 1.0, 0.0, 1.0 ) ), _
+    ( 0.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 1.0, 1.0 ) ), _
+    ( 1.0f, 1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 1.0, 1.0 ) ), _
+    ( 1.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ), _
 	( 2.0f, 1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) )_
 }
 
-dim shared as Vertex g_triangleFan(0 to 6-1) => _
+dim shared as Vertex g_triangleFan(0 to TRIANGLE_FAN_VERTEX_COUNT - 1) => _
 {_
-    ( 0.0f,-1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ),_
-    (-1.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) ),_
-    (-0.5f, 0.5f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 0.0, 1.0, 1.0 ) ),_
-    ( 0.0f, 1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 1.0, 0.0, 1.0 ) ),_
-    ( 0.5f, 0.5f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 1.0, 1.0 ) ),_
+    ( 0.0f, -1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 0.0, 1.0 ) ), _
+    (-1.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 0.0, 1.0 ) ), _
+    (-0.5f, 0.5f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 0.0, 1.0, 1.0 ) ), _
+    ( 0.0f, 1.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 1.0, 0.0, 1.0 ) ), _
+    ( 0.5f, 0.5f, 0.0f,  D3DCOLOR_COLORVALUE( 0.0, 1.0, 1.0, 1.0 ) ), _
     ( 1.0f, 0.0f, 0.0f,  D3DCOLOR_COLORVALUE( 1.0, 0.0, 1.0, 1.0 ) )_
 }
 
@@ -144,10 +151,10 @@ function WinMain(byval hInstance as HINSTANCE, _
 		.style         = CS_HREDRAW or CS_VREDRAW
 		.lpfnWndProc   = cast( WNDPROC, @WindowProc )
 		.hInstance     = hInstance
-		.hIcon	       = LoadIcon(hInstance, cast(LPCTSTR,IDI_APPLICATION))
-    	.hIconSm	   = LoadIcon(hInstance, cast(LPCTSTR,IDI_APPLICATION))
+		.hIcon	       = LoadIcon(hInstance, cast(LPCTSTR, IDI_APPLICATION))
+        .hIconSm     = LoadIcon(hInstance, cast(LPCTSTR, IDI_APPLICATION))
 		.hCursor       = LoadCursor(NULL, IDC_ARROW)
-		.hbrBackground = cast(HBRUSH,GetStockObject(BLACK_BRUSH))
+		.hbrBackground = cast(HBRUSH, GetStockObject(BLACK_BRUSH))
 		.lpszMenuName  = NULL
 		.cbClsExtra    = 0
 		.cbWndExtra    = 0
@@ -177,6 +184,8 @@ function WinMain(byval hInstance as HINSTANCE, _
 			DispatchMessage( @uMsg )
         else
 		    render()
+			'' The queue is empty here; a short delay avoids a busy render loop.
+			'' FB-LINTER: DISABLE-NEXT-LINE FBL602
 		    sleep 10
 		end if
 	loop
@@ -252,8 +261,10 @@ sub init( )
 
     IDirect3D9_GetAdapterDisplayMode( g_pD3D, D3DADAPTER_DEFAULT, @d3ddm )
 
-    dim as D3DPRESENT_PARAMETERS d3dpp
-    clear( d3dpp, 0, len(d3dpp) )
+	dim as D3DPRESENT_PARAMETERS d3dpp
+	'' D3DPRESENT_PARAMETERS is a plain Direct3D ABI structure with no managed references.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL808
+	clear( d3dpp, 0, sizeof(d3dpp) )
 
     d3dpp.Windowed               = TRUE
     d3dpp.SwapEffect             = D3DSWAPEFFECT_DISCARD
@@ -263,11 +274,11 @@ sub init( )
     d3dpp.PresentationInterval   = D3DPRESENT_INTERVAL_IMMEDIATE
 
     IDirect3D9_CreateDevice( g_pD3D, D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, g_hWnd, _
-                          	 D3DCREATE_SOFTWARE_VERTEXPROCESSING, _
-                          	 @d3dpp, @g_pd3dDevice )
+        D3DCREATE_SOFTWARE_VERTEXPROCESSING, _
+        @d3dpp, @g_pd3dDevice )
 
-	IDirect3DDevice9_SetRenderState(g_pd3dDevice,D3DRS_LIGHTING, FALSE)
-	IDirect3DDevice9_SetRenderState(g_pd3dDevice,D3DRS_CULLMODE, D3DCULL_NONE)
+	IDirect3DDevice9_SetRenderState(g_pd3dDevice, D3DRS_LIGHTING, FALSE)
+	IDirect3DDevice9_SetRenderState(g_pd3dDevice, D3DRS_CULLMODE, D3DCULL_NONE)
 
 	dim as D3DXMATRIX mProjection
     D3DXMatrixPerspectiveFovLH( @mProjection, D3DXToRadian( 45.0f ), 1.0f, 1.0f, 100.0f )
@@ -278,79 +289,80 @@ sub init( )
 	''
 	'' Point List
 	''
+	'' Direct3D buffer offsets and lock sizes are byte counts, not element counts.
 
-	IDirect3DDevice9_CreateVertexBuffer(g_pd3dDevice, 5*len(Vertex), 0, D3DFVF_MY_VERTEX, _
-									    D3DPOOL_DEFAULT, @g_pPointList_VB,_
+	IDirect3DDevice9_CreateVertexBuffer(g_pd3dDevice, POINT_LIST_VERTEX_COUNT * sizeof(Vertex), 0, D3DFVF_MY_VERTEX, _
+									    D3DPOOL_DEFAULT, @g_pPointList_VB, _
 									    NULL )
 
 	pVertices = NULL
-	IDirect3DVertexBuffer9_Lock( g_pPointList_VB, 0, len(g_pointList)*5, cast( any ptr ptr, @pVertices ), 0 )
-    memcpy( pVertices, @g_pointList(0), len(g_pointList)*5 )
+	IDirect3DVertexBuffer9_Lock( g_pPointList_VB, 0, POINT_LIST_VERTEX_COUNT * sizeof(Vertex), cast( any ptr ptr, @pVertices ), 0 )
+    memcpy( pVertices, @g_pointList(0), POINT_LIST_VERTEX_COUNT * sizeof(Vertex) )
     IDirect3DVertexBuffer9_Unlock(g_pPointList_VB)
 
 	''
 	'' Line List
 	''
 
-	IDirect3DDevice9_CreateVertexBuffer(g_pd3dDevice, 6*len(Vertex), 0, D3DFVF_MY_VERTEX,_
-									    D3DPOOL_DEFAULT, @g_pLineList_VB,_
+	IDirect3DDevice9_CreateVertexBuffer(g_pd3dDevice, LINE_LIST_VERTEX_COUNT * sizeof(Vertex), 0, D3DFVF_MY_VERTEX, _
+									    D3DPOOL_DEFAULT, @g_pLineList_VB, _
 									    NULL )
 
 	pVertices = NULL
-	IDirect3DVertexBuffer9_Lock( g_pLineList_VB, 0, len(g_lineList)*6, cast( any ptr ptr, @pVertices ), 0 )
-    memcpy( pVertices, @g_lineList(0), len(g_lineList)*6 )
+	IDirect3DVertexBuffer9_Lock( g_pLineList_VB, 0, LINE_LIST_VERTEX_COUNT * sizeof(Vertex), cast( any ptr ptr, @pVertices ), 0 )
+    memcpy( pVertices, @g_lineList(0), LINE_LIST_VERTEX_COUNT * sizeof(Vertex) )
     IDirect3DVertexBuffer9_Unlock(g_pLineList_VB)
 
 	''
 	'' Line Strip
 	''
 
-	IDirect3DDevice9_CreateVertexBuffer(g_pd3dDevice, 6*len(Vertex), 0, D3DFVF_MY_VERTEX,_
-									    D3DPOOL_DEFAULT, @g_pLineStrip_VB,_
+	IDirect3DDevice9_CreateVertexBuffer(g_pd3dDevice, LINE_STRIP_VERTEX_COUNT * sizeof(Vertex), 0, D3DFVF_MY_VERTEX, _
+									    D3DPOOL_DEFAULT, @g_pLineStrip_VB, _
 									    NULL )
 
 	pVertices = NULL
-	IDirect3DVertexBuffer9_Lock( g_pLineStrip_VB, 0, len(g_lineStrip)*6, cast( any ptr ptr, @pVertices ), 0 )
-    memcpy( pVertices, @g_lineStrip(0), len(g_lineStrip)*6 )
+	IDirect3DVertexBuffer9_Lock( g_pLineStrip_VB, 0, LINE_STRIP_VERTEX_COUNT * sizeof(Vertex), cast( any ptr ptr, @pVertices ), 0 )
+    memcpy( pVertices, @g_lineStrip(0), LINE_STRIP_VERTEX_COUNT * sizeof(Vertex) )
     IDirect3DVertexBuffer9_Unlock(g_pLineStrip_VB)
 
 	''
 	'' Triangle List
 	''
 
-	IDirect3DDevice9_CreateVertexBuffer(g_pd3dDevice, 6*len(Vertex), 0, D3DFVF_MY_VERTEX,_
-									    D3DPOOL_DEFAULT, @g_pTriangleList_VB,_
+	IDirect3DDevice9_CreateVertexBuffer(g_pd3dDevice, TRIANGLE_LIST_VERTEX_COUNT * sizeof(Vertex), 0, D3DFVF_MY_VERTEX, _
+									    D3DPOOL_DEFAULT, @g_pTriangleList_VB, _
 									    NULL )
 
 	pVertices = NULL
-	IDirect3DVertexBuffer9_Lock( g_pTriangleList_VB, 0, len(g_triangleList)*8, cast( any ptr ptr, @pVertices ), 0 )
-    memcpy( pVertices, @g_triangleList(0), len(g_triangleList)*8 )
+	IDirect3DVertexBuffer9_Lock( g_pTriangleList_VB, 0, TRIANGLE_LIST_VERTEX_COUNT * sizeof(Vertex), cast( any ptr ptr, @pVertices ), 0 )
+    memcpy( pVertices, @g_triangleList(0), TRIANGLE_LIST_VERTEX_COUNT * sizeof(Vertex) )
     IDirect3DVertexBuffer9_Unlock(g_pTriangleList_VB)
 
 	''
 	'' Triangle Strip
 	''
 
-	IDirect3DDevice9_CreateVertexBuffer(g_pd3dDevice, 8*len(Vertex), 0, D3DFVF_MY_VERTEX,_
-									    D3DPOOL_DEFAULT, @g_pTriangleStrip_VB,_
+	IDirect3DDevice9_CreateVertexBuffer(g_pd3dDevice, TRIANGLE_STRIP_VERTEX_COUNT * sizeof(Vertex), 0, D3DFVF_MY_VERTEX, _
+									    D3DPOOL_DEFAULT, @g_pTriangleStrip_VB, _
 									    NULL )
 
 	pVertices = NULL
-	IDirect3DVertexBuffer9_Lock( g_pTriangleStrip_VB, 0, len(g_triangleStrip)*6, cast( any ptr ptr, @pVertices ), 0 )
-    memcpy( pVertices, @g_triangleStrip(0), len(g_triangleStrip)*6 )
+	IDirect3DVertexBuffer9_Lock( g_pTriangleStrip_VB, 0, TRIANGLE_STRIP_VERTEX_COUNT * sizeof(Vertex), cast( any ptr ptr, @pVertices ), 0 )
+    memcpy( pVertices, @g_triangleStrip(0), TRIANGLE_STRIP_VERTEX_COUNT * sizeof(Vertex) )
     IDirect3DVertexBuffer9_Unlock(g_pTriangleStrip_VB)
 
 	''
 	'' Triangle Fan
 	''
 
-	IDirect3DDevice9_CreateVertexBuffer(g_pd3dDevice, 6*len(Vertex), 0, D3DFVF_MY_VERTEX,_
-									    D3DPOOL_DEFAULT, @g_pTriangleFan_VB,_
+	IDirect3DDevice9_CreateVertexBuffer(g_pd3dDevice, TRIANGLE_FAN_VERTEX_COUNT * sizeof(Vertex), 0, D3DFVF_MY_VERTEX, _
+									    D3DPOOL_DEFAULT, @g_pTriangleFan_VB, _
 									    NULL )
 
 	pVertices = NULL
-	IDirect3DVertexBuffer9_Lock( g_pTriangleFan_VB, 0, len(g_triangleFan)*6, cast( any ptr ptr, @pVertices ), 0 )
-    memcpy( pVertices, @g_triangleFan(0), len(g_triangleFan)*6 )
+	IDirect3DVertexBuffer9_Lock( g_pTriangleFan_VB, 0, TRIANGLE_FAN_VERTEX_COUNT * sizeof(Vertex), cast( any ptr ptr, @pVertices ), 0 )
+    memcpy( pVertices, @g_triangleFan(0), TRIANGLE_FAN_VERTEX_COUNT * sizeof(Vertex) )
     IDirect3DVertexBuffer9_Unlock(g_pTriangleFan_VB)
 end sub
 
@@ -398,7 +410,7 @@ end sub
 ''-----------------------------------------------------------------------------
 sub render( )
     IDirect3DDevice9_Clear( g_pd3dDevice, 0, NULL, D3DCLEAR_TARGET or D3DCLEAR_ZBUFFER, _
-                            D3DCOLOR_COLORVALUE(0.0f,0.0f,0.0f,1.0f), 1.0f, 0 )
+                            D3DCOLOR_COLORVALUE(0.0f, 0.0f, 0.0f, 1.0f), 1.0f, 0 )
 
 	static as single zAngle = 0, zPos = 5, zInc = .1
 	dim as D3DXMATRIX mWorld
@@ -422,7 +434,7 @@ sub render( )
     IDirect3DDevice9_MultiplyTransform( g_pd3dDevice, D3DTS_WORLD, @mWorld )
     zPos += zInc
     if( zPos < 2.5 or zPos > 10 ) then
-    	zInc = -zInc
+        zInc = -zInc
     end if
 
 	''

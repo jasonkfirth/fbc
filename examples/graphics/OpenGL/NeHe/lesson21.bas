@@ -17,6 +17,8 @@
 
 '' Setup our booleans
 const null = 0
+const FONT_GRID_SIZE = 16
+const FONT_GRID_STEP as single = 1.0 / FONT_GRID_SIZE
 #include once "GL/gl.bi"
 #include once "GL/glu.bi"
 #include once "fbgfx.bi"                   '' for Scan code constants
@@ -35,13 +37,19 @@ declare sub BuildFont()
 declare sub glPrint cdecl (byval x as integer, byval y as integer, byval gset as integer, byref fmt as string, ...)
 declare sub ResetObjects()
 
+'' -------------------------------------------------------------------------
+'' GLFW renderer and game state
+'' -------------------------------------------------------------------------
+
+'' The one event-and-render loop owns this state and calls ResetObjects directly.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared player as OBJECT_
 dim shared loop1 as integer                                 '' Generic Loop1
 dim shared stage as integer = 1                             '' Game Stage
 dim shared level as integer = 1                             '' Internal Game Level
-dim shared enemy(8) as OBJECT_
+dim shared enemy(0 to 8) as OBJECT_
 dim shared gbase as uinteger                                '' Base Display List For The Font
-dim shared texture(1) as GLuint                           '' Font Texture Storage Space
+dim shared texture(0 to 1) as GLuint                      '' Font Texture Storage Space
 
 	dim vline(0 to 10, 0 to 9) as integer                   '' Keeps Track Of Vertical Lines
 	dim hline(0 to 9, 0 to 10) as integer                   '' Keeps Track Of Horizontal Lines
@@ -73,11 +81,12 @@ dim shared texture(1) as GLuint                           '' Font Texture Storag
 	glLoadIdentity                           '' Reset The Projection Matrix
 
 	'' Use BLOAD to load the bitmaps.
-	redim buffer(256*256*4+4) as ubyte       '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
-	bload exepath + "/data/Font.bmp", @buffer(0)        '' BLOAD the bitmap
-	texture(0) = CreateTexture(@buffer(0))   '' Linear Texture
-	bload exepath + "/data/colpatt.bmp", @buffer(0)       '' BLOAD the bitmap
-	texture(1) = CreateTexture(@buffer(0))   '' Linear Texture
+	redim buffer(0 to 256*256*4+4) as ubyte  '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
+	if ubound(buffer) < lbound(buffer) then end 1
+	bload exepath + "/data/Font.bmp", @buffer(lbound(buffer))        '' BLOAD the bitmap
+	texture(0) = CreateTexture(@buffer(lbound(buffer)))   '' Linear Texture
+	bload exepath + "/data/colpatt.bmp", @buffer(lbound(buffer))       '' BLOAD the bitmap
+	texture(1) = CreateTexture(@buffer(lbound(buffer)))   '' Linear Texture
 	'' Exit if error loading textures
 	if texture(0) = 0 or texture(1) = 0 then end 1
 
@@ -115,9 +124,9 @@ dim shared texture(1) as GLuint                           '' Font Texture Storag
 			glRotatef -player.spin, 0.0, 0.0, 1.0             '' Rotate Counter Clockwise
 			glColor3f 0.0, 1.0, 0.0                           '' Set Player Color To Light Green
 			glBegin GL_LINES                                  '' Start Drawing Our Player Using Lines
-				glVertex2d -5,-5                              '' Top Left Of Player
+				glVertex2d -5, -5                              '' Top Left Of Player
 				glVertex2d  5, 5                              '' Bottom Right Of Player
-				glVertex2d  5,-5                              '' Top Right Of Player
+				glVertex2d  5, -5                              '' Top Right Of Player
 				glVertex2d -5, 5                              '' Bottom Left Of Player
 			glEnd                                             '' Done Drawing The Player
 			glRotatef -player.spin*0.5, 0.0, 0.0, 1.0         '' Rotate Counter Clockwise
@@ -125,7 +134,7 @@ dim shared texture(1) as GLuint                           '' Font Texture Storag
 			glBegin GL_LINES                                  '' Start Drawing Our Player Using Lines
 				glVertex2d -7, 0                              '' Left Center Of Player
 				glVertex2d  7, 0                              '' Right Center Of Player
-				glVertex2d  0,-7                              '' Top Center Of Player
+				glVertex2d  0, -7                              '' Top Center Of Player
 				glVertex2d  0, 7                              '' Bottom Center Of Player
 			glEnd                                             '' Done Drawing The Player
 		next
@@ -138,11 +147,11 @@ dim shared texture(1) as GLuint                           '' Font Texture Storag
 			for loop2 = 0 to 10                               '' Loop From Top To Bottom
 				glColor3f 0.0, 0.5, 1.0                       '' Set Line Color To Blue
 				If loop1 < 10 Then
-					If hline(loop1,loop2) Then                    '' Has The Horizontal Line Been Traced
+					If hline(loop1, loop2) Then                    '' Has The Horizontal Line Been Traced
 						glColor3f 1.0, 1.0, 1.0                   '' If So, Set Line Color To White
 					End If
 
-					If Not hline(loop1,loop2) Then            '' If A Horizontal Line Isn''t Filled
+					If Not hline(loop1, loop2) Then            '' If A Horizontal Line Isn''t Filled
 						filled = FALSE                        '' filled Becomes False
 					End If
 					glBegin GL_LINES                          '' Start Drawing Horizontal Cell Borders
@@ -153,10 +162,10 @@ dim shared texture(1) as GLuint                           '' Font Texture Storag
 
 				glColor3f 0.0, 0.5, 1.0                       '' Set Line Color To Blue
 				If loop2<10 Then
-					If vline(loop1,loop2) Then                    '' Has The Horizontal Line Been Traced
+					If vline(loop1, loop2) Then                    '' Has The Horizontal Line Been Traced
 						glColor3f 1.0, 1.0, 1.0                   '' If So, Set Line Color To White
 					End If
-                                        If Not vline(loop1,loop2) Then            '' If A Vertical Line isn''t Filled
+                                        If Not vline(loop1, loop2) Then            '' If A Vertical Line isn''t Filled
                                                 filled = FALSE                        '' filled Becomes False
                                         End If
                                         glBegin GL_LINES                          '' Start Drawing Vertical Cell Borders
@@ -170,7 +179,7 @@ dim shared texture(1) as GLuint                           '' Font Texture Storag
 				if loop1<10  and loop2<10 then                '' If In Bounds, Fill In Traced Boxes
 
 					'' Are All Sides Of The Box Traced?
-					if hline(loop1,loop2) and hline(loop1,loop2+1) and vline(loop1,loop2) and vline(loop1+1,loop2) then
+					if hline(loop1, loop2) and hline(loop1, loop2+1) and vline(loop1, loop2) and vline(loop1+1, loop2) then
 
 						glBegin GL_QUADS                      '' Draw A Textured Quad
 							glTexCoord2f (loop1/10.0)+0.1, 1.0-(loop2/10.0)
@@ -211,13 +220,13 @@ dim shared texture(1) as GLuint                           '' Font Texture Storag
 		end if
 
 		glLoadIdentity                                        '' Reset The Modelview Matrix
-		glTranslatef player.fx+20.0, player.fy+70.0,0.0       '' Move To The Fine Player Position
+		glTranslatef player.fx+20.0, player.fy+70.0, 0.0       '' Move To The Fine Player Position
 		glRotatef player.spin, 0.0, 0.0, 1.0                  '' Rotate Clockwise
 		glColor3f 0.0, 1.0, 0.0                               '' Set Player Color To Light Green
 		glBegin GL_LINES                                      '' Start Drawing Our Player Using Lines
 			glVertex2d -5, -5                                 '' Top Left Of Player
 			glVertex2d 5, 5                                   '' Bottom Right Of Player
-			glVertex2d 5,-5                                   '' Top Right Of Player
+			glVertex2d 5, -5                                   '' Top Right Of Player
 			glVertex2d -5, 5                                  '' Bottom Left Of Player
 		glEnd                                                 '' Done Drawing The Player
 		glRotatef player.spin*0.5, 0.0, 0.0, 1.0              '' Rotate Clockwise
@@ -225,7 +234,7 @@ dim shared texture(1) as GLuint                           '' Font Texture Storag
 		glBegin GL_LINES                                      '' Start Drawing Our Player Using Lines
 			glVertex2d -7, 0                                  '' Left Center Of Player
 			glVertex2d  7, 0                                  '' Right Center Of Player
-			glVertex2d 0,-7                                   '' Top Center Of Player
+			glVertex2d 0, -7                                   '' Top Center Of Player
 			glVertex2d 0, 7                                   '' Bottom Center Of Player
 		glEnd                                                 '' Done Drawing The Player
 
@@ -241,12 +250,12 @@ dim shared texture(1) as GLuint                           '' Font Texture Storag
 				glVertex2d 0, 7                               '' Bottom Point Of Body
 				glVertex2d 7, 0                               '' Right Point Of Body
 				glVertex2d 7, 0                               '' Right Point Of Body
-				glVertex2d 0,-7                               '' Top Point Of Body
+				glVertex2d 0, -7                               '' Top Point Of Body
 			glEnd                                             '' Done Drawing Enemy Body
 			glRotatef enemy(loop1).spin, 0.0, 0.0, 1.0        '' Rotate The Enemy Blade
 			glColor3f 1.0, 0.0, 0.0                           '' Make Enemy Blade Red
 			glBegin GL_LINES                                  '' Start Drawing Enemy Blade
-				glVertex2d -7,-7                              '' Top Left Of Enemy
+				glVertex2d -7, -7                              '' Top Left Of Enemy
 				glVertex2d 7, 7                               '' Bottom Right Of Enemy
 				glVertex2d -7, 7                              '' Bottom Left Of Enemy
 				glVertex2d 7, -7                              '' Top Right Of Enemy
@@ -303,20 +312,20 @@ dim shared texture(1) as GLuint                           '' Font Texture Storag
 			next
 
 			if (MULTIKEY(FB.SC_RIGHT) and (player.x<10)  and  (player.fx=player.x*60)  and  (player.fy=player.y*40)) then
-				hline(player.x,player.y)=TRUE                         '' Mark The Current Horizontal Border As Filled
+				hline(player.x, player.y)=TRUE                         '' Mark The Current Horizontal Border As Filled
 				player.x = player.x + 1                               '' Move The Player Right
 			end if
 			if (MULTIKEY(FB.SC_LEFT) and  (player.x>0)  and  (player.fx=player.x*60)  and  (player.fy=player.y*40)) then
 				player.x = player.x -1                                '' Move The Player Left
-				hline(player.x,player.y)=TRUE                         '' Mark The Current Horizontal Border As Filled
+				hline(player.x, player.y)=TRUE                         '' Mark The Current Horizontal Border As Filled
 			end if
 			if (MULTIKEY(FB.SC_DOWN) and  (player.y<10)  and  (player.fx=player.x*60)  and  (player.fy=player.y*40)) then
-				vline(player.x,player.y)=TRUE                         '' Mark The Current Verticle Border As Filled
+				vline(player.x, player.y)=TRUE                         '' Mark The Current Verticle Border As Filled
 				player.y = player.y +1                                '' Move The Player Down
 			end if
 			if (MULTIKEY(FB.SC_UP) and  (player.y>0)  and  (player.fx=player.x*60)  and  (player.fy=player.y*40)) then
 				player.y = player.y -1                                '' Move The Player Up
-				vline(player.x,player.y)=TRUE                         '' Mark The Current Vertical Border As Filled
+				vline(player.x, player.y)=TRUE                         '' Mark The Current Vertical Border As Filled
 			end if
 
 			if (player.fx<player.x*60) then                           '' Is Fine Position On X Axis Lower Than Intended Position?
@@ -362,10 +371,10 @@ dim shared texture(1) as GLuint                           '' Font Texture Storag
 			for loop1=0 to 10                                        '' Loop Through The Grid X Coordinates
 				for loop2=0 to 10                                    '' Loop Through The Grid Y Coordinates
 					if (loop1<10) then                               '' If X Coordinate Is Less Than 10
-						hline(loop1,loop2)=FALSE                     '' Set The Current Horizontal Value To FALSE
+						hline(loop1, loop2)=FALSE                     '' Set The Current Horizontal Value To FALSE
 					end if
 					if (loop2<10) then                               '' If Y Coordinate Is Less Than 10
-						vline(loop1,loop2)=FALSE                     '' Set The Current Vertical Value To FALSE
+						vline(loop1, loop2)=FALSE                     '' Set The Current Vertical Value To FALSE
 					end if
 				next
 			next
@@ -416,7 +425,7 @@ dim shared texture(1) as GLuint                           '' Font Texture Storag
 			ap = true
 			anti = not anti                               ''  Toggle Antialiasing
 		end if
-		if not MULTIKEY(FB.SC_A) then ap = false             '' A key up
+		if MULTIKEY(FB.SC_A) = 0 then ap = false             '' A key up
 
 		flip  '' flip or crash
 	loop while MULTIKEY(FB.SC_ESCAPE) = 0
@@ -455,7 +464,7 @@ sub BuildFont()                                  '' Build Our Font Display List
 	for loop1 = 0 to 255                         '' Loop Through All 256 Lists
 
 		cx = (loop1 mod 16)/16.0                 '' X Position Of Current Character
-		cy = (loop1\16)/16.0                     '' Y Position Of Current Character
+		cy = (loop1\FONT_GRID_SIZE) * FONT_GRID_STEP '' Y Position Of Current Character
 
 		glNewList gbase+loop1, GL_COMPILE        '' Start Building A List
 		glBegin GL_QUADS                         '' Use A Quad For Each Character
@@ -492,14 +501,13 @@ sub glPrint cdecl (byval x as integer, byval y as integer, byval gset as integer
 
 	glEnable(GL_TEXTURE_2D)                 '' Enable Texture Mapping
 	glLoadIdentity()                        '' Reset The Modelview Matrix
-	glTranslated(x,y,0)                     '' Position The Text (0,0 - Bottom Left)
+	glTranslated(x, y, 0)                     '' Position The Text (0,0 - Bottom Left)
 	glListBase(gbase-32+(128*gset))         '' Choose The Font Set (0 or 1)
 
 	if gset=0 then                          '' If Set 0 Is Being Used Enlarge Font
 		glScalef(1.5, 2.0, 1.0)             '' Enlarge Font Width And Height
 	end if
 
-	glCallLists(strlen(text),GL_UNSIGNED_BYTE, strptr(text)) '' Write The Text To The Screen
+	glCallLists(strlen(text), GL_UNSIGNED_BYTE, strptr(text)) '' Write The Text To The Screen
 	glDisable(GL_TEXTURE_2D)                '' Disable Texture Mapping
 end sub
-

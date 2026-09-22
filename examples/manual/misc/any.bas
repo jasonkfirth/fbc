@@ -30,6 +30,8 @@ Sub echo (ByVal x As Any Ptr)
 	Dim As Integer i
 	For i = 0 To 39
 		'echo interprets the data in the pointer as bytes
+		' The lesson supplies 40-element arrays to this byte-viewing routine.
+		' FB-LINTER: DISABLE-NEXT-LINE FBL525 FBL-PTR-019
 		Print Cast(UByte Ptr, x)[i] & " ";
 	Next
 	Print

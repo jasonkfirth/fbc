@@ -8,6 +8,8 @@
 
 ' Getting whole palette, form 3.
 Dim pal(0 To 255) As ULong
+'' Mode 13 is the documented compatibility mode for this PALETTE lesson.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL734
 Screen 13
 Palette Get Using pal
 For i As Integer = 0 To 15

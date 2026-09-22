@@ -7,10 +7,9 @@
 '' --------
 
 ' Declares and initializes an array of four integer elements.
-Dim array(3) As Integer = { 10, 20, 30, 40 }
+Dim array(0 To 3) As Integer = { 10, 20, 30, 40 }
 
 ' Outputs all of the element values (" 10 20 30 40").
 For position As Integer = LBound(array) To UBound(array)
 	Print array(position) ;
 Next
-

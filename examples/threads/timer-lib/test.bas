@@ -22,6 +22,8 @@ end sub
 
 	do
 		''print "(main loop)"
+		'' Keep the main thread idle while the timer callback runs.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL602
 		sleep 1000
 	loop until len( inkey ) > 0
 

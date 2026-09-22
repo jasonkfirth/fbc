@@ -7,13 +7,16 @@
 '' --------
 
 ' Set gfx mode
-ScreenRes 320, 200, 32
+If ScreenRes(320, 200, 32) <> 0 Then
+  Print "Could not set the graphics mode"
+Else
 
-' Clear with black on white
-Color RGB(0, 0, 0), RGB(255, 255, 255)
-Cls
+  ' Clear with black on white
+  Color RGB(0, 0, 0), RGB(255, 255, 255)
+  Cls
 
-Locate 13, 15: Print "Hello world!"
+  Locate 13, 15: Print "Hello world!"
 
-' Save screen as BMP
-BSave "hello.bmp", 0
+  ' Save screen as BMP
+  If BSave("hello.bmp", 0) <> 0 Then Print "Could not save hello.bmp"
+End If

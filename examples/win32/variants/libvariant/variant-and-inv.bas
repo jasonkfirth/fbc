@@ -18,9 +18,9 @@ operator and _
 
 	dim as VARIANT_ res = any
 
+	VariantInit( @res )
 	VarAnd( @lhs, @rhs.var_, @res )
 
 	return VARIANT( res, FALSE )
 
 end operator
-

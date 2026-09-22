@@ -25,7 +25,7 @@
 '     Shared integer flags provide monotonic progress and failure reporting for
 '     this bounded loopback test.
 
-#if defined(__FB_DOS__) or defined(__FB_JS__) or defined(__FB_XBOX__)
+#if (defined( __FB_DOS__ ) and (( __FB_MT__ = 0 ) or (not defined( FB_DOS_WATT32 )))) or defined( __FB_JS__ ) or defined( __FB_XBOX__ )
 	end 0
 #else
 

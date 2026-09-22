@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include once "cd.bi"
+
 #inclib "iupcd"
 
 extern "C"

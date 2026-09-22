@@ -265,6 +265,8 @@ FUNCTION create_table_page () AS GtkWidget PTR
 
   VAR canvas = goo_canvas_new ()
   gtk_widget_set_size_request (canvas, 600, 450)
+	' The table demonstration needs the taller 1000 by 2000 logical canvas.
+	' FB-LINTER: DISABLE-NEXT-LINE FBL-NUM-009
   goo_canvas_set_bounds (GOO_CANVAS (canvas), 0, 0, 1000, 2000)
   gtk_container_add (GTK_CONTAINER (scrolled_win), canvas)
 

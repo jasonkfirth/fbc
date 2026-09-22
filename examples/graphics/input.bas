@@ -12,7 +12,7 @@ declare sub joystick_demo( )
 	screen 15, , 3
 
 	screenset 2
-	color ,15
+	color , 15
 	cls
 
 	center( 1, "FreeBASIC Gfxlib input methods demo", 4 )
@@ -80,7 +80,11 @@ sub keyboard_demo( )
 end sub
 
 sub mouse_demo( )
-	dim as integer x, y, z, buttons, shown = 1
+	dim as integer x
+	dim as integer y
+	dim as integer z
+	dim as integer buttons
+	dim as integer shown = 1
 
 	setmouse 200, 150, 1
 	do
@@ -120,9 +124,9 @@ sub mouse_demo( )
 end sub
 
 sub joystick_demo
-	dim cursor(130) as ushort
+	dim cursor(0 to 130) as ushort
 	dim as integer buttons, col, hue, num_axis, axis_pos
-	dim as single x, y, cur_x, cur_y, additional_axis(4)
+	dim as single x, y, cur_x, cur_y, additional_axis(0 to 4)
 
 	cursor(0) = 16 shl 3
 	cursor(1) = 16

@@ -15,9 +15,11 @@ declare sub doRender (byval video as SDL_Surface ptr)
 	dim video as SDL_Surface ptr
 	dim event as SDL_Event
 
+	randomize timer
+
 	result = SDL_Init(SDL_INIT_VIDEO)
 	if result <> 0 then
-  		end 1
+		end 1
 	end if
 
 	video = SDL_SetVideoMode( SCR_WIDTH, SCR_HEIGHT, SCR_BPP, 0 ) 'or SDL_FULLSCREEN
@@ -28,7 +30,7 @@ declare sub doRender (byval video as SDL_Surface ptr)
 
 	do
 
-  		doRender video
+		doRender video
 
 		SDL_Flip video
 
@@ -57,4 +59,3 @@ sub doRender( byval video as SDL_Surface ptr )
 	next i
 
 end sub
-

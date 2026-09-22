@@ -46,7 +46,7 @@ end function
 function winmmPlayMidi( byval filename as string ) as integer
 
     if( mciSendString( "open " + filename + " alias mymidifile", NULL, 0, 0 ) <> 0 ) then
-    	return 0
+	return 0
 	end if
 
     function = mciSendString( "play mymidifile", NULL, 0, 0 ) = 0

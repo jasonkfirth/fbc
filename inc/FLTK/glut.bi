@@ -313,7 +313,7 @@ end sub
 
 declare function glutGet(type_ as GLenum) as long
 
-enum 
+enum
 	GLUT_RETURN_ZERO = 0
 	GLUT_WINDOW_X
 	GLUT_WINDOW_Y
@@ -381,7 +381,7 @@ declare function glutLayerGet(as GLenum) as long
 #define GLUT_NORMAL_DAMAGED		804
 #define GLUT_OVERLAY_DAMAGED		805
 
-extern "C" 
+extern "C"
 type GLUTproc as sub()
 end extern
 
@@ -413,7 +413,7 @@ type Fl_Glut_StrokeVertex
 	as GLfloat X, Y
 end type
 
-type Fl_Glut_StrokeStrip 
+type Fl_Glut_StrokeStrip
 	Number as long
 	as const Fl_Glut_StrokeVertex ptr Vertices
 end type
@@ -427,7 +427,7 @@ end type
 type Fl_Glut_StrokeFont
 	Name as zstring ptr
 	Quantity as long
-	Height as GLfloat 
+	Height as GLfloat
 	as const Fl_Glut_StrokeChar ptr ptr Characters
 end type
 

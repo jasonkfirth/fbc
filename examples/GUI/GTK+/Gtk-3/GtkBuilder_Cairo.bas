@@ -51,6 +51,8 @@ CONST PROJ_LICE = "GNU General Public License v3" '                            >
 ' ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 '<  GTK+tobac:                                  load GTK stuff / GTK Anbindung >
 DIM AS STRING GUISTR
+' Builder-created widgets remain available until GTK releases the builder.
+' FB-LINTER: DISABLE-NEXT-LINE FBL301
 DIM SHARED AS GtkBuilder PTR XML
 DIM SHARED AS GObject PTR window1
 

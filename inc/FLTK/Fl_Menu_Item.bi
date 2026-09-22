@@ -76,7 +76,7 @@ type Fl_Menu_Item
 	declare sub image(byref a as Fl_Image)
 
 	declare const function measure (h as long ptr, m as const Fl_Menu__ ptr) as long
-	declare sub draw(x as long, y as long, w as long, h as long, m as const Fl_Menu__ ptr, t as long=0) 
+	declare sub draw(x as long, y as long, w as long, h as long, m as const Fl_Menu__ ptr, t as long=0)
 	declare const function popup(X as long, Y as long, title as const zstring ptr=0, picked as const Fl_Menu_Item ptr=0, m as const Fl_Menu__ ptr=0) as Fl_Menu_Item ptr
 	declare const function pulldown(X as long, Y as long, W as long, H as long, picked as const Fl_Menu_Item ptr=0, m as const Fl_Menu__ ptr=0, title as const Fl_Menu_Item ptr=0, menubar as long=0) as Fl_Menu_Item ptr
 
@@ -94,7 +94,7 @@ type Fl_Menu_Item
 	declare function insert(as long, as const zstring ptr, as long, as Fl_Callback, as any ptr =0, as long =0) as long
 	declare function add(as const zstring ptr, shortcut as long, as Fl_Callback, as any ptr =0, as long =0) as long
 	declare function add(a as const zstring ptr, b as const zstring ptr, c as Fl_Callback, d as any ptr =0, e as long =0) as long
-end type 
+end type
 
 end extern
 

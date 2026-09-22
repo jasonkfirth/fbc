@@ -1,4 +1,4 @@
-locate ,,0
+locate ,, 0
 dim as integer oldcolor = color
 dim as integer oldwidth = width
 
@@ -12,7 +12,7 @@ view print 17 to 25
 color , 7
 cls
 
-locate 25,57
+locate 25, 57
 print "press any key to exit...";
 
 view print 9 to 16
@@ -34,4 +34,4 @@ width oldwidth and &HFFFF, oldwidth shr 16
 color oldcolor and &HFFFF, oldcolor shr 16
 view print 1 to oldwidth shr 16
 cls
-locate ,,1
+locate ,, 1

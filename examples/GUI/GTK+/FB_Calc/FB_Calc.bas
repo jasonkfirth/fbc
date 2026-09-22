@@ -63,6 +63,9 @@ END ENUM
 
 DECLARE SUB Calc(BYVAL O AS OP)
 
+' The GTK main thread owns this display state; Calc() and the generated signal
+' handlers access it only while gtk_main() dispatches one callback at a time.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 DIM SHARED AS INTEGER CLEAR_DISPLAY = 1
 DIM SHARED AS STRING D_SEP
 IF VAL("0.1") <> 0.1 THEN D_SEP = "," ELSE D_SEP = "."
@@ -70,6 +73,9 @@ IF VAL("0.1") <> 0.1 THEN D_SEP = "," ELSE D_SEP = "."
 
 ' ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 '<  GTK+tobac:                                  load GTK stuff / GTK Anbindung >
+    ' The GladeToBac generator emits this implementation fragment so its GUI
+    ' declarations and signal handlers remain in the same executable module.
+    '' FB-LINTER: DISABLE-NEXT-LINE FBL950 FBL-INC-002
     #INCLUDE "tobac/FB_Calc_tobac.bas" '                     Signale & GUI-XML >
 '<  GTK+tobac:                                           end block / Blockende >
 ' vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
@@ -97,6 +103,9 @@ SUB Calc(BYVAL O AS OP)
       CASE Op.Multiplication
         disp *= CVD(MID(stack, p, 8))
       CASE Op.Division
+        ' Exact zero is the calculator's rejected divisor; nonzero IEEE values
+        ' remain valid input, including very small values entered by the user.
+        '' FB-LINTER: DISABLE-NEXT-LINE FBL407 FBL-NUM-013
         IF disp = 0.0 THEN
           gtk_entry_set_text(entry, *__("Error"))
           CLEAR_DISPLAY = 1

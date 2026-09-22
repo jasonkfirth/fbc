@@ -139,6 +139,16 @@ extern "C"
 #if defined( __FB_WIN32__ ) and defined( __FB_ARM__ )
 declare function setjmp alias "__mingw_setjmp" (byval as jmp_buf ptr) as long
 declare sub longjmp alias "__mingw_longjmp" (byval as jmp_buf ptr, byval as long)
+#elseif defined( __FB_WIN32__ ) and defined( __FB_64BIT__ )
+	''
+	'' MinGW-w64 x86_64 defines _setjmp() with a caller-frame argument so SEH
+	'' unwinding can locate the saved frame. The compiler's GOSUB implementation
+	'' passes __builtin_frame_address(0) for C backends and NULL for other
+	'' backends. Keep the public one-argument spelling source-compatible by
+	'' using that documented NULL fallback as the optional second argument.
+	''
+declare function setjmp alias "_setjmp" (byval as jmp_buf ptr, byval as any ptr = 0) as long
+declare sub longjmp (byval as jmp_buf ptr, byval as long)
 #elseif defined( __FB_WIN32__ )
 declare function setjmp alias "_setjmp" (byval as jmp_buf ptr) as long
 declare sub longjmp (byval as jmp_buf ptr, byval as long)

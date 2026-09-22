@@ -86,7 +86,8 @@ END FUNCTION
 VAR status = -1
 VAR app = test_application_new ("org.gtk.TestApplication", 0)
 IF app THEN
-  g_application_set_inactivity_timeout (app, 10000)
+  CONST INACTIVITY_TIMEOUT_MILLISECONDS = 10000
+  g_application_set_inactivity_timeout (app, INACTIVITY_TIMEOUT_MILLISECONDS)
   g_signal_connect(app, "command-line", G_CALLBACK (@command_line), NULL)
 
   status = g_application_run (app, __FB_ARGC__, __FB_ARGV__)

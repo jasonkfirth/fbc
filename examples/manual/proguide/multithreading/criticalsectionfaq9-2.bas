@@ -6,11 +6,17 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtCriticalSectionsFAQ
 '' --------
 
+'' Worker argument boundary:
+''
+'' Each worker receives only its encoded thread number 1 through 9. The
+'' demonstration converts it through a pointer-sized integer before using it.
+
 Sub Thread (ByVal p As Any Ptr)
-	Color Cast(Integer, p) + 8, Cast(Integer, p)
-	For I As Integer = 1 To 50 - 2 * Cast(Integer, p)
-		Print " " & Cast(Integer, p) & " ";
-		Sleep 20 * Cast(Integer, p), 1
+	Dim As Integer threadNumber = CInt(CLngInt(p))
+	Color threadNumber + 8, threadNumber
+	For I As Integer = 1 To 50 - 2 * threadNumber
+		Print " " & threadNumber & " ";
+		Sleep 20 * threadNumber, 1
 	Next I
 End Sub
 
@@ -36,4 +42,3 @@ Screen 12
 test()
 Print "Any key to quit"
 Sleep
-

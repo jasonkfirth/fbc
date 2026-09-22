@@ -3,7 +3,7 @@
 extern "c++"
 type Fl_Plugin extends object
 private:
-	id as ID_
+	id as Fl_Preferences.ID
 public:
 	declare constructor(klass as const zstring ptr, name as const zstring ptr)
 	declare virtual destructor()
@@ -17,9 +17,9 @@ public:
 	declare function plugins() as long
 	declare function plugin(index as long) as Fl_Plugin ptr
 	declare function plugin(name as const zstring ptr) as Fl_Plugin ptr
-	declare function addPlugin(name as const zstring ptr, plugin as Fl_Plugin ptr) as ID_
-  
-	declare static sub removePlugin(id as ID_)
+	declare function addPlugin(name as const zstring ptr, plugin as Fl_Plugin ptr) as Fl_Preferences.ID
+
+	declare static sub removePlugin(id as Fl_Preferences.ID)
 	declare static function load(filename as const zstring ptr) as long
 	declare static function loadAll(filepath as const zstring ptr, pattern as const zstring ptr=0) as long
 end type

@@ -18,8 +18,9 @@ type art_boolean as integer
 #define M_PI 3.14159265358979323846
 #define M_SQRT2 1.41421356237309504880
 
-declare sub art_die (byval fmt as zstring ptr, ...)
-declare sub art_warn (byval fmt as zstring ptr, ...)
-declare sub art_dprint (byval fmt as zstring ptr, ...)
+' These C APIs are variadic, so they must use FreeBASIC's C calling convention.
+declare sub art_die cdecl (byval fmt as zstring ptr, ...)
+declare sub art_warn cdecl (byval fmt as zstring ptr, ...)
+declare sub art_dprint cdecl (byval fmt as zstring ptr, ...)
 
 #endif

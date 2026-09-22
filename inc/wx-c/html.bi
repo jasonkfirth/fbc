@@ -47,7 +47,7 @@ Declare Function wxHtmlWindow_HistoryForward WXCALL Alias "wxHtmlWindow_HistoryF
 Declare Function wxHtmlWindow_HistoryCanBack WXCALL Alias "wxHtmlWindow_HistoryCanBack" (self As wxHtmlWindow Ptr) As wxBool
 Declare Function wxHtmlWindow_HistoryCanForward WXCALL Alias "wxHtmlWindow_HistoryCanForward" (self As wxHtmlWindow Ptr) As wxBool
 Declare Sub wxHtmlWindow_HistoryClear WXCALL Alias "wxHtmlWindow_HistoryClear" (self As wxHtmlWindow Ptr)
-Declare Function wxHtmlWindow_GetInternalRepresentation WXCALL Alias "wxHtmlWindow_GetInternalRepresentation" (self As wxHtmlWindow Ptr) As wxHtmlContainerCell Ptr 
+Declare Function wxHtmlWindow_GetInternalRepresentation WXCALL Alias "wxHtmlWindow_GetInternalRepresentation" (self As wxHtmlWindow Ptr) As wxHtmlContainerCell Ptr
 Declare Sub wxHtmlWindow_AddFilter WXCALL Alias "wxHtmlWindow_AddFilter" (filter As wxHtmlFilter Ptr )
 Declare Function wxHtmlWindow_GetParser WXCALL Alias "wxHtmlWindow_GetParser" (self As wxHtmlWindow Ptr) As wxHtmlWinParser Ptr
 Declare Sub wxHtmlWindow_AddProcessor WXCALL Alias "wxHtmlWindow_AddProcessor" (self As wxHtmlWindow Ptr, processor As wxHtmlProcessor Ptr)
@@ -182,7 +182,7 @@ Declare Function wxHtmlWinParser_ctor WXCALL Alias "wxHtmlWinParser_ctor" (win A
 Declare Sub wxHtmlWinParser_InitParser WXCALL Alias "wxHtmlWinParser_InitParser" (self As wxHtmlWinParser Ptr, src As wxString Ptr)
 Declare Sub wxHtmlWinParser_DoneParser WXCALL Alias "wxHtmlWinParser_DoneParser" (self As wxHtmlWinParser Ptr)
 Declare Function wxHtmlWinParser_GetProduct WXCALL Alias "wxHtmlWinParser_GetProduct" (self As wxHtmlWinParser Ptr) As wxObject Ptr
-Declare Function wxHtmlWinParser_OpenURL WXCALL Alias "wxHtmlWinParser_OpenURL" (self As wxHtmlWinParser Ptr, typ As wxHtmlURLType, url As wxString Ptr) As wxFSFile Ptr 
+Declare Function wxHtmlWinParser_OpenURL WXCALL Alias "wxHtmlWinParser_OpenURL" (self As wxHtmlWinParser Ptr, typ As wxHtmlURLType, url As wxString Ptr) As wxFSFile Ptr
 Declare Sub wxHtmlWinParser_SetDC WXCALL Alias "wxHtmlWinParser_SetDC" (self As wxHtmlWinParser Ptr, dc As wxDC Ptr, pixelscale As wxDouble)
 Declare Function wxHtmlWinParser_GetDC WXCALL Alias "wxHtmlWinParser_GetDC" (self As wxHtmlWinParser Ptr) As wxDC Ptr
 Declare Function wxHtmlWinParser_GetPixelScale WXCALL Alias "wxHtmlWinParser_GetPixelScale" (self As wxHtmlWinParser Ptr) As wxDouble
@@ -210,9 +210,9 @@ Declare Function wxHtmlWinParser_GetFontFace WXCALL Alias "wxHtmlWinParser_GetFo
 Declare Sub wxHtmlWinParser_SetFontFace WXCALL Alias "wxHtmlWinParser_SetFontFace" (self As wxHtmlWinParser Ptr, face As wxString Ptr)
 Declare Function wxHtmlWinParser_GetAlign WXCALL Alias "wxHtmlWinParser_GetAlign" (self As wxHtmlWinParser Ptr) As wxInt
 Declare Sub wxHtmlWinParser_SetAlign WXCALL Alias "wxHtmlWinParser_SetAlign" (self As wxHtmlWinParser Ptr, align As wxInt)
-Declare Function wxHtmlWinParser_GetLinkColor WXCALL Alias "wxHtmlWinParser_GetLinkColor" (self As wxHtmlWinParser Ptr) As wxColour Ptr 
+Declare Function wxHtmlWinParser_GetLinkColor WXCALL Alias "wxHtmlWinParser_GetLinkColor" (self As wxHtmlWinParser Ptr) As wxColour Ptr
 Declare Sub wxHtmlWinParser_SetLinkColor WXCALL Alias "wxHtmlWinParser_SetLinkColor" (self As wxHtmlWinParser Ptr, col As wxColour Ptr)
-Declare Function wxHtmlWinParser_GetActualColor WXCALL Alias "wxHtmlWinParser_GetActualColor" (self As wxHtmlWinParser Ptr) As wxColour Ptr 
+Declare Function wxHtmlWinParser_GetActualColor WXCALL Alias "wxHtmlWinParser_GetActualColor" (self As wxHtmlWinParser Ptr) As wxColour Ptr
 Declare Sub wxHtmlWinParser_SetActualColor WXCALL Alias "wxHtmlWinParser_SetActualColor" (self As wxHtmlWinParser Ptr, col As wxColour Ptr)
 Declare Function wxHtmlWinParser_GetLink WXCALL Alias "wxHtmlWinParser_GetLink" (self As wxHtmlWinParser Ptr) As wxHtmlLinkInfo Ptr
 Declare Sub wxHtmlWinParser_SetLink WXCALL Alias "wxHtmlWinParser_SetLink" (self As wxHtmlWinParser Ptr, link As wxHtmlLinkInfo Ptr)
@@ -244,7 +244,7 @@ Declare Function wxHtmlParser_GetProduct WXCALL Alias "wxHtmlParser_GetProduct" 
 Declare Sub wxHtmlParser_AddTagHandler WXCALL Alias "wxHtmlParser_AddTagHandler" (self As wxHtmlParser Ptr, handler As wxHtmlTagHandler Ptr)
 Declare Sub wxHtmlParser_PushTagHandler WXCALL Alias "wxHtmlParser_PushTagHandler" (self As wxHtmlParser Ptr, handler As wxHtmlTagHandler Ptr, tags As wxString Ptr)
 Declare Sub wxHtmlParser_PopTagHandler WXCALL Alias "wxHtmlParser_PopTagHandler" (self As wxHtmlParser Ptr)
-Declare Function wxHtmlParser_GetSource WXCALL Alias "wxHtmlParser_GetSource" (self As wxHtmlParser Ptr) As wxString Ptr 
+Declare Function wxHtmlParser_GetSource WXCALL Alias "wxHtmlParser_GetSource" (self As wxHtmlParser Ptr) As wxString Ptr
 Declare Sub wxHtmlParser_SetSource WXCALL Alias "wxHtmlParser_SetSource" (self As wxHtmlParser Ptr, src  As wxString Ptr)
 Declare Sub wxHtmlParser_SetSourceAndSaveState WXCALL Alias "wxHtmlParser_SetSourceAndSaveState" (self As wxHtmlParser Ptr, src As wxString Ptr)
 Declare Function wxHtmlParser_RestoreState WXCALL Alias "wxHtmlParser_RestoreState" (self As wxHtmlParser Ptr) As wxBool
@@ -270,7 +270,7 @@ Declare Sub wxHtmlSelection_SetFromPrivPos WXCALL Alias "wxHtmlSelection_SetFrom
 Declare Sub wxHtmlSelection_SetToPrivPos WXCALL Alias "wxHtmlSelection_SetToPrivPos" (self As wxHtmlSelection Ptr, p As wxPoint Ptr)
 Declare Sub wxHtmlSelection_ClearPrivPos WXCALL Alias "wxHtmlSelection_ClearPrivPos" (self As wxHtmlSelection Ptr)
 Declare Function wxHtmlSelection_IsEmpty WXCALL Alias "wxHtmlSelection_IsEmpty" (self As wxHtmlSelection Ptr) As wxBool
-Declare Function wxHtmlEasyPrinting_ctor WXCALL Alias "wxHtmlEasyPrinting_ctor" (nam As wxString Ptr, parent As wxWindow Ptr) As wxHtmlEasyPrinting Ptr 
+Declare Function wxHtmlEasyPrinting_ctor WXCALL Alias "wxHtmlEasyPrinting_ctor" (nam As wxString Ptr, parent As wxWindow Ptr) As wxHtmlEasyPrinting Ptr
 Declare Function wxHtmlEasyPrinting_PreviewFile WXCALL Alias "wxHtmlEasyPrinting_PreviewFile" (self As wxHtmlEasyPrinting Ptr, htmlfile As wxString Ptr) As wxBool
 Declare Function wxHtmlEasyPrinting_PreviewText WXCALL Alias "wxHtmlEasyPrinting_PreviewText" (self As wxHtmlEasyPrinting Ptr, htmltext As wxString Ptr, basepath As wxString Ptr) As wxBool
 Declare Function wxHtmlEasyPrinting_PrintFile WXCALL Alias "wxHtmlEasyPrinting_PrintFile" (self As wxHtmlEasyPrinting Ptr, htmlfile As wxString Ptr) As wxBool

@@ -6,4 +6,4 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgStep
 '' --------
 
-Line -Step(10,10),13
+Line -Step(10, 10), 13

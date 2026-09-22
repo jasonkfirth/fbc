@@ -34,6 +34,8 @@ Operator UDT.Let (ByRef u As UDT)
 	If @This <> @u Then  '' not self-assignment
 		This.s = u.s
 		If UBound(u.array) >= LBound(u.array) Then  '' explicit array sizing and copying
+			'' The destination is replaced immediately by the source-array copy below.
+			'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-009
 			ReDim This.array(LBound(u.array) To UBound(u.array))
 			memcpy(@This.array(LBound(This.array)), @u.array(LBound(u.array)), (UBound(u.array) - LBound(u.array) + 1) * SizeOf(@u.array(LBound(u.array))))
 		End If
@@ -65,4 +67,3 @@ Next I
 Print
 
 Sleep
-

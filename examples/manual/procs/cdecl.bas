@@ -7,4 +7,4 @@
 '' --------
 
 ' declaring 'strcpy' from the standard C library
-Declare Function strcpy cdecl Alias "strcpy" (ByVal dest As ZString Ptr, ByVal src As ZString Ptr) As ZString Ptr
+Declare Function strcpy cdecl Alias "strcpy" (ByVal dest As ZString Ptr, ByVal src As Const ZString Ptr) As ZString Ptr

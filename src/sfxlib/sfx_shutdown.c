@@ -169,6 +169,12 @@ void fb_sfxAbort(void)
     fb_sfxRuntimeUnlock();
 
     fb_sfxMidiStop();
+#if FB_SFX_DOS_THREADS
+    /* The DOS worker must leave its mixer/write path before buffers or the
+     * DMA driver are released, including this abbreviated shutdown path.
+     */
+    fb_sfxPlatformExit();
+#endif
     fb_sfxDriverShutdown();
 
     fb_sfxRuntimeLock();

@@ -18,6 +18,7 @@ operator eqv _
 
 	dim as VARIANT_ res = any
 
+	VariantInit( @res )
 	VarEqv( @lhs.var_, @rhs.var_, @res )
 
 	return VARIANT( res, FALSE )
@@ -33,9 +34,9 @@ operator eqv _
 
 	dim as VARIANT_ res = any
 
+	VariantInit( @res )
 	VarEqv( @lhs.var_, @rhs, @res )
 
 	return VARIANT( res, FALSE )
 
 end operator
-

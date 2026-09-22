@@ -16,6 +16,8 @@ declare function fb_isr_get cdecl alias "fb_isr_get"( _
 	byval irq_number as uinteger ) as FnIntHandler
 
 
+'' The timer ISR uses this complete data range while DPMI keeps it resident.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared isr_data_start as byte
 dim shared timer_ticks as integer
 dim shared old_isr as FnIntHandler
@@ -54,4 +56,6 @@ while len(inkey)=0: sleep 100: wend
 fb_isr_reset( 0 )
 
 print timer_ticks
+'' The top-level DOS sample must return control to DPMI after restoring the ISR.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-CF-005
 end

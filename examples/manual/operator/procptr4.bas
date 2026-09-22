@@ -42,11 +42,6 @@ End Sub
 
 Dim As Parent Ptr p = New Child
 
-(*p).VirtualTest()      '' or p->VirtualTest()
-Print Cast(Parent, *p)  '' or Print *p
-(*p).NormalTest()       '' or p->NormalTest()
-Print
-
 #define RuntimeProcPtr(instance, procedure, signature...) _   '' pointer to procedure
 	__FB_IIF__(ProcPtr(procedure, Virtual signature) >= 0, _  '' (the most derived override if exists)
 			   CPtr(TypeOf(ProcPtr(procedure, signature)), _
@@ -54,12 +49,21 @@ Print
 					[0][ProcPtr(procedure, Virtual signature)]), _
 			   ProcPtr(procedure, signature))
 
-'' Here, providing the procedure signature to the macro is useless
-'' (because there are no procedure overloads to solve in this case)
-RuntimeProcPtr(*p, Parent.VirtualTest)(*p)  '' execute (*p).VirtualTest() through its vtable index
-Print RuntimeProcPtr(*p, Parent.Cast)(*p)   '' execute Cast(Parent, *p) through its vtable index
-RuntimeProcPtr(*p, Parent.NormalTest)(*p)   '' execute (*p).NormalTest() through its compile address
-Print
+If p <> 0 Then
+  (*p).VirtualTest()      '' or p->VirtualTest()
+  Print Cast(Parent, *p)  '' or Print *p
+  (*p).NormalTest()       '' or p->NormalTest()
+  Print
 
-Delete p
+  '' Here, providing the procedure signature to the macro is useless
+  '' (because there are no procedure overloads to solve in this case)
+  RuntimeProcPtr(*p, Parent.VirtualTest)(*p)  '' execute (*p).VirtualTest() through its vtable index
+  Print RuntimeProcPtr(*p, Parent.Cast)(*p)   '' execute Cast(Parent, *p) through its vtable index
+  RuntimeProcPtr(*p, Parent.NormalTest)(*p)   '' execute (*p).NormalTest() through its compile address
+  Print
+
+  Delete p
+Else
+  Print "Could not allocate Child"
+End If
 Sleep

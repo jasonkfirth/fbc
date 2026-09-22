@@ -1,8 +1,25 @@
+''
+''  Project: FreeBASIC OpenGL examples
+''  File: lesson29.bas
+''
+''  Purpose:
+''      Show raw RGBA image loading and software image blending before an
+''      image is transferred to an OpenGL texture.
+''
+''  Ownership:
+''      Each TEXTURE_IMAGE owns the buffer allocated with it.  InitGL releases
+''      the two temporary images after a successful texture transfer and also
+''      releases any image already allocated when a later setup step fails.
+''
+''  This file intentionally does NOT contain:
+''      - reusable image-file format support
+''      - general-purpose image compositing
+''
 ''  The OpenGL Basecode Used In This Project Was Created By
 ''  Jeff Molofee ( NeHe ).  1997-2000.  If You Find This Code
 ''  Useful, Please Let Me Know.
 ''
-''  Original Code & Tutorial Text By Andreas L�ffler
+''  Original Code & Tutorial Text By Andreas Loffler
 ''  Excellent Job Andreas!
 ''
 ''  Code Heavily Modified By Rob Fletcher ( rpf1@york.ac.uk )
@@ -44,7 +61,7 @@ end type
 declare function AllocateTextureBuffer(byval w as integer, byval h as integer, byval f as integer) as TEXTURE_IMAGE ptr
 declare sub DeallocateTexture(byval t as TEXTURE_IMAGE ptr)
 declare function ReadTextureData(byref filename as string, byval buffer as TEXTURE_IMAGE ptr) as integer
-declare sub BuildTexture(byval tex as TEXTURE_IMAGE ptr)
+declare function BuildTexture(byval tex as TEXTURE_IMAGE ptr) as integer
 declare sub Blit(byval src as TEXTURE_IMAGE ptr, byval dst as TEXTURE_IMAGE ptr, _
 	byval src_xstart as integer, byval src_ystart as integer, byval src_width as integer, _
 	byval src_height as integer, byval dst_xstart as integer, byval dst_ystart as integer, _
@@ -54,14 +71,14 @@ declare function InitGL() as integer
 ''------------------------------------------------------------------------------
 '' Declare Global Variables
 dim shared texture(0) as GLuint     '' Storage For 1 Texture
-dim shared t1 as TEXTURE_IMAGE ptr    '' Pointer To The Texture Image Data Type
-dim shared t2 as TEXTURE_IMAGE ptr    '' Pointer To The Texture Image Data Type
+dim shared t1 as TEXTURE_IMAGE ptr  '' First temporary texture image
+dim shared t2 as TEXTURE_IMAGE ptr  '' Second temporary texture image
 
 	dim xrot as single            '' X Rotation
 	dim yrot as single            '' Y Rotation
 	dim zrot as single            '' Z Rotation
 
-	windowtitle "Andreas L�ffler, Rob Fletcher & NeHe's Blitter & Raw Image Loading Tutorial"   '' Set window title
+	windowtitle "Andreas Loffler, Rob Fletcher & NeHe's Blitter & Raw Image Loading Tutorial"   '' Set window title
 	screen 18, 16, , 2
 
 	'' ReSizeGLScene
@@ -72,7 +89,7 @@ dim shared t2 as TEXTURE_IMAGE ptr    '' Pointer To The Texture Image Data Type
 	glMatrixMode GL_MODELVIEW                  '' Select The Modelview Matrix
 	glLoadIdentity                             '' Reset The Projection Matrix
 
-	InitGL()                                   '' All Setup For OpenGL Goes Here
+	if InitGL() = false then end 1             '' All Setup For OpenGL Goes Here
 
 	do
 		glClear(GL_COLOR_BUFFER_BIT  or  GL_DEPTH_BUFFER_BIT)  '' Clear The Screen And The Depth Buffer
@@ -135,6 +152,11 @@ dim shared t2 as TEXTURE_IMAGE ptr    '' Pointer To The Texture Image Data Type
 	'' Empty keyboard buffer
 	while inkey <> "": wend
 
+	if texture(0) <> 0 then
+		glDeleteTextures(1, @texture(0))
+		texture(0) = 0
+	end if
+
 	end
 
 ''------------------------------------------------------------------------------
@@ -142,25 +164,31 @@ dim shared t2 as TEXTURE_IMAGE ptr    '' Pointer To The Texture Image Data Type
 function AllocateTextureBuffer(byval w as integer, byval h as integer, byval f as integer) as TEXTURE_IMAGE ptr
 	dim ti as TEXTURE_IMAGE ptr         '' Pointer To Image Struct
 	dim c as ubyte ptr                  '' Pointer To Block Memory For Image
+	dim byteCount as ulongint
+
+	'' The multiplication is checked before Allocate receives a size that could
+	'' wrap on a 32-bit target.
+	if w <= 0 or h <= 0 or f <= 0 then exit function
+	if culngint(w) > culngint(&h7fffffff) \ culngint(h) then exit function
+	byteCount = culngint(w) * culngint(h)
+	if byteCount > culngint(&h7fffffff) \ culngint(f) then exit function
+	byteCount = byteCount * culngint(f)
 
 	ti = allocate(len(TEXTURE_IMAGE))   '' One Image Struct Please
 	if ti <> null then
 		ti->wwidth = w                  '' Set Width
 		ti->height = h                  '' Set Height
 		ti->format = f                  '' Set Format
-		c = allocate (w * h * f)
+		c = allocate(byteCount)
 		if c <> null then
 			ti->buffer = c
 		else
-			AllocateTextureBuffer = null
+			deallocate(ti)
+			ti = null
 			exit function
 		end if
-	else
-		AllocateTextureBuffer = null
-		exit function
 	end if
 	AllocateTextureBuffer = ti
-	exit function                       '' Return Pointer To Image Struct
 end function
 
 ''------------------------------------------------------------------------------
@@ -169,6 +197,7 @@ sub DeallocateTexture(byval t as TEXTURE_IMAGE ptr)
 	if t then
 		if t->buffer then
 			deallocate(t->buffer)       '' Free Its Image Buffer
+			t->buffer = null
 		end if
 		deallocate(t)                   '' Free Itself
 	end if
@@ -176,43 +205,74 @@ end sub
 
 ''------------------------------------------------------------------------------
 '' Read A .RAW File In To The Allocated Image Buffer Using Data In The Image Structure Header.
+'' Raw file format: contiguous RGB pixels, left to right and top to bottom,
+'' with no header.  The caller supplies the exact image dimensions.
 '' Flip The Image Top To Bottom.  Returns 0 For Failure Of Read, Or Number Of Bytes Read.
 function ReadTextureData(byref filename as string, byval buffer as TEXTURE_IMAGE ptr) as integer
 	dim f as integer
 	dim i as integer, j as integer, k as integer, done as integer
 	dim stride as integer
 	dim p as ubyte ptr
+	dim alphaPixel as ubyte ptr
 
+	if buffer = null then exit function
+	if buffer->buffer = null then exit function
+	if buffer->wwidth <= 0 or buffer->height <= 0 or buffer->format < 2 then exit function
+	if buffer->wwidth > &h7fffffff \ buffer->format then exit function
 	stride = buffer->wwidth * buffer->format    '' Size Of A Row (Width * Bytes Per Pixel)
 
 	f = freefile
-	if (open (filename, for binary, as #f) = 0) then
-		'' Loop Through Height (Bottoms Up - Flip Image)
-		i=buffer->height-1
-		while i>=0
-			p = buffer->buffer + (i * stride)
-			for j = 0 to buffer->wwidth - 1     '' Loop Through Width
-				for k= 0 to buffer->format-2
-					get #f,, *p                 '' Read Value From File And Store In Memory
-					p = p + 1 : done = done + 1
-				next
-				*p = 255 : p = P + 1            '' Store 255 In Alpha Channel And Increase Pointer
+	open filename for binary as #f
+	if err <> 0 then exit function
+
+	'' Loop Through Height (Bottoms Up - Flip Image)
+	i=buffer->height-1
+	while i>=0
+		p = buffer->buffer + (i * stride)
+		if p = null then
+			close #f
+			exit function
+		end if
+		for j = 0 to buffer->wwidth - 1     '' Loop Through Width
+			for k= 0 to buffer->format-2
+				get #f,, *p                 '' Read Value From File And Store In Memory
+				if err <> 0 then
+					close #f
+					exit function
+				end if
+				p = p + 1 : done = done + 1
 			next
-			i = i - 1
-		wend
-		close #f                                '' Close The File
-	end if
+			alphaPixel = p
+			if alphaPixel = null then
+				close #f
+				exit function
+			end if
+			*alphaPixel = 255 : p = alphaPixel + 1  '' Store alpha and advance to the next pixel
+		next
+		i = i - 1
+	wend
+	close #f                                '' Close The File
 	ReadTextureData = done                      '' Returns Number Of Bytes Read In
 end function
 
 ''------------------------------------------------------------------------------
-sub BuildTexture(byval tex as TEXTURE_IMAGE ptr)
+function BuildTexture(byval tex as TEXTURE_IMAGE ptr) as integer
+	if tex = null then exit function
+	if tex->buffer = null then exit function
+	if tex->wwidth <= 0 or tex->height <= 0 or tex->format <> 4 then exit function
+
 	glGenTextures(1, @texture(0))
+	if texture(0) = 0 then exit function
 	glBindTexture(GL_TEXTURE_2D, texture(0))
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGB, tex->wwidth, tex->height, GL_RGBA, GL_UNSIGNED_BYTE, tex->buffer)
-end sub
+	if gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGB, tex->wwidth, tex->height, GL_RGBA, GL_UNSIGNED_BYTE, tex->buffer) <> 0 then
+		glDeleteTextures(1, @texture(0))
+		texture(0) = 0
+		exit function
+	end if
+	BuildTexture = true
+end function
 
 ''------------------------------------------------------------------------------
 sub Blit(byval src as TEXTURE_IMAGE ptr, byval dst as TEXTURE_IMAGE ptr, _
@@ -222,6 +282,19 @@ sub Blit(byval src as TEXTURE_IMAGE ptr, byval dst as TEXTURE_IMAGE ptr, _
 
 	dim i as integer, j as integer, k as integer
 	dim s as ubyte ptr, d as ubyte ptr          '' Source & Destination
+
+	if src = null then exit sub
+	if dst = null then exit sub
+	if src->buffer = null then exit sub
+	if dst->buffer = null then exit sub
+	if src->wwidth <= 0 or src->height <= 0 or src->format <= 0 then exit sub
+	if dst->wwidth <= 0 or dst->height <= 0 or dst->format <> src->format then exit sub
+	if src_xstart < 0 or src_ystart < 0 or dst_xstart < 0 or dst_ystart < 0 then exit sub
+	if src_width <= 0 or src_height <= 0 then exit sub
+	if src_xstart > src->wwidth - src_width then exit sub
+	if src_ystart > src->height - src_height then exit sub
+	if dst_xstart > dst->wwidth - src_width then exit sub
+	if dst_ystart > dst->height - src_height then exit sub
 
 	'' Clamp Alpha If Value Is Out Of Range
 	if alpha > 255 then alpha = 255
@@ -259,24 +332,42 @@ end sub
 '' This Will Be Called Right After The GL Window Is Set up
 function InitGL() as integer
 	t1 = AllocateTextureBuffer(128, 128, 4)             '' Get An Image Structure
+	if t1 = null then exit function
 	'' Fill The Image Structure With Data
 	if ReadTextureData(exepath + "/data/Monitor.raw", t1) = 0 then '' Nothing Read?
-		InitGL = false
+		DeallocateTexture(t1)
+		t1 = null
 		exit function
 	end if
 	t2 = AllocateTextureBuffer(128, 128, 4)             '' Second Image Structure
+	if t2 = null then
+		DeallocateTexture(t1)
+		t1 = null
+		exit function
+	end if
 	'' Fill The Image Structure With Data
 	if ReadTextureData(exepath + "/data/GL.raw", t2) = 0 then      '' Nothing Read?
-		InitGL = false
+		DeallocateTexture(t1)
+		t1 = null
+		DeallocateTexture(t2)
+		t2 = null
 		exit function
 	end if
 	'' Image To Blend In, Original Image, Src Start X & Y, Src Width & Height, Dst Location X & Y, Blend Flag, Alpha Value
 	Blit(t2, t1, 63, 63, 64, 64, 32, 32, 1, 127)    '' Call The Blitter Routine
 
-	BuildTexture(t1)                                    '' Load The Texture Map Into Texture Memory
+	if BuildTexture(t1) = false then
+		DeallocateTexture(t1)
+		t1 = null
+		DeallocateTexture(t2)
+		t2 = null
+		exit function
+	end if
 
 	DeallocateTexture(t1)                               '' Clean Up Image Memory Because Texture Is
 	DeallocateTexture(t2)                               '' In GL Texture Memory Now
+	t1 = null
+	t2 = null
 
 	glEnable(GL_TEXTURE_2D)                             '' Enable Texture Mapping
 
@@ -289,3 +380,4 @@ function InitGL() as integer
 	InitGL = true
 end function
 
+'' End of lesson29.bas

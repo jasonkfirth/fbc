@@ -3,7 +3,7 @@
 
 #Include Once "common.bi"
 
-Type Virtual_VoidNoParams     As Sub      WXCALL 
+Type Virtual_VoidNoParams     As Sub      WXCALL
 Type Virtual_VoidSizeT        As Sub      WXCALL (s As size_t)
 Type Virtual_wxStringSizeT    As Function WXCALL (s As size_t) As _DisposableStringBox Ptr
 Type Virtual_wxColourwxColour As Function WXCALL (col As wxColour Ptr) As wxColour Ptr

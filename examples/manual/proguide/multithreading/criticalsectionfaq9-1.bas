@@ -6,21 +6,28 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtCriticalSectionsFAQ
 '' --------
 
+'' Thread mutex synchronization:
+''
+'' Every Locate, Print, and saved cursor state operation is protected by mutex.
+'' The worker argument carries only the documented small thread number 1 through
+'' 9, which is converted through a pointer-sized integer before use.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 Dim Shared As Any Ptr mutex
 
 Sub Thread (ByVal p As Any Ptr)
+	Dim As Integer threadNumber = CInt(CLngInt(p))
 	MutexLock(mutex)
 	Dim As Long l0 = Locate()
-	Locate Cast(Integer, p), Cast(Integer, p)
+	Locate threadNumber, threadNumber
 	Dim As Long l = Locate()
 	Locate HiByte(LoWord(l0)), LoByte(LoWord(l0)), HiWord(l0)
 	MutexUnlock(mutex)
-	For I As Integer = 1 To 50 - 2 * Cast(Integer, p)
-		Sleep 20 * Cast(Integer, p), 1
+	For I As Integer = 1 To 50 - 2 * threadNumber
+		Sleep 20 * threadNumber, 1
 		MutexLock(mutex)
 		l0 = Locate()
 		Locate HiByte(LoWord(l)), LoByte(LoWord(l)), HiWord(l)
-		Print Str(Cast(Integer, p));
+		Print Str(threadNumber);
 		l = Locate()
 		Locate HiByte(LoWord(l0)), LoByte(LoWord(l0)), HiWord(l0)
 		MutexUnlock(mutex)
@@ -53,4 +60,3 @@ Print "Any key to quit"
 Sleep
 
 MutexDestroy(mutex)
-

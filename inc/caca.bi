@@ -622,8 +622,8 @@ declare function cucul_set_canvas_boundaries alias "caca_set_canvas_boundaries"(
 
 declare function cucul_get_import_list alias "caca_get_import_list"() as const zstring const ptr ptr
 declare function cucul_create_canvas alias "caca_create_canvas"(byval as long, byval as long) as caca_canvas_t ptr
-declare function cucul_manage_canvas alias "caca_manage_canvas"(byval as caca_canvas_t ptr, byval as function(byval as any ptr) as long, byval as any ptr) as long
-declare function cucul_unmanage_canvas alias "caca_unmanage_canvas"(byval as caca_canvas_t ptr, byval as function(byval as any ptr) as long, byval as any ptr) as long
+declare function cucul_manage_canvas alias "caca_manage_canvas"(byval as caca_canvas_t ptr, byval as function cdecl(byval as any ptr) as long, byval as any ptr) as long
+declare function cucul_unmanage_canvas alias "caca_unmanage_canvas"(byval as caca_canvas_t ptr, byval as function cdecl(byval as any ptr) as long, byval as any ptr) as long
 declare function cucul_set_canvas_size alias "caca_set_canvas_size"(byval as caca_canvas_t ptr, byval as long, byval as long) as long
 declare function cucul_get_canvas_width alias "caca_get_canvas_width"(byval as const caca_canvas_t ptr) as long
 declare function cucul_get_canvas_height alias "caca_get_canvas_height"(byval as const caca_canvas_t ptr) as long

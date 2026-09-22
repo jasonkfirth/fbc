@@ -1,9 +1,22 @@
+'' Project: FreeBASIC OpenGL examples
+'' File: gl_test.bas
+''
+'' Purpose:
+''     Demonstrate GLUT-managed rendering, input, reshape callbacks, and a
+''     simple lit OpenGL scene.
+''
+'' Responsibilities:
+''     - initialize the GLUT window and callbacks
+''     - render rotating primitive geometry
+''     - end the program after an Escape-key callback
+''
+'' This file intentionally does NOT contain:
+''     - application-owned OpenGL resources
+''     - a custom GLUT event loop
 ''
 '' gltest.bas - freeBASIC opengl example, using GLUT for simplicity
 '' by Blitz
-''
 '' Opengl code ported from nehe's gl tutorials
-''
 
 #include once "GL/gl.bi"
 #include once "GL/glu.bi"
@@ -13,15 +26,10 @@
 declare sub         doMain           ( )
 declare sub         doShutdown		 ( )
 
-
-
     ''
     '' Entry point
     ''
     doMain
-
-
-
 
 '' ::::::::::::
 '' name: doRender
@@ -43,40 +51,40 @@ sub doRender cdecl
 		glColor3f   1.0, 0.0, 0.0			'' Red
 		glVertex3f  0.0, 1.0, 0.0			'' Top Of Triangle  Front)
 		glColor3f   0.0, 1.0, 0.0			'' Green
-		glVertex3f -1.0,-1.0, 1.0			'' Left Of Triangle  Front)
+		glVertex3f -1.0, -1.0, 1.0			'' Left Of Triangle  Front)
 		glColor3f   0.0, 0.0, 1.0			'' Blue
-		glVertex3f  1.0,-1.0, 1.0			'' Right Of Triangle  Front)
+		glVertex3f  1.0, -1.0, 1.0			'' Right Of Triangle  Front)
 		glColor3f   1.0, 0.0, 0.0			'' Red
 		glVertex3f  0.0, 1.0, 0.0			'' Top Of Triangle  Right)
 		glColor3f   0.0, 0.0, 1.0			'' Blue
-		glVertex3f  1.0,-1.0, 1.0			'' Left Of Triangle  Right)
+		glVertex3f  1.0, -1.0, 1.0			'' Left Of Triangle  Right)
 		glColor3f   0.0, 1.0, 0.0			'' Green
-		glVertex3f  1.0,-1.0,-1.0			'' Right Of Triangle  Right)
-        glColor3f   1.0, 0.0, 0.0			'' Red
+		glVertex3f  1.0, -1.0, -1.0			'' Right Of Triangle  Right)
+    glColor3f   1.0, 0.0, 0.0			'' Red
 		glVertex3f  0.0, 1.0, 0.0			'' Top Of Triangle  Back)
 		glColor3f   0.0, 1.0, 0.0			'' Green
-		glVertex3f  1.0,-1.0,-1.0			'' Left Of Triangle  Back)
+		glVertex3f  1.0, -1.0, -1.0			'' Left Of Triangle  Back)
 		glColor3f   0.0, 0.0, 1.0			'' Blue
-		glVertex3f -1.0,-1.0,-1.0			'' Right Of Triangle  Back)
+		glVertex3f -1.0, -1.0, -1.0			'' Right Of Triangle  Back)
 		glColor3f   1.0, 0.0, 0.0			'' Red
 		glVertex3f  0.0, 1.0, 0.0			'' Top Of Triangle  Left)
 		glColor3f   0.0, 0.0, 1.0			'' Blue
-		glVertex3f -1.0,-1.0,-1.0			'' Left Of Triangle  Left)
+		glVertex3f -1.0, -1.0, -1.0			'' Left Of Triangle  Left)
 		glColor3f   0.0, 1.0, 0.0			'' Green
-		glVertex3f -1.0,-1.0, 1.0			'' Right Of Triangle  Left)
+		glVertex3f -1.0, -1.0, 1.0			'' Right Of Triangle  Left)
     glEnd
 
     glColor3f 0.5, 0.5, 1.0
     glLoadIdentity
     glTranslatef -1.5, 0.0, -6.0
-	glTranslatef 3.0,0.0,0.0
+	glTranslatef 3.0, 0.0, 0.0
 	glRotatef rqud, 1.0, 0.0, 0.0
 
 	glBegin GL_QUADS
 		glVertex3f -1.0, 1.0, 0.0
 		glVertex3f  1.0, 1.0, 0.0
-		glVertex3f  1.0,-1.0, 0.0
-		glVertex3f -1.0,-1.0, 0.0
+		glVertex3f  1.0, -1.0, 0.0
+		glVertex3f -1.0, -1.0, 0.0
 	glEnd
 
     glPopMatrix
@@ -87,16 +95,14 @@ sub doRender cdecl
 
 end sub
 
-
-
 '' ::::::::::::
 '' name: doInput
 '' desc: Handles input
 ''
 '' ::::::::::::
 sub doInput CDECL ( byval kbcode as unsigned byte, _
-              byval mousex as integer, _
-              byval mousey as integer )
+              byval mousex as long, _
+              byval mousey as long )
 
     if ( kbcode = 27 ) then
         doShutdown
@@ -105,8 +111,6 @@ sub doInput CDECL ( byval kbcode as unsigned byte, _
 
 end sub
 
-
-
 '' ::::::::::::
 '' name: doInitGL
 '' desc: Inits OpenGL
@@ -114,9 +118,9 @@ end sub
 '' ::::::::::::
 sub doInitGL
     dim i as integer
-    dim lightAmb(3) as single
-    dim lightDif(3) as single
-    dim lightPos(3) as single
+    dim lightAmb(0 to 3) as single
+    dim lightDif(0 to 3) as single
+    dim lightPos(0 to 3) as single
 
     ''
     '' Rendering stuff
@@ -144,7 +148,7 @@ sub doInitGL
 
     glLightfv GL_LIGHT1, GL_AMBIENT, @lightAmb(0)
 	glLightfv GL_LIGHT1, GL_DIFFUSE, @lightDif(0)
-	glLightfv GL_LIGHT1, GL_POSITION,@lightPos(0)
+	glLightfv GL_LIGHT1, GL_POSITION, @lightPos(0)
 	glEnable GL_LIGHT1
 
     ''
@@ -155,15 +159,13 @@ sub doInitGL
 
 end sub
 
-
-
 '' ::::::::::::
 '' name: doReshapeGL
 '' desc: Reshapes GL window
 ''
 '' ::::::::::::
-sub doReshapeGL CDECL ( byval w as integer, _
-                        byval h as integer )
+sub doReshapeGL CDECL ( byval w as long, _
+                        byval h as long )
 
     glViewport 0, 0, w, h
     glMatrixMode GL_PROJECTION
@@ -247,4 +249,4 @@ sub doMain
 
 end sub
 
-
+'' End of gl_test.bas

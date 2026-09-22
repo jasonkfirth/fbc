@@ -1,3 +1,6 @@
+#ifndef FB_EXAMPLES_WIN32_VARIANTS_LIBVARIANT_INTERN_BI
+#define FB_EXAMPLES_WIN32_VARIANTS_LIBVARIANT_INTERN_BI
+
 '':::::
 #macro VAR_GEN_CTOR( r_type, vt_type )
 	constructor VARIANT _
@@ -27,6 +30,8 @@
 
 	end operator
 #endmacro
+
+#endif
 
 '':::::
 #macro VAR_GEN_CAST( ret_type, vt_type )
@@ -58,6 +63,7 @@
 		dim as VARIANT_ tmp = any, res = any
 
 		VariantInit( @tmp )
+		VariantInit( @res )
 		V_VT(@tmp) = VT_##vt_type
 		V_##vt_type(@tmp) = rhs
 
@@ -79,6 +85,7 @@
 		dim as VARIANT_ tmp = any, res = any
 
 		VariantInit( @tmp )
+		VariantInit( @res )
 		V_VT(@tmp) = VT_##vt_type
 		V_##vt_type(@tmp) = lhs
 
@@ -99,13 +106,14 @@
 		dim as VARIANT_ tmp = any, res = any
 
 		VariantInit( @tmp )
+		VariantInit( @res )
 		V_VT(@tmp) = VT_##vt_type
 		V_##vt_type(@tmp) = rhs
 
-		proc( @this.var_, @tmp, @res )
-
-		VariantClear( @this.var_ )
-		this.var_ = res
+		if proc( @this.var_, @tmp, @res ) = 0 then
+			VariantClear( @this.var_ )
+			this.var_ = res
+		end if
 
 	end operator
 #endmacro

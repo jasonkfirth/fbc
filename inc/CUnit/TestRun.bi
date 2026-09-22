@@ -24,10 +24,13 @@
 
 #pragma once
 
-#include once "CUnit.bi"
 #include once "CUError.bi"
 #include once "TestDB.bi"
 #include once "crt/stdio.bi"
+
+'' TestRun only needs the error, registry, and stdio declarations above.
+'' Omitting the umbrella CUnit include keeps this leaf header's declaration
+'' order independent when it is included directly.
 
 extern "C"
 
@@ -72,13 +75,16 @@ type CU_RunSummary
 end type
 
 type CU_pRunSummary as CU_RunSummary ptr
-type CU_SuiteStartMessageHandler as sub(byval pSuite as const CU_pSuite)
-type CU_TestStartMessageHandler as sub(byval pTest as const CU_pTest, byval pSuite as const CU_pSuite)
-type CU_TestCompleteMessageHandler as sub(byval pTest as const CU_pTest, byval pSuite as const CU_pSuite, byval pFailure as const CU_pFailureRecord)
-type CU_SuiteCompleteMessageHandler as sub(byval pSuite as const CU_pSuite, byval pFailure as const CU_pFailureRecord)
-type CU_AllTestsCompleteMessageHandler as sub(byval pFailure as const CU_pFailureRecord)
-type CU_SuiteInitFailureMessageHandler as sub(byval pSuite as const CU_pSuite)
-type CU_SuiteCleanupFailureMessageHandler as sub(byval pSuite as const CU_pSuite)
+'' These aliases already denote pointers. FreeBASIC does not permit Const
+'' on a pointer alias, so the callback ABI uses the equivalent unqualified
+'' pointer parameter spelling here.
+type CU_SuiteStartMessageHandler as sub(byval pSuite as CU_pSuite)
+type CU_TestStartMessageHandler as sub(byval pTest as CU_pTest, byval pSuite as CU_pSuite)
+type CU_TestCompleteMessageHandler as sub(byval pTest as CU_pTest, byval pSuite as CU_pSuite, byval pFailure as CU_pFailureRecord)
+type CU_SuiteCompleteMessageHandler as sub(byval pSuite as CU_pSuite, byval pFailure as CU_pFailureRecord)
+type CU_AllTestsCompleteMessageHandler as sub(byval pFailure as CU_pFailureRecord)
+type CU_SuiteInitFailureMessageHandler as sub(byval pSuite as CU_pSuite)
+type CU_SuiteCleanupFailureMessageHandler as sub(byval pSuite as CU_pSuite)
 
 declare sub CU_set_suite_start_handler(byval pSuiteStartMessage as CU_SuiteStartMessageHandler)
 declare sub CU_set_test_start_handler(byval pTestStartMessage as CU_TestStartMessageHandler)

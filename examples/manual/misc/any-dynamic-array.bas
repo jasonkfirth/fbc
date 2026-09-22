@@ -7,7 +7,10 @@
 '' --------
 
 Dim a(Any) As Integer ' 1-dimensional dynamic array
+'' `Any` declares an unsized dynamic dimension, not a zero-based fixed array.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-OPT-003
 Dim b(Any, Any) As Integer ' 2-dimensional dynamic array
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-OPT-003
 Dim c(Any, Any, Any) As Integer ' 3-dimensional dynamic array
 ' etc.
 

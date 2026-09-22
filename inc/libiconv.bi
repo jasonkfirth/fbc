@@ -17,7 +17,7 @@
 ''   You should have received a copy of the GNU Library General Public
 ''   License along with the GNU LIBICONV Library; see the file COPYING.LIB.
 ''   If not, write to the Free Software Foundation, Inc., 51 Franklin Street,
-''   Fifth Floor, Boston, MA 02110-1301, USA.  
+''   Fifth Floor, Boston, MA 02110-1301, USA.
 ''
 '' translated to FreeBASIC by:
 ''   FreeBASIC development team
@@ -130,11 +130,11 @@ const ICONV_SET_HOOKS = 5
 const ICONV_SET_FALLBACKS = 6
 
 #ifdef __FB_DARWIN__
-	declare sub libiconvlist alias "iconvlist"(byval do_one as function(byval namescount as ulong, byval names as const zstring const ptr ptr, byval data as any ptr) as long, byval data as any ptr)
-	declare sub iconvlist(byval do_one as function(byval namescount as ulong, byval names as const zstring const ptr ptr, byval data as any ptr) as long, byval data as any ptr)
+	declare sub libiconvlist alias "iconvlist"(byval do_one as function cdecl(byval namescount as ulong, byval names as const zstring const ptr ptr, byval data as any ptr) as long, byval data as any ptr)
+	declare sub iconvlist(byval do_one as function cdecl(byval namescount as ulong, byval names as const zstring const ptr ptr, byval data as any ptr) as long, byval data as any ptr)
 #else
-	declare sub libiconvlist(byval do_one as function(byval namescount as ulong, byval names as const zstring const ptr ptr, byval data as any ptr) as long, byval data as any ptr)
-	declare sub iconvlist alias "libiconvlist"(byval do_one as function(byval namescount as ulong, byval names as const zstring const ptr ptr, byval data as any ptr) as long, byval data as any ptr)
+	declare sub libiconvlist(byval do_one as function cdecl(byval namescount as ulong, byval names as const zstring const ptr ptr, byval data as any ptr) as long, byval data as any ptr)
+	declare sub iconvlist alias "libiconvlist"(byval do_one as function cdecl(byval namescount as ulong, byval names as const zstring const ptr ptr, byval data as any ptr) as long, byval data as any ptr)
 #endif
 declare function iconv_canonicalize(byval name as const zstring ptr) as const zstring ptr
 declare sub libiconv_set_relocation_prefix(byval orig_prefix as const zstring ptr, byval curr_prefix as const zstring ptr)

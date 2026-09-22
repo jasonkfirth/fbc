@@ -6,6 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgWindow
 '' --------
 
+'' Mode 13 is the documented compatibility mode for this WINDOW lesson.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL734
 Screen 13
 
 '' define clipping area
@@ -15,11 +17,11 @@ View ( 10, 10 ) - ( 310, 150 ), 1, 15
 Window ( -1, -1 ) - ( 1, 1 )
 
 '' Draw X axis
-Line (-1,0)-(1,0),7
+Line (-1, 0)-(1, 0), 7
 Draw String ( 0.8, -0.1 ), "X"
 
 '' Draw Y axis
-Line (0,-1)-(0,1),7
+Line (0, -1)-(0, 1), 7
 Draw String ( 0.1, 0.8 ), "Y"
 
 Dim As Single x, y, s

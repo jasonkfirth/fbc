@@ -14,10 +14,10 @@ Function maxRef (ByRef r1 As Integer, ByRef r2 As Integer) ByRef As Integer
   End If
 End Function
 
-Dim As Integer i1 = 1, i2 = 2
+Dim As Integer i1 = 1
+Dim As Integer i2 = 2
 Print i1, i2
 maxRef(i1, i2) = 3
 Print i1, i2
 
 Sleep
-

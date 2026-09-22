@@ -7,6 +7,7 @@
 ''    Copyright (C) 1998-2009 VLC authors and VideoLAN
 ''    $Id: cf263b0536d9b19e725e039f12ef20eaa392fec3 $
 ''
+'' FB-LINTER: DISABLE-NEXT-LINE FBL004
 ''    Authors: Clément Stenac <zorglub@videolan.org>
 ''             Jean-Paul Saman <jpsaman@videolan.org>
 ''             Pierre d'Herbemont <pdherbemont@videolan.org>
@@ -30,6 +31,10 @@
 ''   FreeBASIC development team
 
 #pragma once
+
+#include once "libvlc_media_list.bi"
+
+#include once "libvlc.bi"
 
 extern "C"
 

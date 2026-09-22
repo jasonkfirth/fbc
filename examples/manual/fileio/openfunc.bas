@@ -7,13 +7,16 @@
 '' --------
 
 'function version of OPEN
-If Open("file.ext" For Binary Access Read As #1) = 0 Then
+Dim file_number As Integer
+file_number = FreeFile
+
+If Open("file.ext" For Binary Access Read As #file_number) = 0 Then
 
 	Print "Successfully opened file"
 
 	'' ...
 
-	Close #1
+	Close #file_number
 
 Else
 

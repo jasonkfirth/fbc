@@ -24,10 +24,20 @@
 '' Common window constants
 '' Setup our booleans
 const null = 0
+const TEXTURE_COUNT = 5
+const LAST_TEXTURE_INDEX = TEXTURE_COUNT - 1
+const DEMO_SCREEN_MODE = 18
+const DEMO_SCREEN_DEPTH = 16
+const DEMO_SCREEN_PAGES = 2
+const DEMO_WINDOW_WIDTH = 640
+const DEMO_WINDOW_HEIGHT = 480
+const DEMO_VIEW_FOV = 45.0
+const DEMO_NEAR_PLANE = 0.1
+const DEMO_FAR_PLANE = 100.0
 declare function LoadGLTextures() as integer
 
 	'' Global variable
-	dim shared texture(5) as GLuint        '' Storage For Our Five Textures
+	dim shared texture(0 to LAST_TEXTURE_INDEX) as GLuint '' Storage For Our Five Textures
 
 	'' Local variables
 	dim roll    as single                    '' Rolling Texture
@@ -37,12 +47,12 @@ declare function LoadGLTextures() as integer
 
 	'' Start
 
-	screen 18, 16, , 2
+	screen DEMO_SCREEN_MODE, DEMO_SCREEN_DEPTH, , DEMO_SCREEN_PAGES
 
-	glViewport 0, 0, 640, 480
+	glViewport 0, 0, DEMO_WINDOW_WIDTH, DEMO_WINDOW_HEIGHT
 	glMatrixMode GL_PROJECTION
 	glLoadIdentity
-	gluPerspective 45.0, 640.0/480.0, 0.1, 100.0
+	gluPerspective DEMO_VIEW_FOV, DEMO_WINDOW_WIDTH / DEMO_WINDOW_HEIGHT, DEMO_NEAR_PLANE, DEMO_FAR_PLANE
 	glMatrixMode GL_MODELVIEW
 	glLoadIdentity
 
@@ -62,7 +72,7 @@ declare function LoadGLTextures() as integer
 	do
 		glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)      '' Clear The Screen And The Depth Buffer
 		glLoadIdentity()                                         '' Reset The Modelview Matrix
-		glTranslatef(0.0,0.0,-2.0)                               '' Move Into The Screen 5 Units
+		glTranslatef(0.0, 0.0, -2.0)                               '' Move Into The Screen 5 Units
 
 		glBindTexture(GL_TEXTURE_2D, texture(0))                 '' Select Our Logo Texture
 		glBegin(GL_QUADS)                    '' Start Drawing A Textured Quad
@@ -76,12 +86,12 @@ declare function LoadGLTextures() as integer
 		glDisable(GL_DEPTH_TEST)             '' Disable Depth Testing
 
 		if masking then                      '' Is Masking Enabled?
-			glBlendFunc(GL_DST_COLOR,GL_ZERO)  '' Blend Screen Color With Zero (Black)
+			glBlendFunc(GL_DST_COLOR, GL_ZERO)  '' Blend Screen Color With Zero (Black)
 		end if
 
 		if (scene) then                      '' Are We Drawing The Second Scene?
-			glTranslatef(0.0,0.0,-1.0)         '' Translate Into The Screen One Unit
-			glRotatef(roll*360,0.0,0.0,1.0)    '' Rotate On The Z Axis 360 Degrees.
+			glTranslatef(0.0, 0.0, -1.0)         '' Translate Into The Screen One Unit
+			glRotatef(roll*360, 0.0, 0.0, 1.0)    '' Rotate On The Z Axis 360 Degrees.
 			if masking then                    '' Is Masking On?
 				glBindTexture(GL_TEXTURE_2D, texture(3))          '' Select The Second Mask Texture
 				glBegin(GL_QUADS)           '' Start Drawing A Textured Quad
@@ -134,11 +144,11 @@ declare function LoadGLTextures() as integer
 		flip
 
 		'' Keyboard handlers
-		if MULTIKEY(FB.SC_M) and not sm then masking = not masking : sm = true
-		if not MULTIKEY(FB.SC_M) then sm = false
+		if (MULTIKEY(FB.SC_M) <> 0) andalso (sm = 0) then masking = (masking = 0) : sm = true
+		if MULTIKEY(FB.SC_M) = 0 then sm = false
 
-		if MULTIKEY(FB.SC_SPACE) and not sp then scene = not scene : sp = true
-		if not MULTIKEY(FB.SC_SPACE) then sp = false
+		if (MULTIKEY(FB.SC_SPACE) <> 0) andalso (sp = 0) then scene = (scene = 0) : sp = true
+		if MULTIKEY(FB.SC_SPACE) = 0 then sp = false
 
 	loop while MULTIKEY(FB.SC_ESCAPE) = 0
 
@@ -151,7 +161,7 @@ declare function LoadGLTextures() as integer
 function LoadGLTextures() as integer
   dim gloop as integer
 
-  dim TextureImage(5) as BITMAP_RGBImageRec ptr           '' Create Storage Space For The Textures
+  dim TextureImage(0 to LAST_TEXTURE_INDEX) as BITMAP_RGBImageRec ptr '' Create Storage Space For The Textures
 
   TextureImage(0)=LoadBMP(exepath + "/data/Logo.bmp")                '' Logo Texture
   TextureImage(1)=LoadBMP(exepath + "/data/Mask1.bmp")               '' First Mask
@@ -160,24 +170,24 @@ function LoadGLTextures() as integer
   TextureImage(4)=LoadBMP(exepath + "/data/Image2.bmp")              '' Second Image
 
   if (TextureImage(0) <> NULL and _
-  	  TextureImage(1) <> NULL and _
-  	  TextureImage(2) <> NULL and _
-  	  TextureImage(3) <> NULL and _
-  	  TextureImage(4) <> NULL) then
+	  TextureImage(1) <> NULL and _
+	  TextureImage(2) <> NULL and _
+	  TextureImage(3) <> NULL and _
+	  TextureImage(4) <> NULL) then
     LoadGLTextures = true
-    glGenTextures(5, @texture(0))     '' Create Five Textures
+    glGenTextures(TEXTURE_COUNT, @texture(0))     '' Create Five Textures
 
-    for gloop=0 to 4                  '' Loop Through All 5 Textures
+    for gloop=0 to LAST_TEXTURE_INDEX  '' Loop Through All 5 Textures
       glBindTexture(GL_TEXTURE_2D, texture(gloop))
-      glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR)
-      glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR)
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
       glTexImage2D(GL_TEXTURE_2D, 0, 3, TextureImage(gloop)->sizeX, TextureImage(gloop)->sizeY, 0, GL_RGB, GL_UNSIGNED_BYTE, TextureImage(gloop)->buffer)
     next
   else
     LoadGLTextures = false              '' Set return value to FALSE if textures not loaded
   end if
 
-  for gloop=0 to 4                     '' Loop Through All 5 Textures
+  for gloop=0 to LAST_TEXTURE_INDEX     '' Loop Through All 5 Textures
     if (TextureImage(gloop)) then      '' If Texture Exists
       if (TextureImage(gloop)->buffer) then               '' If Texture Image Exists
         deallocate(TextureImage(gloop)->buffer)           '' Free The Texture Image Memory

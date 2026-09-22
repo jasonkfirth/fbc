@@ -11,6 +11,8 @@ Const TTF_FONT = "Vera.ttf"
 Const SCREEN_W = 320
 Const SCREEN_H = 240
 
+'' Text helpers share the active FreeType handles initialized by the module.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 Dim Shared As Integer pixelsize
 Dim Shared As FT_Library library
 Dim Shared As FT_Face font1
@@ -23,6 +25,8 @@ Sub draw_glyph _
         ByVal col As UInteger _
     )
 
+    If font = 0 Then Exit Sub
+
     Dim As FT_Bitmap Ptr bitmap = @font->glyph->bitmap
 
     Dim As UByte Ptr source = bitmap->buffer
@@ -30,6 +34,8 @@ Sub draw_glyph _
     Dim As Integer pitch = SCREEN_W - bitmap->width
 
     Dim As UInteger Ptr p = CPtr(UInteger Ptr, ScreenPtr()) + (y * SCREEN_W) + x
+
+    If source = 0 OrElse p = 0 Then Exit Sub
 
     While (h > 0)
         Dim As Integer w = bitmap->width
@@ -49,6 +55,8 @@ Sub draw_glyph _
             srb = ((srb - drb) * Alpha) Shr 8
             sg  = ((sg - dg) * Alpha) Shr 8
 
+            '' source and p were checked before this glyph-row loop.
+            '' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
             *p = ((drb + srb) And MASK_RB_32) Or ((dg + sg) And MASK_G_32)
 
             p += 1

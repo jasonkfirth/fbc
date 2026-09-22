@@ -2,7 +2,7 @@
 #include once "fl_draw.bi"
 #include once "crt/stdio.bi"
 
-extern "c" 
+extern "c"
 type Fl_PostScript_Close_Command as function(as FILE ptr) as long
 end extern
 
@@ -13,7 +13,7 @@ public:
 	prev as Clip_ ptr
 end type
 
-type Fl_PostScript_Graphics_Driver extends Fl_Graphics_Driver 
+type Fl_PostScript_Graphics_Driver extends Fl_Graphics_Driver
 private:
 	declare sub transformed_draw_extra(str_ as const zstring ptr, n as long, x as double, y as double, w as long, rtl as boolean)
 	declare function prepare_rle85() as any ptr
@@ -34,14 +34,14 @@ public:
 		POINTS
 	end enum
 	clip__ as Clip_ ptr
-  
+
 	lang_level_ as long
 	gap_ as long
 	pages_ as long
-  
+
 	width__ as double
 	height_ as double
-  
+
 	shape_ as long
 	linewidth_ as long
 	linestyle_ as long
@@ -52,7 +52,7 @@ public:
 	declare sub reconcat()
 	declare sub recover()
 	declare sub reset()
-  
+
 	mask as ubyte ptr
 	mx as long
 	my as long
@@ -60,60 +60,60 @@ public:
 	page_policy_ as long
 	nPages as long
 	orientation_ as long
-  
+
 	scale_x as single
 	scale_y as single
 	angle as single
 	left_margin as long
 	top_margin as long
- 
+
 	output as FILE ptr
 	as double pw_, ph_
-  
+
 	as ubyte bg_r, bg_g, bg_b
 	declare function start_postscript (pagecount as long, format as Fl_Paged_Device.Page_Format, layout as Fl_Paged_Device.Page_Layout) as long
 	declare sub transformed_draw(s as const zstring ptr, n as long, x as double, y as double)
 	declare sub transformed_draw(s as const zstring ptr, x as double, y as double)
 	declare function alpha_mask(data_ as const ubyte ptr, w as long, h as long, D as long, LD as long=0) as long
-  
+
 	page_format_ as long'Fl_Paged_Device.Page_Format
 	ps_filename_ as zstring ptr
- 
+
 	declare sub page_policy(p as long)
 	declare function page_policy() as long
 	declare sub close_command(cmd as Fl_PostScript_Close_Command)
 	declare function file_() as FILE ptr
 	declare sub interpolate(i as long)
 	declare function interpolate() as long
-  
+
 	declare sub page(pw as double, ph as double, media as long = 0)
 	declare sub page(format as long)
 
 	declare sub color(c as Fl_Color)
 	declare sub color(r as ubyte, g as ubyte, b as ubyte)
-  
+
 	declare sub push_clip(x as long, y as long, w as long, h as long)
 	declare function clip_box(x as long, y as long, w as long, h as long, byref X1 as long, byref Y1 as long, byref W1 as long, byref H1 as long) as long
 	declare function not_clipped(x as long, y as long, w as long, h as long) as long
 	declare sub push_no_clip()
 	declare sub pop_clip()
-  
+
 	declare sub line_style(style as long, width_ as long=0, dashes as zstring ptr=0)
-  
+
 	declare sub rect(x as long, y as long, w as long, h as long)
 	declare sub rectf(x as long, y as long, w as long, h as long)
-  
+
 	declare sub xyline(x as long, y as long, x1 as long)
 	declare sub xyline(x as long, y as long, x1 as long, y2 as long)
 	declare sub xyline(x as long, y as long, x1 as long, y2 as long, x3 as long)
-  
+
 	declare sub yxline(x as long, y as long, y1 as long)
 	declare sub yxline(x as long, y as long, y1 as long, x2 as long)
 	declare sub yxline(x as long, y as long, y1 as long, x2 as long, y3 as long)
-  
+
 	declare sub line(x1 as long, y1 as long, x2 as long, y2 as long)
 	declare sub line(x1 as long, y1 as long, x2 as long, y2 as long, x3 as long, y3 as long)
-  
+
 	declare sub loop_ alias "loop"(x0 as long, y0 as long, x1 as long, y1 as long, x2 as long, y2 as long)
 	declare sub loop_ alias "loop"(x0 as long, y0 as long, x1 as long, y1 as long, x2 as long, y2 as long, x3 as long, y3 as long)
 	declare sub polygon(x0 as long, y0 as long, x1 as long, y1 as long, x2 as long, y2 as long)
@@ -138,12 +138,12 @@ public:
 	declare sub gap()
 	declare sub end_complex_polygon()
 	declare sub transformed_vertex(x as double, y as double)
-    
+
 	declare sub draw_image(d as const ubyte ptr, x as long, y as long, w as long, h as long, delta as long=3, ldelta as long=0)
 	declare sub draw_image_mono(d as const ubyte ptr, x as long, y as long, w as long, h as long, delta as long=1, ld as long=0)
 	declare sub draw_image(call_ as Fl_Draw_Image_Cb, data_ as any ptr, x as long, y as long, w as long, h as long, delta as long=3)
 	declare sub draw_image_mono(call_ as Fl_Draw_Image_Cb, data_ as any ptr, x as long, y as long, w as long, h as long, delta as long=1)
-      
+
 	declare sub draw(s as const zstring ptr, nBytes as long, x as long, y as long)
 
 	declare sub draw(angle as long, str_ as const zstring ptr, n as long, x as long, y as long)
@@ -235,8 +235,8 @@ public:
 #ifdef __FB_APPLE__
   void set_current() { fl_gc = gc; Fl_Paged_Device::set_current(); }
 #endif
-  
-	static file_chooser_title as const zstring ptr 
+
+	static file_chooser_title as const zstring ptr
 end type
 end extern
 

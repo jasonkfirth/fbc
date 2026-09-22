@@ -18,7 +18,7 @@ Function recursiveIsEven(ByVal n As Integer) As Boolean
 End Function
 
 Function recursiveIsOdd(ByVal n As Integer) As Boolean
- 	If n = 0 Then
+	If n = 0 Then
 		Return False
 	Else
 		Return recursiveIsEven(n - 1)

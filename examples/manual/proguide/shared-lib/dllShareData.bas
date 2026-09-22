@@ -11,7 +11,9 @@
 
 ' 'Alias' clause (in addition to 'Export') allows compatibility with dll loaded statically or dynamically
 
-' share main variable
+' The exported binding stores the caller's integer reference. The caller must
+' keep that integer alive until it no longer calls printIdll or incrementIdll.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 Dim Shared ByRef As Integer Idll = *CPtr(Integer Ptr, 0)
 Sub passIntByRef Alias"passIntByRef"(ByRef i As Integer) Export
 	Print "   dll code receives by reference main integer"
@@ -27,7 +29,8 @@ Sub incrementIdll Alias"incrementIdll"() Export
 	Idll += 1
 End Sub
 
-' share dll variable
+' This integer is DLL-owned storage exposed through the return-by-reference API.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 Dim Shared As Integer Jdll = 5
 Function returnIntByRef Alias"returnIntByRef"() ByRef As Integer Export
 	Print "   dll code returns by reference dll integer"
@@ -42,3 +45,5 @@ End Sub
 Sub incrementJdll Alias"incrementJdll"() Export
 	Jdll +=1
 End Sub
+
+'' end of dllShareData.bas

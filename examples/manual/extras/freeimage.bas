@@ -46,22 +46,46 @@ Function FI_Load(filename As String) As Any Ptr
 	End If
 
 	'' Flip the image so it matches FB's coordinate system
-	FreeImage_FlipVertical(image)
+	If FreeImage_FlipVertical(image) = 0 Then
+		FreeImage_Unload image
+		Return NULL
+	End If
 
 	'' Convert to 32 bits per pixel
 	Dim As FIBITMAP Ptr image32 = FreeImage_ConvertTo32Bits(image)
+	If image32 = NULL Then
+		FreeImage_Unload image
+		Return NULL
+	End If
 
 	'' Get the image's size
 	Dim As UInteger w = FreeImage_GetWidth(image)
 	Dim As UInteger h = FreeImage_GetHeight(image)
+	If w = 0 Or h = 0 Then
+		FreeImage_Unload image32
+		FreeImage_Unload image
+		Return NULL
+	End If
 
 	'' Create an FB image of the same size
 	Dim As fb.Image Ptr sprite = ImageCreate(w, h)
+	If sprite = NULL Then
+		FreeImage_Unload image32
+		FreeImage_Unload image
+		Return NULL
+	End If
 
 	Dim As Byte Ptr target = CPtr(Byte Ptr, sprite + 1)
 	Dim As Integer target_pitch = sprite->pitch
 
-	Dim As Any Ptr source = FreeImage_GetBits(image32)
+	Dim As Byte Ptr source = FreeImage_GetBits(image32)
+	If source = NULL Then
+		ImageDestroy sprite
+		FreeImage_Unload image32
+		FreeImage_Unload image
+		Return NULL
+	End If
+
 	Dim As Integer source_pitch = FreeImage_GetPitch(image32)
 
 	'' And copy over the pixels, row by row
@@ -77,7 +101,11 @@ Function FI_Load(filename As String) As Any Ptr
 	Return sprite
 End Function
 
-ScreenRes 640, 480, 32
+If ScreenRes(640, 480, 32) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 Dim As String filename = Command(1)
 

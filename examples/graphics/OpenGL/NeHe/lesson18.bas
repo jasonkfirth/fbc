@@ -1,4 +1,19 @@
 ''
+'' Project: FreeBASIC OpenGL examples
+'' File: lesson18.bas
+''
+'' Purpose:
+''     Demonstrate textured GLU quadric shapes with keyboard-controlled
+''     lighting, texture filters, and partial-disc animation.
+''
+'' Ownership:
+''     The module owns its three OpenGL texture names and one GLU quadric from
+''     successful initialization to display-loop cleanup.
+''
+'' This file intentionally does NOT contain:
+''     - a reusable GLU quadric wrapper
+''     - persistent graphics state outside this lesson
+''
 '' This Code Was Created By Jeff Molofee 2000
 '' A HUGE Thanks To Fredric Echols For Cleaning Up
 '' And Optimizing The Base Code, Making It More Flexible!
@@ -67,13 +82,20 @@ declare sub glDrawCube()
 	glLoadIdentity                                 '' Reset The Modelview Matrix
 
 	'' Use BLOAD to load the bitmaps.
-	redim buffer(256*256*4+4) as ubyte       '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
-	bload exepath + "/data/Wall.bmp", @buffer(0)         '' BLOAD the bitmap
-	texture(0) = CreateTexture(@buffer(0),TEX_NOFILTER)  '' Nearest Texture
-	texture(1) = CreateTexture(@buffer(0))               '' Linear Texture (default)
-	texture(2) = CreateTexture(@buffer(0),TEX_MIPMAP)    '' MipMapped Texture
+	redim buffer(0 to 256*256*4+4) as ubyte  '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
+	if ubound(buffer) < lbound(buffer) then end 1
+	bload exepath + "/data/Wall.bmp", @buffer(lbound(buffer))         '' BLOAD the bitmap
+	'' BLOAD reports a failed file transfer through FreeBASIC's immediate Err value.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL613
+	if err <> 0 then end 1
+	texture(0) = CreateTexture(@buffer(lbound(buffer)), TEX_NOFILTER)  '' Nearest Texture
+	texture(1) = CreateTexture(@buffer(lbound(buffer)))               '' Linear Texture (default)
+	texture(2) = CreateTexture(@buffer(lbound(buffer)), TEX_MIPMAP)    '' MipMapped Texture
 	'' Exit if error loading textures
-	if texture(0) = 0 or texture(1) = 0 or texture(2) = 0 then end 1
+	if texture(0) = 0 or texture(1) = 0 or texture(2) = 0 then
+		glDeleteTextures(3, @texture(0))
+		end 1
+	end if
 
 	'' All Setup For OpenGL Goes Here
 	glEnable GL_TEXTURE_2D                                  '' Enable Texture Mapping ( NEW )
@@ -91,6 +113,10 @@ declare sub glDrawCube()
 	glEnable GL_LIGHT1                                      '' Enable Light One
 
 	quadratic = gluNewQuadric                               '' Create A Pointer To The Quadric Object (Return 0 If No Memory) (NEW)
+	if quadratic = 0 then
+		glDeleteTextures(3, @texture(0))
+		end 1
+	end if
 	gluQuadricNormals quadratic, GLU_SMOOTH                 '' Create Smooth Normals (NEW)
 	gluQuadricTexture quadratic, GL_TRUE                    '' Create Texture Coords (NEW)
 
@@ -148,21 +174,21 @@ declare sub glDrawCube()
 				glEnable(GL_LIGHTING)             '' enable lighting
 			end if
 		end if
-		if not MULTIKEY(FB.SC_L) then lp = false     '' L key up
+		if MULTIKEY(FB.SC_L) = 0 then lp = false     '' L key up
 
 		if MULTIKEY(FB.SC_F) and not fp then         '' F Key down
 			fp = true
 			filter += 1                           '' Cycle filter 0 -> 1 -> 2
 			if (filter > 2) then filter = 0       '' 2 -> 0
 		end if
-		if not MULTIKEY(FB.SC_F) then fp = false     '' F Key Up
+		if MULTIKEY(FB.SC_F) = 0 then fp = false     '' F Key Up
 
 		if MULTIKEY(FB.SC_SPACE) and not sp then     '' Space Key down
 			sp = TRUE                             '' Set sp To TRUE
 			object_ += 1                            '' Cycle Through The Objects
 			if object_>5 then object_=0             '' (0-5) = 6 objects
 		end if
-		if not MULTIKEY(FB.SC_SPACE) then sp = false '' Space Key Up
+		if MULTIKEY(FB.SC_SPACE) = 0 then sp = false '' Space Key Up
 
 		if MULTIKEY(FB.SC_PAGEUP) then z-=0.02     '' If Page Up is Being Pressed, Move Into The Screen
 		if MULTIKEY(FB.SC_PAGEDOWN) then z+=0.02   '' If Page Down is Being Pressed, Move Towards The Viewer
@@ -178,6 +204,7 @@ declare sub glDrawCube()
 	while INKEY <> "": wend
 
 	gluDeleteQuadric quadratic 				'' Delete Quadratic - Free Resources
+	glDeleteTextures(3, @texture(0))
 	end
 '------------------------------------------------------------------------
 sub glDrawCube()
@@ -189,7 +216,7 @@ sub glDrawCube()
 		glTexCoord2f 1.0, 1.0 : glVertex3f  1.0,  1.0,  1.0   '' Point 3
 		glTexCoord2f 0.0, 1.0 : glVertex3f -1.0,  1.0,  1.0   '' Point 4
 		'' Back Face
-		glNormal3f  0.0, 0.0,-1.0                             '' Normal Pointing Away From Viewer
+		glNormal3f  0.0, 0.0, -1.0                             '' Normal Pointing Away From Viewer
 		glTexCoord2f 1.0, 0.0 : glVertex3f -1.0, -1.0, -1.0   '' Point 1 (Back)
 		glTexCoord2f 1.0, 1.0 : glVertex3f -1.0,  1.0, -1.0   '' Point 2
 		glTexCoord2f 0.0, 1.0 : glVertex3f  1.0,  1.0, -1.0   '' Point 3
@@ -201,7 +228,7 @@ sub glDrawCube()
 		glTexCoord2f 1.0, 0.0 : glVertex3f  1.0,  1.0,  1.0
 		glTexCoord2f 1.0, 1.0 : glVertex3f  1.0,  1.0, -1.0
 		'' Bottom Face
-		glNormal3f  0.0,-1.0, 0.0                             '' Normal Pointing Down
+		glNormal3f  0.0, -1.0, 0.0                             '' Normal Pointing Down
 		glTexCoord2f 1.0, 1.0 : glVertex3f -1.0, -1.0, -1.0   '' (Bottom)
 		glTexCoord2f 0.0, 1.0 : glVertex3f  1.0, -1.0, -1.0
 		glTexCoord2f 0.0, 0.0 : glVertex3f  1.0, -1.0,  1.0
@@ -220,3 +247,5 @@ sub glDrawCube()
 		glTexCoord2f 0.0, 1.0 : glVertex3f -1.0,  1.0, -1.0
 	glEnd                        '' Done Drawing Quads
 end sub
+
+'' End of lesson18.bas

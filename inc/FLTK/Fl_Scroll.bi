@@ -41,7 +41,7 @@ private:
 		vneeded as long
 		hscroll as Fl_Scrollbar_Data
 		vscroll as Fl_Scrollbar_Data
-	end type	  
+	end type
 	declare sub recalc_scrollbars(byref si as ScrollInfo)
 protected:
 

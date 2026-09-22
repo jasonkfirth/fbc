@@ -7,19 +7,32 @@
 '' --------
 
 'This simple program will print a PostScript file to a PostScript compatible printer.
-Dim As Long FFI, PPO
+'' Resource ownership:
+'' The source file remains open while its checked printer handle receives the
+'' text stream. The printer closes before the source file.
+Dim As Integer FFI, PPO
 Dim As String temp
 
 FFI = FreeFile()
-Open "sample.ps" For Input Access Read As #FFI
-PPO = FreeFile()
-Open Lpt "LPT1:" For Output As #PPO
-While (EOF(FFI) = 0)
-Line Input #FFI, temp
-Print #PPO, temp
-Wend
+If Open("sample.ps" For Input Access Read As #FFI) <> 0 Then
+  Print "Could not open sample.ps"
+Else
+  PPO = FreeFile()
 
-Close #FFI
-Close #PPO
+  '' LPT1 is an explicit printer endpoint, not a persistent output path.
+  '' FB-LINTER: DISABLE-NEXT-LINE FBL103 FBL-IO-005
+  Open Lpt "LPT1:" For Output As #PPO
+  If Err <> 0 Then
+    Print "Could not open LPT1:"
+  Else
+    While EOF(FFI) = 0
+      Line Input #FFI, temp
+      Print #PPO, temp
+    Wend
+    Close #PPO
+  End If
+
+  Close #FFI
+End If
 
 Print "Printing Completed!"

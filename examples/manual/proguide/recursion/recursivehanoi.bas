@@ -13,7 +13,7 @@ Sub recursiveHanoi (ByVal n As Integer, ByVal departure As String, ByVal middle 
 	If n > 0 Then
 		recursiveHanoi(n - 1, departure, arrival, middle)
 		Print "  move one disk from " & departure & " to " & arrival
-		recursiveHanoi(n -1 , middle, departure, arrival)
+		recursiveHanoi(n - 1, middle, departure, arrival)
 	End If
 End Sub
 

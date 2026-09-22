@@ -18,6 +18,7 @@ operator xor _
 
 	dim as VARIANT_ res = any
 
+	VariantInit( @res )
 	VarXor( @lhs.var_, @rhs.var_, @res )
 
 	return VARIANT( res, FALSE )
@@ -34,9 +35,9 @@ operator xor _
 
 	dim as VARIANT_ res = any
 
+	VariantInit( @res )
 	VarXor( @lhs.var_, @rhs, @res )
 
 	return VARIANT( res, FALSE )
 
 end operator
-

@@ -54,7 +54,7 @@ private function ReadObject(byref st as string, byval o as glObject ptr) as inte
 	sscanf(strptr(oneline), "%d", @o->nPoints)
 	for i=1 to o->nPoints
 		readstr(file, oneline)
-		sscanf(strptr(oneline), "%f %f %f", @o->points(i).x,@o->points(i).y,@o->points(i).z)
+		sscanf(strptr(oneline), "%f %f %f", @o->points(i).x, @o->points(i).y, @o->points(i).z)
 	next
 	''planes
 	readstr(file, oneline)
@@ -75,6 +75,7 @@ private function ReadObject(byref st as string, byval o as glObject ptr) as inte
 			@o->planes(i).normals(2).y, _
 			@o->planes(i).normals(2).z)
 	next
+	close #file
 	return true
 end function
 
@@ -83,7 +84,7 @@ end function
 private sub SetConnectivity(byval o as glObject ptr)
 	dim as uinteger p1i, p2i, p1j, p2j
 	dim as uinteger b1i, b2i, b1j, b2j
-	dim as uinteger i,j,ki,kj
+	dim as uinteger i, j, ki, kj
 
 	for i=0  to o->nPlanes-2
 		for j=i+1 to o->nPlanes-1
@@ -278,10 +279,10 @@ private sub  CastShadow(byval o as glObject ptr, byval lp as single ptr)
 	glPushMatrix()
 		glLoadIdentity()
 		glBegin(GL_TRIANGLE_STRIP)
-			glVertex3f(-0.1, 0.1,-0.10)
-			glVertex3f(-0.1,-0.1,-0.10)
-			glVertex3f( 0.1, 0.1,-0.10)
-			glVertex3f( 0.1,-0.1,-0.10)
+			glVertex3f(-0.1, 0.1, -0.10)
+			glVertex3f(-0.1, -0.1, -0.10)
+			glVertex3f( 0.1, 0.1, -0.10)
+			glVertex3f( 0.1, -0.1, -0.10)
 		glEnd()
 	glPopMatrix()
 	glDisable(GL_BLEND)

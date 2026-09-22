@@ -11,7 +11,7 @@ extern "c++"
 declare function fl_old_shortcut(as const zstring ptr) as unsigned long
 #endif
 
-type Fl_Button extends Fl_Widget 
+type Fl_Button extends Fl_Widget
 private:
 	shortcut_ as long
 	value_ as byte
@@ -35,10 +35,10 @@ public:
 	declare function clear() as long
 	declare sub setonly()
 	declare const function shortcut() as long
-	declare sub shortcut(s as long) 
+	declare sub shortcut(s as long)
 	declare const function down_box() as Fl_Boxtype
 	declare sub down_box(b as Fl_Boxtype)
-	declare sub shortcut(s as const zstring ptr) 
+	declare sub shortcut(s as const zstring ptr)
 
 
 
@@ -61,7 +61,7 @@ private const function Fl_Button.shortcut() as long
 	return this.shortcut_
 end function
 
-private sub Fl_Button.shortcut(s as long) 
+private sub Fl_Button.shortcut(s as long)
 	this.shortcut_=s
 end sub
 
@@ -73,6 +73,6 @@ private sub Fl_Button.down_box(b as Fl_Boxtype)
 	this.down_box_=b
 end sub
 
-private sub Fl_Button.shortcut(s as const zstring ptr) 
+private sub Fl_Button.shortcut(s as const zstring ptr)
 	this.shortcut(fl_old_shortcut(s))
 end sub

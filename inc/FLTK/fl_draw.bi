@@ -61,7 +61,7 @@ private sub fl_line_style(style as long, width_ as long=0, dashes as zstring ptr
 	fl_graphics_driver_->line_style(style,width_,dashes)
 end sub
 
-enum 
+enum
 	FL_SOLID	= 0,		'< line style: <tt>___________</tt>
 	FL_DASH	= 1,			'< line style: <tt>_ _ _ _ _ _</tt>
 	FL_DOT	= 2,			'< line style: <tt>. . . . . .</tt>
@@ -367,7 +367,7 @@ declare function fl_draw_pixmap overload(cdata as const zstring const ptr const 
 declare function fl_measure_pixmap overload(data_ as zstring const ptr const ptr, byref w as long , byref h as long) as long
 declare function fl_measure_pixmap overload(cdata as const zstring const ptr const ptr, byref w as long , byref h as long) as long
 
-declare sub fl_scroll_ alias "fl_scroll"(X as long, Y as long, W as long, H as long, dx as long, dy as long, draw_area as sub(as any ptr, as long, as long, as long, as long), data_ as any ptr)
+declare sub fl_scroll_ alias "fl_scroll"(X as long, Y as long, W as long, H as long, dx as long, dy as long, draw_area as sub cdecl(as any ptr, as long, as long, as long, as long), data_ as any ptr)
 
 declare function  fl_shortcut_label overload(shortcut as unsigned long) as const zstring ptr
 declare function  fl_shortcut_label overload (shortcut as unsigned long, eom as const zstring ptr ptr)as const zstring ptr
@@ -389,4 +389,3 @@ declare sub fl_reset_spot()
 declare function fl_draw_symbol(label as const zstring ptr, x as long, y as long, w as long, h as long, as Fl_Color) as long
 declare function fl_add_symbol(name as const zstring ptr, drawit as sub (as Fl_Color), scalable as long) as long
 end extern
-

@@ -7,7 +7,8 @@
 '' --------
 
 Function betterTranslationToIterativeFibonacci (ByVal n As UInteger) As LongInt
-	Dim As UInteger a = 0, b = 1
+	Dim As UInteger a = 0
+	Dim As UInteger b = 1
 	While Not (n <= 1)  '' end condition of iterative loop
 		n = n - 1
 		Swap a, b
@@ -15,4 +16,3 @@ Function betterTranslationToIterativeFibonacci (ByVal n As UInteger) As LongInt
 	Wend
 	Return b * n
 End Function
-

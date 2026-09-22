@@ -1,3 +1,31 @@
+''
+'' Project: FreeBASIC examples
+'' --------------------------
+''
+'' File: png.bas
+''
+'' Purpose:
+''
+''     Load selected PNG formats into FreeBASIC images through libpng.
+''
+'' Responsibilities:
+''
+''     - validate screen setup and image-decoder resources
+''     - convert supported libpng rows into FreeBASIC pixel storage
+''     - release file, libpng, row-buffer, and image resources on all paths
+''
+'' Ownership:
+''
+''     imageread_png transfers its image result to the caller on success.
+''     Every intermediate resource remains local and is released before a
+''     failed read returns.
+''
+'' This file intentionally does NOT contain:
+''
+''     - PNG writing support
+''     - palette conversion for low-depth PNG input
+''
+
 #include once "png.bi"
 #include once "fbgfx.bi"
 #include once "crt/errno.bi"
@@ -14,7 +42,10 @@ declare function imageread_png _
 		byval bpp as integer _
 	) as FB.IMAGE ptr
 
-	screenres SCR_W, SCR_H, SCR_BPP
+	if( screenres( SCR_W, SCR_H, SCR_BPP ) <> 0 ) then
+		print "could not set graphics mode"
+		end 1
+	end if
 
 	#if SCR_BPP <= 8
 		'' With 8bpp or less screen, a palette is used, instead of RGB colors.
@@ -35,7 +66,7 @@ declare function imageread_png _
 			sleep : end 1
 		end if
 
-		put (0,100), img1, pset
+		put (0, 100), img1, pset
 
 		sleep
 
@@ -51,9 +82,9 @@ declare function imageread_png _
 			sleep : end 1
 		end if
 
-		put (0,100), img1, alpha
-		put (320,100), img2, alpha
-		put (200,200), img3, alpha
+		put (0, 100), img1, alpha
+		put (320, 100), img2, alpha
+		put (200, 200), img3, alpha
 
 		sleep
 
@@ -69,9 +100,39 @@ private sub libpng_error_callback cdecl _
 		byval p as png_const_charp _
 	)
 
+	'' libpng provides a non-null error-message pointer to this callback. FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
 	print "libpng failed to load the image (" & *p & ")"
 	sleep
 	end 1
+
+end sub
+
+private sub imageread_png_cleanup _
+	( _
+		byref fp as FILE ptr, _
+		byref png as png_structp, _
+		byref info as png_infop, _
+		byref src as ubyte ptr, _
+		byref img as FB.IMAGE ptr _
+	)
+
+	if( src <> NULL ) then
+		deallocate( src )
+		src = NULL
+	end if
+	if( png <> NULL ) then
+		png_destroy_read_struct( @png, @info, 0 )
+		png = NULL
+		info = NULL
+	end if
+	if( fp <> NULL ) then
+		fclose( fp )
+		fp = NULL
+	end if
+	if( img <> NULL ) then
+		imagedestroy( img )
+		img = NULL
+	end if
 
 end sub
 
@@ -83,36 +144,46 @@ function imageread_png _
 	) as FB.IMAGE ptr
 
 	dim as ubyte header(0 to 7)
+	dim as FILE ptr fp
+	dim as png_structp png
+	dim as png_infop info
+	dim as FB.IMAGE ptr img
+	dim as ubyte ptr dst
+	dim as ubyte ptr src
+	dim as integer w, h, bitdepth, channels, pixdepth, colortype, rowbytes
 
-	dim as FILE ptr fp = fopen( path + filename, "rb" )
+	function = NULL
+
+	fp = fopen( path + filename, "rb" )
 	if( fp = NULL ) then
 		print "could not open image file " & filename
+		imageread_png_cleanup( fp, png, info, src, img )
 		return NULL
 	end if
 
 	if( fread( @header(0), 1, 8, fp ) <> 8 ) then
 		print "couldn't read header"
-		fclose( fp )
+		imageread_png_cleanup( fp, png, info, src, img )
 		return NULL
 	end if
 
 	if( png_sig_cmp( @header(0), 0, 8 ) ) then
 		print "png_sig_cmp() failed"
-		fclose( fp )
+		imageread_png_cleanup( fp, png, info, src, img )
 		return NULL
 	end if
 
-	dim as png_structp png = png_create_read_struct( PNG_LIBPNG_VER_STRING, NULL, @libpng_error_callback, NULL )
+	png = png_create_read_struct( PNG_LIBPNG_VER_STRING, NULL, @libpng_error_callback, NULL )
 	if( png = NULL ) then
 		print "png_create_read_struct() failed"
-		fclose( fp )
+		imageread_png_cleanup( fp, png, info, src, img )
 		return NULL
 	end if
 
-	dim as png_infop info = png_create_info_struct( png )
+	info = png_create_info_struct( png )
 	if( info = NULL ) then
 		print "png_create_info_struct() failed"
-		fclose( fp )
+		imageread_png_cleanup( fp, png, info, src, img )
 		return NULL
 	end if
 
@@ -121,7 +192,6 @@ function imageread_png _
 
 	png_read_info( png, info )
 
-	dim as integer w, h, bitdepth, channels, pixdepth, colortype, rowbytes
 	w = png_get_image_width( png, info )
 	h = png_get_image_height( png, info )
 	bitdepth = png_get_bit_depth( png, info )
@@ -140,17 +210,35 @@ function imageread_png _
 		print "grayscale"
 	case else
 		print "unsupported color type"
+		imageread_png_cleanup( fp, png, info, src, img )
 		return NULL
 	end select
 
-	dim as FB.IMAGE ptr img = imagecreate( w, h )
-	dim as ubyte ptr dst = cptr( ubyte ptr, img + 1 )
+	img = imagecreate( w, h )
+	if( img = NULL ) then
+		print "could not allocate output image"
+		imageread_png_cleanup( fp, png, info, src, img )
+		return NULL
+	end if
+
+	dst = cptr( ubyte ptr, img + 1 )
 
 	png_set_interlace_handling( png )
 	png_read_update_info( png, info )
 
 	rowbytes = png_get_rowbytes( png, info )
-	dim as ubyte ptr src = callocate( rowbytes )
+	if( rowbytes <= 0 ) then
+		print "invalid PNG row size"
+		imageread_png_cleanup( fp, png, info, src, img )
+		return NULL
+	end if
+
+	src = callocate( rowbytes )
+	if( src = NULL ) then
+		print "could not allocate PNG row buffer"
+		imageread_png_cleanup( fp, png, info, src, img )
+		return NULL
+	end if
 
 	for y as integer = 0 to h-1
 		png_read_row( png, src, NULL )
@@ -171,7 +259,8 @@ function imageread_png _
 					''
 					'' so we need to copy AA/GG as-is, and
 					'' swap RR/BB
-					dst[0] = src[i+2]
+				'' The loop stays inside the row allocation, which has rowbytes bytes. FB-LINTER: DISABLE-NEXT-LINE FBL525
+				dst[0] = src[i+2]
 					dst[1] = src[i+1]
 					dst[2] = src[i+0]
 					dst[3] = src[i+3]
@@ -188,11 +277,13 @@ function imageread_png _
 			select case( bpp )
 			case 24, 32
 				for i as integer = 0 to rowbytes-1
+					'' Each i is within the row allocation. FB-LINTER: DISABLE-NEXT-LINE FBL525
 					*cptr( ulong ptr, dst ) = rgb( src[i], src[i], src[i] )
 					dst += 4
 				next
 			case 15, 16
 				for i as integer = 0 to rowbytes-1
+					'' Each i is within the row allocation. FB-LINTER: DISABLE-NEXT-LINE FBL525
 					pset img, (i, y), rgb( src[i], src[i], src[i] )
 				next
 			case else
@@ -207,11 +298,10 @@ function imageread_png _
 		end select
 	next
 
-	deallocate( src )
-
 	png_read_end( png, info )
-	png_destroy_read_struct( @png, @info, 0 )
-	fclose( fp )
-
 	function = img
+	img = NULL
+	imageread_png_cleanup( fp, png, info, src, img )
 end function
+
+'' end of png.bas

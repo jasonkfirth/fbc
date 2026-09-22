@@ -100,7 +100,7 @@ public:
 	declare sub textsize(s as Fl_Fontsize)
 	declare const function textcolor() as Fl_Color
 	declare sub textcolor(n as Fl_Color)
-	declare const function cursor_color() as Fl_Color 
+	declare const function cursor_color() as Fl_Color
 	declare sub cursor_color(n as Fl_Color)
 	declare const function input_type() as long
 	declare sub input_type(t as long)

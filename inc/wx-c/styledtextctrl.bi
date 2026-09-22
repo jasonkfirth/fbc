@@ -58,7 +58,7 @@ Declare Sub wxStyledTextCtrl_SetSavePoint WXCALL Alias "wxStyledTextCtrl_SetSave
 Declare Function wxStyledTextCtrl_GetStyledText WXCALL Alias "wxStyledTextCtrl_GetStyledText" (self As wxStyledTextCtrl Ptr, startPos As wxInt, endPos As wxInt) As wxMemoryBuffer Ptr
 Declare Function wxStyledTextCtrl_MarkerLineFromHandle WXCALL Alias "wxStyledTextCtrl_MarkerLineFromHandle" (self As wxStyledTextCtrl Ptr, handle As wxInt) As wxInt
 Declare Sub wxStyledTextCtrl_MarkerDeleteHandle WXCALL Alias "wxStyledTextCtrl_MarkerDeleteHandle" (self As wxStyledTextCtrl Ptr, handle As wxInt)
-Declare Function wxStyledTextCtrl_GetUndoCollection WXCALL Alias "wxStyledTextCtrl_GetUndoCollection" (self As wxStyledTextCtrl Ptr) As wxBool 
+Declare Function wxStyledTextCtrl_GetUndoCollection WXCALL Alias "wxStyledTextCtrl_GetUndoCollection" (self As wxStyledTextCtrl Ptr) As wxBool
 Declare Sub wxStyledTextCtrl_SetViewWhiteSpace WXCALL Alias "wxStyledTextCtrl_SetViewWhiteSpace" (self As wxStyledTextCtrl Ptr, viewWS As wxInt)
 Declare Function wxStyledTextCtrl_GetViewWhiteSpace WXCALL Alias "wxStyledTextCtrl_GetViewWhiteSpace" (self As wxStyledTextCtrl Ptr) As wxInt
 Declare Function wxStyledTextCtrl_PositionFromPoint WXCALL Alias "wxStyledTextCtrl_PositionFromPoint" (self As wxStyledTextCtrl Ptr, pt As wxPoint Ptr) As wxInt
@@ -153,7 +153,7 @@ Declare Sub wxStyledTextCtrl_AutoCompSetFillUps WXCALL Alias "wxStyledTextCtrl_A
 Declare Sub wxStyledTextCtrl_AutoCompSetChooseSingle WXCALL Alias "wxStyledTextCtrl_AutoCompSetChooseSingle" (self As wxStyledTextCtrl Ptr, chooseSingle As wxBool)
 Declare Function wxStyledTextCtrl_AutoCompGetChooseSingle WXCALL Alias "wxStyledTextCtrl_AutoCompGetChooseSingle" (self As wxStyledTextCtrl Ptr) As wxBool
 Declare Sub wxStyledTextCtrl_AutoCompSetIgnoreCase WXCALL Alias "wxStyledTextCtrl_AutoCompSetIgnoreCase" (self As wxStyledTextCtrl Ptr, ignoreCase As wxBool)
-Declare Function wxStyledTextCtrl_AutoCompGetIgnoreCase WXCALL Alias "wxStyledTextCtrl_AutoCompGetIgnoreCase" (self As wxStyledTextCtrl Ptr) As wxBool 
+Declare Function wxStyledTextCtrl_AutoCompGetIgnoreCase WXCALL Alias "wxStyledTextCtrl_AutoCompGetIgnoreCase" (self As wxStyledTextCtrl Ptr) As wxBool
 Declare Sub wxStyledTextCtrl_UserListShow WXCALL Alias "wxStyledTextCtrl_UserListShow" (self As wxStyledTextCtrl Ptr, listType As wxInt, itermlist As wxString Ptr)
 Declare Sub wxStyledTextCtrl_AutoCompSetAutoHide WXCALL Alias "wxStyledTextCtrl_AutoCompSetAutoHide" (self As wxStyledTextCtrl Ptr, autoHide As wxBool)
 Declare Function wxStyledTextCtrl_AutoCompGetAutoHide WXCALL Alias "wxStyledTextCtrl_AutoCompGetAutoHide" (self As wxStyledTextCtrl Ptr) As wxBool

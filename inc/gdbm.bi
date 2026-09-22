@@ -1,7 +1,7 @@
 '' FreeBASIC binding for gdbm-1.11
 ''
 '' based on the C header files:
-''    gdbm.h  -  The include file for dbm users.  -*- c -*- 
+''    gdbm.h  -  The include file for dbm users.  -*- c -*-
 ''     This file is part of GDBM, the GNU data base manager, by Philip A. Nelson.
 ''       Copyright (C) 1990, 1991, 1993, 2011 Free Software Foundation, Inc.
 ''
@@ -16,7 +16,7 @@
 ''       GNU General Public License for more details.
 ''
 ''       You should have received a copy of the GNU General Public License
-''       along with GDBM. If not, see <http://www.gnu.org/licenses/>.  
+''       along with GDBM. If not, see <http://www.gnu.org/licenses/>.
 ''
 ''       You may contact the author by:
 ''          e-mail:  phil@cs.wwu.edu
@@ -24,7 +24,7 @@
 ''                   Computer Science Department
 ''                   Western Washington University
 ''                   Bellingham, WA 98226
-''          
+''
 ''   ************************************************************************
 ''
 '' translated to FreeBASIC by:

@@ -1,6 +1,19 @@
 ''
 '' MilkshapeModel.bi
+'' Resource ownership: MODEL owns the parsed arrays after a successful load;
+'' Model_Delete releases them, while the loader releases its temporary buffer.
 ''
+
+/'
+    MilkShape model loader
+
+    Model_LoadModelData owns its temporary file buffer only while parsing.
+    A successful call transfers mesh, material, triangle, vertex, index, and
+    texture-name storage to MODEL; Model_Delete releases those allocations.
+
+    The MS3D structures below are packed on-disk records. Their field widths
+    follow the MilkShape 1.3/1.4 format, not the native FreeBASIC ABI.
+'/
 
 #ifndef __milkshapemodel_bi__
 #define __milkshapemodel_bi__
@@ -10,7 +23,7 @@
 '' Use FIELD = 1 for all structures that are used to read data from disk.
 type MS3DHEADER FIELD = 1
 	m_ID(9) as ubyte
-	m_version as integer
+	m_version as long
 end type
 
 '' Vertex information
@@ -25,7 +38,7 @@ end type
 type MS3DTRIANGLE FIELD = 1
 	m_flags as short
 	m_vertexIndices(2) as short
-	m_vertexNormals(2,2) as single
+	m_vertexNormals(2, 2) as single
 	m_s(2) as single
 	m_t(2) as single
 	m_smoothingGroup as ubyte
@@ -73,7 +86,7 @@ end type
 
 ''	Triangle structure
 type TRIANGLE
-	m_vertexNormals(2,2) as single
+	m_vertexNormals(2, 2) as single
 	m_s(2) as single
 	m_t(2) as single
 	m_vertexIndices(2) as integer
@@ -124,11 +137,29 @@ declare sub Model_Delete(byval pM as MODEL ptr)
 #include once "crt.bi"
 #include once "GL/glu.bi"
 ''------------------------------------------------------------------------------
+
+private function Model_HasBytes(byval byteOffset as integer, _
+	byval byteCount as integer, byval fileSize as integer) as integer
+
+	if byteOffset < 0 or byteCount < 0 or fileSize < 0 then return false
+	if byteOffset > fileSize then return false
+	if byteCount > fileSize - byteOffset then return false
+
+	return true
+end function
+
+
 ''Load the model data into the private variables.
+'' Boundary checks are deliberately explicit because every branch protects a
+'' different field in the packed MS3D record stream.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL111
 function Model_LoadModelData(byval pM as MODEL ptr, byref filename as string) as integer
 	dim i as integer, j as integer, c as integer
 	dim ffile as integer
 	dim fileSize as integer
+	dim byteOffset as integer
+	dim fileOpen as integer
+	dim textureLength as integer
 	dim pBuffer as byte ptr
 	dim pPtr as byte ptr
 
@@ -143,126 +174,197 @@ function Model_LoadModelData(byval pM as MODEL ptr, byref filename as string) as
 	dim nMaterials as integer
 	dim nGroups as integer
 
-	dim vertexIndices(3) as integer
-	dim t(3) as single
+	dim vertexIndices(0 to 3) as integer
+	dim t(0 to 3) as single
 	dim materialIndex as byte
 
 
+	if pM = 0 then return false
+
+	'' The loader starts from a known ownership state so failure cleanup is safe.
+	Model_Init(pM)
+
 	ffile = freefile
-
-	if  dir(filename) = "" then                                      '' Couldn't open the model file.
-		return false
-	end if
-
-	open filename for binary as ffile
+	open filename for binary as #ffile
+	if err <> 0 then return false
+	fileOpen = true
 
 	fileSize = lof(ffile)
+	if fileSize < sizeof(MS3DHEADER) then goto load_failed
 
 	pBuffer = allocate(fileSize)
-	pPtr = pBuffer
+	if pBuffer = 0 then goto load_failed
 
-	for i = 0 to filesize - 1
-		get #ffile, , *pPtr
-		pPtr=pPtr+1
+	'' The raw file buffer is validated against each MS3D record size before parsing.
+	for i = 0 to fileSize - 1
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-DOC-BIN-003
+		get #ffile, , pBuffer[i]
+		if err <> 0 then goto load_failed
 	next
-	close (ffile)
+	close #ffile
+	fileOpen = false
 
 	pPtr = pBuffer
-	pHeader = cast(MS3DHEADER ptr,pPtr)
-	pPtr = pPtr + len(MS3DHEADER)
+	byteOffset = 0
+	if Model_HasBytes(byteOffset, sizeof(MS3DHEADER), fileSize) = false then goto load_failed
+	pHeader = cast(MS3DHEADER ptr, pPtr)
+	pPtr += sizeof(MS3DHEADER)
+	byteOffset += sizeof(MS3DHEADER)
 
-	if strncmp(varptr(pHeader->m_ID(0)),"MS3D000000", 10) <> 0 then  '' Not a valid Milkshape3D model file.
-			return false
+	if strncmp(varptr(pHeader->m_ID(0)), "MS3D000000", 10) <> 0 then goto load_failed
+	if pHeader->m_version < 3 or pHeader->m_version > 4 then goto load_failed
+
+	if Model_HasBytes(byteOffset, sizeof(short), fileSize) = false then goto load_failed
+	nVertices = peek(short, pPtr)
+	pPtr += sizeof(short)
+	byteOffset += sizeof(short)
+	if nVertices < 0 then goto load_failed
+	if Model_HasBytes(byteOffset, sizeof(MS3DVERTEX) * nVertices, fileSize) = false then goto load_failed
+
+	if nVertices > 0 then
+		pM->m_pVertices = callocate(sizeof(VERTEX) * nVertices)
+		if pM->m_pVertices = 0 then goto load_failed
 	end if
-
-	if pHeader->m_version < 3  or  pHeader->m_version > 4 then        '' Unhandled file version. Only Milkshape3D Version 1.3 and 1.4 is supported.
-			return false
-	end if
-
-
-	nVertices = peek(short,pPtr)
 	pM->m_numVertices = nVertices
-	pM->m_pVertices = allocate(len(VERTEX)*(nVertices+1))
-	pPtr = pPtr + len(short)
 
 	for i = 0 to nVertices - 1
-		pVertex = cast(MS3DVERTEX ptr,pPtr)
+		pVertex = cast(MS3DVERTEX ptr, pPtr)
 		pM->m_pVertices[i].m_boneID = pVertex->m_boneID
-		memcpy (varptr(pM->m_pVertices[i].m_location(0)), varptr(pVertex->m_vertex(0)), len(single)*3)
-		pPtr = pPtr + len(MS3DVERTEX)
+		memcpy(varptr(pM->m_pVertices[i].m_location(0)), varptr(pVertex->m_vertex(0)), sizeof(single) * 3)
+		pPtr += sizeof(MS3DVERTEX)
 	next
+	byteOffset += sizeof(MS3DVERTEX) * nVertices
 
-	nTriangles = peek(short,pPtr)
+	if Model_HasBytes(byteOffset, sizeof(short), fileSize) = false then goto load_failed
+	nTriangles = peek(short, pPtr)
+	pPtr += sizeof(short)
+	byteOffset += sizeof(short)
+	if nTriangles < 0 then goto load_failed
+	if Model_HasBytes(byteOffset, sizeof(MS3DTRIANGLE) * nTriangles, fileSize) = false then goto load_failed
+
+	if nTriangles > 0 then
+		pM->m_pTriangles = callocate(sizeof(TRIANGLE) * nTriangles)
+		if pM->m_pTriangles = 0 then goto load_failed
+	end if
 	pM->m_numTriangles = nTriangles
-	pM->m_pTriangles = allocate(len(TRIANGLE)*(nTriangles+1))
-	pPtr = pPtr + len(short)
 
 	for i = 0 to nTriangles - 1
-		pTriangle = cast(MS3DTRIANGLE ptr,pPtr)
+		pTriangle = cast(MS3DTRIANGLE ptr, pPtr)
 		vertexIndices(0) = pTriangle->m_vertexIndices(0)
 		vertexIndices(1) = pTriangle->m_vertexIndices(1)
 		vertexIndices(2) = pTriangle->m_vertexIndices(2)
+		if vertexIndices(0) < 0 or vertexIndices(0) >= nVertices then goto load_failed
+		if vertexIndices(1) < 0 or vertexIndices(1) >= nVertices then goto load_failed
+		if vertexIndices(2) < 0 or vertexIndices(2) >= nVertices then goto load_failed
 		t(0) = 1.0 - pTriangle->m_t(0)
 		t(1) = 1.0 - pTriangle->m_t(1)
 		t(2) = 1.0 - pTriangle->m_t(2)
-		memcpy(varptr(pM->m_pTriangles[i].m_vertexNormals(0,0)), varptr(pTriangle->m_vertexNormals(0,0)), len(single)*3*3)
-		memcpy(varptr(pM->m_pTriangles[i].m_s(0)), varptr(pTriangle->m_s(0)), len(single)*3)
-		memcpy(varptr(pM->m_pTriangles[i].m_t(0)), varptr(t(0)), len(single)*3)
-		memcpy(varptr(pM->m_pTriangles[i].m_vertexIndices(0)), varptr(vertexIndices(0)), len(integer)*3)
-		pPtr + = len(MS3DTRIANGLE)
+		memcpy(varptr(pM->m_pTriangles[i].m_vertexNormals(0, 0)), varptr(pTriangle->m_vertexNormals(0, 0)), sizeof(single) * 3 * 3)
+		memcpy(varptr(pM->m_pTriangles[i].m_s(0)), varptr(pTriangle->m_s(0)), sizeof(single) * 3)
+		memcpy(varptr(pM->m_pTriangles[i].m_t(0)), varptr(t(0)), sizeof(single) * 3)
+		memcpy(varptr(pM->m_pTriangles[i].m_vertexIndices(0)), varptr(vertexIndices(0)), sizeof(integer) * 3)
+		pPtr += sizeof(MS3DTRIANGLE)
 	next
+	byteOffset += sizeof(MS3DTRIANGLE) * nTriangles
 
-	nGroups = peek(short,pPtr)
+	if Model_HasBytes(byteOffset, sizeof(short), fileSize) = false then goto load_failed
+	nGroups = peek(short, pPtr)
+	pPtr += sizeof(short)
+	byteOffset += sizeof(short)
+	if nGroups < 0 then goto load_failed
+
+	if nGroups > 0 then
+		pM->m_pMeshes = callocate(sizeof(MESH) * nGroups)
+		if pM->m_pMeshes = 0 then goto load_failed
+	end if
 	pM->m_numMeshes = nGroups
-	pM->m_pMeshes = allocate(len(MESH)*(nGroups+1))
-	pPtr = pPtr + len(short)
 
 	for i = 0 to nGroups - 1
-		pPtr = pPtr + len(byte)                               '' flags
-		pPtr = pPtr + 32                                      '' name
-		nTriangles = peek(short,pPtr)
-		pPtr = pPtr + len(short)
+		if Model_HasBytes(byteOffset, sizeof(byte) + 32 + sizeof(short), fileSize) = false then goto load_failed
+		pPtr += sizeof(byte) + 32
+		byteOffset += sizeof(byte) + 32
+		nTriangles = peek(short, pPtr)
+		pPtr += sizeof(short)
+		byteOffset += sizeof(short)
+		if nTriangles < 0 then goto load_failed
+		if Model_HasBytes(byteOffset, sizeof(short) * nTriangles + sizeof(byte), fileSize) = false then goto load_failed
 
-		pTriangleIndices = allocate(len(integer)*(nTriangles+1))
+		if nTriangles > 0 then
+			pTriangleIndices = callocate(sizeof(integer) * nTriangles)
+			if pTriangleIndices = 0 then goto load_failed
+		end if
 
 		for j = 0 to nTriangles - 1
-			pTriangleIndices[j] = peek(short,pPtr)
-			pPtr + = len(short)
+			pTriangleIndices[j] = peek(short, pPtr)
+			if pTriangleIndices[j] < 0 or pTriangleIndices[j] >= pM->m_numTriangles then goto load_failed
+			pPtr += sizeof(short)
 		next
+		byteOffset += sizeof(short) * nTriangles
 
-		materialIndex = peek(byte,pPtr)
-		pPtr = pPtr + len(byte)
+		materialIndex = peek(byte, pPtr)
+		pPtr += sizeof(byte)
+		byteOffset += sizeof(byte)
 
 		pM->m_pMeshes[i].m_materialIndex = materialIndex
 		pM->m_pMeshes[i].m_numTriangles = nTriangles
 		pM->m_pMeshes[i].m_pTriangleIndices = pTriangleIndices
+		pTriangleIndices = 0
 	next
 
-	nMaterials = peek(short,pPtr)
+	if Model_HasBytes(byteOffset, sizeof(short), fileSize) = false then goto load_failed
+	nMaterials = peek(short, pPtr)
+	pPtr += sizeof(short)
+	byteOffset += sizeof(short)
+	if nMaterials < 0 then goto load_failed
+	if Model_HasBytes(byteOffset, sizeof(MS3DMATERIAL) * nMaterials, fileSize) = false then goto load_failed
+
+	if nMaterials > 0 then
+		pM->m_pMaterials = callocate(sizeof(MATERIAL) * nMaterials)
+		if pM->m_pMaterials = 0 then goto load_failed
+	end if
 	pM->m_numMaterials = nMaterials
-	pM->m_pMaterials = allocate(len(MATERIAL)*(nMaterials+1))
-	pPtr = pPtr + len(short)
-	dim ptemp as ubyte ptr
+
 	for i = 0 to nMaterials - 1
-		pMaterial = cast(MS3DMATERIAL ptr,pPtr)
-		memcpy (varptr(pM->m_pMaterials[i].m_ambient(0)), varptr(pMaterial->m_ambient(0)), len(single)*4)
-		memcpy (varptr(pM->m_pMaterials[i].m_diffuse(0)), varptr(pMaterial->m_diffuse(0)), len(single)*4)
-		memcpy (varptr(pM->m_pMaterials[i].m_specular(0)), varptr(pMaterial->m_specular(0)), len(single)*4)
-		memcpy (varptr(pM->m_pMaterials[i].m_emissive(0)), varptr(pMaterial->m_emissive(0)), len(single)*4)
+		pMaterial = cast(MS3DMATERIAL ptr, pPtr)
+		memcpy(varptr(pM->m_pMaterials[i].m_ambient(0)), varptr(pMaterial->m_ambient(0)), sizeof(single) * 4)
+		memcpy(varptr(pM->m_pMaterials[i].m_diffuse(0)), varptr(pMaterial->m_diffuse(0)), sizeof(single) * 4)
+		memcpy(varptr(pM->m_pMaterials[i].m_specular(0)), varptr(pMaterial->m_specular(0)), sizeof(single) * 4)
+		memcpy(varptr(pM->m_pMaterials[i].m_emissive(0)), varptr(pMaterial->m_emissive(0)), sizeof(single) * 4)
 		pM->m_pMaterials[i].m_shininess = pMaterial->m_shininess
-		pM->m_pMaterials[i].m_pTextureFilename = allocate(strlen(pMaterial->m_texture) + 1)
 
-		c = 0
-		while pMaterial->m_texture[c] <> 0
-			pM->m_pMaterials[i].m_pTextureFilename[c] = pMaterial->m_texture[c]
-			c =c+1
+		textureLength = 0
+		while textureLength < sizeof(pMaterial->m_texture)
+			if pMaterial->m_texture[textureLength] = 0 then exit while
+			textureLength += 1
 		wend
-		pM->m_pMaterials[i].m_pTextureFilename[c] = 0
-		pPtr = pPtr + len(MS3DMATERIAL)
-	next
-	Model_ReloadTextures (pM)
+		pM->m_pMaterials[i].m_pTextureFilename = callocate(textureLength + 1)
+		if pM->m_pMaterials[i].m_pTextureFilename = 0 then goto load_failed
+		for c = 0 to textureLength - 1
+			pM->m_pMaterials[i].m_pTextureFilename[c] = pMaterial->m_texture[c]
+		next
 
+		pPtr += sizeof(MS3DMATERIAL)
+	next
+	byteOffset += sizeof(MS3DMATERIAL) * nMaterials
+
+	for i = 0 to pM->m_numMeshes - 1
+		if pM->m_pMeshes[i].m_materialIndex < -1 or _
+		   pM->m_pMeshes[i].m_materialIndex >= nMaterials then goto load_failed
+	next
+
+	deallocate(pBuffer)
+	pBuffer = 0
+	Model_ReloadTextures(pM)
 	return true
+
+load_failed:
+	if fileOpen then close #ffile
+	if pBuffer <> 0 then
+		deallocate(pBuffer)
+		pBuffer = 0
+	end if
+	Model_Delete(pM)
+	return false
 end function
 
 ''------------------------------------------------------------------------------
@@ -285,47 +387,41 @@ sub Model_Delete(byval pM as MODEL ptr)
 
 	if pM = 0 then exit sub
 
-	for i = 0 to pM->m_numMeshes - 1
-		if pM->m_pMeshes[i].m_pTriangleIndices then
-			deallocate(pM->m_pMeshes[i].m_pTriangleIndices)
-		end if
-	next
-
-	for i = 0 to pM->m_numMaterials - 1
-		if pM->m_pMaterials[i].m_pTextureFilename then
-			deallocate(pM->m_pMaterials[i].m_pTextureFilename)
-		end if
-	next
-
-	pM->m_numMeshes = 0
 	if pM->m_pMeshes <> 0 then
-		if pM->m_pMeshes then
-			deallocate(pM->m_pMeshes)
-		end if
+		for i = 0 to pM->m_numMeshes - 1
+			if pM->m_pMeshes[i].m_pTriangleIndices <> 0 then
+				deallocate(pM->m_pMeshes[i].m_pTriangleIndices)
+				pM->m_pMeshes[i].m_pTriangleIndices = 0
+			end if
+		next
+		deallocate(pM->m_pMeshes)
 		pM->m_pMeshes = 0
 	end if
-	pM->m_numMaterials = 0
+	pM->m_numMeshes = 0
+
 	if pM->m_pMaterials <> 0 then
-		if pM->m_pMaterials then
-			deallocate(pM->m_pMaterials)
-		end if
+		for i = 0 to pM->m_numMaterials - 1
+			if pM->m_pMaterials[i].m_pTextureFilename <> 0 then
+				deallocate(pM->m_pMaterials[i].m_pTextureFilename)
+				pM->m_pMaterials[i].m_pTextureFilename = 0
+			end if
+		next
+		deallocate(pM->m_pMaterials)
 		pM->m_pMaterials = 0
 	end if
+	pM->m_numMaterials = 0
+
 	pM->m_numTriangles = 0
 	if pM->m_pTriangles <> 0 then
-		if pM->m_pTriangles then
-			deallocate(pM->m_pTriangles)
-		end if
+		deallocate(pM->m_pTriangles)
 		pM->m_pTriangles = 0
 	end if
+
 	pM->m_numVertices = 0
 	if pM->m_pVertices <> 0 then
-		if pM->m_pVertices then
-			deallocate(pM->m_pVertices)
-		end if
+		deallocate(pM->m_pVertices)
 		pM->m_pVertices = 0
 	end if
-	pM = 0
 end sub
 
 ''------------------------------------------------------------------------------
@@ -367,7 +463,7 @@ sub Model_Draw(byval pM as MODEL ptr)
 				pTri = varptr(pM->m_pTriangles[triangleIndex])
 				for k = 0 to 2
 					index = pTri->m_vertexIndices(k)
-					glNormal3fv (varptr(pTri->m_vertexNormals(k,0)))
+					glNormal3fv (varptr(pTri->m_vertexNormals(k, 0)))
 					glTexCoord2f (pTri->m_s(k), pTri->m_t(k))
 					glVertex3fv (varptr(pM->m_pVertices[index].m_location(0)))
 				next
@@ -390,8 +486,12 @@ end sub
 sub Model_ReloadTextures(byval pM as MODEL ptr)
 	dim  i as integer
 
+	if pM = 0 then exit sub
+	if pM->m_pMaterials = 0 then exit sub
+
 	for i = 0 to pM->m_numMaterials - 1
-		if strlen (*pM->m_pMaterials[i].m_pTextureFilename) > 0 then
+		if pM->m_pMaterials[i].m_pTextureFilename <> 0 andalso _
+		   strlen(*pM->m_pMaterials[i].m_pTextureFilename) > 0 then
 			pM->m_pMaterials[i].m_texture = LoadGLTexture(pM->m_pMaterials[i].m_pTextureFilename)
 		else
 			pM->m_pMaterials[i].m_texture = 0
@@ -406,8 +506,13 @@ function LoadGLTexture (byval filename as zstring ptr) as GLuint         '' Load
 	dim texture as GLuint           			 '' Texture ID
 	dim fbfilename as string
 
+	texture = 0
+	if filename = 0 then return texture
+
 	'' Convert filename in model from a zstring to a FB string.
 	'' Notice that NeHe created the model with the "data" directory hard coded in the Milkshape model
+	'' The FreeBASIC file runtime accepts this portable separator on its supported hosts.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-IO-012
 	fbfilename = exepath + "/" + *filename
 
 	pImage = LoadBMP (fbfilename)
@@ -423,8 +528,10 @@ function LoadGLTexture (byval filename as zstring ptr) as GLuint         '' Load
 			glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
 
 			deallocate(pImage->buffer)                  '' DEALLOCATE The Texture Image Memory
-			deallocate(pImage)                          '' DEALLOCATE The Image Structure
+			pImage->buffer = 0
 		end if
+		deallocate(pImage)                          '' DEALLOCATE The Image Structure
+		pImage = 0
 	end if
 
 	return texture

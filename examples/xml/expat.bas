@@ -14,6 +14,8 @@ Type Context
     As Integer textlength
 End Type
 
+'' libexpat callbacks collect text in this parser-owned module context.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 Dim Shared As Context ctx
 
 '' Callback called by libexpat when begin of XML tag is found
@@ -76,6 +78,7 @@ End Sub
 ''
 
     Dim As String filename = Command(1)
+    Dim As Integer file_number = FreeFile
     If (Len(filename) = 0) Then
         Print "Usage: expat <xmlfilename>"
         End 1
@@ -88,11 +91,11 @@ End Sub
     End If
 
     ''XML_SetUserData(parser, userdata_pointer)
-    XML_SetElementHandler(parser, Cast(XML_StartElementHandler,@elementBegin),Cast(XML_EndElementHandler, @elementEnd))
-    XML_SetCharacterDataHandler(parser,Cast(XML_CharacterDataHandler, @charData))
+    XML_SetElementHandler(parser, Cast(XML_StartElementHandler, @elementBegin), Cast(XML_EndElementHandler, @elementEnd))
+    XML_SetCharacterDataHandler(parser, Cast(XML_CharacterDataHandler, @charData))
 
 
-    If (Open(filename, For Input, As #1)) Then
+    If (Open(filename, For Input, As #file_number)) Then
         Print "Could not open file: '";filename;"'"
         End 1
     End If
@@ -102,13 +105,13 @@ End Sub
     Dim As Integer reached_eof = FALSE
     Do
         Dim As Integer size = BUFFER_SIZE
-        Dim As Integer result = Get(#1, , buffer(0), size, size)
+        Dim As Integer result = Get(#file_number, , buffer(0), size, size)
         If (result Or (size <= 0)) Then
             Print "File input error"
             End 1
         End If
 
-        reached_eof = (EOF(1) <> FALSE)
+        reached_eof = (EOF(file_number) <> FALSE)
 
         If (XML_Parse(parser, @buffer(0), size, reached_eof) = FALSE) Then
             Print filename & "(" & XML_GetCurrentLineNumber(parser) & "): Error from XML parser: "
@@ -117,4 +120,5 @@ End Sub
         End If
     Loop While (reached_eof = FALSE)
 
+    Close #file_number
     XML_ParserFree(parser)

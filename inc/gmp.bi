@@ -29,7 +29,7 @@
 ''
 ''   You should have received copies of the GNU General Public License and the
 ''   GNU Lesser General Public License along with the GNU MP Library.  If not,
-''   see https://www.gnu.org/licenses/.  
+''   see https://www.gnu.org/licenses/.
 ''
 '' translated to FreeBASIC by:
 ''   FreeBASIC development team
@@ -131,8 +131,8 @@ const __GMP_USHRT_MAX = 0 + cushort(not 0)
 #define mpq_numref(Q) (@(Q)->_mp_num)
 #define mpq_denref(Q) (@(Q)->_mp_den)
 
-declare sub __gmp_set_memory_functions(byval as function(byval as uinteger) as any ptr, byval as function(byval as any ptr, byval as uinteger, byval as uinteger) as any ptr, byval as sub(byval as any ptr, byval as uinteger))
-declare sub mp_set_memory_functions alias "__gmp_set_memory_functions"(byval as function(byval as uinteger) as any ptr, byval as function(byval as any ptr, byval as uinteger, byval as uinteger) as any ptr, byval as sub(byval as any ptr, byval as uinteger))
+declare sub __gmp_set_memory_functions(byval as function cdecl(byval as uinteger) as any ptr, byval as function cdecl(byval as any ptr, byval as uinteger, byval as uinteger) as any ptr, byval as sub cdecl(byval as any ptr, byval as uinteger))
+declare sub mp_set_memory_functions alias "__gmp_set_memory_functions"(byval as function cdecl(byval as uinteger) as any ptr, byval as function cdecl(byval as any ptr, byval as uinteger, byval as uinteger) as any ptr, byval as sub cdecl(byval as any ptr, byval as uinteger))
 declare sub __gmp_get_memory_functions(byval as typeof(function(byval as uinteger) as any ptr) ptr, byval as typeof(function(byval as any ptr, byval as uinteger, byval as uinteger) as any ptr) ptr, byval as typeof(sub(byval as any ptr, byval as uinteger)) ptr)
 declare sub mp_get_memory_functions alias "__gmp_get_memory_functions"(byval as typeof(function(byval as uinteger) as any ptr) ptr, byval as typeof(function(byval as any ptr, byval as uinteger, byval as uinteger) as any ptr) ptr, byval as typeof(sub(byval as any ptr, byval as uinteger)) ptr)
 

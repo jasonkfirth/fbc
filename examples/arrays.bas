@@ -1,8 +1,22 @@
+'' Project: FreeBASIC example programs
+'' File: arrays.bas
+''
+'' Purpose:
+''     Demonstrate fixed arrays, dynamic arrays, UDT fields, and array parameters.
+''
+'' Responsibilities:
+''     - show explicit lower and upper bounds
+''     - retain dynamic-array contents across ReDim Preserve
+''     - process only non-empty procedure arrays
+''
+'' This file intentionally does NOT contain:
+''     - dynamic-array fields in UDTs
+''     - a general container abstraction
 ''
 '' Fixed-size arrays:
 ''
 	dim a(0 to 9) as integer '' 10 elements
-	dim b(9) as integer      '' 10 elements (default lower bound is 0)
+	dim b(0 to 9) as integer '' 10 elements
 	dim c(5 to 6) as integer '' 2 elements
 
 	print lbound(a), ubound(a)
@@ -17,9 +31,11 @@
 	redim d(1 to 10)   '' allocate memory for the array
 	redim preserve d(1 to 20) '' to resize the array while keeping its contents
 
-	print lbound(d), ubound(d)
-
-	erase d            '' free the array's memory
+	if ubound(d) < lbound(d) then
+		print "dynamic array allocation failed"
+	else
+		print lbound(d), ubound(d)
+	end if
 
 ''
 '' Multiple dimensions (up to 8 supported):
@@ -37,18 +53,22 @@
 	end type
 
 	dim x as MyType
+	'' foo is a fixed field with declared bounds, not an empty dynamic array.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
 	print lbound(x.foo), ubound(x.foo)
 
 ''
 '' Passing arrays to procedures:
 ''
 	sub fillWithSomeData( array() as integer )
+		if ubound(array) < lbound(array) then exit sub
 		for i as integer = lbound(array) to ubound(array)
 			array(i) = i
 		next
 	end sub
 
 	sub printArrayData( array() as integer )
+		if ubound(array) < lbound(array) then exit sub
 		for i as integer = lbound(array) to ubound(array)
 			print array(i);" ";
 		next
@@ -60,3 +80,7 @@
 
 	printArrayData( a() )
 	printArrayData( c() )
+
+	erase d            '' Free the dynamic array after its final use.
+
+'' End of arrays.bas

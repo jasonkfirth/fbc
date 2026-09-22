@@ -19,6 +19,8 @@
 declare function LoadGLTextures() as integer
 
 
+	'' The texture loader fills this render handle for the module draw loop.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 	dim shared texture(0) as GLuint               '' Storage For One Texture ( NEW )
 
 	dim xrot as single                            '' X Rotation ( NEW )
@@ -57,9 +59,9 @@ declare function LoadGLTextures() as integer
 		glLoadIdentity                                          '' Reset The View
 		glTranslatef 0.0, 0.0, -5.0                             '' Move Into The Screen 5 Units
 
-		glRotatef xrot,1.0, 0.0, 0.0                            '' Rotate On The X Axis
-		glRotatef yrot,0.0, 1.0, 0.0                            '' Rotate On The Y Axis
-		glRotatef zrot,0.0, 0.0, 1.0                            '' Rotate On The Z Axis
+		glRotatef xrot, 1.0, 0.0, 0.0                            '' Rotate On The X Axis
+		glRotatef yrot, 0.0, 1.0, 0.0                            '' Rotate On The Y Axis
+		glRotatef zrot, 0.0, 0.0, 1.0                            '' Rotate On The Z Axis
 
 		glBindTexture GL_TEXTURE_2D, texture(0)                 '' Select Our Texture
 
@@ -117,8 +119,8 @@ function LoadGLTextures() as integer
     ' Typical Texture Generation Using Data From The Bitmap
     glBindTexture GL_TEXTURE_2D, texture(0)
     glTexImage2D GL_TEXTURE_2D, 0, 3, TextureImage(0)->sizeX, TextureImage(0)->sizeY, 0, GL_RGB, GL_UNSIGNED_BYTE, TextureImage(0)->buffer
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR
+    glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR
+    glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR
   end if
 
   if TextureImage(0) then                           '' If Texture Exists

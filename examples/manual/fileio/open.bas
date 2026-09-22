@@ -18,7 +18,9 @@ Open "file.ext" For Binary As #f
 If Err>0 Then Print "Error opening the file":End
 
 ' Place our string inside the file, using number "f".
-Put #f, , buffer
+' file.ext contains exactly the bytes of buffer for this manual transfer.
+' FB-LINTER: DISABLE-NEXT-LINE FBL-DOC-BIN-003
+If Put(#f, , buffer) <> 0 Then Print "Error writing the file"
 
 ' Close all open files.
 Close

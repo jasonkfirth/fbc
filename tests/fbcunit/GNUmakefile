@@ -72,7 +72,12 @@ ifneq ($(FPU),)
 	FBCFLAGS += -fpu $(FPU)
 endif
 
-ifneq ($(TARGET),dos)
+ifeq ($(TARGET),dos)
+ifeq ($(DOS_THREAD_PROVIDER),pdmlwp)
+	# DOS needs an explicit scheduler provider before fbc accepts -mt.
+FBCFLAGS += -mt -dos-threads pdmlwp
+endif
+else
 ifneq ($(TARGET),wince-mips)
 FBCFLAGS += -mt
 endif

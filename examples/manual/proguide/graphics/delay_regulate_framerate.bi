@@ -8,11 +8,17 @@
 
 '  delay_regulate_framerate.bi
 
+#ifndef __DELAY_REGULATE_FRAMERATE_BI__
+#define __DELAY_REGULATE_FRAMERATE_BI__
+
 #if defined(__FB_WIN32__)
 Declare Sub delay(ByVal amount As Single, ByVal threshold As ULong = 2 * 16)
 Declare Function regulate(ByVal MyFps As ULong, ByVal threshold As ULong = 2 * 16) As Single
-Declare Function _setTimer Lib "winmm" Alias "timeBeginPeriod"(ByVal As ULong = 1) As Long
-Declare Function _resetTimer Lib "winmm" Alias "timeEndPeriod"(ByVal As ULong = 1) As Long
+'' timeBeginPeriod and timeEndPeriod use Win32 UINT and MMRESULT 32-bit values.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL320 FBL-INC-007
+Declare Function _setTimer StdCall Lib "winmm" Alias "timeBeginPeriod"(ByVal As ULong = 1) As Long
+'' FB-LINTER: DISABLE-NEXT-LINE FBL320 FBL-INC-007
+Declare Function _resetTimer StdCall Lib "winmm" Alias "timeEndPeriod"(ByVal As ULong = 1) As Long
 Declare Sub delayHR(ByVal amount As Single, ByVal threshold As ULong = 2 * 1)
 Declare Function regulateHR(ByVal MyFps As ULong, ByVal threshold As ULong = 2 * 1) As Single
 Sub delayHR(ByVal amount As Single, ByVal threshold As ULong)
@@ -39,6 +45,7 @@ Function regulateHR(ByVal MyFps As ULong, ByVal threshold As ULong) As Single
 	'' 'MyFps' : requested FPS value, in frames per second
 	'' function return : applied delay (for debug), in milliseconds
 	'' 'thresold' : fixing threshold for fine-grain temporisation (by waiting loop), in milliseconds
+	If MyFps = 0 Then Return 0
 	Static As Double t1
 	Dim As Single tf = 1 / MyFps
 	Dim As Double t2 = Timer
@@ -58,7 +65,7 @@ Declare Sub delay(ByVal amount As Single, ByVal threshold As ULong = 2 * 55)
 Declare Function regulate(ByVal MyFps As ULong, ByVal threshold As ULong = 2 * 55) As Single
 #else
 Declare Sub delay(ByVal amount As Single, ByVal threshold As ULong = 2 * 16)
-Declare Function regulate(ByVal MyFps As ULong, ByVal ULong As Single = 2 * 16) As Single
+Declare Function regulate(ByVal MyFps As ULong, ByVal threshold As ULong = 2 * 16) As Single
 #endif
 
 Declare Function framerate() As ULong
@@ -86,6 +93,7 @@ Function regulate(ByVal MyFps As ULong, ByVal threshold As ULong) As Single
 	'' 'MyFps' : requested FPS value, in frames per second
 	'' function return : applied delay (for debug), in milliseconds
 	'' 'thresold' : fixing threshold for fine-grain temporisation (by waiting loop), in milliseconds
+	If MyFps = 0 Then Return 0
 	Static As Double t1
 	Dim As Single tf = 1 / MyFps
 	Dim As Double t2 = Timer
@@ -102,6 +110,7 @@ Function framerate() As ULong
 	'' function return : measured FPS value (for debug), in frames per second
 	Static As Double t1
 	Dim As Double t2 = Timer
+	If t2 <= t1 Then Return 0
 	#if Not defined(__FB_WIN32__) And Not defined(__FB_LINUX__)
 	If t2 < t1 Then t1 -= 24 * 60 * 60
 	#endif
@@ -109,3 +118,5 @@ Function framerate() As ULong
 	t1 = t2
 	Return tf
 End Function
+
+#endif

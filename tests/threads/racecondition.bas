@@ -1,6 +1,6 @@
 #include "fbcunit.bi"
 
-#ifndef __FB_DOS__
+#if (not defined( __FB_DOS__ )) or ( __FB_MT__ <> 0 )
 
 SUITE( fbc_tests.threads.racecondition )
 
@@ -178,4 +178,4 @@ SUITE( fbc_tests.threads.racecondition )
 
 END_SUITE
 
-#endif '' !defined(__FB_DOS__)
+#endif '' non-DOS or provider-enabled DOS

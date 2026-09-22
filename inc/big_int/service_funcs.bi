@@ -9,6 +9,7 @@
 #ifndef __bigint_service_funcs_bi__
 #define __bigint_service_funcs_bi__
 
+#include once "crt/stddef.bi"
 #include once "big_int/big_int.bi"
 #include once "big_int/str_funcs.bi"
 

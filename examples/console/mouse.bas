@@ -10,7 +10,7 @@ while inkey() <> chr(27)
 		locate y+1, x+1: print " ";
 		x = new_x
 		y = new_y
-		locate 1,1: print x, y,""
+		locate 1, 1: print x, y, ""
 		locate y+1, x+1: print "X";
 	end if
 wend

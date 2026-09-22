@@ -1,7 +1,7 @@
 #include once "Fl_Valuator.bi"
 
 extern "c++"
-type Fl_Roller extends Fl_Valuator 
+type Fl_Roller extends Fl_Valuator
 protected:
 	declare sub draw()
 	declare constructor (byref b as const Fl_Roller)

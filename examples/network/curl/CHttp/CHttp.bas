@@ -27,9 +27,9 @@ constructor CHttp _
 	ctx->curl = NULL
 	ctx->headerlist = NULL
 
-  	curl_global_init( CURL_GLOBAL_ALL )
+	curl_global_init( CURL_GLOBAL_ALL )
 
-  	ctx->curl = curl_easy_init()
+	ctx->curl = curl_easy_init()
 	if( ctx->curl = NULL ) then
 		delete ctx
 		ctx = NULL
@@ -60,8 +60,8 @@ destructor CHttp _
 	end if
 
     if( ctx->headerlist <> NULL ) then
-    	curl_slist_free_all( ctx->headerlist )
-    	ctx->headerlist = NULL
+        curl_slist_free_all( ctx->headerlist )
+        ctx->headerlist = NULL
     end if
 
 	if( ctx->curl <> NULL ) then
@@ -105,7 +105,7 @@ function CHttp.post _
     curl_easy_setopt( ctx->curl, CURLOPT_HTTPPOST, form->getHandle( ) )
 
     if( http_stream->receive( url, NULL, FALSE ) ) then
-    	function = http_stream->read( is_binary )
+        function = http_stream->read( is_binary )
     end if
 
     delete http_stream

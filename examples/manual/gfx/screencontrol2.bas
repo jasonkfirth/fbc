@@ -16,7 +16,11 @@ Dim As String driver
 ScreenControl FB.SET_DRIVER_NAME, "GDI"
 #endif
 
-ScreenRes 640, 480
+If ScreenRes(640, 480) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 '' fetch graphics driver name and display it to user
 ScreenControl FB.GET_DRIVER_NAME, driver
@@ -24,4 +28,3 @@ Print "Graphics driver name: " & driver
 
 '' wait for a keypress before closing the window
 Sleep
-

@@ -196,11 +196,19 @@ End Destructor
 
 
 Sub PrintInfo (ByVal p As root Ptr)                                       '' parameter is a 'root Ptr' or compatible (smart pointer)
+	If p = 0 Then
+		Print "  (null smart pointer)"
+		Exit Sub
+	End If
 	Print "  " & p->ObjectName, "  " & p->ObjectRealType, "           ";
+	' p passed the routine's null guard above and remains unchanged below.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
 	If *p Is dog Then                                                     '' 'Is' allows to check compatibility with type symbol
 		Print  Cast(dog Ptr, p)->ObjectHierarchy
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
 	ElseIf *p Is cat Then                                                 '' 'Is' allows to check compatibility with type symbol
 		Print Cast(cat Ptr, p)->ObjectHierarchy
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
 	ElseIf *p Is animal Then                                              '' 'Is' allows to check compatibility with type symbol
 		Print Cast(animal Ptr, p)->ObjectHierarchy
 	End If
@@ -212,7 +220,7 @@ Define_SmartPointer(root)  '' smart pointer definition
 Scope
 	Print "reference counter value:"; SmartPointer_root.returnCount()
 	Print
-	Dim As SmartPointer_root sp(2) = {New animal("Mouse"), New dog("Buddy"), New cat("Tiger")}
+	Dim As SmartPointer_root sp(0 To 2) = {New animal("Mouse"), New dog("Buddy"), New cat("Tiger")}
 	Print
 	Print "reference counter value:"; SmartPointer_root.returnCount()
 	For I As Integer = 0 To 2
@@ -234,4 +242,3 @@ Print "reference counter value:"; SmartPointer_root.returnCount()
 Print
 
 Sleep
-

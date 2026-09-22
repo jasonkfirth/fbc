@@ -1,4 +1,5 @@
 #include once "fl_types.bi"
+#include once "crt/stdio.bi"
 
 extern "c"
 declare function fl_utf8bytes(ucs as unsigned long) as long

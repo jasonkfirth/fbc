@@ -12,13 +12,19 @@
 #lang "fblite"
 
 Sub Generate_Error
+  '' This compact FBlite example intentionally demonstrates one local handler,
+  '' including its Resume Next continuation after the synthetic Error statement.
+  '' FB-LINTER: DISABLE-NEXT-LINE FBL-ERR-004 FBL-ERR-005 FBL-ERR-007
   On Error Goto Handler
   Error 1000
   Exit Sub
 Handler:
   Print "Error Function: "; *Erfn()
   Print "Error Module  : "; *Ermn()
+  '' FB-LINTER: DISABLE-NEXT-LINE FBL-ERR-007
   Resume Next
 End Sub
 
 Generate_Error
+
+'' end of ermn.bas

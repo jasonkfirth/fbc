@@ -1,3 +1,6 @@
+#ifndef FB_EXAMPLES_MISC_GENERICS_LIST_BI
+#define FB_EXAMPLES_MISC_GENERICS_LIST_BI
+
 #macro list ? (T)
 	__fb_join__(list_,__fb_arg_rightof__(T,OF))
 #endmacro
@@ -62,3 +65,5 @@
 	end operator
 #endif
 #endmacro
+
+#endif

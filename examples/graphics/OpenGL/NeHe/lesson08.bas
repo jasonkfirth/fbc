@@ -1,4 +1,20 @@
 ''
+'' Project: FreeBASIC OpenGL examples
+'' File: lesson08.bas
+''
+'' Purpose:
+''     Demonstrate texture filtering, lighting, and blending on a rotating
+''     textured cube.
+''
+'' Ownership:
+''     LoadGLTextures owns its temporary decoded bitmap and transfers pixels
+''     into three module-owned OpenGL texture names.  The render loop releases
+''     those names when it ends.
+''
+'' This file intentionally does NOT contain:
+''     - a general texture asset manager
+''     - graphics state outside the single render loop
+''
 '' This Code Was Created By Jeff Molofee 2000
 '' A HUGE Thanks To Fredric Echols For Cleaning Up
 '' And Optimizing The Base Code, Making It More Flexible!
@@ -29,6 +45,8 @@
 
 declare function LoadGLTextures() as integer
 
+'' LoadGLTextures and the one render loop share these module-local controls.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 	dim shared filter as uinteger                  '' Which Filter To Use
 	dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 
@@ -59,7 +77,7 @@ declare function LoadGLTextures() as integer
 	glLoadIdentity                                 '' Reset The Modelview Matrix
 
 	'' Jump To Texture Loading Routine
-	if (not LoadGLTextures()) then
+	if LoadGLTextures() = false then
 	  end 1                                        '' If Texture Didn't Load Quit
 	end if
 
@@ -83,10 +101,10 @@ declare function LoadGLTextures() as integer
 	do
 		glClear GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT      '' Clear Screen And Depth Buffer
 		glLoadIdentity                                          '' Reset The View
-		glTranslatef 0.0,0.0,z
+		glTranslatef 0.0, 0.0, z
 
-		glRotatef xrot,1.0,0.0,0.0                              '' Rotate On The X Axis By xrot
-		glRotatef yrot,0.0,1.0,0.0                              '' Rotate On The Y Axis By yrot
+		glRotatef xrot, 1.0, 0.0, 0.0                              '' Rotate On The X Axis By xrot
+		glRotatef yrot, 0.0, 1.0, 0.0                              '' Rotate On The Y Axis By yrot
 
 		glBindTexture GL_TEXTURE_2D, texture(filter)            '' Select A Texture Based On filter
 
@@ -98,7 +116,7 @@ declare function LoadGLTextures() as integer
 			glTexCoord2f 1.0, 1.0 : glVertex3f  1.0,  1.0,  1.0   '' Point 3
 			glTexCoord2f 0.0, 1.0 : glVertex3f -1.0,  1.0,  1.0   '' Point 4
 			'' Back Face
-			glNormal3f  0.0, 0.0,-1.0                             '' Normal Pointing Away From Viewer
+			glNormal3f  0.0, 0.0, -1.0                             '' Normal Pointing Away From Viewer
 			glTexCoord2f 1.0, 0.0 : glVertex3f -1.0, -1.0, -1.0   '' Point 1 (Back)
 			glTexCoord2f 1.0, 1.0 : glVertex3f -1.0,  1.0, -1.0   '' Point 2
 			glTexCoord2f 0.0, 1.0 : glVertex3f  1.0,  1.0, -1.0   '' Point 3
@@ -110,7 +128,7 @@ declare function LoadGLTextures() as integer
 			glTexCoord2f 1.0, 0.0 : glVertex3f  1.0,  1.0,  1.0
 			glTexCoord2f 1.0, 1.0 : glVertex3f  1.0,  1.0, -1.0
 			'' Bottom Face
-			glNormal3f  0.0,-1.0, 0.0                             '' Normal Pointing Down
+			glNormal3f  0.0, -1.0, 0.0                             '' Normal Pointing Down
 			glTexCoord2f 1.0, 1.0 : glVertex3f -1.0, -1.0, -1.0   '' (Bottom)
 			glTexCoord2f 0.0, 1.0 : glVertex3f  1.0, -1.0, -1.0
 			glTexCoord2f 0.0, 0.0 : glVertex3f  1.0, -1.0,  1.0
@@ -142,14 +160,14 @@ declare function LoadGLTextures() as integer
 				glEnable(GL_LIGHTING)               '' enable lighting
 			end if
 		end if
-		if not MULTIKEY(FB.SC_L) then lp = false   '' L key up
+		if MULTIKEY(FB.SC_L) = 0 then lp = false   '' L key up
 
 		if MULTIKEY(FB.SC_F) and not fp then       '' F Key down
 			fp = true
 			filter += 1                           '' Cycle filter 0 -> 1 -> 2
 			if (filter > 2) then filter = 0       '' 2 -> 0
 		end if
-		if not MULTIKEY(FB.SC_F) then fp = false   '' F Key Up
+		if MULTIKEY(FB.SC_F) = 0 then fp = false   '' F Key Up
 
 		'' Blending Code Starts Here
 		if MULTIKEY(FB.SC_B) and not blendpressed then '' B Key down
@@ -163,7 +181,7 @@ declare function LoadGLTextures() as integer
 				glEnable(GL_DEPTH_TEST)             '' Turn Depth Testing On
 			end if
 		end if
-		if not MULTIKEY(FB.SC_B) then blendpressed = false '' B Key up
+		if MULTIKEY(FB.SC_B) = 0 then blendpressed = false '' B Key up
 		'' Blending Code Ends Here
 
 		if MULTIKEY(FB.SC_PAGEUP) then z-=0.02     '' If Page Up is Being Pressed, Move Into The Screen
@@ -178,6 +196,7 @@ declare function LoadGLTextures() as integer
 
 	'Empty keyboard buffer
 	while inkey <> "": wend
+	glDeleteTextures 3, @texture(0)
 
 	end
 
@@ -189,26 +208,29 @@ function LoadGLTextures() as integer
   ' Load The Bitmap, Check For Errors, If Bitmap's Not Found Quit
   TextureImage(0) = LoadBMP(exepath + "/data/Glass.bmp")
   if TextureImage(0) then
-    Status = true                                   '' Set The Status To TRUE
     glGenTextures 3, @texture(0)                    '' Create The Texture
+    if texture(0) <> 0 and texture(1) <> 0 and texture(2) <> 0 then
 
-    ' Create Nearest Filtered Texture
-    glBindTexture GL_TEXTURE_2D, texture(0)
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST
-    glTexImage2D GL_TEXTURE_2D, 0, 3, TextureImage(0)->sizeX, TextureImage(0)->sizeY, 0, GL_RGB, GL_UNSIGNED_BYTE, TextureImage(0)->buffer
+      ' Create Nearest Filtered Texture
+      glBindTexture GL_TEXTURE_2D, texture(0)
+      glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST
+      glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST
+      glTexImage2D GL_TEXTURE_2D, 0, 3, TextureImage(0)->sizeX, TextureImage(0)->sizeY, 0, GL_RGB, GL_UNSIGNED_BYTE, TextureImage(0)->buffer
 
-    ' Create Linear Filtered Texture
-    glBindTexture GL_TEXTURE_2D, texture(1)
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR
-    glTexImage2D GL_TEXTURE_2D, 0, 3, TextureImage(0)->sizeX, TextureImage(0)->sizeY, 0, GL_RGB, GL_UNSIGNED_BYTE, TextureImage(0)->buffer
+      ' Create Linear Filtered Texture
+      glBindTexture GL_TEXTURE_2D, texture(1)
+      glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR
+      glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR
+      glTexImage2D GL_TEXTURE_2D, 0, 3, TextureImage(0)->sizeX, TextureImage(0)->sizeY, 0, GL_RGB, GL_UNSIGNED_BYTE, TextureImage(0)->buffer
 
-    ' Create MipMapped Texture
-    glBindTexture GL_TEXTURE_2D, texture(2)
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_NEAREST
-    gluBuild2DMipmaps GL_TEXTURE_2D, 3, TextureImage(0)->sizeX, TextureImage(0)->sizeY, GL_RGB, GL_UNSIGNED_BYTE, TextureImage(0)->buffer
+      ' Create MipMapped Texture
+      glBindTexture GL_TEXTURE_2D, texture(2)
+      glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR
+      glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST
+      if gluBuild2DMipmaps(GL_TEXTURE_2D, 3, TextureImage(0)->sizeX, TextureImage(0)->sizeY, GL_RGB, GL_UNSIGNED_BYTE, TextureImage(0)->buffer) = 0 then
+        Status = true                                 '' All three textures are ready
+      end if
+    end if
 
   end if
 
@@ -219,5 +241,14 @@ function LoadGLTextures() as integer
     deallocate(TextureImage(0))                     '' Free The Image Structure
   end if
 
+  if Status = false then
+    glDeleteTextures 3, @texture(0)
+    texture(0) = 0
+    texture(1) = 0
+    texture(2) = 0
+  end if
+
   return Status                                     '' Return The Status
 end function
+
+'' End of lesson08.bas

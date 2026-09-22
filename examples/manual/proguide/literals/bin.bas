@@ -7,4 +7,6 @@
 '' --------
 
 Dim x As Integer = &B11110001001000000
+'' The high bit deliberately demonstrates the signed BYTE bit pattern.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-NUM-003
 Dim b As Byte = &B10000000

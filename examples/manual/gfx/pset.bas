@@ -7,7 +7,11 @@
 '' --------
 
 ' Set an appropriate screen mode - 320 x 240 x 8bpp indexed color
-ScreenRes 320, 240, 8
+If ScreenRes( 320, 240, 8 ) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 ' Plot a pixel at the coordinates 100, 100, Color 15. (white)
 PSet (100, 100), 15

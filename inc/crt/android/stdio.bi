@@ -26,7 +26,7 @@ type __sbuf
 	_base as ubyte ptr
 	_size as size_t
 end type
-#else     
+#else
 type __sbuf
 	_base as ubyte ptr
 	_size as long
@@ -40,7 +40,7 @@ type FILE
 #if defined(__LP64__)
 	_flags as long
 	_file as long
-#else     
+#else
 	_flags as short
 	_file as short
 #endif

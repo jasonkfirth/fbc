@@ -1,12 +1,27 @@
+' Project: FreeBASIC TinyPTC examples
+' File: rel-juliarings.bas
+'
+' Purpose:
+'     Render an animated Julia-set ring pattern through the TinyPTC display.
+'
+' Responsibilities:
+'     - prepare coordinate and square-root lookup tables
+'     - render matching upper and lower image rows into the framebuffer
+'     - update the one TinyPTC display until a key is pressed
+'
+' Ownership:
+'     A successful PTC_Open is paired with PTC_Close after the display loop.
+'     The fixed lookup tables and framebuffer remain module-owned throughout.
+'
+' This file intentionally does NOT contain:
+'     - a reusable Julia-set renderer
+'     - user-controlled rendering parameters
+'
 ' The Lord of the Julia Rings
 ' The Fellowship of the Julia Ring
 ' Free Basic
 ' Relsoft
 ' Rel.BetterWebber.com
-'
-
-
-
 #ifdef __FB_WIN32__
 #include once "windows.bi"
 #endif
@@ -25,10 +40,10 @@ const MAXITER = 20
 const MAXSIZE = 4
 
 
-dim Buffer(SCR_SIZE - 1) as integer
-dim Lx(SCR_WIDTH-1) as single
-dim Ly(SCR_HEIGHT-1) as single
-dim sqrt(SCR_SIZE - 1) as single
+dim Buffer(0 to SCR_SIZE - 1) as integer
+dim Lx(0 to SCR_WIDTH-1) as single
+dim Ly(0 to SCR_HEIGHT-1) as single
+dim sqrt(0 to SCR_SIZE - 1) as single
 
 
 if( ptc_open( "Julia (Relsoft)", SCR_WIDTH, SCR_HEIGHT ) = 0 ) then
@@ -123,6 +138,7 @@ do
             ysquare = 0
             ztot =0
             i = 0
+            i_last = 0
             while (i < MAXITER) and (( xsquare + ysquare ) < MAXSIZE)
                 xsquare = x * x
                 ysquare = y * y
@@ -131,9 +147,9 @@ do
                 y = ytemp + q
                 zmag = (x * x + y * y)
                 if (zmag < drad_H) then
-                	if (zmag > drad_L) and (i > 0) then
-                    		ztot = ztot + ( 1 - (abs(zmag - cmagsq) / drad))
-                    		i_last = i
+                    if (zmag > drad_L) and (i > 0) then
+                        ztot = ztot + ( 1 - (abs(zmag - cmagsq) / drad))
+                        i_last = i
                     end if
                 end if
                 i = i + 1
@@ -147,49 +163,49 @@ do
             else
                 i = 0
             end if
-              if i < 256 then
+            if i < 256 then
                 red = i
-              else
+            else
                 red = 255
-              end if
+            end if
 
-              if i < 512 and i > 255 then
+            if i < 512 and i > 255 then
                 grn = i - 256
-              else
+            else
                 if i >= 512 then
-                  grn = 255
+                    grn = 255
                 else
-                  grn = 0
+                    grn = 0
                 end if
-              end if
+            end if
 
-              if i <= 768 and i > 511 then
+            if i <= 768 and i > 511 then
                 blu = i - 512
-              else
+            else
                 if i >= 768 then
-                  blu = 255
+                    blu = 255
                 else
-                  blu = 0
+                    blu = 0
                 end if
-              end if
+            end if
 
-          		tmp = cint((red+grn+blu) * 0.33)
-          		red = cint((red+grn+tmp) * 0.33)
-          		grn = cint((grn+blu+tmp) * 0.33)
-          		blu = cint((blu+red+tmp) * 0.33)
+            tmp = cint((red+grn+blu) * 0.33)
+            red = cint((red+grn+tmp) * 0.33)
+            grn = cint((grn+blu+tmp) * 0.33)
+            blu = cint((blu+red+tmp) * 0.33)
 
-              select case (i_last and 3)
-          		case 1
-                  tmp = red
-                  red = grn
-                  grn = blu
-                  blu = tmp
-          		case 2
-                  tmp = red
-                  blu = grn
-                  red = blu
-                  grn = tmp
-              end select
+            select case (i_last and 3)
+            case 1
+                tmp = red
+                red = grn
+                grn = blu
+                blu = tmp
+            case 2
+                tmp = red
+                blu = grn
+                red = blu
+                grn = tmp
+            end select
 
             pixel = rgb( red, grn, blu )
             *p_buffer = pixel
@@ -202,11 +218,11 @@ do
     'calc fps
     fps = fps + 1
     if stime + 1 < timer then
-     fps2 = fps
-     fps = 0
-     stime = timer
+        fps2 = fps
+        fps = 0
+        stime = timer
 #ifdef __FB_WIN32__
-     SetWindowText( hwnd, "FreeBasic Julia Rings FPS:" & Fps2 )
+        SetWindowText( hwnd, "FreeBasic Julia Rings FPS:" & Fps2 )
 #endif
     end if
     ptc_update @buffer(0)
@@ -217,6 +233,4 @@ ptc_close
 
 end
 
-
-
-
+' End of rel-juliarings.bas

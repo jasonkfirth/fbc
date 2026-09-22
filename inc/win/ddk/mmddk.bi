@@ -9,9 +9,12 @@
 /'      Copyright (c) Microsoft Corp.  All rights reserved.                 '/
 /'                                                                          '/
 /'**************************************************************************'/
- 
+
 #ifndef __MMDDK_BI__
 #define __MMDDK_BI__
+
+#include once "windows.bi"
+#include once "win/mmsystem.bi"
 
 /'    If defined, the following flags inhibit inclusion
  *    of the indicated items:
@@ -46,8 +49,8 @@
 #ifdef MMNOMCI
   #define MMNOMCIDEV
 #endif
- 
- 
+
+
 /'**************************************************************************
                        Helper functions for drivers
 **************************************************************************'/
@@ -66,35 +69,35 @@
 
 #  define DRV_RESERVED           &H0800
 #  define DRV_USER               &H4000
- 
+
 #  define DRIVERS_SECTION  "DRIVERS32"     ' Section name for installed drivers
 #  define MCI_SECTION      "MCI32"         ' Section name for installed MCI drivers
 # endif
 #endif
- 
+
 #define DCB_NOSWITCH   &H0008           ' don't switch stacks for callback
 #define DCB_TYPEMASK   &H0007           ' callback type mask
 #define DCB_NULL       &H0000           ' unknown callback type
- 
+
 ' flags for wFlags parameter of DriverCallback()
 #define DCB_WINDOW     &H0001           ' dwCallback is a HWND
 #define DCB_TASK       &H0002           ' dwCallback is a HTASK
 #define DCB_FUNCTION   &H0003           ' dwCallback is a FARPROC
 #define DCB_EVENT      &H0005           ' dwCallback is an EVENT
- 
+
 ' BOOL APIENTRY DriverCallback(DWORD_PTR dwCallback, DWORD dwFlags, HDRVR hDevice, DWORD dwMsg, DWORD_PTR dwUser, DWORD_PTR dwParam1, DWORD_PTR dwParam2)
- 
+
 ' generic prototype for audio device driver entry-point functions
 ' midMessage(), modMessage(), widMessage(), wodMessage(), auxMessage()
 'typedef DWORD (SOUNDDEVMSGPROC)(WORD, WORD, DWORD, DWORD, DWORD);
 'typedef SOUNDDEVMSGPROC FAR *LPSOUNDDEVMSGPROC;
- 
+
 #define DRVM_INIT               100
 #define DRVM_EXIT               101
 #define DRVM_DISABLE            102
 #define DRVM_ENABLE             103
- 
- 
+
+
 ' message base for driver specific messages.
 '
 #define DRVM_MAPPER                     &H2000
@@ -124,7 +127,7 @@
 #define DRVM_ADD_THRU    (DRVM_IOCTL+1)
 #define DRVM_REMOVE_THRU (DRVM_IOCTL+2)
 #define DRVM_IOCTL_LAST  (DRVM_IOCTL+5)
- 
+
 type DRVM_IOCTL_DATA field=1
   as DWORD  dwSize ' size of this structure (inclusive)
   as DWORD  dwCmd  ' IOCTL command code, &H80000000 and above reserved for system
@@ -137,23 +140,23 @@ type LPDRVM_IOCTL_DATA as DRVM_IOCTL_DATA ptr
 ' definition by microsoft
 #define DRVM_IOCTL_CMD_USER   &H00000000L
 #define DRVM_IOCTL_CMD_SYSTEM &H80000000L
- 
+
 ' device ID for 386 AUTODMA VxD
 #define VADMAD_Device_ID    &H0444
- 
+
 /' PnP version of media device caps '/
 type MDEVICECAPSEX field=1
   as DWORD   cbSize
   as any ptr pCaps
 end type
- 
+
 #ifndef MMNOWAVEDEV
 /'***************************************************************************
                        Waveform device driver support
 ***************************************************************************'/
 #define WODM_INIT DRVM_INIT
 #define WIDM_INIT DRVM_INIT
- 
+
 ' waveform input and output device open information structure
 type WAVEOPENDESC field=1
   as HWAVE        hWave           ' handle
@@ -164,7 +167,7 @@ type WAVEOPENDESC field=1
   as DWORD_PTR    dnDevNode       ' if device is PnP
 end type
 type LPWAVEOPENDESC as WAVEOPENDESC ptr
- 
+
 ' messages sent to wodMessage() entry-point function
 #define WODM_GETNUMDEVS       3
 #define WODM_GETDEVCAPS       4
@@ -192,7 +195,7 @@ type LPWAVEOPENDESC as WAVEOPENDESC ptr
 #define WAVEOUT_MAPPER_STATUS_FORMAT 2
 
 #define WODM_BUSY             21
- 
+
 ' messages sent to widMessage() entry-point function
 #define WIDM_GETNUMDEVS 50
 #define WIDM_GETDEVCAPS 51
@@ -223,10 +226,10 @@ type LPWAVEOPENDESC as WAVEOPENDESC ptr
 #define MIDM_USER   DRVM_USER
 #define MODM_MAPPER DRVM_MAPPER
 #define MIDM_MAPPER DRVM_MAPPER
- 
+
 #define MODM_INIT   DRVM_INIT
 #define MIDM_INIT   DRVM_INIT
- 
+
 #ifndef MMNOMIDI   ' This protects the definition of HMIDI in WINMM.bi
 type MIDIOPENSTRMID field=1
   as DWORD          dwStreamID
@@ -244,12 +247,12 @@ end type
 type  PMIDIOPENDESC as MIDIOPENDESC ptr
 type LPMIDIOPENDESC as MIDIOPENDESC ptr
 #endif ' MMNOMIDI
- 
- 
+
+
 /' Flags for MODM_OPEN '/
 #define MIDI_IO_PACKED      &H00000000L     /' Compatibility mode '/
 #define MIDI_IO_COOKED      &H00000002L
- 
+
 ' messages sent to modMessage() entry-point function
 #define MODM_GETNUMDEVS     1
 #define MODM_GETDEVCAPS     2
@@ -273,8 +276,8 @@ type LPMIDIOPENDESC as MIDIOPENDESC ptr
 #define MODM_PROPERTIES             21
 #define MODM_PREFERRED              22
 #define MODM_RECONFIGURE            (MODM_USER+&H0768)
- 
- 
+
+
 ' messages sent to midMessage() entry-point function
 #define MIDM_GETNUMDEVS  53
 #define MIDM_GETDEVCAPS  54
@@ -286,25 +289,25 @@ type LPMIDIOPENDESC as MIDIOPENDESC ptr
 #define MIDM_START       60
 #define MIDM_STOP        61
 #define MIDM_RESET       62
- 
+
 #endif ' ifndef MMNOMIDIDEV
- 
- 
+
+
 #ifndef MMNOAUXDEV
 /'***************************************************************************
                     Auxiliary audio device driver support
 ***************************************************************************'/
- 
+
 #define AUXM_INIT      DRVM_INIT
- 
+
 ' messages sent to auxMessage() entry-point function
 #define AUXDM_GETNUMDEVS    3
 #define AUXDM_GETDEVCAPS    4
 #define AUXDM_GETVOLUME     5
 #define AUXDM_SETVOLUME     6
- 
+
 #endif ' ifndef MMNOAUXDEV
- 
+
 
 #ifndef MMNOMIXERDEV
 '
@@ -335,12 +338,12 @@ type LPMIXEROPENDESC as MIXEROPENDESC ptr
 
 #endif ' MMNOMIXERDEV
 
- 
+
 #ifndef MMNOTIMERDEV
 /'***************************************************************************
- 
+
                         Timer device driver support
- 
+
 ***************************************************************************'/
 
 type TIMEREVENT field=1
@@ -352,7 +355,7 @@ type TIMEREVENT field=1
   as  WORD                wReserved1     ' structure packing
 end type
 type LPTIMEREVENT as TIMEREVENT ptr
- 
+
 ' messages sent to tddMessage() function
 #define TDD_KILLTIMEREVENT  (DRV_RESERVED+0)  ' indices into a table of
 #define TDD_SETTIMEREVENT   (DRV_RESERVED+4)  ' functions; thus offset by
@@ -360,20 +363,20 @@ type LPTIMEREVENT as TIMEREVENT ptr
 #define TDD_GETDEVCAPS      (DRV_RESERVED+12) ' room for future expansion
 #define TDD_BEGINMINPERIOD  (DRV_RESERVED+16) ' room for future expansion
 #define TDD_ENDMINPERIOD    (DRV_RESERVED+20) ' room for future expansion
- 
+
 #endif ' ifndef MMNOTIMERDEV
- 
- 
+
+
 #ifndef MMNOJOYDEV
 /'***************************************************************************
- 
+
                        Joystick device driver support
- 
+
 ***************************************************************************'/
- 
+
 /' RegisterWindowMessage with this to get msg id of config changes '/
 #define JOY_CONFIGCHANGED_MSGSTRING     "MSJSTICK_VJOYD_MSGSTR"
- 
+
 /' pre-defined joystick types '/
 #define JOY_HW_NONE                     0
 #define JOY_HW_CUSTOM                   1
@@ -388,7 +391,7 @@ type LPTIMEREVENT as TIMEREVENT ptr
 #define JOY_HW_4B_FLIGHTYOKE            10
 #define JOY_HW_4B_FLIGHTYOKETHROTTLE    11
 #define JOY_HW_LASTENTRY                12
- 
+
 /' calibration flags '/
 #define JOY_ISCAL_XY            &H00000001l     /' XY are calibrated '/
 #define JOY_ISCAL_Z             &H00000002l     /' Z is calibrated '/
@@ -396,14 +399,14 @@ type LPTIMEREVENT as TIMEREVENT ptr
 #define JOY_ISCAL_U             &H00000008l     /' U is calibrated '/
 #define JOY_ISCAL_V             &H00000010l     /' V is calibrated '/
 #define JOY_ISCAL_POV           &H00000020l     /' POV is calibrated '/
- 
+
 /' point of view constants '/
 #define JOY_POV_NUMDIRS          4
 #define JOY_POVVAL_FORWARD       0
 #define JOY_POVVAL_BACKWARD      1
 #define JOY_POVVAL_LEFT          2
 #define JOY_POVVAL_RIGHT         3
- 
+
 /' Specific settings for joystick hardware '/
 #define JOY_HWS_HASZ            &H00000001l     /' has Z info? '/
 #define JOY_HWS_HASPOV          &H00000002l     /' point of view hat present '/
@@ -436,12 +439,12 @@ type LPTIMEREVENT as TIMEREVENT ptr
 /' U & V for future hardware '/
 #define JOY_HWS_HASU            &H00800000l     /' has U (5th axis) info '/
 #define JOY_HWS_HASV            &H01000000l     /' has V (6th axis) info '/
- 
+
 /' Usage settings '/
 #define JOY_US_HASRUDDER        &H00000001l     /' joystick configured with rudder '/
 #define JOY_US_PRESENT          &H00000002l     /' is joystick actually present? '/
 #define JOY_US_ISOEM            &H00000004l     /' joystick is an OEM defined type '/
- 
+
 /' struct for storing x,y, z, and rudder values '/
 type JOYPOS field=1
   as DWORD       dwX
@@ -452,7 +455,7 @@ type JOYPOS field=1
   as DWORD       dwV
 end type
 type LPJOYPOS as JOYPOS ptr
- 
+
 /' struct for storing ranges '/
 type JOYRANGE field=1
   as JOYPOS      jpMin
@@ -460,7 +463,7 @@ type JOYRANGE field=1
   as JOYPOS      jpCenter
 end type
 type LPJOYRANGE as JOYRANGE ptr
- 
+
 type JOYREGUSERVALUES
   as DWORD       dwTimeOut      /' value at which to timeout joystick polling '/
   as JOYRANGE    jrvRanges      /' range of values app wants returned for axes '/
@@ -469,13 +472,13 @@ type JOYREGUSERVALUES
                                    (0-100). Only X & Y handled by system driver '/
 end type
 type LPJOYREGUSERVALUES as JOYREGUSERVALUES ptr
- 
+
 type JOYREGHWSETTINGS field=1
   as DWORD       dwFlags
   as DWORD       dwNumButtons           /' number of buttons '/
 end type
 type LPJOYHWSETTINGS as JOYREGHWSETTINGS ptr
- 
+
 /' range of values returned by the hardware (filled in by calibration) '/
 type JOYREGHWVALUES field=1
   as JOYRANGE    jrvHardware            /' values returned by hardware '/
@@ -483,7 +486,7 @@ type JOYREGHWVALUES field=1
   as DWORD       dwCalFlags             /' what has been calibrated '/
 end type
 type LPJOYREGHWVALUES as JOYREGHWVALUES ptr
- 
+
 /' hardware configuration '/
 type JOYREGHWCONFIG field=1
   as JOYREGHWSETTINGS    hws             /' hardware settings '/
@@ -493,7 +496,7 @@ type JOYREGHWCONFIG field=1
   as DWORD               dwReserved      /' reserved for OEM drivers '/
 end type
 type LPJOYREGHWCONFIG as JOYREGHWCONFIG ptr
- 
+
 ' joystick calibration info structure
 type JOYCALIBRATE field=1
   as WORD    wXbase
@@ -504,11 +507,11 @@ type JOYCALIBRATE field=1
   as WORD    wZdelta
 end type
 type LPJOYCALIBRATE as JOYCALIBRATE ptr
- 
+
 ' prototype for joystick message function
 type JOYDEVMSGPROC as function (as DWORD,as UINT,as LONG,as LONG) as DWORD
 type LPJOYDEVMSGPROC as JOYDEVMSGPROC ptr
- 
+
 ' messages sent to joystick driver's DriverProc() function
 #define JDD_GETNUMDEVS          (DRV_RESERVED + &H0001)
 #define JDD_GETDEVCAPS          (DRV_RESERVED + &H0002)
@@ -516,32 +519,32 @@ type LPJOYDEVMSGPROC as JOYDEVMSGPROC ptr
 #define JDD_SETCALIBRATION      (DRV_RESERVED + &H0102)
 #define JDD_CONFIGCHANGED       (DRV_RESERVED + &H0103)
 #define JDD_GETPOSEX            (DRV_RESERVED + &H0104)
- 
+
 #endif ' ifndef MMNOJOYDEV
- 
+
 #ifndef MAKELRESULT
 #define MAKELRESULT(low, high)   (cast(LRESULT,MAKELONG(low, high)))
 #endif
- 
- 
+
+
 #ifndef MMNOMCIDEV
 /'***************************************************************************
- 
+
                         MCI device driver support
- 
+
 ***************************************************************************'/
- 
- 
+
+
 ' internal MCI messages
 #define MCI_OPEN_DRIVER             &H0801
 #define MCI_CLOSE_DRIVER            &H0802
- 
+
 #define MAKEMCIRESOURCE(wRet, wRes) MAKELRESULT((wRet), (wRes))
- 
+
 ' string return values only used with MAKEMCIRESOURCE
 #define MCI_FALSE                       (MCI_STRING_OFFSET + 19)
 #define MCI_TRUE                        (MCI_STRING_OFFSET + 20)
- 
+
 ' resource string return values
 #define MCI_FORMAT_RETURN_BASE          MCI_FORMAT_MILLISECONDS_S
 #define MCI_FORMAT_MILLISECONDS_S       (MCI_STRING_OFFSET + 21)
@@ -555,12 +558,12 @@ type LPJOYDEVMSGPROC as JOYDEVMSGPROC ptr
 #define MCI_FORMAT_BYTES_S              (MCI_STRING_OFFSET + 29)
 #define MCI_FORMAT_SAMPLES_S            (MCI_STRING_OFFSET + 30)
 #define MCI_FORMAT_TMSF_S               (MCI_STRING_OFFSET + 31)
- 
+
 #define MCI_VD_FORMAT_TRACK_S           (MCI_VD_OFFSET + 5)
- 
+
 #define WAVE_FORMAT_PCM_S               (MCI_WAVE_OFFSET + 0)
 #define WAVE_MAPPER_S                   (MCI_WAVE_OFFSET + 1)
- 
+
 #define MCI_SEQ_MAPPER_S                (MCI_SEQ_OFFSET + 5)
 #define MCI_SEQ_FILE_S                  (MCI_SEQ_OFFSET + 6)
 #define MCI_SEQ_MIDI_S                  (MCI_SEQ_OFFSET + 7)
@@ -568,7 +571,7 @@ type LPJOYDEVMSGPROC as JOYDEVMSGPROC ptr
 #define MCI_SEQ_FORMAT_SONGPTR_S        (MCI_SEQ_OFFSET + 9)
 #define MCI_SEQ_NONE_S                  (MCI_SEQ_OFFSET + 10)
 #define MIDIMAPPER_S                    (MCI_SEQ_OFFSET + 11)
- 
+
 #define MCI_TABLE_NOT_PRESENT   ((UINT)-1)
 ' parameters for internal version of MCI_OPEN message sent from
 ' mciOpenDevice() to the driver
@@ -581,10 +584,10 @@ type MCI_OPEN_DRIVER_PARMS field=1
                                        ' filled in by the driver
 end type
 type LPMCI_OPEN_DRIVER_PARMS as MCI_OPEN_DRIVER_PARMS ptr
- 
+
 ' maximum length of an MCI device type
 #define MCI_MAX_DEVICE_TYPE_LENGTH 80
- 
+
 ' flags for mciSendCommandInternal() which direct mciSendString() how to
 ' interpret the return value
 #define MCI_RESOURCE_RETURNED       &H00010000  ' resource ID
@@ -592,10 +595,10 @@ type LPMCI_OPEN_DRIVER_PARMS as MCI_OPEN_DRIVER_PARMS ptr
 #define MCI_COLONIZED4_RETURN       &H00040000  ' colonized ID, 4 bytes data
 #define MCI_INTEGER_RETURNED        &H00080000  ' integer conversion needed
 #define MCI_RESOURCE_DRIVER         &H00100000  ' driver owns returned resource
- 
+
 ' invalid command table ID
 #define MCI_NO_COMMAND_TABLE    (cuint(-1))
- 
+
 ' command table information type tags
 #define MCI_COMMAND_HEAD        0
 #define MCI_STRING              1
@@ -610,7 +613,7 @@ type LPMCI_OPEN_DRIVER_PARMS as MCI_OPEN_DRIVER_PARMS ptr
 #define MCI_HWND               10
 #define MCI_HPAL               11
 #define MCI_HDC                12
- 
+
 ' function prototypes for MCI driver functions
 type mciGetDriverData       as function (wDeviceID as MCIDEVICEID ) as DWORD_PTR
 type mciSetDriverData       as function (wDeviceID as MCIDEVICEID, dwData as DWORD_PTR ) as BOOL
@@ -618,10 +621,10 @@ type mciDriverYield         as function (wDeviceID as MCIDEVICEID) as UINT
 type mciDriverNotify        as function (hwndCallback as HANDLE , wDeviceID as MCIDEVICEID , uStatus as UINT) as UINT
 type mciLoadCommandResource as function (hInstance as HANDLE ,lpResName as LPCWSTR, wType as UINT) as UINT
 type mciFreeCommandResource as function (wTable as UINT) as BOOL
- 
+
 #endif ' ifndef MMNOMCIDEV
- 
- 
+
+
 #ifndef MMNOTASKDEV
 /'****************************************************************************
                                Task support
@@ -629,7 +632,7 @@ type mciFreeCommandResource as function (wTable as UINT) as BOOL
 ' error return values
 #define TASKERR_NOTASKSUPPORT 1
 #define TASKERR_OUTOFMEMORY   2
- 
+
 ' task support function prototypes
 type TASKCALLBACK     as sub (dwInst as DWORD_PTR)
 type LPTASKCALLBACK   as TASKCALLBACK ptr
@@ -638,9 +641,9 @@ type mmTaskBlock      as sub      (h as DWORD)
 type mmTaskSignal     as function (h as DWORD) as BOOL
 type mmTaskYield      as sub      ()
 type mmGetCurrentTask as function () as DWORD
- 
+
 #endif ' endif MMNOTASKDEV
 
 
 #endif /' __MMDDK_BI__ '/
- 
+

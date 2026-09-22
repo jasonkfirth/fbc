@@ -29,13 +29,13 @@ private:
 	callback_ as sub(as Fl_File_Chooser ptr, as any ptr)
 	data_ as any ptr
 	directory_ as zstring*FL_PATH_MAX
-	pattern_ as zstring*FL_PATH_MAX 
+	pattern_ as zstring*FL_PATH_MAX
 	preview_text_ as zstring*2048
 	type__ as long
 	declare sub favoritesButtonCB()
 	declare sub favoritesCB(w as Fl_Widget ptr)
-	declare sub fileListCB() 
-	declare sub fileNameCB() 
+	declare sub fileListCB()
+	declare sub fileNameCB()
 	declare sub newdir()
 	declare static sub previewCB(fc as Fl_File_Chooser ptr)
 	declare sub showChoiceCB()

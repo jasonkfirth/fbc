@@ -1,7 +1,8 @@
 #include once "Fl_Bitmap.bi"
+#include once "Fl_Widget.bi"
 
 extern "c++"
-type Fl_FormsBitmap extends Fl_Widget 
+type Fl_FormsBitmap extends Fl_Widget
 private:
 	b as Fl_Bitmap ptr
 protected:

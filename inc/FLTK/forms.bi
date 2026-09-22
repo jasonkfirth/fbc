@@ -99,10 +99,10 @@ type FL_FORM as Fl_Window
 #define FL_EMBOSSED_STYLE	(FL_EMBOSSED_LABEL SHL 0)
 
 #define FL_TINY_SIZE	8
-#define FL_SMALL_SIZE	11 
-#define FL_MEDIUM_SIZE	18 
-#define FL_LARGE_SIZE	24 
-#define FL_HUGE_SIZE	32 
+#define FL_SMALL_SIZE	11
+#define FL_MEDIUM_SIZE	18
+#define FL_LARGE_SIZE	24
+#define FL_HUGE_SIZE	32
 #define FL_DEFAULT_SIZE	FL_SMALL_SIZE
 #define FL_TINY_FONT	FL_TINY_SIZE
 #define FL_SMALL_FONT	FL_SMALL_SIZE
@@ -130,14 +130,14 @@ declare sub fl_initialize(as long ptr, as zstring ptr ptr, as const zstring ptr,
 private sub fl_finish()
 end sub
 type FL_IO_CALLBACK as sub (as FL_SOCKET, as any ptr)
-private sub fl_add_io_callback(fd as long, w as short, cb as FL_IO_CALLBACK , v as any ptr) 
+private sub fl_add_io_callback(fd as long, w as short, cb as FL_IO_CALLBACK , v as any ptr)
 	Fl.add_fd(fd, w, cb, v)
 end sub
-private sub fl_remove_io_callback(fd as long, w as short, cb as FL_IO_CALLBACK) 
+private sub fl_remove_io_callback(fd as long, w as short, cb as FL_IO_CALLBACK)
 	Fl.remove_fd(fd)
 end sub
 
-private sub fl_add_timeout(msec as long, cb as sub(as any ptr),  v as any ptr) 
+private sub fl_add_timeout(msec as long, cb as sub(as any ptr),  v as any ptr)
 	Fl.add_timeout(msec*.001, cb, v)
 end sub
 private sub fl_remove_timeout(l as long)
@@ -166,7 +166,7 @@ private sub fl_unfreeze_form(foo as Fl_Window ptr)
 end sub
 private sub fl_freeze_all_forms()
 end sub
-private sub fl_unfreeze_all_forms() 
+private sub fl_unfreeze_all_forms()
 end sub
 
 private sub fl_set_focus_object(a as Fl_Window ptr, o as Fl_Widget ptr)
@@ -272,7 +272,7 @@ end function
 private function fl_get_border_width() as long
 	return 3
 end function
-private sub fl_set_border_width(x as long) 
+private sub fl_set_border_width(x as long)
 end sub
 private sub fl_set_object_dblbuffer(a as Fl_Widget ptr, b as long)
 end sub
@@ -764,8 +764,8 @@ private function fl_add_labelframe(i as Fl_Boxtype, x as long, y as long, w as l
 end function
 
 #include once "Fl_Free.bi"
-declare function fl_add_free(t as long, x as double, y as double, w as double, h as double, l as const zstring ptr, hdl as FL_HANDLEPTR) as Fl_Free ptr
-	return cast(Fl_Free ptr, (fl_add_new(new Fl_Free(t,cast(long, x),cast(long, y), cast(long, w), cast(long, h),l,hdl)))
+private function fl_add_free(t as long, x as double, y as double, w as double, h as double, l as const zstring ptr, hdl as FL_HANDLEPTR) as Fl_Free ptr
+	return cast(Fl_Free ptr, (fl_add_new(new Fl_Free(t,cast(long, x),cast(long, y), cast(long, w), cast(long, h),l,hdl))))
 end function
 
 #include once "fl_ask.bi"
@@ -853,7 +853,7 @@ end sub
 private sub fl_set_menu_item_mode(o as Fl_Widget ptr, i as long, x as long)
 	cast(Fl_Menu_Button ptr,o)->mode(i-1,x)
 end sub
-private sub fl_show_menu_symbol(o as Fl_Widget ptr, z as long) 
+private sub fl_show_menu_symbol(o as Fl_Widget ptr, z as long)
 end sub
 private function fl_get_menu(o as Fl_Widget ptr) as long
 	return cast(Fl_Menu_Button ptr,o)->value()+1

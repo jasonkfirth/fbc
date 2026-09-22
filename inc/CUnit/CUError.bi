@@ -25,7 +25,10 @@
 #pragma once
 
 #include once "crt/errno.bi"
-#include once "CUnit.bi"
+
+'' CUError only declares error values and functions. Keeping the umbrella
+'' CUnit include out of this leaf header avoids a circular declaration order
+'' when a program includes CUError directly.
 
 extern "C"
 

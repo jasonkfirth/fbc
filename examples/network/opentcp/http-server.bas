@@ -1,5 +1,6 @@
 ''
 '' minimal http server example using OPEN TCP SERVER
+'' Ownership: the server closes each accepted TCP file unit before the next request.
 ''
 
 #if defined(__FB_DOS__) or defined(__FB_JS__) or defined(__FB_XBOX__)

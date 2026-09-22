@@ -21,8 +21,10 @@ sub create_poly (byval x as integer, byval y as integer, _
 				 byval ang as integer, _
 				 vertTb() as POINT )
 
-	dim as integer cx = x - radius, cy = y
-	dim as integer stp = 180 \ vertices, df = 180 mod vertices
+	dim as integer cx = x - radius
+	dim as integer cy = y
+	dim as integer stp = 180 \ vertices
+	dim as integer df = 180 mod vertices
 	dim as integer diam = radius * 2
 	dim as integer deg = (ang \ 2) - stp
 	dim as integer v = vertices
@@ -34,13 +36,13 @@ sub create_poly (byval x as integer, byval y as integer, _
 			v += vertices
 		end if
 
-     	deg += stp
-     	dim as double r = diam * cos( DEG2RAD(deg) )
+		deg += stp
+		dim as double r = diam * cos( DEG2RAD(deg) )
 
-    	with vertTb(i)
-     		.x = cx + r * cos( DEG2RAD(deg) )
-     		.y = cy + r * sin( DEG2RAD(deg) )
-     	end with
+		with vertTb(i)
+			.x = cx + r * cos( DEG2RAD(deg) )
+			.y = cy + r * sin( DEG2RAD(deg) )
+		end with
 	next
 
 end sub
@@ -58,9 +60,9 @@ function WndProc ( byval hWnd as HWND, _
 
     select case( wMsg )
         case WM_CREATE
-        	GetClientRect( hWnd, @rect )
+            GetClientRect( hWnd, @rect )
 
-        	create_poly( rect.right \ 2, _
+            create_poly( rect.right \ 2, _
         				 rect.bottom \ 2, _
         				 iif(rect.right < rect.bottom, rect.right, rect.bottom) \ 2, _
         				 POLY_VERTICES, _
@@ -73,7 +75,7 @@ function WndProc ( byval hWnd as HWND, _
 
         case WM_PAINT
 			dim as PAINTSTRUCT pnt
-    		dim as HDC hDC
+            dim as HDC hDC
 
             hDC = BeginPaint( hWnd, @pnt )
             GetClientRect( hWnd, @rect )
@@ -100,7 +102,7 @@ function WndProc ( byval hWnd as HWND, _
 				exit function
 			end if
 
-    	case WM_DESTROY
+        case WM_DESTROY
             PostQuitMessage( 0 )
             exit function
     end select
@@ -113,11 +115,11 @@ end function
 sub remove_caption(byval hwnd as HWND )
 	dim as RECT rect
 
-  	dim as integer style = GetWindowLong( hwnd, GWL_STYLE ) and (not WS_CAPTION)
+	dim as integer style = GetWindowLong( hwnd, GWL_STYLE ) and (not WS_CAPTION)
 	SetWindowLong( hwnd, GWL_STYLE, style )
-  	GetClientRect( hwnd, @rect )
+	GetClientRect( hwnd, @rect )
 	AdjustWindowRect( @rect, style, (GetMenu( hwnd ) <> NULL) )
-  	SetWindowPos( hwnd, 0, 0, 0, rect.Right, rect.Bottom, _
+	SetWindowPos( hwnd, 0, 0, 0, rect.Right, rect.Bottom, _
 				  SWP_NOMOVE or SWP_NOZORDER or SWP_FRAMECHANGED or SWP_NOSENDCHANGING )
 end sub
 
@@ -134,21 +136,21 @@ function WinMain ( byval hInstance as HINSTANCE, _
     function = 0
 
     with wcls
-    	.style         = CS_HREDRAW or CS_VREDRAW
+        .style         = CS_HREDRAW or CS_VREDRAW
 		.lpfnWndProc   = cast( WNDPROC, @WndProc )
-    	.cbClsExtra    = 0
-    	.cbWndExtra    = 0
-    	.hInstance     = hInstance
-    	.hIcon         = LoadIcon( NULL, IDI_APPLICATION )
-    	.hCursor       = LoadCursor( NULL, IDC_ARROW )
-    	.hbrBackground = GetStockObject( LTGRAY_BRUSH )
-    	.lpszMenuName  = NULL
-    	.lpszClassName = @"HelloWin"
+        .cbClsExtra    = 0
+        .cbWndExtra    = 0
+        .hInstance     = hInstance
+        .hIcon         = LoadIcon( NULL, IDI_APPLICATION )
+        .hCursor       = LoadCursor( NULL, IDC_ARROW )
+        .hbrBackground = GetStockObject( LTGRAY_BRUSH )
+        .lpszMenuName  = NULL
+        .lpszClassName = @"HelloWin"
     end with
 
     if( RegisterClass( @wcls ) = FALSE ) then
-       MessageBox( null, "Failed to register wcls!", "Error", MB_ICONERROR )
-       exit function
+        MessageBox( null, "Failed to register wcls!", "Error", MB_ICONERROR )
+        exit function
     end if
 
     hWnd = CreateWindowEx( 0, _

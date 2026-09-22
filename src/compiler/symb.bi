@@ -210,6 +210,8 @@ enum FB_PROCATTRIB
 	FB_PROCATTRIB_NOTHISCONSTNESS  = &h00000400  '' PROCs only
 	FB_PROCATTRIB_RETURNBYREF      = &h00000800  '' PROCs (functions/function pointers returning BYREF)
 	FB_PROCATTRIB_DESTRUCTOR0      = &h00001000  '' methods only - deleting destructor
+	FB_PROCATTRIB_SFXLIB           = &h00002000  '' compiler-registered sfxlib intrinsic
+	FB_PROCATTRIB_GFXLIB           = &h00004000  '' compiler-registered gfxlib intrinsic
 end enum
 
 '' parameter modes
@@ -1145,6 +1147,8 @@ declare function symbAddKeyword _
 declare function symbKeywordGetText( byval tk as integer ) as const zstring ptr
 declare function symbKeywordGetIllegalRedefErr( byval tk as integer ) as FB_ERRMSG
 declare function symbKeywordIsDisabledCommand( byval tk as integer ) as integer
+declare function symbIsDisabledCommand( byval sym as FBSYMBOL ptr ) as integer
+declare function symbGetIllegalRedefErr( byval sym as FBSYMBOL ptr ) as FB_ERRMSG
 
 declare function symbAddDefine _
 	( _
@@ -2592,6 +2596,9 @@ declare sub symbProcRecalcRealType( byval proc as FBSYMBOL ptr )
 #define symbIsImport(s) ((s->attrib and FB_SYMBATTRIB_IMPORT) <> 0)
 
 #define symbIsOverloaded(s) ((s->pattrib and FB_PROCATTRIB_OVERLOADED) <> 0)
+
+#define symbIsSfxlibProc(s) (symbIsProc(s) and ((s->pattrib and FB_PROCATTRIB_SFXLIB) <> 0))
+#define symbIsGfxlibProc(s) (symbIsProc(s) and ((s->pattrib and FB_PROCATTRIB_GFXLIB) <> 0))
 
 #define symbIsConstructor(s) ((s->pattrib and FB_PROCATTRIB_CONSTRUCTOR) <> 0)
 

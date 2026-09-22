@@ -11,8 +11,7 @@ Dim a As Integer
 a = 0
 Do While a < 10
 	Print "hello"
-a = a + 1
+	a = a + 1
 Loop
 
 'This will continue to print "hello" on the screen while the condition (a < 10) is met.
-

@@ -11,14 +11,23 @@
 Function TLSindex() As Integer  ' returning a unique thread index (incremented with each new thread)
 	Static As Any Ptr TLSind()
 	Dim As Integer index = -1
-	For I As Integer = LBound(TLSind) To UBound(TLSind)
-		If TLSind(I) = ThreadSelf() Then
-			index = I
-			Exit For
-		End If
-	Next I
+	'' The initial undimensioned array reports an upper bound below its lower bound.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
+	Dim As Integer lower_bound = LBound(TLSind)
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
+	Dim As Integer upper_bound = UBound(TLSind)
+
+	If upper_bound >= lower_bound Then
+		For I As Integer = lower_bound To upper_bound
+			If TLSind(I) = ThreadSelf() Then
+				index = I
+				Exit For
+			End If
+		Next I
+	End If
+
 	If index = -1 Then
-		index = UBound(TLSind) + 1
+		index = upper_bound + 1
 		ReDim Preserve TLSind(index)
 		TLSind(index) = ThreadSelf()
 	End If
@@ -28,7 +37,9 @@ End Function
 Function TLSinteger() ByRef As Integer  ' emulation of global integer with value depending on thread using it
 	Static As Integer TLSint()
 	Dim As Integer index = TLSindex()
-	If index > UBound(TLSint) Then
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
+	Dim As Integer upper_bound = UBound(TLSint)
+	If upper_bound < 0 OrElse index > upper_bound Then
 		ReDim Preserve TLSint(index)
 	End If
 	Return TLSint(index)

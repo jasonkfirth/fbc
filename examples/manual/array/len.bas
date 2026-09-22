@@ -9,8 +9,10 @@
 #include Once "fbc-int/array.bi"
 Using FB
 
-Dim As LongInt array(4, 5)
+Dim As LongInt array(0 To 4, 0 To 5)
 Dim As UInteger array_length
 
 array_length = ArrayLen(array())
 Print array_length                '' 30
+
+' end of len.bas

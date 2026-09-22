@@ -10,7 +10,7 @@
 
 ' Acts like puts with the file given at time of enclosure.
 Sub Printer cdecl(ByVal cif As ffi_cif Ptr, ByVal ret As Any Ptr, ByVal args As Any Ptr Ptr, ByVal File As Any Ptr)
-	Write #*CPtr(Integer Ptr, file), **CPtr(ZString Ptr Ptr, args[0])
+	Print #*CPtr(Integer Ptr, file), **CPtr(ZString Ptr Ptr, args[0])
 	*CPtr(UInteger Ptr, ret) = 42
 End Sub
 
@@ -35,26 +35,35 @@ If closure <> 0 Then
 	If prep_result = FFI_OK Then
 		' Open console file to send to PrinterBinding as user data
 		Dim ConsoleFile As Integer = FreeFile()
+		'' CONS is the process console stream, not a disk path.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-IO-005
 		Open Cons For Output As ConsoleFile
+		If Err = 0 Then
+			' Initialize the closure, setting user data to the console file
+			prep_result = ffi_prep_closure_loc( _
+				closure,         _ ' closure object
+				@cif,            _ ' call interface object
+				@Printer,        _ ' actual closure function
+				@ConsoleFile,    _ ' user data, our console file #
+				PrinterBinding   _ ' pointer to binding
+			)
+			If prep_result = FFI_OK Then
+				' Call binding as a natural function call
+				Dim Result As Integer
+				Result = PrinterBinding("Hello World!")
+				Print Using "Returned &"; Result
+			End If
 
-		' Initialize the closure, setting user data to the console file
-		prep_result = ffi_prep_closure_loc( _
-			closure,         _ ' closure object
-			@cif,            _ ' call interface object
-			@Printer,        _ ' actual closure function
-			@ConsoleFile,    _ ' user data, our console file #
-			PrinterBinding   _ ' pointer to binding
-		)
-		If prep_result = FFI_OK Then
-			' Call binding as a natural function call
-			Dim Result As Integer
-			Result = PrinterBinding("Hello World!")
-			Print Using "Returned &"; Result
+			Close ConsoleFile
+		Else
+			Print "Could not open the console stream"
 		End If
-
-		Close ConsoleFile
 	End If
 End If
 
 ' Clean up
-ffi_closure_free(closure)
+If closure <> 0 Then
+	ffi_closure_free(closure)
+End If
+
+' end of closures.bas

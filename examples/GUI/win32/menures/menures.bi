@@ -1,3 +1,6 @@
+#ifndef FB_EXAMPLES_GUI_WIN32_MENURES_MENURES_BI
+#define FB_EXAMPLES_GUI_WIN32_MENURES_MENURES_BI
+
 #define IDC_MAINMENU                    200
 
 #define IDM_BASE						100
@@ -30,3 +33,5 @@
 #define TITLEM_SEARCH_FINDNEXT "Find &Next"
 #define TITLEM_SEARCH_FINDPREV "Find &Prev"
 #define TITLEM_SEARCH_REPLACE "&Replace"
+
+#endif

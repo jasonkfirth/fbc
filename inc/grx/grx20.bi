@@ -50,7 +50,7 @@
 ''
 ''   A copy of the GNU GPL (in the file "COPYING") and the GNU LGPL (in
 ''   the file "COPYING.LIB") is included with this document. If you did
-''   not receive a copy of "COPYING" or "COPYING.LIB", you may obtain one 
+''   not receive a copy of "COPYING" or "COPYING.LIB", you may obtain one
 ''   from where this document was obtained, or by writing to:
 ''
 ''     Free Software Foundation

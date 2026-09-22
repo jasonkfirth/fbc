@@ -7,5 +7,5 @@
 '' --------
 
 #if Not __FB_MIN_VERSION__(0, 18, 2)
- 	#error fbc must be at least version 0.18.2 To compile This module
+	#error fbc must be at least version 0.18.2 To compile This module
 #endif

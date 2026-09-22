@@ -18,7 +18,7 @@ Type operation As Function (ByVal As Integer) As Integer
 
 ' an array of procedure pointers, NULL indicates the
 ' end of the array
-Dim operations(20) As operation = _
+Dim operations(0 To 20) As operation = _
 { @Halve, @Triple, 0 }
 
 Dim i As Integer = 280
@@ -33,4 +33,3 @@ While (*op <> 0)
 Wend
 
 Print "Value of 'i' after all operations performed: " & i
-

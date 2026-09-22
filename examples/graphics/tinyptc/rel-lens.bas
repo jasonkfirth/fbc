@@ -6,10 +6,10 @@
 #include "tinyptc.bi"
 
 declare sub smooth( buffer() as integer)
-declare sub put_pixel(buffer() as integer, byval x as integer, byval y as integer,_
+declare sub put_pixel(target() as integer, byval x as integer, byval y as integer, _
                       byval col as integer)
-declare function dist (byval x as single,byval  y as single, xc() as single, yc() as single) as single
-declare sub do_lens(dest() as integer, source() as integer,_
+declare function dist (byval x as single, byval  y as single, xc() as single, yc() as single) as single
+declare sub do_lens(dest() as integer, source() as integer, _
                     byval x as integer, byval y as integer, byval radius as integer )
 declare sub pcopy_ ( dest() as integer, source() as integer)
 
@@ -31,15 +31,15 @@ const MAXPOINTS = 64
 const XMID = SCR_WIDTH \ 2
 const YMID = SCR_HEIGHT \ 2
 
+
+' The main display loop owns these tables and does not create worker threads.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 	dim shared buffer( 0 to SCR_SIZE-1 ) as integer
 	dim shared texture( 0 to SCR_SIZE-1 ) as integer
-	dim shared distbuffer( SCR_WIDTH - 1, SCR_HEIGHT - 1 ) as single
-    DIM shared xcoords(maxpoints) as single
-    DIM shared ycoords(maxpoints) as single
-    dim shared sqrt(256* 256) as integer
-
-
-
+	dim shared distbuffer(0 to SCR_WIDTH - 1, 0 to SCR_HEIGHT - 1) as single
+    DIM shared xcoords(0 to maxpoints) as single
+    DIM shared ycoords(0 to maxpoints) as single
+    dim shared sqrt(0 to 256*256) as integer
 	if( ptc_open( "Lens mapping", SCR_WIDTH, SCR_HEIGHT ) = 0 ) then
 		end -1
 	end if
@@ -63,32 +63,32 @@ const YMID = SCR_HEIGHT \ 2
 
     frame = 0
 
-          mindist = 1D+16
-          maxdist = 0
+mindist = 1D+16
+maxdist = 0
 
-          FOR y = 0 TO SCR_HEIGHT - 1
-          FOR x = 0 TO SCR_WIDTH  - 1
-              tx = x
-              ty = y
-              distance = dist(tx, ty, xcoords(), ycoords())
-              distbuffer(x, y) = distance
-              IF distance < mindist THEN mindist = distance
-              IF distance > maxdist THEN maxdist = distance
-          NEXT x
-          NEXT y
+FOR y = 0 TO SCR_HEIGHT - 1
+    FOR x = 0 TO SCR_WIDTH  - 1
+        tx = x
+        ty = y
+        distance = dist(tx, ty, xcoords(), ycoords())
+        distbuffer(x, y) = distance
+        IF distance < mindist THEN mindist = distance
+        IF distance > maxdist THEN maxdist = distance
+    NEXT x
+NEXT y
 
-          dim as single c
+dim as single c
 
-          '1
-          FOR y = 0 TO SCR_HEIGHT - 1
-          FOR x = 0 TO SCR_WIDTH - 1
-              c =1 - (distbuffer(x, y) - mindist) / (maxdist - mindist)
-              r = cint(c * 55)
-              g = cint(c * 155)
-              b = cint(c * 255)
-              put_pixel texture(), x, y, r shl 16 or g shl 8 or b
-          NEXT x
-          NEXT y
+'1
+FOR y = 0 TO SCR_HEIGHT - 1
+    FOR x = 0 TO SCR_WIDTH - 1
+        c =1 - (distbuffer(x, y) - mindist) / (maxdist - mindist)
+        r = cint(c * 55)
+        g = cint(c * 155)
+        b = cint(c * 255)
+        put_pixel texture(), x, y, r shl 16 or g shl 8 or b
+    NEXT x
+NEXT y
 
           'jump:
 
@@ -98,8 +98,8 @@ const YMID = SCR_HEIGHT \ 2
           'NEXT x
           'NEXT y
 
-          dim t as single
-          dim as integer x2, y2, x3, y3
+dim t as single
+dim as integer x2, y2, x3, y3
     do
         T = timer
         x =  INT(sin(T * .6) * cos(T) * 140)
@@ -110,9 +110,9 @@ const YMID = SCR_HEIGHT \ 2
         y3 =  INT(sin(T + .72) * cos(T * .5) * 90)
 
         pcopy_ buffer(), texture()
-        do_lens buffer(), texture(),-64+ x + XMID, -64+ y + YMID, 64
-        do_lens buffer(), texture(),-16+ x2 + XMID, -16+ y2 + YMID, 32
-        do_lens buffer(), texture(),-22+ x3 + XMID, -22+ y3 + YMID, 44
+        do_lens buffer(), texture(), -64+ x + XMID, -64+ y + YMID, 64
+        do_lens buffer(), texture(), -16+ x2 + XMID, -16+ y2 + YMID, 32
+        do_lens buffer(), texture(), -22+ x3 + XMID, -22+ y3 + YMID, 44
         ptc_update @buffer(0)
 
     loop until( inkey = chr( 27 ) )
@@ -120,15 +120,32 @@ const YMID = SCR_HEIGHT \ 2
 
 	ptc_close
 
-
-
-
 private FUNCTION dist (byval x as single, byval y as single, xc() as single, yc() as single) as single
     dim as single mindist = 1D+16
-    dim as integer max = UBOUND(xc)
     dim as single a, b, d
     dim as integer i
-    FOR i = 0 TO max
+    dim as integer firstpoint, lastpoint
+
+    if ubound(xc) < lbound(xc) then
+        dist = 0
+        exit function
+    end if
+    if ubound(yc) < lbound(yc) then
+        dist = 0
+        exit function
+    end if
+    if lbound(xc) <> lbound(yc) then
+        dist = 0
+        exit function
+    end if
+    if ubound(xc) <> ubound(yc) then
+        dist = 0
+        exit function
+    end if
+
+    firstpoint = lbound(xc)
+    lastpoint = ubound(xc)
+    FOR i = firstpoint TO lastpoint
         a = (xc(i) - x) * (xc(i) - x)
         b = (yc(i) - y) * (yc(i) - y)
         d = SQR(a + b)
@@ -137,13 +154,13 @@ private FUNCTION dist (byval x as single, byval y as single, xc() as single, yc(
     dist = mindist
 END FUNCTION
 
-'*******************************************************************************************
-'GFX subs/Funks
-'
-'*******************************************************************************************
-private sub put_pixel(buffer() as integer, byval x as integer, byval y as integer, byval col as integer)
-        if cunsg(x) >= SCR_WIDTH or cunsg(y) >= SCR_HEIGHT then exit sub
-        buffer(y * SCR_WIDTH + x) = col
+' -------------------------------------------------------------------------
+' Lens-renderer helpers
+' -------------------------------------------------------------------------
+
+private sub put_pixel(target() as integer, byval x as integer, byval y as integer, byval col as integer)
+    if cunsg(x) >= SCR_WIDTH or cunsg(y) >= SCR_HEIGHT then exit sub
+    target(y * SCR_WIDTH + x) = col
 end sub
 
 private sub pcopy_ ( dest() as integer, source() as integer)
@@ -153,10 +170,10 @@ private sub pcopy_ ( dest() as integer, source() as integer)
     next offset
 end sub
 
-Private sub do_lens(dest()as integer, source() as integer,_
+Private sub do_lens(dest()as integer, source() as integer, _
                     byval x as integer, byval y as integer, byval radius as integer )
 
-   	const SCR_X_MAX = SCR_WIDTH - 1
+    const SCR_X_MAX = SCR_WIDTH - 1
 	const SCR_Y_MAX = SCR_HEIGHT - 1
 
     dim as integer wid, hei
@@ -180,7 +197,7 @@ Private sub do_lens(dest()as integer, source() as integer,_
     minx = 0
     miny = 0
 
-  	if y < 0 then
+    if y < 0 then
 		y = -y
 		miny = y
 		hei = hei - y
@@ -208,24 +225,24 @@ Private sub do_lens(dest()as integer, source() as integer,_
 	end if
 
     FOR yt = 0 TO hei - 1
-     FOR xt = 0 TO wid - 1
-          x1 = (xt - Radius) + minx
-          y1 = (yt - Radius) + miny
+        FOR xt = 0 TO wid - 1
+            x1 = (xt - Radius) + minx
+            y1 = (yt - Radius) + miny
 
-          HypotSquared = (x1 * x1) + (y1 * y1)
-          IF HypotSquared < (RadiusSquared - Cleaner) THEN
-           H = (Sqrt(RadiusSquared - HypotSquared))
-           Sx = (SphereHeight - H)
-           Sy = (SphereHeight - H)
-           Sx = Sx * ((x1 shl 16) \ H)
-           Sy = Sy * ((y1 shl 16) \ H)
-           py = ((Sy shr 16) + yt + y)
-           px = ((Sx shr 16) + xt + x)
-           if px > -1 and px < SCR_WIDTH and py > -1 and py < SCR_HEIGHT then
-              dest( (y+yt) * SCR_WIDTH + (x + xt) ) = source(py * SCR_WIDTH + px)
-           end if
-          END IF
-     NEXT xt
+            HypotSquared = (x1 * x1) + (y1 * y1)
+            IF HypotSquared < (RadiusSquared - Cleaner) THEN
+                H = (Sqrt(RadiusSquared - HypotSquared))
+                Sx = (SphereHeight - H)
+                Sy = (SphereHeight - H)
+                Sx = Sx * ((x1 shl 16) \ H)
+                Sy = Sy * ((y1 shl 16) \ H)
+                py = ((Sy shr 16) + yt + y)
+                px = ((Sx shr 16) + xt + x)
+                if px > -1 and px < SCR_WIDTH and py > -1 and py < SCR_HEIGHT then
+                    dest( (y+yt) * SCR_WIDTH + (x + xt) ) = source(py * SCR_WIDTH + px)
+                end if
+            END IF
+        NEXT xt
     NEXT yt
 
 

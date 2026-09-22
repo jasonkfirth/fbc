@@ -22,7 +22,7 @@ private function doPaint _
 		) as integer
 
 	'' PathGradientBrush is a kind of Brush
-	dim as GpPathGradient ptr grad
+	dim as GpPathGradient ptr grad = NULL
 
 	'' create a brush
 	static as GpPoint pntTb(0 to 3) = _
@@ -33,13 +33,20 @@ private function doPaint _
 		type<GpPoint>(0, 100) _
 	}
 
-	GdipCreatePathGradientI( @pntTb(0), 4, WrapModeTile, @grad )
+	If GdipCreatePathGradientI( @pntTb(0), 4, WrapModeTile, @grad ) <> 0 Then
+		function = FALSE
+		exit function
+	End If
 
 	GdipSetPathGradientCenterColor( grad, BGRA(63, 127, 255, 255) )
 
 	'' draw an ellipse
-	dim as .RECT rc = any
-	GetClientRect( hWnd, @rc )
+	dim as .RECT rc = type<.RECT>( 0, 0, 0, 0 )
+	If GetClientRect( hWnd, @rc ) = FALSE Then
+		GdipDeleteBrush( cast( GpBrush ptr, grad ) )
+		function = FALSE
+		exit function
+	End If
 	GdipFillEllipseI( gfx, cast( GpBrush ptr, grad ), 0, 0, rc.right, rc.bottom )
 
 	'' destroy the brush

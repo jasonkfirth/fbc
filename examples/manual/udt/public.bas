@@ -8,10 +8,10 @@
 
 Type testing
   Private:
-	nome As String
+    nome As String
   Public:
 	number As Integer
-  Declare Sub setNome( ByRef newnome As String )
+    Declare Sub setNome( ByRef newnome As String )
 End Type
 
 Sub testing.setnome( ByRef newnome As String )
@@ -24,4 +24,3 @@ Dim As testing myVariable
 '' they're public
 myVariable.number = 69 ''
 myVariable.setNome( "FreeBASIC" )
-

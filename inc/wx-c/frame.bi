@@ -4,7 +4,7 @@
 #Include Once "common.bi"
 
 ' class wxFrame
-Declare Function wxFrame_ctor WXCALL Alias "wxFrame_ctor" () As wxFrame Ptr 
+Declare Function wxFrame_ctor WXCALL Alias "wxFrame_ctor" () As wxFrame Ptr
 Declare Function wxFrame_Create WXCALL Alias "wxFrame_Create" (self As wxFrame  Ptr, _
                                  parent   As wxWindow Ptr = WX_NULL, _
                                  id       As  wxWindowID   = -1, _

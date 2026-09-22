@@ -22,6 +22,7 @@
 
 #lang "fblite"
 
+' This smoke verifies the fblite GOSUB runtime contract. FB-LINTER: DISABLE-NEXT-LINE FBL-OPT-007
 option gosub
 
 dim shared as integer gosub_total
@@ -40,10 +41,12 @@ end
 
 first_probe:
 gosub_total = 17
+' GOSUB/RETURN label exit is the behavior under test. FB-LINTER: DISABLE-NEXT-LINE FBL-CF-007
 return
 
 second_probe:
 gosub_total = gosub_total + 25
+' GOSUB/RETURN label exit is the behavior under test. FB-LINTER: DISABLE-NEXT-LINE FBL-CF-007
 return
 
 '' end of fbgosub_smoke.bas

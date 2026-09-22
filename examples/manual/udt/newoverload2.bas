@@ -5,6 +5,12 @@
 ''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgOpNewOverload
 '' --------
+''
+'' Resource ownership:
+''
+'' UDTmanager records each successful New[] allocation until its matching
+'' Delete[] call.  endProgram releases every remaining tracked allocation before
+'' ending the deliberate allocation-limit demonstration.
 
 Type UDTmanager
   '' user UDT fields:
@@ -15,10 +21,13 @@ Type UDTmanager
 	  Declare Operator Delete[] (ByVal buf As Any Ptr)
 	  Static As UInteger maxmemory
 	Private:
+	  '' The dynamic bookkeeping arrays have one matching live slot per allocation.
+	  '' FB-LINTER: DISABLE-NEXT-LINE FBL525
 	  Static As Any Ptr address()
 	  Static As UInteger bytes()
 	  Static upbound As UInteger
 	  Declare Static Function printLine (ByRef text As String, ByVal index As UInteger, ByVal sign As Integer) As UInteger
+	  Declare Static Sub shrinkBookkeeping ()
 	  Declare Static Sub endProgram ()
 End Type
 
@@ -29,7 +38,7 @@ Dim UDTmanager.upbound As UInteger = 0
 
 Function UDTmanager.printLine (ByRef text As String, ByVal index As UInteger, ByVal sign As Integer) As UInteger
   Dim As UInteger total = 0
-  For I As UInteger = 1 To UDTmanager.upbound
+	For I As UInteger = LBound(UDTmanager.address) + 1 To UBound(UDTmanager.address)
 	If I <> index OrElse Sgn(sign) > 0 Then
 	  total += UDTmanager.bytes(I)
 	End If
@@ -45,23 +54,32 @@ Function UDTmanager.printLine (ByRef text As String, ByVal index As UInteger, By
   Return total
 End Function
 
+Sub UDTmanager.shrinkBookkeeping ()
+	ReDim Preserve UDTmanager.address(UDTmanager.upbound)
+	ReDim Preserve UDTmanager.bytes(UDTmanager.upbound)
+End Sub
+
 Sub UDTmanager.endProgram ()
-  Do While UDTmanager.upbound > 0
+	Do While UDTmanager.upbound > 0
 	Deallocate UDTmanager.address(UDTmanager.upbound)
 	UDTmanager.printLine("memory deallocation forced", UDTmanager.upbound, -1)
 	UDTmanager.upbound -= 1
-	ReDim Preserve UDTmanager.address(UDTmanager.upbound)
-	ReDim Preserve UDTmanager.bytes(UDTmanager.upbound)
-  Loop
+	Loop
+	Erase UDTmanager.address
+	Erase UDTmanager.bytes
+	ReDim UDTmanager.address(0)
+	ReDim UDTmanager.bytes(0)
   Print "end program forced"
   Print
   Sleep
+	'' This demonstration must stop after its allocator reports exhaustion.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-CF-005
   End
 End Sub
 
 Operator UDTmanager.New[] (ByVal size As UInteger) As Any Ptr
   Dim As Any Ptr p = Allocate(size)
-  If p > 0 Then
+	If p <> 0 Then
 	UDTmanager.upbound += 1
 	ReDim Preserve UDTmanager.address(UDTmanager.upbound)
 	ReDim Preserve UDTmanager.bytes(UDTmanager.upbound)
@@ -86,17 +104,16 @@ End Operator
 
 Operator UDTmanager.Delete[] (ByVal buf As Any Ptr)
   Dim As UInteger found = 0
-  For I As UInteger = 1 To UDTmanager.upbound
+	For I As UInteger = LBound(UDTmanager.address) + 1 To UBound(UDTmanager.address)
 	If UDTmanager.address(I) = buf Then
 	  Deallocate buf
 	  UDTmanager.printLine("memory deallocation", I, -1)
-	  For J As UInteger = I + 1 To UDTmanager.upbound
+	  For J As UInteger = I + 1 To UBound(UDTmanager.address)
 		UDTmanager.address(J - 1) = UDTmanager.address(J)
 		UDTmanager.bytes(J - 1) = UDTmanager.bytes(J)
 	  Next J
 	  UDTmanager.upbound -= 1
-	  ReDim Preserve UDTmanager.address(UDTmanager.upbound)
-	  ReDim Preserve UDTmanager.bytes(UDTmanager.upbound)
+	  UDTmanager.shrinkBookkeeping()
 	  found = 1
 	  Exit For
 	End If

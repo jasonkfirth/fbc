@@ -5,6 +5,11 @@
 ''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgErase
 '' --------
+''
+'' Array-state boundary:
+''
+'' This page deliberately queries both a fixed array and a ReDim array before
+'' and after ERASE, so their distinct bound-reporting behavior remains visible.
 
 Dim MyArray1(1 To 3, 4 To 9) As Integer
 ReDim MyArray2(1 To 3, 4 To 9) As Integer
@@ -13,17 +18,14 @@ Print , "LOWER", "UPPER"
 Print "MyArray1", _
 	  LBound( MyArray1, 1 ); ", "; LBound( MyArray1, 2 ), _
 	  UBound( MyArray1, 1 ); ", "; UBound( MyArray1, 2 )
-Print "MyArray2", _
-	  LBound( MyArray2, 1 ); ", "; LBound( MyArray2, 2 ), _
-	  UBound( MyArray2, 1 ); ", "; UBound( MyArray2, 2 )
+Print "MyArray2", LBound( MyArray2, 1 ); ", "; LBound( MyArray2, 2 ), UBound( MyArray2, 1 ); ", "; UBound( MyArray2, 2 )  '' MyArray2 was explicitly ReDim. FB-LINTER: DISABLE-LINE FBL-ARR-004
 
+'' The following lower and upper bounds intentionally demonstrate ERASE results.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-007
 Erase MyArray1, MyArray2
 
 Print
 Print "MyArray1", _
 	  LBound( MyArray1, 1 ); ", "; LBound( MyArray1, 2 ), _
 	  UBound( MyArray1, 1 ); ", "; UBound( MyArray1, 2 )
-Print "MyArray2", _
-	  LBound( MyArray2, 1 ); ", "; LBound( MyArray2, 2 ), _
-	  UBound( MyArray2, 1 ); ", "; UBound( MyArray2, 2 )
-
+Print "MyArray2", LBound( MyArray2, 1 ); ", "; LBound( MyArray2, 2 ), UBound( MyArray2, 1 ); ", "; UBound( MyArray2, 2 )  '' This post-ERASE query is the purpose of the manual example. FB-LINTER: DISABLE-LINE FBL-ARR-004

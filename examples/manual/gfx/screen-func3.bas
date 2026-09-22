@@ -7,7 +7,11 @@
 '' --------
 
 '' open a full-color graphics screen
-ScreenRes 320, 200, 32
+If ScreenRes(320, 200, 32) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 '' print a character
 Color RGB(255, 255, 0), RGB(0, 0, 255) 'yellow on blue

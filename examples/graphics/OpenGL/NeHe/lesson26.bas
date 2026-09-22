@@ -33,6 +33,8 @@ const null = 0
 declare sub DrawObject()
 declare sub DrawFloor()
 
+'' The setup helpers initialize these OpenGL handles for the draw loop.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared texture(0 to 2) as GLuint                     '' 3 Textures
 dim shared q as GLUquadricObj ptr                          '' Quadratic For Drawing A Sphere
 
@@ -63,7 +65,7 @@ dim shared q as GLUquadricObj ptr                          '' Quadratic For Draw
 	glLoadIdentity                               '' Reset The Projection Matrix
 
 	'' All Setup For OpenGL Goes Here
-	redim buffer(256*256*4+4) as ubyte           '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
+	redim buffer(0 to 256*256*4+4) as ubyte      '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
 	bload exepath + "/data/Envwall.bmp", @buffer(0)         '' BLOAD data from bitmap
 	texture(0) = CreateTexture(@buffer(0))       '' GL_LINEAR Texture
 	bload exepath + "/data/Ball.bmp", @buffer(0)            '' BLOAD data from bitmap
@@ -78,7 +80,7 @@ dim shared q as GLUquadricObj ptr                          '' Quadratic For Draw
 	glClearStencil (0)                           '' Clear The Stencil Buffer To 0
 	glEnable (GL_DEPTH_TEST)                     '' Enables Depth Testing
 	glDepthFunc (GL_LEQUAL)                      '' The Type Of Depth Testing To Do
-	glHint (GL_PERSPECTIVE_CORRECTION_HINT , GL_NICEST)     '' Really Nice Perspective Calculations
+	glHint (GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)     '' Really Nice Perspective Calculations
 	glEnable (GL_TEXTURE_2D)                     '' Enable 2D Texture Mapping
 
 	glLightfv GL_LIGHT0 , GL_AMBIENT , @LightAmb(0)         '' Set The Ambient Lighting For Light0
@@ -89,11 +91,11 @@ dim shared q as GLUquadricObj ptr                          '' Quadratic For Draw
 	glEnable (GL_LIGHTING)                                  '' Enable Lighting
 
 	q = gluNewQuadric ()                                    '' Create A New Quadratic
-	gluQuadricNormals (q , GL_SMOOTH)                       '' Generate Smooth Normals For The Quad
-	gluQuadricTexture (q , GL_TRUE)                         '' Enable Texture Coords For The Quad
+	gluQuadricNormals (q, GL_SMOOTH)                       '' Generate Smooth Normals For The Quad
+	gluQuadricTexture (q, GL_TRUE)                         '' Enable Texture Coords For The Quad
 
-	glTexGeni (GL_S , GL_TEXTURE_GEN_MODE , GL_SPHERE_MAP)  '' Set Up Sphere Mapping
-	glTexGeni (GL_T , GL_TEXTURE_GEN_MODE , GL_SPHERE_MAP)  '' Set Up Sphere Mapping
+	glTexGeni (GL_S, GL_TEXTURE_GEN_MODE, GL_SPHERE_MAP)  '' Set Up Sphere Mapping
+	glTexGeni (GL_T, GL_TEXTURE_GEN_MODE, GL_SPHERE_MAP)  '' Set Up Sphere Mapping
 
 	do
 		glClear GL_COLOR_BUFFER_BIT  or  GL_DEPTH_BUFFER_BIT  or  GL_STENCIL_BUFFER_BIT

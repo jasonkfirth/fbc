@@ -10,14 +10,23 @@
 ' The main routine creates three threads.
 ' Two of the threads update a "count" variable.
 ' The third thread waits until the count variable reaches a specified value.
+'
+' Thread synchronization uses countMutex:
+'
+' count and ok are read or changed only while countMutex is locked. CondWait
+' atomically releases that mutex while sleeping and re-acquires it before the
+' watcher evaluates ok again. The main routine destroys both synchronization
+' objects only after ThreadWait has joined every worker.
 
 #define numThread  3
 #define countThreshold 6
 
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 Dim Shared As Integer count = 0
 Dim Shared As Any Ptr countMutex
 Dim Shared As Any Ptr countThresholdCV
 Dim As Any Ptr threadID(0 To numThread-1)
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 Dim Shared As Integer ok = 0
 
 Sub threadCount (ByVal p As Any Ptr)
@@ -71,3 +80,5 @@ For I As Integer = 0 To numThread-1
 Next I
 MutexDestroy(countMutex)
 CondDestroy(countThresholdCV)
+
+'' end of condwait.bas

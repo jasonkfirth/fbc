@@ -1,3 +1,14 @@
+' Try/catch runtime demonstration
+'
+' This module implements the private signal and setjmp/longjmp state used by
+' the companion try/catch macros.
+'
+' Ownership: Each Exception owns its string copies and replaces them only after
+' a new copy has been allocated.
+'
+' This demonstration intentionally does not provide thread-safe exception
+' delivery or an async-signal-safe allocation strategy.
+
 #include once "trycatch.bi"
 
 #define	SIGINT		2	'' Interactive attention
@@ -23,6 +34,8 @@ type TryCatchCtx
 	oldsigint	as __p_sig_fn_t
 end type
 
+' The signal handler and TryCatch constructors share one process-local context.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 	dim shared ctx as TryCatchCtx
 	dim shared messages(0 to 31) as zstring * 32
 
@@ -30,10 +43,16 @@ private sub handler cdecl(byval sig as integer)
 	if ctx.cur = 0 then
 		error sig
 	end if
+	if sig < lbound(messages) orelse sig > ubound(messages) then
+		error sig
+	end if
 
 	signal(sig, @handler)
 
 	ctx.cur->ex = new Exception(messages(sig))
+	if ctx.cur->ex = 0 then
+		error 7
+	end if
 
 	var buf = @ctx.cur->buf
 
@@ -89,6 +108,9 @@ sub TryCatch.throw_(file as zstring ptr, func as zstring ptr, line_ as integer)
 	if ctx.cur = 0 then
 		error 1
 	end if
+	if this.ex = 0 then
+		error 7
+	end if
 
 	this.ex->file = file
 	this.ex->func = func
@@ -99,24 +121,49 @@ sub TryCatch.throw_(file as zstring ptr, func as zstring ptr, line_ as integer)
 end sub
 
 sub TryCatch.throw_(ex as Exception ptr, file as zstring ptr, func as zstring ptr, line_ as integer)
+	if ex = 0 then
+		error 5
+	end if
 	this.ex = ex
 	throw_(file, func, line_)
 end sub
 
 sub TryCatch.throw_(msg as zstring ptr, file as zstring ptr, func as zstring ptr, line_ as integer)
 	this.ex = new Exception(msg)
+	if this.ex = 0 then
+		error 7
+	end if
 	throw_(file, func, line_)
 end sub
 
 ''
 '' Exception
 ''
+private sub CopyExceptionString(byref destination as zstring ptr, _
+	byval source as zstring ptr)
+
+	dim as zstring ptr replacement
+
+	if source = 0 then
+		replacement = allocate(1)
+		if replacement = 0 then error 7
+		*replacement = 0
+	else
+		replacement = allocate(len(*source) + 1)
+		if replacement = 0 then error 7
+		*replacement = *source
+	end if
+
+	if destination <> 0 then deallocate(destination)
+	destination = replacement
+end sub
+
 constructor Exception()
+	CopyExceptionString this.msg, @""
 end constructor
 
 constructor Exception(msg as zstring ptr)
-	this.msg = allocate(len(*msg) + 1)
-	*this.msg = *msg
+	CopyExceptionString this.msg, msg
 end constructor
 
 destructor Exception()
@@ -140,8 +187,7 @@ property Exception.file() as string
 end property
 
 property Exception.file(file_ as zstring ptr)
-	this.file_ = allocate(len(*file_) + 1)
-	*this.file_ = *file_
+	CopyExceptionString this.file_, file_
 end property
 
 property Exception.func() as string
@@ -149,8 +195,7 @@ property Exception.func() as string
 end property
 
 property Exception.func(func_ as zstring ptr)
-	this.func_ = allocate(len(*func_) + 1)
-	*this.func_ = *func_
+	CopyExceptionString this.func_, func_
 end property
 
 property Exception.line() as integer
@@ -168,3 +213,5 @@ end operator
 function Exception.toString() as string
 	function = this.message & " exception threw at " & this.file & "(" & this.line & "):" & this.func & "()"
 end function
+
+' End of trycatch.bas

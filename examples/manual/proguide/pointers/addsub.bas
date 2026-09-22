@@ -8,5 +8,13 @@
 
 Dim p As Integer Ptr = New Integer[2]
 
-*p = 1
-*(p + 1) = 2
+If p = 0 Then
+	Print "Memory allocation failed"
+Else
+	'' p was checked before assigning the two allocated elements.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
+	*p = 1
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
+	*(p + 1) = 2
+	Delete[] p
+End If

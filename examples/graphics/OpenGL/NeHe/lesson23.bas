@@ -62,15 +62,15 @@ declare sub glDrawCube()
 	'' All Setup For OpenGL Goes Here
 
 	'' Use BLOAD to load the bitmaps.
-	redim buffer(256*256*4+4) as ubyte     '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
+	redim buffer(0 to 256*256*4+4) as ubyte '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
 	bload exepath + "/data/BG.bmp", @buffer(0)                       '' BLOAD the bitmap
-	texture(0) = CreateTexture(@buffer(0),TEX_NOFILTER)   '' Nearest Texture
+	texture(0) = CreateTexture(@buffer(0), TEX_NOFILTER)   '' Nearest Texture
 	texture(2) = CreateTexture(@buffer(0))                '' Linear Texture (default)
-	texture(4) = CreateTexture(@buffer(0),TEX_MIPMAP)     '' MipMapped Texture
+	texture(4) = CreateTexture(@buffer(0), TEX_MIPMAP)     '' MipMapped Texture
 	bload exepath + "/data/Reflect.bmp", @buffer(0)                  '' BLOAD the bitmap
-	texture(1) = CreateTexture(@buffer(0),TEX_NOFILTER)   '' Nearest Texture
+	texture(1) = CreateTexture(@buffer(0), TEX_NOFILTER)   '' Nearest Texture
 	texture(3) = CreateTexture(@buffer(0))                '' Linear Texture (default)
-	texture(5) = CreateTexture(@buffer(0),TEX_MIPMAP)     '' MipMapped Texture
+	texture(5) = CreateTexture(@buffer(0), TEX_MIPMAP)     '' MipMapped Texture
 	'' Exit if error loading textures
 	if (texture(0) or texture(1) or texture(2) or texture(3) _
 			or texture(4) or texture(5)) = NULL then end 1
@@ -86,7 +86,7 @@ declare sub glDrawCube()
 
 	glLightfv GL_LIGHT1, GL_AMBIENT, @LightAmbient(0)     '' Setup The Ambient Light
 	glLightfv GL_LIGHT1, GL_DIFFUSE, @LightDiffuse(0)     '' Setup The Diffuse Light
-	glLightfv GL_LIGHT1, GL_POSITION,@LightPosition(0)    '' Position The Light
+	glLightfv GL_LIGHT1, GL_POSITION, @LightPosition(0)    '' Position The Light
 	glEnable GL_LIGHT1                                    '' Enable Light One
 
 	quadratic = gluNewQuadric()                           '' Create A Pointer To The Quadric Object
@@ -100,15 +100,15 @@ declare sub glDrawCube()
 
 		glClear GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT      '' Clear The Screen And The Depth Buffer
 		glLoadIdentity                                          '' Reset The View
-		glTranslatef 0.0,0.0,z
+		glTranslatef 0.0, 0.0, z
 
 		glEnable GL_TEXTURE_GEN_S                               '' Enable Texture Coord Generation For S  NEW
 		glEnable GL_TEXTURE_GEN_T                               '' Enable Texture Coord Generation For T  NEW
 
 		glBindTexture GL_TEXTURE_2D, texture(filter*2 + 1)      '' This Will Select The Sphere Map (1, 3 or 5)
 		glPushMatrix
-			glRotatef xrot,1.0,0.0,0.0
-			glRotatef yrot,0.0,1.0,0.0
+			glRotatef xrot, 1.0, 0.0, 0.0
+			glRotatef yrot, 0.0, 1.0, 0.0
 			select case object_
 			case 0
 				glDrawCube()
@@ -116,7 +116,7 @@ declare sub glDrawCube()
 				glTranslatef 0.0, 0.0, -1.5                     '' Center The Cylinder
 				gluCylinder quadratic, 1.0, 1.0, 3.0, 32, 32    '' A Cylinder With A Radius Of 0.5 And A Height Of 2
 			case 2
-				gluSphere quadratic,1.3, 32, 32                 '' Draw A Sphere With A Radius Of 1 And 16 Longitude And 16 Latitude Segments
+				gluSphere quadratic, 1.3, 32, 32                 '' Draw A Sphere With A Radius Of 1 And 16 Longitude And 16 Latitude Segments
 			case 3
 				glTranslatef 0.0, 0.0, -1.5                     '' Center The Cone
 				gluCylinder quadratic, 1.0, 0.0, 3.0, 32, 32    '' A Cone With A Bottom Radius Of .5 And A Height Of 2
@@ -193,7 +193,7 @@ sub glDrawCube()
 		glTexCoord2f 1.0, 1.0 : glVertex3f  1.0,  1.0,  1.0
 		glTexCoord2f 0.0, 1.0 : glVertex3f -1.0,  1.0,  1.0
 		'' Back Face
-		glNormal3f  0.0, 0.0,-1.0
+		glNormal3f  0.0, 0.0, -1.0
 		glTexCoord2f 1.0, 0.0 : glVertex3f -1.0, -1.0, -1.0
 		glTexCoord2f 1.0, 1.0 : glVertex3f -1.0,  1.0, -1.0
 		glTexCoord2f 0.0, 1.0 : glVertex3f  1.0,  1.0, -1.0
@@ -205,7 +205,7 @@ sub glDrawCube()
 		glTexCoord2f 1.0, 0.0 : glVertex3f  1.0,  1.0,  1.0
 		glTexCoord2f 1.0, 1.0 : glVertex3f  1.0,  1.0, -1.0
 		'' Bottom Face
-		glNormal3f  0.0,-1.0, 0.0
+		glNormal3f  0.0, -1.0, 0.0
 		glTexCoord2f 1.0, 1.0 : glVertex3f -1.0, -1.0, -1.0
 		glTexCoord2f 0.0, 1.0 : glVertex3f  1.0, -1.0, -1.0
 		glTexCoord2f 0.0, 0.0 : glVertex3f  1.0, -1.0,  1.0
@@ -224,4 +224,3 @@ sub glDrawCube()
 		glTexCoord2f 0.0, 1.0 : glVertex3f -1.0,  1.0, -1.0
 	glEnd
 end sub
-

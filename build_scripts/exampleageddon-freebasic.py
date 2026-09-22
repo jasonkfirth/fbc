@@ -165,6 +165,59 @@ MULTIFILE_PROGRAMS = {
     "examples/misc/trycatch/test.bas": (
         "examples/misc/trycatch/trycatch.bas",
     ),
+    "examples/manual/module/common1.bas": (
+        "examples/manual/module/common2.bas",
+    ),
+    "examples/manual/module/extern1.bas": (
+        "examples/manual/module/extern2.bas",
+    ),
+    "examples/manual/module/extern2.bas": (
+        "examples/manual/module/extern1.bas",
+    ),
+    "examples/manual/proguide/varscope/module1.bas": (
+        "examples/manual/proguide/varscope/module2.bas",
+    ),
+    "examples/manual/proguide/varscope/module2.bas": (
+        "examples/manual/proguide/varscope/module1.bas",
+    ),
+    "examples/manual/proguide/varscope/module3.bas": (
+        "examples/manual/proguide/varscope/module4.bas",
+    ),
+    "examples/win32/COM/DropTarget/test.bas": (
+        "examples/win32/COM/DropTarget/CDropTarget.bas",
+    ),
+    "examples/win32/GDIPlus/circle.bas": (
+        "examples/win32/GDIPlus/frmwrk.bas",
+    ),
+}
+
+# A few manual examples document compiler switches that are part of the
+# example itself. Keep those switches local to the affected source so the
+# general sweep continues to exercise ordinary command-line behavior.
+EXAMPLE_FBC_ARGUMENTS = {
+    "examples/manual/module/option_entry.bas": (
+        "-entry",
+        "custom_main",
+    ),
+    "examples/manual/proguide/varscope/module1.bas": (
+        "-lang",
+        "qb",
+    ),
+    "examples/manual/proguide/varscope/module2.bas": (
+        "-lang",
+        "qb",
+    ),
+}
+
+GAS64_VARIADIC_SOURCES = {
+    "examples/manual/procs/vararg1.bas",
+    "examples/manual/procs/vararg2.bas",
+    "examples/manual/proguide/variadic_arguments/va_.bas",
+    "examples/manual/proguide/variadic_arguments/va_2.bas",
+    "examples/manual/proguide/variadic_arguments/va_3.bas",
+    "examples/graphics/OpenGL/NeHe/lesson21.bas",
+    "examples/graphics/OpenGL/NeHe/lesson24.bas",
+    "examples/graphics/OpenGL/NeHe/lesson32.bas",
 }
 
 INTENTIONAL_FAILURES = {
@@ -288,6 +341,34 @@ def host_uses_windows_executables() -> bool:
 
     system = platform.system().lower()
     return system.startswith(("msys", "mingw", "cygwin"))
+
+
+def compiler_supports_gas64(args: argparse.Namespace) -> bool:
+    """Return whether the selected compiler can use the x86-64 ASM backend."""
+    machine = platform.machine().lower()
+    if machine not in ("x86_64", "amd64", "x64"):
+        return False
+
+    compiler_name = Path(args.fbc[0]).name.lower() if args.fbc else ""
+    if compiler_name in ("fbc32.exe", "fbcarm64.exe", "fbcarm64"):
+        return False
+
+    compiler_arguments = [str(argument).lower() for argument in args.fbc_arg]
+    for index, argument in enumerate(compiler_arguments):
+        if argument.startswith("-target="):
+            target = argument.split("=", 1)[1]
+            if target in ("win32", "dos", "x86", "i386"):
+                return False
+        elif argument in ("-target", "--target") and index + 1 < len(compiler_arguments):
+            target = compiler_arguments[index + 1]
+            if target in ("win32", "dos", "x86", "i386"):
+                return False
+        elif argument in ("-arch", "-cpu") and index + 1 < len(compiler_arguments):
+            cpu = compiler_arguments[index + 1]
+            if cpu in ("x86", "i386", "i686", "386", "x86_32"):
+                return False
+
+    return True
 
 
 def executable_name(stem: str) -> str:
@@ -748,6 +829,21 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     if args.prefix is not None:
         cmd.extend(["-prefix", str(args.prefix)])
     cmd.extend(args.fbc_arg)
+    cmd.extend(EXAMPLE_FBC_ARGUMENTS.get(rel, ()))
+    if rel in GAS64_VARIADIC_SOURCES and compiler_supports_gas64(args):
+        # va_first/va_arg/va_next are implemented by the native ASM backend;
+        # the GCC/Clang generator intentionally rejects these statements.
+        cmd.extend(["-gen", "gas64"])
+
+    if (
+        args.target_os == "windows"
+        and compiler_supports_gas64(args)
+        and rel.lower().startswith("examples/gui/gtk+/goocanvas/")
+    ):
+        # The Windows 64-bit package ships GooCanvas 3.0 with the GTK3
+        # bindings.  The examples retain their historical GTK2 default so
+        # 32-bit and non-Windows builds keep their original library choice.
+        cmd.extend(["-d", "__USE_GTK3__"])
 
     cmd.extend([
         "-i",
@@ -805,6 +901,12 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     else:
         run_status = "skipped-compile-failed"
         run_log.write_text("skipped: compile did not pass\n", encoding="utf-8")
+
+    if not args.keep_work:
+        # The copied sources are only needed while compiling or running. Logs
+        # and binaries live outside this tree, so retaining it for every
+        # example needlessly consumes several gigabytes in a full sweep.
+        shutil.rmtree(compile_cwd.parent, ignore_errors=True)
 
     return Result(
         path=rel,
@@ -965,6 +1067,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--compile-timeout", type=int, default=60)
     parser.add_argument("--run-timeout", type=int, default=15)
     parser.add_argument("--no-run", action="store_true")
+    parser.add_argument(
+        "--keep-work",
+        action="store_true",
+        help="Keep per-example copied source trees for post-run debugging",
+    )
     parser.add_argument("--run-all", action="store_true", help="Run compiled non-external/non-platform examples even if classified interactive")
     parser.add_argument("--fail-on-self-contained", action="store_true", help="Exit non-zero if self-contained examples fail to compile or run")
     parser.add_argument("--main-module-from-source", action="store_true", help="Pass -m <source-stem> when compiling each example")

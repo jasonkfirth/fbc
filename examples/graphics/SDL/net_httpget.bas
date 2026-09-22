@@ -62,16 +62,16 @@ declare sub gethostandpath( byref src as string, byref hostname as string, byref
     dim bytes as integer
 
     do
-    	bytes = SDLNet_TCP_Recv( socket, strptr( recvbuffer ), RECVBUFFLEN )
-    	if( bytes <= 0 ) then
-    		exit do
-    	end if
+        bytes = SDLNet_TCP_Recv( socket, strptr( recvbuffer ), RECVBUFFLEN )
+        if( bytes <= 0 ) then
+            exit do
+        end if
 
-    	'' add the null-terminator
-    	recvbuffer[bytes] = 0
+        '' add the null-terminator
+        recvbuffer[bytes] = 0
 
-    	'' print it as string
-    	print recvbuffer;
+        '' print it as string
+        print recvbuffer;
     loop
     print
 

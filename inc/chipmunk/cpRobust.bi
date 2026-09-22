@@ -26,6 +26,8 @@
 
 #pragma once
 
+#include once "chipmunk_structs.bi"
+
 extern "C"
 
 declare function cpCheckPointGreater(byval a as const cpVect, byval b as const cpVect, byval c as const cpVect) as cpBool

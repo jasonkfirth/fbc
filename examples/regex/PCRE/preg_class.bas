@@ -17,6 +17,14 @@
 '' Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 '/
 
+/'
+    Resource ownership:
+
+        strings owns an array of match arrays.  Each match array owns the
+        PCRE substring pointers returned for that match.  clean_up() releases
+        every acquired level before clearing the owning fields.
+'/
+
 #include "pcre.bi"
 
 type preg_t
@@ -44,18 +52,34 @@ type preg_t
 	'' to insert a literal '$' use '$$'
 	declare function replace(pattern as zstring ptr, replacement as zstring ptr, subject as zstring ptr, byval offset as long = 0, byval flags as long = 0) as integer
 
+	declare function append_match() as integer
 	declare function clean_up() as integer
 
 	declare constructor (byval substrings_limit_ as integer = -1)
 	declare destructor ()
 end type
 
+function preg_t.append_match() as integer
+	dim as zstring ptr ptr ptr resized_strings
+	dim as zstring ptr ptr new_match
+
+	resized_strings = reallocate(this.strings, (this.matches + 1) * sizeof(zstring ptr ptr))
+	if resized_strings = 0 then return -1
+
+	this.strings = resized_strings
+	new_match = callocate((this.substrings + 1) * sizeof(zstring ptr))
+	if new_match = 0 then return -1
+
+	'' append_match allocated this exact match slot. FB-LINTER: DISABLE-NEXT-LINE FBL525
+	this.strings[this.matches] = new_match
+	function = this.matches
+	this.matches += 1
+end function
+
 function preg_t.match(pattern as zstring ptr, subject as zstring ptr, byval offset as long = 0, byval flags as long = 0) as integer
 	this.clean_up()
 
 	this.errorcode = 0
-	this.strings = 0
-	this.matches = 0
 
 	dim as pcre ptr temp_c = pcre_compile2(pattern, flags, @this.errorcode, @this.err_, @this.erroffset, 0)
 	if temp_c = 0 then return this.errorcode
@@ -64,24 +88,39 @@ function preg_t.match(pattern as zstring ptr, subject as zstring ptr, byval offs
 	if (this.substrings_limit >= 0 and this.substrings_limit < this.substrings) then this.substrings = this.substrings_limit
 
 	dim as long ptr vector = allocate((this.substrings + 1) * 3 * sizeof(long))
+	if vector = 0 then
+		pcre_free(temp_c)
+		this.errorcode = PCRE_ERROR_NOMEMORY
+		return this.errorcode
+	end if
 
 	dim as long temp_e = pcre_exec(temp_c, 0, subject, len(*subject), offset, 0 /'flags'/, vector, (this.substrings + 1) * 3)
 	if temp_e = 0 then temp_e = this.substrings + 1
 	if temp_e < 0 then
 		this.errorcode = temp_e
 	else
-		this.strings = reallocate(this.strings, (this.matches + 1) * sizeof(zstring ptr ptr))
-		this.strings[this.matches] = callocate((this.substrings + 1) * sizeof(zstring ptr))
+		dim as integer match_index = this.append_match()
+		if match_index < 0 then
+			this.clean_up()
+			this.errorcode = PCRE_ERROR_NOMEMORY
+		else
 		for i as integer = 0 to temp_e - 1
 			dim as const zstring ptr substring
-			pcre_get_substring(subject, vector, temp_e, i, @substring)
-			this.strings[this.matches][i] = cast(zstring ptr, substring)
+			dim as integer substring_result = pcre_get_substring(subject, vector, temp_e, i, @substring)
+			if substring_result < 0 then
+				this.errorcode = substring_result
+				exit for
+			end if
+			'' PCRE returned substring i within the newly allocated match array. FB-LINTER: DISABLE-NEXT-LINE FBL525
+			this.strings[match_index][i] = cast(zstring ptr, substring)
 		next
-		this.matches += 1
+			if this.errorcode < 0 then this.clean_up()
+		end if
 	end if
 	if this.errorcode = PCRE_ERROR_NOMATCH then this.errorcode = 0
 
 	deallocate(vector)
+	vector = 0
 
 	pcre_free(temp_c)
 
@@ -92,8 +131,6 @@ function preg_t.match_all(pattern as zstring ptr, subject as zstring ptr, byval 
 	this.clean_up()
 
 	this.errorcode = 0
-	this.strings = 0
-	this.matches = 0
 
 	dim as pcre ptr temp_c = pcre_compile2(pattern, flags, @this.errorcode, @this.err_, @this.erroffset, 0)
 	if temp_c = 0 then return this.errorcode
@@ -102,28 +139,48 @@ function preg_t.match_all(pattern as zstring ptr, subject as zstring ptr, byval 
 	if (this.substrings_limit >= 0 and this.substrings_limit < this.substrings) then this.substrings = this.substrings_limit
 
 	dim as long ptr vector = allocate((this.substrings + 1) * 3 * sizeof(long))
+	if vector = 0 then
+		pcre_free(temp_c)
+		this.errorcode = PCRE_ERROR_NOMEMORY
+		return this.errorcode
+	end if
 
-	dim as long temp_l = len(*subject), temp_o = offset
+	dim as long temp_l = len(*subject)
+	dim as long temp_o = offset
 	do
 		dim as long temp_e = pcre_exec(temp_c, 0, subject, temp_l, temp_o, 0 /'flags'/, vector, (this.substrings + 1) * 3)
 		if temp_e = 0 then temp_e = this.substrings + 1
 		if temp_e < 0 then
 			this.errorcode = temp_e
 		else
-			this.strings = reallocate(this.strings, (this.matches + 1) * sizeof(zstring ptr ptr))
-			this.strings[this.matches] = callocate((this.substrings + 1) * sizeof(zstring ptr))
+			dim as integer match_index = this.append_match()
+			if match_index < 0 then
+				this.clean_up()
+				this.errorcode = PCRE_ERROR_NOMEMORY
+			else
 			for i as integer = 0 to temp_e - 1
 				dim as const zstring ptr substring
-				pcre_get_substring(subject, vector, temp_e, i, @substring)
-				this.strings[this.matches][i] = cast(zstring ptr, substring)
+				dim as integer substring_result = pcre_get_substring(subject, vector, temp_e, i, @substring)
+				if substring_result < 0 then
+					this.errorcode = substring_result
+					exit for
+				end if
+				'' PCRE returned substring i within the newly allocated match array. FB-LINTER: DISABLE-NEXT-LINE FBL525
+				this.strings[match_index][i] = cast(zstring ptr, substring)
 			next
-			temp_o = vector[1]
-			this.matches += 1
+				if this.errorcode < 0 then
+					this.clean_up()
+					exit do
+				end if
+				'' PCRE writes the next subject offset into vector slot 1. FB-LINTER: DISABLE-NEXT-LINE FBL525
+				temp_o = vector[1]
+			end if
 		end if
 	loop while this.errorcode = 0
 	if this.errorcode = PCRE_ERROR_NOMATCH then this.errorcode = 0
 
 	deallocate(vector)
+	vector = 0
 
 	pcre_free(temp_c)
 
@@ -134,8 +191,6 @@ function preg_t.replace(pattern as zstring ptr, replacement as zstring ptr, subj
 	this.clean_up()
 
 	this.errorcode = 0
-	this.strings = 0
-	this.matches = 0
 
 	dim as pcre ptr temp_c = pcre_compile2(pattern, flags, @this.errorcode, @this.err_, @this.erroffset, 0)
 	if temp_c = 0 then return this.errorcode
@@ -146,14 +201,21 @@ function preg_t.replace(pattern as zstring ptr, replacement as zstring ptr, subj
 	dim as string result_
 
 	dim as long ptr vector = allocate((this.substrings + 1) * 3 * sizeof(long))
+	if vector = 0 then
+		pcre_free(temp_c)
+		this.errorcode = PCRE_ERROR_NOMEMORY
+		return this.errorcode
+	end if
 
-	dim as long temp_s = len(*subject), temp_o = offset
+	dim as long temp_s = len(*subject)
+	dim as long temp_o = offset
 	do
 		dim as long temp_e = pcre_exec(temp_c, 0, subject, temp_s, temp_o, 0 /'flags'/, vector, (this.substrings + 1) * 3)
 		if temp_e = 0 then temp_e = this.substrings + 1
 		if temp_e < 0 then
 			this.errorcode = temp_e
 		else
+			'' PCRE replacement output has variable-length matches. FB-LINTER: DISABLE-NEXT-LINE FBL503
 			result_ &= left(subject[temp_o], vector[0] - temp_o)
 
 			dim as integer temp_s1, temp_s2
@@ -170,6 +232,7 @@ function preg_t.replace(pattern as zstring ptr, replacement as zstring ptr, subj
 					temp_s1 += 1
 				loop
 				if left(replacement[temp_s1 + temp_s2], 1) = "$" then
+					'' Literal-dollar replacement is one token per replacement field. FB-LINTER: DISABLE-NEXT-LINE FBL503
 					if temp_n = -1 then result_ &= "$"
 					temp_s1 += 1
 				end if
@@ -183,6 +246,7 @@ function preg_t.replace(pattern as zstring ptr, replacement as zstring ptr, subj
 			loop
 			result_ &= replacement[temp_s1]
 
+			'' PCRE writes the next subject offset into vector slot 1. FB-LINTER: DISABLE-NEXT-LINE FBL525
 			temp_o = vector[1]
 		end if
 	loop while this.errorcode = 0
@@ -191,14 +255,25 @@ function preg_t.replace(pattern as zstring ptr, replacement as zstring ptr, subj
 		this.errorcode = 0
 	end if
 
-	this.matches = 1
-	this.substrings = 0
-	this.strings = allocate(1 * sizeof(zstring ptr ptr))
-	this.strings[0] = allocate(1 * sizeof(zstring ptr))
-	this.strings[0][0] = pcre_malloc(len(result_) + 1)
-	*this.strings[0][0] = result_
+	if this.errorcode = 0 then
+		dim as integer match_index = this.append_match()
+		if match_index < 0 then
+			this.clean_up()
+			this.errorcode = PCRE_ERROR_NOMEMORY
+		else
+			this.strings[match_index][0] = pcre_malloc(len(result_) + 1)
+			if this.strings[match_index][0] = 0 then
+				this.clean_up()
+				this.errorcode = PCRE_ERROR_NOMEMORY
+			else
+				*this.strings[match_index][0] = result_
+				this.substrings = 0
+			end if
+		end if
+	end if
 
 	deallocate(vector)
+	vector = 0
 
 	pcre_free(temp_c)
 
@@ -229,18 +304,32 @@ function preg_t.clean_up() as integer
 	if this.strings then
 		for i as integer = 0 to this.matches - 1
 			for j as integer = 0 to this.substrings
-				pcre_free_substring(this.strings[i][j])
+				if this.strings[i][j] then
+					pcre_free_substring(this.strings[i][j])
+					this.strings[i][j] = 0
+				end if
 			next
 			deallocate(this.strings[i])
+			this.strings[i] = 0
 		next
 		deallocate(this.strings)
+		this.strings = 0
 	end if
+
+	this.matches = 0
+	this.substrings = 0
 
 	return 0
 end function
 
 constructor preg_t(byval substrings_limit_ as integer = -1)
 	this.substrings_limit = substrings_limit_
+	this.strings = 0
+	this.matches = 0
+	this.substrings = 0
+	this.errorcode = 0
+	this.err_ = 0
+	this.erroffset = 0
 end constructor
 
 destructor preg_t()

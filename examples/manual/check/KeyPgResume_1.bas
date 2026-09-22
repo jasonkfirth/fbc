@@ -6,6 +6,7 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgResume
 '' --------
 
-If Open( "text" For Input As #1 ) <> 0 Then
+Dim As Integer file_number = FreeFile
+If Open( "text" For Input As #file_number ) <> 0 Then
   Print "Unable to open file"
 End If

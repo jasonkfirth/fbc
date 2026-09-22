@@ -1664,7 +1664,7 @@ private function hAddProcPrototype _
 	end if
 
 	if( proc = NULL ) then
-		errReport( FB_ERRMSG_DUPDEFINITION )
+		errReport( symbGetIllegalRedefErr( head_proc ) )
 		return NULL
 	end if
 
@@ -1913,7 +1913,7 @@ function cProcHeader _
 
 		'' non-properties cannot implement properties, and vice-versa
 		if( symbIsProperty( head_proc ) <> (tk = FB_TK_PROPERTY) ) then
-			errReport( FB_ERRMSG_DUPDEFINITION, TRUE )
+			errReport( symbGetIllegalRedefErr( head_proc ), TRUE )
 			return CREATEFAKE( )
 		end if
 
@@ -1960,7 +1960,7 @@ function cProcHeader _
 		else
 			'' already parsed?
 			if( symbGetIsDeclared( head_proc ) ) then
-				errReport( FB_ERRMSG_DUPDEFINITION, TRUE )
+				errReport( symbGetIllegalRedefErr( head_proc ), TRUE )
 				return CREATEFAKE( )
 			end if
 

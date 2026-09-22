@@ -13,7 +13,8 @@ Function translationToIterativeFactorial (ByVal n As Integer, ByVal result As In
 	Else                     '' iteration loop
 		result = result * n  '' iterative accumulation
 		n = n - 1
+		'' This translation lesson uses GOTO to expose the recursion-to-loop step.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL101
 		Goto begin           '' iterative jump
 	End If
 End Function
-

@@ -13,7 +13,11 @@
 '' screencontrol expects integer/uinteger
 Dim As Long fgcolor, bkcolor
 
-ScreenRes 500, 500, 32
+If ScreenRes( 500, 500, 32 ) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 Width 500\8, 500\16
 Color &HFFFF00, &H0000FF
 Cls

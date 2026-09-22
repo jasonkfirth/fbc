@@ -18,7 +18,7 @@ Declare Function wxFontMapper_GetEncoding WXCALL Alias "wxFontMapper_GetEncoding
 Declare Function wxFontMapper_GetEncodingName WXCALL Alias "wxFontMapper_GetEncodingName" (enc As wxFontEncoding) As wxString Ptr
 Declare Function wxFontMapper_GetEncodingFromName WXCALL Alias "wxFontMapper_GetEncodingFromName" (nameArg As wxString Ptr) As wxFontEncoding
 Declare Function wxFontMapper_CharsetToEncoding WXCALL Alias "wxFontMapper_CharsetToEncoding" (self As wxFontMapper Ptr, charset As wxString Ptr, interactive As wxBool) As wxFontEncoding
-Declare Function wxFontMapper_IsEncodingAvailable WXCALL Alias "wxFontMapper_IsEncodingAvailable" (self As wxFontMapper Ptr, enc As wxFontEncoding, facename As wxString Ptr) As wxBool 
+Declare Function wxFontMapper_IsEncodingAvailable WXCALL Alias "wxFontMapper_IsEncodingAvailable" (self As wxFontMapper Ptr, enc As wxFontEncoding, facename As wxString Ptr) As wxBool
 Declare Function wxFontMapper_GetAltForEncoding WXCALL Alias "wxFontMapper_GetAltForEncoding" (self As wxFontMapper Ptr, enc As wxFontEncoding, alt_enc As wxFontEncoding, facename As wxString Ptr, interactive As wxBool) As wxBool
 Declare Function wxFontMapper_GetEncodingDescription WXCALL Alias "wxFontMapper_GetEncodingDescription" (enc As wxFontEncoding) As wxString Ptr
 Declare Sub wxFontMapper_SetDialogParent WXCALL Alias "wxFontMapper_SetDialogParent" (self As wxFontMapper Ptr, parent As wxWindow Ptr)

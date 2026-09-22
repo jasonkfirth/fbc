@@ -7,4 +7,4 @@
 '' --------
 
 '' Turn off PC speaker
-Out &h61,Inp(&h61) And &hfc
+Out &h61, Inp(&h61) And &hfc

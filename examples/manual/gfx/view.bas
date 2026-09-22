@@ -11,7 +11,7 @@ Dim ip As Any Ptr
 Dim As Integer x, y
 
 'simple sprite
-ip = ImageCreate(64,64)
+ip = ImageCreate(64, 64)
 For y = 0 To 63
   For x = 0 To 63
 	PSet ip, (x, y), (x\4) Xor (y\4)
@@ -19,8 +19,8 @@ For y = 0 To 63
 Next y
 
 'viewport with blue border
-Line (215,135)-(425,345), 1, bf
-View (220,140)-(420,340)
+Line (215, 135)-(425, 345), 1, bf
+View (220, 140)-(420, 340)
 
 'move sprite around the viewport
 Do

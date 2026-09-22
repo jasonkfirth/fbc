@@ -7,8 +7,8 @@
 
 extern "c++"
 
-type Fl_Text_Display extends Fl_Group 
-	enum 
+type Fl_Text_Display extends Fl_Group
+	enum
 		NORMAL_CURSOR
 		CARET_CURSOR
 		DIM_CURSOR
@@ -18,18 +18,18 @@ type Fl_Text_Display extends Fl_Group
 	end enum
 
 	enum
-		CURSOR_POS, 
+		CURSOR_POS,
 		CHARACTER_POS
 	end enum
 
 	enum
 		DRAG_NONE = -2
 		DRAG_START_DND = -1
-		DRAG_CHAR = 0 
-		DRAG_WORD = 1 
+		DRAG_CHAR = 0
+		DRAG_WORD = 1
 		DRAG_LINE = 2
 	end enum
-	  
+
 	enum
 		WRAP_NONE
 		WRAP_AT_COLUMN
@@ -39,7 +39,7 @@ type Fl_Text_Display extends Fl_Group
 
 	type Unfinished_Style_Cb as sub(as long, as any ptr)
 
-	type Style_Table_Entry 
+	type Style_Table_Entry
 		color as Fl_Color
 		font as Fl_Font
 		size as Fl_Fontsize
@@ -126,7 +126,7 @@ public:
 	declare const function wrapped_column(row as long, column as long) as long
 	declare const function wrapped_row(row as long) as long
 	declare sub wrap_mode(wrap as long, wrap_margin as long)
-  
+
 	declare virtual sub resize(X as long, Y as long, W as long, H as long)
 
 	declare const function x_to_col(x as double) as double
@@ -152,36 +152,36 @@ protected:
 	declare sub draw_text(X as long, Y as long, W as long, H as long)
 	declare sub draw_range(start as long, end as long)
 	declare sub draw_cursor(as long, as long)
-  
+
 	declare const sub draw_string(style as long, x as long, y as long, toX as long, string_ as const zstring ptr, nChars as long)
-  
+
 	declare sub draw_vline(visLineNum as long, leftClip as long, rightClip as long, leftCharIndex as long, rightCharIndex as long)
-  
+
 	declare const function find_x(s as const zstring ptr, len as long, style as long, x as long) as long
 
 	declare const function handle_vline(mode as long, lineStart as long, lineLen as long, leftChar as long, rightChar as long, topClip as long, bottomClip as long, leftClip as long, rightClip as long) as long
-  
+
 	declare sub draw_line_numbers(clearAll as boolean)
-  
-	declare const sub clear_rect(style as long, x as long, y as long, width as long, height as long) 
+
+	declare const sub clear_rect(style as long, x as long, y as long, width as long, height as long)
 	declare sub display_insert()
-  
+
 	declare sub offset_line_starts(newTopLineNum as long)
-  
+
 	declare sub calc_line_starts(startLine as long, endLine as long)
 
 	declare sub update_line_starts(pos as long, charsInserted as long, charsDeleted as long, linesInserted as long, linesDeleted as long, scrolled as long ptr)
-  
+
 	declare sub calc_last_char()
-  
+
 	declare const function position_to_line(pos as long, lineNum as long ptr) as long
 	declare const function string_width(string as const zstring ptr, length as long, style as long) as double
-  
+
 	declare sub scroll_timer_cb(as any ptr)
-  
+
 	declare static sub buffer_predelete_cb(pos as long, nDeleted as long, cbArg as any ptr)
 	declare static sub buffer_modified_cb(pos as long, nInserted as long, nDeleted as long, nRestyled as long, deletedText as const zstring ptr, cbArg as any ptr)
-  
+
 	declare static sub h_scrollbar_cb(w as Fl_Scrollbar ptr, d as Fl_Text_Display ptr)
 	declare static sub v_scrollbar_cb(w as Fl_Scrollbar ptr, d as Fl_Text_Display ptr)
 	declare sub update_v_scrollbar()
@@ -191,7 +191,7 @@ protected:
 	declare const function empty_vlines() as long
 	declare const function vline_length(visLineNum as long) as long
 	declare const function xy_to_position(x as long, y as long, PosType as long = CHARACTER_POS) as long
-  
+
 	declare const sub xy_to_rowcol(x as long, y as long, row as long ptr, column as long ptr, PosType as long = CHARACTER_POS)
 	declare sub maintain_absolute_top_line_number(state as long)
 	declare const function get_absolute_top_line_number() as long
@@ -200,9 +200,9 @@ protected:
 	declare sub reset_absolute_top_line_number()
 	declare const function  position_to_linecol(pos as long, lineNum as long ptr, column as long ptr) as long
 	declare function scroll_(topLineNum as long, horizOffset as long) as long
-  
+
 	declare sub extend_range_for_styles(start as long ptr, end as long ptr)
-  
+
 	declare sub find_wrap_range(deletedText as const zstring ptr, pos as long, nInserted as long, nDeleted as long, modRangeStart as long ptr, modRangeEnd as long ptr,linesInserted as long ptr, linesDeleted as long ptr)
 	declare sub measure_deleted_lines(pos as long, nDeleted as long)
 	declare const sub wrapped_line_counter(buf as Fl_Text_Buffer ptr, startPos as long, maxPos as long,_
@@ -244,7 +244,7 @@ protected:
 	mTopLineNumHint as long
 
 	mHorizOffsetHint as long
-	mNStyles as long 
+	mNStyles as long
 	mStyleTable as const Style_Table_Entry ptr
 
 	mUnfinishedStyle as byte
@@ -252,19 +252,19 @@ protected:
 	mUnfinishedHighlightCB as Unfinished_Style_Cb
 
 	mHighlightCBArg as any ptr
-  
+
 	mMaxsize as long
-  
+
 	mSuppressResync as long
 	mNLinesDeleted as long
 
 	mModifyingTabDistance as long
-  
+
 	mColumnScale as double	'mutable?
 
-  
+
 	mCursor_color as Fl_Color
-  
+
 	mHScrollBar as Fl_Scrollbar ptr
 	mVScrollBar as Fl_Scrollbar ptr
 	scrollbar_width_ as long
@@ -272,13 +272,13 @@ protected:
 	as long dragPos, dragType, dragging
 	display_insert_position_hint as long
 	text_area as text_area_
-  
+
 	shortcut_ as long
-  
+
 	textfont_ as Fl_Font
 	textsize_ as Fl_Fontsize
 	textcolor_ as Fl_Color
-  
+
 	as long mLineNumLeft, mLineNumWidth
 
 '#if FLTK_ABI_VERSION >= 10303
@@ -292,7 +292,7 @@ protected:
 end type
 end extern
 
-private sub Fl_Text_Display.buffer(byref buf as Fl_Text_Buffer) 
+private sub Fl_Text_Display.buffer(byref buf as Fl_Text_Buffer)
 	buffer(@buf)
 end sub
 
@@ -304,7 +304,7 @@ private const function Fl_Text_Display.insert_position() as long
 	return mCursorPos
 end function
 
-private sub Fl_Text_Display.hide_cursor() 
+private sub Fl_Text_Display.hide_cursor()
 	show_cursor(0)
 end sub
 

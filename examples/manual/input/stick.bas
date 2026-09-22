@@ -34,6 +34,8 @@ Do
 		Exit Do
 	End If
 
+	'' Yield while polling the joystick state.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL602
 	Sleep 1
 
 Loop

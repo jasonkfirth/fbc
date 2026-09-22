@@ -89,8 +89,8 @@ private function win_cb _
 
 	select case uMsg
 	case WM_SIZE
-		dim as integer wdt = LOWORD( lParam ), _
-					   hgt = HIWORD( lParam )
+		dim as integer wdt = LOWORD( lParam )
+		dim as integer hgt = HIWORD( lParam )
 
 		movie_onresize( wdt, hgt )
 
@@ -226,7 +226,7 @@ private function movie_oncreate _
 		byval filename as wstring ptr _
 	) as movctrl ptr
 
-	dim as movctrl ptr movie
+	dim as movctrl ptr movie_control
 
 	function = NULL
 
@@ -234,27 +234,27 @@ private function movie_oncreate _
 		exit function
 	end if
 
-	movie = new movctrl( parent, _
+	movie_control = new movctrl( parent, _
 						 0, _
 						 WIN_TOOLBAR_HEIGHT, _
 						 WIN_WIDTH, _
 						 WIN_HEIGHT-WIN_TOOLBAR_HEIGHT )
 
-	if( movie = NULL ) then
+	if( movie_control = NULL ) then
 		exit function
 	end if
 
-	if( movie->load( filename ) = FALSE ) then
-		delete movie
+	if( movie_control->load( filename ) = FALSE ) then
+		delete movie_control
 		exit function
 	end if
 
-	if( movie->play( ) = FALSE ) then
-		delete movie
+	if( movie_control->play( ) = FALSE ) then
+		delete movie_control
 		exit function
 	end if
 
-	function = movie
+	function = movie_control
 
 end function
 

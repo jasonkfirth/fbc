@@ -6,6 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgDraw
 '' --------
 
+'' Mode 13 is the documented compatibility mode for this DRAW lesson.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL734
 Screen 13
 
 'Move to (50,50) without drawing

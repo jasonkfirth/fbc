@@ -9,7 +9,12 @@
 
 Dim As Long x, y, buttons, res
 ' Set video mode and enter loop
-ScreenRes 640, 480, 8
+If ScreenRes(640, 480, 8) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
+
 Do
 	' Get mouse x, y and buttons. Discard wheel position.
 	res = GetMouse (x, y, , buttons)
@@ -29,5 +34,7 @@ Do
 		If buttons And 4 Then Print "M";
 		Print "   "
 	End If
+
+	Sleep 15, 1
 Loop While Inkey = ""
 End

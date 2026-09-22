@@ -14,11 +14,21 @@ Dim As UByte Ptr p, myFont
 Dim As Integer i
 
 '' Open a 256 color graphics screen (320*200)
-ScreenRes 320, 200, 8
+If ScreenRes(320, 200, 8) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 '' Create custom font into PUT buffer
 
 myFont = ImageCreate(NUMCHARS * 8, 9)
+
+If myFont = 0 Then
+	Print "Could not create the custom font buffer"
+	Sleep
+	End 1
+End If
 
  '' Put font header at start of pixel data
 

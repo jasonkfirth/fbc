@@ -89,6 +89,9 @@ Environment:
   HOST_TRIPLET           Build-host triplet passed to cross make steps
   CURL_BIN               curl executable for host downloads (MSYS2 default: /usr/bin/curl)
   TARGET_TRIPLET         DJGPP target triplet (default: i586-pc-msdosdjgpp)
+  DOS_TCP_PROVIDER        Set to watt32 to enable the optional Watt-32 TCP path
+  DOS_WATT32_CFLAGS       Include path for the Watt-32 headers
+  DOS_DPMI_YIELD          Set to YesPlease for a tested DPMI host time-slice path
   DJGPP_CROSS_VERSION    MSYS2 prebuilt toolchain release tag (default: v3.4)
   DJGPP_CROSS_ASSET      MSYS2 prebuilt toolchain asset name
   DJGPP_CROSS_URL        MSYS2 prebuilt toolchain archive URL
@@ -1043,8 +1046,16 @@ if [ "$DO_STAGE_INSTALL" = "1" ]; then
 	fi
 	[ -d "$DISTROOT/inc" ] || die "installed DOS include tree is missing"
 	[ -d "$DISTROOT/lib" ] || die "installed DOS library tree is missing"
-	mv "$DISTROOT/inc" "$DISTROOT/fb/inc"
-	mv "$DISTROOT/lib" "$DISTROOT/fb/lib"
+	#
+	# A hosted NTFS package tree can be observed by a synchronization client
+	# while it is staged.  Renaming a populated directory into fb/ is then not
+	# reliable even though both paths are on the same volume.  Copy each tree
+	# first, and remove its staging location only after the destination exists.
+	#
+	copy_tree "$DISTROOT/inc" "$DISTROOT/fb/inc"
+	rm -rf "$DISTROOT/inc"
+	copy_tree "$DISTROOT/lib" "$DISTROOT/fb/lib"
+	rm -rf "$DISTROOT/lib"
 
 	copy_tree "$DJGPP_DOS_CACHE" "$DISTROOT/djgpp"
 	stage_dos_compiler_tools "$DISTROOT/fb"

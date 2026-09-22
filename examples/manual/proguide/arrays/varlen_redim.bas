@@ -13,4 +13,6 @@ Dim array(Any) As Single
 ReDim array(0 To 9) As Single
 
 '' The data type may be omitted when resizing:
+'' This lesson intentionally replaces the first range instead of preserving it.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-009
 ReDim array(10 To 19)

@@ -1,9 +1,13 @@
-/* ISR handling for DOS */
+/* FreeBASIC DOS runtime: sys_isr.c
+ * Install and remove IRQ handlers, locked stacks and selector state.
+ * Interrupt dispatch is in drv_isr.s; this file does not process device data.
+ */
 
 #include "../fb.h"
 #include <dpmi.h>
 #include <go32.h>
 #include <pc.h>
+#include <sys/exceptn.h>
 
 typedef struct _FB_DOS_STACK_INFO {
     void  *offset;
@@ -151,8 +155,12 @@ static int fb_isr_init(void)
     }
 
     /* store all selectors */
-    __fb_hDrvSelectors[0] = _my_ds();
-    __fb_hDrvSelectors[1] = _my_es();
+    /* DJGPP delivers asynchronous signals by temporarily shrinking the
+     * application's DS/ES/SS limit to the null page. Interrupt callbacks
+     * must use the always-valid data alias while that signal is pending.
+     */
+    __fb_hDrvSelectors[0] = __djgpp_ds_alias;
+    __fb_hDrvSelectors[1] = __djgpp_ds_alias;
     __fb_hDrvSelectors[2] = _my_fs();
     __fb_hDrvSelectors[3] = _my_gs();
     __fb_hDrvSelectors[4] = _my_ss();
@@ -335,3 +343,5 @@ FnIntHandler fb_isr_get( unsigned irq_number )
     DBG_ASSERT( irq_number < 16 );
     return __fb_hDrvIntHandler[irq_number];
 }
+
+/* end of sys_isr.c */

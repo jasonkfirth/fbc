@@ -18,8 +18,10 @@ const null = 0
 
 declare function LoadGLTextures () as integer
 
+'' The TGA loader and draw loop share this lesson's texture state.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared spin as single                      '' Spin Variable
-dim shared texture(2) as structTexture         '' Storage For 2 Textures ( NEW )
+dim shared texture(0 to 2) as structTexture    '' Storage For 2 Textures ( NEW )
 
 	dim as integer iLoop = 0
 	windowtitle "NeHe & Evan 'terminate' Pipho's TGA Loading Tutorial"      '' Set window title

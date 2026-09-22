@@ -20,7 +20,7 @@ OtherNumbers(2) = 4
 PrintArray ()
 
 For a = 1 To 10
- Print Numbers(a)
+  Print Numbers(a)
 Next a
 
 Print OtherNumbers(1)
@@ -35,8 +35,8 @@ Print OtherNumbers(9)
 Print OtherNumbers(10)
 
 Sub PrintArray ()
- Dim a As Integer
- For a = 1 To 10
-   Print otherNumbers(a)
- Next a
+  Dim a As Integer
+  For a = 1 To 10
+    Print otherNumbers(a)
+  Next a
 End Sub

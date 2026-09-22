@@ -2,7 +2,7 @@
 
 namespace tui
 
-type window
+    type window
 	declare constructor _
 		( _
 			new_x as integer = 1, new_y as integer = 1, _
@@ -22,16 +22,16 @@ type window
 	declare property y as integer
 	declare property y( new_y as integer )
 
-private:
+        private:
 	declare sub redraw( )
 	declare sub remove( )
 	declare sub drawtitle( )
 
 	dim as string mytitle
 	dim as integer posx, posy, sizew, sizeh
-end type
+    end type
 
-constructor window _
+    constructor window _
 	( _
 		new_x as integer, new_y as integer, _
 		new_w as integer, new_h as integer, _
@@ -48,64 +48,64 @@ constructor window _
 		this.mytitle = "untitled"
 	end if
 
-end constructor
+    end constructor
 
-destructor window( )
+    destructor window( )
 	color 7, 0
 	cls
-end destructor
+    end destructor
 
-property window.title( ) as string
+    property window.title( ) as string
 	return this.mytitle
-end property
+    end property
 
-property window.title( new_title as string )
+    property window.title( new_title as string )
 	this.mytitle = new_title
 	this.drawtitle( )
-end property
+    end property
 
-property window.x( ) as integer
+    property window.x( ) as integer
 	return this.posx
-end property
+    end property
 
-property window.x( new_x as integer )
+    property window.x( new_x as integer )
 	this.remove( )
 	this.posx = new_x
 	this.redraw( )
-end property
+    end property
 
-property window.y( ) as integer
+    property window.y( ) as integer
 	return this.posy
-end property
+    end property
 
-property window.y( new_y as integer )
+    property window.y( new_y as integer )
 	this.remove( )
 	this.posy = new_y
 	this.redraw( )
-end property
+    end property
 
-sub window.show( )
+    sub window.show( )
 	this.redraw( )
-end sub
+    end sub
 
-sub window.drawtitle( )
+    sub window.drawtitle( )
 	locate this.posy, this.posx
 	color 15, 1
 	print space( this.sizew );
 	locate this.posy, this.posx + (this.sizew \ 2) - (len( this.mytitle ) \ 2)
 	print this.mytitle;
-end sub
+    end sub
 
-sub window.remove( )
+    sub window.remove( )
 	color 0, 0
 	var spaces = space( this.sizew )
 	for i as integer = this.posy to this.posy + this.sizeh - 1
 		locate i, this.posx
 		print spaces;
 	next
-end sub
+    end sub
 
-sub window.redraw( )
+    sub window.redraw( )
 	this.drawtitle( )
 	color 8, 7
 	var spaces = space( this.sizew )
@@ -113,7 +113,7 @@ sub window.redraw( )
 		locate i, this.posx
 		print spaces;
 	next
-end sub
+    end sub
 
 end namespace
 

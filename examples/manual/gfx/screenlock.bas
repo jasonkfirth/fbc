@@ -10,7 +10,11 @@
 Dim As Long mx, my
 Dim As String key
 
-ScreenRes 640, 480, 32
+If ScreenRes(640, 480, 32) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 Do
 

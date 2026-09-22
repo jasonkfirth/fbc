@@ -136,7 +136,7 @@
 	#define alloca(x) __builtin_alloca(x)
 #endif
 
-#if defined ENABLE_MT && !defined HOST_DOS
+#if defined ENABLE_MT && (!defined HOST_DOS || defined FB_DOS_PDMLWP)
 #ifdef __cplusplus
 extern "C" {
 #endif

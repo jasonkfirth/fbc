@@ -23,7 +23,7 @@
 #pragma once
 
 #include once "ole2.bi"
-#include once "dplay8.bi"
+#include once "winsock2.bi"
 
 extern "Windows"
 
@@ -130,6 +130,8 @@ type IDirectPlay8AddressVtbl as IDirectPlay8AddressVtbl_
 type IDirectPlay8Address_
 	lpVtbl as IDirectPlay8AddressVtbl ptr
 end type
+
+type IDirectPlay8Address as IDirectPlay8Address_
 
 type IDirectPlay8AddressVtbl_
 	QueryInterface as function(byval This as IDirectPlay8Address ptr, byval riid as const IID const ptr, byval ppvObject as any ptr ptr) as HRESULT

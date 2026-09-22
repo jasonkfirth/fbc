@@ -24,21 +24,25 @@ Scope
 	'' allocate some memory to construct as a Rational
 	Dim As Any Ptr ap = CAllocate(Len(Rational))
 
-	'' make the placement new call
-	Dim As Rational Ptr r = New (ap) Rational( 3, 4 )
+	If ap = 0 Then
+		Print "Memory allocation failed"
+	Else
+		'' make the placement new call
+		Dim As Rational Ptr r = New (ap) Rational( 3, 4 )
 
-	'' you can see, the addresses are the same, just having different types in the compiler
-	Print ap, r
+		'' you can see, the addresses are the same, just having different types in the compiler
+		Print ap, r
 
-	'' confirm all is okay
-	Print r->numerator & r->ratio & r->denominator
+		'' confirm all is okay
+		Print r->numerator & r->ratio & r->denominator
 
-	'' delete must not be used with placement new
-	'' destroying must be done explicitly if a destructor exists (implicitly or explicitly)
-	''   (in this example, the var-string member induces an implicit destructor)
-	r->Destructor( )
+		'' delete must not be used with placement new
+		'' destroying must be done explicitly if a destructor exists (implicitly or explicitly)
+		''   (in this example, the var-string member induces an implicit destructor)
+		r->Destructor( )
 
-	'' we explicitly allocated, so we explicitly deallocate
-	Deallocate( ap )
+		'' we explicitly allocated, so we explicitly deallocate
+		Deallocate( ap )
+	End If
 
 End Scope

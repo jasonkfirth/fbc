@@ -114,7 +114,7 @@ type sockaddr_storage
 	__ss_padding(0 to _SS_SIZE-(2*len(__uint32_t))-1) as byte
 end type
 
-enum 
+enum
 	MSG_OOB = &h01
 	MSG_PEEK = &h02
 	MSG_DONTROUTE = &h04
@@ -152,7 +152,7 @@ end type
 
 declare function __cmsg_nxthdr cdecl alias "__cmsg_nxthdr" (byval __mhdr as msghdr ptr, byval __cmsg as cmsghdr ptr) as cmsghdr ptr
 
-enum 
+enum
 	SCM_RIGHTS = &h01
 	SCM_CREDENTIALS = &h02
 end enum

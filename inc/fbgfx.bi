@@ -46,6 +46,8 @@ namespace FB
 		  byval relative as long = 0 ) as long
 #else
 	extern "rtlib"
+	' The QB and FB declarations have equivalent ABI signatures but use dialect-specific pointer spelling.
+	' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-014
 	declare function DrawStringSize alias "fb_GfxDrawStringSize" _
 		( byref text as const string, byref pixel_width as long, _
 		  byref pixel_height as long, byval font_image as any ptr = 0 ) as long
@@ -53,6 +55,8 @@ namespace FB
 	'' Target 0 selects the work page. Nonzero relative uses STEP coordinates.
 	'' Pattern phase follows physical target coordinates. Colors are ordinary
 	'' gfxlib colors, written directly without alpha blending.
+	' The QB and FB declarations have equivalent ABI signatures but use dialect-specific pointer spelling.
+	' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-014
 	declare function PaintPattern alias "fb_GfxPaintPattern" _
 		( byval target as any ptr, byval x as single, byval y as single, _
 		  byref pattern as const string, byval foreground as ulong = 1, _
@@ -239,6 +243,7 @@ namespace FB
 	end type
 
 	'' Image buffer header, old style
+	'' Layout: bits 0-2 bpp, bits 3-15 width, then a 16-bit height.
 	type _OLD_HEADER field = 1
 		#if __FB_LANG__ = "qb"
 			bpp : 3 as __ushort
@@ -283,6 +288,8 @@ namespace FB
 	'' This is a trick to obtain a pointer to the pixels data area
 	#if __FB_LANG__ = "qb"
 		__private function __pixels( byval anImage as Image __ptr ) as __ubyte __ptr
+			'' The helper is intentionally inline so the pointer stays tied to the image layout.
+			'' FB-LINTER: DISABLE-NEXT-LINE FBL-INC-005
 			__pixels = __cast( __ubyte __ptr, anImage ) + __sizeOf( Image )
 		end function
 	#else

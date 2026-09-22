@@ -10,5 +10,7 @@
 
 Do
 	Exit Do ' Exit the Do...Loop and continues to run the code after Loop
+	'' The unreachable statement is retained to show the effect of EXIT DO.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL610
 	Print "I will never be shown"
 Loop

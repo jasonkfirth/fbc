@@ -9,6 +9,7 @@
 #ifndef __bigint_bitset_funcs_bi__
 #define __bigint_bitset_funcs_bi__
 
+#include once "crt/stddef.bi"
 #include once "big_int/big_int.bi"
 
 type big_int_rnd_fp as function cdecl() as integer

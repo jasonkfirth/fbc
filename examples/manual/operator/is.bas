@@ -21,6 +21,10 @@ End Type
 
 Sub identify(ByVal p As Object Ptr)
 	Print "Identifying:"
+	If p = 0 Then
+		Print , "unknown object"
+		Return
+	End If
 
 	'' Not a Vehicle object?
 	If Not (*p Is Vehicle) Then

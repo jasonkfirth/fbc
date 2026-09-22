@@ -9,6 +9,8 @@ const SCR_WIDTH = 800
 const SCR_HEIGHT= 600
 const SCR_BPP   = 16
 
+'' The blit helper uses the video surface created by main.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared video as SDL_Surface ptr
 
 declare sub blitImage( byval img as SDL_Surface ptr, byval x as integer, byval y as integer )

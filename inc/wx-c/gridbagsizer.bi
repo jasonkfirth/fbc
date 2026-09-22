@@ -10,7 +10,7 @@ Declare Function wxGBSizerItem_ctor WXCALL Alias "wxGBSizerItem_ctor" (w As  wxI
                         span      As wxGBSpan     Ptr, _
                         flag      As  wxInt           , _
                         border    As  wxInt           , _
-                        pUserData As wxObject     Ptr) As wxGBSizerItem Ptr 
+                        pUserData As wxObject     Ptr) As wxGBSizerItem Ptr
 Declare Function wxGBSizerItem_ctorWindow WXCALL Alias "wxGBSizerItem_ctorWindow" (win As wxWindow Ptr, _
                               p         As wxGBPosition Ptr, _
                               span      As wxGBSpan     Ptr, _
@@ -50,7 +50,7 @@ Declare Function wxGridBagSizer_AddWindow WXCALL Alias "wxGridBagSizer_AddWindow
                               span      As wxGBSpan       Ptr, _
                               flag      As  wxInt             , _
                               border    As  wxInt             , _
-                              pUserData As wxObject       Ptr) As wxBool 
+                              pUserData As wxObject       Ptr) As wxBool
 Declare Function wxGridBagSizer_AddSizer WXCALL Alias "wxGridBagSizer_AddSizer" (self As wxGridBagSizer Ptr, _
                              sizer     As wxSizer        Ptr, _
                              p         As wxGBPosition   Ptr, _

@@ -3,6 +3,8 @@
 
 #include  "SDL\SDL.bi"
 
+	' The SDL timer callback signals the module loop through this flag.
+	' FB-LINTER: DISABLE-NEXT-LINE FBL301
 	dim shared flag as integer
 
 ' callback function used by the SDL_SetTimer function
@@ -27,16 +29,16 @@ end function
 
 	' a little 5-second loop
 	for i = 0 to 4
-   		' show a countdown
-   		print 5 - i
+		' show a countdown
+		print 5 - i
 
-   		' show if the flag was set during the last second (clear it, too)
-   		if (flag = 1) then
-      		print "Flag was set!"
-      		flag = 0
-   		end if
+		' show if the flag was set during the last second (clear it, too)
+		if (flag = 1) then
+			print "Flag was set!"
+			flag = 0
+		end if
 
-   		SDL_Delay(1000)
+		SDL_Delay(1000)
 	next
 
 	' close up and quit

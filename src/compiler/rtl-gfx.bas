@@ -1487,7 +1487,7 @@ declare function hPorts_cb _
 '':::::
 sub rtlGfxModInit( )
 
-	rtlAddIntrinsicProcs( @funcdata(0) )
+	rtlAddIntrinsicProcs( @funcdata(0), FALSE, TRUE )
 
 end sub
 

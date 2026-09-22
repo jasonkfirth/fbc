@@ -1,10 +1,15 @@
+'' Fl_Image is a leaf binding, so provide its enum definitions and forward
+'' declare the widget type used by label callbacks when included directly.
+#include once "Enumerations.bi"
+
+type Fl_Widget_ as Fl_Widget
 type Fl_Menu_Item_ as Fl_Menu_Item
 type Fl_Pixmap_ as Fl_Pixmap
 
 
-enum Fl_RGB_Scaling 
+enum Fl_RGB_Scaling
 	FL_RGB_SCALING_NEAREST = 0
-	FL_RGB_SCALING_BILINEAR 
+	FL_RGB_SCALING_BILINEAR
 end enum
 
 extern "c++"
@@ -46,7 +51,7 @@ public:
 	declare sub inactive()
 
 	declare virtual sub desaturate()
-	declare virtual sub label(w as Fl_Widget ptr)
+	declare virtual sub label(w as Fl_Widget_ ptr)
 	declare virtual sub label(m as Fl_Menu_Item_ ptr)
 
 	declare virtual sub draw(X as long, Y as long, W as long, H as long, cx as long=0, cy as long=0)
@@ -122,7 +127,7 @@ public:
 	declare virtual sub desaturate()
 	declare virtual sub draw(X as long, Y as long, W as long, H as long, cx as long=0, cy as long=0)
 	declare sub draw(X as long, Y as long)
-	declare virtual sub label(w as Fl_Widget ptr)
+	declare virtual sub label(w as Fl_Widget_ ptr)
 	declare virtual sub label(m as Fl_Menu_Item_ ptr)
 	declare virtual sub uncache()
 	declare static sub max_size(size as unsigned integer)
@@ -143,4 +148,3 @@ end sub
 private function Fl_RGB_Image.max_size() as unsigned integer
 	return max_size_
 end function
-

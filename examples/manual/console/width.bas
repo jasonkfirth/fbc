@@ -8,7 +8,11 @@
 
 ''Set up a graphics screen
 Const W = 320, H = 200
-ScreenRes W, H
+If ScreenRes( W, H ) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 Dim As Long twid
 Dim As UInteger tw, th
@@ -20,6 +24,8 @@ Print "Default for current screen (8*8)"
 Print "Width:  " & tw
 Print "Height: " & th
 Sleep
+
+' end of width.bas
 
 Width W\8, H\16 '' Use 8*16 font
 

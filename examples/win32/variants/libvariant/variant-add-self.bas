@@ -18,10 +18,11 @@ operator VARIANT.+= _
 
 	dim as VARIANT_ res = any
 
-	VarAdd( @this.var_, @rhs.var_, @res )
-
-	VariantClear( @this.var_ )
-	this.var_ = res
+	VariantInit( @res )
+	if VarAdd( @this.var_, @rhs.var_, @res ) = 0 then
+		VariantClear( @this.var_ )
+		this.var_ = res
+	end if
 
 end operator
 
@@ -33,10 +34,11 @@ operator VARIANT.+= _
 
 	dim as VARIANT_ res = any
 
-	VarAdd( @this.var_, @rhs, @res )
-
-	VariantClear( @this.var_ )
-	this.var_ = res
+	VariantInit( @res )
+	if VarAdd( @this.var_, @rhs, @res ) = 0 then
+		VariantClear( @this.var_ )
+		this.var_ = res
+	end if
 
 end operator
 
@@ -49,13 +51,14 @@ operator VARIANT.+= _
 	dim as VARIANT_ tmp = any, res = any
 
 	VariantInit( @tmp )
+	VariantInit( @res )
 	V_VT(@tmp) = VT_BSTR
 	V_BSTR(@tmp) = SysAllocStringByteLen( rhs, len( *rhs ) )
 
-	VarAdd( @this.var_, @tmp, @res )
-
-	VariantClear( @this.var_ )
-	this.var_ = res
+	if VarAdd( @this.var_, @tmp, @res ) = 0 then
+		VariantClear( @this.var_ )
+		this.var_ = res
+	end if
 
 	VariantClear( @tmp )
 
@@ -70,13 +73,14 @@ operator VARIANT.+= _
 	dim as VARIANT_ tmp = any, res = any
 
 	VariantInit( @tmp )
+	VariantInit( @res )
 	V_VT(@tmp) = VT_BSTR
 	V_BSTR(@tmp) = SysAllocStringLen( rhs, len( *rhs ) )
 
-	VarAdd( @this.var_, @tmp, @res )
-
-	VariantClear( @this.var_ )
-	this.var_ = res
+	if VarAdd( @this.var_, @tmp, @res ) = 0 then
+		VariantClear( @this.var_ )
+		this.var_ = res
+	end if
 
 	VariantClear( @tmp )
 

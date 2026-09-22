@@ -23,10 +23,16 @@ For i As Integer = 1 To N
 		dummy += 1
 	Case 21 To 30
 		dummy += 1
+	'' The preceding ranges stop at 30, so this scalar is not shadowed.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-CASE-006
 	Case 31
 		dummy += 1
+	'' The preceding ranges stop at 30, so this scalar is not shadowed.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-CASE-006
 	Case 32
 		dummy += 1
+	'' The preceding ranges stop at 30, so this scalar is not shadowed.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-CASE-006
 	Case 33
 		dummy += 1
 	Case Is >= 34
@@ -49,10 +55,16 @@ For i As Integer = 1 To N
 		dummy += 1
 	Case 21 To 30
 		dummy += 1
+	'' The preceding ranges stop at 30, so this scalar is not shadowed.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-CASE-006
 	Case 31
 		dummy += 1
+	'' The preceding ranges stop at 30, so this scalar is not shadowed.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-CASE-006
 	Case 32
 		dummy += 1
+	'' The preceding ranges stop at 30, so this scalar is not shadowed.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-CASE-006
 	Case 33
 		dummy += 1
 	Case Else

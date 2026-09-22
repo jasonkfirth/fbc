@@ -37,7 +37,7 @@
 ''   OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
 ''   EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY DIRECT, INDIRECT,
 ''   INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-''   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
+''   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
 ''   OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
 ''   LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 ''   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
@@ -51,11 +51,10 @@
 #include once "rpc.bi"
 #include once "rpcndr.bi"
 #include once "windows.bi"
-#include once "ole2.bi"
 #include once "objidl.bi"
 #include once "oleidl.bi"
 #include once "servprov.bi"
-#include once "msxml.bi"
+#include once "oaidl.bi"
 #include once "winapifamily.bi"
 
 extern "Windows"
@@ -3176,7 +3175,9 @@ type ISoftDistExtVtbl
 	QueryInterface as function(byval This as ISoftDistExt ptr, byval riid as const IID const ptr, byval ppvObject as any ptr ptr) as HRESULT
 	AddRef as function(byval This as ISoftDistExt ptr) as ULONG
 	Release as function(byval This as ISoftDistExt ptr) as ULONG
-	ProcessSoftDist as function(byval This as ISoftDistExt ptr, byval szCDFURL as LPCWSTR, byval pSoftDistElement as IXMLElement ptr, byval lpsdi as LPSOFTDISTINFO) as HRESULT
+	'' IXMLElement is declared by msxml.bi. Keep this leaf binding independent
+	'' of msxml's reverse dependency on urlmon while preserving the COM pointer ABI.
+	ProcessSoftDist as function(byval This as ISoftDistExt ptr, byval szCDFURL as LPCWSTR, byval pSoftDistElement as any ptr, byval lpsdi as LPSOFTDISTINFO) as HRESULT
 	GetFirstCodeBase as function(byval This as ISoftDistExt ptr, byval szCodeBase as LPWSTR ptr, byval dwMaxSize as LPDWORD) as HRESULT
 	GetNextCodeBase as function(byval This as ISoftDistExt ptr, byval szCodeBase as LPWSTR ptr, byval dwMaxSize as LPDWORD) as HRESULT
 	AsyncInstallDistributionUnit as function(byval This as ISoftDistExt ptr, byval pbc as IBindCtx ptr, byval pvReserved as LPVOID, byval flags as DWORD, byval lpcbh as LPCODEBASEHOLD) as HRESULT
@@ -3194,7 +3195,7 @@ end type
 #define ISoftDistExt_GetNextCodeBase(This, szCodeBase, dwMaxSize) (This)->lpVtbl->GetNextCodeBase(This, szCodeBase, dwMaxSize)
 #define ISoftDistExt_AsyncInstallDistributionUnit(This, pbc, pvReserved, flags, lpcbh) (This)->lpVtbl->AsyncInstallDistributionUnit(This, pbc, pvReserved, flags, lpcbh)
 
-declare function ISoftDistExt_ProcessSoftDist_Proxy(byval This as ISoftDistExt ptr, byval szCDFURL as LPCWSTR, byval pSoftDistElement as IXMLElement ptr, byval lpsdi as LPSOFTDISTINFO) as HRESULT
+declare function ISoftDistExt_ProcessSoftDist_Proxy(byval This as ISoftDistExt ptr, byval szCDFURL as LPCWSTR, byval pSoftDistElement as any ptr, byval lpsdi as LPSOFTDISTINFO) as HRESULT
 declare sub ISoftDistExt_ProcessSoftDist_Stub(byval This as IRpcStubBuffer ptr, byval pRpcChannelBuffer as IRpcChannelBuffer ptr, byval pRpcMessage as PRPC_MESSAGE, byval pdwStubPhase as DWORD ptr)
 declare function ISoftDistExt_GetFirstCodeBase_Proxy(byval This as ISoftDistExt ptr, byval szCodeBase as LPWSTR ptr, byval dwMaxSize as LPDWORD) as HRESULT
 declare sub ISoftDistExt_GetFirstCodeBase_Stub(byval This as IRpcStubBuffer ptr, byval pRpcChannelBuffer as IRpcChannelBuffer ptr, byval pRpcMessage as PRPC_MESSAGE, byval pdwStubPhase as DWORD ptr)

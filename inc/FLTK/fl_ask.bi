@@ -21,12 +21,12 @@ declare function fl_choice_ alias "fl_choice" (q as const zstring ptr, b0 as con
 declare function _fl_input alias "fl_input" (label as const zstring ptr, deflt as const zstring ptr= 0, ...) as const zstring ptr
 declare function fl_password(label as const zstring ptr, deflt as const zstring ptr= 0, ...) as const zstring ptr
 
-declare function fl_message_icon() as Fl_Widget ptr
+declare function fl_message_icon() as Fl_Widget_ ptr
 extern "c"
 extern fl_message_font_ as Fl_Font
 extern fl_message_size_ as Fl_Fontsize
 end extern
-declare sub fl_message_font(f as Fl_Font , s as Fl_Fontsize) 
+declare sub fl_message_font(f as Fl_Font , s as Fl_Fontsize)
 
 declare sub fl_message_hotspot overload(enable as long)
 declare function fl_message_hotspot overload () as long
@@ -45,6 +45,6 @@ end extern
 end extern
 
 
-private sub fl_message_font(f as Fl_Font , s as Fl_Fontsize) 
+private sub fl_message_font(f as Fl_Font , s as Fl_Fontsize)
 	fl_message_font_ = f: fl_message_size_ = s
 end sub

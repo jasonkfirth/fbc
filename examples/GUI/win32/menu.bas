@@ -63,8 +63,6 @@ declare function        WinMain     ( byval hInstance as HINSTANCE, _
 
 
 
-
-
 '' ::::::::
 '' name: WndProc
 '' desc: Processes windows messages
@@ -98,9 +96,9 @@ function WndProc ( byval hWnd as HWND, _
             init_menus( hWnd )
             exit function
 
-    	''
-    	'' menu item selected
-    	''
+        ''
+        '' menu item selected
+        ''
 		case WM_COMMAND
 			wmId    = loword( wParam )
 			wmEvent = hiword( wParam )
@@ -133,7 +131,7 @@ function WndProc ( byval hWnd as HWND, _
             GetClientRect( hWnd, @rct )
 
             if( lastmenuid <> 0 ) then
-            	DrawText( hDC, _
+                DrawText( hDC, _
             			  "Last menu selected: id(" & lastmenuid & ") title(" & menuitemTB(lastmenuid-MENUID_BASE).title & ")", _
             			  -1, _
             			  @rct, _
@@ -197,17 +195,19 @@ function WinMain ( byval hInstance as HINSTANCE, _
 		.hInstance     = hInstance
 		.hIcon         = LoadIcon( null, IDI_APPLICATION )
 		.hCursor       = LoadCursor( null, IDC_ARROW )
-     	.hbrBackground = GetStockObject( WHITE_BRUSH )
-     	.lpszMenuName  = null
-     	.lpszClassName = strptr( appName )
+        .hbrBackground = GetStockObject( WHITE_BRUSH )
+        .lpszMenuName  = null
+		'' appName remains alive through this synchronous RegisterClass call.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL427
+	.lpszClassName = strptr( appName )
     end with
 
     ''
     '' Register the window class
     ''
     if ( RegisterClass( @wcls ) = false ) then
-       MessageBox( null, "Failed to register the window class", appName, MB_ICONERROR )
-       exit function
+        MessageBox( null, "Failed to register the window class", appName, MB_ICONERROR )
+        exit function
     end if
 
     ''
@@ -250,9 +250,9 @@ sub menu_insert( byval hmenu as HMENU, byval submenu as integer, byref title as 
 
     with submenuTB(submenu)
 
-    	.hnd 	= CreatePopupMenu( )
+        .hnd 	= CreatePopupMenu( )
 
-    	InsertMenu( hmenu, submenu, MF_BYPOSITION Or MF_POPUP Or MF_STRING or flags, cuint( .hnd ), title )
+        InsertMenu( hmenu, submenu, MF_BYPOSITION Or MF_POPUP Or MF_STRING or flags, cuint( .hnd ), title )
 
     end with
 
@@ -263,10 +263,10 @@ sub menu_append( byval submenu as integer, byval id as integer, byref title as s
 
     with menuitemTB(id-MENUID_BASE)
 
-    	.id = id
-    	.title = title
+        .id = id
+        .title = title
 
-    	AppendMenu( submenuTB(submenu).hnd, MF_STRING or flags, id, title )
+        AppendMenu( submenuTB(submenu).hnd, MF_STRING or flags, id, title )
 
     end with
 
@@ -283,10 +283,10 @@ end sub
 sub init_menus( byval hWnd as HWND )
 	dim menu as HMENU
 
- 	menu = CreateMenu( )
+	menu = CreateMenu( )
 
- 	'' File
- 	menu_insert( menu, 0, "&File" )
+	'' File
+	menu_insert( menu, 0, "&File" )
 
     menu_append( 0, MENUID_FILE_NEW, "&New" )
     menu_append( 0, MENUID_FILE_OPEN, "&Open..." )
@@ -300,7 +300,7 @@ sub init_menus( byval hWnd as HWND )
     menu_append( 0, MENUID_FILE_EXIT, "&Exit" )
 
 	'' Edit
- 	menu_insert( menu, 1, "&Edit" )
+	menu_insert( menu, 1, "&Edit" )
 
     menu_append( 1, MENUID_EDIT_UNDO, "&Undo" )
     menu_append( 1, MENUID_EDIT_REDO, "&Redo" )
@@ -308,8 +308,8 @@ sub init_menus( byval hWnd as HWND )
     menu_append( 1, MENUID_EDIT_CUT, "&Cut" )
     menu_append( 1, MENUID_EDIT_COPY, "C&opy" )
 
- 	'' Search
- 	menu_insert( menu, 2, "&Search" )
+	'' Search
+	menu_insert( menu, 2, "&Search" )
 
     menu_append( 2, MENUID_SEARCH_FIND, "&Find" )
     menu_append( 2, MENUID_SEARCH_FINDNEXT, "Find &Next" )

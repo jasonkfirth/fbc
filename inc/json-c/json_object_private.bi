@@ -15,6 +15,8 @@
 
 #pragma once
 
+#include once "json_object.bi"
+
 '' The following symbols have been renamed:
 ''     union data => json_object_data
 

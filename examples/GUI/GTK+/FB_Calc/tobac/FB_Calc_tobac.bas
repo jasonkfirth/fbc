@@ -18,6 +18,10 @@ TYPE GUIData
   but6, but3, but_plus, but_gleich, but_minus, but_mult, but_div, but_clear,  _
   butD, butPM
 END TYPE
+
+' This generated module stores the builder and widget lookup table for the one
+' GTK main thread. The parent program includes it before signal dispatch begins.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 DIM SHARED AS GUIData GUI
 
 GUI.XML = gtk_builder_new()
@@ -56,6 +60,9 @@ WITH GUI
   .butPM = gtk_builder_get_object(.XML, "butPM")
 END WITH
 
+' GladeToBac emits the callbacks as source fragments so they share this module's
+' generated GUIData declaration without a separate public interface.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL950 FBL-INC-002
 #INCLUDE "on_number_clicked.bas"
+'' FB-LINTER: DISABLE-NEXT-LINE FBL950 FBL-INC-002
 #INCLUDE "on_operation_clicked.bas"
-

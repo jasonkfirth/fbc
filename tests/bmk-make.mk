@@ -38,7 +38,12 @@ TESTS_BMK_CXX := env $(TESTS_FBC_ENV_EXTRA) $(TESTS_BMK_CXX)
 endif
 CXX := $(TESTS_BMK_CXX)
 
+# Multi-module DOS tests do not invoke a host C++ compiler.  Avoid the
+# host-only Clang probe because DJGPP make cannot run its shell pipeline.
+TESTS_BMK_CXX_IS_CLANG :=
+ifneq ($(HOST),dos)
 TESTS_BMK_CXX_IS_CLANG := $(strip $(shell $(TESTS_BMK_CXX_FOR_PROBE) -dM -E -x c++ /dev/null 2>/dev/null | grep -q __clang__ && echo yes || true))
+endif
 
 CXXFLAGS ?=
 ifeq ($(TESTS_BMK_CXX_IS_CLANG),yes)

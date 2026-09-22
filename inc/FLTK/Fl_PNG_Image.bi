@@ -1,7 +1,7 @@
 #include once "Fl_Image.bi"
 
 extern "c++"
-type Fl_PNG_Image extends Fl_RGB_Image 
+type Fl_PNG_Image extends Fl_RGB_Image
 private:
 	declare operator let (byref w as const Fl_PNG_Image)
 	declare constructor (byref w as const Fl_PNG_Image)

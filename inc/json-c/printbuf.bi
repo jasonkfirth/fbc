@@ -29,6 +29,8 @@ type printbuf_
 	size as long
 end type
 
+type printbuf as printbuf_
+
 declare function printbuf_new() as printbuf ptr
 declare function printbuf_memappend(byval p as printbuf ptr, byval buf as const zstring ptr, byval size as long) as long
 #macro printbuf_memappend_fast(p, bufptr, bufsize)

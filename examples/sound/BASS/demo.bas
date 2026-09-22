@@ -112,6 +112,8 @@ Do
 	Print "Music position: Order: " & LoWord(trackerPosition) & ", Row: " & HiWord(trackerPosition) & " (" & CInt(secondsPosition) & " seconds)    "
 	If( autoplay AndAlso secondsPosition >= 1.0 ) Then Exit Do
 
+	'' Allow the audio driver to advance between status polls.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL602
 	Sleep 10
 Loop
 

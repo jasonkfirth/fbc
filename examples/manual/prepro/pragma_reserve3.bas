@@ -14,6 +14,8 @@
 Dim Shared xyz As Integer
 
 Sub proc Naked()
+	'' The example emits the x86_64 assembly named by its gas64 command line.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL972
 	Asm
 		xyz
 		ret

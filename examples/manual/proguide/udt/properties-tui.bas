@@ -80,7 +80,7 @@ Namespace tui
 
 	Property window.title( new_title As String )
 		p_title = new_title
-		drawtitle
+		This.drawtitle
 	End Property
 
 	Property window.x As Integer
@@ -88,9 +88,9 @@ Namespace tui
 	End Property
 
 	Property window.x( new_x As Integer )
-		remove
+		This.remove
 		pos.x = new_x
-		redraw
+		This.redraw
 	End Property
 
 	Property window.y As Integer
@@ -98,13 +98,13 @@ Namespace tui
 	End Property
 
 	Property window.y( new_y As Integer )
-		remove
+		This.remove
 		pos.y = new_y
-		redraw
+		This.redraw
 	End Property
 
 	Sub window.show
-		redraw
+		This.redraw
 	End Sub
 
 	Sub window.drawtitle
@@ -125,7 +125,7 @@ Namespace tui
 	End Sub
 
 	Sub window.redraw
-		drawtitle
+		This.drawtitle
 		Color 8, 7
 		Var sp = Space( siz.x )
 		For i As Integer = pos.y + 1 To pos.y + siz.y - 1

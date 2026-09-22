@@ -30,7 +30,7 @@ private function Fl_Text_Selection.selected() as boolean
 	return mSelected
 end function
 
-private sub Fl_Text_Selection.selected(b as boolean) 
+private sub Fl_Text_Selection.selected(b as boolean)
 	mSelected=b
 end sub
 
@@ -132,7 +132,7 @@ protected:
 
 	declare function insert_(pos as long, text as const zstring ptr) as long
 	declare sub remove_(start as long, end as long)
-	declare const sub redisplay_selection(oldSelection as Fl_Text_Selection ptr, newSelection as Fl_Text_Selection ptr ) 
+	declare const sub redisplay_selection(oldSelection as Fl_Text_Selection ptr, newSelection as Fl_Text_Selection ptr )
 	declare sub move_gap(pos as long)
 
 	declare sub reallocate_with_gap(newGapStart as long, newGapLen as long)
@@ -142,9 +142,9 @@ protected:
 	declare sub update_selections(pos as long, nDeleted as long, nInserted as long)
 
 
-	mPrimary as Fl_Text_Selection 
-	mSecondary as Fl_Text_Selection 
-	mHighlight as Fl_Text_Selection 
+	mPrimary as Fl_Text_Selection
+	mSecondary as Fl_Text_Selection
+	mHighlight as Fl_Text_Selection
 	mLength as long
 
 	mBuf as zstring ptr
@@ -153,17 +153,17 @@ protected:
 
 	mTabDist as long
 	mNModifyProcs as long
-	mModifyProcs as Fl_Text_Modify_Cb 
+	mModifyProcs as Fl_Text_Modify_Cb
 
 	mCbArgs as any ptr ptr
 	mNPredeleteProcs as long
 	mPredeleteProcs as Fl_Text_Predelete_Cb
 
-	mPredeleteCbArgs as any ptr ptr 
+	mPredeleteCbArgs as any ptr ptr
 	mCursorPosHint as long
 
 	mCanUndo as ubyte
-                                 
+
 	mPreferredGapSize as long
 
 end type

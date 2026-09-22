@@ -180,7 +180,8 @@ function CBrowser.resize _
 		exit function
 	end if
 
-	dim as SIZEL pxSize, hmSize = ( width_, height )
+	dim as SIZEL pxSize
+	dim as SIZEL hmSize = ( width_, height )
 	hPixelToMetric( @pxSize, @hmSize )
 	ctx->browserclass->lpVtbl->SetExtent( ctx->browserclass, _
 											DVASPECT_CONTENT, _

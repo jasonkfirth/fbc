@@ -29,8 +29,8 @@ end function
 
 	' Initialize the SDL library (starts the event loop)
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) then
-   		print "Couldn't initialize SDL: "; *SDL_GetError()
-   		end 1
+		print "Couldn't initialize SDL: "; *SDL_GetError()
+		end 1
 	end if
 
 	' Ignore key events
@@ -43,36 +43,36 @@ end function
 
 	' The mouse isn't much use unless we have a display for reference
 	if (SDL_SetVideoMode(320, 240, 8, 0) = NULL) then
-   		print "Couldn't set 320x240x8 video mode: "; *SDL_GetError()
-   		end 1
+		print "Couldn't set 320x240x8 video mode: "; *SDL_GetError()
+		end 1
 	end if
 
 	' Loop waiting for ESC+Mouse_Button
 	do while (SDL_WaitEvent(@event) >= 0)
-   		select case (event.type)
-   		case SDL_ACTIVEEVENT:
-      		if (event.active.state and SDL_APPACTIVE) then
-         		if (event.active.gain) then
-            		print "App activated"
-         		else
-            		print "App iconified"
-         		end if
-      		end if
+		select case (event.type)
+		case SDL_ACTIVEEVENT:
+			if (event.active.state and SDL_APPACTIVE) then
+				if (event.active.gain) then
+					print "App activated"
+				else
+					print "App iconified"
+				end if
+			end if
 
-   		case SDL_MOUSEBUTTONDOWN:
-      		dim keys as Uint8 ptr
+		case SDL_MOUSEBUTTONDOWN:
+			dim keys as Uint8 ptr
 
-      		keys = SDL_GetKeyState(NULL) + SDLK_ESCAPE
-      		if (keys = SDL_PRESSED) then
-         		print "Bye bye..."
-         		end 0
-      		end if
-      		print "Mouse button pressed"
+			keys = SDL_GetKeyState(NULL) + SDLK_ESCAPE
+			if (keys = SDL_PRESSED) then
+				print "Bye bye..."
+				end 0
+			end if
+			print "Mouse button pressed"
 
-   		case SDL_QUIT_:
-      		print "Quit requested, quitting."
-      		end 0
-   		end select
+		case SDL_QUIT_:
+			print "Quit requested, quitting."
+			end 0
+		end select
 	loop
 
 	' This should never happen

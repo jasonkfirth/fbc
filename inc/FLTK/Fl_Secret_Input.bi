@@ -9,5 +9,5 @@ public:
 	declare constructor(X as long, Y as long, W as long, H as long, L as const zstring ptr=0)
 	declare function handle(as long) as long
 end type
-end extern 
+end extern
 

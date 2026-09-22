@@ -7,5 +7,6 @@
 '' --------
 
 Dim As UByte a = &b00110011
-Dim As UByte b = &b01010101, c
+Dim As UByte b = &b01010101
+Dim As UByte c
 c = a Eqv b '' c = &b10011001

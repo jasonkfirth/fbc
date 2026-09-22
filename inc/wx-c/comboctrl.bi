@@ -3,15 +3,15 @@
 
 #Include Once "common.bi"
 
-Type CallInit                As Sub      WXCALL 
+Type CallInit                As Sub      WXCALL
 Type CallCreate              As Function WXCALL (parent As wxWindow Ptr) As wxBool
-Type CallOnPopup             As Sub      WXCALL 
-Type CallOnDismiss           As Sub      WXCALL 
+Type CallOnPopup             As Sub      WXCALL
+Type CallOnDismiss           As Sub      WXCALL
 Type CallSetStringValue      As Sub      WXCALL (stringValue As wxString Ptr)
 Type CallGetStringValue      As Function WXCALL As wxString Ptr
 Type CallPaintComboControl   As Sub      WXCALL (dc As wxDC Ptr, x As wxInt, y As wxInt, w As wxInt, h As wxInt)
 Type CallOnComboKeyEvent     As Sub      WXCALL (keyEvent As wxKeyEvent Ptr)
-Type CallOnComboDoubleClick  As Sub      WXCALL 
+Type CallOnComboDoubleClick  As Sub      WXCALL
 Type CallGetAdjustedSize     As Sub      WXCALL (w As wxInt Ptr, h As wxInt Ptr, minWidth As wxInt, prefHeight As wxInt, maxHeight As wxInt)
 Type CallLazyCreate          As Function WXCALL As wxBool
 Type CallGetControl          As Function WXCALL As wxWindow Ptr

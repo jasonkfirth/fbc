@@ -56,7 +56,7 @@ private function Fl_File_Browser.filter() as const zstring ptr
 	return (pattern_)
 end function
 
-private function Fl_File_Browser.textsize() as Fl_Fontsize 
+private function Fl_File_Browser.textsize() as Fl_Fontsize
 	return base.textsize()
 end function
 

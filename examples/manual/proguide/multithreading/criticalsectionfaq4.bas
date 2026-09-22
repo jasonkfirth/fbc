@@ -6,6 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtCriticalSectionsFAQ
 '' --------
 
+'' Thread synchronization: the mutex lock protects the handoff flags and exit request.
+
 Dim As Any Ptr handle
 Dim Shared As Any Ptr mutex
 Dim Shared As Any Ptr cond1
@@ -64,4 +66,3 @@ CondDestroy(cond2)
 Print
 
 Sleep
-

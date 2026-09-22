@@ -131,6 +131,8 @@ FUNCTION create_focus_page() AS GtkWidget PTR
   VAR canvas = goo_canvas_new ()
   gtk_widget_set_can_focus (canvas, TRUE)
   gtk_widget_set_size_request (canvas, 600, 450)
+	' The focus example uses a 1000-unit square scrollable logical canvas.
+	' FB-LINTER: DISABLE-NEXT-LINE FBL-NUM-009
   goo_canvas_set_bounds (GOO_CANVAS (canvas), 0, 0, 1000, 1000)
   gtk_widget_show (canvas)
   gtk_container_add (GTK_CONTAINER (scrolled_win), canvas)

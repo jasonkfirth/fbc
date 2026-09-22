@@ -1,12 +1,25 @@
 ''
+'' Project: FreeBASIC OpenGL examples
+'' File: lesson34.bas
+''
+'' Purpose:
+''     Render a fixed-size raw terrain height map as OpenGL quads or lines.
+''
+'' Ownership:
+''     The module owns the fixed height-map array for its one render loop.
+''     LoadRawFile owns its file unit only after a successful binary open.
+''
+'' Raw file format:
+''     Terrain.raw contains exactly MAP_SIZE by MAP_SIZE unsigned height bytes
+''     without a header, stride, palette, or compression.
+''
+'' This file intentionally does NOT contain:
+''     - a general terrain file loader
+''     - dynamically sized terrain storage
+''
 ''  This Code Was Created By Ben Humphrey 2001
 ''  If You've Found This Code Useful, Please Let Me Know.
 ''  Visit NeHe Productions At http://nehe.gamedev.net
-''----------------------------------------------------------
-
-
-
-
 '' Setup our booleans
 const null = 0
 
@@ -22,16 +35,16 @@ const HEIGHT_RATIO = 1.5f                      '' Ratio That The Y Is Scaled Acc
 
 
 declare sub RenderHeightMap (byval pHeightMap as ubyte ptr)
-declare sub SetVertexColor (byval pHeightMap as ubyte ptr , byval x as integer , byval y as integer)
-declare function Height (byval pHeightMap as ubyte ptr , byval X as integer , byval Y as integer) as integer
-declare sub LoadRawFile (byref strName as string , byval nSize as integer , HeightMap() as ubyte)
+declare sub SetVertexColor (byval pHeightMap as ubyte ptr, byval x as integer, byval y as integer)
+declare function Height (byval pHeightMap as ubyte ptr, byval X as integer, byval Y as integer) as integer
+declare function LoadRawFile (byref strName as string, byval nSize as integer, HeightMap() as ubyte) as integer
 
 
+'' The render loop and terrain helpers share only this module's height-map state.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared as integer bRender = TRUE, rdown = FALSE         '' Polygon Flag Set To TRUE By Default (NEW)
-dim shared as ubyte g_HeightMap(MAP_SIZE * MAP_SIZE)        '' Holds The Height Map Data (NEW)
+dim shared as ubyte g_HeightMap(0 to MAP_SIZE * MAP_SIZE - 1)  '' Holds The Height Map Data (NEW)
 dim shared as single scaleValue = 0.30f                     '' Scale Value For The Terrain (NEW)
-
-
 
 	windowtitle "NeHe & Ben Humphrey's Height Map Tutorial" '' Set window title
 	screen 18, 32, , 2
@@ -47,20 +60,20 @@ dim shared as single scaleValue = 0.30f                     '' Scale Value For T
 
 	'' All Setup For OpenGL Goes Here
 	glShadeModel (GL_SMOOTH)                                '' Enable Smooth Shading
-	glClearColor (0.0f , 0.0f , 0.0f , 0.5f)                '' Black Background
+	glClearColor (0.0f, 0.0f, 0.0f, 0.5f)                '' Black Background
 	glClearDepth (1.0f)                                     '' Depth Buffer Setup
 	glEnable (GL_DEPTH_TEST)                                '' Enables Depth Testing
 	glDepthFunc (GL_LEQUAL)                                 '' The Type Of Depth Testing To Do
-	glHint (GL_PERSPECTIVE_CORRECTION_HINT , GL_NICEST)     '' Really Nice Perspective Calculations
-	LoadRawFile (exepath + "/data/Terrain.raw" , MAP_SIZE * MAP_SIZE , g_HeightMap())        '' (NEW)
+	glHint (GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)     '' Really Nice Perspective Calculations
+	if LoadRawFile (exepath + "/data/Terrain.raw", MAP_SIZE * MAP_SIZE, g_HeightMap()) = false then end 1
 
 	do
 
 		glClear (GL_COLOR_BUFFER_BIT  or  GL_DEPTH_BUFFER_BIT)        '' Clear The Screen And The Depth Buffer
 		glLoadIdentity ()                                             '' Reset The Matrix
 		''         Position         View             Up Vector
-		gluLookAt (212 , 60 , 194 , 186 , 55 , 171 , 0 , 1 , 0)       '' This Determines Where The Camera's Position And View Is
-		glScalef (scaleValue , scaleValue * HEIGHT_RATIO , scaleValue)
+		gluLookAt (212, 60, 194, 186, 55, 171, 0, 1, 0)       '' This Determines Where The Camera's Position And View Is
+		glScalef (scaleValue, scaleValue * HEIGHT_RATIO, scaleValue)
 		RenderHeightMap (@g_HeightMap(0))                             '' Render The Height Map
 
 		'' Is the UP ARROW key Being Pressed?
@@ -76,7 +89,7 @@ dim shared as single scaleValue = 0.30f                     '' Scale Value For T
 			bRender = not bRender
 			rdown = true
 		end if
-		if not MULTIKEY(FB.SC_R) then rdown = false
+	if MULTIKEY(FB.SC_R) = 0 then rdown = false
 
 		flip
 		if inkey = chr(255)+"k" then exit do           '' exit if close box is clicked
@@ -89,24 +102,34 @@ dim shared as single scaleValue = 0.30f                     '' Scale Value For T
 
 
 '----------------------------------------------------------
-'' Loads The .RAW File And Stores It In pHeightMap
-sub LoadRawFile (byref strName as string , byval nSize as integer , HeightMap() as ubyte)
+'' Loads the documented headerless RAW file into one exact caller-owned array.
+function LoadRawFile (byref strName as string, byval nSize as integer, HeightMap() as ubyte) as integer
 	dim pFile as integer
+
+	if nSize <= 0 then exit function
+	if ubound(HeightMap) < lbound(HeightMap) then exit function
+	if ubound(HeightMap) - lbound(HeightMap) + 1 <> nSize then exit function
 
 	'' Open The File In Read / Binary Mode.
 	pFile = freefile
-	if open (strName, for binary, as pFile) <> 0 then
-		end
+	open strName for binary access read as #pFile
+	if err <> 0 then exit function
+
+	'' The routine header documents this exact raw transfer and its byte count.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-DOC-BIN-003
+	get #pFile,, HeightMap()
+	if err <> 0 then
+		close #pFile
+		exit function
 	end if
 
-	get #pFile,, HeightMap()
-
 	'' Close The File.
-	close pFile
-end sub
+	close #pFile
+	LoadRawFile = true
+end function
 
 '----------------------------------------------------------
-function Height (byval pHeightMap as ubyte ptr , byval XX as integer , byval YY as integer) as integer        '' This Returns The Height From A Height Map Index
+function Height (byval pHeightMap as ubyte ptr, byval XX as integer, byval YY as integer) as integer        '' This Returns The Height From A Height Map Index
 	dim x as integer                                    '' Error Check Our x Value
 	x = XX mod MAP_SIZE
 	dim y as integer                                    '' Error Check Our y Value
@@ -120,16 +143,16 @@ end function
 
 '----------------------------------------------------------
 '' Sets The Color Value For A Particular Index, Depending On The Height Index
-sub SetVertexColor (byval pHeightMap as ubyte ptr , byval x as integer , byval y as integer)
+sub SetVertexColor (byval pHeightMap as ubyte ptr, byval x as integer, byval y as integer)
 	if pHeightMap = 0 then                             '' Make Sure Our Height Data Is Valid
 		exit sub
 	end if
 	dim fColor as single
 
-	fColor = - 0.15f + (Height (pHeightMap , x , y) / 256.0f)
+	fColor = - 0.15f + (Height (pHeightMap, x, y) / 256.0f)
 
 	'' Assign This Blue Shade To The Current Vertex
-	glColor3f (0 , 0 , fColor)
+	glColor3f (0, 0, fColor)
 end sub
 
 '----------------------------------------------------------
@@ -152,45 +175,45 @@ sub RenderHeightMap (byval pHeightMap as ubyte ptr)
 		for YY = 0 to MAP_SIZE-1 step STEP_SIZE
 			'' Get The (X, Y, Z) Value For The Bottom Left Vertex
 			x = XX
-			y = Height (pHeightMap , XX , YY)
+			y = Height (pHeightMap, XX, YY)
 			z = YY
 
 			'' Set The Color Value Of The Current Vertex
-			SetVertexColor (pHeightMap , x , z)
+			SetVertexColor (pHeightMap, x, z)
 
-			glVertex3i (x , y , z)                     '' Send This Vertex To OpenGL To Be Rendered (Integer Points Are Faster)
+			glVertex3i (x, y, z)                     '' Send This Vertex To OpenGL To Be Rendered (Integer Points Are Faster)
 
 			'' Get The (X, Y, Z) Value For The Top Left Vertex
 			x = XX
-			y = Height (pHeightMap , XX , YY + STEP_SIZE)
+			y = Height (pHeightMap, XX, YY + STEP_SIZE)
 			z = YY + STEP_SIZE
 			'' Set The Color Value Of The Current Vertex
-			SetVertexColor (pHeightMap , x , z)
+			SetVertexColor (pHeightMap, x, z)
 
-			glVertex3i (x , y , z)                     '' Send This Vertex To OpenGL To Be Rendered
+			glVertex3i (x, y, z)                     '' Send This Vertex To OpenGL To Be Rendered
 
 			'' Get The (X, Y, Z) Value For The Top Right Vertex
 			x = XX + STEP_SIZE
-			y = Height (pHeightMap , XX + STEP_SIZE , YY + STEP_SIZE)
+			y = Height (pHeightMap, XX + STEP_SIZE, YY + STEP_SIZE)
 			z = YY + STEP_SIZE
 
 			'' Set The Color Value Of The Current Vertex
-			SetVertexColor (pHeightMap , x , z)
-			glVertex3i (x , y , z)                     '' Send This Vertex To OpenGL To Be Rendered
+			SetVertexColor (pHeightMap, x, z)
+			glVertex3i (x, y, z)                     '' Send This Vertex To OpenGL To Be Rendered
 
 			'' Get The (X, Y, Z) Value For The Bottom Right Vertex
 			x = XX + STEP_SIZE
-			y = Height (pHeightMap , XX + STEP_SIZE , YY)
+			y = Height (pHeightMap, XX + STEP_SIZE, YY)
 			z = YY
 
 			'' Set The Color Value Of The Current Vertex
-			SetVertexColor (pHeightMap , x , z)
+			SetVertexColor (pHeightMap, x, z)
 
-			glVertex3i (x , y , z)                     '' Send This Vertex To OpenGL To Be Rendered
+			glVertex3i (x, y, z)                     '' Send This Vertex To OpenGL To Be Rendered
 		next
 	next
 	glEnd ()
-	glColor4f (1.0f , 1.0f , 1.0f , 1.0f)              '' Reset The Color
+	glColor4f (1.0f, 1.0f, 1.0f, 1.0f)              '' Reset The Color
 end sub
 
-
+'' End of lesson34.bas

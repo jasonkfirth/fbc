@@ -1,5 +1,6 @@
 ''
 '' simple http-get example using OPEN TCP
+'' Ownership: the module closes its acquired TCP file unit on every exit path.
 ''
 
 #if defined(__FB_DOS__) or defined(__FB_JS__) or defined(__FB_XBOX__)
@@ -40,6 +41,8 @@ print #f,
 
 do while( headers_done = FALSE )
 	if( eof( f ) = 0 ) then
+		'' EOF/EOC readiness plus the idle counter below bound this TCP read loop.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL704
 		line input #f, line_
 		print line_
 		saw_data = TRUE

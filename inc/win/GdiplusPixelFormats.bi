@@ -9,6 +9,8 @@
 #ifndef __win_GdiplusPixelFormats_bi__
 #define __win_GdiplusPixelFormats_bi__
 
+#include once "windows.bi"
+
 type ARGB as DWORD
 type ARGB64 as DWORDLONG
 

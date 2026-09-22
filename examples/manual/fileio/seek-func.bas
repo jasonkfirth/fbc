@@ -6,11 +6,14 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgSeekreturn
 '' --------
 
-Dim f As Long, position As LongInt
+Dim f As Integer, position As LongInt
 
 f = FreeFile
-Open "file.ext" For Binary As #f
+If Open("file.ext" For Binary As #f) <> 0 Then
+  Print "Could not open file.ext"
+Else
 
-position = Seek(f)
+  position = Seek(f)
 
-Close #f
+  Close #f
+End If

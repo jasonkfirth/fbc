@@ -4,7 +4,7 @@
 #Include Once "common.bi"
 
 ' Virtual method delegate pointer types
-Type Virtual_NoParams        As Sub      WXCALL 
+Type Virtual_NoParams        As Sub      WXCALL
 Type Virtual_ParamsInt       As Function WXCALL (As wxInt) As wxBool
 Type Virtual_OnBeginDocument As Function WXCALL (startPage As wxInt, endPage As wxInt) As wxBool
 Type Virtual_GetPageInfo     As Sub      WXCALL (minPage As wxInt Ptr, maxPage As wxInt Ptr, pageFrom As wxInt Ptr, pageTo As wxInt Ptr)

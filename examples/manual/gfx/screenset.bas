@@ -7,7 +7,11 @@
 '' --------
 
 ' Open graphics screen (320*200, 8bpp) with 2 pages
-ScreenRes 320, 200, 8, 2
+If ScreenRes(320, 200, 8, 2) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 ' Work on page 1 while displaying page 0
 ScreenSet 1, 0

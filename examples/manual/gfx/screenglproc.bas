@@ -13,7 +13,12 @@ Dim SwapInterval As Function(ByVal interval As Integer) As Integer
 Dim extensions As String
 
 '' Setup OpenGL and retrieve supported extensions
-ScreenRes 640, 480, 32,, FB.GFX_OPENGL
+If ScreenRes(640, 480, 32, , FB.GFX_OPENGL) <> 0 Then
+	Print "Could not set the requested OpenGL graphics mode"
+	Sleep
+	End 1
+End If
+
 ScreenControl FB.GET_GL_EXTENSIONS, extensions
 
 If (InStr(extensions, "WGL_EXT_swap_control") <> 0) Then

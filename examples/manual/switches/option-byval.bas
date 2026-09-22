@@ -15,6 +15,8 @@ Sub TestDefaultByref( a As Integer )
   a = a * 2
 End Sub
 
+'' This FBlite lesson contrasts declarations before and after Option ByVal.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-OPT-001
 Option ByVal
 
 Sub TestDefaultByval( a As Integer )

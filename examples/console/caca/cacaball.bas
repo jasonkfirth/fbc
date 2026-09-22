@@ -39,14 +39,20 @@
 
 declare sub create_ball()
 declare sub draw_ball(byval as uinteger, byval as uinteger)
+declare function palette_component(byval as integer, byval as integer) as integer
 
+/' These buffers are the single-threaded renderer's shared working state.
+ * create_ball() creates the sprite and draw_ball() composites it. '/
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared pixels(0 to XSIZ * YSIZ - 1) as ubyte
 dim shared metaball(0 to METASIZE * METASIZE - 1) as ubyte
 
 dim as ulong r(0 to 255), g(0 to 255), b(0 to 255), a(0 to 255)
 dim as single d(0 to METABALLS - 1), di(0 to METABALLS - 1), dj(0 to METABALLS - 1), dk(0 to METABALLS - 1)
 dim as uinteger x(0 to METABALLS - 1), y(0 to METABALLS - 1)
-dim as single i = 10.0, j = 17.0, k = 11.0
+dim as single i = 10.0
+dim as single j = 17.0
+dim as single k = 11.0
 dim as integer frame
 
 	if (caca_init()) then
@@ -90,19 +96,19 @@ dim as integer frame
 		/' Crop the palette '/
 		for p as integer = CROPBALL to 254
 			dim as integer t1, t2, t3
-			t1 = iif(p < &H40 , 0 , iif(p < &Hc0 , (p - &H40) * &H20 , &Hfff))
-			t2 = iif(p < &He0 , 0 , (p - &He0) * &H80)
-			t3 = iif(p < &H40 , p * &H40 , &Hfff)
+			t1 = iif(p < &H40, 0, iif(p < &Hc0, (p - &H40) * &H20, &Hfff))
+			t2 = iif(p < &He0, 0, (p - &He0) * &H80)
+			t3 = iif(p < &H40, p * &H40, &Hfff)
 
-			r(p) = (1.0 + sin(cdbl(frame) * M_PI / 60)) * t1 \ 4 _
-			     + (1.0 + sin(cdbl(frame + 40) * M_PI / 60)) * t2 \ 4 _
-			     + (1.0 + sin(cdbl(frame + 80) * M_PI / 60)) * t3 \ 4
-			g(p) = (1.0 + sin(cdbl(frame) * M_PI / 60)) * t2 \ 4 _
-			     + (1.0 + sin(cdbl(frame + 40) * M_PI / 60)) * t3 \ 4 _
-			     + (1.0 + sin(cdbl(frame + 80) * M_PI / 60)) * t1 \ 4
-			b(p) = (1.0 + sin(cdbl(frame) * M_PI / 60)) * t3 \ 4 _
-			     + (1.0 + sin(cdbl(frame + 40) * M_PI / 60)) * t1 \ 4 _
-			     + (1.0 + sin(cdbl(frame + 80) * M_PI / 60)) * t2 \ 4
+			r(p) = palette_component(frame, t1) _
+			     + palette_component(frame + 40, t2) _
+			     + palette_component(frame + 80, t3)
+			g(p) = palette_component(frame, t2) _
+			     + palette_component(frame + 40, t3) _
+			     + palette_component(frame + 80, t1)
+			b(p) = palette_component(frame, t3) _
+			     + palette_component(frame + 40, t1) _
+			     + palette_component(frame + 80, t2)
 		next
 
 		/' Set the palette '/
@@ -143,6 +149,14 @@ dim as integer frame
 	end 0
 
 
+/' Preserve the palette's original quantization: each sine component is
+ * rounded before integer division, then the three components are added. '/
+function palette_component(byval phase as integer, byval intensity as integer) as integer
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL405 FBL-NUM-017
+	return cint((1.0 + sin(cdbl(phase) * M_PI / 60)) * intensity) \ 4
+end function
+
+
 /' Generate ball sprite
  * You should read the comments, I already wrote that before ... '/
 sub create_ball()
@@ -152,7 +166,7 @@ sub create_ball()
 			distance = ((METASIZE\2) - x) * ((METASIZE\2) - x) _
 			         + ((METASIZE\2) - y) * ((METASIZE\2) - y)
 			distance = sqr(distance) * 64 / METASIZE
-			metaball(x + y * METASIZE) = iif(distance > 15 , 0 , cint(((255.0 - distance) * 15)))
+			metaball(x + y * METASIZE) = iif(distance > 15, 0, cint(((255.0 - distance) * 15)))
 		next
 	next
 end sub

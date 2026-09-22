@@ -6,6 +6,9 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgLiteRegulate
 '' --------
 
+#ifndef FB_EXAMPLES_MANUAL_PROGUIDE_GRAPHICS_REGULATELITE_BI
+#define FB_EXAMPLES_MANUAL_PROGUIDE_GRAPHICS_REGULATELITE_BI
+
 ' regulateLite.bi
 
 Function regulateLite(ByVal MyFps As ULong, ByVal SkipImage As Boolean = True, ByVal Restart As Boolean = False, ByRef ImageSkipped As Boolean = False) As ULong
@@ -81,3 +84,5 @@ Function regulateLite(ByVal MyFps As ULong, ByVal SkipImage As Boolean = True, B
 	End If
 	Return fps
 End Function
+
+#endif

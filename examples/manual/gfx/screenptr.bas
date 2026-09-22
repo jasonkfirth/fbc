@@ -29,7 +29,8 @@ ScreenLock()
 
 	'' Find the address of the pixel in the centre of the screen
 	'' It's an 8-bit pixel, so use a UByte Ptr.
-	Dim As Integer x = w \ 2, y = h \ 2
+	Dim As Integer x = w \ 2
+	Dim As Integer y = h \ 2
 	Dim As UByte Ptr pixel = buffer + (y * pitch) + (x * bypp)
 
 

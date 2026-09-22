@@ -26,6 +26,8 @@
 
 #pragma once
 
+#include once "chipmunk_structs.bi"
+
 extern "C"
 
 #define CHIPMUNK_UNSAFE_H

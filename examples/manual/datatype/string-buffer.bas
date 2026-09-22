@@ -11,8 +11,10 @@
 '' Reserving space for a string,
 '' using Space() to produce lots of space characters (ASCII 32)
 Dim As String mybigstring = Space(1024)
-Print "buffer address: &h" & Hex( StrPtr( mybigstring ), 8 ) & ", length: " & Len( mybigstring )
+Dim As UInteger buffer_address = Cast(UInteger, StrPtr(mybigstring))
+Print "buffer address: &h" & Hex(buffer_address, SizeOf(buffer_address) * 2) & ", length: " & Len(mybigstring)
 
 '' Explicitly destroying a string
 mybigstring = ""
-Print "buffer address: &h" & Hex( StrPtr( mybigstring ), 8 ) & ", length: " & Len( mybigstring )
+buffer_address = Cast(UInteger, StrPtr(mybigstring))
+Print "buffer address: &h" & Hex(buffer_address, SizeOf(buffer_address) * 2) & ", length: " & Len(mybigstring)

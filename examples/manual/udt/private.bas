@@ -9,8 +9,8 @@
 Type testing
   number As Integer
   Private:
-	nome As String
-  Declare Sub setNome( ByRef newnome As String )
+    nome As String
+    Declare Sub setNome( ByRef newnome As String )
 End Type
 
 Sub testing.setnome( ByRef newnome As String )

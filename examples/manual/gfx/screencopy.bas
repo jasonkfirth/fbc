@@ -7,7 +7,9 @@
 '' --------
 
 '' 320x200x8, with 3 pages
-Screen 13,,3
+'' Mode 13 is the documented compatibility mode for this page-copy lesson.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL734
+Screen 13,, 3
 
 '' image for working page #1 (visible page #0)
 ScreenSet 1, 0
@@ -45,5 +47,7 @@ Do
 	ScreenCopy 2, 0
   End Select
 
+	' Limit the animation cadence while allowing input events to be processed.
+	' FB-LINTER: DISABLE-NEXT-LINE FBL602
   Sleep 25
 Loop

@@ -12,8 +12,13 @@
 
 Option Dynamic
 
-Dim foo(100) As Integer			' declares a variable-length array
+Dim foo(0 To 100) As Integer		' declares a variable-length array
 
+'' This deliberate mid-file change contrasts the prior dynamic declaration
+'' with the fixed declaration below.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-OPT-001 FBL-OPT-002
 Option Static
 
-Dim bar(100) As Integer			' declares a fixed-length array
+Dim bar(0 To 100) As Integer		' declares a fixed-length array
+
+'' end of option-static.bas

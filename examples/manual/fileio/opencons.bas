@@ -6,14 +6,31 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgOpenCons
 '' --------
 
+'' Resource ownership:
+'' The input and output console handles are independent and are closed only
+'' after both ends opened successfully.
 Dim a As String
+Dim input_number As Integer, output_number As Integer
 
-Open Cons For Input As #1
-Open Cons For Output As #2
+input_number = FreeFile
+Open Cons For Input As #input_number
+If Err <> 0 Then
+  Print "Could not open console input"
+Else
+  output_number = FreeFile
 
-Print #2,"Please write something and press ENTER"
-Line Input #1,a
-Print #2, "You wrote : ";a
+  '' CONS is a device endpoint, not a persistent output path.
+  '' FB-LINTER: DISABLE-NEXT-LINE FBL103 FBL-IO-005
+  Open Cons For Output As #output_number
+  If Err <> 0 Then
+    Print "Could not open console output"
+  Else
+    Print #output_number, "Please write something and press ENTER"
+    Line Input #input_number, a
+    Print #output_number, "You wrote : "; a
+    Close #output_number
+  End If
 
-Close
+  Close #input_number
+End If
 Sleep

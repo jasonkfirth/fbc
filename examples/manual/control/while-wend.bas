@@ -9,11 +9,11 @@
 Dim As String sentence                          '' string to reverse
 sentence = "The quick brown fox jumps over the lazy dog."
 
-Dim As String ecnetnes
+Dim As String ecnetnes = Space(Len(sentence))
 Dim As Integer index
 index = Len( sentence ) - 1                     '' point to last character
 While( index >= 0 )                             '' stop after first character
-  ecnetnes += Chr( sentence[index] )           '' append character to new string
+  ecnetnes[Len(sentence) - index - 1] = sentence[index]
   index -= 1
 Wend
 

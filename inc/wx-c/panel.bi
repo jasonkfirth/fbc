@@ -3,7 +3,7 @@
 
 #Include Once "common.bi"
 
-Declare Function wxPanel_ctor WXCALL Alias "wxPanel_ctor" () As wxPanel Ptr 
+Declare Function wxPanel_ctor WXCALL Alias "wxPanel_ctor" () As wxPanel Ptr
 Declare Function wxPanel_ctor2 WXCALL Alias "wxPanel_ctor2" (parent As wxWindow Ptr, _
                    id      As  wxWindowID   = -1, _
                    x       As  wxInt        = -1, _
@@ -11,7 +11,7 @@ Declare Function wxPanel_ctor2 WXCALL Alias "wxPanel_ctor2" (parent As wxWindow 
                    w       As  wxInt        = -1, _
                    h       As  wxInt        = -1, _
                    style   As  wxUInt       =  0, _
-                   nameArg As wxString Ptr = WX_NULL) As wxPanel Ptr 
+                   nameArg As wxString Ptr = WX_NULL) As wxPanel Ptr
 Declare Function wxPanel_Create WXCALL Alias "wxPanel_Create" (self As wxPanel  Ptr, _
                     parent  As wxWindow Ptr    , _
                     id      As  wxWindowID   = -1, _

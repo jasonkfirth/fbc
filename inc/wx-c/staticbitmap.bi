@@ -3,7 +3,7 @@
 
 #Include Once "common.bi"
 
-Declare Function wxStaticBitmap_ctor WXCALL Alias "wxStaticBitmap_ctor" () As wxStaticBitmap Ptr 
+Declare Function wxStaticBitmap_ctor WXCALL Alias "wxStaticBitmap_ctor" () As wxStaticBitmap Ptr
 Declare Function wxStaticBitmap_Create WXCALL Alias "wxStaticBitmap_Create" (self As wxStaticBitmap Ptr, _
                            parent  As wxWindow       Ptr     , _
                            id      As  wxWindowID         = -1, _

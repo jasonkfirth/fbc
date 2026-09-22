@@ -1,3 +1,6 @@
+#ifndef FB_EXAMPLES_SFXLIB_EXAMPLE_COMMON_BI
+#define FB_EXAMPLES_SFXLIB_EXAMPLE_COMMON_BI
+
 ''
 '' Shared helper routines for the sfxlib example programs.
 ''
@@ -28,3 +31,5 @@ end sub
 sub SfxExampleResult( byref label as string, byval value as long )
 	print label; value
 end sub
+
+#endif

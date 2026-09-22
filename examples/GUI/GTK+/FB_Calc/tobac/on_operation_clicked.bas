@@ -14,15 +14,15 @@ SUB on_operation_clicked CDECL ALIAS "on_operation_clicked" ( _
   BYVAL button AS GtkButton PTR, _
   BYVAL user_data AS gpointer) EXPORT
 
-WITH GUI
-SELECT CASE G_OBJECT(button)
-CASE .but_plus : Calc(Op.Plus)
-CASE .but_minus : Calc(Op.Minus)
-CASE .but_mult : Calc(Op.Multiplication)
-CASE .but_div : Calc(Op.Division)
-CASE .but_clear : Calc(Op.Clear)
-CASE .but_gleich : Calc(Op.Result)
-END SELECT
-END WITH
+  WITH GUI
+    SELECT CASE G_OBJECT(button)
+      CASE .but_plus : Calc(Op.Plus)
+      CASE .but_minus : Calc(Op.Minus)
+      CASE .but_mult : Calc(Op.Multiplication)
+      CASE .but_div : Calc(Op.Division)
+      CASE .but_clear : Calc(Op.Clear)
+      CASE .but_gleich : Calc(Op.Result)
+    END SELECT
+  END WITH
 
 END SUB

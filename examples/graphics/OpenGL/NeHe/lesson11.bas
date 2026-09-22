@@ -23,7 +23,7 @@
 
 	dim texture(0) as GLuint                    '' Storage For One Texture
 
-	dim points(44, 44, 2) as single               '' The Array For The Points On The Grid Of Our "Wave"
+	dim points(0 to 44, 0 to 44, 0 to 2) as single '' The Array For The Points On The Grid Of Our "Wave"
 	dim wiggle_count as integer                   '' Counter Used To Control How Fast Flag Waves
 
 	dim xrot as single                            '' X Rotation
@@ -45,7 +45,7 @@
 	glLoadIdentity                                 '' Reset The Modelview Matrix
 
 	'' Use BLOAD to load the bitmaps.
-	redim buffer(256*256*4+4) as ubyte             '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
+	redim buffer(0 to 256*256*4+4) as ubyte        '' Size = Width x Height x 4 bytes per pixel + 4 bytes for header
 	bload exepath + "/data/Tim.bmp", @buffer(0)    '' BLOAD data from bitmap
 	texture(0) = CreateTexture(@buffer(0))         '' Tim Texture
 	if texture(0) = 0 then end 1                   '' Exit if error loading data file
@@ -66,9 +66,9 @@
 		'' Loop Through The Y Plane
 		for y = 0 to 44
 			'' Apply The Wave To Our Mesh
-			points(x,y,0)=(x/5.0)-4.5
-			points(x,y,1)=(y/5.0)-4.5
-			points(x,y,2)=sin((((x/5.0)*40.0)/360.0)*3.141592654*2.0)
+			points(x, y, 0)=(x/5.0)-4.5
+			points(x, y, 1)=(y/5.0)-4.5
+			points(x, y, 2)=sin((((x/5.0)*40.0)/360.0)*3.141592654*2.0)
 		next
 	next
 
@@ -96,31 +96,31 @@
 					float_yb = (y+1)/44.0             '' Create A Floating Point Y Value+0.0227
 
 					glTexCoord2f float_x, float_y     '' First Texture Coordinate (Bottom Left)
-					glVertex3f points(x,y,0), points(x,y,1), points(x,y,2)
+					glVertex3f points(x, y, 0), points(x, y, 1), points(x, y, 2)
 
 					glTexCoord2f float_x, float_yb    '' Second Texture Coordinate (Top Left)
-					glVertex3f points(x,y+1,0), points(x,y+1,1), points(x,y+1,2)
+					glVertex3f points(x, y+1, 0), points(x, y+1, 1), points(x, y+1, 2)
 
 					glTexCoord2f float_xb, float_yb   '' Third Texture Coordinate (Top Right)
-					glVertex3f points(x+1,y+1,0), points(x+1,y+1,1), points(x+1,y+1,2)
+					glVertex3f points(x+1, y+1, 0), points(x+1, y+1, 1), points(x+1, y+1, 2)
 
 					glTexCoord2f float_xb, float_y    '' Fourth Texture Coordinate (Bottom Right)
-					glVertex3f points(x+1,y,0), points(x+1,y,1), points(x+1,y,2)
+					glVertex3f points(x+1, y, 0), points(x+1, y, 1), points(x+1, y, 2)
 				next
 			next
 		glEnd                                         '' Done Drawing Our Quads
 
 		if wiggle_count = 2 then                      '' Used To Slow Down The Wave (Every 2nd Frame Only)
 			for y = 0 to 44                           '' Loop Through The Y Plane
-				hold=points(0,y,2)                    '' Store Current Value One Left Side Of Wave
+				hold=points(0, y, 2)                    '' Store Current Value One Left Side Of Wave
 				for x = 0 to 44                       '' Loop Through The X Plane
 					if x < 44 then
-						points(x,y,2) = points(x+1,y,2)   '' Current Wave Value Equals Value To The Right
+						points(x, y, 2) = points(x+1, y, 2)   '' Current Wave Value Equals Value To The Right
 					else
-						points(x,y,2) = points(x-1,y,2)   '' Current Wave Value Equals Value To The Left
+						points(x, y, 2) = points(x-1, y, 2)   '' Current Wave Value Equals Value To The Left
 					end if
 				next
-				points(44,y,2)=hold                   '' Last Value Becomes The Far Left Stored Value
+				points(44, y, 2)=hold                   '' Last Value Becomes The Far Left Stored Value
 			next
 			wiggle_count = 0                          '' Set Counter Back To Zero
 		end if

@@ -142,6 +142,8 @@ Dim As GraphicPoint p2 = GraphicPoint(500, 350)  '' to construct graphic point 2
 Dim As GraphicPoint p3 = GraphicPoint(280, 170)  '' to construct graphic point 2
 
 '' array of base type pointer referring to instances of different derived types
+'' The ellipsis initializer determines a fixed non-empty array size here.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-OPT-003
 Dim As GraphicForm2P Ptr pgf (...) = {New GraphicLine2P(p1, p2, 14), New GraphicBox2P(p1, p2, 13), New GraphicCircle2P(p1, p2, 12), _
 									  New GraphicLine2P(p1, p3, 11), New GraphicBox2P(p1, p3, 10), New GraphicCircle2P(p1, p3, 09)}
 
@@ -154,4 +156,3 @@ For I As Integer = LBound(pgf) To UBound(pgf)
 Next I
 
 Sleep
-

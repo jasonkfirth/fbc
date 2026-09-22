@@ -28,6 +28,8 @@
 
 declare function LoadGLTextures() as integer
 
+	'' The texture loader and keyboard loop share this render configuration.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 	dim shared filter as uinteger                  '' Which Filter To Use
 	dim shared texture(0 to 2) as GLuint         '' Storage For 3 Textures
 
@@ -78,10 +80,10 @@ declare function LoadGLTextures() as integer
 	do
 		glClear GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT      '' Clear Screen And Depth Buffer
 		glLoadIdentity                                          '' Reset The View
-		glTranslatef 0.0,0.0,z                                  '' Translate Into/Out Of The Screen By z
+		glTranslatef 0.0, 0.0, z                                  '' Translate Into/Out Of The Screen By z
 
-		glRotatef xrot,1.0,0.0,0.0                              '' Rotate On The X Axis By xrot
-		glRotatef yrot,0.0,1.0,0.0                              '' Rotate On The Y Axis By yrot
+		glRotatef xrot, 1.0, 0.0, 0.0                              '' Rotate On The X Axis By xrot
+		glRotatef yrot, 0.0, 1.0, 0.0                              '' Rotate On The Y Axis By yrot
 
 		glBindTexture GL_TEXTURE_2D, texture(filter)            '' Select A Texture Based On filter
 
@@ -93,7 +95,7 @@ declare function LoadGLTextures() as integer
 			glTexCoord2f 1.0, 1.0 : glVertex3f  1.0,  1.0,  1.0   '' Point 3
 			glTexCoord2f 0.0, 1.0 : glVertex3f -1.0,  1.0,  1.0   '' Point 4
 			'' Back Face
-			glNormal3f  0.0, 0.0,-1.0                             '' Normal Pointing Away From Viewer
+			glNormal3f  0.0, 0.0, -1.0                             '' Normal Pointing Away From Viewer
 			glTexCoord2f 1.0, 0.0 : glVertex3f -1.0, -1.0, -1.0   '' Point 1 (Back)
 			glTexCoord2f 1.0, 1.0 : glVertex3f -1.0,  1.0, -1.0   '' Point 2
 			glTexCoord2f 0.0, 1.0 : glVertex3f  1.0,  1.0, -1.0   '' Point 3
@@ -105,7 +107,7 @@ declare function LoadGLTextures() as integer
 			glTexCoord2f 1.0, 0.0 : glVertex3f  1.0,  1.0,  1.0
 			glTexCoord2f 1.0, 1.0 : glVertex3f  1.0,  1.0, -1.0
 			'' Bottom Face
-			glNormal3f  0.0,-1.0, 0.0                             '' Normal Pointing Down
+			glNormal3f  0.0, -1.0, 0.0                             '' Normal Pointing Down
 			glTexCoord2f 1.0, 1.0 : glVertex3f -1.0, -1.0, -1.0   '' (Bottom)
 			glTexCoord2f 0.0, 1.0 : glVertex3f  1.0, -1.0, -1.0
 			glTexCoord2f 0.0, 0.0 : glVertex3f  1.0, -1.0,  1.0
@@ -137,14 +139,14 @@ declare function LoadGLTextures() as integer
 			  glEnable(GL_LIGHTING)               '' enable lighting
 			end if
 		end if
-		if not MULTIKEY(FB.SC_L) then lp = false   '' L key up
+		if not (MULTIKEY(FB.SC_L)) then lp = false   '' L key up
 
 		if MULTIKEY(FB.SC_F) and not fp then       '' F Key down
 			fp = true
 			filter += 1                           '' Cycle filter 0 -> 1 -> 2
 			if (filter > 2) then filter = 0       '' 2 -> 0
 		end if
-		if not MULTIKEY(FB.SC_F) then fp = false   '' F Key Up
+		if not (MULTIKEY(FB.SC_F)) then fp = false   '' F Key Up
 
 		if MULTIKEY(FB.SC_PAGEUP) then z-=0.02     '' If Page Up is Being Pressed, Move Into The Screen
 		if MULTIKEY(FB.SC_PAGEDOWN) then z+=0.02   '' If Page Down is Being Pressed, Move Towards The Viewer
@@ -174,20 +176,20 @@ function LoadGLTextures() as integer
 
     ' Create Nearest Filtered Texture
     glBindTexture GL_TEXTURE_2D, texture(0)
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST
+    glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST
+    glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST
     glTexImage2D GL_TEXTURE_2D, 0, 3, TextureImage(0)->sizeX, TextureImage(0)->sizeY, 0, GL_RGB, GL_UNSIGNED_BYTE, TextureImage(0)->buffer
 
     ' Create Linear Filtered Texture
     glBindTexture GL_TEXTURE_2D, texture(1)
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR
+    glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR
+    glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR
     glTexImage2D GL_TEXTURE_2D, 0, 3, TextureImage(0)->sizeX, TextureImage(0)->sizeY, 0, GL_RGB, GL_UNSIGNED_BYTE, TextureImage(0)->buffer
 
     ' Create MipMapped Texture
     glBindTexture GL_TEXTURE_2D, texture(2)
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR
-    glTexParameteri GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_NEAREST
+    glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR
+    glTexParameteri GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST
     gluBuild2DMipmaps GL_TEXTURE_2D, 3, TextureImage(0)->sizeX, TextureImage(0)->sizeY, GL_RGB, GL_UNSIGNED_BYTE, TextureImage(0)->buffer
 
   end if

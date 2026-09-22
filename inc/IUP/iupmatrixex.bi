@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include once "iup.bi"
+
 #inclib "iupmatrixex"
 
 extern "C"

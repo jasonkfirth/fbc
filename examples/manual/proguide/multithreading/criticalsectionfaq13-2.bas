@@ -6,6 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtCriticalSectionsFAQ
 '' --------
 
+'' Thread synchronization: each shared flag is protected by its corresponding mutex lock.
+
 Dim Shared As Any Ptr pt, mutex1, mutex2, cond1, cond2
 Dim Shared As Integer quit, flag1, flag2
 

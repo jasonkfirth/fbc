@@ -20,6 +20,7 @@ operator mod _
 
 	dim as VARIANT_ res = any
 
+	VariantInit( @res )
 	VarMod( @lhs.var_, @rhs.var_, @res )
 
 	return VARIANT( res, FALSE )
@@ -35,9 +36,9 @@ operator mod _
 
 	dim as VARIANT_ res = any
 
+	VariantInit( @res )
 	VarMod( @lhs.var_, @rhs, @res )
 
 	return VARIANT( res, FALSE )
 
 end operator
-

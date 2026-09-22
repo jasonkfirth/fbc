@@ -23,5 +23,8 @@ End Type
 Type TheNewType As myType
 ' ...
 
+'' This declaration-only snippet intentionally shows a literal file unit.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-IO-001 FBL-IO-002
 Open "test" For Input As #1
+Close #1
 ' ...

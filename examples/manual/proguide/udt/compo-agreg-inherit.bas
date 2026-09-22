@@ -7,9 +7,9 @@
 '' --------
 
 ' Between the different types "Driver", "Person", "Driver_license" and "Vehicle", the respective relationships are:
-'    - A driver “IS-A” person (driver is a person): => "INHERITANCE".
-'    - A driver “HAS-A” driver's license (driver license only existing for the driver): => "COMPOSITION".
-'    - A driver “USES-A” vehicle (vehicle lifetime independent of the driver life): => "AGGREGATION".
+'    - A driver "IS-A" person (driver is a person): => "INHERITANCE".
+'    - A driver "HAS-A" driver's license (driver license only existing for the driver): => "COMPOSITION".
+'    - A driver "USES-A" vehicle (vehicle lifetime independent of the driver life): => "AGGREGATION".
 
 
 Type Person
@@ -46,12 +46,18 @@ End Type
 Constructor Driver (ByRef _full_name As String, ByRef _dl As Driver_license)
 	Base(_full_name)
 	This.dl = _dl
+	This.pv = 0
 End Constructor
 
 
 Dim As Driver d1 = Driver("User fxm", Type<Driver_license>(123456789))
 
 Dim As Vehicle Ptr pv1 = New Vehicle("ABCDEFGHI")
+If pv1 = 0 Then
+	Print "Vehicle allocation failed"
+	Sleep
+	End 1
+End If
 d1.pv = pv1
 
 Print "Person full name      : " & d1.full_name
@@ -63,3 +69,4 @@ d1.pv = 0
 
 Sleep
 
+'' end of compo-agreg-inherit.bas

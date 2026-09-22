@@ -21,7 +21,7 @@ Declare Function wxPrintDialog_GetPrintDC WXCALL Alias "wxPrintDialog_GetPrintDC
 Declare Function wxPrintSetupDialog_ctorPrintData WXCALL Alias "wxPrintSetupDialog_ctorPrintData" (parent As wxWindow Ptr, printdata As wxPrintData Ptr) As wxPrintSetupDialog Ptr
 Declare Function wxPrintSetupDialog_ctor WXCALL Alias "wxPrintSetupDialog_ctor" (parent As wxWindow Ptr, setupdata As wxPrintSetupData Ptr) As wxPrintSetupDialog Ptr
 Declare Sub wxPrintSetupDialog_Init WXCALL Alias "wxPrintSetupDialog_Init" (self As wxPrintSetupDialog Ptr, printdata As wxPrintData Ptr)
-Declare Function wxPrintSetupDialog_TransferDataFromWindow WXCALL Alias "wxPrintSetupDialog_TransferDataFromWindow" (self As wxPrintSetupDialog Ptr) As wxBool 
+Declare Function wxPrintSetupDialog_TransferDataFromWindow WXCALL Alias "wxPrintSetupDialog_TransferDataFromWindow" (self As wxPrintSetupDialog Ptr) As wxBool
 Declare Function wxPrintSetupDialog_TransferDataToWindow WXCALL Alias "wxPrintSetupDialog_TransferDataToWindow" (self As wxPrintSetupDialog Ptr) As wxBool
 Declare Function wxPrintSetupDialog_GetPrintData WXCALL Alias "wxPrintSetupDialog_GetPrintData" (self As wxPrintSetupDialog Ptr) As wxPrintData Ptr
 #EndIf ' __FB_LINUX__

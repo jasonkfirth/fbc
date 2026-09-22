@@ -28,6 +28,24 @@ $(libdir)/libfbmt.a: $(RTLIB_MT_OBJ) | $(libdir)
 $(libdir)/libfbmtpic.a: $(RTLIB_MT_PIC_OBJ) | $(libdir)
 	$(call DO_AR)
 
+ifeq ($(THREAD_MODEL),pdmlwp)
+DOS_PDMLWP_DIR := $(rootdir)/contrib/dos/pdmlwp
+DOS_PDMLWP_OBJ := $(libfbmtobjdir)/pdmlwp/lwp.o $(libfbmtobjdir)/pdmlwp/lwpasm.o
+
+# The imported scheduler locks regions bounded by source-order markers.
+# Disable function/data reordering and LTO for these two objects only.
+$(libfbmtobjdir)/pdmlwp/lwp.o: $(DOS_PDMLWP_DIR)/src/lwp.c $(DOS_PDMLWP_DIR)/include/lwp.h
+	@mkdir -p "$(dir $@)"
+	$(RUN_CC) -I$(DOS_PDMLWP_DIR)/include -std=gnu11 -O1 -march=i386 -mno-sse -mno-mmx -fno-lto -fno-toplevel-reorder -fno-reorder-functions -fno-strict-aliasing -fno-omit-frame-pointer -c $< -o $@
+
+$(libfbmtobjdir)/pdmlwp/lwpasm.o: $(DOS_PDMLWP_DIR)/src/lwpasm.s
+	@mkdir -p "$(dir $@)"
+	$(RUN_CC) -x assembler-with-cpp -c $< -o $@
+
+$(libdir)/libfbpdmlwp.a: $(DOS_PDMLWP_OBJ) | $(libdir)
+	$(call DO_AR)
+endif
+
 ##############################################################################
 # FreeBASIC runtime layer (fbrt)
 ##############################################################################

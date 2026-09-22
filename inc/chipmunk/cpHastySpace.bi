@@ -26,6 +26,8 @@
 
 #pragma once
 
+#include once "chipmunk_structs.bi"
+
 #include once "crt/long.bi"
 
 extern "C"

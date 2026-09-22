@@ -30,6 +30,10 @@
 'there will be no longer mutual exclusion between computation of coordinates and plotting of points,
 'and many points will not be plotted on circle (due to non coherent coordinates).
 
+' Thread ownership:
+' ThreadUDT owns its thread handle and mutex until ThreadWait and MutexDestroy
+' complete. Point2D remains valid until the worker has stopped.
+
 '-----------------------------------------------------------------------------------------------------
 
 Type ThreadUDT                                   'Generic user thread UDT
@@ -37,6 +41,8 @@ Type ThreadUDT                                   'Generic user thread UDT
 	Dim sync As Any Ptr                          'Any Ptr handle to mutex
 	Dim quit As Byte                             'Boolean to end user thread
 	Declare Static Sub Thread (ByVal As Any Ptr) 'Generic user thread procedure
+	' This is a procedure-pointer signature, not an array declaration.
+	' FB-LINTER: DISABLE-NEXT-LINE FBL-OPT-003
 	Dim procedure As Sub (ByVal As Any Ptr)      'Procedure(Any Ptr) to be executed by user thread
 	Dim p As Any Ptr                             'Any Ptr to pass to procedure executed by user thread
 	Const False As Byte = 0                      'Constante "false"
@@ -64,8 +70,8 @@ Type Point2D
 	Dim y As Integer
 End Type
 
-Const x0 As Integer = 640 / 2
-Const y0 As Integer = 480 / 2
+Const x0 As Integer = 640 \ 2
+Const y0 As Integer = 480 \ 2
 Const r0 As Integer = 200
 Const pi As Single = 4 * Atn(1)
 
@@ -78,6 +84,7 @@ Sub PointOnCircle (ByVal p As Any Ptr)
 End Sub
 
 
+Randomize
 Screen 12
 Locate 30, 2
 Print "<any_key> : exit";

@@ -7,7 +7,11 @@
 '' --------
 
 'Sets up the screen to be 320x200 in 8-bit color with 2 video pages.
-ScreenRes 320, 200, 8, 2
+If ScreenRes(320, 200, 8, 2) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 'Sets the working page to 1 and the displayed page to 0
 ScreenSet 1, 0

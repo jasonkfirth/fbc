@@ -1,4 +1,18 @@
 ''
+'' Project: FreeBASIC OpenGL examples
+'' File: lesson24.bas
+''
+'' Purpose:
+''     Display OpenGL renderer information and extensions using a TGA font.
+''
+'' Ownership:
+''     LoadTGA owns the decoded TGA pixels until OpenGL copies them into the
+''     module-owned texture.  The render loop owns that texture and font list.
+''
+'' This file intentionally does NOT contain:
+''     - a general TGA decoder
+''     - persistent OpenGL text state outside this lesson
+''
 ''      This Code Was Created By Jeff Molofee and GB Schmick 2000
 ''      A HUGE Thanks To Fredric Echols For Cleaning Up
 ''      And Optimizing The Base Code, Making It More Flexible!
@@ -16,6 +30,8 @@
 
 '' Setup our booleans
 const null = 0
+'' The byte-at-a-time load loop uses an INTEGER index.
+const MAX_TGA_IMAGE_BYTES as ulongint = &h7fffffff
 #include once "GL/gl.bi"
 #include once "GL/glu.bi"
 #include once "fbgfx.bi"                   '' for Scan code constants
@@ -37,6 +53,8 @@ declare sub BuildFont()
 declare sub glPrint cdecl (byval x as integer, byval y as integer, byval gset as integer, byref fmt as string, ...)
 
 
+'' The render loop and two font helpers share one texture and one display-list base.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared textures(0) as TEXTUREIMAGE             '' Storage For One Texture
 dim shared gbase as GLuint                         '' Base Display List For The Font
 
@@ -65,16 +83,23 @@ dim shared gbase as GLuint                         '' Base Display List For The 
 
 	'' All Setup For OpenGL Goes Here
 
-	if (not LoadTGA(@textures(0), exepath + "/data/Font.tga")) then   '' Load The Font Texture
+	if LoadTGA(@textures(0), exepath + "/data/Font.tga") = false then   '' Load The Font Texture
 		end 1                                  '' If Loading Failed, Quit
 	end if
 
 	BuildFont()                                           '' Build The Font
+	if gbase = 0 then
+		glDeleteTextures(1, @textures(0).texID)
+		end 1
+	end if
 
 	glShadeModel(GL_SMOOTH)                               '' Enable Smooth Shading
 	glClearColor(0.0, 0.0, 0.0, 0.5)                      '' Black Background
 	glClearDepth(1.0)                                     '' Depth Buffer Setup
 	glBindTexture(GL_TEXTURE_2D, textures(0).texID)       '' Select Our Font Texture
+	dim as string renderer = *glGetString(GL_RENDERER)
+	dim as string vendor = *glGetString(GL_VENDOR)
+	dim as string version = *glGetString(GL_VERSION)
 
 	do
 		glClear GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT      '' Clear The Screen And The Depth Buffer
@@ -84,38 +109,38 @@ dim shared gbase as GLuint                         '' Base Display List For The 
 		glPrint(66, 80, 1, "Version")                     ''  Display Version
 
 		glColor3f(1.0, 0.7, 0.4)                          ''  Set Color To Orange
-		glPrint(200, 16, 1, *glGetString(GL_RENDERER))    ''  Display Renderer
-		glPrint(200, 48, 1, *glGetString(GL_VENDOR))      ''  Display Vendor Name
-		glPrint(200, 80, 1, *glGetString(GL_VERSION))     ''  Display Version
+		glPrint(200, 16, 1, renderer)                     ''  Display Renderer
+		glPrint(200, 48, 1, vendor)                       ''  Display Vendor Name
+		glPrint(200, 80, 1, version)                      ''  Display Version
 
-		glColor3f(0.5,0.5,1.0)                            ''  Set Color To Bright Blue
-		glPrint(192,432,1,"NeHe Productions")             ''  Write NeHe Productions At The Bottom Of The Screen
+		glColor3f(0.5, 0.5, 1.0)                            ''  Set Color To Bright Blue
+		glPrint(192, 432, 1, "NeHe Productions")             ''  Write NeHe Productions At The Bottom Of The Screen
 
 		glLoadIdentity()                                  ''  Reset The ModelView Matrix
-		glColor3f(1.0,1.0,1.0)                            ''  Set The Color To White
+		glColor3f(1.0, 1.0, 1.0)                            ''  Set The Color To White
 		glBegin(GL_LINE_STRIP)                            ''  Start Drawing Line Strips (Something New)
-			glVertex2d(639,417)                           ''  Top Right Of Bottom Box
-			glVertex2d(0,417)                             ''  Top Left Of Bottom Box
-			glVertex2d(0,480)                             ''  Lower Left Of Bottom Box
-			glVertex2d(639,480)                           ''  Lower Right Of Bottom Box
-			glVertex2d(639,128)                           ''  Up To Bottom Right Of Top Box
+			glVertex2d(639, 417)                           ''  Top Right Of Bottom Box
+			glVertex2d(0, 417)                             ''  Top Left Of Bottom Box
+			glVertex2d(0, 480)                             ''  Lower Left Of Bottom Box
+			glVertex2d(639, 480)                           ''  Lower Right Of Bottom Box
+			glVertex2d(639, 128)                           ''  Up To Bottom Right Of Top Box
 		glEnd()                                           ''  Done First Line Strip
 		glBegin(GL_LINE_STRIP)                            ''  Start Drawing Another Line Strip
-			glVertex2d(0,128)                             ''  Bottom Left Of Top Box
-			glVertex2d(639,128)                           ''  Bottom Right Of Top Box
+			glVertex2d(0, 128)                             ''  Bottom Left Of Top Box
+			glVertex2d(639, 128)                           ''  Bottom Right Of Top Box
 			glVertex2d(639, 1)                            ''  Top Right Of Top Box
 			glVertex2d(0, 1)                              ''  Top Left Of Top Box
-			glVertex2d(0,417)                             ''  Down To Top Left Of Bottom Box
+			glVertex2d(0, 417)                             ''  Down To Top Left Of Bottom Box
 		glEnd()                                           ''  Done Second Line Strip
 
-		glScissor(1 , int(0.135416*sheight), swidth-2, int(0.597916*sheight))      ''  Define Scissor Region
+		glScissor(1, int(0.135416*sheight), swidth-2, int(0.597916*sheight))      ''  Define Scissor Region
 		glEnable(GL_SCISSOR_TEST)                         ''  Enable Scissor Testing
 
 		text = *glGetString(GL_EXTENSIONS)        ''  Grab The Extension List, Store In Text
 
 		''  Parse 'text'  For Words, Separated By spaces
 		i = 1                            '' i is start position for search
-		j = instr(i,text, " ")           '' j is location in extension string of next space
+		j = instr(i, text, " ")           '' j is location in extension string of next space
 		token = mid(text, i, j - i)      '' extract token from extension string
 		i = j + 1                        '' advance start position for next search
         cnt = 0                          '' reset counter
@@ -125,11 +150,11 @@ dim shared gbase as GLuint                         '' Base Display List For The 
 				maxtokens=cnt                            ''  If So, Set 'maxtokens' Equal To 'cnt'
 			end if
 
-			glColor3f(0.5,1.0,0.5)                       ''  Set Color To Bright Green
-			glPrint(0,96+(cnt*32)-scroll,0,"%i",cnt)     ''  Print Current Extension Number
-			glColor3f(1.0,1.0,0.5)                       ''  Set Color To Yellow
-			glPrint(50,96+(cnt*32)-scroll,0,token)       ''  Print The Current Token (Parsed Extension Name)
-			j = instr(i,text, " ")           '' j is location in extension string of next space
+			glColor3f(0.5, 1.0, 0.5)                       ''  Set Color To Bright Green
+			glPrint(0, 96+(cnt*32)-scroll, 0, "%i", cnt)     ''  Print Current Extension Number
+			glColor3f(1.0, 1.0, 0.5)                       ''  Set Color To Yellow
+			glPrint(50, 96+(cnt*32)-scroll, 0, token)       ''  Print The Current Token (Parsed Extension Name)
+			j = instr(i, text, " ")           '' j is location in extension string of next space
 			token = mid(text, i, j - i)      '' extract token from extension string
 			i = j + 1                        '' advance start position for next search
 		wend
@@ -153,7 +178,8 @@ dim shared gbase as GLuint                         '' Base Display List For The 
 	'' Empty keyboard buffer
 	while INKEY <> "": wend
 
-	glDeleteLists(gbase,256)                      '' Delete All 256 Display Lists
+	glDeleteLists(gbase, 256)                      '' Delete All 256 Display Lists
+	glDeleteTextures(1, @textures(0).texID)
 	end
 
 
@@ -161,11 +187,12 @@ dim shared gbase as GLuint                         '' Base Display List For The 
 '' Loads A TGA File Into Memory
 function LoadTGA(byval texture as TEXTUREIMAGE ptr, byref filename as string) as integer
 	dim i as integer
-	dim TGAheader (0 to 11) as ubyte => {0,0,2,0,0,0,0,0,0,0,0,0} '' Uncompressed TGA Header
+	dim TGAheader (0 to 11) as ubyte => {0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0} '' Uncompressed TGA Header
 	dim TGAcompare(0 to 11) as ubyte           '' Used To Compare TGA Header
 	dim header(0 to 5) as ubyte                '' First 6 Useful Bytes From The Header
 	dim bytesPerPixel as uinteger              '' Holds Number Of Bytes Per Pixel Used In The TGA File
 	dim imageSize as integer                   '' Used To Store The Image Size When Setting Aside Ram
+	dim imageBytes as ulongint                 '' Checked allocation size before narrowing for the load loop
 	dim temp as ubyte                          '' Temporary Variable
 	dim gtype as GLenum  = GL_RGBA             '' Set The Default GL Mode To RBGA (32 BPP)
 	dim hFile as integer
@@ -179,7 +206,9 @@ function LoadTGA(byval texture as TEXTUREIMAGE ptr, byref filename as string) as
 
 	if lof(hFile) > 18 then                    '' Are There 12+6 Bytes To Read?
 		get #hFile, , TGAcompare()             '' If So Read FIrst 12 Header Bytes
-		if memcmp(@TGAheader(0),@TGAcompare(0),len(TGAheader)) = 0 then     '' Does The Header Match What We Want?
+		'' These are fixed UBYTE arrays, so byte comparison has no padding risk.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL-MEM-005
+		if memcmp(@TGAheader(0), @TGAcompare(0), len(TGAheader)) = 0 then     '' Does The Header Match What We Want?
 			get #hFile, , header()             '' If So Read Next 6 Header Bytes
 		else
 			'Header does not match
@@ -197,7 +226,7 @@ function LoadTGA(byval texture as TEXTUREIMAGE ptr, byref filename as string) as
 
 	if (texture->wwidth <=0 or _                         '' Is The Width Less Than Or Equal To Zero
 			texture->height <=0 or _                     '' Is The Height Less Than Or Equal To Zero
-			(header(4) <> 24 and header(4) <> 32)) then  '' Is The TGA 24 or 32 Bit?
+			(header(4) <> 24 andalso header(4) <> 32)) then  '' Is The TGA 24 or 32 Bit?
 		close hFile                                      '' If Anything Failed, Close The File
 		return FALSE                                     '' Return FALSE
 	end if
@@ -205,7 +234,26 @@ function LoadTGA(byval texture as TEXTUREIMAGE ptr, byref filename as string) as
 	texture->bpp = header(4)                                '' Grab The TGA's Bits Per Pixel (24 or 32)
 
 	bytesPerPixel = texture->bpp/8                          '' Divide By 8 To Get The Bytes Per Pixel
-	imageSize = texture->wwidth*texture->height*bytesPerPixel  '' Calculate The Memory Required For The TGA Data
+
+	'' Reject dimensions that overflow the signed load-loop index or do not fit in the file.
+	if culngint(texture->wwidth) > MAX_TGA_IMAGE_BYTES / culngint(texture->height) then
+		close hFile
+		return FALSE
+	end if
+
+	imageBytes = culngint(texture->wwidth) * culngint(texture->height)
+	if imageBytes > MAX_TGA_IMAGE_BYTES / culngint(bytesPerPixel) then
+		close hFile
+		return FALSE
+	end if
+
+	imageBytes *= culngint(bytesPerPixel)
+	if culngint(lof(hFile) - 18) < imageBytes then
+		close hFile
+		return FALSE
+	end if
+
+	imageSize = cint(imageBytes)                            '' Safe after the signed-range check above
 
 	texture->imageData=allocate(imageSize)               '' Reserve Memory To Hold The TGA Data
 
@@ -230,6 +278,11 @@ function LoadTGA(byval texture as TEXTUREIMAGE ptr, byref filename as string) as
 
 	'' Build A Texture From The Data
 	glGenTextures(1, varptr(texture->texID))             '' Generate OpenGL texture IDs
+	if texture->texID = 0 then
+		deallocate texture->imageData
+		texture->imageData = NULL
+		return false
+	end if
 
 	glBindTexture(GL_TEXTURE_2D, texture->texID)         '' Bind Our Texture
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)  '' Linear Filtered
@@ -240,6 +293,8 @@ function LoadTGA(byval texture as TEXTUREIMAGE ptr, byref filename as string) as
 	end if
 
 	glTexImage2D(GL_TEXTURE_2D, 0, gtype, texture[0].wwidth, texture[0].height, 0, gtype, GL_UNSIGNED_BYTE, texture[0].imageData)
+	deallocate texture->imageData                           '' OpenGL has copied the texture pixels
+	texture->imageData = NULL
 
 	return TRUE                                          '' Texture Building Went Ok, Return True
 end function
@@ -256,6 +311,8 @@ sub BuildFont()                                  '' Build Our Font Display List
 	for loop1 = 0 to 255                         '' Loop Through All 256 Lists
 
 		cx = (loop1 mod 16)/16.0                 '' X Position Of Current Character
+		'' Each row contains 16 glyphs, so this deliberately uses integer division.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL405 FBL-NUM-017
 		cy = (loop1\16)/16.0                     '' Y Position Of Current Character
 
 		glNewList gbase+loop1, GL_COMPILE        '' Start Building A List
@@ -293,11 +350,13 @@ sub glPrint cdecl (byval x as integer, byval y as integer, byval gset as integer
 
 	glEnable(GL_TEXTURE_2D)                 '' Enable Texture Mapping
 	glLoadIdentity()                        '' Reset The Modelview Matrix
-	glTranslated(x,y,0)                     '' Position The Text (0,0 - Bottom Left)
+	glTranslated(x, y, 0)                     '' Position The Text (0,0 - Bottom Left)
 	glListBase(gbase-32+(128*gset))         '' Choose The Font Set (0 or 1)
 
 	glScalef 1.0, 2.0, 1.0                  '' Make The Text 2X Taller
 
-	glCallLists(strlen(text),GL_UNSIGNED_BYTE, strptr(text)) '' Write The Text To The Screen
+	glCallLists(strlen(text), GL_UNSIGNED_BYTE, strptr(text)) '' Write The Text To The Screen
 	glDisable(GL_TEXTURE_2D)                '' Disable Texture Mapping
 end sub
+
+'' End of lesson24.bas

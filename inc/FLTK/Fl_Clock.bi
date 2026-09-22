@@ -1,7 +1,7 @@
 #include once "Fl_Widget.bi"
 
 extern "c++"
-type Fl_Clock_Output extends Fl_Widget 
+type Fl_Clock_Output extends Fl_Widget
 private:
 	as long hour_, minute_, second_
 	value_ as unsigned integer

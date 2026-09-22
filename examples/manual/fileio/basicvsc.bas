@@ -8,7 +8,7 @@
 
 '==== File I/O example / 2018-05-18 ====
 
-Dim As String fileName = "test_123.tmp"
+Dim As String fileName = "test_123.bin"
 Dim As ULong buffer(0 To 99) '100 x 4 bytes
 Dim As Integer numItems, result
 

@@ -6,6 +6,9 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgErrorHandling
 '' --------
 
-Print Open ("xzxwz.zwz" For Input As #1)
+Dim file_number As Integer, open_result As Integer
+file_number = FreeFile
+open_result = Open("xzxwz.zwz" For Input As #file_number)
+Print open_result
+If open_result = 0 Then Close #file_number
 Sleep
-

@@ -26,6 +26,14 @@
 
 #pragma once
 
+'' threads.bi refers to the global-state pointer while this header is still
+'' loading its parser and SAX dependencies. Publish the opaque aliases first.
+#define __XML_GLOBALS_H
+type xmlGlobalState as _xmlGlobalState
+type xmlGlobalStatePtr as xmlGlobalState ptr
+
+#include once "libxml/tree.bi"
+
 #include once "libxml/xmlversion.bi"
 #include once "libxml/parser.bi"
 #include once "libxml/xmlerror.bi"
@@ -35,7 +43,6 @@
 
 extern "C"
 
-#define __XML_GLOBALS_H
 declare sub xmlInitGlobals()
 declare sub xmlCleanupGlobals()
 type xmlParserInputBufferCreateFilenameFunc as function(byval URI as const zstring ptr, byval enc as xmlCharEncoding) as xmlParserInputBufferPtr
@@ -78,9 +85,6 @@ declare function xmlOutputBufferCreateFilenameDefault(byval func as xmlOutputBuf
 
 type xmlRegisterNodeFunc as sub(byval node as xmlNodePtr)
 type xmlDeregisterNodeFunc as sub(byval node as xmlNodePtr)
-type xmlGlobalState as _xmlGlobalState
-type xmlGlobalStatePtr as xmlGlobalState ptr
-
 type _xmlGlobalState
 	xmlParserVersion as const zstring ptr
 	xmlDefaultSAXLocator as xmlSAXLocator

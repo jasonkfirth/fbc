@@ -9,6 +9,13 @@
 #ifndef __mysql_com_bi__
 #define __mysql_com_bi__
 
+#ifndef __MYSQL_BASIC_TYPES__
+#define __MYSQL_BASIC_TYPES__
+type my_bool as byte
+type gptr as byte ptr
+type my_socket as integer
+#endif
+
 #define NAME_LEN 64
 #define HOSTNAME_LENGTH 60
 #define USERNAME_LENGTH 16

@@ -9,6 +9,16 @@
 #ifndef __win_GdiplusTypes_bi__
 #define __win_GdiplusTypes_bi__
 
+#include once "windows.bi"
+
+#ifndef __FB_GDIPLUS_NAMESPACE_ACTIVE__
+#define __FB_GDIPLUS_NAMESPACE_ACTIVE__
+#define __FB_GDIPLUS_LOCAL_NAMESPACE__
+namespace Gdiplus
+#endif
+
+#include once "GdiplusEnums.bi"
+
 type ImageAbort as function (byval as any ptr) as BOOL
 type DrawImageAbort as ImageAbort
 type GetThumbnailImageAbort as ImageAbort
@@ -21,14 +31,6 @@ type REAL as single
 #define REAL_MIN FLT_MIN
 #define REAL_TOLERANCE (FLT_MIN * 100)
 #define REAL_EPSILON 1.192092896e-07F
-
-type CSize as Size
-type CSizeF as SizeF
-type CPoint as Point
-type CPointF as PointF
-type CRect as Rect
-type CRectF as RectF
-type CCharacterRange as CharacterRange
 
 enum Status
 	Ok = 0
@@ -176,7 +178,7 @@ type PointF
 	declare operator += (byref pt as PointF)
 	declare operator -= (byref pt as PointF)
 	declare function Equals (byref pt as PointF) as BOOL
-	
+
 	X as REAL
 	Y as REAL
 end type
@@ -234,7 +236,7 @@ type Point
 	declare operator += (byref pt as Point)
 	declare operator -= (byref pt as Point)
 	declare function Equals (byref pt as Point) as BOOL
-	
+
 	X as INT_
 	Y as INT_
 end type
@@ -510,6 +512,10 @@ type Rect
 	Height as INT_
 end type
 
+'' FreeBASIC resolves the enclosing type name as the method namespace while
+'' compiling Rect.Intersect(), so keep a local alias available to that body.
+type CRect as Rect
+
 private constructor Rect ()
 	this.X = 0
 	this.Y = 0
@@ -609,7 +615,7 @@ private sub Rect.Inflate (byref pt as Point)
 end sub
 
 private function Rect.Intersect (byref rect as Rect) as BOOL
-	dim result as Rect
+	dim result as CRect
 
 	if( this.Intersect( result, this, rect ) ) then
 		this = result
@@ -712,5 +718,20 @@ private constructor CharacterRange ()
 	this.First = 0
 	this.Length = 0
 end constructor
+
+'' These aliases follow the concrete UDT definitions so a standalone include
+'' does not make FreeBASIC treat the forward alias as a second UDT definition.
+type CSize as Size
+type CSizeF as SizeF
+type CPoint as Point
+type CPointF as PointF
+type CRectF as RectF
+type CCharacterRange as CharacterRange
+
+#ifdef __FB_GDIPLUS_LOCAL_NAMESPACE__
+end namespace
+#undef __FB_GDIPLUS_LOCAL_NAMESPACE__
+#undef __FB_GDIPLUS_NAMESPACE_ACTIVE__
+#endif
 
 #endif

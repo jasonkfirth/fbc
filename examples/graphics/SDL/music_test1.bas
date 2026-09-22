@@ -11,6 +11,8 @@
 #include once "SDL\SDL_mixer.bi"
 
 ' Mix_Music actually holds the music information.
+'' The mixer completion callback and key handler share the loaded song.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared song as Mix_Music ptr = NULL
 
 declare sub handlekey(byval key as SDL_KeyboardEvent ptr)
@@ -39,8 +41,8 @@ sub main()
 	' This is where we open up our audio device.  Mix_OpenAudio takes
 	' as its parameters the audio format we'd /like/ to have.
 	if (Mix_OpenAudio(audio_rate, audio_format, audio_channels, audio_buffers)) then
-   		print "Unable to open audio!"
-   		end 1
+		print "Unable to open audio!"
+		end 1
 	end if
 
 	' If we actually care about what we got, we can ask here.  In this
@@ -72,21 +74,21 @@ sub main()
 	end if
 
 	do while (done = 0)
-   		do while (SDL_PollEvent(@event))
-      		select case (event.type)
-      		case SDL_QUIT_
-         		done = 1
-      		case SDL_KEYDOWN
-         		if( event.key.keysym.sym = SDLK_ESCAPE ) then
-         			done = -1
-         		end if
+		do while (SDL_PollEvent(@event))
+			select case (event.type)
+			case SDL_QUIT_
+				done = 1
+			case SDL_KEYDOWN
+				if( event.key.keysym.sym = SDLK_ESCAPE ) then
+					done = -1
+				end if
 
-         		handleKey @event.key
-      		end select
-   		loop
+				handleKey @event.key
+			end select
+		loop
 
-   		' So we don't hog the CPU
-   		SDL_Delay(50)
+		' So we don't hog the CPU
+		SDL_Delay(50)
 	loop
 
 	' This is the cleaning up part
@@ -96,7 +98,7 @@ end sub
 
 sub handleKey (byval key as SDL_KeyboardEvent ptr)
 	dim keyEvent as SDL_KeyboardEvent
-   	keyEvent = *key
+	keyEvent = *key
 
     ' Here we're going to have the 'm' key toggle the music on and
     ' off.  When it's on, it'll be loaded and 'music' will point to
@@ -135,9 +137,9 @@ end sub
 ' as though the player wanted it stopped.  In other applications, a
 ' different music file might be loaded and played.
 sub musicDone cdecl ()
-   	Mix_HaltMusic
-   	Mix_FreeMusic(song)
-   	song = NULL
+	Mix_HaltMusic
+	Mix_FreeMusic(song)
+	song = NULL
 end sub
 
 main()

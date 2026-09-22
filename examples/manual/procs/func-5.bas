@@ -10,7 +10,15 @@
 '' functions taking array arguments.
 
 Function x(b() As Double) As Integer
-  x = UBound(b)-LBound(b)+1
+	'' The captured bounds are compared before the function calculates a length.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
+	Dim As Integer lower_bound = LBound(b)
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL-ARR-004
+	Dim As Integer upper_bound = UBound(b)
+
+	If upper_bound < lower_bound Then Return 0
+
+	Return upper_bound - lower_bound + 1
 End Function
 
 Dim a(1 To 10) As Double

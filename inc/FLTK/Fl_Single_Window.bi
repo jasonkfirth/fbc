@@ -9,7 +9,7 @@ public:
 	declare sub show()
 	declare sub show(a as long, b as zstring ptr ptr)
 	declare sub flush()
-  
+
 
 	declare constructor(W as long, H as long, l as const zstring ptr=0)
 

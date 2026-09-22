@@ -86,7 +86,7 @@ constructor VARIANT _
 
 	var wlen = MultiByteToWideChar(CP_ACP, NULL, rhs, &HFFFFFFFF, 0, 0)
 
- 	V_VT(@this.var_) = VT_BSTR
+	V_VT(@this.var_) = VT_BSTR
 	V_BSTR(@this.var_) = SysAllocStringLen(NULL, wlen)
 
 	MultiByteToWideChar(CP_ACP, NULL, rhs, &HFFFFFFFF, V_BSTR(@this.var_), wlen)
@@ -105,4 +105,3 @@ constructor VARIANT _
 	V_BSTR(@this.var_) = SysAllocStringLen( rhs, len( *rhs ) )
 
 end constructor
-

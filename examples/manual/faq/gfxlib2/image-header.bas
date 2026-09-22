@@ -51,9 +51,19 @@ End Sub
 
 Dim As Any Ptr picture
 
-ScreenRes 320, 200, 32
+If ScreenRes(320, 200, 32) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
 
 picture = ImageCreate( 10, 10, RGB(128, 192, 255) )
+
+If picture = 0 Then
+	Print "Could not create the demonstration image"
+	Sleep
+	End 1
+End If
 
 Put( 40, 40 ), picture, PSet
 

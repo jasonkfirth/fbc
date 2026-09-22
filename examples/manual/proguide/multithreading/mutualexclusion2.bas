@@ -6,6 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtMutualExclusion
 '' --------
 
+'' Thread synchronization: the mutex lock encloses each shared output section.
+
 '  Principle of mutual exclusion
 '      Main thread                      XOR            Child thread
 '  .....                                           .....

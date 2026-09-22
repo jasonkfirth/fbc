@@ -1,7 +1,7 @@
 '' FreeBASIC binding for xproto-7.0.27
 ''
 '' based on the C header files:
-''    * 
+''    *
 ''   Copyright 1990, 1998  The Open Group
 ''
 ''   Permission to use, copy, modify, distribute, and sell this software and its

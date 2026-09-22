@@ -7,11 +7,23 @@
 '' --------
 
 '' set up the screen and fill the background with a color
-ScreenRes 320, 200, 32
+If ScreenRes(320, 200, 32) <> 0 Then
+	Print "Could not set the requested graphics mode"
+	Sleep
+	End 1
+End If
+
 Paint (0, 0), RGB(64, 128, 255)
 
 '' set up an image and draw something in it
 Dim img As Any Ptr = ImageCreate( 32, 32, RGB(255, 0, 255) )
+
+If img = 0 Then
+	Print "Could not create the image buffer"
+	Sleep
+	End 1
+End If
+
 Circle img, (16, 16), 15, RGB(255, 255, 0),     ,     , 1, f
 Circle img, (10, 10), 3,  RGB(  0,   0, 0),     ,     , 2, f
 Circle img, (23, 10), 3,  RGB(  0,   0, 0),     ,     , 2, f

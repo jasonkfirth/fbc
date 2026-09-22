@@ -1,4 +1,5 @@
 #include once "Fl_Input.bi"
+#include once "Fl_Group.bi"
 
 extern "c++"
 type Fl_Tile extends Fl_Group
@@ -11,5 +12,4 @@ public:
 	declare sub resize(X as long, Y as long, W as long, H as long)
 	declare sub position(oldx as long, oldy as long, newx as long, newy as long)
 end type
-end extern 
-
+end extern

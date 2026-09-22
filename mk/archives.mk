@@ -32,6 +32,10 @@ RTL_LIBS := \
 	$(libdir)/$(FB_LDSCRIPT) \
 	$(libdir)/$(FBEXTRA_SCRIPT)
 
+ifeq ($(THREAD_MODEL),pdmlwp)
+RTL_LIBS += $(libdir)/libfbpdmlwp.a
+endif
+
 ifdef ENABLE_NONPIC
 RTL_LIBS += \
 	$(libdir)/fbrt0.o \

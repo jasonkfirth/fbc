@@ -1,4 +1,4 @@
-' Copyright (C) 1996 DJ Delorie, see COPYING.DJ for details 
+' Copyright (C) 1996 DJ Delorie, see COPYING.DJ for details
 ' Copyright (C) 1995 DJ Delorie, see COPYING.DJ for details
 ' converted by DrV for FreeBASIC 07-Feb-2005
 
@@ -19,7 +19,7 @@ declare function	biostime	cdecl alias "biostime"		(byval cmd as integer, byval n
 '  For compatibility with other DOS C compilers.
 '
 
-' Disk parameters for _bios_disk() function. 
+' Disk parameters for _bios_disk() function.
 
 type diskinfo_t
 	drive as uinteger	' Drive number.
@@ -65,7 +65,7 @@ end type
 #define _COM_4800		192	' 4800 baud.
 #define _COM_9600		224	' 9600 baud.
 
-' Constants for _bios_keybrd() function. 
+' Constants for _bios_keybrd() function.
 #define _KEYBRD_READ		0	' Read character.
 #define _KEYBRD_READY		1	' Check character.
 #define _KEYBRD_SHIFTSTATUS	2	' Get shift status.
@@ -93,7 +93,7 @@ end type
 declare function _bios_disk	cdecl alias "_bios_disk"	(byval cmd as uinteger, byref di as diskinfo_t) as uinteger
 declare function _bios_timeofday	cdecl alias "_bios_timeofday"	(byval cmd as integer, byval timeval as uinteger ptr) as uinteger
 
-' For int86(), int86x() and union REGS. 
+' For int86(), int86x() and union REGS.
 #include "dos/dos.bi"
 
 #endif ' !__dj_include_bios_h_

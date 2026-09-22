@@ -22,6 +22,8 @@
 '' translated to FreeBASIC by:
 ''   FreeBASIC development team
 
+#include once "windows.bi"
+
 #pragma once
 
 #if _WIN32_WINNT >= &h0600

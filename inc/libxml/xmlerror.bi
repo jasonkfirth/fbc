@@ -26,13 +26,39 @@
 
 #pragma once
 
+'' Parser and globals embed error records and callback aliases while the
+'' translated headers include one another. Publish the complete record and
+'' opaque result types before entering that cycle.
+#define __XML_ERROR_H__
+type xmlErrorLevel as long
+type xmlErrorDomain as long
+type xmlError as _xmlError
+type xmlErrorPtr as xmlError ptr
+type _xmlError
+	domain as long
+	code as long
+	message as zstring ptr
+	level as xmlErrorLevel
+	file as zstring ptr
+	line as long
+	str1 as zstring ptr
+	str2 as zstring ptr
+	str3 as zstring ptr
+	int1 as long
+	int2 as long
+	ctxt as any ptr
+	node as any ptr
+end type
+type xmlParserErrors as long
+type xmlGenericErrorFunc as sub cdecl(byval ctx as any ptr, byval msg as const zstring ptr, ...)
+type xmlStructuredErrorFunc as sub(byval userData as any ptr, byval error as xmlErrorPtr)
+
+#include once "libxml/tree.bi"
+
 #include once "libxml/parser.bi"
 
 extern "C"
 
-#define __XML_ERROR_H__
-
-type xmlErrorLevel as long
 enum
 	XML_ERR_NONE = 0
 	XML_ERR_WARNING = 1
@@ -40,7 +66,6 @@ enum
 	XML_ERR_FATAL = 3
 end enum
 
-type xmlErrorDomain as long
 enum
 	XML_FROM_NONE = 0
 	XML_FROM_PARSER
@@ -75,26 +100,6 @@ enum
 	XML_FROM_URI
 end enum
 
-type xmlError as _xmlError
-type xmlErrorPtr as xmlError ptr
-
-type _xmlError
-	domain as long
-	code as long
-	message as zstring ptr
-	level as xmlErrorLevel
-	file as zstring ptr
-	line as long
-	str1 as zstring ptr
-	str2 as zstring ptr
-	str3 as zstring ptr
-	int1 as long
-	int2 as long
-	ctxt as any ptr
-	node as any ptr
-end type
-
-type xmlParserErrors as long
 enum
 	XML_ERR_OK = 0
 	XML_ERR_INTERNAL_ERROR
@@ -832,8 +837,6 @@ enum
 	XML_BUF_OVERFLOW = 7000
 end enum
 
-type xmlGenericErrorFunc as sub(byval ctx as any ptr, byval msg as const zstring ptr, ...)
-type xmlStructuredErrorFunc as sub(byval userData as any ptr, byval error as xmlErrorPtr)
 declare sub xmlSetGenericErrorFunc(byval ctx as any ptr, byval handler as xmlGenericErrorFunc)
 declare sub initGenericErrorDefaultFunc(byval handler as xmlGenericErrorFunc ptr)
 declare sub xmlSetStructuredErrorFunc(byval ctx as any ptr, byval handler as xmlStructuredErrorFunc)

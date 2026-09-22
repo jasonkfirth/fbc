@@ -20,12 +20,12 @@ protected:
 public:
 
 	alloc_data as long
-  
+
 private:
 
 	id_ as unsigned long
 	mask_ as unsigned long
-public: 
+public:
 	declare constructor (D as byte ptr const ptr)
 	declare constructor (D as ubyte ptr const ptr)
 	declare constructor (D as const byte ptr const ptr)
@@ -38,7 +38,7 @@ public:
 	declare virtual sub desaturate()
 	declare virtual sub draw(X as long, Y as long, W as long, H as long, cx as long=0, cy as long=0)
 	declare sub  draw(X as long, Y as long)
-	declare virtual sub label(w as Fl_Widget ptr)
+	declare virtual sub label(w as Fl_Widget_ ptr)
 	declare virtual sub label(m as Fl_Menu_Item_ ptr)
 	declare virtual sub uncache()
 
@@ -53,4 +53,3 @@ end function
 private sub Fl_Pixmap.draw(X as long, Y as long)
 	draw(X, Y, w(), h(), 0, 0)
 end sub
-

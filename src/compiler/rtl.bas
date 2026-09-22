@@ -104,7 +104,12 @@ sub rtlEnd
 
 end sub
 
-sub rtlAddIntrinsicProcs( byval procdef as const FB_RTL_PROCDEF ptr )
+sub rtlAddIntrinsicProcs _
+	( _
+		byval procdef as const FB_RTL_PROCDEF ptr, _
+		byval is_sfxlib as integer = FALSE, _
+		byval is_gfxlib as integer = FALSE _
+	)
 	dim as FBSYMBOL ptr param = any
 	dim as integer callconv = any
 
@@ -241,6 +246,15 @@ sub rtlAddIntrinsicProcs( byval procdef as const FB_RTL_PROCDEF ptr )
 
 			if( (procdef->options and FB_RTL_OPT_STRSUFFIX) <> 0 ) then
 				attrib or= FB_SYMBATTRIB_SUFFIXED
+			end if
+
+			'' Mark library procedures so the matching FB_NO_* define can make
+			'' their names available to user declarations without a name list.
+			if( is_sfxlib ) then
+				pattrib or= FB_PROCATTRIB_SFXLIB
+			end if
+			if( is_gfxlib ) then
+				pattrib or= FB_PROCATTRIB_GFXLIB
 			end if
 
 			dim as const zstring ptr pname = procdef->name

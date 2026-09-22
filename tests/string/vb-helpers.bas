@@ -3,7 +3,7 @@
     File: string/vb-helpers.bas
     Purpose: Exercise the optional VB-style byte-string API.
     Responsibilities: Semantics, embedded bytes, aliasing and temporary lifetime.
-    This file does not test Unicode collation or the Optical parser.
+    This file does not test Unicode collation or profile-specific parsers.
 '/
 
 #include "fbcunit.bi"

@@ -31,6 +31,8 @@
 
 #include once "emscripten_websocket.bi"
 
+'' Browser callbacks and the Asyncify loop share this socket lifetime state.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared as EMSCRIPTEN_WEBSOCKET_T socketHandle
 dim shared as string messageText
 
@@ -97,6 +99,8 @@ if emscripten_websocket_is_supported() = 0 then
 	system 1
 end if
 
+'' websocketUrl remains in module scope until emscripten_websocket_new copies it.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL427
 attributes.url = strptr( websocketUrl )
 attributes.protocols = 0
 attributes.createOnMainThread = 0
@@ -120,6 +124,7 @@ end if
 
 '' The callbacks run from the browser event loop. Sleep yields with Asyncify.
 do while socketHandle <> 0
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL602
 	sleep 50
 loop
 

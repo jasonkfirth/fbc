@@ -6,6 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgThreadSelf
 '' --------
 
+'' Thread synchronization: the mutex lock protects handle publication to each child thread.
+
 #include "fbthread.bi"
 
 Dim As Any Ptr phandle(1 To 10)
@@ -35,4 +37,3 @@ Next I
 MutexDestroy(pmutex)
 
 Sleep
-

@@ -10,6 +10,9 @@
 '    Added member procedures to workaround unsuitable or unexpected behaviors:
 '       - Abstract/Virtual 'Operator []()' to access to the right address of any derived object from a base-typed pointer
 '       - Abstract/Virtual 'DeleteSB_launcher()' to destroy the right objects from a base-typed pointer, and to call the overload Delete[] operator of the derived type from a base-typed pointer
+'
+' Ownership: Each successful Cat[] or Dog[] allocation is released through the
+' matching virtual DeleteSB_launcher() call below.
 
 Type Animal Extends Object
 	Public:
@@ -71,6 +74,10 @@ End Operator
 
 Operator Cat.New[](ByVal size As UInteger) As Any Ptr
 	Dim As Any Ptr p = CAllocate(size)
+	If p = 0 Then
+		Print "Cat New[] operator: allocation failed"
+		Return 0
+	End If
 	Print "Cat New[] operator: ", "buffer address: " & p
 	Return p
 End Operator
@@ -122,6 +129,10 @@ End Operator
 
 Operator Dog.New[](ByVal size As UInteger) As Any Ptr
 	Dim As Any Ptr p = CAllocate(size)
+	If p = 0 Then
+		Print "Dog New[] operator: allocation failed"
+		Return 0
+	End If
 	Print "Dog New[] operator: ", "buffer address: " & p
 	Return p
 End Operator
@@ -137,6 +148,8 @@ End Sub
 
 '------------------------------------------------------------------------------
 
+' Each literal New[] count is two, matching the zero and one accesses below.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL525
 Dim As Animal Ptr pa(0 To ...) = {New Cat[2], New Dog[2]}
 
 'pa(0)[0].Init("Tiger", "Salmon")   '' does not work
@@ -161,3 +174,5 @@ For I As Integer = LBound(pa) To UBound(pa)
 Next I
 
 Sleep
+
+'' end of use_overload_operators_array.bas

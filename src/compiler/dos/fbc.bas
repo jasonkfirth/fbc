@@ -16,6 +16,16 @@
 
 #include once "file.bi"
 
+#ifdef __FB_WIN32__
+extern "windows"
+	declare function GetCurrentProcessId( ) as ulong
+end extern
+#else
+extern "c"
+	declare function getpid( ) as long
+end extern
+#endif
+
 #if defined( ENABLE_STANDALONE ) and defined( __FB_WIN32__ )
 	#define ENABLE_GORC
 #endif
@@ -38,6 +48,9 @@ end type
 type FBCIOFILE
 	'' Input file name (usually *.bas, but also *.rc, *.res, *.xpm)
 	srcfile         as string     '' input file
+
+	'' Stage-one output (.asm/.c/.ll), retained across parser restarts
+	asmfile         as string
 
 	'' Output .o file
 	'' - for modules from the command line this points to a node from
@@ -107,6 +120,8 @@ type FBCCTX
 #endif
 	sysroot             as zstring * FB_MAXPATHLEN+1
 	xbe_title           as zstring * FB_MAXNAMELEN+1  '' For the '-title <title>' xbox option
+	dos_threads         as integer     '' Explicit native DOS provider selection
+	fbctinfdir          as string      '' Private directory for temporary archive metadata
 	stacksize_set       as integer
 	nodeflibs           as integer
 	nofbrt0             as integer  '' If we should exclude fbrt0.o or fbrt0pic.o (implied by nodeflibs, and optional by -nolib fbrt0.o,fbrt0pic.o)
@@ -302,6 +317,17 @@ private sub fbcEnd( byval errnum as integer )
 		safeKill( file->s )
 		file = listGetNext( file )
 	wend
+
+	'' The directory is created only for compiler-owned archive metadata.
+	'' All known files above must be removed before attempting to remove it.
+	if( len( fbc.fbctinfdir ) > 0 ) then
+		if( rmdir( fbc.fbctinfdir ) <> 0 ) then
+			if( fbc.verbose ) then
+				print "warning: could not remove temporary directory: ", _
+					fbc.fbctinfdir
+			end if
+		end if
+	end if
 
 	end errnum
 end sub
@@ -791,13 +817,22 @@ private function hGetTempFileTag( ) as string
 	static as string tag
 
 	if( len( tag ) = 0 ) then
+		dim as uinteger processid
+		#ifdef __FB_WIN32__
+			processid = GetCurrentProcessId( )
+		#else
+			processid = culng( getpid( ) )
+		#endif
+
 		''
 		'' Intermediate and response files are deleted automatically unless
-		'' the user asked to keep them.  Keep their names away from normal
-		'' source names and from another compiler invocation in the same
-		'' output directory.
+		'' the user asked to keep them.  The process id prevents simultaneous
+		'' compiler invocations started during the same timer tick from choosing
+		'' the same names.  The timer prevents a later process which reuses an id
+		'' from selecting a stale file left by an interrupted compilation.
 		''
-		tag = ".fbc-" + hex( cuint( timer( ) * 1000.0 ), 8 )
+		tag = ".fbc-" + hex( processid, 8 ) + "-" + _
+			hex( cuint( timer( ) * 1000.0 ), 8 )
 	end if
 
 	function = tag
@@ -820,6 +855,93 @@ private function hGetDosTempFileStem _
 		hex( hashHash( strptr( hashinput ) ), 8 )
 end function
 #endif
+
+private function hCreateFbctinfDirectory( ) as integer
+	if( len( fbc.fbctinfdir ) > 0 ) then
+		return TRUE
+	end if
+
+	'' GNU ar stores the basename of a path as the archive member name.  A
+	'' private directory therefore isolates concurrent compilers while keeping
+	'' the required __fb_ct.inf member spelling intact.  Keep using the current
+	'' directory, where the historical fixed-name metadata was created.
+	#ifndef __FB_DOS__
+		dim as string candidatebase = hGetTempFileTag( ) + "-ct"
+	#endif
+	dim as string candidate
+	for attempt as integer = 0 to 255
+		#ifdef __FB_DOS__
+			dim as string key = "fbctinf" + ltrim( str( attempt ) )
+			candidate = hStripPath( _
+				hGetDosTempFileStem( fbc.outname, key ) _
+			)
+		#else
+			candidate = candidatebase
+			if( attempt > 0 ) then
+				candidate = candidatebase + "-" + ltrim( str( attempt ) )
+			end if
+		#endif
+
+		if( mkdir( candidate ) = 0 ) then
+			fbc.fbctinfdir = candidate
+			return TRUE
+		end if
+	next
+
+	errReportEx( FB_ERRMSG_FILEACCESSERROR, candidate, -1 )
+	function = FALSE
+end function
+
+private sub hUseTemporaryObjfile _
+	( _
+		byval module as FBCIOFILE ptr, _
+		byval sequence as integer _
+	)
+
+	if( module->is_custom_objfile ) then
+		exit sub
+	end if
+
+	dim as string extension = hGetFileExt( *module->objfile )
+	#ifdef __FB_DOS__
+		*module->objfile = hGetDosTempFileStem( _
+			*module->objfile, "object" + ltrim( str( sequence ) ) _
+		) + "." + extension
+	#else
+		*module->objfile = hStripExt( *module->objfile ) + _
+			hGetTempFileTag( ) + "." + extension
+	#endif
+end sub
+
+private sub hUseTemporaryObjfiles( )
+	'' -c, -C and final assembly output expose the traditional object-derived
+	'' names to the caller.  Only objects which are internal to a link/archive
+	'' operation can be renamed without changing the command-line contract.
+	if( fbc.keepobj or fbc.keepfinalasm or fbc.emitfinalasmonly or _
+		fbc.emitasmonly or _
+		(fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_OBJECT) ) then
+		exit sub
+	end if
+
+	dim as integer sequence = 0
+	dim as FBCIOFILE ptr module = listGetHead( @fbc.modules )
+	while( module )
+		hUseTemporaryObjfile( module, sequence )
+		sequence += 1
+		module = listGetNext( module )
+	wend
+
+	dim as FBCIOFILE ptr rc = listGetHead( @fbc.rcs )
+	while( rc )
+		hUseTemporaryObjfile( rc, sequence )
+		sequence += 1
+		rc = listGetNext( rc )
+	wend
+
+	if( len( fbc.xpm.srcfile ) > 0 ) then
+		hUseTemporaryObjfile( @fbc.xpm, sequence )
+	end if
+end sub
 
 #if defined( __FB_WIN32__ ) or defined( __FB_DOS__ )
 private function hPutLdArgsIntoFile( byref ldcline as string ) as integer
@@ -2419,6 +2541,8 @@ dim shared as FBOSARCHINFO fbosarchmap(0 to ...) => _
 { _
 	_ '' win32/win64 refer to specific OS/arch combinations
 	(@"win32"  , FB_COMPTARGET_WIN32  , FB_DEFAULT_CPUTYPE_X86   ), _
+	_ '' dos-hx is a 32-bit Win32 PE image for the HX DOS extender
+	(@"dos-hx"  , FB_COMPTARGET_WIN32  , FB_DEFAULT_CPUTYPE_X86   ), _
 	(@"win64"  , FB_COMPTARGET_WIN32  , FB_DEFAULT_CPUTYPE_X86_64), _
 	(@"win32-aarch64", FB_COMPTARGET_WIN32, FB_DEFAULT_CPUTYPE_AARCH64), _
 	_ '' dragonfly is 64 bit only
@@ -2455,6 +2579,7 @@ dim shared as FBOSARCHINFO fbosarchmap(0 to ...) => _
 ''    -target win32           ->    Windows + default x86 arch
 ''    -target win64           ->    Windows + x86_64
 ''    -target win32-aarch64   ->    Windows + AArch64
+''    -target dos-hx          ->    Win32 PE for HX under DOS + x86
 ''    -target dos             ->    DOS + x86
 ''    -target linux           ->    Linux + default arch
 ''    -target linux-x86       ->    Linux + default x86 arch
@@ -2602,6 +2727,7 @@ enum
 	OPT_MAP
 	OPT_MAXERR
 	OPT_MT
+	OPT_DOS_THREADS
 	OPT_NODEFLIBS
 	OPT_NOERRLINE
 	OPT_NOLIB
@@ -2689,6 +2815,7 @@ dim shared as FBC_CMDLINE_OPTION cmdlineOptionTB(0 to (OPT__COUNT - 1)) = _
 	( TRUE , TRUE , FALSE, FALSE ), _ '' OPT_MAP          affects output files
 	( TRUE , TRUE , FALSE, FALSE ), _ '' OPT_MAXERR       affects compile process
 	( FALSE, TRUE , TRUE , FALSE ), _ '' OPT_MT           affects link, __FB_MT__
+	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_DOS_THREADS  command-line provider selection
 	( FALSE, TRUE , FALSE, FALSE ), _ '' OPT_NODEFLIBS    affects link
 	( FALSE, TRUE , FALSE, FALSE ), _ '' OPT_NOERRLINE    affects compiler output display
 	( TRUE , TRUE , FALSE, FALSE ), _ '' OPT_NOLIB        affects link
@@ -2953,6 +3080,14 @@ private sub hHandleOptFilesAndOutput _
 			end if
 		end if
 		fbSetOption( FB_COMPOPT_MAXERRORS, value )
+
+	case OPT_DOS_THREADS
+		if( lcase( arg ) <> "pdmlwp" ) then
+			hFatalInvalidOption( arg, is_source )
+		end if
+		fbc.dos_threads = TRUE
+		fbSetOption( FB_COMPOPT_MULTITHREADED, TRUE )
+		fbc.objinf.mt = TRUE
 
 	case OPT_MT
 		fbSetOption( FB_COMPOPT_MULTITHREADED, TRUE )
@@ -3314,6 +3449,7 @@ private function parseOption(byval opt as zstring ptr) as integer
 
 	case asc("d")
 		ONECHAR(OPT_D)
+		CHECK("dos-threads", OPT_DOS_THREADS)
 		CHECK("dll", OPT_DLL)
 		CHECK("dylib", OPT_DYLIB)
 
@@ -3751,9 +3887,20 @@ private sub hCheckArgs()
 		fbcEnd( 1 )
 	end if
 
-	if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_DOS) and _
+	if( fbc.dos_threads ) then
+		if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_DOS ) then
+			errReportEx( FB_ERRMSG_INVALIDCMDOPTION, "-dos-threads requires -target dos", -1 )
+			fbcEnd( 1 )
+		end if
+		'' The native scheduler preserves x87 state. Do not silently accept a
+		'' code generation mode whose SIMD registers it cannot switch.
+		if( fbGetOption( FB_COMPOPT_FPUTYPE ) <> FB_FPUTYPE_FPU ) then
+			errReportEx( FB_ERRMSG_INVALIDCMDOPTION, "-dos-threads requires -fpu x87", -1 )
+			fbcEnd( 1 )
+		end if
+	elseif( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_DOS) and _
 		fbGetOption( FB_COMPOPT_MULTITHREADED ) ) then
-		errReportEx( FB_ERRMSG_INVALIDCMDOPTION, "-mt", -1 )
+		errReportEx( FB_ERRMSG_INVALIDCMDOPTION, "-mt requires -dos-threads pdmlwp on DOS", -1 )
 		fbcEnd( 1 )
 	end if
 
@@ -4202,6 +4349,10 @@ private sub hCompileBas _
 	dim as string asmfile, pponlyfile
 
 	asmfile = hGetAsmName( module, 1 )
+	'' A #cmdline directive can change -R after the first parse.  Keep the
+	'' name selected before that restart so stage two consumes the file that
+	'' the parser actually emitted.
+	module->asmfile = asmfile
 
 	'' -pp?
 	if( fbGetOption( FB_COMPOPT_PPONLY ) ) then
@@ -4804,7 +4955,13 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 
 	end select
 
-	ln += """" + hGetAsmName( module, 1 ) + """ "
+	'' hCompileBas() records the stage-one name before parsing.  Reusing it is
+	'' required when a source-level #cmdline changes temporary-file retention.
+	if( len( module->asmfile ) > 0 ) then
+		ln += """" + module->asmfile + """ "
+	else
+		ln += """" + hGetAsmName( module, 1 ) + """ "
+	end if
 	ln += "-o """ + asmfile + """"
 	ln += fbc.extopt.gcc
 
@@ -5039,16 +5196,26 @@ private function hGetFbctinfAnchorName( ) as string
 	function = "__fb_ctinf_anchor_" + lcase( hex( cuint( hash ), 8 ) )
 end function
 
-private function hCompileFbctinf( ) as integer
+private function hCompileFbctinf( byref archiveobjfile as string ) as integer
 	dim as FBCIOFILE fbctinf
 	dim as string objfile
 	dim as integer fo = any
 
 	'' Compile an empty .bas into the fbctinf object file
 	'' (it will contain only objinfo)
-	fbctinf.srcfile = FB_INFOSEC_BASNAME
-	objfile = FB_INFOSEC_OBJNAME
+	if( (fbc.keepasm = FALSE) and (fbc.keepfinalasm = FALSE) ) then
+		if( hCreateFbctinfDirectory( ) = FALSE ) then
+			exit function
+		end if
+		fbctinf.srcfile = fbc.fbctinfdir + FB_HOST_PATHDIV + FB_INFOSEC_BASNAME
+		objfile = fbc.fbctinfdir + FB_HOST_PATHDIV + FB_INFOSEC_OBJNAME
+	else
+		'' Preserve the historical names when the user requested intermediates.
+		fbctinf.srcfile = FB_INFOSEC_BASNAME
+		objfile = FB_INFOSEC_OBJNAME
+	end if
 	fbctinf.objfile = @objfile
+	archiveobjfile = objfile
 
 	if( fbc.verbose ) then
 		print "creating: ", fbctinf.srcfile
@@ -5093,13 +5260,18 @@ private function hArchiveFiles( ) as integer
 	if( fbGetOption( FB_COMPOPT_OBJINFO ) and _
 		(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
 		(not fbIsCrossComp( )) ) then
-		if( hCompileFbctinf( ) ) then
+		dim as string archiveobjfile
+		dim as integer compiled = hCompileFbctinf( archiveobjfile )
+		if( len( archiveobjfile ) > 0 ) then
+			'' Also remove a partial object left by a failed assembler.
+			fbcAddTemp( archiveobjfile )
+		end if
+		if( compiled ) then
 			'' The objinfo reader expects the fbctinf object to be
 			'' the first object file in libraries, so it must be
 			'' specified first on the archiver command line:
-			ln += QUOTE + FB_INFOSEC_OBJNAME + QUOTE + " "
+			ln += QUOTE + archiveobjfile + QUOTE + " "
 		end if
-		fbcAddTemp( FB_INFOSEC_OBJNAME )
 	end if
 
 	dim as DZSTRING objects
@@ -5313,6 +5485,7 @@ private sub hPrintOptions( byval verbose as integer )
 	print "  -map <file>      Save linking map to file"
 	print "  -maxerr <n>      Only show <n> errors"
 	print "  -mt              Use thread-safe FB runtime"
+	print "  -dos-threads pdmlwp  Enable the optional native DOS thread provider (x87)"
 	print "  -nodeflibs       Do not include the default libraries when linking"
 	print "  -noerrline       Do not show source context in error messages"
 	print "  -nolib <a,b,c>   Do not include the specified libraries when linking"
@@ -5529,6 +5702,11 @@ end sub
 			print "Restarting fbc ..."
 		end if
 	loop
+
+	'' Object files which are consumed by this invocation are implementation
+	'' details.  Give them invocation-private names before the backend creates
+	'' them so parallel compilers cannot link or delete one another's objects.
+	hUseTemporaryObjfiles( )
 
 	if( hCompileXpm( ) = FALSE ) then
 		fbcEnd( 1 )

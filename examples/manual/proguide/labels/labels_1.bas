@@ -12,4 +12,6 @@
 
 beginning:
 3 Print "Hello World!"
+'' This FBlite label lesson deliberately repeats through its GOTO.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL101
 Goto beginning

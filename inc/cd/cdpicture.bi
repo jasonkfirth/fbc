@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include once "cd.bi"
+
 extern "C"
 
 #define __CD_PICTURE_H

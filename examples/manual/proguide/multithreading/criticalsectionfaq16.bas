@@ -6,6 +6,8 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtCriticalSectionsFAQ
 '' --------
 
+Const MAX_THREAD_COUNT As UInteger = 4
+
 Type Thread
 	Dim As UInteger valueIN
 	Dim As Double valueOUT
@@ -30,7 +32,14 @@ Sub Thread.SumUpTo_2(ByVal pt As Thread Ptr)
 End Sub
 
 Sub MyThreads(ByVal pThread As Any Ptr, ByVal threadNB As UInteger = 1)
-	Dim As Thread td(1 To threadNB)
+	If threadNB = 0 OrElse threadNB > MAX_THREAD_COUNT Then
+		Print "Thread count must be between 1 and"; MAX_THREAD_COUNT
+		Exit Sub
+	End If
+
+	'' The fixed four-slot local table is bounded before any thread state is stored.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL524
+	Dim As Thread td(1 To MAX_THREAD_COUNT)
 	Dim As Double t
 
 	t = Timer

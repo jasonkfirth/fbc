@@ -1,6 +1,12 @@
 #ifndef __wxc_WXCLASSES_bi__
 #define __wxc_WXCLASSES_bi__
 
+#Ifdef __FB_WIN32__
+#Define WXCALL StdCall
+#Else
+#Define WXCALL Cdecl
+#EndIf
+
 type Virtual_Dispose as sub WXCALL ()
 
 type _acceleratorentry as any

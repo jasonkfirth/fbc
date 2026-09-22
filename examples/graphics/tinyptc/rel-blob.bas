@@ -11,10 +11,10 @@
 
 Declare Sub ErrorQuit (byref Message as string)
 
-declare sub cls_(buffer() as integer)
+declare sub cls_(target() as integer)
 declare sub pcopy_ ( dest() as integer, source() as integer)
-declare sub put_pixel(buffer() as integer, byval x as integer, byval y as integer, byval col as integer)
-declare sub draw_blob(buffer() as integer, light() as integer,_
+declare sub put_pixel(target() as integer, byval x as integer, byval y as integer, byval col as integer)
+declare sub draw_blob(target() as integer, light_map() as integer, _
                       byval x as integer, byval y as integer)
 
 const SCR_WIDTH = 320  * 2
@@ -29,8 +29,11 @@ const BLOB_HEI = 128
 
 
 
+/' The main display thread owns the framebuffer and the precomputed light map.
+ * draw_blob() accepts arrays so its compositor can be reused with like layouts. '/
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 	dim shared buffer( 0 to SCR_SIZE-1 ) as integer
-	dim shared light(BLOB_WID - 1, BLOB_HEI - 1) as integer
+	dim shared light(0 to BLOB_WID - 1, 0 to BLOB_HEI - 1) as integer
 
 	if( ptc_open( "Blob demo(Relsoft)", SCR_WIDTH, SCR_HEIGHT ) = 0 ) then
 		end -1
@@ -42,34 +45,34 @@ const BLOB_HEI = 128
     dim dist as single
     strength =  BLOB_WID \ 2
     for x = -(BLOB_WID \ 2) to (BLOB_WID \ 2) - 1
-        for y = -(BLOB_HEI \ 2) to (BLOB_HEI \ 2) - 1
-            dist = sqr(x ^ 2 + y ^ 2)
-            if x = 0 and y = 0 then
-                bcol = 255
-            else
-                bcol = (Strength / dist) * 255
-                bcol = bcol - 255
-            end if
-            if bcol < 0 then bcol = 0
-            if bcol > 255 then bcol = 255
-            light(x + (BLOB_WID \ 2), y + (BLOB_HEI \ 2)) = rgba( bcol, bcol, bcol, 0 )
+      for y = -(BLOB_HEI \ 2) to (BLOB_HEI \ 2) - 1
+        dist = sqr(x ^ 2 + y ^ 2)
+        if x = 0 and y = 0 then
+          bcol = 255
+        else
+          bcol = (Strength / dist) * 255
+          bcol = bcol - 255
+        end if
+        if bcol < 0 then bcol = 0
+        if bcol > 255 then bcol = 255
+        light(x + (BLOB_WID \ 2), y + (BLOB_HEI \ 2)) = rgba( bcol, bcol, bcol, 0 )
 
-        next y
+      next y
     next x
 
     dim as integer f, i
 
     do
 
-        F = F + 1
-        cls_ buffer()
-        for i = 0 to 8
-            x = SIN(F / 40 * .8 * i) * (i * (SCR_HEIGHT \ 28)) + ((SCR_WIDTH \ 2) - (BLOB_WID \2))
-            y = COS(F / 35 * .9 * i) * (i * (SCR_HEIGHT \ 28)) + ((SCR_HEIGHT\ 2) - (BLOB_HEI \2))
-            Draw_Blob buffer(), light(), x, y
-        next i
+      F = F + 1
+      cls_ buffer()
+      for i = 0 to 8
+        x = SIN(F / 40 * .8 * i) * (i * (SCR_HEIGHT \ 28)) + ((SCR_WIDTH \ 2) - (BLOB_WID \2))
+        y = COS(F / 35 * .9 * i) * (i * (SCR_HEIGHT \ 28)) + ((SCR_HEIGHT\ 2) - (BLOB_HEI \2))
+        Draw_Blob buffer(), light(), x, y
+      next i
 
-        ptc_update @buffer(0)
+      ptc_update @buffer(0)
 
 
     loop until( inkey = chr( 27 ) )
@@ -87,6 +90,8 @@ end
 Sub ErrorQuit (byref Message as string)
 
   Print "Error: "; Message
+  ' ErrorQuit is the standalone demo's unrecoverable-error path.
+  '' FB-LINTER: DISABLE-NEXT-LINE FBL-CF-005
   End
 
 End Sub
@@ -96,25 +101,28 @@ End Sub
 '
 '*******************************************************************************************
 
-private sub draw_blob(buffer() as integer, light() as integer,_
+private sub draw_blob(target() as integer, light_map() as integer, _
                       byval x as integer, byval y as integer)
 
-   	const SCR_X_MAX = SCR_WIDTH - 1
+  const SCR_X_MAX = SCR_WIDTH - 1
 	const SCR_Y_MAX = SCR_HEIGHT - 1
 
-    dim as integer wid, hei
-    dim as integer minx, miny
-    dim as integer wtemp, htemp
-    dim as integer ptr offset
+  dim as integer wid, hei
+  dim as integer minx, miny
+  dim as integer wtemp, htemp
+  dim as integer ptr offset
 
 
-    wid = (Ubound(light,1) - Lbound(light,1)) + 1
-    hei = (Ubound(light,2) - Lbound(light,2)) + 1
+  if ubound(light_map, 1) < lbound(light_map, 1) orelse _
+       ubound(light_map, 2) < lbound(light_map, 2) then exit sub
 
-    minx = 0
-    miny = 0
+  wid = (Ubound(light_map, 1) - Lbound(light_map, 1)) + 1
+  hei = (Ubound(light_map, 2) - Lbound(light_map, 2)) + 1
 
-  	if y < 0 then
+  minx = 0
+  miny = 0
+
+  if y < 0 then
 		y = -y
 		miny = y
 		hei = hei - y
@@ -143,44 +151,44 @@ private sub draw_blob(buffer() as integer, light() as integer,_
 
 
 
-    dim as integer erroradd
-    dim as integer nx, ny
-    dim as integer c, oc
-    dim as integer lr, lg, lb, br, bg, bb
-    dim as integer r, g, b
+  dim as integer erroradd
+  dim as integer nx, ny
+  dim as integer c, oc
+  dim as integer lr, lg, lb, br, bg, bb
+  dim as integer r, g, b
 
-    erroradd = SCR_WIDTH - wid
-	offset = @buffer(0) + (y * SCR_WIDTH + x)
+  erroradd = SCR_WIDTH - wid
+	offset = @target(0) + (y * SCR_WIDTH + x)
 
-    for ny = 0 to hei -1
-        for nx = 0 to wid -1
-            c = light(nx + minx, ny + miny)
-            if c then
-                oc = *offset
-                br = oc shr 16
-                bg = (oc shr 8) and 255
-                bb = oc and 255
+  for ny = 0 to hei -1
+    for nx = 0 to wid -1
+      c = light_map(nx + minx, ny + miny)
+      if c then
+        oc = *offset
+        br = oc shr 16
+        bg = (oc shr 8) and 255
+        bb = oc and 255
 
-                lr = c shr 16
-                lg = (c shr 8) and 255
-                lb = c and 255
+        lr = c shr 16
+        lg = (c shr 8) and 255
+        lb = c and 255
 
-                r = (lr + br)
-                if r > 255 then r = 255
+        r = (lr + br)
+        if r > 255 then r = 255
 
-                g = (lg + bg)
-                if g > 255 then g = 255
+        g = (lg + bg)
+        if g > 255 then g = 255
 
-                b = (lb + bb)
-                if b > 255 then b = 255
+        b = (lb + bb)
+        if b > 255 then b = 255
 
-                *offset = rgba( r, g, b, 0 )
-            end if
+        *offset = rgba( r, g, b, 0 )
+      end if
 
-            offset = offset + 1
-        next nx
-            offset = offset + erroradd
-    next ny
+      offset = offset + 1
+    next nx
+    offset = offset + erroradd
+  next ny
 end sub
 
 
@@ -188,36 +196,34 @@ end sub
 'GFX subs/Funks
 '
 '*******************************************************************************************
-private sub put_pixel(buffer() as integer, byval x as integer, byval y as integer, byval col as integer)
-    if (y >= 0) and (y < SCR_HEIGHT) and (x >= 0) and (x < SCR_WIDTH) then
-        buffer(y * SCR_WIDTH + x) = col
-    end if
+private sub put_pixel(target() as integer, byval x as integer, byval y as integer, byval col as integer)
+  if (y >= 0) and (y < SCR_HEIGHT) and (x >= 0) and (x < SCR_WIDTH) then
+    target(y * SCR_WIDTH + x) = col
+  end if
 end sub
 
 
 private sub pcopy_ ( dest() as integer, source() as integer)
-    dim offset1 as integer ptr
-    dim offset2 as integer ptr
-    dim i as integer
-    offset1 = @dest(0)
-    offset2 = @source(0)
-    for i = 0 to  SCR_SIZE -1
-        *offset1 = *offset2
-        offset1 = offset1 + 1
-        offset2 = offset2 + 1
-    next i
+  dim offset1 as integer ptr
+  dim offset2 as integer ptr
+  dim i as integer
+  offset1 = @dest(0)
+  offset2 = @source(0)
+  for i = 0 to  SCR_SIZE -1
+    *offset1 = *offset2
+    offset1 = offset1 + 1
+    offset2 = offset2 + 1
+  next i
 
 end sub
 
-private sub cls_(buffer() as integer)
-    dim offset as integer ptr
-    dim i as integer
-    offset = @buffer(0)
-    for i = 0 to  SCR_SIZE -1
-        *offset = 0
-        offset = offset + 1
-    next i
+private sub cls_(target() as integer)
+  dim offset as integer ptr
+  dim i as integer
+  offset = @target(0)
+  for i = 0 to  SCR_SIZE -1
+    *offset = 0
+    offset = offset + 1
+  next i
 
 end sub
-
-

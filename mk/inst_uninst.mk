@@ -136,6 +136,15 @@ install-runtime:
 			echo "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_LIBDIR),$(FBINSTALL_RUNTIME_DIR))/$$b" >> "$(INSTALL_MANIFEST)"; \
 		fi; \
 	done
+	@set -e; \
+	if [ -f "$(libdir)/libfbpdmlwp.a" ]; then \
+		dst="$(INSTALL_LIBDIR)/pdmlwp-source"; \
+		mkdir -p "$$dst/contrib/dos/pdmlwp" "$$dst/build_scripts" "$$dst/docs"; \
+		cp -a "$(rootdir)/contrib/dos/pdmlwp/." "$$dst/contrib/dos/pdmlwp/"; \
+		cp "$(rootdir)/build_scripts/build-dos-pdmlwp.py" "$$dst/build_scripts/"; \
+		cp "$(rootdir)/docs/freedos-providers.md" "$$dst/docs/"; \
+		find "$$dst" -type f | sed "s|^$(DESTDIR)||" >> "$(INSTALL_MANIFEST)"; \
+	fi
 
 .PHONY: install-js install-js-bin install-js-includes install-js-runtime
 install-js: install-js-bin install-js-includes install-js-runtime

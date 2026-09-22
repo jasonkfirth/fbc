@@ -19,6 +19,8 @@
 #   DISABLE_MT
 #   ENABLE_PIE
 #   THREAD_MODEL
+#   ENABLE_DOS_WATT32
+#   ENABLE_DOS_DPMI_YIELD
 #
 # Graphics policy:
 #   ENABLE_X11
@@ -49,6 +51,17 @@
 #   DISABLE_TCP
 ########################
 
+# Optional DOS TCP provider.  The empty default preserves the normal DOS
+# build; Watt-32 is enabled only by an explicit command-line assignment.
+DOS_TCP_PROVIDER  ?=
+DOS_WATT32_CFLAGS ?=
+DOS_THREAD_PROVIDER ?=
+
+# Optional DOS host yield.  The empty default preserves the normal DOS
+# delay behavior; a tested CWSDPMI, HDPMI, or other DPMI host can opt in to
+# DJGPP's __dpmi_yield path explicitly.
+DOS_DPMI_YIELD ?=
+
 # ---------------------------------------------------------------------------
 # Reset to avoid stale values
 # ---------------------------------------------------------------------------
@@ -70,6 +83,9 @@ DISABLE_ALSA   :=
 DISABLE_PULSE  :=
 DISABLE_D3D10  :=
 DISABLE_TCP    :=
+
+ENABLE_DOS_WATT32 :=
+ENABLE_DOS_DPMI_YIELD :=
 
 ENABLE_STACK_PROTECTOR :=
 ENABLE_FORTIFY         :=
@@ -178,10 +194,18 @@ ifeq ($(TARGET_OS),wii)
   THREAD_MODEL := wii
 endif
 
-# DOS has no runtime provider for parallel threads.
+# Native DOS threads require an explicitly selected provider. The ordinary
+# archives and QB build keep their single-threaded behavior.
 ifeq ($(TARGET_OS),dos)
   DISABLE_MT := YesPlease
   THREAD_MODEL :=
+  ifeq ($(DOS_THREAD_PROVIDER),pdmlwp)
+    DISABLE_MT :=
+    THREAD_MODEL := pdmlwp
+    DOS_THREAD_FBCFLAGS := -dos-threads pdmlwp
+  else ifneq ($(strip $(DOS_THREAD_PROVIDER)),)
+    $(error Unknown DOS_THREAD_PROVIDER '$(DOS_THREAD_PROVIDER)')
+  endif
 endif
 
 # ---------------------------------------------------------------------------
@@ -289,9 +313,21 @@ ifeq ($(TARGET_OS),aros)
   DISABLE_FBDEV := YesPlease
 endif
 
-# DOS -> no hosted sockets in the current runtime
+# DOS -> no hosted sockets in the current runtime unless an explicit provider
+# is selected.  The Watt-32 adapter is still opt-in because it needs a packet
+# driver and WATTCP.CFG at run time.
 ifeq ($(TARGET_OS),dos)
-  DISABLE_TCP := YesPlease
+  ifeq ($(DOS_TCP_PROVIDER),watt32)
+    ENABLE_DOS_WATT32 := YesPlease
+    DISABLE_TCP :=
+  else
+    DISABLE_TCP := YesPlease
+  endif
+
+  ifeq ($(DOS_DPMI_YIELD),YesPlease)
+    # Host yielding is independent of FreeBASIC's in-process MT archives.
+    ENABLE_DOS_DPMI_YIELD := YesPlease
+  endif
 endif
 
 # ---------------------------------------------------------------------------
@@ -539,6 +575,15 @@ endif
 ifdef DISABLE_TCP
   ALLCFLAGS += -DDISABLE_TCP
   FBFLAGS += -d DISABLE_TCP
+endif
+
+ifdef ENABLE_DOS_WATT32
+  ALLCFLAGS += -DFB_DOS_WATT32 $(DOS_WATT32_CFLAGS)
+  FBFLAGS += -d FB_DOS_WATT32
+endif
+
+ifdef ENABLE_DOS_DPMI_YIELD
+  ALLCFLAGS += -DFB_DOS_DPMI_YIELD
 endif
 
 ###############################

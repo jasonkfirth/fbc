@@ -20,6 +20,8 @@ Constructor myZstring (ByRef z As Const ZString = "")
 End Constructor
 
 Operator myZstring.Cast () ByRef As Const ZString
+	'' The returned buffer belongs to This.s and remains valid with this object.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL427
   Return *StrPtr(This.s)
 End Operator
 

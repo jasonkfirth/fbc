@@ -1,11 +1,11 @@
 #include once "Fl_Table.bi"
 
 extern "c++"
-type CharVector 
+type CharVector
 private:
 	arr as byte ptr
 	_size as long
-	'declare sub init() 
+	'declare sub init()
 	declare sub copy(newarr as byte ptr, newsize as long)
 public:
 	declare constructor
@@ -85,7 +85,7 @@ private:
 	_last_y as long
 	_last_push_x as long
 	_last_push_y as long
-  
+
 	_selectmode as long'TableRowSelectMode
 
 protected:
@@ -100,14 +100,14 @@ public:
 
 	declare sub rows(val as long)
 	declare function rows() as long
-  
+
 	declare sub type_ alias "type" (val_ as TableRowSelectMode)
-	declare const function type_ () as TableRowSelectMode 
-  
+	declare const function type_ () as TableRowSelectMode
+
 	declare function row_selected(row as long) as long
 	declare function select_row(row as long, flag as long=1) as long
 	declare sub select_all_rows(flag as long=1)
-  
+
 	declare sub clear()
 end type
 

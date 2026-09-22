@@ -38,11 +38,9 @@ operator VARIANT.cast _
 	VariantInit( @tmp )
 	VariantChangeTypeEx( @tmp, @this.var_, NULL, VARIANT_NOVALUEPROP, VT_BSTR )
 
-	'' !!!FIXME!!! the pointer returned will leak
+	'' The returned BSTR has independent ownership; callers release it with SysFreeString.
+	operator = SysAllocString(V_BSTR(@tmp))
 
-	operator = V_BSTR(@tmp)
-
-	''VariantClear( @tmp )
+	VariantClear( @tmp )
 
 end operator
-

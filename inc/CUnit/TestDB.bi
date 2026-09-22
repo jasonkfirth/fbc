@@ -25,8 +25,11 @@
 #pragma once
 
 #include once "crt/setjmp.bi"
-#include once "CUnit.bi"
 #include once "CUError.bi"
+
+'' TestDB defines the registry and test records directly. It does not need
+'' the umbrella CUnit header, whose TestRun include would create a cycle when
+'' this leaf header is included on its own.
 
 '' The following symbols have been renamed:
 ''     #define CU_ADD_TEST => CU_ADD_TEST_

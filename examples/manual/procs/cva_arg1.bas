@@ -15,15 +15,20 @@ Sub myprintf cdecl(ByRef formatstring As String, ...)
 
 	'' For each char in format string...
 	Dim As UByte Ptr p = StrPtr(formatstring)
-	Dim As Integer todo = Len(formatstring)
-	While (todo > 0)
+	Dim As Integer remaining_characters = Len(formatstring)
+	If p = 0 Then
+		Cva_End(args)
+		Return
+	End If
+
+	While (remaining_characters > 0)
 		Dim As Integer char = *p
 		p += 1
-		todo -= 1
+		remaining_characters -= 1
 
 		'' Is it a format char?
 		If (char = Asc("%")) Then
-			If (todo = 0) Then
+			If (remaining_characters = 0) Then
 				'' % at the end
 				Print "%";
 				Exit While
@@ -32,7 +37,7 @@ Sub myprintf cdecl(ByRef formatstring As String, ...)
 			'' The next char should tell the type
 			char = *p
 			p += 1
-			todo -= 1
+			remaining_characters -= 1
 
 			'' Print var-arg, depending on the type
 			Select Case char

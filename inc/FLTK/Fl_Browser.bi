@@ -4,7 +4,7 @@
 type FL_BLINE_ as FL_BLINE
 
 extern "c++"
-type Fl_Browser extends Fl_Browser_ 
+type Fl_Browser extends Fl_Browser_
 private:
 	first as FL_BLINE_ ptr
 	last as FL_BLINE_ ptr
@@ -108,7 +108,7 @@ private sub Fl_Browser.item_swap(a as any ptr, b as any ptr)
 	swap_(cast(FL_BLINE_ ptr,a), cast(FL_BLINE_ ptr,b))
 end sub
 
-private function Fl_Browser.item_at(line_ as long) as any ptr 
+private function Fl_Browser.item_at(line_ as long) as any ptr
 	return cast(any ptr, find_line(line_))
 end function
 
@@ -185,7 +185,7 @@ private sub Fl_Browser.make_visible(line_ as long)
 		 base.display(find_line(1))
 	elseif line_ > lines then
 		base.display(find_line(lines))
-	else 
+	else
 		base.display(find_line(line_))
 	end if
 end sub

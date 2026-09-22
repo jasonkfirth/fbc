@@ -60,7 +60,7 @@ sub animate_fire(byval buffer as ubyte ptr, byval new_ as integer = 0)
 		for i as integer = 1 to FIRE_SEED_COUNT
 			'' The main program seeds the generator before creating explosions.
 			'' FB-LINTER: DISABLE-NEXT-LINE FBL-NUM-011
-			circle buffer, ((w\4)+(rnd*(w\2)), (h\4)+(rnd*(h\2))), (w\6), FIRE_COLOR,,,,F
+			circle buffer, ((w\4)+(rnd*(w\2)), (h\4)+(rnd*(h\2))), (w\6), FIRE_COLOR,,,, F
 		next
 	else
 		for y as integer = 1 to h-2

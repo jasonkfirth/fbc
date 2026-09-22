@@ -13,7 +13,8 @@ Function translationToIterativeReverse (ByVal s As String, ByVal cumul As String
 	Else                            '' iteration loop
 		cumul = Left(s, 1) & cumul  '' iterative accumulation
 		s = Mid(s, 2)
+		'' This translation lesson uses GOTO to expose the recursion-to-loop step.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL101
 		Goto begin                  '' iterative jump
 	End If
 End Function
-

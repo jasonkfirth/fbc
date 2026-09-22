@@ -38,6 +38,8 @@ declare sub DrawGLRoom()
 ''------------------------------------------------------------------------------
 
 
+'' The object loader fills this scene shared by the module draw routine.
+'' FB-LINTER: DISABLE-NEXT-LINE FBL301
 dim shared as glObject obj              '' Object
 
 	dim as single xrot=0, xspeed=0      '' X Rotation & X Speed
@@ -123,14 +125,14 @@ dim shared as glObject obj              '' Object
 		glLoadIdentity()                                  '' Reset Matrix
 		glRotatef(-yrot, 0.0, 1.0, 0.0)                   '' Rotate By -yrot On Y Axis
 		glRotatef(-xrot, 1.0, 0.0, 0.0)                   '' Rotate By -xrot On X Axis
-		glGetFloatv(GL_MODELVIEW_MATRIX,@Minv(0))         '' Retrieve ModelView Matrix (Stores In Minv)
+		glGetFloatv(GL_MODELVIEW_MATRIX, @Minv(0))         '' Retrieve ModelView Matrix (Stores In Minv)
 		lp(0) = LightPos(0)                               '' Store Light Position X In lp[0]
 		lp(1) = LightPos(1)                               '' Store Light Position Y In lp[1]
 		lp(2) = LightPos(2)                               '' Store Light Position Z In lp[2]
 		lp(3) = LightPos(3)                               '' Store Light Direction In lp[3]
 		VMatMult(@Minv(0), @lp(0))                        '' We Store Rotated Light Vector In 'lp' Array
 		glTranslatef(-ObjPos(0), -ObjPos(1), -ObjPos(2))  '' Move Negative On All Axis Based On ObjPos[] Values (X, Y, Z)
-		glGetFloatv(GL_MODELVIEW_MATRIX,@Minv(0))         '' Retrieve ModelView Matrix From Minv
+		glGetFloatv(GL_MODELVIEW_MATRIX, @Minv(0))         '' Retrieve ModelView Matrix From Minv
 		wlp(0) = 0.0                                      '' World Local Coord X To 0
 		wlp(1) = 0.0                                      '' World Local Coord Y To 0
 		wlp(2) = 0.0                                      '' World Local Coord Z To 0
@@ -244,39 +246,39 @@ sub DrawGLRoom()
 	glBegin(GL_QUADS)                    '' Begin Drawing Quads
 		'' Floor
 		glNormal3f(0.0, 1.0, 0.0)                     '' Normal Pointing Up
-		glVertex3f(-10.0,-10.0,-20.0)                 '' Back Left
-		glVertex3f(-10.0,-10.0, 20.0)                 '' Front Left
-		glVertex3f( 10.0,-10.0, 20.0)                 '' Front Right
-		glVertex3f( 10.0,-10.0,-20.0)                 '' Back Right
+		glVertex3f(-10.0, -10.0, -20.0)                 '' Back Left
+		glVertex3f(-10.0, -10.0, 20.0)                 '' Front Left
+		glVertex3f( 10.0, -10.0, 20.0)                 '' Front Right
+		glVertex3f( 10.0, -10.0, -20.0)                 '' Back Right
 		'' Ceiling
-		glNormal3f(0.0,-1.0, 0.0)                     '' Normal Point Down
+		glNormal3f(0.0, -1.0, 0.0)                     '' Normal Point Down
 		glVertex3f(-10.0, 10.0, 20.0)                 '' Front Left
-		glVertex3f(-10.0, 10.0,-20.0)                 '' Back Left
-		glVertex3f( 10.0, 10.0,-20.0)                 '' Back Right
+		glVertex3f(-10.0, 10.0, -20.0)                 '' Back Left
+		glVertex3f( 10.0, 10.0, -20.0)                 '' Back Right
 		glVertex3f( 10.0, 10.0, 20.0)                 '' Front Right
 		'' Front Wall
 		glNormal3f(0.0, 0.0, 1.0)                     '' Normal Pointing Away From Viewer
-		glVertex3f(-10.0, 10.0,-20.0)                 '' Top Left
-		glVertex3f(-10.0,-10.0,-20.0)                 '' Bottom Left
-		glVertex3f( 10.0,-10.0,-20.0)                 '' Bottom Right
-		glVertex3f( 10.0, 10.0,-20.0)                 '' Top Right
+		glVertex3f(-10.0, 10.0, -20.0)                 '' Top Left
+		glVertex3f(-10.0, -10.0, -20.0)                 '' Bottom Left
+		glVertex3f( 10.0, -10.0, -20.0)                 '' Bottom Right
+		glVertex3f( 10.0, 10.0, -20.0)                 '' Top Right
 		'' Back Wall
-		glNormal3f(0.0, 0.0,-1.0)                     '' Normal Pointing Towards Viewer
+		glNormal3f(0.0, 0.0, -1.0)                     '' Normal Pointing Towards Viewer
 		glVertex3f( 10.0, 10.0, 20.0)                 '' Top Right
-		glVertex3f( 10.0,-10.0, 20.0)                 '' Bottom Right
-		glVertex3f(-10.0,-10.0, 20.0)                 '' Bottom Left
+		glVertex3f( 10.0, -10.0, 20.0)                 '' Bottom Right
+		glVertex3f(-10.0, -10.0, 20.0)                 '' Bottom Left
 		glVertex3f(-10.0, 10.0, 20.0)                 '' Top Left
 		'' Left Wall
 		glNormal3f(1.0, 0.0, 0.0)                     '' Normal Pointing Right
 		glVertex3f(-10.0, 10.0, 20.0)                 '' Top Front
-		glVertex3f(-10.0,-10.0, 20.0)                 '' Bottom Front
-		glVertex3f(-10.0,-10.0,-20.0)                 '' Bottom Back
-		glVertex3f(-10.0, 10.0,-20.0)                 '' Top Back
+		glVertex3f(-10.0, -10.0, 20.0)                 '' Bottom Front
+		glVertex3f(-10.0, -10.0, -20.0)                 '' Bottom Back
+		glVertex3f(-10.0, 10.0, -20.0)                 '' Top Back
 		'' Right Wall
 		glNormal3f(-1.0, 0.0, 0.0)                    '' Normal Pointing Left
-		glVertex3f( 10.0, 10.0,-20.0)                 '' Top Back
-		glVertex3f( 10.0,-10.0,-20.0)                 '' Bottom Back
-		glVertex3f( 10.0,-10.0, 20.0)                 '' Bottom Front
+		glVertex3f( 10.0, 10.0, -20.0)                 '' Top Back
+		glVertex3f( 10.0, -10.0, -20.0)                 '' Bottom Back
+		glVertex3f( 10.0, -10.0, 20.0)                 '' Bottom Front
 		glVertex3f( 10.0, 10.0, 20.0)                 '' Top Front
 	glEnd()                              '' Done Drawing Quads
 end sub

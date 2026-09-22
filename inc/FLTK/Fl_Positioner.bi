@@ -1,7 +1,7 @@
 #include once "Fl_Widget.bi"
 
 extern "c++"
-type Fl_Positioner extends Fl_Widget 
+type Fl_Positioner extends Fl_Widget
 private:
 	as double xmin, ymin
 	as double xmax, ymax
@@ -51,7 +51,7 @@ private function Fl_Positioner.yvalue() as double
 	return yvalue_
 end function
 
-private function Fl_Positioner.xminimum() as double 
+private function Fl_Positioner.xminimum() as double
 	return xmin
 end function
 
@@ -67,7 +67,7 @@ private sub Fl_Positioner.xmaximum(a as double)
 	xbounds(xmin,a)
 end sub
 
-private function Fl_Positioner.yminimum() as double 
+private function Fl_Positioner.yminimum() as double
 	return ymin
 end function
 
