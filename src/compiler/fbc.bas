@@ -5060,10 +5060,17 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 	'' GAS consumes the first-stage assembly directly.  Reuse the name chosen
 	'' before parsing, because invocation-private object names already contain
 	'' the temporary tag and recomputing a stage-two name would append it again.
-	if( len( module->asmfile ) > 0 ) then
-		ln += """" + module->asmfile + """ "
+	'' Other backends create a second-stage assembly file which is the input to
+	'' the assembler, so they must retain the traditional stage-two lookup.
+	if( (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GAS) or _
+		(fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GAS64) ) then
+		if( len( module->asmfile ) > 0 ) then
+			ln += """" + module->asmfile + """ "
+		else
+			ln += """" + hGetAsmName( module, 1 ) + """ "
+		end if
 	else
-		ln += """" + hGetAsmName( module, 1 ) + """ "
+		ln += """" + hGetAsmName( module, 2 ) + """ "
 	end if
 	ln += "-o """ + *module->objfile + """"
 	ln += fbc.extopt.gas
