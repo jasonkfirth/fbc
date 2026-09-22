@@ -12,6 +12,7 @@
 # Responsibilities:
 #
 #     * build Linux, Windows, macOS, BSD, and Haiku package sets
+#     * package a tested master revision after CI qualification succeeds
 #     * audit every Linux package-factory row on the scheduled full matrix
 #     * retain successful package output for manual download
 #     * attach package files to version-tagged GitHub Releases
@@ -26,10 +27,19 @@ name: FreeBASIC XL packages
 
 on:
   push:
-    branches:
-      - master
     tags:
       - 'v*'
+  # A normal master push first runs the compiler qualification workflow.  The
+  # complete Linux package set is useful only when that tested source revision
+  # has passed fbctests and Exampleageddon, so package creation follows that
+  # successful workflow completion instead of racing it.
+  workflow_run:
+    workflows:
+      - FreeBASIC XL CI
+    types:
+      - completed
+    branches:
+      - master
   schedule:
     # The full package-factory audit catches distribution image and packaging
     # drift without making normal source commits wait for every Linux row.
@@ -60,13 +70,15 @@ env:
 jobs:
   linux-debian:
     name: Debian package
-    if: ${{ github.event_name != 'schedule' && !startsWith(github.ref, 'refs/tags/v') && !(github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) }}
+    if: ${{ github.event_name != 'workflow_run' && github.event_name != 'schedule' && !startsWith(github.ref, 'refs/tags/v') && !(github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 180
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Install package build dependencies
         run: |
@@ -106,6 +118,7 @@ jobs:
 
   linux-package-plan:
     name: Linux package-factory plan
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
@@ -114,6 +127,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Export the canonical Linux package matrix
         id: plan
@@ -184,7 +199,7 @@ jobs:
   linux-release-matrix:
     name: Linux ${{ matrix.name }} package
     needs: linux-package-plan
-    if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master') }}
     strategy:
       fail-fast: false
       max-parallel: 6
@@ -196,6 +211,8 @@ jobs:
       - name: Checkout
         if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Install Linux matrix host dependencies
         if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
@@ -338,7 +355,7 @@ jobs:
 
   windows:
     name: Windows package matrix
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' }}
+    if: ${{ github.event_name != 'workflow_run' && (github.event_name != 'workflow_dispatch' || inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all') }}
     runs-on: windows-latest
     timeout-minutes: 240
 
@@ -349,6 +366,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up MSYS2
         uses: msys2/setup-msys2@v2
@@ -402,13 +421,15 @@ jobs:
 
   macos:
     name: macOS package matrix
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' }}
+    if: ${{ github.event_name != 'workflow_run' && (github.event_name != 'workflow_dispatch' || inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all') }}
     runs-on: macos-15
     timeout-minutes: 180
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Seed Darwin package bootstrap sources
         run: |
@@ -446,6 +467,8 @@ jobs:
     steps:
       - name: Checkout publisher
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Download Linux package matrix
         uses: actions/download-artifact@v8
