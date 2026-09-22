@@ -5071,7 +5071,14 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 
 	fbcDarwinPlatformAddAssemblerOptions( ln )
 
-	ln += """" + hGetAsmName( module, 2 ) + """ "
+	'' GAS consumes the first-stage assembly directly.  Reuse the name chosen
+	'' before parsing, because invocation-private object names already contain
+	'' the temporary tag and recomputing a stage-two name would append it again.
+	if( len( module->asmfile ) > 0 ) then
+		ln += """" + module->asmfile + """ "
+	else
+		ln += """" + hGetAsmName( module, 1 ) + """ "
+	end if
 	ln += "-o """ + *module->objfile + """"
 	ln += fbc.extopt.gas
 
