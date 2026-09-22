@@ -350,6 +350,10 @@ jobs:
             bash build_scripts/riscos-run-exampleageddon.sh \
               --jobs "$JOBS"
 
+      - name: Show RISC OS Exampleageddon failure evidence
+        if: failure()
+        run: python3 build_scripts/show-riscos-exampleageddon-failures.py out/riscos/exampleageddon
+
       - name: Upload RISC OS qualification evidence
         if: always()
         uses: actions/upload-artifact@v7

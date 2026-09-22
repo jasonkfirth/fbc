@@ -57,6 +57,7 @@ RPCEMU_MEMORY=256
 COMPILE_ONLY=0
 SKIP_COMPILE=0
 RESUME=0
+EXAMPLEAGEDDON_ARGS=()
 
 RPCEMU_PID=""
 BOOT_TASK=""
@@ -291,6 +292,12 @@ if [ "$SKIP_COMPILE" -eq 0 ]; then
         die "RISC OS libffi is missing from the FreeBASIC runtime directory"
 
     msg "compiling and classifying the complete example tree for RISC OS"
+    if [ "$COMPILE_ONLY" -eq 0 ]; then
+        # Runtime staging copies source-local resources after compilation.
+        # Compile-only qualification needs only the binaries and inventory.
+        EXAMPLEAGEDDON_ARGS+=(--keep-work)
+    fi
+
     python3 "$SCRIPT_DIR/exampleageddon-freebasic.py" \
         --root "$ROOT" \
         --outdir "$OUTPUT_ROOT" \
@@ -300,7 +307,8 @@ if [ "$SKIP_COMPILE" -eq 0 ]; then
         --jobs "$JOBS" \
         --compile-timeout "$COMPILE_TIMEOUT" \
         --no-run \
-        --fail-on-self-contained
+        --fail-on-self-contained \
+        "${EXAMPLEAGEDDON_ARGS[@]}"
 fi
 
 [ -s "$COMPILE_RESULTS" ] ||
