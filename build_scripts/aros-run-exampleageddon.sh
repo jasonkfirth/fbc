@@ -383,11 +383,18 @@ refresh_target_libraries() {
 compile_inventory() {
     local target="$1"
     local target_output="$OUTPUT_ROOT/$target"
+    local -a exampleageddon_args=()
 
     map_target "$target"
     mkdir -p "$target_output"
     if [ "$SKIP_COMPILE" -eq 0 ]; then
         msg "compiling all examples for AROS $target"
+        if [ "$COMPILE_ONLY" -eq 0 ]; then
+            # Runtime staging copies source-local resources after compilation.
+            # Compile-only qualification needs only the binaries and inventory.
+            exampleageddon_args+=(--keep-work)
+        fi
+
         env -u DEBUG PATH="$MAP_TOOLCHAIN:$PATH" \
             python3 "$SCRIPT_DIR/exampleageddon-freebasic.py" \
                 --root "$ROOT" \
@@ -399,7 +406,8 @@ compile_inventory() {
                 --jobs "$JOBS" \
                 --compile-timeout "$COMPILE_TIMEOUT" \
                 --no-run \
-                --fail-on-self-contained
+                --fail-on-self-contained \
+                "${exampleageddon_args[@]}"
     fi
 
     [ -s "$target_output/results.csv" ] ||
