@@ -285,6 +285,10 @@ jobs:
             --targets x86_64 \
             --jobs "$JOBS"
 
+      - name: Show AROS Exampleageddon failure evidence
+        if: failure()
+        run: python3 build_scripts/show-exampleageddon-failures.py out/aros/exampleageddon/x86_64
+
       - name: Upload AROS qualification evidence
         if: always()
         uses: actions/upload-artifact@v7
@@ -324,6 +328,13 @@ jobs:
           bash build_scripts/debianubuntu-build-freebasic-riscos.sh \
             --no-package \
             --jobs "$JOBS" 2>&1 | tee out/riscos/build-riscos.log
+
+      - name: Show RISC OS build failure evidence
+        if: failure()
+        run: |
+          set -euo pipefail
+          test -f out/riscos/build-riscos.log || exit 0
+          tail -n 200 out/riscos/build-riscos.log
 
       - name: Run RISC OS fbctests
         run: |
@@ -398,6 +409,10 @@ jobs:
             --arch arm \
             --compile-only \
             --jobs 2
+
+      - name: Show Windows CE Exampleageddon failure evidence
+        if: failure()
+        run: python3 build_scripts/show-exampleageddon-failures.py out/wince/exampleageddon/arm
 
       - name: Upload Windows CE compile evidence
         if: always()
