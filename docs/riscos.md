@@ -147,8 +147,12 @@ Then run:
 source out/riscos/gccsdk/env.sh
 ```
 
-`--revision REV` makes the Subversion checkout reproducible.  Without it, the
-script builds the current GCCSDK trunk.  GCCSDK can take a few hours to build.
+The normal build obtains GCCSDK from its reachable Git mirror and retains the
+documented `out/riscos/gccsdk/gcc4` path. `--update` refreshes that mirror.
+`--revision REV` remains available for a local or otherwise reachable legacy
+Subversion mirror when an exact historic GCCSDK revision is required; set
+`RISCOS_GCCSDK_SVN_URL` to that mirror's `gcc4` checkout URL first. GCCSDK can
+take a few hours to build.
 
 If GCCSDK is already installed, export its standard variables instead:
 

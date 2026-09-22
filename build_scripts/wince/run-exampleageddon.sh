@@ -275,9 +275,18 @@ SHARE_ROOT="$CERF_ROOT/share"
 ##############################################################################
 
 compile_inventory() {
+	local compiler_arguments=()
+
 	[ "$SKIP_COMPILE" -eq 0 ] || return 0
 
 	msg "compiling all examples for Windows CE $TARGET_ARCH"
+	# The compile-only qualification needs only the inventory, logs, and
+	# executable outputs. Emulator execution later copies each source-local
+	# resource tree, so retain those temporary trees only for that path.
+	if [ "$COMPILE_ONLY" -eq 0 ]; then
+		compiler_arguments+=(--keep-work)
+	fi
+
 	if [ "$TARGET_ARCH" = arm ]; then
 		docker run --rm --user "$(id -u):$(id -g)" \
 			-v "$ROOT:/src" \
@@ -295,7 +304,8 @@ compile_inventory() {
 				--jobs "$JOBS" \
 				--compile-timeout "$COMPILE_TIMEOUT" \
 				--no-run \
-				--fail-on-self-contained
+				--fail-on-self-contained \
+				"${compiler_arguments[@]}"
 	else
 		python3 "$ROOT/build_scripts/exampleageddon-freebasic.py" \
 			--root "$ROOT" \
@@ -307,7 +317,8 @@ compile_inventory() {
 			--jobs "$JOBS" \
 			--compile-timeout "$COMPILE_TIMEOUT" \
 			--no-run \
-			--fail-on-self-contained
+			--fail-on-self-contained \
+			"${compiler_arguments[@]}"
 	fi
 }
 
@@ -470,16 +481,20 @@ save_batch_evidence() {
 
 compile_inventory
 [ -s "$INVENTORY" ] || die "Exampleageddon compile inventory is missing"
+
+if [ "$COMPILE_ONLY" -eq 1 ]; then
+	# compile_inventory already enforces --fail-on-self-contained. It also
+	# removes per-example resource copies to keep this CI qualification small,
+	# so do not create the emulator manifest which requires those copies.
+	echo "==> Windows CE $TARGET_ARCH Exampleageddon compile inventory completed"
+	exit 0
+fi
+
 write_manifest
 
 mapfile -t MANIFEST_ROWS < <(tail -n +2 "$MANIFEST")
 TOTAL_CASES="${#MANIFEST_ROWS[@]}"
 [ "$TOTAL_CASES" -gt 0 ] || die "no self-contained examples were selected"
-
-if [ "$COMPILE_ONLY" -eq 1 ]; then
-	echo "==> Windows CE $TARGET_ARCH Exampleageddon compiled: $TOTAL_CASES runnable cases"
-	exit 0
-fi
 
 build_guest_runner
 

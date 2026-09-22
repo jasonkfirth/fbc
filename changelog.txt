@@ -28,6 +28,8 @@ Version 1.20.4
 - tests/documentation: added DOS provider probes for PDMLWP, Sound Blaster, PC speaker, AC'97, Watt-32, graphics, TCP, FreeDOS and DOSBox-X runs, enabled matching optional DOS unit/log suites, added `#cmdline`, gas64 array-index, and sfx intrinsic regression cases, and documented the compatibility services, direct-include results, DOS provider boundaries, AC'97 behavior, and SuperDuel integration findings.
 
 [fixed]
+- build/Windows CE: let the compile-only Exampleageddon qualification finish after its gated compile inventory instead of creating an emulator manifest from deliberately discarded resource trees; retain those trees only when the emulator execution path needs them.
+- build/RISC OS: replace the no-longer-resolvable default GCCSDK Subversion checkout with its reachable Git mirror while retaining the established toolchain layout, update behavior, and explicit legacy Subversion-revision support.
 - examples/build hygiene: remove emitted NeHe lesson 21/24 assembler and BASSMOD C output from version control, ignore their regenerated forms, and keep clean checkouts free of stale compilation artifacts.
 - build/Windows CE: make Exampleageddon inspect compiler options embedded in `--fbc` before selecting gas64, preserving the ARM GCC generator instead of appending an incompatible x86-64 backend; classify gas64-only examples as platform-specific when their required backend is unavailable, so they are reported rather than treated as ARM self-contained failures.
 - build/CI diagnostics: retain Cppcheck output and the RISC OS toolchain-build log as seven-day failure artifacts, so version-specific lint and guest-build errors remain available after a failed run.

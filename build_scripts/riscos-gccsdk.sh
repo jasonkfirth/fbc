@@ -13,7 +13,7 @@
 # Responsibilities:
 #
 #     - check the host tools required by GCCSDK
-#     - create or update a GCCSDK Subversion checkout
+#     - obtain GCCSDK from its reachable Git mirror or a pinned Subversion revision
 #     - provide GCCSDK's install paths through gccsdk-params
 #     - select host language modes accepted by GCCSDK's legacy dependencies
 #     - select the static C-only UnixLib configuration used by FreeBASIC
@@ -60,7 +60,9 @@ GCCSDK_REVISION=""
 UPDATE=0
 BUILD_NATIVE=0
 
-GCCSDK_URL="svn://svn.riscos.info/gccsdk/trunk/gcc4"
+GCCSDK_URL="${RISCOS_GCCSDK_SVN_URL:-svn://svn.riscos.info/gccsdk/trunk/gcc4}"
+GCCSDK_GIT_URL="${RISCOS_GCCSDK_GIT_URL:-https://github.com/jhamby/riscos-gccsdk.git}"
+GCCSDK_GIT_REF="${RISCOS_GCCSDK_GIT_REF:-main}"
 GMP_ARCHIVE_NAME="gmp-5.0.1.tar.bz2"
 GMP_ARCHIVE_URL="https://ftp.gnu.org/gnu/gmp/$GMP_ARCHIVE_NAME"
 GMP_ARCHIVE_SHA256="a2a610f01fd3298dc08c87bf30498c2402590e1bcb227fc40b15ee6d280939fb"
@@ -149,7 +151,7 @@ Usage: ./build_scripts/riscos-gccsdk.sh [options]
 Options:
   --workdir DIR       Managed GCCSDK checkout/install root.
                       Default: out/riscos/gccsdk
-  --revision REV      Pin the GCCSDK Subversion checkout to REV.
+  --revision REV      Pin the legacy GCCSDK Subversion checkout to REV.
   --update            Update an existing unpinned checkout before building.
   --with-native       Also build native RISC OS GCC and binutils programs.
   --jobs N            Parallel build jobs. Default: detected CPU count
@@ -168,6 +170,11 @@ This script does not install host packages. On Debian/Ubuntu, GCCSDK normally
 requires build-essential, subversion, m4, bison, flex, autogen, gperf, texinfo,
 wget, sha256sum, bzip2, unzip, xsltproc, cmake, and their normal development
 tools.
+
+Environment:
+  RISCOS_GCCSDK_GIT_URL  GCCSDK mirror URL for ordinary builds.
+  RISCOS_GCCSDK_GIT_REF  Mirror branch or ref. Default: main.
+  RISCOS_GCCSDK_SVN_URL  Legacy checkout URL used with --revision.
 EOF
 }
 
@@ -220,7 +227,7 @@ esac
 # Host and checkout validation
 ##############################################################################
 
-for tool in svn make gcc g++ m4 bison flex autogen gperf makeinfo wget \
+for tool in git make gcc g++ m4 bison flex autogen gperf makeinfo wget \
     bzip2 unzip xsltproc cmake sed sha256sum; do
     command -v "$tool" >/dev/null 2>&1 ||
         die "required host tool not found: $tool"
@@ -231,28 +238,50 @@ WORK_DIR="$(cd "$WORK_DIR" && pwd)"
 [ "$WORK_DIR" != "/" ] || die "refusing to use the filesystem root as --workdir"
 
 GCC4_DIR="$WORK_DIR/gcc4"
+GCCSDK_GIT_DIR="$WORK_DIR/.gccsdk-git"
 GCCSDK_INSTALL_CROSSBIN="$WORK_DIR/cross/bin"
 GCCSDK_INSTALL_ENV="$WORK_DIR/env"
 GCCSDK_TARGET_ENV="$WORK_DIR/cross/arm-unknown-riscos"
 export GCCSDK_INSTALL_CROSSBIN GCCSDK_INSTALL_ENV GCCSDK_TARGET_ENV
 export PATH="$GCCSDK_INSTALL_CROSSBIN:$PATH"
 
-if [ ! -d "$GCC4_DIR/.svn" ]; then
-    [ ! -e "$GCC4_DIR" ] ||
-        die "$GCC4_DIR exists but is not a Subversion checkout"
-
-    checkout_args=(checkout)
-    if [ -n "$GCCSDK_REVISION" ]; then
-        checkout_args+=(-r "$GCCSDK_REVISION")
-    fi
-    checkout_args+=("$GCCSDK_URL" "$GCC4_DIR")
-    svn "${checkout_args[@]}"
-elif [ -n "$GCCSDK_REVISION" ]; then
+if [ -d "$GCC4_DIR/.svn" ]; then
     # A requested revision is a reproducibility constraint, not merely an
     # update hint, so apply it even when --update was not supplied.
-    svn update -r "$GCCSDK_REVISION" "$GCC4_DIR"
-elif [ "$UPDATE" -eq 1 ]; then
-    svn update "$GCC4_DIR"
+    command -v svn >/dev/null 2>&1 ||
+        die "Subversion is required for the existing GCCSDK checkout"
+    if [ -n "$GCCSDK_REVISION" ]; then
+        svn update -r "$GCCSDK_REVISION" "$GCC4_DIR"
+    elif [ "$UPDATE" -eq 1 ]; then
+        svn update "$GCC4_DIR"
+    fi
+elif [ -L "$GCC4_DIR" ] && [ -d "$GCCSDK_GIT_DIR/.git" ] && \
+     [ "$(readlink -f "$GCC4_DIR")" = "$GCCSDK_GIT_DIR/gcc4" ]; then
+    [ -z "$GCCSDK_REVISION" ] ||
+        die "--revision requires a GCCSDK Subversion checkout"
+    if [ "$UPDATE" -eq 1 ]; then
+        git -C "$GCCSDK_GIT_DIR" fetch --depth 1 origin "$GCCSDK_GIT_REF"
+        git -C "$GCCSDK_GIT_DIR" checkout --detach FETCH_HEAD
+    fi
+elif [ -e "$GCC4_DIR" ]; then
+    die "$GCC4_DIR exists but is not a GCCSDK checkout managed by this script"
+elif [ -n "$GCCSDK_REVISION" ]; then
+    # The public GCCSDK Subversion host is no longer generally reachable.
+    # Keep the explicit revision option for users with a local mirror, but do
+    # not use that unavailable transport for the ordinary current-toolchain
+    # build.
+    command -v svn >/dev/null 2>&1 ||
+        die "Subversion is required when --revision is specified"
+    svn checkout -r "$GCCSDK_REVISION" "$GCCSDK_URL" "$GCC4_DIR"
+else
+    # svn.riscos.info is no longer resolvable from current CI runners. The
+    # mirror retains the GCCSDK repository layout, while the symlink keeps
+    # the documented <workdir>/gcc4 path unchanged for later build stages.
+    git clone --depth 1 --branch "$GCCSDK_GIT_REF" \
+        "$GCCSDK_GIT_URL" "$GCCSDK_GIT_DIR"
+    [ -d "$GCCSDK_GIT_DIR/gcc4" ] ||
+        die "GCCSDK Git mirror does not contain gcc4"
+    ln -s .gccsdk-git/gcc4 "$GCC4_DIR"
 fi
 
 # ftpmirror.gnu.org redirects each request to a randomly selected mirror.
