@@ -482,6 +482,13 @@ def classify(path: Path, root: Path, target_os: str, supports_gas64: bool) -> Cl
     if rel in HELPER_MODULES:
         return Classification("helper-module", "source is built through a multi-file or library rule", False)
 
+    if rel.startswith("examples/aros/") and target_os != "aros":
+        # These fixtures depend on native AROS devices and, in the graphics
+        # cases, runner-provided AROS assigns.  Other target inventories still
+        # compile and report them, but cannot treat their result as a portable
+        # self-contained example.
+        return Classification("platform-specific", "example requires the AROS runtime", False)
+
     if rel.startswith("examples/nuttx/") and target_os != "nuttx":
         return Classification("platform-specific", "example requires the NuttX runtime", False)
 
