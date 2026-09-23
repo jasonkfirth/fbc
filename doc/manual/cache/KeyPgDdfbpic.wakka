@@ -1,0 +1,16 @@
+{{fbdoc item="title" value="__FB_PIC__"}}----
+Intrinsic define (macro value) set by the compiler
+
+{{fbdoc item="syntax"}}##
+	""__FB_PIC__""
+##
+{{fbdoc item="desc"}}
+	Returns non-zero (-1) when position-independent code is active, or zero (0) otherwise. The compiler may enable this mode implicitly when required by the target or output type, as well as when [[CompilerOptpic|-pic]] is used.
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.4
+
+{{fbdoc item="see"}}
+	- [[CompilerOptpic|Compiler Option: -pic]]
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

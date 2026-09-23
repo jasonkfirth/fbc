@@ -68,6 +68,7 @@ Set target architecture for improved/restricted code generation or cross-compili
 	- Before fbc 1.10.0, default was 486 for 32bit x86.
 
 {{fbdoc item="see"}}
+	- ##[[KeyPgDdfbarch|__FB_ARCH__]]##
 	- [[CompilerCmdLine|Using the Command Line]]
 	- [[CompilerOpttarget|-target]]
 	- [[DevCrossCompiling|FB and cross-compiling]]

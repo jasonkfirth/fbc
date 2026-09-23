@@ -8,6 +8,7 @@ Export symbols for dynamic linkage
 	The ##-export## compiler option exports symbols for dynamic linkage.
 
 {{fbdoc item="see"}}
+	- ##[[KeyPgDdfbexport|__FB_EXPORT__]]##
 	- ##[[KeyPgExport|Export]]##
 	- [[ProPgSharedLibraries|Shared Libraries]]
 	- [[CompilerCmdLine|Using the Command Line]]

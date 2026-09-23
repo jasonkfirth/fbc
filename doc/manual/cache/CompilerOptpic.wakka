@@ -12,6 +12,7 @@ Generate position-independent code (non-x86 Unix shared libs)
 	##-pic## is implemented by passing ##-fPIC## to gcc (when using the -gen gcc backend). The -gen gas backend does not support position-independent code since it only supports 32bit x86 and there is no special position-independent code needed for shared libraries on 32bit x86.
 
 {{fbdoc item="see"}}
+	- ##[[KeyPgDdfbpic|__FB_PIC__]]##
 	- [[CompilerCmdLine|Using the Command Line]]
 
 {{fbdoc item="back" value="CatPgCompOpt|Compiler Options"}}

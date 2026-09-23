@@ -16,6 +16,10 @@
 #include once "datetime.bi"
 #include once "string.bi"
 
+declare function fbcGetVerbose() as integer
+declare function fbcGetSourceCmdline() as string
+declare function fbcGetEntry() as string
+
 type SYMBDEF
 	name            as const zstring ptr
 	value           as zstring ptr
@@ -135,6 +139,70 @@ end function
 
 private function hDefMultithread_cb() as string static
 	function = str( env.clopt.multithreaded )
+end function
+
+private function hDefCmdline_cb() as string
+	dim as string cmdline = fbcGetSourceCmdline()
+	'' String defines are literals, so quotes in the source text must be doubled.
+	function = hReplace( cmdline, QUOTE, QUOTE + QUOTE )
+end function
+
+private function hDefVerbose_cb() as string
+	function = str( fbcGetVerbose() )
+end function
+
+private function hDefArch_cb() as string
+	dim as zstring ptr arch = fbGetFbcArch()
+	if( arch = NULL ) then
+		function = ""
+	else
+		function = *arch
+	end if
+end function
+
+private function hDefEntry_cb() as string
+	dim as string entry = fbcGetEntry()
+	function = hReplace( entry, QUOTE, QUOTE + QUOTE )
+end function
+
+private function hDefExport_cb() as string
+	function = str( fbGetOption( FB_COMPOPT_EXPORT ) )
+end function
+
+private function hDefPic_cb() as string
+	function = str( fbGetOption( FB_COMPOPT_PIC ) )
+end function
+
+private function hDefGosubSetjmp_cb() as string
+	function = str( fbGetOption( FB_COMPOPT_GOSUBSETJMP ) )
+end function
+
+private function hDefVaListAsPtr_cb() as string
+	function = str( fbGetOption( FB_COMPOPT_VALISTASPTR ) )
+end function
+
+private function hDefNoThiscall_cb() as string
+	function = str( fbGetOption( FB_COMPOPT_NOTHISCALL ) )
+end function
+
+private function hDefNoFastcall_cb() as string
+	function = str( fbGetOption( FB_COMPOPT_NOFASTCALL ) )
+end function
+
+private function hDefReturnInFlts_cb() as string
+	function = str( fbGetOption( FB_COMPOPT_RETURNINFLTS ) )
+end function
+
+private function hDefNoBuiltins_cb() as string
+	function = str( fbGetOption( FB_COMPOPT_NOBUILTINS ) )
+end function
+
+private function hDefNoCmdline_cb() as string
+	function = str( fbGetOption( FB_COMPOPT_NOCMDLINE ) )
+end function
+
+private function hDefOptAbstract_cb() as string
+	function = str( fbGetOption( FB_COMPOPT_OPTABSTRACT ) )
 end function
 
 private function hDefOptByval_cb() as string
@@ -1508,6 +1576,8 @@ end function
 dim shared defTb(0 to ...) as SYMBDEF => _
 { _
 	_ '' name                     constant value  flags                callback (if value isn't constant)
+	(@"__CMDLINE__"           , NULL          , FB_DEFINE_FLAGS_STR, @hDefCmdline_cb    ), _
+	(@"__FB_ARCH__"           , NULL          , FB_DEFINE_FLAGS_STR, @hDefArch_cb       ), _
 	(@"__FB_VERSION__"        , @FB_VERSION       , FB_DEFINE_FLAGS_STR, NULL           ), _
 	(@"__FB_BUILD_DATE__"     , @FB_BUILD_DATE    , FB_DEFINE_FLAGS_STR, NULL           ), _
 	(@"__FB_BUILD_DATE_ISO__" , @FB_BUILD_DATE_ISO, FB_DEFINE_FLAGS_STR, NULL           ), _
@@ -1518,6 +1588,7 @@ dim shared defTb(0 to ...) as SYMBDEF => _
 	(@"__FB_BUILD_SHA1__"     , @FB_BUILD_SHA1    , FB_DEFINE_FLAGS_STR, NULL           ), _
 	(@"__FB_BUILD_FORK_ID__"  , @FB_BUILD_FORK_ID , FB_DEFINE_FLAGS_STR, NULL           ), _
 	(@"__FB_MT__"             , NULL          , 0                  , @hDefMultithread_cb), _
+	(@"__FB_ENTRY__"          , NULL          , FB_DEFINE_FLAGS_STR, @hDefEntry_cb      ), _
 	(@"__FILE__"              , NULL          , FB_DEFINE_FLAGS_STR, @hDefFile_cb       ), _
 	(@"__FILE_NQ__"           , NULL          , 0                  , @hDefFile_cb       ), _
 	(@"__FUNCTION__"          , NULL          , FB_DEFINE_FLAGS_STR, @hDefFunction_cb   ), _
@@ -1538,7 +1609,18 @@ dim shared defTb(0 to ...) as SYMBDEF => _
 	(@"__FB_OUT_LIB__"        , NULL          , 0                  , @hDefOutLib_cb     ), _
 	(@"__FB_OUT_DLL__"        , NULL          , 0                  , @hDefOutDll_cb     ), _
 	(@"__FB_OUT_OBJ__"        , NULL          , 0                  , @hDefOutObj_cb     ), _
+	(@"__FB_EXPORT__"         , NULL          , 0                  , @hDefExport_cb     ), _
+	(@"__FB_PIC__"            , NULL          , 0                  , @hDefPic_cb        ), _
 	(@"__FB_DEBUG__"          , NULL          , 0                  , @hDefDebug_cb      ), _
+	(@"__FB_VERBOSE__"        , NULL          , 0                  , @hDefVerbose_cb    ), _
+	(@"__FB_GOSUB_SETJMP__"   , NULL          , 0                  , @hDefGosubSetjmp_cb), _
+	(@"__FB_VALIST_AS_PTR__"  , NULL          , 0                  , @hDefVaListAsPtr_cb), _
+	(@"__FB_NO_THISCALL__"    , NULL          , 0                  , @hDefNoThiscall_cb ), _
+	(@"__FB_NO_FASTCALL__"    , NULL          , 0                  , @hDefNoFastcall_cb ), _
+	(@"__FB_RETURN_IN_FLTS__" , NULL          , 0                  , @hDefReturnInFlts_cb), _
+	(@"__FB_NOBUILTINS__"     , NULL          , 0                  , @hDefNoBuiltins_cb ), _
+	(@"__FB_NOCMDLINE__"      , NULL          , 0                  , @hDefNoCmdline_cb  ), _
+	(@"__FB_OPTABSTRACT__"    , NULL          , 0                  , @hDefOptAbstract_cb), _
 	(@"__FB_ERR__"            , NULL          , 0                  , @hDefErr_cb        ), _
 	(@"__FB_LANG__"           , NULL          , FB_DEFINE_FLAGS_STR, @hDefLang_cb       ), _
 	(@"__FB_BACKEND__"        , NULL          , FB_DEFINE_FLAGS_STR, @hDefBackend_cb    ), _

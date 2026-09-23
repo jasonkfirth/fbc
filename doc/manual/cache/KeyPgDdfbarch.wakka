@@ -1,0 +1,18 @@
+{{fbdoc item="title" value="__FB_ARCH__"}}----
+Intrinsic define (macro string) set by the compiler
+
+{{fbdoc item="syntax"}}##
+	""__FB_ARCH__""
+##
+{{fbdoc item="desc"}}
+	Defined as a string literal containing the effective target architecture selected by the compiler, after applying options such as [[CompilerOptarch|-arch]]. The value is the compiler's canonical architecture name, not the original option text.
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.4
+
+{{fbdoc item="see"}}
+	- [[CompilerOptarch|Compiler Option: -arch]]
+	- ##[[KeyPgDdfbx86|__FB_X86__]]##
+	- ##[[KeyPgDdfbarm|__FB_ARM__]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

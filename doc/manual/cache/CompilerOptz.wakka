@@ -51,5 +51,13 @@ Sets miscellaneous or experimental compiler options.
 
 {{fbdoc item="see"}}
 	- [[CompilerCmdLine|Using the Command Line]]
+	- ##[[KeyPgDdfbgosubsetjmp|__FB_GOSUB_SETJMP__]]##
+	- ##[[KeyPgDdfbvalistasptr|__FB_VALIST_AS_PTR__]]##
+	- ##[[KeyPgDdfbnothiscall|__FB_NO_THISCALL__]]##
+	- ##[[KeyPgDdfbnofastcall|__FB_NO_FASTCALL__]]##
+	- ##[[KeyPgDdfbnocmdline|__FB_NOCMDLINE__]]##
+	- ##[[KeyPgDdfbreturninflts|__FB_RETURN_IN_FLTS__]]##
+	- ##[[KeyPgDdfbnobuiltins|__FB_NOBUILTINS__]]##
+	- ##[[KeyPgDdfboptabstract|__FB_OPTABSTRACT__]]##
 
 {{fbdoc item="back" value="CatPgCompOpt|Compiler Options"}}

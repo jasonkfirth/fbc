@@ -1,3 +1,10 @@
+freebasic (1.20.4-2) unstable; urgency=medium
+
+  * Rebuild the current 1.20.4 packages as revision 2 so APT recognizes them
+    as newer than the already published revision 1 packages.
+
+ -- SJ_Zero <sj@fbxl.net>  Wed, 23 Sep 2026 10:19:12 -0400
+
 freebasic (1.20.4-1) unstable; urgency=medium
 
   * Package the 1.20.4 compiler, runtime, graphics, sound, platform, and

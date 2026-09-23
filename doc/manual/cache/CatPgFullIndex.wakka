@@ -14,10 +14,12 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgDots|... (Ellipsis)"}}
 
 {{fbdoc item="section" value="_"}}{{anchor name="underscore"}}
+	- {{fbdoc item="keyword" value="KeyPgDdcmdline|__CMDLINE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDddate|__DATE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDddateiso|__DATE_ISO__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfb64bit|__FB_64BIT__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbandroid|__FB_ANDROID__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbarch|__FB_ARCH__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbaros|__FB_AROS__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbargcount|__FB_ARG_COUNT__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbargextract|__FB_ARG_EXTRACT__"}}
@@ -39,14 +41,17 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgDdfbdragonfly|__FB_DRAGONFLY__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbdebug|__FB_DEBUG__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbdos|__FB_DOS__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbentry|__FB_ENTRY__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfberr|__FB_ERR__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbeval|__FB_EVAL__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbexport|__FB_EXPORT__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbfpmode|__FB_FPMODE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbfpu|__FB_FPU__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbfreebsd|__FB_FREEBSD__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbhaiku|__FB_HAIKU__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbgcc|__FB_GCC__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbgfxlib3|__FB_GFXLIB3__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbgosubsetjmp|__FB_GOSUB_SETJMP__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbgui|__FB_GUI__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbiif|__FB_IIF__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbillumos|__FB_ILLUMOS__"}}
@@ -63,8 +68,13 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgDdfbmips64|__FB_MIPS64__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbmt|__FB_MT__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbnetbsd|__FB_NETBSD__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbnobuiltins|__FB_NOBUILTINS__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbnocmdline|__FB_NOCMDLINE__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbnofastcall|__FB_NO_FASTCALL__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbnothiscall|__FB_NO_THISCALL__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbnuttx|__FB_NUTTX__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbopenbsd|__FB_OPENBSD__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfboptabstract|__FB_OPTABSTRACT__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfboptimize|__FB_OPTIMIZE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfboptionbyval|__FB_OPTION_BYVAL__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfboptiondynamic|__FB_OPTION_DYNAMIC__"}}
@@ -78,10 +88,12 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgDdfboutlib|__FB_OUT_LIB__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfboutobj|__FB_OUT_OBJ__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbpcos|__FB_PCOS__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbpic|__FB_PIC__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbppc|__FB_PPC__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbprofile|__FB_PROFILE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbquerysymbol|__FB_QUERY_SYMBOL__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbquote|__FB_QUOTE__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbreturninflts|__FB_RETURN_IN_FLTS__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbriscos|__FB_RISCOS__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbriscv32|__FB_RISCV32__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbriscv64|__FB_RISCV64__"}}
@@ -94,7 +106,9 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgDdfbuniqueidpush|__FB_UNIQUEID_PUSH__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbunix|__FB_UNIX__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbunquote|__FB_UNQUOTE__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbvalistasptr|__FB_VALIST_AS_PTR__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdfbvectorize|__FB_VECTORIZE__"}}
+	- {{fbdoc item="keyword" value="KeyPgDdfbverbose|__FB_VERBOSE__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdFBVerMajor|__FB_VER_MAJOR__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdFBVerMinor|__FB_VER_MINOR__"}}
 	- {{fbdoc item="keyword" value="KeyPgDdFBVerPatch|__FB_VER_PATCH__"}}

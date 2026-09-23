@@ -1,0 +1,17 @@
+{{fbdoc item="title" value="__FB_NO_THISCALL__"}}----
+Intrinsic define (macro value) set by the compiler
+
+{{fbdoc item="syntax"}}##
+	""__FB_NO_THISCALL__""
+##
+{{fbdoc item="desc"}}
+	Returns non-zero (-1) when ##-z no-thiscall## instructs the compiler to ignore ##__thiscall## directives, or zero (0) otherwise.
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.4
+
+{{fbdoc item="see"}}
+	- [[CompilerOptz|Compiler Option: -z]]
+	- ##[[KeyPgThiscall|__thiscall]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

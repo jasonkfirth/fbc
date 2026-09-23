@@ -875,6 +875,8 @@ declare sub fbcParseArgsFromString _
 		byval is_file as integer _
 	)
 
+declare sub fbcAddSourceCmdline(byval args as zstring ptr)
+
 '':::::
 '' ppCmdLine        =   '#'CMDLINE LIT_STR
 ''
@@ -916,16 +918,17 @@ private sub ppCmdline( )
 	elseif( env.module_count <> 1 ) then
 		errReportWarn( FB_WARNINGMSG_CMDLINEIGNORED )
 
-	'' ignoring all #cmdline's due to '-z nocmdline' option?
-	elseif( fbGetOption(FB_COMPOPT_NOCMDLINE) ) then
-		errReportWarn( FB_WARNINGMSG_CMDLINEIGNORED )
-
 	'' Already restarted due to #cmdline "-end" | "-restart"?
 	elseif( (env.restart_status and FB_RESTART_CMDLINE) <> 0 ) then
 		'' do nothing
 
+	'' ignoring all #cmdline's due to '-z nocmdline' option?
+	elseif( fbGetOption(FB_COMPOPT_NOCMDLINE) ) then
+		errReportWarn( FB_WARNINGMSG_CMDLINEIGNORED )
+
 	'' #cmdline "-end" ?
 	elseif( lcase(trim(*args)) = "-end" ) then
+		fbcAddSourceCmdline( args )
 
 		'' We don't have any clever way to auto-detect when all #cmdline's have been read
 		'' Check for '#cmdline "-end"' to begin a restart and not wait for end of file
@@ -938,6 +941,7 @@ private sub ppCmdline( )
 
 	'' #cmdline "-restart" ?
 	elseif( lcase(trim(*args)) = "-restart" ) then
+		fbcAddSourceCmdline( args )
 
 		'' like "-end" above, but always reset fbc
 		fbRestartBeginRequest( FB_RESTART_FBC_CMDLINE )
@@ -948,6 +952,7 @@ private sub ppCmdline( )
 
 	'' must be first pass in the first module, so process the option
 	else
+		fbcAddSourceCmdline( args )
 		fbcParseArgsFromString( args, TRUE, FALSE )
 
 	end if

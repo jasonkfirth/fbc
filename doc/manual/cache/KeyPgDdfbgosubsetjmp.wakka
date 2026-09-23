@@ -1,0 +1,17 @@
+{{fbdoc item="title" value="__FB_GOSUB_SETJMP__"}}----
+Intrinsic define (macro value) set by the compiler
+
+{{fbdoc item="syntax"}}##
+	""__FB_GOSUB_SETJMP__""
+##
+{{fbdoc item="desc"}}
+	Returns non-zero (-1) when the setjmp/longjmp implementation of GOSUB is enabled with ##-z gosub-setjmp##, or zero (0) otherwise.
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.4
+
+{{fbdoc item="see"}}
+	- [[CompilerOptz|Compiler Option: -z]]
+	- ##[[KeyPgGosub|Gosub]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

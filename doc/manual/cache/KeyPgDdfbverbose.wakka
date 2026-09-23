@@ -1,0 +1,29 @@
+{{fbdoc item="title" value="__FB_VERBOSE__"}}----
+Intrinsic define (macro value) set by the compiler
+
+{{fbdoc item="syntax"}}##
+	""__FB_VERBOSE__""
+##
+{{fbdoc item="desc"}}
+	##""__FB_VERBOSE__""## indicates whether verbose mode is active at the current point in compilation.
+
+	Returns non-zero (-1) if the ##-v## compiler option has been enabled, including by a source ###cmdline## directive. Returns zero (0) otherwise.
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.4
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#if __FB_VERBOSE__ <> 0
+	#print Verbose mode
+#else
+	#print Normal mode
+#endif
+%%
+
+{{fbdoc item="see"}}
+	- [[CompilerOptv|Compiler Option: -v]]
+	- ##[[KeyPgPpcmdline|#cmdline]]##
+	- ##[[KeyPgDdcmdline|__CMDLINE__]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

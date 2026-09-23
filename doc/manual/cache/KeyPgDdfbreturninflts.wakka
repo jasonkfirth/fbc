@@ -1,0 +1,16 @@
+{{fbdoc item="title" value="__FB_RETURN_IN_FLTS__"}}----
+Intrinsic define (macro value) set by the compiler
+
+{{fbdoc item="syntax"}}##
+	""__FB_RETURN_IN_FLTS__""
+##
+{{fbdoc item="desc"}}
+	Returns non-zero (-1) when ##-z retinflts## enables returning supported structures in floating-point registers, or zero (0) otherwise.
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.4
+
+{{fbdoc item="see"}}
+	- [[CompilerOptz|Compiler Option: -z]]
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

@@ -114,6 +114,10 @@ Preprocessor symbols defined by the compiler.
 		Defined as a string literal of the custom defined project fork identifier name.
 
 {{anchor name="CMDLINE"}}{{fbdoc item="section" value="Command-line switches"}}
+	=={{fbdoc item="keyword" value="KeyPgDdcmdline|__CMDLINE__"}}==
+		Defined as a string literal containing accepted options from source ###cmdline## directives, in directive order.
+	=={{fbdoc item="keyword" value="KeyPgDdfbarch|__FB_ARCH__"}}==
+		Defined as a string literal of the effective target architecture.
 	=={{fbdoc item="keyword" value="KeyPgDdfbasm|__FB_ASM__"}}==
 		Defined to either ##"intel"## or ##"att"## depending on [[CompilerOptasm|-asm]].
 	=={{fbdoc item="keyword" value="KeyPgDdFBBackend|__FB_BACKEND__"}}==
@@ -126,6 +130,30 @@ Preprocessor symbols defined by the compiler.
 		Defined to the optimization level depending on [[CompilerOptoptimization|-O]].
 	=={{fbdoc item="keyword" value="KeyPgDdfbgui|__FB_GUI__"}}==
 		True (##-1##) if GUI subsystem mode is active, false (##0##) otherwise.
+	=={{fbdoc item="keyword" value="KeyPgDdfbverbose|__FB_VERBOSE__"}}==
+		True (##-1##) if verbose mode is active, false (##0##) otherwise.
+	=={{fbdoc item="keyword" value="KeyPgDdfbentry|__FB_ENTRY__"}}==
+		Defined as a string literal of the custom entry point, or an empty string if none was specified.
+	=={{fbdoc item="keyword" value="KeyPgDdfbexport|__FB_EXPORT__"}}==
+		True (##-1##) if exports are enabled, false (##0##) otherwise.
+	=={{fbdoc item="keyword" value="KeyPgDdfbgosubsetjmp|__FB_GOSUB_SETJMP__"}}==
+		True (##-1##) if the setjmp/longjmp GOSUB implementation is enabled, false (##0##) otherwise.
+	=={{fbdoc item="keyword" value="KeyPgDdfbnobuiltins|__FB_NOBUILTINS__"}}==
+		True (##-1##) if nonessential builtin declarations and definitions are disabled, false (##0##) otherwise.
+	=={{fbdoc item="keyword" value="KeyPgDdfbnocmdline|__FB_NOCMDLINE__"}}==
+		True (##-1##) if source ###cmdline## directives are disabled, false (##0##) otherwise.
+	=={{fbdoc item="keyword" value="KeyPgDdfbnofastcall|__FB_NO_FASTCALL__"}}==
+		True (##-1##) if ##__fastcall## directives are ignored, false (##0##) otherwise.
+	=={{fbdoc item="keyword" value="KeyPgDdfbnothiscall|__FB_NO_THISCALL__"}}==
+		True (##-1##) if ##__thiscall## directives are ignored, false (##0##) otherwise.
+	=={{fbdoc item="keyword" value="KeyPgDdfboptabstract|__FB_OPTABSTRACT__"}}==
+		True (##-1##) if unused pure abstract types are not emitted, false (##0##) otherwise.
+	=={{fbdoc item="keyword" value="KeyPgDdfbpic|__FB_PIC__"}}==
+		True (##-1##) if position-independent code is active, false (##0##) otherwise.
+	=={{fbdoc item="keyword" value="KeyPgDdfbreturninflts|__FB_RETURN_IN_FLTS__"}}==
+		True (##-1##) if supported structures may be returned in floating-point registers, false (##0##) otherwise.
+	=={{fbdoc item="keyword" value="KeyPgDdfbvalistasptr|__FB_VALIST_AS_PTR__"}}==
+		True (##-1##) if variadic argument lists use pointer expressions, false (##0##) otherwise.
 	=={{fbdoc item="keyword" value="KeyPgDdFBMain|__FB_MAIN__"}}==
 		Defined if compiling a module with an entry point.
 	=={{fbdoc item="keyword" value="KeyPgDdfbdebug|__FB_DEBUG__"}}==

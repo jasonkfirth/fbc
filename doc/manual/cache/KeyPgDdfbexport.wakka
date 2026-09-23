@@ -1,0 +1,16 @@
+{{fbdoc item="title" value="__FB_EXPORT__"}}----
+Intrinsic define (macro value) set by the compiler
+
+{{fbdoc item="syntax"}}##
+	""__FB_EXPORT__""
+##
+{{fbdoc item="desc"}}
+	Returns non-zero (-1) when exporting symbols has been enabled with [[CompilerOptexport|-export]], or zero (0) otherwise.
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.4
+
+{{fbdoc item="see"}}
+	- [[CompilerOptexport|Compiler Option: -export]]
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

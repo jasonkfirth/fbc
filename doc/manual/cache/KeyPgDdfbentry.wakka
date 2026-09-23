@@ -1,0 +1,16 @@
+{{fbdoc item="title" value="__FB_ENTRY__"}}----
+Intrinsic define (macro string) set by the compiler
+
+{{fbdoc item="syntax"}}##
+	""__FB_ENTRY__""
+##
+{{fbdoc item="desc"}}
+	Defined as a string literal containing the custom entry point specified with [[CompilerOptentry|-entry]]. It is an empty string when no custom entry point was specified.
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.4
+
+{{fbdoc item="see"}}
+	- [[CompilerOptentry|Compiler Option: -entry]]
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

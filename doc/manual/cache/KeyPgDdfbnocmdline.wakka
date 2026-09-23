@@ -1,0 +1,17 @@
+{{fbdoc item="title" value="__FB_NOCMDLINE__"}}----
+Intrinsic define (macro value) set by the compiler
+
+{{fbdoc item="syntax"}}##
+	""__FB_NOCMDLINE__""
+##
+{{fbdoc item="desc"}}
+	Returns non-zero (-1) when ##-z nocmdline## disables source ###cmdline## directives, or zero (0) otherwise. When enabled, the compiler ignores those directives and uses only options passed to **fbc**.
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.4
+
+{{fbdoc item="see"}}
+	- [[CompilerOptz|Compiler Option: -z]]
+	- ##[[KeyPgPpcmdline|#cmdline]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

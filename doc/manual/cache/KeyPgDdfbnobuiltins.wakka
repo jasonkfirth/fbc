@@ -1,0 +1,16 @@
+{{fbdoc item="title" value="__FB_NOBUILTINS__"}}----
+Intrinsic define (macro value) set by the compiler
+
+{{fbdoc item="syntax"}}##
+	""__FB_NOBUILTINS__""
+##
+{{fbdoc item="desc"}}
+	Returns non-zero (-1) when ##-z nobuiltins## disables nonessential builtin declarations and definitions, or zero (0) otherwise.
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.4
+
+{{fbdoc item="see"}}
+	- [[CompilerOptz|Compiler Option: -z]]
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

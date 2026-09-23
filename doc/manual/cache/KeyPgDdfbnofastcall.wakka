@@ -1,0 +1,17 @@
+{{fbdoc item="title" value="__FB_NO_FASTCALL__"}}----
+Intrinsic define (macro value) set by the compiler
+
+{{fbdoc item="syntax"}}##
+	""__FB_NO_FASTCALL__""
+##
+{{fbdoc item="desc"}}
+	Returns non-zero (-1) when ##-z no-fastcall## instructs the compiler to ignore ##__fastcall## directives, or zero (0) otherwise.
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.4
+
+{{fbdoc item="see"}}
+	- [[CompilerOptz|Compiler Option: -z]]
+	- ##[[KeyPgFastcall|__fastcall]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}

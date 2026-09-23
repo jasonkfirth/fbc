@@ -84,6 +84,7 @@ type FBCCTX
 	keepfinalasm        as integer     '' preserve final .asm
 	keepobj             as integer
 	verbose             as integer
+	sourcecmdline       as string      '' accepted options from source #cmdline directives
 	showversion         as integer
 	showhelp            as integer
 	print               as integer     '' PRINT_* (-print option)
@@ -234,12 +235,44 @@ declare sub fbcAddDefLib(byval libname as zstring ptr)
 
 dim shared as FBCCTX fbc
 
+function fbcGetVerbose() as integer
+	function = fbc.verbose
+end function
+
+function fbcGetSourceCmdline() as string
+	function = fbc.sourcecmdline
+end function
+
+function fbcGetEntry() as string
+	function = fbc.entry
+end function
+
+'' Keep accepted source #cmdline text for the __CMDLINE__ intrinsic define.
+'' Preserve each directive's text and separate directives with one space.
+sub fbcAddSourceCmdline(byval args as zstring ptr)
+	if( args = NULL ) then
+		exit sub
+	end if
+
+	if( len( *args ) = 0 ) then
+		exit sub
+	end if
+
+	if( len( fbc.sourcecmdline ) > 0 ) then
+		fbc.sourcecmdline += " "
+	end if
+
+	fbc.sourcecmdline += *args
+end sub
+
 private sub fbcInit( )
 	const FBC_INITFILES = 64
 
 	fbc.backend = -1
 	fbc.cputype = -1
 	fbc.asmsyntax = -1
+	fbc.sourcecmdline = ""
+	fbc.entry = ""
 
 	listInit( @fbc.modules, FBC_INITFILES, sizeof(FBCIOFILE) )
 	listInit( @fbc.rcs, FBC_INITFILES\4, sizeof(FBCIOFILE) )

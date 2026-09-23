@@ -1,0 +1,27 @@
+{{fbdoc item="title" value="__CMDLINE__"}}----
+Intrinsic define (macro value) set by the compiler
+
+{{fbdoc item="syntax"}}##
+	""__CMDLINE__""
+##
+{{fbdoc item="desc"}}
+	##""__CMDLINE__""## is a string literal containing the option text from accepted source ###cmdline## directives in the current compilation. The directive text is joined in source order with one space between directives.
+
+	It reflects options supplied by source directives, not the arguments used to launch **fbc**. It is an empty string when no non-empty source ###cmdline## options have been accepted.
+
+{{fbdoc item="ver"}}
+	- Since fbc 1.20.4
+
+{{fbdoc item="ex"}}
+%%(freebasic)
+#cmdline "-v"
+#cmdline "-s gui"
+
+#print __CMDLINE__ ' -v -s gui
+%%
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgPpcmdline|#cmdline]]##
+	- ##[[KeyPgDdfbverbose|__FB_VERBOSE__]]##
+
+{{fbdoc item="back" value="CatPgDddefines|Intrinsic Defines"}}
