@@ -17,6 +17,9 @@
 #include once "rtl.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportProc(byval proc as FBSYMBOL ptr, _
+	byval astproc as ASTNODE ptr)
+
 type FB_GLOBINSTANCE
 	sym             as FBSYMBOL_ ptr            '' for symbol
 	initree         as ASTNODE ptr              '' can't store in sym, or emit will use it
@@ -788,6 +791,10 @@ function astProcEnd( byval callrtexit as integer ) as integer
 		if( env.clopt.backend = FB_BACKEND_GAS ) then
 			astProcVectorize( n->l )
 		end if
+	end if
+
+	if( res and (errGetCount( ) = 0) ) then
+	fbSemanticModelExportProc( sym, n )
 	end if
 
 	''

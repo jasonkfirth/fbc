@@ -77,6 +77,7 @@ quick-test-body: sanity \
 	build-graph-test \
 	bootstrap-emit-test \
 	compiler-smoke \
+	compiler-semantic-model-smoke \
 	compiler-indirect-goto-smoke \
 	compiler-riscv64-smoke \
 	compiler-s390x-smoke \
@@ -114,6 +115,7 @@ full-test-body: sanity \
 	uninstall-test \
 	matrix-test \
 	compiler-smoke \
+	compiler-semantic-model-smoke \
 	compiler-indirect-goto-smoke \
 	compiler-riscv64-smoke \
 	compiler-s390x-smoke \
@@ -148,6 +150,7 @@ MAKETEST_HOST_FBC_TARGETS := \
 	uninstall-test \
 	matrix-test \
 	compiler-smoke \
+	compiler-semantic-model-smoke \
 	compiler-indirect-goto-smoke \
 	compiler-riscv64-smoke \
 	compiler-s390x-smoke \

@@ -15,6 +15,9 @@
 #include once "ir.bi"
 #include once "objinfo.bi"
 
+declare sub fbSemanticModelBeginModule(byref filename as string)
+declare sub fbSemanticModelExportGlobals(byval symbol as FBSYMBOL ptr)
+
 type FB_LANG_INFO
 	name        as const zstring ptr
 	options     as FB_LANG_OPT
@@ -1535,6 +1538,7 @@ sub fbCompile _
 	hReplaceSlash( env.inf.name, asc( FB_HOST_PATHDIV ) )
 	env.inf.incfile = hAddIncFile( NULL, @env.filenamehash, env.inf.name )
 	env.inf.ismain = ismain
+	fbSemanticModelBeginModule( env.inf.name )
 
 	env.outf.name = *outfname
 	env.outf.ismain = ismain
@@ -1586,6 +1590,7 @@ sub fbCompile _
 
 	if (fbShouldContinue()) then
 		fbMainEnd( )
+	fbSemanticModelExportGlobals( symbGetGlobalTbHead( ) )
 	end if
 
 	'' compiling only, not cross-compiling?

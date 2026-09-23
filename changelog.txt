@@ -1,6 +1,7 @@
 Version 1.20.4
 
 [changed]
+- compiler semantic model: add the opt-in `-semantic-model` sidecar with transactional module output, globally stable symbol references, resolved variable type facts, procedure records, typed AST nodes, source locations, and schema/count validation; use compiler type facts in FBL503 without changing ordinary compilation, and document schema version 2.
 - linter/style: FBL009 skips a line that follows an explicit continuation. Its alignment is horizontal layout within an open statement and no longer produces a false mixed-indentation result.
 - examples/TinyPTC and linter/style: normalize the remaining legacy block layouts without changing drawing, clipping, or copy behavior, completing a warning-free automatic-width style pass across all 1,722 examples.
 - compiler/AST: replace an obsolete null-pointer-check TODO with the implemented direct-address and pointer-indexing optimization boundary, without changing generated code.

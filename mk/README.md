@@ -183,6 +183,7 @@ Useful high-level targets:
 - `make quick-test`
 - `make full-test`
 - `make compiler-smoke`
+- `make compiler-semantic-model-smoke`
 - `make bootstrap-emit-test`
 
 The test harness is designed to preserve enough state to avoid rebuilding the

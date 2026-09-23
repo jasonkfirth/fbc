@@ -127,6 +127,7 @@ type FBCCTX
 	nofbrt0             as integer  '' If we should exclude fbrt0.o or fbrt0pic.o (implied by nodeflibs, and optional by -nolib fbrt0.o,fbrt0pic.o)
 	staticlink          as integer
 	stripsymbols        as integer
+	semanticmodel       as string      '' Optional compiler-owned semantic model output
 
 	'' Compiler paths
 	prefix              as zstring * FB_MAXPATHLEN+1  '' Path from -prefix or empty
@@ -229,6 +230,9 @@ declare function fbcRiscosHostRunTool _
 declare sub hPrintVersion( byval verbose as integer )
 declare sub hAddDarwinFrameworks( byref ldcline as string )
 declare sub fbcAddDefLib(byval libname as zstring ptr)
+declare function fbSemanticModelBegin(byref filename as string) as integer
+declare sub fbSemanticModelEnd(byval succeeded as integer)
+declare sub fbSemanticModelFinishModule(byval commit as integer)
 
 #macro safeKill(f)
 	if( kill( f ) <> 0 ) then
@@ -314,6 +318,8 @@ private sub hSetOutName( )
 end sub
 
 private sub fbcEnd( byval errnum as integer )
+	fbSemanticModelEnd( errnum = 0 )
+
 	'' Clean up temporary files
 	dim as TSTRSETITEM ptr file = listGetHead(@fbc.temps.list)
 	while( file )
@@ -2717,6 +2723,7 @@ enum
 	OPT_RR
 	OPT_RRKEEPASM
 	OPT_S
+	OPT_SEMANTIC_MODEL
 	OPT_SHOWINCLUDES
 	OPT_STATIC
 	OPT_STRIP
@@ -2805,6 +2812,7 @@ dim shared as FBC_CMDLINE_OPTION cmdlineOptionTB(0 to (OPT__COUNT - 1)) = _
 	( FALSE, TRUE , TRUE , FALSE ), _ '' OPT_RR           affects compile / assemble / link process, removal of temporary files
 	( FALSE, TRUE , TRUE , FALSE ), _ '' OPT_RRKEEPASM    affects removal of temporary files
 	( TRUE , TRUE , FALSE, FALSE ), _ '' OPT_S            affects link
+	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_MODEL compiler-owned semantic model output
 	( FALSE, TRUE , FALSE, TRUE  ), _ '' OPT_SHOWINCLUDES affects compiler output display
 	( FALSE, TRUE , FALSE, FALSE ), _ '' OPT_STATIC       affects link
 	( FALSE, TRUE , FALSE, FALSE ), _ '' OPT_STRIP        affects link
@@ -2922,6 +2930,12 @@ private sub hHandleOptCompileSetup _
 
 	case OPT_FBGFX
 		fbSetOption( FB_COMPOPT_FBGFX, TRUE )
+
+	case OPT_SEMANTIC_MODEL
+		fbc.semanticmodel = arg
+		'' Keep AST line markers for the sidecar; code generation is otherwise
+		'' unchanged.
+		fbSetOption( FB_COMPOPT_DEBUGINFO, TRUE )
 
 	case OPT_GFX3
 		'' The preinclude uses the same empty define spelling as source code,
@@ -3372,13 +3386,13 @@ private sub handleOpt _
 	)
 
 	select case as const optid
-	case OPT_A to OPT_FPU, OPT_GFX3
+	case OPT_A to OPT_FPU, OPT_GFX3, OPT_SEMANTIC_MODEL
 		hHandleOptCompileSetup( optid, arg, is_source )
 
 	case OPT_G, OPT_GEN to OPT_O
 		hHandleOptFilesAndOutput( optid, arg, is_source )
 
-	case OPT_OPTIMIZE to OPT_TARGET
+	case OPT_OPTIMIZE to OPT_S, OPT_SHOWINCLUDES to OPT_TARGET
 		hHandleOptPipeline( optid, arg, is_source )
 
 	case OPT_TITLE to OPT_Z
@@ -3498,6 +3512,7 @@ private function parseOption(byval opt as zstring ptr) as integer
 
 	case asc("s")
 		ONECHAR(OPT_S)
+		CHECK("semantic-model", OPT_SEMANTIC_MODEL)
 		CHECK("showincludes", OPT_SHOWINCLUDES)
 		CHECK("static", OPT_STATIC)
 		CHECK("strip", OPT_STRIP)
@@ -4399,13 +4414,17 @@ private sub hCompileBas _
 		'' If there were any errors during parsing, just exit without
 		'' doing anything else.
 		if( errGetCount( ) > 0 ) then
+			fbSemanticModelFinishModule( FALSE )
 			fbcEnd( 1 )
 		end if
 
 		'' Don't restart unless asked for
 		if( fbShouldRestart( ) = FALSE ) then
+			fbSemanticModelFinishModule( TRUE )
 			exit do
 		end if
+
+		fbSemanticModelFinishModule( FALSE )
 
 		'' Close the request to restart the parser
 		fbRestartEndRequest( FB_RESTART_PARSER )
@@ -5454,6 +5473,7 @@ private sub hPrintOptions( byval verbose as integer )
 	print "  -ex              -e plus RESUME support"
 	print "  -exx             -ex plus array bounds/null-pointer checking"
 	print "  -export          Export symbols for dynamic linkage"
+	print "  -semantic-model <file>  Write a versioned compiler semantic model"
 	if( verbose ) then
 	print "  -fbgfx           Link to the appropriate libfbgfx variant (normally automatic)"
 	end if
@@ -5680,6 +5700,13 @@ end sub
 		if( have_input_files = FALSE ) then
 			hPrintOptions( fbc.verbose )
 			fbcEnd( 1 )
+		end if
+
+		if( len( fbc.semanticmodel ) > 0 ) then
+			if( fbSemanticModelBegin( fbc.semanticmodel ) = FALSE ) then
+				print "error: could not write semantic model: "; fbc.semanticmodel
+				fbcEnd( 1 )
+			end if
 		end if
 
 		''

@@ -4,7 +4,7 @@
 # Compiler smoke test
 ##############################################################################
 
-.PHONY: compiler-smoke compiler-indirect-goto-smoke compiler-riscv32-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-mips-smoke compiler-ppc-smoke compiler-ppc64-smoke compiler-ppc64le-smoke compiler-riscos-smoke
+.PHONY: compiler-smoke compiler-semantic-model-smoke compiler-indirect-goto-smoke compiler-riscv32-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-mips-smoke compiler-ppc-smoke compiler-ppc64-smoke compiler-ppc64le-smoke compiler-riscos-smoke
 compiler-smoke: libs
 	$(call _mt_echo,Compiler smoke test)
 	@mkdir -p "$(TEST_TMP)"
@@ -13,6 +13,37 @@ compiler-smoke: libs
 ifneq ($(CAN_RUN),)
 	@./"$(TEST_TMP)/smoke$(EXEEXT)" >/dev/null 2>&1 && echo "==> RUN OK"
 endif
+	$(call _mt_cleanup_success)
+
+compiler-semantic-model-smoke:
+	$(call _mt_echo,Compiler semantic model smoke test)
+	@mkdir -p "$(TEST_TMP)"
+	@printf "%s\n" \
+		'declare function semantic_helper() as integer' \
+	'sub semantic_probe()' \
+	'    dim as integer value = 1' \
+	'    value += semantic_helper()' \
+	'end sub' \
+	'semantic_probe()' \
+	> "$(TEST_TMP)/semantic-model.bas"
+	@printf "%s\n" \
+		'function semantic_helper() as integer' \
+		'    return 1' \
+		'end function' \
+		> "$(TEST_TMP)/semantic-model-helper.bas"
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model "$(TEST_TMP)/semantic-model.tsv" -r "$(TEST_TMP)/semantic-model.bas" "$(TEST_TMP)/semantic-model-helper.bas")
+	@awk -F '\t' '\
+		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 != "2") exit 1; header = 1; next } \
+		$$1 == "M" { if (NF != 2) exit 1; modules++; next } \
+		$$1 == "S" { if (NF != 12 || symbol_ids[$$2]++) exit 1; if ($$6 != 0) symbol_refs[++symbol_ref_count] = $$6; if ($$12 != 0) symbol_refs[++symbol_ref_count] = $$12; symbols++; next } \
+		$$1 == "P" { if (NF != 9) exit 1; symbol_refs[++symbol_ref_count] = $$2; procedures++; next } \
+		$$1 == "V" { if (NF != 5 || $$2 == 0 || $$4 == "" || ($$5 != "pointer" && $$5 != "numeric" && $$5 != "dynamic-string" && $$5 != "fixed-string" && $$5 != "aggregate" && $$5 != "procedure" && $$5 != "other")) exit 1; symbol_refs[++symbol_ref_count] = $$2; typefacts++; next } \
+		$$1 == "N" { if (NF != 11 || node_ids[$$2]++) exit 1; if ($$8 != 0) symbol_refs[++symbol_ref_count] = $$8; if ($$9 != 0) symbol_refs[++symbol_ref_count] = $$9; nodes++; next } \
+		$$1 == "END" { if (NF != 7 || $$2 != "2" || $$3 != modules || $$4 != procedures || $$5 != symbols || $$6 != typefacts || $$7 != nodes) exit 1; footer = 1; next } \
+		footer { exit 1 } \
+		{ exit 1 } \
+		END { if (!header || !footer || modules != 2 || procedures < 2 || symbols < 1 || typefacts < 2 || nodes < 1) exit 1; for (i = 1; i <= symbol_ref_count; i++) if (!(symbol_refs[i] in symbol_ids)) exit 1 }' \
+		"$(TEST_TMP)/semantic-model.tsv" || { echo "ERROR: invalid or incomplete compiler semantic model"; exit 1; }
 	$(call _mt_cleanup_success)
 
 compiler-indirect-goto-smoke:
