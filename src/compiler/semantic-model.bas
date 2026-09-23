@@ -38,7 +38,7 @@
 '' Export limits and process-local module state
 '' -------------------------------------------------------------------------
 
-private const SEMANTIC_MODEL_SCHEMA = "3"
+private const SEMANTIC_MODEL_SCHEMA = "4"
 private const SEMANTIC_MODEL_MAX_SYMBOLS = 1000000
 private const SEMANTIC_MODEL_INITIAL_SYMBOL_INDEX_CAPACITY = 256
 private const SEMANTIC_MODEL_MAX_SYMBOL_INDEX_CAPACITY = 2097152
@@ -471,15 +471,18 @@ sub fbSemanticModelExportExpression _
 
 	if( (source_start.start_line < 1) or (source_start.start_column < 0) or _
 		(source_end.end_line < source_start.start_line) or _
-		(source_end.end_column < 0) ) then
+		(source_end.end_column < 0) or _
+		((source_end.end_line = source_start.start_line) and _
+		 (source_end.end_column <= source_start.start_column))) then
 		exit sub
 	end if
 
 	dim as string sourcefile = source_start.source_file
-	dim as integer physical_range = source_start.is_physical and _
+	dim as string type_name = symbTypeToStr(expr->dtype, expr->subtype)
+	dim as integer physical_range = abs(source_start.is_physical and _
 		source_end.is_physical and _
 		(nonphysical_tokens_at_start = nonphysical_tokens_at_end) and _
-		(source_start.source_file = source_end.source_file)
+		(source_start.source_file = source_end.source_file))
 	dim as longint symbolid = hSemanticModelSymbolId(expr->sym)
 	dim as longint subtypeid = hSemanticModelSymbolId(expr->subtype)
 	dim as longint expressionid = semantic_model_expression_count + _
@@ -496,7 +499,8 @@ sub fbSemanticModelExportExpression _
 		hSemanticModelNumber(hSemanticModelNodeOperator(expr)) + TABCHAR + _
 		hSemanticModelNumber(astGetFullType(expr)) + TABCHAR + _
 		hSemanticModelNumber(symbolid) + TABCHAR + _
-		hSemanticModelNumber(subtypeid))
+		hSemanticModelNumber(subtypeid) + TABCHAR + _
+		hSemanticModelEscape(type_name))
 	if( semantic_model_module_failed = FALSE ) then
 		semantic_model_module_expression_count += 1
 	end if

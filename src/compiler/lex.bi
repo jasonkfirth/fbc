@@ -110,6 +110,7 @@ type LEX_TKCTX
 
 	linenum         as integer
 	column          as integer
+	utf8_continuations_left as integer
 	lasttk_id       as integer
 	last_source     as LEX_LOCATION
 	nonphysical_token_count as longint

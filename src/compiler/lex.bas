@@ -217,6 +217,7 @@ sub lexInit _
 	lex.ctx->lahdchar1 = UINVALID
 	lex.ctx->lahdchar2 = UINVALID
 	lex.ctx->column = 0
+	lex.ctx->utf8_continuations_left = 0
 	lex.ctx->last_source.source_file = ""
 	lex.ctx->last_source.start_line = 0
 	lex.ctx->last_source.start_column = 0
@@ -444,8 +445,39 @@ sub lexEatChar( )
 		select case consumed_char
 		case CHAR_CR, CHAR_LF
 			lex.ctx->column = 0
+			lex.ctx->utf8_continuations_left = 0
 		case else
-			lex.ctx->column += iif(consumed_char > &hFFFF, 2, 1)
+			if( env.inf.format = FBFILE_FORMAT_ASCII ) then
+				'' Unmarked FreeBASIC source is consumed as bytes, but editor
+				'' columns still count UTF-16 units. Keep continuation bytes from
+				'' a valid UTF-8 sequence from advancing the reported column.
+				if( lex.ctx->utf8_continuations_left > 0 ) then
+					if( (consumed_char >= &h80) and (consumed_char <= &hBF) ) then
+						lex.ctx->utf8_continuations_left -= 1
+						consumed_char = UINVALID
+					else
+						lex.ctx->utf8_continuations_left = 0
+					end if
+				end if
+
+				select case consumed_char
+				case &hC2 to &hDF
+					lex.ctx->column += 1
+					lex.ctx->utf8_continuations_left = 1
+				case &hE0 to &hEF
+					lex.ctx->column += 1
+					lex.ctx->utf8_continuations_left = 2
+				case &hF0 to &hF4
+					lex.ctx->column += 2
+					lex.ctx->utf8_continuations_left = 3
+				case UINVALID
+					'' Continuation byte already accounted for by its leading byte.
+				case else
+					lex.ctx->column += 1
+				end select
+			else
+				lex.ctx->column += iif(consumed_char > &hFFFF, 2, 1)
+			end if
 		end select
 	end if
 

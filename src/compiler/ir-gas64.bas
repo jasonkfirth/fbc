@@ -1413,8 +1413,9 @@ private sub reg_freeable(byref lineasm as string)
 		exit sub
 	end if
 
-	'' Decode the first operand and any index register in its address.
-	dim as ubyte ptr first_operand = schptrb
+	'' The instruction length includes the separating space, so operand
+	'' decoding must begin after the mnemonic.
+	dim as ubyte ptr first_operand = schptrb + linstruc
 	hDecodeAsmOperand( first_operand, (instruc = KMOV), _
 	                   regfound11, regfound12, regfound3 )
 
@@ -4902,29 +4903,33 @@ private sub hBopEmitShift _
 		byref vrreg as integer _
 	)
 
-	if( (v2->typ <> IR_VREGTYPE_IMM) andalso _
-	    (op2 <> *regstrq( KREG_RCX )) ) then
-		if( reghandle( KREG_RCX ) <> KREGFREE ) then
-			dim as integer tmpreg = reghandle( KREG_RCX )
-			reg_findfree( tmpreg )
-			reghandle( KREG_RCX ) = KREGFREE
-			asm_info( "rcx used so transfer to other register" )
-			asm_code( "mov " + *regstrq( reg_findreal( tmpreg ) ) + _
-			          ", " + *regstrq( KREG_RCX ) )
-			if( vrreg = KREG_RCX ) then
-				vrreg = reg_findreal( tmpreg )
-			end if
-		else
-			ctx.usedreg or= (1 shl KREG_RCX)
-		end if
+	if( v2->typ <> IR_VREGTYPE_IMM ) then
+		'' Variable shift counts are read from CL, regardless of the operand size.
+		dim as integer op2_is_rcx = _
+			(op2 = *regstrq( KREG_RCX )) or _
+			(op2 = *regstrd( KREG_RCX )) or _
+			(op2 = *regstrw( KREG_RCX )) or _
+			(op2 = *regstrb( KREG_RCX ))
 
-		if( (dtype = FB_DATATYPE_LONG) or _
-		    (dtype = FB_DATATYPE_ULONG) ) then
-			asm_code( "mov ecx, " + op2 )
-		else
-			asm_code( "mov rcx, " + op2 )
+		if( op2_is_rcx = FALSE ) then
+			if( reghandle( KREG_RCX ) <> KREGFREE ) then
+				dim as integer tmpreg = reghandle( KREG_RCX )
+				reg_findfree( tmpreg )
+				reghandle( KREG_RCX ) = KREGFREE
+				asm_info( "rcx used so transfer to other register" )
+				asm_code( "mov " + *regstrq( reg_findreal( tmpreg ) ) + _
+				          ", " + *regstrq( KREG_RCX ) )
+				if( vrreg = KREG_RCX ) then
+					vrreg = reg_findreal( tmpreg )
+				end if
+			else
+				ctx.usedreg or= (1 shl KREG_RCX)
+			end if
+
+			asm_code( "mov " + hBopRegisterName( KREG_RCX, dtype ) + _
+			          ", " + op2 )
 		end if
-		op2 = "cl"
+		op2 = *regstrb( KREG_RCX )
 	end if
 
 	if( op = AST_OP_SHL ) then
