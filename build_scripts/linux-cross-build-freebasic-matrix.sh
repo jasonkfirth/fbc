@@ -178,10 +178,8 @@ DEB_EXTENDED_ARCHES=(
 )
 
 DEB_SID_ARCHES=(
+    # Keep Sid aligned with the native Debian images supported by package CI.
     "${DEB_ARCHES[@]}"
-    loong64
-    powerpc
-    ppc64
 )
 
 APK_ARCHES=(

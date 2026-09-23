@@ -257,7 +257,9 @@ install_deps() {
                     ;;
             esac
 
-            run sed -i -e 's/^enabled=1/enabled=0/' /etc/yum.repos.d/fedora-cisco-openh264.repo
+            if [ -f /etc/yum.repos.d/fedora-cisco-openh264.repo ]; then
+                run sed -i -e 's/^enabled=1/enabled=0/' /etc/yum.repos.d/fedora-cisco-openh264.repo
+            fi
             run sed -i \
                 -e 's|^metalink=|#metalink=|' \
                 -e "s|^#baseurl=http://download.example/pub/fedora/linux|baseurl=${fedora_repo_root}|" \
@@ -460,9 +462,11 @@ write_spec() {
     local rpm_make_args
 
     mkdir -p "$RPMTOP/SPECS"
-    rpm_make_args='ALLCFLAGS+=-O2'
+    # Do not set ALLCFLAGS on the make command line. Feature policy appends
+    # required defines there, including DISABLE_NCURSES for bootstrap-minimal.
+    rpm_make_args='CFLAGS=-O2'
     if [ "$USE_GPM" -eq 0 ]; then
-        rpm_make_args="$rpm_make_args ALLCFLAGS+=-DDISABLE_GPM"
+        rpm_make_args="$rpm_make_args DISABLE_GPM=YesPlease"
     fi
 
     {
@@ -540,8 +544,8 @@ export FCFLAGS=
 export LDFLAGS=
 export RPM_OPT_FLAGS=
 
-$MAKE_CMD TARGET_TRIPLET="$TARGET_TRIPLET" FBC_TARGET="$FBC_TARGET" FBTARGET_DIR_OVERRIDE="$BOOTKEY" CFLAGS= CXXFLAGS= CPPFLAGS= LDFLAGS= $rpm_make_args bootstrap-minimal -j"$JOBS"
-$MAKE_CMD TARGET_TRIPLET="$TARGET_TRIPLET" FBC_TARGET="$FBC_TARGET" FBTARGET_DIR_OVERRIDE="$BOOTKEY" CFLAGS= CXXFLAGS= CPPFLAGS= LDFLAGS= $rpm_make_args all FBC=bootstrap/fbc BUILD_FBC_TARGET="$FBC_TARGET" -j"$JOBS"
+$MAKE_CMD TARGET_TRIPLET="$TARGET_TRIPLET" FBC_TARGET="$FBC_TARGET" FBTARGET_DIR_OVERRIDE="$BOOTKEY" CXXFLAGS= CPPFLAGS= LDFLAGS= $rpm_make_args bootstrap-minimal -j"$JOBS"
+$MAKE_CMD TARGET_TRIPLET="$TARGET_TRIPLET" FBC_TARGET="$FBC_TARGET" FBTARGET_DIR_OVERRIDE="$BOOTKEY" CXXFLAGS= CPPFLAGS= LDFLAGS= $rpm_make_args all FBC=bootstrap/fbc BUILD_FBC_TARGET="$FBC_TARGET" -j"$JOBS"
 
 mkdir -p .package-smoke
 cat > .package-smoke/console.bas <<'SMOKEEOF'

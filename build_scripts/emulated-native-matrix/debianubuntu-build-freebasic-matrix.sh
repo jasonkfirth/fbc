@@ -374,6 +374,10 @@ DEBIAN_TRIXIE_ARCHES=(
     loong64
 )
 
+DEBIAN_SID_ARCHES=(
+    "${LINUX_ARCHES[@]}"
+)
+
 RASPBIAN_ARCHES=(
     armhf
 )
@@ -471,11 +475,11 @@ target_arches() {
             printf '%s\n' "${RASPBIAN_ARCHES[@]}"
             ;;
         debian)
-            if [ "$codename" = "trixie" ]; then
-                printf '%s\n' "${DEBIAN_TRIXIE_ARCHES[@]}"
-            else
-                printf '%s\n' "${LINUX_ARCHES[@]}"
-            fi
+            case "$codename" in
+                trixie) printf '%s\n' "${DEBIAN_TRIXIE_ARCHES[@]}" ;;
+                sid) printf '%s\n' "${DEBIAN_SID_ARCHES[@]}" ;;
+                *) printf '%s\n' "${LINUX_ARCHES[@]}" ;;
+            esac
             ;;
         *)
             printf '%s\n' "${LINUX_ARCHES[@]}"
@@ -782,6 +786,9 @@ EOF
     exit 0
 fi
 
+selected_bootstrap_arches="$(bootstrap_arches_for_filters)"
+[ -n "$selected_bootstrap_arches" ] || die "no Debian-family package target matched the selected filters"
+
 ##############################################################################
 # Build prep
 ##############################################################################
@@ -826,28 +833,6 @@ if [ "$NO_XBOX" -eq 0 ]; then
     fi
 else
     echo "==> Xbox package auto-build: disabled by --no-xbox"
-fi
-
-if [ "$SKIP_BOOTSTRAP" -eq 0 ]; then
-    ensure_host_compiler
-
-    if [ -n "$ARCH_FILTER" ]; then
-        if [ "$DISTRO_FILTER" = "raspbian" ]; then
-            build_bootstrap_for_arch "$ARCH_FILTER" "$(arm_arch_for_target "$DISTRO_FILTER" "$ARCH_FILTER")"
-            RASPBIAN_BOOTSTRAP_READY=1
-        else
-            build_bootstrap_for_arch "$ARCH_FILTER"
-        fi
-    elif [ "$DISTRO_FILTER" = "raspbian" ]; then
-        for debarch in "${RASPBIAN_ARCHES[@]}"; do
-            build_bootstrap_for_arch "$debarch" "$(arm_arch_for_target "$DISTRO_FILTER" "$debarch")"
-        done
-        RASPBIAN_BOOTSTRAP_READY=1
-    else
-        while IFS= read -r debarch; do
-            build_bootstrap_for_arch "$debarch"
-        done < <(bootstrap_arches_for_filters)
-    fi
 fi
 
 ##############################################################################
@@ -1071,6 +1056,28 @@ EOF
 done
 
 failures=0
+
+if [ "$SKIP_BOOTSTRAP" -eq 0 ]; then
+    ensure_host_compiler
+
+    if [ -n "$ARCH_FILTER" ]; then
+        if [ "$DISTRO_FILTER" = "raspbian" ]; then
+            build_bootstrap_for_arch "$ARCH_FILTER" "$(arm_arch_for_target "$DISTRO_FILTER" "$ARCH_FILTER")"
+            RASPBIAN_BOOTSTRAP_READY=1
+        else
+            build_bootstrap_for_arch "$ARCH_FILTER"
+        fi
+    elif [ "$DISTRO_FILTER" = "raspbian" ]; then
+        for debarch in "${RASPBIAN_ARCHES[@]}"; do
+            build_bootstrap_for_arch "$debarch" "$(arm_arch_for_target "$DISTRO_FILTER" "$debarch")"
+        done
+        RASPBIAN_BOOTSTRAP_READY=1
+    else
+        while IFS= read -r debarch; do
+            build_bootstrap_for_arch "$debarch"
+        done < <(printf '%s\n' "$selected_bootstrap_arches")
+    fi
+fi
 
 for entry in "${BUILD_MATRIX[@]}"; do
     entry_matches_filters "$entry" || continue

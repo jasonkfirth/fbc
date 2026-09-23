@@ -193,8 +193,6 @@ DEBIAN_TRIXIE_ARCHES=(
 DEBIAN_SID_ARCHES=(
     "${LINUX_ARCHES[@]}"
     loong64
-    powerpc
-    ppc64
 )
 
 DISTRO_TARGETS=(
