@@ -48,10 +48,22 @@ enum LEXCHECK
 	LEXCHECK_POST_MASK          = &h3800  '' mask out context specfic bits
 end enum
 
+'' Physical source range for a token. Macro-expanded tokens remain marked
+'' non-physical because their parser-visible text does not map to one range.
+type LEX_LOCATION
+	source_file		as zstring * FB_MAXPATHLEN+1
+	start_line		as integer
+	start_column	as integer
+	end_line		as integer
+	end_column		as integer
+	is_physical		as integer
+end type
+
 type FBTOKEN
 	id              as integer
 	class           as integer
 	dtype           as integer
+	source          as LEX_LOCATION
 
 	'' used by literal strings too
 	union
@@ -97,7 +109,10 @@ type LEX_TKCTX
 	lahdchar2       as uinteger                 '' look ahead second char
 
 	linenum         as integer
+	column          as integer
 	lasttk_id       as integer
+	last_source     as LEX_LOCATION
+	nonphysical_token_count as longint
 
 	reclevel        as integer                  '' PP recursion
 	currmacro       as FBSYMBOL ptr             '' used to check macro recursion
@@ -262,7 +277,11 @@ declare sub lexNextToken _
 	( _
 		byval t as FBTOKEN ptr, _
 		byval flags as LEXCHECK = LEXCHECK_EVERYTHING _
-	)
+	) 
+
+declare function lexGetCurrentLocation( ) as LEX_LOCATION
+declare function lexGetLastLocation( ) as LEX_LOCATION
+declare function lexGetNonphysicalTokenCount( ) as longint
 
 declare function lexCurrentChar _
 	( _

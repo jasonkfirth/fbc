@@ -9,6 +9,16 @@
 #include once "ast.bi"
 #include once "rtl.bi"
 
+declare function fbSemanticModelEnabled( ) as integer
+declare sub fbSemanticModelExportExpression _
+	( _
+		byval expr as ASTNODE ptr, _
+		byref source_start as LEX_LOCATION, _
+		byref source_end as LEX_LOCATION, _
+		byval nonphysical_tokens_at_start as longint, _
+		byval nonphysical_tokens_at_end as longint _
+	)
+
 declare function cLogOrExpression _
 	( _
 		_
@@ -33,12 +43,29 @@ function cExpression _
 	) as ASTNODE ptr
 
 	dim as integer last_isexpr = fbGetIsExpression( )
+	dim as ASTNODE ptr expr
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start
+	dim as integer export_semantics = fbSemanticModelEnabled( )
+
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
+
 	fbSetIsExpression( TRUE )
 
 	'' LogExpression
-	function = cBoolExpression( )
+	expr = cBoolExpression( )
+	if( export_semantics andalso (expr <> NULL) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(expr, source_start, source_end, _
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+	end if
 
 	fbSetIsExpression( last_isexpr )
+	function = expr
 
 end function
 

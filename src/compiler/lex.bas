@@ -216,6 +216,14 @@ sub lexInit _
 	lex.ctx->currchar = UINVALID
 	lex.ctx->lahdchar1 = UINVALID
 	lex.ctx->lahdchar2 = UINVALID
+	lex.ctx->column = 0
+	lex.ctx->last_source.source_file = ""
+	lex.ctx->last_source.start_line = 0
+	lex.ctx->last_source.start_column = 0
+	lex.ctx->last_source.end_line = 0
+	lex.ctx->last_source.end_column = 0
+	lex.ctx->last_source.is_physical = FALSE
+	lex.ctx->nonphysical_token_count = 0
 
 	lex.ctx->kind = ctx_kind
 
@@ -427,6 +435,20 @@ private function hReadChar _
 end function
 
 sub lexEatChar( )
+	dim as uinteger consumed_char = lexCurrentChar( )
+
+	'' Columns count source characters as UTF-16 code units, matching editor
+	'' coordinates. Macro replacement text has no single physical source span.
+	if( (lex.ctx->kind <> LEX_TKCTX_CONTEXT_EVAL) and _
+		(lex.ctx->deflen = 0) ) then
+		select case consumed_char
+		case CHAR_CR, CHAR_LF
+			lex.ctx->column = 0
+		case else
+			lex.ctx->column += iif(consumed_char > &hFFFF, 2, 1)
+		end select
+	end if
+
 	if( lex.ctx->lahdchar1 = UINVALID ) then
 		'' No look-ahead char, read next char and force the next
 		'' lexCurrentChar() to update the current char.
@@ -444,6 +466,18 @@ sub lexEatChar( )
 		lex.ctx->lahdchar2 = UINVALID
 	end if
 end sub
+
+function lexGetCurrentLocation( ) as LEX_LOCATION
+	function = lex.ctx->head->source
+end function
+
+function lexGetLastLocation( ) as LEX_LOCATION
+	function = lex.ctx->last_source
+end function
+
+function lexGetNonphysicalTokenCount( ) as longint
+	function = lex.ctx->nonphysical_token_count
+end function
 
 function lexEatWhitespace( ) as integer
 
@@ -2024,8 +2058,22 @@ sub lexNextToken _
 
 	'' skip white space
 	if( hSkipWhitespace( t, flags, char ) ) then
+		t->source.source_file = env.inf.name
+		t->source.start_line = lex.ctx->linenum
+		t->source.start_column = lex.ctx->column
+		t->source.end_line = lex.ctx->linenum
+		t->source.end_column = lex.ctx->column
+		t->source.is_physical = (lex.ctx->kind <> LEX_TKCTX_CONTEXT_EVAL)
 		exit sub
 	end if
+
+	'' Record locations while this token still owns the scanner position. The
+	'' lexer may fill several look-ahead slots before the parser consumes it.
+	t->source.source_file = env.inf.name
+	t->source.start_line = lex.ctx->linenum
+	t->source.start_column = lex.ctx->column
+	t->source.is_physical = (lex.ctx->kind <> LEX_TKCTX_CONTEXT_EVAL) and _
+		(lex.ctx->deflen = 0)
 
 	lex.ctx->lastfilepos = lex.ctx->filepos + (lex.ctx->buffptr - @lex.ctx->buff) - 1
 
@@ -2258,6 +2306,9 @@ sub lexNextToken _
 	end if
 
 	loop while( reread )
+
+	t->source.end_line = lex.ctx->linenum
+	t->source.end_column = lex.ctx->column
 
 end sub
 
@@ -2543,6 +2594,10 @@ sub lexSkipToken( byval flags as LEXCHECK )
 	end select
 
 	lex.ctx->lasttk_id = lex.ctx->head->id
+	lex.ctx->last_source = lex.ctx->head->source
+	if( lex.ctx->head->source.is_physical = FALSE ) then
+		lex.ctx->nonphysical_token_count += 1
+	end if
 
 	''
 	if( lex.ctx->k = 0 ) then

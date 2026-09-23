@@ -30,6 +30,7 @@
 
 #include once "fbint.bi"
 #include once "ast.bi"
+#include once "lex.bi"
 #include once "symb.bi"
 #include once "crt/mem.bi"
 
@@ -37,13 +38,14 @@
 '' Export limits and process-local module state
 '' -------------------------------------------------------------------------
 
-private const SEMANTIC_MODEL_SCHEMA = "2"
+private const SEMANTIC_MODEL_SCHEMA = "3"
 private const SEMANTIC_MODEL_MAX_SYMBOLS = 1000000
 private const SEMANTIC_MODEL_INITIAL_SYMBOL_INDEX_CAPACITY = 256
 private const SEMANTIC_MODEL_MAX_SYMBOL_INDEX_CAPACITY = 2097152
 private const SEMANTIC_MODEL_INITIAL_MODULE_BUFFER_CAPACITY = 8192
 private const SEMANTIC_MODEL_MAX_MODULE_BUFFER_BYTES = 268435456
 private const SEMANTIC_MODEL_MAX_NODES_PER_MODEL = 1000000
+private const SEMANTIC_MODEL_MAX_EXPRESSIONS_PER_MODEL = 1000000
 
 private type SEMANTIC_MODEL_SYMBOL
 	sym         as FBSYMBOL ptr
@@ -70,10 +72,12 @@ dim shared as integer semantic_model_any_failed
 dim shared as integer semantic_model_module_count
 dim shared as integer semantic_model_module_proc_count
 dim shared as integer semantic_model_module_type_fact_count
+dim shared as longint semantic_model_module_expression_count
 dim shared as longint semantic_model_module_node_count
 dim shared as integer semantic_model_proc_count
 dim shared as integer semantic_model_total_symbol_count
 dim shared as integer semantic_model_total_type_fact_count
+dim shared as longint semantic_model_expression_count
 dim shared as longint semantic_model_node_count
 dim shared as string semantic_model_filename
 dim shared as ubyte ptr semantic_model_module_buffer
@@ -441,6 +445,62 @@ private function hSemanticModelEdgeName(byval edge as integer) as string
 		return "root"
 	end select
 end function
+
+sub fbSemanticModelExportExpression _
+	( _
+		byval expr as ASTNODE ptr, _
+		byref source_start as LEX_LOCATION, _
+		byref source_end as LEX_LOCATION, _
+		byval nonphysical_tokens_at_start as longint, _
+		byval nonphysical_tokens_at_end as longint _
+	)
+
+	if( (semantic_model_file_open = FALSE) or _
+		(semantic_model_module_open = FALSE) or _
+		(semantic_model_module_failed) or (expr = NULL) ) then
+		exit sub
+	end if
+
+	if( semantic_model_expression_count + _
+		semantic_model_module_expression_count >= _
+		SEMANTIC_MODEL_MAX_EXPRESSIONS_PER_MODEL ) then
+		semantic_model_module_failed = TRUE
+		semantic_model_any_failed = TRUE
+		exit sub
+	end if
+
+	if( (source_start.start_line < 1) or (source_start.start_column < 0) or _
+		(source_end.end_line < source_start.start_line) or _
+		(source_end.end_column < 0) ) then
+		exit sub
+	end if
+
+	dim as string sourcefile = source_start.source_file
+	dim as integer physical_range = source_start.is_physical and _
+		source_end.is_physical and _
+		(nonphysical_tokens_at_start = nonphysical_tokens_at_end) and _
+		(source_start.source_file = source_end.source_file)
+	dim as longint symbolid = hSemanticModelSymbolId(expr->sym)
+	dim as longint subtypeid = hSemanticModelSymbolId(expr->subtype)
+	dim as longint expressionid = semantic_model_expression_count + _
+		semantic_model_module_expression_count + 1
+
+	hSemanticModelAppendLine("E" + TABCHAR + hSemanticModelNumber(expressionid) + _
+		TABCHAR + hSemanticModelNumber(physical_range) + TABCHAR + _
+		hSemanticModelEscape(sourcefile) + TABCHAR + _
+		hSemanticModelNumber(source_start.start_line) + TABCHAR + _
+		hSemanticModelNumber(source_start.start_column) + TABCHAR + _
+		hSemanticModelNumber(source_end.end_line) + TABCHAR + _
+		hSemanticModelNumber(source_end.end_column) + TABCHAR + _
+		hSemanticModelNumber(expr->class) + TABCHAR + _
+		hSemanticModelNumber(hSemanticModelNodeOperator(expr)) + TABCHAR + _
+		hSemanticModelNumber(astGetFullType(expr)) + TABCHAR + _
+		hSemanticModelNumber(symbolid) + TABCHAR + _
+		hSemanticModelNumber(subtypeid))
+	if( semantic_model_module_failed = FALSE ) then
+		semantic_model_module_expression_count += 1
+	end if
+end sub
 
 private sub hSemanticModelExportTree _
 	( _
