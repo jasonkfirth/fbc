@@ -29,10 +29,9 @@ on:
   push:
     tags:
       - 'v*'
-  # A normal master push first runs the compiler qualification workflow.  The
-  # complete Linux package set is useful only when that tested source revision
-  # has passed fbctests and Exampleageddon, so package creation follows that
-  # successful workflow completion instead of racing it.
+  # A normal master push first runs the compiler qualification workflow.
+  # Package creation follows only after that tested source revision has passed
+  # fbctests and Exampleageddon, instead of racing the qualification run.
   workflow_run:
     workflows:
       - FreeBASIC XL CI
@@ -58,7 +57,7 @@ on:
         type: string
 
 concurrency:
-  group: fbc-xl-packages-${{ github.ref }}
+  group: fbc-xl-packages-${{ github.ref }}${{ github.event_name == 'workflow_run' && '-workflow-run' || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -123,12 +122,14 @@ jobs:
     timeout-minutes: 10
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
+      run_linux_matrix: ${{ steps.plan.outputs.run_linux_matrix }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
 
       - name: Export the canonical Linux package matrix
         id: plan
@@ -189,9 +190,27 @@ jobs:
               names = ", ".join(sorted(missing_families))
               raise SystemExit(f"the Linux package factory omitted: {names}")
 
+          run_linux_matrix = True
+          if os.environ.get("GITHUB_EVENT_NAME") == "workflow_run":
+              changed = subprocess.run(
+                  ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"],
+                  check=True,
+                  stdout=subprocess.PIPE,
+                  text=True,
+              ).stdout.splitlines()
+              if changed and all(
+                  path == ".github/workflows/packages.yml" for path in changed
+              ):
+                  run_linux_matrix = False
+                  print(
+                      "Skipping the Linux matrix because this commit only changes "
+                      "the package workflow; the tested compiler source is unchanged."
+                  )
+
           matrix = json.dumps({"include": rows}, separators=(",", ":"))
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               print(f"matrix={matrix}", file=output)
+              print(f"run_linux_matrix={str(run_linux_matrix).lower()}", file=output)
 
           print(f"Prepared {len(rows)} Linux package rows.")
           PY
@@ -199,7 +218,7 @@ jobs:
   linux-release-matrix:
     name: Linux ${{ matrix.name }} package
     needs: linux-package-plan
-    if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master') }}
+    if: ${{ needs.linux-package-plan.outputs.run_linux_matrix == 'true' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master')) }}
     strategy:
       fail-fast: false
       max-parallel: 6
@@ -355,7 +374,7 @@ jobs:
 
   windows:
     name: Windows package matrix
-    if: ${{ github.event_name != 'workflow_run' && (github.event_name != 'workflow_dispatch' || inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all') }}
+    if: ${{ (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master')) && (github.event_name != 'workflow_dispatch' || inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all') }}
     runs-on: windows-latest
     timeout-minutes: 240
 
@@ -421,7 +440,7 @@ jobs:
 
   macos:
     name: macOS package matrix
-    if: ${{ github.event_name != 'workflow_run' && (github.event_name != 'workflow_dispatch' || inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all') }}
+    if: ${{ (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master')) && (github.event_name != 'workflow_dispatch' || inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all') }}
     runs-on: macos-15
     timeout-minutes: 180
 
