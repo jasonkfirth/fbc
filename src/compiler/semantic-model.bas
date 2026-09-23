@@ -632,6 +632,7 @@ function fbSemanticModelBegin(byref filename as string) as integer
 	semantic_model_proc_count = 0
 	semantic_model_total_symbol_count = 0
 	semantic_model_total_type_fact_count = 0
+	semantic_model_expression_count = 0
 	semantic_model_node_count = 0
 	print #semantic_model_file_num, "FBCSEM" + TABCHAR + SEMANTIC_MODEL_SCHEMA + _
 		TABCHAR + FB_VERSION
@@ -654,6 +655,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	semantic_model_module_failed = FALSE
 	semantic_model_module_proc_count = 0
 	semantic_model_module_type_fact_count = 0
+	semantic_model_module_expression_count = 0
 	semantic_model_module_node_count = 0
 	semantic_model_module_open = TRUE
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
@@ -671,12 +673,14 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 		semantic_model_proc_count += semantic_model_module_proc_count
 		semantic_model_total_symbol_count += semantic_model_symbol_count
 		semantic_model_total_type_fact_count += semantic_model_module_type_fact_count
+		semantic_model_expression_count += semantic_model_module_expression_count
 		semantic_model_node_count += semantic_model_module_node_count
 	end if
 
 	semantic_model_module_buffer_len = 0
 	semantic_model_module_open = FALSE
 	semantic_model_symbol_count = 0
+	semantic_model_module_expression_count = 0
 end sub
 
 sub fbSemanticModelExportProc(byval proc as FBSYMBOL ptr, byval astproc as ASTNODE ptr)
@@ -776,7 +780,8 @@ sub fbSemanticModelEnd(byval succeeded as integer)
 			hSemanticModelNumber(semantic_model_proc_count) + TABCHAR + _
 			hSemanticModelNumber(semantic_model_total_symbol_count) + TABCHAR + _
 			hSemanticModelNumber(semantic_model_total_type_fact_count) + TABCHAR + _
-			hSemanticModelNumber(semantic_model_node_count)
+			hSemanticModelNumber(semantic_model_node_count) + TABCHAR + _
+			hSemanticModelNumber(semantic_model_expression_count)
 	end if
 
 	close #semantic_model_file_num
