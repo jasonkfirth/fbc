@@ -22,6 +22,7 @@ compiler-semantic-model-smoke:
 	'#define SEMANTIC_INCREMENT 2' \
 	'#if 1 + 2 = 3' \
 	'#assert 1 + 2 = 3' \
+	'#endif' \
 		'declare function semantic_helper() as integer' \
 	'sub semantic_probe()' \
 	'    dim as integer value = 1' \
@@ -43,7 +44,7 @@ compiler-semantic-model-smoke:
 		$$1 == "P" { if (NF != 9) exit 1; symbol_refs[++symbol_ref_count] = $$2; procedures++; next } \
 		$$1 == "V" { if (NF != 5 || $$2 == 0 || $$4 == "" || ($$5 != "pointer" && $$5 != "numeric" && $$5 != "dynamic-string" && $$5 != "fixed-string" && $$5 != "aggregate" && $$5 != "procedure" && $$5 != "other")) exit 1; symbol_refs[++symbol_ref_count] = $$2; typefacts++; next } \
 		$$1 == "N" { if (NF != 11 || node_ids[$$2]++) exit 1; if ($$8 != 0) symbol_refs[++symbol_ref_count] = $$8; if ($$9 != 0) symbol_refs[++symbol_ref_count] = $$9; nodes++; next } \
-		$$1 == "E" { if (NF != 14 || expression_ids[$$2]++ || ($$3 != "0" && $$3 != "1") || $$4 == "" || $$5 < 1 || $$6 < 0 || $$7 < $$5 || ($$7 == $$5 && $$8 <= $$6) || $$8 < 0 || $$14 == "") exit 1; if ($$3 == "1" && $$5 == 7 && $$6 == 13 && $$7 == 7 && $$8 == 34) direct_range = 1; if ($$3 == "0" && $$5 == 8 && $$6 == 13) expanded_range = 1; if ($$5 == 2) directive_expressions++; if ($$12 != 0) symbol_refs[++symbol_ref_count] = $$12; if ($$13 != 0) symbol_refs[++symbol_ref_count] = $$13; expressions++; next } \
+		$$1 == "E" { if (NF != 14 || expression_ids[$$2]++ || ($$3 != "0" && $$3 != "1") || $$4 == "" || $$5 < 1 || $$6 < 0 || $$7 < $$5 || ($$7 == $$5 && $$8 <= $$6) || $$8 < 0 || $$14 == "") exit 1; if ($$3 == "1" && $$5 == 8 && $$6 == 13 && $$7 == 8 && $$8 == 34) direct_range = 1; if ($$3 == "0" && $$5 == 9 && $$6 == 13) expanded_range = 1; if ($$5 == 2 || $$5 == 3) directive_expressions++; if ($$12 != 0) symbol_refs[++symbol_ref_count] = $$12; if ($$13 != 0) symbol_refs[++symbol_ref_count] = $$13; expressions++; next } \
 		$$1 == "END" { if (NF != 8 || $$2 != "4" || $$3 != modules || $$4 != procedures || $$5 != symbols || $$6 != typefacts || $$7 != nodes || $$8 != expressions) exit 1; footer = 1; next } \
 		footer { exit 1 } \
 		{ exit 1 } \
