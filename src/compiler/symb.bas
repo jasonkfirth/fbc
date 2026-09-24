@@ -10,6 +10,8 @@
 #include once "list.bi"
 #include once "pool.bi"
 
+declare sub fbSemanticModelInitializeSymbol(byval sym as FBSYMBOL ptr)
+
 declare sub         symbDelGlobalTb     ( )
 
 declare sub         symbKeywordInit     ( )
@@ -644,6 +646,10 @@ function symbNewSymbol _
 	if( s = NULL ) then
 		delok = TRUE
 		s = listNewNode( @symb.symlist )
+		s->semantic_model_identity = 0
+		fbSemanticModelInitializeSymbol(s)
+	elseif( s->semantic_model_identity = 0 ) then
+		fbSemanticModelInitializeSymbol(s)
 	end if
 
 	''

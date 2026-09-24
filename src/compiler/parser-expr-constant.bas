@@ -7,11 +7,21 @@
 #include once "parser.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 function cConstant( byval sym as FBSYMBOL ptr ) as ASTNODE ptr
+	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
+
 	'' Check visibility of constant
 	if( symbCheckAccess( sym ) = FALSE ) then
 		errReport( FB_ERRMSG_ILLEGALMEMBERACCESS )
 	end if
+	fbSemanticModelExportBinding(sym, semantic_site, FALSE)
 
 	'' ID
 	lexSkipToken( LEXCHECK_POST_LANG_SUFFIX )

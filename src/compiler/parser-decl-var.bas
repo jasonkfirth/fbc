@@ -1816,7 +1816,7 @@ function cVarDecl _
 		''
 		sym = hAddVar( sym, parent, id, palias, dtype, subtype, lgt, addsuffix, _
 		               attrib, dimensions, have_bounds, dTB(), chain_, token )
-		if( token <> FB_TK_REDIM ) then
+		if( (token <> FB_TK_REDIM) and (varexpr = NULL) ) then
 			fbSemanticModelExportBinding(sym, semantic_site, TRUE)
 		end if
 

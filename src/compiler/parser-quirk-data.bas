@@ -9,6 +9,13 @@
 #include once "rtl.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 '':::::
 ''DataStmt        =   RESTORE LABEL?
 ''                |   READ Variable{int|flt|str} (',' Variable{int|flt|str})*
@@ -32,6 +39,7 @@ function cDataStmt  _
 		case FB_TKCLASS_IDENTIFIER, FB_TKCLASS_QUIRKWD, FB_TKCLASS_NUMLITERAL
 			dim as FBSYMCHAIN ptr chain_ = any
 			dim as FBSYMBOL ptr base_parent = any
+			dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
 
 			chain_ = cIdentifier( base_parent )
 
@@ -45,6 +53,7 @@ function cDataStmt  _
 					return TRUE
 				end if
 			end if
+			fbSemanticModelExportBinding(sym, semantic_site, FALSE)
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 		end select
 
@@ -202,4 +211,3 @@ function cDataStmt  _
 	end select
 
 end function
-

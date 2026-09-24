@@ -9,6 +9,13 @@
 #include once "rtl.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 '' [ALIAS "id"]
 function cAliasAttribute( ) as zstring ptr
 	static as zstring * FB_MAXNAMELEN+1 aliasid
@@ -1726,6 +1733,7 @@ function cProcHeader _
 	dim as integer mode = any, stats = any, op = any, is_get = any, is_indexed = any
 	dim as integer priority = any
 	dim as integer mode_is_explicit = any
+	dim as LEX_LOCATION semantic_site
 
 	is_nested = FALSE
 	is_outside = FALSE
@@ -1741,6 +1749,10 @@ function cProcHeader _
 	if( hResolveProcParent( tk, options, attrib, pattrib, parent, _
 	                       is_outside, is_memberproc ) = FALSE ) then
 		exit function
+	end if
+
+	if( (tk = FB_TK_SUB) or (tk = FB_TK_FUNCTION) or (tk = FB_TK_PROPERTY) ) then
+		semantic_site = lexGetCurrentLocation( )
 	end if
 
 	proc = hPreAddHeaderProc( tk, parent, is_memberproc, @id, head_proc, _
@@ -1783,9 +1795,14 @@ function cProcHeader _
 
 	'' Prototype?
 	if( options and FB_PROCOPT_ISPROTO ) then
-		return hAddProcPrototype( tk, parent, head_proc, proc, @id, palias, _
+		proc = hAddProcPrototype( tk, parent, head_proc, proc, @id, palias, _
 		                          attrib, pattrib, mode, op, dtype, subtype, _
 		                          options, is_get, is_indexed )
+		if( (proc <> NULL) and _
+		    ((tk = FB_TK_SUB) or (tk = FB_TK_FUNCTION) or (tk = FB_TK_PROPERTY)) ) then
+			fbSemanticModelExportBinding(proc, semantic_site, TRUE)
+		end if
+		return proc
 	end if
 
 	''
@@ -2022,6 +2039,11 @@ function cProcHeader _
 
 	if( tk = FB_TK_PROPERTY ) then
 		hSetUdtPropertyFlags( parent, is_indexed, is_get )
+	end if
+
+	if( (proc <> NULL) and _
+	    ((tk = FB_TK_SUB) or (tk = FB_TK_FUNCTION) or (tk = FB_TK_PROPERTY)) ) then
+		fbSemanticModelExportBinding(proc, semantic_site, TRUE)
 	end if
 
 	function = proc

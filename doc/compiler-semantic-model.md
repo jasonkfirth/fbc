@@ -55,7 +55,7 @@ facts, and mark retained facts provisional. The full-model reader must never
 treat a `RECOVERY` footer as a valid semantic model. Interrupted processes do
 not write this footer and remain invalid.
 
-## Schema version 6
+## Schema version 8
 
 Fields are separated by tabs. Literal percent signs, tabs, carriage returns,
 and line feeds inside names and paths are escaped as `%25`, `%09`, `%0D`, and
@@ -67,13 +67,41 @@ and line feeds inside names and paths are escaped as `%25`, `%09`, `%0D`, and
 | `M` | source path | Successfully parsed module |
 | `D` | source path | Unique source file opened by the compiler invocation, including root modules and includes |
 | `S` | ID, name, symbol class, data type, subtype ID, scope, attributes, parameter attributes, length, offset, parent ID | Resolved compiler symbol |
+| `B` | symbol ID, role (`declaration` or `reference`), physical-range flag, source path, start line, start column, end line, end column | Compiler-resolved identifier occurrence |
 | `P` | symbol ID, name, symbol class, data type, subtype ID, start line, end line, source path | Procedure metadata |
 | `V` | symbol ID, procedure name (empty for global scope), variable name, stable type kind | Resolved variable type fact (`pointer`, `numeric`, `dynamic-string`, `fixed-string`, `aggregate`, `procedure`, or `other`) |
-| `N` | ID, parent ID, child edge, AST class, operator, data type, symbol ID, subtype ID, source line, source path | Typed AST node |
-| `E` | ID, physical-range flag, source path, start line, start column, end line, end column, AST class, operator, data type, symbol ID, subtype ID, source type spelling | Type and resolved identity of one completed parser expression |
+| `N` | ID, parent ID, child edge, AST class, raw operator, operator code, operator kind, data type, symbol ID, subtype ID, source line, source path | Typed AST node |
+| `E` | ID, physical-range flag, source path, start line, start column, end line, end column, AST class, raw operator, operator code, operator kind, data type, symbol ID, subtype ID, source type spelling | Type and resolved identity of one completed parser expression |
 | `R` | schema version, expression count for the preceding module | Explicitly recovered module in expression-only output |
-| `END` | schema version, module count, procedure count, symbol count, type-fact count, AST-node count, expression count, dependency count, dependency-complete flag | Completeness marker and record totals |
-| `RECOVERY` | schema version, module count, expression count, recovered-module count, dependency count, dependency-complete flag | Incomplete expression-only recovery marker and record totals |
+| `END` | schema version, module count, procedure count, symbol count, type-fact count, AST-node count, expression count, binding count, dependency count, dependency-complete flag | Completeness marker and record totals |
+| `RECOVERY` | schema version, module count, expression count, recovered-module count, binding count, dependency count, dependency-complete flag | Incomplete expression-only recovery marker and record totals |
+
+Binding occurrences preserve the compiler's resolved symbol identity rather
+than asking tooling to infer a target from spelling. Coordinates are one-based
+lines and zero-based UTF-16 columns with an exclusive end. A physical flag of
+`1` is required before an editor may treat the span as editable; macro-expanded
+or otherwise nonphysical occurrences remain informational. The parser hooks
+cover variable declarations, direct variable/member references, named
+procedure declarations and calls, namespace declarations and namespace
+prefixes resolved in qualified identifiers, named type/union/enum declarations
+and references, typedef declarations and references, constant/enum-element
+declarations and references, and field declarations. Compiler-resolved implicit
+member references written as `.field` inside `WITH` blocks share the field
+declaration's symbol ID. Label declarations and compiler-resolved label
+targets are also exported, including numeric labels, direct
+`GOTO`/`GOSUB`/`RETURN`, `ON ... GOTO`/`GOSUB` lists, single-line numeric `IF`
+branches, error-handler targets, and `RESTORE` labels. An overloaded call is
+associated with the exact procedure selected by argument resolution, not
+merely the shared overload head. Procedure-address expressions written with
+`@` or `ProcPtr` are also associated with the exact overload selected by the
+expected or explicit signature. Calls through a procedure pointer and
+implicit/generated calls are not represented as direct procedure references.
+The record remains an extension point for further compiler-resolved
+occurrence kinds, not a claim that every FreeBASIC binding route is exported
+yet. The compiler tracks the opened include path
+separately from its logical filename; after a `#line` remap, `B` and `E` ranges
+are marked nonphysical until that source context ends. Expressions-only output
+deliberately omits `B` records.
 
 Dependency records are emitted once per normalized source path in compiler
 read order. The root module is included, as are successfully opened include and
@@ -82,12 +110,40 @@ complete` flag is `1` only when the list covers every source opened by the
 invocation; consumers that need to validate source-backed ranges must reject
 an incomplete list rather than treating omitted files as unrelated.
 
-Symbol and AST node IDs are unique within one output file. A zero subtype,
-parent, or symbol ID means that the AST or symbol has no corresponding
-reference. AST class, operator, symbol class, type, scope, attribute, offset,
-and length values use compiler internal numeric encodings. Consumers must use
-the schema version and must not assume that those numbers are a public binary
-interface.
+The `operator code` and `operator kind` fields provide stable conceptual
+operator semantics for external tools. The vocabulary is `assign`, arithmetic
+codes (`add`, `subtract`, `multiply`, `divide`, `integer-divide`, `modulo`,
+`power`), their `-assign` forms, logical/bitwise codes (`and`, `or`,
+`logical-and`, `logical-or`, `xor`, `equivalence`, `implication`,
+`shift-left`, `shift-right`, and their `-assign` forms), comparisons (`equal`,
+`greater-than`, `less-than`, `not-equal`, `greater-or-equal`,
+`less-or-equal`, `identity-test`), unary codes (`not`, `logical-not`,
+`unary-plus`, `negate`, `address-of`, `dereference`), and `index`, `cast`,
+`convert-to-integer`, `convert-to-float`, `concatenate`, `concatenate-assign`,
+`allocate`, `allocate-array`, `deallocate`, and `deallocate-array`.
+`operator kind` is `builtin` for a compiler built-in, `overloaded` when the
+resolved call target is a user-defined operator procedure, or `none` when the
+node is not a recognized operator. A `none` kind is paired with an empty code.
+An operator that this compiler does not recognize for export is reported as
+`none`; consumers must not infer its meaning from the raw numeric field.
+This vocabulary is part of schema version 8 and can grow only through an
+explicit schema update.
+These concepts describe the operator represented by the exported AST node;
+they do not reconstruct source operators removed by optimization. A
+constant-folded expression can therefore have an empty code and `none` kind.
+
+Symbol and AST node IDs are unique within one output file. The exporter keys a
+compiler symbol by its allocation lifetime rather than its memory address,
+because the compiler recycles symbol-table nodes after scopes end. Reusing a
+node therefore cannot make a later binding inherit an earlier symbol's ID. A
+zero subtype, parent, or symbol ID means that the AST or symbol has no
+corresponding reference. Raw AST class, operator, symbol class, type, scope,
+attribute, offset, and length values use compiler-internal numeric encodings.
+Consumers must not assume that those numbers are a public binary interface.
+Schema version 8's conceptual operator fields are the cross-version tooling
+interface; the raw AST fields remain optional diagnostic detail and must be
+interpreted only for an inspected compiler family. The VS Code consumer keeps
+the raw values opaque.
 
 Expression line numbers are one-based and columns are zero-based UTF-16 code
 unit offsets, with the end position exclusive. The source type spelling is

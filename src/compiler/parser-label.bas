@@ -8,6 +8,13 @@
 #include once "parser.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 '':::::
 ''Label           =   NUM_LIT
 ''                |   ID ':' .
@@ -15,6 +22,7 @@
 function cLabel as integer
 	dim as FBSYMBOL ptr l = NULL
 	dim as FBSYMCHAIN ptr chain_ = any
+	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
 
 	function = FALSE
 
@@ -79,6 +87,7 @@ function cLabel as integer
 	end select
 
 	if( l <> NULL ) then
+		fbSemanticModelExportBinding(l, semantic_site, TRUE)
 		astAdd( astNewLABEL( l ) )
 
 		symbSetLastLabel( l )

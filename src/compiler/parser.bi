@@ -287,7 +287,13 @@ declare function cDeclaration _
 declare sub cConstDecl( byval attrib as FB_SYMBATTRIB )
 declare sub cTypeDecl( byval attrib as FB_SYMBATTRIB )
 declare sub cTypedefMultDecl( byval attrib as FB_SYMBATTRIB )
-declare sub cTypedefSingleDecl( byval attrib as FB_SYMBATTRIB, byval pid as zstring ptr )
+declare sub cTypedefSingleDecl _
+	( _
+		byval attrib as FB_SYMBATTRIB, _
+		byval pid as zstring ptr, _
+		byref semantic_site as LEX_LOCATION, _
+		byval has_site as integer _
+	)
 declare sub cEnumDecl( byval attrib as FB_SYMBATTRIB )
 declare function hCheckScope() as integer
 
@@ -634,7 +640,8 @@ declare function cProcArgList _
 		byval proc as FBSYMBOL ptr, _
 		byval ptrexpr as ASTNODE ptr, _
 		byval arg_list as FB_CALL_ARG_LIST ptr, _
-		byval options as FB_PARSEROPT _
+		byval options as FB_PARSEROPT, _
+		byval semantic_site as LEX_LOCATION ptr = NULL _
 	) as ASTNODE ptr
 
 declare function cAsmBlock _
@@ -680,7 +687,8 @@ declare function cFunctionCall _
 		byval sym as FBSYMBOL ptr, _
 		byval ptrexpr as ASTNODE ptr, _
 		byval thisexpr as ASTNODE ptr = NULL, _
-		byval options as FB_PARSEROPT = 0 _
+		byval options as FB_PARSEROPT = 0, _
+		byval semantic_site as LEX_LOCATION ptr = NULL _
 	) as ASTNODE ptr
 
 declare sub hMethodCallAddInstPtrOvlArg _
@@ -700,7 +708,8 @@ declare function cProcCall _
 		byval ptrexpr as ASTNODE ptr, _
 		byval thisexpr as ASTNODE ptr = NULL, _
 		byval checkprnts as integer = FALSE, _
-		byval options as FB_PARSEROPT = 0 _
+		byval options as FB_PARSEROPT = 0, _
+		byval semantic_site as LEX_LOCATION ptr = NULL _
 	) as ASTNODE ptr
 
 declare function cMethodCall _

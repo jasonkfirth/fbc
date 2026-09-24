@@ -9,6 +9,13 @@
 #include once "parser.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 '':::
 ''EnumConstDecl     =   ID ('=' ConstExpression)? .
 ''
@@ -48,6 +55,7 @@ end sub
 sub cEnumBody( byval s as FBSYMBOL ptr, byval attrib as FB_SYMBATTRIB )
 	static as zstring * FB_MAXNAMELEN+1 id
 	dim as longint value = any
+	dim as LEX_LOCATION semantic_site
 
 	value = 0
 
@@ -70,9 +78,12 @@ sub cEnumBody( byval s as FBSYMBOL ptr, byval attrib as FB_SYMBATTRIB )
 
 			'' ID ConstDecl (',' ID ConstDecl)*
 			do
+				dim as integer has_site = FALSE
 				'' ID?
 				select case lexGetClass( )
 				case FB_TKCLASS_IDENTIFIER
+					semantic_site = lexGetCurrentLocation( )
+					has_site = TRUE
 					if( fbLangOptIsSet( FB_LANG_OPT_PERIODS ) ) then
 						'' if inside a namespace, symbols can't contain periods (.)'s
 						if( symbIsGlobalNamespc( ) = FALSE ) then
@@ -91,6 +102,8 @@ sub cEnumBody( byval s as FBSYMBOL ptr, byval attrib as FB_SYMBATTRIB )
 						'' error recovery: fake an id
 						id = *symbUniqueLabel( )
 					else
+						semantic_site = lexGetCurrentLocation( )
+						has_site = TRUE
 						id = *lexGetText( )
 					end if
 
@@ -103,8 +116,11 @@ sub cEnumBody( byval s as FBSYMBOL ptr, byval attrib as FB_SYMBATTRIB )
 				'' ConstDecl
 				hEnumConstDecl( @id, value )
 
-				if( symbAddEnumElement( s, @id, value, attrib ) = NULL ) then
+				dim as FBSYMBOL ptr enum_element = symbAddEnumElement( s, @id, value, attrib )
+				if( enum_element = NULL ) then
 					errReportEx( FB_ERRMSG_DUPDEFINITION, id )
+				elseif( has_site ) then
+					fbSemanticModelExportBinding(enum_element, semantic_site, TRUE)
 				end if
 
 				value += 1
@@ -144,6 +160,8 @@ end sub
 sub cEnumDecl( byval attrib as FB_SYMBATTRIB )
 	static as zstring * FB_MAXNAMELEN+1 id
 	dim as FBSYMBOL ptr e = any
+	dim as LEX_LOCATION semantic_site
+	dim as integer has_site = FALSE
 
 	'' ENUM doesn't generate any code, but should not be allowed between SELECT and CASE
 	if( cCompStmtIsAllowed( FB_CMPSTMT_MASK_DECL or FB_CMPSTMT_MASK_CODE ) = FALSE ) then
@@ -169,6 +187,8 @@ sub cEnumDecl( byval attrib as FB_SYMBATTRIB )
 		end if
 
 		id = *lexGetText( )
+		semantic_site = lexGetCurrentLocation( )
+		has_site = TRUE
 		lexSkipToken( LEXCHECK_POST_LANG_SUFFIX )
 
 	case else
@@ -209,6 +229,8 @@ sub cEnumDecl( byval attrib as FB_SYMBATTRIB )
 		errReportEx( FB_ERRMSG_DUPDEFINITION, id )
 		'' error recovery: create a fake symbol
 		e = symbAddEnum( symbUniqueLabel( ), NULL, FB_SYMBATTRIB_NONE, use_hashtb )
+	elseif( has_site ) then
+		fbSemanticModelExportBinding(e, semantic_site, TRUE)
 	end if
 
 	'' Comment? SttSeparator

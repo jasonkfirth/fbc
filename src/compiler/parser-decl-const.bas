@@ -8,6 +8,13 @@
 #include once "parser.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 private sub hGetType( byref dtype as integer, byref subtype as FBSYMBOL ptr )
 	'' (AS SymbolType)?
 	if( lexGetToken( ) = FB_TK_AS ) then
@@ -49,7 +56,9 @@ private sub cConstAssign _
 	dim as ASTNODE ptr expr = any
 	dim as FBSYMBOL ptr litsym = any
 	dim as FBSYMBOL ptr redefinition = NULL
+	dim as FBSYMBOL ptr symbol = NULL
 	dim as FBVALUE value = any
+	dim as LEX_LOCATION semantic_site
 
 	'' Namespace identifier if it matches the current namespace
 	cCurrentParentId()
@@ -93,6 +102,7 @@ private sub cConstAssign _
 	end select
 
 	id = *lexGetText( )
+	semantic_site = lexGetCurrentLocation( )
 
 	'' Keep the original symbol so duplicate diagnostics can identify
 	'' compiler-registered intrinsics that are not keyword tokens.
@@ -166,8 +176,11 @@ private sub cConstAssign _
 		end if
 
 		value.s = litsym
-		if( symbReuseOrAddConst( @id, exprdtype, NULL, @value, attrib ) = NULL ) then
+		symbol = symbReuseOrAddConst( @id, exprdtype, NULL, @value, attrib )
+		if( symbol = NULL ) then
 			errReportEx( symbGetIllegalRedefErr( redefinition ), id )
+		else
+			fbSemanticModelExportBinding(symbol, semantic_site, TRUE)
 		end if
 	'' anything else..
 	else
@@ -212,8 +225,11 @@ private sub cConstAssign _
 			subtype = astGetSubtype( expr )
 		end if
 
-		if( symbReuseOrAddConst( @id, dtype, subtype, astConstGetVal( expr ), attrib ) = NULL ) then
+		symbol = symbReuseOrAddConst( @id, dtype, subtype, astConstGetVal( expr ), attrib )
+		if( symbol = NULL ) then
 			errReportEx( symbGetIllegalRedefErr( redefinition ), id )
+		else
+			fbSemanticModelExportBinding(symbol, semantic_site, TRUE)
 		end if
 	end if
 

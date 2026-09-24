@@ -9,6 +9,13 @@
 #include once "rtl.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 '':::::
 private function hFuncReturn _
 	( _
@@ -65,6 +72,7 @@ private function hGetLabelId _
 	) as FBSYMBOL ptr
 
 	dim as FBSYMBOL ptr sym = any
+	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
 
 	select case as const lexGetClass( )
 	case FB_TKCLASS_NUMLITERAL
@@ -94,6 +102,7 @@ private function hGetLabelId _
 		end if
 	end if
 
+	fbSemanticModelExportBinding(sym, semantic_site, FALSE)
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 	function = sym

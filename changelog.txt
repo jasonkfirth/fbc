@@ -2,6 +2,8 @@ Version 1.20.4
 
 [changed]
 - compiler semantic model: add the opt-in `-semantic-model` sidecar with transactional module output, globally stable symbol references, resolved variable type facts, procedure records, typed AST nodes, source locations, and schema/count validation; use compiler type facts in FBL503 without changing ordinary compilation, and document schema version 2.
+- compiler semantic model: schema version 8 adds stable conceptual operator codes and `builtin`/`overloaded`/`none` kinds to AST and expression records, deriving overloaded operations from the compiler-selected procedure while retaining raw AST numbers as diagnostic detail.
+- compiler semantic model: export references for `@` and `ProcPtr` procedure-address expressions after compiler overload resolution, preserving the selected procedure identity for project-wide tooling.
 - compiler/preprocessor: expose accepted source #cmdline options through __CMDLINE__ and reflect verbose, effective architecture, custom entry, export, PIC, calling-convention, variadic-argument, return-register, abstract-type optimization, builtin, and preprocessor settings through intrinsic defines; suppress the replay warning for a directive that enabled -z nocmdline, and add regression coverage for ordered options, quoted values, restart persistence, and source/code-generation settings.
 - linter/style: FBL009 skips a line that follows an explicit continuation. Its alignment is horizontal layout within an open statement and no longer produces a false mixed-indentation result.
 - examples/TinyPTC and linter/style: normalize the remaining legacy block layouts without changing drawing, clipping, or copy behavior, completing a warning-free automatic-width style pass across all 1,722 examples.

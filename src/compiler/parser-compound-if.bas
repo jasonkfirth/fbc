@@ -8,13 +8,23 @@
 #include once "parser.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 '':::::
 ''SingleIfStatement=  !(COMMENT|NEWLINE|STATSEP) NUM_LIT | Statement*)
 ''                    (ELSE NUM_LIT | Statement*)?
 ''
 private sub hIfSingleLine(byval stk as FB_CMPSTMTSTK ptr)
+	dim as LEX_LOCATION semantic_site
+
 	'' NUM_LIT | Statement*
 	if( lexGetClass( ) = FB_TKCLASS_NUMLITERAL ) then
+		semantic_site = lexGetCurrentLocation( )
 		dim as FBSYMBOL ptr l = symbLookupByNameAndClass _
 			( _
 				symbGetCurrentNamespc( ), _
@@ -27,6 +37,7 @@ private sub hIfSingleLine(byval stk as FB_CMPSTMTSTK ptr)
 			l = symbAddLabel( lexGetText( ), FB_SYMBOPT_CREATEALIAS )
 		end if
 
+		fbSemanticModelExportBinding(l, semantic_site, FALSE)
 		lexSkipToken( )
 
 		astAdd( astNewBRANCH( AST_OP_JMP, l ) )
@@ -52,6 +63,7 @@ private sub hIfSingleLine(byval stk as FB_CMPSTMTSTK ptr)
 
 		'' NUM_LIT | Statement*
 		if( lexGetClass( ) = FB_TKCLASS_NUMLITERAL ) then
+			semantic_site = lexGetCurrentLocation( )
 			dim as FBSYMBOL ptr l = symbLookupByNameAndClass _
 				( _
 					symbGetCurrentNamespc( ), _
@@ -64,6 +76,7 @@ private sub hIfSingleLine(byval stk as FB_CMPSTMTSTK ptr)
 				l = symbAddLabel( lexGetText( ), FB_SYMBOPT_CREATEALIAS )
 			end if
 
+			fbSemanticModelExportBinding(l, semantic_site, FALSE)
 			lexSkipToken( )
 
 			astAdd( astNewBRANCH( AST_OP_JMP, l ) )

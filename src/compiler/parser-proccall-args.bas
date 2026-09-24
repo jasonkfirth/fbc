@@ -9,6 +9,13 @@
 #include once "parser.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 '':::::
 sub parserProcCallInit( )
 
@@ -291,7 +298,8 @@ private function hOvlProcArgList _
 		byval base_parent as FBSYMBOL ptr, _
 		byval proc as FBSYMBOL ptr, _
 		byval arg_list as FB_CALL_ARG_LIST ptr, _
-		byval options as FB_PARSEROPT _
+		byval options as FB_PARSEROPT, _
+		byval semantic_site as LEX_LOCATION ptr _
 	) as ASTNODE ptr
 
 	dim as integer i = any, params = any, args = any, have_eq_outside_parens = any
@@ -393,6 +401,10 @@ private function hOvlProcArgList _
 		return astBuildFakeCall( proc )
 	end if
 
+	if( semantic_site <> NULL ) then
+		fbSemanticModelExportBinding(proc, *semantic_site, FALSE)
+	end if
+
 	'' method?
 	if( symbIsMethod( proc ) ) then
 		'' calling a method without the instance ptr?
@@ -474,19 +486,21 @@ function cProcArgList _
 		byval proc as FBSYMBOL ptr, _
 		byval ptrexpr as ASTNODE ptr, _
 		byval arg_list as FB_CALL_ARG_LIST ptr, _
-		byval options as FB_PARSEROPT _
+		byval options as FB_PARSEROPT, _
+		byval semantic_site as LEX_LOCATION ptr _
 	) as ASTNODE ptr
 
 	dim as integer args = any, params = any, mode = any, have_eq_outside_parens = any
 	dim as FBSYMBOL ptr param = any
 	dim as ASTNODE ptr procexpr = any, expr = any
 	dim as FB_CALL_ARG ptr arg = any
+	if( ptrexpr <> NULL ) then semantic_site = NULL
 
 	'' overloaded?
 	if( symbGetProcIsOverloaded( proc ) ) then
 		'' only if there's more than one overloaded function
 		if( symbGetProcOvlNext( proc ) <> NULL ) then
-			return hOvlProcArgList( base_parent, proc, arg_list, options )
+			return hOvlProcArgList( base_parent, proc, arg_list, options, semantic_site )
 		end if
 	end if
 
@@ -501,6 +515,10 @@ function cProcArgList _
 		             symbGetFullProcName( proc ) )
 		'' error recovery: fake an expr
 		return astBuildFakeCall( proc )
+	end if
+
+	if( semantic_site <> NULL ) then
+		fbSemanticModelExportBinding(proc, *semantic_site, FALSE)
 	end if
 
 	'' method?

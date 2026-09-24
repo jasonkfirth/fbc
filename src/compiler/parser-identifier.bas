@@ -7,6 +7,13 @@
 #include once "fbint.bi"
 #include once "parser.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 '':::::
 private sub hSkipSymbol( )
 
@@ -252,6 +259,8 @@ function cIdentifier _
 
 	dim as FBSYMCHAIN ptr chain_ = any
 	dim as FBSYMBOL ptr parent = any
+	dim as LEX_LOCATION semantic_site = any
+	dim as integer namespace_prefix_is_physical = (parser.nsprefix = NULL)
 
 	base_parent = NULL
 
@@ -293,6 +302,7 @@ function cIdentifier _
 
 	do
 		dim as FBSYMBOL ptr sym = chain_->sym
+		semantic_site = lexGetCurrentLocation( )
 
 		'' explicit base_parent? don't access local variables
 		'' we are assuming that the logic is correct that any symbol with the
@@ -379,6 +389,11 @@ function cIdentifier _
 			end if
 
 			exit do
+		end if
+
+		if( namespace_prefix_is_physical and _
+			symbGetClass( sym ) = FB_SYMBCLASS_NAMESPACE ) then
+			fbSemanticModelExportBinding(sym, semantic_site, FALSE)
 		end if
 
 		if( symbIsEnum( sym ) ) then

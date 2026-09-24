@@ -26,7 +26,8 @@ function cFunctionCall _
 		byval sym as FBSYMBOL ptr, _
 		byval ptrexpr as ASTNODE ptr, _
 		byval thisexpr as ASTNODE ptr, _
-		byval options as FB_PARSEROPT _
+		byval options as FB_PARSEROPT, _
+		byval semantic_site as LEX_LOCATION ptr _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr funcexpr = any
@@ -55,7 +56,7 @@ function cFunctionCall _
 
 			lexSkipToken( )
 
-			funcexpr = cProcArgList( base_parent, sym, ptrexpr, @arg_list, options )
+			funcexpr = cProcArgList( base_parent, sym, ptrexpr, @arg_list, options, semantic_site )
 
 			'' ')'
 			hParseRPNT( )
@@ -68,7 +69,7 @@ function cFunctionCall _
 
 			'' no args
 			funcexpr = cProcArgList( base_parent, sym, ptrexpr, @arg_list, _
-			                         options or FB_PARSEROPT_OPTONLY )
+			                         options or FB_PARSEROPT_OPTONLY, semantic_site )
 		end if
 
 	else
@@ -77,7 +78,7 @@ function cFunctionCall _
 			lexSkipToken( )
 
 			'' ProcArgList
-			funcexpr = cProcArgList( base_parent, sym, ptrexpr, @arg_list, options )
+			funcexpr = cProcArgList( base_parent, sym, ptrexpr, @arg_list, options, semantic_site )
 
 			'' ')'
 			hParseRPNT( )
@@ -85,7 +86,7 @@ function cFunctionCall _
 		else
 			'' ProcArgList (function could have optional params)
 			funcexpr = cProcArgList( base_parent, sym, ptrexpr, @arg_list, _
-			                         options or FB_PARSEROPT_OPTONLY )
+			                         options or FB_PARSEROPT_OPTONLY, semantic_site )
 		end if
 
 	end if
@@ -115,6 +116,8 @@ function cFunctionEx _
 		byval options as FB_PARSEROPT _
 	) as ASTNODE ptr
 
+	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
+
 	'' ID
 	lexSkipToken( _
 		iif( symbIsSuffixed(sym), _
@@ -122,7 +125,7 @@ function cFunctionEx _
 			LEXCHECK_POST_SUFFIX _
 		) )
 
-	function = cFunctionCall( base_parent, sym, NULL, NULL, options )
+	function = cFunctionCall( base_parent, sym, NULL, NULL, options, @semantic_site )
 
 end function
 
@@ -135,19 +138,20 @@ function cMethodCall _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = any
+	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
 
 	'' ID
 	lexSkipToken( LEXCHECK_POST_LANG_SUFFIX )
 
 	'' inside an expression? (can't check sym type, it could be an overloaded proc)
 	if( fbGetIsExpression( ) ) then
-		expr = cFunctionCall( NULL, sym, NULL, thisexpr, options )
+			expr = cFunctionCall( NULL, sym, NULL, thisexpr, options, @semantic_site )
 
 		'' no need to check expr, cFunctionCall() will handle VOID calls
 
 	'' assignment..
 	else
-		expr = cProcCall( NULL, sym, NULL, thisexpr, FALSE, options )
+		expr = cProcCall( NULL, sym, NULL, thisexpr, FALSE, options, @semantic_site )
 
 		'' ditto
 	end if

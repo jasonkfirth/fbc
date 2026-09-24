@@ -311,7 +311,8 @@ private function hMemberId( byval parent as FBSYMBOL ptr, byval allow_inner as i
 		return NULL
 	end select
 
-	if( symbGetClass(sym) <> FB_SYMBCLASS_VAR ) then
+	if( (symbGetClass(sym) <> FB_SYMBCLASS_VAR) and _
+	    (symbGetClass(sym) <> FB_SYMBCLASS_PROC) ) then
 		fbSemanticModelExportBinding(sym, semantic_site, FALSE)
 	end if
 	return sym

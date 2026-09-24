@@ -9,6 +9,13 @@
 #include once "ast.bi"
 #include once "rtl.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 function cConstIntExpr _
 	( _
 		byval expr as ASTNODE ptr, _
@@ -581,6 +588,7 @@ private sub hParseUserDefinedType _
 	dim as FBSYMCHAIN ptr chain_ = NULL
 	dim as FBSYMBOL ptr base_parent = any
 	dim as integer check_id = TRUE
+	dim as LEX_LOCATION semantic_site
 
 	if( parser.stmt.with ) then
 		if( lexGetToken( ) = CHAR_DOT ) then
@@ -599,6 +607,8 @@ private sub hParseUserDefinedType _
 		exit sub
 	end if
 
+	semantic_site = lexGetCurrentLocation( )
+
 	'' cTypeOrExpression() will expect that the namespace prefix
 	'' will be preserved if we abort and retry as an expression.
 	'' Eventually namespace prefix gets used in cIdentifier()
@@ -613,8 +623,9 @@ private sub hParseUserDefinedType _
 	do
 		dim as FBSYMBOL ptr sym = chain_->sym
 		do
-			select case symbGetClass( sym )
+		select case symbGetClass( sym )
 			case FB_SYMBCLASS_STRUCT
+				fbSemanticModelExportBinding(sym, semantic_site, FALSE)
 				lexSkipToken( LEXCHECK_POST_SUFFIX )
 				dtype = FB_DATATYPE_STRUCT
 				subtype = sym
@@ -623,6 +634,7 @@ private sub hParseUserDefinedType _
 				exit do, do
 
 			case FB_SYMBCLASS_ENUM
+				fbSemanticModelExportBinding(sym, semantic_site, FALSE)
 				lexSkipToken( LEXCHECK_POST_SUFFIX )
 				dtype = FB_DATATYPE_ENUM
 				subtype = sym
@@ -635,6 +647,7 @@ private sub hParseUserDefinedType _
 				if( symbCheckAccess( sym ) = FALSE ) then
 					errReport( FB_ERRMSG_ILLEGALMEMBERACCESS )
 				end if
+				fbSemanticModelExportBinding(sym, semantic_site, FALSE)
 				lexSkipToken( LEXCHECK_POST_SUFFIX )
 				dtype = symbGetFullType( sym )
 				subtype = symbGetSubtype( sym )

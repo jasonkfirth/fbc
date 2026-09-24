@@ -832,6 +832,8 @@ type FBSYMBOL
 
 	prev            as FBSYMBOL ptr             '' next in symbol tb list
 	next            as FBSYMBOL ptr             '' prev /
+
+	semantic_model_identity as ulongint '' exporter key for this symbol allocation
 end type
 
 type FBHASHTBLIST

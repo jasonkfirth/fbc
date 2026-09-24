@@ -9,6 +9,13 @@
 #include once "rtl.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 private function cGOTBStmt _
 	( _
 		byval expr as ASTNODE ptr, _
@@ -21,6 +28,7 @@ private function cGOTBStmt _
 	dim as FBSYMBOL ptr labels(0 to FB_MAXGOTBITEMS-1) = any
 	dim as FBSYMCHAIN ptr chain_ = any
 	dim as FBSYMBOL ptr base_parent = any
+	dim as LEX_LOCATION semantic_site
 
 	function = FALSE
 
@@ -60,6 +68,7 @@ private function cGOTBStmt _
 		'' Label
 		select case lexGetClass( )
 		case FB_TKCLASS_NUMLITERAL, FB_TKCLASS_IDENTIFIER
+			semantic_site = lexGetCurrentLocation( )
 			chain_ = cIdentifier( base_parent )
 
 			'' Not not too many target labels yet?
@@ -68,6 +77,7 @@ private function cGOTBStmt _
 				if( labels(l) = NULL ) then
 					labels(l) = symbAddLabel( lexGetText( ), FB_SYMBOPT_CREATEALIAS )
 				end if
+				fbSemanticModelExportBinding(labels(l), semantic_site, FALSE)
 			elseif( l = FB_MAXGOTBITEMS ) then '' (Only show the error once)
 				errReport( FB_ERRMSG_TOOMANYLABELS )
 				'' Error recovery: continue parsing all labels, but don't add
@@ -131,6 +141,7 @@ function cOnStmt _
 	dim as FBSYMBOL ptr label = any
 	dim as FBSYMCHAIN ptr chain_ = any
 	dim as FBSYMBOL ptr base_parent = any
+	dim as LEX_LOCATION semantic_site
 
 	function = FALSE
 
@@ -208,6 +219,7 @@ function cOnStmt _
 
 		if( isrestore = FALSE ) then
 			'' Label
+			semantic_site = lexGetCurrentLocation( )
 			chain_ = cIdentifier( base_parent )
 
 			label = symbFindByClass( chain_, FB_SYMBCLASS_LABEL )
@@ -215,6 +227,7 @@ function cOnStmt _
 				label = symbAddLabel( lexGetText( ), FB_SYMBOPT_CREATEALIAS )
 			end if
 
+			fbSemanticModelExportBinding(label, semantic_site, FALSE)
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 			expr = astNewADDROF( astNewVAR( label ) )

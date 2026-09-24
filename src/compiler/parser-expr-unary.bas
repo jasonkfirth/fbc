@@ -11,6 +11,12 @@
 
 declare function hCast( byval options as AST_CONVOPT ) as ASTNODE ptr
 declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
 declare sub fbSemanticModelPushExpressionRange _
 	( _
 		byref source_start as LEX_LOCATION, _
@@ -606,7 +612,8 @@ private function hProcPtrBody _
 		byval base_parent as FBSYMBOL ptr, _
 		byval proc as FBSYMBOL ptr, _
 		byval check_exact as boolean, _
-		byval is_vtable_index as integer _
+		byval is_vtable_index as integer, _
+		byref semantic_site as LEX_LOCATION _
 	) as ASTNODE ptr
 
 	assert( proc <> NULL )
@@ -632,6 +639,10 @@ private function hProcPtrBody _
 	if( symbCheckAccess( proc ) = FALSE ) then
 		errReportEx( FB_ERRMSG_ILLEGALMEMBERACCESS, symbGetFullProcName( proc ) )
 	end if
+
+	'' A procedure address is a reference, not a call. Export it only after
+	'' the expected signature has selected the compiler's exact overload.
+	fbSemanticModelExportBinding(proc, semantic_site, FALSE)
 
 	'' call any necessary rtl callbacks...
 	dim as FBRTLCALLBACK callback = symbGetProcCallback( proc )
@@ -678,6 +689,7 @@ function cProcPtrBody _
 	dim as FBSYMBOL ptr sym = any, base_parent = any
 	dim as ASTNODE ptr expr = any
 	dim as integer is_vtable_index = FALSE
+	dim as LEX_LOCATION semantic_site
 
 	if( dtype = FB_DATATYPE_STRUCT ) then
 		base_parent = subtype
@@ -692,6 +704,7 @@ function cProcPtrBody _
 	end if
 
 	sym = cIdentifierOrUDTMember( base_parent, chain_ )
+	semantic_site = lexGetLastLocation( )
 
 	if( sym = NULL ) then
 		errReport( FB_ERRMSG_UNDEFINEDSYMBOL )
@@ -748,13 +761,13 @@ function cProcPtrBody _
 		parser.ctxsym = subtype
 		parser.ctx_dtype = dtype
 
-		expr = hProcPtrBody( base_parent, sym, is_exact, is_vtable_index )
+		expr = hProcPtrBody( base_parent, sym, is_exact, is_vtable_index, semantic_site )
 
 		parser.ctxsym = oldsym
 		parser.ctx_dtype = old_dtype
 
 	else
-		expr = hProcPtrBody( base_parent, sym, FALSE, is_vtable_index )
+		expr = hProcPtrBody( base_parent, sym, FALSE, is_vtable_index, semantic_site )
 	end if
 
 	return expr
@@ -848,6 +861,7 @@ function cAddrOfExpression( ) as ASTNODE ptr
 		'' check if the address of function is being taken
 		dim as FBSYMCHAIN ptr chain_ = NULL
 		dim as FBSYMBOL ptr sym = NULL, base_parent = NULL
+		dim as LEX_LOCATION semantic_site
 
 		if( check_id ) then
 			chain_ = cIdentifier( base_parent, FB_IDOPT_DEFAULT or FB_IDOPT_ALLOWSTRUCT )
@@ -857,8 +871,9 @@ function cAddrOfExpression( ) as ASTNODE ptr
 		'' proc?
 		if( sym <> NULL ) then
 			lexSkipToken( LEXCHECK_POST_LANG_SUFFIX )
+			semantic_site = lexGetLastLocation( )
 			hCheckEmptyProcParens()
-			return hProcPtrBody( base_parent, sym, FALSE, FALSE )
+			return hProcPtrBody( base_parent, sym, FALSE, FALSE, semantic_site )
 		end if
 
 		'' anything else

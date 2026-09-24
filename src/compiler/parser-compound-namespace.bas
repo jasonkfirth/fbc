@@ -8,6 +8,13 @@
 #include once "parser.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 private sub namespaceBegin _
 	( _
 		byval stk as FB_CMPSTMTSTK ptr, _
@@ -33,6 +40,8 @@ sub cNamespaceStmtBegin( )
 	dim as FBSYMCHAIN ptr chain_ = any
 	dim as FB_CMPSTMTSTK ptr stk = any
 	dim as integer levels = any
+	dim as LEX_LOCATION semantic_site = any
+	dim as integer semantic_site_valid = FALSE
 
 	if( fbLangOptIsSet( FB_LANG_OPT_NAMESPC ) = FALSE ) then
 		errReportNotAllowed(FB_LANG_OPT_NAMESPC )
@@ -77,6 +86,8 @@ sub cNamespaceStmtBegin( )
 		'' not an id?
 		select case lexGetClass( )
 		case FB_TKCLASS_IDENTIFIER
+			semantic_site = lexGetCurrentLocation( )
+			semantic_site_valid = TRUE
 			id = *lexGetText( )
 			chain_ = lexGetSymChain( )
 
@@ -85,8 +96,11 @@ sub cNamespaceStmtBegin( )
 			if( symbIsGlobalNamespc( ) ) then
 				errReport( FB_ERRMSG_DUPDEFINITION )
 				id[0] = 0                       '' id = ""
+				semantic_site_valid = FALSE
 				chain_ = NULL
 			else
+				semantic_site = lexGetCurrentLocation( )
+				semantic_site_valid = TRUE
 				id = *lexGetText( )
 				chain_ = lexGetSymChain( )
 			end if
@@ -94,6 +108,7 @@ sub cNamespaceStmtBegin( )
 		case else
 			errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
 			id[0] = 0                           '' id = ""
+			semantic_site_valid = FALSE
 			chain_ = NULL
 		end select
 
@@ -105,6 +120,7 @@ sub cNamespaceStmtBegin( )
 				errReportEx( FB_ERRMSG_DUPDEFINITION, id )
 				'' error recovery: fake an id
 				id = *symbUniqueLabel( )
+				semantic_site_valid = FALSE
 				sym = NULL
 			else
 				'' not the same hash tb?
@@ -133,6 +149,10 @@ sub cNamespaceStmtBegin( )
 			if( sym = NULL ) then
 				errReportEx( FB_ERRMSG_DUPDEFINITION, id )
 			end if
+		end if
+
+		if( semantic_site_valid and (sym <> NULL) ) then
+			fbSemanticModelExportBinding(sym, semantic_site, TRUE)
 		end if
 
 		stk = cCompStmtPush(FB_TK_NAMESPACE, _

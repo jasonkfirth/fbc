@@ -8,6 +8,13 @@
 #include once "parser.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 declare sub hTypeBody( byval s as FBSYMBOL ptr )
 
 declare sub hPatchByvalParamsToSelf _
@@ -404,7 +411,8 @@ private function hAddAndInitField _
 		byval subtype as FBSYMBOL ptr, _
 		byval lgt as longint, _
 		byval bits as integer, _
-		byval attrib as FB_SYMBATTRIB _
+		byval attrib as FB_SYMBATTRIB, _
+		byref semantic_site as LEX_LOCATION _
 	) as integer
 
 	dim as FBSYMBOL ptr sym = any
@@ -447,6 +455,7 @@ private function hAddAndInitField _
 		errReportEx( FB_ERRMSG_DUPDEFINITION, id )
 		exit function
 	end if
+	fbSemanticModelExportBinding(sym, semantic_site, TRUE)
 
 	if( attrib and FB_SYMBATTRIB_DYNAMIC ) then
 		hComplainAboutConstDynamicArray( sym )
@@ -458,12 +467,17 @@ private function hAddAndInitField _
 	function = TRUE
 end function
 
-private function hFieldId( byval parent as FBSYMBOL ptr ) as zstring ptr
+private function hFieldId _
+	( _
+		byval parent as FBSYMBOL ptr, _
+		byref semantic_site as LEX_LOCATION _
+	) as zstring ptr
 	static as zstring * FB_MAXNAMELEN+1 id
 
 	'' allow keywords as field names
 	select case( lexGetClass( ) )
 	case FB_TKCLASS_IDENTIFIER, FB_TKCLASS_KEYWORD, FB_TKCLASS_QUIRKWD
+		semantic_site = lexGetCurrentLocation( )
 		'' Disallow type suffixes on fields
 		if( lexGetType( ) <> FB_DATATYPE_INVALID ) then
 			errReport( FB_ERRMSG_SYNTAXERROR )
@@ -488,6 +502,7 @@ private function hFieldId( byval parent as FBSYMBOL ptr ) as zstring ptr
 		lexSkipToken( )
 
 	case else
+		semantic_site.start_line = 0
 		errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
 		'' error recovery: fake an id
 		id = *symbUniqueLabel( )
@@ -516,6 +531,7 @@ private sub hTypeMultElementDecl _
 	dim as integer dtype = any, bits = any, dims = any, fieldattrib = any
 	dim as longint lgt = any
 	dim as ASTNODE ptr boundstypeini = any
+	dim as LEX_LOCATION semantic_site = any
 
 	'' AS SymbolType
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -525,14 +541,14 @@ private sub hTypeMultElementDecl _
 		fieldattrib = attrib
 
 		'' Identifier
-		id = hFieldId( parent )
+		id = hFieldId( parent, semantic_site )
 
 		'' [ArrayDimensions | ':' BitfieldSize]
 		hArrayOrBitfield( token, fieldattrib, bits, dims, dTB(), boundstypeini )
 
 		'' symbAddField()
 		'' ['=' InitializerExpression]
-		hAddAndInitField( parent, id, dims, dTB(), boundstypeini, dtype, subtype, lgt, bits, fieldattrib )
+		hAddAndInitField( parent, id, dims, dTB(), boundstypeini, dtype, subtype, lgt, bits, fieldattrib, semantic_site )
 
 		'' ','?
 	loop while( hMatch( CHAR_COMMA ) )
@@ -556,9 +572,10 @@ private sub hTypeElementDecl _
 	dim as integer dtype = any, bits = any, dims = any
 	dim as longint lgt = any
 	dim as ASTNODE ptr boundstypeini = any
+	dim as LEX_LOCATION semantic_site = any
 
 	'' Identifier
-	id = hFieldId( parent )
+	id = hFieldId( parent, semantic_site )
 
 	'' [ArrayDimensions | ':' BitfieldSize]
 	hArrayOrBitfield( token, attrib, bits, dims, dTB(), boundstypeini )
@@ -573,7 +590,7 @@ private sub hTypeElementDecl _
 
 	'' symbAddField()
 	'' ['=' InitializerExpression]
-	hAddAndInitField( parent, id, dims, dTB(), boundstypeini, dtype, subtype, lgt, bits, attrib )
+	hAddAndInitField( parent, id, dims, dTB(), boundstypeini, dtype, subtype, lgt, bits, attrib, semantic_site )
 end sub
 
 private sub hFieldDeclWithExplicitDim _
@@ -1048,6 +1065,7 @@ sub cTypeDecl( byval attrib as FB_SYMBATTRIB )
 	dim as integer isunion = any, checkid = any
 	dim as FBSYMBOL ptr sym = any
 	dim as FB_CMPSTMTSTK ptr stk = any
+	dim as LEX_LOCATION semantic_site
 
 	isunion = (lexGetToken( ) = FB_TK_UNION)
 
@@ -1094,6 +1112,7 @@ sub cTypeDecl( byval attrib as FB_SYMBATTRIB )
 			end if
 		end if
 
+		semantic_site = lexGetCurrentLocation( )
 		lexEatToken( @id )
 	else
 		id = *symbUniqueId( )
@@ -1106,7 +1125,7 @@ sub cTypeDecl( byval attrib as FB_SYMBATTRIB )
 		end if
 
 		'' (Note: the typedef parser will skip the AS)
-		cTypedefSingleDecl( attrib, id )
+		cTypedefSingleDecl( attrib, id, semantic_site, checkid )
 		exit sub
 	end if
 
@@ -1144,6 +1163,9 @@ sub cTypeDecl( byval attrib as FB_SYMBATTRIB )
 	dim as integer scope_depth = parser.scope
 
 	sym = hTypeAdd( NULL, id, palias, isunion, align, baseDType, baseSubtype, stringType )
+	if( checkid ) then
+		fbSemanticModelExportBinding(sym, semantic_site, TRUE)
+	end if
 
 	'' set visibility flags
 	sym->attrib or= (attrib and FB_SYMBATTRIB_VIS_PRIVATE)

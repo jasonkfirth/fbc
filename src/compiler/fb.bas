@@ -17,6 +17,9 @@
 
 declare sub fbSemanticModelBeginModule(byref filename as string)
 declare sub fbSemanticModelAddDependency(byref filename as string)
+declare sub fbSemanticModelBeginSource(byref filename as string, byval depth as integer)
+declare sub fbSemanticModelEndSource(byval depth as integer)
+declare sub fbSemanticModelMarkSourceRemapped(byval depth as integer)
 declare sub fbSemanticModelExportGlobals(byval symbol as FBSYMBOL ptr)
 
 type FB_LANG_INFO
@@ -1950,6 +1953,7 @@ sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer)
 	end if
 
 	env.inf.format = hCheckFileFormat( env.inf.num )
+	fbSemanticModelBeginSource(incfile, env.includerec)
 
 	'' parse
 	lexPushCtx( )
@@ -1961,6 +1965,7 @@ sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer)
 	lexPopCtx( )
 
 	close #env.inf.num
+	fbSemanticModelEndSource(env.includerec)
 
 	'' pop context
 	env.includerec -= 1
@@ -1969,6 +1974,7 @@ end sub
 
 '' Used by #line to change the effective filename of the current source file.
 sub fbOverrideFilename(byval filename as zstring ptr)
+	fbSemanticModelMarkSourceRemapped(env.includerec)
 	env.inf.name = *filename
 	'' env.inf.incfile is an interned copy of env.inf.name (possibly up-cased),
 	'' so must be updated too.

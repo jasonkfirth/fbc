@@ -224,7 +224,8 @@ function cProcCall _
 		byval ptrexpr as ASTNODE ptr, _
 		byval thisexpr as ASTNODE ptr, _
 		byval checkprnts as integer, _
-		byval options as FB_PARSEROPT _
+		byval options as FB_PARSEROPT, _
+		byval semantic_site as LEX_LOCATION ptr _
 	) as ASTNODE ptr
 
 	dim as integer is_propset = FALSE
@@ -339,7 +340,7 @@ function cProcCall _
 	fbSetPrntOptional( not checkprnts )
 
 	'' ProcArgList
-	procexpr = cProcArgList( base_parent, sym, ptrexpr, @arg_list, options )
+	procexpr = cProcArgList( base_parent, sym, ptrexpr, @arg_list, options, semantic_site )
 
 	'' ')'
 	if( (checkprnts) or (parser.prntcnt > 0) ) then
@@ -394,6 +395,7 @@ private function hProcSymbol _
 	dim as integer do_call = any
 
 	function = FALSE
+	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
 
 	if( cCompStmtIsAllowed( FB_CMPSTMT_MASK_CODE ) = FALSE ) then
 		hSkipStmt( )
@@ -424,7 +426,7 @@ private function hProcSymbol _
 	'' ID ProcParamList?
 	if( do_call ) then
 		dim as ASTNODE ptr expr = any
-		expr = cProcCall( base_parent, sym, NULL, NULL, FALSE, options )
+		expr = cProcCall( base_parent, sym, NULL, NULL, FALSE, options, @semantic_site )
 
 		'' assignment of a function deref?
 		if( expr <> NULL ) then

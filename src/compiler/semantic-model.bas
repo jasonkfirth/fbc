@@ -41,7 +41,7 @@
 '' Export limits and process-local module state
 '' -------------------------------------------------------------------------
 
-private const SEMANTIC_MODEL_SCHEMA = "7"
+private const SEMANTIC_MODEL_SCHEMA = "8"
 private const SEMANTIC_MODEL_MAX_SYMBOLS = 1000000
 private const SEMANTIC_MODEL_MAX_DEPENDENCIES = 5000
 private const SEMANTIC_MODEL_INITIAL_SYMBOL_INDEX_CAPACITY = 256
@@ -51,15 +51,17 @@ private const SEMANTIC_MODEL_MAX_MODULE_BUFFER_BYTES = 268435456
 private const SEMANTIC_MODEL_MAX_NODES_PER_MODEL = 1000000
 private const SEMANTIC_MODEL_MAX_EXPRESSIONS_PER_MODEL = 1000000
 private const SEMANTIC_MODEL_MAX_BINDINGS_PER_MODEL = 1000000
+private const SEMANTIC_MODEL_MAX_SOURCE_CONTEXTS = FB_MAXINCRECLEVEL
 private const SEMANTIC_MODEL_MAX_SOURCE_LINE_BYTES = LEX_MAXBUFFCHARS
 
 private type SEMANTIC_MODEL_SYMBOL
 	sym         as FBSYMBOL ptr
+	identity    as ulongint
 	state       as integer
 end type
 
 private type SEMANTIC_MODEL_SYMBOL_SLOT
-	sym         as FBSYMBOL ptr
+	identity    as ulongint
 	id          as integer
 end type
 
@@ -80,6 +82,8 @@ dim shared as integer semantic_model_recovery_module_count
 dim shared as integer semantic_model_dependency_count
 dim shared as integer semantic_model_dependencies_complete
 dim shared as string semantic_model_dependencies(0 to SEMANTIC_MODEL_MAX_DEPENDENCIES - 1)
+dim shared as string semantic_model_physical_sources(0 to SEMANTIC_MODEL_MAX_SOURCE_CONTEXTS - 1)
+dim shared as integer semantic_model_source_remapped(0 to SEMANTIC_MODEL_MAX_SOURCE_CONTEXTS - 1)
 dim shared as integer semantic_model_source_bound_valid
 dim shared as integer semantic_model_source_bound_line
 dim shared as integer semantic_model_source_bound_columns
@@ -109,6 +113,7 @@ dim shared as SEMANTIC_MODEL_SYMBOL ptr semantic_model_symbols
 dim shared as integer semantic_model_symbol_capacity
 dim shared as SEMANTIC_MODEL_SYMBOL_SLOT ptr semantic_model_symbol_index
 dim shared as integer semantic_model_symbol_index_capacity
+dim shared as ulongint semantic_model_next_symbol_identity
 
 '' -------------------------------------------------------------------------
 '' Sidecar lifecycle state
@@ -255,19 +260,59 @@ sub fbSemanticModelAddDependency(byref filename as string)
 	semantic_model_dependency_count += 1
 end sub
 
+sub fbSemanticModelBeginSource(byref filename as string, byval depth as integer)
+	if( semantic_model_file_open = FALSE ) then exit sub
+	if( (depth < 0) or (depth >= SEMANTIC_MODEL_MAX_SOURCE_CONTEXTS) ) then exit sub
+	semantic_model_physical_sources(depth) = filename
+	semantic_model_source_remapped(depth) = FALSE
+end sub
+
+sub fbSemanticModelEndSource(byval depth as integer)
+	if( semantic_model_file_open = FALSE ) then exit sub
+	if( (depth < 0) or (depth >= SEMANTIC_MODEL_MAX_SOURCE_CONTEXTS) ) then exit sub
+	semantic_model_physical_sources(depth) = ""
+	semantic_model_source_remapped(depth) = FALSE
+end sub
+
+sub fbSemanticModelMarkSourceRemapped(byval depth as integer)
+	if( semantic_model_file_open = FALSE ) then exit sub
+	if( (depth < 0) or (depth >= SEMANTIC_MODEL_MAX_SOURCE_CONTEXTS) ) then exit sub
+	semantic_model_source_remapped(depth) = TRUE
+end sub
+
+private function hSemanticModelLocationIsPhysical(byref source as LEX_LOCATION) as integer
+	if( (source.is_physical = FALSE) or _
+		(env.includerec < 0) or _
+		(env.includerec >= SEMANTIC_MODEL_MAX_SOURCE_CONTEXTS) or _
+		(semantic_model_source_remapped(env.includerec)) ) then
+		return FALSE
+	end if
+	return abs(source.source_file = semantic_model_physical_sources(env.includerec))
+end function
+
 '' -------------------------------------------------------------------------
 '' Compiler symbol and typed AST serialization
 '' -------------------------------------------------------------------------
 
-private function hSemanticModelSymbolHash(byval sym as FBSYMBOL ptr) as uinteger
-	dim as ulongint address_value = 0
+sub fbSemanticModelInitializeSymbol(byval sym as FBSYMBOL ptr)
+	if( sym = NULL ) then exit sub
+	if( sym->semantic_model_identity <> 0 ) then exit sub
+	if( semantic_model_file_open = FALSE ) then exit sub
+	if( semantic_model_next_symbol_identity = &hFFFFFFFFFFFFFFFFull ) then
+		semantic_model_module_failed = TRUE
+		semantic_model_any_failed = TRUE
+		exit sub
+	end if
+	semantic_model_next_symbol_identity += 1
+	sym->semantic_model_identity = semantic_model_next_symbol_identity
+end sub
 
-	memcpy(@address_value, @sym, sizeof(sym))
-	address_value xor= address_value shr 4
-	address_value xor= address_value shr 13
-	address_value xor= address_value shr 23
-	address_value xor= address_value shr 37
-	return cuint(address_value)
+private function hSemanticModelSymbolHash(byval identity as ulongint) as uinteger
+	identity xor= identity shr 4
+	identity xor= identity shr 13
+	identity xor= identity shr 23
+	identity xor= identity shr 37
+	return cuint(identity)
 end function
 
 private function hSemanticModelGrowSymbolIndex(byval new_capacity as integer) as integer
@@ -278,12 +323,12 @@ private function hSemanticModelGrowSymbolIndex(byval new_capacity as integer) as
 	if( new_index = NULL ) then return FALSE
 
 	for i as integer = 0 to semantic_model_symbol_count - 1
-		slot_index = hSemanticModelSymbolHash(semantic_model_symbols[i].sym) and _
+		slot_index = hSemanticModelSymbolHash(semantic_model_symbols[i].identity) and _
 			(new_capacity - 1)
-		while( new_index[slot_index].sym <> NULL )
+		while( new_index[slot_index].identity <> 0 )
 			slot_index = (slot_index + 1) and (new_capacity - 1)
 		wend
-		new_index[slot_index].sym = semantic_model_symbols[i].sym
+		new_index[slot_index].identity = semantic_model_symbols[i].identity
 		new_index[slot_index].id = i + 1
 	next
 
@@ -312,12 +357,13 @@ end function
 
 private function hSemanticModelFindSymbol(byval sym as FBSYMBOL ptr) as integer
 	dim as uinteger slot_index
+	dim as ulongint identity = sym->semantic_model_identity
 
-	if( semantic_model_symbol_index_capacity = 0 ) then return -1
-	slot_index = hSemanticModelSymbolHash(sym) and _
+	if( (identity = 0) or (semantic_model_symbol_index_capacity = 0) ) then return -1
+	slot_index = hSemanticModelSymbolHash(identity) and _
 		(semantic_model_symbol_index_capacity - 1)
-	do while( semantic_model_symbol_index[slot_index].sym <> NULL )
-		if( semantic_model_symbol_index[slot_index].sym = sym ) then
+	do while( semantic_model_symbol_index[slot_index].identity <> 0 )
+		if( semantic_model_symbol_index[slot_index].identity = identity ) then
 			return semantic_model_symbol_index[slot_index].id - 1
 		end if
 		slot_index = (slot_index + 1) and _
@@ -337,6 +383,10 @@ private function hSemanticModelSymbolId(byval sym as FBSYMBOL ptr) as longint
 
 	if( hSemanticModelHasSymbol(sym) = FALSE ) then
 		return 0
+	end if
+	if( sym->semantic_model_identity = 0 ) then
+		fbSemanticModelInitializeSymbol(sym)
+		if( sym->semantic_model_identity = 0 ) then return 0
 	end if
 
 	index = hSemanticModelFindSymbol(sym)
@@ -385,16 +435,17 @@ private function hSemanticModelSymbolId(byval sym as FBSYMBOL ptr) as longint
 
 		index = semantic_model_symbol_count
 		semantic_model_symbols[index].sym = sym
+		semantic_model_symbols[index].identity = sym->semantic_model_identity
 		semantic_model_symbols[index].state = 0
 		semantic_model_symbol_count += 1
 
-		slot_index = hSemanticModelSymbolHash(sym) and _
+		slot_index = hSemanticModelSymbolHash(sym->semantic_model_identity) and _
 			(semantic_model_symbol_index_capacity - 1)
-		while( semantic_model_symbol_index[slot_index].sym <> NULL )
+		while( semantic_model_symbol_index[slot_index].identity <> 0 )
 			slot_index = (slot_index + 1) and _
 				(semantic_model_symbol_index_capacity - 1)
 		wend
-		semantic_model_symbol_index[slot_index].sym = sym
+		semantic_model_symbol_index[slot_index].identity = sym->semantic_model_identity
 		semantic_model_symbol_index[slot_index].id = index + 1
 	end if
 
@@ -454,12 +505,13 @@ sub fbSemanticModelExportBinding _
 		exit sub
 	end if
 
+	dim as integer physical_range = hSemanticModelLocationIsPhysical(source)
 	dim as longint symbolid = hSemanticModelSymbolId(sym)
 	if( (symbolid = 0) or (semantic_model_module_failed) ) then exit sub
 
 	hSemanticModelAppendLine("B" + TABCHAR + hSemanticModelNumber(symbolid) + _
 		TABCHAR + iif(is_declaration, "declaration", "reference") + _
-		TABCHAR + hSemanticModelNumber(abs(source.is_physical)) + _
+		TABCHAR + hSemanticModelNumber(physical_range) + _
 		TABCHAR + hSemanticModelEscape(source.source_file) + _
 		TABCHAR + hSemanticModelNumber(source.start_line) + _
 		TABCHAR + hSemanticModelNumber(source.start_column) + _
@@ -529,6 +581,99 @@ private function hSemanticModelNodeOperator(byval node as ASTNODE ptr) as intege
 		return node->dbg.op
 	case else
 		return 0
+	end select
+end function
+
+private function hSemanticModelConceptOperator(byval node as ASTNODE ptr, _
+	byref operator_kind as string) as string
+	dim as integer op
+
+	operator_kind = "none"
+	if( node = NULL ) then return ""
+
+	if( (node->class = AST_NODECLASS_CALL) or _
+		(node->class = AST_NODECLASS_CALLCTOR) ) then
+		if( hSemanticModelHasSymbol(node->sym) = FALSE ) then return ""
+		if( (symbIsProc(node->sym) = FALSE) or _
+			(symbIsOperator(node->sym) = FALSE) ) then return ""
+		op = symbGetProcOpOvl(node->sym)
+		operator_kind = "overloaded"
+	else
+		select case node->class
+		case AST_NODECLASS_ASSIGN
+			op = AST_OP_ASSIGN
+		case AST_NODECLASS_IDX
+			operator_kind = "builtin"
+			return "index"
+		case AST_NODECLASS_BOP, AST_NODECLASS_UOP, AST_NODECLASS_CONV, _
+			AST_NODECLASS_ADDROF, AST_NODECLASS_MEM
+			op = hSemanticModelNodeOperator(node)
+		case else
+			return ""
+		end select
+		operator_kind = "builtin"
+	end if
+
+	select case op
+	case AST_OP_ASSIGN: return "assign"
+	case AST_OP_ADD_SELF: return "add-assign"
+	case AST_OP_SUB_SELF: return "subtract-assign"
+	case AST_OP_MUL_SELF: return "multiply-assign"
+	case AST_OP_DIV_SELF: return "divide-assign"
+	case AST_OP_INTDIV_SELF: return "integer-divide-assign"
+	case AST_OP_MOD_SELF: return "modulo-assign"
+	case AST_OP_AND_SELF: return "and-assign"
+	case AST_OP_OR_SELF: return "or-assign"
+	case AST_OP_ANDALSO_SELF: return "logical-and-assign"
+	case AST_OP_ORELSE_SELF: return "logical-or-assign"
+	case AST_OP_XOR_SELF: return "xor-assign"
+	case AST_OP_EQV_SELF: return "equivalence-assign"
+	case AST_OP_IMP_SELF: return "implication-assign"
+	case AST_OP_SHL_SELF: return "shift-left-assign"
+	case AST_OP_SHR_SELF: return "shift-right-assign"
+	case AST_OP_POW_SELF: return "power-assign"
+	case AST_OP_CONCAT_SELF: return "concatenate-assign"
+	case AST_OP_ADD: return "add"
+	case AST_OP_SUB: return "subtract"
+	case AST_OP_MUL: return "multiply"
+	case AST_OP_DIV: return "divide"
+	case AST_OP_INTDIV: return "integer-divide"
+	case AST_OP_MOD: return "modulo"
+	case AST_OP_AND: return "and"
+	case AST_OP_OR: return "or"
+	case AST_OP_ANDALSO: return "logical-and"
+	case AST_OP_ORELSE: return "logical-or"
+	case AST_OP_XOR: return "xor"
+	case AST_OP_EQV: return "equivalence"
+	case AST_OP_IMP: return "implication"
+	case AST_OP_SHL: return "shift-left"
+	case AST_OP_SHR: return "shift-right"
+	case AST_OP_POW: return "power"
+	case AST_OP_CONCAT: return "concatenate"
+	case AST_OP_EQ: return "equal"
+	case AST_OP_GT: return "greater-than"
+	case AST_OP_LT: return "less-than"
+	case AST_OP_NE: return "not-equal"
+	case AST_OP_GE: return "greater-or-equal"
+	case AST_OP_LE: return "less-or-equal"
+	case AST_OP_IS: return "identity-test"
+	case AST_OP_NOT: return "not"
+	case AST_OP_BOOLNOT: return "logical-not"
+	case AST_OP_PLUS: return "unary-plus"
+	case AST_OP_NEG: return "negate"
+	case AST_OP_ADDROF: return "address-of"
+	case AST_OP_DEREF: return "dereference"
+	case AST_OP_PTRINDEX: return "index"
+	case AST_OP_CAST: return "cast"
+	case AST_OP_TOINT: return "convert-to-integer"
+	case AST_OP_TOFLT: return "convert-to-float"
+	case AST_OP_NEW: return "allocate"
+	case AST_OP_NEW_VEC: return "allocate-array"
+	case AST_OP_DEL: return "deallocate"
+	case AST_OP_DEL_VEC: return "deallocate-array"
+	case else
+		operator_kind = "none"
+		return ""
 	end select
 end function
 
@@ -736,12 +881,15 @@ sub fbSemanticModelExportExpression _
 
 	dim as string sourcefile = source_start.source_file
 	dim as string type_name = symbTypeToStr(expr->dtype, expr->subtype)
-	dim as integer physical_range = abs(source_start.is_physical and _
-		source_end.is_physical and _
+	dim as integer physical_range = abs(hSemanticModelLocationIsPhysical(source_start) and _
+		hSemanticModelLocationIsPhysical(source_end) and _
+		source_start.is_physical and source_end.is_physical and _
 		(nonphysical_tokens_at_start = nonphysical_tokens_at_end) and _
 		(source_start.source_file = source_end.source_file) and _
 		hSemanticModelRangeFitsCurrentSourceLine(source_end))
 	dim as longint symbolid = 0, subtypeid = 0
+	dim as string operator_kind = "none"
+	dim as string operator_code = hSemanticModelConceptOperator(expr, operator_kind)
 	if( semantic_model_expressions_only = FALSE ) then
 		symbolid = hSemanticModelSymbolId(expr->sym)
 		subtypeid = hSemanticModelSymbolId(expr->subtype)
@@ -755,6 +903,8 @@ sub fbSemanticModelExportExpression _
 		hSemanticModelNumber(source_end.end_column) + TABCHAR + _
 		hSemanticModelNumber(expr->class) + TABCHAR + _
 		hSemanticModelNumber(hSemanticModelNodeOperator(expr)) + TABCHAR + _
+		hSemanticModelEscape(operator_code) + _
+		TABCHAR + hSemanticModelEscape(operator_kind) + TABCHAR + _
 		hSemanticModelNumber(astGetFullType(expr)) + TABCHAR + _
 		hSemanticModelNumber(symbolid) + TABCHAR + _
 		hSemanticModelNumber(subtypeid) + TABCHAR + _
@@ -802,7 +952,7 @@ private sub hSemanticModelExportTree _
 	dim as SEMANTIC_MODEL_NODEFRAME current
 	dim as SEMANTIC_MODEL_NODEFRAME ptr resized_stack
 	dim as longint symbolid, subtypeid
-	dim as string sourcefile
+	dim as string sourcefile, operator_kind, operator_code
 
 	stack_capacity = 64
 	stack = callocate(stack_capacity, sizeof(SEMANTIC_MODEL_NODEFRAME))
@@ -839,10 +989,14 @@ private sub hSemanticModelExportTree _
 
 		symbolid = hSemanticModelSymbolId(current.node->sym)
 		subtypeid = hSemanticModelSymbolId(current.node->subtype)
+		operator_kind = "none"
+		operator_code = hSemanticModelConceptOperator(current.node, operator_kind)
 		hSemanticModelAppendLine("N" + TABCHAR + hSemanticModelNumber(current.nodeid) + TABCHAR + _
 			hSemanticModelNumber(current.parentid) + TABCHAR + hSemanticModelEdgeName(current.edge) + _
 			TABCHAR + hSemanticModelNumber(current.node->class) + TABCHAR + _
 			hSemanticModelNumber(hSemanticModelNodeOperator(current.node)) + TABCHAR + _
+			hSemanticModelEscape(operator_code) + TABCHAR + _
+			hSemanticModelEscape(operator_kind) + TABCHAR + _
 			hSemanticModelNumber(current.node->dtype) + TABCHAR + hSemanticModelNumber(symbolid) + _
 			TABCHAR + hSemanticModelNumber(subtypeid) + TABCHAR + _
 			hSemanticModelNumber(source_line) + _
@@ -993,6 +1147,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	semantic_model_module_binding_count = 0
 	semantic_model_module_node_count = 0
 	semantic_model_module_open = TRUE
+	fbSemanticModelBeginSource(filename, 0)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	fbSemanticModelAddDependency(filename)
 end sub
@@ -1016,6 +1171,7 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 
 	semantic_model_module_buffer_len = 0
 	semantic_model_module_open = FALSE
+	fbSemanticModelEndSource(0)
 	semantic_model_symbol_count = 0
 	semantic_model_module_expression_count = 0
 	semantic_model_module_binding_count = 0

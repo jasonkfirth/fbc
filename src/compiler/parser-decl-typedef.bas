@@ -7,6 +7,13 @@
 #include once "fbint.bi"
 #include once "parser.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 private sub hPtrDecl(byref dtype as integer)
 	dim as integer ptr_cnt = 0
 
@@ -180,7 +187,9 @@ private sub hAddTypedef _
 		byval subtype as FBSYMBOL ptr, _
 		byval lgt as longint, _
 		byval is_fixlenstr as integer, _
-		byval attrib as FB_SYMBATTRIB _
+		byval attrib as FB_SYMBATTRIB, _
+		byref semantic_site as LEX_LOCATION, _
+		byval has_site as integer _
 	)
 
 	'' Forward ref? Note: may update dtype & co
@@ -197,6 +206,9 @@ private sub hAddTypedef _
 		'' set visibility flags
 		typedef->attrib or= (attrib and FB_SYMBATTRIB_VIS_PRIVATE)
 		typedef->attrib or= (attrib and FB_SYMBATTRIB_VIS_PROTECTED)
+		if( has_site ) then
+			fbSemanticModelExportBinding(typedef, semantic_site, TRUE)
+		end if
 	else
 		'' check if the dup definition is different
 		dim as integer isdup = TRUE
@@ -218,19 +230,28 @@ private sub hAddTypedef _
 
 		if( isdup ) then
 			errReport( FB_ERRMSG_DUPDEFINITION, TRUE )
+		elseif( has_site ) then
+			fbSemanticModelExportBinding(sym, semantic_site, TRUE)
 		end if
 	end if
 end sub
 
-private function hReadId( ) as zstring ptr
+private function hReadId _
+	( _
+		byref semantic_site as LEX_LOCATION, _
+		byref has_site as integer _
+	) as zstring ptr
 
 	static as zstring * FB_MAXNAMELEN+1 id
 
 	'' Namespace identifier if it matches the current namespace
 	cCurrentParentId()
+	has_site = FALSE
 
 	select case as const lexGetClass( )
 	case FB_TKCLASS_IDENTIFIER, FB_TKCLASS_KEYWORD, FB_TKCLASS_QUIRKWD
+		semantic_site = lexGetCurrentLocation( )
+		has_site = TRUE
 
 		if( fbLangOptIsSet( FB_LANG_OPT_PERIODS ) ) then
 			'' if inside a namespace, symbols can't contain periods (.)'s
@@ -272,16 +293,25 @@ sub cTypedefMultDecl( byval attrib as FB_SYMBATTRIB )
 
 	do
 		'' Parse the ID
-		var pid = hReadId( )
+		dim as LEX_LOCATION semantic_site
+		dim as integer has_site
+		var pid = hReadId( semantic_site, has_site )
 
-		hAddTypedef( pid, pfwdname, dtype, subtype, lgt, is_fixlenstr, attrib )
+		hAddTypedef( pid, pfwdname, dtype, subtype, lgt, is_fixlenstr, attrib, _
+		             semantic_site, has_site )
 
 		'' ','?
 	loop while( hMatch( CHAR_COMMA ) )
 end sub
 
 '' SingleTypedef  =  TYPE symbol AS SymbolType (',' symbol AS SymbolType)*
-sub cTypedefSingleDecl( byval attrib as FB_SYMBATTRIB, byval pid as zstring ptr )
+sub cTypedefSingleDecl _
+	( _
+		byval attrib as FB_SYMBATTRIB, _
+		byval pid as zstring ptr, _
+		byref semantic_site as LEX_LOCATION, _
+		byval has_site as integer _
+	)
 	'' note: given id can be Ucase()'d
 
 	if( cCompStmtIsAllowed( FB_CMPSTMT_MASK_DECL or FB_CMPSTMT_MASK_CODE ) = FALSE ) then
@@ -301,7 +331,8 @@ sub cTypedefSingleDecl( byval attrib as FB_SYMBATTRIB, byval pid as zstring ptr 
 		dim as FBSYMBOL ptr subtype
 		var pfwdname = hReadType( dtype, subtype, lgt, is_fixlenstr )
 
-		hAddTypedef( pid, pfwdname, dtype, subtype, lgt, is_fixlenstr, attrib )
+		hAddTypedef( pid, pfwdname, dtype, subtype, lgt, is_fixlenstr, attrib, _
+		             semantic_site, has_site )
 
 		'' ','?
 		if( hMatch( CHAR_COMMA ) = FALSE ) then
@@ -309,6 +340,6 @@ sub cTypedefSingleDecl( byval attrib as FB_SYMBATTRIB, byval pid as zstring ptr 
 		end if
 
 		'' Parse the next ID
-		pid = hReadId( )
+		pid = hReadId( semantic_site, has_site )
 	loop
 end sub
