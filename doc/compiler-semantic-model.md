@@ -155,14 +155,17 @@ same physical source file; the range can be used for editor navigation. A
 value of `0` means macro expansion or another non-physical token participated,
 or the reported range failed a physical-line bound check. In either case,
 coordinates are informational only and must not be used as an editable source
-range. The exporter also checks single-line ASCII-compatible ranges against
-the complete physical line and clears the physical flag when a parser cursor
-extends beyond that line. This reads the input file directly rather than using
-the shorter diagnostic excerpt, and fails closed if the line cannot be read
-within the lexer's line-size bound. The check is keyed by physical file
-position as well as reported path and line, because `#line` can assign the same
-logical location to different source lines. Empty or reversed parser spans are
-omitted. Full-model `E` records are emitted at the common `cExpression()` parser
+range. The exporter also checks single-line ranges against the complete
+physical line for unmarked source and BOM-marked UTF-8, UTF-16LE/BE, and
+UTF-32LE/BE. It reads bounded chunks aligned to the input encoding and counts
+editor UTF-16 columns, including two columns for supplementary-plane
+characters. A parser cursor that extends beyond the physical line is marked
+nonphysical. The check does not use the shorter diagnostic excerpt and fails
+closed when the source line is oversized, an explicitly encoded line is
+malformed, or the input cannot be read. Its cache uses a physical line count
+independent of `#line` remapping, so repeated logical locations do not share a
+stale bound. Empty or reversed parser spans are omitted. Full-model `E` records
+are emitted at the common `cExpression()` parser
 boundary. Expressions-only output additionally records completed binary
 precedence results, unary results, and completed results from the
 highest-precedence parser route. This includes complete primary, member, index,

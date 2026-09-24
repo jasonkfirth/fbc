@@ -9,6 +9,13 @@
 #include once "parser.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 ''
 '' ASM keyword lists
 ''
@@ -271,17 +278,24 @@ sub cAsmCode()
 				dim as FBSYMBOL ptr base_parent = any
 
 				chain_ = cIdentifier( base_parent )
+				'' cIdentifier() consumes namespace prefixes but leaves the
+				'' selected symbol token current. The backend keeps resolved ASM
+				'' names as symbol nodes, so export that same compiler decision for
+				'' navigation and project refactoring instead of treating it as text.
+				dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
 				do while( chain_ <> NULL )
 					dim as FBSYMBOL ptr s = chain_->sym
 					do
 						select case symbGetClass( s )
 						case FB_SYMBCLASS_PROC, FB_SYMBCLASS_LABEL
 							sym = s
+							fbSemanticModelExportBinding(sym, semantic_site, FALSE)
 							exit do, do
 
 						'' const?
 						case FB_SYMBCLASS_CONST
 							text = symbGetConstValueAsStr( s )
+							fbSemanticModelExportBinding(s, semantic_site, FALSE)
 							exit do, do
 
 						case FB_SYMBCLASS_VAR
@@ -290,6 +304,7 @@ sub cAsmCode()
 
 							if( sym <> NULL ) then
 								symbSetIsAccessed( sym )
+								fbSemanticModelExportBinding(sym, semantic_site, FALSE)
 							end if
 							exit do, do
 

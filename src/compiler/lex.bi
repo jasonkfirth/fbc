@@ -108,7 +108,8 @@ type LEX_TKCTX
 	lahdchar1       as uinteger                 '' look ahead first char
 	lahdchar2       as uinteger                 '' look ahead second char
 
-	linenum         as integer
+	linenum         as integer                  '' logical line after #line remapping
+	physical_linenum as integer                 '' physical line within the current file
 	column          as integer
 	utf8_continuations_left as integer
 	lasttk_id       as integer

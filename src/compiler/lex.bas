@@ -37,7 +37,8 @@ dim shared as string pponly_ln
 '' only update the line count if not inside a multi-line macro
 #define UPDATE_LINENUM( )            _
 	if( lex.ctx->deflen = 0 ) then  :_
-		lex.ctx->linenum += 1       :_
+		lex.ctx->linenum += 1      :_
+		lex.ctx->physical_linenum += 1 :_
 	end if
 
 '':::::
@@ -231,6 +232,7 @@ sub lexInit _
 	'' preprocessor evaluation?
 	if( ctx_kind = LEX_TKCTX_CONTEXT_EVAL ) then
 		lex.ctx->linenum = (lex.ctx-1)->linenum
+		lex.ctx->physical_linenum = (lex.ctx-1)->physical_linenum
 		lex.ctx->reclevel = (lex.ctx-1)->reclevel
 		lex.ctx->currmacro = (lex.ctx-1)->currmacro
 		lex.ctx->macrodepth = (lex.ctx-1)->macrodepth
@@ -243,6 +245,7 @@ sub lexInit _
 	'' else it is an include file or first time initialization
 	else
 		lex.ctx->linenum = 1
+		lex.ctx->physical_linenum = 1
 		lex.ctx->reclevel = 0
 		lex.ctx->currmacro = NULL
 		lex.ctx->macrodepth = 0

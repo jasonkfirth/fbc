@@ -52,7 +52,6 @@ private const SEMANTIC_MODEL_MAX_NODES_PER_MODEL = 1000000
 private const SEMANTIC_MODEL_MAX_EXPRESSIONS_PER_MODEL = 1000000
 private const SEMANTIC_MODEL_MAX_BINDINGS_PER_MODEL = 1000000
 private const SEMANTIC_MODEL_MAX_SOURCE_CONTEXTS = FB_MAXINCRECLEVEL
-private const SEMANTIC_MODEL_MAX_SOURCE_LINE_BYTES = LEX_MAXBUFFCHARS
 
 private type SEMANTIC_MODEL_SYMBOL
 	sym         as FBSYMBOL ptr
@@ -86,9 +85,14 @@ dim shared as string semantic_model_physical_sources(0 to SEMANTIC_MODEL_MAX_SOU
 dim shared as integer semantic_model_source_remapped(0 to SEMANTIC_MODEL_MAX_SOURCE_CONTEXTS - 1)
 dim shared as integer semantic_model_source_bound_valid
 dim shared as integer semantic_model_source_bound_line
+dim shared as integer semantic_model_source_bound_physical_line
 dim shared as integer semantic_model_source_bound_columns
-dim shared as integer semantic_model_source_bound_filepos
 dim shared as string semantic_model_source_bound_file
+dim shared as integer semantic_model_source_scan_valid
+dim shared as integer semantic_model_source_scan_line
+dim shared as integer semantic_model_source_scan_format
+dim shared as longint semantic_model_source_scan_filepos
+dim shared as string semantic_model_source_scan_file
 dim shared as LEX_LOCATION semantic_model_active_expression_start
 dim shared as longint semantic_model_active_expression_nonphysical
 dim shared as string semantic_model_last_expression_fact
@@ -677,11 +681,160 @@ private function hSemanticModelConceptOperator(byval node as ASTNODE ptr, _
 	end select
 end function
 
+private function hSemanticModelSourceCodeUnitWidth() as integer
+	select case env.inf.format
+	case FBFILE_FORMAT_UTF16LE, FBFILE_FORMAT_UTF16BE
+		return 2
+	case FBFILE_FORMAT_UTF32LE, FBFILE_FORMAT_UTF32BE
+		return 4
+	case else
+		return 1
+	end select
+end function
+
+private function hSemanticModelSourceBOMLength() as integer
+	select case env.inf.format
+	case FBFILE_FORMAT_UTF8
+		return 3
+	case FBFILE_FORMAT_UTF16LE, FBFILE_FORMAT_UTF16BE
+		return 2
+	case FBFILE_FORMAT_UTF32LE, FBFILE_FORMAT_UTF32BE
+		return 4
+	case else
+		return 0
+	end select
+end function
+
+private function hSemanticModelSourceLineLimitBytes() as longint
+	dim as integer bytes_per_column = 1
+	select case env.inf.format
+	case FBFILE_FORMAT_UTF8, FBFILE_FORMAT_UTF32LE, FBFILE_FORMAT_UTF32BE
+		bytes_per_column = 4
+	case FBFILE_FORMAT_UTF16LE, FBFILE_FORMAT_UTF16BE
+		bytes_per_column = 2
+	end select
+	return culngint(LEX_MAXBUFFCHARS) * bytes_per_column
+end function
+
+private function hSemanticModelReadSourceCodeUnit _
+	( _
+		byref source_text as string, _
+		byval offset as integer _
+	) as ulongint
+
+	dim as ubyte ptr source_bytes = cast(ubyte ptr, strptr(source_text))
+	select case env.inf.format
+	case FBFILE_FORMAT_UTF16LE
+		return culngint(source_bytes[offset]) or _
+			(culngint(source_bytes[offset + 1]) shl 8)
+	case FBFILE_FORMAT_UTF16BE
+		return (culngint(source_bytes[offset]) shl 8) or _
+			culngint(source_bytes[offset + 1])
+	case FBFILE_FORMAT_UTF32LE
+		return culngint(source_bytes[offset]) or _
+			(culngint(source_bytes[offset + 1]) shl 8) or _
+			(culngint(source_bytes[offset + 2]) shl 16) or _
+			(culngint(source_bytes[offset + 3]) shl 24)
+	case FBFILE_FORMAT_UTF32BE
+		return (culngint(source_bytes[offset]) shl 24) or _
+			(culngint(source_bytes[offset + 1]) shl 16) or _
+			(culngint(source_bytes[offset + 2]) shl 8) or _
+			culngint(source_bytes[offset + 3])
+	case else
+		return source_bytes[offset]
+	end select
+end function
+
+private function hSemanticModelUTF8SourceColumnCount(byref source_line as string) as integer
+	dim as ubyte ptr source_bytes = cast(ubyte ptr, strptr(source_line))
+	dim as integer column = 0, index = 0
+
+	do while( index < len(source_line) )
+		dim as integer first_byte = source_bytes[index]
+		if( first_byte <= &h7F ) then
+			column += 1
+			index += 1
+		elseif( (first_byte >= &hC2) and (first_byte <= &hDF) ) then
+			if( index + 1 >= len(source_line) ) then return -1
+			if( (source_bytes[index + 1] < &h80) or _
+				(source_bytes[index + 1] > &hBF) ) then return -1
+			column += 1
+			index += 2
+		elseif( (first_byte >= &hE0) and (first_byte <= &hEF) ) then
+			if( index + 2 >= len(source_line) ) then return -1
+			dim as integer second_byte3 = source_bytes[index + 1]
+			dim as integer third_byte3 = source_bytes[index + 2]
+			if( (second_byte3 < &h80) or (second_byte3 > &hBF) or _
+				(third_byte3 < &h80) or (third_byte3 > &hBF) ) then return -1
+			if( ((first_byte = &hE0) and (second_byte3 < &hA0)) or _
+				((first_byte = &hED) and (second_byte3 > &h9F)) ) then return -1
+			column += 1
+			index += 3
+		elseif( (first_byte >= &hF0) and (first_byte <= &hF4) ) then
+			if( index + 3 >= len(source_line) ) then return -1
+			dim as integer second_byte4 = source_bytes[index + 1]
+			dim as integer third_byte4 = source_bytes[index + 2]
+			dim as integer fourth_byte4 = source_bytes[index + 3]
+			if( (second_byte4 < &h80) or (second_byte4 > &hBF) or _
+				(third_byte4 < &h80) or (third_byte4 > &hBF) or _
+				(fourth_byte4 < &h80) or (fourth_byte4 > &hBF) ) then return -1
+			if( ((first_byte = &hF0) and (second_byte4 < &h90)) or _
+				((first_byte = &hF4) and (second_byte4 > &h8F)) ) then return -1
+			column += 2
+			index += 4
+		else
+			return -1
+		end if
+	loop
+
+	return column
+end function
+
 private function hSemanticModelSourceColumnCount(byref source_line as string) as integer
 	if( len(source_line) = 0 ) then return 0
-	dim as ubyte ptr source_bytes = cast(ubyte ptr, strptr(source_line))
-	dim as integer column = 0, utf8_continuations_left = 0
+	if( env.inf.format = FBFILE_FORMAT_UTF8 ) then
+		return hSemanticModelUTF8SourceColumnCount(source_line)
+	end if
+	dim as integer unit_width = hSemanticModelSourceCodeUnitWidth()
+	if( (len(source_line) mod unit_width) <> 0 ) then return -1
 
+	dim as integer column = 0
+	if( (env.inf.format = FBFILE_FORMAT_UTF16LE) or _
+		(env.inf.format = FBFILE_FORMAT_UTF16BE) ) then
+		dim as integer index = 0
+		do while( index < len(source_line) )
+			dim as ulongint code_unit = hSemanticModelReadSourceCodeUnit(source_line, index)
+			if( (code_unit >= &hD800) and (code_unit <= &hDBFF) ) then
+				if( index + 2 >= len(source_line) ) then return -1
+				dim as ulongint low_surrogate = hSemanticModelReadSourceCodeUnit(source_line, index + 2)
+				if( (low_surrogate < &hDC00) or (low_surrogate > &hDFFF) ) then return -1
+				column += 2
+				index += 4
+			elseif( (code_unit >= &hDC00) and (code_unit <= &hDFFF) ) then
+				return -1
+			else
+				column += 1
+				index += 2
+			end if
+		loop
+		return column
+	end if
+
+	if( (env.inf.format = FBFILE_FORMAT_UTF32LE) or _
+		(env.inf.format = FBFILE_FORMAT_UTF32BE) ) then
+		for index as integer = 0 to len(source_line) - 1 step 4
+			dim as ulongint codepoint = hSemanticModelReadSourceCodeUnit(source_line, index)
+			if( (codepoint > &h10FFFF) or _
+				((codepoint >= &hD800) and (codepoint <= &hDFFF)) ) then
+				return -1
+			end if
+			column += iif(codepoint > &hFFFF, 2, 1)
+		next
+		return column
+	end if
+
+	dim as ubyte ptr source_bytes = cast(ubyte ptr, strptr(source_line))
+	dim as integer utf8_continuations_left = 0
 	for index as integer = 0 to len(source_line) - 1
 		dim as integer source_byte = source_bytes[index]
 		if( utf8_continuations_left > 0 ) then
@@ -713,96 +866,114 @@ end function
 
 private function hSemanticModelReadCurrentSourceLine _
 	( _
-		byval current_filepos as longint, _
+		byval current_physical_line as integer, _
 		byref source_line as string _
 	) as integer
 
 	const READ_CHUNK_BYTES = 1024
 	dim as longint old_file_position = seek(env.inf.num)
 	dim as longint file_length = lof(env.inf.num)
-	dim as longint scan_position, line_start = 0
-	dim as integer chunk_length, index, source_byte
-	dim as integer valid = TRUE, found_line_start = FALSE, found_line_end = FALSE
-	dim as string chunk
-	dim as ubyte ptr chunk_bytes
+	dim as longint scan_position, line_start
+	dim as integer unit_width = hSemanticModelSourceCodeUnitWidth()
+	dim as integer bom_length = hSemanticModelSourceBOMLength()
+	dim as longint max_line_bytes = hSemanticModelSourceLineLimitBytes()
+	dim as integer chunk_length, index, scan_line
+	dim as integer valid = TRUE, found_line_end = FALSE
+	dim as string chunk, line_feed_unit
+	dim as ulongint source_char
 
 	function = FALSE
 	source_line = ""
-	if( (current_filepos < 0) or (current_filepos > file_length) ) then
+	if( (current_physical_line < 1) or (file_length < bom_length) or _
+		((file_length - bom_length) mod unit_width <> 0) ) then
 		seek #env.inf.num, old_file_position
 		exit function
 	end if
 
-	'' Locate the physical line start without lexPeekCurrentLine()'s bounded
-	'' diagnostic excerpt. Semantic editor columns need the whole line length.
-	scan_position = current_filepos
-	do while( (scan_position > 0) and (found_line_start = FALSE) )
-		chunk_length = iif(scan_position > READ_CHUNK_BYTES, _
-			READ_CHUNK_BYTES, scan_position)
-		dim as longint chunk_start = scan_position - chunk_length
-		chunk = space(chunk_length)
-		if( get(#env.inf.num, chunk_start + 1, chunk) <> 0 ) then
-			valid = FALSE
-			exit do
-		end if
-		chunk_bytes = cast(ubyte ptr, strptr(chunk))
-		for index = chunk_length - 1 to 0 step -1
-			source_byte = chunk_bytes[index]
-			if( (source_byte = 10) or (source_byte = 13) ) then
-				line_start = chunk_start + index + 1
-				found_line_start = TRUE
-				exit for
-			end if
-		next
-		if( found_line_start = FALSE ) then
-			scan_position = chunk_start
-			if( current_filepos - scan_position > SEMANTIC_MODEL_MAX_SOURCE_LINE_BYTES ) then
+	'' Keep a forward-only physical line cursor so checking many consecutive
+	'' expressions does not rescan the entire encoded file for each line.
+	if( semantic_model_source_scan_valid and _
+		(semantic_model_source_scan_file = env.inf.name) and _
+		(semantic_model_source_scan_format = env.inf.format) and _
+		(current_physical_line >= semantic_model_source_scan_line) ) then
+		scan_line = semantic_model_source_scan_line
+		scan_position = semantic_model_source_scan_filepos
+	else
+		scan_line = 1
+		scan_position = bom_length
+	end if
+
+	do while( (valid) and (scan_line <= current_physical_line) )
+		line_start = scan_position
+		found_line_end = FALSE
+		source_line = ""
+		do while( (valid) and (found_line_end = FALSE) and _
+			(scan_position < file_length) )
+			chunk_length = iif(file_length - scan_position > READ_CHUNK_BYTES, _
+				READ_CHUNK_BYTES, file_length - scan_position)
+			chunk_length -= chunk_length mod unit_width
+			if( chunk_length <= 0 ) then
 				valid = FALSE
 				exit do
 			end if
-		elseif( current_filepos - line_start > SEMANTIC_MODEL_MAX_SOURCE_LINE_BYTES ) then
-			valid = FALSE
-			exit do
-		end if
-	loop
-
-	'' Read forward from the physical start and stop at the first line ending.
-	'' The compiler's lexer caps one source line to this same byte count.
-	scan_position = line_start
-	do while( (valid) and (found_line_end = FALSE) and (scan_position < file_length) )
-		chunk_length = iif(file_length - scan_position > READ_CHUNK_BYTES, _
-			READ_CHUNK_BYTES, file_length - scan_position)
-		chunk = space(chunk_length)
-		if( get(#env.inf.num, scan_position + 1, chunk) <> 0 ) then
-			valid = FALSE
-			exit do
-		end if
-		chunk_bytes = cast(ubyte ptr, strptr(chunk))
-		for index = 0 to chunk_length - 1
-			source_byte = chunk_bytes[index]
-			if( (source_byte = 10) or (source_byte = 13) ) then
-				if( scan_position - line_start + index > _
-					SEMANTIC_MODEL_MAX_SOURCE_LINE_BYTES ) then
-					valid = FALSE
-				elseif( index > 0 ) then
-					source_line += left(chunk, index)
-				end if
-				found_line_end = TRUE
-				exit for
-			end if
-		next
-		if( (valid) and (found_line_end = FALSE) ) then
-			scan_position += chunk_length
-			if( scan_position - line_start > SEMANTIC_MODEL_MAX_SOURCE_LINE_BYTES ) then
+			chunk = space(chunk_length)
+			if( get(#env.inf.num, scan_position + 1, chunk) <> 0 ) then
 				valid = FALSE
-			else
-				source_line += chunk
+				exit do
 			end if
+			for index = 0 to chunk_length - unit_width step unit_width
+				source_char = hSemanticModelReadSourceCodeUnit(chunk, index)
+				if( (source_char = 10) or (source_char = 13) ) then
+					if( scan_line = current_physical_line ) then
+						if( scan_position - line_start + index > max_line_bytes ) then
+							valid = FALSE
+						elseif( index > 0 ) then
+							source_line += left(chunk, index)
+						end if
+					end if
+					scan_position += index + unit_width
+					if( (source_char = 13) and _
+						(scan_position + unit_width <= file_length) ) then
+						line_feed_unit = space(unit_width)
+						if( get(#env.inf.num, scan_position + 1, line_feed_unit) <> 0 ) then
+							valid = FALSE
+						elseif( hSemanticModelReadSourceCodeUnit(line_feed_unit, 0) = 10 ) then
+							scan_position += unit_width
+						end if
+					end if
+					found_line_end = TRUE
+					exit for
+				end if
+			next
+			if( (valid) and (found_line_end = FALSE) ) then
+				scan_position += chunk_length
+				if( scan_line = current_physical_line ) then
+					if( scan_position - line_start > max_line_bytes ) then
+						valid = FALSE
+					else
+						source_line += chunk
+					end if
+				end if
+			end if
+		loop
+
+		if( (valid = FALSE) or (scan_line = current_physical_line) ) then
+			exit do
 		end if
+		if( found_line_end = FALSE ) then
+			valid = FALSE
+			exit do
+		end if
+		scan_line += 1
 	loop
 
 	seek #env.inf.num, old_file_position
-	if( valid ) then
+	if( valid and (scan_line = current_physical_line) ) then
+		semantic_model_source_scan_valid = TRUE
+		semantic_model_source_scan_file = env.inf.name
+		semantic_model_source_scan_format = env.inf.format
+		semantic_model_source_scan_line = current_physical_line + 1
+		semantic_model_source_scan_filepos = scan_position
 		return TRUE
 	end if
 	source_line = ""
@@ -815,33 +986,34 @@ private function hSemanticModelRangeFitsCurrentSourceLine _
 		byref source_end as LEX_LOCATION _
 	) as integer
 
-	if( env.inf.format <> FBFILE_FORMAT_ASCII ) then return TRUE
 	if( source_end.source_file <> env.inf.name ) then return TRUE
 	if( source_end.end_line <> lex.ctx->linenum ) then return TRUE
-	if( lex.ctx->lastfilepos <= 0 ) then return TRUE
+	if( lex.ctx->physical_linenum < 1 ) then return FALSE
 	'' #line can reuse a logical filename and line number for a different
-	'' physical line, so include the lexer's file position in the cache key.
+	'' physical line, so include the physical line number in the cache key.
 	if( semantic_model_source_bound_valid and _
 		(semantic_model_source_bound_file = source_end.source_file) and _
 		(semantic_model_source_bound_line = source_end.end_line) and _
-		(semantic_model_source_bound_filepos = lex.ctx->lastfilepos) ) then
+		(semantic_model_source_bound_physical_line = lex.ctx->physical_linenum) ) then
 		return source_end.end_column <= semantic_model_source_bound_columns
 	end if
 
 	'' The lexer can already be past a written token when a parser boundary
 	'' exports a folded/generated AST value. Check its claimed end against the
 	'' complete physical line before calling it an editable range. The reader
-	'' preserves the source file position and fails closed on oversized lines.
+	'' follows physical lines across #line remapping and fails closed on unsafe input.
 	dim as string source_line
-	if( hSemanticModelReadCurrentSourceLine(lex.ctx->lastfilepos, source_line) = FALSE ) then
+	if( hSemanticModelReadCurrentSourceLine(lex.ctx->physical_linenum, source_line) = FALSE ) then
 		return FALSE
 	end if
+	dim as integer source_columns = hSemanticModelSourceColumnCount(source_line)
 	semantic_model_source_bound_file = source_end.source_file
 	semantic_model_source_bound_line = source_end.end_line
-	semantic_model_source_bound_columns = hSemanticModelSourceColumnCount( source_line )
-	semantic_model_source_bound_filepos = lex.ctx->lastfilepos
+	semantic_model_source_bound_physical_line = lex.ctx->physical_linenum
+	semantic_model_source_bound_columns = source_columns
 	semantic_model_source_bound_valid = TRUE
-	return source_end.end_column <= semantic_model_source_bound_columns
+	return (source_columns >= 0) and _
+		source_end.end_column <= semantic_model_source_bound_columns
 
 end function
 
@@ -1057,6 +1229,7 @@ function fbSemanticModelBegin(byref filename as string, byval expressions_only a
 
 	semantic_model_filename = filename
 	semantic_model_source_bound_valid = FALSE
+	semantic_model_source_scan_valid = FALSE
 	semantic_model_expressions_only = (expressions_only <> FALSE)
 	semantic_model_file_num = freefile
 	if( open(filename for output as #semantic_model_file_num) <> 0 ) then
@@ -1131,6 +1304,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	if( semantic_model_file_open = FALSE ) then exit sub
 
 	semantic_model_source_bound_valid = FALSE
+	semantic_model_source_scan_valid = FALSE
 	semantic_model_active_expression_start.start_line = 0
 	semantic_model_active_expression_nonphysical = 0
 	semantic_model_last_expression_fact = ""
