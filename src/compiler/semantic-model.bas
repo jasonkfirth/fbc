@@ -11,9 +11,11 @@
 '' Responsibilities:
 ''
 ''     - write a transactional, tab-separated semantic sidecar
+''     - retain bounded expression facts under an explicit recovery footer
 ''     - preserve symbol identity, type, scope, and parent relationships
 ''     - serialize procedure AST nodes with source locations
-''     - reject incomplete module or invocation output with a missing footer
+''     - reject incomplete output unless expression-only recovery is explicit
+''     - export the bounded set of source files read by each compiler request
 ''     - release the output file and dynamic buffers at compiler shutdown
 ''
 '' This file intentionally does NOT contain:
@@ -26,7 +28,8 @@
 ''
 ''     The sidecar file remains open from fbSemanticModelBegin() through
 ''     fbSemanticModelEnd(). Module buffers and symbol tables are released at the
-''     end of the compiler invocation and reused only between modules.
+''     end of the compiler invocation and reused only between modules. A failed
+''     parse can commit only expression-only records through an explicit R tag.
 
 #include once "fbint.bi"
 #include once "ast.bi"
@@ -38,14 +41,17 @@
 '' Export limits and process-local module state
 '' -------------------------------------------------------------------------
 
-private const SEMANTIC_MODEL_SCHEMA = "4"
+private const SEMANTIC_MODEL_SCHEMA = "7"
 private const SEMANTIC_MODEL_MAX_SYMBOLS = 1000000
+private const SEMANTIC_MODEL_MAX_DEPENDENCIES = 5000
 private const SEMANTIC_MODEL_INITIAL_SYMBOL_INDEX_CAPACITY = 256
 private const SEMANTIC_MODEL_MAX_SYMBOL_INDEX_CAPACITY = 2097152
 private const SEMANTIC_MODEL_INITIAL_MODULE_BUFFER_CAPACITY = 8192
 private const SEMANTIC_MODEL_MAX_MODULE_BUFFER_BYTES = 268435456
 private const SEMANTIC_MODEL_MAX_NODES_PER_MODEL = 1000000
 private const SEMANTIC_MODEL_MAX_EXPRESSIONS_PER_MODEL = 1000000
+private const SEMANTIC_MODEL_MAX_BINDINGS_PER_MODEL = 1000000
+private const SEMANTIC_MODEL_MAX_SOURCE_LINE_BYTES = LEX_MAXBUFFCHARS
 
 private type SEMANTIC_MODEL_SYMBOL
 	sym         as FBSYMBOL ptr
@@ -66,18 +72,33 @@ end type
 
 dim shared as integer semantic_model_file_num
 dim shared as integer semantic_model_file_open
+dim shared as integer semantic_model_expressions_only
 dim shared as integer semantic_model_module_open
 dim shared as integer semantic_model_module_failed
 dim shared as integer semantic_model_any_failed
+dim shared as integer semantic_model_recovery_module_count
+dim shared as integer semantic_model_dependency_count
+dim shared as integer semantic_model_dependencies_complete
+dim shared as string semantic_model_dependencies(0 to SEMANTIC_MODEL_MAX_DEPENDENCIES - 1)
+dim shared as integer semantic_model_source_bound_valid
+dim shared as integer semantic_model_source_bound_line
+dim shared as integer semantic_model_source_bound_columns
+dim shared as integer semantic_model_source_bound_filepos
+dim shared as string semantic_model_source_bound_file
+dim shared as LEX_LOCATION semantic_model_active_expression_start
+dim shared as longint semantic_model_active_expression_nonphysical
+dim shared as string semantic_model_last_expression_fact
 dim shared as integer semantic_model_module_count
 dim shared as integer semantic_model_module_proc_count
 dim shared as integer semantic_model_module_type_fact_count
 dim shared as longint semantic_model_module_expression_count
+dim shared as longint semantic_model_module_binding_count
 dim shared as longint semantic_model_module_node_count
 dim shared as integer semantic_model_proc_count
 dim shared as integer semantic_model_total_symbol_count
 dim shared as integer semantic_model_total_type_fact_count
 dim shared as longint semantic_model_expression_count
+dim shared as longint semantic_model_binding_count
 dim shared as longint semantic_model_node_count
 dim shared as string semantic_model_filename
 dim shared as ubyte ptr semantic_model_module_buffer
@@ -101,6 +122,10 @@ dim shared as integer semantic_model_symbol_index_capacity
 
 private function hSemanticModelNumber(byval value as longint) as string
 	return ltrim(str(value))
+end function
+
+private function hSemanticModelHasSymbol(byval sym as FBSYMBOL ptr) as integer
+	return (sym <> NULL) and (sym <> cast(FBSYMBOL ptr, INVALID))
 end function
 
 private function hSemanticModelEscape(byref value as string) as string
@@ -201,9 +226,33 @@ private sub hSemanticModelAppendBytes(byval source as const any ptr, _
 end sub
 
 private sub hSemanticModelAppendLine(byref value as string)
+	'' A non-expression record separates parser results and breaks adjacency.
+	if( (len(value) < 2) or (left(value, 2) <> "E" + TABCHAR) ) then
+		semantic_model_last_expression_fact = ""
+	end if
 	dim as string line_text = value + NEWLINE
 
 	hSemanticModelAppendBytes(strptr(line_text), len(line_text))
+end sub
+
+private sub hSemanticModelWriteDependencies( )
+	for index as integer = 0 to semantic_model_dependency_count - 1
+		print #semantic_model_file_num, "D" + TABCHAR + _
+			hSemanticModelEscape(semantic_model_dependencies(index))
+	next
+end sub
+
+sub fbSemanticModelAddDependency(byref filename as string)
+	if( (semantic_model_file_open = FALSE) or (len(filename) = 0) ) then exit sub
+	for index as integer = 0 to semantic_model_dependency_count - 1
+		if( semantic_model_dependencies(index) = filename ) then exit sub
+	next
+	if( semantic_model_dependency_count >= SEMANTIC_MODEL_MAX_DEPENDENCIES ) then
+		semantic_model_dependencies_complete = FALSE
+		exit sub
+	end if
+	semantic_model_dependencies(semantic_model_dependency_count) = filename
+	semantic_model_dependency_count += 1
 end sub
 
 '' -------------------------------------------------------------------------
@@ -286,7 +335,7 @@ private function hSemanticModelSymbolId(byval sym as FBSYMBOL ptr) as longint
 	dim as SEMANTIC_MODEL_SYMBOL ptr resized_symbols
 	dim as string symbolname
 
-	if( sym = NULL ) then
+	if( hSemanticModelHasSymbol(sym) = FALSE ) then
 		return 0
 	end if
 
@@ -372,6 +421,55 @@ private function hSemanticModelSymbolId(byval sym as FBSYMBOL ptr) as longint
 	return symbolid
 end function
 
+'' Export one compiler-resolved identifier occurrence with its exact lexer span.
+'' Physical-origin status lets editor consumers refuse macro-expanded ranges.
+sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
+	if( (semantic_model_file_open = FALSE) or _
+		(semantic_model_module_open = FALSE) or _
+		(semantic_model_expressions_only) or _
+		(semantic_model_module_failed) or _
+		(hSemanticModelHasSymbol(sym) = FALSE) ) then
+		exit sub
+	end if
+
+	if( (source.start_line < 1) or (source.start_column < 0) or _
+		(source.end_line < source.start_line) or (source.end_column < 0) or _
+		((source.end_line = source.start_line) and _
+		 (source.end_column <= source.start_column)) or _
+		(len(source.source_file) = 0) ) then
+		exit sub
+	end if
+
+	if( semantic_model_binding_count + _
+		semantic_model_module_binding_count >= _
+		SEMANTIC_MODEL_MAX_BINDINGS_PER_MODEL ) then
+		semantic_model_module_failed = TRUE
+		semantic_model_any_failed = TRUE
+		exit sub
+	end if
+
+	dim as longint symbolid = hSemanticModelSymbolId(sym)
+	if( (symbolid = 0) or (semantic_model_module_failed) ) then exit sub
+
+	hSemanticModelAppendLine("B" + TABCHAR + hSemanticModelNumber(symbolid) + _
+		TABCHAR + iif(is_declaration, "declaration", "reference") + _
+		TABCHAR + hSemanticModelNumber(abs(source.is_physical)) + _
+		TABCHAR + hSemanticModelEscape(source.source_file) + _
+		TABCHAR + hSemanticModelNumber(source.start_line) + _
+		TABCHAR + hSemanticModelNumber(source.start_column) + _
+		TABCHAR + hSemanticModelNumber(source.end_line) + _
+		TABCHAR + hSemanticModelNumber(source.end_column))
+	if( semantic_model_module_failed = FALSE ) then
+		semantic_model_module_binding_count += 1
+	end if
+end sub
+
 private function hSemanticModelTypeKind(byval sym as FBSYMBOL ptr) as string
 	dim as integer dtype
 
@@ -405,10 +503,9 @@ private sub hSemanticModelExportVariableType(byval sym as FBSYMBOL ptr, _
 	dim as longint symbolid
 	dim as string variablename
 
-	if( (sym = NULL) or (symbIsVar(sym) = FALSE) or _
-		(semantic_model_module_failed) ) then
-		exit sub
-	end if
+	if( hSemanticModelHasSymbol(sym) = FALSE ) then exit sub
+	if( symbIsVar(sym) = FALSE ) then exit sub
+	if( semantic_model_module_failed ) then exit sub
 	if( sym->id.name = NULL ) then exit sub
 
 	symbolid = hSemanticModelSymbolId(sym)
@@ -433,6 +530,174 @@ private function hSemanticModelNodeOperator(byval node as ASTNODE ptr) as intege
 	case else
 		return 0
 	end select
+end function
+
+private function hSemanticModelSourceColumnCount(byref source_line as string) as integer
+	if( len(source_line) = 0 ) then return 0
+	dim as ubyte ptr source_bytes = cast(ubyte ptr, strptr(source_line))
+	dim as integer column = 0, utf8_continuations_left = 0
+
+	for index as integer = 0 to len(source_line) - 1
+		dim as integer source_byte = source_bytes[index]
+		if( utf8_continuations_left > 0 ) then
+			if( (source_byte >= &h80) and (source_byte <= &hBF) ) then
+				utf8_continuations_left -= 1
+				continue for
+			end if
+			utf8_continuations_left = 0
+		end if
+
+		select case source_byte
+		case &hC2 to &hDF
+			column += 1
+			utf8_continuations_left = 1
+		case &hE0 to &hEF
+			column += 1
+			utf8_continuations_left = 2
+		case &hF0 to &hF4
+			column += 2
+			utf8_continuations_left = 3
+		case else
+			column += 1
+		end select
+	next
+
+	return column
+
+end function
+
+private function hSemanticModelReadCurrentSourceLine _
+	( _
+		byval current_filepos as longint, _
+		byref source_line as string _
+	) as integer
+
+	const READ_CHUNK_BYTES = 1024
+	dim as longint old_file_position = seek(env.inf.num)
+	dim as longint file_length = lof(env.inf.num)
+	dim as longint scan_position, line_start = 0
+	dim as integer chunk_length, index, source_byte
+	dim as integer valid = TRUE, found_line_start = FALSE, found_line_end = FALSE
+	dim as string chunk
+	dim as ubyte ptr chunk_bytes
+
+	function = FALSE
+	source_line = ""
+	if( (current_filepos < 0) or (current_filepos > file_length) ) then
+		seek #env.inf.num, old_file_position
+		exit function
+	end if
+
+	'' Locate the physical line start without lexPeekCurrentLine()'s bounded
+	'' diagnostic excerpt. Semantic editor columns need the whole line length.
+	scan_position = current_filepos
+	do while( (scan_position > 0) and (found_line_start = FALSE) )
+		chunk_length = iif(scan_position > READ_CHUNK_BYTES, _
+			READ_CHUNK_BYTES, scan_position)
+		dim as longint chunk_start = scan_position - chunk_length
+		chunk = space(chunk_length)
+		if( get(#env.inf.num, chunk_start + 1, chunk) <> 0 ) then
+			valid = FALSE
+			exit do
+		end if
+		chunk_bytes = cast(ubyte ptr, strptr(chunk))
+		for index = chunk_length - 1 to 0 step -1
+			source_byte = chunk_bytes[index]
+			if( (source_byte = 10) or (source_byte = 13) ) then
+				line_start = chunk_start + index + 1
+				found_line_start = TRUE
+				exit for
+			end if
+		next
+		if( found_line_start = FALSE ) then
+			scan_position = chunk_start
+			if( current_filepos - scan_position > SEMANTIC_MODEL_MAX_SOURCE_LINE_BYTES ) then
+				valid = FALSE
+				exit do
+			end if
+		elseif( current_filepos - line_start > SEMANTIC_MODEL_MAX_SOURCE_LINE_BYTES ) then
+			valid = FALSE
+			exit do
+		end if
+	loop
+
+	'' Read forward from the physical start and stop at the first line ending.
+	'' The compiler's lexer caps one source line to this same byte count.
+	scan_position = line_start
+	do while( (valid) and (found_line_end = FALSE) and (scan_position < file_length) )
+		chunk_length = iif(file_length - scan_position > READ_CHUNK_BYTES, _
+			READ_CHUNK_BYTES, file_length - scan_position)
+		chunk = space(chunk_length)
+		if( get(#env.inf.num, scan_position + 1, chunk) <> 0 ) then
+			valid = FALSE
+			exit do
+		end if
+		chunk_bytes = cast(ubyte ptr, strptr(chunk))
+		for index = 0 to chunk_length - 1
+			source_byte = chunk_bytes[index]
+			if( (source_byte = 10) or (source_byte = 13) ) then
+				if( scan_position - line_start + index > _
+					SEMANTIC_MODEL_MAX_SOURCE_LINE_BYTES ) then
+					valid = FALSE
+				elseif( index > 0 ) then
+					source_line += left(chunk, index)
+				end if
+				found_line_end = TRUE
+				exit for
+			end if
+		next
+		if( (valid) and (found_line_end = FALSE) ) then
+			scan_position += chunk_length
+			if( scan_position - line_start > SEMANTIC_MODEL_MAX_SOURCE_LINE_BYTES ) then
+				valid = FALSE
+			else
+				source_line += chunk
+			end if
+		end if
+	loop
+
+	seek #env.inf.num, old_file_position
+	if( valid ) then
+		return TRUE
+	end if
+	source_line = ""
+	return FALSE
+
+end function
+
+private function hSemanticModelRangeFitsCurrentSourceLine _
+	( _
+		byref source_end as LEX_LOCATION _
+	) as integer
+
+	if( env.inf.format <> FBFILE_FORMAT_ASCII ) then return TRUE
+	if( source_end.source_file <> env.inf.name ) then return TRUE
+	if( source_end.end_line <> lex.ctx->linenum ) then return TRUE
+	if( lex.ctx->lastfilepos <= 0 ) then return TRUE
+	'' #line can reuse a logical filename and line number for a different
+	'' physical line, so include the lexer's file position in the cache key.
+	if( semantic_model_source_bound_valid and _
+		(semantic_model_source_bound_file = source_end.source_file) and _
+		(semantic_model_source_bound_line = source_end.end_line) and _
+		(semantic_model_source_bound_filepos = lex.ctx->lastfilepos) ) then
+		return source_end.end_column <= semantic_model_source_bound_columns
+	end if
+
+	'' The lexer can already be past a written token when a parser boundary
+	'' exports a folded/generated AST value. Check its claimed end against the
+	'' complete physical line before calling it an editable range. The reader
+	'' preserves the source file position and fails closed on oversized lines.
+	dim as string source_line
+	if( hSemanticModelReadCurrentSourceLine(lex.ctx->lastfilepos, source_line) = FALSE ) then
+		return FALSE
+	end if
+	semantic_model_source_bound_file = source_end.source_file
+	semantic_model_source_bound_line = source_end.end_line
+	semantic_model_source_bound_columns = hSemanticModelSourceColumnCount( source_line )
+	semantic_model_source_bound_filepos = lex.ctx->lastfilepos
+	semantic_model_source_bound_valid = TRUE
+	return source_end.end_column <= semantic_model_source_bound_columns
+
 end function
 
 private function hSemanticModelEdgeName(byval edge as integer) as string
@@ -461,14 +726,6 @@ sub fbSemanticModelExportExpression _
 		exit sub
 	end if
 
-	if( semantic_model_expression_count + _
-		semantic_model_module_expression_count >= _
-		SEMANTIC_MODEL_MAX_EXPRESSIONS_PER_MODEL ) then
-		semantic_model_module_failed = TRUE
-		semantic_model_any_failed = TRUE
-		exit sub
-	end if
-
 	if( (source_start.start_line < 1) or (source_start.start_column < 0) or _
 		(source_end.end_line < source_start.start_line) or _
 		(source_end.end_column < 0) or _
@@ -482,14 +739,15 @@ sub fbSemanticModelExportExpression _
 	dim as integer physical_range = abs(source_start.is_physical and _
 		source_end.is_physical and _
 		(nonphysical_tokens_at_start = nonphysical_tokens_at_end) and _
-		(source_start.source_file = source_end.source_file))
-	dim as longint symbolid = hSemanticModelSymbolId(expr->sym)
-	dim as longint subtypeid = hSemanticModelSymbolId(expr->subtype)
-	dim as longint expressionid = semantic_model_expression_count + _
-		semantic_model_module_expression_count + 1
-
-	hSemanticModelAppendLine("E" + TABCHAR + hSemanticModelNumber(expressionid) + _
-		TABCHAR + hSemanticModelNumber(physical_range) + TABCHAR + _
+		(source_start.source_file = source_end.source_file) and _
+		hSemanticModelRangeFitsCurrentSourceLine(source_end))
+	dim as longint symbolid = 0, subtypeid = 0
+	if( semantic_model_expressions_only = FALSE ) then
+		symbolid = hSemanticModelSymbolId(expr->sym)
+		subtypeid = hSemanticModelSymbolId(expr->subtype)
+	end if
+	dim as string expression_fact = _
+		hSemanticModelNumber(physical_range) + TABCHAR + _
 		hSemanticModelEscape(sourcefile) + TABCHAR + _
 		hSemanticModelNumber(source_start.start_line) + TABCHAR + _
 		hSemanticModelNumber(source_start.start_column) + TABCHAR + _
@@ -500,9 +758,29 @@ sub fbSemanticModelExportExpression _
 		hSemanticModelNumber(astGetFullType(expr)) + TABCHAR + _
 		hSemanticModelNumber(symbolid) + TABCHAR + _
 		hSemanticModelNumber(subtypeid) + TABCHAR + _
-		hSemanticModelEscape(type_name))
+		hSemanticModelEscape(type_name)
+
+	'' Parser precedence layers often return the same completed result while
+	'' unwinding. Keep one copy when the adjacent fact payload is identical;
+	'' distinct ranges, types, identities, or intervening records remain intact.
+	if( expression_fact = semantic_model_last_expression_fact ) then exit sub
+
+	if( semantic_model_expression_count + _
+		semantic_model_module_expression_count >= _
+		SEMANTIC_MODEL_MAX_EXPRESSIONS_PER_MODEL ) then
+		semantic_model_module_failed = TRUE
+		semantic_model_any_failed = TRUE
+		exit sub
+	end if
+
+	dim as longint expressionid = semantic_model_expression_count + _
+		semantic_model_module_expression_count + 1
+
+	hSemanticModelAppendLine("E" + TABCHAR + _
+		hSemanticModelNumber(expressionid) + TABCHAR + expression_fact)
 	if( semantic_model_module_failed = FALSE ) then
 		semantic_model_module_expression_count += 1
+		semantic_model_last_expression_fact = expression_fact
 	end if
 end sub
 
@@ -617,13 +895,15 @@ end sub
 '' Sidecar and module lifecycle
 '' -------------------------------------------------------------------------
 
-function fbSemanticModelBegin(byref filename as string) as integer
+function fbSemanticModelBegin(byref filename as string, byval expressions_only as integer) as integer
 	if( semantic_model_file_open ) then
 		close #semantic_model_file_num
 		semantic_model_file_open = FALSE
 	end if
 
 	semantic_model_filename = filename
+	semantic_model_source_bound_valid = FALSE
+	semantic_model_expressions_only = (expressions_only <> FALSE)
 	semantic_model_file_num = freefile
 	if( open(filename for output as #semantic_model_file_num) <> 0 ) then
 		return FALSE
@@ -633,10 +913,17 @@ function fbSemanticModelBegin(byref filename as string) as integer
 	semantic_model_module_open = FALSE
 	semantic_model_any_failed = FALSE
 	semantic_model_module_count = 0
+	semantic_model_recovery_module_count = 0
+	semantic_model_dependency_count = 0
+	semantic_model_dependencies_complete = TRUE
+	for index as integer = 0 to SEMANTIC_MODEL_MAX_DEPENDENCIES - 1
+		semantic_model_dependencies(index) = ""
+	next
 	semantic_model_proc_count = 0
 	semantic_model_total_symbol_count = 0
 	semantic_model_total_type_fact_count = 0
 	semantic_model_expression_count = 0
+	semantic_model_binding_count = 0
 	semantic_model_node_count = 0
 	print #semantic_model_file_num, "FBCSEM" + TABCHAR + SEMANTIC_MODEL_SCHEMA + _
 		TABCHAR + FB_VERSION
@@ -647,9 +934,52 @@ function fbSemanticModelEnabled() as integer
 	return semantic_model_file_open
 end function
 
+function fbSemanticModelExpressionsOnlyEnabled() as integer
+	return abs(semantic_model_file_open and semantic_model_expressions_only)
+end function
+
+sub fbSemanticModelPushExpressionRange _
+	( _
+		byref source_start as LEX_LOCATION, _
+		byval nonphysical_tokens_at_start as longint, _
+		byref previous_start as LEX_LOCATION, _
+		byref previous_nonphysical_tokens as longint _
+	)
+
+	if( fbSemanticModelExpressionsOnlyEnabled( ) = FALSE ) then exit sub
+	previous_start = semantic_model_active_expression_start
+	previous_nonphysical_tokens = semantic_model_active_expression_nonphysical
+	semantic_model_active_expression_start = source_start
+	semantic_model_active_expression_nonphysical = nonphysical_tokens_at_start
+end sub
+
+sub fbSemanticModelPopExpressionRange _
+	( _
+		byref previous_start as LEX_LOCATION, _
+		byval previous_nonphysical_tokens as longint _
+	)
+
+	if( fbSemanticModelExpressionsOnlyEnabled( ) = FALSE ) then exit sub
+	semantic_model_active_expression_start = previous_start
+	semantic_model_active_expression_nonphysical = previous_nonphysical_tokens
+end sub
+
+sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
+	if( fbSemanticModelExpressionsOnlyEnabled( ) = FALSE ) then exit sub
+	if( semantic_model_active_expression_start.start_line < 1 ) then exit sub
+	dim as LEX_LOCATION source_end = lexGetLastLocation( )
+	fbSemanticModelExportExpression(expr, semantic_model_active_expression_start, _
+		source_end, semantic_model_active_expression_nonphysical, _
+		lexGetNonphysicalTokenCount( ))
+end sub
+
 sub fbSemanticModelBeginModule(byref filename as string)
 	if( semantic_model_file_open = FALSE ) then exit sub
 
+	semantic_model_source_bound_valid = FALSE
+	semantic_model_active_expression_start.start_line = 0
+	semantic_model_active_expression_nonphysical = 0
+	semantic_model_last_expression_fact = ""
 	semantic_model_module_buffer_len = 0
 	semantic_model_symbol_count = 0
 	if( semantic_model_symbol_index <> NULL ) then
@@ -660,9 +990,11 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	semantic_model_module_proc_count = 0
 	semantic_model_module_type_fact_count = 0
 	semantic_model_module_expression_count = 0
+	semantic_model_module_binding_count = 0
 	semantic_model_module_node_count = 0
 	semantic_model_module_open = TRUE
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
+	fbSemanticModelAddDependency(filename)
 end sub
 
 sub fbSemanticModelFinishModule(byval commit as integer)
@@ -678,6 +1010,7 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 		semantic_model_total_symbol_count += semantic_model_symbol_count
 		semantic_model_total_type_fact_count += semantic_model_module_type_fact_count
 		semantic_model_expression_count += semantic_model_module_expression_count
+		semantic_model_binding_count += semantic_model_module_binding_count
 		semantic_model_node_count += semantic_model_module_node_count
 	end if
 
@@ -685,6 +1018,32 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 	semantic_model_module_open = FALSE
 	semantic_model_symbol_count = 0
 	semantic_model_module_expression_count = 0
+	semantic_model_module_binding_count = 0
+end sub
+
+'' Commit expression-only facts from a module whose parser recovered with
+'' errors. The R record distinguishes this incomplete module from a normal
+'' module; consumers must also reject source ranges that overlap recovery.
+sub fbSemanticModelFinishRecoveryModule( )
+	if( semantic_model_module_open = FALSE ) then exit sub
+	if( semantic_model_expressions_only = FALSE ) then
+		fbSemanticModelFinishModule(FALSE)
+		exit sub
+	end if
+	if( semantic_model_module_failed ) then
+		fbSemanticModelFinishModule(FALSE)
+		exit sub
+	end if
+
+	hSemanticModelAppendLine("R" + TABCHAR + SEMANTIC_MODEL_SCHEMA + _
+		TABCHAR + hSemanticModelNumber(semantic_model_module_expression_count))
+	if( semantic_model_module_failed ) then
+		fbSemanticModelFinishModule(FALSE)
+		exit sub
+	end if
+
+	fbSemanticModelFinishModule(TRUE)
+	semantic_model_recovery_module_count += 1
 end sub
 
 sub fbSemanticModelExportProc(byval proc as FBSYMBOL ptr, byval astproc as ASTNODE ptr)
@@ -697,10 +1056,11 @@ sub fbSemanticModelExportProc(byval proc as FBSYMBOL ptr, byval astproc as ASTNO
 	dim as longint procid, subtypeid, next_node_id
 
 	if( (semantic_model_file_open = FALSE) or (semantic_model_module_open = FALSE) or _
+		(semantic_model_expressions_only) or _
 		(semantic_model_module_failed) ) then
 		exit sub
 	end if
-	if( (proc = NULL) or (astproc = NULL) ) then exit sub
+	if( (hSemanticModelHasSymbol(proc) = FALSE) or (astproc = NULL) ) then exit sub
 
 	procid = hSemanticModelSymbolId(proc)
 	next_node_id = semantic_model_node_count + semantic_model_module_node_count
@@ -710,9 +1070,9 @@ sub fbSemanticModelExportProc(byval proc as FBSYMBOL ptr, byval astproc as ASTNO
 		proc_end_line = proc->proc.ext->dbg.endline
 	end if
 	param = symbGetProcHeadParam(proc)
-	while( param <> NULL )
+	while( hSemanticModelHasSymbol(param) )
 		hSemanticModelSymbolId(param)
-		if( param->param.var <> NULL ) then
+		if( hSemanticModelHasSymbol(param->param.var) ) then
 			hSemanticModelSymbolId(param->param.var)
 			hSemanticModelExportVariableType(param->param.var, procname)
 		end if
@@ -720,7 +1080,7 @@ sub fbSemanticModelExportProc(byval proc as FBSYMBOL ptr, byval astproc as ASTNO
 	wend
 
 	symbol = symbGetProcSymbTbHead(proc)
-	while( symbol <> NULL )
+	while( hSemanticModelHasSymbol(symbol) )
 		hSemanticModelSymbolId(symbol)
 		hSemanticModelExportVariableType(symbol, procname)
 		symbol = symbol->next
@@ -761,10 +1121,11 @@ end sub
 sub fbSemanticModelExportGlobals(byval symbol as FBSYMBOL ptr)
 	dim as string global_procname
 
-	if( (semantic_model_file_open = FALSE) or (semantic_model_module_open = FALSE) ) then
+	if( (semantic_model_file_open = FALSE) or (semantic_model_module_open = FALSE) or _
+		(semantic_model_expressions_only) ) then
 		exit sub
 	end if
-	while( (symbol <> NULL) and (semantic_model_module_failed = FALSE) )
+	while( hSemanticModelHasSymbol(symbol) and (semantic_model_module_failed = FALSE) )
 		hSemanticModelSymbolId(symbol)
 		hSemanticModelExportVariableType(symbol, global_procname)
 		symbol = symbol->next
@@ -777,6 +1138,7 @@ sub fbSemanticModelEnd(byval succeeded as integer)
 	if( semantic_model_module_open ) then
 		fbSemanticModelFinishModule(FALSE)
 	end if
+	hSemanticModelWriteDependencies()
 
 	if( (succeeded <> FALSE) and (semantic_model_any_failed = FALSE) ) then
 		print #semantic_model_file_num, "END" + TABCHAR + SEMANTIC_MODEL_SCHEMA + _
@@ -785,7 +1147,22 @@ sub fbSemanticModelEnd(byval succeeded as integer)
 			hSemanticModelNumber(semantic_model_total_symbol_count) + TABCHAR + _
 			hSemanticModelNumber(semantic_model_total_type_fact_count) + TABCHAR + _
 			hSemanticModelNumber(semantic_model_node_count) + TABCHAR + _
-			hSemanticModelNumber(semantic_model_expression_count)
+			hSemanticModelNumber(semantic_model_expression_count) + TABCHAR + _
+			hSemanticModelNumber(semantic_model_binding_count) + TABCHAR + _
+			hSemanticModelNumber(semantic_model_dependency_count) + TABCHAR + _
+			hSemanticModelNumber(abs(semantic_model_dependencies_complete))
+	elseif( semantic_model_expressions_only and _
+		(semantic_model_recovery_module_count > 0) and _
+		(semantic_model_any_failed = FALSE) ) then
+		'' RECOVERY is a bounded expression snapshot, not a complete semantic model.
+		print #semantic_model_file_num, "RECOVERY" + TABCHAR + _
+			SEMANTIC_MODEL_SCHEMA + TABCHAR + _
+			hSemanticModelNumber(semantic_model_module_count) + TABCHAR + _
+			hSemanticModelNumber(semantic_model_expression_count) + TABCHAR + _
+			hSemanticModelNumber(semantic_model_recovery_module_count) + TABCHAR + _
+			hSemanticModelNumber(semantic_model_binding_count) + TABCHAR + _
+			hSemanticModelNumber(semantic_model_dependency_count) + TABCHAR + _
+			hSemanticModelNumber(abs(semantic_model_dependencies_complete))
 	end if
 
 	close #semantic_model_file_num
@@ -793,6 +1170,10 @@ sub fbSemanticModelEnd(byval succeeded as integer)
 	semantic_model_module_open = FALSE
 	semantic_model_module_buffer_len = 0
 	semantic_model_filename = ""
+	for index as integer = 0 to semantic_model_dependency_count - 1
+		semantic_model_dependencies(index) = ""
+	next
+	semantic_model_dependency_count = 0
 	if( semantic_model_module_buffer <> NULL ) then
 		deallocate(semantic_model_module_buffer)
 		semantic_model_module_buffer = NULL

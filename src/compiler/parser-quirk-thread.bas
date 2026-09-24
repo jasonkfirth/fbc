@@ -9,6 +9,16 @@
 #include once "ast.bi"
 #include once "rtl.bi"
 
+declare function fbSemanticModelEnabled( ) as integer
+declare sub fbSemanticModelExportExpression _
+	( _
+		byval expr as ASTNODE ptr, _
+		byref source_start as LEX_LOCATION, _
+		byref source_end as LEX_LOCATION, _
+		byval nonphysical_tokens_at_start as longint, _
+		byval nonphysical_tokens_at_end as longint _
+	)
+
 '':::::
 '' ThreadCallFunc =   THREADCALL proc_call
 ''
@@ -18,6 +28,16 @@ function cThreadCallFunc() as ASTNODE ptr
 	dim as integer check_paren
 	dim as FB_CALL_ARG_LIST arg_list = ( 0, NULL, NULL )
 	dim as ASTNODE ptr childcall
+	dim as ASTNODE ptr threadcall_expr
+	dim as integer export_semantics = fbSemanticModelEnabled( )
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start
+
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	function = NULL
 
@@ -71,5 +91,13 @@ function cThreadCallFunc() as ASTNODE ptr
 	end if
 
 	'' transform the call into a threadcall
-	function = rtlThreadCall( childcall )
+	threadcall_expr = rtlThreadCall( childcall )
+	function = threadcall_expr
+	if( export_semantics andalso (threadcall_expr <> NULL) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(threadcall_expr, source_start, source_end, _
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+	end if
 end function
+
+'' end of parser-quirk-thread.bas

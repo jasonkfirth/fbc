@@ -721,7 +721,8 @@ declare function cUdtMember _
 		byval subtype as FBSYMBOL ptr, _
 		byval varexpr as ASTNODE ptr, _
 		byval check_array as integer, _
-		byval options as FB_PARSEROPT = 0 _
+		byval options as FB_PARSEROPT = 0, _
+		byval export_prefixes as integer = TRUE _
 	) as ASTNODE ptr
 
 declare sub cUdtTypeMember _

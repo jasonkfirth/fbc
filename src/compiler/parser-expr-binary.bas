@@ -10,6 +10,7 @@
 #include once "rtl.bi"
 
 declare function fbSemanticModelEnabled( ) as integer
+declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
 declare sub fbSemanticModelExportExpression _
 	( _
 		byval expr as ASTNODE ptr, _
@@ -18,6 +19,20 @@ declare sub fbSemanticModelExportExpression _
 		byval nonphysical_tokens_at_start as longint, _
 		byval nonphysical_tokens_at_end as longint _
 	)
+
+'' A later operator in the same loop can fold the current AST. Export the
+'' completed prefix first so the source range keeps its compiler-selected type.
+private sub hSemanticModelExportCurrentExpression _
+	( _
+		byval expr as ASTNODE ptr, _
+		byref source_start as LEX_LOCATION, _
+		byval nonphysical_tokens_at_start as longint _
+	)
+	if( expr = NULL ) then exit sub
+	dim as LEX_LOCATION source_end = lexGetLastLocation( )
+	fbSemanticModelExportExpression(expr, source_start, source_end, _
+		nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+end sub
 
 declare function cLogOrExpression _
 	( _
@@ -83,6 +98,15 @@ end function
 function cBoolExpression( ) as ASTNODE ptr
 	dim as integer op = any, dtorlistcookie = any, hideconsterrors = any
 	dim as ASTNODE ptr expr = any, logexpr = any
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_operator_count = 0
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	'' LogExpression
 	'' The first operand expression will always be executed
@@ -106,6 +130,10 @@ function cBoolExpression( ) as ASTNODE ptr
 		'' Self-assignment? Then don't parse a BOP
 		if( hIsAssignToken( lexGetLookAhead( 1 ) ) ) then
 			exit do
+		end if
+		if( export_semantics and (semantic_operator_count > 0) ) then
+			hSemanticModelExportCurrentExpression(logexpr, source_start, _
+				nonphysical_tokens_at_start)
 		end if
 
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -144,9 +172,15 @@ function cBoolExpression( ) as ASTNODE ptr
 			'' error recovery: fake a node
 			logexpr = astNewCONSTi( 0 )
 		end if
+		if( export_semantics ) then semantic_operator_count += 1
 	loop
 
 	function = logexpr
+	if( export_semantics andalso (logexpr <> NULL) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(logexpr, source_start, source_end, _
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+	end if
 end function
 
 '':::::
@@ -159,6 +193,15 @@ function cLogExpression _
 
 	dim as integer op = any
 	dim as ASTNODE ptr expr = any, logexpr = any
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_operator_count = 0
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	'' LogOrExpression
 	logexpr = cLogOrExpression( )
@@ -184,6 +227,10 @@ function cLogExpression _
 		if( hIsAssignToken( lexGetLookAhead( 1 ) ) ) then
 			exit do
 		end if
+		if( export_semantics and (semantic_operator_count > 0) ) then
+			hSemanticModelExportCurrentExpression(logexpr, source_start, _
+				nonphysical_tokens_at_start)
+		end if
 
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
@@ -202,10 +249,16 @@ function cLogExpression _
 			'' error recovery: fake a node
 			logexpr = astNewCONSTi( 0 )
 		end if
+		if( export_semantics ) then semantic_operator_count += 1
 
 	loop
 
 	function = logexpr
+	if( export_semantics andalso (logexpr <> NULL) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(logexpr, source_start, source_end, _
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+	end if
 
 end function
 
@@ -218,6 +271,15 @@ function cLogOrExpression _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = any, logexpr = any
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_operator_count = 0
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	'' LogAndExpression
 	logexpr = cLogAndExpression( )
@@ -235,6 +297,10 @@ function cLogOrExpression _
 		'' Self-assignment? Then don't parse a BOP
 		if( hIsAssignToken( lexGetLookAhead( 1 ) ) ) then
 			exit do
+		end if
+		if( export_semantics and (semantic_operator_count > 0) ) then
+			hSemanticModelExportCurrentExpression(logexpr, source_start, _
+				nonphysical_tokens_at_start)
 		end if
 
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -254,10 +320,16 @@ function cLogOrExpression _
 			'' error recovery: fake a node
 			logexpr = astNewCONSTi( 0 )
 		end if
+		if( export_semantics ) then semantic_operator_count += 1
 
 	loop
 
 	function = logexpr
+	if( export_semantics andalso (logexpr <> NULL) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(logexpr, source_start, source_end, _
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+	end if
 
 end function
 
@@ -270,6 +342,15 @@ function cLogAndExpression _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = any, logexpr = any
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_operator_count = 0
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	'' RelExpression
 	logexpr = cRelExpression( )
@@ -287,6 +368,10 @@ function cLogAndExpression _
 		'' Self-assignment? Then don't parse a BOP
 		if( hIsAssignToken( lexGetLookAhead( 1 ) ) ) then
 			exit do
+		end if
+		if( export_semantics and (semantic_operator_count > 0) ) then
+			hSemanticModelExportCurrentExpression(logexpr, source_start, _
+				nonphysical_tokens_at_start)
 		end if
 
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -306,10 +391,16 @@ function cLogAndExpression _
 			'' error recovery: fake a node
 			logexpr = astNewCONSTi( 0 )
 		end if
+		if( export_semantics ) then semantic_operator_count += 1
 
 	loop
 
 	function = logexpr
+	if( export_semantics andalso (logexpr <> NULL) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(logexpr, source_start, source_end, _
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+	end if
 
 end function
 
@@ -323,6 +414,15 @@ function cRelExpression _
 
 	dim as integer op = any
 	dim as ASTNODE ptr expr = any, relexpr = any
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_operator_count = 0
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	'' IsExpression
 	relexpr = cIsExpression(  )
@@ -360,6 +460,10 @@ function cRelExpression _
 		case else
 			exit do
 		end select
+		if( export_semantics and (semantic_operator_count > 0) ) then
+			hSemanticModelExportCurrentExpression(relexpr, source_start, _
+				nonphysical_tokens_at_start)
+		end if
 
 		lexSkipToken( )
 
@@ -378,9 +482,15 @@ function cRelExpression _
 			'' error recovery: fake a node
 			relexpr = astNewCONSTi( 0 )
 		end if
+		if( export_semantics ) then semantic_operator_count += 1
 	loop
 
 	function = relexpr
+	if( export_semantics andalso (relexpr <> NULL) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(relexpr, source_start, source_end, _
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+	end if
 
 end function
 
@@ -469,6 +579,15 @@ function cCatExpression _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = any, catexpr = any
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_operator_count = 0
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	'' AddExpression
 	catexpr = cAddExpression(  )
@@ -486,6 +605,10 @@ function cCatExpression _
 		'' Self-assignment? Then don't parse a BOP
 		if( hIsAssignToken( lexGetLookAhead( 1 ) ) ) then
 			exit do
+		end if
+		if( export_semantics and (semantic_operator_count > 0) ) then
+			hSemanticModelExportCurrentExpression(catexpr, source_start, _
+				nonphysical_tokens_at_start)
 		end if
 
 		lexSkipToken( )
@@ -505,10 +628,16 @@ function cCatExpression _
 			'' error recovery: fake a new node
 			catexpr = astNewCONSTstr( NULL )
 		end if
+		if( export_semantics ) then semantic_operator_count += 1
 
 	loop
 
 	function = catexpr
+	if( export_semantics andalso (catexpr <> NULL) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(catexpr, source_start, source_end, _
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+	end if
 
 end function
 
@@ -522,6 +651,15 @@ function cAddExpression _
 
 	dim as integer op = any
 	dim as ASTNODE ptr expr = any, addexpr = any
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_operator_count = 0
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	'' ShiftExpression
 	addexpr = cShiftExpression(  )
@@ -545,6 +683,10 @@ function cAddExpression _
 		if( hIsAssignToken( lexGetLookAhead( 1 ) ) ) then
 			exit do
 		end if
+		if( export_semantics and (semantic_operator_count > 0) ) then
+			hSemanticModelExportCurrentExpression(addexpr, source_start, _
+				nonphysical_tokens_at_start)
+		end if
 
 		lexSkipToken( )
 
@@ -566,9 +708,15 @@ function cAddExpression _
 			'' error recovery: fake a node
 			addexpr = astNewCONSTi( 0 )
 		end if
+		if( export_semantics ) then semantic_operator_count += 1
 	loop
 
 	function = addexpr
+	if( export_semantics andalso (addexpr <> NULL) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(addexpr, source_start, source_end, _
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+	end if
 
 end function
 
@@ -582,6 +730,15 @@ function cShiftExpression _
 
 	dim as integer op = any
 	dim as ASTNODE ptr expr = any, shiftexpr = any
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_operator_count = 0
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	'' ModExpression
 	shiftexpr = cModExpression(  )
@@ -605,6 +762,10 @@ function cShiftExpression _
 		if( hIsAssignToken( lexGetLookAhead( 1 ) ) ) then
 			exit do
 		end if
+		if( export_semantics and (semantic_operator_count > 0) ) then
+			hSemanticModelExportCurrentExpression(shiftexpr, source_start, _
+				nonphysical_tokens_at_start)
+		end if
 
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
@@ -623,9 +784,15 @@ function cShiftExpression _
 			'' error recovery: fake a node
 			shiftexpr = astNewCONSTi( 0 )
 		end if
+		if( export_semantics ) then semantic_operator_count += 1
 	loop
 
 	function = shiftexpr
+	if( export_semantics andalso (shiftexpr <> NULL) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(shiftexpr, source_start, source_end, _
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+	end if
 
 end function
 
@@ -638,6 +805,15 @@ function cModExpression _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = any, modexpr = any
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_operator_count = 0
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	'' IntDivExpression
 	modexpr = cIntDivExpression( )
@@ -655,6 +831,10 @@ function cModExpression _
 		'' Self-assignment? Then don't parse a BOP
 		if( hIsAssignToken( lexGetLookAhead( 1 ) ) ) then
 			exit do
+		end if
+		if( export_semantics and (semantic_operator_count > 0) ) then
+			hSemanticModelExportCurrentExpression(modexpr, source_start, _
+				nonphysical_tokens_at_start)
 		end if
 
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -674,9 +854,15 @@ function cModExpression _
 			'' error recovery: fake a node
 			modexpr = astNewCONSTi( 0 )
 		end if
+		if( export_semantics ) then semantic_operator_count += 1
 	loop
 
 	function = modexpr
+	if( export_semantics andalso (modexpr <> NULL) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(modexpr, source_start, source_end, _
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+	end if
 
 end function
 
@@ -689,6 +875,15 @@ function cIntDivExpression _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = any, idivexpr = any
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_operator_count = 0
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	'' MultExpression
 	idivexpr = cMultExpression( )
@@ -706,6 +901,10 @@ function cIntDivExpression _
 		'' Self-assignment? Then don't parse a BOP
 		if( hIsAssignToken( lexGetLookAhead( 1 ) ) ) then
 			exit do
+		end if
+		if( export_semantics and (semantic_operator_count > 0) ) then
+			hSemanticModelExportCurrentExpression(idivexpr, source_start, _
+				nonphysical_tokens_at_start)
 		end if
 
 		lexSkipToken( )
@@ -725,9 +924,15 @@ function cIntDivExpression _
 			'' error recovery: fake a node
 			idivexpr = astNewCONSTi( 0 )
 		end if
+		if( export_semantics ) then semantic_operator_count += 1
 	loop
 
 	function = idivexpr
+	if( export_semantics andalso (idivexpr <> NULL) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(idivexpr, source_start, source_end, _
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+	end if
 
 end function
 
@@ -741,6 +946,15 @@ function cMultExpression _
 
 	dim as integer op = any
 	dim as ASTNODE ptr expr = any, mulexpr = any
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_operator_count = 0
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	'' ExpExpression
 	mulexpr = cExpExpression( )
@@ -764,6 +978,10 @@ function cMultExpression _
 		if( hIsAssignToken( lexGetLookAhead( 1 ) ) ) then
 			exit do
 		end if
+		if( export_semantics and (semantic_operator_count > 0) ) then
+			hSemanticModelExportCurrentExpression(mulexpr, source_start, _
+				nonphysical_tokens_at_start)
+		end if
 
 		lexSkipToken( )
 
@@ -782,9 +1000,15 @@ function cMultExpression _
 			'' error recovery: fake a node
 			mulexpr = astNewCONSTi( 0 )
 		end if
+		if( export_semantics ) then semantic_operator_count += 1
 	loop
 
 	function = mulexpr
+	if( export_semantics andalso (mulexpr <> NULL) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(mulexpr, source_start, source_end, _
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+	end if
 
 end function
 
@@ -797,6 +1021,15 @@ function cExpExpression _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = any, expexpr = any
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_operator_count = 0
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	'' NegNotExpression
 	expexpr = cNegNotExpression( )
@@ -813,6 +1046,10 @@ function cExpExpression _
 		'' Self-assignment? Then don't parse a BOP
 		if( hIsAssignToken( lexGetLookAhead( 1 ) ) ) then
 			exit do
+		end if
+		if( export_semantics and (semantic_operator_count > 0) ) then
+			hSemanticModelExportCurrentExpression(expexpr, source_start, _
+				nonphysical_tokens_at_start)
 		end if
 
 		lexSkipToken( )
@@ -832,8 +1069,14 @@ function cExpExpression _
 			'' error recovery: fake a node
 			expexpr = astNewCONSTf( 0, FB_DATATYPE_DOUBLE )
 		end if
+		if( export_semantics ) then semantic_operator_count += 1
 	loop
 
 	function = expexpr
+	if( export_semantics andalso (expexpr <> NULL) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(expexpr, source_start, source_end, _
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+	end if
 
 end function

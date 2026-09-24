@@ -18,8 +18,10 @@ endif
 compiler-semantic-model-smoke:
 	$(call _mt_echo,Compiler semantic model smoke test)
 	@mkdir -p "$(TEST_TMP)"
+	@printf "%s\n" "'' schema 6 dependency inventory smoke" > "$(TEST_TMP)/semantic-model-header.bi"
 	@printf "%s\n" \
 	'#define SEMANTIC_INCREMENT 2' \
+	'#assert __FB_ERR__ = 0' \
 	'#if 1 + 2 = 3' \
 	'#assert 1 + 2 = 3' \
 	'#endif' \
@@ -29,7 +31,20 @@ compiler-semantic-model-smoke:
 	'    value += semantic_helper() + 1' \
 	'    value += semantic_helper() + SEMANTIC_INCREMENT' \
 	'end sub' \
+	'sub semantic_varargs cdecl (byval count as integer, ...)' \
+	'    dim as integer value = count' \
+	'end sub' \
 	'semantic_probe()' \
+	'type semantic_probe_type' \
+	'    precise as double' \
+	'end type' \
+	'sub semantic_typeof_probe()' \
+	'    dim checked as semantic_probe_type' \
+	'    #assert typeof(checked.precise) = typeof(double)' \
+	'end sub' \
+	'#define D .' \
+	'dim array(0 to D D D) as integer => { 1 }' \
+	'#include "semantic-model-header.bi"' \
 	> "$(TEST_TMP)/semantic-model.bas"
 	@printf "%s\n" \
 		'function semantic_helper() as integer' \
@@ -38,18 +53,97 @@ compiler-semantic-model-smoke:
 		> "$(TEST_TMP)/semantic-model-helper.bas"
 	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model "$(TEST_TMP)/semantic-model.tsv" -r "$(TEST_TMP)/semantic-model.bas" "$(TEST_TMP)/semantic-model-helper.bas")
 	@awk -F '\t' '\
-		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 != "4") exit 1; header = 1; next } \
+		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 != "6") exit 1; header = 1; next } \
 		$$1 == "M" { if (NF != 2) exit 1; modules++; next } \
+		$$1 == "D" { if (NF != 2 || $$2 == "" || dependencies[$$2]++) exit 1; if ($$2 ~ /semantic-model-header\.bi$$/) header_dependency = 1; dependency_count++; next } \
 		$$1 == "S" { if (NF != 12 || symbol_ids[$$2]++) exit 1; if ($$6 != 0) symbol_refs[++symbol_ref_count] = $$6; if ($$12 != 0) symbol_refs[++symbol_ref_count] = $$12; symbols++; next } \
 		$$1 == "P" { if (NF != 9) exit 1; symbol_refs[++symbol_ref_count] = $$2; procedures++; next } \
 		$$1 == "V" { if (NF != 5 || $$2 == 0 || $$4 == "" || ($$5 != "pointer" && $$5 != "numeric" && $$5 != "dynamic-string" && $$5 != "fixed-string" && $$5 != "aggregate" && $$5 != "procedure" && $$5 != "other")) exit 1; symbol_refs[++symbol_ref_count] = $$2; typefacts++; next } \
 		$$1 == "N" { if (NF != 11 || node_ids[$$2]++) exit 1; if ($$8 != 0) symbol_refs[++symbol_ref_count] = $$8; if ($$9 != 0) symbol_refs[++symbol_ref_count] = $$9; nodes++; next } \
-		$$1 == "E" { if (NF != 14 || expression_ids[$$2]++ || ($$3 != "0" && $$3 != "1") || $$4 == "" || $$5 < 1 || $$6 < 0 || $$7 < $$5 || ($$7 == $$5 && $$8 <= $$6) || $$8 < 0 || $$14 == "") exit 1; if ($$3 == "1" && $$5 == 8 && $$6 == 13 && $$7 == 8 && $$8 == 34) direct_range = 1; if ($$3 == "0" && $$5 == 9 && $$6 == 13) expanded_range = 1; if ($$5 == 2 || $$5 == 3) directive_expressions++; if ($$12 != 0) symbol_refs[++symbol_ref_count] = $$12; if ($$13 != 0) symbol_refs[++symbol_ref_count] = $$13; expressions++; next } \
-		$$1 == "END" { if (NF != 8 || $$2 != "4" || $$3 != modules || $$4 != procedures || $$5 != symbols || $$6 != typefacts || $$7 != nodes || $$8 != expressions) exit 1; footer = 1; next } \
+		$$1 == "E" { if (NF != 14 || expression_ids[$$2]++ || ($$3 != "0" && $$3 != "1") || $$4 == "" || $$5 < 1 || $$6 < 0 || $$7 < $$5 || ($$7 == $$5 && $$8 <= $$6) || $$8 < 0 || $$14 == "") exit 1; if ($$3 == "1" && $$5 == 9 && $$6 == 13 && $$7 == 9 && $$8 == 34) direct_range = 1; if ($$3 == "0" && $$5 == 10 && $$6 == 13) expanded_range = 1; if ($$3 == "0" && $$5 == 24 && $$6 == 41 && $$7 == 24 && $$8 == 42) macro_range_withheld = 1; if ($$5 >= 2 && $$5 <= 4) directive_expressions++; if ($$14 == "double") nested_operands[$$5] = 1; if ($$14 == "integer") nested_comparisons[$$5] = 1; if ($$12 != 0) symbol_refs[++symbol_ref_count] = $$12; if ($$13 != 0) symbol_refs[++symbol_ref_count] = $$13; expressions++; next } \
+		$$1 == "END" { if (NF != 10 || $$2 != "6" || $$3 != modules || $$4 != procedures || $$5 != symbols || $$6 != typefacts || $$7 != nodes || $$8 != expressions || $$9 != dependency_count || $$10 != "1") exit 1; footer = 1; next } \
 		footer { exit 1 } \
 		{ exit 1 } \
-		END { if (!header || !footer || modules != 2 || procedures < 2 || symbols < 1 || typefacts < 2 || nodes < 1 || expressions < 2 || directive_expressions < 2 || !direct_range || !expanded_range) exit 1; for (i = 1; i <= symbol_ref_count; i++) if (!(symbol_refs[i] in symbol_ids)) exit 1 }' \
+		END { for (line in nested_operands) if (line in nested_comparisons) nested_typeof = 1; if (!header || !footer || modules != 2 || dependency_count != 3 || !header_dependency || procedures < 2 || symbols < 1 || typefacts < 2 || nodes < 1 || expressions < 2 || directive_expressions < 3 || !direct_range || !expanded_range || !macro_range_withheld || !nested_typeof) exit 1; for (i = 1; i <= symbol_ref_count; i++) if (!(symbol_refs[i] in symbol_ids)) exit 1 }' \
 		"$(TEST_TMP)/semantic-model.tsv" || { echo "ERROR: invalid or incomplete compiler semantic model"; exit 1; }
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-expressions "$(TEST_TMP)/semantic-expressions.tsv" -r "$(TEST_TMP)/semantic-model.bas" "$(TEST_TMP)/semantic-model-helper.bas")
+	@awk -F '\t' '\
+		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 != "6") exit 1; header = 1; next } \
+		$$1 == "M" { if (NF != 2) exit 1; modules++; next } \
+		$$1 == "D" { if (NF != 2 || $$2 == "" || dependencies[$$2]++) exit 1; if ($$2 ~ /semantic-model-header\.bi$$/) header_dependency = 1; dependency_count++; next } \
+		$$1 == "E" { if (NF != 14 || $$2 != expressions + 1 || $$4 == "" || $$5 < 1 || $$6 < 0 || $$7 < $$5 || ($$7 == $$5 && $$8 <= $$6) || $$8 < 0 || $$12 != 0 || $$13 != 0 || $$14 == "") exit 1; expressions++; next } \
+		$$1 == "END" { if (NF != 10 || $$2 != "6" || $$3 != modules || $$4 != 0 || $$5 != 0 || $$6 != 0 || $$7 != 0 || $$8 != expressions || $$9 != dependency_count || $$10 != "1") exit 1; footer = 1; next } \
+		footer { exit 1 } \
+		{ exit 1 } \
+		END { if (!header || !footer || modules != 2 || dependency_count != 3 || !header_dependency || expressions < 2) exit 1 }' \
+		"$(TEST_TMP)/semantic-expressions.tsv" || { echo "ERROR: expression-only semantic model contains unrelated or invalid records"; exit 1; }
+	@printf "%s\n" \
+		'dim as double semantic_factor' \
+		'dim as integer semantic_result' \
+		'semantic_result = 2 + 3 * semantic_factor' \
+		'type SemanticRangeRecord' \
+		'    precise as double' \
+		'end type' \
+	'dim as SemanticRangeRecord semantic_record' \
+	'semantic_result = -semantic_factor' \
+	'semantic_result = semantic_record.precise' \
+	'semantic_result = len("abc")' \
+	'semantic_result = sizeof(semantic_factor + 1)' \
+	'semantic_result = iif(semantic_factor > 0, semantic_factor + 1, semantic_factor + 2)' \
+	'semantic_result = 1 + 2 + semantic_factor + 4' \
+	> "$(TEST_TMP)/semantic-intermediate.bas"
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-expressions "$(TEST_TMP)/semantic-intermediate.tsv" -c "$(TEST_TMP)/semantic-intermediate.bas" -o "$(TEST_TMP)/semantic-intermediate.o")
+	@awk -F '\t' '$$1 == "E" && $$3 == "1" && $$5 == 3 && $$6 == 22 && $$7 == 3 && $$8 == 41 && tolower($$14) == "double" { inner = 1 } $$1 == "E" && $$3 == "1" && $$5 == 3 && $$6 == 18 && $$7 == 3 && $$8 == 41 && tolower($$14) == "double" { outer = 1 } $$1 == "E" && $$3 == "1" && $$5 == 8 && $$6 == 18 && $$7 == 8 && $$8 == 34 && tolower($$14) == "double" { unary = 1 } $$1 == "E" && $$3 == "1" && $$5 == 9 && $$6 == 18 && $$7 == 9 && $$8 == 41 && tolower($$14) == "double" { member = 1 } $$1 == "E" && $$3 == "1" && $$5 == 10 && $$6 == 18 && $$7 == 10 && $$8 == 28 && tolower($$14) == "integer" { call = 1 } $$1 == "E" && $$3 == "1" && $$5 == 11 && $$6 == 18 && $$7 == 11 && $$8 == 45 && tolower($$14) == "integer" { sizeof_result = 1 } $$1 == "E" && $$3 == "1" && $$5 == 11 && $$6 == 25 && $$7 == 11 && $$8 == 44 && tolower($$14) == "double" { sizeof_operand = 1 } $$1 == "E" && $$3 == "1" && $$5 == 12 && $$6 == 18 && $$7 == 12 && $$8 == 84 && tolower($$14) == "double" { iif_result = 1 } $$1 == "E" && $$3 == "1" && $$5 == 12 && $$6 == 22 && $$7 == 12 && $$8 == 41 && tolower($$14) == "integer" { iif_condition = 1 } $$1 == "E" && $$3 == "1" && $$5 == 12 && $$6 == 43 && $$7 == 12 && $$8 == 62 && tolower($$14) == "double" { iif_true = 1 } $$1 == "E" && $$3 == "1" && $$5 == 12 && $$6 == 64 && $$7 == 12 && $$8 == 83 && tolower($$14) == "double" { iif_false = 1 } $$1 == "E" && $$3 == "1" && $$5 == 13 && $$6 == 18 && $$7 == 13 && $$8 == 23 && tolower($$14) == "integer" { folded_prefix = 1 } $$1 == "E" && $$3 == "1" && $$5 == 13 && $$6 == 18 && $$7 == 13 && $$8 == 41 && tolower($$14) == "double" { chained_prefix = 1 } END { if (!inner || !outer || !unary || !member || !call || !sizeof_result || !sizeof_operand || !iif_result || !iif_condition || !iif_true || !iif_false || !folded_prefix || !chained_prefix) exit 1 }' \
+		"$(TEST_TMP)/semantic-intermediate.tsv" || { echo "ERROR: expression-only model omitted a typed intermediate expression range"; exit 1; }
+	@printf "%s\n" \
+		'type SemanticRangeLeaf' \
+		'    amount as double' \
+		'end type' \
+		'type SemanticRangeBranch' \
+		'    leaf as SemanticRangeLeaf' \
+		'    leaves(0 to 2) as SemanticRangeLeaf' \
+		'end type' \
+		'declare function semantic_range_factory() as SemanticRangeBranch' \
+		'dim as SemanticRangeBranch semantic_branch' \
+		'print semantic_branch.leaf.amount' \
+		'print semantic_branch.leaves(1).amount' \
+		'print semantic_range_factory().leaf.amount' \
+		> "$(TEST_TMP)/semantic-prefix.bas"
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-expressions "$(TEST_TMP)/semantic-prefix.tsv" -c "$(TEST_TMP)/semantic-prefix.bas" -o "$(TEST_TMP)/semantic-prefix.o")
+	@awk -F '\t' '$$1 == "E" && $$3 == "1" && $$5 == 10 && $$6 == 6 && $$7 == 10 && $$8 == 26 && tolower($$14) == "semanticrangeleaf" { direct_member = 1 } $$1 == "E" && $$3 == "1" && $$5 == 10 && $$6 == 6 && $$7 == 10 && $$8 == 33 && tolower($$14) == "double" { direct_result = 1 } $$1 == "E" && $$3 == "1" && $$5 == 11 && $$6 == 6 && $$7 == 11 && $$8 == 31 && tolower($$14) == "semanticrangeleaf" { indexed_member = 1 } $$1 == "E" && $$3 == "1" && $$5 == 11 && $$6 == 6 && $$7 == 11 && $$8 == 38 && tolower($$14) == "double" { indexed_result = 1 } $$1 == "E" && $$3 == "1" && $$5 == 12 && $$6 == 6 && $$7 == 12 && $$8 == 30 && tolower($$14) == "semanticrangebranch" { call = 1 } $$1 == "E" && $$3 == "1" && $$5 == 12 && $$6 == 6 && $$7 == 12 && $$8 == 35 && tolower($$14) == "semanticrangeleaf" { call_member = 1 } $$1 == "E" && $$3 == "1" && $$5 == 12 && $$6 == 6 && $$7 == 12 && $$8 == 42 && tolower($$14) == "double" { call_result = 1 } END { if (!direct_member || !direct_result || !indexed_member || !indexed_result || !call || !call_member || !call_result) exit 1 }' \
+		"$(TEST_TMP)/semantic-prefix.tsv" || { echo "ERROR: expression-only model omitted a member, index, or call prefix"; exit 1; }
+	@printf "%s\n" \
+		'#line 23 "semantic-remapped.bas"' \
+		'dim as integer padding = len("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")' \
+		'#line 22 "semantic-remapped.bas"' \
+		'#define D .' \
+		'dim array(0 to D D D) as integer => { 1 }' \
+		> "$(TEST_TMP)/semantic-remapped-range.bas"
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model "$(TEST_TMP)/semantic-remapped-range.tsv" -c "$(TEST_TMP)/semantic-remapped-range.bas" -o "$(TEST_TMP)/semantic-remapped-range.o")
+	@awk -F '\t' '$$1 == "E" && $$4 == "semantic-remapped.bas" && $$5 == 24 && $$6 == 41 && $$7 == 24 && $$8 == 42 { if ($$3 != "0") exit 1; found = 1 } END { if (!found) exit 1 }' \
+		"$(TEST_TMP)/semantic-remapped-range.tsv" || { echo "ERROR: repeated #line location reused a stale physical-line bound"; exit 1; }
+	@{ printf 'Print '; printf '%1500s' ''; printf 'Len("😀") + 1 + 2\n'; } > "$(TEST_TMP)/semantic-long-line.bas"
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model "$(TEST_TMP)/semantic-long-line.tsv" -c "$(TEST_TMP)/semantic-long-line.bas" -o "$(TEST_TMP)/semantic-long-line.o")
+	@awk -F '\t' '$$1 == "E" && $$4 ~ /semantic-long-line\.bas$$/ && $$5 == 1 && $$6 == 1506 && $$7 == 1 && $$8 == 1523 { if ($$3 != "1") exit 1; found = 1 } END { if (!found) exit 1 }' \
+		"$(TEST_TMP)/semantic-long-line.tsv" || { echo "ERROR: diagnostic excerpt truncated the semantic physical-line bound"; exit 1; }
+	@printf "%s\n" \
+		'dim as double recovery_factor = 1' \
+		'print recovery_factor * 2 +' \
+		'print recovery_factor * 3' \
+		> "$(TEST_TMP)/semantic-recovery.bas"
+	@set +e; $(TEST_FBC_CMD) -semantic-model-expressions "$(TEST_TMP)/semantic-recovery.tsv" -c "$(TEST_TMP)/semantic-recovery.bas" -o "$(TEST_TMP)/semantic-recovery.o" >/dev/null 2>&1; status=$$?; set -e; \
+		test $$status -eq 1 || { echo "ERROR: malformed semantic-recovery fixture did not fail compilation"; exit 1; }
+	@awk -F '\t' '\
+		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 != "6") exit 1; header = 1; next } \
+		$$1 == "M" { if (NF != 2) exit 1; modules++; next } \
+		$$1 == "D" { if (NF != 2 || $$2 == "" || dependencies[$$2]++) exit 1; dependency_count++; next } \
+		$$1 == "E" { if (NF != 14) exit 1; expressions++; if ($$3 == "1" && $$5 == 3 && tolower($$14) == "double") later_expression = 1; next } \
+		$$1 == "R" { if (NF != 3 || $$2 != "6" || $$3 != expressions) exit 1; recovered_modules++; next } \
+		$$1 == "RECOVERY" { if (NF != 7 || $$2 != "6" || $$3 != modules || $$4 != expressions || $$5 != recovered_modules || $$6 != dependency_count || $$7 != "1") exit 1; footer = 1; next } \
+		footer { exit 1 } \
+		{ exit 1 } \
+		END { if (!header || !footer || modules != 1 || dependency_count != 1 || expressions < 1 || recovered_modules != 1 || !later_expression) exit 1 }' \
+		"$(TEST_TMP)/semantic-recovery.tsv" || { echo "ERROR: expression-only recovery snapshot is incomplete or mistyped"; exit 1; }
 	$(call _mt_cleanup_success)
 
 compiler-indirect-goto-smoke:

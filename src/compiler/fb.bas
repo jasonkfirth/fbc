@@ -16,6 +16,7 @@
 #include once "objinfo.bi"
 
 declare sub fbSemanticModelBeginModule(byref filename as string)
+declare sub fbSemanticModelAddDependency(byref filename as string)
 declare sub fbSemanticModelExportGlobals(byval symbol as FBSYMBOL ptr)
 
 type FB_LANG_INFO
@@ -1927,6 +1928,7 @@ sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer)
 
 	'' we should respect the path here too
 	fileidx = hAddIncFile( @env.incfilehash, @env.filenamehash, incfile )
+	fbSemanticModelAddDependency(incfile)
 
 	'' push context
 	infileTb(env.includerec) = env.inf

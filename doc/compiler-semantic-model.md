@@ -3,7 +3,35 @@
 `-semantic-model <file>` asks the compiler to write a tab-separated semantic
 sidecar for external tooling. The option is opt-in and does not change ordinary
 compiler invocations. It enables source locations during analysis; tools should
-still compile to a temporary object when they only need the model.
+still compile to a temporary object when they only need the model. It does not
+enable language debug options or change predefined compiler configuration
+values such as `__FB_ERR__`.
+
+`-semantic-model-expressions <file>` writes the same versioned header and
+completeness footer, but limits successful module output to `M` and `E` records.
+This mode avoids retaining the symbol table, procedure summaries, variable
+type facts, and serialized AST when a consumer only needs compiler-typed source
+ranges.
+Its `E` symbol and subtype IDs are zero by design; the numeric dtype and
+compiler-formatted type spelling remain available. The full
+`-semantic-model` mode is unchanged and continues to include those identities.
+The expressions-only mode also records completed results from the binary
+precedence parser tiers, unary operators, and the highest-precedence parser
+route. This includes useful intermediate ranges such as a typed product nested
+inside an addition, plus complete unary expressions and source-visible
+member/index/call prefixes. The parser exports the current receiver before
+consuming a suffix and each completed prefix after resolving its member or
+index, so chains such as `record.child.items(0).value` retain the intermediate
+compiler types. Adjacent expression records with identical fields after their
+unique ID are written once when several parser tiers return the same result.
+The exporter does not merge different ranges, types, identities, or facts
+separated by another record. Expression IDs and footer totals count the records
+actually written. For
+repeated operators at one precedence, each completed left-associated prefix is
+recorded before the next operation can fold or replace its AST. For example,
+`1 + 2` keeps its own compiler type inside `1 + 2 + value`. These facts are
+completed parser results, not a complete graph of compiler-generated
+conversions, calls, or other lowering operations.
 
 The format is tool-neutral. Fblint is its first current consumer, and editor
 integrations can use the same symbol, type, AST, and source-location facts. The
@@ -11,13 +39,23 @@ sidecar is output from a compiler invocation, not a language-server protocol or
 an incremental workspace index; an editor integration must manage compiler
 arguments, project state, and invocation lifetime itself.
 
-The sidecar is complete only when it ends with a valid `END` record. A failed
-or interrupted compile may leave a partial file, which consumers must reject.
-The compiler stages each module's records and commits them only after parsing
-that module succeeds. This prevents failed parser retries from leaving stale
-symbols or AST nodes in the final model.
+The full semantic model is complete only when it ends with a valid `END`
+record. A failed or interrupted compile may leave an incomplete file, which
+full-model consumers must reject. The compiler stages each module's records
+and commits them only after parsing that module succeeds. This prevents failed
+parser retries from leaving stale symbols or AST nodes in the final model.
 
-## Schema version 4
+Expression-only output has a separate, explicitly incomplete recovery form for
+compiler-reported parse errors. A recovered module is followed by an `R` record
+and the file ends with a `RECOVERY` footer instead of `END`. The footer counts
+all committed expression records; it does not claim that a failed module is
+complete. Consumers using this form must reconcile each physical range with
+their primary parser's invalid or recovered source regions, withhold overlapping
+facts, and mark retained facts provisional. The full-model reader must never
+treat a `RECOVERY` footer as a valid semantic model. Interrupted processes do
+not write this footer and remain invalid.
+
+## Schema version 6
 
 Fields are separated by tabs. Literal percent signs, tabs, carriage returns,
 and line feeds inside names and paths are escaped as `%25`, `%09`, `%0D`, and
@@ -27,12 +65,22 @@ and line feeds inside names and paths are escaped as `%25`, `%09`, `%0D`, and
 | --- | --- | --- |
 | `FBCSEM` | schema version, compiler version | Model header |
 | `M` | source path | Successfully parsed module |
+| `D` | source path | Unique source file opened by the compiler invocation, including root modules and includes |
 | `S` | ID, name, symbol class, data type, subtype ID, scope, attributes, parameter attributes, length, offset, parent ID | Resolved compiler symbol |
 | `P` | symbol ID, name, symbol class, data type, subtype ID, start line, end line, source path | Procedure metadata |
 | `V` | symbol ID, procedure name (empty for global scope), variable name, stable type kind | Resolved variable type fact (`pointer`, `numeric`, `dynamic-string`, `fixed-string`, `aggregate`, `procedure`, or `other`) |
 | `N` | ID, parent ID, child edge, AST class, operator, data type, symbol ID, subtype ID, source line, source path | Typed AST node |
 | `E` | ID, physical-range flag, source path, start line, start column, end line, end column, AST class, operator, data type, symbol ID, subtype ID, source type spelling | Type and resolved identity of one completed parser expression |
-| `END` | schema version, module count, procedure count, symbol count, type-fact count, AST-node count, expression count | Completeness marker and record totals |
+| `R` | schema version, expression count for the preceding module | Explicitly recovered module in expression-only output |
+| `END` | schema version, module count, procedure count, symbol count, type-fact count, AST-node count, expression count, dependency count, dependency-complete flag | Completeness marker and record totals |
+| `RECOVERY` | schema version, module count, expression count, recovered-module count, dependency count, dependency-complete flag | Incomplete expression-only recovery marker and record totals |
+
+Dependency records are emitted once per normalized source path in compiler
+read order. The root module is included, as are successfully opened include and
+preinclude files. At most 5,000 paths are retained. The final `dependency
+complete` flag is `1` only when the list covers every source opened by the
+invocation; consumers that need to validate source-backed ranges must reject
+an incomplete list rather than treating omitted files as unrelated.
 
 Symbol and AST node IDs are unique within one output file. A zero subtype,
 parent, or symbol ID means that the AST or symbol has no corresponding
@@ -49,17 +97,45 @@ comparisons. A `physical-range` value of `1`
 means every consumed token in that parser expression came directly from the
 same physical source file; the range can be used for editor navigation. A
 value of `0` means macro expansion or another non-physical token participated,
-so the reported coordinates are informational only and must not be used as an
-editable source range. Empty or reversed parser spans are omitted. `E` records
-are emitted at the common `cExpression()` parser boundary. Special built-in
-parser routes that do not pass through this boundary are not represented yet,
-and constant folding can still remove subexpressions before their type is
-exported. The record therefore supplements the typed AST; it is not a complete
-source-expression graph.
+or the reported range failed a physical-line bound check. In either case,
+coordinates are informational only and must not be used as an editable source
+range. The exporter also checks single-line ASCII-compatible ranges against
+the complete physical line and clears the physical flag when a parser cursor
+extends beyond that line. This reads the input file directly rather than using
+the shorter diagnostic excerpt, and fails closed if the line cannot be read
+within the lexer's line-size bound. The check is keyed by physical file
+position as well as reported path and line, because `#line` can assign the same
+logical location to different source lines. Empty or reversed parser spans are
+omitted. Full-model `E` records are emitted at the common `cExpression()` parser
+boundary. Expressions-only output additionally records completed binary
+precedence results, unary results, and completed results from the
+highest-precedence parser route. This includes complete primary, member, index,
+and call expressions. Special forms such as `SIZEOF()` and `IIF()` retain their
+completed result range, while operands parsed through the common expression
+parser also retain their own typed ranges. Nested parser calls can therefore
+produce overlapping ranges, for example an arithmetic subexpression inside a
+larger expression or a member expression inside a compile-time `TYPEOF()`
+assertion.
+For cursor queries, consumers should
+prefer the narrowest physical expression range containing the position; an
+exact selection should use an exact-range match so an operand does not inherit
+the enclosing comparison's type. A special parser route may expose only its
+completed result and subexpressions that re-enter the common expression
+parser. Repeated binary parser chains are captured prefix-by-prefix, but other
+constant-folding and lowering paths can still remove intermediate AST
+structure before it can be exported. Compiler-generated implementation
+details are not source ranges. The record therefore supplements the typed AST;
+it is not a complete source-expression graph.
 
 The schema is intended to grow through an explicit version change when record
 meaning or layout changes. Consumers should reject unknown schema versions,
 unknown record types, incorrect field counts, or mismatched footer totals.
+
+Physical ranges can occur more than once when a header is intentionally
+included and parsed under different namespace or macro contexts. If identical
+source spans carry contradictory types, a source-only consumer cannot choose
+the applicable include instance from the range alone and should withhold that
+type rather than rely on record order.
 
 ## Current use in Fblint
 

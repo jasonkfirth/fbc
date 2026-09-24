@@ -10,6 +10,60 @@
 #include once "pp.bi"
 
 declare function hCast( byval options as AST_CONVOPT ) as ASTNODE ptr
+declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
+declare sub fbSemanticModelPushExpressionRange _
+	( _
+		byref source_start as LEX_LOCATION, _
+		byval nonphysical_tokens_at_start as longint, _
+		byref previous_start as LEX_LOCATION, _
+		byref previous_nonphysical_tokens as longint _
+	)
+declare sub fbSemanticModelPopExpressionRange _
+	( _
+		byref previous_start as LEX_LOCATION, _
+		byval previous_nonphysical_tokens as longint _
+	)
+declare sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
+declare sub fbSemanticModelExportExpression _
+	( _
+		byval expr as ASTNODE ptr, _
+		byref source_start as LEX_LOCATION, _
+		byref source_end as LEX_LOCATION, _
+		byval nonphysical_tokens_at_start as longint, _
+		byval nonphysical_tokens_at_end as longint _
+	)
+
+private sub hSemanticModelExportCurrentExpression _
+	( _
+		byval expr as ASTNODE ptr, _
+		byref source_start as LEX_LOCATION, _
+		byval nonphysical_tokens_at_start as longint _
+	)
+	if( expr = NULL ) then exit sub
+	dim as LEX_LOCATION source_end = lexGetLastLocation( )
+	fbSemanticModelExportExpression(expr, source_start, source_end, _
+		nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+end sub
+
+private function hSemanticModelFinishHighestPrecExpr _
+	( _
+		byval expr as ASTNODE ptr, _
+		byval export_semantics as integer, _
+		byref source_start as LEX_LOCATION, _
+		byval nonphysical_tokens_at_start as longint, _
+		byref previous_start as LEX_LOCATION, _
+		byval previous_nonphysical_tokens as longint _
+	) as ASTNODE ptr
+
+	if( export_semantics ) then
+		hSemanticModelExportCurrentExpression(expr, source_start, _
+			nonphysical_tokens_at_start)
+		fbSemanticModelPopExpressionRange(previous_start, _
+			previous_nonphysical_tokens)
+	end if
+
+	return expr
+end function
 
 private function hPPDefinedExpr( ) as ASTNODE ptr
 	dim as integer is_defined = any
@@ -48,6 +102,14 @@ function cNegNotExpression _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr negexpr = any
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as LEX_LOCATION source_start
+	dim as longint nonphysical_tokens_at_start
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	select case lexGetToken( )
 	'' '-'
@@ -70,6 +132,10 @@ function cNegNotExpression _
 			negexpr = astNewCONSTi( 0 )
 		end if
 
+		if( export_semantics ) then
+			hSemanticModelExportCurrentExpression(negexpr, source_start, _
+				nonphysical_tokens_at_start)
+		end if
 		return negexpr
 
 	'' '+'
@@ -92,6 +158,10 @@ function cNegNotExpression _
 			negexpr = astNewCONSTi( 0 )
 		end if
 
+		if( export_semantics ) then
+			hSemanticModelExportCurrentExpression(negexpr, source_start, _
+				nonphysical_tokens_at_start)
+		end if
 		return negexpr
 
 	'' NOT
@@ -114,6 +184,10 @@ function cNegNotExpression _
 			negexpr = astNewCONSTi( 0 )
 		end if
 
+		if( export_semantics ) then
+			hSemanticModelExportCurrentExpression(negexpr, source_start, _
+				nonphysical_tokens_at_start)
+		end if
 		return negexpr
 	end select
 
@@ -131,6 +205,9 @@ function cStrIdxOrMemberDeref _
 	dim as integer dtype = any
 
 	if( expr = NULL ) then exit function
+	if( fbSemanticModelExpressionsOnlyEnabled( ) ) then
+		fbSemanticModelExportCurrentExpressionPrefix(expr)
+	end if
 
 	dtype = astGetFullType( expr )
 	subtype = astGetSubType( expr )
@@ -216,6 +293,19 @@ function cHighestPrecExpr _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = any
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as LEX_LOCATION source_start
+	dim as LEX_LOCATION previous_source_start
+	dim as longint nonphysical_tokens_at_start
+	dim as longint previous_nonphysical_tokens
+	if( export_semantics ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+		fbSemanticModelPushExpressionRange(source_start, _
+			nonphysical_tokens_at_start, previous_source_start, _
+			previous_nonphysical_tokens)
+	end if
 
 	select case lexGetToken( )
 	'' AddrOfExpression
@@ -224,7 +314,10 @@ function cHighestPrecExpr _
 		'' as not optional and the closing ')' should not end the expression
 		fbSetPrntOptional( FALSE )
 
-		return cAddrOfExpression( )
+		expr = cAddrOfExpression( )
+		return hSemanticModelFinishHighestPrecExpr(expr, export_semantics, _
+			source_start, nonphysical_tokens_at_start, previous_source_start, _
+			previous_nonphysical_tokens)
 
 	'' DerefExpr
 	case FB_TK_DEREFCHAR
@@ -232,7 +325,10 @@ function cHighestPrecExpr _
 		'' as not optional and the closing ')' should not end the expression
 		fbSetPrntOptional( FALSE )
 
-		return cDerefExpression( )
+		expr = cDerefExpression( )
+		return hSemanticModelFinishHighestPrecExpr(expr, export_semantics, _
+			source_start, nonphysical_tokens_at_start, previous_source_start, _
+			previous_nonphysical_tokens)
 
 	'' ParentExpression
 	case CHAR_LPRNT
@@ -242,7 +338,9 @@ function cHighestPrecExpr _
 
 		'' if parsing a SUB, don't call StrIdxOrMemberDeref() twice
 		if( is_opt ) then
-			return expr
+			return hSemanticModelFinishHighestPrecExpr(expr, export_semantics, _
+				source_start, nonphysical_tokens_at_start, previous_source_start, _
+				previous_nonphysical_tokens)
 		end if
 
 	case else
@@ -250,7 +348,10 @@ function cHighestPrecExpr _
 		select case as const lexGetToken( )
 		'' AddrOfExpression
 		case FB_TK_VARPTR, FB_TK_PROCPTR, FB_TK_SADD, FB_TK_STRPTR
-			return cAddrOfExpression( )
+			expr = cAddrOfExpression( )
+			return hSemanticModelFinishHighestPrecExpr(expr, export_semantics, _
+				source_start, nonphysical_tokens_at_start, previous_source_start, _
+				previous_nonphysical_tokens)
 
 		'' CAST '(' DataType ',' Expression ')'
 		case FB_TK_CAST
@@ -277,11 +378,17 @@ function cHighestPrecExpr _
 				select case( lexGetToken( ) )
 				'' TYPEOF '(' Expression ')'
 				case FB_TK_TYPEOF
-					return astNewCONSTstr( ppTypeOf( ) )
+					expr = astNewCONSTstr( ppTypeOf( ) )
+					return hSemanticModelFinishHighestPrecExpr(expr, export_semantics, _
+						source_start, nonphysical_tokens_at_start, previous_source_start, _
+						previous_nonphysical_tokens)
 
 				'' DEFINED '(' Identifier ')'
 				case FB_TK_DEFINED
-					return hPPDefinedExpr( )
+					expr = hPPDefinedExpr( )
+					return hSemanticModelFinishHighestPrecExpr(expr, export_semantics, _
+						source_start, nonphysical_tokens_at_start, previous_source_start, _
+						previous_nonphysical_tokens)
 
 				end select
 			end if
@@ -293,13 +400,19 @@ function cHighestPrecExpr _
 			'' to cProcCall().
 			fbSetPrntOptional( FALSE )
 
-			return cAtom( base_parent, chain_ )
+			expr = cAtom( base_parent, chain_ )
+			return hSemanticModelFinishHighestPrecExpr(expr, export_semantics, _
+				source_start, nonphysical_tokens_at_start, previous_source_start, _
+				previous_nonphysical_tokens)
 
 		end select
 
 	end select
 
-	function = cStrIdxOrMemberDeref( expr )
+	expr = cStrIdxOrMemberDeref( expr )
+	function = hSemanticModelFinishHighestPrecExpr(expr, export_semantics, _
+		source_start, nonphysical_tokens_at_start, previous_source_start, _
+		previous_nonphysical_tokens)
 end function
 
 '' '(' DataType ',' Expression ')'

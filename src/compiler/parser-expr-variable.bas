@@ -9,6 +9,15 @@
 #include once "parser.bi"
 #include once "ast.bi"
 
+declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
+declare sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 declare function cDynamicArrayIndex _
 	( _
 		byval sym as FBSYMBOL ptr, _
@@ -227,6 +236,7 @@ end function
 ''
 private function hMemberId( byval parent as FBSYMBOL ptr, byval allow_inner as integer ) as FBSYMBOL ptr
 	dim as FBSYMBOL ptr res = any
+	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
 
 	if( parent = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDUDT, TRUE )
@@ -254,6 +264,7 @@ private function hMemberId( byval parent as FBSYMBOL ptr, byval allow_inner as i
 	end select
 
 	if( res ) then
+		fbSemanticModelExportBinding(res, semantic_site, FALSE)
 		return res
 	end if
 
@@ -300,6 +311,9 @@ private function hMemberId( byval parent as FBSYMBOL ptr, byval allow_inner as i
 		return NULL
 	end select
 
+	if( symbGetClass(sym) <> FB_SYMBCLASS_VAR ) then
+		fbSemanticModelExportBinding(sym, semantic_site, FALSE)
+	end if
 	return sym
 
 end function
@@ -313,12 +327,14 @@ function cUdtMember _
 		byval subtype as FBSYMBOL ptr, _
 		byval varexpr as ASTNODE ptr, _
 		byval check_array as integer, _
-		byval options as FB_PARSEROPT _
+		byval options as FB_PARSEROPT, _
+		byval export_prefixes as integer _
 	) as ASTNODE ptr
 
 	'' note: assuming a pointer is being passed to this function
 	dim as integer is_ptr = TRUE
 	dim as integer mask = typeGetConstMask( dtype )
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( ) and export_prefixes
 
 	do
 		dim as FBSYMBOL ptr fld = hMemberId( subtype, FALSE )
@@ -332,7 +348,11 @@ function cUdtMember _
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 			astDeltree( varexpr )
-			return astBuildConst( fld )
+			varexpr = astBuildConst( fld )
+			if( export_semantics ) then
+				fbSemanticModelExportCurrentExpressionPrefix(varexpr)
+			end if
+			return varexpr
 
 		'' enum?
 		case FB_SYMBCLASS_ENUM
@@ -359,6 +379,9 @@ function cUdtMember _
 			end if
 
 			varexpr = hFieldAccess( varexpr, fld, dtype, subtype, check_array )
+			if( export_semantics ) then
+				fbSemanticModelExportCurrentExpressionPrefix(varexpr)
+			end if
 
 			'' Only continue if the field was an UDT and there's a '.' following
 			if( (typeGetDtAndPtrOnly( dtype ) <> FB_DATATYPE_STRUCT) or _
@@ -373,6 +396,9 @@ function cUdtMember _
 		case FB_SYMBCLASS_VAR
 			astDelTree( varexpr )
 			varexpr = cVariableEx( fld, check_array )
+			if( export_semantics ) then
+				fbSemanticModelExportCurrentExpressionPrefix(varexpr)
+			end if
 
 			'' make sure the field inherits the parent's constant mask
 			dtype = symbGetFullType( fld ) or mask
@@ -396,7 +422,11 @@ function cUdtMember _
 				varexpr = astNewDEREF( varexpr, dtype, subtype )
 			end if
 
-			return cMethodCall( fld, varexpr, options )
+			varexpr = cMethodCall( fld, varexpr, options )
+			if( export_semantics ) then
+				fbSemanticModelExportCurrentExpressionPrefix(varexpr)
+			end if
+			return varexpr
 
 		case else
 			errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
@@ -561,6 +591,7 @@ function cMemberDeref _
 	dim as integer derefcnt = any
 	dim as longint lgt = any
 	dim as ASTNODE ptr idxexpr = any
+	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
 
 	function = NULL
 
@@ -600,7 +631,8 @@ function cMemberDeref _
 				derefcnt += hMultiDeref( )
 
 				'' UdtMember
-				varexpr = cUdtMember( dtype, subtype, varexpr, check_array )
+				varexpr = cUdtMember(dtype, subtype, varexpr, check_array, 0, _
+					derefcnt = 0)
 			else
 				'' check op overloading
 				if( symb.globOpOvlTb(AST_OP_FLDDEREF).head = NULL ) then
@@ -804,6 +836,10 @@ function cMemberDeref _
 		case else
 			exit do
 		end select
+
+		if( export_semantics ) then
+			fbSemanticModelExportCurrentExpressionPrefix(varexpr)
+		end if
 	loop
 
 	function = varexpr
@@ -1094,6 +1130,8 @@ function cVariableEx overload _
 	function = NULL
 
 	assert( symbIsVar( sym ) )
+	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
+	fbSemanticModelExportBinding(sym, semantic_site, FALSE)
 
 	'' Check visibility of the variable
 	if( symbCheckAccess( sym ) = FALSE ) then

@@ -129,6 +129,7 @@ type FBCCTX
 	staticlink          as integer
 	stripsymbols        as integer
 	semanticmodel       as string      '' Optional compiler-owned semantic model output
+	semanticmodel_expressions as integer '' Emit only module and expression records
 
 	'' Compiler paths
 	prefix              as zstring * FB_MAXPATHLEN+1  '' Path from -prefix or empty
@@ -231,9 +232,10 @@ declare function fbcRiscosHostRunTool _
 declare sub hPrintVersion( byval verbose as integer )
 declare sub hAddDarwinFrameworks( byref ldcline as string )
 declare sub fbcAddDefLib(byval libname as zstring ptr)
-declare function fbSemanticModelBegin(byref filename as string) as integer
+declare function fbSemanticModelBegin(byref filename as string, byval expressions_only as integer) as integer
 declare sub fbSemanticModelEnd(byval succeeded as integer)
 declare sub fbSemanticModelFinishModule(byval commit as integer)
+declare sub fbSemanticModelFinishRecoveryModule( )
 
 #macro safeKill(f)
 	if( kill( f ) <> 0 ) then
@@ -2757,6 +2759,7 @@ enum
 	OPT_RRKEEPASM
 	OPT_S
 	OPT_SEMANTIC_MODEL
+	OPT_SEMANTIC_EXPRESSIONS
 	OPT_SHOWINCLUDES
 	OPT_STATIC
 	OPT_STRIP
@@ -2846,6 +2849,7 @@ dim shared as FBC_CMDLINE_OPTION cmdlineOptionTB(0 to (OPT__COUNT - 1)) = _
 	( FALSE, TRUE , TRUE , FALSE ), _ '' OPT_RRKEEPASM    affects removal of temporary files
 	( TRUE , TRUE , FALSE, FALSE ), _ '' OPT_S            affects link
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_MODEL compiler-owned semantic model output
+	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_EXPRESSIONS expression-only semantic output
 	( FALSE, TRUE , FALSE, TRUE  ), _ '' OPT_SHOWINCLUDES affects compiler output display
 	( FALSE, TRUE , FALSE, FALSE ), _ '' OPT_STATIC       affects link
 	( FALSE, TRUE , FALSE, FALSE ), _ '' OPT_STRIP        affects link
@@ -2966,9 +2970,14 @@ private sub hHandleOptCompileSetup _
 
 	case OPT_SEMANTIC_MODEL
 		fbc.semanticmodel = arg
-		'' Keep AST line markers for the sidecar; code generation is otherwise
-		'' unchanged.
-		fbSetOption( FB_COMPOPT_DEBUGINFO, TRUE )
+		fbc.semanticmodel_expressions = FALSE
+		'' The parser emits AST line markers independently of debug-info mode.
+		'' Keep this tooling option from changing source-visible __FB_ERR__.
+
+	case OPT_SEMANTIC_EXPRESSIONS
+		fbc.semanticmodel = arg
+		fbc.semanticmodel_expressions = TRUE
+		'' The compact mode retains typed source ranges without symbol or AST dumps.
 
 	case OPT_GFX3
 		'' The preinclude uses the same empty define spelling as source code,
@@ -3419,7 +3428,7 @@ private sub handleOpt _
 	)
 
 	select case as const optid
-	case OPT_A to OPT_FPU, OPT_GFX3, OPT_SEMANTIC_MODEL
+	case OPT_A to OPT_FPU, OPT_GFX3, OPT_SEMANTIC_MODEL, OPT_SEMANTIC_EXPRESSIONS
 		hHandleOptCompileSetup( optid, arg, is_source )
 
 	case OPT_G, OPT_GEN to OPT_O
@@ -3546,6 +3555,7 @@ private function parseOption(byval opt as zstring ptr) as integer
 	case asc("s")
 		ONECHAR(OPT_S)
 		CHECK("semantic-model", OPT_SEMANTIC_MODEL)
+		CHECK("semantic-model-expressions", OPT_SEMANTIC_EXPRESSIONS)
 		CHECK("showincludes", OPT_SHOWINCLUDES)
 		CHECK("static", OPT_STATIC)
 		CHECK("strip", OPT_STRIP)
@@ -4447,7 +4457,7 @@ private sub hCompileBas _
 		'' If there were any errors during parsing, just exit without
 		'' doing anything else.
 		if( errGetCount( ) > 0 ) then
-			fbSemanticModelFinishModule( FALSE )
+			fbSemanticModelFinishRecoveryModule( )
 			fbcEnd( 1 )
 		end if
 
@@ -5507,6 +5517,7 @@ private sub hPrintOptions( byval verbose as integer )
 	print "  -exx             -ex plus array bounds/null-pointer checking"
 	print "  -export          Export symbols for dynamic linkage"
 	print "  -semantic-model <file>  Write a versioned compiler semantic model"
+	print "  -semantic-model-expressions <file>  Write only typed expression ranges"
 	if( verbose ) then
 	print "  -fbgfx           Link to the appropriate libfbgfx variant (normally automatic)"
 	end if
@@ -5736,7 +5747,7 @@ end sub
 		end if
 
 		if( len( fbc.semanticmodel ) > 0 ) then
-			if( fbSemanticModelBegin( fbc.semanticmodel ) = FALSE ) then
+			if( fbSemanticModelBegin( fbc.semanticmodel, fbc.semanticmodel_expressions ) = FALSE ) then
 				print "error: could not write semantic model: "; fbc.semanticmodel
 				fbcEnd( 1 )
 			end if

@@ -61,35 +61,44 @@ private function hMacroIsActive _
 
 	for i as integer = macrodepth - 1 to 0 step -1
 		if( s = macrostack[i] ) then
-			'' Function-like macro walkers may leave the current macro name as
-			'' the tail of their replacement text so the next argument group can
-			'' be consumed from the caller's remaining input.  Other active
-			'' function-like stack references are recursive DEFINEs and must be
-			'' rejected before they can keep prepending replacement text forever.
-			if( i = macrodepth - 1 ) then
-				if( symbGetDefineParams( s ) > 0 ) then
+			'' readId() snapshots the stack before consuming the identifier. It may
+			'' therefore include a frame whose replacement text ended at that token.
+			if( lex.ctx->deflen > macroresume[i] ) then
+				if( i = macrodepth - 1 ) then
+					'' A function-like macro can remain as the tail of its own
+					'' replacement while the caller's next argument group is read.
+					if( symbGetDefineParams( s ) > 0 ) then
+						return FALSE
+					end if
+
+					return TRUE
+				end if
+
+				if( pp.skipping ) then
+					'' Skipped conditional text can contain nested template helpers.
+					'' Keep scanning them; the stack limit still bounds real cycles.
 					return FALSE
 				end if
 
-				return TRUE
-			end if
+				if( symbGetDefineParams( macrostack[macrodepth - 1] ) = 0 ) then
+					return FALSE
+				end if
 
-			if( pp.skipping ) then
-				return TRUE
-			end if
-
-			if( symbGetDefineParams( macrostack[macrodepth - 1] ) = 0 ) then
-				return FALSE
-			end if
-
-			if( symbGetDefineParams( s ) > 0 ) then
-				return TRUE
+				if( symbGetDefineParams( s ) > 0 ) then
+					'' Template helpers can re-enter this macro for a different
+					'' dependent type. The stack limit still bounds recursive calls.
+					return FALSE
+				end if
 			end if
 		end if
 	next
 
 	if( s = currmacro ) then
-		return TRUE
+		for i as integer = macrodepth - 1 to 0 step -1
+			if( macrostack[i] = s ) then
+				return (lex.ctx->deflen > macroresume[i])
+			end if
+		next
 	end if
 
 	return FALSE

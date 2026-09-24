@@ -9,6 +9,13 @@
 #include once "rtl.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 declare sub cAutoVarDecl( byval baseattrib as FB_SYMBATTRIB )
 
 ''
@@ -1503,6 +1510,7 @@ function cVarDecl _
 	dim as integer dimensions = any, suffix = any
 	dim as zstring ptr palias = any
 	dim as FB_IDOPT options = any
+	dim as LEX_LOCATION semantic_site
 
 	function = NULL
 
@@ -1601,6 +1609,7 @@ function cVarDecl _
 			id = *symbGetName( varexpr->sym )
 			suffix = FB_DATATYPE_INVALID
 		else
+			semantic_site = lexGetCurrentLocation( )
 			chain_ = hGetId( parent, @id, suffix, is_redim )
 		end if
 
@@ -1807,6 +1816,9 @@ function cVarDecl _
 		''
 		sym = hAddVar( sym, parent, id, palias, dtype, subtype, lgt, addsuffix, _
 		               attrib, dimensions, have_bounds, dTB(), chain_, token )
+		if( token <> FB_TK_REDIM ) then
+			fbSemanticModelExportBinding(sym, semantic_site, TRUE)
+		end if
 
 		if( hEmitVarDecl( sym, token, is_fordecl, attrib, dimensions, _
 		    have_bounds, varexpr, exprTB(), dopreserve ) = FALSE ) then
