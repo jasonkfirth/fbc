@@ -96,6 +96,9 @@ merely the shared overload head. Procedure-address expressions written with
 `@` or `ProcPtr` are also associated with the exact overload selected by the
 expected or explicit signature. Calls through a procedure pointer and
 implicit/generated calls are not represented as direct procedure references.
+Inline assembly identifiers resolved by the compiler are also exported for
+procedures, labels, variables, and constants. Assembly keywords and unresolved
+assembler-local names remain text and do not acquire guessed bindings.
 The record remains an extension point for further compiler-resolved
 occurrence kinds, not a claim that every FreeBASIC binding route is exported
 yet. The compiler tracks the opened include path
