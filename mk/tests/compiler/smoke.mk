@@ -18,7 +18,7 @@ endif
 compiler-semantic-model-smoke:
 	$(call _mt_echo,Compiler semantic model smoke test)
 	@mkdir -p "$(TEST_TMP)"
-	@printf "%s\n" "'' schema 9 binding and lowered operator smoke" > "$(TEST_TMP)/semantic-model-header.bi"
+	@printf "%s\n" "'' schema 12 bindings, implicit calls, and lowered operators" > "$(TEST_TMP)/semantic-model-header.bi"
 	@printf "%s\n" \
 	'#define SEMANTIC_INCREMENT 2' \
 	'#assert __FB_ERR__ = 0' \
@@ -54,6 +54,40 @@ compiler-semantic-model-smoke:
 	'    if rtti_value is semantic_rtti_type then Print 1' \
 	'end sub' \
 	'semantic_rtti_probe()' \
+	'type semantic_ctor_type' \
+	'    as integer marker' \
+	'    declare constructor()' \
+	'    declare constructor(byref source as semantic_ctor_type)' \
+	'    declare constructor(byval value as integer)' \
+	'    declare destructor()' \
+	'end type' \
+	'constructor semantic_ctor_type()' \
+	'    this.marker = 1' \
+	'end constructor' \
+	'constructor semantic_ctor_type(byref source as semantic_ctor_type)' \
+	'    this.marker = source.marker' \
+	'end constructor' \
+	'constructor semantic_ctor_type(byval value as integer)' \
+	'    this.marker = value' \
+	'end constructor' \
+	'destructor semantic_ctor_type()' \
+	'    this.marker = 0' \
+	'end destructor' \
+	'type semantic_ctor_holder' \
+	'    default_value as semantic_ctor_type' \
+	'    converted_value as semantic_ctor_type = 7' \
+	'end type' \
+	'function semantic_optional_ctor_probe(byval optional_value as semantic_ctor_type = 8) as integer' \
+	'    return optional_value.marker' \
+	'end function' \
+	'sub semantic_ctor_probe()' \
+	'    dim as semantic_ctor_type constructed_value' \
+	'    dim as semantic_ctor_type copied_value = constructed_value' \
+	'    dim as semantic_ctor_type converted_value = 7' \
+	'    dim as semantic_ctor_type ptr allocated_value = new semantic_ctor_type(7)' \
+	'    dim as semantic_ctor_type ptr allocated_array = new semantic_ctor_type[2]' \
+	'end sub' \
+	'semantic_ctor_probe()' \
 	> "$(TEST_TMP)/semantic-model.bas"
 	@printf "%s\n" \
 		'function semantic_helper() as integer' \
@@ -62,19 +96,20 @@ compiler-semantic-model-smoke:
 		> "$(TEST_TMP)/semantic-model-helper.bas"
 	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model "$(TEST_TMP)/semantic-model.tsv" -r "$(TEST_TMP)/semantic-model.bas" "$(TEST_TMP)/semantic-model-helper.bas")
 	@awk -F '\t' '\
-		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 != "9") exit 1; header = 1; next } \
+		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 != "12") exit 1; header = 1; next } \
 		$$1 == "M" { if (NF != 2) exit 1; modules++; next } \
 		$$1 == "D" { if (NF != 2 || $$2 == "" || dependencies[$$2]++) exit 1; if ($$2 ~ /semantic-model-header\.bi$$/) header_dependency = 1; dependency_count++; next } \
-		$$1 == "S" { if (NF != 12 || symbol_ids[$$2]++) exit 1; if ($$6 != 0) symbol_refs[++symbol_ref_count] = $$6; if ($$12 != 0) symbol_refs[++symbol_ref_count] = $$12; symbols++; next } \
+		$$1 == "S" { if (NF != 12 || symbol_ids[$$2]++) exit 1; symbol_names[$$2] = tolower($$3); if ($$6 != 0) symbol_refs[++symbol_ref_count] = $$6; if ($$12 != 0) symbol_refs[++symbol_ref_count] = $$12; symbols++; next } \
 		$$1 == "P" { if (NF != 9) exit 1; symbol_refs[++symbol_ref_count] = $$2; procedures++; next } \
 		$$1 == "V" { if (NF != 5 || $$2 == 0 || $$4 == "" || ($$5 != "pointer" && $$5 != "numeric" && $$5 != "dynamic-string" && $$5 != "fixed-string" && $$5 != "aggregate" && $$5 != "procedure" && $$5 != "other")) exit 1; symbol_refs[++symbol_ref_count] = $$2; typefacts++; next } \
 		$$1 == "N" { if (NF != 13 || node_ids[$$2]++ || ($$8 == "none" && $$7 != "") || ($$8 != "none" && $$8 != "builtin" && $$8 != "overloaded")) exit 1; if ($$10 != 0) symbol_refs[++symbol_ref_count] = $$10; if ($$11 != 0) symbol_refs[++symbol_ref_count] = $$11; nodes++; next } \
 		$$1 == "E" { if (NF != 16 || expression_ids[$$2]++ || ($$3 != "0" && $$3 != "1") || $$4 == "" || $$5 < 1 || $$6 < 0 || $$7 < $$5 || ($$7 == $$5 && $$8 <= $$6) || $$8 < 0 || $$16 == "" || ($$12 == "none" && $$11 != "") || ($$12 != "none" && $$12 != "builtin" && $$12 != "overloaded")) exit 1; if ($$3 == "1" && $$5 == 9 && $$6 == 13 && $$7 == 9 && $$8 == 34) direct_range = 1; if ($$3 == "0" && $$5 == 10 && $$6 == 13) expanded_range = 1; if ($$3 == "0" && $$5 == 24 && $$6 == 41 && $$7 == 24 && $$8 == 42) macro_range_withheld = 1; if ($$5 >= 2 && $$5 <= 4) directive_expressions++; if ($$16 == "double") nested_operands[$$5] = 1; if ($$16 == "integer") nested_comparisons[$$5] = 1; if ($$11 == "add" && $$12 == "builtin") builtin_add = 1; if ($$11 == "subtract" && $$12 == "builtin") builtin_subtract = 1; if ($$11 == "power" && $$12 == "builtin") builtin_power = 1; if ($$11 == "concatenate" && $$12 == "builtin") builtin_concatenate = 1; if ($$11 == "unary-plus" && $$12 == "builtin") builtin_unary_plus = 1; if ($$11 == "identity-test" && $$12 == "builtin") identity_test = 1; if ($$14 != 0) symbol_refs[++symbol_ref_count] = $$14; if ($$15 != 0) symbol_refs[++symbol_ref_count] = $$15; expressions++; next } \
-		$$1 == "B" { if (NF != 9 || $$2 == 0 || ($$3 != "declaration" && $$3 != "reference") || ($$4 != "0" && $$4 != "1") || $$5 == "" || $$6 < 1 || $$7 < 0 || $$8 < $$6 || ($$8 == $$6 && $$9 <= $$7)) exit 1; symbol_refs[++symbol_ref_count] = $$2; if ($$3 == "declaration") binding_declarations++; else binding_references++; bindings++; next } \
-		$$1 == "END" { if (NF != 11 || $$2 != "9" || $$3 != modules || $$4 != procedures || $$5 != symbols || $$6 != typefacts || $$7 != nodes || $$8 != expressions || $$9 != bindings || $$10 != dependency_count || $$11 != "1") exit 1; footer = 1; next } \
+		$$1 == "B" { if (NF != 9 || $$2 == 0 || ($$3 != "declaration" && $$3 != "reference") || ($$4 != "0" && $$4 != "1") || $$5 == "" || $$6 < 1 || $$7 < 0 || $$8 < $$6 || ($$8 == $$6 && $$9 <= $$7)) exit 1; symbol_refs[++symbol_ref_count] = $$2; if ($$3 == "declaration") { binding_declarations++; declaration_ranges[$$2 ":" $$6 ":" $$7 ":" $$8 ":" $$9] = 1 } else binding_references++; bindings++; next } \
+		$$1 == "I" { if (NF != 12 || $$2 == 0 || $$3 == 0 || $$4 == 0 || ($$5 != "default-constructor" && $$5 != "initializer-constructor" && $$5 != "new-constructor" && $$5 != "destructor-call") || ($$6 != "0" && $$6 != "1") || $$7 == "" || $$8 < 1 || $$9 < 0 || $$10 < $$8 || ($$10 == $$8 && $$11 <= $$9) || $$12 == "") exit 1; if ($$5 == "default-constructor") default_constructors++; else if ($$5 == "initializer-constructor") initializer_constructors++; else if ($$5 == "new-constructor") new_constructors++; else destructor_calls++; owner_range = $$2 ":" $$8 ":" $$9 ":" $$10 ":" $$11; if (symbol_names[$$2] == "default_value" && $$5 == "default-constructor" && owner_range in declaration_ranges) field_default_constructor = 1; if (symbol_names[$$2] == "converted_value" && $$5 == "initializer-constructor" && owner_range in declaration_ranges) field_initializer_constructor = 1; if (symbol_names[$$2] == "optional_value" && $$5 == "initializer-constructor" && owner_range in declaration_ranges) optional_parameter_constructor = 1; if (symbol_names[$$2] == "default_value" && $$5 == "destructor-call" && owner_range in declaration_ranges) field_destructor = 1; if (symbol_names[$$2] == "constructed_value" && $$5 == "destructor-call" && owner_range in declaration_ranges) local_destructor = 1; symbol_refs[++symbol_ref_count] = $$2; symbol_refs[++symbol_ref_count] = $$3; symbol_refs[++symbol_ref_count] = $$4; implicit_calls++; next } \
+		$$1 == "END" { if (NF != 12 || $$2 != "12" || $$3 != modules || $$4 != procedures || $$5 != symbols || $$6 != typefacts || $$7 != nodes || $$8 != expressions || $$9 != bindings || $$10 != implicit_calls || $$11 != dependency_count || $$12 != "1") exit 1; footer = 1; next } \
 		footer { exit 1 } \
 		{ exit 1 } \
-		END { for (line in nested_operands) if (line in nested_comparisons) nested_typeof = 1; if (!header || !footer || modules != 2 || dependency_count != 3 || !header_dependency || procedures < 2 || symbols < 1 || typefacts < 2 || nodes < 1 || expressions < 2 || bindings < 2 || !binding_declarations || !binding_references || directive_expressions < 3 || !direct_range || !expanded_range || !macro_range_withheld || !nested_typeof || !builtin_add || !builtin_subtract || !builtin_power || !builtin_concatenate || !builtin_unary_plus || !identity_test) exit 1; for (i = 1; i <= symbol_ref_count; i++) if (!(symbol_refs[i] in symbol_ids)) exit 1 }' \
+		END { for (line in nested_operands) if (line in nested_comparisons) nested_typeof = 1; if (!header || !footer || modules != 2 || dependency_count != 3 || !header_dependency || procedures < 2 || symbols < 1 || typefacts < 2 || nodes < 1 || expressions < 2 || bindings < 2 || !binding_declarations || !binding_references || implicit_calls < 5 || default_constructors < 1 || initializer_constructors < 2 || new_constructors < 2 || destructor_calls < 2 || !field_default_constructor || !field_initializer_constructor || !optional_parameter_constructor || !field_destructor || !local_destructor || directive_expressions < 3 || !direct_range || !expanded_range || !macro_range_withheld || !nested_typeof || !builtin_add || !builtin_subtract || !builtin_power || !builtin_concatenate || !builtin_unary_plus || !identity_test) exit 1; for (i = 1; i <= symbol_ref_count; i++) if (!(symbol_refs[i] in symbol_ids)) exit 1 }' \
 		"$(TEST_TMP)/semantic-model.tsv" || { echo "ERROR: invalid or incomplete compiler semantic model"; exit 1; }
 	@printf "%s\n" \
 		'declare function semantic_overload overload (byval value as integer) as integer' \
@@ -238,11 +273,11 @@ compiler-semantic-model-smoke:
 		"$(TEST_TMP)/semantic-this-bindings.tsv" || { echo "ERROR: member binding inventory omitted a compiler-resolved This reference or implicit method call"; exit 1; }
 	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-expressions "$(TEST_TMP)/semantic-expressions.tsv" -r "$(TEST_TMP)/semantic-model.bas" "$(TEST_TMP)/semantic-model-helper.bas")
 	@awk -F '\t' '\
-		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 != "9") exit 1; header = 1; next } \
+		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 != "12") exit 1; header = 1; next } \
 		$$1 == "M" { if (NF != 2) exit 1; modules++; next } \
 		$$1 == "D" { if (NF != 2 || $$2 == "" || dependencies[$$2]++) exit 1; if ($$2 ~ /semantic-model-header\.bi$$/) header_dependency = 1; dependency_count++; next } \
 		$$1 == "E" { if (NF != 16 || $$2 != expressions + 1 || $$4 == "" || $$5 < 1 || $$6 < 0 || $$7 < $$5 || ($$7 == $$5 && $$8 <= $$6) || $$8 < 0 || $$14 != 0 || $$15 != 0 || $$16 == "") exit 1; if ($$11 == "subtract" && $$12 == "builtin") builtin_subtract = 1; if ($$11 == "power" && $$12 == "builtin") builtin_power = 1; if ($$11 == "concatenate" && $$12 == "builtin") builtin_concatenate = 1; if ($$11 == "unary-plus" && $$12 == "builtin") builtin_unary_plus = 1; if ($$11 == "identity-test" && $$12 == "builtin") identity_test = 1; expressions++; next } \
-		$$1 == "END" { if (NF != 11 || $$2 != "9" || $$3 != modules || $$4 != 0 || $$5 != 0 || $$6 != 0 || $$7 != 0 || $$8 != expressions || $$9 != 0 || $$10 != dependency_count || $$11 != "1") exit 1; footer = 1; next } \
+		$$1 == "END" { if (NF != 12 || $$2 != "12" || $$3 != modules || $$4 != 0 || $$5 != 0 || $$6 != 0 || $$7 != 0 || $$8 != expressions || $$9 != 0 || $$10 != 0 || $$11 != dependency_count || $$12 != "1") exit 1; footer = 1; next } \
 		footer { exit 1 } \
 		{ exit 1 } \
 		END { if (!header || !footer || modules != 2 || dependency_count != 3 || !header_dependency || expressions < 2 || !builtin_subtract || !builtin_power || !builtin_concatenate || !builtin_unary_plus || !identity_test) exit 1 }' \
@@ -304,12 +339,12 @@ compiler-semantic-model-smoke:
 	@set +e; $(TEST_FBC_CMD) -semantic-model-expressions "$(TEST_TMP)/semantic-recovery.tsv" -c "$(TEST_TMP)/semantic-recovery.bas" -o "$(TEST_TMP)/semantic-recovery.o" >/dev/null 2>&1; status=$$?; set -e; \
 		test $$status -eq 1 || { echo "ERROR: malformed semantic-recovery fixture did not fail compilation"; exit 1; }
 	@awk -F '\t' '\
-		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 != "9") exit 1; header = 1; next } \
+		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 != "12") exit 1; header = 1; next } \
 		$$1 == "M" { if (NF != 2) exit 1; modules++; next } \
 		$$1 == "D" { if (NF != 2 || $$2 == "" || dependencies[$$2]++) exit 1; dependency_count++; next } \
 		$$1 == "E" { if (NF != 16) exit 1; expressions++; if ($$3 == "1" && $$5 == 3 && tolower($$16) == "double") later_expression = 1; next } \
-		$$1 == "R" { if (NF != 3 || $$2 != "9" || $$3 != expressions) exit 1; recovered_modules++; next } \
-		$$1 == "RECOVERY" { if (NF != 8 || $$2 != "9" || $$3 != modules || $$4 != expressions || $$5 != recovered_modules || $$6 != 0 || $$7 != dependency_count || $$8 != "1") exit 1; footer = 1; next } \
+		$$1 == "R" { if (NF != 3 || $$2 != "12" || $$3 != expressions) exit 1; recovered_modules++; next } \
+		$$1 == "RECOVERY" { if (NF != 8 || $$2 != "12" || $$3 != modules || $$4 != expressions || $$5 != recovered_modules || $$6 != 0 || $$7 != dependency_count || $$8 != "1") exit 1; footer = 1; next } \
 		footer { exit 1 } \
 		{ exit 1 } \
 		END { if (!header || !footer || modules != 1 || dependency_count != 1 || expressions < 1 || recovered_modules != 1 || !later_expression) exit 1 }' \

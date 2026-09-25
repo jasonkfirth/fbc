@@ -52,4 +52,10 @@ examples were found in the referenced FreeBASIC 1.10.1 winlibs tree.  Selected
 64-bit static libraries were rebuilt from source where the old API still
 matched the shipped bindings.
 
+The libopenmpt 0.8.9 x86 and amd64 import archives are generated from the
+official VS2022 development package. They are kept here as opt-in dependencies;
+the matching libopenmpt and codec DLLs are not staged. See
+`lib/libopenmpt.txt` for the source package, link paths, runtime requirements,
+and license.
+
 See manifest.tsv for file sizes and SHA-256 hashes.

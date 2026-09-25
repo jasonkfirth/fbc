@@ -32,3 +32,5 @@ win32	libpango-1.0.dll.a	libpango-1.0-0.dll	staged
 win32	libpangocairo-1.0.dll.a	libpangocairo-1.0-0.dll	staged
 win32	libpangoft2-1.0.dll.a	libpangoft2-1.0-0.dll	staged
 win32	libpangowin32-1.0.dll.a	libpangowin32-1.0-0.dll	staged
+win32	libopenmpt.dll.a	libopenmpt.dll	not-staged
+win64	libopenmpt.dll.a	libopenmpt.dll	not-staged

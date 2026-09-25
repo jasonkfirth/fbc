@@ -8,6 +8,14 @@
 #include once "parser.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportImplicitCall _
+	( _
+		byval owner as FBSYMBOL ptr, _
+		byval target as FBSYMBOL ptr, _
+		byval call_kind as string, _
+		byref source as LEX_LOCATION _
+	)
+
 '':::::
 ''cOperatorNew =     NEW DataType|Constructor()
 ''             |     NEW DataType[Expr] .
@@ -19,6 +27,7 @@ function cOperatorNew( ) as ASTNODE ptr
 	dim as ASTNODE ptr initexpr = any, elementsexpr = any, placementexpr = any
 	dim as ASTNODE ptr expr = any
 	dim as AST_OP op = any
+	dim as LEX_LOCATION semantic_site
 
 	do_clear = TRUE
 	op = AST_OP_NEW
@@ -44,6 +53,7 @@ function cOperatorNew( ) as ASTNODE ptr
 	end if
 
 	'' DataType
+	semantic_site = lexGetCurrentLocation( )
 	hSymbolType( dtype, subtype, 0 )
 
 	select case( typeGetDtAndPtrOnly( dtype ) )
@@ -140,6 +150,10 @@ function cOperatorNew( ) as ASTNODE ptr
 				errReport( FB_ERRMSG_EXPLICITCTORCALLINVECTOR, TRUE )
 			else
 				initexpr = cCtorCall( subtype )
+				if( (initexpr <> NULL) and astIsCALLCTOR(initexpr) ) then
+					fbSemanticModelExportImplicitCall(subtype, astGetSymbol(initexpr->l), _
+						"new-constructor", semantic_site)
+				end if
 			end if
 		else
 			dim as FBSYMBOL ptr ctor = symbGetCompDefCtor( subtype )
@@ -155,6 +169,8 @@ function cOperatorNew( ) as ASTNODE ptr
 					if( symbCheckAccess( ctor ) = FALSE ) then
 						errReport( FB_ERRMSG_NOACCESSTODEFAULTCTOR )
 					end if
+					fbSemanticModelExportImplicitCall(subtype, ctor, _
+						"new-constructor", semantic_site)
 				end if
 			end if
 		end if

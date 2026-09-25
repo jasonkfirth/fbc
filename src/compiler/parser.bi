@@ -314,7 +314,8 @@ declare function cInitializer _
 		byval sym as FBSYMBOL ptr, _
 		byval options as FB_INIOPT, _
 		byval dtype as integer = FB_DATATYPE_INVALID, _
-		byval subtype as FBSYMBOL ptr = NULL _
+		byval subtype as FBSYMBOL ptr = NULL, _
+		byval semantic_site as LEX_LOCATION ptr = NULL _
 	) as ASTNODE ptr
 
 declare function cTypeOrExpression _

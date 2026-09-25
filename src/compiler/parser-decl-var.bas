@@ -16,6 +16,14 @@ declare sub fbSemanticModelExportBinding _
 		byval is_declaration as integer _
 	)
 
+declare sub fbSemanticModelExportImplicitCall _
+	( _
+		byval owner as FBSYMBOL ptr, _
+		byval target as FBSYMBOL ptr, _
+		byval call_kind as string, _
+		byref source as LEX_LOCATION _
+	)
+
 declare sub cAutoVarDecl( byval baseattrib as FB_SYMBATTRIB )
 
 ''
@@ -604,7 +612,8 @@ private function hVarInitDefault _
 	( _
 		byval sym as FBSYMBOL ptr, _
 		byval is_declared as integer, _
-		byval has_defctor as integer _
+		byval has_defctor as integer, _
+		byref semantic_site as LEX_LOCATION _
 	) as ASTNODE ptr
 
 	function = NULL
@@ -630,10 +639,12 @@ private function hVarInitDefault _
 	if( has_defctor ) then
 		'' not already declared nor dynamic array?
 		if( (not is_declared) and ((symbGetAttrib( sym ) and (FB_SYMBATTRIB_DYNAMIC or FB_SYMBATTRIB_COMMON)) = 0) ) then
+			dim as FBSYMBOL ptr ctor = symbGetCompDefCtor( symbGetSubtype( sym ) )
 			'' Check visibility to the default constructor
-			if( symbCheckAccess( symbGetCompDefCtor( symbGetSubtype( sym ) ) ) = FALSE ) then
+			if( symbCheckAccess( ctor ) = FALSE ) then
 				errReport( FB_ERRMSG_NOACCESSTODEFAULTCTOR )
 			end if
+			fbSemanticModelExportImplicitCall(sym, ctor, "default-constructor", semantic_site)
 			function = astBuildTypeIniCtorList( sym )
 		end if
 	else
@@ -803,7 +814,8 @@ end function
 private function hVarInit _
 	( _
 		byval sym as FBSYMBOL ptr, _
-		byval isdecl as integer _
+		byval isdecl as integer, _
+		byref semantic_site as LEX_LOCATION _
 	) as ASTNODE ptr
 
 	dim as integer attrib = any
@@ -882,7 +894,7 @@ private function hVarInit _
 		exit function
 	end if
 
-	var initree = cInitializer( sym, FB_INIOPT_ISINI )
+	var initree = cInitializer( sym, FB_INIOPT_ISINI, FB_DATATYPE_INVALID, NULL, @semantic_site )
 	if( initree = NULL ) then
 		return NULL
 	end if
@@ -1228,7 +1240,8 @@ private function hEmitVarDecl _
 		byval have_bounds as integer, _
 		byref varexpr as ASTNODE ptr, _
 		exprTB() as ASTNODE ptr, _
-		byval dopreserve as integer _
+		byval dopreserve as integer, _
+		byref semantic_site as LEX_LOCATION _
 	) as integer
 
 	dim as ASTNODE ptr initree = any, assign_initree = any
@@ -1249,7 +1262,7 @@ private function hEmitVarDecl _
 		assign_initree = NULL
 
 		if( hIsAssignToken( lexGetToken( ) ) ) then
-			initree = hVarInit( sym, is_declared )
+			initree = hVarInit( sym, is_declared, semantic_site )
 
 			if( (initree <> NULL) and _
 			    (fbLangOptIsSet( FB_LANG_OPT_SCOPE ) = FALSE) ) then
@@ -1261,7 +1274,7 @@ private function hEmitVarDecl _
 					'' level and the explicit assignment at the declaration.
 					''
 					assign_initree = initree
-					initree = hVarInitDefault( sym, is_declared, has_defctor )
+					initree = hVarInitDefault( sym, is_declared, has_defctor, semantic_site )
 				end if
 			end if
 		else
@@ -1279,7 +1292,7 @@ private function hEmitVarDecl _
 				end if
 			end if
 
-			initree = hVarInitDefault( sym, is_declared, has_defctor )
+			initree = hVarInitDefault( sym, is_declared, has_defctor, semantic_site )
 		end if
 	else
 		initree = NULL
@@ -1289,6 +1302,16 @@ private function hEmitVarDecl _
 	'' EXTERN declarations do not emit storage or initialization nodes.
 	if( (sym = NULL) or (token = FB_TK_EXTERN) ) then
 		return TRUE
+	end if
+
+	'' Cleanup is selected from the declared UDT even though its destructor
+	'' call is emitted later by scope or static-instance lowering.
+	if( (not is_fordecl) and (not is_declared) and _
+		(symbGetType(sym) = FB_DATATYPE_STRUCT) ) then
+		dim as FBSYMBOL ptr dtor = symbGetCompDtor1(symbGetSubtype(sym))
+		if( dtor <> NULL ) then
+			fbSemanticModelExportImplicitCall(sym, dtor, "destructor-call", semantic_site)
+		end if
 	end if
 
 	dim as ASTNODE ptr tree
@@ -1821,7 +1844,7 @@ function cVarDecl _
 		end if
 
 		if( hEmitVarDecl( sym, token, is_fordecl, attrib, dimensions, _
-		    have_bounds, varexpr, exprTB(), dopreserve ) = FALSE ) then
+		    have_bounds, varexpr, exprTB(), dopreserve, semantic_site ) = FALSE ) then
 			exit function
 		end if
 

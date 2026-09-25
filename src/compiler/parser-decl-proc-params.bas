@@ -7,6 +7,21 @@
 #include once "parser.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
+declare sub fbSemanticModelExportImplicitCall _
+	( _
+		byval owner as FBSYMBOL ptr, _
+		byval target as FBSYMBOL ptr, _
+		byval call_kind as string, _
+		byref source as LEX_LOCATION _
+	)
+
 declare function hParamDecl _
 	( _
 		byval proc as FBSYMBOL ptr, _
@@ -126,7 +141,8 @@ private function hOptionalExpr _
 	( _
 		byval proc as FBSYMBOL ptr, _
 		byval pid as zstring ptr, _
-		byval param as FBSYMBOL ptr _
+		byval param as FBSYMBOL ptr, _
+		byref semantic_site as LEX_LOCATION _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = any
@@ -151,7 +167,8 @@ private function hOptionalExpr _
 		return astNewCONSTi( 0 )
 	end select
 
-	expr = cInitializer( param, FB_INIOPT_ISINI )
+	expr = cInitializer( param, FB_INIOPT_ISINI, _
+		FB_DATATYPE_INVALID, NULL, @semantic_site )
 	if( expr = NULL ) then
 		exit function
 	end if
@@ -228,6 +245,7 @@ private function hParamDecl _
 	dim as integer readid = any, dotpos = any, doskip = any
 	dim as integer use_default = any, have_bounds = any
 	dim as FBSYMBOL ptr subtype = any, param = any
+	dim as LEX_LOCATION semantic_site = any
 
 	'' unused, so overwriting during recursion doesn't matter
 	static as ASTNODE ptr exprTB(0 to FB_MAXARRAYDIMS-1, 0 to 1)
@@ -235,6 +253,7 @@ private function hParamDecl _
 	function = NULL
 
 	attrib = 0
+	semantic_site.start_line = 0
 
 	'' '...'?
 	if( lexGetToken( ) = CHAR_DOT ) then
@@ -330,6 +349,7 @@ private function hParamDecl _
 
 	'' ID (or keyword used as ID)
 	if( readid ) then
+		semantic_site = lexGetCurrentLocation( )
 		*id = *lexGetText( )
 		dotpos = lexGetPeriodPos( )
 
@@ -490,6 +510,7 @@ private function hParamDecl _
 	if( param = NULL ) then
 		exit function
 	end if
+	fbSemanticModelExportBinding(param, semantic_site, TRUE)
 
 	if( isproto = FALSE ) then
 		if( symbGetSizeOf( param ) > (env.pointersize * 4) ) then
@@ -512,7 +533,7 @@ private function hParamDecl _
 				hSkipUntil( CHAR_COMMA )
 			end if
 		else
-			var optexpr = hOptionalExpr( proc, id, param )
+			var optexpr = hOptionalExpr( proc, id, param, semantic_site )
 			if( optexpr ) then
 				symbMakeParamOptional( proc, param, optexpr )
 			else

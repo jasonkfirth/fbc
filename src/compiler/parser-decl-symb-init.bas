@@ -10,6 +10,14 @@
 #include once "ir.bi"
 #include once "symb.bi"
 
+declare sub fbSemanticModelExportImplicitCall _
+	( _
+		byval owner as FBSYMBOL ptr, _
+		byval target as FBSYMBOL ptr, _
+		byval call_kind as string, _
+		byref source as LEX_LOCATION _
+	)
+
 '' purpose of FB_INITCTX is to track state information for the
 '' current level of initialization and allow passing of necessary information
 '' byref to the parser funtions instead of pushing everything on the stack.
@@ -24,6 +32,7 @@ type FB_INITCTX
 	init_expr   as ASTNODE ptr      '' initializing expression to hand back to parent
 	rec_cnt     as integer          '' current UDT recursion count in to hUDTInit()
 	last_ctx    as FB_INITCTX ptr   '' pointer to the last ctx to track global recursion
+	semantic_site as LEX_LOCATION ptr '' declaration anchor for compiler-selected initializer calls
 end type
 
 '' Module state: track all FB_INITCTX in a stack for nested initializers.
@@ -409,6 +418,15 @@ private function hUDTInitObject( byref ctx as FB_INITCTX ) as integer
 	end if
 
 	if( is_ctorcall ) then
+		'' The selected constructor has no written callee token. Anchor its
+		'' relationship to the declared symbol, not the initializer expression.
+		if( (ctx.semantic_site <> NULL) and _
+			(symbIsVar(ctx.sym) or symbIsField(ctx.sym) or _
+			 (symbGetClass(ctx.sym) = FB_SYMBCLASS_PARAM)) and _
+			astIsCALL(expr) ) then
+			fbSemanticModelExportImplicitCall(ctx.sym, astGetSymbol(expr), _
+				"initializer-constructor", *ctx.semantic_site)
+		end if
 		return astTypeIniAddCtorCall( ctx.tree, ctx.sym, expr, ctx.dtype, ctx.subtype ) <> NULL
 	end if
 
@@ -628,7 +646,8 @@ function cInitializer _
 		byval sym as FBSYMBOL ptr, _
 		byval options as FB_INIOPT, _
 		byval dtype as integer, _
-		byval subtype as FBSYMBOL ptr _
+		byval subtype as FBSYMBOL ptr, _
+		byval semantic_site as LEX_LOCATION ptr _
 	) as ASTNODE ptr
 
 	dim as integer is_local = any, ok = any
@@ -660,6 +679,7 @@ function cInitializer _
 	ctx.dimension = -1
 	ctx.init_expr = NULL
 	ctx.rec_cnt = 0
+	ctx.semantic_site = semantic_site
 	hUpdateContextDtype( ctx, dtype, subtype )
 
 	ctx.tree = astTypeIniBegin( ctx.dtype, ctx.subtype, is_local, symbGetOfs( sym ) )

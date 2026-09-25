@@ -15,6 +15,14 @@ declare sub fbSemanticModelExportBinding _
 		byval is_declaration as integer _
 	)
 
+declare sub fbSemanticModelExportImplicitCall _
+	( _
+		byval owner as FBSYMBOL ptr, _
+		byval target as FBSYMBOL ptr, _
+		byval call_kind as string, _
+		byref source as LEX_LOCATION _
+	)
+
 declare sub hTypeBody( byval s as FBSYMBOL ptr )
 
 declare sub hPatchByvalParamsToSelf _
@@ -161,7 +169,8 @@ private sub hFieldInit _
 	( _
 		byval parent as FBSYMBOL ptr, _
 		byval sym as FBSYMBOL ptr, _
-		byval boundstypeini as ASTNODE ptr _
+		byval boundstypeini as ASTNODE ptr, _
+		byref semantic_site as LEX_LOCATION _
 	)
 
 	dim as FBSYMBOL ptr defctor = any, subtype = any
@@ -184,6 +193,8 @@ private sub hFieldInit _
 						if( symbCheckAccess( defctor ) = FALSE ) then
 							errReport( FB_ERRMSG_NOACCESSTODEFAULTCTOR )
 						end if
+						fbSemanticModelExportImplicitCall(sym, defctor, _
+							"default-constructor", semantic_site)
 					else
 						'' It has constructors, but no default one -- we cannot initialize it
 						errReport( FB_ERRMSG_NODEFAULTCTORDEFINED )
@@ -255,7 +266,8 @@ private sub hFieldInit _
 	end if
 
 	hBeginNesting( parent )
-	hSetFieldInitree( sym, cInitializer( sym, FB_INIOPT_ISINI ) )
+	hSetFieldInitree( sym, cInitializer( sym, FB_INIOPT_ISINI, _
+		FB_DATATYPE_INVALID, NULL, @semantic_site ) )
 end sub
 
 private sub hFieldType _
@@ -415,7 +427,7 @@ private function hAddAndInitField _
 		byref semantic_site as LEX_LOCATION _
 	) as integer
 
-	dim as FBSYMBOL ptr sym = any
+	dim as FBSYMBOL ptr sym = any, dtor = any
 
 	function = FALSE
 
@@ -456,13 +468,19 @@ private function hAddAndInitField _
 		exit function
 	end if
 	fbSemanticModelExportBinding(sym, semantic_site, TRUE)
+	if( symbGetType(sym) = FB_DATATYPE_STRUCT ) then
+		dtor = symbGetCompDtor1(symbGetSubtype(sym))
+		if( dtor <> NULL ) then
+			fbSemanticModelExportImplicitCall(sym, dtor, "destructor-call", semantic_site)
+		end if
+	end if
 
 	if( attrib and FB_SYMBATTRIB_DYNAMIC ) then
 		hComplainAboutConstDynamicArray( sym )
 	end if
 
 	'' Initializer?
-	hFieldInit( parent, sym, boundstypeini )
+	hFieldInit( parent, sym, boundstypeini, semantic_site )
 
 	function = TRUE
 end function

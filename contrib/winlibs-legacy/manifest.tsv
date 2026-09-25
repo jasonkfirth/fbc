@@ -23,6 +23,7 @@ win32	libmySQL.dll.a	66834	5ce86edcb4e200d08d24dec222020eaec80fd78f3e8107d527a86
 win32	libmysqlclient.dll.a	66834	5ce86edcb4e200d08d24dec222020eaec80fd78f3e8107d527a86bade9f1adef	derived alias for libmySQL.dll.a
 win32	libNewton.dll.a	184096	b4be1461151d764d4cb432a84e5ce0df996e959faabffc67115c1808c8ee9c0b	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-newton-2005.zip
 win32	libode_single.dll.a	446882	bb8feccbece2776764519c7a8cb0b9fe062855808a17df2a15a80639e06673f9	MSYS2 mingw-w64-i686-ode 0.16.6-1 package
+win32	libopenmpt.dll.a	34330	421327195263af5090d426b7651766c47ee997a940c8abb0761658de7fbc21b4	generated with LLVM llvm-dlltool from libopenmpt 0.8.9 VS2022 package bin/x86/libopenmpt.dll exports
 win32	libpanel.a	127906	f5f88443570e6cf913da7adc7041b3d0b39e398e7fbdedfc943a3093125cb4d1	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-pdcurses-3.4.zip
 win32	libpcre.a	284392	f6d22f9d83d94beaac4e29ea139b9183b663ba061bd3fa086620270f889a8f40	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-pcre-8.32.zip
 win32	libpcre16.a	264946	7d2e903b553aca8547a67d94fdd3d2a9a71e767ea00aaec324b49bdc8fb8a6fd	FreeBASIC SourceForge 0.90.1 Libraries/FB-win32-pcre-8.32.zip
@@ -50,6 +51,7 @@ win32	bin/win32/SDL2_image.dll	177664	4ba631bb58bd31ce328cb8c71f21e6da83fd10843e
 win32	bin/win32/SDL_mixer.dll	160256	04997292dfb89be611f074699224992d4618f258b49e31d91dfbc76a9fd0e714	SDL_mixer 1.2.12 official Win32 binary package/SDL_mixer-1.2.12-win32.zip
 win32	bin/win32/smpeg.dll	209408	86e81a2c58b6cd757909c9719d567ef445d887da326fbdb5388c85fd118cf467	SDL_mixer 1.2.12 official Win32 binary package/SDL_mixer-1.2.12-win32.zip
 win64	libiup.a	457194	d18447cc1e20bac632fef287ba30884a00d0a202caea27b7248b8caf5e8afbf1	IUP SourceForge 3.32 Windows Libraries/Dynamic/iup-3.32_Win64_dllw6_lib.zip
+win64	libopenmpt.dll.a	33762	8b2f5e75a613e4a90f6f3db5079554e21e320ace8e5bf02a422fe3e5c2018032	generated with LLVM llvm-dlltool from libopenmpt 0.8.9 VS2022 package bin/amd64/libopenmpt.dll exports
 win64	libbig_int.a	67520	7d9d829af60dd53e2eee4f298acdd563f1f3b236fb688989cd58199d305d53f9	PECL big_int-1.0.7 libbig_int source, built with MSYS2 x86_64-w64-mingw32-gcc
 win64	libdisphelper.a	28270	7f71c259be4d51f34fcde360073b85b26ea082df5815b92eb30a78bca08e5133	DispHelper SourceForge 0.81 single_file_source, built with MSYS2 x86_64-w64-mingw32-gcc
 win64	libfcgi.a	53294	d7d8ed01511126b74f3b84c0bc67a4e24a129d61af093e0453e4369a49449bf7	FastCGI.com archived fcgi-2.4.1-SNAP-0910052249 source, built static with MSYS2 x86_64-w64-mingw32-gcc and contrib/winlibs-legacy/patches/fcgi-2.4.1-win64-pointer-sized-handles.patch

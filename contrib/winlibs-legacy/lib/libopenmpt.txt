@@ -1,0 +1,28 @@
+libopenmpt Windows import libraries
+===================================
+
+These GNU/MinGW import archives were generated from the official libopenmpt
+0.8.9 Visual Studio 2022 development package:
+
+  https://lib.openmpt.org/files/libopenmpt/dev/libopenmpt-0.8.9+release.dev.windows.vs2022.zip
+
+The package supplies `libopenmpt.dll` for x86 and amd64. The import archives
+contain the exported `openmpt_*` C API symbols and are named to match the
+`#inclib "openmpt"` directive in `inc/libopenmpt.bi`:
+
+  win32/libopenmpt.dll.a  - 32-bit x86
+  win64/libopenmpt.dll.a  - 64-bit amd64
+
+These are import libraries, not static libraries. A program linked against
+them still needs the matching `libopenmpt.dll` at runtime. The DLL depends on
+`openmpt-mpg123.dll`, `openmpt-vorbis.dll`, and `openmpt-zlib.dll`; the Vorbis
+DLL in turn depends on `openmpt-ogg.dll`. Those four DLLs are shipped in the
+same upstream package. The libopenmpt DLL also imports the Microsoft C++ and
+Visual C runtime (`MSVCP140.dll`, `VCRUNTIME140.dll`, and `VCRUNTIME140_1.dll`),
+so the corresponding Microsoft Visual C++ Redistributable must be available.
+Deploy the matching architecture's OpenMPT DLL set beside the program; do not
+mix versions or architectures. The upstream package's license is reproduced in
+`libopenmpt.LICENSE.txt`.
+
+The FreeBASIC examples under `examples/libopenmpt/` use this binding and
+demonstrate memory-based loading and PCM rendering.

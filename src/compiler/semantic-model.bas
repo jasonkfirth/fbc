@@ -14,6 +14,7 @@
 ''     - retain bounded expression facts under an explicit recovery footer
 ''     - preserve symbol identity, type, scope, and parent relationships
 ''     - serialize procedure AST nodes with source locations
+''     - export implicit construction/destruction selections as anchored relationships
 ''     - reject incomplete output unless expression-only recovery is explicit
 ''     - export the bounded set of source files read by each compiler request
 ''     - release the output file and dynamic buffers at compiler shutdown
@@ -41,7 +42,7 @@
 '' Export limits and process-local module state
 '' -------------------------------------------------------------------------
 
-private const SEMANTIC_MODEL_SCHEMA = "9"
+private const SEMANTIC_MODEL_SCHEMA = "12"
 private const SEMANTIC_MODEL_MAX_SYMBOLS = 1000000
 private const SEMANTIC_MODEL_MAX_DEPENDENCIES = 5000
 private const SEMANTIC_MODEL_INITIAL_SYMBOL_INDEX_CAPACITY = 256
@@ -51,6 +52,9 @@ private const SEMANTIC_MODEL_MAX_MODULE_BUFFER_BYTES = 268435456
 private const SEMANTIC_MODEL_MAX_NODES_PER_MODEL = 1000000
 private const SEMANTIC_MODEL_MAX_EXPRESSIONS_PER_MODEL = 1000000
 private const SEMANTIC_MODEL_MAX_BINDINGS_PER_MODEL = 1000000
+private const SEMANTIC_MODEL_MAX_IMPLICIT_CALLS_PER_MODEL = 1000000
+'' Keep one malformed or pathological procedure from expanding a sidecar without bound.
+private const SEMANTIC_MODEL_MAX_CALL_SIGNATURE_BYTES = 1048576
 private const SEMANTIC_MODEL_MAX_SOURCE_CONTEXTS = FB_MAXINCRECLEVEL
 
 private type SEMANTIC_MODEL_SYMBOL
@@ -107,12 +111,14 @@ dim shared as integer semantic_model_module_proc_count
 dim shared as integer semantic_model_module_type_fact_count
 dim shared as longint semantic_model_module_expression_count
 dim shared as longint semantic_model_module_binding_count
+dim shared as longint semantic_model_module_implicit_call_count
 dim shared as longint semantic_model_module_node_count
 dim shared as integer semantic_model_proc_count
 dim shared as integer semantic_model_total_symbol_count
 dim shared as integer semantic_model_total_type_fact_count
 dim shared as longint semantic_model_expression_count
 dim shared as longint semantic_model_binding_count
+dim shared as longint semantic_model_implicit_call_count
 dim shared as longint semantic_model_node_count
 dim shared as string semantic_model_filename
 dim shared as ubyte ptr semantic_model_module_buffer
@@ -552,6 +558,154 @@ sub fbSemanticModelExportBinding _
 		TABCHAR + hSemanticModelNumber(source.end_column))
 	if( semantic_model_module_failed = FALSE ) then
 		semantic_model_module_binding_count += 1
+	end if
+end sub
+
+'' Export a compiler-selected call that has no written callee token.
+'' The owner range is a physical source anchor, not an editable call spelling.
+private function hSemanticModelCallSignature _
+	( _
+		byval target as FBSYMBOL ptr, _
+		byval owner_type as FBSYMBOL ptr _
+	) as string
+
+	dim as FBSYMBOL ptr param
+	dim as string signature = "sig1"
+	dim as string mode_name, param_type, signature_part, owner_name
+	dim as integer param_optional, param_dimensions, signature_name_position
+	dim as integer skip_instance_param
+	dim as integer i, owner_name_length
+
+	if( (hSemanticModelHasSymbol(target) = FALSE) or _
+		(symbIsProc(target) = FALSE) or _
+		(hSemanticModelHasSymbol(owner_type) = FALSE) ) then
+		exit function
+	end if
+
+	param = symbGetProcHeadParam(target)
+	skip_instance_param = symbIsMethod(target)
+	while( hSemanticModelHasSymbol(param) )
+		if( skip_instance_param ) then
+			'' Methods store their compiler-generated instance parameter first.
+			skip_instance_param = FALSE
+		else
+			select case symbGetParamMode(param)
+			case FB_PARAMMODE_BYVAL
+				mode_name = "byval"
+			case FB_PARAMMODE_BYREF
+				mode_name = "byref"
+			case FB_PARAMMODE_BYDESC
+				mode_name = "bydesc"
+			case FB_PARAMMODE_VARARG
+				mode_name = "vararg"
+			case else
+				exit function
+			end select
+
+			param_type = symbTypeToStr(symbGetFullType(param), symbGetSubtype(param))
+			if( len(param_type) = 0 ) then exit function
+
+			'' A constructor's explicit copy parameter has the same type as its
+			'' owner. Normalize only that final type name so a UDT rename does not
+			'' make the selected overload appear to change between compiler passes.
+			if( symbGetSubtype(param) = owner_type ) then
+				if( (owner_type->id.name = NULL) or (len(*owner_type->id.name) = 0) ) then
+					exit function
+				end if
+				owner_name = *owner_type->id.name
+				owner_name_length = len(owner_name)
+				signature_name_position = 0
+				for i = 1 to len(param_type) - owner_name_length + 1
+					if( lcase(mid(param_type, i, owner_name_length)) = lcase(owner_name) ) then
+						signature_name_position = i
+					end if
+				next
+				if( signature_name_position = 0 ) then exit function
+				param_type = left(param_type, signature_name_position - 1) + "$self" + _
+					mid(param_type, signature_name_position + owner_name_length)
+			end if
+
+			param_optional = symbParamIsOptional(param)
+			param_dimensions = param->param.bydescdimensions
+			signature_part = "|" + mode_name + "|" + _
+				hSemanticModelNumber(param_optional) + "|" + _
+				hSemanticModelNumber(param_dimensions) + "|" + _
+				hSemanticModelNumber(len(param_type)) + ":" + param_type
+			if( len(signature) > _
+				SEMANTIC_MODEL_MAX_CALL_SIGNATURE_BYTES - len(signature_part) ) then
+				exit function
+			end if
+			signature += signature_part
+		end if
+		param = symbGetParamNext(param)
+	wend
+
+	return signature
+end function
+
+sub fbSemanticModelExportImplicitCall _
+	( _
+		byval owner as FBSYMBOL ptr, _
+		byval target as FBSYMBOL ptr, _
+		byval call_kind as string, _
+		byref source as LEX_LOCATION _
+	)
+
+	if( (call_kind <> "default-constructor") and _
+		(call_kind <> "initializer-constructor") and _
+		(call_kind <> "new-constructor") and _
+		(call_kind <> "destructor-call") ) then
+		exit sub
+	end if
+
+	if( (semantic_model_file_open = FALSE) or _
+		(semantic_model_module_open = FALSE) or _
+		(semantic_model_expressions_only) or _
+		(semantic_model_module_failed) or _
+		(hSemanticModelHasSymbol(owner) = FALSE) or _
+		(hSemanticModelHasSymbol(target) = FALSE) ) then
+		exit sub
+	end if
+
+	if( (source.start_line < 1) or (source.start_column < 0) or _
+		(source.end_line < source.start_line) or (source.end_column < 0) or _
+		((source.end_line = source.start_line) and _
+		 (source.end_column <= source.start_column)) or _
+		(len(source.source_file) = 0) ) then
+		exit sub
+	end if
+
+	if( semantic_model_implicit_call_count + _
+		semantic_model_module_implicit_call_count >= _
+		SEMANTIC_MODEL_MAX_IMPLICIT_CALLS_PER_MODEL ) then
+		semantic_model_module_failed = TRUE
+		semantic_model_any_failed = TRUE
+		exit sub
+	end if
+
+	dim as FBSYMBOL ptr owner_type = symbGetSubtype(owner)
+	if( symbIsStruct(owner) ) then owner_type = owner
+	if( hSemanticModelHasSymbol(owner_type) = FALSE ) then exit sub
+	dim as string target_signature = hSemanticModelCallSignature(target, owner_type)
+	if( len(target_signature) = 0 ) then exit sub
+	dim as longint ownerid = hSemanticModelSymbolId(owner)
+	dim as longint targetid = hSemanticModelSymbolId(target)
+	dim as longint typeid = hSemanticModelSymbolId(owner_type)
+	if( (ownerid = 0) or (targetid = 0) or (typeid = 0) or _
+		(semantic_model_module_failed) ) then exit sub
+
+	hSemanticModelAppendLine("I" + TABCHAR + hSemanticModelNumber(ownerid) + _
+		TABCHAR + hSemanticModelNumber(targetid) + _
+		TABCHAR + hSemanticModelNumber(typeid) + TABCHAR + call_kind + _
+		TABCHAR + hSemanticModelNumber(hSemanticModelLocationIsPhysical(source)) + _
+		TABCHAR + hSemanticModelEscape(source.source_file) + _
+		TABCHAR + hSemanticModelNumber(source.start_line) + _
+		TABCHAR + hSemanticModelNumber(source.start_column) + _
+		TABCHAR + hSemanticModelNumber(source.end_line) + _
+		TABCHAR + hSemanticModelNumber(source.end_column) + _
+		TABCHAR + hSemanticModelEscape(target_signature))
+	if( semantic_model_module_failed = FALSE ) then
+		semantic_model_module_implicit_call_count += 1
 	end if
 end sub
 
@@ -1343,6 +1497,7 @@ function fbSemanticModelBegin(byref filename as string, byval expressions_only a
 	semantic_model_total_type_fact_count = 0
 	semantic_model_expression_count = 0
 	semantic_model_binding_count = 0
+	semantic_model_implicit_call_count = 0
 	semantic_model_node_count = 0
 	print #semantic_model_file_num, "FBCSEM" + TABCHAR + SEMANTIC_MODEL_SCHEMA + _
 		TABCHAR + FB_VERSION
@@ -1431,6 +1586,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	semantic_model_module_type_fact_count = 0
 	semantic_model_module_expression_count = 0
 	semantic_model_module_binding_count = 0
+	semantic_model_module_implicit_call_count = 0
 	semantic_model_module_node_count = 0
 	semantic_model_module_open = TRUE
 	fbSemanticModelBeginSource(filename, 0)
@@ -1452,6 +1608,7 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 		semantic_model_total_type_fact_count += semantic_model_module_type_fact_count
 		semantic_model_expression_count += semantic_model_module_expression_count
 		semantic_model_binding_count += semantic_model_module_binding_count
+		semantic_model_implicit_call_count += semantic_model_module_implicit_call_count
 		semantic_model_node_count += semantic_model_module_node_count
 	end if
 
@@ -1461,6 +1618,7 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 	semantic_model_symbol_count = 0
 	semantic_model_module_expression_count = 0
 	semantic_model_module_binding_count = 0
+	semantic_model_module_implicit_call_count = 0
 end sub
 
 '' Commit expression-only facts from a module whose parser recovered with
@@ -1591,6 +1749,7 @@ sub fbSemanticModelEnd(byval succeeded as integer)
 			hSemanticModelNumber(semantic_model_node_count) + TABCHAR + _
 			hSemanticModelNumber(semantic_model_expression_count) + TABCHAR + _
 			hSemanticModelNumber(semantic_model_binding_count) + TABCHAR + _
+			hSemanticModelNumber(semantic_model_implicit_call_count) + TABCHAR + _
 			hSemanticModelNumber(semantic_model_dependency_count) + TABCHAR + _
 			hSemanticModelNumber(abs(semantic_model_dependencies_complete))
 	elseif( semantic_model_expressions_only and _
