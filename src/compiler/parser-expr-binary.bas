@@ -1,3 +1,25 @@
+'' Project: FreeBASIC Compiler
+'' -------------------------
+''
+'' File: parser-expr-binary.bas
+''
+'' Purpose:
+''
+''     Parse relational and binary expressions using the compiler's
+''     precedence rules and produce their resolved AST forms.
+''
+'' Responsibilities:
+''
+''     - parse the binary operator precedence levels
+''     - construct compiler AST nodes for relational and binary operations
+''     - retain parser-known source ranges for semantic expression records
+''
+'' This file intentionally does NOT contain:
+''
+''     - semantic sidecar serialization or schema validation
+''     - compiler command-line option handling
+''     - source-level editor refactoring rules
+''
 '' binary operators (+, \, MOD, ...) parsing
 ''
 '' chng: sep/2004 written [v1ctor]
@@ -11,13 +33,20 @@
 
 declare function fbSemanticModelEnabled( ) as integer
 declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
+declare sub fbSemanticModelSetExpressionOperatorOverride _
+	( _
+		byref source_start as LEX_LOCATION, _
+		byref source_end as LEX_LOCATION, _
+		byval operator_override as integer _
+	)
 declare sub fbSemanticModelExportExpression _
 	( _
 		byval expr as ASTNODE ptr, _
 		byref source_start as LEX_LOCATION, _
 		byref source_end as LEX_LOCATION, _
 		byval nonphysical_tokens_at_start as longint, _
-		byval nonphysical_tokens_at_end as longint _
+		byval nonphysical_tokens_at_end as longint, _
+		byval semantic_operator_override as integer = -1 _
 	)
 
 '' A later operator in the same loop can fold the current AST. Export the
@@ -26,13 +55,28 @@ private sub hSemanticModelExportCurrentExpression _
 	( _
 		byval expr as ASTNODE ptr, _
 		byref source_start as LEX_LOCATION, _
-		byval nonphysical_tokens_at_start as longint _
+		byval nonphysical_tokens_at_start as longint, _
+		byval semantic_operator_override as integer = -1 _
 	)
 	if( expr = NULL ) then exit sub
 	dim as LEX_LOCATION source_end = lexGetLastLocation( )
 	fbSemanticModelExportExpression(expr, source_start, source_end, _
-		nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+		nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
+		semantic_operator_override)
 end sub
+
+'' Some built-in operators are normalized to a different BOP by astNewBOP().
+'' Preserve the parser-selected operation only when the resulting AST still
+'' has an operator node whose opcode no longer represents that source operator.
+private function hSemanticModelLoweredBinaryOperator _
+	( _
+		byval expr as ASTNODE ptr, _
+		byval source_operator as integer _
+	) as integer
+	if( (expr = NULL) or (expr->class <> AST_NODECLASS_BOP) ) then return -1
+	if( expr->op.op = source_operator ) then return -1
+	return source_operator
+end function
 
 declare function cLogOrExpression _
 	( _
@@ -46,7 +90,7 @@ declare function cLogAndExpression _
 
 declare function cIsExpression _
 	( _
-		_
+		byval semantic_operator as integer ptr _
 	) as ASTNODE ptr
 
 '':::::
@@ -415,17 +459,19 @@ function cRelExpression _
 	dim as integer op = any
 	dim as ASTNODE ptr expr = any, relexpr = any
 	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_model_enabled = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
+	dim as integer semantic_operator_override = -1
 	dim as LEX_LOCATION source_start, source_end
 	dim as longint nonphysical_tokens_at_start
-	if( export_semantics ) then
+	if( semantic_model_enabled ) then
 		lexGetToken( )
 		source_start = lexGetCurrentLocation( )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
 	end if
 
 	'' IsExpression
-	relexpr = cIsExpression(  )
+	relexpr = cIsExpression( @semantic_operator_override )
 	if( relexpr = NULL ) then
 		return NULL
 	end if
@@ -462,13 +508,14 @@ function cRelExpression _
 		end select
 		if( export_semantics and (semantic_operator_count > 0) ) then
 			hSemanticModelExportCurrentExpression(relexpr, source_start, _
-				nonphysical_tokens_at_start)
+				nonphysical_tokens_at_start, semantic_operator_override)
 		end if
 
 		lexSkipToken( )
 
 		'' IsExpression
-		expr = cIsExpression(  )
+		semantic_operator_override = -1
+		expr = cIsExpression( @semantic_operator_override )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 			exit do
@@ -476,6 +523,7 @@ function cRelExpression _
 
 		'' do operation
 		relexpr = astNewBOP( op, relexpr, expr )
+		semantic_operator_override = -1
 
 		if( relexpr = NULL ) Then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
@@ -489,7 +537,13 @@ function cRelExpression _
 	if( export_semantics andalso (relexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
 		fbSemanticModelExportExpression(relexpr, source_start, source_end, _
-			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
+			semantic_operator_override)
+	elseif( semantic_model_enabled andalso (relexpr <> NULL) and _
+		(semantic_operator_override >= 0) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelSetExpressionOperatorOverride(source_start, source_end, _
+			semantic_operator_override)
 	end if
 
 end function
@@ -499,7 +553,7 @@ end function
 ''
 function cIsExpression _
 	( _
-		_
+		byval semantic_operator as integer ptr _
 	) as ASTNODE ptr
 
 	'' CatExpression
@@ -507,6 +561,7 @@ function cIsExpression _
 	if( isexpr = NULL ) then
 		return NULL
 	end if
+	if( semantic_operator <> NULL ) then *semantic_operator = -1
 
 	'' IS?
 	if( lexGetToken( ) <> FB_TK_IS ) then
@@ -564,6 +619,8 @@ function cIsExpression _
 		errReport( FB_ERRMSG_TYPEMISMATCH )
 		'' error recovery: fake a node
 		isexpr = astNewCONSTi( 0 )
+	elseif( semantic_operator <> NULL ) then
+		*semantic_operator = AST_OP_IS
 	end if
 
 	function = isexpr
@@ -580,10 +637,12 @@ function cCatExpression _
 
 	dim as ASTNODE ptr expr = any, catexpr = any
 	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_model_enabled = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
+	dim as integer semantic_operator_override = -1
 	dim as LEX_LOCATION source_start, source_end
 	dim as longint nonphysical_tokens_at_start
-	if( export_semantics ) then
+	if( semantic_model_enabled ) then
 		lexGetToken( )
 		source_start = lexGetCurrentLocation( )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
@@ -608,7 +667,7 @@ function cCatExpression _
 		end if
 		if( export_semantics and (semantic_operator_count > 0) ) then
 			hSemanticModelExportCurrentExpression(catexpr, source_start, _
-				nonphysical_tokens_at_start)
+				nonphysical_tokens_at_start, semantic_operator_override)
 		end if
 
 		lexSkipToken( )
@@ -628,6 +687,7 @@ function cCatExpression _
 			'' error recovery: fake a new node
 			catexpr = astNewCONSTstr( NULL )
 		end if
+		semantic_operator_override = hSemanticModelLoweredBinaryOperator(catexpr, AST_OP_CONCAT)
 		if( export_semantics ) then semantic_operator_count += 1
 
 	loop
@@ -636,7 +696,13 @@ function cCatExpression _
 	if( export_semantics andalso (catexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
 		fbSemanticModelExportExpression(catexpr, source_start, source_end, _
-			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
+			semantic_operator_override)
+	elseif( semantic_model_enabled andalso (catexpr <> NULL) and _
+		(semantic_operator_override >= 0) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelSetExpressionOperatorOverride(source_start, source_end, _
+			semantic_operator_override)
 	end if
 
 end function
@@ -652,10 +718,12 @@ function cAddExpression _
 	dim as integer op = any
 	dim as ASTNODE ptr expr = any, addexpr = any
 	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_model_enabled = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
+	dim as integer semantic_operator_override = -1
 	dim as LEX_LOCATION source_start, source_end
 	dim as longint nonphysical_tokens_at_start
-	if( export_semantics ) then
+	if( semantic_model_enabled ) then
 		lexGetToken( )
 		source_start = lexGetCurrentLocation( )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
@@ -685,7 +753,7 @@ function cAddExpression _
 		end if
 		if( export_semantics and (semantic_operator_count > 0) ) then
 			hSemanticModelExportCurrentExpression(addexpr, source_start, _
-				nonphysical_tokens_at_start)
+				nonphysical_tokens_at_start, semantic_operator_override)
 		end if
 
 		lexSkipToken( )
@@ -708,6 +776,7 @@ function cAddExpression _
 			'' error recovery: fake a node
 			addexpr = astNewCONSTi( 0 )
 		end if
+		semantic_operator_override = hSemanticModelLoweredBinaryOperator(addexpr, op)
 		if( export_semantics ) then semantic_operator_count += 1
 	loop
 
@@ -715,7 +784,13 @@ function cAddExpression _
 	if( export_semantics andalso (addexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
 		fbSemanticModelExportExpression(addexpr, source_start, source_end, _
-			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
+			semantic_operator_override)
+	elseif( semantic_model_enabled andalso (addexpr <> NULL) and _
+		(semantic_operator_override >= 0) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelSetExpressionOperatorOverride(source_start, source_end, _
+			semantic_operator_override)
 	end if
 
 end function
@@ -1022,10 +1097,12 @@ function cExpExpression _
 
 	dim as ASTNODE ptr expr = any, expexpr = any
 	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
+	dim as integer semantic_model_enabled = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
+	dim as integer semantic_operator_override = -1
 	dim as LEX_LOCATION source_start, source_end
 	dim as longint nonphysical_tokens_at_start
-	if( export_semantics ) then
+	if( semantic_model_enabled ) then
 		lexGetToken( )
 		source_start = lexGetCurrentLocation( )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
@@ -1049,7 +1126,7 @@ function cExpExpression _
 		end if
 		if( export_semantics and (semantic_operator_count > 0) ) then
 			hSemanticModelExportCurrentExpression(expexpr, source_start, _
-				nonphysical_tokens_at_start)
+				nonphysical_tokens_at_start, semantic_operator_override)
 		end if
 
 		lexSkipToken( )
@@ -1069,6 +1146,7 @@ function cExpExpression _
 			'' error recovery: fake a node
 			expexpr = astNewCONSTf( 0, FB_DATATYPE_DOUBLE )
 		end if
+		semantic_operator_override = hSemanticModelLoweredBinaryOperator(expexpr, AST_OP_POW)
 		if( export_semantics ) then semantic_operator_count += 1
 	loop
 
@@ -1076,7 +1154,15 @@ function cExpExpression _
 	if( export_semantics andalso (expexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
 		fbSemanticModelExportExpression(expexpr, source_start, source_end, _
-			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
+			semantic_operator_override)
+	elseif( semantic_model_enabled andalso (expexpr <> NULL) and _
+		(semantic_operator_override >= 0) ) then
+		source_end = lexGetLastLocation( )
+		fbSemanticModelSetExpressionOperatorOverride(source_start, source_end, _
+			semantic_operator_override)
 	end if
 
 end function
+
+'' end of parser-expr-binary.bas

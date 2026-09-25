@@ -24,11 +24,14 @@ consuming a suffix and each completed prefix after resolving its member or
 index, so chains such as `record.child.items(0).value` retain the intermediate
 compiler types. Adjacent expression records with identical fields after their
 unique ID are written once when several parser tiers return the same result.
-The exporter does not merge different ranges, types, identities, or facts
-separated by another record. Expression IDs and footer totals count the records
-actually written. For
-repeated operators at one precedence, each completed left-associated prefix is
-recorded before the next operation can fold or replace its AST. For example,
+When the parser later identifies the source operator for an otherwise
+identical AST result, the staged raw-AST-only fact is replaced in place with
+the parser-resolved concept. This keeps its expression ID and prevents two
+concepts from being published for one unchanged result. The exporter does not
+merge different ranges, types, identities, or facts separated by another
+record. Expression IDs and footer totals count the records actually written.
+For repeated operators at one precedence, each completed left-associated prefix
+is recorded before the next operation can fold or replace its AST. For example,
 `1 + 2` keeps its own compiler type inside `1 + 2 + value`. These facts are
 completed parser results, not a complete graph of compiler-generated
 conversions, calls, or other lowering operations.
@@ -55,7 +58,7 @@ facts, and mark retained facts provisional. The full-model reader must never
 treat a `RECOVERY` footer as a valid semantic model. Interrupted processes do
 not write this footer and remain invalid.
 
-## Schema version 8
+## Schema version 9
 
 Fields are separated by tabs. Literal percent signs, tabs, carriage returns,
 and line feeds inside names and paths are escaped as `%25`, `%09`, `%0D`, and
@@ -129,11 +132,17 @@ resolved call target is a user-defined operator procedure, or `none` when the
 node is not a recognized operator. A `none` kind is paired with an empty code.
 An operator that this compiler does not recognize for export is reported as
 `none`; consumers must not infer its meaning from the raw numeric field.
-This vocabulary is part of schema version 8 and can grow only through an
+This vocabulary is part of schema version 9 and can grow only through an
 explicit schema update.
-These concepts describe the operator represented by the exported AST node;
-they do not reconstruct source operators removed by optimization. A
-constant-folded expression can therefore have an empty code and `none` kind.
+For `N` records, these concepts describe the operator represented by that AST
+node. For `E` records, the parser can preserve a recognized operation when AST
+construction normalizes its opcode, such as subtraction represented by
+addition with a negated operand, exponentiation represented by multiplication,
+or string concatenation represented by addition. It also preserves operations
+lowered to helper calls, such as `Is`. These codes come from the parser's
+resolved operation, not source-text inference. An operation erased by a later
+optimization is not reconstructed; a constant-folded expression can therefore
+have an empty code and `none` kind.
 
 Symbol and AST node IDs are unique within one output file. The exporter keys a
 compiler symbol by its allocation lifetime rather than its memory address,
@@ -143,7 +152,7 @@ zero subtype, parent, or symbol ID means that the AST or symbol has no
 corresponding reference. Raw AST class, operator, symbol class, type, scope,
 attribute, offset, and length values use compiler-internal numeric encodings.
 Consumers must not assume that those numbers are a public binary interface.
-Schema version 8's conceptual operator fields are the cross-version tooling
+Schema version 9's conceptual operator fields are the cross-version tooling
 interface; the raw AST fields remain optional diagnostic detail and must be
 interpreted only for an inspected compiler family. The VS Code consumer keeps
 the raw values opaque.

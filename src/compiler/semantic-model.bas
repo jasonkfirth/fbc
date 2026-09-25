@@ -41,7 +41,7 @@
 '' Export limits and process-local module state
 '' -------------------------------------------------------------------------
 
-private const SEMANTIC_MODEL_SCHEMA = "8"
+private const SEMANTIC_MODEL_SCHEMA = "9"
 private const SEMANTIC_MODEL_MAX_SYMBOLS = 1000000
 private const SEMANTIC_MODEL_MAX_DEPENDENCIES = 5000
 private const SEMANTIC_MODEL_INITIAL_SYMBOL_INDEX_CAPACITY = 256
@@ -96,7 +96,13 @@ dim shared as string semantic_model_source_scan_file
 dim shared as LEX_LOCATION semantic_model_active_expression_start
 dim shared as longint semantic_model_active_expression_nonphysical
 dim shared as string semantic_model_last_expression_fact
+dim shared as integer semantic_model_pending_operator_override
+dim shared as LEX_LOCATION semantic_model_pending_operator_start
+dim shared as LEX_LOCATION semantic_model_pending_operator_end
 dim shared as integer semantic_model_module_count
+dim shared as string semantic_model_last_expression_shape
+dim shared as integer semantic_model_last_expression_had_operator_override
+dim shared as uinteger semantic_model_last_expression_buffer_start
 dim shared as integer semantic_model_module_proc_count
 dim shared as integer semantic_model_module_type_fact_count
 dim shared as longint semantic_model_module_expression_count
@@ -238,11 +244,34 @@ private sub hSemanticModelAppendLine(byref value as string)
 	'' A non-expression record separates parser results and breaks adjacency.
 	if( (len(value) < 2) or (left(value, 2) <> "E" + TABCHAR) ) then
 		semantic_model_last_expression_fact = ""
+		semantic_model_last_expression_shape = ""
+		semantic_model_last_expression_had_operator_override = FALSE
 	end if
 	dim as string line_text = value + NEWLINE
+	if( (len(value) >= 2) and (left(value, 2) = "E" + TABCHAR) ) then
+		semantic_model_last_expression_buffer_start = semantic_model_module_buffer_len
+	end if
 
 	hSemanticModelAppendBytes(strptr(line_text), len(line_text))
 end sub
+
+private function hSemanticModelReplaceLastExpressionFact(byref expression_fact as string) as integer
+	if( (semantic_model_module_buffer = NULL) or _
+		(semantic_model_last_expression_buffer_start >= semantic_model_module_buffer_len) or _
+		(semantic_model_expression_count + semantic_model_module_expression_count <= 0) ) then
+		return FALSE
+	end if
+
+	'' Keep the existing expression identity and replace only the staged E record.
+	semantic_model_module_buffer_len = semantic_model_last_expression_buffer_start
+	semantic_model_module_buffer[semantic_model_module_buffer_len] = 0
+	hSemanticModelAppendLine("E" + TABCHAR + _
+		hSemanticModelNumber(semantic_model_expression_count + _
+			semantic_model_module_expression_count) + TABCHAR + expression_fact)
+	if( semantic_model_module_failed ) then return FALSE
+	semantic_model_last_expression_fact = expression_fact
+	return TRUE
+end function
 
 private sub hSemanticModelWriteDependencies( )
 	for index as integer = 0 to semantic_model_dependency_count - 1
@@ -588,36 +617,7 @@ private function hSemanticModelNodeOperator(byval node as ASTNODE ptr) as intege
 	end select
 end function
 
-private function hSemanticModelConceptOperator(byval node as ASTNODE ptr, _
-	byref operator_kind as string) as string
-	dim as integer op
-
-	operator_kind = "none"
-	if( node = NULL ) then return ""
-
-	if( (node->class = AST_NODECLASS_CALL) or _
-		(node->class = AST_NODECLASS_CALLCTOR) ) then
-		if( hSemanticModelHasSymbol(node->sym) = FALSE ) then return ""
-		if( (symbIsProc(node->sym) = FALSE) or _
-			(symbIsOperator(node->sym) = FALSE) ) then return ""
-		op = symbGetProcOpOvl(node->sym)
-		operator_kind = "overloaded"
-	else
-		select case node->class
-		case AST_NODECLASS_ASSIGN
-			op = AST_OP_ASSIGN
-		case AST_NODECLASS_IDX
-			operator_kind = "builtin"
-			return "index"
-		case AST_NODECLASS_BOP, AST_NODECLASS_UOP, AST_NODECLASS_CONV, _
-			AST_NODECLASS_ADDROF, AST_NODECLASS_MEM
-			op = hSemanticModelNodeOperator(node)
-		case else
-			return ""
-		end select
-		operator_kind = "builtin"
-	end if
-
+private function hSemanticModelConceptOperatorCode(byval op as integer) as string
 	select case op
 	case AST_OP_ASSIGN: return "assign"
 	case AST_OP_ADD_SELF: return "add-assign"
@@ -676,9 +676,44 @@ private function hSemanticModelConceptOperator(byval node as ASTNODE ptr, _
 	case AST_OP_DEL: return "deallocate"
 	case AST_OP_DEL_VEC: return "deallocate-array"
 	case else
-		operator_kind = "none"
 		return ""
 	end select
+end function
+
+private function hSemanticModelConceptOperator(byval node as ASTNODE ptr, _
+	byref operator_kind as string) as string
+	dim as integer op
+	dim as string operator_code
+
+	operator_kind = "none"
+	if( node = NULL ) then return ""
+
+	if( (node->class = AST_NODECLASS_CALL) or _
+		(node->class = AST_NODECLASS_CALLCTOR) ) then
+		if( hSemanticModelHasSymbol(node->sym) = FALSE ) then return ""
+		if( (symbIsProc(node->sym) = FALSE) or _
+			(symbIsOperator(node->sym) = FALSE) ) then return ""
+		op = symbGetProcOpOvl(node->sym)
+		operator_kind = "overloaded"
+	else
+		select case node->class
+		case AST_NODECLASS_ASSIGN
+			op = AST_OP_ASSIGN
+		case AST_NODECLASS_IDX
+			operator_kind = "builtin"
+			return "index"
+		case AST_NODECLASS_BOP, AST_NODECLASS_UOP, AST_NODECLASS_CONV, _
+			AST_NODECLASS_ADDROF, AST_NODECLASS_MEM
+			op = hSemanticModelNodeOperator(node)
+		case else
+			return ""
+		end select
+		operator_kind = "builtin"
+	end if
+
+	operator_code = hSemanticModelConceptOperatorCode(op)
+	if( len(operator_code) = 0 ) then operator_kind = "none"
+	return operator_code
 end function
 
 private function hSemanticModelSourceCodeUnitWidth() as integer
@@ -1034,7 +1069,8 @@ sub fbSemanticModelExportExpression _
 		byref source_start as LEX_LOCATION, _
 		byref source_end as LEX_LOCATION, _
 		byval nonphysical_tokens_at_start as longint, _
-		byval nonphysical_tokens_at_end as longint _
+		byval nonphysical_tokens_at_end as longint, _
+		byval semantic_operator_override as integer = -1 _
 	)
 
 	if( (semantic_model_file_open = FALSE) or _
@@ -1060,8 +1096,27 @@ sub fbSemanticModelExportExpression _
 		(source_start.source_file = source_end.source_file) and _
 		hSemanticModelRangeFitsCurrentSourceLine(source_end))
 	dim as longint symbolid = 0, subtypeid = 0
+	dim as integer effective_operator_override = semantic_operator_override
+	if( (effective_operator_override < 0) and _
+		(semantic_model_pending_operator_override >= 0) ) then
+		if( (semantic_model_pending_operator_start.source_file = source_start.source_file) and _
+			(semantic_model_pending_operator_start.start_line = source_start.start_line) and _
+			(semantic_model_pending_operator_start.start_column = source_start.start_column) and _
+			(semantic_model_pending_operator_end.end_line = source_end.end_line) and _
+			(semantic_model_pending_operator_end.end_column = source_end.end_column) ) then
+			effective_operator_override = semantic_model_pending_operator_override
+		end if
+		semantic_model_pending_operator_override = -1
+	end if
 	dim as string operator_kind = "none"
 	dim as string operator_code = hSemanticModelConceptOperator(expr, operator_kind)
+	if( effective_operator_override >= 0 ) then
+		'' A parser operation can be lowered to a helper call before its
+		'' enclosing expression is exported. Keep the compiler-known source
+		'' operation concept without rewriting the raw AST fields.
+		operator_code = hSemanticModelConceptOperatorCode(effective_operator_override)
+		operator_kind = iif(len(operator_code) > 0, "builtin", "none")
+	end if
 	if( semantic_model_expressions_only = FALSE ) then
 		symbolid = hSemanticModelSymbolId(expr->sym)
 		subtypeid = hSemanticModelSymbolId(expr->subtype)
@@ -1081,10 +1136,45 @@ sub fbSemanticModelExportExpression _
 		hSemanticModelNumber(symbolid) + TABCHAR + _
 		hSemanticModelNumber(subtypeid) + TABCHAR + _
 		hSemanticModelEscape(type_name)
+	dim as string expression_fact_shape = _
+		hSemanticModelNumber(physical_range) + TABCHAR + _
+		hSemanticModelEscape(sourcefile) + TABCHAR + _
+		hSemanticModelNumber(source_start.start_line) + TABCHAR + _
+		hSemanticModelNumber(source_start.start_column) + TABCHAR + _
+		hSemanticModelNumber(source_end.end_line) + TABCHAR + _
+		hSemanticModelNumber(source_end.end_column) + TABCHAR + _
+		hSemanticModelNumber(expr->class) + TABCHAR + _
+		hSemanticModelNumber(hSemanticModelNodeOperator(expr)) + TABCHAR + _
+		hSemanticModelNumber(astGetFullType(expr)) + TABCHAR + _
+		hSemanticModelNumber(symbolid) + TABCHAR + _
+		hSemanticModelNumber(subtypeid) + TABCHAR + _
+		hSemanticModelEscape(type_name)
+	dim as integer has_operator_override = (effective_operator_override >= 0)
 
 	'' Parser precedence layers often return the same completed result while
 	'' unwinding. Keep one copy when the adjacent fact payload is identical;
 	'' distinct ranges, types, identities, or intervening records remain intact.
+	if( (len(semantic_model_last_expression_shape) > 0) and _
+		(expression_fact_shape = semantic_model_last_expression_shape) ) then
+		if( has_operator_override ) then
+			if( semantic_model_last_expression_had_operator_override = FALSE ) then
+				'' Parser-lowered operations can first reach the exporter without
+				'' their source operator. Keep the later parser-resolved concept.
+				if( expression_fact <> semantic_model_last_expression_fact ) then
+					if( hSemanticModelReplaceLastExpressionFact(expression_fact) = FALSE ) then exit sub
+				end if
+				semantic_model_last_expression_had_operator_override = TRUE
+				exit sub
+			elseif( expression_fact <> semantic_model_last_expression_fact ) then
+				if( hSemanticModelReplaceLastExpressionFact(expression_fact) = FALSE ) then exit sub
+				semantic_model_last_expression_had_operator_override = TRUE
+				exit sub
+			end if
+		elseif( semantic_model_last_expression_had_operator_override ) then
+			'' Do not let a later export of the same lowered AST erase source intent.
+			exit sub
+		end if
+	end if
 	if( expression_fact = semantic_model_last_expression_fact ) then exit sub
 
 	if( semantic_model_expression_count + _
@@ -1103,6 +1193,8 @@ sub fbSemanticModelExportExpression _
 	if( semantic_model_module_failed = FALSE ) then
 		semantic_model_module_expression_count += 1
 		semantic_model_last_expression_fact = expression_fact
+		semantic_model_last_expression_shape = expression_fact_shape
+		semantic_model_last_expression_had_operator_override = has_operator_override
 	end if
 end sub
 
@@ -1261,6 +1353,22 @@ function fbSemanticModelEnabled() as integer
 	return semantic_model_file_open
 end function
 
+sub fbSemanticModelSetExpressionOperatorOverride _
+	( _
+		byref source_start as LEX_LOCATION, _
+		byref source_end as LEX_LOCATION, _
+		byval operator_override as integer _
+	)
+	if( (semantic_model_file_open = FALSE) or _
+		(semantic_model_expressions_only) or _
+		(operator_override < 0) ) then
+		exit sub
+	end if
+	semantic_model_pending_operator_start = source_start
+	semantic_model_pending_operator_end = source_end
+	semantic_model_pending_operator_override = operator_override
+end sub
+
 function fbSemanticModelExpressionsOnlyEnabled() as integer
 	return abs(semantic_model_file_open and semantic_model_expressions_only)
 end function
@@ -1307,7 +1415,11 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	semantic_model_source_scan_valid = FALSE
 	semantic_model_active_expression_start.start_line = 0
 	semantic_model_active_expression_nonphysical = 0
+	semantic_model_pending_operator_override = -1
 	semantic_model_last_expression_fact = ""
+	semantic_model_last_expression_shape = ""
+	semantic_model_last_expression_had_operator_override = FALSE
+	semantic_model_last_expression_buffer_start = 0
 	semantic_model_module_buffer_len = 0
 	semantic_model_symbol_count = 0
 	if( semantic_model_symbol_index <> NULL ) then

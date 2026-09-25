@@ -1596,6 +1596,24 @@ private sub hReadNumber( byref t as FBTOKEN, byval flags as LEXCHECK )
 	t.id = t.dtype
 end sub
 
+private sub hWarnLongString _
+	( _
+		byref skipchar as integer, _
+	byref flags as LEXCHECK _
+	)
+
+	if( skipchar ) then exit sub
+
+	if( (flags and LEXCHECK_NOLINECONT) = 0 ) then
+		'' just once..
+		flags or= LEXCHECK_NOLINECONT
+		errReportWarn( FB_WARNINGMSG_LITSTRINGTOOBIG )
+	end if
+
+	skipchar = TRUE
+
+end sub
+
 '':::::
 ''string          = '"' { ANY_CHAR_BUT_QUOTE } '"'.   # less quotes
 ''
@@ -1603,10 +1621,12 @@ private sub hReadString _
 	( _
 		byval tk as FBTOKEN ptr, _
 		byval ps as zstring ptr, _
-		byval flags as LEXCHECK _
+		byval flags as LEXCHECK, _
+		byval maxlen as integer _
 	)
 
 	dim as integer lgt = any, hasesc = any, escaped = any, skipchar = any
+	dim as integer maxcharlen = maxlen
 	dim as uinteger char = any
 
 	*ps = 0
@@ -1615,12 +1635,18 @@ private sub hReadString _
 
 	escaped = (tk->id = FB_TK_STRLIT_ESC)
 	skipchar = FALSE
+	'' Retained token spelling needs room for both the opening and closing quotes.
+	if( flags and LEXCHECK_NOQUOTES ) then maxcharlen -= 1
 
 	'' Save opening quote?
 	if( flags and LEXCHECK_NOQUOTES ) then
-		*ps = lexCurrentChar( )
-		ps += 1
-		lgt += 1
+		if( lgt >= maxcharlen ) then
+			hWarnLongString( skipchar, flags )
+		else
+			*ps = lexCurrentChar( )
+			ps += 1
+			lgt += 1
+		end if
 	end if
 	lexEatChar( )
 
@@ -1630,10 +1656,23 @@ private sub hReadString _
 		'' '"'?
 		if( char = CHAR_QUOTE ) then
 			lexEatChar( )
+			char = lexCurrentChar( )
 
-			'' copy quote? (even if first of a double)
+			'' Copy quoted text while leaving room for the closing quote.
 			if( (flags and LEXCHECK_NOQUOTES) <> 0 ) then
-				if( skipchar = FALSE ) then
+				if( char = CHAR_QUOTE ) then
+					'' First quote of a doubled quote inside the string.
+					if( skipchar = FALSE ) then
+						if( lgt >= maxcharlen ) then
+							hWarnLongString( skipchar, flags )
+						else
+							*ps = CHAR_QUOTE
+							ps += 1
+							lgt += 1
+						end if
+					end if
+				elseif( lgt < maxlen ) then
+					'' Keep the closing quote so retained source remains balanced.
 					*ps = CHAR_QUOTE
 					ps += 1
 					lgt += 1
@@ -1641,7 +1680,6 @@ private sub hReadString _
 			end if
 
 			'' not a double-quote? then it's the closing quote
-			char = lexCurrentChar( )
 			if( char <> CHAR_QUOTE ) then exit do
 
 		'' '[\x1b]' (internal escape char)
@@ -1650,9 +1688,13 @@ private sub hReadString _
 			'' escape it?
 			if( (flags and LEXCHECK_NOQUOTES) = 0 ) then
 				if( skipchar = FALSE ) then
-					*ps = FB_INTSCAPECHAR
-					ps += 1
-					lgt += 1
+					if( lgt >= maxcharlen ) then
+						hWarnLongString( skipchar, flags )
+					else
+						*ps = FB_INTSCAPECHAR
+						ps += 1
+						lgt += 1
+					end if
 				end if
 			end if
 
@@ -1665,9 +1707,13 @@ private sub hReadString _
 				lexEatChar( )
 
 				if( skipchar = FALSE ) then
-					*ps = CHAR_RSLASH
-					ps += 1
-					lgt += 1
+					if( lgt >= maxcharlen ) then
+						hWarnLongString( skipchar, flags )
+					else
+						*ps = CHAR_RSLASH
+						ps += 1
+						lgt += 1
+					end if
 				end if
 
 				char = lexCurrentChar( )
@@ -1690,16 +1736,8 @@ private sub hReadString _
 
 		if( skipchar = FALSE ) then
 			'' no more room?
-			if( lgt = FB_MAXLITLEN ) then
-				'' show warning?
-				if( (flags and LEXCHECK_NOLINECONT) = 0 ) then
-					'' just once..
-					flags or= LEXCHECK_NOLINECONT
-					errReportWarn( FB_WARNINGMSG_LITSTRINGTOOBIG )
-				end if
-
-				skipchar = TRUE
-
+			if( lgt >= maxcharlen ) then
+				hWarnLongString( skipchar, flags )
 			else
 				*ps = char
 				ps += 1
@@ -1725,10 +1763,12 @@ private sub hReadWStr _
 	( _
 		byval tk as FBTOKEN ptr, _
 		byval ps as wstring ptr, _
-		byval flags as LEXCHECK _
+		byval flags as LEXCHECK, _
+		byval maxlen as integer _
 	)
 
 	dim as integer lgt = any, hasesc = any, escaped = any, skipchar = any
+	dim as integer maxcharlen = maxlen
 	dim as uinteger char = any
 
 	*ps = 0
@@ -1737,12 +1777,18 @@ private sub hReadWStr _
 
 	escaped = (tk->id = FB_TK_STRLIT_ESC)
 	skipchar = FALSE
+	'' Retained token spelling needs room for both the opening and closing quotes.
+	if( flags and LEXCHECK_NOQUOTES ) then maxcharlen -= 1
 
 	'' Save opening quote?
 	if( flags and LEXCHECK_NOQUOTES ) then
-		*ps = lexCurrentChar( )
-		ps += 1
-		lgt += 1
+		if( lgt >= maxcharlen ) then
+			hWarnLongString( skipchar, flags )
+		else
+			*ps = lexCurrentChar( )
+			ps += 1
+			lgt += 1
+		end if
 	end if
 	lexEatChar( )
 
@@ -1752,10 +1798,23 @@ private sub hReadWStr _
 		'' '"'?
 		if( char = CHAR_QUOTE ) then
 			lexEatChar( )
+			char = lexCurrentChar( )
 
-			'' copy quote? (even if first of a double)
+			'' Copy quoted text while leaving room for the closing quote.
 			if( (flags and LEXCHECK_NOQUOTES) <> 0 ) then
-				if( skipchar = FALSE ) then
+				if( char = CHAR_QUOTE ) then
+					'' First quote of a doubled quote inside the string.
+					if( skipchar = FALSE ) then
+						if( lgt >= maxcharlen ) then
+							hWarnLongString( skipchar, flags )
+						else
+							*ps = CHAR_QUOTE
+							ps += 1
+							lgt += 1
+						end if
+					end if
+				elseif( lgt < maxlen ) then
+					'' Keep the closing quote so retained source remains balanced.
 					*ps = CHAR_QUOTE
 					ps += 1
 					lgt += 1
@@ -1763,7 +1822,6 @@ private sub hReadWStr _
 			end if
 
 			'' not a double-quote? then it's the closing quote
-			char = lexCurrentChar( )
 			if( char <> CHAR_QUOTE ) then exit do
 
 		'' '\27' (internal escape char)
@@ -1772,9 +1830,13 @@ private sub hReadWStr _
 			'' escape it?
 			if( (flags and LEXCHECK_NOQUOTES) = 0 ) then
 				if( skipchar = FALSE ) then
-					*ps = FB_INTSCAPECHAR
-					ps += 1
-					lgt += 1
+					if( lgt >= maxcharlen ) then
+						hWarnLongString( skipchar, flags )
+					else
+						*ps = FB_INTSCAPECHAR
+						ps += 1
+						lgt += 1
+					end if
 				end if
 			end if
 
@@ -1787,9 +1849,13 @@ private sub hReadWStr _
 				lexEatChar( )
 
 				if( skipchar = FALSE ) then
-					*ps = CHAR_RSLASH
-					ps += 1
-					lgt += 1
+					if( lgt >= maxcharlen ) then
+						hWarnLongString( skipchar, flags )
+					else
+						*ps = CHAR_RSLASH
+						ps += 1
+						lgt += 1
+					end if
 				end if
 
 				char = lexCurrentChar( )
@@ -1812,16 +1878,8 @@ private sub hReadWStr _
 
 		if( skipchar = FALSE ) then
 			'' no more room?
-			if( lgt = FB_MAXLITLEN ) then
-				'' show warning?
-				if( (flags and LEXCHECK_NOLINECONT) = 0 ) then
-					'' just once..
-					flags or= LEXCHECK_NOLINECONT
-					errReportWarn( FB_WARNINGMSG_LITSTRINGTOOBIG )
-				end if
-
-				skipchar = TRUE
-
+			if( lgt >= maxcharlen ) then
+				hWarnLongString( skipchar, flags )
 			else
 				*ps = char
 				ps += 1
@@ -2158,9 +2216,9 @@ sub lexNextToken _
 		t->dtype = FB_DATATYPE_INVALID
 
 		if( env.inf.format = FBFILE_FORMAT_ASCII ) then
-			hReadString( t, @t->text, flags )
+			hReadString( t, @t->text, flags, FB_MAXLITLEN )
 		else
-			hReadWStr( t, @t->textw, flags )
+			hReadWStr( t, @t->textw, flags, FB_MAXLITLEN )
 		end if
 
 	'' '!' | '$'?
@@ -2174,6 +2232,10 @@ sub lexNextToken _
 			t->class = FB_TKCLASS_STRLITERAL
 			t->id = iif( char = CHAR_EXCL, FB_TK_STRLIT_ESC, FB_TK_STRLIT_NOESC )
 			t->dtype = FB_DATATYPE_INVALID
+			dim as integer maxlen = FB_MAXLITLEN
+
+			'' The string modifier uses the first buffer element when quotes are kept.
+			if( flags and LEXCHECK_NOQUOTES ) then maxlen -= 1
 
 			if( env.inf.format = FBFILE_FORMAT_ASCII ) then
 				dim as zstring ptr ps = any
@@ -2186,7 +2248,7 @@ sub lexNextToken _
 					ps = @t->text[1]
 				end if
 
-				hReadString( t, ps, flags )
+				hReadString( t, ps, flags, maxlen )
 			else
 				dim as wstring ptr ps = any
 
@@ -2198,7 +2260,7 @@ sub lexNextToken _
 					ps = @t->textw[1]
 				end if
 
-				hReadWStr( t, ps, flags )
+				hReadWStr( t, ps, flags, maxlen )
 			end if
 		end if
 

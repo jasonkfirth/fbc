@@ -1,3 +1,25 @@
+'' Project: FreeBASIC Compiler
+'' -------------------------
+''
+'' File: parser-expr-unary.bas
+''
+'' Purpose:
+''
+''     Parse unary, address, dereference, and cast expressions and produce
+''     their resolved AST forms.
+''
+'' Responsibilities:
+''
+''     - parse unary operator and cast syntax
+''     - construct compiler AST nodes for unary and conversion operations
+''     - retain parser expression ranges for the semantic sidecar
+''
+'' This file intentionally does NOT contain:
+''
+''     - semantic sidecar serialization or schema validation
+''     - compiler command-line option handling
+''     - source-level editor refactoring rules
+''
 '' unary operators (NOT, @, *, ...) parsing
 ''
 '' chng: sep/2004 written [v1ctor]
@@ -10,7 +32,14 @@
 #include once "pp.bi"
 
 declare function hCast( byval options as AST_CONVOPT ) as ASTNODE ptr
+declare function fbSemanticModelEnabled( ) as integer
 declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
+declare sub fbSemanticModelSetExpressionOperatorOverride _
+	( _
+		byref source_start as LEX_LOCATION, _
+		byref source_end as LEX_LOCATION, _
+		byval operator_override as integer _
+	)
 declare sub fbSemanticModelExportBinding _
 	( _
 		byval sym as FBSYMBOL ptr, _
@@ -36,19 +65,22 @@ declare sub fbSemanticModelExportExpression _
 		byref source_start as LEX_LOCATION, _
 		byref source_end as LEX_LOCATION, _
 		byval nonphysical_tokens_at_start as longint, _
-		byval nonphysical_tokens_at_end as longint _
+		byval nonphysical_tokens_at_end as longint, _
+		byval semantic_operator_override as integer = -1 _
 	)
 
 private sub hSemanticModelExportCurrentExpression _
 	( _
 		byval expr as ASTNODE ptr, _
 		byref source_start as LEX_LOCATION, _
-		byval nonphysical_tokens_at_start as longint _
+		byval nonphysical_tokens_at_start as longint, _
+		byval semantic_operator_override as integer = -1 _
 	)
 	if( expr = NULL ) then exit sub
 	dim as LEX_LOCATION source_end = lexGetLastLocation( )
 	fbSemanticModelExportExpression(expr, source_start, source_end, _
-		nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
+		nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
+		semantic_operator_override)
 end sub
 
 private function hSemanticModelFinishHighestPrecExpr _
@@ -109,9 +141,11 @@ function cNegNotExpression _
 
 	dim as ASTNODE ptr negexpr = any
 	dim as integer export_semantics = fbSemanticModelExpressionsOnlyEnabled( )
-	dim as LEX_LOCATION source_start
+	dim as integer semantic_model_enabled = fbSemanticModelEnabled( )
+	dim as integer semantic_operator_override = -1
+	dim as LEX_LOCATION source_start, source_end
 	dim as longint nonphysical_tokens_at_start
-	if( export_semantics ) then
+	if( semantic_model_enabled ) then
 		lexGetToken( )
 		source_start = lexGetCurrentLocation( )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
@@ -137,7 +171,6 @@ function cNegNotExpression _
 			'' error recovery: fake a new node
 			negexpr = astNewCONSTi( 0 )
 		end if
-
 		if( export_semantics ) then
 			hSemanticModelExportCurrentExpression(negexpr, source_start, _
 				nonphysical_tokens_at_start)
@@ -163,10 +196,20 @@ function cNegNotExpression _
 			'' error recovery: fake a new node
 			negexpr = astNewCONSTi( 0 )
 		end if
+		if( negexpr->class <> AST_NODECLASS_UOP ) then
+			semantic_operator_override = AST_OP_PLUS
+		elseif( negexpr->op.op <> AST_OP_PLUS ) then
+			semantic_operator_override = AST_OP_PLUS
+		end if
 
 		if( export_semantics ) then
 			hSemanticModelExportCurrentExpression(negexpr, source_start, _
-				nonphysical_tokens_at_start)
+				nonphysical_tokens_at_start, semantic_operator_override)
+		elseif( semantic_model_enabled andalso _
+			(semantic_operator_override >= 0) ) then
+			source_end = lexGetLastLocation( )
+			fbSemanticModelSetExpressionOperatorOverride(source_start, source_end, _
+				semantic_operator_override)
 		end if
 		return negexpr
 
@@ -1010,3 +1053,5 @@ function cAddrOfExpression( ) as ASTNODE ptr
 	''    varptr(expr)[i], that problem doesn't exist.
 	function = cStrIdxOrMemberDeref( expr )
 end function
+
+'' end of parser-expr-unary.bas
