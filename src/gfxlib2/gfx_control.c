@@ -192,6 +192,8 @@ FBCALL void fb_GfxControl_i( int what, ssize_t *param1, ssize_t *param2, ssize_t
 				__fb_gfx->flags |= ALPHA_PRIMITIVES;
 			else
 				__fb_gfx->flags &= ~ALPHA_PRIMITIVES;
+			/* Pixel transfer routines depend on the current alpha mode. */
+			fb_hSetupFuncs(__fb_gfx->bpp);
 		}
 		break;
 

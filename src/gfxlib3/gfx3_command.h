@@ -13,7 +13,7 @@
 
         - define command identity and payload ownership
         - assign a total submission order
-        - block producers when the bounded queue is full
+        - block producers when command-count or queued-byte capacity is full
         - wake all waiters during close or renderer failure
 
     This file intentionally does NOT contain:
@@ -29,6 +29,9 @@
 #include "fb_gfx3.h"
 
 #define FB_GFX3_COMMAND_MAX_SIZE (64u * 1024u * 1024u)
+
+/* Bound queued command allocations; one oversized command fits alone. */
+#define FB_GFX3_QUEUE_BYTE_CAPACITY (32u * 1024u * 1024u)
 
 enum FB_GFX3_COMMAND_TYPE {
 	FB_GFX3_COMMAND_INVALID = 0,
@@ -102,6 +105,9 @@ typedef struct FB_GFX3_COMMAND_QUEUE {
 	FBCOND *can_write;
 	FB_GFX3_COMMAND **slots;
 	size_t capacity;
+	size_t byte_capacity;
+	/* Count complete allocations, including fixed headers and payloads. */
+	size_t queued_bytes;
 	size_t head;
 	size_t tail;
 	size_t count;

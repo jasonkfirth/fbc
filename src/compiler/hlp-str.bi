@@ -126,7 +126,8 @@ declare function hReplaceW _
 	( _
 		byval orgtext as wstring ptr, _
 		byval oldtext as wstring ptr, _
-		byval newtext as wstring ptr _
+		byval newtext as wstring ptr, _
+		byval orglen as integer _
 	) as wstring ptr
 
 declare function hReplaceChar _

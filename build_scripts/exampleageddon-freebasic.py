@@ -100,6 +100,7 @@ EXTERNAL_TEXT_MARKERS = (
     "gsl",
     "gtk",
     "jpeglib",
+    "libopenmpt",
     "libxml",
     "llvm-c.bi",
     "mysql",

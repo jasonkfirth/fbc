@@ -272,30 +272,127 @@ function hReplaceW _
 	( _
 		byval orgtext as wstring ptr, _
 		byval oldtext as wstring ptr, _
-		byval newtext as wstring ptr _
+		byval newtext as wstring ptr, _
+		byval orglen as integer _
 	) as wstring ptr static
 
-	dim as integer oldlen, newlen, p
-	static as DWSTRING text, remtext
+	dim as integer oldlen, newlen, inputlen
+	dim as integer sourcepos, destpos, matched, i
+	dim as longint replacements, resultlen
+	dim as WSTRING_CHAR ptr sourcechars, oldchars, orgchars, newchars, textchars
+	static as DWSTRING text, source
+
+	if( orgtext = NULL ) then
+		DWstrAssign( text, NULL )
+		function = text.data
+		exit function
+	end if
+
+	'' Keep the input separate in case it aliases the previous result.
+	inputlen = orglen
+	if( inputlen < 0 ) then
+		inputlen = len( *orgtext )
+	end if
+	orgchars = cast( WSTRING_CHAR ptr, orgtext )
+	DWstrAllocate( source, inputlen )
+	sourcechars = cast( WSTRING_CHAR ptr, source.data )
+	if( inputlen > 0 ) then
+		for i = 0 to inputlen - 1
+			sourcechars[i] = orgchars[i]
+		next
+	end if
+	if( sourcechars <> NULL ) then
+		sourcechars[inputlen] = 0
+	end if
+	source.len = inputlen
+	orgtext = source.data
+
+	if( (oldtext = NULL) or (newtext = NULL) ) then
+		DWstrAssign( text, orgtext )
+		function = text.data
+		exit function
+	end if
 
 	oldlen = len( *oldtext )
+	if( oldlen = 0 ) then
+		DWstrAssign( text, orgtext )
+		function = text.data
+		exit function
+	end if
+
+	sourcechars = cast( WSTRING_CHAR ptr, orgtext )
+	oldchars = cast( WSTRING_CHAR ptr, oldtext )
+	newchars = cast( WSTRING_CHAR ptr, newtext )
+
 	newlen = len( *newtext )
+	inputlen = source.len
 
-	DWstrAssign( text, orgtext )
+	'' Instr() calls wcslen() for each search, which is expensive while nested
+	'' macros are being loaded. Scan the source by wchar index instead.
+	sourcepos = 0
+	replacements = 0
+	do while( sourcepos <= inputlen - oldlen )
+		matched = TRUE
+		for i = 0 to oldlen - 1
+			if( sourcechars[sourcepos + i] <> oldchars[i] ) then
+				matched = FALSE
+				exit for
+			end if
+		next
 
-	p = 0
-	do
-		p = instr( p+1, *text.data, *oldtext )
-		if( p = 0 ) then
-			exit do
+		if( matched ) then
+			replacements += 1
+			sourcepos += oldlen
+		else
+			sourcepos += 1
+		end if
+	loop
+
+	resultlen = cast( longint, inputlen ) + _
+	            replacements * (cast( longint, newlen ) - oldlen)
+	if( (resultlen < 0) or (resultlen > &h7FFFFFFF) ) then
+		error( 4 )
+	end if
+
+	DWstrAllocate( text, cast( integer, resultlen ) )
+	textchars = cast( WSTRING_CHAR ptr, text.data )
+
+	'' Copy untouched source ranges and replacement text into the final buffer.
+	sourcepos = 0
+	destpos = 0
+	do while( sourcepos < inputlen )
+		matched = FALSE
+		if( sourcepos <= inputlen - oldlen ) then
+			matched = TRUE
+			for i = 0 to oldlen - 1
+				if( sourcechars[sourcepos + i] <> oldchars[i] ) then
+					matched = FALSE
+					exit for
+				end if
+			next
 		end if
 
-		DWstrAssign( remtext, mid( *text.data, p + oldlen ) )
-		DWstrAssign( text, left( *text.data, p-1 ) )
-		DWstrConcatAssign( text, newtext )
-		DWstrConcatAssign( text, remtext.data )
-		p += newlen-1
+		if( matched ) then
+			if( newlen > 0 ) then
+				for i = 0 to newlen - 1
+					textchars[destpos] = newchars[i]
+					destpos += 1
+				next
+			end if
+
+			sourcepos += oldlen
+		else
+			textchars[destpos] = sourcechars[sourcepos]
+			sourcepos += 1
+			destpos += 1
+		end if
 	loop
+
+	assert( destpos = cast( integer, resultlen ) )
+	if( textchars <> NULL ) then
+		textchars[destpos] = 0
+	end if
+	text.len = destpos
 
 	function = text.data
 

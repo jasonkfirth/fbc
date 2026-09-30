@@ -385,6 +385,14 @@ $(libfbgfxmtpicobjdir)/%.o: $(srcdir)/gfxlib2/%.s $(LIBFBGFX_H) | $(libfbgfxmtpi
 # gfxlib3 common core (C sources)
 ##############################################################################
 
+# libdrm keeps its development headers in a pkg-config include directory on
+# distributions such as Debian. The Linux DRM adapter remains optional when
+# libdrm development headers are not installed.
+GFX3_LINUX_DRM_CFLAGS :=
+ifeq ($(TARGET_OS),linux)
+GFX3_LINUX_DRM_CFLAGS := $(strip $(shell pkg-config --cflags libdrm 2>/dev/null))
+endif
+
 ifeq ($(TARGET_OS),darwin)
 
 $(libfbgfx3objdir)/darwin/%.o: $(srcdir)/gfxlib3/darwin/%.c $(LIBFBGFX3_H) | $(libfbgfx3objdir)
@@ -407,19 +415,19 @@ endif
 
 $(libfbgfx3objdir)/%.o: $(srcdir)/gfxlib3/%.c $(LIBFBGFX3_H) | $(libfbgfx3objdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(GFX3_LINUX_DRM_CFLAGS) -MMD -MP -c $< -o $@
 
 $(libfbgfx3picobjdir)/%.o: $(srcdir)/gfxlib3/%.c $(LIBFBGFX3_H) | $(libfbgfx3picobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(GFX3_LINUX_DRM_CFLAGS) $(PIC_CFLAGS) -MMD -MP -c $< -o $@
 
 $(libfbgfx3mtobjdir)/%.o: $(srcdir)/gfxlib3/%.c $(LIBFBGFX3_H) | $(libfbgfx3mtobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MT_CFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(GFX3_LINUX_DRM_CFLAGS) $(MT_CFLAGS) -MMD -MP -c $< -o $@
 
 $(libfbgfx3mtpicobjdir)/%.o: $(srcdir)/gfxlib3/%.c $(LIBFBGFX3_H) | $(libfbgfx3mtpicobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MTPIC_CFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(GFX3_LINUX_DRM_CFLAGS) $(MTPIC_CFLAGS) -MMD -MP -c $< -o $@
 
 ##############################################################################
 # sfxlib (C sources)

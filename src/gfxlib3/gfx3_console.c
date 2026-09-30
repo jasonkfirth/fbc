@@ -654,6 +654,8 @@ void fb_GfxClear(int mode)
 	int32_t center_y;
 	int full_clear;
 	int result;
+	int preserve_locked_dirty = FALSE;
+	uint32_t clear_flags;
 	int top_row = 0;
 	int bottom_row = (int)console_state.rows - 1;
 
@@ -702,20 +704,28 @@ void fb_GfxClear(int mode)
 	full_clear = (clip.x1 == 0) && (clip.y1 == 0) &&
 		(clip.x2 == (int32_t)surface->width - 1) &&
 		(clip.y2 == (int32_t)surface->height - 1);
+	clear_flags = fb_gfx3_compat_primitive_flags(state, surface->depth,
+		state->background_color);
+	if (full_clear &&
+	    ((clear_flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u) &&
+	    (state->mode->access_lock_count != 0u) &&
+	    (state->mode->shadow_dirty != NULL) &&
+	    (state->work_page < state->mode->page_count))
+		preserve_locked_dirty =
+			state->mode->shadow_dirty[state->work_page] != 0u;
 	/*
-		A partial CLS must preserve dirty shadow pixels outside its clip, so
-		upload them first. A full-page CLS overwrites every old pixel and may
-		discard those writes; uploading them would only add traffic ahead of the
-		clear.
+		A partial CLS must preserve dirty shadow pixels outside its clip. An
+		alpha full-page CLS also reads the old page as its blend destination, so
+		pending CPU writes must reach the GPU before the clear.
 	*/
-	if (!full_clear &&
+	if ((!full_clear ||
+	     ((clear_flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u)) &&
 	    (fb_gfx3_compat_commit_shadow(state) != FB_GFX3_OK)) {
 		FB_GRAPHICS_UNLOCK();
 		return;
 	}
 	result = fb_gfx3_surface_clear(surface, &clip, state->background_color,
-		fb_gfx3_compat_primitive_flags(state, surface->depth,
-			state->background_color));
+		clear_flags);
 	if (result != FB_GFX3_OK) {
 		FB_GRAPHICS_UNLOCK();
 		return;
@@ -744,7 +754,8 @@ void fb_GfxClear(int mode)
 			loop.
 		*/
 		if (fb_gfx3_compat_replace_shadow_after_full_clear_graphics_locked(
-		    state, state->background_color) != FB_GFX3_OK)
+		    state, state->background_color, clear_flags,
+		    preserve_locked_dirty) != FB_GFX3_OK)
 			console_invalidate_shadow(state);
 	} else {
 		console_invalidate_shadow(state);

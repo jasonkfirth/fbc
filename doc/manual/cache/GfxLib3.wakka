@@ -4,7 +4,7 @@ An opt-in render-threaded implementation of the FreeBASIC graphics interface.
 {{fbdoc item="desc"}}
 	gfxlib3 preserves the existing FreeBASIC and QB graphics command surface while moving ordinary rendering and presentation onto a dedicated render thread.  gfxlib2 remains the default runtime.
 
-	On Windows and Linux/X11, an ordinary mode tries Vulkan first and then OpenGL.  Android uses its NativeActivity adapter and OpenGL ES 3.0 fallback.  The Null backend provides deterministic headless drawing and image tests without opening a display.
+	On Windows and Linux/X11, an ordinary mode tries Vulkan first and then OpenGL.  On Linux without an X11 desktop, SDL2 can provide a KMSDRM/EGL window and OpenGL ES 3.0 renderer; the target must have SDL2's KMSDRM video driver and an EGL/GLES 3 implementation.  Android uses its NativeActivity adapter and OpenGL ES 3.0 fallback.  The Null backend provides deterministic headless drawing and image tests without opening a display.
 
 	The public compatibility surface includes graphics pages, palettes, the graphical console and line input, keyboard, mouse, touch and controller input, VIEW, WINDOW, PMAP, primitives, DRAW, PAINT, text, CPU images, GET, PUT, BLOAD, BSAVE, SCREENPTR, SCREENLOCK, SCREENINFO, and SCREENCONTROL.
 
@@ -31,7 +31,8 @@ An opt-in render-threaded implementation of the FreeBASIC graphics interface.
 	gfxlib3 adds historical modes that gfxlib2 still leaves undefined: SCREEN 3 Hercules 720 by 348 monochrome, SCREEN 4 Olivetti/AT&T 640 by 400 monochrome, SCREEN 5 PCjr/Tandy 320 by 200 with 16 colours, and SCREEN 6 PCjr/Tandy 640 by 200 with 4 colours.
 
 {{fbdoc item="target"}}
-	- Windowed gfxlib3 adapters are currently implemented for Windows, Linux/X11, and Android.
+	- Windowed gfxlib3 adapters are implemented for Windows, Linux/X11, Linux SDL2 KMSDRM, and Android.
+	- The SDL2 Linux adapter publishes keyboard, mouse, and SDL gamepad state to gfxlib3 input queries, including GETXPAD.
 	- DOS, Haiku, JavaScript, NuttX, Wii, Xbox, and the other ports continue to use gfxlib2.
 	- An explicit Vulkan request fails if Vulkan cannot create the requested mode.  It does not silently fall back to the Null driver.
 

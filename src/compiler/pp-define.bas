@@ -930,7 +930,8 @@ private function hLoadMacroW _
 					if( argtext <> NULL ) then
 						'' don't escape, preserve the sequencies as-is
 						DWstrConcatAssign( text, dollarquotew.data )
-						DWstrConcatAssign( text, hReplaceW( argtext, quotew.data, quotequotew.data ) )
+						DWstrConcatAssign( text, hReplaceW( argtext, quotew.data, quotequotew.data, _
+													argtb->tb( symbGetDefTokParamNum( dt ) ).textw.len ) )
 						DWstrConcatAssign( text, quotew.data )
 					else
 						'' If it's empty, produce an empty string ("")

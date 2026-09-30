@@ -6,8 +6,8 @@
 
     Purpose:
 
-        Own the X11 window used by a gfxlib3 renderer and, when requested, its
-        GLX context.
+        Own the X11 window used by a gfxlib3 renderer and select the native
+        DRM/GBM/EGL adapter when Linux has no desktop display.
 
     Responsibilities:
 
@@ -16,6 +16,7 @@
         - expose Display and Window values for Vulkan Xlib surfaces
         - translate X11 keyboard, mouse, focus, close, and resize events
         - apply synchronized cursor and window requests on the render thread
+        - use native DRM/KMS and GLES when no desktop display is active
 
     This file intentionally does NOT contain:
 
@@ -26,6 +27,7 @@
 
 #include "../gfx3_platform.h"
 #include "../gfx3_input.h"
+#include "gfx3_platform_drm.h"
 
 #if defined(HOST_LINUX) && !defined(DISABLE_X11)
 
@@ -1082,6 +1084,8 @@ int fb_gfx3_platform_keyboard_overlay(void *platform,
 
 const FB_GFX3_PLATFORM_VTABLE *fb_gfx3_platform_default(void)
 {
+	if (fb_gfx3_platform_drm_should_default())
+		return fb_gfx3_platform_drm();
 	return &__fb_gfx3_platform_x11;
 }
 

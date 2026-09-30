@@ -948,6 +948,242 @@ static void test_queue_order_and_back_pressure(void)
 	fb_gfx3_queue_destroy(&queue);
 }
 
+static void test_queue_command_byte_back_pressure(void)
+{
+	FB_GFX3_COMMAND_QUEUE queue;
+	FB_GFX3_COMMAND *first;
+	FB_GFX3_COMMAND *second;
+	FB_GFX3_COMMAND *third;
+	FB_GFX3_COMMAND *popped = NULL;
+	QUEUE_THREAD_DATA data;
+	TEST_THREAD thread;
+	size_t expected_bytes;
+
+	if (fb_gfx3_queue_init(&queue, 4) != FB_GFX3_OK) {
+		CHECK(FALSE);
+		return;
+	}
+	first = fb_gfx3_command_create(FB_GFX3_COMMAND_CLEAR, 32);
+	second = fb_gfx3_command_create(FB_GFX3_COMMAND_CLEAR, 32);
+	third = fb_gfx3_command_create(FB_GFX3_COMMAND_PRESENT, 32);
+	CHECK((first != NULL) && (second != NULL) && (third != NULL));
+	if ((first == NULL) || (second == NULL) || (third == NULL)) {
+		fb_gfx3_command_destroy(first);
+		fb_gfx3_command_destroy(second);
+		fb_gfx3_command_destroy(third);
+		fb_gfx3_queue_destroy(&queue);
+		return;
+	}
+
+	expected_bytes = (size_t)first->size + second->size;
+	queue.byte_capacity = expected_bytes;
+	if (fb_gfx3_queue_submit(&queue, first, NULL) != FB_GFX3_OK) {
+		CHECK(FALSE);
+		fb_gfx3_command_destroy(first);
+		fb_gfx3_command_destroy(second);
+		fb_gfx3_command_destroy(third);
+		fb_gfx3_queue_destroy(&queue);
+		return;
+	}
+	if (fb_gfx3_queue_submit(&queue, second, NULL) != FB_GFX3_OK) {
+		CHECK(FALSE);
+		fb_gfx3_command_destroy(second);
+		fb_gfx3_command_destroy(third);
+		fb_gfx3_queue_destroy(&queue);
+		return;
+	}
+	CHECK(queue.queued_bytes == expected_bytes);
+
+	memset(&data, 0, sizeof(data));
+	data.queue = &queue;
+	data.command = third;
+	atomic_init(&data.started, FALSE);
+	atomic_init(&data.done, FALSE);
+	if (test_thread_create(&thread, submit_thread, &data) != 0) {
+		CHECK(FALSE);
+		fb_gfx3_command_destroy(third);
+		fb_gfx3_queue_destroy(&queue);
+		return;
+	}
+	wait_until_started(&data);
+	test_delay();
+	CHECK(!atomic_load(&data.done));
+
+	CHECK(fb_gfx3_queue_pop(&queue, &popped) == FB_GFX3_OK);
+	CHECK(popped == first);
+	fb_gfx3_command_destroy(popped);
+	test_thread_join(thread);
+	CHECK(data.result == FB_GFX3_OK);
+	CHECK(atomic_load(&data.done));
+	if (data.result != FB_GFX3_OK) {
+		fb_gfx3_command_destroy(third);
+		fb_gfx3_queue_destroy(&queue);
+		return;
+	}
+	CHECK(queue.queued_bytes == expected_bytes);
+
+	CHECK(fb_gfx3_queue_pop(&queue, &popped) == FB_GFX3_OK);
+	CHECK(popped == second);
+	CHECK(queue.queued_bytes == (size_t)third->size);
+	fb_gfx3_command_destroy(popped);
+	CHECK(fb_gfx3_queue_pop(&queue, &popped) == FB_GFX3_OK);
+	CHECK(popped == third);
+	CHECK(queue.queued_bytes == 0);
+	fb_gfx3_command_destroy(popped);
+
+	fb_gfx3_queue_close(&queue);
+	CHECK(fb_gfx3_queue_pop(&queue, &popped) == FB_GFX3_CLOSED);
+	CHECK(popped == NULL);
+	fb_gfx3_queue_destroy(&queue);
+}
+
+static void test_queue_command_byte_capacity_boundaries(void)
+{
+	FB_GFX3_COMMAND_QUEUE queue;
+	FB_GFX3_COMMAND *large;
+	FB_GFX3_COMMAND *first;
+	FB_GFX3_COMMAND *second;
+	FB_GFX3_COMMAND *popped = NULL;
+	FB_GFX3_COMMAND *batch[2];
+	QUEUE_THREAD_DATA data;
+	TEST_THREAD thread;
+	size_t expected_bytes;
+
+	if (fb_gfx3_queue_init(&queue, 4) != FB_GFX3_OK) {
+		CHECK(FALSE);
+		return;
+	}
+	large = fb_gfx3_command_create(FB_GFX3_COMMAND_SURFACE_UPLOAD, 128);
+	CHECK(large != NULL);
+	if (large == NULL) {
+		fb_gfx3_queue_destroy(&queue);
+		return;
+	}
+	queue.byte_capacity = (size_t)large->size - 1u;
+	if (fb_gfx3_queue_submit(&queue, large, NULL) != FB_GFX3_OK) {
+		CHECK(FALSE);
+		fb_gfx3_command_destroy(large);
+		fb_gfx3_queue_destroy(&queue);
+		return;
+	}
+	CHECK(queue.queued_bytes == (size_t)large->size);
+	CHECK(fb_gfx3_queue_try_pop(&queue, &popped) == FB_GFX3_OK);
+	CHECK(popped == large);
+	CHECK(queue.queued_bytes == 0);
+	fb_gfx3_command_destroy(popped);
+	fb_gfx3_queue_destroy(&queue);
+
+	if (fb_gfx3_queue_init(&queue, 4) != FB_GFX3_OK) {
+		CHECK(FALSE);
+		return;
+	}
+	first = fb_gfx3_command_create(FB_GFX3_COMMAND_CLEAR, 16);
+	large = fb_gfx3_command_create(FB_GFX3_COMMAND_SURFACE_UPLOAD, 128);
+	CHECK((first != NULL) && (large != NULL));
+	if ((first == NULL) || (large == NULL)) {
+		fb_gfx3_command_destroy(first);
+		fb_gfx3_command_destroy(large);
+		fb_gfx3_queue_destroy(&queue);
+		return;
+	}
+	queue.byte_capacity = first->size;
+	if (fb_gfx3_queue_submit(&queue, first, NULL) != FB_GFX3_OK) {
+		CHECK(FALSE);
+		fb_gfx3_command_destroy(first);
+		fb_gfx3_command_destroy(large);
+		fb_gfx3_queue_destroy(&queue);
+		return;
+	}
+	memset(&data, 0, sizeof(data));
+	data.queue = &queue;
+	data.command = large;
+	atomic_init(&data.started, FALSE);
+	atomic_init(&data.done, FALSE);
+	if (test_thread_create(&thread, submit_thread, &data) != 0) {
+		CHECK(FALSE);
+		fb_gfx3_command_destroy(large);
+		fb_gfx3_queue_destroy(&queue);
+		return;
+	}
+	wait_until_started(&data);
+	test_delay();
+	CHECK(!atomic_load(&data.done));
+	if (fb_gfx3_queue_pop(&queue, &popped) != FB_GFX3_OK) {
+		CHECK(FALSE);
+		fb_gfx3_queue_fail(&queue, FB_GFX3_FAILED);
+		test_thread_join(thread);
+		fb_gfx3_command_destroy(large);
+		fb_gfx3_queue_destroy(&queue);
+		return;
+	}
+	CHECK(popped == first);
+	fb_gfx3_command_destroy(popped);
+	test_thread_join(thread);
+	CHECK(data.result == FB_GFX3_OK);
+	if (data.result != FB_GFX3_OK) {
+		fb_gfx3_command_destroy(large);
+		fb_gfx3_queue_destroy(&queue);
+		return;
+	}
+	CHECK(queue.queued_bytes == (size_t)large->size);
+	CHECK(fb_gfx3_queue_try_pop(&queue, &popped) == FB_GFX3_OK);
+	CHECK(popped == large);
+	CHECK(queue.queued_bytes == 0);
+	fb_gfx3_command_destroy(popped);
+	fb_gfx3_queue_destroy(&queue);
+
+	if (fb_gfx3_queue_init(&queue, 4) != FB_GFX3_OK) {
+		CHECK(FALSE);
+		return;
+	}
+	first = fb_gfx3_command_create(FB_GFX3_COMMAND_CLEAR, 16);
+	second = fb_gfx3_command_create(FB_GFX3_COMMAND_PRESENT, 16);
+	CHECK((first != NULL) && (second != NULL));
+	if ((first == NULL) || (second == NULL)) {
+		fb_gfx3_command_destroy(first);
+		fb_gfx3_command_destroy(second);
+		fb_gfx3_queue_destroy(&queue);
+		return;
+	}
+
+	batch[0] = first;
+	batch[1] = second;
+	expected_bytes = (size_t)first->size + second->size;
+	queue.byte_capacity = expected_bytes - 1u;
+	CHECK(fb_gfx3_queue_submit_many(&queue, batch, 2, NULL) ==
+		FB_GFX3_INVALID);
+	CHECK(queue.count == 0);
+	CHECK(queue.queued_bytes == 0);
+	fb_gfx3_command_destroy(first);
+	fb_gfx3_command_destroy(second);
+
+	first = fb_gfx3_command_create(FB_GFX3_COMMAND_CLEAR, 16);
+	second = fb_gfx3_command_create(FB_GFX3_COMMAND_PRESENT, 16);
+	CHECK((first != NULL) && (second != NULL));
+	if ((first == NULL) || (second == NULL)) {
+		fb_gfx3_command_destroy(first);
+		fb_gfx3_command_destroy(second);
+		fb_gfx3_queue_destroy(&queue);
+		return;
+	}
+	expected_bytes = (size_t)first->size + second->size;
+	queue.byte_capacity = expected_bytes;
+	batch[0] = first;
+	batch[1] = second;
+	if (fb_gfx3_queue_submit_many(&queue, batch, 2, NULL) != FB_GFX3_OK) {
+		CHECK(FALSE);
+		fb_gfx3_command_destroy(first);
+		fb_gfx3_command_destroy(second);
+		fb_gfx3_queue_destroy(&queue);
+		return;
+	}
+	CHECK(queue.queued_bytes == expected_bytes);
+	fb_gfx3_queue_fail(&queue, -322);
+	CHECK(fb_gfx3_queue_discard(&queue, -322) == 2);
+	CHECK(queue.queued_bytes == 0);
+	fb_gfx3_queue_destroy(&queue);
+}
+
 static void test_queue_close_and_failure_wakeups(void)
 {
 	FB_GFX3_COMMAND_QUEUE queue;
@@ -2971,6 +3207,8 @@ int main(void)
 	test_gamepad_snapshot_lifecycle();
 	test_checked_sizes_and_commands();
 	test_queue_order_and_back_pressure();
+	test_queue_command_byte_back_pressure();
+	test_queue_command_byte_capacity_boundaries();
 	test_queue_close_and_failure_wakeups();
 	test_completion();
 	test_resource_registry();

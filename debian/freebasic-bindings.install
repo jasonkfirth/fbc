@@ -75,6 +75,7 @@ usr/include/freebasic/libart_lgpl
 usr/include/freebasic/libexslt
 usr/include/freebasic/libiconv.bi
 usr/include/freebasic/libintl.bi
+usr/include/freebasic/libopenmpt.bi
 usr/include/freebasic/libxml
 usr/include/freebasic/libxslt
 usr/include/freebasic/llvm-c.bi

@@ -205,13 +205,14 @@ int fb_gfx3_compat_flush_points_graphics_locked(FB_GFX3_DRAW_STATE *state);
 int fb_gfx3_compat_commit_shadow(FB_GFX3_DRAW_STATE *state);
 
 /*
-	A full-page clear replaces every old pixel, so it can make an existing or
-	locked CPU shadow authoritative without first downloading or uploading the
-	superseded page. The caller has already queued a successful GPU clear and
-	holds FB_GRAPHICS_LOCK.
+	Reflect a successful full-page GPU clear in the CPU shadow. Opaque clears
+	provide every resulting pixel directly; alpha clears need the old destination
+	and therefore update only a valid shadow or read back for a live SCREENPTR.
+	The caller holds FB_GRAPHICS_LOCK.
 */
 int fb_gfx3_compat_replace_shadow_after_full_clear_graphics_locked(
-	FB_GFX3_DRAW_STATE *state, uint32_t color);
+	FB_GFX3_DRAW_STATE *state, uint32_t color, uint32_t flags,
+	int preserve_locked_dirty);
 
 void fb_gfx3_compat_invalidate_point_cache_rect_graphics_locked(
 	FB_GFX3_DRAW_STATE *state, int x1, int y1, int x2, int y2);

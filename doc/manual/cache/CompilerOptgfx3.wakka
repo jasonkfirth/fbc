@@ -9,7 +9,7 @@ Selects the opt-in gfxlib3 GPU graphics runtime.
 
 	The compiler records the selection in object metadata, so a separately compiled object carries the correct normal, multithreaded, PIC, or multithreaded PIC gfxlib3 dependency into the final link.
 
-	gfxlib3 currently supplies windowed backends for Windows, Linux/X11, and Android, plus the headless Null backend.  Desktop mode selection tries Vulkan first and then OpenGL.  Android uses OpenGL ES when Vulkan is unavailable.  A program can request a specific renderer with the corresponding constants from ##fbgfx.bi##.
+	gfxlib3 supplies windowed backends for Windows, Linux/X11, Linux SDL2 KMSDRM, and Android, plus the headless Null backend.  Desktop mode selection tries Vulkan first and then OpenGL.  Linux KMSDRM and Android use OpenGL ES 3.0.  A program can request a specific renderer with the corresponding constants from ##fbgfx.bi##.
 
 	gfxlib3 and gfxlib2 must not be linked into one process.  Their public graphics entry points and process-global state are alternatives, not an interoperability boundary.
 

@@ -1,4 +1,25 @@
-/* Framebuffer device gfx driver */
+/*
+	Project: FreeBASIC GfxLib2 Linux backend
+	-----------------------------------------
+
+	File: gfx_driver_fbdev.c
+
+	Purpose:
+
+		Present gfxlib2 graphics through a Linux framebuffer device.
+
+	Responsibilities:
+
+		- select and restore fbdev display modes
+		- convert gfxlib2 pixels and palettes into the device pixel format
+		- provide framebuffer mouse input and vertical synchronization
+
+	This file intentionally does NOT contain:
+
+		- generic graphics drawing operations
+		- Linux joystick input, which is handled by GETJOYSTICK
+		- sound output, which is handled by sfxlib
+*/
 
 #include "../fb_gfx.h"
 #include "fb_gfx_linux.h"
@@ -6,12 +27,16 @@
 
 #ifndef DISABLE_FBDEV
 
+#include <errno.h>
 #include <fcntl.h>
+#include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <linux/fb.h>
 #include <pthread.h>
+#include <string.h>
+#include <unistd.h>
 
 #ifndef FB_AUX_VGA_PLANES_VGA4
 #define FB_AUX_VGA_PLANES_VGA4	0
@@ -86,6 +111,10 @@ static unsigned char color_conv[4096];
 static BLITTER *blitter;
 static unsigned char *scale_buffer = NULL;
 static int framebuffer_offset, is_running = FALSE, is_active = TRUE;
+static int mode_changed = FALSE, console_mode_active = FALSE;
+static int sync_initialized = FALSE, driver_ready = FALSE;
+static int framebuffer_mapped = FALSE, framebuffer_uses_write = FALSE;
+static int framebuffer_write_error = FALSE;
 static int framebuffer_scale = 1, framebuffer_scaled_w = 0, framebuffer_scaled_h = 0, scale_pitch = 0;
 static int vsync_flags = 0, is_palette_changed = FALSE;
 static int mouse_fd = -1, mouse_packet_size, mouse_shown = TRUE;
@@ -95,6 +124,122 @@ static unsigned int last_click_time = 0;
 static pthread_t thread;
 static pthread_mutex_t mutex;
 static pthread_cond_t cond;
+
+static int fbdev_modes_match(const struct fb_var_screeninfo *left,
+	const struct fb_var_screeninfo *right)
+{
+	return (left->xres == right->xres) &&
+		(left->yres == right->yres) &&
+		(left->xres_virtual == right->xres_virtual) &&
+		(left->yres_virtual == right->yres_virtual) &&
+		(left->xoffset == right->xoffset) &&
+		(left->yoffset == right->yoffset) &&
+		(left->bits_per_pixel == right->bits_per_pixel) &&
+		(left->grayscale == right->grayscale) &&
+		(left->red.offset == right->red.offset) &&
+		(left->red.length == right->red.length) &&
+		(left->red.msb_right == right->red.msb_right) &&
+		(left->green.offset == right->green.offset) &&
+		(left->green.length == right->green.length) &&
+		(left->green.msb_right == right->green.msb_right) &&
+		(left->blue.offset == right->blue.offset) &&
+		(left->blue.length == right->blue.length) &&
+		(left->blue.msb_right == right->blue.msb_right) &&
+		(left->transp.offset == right->transp.offset) &&
+		(left->transp.length == right->transp.length) &&
+		(left->transp.msb_right == right->transp.msb_right) &&
+		(left->pixclock == right->pixclock) &&
+		(left->left_margin == right->left_margin) &&
+		(left->right_margin == right->right_margin) &&
+		(left->upper_margin == right->upper_margin) &&
+		(left->lower_margin == right->lower_margin) &&
+		(left->hsync_len == right->hsync_len) &&
+		(left->vsync_len == right->vsync_len) &&
+		(left->sync == right->sync) &&
+		(left->vmode == right->vmode);
+}
+
+static int fbdev_set_mode(const struct fb_var_screeninfo *requested,
+	struct fb_var_screeninfo *current)
+{
+	if (fbdev_modes_match(requested, current))
+		return 0;
+
+	if (ioctl(device_fd, FBIOPUT_VSCREENINFO, requested) < 0) {
+		if (ioctl(device_fd, FBIOGET_VSCREENINFO, current) < 0) {
+			mode_changed = TRUE;
+			return -1;
+		}
+		mode_changed = !fbdev_modes_match(current, &orig_mode);
+		return 0;
+	}
+
+	/* A successful set may invalidate fbdev mappings, so read back before use. */
+	mode_changed = TRUE;
+	if (ioctl(device_fd, FBIOGET_VSCREENINFO, current) < 0)
+		return -1;
+
+	mode_changed = !fbdev_modes_match(current, &orig_mode);
+	return 0;
+}
+
+static int fbdev_use_write_access(const char *device_name)
+{
+	const char *access_method = getenv("FBGFX_FRAMEBUFFER_ACCESS");
+	char sysfs_driver[128];
+	ssize_t path_length;
+
+	if (access_method) {
+		if (!strcmp(access_method, "write"))
+			return TRUE;
+		if (!strcmp(access_method, "mmap"))
+			return FALSE;
+	}
+
+	/*
+		This Rockchip DRM fbdev advertises GEM-backed memory with no physical
+		start address.  Its legacy mmap callback returns EINVAL on the R36 kernel,
+		and that failed mapping also corrupts page-table state in that kernel.
+		Use fbdev's write callback for this device instead of probing mmap.
+	*/
+	if (!device_name || strcmp(device_name, "/dev/fb0") ||
+	    (device_info.smem_start != 0))
+		return FALSE;
+
+	path_length = readlink("/sys/class/graphics/fb0/device/driver",
+		sysfs_driver, sizeof(sysfs_driver) - 1);
+	if ((path_length <= 0) || ((size_t)path_length >= sizeof(sysfs_driver) - 1))
+		return FALSE;
+
+	sysfs_driver[path_length] = '\0';
+	return (strstr(sysfs_driver, "rockchip-drm") != NULL);
+}
+
+static int fbdev_write_framebuffer(void)
+{
+	size_t offset = 0;
+	size_t remaining = (size_t)device_info.smem_len;
+
+	while (remaining > 0) {
+		ssize_t bytes_written = pwrite(device_fd, framebuffer + offset,
+			remaining, (off_t)offset);
+
+		if (bytes_written < 0) {
+			if (errno == EINTR)
+				continue;
+			return -1;
+		}
+		if (bytes_written == 0) {
+			errno = EIO;
+			return -1;
+		}
+
+		offset += (size_t)bytes_written;
+		remaining -= (size_t)bytes_written;
+	}
+
+	return 0;
+}
 
 #if defined HOST_X86 || defined HOST_X86_64
 
@@ -289,14 +434,17 @@ static void *driver_thread(void *arg)
 
 	(void)arg;
 
-	is_running = TRUE;
-
 	pthread_mutex_lock(&mutex);
+	is_running = TRUE;
 	pthread_cond_signal(&cond);
 	pthread_mutex_unlock(&mutex);
 
-	while (is_running) {
+	for (;;) {
 		pthread_mutex_lock(&mutex);
+		if (!is_running) {
+			pthread_mutex_unlock(&mutex);
+			break;
+		}
 
 		if (mouse_fd >= 0) {
 			FD_ZERO(&set);
@@ -382,6 +530,9 @@ static void *driver_thread(void *arg)
 			if ((mouse_fd >= 0) && (mouse_shown))
 				fb_hSoftCursorPut(mouse_x, mouse_y);
 			scaled_blitter(framebuffer + framebuffer_offset, device_info.line_length);
+			if (framebuffer_uses_write && !framebuffer_write_error &&
+			    (fbdev_write_framebuffer() < 0))
+				framebuffer_write_error = TRUE;
 			fb_hMemSet(__fb_gfx->dirty, FALSE, fb_fbdev.h);
 			if ((mouse_fd >= 0) && (mouse_shown))
 				fb_hSoftCursorUnput(mouse_x, mouse_y);
@@ -403,6 +554,10 @@ static void driver_save_screen(void)
 	EVENT e;
 
 	pthread_mutex_lock(&mutex);
+	if (!driver_ready) {
+		pthread_mutex_unlock(&mutex);
+		return;
+	}
 	is_active = FALSE;
 	pthread_mutex_unlock(&mutex);
 	ioctl(device_fd, FBIOPUTCMAP, &orig_cmap);
@@ -415,9 +570,16 @@ static void driver_restore_screen(void)
 	EVENT e;
 
 	pthread_mutex_lock(&mutex);
+	if (!driver_ready) {
+		pthread_mutex_unlock(&mutex);
+		return;
+	}
 	is_active = TRUE;
 	is_palette_changed = TRUE;
 	fb_hMemSet(framebuffer, 0, device_info.smem_len);
+	if (framebuffer_uses_write && !framebuffer_write_error &&
+	    (fbdev_write_framebuffer() < 0))
+		framebuffer_write_error = TRUE;
 	fb_hMemSet(__fb_gfx->dirty, TRUE, fb_fbdev.h);
 	pthread_mutex_unlock(&mutex);
 	e.type = EVENT_WINDOW_GOT_FOCUS;
@@ -427,6 +589,13 @@ static void driver_restore_screen(void)
 static void driver_key_handler( int pressed, int repeated, int scancode, int key )
 {
 	EVENT e;
+	int ready;
+
+	pthread_mutex_lock(&mutex);
+	ready = driver_ready;
+	pthread_mutex_unlock(&mutex);
+	if (!ready)
+		return;
 
 	if( pressed ) {
 		if( repeated ) {
@@ -453,12 +622,28 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 	ssize_t dummy;
 	int palette_len;
 	int using_current_mode = FALSE;
+	struct fb_var_screeninfo current_mode;
 	struct fb_vblank vblank;
 	const char *mouse_device[] = { "/dev/input/mice", "/dev/usbmouse", "/dev/psaux", NULL };
 	const unsigned char im_init[] = { 243, 200, 243, 100, 243, 80 };
 
 	if (flags & DRIVER_OPENGL)
 		return -1;
+
+	mode_changed = FALSE;
+	console_mode_active = FALSE;
+	sync_initialized = FALSE;
+	driver_ready = FALSE;
+	framebuffer = NULL;
+	palette = NULL;
+	scale_buffer = NULL;
+	framebuffer_mapped = FALSE;
+	framebuffer_uses_write = FALSE;
+	framebuffer_write_error = FALSE;
+	device_fd = -1;
+	mouse_fd = -1;
+	is_running = FALSE;
+	is_active = TRUE;
 
 	fb_fbdev.w = w;
 	fb_fbdev.h = h;
@@ -486,10 +671,27 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 	    ((device_info.visual != FB_VISUAL_PSEUDOCOLOR) &&
 	     (device_info.visual != FB_VISUAL_DIRECTCOLOR) &&
 	     (device_info.visual != FB_VISUAL_TRUECOLOR))) {
-		close(device_fd);
-		device_fd = -1;
 		return -1;
 	}
+
+	if (pthread_mutex_init(&mutex, NULL) != 0)
+		return -1;
+	if (pthread_cond_init(&cond, NULL) != 0) {
+		pthread_mutex_destroy(&mutex);
+		return -1;
+	}
+	sync_initialized = TRUE;
+
+	/*
+		A Linux fbdev mode switch requires a controlling virtual console.
+		Acquire it before changing the hardware mode so an SSH-launched program
+		cannot leave the display in a half-initialized state.
+	*/
+	if (fb_hConsoleGfxMode(driver_exit, driver_save_screen,
+		driver_restore_screen, driver_key_handler))
+		return -1;
+	console_mode_active = TRUE;
+	current_mode = orig_mode;
 
 #if defined(i386) && defined(FB_TYPE_VGA_PLANES)
 	if ((device_info.type == FB_TYPE_VGA_PLANES) && (device_info.type_aux == FB_AUX_VGA_PLANES_VGA4)) {
@@ -499,8 +701,6 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 			goto got_mode;
 		}
 
-		close(device_fd);
-		device_fd = -1;
 		return -1;
 	}
 #endif
@@ -552,50 +752,59 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 
 		mode.xres = mode.xres_virtual = w;
 		mode.yres = mode.yres_virtual = h;
-		if (ioctl(device_fd, FBIOPUT_VSCREENINFO, &mode) == 0) {
-			/*
-			 * Some fbdev drivers accept FBIOPUT_VSCREENINFO but then
-			 * round the visible geometry.  Treat that as a failed exact
-			 * mode switch so the scaled-current-mode path below can
-			 * handle it consistently.
-			 */
-			if ((ioctl(device_fd, FBIOGET_VSCREENINFO, &mode) == 0) &&
-			    (mode.xres == (unsigned int)w) &&
-			    (mode.yres == (unsigned int)h)) {
-				goto got_mode;
-			}
-		}
+		/* Do not repeat FBIOPUT for the active mode: some drivers invalidate
+		   their fbdev mapping even when the requested mode is unchanged. */
+		if (fbdev_set_mode(&mode, &current_mode) < 0)
+			return -1;
+		mode = current_mode;
+		/* Some fbdev drivers round the requested visible geometry. */
+		if ((mode.xres == (unsigned int)w) &&
+		    (mode.yres == (unsigned int)h))
+			goto got_mode;
 	}
 
 	mode = orig_mode;
 	mode.xoffset = 0;
 	mode.yoffset = 0;
+	if (fbdev_set_mode(&mode, &current_mode) < 0)
+		return -1;
+	mode = current_mode;
 	if ((mode.xres >= (unsigned int)w) && (mode.yres >= (unsigned int)h)) {
-		if (ioctl(device_fd, FBIOPUT_VSCREENINFO, &mode) == 0)
-			ioctl(device_fd, FBIOGET_VSCREENINFO, &mode);
 		using_current_mode = TRUE;
 		goto got_mode;
 	}
 
-	close(device_fd);
-	device_fd = -1;
 	return -1;
 
 got_mode:
-	if (fb_hConsoleGfxMode(driver_exit, driver_save_screen, driver_restore_screen, driver_key_handler))
-		return -1;
-
 	fb_hFBDevInfo(&dummy, &dummy, &dummy, &fb_fbdev.refresh_rate);
 	__fb_gfx->refresh_rate = fb_fbdev.refresh_rate;
 
 	if (ioctl(device_fd, FBIOGET_FSCREENINFO, &device_info) < 0)
 		return -1;
 
-	framebuffer = mmap(NULL, device_info.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, device_fd, 0);
-	if (framebuffer == (unsigned char *)-1)
-		return -1;
+	framebuffer_uses_write = fbdev_use_write_access(device_name);
+	if (framebuffer_uses_write) {
+		if (device_info.smem_len == 0)
+			return -1;
+		framebuffer = (unsigned char *)malloc((size_t)device_info.smem_len);
+		if (!framebuffer)
+			return -1;
+	} else {
+		framebuffer = mmap(NULL, device_info.smem_len, PROT_READ | PROT_WRITE,
+			MAP_SHARED, device_fd, 0);
+		if (framebuffer == (unsigned char *)-1) {
+			framebuffer = NULL;
+			return -1;
+		}
+		framebuffer_mapped = TRUE;
+	}
 
 	fb_hMemSet(framebuffer, 0, device_info.smem_len);
+	if (framebuffer_uses_write && (fbdev_write_framebuffer() < 0)) {
+		framebuffer_write_error = TRUE;
+		return -1;
+	}
 
 	/*
 	 * Some fbdev drivers cannot switch to the exact requested mode even
@@ -719,14 +928,15 @@ got_mode:
 	if (ioctl(device_fd, FBIOGET_VBLANK, &vblank) == 0)
 		vsync_flags = vblank.flags;
 
-	pthread_mutex_init(&mutex, NULL);
-	pthread_cond_init(&cond, NULL);
 	pthread_mutex_lock(&mutex);
+	driver_ready = TRUE;
 	if (pthread_create(&thread, NULL, driver_thread, NULL)) {
+		driver_ready = FALSE;
 		pthread_mutex_unlock(&mutex);
 		return -1;
 	}
-	pthread_cond_wait(&cond, &mutex);
+	while (!is_running)
+		pthread_cond_wait(&cond, &mutex);
 	pthread_mutex_unlock(&mutex);
 
 	return 0;
@@ -734,11 +944,25 @@ got_mode:
 
 static void driver_exit(void)
 {
-	if (is_running) {
-		is_running = FALSE;
+	int join_thread = FALSE;
+
+	/* Stop and join the renderer before unmapping its framebuffer. */
+	if (sync_initialized) {
+		pthread_mutex_lock(&mutex);
+		driver_ready = FALSE;
+		if (is_running) {
+			is_running = FALSE;
+			join_thread = TRUE;
+		}
+		pthread_mutex_unlock(&mutex);
+	}
+
+	if (join_thread)
 		pthread_join(thread, NULL);
-		pthread_mutex_destroy(&mutex);
-		pthread_cond_destroy(&cond);
+
+	if (console_mode_active) {
+		fb_hConsoleGfxMode(NULL, NULL, NULL, NULL);
+		console_mode_active = FALSE;
 	}
 
 	if (mouse_fd >= 0) {
@@ -748,11 +972,16 @@ static void driver_exit(void)
 	}
 
 	if (device_fd >= 0) {
-		fb_hConsoleGfxMode(NULL, NULL, NULL, NULL);
-		if (framebuffer) {
-			munmap(framebuffer, device_info.smem_len);
+		if (framebuffer != NULL) {
+			if (framebuffer_mapped)
+				munmap(framebuffer, device_info.smem_len);
+			else
+				free(framebuffer);
 			framebuffer = NULL;
 		}
+		framebuffer_mapped = FALSE;
+		framebuffer_uses_write = FALSE;
+		framebuffer_write_error = FALSE;
 		if (scale_buffer) {
 			free(scale_buffer);
 			scale_buffer = NULL;
@@ -762,9 +991,18 @@ static void driver_exit(void)
 			free(palette);
 			palette = NULL;
 		}
-		ioctl(device_fd, FBIOPUT_VSCREENINFO, &orig_mode);
+		if (mode_changed) {
+			ioctl(device_fd, FBIOPUT_VSCREENINFO, &orig_mode);
+			mode_changed = FALSE;
+		}
 		close(device_fd);
 		device_fd = -1;
+	}
+
+	if (sync_initialized) {
+		pthread_cond_destroy(&cond);
+		pthread_mutex_destroy(&mutex);
+		sync_initialized = FALSE;
 	}
 }
 
@@ -907,3 +1145,5 @@ int fb_hFBDevInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *refr
 }
 
 #endif
+
+/* end of gfx_driver_fbdev.c */

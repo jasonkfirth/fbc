@@ -117,6 +117,10 @@ return values, error codes, events, image layouts, and synchronization effects.
 - Multi-producer ordering with sequence rollover protection.
 - Queue full/empty transitions, spurious wakeups, shutdown while empty, and
   shutdown with pending commands.
+- Bound queued command allocation bytes as well as command count. Verify byte
+  back-pressure, exact-capacity batches, oversized single-command admission
+  only into an empty queue, oversized batch rejection, and byte accounting on
+  pop, non-blocking pop, and discard.
 - Non-blocking queue drains and bounded asynchronous render-command batches;
   completion-bearing commands, shutdown, and interop callbacks must remain
   boundaries.

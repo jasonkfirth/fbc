@@ -32,9 +32,14 @@
 #include "../gfx3_protocol.h"
 #include "../gfx3_resource.h"
 
-#if defined(HOST_ANDROID) && !defined(DISABLE_OPENGL)
+#if (defined(HOST_ANDROID) || defined(HOST_LINUX)) && \
+	!defined(DISABLE_OPENGL)
 
 #include <GLES3/gl3.h>
+
+#if defined(FB_GFX3_GLES_DYNAMIC)
+#include "../linux/gfx3_gles_dispatch.h"
+#endif
 
 typedef struct FB_GFX3_GLES_FENCE {
 	GLsync sync;
@@ -132,6 +137,35 @@ typedef struct FB_GFX3_GLES_STATE {
 	FB_GFX3_GLES_FENCE *last_fence;
 } FB_GFX3_GLES_STATE;
 
+#if defined(FB_GFX3_GLES_DYNAMIC)
+
+static FB_GFX3_GLES_DISPATCH gles_dispatch;
+
+/*
+	Linux loads GLES entry points from the context owner.  This keeps the
+	GLES backend optional on desktop Linux builds which only install GLX or
+	Vulkan development packages.
+*/
+static int gles_load_dispatch(FB_GFX3_GLES_STATE *state)
+{
+	const FB_GFX3_PLATFORM_VTABLE *platform_vtable =
+		state->platform_vtable;
+
+	if ((platform_vtable == NULL) ||
+	    (platform_vtable->load_opengl_function == NULL))
+		return FB_GFX3_UNSUPPORTED;
+#define FB_GFX3_GLES_LOAD_FUNCTION(name) \
+	if (platform_vtable->load_opengl_function(state->platform, #name, \
+	    &gles_dispatch.p_##name, sizeof(gles_dispatch.p_##name)) != \
+	    FB_GFX3_OK) \
+		return FB_GFX3_UNSUPPORTED;
+	FB_GFX3_GLES_DISPATCH_FUNCTIONS(FB_GFX3_GLES_LOAD_FUNCTION)
+#undef FB_GFX3_GLES_LOAD_FUNCTION
+	return FB_GFX3_OK;
+}
+
+#endif
+
 /*
 	An ES 3.0 fragment program cannot advance a writable frontier texture more
 	than once in one draw.  Keep a batch short enough for older mobile drivers,
@@ -163,17 +197,16 @@ typedef struct FB_GFX3_GLES_STATE {
 #define FB_GFX3_GLES_POINTS_BATCH_LIMIT 256u
 
 /*
-	The exact midpoint path emits one initial span and no more than two spans
-	for each horizontal or vertical midpoint step. Keep the common mobile
-	CIRCLE range stack-only; larger shapes retain the existing bounded
-	compatibility path.
+	The exact midpoint path emits at most 1,025 spans or outline points for the
+	common mobile CIRCLE range. Keep those commands stack-only; larger shapes
+	retain the existing bounded compatibility path.
 */
 #define FB_GFX3_GLES_ELLIPSE_SPAN_BATCH_LIMIT 1025u
 
 /*
-	A public CIRCLE benchmark normally submits many small opaque filled circles.
-	Each circle has at most 1,025 midpoint spans, so this bounded aggregate keeps
-	the entire ordered run in one GPU draw without requiring unbounded storage.
+	A public CIRCLE benchmark normally submits many small opaque circles. Each
+	command contributes at most 1,025 midpoint spans or points, so this bounded
+	aggregate keeps an ordered run in one GPU draw without unbounded storage.
 */
 #define FB_GFX3_GLES_ELLIPSE_BATCH_LIMIT 64u
 #define FB_GFX3_GLES_ELLIPSE_BATCH_SPAN_LIMIT \
@@ -683,16 +716,16 @@ static const char gles_paint_fragment_shader[] =
 	"        return;\n"
 	"    }\n"
 	"    if (operation_mode == 1) {\n"
-	"        uint active = 0u;\n"
+	"        uint mask_value = 0u;\n"
 	"        if (in_clip(pixel) &&\n"
 	"            (unpack_pixel(texelFetch(surface_image, pixel, 0)) != operation_border)) {\n"
-	"            active = mask_at(pixel);\n"
-	"            if ((active == 0u) && in_clip(pixel + ivec2(-1, 0))) active = mask_at(pixel + ivec2(-1, 0));\n"
-	"            if ((active == 0u) && in_clip(pixel + ivec2(1, 0))) active = mask_at(pixel + ivec2(1, 0));\n"
-	"            if ((active == 0u) && in_clip(pixel + ivec2(0, -1))) active = mask_at(pixel + ivec2(0, -1));\n"
-	"            if ((active == 0u) && in_clip(pixel + ivec2(0, 1))) active = mask_at(pixel + ivec2(0, 1));\n"
+	"            mask_value = mask_at(pixel);\n"
+	"            if ((mask_value == 0u) && in_clip(pixel + ivec2(-1, 0))) mask_value = mask_at(pixel + ivec2(-1, 0));\n"
+	"            if ((mask_value == 0u) && in_clip(pixel + ivec2(1, 0))) mask_value = mask_at(pixel + ivec2(1, 0));\n"
+	"            if ((mask_value == 0u) && in_clip(pixel + ivec2(0, -1))) mask_value = mask_at(pixel + ivec2(0, -1));\n"
+	"            if ((mask_value == 0u) && in_clip(pixel + ivec2(0, 1))) mask_value = mask_at(pixel + ivec2(0, 1));\n"
 	"        }\n"
-	"        output_pixel = pack_pixel(active);\n"
+	"        output_pixel = pack_pixel(mask_value);\n"
 	"        return;\n"
 	"    }\n"
 	"    if (operation_mode == 3) {\n"
@@ -1275,24 +1308,39 @@ static uint32_t gles_color_mask(uint32_t depth)
 
 static uint32_t gles_bytes_per_pixel(uint32_t depth)
 {
-	if (depth <= 8u)
+	if ((depth > 0u) && (depth <= 8u))
 		return 1;
 	if (depth == 16u)
 		return 2;
 	return (depth == 32u) ? 4 : 0;
 }
 
-static uint32_t gles_decode_pixel(const unsigned char *source,
-	uint32_t bytes_per_pixel)
+static GLenum gles_surface_internal_format(uint32_t bytes_per_pixel)
 {
-	uint32_t value = source[0];
+	switch (bytes_per_pixel) {
+	case 1:
+		return GL_R8UI;
+	case 2:
+		return GL_RG8UI;
+	case 4:
+		return GL_RGBA8UI;
+	default:
+		return 0;
+	}
+}
 
-	if (bytes_per_pixel > 1u)
-		value |= (uint32_t)source[1] << 8;
-	if (bytes_per_pixel > 2u)
-		value |= ((uint32_t)source[2] << 16) |
-			((uint32_t)source[3] << 24);
-	return value;
+static GLenum gles_surface_external_format(uint32_t bytes_per_pixel)
+{
+	switch (bytes_per_pixel) {
+	case 1:
+		return GL_RED_INTEGER;
+	case 2:
+		return GL_RG_INTEGER;
+	case 4:
+		return GL_RGBA_INTEGER;
+	default:
+		return 0;
+	}
 }
 
 static void gles_encode_pixel(unsigned char *destination,
@@ -1305,15 +1353,6 @@ static void gles_encode_pixel(unsigned char *destination,
 		destination[2] = (unsigned char)(value >> 16);
 		destination[3] = (unsigned char)(value >> 24);
 	}
-}
-
-static void gles_pack_texture_pixel(unsigned char *destination,
-	uint32_t value)
-{
-	destination[0] = (unsigned char)value;
-	destination[1] = (unsigned char)(value >> 8);
-	destination[2] = (unsigned char)(value >> 16);
-	destination[3] = (unsigned char)(value >> 24);
 }
 
 static uint32_t gles_unpack_texture_pixel(const unsigned char *source)
@@ -1487,6 +1526,7 @@ static int gles_surface_create(FB_GFX3_GLES_STATE *state,
 	FB_GFX3_GLES_SURFACE *surface;
 	FB_GFX3_RECT full;
 	FB_GFX3_HANDLE handle;
+	GLenum internal_format;
 	int data[4] = { 0, 0, 0, 0 };
 	int result;
 
@@ -1498,6 +1538,10 @@ static int gles_surface_create(FB_GFX3_GLES_STATE *state,
 	    (payload->width > state->maximum_texture_size) ||
 	    (payload->height > state->maximum_texture_size) ||
 	    (gles_bytes_per_pixel(payload->depth) == 0))
+		return FB_GFX3_INVALID;
+	internal_format = gles_surface_internal_format(
+		gles_bytes_per_pixel(payload->depth));
+	if (internal_format == 0)
 		return FB_GFX3_INVALID;
 	surface = (FB_GFX3_GLES_SURFACE *)calloc(1, sizeof(*surface));
 	if (surface == NULL)
@@ -1512,7 +1556,7 @@ static int gles_surface_create(FB_GFX3_GLES_STATE *state,
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8UI, (GLsizei)surface->width,
+	glTexStorage2D(GL_TEXTURE_2D, 1, internal_format, (GLsizei)surface->width,
 		(GLsizei)surface->height);
 	result = gles_check_error(state, "surface texture allocation");
 	if (result != FB_GFX3_OK) {
@@ -1562,14 +1606,12 @@ static int gles_surface_upload(FB_GFX3_GLES_STATE *state,
 {
 	const FB_GFX3_SURFACE_UPLOAD_COMMAND *payload;
 	FB_GFX3_GLES_SURFACE *surface;
-	unsigned char *expanded = NULL;
 	size_t header_size = offsetof(FB_GFX3_SURFACE_UPLOAD_COMMAND, data);
 	size_t expected_size;
-	size_t expanded_size;
 	size_t row_size;
 	uint32_t bytes_per_pixel;
-	uint32_t x;
 	uint32_t y;
+	GLenum format;
 	int result;
 
 	if (fb_gfx3_command_payload_size(command) < header_size)
@@ -1585,67 +1627,47 @@ static int gles_surface_upload(FB_GFX3_GLES_STATE *state,
 	if (result != FB_GFX3_OK)
 		return result;
 	bytes_per_pixel = gles_bytes_per_pixel(surface->depth);
+	format = gles_surface_external_format(bytes_per_pixel);
 	if (((uint64_t)(uint32_t)payload->destination_x + payload->width >
 	     surface->width) ||
 	    ((uint64_t)(uint32_t)payload->destination_y + payload->height >
 	     surface->height) ||
+	    (bytes_per_pixel == 0) || (format == 0) ||
 	    (fb_gfx3_size_multiply(payload->width, bytes_per_pixel,
 	     &row_size) != FB_GFX3_OK) || (payload->source_pitch < row_size) ||
 	    (fb_gfx3_size_multiply(payload->source_pitch, payload->height,
 	     &expected_size) != FB_GFX3_OK) ||
-	    (expected_size != payload->data_size) ||
-	    (fb_gfx3_size_multiply((size_t)payload->width * 4u,
-	     payload->height, &expanded_size) != FB_GFX3_OK)) {
+	    (expected_size != payload->data_size)) {
 		result = FB_GFX3_INVALID;
 		goto done;
 	}
 
 	/*
-		A 32-bit gfxlib surface and the GLES integer texture use the same
-		little-endian byte order. Full-frame software presenters already
-		supply tightly packed rows, so uploading that memory directly avoids
-		allocating and rebuilding an identical RGBA buffer every frame.
-
-		Pitched subimages and lower-depth indexed surfaces retain the general
-		conversion path below.
+		The integer texture stores the same byte lanes as SCREENPTR: one channel
+		for indexed pixels, two for RGB565, and four for 32-bit pixels. Full-page
+		screen shadows are tightly packed, so they can be uploaded as-is without
+		allocating and filling an RGBA staging image on every frame.
 	*/
-	if ((surface->depth == 32u) &&
-	    (payload->source_pitch == payload->width * 4u)) {
-		glBindTexture(GL_TEXTURE_2D, surface->texture);
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, payload->destination_x,
-			payload->destination_y, (GLsizei)payload->width,
-			(GLsizei)payload->height, GL_RGBA_INTEGER,
-			GL_UNSIGNED_BYTE, payload->data);
-		result = gles_check_error(state, "32-bit surface upload");
-		goto done;
-	}
-
-	expanded = (unsigned char *)malloc(expanded_size);
-	if (expanded == NULL) {
-		result = FB_GFX3_OUT_OF_MEMORY;
-		goto done;
-	}
-	for (y = 0; y < payload->height; y++) {
-		const unsigned char *source_row = payload->data +
-			((size_t)y * payload->source_pitch);
-		unsigned char *destination_row = expanded +
-			((size_t)y * payload->width * 4u);
-		for (x = 0; x < payload->width; x++)
-			gles_pack_texture_pixel(destination_row + ((size_t)x * 4u),
-				gles_decode_pixel(source_row +
-				((size_t)x * bytes_per_pixel), bytes_per_pixel));
-	}
 	glBindTexture(GL_TEXTURE_2D, surface->texture);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, payload->destination_x,
-		payload->destination_y, (GLsizei)payload->width,
-		(GLsizei)payload->height, GL_RGBA_INTEGER, GL_UNSIGNED_BYTE, expanded);
+	if (payload->source_pitch == row_size) {
+		glTexSubImage2D(GL_TEXTURE_2D, 0, payload->destination_x,
+			payload->destination_y, (GLsizei)payload->width,
+			(GLsizei)payload->height, format, GL_UNSIGNED_BYTE,
+			payload->data);
+	} else {
+		/* GLES has no byte-pitch parameter; upload padded rows separately. */
+		for (y = 0; y < payload->height; y++) {
+			glTexSubImage2D(GL_TEXTURE_2D, 0, payload->destination_x,
+				payload->destination_y + (int32_t)y,
+				(GLsizei)payload->width, 1, format, GL_UNSIGNED_BYTE,
+				payload->data + ((size_t)y * payload->source_pitch));
+		}
+	}
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 	result = gles_check_error(state, "surface upload");
 
 done:
-	free(expanded);
 	fb_gfx3_resource_release(state->resources, command->target);
 	return result;
 }
@@ -2393,15 +2415,17 @@ static void gles_append_ellipse_span(const FB_GFX3_RECT *clip,
 	*/
 	if (*count >= limit)
 		return;
-	item = &items[*count];
-	item->x1 = (x1 < clip->x1) ? clip->x1 : x1;
-	item->y1 = y;
-	item->x2 = (x2 > clip->x2) ? clip->x2 : x2;
-	item->y2 = y;
-	item->color = color;
-	item->reserved1 = 0;
-	item->reserved2 = 0;
-	item->reserved3 = 0;
+	if (items != NULL) {
+		item = &items[*count];
+		item->x1 = (x1 < clip->x1) ? clip->x1 : x1;
+		item->y1 = y;
+		item->x2 = (x2 > clip->x2) ? clip->x2 : x2;
+		item->y2 = y;
+		item->color = color;
+		item->reserved1 = 0;
+		item->reserved2 = 0;
+		item->reserved3 = 0;
+	}
 	(*count)++;
 }
 
@@ -2447,7 +2471,7 @@ static int gles_draw_ellipse_scanline(FB_GFX3_GLES_STATE *state,
 	int x2, uint32_t color, int filled, uint32_t flags)
 {
 	FB_GFX3_RECT area;
-	int data[4];
+	int data[4] = { 0 };
 	int result;
 
 	if ((y < clip->y1) || (y > clip->y2))
@@ -2493,7 +2517,16 @@ static int gles_draw_ellipse_scanline(FB_GFX3_GLES_STATE *state,
 	return FB_GFX3_OK;
 }
 
-static void gles_append_opaque_ellipse_spans(
+static void gles_append_ellipse_outline_row(const FB_GFX3_RECT *clip,
+	FB_GFX3_GLES_ELLIPSE_SPAN_ITEM *items, uint32_t *count, int y, int x1,
+	int x2, uint32_t color, uint32_t limit)
+{
+	gles_append_ellipse_span(clip, items, count, y, x1, x1, color, limit);
+	if (x2 != x1)
+		gles_append_ellipse_span(clip, items, count, y, x2, x2, color, limit);
+}
+
+static void gles_append_ellipse_spans(
 	const FB_GFX3_ELLIPSE_COMMAND *payload, const FB_GFX3_RECT *clip,
 	uint32_t depth, FB_GFX3_GLES_ELLIPSE_SPAN_ITEM *items,
 	uint32_t *count, uint32_t limit)
@@ -2518,7 +2551,11 @@ static void gles_append_opaque_ellipse_spans(
 	y1 = payload->center_y;
 	y2 = payload->center_y;
 	color = payload->color & gles_color_mask(depth);
-	gles_append_ellipse_span(clip, items, count, y1, x1, x2, color, limit);
+	if (payload->filled != 0u)
+		gles_append_ellipse_span(clip, items, count, y1, x1, x2, color, limit);
+	else
+		gles_append_ellipse_outline_row(clip, items, count, y1, x1, x2,
+			color, limit);
 	if (payload->radius_y == 0.0f)
 		return;
 	aq = (int64_t)(payload->radius_x * payload->radius_x);
@@ -2543,16 +2580,35 @@ static void gles_append_opaque_ellipse_spans(
 			rx -= dy;
 			r += rx;
 		}
-		gles_append_ellipse_span(clip, items, count, y1, x1, x2, color, limit);
-		gles_append_ellipse_span(clip, items, count, y2, x1, x2, color, limit);
+		if (payload->filled != 0u) {
+			gles_append_ellipse_span(clip, items, count, y1, x1, x2,
+				color, limit);
+			gles_append_ellipse_span(clip, items, count, y2, x1, x2,
+				color, limit);
+		} else {
+			gles_append_ellipse_outline_row(clip, items, count, y1, x1,
+				x2, color, limit);
+			if (y2 != y1)
+				gles_append_ellipse_outline_row(clip, items, count, y2,
+					x1, x2, color, limit);
+		}
 	}
 }
 
 static int gles_ellipse_batchable(const FB_GFX3_ELLIPSE_COMMAND *payload)
 {
-	return (payload->filled != 0u) && (payload->flags == 0u) &&
-		(payload->radius_x >= 0.0f) && (payload->radius_x <= 256.0f) &&
-		(payload->radius_y >= 0.0f) && (payload->radius_y <= 256.0f);
+	if ((payload == NULL) || (payload->flags != 0u) ||
+	    !(payload->radius_x >= 0.0f) || !(payload->radius_x <= 256.0f) ||
+	    !(payload->radius_y >= 0.0f) || !(payload->radius_y <= 256.0f))
+		return FALSE;
+	if (payload->filled != 0u)
+		return TRUE;
+	/*
+		Small opaque outlines can be flattened to ordered single-pixel spans.
+		The radius-sum bound keeps their worst-case midpoint output inside the
+		fixed per-command batch capacity.
+	*/
+	return payload->radius_x + payload->radius_y <= 255.0f;
 }
 
 static size_t gles_ellipse_batch_count(FB_GFX3_COMMAND *const *commands,
@@ -2596,6 +2652,7 @@ static int gles_ellipse_batch(FB_GFX3_GLES_STATE *state,
 	FB_GFX3_GLES_SURFACE *surface;
 	FB_GFX3_RECT clip;
 	uint32_t span_count = 0u;
+	size_t allocation_size;
 	size_t index;
 	int result;
 
@@ -2612,21 +2669,36 @@ static int gles_ellipse_batch(FB_GFX3_GLES_STATE *state,
 		result = FB_GFX3_OK;
 		goto done;
 	}
-	items = (FB_GFX3_GLES_ELLIPSE_SPAN_ITEM *)malloc(
-		FB_GFX3_GLES_ELLIPSE_BATCH_SPAN_LIMIT * sizeof(items[0]));
-	if (items == NULL) {
-		result = FB_GFX3_OUT_OF_MEMORY;
-		goto done;
-	}
 	for (index = 0u; index < count; ++index) {
 		const FB_GFX3_ELLIPSE_COMMAND *payload =
 			(const FB_GFX3_ELLIPSE_COMMAND *)commands[index]->payload;
 
-		gles_append_opaque_ellipse_spans(payload, &clip, surface->depth,
-			items, &span_count, FB_GFX3_GLES_ELLIPSE_BATCH_SPAN_LIMIT);
+		gles_append_ellipse_spans(payload, &clip, surface->depth, NULL,
+			&span_count, FB_GFX3_GLES_ELLIPSE_BATCH_SPAN_LIMIT);
 	}
-	result = (span_count == 0u) ? FB_GFX3_OK :
-		gles_draw_ellipse_span_batch(state, surface, items, span_count);
+	if (span_count == 0u) {
+		result = FB_GFX3_OK;
+		goto done;
+	}
+	if (fb_gfx3_size_multiply(span_count, sizeof(items[0]),
+	    &allocation_size) != FB_GFX3_OK) {
+		result = FB_GFX3_INVALID;
+		goto done;
+	}
+	items = (FB_GFX3_GLES_ELLIPSE_SPAN_ITEM *)malloc(allocation_size);
+	if (items == NULL) {
+		result = FB_GFX3_OUT_OF_MEMORY;
+		goto done;
+	}
+	span_count = 0u;
+	for (index = 0u; index < count; ++index) {
+		const FB_GFX3_ELLIPSE_COMMAND *payload =
+			(const FB_GFX3_ELLIPSE_COMMAND *)commands[index]->payload;
+
+		gles_append_ellipse_spans(payload, &clip, surface->depth, items,
+			&span_count, FB_GFX3_GLES_ELLIPSE_BATCH_SPAN_LIMIT);
+	}
+	result = gles_draw_ellipse_span_batch(state, surface, items, span_count);
 	free(items);
 
 done:
@@ -2668,59 +2740,24 @@ static int gles_ellipse(FB_GFX3_GLES_STATE *state,
 		result = FB_GFX3_OK;
 		goto done;
 	}
-
 	x1 = (int)((float)payload->center_x - payload->radius_x);
 	x2 = (int)((float)payload->center_x + payload->radius_x);
-	y1 = payload->center_y;
-	y2 = payload->center_y;
+
 	/*
-		Opaque filled ellipses are the normal CIRCLE ... , BF case. Preserve
-		the existing integer midpoint decisions, then let one instanced GPU draw
-		rasterize all of their spans. Alpha and outline ellipses retain their
-		ordered per-span path because their repeated writes are observable.
+		Opaque filled ellipses and small opaque outlines can use one instanced
+		GPU draw. Alpha primitives retain their ordered path because repeated
+		writes affect the blended result.
 	*/
-	if ((payload->filled != 0u) &&
-	    ((payload->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) == 0u) &&
-	    (payload->radius_x <= 256.0f) &&
-	    (payload->radius_y <= 256.0f)) {
+	if (((payload->filled != 0u) && (payload->flags == 0u) &&
+	     (payload->radius_x <= 256.0f) && (payload->radius_y <= 256.0f)) ||
+	    ((payload->filled == 0u) && (payload->flags == 0u) &&
+	     (payload->radius_x + payload->radius_y <= 255.0f))) {
 		FB_GFX3_GLES_ELLIPSE_SPAN_ITEM
 			items[FB_GFX3_GLES_ELLIPSE_SPAN_BATCH_LIMIT];
-		uint32_t count = 0;
+		uint32_t count = 0u;
 
-		gles_append_ellipse_span(&clip, items, &count, y1, x1, x2,
-			payload->color & gles_color_mask(surface->depth),
-			FB_GFX3_GLES_ELLIPSE_SPAN_BATCH_LIMIT);
-		if (payload->radius_y != 0.0f) {
-			aq = (int64_t)(payload->radius_x * payload->radius_x);
-			bq = (int64_t)(payload->radius_y * payload->radius_y);
-			dx = aq * 2;
-			dy = bq * 2;
-			r = (int64_t)(payload->radius_x * (float)bq);
-			rx = r * 2;
-			ry = 0;
-			d = (int)payload->radius_x;
-			while (d > 0) {
-				if (r > 0) {
-					y1++;
-					y2--;
-					ry += dx;
-					r -= ry;
-				}
-				if (r <= 0) {
-					d--;
-					x1++;
-					x2--;
-					rx -= dy;
-					r += rx;
-				}
-				gles_append_ellipse_span(&clip, items, &count, y1, x1, x2,
-					payload->color & gles_color_mask(surface->depth),
-					FB_GFX3_GLES_ELLIPSE_SPAN_BATCH_LIMIT);
-				gles_append_ellipse_span(&clip, items, &count, y2, x1, x2,
-					payload->color & gles_color_mask(surface->depth),
-					FB_GFX3_GLES_ELLIPSE_SPAN_BATCH_LIMIT);
-			}
-		}
+		gles_append_ellipse_spans(payload, &clip, surface->depth, items,
+			&count, FB_GFX3_GLES_ELLIPSE_SPAN_BATCH_LIMIT);
 		if (count == 0u) {
 			result = FB_GFX3_OK;
 			goto done;
@@ -2729,11 +2766,14 @@ static int gles_ellipse(FB_GFX3_GLES_STATE *state,
 		goto done;
 	}
 	if (payload->radius_y == 0.0f) {
-		result = gles_draw_ellipse_scanline(state, surface, &clip, y1, x1,
-			x2, payload->color, TRUE, payload->flags);
+		result = gles_draw_ellipse_scanline(state, surface, &clip,
+			payload->center_y, x1, x2,
+			payload->color, TRUE, payload->flags);
 		goto done;
 	}
 
+	y1 = payload->center_y;
+	y2 = payload->center_y;
 	result = gles_draw_ellipse_scanline(state, surface, &clip, y1, x1, x2,
 		payload->color, payload->filled != 0, payload->flags);
 	if (result != FB_GFX3_OK)
@@ -4386,6 +4426,11 @@ static int gles_init(FB_GFX3_BACKEND *backend,
 		&platform_config);
 	if (result != FB_GFX3_OK)
 		return result;
+#if defined(FB_GFX3_GLES_DYNAMIC)
+	result = gles_load_dispatch(state);
+	if (result != FB_GFX3_OK)
+		return result;
+#endif
 	version = glGetString(GL_VERSION);
 	if ((version == NULL) || (strstr((const char *)version,
 	    "OpenGL ES 3.") == NULL))

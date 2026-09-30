@@ -1,4 +1,26 @@
-/* Linux multikey function implementation */
+/*
+	Project: FreeBASIC Linux runtime
+	-------------------------------
+
+	File: io_multikey.c
+
+	Purpose:
+
+		Read Linux console and X11 keyboard state for MULTIKEY, INKEY, and
+		gfxlib2 keyboard events.
+
+	Responsibilities:
+
+		- initialize and restore the selected keyboard input path
+		- translate Linux keycodes into FreeBASIC scancodes and key events
+		- hand keyboard focus to gfxlib2 while a console graphics mode is active
+
+	This file intentionally does NOT contain:
+
+		- framebuffer drawing or display mode selection
+		- joystick or gamepad device handling
+		- audio input or output
+*/
 
 #include "../fb.h"
 #include "../unix/fb_private_console.h"
@@ -33,7 +55,8 @@ static X_FUNCS X = { NULL, NULL, NULL, NULL, NULL, NULL };
 #endif
 
 static pid_t main_pid;
-static int key_fd, key_old_mode, key_leds;
+static int key_fd = -1;
+static int key_old_mode, key_leds;
 static unsigned char key_state[128];
 static unsigned short key_buffer[KEY_BUFFER_SIZE], key_head, key_tail;
 static int (*old_getch)(void);
@@ -257,6 +280,7 @@ static int keyboard_init(void)
 		    (tcsetattr(key_fd, TCSANOW, &term) < 0) ||
 		    (ioctl(key_fd, KDSKBMODE, K_MEDIUMRAW) < 0)) {
 			close(key_fd);
+			key_fd = -1;
 			return -1;
 		}
 		__fb_con.keyboard_handler = keyboard_console_handler;
@@ -276,8 +300,10 @@ static int keyboard_init(void)
 			return -1;
 
 		display = X.OpenDisplay(NULL);
-		if (!display)
+		if (!display) {
+			fb_hDynUnload(&xlib);
 			return -1;
+		}
 
 		fb_hInitX11KeycodeToScancodeTb( display, X.DisplayKeycodes, X.GetKeyboardMapping, X.Free );
 
@@ -295,15 +321,21 @@ static int keyboard_init(void)
 static void keyboard_exit(void)
 {
 	if (__fb_con.inited == INIT_CONSOLE) {
-		ioctl(key_fd, KDSKBMODE, key_old_mode);
-		close(key_fd);
-		key_fd = -1;
+		if (key_fd >= 0) {
+			ioctl(key_fd, KDSKBMODE, key_old_mode);
+			close(key_fd);
+			key_fd = -1;
+		}
 	}
 #ifndef DISABLE_X11
 	else if (__fb_con.inited == INIT_X11) {
-		X.CloseDisplay(display);
-		fb_hDynUnload(&xlib);
-		fb_hXTermExitFocus();
+		if (display) {
+			X.CloseDisplay(display);
+			display = NULL;
+			fb_hXTermExitFocus();
+		}
+		if (xlib)
+			fb_hDynUnload(&xlib);
 	}
 #endif
 	__fb_con.keyboard_getch = old_getch;
@@ -350,6 +382,28 @@ int fb_hConsoleGfxMode
 
 	__fb_con.gfx_exit = gfx_exit;
 	if (gfx_exit) {
+		gfx_save = save;
+		gfx_restore = restore;
+		gfx_key_handler = key_handler;
+		if (keyboard_init()) {
+			gfx_save = NULL;
+			gfx_restore = NULL;
+			gfx_key_handler = NULL;
+			__fb_con.gfx_exit = NULL;
+			BG_UNLOCK();
+			return -1;
+		}
+		/* fbdev memory must not be touched without a VT in graphics mode. */
+		if ((key_fd < 0) || (ioctl(key_fd, KDSETMODE, KD_GRAPHICS) < 0)) {
+			keyboard_exit();
+			gfx_save = NULL;
+			gfx_restore = NULL;
+			gfx_key_handler = NULL;
+			__fb_con.gfx_exit = NULL;
+			BG_UNLOCK();
+			return -1;
+		}
+
 		FB_LOCK( );
 		__fb_ctx.hooks.multikeyproc = NULL;
 		__fb_ctx.hooks.inkeyproc = NULL;
@@ -357,23 +411,25 @@ int fb_hConsoleGfxMode
 		__fb_ctx.hooks.keyhitproc = NULL;
 		__fb_ctx.hooks.sleepproc = NULL;
 		FB_UNLOCK( );
-		gfx_save = save;
-		gfx_restore = restore;
-		gfx_key_handler = key_handler;
-		if (keyboard_init()) {
-			BG_UNLOCK();
-			return -1;
-		}
-		ioctl(key_fd, KDSETMODE, KD_GRAPHICS);
 	} else {
-		if (key_fd >= 0) {
-			ioctl(key_fd, KDSETMODE, KD_TEXT);
-			keyboard_exit();
-			fb_hTermOut(SEQ_EXIT_GFX_MODE, 0, 0);
+		if (__fb_con.keyboard_exit) {
+			if (key_fd >= 0) {
+				ioctl(key_fd, KDSETMODE, KD_TEXT);
+				keyboard_exit();
+				fb_hTermOut(SEQ_EXIT_GFX_MODE, 0, 0);
+			} else {
+				keyboard_exit();
+			}
 		}
+		__fb_con.gfx_exit = NULL;
+		gfx_save = NULL;
+		gfx_restore = NULL;
+		gfx_key_handler = NULL;
 	}
 
 	BG_UNLOCK();
 
 	return 0;
 }
+
+/* end of io_multikey.c */

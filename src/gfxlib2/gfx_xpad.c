@@ -39,6 +39,9 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#if defined(HOST_LINUX)
+#include <linux/input.h>
+#endif
 #endif
 
 #if defined(HOST_JS)
@@ -295,6 +298,16 @@ static int xpad_win32_get(int id, ssize_t *buttons,
 #define JS_EVENT_INIT           0x80
 #define JSIOCGVERSION           _IOR('j', 0x01, unsigned int)
 
+/* A normal frame loop makes about 60 controller queries per second. */
+#define XPAD_MISSING_RETRY_CALLS 60u
+
+#if defined(HOST_LINUX)
+#define FB_JSIOCGAXES            _IOR('j', 0x11, uint8_t)
+#define FB_JSIOCGBUTTONS         _IOR('j', 0x12, uint8_t)
+#define FB_JSIOCGAXMAP           _IOR('j', 0x32, uint8_t[ABS_CNT])
+#define FB_JSIOCGBTNMAP          _IOR('j', 0x34, uint16_t[KEY_MAX - BTN_MISC + 1])
+#endif
+
 typedef struct FB_JS_EVENT_ {
 	unsigned int time;
 	short value;
@@ -305,9 +318,18 @@ typedef struct FB_JS_EVENT_ {
 typedef struct FB_JOYDEV_XPAD_ {
 	int fd;
 	int seen;
+	unsigned int open_retry_calls_remaining;
 	float axis[8];
 	unsigned char axis_seen[8];
 	uint32_t buttons;
+#if defined(HOST_LINUX)
+	uint8_t axis_count;
+	uint8_t button_count;
+	uint8_t axis_map[ABS_CNT];
+	uint16_t button_map[KEY_MAX - BTN_MISC + 1];
+	int axis_map_valid;
+	int button_map_valid;
+#endif
 } FB_JOYDEV_XPAD;
 
 static FB_JOYDEV_XPAD joydev_xpad[XPAD_MAX_DEVICES];
@@ -342,6 +364,10 @@ static int xpad_joydev_open(int id)
 	pad = &joydev_xpad[id];
 	if (pad->fd >= 0)
 		return TRUE;
+	if (pad->open_retry_calls_remaining > 0u) {
+		--pad->open_retry_calls_remaining;
+		return FALSE;
+	}
 
 	for (i = 0; device_path[i]; ++i) {
 		snprintf(device_name, sizeof(device_name), "%s%d", device_path[i], id);
@@ -356,13 +382,28 @@ static int xpad_joydev_open(int id)
 			continue;
 		}
 
+#if defined(HOST_LINUX)
+		pad->axis_count = 0;
+		pad->button_count = 0;
+		pad->axis_map_valid = FALSE;
+		pad->button_map_valid = FALSE;
+		/* Some Linux joydev implementations return the copied map size. */
+		if (ioctl(pad->fd, FB_JSIOCGAXES, &pad->axis_count) >= 0)
+			pad->axis_map_valid = (ioctl(pad->fd, FB_JSIOCGAXMAP, pad->axis_map) >= 0);
+		if (ioctl(pad->fd, FB_JSIOCGBUTTONS, &pad->button_count) >= 0)
+			pad->button_map_valid = (ioctl(pad->fd, FB_JSIOCGBTNMAP, pad->button_map) >= 0);
+#endif
+
 		memset(pad->axis, 0, sizeof(pad->axis));
 		memset(pad->axis_seen, 0, sizeof(pad->axis_seen));
 		pad->buttons = 0;
+		pad->open_retry_calls_remaining = 0u;
 		pad->seen = TRUE;
 		return TRUE;
 	}
 
+	/* Keep absent slots hot-pluggable without opening them on every frame. */
+	pad->open_retry_calls_remaining = XPAD_MISSING_RETRY_CALLS;
 	return FALSE;
 }
 
@@ -421,11 +462,132 @@ static float xpad_joydev_trigger(FB_JOYDEV_XPAD *pad, int axis)
 	return xpad_clamp_unit((pad->axis[axis] + 1.0f) * 0.5f);
 }
 
+#if defined(HOST_LINUX)
+
+/*
+	Linux joydev axis and button numbers follow each device's input map, so
+	they are not a stable Xbox-style layout.  Resolve the event indices through
+	the kernel maps before assigning stick, trigger, face-button, and d-pad roles.
+*/
+static int xpad_joydev_find_axis(FB_JOYDEV_XPAD *pad, unsigned int code)
+{
+	int count = pad->axis_count;
+	int i;
+
+	if (!pad->axis_map_valid)
+		return -1;
+	if (count > 8)
+		count = 8;
+
+	for (i = 0; i < count; ++i) {
+		if (pad->axis_map[i] == code)
+			return i;
+	}
+
+	return -1;
+}
+
+static int xpad_joydev_find_button(FB_JOYDEV_XPAD *pad, unsigned int code)
+{
+	int count = pad->button_count;
+	int i;
+
+	if (!pad->button_map_valid)
+		return -1;
+	if (count > 32)
+		count = 32;
+
+	for (i = 0; i < count; ++i) {
+		if (pad->button_map[i] == code)
+			return i;
+	}
+
+	return -1;
+}
+
+static int xpad_joydev_button_pressed(FB_JOYDEV_XPAD *pad, unsigned int code)
+{
+	int index = xpad_joydev_find_button(pad, code);
+
+	return ((index >= 0) && (pad->buttons & (1u << index)));
+}
+
+static float xpad_joydev_axis_value(FB_JOYDEV_XPAD *pad, unsigned int code)
+{
+	int index = xpad_joydev_find_axis(pad, code);
+
+	if ((index < 0) || (index >= 8) || !pad->axis_seen[index])
+		return 0.0f;
+
+	return pad->axis[index];
+}
+
+static float xpad_joydev_trigger_code(FB_JOYDEV_XPAD *pad,
+	unsigned int primary_code, unsigned int alternate_code)
+{
+	int axis = xpad_joydev_find_axis(pad, primary_code);
+
+	if (axis < 0)
+		axis = xpad_joydev_find_axis(pad, alternate_code);
+
+	return xpad_joydev_trigger(pad, axis);
+}
+
+#endif
+
 static ssize_t xpad_joydev_buttons(FB_JOYDEV_XPAD *pad)
 {
 	ssize_t buttons = 0;
 	float left_trigger;
 	float right_trigger;
+
+#if defined(HOST_LINUX)
+	if (pad->button_map_valid) {
+		if (xpad_joydev_button_pressed(pad, BTN_SOUTH))
+			buttons |= XPAD_BUTTON_A;
+		if (xpad_joydev_button_pressed(pad, BTN_EAST))
+			buttons |= XPAD_BUTTON_B;
+		if (xpad_joydev_button_pressed(pad, BTN_WEST))
+			buttons |= XPAD_BUTTON_X;
+		if (xpad_joydev_button_pressed(pad, BTN_NORTH))
+			buttons |= XPAD_BUTTON_Y;
+		if (xpad_joydev_button_pressed(pad, BTN_TL))
+			buttons |= XPAD_BUTTON_L1;
+		if (xpad_joydev_button_pressed(pad, BTN_TR))
+			buttons |= XPAD_BUTTON_R1;
+		if (xpad_joydev_button_pressed(pad, BTN_TL2))
+			buttons |= XPAD_BUTTON_L2;
+		if (xpad_joydev_button_pressed(pad, BTN_TR2))
+			buttons |= XPAD_BUTTON_R2;
+		if (xpad_joydev_button_pressed(pad, BTN_SELECT))
+			buttons |= XPAD_BUTTON_SELECT;
+		if (xpad_joydev_button_pressed(pad, BTN_START))
+			buttons |= XPAD_BUTTON_START;
+		/* Handheld device trees often use these codes for the missing pad keys. */
+		if (xpad_joydev_button_pressed(pad, BTN_TRIGGER_HAPPY1))
+			buttons |= XPAD_BUTTON_SELECT;
+		if (xpad_joydev_button_pressed(pad, BTN_TRIGGER_HAPPY2))
+			buttons |= XPAD_BUTTON_START;
+		if (xpad_joydev_button_pressed(pad, BTN_TRIGGER_HAPPY3))
+			buttons |= XPAD_BUTTON_L3;
+		if (xpad_joydev_button_pressed(pad, BTN_TRIGGER_HAPPY4))
+			buttons |= XPAD_BUTTON_R3;
+		if (xpad_joydev_button_pressed(pad, BTN_MODE))
+			buttons |= XPAD_BUTTON_GUIDE;
+		if (xpad_joydev_button_pressed(pad, BTN_THUMBL))
+			buttons |= XPAD_BUTTON_L3;
+		if (xpad_joydev_button_pressed(pad, BTN_THUMBR))
+			buttons |= XPAD_BUTTON_R3;
+
+		left_trigger = xpad_joydev_trigger_code(pad, ABS_Z, ABS_BRAKE);
+		right_trigger = xpad_joydev_trigger_code(pad, ABS_RZ, ABS_GAS);
+		if (left_trigger > XPAD_TRIGGER_DIGITAL_THRESHOLD)
+			buttons |= XPAD_BUTTON_L2;
+		if (right_trigger > XPAD_TRIGGER_DIGITAL_THRESHOLD)
+			buttons |= XPAD_BUTTON_R2;
+		return buttons;
+	}
+#endif
 
 	if (pad->buttons & (1u << 0))
 		buttons |= XPAD_BUTTON_A;
@@ -463,6 +625,33 @@ static ssize_t xpad_joydev_buttons(FB_JOYDEV_XPAD *pad)
 static ssize_t xpad_joydev_dpad(FB_JOYDEV_XPAD *pad)
 {
 	ssize_t dpad = 0;
+
+#if defined(HOST_LINUX)
+	if (pad->button_map_valid) {
+		if (xpad_joydev_button_pressed(pad, BTN_DPAD_UP))
+			dpad |= XPAD_DPAD_UP;
+		if (xpad_joydev_button_pressed(pad, BTN_DPAD_RIGHT))
+			dpad |= XPAD_DPAD_RIGHT;
+		if (xpad_joydev_button_pressed(pad, BTN_DPAD_DOWN))
+			dpad |= XPAD_DPAD_DOWN;
+		if (xpad_joydev_button_pressed(pad, BTN_DPAD_LEFT))
+			dpad |= XPAD_DPAD_LEFT;
+	}
+	if (pad->axis_map_valid) {
+		float hat_x = xpad_joydev_axis_value(pad, ABS_HAT0X);
+		float hat_y = xpad_joydev_axis_value(pad, ABS_HAT0Y);
+		if (hat_x < -0.5f)
+			dpad |= XPAD_DPAD_LEFT;
+		else if (hat_x > 0.5f)
+			dpad |= XPAD_DPAD_RIGHT;
+		if (hat_y < -0.5f)
+			dpad |= XPAD_DPAD_UP;
+		else if (hat_y > 0.5f)
+			dpad |= XPAD_DPAD_DOWN;
+	}
+	if (pad->button_map_valid || pad->axis_map_valid)
+		return dpad;
+#endif
 
 	if (pad->axis_seen[7]) {
 		if (pad->axis[7] < -0.5f)
@@ -503,6 +692,26 @@ static int xpad_joydev_get(int id, ssize_t *buttons,
 
 	if (buttons)
 		*buttons = xpad_joydev_buttons(pad);
+#if defined(HOST_LINUX)
+	if (lstick_x)
+		*lstick_x = pad->axis_map_valid ? xpad_joydev_axis_value(pad, ABS_X) :
+			(pad->axis_seen[0] ? pad->axis[0] : 0.0f);
+	if (lstick_y)
+		*lstick_y = pad->axis_map_valid ? -xpad_joydev_axis_value(pad, ABS_Y) :
+			(pad->axis_seen[1] ? -pad->axis[1] : 0.0f);
+	if (rstick_x)
+		*rstick_x = pad->axis_map_valid ? xpad_joydev_axis_value(pad, ABS_RX) :
+			(pad->axis_seen[3] ? pad->axis[3] : 0.0f);
+	if (rstick_y)
+		*rstick_y = pad->axis_map_valid ? -xpad_joydev_axis_value(pad, ABS_RY) :
+			(pad->axis_seen[4] ? -pad->axis[4] : 0.0f);
+	if (ltrigger)
+		*ltrigger = pad->axis_map_valid ? xpad_joydev_trigger_code(pad, ABS_Z, ABS_BRAKE) :
+			xpad_joydev_trigger(pad, 2);
+	if (rtrigger)
+		*rtrigger = pad->axis_map_valid ? xpad_joydev_trigger_code(pad, ABS_RZ, ABS_GAS) :
+			xpad_joydev_trigger(pad, 5);
+#else
 	if (lstick_x)
 		*lstick_x = pad->axis_seen[0] ? pad->axis[0] : 0.0f;
 	if (lstick_y)
@@ -515,6 +724,7 @@ static int xpad_joydev_get(int id, ssize_t *buttons,
 		*ltrigger = xpad_joydev_trigger(pad, 2);
 	if (rtrigger)
 		*rtrigger = xpad_joydev_trigger(pad, 5);
+#endif
 	if (dpad)
 		*dpad = xpad_joydev_dpad(pad);
 

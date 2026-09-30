@@ -387,10 +387,11 @@ private function hMacro_getArgZ( byval argtb as LEXPP_ARGTB ptr, byval num as in
 
 end function
 
-private function hMacro_getArgW( byval argtb as LEXPP_ARGTB ptr, byval num as integer = 0 ) as wstring ptr
+private function hMacro_getArgW( byval argtb as LEXPP_ARGTB ptr, byval num as integer = 0, byref arglen as integer = 0 ) as wstring ptr
 
 	static as DWSTRING res
 	DWstrAssign( res, NULL )
+	arglen = 0
 
 	if( env.inf.format = FBFILE_FORMAT_ASCII ) then
 		var dt = argtb->tb(num).text.data
@@ -405,6 +406,7 @@ private function hMacro_getArgW( byval argtb as LEXPP_ARGTB ptr, byval num as in
 		end if
 		DWstrConcatAssign(res, dt)
 	end if
+	arglen = res.len
 
 	function = res.data
 
@@ -1124,7 +1126,8 @@ private function hDefQuoteW_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum as 
 
 	'' __FB_QUOTE__( arg )
 
-	var arg = hMacro_getArgW( argtb, 0 )
+	dim as integer arglen
+	var arg = hMacro_getArgW( argtb, 0, arglen )
 	static as DWSTRING res, quotew, quotequotew, dollarquotew
 
 	DWstrAssign( res, NULL )
@@ -1140,7 +1143,7 @@ private function hDefQuoteW_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum as 
 	if( arg <> NULL ) then
 		'' don't escape, preserve the sequences as-is
 		DWstrConcatAssign( res, dollarquotew.data )
-		DWstrConcatAssign( res, hReplaceW( arg, quotew.data, quotequotew.data ) )
+		DWstrConcatAssign( res, hReplaceW( arg, quotew.data, quotequotew.data, arglen ) )
 		DWstrConcatAssign( res, quotew.data )
 	else
 		'' If it's empty, produce an empty string ("")
@@ -1199,7 +1202,8 @@ private function hDefUnquoteW_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum a
 
 	'' __FB_UNQUOTE__( arg )
 
-	var arg = hMacro_getArgW( argtb, 0 )
+	dim as integer arglen
+	var arg = hMacro_getArgW( argtb, 0, arglen )
 	static as DWSTRING res, quotew, quotequotew
 	const DOLLAR_QUOTED_PREFIX_LENGTH = 2
 	const ESCAPED_QUOTED_PREFIX_LENGTH = 2
@@ -1214,22 +1218,25 @@ private function hDefUnquoteW_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum a
 
 	'' arg must be of the form [$]"[text]"
 	if( arg <> NULL ) then
-		var length = len(*arg)
+		var length = arglen
 
 		'' $"[text]"?
 		if( (length >= DOLLAR_QUOTED_PREFIX_LENGTH + 1) andalso ((arg[0] = asc( "$" )) and (arg[1] = asc(QUOTE)) and (arg[length-1] = asc(QUOTE))) ) then
-			DWstrAssign( res, hReplaceW( mid( *arg, DOLLAR_QUOTED_PREFIX_LENGTH + 1, length-DOLLAR_QUOTED_PREFIX_LENGTH-1 ), quotequotew.data, quotew.data ) )
+			DWstrAssign( res, hReplaceW( @arg[DOLLAR_QUOTED_PREFIX_LENGTH], quotequotew.data, quotew.data, _
+									 length-DOLLAR_QUOTED_PREFIX_LENGTH-1 ) )
 
 		'' !"[escaped text]"?
 		elseif( (length >= ESCAPED_QUOTED_PREFIX_LENGTH + 1) andalso ((arg[0] = asc( "!" )) and (arg[1] = asc(QUOTE)) and (arg[length-1] = asc(QUOTE))) ) then
-			DWstrAssign( res, hReplaceW( mid( *arg, ESCAPED_QUOTED_PREFIX_LENGTH + 1, length-ESCAPED_QUOTED_PREFIX_LENGTH-1 ), quotequotew.data, quotew.data ) )
+			DWstrAssign( res, hReplaceW( @arg[ESCAPED_QUOTED_PREFIX_LENGTH], quotequotew.data, quotew.data, _
+									 length-ESCAPED_QUOTED_PREFIX_LENGTH-1 ) )
 			dim as integer textlen
 			DWstrAssign( res, hReEscapeW( res.data, textlen ) )
 			DWstrAssign( res, hUnescapeW( res.data ) )
 
 		'' "[text]"?
 		elseif( (length >= QUOTED_STRING_DELIMITER_LENGTH) andalso ((arg[0] = asc(QUOTE)) and (arg[length-1] = asc(QUOTE))) ) then
-			DWstrAssign( res, hReplaceW( mid( *arg, QUOTED_STRING_DELIMITER_LENGTH, length-QUOTED_STRING_DELIMITER_LENGTH ), quotequotew.data, quotew.data ) )
+			DWstrAssign( res, hReplaceW( @arg[QUOTED_STRING_DELIMITER_LENGTH-1], quotequotew.data, quotew.data, _
+									 length-QUOTED_STRING_DELIMITER_LENGTH ) )
 			if( env.opt.escapestr ) then
 				dim as integer textlen
 				DWstrAssign( res, hReEscapeW( res.data, textlen ) )

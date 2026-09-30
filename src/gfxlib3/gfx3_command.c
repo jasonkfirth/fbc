@@ -239,6 +239,7 @@ int fb_gfx3_queue_init(FB_GFX3_COMMAND_QUEUE *queue, size_t capacity)
 		goto fail;
 
 	queue->capacity = capacity;
+	queue->byte_capacity = FB_GFX3_QUEUE_BYTE_CAPACITY;
 	queue->next_sequence = 1;
 	queue->accepting = TRUE;
 	return FB_GFX3_OK;
@@ -251,6 +252,41 @@ fail:
 	free((void *)queue->slots);
 	memset(queue, 0, sizeof(*queue));
 	return FB_GFX3_OUT_OF_MEMORY;
+}
+
+/* Caller holds queue->mutex. */
+static int fb_gfx3_queue_has_byte_capacity_locked(
+	const FB_GFX3_COMMAND_QUEUE *queue, size_t additional_bytes)
+{
+	if (queue->count == 0) {
+		/* A single valid large upload must not deadlock an otherwise empty queue. */
+		return queue->queued_bytes == 0;
+	}
+	if ((additional_bytes > queue->byte_capacity) ||
+	    (queue->queued_bytes > queue->byte_capacity - additional_bytes))
+		return FALSE;
+	return TRUE;
+}
+
+/* Caller holds queue->mutex and the queue is not empty. */
+static FB_GFX3_COMMAND *fb_gfx3_queue_take_head_locked(
+	FB_GFX3_COMMAND_QUEUE *queue)
+{
+	FB_GFX3_COMMAND *command = queue->slots[queue->head];
+
+	queue->slots[queue->head] = NULL;
+	queue->head++;
+	if (queue->head == queue->capacity)
+		queue->head = 0;
+	queue->count--;
+	if ((command != NULL) && (command->size <= queue->queued_bytes))
+		queue->queued_bytes -= command->size;
+	else
+		queue->queued_bytes = 0;
+	if (queue->count == 0)
+		queue->queued_bytes = 0;
+	fb_CondSignal(queue->can_write);
+	return command;
 }
 
 void fb_gfx3_queue_close(FB_GFX3_COMMAND_QUEUE *queue)
@@ -294,8 +330,9 @@ static int fb_gfx3_queue_submit_internal(FB_GFX3_COMMAND_QUEUE *queue,
 		return FB_GFX3_INVALID;
 
 	fb_MutexLock(queue->mutex);
-	while ((queue->count == queue->capacity) && queue->accepting &&
-	       !queue->failed)
+	while (((queue->count == queue->capacity) ||
+		!fb_gfx3_queue_has_byte_capacity_locked(queue, command->size)) &&
+	       queue->accepting && !queue->failed)
 		fb_CondWait(queue->can_write, queue->mutex);
 
 	if (queue->failed) {
@@ -320,6 +357,7 @@ static int fb_gfx3_queue_submit_internal(FB_GFX3_COMMAND_QUEUE *queue,
 		queue->next_sequence++;
 
 	command->sequence = assigned_sequence;
+	queue->queued_bytes += command->size;
 	queue->slots[queue->tail] = command;
 	queue->tail++;
 	if (queue->tail == queue->capacity)
@@ -347,6 +385,7 @@ int fb_gfx3_queue_submit_many(FB_GFX3_COMMAND_QUEUE *queue,
 	FB_GFX3_COMMAND *const *commands, size_t count, uint64_t *sequence)
 {
 	uint64_t assigned_sequence = 0;
+	size_t command_bytes = 0;
 	size_t index;
 
 	if ((queue == NULL) || (commands == NULL) || (count == 0) ||
@@ -360,11 +399,27 @@ int fb_gfx3_queue_submit_many(FB_GFX3_COMMAND_QUEUE *queue,
 		    (command->size < offsetof(FB_GFX3_COMMAND, payload)) ||
 		    (command->size > FB_GFX3_COMMAND_MAX_SIZE))
 			return FB_GFX3_INVALID;
+		if ((size_t)command->size > SIZE_MAX - command_bytes)
+			return FB_GFX3_INVALID;
+		command_bytes += command->size;
 	}
 
 	fb_MutexLock(queue->mutex);
-	while ((queue->count > queue->capacity - count) && queue->accepting &&
-	       !queue->failed)
+	if (queue->failed) {
+		fb_MutexUnlock(queue->mutex);
+		return FB_GFX3_FAILED;
+	}
+	if (!queue->accepting) {
+		fb_MutexUnlock(queue->mutex);
+		return FB_GFX3_CLOSED;
+	}
+	if (command_bytes > queue->byte_capacity) {
+		fb_MutexUnlock(queue->mutex);
+		return FB_GFX3_INVALID;
+	}
+	while (((queue->count > queue->capacity - count) ||
+		!fb_gfx3_queue_has_byte_capacity_locked(queue, command_bytes)) &&
+	       queue->accepting && !queue->failed)
 		fb_CondWait(queue->can_write, queue->mutex);
 	if (queue->failed) {
 		fb_MutexUnlock(queue->mutex);
@@ -390,6 +445,7 @@ int fb_gfx3_queue_submit_many(FB_GFX3_COMMAND_QUEUE *queue,
 			queue->tail = 0;
 		queue->count++;
 	}
+	queue->queued_bytes += command_bytes;
 	if (sequence != NULL)
 		*sequence = assigned_sequence;
 	fb_CondSignal(queue->can_read);
@@ -424,14 +480,7 @@ int fb_gfx3_queue_pop(FB_GFX3_COMMAND_QUEUE *queue,
 		return FB_GFX3_CLOSED;
 	}
 
-	*command = queue->slots[queue->head];
-	queue->slots[queue->head] = NULL;
-	queue->head++;
-	if (queue->head == queue->capacity)
-		queue->head = 0;
-	queue->count--;
-
-	fb_CondSignal(queue->can_write);
+	*command = fb_gfx3_queue_take_head_locked(queue);
 	fb_MutexUnlock(queue->mutex);
 	return FB_GFX3_OK;
 }
@@ -454,13 +503,7 @@ int fb_gfx3_queue_try_pop(FB_GFX3_COMMAND_QUEUE *queue,
 		fb_MutexUnlock(queue->mutex);
 		return result;
 	}
-	*command = queue->slots[queue->head];
-	queue->slots[queue->head] = NULL;
-	queue->head++;
-	if (queue->head == queue->capacity)
-		queue->head = 0;
-	queue->count--;
-	fb_CondSignal(queue->can_write);
+	*command = fb_gfx3_queue_take_head_locked(queue);
 	fb_MutexUnlock(queue->mutex);
 	return FB_GFX3_OK;
 }
@@ -480,13 +523,7 @@ size_t fb_gfx3_queue_discard(FB_GFX3_COMMAND_QUEUE *queue, int status)
 			break;
 		}
 
-		command = queue->slots[queue->head];
-		queue->slots[queue->head] = NULL;
-		queue->head++;
-		if (queue->head == queue->capacity)
-			queue->head = 0;
-		queue->count--;
-		fb_CondSignal(queue->can_write);
+		command = fb_gfx3_queue_take_head_locked(queue);
 		fb_MutexUnlock(queue->mutex);
 
 		/*

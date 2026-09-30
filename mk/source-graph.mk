@@ -288,9 +288,10 @@ endif
 # GFXLIB3 sources
 ##############################################################################
 
-# gfxlib3 currently has native Android/EGL, Darwin/Cocoa, Linux/X11, and
-# Win32/WGL adapters. Target sources override generic stubs with the same
-# basename, matching the source precedence used by gfxlib2, rtlib, and sfxlib.
+# gfxlib3 currently has native Android/EGL, Darwin/Cocoa, Linux/X11,
+# Linux DRM/GBM/EGL, and Win32/WGL adapters. Target sources override generic
+# stubs with the same basename, matching the source precedence used by
+# gfxlib2, rtlib, and sfxlib.
 GFX3_SRC_GENERIC := $(wildcard $(srcdir)/gfxlib3/*.c)
 GFX3_SRC_TARGET :=
 ifneq ($(filter $(SOURCE_OS),$(GFXLIB3_PLATFORM_OS)),)

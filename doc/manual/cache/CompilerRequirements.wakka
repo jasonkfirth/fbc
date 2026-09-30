@@ -15,7 +15,7 @@ FreeBASIC's requirements depend on whether the compiler runs natively on the hos
 
 {{fbdoc item="section" value="Linux and hosted Unix systems"}}
 	- Console programs normally need the platform C runtime, math, threading, dynamic-loading, and terminal libraries selected by the package.  Building from source also needs GNU make and a supported GCC or clang toolchain.
-	- gfxlib2 desktop programs normally use X11 and the X extension libraries installed by the package.  gfxlib3 additionally needs a working OpenGL or Vulkan loader and driver on its supported Linux/X11 hosts.
+	- gfxlib2 desktop programs normally use X11 and the X extension libraries installed by the package.  gfxlib3 on Linux/X11 needs a working OpenGL or Vulkan loader and driver.  Its SDL2 KMSDRM path also needs SDL2 with the KMSDRM video driver and a working EGL/OpenGL ES 3 implementation.
 	- sfxlib links the platform audio interfaces selected at package build time.  Linux packages commonly use ALSA and PulseAudio development link interfaces; BSD, Haiku, Darwin, Solaris/illumos, and other targets use their own backends.
 	- Cross-architecture packages need a target sysroot, linker, and development libraries for the target architecture.  Host libraries with the same names are not substitutes.
 

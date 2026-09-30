@@ -71,6 +71,8 @@ const as ulong destination_color = &hFF204060u
 const as ulong source_color = &h8030C080u
 dim as ulong expected_color = alpha_primitive_pixel( source_color, _
 	destination_color )
+dim as ulong expected_repeated_clear_color = alpha_primitive_pixel( _
+	source_color, expected_color )
 
 if screenres( 64, 64, 32, 2, backend_flags ) <> 0 then end 2
 
@@ -179,10 +181,23 @@ imagedestroy cpu_image
 
 '' CLS uses the mode background color as a primitive color in gfxlib2. It
 '' therefore blends over the current page when alpha primitives are enabled.
+'' Leave one newer CPU-shadow pixel pending to check that CLS uploads its
+'' destination before blending, while the neighboring pixel blends only once.
 line ( 0, 0 )-( 63, 63 ), destination_color, bf
+if culng( point( 32, 32 ) ) <> destination_color then end 22
+pset ( 32, 32 ), source_color
+if culng( point( 32, 32 ) ) <> expected_color then end 23
 color , source_color
 cls
-if culng( point( 32, 32 ) ) <> expected_color then end 19
+actual_color = culng( point( 32, 32 ) )
+if actual_color <> expected_repeated_clear_color then
+	screen 0
+	print "CLS pending shadow expected " & _
+		hex( expected_repeated_clear_color, 8 ) & ", got " & _
+		hex( actual_color, 8 )
+	end 24
+end if
+if culng( point( 31, 32 ) ) <> expected_color then end 25
 
 alpha_enabled = false
 screencontrol fb.SET_ALPHA_PRIMITIVES, alpha_enabled

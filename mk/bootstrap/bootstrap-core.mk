@@ -134,6 +134,10 @@ bootstrap-minimal:
 
 	@echo "==> Building bootstrap compiler"
 
+	# Bootstrap-minimal uses different feature flags from the normal runtime.
+	# Remove regular objects first so Make cannot reuse an incompatible archive.
+	$(MAKE) clean-libs
+
 	$(MAKE) BOOTSTRAP_MINIMAL=YesPlease $(BOOTSTRAP_FBC)
 
 	@echo "==> Installing bootstrap compiler"

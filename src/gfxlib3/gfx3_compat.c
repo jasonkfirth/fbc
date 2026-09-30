@@ -706,12 +706,14 @@ static int compat_ensure_truecolor_shadow(FB_GFX3_DRAW_STATE *state,
 }
 
 int fb_gfx3_compat_replace_shadow_after_full_clear_graphics_locked(
-	FB_GFX3_DRAW_STATE *state, uint32_t color)
+	FB_GFX3_DRAW_STATE *state, uint32_t color, uint32_t flags,
+	int preserve_locked_dirty)
 {
 	FB_GFX3_MODE *mode = compat_state_graphics_locked(state);
 	uint32_t page;
 	size_t pixel_count;
 	size_t index;
+	int alpha_blend = (flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u;
 	int result;
 
 	if (mode == NULL)
@@ -757,6 +759,21 @@ int fb_gfx3_compat_replace_shadow_after_full_clear_graphics_locked(
 		compat_clear_shadow_dirty(mode, page);
 		return FB_GFX3_INVALID;
 	}
+	if (alpha_blend && !mode->shadow_valid[page]) {
+		if (mode->access_lock_count == 0u) {
+			compat_clear_shadow_dirty(mode, page);
+			return FB_GFX3_OK;
+		}
+		result = fb_gfx3_surface_download(&mode->pages[page], 0, 0,
+			mode->width, mode->height, mode->shadow_pitch,
+			mode->shadow_pages[page]);
+		if (result != FB_GFX3_OK) {
+			mode->shadow_valid[page] = FALSE;
+			compat_clear_shadow_dirty(mode, page);
+			return result;
+		}
+		mode->shadow_valid[page] = TRUE;
+	}
 	if (mode->depth == 16) {
 		uint16_t *pixels = (uint16_t *)mode->shadow_pages[page];
 		uint16_t packed_color = (uint16_t)color;
@@ -766,8 +783,14 @@ int fb_gfx3_compat_replace_shadow_after_full_clear_graphics_locked(
 	} else {
 		uint32_t *pixels = (uint32_t *)mode->shadow_pages[page];
 
-		for (index = 0u; index < pixel_count; ++index)
-			pixels[index] = color;
+		if (alpha_blend) {
+			for (index = 0u; index < pixel_count; ++index)
+				pixels[index] = compat_alpha_primitive_pixel(color,
+					pixels[index]);
+		} else {
+			for (index = 0u; index < pixel_count; ++index)
+				pixels[index] = color;
+		}
 	}
 	mode->shadow_valid[page] = TRUE;
 	/*
@@ -777,6 +800,8 @@ int fb_gfx3_compat_replace_shadow_after_full_clear_graphics_locked(
 	*/
 	if (mode->access_lock_count == 0u)
 		compat_clear_shadow_dirty(mode, page);
+	else if (preserve_locked_dirty)
+		compat_mark_shadow_dirty(mode, page, 0u, mode->height - 1u);
 	return FB_GFX3_OK;
 }
 
@@ -1227,7 +1252,9 @@ static int compat_commit_locked_shadow(FB_GFX3_DRAW_STATE *state,
 	const unsigned char *pixels;
 	int result;
 
-	if (((mode->depth != 16) && (mode->depth != 32)) ||
+	/* Indexed shadows store one byte per pixel and need the same upload boundary. */
+	if (!(((mode->depth >= 1u) && (mode->depth <= 8u)) ||
+	      (mode->depth == 16u) || (mode->depth == 32u)) ||
 	    (page >= mode->page_count) ||
 	    (mode->shadow_dirty == NULL) ||
 	    !mode->shadow_dirty[page])
