@@ -226,6 +226,13 @@ type AST_NODE_BREAK
 	scope           as integer
 	linenum         as integer
 	stmtnum         as integer                      '' can't use colnum as it's unreliable
+	'' Physical source token for a parsed control-flow exit, retained until
+	'' scope cleanup is lowered after the parser has closed the block.
+	semantic_dependency       as integer
+	semantic_start_line       as integer
+	semantic_start_column     as integer
+	semantic_end_line         as integer
+	semantic_end_column       as integer
 end type
 
 type AST_BREAKLIST

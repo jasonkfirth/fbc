@@ -120,6 +120,9 @@ callee occurrence. Consumers should require a physical range before projecting
 the actual argument, and should map the owner through its exact parameter
 declaration. Schema 11 and later include an opaque stable target signature;
 older schema 10 relationships do not carry that overload discriminator.
+For `NEW`, the owner range is the exact written UDT type; the selected default
+constructor is exported for scalar `NEW Type` as well as vector `NEW Type[n]`,
+and the selected overload is exported for scalar `NEW Type(args)`.
 
 Schema 14 adds `temporary-destructor` for a compiler-selected UDT destructor
 that is emitted while flushing the temporary-destruction list. Its source range
@@ -133,6 +136,30 @@ without a retained physical range, including macro-expanded expressions, are
 omitted. This record does not expand the later scope-exit control-flow cleanup
 for declared locals; their declaration-anchored destructor selections use the
 separate `destructor-call` relationship.
+
+Schema 15 adds `scope-exit-destructor` for a compiler-selected destructor
+inserted while lowering a `GOTO`, `RETURN`, `EXIT`, or `CONTINUE` that leaves a
+scope containing a declared UDT local. The physical range identifies only the
+branch keyword, while the owner is the exact local variable and the owner UDT
+is its declared type. This records the compiler's cleanup edge, not a source
+call; it must never be treated as an editable token. Edges whose branch keyword
+comes from a macro, has a remapped/nonphysical location, or cannot be tied to a
+verified source range are omitted. Only emitted destructors for which the
+compiler selected a concrete UDT destructor are recorded.
+
+Schema 16 adds `delete-destructor` for the UDT destructor selected by scalar
+`DELETE` and vector `DELETE[]`. The physical range identifies the `DELETE`
+keyword, and the owner and owner-type IDs both identify the exact pointee UDT.
+The relationship records compiler-selected cleanup only; it does not identify
+an editable destructor call. Non-UDT cleanup and operations without a concrete
+UDT destructor are not emitted.
+
+Schema 17 adds `return-constructor` when a `RETURN` expression is converted by
+a compiler-selected constructor to the enclosing function's UDT result. Its
+physical range covers the actual return expression; owner and owner-type IDs
+both identify the exact result UDT. The relationship has no editable callee
+token, and macro-derived or otherwise nonphysical return expressions remain
+informational rather than project-edit occurrences.
 
 Dependency records are emitted once per normalized source path in compiler
 read order. The root module is included, as are successfully opened include and

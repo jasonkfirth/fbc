@@ -164,6 +164,10 @@ function cOperatorNew( ) as ASTNODE ptr
 				'' only if not a vector
 				if( op <> AST_OP_NEW_VEC ) then
 					initexpr = cCtorCall( subtype )
+					if( (initexpr <> NULL) and astIsCALLCTOR(initexpr) ) then
+						fbSemanticModelExportImplicitCall(subtype, astGetSymbol(initexpr->l), _
+							"new-constructor", semantic_site)
+					end if
 				else
 					'' Check visibility of the default constructor
 					if( symbCheckAccess( ctor ) = FALSE ) then
@@ -229,7 +233,8 @@ end function
 sub cOperatorDelete( )
 	dim as ASTNODE ptr ptrexpr = any
 	dim as integer dtype = any, op = any
-	dim as FBSYMBOL ptr subtype = any
+	dim as FBSYMBOL ptr subtype = any, dtor = any
+	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
 
 	'' DELETE
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -277,8 +282,11 @@ sub cOperatorDelete( )
 	'' Check visibility
 	if( typeHasDtor( typeDeref( dtype ), subtype ) ) then
 		'' Check visibility of the destructor
-		if( symbCheckAccess( symbGetCompDtor1( subtype ) ) = FALSE ) then
+		dtor = symbGetCompDtor1( subtype )
+		if( symbCheckAccess( dtor ) = FALSE ) then
 			errReport( FB_ERRMSG_NOACCESSTODTOR )
+		elseif( (subtype <> NULL) and symbIsStruct( subtype ) ) then
+			fbSemanticModelExportImplicitCall(subtype, dtor, "delete-destructor", semantic_site)
 		end if
 	end if
 

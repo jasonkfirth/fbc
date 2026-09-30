@@ -42,7 +42,7 @@
 '' Export limits and process-local module state
 '' -------------------------------------------------------------------------
 
-private const SEMANTIC_MODEL_SCHEMA = "14"
+private const SEMANTIC_MODEL_SCHEMA = "17"
 private const SEMANTIC_MODEL_MAX_SYMBOLS = 1000000
 private const SEMANTIC_MODEL_MAX_DEPENDENCIES = 5000
 private const SEMANTIC_MODEL_INITIAL_SYMBOL_INDEX_CAPACITY = 256
@@ -98,6 +98,9 @@ dim shared as integer semantic_model_source_scan_format
 dim shared as longint semantic_model_source_scan_filepos
 dim shared as string semantic_model_source_scan_file
 dim shared as LEX_LOCATION semantic_model_active_expression_start
+dim shared as LEX_LOCATION semantic_model_pending_scope_exit_source
+dim shared as integer semantic_model_pending_scope_exit_valid
+dim shared as longint semantic_model_pending_scope_exit_nonphysical
 dim shared as longint semantic_model_active_expression_nonphysical
 dim shared as string semantic_model_last_expression_fact
 dim shared as integer semantic_model_pending_operator_override
@@ -130,6 +133,11 @@ dim shared as integer semantic_model_symbol_capacity
 dim shared as SEMANTIC_MODEL_SYMBOL_SLOT ptr semantic_model_symbol_index
 dim shared as integer semantic_model_symbol_index_capacity
 dim shared as ulongint semantic_model_next_symbol_identity
+
+declare function hSemanticModelRangeFitsCurrentSourceLine _
+	( _
+		byref source_end as LEX_LOCATION _
+	) as integer
 
 '' -------------------------------------------------------------------------
 '' Sidecar lifecycle state
@@ -643,23 +651,27 @@ private function hSemanticModelCallSignature _
 	return signature
 end function
 
-sub fbSemanticModelExportImplicitCall _
+private function hSemanticModelImplicitCallKindSupported(byref call_kind as const string) as integer
+	select case call_kind
+	case "default-constructor", "initializer-constructor", "new-constructor", _
+		"destructor-call", "argument-constructor", "temporary-destructor", _
+		"scope-exit-destructor", "delete-destructor", "return-constructor"
+		return TRUE
+	case else
+		return FALSE
+	end select
+end function
+
+private sub hSemanticModelEmitImplicitCall _
 	( _
 		byval owner as FBSYMBOL ptr, _
 		byval target as FBSYMBOL ptr, _
-		byval call_kind as string, _
-		byref source as LEX_LOCATION _
+		byref call_kind as const string, _
+		byref source as LEX_LOCATION, _
+		byval source_is_physical as integer _
 	)
 
-	if( (call_kind <> "default-constructor") and _
-		(call_kind <> "initializer-constructor") and _
-		(call_kind <> "new-constructor") and _
-		(call_kind <> "destructor-call") and _
-		(call_kind <> "argument-constructor") and _
-		(call_kind <> "temporary-destructor") ) then
-		exit sub
-	end if
-
+	if( hSemanticModelImplicitCallKindSupported(call_kind) = FALSE ) then exit sub
 	if( (semantic_model_file_open = FALSE) or _
 		(semantic_model_module_open = FALSE) or _
 		(semantic_model_expressions_only) or _
@@ -699,7 +711,7 @@ sub fbSemanticModelExportImplicitCall _
 	hSemanticModelAppendLine("I" + TABCHAR + hSemanticModelNumber(ownerid) + _
 		TABCHAR + hSemanticModelNumber(targetid) + _
 		TABCHAR + hSemanticModelNumber(typeid) + TABCHAR + call_kind + _
-		TABCHAR + hSemanticModelNumber(hSemanticModelLocationIsPhysical(source)) + _
+		TABCHAR + hSemanticModelNumber(abs(source_is_physical <> FALSE)) + _
 		TABCHAR + hSemanticModelEscape(source.source_file) + _
 		TABCHAR + hSemanticModelNumber(source.start_line) + _
 		TABCHAR + hSemanticModelNumber(source.start_column) + _
@@ -709,6 +721,103 @@ sub fbSemanticModelExportImplicitCall _
 	if( semantic_model_module_failed = FALSE ) then
 		semantic_model_module_implicit_call_count += 1
 	end if
+end sub
+
+sub fbSemanticModelExportImplicitCall _
+	( _
+		byval owner as FBSYMBOL ptr, _
+		byval target as FBSYMBOL ptr, _
+		byval call_kind as string, _
+		byref source as LEX_LOCATION _
+	)
+	if( hSemanticModelImplicitCallKindSupported(call_kind) = FALSE ) then exit sub
+	hSemanticModelEmitImplicitCall(owner, target, call_kind, source, _
+		hSemanticModelLocationIsPhysical(source))
+end sub
+
+sub fbSemanticModelSetPendingScopeExitSource _
+	( _
+		byref source as LEX_LOCATION, _
+		byval nonphysical_tokens as longint _
+	)
+	semantic_model_pending_scope_exit_valid = FALSE
+	if( (semantic_model_file_open = FALSE) or _
+		(semantic_model_module_open = FALSE) or _
+		(semantic_model_expressions_only) or _
+		(semantic_model_module_failed) ) then
+		exit sub
+	end if
+	semantic_model_pending_scope_exit_source = source
+	semantic_model_pending_scope_exit_nonphysical = nonphysical_tokens
+	semantic_model_pending_scope_exit_valid = TRUE
+end sub
+
+sub fbSemanticModelAttachPendingScopeExitSource(byval branch as ASTNODE ptr)
+	if( branch = NULL ) then
+		semantic_model_pending_scope_exit_valid = FALSE
+		exit sub
+	end if
+
+	branch->break.semantic_dependency = -1
+	branch->break.semantic_start_line = 0
+	branch->break.semantic_start_column = 0
+	branch->break.semantic_end_line = 0
+	branch->break.semantic_end_column = 0
+	if( semantic_model_pending_scope_exit_valid = FALSE ) then exit sub
+
+	dim as LEX_LOCATION source = semantic_model_pending_scope_exit_source
+	semantic_model_pending_scope_exit_valid = FALSE
+	if( (source.start_line < 1) or (source.start_column < 0) or _
+		(source.end_line < source.start_line) or (source.end_column < 0) or _
+		((source.end_line = source.start_line) and _
+		 (source.end_column <= source.start_column)) or _
+		(len(source.source_file) = 0) or _
+		(hSemanticModelLocationIsPhysical(source) = FALSE) or _
+		(lexGetNonphysicalTokenCount() <> semantic_model_pending_scope_exit_nonphysical) or _
+		(hSemanticModelRangeFitsCurrentSourceLine(source) = FALSE) ) then
+		exit sub
+	end if
+
+	fbSemanticModelAddDependency(source.source_file)
+	dim as integer source_dependency = -1
+	for index as integer = 0 to semantic_model_dependency_count - 1
+		if( semantic_model_dependencies(index) = source.source_file ) then
+			source_dependency = index
+			exit for
+		end if
+	next
+	if( source_dependency < 0 ) then exit sub
+
+	branch->break.semantic_dependency = source_dependency
+	branch->break.semantic_start_line = source.start_line
+	branch->break.semantic_start_column = source.start_column
+	branch->break.semantic_end_line = source.end_line
+	branch->break.semantic_end_column = source.end_column
+end sub
+
+sub fbSemanticModelExportScopeExitDestructor _
+	( _
+		byval owner as FBSYMBOL ptr, _
+		byval target as FBSYMBOL ptr, _
+		byval source_dependency as integer, _
+		byval start_line as integer, _
+		byval start_column as integer, _
+		byval end_line as integer, _
+		byval end_column as integer _
+	)
+
+	if( (source_dependency < 0) or _
+		(source_dependency >= semantic_model_dependency_count) ) then
+		exit sub
+	end if
+	dim as LEX_LOCATION source
+	source.source_file = semantic_model_dependencies(source_dependency)
+	source.start_line = start_line
+	source.start_column = start_column
+	source.end_line = end_line
+	source.end_column = end_column
+	source.is_physical = TRUE
+	hSemanticModelEmitImplicitCall(owner, target, "scope-exit-destructor", source, TRUE)
 end sub
 
 sub fbSemanticModelExportTemporaryDestructor _
@@ -1584,6 +1693,7 @@ end sub
 '' -------------------------------------------------------------------------
 
 function fbSemanticModelBegin(byref filename as string, byval expressions_only as integer) as integer
+	semantic_model_pending_scope_exit_valid = FALSE
 	if( semantic_model_file_open ) then
 		close #semantic_model_file_num
 		semantic_model_file_open = FALSE
@@ -1682,6 +1792,7 @@ end sub
 sub fbSemanticModelBeginModule(byref filename as string)
 	if( semantic_model_file_open = FALSE ) then exit sub
 
+	semantic_model_pending_scope_exit_valid = FALSE
 	semantic_model_source_bound_valid = FALSE
 	semantic_model_source_scan_valid = FALSE
 	semantic_model_active_expression_start.start_line = 0

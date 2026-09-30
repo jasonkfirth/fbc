@@ -12,6 +12,18 @@
 #include once "ast.bi"
 #include once "ir.bi"
 
+declare sub fbSemanticModelAttachPendingScopeExitSource(byval branch as ASTNODE ptr)
+declare sub fbSemanticModelExportScopeExitDestructor _
+	( _
+		byval owner as FBSYMBOL ptr, _
+		byval target as FBSYMBOL ptr, _
+		byval source_dependency as integer, _
+		byval start_line as integer, _
+		byval start_column as integer, _
+		byval end_line as integer, _
+		byval end_column as integer _
+	)
+
 declare function hCheckBranch _
 	( _
 		byval proc as ASTNODE ptr, _
@@ -95,6 +107,12 @@ sub astScopeBreak( byval target as FBSYMBOL ptr )
 	n->break.scope = parser.scope
 	n->break.linenum = lexLineNum( )
 	n->break.stmtnum = parser.stmt.cnt
+	n->break.semantic_dependency = -1
+	n->break.semantic_start_line = 0
+	n->break.semantic_start_column = 0
+	n->break.semantic_end_line = 0
+	n->break.semantic_end_column = 0
+	fbSemanticModelAttachPendingScopeExitSource(n)
 
 	'' the branch node is added, not the break itself, any
 	'' destructor will be added before this node when
@@ -373,10 +391,12 @@ private sub hDestroyBlockLocals _
 		byval blk as FBSYMBOL ptr, _
 		byval top_stmt as integer, _
 		byval bot_stmt as integer, _
-		byval base_expr as ASTNODE ptr _    '' the node before the branch, not itself!
+		byval base_expr as ASTNODE ptr, _	'' the node before the branch, not itself!
+		byval branch as ASTNODE ptr _		'' source token for this cleanup edge
 	)
 
 	dim as FBSYMBOL ptr s = any
+	dim as FBSYMBOL ptr dtor = any
 	dim as ASTNODE ptr expr = any
 	dim as integer stmt = any
 
@@ -397,6 +417,21 @@ private sub hDestroyBlockLocals _
 						'' call it..
 						expr = astBuildVarDtorCall( s, TRUE )
 						if( expr <> NULL ) then
+							if( (branch <> NULL) andalso _
+								(branch->break.semantic_dependency >= 0) ) then
+								dim as FBSYMBOL ptr subtype = symbGetSubtype(s)
+								if( (subtype <> NULL) and symbIsStruct(subtype) ) then
+									dtor = symbGetCompDtor1(subtype)
+									if( dtor <> NULL ) then
+										fbSemanticModelExportScopeExitDestructor( _
+											s, dtor, branch->break.semantic_dependency, _
+											branch->break.semantic_start_line, _
+											branch->break.semantic_start_column, _
+											branch->break.semantic_end_line, _
+											branch->break.semantic_end_column )
+									end if
+								end if
+							end if
 							base_expr = astAddAfter( expr, base_expr )
 						end if
 					end if
@@ -420,7 +455,8 @@ private sub hDelBackwardLocals _
 	hDestroyBlockLocals( n->break.parent->sym, _
 	                     symbGetLabelStmt( n->sym ), _
 	                     n->break.stmtnum, _
-	                     astGetPrev( n->l ) )
+	                     astGetPrev( n->l ), _
+	                     n )
 
 end sub
 
@@ -451,7 +487,8 @@ private sub hDelLocals _
 		hDestroyBlockLocals( blk->sym, _
 		                     0, _
 		                     branch_stmt, _
-		                     astGetPrev( n->l ) ) '' prev node will change
+		                     astGetPrev( n->l ), _
+		                     n ) '' prev node will change
 
 		blk = blk->block.parent
 		if( blk = NULL ) then
@@ -467,7 +504,8 @@ private sub hDelLocals _
 					hDestroyBlockLocals( blk->sym, _
 					                     label_stmt, _
 					                     branch_stmt, _
-					                     astGetPrev( n->l ) )
+					                     astGetPrev( n->l ), _
+					                     n )
 				end if
 			end if
 

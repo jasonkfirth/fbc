@@ -8,6 +8,12 @@
 #include once "ast.bi"
 #include once "rtl.bi"
 
+declare sub fbSemanticModelSetPendingScopeExitSource _
+	( _
+		byref source as LEX_LOCATION, _
+		byval nonphysical_tokens as longint _
+	)
+
 declare sub parserSelectStmtInit ( )
 declare sub parserSelectStmtEnd ( )
 declare sub parserSelConstStmtInit ( )
@@ -183,6 +189,8 @@ end function
 '' ExitStatement  =  EXIT (FOR | DO | WHILE | SELECT | SUB | FUNCTION)
 sub cExitStatement( )
 	dim as FBSYMBOL ptr label = NULL
+	dim as LEX_LOCATION semantic_source = lexGetCurrentLocation( )
+	dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
 
 	'' EXIT
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -378,12 +386,15 @@ sub cExitStatement( )
 		hExitError( FB_ERRMSG_INVALIDEXITSTMT )
 	end select
 
+	if( label <> NULL ) then fbSemanticModelSetPendingScopeExitSource(semantic_source, semantic_nonphysical)
 	astScopeBreak( label )
 end sub
 
 '' ContinueStatement  =  CONTINUE (FOR | DO | WHILE)
 sub cContinueStatement( )
 	dim as FBSYMBOL ptr label = NULL
+	dim as LEX_LOCATION semantic_source = lexGetCurrentLocation( )
+	dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
 
 	'' CONTINUE
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -469,6 +480,7 @@ sub cContinueStatement( )
 		hExitError( FB_ERRMSG_INVALIDCONTINUESTMT )
 	end select
 
+	if( label <> NULL ) then fbSemanticModelSetPendingScopeExitSource(semantic_source, semantic_nonphysical)
 	astScopeBreak( label )
 end sub
 

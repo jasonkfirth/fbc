@@ -9,6 +9,14 @@
 #include once "rtl.bi"
 #include once "ast.bi"
 
+declare sub fbSemanticModelExportImplicitCall _
+	( _
+		byval owner as FBSYMBOL ptr, _
+		byval target as FBSYMBOL ptr, _
+		byval call_kind as string, _
+		byref source as LEX_LOCATION _
+	)
+
 declare sub hCtorChain( )
 declare sub hBaseInit( )
 declare function hBaseMemberAccess( ) as integer
@@ -18,6 +26,9 @@ function cAssignFunctResult( byval is_return as integer ) as integer
 	dim as FBSYMBOL ptr res = any, subtype = any
 	dim as ASTNODE ptr rhs = any, expr = any
 	dim as integer has_ctor = any, has_defctor = any, assignoptions = any
+	dim as LEX_LOCATION semantic_site, semantic_start, semantic_end
+	dim as longint semantic_nonphysical = 0
+	dim as integer semantic_return_range_valid = FALSE
 
 	function = FALSE
 
@@ -98,7 +109,23 @@ function cAssignFunctResult( byval is_return as integer ) as integer
 			end if
 		end if
 	else
+		if( is_return ) then
+			lexGetToken( )
+			semantic_start = lexGetCurrentLocation( )
+			semantic_nonphysical = lexGetNonphysicalTokenCount( )
+		end if
 		rhs = cExpression( )
+		if( is_return and (rhs <> NULL) ) then
+			semantic_end = lexGetLastLocation( )
+			semantic_site = semantic_start
+			semantic_site.end_line = semantic_end.end_line
+			semantic_site.end_column = semantic_end.end_column
+			semantic_site.is_physical = semantic_start.is_physical and _
+				semantic_end.is_physical and _
+				(semantic_start.source_file = semantic_end.source_file) and _
+				(semantic_nonphysical = lexGetNonphysicalTokenCount( ))
+			semantic_return_range_valid = TRUE
+		end if
 	end if
 
 	parser.ctxsym = NULL
@@ -127,6 +154,11 @@ function cAssignFunctResult( byval is_return as integer ) as integer
 			end if
 
 			if( is_ctorcall ) then
+				if( semantic_return_range_valid ) then
+					fbSemanticModelExportImplicitCall( _
+						symbGetSubType( parser.currproc ), astGetSymbol( rhs ), _
+						"return-constructor", semantic_site )
+				end if
 				'' Result constructed by ctor call, no assignment needed after this.
 				astAdd( astPatchCtorCall( rhs, astBuildProcResultVar( parser.currproc, res ) ) )
 				return TRUE

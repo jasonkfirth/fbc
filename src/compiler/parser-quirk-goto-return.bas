@@ -16,12 +16,20 @@ declare sub fbSemanticModelExportBinding _
 		byval is_declaration as integer _
 	)
 
+declare sub fbSemanticModelSetPendingScopeExitSource _
+	( _
+		byref source as LEX_LOCATION, _
+		byval nonphysical_tokens as longint _
+	)
+
 '':::::
 private function hFuncReturn _
 	( _
 	) as integer
 
 	dim as integer checkexpr = any
+	dim as LEX_LOCATION semantic_source = lexGetCurrentLocation( )
+	dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
 
 	function = FALSE
 
@@ -60,6 +68,7 @@ private function hFuncReturn _
 	end if
 
 	'' do an implicit exit function
+	fbSemanticModelSetPendingScopeExitSource(semantic_source, semantic_nonphysical)
 	astScopeBreak( label )
 	function = TRUE
 
@@ -162,6 +171,8 @@ function cGotoStmt _
 	) as integer
 
 	dim as FBSYMBOL ptr l = any
+	dim as LEX_LOCATION semantic_source = lexGetCurrentLocation( )
+	dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
 
 	function = FALSE
 
@@ -172,6 +183,7 @@ function cGotoStmt _
 
 		l = hGetLabelId( )
 		if( l <> NULL ) then
+			fbSemanticModelSetPendingScopeExitSource(semantic_source, semantic_nonphysical)
 			astScopeBreak( l )
 		end if
 		function = TRUE
