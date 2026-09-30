@@ -58,7 +58,7 @@ facts, and mark retained facts provisional. The full-model reader must never
 treat a `RECOVERY` footer as a valid semantic model. Interrupted processes do
 not write this footer and remain invalid.
 
-## Schema version 9
+## Current record layout (schema version 14)
 
 Fields are separated by tabs. Literal percent signs, tabs, carriage returns,
 and line feeds inside names and paths are escaped as `%25`, `%09`, `%0D`, and
@@ -71,12 +71,13 @@ and line feeds inside names and paths are escaped as `%25`, `%09`, `%0D`, and
 | `D` | source path | Unique source file opened by the compiler invocation, including root modules and includes |
 | `S` | ID, name, symbol class, data type, subtype ID, scope, attributes, parameter attributes, length, offset, parent ID | Resolved compiler symbol |
 | `B` | symbol ID, role (`declaration` or `reference`), physical-range flag, source path, start line, start column, end line, end column | Compiler-resolved identifier occurrence |
+| `I` | owner symbol ID, selected procedure symbol ID, owner UDT symbol ID, relationship kind, physical-range flag, source path, start line, start column, end line, end column, target signature | Compiler-selected implicit construction or destruction relationship |
 | `P` | symbol ID, name, symbol class, data type, subtype ID, start line, end line, source path | Procedure metadata |
 | `V` | symbol ID, procedure name (empty for global scope), variable name, stable type kind | Resolved variable type fact (`pointer`, `numeric`, `dynamic-string`, `fixed-string`, `aggregate`, `procedure`, or `other`) |
 | `N` | ID, parent ID, child edge, AST class, raw operator, operator code, operator kind, data type, symbol ID, subtype ID, source line, source path | Typed AST node |
 | `E` | ID, physical-range flag, source path, start line, start column, end line, end column, AST class, raw operator, operator code, operator kind, data type, symbol ID, subtype ID, source type spelling | Type and resolved identity of one completed parser expression |
 | `R` | schema version, expression count for the preceding module | Explicitly recovered module in expression-only output |
-| `END` | schema version, module count, procedure count, symbol count, type-fact count, AST-node count, expression count, binding count, dependency count, dependency-complete flag | Completeness marker and record totals |
+| `END` | schema version, module count, procedure count, symbol count, type-fact count, AST-node count, expression count, binding count, implicit-call count, dependency count, dependency-complete flag | Completeness marker and record totals |
 | `RECOVERY` | schema version, module count, expression count, recovered-module count, binding count, dependency count, dependency-complete flag | Incomplete expression-only recovery marker and record totals |
 
 Binding occurrences preserve the compiler's resolved symbol identity rather
@@ -108,6 +109,30 @@ yet. The compiler tracks the opened include path
 separately from its logical filename; after a `#line` remap, `B` and `E` ranges
 are marked nonphysical until that source context ends. Expressions-only output
 deliberately omits `B` records.
+
+Implicit-call records were introduced in schema 10 for default, initializer,
+and `NEW` constructors. Schema 12 added destructor calls. Schema 13 adds
+`argument-constructor` for a constructor selected while converting an actual
+argument to a UDT formal parameter. Its source range is the actual expression;
+the owner symbol is the exact formal parameter, and the owner UDT is the
+parameter's declared type. This is a semantic relationship, not an editable
+callee occurrence. Consumers should require a physical range before projecting
+the actual argument, and should map the owner through its exact parameter
+declaration. Schema 11 and later include an opaque stable target signature;
+older schema 10 relationships do not carry that overload discriminator.
+
+Schema 14 adds `temporary-destructor` for a compiler-selected UDT destructor
+that is emitted while flushing the temporary-destruction list. Its source range
+is a verified physical parser range. Ordinary expression temporaries use their
+completed expression range; compiler-generated temporaries in `IIf()` use the
+`IIf()` range before conditional cleanup is flushed. The owner and owner-type
+IDs are both the exact UDT identity. This range provides semantic provenance
+only. It does not identify a written
+destructor token and must never become an edit or rename occurrence. Temporaries
+without a retained physical range, including macro-expanded expressions, are
+omitted. This record does not expand the later scope-exit control-flow cleanup
+for declared locals; their declaration-anchored destructor selections use the
+separate `destructor-call` relationship.
 
 Dependency records are emitted once per normalized source path in compiler
 read order. The root module is included, as are successfully opened include and

@@ -33,6 +33,14 @@
 
 declare function fbSemanticModelEnabled( ) as integer
 declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
+declare sub fbSemanticModelAssociateTemporaryDestructors _
+	( _
+		byval generation as ulongint, _
+		byref source_start as LEX_LOCATION, _
+		byref source_end as LEX_LOCATION, _
+		byval nonphysical_tokens_at_start as longint, _
+		byval nonphysical_tokens_at_end as longint _
+	)
 declare sub fbSemanticModelSetExpressionOperatorOverride _
 	( _
 		byref source_start as LEX_LOCATION, _
@@ -106,6 +114,7 @@ function cExpression _
 	dim as LEX_LOCATION source_start, source_end
 	dim as longint nonphysical_tokens_at_start
 	dim as integer export_semantics = fbSemanticModelEnabled( )
+	dim as ulongint semantic_dtor_generation = ast.dtorlistgeneration
 
 	if( export_semantics ) then
 		lexGetToken( )
@@ -119,6 +128,11 @@ function cExpression _
 	expr = cBoolExpression( )
 	if( export_semantics andalso (expr <> NULL) ) then
 		source_end = lexGetLastLocation( )
+		if( fbSemanticModelExpressionsOnlyEnabled( ) = FALSE ) then
+			fbSemanticModelAssociateTemporaryDestructors( _
+				semantic_dtor_generation, source_start, source_end, _
+				nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ) )
+		end if
 		fbSemanticModelExportExpression(expr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if

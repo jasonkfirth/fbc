@@ -1,4 +1,17 @@
 ''
+'' Project: FreeBASIC Compiler
+'' File: ir-llvm.bas
+''
+'' Purpose:
+''     Emit LLVM IR from the compiler's intermediate representation.
+''
+'' Responsibilities:
+''     - translate compiler operations into LLVM declarations and instructions
+''     - buffer ordered declaration, procedure, and debug output sections
+''
+'' This file intentionally does NOT contain:
+''     - source parsing or semantic-model export
+''
 '' IR interface for emitting LLVM IR to output file
 ''
 '' For comparison, see
@@ -91,6 +104,7 @@
 #include once "flist.bi"
 #include once "lex.bi"
 #include once "ir-private.bi"
+#include once "crt/mem.bi"
 
 enum
 	SECTION_HEAD  '' global declarations
@@ -123,6 +137,16 @@ end enum
 type BUILTIN
 	decl as zstring ptr
 	used as integer
+end type
+
+'' LLVM output sections are flushed in declaration, body, and debug order.
+'' Geometric buffers keep large modules from copying prior output per line.
+const LLVM_OUTPUT_BUFFER_INITIAL_CAPACITY = 8192
+
+type IRLLVMOUTPUTBUFFER
+	buffer          as ubyte ptr
+	bufferlen       as uinteger
+	buffercapacity  as uinteger
 end type
 
 dim shared as BUILTIN builtins(0 to BUILTIN__COUNT-1) => _
@@ -170,9 +194,9 @@ type IRLLVMCONTEXT
 	fbctinf_len         as integer
 
 	section             as integer  '' current section to write to
-	head_txt            as string
-	body_txt            as string
-	foot_txt            as string
+	head_txt            as IRLLVMOUTPUTBUFFER
+	body_txt            as IRLLVMOUTPUTBUFFER
+	foot_txt            as IRLLVMOUTPUTBUFFER
 end type
 
 declare function hEmitType _
@@ -258,24 +282,106 @@ end sub
 
 private sub _end( )
 	irhlEnd( )
+
+	if( ctx.head_txt.buffer <> NULL ) then
+		deallocate( ctx.head_txt.buffer )
+		ctx.head_txt.buffer = NULL
+	end if
+	ctx.head_txt.bufferlen = 0
+	ctx.head_txt.buffercapacity = 0
+
+	if( ctx.body_txt.buffer <> NULL ) then
+		deallocate( ctx.body_txt.buffer )
+		ctx.body_txt.buffer = NULL
+	end if
+	ctx.body_txt.bufferlen = 0
+	ctx.body_txt.buffercapacity = 0
+
+	if( ctx.foot_txt.buffer <> NULL ) then
+		deallocate( ctx.foot_txt.buffer )
+		ctx.foot_txt.buffer = NULL
+	end if
+	ctx.foot_txt.bufferlen = 0
+	ctx.foot_txt.buffercapacity = 0
+end sub
+
+private sub hAppendOutputBuffer _
+	( _
+		byval output_buffer as IRLLVMOUTPUTBUFFER ptr, _
+		byval src as const any ptr, _
+		byval bytes as uinteger _
+	)
+	dim as uinteger required = any
+	dim as uinteger newcapacity = any
+	dim as uinteger doubledcapacity = any
+	dim as ubyte ptr newbuffer = any
+
+	if( bytes = 0 ) then
+		exit sub
+	end if
+
+	'' Unsigned wrap would otherwise allow an undersized allocation and copy.
+	required = output_buffer->bufferlen + bytes
+	if( required < output_buffer->bufferlen ) then
+		error( 4 )
+		exit sub
+	end if
+
+	if( required > output_buffer->buffercapacity ) then
+		newcapacity = output_buffer->buffercapacity
+		if( newcapacity = 0 ) then
+			newcapacity = LLVM_OUTPUT_BUFFER_INITIAL_CAPACITY
+		end if
+
+		do while( newcapacity < required )
+			doubledcapacity = newcapacity shl 1
+
+			'' Once doubling would wrap, use the exact final request.
+			if( doubledcapacity <= newcapacity ) then
+				newcapacity = required
+				exit do
+			end if
+
+			newcapacity = doubledcapacity
+		loop
+
+		'' Keep the old allocation until reallocation has succeeded.
+		newbuffer = reallocate( output_buffer->buffer, newcapacity )
+		if( newbuffer = NULL ) then
+			error( 4 )
+			exit sub
+		end if
+
+		output_buffer->buffer = newbuffer
+		output_buffer->buffercapacity = newcapacity
+	end if
+
+	memcpy( output_buffer->buffer + output_buffer->bufferlen, src, bytes )
+	output_buffer->bufferlen = required
 end sub
 
 private sub hWriteLine( byref ln as string )
+	dim as IRLLVMOUTPUTBUFFER ptr output_buffer = any
+
 	if( (ctx.indent > 0) andalso (len( ln ) > 0) ) then
 		ln = string( ctx.indent, TABCHAR ) + ln
 	end if
 
 	ln += NEWLINE
 
-	'' Write it out to the current section
+	'' The full output is written in section order by _emitEnd().
 	select case as const( ctx.section )
 	case SECTION_HEAD
-		ctx.head_txt += ln
+		output_buffer = @ctx.head_txt
 	case SECTION_BODY
-		ctx.body_txt += ln
+		output_buffer = @ctx.body_txt
 	case SECTION_FOOT
-		ctx.foot_txt += ln
+		output_buffer = @ctx.foot_txt
+	case else
+		exit sub
 	end select
+
+	hAppendOutputBuffer( output_buffer, strptr( ln ), len( ln ) )
 end sub
 
 private sub hInternalCommand( byref message as string )
@@ -935,9 +1041,9 @@ private function _emitBegin( ) as integer
 	ctx.dtors = ""
 	ctx.ctorcount = 0
 	ctx.dtorcount = 0
-	ctx.head_txt = ""
-	ctx.body_txt = ""
-	ctx.foot_txt = ""
+	ctx.head_txt.bufferlen = 0
+	ctx.body_txt.bufferlen = 0
+	ctx.foot_txt.bufferlen = 0
 	ctx.linenum = 0
 	ctx.section = SECTION_HEAD
 
@@ -996,11 +1102,17 @@ private sub _emitEnd( )
 	ctx.section = SECTION_FOOT
 
 	' flush all sections to file
-	if( put( #env.outf.num, , ctx.head_txt ) <> 0 ) then
+	if( ctx.head_txt.bufferlen > 0 ) then
+		if( put( #env.outf.num, , *ctx.head_txt.buffer, ctx.head_txt.bufferlen ) <> 0 ) then
+		end if
 	end if
-	if( put( #env.outf.num, , ctx.body_txt ) <> 0 ) then
+	if( ctx.body_txt.bufferlen > 0 ) then
+		if( put( #env.outf.num, , *ctx.body_txt.buffer, ctx.body_txt.bufferlen ) <> 0 ) then
+		end if
 	end if
-	if( put( #env.outf.num, , ctx.foot_txt ) <> 0 ) then
+	if( ctx.foot_txt.bufferlen > 0 ) then
+		if( put( #env.outf.num, , *ctx.foot_txt.buffer, ctx.foot_txt.bufferlen ) <> 0 ) then
+		end if
 	end if
 
 	if( close( #env.outf.num ) <> 0 ) then
@@ -2658,7 +2770,9 @@ static as IR_VTBL irllvm_vtbl = _
 	@irhlAllocVrOfs, _
 	@_setVregDataType, _
 	NULL, _
-	NULL, _
-	NULL, _
-	NULL _
+NULL, _
+NULL, _
+NULL _
 )
+
+'' end of ir-llvm.bas

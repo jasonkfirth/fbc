@@ -348,6 +348,14 @@ type AST_DTORLIST_ITEM
 	cookie          as integer
 
 	refcount        as integer
+
+	'' Sidecar provenance is compact: dependency identity plus an expression range.
+	semantic_generation       as ulongint
+	semantic_dependency       as integer
+	semantic_start_line       as integer
+	semantic_start_column     as integer
+	semantic_end_line         as integer
+	semantic_end_column       as integer
 end type
 
 type AST_DTORLIST_SCOPESTACK
@@ -355,6 +363,21 @@ type AST_DTORLIST_SCOPESTACK
 	cookies as integer ptr
 	count   as integer
 	room    as integer
+end type
+
+'' Physical parser range borrowed by astNewIIF() only for the duration of the
+'' call. It lets compiler-generated branch temporaries retain source context
+'' when astTypeIniUpdate() creates and flushes them before cExpression() ends.
+type AST_SEMANTIC_SOURCE_RANGE
+	source_file			as zstring ptr
+	start_line			as integer
+	start_column		as integer
+	end_line			as integer
+	end_column			as integer
+	start_is_physical	as integer
+	end_is_physical		as integer
+	nonphysical_at_start	as longint
+	nonphysical_at_end		as longint
 end type
 
 type ASTCTX
@@ -390,6 +413,7 @@ type ASTCTX
 	dtorlist        as TLIST                        '' temp dtors list
 	dtorlistscopes  as AST_DTORLIST_SCOPESTACK      '' scope stack for astDtorListScope*()
 	dtorlistcookies as integer                      '' Cookie counter used to allocate new cookie numbers
+	dtorlistgeneration as ulongint                  '' monotonic temporary identity for semantic provenance
 	flushdtorlist   as integer
 
 	asmtoklist      as TLIST                        '' inline ASM token nodes
@@ -787,7 +811,8 @@ declare function astNewIIF _
 		byval truexpr as ASTNODE ptr, _
 		byval truecookie as integer, _
 		byval falsexpr as ASTNODE ptr, _
-		byval falsecookie as integer _
+		byval falsecookie as integer, _
+		byval semantic_range as AST_SEMANTIC_SOURCE_RANGE ptr = NULL _
 	) as ASTNODE ptr
 
 declare function astNewLINK _

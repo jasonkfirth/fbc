@@ -8,6 +8,12 @@
 #include once "ast.bi"
 #include once "rtl.bi"
 
+declare sub fbSemanticModelAssociateTemporaryDestructorsForRange _
+	( _
+		byval generation as ulongint, _
+		byval source_range as AST_SEMANTIC_SOURCE_RANGE ptr _
+	)
+
 function hCheckTypes _
 	( _
 		byval ldtype as integer, _
@@ -228,7 +234,8 @@ function astNewIIF _
 		byval truexpr as ASTNODE ptr, _
 		byval truecookie as integer, _
 		byval falsexpr as ASTNODE ptr, _
-		byval falsecookie as integer _
+		byval falsecookie as integer, _
+		byval semantic_range as AST_SEMANTIC_SOURCE_RANGE ptr _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr n = any, varexpr = any, foldedexpr = any
@@ -236,6 +243,7 @@ function astNewIIF _
 	dim as integer is_true_ctorcall = any, is_false_ctorcall = any
 	dim as integer call_true_defctor = any, call_false_defctor = any
 	dim as FBSYMBOL ptr falselabel = any, subtype = any, temp = any
+	dim as ulongint semantic_dtor_generation = ast.dtorlistgeneration
 
 	function = NULL
 
@@ -407,6 +415,14 @@ function astNewIIF _
 	astDtorListScopeBegin( falsecookie )
 	falsexpr = astTypeIniUpdate( falsexpr )
 	astDtorListScopeEnd( )
+
+	'' TYPEINI lowering above may create branch-local UDT temporaries that are
+	'' destroyed by the flushes below. Associate only those newly generated
+	'' entries; parser-created branch temporaries already have narrower ranges.
+	if( semantic_range <> NULL ) then
+		fbSemanticModelAssociateTemporaryDestructorsForRange( _
+			semantic_dtor_generation, semantic_range )
+	end if
 
 	'' Add dtor calls to the true/false code paths, behind the assignments
 	'' to the iif temp var, so that any temp vars constructed inside the

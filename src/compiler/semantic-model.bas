@@ -42,7 +42,7 @@
 '' Export limits and process-local module state
 '' -------------------------------------------------------------------------
 
-private const SEMANTIC_MODEL_SCHEMA = "12"
+private const SEMANTIC_MODEL_SCHEMA = "14"
 private const SEMANTIC_MODEL_MAX_SYMBOLS = 1000000
 private const SEMANTIC_MODEL_MAX_DEPENDENCIES = 5000
 private const SEMANTIC_MODEL_INITIAL_SYMBOL_INDEX_CAPACITY = 256
@@ -654,7 +654,9 @@ sub fbSemanticModelExportImplicitCall _
 	if( (call_kind <> "default-constructor") and _
 		(call_kind <> "initializer-constructor") and _
 		(call_kind <> "new-constructor") and _
-		(call_kind <> "destructor-call") ) then
+		(call_kind <> "destructor-call") and _
+		(call_kind <> "argument-constructor") and _
+		(call_kind <> "temporary-destructor") ) then
 		exit sub
 	end if
 
@@ -707,6 +709,30 @@ sub fbSemanticModelExportImplicitCall _
 	if( semantic_model_module_failed = FALSE ) then
 		semantic_model_module_implicit_call_count += 1
 	end if
+end sub
+
+sub fbSemanticModelExportTemporaryDestructor _
+	( _
+		byval owner as FBSYMBOL ptr, _
+		byval target as FBSYMBOL ptr, _
+		byval source_dependency as integer, _
+		byval start_line as integer, _
+		byval start_column as integer, _
+		byval end_line as integer, _
+		byval end_column as integer _
+	)
+	dim as LEX_LOCATION source
+	if( (source_dependency < 0) or _
+		(source_dependency >= semantic_model_dependency_count) ) then
+		exit sub
+	end if
+	source.source_file = semantic_model_dependencies(source_dependency)
+	source.start_line = start_line
+	source.start_column = start_column
+	source.end_line = end_line
+	source.end_column = end_column
+	source.is_physical = TRUE
+	fbSemanticModelExportImplicitCall(owner, target, "temporary-destructor", source)
 end sub
 
 private function hSemanticModelTypeKind(byval sym as FBSYMBOL ptr) as string
@@ -1205,6 +1231,96 @@ private function hSemanticModelRangeFitsCurrentSourceLine _
 		source_end.end_column <= semantic_model_source_bound_columns
 
 end function
+
+'' Temporary destructors are emitted after expression parsing. Attach a
+'' verified physical parser range to live dtor-list entries before that later
+'' cleanup step, without storing a path string in every AST list item.
+sub fbSemanticModelAssociateTemporaryDestructors _
+	( _
+		byval generation as ulongint, _
+		byref source_start as LEX_LOCATION, _
+		byref source_end as LEX_LOCATION, _
+		byval nonphysical_tokens_at_start as longint, _
+		byval nonphysical_tokens_at_end as longint _
+	)
+
+	if( (semantic_model_file_open = FALSE) or _
+		(semantic_model_expressions_only) or _
+		(semantic_model_module_open = FALSE) or _
+		(semantic_model_module_failed) or _
+		(source_start.start_line < 1) or (source_start.start_column < 0) or _
+		(source_end.end_line < source_start.start_line) or _
+		(source_end.end_column < 0) or _
+		((source_end.end_line = source_start.start_line) and _
+		 (source_end.end_column <= source_start.start_column)) or _
+		(source_start.is_physical = FALSE) or (source_end.is_physical = FALSE) or _
+		(nonphysical_tokens_at_start <> nonphysical_tokens_at_end) or _
+		(source_start.source_file <> source_end.source_file) or _
+		(hSemanticModelLocationIsPhysical(source_start) = FALSE) or _
+		(hSemanticModelLocationIsPhysical(source_end) = FALSE) or _
+		(hSemanticModelRangeFitsCurrentSourceLine(source_end) = FALSE) ) then
+		exit sub
+	end if
+
+	fbSemanticModelAddDependency(source_start.source_file)
+	dim as integer source_dependency = -1
+	for index as integer = 0 to semantic_model_dependency_count - 1
+		if( semantic_model_dependencies(index) = source_start.source_file ) then
+			source_dependency = index
+			exit for
+		end if
+	next
+	if( source_dependency < 0 ) then exit sub
+
+	dim as AST_DTORLIST_ITEM ptr item = listGetTail(@ast.dtorlist)
+	while( item )
+		'' Entries are appended in generation order, so older parser temporaries
+		'' delimit the scan instead of making each expression walk the full list.
+		if( item->semantic_generation <= generation ) then exit while
+		if( item->semantic_dependency < 0 ) then
+			dim as FBSYMBOL ptr subtype = symbGetSubtype(item->sym)
+			if( subtype <> NULL ) then
+				if( symbIsStruct(subtype) ) then
+					item->semantic_dependency = source_dependency
+					item->semantic_start_line = source_start.start_line
+					item->semantic_start_column = source_start.start_column
+					item->semantic_end_line = source_end.end_line
+					item->semantic_end_column = source_end.end_column
+				end if
+			end if
+		end if
+		item = listGetPrev(item)
+	wend
+end sub
+
+'' Convert the parser-owned range passed to astNewIIF() to the lexer's checked
+'' location form, keeping AST construction independent from lexer structures.
+sub fbSemanticModelAssociateTemporaryDestructorsForRange _
+	( _
+		byval generation as ulongint, _
+		byval source_range as AST_SEMANTIC_SOURCE_RANGE ptr _
+	)
+
+	if( (source_range = NULL) or (source_range->source_file = NULL) ) then exit sub
+
+	dim as LEX_LOCATION source_start = any, source_end = any
+	source_start.source_file = *source_range->source_file
+	source_start.start_line = source_range->start_line
+	source_start.start_column = source_range->start_column
+	source_start.end_line = source_range->start_line
+	source_start.end_column = source_range->start_column
+	source_start.is_physical = source_range->start_is_physical
+	source_end.source_file = *source_range->source_file
+	source_end.start_line = source_range->end_line
+	source_end.start_column = source_range->end_column
+	source_end.end_line = source_range->end_line
+	source_end.end_column = source_range->end_column
+	source_end.is_physical = source_range->end_is_physical
+
+	fbSemanticModelAssociateTemporaryDestructors( _
+		generation, source_start, source_end, _
+		source_range->nonphysical_at_start, source_range->nonphysical_at_end )
+end sub
 
 private function hSemanticModelEdgeName(byval edge as integer) as string
 	select case edge

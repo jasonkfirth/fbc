@@ -17,6 +17,17 @@ declare sub astReplaceSymbolOnCALL _
 		byval new_sym as FBSYMBOL ptr _
 	)
 
+declare sub fbSemanticModelExportTemporaryDestructor _
+	( _
+		byval owner as FBSYMBOL ptr, _
+		byval target as FBSYMBOL ptr, _
+		byval source_dependency as integer, _
+		byval start_line as integer, _
+		byval start_column as integer, _
+		byval end_line as integer, _
+		byval end_column as integer _
+	)
+
 sub astMiscInit( )
 	listInit( @ast.dtorlist, 64, len( AST_DTORLIST_ITEM ), LIST_FLAGS_NOCLEAR )
 	with( ast.dtorlistscopes )
@@ -25,6 +36,7 @@ sub astMiscInit( )
 		.room = 0
 	end with
 	ast.dtorlistcookies = 0
+	ast.dtorlistgeneration = 0
 	ast.flushdtorlist = TRUE
 end sub
 
@@ -1061,6 +1073,13 @@ sub astDtorListAdd( byval sym as FBSYMBOL ptr )
 
 	n = listNewNode( @ast.dtorlist )
 	n->sym = sym
+	ast.dtorlistgeneration += 1
+	n->semantic_generation = ast.dtorlistgeneration
+	n->semantic_dependency = -1
+	n->semantic_start_line = 0
+	n->semantic_start_column = 0
+	n->semantic_end_line = 0
+	n->semantic_end_column = 0
 
 	with( ast.dtorlistscopes )
 		'' If inside a dtorlist scope, mark the new entry
@@ -1144,7 +1163,23 @@ function astDtorListFlush( byval cookie as integer ) as ASTNODE ptr
 
 		'' Only flush dtors for the given cookie number
 		if( n->cookie = cookie ) then
-			t = astNewLINK( t, astBuildVarDtorCall( n->sym ), AST_LINK_RETURN_NONE )
+			dim as ASTNODE ptr dtorcall = astBuildVarDtorCall( n->sym )
+			if( n->semantic_dependency >= 0 ) then
+				dim as FBSYMBOL ptr subtype = symbGetSubtype( n->sym )
+				dim as FBSYMBOL ptr dtor = NULL
+				if( subtype <> NULL ) then
+					if( symbIsStruct( subtype ) ) then
+						dtor = symbGetCompDtor1( subtype )
+					end if
+				end if
+				if( (dtorcall <> NULL) and (dtor <> NULL) ) then
+					fbSemanticModelExportTemporaryDestructor( _
+						subtype, dtor, n->semantic_dependency, _
+						n->semantic_start_line, n->semantic_start_column, _
+						n->semantic_end_line, n->semantic_end_column )
+				end if
+			end if
+			t = astNewLINK( t, dtorcall, AST_LINK_RETURN_NONE )
 			listDelNode( @ast.dtorlist, n )
 
 		'' or delete the cookie was marked for delete
