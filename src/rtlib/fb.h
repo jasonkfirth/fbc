@@ -112,6 +112,8 @@
 
 #if defined HOST_DOS
 	#include "dos/fb_dos.h"
+#elif defined HOST_AMIGA
+	#include "amiga/fb_amiga.h"
 #elif defined HOST_UNIX
 	#include "unix/fb_unix.h"
 	#if defined HOST_AROS

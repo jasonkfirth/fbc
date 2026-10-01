@@ -13,7 +13,8 @@
 ''   -k, --keep-spaces    keep spaces when line begins with spaces
 ''
 '' Example:
-''   check-whitespace src/compiler/*.bi src/compiler/*.bas
+''   find src/compiler -type f \( -name '*.bas' -o -name '*.bi' \) -print0 | _
+''     xargs -0 check-whitespace --check-only
 ''
 '' default behaviour:
 '' - remove trailing whtespace

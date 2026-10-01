@@ -1,3 +1,24 @@
+FreeBASIC compiler licensing
+--------------------------
+
+File: license.txt
+
+Purpose:
+
+    Preserve the compiler copyright and license notice.
+
+Responsibilities:
+
+    - identify the copyright holder and compiler license
+    - accompany compiler source and binary distributions
+
+This file intentionally does NOT contain:
+
+    - runtime library licenses or compiler architecture documentation
+
+Legal notice
+------------
+
 FreeBASIC Compiler - Multi-platform BASIC Compiler.
 Copyright (C) 2004-2022 The FreeBASIC development team.
 
@@ -14,3 +35,5 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+end of license.txt

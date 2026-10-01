@@ -4,8 +4,9 @@
 # Compiler smoke test
 ##############################################################################
 
-# The scope-exit relationship first appears in schema 15. Later schemas may
-# add relationships while preserving the records checked by this smoke test.
+# The scope-exit relationship first appears in schema 15. Schema 19 adds
+# metadata, source operations, and the detail total in its completion footer.
+# Check these record shapes while retaining the established semantic probes.
 SEMANTIC_MODEL_SMOKE_MIN_SCHEMA := 15
 
 .PHONY: compiler-smoke compiler-semantic-model-smoke compiler-indirect-goto-smoke compiler-riscv32-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-mips-smoke compiler-ppc-smoke compiler-ppc64-smoke compiler-ppc64le-smoke compiler-riscos-smoke
@@ -19,7 +20,7 @@ ifneq ($(CAN_RUN),)
 endif
 	$(call _mt_cleanup_success)
 
-compiler-semantic-model-smoke:
+compiler-semantic-model-smoke: compiler
 	$(call _mt_echo,Compiler semantic model smoke test)
 	@mkdir -p "$(TEST_TMP)"
 	@printf "%s\n" "'' semantic model bindings, implicit calls, and lowered operators" > "$(TEST_TMP)/semantic-model-header.bi"
@@ -118,7 +119,17 @@ compiler-semantic-model-smoke:
 		$$1 == "E" { if (NF != 16 || expression_ids[$$2]++ || ($$3 != "0" && $$3 != "1") || $$4 == "" || $$5 < 1 || $$6 < 0 || $$7 < $$5 || ($$7 == $$5 && $$8 <= $$6) || $$8 < 0 || $$16 == "" || ($$12 == "none" && $$11 != "") || ($$12 != "none" && $$12 != "builtin" && $$12 != "overloaded")) exit 1; if ($$3 == "1" && $$5 == 9 && $$6 == 13 && $$7 == 9 && $$8 == 34) direct_range = 1; if ($$3 == "0" && $$5 == 10 && $$6 == 13) expanded_range = 1; if ($$3 == "0" && $$5 == 24 && $$6 == 41 && $$7 == 24 && $$8 == 42) macro_range_withheld = 1; if ($$5 >= 2 && $$5 <= 4) directive_expressions++; if ($$16 == "double") nested_operands[$$5] = 1; if ($$16 == "integer") nested_comparisons[$$5] = 1; if ($$11 == "add" && $$12 == "builtin") builtin_add = 1; if ($$11 == "subtract" && $$12 == "builtin") builtin_subtract = 1; if ($$11 == "power" && $$12 == "builtin") builtin_power = 1; if ($$11 == "concatenate" && $$12 == "builtin") builtin_concatenate = 1; if ($$11 == "unary-plus" && $$12 == "builtin") builtin_unary_plus = 1; if ($$11 == "identity-test" && $$12 == "builtin") identity_test = 1; if ($$14 != 0) symbol_refs[++symbol_ref_count] = $$14; if ($$15 != 0) symbol_refs[++symbol_ref_count] = $$15; expressions++; next } \
 		$$1 == "B" { if (NF != 9 || $$2 == 0 || ($$3 != "declaration" && $$3 != "reference") || ($$4 != "0" && $$4 != "1") || $$5 == "" || $$6 < 1 || $$7 < 0 || $$8 < $$6 || ($$8 == $$6 && $$9 <= $$7)) exit 1; symbol_refs[++symbol_ref_count] = $$2; if ($$3 == "declaration") { binding_declarations++; declaration_ranges[$$2 ":" $$6 ":" $$7 ":" $$8 ":" $$9] = 1 } else binding_references++; bindings++; next } \
 		$$1 == "I" { if (NF != 12 || $$2 == 0 || $$3 == 0 || $$4 == 0 || ($$5 != "default-constructor" && $$5 != "initializer-constructor" && $$5 != "new-constructor" && $$5 != "destructor-call" && $$5 != "argument-constructor" && $$5 != "temporary-destructor" && $$5 != "scope-exit-destructor" && $$5 != "delete-destructor" && $$5 != "return-constructor") || ($$6 != "0" && $$6 != "1") || $$7 == "" || $$8 < 1 || $$9 < 0 || $$10 < $$8 || ($$10 == $$8 && $$11 <= $$9) || $$12 == "") exit 1; if ($$5 == "default-constructor") default_constructors++; else if ($$5 == "initializer-constructor") initializer_constructors++; else if ($$5 == "new-constructor") new_constructors++; else if ($$5 == "destructor-call") destructor_calls++; else if ($$5 == "temporary-destructor") temporary_destructors++; else if ($$5 == "scope-exit-destructor") scope_exit_destructors++; owner_range = $$2 ":" $$8 ":" $$9 ":" $$10 ":" $$11; if (symbol_names[$$2] == "default_value" && $$5 == "default-constructor" && owner_range in declaration_ranges) field_default_constructor = 1; if (symbol_names[$$2] == "converted_value" && $$5 == "initializer-constructor" && owner_range in declaration_ranges) field_initializer_constructor = 1; if (symbol_names[$$2] == "optional_value" && $$5 == "initializer-constructor" && owner_range in declaration_ranges) optional_parameter_constructor = 1; if (symbol_names[$$2] == "default_value" && $$5 == "destructor-call" && owner_range in declaration_ranges) field_destructor = 1; if (symbol_names[$$2] == "constructed_value" && $$5 == "destructor-call" && owner_range in declaration_ranges) local_destructor = 1; if (symbol_names[$$2] == "scope_exit_value" && $$5 == "scope-exit-destructor") scope_exit_destructor = 1; symbol_refs[++symbol_ref_count] = $$2; symbol_refs[++symbol_ref_count] = $$3; symbol_refs[++symbol_ref_count] = $$4; implicit_calls++; next } \
-		$$1 == "END" { if (NF != 12 || $$2 != schema || $$3 != modules || $$4 != procedures || $$5 != symbols || $$6 != typefacts || $$7 != nodes || $$8 != expressions || $$9 != bindings || $$10 != implicit_calls || $$11 != dependency_count || $$12 != "1") exit 1; footer = 1; next } \
+		$$1 == "T" { if (schema < 19 || NF != 19) exit 1; details++; next } \
+		$$1 == "A" { if (schema < 19 || NF != 7) exit 1; details++; next } \
+		$$1 == "F" { if (schema < 19 || NF != 13) exit 1; details++; next } \
+		$$1 == "G" { if (schema < 19 || NF != 9) exit 1; details++; next } \
+		$$1 == "U" { if (schema < 19 || NF != 12) exit 1; details++; next } \
+		$$1 == "C" || $$1 == "K" || $$1 == "J" || $$1 == "Z" { if (schema < 19 || NF != 5) exit 1; details++; next } \
+		$$1 == "H" { if (schema < 19 || NF != 7) exit 1; details++; next } \
+		$$1 == "O" { if (schema < 19 || NF != 10) exit 1; details++; next } \
+		$$1 == "Q" { if (schema < 19 || NF != 10) exit 1; details++; next } \
+		$$1 == "Y" { if (schema < 19 || NF != 7) exit 1; details++; next } \
+		$$1 == "END" { if (NF != (schema >= 19 ? 13 : 12) || $$2 != schema || $$3 != modules || $$4 != procedures || $$5 != symbols || $$6 != typefacts || $$7 != nodes || $$8 != expressions || $$9 != bindings || $$10 != implicit_calls || $$11 != dependency_count || $$12 != "1" || (schema >= 19 && $$13 != details)) exit 1; footer = 1; next } \
 		footer { exit 1 } \
 		{ exit 1 } \
 		END { for (line in nested_operands) if (line in nested_comparisons) nested_typeof = 1; if (!header || !footer || modules != 2 || dependency_count != 3 || !header_dependency || procedures < 2 || symbols < 1 || typefacts < 2 || nodes < 1 || expressions < 2 || bindings < 2 || !binding_declarations || !binding_references || implicit_calls < 6 || default_constructors < 1 || initializer_constructors < 2 || new_constructors < 2 || destructor_calls < 2 || !scope_exit_destructors || !scope_exit_destructor || !field_default_constructor || !field_initializer_constructor || !optional_parameter_constructor || !field_destructor || !local_destructor || directive_expressions < 3 || !direct_range || !expanded_range || !macro_range_withheld || !nested_typeof || !builtin_add || !builtin_subtract || !builtin_power || !builtin_concatenate || !builtin_unary_plus || !identity_test) exit 1; for (i = 1; i <= symbol_ref_count; i++) if (!(symbol_refs[i] in symbol_ids)) exit 1 }' \
@@ -289,7 +300,7 @@ compiler-semantic-model-smoke:
 		$$1 == "M" { if (NF != 2) exit 1; modules++; next } \
 		$$1 == "D" { if (NF != 2 || $$2 == "" || dependencies[$$2]++) exit 1; if ($$2 ~ /semantic-model-header\.bi$$/) header_dependency = 1; dependency_count++; next } \
 		$$1 == "E" { if (NF != 16 || $$2 != expressions + 1 || $$4 == "" || $$5 < 1 || $$6 < 0 || $$7 < $$5 || ($$7 == $$5 && $$8 <= $$6) || $$8 < 0 || $$14 != 0 || $$15 != 0 || $$16 == "") exit 1; if ($$11 == "subtract" && $$12 == "builtin") builtin_subtract = 1; if ($$11 == "power" && $$12 == "builtin") builtin_power = 1; if ($$11 == "concatenate" && $$12 == "builtin") builtin_concatenate = 1; if ($$11 == "unary-plus" && $$12 == "builtin") builtin_unary_plus = 1; if ($$11 == "identity-test" && $$12 == "builtin") identity_test = 1; expressions++; next } \
-		$$1 == "END" { if (NF != 12 || $$2 != schema || $$3 != modules || $$4 != 0 || $$5 != 0 || $$6 != 0 || $$7 != 0 || $$8 != expressions || $$9 != 0 || $$10 != 0 || $$11 != dependency_count || $$12 != "1") exit 1; footer = 1; next } \
+		$$1 == "END" { if (NF != (schema >= 19 ? 13 : 12) || $$2 != schema || $$3 != modules || $$4 != 0 || $$5 != 0 || $$6 != 0 || $$7 != 0 || $$8 != expressions || $$9 != 0 || $$10 != 0 || $$11 != dependency_count || $$12 != "1" || (schema >= 19 && $$13 != 0)) exit 1; footer = 1; next } \
 		footer { exit 1 } \
 		{ exit 1 } \
 		END { if (!header || !footer || modules != 2 || dependency_count != 3 || !header_dependency || expressions < 2 || !builtin_subtract || !builtin_power || !builtin_concatenate || !builtin_unary_plus || !identity_test) exit 1 }' \

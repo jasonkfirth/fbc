@@ -16,7 +16,9 @@ SRC_ROOT := $(CURDIR)
 TEST_INPUT_FBC := $(strip $(or $(BUILD_FBC),$(LOCAL_FBC),$(SYSTEM_FBC),$(AVAILABLE_FBC)))
 TEST_HOST_FBC := $(abspath $(TEST_HOST_DIR)/fbc$(EXEEXT))
 TEST_HOST_BINDIR := $(patsubst %/,%,$(dir $(TEST_HOST_FBC)))
-TEST_FBC := $(if $(CROSS_BUILD),$(TEST_HOST_FBC),$(if $(wildcard $(FBC_EXE)),$(abspath $(FBC_EXE)),$(TEST_HOST_FBC)))
+# Select after prerequisites run: a native compiler may be built during this
+# invocation even when it did not exist while Make was reading the rules.
+TEST_FBC = $(if $(CROSS_BUILD),$(TEST_HOST_FBC),$(if $(wildcard $(FBC_EXE)),$(abspath $(FBC_EXE)),$(TEST_HOST_FBC)))
 TEST_FBC_TARGET_ARGS := $(if $(strip $(BUILD_FBC_TARGET)),-target $(BUILD_FBC_TARGET))
 TEST_FBC_BUILDPREFIX_ARGS := $(if $(strip $(BUILD_FBC_BUILDPREFIX)),-buildprefix $(BUILD_FBC_BUILDPREFIX))
 TEST_TOOLCHAIN_BINDIR := $(call tool_bindir,$(CC))
@@ -38,11 +40,11 @@ TEST_TOOLCHAIN_ENV := env \
 	EMCC="$(EMCC)" \
 	CXBE="$(CXBE)" \
 	DXEGEN="$(DXEGEN)"
-TEST_FBC_CMD := $(TEST_TOOLCHAIN_ENV) "$(TEST_FBC)" $(TEST_FBC_TARGET_ARGS) $(TEST_FBC_BUILDPREFIX_ARGS)
+TEST_FBC_CMD = $(TEST_TOOLCHAIN_ENV) "$(TEST_FBC)" $(TEST_FBC_TARGET_ARGS) $(TEST_FBC_BUILDPREFIX_ARGS)
 
 # GNU-triplet smoke tests exercise fbc's automatic tool-prefix selection.
 # Empty overrides prevent the active Make toolchain from masking that behavior.
-TEST_FBC_TRIPLET_CMD := env \
+TEST_FBC_TRIPLET_CMD = env \
 	BUILD_FBC="$(TEST_HOST_FBC)" \
 	PATH="$(TEST_HOST_BINDIR):$(if $(strip $(TEST_TOOLCHAIN_BINDIR)),$(TEST_TOOLCHAIN_BINDIR):)$$PATH" \
 	AS= AR= LD= GCC= CLANG= LLC= \

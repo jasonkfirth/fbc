@@ -21,7 +21,14 @@ fb_cleanup_success() {
             rm -rf .build-*
             rm -rf .maketests-tmp maketests-log test-run-log
             rm -rf src/*/obj
-            rm -f src/compiler/*.c src/compiler/*.asm
+            # Compiler support C is maintained source. Only BASIC modules
+            # donate the names of disposable compiler emissions.
+            find src/compiler -type f -name '*.bas' -exec sh -c '
+                for source do
+                    emitted=${source%.bas}
+                    rm -f "$emitted.c" "$emitted.asm" "$emitted.ll"
+                done
+            ' sh {} +
         ) || true
     fi
 

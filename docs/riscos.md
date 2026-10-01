@@ -39,7 +39,7 @@ not been added.
 RISC OS implementation files live in target directories instead of adding
 RISC OS branches throughout shared sources. Runtime replacements are under
 `src/rtlib/riscos/`; compiler platform policy is under
-`src/compiler/riscos/`; complete CRT and library-header replacements are under
+`src/compiler/driver/platforms/riscos/`; complete CRT and library-header replacements are under
 `inc/riscos/`; and target-specific fbctests sources are under `tests/riscos/`
 and `tests/fbcunit/src/riscos/`. The build selects a same-named target file
 before its shared counterpart and searches the RISC OS include tree before the

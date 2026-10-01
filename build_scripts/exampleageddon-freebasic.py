@@ -496,6 +496,9 @@ def classify(path: Path, root: Path, target_os: str, supports_gas64: bool) -> Cl
         # self-contained example.
         return Classification("platform-specific", "example requires the AROS runtime", False)
 
+    if rel.startswith("examples/amiga/") and target_os != "amiga":
+        return Classification("platform-specific", "example requires classic AmigaOS", False)
+
     if rel.startswith("examples/nuttx/") and target_os != "nuttx":
         return Classification("platform-specific", "example requires the NuttX runtime", False)
 

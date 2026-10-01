@@ -6,7 +6,7 @@
 #include "win/winioctl.bi"
 #include "../fbportio.h"
 
-#define INFO(message) print __FUNCTION__ & "(): " & message
+#define INFO(message) print (__FUNCTION__ & "(): " & (message))
 #define APIFAILED(func) print_winapi_error(__FUNCTION__, func)
 
 private function command_line_argument _
@@ -37,9 +37,8 @@ private sub print_winapi_error(byval parent as zstring ptr, byval func as zstrin
                       cptr(LPTSTR, @p), _
                       0, _
                       NULL)) then
-        if (p <> NULL) then
+        if( p <> NULL ) then
             '' FORMAT_MESSAGE_ALLOCATE_BUFFER transfers this buffer to the caller.
-            '' fblint: disable-next-line FBL-PTR-001
             print *p
             LocalFree(p)
         end if

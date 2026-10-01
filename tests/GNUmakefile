@@ -89,7 +89,7 @@ all :
 	@$(ECHO) "   OS=DOS"
 	@$(ECHO) "   FPU=fpu | sse"
 	@$(ECHO) "   FPMODE=fast | precise"
-	@$(ECHO) "   GEN=gas | gcc"
+	@$(ECHO) "   GEN=gas | gcc | llvm"
 	@$(ECHO) "   UNITTEST_RUN_ARGS=args"
 	@$(ECHO) "   ENABLE_CHECK_BUGS=1"
 	@$(ECHO) "   ENABLE_CONSOLE_OUTPUT=1"

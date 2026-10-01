@@ -413,4 +413,6 @@ FBCALL long long    fb_VALLNG           ( FBSTRING *str );
 FBCALL unsigned int fb_VALUINT          ( FBSTRING *str );
 FBCALL unsigned long long fb_VALULNG    ( FBSTRING *str );
 
+#include "fb_ustring.h"
+
 /* end of fb_string.h */

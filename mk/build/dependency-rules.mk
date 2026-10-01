@@ -10,7 +10,8 @@
 # Dependency files
 ##############################################################################
 
-DEPFILES := $(ALL_RUNTIME_OBJS:.o=.d)
+DEPFILES := $(ALL_RUNTIME_OBJS:.o=.d) \
+$(addsuffix /semantic-output.d,$(fbcobjdir) $(fbcjsobjdir) $(fbcandroidobjdir) $(fbcwiiobjdir))
 
 ##############################################################################
 # Include generated dependency files

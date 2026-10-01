@@ -757,8 +757,10 @@ static void fb_sfxSleepMs(unsigned long milliseconds)
 
 #if defined(_WIN32)
     Sleep((DWORD)milliseconds);
-#elif FB_SFX_DOS_THREADS
-    fb_Delay((int)milliseconds);
+#elif FB_SFX_DOS_THREADS || defined(__amigaos__)
+    /* Native Amiga newlib does not implement POSIX nanosleep. */
+    extern void fb_Delay(int milliseconds);
+    fb_Delay(milliseconds > INT_MAX ? INT_MAX : (int)milliseconds);
 #elif defined(__DJGPP__)
     delay((unsigned)milliseconds);
 #else

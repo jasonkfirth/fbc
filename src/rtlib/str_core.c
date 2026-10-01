@@ -1,3 +1,12 @@
+/*
+    FreeBASIC Runtime Library
+    File: str_core.c
+    Purpose: Own shared string storage and the temporary descriptor pool.
+    Responsibilities: Allocate and resize buffers, locate descriptors, and
+        release temporary ownership for STRING and USTRING callers.
+    This file intentionally does NOT contain UTF-8 interpretation or grammar.
+*/
+
 /* string/descriptor allocation, deletion, assignament, etc
 **
 ** string is interpreted depending on the size argument passed:
@@ -41,13 +50,19 @@ FBCALL FBSTRING *fb_hStrAllocTempDesc( void )
 
 FBCALL int fb_hStrDelTempDesc( FBSTRING *str )
 {
-	FB_STR_TMPDESC *item =
-	    (FB_STR_TMPDESC*) ( (char*)str - offsetof( FB_STR_TMPDESC, desc ) );
+	FB_STR_TMPDESC *item;
+	uintptr_t address = (uintptr_t)str;
+	uintptr_t first = (uintptr_t)&fb_tmpdsTB[0].desc;
+	uintptr_t last = (uintptr_t)&fb_tmpdsTB[FB_STR_TMPDESCRIPTORS-1].desc;
 
-	/* is this really a temp descriptor? */
-	if( (item < fb_tmpdsTB+0) ||
-		(item > fb_tmpdsTB+FB_STR_TMPDESCRIPTORS-1) )
+	/* Ordinary STRING/USTRING variables also reach this function. Compare
+	   integer addresses before locating the pool entry, so unrelated
+	   objects are never compared or adjusted using C pointer arithmetic. */
+	if( (address < first) || (address > last) )
 		return -1;
+	if( (address - first) % sizeof(FB_STR_TMPDESC) != 0 )
+		return -1;
+	item = &fb_tmpdsTB[(address - first) / sizeof(FB_STR_TMPDESC)];
 
 	fb_hListFreeElem( &tmpdsList, (FB_LISTELEM *)item );
 
@@ -224,3 +239,5 @@ FBCALL void fb_hStrCopyN( char *dst, const char *src, ssize_t bytes )
 		FB_MEMCPYX( dst, src, bytes );
 	}
 }
+
+/* end of str_core.c */

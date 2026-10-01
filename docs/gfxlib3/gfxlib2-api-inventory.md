@@ -4,8 +4,8 @@
 
 This inventory is the compatibility contract for gfxlib3. It was derived from:
 
-- `src/compiler/rtl-gfx.bas`, which registers graphics runtime intrinsics.
-- `src/compiler/parser-quirk-gfx.bas`, which lowers graphics statements.
+- `src/compiler/runtime/rtl-gfx.bas`, which registers graphics runtime intrinsics.
+- `src/compiler/parser/intrinsics/parser-quirk-gfx.bas`, which lowers graphics statements.
 - `src/gfxlib2/fb_gfx.h`, which declares the C ABI and driver interface.
 - `src/rtlib/fb_gfx_private.h`, which defines the shared context and PUT ABI.
 - `inc/fbgfx.bi`, which exposes constants, events, and the FB.IMAGE layout.

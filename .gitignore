@@ -52,6 +52,7 @@
 /src/compiler/*.h
 /src/compiler/*.asm
 /out/*
+/AmigaOS/
 /packages/*
 /.build-debianubuntu/*
 /.build-debianubuntu

@@ -38,6 +38,7 @@
 #include "fb_sfx_internal.h"
 
 #include <stdio.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -121,6 +122,9 @@ static void fb_sfxMidiSleepMs(unsigned long milliseconds)
 #else
     delay((unsigned)milliseconds);
 #endif
+#elif defined(__amigaos__)
+    extern void fb_Delay(int milliseconds);
+    fb_Delay(milliseconds > INT_MAX ? INT_MAX : (int)milliseconds);
 #elif defined(HOST_WII)
     usleep((useconds_t)(milliseconds * 1000UL));
 #else

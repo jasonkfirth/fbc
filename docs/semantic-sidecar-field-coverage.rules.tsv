@@ -1,0 +1,242 @@
+# Project: FreeBASIC semantic sidecar audit
+# File: semantic-sidecar-field-coverage.rules.tsv
+# Purpose: Record reviewed dispositions of compiler contract fields.
+# Responsibilities: Distinguish exported facts, omitted semantics, and implementation state.
+# This file intentionally does NOT claim that matching a rule exercises a compiler path.
+file	contract	field	status	records	gaps	reason
+support/*	*	*	bookkeeping			Containers, allocation, strings, and object-format reader implementation state; invocation inputs are covered separately by G08.
+tooling/*	*	*	bookkeeping		G40,G46	Exporter buffer, identity index, traversal, and transaction state; expose failure status rather than private pointers.
+backend/*	*	*	backend-detail		G50	Physical registers, virtual registers, instruction lists, emission buffers, and backend callback tables belong to an optional emission artifact.
+backend/ir.bi	ASTASMTOK	*	missing	B,N	G25	B captures some BASIC names but N omits the ordered text/symbol token list and its linkage to assembly nodes.
+backend/ir.bi	ASTASMTOK	next	bookkeeping			Export an ordered token sequence instead of a list address.
+driver/*	*	*	bookkeeping		G08	Driver lists and subprocess bookkeeping are not semantic facts; their input choices require an invocation manifest.
+runtime/*	*	*	partial	T,F,G	G07,G30,G37	Registered intrinsic signatures are present; source intrinsic identity, selection policy, bridges, and effect contracts are not normalized.
+runtime/*	*	callback	bookkeeping			Function pointers are implementation state; observe the selected result once rather than invoking callbacks again.
+core/*	*	*	partial	Q,Y	G07,G08	Target/language selections are partially described; effective options, file revisions, and invocation inputs are not fully recorded.
+core/fb.bi	FBCMMLINEOPT	*	missing	Q	G07	Only four selected command-line fields appear in Q; retain all effective semantic options and their changes.
+core/fb.bi	FBCMMLINEOPT	backend	exported	Q		Module backend name.
+core/fb.bi	FBCMMLINEOPT	target	exported	Q		Module target name.
+core/fb.bi	FBCMMLINEOPT	cputype	exported	Q		Module CPU name.
+core/fb.bi	FBCMMLINEOPT	lang	partial	Q	G07	Final language is recorded; initial language, changes, and feature policy are absent.
+core/fbint.bi	FBFILE	num	bookkeeping			Private runtime file handle.
+core/fbint.bi	FBFILE	format	missing	D	G03	Source encoding/BOM format is not attached to a revision identity.
+core/fbint.bi	FBTARGET	id	exported	Q		Selected target identity.
+core/fbint.bi	FBTARGET	wchar	exported	Q,Y		Selected wide-unit storage width.
+core/fbint.bi	FBOPTION	*	missing		G07	OPTION BASE, parameter mode, explicitness, procedure defaults, escapes, dynamic arrays, and GOSUB settings need context events.
+core/fbint.bi	FB_LANG_CTX	*	missing	Q	G07	Language feature and literal typing policies are not a complete configuration record.
+core/fbint.bi	FB_LANG_CTX	integerkeyworddtype	exported	Q		Current default INTEGER dtype.
+core/fbint.bi	FBENV	pointersize	exported	Q,Y		Selected target pointer width.
+core/fbint.bi	FBENV	inited	bookkeeping			Subsystem initialization flag.
+core/fbint.bi	FBENV	*hash	bookkeeping			Lookup storage; export include/remap events and file identities rather than hash buckets.
+core/fbint.bi	FBENV	restart_*	bookkeeping		G07,G39	Discarded parser attempts must stay rolled back; only committed context and failure status are public facts.
+diagnostics/*	*	*	bookkeeping		G38,G39	Diagnostic catalogs, suppression sets, and counters are internal; emitted diagnostics and affected regions require records.
+diagnostics/error.bas	ERRPARAMLOCATION	*	missing		G38	Diagnostic procedure, token, and parameter context is not exported.
+lexer/*	*	*	bookkeeping		G03,G05,G09	Scanner buffers and cursors are implementation state; record their observable token/provenance outcomes.
+lexer/lex.bi	LEX_LOCATION	*	partial	B,E,I,O	G04,G05,G09,G10,G11	Physical ranges exist but have no source revision, include occurrence, expansion, or statement identity.
+lexer/lex.bi	FBTOKEN	*	missing	B,E	G13,G23	The model lacks a token/declarator representation, original spelling, suffix, escape, and source-intent facts.
+lexer/lex.bi	FBTOKEN	sym_chain	partial	B	G15,G49	Selected references are exported on observed routes; candidate lookup chains are not a public trace.
+lexer/lex.bi	FBTOKEN	next	bookkeeping			Lookahead token list link.
+lexer/lex.bi	LEX_TKCTX	linenum	partial	P,N	G09,G10	Logical lines are used for debug metadata; no logical-to-physical map is published.
+lexer/lex.bi	LEX_TKCTX	physical_linenum	partial	B,E,I,O	G09,G10	Observed physical ranges do not identify every source statement or logical remap.
+lexer/lex.bi	LEX_TKCTX	column	partial	B,E,I,O	G10,G11	Observed columns do not create a complete source graph.
+lexer/lex.bi	LEX_TKCTX	last_source	partial	B,E,I,O	G11	Range endpoints are available but source-event ownership is absent.
+lexer/lex.bi	LEX_TKCTX	currmacro	missing		G05	Current expansion identity is used to suppress editable ranges rather than published.
+lexer/lex.bi	LEX_TKCTX	macrodepth	missing		G05	Nested expansion provenance is not recorded.
+lexer/lex.bi	LEX_TKCTX	macrostack	missing		G05	Parent expansion identities are not recorded.
+lexer/lex.bi	LEX_TKCTX	macroresume	bookkeeping			Private expansion buffer resume offsets; publish expansion/substitution events instead.
+lexer/lex.bi	LEX_TKCTX	kind	missing		G04,G05,G06	Include and preprocessor evaluation contexts have no public context identity.
+lexer/lex.bi	LEXPP_ARG	*	missing	Z	G05	Z contains macro definitions, not the actual arguments supplied to an invocation.
+lexer/lex.bi	LEXPP_ARGTB	*	bookkeeping		G05	Argument table storage; publish invocation arguments by ordinal.
+preprocessor/*	*	*	bookkeeping		G05,G06,G07	Private directive tables and stacks should yield committed expansion, branch, and option events.
+preprocessor/pp-cond.bas	LEXPP_REC	istrue	missing		G06	Actual preprocessor branch selection is not recorded.
+preprocessor/pp-cond.bas	LEXPP_REC	elsecnt	missing		G06	Conditional branch structure and skipped regions are not recorded.
+preprocessor/pp.bi	PP_CTX	level	missing		G06	Conditional nesting identity is absent.
+preprocessor/pp.bi	PP_CTX	skipping	missing		G06	Skipped source ranges are absent; do not invent bindings inside them.
+parser/*	*	*	bookkeeping			Parser scratch tables and recovery cursors are private; source constructs are considered separately.
+parser/parser.bi	FB_CMPSTMT*	*	partial	N,H,J,U	G10,G27,G35	Lowered symbols and labels preserve some results; source compounds, conditions, case ranges, and control-flow roles are not explicit.
+parser/parser.bi	FBPARSER_STMT	cnt	missing		G10,G22,G27	Statement identity/order is not exported independently of debug lines.
+parser/parser.bi	PARSERCTX	currproc	partial	P,N,T	G10,G11	Procedure ownership exists for body trees but source expressions and statements lack an explicit context link.
+parser/parser.bi	PARSERCTX	currblock	partial	T,U,N	G10,G16,G27	Lexical symbol owners exist; every source construct does not have a block/range identity.
+parser/parser.bi	PARSERCTX	mangling	missing	T	G07,G21	EXTERN scope policy and selected symbol mangling mode are absent.
+parser/statements/parser-compound-select.bas	FBCASECTX	*	partial	N,J,H	G10,G35	Runtime comparisons/targets exist without source CASE kind, range, or clause ownership.
+parser/statements/parser-compound-select-const.bas	SELECTCTX	*	partial	J,H,K	G10,G35	Normalized sparse jump entries exist; source SELECT/CASE structure and edge roles are absent.
+parser/declarations/parser-decl-symb-init.bas	FB_INITCTX	*	partial	N,H,E,I	G11,G26,G31	Some initializer trees and constructor selections survive; source initializer ownership and adaptation stages are incomplete.
+ast/*	*	*	bookkeeping			AST allocation, list cursors, counters, and optimizer scratch data are private.
+ast/ast.bi	ASTNODE	*	partial	N,K,C,H	G11,G24,G25,G26,G27,G29	Union payload containers must be evaluated using the active class and the field-specific rules below.
+ast/ast.bi	ASTNODE	class	exported	N,K		Raw class and stable kind; naming coverage is not payload or execution coverage.
+ast/ast.bi	ASTNODE	dtype	exported	N	G17	Raw resolved dtype; normalized qualifier/type graph is a separate derived representation.
+ast/ast.bi	ASTNODE	subtype	exported	N		Resolved subtype symbol identity.
+ast/ast.bi	ASTNODE	sym	exported	N		Attached symbol identity.
+ast/ast.bi	ASTNODE	vector	exported	K		Nonzero vector width is recorded; absence means scalar.
+ast/ast.bi	ASTNODE	l	exported	N		Left tree edge when reachable at the export phase.
+ast/ast.bi	ASTNODE	r	exported	N		Right tree edge when reachable at the export phase; this does not specify execution order.
+ast/ast.bi	ASTNODE	prev	derivable	N	G34	Root record stream preserves statement-list order; publish explicit sequence/evaluation roles for consumers.
+ast/ast.bi	ASTNODE	next	derivable	N	G34	Root record stream preserves statement-list order; child execution order requires class-specific semantics.
+ast/ast.bi	AST_NODE_*	*	missing	N	G24,G27	Class-specific semantic payload requires an explicit serializer or a documented derivation.
+ast/ast.bi	AST_NODE_ARG	*	exported	K,N	G31	Passing-mode override, aggregate bytes, expression child, and attached formal are present; source adaptation roles are not.
+ast/ast.bi	AST_NODE_CONST	*	exported	C		Active FBVALUE member is exported as an exact value.
+ast/ast.bi	AST_NODE_CONST	hassuffix	missing		G23	Literal suffix intent affects compiler decisions but is not exported.
+ast/ast.bi	AST_NODE_VAR	*	exported	K		Byte offset.
+ast/ast.bi	AST_NODE_IDX	*	exported	K		Byte offset and backend index scale.
+ast/ast.bi	AST_NODE_PTR	*	exported	K		Byte offset.
+ast/ast.bi	AST_NODE_IIF	*	exported	H	G34,G35	False target is present; evaluation/control-flow roles are not explicit.
+ast/ast.bi	AST_NODE_LABEL	flush	backend-detail			Label flush policy is an emission boundary rather than source meaning.
+ast/ast.bi	AST_NODE_LIT	*	exported	K		Compiler literal/comment text.
+ast/ast.bi	AST_NODE_ASM	*	missing	N,B	G25	Token-head payload is not traversed.
+ast/ast.bi	AST_NODE_OP	op	exported	N	G12	Raw AST opcode is present; source operation recognition is a separate coverage question.
+ast/ast.bi	AST_NODE_OP	options	missing		G24	Initialization, pointer arithmetic, inverse branch, and coercion flags are absent.
+ast/ast.bi	AST_NODE_OP	ex	partial	H	G24	Initialized BOP/UOP/BRANCH targets are exported; unused ADDROF union storage must never be read.
+ast/ast.bi	AST_NODE_OFFS	*	exported	K		Byte offset.
+ast/ast.bi	AST_NODE_JMPTB	*	exported	J,H,K		Unsigned normalized values, labels, default, bias, and span.
+ast/ast.bi	AST_NODE_JMPTB	labelcount	derivable	J		Count ordered J rows for the node.
+ast/ast.bi	AST_NODE_DBG	*	backend-detail	P,N	G10	Debug operations are optional; semantic source mapping must not depend on debug-node creation.
+ast/ast.bi	AST_NODE_MEM	*	exported	K	G37	Memory operation, bytes, and fill value; explicit read/write effects remain derived.
+ast/ast.bi	AST_NODE_STACK	*	exported	K		Stable stack operation kind.
+ast/ast.bi	AST_NODE_LINK	*	exported	K		Which sequence child supplies the result.
+ast/ast.bi	AST_NODE_CAST	*	exported	K	G11,G31	Surviving conversion flags; conversion reason and pre-conversion source graph are absent.
+ast/ast.bi	AST_NODE_CALL	*	missing	N,K,H	G29,G31	Only ordinary children, call kind/count, temporary result, and virtual static target are exported.
+ast/ast.bi	AST_NODE_CALL	isrtl	exported	K		Runtime call kind for direct runtime calls.
+ast/ast.bi	AST_NODE_CALL	args	exported	K		Argument count.
+ast/ast.bi	AST_NODE_CALL	currarg	bookkeeping			Construction cursor; ARG.sym already records each attached formal.
+ast/ast.bi	AST_NODE_CALL	argtail	bookkeeping			Argument list tail; ordinary ARG child chain is exported.
+ast/ast.bi	AST_NODE_CALL	tmpres	exported	H	G31	Result-temporary relationship.
+ast/ast.bi	AST_NODE_CALL	semantic_target	exported	H,E		Selected virtual method survives procedure-pointer lowering.
+ast/ast.bi	AST_TMPSTRLIST_ITEM	*	missing		G29	Temporary string and source tree for deferred writeback are outside the l/r traversal.
+ast/ast.bi	AST_TMPSTRLIST_ITEM	prev	bookkeeping			Publish ordered copyback actions rather than a linked-list pointer.
+ast/ast.bi	AST_NODE_TYPEINI	*	partial	K,H	G26	Offset, byte/count values exist; initializer scopes and ownership/provenance are incomplete.
+ast/ast.bi	AST_NODE_TYPEINI	ofs	exported	K		Initializer byte offset.
+ast/ast.bi	AST_NODE_TYPEINI	bytes	exported	K		Byte count for classes where this union member is active.
+ast/ast.bi	AST_NODE_TYPEINI	elements	exported	K		Element count for construction lists only.
+ast/ast.bi	AST_NODE_TYPEINI	lastscp	bookkeeping			Construction cursor; expose actual scope ownership rather than this cursor.
+ast/ast.bi	AST_NODE_TYPEINISCOPE	*	missing	K	G26	Merged initializer scope offsets/bytes and scope-end data are absent.
+ast/ast.bi	AST_NODE_TYPEINISCOPE	is_array	partial	K	G26	Scope-begin array flag is present; scope-end does not repeat or link scope ownership.
+ast/ast.bi	AST_NODE_PROC	decl_last	bookkeeping			Insertion cursor for implicit declarations.
+ast/ast.bi	AST_NODE_BREAK	semantic_*	partial	I	G27,G33	Some scope cleanup gets source ranges; source exit identity and emitted node ownership are absent.
+ast/ast.bi	AST_BREAKLIST	*	bookkeeping		G27	Export source exits and their cleanup actions before this private list is consumed.
+ast/ast.bi	AST_SEMANTIC_SOURCE_RANGE	*	partial	E,I	G11,G31,G33	Physical range snapshots are not source-event or expression identities.
+ast/ast.bi	AST_DTORLIST_ITEM	*	partial	I	G33	Destructor selections/ranges exist; condition cookie, ownership, and ordered cleanup actions are absent.
+ast/ast.bi	AST_DTORLIST_ITEM	refcount	bookkeeping			Temporary-list lifetime bookkeeping.
+ast/ast.bi	AST_GLOBINST_CTX	*	partial	P,N,I	G22,G32,G33	Wrapper bodies are exported, but the registration/instance/wrapper relationship and lifetime order are not explicit.
+ast/ast.bi	AST_DATASTMT_CTX	*	partial	T,N,H,C	G28	Lowered DATA descriptor initializers exist; source item and label ownership are absent.
+ast/nodes/ast-node-proc.bas	FB_GLOBINSTANCE	*	partial	P,N,I	G22,G32,G33	Generated initialization/cleanup bodies exist without a normalized instance/action/registration link.
+ast/ast.bi	AST_OPINFO	*	bookkeeping	N,O	G12,G17	Static operator registry; selected operation and a public vocabulary are the useful contract.
+symbols/*	*	*	bookkeeping			Pool lists, hash buckets, lookup cursors, mangling abbreviations, and static registration tables are private.
+symbols/symb.bi	FBSYMBOL	*	partial	S,T		Payload containers are assessed by their active symbol class below.
+symbols/symb.bi	FBSYMBOL	class	exported	S,T		Raw and stable symbol class.
+symbols/symb.bi	FBSYMBOL	attrib	exported	S,T	G17	Raw attributes plus stable storage/visibility summaries; flag vocabulary needs a public contract.
+symbols/symb.bi	FBSYMBOL	pattrib	exported	S,T	G17	Raw procedure attributes; flag vocabulary needs a public contract.
+symbols/symb.bi	FBSYMBOL	stats	exported	T	G17	Raw symbol status; this is not FB_PROCEXT.stats.
+symbols/symb.bi	FBSYMBOL	typ	exported	S,T	G17	Resolved raw dtype.
+symbols/symb.bi	FBSYMBOL	subtype	exported	S,T		Resolved subtype identity.
+symbols/symb.bi	FBSYMBOL	scope	exported	S		Compiler numeric scope.
+symbols/symb.bi	FBSYMBOL	mangling	missing		G21	Selected EXTERN/native mangling mode is absent.
+symbols/symb.bi	FBSYMBOL	lgt	exported	S,T		Frontend size at each exported snapshot.
+symbols/symb.bi	FBSYMBOL	ofs	partial	S,T	G50	Field offsets are semantic; final backend stack/register locations may be assigned after the snapshot.
+symbols/symb.bi	FBSYMBOL	parent	exported	S		Exporter computes lexical owner; do not interpret an unrelated internal parent pointer as lexical ownership.
+symbols/symb.bi	FBSYMBOL	symtb	partial	S,T	G16	Lexical owner is exported; source scope occurrence/order is not.
+symbols/symb.bi	FBSYMBOL	hash	partial	T	G16,G49	Lookup namespace is exported; import occurrence and resolution traces are not.
+symbols/symb.bi	FBSYMBOL	prev	bookkeeping			Symbol table storage link.
+symbols/symb.bi	FBSYMBOL	next	bookkeeping			Symbol table storage link; explicit member/declaration order requires semantic ordinals.
+symbols/symb.bi	FBSYMBOL	semantic_model_identity	bookkeeping	S		Internal allocation key supplies public IDs; do not expose its address or require cross-run stability.
+symbols/symb.bi	FBSYMBOL	semantic_dtor_*	partial	I	G33	Range provenance is present for some temporary destruction, without lifetime/action identities.
+symbols/symb.bi	FB_SYMBID	name	partial	S,T,B	G13,G14,G51	Final names exist; prototypes discard names, ordinary names may be uppercase, and internal literal keys can contain bytes the reader cannot decode.
+symbols/symb.bi	FB_SYMBID	alias	exported	T	G51	Compiler external/preserved alias; the wire encoding of arbitrary accepted bytes remains to be specified.
+symbols/symb.bi	FB_SYMBID	mangled	missing		G21	Emitted link identity can be computed lazily after export and is not recorded.
+symbols/symb.bi	FBS_CONST	*	exported	C		Active named-constant value.
+symbols/symb.bi	FBS_CONST	hassuffix	missing		G23	Written suffix intent is absent.
+symbols/symb.bi	FBS_VAR	*	partial	T,A,K,H,C	G22,G23,G28	Variable payload includes separately assessed array, layout, initializer, literal, and declaration facts.
+symbols/symb.bi	FBS_VAR	stmtnum	missing		G22	Declaration statement order used by branch/lifetime checks is absent.
+symbols/symb.bi	FBS_VAR	align	exported	K		Variable/field alignment override.
+symbols/symb.bi	FBS_VAR	bitpos	exported	K		Field bit position.
+symbols/symb.bi	FBS_VAR	bits	exported	K		Field bit width.
+symbols/symb.bi	FBS_VAR	initree	partial	H,N	G11,G26	Live retained initializers are exported; source graph and adaptation provenance are incomplete.
+symbols/symb.bi	FBS_ARRAY	*	exported	A,K,H		Rank, fixed/runtime bounds, element count, and descriptor relationships.
+symbols/symb.bi	FBS_ARRAY	diff	derivable	A,T,Y		Fixed-array addressing bias follows resolved lower bounds and element sizes; runtime contents remain unknown.
+symbols/symb.bi	FBARRAYDIM	*	exported	A		Fixed lower/upper bounds, including unknown-upper marker.
+symbols/symb.bi	FBVAR_DESC	array	derivable	H		Invert the array-descriptor relationship; do not serialize both private backlinks.
+symbols/symb.bi	FBVAR_DATA	prev	bookkeeping		G28	Reverse DATA list is C emission bookkeeping; source DATA sequence needs its own records.
+symbols/symb.bi	FBS_PROC	*	partial	F,G,H,T	G19,G22,G41	Source signature and ABI result are present; other procedure payloads are assessed below.
+symbols/symb.bi	FBS_PROC	params	exported	F,G		Explicit arity plus G instance row.
+symbols/symb.bi	FBS_PROC	optparams	exported	F,G		Optional argument count.
+symbols/symb.bi	FBS_PROC	mode	exported	F	G19	Source calling convention, not all effective target ABI classifications.
+symbols/symb.bi	FBS_PROC	realdtype	exported	F		ABI result dtype.
+symbols/symb.bi	FBS_PROC	realsubtype	exported	F		ABI result subtype.
+symbols/symb.bi	FBS_PROC	returnMethod	exported	F	G17	Raw return method; a stable named vocabulary remains to be documented/exported.
+symbols/symb.bi	FBS_PARAM	*	missing	G,H	G19	ABI descriptor subtype and register argument classification are omitted.
+symbols/symb.bi	FBS_PARAM	mode	exported	G		Source passing mode.
+symbols/symb.bi	FBS_PARAM	var	exported	G		Body variable is captured while live.
+symbols/symb.bi	FBS_PARAM	optexpr	exported	H,N	G11,G31	Retained default tree; source default/adaptation identity remains missing.
+symbols/symb.bi	FBS_PARAM	bydescdimensions	exported	G		Required rank, including unknown rank.
+symbols/symb.bi	FB_PROCOVL	next	exported	H		Overload-next relation.
+symbols/symb.bi	FB_PROCOVL	minparams	derivable	F,G		Derive required arity of each overload from its optional parameter flags.
+symbols/symb.bi	FB_PROCOVL	maxparams	derivable	F,G,H		Derive overload-set bounds from source signatures, handling variadic tails explicitly.
+symbols/symb.bi	FB_PROCEXT	*	missing		G22,G32,G33	Procedure-specific status, registration priority, handler/cleanup links, and explicit base initializer provenance are absent.
+symbols/symb.bi	FB_PROCEXT	res	partial	H	G41	Result variable is exported only while locals are live; snapshot phase is implicit.
+symbols/symb.bi	FB_PROCEXT	stk	backend-detail		G50	Final frame offsets belong to emission metadata.
+symbols/symb.bi	FB_PROCEXT	dbg	exported	P	G09,G10	Procedure logical source lines/file are present without full physical construct ranges.
+symbols/symb.bi	FB_PROCEXT	opovl	exported	F		Stable selected overload operation code.
+symbols/symb.bi	FB_PROCEXT	vtableindex	exported	F		Virtual table slot.
+symbols/symb.bi	FB_PROCEXT	overridden	exported	F,H		Overridden method identity.
+symbols/symb.bi	FB_PROCDBG	*	exported	P	G09,G10	Logical procedure location metadata.
+symbols/symb.bi	FB_PROCSTK	*	backend-detail		G50	Argument and local frame allocation.
+symbols/symb.bi	FB_PROCERR	*	missing	N	G35	Runtime handler/module/function variables exist without explicit handler-state relationships.
+symbols/symb.bi	FB_PROCGSB	ctx	missing	N	G35	GOSUB context exists without a control-flow/context relationship.
+symbols/symb.bi	FB_PROCOPOVL	*	exported	F		Procedure overload operation code.
+symbols/symb.bi	FB_PROCRTL	*	bookkeeping			Runtime registration callback address is not a semantic target; observe selected outcomes.
+symbols/symb.bi	FB_DTORWRAPPER	*	missing	P,N	G22,G33	Bodies exist without explicit wrapper-to-instance registration relationship.
+symbols/symb.bi	FBS_STRUCT	*	partial	U,H,T	G18,G19,G20	Base, size, selected alignment, options, return dtype, and special members exist; remaining fields require separate treatment.
+symbols/symb.bi	FBS_STRUCT	base	exported	U		Exported base type identity is the hidden base field's subtype.
+symbols/symb.bi	FBS_STRUCT	anonparent	exported	H		Only initialized anonymous aggregate parents are read.
+symbols/symb.bi	FBS_STRUCT	natalign	partial	U	G18	Packing override replaces natural alignment in the single U alignment field.
+symbols/symb.bi	FBS_STRUCT	align	partial	U	G18	Chosen alignment exists but requested packing and natural alignment are conflated.
+symbols/symb.bi	FBS_STRUCT	unpadlgt	exported	U		Unpadded size.
+symbols/symb.bi	FBS_STRUCT	options	exported	U	G17	Raw UDT flags; stable named flag contract is absent.
+symbols/symb.bi	FBS_STRUCT	bitpos	bookkeeping			Current layout packing cursor; final field positions are in K.
+symbols/symb.bi	FBS_STRUCT	retdtype	exported	U		Aggregate result dtype.
+symbols/symb.bi	FBS_STRUCT	retin2regs	missing		G19	Aggregate register return classification is absent.
+symbols/symb.bi	FBS_STRUCT	dbg	backend-detail			Debugger type number.
+symbols/symb.bi	FB_STRUCTEXT	*	missing	F,H	G20	Virtual table/RTTI ownership and slots are not a complete object-model contract.
+symbols/symb.bi	FB_STRUCTEXT	*ctor*	exported	H		Default/copy constructors are related explicitly; constructor-head is assessed separately.
+symbols/symb.bi	FB_STRUCTEXT	ctorhead	derivable	F,H,T		Constructor overload family can be recovered from owner, kind, and overload-next edges.
+symbols/symb.bi	FB_STRUCTEXT	dtor*	exported	H		Complete/deleting destructor relations.
+symbols/symb.bi	FB_STRUCTEXT	copyletop*	exported	H		Copy assignment relations.
+symbols/symb.bi	FB_STRUCTEXT	opovlTb	derivable	F,H,T		Member operation families follow owner, operator code, and overload-next edges.
+symbols/symb.bi	FB_STRUCTEXT	abstractcount	exported	U		Number of abstract methods.
+symbols/symb.bi	FB_STRUCT_DBG	*	backend-detail			Debugger type number.
+symbols/symb.bi	FBS_ENUM	elements	exported	U		Enum element count; constant values are C.
+symbols/symb.bi	FBS_ENUM	ns	partial	T,C	G16	Member owner and lookup namespace exist; source enum scope/occurrence is not explicit.
+symbols/symb.bi	FBS_ENUM	dbg	backend-detail			Debugger type number.
+symbols/symb.bi	FBS_SCOPE	*	partial	T,U,N	G16,G27	Owner, debug line extent, and begin/end nodes exist without complete source block identity.
+symbols/symb.bi	FBS_SCOPE	emit	backend-detail			Physical frame emission state.
+symbols/symb.bi	FB_SCOPEDBG	*	partial	U,N	G09,G16,G27	Logical scope line range and label nodes are present without physical source identity and named scope edges.
+symbols/symb.bi	FB_SCOPEEMIT	*	backend-detail			Physical scope frame base offset.
+symbols/symb.bi	FBS_LABEL	*	missing	H	G22,G35	Declared/statement/GOSUB properties are absent.
+symbols/symb.bi	FBS_LABEL	parent	exported	H		Label scope relation, only after declaration initialized the pointer.
+symbols/symb.bi	FBS_NAMESPACE	*	partial	T,B	G16	Namespace identity/owner exist without reopening instances and ordered USING/import events.
+symbols/symb.bi	FBS_NAMESPACE	last_tail	bookkeeping			Namespace reopening cursor; export source occurrences rather than this pointer.
+symbols/symb.bi	FBS_NSIMPORT	imp_ns	exported	H		Imported source namespace.
+symbols/symb.bi	FBS_NSIMPORT	exp_ns	partial	T,H	G16	Destination follows the import's lexical owner in ordinary cases; import source occurrence/order is absent.
+symbols/symb.bi	FBS_NSIMPORT	imp_prev	bookkeeping			Import list storage link.
+symbols/symb.bi	FBS_NSIMPORT	imp_next	bookkeeping			Import list storage link.
+symbols/symb.bi	FBS_NSIMPORT	exp_prev	bookkeeping			Reverse import list storage link.
+symbols/symb.bi	FBS_NSIMPORT	exp_next	bookkeeping			Reverse import list storage link.
+symbols/symb.bi	FBS_DEFINE	*	partial	Z,K,T	G05,G51	Replacement definitions exist, including retired macros; invocation/lifetime events are absent and raw legacy text can fail the supplied reader.
+symbols/symb.bi	FBS_DEFINE	*dprocz*	bookkeeping	K		Callback kind is public; the implementation function address is private.
+symbols/symb.bi	FBS_DEFINE	*mproc*	bookkeeping	K		Callback kind is public; actual expansion result should be observed once.
+symbols/symb.bi	FB_DEFPARAM	name	exported	Z		Macro parameter spelling.
+symbols/symb.bi	FB_DEFPARAM	num	exported	Z		Macro parameter ordinal.
+symbols/symb.bi	FB_DEFTOK	*	exported	Z		Active replacement text/parameter/stringify token values and ordering.
+symbols/symb.bi	FB_DEFTOK	text	exported	Z	G51	Narrow replacement token bytes are present but arbitrary accepted legacy bytes need a lossless wire contract.
+symbols/symb.bi	FB_DEFTOK	prev	bookkeeping			Replacement token list storage link.
+symbols/symb.bi	FB_DEFTOK	next	bookkeeping			Replacement token list storage link; Z ordinals supply public order.
+symbols/symb.bi	FBS_KEYWORD	*	missing	T	G07,G17	Keyword token/class payload and reservation context are absent.
+symbols/symb.bi	FBS_FWDREF	*	bookkeeping	H	G15	Backpatch lists are implementation state; observe the source forward reference and canonical resolved symbol.
+symbols/symb.bi	FBFWDREF	*	bookkeeping	H	G15	Backpatch user links are not a substitute for source type-use bindings.
+symbols/symb.bi	FBVALUE	*	exported	C		Only the active exact-value representation is serialized.
+symbols/symb.bi	SYMB_DATATYPE	*	partial	Y	G17	Names, class, size, signedness, and alignment exist; promotion/remapping/sizing policy is not normalized.
+symbols/symb.bi	FB_GLOBCTORLIST_ITEM	*	missing	T	G22	Global registration membership/order/priority need explicit records.
+symbols/symb.bi	FB_GLOBCTORLIST	*	bookkeeping		G22	Export ordered registrations rather than list allocation state.
+symbols/symb.bi	FB_RTTICTX	*	partial	T	G20	Runtime OBJECT/RTTI symbols exist without all type/table ownership relationships.
+symbols/symb.bi	SYMB_OVLOP	head	derivable	F,H,T		Operator overload groups follow owner, operation code, and overload-next edges.
+symbols/symb.bi	SYMBDEFAULTMEMBERS	*	exported	H		Generated special member identities are related from their owning type.
+# end of semantic-sidecar-field-coverage.rules.tsv

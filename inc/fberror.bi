@@ -1,5 +1,5 @@
 ''
-'' Enum copied from FBC compiler src/compiler/fbint.bi
+'' Enum copied from FBC compiler src/compiler/core/fbint.bi
 ''
 
 #pragma once

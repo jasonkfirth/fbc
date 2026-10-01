@@ -63,6 +63,8 @@ for i as integer = 0 to ubound( entries )
 			end 1
 		end if
 
+		'' Require the exact small record size before converting the wide LOF result.
+		'' fblint: disable-next-line FBL423 REASON: LongInt is fixed-width; equality bounds the later CInt.
 		dim as longint file_size = lof( f )
 		if( file_size <> .expected_size ) then
 			close #f

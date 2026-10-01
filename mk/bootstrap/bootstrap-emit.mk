@@ -205,8 +205,9 @@ bootstrap-emit: bootstrap-check
 	rm -f "$(BOOTSTRAP_OUT)"/*.c "$(BOOTSTRAP_OUT)"/*.asm "$(BOOTSTRAP_SRC_RSP)"
 
 	@echo "==> Clearing temporary compiler emission"
-	@for source_dir in $(BOOTSTRAP_COMPILER_SRC_DIRS); do \
-		rm -f "$$source_dir"*.c "$$source_dir"*.asm; \
+	@for source in $(BOOTSTRAP_COMPILER_SRC); do \
+		emitted=$${source%.bas}; \
+		rm -f "$$emitted.c" "$$emitted.asm" "$$emitted.ll"; \
 	done
 
 	@echo "==> Writing bootstrap source response file"
@@ -229,14 +230,13 @@ bootstrap-emit: bootstrap-check
 
 	@echo "==> Collecting emitted sources"
 
-	@for source_dir in $(BOOTSTRAP_COMPILER_SRC_DIRS); do \
-		if ls "$$source_dir"*.c >/dev/null 2>&1; then \
-			mv "$$source_dir"*.c "$(BOOTSTRAP_OUT)/"; \
-		fi; \
-		if ls "$$source_dir"*.asm >/dev/null 2>&1; then \
-			mv "$$source_dir"*.asm "$(BOOTSTRAP_OUT)/"; \
-		fi; \
+	@for source in $(BOOTSTRAP_COMPILER_SRC); do \
+		emitted=$${source%.bas}; \
+		for extension in c asm ll; do \
+			if [ -f "$$emitted.$$extension" ]; then mv "$$emitted.$$extension" "$(BOOTSTRAP_OUT)/"; fi; \
+		done; \
 	done
+	@for source in $(FBC_C_SRC); do cp "$$source" "$(BOOTSTRAP_OUT)/"; done
 
 	@if ! ls "$(BOOTSTRAP_OUT)"/* >/dev/null 2>&1; then \
 		echo "ERROR: bootstrap emission produced no sources"; \

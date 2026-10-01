@@ -399,6 +399,9 @@ extern const UTF_8 __fb_utf8_bmarkTb[7];
 
 FBCALL int          fb_FileCopy         ( const char *source, const char *destination );
 FBCALL int          fb_CrtFileCopy      ( const char *source, const char *destination );
+FBCALL int          fb_FileExists       ( const char *filename );
+FBCALL long long    fb_FileLen          ( const char *filename );
+FBCALL double       fb_FileDateTime     ( const char *filename );
 
 /* Pathname attributes, distinct from FileAttr's open-handle information.
    These bits match dir.bi and the corresponding DOS/Windows attributes. */

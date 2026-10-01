@@ -166,7 +166,9 @@ FBC_CFLAGS += -i $(abspath ../inc/wince)
 endif
 FBC_CFLAGS += -i $(abspath ../inc)
 ifneq ($(TARGET_OS),dos)
-	FBC_CFLAGS += -Wc -Wno-tautological-compare
+	ifneq ($(GEN),llvm)
+		FBC_CFLAGS += -Wc -Wno-tautological-compare
+	endif
 endif
 ifneq ($(TARGET_OS),dos)
 ifneq ($(TARGET),wince-mips)

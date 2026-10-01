@@ -1,3 +1,9 @@
+'' Project: FreeBASIC compiler introspection
+'' File: symbol.bi
+'' Purpose: Expose compiler datatype identities and symbol-query macros.
+'' Responsibilities: Mirror the compiler type model for BASIC clients.
+'' This file intentionally does NOT contain compiler symbol-table storage.
+
 #ifndef __FBC_INT_SYMBOL_BI__
 #define __FBC_INT_SYMBOL_BI__
 
@@ -5,7 +11,7 @@
 '' This header exposes internals of the fbc compiler through the built-in
 '' macro __FB_QUERY_SYMBOL__.  Much work is still needed here.
 ''
-'' Constants are mostly copied as-is from src/compiler/symb.bi
+'' Constants are mostly copied as-is from src/compiler/symbols/symb.bi
 '' Except:
 '' - fbc namespace added
 '' - macros prefixed with fbc
@@ -19,7 +25,7 @@
 
 namespace FBC
 
-'' declarations must follow src/compiler/symb.bi
+'' declarations must follow src/compiler/symbols/symb.bi
 
 enum FB_DATACLASS
 	FB_DATACLASS_INTEGER
@@ -57,9 +63,10 @@ enum FB_DATATYPE
 	FB_DATATYPE_FWDREF
 	FB_DATATYPE_POINTER
 	FB_DATATYPE_XMMWORD
+	FB_DATATYPE_USTRING
 end enum
 
-const FB_DATATYPES = (FB_DATATYPE_XMMWORD - FB_DATATYPE_VOID) + 1
+const FB_DATATYPES = (FB_DATATYPE_USTRING - FB_DATATYPE_VOID) + 1
 
 const FB_DT_TYPEMASK        = &b00000000000000000000000000011111 '' max 32 built-in datatypes
 const FB_DT_PTRMASK         = &b00000000000000000000000111100000 '' level of pointer indirection
@@ -102,7 +109,7 @@ end enum
 #define fbcTypeIsPtr( dt ) (((dt and fbc.FB_DT_PTRMASK) <> 0))
 #define fbcTypeGetPtrCnt( dt ) ((dt and fbc.FB_DT_PTRMASK) shr fbc.FB_DT_PTRPOS)
 
-'' FB_QUERY_SYMBOL must follow src/compiler/symb-define.bas
+'' FB_QUERY_SYMBOL must follow src/compiler/symbols/symb-define.bas
 ''
 enum FB_QUERY_SYMBOL explicit
 
@@ -162,9 +169,12 @@ end enum
 #define isTypeULongint( sym ) ( fbcTypeGetDtOnly( __FB_QUERY_SYMBOL__( fbc.FB_QUERY_SYMBOL.datatype, sym ) ) = fbc.FB_DATATYPE_ULONGINT )
 #define isTypeSingle( sym )   ( fbcTypeGetDtOnly( __FB_QUERY_SYMBOL__( fbc.FB_QUERY_SYMBOL.datatype, sym ) ) = fbc.FB_DATATYPE_SINGLE )
 #define isTypeDouble( sym )   ( fbcTypeGetDtOnly( __FB_QUERY_SYMBOL__( fbc.FB_QUERY_SYMBOL.datatype, sym ) ) = fbc.FB_DATATYPE_DOUBLE )
+#define isTypeUstring( sym )  ( fbcTypeGetDtOnly( __FB_QUERY_SYMBOL__( fbc.FB_QUERY_SYMBOL.datatype, sym ) ) = fbc.FB_DATATYPE_USTRING )
 #define isTypeUDT( sym )      ( fbcTypeGetDtOnly( __FB_QUERY_SYMBOL__( fbc.FB_QUERY_SYMBOL.datatype, sym ) ) = fbc.FB_DATATYPE_STRUCT )
 #define isTypePointer( sym )  ( fbcTypeGet      ( __FB_QUERY_SYMBOL__( fbc.FB_QUERY_SYMBOL.datatype, sym ) ) = fbc.FB_DATATYPE_POINTER )
 
 end namespace
 
 #endif
+
+'' end of symbol.bi

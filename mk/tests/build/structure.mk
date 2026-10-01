@@ -13,6 +13,7 @@ mk-structure-test:
 
 	@test -f $(mkpath)/platform.mk        || { echo "ERROR: missing $(mkpath)/platform.mk"; exit 1; }
 	@test -f $(mkpath)/source-graph.mk    || { echo "ERROR: missing $(mkpath)/source-graph.mk"; exit 1; }
+	@test -f $(mkpath)/compiler-sources.mk || { echo "ERROR: missing $(mkpath)/compiler-sources.mk"; exit 1; }
 	@test -f $(mkpath)/layout.mk          || { echo "ERROR: missing $(mkpath)/layout.mk"; exit 1; }
 	@test -f $(mkpath)/build-layout.mk    || { echo "ERROR: missing $(mkpath)/build-layout.mk"; exit 1; }
 	@test -f $(mkpath)/toolchain-flags.mk || { echo "ERROR: missing $(mkpath)/toolchain-flags.mk"; exit 1; }

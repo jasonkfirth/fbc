@@ -1,5 +1,7 @@
 ' TEST_MODE : COMPILE_ONLY_OK
-#cmdline "-Wc -Wno-infinite-recursion"
+#if (__FB_BACKEND__ = "gcc") or (__FB_BACKEND__ = "clang")
+	#cmdline "-Wc -Wno-infinite-recursion"
+#endif
 
 type T
 	as integer i

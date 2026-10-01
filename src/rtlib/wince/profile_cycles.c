@@ -28,7 +28,7 @@
 */
 
 /* WIP */
-/* TODO: update src/compiler/rtl-system.bas:rtlInitProfile */
+/* TODO: update src/compiler/runtime/rtl-system.bas:rtlInitProfile */
 /* TODO: test exit code, profiler clean-up should still run
 **       even when compiled exe does not encounter fb_End() */
 /* TODO: organize this code by only having start-up code here

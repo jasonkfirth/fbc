@@ -21,6 +21,21 @@ ifndef FBC
 FBC := $(TESTS_DEFAULT_FBC)
 endif
 
+# Bound individual tests when GNU timeout is available. A compiler hang must
+# produce a failed record, including for tests which expect a normal error.
+# Hosts without this tool retain the existing invocation. Set the limit to 0
+# to disable it, or supply gtimeout on systems using GNU coreutils that name.
+LOG_TEST_TIMEOUT ?= 60
+LOG_TEST_TIMEOUT_TOOL ?= timeout
+LOG_TEST_LIMIT :=
+ifneq ($(HOST),dos)
+ifneq ($(filter-out 0,$(strip $(LOG_TEST_TIMEOUT))),)
+ifneq ($(shell $(LOG_TEST_TIMEOUT_TOOL) --version >/dev/null 2>&1 && echo yes),)
+LOG_TEST_LIMIT := $(LOG_TEST_TIMEOUT_TOOL) --kill-after=5 $(LOG_TEST_TIMEOUT)
+endif
+endif
+endif
+
 # verify the FB_LANG option
 # - must be set to a valid -lang option
 ifeq ($(FB_LANG),)
@@ -195,7 +210,9 @@ ifeq ($(DOS_LOG_TCP),yes)
 	FBC_CFLAGS += -d FB_DOS_WATT32
 endif
 ifneq ($(TARGET_OS),dos)
-	FBC_CFLAGS += -Wc -Wno-tautological-compare
+	ifneq ($(GEN),llvm)
+		FBC_CFLAGS += -Wc -Wno-tautological-compare
+	endif
 endif
 ifdef DEBUG
 	FBC_CFLAGS += -g
@@ -206,6 +223,10 @@ endif
 
 ifneq ($(FB_LANG),)
 FBC_CFLAGS += -lang $(FB_LANG)
+endif
+
+ifneq ($(GEN),)
+FBC_CFLAGS += -gen $(GEN)
 endif
 
 ifeq ($(ENABLE_CHECK_BUGS),1)
@@ -222,7 +243,7 @@ endif
 # bmk-make.mk parses platform conditions independently. Forward the resolved target
 # OS as well as provider names so a recursive DOS TCP test selects its own
 # DOS-only compile and link flags.
-BMK_MAKE_COMMON_ARGS = FBC="$(FBC)" FBC_EXTRA_CFLAGS="$(FBC_EXTRA_CFLAGS)" GCC="$(GCC)" TARGET="$(TARGET)" TARGET_OS="$(TARGET_OS)" DOS_THREAD_PROVIDER="$(DOS_THREAD_PROVIDER)" DOS_TCP_PROVIDER="$(DOS_TCP_PROVIDER)"
+BMK_MAKE_COMMON_ARGS = FBC="$(FBC)" FBC_EXTRA_CFLAGS="$(FBC_EXTRA_CFLAGS)" GCC="$(GCC)" GEN="$(GEN)" TARGET="$(TARGET)" TARGET_OS="$(TARGET_OS)" DOS_THREAD_PROVIDER="$(DOS_THREAD_PROVIDER)" DOS_TCP_PROVIDER="$(DOS_TCP_PROVIDER)"
 
 # ------------------------------------------------------------------------
 
@@ -237,7 +258,7 @@ $(LOGLIST_COMPILE_ONLY_OK) : %.log : %.bas
 	@$(ECHO) "$< : TEST_MODE=COMPILE_ONLY_OK"
 	@{ \
 	$(ECHO) "$< : TEST_MODE=COMPILE_ONLY_OK"; \
-	if $(FBC) $(FBC_CFLAGS) -c $< \
+	if $(LOG_TEST_LIMIT) $(FBC) $(FBC_CFLAGS) -c $< \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -266,7 +287,7 @@ $(LOGLIST_COMPILE_ONLY_FAIL) : %.log : %.bas
 	@$(ECHO) "$< : TEST_MODE=COMPILE_ONLY_FAIL"
 	@{ \
 		$(ECHO) "$< : TEST_MODE=COMPILE_ONLY_FAIL"; \
-		$(FBC) $(FBC_CFLAGS) -c $<; \
+		$(LOG_TEST_LIMIT) $(FBC) $(FBC_CFLAGS) -c $<; \
 		exitcode=$$?; \
 		if [ $$exitcode -eq 0 ]; then \
 			$(ECHO) "$< : RESULT=FAILED"; \
@@ -290,7 +311,7 @@ $(LOGLIST_COMPILE_AND_RUN_OK) : %.log : %.bas
 	@$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_OK"
 	@{ \
 	$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_OK"; \
-	if cd . && $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_OK LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
+	if cd . && $(LOG_TEST_LIMIT) $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_OK LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -308,7 +329,7 @@ $(LOGLIST_COMPILE_AND_RUN_FAIL) : %.log : %.bas
 	@$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_FAIL"
 	@{ \
 	$(ECHO) "$< : TEST_MODE=COMPILE_AND_RUN_FAIL"; \
-	if cd . && $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_FAIL LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
+	if cd . && $(LOG_TEST_LIMIT) $(MAKE) -f bmk-make.mk FILE=$< TEST_MODE=COMPILE_AND_RUN_FAIL LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -326,7 +347,7 @@ $(LOGLIST_MULTI_MODULE_OK)  : %.log : %.bmk
 	@$(ECHO) "$< : TEST_MODE=MULTI_MODULE_OK"
 	@{ \
 	$(ECHO) "$< : TEST_MODE=MULTI_MODULE_OK"; \
-	if cd . && $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_OK LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
+	if cd . && $(LOG_TEST_LIMIT) $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_OK LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -344,7 +365,7 @@ $(LOGLIST_MULTI_MODULE_FAIL)  : %.log : %.bmk
 	@$(ECHO) "$< : TEST_MODE=MULTI_MODULE_FAIL"
 	@{ \
 	$(ECHO) "$< : TEST_MODE=MULTI_MODULE_FAIL"; \
-	if cd . && $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_FAIL LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
+	if cd . && $(LOG_TEST_LIMIT) $(MAKE) -f bmk-make.mk BMK=$< TEST_MODE=MULTI_MODULE_FAIL LOGFILE=$@ FB_LANG="$(FB_LANG)" FBC_LFLAGS="$(FBC_LFLAGS)" $(BMK_MAKE_COMMON_ARGS) \
 	; then \
 		$(ECHO) "$< : RESULT=PASSED" && \
 		true \
@@ -450,6 +471,11 @@ $(LOG_TESTS_LOG_LST) : $(LOG_TESTS_INC)
 #
 #
 $(LOG_TESTS_RESULTS_LOG): $(LOG_TESTS_LOG_LST) $(LOGLIST_ALL)
+	@while IFS= read -r logfile; do \
+		test -f "$$logfile" || { $(ECHO) "Missing test log: $$logfile"; exit 1; }; \
+		records=$$($(GREP) -c -E '^.* : RESULT=(PASSED|FAILED)( |$$)' "$$logfile"); \
+		test "$$records" = 1 || { $(ECHO) "Incomplete test log: $$logfile"; exit 1; }; \
+	done < $(LOG_TESTS_LOG_LST)
 	@$(CAT) $(LOG_TESTS_LOG_LST) | $(XARGS) $(GREP) -i -E '^.*[[:space:]]*:[[:space:]]*RESULT=FAILED' | $(TAIL) -n +1 > $@ 
 
 results : $(LOG_TESTS_RESULTS_LOG)
@@ -470,6 +496,7 @@ $(GREP) -i -E '^.*[[:space:]]*:[[:space:]]*RESULT=FAILED' $(LOG_TESTS_RESULTS_LO
 	; fi  >> $(FAILED_LOG)
 endif
 	@$(CAT) $(FAILED_LOG)
+	@test ! -s $(LOG_TESTS_RESULTS_LOG)
 
 # ------------------------------------------------------------------------
 # clean-up

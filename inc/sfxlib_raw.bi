@@ -6,14 +6,15 @@
 ''
 '' Purpose:
 ''
-''     Provide an opt-in low-level declaration for writing raw sample
-''     data through the sfxlib driver path and recording final output.
+''     Provide opt-in low-level declarations for raw sample output,
+''     output capture, and asynchronous MIDI playback status.
 ''
 '' Responsibilities:
 ''
 ''     - link the sfxlib runtime library
 ''     - expose the raw floating-point output queue writer
 ''     - expose output-side WAV recording helpers
+''     - expose asynchronous MIDI file playback status
 ''     - keep raw driver access separate from the BASIC command set
 ''
 '' This file intentionally does NOT contain:
@@ -22,6 +23,7 @@
 ''     - decoding helpers
 ''     - synthesis helpers
 ''     - platform driver details
+''     - MIDI parsing or transport controls
 ''
 
 #pragma once
@@ -143,6 +145,17 @@ namespace sfxlib
 	declare function OutputCaptureSave cdecl alias "fb_sfxOutputCaptureSave" _
 		( _
 			byval filename as const zstring ptr _
+		) as long
+
+	''
+	'' MidiPlaying()
+	''
+	'' Returns non-zero while a MIDI PLAY file is being processed. This is
+	'' useful when an application needs to restart background tracks after
+	'' one-shot playback completes.
+	''
+	declare function MidiPlaying cdecl alias "fb_sfxMidiPlaying" _
+		( _
 		) as long
 
 	end extern

@@ -451,7 +451,7 @@ an experimental attempt to generate that order.
     --------
 
     Typical usage:
-        $ ./mkerrlst [ -p ../../src/compiler/ ]
+        $ ./mkerrlst [ -p ../../src/compiler/diagnostics/ ]
         $ fbc mkerrtxt.bas
         $ ./mkerrtxt > errlist.txt
 

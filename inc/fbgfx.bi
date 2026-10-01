@@ -48,9 +48,17 @@ namespace FB
 	extern "rtlib"
 	' The QB and FB declarations have equivalent ABI signatures but use dialect-specific pointer spelling.
 	' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-014
-	declare function DrawStringSize alias "fb_GfxDrawStringSize" _
+	declare function DrawStringSize overload alias "fb_GfxDrawStringSize" _
 		( byref text as const string, byref pixel_width as long, _
 		  byref pixel_height as long, byval font_image as any ptr = 0 ) as long
+	declare function DrawStringSize overload alias "fb_GfxDrawStringSizeWstr" _
+		( byref text as const wstring, byref pixel_width as long, _
+		  byref pixel_height as long, byval font_image as any ptr = 0 ) as long
+#if defined(__FB_HAS_USTRING__) and not defined(FB_NO_USTRING)
+	declare function DrawStringSize overload alias "fb_GfxDrawStringSizeUstr" _
+		( byref text as const ustring, byref pixel_width as long, _
+		  byref pixel_height as long, byval font_image as any ptr = 0 ) as long
+#endif
 	'' One packed byte per row, 1..64 rows; bit 7 is the leftmost pixel.
 	'' Target 0 selects the work page. Nonzero relative uses STEP coordinates.
 	'' Pattern phase follows physical target coordinates. Colors are ordinary

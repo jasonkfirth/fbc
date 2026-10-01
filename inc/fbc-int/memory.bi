@@ -51,7 +51,7 @@ extern "rtlib"
 	'' - fbc declares the functions to the user as 'byref as any'
 	'' - the underlying implementation is a 'byval as any ptr' (char* to be exact)
 	''
-	'' from ./src/compiler/rtl-mem.bas:
+	'' from ./src/compiler/runtime/rtl-mem.bas:
 	'' declare function clear cdecl alias "memset" ( byref dst as any, byval value as const long = 0, byval size as const uinteger ) as any ptr
 	'' declare function fb_MemMove cdecl alias "memmove" ( byref dst as any, byref src as const any, byval size as const uinteger ) as any ptr
 	'' declare function fb_MemCopy cdecl alias "memcpy" ( byref dst as any, byref src as const any, byval size as const uinteger ) as any ptr

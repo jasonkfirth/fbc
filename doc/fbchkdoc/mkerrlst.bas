@@ -95,10 +95,10 @@ end sub
 sub ShowUsage( )
 	print "mkerrlst [ -p path ]"
 	print
-	print "Default path to compiler sources: ../../src/compiler"
+	print "Default path to compiler sources: ../../src/compiler/diagnostics"
 	print
 	print "Example:"
-	print "    ./mkerrlst -p ../../src/compiler"
+	print "    ./mkerrlst -p ../../src/compiler/diagnostics"
 	print
 	print "Then:"
 	print "    fbc mkerrtxt.bas"
@@ -130,7 +130,7 @@ while( command(i) > "" )
 wend
 
 if( p = "" ) then
-	p = "../../src/compiler"
+	p = "../../src/compiler/diagnostics"
 end if
 
 f1 = p & "/error.bi"

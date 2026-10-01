@@ -52,7 +52,7 @@
 		int com_num;
 		FB_SERIAL_OPTIONS *pOptions;
 	} DOS_SERIAL_INFO;
-#elif defined HOST_AROS
+#elif defined HOST_AROS || defined HOST_AMIGA
 	struct MsgPort;
 	struct IOExtSer;
 	typedef struct _AROS_SERIAL_INFO {
@@ -61,6 +61,7 @@
 		FB_SERIAL_OPTIONS *pOptions;
 		int unit;
 	} AROS_SERIAL_INFO;
+	typedef AROS_SERIAL_INFO AMIGA_SERIAL_INFO;
 #elif defined HOST_RISCOS
 	typedef struct _RISCOS_SERIAL_INFO {
 		FB_SERIAL_OPTIONS *pOptions;

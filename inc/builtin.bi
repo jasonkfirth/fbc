@@ -3,6 +3,7 @@
 ''
 '' This include exposes a core set of GCC/clang __builtin_* entry points to
 '' FreeBASIC code using normal DECLARE statements.
+'' The LLVM emitter translates these declarations to intrinsics or libc calls.
 ''
 '' Responsibilities:
 ''   - spell GCC/clang builtin prototypes with target C ABI types
@@ -18,8 +19,8 @@
 
 #pragma once
 
-#if (__FB_BACKEND__ <> "gcc") and (__FB_BACKEND__ <> "clang")
-	#error "builtin.bi requires -gen gcc or -gen clang"
+#if (__FB_BACKEND__ <> "gcc") and (__FB_BACKEND__ <> "clang") and (__FB_BACKEND__ <> "llvm")
+	#error "builtin.bi requires -gen gcc, -gen clang or -gen llvm"
 #endif
 
 '' GCC and clang check builtin declarations against the target C ABI.  On LP64
@@ -168,10 +169,9 @@ extern "C"
 	declare function __builtin_parityll cdecl alias "__builtin_parityll" ( byval as ulongint ) as long
 #endif
 
-'' Byte-swap builtins use GCC/clang's builtin-family argument types rather
-'' than the platform's fixed-width typedef spellings.  In particular,
-'' __builtin_bswap64 is defined with unsigned long long even on LP64 targets
-'' where uint64_t is an unsigned long.
+'' Byte-swap operands retain their fixed BASIC widths. Clang uses its known
+'' 64-bit builtin prototype because uint64_t's C spelling varies by target.
+'' This does not change the type seen by BASIC callers.
 #ifndef __builtin_bswap16
 	declare function __builtin_bswap16 cdecl alias "__builtin_bswap16" ( byval as ushort ) as ushort
 #endif

@@ -29,6 +29,8 @@ This document intentionally does NOT contain:
   libraries, and compiler binaries.
 - `compiler-config.mk`: chooses C/C++/binutils tools, resolves local or system
   `fbc`, and derives the compiler used during the build.
+- `compiler-sources.mk`: lists compiler subsystem directories, selects small
+  host policy replacements, and rejects duplicate flat object basenames.
 - `cpu.mk`: derives ARM sub-architecture and default ARM CPU policy.
 - `dist.mk`: stages and archives a distributable build tree.
 - `feature-policy.mk`: applies high-level feature toggles that do not belong in
@@ -105,6 +107,11 @@ implementation logic.
   trivial program.
 - `tests/compiler/language.mk`: runs the language-suite wrappers and captures
   logs.
+- `tests/compiler/structure.mk`: checks compiler source coverage, headers,
+  host numeric policies, storage contracts, and language-test failure handling.
+- `tests/compiler/semantic.mk`: validates semantic sidecar records, compiler
+  facts, source provenance, completion, and deliberate omissions. Extended
+  targets audit the native compiler source graph and maintained OMA programs.
 - `tests/packaging/packaging.mk`: checks packaging targets.
 - `tests/packaging/install.mk`: checks install and uninstall behavior.
 
@@ -117,7 +124,8 @@ If you are asking one of these questions, start here:
 - "Why is this exact warning or hardening flag present?" -> `toolchain-flags.mk`
 - "Why is the runtime landing in this directory?" -> `layout.mk` or
   `build-layout.mk`
-- "Why did this source file get selected?" -> `source-graph.mk`
+- "Why did this source file get selected?" -> `compiler-sources.mk` for the
+  compiler, `source-graph.mk` for runtime libraries
 - "Why did a library or linker script not get created?" -> `archives.mk` and
   `build/archive-rules.mk`
 - "Why did the compiler fail before it even started?" -> `compiler-config.mk`

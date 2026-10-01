@@ -16,6 +16,8 @@ function fileLoad(byref filename as string, byval psize as integer ptr) as ubyte
     end if
 
     dim as ubyte ptr p = NULL
+    '' Keep LOF wide, then reject sizes outside the INTEGER range before conversion.
+    '' fblint: disable-next-line FBL423 REASON: LongInt is fixed-width and bounded before CInt.
     dim as longint file_size = lof(f)
     if (file_size < 0) orelse (file_size > clngint(&h7FFFFFFF)) then
         close #f
@@ -25,18 +27,16 @@ function fileLoad(byref filename as string, byval psize as integer ptr) as ubyte
 
     if (size > 0) then
         p = allocate(size)
-        if (p = NULL) then
-            close #f
-            fatalCantAccessFile(filename)
-            return NULL
-        end if
-
-        '' The allocation was checked above and remains valid through GET.
-        '' fblint: disable-next-line FBL-PTR-001
-        dim as integer result = get(#f, , *p, size, size)
-        if (result or (size <= 0)) then
-            deallocate(p)
-            p = NULL
+        if( p <> NULL ) then
+            dim as integer result = get(#f, , *p, size, size)
+            if (result or (size <= 0)) then
+                deallocate(p)
+                p = NULL
+                close #f
+                fatalCantAccessFile(filename)
+                return NULL
+            end if
+        else
             close #f
             fatalCantAccessFile(filename)
             return NULL

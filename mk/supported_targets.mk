@@ -19,7 +19,7 @@
 # Architecture identity is deliberately independent of the OS emission matrix.
 # In particular, m68k is reusable by future ports even though the only current
 # bootstrap target for it is AROS.  AROS-specific ISA and soft-float policy
-# belongs in mk/toolchain-flags.mk and src/compiler/aros/fbc-platform.bi.
+# belongs in mk/toolchain-flags.mk and src/compiler/driver/platforms/aros/fbc-platform.bi.
 GENERIC_CPU_FAMILIES := \
 	x86 \
 	x86_64 \
@@ -129,6 +129,9 @@ AROS_BOOTSTRAP_TARGETS := \
 	$(call _fb_bootstrap_spec,aros-arm,aros-arm,arm-aros) \
 	$(call _fb_bootstrap_spec,aros-x86_64,aros-x86_64,x86_64-aros)
 
+AMIGA_BOOTSTRAP_TARGETS := \
+	$(call _fb_bootstrap_spec,amiga-m68k,amiga-m68k,m68k-amigaos)
+
 ##############################################################################
 # Final supported bootstrap targets
 ##############################################################################
@@ -145,7 +148,8 @@ SUPPORTED_BOOTSTRAP_TARGETS := \
 	$(DOS_BOOTSTRAP_TARGETS) \
 	$(NUTTX_BOOTSTRAP_TARGETS) \
 	$(RISCOS_BOOTSTRAP_TARGETS) \
-	$(AROS_BOOTSTRAP_TARGETS)
+	$(AROS_BOOTSTRAP_TARGETS) \
+	$(AMIGA_BOOTSTRAP_TARGETS)
 
 SUPPORTED_BOOTSTRAP_DIRS := $(foreach spec,$(SUPPORTED_BOOTSTRAP_TARGETS),$(word 2,$(subst :, ,$(spec))))
 

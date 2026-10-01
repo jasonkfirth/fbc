@@ -1092,7 +1092,7 @@ windowsbuild() {
 		#     extern as integer _dowildcard alias "_dowildcard"
 		#     dim shared _dowildcard as integer = -1
 		# careful, this adds the module to the bootstrap and source packages
-		cp ../../input/fbc/contrib/release/equation-crt-glob.bas src/compiler/equation-crt-glob.bas
+		cp ../../input/fbc/contrib/release/equation-crt-glob.bas src/compiler/support/equation-crt-glob.bas
 		;;
 	esac
 

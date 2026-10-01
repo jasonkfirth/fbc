@@ -177,7 +177,7 @@ else ifeq ($(TARGET_OS),riscos)
   # UnixLib implements pthreads inside libc; GCCSDK 4.7 has no -pthread
   # driver option and needs no separate thread library.
   THREAD_MODEL := unixlib
-else ifeq ($(TARGET_OS),aros)
+else ifneq ($(filter aros amiga,$(TARGET_OS)),)
   # AROS supplies pthreads as a target library, but its GCC does not use the
   # hosted Unix -pthread driver convention.  The AROS runtime uses pthread
   # mutexes even without the public -mt option, so the compiler's AROS module
@@ -304,7 +304,7 @@ endif
 # AROS uses native Intuition/CyberGraphX presentation and AHI sound.  Desktop
 # Unix graphics backends are not applicable even though the runtime reuses the
 # portable POSIX source layer where AROS posixc provides the required API.
-ifeq ($(TARGET_OS),aros)
+ifneq ($(filter aros amiga,$(TARGET_OS)),)
   ENABLE_X11 :=
   ENABLE_SDL :=
   DISABLE_X11 := YesPlease
@@ -316,6 +316,12 @@ endif
 # DOS -> no hosted sockets in the current runtime unless an explicit provider
 # is selected.  The Watt-32 adapter is still opt-in because it needs a packet
 # driver and WATTCP.CFG at run time.
+ifeq ($(TARGET_OS),amiga)
+  # The pinned newlib SDK does not supply a socket resolver or a native TCP
+  # stack. Keep TCP opt-in work separate from the executable/runtime port.
+  DISABLE_TCP := YesPlease
+endif
+
 ifeq ($(TARGET_OS),dos)
   ifeq ($(DOS_TCP_PROVIDER),watt32)
     ENABLE_DOS_WATT32 := YesPlease
@@ -469,7 +475,7 @@ endif
 
 # AROS toolchains and loader images are intentionally static.  Keep generic
 # hosted ELF hardening and PIE flags out of this platform contract.
-ifeq ($(TARGET_OS),aros)
+ifneq ($(filter aros amiga,$(TARGET_OS)),)
 
   ENABLE_PIC             :=
   ENABLE_NONPIC          := YesPlease

@@ -1,0 +1,152 @@
+"""Project: FreeBASIC semantic audits
+File: compiler_semantic_audit.py
+Purpose: Check semantic exports against frozen source files and generated code.
+Responsibilities: Bound compiler execution, validate provenance, and compare export modes.
+This file intentionally does NOT contain: source selection or BASIC name resolution.
+"""
+
+from __future__ import annotations
+
+from collections import Counter
+import codecs
+import hashlib
+import os
+from pathlib import Path
+import shlex
+import shutil
+import signal
+import subprocess
+
+
+EMISSION_SUFFIX = {"gcc": ".c", "clang": ".c", "llvm": ".ll", "gas64": ".asm", "gas": ".asm"}
+
+
+def digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def invoke(command: list[str], cwd: Path, log: Path, timeout: int) -> int:
+    with log.open("w", encoding="utf-8") as stream:
+        stream.write("$ " + shlex.join(command) + "\n")
+        stream.flush()
+        process = subprocess.Popen(command, cwd=cwd, stdin=subprocess.DEVNULL,
+                                   stdout=stream, stderr=subprocess.STDOUT, start_new_session=True)
+        try:
+            return process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # Terminate the compiler's process group, including any tool it
+            # launched, rather than leaving a child behind after a failed job.
+            os.killpg(process.pid, signal.SIGTERM)
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait()
+            return 124
+
+
+def emission_hashes(modules: list[Path], backend: str, destination: Path) -> dict[str, str]:
+    destination.mkdir()
+    result = {}
+    for module in modules:
+        path = module.with_suffix(EMISSION_SUFFIX[backend])
+        if not path.is_file():
+            raise ValueError("Compiler did not produce emission for " + str(module))
+        shutil.copy2(path, destination / path.name)
+        result[module.name] = digest(path)
+    return result
+
+
+def physical_lines(path: Path) -> list[str]:
+    data = path.read_bytes()
+    for bom, encoding in ((codecs.BOM_UTF32_LE, "utf-32"), (codecs.BOM_UTF32_BE, "utf-32"),
+                          (codecs.BOM_UTF16_LE, "utf-16"), (codecs.BOM_UTF16_BE, "utf-16"),
+                          (codecs.BOM_UTF8, "utf-8-sig")):
+        if data.startswith(bom):
+            return data.decode(encoding).splitlines()
+    # Unmarked legacy sources can contain single-byte comments. Preserve
+    # those bytes while still counting UTF-8 text in editor UTF-16 columns.
+    return data.decode("utf-8", errors="surrogateescape").splitlines()
+
+
+def audit_source_ranges(model) -> dict[str, int]:
+    from sidecar import source_range
+
+    dependencies = {row[1] for row in model.records["D"]}
+    if model.footer[11] != "1":
+        raise ValueError("Corpus dependency list is incomplete")
+    if not {row[1] for row in model.records["M"]} <= dependencies:
+        raise ValueError("Committed module is missing from its dependencies")
+    lines = {}
+    counts = Counter()
+    for tag, flag_column, range_column in (("B", 3, 4), ("E", 2, 3), ("I", 5, 6), ("O", 4, 5)):
+        for row in model.records[tag]:
+            if row[flag_column] != "1":
+                continue
+            filename, start_line, start_column, end_line, end_column = source_range(row, range_column)
+            if filename not in dependencies:
+                raise ValueError("Physical source fact is missing its dependency: " + filename)
+            if filename not in lines:
+                lines[filename] = physical_lines(Path(filename))
+            source = lines[filename]
+            if start_line > len(source) or end_line > len(source):
+                raise ValueError("Physical range extends beyond its source: " + repr(row))
+            for line, column in ((start_line, start_column), (end_line, end_column)):
+                width = len(source[line - 1].encode("utf-16-le", errors="surrogatepass")) // 2
+                if column > width:
+                    raise ValueError("Physical range extends beyond its source line: " + repr(row))
+            counts[tag] += 1
+    return dict(counts)
+
+
+def expression_facts(model) -> Counter:
+    # Full and compact modes use separate identity domains. Compare exact
+    # parser-selected source/type/operator facts with identity fields removed.
+    return Counter(tuple(row[2:13] + row[15:]) for row in model.records["E"])
+
+
+def audit_exports(common: list[str], modules: list[Path], work: Path,
+                  backend: str, timeout: int) -> dict:
+    from sidecar import Model
+
+    full = None
+    baseline = None
+    record = {"backend": backend, "modules": len(modules), "modes": {}}
+    for mode in ("off", "full", "expressions"):
+        model_path = work / (mode + ".tsv")
+        option = [] if mode == "off" else [
+            "-semantic-model" if mode == "full" else "-semantic-model-expressions", str(model_path)]
+        command = [*common, *option, *map(str, modules)]
+        status = invoke(command, modules[0].parent, work / (mode + ".log"), timeout)
+        record["modes"][mode] = {"status": status}
+        if status != 0:
+            raise ValueError(f"{mode} compiler exited with {status}; see {work / (mode + '.log')}")
+        emitted = emission_hashes(modules, backend, work / mode)
+        record["modes"][mode]["emission_sha256"] = emitted
+        if mode == "off":
+            baseline = emitted
+            continue
+        if emitted != baseline:
+            raise ValueError("Semantic export changed emitted program code in " + mode + " mode")
+        model = Model.read(model_path, expressions_only=mode == "expressions")
+        if [row[1] for row in model.records["M"]] != [str(module) for module in modules]:
+            raise ValueError("Semantic export changed or omitted a translation unit")
+        if mode == "full" and any(context[5] != backend for context in model.contexts):
+            raise ValueError("Semantic export reported the wrong emission backend")
+        record["modes"][mode]["records"] = {tag: len(rows) for tag, rows in model.records.items()}
+        record["modes"][mode]["physical_ranges"] = audit_source_ranges(model)
+        if mode == "full":
+            full = model
+            record["modes"][mode]["symbol_classes"] = dict(Counter(row[3] for row in model.types.values()))
+            record["modes"][mode]["node_kinds"] = dict(Counter(
+                model.properties["node", identity]["kind"] for identity in model.nodes))
+        else:
+            if expression_facts(model) != expression_facts(full):
+                raise ValueError("Full and compact expression facts differ")
+            if model.records["D"] != full.records["D"]:
+                raise ValueError("Full and compact dependency closures differ")
+    record["passed"] = True
+    return record
+
+
+# end of compiler_semantic_audit.py

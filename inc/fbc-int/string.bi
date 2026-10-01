@@ -1,3 +1,9 @@
+'' Project: FreeBASIC runtime introspection
+'' File: string.bi
+'' Purpose: Expose descriptor layout and low-level string truncation.
+'' Responsibilities: Mirror runtime ABI and retain each text type's units.
+'' This file intentionally does NOT implement allocation or text algorithms.
+
 #ifndef __FBC_INT_STRING_BI__
 #define __FBC_INT_STRING_BI__
 
@@ -47,10 +53,16 @@ extern "rtlib"
 	declare sub fb_LEFTSELF( byval dst as FBSTRING ptr, byval length as const integer )
 
 	'' VAR-LEN STRING API (STRING)
-	declare sub LEFTSELF alias "fb_LEFTSELF" ( byref dst as string, byval length as const integer )
+	declare sub LEFTSELF overload alias "fb_LEFTSELF" ( byref dst as string, byval length as const integer )
+	declare sub LEFTSELF overload alias "fb_WstrLeftSelf" ( byref dst as wstring, byval length as const integer )
+#if defined(__FB_HAS_USTRING__) and not defined(FB_NO_USTRING)
+	declare sub LEFTSELF overload alias "fb_UStrLeftSelf" ( byref dst as ustring, byval length as const integer )
+#endif
 
 end extern
 
 end namespace
 
 #endif
+
+'' end of string.bi

@@ -4,7 +4,7 @@
 # Unit / log / warning test harness
 ##############################################################################
 
-.PHONY: unit-tests log-tests warning-tests clean-tests
+.PHONY: unit-tests log-tests warning-tests clean-tests ustring-test
 
 TESTS_FBC := $(if $(LOCAL_FBC),$(abspath $(LOCAL_FBC)),$(AVAILABLE_FBC))
 TESTS_TOOLCHAIN_BINDIR := $(call tool_bindir,$(CC))
@@ -59,6 +59,15 @@ warning-tests: | maybe-build-fbc $(TESTS_RUNTIME_LIBS)
 	@chmod +x tests/warnings/test.sh 2>/dev/null || true
 	cd tests/warnings && \
 		FBC="$(TESTS_FBC_CMD)" ./test.sh
+
+##############################################################################
+# USTRING needs the compiler and runtime built from the same source tree.
+# The runner keeps its unit library, examples, and sanitizer artifacts in a
+# temporary directory, so it can be used alongside the normal test harness.
+##############################################################################
+
+ustring-test: compiler rtlib
+	$(TESTS_FBC_ENV) python3 "$(rootdir)/build_scripts/test-ustring.py" --root "$(rootdir)" --fbc "$(abspath $(FBC_EXE))"
 
 ##############################################################################
 # END tests.mk

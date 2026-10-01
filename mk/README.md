@@ -49,6 +49,8 @@ The important design rule is that each layer answers one class of question:
   "what are the artifacts called and where do they live?"
 - `source-graph.mk` and `archives.mk` answer
   "what gets built?"
+- `compiler-sources.mk`, included by `source-graph.mk`, owns compiler subsystem
+  discovery and host policy replacement.
 - `mk/build/*.mk` answer "how do we build and clean it?"
 - `mk/bootstrap/*.mk` answer "how do we recover or regenerate the compiler?"
 - `mk/tests*.mk` and `mk/tests/*.mk` answer "how do we verify the build graph?"
@@ -184,11 +186,23 @@ Useful high-level targets:
 - `make full-test`
 - `make compiler-smoke`
 - `make compiler-semantic-model-smoke`
+- `make compiler-semantic-model-test`
+- `make compiler-semantic-corpus-test` (the maintained OMA programs)
+- `make compiler-structure-test`
+- `make compiler-host-policy-test`
+- `make compiler-storage-test`
+- `make compiler-test-harness-test`
+- `make compiler-backends-test`
 - `make bootstrap-emit-test`
 
 The test harness is designed to preserve enough state to avoid rebuilding the
 entire world unnecessarily while still checking that the graph behaves the way
 the build expects.
+
+Native smoke commands select the compiler after their prerequisites finish.
+This allows an invocation that starts without `bin/fbc` to test the compiler
+it just built. Cross builds continue to use the preserved host compiler.
+The semantic smoke explicitly depends on the compiler build.
 
 ## Where To Edit Common Behavior
 
@@ -201,7 +215,8 @@ Use this rule of thumb when changing the system:
   correct but the emitted compiler/linker flags are wrong
 - change `layout.mk` for install-tree paths
 - change `build-layout.mk` for in-tree artifact paths
-- change `source-graph.mk` when the wrong source files are being selected
+- change `compiler-sources.mk` for compiler subsystem directories and host
+  policy selection; change `source-graph.mk` for runtime source discovery
 - change `mk/build/*.mk` when the graph is correct but the rules are wrong
 - change `mk/bootstrap/*.mk` for compiler recovery and source emission flows
 - change `mk/tests/**/*.mk` when adding new build-system regression coverage

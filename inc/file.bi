@@ -27,6 +27,9 @@ const fbFileEncodUTF8    = 1
 const fbFileEncodUTF16   = 2
 const fbFileEncodUTF32   = 3
 
+'' Overloads refer to C entry points, so their aliases must not be mangled.
+extern "c"
+
 #if __FB_LANG__ = "qb"
 
 declare function FileCopy alias "fb_FileCopy" ( byval source as const __zstring __ptr, byval destination as const __zstring __ptr ) as long
@@ -37,38 +40,65 @@ declare function FileCopy alias "fb_FileCopy" ( byval source as const __zstring 
 	' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-014
 	declare function FileAttr alias "fb_FileAttr" ( byval filenumber as long, byval returntype as long = 1 ) as long
 #endif
-declare function FileLen alias "fb_FileLen" ( byval filename as const __zstring __ptr ) as __longint
-declare function FileExists alias "fb_FileExists" ( byval filename as const __zstring __ptr ) as long
-declare function FileDateTime alias "fb_FileDateTime" ( byval filename as const __zstring __ptr ) as double
-declare function GetAttr alias "fb_FileGetAttr" ( byval filename as const __zstring __ptr ) as long
-declare function SetAttr alias "fb_FileSetAttr" ( byval filename as const __zstring __ptr, byval attributes as long ) as long
+declare function FileLen overload alias "fb_FileLen" ( byval filename as const __zstring __ptr ) as __longint
+declare function FileExists overload alias "fb_FileExists" ( byval filename as const __zstring __ptr ) as long
+declare function FileDateTime overload alias "fb_FileDateTime" ( byval filename as const __zstring __ptr ) as double
+declare function GetAttr overload alias "fb_FileGetAttr" ( byval filename as const __zstring __ptr ) as long
+declare function SetAttr overload alias "fb_FileSetAttr" ( byval filename as const __zstring __ptr, byval attributes as long ) as long
 
 #else
 
+extern "rtlib"
+
 ' The FB and QB branches intentionally use dialect-specific pointer spelling.
 ' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-014
-declare function FileCopy alias "fb_FileCopy" ( byval source as const zstring ptr, byval destination as const zstring ptr ) as long
+declare function FileCopy overload alias "fb_FileCopy" ( byval source as const zstring ptr, byval destination as const zstring ptr ) as long
 ' The FB FileAttr result is intentionally Integer for compatibility with the FB ABI.
 ' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-014
 declare function FileAttr alias "fb_FileAttr" ( byval filenumber as long, byval returntype as long = 1 ) as integer
 ' FB and QB use equivalent pointer-width integer types with dialect-specific names.
 ' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-014
-declare function FileLen alias "fb_FileLen" ( byval filename as const zstring ptr ) as longint
+declare function FileLen overload alias "fb_FileLen" ( byval filename as const zstring ptr ) as longint
 ' FB and QB use the same ABI while retaining dialect-specific declarations.
 ' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-014
-declare function FileExists alias "fb_FileExists" ( byval filename as const zstring ptr ) as long
+declare function FileExists overload alias "fb_FileExists" ( byval filename as const zstring ptr ) as long
 ' FB and QB use equivalent pointer and return types with dialect-specific declarations.
 ' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-014
-declare function FileDateTime alias "fb_FileDateTime" ( byval filename as const zstring ptr ) as double
+declare function FileDateTime overload alias "fb_FileDateTime" ( byval filename as const zstring ptr ) as double
 ' FB and QB use equivalent pointer spellings for the pathname attribute API.
 ' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-014
-declare function GetAttr alias "fb_FileGetAttr" ( byval filename as const zstring ptr ) as long
-declare function SetAttr alias "fb_FileSetAttr" ( byval filename as const zstring ptr, byval attributes as long ) as long
+declare function GetAttr overload alias "fb_FileGetAttr" ( byval filename as const zstring ptr ) as long
+declare function SetAttr overload alias "fb_FileSetAttr" ( byval filename as const zstring ptr, byval attributes as long ) as long
 
+end extern
+#endif
+
+#if __FB_LANG__ <> "qb"
+extern "rtlib"
+'' Unicode path overloads use UTF-8 independently of the process locale.
+declare function FileCopy overload alias "fb_WideFileCopy" _
+    ( byval source as const wstring ptr, byval destination as const wstring ptr ) as long
+declare function FileCopy overload alias "fb_WideFileCopyFromBytes" _
+    ( byval source as const zstring ptr, byval destination as const wstring ptr ) as long
+declare function FileCopy overload alias "fb_WideFileCopyToBytes" _
+    ( byval source as const wstring ptr, byval destination as const zstring ptr ) as long
+declare function FileLen overload alias "fb_WideFileLen" _
+    ( byval filename as const wstring ptr ) as longint
+declare function FileExists overload alias "fb_WideFileExists" _
+    ( byval filename as const wstring ptr ) as long
+declare function FileDateTime overload alias "fb_WideFileDateTime" _
+    ( byval filename as const wstring ptr ) as double
+declare function GetAttr overload alias "fb_WideFileGetAttr" _
+    ( byval filename as const wstring ptr ) as long
+declare function SetAttr overload alias "fb_WideFileSetAttr" _
+    ( byval filename as const wstring ptr, byval attributes as long ) as long
+end extern
 #endif
 
 declare function FileFlush alias "fb_FileFlush" ( byval filenumber as long = -1, byval systembuffer as long = 0 ) as long
 declare function FileSetEof alias "fb_FileSetEof" ( byval filenumber as long ) as long
+
+end extern
 
 #endif
 

@@ -185,6 +185,16 @@ ifeq ($(TARGET_OS),aros)
     -DDISABLE_GPM
 endif
 
+# Amiga newlib has no desktop Unix integration or target libffi in the pinned
+# SDK. Native DOS, Intuition, and AHI replacements provide the platform APIs.
+ifeq ($(TARGET_OS),amiga)
+  ALLCFLAGS += \
+    -DDISABLE_NCURSES \
+    -DDISABLE_LANGINFO \
+    -DDISABLE_GPM \
+    -DDISABLE_FFI
+endif
+
 # ---------------------------------------------------------------------------
 # Windows console stack size
 #

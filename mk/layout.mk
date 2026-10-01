@@ -121,6 +121,9 @@ FBC_INCLUDE_FLAGS := -i $(SRC_INCDIR)
 ifeq ($(TARGET_OS),aros)
 FBC_INCLUDE_FLAGS := -i $(SRC_INCDIR)/aros $(FBC_INCLUDE_FLAGS)
 endif
+ifeq ($(TARGET_OS),amiga)
+FBC_INCLUDE_FLAGS := -i $(SRC_INCDIR)/amiga $(FBC_INCLUDE_FLAGS)
+endif
 ifeq ($(TARGET_OS),riscos)
 FBC_INCLUDE_FLAGS := -i $(SRC_INCDIR)/riscos $(FBC_INCLUDE_FLAGS)
 endif

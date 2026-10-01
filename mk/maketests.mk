@@ -44,6 +44,8 @@ include $(mkpath)/tests/packaging/install.mk
 
 include $(mkpath)/tests/compiler/smoke.mk
 include $(mkpath)/tests/compiler/language.mk
+include $(mkpath)/tests/compiler/structure.mk
+include $(mkpath)/tests/compiler/semantic.mk
 
 ##############################################################################
 # Sanity / configuration test
@@ -67,12 +69,21 @@ sanity: | prereqs
 ##############################################################################
 
 .PHONY: quick-test quick-test-body
+# These aggregate workflows include clean and bootstrap operations that mutate
+# shared build products. Keep their prerequisite sequence serial under -j.
+.NOTPARALLEL: quick-test-body full-test-body
 quick-test: quick-test-body
 	@$(MAKE) clean-maketests-success
 	@$(MAKE) clean-maketests-host
 
 quick-test-body: sanity \
 	mk-structure-test \
+	compiler-structure-test \
+	compiler-host-policy-test \
+	compiler-storage-test \
+	compiler-test-harness-test \
+	compiler-backends-test \
+	compiler-semantic-model-test \
 	example-artifact-test \
 	build-graph-test \
 	bootstrap-emit-test \
@@ -95,6 +106,12 @@ full-test: full-test-body
 
 full-test-body: sanity \
 	mk-structure-test \
+	compiler-structure-test \
+	compiler-host-policy-test \
+	compiler-storage-test \
+	compiler-test-harness-test \
+	compiler-backends-test \
+	compiler-semantic-model-test \
 	example-artifact-test \
 	build-graph-test \
 	parallel-build-test \
@@ -130,6 +147,14 @@ full-test-body: sanity \
 MAKETEST_HOST_FBC_TARGETS := \
 	sanity \
 	mk-structure-test \
+	compiler-structure-test \
+	compiler-host-policy-test \
+	compiler-storage-test \
+	compiler-test-harness-test \
+	compiler-backends-test \
+	compiler-semantic-model-test \
+	compiler-semantic-corpus-test \
+	compiler-semantic-self-test \
 	example-artifact-test \
 	build-graph-test \
 	parallel-build-test \
@@ -163,6 +188,10 @@ MAKETEST_HOST_FBC_TARGETS := \
 	tests-test
 
 $(MAKETEST_HOST_FBC_TARGETS): | maketests-preserve-host-fbc
+
+# Compiler smoke checks can be requested together with -j. Each owns a separate
+# directory so one check's successful cleanup cannot remove another's input.
+$(filter compiler-%,$(MAKETEST_HOST_FBC_TARGETS)): private TEST_TMP = .maketests-tmp/$@
 
 ##############################################################################
 # end of mk/maketests.mk

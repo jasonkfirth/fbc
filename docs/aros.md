@@ -63,7 +63,7 @@ This split leaves the shared m68k work available to later operating-system
 ports without imposing the AROS ABI or 68000 baseline on them.
 
 AROS implementation files use the same replacement-directory model as the
-other complete platform ports. Compiler policy is in `src/compiler/aros/`,
+other complete platform ports. Compiler policy is in `src/compiler/driver/platforms/aros/`,
 runtime replacements are in `src/rtlib/aros/`, gfxlib2 is in
 `src/gfxlib2/aros/`, sfxlib is in `src/sfxlib/aros/`, and CRT declarations are
 in `inc/aros/`. AROS SDK architecture flags, including the m68k 68000

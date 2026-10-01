@@ -1,0 +1,70 @@
+# Project: FreeBASIC semantic sidecar audit
+# File: semantic-sidecar-class-coverage.tsv
+# Purpose: Account for every AST and symbol class in the audited compiler.
+# Responsibilities: Identify preserved payloads, missing relationships, and classes without a live producer.
+# This file intentionally does NOT infer behavioral coverage from a class-name switch.
+domain	class	preserved	remaining	gaps
+ast	AST_NODECLASS_NOP	Kind and ordinary node fields.	No additional semantic union payload; source/generated ownership belongs to the source graph.	G11
+ast	AST_NODECLASS_LOAD	Result expression child and resolved type.	LOAD.isres is absent.	G24
+ast	AST_NODECLASS_ASSIGN	Assignment opcode, children, and resolved types.	Initialized assignment options and source adaptation/access roles are absent.	G11,G24,G36
+ast	AST_NODECLASS_BOP	Raw/concept operator, children, and initialized branch target.	Operator options, complete source operator coverage, evaluation/control/effect roles are incomplete.	G12,G24,G34,G35,G37
+ast	AST_NODECLASS_UOP	Raw/concept operator and child.	Initialized options and source operation/adaptation roles are incomplete.	G11,G12,G24
+ast	AST_NODECLASS_CONV	Conversion, float narrowing, and const conversion flags.	Pre-conversion source identity and conversion reason/lineage are absent.	G11,G31
+ast	AST_NODECLASS_ADDROF	Opcode, child, and source concept when observed.	Complete source event and escape roles are absent; unused ex must remain unread.	G12,G15,G36
+ast	AST_NODECLASS_BRANCH	Raw/concept operation, stable branch kind, and target.	Inversion options, source exit ownership, and complete control-flow edge roles are absent.	G24,G27,G35
+ast	AST_NODECLASS_JMPTB	Ordered unsigned value/label pairs, default, bias, and span.	Source SELECT/CASE ownership and normalized CFG edges are absent.	G10,G35
+ast	AST_NODECLASS_CALL	Call kind/count, ordinary children, formals, result temporary, and virtual static target.	Deferred copyback/profiling trees, source argument/default/adaptation roles, late actions, and execution order are incomplete.	G29,G30,G31,G34
+ast	AST_NODECLASS_CALLCTOR	Constructor call and instance children plus resolved object type.	Source constructor/materialization/lifetime identity and reason are incomplete.	G11,G31,G32,G33
+ast	AST_NODECLASS_STACK	Stable stack operation and ordinary child.	Final stack placement is backend detail; explicit access/effect roles are derived.	G37,G50
+ast	AST_NODECLASS_MEM	Operation kind, byte count, fill value, and children.	Explicit read/write/effect roles and complete source operation identity are absent.	G12,G36,G37
+ast	AST_NODECLASS_LOOP	Wrapper children and attached label identity.	Source/generated loop ownership and execution/control-flow roles are absent.	G10,G32,G34,G35
+ast	AST_NODECLASS_COMP	Vocabulary only.	AST header explicitly states no COMP nodes exist; comparisons use other node classes. Do not manufacture fixture nodes.	G42
+ast	AST_NODECLASS_LINK	Ordinary children and result-edge selection.	Semantic sequence/evaluation/conditional roles need explicit representation.	G34
+ast	AST_NODECLASS_CONST	Exact typed value.	Written suffix/spelling/escape/contextual typing intent and source/generated ownership are absent.	G11,G23
+ast	AST_NODECLASS_VAR	Symbol, type, and byte offset.	Source use identity, access role, and definition/use relationships are absent.	G11,G15,G36
+ast	AST_NODECLASS_IDX	Children, symbol/type, byte offset, and index scale.	Complete source index/call distinction, evaluation order, and storage access roles are absent.	G12,G34,G36
+ast	AST_NODECLASS_FIELD	Attached field/type and ordinary children if still live at export.	Earlier bitfield lowering can erase the source field node; source/lowering/access correspondence is absent.	G11,G36
+ast	AST_NODECLASS_DEREF	Resolved type, child, and byte offset.	Source dereference identity, uncertainty, and access/escape roles are absent.	G12,G36
+ast	AST_NODECLASS_LABEL	Symbol and label-scope relation when initialized.	Declared/statement/GOSUB metadata and explicit CFG roles are absent; flush is an emission detail.	G22,G35,G50
+ast	AST_NODECLASS_ARG	Attached formal, expression, mode override, and aggregate bytes.	Source ordinal/supplied/default/hidden roles, conversion/materialization lineage, and ABI/evaluation details are incomplete.	G19,G31,G34
+ast	AST_NODECLASS_OFFSET	Symbol and byte offset.	Source/generated address identity, emitted link identity, and escape roles are incomplete.	G11,G21,G36
+ast	AST_NODECLASS_DECL	Attached symbol and live children.	Full declarator/statement identity, initialization ownership, and declaration order are absent.	G10,G13,G22,G26
+ast	AST_NODECLASS_NIDXARRAY	Unindexed array child and resolved type.	Source use/call adaptation and descriptor/access roles are incomplete; runtime shape is intentionally unknown.	G11,G19,G31,G36
+ast	AST_NODECLASS_IIF	Children and false target.	Source operand graph, conditional evaluation, lifetime ownership, and CFG roles are absent.	G11,G33,G34,G35
+ast	AST_NODECLASS_LIT	Compiler literal/comment text.	Source graph ownership is not explicit; debug/comment emission is not source execution semantics.	G10,G11,G50
+ast	AST_NODECLASS_ASM	Kind; some BASIC operands have separate B records.	Ordered ASTASMTOK text/symbol payload, operand linkage, source extent, and conservative barrier/clobber policy are absent.	G25,G37
+ast	AST_NODECLASS_DATASTMT	Vocabulary; lowered descriptor initializers and exact stored values exist elsewhere.	Transient nodes are consumed before export; source DATA items/ordering and label ownership are absent.	G28,G42
+ast	AST_NODECLASS_DBG	Kind; subsequent nodes inherit logical lines only when debug nodes were created.	Semantic source mapping is debug-dependent; detailed debug operation/ex/file payload belongs to an optional emission artifact.	G09,G10,G50
+ast	AST_NODECLASS_BOUNDCHK	Index expression, temporary, and checking runtime call children.	Late handler transfers and source/effect/CFG ownership are incomplete.	G30,G35,G37
+ast	AST_NODECLASS_PTRCHK	Pointer expression, temporary, and checking runtime call children.	Late handler transfers and source/effect/CFG ownership are incomplete.	G30,G35,G37
+ast	AST_NODECLASS_SCOPEBEGIN	Scope symbol, ordinary node fields, and scope metadata.	Source block identity and initialized parent/entry/exit/statement relationships are incomplete.	G10,G16,G27
+ast	AST_NODECLASS_SCOPEEND	Scope symbol and ordinary node fields.	Matching source scope/end ownership and cleanup/control roles are incomplete; do not read begin-only union fields.	G10,G27,G33
+ast	AST_NODECLASS_SCOPE_BREAK	Vocabulary and any surviving ordinary child data; some cleanup I ranges.	Break-list payload is consumed before ordinary export; source exit parent/scope/statement/target/action identity is absent.	G27,G33,G42
+ast	AST_NODECLASS_TYPEINI	Offset/byte count, live children, and initializer-owner H relation.	Semantic initializer scopes, source graph/lineage, and ownership are incomplete.	G11,G26
+ast	AST_NODECLASS_TYPEINI_PAD	Offset and byte count.	Source/generated padding/initializer ownership is incomplete.	G26
+ast	AST_NODECLASS_TYPEINI_ASSIGN	Offset/byte count, assigned field, and value child.	Source initialization/access/adaptation roles and scope ownership are incomplete.	G11,G26,G31,G36
+ast	AST_NODECLASS_TYPEINI_CTORCALL	Offset/byte count and constructor call child.	Source constructor/action/lifetime owner and scope lineage are incomplete.	G26,G32,G33
+ast	AST_NODECLASS_TYPEINI_CTORLIST	Offset, element count, and constructor child.	Source array/action/lifetime order and scope lineage are incomplete; bytes is an inactive union alternative.	G26,G32,G33
+ast	AST_NODECLASS_TYPEINI_SCOPEINI	Array-initializer flag.	Initialized offsets/bytes, matching scope identity, and source/owner relationships are absent.	G26
+ast	AST_NODECLASS_TYPEINI_SCOPEEND	Kind.	Initialized offsets/bytes, matching scope identity, and owner relationships are absent; is_array is not assumed initialized.	G26
+ast	AST_NODECLASS_PROC	P signature/body location and ordinary body roots; procedure wrapper is not traversed.	Main/entry/exit/block/statement payload needs explicit records, not a fabricated N wrapper.	G08,G27,G42
+ast	AST_NODECLASS_MACRO	Stable VA_START/END/COPY/ARG operation, ordinary children, and resolved types.	Source varargs operation, ABI policy, adaptation and access/effect roles are incomplete; this is not a preprocessor macro node.	G12,G19,G31,G36,G37
+ast	AST_NODECLASS_USTRINDEX	Unicode index kind, operands, and resolved scalar type.	Indexed-read runtime CALL is created during astLoad, after export; source operation/access/effect correspondence is incomplete.	G12,G30,G36,G37
+symbol	FB_SYMBCLASS_VAR	Name/type/size/storage/visibility/owner/status, arrays/descriptors, live initializers, string literals, and alignment.	Implicit source origin, declarator/order/lifetime/linkage/snapshot metadata are incomplete; generated literal names can contain bytes the supplied reader cannot decode.	G13,G21,G22,G23,G26,G33,G41,G51
+symbol	FB_SYMBCLASS_CONST	Name/type/owner and exact value.	Written literal intent, complete declaration/source expression identity, and normalized type/flag contract are incomplete.	G10,G17,G23
+symbol	FB_SYMBCLASS_PROC	Signature, formals/defaults, result subtype/method, override/slot/overloads, and exported bodies.	Special declaration anchors/origin, full ABI, linkage/priority/status/registration, source call graph and snapshot ownership are incomplete.	G14,G19,G20,G21,G22,G31,G41
+symbol	FB_SYMBCLASS_PARAM	Type, source passing mode, optional/rank/default, ordinal/THIS role, and live body variable.	Prototype spelling/names and real descriptor/register ABI classification are incomplete.	G13,G19,G31
+symbol	FB_SYMBCLASS_DEFINE	Definition parameters/replacement tokens/text/flags/callback kind and retired definition snapshots.	Invocation/substitution/callback-result/source provenance and definition lifetime events are absent; accepted legacy token bytes can break the supplied reader.	G05,G51
+symbol	FB_SYMBCLASS_KEYWORD	Name/class/type/owner/status metadata.	Token ID/class and source reservation/keyword policy are absent.	G07,G17
+symbol	FB_SYMBCLASS_LABEL	Name/owner plus initialized label-scope relation.	Declared/statement/GOSUB flags, full source definition/use roles, and control-flow identity are incomplete.	G15,G22,G35
+symbol	FB_SYMBCLASS_NAMESPACE	Name, lexical owner, lookup namespace, declaration/use bindings, and import relationships.	Reopening/include/context instances and ordered import visibility are incomplete.	G04,G16
+symbol	FB_SYMBCLASS_ENUM	Type/owner/member constants and element count.	Source enum/member scope extents, declaration order, normalized nominal type/flag policy are incomplete.	G10,G16,G17,G22
+symbol	FB_SYMBCLASS_STRUCT	Type/union/base, padded/unpadded size, selected alignment, options, abstract count, return dtype, fields and special-member relations.	Separate natural/pack/effective alignment, retin2regs, vtable/RTTI ownership, source initializer/lifetime graph are incomplete.	G18,G19,G20,G26,G32,G33
+symbol	FB_SYMBCLASS_CLASS	Vocabulary and lookup cases.	No class-symbol constructor found in this source inventory; do not infer a working class payload or manufacture source coverage from the name.	G42,G48
+symbol	FB_SYMBCLASS_FIELD	Resolved type/owner/offset/size/bit position/width/array/alignment and retained initializer.	Complete source declarator, initialization/lowering identity, declaration order, and access/lifetime roles are incomplete.	G10,G11,G22,G26,G32,G36
+symbol	FB_SYMBCLASS_TYPEDEF	Alias declaration identity/name and resolved underlying dtype/subtype; ordinary alias-use bindings.	Complete source type-constructor/alias graph, qualifiers/promotion policy, and forward-name use closure are incomplete.	G11,G15,G17
+symbol	FB_SYMBCLASS_FWDREF	Generated forward identity and canonical resolved-symbol relationship.	First unresolved type-name source use is absent in the probe; private backpatch lists should not be exported as source references.	G15,G41
+symbol	FB_SYMBCLASS_SCOPE	Lexical owner, logical line extent, and begin/end body nodes.	Physical source scope/occurrence identity and complete control/lifetime ownership are incomplete; frame base offset is emission detail.	G09,G10,G16,G27,G33,G50
+symbol	FB_SYMBCLASS_RESERVED	Name/class/owner/status metadata for actual reserve symbols.	Source reservation event and effective keyword/assembly policy are absent; do not read VAR payload merely because reserve symbols share a lookup path.	G07,G17,G42
+symbol	FB_SYMBCLASS_NSIMPORT	Imported namespace and lexical/lookup owner metadata.	Source USING occurrence, order/lifetime/context and visibility event graph are absent; linked-list pointers are implementation state.	G16
+# end of semantic-sidecar-class-coverage.tsv

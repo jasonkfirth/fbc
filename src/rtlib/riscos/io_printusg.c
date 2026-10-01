@@ -31,6 +31,7 @@ typedef struct {
 	int       chars;
 	char     *ptr;
 	FBSTRING  fmtstr;
+	int       utf8;
 } FB_PRINTUSGCTX;
 
 #define fb_PRINTUSGCTX_Destructor NULL
@@ -141,6 +142,36 @@ static int hIsNan(double d)
 #define VAL_ISBOOL 0x40
 
 
+/* PRINT USING keeps its existing byte format grammar. Unicode arguments
+   select scalar widths and UTF-8 output; numeric formatting is shared. */
+static void hPrintText( int fnum, const char *text, ssize_t length )
+{
+	FB_PRINTUSGCTX *ctx = FB_TLSGETCTX( PRINTUSG );
+	if( ctx->utf8 ) {
+		FBSTRING view = { (char *)text, length, length };
+		fb_UStrPrint( fnum, &view, 0 );
+	} else fb_PrintFixString( fnum, text, 0 );
+}
+
+static void hPrintField( int fnum, FBSTRING *source, ssize_t columns )
+{
+	ssize_t length = source && source->data ? FB_STRSIZE(source) : 0;
+	ssize_t count = fb_hUtf8Count(source ? source->data : NULL, length);
+	ssize_t bytes = fb_hUtf8Offset(source ? source->data : NULL, length, columns);
+	ssize_t padding = count < columns ? columns - count : 0, i;
+	FBSTRING *result;
+	FB_STRLOCK();
+	result = bytes <= FB_USTRING_MAX_BYTES - padding ? fb_hUStrAlloc_NoLock(bytes + padding) : NULL;
+	if( result != NULL && bytes + padding > 0 ) {
+		if( bytes ) memcpy(result->data, source->data, bytes);
+		/* Fixed fields retain BASIC's NUL-to-space convention. */
+		for( i = 0; i < bytes; ++i ) if( result->data[i] == 0 ) result->data[i] = ' ';
+		memset(result->data + bytes, ' ', padding);
+	}
+	FB_STRUNLOCK();
+	if( result != NULL ) fb_UStrPrint(fnum, result, 0);
+}
+
 static int fb_PrintUsingFmtStr( int fnum );
 
 FBCALL int fb_PrintUsingInit( FBSTRING *fmtstr )
@@ -154,10 +185,26 @@ FBCALL int fb_PrintUsingInit( FBSTRING *fmtstr )
 	fb_StrAssign( (void *)&ctx->fmtstr, -1, fmtstr, -1, 0 );
 	ctx->ptr = ctx->fmtstr.data;
 	ctx->chars = FB_STRSIZE( &ctx->fmtstr );
+	ctx->utf8 = FALSE;
 
 	FB_UNLOCK();
 
 	return fb_ErrorSetNum( FB_RTERROR_OK );
+}
+
+FBCALL int fb_PrintUsingInitUstr( FBSTRING *format )
+{
+	int result = fb_PrintUsingInit(format);
+	FB_PRINTUSGCTX *ctx = FB_TLSGETCTX( PRINTUSG );
+	ctx->utf8 = TRUE;
+	return result;
+}
+
+FBCALL int fb_LPrintUsingInitUstr( FBSTRING *format )
+{
+	int result = fb_LPrintInit();
+	if( result != FB_RTERROR_OK ) return result;
+	return fb_PrintUsingInitUstr(format);
 }
 
 FBCALL int fb_PrintUsingEnd( int fnum )
@@ -325,19 +372,20 @@ static int fb_PrintUsingFmtStr( int fnum )
 	if( len > 0 )
 	{
 		buffer[len] = '\0';
-		fb_PrintFixString( fnum, buffer, 0 );
+		hPrintText( fnum, buffer, len );
 	}
 
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }
 
-FBCALL int fb_PrintUsingStr( int fnum, FBSTRING *s, int mask )
+static int hPrintUsingString( int fnum, FBSTRING *s, int mask, int unicode )
 {
 	FB_PRINTUSGCTX *ctx;
 	char buffer[BUFFERLEN+1];
 	int c, nc, strchars, doexit, i;
 
 	ctx = FB_TLSGETCTX( PRINTUSG );
+	if( unicode ) ctx->utf8 = TRUE;
 
     /* restart if needed */
 	if( ctx->chars == 0 )
@@ -363,20 +411,26 @@ FBCALL int fb_PrintUsingStr( int fnum, FBSTRING *s, int mask )
 		switch( c )
 		{
 		case '!':
+			if( unicode ) {
+				hPrintField(fnum, s, 1);
+				++ctx->ptr;
+				--ctx->chars;
+				break;
+			}
 			if( FB_STRSIZE( s ) >= 1 )
 				buffer[0] = s->data[0];
 			else
 				buffer[0] = ' ';
 
 			buffer[1] = '\0';
-			fb_PrintFixString( fnum, buffer, 0 );
+			hPrintText( fnum, buffer, strlen(buffer) );
 
 			++ctx->ptr;
 			--ctx->chars;
 			break;
 
 		case '&':
-			fb_PrintFixString( fnum, s->data, 0 );
+			hPrintText( fnum, s->data ? s->data : "", FB_STRSIZE(s) );
 
 			++ctx->ptr;
 			--ctx->chars;
@@ -388,10 +442,16 @@ FBCALL int fb_PrintUsingStr( int fnum, FBSTRING *s, int mask )
 				if( strchars > 0 )
 				{
 					++strchars;
+					if( unicode ) {
+						hPrintField(fnum, s, strchars);
+						++ctx->ptr;
+						--ctx->chars;
+						break;
+					}
 
 					if( FB_STRSIZE( s ) < strchars )
 					{
-						fb_PrintFixString( fnum, s->data, 0 );
+						hPrintText( fnum, s->data ? s->data : "", FB_STRSIZE(s) );
 
 						strchars -= FB_STRSIZE( s );
 						for( i = 0; i < strchars; i++ )
@@ -409,7 +469,7 @@ FBCALL int fb_PrintUsingStr( int fnum, FBSTRING *s, int mask )
 						if( buffer[i] == '\0' )
 							buffer[i] = ' ';
 
-					fb_PrintFixString( fnum, buffer, 0 );
+					hPrintText( fnum, buffer, strlen(buffer) );
 
 					++ctx->ptr;
 					--ctx->chars;
@@ -457,113 +517,19 @@ FBCALL int fb_PrintUsingStr( int fnum, FBSTRING *s, int mask )
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }
 
-FBCALL int fb_PrintUsingWstr( int fnum, FB_WCHAR *s, int mask )
+FBCALL int fb_PrintUsingStr( int fnum, FBSTRING *source, int mask )
 {
-	FB_PRINTUSGCTX *ctx;
-	FB_WCHAR buffer[BUFFERLEN+1];
-	int c, nc, strchars, doexit, i, length;
+	return hPrintUsingString(fnum, source, mask, FALSE);
+}
 
-	ctx = FB_TLSGETCTX( PRINTUSG );
+FBCALL int fb_PrintUsingUstr( int fnum, FBSTRING *source, int mask )
+{
+	return hPrintUsingString(fnum, source, mask, TRUE);
+}
 
-	/* restart if needed */
-	if( ctx->chars == 0 ) {
-		ctx->ptr = ctx->fmtstr.data;
-		ctx->chars = FB_STRSIZE( &ctx->fmtstr );
-	}
-
-	/* any text first */
-	fb_PrintUsingFmtStr( fnum );
-
-	strchars = -1;
-	length = (s != NULL) ? fb_wstr_Len( s ) : 0;
-
-	if( ctx->ptr == NULL )
-		ctx->chars = 0;
-
-	while( ctx->chars > 0 ) {
-		c = FB_CHAR_TO_INT( *ctx->ptr );
-		nc = ctx->chars > 1 ? FB_CHAR_TO_INT( ctx->ptr[1] ) : -1;
-
-		doexit = TRUE;
-		switch( c ) {
-		case '!':
-			if( length >= 1 )
-				buffer[0] = s[0];
-			else
-				buffer[0] = L' ';
-
-			buffer[1] = L'\0';
-			fb_PrintWstr( fnum, buffer, 0 );
-
-			++ctx->ptr;
-			--ctx->chars;
-			break;
-
-		case '&':
-			fb_PrintWstr( fnum, s, 0 );
-
-			++ctx->ptr;
-			--ctx->chars;
-			break;
-
-		case '\\':
-			if( (strchars != -1) || (nc == ' ') || (nc == '\\') ) {
-				if( strchars > 0 ) {
-					++strchars;
-
-					if( length < strchars ) {
-						fb_PrintWstr( fnum, s, 0 );
-
-						strchars -= length;
-						for( i = 0; i < strchars; i++ )
-							buffer[i] = L' ';
-						buffer[i] = L'\0';
-					} else {
-						fb_wstr_Copy( buffer, s, strchars );
-					}
-
-					/* replace null-terminators by spaces */
-					for( i = 0; i < strchars; i++ )
-						if( buffer[i] == '\0' )
-							buffer[i] = ' ';
-
-					fb_PrintWstr( fnum, buffer, 0 );
-
-					++ctx->ptr;
-					--ctx->chars;
-				} else {
-					strchars = 1;
-					doexit = FALSE;
-				}
-			}
-			break;
-
-		case ' ':
-			if( strchars > -1 ) {
-				++strchars;
-				doexit = FALSE;
-			}
-			break;
-		}
-
-		if( doexit )
-			break;
-
-		++ctx->ptr;
-		--ctx->chars;
-	}
-
-	/* any text */
-	fb_PrintUsingFmtStr( fnum );
-
-	/**/
-	if( mask & FB_PRINT_ISLAST ) {
-		if( mask & FB_PRINT_NEWLINE )
-			fb_PrintVoid( fnum, FB_PRINT_NEWLINE );
-		fb_StrDelete( &ctx->fmtstr );
-	}
-
-	return fb_ErrorSetNum( FB_RTERROR_OK );
+FBCALL int fb_PrintUsingWstr( int fnum, FB_WCHAR *source, int mask )
+{
+	return fb_PrintUsingUstr(fnum, fb_UStrFromWstr(source), mask);
 }
 
 static int hPrintNumber
@@ -1301,7 +1267,7 @@ static int hPrintNumber
 
 	/**/
 	++p;
-	fb_PrintFixString( fnum, p, 0 );
+	hPrintText( fnum, p, strlen(p) );
 
 	/* ------------------------------------------------------ */
 

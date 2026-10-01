@@ -46,6 +46,10 @@
 	/* AROS exposes a POSIX compatibility surface around native Exec/DOS APIs. */
 	#define HOST_AROS
 	#define HOST_UNIX
+#elif defined __amigaos__ || defined __AMIGA__
+	/* Amiga newlib supplies the portable C layer; native replacements own DOS. */
+	#define HOST_AMIGA
+	#define HOST_UNIX
 #elif defined __riscos__
 	/* GCCSDK/UnixLib presents RISC OS as an ELF Unix-like target. */
 	#define HOST_RISCOS
