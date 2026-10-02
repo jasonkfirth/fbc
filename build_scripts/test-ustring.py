@@ -69,6 +69,10 @@ def main():
                 raise RuntimeError(f"{backend}: missing passing test summary\n{output}")
             run(flags + ["-c", str(root / "tests/string/text-types-api.bas"),
                          "-o", str(working / ("text-api-" + backend + ".o"))], working)
+            printer = working / ("printer-" + backend)
+            run(flags + [str(root / "tests/string/ustring-lprint.bas"),
+                         "-x", str(printer)], working)
+            run([str(printer)], working)
 
             rejected = sorted((root / "tests/string").glob("ustring-*-invalid.bas"))
             for source in rejected:

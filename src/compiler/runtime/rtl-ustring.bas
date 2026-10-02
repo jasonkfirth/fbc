@@ -456,7 +456,7 @@ dim shared as FB_RTL_PROCDEF ufuncdata(0 to ...) = _
 	( _
 		@FB_RTL_USTRLPRINTUSGINIT, NULL, _
 		FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
-		NULL, FB_RTL_OPT_NOQB, _
+		@rtlPrinter_cb, FB_RTL_OPT_NOQB, _
 		1, _
 		{ _
 			( typeSetIsConst( FB_DATATYPE_USTRING ), FB_PARAMMODE_BYREF, FALSE ) _

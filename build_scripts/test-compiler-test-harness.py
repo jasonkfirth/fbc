@@ -10,6 +10,7 @@ This file intentionally does NOT run the complete language suite.
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -18,6 +19,18 @@ import tempfile
 
 def test_haiku_grep(root: Path, working: Path) -> bool:
     """Haiku must count result records with the same status as native grep."""
+    # The Haiku helper requires GNU awk extensions. Other hosts may only
+    # provide BSD awk or mawk, which cannot run this platform-specific probe.
+    awk = shutil.which("gawk") or shutil.which("awk")
+    if awk is None:
+        print("Haiku grep: skipped (GNU awk unavailable)")
+        return True
+    version = subprocess.run([awk, "--version"], text=True, capture_output=True,
+                             timeout=10, check=False)
+    if "GNU Awk" not in version.stdout:
+        print("Haiku grep: skipped (GNU awk unavailable)")
+        return True
+    environment = dict(os.environ, AWK=awk)
     working.mkdir()
     (working / "matches.log").write_text(
         "probe : RESULT=PASSED\nignored\nprobe : RESULT=FAILED\n", encoding="utf-8")
@@ -36,7 +49,8 @@ def test_haiku_grep(root: Path, working: Path) -> bool:
         expected = subprocess.run(["grep", *arguments], cwd=working, input=input_text,
                                   text=True, capture_output=True, timeout=10, check=False)
         actual = subprocess.run(helper + arguments, cwd=working, input=input_text,
-                                text=True, capture_output=True, timeout=10, check=False)
+                                text=True, capture_output=True, timeout=10, check=False,
+                                env=environment)
         if (actual.returncode, actual.stdout) != (expected.returncode, expected.stdout):
             print(label + ": wrong Haiku grep result\n" + actual.stdout + actual.stderr)
             return False

@@ -45,9 +45,13 @@ SUITE( fbc_tests.string_.text_types )
 		CU_ASSERT( ustring(environ(wstr("FBC_TEXT_TYPES_TEST"))) = uchr(&hE9, &h4E2D) )
 		CU_ASSERT_EQUAL( setenviron(utf8), 0 )
 		CU_ASSERT( ustring(environ(ustring("FBC_TEXT_TYPES_TEST"))) = uchr(&hE9, &h4E2D) )
-		CU_ASSERT_EQUAL( DateValue(wstr("1/2/2020")), DateValue(ustring("1/2/2020")) )
-		CU_ASSERT( IsDate(wstr("1/2/2020")) )
-		CU_ASSERT( IsDate(ustring("1/2/2020")) )
+		'' Numeric date order follows the host locale. Named months also accept
+		'' English names, so these conversion checks work with any date order.
+		const dateText = "January 2, 2020"
+		CU_ASSERT_EQUAL( DateValue(wstr(dateText)), DateSerial(2020, 1, 2) )
+		CU_ASSERT_EQUAL( DateValue(ustring(dateText)), DateSerial(2020, 1, 2) )
+		CU_ASSERT( IsDate(wstr(dateText)) )
+		CU_ASSERT( IsDate(ustring(dateText)) )
 		CU_ASSERT_EQUAL( TimeValue(wstr("12:30:00")), TimeValue(ustring("12:30:00")) )
 		CU_ASSERT_EQUAL( DateAdd(wstr("d"), 1, 100), DateAdd(ustring("d"), 1, 100) )
 		CU_ASSERT_EQUAL( DatePart(wstr("yyyy"), 100), DatePart(ustring("yyyy"), 100) )

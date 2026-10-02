@@ -85,7 +85,7 @@ fi
 # The supported Haiku images provide GNU awk.  IGNORECASE and nextfile let the
 # helper preserve grep's case-folding and one-name-per-matching-file behavior
 # without opening the files through the failing GNU grep code path.
-FB_TEST_GREP_PATTERN="$pattern" awk \
+FB_TEST_GREP_PATTERN="$pattern" "${AWK:-awk}" \
 	-v ignore_case="$ignore_case" \
 	-v list_only="$list_only" \
 	-v count_only="$count_only" \

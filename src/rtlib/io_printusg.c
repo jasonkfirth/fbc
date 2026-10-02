@@ -186,13 +186,6 @@ FBCALL int fb_PrintUsingInitUstr( FBSTRING *format )
 	return result;
 }
 
-FBCALL int fb_LPrintUsingInitUstr( FBSTRING *format )
-{
-	int result = fb_LPrintInit();
-	if( result != FB_RTERROR_OK ) return result;
-	return fb_PrintUsingInitUstr(format);
-}
-
 FBCALL int fb_PrintUsingEnd( int fnum )
 {
 	FB_PRINTUSGCTX *ctx;
