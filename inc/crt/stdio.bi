@@ -6,6 +6,10 @@
 ''         be included in other distributions without authorization.
 ''
 ''
+#ifdef __FB_AMIGA__
+#include once "amiga/crt/stdio.bi"
+#endif
+
 #ifndef __crt_stdio_bi__
 #define __crt_stdio_bi__
 

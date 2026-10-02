@@ -26,6 +26,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
+#include once "tooling/semantic-constructs.bi"
 #include once "ast/ast.bi"
 
 declare sub fbSemanticModelExportBinding _
@@ -94,6 +95,9 @@ sub cEnumBody( byval s as FBSYMBOL ptr, byval attrib as FB_SYMBATTRIB )
 			exit do
 
 		case else
+			dim as LEX_LOCATION statement_source = lexGetCurrentLocation( )
+			dim as integer statement_errors = errGetCount( )
+			dim as longint statement = fbSemanticModelStatementBegin(statement_source, lexGetToken( ), lexGetClass( ))
 
 			'' ID ConstDecl (',' ID ConstDecl)*
 			do
@@ -152,6 +156,8 @@ sub cEnumBody( byval s as FBSYMBOL ptr, byval attrib as FB_SYMBATTRIB )
 				lexSkipToken( )
 			loop
 
+			dim as LEX_LOCATION statement_ending = lexGetLastLocation( )
+			fbSemanticModelStatementEnd(statement, "enumerator", statement_ending, statement_errors)
 			'' Comment? SttSeparator
 			cComment( )
 
@@ -270,6 +276,7 @@ sub cEnumDecl( byval attrib as FB_SYMBATTRIB )
 	end if
 
 	'' EnumBody (enum elements don't inherit anonymous attribute)
+	dim as longint semantic_construct = fbSemanticModelConstructBegin(FB_TK_ENUM)
 	cEnumBody( e, attrib and (not FB_SYMBATTRIB_ANONYMOUS) )
 
 	'' close scope
@@ -300,6 +307,8 @@ sub cEnumDecl( byval attrib as FB_SYMBATTRIB )
 			end if
 		end if
 	end if
+	dim as LEX_LOCATION semantic_ending = lexGetLastLocation( )
+	fbSemanticModelConstructEnd(semantic_construct, semantic_ending)
 end sub
 
 '' end of parser/declarations/parser-decl-enum.bas

@@ -1,0 +1,436 @@
+{
+  "objective": "Complete the semantic model using the compiler-wide gap audit, including additional defects discovered during implementation.",
+  "schema": "25",
+  "goal_status": "active",
+  "compiler": "/home/jkfirth/fbc/out/semantic-basic-correction/fbc",
+  "compiler_sha256": "887677078a36d4f8e529b1c75ab2a43b56a0ae5c116045342d18458fed3ae18d",
+  "verified_checks": [
+    "101 schema 25 sidecar contract methods passed with GCC/LLVM/Clang emission checks; log: out/semantic-basic-correction/contracts-final.log.",
+    "174 Make-selected native BASIC compiler modules passed all 522 GCC/LLVM/Clang cases, validating full/expressions artifacts and identical emitted code against export-disabled controls; evidence: out/semantic-basic-correction/compiler-self/results.json.",
+    "All six BASIC output/source safety methods passed, including source/include/preinclude/hardlink/symlink aliases, output collisions, successful replacement, injected write/flush/close/replace failures, SHA-256 padding/read boundaries and open-stream position/change detection; log: out/semantic-basic-correction/file-contracts.log.",
+    "Six source construct methods passed: all 14 compound kinds, every accepted dispatch route, colon/continuation/inline nesting, aggregate/enum/assembly bodies, shared NEXT closure, repeated include/module contexts, generated/inactive omissions, recovery, legacy numeric labels and corrupted ownership/closure; log: out/semantic-basic-correction/construct-contracts.log.",
+    "Source/AST and binding links, access roles, optional argument origin, selected file-operation ownership and explicit partial/unavailable capabilities passed in the schema 25 suite.",
+    "Make semantic smoke passed with all schema 24/25 record families recognized; log: out/semantic-basic-correction/smoke.log.",
+    "Structure validation checked 245 documented compiler BASIC/header files and 21 host graphs; rejects untracked handwritten C helpers and orphan C, permits compiler-generated C paired with BASIC.",
+    "Prior schema 23 source-coordinate checkpoint: 171 Make-selected modules passed 513 GCC/LLVM/Clang cases; all 20062 exported lexer locations independently validated. Evidence remains in out/semantic-coordinate-self-all and out/semantic-coordinate-verification."
+  ],
+  "limitations": "No gap is claimed fully complete by this implementation checkpoint; evidence is partial until its full acceptance scope is verified.",
+  "items": [
+    {
+      "id": "G01",
+      "title": "Reject output aliases of compiler inputs and emissions",
+      "status": "in-progress",
+      "evidence": "Staged publication protects source/include/preinclude, link aliases, emissions and executable/preprocessed outputs; dedicated regressions pass. Remaining resource/input cases and target validation must be audited.",
+      "required_positive": "Distinct output paths preserve input bytes and publish the expected nonempty module.",
+      "required_negative": "Same path, relative alias, symlink, hardlink, include alias, and emitted-code alias cannot overwrite another artifact or report success."
+    },
+    {
+      "id": "G02",
+      "title": "Check writes, close, and final publication",
+      "status": "in-progress",
+      "evidence": "Checked staging, writes, flush, close and replacement are implemented in BASIC. A BASIC fault fixture verifies partial writes, flush/close/replacement failures, abandonment, exactly one close, old contents and cleanup. Compiler rebuild, bootstrap emission and 64 contract methods pass. Native target and complete limit review remain.",
+      "required_positive": "Successful publication yields a readable complete model with matching counts.",
+      "required_negative": "Full device, short write, close failure, interrupted compile, and failed replacement never publish a newly complete model or silently succeed."
+    },
+    {
+      "id": "G03",
+      "title": "Identify source revisions, encoding, and coordinate systems",
+      "status": "in-progress",
+      "evidence": "FILE revisions retain actual opened-stream hash/encoding. LOC resolves original physical UTF-16 boundaries and absolute BOM-inclusive byte offsets through live source handles, preserving position and original revisions. Six source formats, three line endings and non-BMP text pass independent exact-span tests. All 513 compiler-source cases and 20062 compiler lexer locations validate. Compiler build/invocation identity, complete decoder malformed-state capability and all native host combinations remain.",
+      "required_positive": "UTF-8, UTF-16, UTF-32, legacy bytes, BOMs, CRLF, and non-BMP characters map to the captured revision and documented columns.",
+      "required_negative": "A changed file cannot be silently treated as the revision that supplied an editable semantic fact; malformed encodings remain noneditable."
+    },
+    {
+      "id": "G04",
+      "title": "Export include occurrences and dependency relationships",
+      "status": "in-progress",
+      "evidence": "SRC/INC/SRE preserve successful opens, distinct repeated occurrences, parent contexts and include outcomes; unopened/skipped paths do not become dependencies. Repeated includes and source origins pass focused full/compact checks. Revision deduplication, all failure outcomes and full acceptance coverage remain.",
+      "required_positive": "Repeated includes under different namespaces/configurations have distinct contexts sharing one file revision.",
+      "required_negative": "Skipped, missing, or failed-open includes do not masquerade as successfully opened semantic contexts; skipped text receives no invented bindings."
+    },
+    {
+      "id": "G05",
+      "title": "Export macro invocations, substitutions, and expansion origins",
+      "status": "in-progress",
+      "evidence": "MD/MT/ML preserve selected immutable definitions, formals, paste boundaries and actual lifetime actions. MI/MA/MS/MC/ME capture attempts, parents, effective argument source ranges, ordered substitutions, one callback return and exact replacement text. Independent origin frames and MR consumed-token links preserve generated symbols and operator provenance without invented edit ranges. Eight new test families, 84 total contracts, runtime parity and all 510 compiler-source cases pass. Complete per-token physical/definition spans, invocation extent reconstruction, all target combinations and association with the remaining source/construct graph remain.",
+      "required_positive": "Nested, variadic, multiline, stringifying, token-pasting, and callback macros trace each selected result to its invocation and definition.",
+      "required_negative": "Do not reinvoke stateful callbacks, turn synthesized tokens into editable physical bindings, or emit recursion-suppressed names as ordinary calls."
+    },
+    {
+      "id": "G06",
+      "title": "Record conditional compilation decisions and inactive regions",
+      "status": "in-progress",
+      "evidence": "PPB/PPD/PPE/PPT/PPS record all seven directive kinds, actual evaluation and selection, defined-name results, closure and exact inactive spans. Positive/negative tests cover nested inactive scanning, skipped callbacks, generated narrow/wide points, includes, remaps, recovery, resets and corrupt ownership. All 507 compiler-source cases passed the initial audit. Complete physical/macro origin association depends on G03/G05/G09; all 1,014 saved sidecars also passed the stricter ownership reader. Macro-generated directives and predicate queries now carry actual expansion links through MR; all compiler-source cases pass schema 22.",
+      "required_positive": "Nested #IF/#ELSEIF/#ELSE and #IFDEF decisions retain the actual selected branch and context.",
+      "required_negative": "Do not parse inactive code as semantic declarations, manufacture inactive overload targets, or evaluate skipped callbacks again."
+    },
+    {
+      "id": "G07",
+      "title": "Record effective options and their source history",
+      "status": "in-progress",
+      "evidence": "CTX/OPT capture all 64 compiler/default/language policy fields; USE preserves AST construction and declaration configuration. Temporal directive provenance, DEF ranges, keyword policy and complete source association remain.",
+      "required_positive": "OPTION BASE changes, DEF letter ranges, push/pop pragmas, EXTERN policy, #LANG, #CMDLINE restart, and per-module resets yield the expected contexts.",
+      "required_negative": "Rolled-back attempts and popped options cannot leak into later facts; export must not enable options, checks, profiling, or debug information itself."
+    },
+    {
+      "id": "G08",
+      "title": "Describe invocation, module role, and link inputs",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Multiple translation units, main selection, library attributes, #INCLIB/#LIBPATH, predefines, preincludes, and output modes retain their actual choices.",
+      "required_negative": "Do not claim runtime-loaded libraries, linker-resolved addresses, or unavailable semantic bodies for prebuilt objects."
+    },
+    {
+      "id": "G09",
+      "title": "Retain logical-to-physical source remapping",
+      "status": "in-progress",
+      "evidence": "MAP now has explicit remap identities and LOC attachments to original physical coordinates and bytes; binding/expression/preprocessor origins retain the original source context after repeated logical remaps. Line-only or same-filename remapping stays noneditable. Repeated includes/remaps, byte bounds, stale/fabricated mappings and all 513 compiler-source cases pass. Full attachment to remaining construct/action/diagnostic families depends on their graph implementation.",
+      "required_positive": "Nested includes and repeated remaps preserve logical diagnostic coordinates plus the actual physical source origin.",
+      "required_negative": "Remapped/generated coordinates never become editable merely because their logical filename resembles a dependency path."
+    },
+    {
+      "id": "G10",
+      "title": "Capture source statements, compounds, and complete construct ranges",
+      "status": "in-progress",
+      "evidence": "ST/STE parser observations, BLK/BEND syntax nesting and OWN creation-time associations now retain source/configuration/module/procedure ownership and physical LOC extents. All 14 compound kinds and all accepted routes, inline/colon/continuation/member/enum/assembly/legacy label forms, multiple NEXT closures, includes/remaps, generated/inactive exclusions and provisional recovery pass independent tests and off/full/bindings/expression emission parity. Complete declaration/synthesized-body and branch structural roles still require acceptance review; no complete G10 claim.",
+      "required_positive": "All declaration, compound, legacy single-line, colon-separated, continuation, include, and synthesized-body cases have documented source ownership.",
+      "required_negative": "Enabling export cannot force -g or change emissions; generated statements cannot inherit false editable ranges from the nearest debug marker."
+    },
+    {
+      "id": "G11",
+      "title": "Link typed source expressions and their lowered representations",
+      "status": "in-progress",
+      "evidence": "Immutable source-expression associations survive AST cloning and are exported as compiler-observed H links, with absent/erased nodes explicitly not inferred. Source calls erased by constant short-circuit lowering remain typed E facts without invented retained calls. Source parent/operand/result graphs and complete transformation lineage remain pending.",
+      "required_positive": "Nested expressions, folded expressions, operator calls, pointers, arrays, properties, conditional expressions, and cloned initializers retain source graph and lowering links.",
+      "required_negative": "Do not infer expression parenthood from overlapping ranges, reuse pool addresses as IDs, or invent source AST operations for already-folded nodes."
+    },
+    {
+      "id": "G12",
+      "title": "Cover every source operation route consistently",
+      "status": "in-progress",
+      "evidence": "Selected file statement routes emit SOP ownership after their actual grammar path succeeds; tested file-open, line-input and file-close source extents in all modes. All other source operation routes and variants remain required.",
+      "required_positive": "Every supported arithmetic, cast, address, member/index, type inquiry, allocation, mutation, string, memory, varargs, thread, console/file, graphics/sound, and error operation has a defined event policy.",
+      "required_negative": "Do not classify identifier lookalikes, erased AST nodes, compiler helper calls, rejected overloads, or inactive macro text as source operations."
+    },
+    {
+      "id": "G13",
+      "title": "Preserve declaration spelling, prototype names, and implicit declarations",
+      "status": "in-progress",
+      "evidence": "Written prototype names, prototype/body formal roles and implicit source variable declarations are retained. Unnamed declarators and all remaining declaration routes still need source event coverage.",
+      "required_positive": "Named and unnamed prototypes, body formals, implicit legacy variables, suffix declarations, aliases, and generated THIS parameters retain their distinct roles.",
+      "required_negative": "Do not synthesize a written name for unnamed formals or label compiler temporaries as user declarations."
+    },
+    {
+      "id": "G14",
+      "title": "Anchor constructor/destructor/operator declarations and definitions",
+      "status": "in-progress",
+      "evidence": "DCL now anchors constructor/destructor/operator/procedure prototypes and definitions with correct source origin; positive coverage passes. Precise special-name roles and complete construct provenance remain.",
+      "required_positive": "Constructors, complete/deleting destructors, conversion/binary/member operators, properties, and module constructors/destructors identify their written declarations and definitions.",
+      "required_negative": "Do not create identifier bindings for an operator glyph or present generated special members as written declarations."
+    },
+    {
+      "id": "G15",
+      "title": "Close alternate binding routes and distinguish semantic use roles",
+      "status": "in-progress",
+      "evidence": "First forward-type use now binds the actual compiler-created symbol and canonical type. Alternate binding-role/source graph coverage remains.",
+      "required_positive": "Forward references, aliases, qualified names, BASE/WITH members, function results, assembly BASIC symbols, varargs formals, labels, and overload selections resolve once to the correct symbols.",
+      "required_negative": "Do not bind assembler-local names, unresolved recovery names, namespace lookalikes, keyword spellings, or indirect calls to invented procedure targets."
+    },
+    {
+      "id": "G16",
+      "title": "Model source scope occurrences and ordered import visibility",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Shadowing, reopened namespaces, nested/anonymous types, scoped enums, imported namespaces, include instances, and out-of-line method bodies retain the actual lookup context.",
+      "required_negative": "Do not conflate lexical ownership with lookup namespace or infer a new visible import outside its source context."
+    },
+    {
+      "id": "G17",
+      "title": "Provide a stable normalized type and flag contract",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Pointers with qualifiers at every level, aliases, strings, enums, UDTs, procedure pointers, varargs types, mangle modifiers, and integer promotion policy normalize consistently.",
+      "required_negative": "Do not treat distinct nominal types as identical based on spelling or erase fixed-string length/qualifiers; do not claim raw information already exported is absent."
+    },
+    {
+      "id": "G18",
+      "title": "Separate natural alignment, packing request, and effective layout",
+      "status": "in-progress",
+      "evidence": "Natural and packing alignments are separate, with finalized return classifier guarded. Target/packing partitions and final layout closure remain to verify.",
+      "required_positive": "Packed/unpacked structs, unions, inherited and anonymous members, bitfields, arrays, and target-specific rules retain all distinct alignment values.",
+      "required_negative": "Do not overwrite natural alignment with packing or assign layout to incomplete/forward types as if finalized."
+    },
+    {
+      "id": "G19",
+      "title": "Complete compiler-known parameter and aggregate ABI classifications",
+      "status": "in-progress",
+      "evidence": "Formal descriptor types/register category and finalized aggregate return classification are exported. Complete normalized ABI parameter/return decomposition and effective convention remain.",
+      "required_positive": "32/64-bit source conventions, byref/bydesc/variadic/THIS, aggregate returns, register passing, wchar descriptors, and target FP options retain the actual selected classifications.",
+      "required_negative": "Do not expose stale local pointers after flush or claim final stack/register locations before backend allocation."
+    },
+    {
+      "id": "G20",
+      "title": "Relate virtual tables and RTTI storage to their types",
+      "status": "in-progress",
+      "evidence": "Owning UDT vtable and RTTI relationships and element counts are exported. Slot-level inherited entry origins and full object-model acceptance remain.",
+      "required_positive": "Inheritance, abstract methods, virtual overrides, RTTI identity tests, deleting destructors, and empty virtual tables retain compiler-known ownership and slot choices.",
+      "required_negative": "Do not advertise a runtime dynamic dispatch target as known or infer table ownership solely from generated symbol names."
+    },
+    {
+      "id": "G21",
+      "title": "Expose source mangling mode and emitted external identity",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "C/C++/Windows/rtlib aliases, namespace overloads, data exports, proc addresses, and builtin mappings identify the correct compiler-selected link symbol.",
+      "required_negative": "Do not force code emission/mangling side effects during observation or invent linker addresses/resolutions for external declarations."
+    },
+    {
+      "id": "G22",
+      "title": "Record declaration order, procedure status, and startup registrations",
+      "status": "in-progress",
+      "evidence": "Procedure status/priority, variable/label statement order, declared/GOSUB flags are exported. Ordered global registration, wrapper/instance relationships and completion remain.",
+      "required_positive": "Multiple priority levels, same-priority source order, branch-crossing declarations, GOSUB labels, result-assignment/RETURN usage, static and global instances retain selected metadata.",
+      "required_negative": "Do not confuse FB_SYMBSTATS with FB_PROCSTATS or rely on export-ID allocation order as declaration/registration order."
+    },
+    {
+      "id": "G23",
+      "title": "Retain compiler-observed literal intent and typing provenance",
+      "status": "in-progress",
+      "evidence": "Initialized literal suffix flags are retained alongside exact values. Complete written literal/token intent and contextual source typing remain.",
+      "required_positive": "Signed/unsigned boundaries, suffixes, radix forms, negative zero/NaN/Inf where accepted, embedded NULs, wide units, and language-dependent literal types remain exact.",
+      "required_negative": "Do not derive exact values from decimal pretty-printing, collapse wide units into host bytes, or attach a written suffix to a synthesized constant."
+    },
+    {
+      "id": "G24",
+      "title": "Export initialized operator options and result-load meaning",
+      "status": "in-progress",
+      "evidence": "Initialized operator options, initialization and result-load payloads are exported and validated; assignment construction retains flags. Field/class exhaustive tests remain.",
+      "required_positive": "Initialization versus ordinary assignment, pointer arithmetic, inverse comparison branches, no-coercion paths, and result loads have distinct properties.",
+      "required_negative": "Never read inactive/recycled union slots, especially ADDROF.ex and nonoperator conversion flags; reject impossible class/property combinations."
+    },
+    {
+      "id": "G25",
+      "title": "Export inline assembly tokens, bound operands, and barrier contract",
+      "status": "in-progress",
+      "evidence": "ASM retains ordered actual text/symbol tokens and conservative unknown effects. Backend constraint provenance and source-range ownership remain.",
+      "required_positive": "Instructions with bound BASIC variables/procedures, local assembly labels, register names, newline boundaries, and backend clobber policy preserve actual tokens and operand identity.",
+      "required_negative": "Do not treat register names/assembly-local labels as BASIC bindings or claim instruction-specific alias/effect knowledge the compiler does not possess."
+    },
+    {
+      "id": "G26",
+      "title": "Complete initializer scope payload and ownership",
+      "status": "in-progress",
+      "evidence": "Initializer scope offsets/bytes are exported and typed. Matching scope/owner/source lineage remains.",
+      "required_positive": "Nested arrays/structs/unions, padding, bitfields, constructor lists, field defaults, and cloned/merged initializers retain valid offsets, sizes, and scope matching.",
+      "required_negative": "Do not read elements as bytes for a constructor list, is_array from a TYPEINI payload, or uninitialized scope-end fields."
+    },
+    {
+      "id": "G27",
+      "title": "Retain block, procedure, and source-exit structure",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Nested scopes, EXIT/CONTINUE/RETURN/GOTO/GOSUB, procedure main/module roles, and generated scope cleanup retain ownership and actual targets.",
+      "required_negative": "Do not serialize private list/cursor addresses or reconstruct source exits solely from the final generated branch sequence."
+    },
+    {
+      "id": "G28",
+      "title": "Preserve source DATA items and RESTORE ownership",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Numeric/string/wide/NUL/address data, multiple groups, forward labels, READ targets, and RESTORE starting points retain source and runtime sequence meaning.",
+      "required_negative": "Do not call the internal reverse C-emission list source execution order or manufacture a DATA AST node that no longer exists."
+    },
+    {
+      "id": "G29",
+      "title": "Traverse deferred call actions outside ordinary child edges",
+      "status": "in-progress",
+      "evidence": "Copyback destinations/temporaries/order and profile auxiliary trees are traversed outside l/r. Direct tests cover two ordered copybacks and no copyback for ordinary strings; profiling and late action coverage remain.",
+      "required_positive": "Fixed-string BYREF writeback, nested calls, multiple copybacks, profiling, result temporaries, and no-copyback ordinary strings retain all actual actions in order.",
+      "required_negative": "Do not execute, duplicate, reorder, or falsely attribute a deferred action to a source callee occurrence."
+    },
+    {
+      "id": "G30",
+      "title": "Represent semantic actions introduced after the export phase",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Bounds/null/dimension checks, Unicode scalar read/write, varargs, hidden results, UTF-8 bridges, profile calls, and aggregate ABI helpers have documented origin/effect coverage.",
+      "required_negative": "Do not claim a pre-load AST is the final executed action graph or alter lowering solely to make it observable."
+    },
+    {
+      "id": "G31",
+      "title": "Model call-site arguments, defaults, conversions, and dispatch roles",
+      "status": "in-progress",
+      "evidence": "Actual argument nodes distinguish omitted default initializers from explicit values equal to the default, independent of the passing-mode default. Full source argument/call graphs and remaining argument/dispatch relationships remain required.",
+      "required_positive": "Optional/variadic/instance/byref/bydesc arguments, overloaded operators/properties, virtual calls, proc addresses, THREADCALL, and temporary construction link to selected facts.",
+      "required_negative": "Rejected overloads and unknown dynamic targets stay absent; do not equate ARG.mode=default with an omitted optional argument."
+    },
+    {
+      "id": "G32",
+      "title": "Explain base/member initialization and implicit object operations",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Explicit/default base initialization, constructor chaining, field initialization, generated special members, union exclusions, copy/move-like materialization, and virtual-base-compatible semantics retain selected actions.",
+      "required_negative": "Do not fabricate constructors for plain storage, duplicate compiler-generated calls as source references, or run mutually exclusive initialization paths together."
+    },
+    {
+      "id": "G33",
+      "title": "Represent lifetime ownership, conditional cleanup, and destruction order",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Conditional IIF/short-circuit temporaries, nested scopes, early exits, static guards, global teardown, arrays, returns, deleted objects, and cloned initializer temporaries retain correct lifetimes/order.",
+      "required_negative": "No cleanup for unconstructed/borrowed storage, no unconditional cleanup for an unselected conditional temporary, and no stale identity after pool reuse."
+    },
+    {
+      "id": "G34",
+      "title": "Expose semantic evaluation order and conditional execution",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Nested side-effecting arguments, indirect-call pointer expressions, all supported conventions, IIF/ANDALSO/ORELSE, LINK result edges, and cleanup actions preserve actual sequencing/conditions.",
+      "required_negative": "Consumers must not assume DFS left-before-right or infer an order the language/compiler leaves unspecified; export cannot reorder execution."
+    },
+    {
+      "id": "G35",
+      "title": "Provide a complete conservative control-flow graph",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Loops, SELECT variants, early exits, legacy GOSUB/ON GOTO, indirect branches, checks, ON ERROR/RESUME, and unreachable regions retain correct edges and block membership.",
+      "required_negative": "Do not invent fallthrough after unconditional transfer, mark dead branches executed, or resolve indirect/error targets without evidence."
+    },
+    {
+      "id": "G36",
+      "title": "Add read/write, use-def, and escape relationships",
+      "status": "in-progress",
+      "evidence": "Parser-selected B occurrence access roles and surviving node-to-binding links record reads, assignments, compound assignments, address taking and BYREF uses without asserting unknown callee writes. Coverage is explicitly partial; full route coverage, use-def and escape/alias summaries remain.",
+      "required_positive": "Assignments, compound assignments, fields/arrays/bitfields, address taking, BYREF/BYDESC, returns, READ/INPUT, and known call bridges yield valid access relationships.",
+      "required_negative": "Do not report every reference as a read or claim exact pointee aliases/definite initialization when the compiler has no such proof."
+    },
+    {
+      "id": "G37",
+      "title": "Summarize compiler-known effects and preserve uncertainty",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Known pure math, allocation/free, string mutation, file/console/graphics/sound, synchronization, error handling, profiling, END, and assembly retain appropriate effect categories.",
+      "required_negative": "Unknown externals/indirect calls/assembly cannot be declared pure or assigned precise alias sets from their names; optional summaries must not change compiler optimization policy."
+    },
+    {
+      "id": "G38",
+      "title": "Export structured diagnostics and their semantic context",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Syntax, lookup, overload, access, type/layout, warning, include, parameter, limit, and backend diagnostic paths yield consistent structured facts.",
+      "required_negative": "Do not emit suppressed/discarded-attempt diagnostics as current ones, parse console text to infer semantics, or turn warning generation into extra compiler behavior."
+    },
+    {
+      "id": "G39",
+      "title": "Attach validity and failure regions to provisional facts",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "A bad middle statement with valid surrounding statements, multiple failed modules, restarts, missing includes, and recovered default expressions retain clear validity boundaries.",
+      "required_negative": "Never present a compiler recovery placeholder as a proved user expression or an incomplete full model as semantically complete."
+    },
+    {
+      "id": "G40",
+      "title": "Declare phase, capability, and completeness coverage explicitly",
+      "status": "in-progress",
+      "evidence": "CAP now declares available/partial/unavailable observation families per module and export mode; END remains transport completeness, with external-call effects and alias analysis explicitly unavailable. Complete phase/family validity and failure/drop reasons remain.",
+      "required_positive": "Consumers can distinguish complete required families, intentional compact omissions, recovery, dependency truncation, and unavailable late/backend data.",
+      "required_negative": "A zero-count missing family, overflow, ignored write, or failed producer cannot silently become a complete capability claim."
+    },
+    {
+      "id": "G41",
+      "title": "Make snapshot phases, identity lifetimes, and cross-module ownership explicit",
+      "status": "in-progress",
+      "evidence": "Declaration occurrence IDs, construction configuration identities and canonical names are retained. Complete source/symbol/type/phase/cross-module identity scheme remains.",
+      "required_positive": "Multiple modules, prototype-to-body updates, forward patches, interned procptr formals, recycled symbols, and delayed/generated procedures preserve identity and phase ownership.",
+      "required_negative": "Do not reuse a retired allocation identity, consume stale local pointers, conflate same-named external declarations across modules without linkage evidence, or promise stable IDs across different builds."
+    },
+    {
+      "id": "G42",
+      "title": "Exercise payload semantics for every live AST and symbol class",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Each live class exercises its meaningful payload, relationships, lifecycle, values, and constraints with representative compiler-produced fixtures.",
+      "required_negative": "Wrong active-union reads, absent required payload, impossible class/property pairs, unknown values, and fabricated nodes for enum-only classes are rejected."
+    },
+    {
+      "id": "G43",
+      "title": "Cover every declaration, expression, statement, and intrinsic route",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Every source feature family and overload/special variant has required output assertions tied to intended semantics and source ownership.",
+      "required_negative": "Malformed/inactive/ambiguous/access-denied/unsupported/lookalike variants emit no fabricated binding, target, layout, lifetime, or editable range."
+    },
+    {
+      "id": "G44",
+      "title": "Cover target, dialect, backend, and semantic option interactions",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "FB/fblite/deprecated/QB, 32/64-bit, little/big endian, wchar width, source/effective conventions, FP policy, checking, packing, varargs, and intrinsic availability are covered.",
+      "required_negative": "Unsupported backend/target/feature combinations remain diagnostic outcomes with no false completeness; assert correct reset across modules and restarts."
+    },
+    {
+      "id": "G45",
+      "title": "Prove observation preserves code, diagnostics, and language behavior",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Off/full/compact select the same language decisions, warnings/errors, emitted code, and runtime results for valid programs across representative backends.",
+      "required_negative": "Export must not reexecute macro callbacks, reselect overloads, change evaluation order, enable debug/check flags, or alter the output code to obtain facts."
+    },
+    {
+      "id": "G46",
+      "title": "Exercise bounded failure, allocation, and publication contracts",
+      "status": "in-progress",
+      "evidence": "BASIC publication and source hashing fixtures retain independent fault/hash oracles. Writer/source streams and native opaque positions have explicit ownership; construct/expression/access storage is released at invocation closure. General bounded traversal, all limits/OOM and lifecycle verification remain.",
+      "required_positive": "Near-limit inputs, repeated modules/restarts/clones/deletes, and permitted deep trees complete with valid identity closure and no memory errors.",
+      "required_negative": "Boundary overflow, OOM, null/corrupt internal contracts, full disk, close failure, interruption, and rejected alias publication leave no newly complete invalid model or leaked ownership."
+    },
+    {
+      "id": "G47",
+      "title": "Validate semantic payload integrity beyond record totals",
+      "status": "in-progress",
+      "evidence": "Reader now rejects class-kind disagreement, missing mandatory node payloads, invalid numeric/boolean values, malformed ASM order, missing copyback relations, dangling config uses. Remaining per-family semantic closure remains.",
+      "required_positive": "All legitimate producer records, repeated snapshots, canonical replacements, zero/unknown optional states, and extensible capabilities validate under the documented schema rules.",
+      "required_negative": "Unknown/impossible kind, bad numeric payload, missing required property, class/type contradiction, invalid relation, omitted action, duplicate/conflicting snapshot, and corrected-total corruption are rejected as appropriate."
+    },
+    {
+      "id": "G48",
+      "title": "Keep the compiler coverage manifest current and reviewable",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Every current field/route has a documented semantic disposition, evidence, required capability, and acceptance coverage or justified intentional exclusion.",
+      "required_negative": "A new or changed class/payload/route cannot satisfy completeness merely by adding a name to a switch, a hook text match, or an untested fallback rule."
+    },
+    {
+      "id": "G49",
+      "title": "Expose lookup and overload selection explanations",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Ambiguity, inaccessible overloads, imported candidates, constructor/cast conversion ranking, default/variadic/BYDESC matching, and successful choice retain real resolver explanations.",
+      "required_negative": "Never rerun resolution, expose discarded candidates as executed calls, or claim hypothetical candidates were actually considered."
+    },
+    {
+      "id": "G50",
+      "title": "Expose backend allocation and final emission correspondence",
+      "status": "pending",
+      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "required_positive": "Requested backend artifacts correspond to actual emitted code and explicitly identify phase/target/build/source revision.",
+      "required_negative": "Do not infer final machine locations from early T.ofs, require unavailable cross-target execution, or label optimization-specific instruction artifacts stable source semantics."
+    },
+    {
+      "id": "G51",
+      "title": "Define byte-safe text fields and match the supplied reader",
+      "status": "in-progress",
+      "evidence": "Schema 20 ASCII wire escapes arbitrary bytes; independent reader round-trips all 256 byte values with surrogateescape and decodes valid UTF-8. Legacy literals/macros preserve input and off/full/compact emission. Filesystem-byte and all field domain tests remain.",
+      "required_positive": "ASCII, UTF-8, accepted legacy literal/macro bytes, wide units, internal literal names, percent/control characters, and supported filesystem path encodings round-trip without loss and agree with exact C values.",
+      "required_negative": "Do not silently replace invalid bytes, interpret arbitrary compiler bytes as UTF-8, truncate embedded control data, double-unescape fields, or publish a complete model the declared consumer cannot read."
+    }
+  ],
+  "next_required_scope": "Finish the complete statement/construct/declaration/branch and typed source operand/result/transformation graphs (G10/G11), then all remaining type/ABI/action/control-flow/effect/diagnostic/capability/resolver/emission scopes from the original 51-item catalog.",
+  "active_verification": {
+    "state": "passed",
+    "purpose": "Schema 25 native BASIC compiler source audit after removing compiler C helpers",
+    "cases": 522,
+    "artifacts": "out/semantic-basic-correction/compiler-self",
+    "log": "out/semantic-basic-correction/compiler-self.log"
+  }
+}

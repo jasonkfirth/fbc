@@ -266,6 +266,20 @@ unlock:
 	return node;
 }
 
+FBCALL void *fb_Gfx3SurfaceLoadWstr(const FB_WCHAR *filename, int depth,
+	unsigned int usage)
+{
+	FBSTRING *utf8;
+	/* Convert before acquiring the graphics lock. The existing loader owns
+	   the temporary descriptor and the platform's UTF-8 file operation. */
+	FB_STRLOCK();
+	utf8 = fb_hUStrFromWstr_NoLock(filename);
+	FB_STRUNLOCK();
+	if (utf8 == NULL)
+		return NULL;
+	return fb_Gfx3SurfaceLoad(utf8, depth, usage);
+}
+
 FBCALL int fb_Gfx3SurfaceDestroy(void *surface_pointer)
 {
 	FB_GFX3_DRAW_STATE *state;

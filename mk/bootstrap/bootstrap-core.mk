@@ -306,13 +306,25 @@ endif
 # aggregate here also builds the unused PIC/non-PIC and multithreaded archives,
 # only for bootstrap-minimal to delete them immediately after the link.
 #
-$(BOOTSTRAP_FBC): $(BOOTSTRAP_RT0) $(BOOTSTRAP_RTL) $(BOOTSTRAP_OBJ) | $(BOOTSTRAP_PATH)
+BOOTSTRAP_EARLY_LIBS :=
+BOOTSTRAP_PLATFORM_LIBS :=
+BOOTSTRAP_PLATFORM_ARCHIVES :=
+ifeq ($(TARGET_OS),amiga)
+# Hunk linking must select CPU floating-point helpers before newlib aliases.
+# Use the same providers as the BASIC driver, including its pthread repairs.
+BOOTSTRAP_EARLY_LIBS := -L$(libdir) -Wl,--whole-archive -lfbsoftfloat -Wl,--no-whole-archive
+BOOTSTRAP_PLATFORM_LIBS := -lamiga -lffi
+BOOTSTRAP_PLATFORM_ARCHIVES := $(libdir)/libfbsoftfloat.a $(libdir)/libpthread.a $(libdir)/libffi.a
+endif
+
+$(BOOTSTRAP_FBC): $(BOOTSTRAP_RT0) $(BOOTSTRAP_RTL) $(BOOTSTRAP_OBJ) $(BOOTSTRAP_PLATFORM_ARCHIVES) | $(BOOTSTRAP_PATH)
 
 	$(RUN_CC) $(ALLLDFLAGS) -o $@ \
+	$(BOOTSTRAP_EARLY_LIBS) \
 	$(BOOTSTRAP_RT0) \
 	$(BOOTSTRAP_OBJ) \
 	$(BOOTSTRAP_RTL) \
-	-lm $(THREAD_FLAGS) $(BOOTSTRAP_TERM_LIB)
+	-lm $(THREAD_FLAGS) $(BOOTSTRAP_TERM_LIB) $(BOOTSTRAP_PLATFORM_LIBS)
 
 ##############################################################################
 # End bootstrap-core.mk

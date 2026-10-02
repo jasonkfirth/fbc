@@ -340,7 +340,7 @@ private function FbNetGetDoubleLE( byval fileno as integer, byref value as doubl
 	return 1
 end function
 
-private function FbNetPutStringLE( byval fileno as integer, byref text as const string, byval max_bytes as long ) as integer
+private function FbNetPutStringLE overload( byval fileno as integer, byref text as const string, byval max_bytes as long ) as integer
 	dim as string payload = text
 	dim as long byte_count
 
@@ -364,7 +364,7 @@ private function FbNetPutStringLE( byval fileno as integer, byref text as const 
 	return FbNetPutBytes( fileno, cptr( ubyte ptr, strptr( payload ) ), byte_count )
 end function
 
-private function FbNetGetStringLE( byval fileno as integer, byref text as string, byval max_bytes as long ) as integer
+private function FbNetGetStringLE overload( byval fileno as integer, byref text as string, byval max_bytes as long ) as integer
 	dim as long byte_count
 
 	if( max_bytes < 0 ) then
@@ -387,6 +387,78 @@ private function FbNetGetStringLE( byval fileno as integer, byref text as string
 	text = space$( byte_count )
 	return FbNetGetBytes( fileno, cptr( ubyte ptr, strptr( text ) ), byte_count )
 end function
+
+'' -------------------------------------------------------------------------
+'' Unicode text in the same length-prefixed UTF-8 wire format
+'' -------------------------------------------------------------------------
+
+#if __FB_LANG__ <> "qb"
+extern "rtlib"
+	declare function __FbNetWideToUtf8 alias "fb_UStrFromWstr" _
+		( byval text as const wstring ptr ) as string
+	'' This entry point allocates a terminated wide buffer. The adapters below
+	'' release it explicitly instead of exposing its ownership to callers.
+	declare function __FbNetUtf8ToWide alias "fb_UStrToWstr" _
+		( byref text as const string ) as wstring ptr
+end extern
+
+private function FbNetPutUtf8LE( byval fileno as integer, byref encoded as const string, byval max_bytes as long ) as integer
+	if( max_bytes < 0 ) then return 0
+	dim as integer boundary = max_bytes
+	dim as string payload = encoded
+	if( boundary < len(payload) ) then
+		'' The byte limit remains a wire limit. Discard an incomplete final
+		'' scalar rather than emitting a partial UTF-8 sequence.
+		do while boundary > 0
+			if( (payload[boundary] and &hC0) <> &h80 ) then exit do
+			boundary -= 1
+		loop
+		payload = left(payload, boundary)
+	end if
+	return FbNetPutStringLE(fileno, payload, max_bytes)
+end function
+
+private function FbNetPutStringLE overload( byval fileno as integer, byref text as const wstring, byval max_bytes as long ) as integer
+	dim as string payload = __FbNetWideToUtf8(strptr(text))
+	return FbNetPutUtf8LE(fileno, payload, max_bytes)
+end function
+
+'' Capacity is in wide storage units, including the terminator. A BYREF
+'' WSTRING parameter does not carry its caller's allocation size, so readers
+'' must supply it. On failure the caller's text remains unchanged.
+private function FbNetGetStringLE overload( byval fileno as integer, byref text as wstring, byval max_bytes as long, byval capacity as integer ) as integer
+	if( capacity <= 0 ) then return 0
+	dim as string payload
+	if( FbNetGetStringLE(fileno, payload, max_bytes) = 0 ) then return 0
+	if( len(payload) = 0 ) then
+		text = ""
+		return 1
+	end if
+	dim as wstring ptr converted = __FbNetUtf8ToWide(payload)
+	if( converted = 0 ) then return 0
+	if( len(*converted) >= capacity ) then
+		deallocate converted
+		return 0
+	end if
+	text = *converted
+	deallocate converted
+	return 1
+end function
+
+#if defined(__FB_HAS_USTRING__) and not defined(FB_NO_USTRING)
+private function FbNetPutStringLE overload( byval fileno as integer, byref text as const ustring, byval max_bytes as long ) as integer
+	dim as string payload = cast(string, text)
+	return FbNetPutUtf8LE(fileno, payload, max_bytes)
+end function
+
+private function FbNetGetStringLE overload( byval fileno as integer, byref text as ustring, byval max_bytes as long ) as integer
+	dim as string payload
+	if( FbNetGetStringLE(fileno, payload, max_bytes) = 0 ) then return 0
+	text = payload
+	return 1
+end function
+#endif
+#endif
 
 #endif
 

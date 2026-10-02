@@ -68,6 +68,9 @@ void fb_hAmigaDebugNumber(const char *message, unsigned long value);
 
 /* File-device callers hold FB_LOCK while consulting newlib's descriptor table. */
 int fb_hAmigaGetFileHandle(FILE *stream, unsigned long *handle);
+struct FileInfoBlock;
+struct stat;
+int fb_hAmigaFileStat(const struct FileInfoBlock *native, struct stat *information);
 
 #endif
 

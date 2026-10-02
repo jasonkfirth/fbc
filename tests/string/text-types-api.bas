@@ -10,6 +10,32 @@
 #include once "file.bi"
 #include once "dir.bi"
 #include once "fbgfx.bi"
+#include once "fbc-int/string.bi"
+
+#if __FB_LANG__ = "fb"
+	#define textSize fb.DrawStringSize
+	#define paintBytes fb.PaintPattern
+#else
+	#define textSize DrawStringSize
+	#define paintBytes PaintPattern
+#endif
+
+'' All OPEN variants share the same text argument conversion contract.
+#macro check_file_arguments(value, h)
+	print #(h), value
+	write #(h), value
+	print #(h), using value; value
+	open value for input encoding value as #(h)
+	open value, #(h), value
+	open cons for output encoding value as #(h)
+	open err for output encoding value as #(h)
+	open pipe value for input as #(h)
+	open scrn for output encoding value as #(h)
+	open lpt value for output as #(h)
+	open com value for binary as #(h)
+	open tcp value for binary as #(h)
+	open tcp server value for binary as #(h)
+#endmacro
 
 private sub check_s( byref value as string )
 	print value
@@ -23,6 +49,7 @@ private sub check_s( byref value as string )
 	input value
 	read value
 	dim as integer h
+	check_file_arguments(value, h)
 	open value for input as #h
 	name value as value
 	kill value
@@ -92,15 +119,30 @@ private sub check_s( byref value as string )
 	d = FileDateTime(value)
 	h = FileCopy(value,value)
 	dim as long textWidth, textHeight
-	h = fb.DrawStringSize(value,textWidth,textHeight)
+	h = textSize(value,textWidth,textHeight)
 	windowtitle value
 	screeninfo ,,,,,,value
 	screencontrol 1,value
 	draw value
 	draw string (0,0),value
+	entry = screenglproc(value)
+	h = paintBytes(0, 0, 0, value)
 	h = bload(value)
 	h = bsave(value,cast(any ptr,0),0)
 	width value,80
+	FBC.LeftSelf(value, 1)
+	play value
+	play 1, value
+	play value, value
+	play value, value, value
+	note value, 4, 0.01
+	note 1, value, 4, 0.01
+	music load value
+	music play value
+	music loop value
+	sfx load 1, value
+	midi play value
+	h = capture save(value)
 end sub
 
 private sub check_w( byref value as wstring )
@@ -115,6 +157,7 @@ private sub check_w( byref value as wstring )
 	input value
 	read value
 	dim as integer h
+	check_file_arguments(value, h)
 	open value for input as #h
 	name value as value
 	kill value
@@ -184,15 +227,30 @@ private sub check_w( byref value as wstring )
 	d = FileDateTime(value)
 	h = FileCopy(value,value)
 	dim as long textWidth, textHeight
-	h = fb.DrawStringSize(value,textWidth,textHeight)
+	h = textSize(value,textWidth,textHeight)
 	windowtitle value
 	screeninfo ,,,,,,value
 	screencontrol 1,value
 	draw value
 	draw string (0,0),value
+	entry = screenglproc(value)
+	h = paintBytes(0, 0, 0, value)
 	h = bload(value)
 	h = bsave(value,cast(any ptr,0),0)
 	width value,80
+	FBC.LeftSelf(value, 1)
+	play value
+	play 1, value
+	play value, value
+	play value, value, value
+	note value, 4, 0.01
+	note 1, value, 4, 0.01
+	music load value
+	music play value
+	music loop value
+	sfx load 1, value
+	midi play value
+	h = capture save(value)
 end sub
 
 private sub check_u( byref value as ustring )
@@ -207,6 +265,7 @@ private sub check_u( byref value as ustring )
 	input value
 	read value
 	dim as integer h
+	check_file_arguments(value, h)
 	open value for input as #h
 	name value as value
 	kill value
@@ -276,15 +335,30 @@ private sub check_u( byref value as ustring )
 	d = FileDateTime(value)
 	h = FileCopy(value,value)
 	dim as long textWidth, textHeight
-	h = fb.DrawStringSize(value,textWidth,textHeight)
+	h = textSize(value,textWidth,textHeight)
 	windowtitle value
 	screeninfo ,,,,,,value
 	screencontrol 1,value
 	draw value
 	draw string (0,0),value
+	entry = screenglproc(value)
+	h = paintBytes(0, 0, 0, value)
 	h = bload(value)
 	h = bsave(value,cast(any ptr,0),0)
 	width value,80
+	FBC.LeftSelf(value, 1)
+	play value
+	play 1, value
+	play value, value
+	play value, value, value
+	note value, 4, 0.01
+	note 1, value, 4, 0.01
+	music load value
+	music play value
+	music loop value
+	sfx load 1, value
+	midi play value
+	h = capture save(value)
 end sub
 
 '' Mixed optional signatures must resolve without ambiguity.

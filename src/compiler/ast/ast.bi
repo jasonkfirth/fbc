@@ -142,6 +142,7 @@ end type
 type AST_NODE_ARG
 	mode            as integer                      '' to pass NULL's to byref args, etc
 	lgt             as longint                      '' length, used to push UDT's by value
+	semantic_defaulted as integer                  '' caller omitted this actual argument
 end type
 
 type AST_NODE_CONST
@@ -318,6 +319,16 @@ end type
 ''
 type ASTNODE
 	class           as AST_NODECLASS
+	'' Configuration at construction follows the node through cloning and
+	'' lowering. It is an invocation-local observation identity, never a
+	'' policy input used by code generation.
+	semantic_context as longint
+	semantic_source as longint
+	semantic_statement as longint
+	semantic_expressions as longint                '' immutable source-expression association chain
+	semantic_expression as longint                 '' most recent typed parser result, including compact mode
+	semantic_operands as longint                   '' operands captured before destructive source lowering
+	semantic_binding as longint                    '' actual written variable/member occurrence
 
 	dtype           as integer
 	subtype         as FBSYMBOL ptr
@@ -1532,6 +1543,13 @@ declare function astLoadMACRO( byval n as ASTNODE ptr ) as IRVREG ptr
 #define astShouldShowConstErrors( ) (ast.hideconsterrorslevel = 0)
 
 #macro astInitNode( n, class_, dtype_, subtype_ )
+	(n)->semantic_context = 0
+	(n)->semantic_source = 0
+	(n)->semantic_statement = 0
+	(n)->semantic_expressions = 0
+	(n)->semantic_expression = 0
+	(n)->semantic_operands = 0
+	(n)->semantic_binding = 0
 	(n)->class = class_
 	(n)->dtype = dtype_
 	(n)->subtype = subtype_

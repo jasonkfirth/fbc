@@ -1,3 +1,11 @@
+/*
+    FreeBASIC Runtime Library
+    File: profile_cycles.c
+    Purpose: Collect cycle measurements and generate profiler reports.
+    Responsibilities: Manage cycle profiler state and write measurement data.
+    This file intentionally does NOT contain compiler instrumentation.
+*/
+
 /* profile_cycles.c -- cycle counting profiler */
 
 /* WIP */
@@ -297,7 +305,7 @@ static void hProfilerWriteReport( FB_PROFILER_CYCLES *prof )
 
 	fb_ProfileGetFileName( filename, PROFILER_MAX_PATH );
 
-	f = fopen( filename, "w" );
+	f = fb_hOpenFile( filename, "w" );
 	if( f == NULL )
 		return;
 
@@ -362,3 +370,5 @@ FBCALL FB_PROFILER_CYCLES *fb_ProfileGetCyclesProfiler( void )
 {
 	return fb_profiler;
 }
+
+/* end of profile_cycles.c */

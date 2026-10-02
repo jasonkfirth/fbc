@@ -27,6 +27,9 @@
 #include once "lexer/lex.bi"
 #include once "parser/parser.bi"
 #include once "preprocessor/pp.bi"
+#include once "tooling/semantic-source.bi"
+#include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-macros.bi"
 
 #define LEX_FLAGS (LEXCHECK_NOWHITESPC or _
 	LEXCHECK_NOSUFFIX or _
@@ -233,6 +236,8 @@ sub ppParse( )
 
 		'' #undef
 		lexSkipToken( LEXCHECK_NODEFINE or LEXCHECK_POST_SUFFIX )
+		dim as LEX_LOCATION undef_site = lexGetCurrentLocation( )
+		dim as string undef_name = *lexGetText( )
 
 		chain_ = cIdentifier( base_parent, FB_IDOPT_NONE )
 		if( chain_ <> NULL ) then
@@ -255,9 +260,12 @@ sub ppParse( )
 					end if
 					'' Forget the symbol so it's no longer found by lookups,
 					'' but don't fully delete it, since it might already be used somewhere.
+					if( symbIsDefine(sym) ) then fbSemanticModelMacroLifecycle(sym, "undef", undef_name, undef_site)
 					symbDelFromHash( sym )
 				end if
 			end if
+		else
+			fbSemanticModelMacroLifecycle(NULL, "undef-missing", undef_name, undef_site)
 		end if
 
 		lexSkipToken( )
@@ -388,9 +396,11 @@ private sub ppInclude()
 		return
 	end if
 
+	dim as LEX_LOCATION directive = lexGetCurrentLocation( )
+	directive.is_physical = fbSemanticModelLocationIsPhysical(directive)
 	lexEatToken( incfile )
 
-	fbIncludeFile( incfile, isonce )
+	fbIncludeFile( incfile, isonce, @directive )
 end sub
 
 '':::::
@@ -439,6 +449,9 @@ end sub
 '' ppLine       =   '#'LINE LIT_NUM LIT_STR?
 ''
 private sub ppLine()
+	dim as LEX_LOCATION directive = lexGetCurrentLocation( )
+	'' Capture the old coordinate domain before changing line or filename.
+	directive.is_physical = fbSemanticModelLocationIsPhysical(directive)
 	'' LIT_NUM
 	if( lexGetClass( ) <> FB_TKCLASS_NUMLITERAL ) then
 		errReport( FB_ERRMSG_SYNTAXERROR )
@@ -453,6 +466,7 @@ private sub ppLine()
 			fbOverrideFilename( *lexGetText( ) )
 			lexSkipToken( )
 		end if
+		fbSemanticModelSourceRemap(lex.ctx->linenum, env.inf.name, directive)
 	end if
 end sub
 

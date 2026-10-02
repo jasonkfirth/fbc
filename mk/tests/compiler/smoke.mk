@@ -129,6 +129,40 @@ compiler-semantic-model-smoke: compiler
 		$$1 == "O" { if (schema < 19 || NF != 10) exit 1; details++; next } \
 		$$1 == "Q" { if (schema < 19 || NF != 10) exit 1; details++; next } \
 		$$1 == "Y" { if (schema < 19 || NF != 7) exit 1; details++; next } \
+		$$1 == "ASM" { if (schema < 20 || NF != 6) exit 1; details++; next } \
+		$$1 == "DCL" { if (schema < 20 || NF != 13) exit 1; details++; next } \
+		$$1 == "CTX" { if (schema < 20 || NF != 3) exit 1; details++; next } \
+		$$1 == "OPT" { if (schema < 20 || NF != 5) exit 1; details++; next } \
+		$$1 == "USE" { if (schema < 20 || NF != 4) exit 1; details++; next } \
+		$$1 == "FILE" { if (schema < 20 || NF != 7) exit 1; details++; next } \
+		$$1 == "SRC" { if (schema < 20 || NF != 14) exit 1; details++; next } \
+		$$1 == "SRE" { if (schema < 20 || NF != 3) exit 1; details++; next } \
+		$$1 == "INC" { if (schema < 20 || NF != 12) exit 1; details++; next } \
+		$$1 == "MAP" { if (schema < 20 || NF != (schema >= 23 ? 11 : 10)) exit 1; details++; next } \
+		$$1 == "ORIG" { if (schema < 20 || NF != 4) exit 1; details++; next } \
+		$$1 == "PPB" { if (schema < 21 || NF != 14) exit 1; details++; next } \
+		$$1 == "PPD" { if (schema < 21 || NF != 11) exit 1; details++; next } \
+		$$1 == "PPE" { if (schema < 21 || NF != 9) exit 1; details++; next } \
+		$$1 == "PPT" { if (schema < 21 || NF != 13) exit 1; details++; next } \
+		$$1 == "PPS" { if (schema < 21 || NF != 10) exit 1; details++; next } \
+		$$1 == "MD" { if (schema < 22 || NF != 10) exit 1; details++; next } \
+		$$1 == "MT" { if (schema < 22 || NF != 6) exit 1; details++; next } \
+		$$1 == "MI" { if (schema < 22 || NF != 15) exit 1; details++; next } \
+		$$1 == "MA" { if (schema < 22 || NF != 12) exit 1; details++; next } \
+		$$1 == "MS" { if (schema < 22 || NF != 8) exit 1; details++; next } \
+		$$1 == "MC" { if (schema < 22 || NF != 5) exit 1; details++; next } \
+		$$1 == "ME" { if (schema < 22 || NF != 13) exit 1; details++; next } \
+		$$1 == "ML" { if (schema < 22 || NF != 13) exit 1; details++; next } \
+		$$1 == "MR" { if (schema < 22 || NF != 5) exit 1; details++; next } \
+		$$1 == "LOC" { if (schema < 23 || NF != 12) exit 1; details++; next } \
+		$$1 == "ST" { if (schema < 24 || NF != 17) exit 1; details++; next } \
+		$$1 == "STE" { if (schema < 24 || NF != 10) exit 1; details++; next } \
+		$$1 == "BLK" { if (schema < 24 || NF != 14) exit 1; details++; next } \
+		$$1 == "BEND" { if (schema < 24 || NF != 9) exit 1; details++; next } \
+		$$1 == "OWN" { if (schema < 24 || NF != 4) exit 1; details++; next } \
+		$$1 == "CAP" { if (schema < 25 || NF != 4) exit 1; details++; next } \
+		$$1 == "ACC" { if (schema < 25 || NF != 3) exit 1; details++; next } \
+		$$1 == "SOP" { if (schema < 25 || NF != 3) exit 1; details++; next } \
 		$$1 == "END" { if (NF != (schema >= 19 ? 13 : 12) || $$2 != schema || $$3 != modules || $$4 != procedures || $$5 != symbols || $$6 != typefacts || $$7 != nodes || $$8 != expressions || $$9 != bindings || $$10 != implicit_calls || $$11 != dependency_count || $$12 != "1" || (schema >= 19 && $$13 != details)) exit 1; footer = 1; next } \
 		footer { exit 1 } \
 		{ exit 1 } \
@@ -300,7 +334,36 @@ compiler-semantic-model-smoke: compiler
 		$$1 == "M" { if (NF != 2) exit 1; modules++; next } \
 		$$1 == "D" { if (NF != 2 || $$2 == "" || dependencies[$$2]++) exit 1; if ($$2 ~ /semantic-model-header\.bi$$/) header_dependency = 1; dependency_count++; next } \
 		$$1 == "E" { if (NF != 16 || $$2 != expressions + 1 || $$4 == "" || $$5 < 1 || $$6 < 0 || $$7 < $$5 || ($$7 == $$5 && $$8 <= $$6) || $$8 < 0 || $$14 != 0 || $$15 != 0 || $$16 == "") exit 1; if ($$11 == "subtract" && $$12 == "builtin") builtin_subtract = 1; if ($$11 == "power" && $$12 == "builtin") builtin_power = 1; if ($$11 == "concatenate" && $$12 == "builtin") builtin_concatenate = 1; if ($$11 == "unary-plus" && $$12 == "builtin") builtin_unary_plus = 1; if ($$11 == "identity-test" && $$12 == "builtin") identity_test = 1; expressions++; next } \
-		$$1 == "END" { if (NF != (schema >= 19 ? 13 : 12) || $$2 != schema || $$3 != modules || $$4 != 0 || $$5 != 0 || $$6 != 0 || $$7 != 0 || $$8 != expressions || $$9 != 0 || $$10 != 0 || $$11 != dependency_count || $$12 != "1" || (schema >= 19 && $$13 != 0)) exit 1; footer = 1; next } \
+		$$1 == "FILE" { if (schema < 20 || NF != 7) exit 1; details++; next } \
+		$$1 == "SRC" { if (schema < 20 || NF != 14) exit 1; details++; next } \
+		$$1 == "SRE" { if (schema < 20 || NF != 3) exit 1; details++; next } \
+		$$1 == "INC" { if (schema < 20 || NF != 12) exit 1; details++; next } \
+		$$1 == "MAP" { if (schema < 20 || NF != (schema >= 23 ? 11 : 10)) exit 1; details++; next } \
+		$$1 == "ORIG" { if (schema < 20 || NF != 4 || $$2 != "expression") exit 1; details++; next } \
+		$$1 == "PPB" { if (schema < 21 || NF != 14) exit 1; details++; next } \
+		$$1 == "PPD" { if (schema < 21 || NF != 11) exit 1; details++; next } \
+		$$1 == "PPE" { if (schema < 21 || NF != 9) exit 1; details++; next } \
+		$$1 == "PPT" { if (schema < 21 || NF != 13) exit 1; details++; next } \
+		$$1 == "PPS" { if (schema < 21 || NF != 10) exit 1; details++; next } \
+		$$1 == "MD" { if (schema < 22 || NF != 10) exit 1; details++; next } \
+		$$1 == "MT" { if (schema < 22 || NF != 6) exit 1; details++; next } \
+		$$1 == "MI" { if (schema < 22 || NF != 15) exit 1; details++; next } \
+		$$1 == "MA" { if (schema < 22 || NF != 12) exit 1; details++; next } \
+		$$1 == "MS" { if (schema < 22 || NF != 8) exit 1; details++; next } \
+		$$1 == "MC" { if (schema < 22 || NF != 5) exit 1; details++; next } \
+		$$1 == "ME" { if (schema < 22 || NF != 13) exit 1; details++; next } \
+		$$1 == "ML" { if (schema < 22 || NF != 13) exit 1; details++; next } \
+		$$1 == "MR" { if (schema < 22 || NF != 5) exit 1; details++; next } \
+		$$1 == "LOC" { if (schema < 23 || NF != 12) exit 1; details++; next } \
+		$$1 == "ST" { if (schema < 24 || NF != 17) exit 1; details++; next } \
+		$$1 == "STE" { if (schema < 24 || NF != 10) exit 1; details++; next } \
+		$$1 == "BLK" { if (schema < 24 || NF != 14) exit 1; details++; next } \
+		$$1 == "BEND" { if (schema < 24 || NF != 9) exit 1; details++; next } \
+		$$1 == "OWN" { if (schema < 24 || NF != 4) exit 1; details++; next } \
+		$$1 == "CAP" { if (schema < 25 || NF != 4) exit 1; details++; next } \
+		$$1 == "ACC" { if (schema < 25 || NF != 3) exit 1; details++; next } \
+		$$1 == "SOP" { if (schema < 25 || NF != 3) exit 1; details++; next } \
+		$$1 == "END" { if (NF != (schema >= 19 ? 13 : 12) || $$2 != schema || $$3 != modules || $$4 != 0 || $$5 != 0 || $$6 != 0 || $$7 != 0 || $$8 != expressions || $$9 != 0 || $$10 != 0 || $$11 != dependency_count || $$12 != "1" || (schema >= 19 && $$13 != details)) exit 1; footer = 1; next } \
 		footer { exit 1 } \
 		{ exit 1 } \
 		END { if (!header || !footer || modules != 2 || dependency_count != 3 || !header_dependency || expressions < 2 || !builtin_subtract || !builtin_power || !builtin_concatenate || !builtin_unary_plus || !identity_test) exit 1 }' \
@@ -367,6 +430,35 @@ compiler-semantic-model-smoke: compiler
 		$$1 == "D" { if (NF != 2 || $$2 == "" || dependencies[$$2]++) exit 1; dependency_count++; next } \
 		$$1 == "E" { if (NF != 16) exit 1; expressions++; if ($$3 == "1" && $$5 == 3 && tolower($$16) == "double") later_expression = 1; next } \
 		$$1 == "R" { if (NF != 3 || $$2 != schema || $$3 != expressions) exit 1; recovered_modules++; next } \
+		$$1 == "FILE" { if (schema < 20 || NF != 7) exit 1; next } \
+		$$1 == "SRC" { if (schema < 20 || NF != 14) exit 1; next } \
+		$$1 == "SRE" { if (schema < 20 || NF != 3) exit 1; next } \
+		$$1 == "INC" { if (schema < 20 || NF != 12) exit 1; next } \
+		$$1 == "MAP" { if (schema < 20 || NF != (schema >= 23 ? 11 : 10)) exit 1; next } \
+		$$1 == "ORIG" { if (schema < 20 || NF != 4 || $$2 != "expression") exit 1; next } \
+		$$1 == "PPB" { if (schema < 21 || NF != 14) exit 1; next } \
+		$$1 == "PPD" { if (schema < 21 || NF != 11) exit 1; next } \
+		$$1 == "PPE" { if (schema < 21 || NF != 9) exit 1; next } \
+		$$1 == "PPT" { if (schema < 21 || NF != 13) exit 1; next } \
+		$$1 == "PPS" { if (schema < 21 || NF != 10) exit 1; next } \
+		$$1 == "MD" { if (schema < 22 || NF != 10) exit 1; next } \
+		$$1 == "MT" { if (schema < 22 || NF != 6) exit 1; next } \
+		$$1 == "MI" { if (schema < 22 || NF != 15) exit 1; next } \
+		$$1 == "MA" { if (schema < 22 || NF != 12) exit 1; next } \
+		$$1 == "MS" { if (schema < 22 || NF != 8) exit 1; next } \
+		$$1 == "MC" { if (schema < 22 || NF != 5) exit 1; next } \
+		$$1 == "ME" { if (schema < 22 || NF != 13) exit 1; next } \
+		$$1 == "ML" { if (schema < 22 || NF != 13) exit 1; next } \
+		$$1 == "MR" { if (schema < 22 || NF != 5) exit 1; next } \
+		$$1 == "LOC" { if (schema < 23 || NF != 12) exit 1; next } \
+		$$1 == "ST" { if (schema < 24 || NF != 17) exit 1; next } \
+		$$1 == "STE" { if (schema < 24 || NF != 10) exit 1; next } \
+		$$1 == "BLK" { if (schema < 24 || NF != 14) exit 1; next } \
+		$$1 == "BEND" { if (schema < 24 || NF != 9) exit 1; next } \
+		$$1 == "OWN" { if (schema < 24 || NF != 4) exit 1; next } \
+		$$1 == "CAP" { if (schema < 25 || NF != 4) exit 1; next } \
+		$$1 == "ACC" { if (schema < 25 || NF != 3) exit 1; next } \
+		$$1 == "SOP" { if (schema < 25 || NF != 3) exit 1; next } \
 		$$1 == "RECOVERY" { if (NF != 8 || $$2 != schema || $$3 != modules || $$4 != expressions || $$5 != recovered_modules || $$6 != 0 || $$7 != dependency_count || $$8 != "1") exit 1; footer = 1; next } \
 		footer { exit 1 } \
 		{ exit 1 } \

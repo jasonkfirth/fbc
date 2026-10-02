@@ -1176,6 +1176,7 @@ function astNewARG _
 	dim as ASTNODE ptr n = any
 	dim as FBSYMBOL ptr sym = any, param = any
 	dim as ulongint semantic_dtor_generation = ast.dtorlistgeneration
+	dim as integer semantic_defaulted = (arg = NULL)
 
 	sym = parent->sym
 
@@ -1198,6 +1199,11 @@ function astNewARG _
 
 	if( dtype = FB_DATATYPE_INVALID ) then
 		dtype = astGetFullType( arg )
+	end if
+	if( (semantic_defaulted = FALSE) and (semantic_source_range <> NULL) ) then
+		if( (symbGetParamMode(param) = FB_PARAMMODE_BYREF) or (symbGetParamMode(param) = FB_PARAMMODE_BYDESC) ) then
+			fbSemanticModelSetAccess(arg, "byref")
+		end if
 	end if
 
 	'' Complain about const arg passed to non-const non-byval param,
@@ -1227,6 +1233,7 @@ function astNewARG _
 	n->l = arg
 	n->arg.mode = mode
 	n->arg.lgt = 0
+	n->arg.semantic_defaulted = semantic_defaulted
 
 	'' Add ARGs to the CALL in the order they'll be pushed
 	if( symbGetProcMode( sym ) = FB_FUNCMODE_PASCAL ) then

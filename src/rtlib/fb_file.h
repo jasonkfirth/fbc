@@ -397,7 +397,28 @@ extern const UTF_8 __fb_utf8_bmarkTb[7];
 #define FB_FILE_ATTR_HANDLE   2
 #define FB_FILE_ATTR_ENCODING 3
 
+/* Internal snapshots use fixed-width fields rather than exposing struct stat.
+   Keep this layout in step with inc/fbc-int/file-info.bi. */
+enum {
+	FB_FILE_INFO_EXISTS = 1,
+	FB_FILE_INFO_REGULAR = 2,
+	FB_FILE_INFO_IDENTITY = 4
+};
+typedef struct FB_FILE_INFO {
+	uint64_t identity[3];
+	uint64_t bytes;
+	int64_t modified, modified_fraction;
+	int64_t changed, changed_fraction;
+	uint64_t flags;
+} FB_FILE_INFO;
+
+int fb_FileQueryInfo( const char *filename, int follow_links, FB_FILE_INFO *info );
+int fb_FileQueryStreamInfo( void *stream, FB_FILE_INFO *info );
+void *fb_CrtFileSavePos( void *stream );
+int fb_CrtFileRestorePos( void *stream, void *position );
+
 FBCALL int          fb_FileCopy         ( const char *source, const char *destination );
+       int          fb_FileRename       ( const char *oldname, const char *newname );
 FBCALL int          fb_CrtFileCopy      ( const char *source, const char *destination );
 FBCALL int          fb_FileExists       ( const char *filename );
 FBCALL long long    fb_FileLen          ( const char *filename );

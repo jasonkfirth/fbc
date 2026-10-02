@@ -433,6 +433,22 @@ int fb_sfxOutputCaptureSave(const char *filename)
 
         bytes = (size_t)samples * sizeof(short);
 
+        /* RIFF PCM stores the low byte first, regardless of the native
+           driver's short format. The scratch buffer is disposable and
+           repopulated for every chunk, so encode each sample in place. */
+        if (sizeof(short) != 2)
+        {
+            result = -1;
+            break;
+        }
+        for (int sample = 0; sample < samples; ++sample)
+        {
+            unsigned int value = (unsigned short)pcm[sample];
+            unsigned char *encoded = (unsigned char*)pcm + (size_t)sample * 2;
+            encoded[0] = (unsigned char)(value & 0xffu);
+            encoded[1] = (unsigned char)((value >> 8) & 0xffu);
+        }
+
         if (fb_sfxOutputCaptureWriteBytes(file, pcm, bytes) != 0)
             result = -1;
 

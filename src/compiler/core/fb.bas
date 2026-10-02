@@ -34,9 +34,17 @@
 #include once "ast/ast.bi"
 #include once "backend/ir.bi"
 #include once "driver/objinfo.bi"
+#include once "tooling/semantic-source.bi"
 
 declare sub fbSemanticModelBeginModule(byref filename as string)
 declare sub fbSemanticModelAddDependency(byref filename as string)
+
+#ifdef __FB_AMIGA__
+extern "C"
+declare function fbAmigaRealPath alias "realpath" _
+	( byval filename as const zstring ptr, byval result as zstring ptr ) as zstring ptr
+end extern
+#endif
 declare sub fbSemanticModelBeginSource(byref filename as string, byval depth as integer)
 declare sub fbSemanticModelProtectFile(byref filename as const string)
 declare sub fbSemanticModelEndSource(byval depth as integer)
@@ -1464,7 +1472,7 @@ end sub
 private sub fbParsePreIncludes()
 	dim as string ptr file = listGetHead(@env.preincludes)
 	while ((file <> NULL) and fbShouldContinue())
-		fbIncludeFile(*file, TRUE)
+		fbIncludeFile(*file, TRUE, NULL, TRUE)
 		file = listGetNext(file)
 	wend
 end sub
@@ -1596,10 +1604,12 @@ sub fbCompile _
 	end if
 
 	env.inf.format = hCheckFileFormat( env.inf.num )
+	fbSemanticModelOpenSource(env.inf.name, 0, "module", env.inf.name)
 
 	''
 	if( irEmitBegin( ) = FALSE ) then
 		errReportEx( FB_ERRMSG_FILEACCESSERROR, env.outf.name, -1 )
+		fbSemanticModelCloseSource(0)
 		close #env.inf.num
 		exit sub
 	end if
@@ -1609,6 +1619,8 @@ sub fbCompile _
 		env.ppfile_num = freefile( )
 		if( open( pponlyfile, for output, as #env.ppfile_num ) <> 0 ) then
 			errReportEx( FB_ERRMSG_FILEACCESSERROR, pponlyfile, -1 )
+			fbSemanticModelCloseSource(0)
+			close #env.inf.num
 			exit sub
 		end if
 	else
@@ -1644,6 +1656,7 @@ sub fbCompile _
 		close #env.ppfile_num
 	end if
 
+	fbSemanticModelCloseSource(0)
 	close #env.inf.num
 
 	'' check if any label undefined was used
@@ -1749,6 +1762,10 @@ private function is_rootpath( byref path as zstring ptr ) as integer
 			function = TRUE
 		end if
 	end if
+#elseif defined( __FB_AMIGA__ )
+	'' Native absolute paths start with a device, volume, or assign name.
+	'' A leading slash means a parent directory on AmigaDOS.
+	function = (instr( *path, ":" ) <> 0)
 #else
 	function = (path[0] = asc("/"))
 #endif
@@ -1792,6 +1809,17 @@ end function
 
 ''::::
 private function solve_path( byval path as zstring ptr ) as integer
+
+#ifdef __FB_AMIGA__
+	'' Let DOS resolve assigns and parent components. Unix's removal of empty
+	'' components would change the meaning of native doubled slashes.
+	dim as zstring ptr resolved = fbAmigaRealPath( path, NULL )
+	if( resolved = NULL ) then return FALSE
+	dim as integer fits = (len( *resolved ) < FB_MAXPATHLEN)
+	if( fits ) then *path = *resolved
+	deallocate( resolved )
+	return fits
+#endif
 
 	'' solves a path to its lowest common denominator...
 	'' drive-root\foo\bar\..\baz => drive-root\foo\baz, etc
@@ -1879,11 +1907,13 @@ private function solve_path( byval path as zstring ptr ) as integer
 
 end function
 
-sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer)
+sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer, _
+	byval directive as any ptr, byval is_preinclude as integer)
 	static as zstring * FB_MAXPATHLEN incfile
 	dim as zstring ptr fileidx
 
 	if( env.includerec >= FB_MAXINCRECLEVEL ) then
+		fbSemanticModelIncludeOutcome(*filename, "", "depth-limit", cptr(LEX_LOCATION ptr, directive))
 		errReport( FB_ERRMSG_RECLEVELTOODEEP )
 		errHideFurtherErrors()
 		exit sub
@@ -1910,6 +1940,7 @@ sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer)
 
 			'' not found?
 			if (path = NULL) then
+				fbSemanticModelIncludeOutcome(*filename, "", "not-found", cptr(LEX_LOCATION ptr, directive))
 				if( env.clopt.showincludes ) then
 					hShowInclude( env.includerec + 1, *filename + " (not found in include dirs)" )
 				end if
@@ -1950,6 +1981,7 @@ sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer)
 	if( isonce ) then
 		'' we should respect the path
 		if( hFindIncFile( @env.incfilehash, incfile ) <> NULL ) then
+			fbSemanticModelIncludeOutcome(*filename, incfile, "include-once", cptr(LEX_LOCATION ptr, directive))
 			hOnSkippedFile( incfile )
 			exit sub
 		end if
@@ -1957,13 +1989,13 @@ sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer)
 
 	'' #pragma ONCE
 	if( hFindIncFile( @env.inconcehash, incfile ) <> NULL ) then
+		fbSemanticModelIncludeOutcome(*filename, incfile, "pragma-once", cptr(LEX_LOCATION ptr, directive))
 		hOnSkippedFile( incfile )
 		exit sub
 	end if
 
 	'' we should respect the path here too
 	fileidx = hAddIncFile( @env.incfilehash, @env.filenamehash, incfile )
-	fbSemanticModelAddDependency(incfile)
 
 	'' push context
 	infileTb(env.includerec) = env.inf
@@ -1979,13 +2011,20 @@ sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer)
 	''
 	env.inf.num = freefile
 	if( open( incfile, for binary, access read, as #env.inf.num ) <> 0 ) then
+		fbSemanticModelIncludeOutcome(*filename, incfile, "open-failed", cptr(LEX_LOCATION ptr, directive))
 		errReportEx( FB_ERRMSG_FILENOTFOUND, QUOTE + *filename + QUOTE )
 		errHideFurtherErrors()
+		env.includerec -= 1
+		env.inf = infileTb(env.includerec)
 		exit sub
 	end if
 
 	env.inf.format = hCheckFileFormat( env.inf.num )
 	fbSemanticModelBeginSource(incfile, env.includerec)
+	fbSemanticModelAddDependency(incfile)
+	fbSemanticModelIncludeOutcome(*filename, incfile, "opened", cptr(LEX_LOCATION ptr, directive))
+	fbSemanticModelOpenSource(incfile, env.includerec, iif(is_preinclude, "preinclude", "include"), _
+		*filename, cptr(LEX_LOCATION ptr, directive))
 
 	'' parse
 	lexPushCtx( )
@@ -1996,6 +2035,7 @@ sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer)
 
 	lexPopCtx( )
 
+	fbSemanticModelCloseSource(env.includerec)
 	close #env.inf.num
 	fbSemanticModelEndSource(env.includerec)
 

@@ -1,0 +1,1353 @@
+{
+  "description": "GCC build controls and semantic emission audits for the local FreeBASIC project corpus.",
+  "programs": [
+    {
+      "project": "Araxia-Shadow-of-Etheros-FreeBasic",
+      "sources": [
+        "ARAXIA.BAS"
+      ],
+      "flags": [
+        "-lang",
+        "fblite"
+      ],
+      "name": "Araxia-Shadow-of-Etheros-FreeBasic/ARAXIA.BAS",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "FB_IMG2ASCII",
+      "sources": [
+        "FB_IMG_ASCII.bas"
+      ],
+      "flags": [
+        "-O",
+        "2"
+      ],
+      "name": "FB_IMG2ASCII/FB_IMG_ASCII.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "Lijstjes",
+      "sources": [
+        "lijstjes.bas"
+      ],
+      "flags": [
+        "-O",
+        "2"
+      ],
+      "name": "Lijstjes/lijstjes.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "Rekenblad",
+      "sources": [
+        "rekenblad.bas"
+      ],
+      "flags": [
+        "-O",
+        "2"
+      ],
+      "name": "Rekenblad/rekenblad.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "Schrijf",
+      "sources": [
+        "schrijf.bas"
+      ],
+      "flags": [
+        "-O",
+        "2"
+      ],
+      "name": "Schrijf/schrijf.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "StrawberryNES",
+      "sources": [
+        "StrawberryNES.bas"
+      ],
+      "flags": [
+        "-O",
+        "2"
+      ],
+      "name": "StrawberryNES/StrawberryNES.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "ToyBASIC",
+      "sources": [
+        "src/main.bas"
+      ],
+      "flags": [
+        "-O",
+        "2"
+      ],
+      "name": "ToyBASIC/src/main.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-asteroids",
+      "sources": [
+        "asteroids.bas"
+      ],
+      "flags": [
+        "-O",
+        "2"
+      ],
+      "name": "fb-asteroids/asteroids.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "kiwi",
+      "sources": [
+        "kiwi-debug.bas"
+      ],
+      "flags": [
+        "-O",
+        "2"
+      ],
+      "name": "kiwi/kiwi-debug.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "app.fb.imageviewer",
+      "sources": [
+        "imageviewer.bas"
+      ],
+      "flags": [
+        "-O",
+        "2"
+      ],
+      "name": "app.fb.imageviewer/imageviewer.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "app.fb.slideshow",
+      "sources": [
+        "slideshow.bas"
+      ],
+      "flags": [
+        "-O",
+        "2"
+      ],
+      "name": "app.fb.slideshow/slideshow.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "util.fb.cmdsqlite",
+      "sources": [
+        "cmdsqlite.bas"
+      ],
+      "flags": [
+        "-O",
+        "2"
+      ],
+      "name": "util.fb.cmdsqlite/cmdsqlite.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "clumsier",
+      "sources": [
+        "clumsier.bas"
+      ],
+      "flags": [
+        "-O",
+        "2"
+      ],
+      "name": "clumsier/clumsier.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "clumsier",
+      "sources": [
+        "fbeauty.bas"
+      ],
+      "flags": [
+        "-O",
+        "2"
+      ],
+      "name": "clumsier/fbeauty.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "PCEM_FB486",
+      "sources": [
+        "_80486_emu.bas"
+      ],
+      "flags": [
+        "-O",
+        "2"
+      ],
+      "name": "PCEM_FB486/_80486_emu.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "Station922",
+      "sources": [
+        "src/Station922Portable.bas"
+      ],
+      "flags": [
+        "-O",
+        "2"
+      ],
+      "name": "Station922/src/Station922Portable.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "ChessbrainFB",
+      "sources": [
+        "ChessbrainFB.bas"
+      ],
+      "flags": [
+        "-O",
+        "3",
+        "-mt"
+      ],
+      "name": "ChessbrainFB/ChessbrainFB.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "hackit",
+      "sources": [
+        "hackit.bas"
+      ],
+      "flags": [
+        "-nolib",
+        "kernel32,gdi32,msimg32,user32,version,advapi32,imm32"
+      ],
+      "name": "hackit/hackit.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "griffon_legend",
+      "sources": [
+        "griffon.bas"
+      ],
+      "flags": [
+        "-lang",
+        "fblite"
+      ],
+      "name": "griffon_legend/griffon.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "DarkCastle",
+      "sources": [
+        "src/DCastle.bas",
+        "src/gamlib.bas",
+        "src/autlib.bas",
+        "src/conlib.bas",
+        "src/isolib.bas",
+        "src/maplib.bas",
+        "src/pcxlib.bas",
+        "src/texlib.bas",
+        "src/matlib.bas",
+        "src/menlib.bas"
+      ],
+      "flags": [
+        "-lang",
+        "fblite"
+      ],
+      "name": "DarkCastle/src/DCastle.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "basicverse",
+      "sources": [
+        "bench.bas"
+      ],
+      "flags": [
+        "-O",
+        "2",
+        "-mt"
+      ],
+      "name": "basicverse/bench.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "basicverse",
+      "sources": [
+        "fonttest.bas"
+      ],
+      "flags": [
+        "-O",
+        "2",
+        "-mt"
+      ],
+      "name": "basicverse/fonttest.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "basicverse",
+      "sources": [
+        "game.bas"
+      ],
+      "flags": [
+        "-O",
+        "2",
+        "-mt"
+      ],
+      "name": "basicverse/game.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "basicverse",
+      "sources": [
+        "island.bas"
+      ],
+      "flags": [
+        "-O",
+        "2",
+        "-mt"
+      ],
+      "name": "basicverse/island.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "basicverse",
+      "sources": [
+        "palm_test.bas"
+      ],
+      "flags": [
+        "-O",
+        "2",
+        "-mt"
+      ],
+      "name": "basicverse/palm_test.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "basicverse",
+      "sources": [
+        "pathtrace.bas"
+      ],
+      "flags": [
+        "-O",
+        "2",
+        "-mt"
+      ],
+      "name": "basicverse/pathtrace.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "basicverse",
+      "sources": [
+        "play_island.bas"
+      ],
+      "flags": [
+        "-O",
+        "2",
+        "-mt"
+      ],
+      "name": "basicverse/play_island.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "basicverse",
+      "sources": [
+        "prof.bas"
+      ],
+      "flags": [
+        "-O",
+        "2",
+        "-mt"
+      ],
+      "name": "basicverse/prof.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "basicverse",
+      "sources": [
+        "record.bas"
+      ],
+      "flags": [
+        "-O",
+        "2",
+        "-mt"
+      ],
+      "name": "basicverse/record.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "basicverse",
+      "sources": [
+        "shot.bas"
+      ],
+      "flags": [
+        "-O",
+        "2",
+        "-mt"
+      ],
+      "name": "basicverse/shot.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "basicverse",
+      "sources": [
+        "world_test.bas"
+      ],
+      "flags": [
+        "-O",
+        "2",
+        "-mt"
+      ],
+      "name": "basicverse/world_test.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-imageproc",
+      "sources": [
+        "test-blend.bas"
+      ],
+      "flags": [
+        "-d",
+        "FB_NO_SFXLIB"
+      ],
+      "name": "fb-imageproc/test-blend.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-imageproc",
+      "sources": [
+        "test-blur.bas"
+      ],
+      "flags": [
+        "-d",
+        "FB_NO_SFXLIB"
+      ],
+      "name": "fb-imageproc/test-blur.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-imageproc",
+      "sources": [
+        "test-channels.bas"
+      ],
+      "flags": [
+        "-d",
+        "FB_NO_SFXLIB"
+      ],
+      "name": "fb-imageproc/test-channels.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-imageproc",
+      "sources": [
+        "test-colorize.bas"
+      ],
+      "flags": [
+        "-d",
+        "FB_NO_SFXLIB"
+      ],
+      "name": "fb-imageproc/test-colorize.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-imageproc",
+      "sources": [
+        "test-convolution.bas"
+      ],
+      "flags": [
+        "-d",
+        "FB_NO_SFXLIB"
+      ],
+      "name": "fb-imageproc/test-convolution.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-imageproc",
+      "sources": [
+        "test-flip.bas"
+      ],
+      "flags": [
+        "-d",
+        "FB_NO_SFXLIB"
+      ],
+      "name": "fb-imageproc/test-flip.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-imageproc",
+      "sources": [
+        "test-gaussian-blur.bas"
+      ],
+      "flags": [
+        "-d",
+        "FB_NO_SFXLIB"
+      ],
+      "name": "fb-imageproc/test-gaussian-blur.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-imageproc",
+      "sources": [
+        "test-gradient-map.bas"
+      ],
+      "flags": [
+        "-d",
+        "FB_NO_SFXLIB"
+      ],
+      "name": "fb-imageproc/test-gradient-map.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-imageproc",
+      "sources": [
+        "test-gradient.bas"
+      ],
+      "flags": [
+        "-d",
+        "FB_NO_SFXLIB"
+      ],
+      "name": "fb-imageproc/test-gradient.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-imageproc",
+      "sources": [
+        "test-grayscale.bas"
+      ],
+      "flags": [
+        "-d",
+        "FB_NO_SFXLIB"
+      ],
+      "name": "fb-imageproc/test-grayscale.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-imageproc",
+      "sources": [
+        "test-scaling.bas"
+      ],
+      "flags": [
+        "-d",
+        "FB_NO_SFXLIB"
+      ],
+      "name": "fb-imageproc/test-scaling.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "getting-started/01-hello-triangle.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/getting-started/01-hello-triangle.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "getting-started/02-hello-quad.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/getting-started/02-hello-quad.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "getting-started/03-shaders-uniforms.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/getting-started/03-shaders-uniforms.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "getting-started/04-shaders-vertex-attributes.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/getting-started/04-shaders-vertex-attributes.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "getting-started/05-shaders-textures.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/getting-started/05-shaders-textures.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "getting-started/06-shaders-texture-units.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/getting-started/06-shaders-texture-units.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "getting-started/07-transformations.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/getting-started/07-transformations.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "getting-started/08-transformations-matrices.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/getting-started/08-transformations-matrices.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "getting-started/09-coordinate-systems.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/getting-started/09-coordinate-systems.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "getting-started/10-coordinate-systems-3D.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/getting-started/10-coordinate-systems-3D.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "getting-started/11-coordinate-systems-cubes.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/getting-started/11-coordinate-systems-cubes.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "getting-started/12-camera.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/getting-started/12-camera.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "getting-started/13-camera-walkaround.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/getting-started/13-camera-walkaround.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "getting-started/14-camera-mouselook.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/getting-started/14-camera-mouselook.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "lighting/01-colors.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/lighting/01-colors.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "lighting/02-basic-lighting-ambient.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/lighting/02-basic-lighting-ambient.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "lighting/02-basic-lighting-diffuse.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/lighting/02-basic-lighting-diffuse.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "lighting/02-basic-lighting-specular.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/lighting/02-basic-lighting-specular.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "lighting/03-materials-light-colors.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/lighting/03-materials-light-colors.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "lighting/03-materials.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/lighting/03-materials.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "lighting/04-lighting-maps-diffuse.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/lighting/04-lighting-maps-diffuse.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "lighting/04-lighting-maps-specular.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/lighting/04-lighting-maps-specular.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "lighting/05-lightcasters-directional.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/lighting/05-lightcasters-directional.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "lighting/05-lightcasters-point.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/lighting/05-lightcasters-point.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "lighting/05-lightcasters-spotlight-soft.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/lighting/05-lightcasters-spotlight-soft.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "lighting/05-lightcasters-spotlight.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/lighting/05-lightcasters-spotlight.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fb-learn-opengl",
+      "sources": [
+        "lighting/06-lightcasters-multiple-lights.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fb-learn-opengl/inc"
+      ],
+      "name": "fb-learn-opengl/lighting/06-lightcasters-multiple-lights.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "freebasic-mini-games",
+      "sources": [
+        "2d-games/catfish/catfish.bas"
+      ],
+      "flags": [],
+      "name": "freebasic-mini-games/2d-games/catfish/catfish.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "freebasic-mini-games",
+      "sources": [
+        "2d-games/phoenix/phoenix.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fbsound/inc/fbsound"
+      ],
+      "name": "freebasic-mini-games/2d-games/phoenix/phoenix.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "freebasic-mini-games",
+      "sources": [
+        "text-games/asylum/asylum.bas"
+      ],
+      "flags": [],
+      "name": "freebasic-mini-games/text-games/asylum/asylum.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "freebasic-mini-games",
+      "sources": [
+        "text-games/guess/guess.bas"
+      ],
+      "flags": [],
+      "name": "freebasic-mini-games/text-games/guess/guess.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "freebasic-mini-games",
+      "sources": [
+        "text-games/rps/rps.bas"
+      ],
+      "flags": [],
+      "name": "freebasic-mini-games/text-games/rps/rps.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "freebasic-mini-games",
+      "sources": [
+        "text-games/tictactoe/tictactoe.bas"
+      ],
+      "flags": [],
+      "name": "freebasic-mini-games/text-games/tictactoe/tictactoe.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fbJson",
+      "sources": [
+        "examples/header_example.bas"
+      ],
+      "flags": [],
+      "name": "fbJson/examples/header_example.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fbJson",
+      "sources": [
+        "examples/objectAssembly.bas"
+      ],
+      "flags": [],
+      "name": "fbJson/examples/objectAssembly.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "fbJson",
+      "sources": [
+        "examples/test.bas"
+      ],
+      "flags": [],
+      "name": "fbJson/examples/test.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "oregon-trail",
+      "sources": [
+        "freebasic/oregon.bas"
+      ],
+      "flags": [
+        "-lang",
+        "qb"
+      ],
+      "name": "oregon-trail/freebasic/oregon.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "oregon-trail",
+      "sources": [
+        "original/oregon.bas"
+      ],
+      "flags": [
+        "-lang",
+        "qb"
+      ],
+      "name": "oregon-trail/original/oregon.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "oregon-trail",
+      "sources": [
+        "qb64/oregon.bas"
+      ],
+      "flags": [
+        "-lang",
+        "qb"
+      ],
+      "name": "oregon-trail/qb64/oregon.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "azdecrypt",
+      "sources": [
+        "AZdecrypt/Source/AZdecrypt/AZdecrypt.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/azdecrypt/AZdecrypt/Source/omaGUI-main"
+      ],
+      "name": "azdecrypt/AZdecrypt/Source/AZdecrypt/AZdecrypt.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "nebunoid",
+      "sources": [
+        "Nebunoid.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fbsound/inc",
+        "-i",
+        "{corpus}/fbsound/inc/fbsound"
+      ],
+      "name": "nebunoid/Nebunoid.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "nebunoid",
+      "sources": [
+        "NebEdit.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/fbsound/inc",
+        "-i",
+        "{corpus}/fbsound/inc/fbsound"
+      ],
+      "name": "nebunoid/NebEdit.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "prospector",
+      "sources": [
+        "prospector_nosound.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/prospector/port"
+      ],
+      "name": "prospector/prospector_nosound.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "miniapples",
+      "sources": [
+        "ubl/ubl.bas"
+      ],
+      "flags": [
+        "-lang",
+        "qb"
+      ],
+      "name": "miniapples/ubl/ubl.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "miniapples",
+      "sources": [
+        "ugomoku/prog/ugomoku10.bas"
+      ],
+      "flags": [
+        "-lang",
+        "qb"
+      ],
+      "name": "miniapples/ugomoku/prog/ugomoku10.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "raylib-freebasic",
+      "sources": [
+        "examples/core/core_3d_camera_first_person.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/raylib-freebasic"
+      ],
+      "name": "raylib-freebasic/examples/core/core_3d_camera_first_person.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "raylib-freebasic",
+      "sources": [
+        "examples/core/core_basic_window.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/raylib-freebasic"
+      ],
+      "name": "raylib-freebasic/examples/core/core_basic_window.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "BRPGEngine",
+      "sources": [
+        "BRpg/Samples/RPG.bas"
+      ],
+      "flags": [
+        "-lang",
+        "qb",
+        "-d",
+        "FB_NO_SFXLIB"
+      ],
+      "name": "BRPGEngine/BRpg/Samples/RPG.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "BRPGEngine",
+      "sources": [
+        "BRpgpg/Samples/RPG.bas"
+      ],
+      "flags": [
+        "-lang",
+        "qb",
+        "-d",
+        "FB_NO_SFXLIB"
+      ],
+      "name": "BRPGEngine/BRpgpg/Samples/RPG.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "FBTilengine",
+      "sources": [
+        "SuperMarioClone.bas"
+      ],
+      "flags": [],
+      "name": "FBTilengine/SuperMarioClone.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "FBTilengine",
+      "sources": [
+        "mode7.bas"
+      ],
+      "flags": [],
+      "name": "FBTilengine/mode7.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "FBTilengine",
+      "sources": [
+        "Racer.bas"
+      ],
+      "flags": [],
+      "name": "FBTilengine/Racer.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "FBTilengine",
+      "sources": [
+        "learning.bas"
+      ],
+      "flags": [],
+      "name": "FBTilengine/learning.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "FBTilengine",
+      "sources": [
+        "composing.bas"
+      ],
+      "flags": [],
+      "name": "FBTilengine/composing.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "FBTilengine",
+      "sources": [
+        "composing2.bas"
+      ],
+      "flags": [],
+      "name": "FBTilengine/composing2.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "FBTilengine",
+      "sources": [
+        "fbgfx-composing.bas"
+      ],
+      "flags": [],
+      "name": "FBTilengine/fbgfx-composing.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "FBTilengine",
+      "sources": [
+        "fbgfx-composing2.bas"
+      ],
+      "flags": [],
+      "name": "FBTilengine/fbgfx-composing2.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "FBTilengine",
+      "sources": [
+        "test.bas"
+      ],
+      "flags": [],
+      "name": "FBTilengine/test.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "project": "tiko-editor",
+      "sources": [
+        "src/tiko.bas"
+      ],
+      "flags": [
+        "-i",
+        "{corpus}/tiko-editor/src/omaGUI-main",
+        "-i",
+        "{corpus}/tiko-editor/src",
+        "-gfx3",
+        "-mt",
+        "-O",
+        "2"
+      ],
+      "name": "tiko-editor/src/tiko.bas",
+      "previous_gcc_success": true
+    },
+    {
+      "project": "Pyromax-Dax",
+      "sources": [
+        "source/AABB.bas",
+        "source/Bomb.bas",
+        "source/BossBigEye.bas",
+        "source/BossGyrobot.bas",
+        "source/BossJoker.bas",
+        "source/BossRobbit.bas",
+        "source/Bouncer.bas",
+        "source/Bullet.bas",
+        "source/Camera.bas",
+        "source/Checkpoint.bas",
+        "source/DialogTrigger.bas",
+        "source/Drumbot.bas",
+        "source/Dynamite.bas",
+        "source/Engine.bas",
+        "source/Explosion.bas",
+        "source/Eyesore.bas",
+        "source/FBGL2D7.bas",
+        "source/FallingBlock.bas",
+        "source/Globals.bas",
+        "source/Grog.bas",
+        "source/Helihead.bas",
+        "source/Joystick.bas",
+        "source/Jumpbot.bas",
+        "source/Keyboard.bas",
+        "source/LeavesParticle.bas",
+        "source/Map.bas",
+        "source/Matrix2D.bas",
+        "source/Megaton.bas",
+        "source/Mine.bas",
+        "source/Mouse.bas",
+        "source/Nail.bas",
+        "source/Particles.bas",
+        "source/Plasmo.bas",
+        "source/PlatformH.bas",
+        "source/PlatformV.bas",
+        "source/Player.bas",
+        "source/PowBomb.bas",
+        "source/PowDynamite.bas",
+        "source/PowEnergy.bas",
+        "source/PowMine.bas",
+        "source/PyromaxDax.bas",
+        "source/Robat.bas",
+        "source/Robox.bas",
+        "source/Screwgatling.bas",
+        "source/Sound.bas",
+        "source/Springer.bas",
+        "source/Tile3D.bas",
+        "source/UTIL.bas",
+        "source/Vector2D.bas",
+        "source/Vector3D.bas",
+        "source/VectorSpring.bas",
+        "source/Waller.bas",
+        "source/Warp.bas",
+        "source/Watcher.bas",
+        "source/Wheelie.bas"
+      ],
+      "flags": [
+        "-mt",
+        "-m",
+        "PyromaxDax"
+      ],
+      "name": "Pyromax-Dax/source/AABB.bas",
+      "previous_gcc_success": false
+    },
+    {
+      "name": "fb-linter/src/fb_linter.bas",
+      "project": "fb-linter",
+      "sources": [
+        "src/fb_linter.bas"
+      ],
+      "flags": [],
+      "previous_gcc_success": false
+    }
+  ],
+  "project_builds": [
+    {
+      "project": "fbfrog",
+      "command": [
+        "make",
+        "--no-print-directory",
+        "-B",
+        "-j2",
+        "build",
+        "FBC={wrapper}"
+      ]
+    },
+    {
+      "project": "fb-ext-lib",
+      "command": [
+        "make",
+        "--no-print-directory",
+        "-j1",
+        "build",
+        "FBC={wrapper}",
+        "BITS=64",
+        "ARCH=x86"
+      ]
+    },
+    {
+      "project": "fbsound",
+      "command": [
+        "make",
+        "--no-print-directory",
+        "-B",
+        "-j2",
+        "TARGET=lin64",
+        "FBC={wrapper}",
+        "FBCINC={toolchain}/inc",
+        "build"
+      ]
+    },
+    {
+      "project": "fb-VNC",
+      "command": [
+        "make",
+        "--no-print-directory",
+        "-B",
+        "-j2",
+        "all",
+        "FBC={wrapper}"
+      ]
+    },
+    {
+      "project": "midisoft-fb",
+      "command": [
+        "bash",
+        "build_editor.sh"
+      ],
+      "environment": {
+        "FREEBASIC_PATH": "{wrapper}",
+        "OUTPUT_PATH": "{project}/opensesh"
+      }
+    },
+    {
+      "project": "ohrrpgce",
+      "command": [
+        "scons",
+        "-j2",
+        "game",
+        "custom",
+        "debug=3",
+        "gengcc=1",
+        "fbc={wrapper}",
+        "builddir={project}/audit-build"
+      ],
+      "defines": [
+        "FB_NO_USTRING"
+      ]
+    }
+  ]
+}

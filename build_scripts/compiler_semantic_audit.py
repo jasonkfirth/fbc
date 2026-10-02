@@ -45,15 +45,17 @@ def invoke(command: list[str], cwd: Path, log: Path, timeout: int) -> int:
             return 124
 
 
-def emission_hashes(modules: list[Path], backend: str, destination: Path) -> dict[str, str]:
+def emission_hashes(modules: list[Path], backend: str, destination: Path,
+                    emitted_paths: list[Path] | None = None) -> dict[str, str]:
     destination.mkdir()
     result = {}
-    for module in modules:
-        path = module.with_suffix(EMISSION_SUFFIX[backend])
+    for index, module in enumerate(modules):
+        path = emitted_paths[index] if emitted_paths is not None else module.with_suffix(EMISSION_SUFFIX[backend])
         if not path.is_file():
             raise ValueError("Compiler did not produce emission for " + str(module))
+        name = path.name if emitted_paths is not None else module.name
         shutil.copy2(path, destination / path.name)
-        result[module.name] = digest(path)
+        result[name] = digest(path)
     return result
 
 
@@ -106,46 +108,77 @@ def expression_facts(model) -> Counter:
 
 
 def audit_exports(common: list[str], modules: list[Path], work: Path,
-                  backend: str, timeout: int) -> dict:
+                  backend: str, timeout: int, private_emissions: bool = False,
+                  cwd: Path | None = None, keep_going: bool = False) -> dict:
     from sidecar import Model
 
     full = None
     baseline = None
     record = {"backend": backend, "modules": len(modules), "modes": {}}
+    module_arguments = list(map(str, modules))
+    emitted_paths = None
+    if private_emissions:
+        # Project builds can compile the same helper under different options.
+        # Route emissions per invocation while keeping frozen source locations
+        # and include resolution unchanged across the three export modes.
+        emitted = work / "emitted"
+        emitted.mkdir()
+        module_arguments = []
+        emitted_paths = []
+        for index, module in enumerate(modules):
+            object_path = emitted / (str(index) + "-" + module.stem + ".o")
+            module_arguments += ["-o", str(object_path), str(module)]
+            emitted_paths.append(object_path.with_suffix(EMISSION_SUFFIX[backend]))
+    errors = []
     for mode in ("off", "full", "expressions"):
         model_path = work / (mode + ".tsv")
         option = [] if mode == "off" else [
             "-semantic-model" if mode == "full" else "-semantic-model-expressions", str(model_path)]
-        command = [*common, *option, *map(str, modules)]
-        status = invoke(command, modules[0].parent, work / (mode + ".log"), timeout)
-        record["modes"][mode] = {"status": status}
-        if status != 0:
-            raise ValueError(f"{mode} compiler exited with {status}; see {work / (mode + '.log')}")
-        emitted = emission_hashes(modules, backend, work / mode)
-        record["modes"][mode]["emission_sha256"] = emitted
-        if mode == "off":
-            baseline = emitted
-            continue
-        if emitted != baseline:
-            raise ValueError("Semantic export changed emitted program code in " + mode + " mode")
-        model = Model.read(model_path, expressions_only=mode == "expressions")
-        if [row[1] for row in model.records["M"]] != [str(module) for module in modules]:
-            raise ValueError("Semantic export changed or omitted a translation unit")
-        if mode == "full" and any(context[5] != backend for context in model.contexts):
-            raise ValueError("Semantic export reported the wrong emission backend")
-        record["modes"][mode]["records"] = {tag: len(rows) for tag, rows in model.records.items()}
-        record["modes"][mode]["physical_ranges"] = audit_source_ranges(model)
-        if mode == "full":
-            full = model
-            record["modes"][mode]["symbol_classes"] = dict(Counter(row[3] for row in model.types.values()))
-            record["modes"][mode]["node_kinds"] = dict(Counter(
-                model.properties["node", identity]["kind"] for identity in model.nodes))
-        else:
-            if expression_facts(model) != expression_facts(full):
-                raise ValueError("Full and compact expression facts differ")
-            if model.records["D"] != full.records["D"]:
-                raise ValueError("Full and compact dependency closures differ")
-    record["passed"] = True
+        command = [*common, *option, *module_arguments]
+        record["modes"][mode] = {}
+        try:
+            status = invoke(command, cwd or modules[0].parent, work / (mode + ".log"), timeout)
+            record["modes"][mode]["status"] = status
+            if status != 0:
+                raise ValueError(f"{mode} compiler exited with {status}; see {work / (mode + '.log')}")
+            emitted = emission_hashes(modules, backend, work / mode, emitted_paths)
+            record["modes"][mode]["emission_sha256"] = emitted
+            if mode == "off":
+                baseline = emitted
+                record["modes"][mode]["passed"] = True
+                continue
+            if baseline is not None and emitted != baseline:
+                raise ValueError("Semantic export changed emitted program code in " + mode + " mode")
+            model = Model.read(model_path, expressions_only=mode == "expressions")
+            if [row[1] for row in model.records["M"]] != [str(module) for module in modules]:
+                raise ValueError("Semantic export changed or omitted a translation unit")
+            if mode == "full" and any(context[5] != backend for context in model.contexts):
+                raise ValueError("Semantic export reported the wrong emission backend")
+            record["modes"][mode]["records"] = {tag: len(rows) for tag, rows in model.records.items()}
+            record["modes"][mode]["physical_ranges"] = audit_source_ranges(model)
+            if mode == "full":
+                full = model
+                record["modes"][mode]["symbol_classes"] = dict(Counter(row[3] for row in model.types.values()))
+                record["modes"][mode]["node_kinds"] = dict(Counter(
+                    model.properties["node", identity]["kind"] for identity in model.nodes))
+            elif full is not None:
+                if expression_facts(model) != expression_facts(full):
+                    raise ValueError("Full and compact expression facts differ")
+                if model.records["D"] != full.records["D"]:
+                    raise ValueError("Full and compact dependency closures differ")
+            record["modes"][mode]["passed"] = True
+        except (ValueError, OSError) as error:
+            if not keep_going:
+                raise
+            # A full model may exceed its documented staging budget while
+            # compact export still works. Preserve both outcomes and the
+            # disabled control, without accepting this whole case as passing.
+            record["modes"][mode]["passed"] = False
+            record["modes"][mode]["error"] = str(error)
+            errors.append(str(error))
+    record["passed"] = not errors
+    if errors:
+        record["error"] = "; ".join(errors)
     return record
 
 

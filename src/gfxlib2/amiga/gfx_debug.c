@@ -26,6 +26,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <proto/dos.h>
 
 void fb_amigaGfxDebug(const char *format, ...)
 {
@@ -35,22 +36,25 @@ void fb_amigaGfxDebug(const char *format, ...)
 
     if (!initialized)
     {
-        const char *setting;
-
-        setting = getenv("FB_GFX_AMIGA_DEBUG");
-        enabled = (setting != NULL && setting[0] != '\0' &&
-            setting[0] != '0');
+        char setting[4];
+        LONG length = GetVar("FB_GFX_AMIGA_DEBUG", setting, sizeof(setting), 0);
+        enabled = length > 0 && setting[0] != '0';
         initialized = TRUE;
     }
 
     if (!enabled || format == NULL)
         return;
 
-    fputs("gfxlib2/amiga: ", stderr);
+    char message[256];
+    LONG length;
     va_start(arguments, format);
-    vfprintf(stderr, format, arguments);
+    length = vsnprintf(message, sizeof(message), format, arguments);
     va_end(arguments);
-    fputc('\n', stderr);
+    if (length < 0) return;
+    if ((size_t)length >= sizeof(message)) length = sizeof(message) - 1;
+    Write(Output(), "gfxlib2/amiga: ", 15);
+    Write(Output(), message, length);
+    Write(Output(), "\n", 1);
 }
 
 /* end of gfx_debug.c */

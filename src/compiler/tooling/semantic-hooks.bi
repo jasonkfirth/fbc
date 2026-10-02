@@ -32,6 +32,16 @@ declare function fbSemanticModelSymbolId( byval sym as FBSYMBOL ptr ) as longint
 declare sub fbSemanticModelInitializeSymbol( byval sym as FBSYMBOL ptr )
 declare sub fbSemanticModelAllocateSymbol( byval sym as FBSYMBOL ptr )
 declare sub fbSemanticModelMarkDeclared( byval sym as FBSYMBOL ptr )
+declare function fbSemanticModelCurrentContext( ) as longint
+declare function fbSemanticModelEnabled( ) as integer
+declare function fbSemanticModelBindingCount( ) as longint
+declare sub fbSemanticModelSetAccess(byval node as ASTNODE ptr, byref role as const string)
+declare sub fbSemanticModelDiagnostic(byref severity as const string, byval code as integer, byval line_number as integer, byval message as const zstring ptr, byval detail as const zstring ptr, byval custom_text as const zstring ptr)
+declare function fbSemanticModelLocationIsPhysical( byref source as LEX_LOCATION ) as integer
+declare sub fbSemanticModelSetDeclarationName( byval sym as FBSYMBOL ptr, byval declared_name as const zstring ptr )
+declare sub fbSemanticModelExportDeclaration _
+	( byval sym as FBSYMBOL ptr, byref source as LEX_LOCATION, _
+	  byref role as const string, byref declared_name as const string )
 
 declare sub fbSemanticModelCaptureArgumentSource _
 	( byval arg as FB_CALL_ARG ptr, byref source_range as AST_SEMANTIC_SOURCE_RANGE )

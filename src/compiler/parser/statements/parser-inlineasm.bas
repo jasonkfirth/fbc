@@ -26,6 +26,7 @@
 #include once "core/fbint.bi"
 #include once "support/containers/list.bi"
 #include once "parser/parser.bi"
+#include once "tooling/semantic-constructs.bi"
 #include once "ast/ast.bi"
 
 declare sub fbSemanticModelExportBinding _
@@ -255,6 +256,14 @@ sub cAsmCode()
 	dim as ASTNODE ptr expr = any
 	dim as ASTASMTOK ptr head = any, tail = any
 	dim as integer doskip = any, thisTok = any
+	dim as LEX_LOCATION statement_source = lexGetCurrentLocation( )
+	dim as integer statement_errors = errGetCount( )
+	dim as longint statement = 0
+	select case lexGetToken(LEX_FLAGS)
+	case FB_TK_END, FB_TK_EOL, FB_TK_COMMENT, FB_TK_REM, FB_TK_EOF
+	case else
+		statement = fbSemanticModelStatementBegin(statement_source, lexGetToken(LEX_FLAGS), lexGetClass(LEX_FLAGS))
+	end select
 
 	head = NULL
 	tail = NULL
@@ -417,6 +426,8 @@ sub cAsmCode()
 	if( head <> NULL ) then
 		astAdd( astNewASM( head ) )
 	end if
+	dim as LEX_LOCATION statement_ending = lexGetLastLocation( )
+	fbSemanticModelStatementEnd(statement, "assembly-line", statement_ending, statement_errors)
 end sub
 
 '':::::
@@ -440,6 +451,7 @@ function cAsmBlock as integer
 	end if
 
 	'' ASM
+	dim as longint semantic_construct = fbSemanticModelConstructBegin(FB_TK_ASM)
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 	'' (Comment SttSeparator)?
@@ -510,6 +522,8 @@ function cAsmBlock as integer
 		end if
 	end if
 
+	dim as LEX_LOCATION semantic_ending = lexGetLastLocation( )
+	fbSemanticModelConstructEnd(semantic_construct, semantic_ending)
 	function = TRUE
 
 end function

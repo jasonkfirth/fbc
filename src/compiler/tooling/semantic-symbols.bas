@@ -428,11 +428,12 @@ sub fbSemanticModelExportSymbolDetails(byval sym as FBSYMBOL ptr, byval variable
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
 	dim as longint symbolid = fbSemanticModelSymbolId(sym)
 	if( symbolid = 0 ) then exit sub
+	fbSemanticModelExportType("symbol", symbolid, sym->typ, sym->subtype, sym->lgt)
 	dim as longint ownerid = 0, namespaceid = 0
 	if( sym->symtb <> NULL ) then ownerid = fbSemanticModelSymbolId(sym->symtb->owner)
 	if( sym->hash.tb <> NULL ) then namespaceid = fbSemanticModelSymbolId(sym->hash.tb->owner)
 	dim as string type_name = hTypeName(sym), alias_name, symbol_name
-	if( sym->id.name <> NULL ) then symbol_name = *sym->id.name
+	symbol_name = fbSemanticModelDeclarationName(sym)
 	if( sym->id.alias <> NULL ) then alias_name = *sym->id.alias
 	fbSemanticModelAppendDetail("T" + TABCHAR + fbSemanticModelNumber(symbolid) + TABCHAR + _
 		fbSemanticModelEscape(symbol_name) + TABCHAR + hSymbolClass(sym) + TABCHAR + fbSemanticModelTypeKind(sym) + TABCHAR + _
@@ -487,7 +488,12 @@ sub fbSemanticModelExportSymbolDetails(byval sym as FBSYMBOL ptr, byval variable
 		if( symbIsStruct(sym) ) then
 			hSymbolNumber(symbolid, "natural-alignment", sym->udt.natalign)
 			hSymbolNumber(symbolid, "packing-alignment", sym->udt.align)
-			hSymbolNumber(symbolid, "aggregate-register-return", sym->udt.retin2regs)
+			'' The return classifier initializes retin2regs only after layout
+			'' is finalized. Earlier observations must not read a pool slot.
+			hSymbolNumber(symbolid, "layout-finalized", abs(sym->udt.retdtype <> FB_DATATYPE_INVALID))
+			if( sym->udt.retdtype <> FB_DATATYPE_INVALID ) then
+				hSymbolNumber(symbolid, "aggregate-register-return", sym->udt.retin2regs)
+			end if
 			'' udt.base is the compiler's hidden base FIELD, whose subtype is
 			'' the declared base type. Export that type, not the storage field.
 			if( sym->udt.base <> NULL ) then baseid = fbSemanticModelSymbolId(sym->udt.base->subtype)
@@ -579,8 +585,9 @@ end sub
 
 sub fbSemanticModelExportSymbols(byval head as FBSYMBOL ptr)
 	if( (fbSemanticModelFullEnabled( ) = FALSE) or (head = NULL) ) then exit sub
-	'' Each stack item is a remaining table cursor. Table nesting is bounded
-	'' by compiler scope limits; the heap stack also handles generated types.
+	'' Each stack item resumes a parent table after its child. Visit children
+	'' immediately so thousands of sibling prototypes do not consume one stack
+	'' slot apiece. The bound applies to nesting, including generated types.
 	const MAX_PENDING_TABLES = 4096
 	dim as FBSYMBOL ptr ptr stack = callocate(MAX_PENDING_TABLES, sizeof(FBSYMBOL ptr))
 	if( stack = NULL ) then
@@ -622,8 +629,10 @@ sub fbSemanticModelExportSymbols(byval head as FBSYMBOL ptr)
 						fbSemanticModelFail( )
 						exit while
 					end if
-					stack[count] = child
+					stack[count] = sym->next
 					count += 1
+					sym = child
+					continue while
 				end if
 			end if
 			sym = sym->next

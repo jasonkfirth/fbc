@@ -87,6 +87,42 @@ sub fbSemanticModelExportNodeDetails(byval node as ASTNODE ptr, byval nodeid as 
 		hNumber(nodeid, "literal-suffix", abs(node->val.hassuffix <> FALSE))
 	case AST_NODECLASS_LOAD
 		hNumber(nodeid, "result-load", abs(node->lod.isres <> FALSE))
+	case AST_NODECLASS_ASM
+		'' The parser has already distinguished BASIC symbols from assembler
+		'' text. Preserve that sequence without interpreting instructions or
+		'' treating registers and assembler-local labels as BASIC references.
+		dim as ASTASMTOK ptr token = node->asm.tokhead
+		dim as longint ordinal = 0
+		do while( (token <> NULL) and fbSemanticModelFullEnabled( ) )
+			if( ordinal >= 1000000 ) then
+				fbSemanticModelFail( )
+				exit sub
+			end if
+			dim as string token_kind, token_text
+			dim as longint token_symbol = 0
+			select case token->type
+			case AST_ASMTOK_TEXT
+				token_kind = "text"
+				if( token->text <> NULL ) then token_text = *token->text
+			case AST_ASMTOK_SYMB
+				token_kind = "symbol"
+				token_symbol = fbSemanticModelSymbolId(token->sym)
+				if( token_symbol = 0 ) then
+					fbSemanticModelFail( )
+					exit sub
+				end if
+			case else
+				fbSemanticModelFail( )
+				exit sub
+			end select
+			fbSemanticModelAppendDetail("ASM" + TABCHAR + fbSemanticModelNumber(nodeid) + _
+				TABCHAR + fbSemanticModelNumber(ordinal) + TABCHAR + token_kind + _
+				TABCHAR + fbSemanticModelNumber(token_symbol) + TABCHAR + fbSemanticModelEscape(token_text))
+			ordinal += 1
+			token = token->next
+		loop
+		hNumber(nodeid, "assembly-token-count", ordinal)
+		hProperty(nodeid, "assembly-effects", "unknown-memory-registers-control")
 	case AST_NODECLASS_ASSIGN
 		hNumber(nodeid, "operator-options", node->op.options)
 		hNumber(nodeid, "initialization", abs((node->op.options and AST_OPOPT_ISINI) <> 0))
@@ -106,6 +142,10 @@ sub fbSemanticModelExportNodeDetails(byval node as ASTNODE ptr, byval nodeid as 
 		hNumber(nodeid, "argument-count", node->call.args)
 		fbSemanticModelExportRelation("node", nodeid, node->call.tmpres, "result-temporary")
 	case AST_NODECLASS_ARG
+		'' Passing convention and omitted source arguments are independent.
+		'' Capture omission before the optional initializer is cloned, because
+		'' its lowered value can be identical to an explicitly supplied value.
+		hNumber(nodeid, "default-argument", abs(node->arg.semantic_defaulted <> FALSE))
 		select case node->arg.mode
 		case FB_PARAMMODE_BYVAL: hProperty(nodeid, "passing-mode", "byval")
 		case FB_PARAMMODE_BYREF: hProperty(nodeid, "passing-mode", "byref")

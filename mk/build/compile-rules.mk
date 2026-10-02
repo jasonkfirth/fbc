@@ -137,13 +137,6 @@ endif
 
 BUILD_FBCFLAGS ?=
 
-# Filesystem support has no BASIC lowering stage. All compiler variants link
-# the same host implementation; bootstrap emission copies its source too.
-FBC_SUPPORT_CFLAGS := $(if $(filter YesPlease,$(ENABLE_PIE)),-fPIE,)
-$(fbcobjdir)/semantic-output.o $(fbcjsobjdir)/semantic-output.o $(fbcandroidobjdir)/semantic-output.o $(fbcwiiobjdir)/semantic-output.o: $(srcdir)/compiler/tooling/semantic-output.c
-	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(FBC_SUPPORT_CFLAGS) -MMD -MP -c $< -o $@
-
 $(fbcobjdir)/%.o: %.bas $(FBC_BI) | $(fbcobjdir)
 	@mkdir -p "$(dir $@)"
 	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) -i $(srcdir)/compiler $(FBC_INCLUDE_FLAGS) -c $< -o $@

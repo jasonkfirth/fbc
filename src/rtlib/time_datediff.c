@@ -1,4 +1,8 @@
-/* datediff function */
+/*
+    FreeBASIC runtime: time_datediff.c
+    Compute calendar and time interval differences between double serials.
+    Owns interval selection and result scaling, without reading the OS clock.
+*/
 
 #include "fb.h"
 #include <math.h>
@@ -7,7 +11,7 @@
 FBCALL long long fb_DateDiff( FBSTRING *interval, double serial1, double serial2,
                               int first_day_of_week, int first_day_of_year )
 {
-    int year1, month1, hour, minute, second, week;
+    int year1, month1, hour, minute, second, week, end_week;
     int year2, month2;
     long long result = 0;
     double serial;
@@ -39,14 +43,18 @@ FBCALL long long fb_DateDiff( FBSTRING *interval, double serial1, double serial2
         week = fb_hGetWeekOfYear( year1,
                                   serial1,
                                   first_day_of_year, first_day_of_week );
-        result = fb_hGetWeekOfYear( year1,
-                                    serial2,
-                                    first_day_of_year, first_day_of_week );
+        end_week = fb_hGetWeekOfYear( year1,
+                                      serial2,
+                                      first_day_of_year, first_day_of_week );
         if( week > 0 )
             --week;
-        if( result > 0 )
-            --result;
-        result -= week;
+        /* Both helpers return int week numbers. Normalize them in that
+           type before computing the public 64-bit interval difference.
+           The Amiga/AROS GCC 6.5 optimizer can miscompile a zero comparison
+           after promoting this helper's result directly to long long. */
+        if( end_week > 0 )
+            --end_week;
+        result = (long long)end_week - week;
         if( interval_type==FB_TIME_INTERVAL_WEEKDAY ) {
             int add_value;
             if( serial1 > serial2 ) {
@@ -64,17 +72,19 @@ FBCALL long long fb_DateDiff( FBSTRING *interval, double serial1, double serial2
     case FB_TIME_INTERVAL_HOUR:
         serial = serial2 - serial1;
         fb_hTimeDecodeSerial ( serial, &hour, NULL, NULL, FALSE );
-        result = (long long) (hour + floor(serial) * 24.0l);
+        /* Serial values already use double precision. Keep scaling in that
+           format rather than introducing the target's long-double ABI. */
+        result = (long long) (hour + floor(serial) * 24.0);
         break;
     case FB_TIME_INTERVAL_MINUTE:
         serial = serial2 - serial1;
         fb_hTimeDecodeSerial ( serial, &hour, &minute, NULL, FALSE );
-        result = (long long) (minute + (hour + floor(serial) * 24.0l) * 60.0l);
+        result = (long long) (minute + (hour + floor(serial) * 24.0) * 60.0);
         break;
     case FB_TIME_INTERVAL_SECOND:
         serial = serial2 - serial1;
         fb_hTimeDecodeSerial ( serial, &hour, &minute, &second, FALSE );
-        result = (long long) (second + (minute + (hour + floor(serial) * 24.0l) * 60.0l) * 60.0l);
+        result = (long long) (second + (minute + (hour + floor(serial) * 24.0) * 60.0) * 60.0);
         break;
     case FB_TIME_INTERVAL_INVALID:
     default:
@@ -84,3 +94,5 @@ FBCALL long long fb_DateDiff( FBSTRING *interval, double serial1, double serial2
 
     return result;
 }
+
+/* end of time_datediff.c */

@@ -727,7 +727,9 @@ declare sub fbChangeOption(byval opt as integer, byval value as integer)
 declare sub fbSetLibs(byval libs as TSTRSET ptr, byval libpaths as TSTRSET ptr)
 declare sub fbGetLibs(byval libs as TSTRSET ptr, byval libpaths as TSTRSET ptr)
 declare sub fbPragmaOnce()
-declare sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer)
+declare sub fbIncludeFile _
+	( byval filename as zstring ptr, byval isonce as integer, _
+	  byval directive as any ptr = NULL, byval is_preinclude as integer = FALSE )
 declare sub fbOverrideFilename(byval filename as zstring ptr)
 
 declare function fbGetTargetId( ) as string

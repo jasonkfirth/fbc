@@ -51,8 +51,21 @@
 #include once "ast/ast.bi"
 #include once "runtime/rtl.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-expressions.bi"
 
-declare function fbSemanticModelEnabled( ) as integer
+'' Capture typed operands before astNewBOP folds, promotes, or consumes them.
+'' The parser still owns the actual operation and its source token; tooling
+'' observes these inputs without rebuilding or resolving the operation again.
+private function hSourceBinaryOperation _
+	( byval op as integer, byval left_expr as ASTNODE ptr, byval right_expr as ASTNODE ptr, _
+	  byref source as LEX_LOCATION, byval extra as FBSYMBOL ptr = NULL, _
+	  byval options as AST_OPOPT = AST_OPOPT_DEFAULT ) as ASTNODE ptr
+	dim as longint operands = fbSemanticModelCaptureOperands(left_expr, right_expr, "binary", op, source)
+	dim as ASTNODE ptr result = astNewBOP(op, left_expr, right_expr, extra, options)
+	fbSemanticModelAttachOperands(result, operands)
+	return result
+end function
+
 declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
 declare sub fbSemanticModelAssociateTemporaryDestructors _
 	( _
@@ -279,7 +292,7 @@ function cBoolExpression( ) as ASTNODE ptr
 		end if
 
 		'' Short-circuit operations lower to IIF nodes, so retain their source operator.
-		logexpr = astNewBOP( op, logexpr, expr, cptr( any ptr, dtorlistcookie ) )
+		logexpr = hSourceBinaryOperation( op, logexpr, expr, semantic_operation_site, cptr( any ptr, dtorlistcookie ) )
 		if( export_semantics ) then fbSemanticModelExportOperation(logexpr, op, semantic_operation_site)
 		if( logexpr <> NULL ) then semantic_operator_override = op
 		if( logexpr = NULL ) then
@@ -359,7 +372,7 @@ function cLogExpression _
 		end if
 
 		'' do operation
-		logexpr = astNewBOP( op, logexpr, expr )
+		logexpr = hSourceBinaryOperation( op, logexpr, expr, semantic_operation_site )
 		if( export_semantics ) then fbSemanticModelExportOperation(logexpr, op, semantic_operation_site)
 
 		if( logexpr = NULL ) then
@@ -432,7 +445,7 @@ function cLogOrExpression _
 		end if
 
 		'' do operation
-		logexpr = astNewBOP( AST_OP_OR, logexpr, expr )
+		logexpr = hSourceBinaryOperation( AST_OP_OR, logexpr, expr, semantic_operation_site )
 		if( export_semantics ) then fbSemanticModelExportOperation(logexpr, AST_OP_OR, semantic_operation_site)
 
 		if( logexpr = NULL ) then
@@ -505,7 +518,7 @@ function cLogAndExpression _
 		end if
 
 		'' do operation
-		logexpr = astNewBOP( AST_OP_AND, logexpr, expr )
+		logexpr = hSourceBinaryOperation( AST_OP_AND, logexpr, expr, semantic_operation_site )
 		if( export_semantics ) then fbSemanticModelExportOperation(logexpr, AST_OP_AND, semantic_operation_site)
 
 		if( logexpr = NULL ) then
@@ -601,7 +614,7 @@ function cRelExpression _
 		end if
 
 		'' do operation
-		relexpr = astNewBOP( op, relexpr, expr )
+		relexpr = hSourceBinaryOperation( op, relexpr, expr, semantic_operation_site )
 		if( export_semantics ) then fbSemanticModelExportOperation(relexpr, op, semantic_operation_site)
 		semantic_operator_override = -1
 
@@ -662,6 +675,7 @@ function cIsExpression _
 	end if
 
 	'' IS
+	dim as LEX_LOCATION semantic_operation_site = lexGetCurrentLocation( )
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 	'' SymbolType
@@ -693,7 +707,7 @@ function cIsExpression _
 	var expr = astNewVAR( subtype->udt.ext->rtti )
 
 	'' do operation
-	isexpr = astNewBOP( AST_OP_IS, isexpr, expr )
+	isexpr = hSourceBinaryOperation( AST_OP_IS, isexpr, expr, semantic_operation_site )
 
 	if( isexpr = NULL ) Then
 		errReport( FB_ERRMSG_TYPEMISMATCH )
@@ -761,7 +775,7 @@ function cCatExpression _
 		end if
 
 		'' concatenate
-		catexpr = astNewBOP( AST_OP_CONCAT, catexpr, expr )
+		catexpr = hSourceBinaryOperation( AST_OP_CONCAT, catexpr, expr, semantic_operation_site )
 		if( export_semantics ) then fbSemanticModelExportOperation(catexpr, AST_OP_CONCAT, semantic_operation_site)
 
 		if( catexpr = NULL ) then
@@ -848,9 +862,10 @@ function cAddExpression _
 			exit do
 		end if
 
-		addexpr = astNewBOP( op, _
+		addexpr = hSourceBinaryOperation( op, _
 		                     addexpr, _
 		                     expr, _
+		                     semantic_operation_site, _
 		                     NULL, _
 		                     AST_OPOPT_DEFAULT or AST_OPOPT_DOPTRARITH )
 		if( export_semantics ) then fbSemanticModelExportOperation(addexpr, op, semantic_operation_site)
@@ -937,7 +952,7 @@ function cShiftExpression _
 		end if
 
 		'' do operation
-		shiftexpr = astNewBOP( op, shiftexpr, expr )
+		shiftexpr = hSourceBinaryOperation( op, shiftexpr, expr, semantic_operation_site )
 		if( export_semantics ) then fbSemanticModelExportOperation(shiftexpr, op, semantic_operation_site)
 
 		if( shiftexpr = NULL ) Then
@@ -1009,7 +1024,7 @@ function cModExpression _
 		end if
 
 		'' do operation
-		modexpr = astNewBOP( AST_OP_MOD, modexpr, expr )
+		modexpr = hSourceBinaryOperation( AST_OP_MOD, modexpr, expr, semantic_operation_site )
 		if( export_semantics ) then fbSemanticModelExportOperation(modexpr, AST_OP_MOD, semantic_operation_site)
 
 		if( modexpr = NULL ) Then
@@ -1081,7 +1096,7 @@ function cIntDivExpression _
 		end if
 
 		'' do operation
-		idivexpr = astNewBOP( AST_OP_INTDIV, idivexpr, expr )
+		idivexpr = hSourceBinaryOperation( AST_OP_INTDIV, idivexpr, expr, semantic_operation_site )
 		if( export_semantics ) then fbSemanticModelExportOperation(idivexpr, AST_OP_INTDIV, semantic_operation_site)
 
 		if( idivexpr = NULL ) Then
@@ -1159,7 +1174,7 @@ function cMultExpression _
 		end if
 
 		'' do operation
-		mulexpr = astNewBOP( op, mulexpr, expr )
+		mulexpr = hSourceBinaryOperation( op, mulexpr, expr, semantic_operation_site )
 		if( export_semantics ) then fbSemanticModelExportOperation(mulexpr, op, semantic_operation_site)
 
 		if( mulexpr = NULL ) Then
@@ -1232,7 +1247,7 @@ function cExpExpression _
 		end if
 
 		'' do operation
-		expexpr = astNewBOP( AST_OP_POW, expexpr, expr )
+		expexpr = hSourceBinaryOperation( AST_OP_POW, expexpr, expr, semantic_operation_site )
 		if( export_semantics ) then fbSemanticModelExportOperation(expexpr, AST_OP_POW, semantic_operation_site)
 
 		if( expexpr = NULL ) Then

@@ -26,6 +26,7 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-expressions.bi"
 
 declare function hBaseMemberAccess _
 	( _
@@ -87,6 +88,7 @@ function cParentExpression _
 	if( lexGetToken( ) <> CHAR_LPRNT ) then
 		return NULL
 	end if
+	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
 
 	lexSkipToken( )
 
@@ -123,7 +125,9 @@ function cParentExpression _
 
 	'' ')'
 	if( lexGetToken( ) = CHAR_RPRNT ) then
+		dim as longint operands = fbSemanticModelCaptureOperands(parexpr, NULL, "group", -1, semantic_site)
 		lexSkipToken( )
+		fbSemanticModelAttachOperands(parexpr, operands)
 		'' --parent cnt
 		parser.prntcnt -= 1
 

@@ -6,7 +6,7 @@
 
     Purpose:
 
-        Normalize FreeBASIC file paths for AmigaOS DOS and POSIXC services.
+        Normalize FreeBASIC file paths for native AmigaOS DOS services.
 
     Responsibilities:
 
@@ -22,10 +22,9 @@
 
     AmigaOS path note:
 
-        AmigaOS POSIXC can read an existing path beginning with "./", but the
-        underlying DOS handler may reject creation through that spelling.
-        Native relative paths already start at the current directory, so the
-        redundant prefix is removed before every operation.
+        DOS uses an empty component as a parent traversal: "../file" becomes
+        "/file", and "dir/../file" becomes "dir//file". Existing native empty
+        components must remain intact. Conversion only shortens the buffer.
 */
 
 #include "../fb.h"
@@ -40,6 +39,8 @@
 void fb_hConvertPath( char *path )
 {
 	char *source;
+	char *destination;
+	int component_start;
 	ssize_t index;
 	ssize_t length;
 
@@ -58,6 +59,30 @@ void fb_hConvertPath( char *path )
 		if( path[index] == '\\' )
 			path[index] = '/';
 	}
+
+	/* BASIC headers use Unix-style relative includes on every target. DOS
+	   needs their dot components translated before the first existence check. */
+	source = destination = path;
+	component_start = TRUE;
+	while( *source != '\0' ) {
+		if( component_start && source[0] == '.' ) {
+			if( source[1] == '/' || source[1] == '\0' ) {
+				++source;
+				if( *source == '/' ) ++source;
+				else if( destination > path && destination[-1] == '/' ) --destination;
+				continue;
+			}
+			if( source[1] == '.' && (source[2] == '/' || source[2] == '\0') ) {
+				source += 2;
+				if( *source == '/' ) ++source;
+				*destination++ = '/';
+				continue;
+			}
+		}
+		component_start = (*source == '/' || *source == ':');
+		*destination++ = *source++;
+	}
+	*destination = '\0';
 }
 
 static char *fb_hAmigaCopyPath( const char *path )

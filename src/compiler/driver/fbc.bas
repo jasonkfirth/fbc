@@ -102,6 +102,13 @@ sub fbcEnd( byval errnum as integer )
 		if( module->objfile <> NULL ) then fbSemanticModelProtectFile(*module->objfile)
 		module = listGetNext(module)
 	wend
+	module = listGetHead(@fbc.rcs)
+	while( module <> NULL )
+		fbSemanticModelProtectFile(module->srcfile)
+		if( module->objfile <> NULL ) then fbSemanticModelProtectFile(*module->objfile)
+		module = listGetNext(module)
+	wend
+	fbSemanticModelProtectFile(fbc.xpm.srcfile)
 	dim as string ptr artifact = listGetHead(@fbc.objlist)
 	while( artifact <> NULL )
 		fbSemanticModelProtectFile(*artifact)
@@ -222,7 +229,8 @@ end sub
 		end if
 
 		if( len( fbc.semanticmodel ) > 0 ) then
-			if( fbSemanticModelBegin( fbc.semanticmodel, fbc.semanticmodel_expressions ) = FALSE ) then
+			if( fbSemanticModelBegin( fbc.semanticmodel, fbc.semanticmodel_expressions, _
+				fbc.semanticmodel_bindings, not fbc.semanticmodel_compact ) = FALSE ) then
 				print "error: could not write semantic model: "; fbc.semanticmodel
 				fbcEnd( 1 )
 			end if

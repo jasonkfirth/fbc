@@ -25,23 +25,26 @@ Both have the GCC Runtime Library Exception and are kept separate from libfb.
 import argparse
 import hashlib
 from pathlib import Path
+import shutil
 import subprocess
 import urllib.request
 
 
 SOURCE_URL = "https://raw.githubusercontent.com/gcc-mirror/gcc/releases/gcc-6.5.0/libgcc/config/m68k/lb1sf68.S"
 SOURCE_SHA256 = "a6455a8b299bb903d6fc6b7654409f3fc539b2aad5ce4058e9f79b01b378e3d9"
+LICENSES = {
+    'COPYING3': '8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903',
+    'COPYING.RUNTIME': '9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74',
+}
 PARTS = ("floatex", "double", "float", "eqdf2", "nedf2", "gtdf2", "gedf2",
          "ledf2", "ltdf2", "eqsf2", "nesf2", "gtsf2", "gesf2", "lesf2", "ltsf2")
 CONVERSIONS = {
-    "extendsfdf2": "23f3d8e7fa245c4000b4ecfce19fa1c9d99f62bb445938177c8a8b8c1f7e767d",
     "fixdfsi": "336ae5f2acd998a9a9169e1fd7d698f3ed23df18ed215b0cf6cc2eab1e5c59d9",
     "fixsfsi": "078bb79bf23d7e62999db1e4a6b125a316ba0f9c20f77b53df10cd512c2778aa",
     "floatsidf": "1c8a6c0a8382377df8ae01b69bde05c93f18cba4c588c2dd2d0351fd8c6ebcbe",
     "floatsisf": "a54e460d63aa3a9cfe3bf082fcbdae1336ec5338daa487d9a92835c234d781e4",
     "floatunsidf": "6fb692d744663da14fe5c5d288302a7cec5e4f048035838807b4201598cc26e2",
     "floatunsisf": "e4a9dd890abea9487a361449a9153661c62c96bb3886133add167634bdabe199",
-    "truncdfsf2": "cd0cc49444f57a44bfc1023320fb384c18548b08745013a34e8862b856c87fb1",
 }
 
 
@@ -57,6 +60,18 @@ def build(prefix: Path, work: Path, output: Path) -> None:
         source.write_bytes(data)
     if hashlib.sha256(source.read_bytes()).hexdigest() != SOURCE_SHA256:
         raise SystemExit("Cached GCC m68k assembly source hash mismatch")
+    for name, expected in LICENSES.items():
+        license_file = work / name
+        if not license_file.exists():
+            url = 'https://raw.githubusercontent.com/gcc-mirror/gcc/releases/gcc-6.5.0/' + name
+            with urllib.request.urlopen(url, timeout=60) as response:
+                data = response.read()
+            if hashlib.sha256(data).hexdigest() != expected:
+                raise SystemExit('GCC license hash mismatch: ' + name)
+            license_file.write_bytes(data)
+        if hashlib.sha256(license_file.read_bytes()).hexdigest() != expected:
+            raise SystemExit('Cached GCC license hash mismatch: ' + name)
+        shutil.copy2(license_file, output.parent / ('fbsoftfloat-' + name + '.txt'))
 
     compiler = prefix / "bin/m68k-amigaos-gcc"
     archiver = prefix / "bin/m68k-amigaos-ar"
@@ -77,6 +92,13 @@ def build(prefix: Path, work: Path, output: Path) -> None:
         destination = work / member
         destination.write_bytes(data)
         objects.append(destination)
+
+    conversion_source = Path(__file__).resolve().parent / "amiga/softfloat-convert.c"
+    destination = work / "softfloat-convert.o"
+    subprocess.run([str(compiler), "-m68020", "-msoft-float", "-O2",
+                    "-ffreestanding", "-fno-builtin", "-Wall", "-Wextra",
+                    "-c", str(conversion_source), "-o", str(destination)], check=True)
+    objects.append(destination)
 
     temporary = output.with_suffix(".a.new")
     # ar replaces named members but retains unnamed old members. Always create

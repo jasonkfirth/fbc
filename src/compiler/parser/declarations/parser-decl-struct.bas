@@ -25,6 +25,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
+#include once "tooling/semantic-constructs.bi"
 #include once "ast/ast.bi"
 
 declare sub fbSemanticModelExportBinding _
@@ -123,10 +124,11 @@ private sub hTypeProtoDecl _
 	     FB_TK_CONSTRUCTOR, FB_TK_DESTRUCTOR, _
 	     FB_TK_OPERATOR, FB_TK_PROPERTY
 
+		dim as LEX_LOCATION declaration_start = lexGetCurrentLocation( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		cProcHeader( attrib, pattrib, is_nested, _
-		             FB_PROCOPT_ISPROTO or FB_PROCOPT_HASPARENT, tk )
+		             FB_PROCOPT_ISPROTO or FB_PROCOPT_HASPARENT, tk, @declaration_start )
 
 	case else
 		errReport( FB_ERRMSG_SYNTAXERROR )
@@ -817,6 +819,18 @@ private sub hTypeBody( byval s as FBSYMBOL ptr )
 
 	do
 		isinner = FALSE
+		'' END followed by a terminator closes this body; a field named END
+		'' remains a declaration statement. Comments and separators have no
+		'' statement identity of their own.
+		if( lexGetToken( ) = FB_TK_END ) then
+			select case lexGetLookAhead(1)
+			case FB_TK_AS, CHAR_LPRNT, FB_TK_STMTSEP
+			case else: exit do
+			end select
+		end if
+		dim as LEX_LOCATION statement_source = lexGetCurrentLocation( )
+		dim as integer statement_errors = errGetCount( )
+		dim as longint statement = fbSemanticModelStatementBegin(statement_source, lexGetToken( ), lexGetClass( ))
 		select case as const lexGetToken( )
 		'' visibility?
 		case FB_TK_PRIVATE, FB_TK_PUBLIC, FB_TK_PROTECTED
@@ -927,7 +941,10 @@ private sub hTypeBody( byval s as FBSYMBOL ptr )
 				end if
 
 				'' create a "temp" one
+				dim as longint anonymous_construct = fbSemanticModelConstructBegin(iif(isunion, FB_TK_UNION, FB_TK_TYPE))
 				inner = hTypeAdd( s, symbUniqueId( ), NULL, isunion, align )
+				dim as LEX_LOCATION anonymous_ending = lexGetLastLocation( )
+				fbSemanticModelConstructEnd(anonymous_construct, anonymous_ending)
 
 				if( isunion ) then
 					symbSetUDTIsUnion( inner )
@@ -975,6 +992,8 @@ private sub hTypeBody( byval s as FBSYMBOL ptr )
 
 		end select
 
+		dim as LEX_LOCATION statement_ending = lexGetLastLocation( )
+		fbSemanticModelStatementEnd(statement, "aggregate-member", statement_ending, statement_errors)
 		'' Comment?
 		cComment( )
 

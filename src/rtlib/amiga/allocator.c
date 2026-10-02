@@ -23,7 +23,8 @@
     Allocation layout:
         0..3  : total native allocation size
         4..7  : requested payload size
-        8..15 : padding which preserves Exec's eight-byte alignment
+        8..11 : previous live allocation
+        12..15: next live allocation
         16..  : caller-owned payload
 */
 
@@ -32,13 +33,21 @@
 #include <exec/memory.h>
 #include <proto/exec.h>
 #include <reent.h>
+#include <stabs.h>
 
 typedef struct AMIGA_ALLOCATION
 {
     ULONG allocated;
     ULONG requested;
-    ULONG padding[2];
+    struct AMIGA_ALLOCATION *previous, *next;
 } AMIGA_ALLOCATION;
+
+/* Exec does not reclaim arbitrary AllocMem blocks when a command returns.
+   Track this command's live allocations so unclosed C-library contexts and
+   application allocations cannot survive UnLoadSeg. Workers are joined before
+   the late cleanup hook. Forbid protects only bounded list updates, with no
+   allocator or DOS call inside that task-switch exclusion. */
+static AMIGA_ALLOCATION *allocations;
 
 /* Referenced by runtime startup so archive selection cannot discard the
    allocator in favour of the SDK's constructor-dependent implementation. */
@@ -60,6 +69,12 @@ void *_malloc_r(struct _reent *context, size_t size)
     }
     header->allocated = (ULONG)(payload + sizeof(*header));
     header->requested = (ULONG)size;
+    Forbid();
+    header->previous = NULL;
+    header->next = allocations;
+    if (allocations != NULL) allocations->previous = header;
+    allocations = header;
+    Permit();
     return header + 1;
 }
 
@@ -70,6 +85,11 @@ void _free_r(struct _reent *context, void *pointer)
     (void)context;
     if (pointer == NULL) return;
     header = (AMIGA_ALLOCATION *)pointer - 1;
+    Forbid();
+    if (header->previous != NULL) header->previous->next = header->next;
+    else allocations = header->next;
+    if (header->next != NULL) header->next->previous = header->previous;
+    Permit();
     FreeMem(header, header->allocated);
 }
 
@@ -109,5 +129,23 @@ void *malloc(size_t size) { return _malloc_r(_REENT, size); }
 void *calloc(size_t count, size_t size) { return _calloc_r(_REENT, count, size); }
 void *realloc(void *pointer, size_t size) { return _realloc_r(_REENT, pointer, size); }
 void free(void *pointer) { _free_r(_REENT, pointer); }
+
+__attribute__((used)) static void release_allocations(void)
+{
+    AMIGA_ALLOCATION *header;
+    Forbid();
+    header = allocations;
+    allocations = NULL;
+    Permit();
+    while (header != NULL) {
+        AMIGA_ALLOCATION *next = header->next;
+        FreeMem(header, header->allocated);
+        header = next;
+    }
+}
+
+/* All C/BASIC destructors, pthread joins, and descriptor cleanup precede this.
+   The SDK closes its library bases at -100, after these final Exec frees. */
+ADD2EXIT(release_allocations, -99);
 
 /* end of amiga/allocator.c */

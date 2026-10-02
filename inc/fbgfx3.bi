@@ -109,9 +109,17 @@ namespace fb
 		  byval clear_color as ulong = 0 ) as any ptr
 	'' Decode a BLOAD-compatible bitmap into temporary staging memory, upload it
 	'' once, and release the CPU copy before returning the opaque surface.
-	declare function Gfx3SurfaceLoad GFX3CALL alias "fb_Gfx3SurfaceLoad" _
+	declare function Gfx3SurfaceLoad GFX3CALL overload alias "fb_Gfx3SurfaceLoad" _
 		( byref filename as const string, byval depth as long = 0, _
 		  byval usage as ulong = GFX3_SURFACE_ASSET ) as any ptr
+	declare function Gfx3SurfaceLoad GFX3CALL overload alias "fb_Gfx3SurfaceLoadWstr" _
+		( byref filename as const wstring, byval depth as long = 0, _
+		  byval usage as ulong = GFX3_SURFACE_ASSET ) as any ptr
+#if defined(__FB_HAS_USTRING__) and not defined(FB_NO_USTRING)
+	declare function Gfx3SurfaceLoad GFX3CALL overload alias "fb_Gfx3SurfaceLoad" _
+		( byref filename as const ustring, byval depth as long = 0, _
+		  byval usage as ulong = GFX3_SURFACE_ASSET ) as any ptr
+#endif
 	declare function Gfx3SurfaceDestroy GFX3CALL alias "fb_Gfx3SurfaceDestroy" _
 		( byval surface as any ptr ) as long
 	declare function Gfx3SurfaceInfo GFX3CALL alias "fb_Gfx3SurfaceInfo" _

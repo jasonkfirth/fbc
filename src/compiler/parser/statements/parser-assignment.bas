@@ -230,6 +230,7 @@ sub cAssignment( byval l as ASTNODE ptr )
 	'' BOP?
 	if( op <> INVALID ) then
 		'' l op= r
+		fbSemanticModelSetAccess(l, "read-write")
 		l = astNewSelfBOP( op, l, r, NULL, AST_OPOPT_LPTRARITH )
 		if (l) then
 			fbSemanticModelExportOperation(l, op, semantic_site)
@@ -239,6 +240,7 @@ sub cAssignment( byval l as ASTNODE ptr )
 		end if
 	else
 		'' l = r
+		fbSemanticModelSetAccess(l, "write")
 		l = astNewASSIGN( l, r )
 		if (l) then
 			fbSemanticModelExportOperation(l, AST_OP_ASSIGN, semantic_site)

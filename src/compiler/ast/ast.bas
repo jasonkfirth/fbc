@@ -33,6 +33,9 @@
 #include once "support/containers/list.bi"
 #include once "backend/ir.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-source.bi"
+#include once "tooling/semantic-constructs.bi"
 
 '' Module state: AST lifecycle routines initialize and reset this context.
 dim shared as ASTCTX ast
@@ -569,6 +572,9 @@ function astNewNode _
 	dim as ASTNODE ptr n = listNewNode( @ast.astTB )
 
 	astInitNode( n, class_, dtype, subtype )
+	n->semantic_context = fbSemanticModelCurrentContext( )
+	n->semantic_source = fbSemanticModelCurrentSource( )
+	n->semantic_statement = fbSemanticModelCurrentStatement( )
 
 	function = n
 

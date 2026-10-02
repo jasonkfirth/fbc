@@ -30,6 +30,8 @@
 #include once "lexer/lex.bi"
 #include once "preprocessor/pp.bi"
 #include once "parser/parser.bi"
+#include once "tooling/semantic-macros.bi"
+#include once "tooling/semantic-source.bi"
 
 declare sub         lexReadUTF8             ( )
 
@@ -117,6 +119,7 @@ sub lexProbeBegin _
 	probe.defptrw_offset = -1
 
 	probe.ctx = *parent
+	probe.ctx.semantic_probe = TRUE
 
 	'' Point the circular token list into the probe's own storage.
 	probe.ctx.head = @probe.ctx.tokenTB( parent->head - @parent->tokenTB( 0 ) )
@@ -239,20 +242,32 @@ sub lexInit _
 	lex.ctx->lahdchar2 = UINVALID
 	lex.ctx->column = 0
 	lex.ctx->utf8_continuations_left = 0
+	lex.ctx->utf8_sequence_first = 0
 	lex.ctx->last_source.source_file = ""
 	lex.ctx->last_source.start_line = 0
 	lex.ctx->last_source.start_column = 0
 	lex.ctx->last_source.end_line = 0
 	lex.ctx->last_source.end_column = 0
 	lex.ctx->last_source.is_physical = FALSE
+	lex.ctx->last_source.macro_identity = 0
+	lex.ctx->last_source.source_context = 0
+	lex.ctx->last_source.raw_valid = FALSE
 	lex.ctx->nonphysical_token_count = 0
 
 	lex.ctx->kind = ctx_kind
+	lex.ctx->raw_linenum = 1
+	lex.ctx->raw_after_cr = FALSE
+	lex.ctx->semantic_macro_depth = 0
+	lex.ctx->semantic_eval_origin = 0
+	lex.ctx->semantic_probe = FALSE
+	lex.ctx->semantic_last_macro_token = -1
+	if( ctx_kind = LEX_TKCTX_CONTEXT_EVAL ) then lex.ctx->semantic_eval_origin = fbSemanticModelMacroLoader( )
 
 	'' preprocessor evaluation?
 	if( ctx_kind = LEX_TKCTX_CONTEXT_EVAL ) then
 		lex.ctx->linenum = (lex.ctx-1)->linenum
 		lex.ctx->physical_linenum = (lex.ctx-1)->physical_linenum
+		lex.ctx->raw_linenum = (lex.ctx-1)->raw_linenum
 		lex.ctx->reclevel = (lex.ctx-1)->reclevel
 		lex.ctx->currmacro = (lex.ctx-1)->currmacro
 		lex.ctx->macrodepth = (lex.ctx-1)->macrodepth
@@ -459,6 +474,43 @@ private function hReadChar _
 
 end function
 
+sub lexAdvanceByteColumn(byval source_byte as uinteger, byref column as integer, _
+	byref continuations_left as integer, byref sequence_first as integer)
+
+	'' Unmarked source accepts legacy bytes as well as UTF-8. Count a valid
+	'' sequence as UTF-16 units, but count every byte of a malformed prefix.
+	'' Remember its leading byte to reject overlong and surrogate encodings.
+	if( continuations_left > 0 ) then
+		dim as integer sequence_length = iif(sequence_first < &hE0, 2, iif(sequence_first < &hF0, 3, 4))
+		dim as integer valid = (source_byte >= &h80) and (source_byte <= &hBF)
+		if( continuations_left = sequence_length - 1 ) then
+			select case sequence_first
+			case &hE0: valid and= (source_byte >= &hA0)
+			case &hED: valid and= (source_byte <= &h9F)
+			case &hF0: valid and= (source_byte >= &h90)
+			case &hF4: valid and= (source_byte <= &h8F)
+			end select
+		end if
+		if( valid ) then
+			continuations_left -= 1
+			if( (continuations_left = 0) and (sequence_length = 4) ) then column += 1
+			exit sub
+		end if
+		'' The leading byte already contributed one column. Restore any
+		'' continuation bytes skipped before this sequence proved malformed.
+		column += sequence_length - continuations_left - 1
+		continuations_left = 0
+	end if
+
+	column += 1
+	sequence_first = source_byte
+	select case source_byte
+	case &hC2 to &hDF: continuations_left = 1
+	case &hE0 to &hEF: continuations_left = 2
+	case &hF0 to &hF4: continuations_left = 3
+	end select
+end sub
+
 sub lexEatChar( )
 	dim as uinteger consumed_char = lexCurrentChar( )
 
@@ -466,40 +518,28 @@ sub lexEatChar( )
 	'' coordinates. Macro replacement text has no single physical source span.
 	if( (lex.ctx->kind <> LEX_TKCTX_CONTEXT_EVAL) and _
 		(lex.ctx->deflen = 0) ) then
+		'' Diagnostic line numbers advance when the parser consumes an EOL.
+		'' Physical observation follows the character stream instead, so a
+		'' prefetched token after an EOL retains the correct original line.
+		select case consumed_char
+		case CHAR_CR
+			lex.ctx->raw_linenum += 1
+			lex.ctx->raw_after_cr = TRUE
+		case CHAR_LF
+			if( lex.ctx->raw_after_cr = FALSE ) then lex.ctx->raw_linenum += 1
+			lex.ctx->raw_after_cr = FALSE
+		case else
+			lex.ctx->raw_after_cr = FALSE
+		end select
 		select case consumed_char
 		case CHAR_CR, CHAR_LF
 			lex.ctx->column = 0
 			lex.ctx->utf8_continuations_left = 0
+			lex.ctx->utf8_sequence_first = 0
 		case else
 			if( env.inf.format = FBFILE_FORMAT_ASCII ) then
-				'' Unmarked FreeBASIC source is consumed as bytes, but editor
-				'' columns still count UTF-16 units. Keep continuation bytes from
-				'' a valid UTF-8 sequence from advancing the reported column.
-				if( lex.ctx->utf8_continuations_left > 0 ) then
-					if( (consumed_char >= &h80) and (consumed_char <= &hBF) ) then
-						lex.ctx->utf8_continuations_left -= 1
-						consumed_char = UINVALID
-					else
-						lex.ctx->utf8_continuations_left = 0
-					end if
-				end if
-
-				select case consumed_char
-				case &hC2 to &hDF
-					lex.ctx->column += 1
-					lex.ctx->utf8_continuations_left = 1
-				case &hE0 to &hEF
-					lex.ctx->column += 1
-					lex.ctx->utf8_continuations_left = 2
-				case &hF0 to &hF4
-					lex.ctx->column += 2
-					lex.ctx->utf8_continuations_left = 3
-				case UINVALID
-					'' Continuation byte already accounted for by its leading byte.
-					exit select
-				case else
-					lex.ctx->column += 1
-				end select
+				lexAdvanceByteColumn(consumed_char, lex.ctx->column, _
+					lex.ctx->utf8_continuations_left, lex.ctx->utf8_sequence_first)
 			else
 				lex.ctx->column += iif(consumed_char > &hFFFF, 2, 1)
 			end if
@@ -615,6 +655,10 @@ private sub hSkipChar
 		else
 			lex.ctx->defptrw += 1
 		end if
+		while( lex.ctx->semantic_macro_depth > 0 )
+			if( lex.ctx->deflen > lex.ctx->semantic_macro_resume(lex.ctx->semantic_macro_depth - 1) ) then exit while
+			lex.ctx->semantic_macro_depth -= 1
+		wend
 
 		'' Macro expansion text can be nested by prepending a new replacement
 		'' list in front of the current remainder.  Each active macro stores
@@ -2030,8 +2074,12 @@ private function readId( byref t as FBTOKEN, byval flags as LEXCHECK ) as intege
 	if( t.sym_chain ) then
 		'' define? (defines can't have dups nor be part of namespaces)
 		if( symbGetClass( t.sym_chain->sym ) = FB_SYMBCLASS_DEFINE ) then
+			t.source.end_line = lex.ctx->linenum
+			t.source.end_column = lex.ctx->column
+			t.source.raw_end_line = lex.ctx->raw_linenum
+			t.source.raw_end_column = lex.ctx->column
 			'' restart..
-			if( ppDefineLoad( t.sym_chain->sym, currmacro, macrodepth, @macrostack(0), @macroresume(0) ) ) then
+			if( ppDefineLoad( t.sym_chain->sym, currmacro, macrodepth, @macrostack(0), @macroresume(0), @t.source ) ) then
 				t.after_space = TRUE
 				'' Ignore the ID and read expanded text
 				return FALSE
@@ -2180,6 +2228,13 @@ sub lexNextToken _
 		t->source.end_line = lex.ctx->linenum
 		t->source.end_column = lex.ctx->column
 		t->source.is_physical = (lex.ctx->kind <> LEX_TKCTX_CONTEXT_EVAL)
+		t->source.macro_identity = fbSemanticModelMacroTokenOrigin( )
+		t->source.source_context = fbSemanticModelCurrentSource( )
+		t->source.raw_start_line = lex.ctx->raw_linenum
+		t->source.raw_end_line = lex.ctx->raw_linenum
+		t->source.raw_start_column = lex.ctx->column
+		t->source.raw_end_column = lex.ctx->column
+		t->source.raw_valid = (lex.ctx->kind <> LEX_TKCTX_CONTEXT_EVAL) and (t->source.macro_identity = 0)
 		exit sub
 	end if
 
@@ -2190,6 +2245,13 @@ sub lexNextToken _
 	t->source.start_column = lex.ctx->column
 	t->source.is_physical = (lex.ctx->kind <> LEX_TKCTX_CONTEXT_EVAL) and _
 		(lex.ctx->deflen = 0)
+	t->source.macro_identity = fbSemanticModelMacroTokenOrigin( )
+	t->source.source_context = fbSemanticModelCurrentSource( )
+	t->source.raw_start_line = lex.ctx->raw_linenum
+	t->source.raw_start_column = lex.ctx->column
+	t->source.raw_end_line = lex.ctx->raw_linenum
+	t->source.raw_end_column = lex.ctx->column
+	t->source.raw_valid = (lex.ctx->kind <> LEX_TKCTX_CONTEXT_EVAL) and (lex.ctx->deflen = 0)
 
 	lex.ctx->lastfilepos = lex.ctx->filepos + (lex.ctx->buffptr - @lex.ctx->buff) - 1
 
@@ -2429,6 +2491,8 @@ sub lexNextToken _
 
 	t->source.end_line = lex.ctx->linenum
 	t->source.end_column = lex.ctx->column
+	t->source.raw_end_line = lex.ctx->raw_linenum
+	t->source.raw_end_column = lex.ctx->column
 
 end sub
 
@@ -2718,6 +2782,7 @@ sub lexSkipToken( byval flags as LEXCHECK )
 	if( lex.ctx->head->source.is_physical = FALSE ) then
 		lex.ctx->nonphysical_token_count += 1
 	end if
+	fbSemanticModelMacroConsumed(lex.ctx->head->source.macro_identity, lex.ctx->nonphysical_token_count)
 
 	''
 	if( lex.ctx->k = 0 ) then

@@ -79,9 +79,10 @@ Ordinary text files store UTF-8 bytes. Files opened with `ENCODING "utf-8"`,
 | `SWAP`, `IIF`, `SELECT CASE` | Preserve descriptor lifetime and Unicode text semantics |
 | `STR`, `VAL`, `VALINT`, `VALLNG`, `VALUINT`, `VALULNG` | Accept `USTRING` through the existing string interfaces |
 | `PRINT`, `WRITE`, `INPUT` statement, `LINE INPUT`, `READ`, `GET`, `PUT` | Use the descriptor's UTF-8 bytes; input validates UTF-8 |
+| `PRINT USING`, `LPRINT USING` | Accept all three text types; Unicode fields count scalars and retain whole UTF-8 sequences |
 
 The default case tables are generated from Unicode 17.0 `UnicodeData.txt`,
-`SpecialCasing.txt`, and `DerivedCoreProperties.txt`. They are checked in, so
+`SpecialCasing.txt`, `DerivedCoreProperties.txt`, and `CaseFolding.txt`. They are checked in, so
 building FreeBASIC does not download Unicode data. Locale-specific casing is
 not applied. The algorithms follow the Unicode standard's
 [default casing and malformed-input rules](https://www.unicode.org/versions/Unicode17.0.0/core-spec/chapter-3/).
@@ -99,16 +100,72 @@ representations. Existing `STRING` programs retain their byte-oriented behavior.
 The type is available in the FB, FBlite, and deprecated dialects; QB retains its
 original keyword set.
 
+## Shared text APIs
+
+Every built-in text consumer accepts `STRING`, `WSTRING`, and `USTRING`.
+Procedures which operate on a byte descriptor or terminated byte pointer have
+a UTF-8 argument route: wide text is encoded explicitly, and UTF-8 descriptors
+retain their bytes. Mutable text outputs use a temporary and copy back into
+the caller's text type. This includes device names, filenames, environment
+variables, process commands, dynamic library names, graphics controls, and
+sound commands. The operating system or device provider owns the final host
+encoding and any platform restrictions.
+
+The optional FreeBASIC headers provide the following paths:
+
+| Header | Operations | Unicode contract |
+| --- | --- | --- |
+| `string.bi` | `StrReverse`, `Replace`, `StrComp`, `Format` | Explicit wide/UTF-8 overloads; `Replace` retains the source type; all 27 source/pattern/replacement combinations are supported |
+| `string.bi` | `StrComp`, `Replace` with `fbTextCompare` | Unicode default full case folding for wide/UTF-8 text, including expansions such as sharp s to `ss` |
+| `datetime.bi` | `DateValue`, `TimeValue`, `IsDate`, `DateAdd`, `DatePart`, `DateDiff` | Accept all three types through the existing date/time grammar |
+| `file.bi`, `dir.bi` | `FileExists`, `FileLen`, `FileDateTime`, `GetAttr`, `SetAttr`, `FileCopy`, `DIR` | Wide paths encode to UTF-8 independently of the process locale; mixed copy arguments are supported |
+| `fbgfx.bi` | Graphics-mode `PRINT`, `DRAW STRING`, `DrawStringSize` | Decode a whole scalar per glyph; existing bitmap fonts address U+0000..U+00FF, with `?` for larger scalars |
+| `fbgfx.bi` | `PaintPattern` | Preserve the packed-byte format; wide/UTF-8 arguments contribute UTF-8 bytes, one byte per pattern row |
+| `fbgfx3.bi` | `Gfx3SurfaceLoad` | Accept byte, wide, and UTF-8 asset filenames; gfxlib3 also exports the common Unicode bitmap adapters |
+| `fbnetwire.bi` | `FbNetPutStringLE`, `FbNetGetStringLE` | Keep the Int32 byte-length prefix; Unicode writes truncate only at scalar boundaries; UTF-8 reads validate malformed input |
+| `sfxlib_raw.bi` | `OutputCaptureSave` | Accept UTF-8 bytes and transcode wide filenames explicitly |
+| `fbc-int/string.bi` | `FBC.LeftSelf` | Truncate byte strings by bytes and Unicode strings by scalars; retain the existing allocation |
+| `fbc-int/profile.bi` | Profiler names, ignore lists, and report filenames | Accept UTF-8 bytes and wide names; bound wide output without splitting UTF-16 pairs |
+
+The optional wide string helpers operate on scalars, including UTF-16 pairs.
+Core `WSTRING` operations retain their established target-wide-unit semantics.
+The new type does not change `STRING`'s byte operations or external C library
+declarations. C byte buffers, binary conversion functions, and paint patterns
+continue to consume bytes. Use `STRPTR()` and the encoded byte length when an
+external interface explicitly requires bytes.
+
+Wide output buffers require a capacity because a `BYREF AS WSTRING` parameter
+does not carry its caller's allocation size. The network reader takes this as
+its fourth argument, in wide units including the terminator:
+
+```freebasic
+dim as wstring * 32 text
+if FbNetGetStringLE(handle, text, 128, 32) = 0 then
+    print "Read failed or the wide buffer was too small"
+end if
+```
+
+The compiler defines `__FB_HAS_USTRING__` for native type support. Optional
+headers gate their UTF-8 overloads on this marker and `FB_NO_USTRING`, retaining
+the existing compatibility switch for applications with a legacy `ustring`
+identifier or macro.
+
 ## Examples and tests
 
 - [Construction, conversion, slicing, and indexing](../examples/manual/strings/ustring.bas)
 - [Search, trimming, casing, repetition, and alignment](../examples/manual/strings/ustring-functions.bas)
 - [Procedures, records, arrays, and file I/O](../examples/manual/strings/ustring-io.bas)
+- [Optional helpers and formatted output with all three types](../examples/manual/strings/ustring-helpers.bas)
+- [Unicode filenames and portable wire strings](../examples/manual/strings/ustring-wire.bas)
 
 Run `make ustring-test` after selecting a runnable host build compiler. The
 runner builds its artifacts in a temporary directory, runs the language suite
 and rejection tests across available native backends, and compiles and executes
-all three examples. On Linux it also runs address and undefined-behavior
+all five examples with assertions and bounds checking enabled. It also checks
+the API compilation fixtures, mixed optional overloads, both graphics libraries,
+profiler output, and sound arguments through an observing C stub. Running with
+`LC_ALL=C` verifies that wide text adapters do not depend on a UTF-8 locale.
+On Linux it also runs address and undefined-behavior
 sanitizers over every Unicode scalar, every case-table entry, malformed input,
 allocation limits, aliasing, and temporary ownership, with both UTF-16 and
 UTF-32 wide storage. The language suite is also discovered by the ordinary

@@ -28,8 +28,8 @@
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-expressions.bi"
 
-declare function fbSemanticModelEnabled( ) as integer
 
 declare sub fbSemanticModelExportExpression _
 	( _
@@ -62,7 +62,9 @@ private function hMathOp(byval op as AST_OP) as ASTNODE ptr
 	has_closing_parenthesis = (lexGetToken( ) = CHAR_RPRNT)
 	hMatchRPRNT( )
 
+	dim as longint operands = fbSemanticModelCaptureOperands(expr, NULL, "intrinsic-unary", op, source_start)
 	expr = astNewUOP( op, expr )
+	fbSemanticModelAttachOperands(expr, operands)
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_INVALIDDATATYPES )
 		expr = astNewCONSTi( 0 )
@@ -113,7 +115,9 @@ private function hAtan2() as ASTNODE ptr
 	has_closing_parenthesis = (lexGetToken( ) = CHAR_RPRNT)
 	hMatchRPRNT( )
 
+	dim as longint operands = fbSemanticModelCaptureOperands(expr, expr2, "intrinsic-binary", AST_OP_ATAN2, source_start)
 	expr = astNewBOP( AST_OP_ATAN2, expr, expr2 )
+	fbSemanticModelAttachOperands(expr, operands)
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_INVALIDDATATYPES )
 		expr = astNewCONSTi( 0 )

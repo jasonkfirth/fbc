@@ -35,6 +35,7 @@ keywords and the built-in graphics and sound command syntax.
 ## Platform guides
 
 - [AROS](aros.md)
+- [Classic AmigaOS](amiga.md)
 - [RISC OS](riscos.md)
 - [Windows CE](wince.md)
 - [Linux MIPS](mips.md)

@@ -67,7 +67,8 @@ FBC_DIRS := $(FBC_HOST_DIR) $(FBC_GENERIC_DIRS)
 # compiler objects just like a changed internal header.
 FBC_RUNTIME_BI := $(wildcard $(addprefix $(abspath $(srcdir)/../inc)/,\
 datetime.bi file.bi string.bi string-unicode.bi \
-crt/mem.bi crt/string.bi crt/stddef.bi))
+crt/*.bi crt/*/*.bi crt/sys/*/*.bi amiga/crt/*.bi amiga/crt/sys/*.bi \
+fbc-int/file-info.bi windows.bi win/*.bi))
 FBC_BI := $(sort $(foreach directory,\
 $(FBC_GENERIC_DIRS) $(FBC_PLATFORM_DIRS) $(FBC_BACKEND_PLATFORM_DIRS) \
 $(FBC_HOST_POLICY_DIRS),$(wildcard $(directory)/*.bi)) $(FBC_RUNTIME_BI))
@@ -80,10 +81,6 @@ FBC_SRC_GENERIC := $(filter-out \
 $(foreach filename,$(FBC_BASE_TARGET),%/$(filename)),$(FBC_SRC_GENERIC))
 FBC_SRC := $(FBC_SRC_GENERIC) $(FBC_SRC_TARGET)
 
-# Host filesystem structures stay in C rather than duplicating stat and
-# Windows file-identity layouts in BASIC declarations.
-FBC_C_SRC := $(wildcard $(srcdir)/compiler/tooling/semantic-output.c)
-
 # Both ordinary objects and emitted bootstrap sources are named by basename.
 # Silently keeping the first duplicate would compile a different module after
 # a directory move, so fail here instead of relying on VPATH order.
@@ -94,10 +91,7 @@ ifneq ($(FBC_DUPLICATE_BASENAMES),)
 $(error Duplicate compiler source basenames: $(FBC_DUPLICATE_BASENAMES))
 endif
 
-FBC_OBJNAMES := $(patsubst %.bas,%.o,$(notdir $(FBC_SRC))) $(patsubst %.c,%.o,$(notdir $(FBC_C_SRC)))
-ifneq ($(filter $(patsubst %.c,%.o,$(notdir $(FBC_C_SRC))),$(patsubst %.bas,%.o,$(notdir $(FBC_SRC)))),)
-$(error Compiler BASIC and C sources share an object basename)
-endif
+FBC_OBJNAMES := $(patsubst %.bas,%.o,$(notdir $(FBC_SRC)))
 FBC_OBJS := $(addprefix $(fbcobjdir)/,$(FBC_OBJNAMES))
 FBC_JS_OBJS := $(addprefix $(fbcjsobjdir)/,$(FBC_OBJNAMES))
 FBC_ANDROID_OBJS := $(addprefix $(fbcandroidobjdir)/,$(FBC_OBJNAMES))

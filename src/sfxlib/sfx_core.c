@@ -387,6 +387,8 @@ void fb_sfxRunForeground(int frames)
     if (frames <= 0)
         return;
 
+    SFX_DEBUG("sfx_core: foreground feed starts with %d frames", frames);
+
     samplerate = (__fb_sfx && __fb_sfx->samplerate > 0)
         ? __fb_sfx->samplerate
         : 0;
@@ -411,6 +413,7 @@ void fb_sfxRunForeground(int frames)
         tick_frames = 220;
 
     fb_sfxForegroundFeedBegin();
+    SFX_DEBUG("sfx_core: foreground feed owns the mixer");
 
     fb_sfxRuntimeLock();
     if (g_output_queue_initialized)
@@ -437,6 +440,7 @@ void fb_sfxRunForeground(int frames)
     }
 
     fb_sfxForegroundFeedEnd();
+    SFX_DEBUG("sfx_core: foreground feed finished");
 }
 
 /*

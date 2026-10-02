@@ -431,6 +431,7 @@ end enum
 
 type FB_DEFTOK
 	type            as FB_DEFTOK_TYPE
+	semantic_paste_before as integer             '' observed ## before this replacement token
 
 	union
 		text        as zstring ptr

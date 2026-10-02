@@ -134,6 +134,8 @@ type FBCCTX
 	stripsymbols        as integer
 	semanticmodel       as string      '' Optional compiler-owned semantic model output
 	semanticmodel_expressions as integer '' Emit only module and expression records
+	semanticmodel_bindings as integer '' Emit token identities and implicit calls without AST facts
+	semanticmodel_compact as integer '' Omit verbose macro-expansion provenance
 
 	'' Compiler paths
 	prefix              as zstring * FB_MAXPATHLEN+1  '' Path from -prefix or empty
@@ -380,6 +382,7 @@ declare sub fbcPlatformAddLinkerFrameworks( byref ldcline as string )
 
 declare function fbcArosHostFinishExecutable( ) as integer
 declare sub fbcAmigaPlatformAddLinkOptions( byref ldcline as string )
+declare sub fbcAmigaPlatformValidateOptions( )
 
 declare sub fbcDarwinPlatformAddCCompilerOptions( byref ccline as string )
 
@@ -426,7 +429,7 @@ declare sub fbcDriverAddXboxLibArchive( byref ldcline as string, byref libname a
 
 declare sub fbcDriverAddXboxNxdkLibs( byref ldcline as string )
 
-declare function fbSemanticModelBegin(byref filename as string, byval expressions_only as integer) as integer
+declare function fbSemanticModelBegin(byref filename as string, byval expressions_only as integer, byval bindings_only as integer, byval macros_enabled as integer) as integer
 declare function fbSemanticModelEnd(byval succeeded as integer) as integer
 declare sub fbSemanticModelProtectFile(byref filename as const string)
 declare sub fbSemanticModelFinishModule(byval commit as integer)

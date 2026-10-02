@@ -88,7 +88,8 @@ declare function ppDefineLoad _
 		byval currmacro as FBSYMBOL ptr, _
 		byval macrodepth as integer, _
 		byval macrostack as FBSYMBOL ptr ptr, _
-		byval macroresume as integer ptr _
+		byval macroresume as integer ptr, _
+		byval source as LEX_LOCATION ptr _
 	) as integer
 
 declare sub ppPragmaInit( )

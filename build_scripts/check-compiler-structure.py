@@ -26,7 +26,6 @@ def source_graph(root: Path, host: str) -> dict[str, list[str]]:
             "include " + str(root / "mk/compiler-sources.mk") + "\n"
             "all:\n"
             "\t$(info SOURCES=$(FBC_SRC))\n"
-            "\t$(info CSOURCES=$(FBC_C_SRC))\n"
             "\t$(info HEADERS=$(FBC_BI))\n"
             "\t$(info GROUPS=$(FBC_SOURCE_GROUPS))\n"
             "\t@:\n",
@@ -51,12 +50,37 @@ def compiler_files(root: Path) -> list[Path]:
     )
 
 
+def handwritten_c_sources(compiler: Path) -> list[Path]:
+    """Inspect working files too, so new helpers cannot bypass the language rule."""
+    sources: list[Path] = []
+    for path in sorted(compiler.rglob("*.c")):
+        if "obj" in path.relative_to(compiler).parts:
+            continue
+        try:
+            with path.open("rb") as source:
+                prelude = source.read(256)
+        except FileNotFoundError:
+            # Another compiler process may remove its temporary C emission.
+            continue
+        generated = path.with_suffix(".bas").is_file() and prelude.startswith(
+            b"typedef   signed char       int8;\n"
+        )
+        if not generated:
+            sources.append(path)
+    return sources
+
+
 def validate(root: Path) -> tuple[int, int]:
     compiler = root / "src/compiler"
     files = compiler_files(root)
     if not files:
         raise ValueError("No compiler source files found")
     failures: list[str] = []
+    # The C backend generates .c files alongside BASIC modules during -r.
+    # Recognize the emitter's fixed type prelude and owning BASIC module.
+    # Source policy must not depend on whether a file has been added to Git.
+    for path in handwritten_c_sources(compiler):
+        failures.append(str(path.relative_to(root)) + ": handwritten compiler source must be BASIC")
     runtime_headers: set[Path] = set()
     for path in files:
         relative = path.relative_to(compiler).as_posix()
@@ -110,9 +134,6 @@ def validate(root: Path) -> tuple[int, int]:
     for host in sorted(hosts):
         current = source_graph(root, host)
         sources = current["SOURCES"]
-        support = compiler / "tooling/semantic-output.c"
-        if support.is_file() and current["CSOURCES"] != [str(support)]:
-            failures.append(host + ": omitted compiler filesystem support")
         selected_sources.update(sources)
         selected_headers.update(current["HEADERS"])
         missing_runtime_headers = runtime_headers - {Path(path).resolve() for path in current["HEADERS"]}
@@ -132,6 +153,22 @@ def validate(root: Path) -> tuple[int, int]:
         selected = selected_sources if path.suffix == ".bas" else selected_headers
         if str(path) not in selected:
             failures.append(path.relative_to(compiler).as_posix() + ": omitted from the make source graph")
+
+    # A newly created C helper must fail even beside a BASIC module. Generated
+    # output is allowed only with its owning source; an orphan is not an input.
+    with tempfile.TemporaryDirectory(prefix="fbc-source-language-") as temporary:
+        fixture = Path(temporary)
+        (fixture / "module.bas").write_text("end\n", encoding="utf-8")
+        helper = fixture / "module.c"
+        helper.write_text("int helper(void) { return 0; }\n", encoding="utf-8")
+        if handwritten_c_sources(fixture) != [helper]:
+            failures.append("Structure check accepted a new handwritten C compiler helper")
+        helper.write_text("typedef   signed char       int8;\n", encoding="utf-8")
+        if handwritten_c_sources(fixture):
+            failures.append("Structure check rejected generated C with its BASIC source")
+        (fixture / "module.bas").unlink()
+        if handwritten_c_sources(fixture) != [helper]:
+            failures.append("Structure check accepted C without its BASIC source")
 
     # A duplicate in two ordinary groups must stop make before VPATH can pick
     # one arbitrarily. The fixture has distinct owning directories.

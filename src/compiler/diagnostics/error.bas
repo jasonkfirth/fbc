@@ -22,6 +22,7 @@
 ''
 
 #include once "core/fb.bi"
+#include once "tooling/semantic-hooks.bi"
 #include once "core/fbint.bi"
 #include once "backend/ir.bi"
 #include once "lexer/lex.bi"
@@ -558,6 +559,7 @@ private sub hPrintErrMsg _
 	if( msgex = NULL ) then
 		msgex = @""
 	end if
+	fbSemanticModelDiagnostic("error", errnum, linenum, msg, msgex, customText)
 
 	if( len( env.inf.name ) > 0 ) then
 		print env.inf.name; "(";
@@ -759,6 +761,7 @@ sub errReportWarnEx _
 	end if
 
 	if( len( env.inf.name ) > 0 ) then
+		fbSemanticModelDiagnostic("warning", msgnum, linenum, warningMsgs(msgnum).text, msgex, customText)
 		print env.inf.name;
 	else
 		if( msgex <> NULL ) then

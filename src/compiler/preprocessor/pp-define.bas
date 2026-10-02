@@ -33,6 +33,7 @@ declare sub fbSemanticModelExportBinding _
 #include once "preprocessor/pp.bi"
 #include once "support/containers/list.bi"
 #include once "support/strings/dstr.bi"
+#include once "tooling/semantic-macros.bi"
 
 #define LEX_FLAGS (LEXCHECK_NOWHITESPC or _
 				   LEXCHECK_NOSUFFIX or _
@@ -155,7 +156,8 @@ private function hBeginMacroInvocation _
 		byref hasParens as integer, _
 		byref param as FB_DEFPARAM ptr, _
 		byref argtb as LEXPP_ARGTB ptr, _
-		byref is_variadic as integer _
+		byref is_variadic as integer, _
+		byref outcome as string _
 	) as integer
 
 	hasParens = FALSE
@@ -168,6 +170,7 @@ private function hBeginMacroInvocation _
 	if( (symbGetDefineFlags( s ) and FB_DEFINE_FLAGS_NEEDPARENS) <> 0 ) then
 		if( hasParens = FALSE ) then
 			'' A macro name can be passed as an argument without invoking it.
+			outcome = "not-invoked"
 			return FALSE
 		end if
 	else
@@ -176,6 +179,7 @@ private function hBeginMacroInvocation _
 	end if
 
 	if( isMacroAllowed( s ) = FALSE ) then
+		outcome = "unsupported"
 		return FALSE
 	end if
 
@@ -237,6 +241,24 @@ private sub hTrimMacroArg _
 	end with
 end sub
 
+private sub hClearMacroSource( byval argument as LEXPP_ARG ptr )
+	dim as LEX_LOCATION blank
+	argument->semantic_first = blank
+	argument->semantic_last = blank
+	argument->semantic_has_source = FALSE
+end sub
+
+private sub hObserveMacroSource( byval argument as LEXPP_ARG ptr, byref source as LEX_LOCATION )
+	if( argument->semantic_has_source = FALSE ) then
+		argument->semantic_first = source
+	else
+		argument->semantic_first.is_physical and= source.is_physical
+		if( argument->semantic_first.source_file <> source.source_file ) then argument->semantic_first.is_physical = FALSE
+	end if
+	argument->semantic_last = source
+	argument->semantic_has_source = TRUE
+end sub
+
 private sub hAddMissingMacroArgs _
 	( _
 		byval s as FBSYMBOL ptr, _
@@ -255,6 +277,7 @@ private sub hAddMissingMacroArgs _
 	assert( num < (symbGetDefineParams( s ) - 1) )
 	do
 		num += 1
+		hClearMacroSource(@argtb->tb(num))
 		'' argtb entries must be cleared because this is a NOCLEAR list.
 		if( is_wide ) then
 			DWstrZero( argtb->tb(num).textw )
@@ -269,7 +292,8 @@ end sub
 ''
 private function hLoadMacro _
 	( _
-		byval s as FBSYMBOL ptr _
+		byval s as FBSYMBOL ptr, byval observation as longint, _
+		byref argument_count as integer, byref ending as LEX_LOCATION, byref outcome as string _
 	) as integer
 
 	dim as FB_DEFPARAM ptr param = any, nextparam = any
@@ -284,7 +308,7 @@ private function hLoadMacro _
 	function = -1
 
 	dim as integer hasParens = any
-	if( hBeginMacroInvocation( s, hasParens, param, argtb, is_variadic ) = FALSE ) then
+	if( hBeginMacroInvocation( s, hasParens, param, argtb, is_variadic, outcome ) = FALSE ) then
 		exit function
 	end if
 
@@ -292,6 +316,7 @@ private function hLoadMacro _
 	reached_vararg = FALSE
 
 	var readdchar = -1
+	dim as integer segment_ordinal = 0
 
 	'' for each arg
 	num = 0   '' num represents the current last cleared/used entry in the argtb
@@ -299,6 +324,7 @@ private function hLoadMacro _
 		if( argtb ) then
 			'' argtb entries must be cleared! (it's a NOCLEAR list)
 			DZstrZero( argtb->tb(num).text )
+			hClearMacroSource(@argtb->tb(num))
 		end if
 
 		nextparam = symbGetDefParamNext( param )
@@ -446,6 +472,7 @@ private function hLoadMacro _
 			'' we are still in an argument, so just join the current
 			'' token to the current argument
 			if( argtb <> NULL ) then
+				hObserveMacroSource(@argtb->tb(num), t.source)
 				if( t.dtype <> FB_DATATYPE_WCHAR ) then
 					DZstrConcatAssign( argtb->tb(num).text, t.text )
 				else
@@ -482,28 +509,45 @@ private function hLoadMacro _
 		num += 1
 	loop
 
+	ending = t.source
+	if( argtb <> NULL ) then
+		argument_count = argtb->count
+		for argument as integer = 0 to num
+			fbSemanticModelMacroArgument(observation, argument, @argtb->tb(argument), FALSE)
+		next
+	end if
 	text = ""
 	DZstrReset( expanded )
 
 	'' should we call a function to get definition text?
 	if( symbGetMacroCallbackZ( s ) <> NULL ) then
 		'' call function
+		fbSemanticModelMacroPhase("callback")
 		var errnum = FB_ERRMSG_OK
 		var res = symbGetMacroCallbackZ( s )( argtb, @errnum )
+		fbSemanticModelMacroCallback(observation, res, errnum)
 		if( errnum = FB_ERRMSG_OK ) then
 			text = res
 		else
+			outcome = "failed"
 			hReportMacroError( s, errnum )
 		end if
+		fbSemanticModelMacroSegment(observation, 0, -1, -1, "callback", 0, len(text))
+		segment_ordinal = 1
 
 	'' just load text as-is
 	else
 		if( argtb ) then
 			dt = symbGetDefineHeadToken( s )
+			dim as integer token_ordinal = 0
 			do while( dt )
+				dim as integer offset = expanded.len, parameter = -1
+				dim as string segment_kind = "text"
 				select case as const( symbGetDefTokType( dt ) )
 				'' parameter?
 				case FB_DEFTOK_TYPE_PARAM
+					parameter = symbGetDefTokParamNum(dt)
+					segment_kind = "parameter"
 					assert( symbGetDefTokParamNum( dt ) <= num )
 					argtext = argtb->tb( symbGetDefTokParamNum( dt ) ).text.data
 
@@ -514,6 +558,8 @@ private function hLoadMacro _
 
 				'' stringize parameter?
 				case FB_DEFTOK_TYPE_PARAMSTR
+					parameter = symbGetDefTokParamNum(dt)
+					segment_kind = "stringify"
 					assert( symbGetDefTokParamNum( dt ) <= num )
 					argtext = argtb->tb( symbGetDefTokParamNum( dt ) ).text.data
 
@@ -536,18 +582,13 @@ private function hLoadMacro _
 				case FB_DEFTOK_TYPE_TEXW
 					DZstrConcatAssign( expanded, str( *symbGetDefTokTextW( dt ) ) )
 				end select
+				fbSemanticModelMacroSegment(observation, segment_ordinal, token_ordinal, parameter, segment_kind, offset, expanded.len - offset)
+				segment_ordinal += 1
+				token_ordinal += 1
 
 				'' next
 				dt = symbGetDefTokNext( dt )
 			loop
-
-			'' free args text
-			do while( num > 0 )
-				num -= 1
-				DZstrAssign( argtb->tb(num).text, NULL )
-			loop
-
-			listDelNode( @pp.argtblist, argtb )
 
 			if( expanded.data <> NULL ) then
 				text = *expanded.data
@@ -555,11 +596,20 @@ private function hLoadMacro _
 		end if
 
 		if( readdchar <> -1 ) then
+			fbSemanticModelMacroSegment(observation, segment_ordinal, -1, -1, "restored-delimiter", len(text), 1)
 			text += chr(readdchar)
 		end if
 
 	end if
 
+	'' The loader owns every argument buffer, including the final slot and
+	'' callback arguments. Returned replacement text has already been copied.
+	if( argtb <> NULL ) then
+		for argument as integer = 0 to num
+			DZstrAssign(argtb->tb(argument).text, NULL)
+		next
+		listDelNode(@pp.argtblist, argtb)
+	end if
 	if( lex.ctx->deflen = 0 ) then
 		DZstrAssign( lex.ctx->deftext, text )
 	else
@@ -575,7 +625,9 @@ end function
 ''::::
 private function hLoadDefine _
 	( _
-		byval s as FBSYMBOL ptr _
+		byval s as FBSYMBOL ptr, byval observation as longint, _
+		byref replacement_units as integer, byref argument_count as integer, _
+		byref ending as LEX_LOCATION, byref outcome as string _
 	) as integer
 
 	static as string text
@@ -586,7 +638,7 @@ private function hLoadDefine _
 	'' define has args?
 	if( symbGetDefineParams( s ) > 0 ) then
 
-		lgt = hLoadMacro( s )
+		lgt = hLoadMacro( s, observation, argument_count, ending, outcome )
 		if( lgt = -1 ) then
 			exit function
 		end if
@@ -597,10 +649,13 @@ private function hLoadDefine _
 		'' should we call a function to get definition text?
 		if( symbGetDefineCallback( s ) <> NULL ) then
 			'' call function
+			fbSemanticModelMacroPhase("callback")
+			var callback_text = symbGetDefineCallback(s)()
+			fbSemanticModelMacroCallback(observation, callback_text, FB_ERRMSG_OK)
 			if( symbGetDefineFlags( s ) and FB_DEFINE_FLAGS_STR ) then
-				text = "$" + QUOTE + symbGetDefineCallback( s )( ) + QUOTE
+				text = "$" + QUOTE + callback_text + QUOTE
 			else
-				text = symbGetDefineCallback( s )( )
+				text = callback_text
 			end if
 
 			if( lex.ctx->deflen = 0 ) then
@@ -610,6 +665,7 @@ private function hLoadDefine _
 			end if
 
 			lgt = len( text )
+			fbSemanticModelMacroSegment(observation, 0, -1, -1, "callback", 0, lgt)
 
 		'' just load text as-is
 		else
@@ -666,12 +722,19 @@ private function hLoadDefine _
 			end if
 
 			lgt = symbGetSizeOf( s )
+			fbSemanticModelMacroSegment(observation, 0, -1, -1, "definition-text", 0, lgt)
 		end if
 
 	end if
 
 	''
 	lex.ctx->defptr = lex.ctx->deftext.data
+	ending.end_line = lex.ctx->linenum
+	ending.end_column = lex.ctx->column
+	ending.raw_end_line = lex.ctx->raw_linenum
+	ending.raw_end_column = lex.ctx->column
+	replacement_units = lgt
+	fbSemanticModelMacroPushOrigin(observation, lex.ctx->deflen, lgt)
 	lex.ctx->deflen += lgt
 
 	'' force a re-read
@@ -685,7 +748,8 @@ end function
 ''
 private function hLoadMacroW _
 	( _
-		byval s as FBSYMBOL ptr _
+		byval s as FBSYMBOL ptr, byval observation as longint, _
+		byref argument_count as integer, byref ending as LEX_LOCATION, byref outcome as string _
 	) as integer
 
 	dim as FB_DEFPARAM ptr param = any, nextparam = any
@@ -706,7 +770,7 @@ private function hLoadMacroW _
 	end if
 
 	dim as integer hasParens = any
-	if( hBeginMacroInvocation( s, hasParens, param, argtb, is_variadic ) = FALSE ) then
+	if( hBeginMacroInvocation( s, hasParens, param, argtb, is_variadic, outcome ) = FALSE ) then
 		exit function
 	end if
 
@@ -714,6 +778,7 @@ private function hLoadMacroW _
 	reached_vararg = FALSE
 
 	var readdchar = -1
+	dim as integer segment_ordinal = 0
 
 	'' for each arg
 	num = 0 '' num represents the current last cleared/used entry in the argtb
@@ -721,6 +786,7 @@ private function hLoadMacroW _
 		if( argtb ) then
 			'' argtb entries must be cleared! (it's a NOCLEAR list)
 			DWstrZero( argtb->tb(num).textw )
+			hClearMacroSource(@argtb->tb(num))
 		end if
 
 		nextparam = symbGetDefParamNext( param )
@@ -869,8 +935,10 @@ private function hLoadMacroW _
 			'' token to the current argument
 			if( argtb <> NULL ) then
 				if( t.dtype <> FB_DATATYPE_WCHAR ) then
+					hObserveMacroSource(@argtb->tb(num), t.source)
 					DWstrConcatAssignA( argtb->tb(num).textw, t.text )
 				else
+					hObserveMacroSource(@argtb->tb(num), t.source)
 					DWstrConcatAssign( argtb->tb(num).textw, t.textw )
 				end if
 			end if
@@ -907,35 +975,54 @@ private function hLoadMacroW _
 	'' text = ""
 	DWstrAssign( text, NULL )
 
+	ending = t.source
+	if( argtb <> NULL ) then
+		argument_count = argtb->count
+		for argument as integer = 0 to num
+			fbSemanticModelMacroArgument(observation, argument, @argtb->tb(argument), TRUE)
+		next
+	end if
 	'' should we call a function to get definition text?
 	if( symbGetMacroCallbackZ( s ) <> NULL ) then
 		'' call function
+		fbSemanticModelMacroPhase("callback")
 		var errnum = FB_ERRMSG_OK
 		'' hander for wstring?
 		if( symbGetMacroCallbackW( s ) ) then
 			var res = symbGetMacroCallbackW( s )( argtb, @errnum )
+			fbSemanticModelMacroCallbackW(observation, res, errnum)
 			if( errnum = FB_ERRMSG_OK ) then
 				DWstrAssign( text, res )
 			else
+				outcome = "failed"
 				hReportMacroError( s, errnum )
 			end if
 		else
 			var res = symbGetMacroCallbackZ( s )( argtb, @errnum )
+			fbSemanticModelMacroCallback(observation, res, errnum)
 			if( errnum = FB_ERRMSG_OK ) then
 				DWstrAssignA( text, res )
 			else
+				outcome = "failed"
 				hReportMacroError( s, errnum )
 			end if
 		end if
+		fbSemanticModelMacroSegment(observation, 0, -1, -1, "callback", 0, text.len)
+		segment_ordinal = 1
 
 	'' just load text as-is
 	else
 		if( argtb ) then
 			dt = symbGetDefineHeadToken( s )
+			dim as integer token_ordinal = 0
 			do while( dt )
+				dim as integer offset = text.len, parameter = -1
+				dim as string segment_kind = "text"
 				select case as const( symbGetDefTokType( dt ) )
 				'' parameter?
 				case FB_DEFTOK_TYPE_PARAM
+					parameter = symbGetDefTokParamNum(dt)
+					segment_kind = "parameter"
 					assert( symbGetDefTokParamNum( dt ) <= num )
 					argtext = argtb->tb( symbGetDefTokParamNum( dt ) ).textw.data
 
@@ -946,6 +1033,8 @@ private function hLoadMacroW _
 
 				'' stringize parameter?
 				case FB_DEFTOK_TYPE_PARAMSTR
+					parameter = symbGetDefTokParamNum(dt)
+					segment_kind = "stringify"
 					assert( symbGetDefTokParamNum( dt ) <= num )
 					argtext = argtb->tb( symbGetDefTokParamNum( dt ) ).textw.data
 
@@ -969,22 +1058,25 @@ private function hLoadMacroW _
 				case FB_DEFTOK_TYPE_TEXW
 					DWstrConcatAssign( text, symbGetDefTokTextW( dt ) )
 				end select
+				fbSemanticModelMacroSegment(observation, segment_ordinal, token_ordinal, parameter, segment_kind, offset, text.len - offset)
+				segment_ordinal += 1
+				token_ordinal += 1
 
 				'' next
 				dt = symbGetDefTokNext( dt )
 			loop
 
-			'' free args text
-			do while( num > 0 )
-				num -= 1
-				DWstrAssign( argtb->tb(num).textw, NULL )
-			loop
-
-			listDelNode( @pp.argtblist, argtb )
 		end if
 	end if
 
+	if( argtb <> NULL ) then
+		for argument as integer = 0 to num
+			DWstrAssign(argtb->tb(argument).textw, NULL)
+		next
+		listDelNode(@pp.argtblist, argtb)
+	end if
 	if( readdchar <> -1 ) then
+		fbSemanticModelMacroSegment(observation, segment_ordinal, -1, -1, "restored-delimiter", text.len, 1)
 		DWstrConcatAssignA( text, chr(readdchar) )
 	end if
 
@@ -1003,7 +1095,9 @@ end function
 ''::::
 private function hLoadDefineW _
 	( _
-		byval s as FBSYMBOL ptr _
+		byval s as FBSYMBOL ptr, byval observation as longint, _
+		byref replacement_units as integer, byref argument_count as integer, _
+		byref ending as LEX_LOCATION, byref outcome as string _
 	) as integer
 
 	static as DWSTRING text, quotew, dollarquotew
@@ -1019,7 +1113,7 @@ private function hLoadDefineW _
 	'' define has args?
 	if( symbGetDefineParams( s ) > 0 ) then
 
-		lgt = hLoadMacroW( s )
+		lgt = hLoadMacroW( s, observation, argument_count, ending, outcome )
 		if( lgt = -1 ) then
 			exit function
 		end if
@@ -1030,12 +1124,15 @@ private function hLoadDefineW _
 		'' should we call a function to get definition text?
 		if( symbGetDefineCallback( s ) <> NULL ) then
 			'' call function
+			fbSemanticModelMacroPhase("callback")
+			var callback_text = symbGetDefineCallback(s)()
+			fbSemanticModelMacroCallback(observation, callback_text, FB_ERRMSG_OK)
 			if( symbGetDefineFlags( s ) and FB_DEFINE_FLAGS_STR ) then
 				DWstrAssign( text, dollarquotew.data )
-				DWstrConcatAssignA( text, symbGetDefineCallback( s )( ) )
+				DWstrConcatAssignA( text, callback_text )
 				DWstrConcatAssign( text, quotew.data )
 			else
-				DWstrAssignA( text, symbGetDefineCallback( s )( ) )
+				DWstrAssignA( text, callback_text )
 			end if
 
 			if( lex.ctx->deflen = 0 ) then
@@ -1045,6 +1142,7 @@ private function hLoadDefineW _
 			end if
 
 			lgt = len( *text.data )
+			fbSemanticModelMacroSegment(observation, 0, -1, -1, "callback", 0, lgt)
 
 		'' just load text as-is
 		else
@@ -1101,12 +1199,19 @@ private function hLoadDefineW _
 			end if
 
 			lgt = symbGetSizeOf( s )
+			fbSemanticModelMacroSegment(observation, 0, -1, -1, "definition-text", 0, lgt)
 		end if
 
 	end if
 
 	''
 	lex.ctx->defptrw = lex.ctx->deftextw.data
+	ending.end_line = lex.ctx->linenum
+	ending.end_column = lex.ctx->column
+	ending.raw_end_line = lex.ctx->raw_linenum
+	ending.raw_end_column = lex.ctx->column
+	replacement_units = lgt
+	fbSemanticModelMacroPushOrigin(observation, lex.ctx->deflen, lgt)
 	lex.ctx->deflen += lgt
 
 	function = TRUE
@@ -1120,13 +1225,18 @@ function ppDefineLoad _
 		byval currmacro as FBSYMBOL ptr, _
 		byval macrodepth as integer, _
 		byval macrostack as FBSYMBOL ptr ptr, _
-		byval macroresume as integer ptr _
+		byval macroresume as integer ptr, _
+		byval source as LEX_LOCATION ptr _
 	) as integer
 
 	dim as integer loaded = any
+	dim as longint observation = fbSemanticModelMacroBegin(s, *source)
+	dim as LEX_LOCATION ending = *source
+	dim as integer previous_errors = errGetCount( )
 
 	'' recursion?
 	if( hMacroIsActive( s, currmacro, macrodepth, macrostack, macroresume ) ) then
+		fbSemanticModelMacroResult(observation, "recursive", NULL, 0, FALSE, 0, ending)
 		errReport( FB_ERRMSG_RECURSIVEMACRO )
 		'' error recovery: skip
 		hSkipUntil( INVALID, FALSE, LEX_FLAGS )
@@ -1134,6 +1244,7 @@ function ppDefineLoad _
 	end if
 
 	if( macrodepth >= LEX_MAXMACROSTACK ) then
+		fbSemanticModelMacroResult(observation, "recursive", NULL, 0, FALSE, 0, ending)
 		errReport( FB_ERRMSG_RECURSIVEMACRO )
 		'' error recovery: skip
 		hSkipUntil( INVALID, FALSE, LEX_FLAGS )
@@ -1141,12 +1252,21 @@ function ppDefineLoad _
 	end if
 
 	var olddeflen = lex.ctx->deflen
+	dim as integer replacement_units = 0, argument_count = 0
+	dim as string outcome = "expanded", previous_phase = fbSemanticModelMacroCurrentPhase( )
+	dim as longint previous_loader
+	fbSemanticModelMacroEnter(observation, previous_loader)
 
 	if( env.inf.format = FBFILE_FORMAT_ASCII ) then
-		loaded = hLoadDefine( s )
+		loaded = hLoadDefine( s, observation, replacement_units, argument_count, ending, outcome )
 	else
-		loaded = hLoadDefineW( s )
+		loaded = hLoadDefineW( s, observation, replacement_units, argument_count, ending, outcome )
 	end if
+	fbSemanticModelMacroLeave(previous_loader, previous_phase)
+	if( (loaded = FALSE) and (outcome = "expanded") ) then outcome = "not-invoked"
+	if( (outcome = "expanded") and (errGetCount( ) <> previous_errors) ) then outcome = "recovered"
+	fbSemanticModelMacroResult(observation, outcome, lex.ctx->defptr, replacement_units, _
+		env.inf.format <> FBFILE_FORMAT_ASCII, argument_count, ending)
 
 	function = loaded
 
@@ -1208,6 +1328,7 @@ private function hReadMacroText _
 	dim as FB_DEFPARAM ptr param = any
 	dim as FB_DEFTOK ptr toktail = NULL, tokhead = NULL
 	dim as integer addquotes = any, nestedcnt = 0
+	dim as integer paste_pending = FALSE
 
 	do
 		addquotes = FALSE
@@ -1257,6 +1378,7 @@ private function hReadMacroText _
 			                                (not LEXCHECK_NOWHITESPC) )
 			'' '##'?
 			case CHAR_SHARP
+				paste_pending = TRUE
 				lexSkipToken( LEX_FLAGS )
 				lexSkipToken( LEX_FLAGS or LEXCHECK_NOLINECONT)
 				continue do
@@ -1378,7 +1500,8 @@ private function hReadMacroText _
 			lexSkipToken( LEX_FLAGS )
 
 		end select
-
+		if( toktail <> NULL ) then toktail->semantic_paste_before = paste_pending
+		paste_pending = FALSE
 	loop
 
 	function = tokhead
@@ -1577,6 +1700,7 @@ sub ppDefine( byval ismultiline as integer )
 	dim as FBSYMBOL ptr base_parent = any
 	dim as FB_DEFTOK ptr tokhead = any
 	dim as FB_DEFINE_FLAGS define_flags = any
+	dim as integer previous_errors = errGetCount( ), was_defined = FALSE
 
 	'' note: using the PP hashtb here, so any non-PP keyword won't be found
 
@@ -1626,6 +1750,7 @@ sub ppDefine( byval ismultiline as integer )
 	else
 		sym = NULL
 	end if
+	if( sym <> NULL ) then was_defined = symbIsDefine(sym)
 
 	params = 0
 	paramhead = NULL
@@ -1722,6 +1847,18 @@ sub ppDefine( byval ismultiline as integer )
 		hReadDefineText( sym, @defname, isargless, ismultiline, define_flags )
 		sym = hLookupRedefinition(@defname)
 		if( (sym <> NULL) andalso symbIsDefine(sym) ) then fbSemanticModelExportBinding(sym, semantic_site, TRUE)
+		dim as string action = iif(errGetCount( ) <> previous_errors, "definition-rejected", iif(was_defined, "identical", "define"))
+		dim as LEX_LOCATION ending = lexGetLastLocation( ), definition_site = semantic_site
+		if( definition_site.source_file = ending.source_file ) then
+			definition_site.end_line = ending.end_line
+			definition_site.end_column = ending.end_column
+			definition_site.raw_end_line = ending.raw_end_line
+			definition_site.raw_end_column = ending.raw_end_column
+			definition_site.raw_valid and= ending.raw_valid
+			definition_site.is_physical and= ending.is_physical
+		end if
+		if( (sym <> NULL) andalso (symbIsDefine(sym) = FALSE) ) then sym = NULL
+		fbSemanticModelMacroLifecycle(sym, action, defname, definition_site)
 		exit sub
 	end if
 
@@ -1744,6 +1881,17 @@ sub ppDefine( byval ismultiline as integer )
 		end if
 	end if
 	if( (sym <> NULL) andalso symbIsDefine(sym) ) then fbSemanticModelExportBinding(sym, semantic_site, TRUE)
+	dim as string action = iif(errGetCount( ) <> previous_errors, "definition-rejected", iif(was_defined, "identical", "define"))
+	dim as LEX_LOCATION ending = lexGetLastLocation( ), definition_site = semantic_site
+	if( definition_site.source_file = ending.source_file ) then
+		definition_site.end_line = ending.end_line
+		definition_site.end_column = ending.end_column
+		definition_site.raw_end_line = ending.raw_end_line
+		definition_site.raw_end_column = ending.raw_end_column
+		definition_site.raw_valid and= ending.raw_valid
+		definition_site.is_physical and= ending.is_physical
+	end if
+	fbSemanticModelMacroLifecycle(sym, action, defname, definition_site)
 end sub
 
 '' end of preprocessor/pp-define.bas

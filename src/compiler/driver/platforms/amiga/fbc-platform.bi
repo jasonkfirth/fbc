@@ -23,6 +23,22 @@ private function fbcAmigaPlatformIsSelected( ) as integer
 	function = (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_AMIGA)
 end function
 
+sub fbcAmigaPlatformValidateOptions( )
+	if( fbcAmigaPlatformIsSelected( ) = FALSE ) then exit sub
+	if( fbGetCpuFamily( ) <> FB_CPUFAMILY_M68K ) then
+		errReportEx( FB_ERRMSG_INVALIDCMDOPTION, "AmigaOS requires -arch m68k", -1 )
+		fbcEnd( 1 )
+	end if
+	if( fbGetOption( FB_COMPOPT_BACKEND ) <> FB_BACKEND_GCC ) then
+		errReportEx( FB_ERRMSG_INVALIDCMDOPTION, "AmigaOS requires -gen gcc", -1 )
+		fbcEnd( 1 )
+	end if
+	if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then
+		errReportEx( FB_ERRMSG_INVALIDCMDOPTION, "AmigaOS does not support -dll", -1 )
+		fbcEnd( 1 )
+	end if
+end sub
+
 private function fbcAmigaPlatformGetLinkerTool( ) as integer
 	if( fbcAmigaPlatformIsSelected( ) ) then
 		return FBCTOOL_GCC
@@ -99,6 +115,10 @@ private sub fbcAmigaPlatformAddDefaultLibs( )
 	fbcAddDefLib( "amiga" )
 	fbcAddDefLib( "pthread" )
 	fbcAddDefLib( "m" )
+	'' Hunk objects do not carry the ELF library-dependency metadata emitted
+	'' by separately compiled THREADCALL users. Keep its static provider in
+	'' the default group; the linker selects members only when needed.
+	fbcAddDefLib( "ffi" )
 end sub
 
 private sub fbcAmigaPlatformAddLinkerFrameworks( byref ldcline as string )

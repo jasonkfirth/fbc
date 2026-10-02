@@ -137,6 +137,12 @@ install-runtime:
 		fi; \
 	done
 	@set -e; \
+	if [ "$(TARGET_OS)" = amiga ] && [ -d "$(libdir)/include" ]; then \
+		mkdir -p "$(INSTALL_LIBDIR)/include"; \
+		cp -a "$(libdir)/include/." "$(INSTALL_LIBDIR)/include/"; \
+		find "$(INSTALL_LIBDIR)/include" -type f | sed "s|^$(DESTDIR)||" >> "$(INSTALL_MANIFEST)"; \
+	fi
+	@set -e; \
 	if [ -f "$(libdir)/libfbpdmlwp.a" ]; then \
 		dst="$(INSTALL_LIBDIR)/pdmlwp-source"; \
 		mkdir -p "$$dst/contrib/dos/pdmlwp" "$$dst/build_scripts" "$$dst/docs"; \

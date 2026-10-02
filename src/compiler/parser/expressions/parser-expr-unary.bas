@@ -50,9 +50,10 @@
 #include once "ast/ast.bi"
 #include once "preprocessor/pp.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-preprocessor.bi"
+#include once "tooling/semantic-expressions.bi"
 
-declare function hCast( byval options as AST_CONVOPT ) as ASTNODE ptr
-declare function fbSemanticModelEnabled( ) as integer
+declare function hCast( byval options as AST_CONVOPT, byref source as LEX_LOCATION ) as ASTNODE ptr
 declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
 declare sub fbSemanticModelSetExpressionOperatorOverride _
 	( _
@@ -137,7 +138,20 @@ private function hPPDefinedExpr( ) as ASTNODE ptr
 	end if
 
 	'' Identifier
-	is_defined = (cIdentifierOrUDTMember( ) <> NULL)
+	dim as LEX_LOCATION source = lexGetCurrentLocation( )
+	dim as string spelling = *lexGetText( )
+	dim as FBSYMBOL ptr defined_symbol = cIdentifierOrUDTMember( )
+	is_defined = (defined_symbol <> NULL)
+	dim as LEX_LOCATION ending = lexGetLastLocation( )
+	if( source.source_file = ending.source_file ) then
+		source.end_line = ending.end_line
+		source.end_column = ending.end_column
+		source.raw_end_line = ending.raw_end_line
+		source.raw_end_column = ending.raw_end_column
+		source.raw_valid and= ending.raw_valid
+		source.is_physical and= ending.is_physical
+	end if
+	fbSemanticModelPPDefined(defined_symbol, spelling, source)
 
 	'' ')'
 	if( hMatch( CHAR_RPRNT ) = FALSE ) then
@@ -183,7 +197,9 @@ function cNegNotExpression _
 			'' error recovery: fake a new node
 			negexpr = astNewCONSTi( 0 )
 		else
+			dim as longint operands = fbSemanticModelCaptureOperands(negexpr, NULL, "unary", AST_OP_NEG, source_start)
 			negexpr = astNewUOP( AST_OP_NEG, negexpr )
+			fbSemanticModelAttachOperands(negexpr, operands)
 			if( semantic_model_enabled ) then fbSemanticModelExportOperation(negexpr, AST_OP_NEG, source_start)
 		end if
 
@@ -209,7 +225,9 @@ function cNegNotExpression _
 			'' error recovery: fake a new node
 			negexpr = astNewCONSTi( 0 )
 		else
+			dim as longint operands = fbSemanticModelCaptureOperands(negexpr, NULL, "unary", AST_OP_PLUS, source_start)
 			negexpr = astNewUOP( AST_OP_PLUS, negexpr )
+			fbSemanticModelAttachOperands(negexpr, operands)
 			if( semantic_model_enabled ) then fbSemanticModelExportOperation(negexpr, AST_OP_PLUS, source_start)
 		end if
 
@@ -246,7 +264,9 @@ function cNegNotExpression _
 			'' error recovery: fake a new node
 			negexpr = astNewCONSTi( 0 )
 		else
+			dim as longint operands = fbSemanticModelCaptureOperands(negexpr, NULL, "unary", AST_OP_NOT, source_start)
 			negexpr = astNewUOP( AST_OP_NOT, negexpr )
+			fbSemanticModelAttachOperands(negexpr, operands)
 			if( semantic_model_enabled ) then fbSemanticModelExportOperation(negexpr, AST_OP_NOT, source_start)
 		end if
 
@@ -430,14 +450,14 @@ function cHighestPrecExpr _
 			'' CAST
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 
-			expr = hCast( 0 )
+			expr = hCast( 0, source_start )
 
 		'' CPTR '(' DataType ',' Expression{int|uint|ptr} ')'
 		case FB_TK_CPTR
 			'' CPTR
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 
-			expr = hCast( AST_CONVOPT_PTRONLY )
+			expr = hCast( AST_CONVOPT_PTRONLY, source_start )
 
 		'' OperatorNew
 		case FB_TK_NEW
@@ -488,7 +508,7 @@ function cHighestPrecExpr _
 end function
 
 '' '(' DataType ',' Expression ')'
-private function hCast( byval options as AST_CONVOPT ) as ASTNODE ptr
+private function hCast( byval options as AST_CONVOPT, byref source as LEX_LOCATION ) as ASTNODE ptr
 	dim as integer dtype = any
 	dim as integer errmsg = FB_ERRMSG_OK
 	dim as FBSYMBOL ptr subtype = any
@@ -573,7 +593,9 @@ private function hCast( byval options as AST_CONVOPT ) as ASTNODE ptr
 		options or= AST_CONVOPT_DONTWARNFUNCPTR
 	end if
 
+	dim as longint operands = fbSemanticModelCaptureOperands(expr, NULL, "cast", -1, source)
 	expr = astNewCONV( dtype, subtype, expr, options or AST_CONVOPT_EXACT_CAST, @errmsg )
+	fbSemanticModelAttachOperands(expr, operands)
 	if( expr = NULL ) then
 		if( errmsg = FB_ERRMSG_OK ) then
 			if( options and AST_CONVOPT_PTRONLY ) then
@@ -900,6 +922,7 @@ private function hVarPtrBody _
 		end if
 	end scope
 
+	fbSemanticModelSetAccess(expr, "address")
 	function = astNewADDROF( expr )
 end function
 

@@ -185,14 +185,14 @@ ifeq ($(TARGET_OS),aros)
     -DDISABLE_GPM
 endif
 
-# Amiga newlib has no desktop Unix integration or target libffi in the pinned
-# SDK. Native DOS, Intuition, and AHI replacements provide the platform APIs.
+# Amiga newlib has no desktop Unix integration. Native platform providers and
+# the staged m68k libffi supply the runtime interfaces used by this target.
 ifeq ($(TARGET_OS),amiga)
   ALLCFLAGS += \
     -DDISABLE_NCURSES \
     -DDISABLE_LANGINFO \
-    -DDISABLE_GPM \
-    -DDISABLE_FFI
+    -DDISABLE_GPM
+  CPPFLAGS += -I$(rootdir)/lib/freebasic/amiga-m68k/include
 endif
 
 # ---------------------------------------------------------------------------

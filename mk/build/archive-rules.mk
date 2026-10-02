@@ -28,6 +28,20 @@ $(libdir)/libfbmt.a: $(RTLIB_MT_OBJ) | $(libdir)
 $(libdir)/libfbmtpic.a: $(RTLIB_MT_PIC_OBJ) | $(libdir)
 	$(call DO_AR)
 
+ifeq ($(TARGET_OS),amiga)
+AMIGA_SUPPORT_ROOT ?= $(rootdir)/out/amiga
+AMIGA_TOOLCHAIN_ROOT ?= $(AMIGA_SUPPORT_ROOT)/toolchain
+
+$(libdir)/libfbsoftfloat.a: $(rootdir)/build_scripts/amiga-build-softfloat.py $(rootdir)/build_scripts/amiga/softfloat-convert.c | $(libdir)
+	python3 "$(rootdir)/build_scripts/amiga-build-softfloat.py" --toolchain-root "$(AMIGA_TOOLCHAIN_ROOT)" --work "$(AMIGA_SUPPORT_ROOT)/softfloat" --output "$@"
+
+$(libdir)/libpthread.a: $(rootdir)/build_scripts/amiga-build-pthread.py | $(libdir)
+	python3 "$(rootdir)/build_scripts/amiga-build-pthread.py" --toolchain-root "$(AMIGA_TOOLCHAIN_ROOT)" --work "$(AMIGA_SUPPORT_ROOT)/pthread" --output "$@"
+
+$(libdir)/libffi.a: $(rootdir)/build_scripts/amiga-build-ffi.py | $(libdir)
+	python3 "$(rootdir)/build_scripts/amiga-build-ffi.py" --toolchain-root "$(AMIGA_TOOLCHAIN_ROOT)" --work "$(AMIGA_SUPPORT_ROOT)/ffi" --output "$@"
+endif
+
 ifeq ($(THREAD_MODEL),pdmlwp)
 DOS_PDMLWP_DIR := $(rootdir)/contrib/dos/pdmlwp
 DOS_PDMLWP_OBJ := $(libfbmtobjdir)/pdmlwp/lwp.o $(libfbmtobjdir)/pdmlwp/lwpasm.o

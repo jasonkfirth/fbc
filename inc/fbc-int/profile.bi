@@ -1,3 +1,9 @@
+'' Project: FreeBASIC runtime introspection
+'' File: profile.bi
+'' Purpose: Expose profiler controls and internal data layouts.
+'' Responsibilities: Mirror profiler ABI and provide Unicode name interfaces.
+'' This file intentionally does NOT implement profiling or report generation.
+
 #ifndef __FBC_INT_PROFILE_BI__
 #define __FBC_INT_PROFILE_BI__
 
@@ -48,9 +54,11 @@ extern "rtlib"
 	declare sub ProfileInit alias "fb_InitProfile" ()
 	declare function ProfileEnd alias "fb_EndProfile" ( byval errorcode as long ) as long
 
-	declare function ProfileBeginProc alias "fb_ProfileBeginProc" ( byval procedurename as const zstring ptr ) as any ptr
+	declare function ProfileBeginProc overload alias "fb_ProfileBeginProc" ( byval procedurename as const zstring ptr ) as any ptr
+	declare function ProfileBeginProc overload alias "fb_WstrProfileBeginProc" ( byval procedurename as const wstring ptr ) as any ptr
 	declare sub ProfileEndProc alias "fb_ProfileEndProc" ( byval procctx as any ptr )
-	declare function ProfileBeginCall alias "fb_ProfileBeginCall" ( byval procedurename as const zstring ptr ) as any ptr
+	declare function ProfileBeginCall overload alias "fb_ProfileBeginCall" ( byval procedurename as const zstring ptr ) as any ptr
+	declare function ProfileBeginCall overload alias "fb_WstrProfileBeginCall" ( byval procedurename as const wstring ptr ) as any ptr
 	declare sub ProfileEndCall alias "fb_ProfileEndCall" ( byval procctx as any ptr )
 
 	'' -profgen cycles
@@ -58,11 +66,19 @@ extern "rtlib"
 	declare function ProfileCyclesEnd alias "fb_EndProfileCycles" ( byval errorcode as long ) as long
 
 	'' options common to all profilers
-	declare function ProfileSetFileName alias "fb_ProfileSetFileName" ( byval filename as const zstring ptr ) as long
-	declare function ProfileGetFileName alias "fb_ProfileGetFileName" ( byval filename as zstring ptr, byval length as long ) as long
+	declare function ProfileSetFileName overload alias "fb_ProfileSetFileName" ( byval filename as const zstring ptr ) as long
+	declare function ProfileSetFileName overload alias "fb_WstrProfileSetFileName" ( byval filename as const wstring ptr ) as long
+	declare function ProfileGetFileName overload alias "fb_ProfileGetFileName" ( byval filename as zstring ptr, byval length as long ) as long
+	'' Wide length counts storage units, including the terminator. Dynamic
+	'' UTF-8 output uses a byte limit and keeps only complete scalars.
+	declare function ProfileGetFileName overload alias "fb_WstrProfileGetFileName" ( byval filename as wstring ptr, byval length as long ) as long
+#if defined(__FB_HAS_USTRING__) and not defined(FB_NO_USTRING)
+	declare function ProfileGetFileName overload alias "fb_UStrProfileGetFileName" ( byref filename as ustring, byval length as long = 1024 ) as long
+#endif
 	declare function ProfileGetOptions alias "fb_ProfileSetOptions" ( ) as PROFILE_OPTIONS
 	declare function ProfileSetOptions alias "fb_ProfileSetOptions" ( byval options as PROFILE_OPTIONS ) as PROFILE_OPTIONS
-	declare sub ProfileIgnore alias "fb_ProfileIgnore" ( byval procedurename as zstring ptr )
+	declare sub ProfileIgnore overload alias "fb_ProfileIgnore" ( byval procedurename as const zstring ptr )
+	declare sub ProfileIgnore overload alias "fb_WstrProfileIgnore" ( byval procedurename as const wstring ptr )
 end extern
 
 #if __FB_MT__
@@ -78,7 +94,6 @@ extern "rtlib"
 	end sub
 end extern
 #endif
-
 
 '' ------------------------------------
 '' PROFILER INTERNALS
@@ -270,3 +285,5 @@ end extern
 end namespace
 
 #endif
+
+'' end of profile.bi

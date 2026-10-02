@@ -17,9 +17,24 @@ a temporary object, or use normal emission-only compilation with `-r`.
 `-semantic-model-expressions <file>` retains `M`, `E`, and dependency records,
 with the same versioned header and completeness footer. It omits symbols,
 bindings, signatures, values, implicit relationships, and serialized ASTs.
-Its expression symbol/subtype IDs and detail count are zero. Both modes retain
-completed binary precedence results, unary results, and member/index/call
-prefixes. These are completed parser results, not a reconstructed source tree.
+Its expression symbol/subtype IDs are zero. Provenance records contribute to
+the detail count in every mode. The full and
+expression-only modes retain completed binary precedence results, unary
+results, and member/index/call prefixes. These are completed parser results,
+not a reconstructed source tree.
+
+`-semantic-model-bindings <file>` retains compiler symbol identities, resolved
+token bindings, selected implicit calls, dependency records, and source
+provenance. It omits typed-expression records and the procedure AST dump, so
+edit validation can keep complete identities without retaining unrelated AST
+details. It is not an expression-typing substitute.
+
+`-semantic-model-compact` can accompany any semantic-model mode to omit the
+verbose macro-expansion graph (`MD` through `MR`). It does not change macro
+evaluation or the selected symbols, bindings, calls, expressions, dependencies,
+conditional facts, or ordinary source provenance. Use it when a consumer needs
+those compiler facts but does not need per-expansion argument and replacement
+segments. The default retains the complete macro graph.
 
 The exporter observes the compiler; it does not resolve names independently.
 This is an invocation artifact, not an incremental workspace index or language
@@ -44,7 +59,7 @@ or recovered regions, withhold overlapping facts, and mark retained facts
 provisional. A full-model reader must reject recovery output. Interrupted
 processes do not write a recovery footer.
 
-## Schema version 20
+## Schema version 25
 
 Fields are separated by tabs. The wire representation is ASCII. A percent sign,
 every byte below 32, and every byte at or above 127 is encoded as `%HH`, using
@@ -82,11 +97,49 @@ the literal text `%E9`, not byte E9. Counts below include the record tag.
 | `O` | operator code, operator kind, selected procedure ID, physical flag, source path, start line, start column, end line, end column | 10 |
 | `Q` | module source path, target ID, CPU ID, language, backend, pointer bytes, byte order, wchar bytes, default integer data type | 10 |
 | `Y` | data type, name, class, storage bytes, natural alignment, signed flag | 7 |
+| `ASM` | node ID, token ordinal, text/symbol kind, symbol ID or zero, byte-safe token text | 6 |
+| `DCL` | occurrence ID, symbol ID, declaration role, written name, physical flag, source path, start/end range, module ordinal, statement ordinal | 13 |
+| `CTX` | configuration identity, module ordinal | 3 |
+| `OPT` | configuration identity, option domain, option name, integer value | 5 |
+| `USE` | subject domain, subject identity, configuration identity | 4 |
+| `FILE` | revision ID, opened source path, byte count, SHA-256, encoding, regular/stream kind | 7 |
+| `SRC` | context ID, parent context ID, revision ID, module ordinal, context kind, include depth, requested path, physical flag, directive path, start/end range | 14 |
+| `SRE` | context ID, revision verification result | 3 |
+| `INC` | occurrence ID, parent context ID, requested path, resolved path, outcome, physical flag, directive path, start/end range | 12 |
+| `MAP` | context ID, logical line, logical path, physical flag, directive path, start/end range, remap occurrence ID | 11 |
+| `ORIG` | subject domain, subject identity, source context ID | 4 |
+| `PPB` | branch ID, parent branch ID, group ID, source context ID, configuration ID or zero, branch ordinal, directive kind, physical flag, directive path, start/end range | 14 |
+| `PPD` | branch ID, evaluation state, condition truth or empty, selected flag, physical flag, final token path, start/end range | 11 |
+| `PPE` | group ID, source context ID, physical flag, closing directive path, start/end range | 9 |
+| `PPT` | probe ID, branch ID or zero, source context ID, selected symbol ID or zero, first identifier spelling, found flag, physical flag, query path, start/end range | 13 |
+| `PPS` | inactive region ID, branch ID, source context ID, physical flag, source path, start/end range | 10 |
+| `MD` | definition ID, symbol ID or zero, module ordinal, configuration ID or zero, name, kind, formal count, flags, argless flag | 10 |
+| `MT` | definition ID, ordinal, token kind, value, paste-before flag | 6 |
+| `MI` | attempt ID, parent attempt ID, definition ID, source context ID, configuration ID or zero, conditional branch ID or zero, phase, parent relation, physical flag, name path, start/end range | 15 |
+| `MA` | attempt ID, formal ordinal, unit kind, argument text, has-source flag, physical flag, argument path, start/end range | 12 |
+| `MS` | attempt ID, piece ordinal, definition token ordinal or -1, formal ordinal or -1, piece kind, output offset, output length | 8 |
+| `MC` | attempt ID, unit kind, callback error code, actual callback return text | 5 |
+| `ME` | attempt ID, outcome, unit kind, output length, actual replacement text, actual argument count, physical flag, final input path, start/end range | 13 |
+| `ML` | occurrence ID, definition ID or zero, action, source context ID, configuration ID or zero, spelling, physical flag, declaration/undef path, start/end range | 13 |
+| `MR` | subject domain, subject ID, expansion attempt ID, observed role | 5 |
+| `LOC` | subject domain, subject ID, role, source context ID, physical start/end UTF-16 coordinates, start/end byte offsets, mapping state | 12 |
+| `ST` | statement ID, parent statement, compound ID, procedure owner, source context, configuration, module, source ordinal, token ID/class, physical flag, opening location | 17 |
+| `STE` | statement ID, parser route, outcome, physical flag, closing location | 10 |
+| `BLK` | compound ID, parent compound, opening statement, procedure owner, kind, source/configuration context, physical flag, opening location | 14 |
+| `BEND` | compound ID, closing statement ID, physical flag, closing location | 9 |
+| `OWN` | subject domain, subject identity, statement owner | 4 |
+| `CAP` | module ordinal, semantic capability, available/partial/unavailable coverage | 4 |
+| `ACC` | binding occurrence ordinal, compiler-observed source use role | 3 |
+| `SOP` | statement identity, accepted builtin statement operation | 3 |
 | `Z` | define symbol ID, ordinal, token kind, token value | 5 |
 
 The detail count totals `T`, `A`, `F`, `G`, `U`, `C`, `H`, `K`, `J`, `O`, `Q`,
-`Y`, and `Z`, including repeated snapshots. Earlier schemas have a 12-field
-`END`. Compact mode has no detail records and detail count zero. Unknown
+`Y`, `Z`, `ASM`, `DCL`, `CTX`, `OPT`, `USE`, `FILE`, `SRC`, `SRE`, `INC`, `MAP`,
+`ORIG`, `PPB`, `PPD`, `PPE`, `PPT`, `PPS`, `MD`, `MT`, `MI`, `MA`, `MS`, `MC`,
+`ME`, `ML`, `MR`, `LOC`, `ST`, `STE`, `BLK`, `BEND`, `OWN`, `CAP`, `ACC`, and
+`SOP`, including repeated snapshots.
+Earlier schemas have a 12-field `END`. Expression and binding modes retain
+source provenance details. Unknown
 schemas, tags, field counts, references, and inconsistent totals must be
 rejected; readers must not silently ignore unfamiliar records.
 
@@ -230,6 +283,38 @@ Address-of nodes have no branch target. Their operator number is initialized,
 but the unused extra-operand slot can retain a recycled AST node's data. The
 exporter reads branch labels only from node classes that initialize that slot.
 
+Schema 20 also retains initialized operator options, assignment initialization,
+result-load and literal-suffix flags, and initializer scope offsets/byte counts.
+Natural alignment and requested packing are separate symbol properties. Formal
+descriptor types, argument register classification, finalized aggregate return
+classification, vtable/RTTI ownership, procedure status/priority, and declared
+label roles are preserved as properties and relationships.
+
+CALL auxiliary trees use `copyback`, `profile-begin`, and `profile-end` N edges.
+Their parent is a node. `auxiliary-ordinal` records action order, and each
+copyback destination has a `copyback-temporary` relationship to its source
+temporary. `copyback-count` records the exact number, including zero. These
+describe deferred compiler actions without fabricating source call nodes.
+
+ASM rows preserve the compiler's ordered text and bound-symbol tokens. Registers
+and assembler-local labels remain text. Assembly effects remain explicitly
+unknown for memory, registers, and control; no instruction analysis is implied.
+
+DCL occurrences preserve named prototype formals, procedure prototypes and
+definitions including constructors/destructors/operators, and implicit source
+variables. A name may be empty for an unnameable special procedure. Occurrence
+identity is distinct from symbol allocation identity. A formal's preserved
+written name can supply T's name when the compiler intentionally discarded its
+internal prototype name.
+
+CTX/OPT snapshots contain all current compiler option, language-default, and
+literal/feature-policy fields. AST nodes retain the context at construction,
+including through cloning. USE connects node and declaration identities to
+those snapshots. A later snapshot never retroactively changes an earlier
+declaration or node. Rolled-back parse attempts discard their context records.
+These records describe effective configuration; file/include/expansion source
+contexts and a complete source expression graph are separate work in progress.
+
 `J` preserves normalized unsigned jump-table value/label pairs. Interpret
 `jump-bias` and `jump-span` in the selector's target integer representation to
 recover source case values. Label IDs and default targets are compiler-resolved.
@@ -329,7 +414,194 @@ must match exactly. Compiler-generated details are not a complete source graph.
 Repeated includes can retain identical spans with contradictory types under
 different contexts. Source-only consumers must withhold ambiguous facts.
 
+## Source revisions and occurrences
+
+`FILE` describes bytes from the actual CRT stream opened by the compiler. The
+observer hashes from the beginning, including any BOM, restores the stream
+position, and verifies metadata and bytes again before the compiler closes it.
+SHA-256 is lowercase hexadecimal. Encoding is `unmarked-bytes`, `utf-8-bom`,
+`utf-16le`, `utf-16be`, `utf-32le`, or `utf-32be`; it describes the compiler's
+selected decoder, not a conversion of the captured bytes. Nonregular streams
+have kind `stream`, an empty digest, and zero byte count.
+
+Each successful source open has a distinct `SRC` occurrence, even when the
+path was opened before. Kinds are `module`, `include`, and `preinclude`. Root
+contexts have no parent; nested contexts identify the active includer and its
+actual depth. The requested path preserves include spelling, while `FILE`
+identifies the opened path. A directive range is absent when no source token
+supplied the open, such as a command-line preinclude. Each context closes with
+one `SRE`: `verified`, `unverified-stream`, or `changed-or-unreadable`. A changed
+or unreadable revision prevents successful publication.
+
+`INC` retains attempted include outcomes: `opened`, `include-once`,
+`pragma-once`, `not-found`, `open-failed`, or `depth-limit`. Skipped and failed
+attempts do not create successful source contexts or dependencies. `MAP`
+records an observed `#line` directive's logical line and filename, together
+with its directive range. It does not make synthesized locations editable.
+
+`ORIG` associates a node, declaration occurrence, expression, or binding with
+its source context. Binding identities are their file-wide record ordinals,
+starting at one. Node and declaration origins are absent in expression mode,
+which retains expression origins. A source context and a physical range do
+not establish freshness: before editing, consumers must verify the current
+file bytes against the captured digest and reject unverified streams. The
+independent reader's `validate_source_revisions()` provides this check.
+
+## Physical coordinate attachments
+
+`LOC` links an observed source subject to the original opened source context,
+independently of its logical filename and line number. Physical lines are
+one-based, columns count UTF-16 units from zero, and the end is exclusive.
+Byte offsets are zero-based and include the original BOM. `mapped` means both
+boundaries were resolved against the compiler's open binary handle with the
+captured encoding; `unverified` retains observed positions with byte offsets
+-1. Malformed sequences, unprovable boundaries, unavailable streams, or source
+line limits cannot become successful byte mappings.
+
+Domains include `binding`, `declaration`, `expression`, `conditional`,
+`conditional-end`, `defined-probe`, `macro-attempt`, `macro-argument`,
+`macro-lifetime`, `source-context`, `include`, and `remap`. A `macro-argument`
+uses role `formal-N` for its canonical formal. Other current roles are `range`,
+`name`, `directive`, and `include`. Remap identities remain distinct when a
+logical line and filename are reused.
+
+The physical cursor advances when input characters are consumed, including
+lookahead, rather than when the parser later consumes EOL tokens. CRLF, CR,
+and LF each advance one line. Replacement and EVAL text do not advance the
+original-file cursor, and their token subjects do not acquire invented physical
+attachments. A physical enclosing source range can still contain written macro
+invocations; that describes the original input extent, not expanded text.
+
+Coordinate lookup temporarily reads the already-open handle, restores its
+position, and supports unmarked UTF-8-compatible bytes plus all five BOM
+encodings. It never replaces the observed revision with a pathname reopen.
+Projection must still pass source freshness and existing edit-eligibility
+checks. `LOC` preserves remapped origin without making the logical location
+editable. The independent reader's `validate_physical_locations()` checks the
+current revision, encoding boundaries, byte offsets, and UTF-16 coordinates.
+
+A physical source line is indexed up to 16,777,216 bytes. A larger or malformed
+line yields an unverified attachment, retaining explicit uncertainty instead
+of a fabricated offset.
+
+## Conditional preprocessing
+
+`PPB` begins each observed `#IF`, `#IFDEF`, `#IFNDEF`, `#ELSEIF`,
+`#ELSEIFDEF`, `#ELSEIFNDEF`, or `#ELSE` branch. The first branch's identity is
+also the group identity. Ordinals start at zero; successors retain the group
+and lexical parent branch. Source contexts distinguish repeated includes.
+Configuration identities describe the state before evaluating the directive;
+they are zero in expression and binding modes, which omit configuration records.
+
+`PPD` separates evaluation from selection. `evaluated` has the compiler's
+normalized Boolean result, including an evaluated but unselected `#ELSEIF`.
+`unconditional` describes `#ELSE` without inventing a condition value.
+`parent-inactive` describes directives scanned inside an inactive ancestor:
+their expressions and names were not evaluated. `invalid` retains error
+recovery without claiming a valid condition result. The observer never
+reevaluates a condition or invokes its callbacks. `PPE` closes the group at
+the actual `#ENDIF`; a normal complete model requires every group to close
+and every branch to have exactly one decision. Recovery may retain an unfinished
+group and remains provisional.
+
+`PPT` records the selected symbol, or its absence, from an actual `DEFINED()`
+or conditional defined-name query. The spelling is the first written identifier
+token; the range can include qualifiers. A branch identity of zero describes a
+query outside a conditional group, such as `#ASSERT DEFINED(...)`. Expression
+mode has no symbol inventory and uses zero symbol IDs even for successful
+queries. Inactive nested directives have no invented query records.
+
+`PPS` marks source text skipped by the inactive scanner. Its start is the next
+whole line after the condition, including whitespace and continuations, and
+its exclusive end is the `#` of the directive which resumes processing. Nested
+directives in that region still have branch events, without declarations or
+overload selections for their inactive bodies. Empty or generated regions
+without a source extent have no fabricated physical span. Generated directive
+and condition locations can retain a logical point with equal start/end
+coordinates; this is permitted only when their physical flag is zero.
+The inactive scanner does not validate nested branch syntax. Its events may
+therefore retain duplicate `#ELSE` directives or an `#ELSEIF` after `#ELSE`,
+all marked `parent-inactive`; readers must not impose active-branch grammar on
+that accepted skipped text.
+
+Observation storage supports up to 65,536 nested conditional groups, including
+inactive nesting beyond the parser's active-depth limit. Exceeding that export
+limit fails publication without changing the parser's preprocessing decisions.
+
+## Macro definitions and expansions
+
+`MD` snapshots the selected definition while its data is alive. It has a
+separate identity from the symbol inventory so expression mode can retain
+complete macro provenance with zero symbol and configuration IDs. Kinds are
+`text`, `tokens`, `define-callback`, and `macro-callback`. `MT` retains formal
+names, replacement tokens, parameter/stringify references, and observed `##`
+boundaries. Its token kinds match the `Z` vocabulary; parameter ordinals and
+replacement ordinals are separate sequences starting at zero. A callback
+definition has no fabricated replacement body. Snapshots are immutable;
+undefining and defining the same name again creates a distinct definition.
+
+`ML` observes `define`, `identical`, `undef`, `undef-missing`, or
+`definition-rejected`. Successful identical definitions retain the selected
+definition rather than inventing a replacement. A missing undef has no target.
+Initial built-in or command-line definitions are snapshotted when selected;
+that observation does not claim a source declaration location.
+
+`MI` describes an attempt to load a selected macro. Parent relations distinguish
+`root`, `replacement`, `argument`, and `callback`; phase distinguishes normal
+source, inactive scanning, and preprocessor evaluation. The token's origin is
+captured before consuming its identifier because that token can exhaust an
+older replacement. Independent observation frames follow actual replacement
+lengths; they never alter the compiler's recursion stack.
+
+`MA` maps each effective argument to its canonical formal, including variadic
+tails and empty/missing slots. Text is observed after the loader's trimming and
+before callbacks or substitution. Source ranges describe observed argument
+tokens, with an explicit absence flag for a missing slot. `MS` partitions the
+actual replacement into ordered `text`, `parameter`, `stringify`, `callback`,
+`definition-text`, or `restored-delimiter` pieces. Offsets and lengths use the
+replacement's units. Parameter and stringify pieces identify the exact
+definition token and formal. The paste-before marker and adjacent piece offsets
+retain token-pasting provenance without resolving the resulting identifier again.
+
+`MC` records the return value from the one callback invocation the compiler
+performed. `ME` records the actual text prepended to the lexer, before mixing
+in the caller's remaining input. Outcomes distinguish `expanded`, `not-invoked`,
+`unsupported`, `recursive`, `failed`, and `recovered`. An empty successful
+replacement remains an expansion; a macro name passed without required
+parentheses remains unexpanded. Suppressed or failed attempts do not become
+ordinary source calls. Recovery is provisional, and a successful completeness
+footer cannot advertise a macro failure.
+
+The `bytes` unit kind uses the normal byte-safe field encoding. `wide-units`
+uses eight uppercase hexadecimal digits per code unit from the compiler's
+wide lexer buffer, independently of the target's runtime wchar representation.
+Readers must validate output lengths, piece ordering and coverage, formal
+mapping, and actual parameter/stringify text, with no implicit byte-to-Unicode
+conversion.
+
+`MR` links actual expansion origins to bindings, declarations, expressions,
+conditional directives, defined-name probes, and macro arguments. Expression
+`token-N` roles come from consumed tokens, including expanded operators between
+physical operands; they are not inferred from overlapping source ranges.
+Generated declaration names without an extent can link their selected `symbol`
+with a `declaration-ID` role while omitting a fabricated binding range. All
+these links preserve nonphysical editing policy. Definition and token-history
+storage are each bounded at 1,048,576 entries per module; overflow fails export
+publication without changing macro evaluation.
+
 ## Dependencies, limits, and tests
+
+Sidecars are staged in a private directory beside their destination. The
+compiler checks writes, flush, close, and final replacement before publication.
+An output path cannot alias a source, include, preinclude, object/library input,
+or requested compiler artifact. File identities detect hardlinks; existing
+destination symlinks, devices, directories, and FIFOs are rejected. Protection
+continues when the public dependency list reaches its limit.
+
+An interrupted invocation leaves the destination untouched. A transport or
+publication failure reports a compiler error and preserves existing output.
+Ordinary parser errors retain the previous incomplete/recovery output contract;
+consumers still require the invocation result and the appropriate footer.
 
 `D` paths are unique normalized opened source paths in read order, including
 root modules, successful includes, and preincludes. Unopened paths and inactive
@@ -385,6 +657,11 @@ For retained artifacts, run `build_scripts/test-compiler-semantic-corpus.py`
 with `--fbc bin/fbc --output <new-directory>`; `--backend` and `--program` select
 smaller runs.
 
+The runners also accept `--backend gas64` for x86-64 assembly and `--backend gas`
+for x86 assembly. The compiler-source runner requires a matching Make target,
+for example `--backend gas --target-triplet i686-linux-gnu`. The fixture and OMA
+runners select the x86 target for gas emission without requiring 32-bit linking.
+
 Run `make compiler-semantic-self-test` for the same audit against every module
 selected by the native compiler build. This extended target freezes the
 compiler sources, public headers, Make modules, compiler binary, and validator.
@@ -412,15 +689,108 @@ separate target coverage. The audit emits code and does not link a new compiler.
 
 ## Consumer migration
 
-Schema 19 adds metadata families and the detail count, corrects lexical parent
-ownership, and gives full output the compact mode's expression-prefix coverage.
-Readers must explicitly support this version. Earlier readers must reject it.
-Raw encodings require knowledge of the corresponding compiler family; stable
-labels, relationships, and target type facts reduce that dependency.
+Schema 25 is the current format. It includes the metadata and detail count
+introduced by schema 19, stable operator concepts and configuration/source
+provenance from later versions, compiler-selected preprocessor facts, and the
+macro expansion graph, source constructs, source/AST associations, access roles,
+argument default origins, and explicit capability coverage. Readers must explicitly support the schema they accept
+and reject unknown versions. Raw encodings require knowledge of the
+corresponding compiler family; stable labels, relationships, and target type
+facts reduce that dependency.
 
 Fblint was the initial consumer for undeclared-name and variable-type checks.
 Existing data-flow and safety checks are consumer policy, not sidecar behavior.
-A consumer adopting schema 20 must validate it before using compiler facts as
+A consumer adopting schema 25 must validate it before using compiler facts as
 authoritative, and must continue treating recovery output as provisional.
+
+## Source statements and compounds
+
+`ST` opens a parser dispatch observation and `STE` closes it at the last
+consumed token. The parser route distinguishes declarations, compounds,
+calls/assignments, intrinsic statements, assembly, pointer operations, labels,
+aggregate members, enum lines, and assembly lines. Outcomes are `parsed`,
+`recovered`, or `unmatched`; the last two must retain their provisional meaning.
+Comments and line separators do not become accepted statements. Empty colon
+separators can produce an unmatched dispatch with no valid combined range.
+
+Parent statement identities describe nested grammar calls, including inline
+IF bodies and aggregate members. `BLK`/`BEND` describe the active compound
+stack, whose lifetime can span many statements. Kinds are `if`, `for`, `do`,
+`while`, `select`, `with`, `scope`, `namespace`, `extern`, `procedure`, `type`,
+`union`, `enum`, and `assembly`. One NEXT statement can close several FOR
+compounds. An aggregate or single-line compound can close inside its opening
+statement. This containment graph does not supply execution or branch selection.
+
+Opening and closing locations preserve logical coordinates. `LOC statement`
+and `LOC construct`, with role `range`, independently retain the original
+physical span when both endpoints belong to the same source occurrence.
+Continuations and colon-separated statements keep their actual boundaries.
+Remapped locations retain their conservative editing policy. Macro replacement
+statements retain macro origins without invented physical spans. Inactive
+preprocessor bodies do not acquire statement or compound observations.
+
+`OWN` attaches bindings, declaration occurrences, expressions, and AST nodes to
+their observed statement. An AST node keeps the statement that created it;
+cloning preserves that identity even when emission happens later. Generated
+cleanup and other compiler nodes can therefore have a statement owner while
+retaining no editable node range. Ownership alone does not prove a written
+operation, runtime execution, or an original source token for a generated node.
+
+Completed output closes all statement and compound stacks. Expression recovery
+can retain unfinished observations with its RECOVERY footer. The reader checks
+nesting, closure, source/configuration identities, and same-module fact
+ownership independently of transport totals.
+
+## Source analysis relationships in schema 25
+
+`H node <id> expression <id> source-expression 0` connects a surviving AST
+allocation to the typed source observations actually attached to it. Multiple
+precedence results can share an allocation, and cloned initializer nodes can
+share their source observations. The exporter retains an immutable association
+chain until the module closes. It does not infer this link from overlapping
+source ranges or recycled pool addresses.
+
+These links describe the exported compiler phase. A typed call may disappear
+when a constant short-circuit condition is lowered. Absence of a link means
+that no associated node was exported; it does not by itself prove execution,
+purity, reachability, or a particular reason for removal. The expression-link
+capability is therefore `partial`.
+
+`H node <id> binding <ordinal> source-binding 0` identifies an actual written
+variable/member occurrence retained by that node. The ordinal counts B records
+from one across the invocation. `ACC` gives its parser-selected use role:
+`read`, `write`, `read-write`, `address`, `byref`, or `callee`. A field write
+does not classify its containing pointer or index as written. Passing BYREF
+does not assert that an unknown callee mutates the object. Uncovered binding
+routes have no ACC and must retain an unknown use role. ACC remains available
+in bindings-only exports.
+
+Argument nodes now have the boolean `default-argument` property. It captures
+whether the actual argument was absent before optional initializer cloning.
+This is independent of `passing-mode=default`, which means the formal selects
+the passing convention. An explicit value equal to the default therefore
+remains distinguishable from an omitted argument.
+
+SOP records identify `file-open`, `file-close`, `file-seek`, `file-get`,
+`file-put`, `file-lock`, `file-unlock`, `file-rename`, and `line-input` after
+their actual grammar route succeeds. Their ST/STE owner supplies the statement
+extent, configuration, module, and source context; OWN links connect generated
+operations with that owner. Identifier lookalikes and graphics GET/PUT routes
+do not acquire a file-operation classification. These observations describe
+accepted source operations, not runtime success or external effects.
+
+CAP records describe availability per module and export mode. `available`
+means the named observation family is supplied under the documented contract;
+`partial` means consumers must account for uncovered routes or phases;
+`unavailable` means this artifact does not supply that analysis. In particular,
+external-call effects and alias analysis remain unavailable. END only confirms
+artifact completion and totals, and must not be used as a semantic capability
+claim. Full AST/default-origin facts are unavailable in bindings/expression
+modes, while source constructs and selected statement operations remain.
+
+The Python reader and the editor decoder reject dangling expression/binding
+links, invalid access roles, malformed capability values, and invalid statement
+operation owners. The corpus reductions distinguish source typing from retained
+calls and verify source access roles without enabling debug information.
 
 <!-- end of compiler-semantic-model.md -->

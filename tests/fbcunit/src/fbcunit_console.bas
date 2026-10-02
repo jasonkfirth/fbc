@@ -23,5 +23,10 @@ sub crt_print_output _
 	'' path without borrowing that legacy stream accessor and preserves fbcunit's
 	'' no-newline contract.
 	printf( "%s", strptr(s) )
+#ifdef __FB_AMIGA__
+	'' Preserve the last test name if a native command crashes or hangs while
+	'' its output is redirected to the emulator's host-directory volume.
+	fflush( stdout )
+#endif
 
 end sub

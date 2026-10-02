@@ -1753,7 +1753,8 @@ function cProcHeader _
 		byval pattrib as FB_PROCATTRIB, _
 		byref is_nested as integer, _
 		byval options as FB_PROCOPT, _
-		byval tk as integer _
+		byval tk as integer, _
+		byval declaration_start as LEX_LOCATION ptr _
 	) as FBSYMBOL ptr
 
 	#define CREATEFAKE( ) _
@@ -1768,6 +1769,9 @@ function cProcHeader _
 	dim as integer priority = any
 	dim as integer mode_is_explicit = any
 	dim as LEX_LOCATION semantic_site
+	dim as LEX_LOCATION declaration_site = lexGetCurrentLocation( )
+	if( declaration_start <> NULL ) then declaration_site = *declaration_start
+	dim as longint declaration_nonphysical = lexGetNonphysicalTokenCount( )
 
 	is_nested = FALSE
 	is_outside = FALSE
@@ -1835,6 +1839,14 @@ function cProcHeader _
 		if( (proc <> NULL) and _
 		    ((tk = FB_TK_SUB) or (tk = FB_TK_FUNCTION) or (tk = FB_TK_PROPERTY)) ) then
 			fbSemanticModelExportBinding(proc, semantic_site, TRUE)
+		end if
+		if( proc <> NULL ) then
+			dim as LEX_LOCATION declaration_end = lexGetLastLocation( )
+			declaration_site.end_line = declaration_end.end_line
+			declaration_site.end_column = declaration_end.end_column
+			declaration_site.is_physical and= declaration_end.is_physical and _
+				(declaration_nonphysical = lexGetNonphysicalTokenCount( ))
+			fbSemanticModelExportDeclaration(proc, declaration_site, "procedure-prototype", id)
 		end if
 		return proc
 	end if
@@ -2079,6 +2091,14 @@ function cProcHeader _
 	    ((tk = FB_TK_SUB) or (tk = FB_TK_FUNCTION) or (tk = FB_TK_PROPERTY)) ) then
 		fbSemanticModelExportBinding(proc, semantic_site, TRUE)
 	end if
+	if( proc <> NULL ) then
+		dim as LEX_LOCATION declaration_end = lexGetLastLocation( )
+		declaration_site.end_line = declaration_end.end_line
+		declaration_site.end_column = declaration_end.end_column
+		declaration_site.is_physical and= declaration_end.is_physical and _
+			(declaration_nonphysical = lexGetNonphysicalTokenCount( ))
+		fbSemanticModelExportDeclaration(proc, declaration_site, "procedure-definition", id)
+	end if
 
 	function = proc
 end function
@@ -2154,10 +2174,11 @@ sub cProcStmtBegin( byval attrib as FB_SYMBATTRIB, byval pattrib as FB_PROCATTRI
 		exit sub
 	end if
 
+	dim as LEX_LOCATION declaration_start = lexGetCurrentLocation( )
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 	'' ProcHeader
-	proc = cProcHeader( attrib, pattrib, is_nested, FB_PROCOPT_NONE, tkn )
+	proc = cProcHeader( attrib, pattrib, is_nested, FB_PROCOPT_NONE, tkn, @declaration_start )
 	if( proc = NULL ) then
 		'' Close namespace again if cProcHeader() opened it, for better
 		'' error recovery.

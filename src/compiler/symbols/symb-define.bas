@@ -2026,6 +2026,7 @@ function symbAddDefineTok _
 
 	''
 	t->type = dtype
+	t->semantic_paste_before = FALSE
 	select case as const dtype
 	case FB_DEFTOK_TYPE_TEX
 		t->text = NULL

@@ -194,6 +194,15 @@ validates full and compact exports, and requires the emitted code to match
 export-disabled compilation. `make compiler-semantic-corpus-test` runs the
 same export checks against the maintained OMA programs.
 
+`tooling/semantic-output.bas` owns checked sidecar staging and publication.
+`tooling/semantic-source-file.bas` hashes and verifies the actual opened source
+stream. Both use the runtime's fixed-width metadata query; native filesystem
+structures stay in the runtime. Compiler sources and bootstrap inputs remain
+BASIC.
+The exporter serializes records through the writer's opaque interface. Make
+builds both modules through the ordinary BASIC rules in each compiler variant,
+and bootstrap emission translates them along with the rest of the compiler.
+
 ### LLVM interoperability
 
 `backend/llvm/ir-llvm-abi.bi` contains parameter policies shared by declarations,

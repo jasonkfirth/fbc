@@ -29,7 +29,6 @@
 #include once "support/numeric/fp-policy.bi"
 #include once "tooling/semantic-hooks.bi"
 
-declare function fbSemanticModelEnabled( ) as integer
 
 declare sub fbSemanticModelExportExpression _
 	( _

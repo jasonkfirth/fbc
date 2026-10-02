@@ -1131,15 +1131,15 @@
 				( typeSetIsConst( FB_DATATYPE_LONGINT ), FB_PARAMMODE_BYVAL, TRUE, 0 ) _
 			} _
 		), _
-		/' function fb_rename alias "rename" cdecl _
+		/' function fb_rename alias "fb_FileRename" cdecl _
 			( _
 				byval oldname as const zstring ptr, _
 				byval newname as const zstring ptr _
 			) as long '/ _
 		( _
-			@FB_RTL_FILERENAME, @"rename", _
+			@FB_RTL_FILERENAME, @"fb_FileRename", _
 			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
-			NULL, FB_RTL_OPT_NONE, _
+			NULL, FB_RTL_OPT_UTF8ARGS, _
 			2, _
 			{ _
 				( typeAddrOf( typeSetIsConst( FB_DATATYPE_CHAR ) ), FB_PARAMMODE_BYVAL, FALSE ), _

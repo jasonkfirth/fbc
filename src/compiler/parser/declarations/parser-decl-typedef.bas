@@ -81,10 +81,12 @@ private function hReadType _
 		byref dtype as integer, _
 		byref subtype as FBSYMBOL ptr, _
 		byref lgt as longint, _
-		byref is_fixlenstr as integer _
+		byref is_fixlenstr as integer, _
+		byref forward_site as LEX_LOCATION _
 	) as zstring ptr
 
 	static as zstring * FB_MAXNAMELEN+1 tname
+	forward_site.start_line = 0
 
 	if( cSymbolType( dtype, subtype, lgt, is_fixlenstr, FB_SYMBTYPEOPT_ALLOWFORWARD ) ) then
 		return NULL
@@ -101,6 +103,7 @@ private function hReadType _
 	'' there's no point allowing names that couldn't be used then.
 	select case( lexGetClass( ) )
 	case FB_TKCLASS_IDENTIFIER, FB_TKCLASS_QUIRKWD
+		forward_site = lexGetCurrentLocation( )
 		tname = *lexGetText( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 	case else
@@ -208,12 +211,19 @@ private sub hAddTypedef _
 		byval is_fixlenstr as integer, _
 		byval attrib as FB_SYMBATTRIB, _
 		byref semantic_site as LEX_LOCATION, _
-		byval has_site as integer _
+		byval has_site as integer, _
+		byref forward_site as LEX_LOCATION _
 	)
 
 	'' Forward ref? Note: may update dtype & co
 	if( pfwdname <> NULL ) then
 		hAddForwardRef( pid, pfwdname, dtype, subtype, lgt, is_fixlenstr, attrib )
+		if( (subtype <> NULL) and (forward_site.start_line > 0) ) then
+			'' The chosen forward symbol exists only after the compiler has
+			'' completed this step. Observing it here preserves the first use
+			'' without changing lookup by creating a symbol prematurely.
+			fbSemanticModelExportBinding(subtype, forward_site, FALSE)
+		end if
 	end if
 
 	dim as FBSYMBOL ptr typedef = symbAddTypedef( pid, dtype, subtype, lgt )
@@ -308,7 +318,8 @@ sub cTypedefMultDecl( byval attrib as FB_SYMBATTRIB )
 	dim as integer dtype, is_fixlenstr
 	dim as longint lgt
 	dim as FBSYMBOL ptr subtype
-	var pfwdname = hReadType( dtype, subtype, lgt, is_fixlenstr )
+	dim as LEX_LOCATION forward_site
+	var pfwdname = hReadType( dtype, subtype, lgt, is_fixlenstr, forward_site )
 
 	do
 		'' Parse the ID
@@ -317,7 +328,7 @@ sub cTypedefMultDecl( byval attrib as FB_SYMBATTRIB )
 		var pid = hReadId( semantic_site, has_site )
 
 		hAddTypedef( pid, pfwdname, dtype, subtype, lgt, is_fixlenstr, attrib, _
-		             semantic_site, has_site )
+		             semantic_site, has_site, forward_site )
 
 		'' ','?
 	loop while( hMatch( CHAR_COMMA ) )
@@ -348,10 +359,11 @@ sub cTypedefSingleDecl _
 		dim as integer dtype, is_fixlenstr
 		dim as longint lgt
 		dim as FBSYMBOL ptr subtype
-		var pfwdname = hReadType( dtype, subtype, lgt, is_fixlenstr )
+		dim as LEX_LOCATION forward_site
+		var pfwdname = hReadType( dtype, subtype, lgt, is_fixlenstr, forward_site )
 
 		hAddTypedef( pid, pfwdname, dtype, subtype, lgt, is_fixlenstr, attrib, _
-		             semantic_site, has_site )
+		             semantic_site, has_site, forward_site )
 
 		'' ','?
 		if( hMatch( CHAR_COMMA ) = FALSE ) then

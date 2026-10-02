@@ -76,6 +76,13 @@ type LEX_LOCATION
 	end_line		as integer
 	end_column		as integer
 	is_physical		as integer
+	macro_identity	as longint                 '' actual expansion supplying this token, or zero
+	source_context  as longint                 '' opened source occurrence, independent of #line
+	raw_start_line  as integer
+	raw_start_column as integer
+	raw_end_line    as integer
+	raw_end_column  as integer
+	raw_valid       as integer                 '' original input, not replacement or EVAL text
 end type
 
 type FBTOKEN
@@ -129,8 +136,11 @@ type LEX_TKCTX
 
 	linenum         as integer                  '' logical line after #line remapping
 	physical_linenum as integer                 '' physical line within the current file
+	raw_linenum     as integer                 '' advances on consumed input, including lookahead
+	raw_after_cr    as integer                 '' CRLF is one physical line break
 	column          as integer
 	utf8_continuations_left as integer
+	utf8_sequence_first as integer
 	lasttk_id       as integer
 	last_source     as LEX_LOCATION
 	nonphysical_token_count as longint
@@ -140,6 +150,14 @@ type LEX_TKCTX
 	macrodepth      as integer
 	macrostack(0 to LEX_MAXMACROSTACK-1) as FBSYMBOL ptr
 	macroresume(0 to LEX_MAXMACROSTACK-1) as integer
+	'' Observation frames follow actual replacement lengths, independently of
+	'' the recursion stack (argument scanning may consume an older remainder).
+	semantic_macro_depth as integer
+	semantic_macro_ids(0 to LEX_MAXMACROSTACK-1) as longint
+	semantic_macro_resume(0 to LEX_MAXMACROSTACK-1) as integer
+	semantic_eval_origin as longint
+	semantic_probe as integer
+	semantic_last_macro_token as integer
 
 	kwdns           as FBSYMBOL ptr             '' used by the PP
 	kind            as LEX_TKCTX_CONTEXT        '' the kind of lexer context
@@ -208,6 +226,9 @@ type LEXPP_ARG
 		text        as DZSTRING
 		textw       as DWSTRING
 	end union
+	semantic_first as LEX_LOCATION
+	semantic_last as LEX_LOCATION
+	semantic_has_source as integer
 end type
 
 type LEXPP_ARGTB
@@ -315,6 +336,9 @@ declare function lexGetLookAheadChar _
 declare function lexGetLookAheadChar2 _
 	( _
 	) as uinteger
+
+declare sub lexAdvanceByteColumn(byval source_byte as uinteger, byref column as integer, _
+	byref continuations_left as integer, byref sequence_first as integer)
 
 declare sub lexEatChar( )
 

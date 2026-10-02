@@ -36,6 +36,7 @@ def main():
     root = options.root.resolve()
     fbc = options.fbc.resolve()
     prefix = [str(fbc), "-prefix", str(root), "-i", str(root / "inc")]
+    libdir = Path(run(prefix + ["-print", "fblibdir"], root).strip())
     backends = options.backend or ["gcc"]
     if options.backend is None:
         target = run(prefix + ["-print", "target"], root).strip()
@@ -57,18 +58,25 @@ def main():
                                      str(unit / "src" / (name + ".bas")), "-o", str(obj)], working)
             objects.append(str(obj))
         run(shlex.split(os.environ.get("AR", "ar")) + ["rcs", str(working / "libfbcunit.a")] + objects, working)
+        sound_stub = working / "sound-stub.o"
+        run(shlex.split(os.environ.get("CC", "gcc")) + ["-Wall", "-Wextra", "-Werror",
+            "-Wno-unused-parameter", "-I", str(root / "src/sfxlib"), "-c",
+            str(root / "tests/string/text-types-sfx-stub.c"), "-o", str(sound_stub)], working)
 
         for backend in backends:
             executable = working / ("tests-" + backend)
-            flags = prefix + includes + ["-gen", backend, "-mt", "-p", str(working)]
+            flags = prefix + includes + ["-gen", backend, "-mt", "-g", "-exx", "-p", str(working)]
             run(flags + [str(root / "tests/fbc-tests.bas"), str(root / "tests/string/ustring.bas"),
                          str(root / "tests/string/text-types.bas"),
                          "-x", str(executable)], working)
             output = run([str(executable)], working)
             if not re.search(r"\b0\s+Total\b", output):
                 raise RuntimeError(f"{backend}: missing passing test summary\n{output}")
-            run(flags + ["-c", str(root / "tests/string/text-types-api.bas"),
-                         "-o", str(working / ("text-api-" + backend + ".o"))], working)
+            for dialect in ("fb", "fblite", "deprecated"):
+                run(flags + ["-lang", dialect, "-c", str(root / "tests/string/text-types-api.bas"),
+                             "-o", str(working / ("text-api-" + backend + "-" + dialect + ".o"))], working)
+            run(flags + ["-c", str(root / "tests/string/text-types-gfx3-api.bas"),
+                         "-o", str(working / ("gfx3-api-" + backend + ".o"))], working)
             printer = working / ("printer-" + backend)
             run(flags + [str(root / "tests/string/ustring-lprint.bas"),
                          "-x", str(printer)], working)
@@ -86,18 +94,31 @@ def main():
                 example = working / (source.stem + "-" + backend)
                 run(flags + [str(source), "-x", str(example)], working)
                 run([str(example)], working)
-            graphics = working / ("graphics-" + backend)
-            run(flags + [str(root / "tests/gfx/text-types.bas"), "-x", str(graphics)], working)
-            run([str(graphics)], working)
-            print(f"{backend}: language assertions, {len(rejected)} rejection tests, and {len(examples)} examples passed")
+            libraries = [("gfx2", [])]
+            if (libdir / "libfbgfx3.a").exists():
+                libraries.append(("gfx3", ["-gfx3"]))
+            for library, graphics_flags in libraries:
+                graphics = working / (library + "-" + backend)
+                run(flags + graphics_flags + [str(root / "tests/gfx/text-types.bas"), "-x", str(graphics)], working)
+                run([str(graphics)], working)
+                if library == "gfx3":
+                    assets = working / ("assets-" + backend)
+                    run(flags + graphics_flags + [str(root / "tests/gfx3/text-types.bas"), "-x", str(assets)], working)
+                    run([str(assets)], working)
+            profiler = working / ("profiler-" + backend)
+            run(flags + [str(root / "tests/string/text-types-profile.bas"), "-x", str(profiler)], working)
+            run([str(profiler)], working)
+            sound = working / ("sound-" + backend)
+            run(flags + [str(root / "tests/string/text-types-sfx.bas"), str(sound_stub), "-x", str(sound)], working)
+            run([str(sound)], working)
+            print(f"{backend}: language/API, graphics, profiler, sound, {len(rejected)} rejection tests, and {len(examples)} examples passed")
 
         if not options.no_sanitizers and sys.platform.startswith("linux"):
-            libdir = Path(run(prefix + ["-print", "fblibdir"], working).strip())
             executable = working / "runtime-sanitized"
             sources = [root / "tests/string/ustring-runtime.c"]
             sources.extend(root / "src/rtlib" / name for name in
                            ("ustr_core.c", "ustr_slice.c", "ustr_search.c", "ustr_case.c", "ustr_io.c",
-                            "ustr_optional.c", "ustr_paths.c", "str_core.c", "io_printusg.c"))
+                            "ustr_optional.c", "ustr_paths.c", "ustr_profile.c", "str_core.c", "io_printusg.c"))
             command = shlex.split(os.environ.get("CC", "gcc")) + [
                 "-g", "-O1", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter",
                 "-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-I", str(root / "src/rtlib"),

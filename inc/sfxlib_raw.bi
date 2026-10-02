@@ -142,7 +142,7 @@ namespace sfxlib
 	''
 	'' Saves the recorded output as 16-bit PCM WAV. Returns 0 on success.
 	''
-	declare function OutputCaptureSave cdecl alias "fb_sfxOutputCaptureSave" _
+	declare function OutputCaptureSave cdecl overload alias "fb_sfxOutputCaptureSave" _
 		( _
 			byval filename as const zstring ptr _
 		) as long
@@ -159,6 +159,18 @@ namespace sfxlib
 		) as long
 
 	end extern
+
+	extern "rtlib"
+	declare function __WideFilenameToUtf8 alias "fb_UStrFromWstr" _
+		( byval filename as const wstring ptr ) as string
+	end extern
+
+	'' The recorder accepts UTF-8 filenames. Keep the existing C ABI and
+	'' transcode wide callers without using the process locale.
+	private function OutputCaptureSave overload( byval filename as const wstring ptr ) as long
+		dim as string encoded = __WideFilenameToUtf8(filename)
+		return OutputCaptureSave(strptr(encoded))
+	end function
 
 end namespace
 

@@ -27,7 +27,9 @@
 
 SUITE( fbc_tests.file_.pipe_ )
 
-	#ifdef __FB_WIN32__
+	#ifdef __FB_AMIGA__
+		const filename = "file/pipe.bas"
+	#elseif defined(__FB_WIN32__)
 		const filename = ".\file\pipe.bas"
 	#else
 		const filename = "./file/pipe.bas"
@@ -36,7 +38,11 @@ SUITE( fbc_tests.file_.pipe_ )
 	TEST( pipeInput )
 		dim as integer pipe_file = freefile( )
 
-		#ifdef __FB_WIN32__
+		#ifdef __FB_AMIGA__
+			'' The ROM qualification volume stages this native DOS fixture
+			'' command because Workbench's disk-based List is not in Kickstart.
+			dim as string pipe_command = "C:fb-list " + filename
+		#elseif defined(__FB_WIN32__)
 			'' OPEN PIPE already asks the C runtime to launch the platform's
 			'' command interpreter.  DIR /B is accepted by both COMMAND.COM on
 			'' Windows 95/98/ME and CMD.EXE on the NT family.

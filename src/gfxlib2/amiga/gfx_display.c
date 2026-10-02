@@ -27,7 +27,9 @@
 
 #include <cybergraphx/cybergraphics.h>
 #include <graphics/gfxbase.h>
+#include <graphics/modeid.h>
 #include <proto/exec.h>
+#include <proto/dos.h>
 #include <proto/cybergraphics.h>
 #include <proto/graphics.h>
 #include <proto/intuition.h>
@@ -49,6 +51,7 @@ static int amiga_open_libraries(void)
     IntuitionBase = (struct IntuitionBase *)OpenLibrary("intuition.library", 39);
     GfxBase = (struct GfxBase *)OpenLibrary("graphics.library", 39);
     CyberGfxBase = OpenLibrary("cybergraphics.library", 41);
+    fb_amigaGfxDebug("libraries intuition=%p graphics=%p cyber=%p", IntuitionBase, GfxBase, CyberGfxBase);
     return IntuitionBase != NULL && GfxBase != NULL;
 }
 
@@ -125,6 +128,7 @@ int fb_amigaGfxDisplayInit(const char *title, int width, int height,
 {
     struct Screen *desktop;
     int maximum_depth;
+    ULONG mode_id, screen_error = 0;
 
     (void)refresh_rate;
     fb_amigaGfxDebug("opening %dx%d depth=%d", width, height, __fb_gfx != NULL ? __fb_gfx->depth : 0);
@@ -144,16 +148,35 @@ int fb_amigaGfxDisplayInit(const char *title, int width, int height,
         fb_amiga_gfx.rtg = TRUE;
     } else {
         if (desktop != NULL) UnlockPubScreen(NULL, desktop);
+        /* AA_LISA describes enabled AGA modes. The internal MLISA bit may
+           be set before SetPatch enables those modes, so it cannot establish
+           the depth accepted by graphics.library's display database. */
         maximum_depth = (GfxBase->ChipRevBits0 & GFXF_AA_LISA) ? 8 : 5;
+        fb_amigaGfxDebug("chip revision=%u maximum depth=%d", GfxBase->ChipRevBits0, maximum_depth);
         fb_amiga_gfx.screen_depth = __fb_gfx->depth <= 8
             ? MIN(__fb_gfx->depth, maximum_depth) : maximum_depth;
         if (__fb_gfx->depth <= 8 && __fb_gfx->depth > maximum_depth)
             goto fail;
+        {
+            struct TagItem tags[] = {
+                { BIDTAG_NominalWidth, (ULONG)width },
+                { BIDTAG_NominalHeight, (ULONG)height },
+                { BIDTAG_DesiredWidth, (ULONG)width },
+                { BIDTAG_DesiredHeight, (ULONG)height },
+                { BIDTAG_Depth, (ULONG)fb_amiga_gfx.screen_depth },
+                { TAG_DONE, 0 }
+            };
+            mode_id = BestModeIDA(tags);
+        }
+        fb_amigaGfxDebug("selected mode=%lx", mode_id);
+        if (mode_id == (ULONG)INVALID_ID) goto fail;
         fb_amiga_gfx.screen = OpenScreenTags(NULL,
+            SA_DisplayID, mode_id, SA_ErrorCode, (ULONG)&screen_error,
             SA_Width, (ULONG)width, SA_Height, (ULONG)height,
             SA_Depth, (ULONG)fb_amiga_gfx.screen_depth,
             SA_Title, (ULONG)(title != NULL ? title : "FreeBASIC"),
             SA_ShowTitle, FALSE, SA_Quiet, TRUE, TAG_DONE);
+        fb_amigaGfxDebug("mode=%lx screen error=%lu", mode_id, screen_error);
         fb_amiga_gfx.private_screen = TRUE;
     }
     if (fb_amiga_gfx.screen == NULL) goto fail;
@@ -200,6 +223,7 @@ int fb_amigaGfxDisplayInit(const char *title, int width, int height,
     return 0;
 
 fail:
+    fb_amigaGfxDebug("display setup failed, DOS error=%ld", IoErr());
     fb_amigaGfxDisplayExit();
     return -1;
 }

@@ -131,6 +131,7 @@ end type
 
 type FB_CMPSTMTSTK
 	id          as integer
+	semantic_identity as longint
 	allowmask   as FB_CMPSTMT_MASK
 	scopenode   as ASTNODE ptr
 	union
@@ -392,7 +393,8 @@ declare function cProcHeader _
 		byval pattrib as FB_PROCATTRIB, _
 		byref is_nested as integer, _
 		byval options as FB_PROCOPT, _
-		byval tk as integer _
+		byval tk as integer, _
+		byval declaration_start as LEX_LOCATION ptr = NULL _
 	) as FBSYMBOL ptr
 
 declare sub cParameters _

@@ -8,6 +8,12 @@ This file intentionally does NOT claim missing functionality is implemented or i
 
 # Semantic sidecar gap audit
 
+Follow-up: G01 and G02 now have checked staging, input/artifact protection,
+atomic replacement, and publication failure regressions. The source inventory
+and reproductions below remain the original schema 19 evidence. Current
+publication verification is recorded in the
+[native emitter audit report](compiler-native-semantic-audit.md).
+
 The semantic model is not complete. Schema 19 contains substantial symbol,
 type, binding, value, expression, and typed-tree information, but it does not
 preserve the compiler's complete source context, semantic relationships, or

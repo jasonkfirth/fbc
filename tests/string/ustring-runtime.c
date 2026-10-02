@@ -8,6 +8,8 @@
 */
 
 #include "fb.h"
+#include "fb_profile.h"
+#include "../gfxlib2/gfx_unicode.h"
 #include <assert.h>
 
 typedef struct {
@@ -186,6 +188,107 @@ static void checkOptional( void )
 	assert( fb_UStrComp(NULL, NULL, 1) == 0 );
 }
 
+static void checkLeftSelf( void )
+{
+	FBSTRING dst = { NULL, 0, 0 };
+	FB_WCHAR wide[4];
+	char *buffer;
+	ssize_t capacity, i;
+	fb_UStrAssign(&dst, -1, fb_UStrFromBytes("A\xF0\x9F\x98\x80" "B", 7), -1, 0);
+	buffer = dst.data;
+	capacity = dst.size;
+	fb_UStrLeftSelf(&dst, -1);
+	assert( FB_STRSIZE(&dst) == 6 );
+	fb_UStrLeftSelf(&dst, 2);
+	assert( dst.data == buffer && dst.size == capacity );
+	assert( FB_STRSIZE(&dst) == 5 && dst.data[5] == 0 );
+	fb_UStrLeftSelf(&dst, FB_STRSIZEMSK);
+	assert( FB_STRSIZE(&dst) == 5 );
+	fb_UStrLeftSelf(&dst, 0);
+	assert( FB_STRSIZE(&dst) == 0 && dst.data[0] == 0 );
+	fb_StrDelete(&dst);
+	for( i = 0; i < 1000; ++i )
+		fb_UStrLeftSelf(fb_UStrFromBytes("A", 2), 0);
+	fb_UStrLeftSelf(NULL, 0);
+	fb_WstrLeftSelf(NULL, 0);
+	if( sizeof(FB_WCHAR) == 2 ) {
+		wide[0] = 0xD83D;
+		wide[1] = 0xDE00;
+		wide[2] = 65;
+		wide[3] = 0;
+	} else {
+		wide[0] = (FB_WCHAR)0x1F600;
+		wide[1] = 65;
+		wide[2] = 0;
+	}
+	fb_WstrLeftSelf(wide, -1);
+	assert( wide[0] != 0 );
+	fb_WstrLeftSelf(wide, 1);
+	if( sizeof(FB_WCHAR) == 2 )
+		assert( wide[0] == 0xD83D && wide[1] == 0xDE00 && wide[2] == 0 );
+	else
+		assert( wide[0] == 0x1F600 && wide[1] == 0 );
+	fb_WstrLeftSelf(wide, 0);
+	assert( wide[0] == 0 );
+}
+
+static void checkProfile( void )
+{
+	static const char filename[] = "ustr-profile-\xC3\xA9\xF0\x9F\x98\x80.tmp";
+	FBSTRING borrowed = { (char *)filename, sizeof(filename) - 1, sizeof(filename) - 1 };
+	FBSTRING dst = { NULL, 0, 0 };
+	FB_WCHAR *wide = fb_UStrToWstr(&borrowed), result[64];
+	ssize_t i;
+	assert( wide != NULL );
+	fb_InitProfile();
+	assert( fb_WstrProfileSetFileName(wide) == FB_RTERROR_OK );
+	assert( fb_WstrProfileGetFileName(result, 64) == FB_RTERROR_OK );
+	for( i = 0; wide[i]; ++i ) assert( result[i] == wide[i] );
+	assert( result[i] == 0 );
+	assert( fb_UStrProfileGetFileName(&dst, 64) == FB_RTERROR_OK );
+	checkBytes(&dst, filename, sizeof(filename) - 1);
+	assert( fb_WstrProfileGetFileName(result, 1) == FB_RTERROR_OK && result[0] == 0 );
+	assert( fb_WstrProfileGetFileName(NULL, 1) == FB_RTERROR_ILLEGALFUNCTIONCALL );
+	assert( fb_UStrProfileGetFileName(&dst, 0) == FB_RTERROR_ILLEGALFUNCTIONCALL );
+	assert( fb_ProfileSetFileName("\xC0.tmp") == FB_RTERROR_OK );
+	assert( fb_UStrProfileGetFileName(&dst, 3) == FB_RTERROR_OK );
+	checkBytes(&dst, "", 0);
+	assert( fb_UStrProfileGetFileName(&dst, 4) == FB_RTERROR_OK );
+	checkBytes(&dst, "\xEF\xBF\xBD", 3);
+	assert( fb_WstrProfileSetFileName(wide) == FB_RTERROR_OK );
+	assert( fb_EndProfile(0) == 0 );
+	assert( remove(filename) == 0 );
+	free(wide);
+	fb_StrDelete(&dst);
+}
+
+static void checkWideGlyphs( void )
+{
+	FB_WCHAR buffer[7] = { 65, 0xE9 }, lone[] = { 0xD800 };
+	size_t count;
+	if( sizeof(FB_WCHAR) == 2 ) {
+		buffer[2] = 0xD83D;
+		buffer[3] = 0xDE00;
+		buffer[4] = 0;
+		buffer[5] = 66;
+		buffer[6] = 0xD800;
+		count = 7;
+	} else {
+		buffer[2] = (FB_WCHAR)0x1F600;
+		buffer[3] = 0;
+		buffer[4] = 66;
+		buffer[5] = 0xD800;
+		count = 6;
+	}
+	checkBytes(fb_hGfxWideGlyphs(buffer, count), "A\xE9?\0B?", 6);
+	checkBytes(fb_hGfxWideGlyphs(buffer, 3), "A\xE9?", 3);
+	checkBytes(fb_hGfxWideGlyphs(lone, 1), "?", 1);
+	checkBytes(fb_hGfxWideGlyphs(NULL, 0), "", 0);
+	assert( fb_hGfxWideGlyphs(NULL, 1) == NULL );
+	assert( fb_hGfxWideGlyphs(lone, (size_t)FB_USTRING_MAX_BYTES + 1) == NULL );
+	assert( fb_ErrorGetNum() == FB_RTERROR_OUTOFMEM );
+}
+
 static void checkLimits( void )
 {
 	checkBytes( fb_UStrFill1( FB_STRSIZEMSK, 0x1F600 ), "", 0 );
@@ -298,6 +401,9 @@ int main( int argc, char **argv )
 	checkOwnership();
 	checkWide();
 	checkOptional();
+	checkLeftSelf();
+	checkProfile();
+	checkWideGlyphs();
 	checkData();
 	checkFileIO();
 	checkLimits();

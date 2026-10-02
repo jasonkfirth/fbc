@@ -236,7 +236,6 @@ bootstrap-emit: bootstrap-check
 			if [ -f "$$emitted.$$extension" ]; then mv "$$emitted.$$extension" "$(BOOTSTRAP_OUT)/"; fi; \
 		done; \
 	done
-	@for source in $(FBC_C_SRC); do cp "$$source" "$(BOOTSTRAP_OUT)/"; done
 
 	@if ! ls "$(BOOTSTRAP_OUT)"/* >/dev/null 2>&1; then \
 		echo "ERROR: bootstrap emission produced no sources"; \

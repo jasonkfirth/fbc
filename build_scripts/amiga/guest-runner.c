@@ -28,7 +28,9 @@
 
 #include <proto/exec.h>
 #include <proto/dos.h>
+#include <proto/graphics.h>
 #include <dos/dosextens.h>
+#include <graphics/gfxbase.h>
 
 #define FB_AMIGA_LINE_BYTES 8192
 #define FB_AMIGA_PATH_BYTES 1024
@@ -36,6 +38,7 @@
 
 struct ExecBase *SysBase;
 struct DosLibrary *DOSBase;
+struct GfxBase *GfxBase;
 
 static char manifest_line[FB_AMIGA_LINE_BYTES];
 static char input_buffer[4096];
@@ -180,6 +183,16 @@ LONG fb_amigaGuestMain(void)
     SysBase = *(struct ExecBase **)4;
     DOSBase = (struct DosLibrary *)OpenLibrary("dos.library", 37);
     if (DOSBase == NULL) return 20;
+    /* This disposable volume boots directly from ROM without SetPatch.
+       Enable the actual chipset once, as normal AmigaOS startup does,
+       before asking the display database for AGA modes. Applications must
+       respect the modes enabled by the user's own system startup instead. */
+    GfxBase = (struct GfxBase *)OpenLibrary("graphics.library", 39);
+    if (GfxBase != NULL) {
+        SetChipRev(SETCHIPREV_BEST);
+        CloseLibrary((struct Library *)GfxBase);
+        GfxBase = NULL;
+    }
     assign_directory("T", "SYS:T");
     assign_directory("ENV", "SYS:ENV");
     input = Open("SYS:jobs.tsv", MODE_OLDFILE);

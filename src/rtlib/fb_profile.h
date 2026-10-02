@@ -1,3 +1,11 @@
+/*
+    FreeBASIC Runtime Library
+    File: fb_profile.h
+    Purpose: Define profiler controls, shared layouts, and report options.
+    Responsibilities: Describe the C ABI and profiler storage/locking helpers.
+    This file intentionally does NOT contain collectors or report writers.
+*/
+
 /* reporting options */
 
 enum PROFILE_OPTIONS
@@ -180,6 +188,12 @@ FBCALL FB_PROFILER_GLOBAL *fb_ProfileGetGlobalProfiler( void );
 
 FBCALL int                 fb_ProfileSetFileName( const char *filename );
 FBCALL int                 fb_ProfileGetFileName( char *filename, int length );
+FBCALL void               *fb_WstrProfileBeginProc( const FB_WCHAR *procname );
+FBCALL void               *fb_WstrProfileBeginCall( const FB_WCHAR *procname );
+FBCALL int                 fb_WstrProfileSetFileName( const FB_WCHAR *filename );
+FBCALL int                 fb_WstrProfileGetFileName( FB_WCHAR *filename, int capacity );
+FBCALL int                 fb_UStrProfileGetFileName( FBSTRING *filename, int capacity );
+FBCALL void                fb_WstrProfileIgnore( const FB_WCHAR *procname );
 FBCALL int                 fb_ProfileGetOptions( void );
 FBCALL int                 fb_ProfileSetOptions( int options );
 FBCALL void                fb_ProfileIgnore( const char * procname );
@@ -197,3 +211,5 @@ void fb_hPROFILER_METRICS_Clear( FB_PROFILER_METRICS *metrics );
 void fb_hPROFILER_METRICS_Strings( FB_PROFILER_METRICS *metrics, STRING_TABLE *strings );
 void fb_hPROFILER_METRICS_HashTable( FB_PROFILER_METRICS *metrics, STRING_HASH_TABLE *hash );
 void fb_hPROFILER_METRICS_Global( FB_PROFILER_METRICS *metrics, FB_PROFILER_GLOBAL *global );
+
+/* end of fb_profile.h */

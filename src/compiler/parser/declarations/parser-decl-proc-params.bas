@@ -24,6 +24,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
+#include once "tooling/semantic-hooks.bi"
 #include once "ast/ast.bi"
 
 declare sub fbSemanticModelExportBinding _
@@ -530,6 +531,10 @@ private function hParamDecl _
 		exit function
 	end if
 	fbSemanticModelExportBinding(param, semantic_site, TRUE)
+	fbSemanticModelSetDeclarationName(param, id)
+	if( semantic_site.start_line > 0 ) then
+		fbSemanticModelExportDeclaration(param, semantic_site, iif(isproto, "parameter-prototype", "parameter-definition"), *id)
+	end if
 
 	if( isproto = FALSE ) then
 		if( symbGetSizeOf( param ) > (env.pointersize * 4) ) then

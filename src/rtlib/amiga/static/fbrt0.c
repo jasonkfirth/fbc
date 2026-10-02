@@ -31,6 +31,10 @@ __attribute__((used)) static void fb_hDoInit(void)
 __attribute__((used)) static void fb_hDoExit(void)
 {
 	fb_hRtExit();
+	/* The SDK's native exit walks its initializer lists directly, bypassing
+	   newlib's usual exit() stream flush. C streams opened by BASIC code must
+	   reach DOS before the loader releases this command's address space. */
+	fflush(NULL);
 }
 
 ADD2INIT(fb_hDoInit, 99);

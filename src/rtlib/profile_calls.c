@@ -1,3 +1,11 @@
+/*
+    FreeBASIC Runtime Library
+    File: profile_calls.c
+    Purpose: Collect per-thread calls and generate profiler reports.
+    Responsibilities: Track call trees, manage contexts, and write reports.
+    This file intentionally does NOT contain compiler instrumentation.
+*/
+
 /* profile_calls.c -- fb calls profiler
 **
 ** chng: apr/2005 written [lillo]
@@ -1082,7 +1090,7 @@ static void hProfilerWriteReport( FB_PROFILER_CALLS *prof )
 
 	fb_ProfileGetFileName( filename, PROFILER_MAX_PATH );
 
-	f = fopen( filename, "w" );
+	f = fb_hOpenFile( filename, "w" );
 	if( f == NULL )
 		return;
 
@@ -1370,3 +1378,5 @@ FBCALL FB_PROFILER_CALLS *fb_ProfileGetCallsProfiler( void )
 {
 	return fb_profiler;
 }
+
+/* end of profile_calls.c */

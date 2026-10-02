@@ -66,7 +66,7 @@ warning-tests: | maybe-build-fbc $(TESTS_RUNTIME_LIBS)
 # temporary directory, so it can be used alongside the normal test harness.
 ##############################################################################
 
-ustring-test: compiler rtlib
+ustring-test: compiler rtlib gfxlib2 gfxlib3 sfxlib
 	$(TESTS_FBC_ENV) python3 "$(rootdir)/build_scripts/test-ustring.py" --root "$(rootdir)" --fbc "$(abspath $(FBC_EXE))"
 
 ##############################################################################

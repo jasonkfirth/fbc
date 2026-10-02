@@ -9,28 +9,74 @@ from __future__ import annotations
 
 from collections import Counter
 import codecs
+import hashlib
 from pathlib import Path
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
 
-from sidecar import DETAIL_TAGS, IMPLICIT_KINDS, PRIMITIVE_NAMES, Model, source_range, unescape
+from sidecar import SCHEMA, DETAIL_TAGS, PROVENANCE_TAGS, IMPLICIT_KINDS, PRIMITIVE_NAMES, Model, source_range, unescape
 
 
 class SidecarTests(unittest.TestCase):
     root: Path
     compiler: Path
     backends: list[str]
+    native_windows: bool
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        result = subprocess.run([str(cls.compiler), "-print", "host"], text=True,
+                                capture_output=True, timeout=30, check=True)
+        cls.native_windows = result.stdout.strip().split("-", 1)[0] in ("win32", "win64")
 
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory(prefix="fbc-semantic-")
         self.addCleanup(self.temporary.cleanup)
         self.working = Path(self.temporary.name)
         self.sequence = 0
+        self.compiler_paths: dict[Path, str] = {}
+
+    def compiler_path(self, path: Path) -> str:
+        # MSYS2 converts process arguments, but cannot convert paths recorded
+        # in a native compiler's output. Compare with the compiler's spelling
+        # without rewriting the exported facts or confusing host and target.
+        if not self.native_windows or os.name == "nt":
+            return str(path)
+        if path not in self.compiler_paths:
+            converted = subprocess.run(["cygpath", "-a", "-w", str(path)], text=True,
+                                       capture_output=True, timeout=10, check=True)
+            self.compiler_paths[path] = converted.stdout.rstrip("\r\n")
+            self.assertTrue(self.compiler_paths[path], "cygpath returned an empty path")
+        return self.compiler_paths[path]
+
+    def create_symlink(self, target: str, destination: Path) -> None:
+        if self.native_windows and sys.platform == "cygwin":
+            # MSYS2's default symlink mode copies the target. Start ln with
+            # strict native links so the fixture tests an actual alias.
+            variable = "MSYS" if "MSYSTEM" in os.environ else "CYGWIN"
+            environment = dict(os.environ)
+            flags = [flag for flag in environment.get(variable, "").split()
+                     if not flag.startswith("winsymlinks:")]
+            environment[variable] = " ".join(flags + ["winsymlinks:nativestrict"])
+            linked = subprocess.run(["ln", "-s", "--", target, str(destination)],
+                                    env=environment, text=True, capture_output=True,
+                                    timeout=10, check=False)
+            if linked.returncode:
+                self.skipTest("Native Windows symlinks are unavailable: " + linked.stderr.strip())
+            self.assertTrue(destination.is_symlink(), "ln did not create a symlink")
+        else:
+            try:
+                destination.symlink_to(target)
+            except OSError as error:
+                if self.native_windows:
+                    self.skipTest("Native Windows symlinks are unavailable: " + str(error))
+                raise
 
     def fixture(self, name: str) -> Path:
         target = self.working / name
@@ -56,8 +102,12 @@ class SidecarTests(unittest.TestCase):
         if emit:
             command.append("-r")
         if mode != "off":
-            command += ["-semantic-model-expressions" if mode == "expressions" else "-semantic-model",
-                        str(model)]
+            option = {
+                "full": "-semantic-model",
+                "bindings": "-semantic-model-bindings",
+                "expressions": "-semantic-model-expressions",
+            }[mode]
+            command += [option, str(model)]
         command += [*extra, *(str(path) for path in sources)]
         result = subprocess.run(command, cwd=self.working, text=True, capture_output=True,
                                 timeout=120, check=False,
@@ -73,7 +123,8 @@ class SidecarTests(unittest.TestCase):
     def compile(self, source: Path, *, mode: str = "full", backend: str = "gcc",
                 extra: tuple[str, ...] = ()) -> Model:
         _, path = self.invoke([source], mode=mode, backend=backend, extra=extra)
-        return Model.read(path, expressions_only=mode == "expressions")
+        return Model.read(path, expressions_only=mode == "expressions",
+                          bindings_only=mode == "bindings")
 
     def one(self, model: Model, name: str, kind: str | None = None) -> int:
         identities = model.named(name, kind)
@@ -93,7 +144,7 @@ class SidecarTests(unittest.TestCase):
             token = anchor
         start_column = len(line[:start].encode("utf-16-le")) // 2
         end_column = start_column + len(token.encode("utf-16-le")) // 2
-        return str(path), line_number, start_column, line_number, end_column
+        return self.compiler_path(path), line_number, start_column, line_number, end_column
 
     def binding(self, model: Model, span: tuple[str, int, int, int, int],
                 role: str | None = None) -> int:
@@ -108,6 +159,7 @@ class SidecarTests(unittest.TestCase):
         return [row for row in model.records["E"] if source_range(row, 3) == span]
 
     def assert_physical_ranges(self, model: Model, sources: dict[str, str]) -> None:
+        sources = {self.compiler_path(Path(path)): text for path, text in sources.items()}
         for tag, flag_column, range_column in (("B", 3, 4), ("E", 2, 3), ("I", 5, 6), ("O", 4, 5)):
             for row in model.records[tag]:
                 if row[flag_column] != "1":
@@ -171,6 +223,20 @@ class SidecarTests(unittest.TestCase):
         for token in ("mov", "asm_local"):
             span = self.span(source, "mov eax" if token == "mov" else "jmp asm_local", token)
             self.assertFalse([row for row in model.records["B"] if source_range(row, 4) == span])
+
+    def test_bindings_only_mode_keeps_resolved_calls_without_ast_details(self) -> None:
+        source = self.fixture("lifetimes.bas")
+        model = self.compile(source, mode="bindings")
+
+        self.assertTrue(model.records["S"])
+        self.assertTrue(model.records["B"])
+        self.assertTrue(model.records["I"])
+        for tag in ("P", "V", "N", "E"):
+            self.assertFalse(model.records[tag], tag)
+        self.assertFalse(any(model.records[tag] for tag in DETAIL_TAGS - PROVENANCE_TAGS))
+        self.assertTrue(model.records["FILE"])
+        self.assertTrue(model.records["SRC"])
+        self.assertTrue(model.records["SRE"])
 
     def test_namespace_members_and_import_relationships(self) -> None:
         model = self.compile(self.fixture("bindings.bas"))
@@ -445,7 +511,8 @@ class SidecarTests(unittest.TestCase):
                 self.assertTrue(any(row[2] == "1" and row[15].casefold() == type_name.casefold() for row in rows))
             if mode == "expressions":
                 self.assertFalse(model.records["B"])
-                self.assertFalse(any(model.records[tag] for tag in DETAIL_TAGS))
+                self.assertFalse(any(model.records[tag] for tag in DETAIL_TAGS - PROVENANCE_TAGS))
+                self.assertTrue(model.records["FILE"])
                 self.assertTrue(all(row[13:15] == ["0", "0"] for row in model.records["E"]))
 
     def test_macros_and_line_remaps_never_become_editable(self) -> None:
@@ -496,7 +563,7 @@ class SidecarTests(unittest.TestCase):
         for mode in ("full", "expressions"):
             model = self.compile(source, mode=mode, extra=("-include", str(preinclude)))
             self.assertEqual([row[1] for row in model.records["D"]],
-                             [str(source), str(preinclude), str(first), str(second)])
+                             [self.compiler_path(path) for path in (source, preinclude, first, second)])
             self.assertEqual(model.footer[11], "1")
         self.assertEqual(unescape("%2525%09%0D%0A"), "%25\t\r\n")
 
@@ -508,11 +575,13 @@ class SidecarTests(unittest.TestCase):
             path = includes / f"{index}.bi"
             path.write_text("' bounded dependency fixture\n", encoding="utf-8")
             paths.append(path)
-        source = self.source("".join(f'#include "{path}"\n' for path in paths))
+        # Paths inside BASIC source never pass through MSYS2's argument
+        # conversion. Relative includes work with both compiler hosts.
+        source = self.source("".join(f'#include "includes/{path.name}"\n' for path in paths))
         model = self.compile(source, mode="expressions")
         self.assertEqual(len(model.records["D"]), 5000)
         self.assertEqual(model.footer[11], "0")
-        self.assertEqual(model.records["D"][0][1], str(source))
+        self.assertEqual(model.records["D"][0][1], self.compiler_path(source))
 
     def test_multi_module_ids_and_transaction_rollback(self) -> None:
         first = self.source("dim first_value as long = 1\nprint first_value\n", "first.bas")
@@ -555,7 +624,9 @@ class SidecarTests(unittest.TestCase):
                 Model.read(path, **options)
 
     def test_interrupted_compile_has_no_completeness_marker(self) -> None:
-        if not hasattr(os, "mkfifo"):
+        # MSYS2 exposes mkfifo to Python, but its FIFO is not a blocking
+        # source stream for the native Windows compiler.
+        if self.native_windows or not hasattr(os, "mkfifo"):
             self.skipTest("FIFO source requires POSIX")
         source = self.working / "blocked.bas"
         os.mkfifo(source)
@@ -596,10 +667,14 @@ class SidecarTests(unittest.TestCase):
                         if alias == "hardlink":
                             os.link(protected, destination)
                         else:
-                            destination.symlink_to(protected.name)
+                            self.create_symlink(protected.name, destination)
                     original = protected.read_bytes()
                     extra = ("-include", str(included)) if alias == "preinclude" else ()
-                    option = "-semantic-model-expressions" if mode == "expressions" else "-semantic-model"
+                    option = {
+                        "full": "-semantic-model",
+                        "bindings": "-semantic-model-bindings",
+                        "expressions": "-semantic-model-expressions",
+                    }[mode]
                     result, _ = self.invoke([source], mode="off", success=False,
                                             extra=(*extra, option, str(destination)))
                     self.assertEqual(protected.read_bytes(), original)
@@ -648,16 +723,11 @@ class SidecarTests(unittest.TestCase):
             self.assertEqual(source.read_bytes(), original)
 
     def test_publication_write_flush_close_and_replace_failures(self) -> None:
-        if os.name != "posix":
-            self.skipTest("Replacement failure fixture uses POSIX rename")
-        compiler = shutil.which(os.environ.get("GCC") or "gcc")
-        if compiler is None:
-            self.skipTest("C compiler is unavailable")
-        executable = self.working / "publication-test"
-        command = [compiler, "-Wall", "-Wextra", "-Werror",
-                   "-I", str(self.root / "src/compiler/tooling"),
-                   str(self.root / "tests/semantic-sidecar/semantic-output-test.c"),
-                   "-o", str(executable)]
+        executable = self.working / ("publication-test.exe" if self.native_windows else "publication-test")
+        command = [str(self.compiler), "-prefix", self.compiler_path(self.root), "-exx", "-w", "pedantic",
+                   "-i", self.compiler_path(self.root / "inc"), "-i", self.compiler_path(self.root / "src/compiler"),
+                   self.compiler_path(self.root / "tests/semantic-sidecar/semantic-output-test.bas"),
+                   "-x", self.compiler_path(executable)]
         built = subprocess.run(command, cwd=self.working, text=True, capture_output=True, timeout=60)
         self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
         tested = subprocess.run([str(executable)], cwd=self.working, text=True, capture_output=True, timeout=30)
@@ -668,7 +738,7 @@ class SidecarTests(unittest.TestCase):
     def test_unopened_sources_are_not_dependencies(self) -> None:
         source = self.working / "absent.bas"
         _, path = self.invoke([source], success=False)
-        self.assertNotIn(str(source), [line.split("\t")[1] for line in path.read_text().splitlines()
+        self.assertNotIn(self.compiler_path(source), [line.split("\t")[1] for line in path.read_text().splitlines()
                                        if line.startswith("D\t")])
 
     def test_output_open_failure_is_reported(self) -> None:
@@ -703,9 +773,9 @@ class SidecarTests(unittest.TestCase):
             "truncated": text[:-1], "missing-footer": "".join(lines[:-1]),
             "extra-record": text + "D\tunexpected.bas\n",
             "unknown-record": text.replace("M\t", "UNKNOWN\t", 1),
-            "unsupported-schema": text.replace("FBCSEM\t20", "FBCSEM\t999", 1),
+            "unsupported-schema": text.replace("FBCSEM\t" + SCHEMA, "FBCSEM\t999", 1),
             "invalid-escape": text.replace("M\t", "M\t%ZZ", 1),
-            "short-record": text.replace("M\t" + str(source), "M", 1),
+            "short-record": re.sub(r"(?m)^M\t[^\n]*", "M", text, count=1),
         }
         for index in range(2, 11):
             changed = footer.copy()
@@ -842,7 +912,8 @@ class SidecarTests(unittest.TestCase):
                              '#undef SELECTED_TYPE\n#define SELECTED_TYPE double\nnamespace Second\n'
                              '#include "shared.bi"\nend namespace\n')
         model = self.compile(source)
-        self.assertEqual([row[1] for row in model.records["D"]], [str(source), str(header)])
+        self.assertEqual([row[1] for row in model.records["D"]],
+                         [self.compiler_path(source), self.compiler_path(header)])
         rows = self.expressions(model, self.span(header, "return included_value", "included_value"))
         self.assertEqual({row[15] for row in rows}, {"long", "double"})
         self.assertTrue(all(row[2] == "1" for row in rows))
@@ -891,7 +962,7 @@ class SidecarTests(unittest.TestCase):
                 model = self.compile(source, extra=("-target", "linux", "-arch", architecture))
                 self.assertEqual(len(model.records["Q"]), 1)
                 context = model.records["Q"][0]
-                self.assertEqual(context[1], str(source))
+                self.assertEqual(context[1], self.compiler_path(source))
                 cpu = "686" if architecture == "x86" else "x86-64"
                 self.assertEqual(context[2:5], ["linux-" + architecture, cpu, "fb"])
                 self.assertEqual(context[6:9], [str(pointer_size), "little", "4"])
@@ -1088,6 +1159,36 @@ class SidecarTests(unittest.TestCase):
         self.assertEqual(len(labels), 100)
         self.assertFalse(set(prototypes) & set(labels))
 
+    def test_symbol_inventory_handles_many_sibling_prototypes(self) -> None:
+        # A wide header has many parameter tables but little nesting. Its
+        # sibling count must not exhaust the nested-table traversal stack.
+        count = 4500
+        source = self.source("".join(f"declare sub FlatCallback{index}(byval value as long)\n"
+                                   for index in range(count)))
+        model = self.compile(source)
+        callbacks = [identity for identity, row in model.types.items()
+                     if row[3] == "procedure" and row[2].lower().startswith("flatcallback")]
+        self.assertEqual(len(callbacks), count)
+        for identity in callbacks:
+            self.assertEqual(model.signatures[identity][4], "1")
+            self.assertEqual(model.parameters[identity][0][4], "byval")
+
+    def test_temporary_initializer_scopes_keep_metadata(self) -> None:
+        source = self.source("""type InitializerOptions
+  width as long = 1
+end type
+declare sub WithDefault(byref settings as InitializerOptions = InitializerOptions())
+WithDefault()
+""")
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                model = self.compile(source, backend=backend)
+                scopes = [identity for identity, row in model.types.items() if row[3] == "scope"]
+                self.assertTrue(scopes)
+                for row in model.symbols.values():
+                    if row[11] != "0":
+                        self.assertIn(int(row[11]), model.types)
+
 
     def test_wire_bytes_round_trip_without_unicode_loss(self) -> None:
         payload = bytes(range(256))
@@ -1122,5 +1223,1089 @@ class SidecarTests(unittest.TestCase):
                                                     for row in model.records["Z"]))
                 self.assertEqual(emissions[0], emissions[1])
                 self.assertEqual(emissions[0], emissions[2])
+
+    def test_legacy_and_malformed_utf8_bytes_keep_source_columns(self) -> None:
+        payloads = (b"\xf0", b"\xf0\x9f", b"\xe0\x80\x80", b"\xed\xa0\x80",
+                    b"\xf4\x90\x80\x80", b"\xf0\x9f\x98\x80", b"\xe2\x82\xac")
+        for payload in payloads:
+            original = b'dim value as string = "' + payload + b'" : print value\n'
+            source = self.working / "legacy-columns.bas"
+            source.write_bytes(original)
+            text = original.decode("utf-8", errors="surrogateescape")
+            width = len(text.rstrip("\n").encode("utf-16-le", errors="surrogatepass")) // 2
+            self.invoke([source], mode="off")
+            emitted = source.with_suffix(".c").read_bytes()
+            for mode in ("full", "bindings", "expressions"):
+                with self.subTest(payload=payload, mode=mode):
+                    _, path = self.invoke([source], mode=mode)
+                    self.assertEqual(source.with_suffix(".c").read_bytes(), emitted)
+                    model = Model.read(path, expressions_only=mode == "expressions", bindings_only=mode == "bindings")
+                    self.assertTrue(model.records["E"] if mode != "bindings" else model.records["B"])
+                    for tag, physical, column in (("B", 3, 4), ("E", 2, 3), ("I", 5, 6), ("O", 4, 5)):
+                        for row in model.records[tag]:
+                            if row[physical] == "1":
+                                span = source_range(row, column)
+                                self.assertLessEqual(span[4], width, row)
+                    if mode != "expressions":
+                        references = [row for row in model.records["B"] if row[2] == "reference"]
+                        self.assertTrue(any(source_range(row, 4)[4] == width for row in references))
+
+    def test_layout_abi_status_and_initialized_node_payloads(self) -> None:
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                model = self.compile(self.fixture("types.bas"), backend=backend)
+                packed = self.one(model, "Packed", "type")
+                properties = model.properties["symbol", packed]
+                self.assertEqual(properties["natural-alignment"], "8")
+                self.assertEqual(properties["packing-alignment"], "1")
+                self.assertEqual(properties["layout-finalized"], "1")
+                base = self.one(model, "BaseType", "type")
+                for relation in ("virtual-table", "runtime-type-info"):
+                    edges = [row for row in model.relations(relation) if row[2] == str(base)]
+                    self.assertEqual(len(edges), 1)
+                    self.assertEqual(model.types[int(edges[0][4])][3], "variable")
+                source = self.source("declare sub ArrayAPI(values(any, any) as long)\n"
+                                     "sub InitializeEarly() constructor 201\nend sub\n"
+                                     "function Calculate(byval value as long) as long\n"
+                                     "return value + 1\nend function\n"
+                                     "dim value as long = 1\nvalue = 2\nprint Calculate(value)\n")
+                model = self.compile(source, backend=backend)
+                early = self.one(model, "InitializeEarly", "procedure")
+                self.assertEqual(model.properties["symbol", early]["startup-priority"], "201")
+                calculate = self.one(model, "Calculate", "procedure")
+                self.assertEqual(model.properties["symbol", calculate]["return-used"], "1")
+                api = self.one(model, "ArrayAPI", "procedure")
+                formal = int(model.parameters[api][0][2])
+                descriptor = [row for row in model.relations("parameter-descriptor-type") if int(row[2]) == formal]
+                self.assertEqual(len(descriptor), 1)
+                self.assertEqual(model.types[int(descriptor[0][4])][3], "type")
+                self.assertEqual(model.properties["symbol", formal]["argument-register"], "0")
+                assignments = [properties for (domain, _), properties in model.properties.items()
+                               if domain == "node" and properties["kind"] == "assignment"]
+                self.assertTrue(assignments)
+                self.assertTrue(any(properties["initialization"] == "0" for properties in assignments))
+                self.assertTrue(all("operator-options" in properties for properties in assignments))
+
+    def test_assembly_tokens_preserve_operands_and_unknown_effects(self) -> None:
+        source = self.source("sub AssemblyProbe()\ndim slot as long\nasm\n"
+                             "mov eax, slot\nmov slot, eax\naudit_asm_label:\nnop\nend asm\nend sub\n")
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                model = self.compile(source, backend=backend)
+                tokens = model.records["ASM"]
+                self.assertTrue(tokens)
+                text = "".join(row[5] for row in tokens if row[3] == "text").lower()
+                self.assertIn("eax", text)
+                self.assertIn("audit_asm_label", text)
+                self.assertIn("nop", text)
+                operands = [row for row in tokens if row[3] == "symbol"]
+                self.assertEqual(len(operands), 2)
+                self.assertEqual({model.symbol_name(row[4]) for row in operands}, {"SLOT"})
+                self.assertFalse(model.named("audit_asm_label"))
+                for row in tokens:
+                    self.assertEqual(model.properties["node", int(row[1])]["assembly-effects"],
+                                     "unknown-memory-registers-control")
+
+    def test_deferred_copyback_has_destination_temporary_and_call_order(self) -> None:
+        source = self.source("declare sub Mutate(byref left_value as string, byref right_value as string)\n"
+                             "dim first_value as string * 8\ndim second_value as string * 16\n"
+                             "Mutate(first_value, second_value)\n"
+                             "dim ordinary_value as string\nMutate(ordinary_value, ordinary_value)\n")
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                model = self.compile(source, backend=backend)
+                calls = [row for row in model.records["N"] if model.properties["node", int(row[1])]["kind"] == "call"
+                         and model.symbol_name(row[9]) == "MUTATE"]
+                self.assertEqual(sorted(model.properties["node", int(row[1])]["copyback-count"] for row in calls), ["0", "2"])
+                call = next(row for row in calls if model.properties["node", int(row[1])]["copyback-count"] == "2")
+                destinations = [row for row in model.records["N"] if row[2] == call[1] and row[3] == "copyback"]
+                self.assertEqual(len(destinations), 2)
+                self.assertEqual({model.symbol_name(row[9]) for row in destinations}, {"FIRST_VALUE", "SECOND_VALUE"})
+                self.assertEqual(sorted(int(model.properties["node", int(row[1])]["auxiliary-ordinal"])
+                                        for row in destinations), [0, 1])
+                temporary_edges = model.relations("copyback-temporary")
+                self.assertEqual(len(temporary_edges), 2)
+                self.assertTrue(all(model.types[int(row[4])][18] == "compiler" for row in temporary_edges))
+
+    def test_reader_rejects_missing_or_corrupt_active_payload(self) -> None:
+        _, path = self.invoke([self.fixture("control-flow.bas")])
+        original = [line.split("\t") for line in path.read_text().splitlines()]
+        for property_name, replacement in (("kind", "pretend-kind"), ("bytes", "nonnumeric"),
+                                            ("conversion", "2"), ("operator-options", "256")):
+            with self.subTest(property_name=property_name):
+                rows = [row.copy() for row in original]
+                row = next(row for row in rows if row[0] == "K" and row[1] == "node" and row[3] == property_name)
+                row[4] = replacement
+                with self.assertRaises(ValueError):
+                    Model("\n".join("\t".join(row) for row in rows) + "\n")
+        rows = [row.copy() for row in original]
+        removed = next(row for row in rows if row[0] == "K" and row[1] == "node" and row[3] == "passing-mode")
+        rows.remove(removed)
+        rows[-1][12] = str(int(rows[-1][12]) - 1)
+        with self.assertRaises(ValueError):
+            Model("\n".join("\t".join(row) for row in rows) + "\n")
+
+    def test_prototype_names_special_headers_and_implicit_declarations(self) -> None:
+        source = self.source("declare function API(byval ExplicitName as long, byref BorrowedName as double) as long\n"
+                             "type Tracked\nvalue as long\ndeclare constructor(byval amount as long)\n"
+                             "declare destructor()\nend type\n"
+                             "constructor Tracked(byval amount as long)\nthis.value = amount\nend constructor\n"
+                             "destructor Tracked()\nend destructor\n"
+                             "operator +(byref left_value as Tracked, byref right_value as Tracked) as long\n"
+                             "return left_value.value + right_value.value\nend operator\n")
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                model = self.compile(source, backend=backend)
+                api = self.one(model, "API", "procedure")
+                names = [model.symbol_name(model.parameters[api][index][2]) for index in range(2)]
+                self.assertEqual(names, ["ExplicitName", "BorrowedName"])
+                occurrences = model.records["DCL"]
+                for kind in ("constructor", "destructor", "operator"):
+                    identities = {identity for identity, row in model.signatures.items() if row[2] == kind
+                                  and model.types[identity][18] == "source"}
+                    self.assertTrue(identities, kind)
+                    self.assertTrue(all(any(row[2] == str(identity) and row[3] == "procedure-definition"
+                                             for row in occurrences) for identity in identities))
+                implicit = self.source('#lang "fblite"\nprint implicit_value\n', "implicit.bas")
+                model = self.compile(implicit, backend=backend)
+                variable = self.one(model, "implicit_value", "variable")
+                self.assertEqual(model.types[variable][18], "source")
+                self.assertTrue(any(row[2] == str(variable) and row[3] == "implicit-variable" for row in model.records["DCL"]))
+
+    def test_initial_forward_type_use_resolves_without_fake_self_binding(self) -> None:
+        source = self.source("type LinkType as FutureType ptr\n"
+                             "type FutureType\nvalue as long\nend type\n"
+                             "type SelfType as SelfType\n")
+        model = self.compile(source)
+        selected = self.binding(model, self.span(source, "type LinkType as FutureType", "FutureType"), "reference")
+        self.assertEqual(model.symbol_name(selected), "FUTURETYPE")
+        canonical = {int(row[2]): int(row[4]) for row in model.relations("canonical-symbol")}
+        self.assertEqual(canonical.get(selected, selected), self.one(model, "FutureType", "type"))
+        self.assertFalse([row for row in model.records["B"] if row[2] == "reference"
+                          and source_range(row, 4) == self.span(source, "as SelfType", "SelfType")])
+
+    def test_effective_context_changes_follow_node_construction_and_module_reset(self) -> None:
+        first = self.source('#lang "fblite"\noption base 1\ndim first_values(2) as integer\n'
+                            'option base 0\ndim second_values(2) as integer\n'
+                            'print first_values(1), second_values(0)\n', "context-first.bas")
+        second = self.source('dim final_value as long = 1\nprint final_value\n', "context-second.bas")
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                _, path = self.invoke([first, second], backend=backend)
+                model = Model.read(path)
+                for name, expected in (("first_values", 1), ("second_values", 0)):
+                    symbols = set(model.named(name))
+                    declarations = [row for row in model.records["N"] if int(row[9]) in symbols
+                                    and model.properties["node", int(row[1])]["kind"] == "declaration"]
+                    self.assertTrue(declarations, name)
+                    for row in declarations:
+                        context = model.context_uses["node", int(row[1])]
+                        self.assertEqual(model.options[context]["language-default", "base"], expected)
+                self.assertTrue(any(module == 2 for module in model.configurations.values()))
+                for context, module in model.configurations.items():
+                    options = model.options[context]
+                    self.assertEqual(options["compiler", "debug"], 0)
+                    self.assertEqual(options["compiler", "debuginfo"], 0)
+                    self.assertEqual(options["compiler", "nullptrchk"], 0)
+                    self.assertIn(("language-policy", "int64literaldtype"), options)
+                    if module == 2:
+                        self.assertEqual(options["language-default", "base"], 0)
+                rows = [row.copy() for row in model.rows]
+                changed = next(row for row in rows if row[0] == "USE")
+                changed[3] = "999999999"
+                with self.assertRaises(ValueError):
+                    Model("\n".join("\t".join(row) for row in rows) + "\n")
+
+    def test_file_revisions_include_occurrences_and_remaps(self) -> None:
+        preinclude = self.source("const PreValue = 1\n", "preinclude.bi")
+        repeated = self.source("dim occurrence_value as long\n", "repeated.bi")
+        guarded = self.source("#pragma once\nconst GuardedValue = 2\n", "guarded.bi")
+        source = self.source('#include "guarded.bi"\n#include "guarded.bi"\n'
+                             'namespace FirstNamespace\n#include "repeated.bi"\nend namespace\n'
+                             'namespace SecondNamespace\n#include "repeated.bi"\nend namespace\n'
+                             '#line 200 "logical.bas"\nprint PreValue + GuardedValue\n')
+        for mode in ("full", "expressions"):
+            with self.subTest(mode=mode):
+                model = self.compile(source, mode=mode, extra=("-include", str(preinclude)))
+                model.validate_source_revisions()
+                for row in model.files.values():
+                    original = Path(row[2]).read_bytes()
+                    self.assertEqual(row[3], str(len(original)))
+                    self.assertEqual(row[4], hashlib.sha256(original).hexdigest())
+                repeated_contexts = [row for row in model.source_contexts.values()
+                                     if model.files[int(row[3])][2] == str(repeated)]
+                self.assertEqual(len(repeated_contexts), 2)
+                self.assertNotEqual(repeated_contexts[0][1], repeated_contexts[1][1])
+                self.assertEqual(repeated_contexts[0][2], repeated_contexts[1][2])
+                self.assertEqual(sum(row[5] == "preinclude" for row in model.source_contexts.values()), 1)
+                self.assertEqual([row[5] for row in model.records["INC"]].count("pragma-once"), 1)
+                self.assertTrue(any(row[3] == "logical.bas" for row in model.records["MAP"]))
+                self.assertFalse(any(row[2] == "logical.bas" for row in model.files.values()))
+                self.assertEqual(set(model.source_contexts), set(model.source_endings))
+                self.assertEqual(set(model.source_endings.values()), {"verified"})
+                if mode == "full":
+                    occurrence_symbols = model.named("occurrence_value", "variable")
+                    origins = set()
+                    for identity, row in enumerate(model.records["B"], 1):
+                        if int(row[1]) in occurrence_symbols and row[2] == "declaration":
+                            origin = model.origins.get(("binding", identity))
+                            if origin in {int(item[1]) for item in repeated_contexts}:
+                                origins.add(origin)
+                    self.assertEqual(origins, {int(item[1]) for item in repeated_contexts})
+                repeated.write_text("dim changed_value as long\n")
+                with self.assertRaisesRegex(ValueError, "stale"):
+                    model.validate_source_revisions()
+                repeated.write_text("dim occurrence_value as long\n")
+
+    def test_source_hash_boundaries_position_and_change_detection(self) -> None:
+        executable = self.working / ("source-revision.exe" if self.native_windows else "source-revision")
+        result = subprocess.run([str(self.compiler), "-prefix", self.compiler_path(self.root), "-exx", "-w", "pedantic",
+                                 "-i", self.compiler_path(self.root / "inc"), "-i", self.compiler_path(self.root / "src/compiler"),
+                                 self.compiler_path(self.root / "tests/semantic-sidecar/semantic-source-file-test.bas"),
+                                 "-x", self.compiler_path(executable)], cwd=self.working,
+                                capture_output=True, text=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for size in (0, 1, 55, 56, 63, 64, 65, 16383, 16384, 16385):
+            with self.subTest(size=size):
+                data = bytes(index % 256 for index in range(size))
+                path = self.working / "revision.bin"
+                path.write_bytes(data)
+                tested = subprocess.run([str(executable), self.compiler_path(path), hashlib.sha256(data).hexdigest(),
+                                         str(size), str(min(size, 17))], cwd=self.working,
+                                        capture_output=True, text=True, timeout=30)
+                self.assertEqual(tested.returncode, 0, tested.stdout + tested.stderr)
+                self.assertIn("semantic source revision passed", tested.stdout)
+
+    def test_conditional_directive_vocabulary_and_selections(self) -> None:
+        source = self.source("""#define FLAG 1
+#if 0
+dim excluded_first as long
+#elseifdef FLAG
+dim selected_first as long
+#elseif 1
+dim excluded_later as long
+#else
+dim excluded_else as long
+#endif
+#if not defined(MISSING)
+  #ifndef FLAG
+  dim excluded_nested as long
+  #elseifndef MISSING
+  dim selected_nested as long
+  #elseifdef FLAG
+  dim excluded_nested_later as long
+  #else
+  dim excluded_nested_else as long
+  #endif
+#endif
+#if "a string"
+dim excluded_string as long
+#else
+dim selected_string as long
+#endif
+""")
+        expected = {2: ("evaluated", "0", "0"), 4: ("evaluated", "1", "1"),
+                    6: ("evaluated", "1", "0"), 8: ("unconditional", "", "0"),
+                    11: ("evaluated", "1", "1"), 12: ("evaluated", "0", "0"),
+                    14: ("evaluated", "1", "1"), 16: ("evaluated", "1", "0"),
+                    18: ("unconditional", "", "0"), 22: ("evaluated", "0", "0"),
+                    24: ("unconditional", "", "1")}
+        for backend in self.backends:
+            for mode in ("full", "bindings", "expressions"):
+                with self.subTest(backend=backend, mode=mode):
+                    model = self.compile(source, backend=backend, mode=mode)
+                    actual = {int(branch[10]): tuple(model.conditional_decisions[identity][2:5])
+                              for identity, branch in model.conditional_branches.items()}
+                    self.assertEqual(actual, expected)
+                    self.assertEqual({row[7] for row in model.records["PPB"]},
+                                     {"if", "ifdef", "ifndef", "elseif", "elseifdef", "elseifndef", "else"} - {"ifdef"})
+                    nested = [row for row in model.records["PPB"] if int(row[10]) in (12, 14, 16, 18)]
+                    outer = next(row for row in model.records["PPB"] if row[10] == "11")
+                    self.assertEqual({row[2] for row in nested}, {outer[1]})
+                    if mode != "expressions":
+                        names = {row[2].lower() for row in model.records["S"]}
+                        self.assertTrue({"selected_first", "selected_nested", "selected_string"} <= names)
+                        self.assertFalse(any(name.startswith("excluded_") for name in names))
+                    probes = {(row[5].lower(), row[6]) for row in model.records["PPT"]}
+                    self.assertEqual(probes, {("flag", "1"), ("missing", "0")})
+                    for skipped in model.records["PPS"]:
+                        self.assertEqual(model.conditional_decisions[int(skipped[2])][4], "0")
+                    spans = {(int(row[6]), int(row[7]), int(row[8]), int(row[9])) for row in model.records["PPS"]}
+                    self.assertTrue({(3, 0, 4, 0), (7, 0, 8, 0), (9, 0, 10, 0),
+                                     (13, 0, 14, 2), (17, 0, 18, 2), (19, 0, 20, 2), (23, 0, 24, 0)} <= spans)
+
+    def test_inactive_conditionals_do_not_parse_or_repeat_callbacks(self) -> None:
+        source = self.source("""__FB_UNIQUEID_PUSH__(KEPT)
+dim __FB_UNIQUEID__(KEPT) as long = 17
+#if 0
+  #if __FB_UNIQUEID_POP__(KEPT) 1
+  this is invalid BASIC
+  #elseif defined(NEVER_QUERIED)
+  #else
+  #endif
+  #include "absent.bi"
+  #error "inactive error"
+#endif
+#if 1
+print __FB_UNIQUEID__(KEPT)
+#elseif __FB_UNIQUEID_PUSH__(ONCE) 1
+this is also invalid BASIC
+#endif
+__FB_UNIQUEID_POP__(ONCE)
+#if __FB_QUOTE__(__FB_UNIQUEID__(ONCE)) <> ""
+#error "callback was evaluated twice"
+#endif
+__FB_UNIQUEID_POP__(KEPT)
+""")
+        for backend in self.backends:
+            outputs = []
+            for mode in ("off", "full", "bindings", "expressions"):
+                with self.subTest(backend=backend, mode=mode):
+                    _, path = self.invoke([source], backend=backend, mode=mode)
+                    suffix = ".ll" if backend == "llvm" else ".asm" if backend in ("gas", "gas64") else ".c"
+                    outputs.append(source.with_suffix(suffix).read_bytes())
+                    if mode == "off":
+                        continue
+                    model = Model.read(path, expressions_only=mode == "expressions", bindings_only=mode == "bindings")
+                    branches = {int(row[10]): row for row in model.records["PPB"]}
+                    for line in (4, 6, 7):
+                        self.assertEqual(model.conditional_decisions[int(branches[line][1])][2:5],
+                                         ["parent-inactive", "", "0"])
+                    self.assertEqual(model.conditional_decisions[int(branches[14][1])][2:5],
+                                     ["evaluated", "1", "0"])
+                    self.assertFalse(any(row[5] == "NEVER_QUERIED" for row in model.records["PPT"]))
+                    self.assertFalse(model.records["INC"])
+                    self.assertEqual([row[1] for row in model.records["D"]], [self.compiler_path(source)])
+                    if mode != "expressions":
+                        self.assertFalse(any(row[2].lower() == "never_queried" for row in model.records["S"]))
+                        self.assertFalse(any(int(row[5]) in (5, 15) for row in model.records["B"]))
+            self.assertTrue(all(output == outputs[0] for output in outputs[1:]), backend)
+
+    def test_conditional_contexts_include_remap_and_module_reset(self) -> None:
+        header = self.working / "conditional.bi"
+        header.write_text("#ifdef FLAG\ndim present_value as long\n#else\ndim absent_value as long\n#endif\n")
+        source = self.source("""#if 1
+#define FLAG 1
+namespace First
+#include "conditional.bi"
+end namespace
+#undef FLAG
+namespace Second
+#include "conditional.bi"
+end namespace
+#endif
+#line 600 "conditional-logical.bas"
+#if 0
+not_valid BASIC
+#else
+dim mapped_value as long
+#endif
+""")
+        second = self.source("#if 1\ndim separate_value as long\n#endif\n", "second.bas")
+        for mode in ("full", "bindings", "expressions"):
+            with self.subTest(mode=mode):
+                _, path = self.invoke([source, second], mode=mode)
+                model = Model.read(path, expressions_only=mode == "expressions", bindings_only=mode == "bindings")
+                included = [row for row in model.records["PPB"] if row[9] == self.compiler_path(header)]
+                self.assertEqual(len({row[4] for row in included}), 2)
+                self.assertEqual([model.conditional_decisions[int(row[1])][4] for row in included if row[7] == "ifdef"],
+                                 ["1", "0"])
+                self.assertTrue(all(row[2] != "0" for row in included))
+                mapped = [row for row in model.records["PPB"] if row[9] == "conditional-logical.bas"]
+                self.assertEqual(len(mapped), 2)
+                self.assertTrue(all(row[8] == "0" for row in mapped))
+                following = [row for row in model.records["PPB"] if row[9] == self.compiler_path(second)]
+                self.assertEqual(len(following), 1)
+                self.assertEqual(following[0][2], "0")
+                self.assertEqual(model.source_contexts[int(following[0][4])][4], "2")
+                self.assertNotIn("conditional-logical.bas", [row[1] for row in model.records["D"]])
+
+    def test_inactive_conditional_nesting_can_exceed_parser_limit(self) -> None:
+        source = self.source("#if 0\n" + "#if invalid expression\n" * 80 +
+                             "this must not parse\n" + "#endif\n" * 81 + "dim accepted_value as long\n")
+        for mode in ("full", "expressions"):
+            model = self.compile(source, mode=mode)
+            self.assertEqual(len(model.records["PPB"]), 81)
+            self.assertEqual(len(model.records["PPE"]), 81)
+            self.assertEqual(sum(row[2] == "parent-inactive" for row in model.records["PPD"]), 80)
+
+    def test_conditional_reader_rejects_fabricated_graphs(self) -> None:
+        source = self.source("#define FLAG 1\n#if 1\ndim chosen as long\n#else\nnot valid\n#endif\n#ifdef FLAG\n#endif\n")
+        _, path = self.invoke([source])
+        rows = [line.split("\t") for line in path.read_text().splitlines()]
+        changed_fields = {
+            "PPB": ((1, "0"), (2, "999999"), (3, "999999"), (4, "999999"),
+                    (5, "999999"), (6, "2"), (7, "unknown"), (8, "2")),
+            "PPD": ((1, "999999"), (2, "unknown"), (3, ""), (4, "0")),
+            "PPE": ((1, "999999"), (2, "999999")),
+            "PPT": ((2, "999999"), (2, next(row[1] for row in rows if row[0] == "PPB")),
+                    (3, "999999"), (6, "0")),
+            "PPS": ((2, next(row[1] for row in rows if row[0] == "PPB")), (3, "999999")),
+        }
+        for tag, mutations in changed_fields.items():
+            index = next(index for index, row in enumerate(rows) if row[0] == tag)
+            for field, value in mutations:
+                with self.subTest(tag=tag, field=field), self.assertRaises(ValueError):
+                    changed = [row.copy() for row in rows]
+                    changed[index][field] = value
+                    Model("\n".join("\t".join(row) for row in changed) + "\n")
+        for tag in ("PPD", "PPE"):
+            with self.subTest(missing=tag), self.assertRaisesRegex(ValueError, "[Cc]onditional"):
+                changed = [row.copy() for row in rows if row[0] != tag]
+                changed[-1][12] = str(int(changed[-1][12]) - sum(row[0] == tag for row in rows))
+                Model("\n".join("\t".join(row) for row in changed) + "\n")
+
+    def test_conditional_recovery_does_not_claim_valid_evaluation(self) -> None:
+        source = self.source("dim runtime_value as long\n#if runtime_value\nprint 1\n#endif\n")
+        _, path = self.invoke([source], mode="expressions", success=False)
+        model = Model.read(path, expressions_only=True, allow_recovery=True)
+        self.assertEqual([row[2:5] for row in model.records["PPD"]], [["invalid", "", "0"]])
+        unclosed = self.source("#if 1\nprint 1\n", "unclosed.bas")
+        _, path = self.invoke([unclosed], mode="expressions", success=False)
+        model = Model.read(path, expressions_only=True, allow_recovery=True)
+        self.assertEqual(model.footer[0], "RECOVERY")
+        self.assertEqual(len(model.records["PPB"]), 1)
+        self.assertFalse(model.records["PPE"])
+
+    def test_generated_conditional_locations_remain_noneditable(self) -> None:
+        text = """#macro SelectValue()
+  #if 1
+  dim expanded_value as long
+  #else
+  invalid BASIC
+  #endif
+#endmacro
+SelectValue()
+"""
+        for encoding in ("ascii", "utf-16le"):
+            source = self.working / (encoding + ".bas")
+            source.write_bytes(text.encode("ascii") if encoding == "ascii" else codecs.BOM_UTF16_LE + text.encode("utf-16le"))
+            for mode in ("full", "bindings", "expressions"):
+                with self.subTest(encoding=encoding, mode=mode):
+                    _, path = self.invoke([source], mode=mode)
+                    model = Model.read(path, expressions_only=mode == "expressions", bindings_only=mode == "bindings")
+                    self.assertEqual(len(model.records["PPB"]), 2)
+                    self.assertEqual([row[4] for row in model.records["PPD"]], ["1", "0"])
+                    for tag, flag_column in (("PPB", 8), ("PPD", 5), ("PPE", 3)):
+                        self.assertTrue(all(row[flag_column] == "0" for row in model.records[tag]))
+                    self.assertTrue(any(row[7:11] == [row[7], row[8], row[7], row[8]]
+                                        for row in model.records["PPD"]))
+                    if mode == "full":
+                        rows = path.read_text().splitlines()
+                        index = next(index for index, line in enumerate(rows) if line.startswith("PPD\t"))
+                        corrupted = rows[index].split("\t")
+                        corrupted[5] = "1"
+                        rows[index] = "\t".join(corrupted)
+                        with self.assertRaises(ValueError):
+                            Model("\n".join(rows) + "\n")
+
+    def test_line_only_remaps_do_not_restore_physical_locations(self) -> None:
+        header = self.working / "after-remap.bi"
+        header.write_text("#if 1\ndim actual_include_value as long\n#endif\n")
+        source = self.source("""dim first_value as long
+#line 1
+#if 1
+dim remapped_value as long
+#endif
+#line 2
+#include "after-remap.bi"
+#if 1
+print remapped_value
+#endif
+""")
+        for mode in ("full", "bindings", "expressions"):
+            with self.subTest(mode=mode):
+                model = self.compile(source, mode=mode)
+                self.assertEqual([row[4] for row in model.records["MAP"]], ["1", "0"])
+                roots = [row for row in model.records["PPB"] if row[9] == self.compiler_path(source)]
+                self.assertEqual(len(roots), 2)
+                self.assertTrue(all(row[8] == "0" for row in roots))
+                included = [row for row in model.records["PPB"] if row[9] == self.compiler_path(header)]
+                self.assertEqual(len(included), 1)
+                self.assertEqual(included[0][8], "1")
+                self.assertEqual(model.records["INC"][0][6], "0")
+                include_context = next(row for row in model.records["SRC"] if row[5] == "include")
+                self.assertEqual(include_context[8], "0")
+                if mode != "expressions":
+                    identities = [row[1] for row in model.records["S"] if row[2].lower() == "remapped_value"]
+                    self.assertEqual(len(identities), 1)
+                    bindings = [row for row in model.records["B"] if row[1] == identities[0]]
+                    self.assertTrue(bindings)
+                    self.assertTrue(all(row[3] == "0" for row in bindings))
+
+    def test_inactive_conditional_syntax_is_observed_without_validation(self) -> None:
+        source = self.source("""#if 0
+#if invalid expression
+#else
+#elseif this is not a valid condition
+#else
+#endif
+#endif
+dim accepted_value as long
+""")
+        for mode in ("full", "bindings", "expressions"):
+            with self.subTest(mode=mode):
+                model = self.compile(source, mode=mode)
+                nested = [row for row in model.records["PPB"] if row[2] != "0"]
+                self.assertEqual([row[7] for row in nested], ["if", "else", "elseif", "else"])
+                self.assertTrue(all(model.conditional_decisions[int(row[1])][2:5] ==
+                                    ["parent-inactive", "", "0"] for row in nested))
+                self.assertFalse(model.records["PPT"])
+
+    def test_macro_expansions_arguments_substitutions_and_origins(self) -> None:
+        text = """#define SEM_VALUE 3
+#define SEM_TWICE(x) ((x)*2)
+#define SEM_INDIRECT SEM_TWICE
+#define SEM_STRINGIFY(x) #x
+#define SEM_JOIN(a,b) a##b
+#define SEM_EMPTY
+#define SEM_COUNT(args...) __FB_ARG_COUNT__(args)
+dim SEM_JOIN(joined,SEM_VALUE) as long = SEM_INDIRECT(SEM_VALUE)
+dim nested_value as long = SEM_TWICE(SEM_TWICE(2))
+dim text_value as string = SEM_STRINGIFY(hello)
+dim count_value as long = SEM_COUNT(1,2,3)
+print SEM_EMPTY joined3
+"""
+        for encoding in ("ascii", "utf-16le"):
+            source = self.working / (encoding + ".bas")
+            source.write_bytes(text.encode("ascii") if encoding == "ascii" else codecs.BOM_UTF16_LE + text.encode("utf-16le"))
+            for backend in self.backends:
+                emissions = []
+                for mode in ("off", "full", "bindings", "expressions"):
+                    with self.subTest(encoding=encoding, backend=backend, mode=mode):
+                        _, path = self.invoke([source], backend=backend, mode=mode)
+                        suffix = ".ll" if backend == "llvm" else ".asm" if backend in ("gas", "gas64") else ".c"
+                        emissions.append(source.with_suffix(suffix).read_bytes())
+                        if mode == "off":
+                            continue
+                        model = Model.read(path, expressions_only=mode == "expressions", bindings_only=mode == "bindings")
+                        outcomes: dict[str, list[str]] = {}
+                        for identity, result in model.macro_results.items():
+                            invocation = model.macro_invocations[identity]
+                            name = model.macro_definitions[int(invocation[3])][5]
+                            units = model.macro_units(result[3], result[5])
+                            value = units.decode() if isinstance(units, bytes) else "".join(chr(unit) for unit in units)
+                            outcomes.setdefault(name, []).append(value)
+                        self.assertEqual(outcomes["SEM_JOIN"], ["joined3"])
+                        self.assertEqual(outcomes["SEM_STRINGIFY"], ['$"hello"'])
+                        self.assertEqual(outcomes["SEM_EMPTY"], [""])
+                        self.assertEqual(outcomes["SEM_COUNT"], ["__FB_ARG_COUNT__(1,2,3)"])
+                        self.assertEqual(outcomes["__FB_ARG_COUNT__"], ["3"])
+                        self.assertEqual(sorted(outcomes["SEM_TWICE"]), sorted(["((3)*2)", "((2)*2)", "((((2)*2))*2)"]))
+                        self.assertTrue({"root", "argument", "replacement"} <= {row[8] for row in model.records["MI"]})
+                        join_definition = next(identity for identity, row in model.macro_definitions.items() if row[5] == "SEM_JOIN")
+                        self.assertEqual([row[5] for row in model.macro_tokens[join_definition] if row[3] != "parameter"], ["0", "1"])
+                        self.assertTrue({"parameter", "stringify", "callback", "text", "definition-text"} <=
+                                        {row[5] for row in model.records["MS"]})
+                        self.assertEqual(len(model.records["MC"]), 1)
+                        if mode == "expressions":
+                            self.assertTrue(all(row[2] == "0" for row in model.records["MD"]))
+                        else:
+                            joined = next(row[1] for row in model.records["S"] if row[2].lower() == "joined3")
+                            bindings = {str(index) for index, row in enumerate(model.records["B"], 1) if row[1] == joined}
+                            self.assertTrue(any(row[1] == "binding" and row[2] in bindings or
+                                                row[1] == "symbol" and row[2] == joined and row[4].startswith("declaration-")
+                                                for row in model.records["MR"]))
+                            self.assertTrue(all(row[3] == "0" for row in model.records["B"] if row[1] == joined and row[2] == "declaration"))
+            self.assertTrue(all(item == emissions[0] for item in emissions[1:]))
+
+    def test_compact_mode_omits_macro_graph_without_dropping_requested_semantics(self) -> None:
+        source = self.source("#define SEM_COMPACT(x) ((x) + 1)\n"
+                             "dim compact_value as long = SEM_COMPACT(4)\n"
+                             "print compact_value + 2\n")
+        macro_tags = ("MD", "MT", "MI", "MA", "MS", "MC", "ME", "ML", "MR")
+        for mode in ("full", "bindings", "expressions"):
+            with self.subTest(mode=mode):
+                _, path = self.invoke([source], mode=mode, extra=("-semantic-model-compact",))
+                model = Model.read(path, expressions_only=mode == "expressions",
+                                   bindings_only=mode == "bindings")
+                self.assertFalse(any(model.records[tag] for tag in macro_tags))
+                self.assertTrue(model.records["D"])
+                if mode == "full":
+                    self.assertTrue(model.records["N"])
+                elif mode == "bindings":
+                    self.assertTrue(model.records["B"])
+                else:
+                    self.assertTrue(model.records["E"])
+
+    def test_macro_lifetimes_preserve_retired_definitions_and_missing_undef(self) -> None:
+        source = self.source("#define SEM_REVISED 3\n#define SEM_REVISED 3\ndim first_value as long = SEM_REVISED\n"
+                             "#undef SEM_REVISED\n#undef SEM_ABSENT\n#define SEM_REVISED 4\ndim second_value as long = SEM_REVISED\n")
+        for mode in ("full", "bindings", "expressions"):
+            model = self.compile(source, mode=mode)
+            self.assertEqual([row[3] for row in model.records["ML"]], ["define", "identical", "undef", "undef-missing", "define"])
+            definitions = [row for row in model.records["MD"] if row[5] == "SEM_REVISED"]
+            self.assertEqual(len(definitions), 2)
+            self.assertNotEqual(definitions[0][1], definitions[1][1])
+            self.assertEqual([row[5] for row in model.records["ME"]], ["3", "4"])
+            self.assertEqual(model.records["ML"][3][2], "0")
+            self.assertEqual([row[4] for row in model.macro_tokens[int(definitions[0][1])]], ["3"])
+            self.assertEqual([row[4] for row in model.macro_tokens[int(definitions[1][1])]], ["4"])
+
+    def test_macro_name_only_and_empty_arguments_do_not_fabricate_expansions(self) -> None:
+        source = self.source("#define SEM_ARGLESS() 11\n#define SEM_OPTIONAL(x,args...) x\n"
+                             "dim count_value as long = __FB_ARG_COUNT__(SEM_ARGLESS)\n"
+                             "dim actual_value as long = SEM_ARGLESS()\ndim optional_value as long = SEM_OPTIONAL(5)\n")
+        model = self.compile(source)
+        attempts = [identity for identity, row in model.macro_invocations.items()
+                    if model.macro_definitions[int(row[3])][5] == "SEM_ARGLESS"]
+        self.assertEqual([model.macro_results[identity][2] for identity in attempts], ["not-invoked", "expanded"])
+        self.assertEqual(model.macro_results[attempts[0]][4:7], ["0", "", "0"])
+        self.assertFalse(model.macro_segments[attempts[0]])
+        optional = next(identity for identity, row in model.macro_invocations.items()
+                        if model.macro_definitions[int(row[3])][5] == "SEM_OPTIONAL")
+        empty = model.macro_arguments[optional][1]
+        self.assertEqual(empty[4:8], ["", "0", "0", ""])
+        self.assertEqual(empty[8:], ["0", "0", "0", "0"])
+
+    def test_macro_operator_origins_follow_consumption_inside_physical_operands(self) -> None:
+        source = self.source("#define SEM_PLUS +\ndim value as long = 1 SEM_PLUS 2\n")
+        for mode in ("full", "expressions"):
+            model = self.compile(source, mode=mode)
+            plus = next(identity for identity, row in model.macro_invocations.items()
+                        if model.macro_definitions[int(row[3])][5] == "SEM_PLUS")
+            expressions = [row for row in model.records["E"] if row[2] == "0" and row[4] == "2"]
+            self.assertTrue(expressions)
+            self.assertTrue(any(domain == "expression" and expansion == plus and role.startswith("token-")
+                                for (domain, subject, role), expansion in model.macro_origins.items()
+                                if subject in {int(row[1]) for row in expressions}))
+
+    def test_macro_failed_and_recursive_attempts_remain_recovery(self) -> None:
+        fixtures = (("#define SEM_RECURSE(x) SEM_RECURSE(x)\nprint SEM_RECURSE(1)\n", "recursive"),
+                    ("print __FB_ARG_EXTRACT__(not_a_number,1)\n", "failed"))
+        for text, expected in fixtures:
+            with self.subTest(outcome=expected):
+                source = self.source(text, expected + ".bas")
+                _, path = self.invoke([source], mode="expressions", success=False)
+                model = Model.read(path, expressions_only=True, allow_recovery=True)
+                failures = [identity for identity, row in model.macro_results.items() if row[2] == expected]
+                self.assertTrue(failures)
+                if expected == "recursive":
+                    self.assertTrue(all(model.macro_results[identity][4] == "0" for identity in failures))
+                    self.assertTrue(all(not model.macro_segments[identity] for identity in failures))
+        rejected = self.source("#define DOUBLE(x) x\nprint 1\n", "keyword.bas")
+        _, path = self.invoke([rejected], mode="expressions", success=False)
+        model = Model.read(path, expressions_only=True, allow_recovery=True)
+        self.assertTrue(any(row[3] == "definition-rejected" for row in model.records["ML"]))
+        self.assertFalse(any(row[5] == "DOUBLE" for row in model.records["MD"]))
+
+    def test_macro_reader_rejects_fabricated_provenance_and_substitutions(self) -> None:
+        source = self.source("#define SEM_TEXT(x) #x\n#define SEM_VALUE 2\ndim text_value as string = SEM_TEXT(SEM_VALUE)\n#undef SEM_VALUE\n")
+        _, path = self.invoke([source])
+        rows = [line.split("\t") for line in path.read_text().splitlines()]
+        modifications = {
+            "MD": ((1, "0"), (2, "999999"), (4, "999999"), (6, "unknown"), (7, "33"), (8, "16")),
+            "MT": ((1, "999999"), (3, "unknown"), (5, "2")),
+            "MI": ((2, "999999"), (3, "999999"), (4, "999999"), (7, "unknown"), (8, "callback")),
+            "MA": ((2, "99999"), (3, "unknown"), (5, "0")),
+            "MS": ((2, "99999"), (3, "99999"), (4, "99999"), (5, "unknown"), (6, "1"), (7, "99999")),
+            "ME": ((2, "unknown"), (3, "unknown"), (4, "99999"), (5, "different")),
+            "ML": ((2, "999999"), (3, "unknown"), (4, "999999")),
+            "MR": ((1, "unknown"), (2, "999999"), (3, "999999")),
+        }
+        for tag, mutations in modifications.items():
+            index = next(index for index, row in enumerate(rows) if row[0] == tag)
+            for field, value in mutations:
+                with self.subTest(tag=tag, field=field), self.assertRaises(ValueError):
+                    changed = [row.copy() for row in rows]
+                    changed[index][field] = value
+                    Model("\n".join("\t".join(row) for row in changed) + "\n")
+        with self.assertRaisesRegex(ValueError, "Macro expansion graph is incomplete"):
+            changed = [row.copy() for row in rows if row[0] != "ME"]
+            changed[-1][12] = str(int(changed[-1][12]) - sum(row[0] == "ME" for row in rows))
+            Model("\n".join("\t".join(row) for row in changed) + "\n")
+
+    def test_macro_optional_parentheses_restore_caller_delimiters(self) -> None:
+        text = "#macro SEM_OPTION ?(x)\nx\n#endmacro\nprint SEM_OPTION 7: print 8\n"
+        for wide in (False, True):
+            source = self.working / ("optional-wide.bas" if wide else "optional.bas")
+            source.write_bytes(codecs.BOM_UTF16_LE + text.encode("utf-16le") if wide else text.encode())
+            model = self.compile(source)
+            self.assertEqual([row[5] for row in model.records["MS"]], ["parameter", "restored-delimiter"])
+            result = model.records["ME"][0]
+            units = model.macro_units(result[3], result[5])
+            self.assertEqual(units, (55, 58) if wide else b"7:")
+            self.assertEqual([row[6:8] for row in model.records["MS"]], [["0", "1"], ["1", "1"]])
+
+    def test_macro_arguments_with_invalid_extents_are_nonphysical_points(self) -> None:
+        source = self.working / "macro_no_parentheses.bas"
+        shutil.copyfile(self.root / "tests/pp/macro_no_parentheses.bas", source)
+        model = self.compile(source, mode="expressions",
+                             extra=("-i", str(self.root / "tests/fbcunit/inc")))
+        arguments = model.records["MA"]
+        self.assertTrue(arguments)
+        points = [row for row in arguments if row[5] == "1" and row[6] == "0" and
+                  row[8] == row[10] and row[9] == row[11]]
+        self.assertTrue(points, "invalid macro argument extents should retain only a nonphysical start point")
+
+    def test_macro_callback_outputs_and_argument_reuse_preserve_execution(self) -> None:
+        source = self.source("__FB_UNIQUEID_PUSH__(SEM_STACK)\n"
+                             "dim __FB_UNIQUEID__(SEM_STACK) as long = 17\n"
+                             "dim evaluated_value as long = __FB_EVAL__(1 + 2)\n"
+                             "dim source_line as long = __LINE__\n"
+                             "print __FB_UNIQUEID__(SEM_STACK) + evaluated_value\n"
+                             "__FB_UNIQUEID_POP__(SEM_STACK)\n" +
+                             "#assert __FB_ARG_COUNT__(1,2,3) = 3\n" * 100)
+        outcomes = []
+        for mode in ("off", "full", "bindings", "expressions"):
+            with self.subTest(mode=mode):
+                executable = self.working / (mode + (".exe" if self.native_windows else ""))
+                _, path = self.invoke([source], mode=mode, emit=False, extra=("-x", str(executable)))
+                result = subprocess.run([str(executable)], capture_output=True, timeout=20)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), b"20")
+                outcomes.append(result.stdout)
+                if mode == "off":
+                    continue
+                model = Model.read(path, expressions_only=mode == "expressions", bindings_only=mode == "bindings")
+                callbacks = {}
+                for identity, row in model.macro_callbacks.items():
+                    name = model.macro_definitions[int(model.macro_invocations[identity][3])][5]
+                    callbacks.setdefault(name, []).append(row[4])
+                self.assertEqual(callbacks["__FB_EVAL__"], ["3"])
+                self.assertEqual(callbacks["__LINE__"], ["4"])
+                self.assertEqual(len(callbacks["__FB_ARG_COUNT__"]), 100)
+                self.assertEqual(len(callbacks["__FB_UNIQUEID_PUSH__"]), 1)
+                self.assertEqual(len(callbacks["__FB_UNIQUEID_POP__"]), 1)
+                self.assertEqual(len(set(callbacks["__FB_UNIQUEID__"])), 1)
+                self.assertTrue(any(row[6] == "define-callback" for row in model.records["MD"]))
+        self.assertTrue(all(item == outcomes[0] for item in outcomes[1:]))
+
+    def test_physical_locations_map_encodings_boms_and_line_endings(self) -> None:
+        text = 'dim root_value as long\nprint len("😀") + root_value\n#line 700 "logical.bas"\nprint root_value\n'
+        encodings = (("utf-8", b""), ("utf-8", codecs.BOM_UTF8),
+                     ("utf-16-le", codecs.BOM_UTF16_LE), ("utf-16-be", codecs.BOM_UTF16_BE),
+                     ("utf-32-le", codecs.BOM_UTF32_LE), ("utf-32-be", codecs.BOM_UTF32_BE))
+        for index, (encoding, bom) in enumerate(encodings):
+            for line_ending in ("\n", "\r\n", "\r"):
+                with self.subTest(encoding=encoding, bom=bool(bom), ending=repr(line_ending)):
+                    source = self.working / f"coordinates-{index}.bas"
+                    original = bom + text.replace("\n", line_ending).encode(encoding)
+                    source.write_bytes(original)
+                    model = self.compile(source)
+                    model.validate_physical_locations()
+                    value = self.one(model, "root_value", "variable")
+                    references = {str(ordinal) for ordinal, row in enumerate(model.records["B"], 1)
+                                  if row[1] == str(value) and row[2] == "reference"}
+                    locations = [row for row in model.records["LOC"] if row[1] == "binding" and row[2] in references]
+                    self.assertEqual(len(locations), 2)
+                    self.assertEqual([row[5:9] for row in locations], [["2", "18", "2", "28"], ["4", "6", "4", "16"]])
+                    needle = "root_value".encode(encoding)
+                    offsets = [original.index(needle, len(bom)), original.index(needle, original.index(needle, len(bom)) + len(needle))]
+                    final = original.rindex(needle)
+                    self.assertEqual([int(row[9]) for row in locations], [offsets[1], final])
+                    self.assertTrue(all(row[11] == "mapped" for row in locations))
+                    self.assertTrue(all(row[3] == "0" for row in model.records["B"] if row[4] == "logical.bas"))
+
+    def test_empty_colon_statements_do_not_export_reversed_physical_ranges(self) -> None:
+        source = self.source("sub A overload(byval p as any ptr) :            : end sub\n")
+        model = self.compile(source, mode="bindings")
+        model.validate_physical_locations()
+        statement_ids = {int(row[1]) for row in model.records["ST"]}
+        located_statements = {int(row[2]) for row in model.records["LOC"] if row[1] == "statement"}
+        self.assertTrue(statement_ids)
+        self.assertLess(len(located_statements), len(statement_ids))
+
+    def test_physical_locations_preserve_repeated_include_and_remap_origins(self) -> None:
+        header = self.working / "physical-header.bi"
+        header.write_text("#line 500\ndim repeated_value as long\n")
+        source = self.source("namespace First\n#include \"physical-header.bi\"\nend namespace\n"
+                             "#line 80 \"mapped-root.bas\"\nnamespace Second\n#include \"physical-header.bi\"\nend namespace\n")
+        for mode in ("full", "bindings", "expressions"):
+            with self.subTest(mode=mode):
+                model = self.compile(source, mode=mode)
+                model.validate_physical_locations()
+                included = [row for row in model.records["SRC"] if row[5] == "include"]
+                self.assertEqual(len(included), 2)
+                self.assertNotEqual(included[0][1], included[1][1])
+                include_locations = [row for row in model.records["LOC"] if row[1] == "include"]
+                self.assertEqual([row[5] for row in include_locations], ["2", "6"])
+                self.assertTrue(all(row[11] == "mapped" for row in include_locations))
+                if mode != "expressions":
+                    declarations = {str(index) for index, row in enumerate(model.records["B"], 1)
+                                    if row[2] == "declaration" and row[5] == "501"}
+                    locations = [row for row in model.records["LOC"] if row[1] == "binding" and row[2] in declarations]
+                    self.assertEqual(len(locations), 2)
+                    self.assertEqual({row[4] for row in locations}, {row[1] for row in included})
+                    self.assertTrue(all(row[5] == "2" and row[11] == "mapped" for row in locations))
+
+    def test_physical_location_reader_rejects_false_bytes_and_forged_origins(self) -> None:
+        source = self.source('dim value as long\nprint len("😀") + value\n')
+        _, path = self.invoke([source])
+        model = Model.read(path)
+        model.validate_physical_locations()
+        rows = [line.split("\t") for line in path.read_text().splitlines()]
+        index = next(index for index, row in enumerate(rows) if row[0] == "LOC")
+        for field, value in ((1, "unknown"), (2, "999999"), (4, "999999"), (5, "0"),
+                             (9, "-2"), (10, "999999"), (11, "unknown")):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                changed = [row.copy() for row in rows]
+                changed[index][field] = value
+                Model("\n".join("\t".join(row) for row in changed) + "\n")
+        changed = [row.copy() for row in rows]
+        changed[index][9] = str(int(changed[index][9]) + 1)
+        forged = Model("\n".join("\t".join(row) for row in changed) + "\n")
+        with self.assertRaisesRegex(ValueError, "Physical bytes disagree"):
+            forged.validate_physical_locations()
+        source.write_text("dim changed_value as long\n")
+        with self.assertRaisesRegex(ValueError, "stale"):
+            model.validate_physical_locations()
+
+    def test_generated_and_malformed_locations_do_not_claim_byte_mappings(self) -> None:
+        source = self.source("#define SEM_GENERATED(x) x\n#define SEM_INDIRECT SEM_GENERATED\ndim value as long = SEM_INDIRECT(7)\n")
+        model = self.compile(source)
+        generated = {row[1] for row in model.records["MI"] if row[9] == "0"}
+        self.assertTrue(generated)
+        self.assertFalse(any(row[1] == "macro-attempt" and row[2] in generated for row in model.records["LOC"]))
+        malformed = self.working / "malformed-coordinates.bas"
+        malformed.write_bytes(b'dim value as string = "\xe9" : print value\n')
+        model = self.compile(malformed)
+        self.assertTrue(model.records["LOC"])
+        self.assertTrue(all(row[11] == "unverified" and row[9:11] == ["-1", "-1"] for row in model.records["LOC"]))
+
+    def test_source_calls_formals_and_lowered_calls_keep_distinct_meanings(self) -> None:
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                model = self.compile(self.fixture("sufficiency.bas"), backend=backend)
+                target = self.one(model, "OptionalValue", "procedure")
+                formal = int(model.parameters[target][0][2])
+                self.assertEqual(model.signatures[target][5], "1")
+                calls = [row for identity, row in model.nodes.items()
+                         if model.properties["node", identity]["kind"] == "call"
+                         and row[9] == str(target)]
+                self.assertEqual(len(calls), 2)
+                for call in calls:
+                    argument = next(row for row in model.nodes.values()
+                                    if row[2] == call[1] and row[3] == "right")
+                    self.assertEqual(int(argument[9]), formal)
+                    # "default" describes the passing mode selected from the
+                    # formal, not whether this source omitted the argument.
+                    self.assertEqual(model.properties["node", int(argument[1])]["passing-mode"], "default")
+                    value = next(row for row in model.nodes.values()
+                                 if row[2] == argument[1] and row[3] == "left")
+                    self.assertEqual(model.constants["node", int(value[1])], ("signed", "7"))
+                unevaluated = self.one(model, "UnevaluatedValue", "procedure")
+                typed_calls = [row for row in model.records["E"] if row[13] == str(unevaluated)]
+                self.assertEqual(len(typed_calls), 2)
+                runtime_calls = [row for identity, row in model.nodes.items()
+                                 if model.properties["node", identity]["kind"] == "call"
+                                 and row[9] == str(unevaluated)]
+                self.assertFalse(runtime_calls)
+
+    def test_source_expression_links_access_roles_and_argument_defaults(self) -> None:
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                source = self.fixture("sufficiency.bas")
+                model = self.compile(source, backend=backend)
+                target = self.one(model, "OptionalValue", "procedure")
+                calls = [row for identity, row in model.nodes.items()
+                         if model.properties["node", identity]["kind"] == "call" and row[9] == str(target)]
+                defaults = []
+                for call in calls:
+                    argument = next(row for row in model.nodes.values() if row[2] == call[1] and row[3] == "right")
+                    defaults.append(model.properties["node", int(argument[1])]["default-argument"])
+                self.assertEqual(sorted(defaults), ["0", "1"])
+                links = model.relations("source-expression")
+                self.assertTrue(links)
+                expression_ids = {row[1] for row in model.records["E"]}
+                self.assertTrue(all(row[3] == "expression" and row[4] in expression_ids for row in links))
+                omitted = self.one(model, "UnevaluatedValue", "procedure")
+                source_calls = {row[1] for row in model.records["E"] if row[13] == str(omitted)}
+                self.assertFalse(source_calls & {row[4] for row in links})
+                for text, role in (("value = 1", "write"), ("value += 2", "read-write"),
+                                   ("print value", "read"), ("ChangeValue(value)", "byref")):
+                    span = self.span(source, text, "value")
+                    binding = next(index for index, row in enumerate(model.records["B"], 1)
+                                   if source_range(row, 4) == span and row[2] == "reference")
+                    self.assertEqual(model.access_roles[binding], role)
+                self.assertEqual(model.capabilities[1]["argument-default-origin"], "available")
+                self.assertEqual(model.capabilities[1]["external-call-effects"], "unavailable")
+                self.assertEqual(model.capabilities[1]["expression-node-links"], "partial")
+
+    def test_binding_access_roles_work_without_ast_export(self) -> None:
+        source = self.fixture("sufficiency.bas")
+        model = self.compile(source, mode="bindings")
+        self.assertFalse(model.nodes)
+        self.assertTrue(model.access_roles)
+        self.assertEqual(model.capabilities[1]["lowered-ast"], "unavailable")
+        self.assertEqual(model.capabilities[1]["source-access-roles"], "partial")
+        changed = model.rows.copy()
+        row = next(index for index, row in enumerate(changed) if row[0] == "ACC")
+        changed[row] = ["ACC", "999999999", "write"]
+        with self.assertRaises(ValueError):
+            Model("\n".join("\t".join(row) for row in changed) + "\n", bindings_only=True)
+
+    def test_file_statements_have_source_operation_owners(self) -> None:
+        source = self.source('sub FileOperations()\n'
+                             'dim number as long = freefile()\n'
+                             'open "input.txt" for input as #number\n'
+                             'dim text as string\n'
+                             'line input #number, text\n'
+                             'close #number\nend sub\n')
+        for mode in ("full", "bindings", "expressions"):
+            with self.subTest(mode=mode):
+                model = self.compile(source, mode=mode)
+                self.assertEqual([row[2] for row in model.records["SOP"]], ["file-open", "line-input", "file-close"])
+                for row in model.records["SOP"]:
+                    identity = int(row[1])
+                    self.assertIn(identity, model.statements)
+                    self.assertIn(identity, model.statement_endings)
+                    self.assertIn(("statement", identity, "range"), model.physical_locations)
+
+    def test_source_construct_families_and_routes_preserve_emission(self) -> None:
+        source = self.fixture("constructs.bas")
+        kinds = {"if", "for", "do", "while", "select", "with", "scope", "namespace",
+                 "extern", "procedure", "type", "union", "enum", "assembly"}
+        routes = {"declaration", "compound", "call-or-assignment", "intrinsic", "assembly",
+                  "pointer-or-assignment", "label", "aggregate-member", "enumerator", "assembly-line"}
+        for backend in self.backends:
+            outputs = []
+            for mode in ("off", "full", "bindings", "expressions"):
+                with self.subTest(backend=backend, mode=mode):
+                    result, path = self.invoke([source], backend=backend, mode=mode)
+                    suffix = ".ll" if backend == "llvm" else ".asm" if backend in ("gas", "gas64") else ".c"
+                    outputs.append((result.stdout, result.stderr, source.with_suffix(suffix).read_bytes()))
+                    if mode == "off":
+                        continue
+                    model = Model.read(path, expressions_only=mode == "expressions", bindings_only=mode == "bindings")
+                    self.assertEqual({row[5] for row in model.constructs.values()}, kinds)
+                    self.assertEqual({row[2] for row in model.statement_endings.values()}, routes)
+                    self.assertEqual(set(model.statements), set(model.statement_endings))
+                    self.assertEqual(set(model.constructs), set(model.construct_endings))
+                    self.assertEqual({row[3] for row in model.statement_endings.values()}, {"parsed"})
+                    self.assertTrue(all(row[7] == "1" for row in model.statements.values()))
+                    model.validate_physical_locations()
+            self.assertTrue(all(output == outputs[0] for output in outputs[1:]), backend)
+
+    def test_statement_extents_nesting_and_fact_owners(self) -> None:
+        source = self.fixture("constructs.bas")
+        model = self.compile(source)
+        lines = source.read_text().splitlines()
+
+        def statement(anchor: str) -> list[str]:
+            line = next(index for index, text in enumerate(lines, 1) if anchor in text)
+            matches = [row for row in model.statements.values() if int(row[13]) == line]
+            self.assertTrue(matches, anchor)
+            return min(matches, key=lambda row: int(row[14]))
+
+        first = statement("dim value as long = 1:")
+        second = next(row for row in model.statements.values() if row[13] == first[13] and row[1] != first[1])
+        first_span = model.physical_locations["statement", int(first[1]), "range"]
+        second_span = model.physical_locations["statement", int(second[1]), "range"]
+        colon = lines[int(first[13]) - 1].index(":")
+        self.assertEqual(first_span[5:9], [first[13], "1", first[13], str(colon)])
+        self.assertEqual(second_span[5:9], [first[13], str(colon + 2), first[13], str(len(lines[int(first[13]) - 1]))])
+        self.assertNotEqual(first[1], second[1])
+        self.assertEqual(first[2:4], second[2:4])
+        self.assertEqual(first[2], "0")
+        self.assertEqual(model.symbols[int(first[4])][2].lower(), "observe")
+
+        inline = statement("if value then")
+        children = [row for row in model.statements.values() if row[2] == inline[1]]
+        self.assertEqual(len(children), 2)
+        self.assertEqual({row[13] for row in children}, {inline[13]})
+        self.assertEqual({model.statement_endings[int(row[1])][2] for row in children}, {"call-or-assignment"})
+        self.assertFalse(any(lines[int(row[13]) - 1][int(row[14]):].startswith("else") for row in children))
+
+        continued = statement("dim nested as long = value + _")
+        span = model.physical_locations["statement", int(continued[1]), "range"]
+        self.assertEqual(span[5:9], [continued[13], "2", str(int(continued[13]) + 1), "4"])
+        scope = model.constructs[int(continued[3])]
+        self.assertEqual(scope[5], "scope")
+        self.assertEqual(model.constructs[int(scope[2])][5], "procedure")
+        loops = [row for row in model.constructs.values() if row[5] == "for"]
+        self.assertEqual(len(loops), 2)
+        self.assertEqual(len({model.construct_endings[int(row[1])][2] for row in loops}), 1)
+
+        span = self.span(source, "value += 2", "value")
+        binding = next(index for index, row in enumerate(model.records["B"], 1) if source_range(row, 4) == span)
+        self.assertEqual(model.statement_owners["binding", binding], int(second[1]))
+        owned_nodes = [identity for domain, identity in model.statement_owners if domain == "node"]
+        self.assertTrue(owned_nodes)
+        self.assertTrue(any(model.nodes[identity][11] == "0" for identity in owned_nodes))
+        self.assertFalse(any(row[1] == "node" for row in model.records["LOC"]))
+
+    def test_construct_include_occurrences_generated_and_inactive_exclusions(self) -> None:
+        header = self.source("sub Included()\nscope\ndim included_value as long = 1\nend scope\nend sub\n", "constructs.bi")
+        source = self.source('#define GENERATED_STMT dim generated_value as long = 7\n'
+                             'GENERATED_STMT\n#if 0\nscope\nthis is invalid BASIC\nend scope\n#endif\n'
+                             'namespace First\n#include "constructs.bi"\nend namespace\n'
+                             'namespace Second\n#include "constructs.bi"\nend namespace\n'
+                             '#line 500 "logical-constructs.bas"\nscope\nprint generated_value\nend scope\n')
+        extra_source = self.source("scope\ndim second_module_value as long\nend scope\n", "second-module.bas")
+        for mode in ("full", "bindings", "expressions"):
+            with self.subTest(mode=mode):
+                _, path = self.invoke([source, extra_source], mode=mode)
+                model = Model.read(path, expressions_only=mode == "expressions", bindings_only=mode == "bindings")
+                model.validate_physical_locations()
+                included = [row for row in model.statements.values() if row[12] == self.compiler_path(header)]
+                self.assertEqual(len({row[5] for row in included}), 2)
+                self.assertEqual({row[7] for row in model.statements.values()}, {"1", "2"})
+                self.assertFalse(any(row[12] == self.compiler_path(source) and 3 <= int(row[13]) <= 7
+                                     for row in model.statements.values()))
+                generated = [row for row in model.statements.values()
+                             if row[12] == self.compiler_path(source) and row[13] == "2"]
+                self.assertTrue(generated)
+                self.assertTrue(all(row[11] == "0" for row in generated))
+                self.assertFalse(any(("statement", int(row[1]), "range") in model.physical_locations for row in generated))
+                logical = [row for row in model.statements.values() if row[12] == "logical-constructs.bas"]
+                self.assertTrue(logical)
+                self.assertTrue(all(row[11] == "0" for row in logical))
+                self.assertTrue(all(("statement", int(row[1]), "range") in model.physical_locations for row in logical))
+
+    def test_construct_reader_rejects_corrupt_ownership_and_closure(self) -> None:
+        model = self.compile(self.fixture("constructs.bas"))
+        rows = model.rows
+        indexes = {tag: next(index for index, row in enumerate(rows) if row[0] == tag)
+                   for tag in ("ST", "STE", "BLK", "BEND", "OWN")}
+        for tag, field, value in (("ST", 1, "0"), ("ST", 2, "999999999"), ("ST", 3, "999999999"),
+                                  ("ST", 5, "999999999"), ("ST", 6, "999999999"), ("ST", 7, "2"),
+                                  ("STE", 1, "999999999"), ("STE", 2, "guessed-route"), ("STE", 3, "unmatched"),
+                                  ("BLK", 2, "999999999"), ("BLK", 3, "0"), ("BLK", 5, "guessed-kind"),
+                                  ("BEND", 1, "999999999"), ("BEND", 2, "999999999"),
+                                  ("OWN", 1, "guessed-domain"), ("OWN", 2, "999999999"), ("OWN", 3, "999999999")):
+            with self.subTest(tag=tag, field=field):
+                changed = [row.copy() for row in rows]
+                changed[indexes[tag]][field] = value
+                with self.assertRaises(ValueError):
+                    Model("\n".join("\t".join(row) for row in changed) + "\n")
+        identity = model.records["BEND"][-1][1]
+        changed = [row.copy() for row in rows if not (row[0] == "BEND" and row[1] == identity
+                   or row[0] == "LOC" and row[1:3] == ["construct", identity])]
+        changed[-1][12] = str(sum(row[0] in DETAIL_TAGS for row in changed))
+        with self.assertRaises(ValueError):
+            Model("\n".join("\t".join(row) for row in changed) + "\n")
+
+    def test_statement_recovery_and_unfinished_constructs_remain_provisional(self) -> None:
+        for text in ("dim good as long\n@\nprint good\n", "scope\ndim good as long\n"):
+            source = self.source(text)
+            with self.subTest(text=text):
+                disabled, _ = self.invoke([source], mode="off", success=False)
+                observed, path = self.invoke([source], mode="expressions", success=False)
+                self.assertEqual(observed.stdout, disabled.stdout)
+                self.assertEqual(observed.stderr, disabled.stderr)
+                model = Model.read(path, expressions_only=True, allow_recovery=True)
+                self.assertEqual(model.footer[0], "RECOVERY")
+                self.assertTrue(model.statements)
+                if text.startswith("scope"):
+                    self.assertTrue(model.constructs)
+                    self.assertNotEqual(set(model.constructs), set(model.construct_endings))
+                else:
+                    self.assertTrue(any(row[3] == "unmatched" for row in model.statement_endings.values()))
+                _, full_path = self.invoke([source], success=False)
+                if full_path.exists():
+                    self.assertNotIn("END\t", full_path.read_text())
+
+    def test_legacy_numeric_labels_retain_statement_boundaries(self) -> None:
+        source = self.source("10 dim value as integer\n20 value = 1: ? value\n30 end\n")
+        for language in ("qb", "deprecated", "fblite"):
+            with self.subTest(language=language):
+                model = self.compile(source, mode="bindings", extra=("-lang", language))
+                labels = [row for row in model.statements.values() if model.statement_endings[int(row[1])][2] == "label"]
+                self.assertEqual([row[13] for row in labels], ["1", "2", "3"])
+                self.assertTrue(all(row[14] == "0" and row[16] == "2" for row in labels))
+                self.assertEqual(len([row for row in model.statements.values() if row[13] == "2"]), 3)
+                self.assertEqual(set(model.statements), set(model.statement_endings))
+                model.validate_physical_locations()
 
 # end of test_sidecar.py

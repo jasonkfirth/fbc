@@ -37,7 +37,7 @@
 #include once "ast/ast.bi"
 
 declare sub fbSemanticModelExportProc(byval proc as FBSYMBOL ptr, _
-	byval astproc as ASTNODE ptr)
+	byval astproc as ASTNODE ptr, byval emitted as integer)
 
 type FB_GLOBINSTANCE
 	sym             as FBSYMBOL_ ptr            '' for symbol
@@ -164,6 +164,11 @@ private sub hProcFlush _
 
 		'' allocate the non-static local variables on stack
 		astScopeAllocLocals(symbGetProcSymbTbHead(sym))
+	end if
+	'' Retain the final procedure AST before loads consume it and recycle
+	'' its symbols. Unemitted private bodies remain distinct from emitted code.
+	if( symbGetIsParsed(sym) and (errGetCount( ) = 0) ) then
+		fbSemanticModelExportProc(sym, p, doemit)
 	end if
 
 	'' flush nodes
@@ -811,10 +816,6 @@ function astProcEnd( byval callrtexit as integer ) as integer
 		if( env.clopt.backend = FB_BACKEND_GAS ) then
 			astProcVectorize( n->l )
 		end if
-	end if
-
-	if( res and (errGetCount( ) = 0) ) then
-	fbSemanticModelExportProc( sym, n )
 	end if
 
 	''

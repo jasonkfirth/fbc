@@ -27,8 +27,8 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-hooks.bi"
 
-declare function fbSemanticModelEnabled( ) as integer
 declare sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -360,7 +360,10 @@ function cUdtMember _
 	dim as integer export_semantics = fbSemanticModelEnabled( ) and export_prefixes
 
 	do
+		dim as longint semantic_binding_before = fbSemanticModelBindingCount( )
 		dim as FBSYMBOL ptr fld = hMemberId( subtype, FALSE )
+		dim as longint semantic_binding = fbSemanticModelBindingCount( )
+		if( semantic_binding = semantic_binding_before ) then semantic_binding = 0
 		if( fld = NULL ) then
 			return NULL
 		end if
@@ -402,6 +405,7 @@ function cUdtMember _
 			end if
 
 			varexpr = hFieldAccess( varexpr, fld, dtype, subtype, check_array )
+			if( varexpr <> NULL ) then varexpr->semantic_binding = semantic_binding
 			if( export_semantics ) then
 				fbSemanticModelExportCurrentExpressionPrefix(varexpr)
 			end if
@@ -914,6 +918,7 @@ function cFuncPtrOrMemberDeref _
 	if( isfuncptr = FALSE ) then
 		return expr
 	end if
+	fbSemanticModelSetAccess(expr, "callee")
 
 	'' null pointer checking
 	if( env.clopt.nullptrchk ) then
@@ -1162,7 +1167,10 @@ function cVariableEx overload _
 
 	assert( symbIsVar( sym ) )
 	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
+	dim as longint semantic_binding_before = fbSemanticModelBindingCount( )
 	fbSemanticModelExportBinding(sym, semantic_site, FALSE)
+	dim as longint semantic_binding = fbSemanticModelBindingCount( )
+	if( semantic_binding = semantic_binding_before ) then semantic_binding = 0
 
 	'' Check visibility of the variable
 	if( symbCheckAccess( sym ) = FALSE ) then
@@ -1284,6 +1292,7 @@ function cVariableEx overload _
 
 	assert( varexpr->dtype = sym->typ )
 	assert( varexpr->subtype = sym->subtype )
+	varexpr->semantic_binding = semantic_binding
 
 	if( is_funcptr = FALSE ) then
 		if( check_fields ) then
@@ -1341,6 +1350,14 @@ function cVariableEx overload _
 		end if
 	end if
 
+	if( varexpr <> NULL ) then
+		'' This occurrence is the whole variable only when no field selected
+		'' a more specific written lvalue. Member receivers remain reads.
+		select case varexpr->class
+		case AST_NODECLASS_VAR, AST_NODECLASS_IDX, AST_NODECLASS_DEREF, AST_NODECLASS_NIDXARRAY, AST_NODECLASS_FIELD
+			if( varexpr->semantic_binding = 0 ) then varexpr->semantic_binding = semantic_binding
+		end select
+	end if
 	function = varexpr
 
 end function
@@ -1415,6 +1432,9 @@ function cVariableEx _
 		if( sym = NULL ) then
 			return NULL
 		end if
+		dim as LEX_LOCATION declaration_site = lexGetCurrentLocation( )
+		fbSemanticModelExportBinding(sym, declaration_site, TRUE)
+		fbSemanticModelExportDeclaration(sym, declaration_site, "implicit-variable", *id)
 
 		'' show warning if inside an expression (ie: var was never set)
 		if( fbGetIsExpression( ) ) then

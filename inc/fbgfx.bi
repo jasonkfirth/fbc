@@ -65,11 +65,24 @@ namespace FB
 	'' gfxlib colors, written directly without alpha blending.
 	' The QB and FB declarations have equivalent ABI signatures but use dialect-specific pointer spelling.
 	' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-014
-	declare function PaintPattern alias "fb_GfxPaintPattern" _
+	declare function PaintPattern overload alias "fb_GfxPaintPattern" _
 		( byval target as any ptr, byval x as single, byval y as single, _
 		  byref pattern as const string, byval foreground as ulong = 1, _
 		  byval background as ulong = 0, byval border as ulong = 1, _
 		  byval relative as long = 0 ) as long
+	'' Unicode arguments contribute their UTF-8 bytes to this binary pattern.
+	declare function PaintPattern overload alias "fb_GfxPaintPatternWstr" _
+		( byval target as any ptr, byval x as single, byval y as single, _
+		  byref pattern as const wstring, byval foreground as ulong = 1, _
+		  byval background as ulong = 0, byval border as ulong = 1, _
+		  byval relative as long = 0 ) as long
+#if defined(__FB_HAS_USTRING__) and not defined(FB_NO_USTRING)
+	declare function PaintPattern overload alias "fb_GfxPaintPattern" _
+		( byval target as any ptr, byval x as single, byval y as single, _
+		  byref pattern as const ustring, byval foreground as ulong = 1, _
+		  byval background as ulong = 0, byval border as ulong = 1, _
+		  byval relative as long = 0 ) as long
+#endif
 	end extern
 #endif
 

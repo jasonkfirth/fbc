@@ -34,9 +34,6 @@ def freeze_inputs(root: Path, compiler: Path, output: Path, backends: list[str])
     source = inputs / "src/compiler"
     shutil.copytree(root / "src/compiler", source, ignore=shutil.ignore_patterns(
         "obj", "__pycache__", "*.c", "*.ll", "*.asm", "*.o", "*.exe"))
-    support = root / "src/compiler/tooling/semantic-output.c"
-    if support.is_file():
-        shutil.copy2(support, source / "tooling/semantic-output.c")
     validation = inputs / "validation"
     validation.mkdir()
     shutil.copy2(root / "tests/semantic-sidecar/sidecar.py", validation / "sidecar.py")

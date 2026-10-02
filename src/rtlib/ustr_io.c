@@ -333,11 +333,48 @@ static int hWriteEncoded( FB_FILE *file, const void *data, size_t length )
 	return fwrite( buffer, 1, used, stream ) == used ? 0 : FB_RTERROR_FILEIO;
 }
 
+static int hWriteScreen( FB_FILE *file, const void *buffer, size_t length )
+{
+	FBSTRING borrowed;
+	FB_WCHAR *wide;
+	ssize_t offset = 0, units = 0;
+	unsigned int scalar;
+	int result;
+	if( length > (size_t)FB_USTRING_MAX_BYTES )
+		return fb_ErrorSetNum(FB_RTERROR_OUTOFMEM);
+	borrowed.data = (char *)buffer;
+	borrowed.len = borrowed.size = length;
+	wide = fb_UStrToWstr(&borrowed);
+	if( wide == NULL && length != 0 ) return FB_RTERROR_OUTOFMEM;
+	while( offset < (ssize_t)length ) {
+		scalar = fb_hUtf8Decode(buffer, length, &offset);
+		units += sizeof(FB_WCHAR) == 2 && scalar > 0xFFFF ? 2 : 1;
+	}
+	/* The graphics wide hook owns glyph selection. Pass an explicit unit
+	   count so embedded NULs and UTF-16 pairs do not change the byte contract. */
+	result = fb_DevScrnWriteWstr(file, wide, units);
+	free(wide);
+	return result;
+}
+
+static int hWideScreen( void )
+{
+	if( __fb_ctx.hooks.printbuffwproc != NULL ) return TRUE;
+#if defined(HOST_WIN32) && !defined(HOST_WINCE)
+	/* Native Windows consoles accept UTF-16 independently of their ANSI
+	   codepage. Redirected streams retain UTF-8 bytes; Win9x keeps its API. */
+	return !fb_hWin32IsWin9x() && !fb_ConsoleIsRedirected(FALSE);
+#else
+	return FALSE;
+#endif
+}
+
 static void hPrint( int fnum, FBSTRING *src, int mask, int write )
 {
 	FB_FILE_HOOKS hooks, *original = NULL;
 	FB_FILE *file;
 	FB_LOCK();
+	if( fnum == 0 ) fb_DevScrnInit_Write();
 	file = FB_HANDLE_DEREF( FB_FILE_TO_HANDLE(fnum) );
 	if( hEncoded(file) ) {
 		/* Scope this UTF-8 write hook to one statement. The original stdio
@@ -346,6 +383,13 @@ static void hPrint( int fnum, FBSTRING *src, int mask, int write )
 		original = file->hooks;
 		hooks = *original;
 		hooks.pfnWrite = hWriteEncoded;
+		file->hooks = &hooks;
+	} else if( FB_HANDLE_USED(file) && file->hooks->pfnWrite == fb_DevScrnWrite && hWideScreen() ) {
+		/* Graphics mode has a wide output path even when the host locale
+		   cannot encode Unicode. Keep the scoped-hook ownership used above. */
+		original = file->hooks;
+		hooks = *original;
+		hooks.pfnWrite = hWriteScreen;
 		file->hooks = &hooks;
 	}
 	if( write ) fb_WriteString( fnum, src, mask );

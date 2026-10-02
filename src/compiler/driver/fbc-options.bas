@@ -449,6 +449,8 @@ enum
 	OPT_RRKEEPASM
 	OPT_S
 	OPT_SEMANTIC_MODEL
+	OPT_SEMANTIC_BINDINGS
+	OPT_SEMANTIC_COMPACT
 	OPT_SEMANTIC_EXPRESSIONS
 	OPT_SHOWINCLUDES
 	OPT_STATIC
@@ -539,6 +541,8 @@ dim shared as FBC_CMDLINE_OPTION cmdlineOptionTB(0 to (OPT__COUNT - 1)) = _
 	( FALSE, TRUE , TRUE , FALSE ), _ '' OPT_RRKEEPASM    affects removal of temporary files
 	( TRUE , TRUE , FALSE, FALSE ), _ '' OPT_S            affects link
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_MODEL compiler-owned semantic model output
+	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_BINDINGS compiler-owned bindings and implicit calls
+	( FALSE, FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_COMPACT omit verbose macro-expansion provenance
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_EXPRESSIONS expression-only semantic output
 	( FALSE, TRUE , FALSE, TRUE  ), _ '' OPT_SHOWINCLUDES affects compiler output display
 	( FALSE, TRUE , FALSE, FALSE ), _ '' OPT_STATIC       affects link
@@ -665,12 +669,23 @@ private sub hHandleOptCompileSetup _
 	case OPT_SEMANTIC_MODEL
 		fbc.semanticmodel = arg
 		fbc.semanticmodel_expressions = FALSE
+		fbc.semanticmodel_bindings = FALSE
 		'' The parser emits AST line markers independently of debug-info mode.
 		'' Keep this tooling option from changing source-visible __FB_ERR__.
+
+	case OPT_SEMANTIC_BINDINGS
+		fbc.semanticmodel = arg
+		fbc.semanticmodel_expressions = FALSE
+		fbc.semanticmodel_bindings = TRUE
+		'' Keep resolved token identities and selected implicit calls without an AST dump.
+
+	case OPT_SEMANTIC_COMPACT
+		fbc.semanticmodel_compact = TRUE
 
 	case OPT_SEMANTIC_EXPRESSIONS
 		fbc.semanticmodel = arg
 		fbc.semanticmodel_expressions = TRUE
+		fbc.semanticmodel_bindings = FALSE
 		'' The compact mode retains typed source ranges without symbol or AST dumps.
 
 	case OPT_GFX3
@@ -1122,7 +1137,7 @@ private sub handleOpt _
 	)
 
 	select case as const optid
-	case OPT_A to OPT_FPU, OPT_GFX3, OPT_SEMANTIC_MODEL, OPT_SEMANTIC_EXPRESSIONS
+	case OPT_A to OPT_FPU, OPT_GFX3, OPT_SEMANTIC_MODEL, OPT_SEMANTIC_BINDINGS, OPT_SEMANTIC_COMPACT, OPT_SEMANTIC_EXPRESSIONS
 		hHandleOptCompileSetup( optid, arg, is_source )
 
 	case OPT_G, OPT_GEN to OPT_O
@@ -1253,6 +1268,8 @@ private function parseOption(byval opt as zstring ptr) as integer
 	case asc("s")
 		ONECHAR(OPT_S)
 		CHECK("semantic-model", OPT_SEMANTIC_MODEL)
+		CHECK("semantic-model-bindings", OPT_SEMANTIC_BINDINGS)
+		CHECK("semantic-model-compact", OPT_SEMANTIC_COMPACT)
 		CHECK("semantic-model-expressions", OPT_SEMANTIC_EXPRESSIONS)
 		CHECK("showincludes", OPT_SHOWINCLUDES)
 		CHECK("static", OPT_STATIC)
@@ -1708,6 +1725,7 @@ sub fbcDriverCheckArgs()
 	end if
 
 	'' 7. Check whether backend supports the target/arch.
+	fbcAmigaPlatformValidateOptions( )
 	'' -gen gas with non-x86 arch or with PIC isn't possible.
 	'' -gen gas64 with non-x86_64 or with PIC isn't possible.
 	if( ((fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GAS) and _

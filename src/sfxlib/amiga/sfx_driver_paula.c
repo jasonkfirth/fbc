@@ -43,10 +43,23 @@ static ULONG paula_left_mask, paula_right_mask;
 static uint64_t paula_phase, paula_step;
 static UWORD paula_period;
 static int paula_open, paula_channels;
+static unsigned int paula_debug_writes;
+static int paula_pending;
+static signed char paula_pending_left, paula_pending_right;
+
+static int paula_submit(ULONG produced);
 
 static void paula_exit(void)
 {
     fb_sfxAmigaWorkerStop();
+    /* DMA lengths count words. Preserve an odd final sample, padding its last
+       word with silence only when the stream actually ends. */
+    if (paula_open && paula_pending) {
+        paula_left[0] = paula_pending_left;
+        paula_right[0] = paula_pending_right;
+        paula_left[1] = paula_right[1] = 0;
+        paula_submit(2);
+    }
     if (paula_open) CloseDevice(&paula_allocation->ioa_Request);
     if (paula_allocation != NULL) DeleteIORequest(&paula_allocation->ioa_Request);
     if (paula_port != NULL) DeleteMsgPort(paula_port);
@@ -56,6 +69,8 @@ static void paula_exit(void)
     paula_allocation = NULL; paula_port = NULL;
     paula_left = paula_right = NULL;
     paula_capacity = 0; paula_phase = 0;
+    paula_debug_writes = 0;
+    paula_pending = FALSE;
 }
 
 static int paula_init(int rate, int channels, int buffer_frames, int flags)
@@ -113,24 +128,29 @@ static signed char paula_sample(float sample)
 
 static int paula_write(const float *samples, int frames)
 {
-    struct IOAudio requests[2];
-    struct MsgPort *reply;
     ULONG produced = 0;
-    LONG left_error, right_error;
+    ULONG capacity;
     int frame;
     if (!paula_open || samples == NULL || frames <= 0 || frames > INT_MAX / paula_channels)
         return -1;
-    if ((ULONG)frames > paula_capacity) {
-        signed char *left = AllocMem((ULONG)frames, MEMF_CHIP);
-        signed char *right = AllocMem((ULONG)frames, MEMF_CHIP);
+    /* A prior odd write contributes at most one extra byte per channel. */
+    capacity = (ULONG)frames + 1;
+    if (capacity > paula_capacity) {
+        signed char *left = AllocMem(capacity, MEMF_CHIP);
+        signed char *right = AllocMem(capacity, MEMF_CHIP);
         if (left == NULL || right == NULL) {
-            if (left != NULL) FreeMem(left, (ULONG)frames);
-            if (right != NULL) FreeMem(right, (ULONG)frames);
+            if (left != NULL) FreeMem(left, capacity);
+            if (right != NULL) FreeMem(right, capacity);
             return -1;
         }
         if (paula_left != NULL) FreeMem(paula_left, paula_capacity);
         if (paula_right != NULL) FreeMem(paula_right, paula_capacity);
-        paula_left = left; paula_right = right; paula_capacity = (ULONG)frames;
+        paula_left = left; paula_right = right; paula_capacity = capacity;
+    }
+    if (paula_pending) {
+        paula_left[0] = paula_pending_left;
+        paula_right[0] = paula_pending_right;
+        produced = 1;
     }
     for (frame = 0; frame < frames; ++frame) {
         paula_phase += paula_clock;
@@ -140,27 +160,61 @@ static int paula_write(const float *samples, int frames)
         paula_right[produced] = paula_sample(samples[frame * paula_channels + (paula_channels == 2)]);
         ++produced;
     }
+    paula_pending = (produced & 1) != 0;
+    if (paula_pending) {
+        --produced;
+        paula_pending_left = paula_left[produced];
+        paula_pending_right = paula_right[produced];
+    }
     if (produced == 0) return frames;
+    if (paula_debug_writes < 16)
+        SFX_DEBUG("Paula write %u: task=%p input=%d output=%lu", paula_debug_writes,
+            FindTask(NULL), frames, (unsigned long)produced);
+    return paula_submit(produced) == 0 ? frames : -1;
+}
+
+static int paula_submit(ULONG produced)
+{
+    struct IOAudio requests[2];
+    struct MsgPort *reply;
+    ULONG offset = 0;
+    int channel;
+    int result = 0;
+
     reply = CreateMsgPort();
     if (reply == NULL) return -1;
-    for (frame = 0; frame < 2; ++frame) {
-        memcpy(&requests[frame], paula_allocation, sizeof(struct IOAudio));
-        requests[frame].ioa_Request.io_Message.mn_ReplyPort = reply;
-        requests[frame].ioa_Request.io_Unit = (struct Unit *)(uintptr_t)(frame == 0 ? paula_left_mask : paula_right_mask);
-        requests[frame].ioa_Request.io_Command = CMD_WRITE;
-        requests[frame].ioa_Request.io_Flags = ADIOF_PERVOL;
-        requests[frame].ioa_Request.io_Error = 0;
-        requests[frame].ioa_Data = (UBYTE *)(frame == 0 ? paula_left : paula_right);
-        requests[frame].ioa_Length = produced;
-        requests[frame].ioa_Period = paula_period;
-        requests[frame].ioa_Volume = 64; /* Paula's full volume */
-        requests[frame].ioa_Cycles = 1;
-        SendIO(&requests[frame].ioa_Request);
+    while (offset < produced) {
+        ULONG length = produced - offset;
+        LONG left_error, right_error;
+        /* AUDxLEN is a 16-bit word count. Keep each request even and within
+           65535 words, including callers with unusually large mix buffers. */
+        if (length > 131070UL) length = 131070UL;
+        for (channel = 0; channel < 2; ++channel) {
+            memcpy(&requests[channel], paula_allocation, sizeof(struct IOAudio));
+            requests[channel].ioa_Request.io_Message.mn_ReplyPort = reply;
+            requests[channel].ioa_Request.io_Unit = (struct Unit *)(uintptr_t)(channel == 0 ? paula_left_mask : paula_right_mask);
+            requests[channel].ioa_Request.io_Command = CMD_WRITE;
+            requests[channel].ioa_Request.io_Flags = ADIOF_PERVOL;
+            requests[channel].ioa_Request.io_Error = 0;
+            requests[channel].ioa_Data = (UBYTE *)(channel == 0 ? paula_left : paula_right) + offset;
+            requests[channel].ioa_Length = length;
+            requests[channel].ioa_Period = paula_period;
+            requests[channel].ioa_Volume = 64; /* Paula's full volume */
+            requests[channel].ioa_Cycles = 1;
+            SendIO(&requests[channel].ioa_Request);
+        }
+        left_error = WaitIO(&requests[0].ioa_Request);
+        right_error = WaitIO(&requests[1].ioa_Request);
+        if (paula_debug_writes < 16) {
+            SFX_DEBUG("Paula write %u completed: left=%ld right=%ld", paula_debug_writes,
+                (long)left_error, (long)right_error);
+            ++paula_debug_writes;
+        }
+        if (left_error != 0 || right_error != 0) { result = -1; break; }
+        offset += length;
     }
-    left_error = WaitIO(&requests[0].ioa_Request);
-    right_error = WaitIO(&requests[1].ioa_Request);
     DeleteMsgPort(reply);
-    return left_error == 0 && right_error == 0 ? frames : -1;
+    return result;
 }
 
 static int paula_device_list(void) { return 1; }

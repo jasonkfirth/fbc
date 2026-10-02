@@ -26,6 +26,7 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "runtime/rtl.bi"
+#include once "tooling/semantic-constructs.bi"
 
 declare sub fbSemanticModelSetPendingScopeExitSource _
 	( _
@@ -617,6 +618,7 @@ function cCompStmtPush _
 	stk->id = id
 	stk->allowmask = allowmask
 	stk->scopenode = NULL
+	stk->semantic_identity = fbSemanticModelConstructBegin(id)
 
 	'' same current values, if any
 	select case as const id
@@ -721,6 +723,8 @@ function cCompStmtGetTOS _
 end function
 
 sub cCompStmtPop( byval stk as FB_CMPSTMTSTK ptr )
+	dim as LEX_LOCATION ending = lexGetLastLocation( )
+	fbSemanticModelConstructEnd(stk->semantic_identity, ending)
 	'' restore old values if any
 	select case as const stk->id
 	case FB_TK_DO

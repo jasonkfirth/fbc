@@ -36,6 +36,10 @@ ifeq ($(THREAD_MODEL),pdmlwp)
 RTL_LIBS += $(libdir)/libfbpdmlwp.a
 endif
 
+ifeq ($(TARGET_OS),amiga)
+RTL_LIBS += $(libdir)/libfbsoftfloat.a $(libdir)/libpthread.a $(libdir)/libffi.a
+endif
+
 ifdef ENABLE_NONPIC
 RTL_LIBS += \
 	$(libdir)/fbrt0.o \

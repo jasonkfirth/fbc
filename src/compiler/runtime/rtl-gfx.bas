@@ -1221,7 +1221,7 @@ declare function hPorts_cb _
 		( _
 			@"screenglproc", @"fb_GfxGetGLProcAddress", _
 			typeAddrOf( FB_DATATYPE_VOID ), FB_FUNCMODE_FBCALL, _
-			@hGfxlib_cb, FB_RTL_OPT_OVER or FB_RTL_OPT_NOQB, _
+			@hGfxlib_cb, FB_RTL_OPT_OVER or FB_RTL_OPT_NOQB or FB_RTL_OPT_UTF8ARGS, _
 			1, _
 			{ _
 				( typeAddrOf( typeSetIsConst( FB_DATATYPE_CHAR ) ), FB_PARAMMODE_BYVAL, FALSE ) _

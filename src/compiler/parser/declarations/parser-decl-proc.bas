@@ -42,10 +42,11 @@ sub cProcDecl( )
 	tk = lexGetToken( )
 	select case( tk )
 	case FB_TK_SUB, FB_TK_FUNCTION, FB_TK_OPERATOR
+		dim as LEX_LOCATION declaration_start = lexGetCurrentLocation( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		'' ProcHeader
-		cProcHeader( 0, 0, FALSE, FB_PROCOPT_ISPROTO, tk )
+		cProcHeader( 0, 0, FALSE, FB_PROCOPT_ISPROTO, tk, @declaration_start )
 
 	case else
 		errReport( FB_ERRMSG_SYNTAXERROR )

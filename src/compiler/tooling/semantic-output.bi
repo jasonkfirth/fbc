@@ -9,14 +9,12 @@
 
 '' The writer owns its stream, private directory, and protected path snapshots.
 '' Finish releases it exactly once, whether publication succeeds or fails.
-extern "c"
 declare function fbSemanticOutputOpen( byval filename as const zstring ptr ) as any ptr
 declare function fbSemanticOutputProtect _
-	( byval output as any ptr, byval filename as const zstring ptr ) as long
+	( byval writer as any ptr, byval filename as const zstring ptr ) as long
 declare function fbSemanticOutputWrite _
-	( byval output as any ptr, byval data as const any ptr, byval bytes as uinteger ) as long
-declare function fbSemanticOutputFinish( byval output as any ptr, byval publish as long ) as long
-end extern
+	( byval writer as any ptr, byval buffer as const any ptr, byval bytes as uinteger ) as long
+declare function fbSemanticOutputFinish( byval writer as any ptr, byval publish as long ) as long
 
 #endif
 

@@ -402,11 +402,8 @@ void fb_hInit(void)
         __fb_con.inited = FALSE;
 }
 
-void fb_hEnd(int unused)
+void fb_hAmigaStopBgThread(void)
 {
-    (void)unused;
-
-    fb_hExitConsole();
     BG_LOCK();
     __fb_con.inited = FALSE;
     BG_UNLOCK();
@@ -415,6 +412,13 @@ void fb_hEnd(int unused)
         pthread_join(__fb_bg_thread, NULL);
         bgthread_inited = FALSE;
     }
+}
+
+void fb_hEnd(int unused)
+{
+    (void)unused;
+    fb_hExitConsole();
+    fb_hAmigaStopBgThread();
     pthread_mutex_destroy(&__fb_bg_mutex);
 
     if (__fb_con.char_buffer != NULL) {

@@ -25,6 +25,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
+#include once "tooling/semantic-constructs.bi"
 
 '':::::
 ''Statement       =   STT_SEPARATOR? ( Declaration
@@ -43,17 +44,25 @@ sub cStatement()
 	end if
 
 	do
-		if( cDeclaration( ) = FALSE ) then
-			if( cCompoundStmt( ) = FALSE ) then
-				if( cProcCallOrAssign( ) = FALSE ) then
-					if( cQuirkStmt( ) = FALSE ) then
-						if( cAsmBlock( ) = FALSE ) then
-							cAssignmentOrPtrCall( )
-						end if
-					end if
-				end if
-			end if
+		dim as LEX_LOCATION source = lexGetCurrentLocation( )
+		dim as integer errors_before = errGetCount( )
+		dim as longint statement = fbSemanticModelStatementBegin(source, lexGetToken( ), lexGetClass( ))
+		dim as string route = "unmatched"
+		if( cDeclaration( ) ) then
+			route = "declaration"
+		elseif( cCompoundStmt( ) ) then
+			route = "compound"
+		elseif( cProcCallOrAssign( ) ) then
+			route = "call-or-assignment"
+		elseif( cQuirkStmt( ) ) then
+			route = "intrinsic"
+		elseif( cAsmBlock( ) ) then
+			route = "assembly"
+		elseif( cAssignmentOrPtrCall( ) ) then
+			route = "pointer-or-assignment"
 		end if
+		dim as LEX_LOCATION ending = lexGetLastLocation( )
+		fbSemanticModelStatementEnd(statement, route, ending, errors_before)
 
 		'' ':'?
 		if( lexGetToken( ) <> FB_TK_STMTSEP ) then

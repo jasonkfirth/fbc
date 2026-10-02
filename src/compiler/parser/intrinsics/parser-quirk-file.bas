@@ -25,6 +25,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
+#include once "tooling/semantic-constructs.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
 
@@ -287,6 +288,7 @@ function cLineInputStmt _
 	dim as ASTNODE ptr filestrexpr = NULL, dstexpr = NULL, maxlenexpr = NULL
 	dim as integer isfile = FALSE, addnewline = FALSE, issep = FALSE, addquestion = FALSE
 	dim as integer dtype = any
+	dim as integer semantic_result = FALSE
 
 	function = FALSE
 
@@ -381,10 +383,10 @@ function cLineInputStmt _
 
 	select case astGetDataType( dstexpr )
 	case FB_DATATYPE_STRING, FB_DATATYPE_USTRING, FB_DATATYPE_FIXSTR, FB_DATATYPE_CHAR
-		function = rtlFileLineInput( isfile, filestrexpr, dstexpr, maxlenexpr, addquestion, addnewline )
+		semantic_result = rtlFileLineInput( isfile, filestrexpr, dstexpr, maxlenexpr, addquestion, addnewline )
 
 	case FB_DATATYPE_WCHAR
-		function = rtlFileLineInputWstr( isfile, filestrexpr, dstexpr, maxlenexpr, addquestion, addnewline )
+		semantic_result = rtlFileLineInputWstr( isfile, filestrexpr, dstexpr, maxlenexpr, addquestion, addnewline )
 
 	'' not a string?
 	case else
@@ -392,6 +394,8 @@ function cLineInputStmt _
 		errReport( FB_ERRMSG_INVALIDDATATYPES )
 		return TRUE
 	end select
+	function = semantic_result
+	if( semantic_result ) then fbSemanticModelStatementOperation("line-input")
 
 end function
 
@@ -1203,6 +1207,7 @@ function cFileStmt _
 
 	dim as ASTNODE ptr filenum, expr1, expr2
 	dim as integer islock
+	dim as integer semantic_result = FALSE
 
 	function = FALSE
 
@@ -1210,13 +1215,13 @@ function cFileStmt _
 	case FB_TK_OPEN
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
-		function = (hFileOpen( FALSE ) <> NULL)
+		semantic_result = (hFileOpen( FALSE ) <> NULL)
 
 
 	'' CLOSE ('#'? Expression)*
 	case FB_TK_CLOSE
 
-		function = (hFileClose( FALSE ) <> NULL)
+		semantic_result = (hFileClose( FALSE ) <> NULL)
 
 	'' SEEK '#'? Expression ',' Expression
 	case FB_TK_SEEK
@@ -1229,7 +1234,7 @@ function cFileStmt _
 
 		hMatchExpressionEx( expr1, FB_DATATYPE_INTEGER )
 
-		function = rtlFileSeek( filenum, expr1 )
+		semantic_result = rtlFileSeek( filenum, expr1 )
 
 	'' PUT '#' Expression ',' Expression? ',' Expression{str|int|float|array}
 	case FB_TK_PUT
@@ -1239,7 +1244,7 @@ function cFileStmt _
 
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
-		function = (hFilePut( FALSE ) <> NULL)
+		semantic_result = (hFilePut( FALSE ) <> NULL)
 
 	'' GET '#' Expression ',' Expression? ',' Variable{str|int|float|array}
 	case FB_TK_GET
@@ -1249,7 +1254,7 @@ function cFileStmt _
 
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
-		function = (hFileGet( FALSE ) <> NULL)
+		semantic_result = (hFileGet( FALSE ) <> NULL)
 
 	'' (LOCK|UNLOCK) '#'? Expression, Expression (TO Expression)?
 	case FB_TK_LOCK, FB_TK_UNLOCK
@@ -1275,15 +1280,28 @@ function cFileStmt _
 			expr2 = astNewCONSTi( 0 )
 		end if
 
-		function = rtlFileLock( islock, filenum, expr1, expr2 )
+		semantic_result = rtlFileLock( islock, filenum, expr1, expr2 )
 
 	'' NAME oldfilespec$ AS newfilespec$
 	case FB_TK_NAME
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
-		function = (hFileRename( FALSE ) <> NULL)
+		semantic_result = (hFileRename( FALSE ) <> NULL)
 
 	end select
+	function = semantic_result
+	if( semantic_result ) then
+		select case tk
+		case FB_TK_OPEN: fbSemanticModelStatementOperation("file-open")
+		case FB_TK_CLOSE: fbSemanticModelStatementOperation("file-close")
+		case FB_TK_SEEK: fbSemanticModelStatementOperation("file-seek")
+		case FB_TK_GET: fbSemanticModelStatementOperation("file-get")
+		case FB_TK_PUT: fbSemanticModelStatementOperation("file-put")
+		case FB_TK_LOCK: fbSemanticModelStatementOperation("file-lock")
+		case FB_TK_UNLOCK: fbSemanticModelStatementOperation("file-unlock")
+		case FB_TK_NAME: fbSemanticModelStatementOperation("file-rename")
+		end select
+	end if
 
 end function
 

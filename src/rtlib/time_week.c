@@ -1,4 +1,8 @@
-/* week functions */
+/*
+    FreeBASIC runtime: time_week.c
+    Resolve calendar week boundaries and week numbers from double serials.
+    Owns calendar arithmetic without reading the OS clock or locale settings.
+*/
 
 #include "fb.h"
 #include <math.h>
@@ -41,19 +45,21 @@ double fb_hGetFirstWeekOfYear( int year,
     serial_week_begin = fb_DateSerial( first_week_year,
                                        first_week_month,
                                        first_week_day );
-    remaining_weekdays = (int) ((serial_week_begin + 7.0l) - serial_year_begin);
+    /* Calendar serials are double values. Keep arithmetic in that format
+       instead of depending on the target's extended floating-point ABI. */
+    remaining_weekdays = (int) ((serial_week_begin + 7.0) - serial_year_begin);
 
     switch( first_day_of_year ) {
     case FB_WEEK_FIRST_JAN_1:
         break;
     case FB_WEEK_FIRST_FOUR_DAYS:
         if( remaining_weekdays < 4 ) {
-            serial_week_begin += 7.0l;
+            serial_week_begin += 7.0;
         }
         break;
     case FB_WEEK_FIRST_FULL_WEEK:
         if( remaining_weekdays < 7 ) {
-            serial_week_begin += 7.0l;
+            serial_week_begin += 7.0;
         }
         break;
     }
@@ -77,7 +83,7 @@ int fb_hGetWeekOfYear( int ref_year, double serial,
 
     serial = floor( serial - serial_first_week);
     sign = fb_hSign( serial );
-    serial /= 7.0l;
+    serial /= 7.0;
     week = (int) (serial + sign);
 
     return week;
@@ -92,5 +98,7 @@ int fb_hGetWeeksOfYear( int ref_year, int first_day_of_year, int first_day_of_we
     double serial_end =
         fb_hGetFirstWeekOfYear( ref_year + 1,
                                 first_day_of_year, first_day_of_week );
-    return (int) ((serial_end - serial_start) / 7.0l);
+    return (int) ((serial_end - serial_start) / 7.0);
 }
+
+/* end of time_week.c */

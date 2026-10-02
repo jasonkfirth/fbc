@@ -33,6 +33,8 @@
 
 declare sub fbSemanticModelAttachPendingScopeExitSource(byval branch as ASTNODE ptr)
 declare function fbSemanticModelEnabled( ) as integer
+declare sub fbSemanticModelExportSymbolDetails(byval sym as FBSYMBOL ptr, byval variables_live as integer = FALSE)
+declare sub fbSemanticModelExportSymbols(byval head as FBSYMBOL ptr)
 declare sub fbSemanticModelExportScopeExitDestructor _
 	( _
 		byval owner as FBSYMBOL ptr, _
@@ -794,6 +796,12 @@ sub astTempScopeEnd _
 	)
 
 	dim as FBSYMBOL ptr sym = any
+
+	'' Initializer expressions can already reference these temporary symbols.
+	'' The scope is unlinked below and will not appear in the final inventory.
+	'' Preserve its metadata while its ownership and contents are still live.
+	fbSemanticModelExportSymbolDetails(scp)
+	fbSemanticModelExportSymbols(symbGetScopeSymbTbHead(scp))
 
 	'' remove symbols from hash table
 	symbDelScopeTb( scp )

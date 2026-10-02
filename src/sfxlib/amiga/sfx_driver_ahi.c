@@ -6,7 +6,7 @@
 
     Purpose:
 
-        Stream sfxlib output through AMIGA ahi.device.
+        Stream sfxlib output through native ahi.device.
 
     Responsibilities:
 
@@ -24,8 +24,8 @@
     Portability:
 
         AHIST_M16S and AHIST_S16S describe native-endian WORD samples.  The
-        same implementation therefore serves AMIGA m68k, ARM, and x86_64
-        without embedding an architecture baseline in the sound backend.
+        same request model is used by the AROS backend. The build selects
+        the m68k architecture baseline, independently of this device adapter.
 */
 
 #include "../fb_sfx_driver.h"

@@ -25,6 +25,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
+#include once "tooling/semantic-constructs.bi"
 #include once "ast/ast.bi"
 
 declare sub fbSemanticModelExportBinding _
@@ -39,6 +40,10 @@ declare sub fbSemanticModelExportBinding _
 ''                |   ID ':' .
 ''
 function cLabel as integer
+	dim as LEX_LOCATION statement_source = lexGetCurrentLocation( )
+	dim as integer statement_errors = errGetCount( )
+	dim as longint statement = 0
+	dim as integer statement_token = lexGetToken( ), statement_class = lexGetClass( )
 	dim as FBSYMBOL ptr l = NULL
 	dim as FBSYMCHAIN ptr chain_ = any
 	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
@@ -67,6 +72,7 @@ function cLabel as integer
 				'' error recovery: skip stmt
 				hSkipStmt( )
 			else
+				statement = fbSemanticModelStatementBegin(statement_source, statement_token, statement_class)
 				lexSkipToken( )
 			end if
 
@@ -97,6 +103,7 @@ function cLabel as integer
 			if( l = NULL ) then
 				errReport( FB_ERRMSG_DUPDEFINITION )
 			end if
+			if( l <> NULL ) then statement = fbSemanticModelStatementBegin(statement_source, statement_token, statement_class)
 
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 
@@ -112,6 +119,8 @@ function cLabel as integer
 		symbSetLastLabel( l )
 
 		function = TRUE
+		dim as LEX_LOCATION ending = lexGetLastLocation( )
+		fbSemanticModelStatementEnd(statement, "label", ending, statement_errors)
 	end if
 
 end function

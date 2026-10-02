@@ -30,6 +30,7 @@
 #include "gfx3_console.h"
 #include "gfx3_data.h"
 #include "gfx3_image.h"
+#include "../gfxlib2/gfx_unicode.h"
 
 typedef struct FB_GFX3_CONSOLE_CELL {
 	uint32_t character;
@@ -936,20 +937,11 @@ void fb_GfxPrintBuffer(const char *buffer, int mask)
 void fb_GfxPrintBufferWstrEx(const FB_WCHAR *buffer, size_t length,
 	int mask)
 {
-	char *temporary;
-
-	if ((buffer == NULL) && (length != 0))
+	FBSTRING *glyphs = fb_hGfxWideGlyphs(buffer, length);
+	if (glyphs == NULL)
 		return;
-	if ((length == SIZE_MAX) || (length > (size_t)SSIZE_MAX))
-		return;
-	temporary = (char *)malloc(length + 1u);
-	if (temporary == NULL)
-		return;
-	if (length != 0)
-		fb_wstr_ConvToA(temporary, (ssize_t)length, buffer);
-	temporary[length] = '\0';
-	fb_GfxPrintBufferEx(temporary, length, mask);
-	free(temporary);
+	fb_GfxPrintBufferEx(glyphs->data, FB_STRSIZE(glyphs), mask);
+	fb_hStrDelTemp(glyphs);
 }
 
 void fb_GfxPrintBufferWstr(const FB_WCHAR *buffer, int mask)

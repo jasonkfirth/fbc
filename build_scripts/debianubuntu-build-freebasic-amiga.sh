@@ -21,15 +21,17 @@ IMAGE="amigadev/m68k-amigaos-gcc@sha256:b18080e6ffca8f793e0f539536a9138e9d2a548c
 JOBS="${AMIGA_JOBS:-8}"
 SKIP_TOOLCHAIN=0
 SKIP_COMPILER=0
+NATIVE_COMPILER=0
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --skip-toolchain) SKIP_TOOLCHAIN=1; shift ;;
         --skip-compiler) SKIP_COMPILER=1; shift ;;
+        --native-compiler) NATIVE_COMPILER=1; shift ;;
         --jobs) JOBS="${2:?--jobs needs a value}"; shift 2 ;;
         --toolchain-root) TOOLCHAIN_ROOT="${2:?--toolchain-root needs a value}"; shift 2 ;;
         -h|--help)
-            echo "Usage: $0 [--skip-toolchain] [--skip-compiler] [--jobs N] [--toolchain-root PATH]"
+            echo "Usage: $0 [--skip-toolchain] [--skip-compiler] [--native-compiler] [--jobs N] [--toolchain-root PATH]"
             exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 2 ;;
     esac
@@ -37,6 +39,8 @@ done
 [[ "$JOBS" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid job count: $JOBS" >&2; exit 2; }
 
 mkdir -p "$AMIGA_ROOT" "$TOOLCHAIN_ROOT"
+mkdir -p "$AMIGA_ROOT/tmp"
+export TMPDIR="$AMIGA_ROOT/tmp"
 TOOLCHAIN_ROOT="$(cd "$TOOLCHAIN_ROOT" && pwd)"
 
 if [ ! -x "$TOOLCHAIN_ROOT/bin/m68k-amigaos-gcc" ]; then
@@ -77,15 +81,43 @@ python3 "$SCRIPT_DIR/amiga-build-softfloat.py" \
     --toolchain-root "$TOOLCHAIN_ROOT" --work "$AMIGA_ROOT/softfloat" \
     --output "$ROOT/lib/freebasic/amiga-m68k/libfbsoftfloat.a"
 
+python3 "$SCRIPT_DIR/amiga-build-pthread.py" \
+    --toolchain-root "$TOOLCHAIN_ROOT" --work "$AMIGA_ROOT/pthread" \
+    --output "$ROOT/lib/freebasic/amiga-m68k/libpthread.a"
+
+python3 "$SCRIPT_DIR/amiga-build-ffi.py" \
+    --toolchain-root "$TOOLCHAIN_ROOT" --work "$AMIGA_ROOT/ffi" --jobs "$JOBS" \
+    --output "$ROOT/lib/freebasic/amiga-m68k/libffi.a"
+
 if [ "$SKIP_COMPILER" = 0 ]; then
     make -C "$ROOT" -j"$JOBS" compiler
 fi
 
 make -C "$ROOT" -j"$JOBS" rtlib gfxlib2 sfxlib \
     TARGET_TRIPLET=m68k-amigaos \
+    AMIGA_TOOLCHAIN_ROOT="$TOOLCHAIN_ROOT" AMIGA_SUPPORT_ROOT="$AMIGA_ROOT" \
     CC="$TOOLCHAIN_ROOT/bin/m68k-amigaos-gcc" \
     AR="$TOOLCHAIN_ROOT/bin/m68k-amigaos-ar" \
-    DISABLE_FFI=YesPlease DISABLE_NCURSES=YesPlease
+    RANLIB="$TOOLCHAIN_ROOT/bin/m68k-amigaos-ranlib" \
+    DISABLE_NCURSES=YesPlease
+
+if [ "$NATIVE_COMPILER" = 1 ]; then
+    # Cross-build the native front end without replacing the host bin/fbc.
+    # It uses native GCC when installed on Amiga, or emits C for a cross SDK.
+    make -C "$ROOT" bootstrap-emit TARGET_TRIPLET=m68k-amigaos \
+        CC="$TOOLCHAIN_ROOT/bin/m68k-amigaos-gcc" \
+        AR="$TOOLCHAIN_ROOT/bin/m68k-amigaos-ar" \
+        RANLIB="$TOOLCHAIN_ROOT/bin/m68k-amigaos-ranlib" \
+        DISABLE_NCURSES=YesPlease
+    make -C "$ROOT" -j"$JOBS" "$AMIGA_ROOT/native-fbc" \
+        BOOTSTRAP_FBC="$AMIGA_ROOT/native-fbc" TARGET_TRIPLET=m68k-amigaos \
+        AMIGA_TOOLCHAIN_ROOT="$TOOLCHAIN_ROOT" AMIGA_SUPPORT_ROOT="$AMIGA_ROOT" \
+        CC="$TOOLCHAIN_ROOT/bin/m68k-amigaos-gcc" \
+        AR="$TOOLCHAIN_ROOT/bin/m68k-amigaos-ar" \
+        RANLIB="$TOOLCHAIN_ROOT/bin/m68k-amigaos-ranlib" \
+        DISABLE_NCURSES=YesPlease
+    echo "Native AmigaOS compiler: $AMIGA_ROOT/native-fbc"
+fi
 
 echo "AmigaOS libraries: $ROOT/lib/freebasic/amiga-m68k"
 

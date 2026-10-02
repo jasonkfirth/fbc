@@ -61,6 +61,8 @@ sub fbcDriverPrintOptions( byval verbose as integer )
 	print "  -exx             -ex plus array bounds/null-pointer checking"
 	print "  -export          Export symbols for dynamic linkage"
 	print "  -semantic-model <file>  Write a versioned compiler semantic model"
+	print "  -semantic-model-bindings <file>  Write bindings and selected implicit calls"
+	print "  -semantic-model-compact  Omit verbose macro-expansion provenance from the semantic model"
 	print "  -semantic-model-expressions <file>  Write only typed expression ranges"
 	if( verbose ) then
 	print "  -fbgfx           Link to the appropriate libfbgfx variant (normally automatic)"

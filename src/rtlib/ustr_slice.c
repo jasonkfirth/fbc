@@ -39,16 +39,20 @@ FBCALL void fb_UStrLeftSelf( FBSTRING *dst, ssize_t count )
 	ssize_t length;
 	if( dst == NULL ) return;
 	FB_STRLOCK();
-	length = fb_hUtf8Offset(dst->data, FB_STRSIZE(dst), count > 0 ? count : 0);
-	fb_hStrSetLength(dst, length);
-	if( dst->data != NULL ) dst->data[length] = 0;
+	if( count >= 0 ) {
+		length = fb_hUtf8Offset(dst->data, FB_STRSIZE(dst), count);
+		fb_hStrSetLength(dst, length);
+		if( dst->data != NULL ) dst->data[length] = 0;
+	}
+	/* Match LEFTSELF's existing temporary-descriptor ownership contract. */
+	fb_hStrDelTemp_NoLock(dst);
 	FB_STRUNLOCK();
 }
 
 FBCALL void fb_WstrLeftSelf( FB_WCHAR *dst, ssize_t count )
 {
 	ssize_t offset = 0, remaining = count;
-	if( dst == NULL ) return;
+	if( dst == NULL || count < 0 ) return;
 	/* Truncation cannot extend the caller's buffer. Treat a UTF-16 pair
 	   as one scalar so the new terminator never separates the pair. */
 	while( remaining > 0 && dst[offset] != 0 ) {

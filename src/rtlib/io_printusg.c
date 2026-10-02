@@ -12,7 +12,7 @@
 #include <math.h>
 
 typedef struct {
-	int       chars;
+	ssize_t   chars;
 	char     *ptr;
 	FBSTRING  fmtstr;
 	int       utf8;
@@ -139,11 +139,12 @@ static void hPrintText( int fnum, const char *text, ssize_t length )
 	} else fb_PrintFixString( fnum, text, 0 );
 }
 
-static void hPrintField( int fnum, FBSTRING *source, ssize_t columns )
+static void hPrintField( int fnum, FBSTRING *source, ssize_t columns, int unicode )
 {
 	ssize_t length = source && source->data ? FB_STRSIZE(source) : 0;
-	ssize_t count = fb_hUtf8Count(source ? source->data : NULL, length);
-	ssize_t bytes = fb_hUtf8Offset(source ? source->data : NULL, length, columns);
+	ssize_t count = unicode ? fb_hUtf8Count(source ? source->data : NULL, length) : length;
+	ssize_t bytes = unicode ? fb_hUtf8Offset(source ? source->data : NULL, length, columns) :
+		(length < columns ? length : columns);
 	ssize_t padding = count < columns ? columns - count : 0, i;
 	FBSTRING *result;
 	FB_STRLOCK();
@@ -155,7 +156,10 @@ static void hPrintField( int fnum, FBSTRING *source, ssize_t columns )
 		memset(result->data + bytes, ' ', padding);
 	}
 	FB_STRUNLOCK();
-	if( result != NULL ) fb_UStrPrint(fnum, result, 0);
+	if( result != NULL ) {
+		hPrintText(fnum, result->data ? result->data : "", FB_STRSIZE(result));
+		fb_hStrDelTemp(result);
+	}
 }
 
 static int fb_PrintUsingFmtStr( int fnum );
@@ -280,8 +284,15 @@ static int fb_PrintUsingFmtStr( int fnum )
 	if( ctx->ptr == NULL )
 		ctx->chars = 0;
 
-	while( (ctx->chars > 0) && (len < BUFFERLEN) )
+	while( ctx->chars > 0 )
 	{
+		/* Keep a whole UTF-8 scalar in each flush. The encoded file hook
+		   receives independent chunks, so it cannot join split sequences. */
+		if( len > BUFFERLEN - 4 ) {
+			buffer[len] = 0;
+			hPrintText(fnum, buffer, len);
+			len = 0;
+		}
 		c = FB_CHAR_TO_INT( *ctx->ptr );
 		nc = ( ctx->chars > 1? FB_CHAR_TO_INT( ctx->ptr[1] ) : -1 );
 		nnc = ( ctx->chars > 2? FB_CHAR_TO_INT( ctx->ptr[2] ) : -1 );
@@ -341,10 +352,17 @@ static int fb_PrintUsingFmtStr( int fnum )
 		if( doexit )
 			break;
 
-		buffer[len++] = (char)c;
-
-		++ctx->ptr;
-		--ctx->chars;
+		if( ctx->utf8 && c >= 0x80 ) {
+			ssize_t consumed = 0;
+			unsigned int scalar = fb_hUtf8Decode(ctx->ptr, ctx->chars, &consumed);
+			len += fb_hUtf8Encode(buffer + len, scalar);
+			ctx->ptr += consumed;
+			ctx->chars -= consumed;
+		} else {
+			buffer[len++] = (char)c;
+			++ctx->ptr;
+			--ctx->chars;
+		}
 	}
 
 	/* flush */
@@ -361,7 +379,8 @@ static int hPrintUsingString( int fnum, FBSTRING *s, int mask, int unicode )
 {
 	FB_PRINTUSGCTX *ctx;
 	char buffer[BUFFERLEN+1];
-	int c, nc, strchars, doexit, i;
+	int c, nc, doexit;
+	ssize_t strchars;
 
 	ctx = FB_TLSGETCTX( PRINTUSG );
 	if( unicode ) ctx->utf8 = TRUE;
@@ -391,7 +410,7 @@ static int hPrintUsingString( int fnum, FBSTRING *s, int mask, int unicode )
 		{
 		case '!':
 			if( unicode ) {
-				hPrintField(fnum, s, 1);
+				hPrintField(fnum, s, 1, TRUE);
 				++ctx->ptr;
 				--ctx->chars;
 				break;
@@ -421,34 +440,7 @@ static int hPrintUsingString( int fnum, FBSTRING *s, int mask, int unicode )
 				if( strchars > 0 )
 				{
 					++strchars;
-					if( unicode ) {
-						hPrintField(fnum, s, strchars);
-						++ctx->ptr;
-						--ctx->chars;
-						break;
-					}
-
-					if( FB_STRSIZE( s ) < strchars )
-					{
-						hPrintText( fnum, s->data ? s->data : "", FB_STRSIZE(s) );
-
-						strchars -= FB_STRSIZE( s );
-						for( i = 0; i < strchars; i++ )
-							buffer[i] = ' ';
-						buffer[i] = '\0';
-					}
-					else
-					{
-						memcpy( buffer, s->data, strchars );
-						buffer[strchars] = '\0';
-					}
-
-					/* replace null-terminators by spaces */
-					for( i = 0; i < strchars; i++ )
-						if( buffer[i] == '\0' )
-							buffer[i] = ' ';
-
-					hPrintText( fnum, buffer, strlen(buffer) );
+					hPrintField(fnum, s, strchars, unicode);
 
 					++ctx->ptr;
 					--ctx->chars;
