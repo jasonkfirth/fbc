@@ -28,10 +28,13 @@ const fbFileEncodUTF16   = 2
 const fbFileEncodUTF32   = 3
 
 '' Overloads refer to C entry points, so their aliases must not be mangled.
+#if __FB_LANG__ <> "qb"
 extern "c"
+#endif
 
 #if __FB_LANG__ = "qb"
 
+'' QB has no EXTERN block or OVERLOAD syntax; aliases still select C symbols.
 declare function FileCopy alias "fb_FileCopy" ( byval source as const __zstring __ptr, byval destination as const __zstring __ptr ) as long
 #ifdef __FB_64BIT__
 	declare function FileAttr alias "fb_FileAttr" ( byval filenumber as long, byval returntype as long = 1 ) as __longint
@@ -40,11 +43,11 @@ declare function FileCopy alias "fb_FileCopy" ( byval source as const __zstring 
 	' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-014
 	declare function FileAttr alias "fb_FileAttr" ( byval filenumber as long, byval returntype as long = 1 ) as long
 #endif
-declare function FileLen overload alias "fb_FileLen" ( byval filename as const __zstring __ptr ) as __longint
-declare function FileExists overload alias "fb_FileExists" ( byval filename as const __zstring __ptr ) as long
-declare function FileDateTime overload alias "fb_FileDateTime" ( byval filename as const __zstring __ptr ) as double
-declare function GetAttr overload alias "fb_FileGetAttr" ( byval filename as const __zstring __ptr ) as long
-declare function SetAttr overload alias "fb_FileSetAttr" ( byval filename as const __zstring __ptr, byval attributes as long ) as long
+declare function FileLen alias "fb_FileLen" ( byval filename as const __zstring __ptr ) as __longint
+declare function FileExists alias "fb_FileExists" ( byval filename as const __zstring __ptr ) as long
+declare function FileDateTime alias "fb_FileDateTime" ( byval filename as const __zstring __ptr ) as double
+declare function GetAttr alias "fb_FileGetAttr" ( byval filename as const __zstring __ptr ) as long
+declare function SetAttr alias "fb_FileSetAttr" ( byval filename as const __zstring __ptr, byval attributes as long ) as long
 
 #else
 
@@ -98,7 +101,9 @@ end extern
 declare function FileFlush alias "fb_FileFlush" ( byval filenumber as long = -1, byval systembuffer as long = 0 ) as long
 declare function FileSetEof alias "fb_FileSetEof" ( byval filenumber as long ) as long
 
+#if __FB_LANG__ <> "qb"
 end extern
+#endif
 
 #endif
 

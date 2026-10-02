@@ -78,6 +78,7 @@ static void *amiga_audioWorker(void *unused)
     }
 
     /* The SDK's pthread trampoline treats NULL as a process exit request. */
+    /* cppcheck-suppress intToPointerCast */
     return (void *)1;
 }
 

@@ -16,6 +16,34 @@ import subprocess
 import tempfile
 
 
+def test_haiku_grep(root: Path, working: Path) -> bool:
+    """Haiku must count result records with the same status as native grep."""
+    working.mkdir()
+    (working / "matches.log").write_text(
+        "probe : RESULT=PASSED\nignored\nprobe : RESULT=FAILED\n", encoding="utf-8")
+    (working / "empty.log").write_text("", encoding="utf-8")
+    helper = ["sh", str(root / "tests/haiku/grep.sh")]
+    pattern = r"^.* : RESULT=(PASSED|FAILED)( |$)"
+    for label, arguments, input_text in (
+        ("result counts", ["-c", "-E", pattern, "matches.log"], None),
+        ("empty result count", ["-c", "-E", pattern, "empty.log"], None),
+        ("per-file counts", ["-c", "-E", pattern, "matches.log", "empty.log"], None),
+        ("stdin count", ["-c", "-E", pattern], "probe : RESULT=PASSED\n"),
+        ("quiet count", ["-c", "-q", "-E", pattern, "matches.log"], None),
+        ("file-name count", ["-c", "-l", "-E", pattern, "matches.log", "empty.log"], None),
+        ("missing file", ["-c", "-E", pattern, "missing.log"], None),
+    ):
+        expected = subprocess.run(["grep", *arguments], cwd=working, input=input_text,
+                                  text=True, capture_output=True, timeout=10, check=False)
+        actual = subprocess.run(helper + arguments, cwd=working, input=input_text,
+                                text=True, capture_output=True, timeout=10, check=False)
+        if (actual.returncode, actual.stdout) != (expected.returncode, expected.stdout):
+            print(label + ": wrong Haiku grep result\n" + actual.stdout + actual.stderr)
+            return False
+        print("Haiku grep " + label + ": passed")
+    return True
+
+
 def test_compiler_selection(root: Path, working: Path) -> bool:
     """A compiler built by this invocation must replace the native fallback."""
     working.mkdir()
@@ -55,6 +83,8 @@ def main() -> int:
     options = parser.parse_args()
     root = options.root.resolve()
     with tempfile.TemporaryDirectory(prefix="fbc-log-harness-") as temporary:
+        if not test_haiku_grep(root, Path(temporary) / "grep"):
+            return 1
         if not test_compiler_selection(root, Path(temporary) / "selection"):
             return 1
         working = Path(temporary) / "tests"

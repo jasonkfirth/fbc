@@ -176,6 +176,7 @@ LONG fb_amigaGuestMain(void)
     int status;
 
     /* Exec's base pointer is the documented longword at address four. */
+    /* cppcheck-suppress intToPointerCast */
     SysBase = *(struct ExecBase **)4;
     DOSBase = (struct DosLibrary *)OpenLibrary("dos.library", 37);
     if (DOSBase == NULL) return 20;

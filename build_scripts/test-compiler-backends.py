@@ -36,9 +36,25 @@ def main() -> int:
         ("abi", "tests/compiler-support/backend-abi.bas", "backend ABI passed"),
         ("builtins", "tests/crt/builtin-backends.bas", ""),
         ("asm-registers", "tests/quirk/inline-asm-registers.bas", ""),
+        ("qb-headers", "tests/qb/vb-string-helpers.bas", ""),
     ]
     with tempfile.TemporaryDirectory(prefix="fbc-backends-") as temporary:
         working = Path(temporary)
+        # Every compiler contains GAS64, even when its host has 32-bit INTEGER.
+        # Emission checks that host-width references match the fixed-width state
+        # without requiring the target's assembler, linker, or runtime libraries.
+        for target in ("win32", "linux-mips32", "riscos"):
+            command = [str(options.fbc.resolve()), "-prefix", str(root), "-r",
+                       "-gen", "gcc", "-target", target, "-m", "fbc",
+                       "-i", str(root / "src/compiler"), "-i", str(root / "inc"),
+                       str(root / "src/compiler/backend/gas64/ir-gas64.bas"),
+                       "-o", str(working / ("ir-gas64-" + target + ".c"))]
+            emitted = subprocess.run(command, cwd=working, text=True,
+                                     capture_output=True, timeout=120, check=False)
+            if emitted.returncode:
+                print(f"GAS64/{target}: emission failed\n{emitted.stdout}{emitted.stderr}")
+                return 1
+            print(f"GAS64/{target}: emission passed")
         try:
             target = subprocess.run([str(options.fbc.resolve()), "-print", "target"],
                                     cwd=working, text=True, capture_output=True,
@@ -75,6 +91,8 @@ def main() -> int:
                 command = [str(options.fbc.resolve()), "-prefix", str(root),
                            "-i", str(root / "inc"), "-gen", backend, "-v",
                            str(input_source), "-x", str(executable)]
+                if name == "qb-headers":
+                    command += ["-lang", "qb"]
                 if name.startswith("c-abi"):
                     command += [str(c_object)]
                     if backend == "llvm":

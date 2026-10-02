@@ -158,11 +158,13 @@ static void checkWide( void )
 static void checkOptional( void )
 {
 	FBSTRING a, b;
-	char source[4], mapped[12], actual[12];
+	char source[4], mapped[12] = { 0 }, actual[12];
 	size_t i;
 	ssize_t input_length, output_length, width;
 	unsigned int j;
 	for( i = 0; i < sizeof(fold_map) / sizeof(*fold_map); ++i ) {
+		/* Each mapping contains one to three UTF-8 scalars, at most four bytes each. */
+		assert( fold_map[i].count > 0 && fold_map[i].count <= sizeof(mapped) / 4 );
 		input_length = fb_hUtf8Encode(source, fold_map[i].scalar);
 		output_length = 0;
 		for( j = 0; j < fold_map[i].count; ++j )

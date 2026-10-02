@@ -12,7 +12,7 @@
 # Responsibilities:
 #
 #   * match POSIX basic or extended regular expressions with case folding
-#   * support normal, quiet, and file-name-only output
+#   * support normal, count, quiet, and file-name-only output
 #   * retain grep-compatible success, no-match, and error exit statuses
 #
 # This script intentionally does NOT contain:
@@ -26,6 +26,7 @@ set -u
 
 ignore_case=0
 list_only=0
+count_only=0
 quiet=0
 exact_line=0
 extended=0
@@ -36,6 +37,7 @@ while [ "$#" -gt 0 ]; do
 	case "$1" in
 		-i) ignore_case=1 ;;
 		-l) list_only=1 ;;
+		-c) count_only=1 ;;
 		-q) quiet=1 ;;
 		-x) exact_line=1 ;;
 		-E) extended=1 ;;
@@ -86,6 +88,7 @@ fi
 FB_TEST_GREP_PATTERN="$pattern" awk \
 	-v ignore_case="$ignore_case" \
 	-v list_only="$list_only" \
+	-v count_only="$count_only" \
 	-v quiet="$quiet" \
 	-v exact_line="$exact_line" \
 	-v extended="$extended" '
@@ -142,8 +145,24 @@ function line_matches(line) {
 	return line ~ pattern
 }
 
+# Counts belong to each input file, including empty files and nonmatches.
+# BEGINFILE/ENDFILE are provided by the same GNU awk required for nextfile.
+BEGINFILE {
+	match_count = 0
+}
+
+ENDFILE {
+	if (count_only != 0 && quiet == 0 && list_only == 0) {
+		if (file_count > 1)
+			print FILENAME ":" match_count
+		else
+			print match_count
+	}
+}
+
 line_matches($0) {
 	found = 1
+	match_count++
 
 	if (quiet != 0)
 		exit 0
@@ -153,10 +172,12 @@ line_matches($0) {
 		nextfile
 	}
 
-	if (file_count > 1)
-		print FILENAME ":" $0
-	else
-		print $0
+	if (count_only == 0) {
+		if (file_count > 1)
+			print FILENAME ":" $0
+		else
+			print $0
+	}
 }
 
 END {

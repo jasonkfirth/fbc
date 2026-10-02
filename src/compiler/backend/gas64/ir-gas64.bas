@@ -7364,17 +7364,20 @@ private sub hCallEmitWindowsStackSlot _
 	end if
 end sub
 
-private function hCallAlignStackCopy( byref stack_copy as integer ) as integer
+private function hCallAlignStackCopy( byref stack_copy as longint ) as integer
 	'' A stack-copy cursor is a nonnegative byte count. Qword alignment is a
 	'' power of two, so the low bits provide its remainder without signed MOD.
+	'' Match ctx.stkcopy's fixed width even when building a 32-bit compiler.
 	if( stack_copy < 0 ) then
 		return FALSE
 	end if
 
-	stack_copy += GAS64_QWORD_BYTES - (stack_copy And (GAS64_QWORD_BYTES - 1))
-	if( stack_copy < 0 ) then
+	dim as longint padding = GAS64_QWORD_BYTES - (stack_copy And (GAS64_QWORD_BYTES - 1))
+	'' Reject overflow before the addition reaches the signed 64-bit limit.
+	if( stack_copy > &h7FFFFFFFFFFFFFFFLL - padding ) then
 		return FALSE
 	end if
+	stack_copy += padding
 
 	return TRUE
 end function

@@ -328,6 +328,8 @@ static int hWriteEncoded( FB_FILE *file, const void *data, size_t length )
 			used = 0;
 		}
 	}
+	/* Empty input or an exact buffer flush leaves no bytes to publish. */
+	if( used == 0 ) return FB_RTERROR_OK;
 	return fwrite( buffer, 1, used, stream ) == used ? 0 : FB_RTERROR_FILEIO;
 }
 
