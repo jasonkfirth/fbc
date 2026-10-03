@@ -28,6 +28,13 @@ TESTS_FBC_ENV := env \
 	DXEGEN='$(DXEGEN)'
 TESTS_FBC_CMD := $(TESTS_FBC_ENV) "$(TESTS_FBC)"
 
+# Recursive C/C++ fixtures must use the same deployment floor as fbc. The
+# standalone harness reads this setting for both compiler commands; passing it
+# only inside FBC leaves clang++ targeting the current SDK and mixes object ABIs.
+ifeq ($(TARGET_OS),darwin)
+export TESTS_DARWIN_DEPLOYMENT_TARGET ?= $(DARWIN_DEPLOYMENT_TARGET)
+endif
+
 # Tests that compile and link non-fbcunit sources expect the full platform runtime
 # artifacts to exist in the active $(libdir) layout.
 TESTS_RUNTIME_LIBS := $(RTL_LIBS) $(FBRTL_LIBS) $(GFX_LIBS) $(SFX_LIBS)

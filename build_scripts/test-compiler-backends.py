@@ -27,8 +27,9 @@ def main() -> int:
     root = options.root.resolve()
     backends = options.backend or ["gcc"]
     clang = shutil.which(os.environ.get("CLANG") or "clang")
+    llc = shutil.which(os.environ.get("LLC") or "llc")
     if options.backend is None:
-        if shutil.which(os.environ.get("LLC") or "llc"):
+        if llc:
             backends.append("llvm")
         if clang:
             backends.append("clang")
@@ -56,6 +57,9 @@ def main() -> int:
                 return 1
             print(f"GAS64/{target}: emission passed")
         if "llvm" in backends:
+            if llc is None:
+                print("llvm: configured compiler is unavailable")
+                return 1
             # Run llc for ARM64 even on an x86 host. IR-only checks would miss
             # an architecture name copied from the GCC command-line interface.
             source = working / "llvm-aarch64.bas"
@@ -65,8 +69,11 @@ def main() -> int:
                        "-gen", "llvm", "-target", "win32", "-arch", "aarch64",
                        str(source)]
             try:
+                # Explicit targets select prefixed tools. This emission check
+                # uses the detected host llc, which contains the ARM64 backend.
                 emitted = subprocess.run(command, cwd=working, text=True,
-                                         capture_output=True, timeout=120, check=False)
+                                         capture_output=True, timeout=120, check=False,
+                                         env={**os.environ, "LLC": llc})
             except (OSError, subprocess.TimeoutExpired) as error:
                 print(f"LLVM/aarch64: {error}")
                 return 1
