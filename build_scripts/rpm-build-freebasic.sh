@@ -327,6 +327,21 @@ install_deps() {
             # image libraries with the matching development packages.
             #
             zypper_args+=(--allow-downgrade)
+
+            if [ "$ARCH" = "aarch64" ]; then
+                local opensuse_repo
+
+                # ARM64 mirrors can serve an RPM from a different snapshot
+                # than their metadata. Use the official origin for this port
+                # while retaining repository signatures and package digests.
+                for opensuse_repo in /etc/zypp/repos.d/*.repo; do
+                    [ -f "$opensuse_repo" ] || continue
+                    run sed -i \
+                        -e 's|http://download.opensuse.org/|https://downloadcontent.opensuse.org/|g' \
+                        -e 's|https://download.opensuse.org/|https://downloadcontent.opensuse.org/|g' \
+                        "$opensuse_repo"
+                done
+            fi
         fi
 
         deps=(
