@@ -174,9 +174,10 @@ jobs:
                   raise SystemExit(f"unexpected Linux package family: {family}")
 
               row_name = f"{distro}-{release.replace('.', '_')}-{arch}"
-              # ARM64 packages can build natively on the same hosted runner
-              # used by basic CI. Other CPUs retain the QEMU container path.
-              native_arm64 = arch in {"arm64", "aarch64"}
+              # ARM64 distribution images can build on the same hosted runner
+              # used by basic CI. Arch uses an x86_64 cross-build container for
+              # ARM64, so keep its host native too.
+              native_arm64 = arch in {"arm64", "aarch64"} and family != "archlinux"
               rows.append(
                   {
                       "name": row_name,
