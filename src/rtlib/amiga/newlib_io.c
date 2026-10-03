@@ -152,7 +152,14 @@ int _open(const char *name, int flags, ...)
 
 int _close(int descriptor)
 {
-    BPTR handle = descriptor_handle(descriptor);
+    BPTR handle;
+    /* Validate locally before indexing; descriptor_handle also checks its
+       callers, but closing owns the descriptor table mutation. */
+    if (descriptor < 0 || descriptor >= AMIGA_FILE_DESCRIPTORS) {
+        errno = EBADF;
+        return -1;
+    }
+    handle = descriptor_handle(descriptor);
     if (handle == 0) return -1;
     if (descriptor < 3) return 0;
     Forbid();

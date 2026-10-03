@@ -91,6 +91,11 @@ def main() -> int:
                 command = [str(options.fbc.resolve()), "-prefix", str(root),
                            "-i", str(root / "inc"), "-gen", backend, "-v",
                            str(input_source), "-x", str(executable)]
+                if system == "darwin" and architecture in ("x86", "x86_64") and name in (
+                        "abi", "asm-registers") and backend in ("gcc", "clang"):
+                    # These fixtures contain Intel tokens. Darwin defaults to
+                    # AT&T string expressions, so select their actual syntax.
+                    command += ["-asm", "intel"]
                 if name == "qb-headers":
                     command += ["-lang", "qb"]
                 if name.startswith("c-abi"):
