@@ -204,10 +204,10 @@ jobs:
               names = ", ".join(sorted(missing_families))
               raise SystemExit(f"the Linux package factory omitted: {names}")
 
-          # Exercise rolling Fedora and previously unbuilt architectures first,
+          # Exercise rolling repositories and previously unbuilt architectures first,
           # keeping every canonical row in the full factory qualification.
           def row_priority(row):
-              if row["distro"] == "fedora" and row["release"] == "rawhide":
+              if (row["distro"] == "fedora" and row["release"] == "rawhide") or row["name"] == "opensuse-tumbleweed-aarch64":
                   return 0
               if row["family"] == "slackware" or row["name"] == "archlinux-current-armv7h":
                   return 1
