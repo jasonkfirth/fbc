@@ -49,7 +49,7 @@ cd "$ROOT"
 . "$ROOT/build_scripts/qemu-binfmt.sh"
 
 CLEANUP_SUCCESS=0
-CLEANUP_DIRS=("$ROOT/.build-archlinux")
+CLEANUP_DIRS=("$ROOT/.build-archlinux" "$ROOT/.build-archlinux-image")
 
 cleanup_build_roots() {
     local path
@@ -184,7 +184,10 @@ ARCHLINUX_ARCHES=(
 
 archlinux_image_for_arch() {
     case "$1" in
-        x86_64|aarch64|armv7h|armv7l|riscv64)
+        armv7h|armv7l)
+            echo "fbc-archlinuxarm:armv7h"
+            ;;
+        x86_64|aarch64|riscv64)
             echo "archlinux/archlinux:base"
             ;;
         *)
@@ -195,7 +198,8 @@ archlinux_image_for_arch() {
 
 docker_platform_for_arch() {
     case "$1" in
-        x86_64|aarch64|armv7h|armv7l|riscv64) echo "linux/amd64" ;;
+        armv7h|armv7l) echo "linux/arm/v7" ;;
+        x86_64|aarch64|riscv64) echo "linux/amd64" ;;
         *)
             die "unsupported Docker platform arch: $1"
             ;;
@@ -289,6 +293,7 @@ install_host_deps() {
             binfmt-support \
             ca-certificates \
             curl \
+            gnupg \
             git \
             tar \
             xz-utils \
@@ -305,6 +310,8 @@ install_host_deps() {
             qemu-user-static \
             binfmt-qemu-static \
             ca-certificates \
+            curl \
+            gnupg \
             git \
             base-devel \
             rsync \
@@ -319,6 +326,8 @@ install_host_deps() {
             docker \
             qemu-user-static \
             ca-certificates \
+            curl \
+            gnupg2 \
             gcc \
             make \
             rsync \
@@ -333,6 +342,8 @@ install_host_deps() {
             docker \
             qemu-user-static \
             ca-certificates \
+            curl \
+            gnupg2 \
             gcc \
             make \
             rsync \
@@ -391,11 +402,49 @@ prepare_bootstraps() {
 
     ensure_host_compiler
     build_bootstrap_for_arch x86_64
+    if target_matches_filters archlinux current armv7h; then
+        build_bootstrap_for_arch armv7h
+    fi
 }
 
 ##############################################################################
 # Build execution
 ##############################################################################
+
+prepare_archlinux_image() {
+    local arch="$1"
+    local image="$2"
+    local platform="$3"
+    local image_work="$ROOT/.build-archlinux-image/armv7h"
+    local rootfs="$image_work/ArchLinuxARM-armv7-latest.tar.gz"
+    local mirror="https://ca.us.mirror.archlinuxarm.org/os"
+    # Arch Linux ARM publishes this signing fingerprint on its downloads page.
+    local signing_key="68B3537F39A313B3E574D06777193F152BDBE6A6"
+
+    if [ "$arch" != "armv7h" ] && [ "$arch" != "armv7l" ]; then
+        run_root docker pull --platform "$platform" "$image"
+        return
+    fi
+
+    # Arch's x86_64 repositories have no hard-float ARM cross GCC. Use the
+    # signed upstream ARMv7 userspace under QEMU instead, so pacman supplies
+    # the native compiler and dependencies and this row produces a package.
+    need_cmd curl
+    need_cmd gpg
+    mkdir -p "$image_work/gnupg" || return
+    chmod 700 "$image_work/gnupg" || return
+    run curl --fail --location --retry 3 "$mirror/$(basename "$rootfs")" -o "$rootfs" || return
+    run curl --fail --location --retry 3 "$mirror/$(basename "$rootfs").sig" -o "$rootfs.sig" || return
+    run curl --fail --location --retry 3 \
+        "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x$signing_key" \
+        -o "$image_work/signing-key.asc" || return
+    run gpg --homedir "$image_work/gnupg" --batch --import "$image_work/signing-key.asc" || return
+    run gpg --homedir "$image_work/gnupg" --batch --status-fd 1 \
+        --verify "$rootfs.sig" "$rootfs" > "$image_work/signature.log" || return
+    grep -q "^\[GNUPG:\] VALIDSIG $signing_key " "$image_work/signature.log" || \
+        die "Arch Linux ARM rootfs was not signed by the expected key"
+    run_root docker import --platform "$platform" "$rootfs" "$image"
+}
 
 build_one() {
     local row="$1"
@@ -406,6 +455,7 @@ build_one() {
     local image
     local outdir
     local platform
+    local package_command="/work/build_scripts/archlinux-build-freebasic.sh --no-build"
 
     IFS="|" read -r family distro release arch image outdir <<EOF
 $row
@@ -413,10 +463,9 @@ EOF
 
     platform="$(docker_platform_for_arch "$arch")"
     mkdir -p "$outdir"
-
     if [ "$arch" = "armv7h" ] || [ "$arch" = "armv7l" ]; then
-        echo "SKIPPED: ${distro}/${release} (${arch}) has no official Arch x86_64 Linux hard-float ARM cross GCC"
-        return 0
+        # Upstream rootfs installation starts by initializing its package keyring.
+        package_command="pacman-key --init && pacman-key --populate archlinuxarm && $package_command"
     fi
 
     echo
@@ -428,7 +477,7 @@ EOF
     echo "============================================================"
 
     if ! {
-        run_root docker pull --platform "$platform" "$image" &&
+        prepare_archlinux_image "$arch" "$image" "$platform" &&
         run_root docker run --rm \
             --platform "$platform" \
             -e FBC_PACKAGE_DISTRO_ID="$distro" \
@@ -439,7 +488,7 @@ EOF
             -v "$ROOT:/work" \
             -w /work \
             "$image" \
-            bash -lc "/work/build_scripts/archlinux-build-freebasic.sh --no-build"
+            bash -lc "$package_command"
     } &> "$outdir/docker_build.log"; then
         if log_has_missing_manifest "$outdir/docker_build.log"; then
             echo "SKIPPED: ${distro}/${release} (${arch}) has no Docker image for ${platform}"

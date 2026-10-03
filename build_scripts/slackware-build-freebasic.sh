@@ -214,10 +214,29 @@ configure_slackpkg_mirror() {
     printf '%s\n' "$mirror" >> /etc/slackpkg/mirrors
 }
 
+run_slackpkg_changes() {
+    local status=0
+    local attempt
+
+    for attempt in 1 2; do
+        status=0
+        run slackpkg -batch=on -default_answer=y "$@" || status=$?
+
+        # 20 means no changes; 50 means slackpkg upgraded itself and asks
+        # the caller to restart. Allow one restart, keeping genuine download,
+        # signature, and installation failures fatal.
+        case "$status" in
+            0|20) return 0 ;;
+            50) [ "$attempt" -eq 1 ] || return "$status" ;;
+            *) return "$status" ;;
+        esac
+    done
+}
+
 install_deps() {
     [ "$SKIP_DEPS" -eq 0 ] || return 0
 
-    if command -v gcc >/dev/null 2>&1 && command -v "$MAKE_CMD" >/dev/null 2>&1; then
+    if [ "$CODENAME" != "current" ] && command -v gcc >/dev/null 2>&1 && command -v "$MAKE_CMD" >/dev/null 2>&1; then
         return 0
     fi
 
@@ -230,6 +249,8 @@ install_deps() {
         binutils
         glibc
         glibc-solibs
+        acl
+        attr
         kernel-headers
         'gcc-[0-9]*'
         gcc-g++
@@ -283,7 +304,19 @@ install_deps() {
 
     slackpkg -batch=on -default_answer=y update gpg || true
     run slackpkg -batch=on -default_answer=y update
-    run slackpkg -batch=on -default_answer=y install "${packages[@]}"
+
+    if [ "$CODENAME" = "current" ]; then
+        # The current image can lag behind its rolling repository. Upgrade
+        # libc before the package tools, as required by Slackware's upgrade
+        # procedure, then refresh installed libraries before adding new tools.
+        # Otherwise rsync and dependency install scripts can load old ABIs.
+        run_slackpkg_changes install aaa_glibc-solibs
+        run_slackpkg_changes upgrade aaa_glibc-solibs
+        run_slackpkg_changes upgrade pkgtools tar xz findutils
+        run_slackpkg_changes upgrade-all
+    fi
+
+    run_slackpkg_changes install "${packages[@]}"
 }
 
 ##############################################################################

@@ -51,7 +51,7 @@ on:
         default: false
         type: boolean
       linux_matrix_target:
-        description: Build one named Linux matrix row, or all rows
+        description: Build named Linux matrix rows (wildcards allowed), or all rows
         required: true
         default: all
         type: string
@@ -133,9 +133,12 @@ jobs:
 
       - name: Export the canonical Linux package matrix
         id: plan
+        env:
+          LINUX_MATRIX_TARGET: ${{ inputs.linux_matrix_target }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
+          import fnmatch
           import json
           import os
           import subprocess
@@ -190,6 +193,14 @@ jobs:
               names = ", ".join(sorted(missing_families))
               raise SystemExit(f"the Linux package factory omitted: {names}")
 
+          # Select rows before scheduling jobs. A pattern such as
+          # fedora-rawhide-* qualifies every architecture in one run.
+          selector = os.environ.get("LINUX_MATRIX_TARGET", "")
+          if selector and selector != "all":
+              rows = [row for row in rows if fnmatch.fnmatchcase(row["name"], selector)]
+              if not rows:
+                  raise SystemExit(f"no Linux package rows match: {selector}")
+
           run_linux_matrix = True
           if os.environ.get("GITHUB_EVENT_NAME") == "workflow_run":
               changed = subprocess.run(
@@ -228,19 +239,17 @@ jobs:
 
     steps:
       - name: Checkout
-        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Install Linux matrix host dependencies
-        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         run: |
           set -euo pipefail
           sudo bash build_scripts/github-actions-apt-update.sh
           sudo apt-get install -y --no-install-recommends \
             qemu-user-static binfmt-support \
-            ca-certificates curl wget git \
+            ca-certificates curl wget git gnupg \
             build-essential make pkg-config rsync \
             tar xz-utils gzip zip unzip dos2unix \
             jq python3 perl bc
@@ -251,11 +260,9 @@ jobs:
           docker version
 
       - name: Seed host compiler bootstrap sources
-        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
 
       - name: Build the current host compiler
-        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         run: |
           set -euo pipefail
           host_feature_args=(
@@ -275,7 +282,6 @@ jobs:
           make -j4 compiler "${host_feature_args[@]}" </dev/null
 
       - name: Build Linux package row
-        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         env:
           MATRIX_NAME: ${{ matrix.name }}
           MATRIX_ARCH: ${{ matrix.arch }}
@@ -342,7 +348,6 @@ jobs:
           esac
 
       - name: Upload Linux package row
-        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         uses: actions/upload-artifact@v7
         with:
           name: fbc-xl-linux-package-${{ matrix.name }}
@@ -353,7 +358,7 @@ jobs:
             out/raspbian/
 
       - name: Upload Linux row diagnostics
-        if: ${{ always() && (inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name) }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
           name: fbc-xl-linux-diagnostic-${{ matrix.name }}

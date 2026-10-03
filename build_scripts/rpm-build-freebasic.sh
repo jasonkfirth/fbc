@@ -248,7 +248,7 @@ install_deps() {
 
         msg "installing RPM build dependencies via dnf"
         if [ "$DISTRO_ID" = "fedora" ]; then
-            local fedora_repo_root
+            local fedora_repo_root fedora_repo
 
             fedora_repo_root="https://dl.fedoraproject.org/pub/fedora/linux"
             case "$ARCH" in
@@ -257,15 +257,23 @@ install_deps() {
                     ;;
             esac
 
-            if [ -f /etc/yum.repos.d/fedora-cisco-openh264.repo ]; then
-                run sed -i -e 's/^enabled=1/enabled=0/' /etc/yum.repos.d/fedora-cisco-openh264.repo
-            fi
-            run sed -i \
-                -e 's|^metalink=|#metalink=|' \
-                -e "s|^#baseurl=http://download.example/pub/fedora/linux|baseurl=${fedora_repo_root}|" \
-                /etc/yum.repos.d/fedora.repo \
-                /etc/yum.repos.d/fedora-updates.repo \
-                /etc/yum.repos.d/fedora-updates-testing.repo
+            # Rawhide ships development repositories instead of the release
+            # and updates files. DNF5 also ships defaults under /usr/share.
+            # Keep the image's repository set and enabled state while switching
+            # Fedora URLs to the official mirror and disabling Cisco downloads.
+            for fedora_repo in /etc/yum.repos.d/fedora*.repo /usr/share/dnf5/repos.d/fedora*.repo; do
+                [ -f "$fedora_repo" ] || continue
+                case "$fedora_repo" in
+                    */fedora-cisco-openh264.repo)
+                        run sed -i -e 's/^enabled=1/enabled=0/' "$fedora_repo"
+                        continue
+                        ;;
+                esac
+                run sed -i \
+                    -e 's|^metalink=|#metalink=|' \
+                    -e "s|^#baseurl=http://download.example/pub/fedora/linux|baseurl=${fedora_repo_root}|" \
+                    "$fedora_repo"
+            done
         fi
         run dnf clean all
         deps=(

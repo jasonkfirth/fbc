@@ -422,6 +422,7 @@ list_plan() {
     local script
     local arch
     local outdir
+    local row_image
 
     for target in "${TARGETS[@]}"; do
         IFS="|" read -r family distro image release script <<EOF
@@ -431,8 +432,13 @@ EOF
         while IFS= read -r arch; do
             target_matches_filters "$family" "$distro" "$release" "$arch" || continue
             outdir="$(outdir_for_target "$family" "$distro" "$release" "$arch")"
+            row_image="$image"
+            if [ "$family" = "archlinux" ] && [ "$arch" = "armv7h" ]; then
+                # The Arch family runner imports the signed native ARM rootfs.
+                row_image="fbc-archlinuxarm:armv7h"
+            fi
             printf '%s|%s|%s|%s|%s|%s|%s\n' \
-                "$family" "$distro" "$release" "$arch" "$image" "$script" "$outdir"
+                "$family" "$distro" "$release" "$arch" "$row_image" "$script" "$outdir"
         done < <(arches_for_target "$family" "$distro" "$release")
     done
 }
