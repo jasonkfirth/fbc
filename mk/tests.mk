@@ -8,8 +8,18 @@
 
 TESTS_FBC := $(if $(LOCAL_FBC),$(abspath $(LOCAL_FBC)),$(AVAILABLE_FBC))
 TESTS_TOOLCHAIN_BINDIR := $(call tool_bindir,$(CC))
+# C++ fixtures link Apple's libc++, which is available from macOS 10.7.
+# Keep every test compiler stage on the same floor, including the FBC command
+# whose toolchain environment would otherwise restore the older build target.
+TESTS_DARWIN_ENV :=
+ifeq ($(TARGET_OS),darwin)
+export TESTS_DARWIN_DEPLOYMENT_TARGET ?= $(shell printf '%s\n' '$(DARWIN_DEPLOYMENT_TARGET)' | awk -F. '{ if (($$1+0 < 10) || ($$1+0 == 10 && $$2+0 < 7)) print "10.7"; else print; }')
+TESTS_DARWIN_ENV := MACOSX_DEPLOYMENT_TARGET='$(TESTS_DARWIN_DEPLOYMENT_TARGET)'
+endif
+
 TESTS_FBC_ENV := env \
 	$(TOOLCHAIN_FBC_ENV) \
+	$(TESTS_DARWIN_ENV) \
 	PATH='$(if $(strip $(TESTS_TOOLCHAIN_BINDIR)),$(TESTS_TOOLCHAIN_BINDIR):)'"$$PATH" \
 	AS='$(AS)' \
 	AR='$(AR)' \
@@ -27,13 +37,6 @@ TESTS_FBC_ENV := env \
 	CXBE='$(CXBE)' \
 	DXEGEN='$(DXEGEN)'
 TESTS_FBC_CMD := $(TESTS_FBC_ENV) "$(TESTS_FBC)"
-
-# Recursive C/C++ fixtures must use the same deployment floor as fbc. The
-# standalone harness reads this setting for both compiler commands; passing it
-# only inside FBC leaves clang++ targeting the current SDK and mixes object ABIs.
-ifeq ($(TARGET_OS),darwin)
-export TESTS_DARWIN_DEPLOYMENT_TARGET ?= $(DARWIN_DEPLOYMENT_TARGET)
-endif
 
 # Tests that compile and link non-fbcunit sources expect the full platform runtime
 # artifacts to exist in the active $(libdir) layout.
