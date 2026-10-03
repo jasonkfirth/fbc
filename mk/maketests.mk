@@ -86,6 +86,7 @@ quick-test-body: sanity \
 	compiler-semantic-model-test \
 	example-artifact-test \
 	build-graph-test \
+	debian-include-test \
 	bootstrap-emit-test \
 	compiler-smoke \
 	compiler-semantic-model-smoke \
@@ -114,6 +115,7 @@ full-test-body: sanity \
 	compiler-semantic-model-test \
 	example-artifact-test \
 	build-graph-test \
+	debian-include-test \
 	parallel-build-test \
 	clean-test \
 	clean-idempotence \
