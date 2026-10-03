@@ -146,7 +146,9 @@ REV="$(sed -n 's/^REV[[:space:]]*:=[[:space:]]*//p' mk/version.mk | head -n1)"
 [ -n "$VERSION" ] || die "could not determine FBVERSION"
 [ -n "$REV" ] || REV=1
 
-MACHINE="$(uname -m)"
+# A 32-bit x86 container shares its host's 64-bit kernel, so uname alone
+# cannot identify the image's userspace. Matrix builds supply the image CPU.
+MACHINE="${FBC_PACKAGE_HOST_ARCH:-$(uname -m)}"
 case "$MACHINE" in
     x86_64|amd64)
         ARCH="x86_64"
@@ -172,9 +174,6 @@ case "$MACHINE" in
         die "unsupported Slackware architecture: $MACHINE"
         ;;
 esac
-
-TARGET_TRIPLET="$(gcc -dumpmachine 2>/dev/null || true)"
-[ -n "$TARGET_TRIPLET" ] || TARGET_TRIPLET="${ARCH}-slackware-linux"
 
 BOOTSTRAP_TAR="$ROOT/FreeBASIC-${VERSION}-source-bootstrap-${BOOTKEY}.tar.xz"
 
@@ -499,6 +498,14 @@ EOF
 ##############################################################################
 
 install_deps
+
+# Probe after dependency installation. Minimal images may not initially have
+# GCC, and an invented ARM triplet would lose the hard-float ABI information.
+TARGET_TRIPLET="$(gcc -dumpmachine)"
+case "$ARCH/$TARGET_TRIPLET" in
+    x86_64/x86_64-*|i586/i[3456]86-*|armv7l/arm-*|aarch64/aarch64-*) ;;
+    *) die "GCC target $TARGET_TRIPLET does not match Slackware architecture $ARCH" ;;
+esac
 
 if [ "$NO_BUILD" -eq 0 ]; then
     build_bootstrap_tarball

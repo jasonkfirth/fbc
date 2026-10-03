@@ -388,6 +388,7 @@ EOF
         run_root docker pull --platform "$platform" "$image" &&
         run_root docker run --rm \
             --platform "$platform" \
+            -e FBC_PACKAGE_HOST_ARCH="$arch" \
             -e FBC_PACKAGE_DISTRO_ID="$distro" \
             -e FBC_PACKAGE_CODENAME="$release" \
             -e BUILDROOT="/work/.build-slackware/${distro}/${release}/${arch}" \
