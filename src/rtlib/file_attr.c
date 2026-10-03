@@ -12,12 +12,19 @@
 #endif
 #include "dev_com_private.h"
 #include "io_serial_private.h"
+#ifndef HOST_XBOX
 #include <sys/stat.h>
+#else
+/* nxdk has ISO C stdio, but no POSIX stat or fileno. Its PDCLib stream
+   stores the native Xbox handle, as used by the platform truncate helper. */
+#include <windows.h>
+#include "pdclib/_PDCLIB_int.h"
+#endif
 #ifndef HOST_WINCE
 #include <errno.h>
 #endif
 
-#ifndef HOST_WINCE
+#if !defined(HOST_WINCE) && !defined(HOST_XBOX)
 #if defined(HOST_MINGW) && !defined(HOST_WINCE)
 #include <io.h>
 #define FILE_INFO_STAT struct __stat64
@@ -132,7 +139,7 @@ FBCALL ssize_t fb_FileAttr( int handle, int returntype )
 
 STATIC_ASSERT( sizeof( FB_FILE_INFO ) == 9 * sizeof( uint64_t ) );
 
-#ifndef HOST_WINCE
+#if !defined(HOST_WINCE) && !defined(HOST_XBOX)
 static void hFileInfo( const FILE_INFO_STAT *native, FB_FILE_INFO *info )
 {
 	info->flags = FB_FILE_INFO_EXISTS;
@@ -158,14 +165,14 @@ static void hFileInfo( const FILE_INFO_STAT *native, FB_FILE_INFO *info )
 }
 #endif
 
-#ifdef HOST_MINGW
+#if defined(HOST_MINGW) || defined(HOST_XBOX)
 static int hWindowsFileInfo( HANDLE handle, FB_FILE_INFO *info )
 {
 	BY_HANDLE_FILE_INFORMATION native;
 	if( !GetFileInformationByHandle( handle, &native ) ) return 0;
 	info->flags = FB_FILE_INFO_EXISTS;
-#ifdef HOST_WINCE
-	/* CE filesystems may leave identity fields empty. Do not claim an
+#if defined(HOST_WINCE) || defined(HOST_XBOX)
+	/* CE and Xbox filesystems may leave identity fields empty. Do not claim an
 	   identity for those files; the caller must compare their metadata. */
 	if( native.nFileIndexHigh != 0 || native.nFileIndexLow != 0 )
 		info->flags |= FB_FILE_INFO_IDENTITY;
@@ -212,6 +219,19 @@ int fb_FileQueryInfo( const char *filename, int follow_links, FB_FILE_INFO *info
 	info->modified = ((uint64_t)native.ftLastWriteTime.dwHighDateTime << 32) | native.ftLastWriteTime.dwLowDateTime;
 	info->changed = ((uint64_t)native.ftCreationTime.dwHighDateTime << 32) | native.ftCreationTime.dwLowDateTime;
 	return 1;
+#elif defined(HOST_XBOX)
+	HANDLE handle = fb_hOpenFileForQuery( filename );
+	int ok;
+	(void)follow_links;
+	/* FATX has no symbolic links. Use the same drive search and DOS path
+	   conversion as runtime opens, including directories and read-only files. */
+	if( handle == INVALID_HANDLE_VALUE ) {
+		DWORD error = GetLastError();
+		return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
+	}
+	ok = hWindowsFileInfo( handle, info );
+	CloseHandle( handle );
+	return ok;
 #elif defined(HOST_MINGW)
 	DWORD attributes = GetFileAttributesA( filename );
 	HANDLE handle;
@@ -247,7 +267,7 @@ int fb_FileQueryInfo( const char *filename, int follow_links, FB_FILE_INFO *info
 
 int fb_FileQueryStreamInfo( void *stream, FB_FILE_INFO *info )
 {
-#ifndef HOST_WINCE
+#if !defined(HOST_WINCE) && !defined(HOST_XBOX)
 	FILE_INFO_STAT native;
 #endif
 	/* Some libcs implement fileno as a FILE member access macro. Keep the
@@ -260,6 +280,10 @@ int fb_FileQueryStreamInfo( void *stream, FB_FILE_INFO *info )
 	/* CeGCC _fileno returns the Windows handle directly, not a descriptor
 	   that can be passed to POSIX fstat or desktop _get_osfhandle. */
 	HANDLE handle = (HANDLE)_fileno( file );
+	if( handle == NULL || handle == INVALID_HANDLE_VALUE ) return 0;
+	return hWindowsFileInfo( handle, info );
+#elif defined(HOST_XBOX)
+	HANDLE handle = (HANDLE)file->handle;
 	if( handle == NULL || handle == INVALID_HANDLE_VALUE ) return 0;
 	return hWindowsFileInfo( handle, info );
 #else
