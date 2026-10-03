@@ -28,6 +28,10 @@ on:
         description: Completed package workflow run ID
         required: true
         type: string
+      extended_source_run_id:
+        description: Separate completed BSD and Haiku run, when needed
+        required: false
+        type: string
       release_tag:
         description: Existing repository tag to publish
         required: true
@@ -93,7 +97,7 @@ jobs:
           path: release-assets/extended-platforms
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          run-id: ${{ inputs.source_run_id }}
+          run-id: ${{ inputs.extended_source_run_id || inputs.source_run_id }}
 
       - name: Create or update GitHub Release
         env:
