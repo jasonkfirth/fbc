@@ -193,6 +193,17 @@ jobs:
               names = ", ".join(sorted(missing_families))
               raise SystemExit(f"the Linux package factory omitted: {names}")
 
+          # Exercise rolling Fedora and previously unbuilt architectures first,
+          # keeping every canonical row in the full factory qualification.
+          def row_priority(row):
+              if row["distro"] == "fedora" and row["release"] == "rawhide":
+                  return 0
+              if row["family"] == "slackware" or row["name"] == "archlinux-current-armv7h":
+                  return 1
+              return 2
+
+          rows.sort(key=row_priority)
+
           # Select rows before scheduling jobs. A pattern such as
           # fedora-rawhide-* qualifies every architecture in one run.
           selector = os.environ.get("LINUX_MATRIX_TARGET", "")
