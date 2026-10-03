@@ -1343,7 +1343,7 @@ private sub hMangleProc( byval sym as FBSYMBOL ptr )
 
 	docpp = hDoCppMangling( sym )
 
-	if( env.clopt.backend = FB_BACKEND_CLANG ) then
+	if( irUsesClangCCompiler() ) then
 		if( len( irGetBuiltinLibcName( sym ) ) > 0 ) then
 			'' Clang requires direct calls to its builtin identifiers. Emit an
 			'' ordinary declaration with a libc assembler alias so the same

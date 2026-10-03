@@ -146,7 +146,9 @@ REV="$(sed -n 's/^REV[[:space:]]*:=[[:space:]]*//p' mk/version.mk | head -n1)"
 [ -n "$VERSION" ] || die "could not determine FBVERSION"
 [ -n "$REV" ] || REV=1
 
-MACHINE="$(uname -m)"
+# A 32-bit x86 container shares its host's 64-bit kernel, so uname alone
+# cannot identify the image's userspace. Matrix builds supply the image CPU.
+MACHINE="${FBC_PACKAGE_HOST_ARCH:-$(uname -m)}"
 case "$MACHINE" in
     x86_64|amd64)
         ARCH="x86_64"
@@ -163,13 +165,15 @@ case "$MACHINE" in
         BOOTKEY="linux-aarch64"
         FBC_TARGET="linux-aarch64"
         ;;
+    armv7*)
+        ARCH="armv7l"
+        BOOTKEY="linux-arm"
+        FBC_TARGET="linux-arm"
+        ;;
     *)
         die "unsupported Slackware architecture: $MACHINE"
         ;;
 esac
-
-TARGET_TRIPLET="$(gcc -dumpmachine 2>/dev/null || true)"
-[ -n "$TARGET_TRIPLET" ] || TARGET_TRIPLET="${ARCH}-slackware-linux"
 
 BOOTSTRAP_TAR="$ROOT/FreeBASIC-${VERSION}-source-bootstrap-${BOOTKEY}.tar.xz"
 
@@ -199,37 +203,93 @@ configure_slackpkg_mirror() {
     fi
 
     case "$release" in
-        current)
-            mirror="https://mirrors.slackware.com/slackware/slackware64-current/"
-            ;;
-        15.0)
-            mirror="https://mirrors.slackware.com/slackware/slackware64-15.0/"
-            ;;
-        *)
-            return 0
-            ;;
+        current|15.0) ;;
+        *) return 0 ;;
+    esac
+
+    # The x86, x86_64 and ARM repositories have distinct package trees.
+    # Keep an image's configured mirror, but never default an ARM or 32-bit
+    # container to the Slackware64 repository.
+    case "$ARCH" in
+        x86_64) mirror="https://mirrors.slackware.com/slackware/slackware64-${release}/" ;;
+        i586) mirror="https://mirrors.slackware.com/slackware/slackware-${release}/" ;;
+        armv7l) mirror="https://slackware.uk/slackwarearm/slackwarearm-${release}/" ;;
+        aarch64) mirror="https://slackware.uk/slackwarearm/slackwareaarch64-${release}/" ;;
+        *) die "unsupported Slackware mirror architecture: $ARCH" ;;
     esac
 
     msg "configuring Slackware mirror: $mirror"
     printf '%s\n' "$mirror" >> /etc/slackpkg/mirrors
 }
 
+configure_slackpkg_architecture() {
+    local config=/etc/slackpkg/slackpkg.conf
+    local pkgmain=slackware
+    [ -f "$config" ] || die "missing slackpkg configuration: $config"
+    [ "$ARCH" != "x86_64" ] || pkgmain=slackware64
+
+    # slackpkg also uses uname to select its package architecture and tree.
+    # A linux/386 container can report the host's x86_64 kernel, causing
+    # slackpkg to search for slackware64 under the 32-bit mirror.
+    run sed -i '/^[[:space:]]*ARCH=/d; /^[[:space:]]*PKGMAIN=/d' "$config"
+    printf '\nARCH=%s\nPKGMAIN=%s\n' "$ARCH" "$pkgmain" >> "$config"
+}
+
+configure_slackpkg_priority() {
+    [ "$CODENAME" = "15.0" ] || return 0
+
+    local config=/etc/slackpkg/slackpkg.conf
+    [ -f "$config" ] || die "missing slackpkg configuration: $config"
+
+    # Stable mirrors also contain experimental toolchains in testing. Their
+    # GCC can require a newer libc than the release image, so select packages
+    # only from the stable tree, its patches and supported extras.
+    if grep -Eq '^[[:space:]]*PRIORITY=' "$config"; then
+        run sed -i 's/^[[:space:]]*PRIORITY=.*/PRIORITY=( patches %PKGMAIN extra )/' "$config"
+    else
+        printf '\nPRIORITY=( patches %%PKGMAIN extra )\n' >> "$config"
+    fi
+}
+
+run_slackpkg_changes() {
+    local status=0
+    local attempt
+
+    for attempt in 1 2; do
+        status=0
+        run slackpkg -batch=on -default_answer=y "$@" || status=$?
+
+        # 20 means no changes; 50 means slackpkg upgraded itself and asks
+        # the caller to restart. Allow one restart, keeping genuine download,
+        # signature, and installation failures fatal.
+        case "$status" in
+            0|20) return 0 ;;
+            50) [ "$attempt" -eq 1 ] || return "$status" ;;
+            *) return "$status" ;;
+        esac
+    done
+}
+
 install_deps() {
     [ "$SKIP_DEPS" -eq 0 ] || return 0
 
-    if command -v gcc >/dev/null 2>&1 && command -v "$MAKE_CMD" >/dev/null 2>&1; then
+    if [ "$CODENAME" != "current" ] && command -v gcc >/dev/null 2>&1 && command -v "$MAKE_CMD" >/dev/null 2>&1; then
         return 0
     fi
 
     command -v slackpkg >/dev/null 2>&1 || die "missing gcc/make and slackpkg is not available"
 
     configure_slackpkg_mirror "$CODENAME"
+    configure_slackpkg_architecture
+    configure_slackpkg_priority
 
     msg "installing Slackware build dependencies via slackpkg"
     local packages=(
         binutils
         glibc
         glibc-solibs
+        acl
+        attr
         kernel-headers
         'gcc-[0-9]*'
         gcc-g++
@@ -283,7 +343,19 @@ install_deps() {
 
     slackpkg -batch=on -default_answer=y update gpg || true
     run slackpkg -batch=on -default_answer=y update
-    run slackpkg -batch=on -default_answer=y install "${packages[@]}"
+
+    if [ "$CODENAME" = "current" ]; then
+        # The current image can lag behind its rolling repository. Upgrade
+        # libc before the package tools, as required by Slackware's upgrade
+        # procedure, then refresh installed libraries before adding new tools.
+        # Otherwise rsync and dependency install scripts can load old ABIs.
+        run_slackpkg_changes install aaa_glibc-solibs
+        run_slackpkg_changes upgrade aaa_glibc-solibs
+        run_slackpkg_changes upgrade pkgtools tar xz findutils
+        run_slackpkg_changes upgrade-all
+    fi
+
+    run_slackpkg_changes install "${packages[@]}"
 }
 
 ##############################################################################
@@ -457,6 +529,14 @@ EOF
 ##############################################################################
 
 install_deps
+
+# Probe after dependency installation. Minimal images may not initially have
+# GCC, and an invented ARM triplet would lose the hard-float ABI information.
+TARGET_TRIPLET="$(gcc -dumpmachine)"
+case "$ARCH/$TARGET_TRIPLET" in
+    x86_64/x86_64-*|i586/i[3456]86-*|armv7l/arm-*|aarch64/aarch64-*) ;;
+    *) die "GCC target $TARGET_TRIPLET does not match Slackware architecture $ARCH" ;;
+esac
 
 if [ "$NO_BUILD" -eq 0 ]; then
     build_bootstrap_tarball

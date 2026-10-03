@@ -104,7 +104,8 @@ endif
 TESTS_FBC_ENV_EXTRA :=
 ifeq ($(TESTS_HOST_OS),darwin)
 TESTS_DARWIN_SDKROOT := $(strip $(shell xcrun --sdk macosx --show-sdk-path 2>/dev/null || xcrun --show-sdk-path 2>/dev/null))
-TESTS_DARWIN_DEPLOYMENT_TARGET ?= $(MACOSX_DEPLOYMENT_TARGET)
+# Standalone runs also include libc++ fixtures, whose oldest system is 10.7.
+TESTS_DARWIN_DEPLOYMENT_TARGET ?= $(shell printf '%s\n' '$(MACOSX_DEPLOYMENT_TARGET)' | awk -F. '{ if (($$1+0 < 10) || ($$1+0 == 10 && $$2+0 < 7)) print "10.7"; else print; }')
 ifneq ($(strip $(TESTS_DARWIN_DEPLOYMENT_TARGET)),)
 TESTS_FBC_ENV_EXTRA += MACOSX_DEPLOYMENT_TARGET='$(TESTS_DARWIN_DEPLOYMENT_TARGET)'
 endif

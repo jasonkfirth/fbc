@@ -810,7 +810,7 @@ private function hGetMangledNameForASM _
 
 	dim as string mangled
 	dim as string libcname
-	if( env.clopt.backend = FB_BACKEND_CLANG ) then
+	if( irUsesClangCCompiler() ) then
 		libcname = irGetBuiltinLibcName( sym )
 	end if
 
@@ -844,7 +844,7 @@ end function
 private function hNeedAlias( byval proc as FBSYMBOL ptr ) as integer
 	function = FALSE
 
-	if( env.clopt.backend = FB_BACKEND_CLANG ) then
+	if( irUsesClangCCompiler() ) then
 		if( len( irGetBuiltinLibcName( proc ) ) > 0 ) then return TRUE
 	end if
 
@@ -1479,7 +1479,7 @@ private sub hMaybeEmitProcProto( byval s as FBSYMBOL ptr )
 	'' is unsigned long on Linux but unsigned long long on Darwin/OpenBSD,
 	'' even though all three have LP64 data models. Use Clang's declaration
 	'' rather than guessing from the target word size; BASIC keeps ULONGINT.
-	if( (env.clopt.backend = FB_BACKEND_CLANG) andalso _
+	if( irUsesClangCCompiler() andalso _
 	    (not symbGetIsParsed( s )) andalso _
 	    (symbGetProcMode( s ) = FB_FUNCMODE_CDECL) andalso _
 	    (s->id.alias <> NULL) ) then
@@ -4818,7 +4818,7 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 	'' 2nd pass - emitting
 	dim as integer operandindex
 	dim as integer clang_lea = FALSE
-	if( (env.clopt.backend = FB_BACKEND_CLANG) and _
+	if( irUsesClangCCompiler() and _
 	    (env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL) ) then
 		if( asmtokenhead->type = AST_ASMTOK_TEXT ) then
 			clang_lea = (lcase( *asmtokenhead->text ) = "lea")
@@ -4831,7 +4831,7 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 		select case( n->type )
 		case AST_ASMTOK_TEXT
 			dim as string asmtext = *n->text
-			if( (env.clopt.backend = FB_BACKEND_CLANG) and _
+			if( irUsesClangCCompiler() and _
 			    (env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL) ) then
 				'' LLVM accepts lower or upper case operand qualifiers, but not
 				'' mixed forms such as Ptr. Keep literals and symbol text intact.
@@ -4950,7 +4950,7 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 	listEnd( @seenlabellist )
 
 	if( env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
-		if( env.clopt.backend = FB_BACKEND_CLANG ) then
+		if( irUsesClangCCompiler() ) then
 			asmcode = hStripSimpleAsmPlaceholderBrackets( asmcode )
 		end if
 

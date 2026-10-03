@@ -73,13 +73,6 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 msg() { echo ""; echo "==> $1"; }
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "missing command: $1"; }
 
-log_has_missing_manifest() {
-    local log="$1"
-
-    [ -f "$log" ] || return 1
-    grep -Eq 'no matching manifest|manifest unknown|not found: manifest|no match for platform|platform \(linux/amd64\) does not match the specified platform' "$log"
-}
-
 run_root() {
     if [ "$(id -u)" -eq 0 ]; then
         run "$@"
@@ -172,21 +165,26 @@ VERSION="$(sed -n 's/^FBVERSION[[:space:]]*:=[[:space:]]*//p' mk/version.mk | he
 # Matrix definition
 ##############################################################################
 
-SLACKWARE_ARCHES=(
-    x86_64
-    i586
-    aarch64
+# These images include native x86 and ARM variants. Slackware ARM 15.0
+# supports ARMv7; the AArch64 port follows the current development tree.
+SLACKWARE_TARGETS=(
+    "slackware|aclemons/slackware:15.0|15.0"
+    "slackware|aclemons/slackware:current|current"
 )
 
-SLACKWARE_TARGETS=(
-    "slackware|vbatts/slackware:15.0|15.0"
-    "slackware|vbatts/slackware:current|current"
-)
+arches_for_release() {
+    case "$1" in
+        15.0) printf '%s\n' x86_64 i586 armv7l ;;
+        current) printf '%s\n' x86_64 i586 aarch64 ;;
+        *) die "unsupported Slackware release: $1" ;;
+    esac
+}
 
 docker_platform_for_arch() {
     case "$1" in
         x86_64) echo "linux/amd64" ;;
         i586) echo "linux/386" ;;
+        armv7l) echo "linux/arm/v7" ;;
         aarch64) echo "linux/arm64" ;;
         *)
             die "unsupported Docker platform arch: $1"
@@ -198,6 +196,7 @@ bootstrap_mapping() {
     case "$1" in
         x86_64)  echo "linux-x86_64 linux-x86_64" ;;
         i586)    echo "linux-x86 linux-x86" ;;
+        armv7l)  echo "linux-arm linux-arm" ;;
         aarch64) echo "linux-aarch64 linux-aarch64" ;;
         *)
             die "unsupported Slackware bootstrap arch: $1"
@@ -236,11 +235,11 @@ list_plan() {
         IFS="|" read -r distro image release <<EOF
 $entry
 EOF
-        for arch in "${SLACKWARE_ARCHES[@]}"; do
+        while IFS= read -r arch; do
             target_matches_filters "$release" "$arch" || continue
             outdir="$ROOT/out/linux/${distro}/${release}/${arch}"
             printf 'slackware|%s|%s|%s|%s|%s\n' "$distro" "$release" "$arch" "$image" "$outdir"
-        done
+        done < <(arches_for_release "$release")
     done
 }
 
@@ -389,6 +388,7 @@ EOF
         run_root docker pull --platform "$platform" "$image" &&
         run_root docker run --rm \
             --platform "$platform" \
+            -e FBC_PACKAGE_HOST_ARCH="$arch" \
             -e FBC_PACKAGE_DISTRO_ID="$distro" \
             -e FBC_PACKAGE_CODENAME="$release" \
             -e BUILDROOT="/work/.build-slackware/${distro}/${release}/${arch}" \
@@ -398,14 +398,13 @@ EOF
             "$image" \
             bash -lc "/work/build_scripts/slackware-build-freebasic.sh --no-build"
     } &> "$outdir/docker_build.log"; then
-        if log_has_missing_manifest "$outdir/docker_build.log"; then
-            echo "SKIPPED: ${distro}/${release} (${arch}) has no Docker image for ${platform}"
-            echo "Log: $outdir/docker_build.log"
-            return 0
-        fi
-
         echo "BUILD FAILED: ${distro}/${release} (${arch})"
         echo "Log: $outdir/docker_build.log"
+        return 1
+    fi
+
+    if ! find "$outdir" -type f -name '*.txz' -size +0c -print -quit | grep -q .; then
+        echo "BUILD FAILED: ${distro}/${release} (${arch}) produced no Slackware package"
         return 1
     fi
 

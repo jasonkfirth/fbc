@@ -62,9 +62,12 @@ def handwritten_c_sources(compiler: Path) -> list[Path]:
         except FileNotFoundError:
             # Another compiler process may remove its temporary C emission.
             continue
-        generated = path.with_suffix(".bas").is_file() and prelude.startswith(
-            b"typedef   signed char       int8;\n"
-        )
+        # Native Windows text output uses CRLF; Unix hosts use LF. Both
+        # spellings must retain the exact emitter prelude and owning module.
+        generated = path.with_suffix(".bas").is_file() and prelude.startswith((
+            b"typedef   signed char       int8;\n",
+            b"typedef   signed char       int8;\r\n",
+        ))
         if not generated:
             sources.append(path)
     return sources
@@ -163,9 +166,10 @@ def validate(root: Path) -> tuple[int, int]:
         helper.write_text("int helper(void) { return 0; }\n", encoding="utf-8")
         if handwritten_c_sources(fixture) != [helper]:
             failures.append("Structure check accepted a new handwritten C compiler helper")
-        helper.write_text("typedef   signed char       int8;\n", encoding="utf-8")
-        if handwritten_c_sources(fixture):
-            failures.append("Structure check rejected generated C with its BASIC source")
+        for newline in (b"\n", b"\r\n"):
+            helper.write_bytes(b"typedef   signed char       int8;" + newline)
+            if handwritten_c_sources(fixture):
+                failures.append("Structure check rejected generated C with its BASIC source")
         (fixture / "module.bas").unlink()
         if handwritten_c_sources(fixture) != [helper]:
             failures.append("Structure check accepted C without its BASIC source")

@@ -1,8 +1,15 @@
-/* path conversion */
+/*
+    FreeBASIC Runtime Library
+    File: xbox/file_hconvpath.c
+    Purpose: Adapt runtime paths to the Xbox drive layout.
+    Responsibilities: Normalize paths and choose disc or writable drive access.
+    This file intentionally does NOT contain metadata comparison or hashing.
+*/
 
 #include "../fb.h"
 #include <errno.h>
 #include <direct.h>
+#include <windows.h>
 
 #define FB_XBOX_PATH_NO_PREFIX   0
 #define FB_XBOX_PATH_TEMP_DRIVE  1
@@ -274,6 +281,55 @@ FILE *fb_hReopenFile( const char *path, const char *mode, FILE *stream )
 	return fb_hOpenFile( path, mode );
 }
 
+static HANDLE hOpenConvertedFileForQuery( const char *path, int path_prefix )
+{
+	char dos_path[MAX_PATH];
+	const char *open_path;
+
+	if( !hMakeDosPath( path, dos_path, sizeof( dos_path ), path_prefix, &open_path ) ) {
+		SetLastError( ERROR_INVALID_NAME );
+		return INVALID_HANDLE_VALUE;
+	}
+
+	/* Metadata access must not require read permission or create a file.
+	   Backup semantics lets nxdk open directories for the same query. */
+	return CreateFileA( open_path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+		NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL );
+}
+
+HANDLE fb_hOpenFileForQuery( const char *path )
+{
+	HANDLE handle;
+	int is_relative;
+	DWORD error;
+
+	if( path == NULL || path[0] == '\0' ) {
+		SetLastError( ERROR_INVALID_NAME );
+		return INVALID_HANDLE_VALUE;
+	}
+	is_relative = hIsRelativePath( path );
+
+	handle = hOpenConvertedFileForQuery( path, is_relative ?
+		FB_XBOX_PATH_DISC_DRIVE : FB_XBOX_PATH_NO_PREFIX );
+	if( handle != INVALID_HANDLE_VALUE || !is_relative )
+		return handle;
+	/* Only absence permits drive fallback. Preserve access and I/O failures
+	   so callers cannot mistake an unreadable file for a missing one. */
+	error = GetLastError();
+	if( error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND )
+		return handle;
+	handle = hOpenConvertedFileForQuery( path, FB_XBOX_PATH_NO_PREFIX );
+	if( handle != INVALID_HANDLE_VALUE )
+		return handle;
+	error = GetLastError();
+	/* Some nxdk mount layouts require an explicit drive even for a relative
+	   path. An unqualified path can then fail with ERROR_INVALID_NAME. */
+	if( error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND &&
+	    error != ERROR_INVALID_NAME )
+		return handle;
+	return hOpenConvertedFileForQuery( path, FB_XBOX_PATH_TEMP_DRIVE );
+}
+
 int fb_hRemoveFile( const char *path )
 {
 	char dos_path[MAX_PATH];
@@ -355,3 +411,5 @@ int fb_hRemoveDir( const char *path )
 
 	return _rmdir( rmdir_path );
 }
+
+/* end of xbox/file_hconvpath.c */

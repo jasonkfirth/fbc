@@ -59,7 +59,7 @@ or recovered regions, withhold overlapping facts, and mark retained facts
 provisional. A full-model reader must reject recovery output. Interrupted
 processes do not write a recovery footer.
 
-## Schema version 25
+## Schema version 27
 
 Fields are separated by tabs. The wire representation is ASCII. A percent sign,
 every byte below 32, and every byte at or above 127 is encoded as `%HH`, using
@@ -73,6 +73,15 @@ the literal text `%E9`, not byte E9. Counts below include the record tag.
 | Record | Fields after the tag | Count |
 | --- | --- | --- |
 | `FBCSEM` | schema version, compiler version | 3 |
+| `NT` | subject domain, subject ID, role, primitive name, nominal symbol ID or zero, pointer depth, reference flag, const qualifier bits, storage bytes or empty, mangling modifier or empty | 11 |
+| `PH` | phase ID, procedure symbol ID, phase name, emitted flag | 5 |
+| `NP` | AST node ID, phase ID | 3 |
+| `EV` | parent AST node ID, evaluated AST node ID, ordinal, condition | 5 |
+| `CB` | control-flow block ID, phase ID, ordinal | 4 |
+| `CN` | block ID, root AST node ID, ordinal | 4 |
+| `CE` | phase ID, source block ID, target block ID or zero, transfer kind, label symbol ID or zero | 6 |
+| `CL` | phase ID, label symbol ID, defining block ID | 4 |
+| `DI` | diagnostic ID, severity, compiler code, message, detail, custom text, path, line, source context ID or zero, statement ID or zero, procedure symbol ID or zero | 12 |
 | `M` | source path | 2 |
 | `D` | source path | 2 |
 | `S` | ID, name, symbol class, data type, subtype ID, scope, attributes, procedure attributes, length, offset, lexical parent ID | 12 |
@@ -689,19 +698,60 @@ separate target coverage. The audit emits code and does not link a new compiler.
 
 ## Consumer migration
 
-Schema 25 is the current format. It includes the metadata and detail count
+Schema 27 is the current format. It includes the metadata and detail count
 introduced by schema 19, stable operator concepts and configuration/source
 provenance from later versions, compiler-selected preprocessor facts, and the
 macro expansion graph, source constructs, source/AST associations, access roles,
-argument default origins, and explicit capability coverage. Readers must explicitly support the schema they accept
+argument default origins, explicit capability coverage, normalized types,
+and procedure evaluation/control-flow phases. Readers must explicitly support the schema they accept
 and reject unknown versions. Raw encodings require knowledge of the
 corresponding compiler family; stable labels, relationships, and target type
 facts reduce that dependency.
 
 Fblint was the initial consumer for undeclared-name and variable-type checks.
 Existing data-flow and safety checks are consumer policy, not sidecar behavior.
-A consumer adopting schema 25 must validate it before using compiler facts as
+A consumer adopting schema 27 must validate it before using compiler facts as
 authoritative, and must continue treating recovery output as provisional.
+
+## Normalized types and procedure flow
+
+`NT` is a full-model type snapshot for a `symbol`, `node`, or `expression`
+subject. Its current role is `value`. Primitive names use the `Y` vocabulary;
+the nominal symbol ID preserves distinct aggregate, enum, and procedure types.
+Const bits run from the current value at position zero through each pointer
+dereference. There are exactly pointer-depth plus one bits. Storage width is
+empty when unknown, and pointer width follows the selected target. Symbol
+snapshots may repeat as forward declarations become complete; the latest
+snapshot applies, matching `T` metadata. Expression and node subjects have
+one snapshot. All `NT` records contribute to the detail count.
+
+`PH` observes a procedure's `pre-load` AST, with an emitted flag distinguishing
+emitted and observed-only procedures. `NP` assigns each body node to that phase.
+Symbol initializer and default-argument trees remain separate metadata trees,
+identified by their `H` relationships. They are not procedure blocks.
+
+`EV` records evaluation order under its condition: `always`, `argument`,
+`profile-begin`, `call-target`, `profile-end`, `copyback`, `condition`, `true`,
+`false`, or `result`. Assignment evaluates its right side before its destination
+address. Conditional arms can share an ordinal because only one arm is taken.
+
+Each `CB` currently owns one procedure root through `CN` ordinal zero. Block
+ordinals follow the procedure list. `CL` maps a label to its defining block in
+the same phase. `CE` either names the next block for `fallthrough`, or retains
+a label for `label`, `conditional-label`, `case-label`, `default-label`, and
+`subroutine-call`. Label transfers keep target block zero; consumers can resolve
+them through `CL`. An indirect subroutine call may have label zero.
+`unknown-indirect`, `unknown-assembly`, `subroutine-return`, and `procedure-exit`
+keep both target and label zero. Assembly can retain a fallthrough edge while
+also declaring unknown control effects. These observations are conservative
+and do not claim that opaque or indirect targets are known.
+
+`DI` retains an `error` or `warning` actually reported by the compiler in every
+sidecar mode, including recovery. Its source and statement IDs are optional;
+its path and line describe an informational point, not an editable range.
+Procedure symbol IDs are absent in expression-only output. These records
+contribute to the detail count in complete output and preserve the compiler's
+message, detail, and custom text without parsing console output.
 
 ## Source statements and compounds
 

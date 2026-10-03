@@ -27,8 +27,9 @@ def main() -> int:
     root = options.root.resolve()
     backends = options.backend or ["gcc"]
     clang = shutil.which(os.environ.get("CLANG") or "clang")
+    llc = shutil.which(os.environ.get("LLC") or "llc")
     if options.backend is None:
-        if shutil.which(os.environ.get("LLC") or "llc"):
+        if llc:
             backends.append("llvm")
         if clang:
             backends.append("clang")
@@ -55,6 +56,68 @@ def main() -> int:
                 print(f"GAS64/{target}: emission failed\n{emitted.stdout}{emitted.stderr}")
                 return 1
             print(f"GAS64/{target}: emission passed")
+        # RISC OS overrides fbnetwire.bi for its APCS double layout. Compile
+        # the shared text suite too, so that override retains Unicode overloads.
+        command = [str(options.fbc.resolve()), "-prefix", str(root), "-r",
+                   "-gen", "gcc", "-target", "riscos",
+                   "-i", str(root / "inc"), "-i", str(root / "tests/fbcunit/inc"),
+                   str(root / "tests/string/text-types.bas"),
+                   "-o", str(working / "text-types-riscos.c")]
+        emitted = subprocess.run(command, cwd=working, text=True,
+                                 capture_output=True, timeout=120, check=False)
+        if emitted.returncode:
+            print(f"Unicode/riscos: emission failed\n{emitted.stdout}{emitted.stderr}")
+            return 1
+        print("Unicode/riscos: emission passed")
+        if "llvm" in backends:
+            if llc is None:
+                print("llvm: configured compiler is unavailable")
+                return 1
+            # Run llc for ARM64 even on an x86 host. IR-only checks would miss
+            # an architecture name copied from the GCC command-line interface.
+            source = working / "llvm-aarch64.bas"
+            source.write_text('function increment( byval value as longint ) as longint\n'
+                              '    return value + 1\nend function\n', encoding="utf-8")
+            command = [str(options.fbc.resolve()), "-prefix", str(root), "-rr",
+                       "-gen", "llvm", "-target", "win32", "-arch", "aarch64",
+                       str(source)]
+            try:
+                # Explicit targets select prefixed tools. This emission check
+                # uses the detected host llc, which contains the ARM64 backend.
+                emitted = subprocess.run(command, cwd=working, text=True,
+                                         capture_output=True, timeout=120, check=False,
+                                         env={**os.environ, "LLC": llc})
+            except (OSError, subprocess.TimeoutExpired) as error:
+                print(f"LLVM/aarch64: {error}")
+                return 1
+            assembly = source.with_suffix(".asm")
+            if emitted.returncode or not assembly.is_file() or assembly.stat().st_size == 0:
+                print(f"LLVM/aarch64: assembly emission failed\n{emitted.stdout}{emitted.stderr}")
+                return 1
+            print("LLVM/aarch64: assembly emission passed")
+            if clang is not None:
+                # Assemble both Windows x86 targets with the detected host
+                # Clang. Its default CPU must not decide the object's word size.
+                # The first COFF header field identifies i386 (0x14c) or AMD64
+                # (0x8664), independently of the compiler host architecture.
+                for architecture, machine in (("686", 0x14C), ("x86_64", 0x8664)):
+                    obj = working / ("llvm-win32-" + architecture + ".o")
+                    command = [str(options.fbc.resolve()), "-prefix", str(root), "-c",
+                               "-gen", "llvm", "-target", "win32", "-arch", architecture,
+                               str(source), "-o", str(obj)]
+                    try:
+                        compiled = subprocess.run(command, cwd=working, text=True,
+                                                  capture_output=True, timeout=120, check=False,
+                                                  env={**os.environ, "LLC": llc, "CLANG": clang})
+                    except (OSError, subprocess.TimeoutExpired) as error:
+                        print(f"LLVM/win32-{architecture}: {error}")
+                        return 1
+                    if (compiled.returncode or not obj.is_file() or
+                            int.from_bytes(obj.read_bytes()[:2], "little") != machine):
+                        print(f"LLVM/win32-{architecture}: object compilation failed\n"
+                              f"{compiled.stdout}{compiled.stderr}")
+                        return 1
+                    print(f"LLVM/win32-{architecture}: object compilation passed")
         try:
             target = subprocess.run([str(options.fbc.resolve()), "-print", "target"],
                                     cwd=working, text=True, capture_output=True,
@@ -91,6 +154,11 @@ def main() -> int:
                 command = [str(options.fbc.resolve()), "-prefix", str(root),
                            "-i", str(root / "inc"), "-gen", backend, "-v",
                            str(input_source), "-x", str(executable)]
+                if system == "darwin" and architecture in ("x86", "x86_64") and name in (
+                        "abi", "asm-registers") and backend in ("gcc", "clang"):
+                    # These fixtures contain Intel tokens. Darwin defaults to
+                    # AT&T string expressions, so select their actual syntax.
+                    command += ["-asm", "intel"]
                 if name == "qb-headers":
                     command += ["-lang", "qb"]
                 if name.startswith("c-abi"):
@@ -153,35 +221,45 @@ def main() -> int:
             source = working / "builtin-target.bas"
             source.write_text('#include once "builtin.bi"\n'
                               'dim value as ulongint = &h0123456789abcdefull\n'
-                              'value = __builtin_bswap64(value)\n', encoding="utf-8")
+                              'value = __builtin_bswap64(value)\n'
+                              'dim shared copyBytes as function cdecl( byval as any ptr, '
+                              'byval as const any ptr, byval as __fb_builtin_size_t ) '
+                              'as any ptr = @__builtin_memcpy\n', encoding="utf-8")
             targets = (
-                ("linux", "x86_64-linux-gnu"),
-                ("darwin", "x86_64-apple-darwin"),
-                ("freebsd", "x86_64-unknown-freebsd"),
-                ("openbsd", "x86_64-unknown-openbsd"),
-                ("netbsd", "x86_64-unknown-netbsd"),
+                ("clang", "linux", "x86_64", "x86_64-linux-gnu"),
+                ("clang", "darwin", "x86_64", "x86_64-apple-darwin"),
+                ("clang", "darwin", "aarch64", "aarch64-apple-darwin"),
+                ("clang", "freebsd", "x86_64", "x86_64-unknown-freebsd"),
+                ("clang", "openbsd", "x86_64", "x86_64-unknown-openbsd"),
+                ("clang", "netbsd", "x86_64", "x86_64-unknown-netbsd"),
+                # Darwin also runs Clang behind the system gcc command.
+                ("gcc", "darwin", "x86_64", "x86_64-apple-darwin"),
+                ("gcc", "darwin", "aarch64", "aarch64-apple-darwin"),
+                ("clang", "win32", "aarch64", "aarch64-w64-mingw32"),
+                ("gcc", "win32", "aarch64", "aarch64-w64-mingw32"),
             )
-            for target, triple in targets:
+            for backend, target, arch, triple in targets:
+                label = f"{backend}/{target}-{arch}"
                 command = [str(options.fbc.resolve()), "-prefix", str(root),
-                           "-i", str(root / "inc"), "-gen", "clang", "-r",
-                           "-target", target, "-arch", "x86_64", str(source)]
+                           "-i", str(root / "inc"), "-gen", backend, "-r",
+                           "-target", target, "-arch", arch, str(source)]
                 try:
                     emitted = subprocess.run(command, cwd=working, text=True,
                                              capture_output=True, timeout=120, check=False)
                     if emitted.returncode:
-                        print(f"clang/{target}: C emission failed\n{emitted.stdout}{emitted.stderr}")
+                        print(f"{label}: C emission failed\n{emitted.stdout}{emitted.stderr}")
                         return 1
                     checked = subprocess.run([clang, "--target=" + triple, "-fsyntax-only",
                                               "-nostdinc", str(source.with_suffix(".c"))],
                                              cwd=working, text=True, capture_output=True,
                                              timeout=30, check=False)
                 except (OSError, subprocess.TimeoutExpired) as error:
-                    print(f"clang/{target}: {error}")
+                    print(f"{label}: {error}")
                     return 1
                 if checked.returncode:
-                    print(f"clang/{target}: C declarations failed\n{checked.stdout}{checked.stderr}")
+                    print(f"{label}: C declarations failed\n{checked.stdout}{checked.stderr}")
                     return 1
-                print(f"clang/{target}: C declarations passed")
+                print(f"{label}: C declarations passed")
     return 0
 
 

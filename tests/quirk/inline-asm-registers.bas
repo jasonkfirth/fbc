@@ -22,6 +22,9 @@
 
 #ifdef __FB_X86__
 
+'' The fixture uses Intel operands, including on Darwin where AT&T is default.
+#cmdline "-asm intel"
+
 function read_flags() as uinteger
 	asm
 		#ifdef __FB_64BIT__

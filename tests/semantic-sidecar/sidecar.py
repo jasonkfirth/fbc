@@ -1,6 +1,6 @@
 """Project: FreeBASIC semantic sidecar tests
 File: sidecar.py
-Purpose: Read and independently validate schema 26 sidecars.
+Purpose: Read and independently validate schema 27 sidecars.
 Responsibilities: Check shapes, references, ranges, escaping, and completion totals.
 This file intentionally does NOT contain: compiler invocation or inferred semantics.
 """
@@ -13,7 +13,7 @@ from pathlib import Path
 import re
 
 
-SCHEMA = "26"
+SCHEMA = "27"
 SHAPES = {
     "FBCSEM": 3, "M": 2, "D": 2, "S": 12, "B": 9, "I": 12,
     "P": 9, "V": 5, "N": 13, "E": 16, "R": 3, "END": 13,
@@ -24,11 +24,12 @@ SHAPES = {
     "PPB": 14, "PPD": 11, "PPE": 9, "PPT": 13, "PPS": 10,
     "MD": 10, "MT": 6, "MI": 15, "MA": 12, "MS": 8, "MC": 5, "ME": 13, "ML": 13, "MR": 5,
     "ST": 17, "STE": 10, "BLK": 14, "BEND": 9, "OWN": 4, "CAP": 4, "ACC": 3, "SOP": 3,
-    "EX": 13,
+    "EX": 13, "NT": 11, "PH": 5, "NP": 3, "EV": 5,
+    "CB": 4, "CN": 4, "CE": 6, "CL": 4, "DI": 12,
 }
 PROVENANCE_TAGS = frozenset(("FILE", "SRC", "SRE", "INC", "MAP", "ORIG", "LOC", "PPB", "PPD", "PPE", "PPT", "PPS",
-                            "MD", "MT", "MI", "MA", "MS", "MC", "ME", "ML", "MR", "ST", "STE", "BLK", "BEND", "OWN", "CAP", "ACC", "SOP", "EX"))
-DETAIL_TAGS = frozenset(("T", "A", "F", "G", "U", "C", "H", "K", "J", "O", "Q", "Y", "Z", "ASM", "DCL", "CTX", "OPT", "USE")) | PROVENANCE_TAGS
+                            "MD", "MT", "MI", "MA", "MS", "MC", "ME", "ML", "MR", "ST", "STE", "BLK", "BEND", "OWN", "CAP", "ACC", "SOP", "EX", "DI"))
+DETAIL_TAGS = frozenset(("T", "A", "F", "G", "U", "C", "H", "K", "J", "O", "Q", "Y", "Z", "ASM", "DCL", "CTX", "OPT", "USE", "NT", "PH", "NP", "EV", "CB", "CN", "CE", "CL")) | PROVENANCE_TAGS
 TYPE_KINDS = frozenset(("pointer", "numeric", "dynamic-string", "fixed-string",
                         "aggregate", "procedure", "other"))
 SYMBOL_CLASSES = ("variable", "constant", "procedure", "parameter", "define", "keyword",
@@ -171,6 +172,8 @@ class Model:
         self.records: dict[str, list[list[str]]] = defaultdict(list)
         self.symbols: dict[int, list[str]] = {}
         self.types: dict[int, list[str]] = {}
+        self.normalized_types: dict[tuple[str, int, str], list[str]] = {}
+        self.diagnostics: dict[int, list[str]] = {}
         self.nodes: dict[int, list[str]] = {}
         self.properties: dict[tuple[str, int], dict[str, str]] = defaultdict(dict)
         self.constants: dict[tuple[str, int], tuple[str, str]] = {}
@@ -295,6 +298,40 @@ class Model:
                 if row[18] not in ("source", "compiler", "runtime"):
                     raise ValueError("Unknown symbol origin")
                 self.types[identity] = row
+            elif tag == "DI":
+                identity = number(row[1], 1)
+                if identity in self.diagnostics or row[2] not in ("error", "warning"):
+                    raise ValueError("Invalid or repeated diagnostic")
+                number(row[3], 0)
+                number(row[8])
+                source, statement = number(row[9], 0), number(row[10], 0)
+                if source and (source not in self.source_contexts or int(self.source_contexts[source][4]) != counts["M"]):
+                    raise ValueError("Diagnostic lacks its source occurrence")
+                if statement and (statement not in self.statements or int(self.statements[statement][7]) != counts["M"]):
+                    raise ValueError("Diagnostic lacks its source statement")
+                reference("symbol", row[11])
+                self.diagnostics[identity] = row
+            elif tag == "NT":
+                if row[1] not in ("symbol", "node", "expression") or row[3] != "value":
+                    raise ValueError("Invalid normalized type subject or role")
+                reference(row[1], row[2], nullable=False)
+                reference("symbol", row[5])
+                pointers = number(row[6], 0)
+                flag(row[7])
+                if pointers > 8 or len(row[8]) != pointers + 1 or re.fullmatch(r"[01]+", row[8]) is None:
+                    raise ValueError("Invalid normalized type qualifiers")
+                if row[4] not in PRIMITIVE_NAMES or row[10] and row[10] not in PRIMITIVE_NAMES:
+                    raise ValueError("Unknown normalized type name")
+                if row[9]:
+                    number(row[9], 1)
+                elif pointers:
+                    raise ValueError("Pointer type lacks its storage width")
+                key = row[1], int(row[2]), row[3]
+                # Symbol snapshots can be refreshed after a forward type or
+                # procedure is completed, just like the existing T records.
+                if row[1] != "symbol" and key in self.normalized_types:
+                    raise ValueError("Repeated normalized type subject")
+                self.normalized_types[key] = row
             elif tag == "B":
                 subject_modules["binding", counts["B"]] = counts["M"]
                 reference("symbol", row[1], nullable=False)
@@ -1064,8 +1101,99 @@ class Model:
             if "kind" not in self.properties["node", identity]:
                 raise ValueError("AST node lacks its stable kind")
         self.validate_nodes()
+        self.validate_flow()
         if not expressions_only and not bindings_only:
             self.validate_metadata()
+
+    def validate_flow(self) -> None:
+        """Validate phase ownership and transfers without inventing targets."""
+        phases: dict[int, int] = {}
+        memberships: dict[int, int] = {}
+        blocks: dict[int, tuple[int, int]] = {}
+        block_nodes: dict[int, int] = {}
+        labels: set[tuple[int, int]] = set()
+        for row in self.records["PH"]:
+            identity, procedure = number(row[1], 1), number(row[2], 1)
+            if identity in phases or procedure not in self.signatures or row[3] != "pre-load" or row[4] not in ("0", "1"):
+                raise ValueError("Invalid or repeated AST phase")
+            phases[identity] = procedure
+        for row in self.records["NP"]:
+            node, phase = number(row[1], 1), number(row[2], 1)
+            if node in memberships or node not in self.nodes or phase not in phases:
+                raise ValueError("Invalid or repeated AST phase membership")
+            memberships[node] = phase
+        initializer_roots = {int(row[4]) for row in self.records["H"]
+                             if row[1] == "symbol" and row[3] == "node"
+                             and row[5] in ("initializer", "default-initializer")}
+        # Parents have smaller identities. Cache roots once so a deeply nested
+        # initializer does not make membership validation quadratic.
+        node_roots: dict[int, int] = {}
+        for identity in sorted(self.nodes):
+            row = self.nodes[identity]
+            node_roots[identity] = identity if row[3] == "root" else node_roots[int(row[2])]
+            if identity not in memberships and node_roots[identity] not in initializer_roots:
+                raise ValueError("AST phase membership is incomplete")
+        for node, phase in memberships.items():
+            parent = int(self.nodes[node][2])
+            if self.nodes[node][3] == "root":
+                if parent != phases[phase]:
+                    raise ValueError("AST phase belongs to another procedure")
+            elif memberships.get(parent) != phase:
+                raise ValueError("AST child belongs to another phase")
+        evaluation_edges: set[tuple[int, int]] = set()
+        for row in self.records["EV"]:
+            parent, child = number(row[1], 1), number(row[2], 1)
+            number(row[3], 0)
+            edge = parent, child
+            if parent == child or parent not in memberships or child not in memberships or memberships[parent] != memberships[child]:
+                raise ValueError("Evaluation edge lacks its AST phase")
+            if edge in evaluation_edges or row[4] not in (
+                    "always", "argument", "profile-begin", "call-target", "profile-end",
+                    "copyback", "condition", "true", "false", "result"):
+                raise ValueError("Invalid or repeated evaluation edge")
+            evaluation_edges.add(edge)
+        for row in self.records["CB"]:
+            block, phase, ordinal = [number(value, 1 if index < 2 else 0) for index, value in enumerate(row[1:])]
+            if block in blocks or phase not in phases:
+                raise ValueError("Invalid or repeated control-flow block")
+            blocks[block] = phase, ordinal
+        for phase in phases:
+            ordinals = sorted(ordinal for owner, ordinal in blocks.values() if owner == phase)
+            if ordinals != list(range(len(ordinals))):
+                raise ValueError("Control-flow block order is incomplete")
+        for row in self.records["CN"]:
+            block, node = number(row[1], 1), number(row[2], 1)
+            if block in block_nodes or block not in blocks or node not in memberships or row[3] != "0":
+                raise ValueError("Invalid or repeated control-flow node")
+            if self.nodes[node][3] != "root" or memberships[node] != blocks[block][0]:
+                raise ValueError("Control-flow node lacks its phase root")
+            block_nodes[block] = node
+        roots = {identity for identity in memberships if self.nodes[identity][3] == "root"}
+        if set(block_nodes) != set(blocks) or len(set(block_nodes.values())) != len(block_nodes) or set(block_nodes.values()) != roots:
+            raise ValueError("Control-flow root membership is incomplete")
+        for row in self.records["CL"]:
+            phase, label, block = [number(value, 1) for value in row[1:]]
+            if block not in blocks or blocks[block][0] != phase or label not in self.symbols or (phase, label) in labels:
+                raise ValueError("Invalid or repeated control-flow label")
+            if self.properties["node", block_nodes[block]]["kind"] != "label" or int(self.nodes[block_nodes[block]][9]) != label:
+                raise ValueError("Control-flow label lacks its AST definition")
+            labels.add((phase, label))
+        for row in self.records["CE"]:
+            phase, source, target = number(row[1], 1), number(row[2], 1), number(row[3], 0)
+            kind, label = row[4], number(row[5], 0)
+            if source not in blocks or blocks[source][0] != phase or label and label not in self.symbols:
+                raise ValueError("Control-flow edge lacks its phase or label")
+            if kind == "fallthrough":
+                if target not in blocks or blocks[target][0] != phase or blocks[target][1] != blocks[source][1] + 1 or label:
+                    raise ValueError("Invalid control-flow fallthrough")
+            elif kind in ("label", "conditional-label", "case-label", "default-label", "subroutine-call"):
+                if target or not label and kind != "subroutine-call":
+                    raise ValueError("Invalid control-flow label transfer")
+            elif kind in ("unknown-indirect", "subroutine-return", "unknown-assembly", "procedure-exit"):
+                if target or label:
+                    raise ValueError("Unknown or exit transfer advertises a target")
+            else:
+                raise ValueError("Unknown control-flow transfer kind")
 
     @staticmethod
     def macro_units(kind: str, value: str) -> bytes | tuple[int, ...]:

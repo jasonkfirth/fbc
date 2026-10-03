@@ -229,7 +229,7 @@ jobs:
           path: |
             out/exampleageddon/
             maketests-log/
-            tests/failed-*.log
+            tests/**/*.log
             tests/log-tests-results-*.log
 
   windows:
@@ -359,7 +359,7 @@ jobs:
           path: |
             out/exampleageddon/
             maketests-log/
-            tests/failed-*.log
+            tests/**/*.log
             tests/log-tests-results-*.log
 
   linux-targets:
@@ -545,7 +545,7 @@ jobs:
           if-no-files-found: warn
           path: |
             maketests-log/
-            tests/failed-*.log
+            tests/**/*.log
             tests/log-tests-results-*.log
             bootstrap/
 
@@ -654,7 +654,7 @@ jobs:
             ${{ runner.temp }}/exampleageddon/
             ${{ runner.temp }}/macos-smoke/
             maketests-log/
-            tests/failed-*.log
+            tests/**/*.log
             tests/log-tests-results-*.log
 
   windows-arm64:
@@ -743,7 +743,7 @@ jobs:
             .build-msys2/
             out/mingw32/
             maketests-log/
-            tests/failed-*.log
+            tests/**/*.log
             tests/log-tests-results-*.log
 
   windows-arm64-native:
@@ -848,7 +848,7 @@ jobs:
           path: |
             out/exampleageddon/
             maketests-log/
-            tests/failed-*.log
+            tests/**/*.log
             tests/log-tests-results-*.log
 
   mips:

@@ -1,4 +1,8 @@
-''
+'' Project: FreeBASIC C runtime bindings
+'' File: crt/errno.bi
+'' Purpose: Expose target errno storage and error constants.
+'' Responsibilities: Preserve host-specific error numbers and access functions.
+'' This file intentionally does NOT contain: error handling policy.
 ''
 '' errno -- header translated with help of SWIG FB wrapper
 ''
@@ -60,6 +64,8 @@
 	#define EILSEQ (__FB_HAIKU_POSIX_ERROR_BASE + 38)
 #elseif defined(__FB_DARWIN__)
         '' Darwin errno numbers are different from Linux, so use Darwin values here.
+        '' XNU's sys/errno.h uses 17 for an existing filesystem entry.
+        #define EEXIST 17
 #else
 
         #define EPERM 1
@@ -109,15 +115,25 @@ extern "C"
 #ifdef __FB_WIN32__
 	declare function _errno() as long ptr
 	#define errno (*_errno())
-#elseif defined( __FB_LINUX__ )
+#elseif defined( __FB_LINUX__ ) or defined( __FB_DRAGONFLY__ )
+	'' DragonFly exports this accessor for language bindings to TLS errno.
 	declare function __errno_location() as long ptr
 	#define errno (*__errno_location())
-#elseif defined( __FB_DARWIN__ )
+#elseif defined( __FB_DARWIN__ ) or defined( __FB_FREEBSD__ )
         declare function __error() as long ptr
         #define errno (*__error())
+#elseif defined( __FB_NETBSD__ ) or defined( __FB_OPENBSD__ )
+	'' BSD libc keeps errno per thread; it is not a normal global variable.
+	declare function __errno() as long ptr
+	#define errno (*__errno())
 #elseif defined( __FB_HAIKU__ )
 	declare function _errnop() as long ptr
 	#define errno (*_errnop())
+#elseif defined( __FB_AROS__ )
+	'' AROS stdc keeps errno in its library base and exposes this accessor
+	'' in both stdc.library and its static link library.
+	declare function __stdc_geterrnoptr() as long ptr
+	#define errno (*__stdc_geterrnoptr())
 #else
 	extern errno as long
 #endif
@@ -125,3 +141,5 @@ extern "C"
 end extern
 
 #endif
+
+'' end of crt/errno.bi

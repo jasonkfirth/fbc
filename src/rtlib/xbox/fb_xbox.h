@@ -1,3 +1,11 @@
+/*
+    FreeBASIC Runtime Library
+    File: xbox/fb_xbox.h
+    Purpose: Define Xbox platform types and CRT compatibility helpers.
+    Responsibilities: Adapt nxdk headers and declare Xbox filesystem hooks.
+    This file intentionally does NOT contain filesystem policy implementations.
+*/
+
 #ifndef FB_XBOX_H
 #define FB_XBOX_H
 
@@ -29,6 +37,7 @@
 
 typedef long fb_off_t;
 typedef int ssize_t;
+HANDLE fb_hOpenFileForQuery( const char *path );
 int _stricmp(const char *s1, const char *s2);
 int _strnicmp(const char *s1, const char *s2, size_t n);
 #define strcasecmp  _stricmp
@@ -135,3 +144,5 @@ unsigned long wcstoul(const wchar_t *, wchar_t **, int);
 unsigned long long  wcstoull(const wchar_t * __restrict__, wchar_t ** __restrict__, int);
 
 #endif
+
+/* end of xbox/fb_xbox.h */

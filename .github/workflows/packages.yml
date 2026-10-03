@@ -51,10 +51,15 @@ on:
         default: false
         type: boolean
       linux_matrix_target:
-        description: Build one named Linux matrix row, or all rows
+        description: Build named Linux matrix rows (wildcards allowed), or all rows
         required: true
         default: all
         type: string
+      linux_matrix_parallelism:
+        description: Maximum concurrent Linux package builds
+        required: true
+        default: 6
+        type: number
 
 concurrency:
   group: fbc-xl-packages-${{ github.ref }}${{ github.event_name == 'workflow_run' && '-workflow-run' || '' }}
@@ -133,9 +138,12 @@ jobs:
 
       - name: Export the canonical Linux package matrix
         id: plan
+        env:
+          LINUX_MATRIX_TARGET: ${{ inputs.linux_matrix_target }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
+          import fnmatch
           import json
           import os
           import subprocess
@@ -171,6 +179,10 @@ jobs:
                   raise SystemExit(f"unexpected Linux package family: {family}")
 
               row_name = f"{distro}-{release.replace('.', '_')}-{arch}"
+              # ARM64 distribution images can build on the same hosted runner
+              # used by basic CI. Arch uses an x86_64 cross-build container for
+              # ARM64, so keep its host native too.
+              native_arm64 = arch in {"arm64", "aarch64"} and family != "archlinux"
               rows.append(
                   {
                       "name": row_name,
@@ -178,6 +190,8 @@ jobs:
                       "distro": distro,
                       "release": release,
                       "arch": arch,
+                      "runner": "ubuntu-24.04-arm" if native_arm64 else "ubuntu-24.04",
+                      "host_bootstrap": "linux-aarch64" if native_arm64 else "linux-x86_64",
                   }
               )
               seen_families.add(family)
@@ -189,6 +203,25 @@ jobs:
           if missing_families:
               names = ", ".join(sorted(missing_families))
               raise SystemExit(f"the Linux package factory omitted: {names}")
+
+          # Exercise rolling repositories and previously unbuilt architectures first,
+          # keeping every canonical row in the full factory qualification.
+          def row_priority(row):
+              if (row["distro"] == "fedora" and row["release"] == "rawhide") or row["name"] == "opensuse-tumbleweed-aarch64":
+                  return 0
+              if row["family"] == "slackware" or row["name"] == "archlinux-current-armv7h":
+                  return 1
+              return 2
+
+          rows.sort(key=row_priority)
+
+          # Select rows before scheduling jobs. A pattern such as
+          # fedora-rawhide-* qualifies every architecture in one run.
+          selector = os.environ.get("LINUX_MATRIX_TARGET", "")
+          if selector and selector != "all":
+              rows = [row for row in rows if fnmatch.fnmatchcase(row["name"], selector)]
+              if not rows:
+                  raise SystemExit(f"no Linux package rows match: {selector}")
 
           run_linux_matrix = True
           if os.environ.get("GITHUB_EVENT_NAME") == "workflow_run":
@@ -221,26 +254,24 @@ jobs:
     if: ${{ needs.linux-package-plan.outputs.run_linux_matrix == 'true' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master')) }}
     strategy:
       fail-fast: false
-      max-parallel: 6
+      max-parallel: ${{ github.event_name == 'workflow_dispatch' && fromJSON(inputs.linux_matrix_parallelism || '6') || 6 }}
       matrix: ${{ fromJSON(needs.linux-package-plan.outputs.matrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 360
 
     steps:
       - name: Checkout
-        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Install Linux matrix host dependencies
-        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         run: |
           set -euo pipefail
           sudo bash build_scripts/github-actions-apt-update.sh
           sudo apt-get install -y --no-install-recommends \
             qemu-user-static binfmt-support \
-            ca-certificates curl wget git \
+            ca-certificates curl wget git gnupg \
             build-essential make pkg-config rsync \
             tar xz-utils gzip zip unzip dos2unix \
             jq python3 perl bc
@@ -251,11 +282,9 @@ jobs:
           docker version
 
       - name: Seed host compiler bootstrap sources
-        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
-        run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
+        run: bash build_scripts/ci-seed-source-bootstrap.sh ${{ matrix.host_bootstrap }} ${{ matrix.host_bootstrap }}
 
       - name: Build the current host compiler
-        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         run: |
           set -euo pipefail
           host_feature_args=(
@@ -275,7 +304,6 @@ jobs:
           make -j4 compiler "${host_feature_args[@]}" </dev/null
 
       - name: Build Linux package row
-        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         env:
           MATRIX_NAME: ${{ matrix.name }}
           MATRIX_ARCH: ${{ matrix.arch }}
@@ -341,19 +369,41 @@ jobs:
               ;;
           esac
 
+          # Build logs are diagnostics, not packages. In particular, a missing
+          # container architecture must not turn into a successful log upload.
+          case "$MATRIX_FAMILY" in
+            deb) package_pattern='*.deb' ;;
+            apk) package_pattern='*.apk' ;;
+            rpm) package_pattern='*.rpm' ;;
+            archlinux) package_pattern='*.pkg.tar.*' ;;
+            slackware) package_pattern='*.txz' ;;
+          esac
+          package_roots=()
+          for package_root in out/linux out/raspbian; do
+            [[ ! -d "$package_root" ]] || package_roots+=("$package_root")
+          done
+          if [[ ${#package_roots[@]} -eq 0 ]] ||
+             ! find "${package_roots[@]}" -type f -name "$package_pattern" -size +0c -print -quit | grep -q .; then
+            echo "ERROR: $MATRIX_NAME produced no $MATRIX_FAMILY package" >&2
+            exit 1
+          fi
+
       - name: Upload Linux package row
-        if: ${{ inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name }}
         uses: actions/upload-artifact@v7
         with:
           name: fbc-xl-linux-package-${{ matrix.name }}
           if-no-files-found: error
           retention-days: 30
           path: |
-            out/linux/
-            out/raspbian/
+            out/linux/**/*.deb
+            out/linux/**/*.apk
+            out/linux/**/*.rpm
+            out/linux/**/*.pkg.tar.*
+            out/linux/**/*.txz
+            out/raspbian/**/*.deb
 
       - name: Upload Linux row diagnostics
-        if: ${{ always() && (inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all' || inputs.linux_matrix_target == matrix.name) }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
           name: fbc-xl-linux-diagnostic-${{ matrix.name }}

@@ -155,6 +155,9 @@ int _close(int descriptor)
     BPTR handle = descriptor_handle(descriptor);
     if (handle == 0) return -1;
     if (descriptor < 3) return 0;
+    /* Keep the table bound explicit after the borrowed standard handles.
+       descriptor_handle also rejects invalid descriptors for other callers. */
+    if (descriptor >= AMIGA_FILE_DESCRIPTORS) { errno = EBADF; return -1; }
     Forbid();
     handles[descriptor] = 0;
     memset(&descriptors[descriptor], 0, sizeof(descriptors[descriptor]));

@@ -697,6 +697,13 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86, FB_CPUFAMILY_X86_64
+			'' A host-runnable Clang may default to the other x86 word size.
+			'' Select the assembly mode just as the GNU assembler path does.
+			if( fbGetCpuFamily( ) = FB_CPUFAMILY_X86 ) then
+				ln += "-m32 "
+			else
+				ln += "-m64 "
+			end if
 			if( fbGetOption( FB_COMPOPT_ASMSYNTAX ) = FB_ASMSYNTAX_INTEL ) then
 				ln += "-masm=intel "
 			end if
@@ -711,39 +718,9 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 		case FB_CPUFAMILY_ARM
 			ln += "-march=arm "
 		case FB_CPUFAMILY_AARCH64
-			'' From the GCC manual:
-			'' -march=name
-			'' Specify the name of the target architecture and,
-			'' optionally, one or more feature modifiers. This option
-			'' has the form -march=arch{+[no]feature}*.
-			''
-			'' The permissible values for arch are
-			'' 'armv8-a'
-			'' 'armv8.1-a' = 'armv8-a' + ARMv8.1-A
-			'' 'armv8.2-a' = 'armv8.1-a' + ARMv8.2-A
-			'' 'armv8.3-a' = 'armv8.2-a' + ARMv8.3-A
-			'' 'armv8.4-a' = 'armv8.3-a' + ARMv8.4-A
-			'' 'armv8.5-a' = 'armv8.4-a' + ARMv8.5-A
-			'' 'native' = architecture of the host system
-			''
-			'' It enables the '+crc', '+lse', and '+rdma' features.
-			''
-			'' The value 'native' is available on native AArch64
-			'' GNU/Linux and causes the compiler to pick the
-			'' architecture of the host system. This option has no
-			'' effect if the compiler is unable to recognize the
-			'' architecture of the host system, The permissible
-			'' values for feature are listed in the sub-section on
-			'' ['-march' and '-mcpu' Feature Modifiers]. Where
-			'' conflicting feature modifiers are specified, the
-			'' right-most feature is used. GCC uses name to determine
-			'' what kind of instructions it can emit when generating
-			'' assembly code. If '-march' is specified without either
-			'' of '-mtune' or '-mcpu' also being specified, the code
-			'' is tuned to perform well across a range of target
-			'' processors implementing the target architecture.
-
-			ln += "-march=armv8-a "
+			'' llc selects a target backend here, unlike GCC's instruction
+			'' baseline option. Its 64-bit ARM backend is named aarch64.
+			ln += "-march=aarch64 "
 		case FB_CPUFAMILY_PPC
 			ln += "-mcpu=powerpc "
 		case FB_CPUFAMILY_PPC64
@@ -827,6 +804,14 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 	end if
 #endif
 
+	'' LLVM's Windows assembly can contain unwind directives or unique ctor
+	'' sections unavailable in GNU as. Use the producer's integrated assembler.
+	if( ((fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) or _
+	     (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_LLVM)) and _
+	    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32) ) then
+		assembler = FBCTOOL_CLANG
+	end if
+
 	if( assembler = FBCTOOL_NONE ) then
 		select case fbGetOption( FB_COMPOPT_TARGET )
 		case FB_COMPTARGET_ANDROID
@@ -859,7 +844,7 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 	select case assembler
 	case FBCTOOL_CLANG
 		ln += fbcDriverGetClangTargetOption( )
-		ln += "-c "
+		ln += "-x assembler -c "
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86, FB_CPUFAMILY_X86_64
 			if( fbGetOption( FB_COMPOPT_ASMSYNTAX ) = FB_ASMSYNTAX_INTEL ) then

@@ -41,9 +41,10 @@ def main() -> int:
         for backend in backends:
             for name, arithmetic, bits, defines in policies:
                 executable = working / (backend + "-" + name)
+                # ASSERT requires -g; runtime error checks alone omit assertions.
                 command = [str(options.fbc.resolve()), "-prefix", str(root),
                            "-i", str(root / "inc"), "-i", str(compiler), "-gen", backend,
-                           "-exx", "-m", "host-float-policy", "-x", str(executable),
+                           "-g", "-exx", "-m", "host-float-policy", "-x", str(executable),
                            *defines, str(root / "tests/compiler-support/host-float-policy.bas"),
                            str(compiler / arithmetic), str(compiler / bits)]
                 try:

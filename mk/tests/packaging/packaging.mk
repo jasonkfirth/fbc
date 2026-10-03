@@ -4,6 +4,12 @@
 # Packaging verification tests
 ##############################################################################
 
+PYTHON ?= python3
+
+.PHONY: debian-include-test
+debian-include-test:
+	$(PYTHON) "$(rootdir)/build_scripts/check-debian-includes.py" --root "$(rootdir)"
+
 .PHONY: packaging-test
 packaging-test:
 	$(call _mt_echo,Testing binary distribution)

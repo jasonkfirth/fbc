@@ -417,6 +417,7 @@ int fb_sfxOutputCaptureSave(const char *filename)
     {
         int todo;
         int samples;
+        int sample;
         size_t bytes;
 
         todo = g_output_capture.frames - frames_done;
@@ -441,7 +442,7 @@ int fb_sfxOutputCaptureSave(const char *filename)
             result = -1;
             break;
         }
-        for (int sample = 0; sample < samples; ++sample)
+        for (sample = 0; sample < samples; ++sample)
         {
             unsigned int value = (unsigned short)pcm[sample];
             unsigned char *encoded = (unsigned char*)pcm + (size_t)sample * 2;

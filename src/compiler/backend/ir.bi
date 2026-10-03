@@ -514,6 +514,7 @@ declare sub irEnd( )
 
 '' Return an undecorated libc name, or an empty string for other procedures.
 declare function irGetBuiltinLibcName( byval proc as FBSYMBOL ptr ) as string
+declare function irUsesClangCCompiler() as integer
 #if (__FB_DEBUG__ <> 0) orelse defined(__GAS64_DEBUG__)
 declare function vregDumpToStr( byval v as IRVREG ptr ) as string
 declare sub vregDump( byval v as IRVREG ptr )

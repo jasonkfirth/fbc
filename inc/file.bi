@@ -98,10 +98,16 @@ declare function SetAttr overload alias "fb_WideFileSetAttr" _
 end extern
 #endif
 
+#if __FB_LANG__ <> "qb"
+'' These entry points also use the runtime ABI, including stdcall on Win32.
+extern "rtlib"
+#endif
+
 declare function FileFlush alias "fb_FileFlush" ( byval filenumber as long = -1, byval systembuffer as long = 0 ) as long
 declare function FileSetEof alias "fb_FileSetEof" ( byval filenumber as long ) as long
 
 #if __FB_LANG__ <> "qb"
+end extern
 end extern
 #endif
 

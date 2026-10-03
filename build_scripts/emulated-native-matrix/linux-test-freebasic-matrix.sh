@@ -292,8 +292,8 @@ image_for_nondeb_target() {
         opensuse/leap-16.0) echo "opensuse/leap:16.0" ;;
         opensuse/tumbleweed) echo "opensuse/tumbleweed" ;;
         archlinux/current) archlinux_image_for_arch "$arch" ;;
-        slackware/15.0) echo "vbatts/slackware:15.0" ;;
-        slackware/current) echo "vbatts/slackware:current" ;;
+        slackware/15.0) echo "aclemons/slackware:15.0" ;;
+        slackware/current) echo "aclemons/slackware:current" ;;
         *) return 1 ;;
     esac
 }
@@ -305,7 +305,7 @@ docker_platform_for_nondeb_target() {
         x86_64) echo "linux/amd64" ;;
         i586|x86) echo "linux/386" ;;
         aarch64|arm64) echo "linux/arm64" ;;
-        armv7|armv7h|armhf) echo "linux/arm/v7" ;;
+        armv7|armv7h|armv7l|armhf) echo "linux/arm/v7" ;;
         ppc64le|ppc64el) echo "linux/ppc64le" ;;
         s390x) echo "linux/s390x" ;;
         riscv64) echo "linux/riscv64" ;;
