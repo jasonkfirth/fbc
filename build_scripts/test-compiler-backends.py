@@ -55,6 +55,26 @@ def main() -> int:
                 print(f"GAS64/{target}: emission failed\n{emitted.stdout}{emitted.stderr}")
                 return 1
             print(f"GAS64/{target}: emission passed")
+        if "llvm" in backends:
+            # Run llc for ARM64 even on an x86 host. IR-only checks would miss
+            # an architecture name copied from the GCC command-line interface.
+            source = working / "llvm-aarch64.bas"
+            source.write_text('function increment( byval value as longint ) as longint\n'
+                              '    return value + 1\nend function\n', encoding="utf-8")
+            command = [str(options.fbc.resolve()), "-prefix", str(root), "-rr",
+                       "-gen", "llvm", "-target", "win32", "-arch", "aarch64",
+                       str(source)]
+            try:
+                emitted = subprocess.run(command, cwd=working, text=True,
+                                         capture_output=True, timeout=120, check=False)
+            except (OSError, subprocess.TimeoutExpired) as error:
+                print(f"LLVM/aarch64: {error}")
+                return 1
+            assembly = source.with_suffix(".asm")
+            if emitted.returncode or not assembly.is_file() or assembly.stat().st_size == 0:
+                print(f"LLVM/aarch64: assembly emission failed\n{emitted.stdout}{emitted.stderr}")
+                return 1
+            print("LLVM/aarch64: assembly emission passed")
         try:
             target = subprocess.run([str(options.fbc.resolve()), "-print", "target"],
                                     cwd=working, text=True, capture_output=True,
