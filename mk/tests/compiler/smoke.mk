@@ -6,6 +6,7 @@
 
 # The scope-exit relationship first appears in schema 15. Schema 19 adds
 # metadata, source operations, and the detail total in its completion footer.
+# Schemas 26 and 27 add normalized types, procedure flow, and diagnostics.
 # Check these record shapes while retaining the established semantic probes.
 SEMANTIC_MODEL_SMOKE_MIN_SCHEMA := 15
 
@@ -163,6 +164,14 @@ compiler-semantic-model-smoke: compiler
 		$$1 == "CAP" { if (schema < 25 || NF != 4) exit 1; details++; next } \
 		$$1 == "ACC" { if (schema < 25 || NF != 3) exit 1; details++; next } \
 		$$1 == "SOP" { if (schema < 25 || NF != 3) exit 1; details++; next } \
+		$$1 == "EX" { if (schema < 26 || NF != 13) exit 1; details++; next } \
+		$$1 == "NT" { if (schema < 26 || NF != 11) exit 1; details++; next } \
+		$$1 == "PH" { if (schema < 26 || NF != 5) exit 1; details++; next } \
+		$$1 == "NP" { if (schema < 26 || NF != 3) exit 1; details++; next } \
+		$$1 == "EV" { if (schema < 26 || NF != 5) exit 1; details++; next } \
+		$$1 == "CB" || $$1 == "CN" || $$1 == "CL" { if (schema < 26 || NF != 4) exit 1; details++; next } \
+		$$1 == "CE" { if (schema < 26 || NF != 6) exit 1; details++; next } \
+		$$1 == "DI" { if (schema < 27 || NF != 12) exit 1; details++; next } \
 		$$1 == "END" { if (NF != (schema >= 19 ? 13 : 12) || $$2 != schema || $$3 != modules || $$4 != procedures || $$5 != symbols || $$6 != typefacts || $$7 != nodes || $$8 != expressions || $$9 != bindings || $$10 != implicit_calls || $$11 != dependency_count || $$12 != "1" || (schema >= 19 && $$13 != details)) exit 1; footer = 1; next } \
 		footer { exit 1 } \
 		{ exit 1 } \
@@ -363,6 +372,8 @@ compiler-semantic-model-smoke: compiler
 		$$1 == "CAP" { if (schema < 25 || NF != 4) exit 1; details++; next } \
 		$$1 == "ACC" { if (schema < 25 || NF != 3) exit 1; details++; next } \
 		$$1 == "SOP" { if (schema < 25 || NF != 3) exit 1; details++; next } \
+		$$1 == "EX" { if (schema < 26 || NF != 13) exit 1; details++; next } \
+		$$1 == "DI" { if (schema < 27 || NF != 12) exit 1; details++; next } \
 		$$1 == "END" { if (NF != (schema >= 19 ? 13 : 12) || $$2 != schema || $$3 != modules || $$4 != 0 || $$5 != 0 || $$6 != 0 || $$7 != 0 || $$8 != expressions || $$9 != 0 || $$10 != 0 || $$11 != dependency_count || $$12 != "1" || (schema >= 19 && $$13 != details)) exit 1; footer = 1; next } \
 		footer { exit 1 } \
 		{ exit 1 } \
@@ -459,6 +470,8 @@ compiler-semantic-model-smoke: compiler
 		$$1 == "CAP" { if (schema < 25 || NF != 4) exit 1; next } \
 		$$1 == "ACC" { if (schema < 25 || NF != 3) exit 1; next } \
 		$$1 == "SOP" { if (schema < 25 || NF != 3) exit 1; next } \
+		$$1 == "EX" { if (schema < 26 || NF != 13) exit 1; next } \
+		$$1 == "DI" { if (schema < 27 || NF != 12) exit 1; next } \
 		$$1 == "RECOVERY" { if (NF != 8 || $$2 != schema || $$3 != modules || $$4 != expressions || $$5 != recovered_modules || $$6 != 0 || $$7 != dependency_count || $$8 != "1") exit 1; footer = 1; next } \
 		footer { exit 1 } \
 		{ exit 1 } \

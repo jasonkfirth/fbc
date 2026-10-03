@@ -115,15 +115,25 @@ extern "C"
 #ifdef __FB_WIN32__
 	declare function _errno() as long ptr
 	#define errno (*_errno())
-#elseif defined( __FB_LINUX__ )
+#elseif defined( __FB_LINUX__ ) or defined( __FB_DRAGONFLY__ )
+	'' DragonFly exports this accessor for language bindings to TLS errno.
 	declare function __errno_location() as long ptr
 	#define errno (*__errno_location())
-#elseif defined( __FB_DARWIN__ )
+#elseif defined( __FB_DARWIN__ ) or defined( __FB_FREEBSD__ )
         declare function __error() as long ptr
         #define errno (*__error())
+#elseif defined( __FB_NETBSD__ ) or defined( __FB_OPENBSD__ )
+	'' BSD libc keeps errno per thread; it is not a normal global variable.
+	declare function __errno() as long ptr
+	#define errno (*__errno())
 #elseif defined( __FB_HAIKU__ )
 	declare function _errnop() as long ptr
 	#define errno (*_errnop())
+#elseif defined( __FB_AROS__ )
+	'' AROS stdc keeps errno in its library base and exposes this accessor
+	'' in both stdc.library and its static link library.
+	declare function __stdc_geterrnoptr() as long ptr
+	#define errno (*__stdc_geterrnoptr())
 #else
 	extern errno as long
 #endif

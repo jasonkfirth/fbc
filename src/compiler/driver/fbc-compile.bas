@@ -827,9 +827,10 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 	end if
 #endif
 
-	'' Clang's Windows unwind assembly can contain directives unavailable in
-	'' GNU as. Use the producer's integrated assembler to preserve those tables.
-	if( (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) and _
+	'' LLVM's Windows assembly can contain unwind directives or unique ctor
+	'' sections unavailable in GNU as. Use the producer's integrated assembler.
+	if( ((fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) or _
+	     (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_LLVM)) and _
 	    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32) ) then
 		assembler = FBCTOOL_CLANG
 	end if

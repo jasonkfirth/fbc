@@ -13,8 +13,11 @@
 #include "dev_com_private.h"
 #include "io_serial_private.h"
 #include <sys/stat.h>
+#ifndef HOST_WINCE
 #include <errno.h>
+#endif
 
+#ifndef HOST_WINCE
 #if defined(HOST_MINGW) && !defined(HOST_WINCE)
 #include <io.h>
 #define FILE_INFO_STAT struct __stat64
@@ -24,6 +27,7 @@
 #define FILE_INFO_STAT struct stat
 #define file_info_fstat fstat
 #define file_info_fileno fileno
+#endif
 #endif
 
 static int file_mode_map[] = { FB_FILE_ATTR_MODE_BINARY,   /* FB_FILE_MODE_BINARY = 0 */
@@ -128,6 +132,7 @@ FBCALL ssize_t fb_FileAttr( int handle, int returntype )
 
 STATIC_ASSERT( sizeof( FB_FILE_INFO ) == 9 * sizeof( uint64_t ) );
 
+#ifndef HOST_WINCE
 static void hFileInfo( const FILE_INFO_STAT *native, FB_FILE_INFO *info )
 {
 	info->flags = FB_FILE_INFO_EXISTS;
@@ -151,15 +156,25 @@ static void hFileInfo( const FILE_INFO_STAT *native, FB_FILE_INFO *info )
 	info->changed_fraction = native->st_ctimespec.tv_nsec;
 #endif
 }
+#endif
 
-#if defined(HOST_MINGW) && !defined(HOST_WINCE)
+#ifdef HOST_MINGW
 static int hWindowsFileInfo( HANDLE handle, FB_FILE_INFO *info )
 {
 	BY_HANDLE_FILE_INFORMATION native;
 	if( !GetFileInformationByHandle( handle, &native ) ) return 0;
-	info->flags = FB_FILE_INFO_EXISTS | FB_FILE_INFO_IDENTITY;
+	info->flags = FB_FILE_INFO_EXISTS;
+#ifdef HOST_WINCE
+	/* CE filesystems may leave identity fields empty. Do not claim an
+	   identity for those files; the caller must compare their metadata. */
+	if( native.nFileIndexHigh != 0 || native.nFileIndexLow != 0 )
+		info->flags |= FB_FILE_INFO_IDENTITY;
+	if( !(native.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) )
+#else
+	info->flags |= FB_FILE_INFO_IDENTITY;
 	if( GetFileType( handle ) == FILE_TYPE_DISK &&
 	    !(native.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_DEVICE)) )
+#endif
 		info->flags |= FB_FILE_INFO_REGULAR;
 	info->identity[0] = native.dwVolumeSerialNumber;
 	info->identity[1] = native.nFileIndexHigh;
@@ -178,7 +193,26 @@ int fb_FileQueryInfo( const char *filename, int follow_links, FB_FILE_INFO *info
 	if( info == NULL ) return 0;
 	memset( info, 0, sizeof( *info ) );
 	if( filename == NULL || filename[0] == '\0' ) return 0;
-#if defined(HOST_MINGW) && !defined(HOST_WINCE)
+#ifdef HOST_WINCE
+	WIN32_FILE_ATTRIBUTE_DATA native;
+	wchar_t *wide_path = fb_hConvertPathToWC( filename, NULL );
+	BOOL ok;
+	DWORD error;
+	(void)follow_links;
+	if( wide_path == NULL ) return 0;
+	ok = GetFileAttributesExW( wide_path, GetFileExInfoStandard, &native );
+	error = ok ? ERROR_SUCCESS : GetLastError();
+	free( wide_path );
+	if( !ok ) return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
+	/* Attribute queries support directories and ROM files without opening
+	   them. CE has no POSIX stat/errno contract or portable path identity. */
+	info->flags = FB_FILE_INFO_EXISTS;
+	if( !(native.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ) info->flags |= FB_FILE_INFO_REGULAR;
+	info->bytes = ((uint64_t)native.nFileSizeHigh << 32) | native.nFileSizeLow;
+	info->modified = ((uint64_t)native.ftLastWriteTime.dwHighDateTime << 32) | native.ftLastWriteTime.dwLowDateTime;
+	info->changed = ((uint64_t)native.ftCreationTime.dwHighDateTime << 32) | native.ftCreationTime.dwLowDateTime;
+	return 1;
+#elif defined(HOST_MINGW)
 	DWORD attributes = GetFileAttributesA( filename );
 	HANDLE handle;
 	int ok;
@@ -213,20 +247,33 @@ int fb_FileQueryInfo( const char *filename, int follow_links, FB_FILE_INFO *info
 
 int fb_FileQueryStreamInfo( void *stream, FB_FILE_INFO *info )
 {
+#ifndef HOST_WINCE
 	FILE_INFO_STAT native;
+#endif
+	/* Some libcs implement fileno as a FILE member access macro. Keep the
+	   opaque public interface, but give stdio its actual stream type. */
+	FILE *file = stream;
 	if( info == NULL ) return 0;
 	memset( info, 0, sizeof( *info ) );
 	if( stream == NULL ) return 0;
-#if defined(HOST_MINGW) && !defined(HOST_WINCE)
-	HANDLE handle = (HANDLE)_get_osfhandle( _fileno( stream ) );
+#ifdef HOST_WINCE
+	/* CeGCC _fileno returns the Windows handle directly, not a descriptor
+	   that can be passed to POSIX fstat or desktop _get_osfhandle. */
+	HANDLE handle = (HANDLE)_fileno( file );
+	if( handle == NULL || handle == INVALID_HANDLE_VALUE ) return 0;
+	return hWindowsFileInfo( handle, info );
+#else
+#ifdef HOST_MINGW
+	HANDLE handle = (HANDLE)_get_osfhandle( _fileno( file ) );
 	if( handle == INVALID_HANDLE_VALUE ) return 0;
 	/* CRT fstat supplies a usable type for pipes and character streams. Only
 	   disk handles have the persistent identity queried by the Windows API. */
 	if( GetFileType( handle ) == FILE_TYPE_DISK ) return hWindowsFileInfo( handle, info );
 #endif
-	if( file_info_fstat( file_info_fileno( stream ), &native ) != 0 ) return 0;
+	if( file_info_fstat( file_info_fileno( file ), &native ) != 0 ) return 0;
 	hFileInfo( &native, info );
 	return 1;
+#endif
 }
 
 void *fb_CrtFileSavePos( void *stream )

@@ -10,6 +10,7 @@
 '' Responsibilities:
 ''
 ''     - share the libc mapping used by LLVM and Clang emission
+''     - account for Darwin's Clang-based system C compiler
 ''     - keep calls and procedure addresses on the same external ABI
 ''
 '' This file intentionally does NOT contain:
@@ -20,6 +21,16 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "backend/ir.bi"
+
+function irUsesClangCCompiler() as integer
+	'' Darwin's system gcc and MSYS2's Windows ARM64 C compiler invoke Clang
+	'' even with -gen gcc. Apply its rules to that backend's output too.
+	return (env.clopt.backend = FB_BACKEND_CLANG) or _
+	       ((env.clopt.backend = FB_BACKEND_GCC) and _
+	        ((env.clopt.target = FB_COMPTARGET_DARWIN) or _
+	         ((env.clopt.target = FB_COMPTARGET_WIN32) and _
+	          (fbGetCpuFamily() = FB_CPUFAMILY_AARCH64))))
+end function
 
 function irGetBuiltinLibcName( byval proc as FBSYMBOL ptr ) as string
 

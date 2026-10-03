@@ -158,35 +158,45 @@ def main() -> int:
             source = working / "builtin-target.bas"
             source.write_text('#include once "builtin.bi"\n'
                               'dim value as ulongint = &h0123456789abcdefull\n'
-                              'value = __builtin_bswap64(value)\n', encoding="utf-8")
+                              'value = __builtin_bswap64(value)\n'
+                              'dim shared copyBytes as function cdecl( byval as any ptr, '
+                              'byval as const any ptr, byval as __fb_builtin_size_t ) '
+                              'as any ptr = @__builtin_memcpy\n', encoding="utf-8")
             targets = (
-                ("linux", "x86_64-linux-gnu"),
-                ("darwin", "x86_64-apple-darwin"),
-                ("freebsd", "x86_64-unknown-freebsd"),
-                ("openbsd", "x86_64-unknown-openbsd"),
-                ("netbsd", "x86_64-unknown-netbsd"),
+                ("clang", "linux", "x86_64", "x86_64-linux-gnu"),
+                ("clang", "darwin", "x86_64", "x86_64-apple-darwin"),
+                ("clang", "darwin", "aarch64", "aarch64-apple-darwin"),
+                ("clang", "freebsd", "x86_64", "x86_64-unknown-freebsd"),
+                ("clang", "openbsd", "x86_64", "x86_64-unknown-openbsd"),
+                ("clang", "netbsd", "x86_64", "x86_64-unknown-netbsd"),
+                # Darwin also runs Clang behind the system gcc command.
+                ("gcc", "darwin", "x86_64", "x86_64-apple-darwin"),
+                ("gcc", "darwin", "aarch64", "aarch64-apple-darwin"),
+                ("clang", "win32", "aarch64", "aarch64-w64-mingw32"),
+                ("gcc", "win32", "aarch64", "aarch64-w64-mingw32"),
             )
-            for target, triple in targets:
+            for backend, target, arch, triple in targets:
+                label = f"{backend}/{target}-{arch}"
                 command = [str(options.fbc.resolve()), "-prefix", str(root),
-                           "-i", str(root / "inc"), "-gen", "clang", "-r",
-                           "-target", target, "-arch", "x86_64", str(source)]
+                           "-i", str(root / "inc"), "-gen", backend, "-r",
+                           "-target", target, "-arch", arch, str(source)]
                 try:
                     emitted = subprocess.run(command, cwd=working, text=True,
                                              capture_output=True, timeout=120, check=False)
                     if emitted.returncode:
-                        print(f"clang/{target}: C emission failed\n{emitted.stdout}{emitted.stderr}")
+                        print(f"{label}: C emission failed\n{emitted.stdout}{emitted.stderr}")
                         return 1
                     checked = subprocess.run([clang, "--target=" + triple, "-fsyntax-only",
                                               "-nostdinc", str(source.with_suffix(".c"))],
                                              cwd=working, text=True, capture_output=True,
                                              timeout=30, check=False)
                 except (OSError, subprocess.TimeoutExpired) as error:
-                    print(f"clang/{target}: {error}")
+                    print(f"{label}: {error}")
                     return 1
                 if checked.returncode:
-                    print(f"clang/{target}: C declarations failed\n{checked.stdout}{checked.stderr}")
+                    print(f"{label}: C declarations failed\n{checked.stdout}{checked.stderr}")
                     return 1
-                print(f"clang/{target}: C declarations passed")
+                print(f"{label}: C declarations passed")
     return 0
 
 

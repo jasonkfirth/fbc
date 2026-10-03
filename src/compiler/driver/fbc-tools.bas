@@ -112,8 +112,8 @@ function fbcUseLldLinker( ) as integer
 	'' The package also provides ld.exe for compatibility, but this is actually
 	'' the LLVM driver binary and does not accept all GNU ld linker-option forms
 	'' that fbc currently emits.
+	'' This is a target toolchain requirement, independent of the source backend.
 	if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32) and _
-		(fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) and _
 		(fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64) ) then
 		return TRUE
 	end if
