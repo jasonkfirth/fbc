@@ -55,6 +55,11 @@ on:
         required: true
         default: all
         type: string
+      linux_matrix_parallelism:
+        description: Maximum concurrent Linux package builds
+        required: true
+        default: 6
+        type: number
 
 concurrency:
   group: fbc-xl-packages-${{ github.ref }}${{ github.event_name == 'workflow_run' && '-workflow-run' || '' }}
@@ -249,7 +254,7 @@ jobs:
     if: ${{ needs.linux-package-plan.outputs.run_linux_matrix == 'true' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master')) }}
     strategy:
       fail-fast: false
-      max-parallel: 6
+      max-parallel: ${{ github.event_name == 'workflow_dispatch' && inputs.linux_matrix_parallelism || 6 }}
       matrix: ${{ fromJSON(needs.linux-package-plan.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 360
