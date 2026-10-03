@@ -163,6 +163,11 @@ case "$MACHINE" in
         BOOTKEY="linux-aarch64"
         FBC_TARGET="linux-aarch64"
         ;;
+    armv7*)
+        ARCH="armv7l"
+        BOOTKEY="linux-arm"
+        FBC_TARGET="linux-arm"
+        ;;
     *)
         die "unsupported Slackware architecture: $MACHINE"
         ;;
@@ -199,15 +204,19 @@ configure_slackpkg_mirror() {
     fi
 
     case "$release" in
-        current)
-            mirror="https://mirrors.slackware.com/slackware/slackware64-current/"
-            ;;
-        15.0)
-            mirror="https://mirrors.slackware.com/slackware/slackware64-15.0/"
-            ;;
-        *)
-            return 0
-            ;;
+        current|15.0) ;;
+        *) return 0 ;;
+    esac
+
+    # The x86, x86_64 and ARM repositories have distinct package trees.
+    # Keep an image's configured mirror, but never default an ARM or 32-bit
+    # container to the Slackware64 repository.
+    case "$ARCH" in
+        x86_64) mirror="https://mirrors.slackware.com/slackware/slackware64-${release}/" ;;
+        i586) mirror="https://mirrors.slackware.com/slackware/slackware-${release}/" ;;
+        armv7l) mirror="https://slackware.uk/slackwarearm/slackwarearm-${release}/" ;;
+        aarch64) mirror="https://slackware.uk/slackwarearm/slackwareaarch64-${release}/" ;;
+        *) die "unsupported Slackware mirror architecture: $ARCH" ;;
     esac
 
     msg "configuring Slackware mirror: $mirror"

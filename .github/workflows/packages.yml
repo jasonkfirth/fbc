@@ -347,6 +347,25 @@ jobs:
               ;;
           esac
 
+          # Build logs are diagnostics, not packages. In particular, a missing
+          # container architecture must not turn into a successful log upload.
+          case "$MATRIX_FAMILY" in
+            deb) package_pattern='*.deb' ;;
+            apk) package_pattern='*.apk' ;;
+            rpm) package_pattern='*.rpm' ;;
+            archlinux) package_pattern='*.pkg.tar.*' ;;
+            slackware) package_pattern='*.txz' ;;
+          esac
+          package_roots=()
+          for package_root in out/linux out/raspbian; do
+            [[ ! -d "$package_root" ]] || package_roots+=("$package_root")
+          done
+          if [[ ${#package_roots[@]} -eq 0 ]] ||
+             ! find "${package_roots[@]}" -type f -name "$package_pattern" -size +0c -print -quit | grep -q .; then
+            echo "ERROR: $MATRIX_NAME produced no $MATRIX_FAMILY package" >&2
+            exit 1
+          fi
+
       - name: Upload Linux package row
         uses: actions/upload-artifact@v7
         with:
@@ -354,8 +373,12 @@ jobs:
           if-no-files-found: error
           retention-days: 30
           path: |
-            out/linux/
-            out/raspbian/
+            out/linux/**/*.deb
+            out/linux/**/*.apk
+            out/linux/**/*.rpm
+            out/linux/**/*.pkg.tar.*
+            out/linux/**/*.txz
+            out/raspbian/**/*.deb
 
       - name: Upload Linux row diagnostics
         if: ${{ always() }}

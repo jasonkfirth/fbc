@@ -203,12 +203,6 @@ RPM_RISCV_ARCHES=(
     riscv64
 )
 
-SLACKWARE_ARCHES=(
-    x86_64
-    i586
-    aarch64
-)
-
 VM_ARCHES=(
     x86_64
 )
@@ -238,8 +232,8 @@ TARGETS=(
     "rpm|almalinux|almalinux:10|10|rpm-cross-build-freebasic-matrix.sh"
     "rpm|opensuse|opensuse/leap:16.0|leap-16.0|rpm-cross-build-freebasic-matrix.sh"
     "rpm|opensuse|opensuse/tumbleweed|tumbleweed|rpm-cross-build-freebasic-matrix.sh"
-    "slackware|slackware|vbatts/slackware:15.0|15.0|slackware-cross-build-freebasic-matrix.sh"
-    "slackware|slackware|vbatts/slackware:current|current|slackware-cross-build-freebasic-matrix.sh"
+    "slackware|slackware|aclemons/slackware:15.0|15.0|slackware-cross-build-freebasic-matrix.sh"
+    "slackware|slackware|aclemons/slackware:current|current|slackware-cross-build-freebasic-matrix.sh"
     "archlinux|archlinux|archlinux/archlinux:base|current|archlinux-build-freebasic.sh"
     "vm|haiku||x86-64|haiku-vm-build-freebasic.sh"
     "vm|haiku||i386|haiku-vm-build-freebasic.sh"
@@ -279,8 +273,12 @@ arches_for_target() {
         rpm/*)
             printf '%s\n' "${RPM_COMMON_ARCHES[@]}"
             ;;
-        slackware/*)
-            printf '%s\n' "${SLACKWARE_ARCHES[@]}"
+        slackware/slackware/15.0)
+            # Slackware ARM 15.0 is ARMv7; AArch64 is in the current tree.
+            printf '%s\n' x86_64 i586 armv7l
+            ;;
+        slackware/slackware/current)
+            printf '%s\n' x86_64 i586 aarch64
             ;;
         archlinux/*)
             printf '%s\n' "${ARCHLINUX_ARCHES[@]}"
