@@ -56,6 +56,19 @@ def main() -> int:
                 print(f"GAS64/{target}: emission failed\n{emitted.stdout}{emitted.stderr}")
                 return 1
             print(f"GAS64/{target}: emission passed")
+        # RISC OS overrides fbnetwire.bi for its APCS double layout. Compile
+        # the shared text suite too, so that override retains Unicode overloads.
+        command = [str(options.fbc.resolve()), "-prefix", str(root), "-r",
+                   "-gen", "gcc", "-target", "riscos",
+                   "-i", str(root / "inc"), "-i", str(root / "tests/fbcunit/inc"),
+                   str(root / "tests/string/text-types.bas"),
+                   "-o", str(working / "text-types-riscos.c")]
+        emitted = subprocess.run(command, cwd=working, text=True,
+                                 capture_output=True, timeout=120, check=False)
+        if emitted.returncode:
+            print(f"Unicode/riscos: emission failed\n{emitted.stdout}{emitted.stderr}")
+            return 1
+        print("Unicode/riscos: emission passed")
         if "llvm" in backends:
             if llc is None:
                 print("llvm: configured compiler is unavailable")
