@@ -222,6 +222,19 @@ configure_slackpkg_mirror() {
     printf '%s\n' "$mirror" >> /etc/slackpkg/mirrors
 }
 
+configure_slackpkg_architecture() {
+    local config=/etc/slackpkg/slackpkg.conf
+    local pkgmain=slackware
+    [ -f "$config" ] || die "missing slackpkg configuration: $config"
+    [ "$ARCH" != "x86_64" ] || pkgmain=slackware64
+
+    # slackpkg also uses uname to select its package architecture and tree.
+    # A linux/386 container can report the host's x86_64 kernel, causing
+    # slackpkg to search for slackware64 under the 32-bit mirror.
+    run sed -i '/^[[:space:]]*ARCH=/d; /^[[:space:]]*PKGMAIN=/d' "$config"
+    printf '\nARCH=%s\nPKGMAIN=%s\n' "$ARCH" "$pkgmain" >> "$config"
+}
+
 configure_slackpkg_priority() {
     [ "$CODENAME" = "15.0" ] || return 0
 
@@ -267,6 +280,7 @@ install_deps() {
     command -v slackpkg >/dev/null 2>&1 || die "missing gcc/make and slackpkg is not available"
 
     configure_slackpkg_mirror "$CODENAME"
+    configure_slackpkg_architecture
     configure_slackpkg_priority
 
     msg "installing Slackware build dependencies via slackpkg"
