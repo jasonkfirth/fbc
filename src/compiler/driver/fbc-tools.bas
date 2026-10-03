@@ -71,17 +71,20 @@ function fbcDriverGetClangTargetOption( ) as string
 		return platformoption
 	end if
 
-	if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32) and _
-		(fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64) ) then
-		''
-		'' The MSYS2 Windows ARM64 package uses a host-runnable clang with
-		'' an ARM64 MinGW sysroot.  The compiler executable name does not
-		'' encode that target, so pass the triple explicitly.
-		''
-		function = "--target=aarch64-w64-mingw32 "
-	else
-		function = ""
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32 ) then
+		'' MSYS2 provides host-runnable Clang binaries. Their default CPU
+		'' does not necessarily match the selected MinGW target, especially
+		'' when LLVM assembly is produced for a different word size.
+		select case fbGetCpuFamily( )
+		case FB_CPUFAMILY_X86
+			return "--target=i686-w64-mingw32 "
+		case FB_CPUFAMILY_X86_64
+			return "--target=x86_64-w64-mingw32 "
+		case FB_CPUFAMILY_AARCH64
+			return "--target=aarch64-w64-mingw32 "
+		end select
 	end if
+	return ""
 end function
 
 private sub hAppendTargetCcQueryOptions( byref path as string )

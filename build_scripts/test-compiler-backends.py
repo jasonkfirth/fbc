@@ -95,6 +95,29 @@ def main() -> int:
                 print(f"LLVM/aarch64: assembly emission failed\n{emitted.stdout}{emitted.stderr}")
                 return 1
             print("LLVM/aarch64: assembly emission passed")
+            if clang is not None:
+                # Assemble both Windows x86 targets with the detected host
+                # Clang. Its default CPU must not decide the object's word size.
+                # The first COFF header field identifies i386 (0x14c) or AMD64
+                # (0x8664), independently of the compiler host architecture.
+                for architecture, machine in (("686", 0x14C), ("x86_64", 0x8664)):
+                    obj = working / ("llvm-win32-" + architecture + ".o")
+                    command = [str(options.fbc.resolve()), "-prefix", str(root), "-c",
+                               "-gen", "llvm", "-target", "win32", "-arch", architecture,
+                               str(source), "-o", str(obj)]
+                    try:
+                        compiled = subprocess.run(command, cwd=working, text=True,
+                                                  capture_output=True, timeout=120, check=False,
+                                                  env={**os.environ, "LLC": llc, "CLANG": clang})
+                    except (OSError, subprocess.TimeoutExpired) as error:
+                        print(f"LLVM/win32-{architecture}: {error}")
+                        return 1
+                    if (compiled.returncode or not obj.is_file() or
+                            int.from_bytes(obj.read_bytes()[:2], "little") != machine):
+                        print(f"LLVM/win32-{architecture}: object compilation failed\n"
+                              f"{compiled.stdout}{compiled.stderr}")
+                        return 1
+                    print(f"LLVM/win32-{architecture}: object compilation passed")
         try:
             target = subprocess.run([str(options.fbc.resolve()), "-print", "target"],
                                     cwd=working, text=True, capture_output=True,

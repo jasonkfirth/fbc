@@ -697,6 +697,13 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86, FB_CPUFAMILY_X86_64
+			'' A host-runnable Clang may default to the other x86 word size.
+			'' Select the assembly mode just as the GNU assembler path does.
+			if( fbGetCpuFamily( ) = FB_CPUFAMILY_X86 ) then
+				ln += "-m32 "
+			else
+				ln += "-m64 "
+			end if
 			if( fbGetOption( FB_COMPOPT_ASMSYNTAX ) = FB_ASMSYNTAX_INTEL ) then
 				ln += "-masm=intel "
 			end if
