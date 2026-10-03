@@ -1,4 +1,8 @@
-''
+'' Project: FreeBASIC C runtime bindings
+'' File: crt/errno.bi
+'' Purpose: Expose target errno storage and error constants.
+'' Responsibilities: Preserve host-specific error numbers and access functions.
+'' This file intentionally does NOT contain: error handling policy.
 ''
 '' errno -- header translated with help of SWIG FB wrapper
 ''
@@ -60,6 +64,8 @@
 	#define EILSEQ (__FB_HAIKU_POSIX_ERROR_BASE + 38)
 #elseif defined(__FB_DARWIN__)
         '' Darwin errno numbers are different from Linux, so use Darwin values here.
+        '' XNU's sys/errno.h uses 17 for an existing filesystem entry.
+        #define EEXIST 17
 #else
 
         #define EPERM 1
@@ -125,3 +131,5 @@ extern "C"
 end extern
 
 #endif
+
+'' end of crt/errno.bi

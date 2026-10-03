@@ -71,7 +71,7 @@
 '' Export limits and process-local module state
 '' -------------------------------------------------------------------------
 
-private const SEMANTIC_MODEL_SCHEMA = "26"
+private const SEMANTIC_MODEL_SCHEMA = "27"
 private const SEMANTIC_MODEL_MAX_SYMBOLS = 1000000
 private const SEMANTIC_MODEL_MAX_DEPENDENCIES = 5000
 private const SEMANTIC_MODEL_INITIAL_SYMBOL_INDEX_CAPACITY = 256
@@ -2673,7 +2673,6 @@ sub fbSemanticModelExportProc(byval proc as FBSYMBOL ptr, byval astproc as ASTNO
 	if( (hSemanticModelHasSymbol(proc) = FALSE) or (astproc = NULL) ) then exit sub
 
 	procid = hSemanticModelSymbolId(proc)
-	dim as longint phase = fbSemanticModelPhaseBegin(proc, "pre-load", emitted)
 	if( proc->id.name <> NULL ) then procname = *proc->id.name
 	if( proc->proc.ext <> NULL ) then
 		proc_start_line = proc->proc.ext->dbg.iniline
@@ -2683,6 +2682,9 @@ sub fbSemanticModelExportProc(byval proc as FBSYMBOL ptr, byval astproc as ASTNO
 	fbSemanticModelExportSymbolDetails(proc, TRUE)
 	fbSemanticModelExportSymbols(symbGetProcHeadParam(proc))
 	fbSemanticModelExportSymbols(symbGetProcSymbTbHead(proc))
+	'' Default and symbol initializer trees are metadata snapshots. Only the
+	'' procedure body belongs to the pre-load evaluation/control-flow phase.
+	dim as longint phase = fbSemanticModelPhaseBegin(proc, "pre-load", emitted)
 	next_node_id = semantic_model_node_count + semantic_model_module_node_count
 
 	if( (proc->proc.ext <> NULL) and _

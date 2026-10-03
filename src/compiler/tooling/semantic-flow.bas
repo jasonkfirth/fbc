@@ -113,7 +113,7 @@ sub fbSemanticModelFlowNode(byval node as ASTNODE ptr, byval identity as longint
 		if( edge = 1 ) then owner->left_child = identity
 		if( edge = 2 ) then owner->right_child = identity
 		if( edge > 2 ) then
-			flow_nodes[flow_count - 1].next_auxiliary = owner->first_auxiliary
+			flow_nodes[index].next_auxiliary = owner->first_auxiliary
 			owner->first_auxiliary = identity
 		end if
 	end if

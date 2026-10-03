@@ -46,8 +46,10 @@ class SidecarTests(unittest.TestCase):
         # MSYS2 converts process arguments, but cannot convert paths recorded
         # in a native compiler's output. Compare with the compiler's spelling
         # without rewriting the exported facts or confusing host and target.
-        if not self.native_windows or os.name == "nt":
+        if not self.native_windows:
             return str(path)
+        if os.name == "nt":
+            return str(path).replace("/", "\\")
         if path not in self.compiler_paths:
             converted = subprocess.run(["cygpath", "-a", "-w", str(path)], text=True,
                                        capture_output=True, timeout=10, check=True)
@@ -763,6 +765,59 @@ class SidecarTests(unittest.TestCase):
         self.assertEqual(outputs[0][0], 0)
         self.assertEqual(outputs[0][1].strip(), b"50")
 
+    def test_normalized_types_and_procedure_flow_contract(self) -> None:
+        source = self.source("""type FirstItem
+    value as long
+end type
+type SecondItem
+    value as long
+end type
+dim first_value as FirstItem
+dim second_value as SecondItem
+dim fixed_text as string * 12
+dim pointer_value as const long ptr
+dim value as long = 1
+if value > 0 then
+    value = value + 2
+end if
+print value
+""")
+        _, path = self.invoke([source])
+        text = path.read_text()
+        model = Model(text)
+        first = model.normalized_types["symbol", self.one(model, "first_value", "variable"), "value"]
+        second = model.normalized_types["symbol", self.one(model, "second_value", "variable"), "value"]
+        self.assertEqual(first[4], "type")
+        self.assertNotEqual(first[5], second[5])
+        fixed = model.normalized_types["symbol", self.one(model, "fixed_text", "variable"), "value"]
+        self.assertEqual(fixed[4], "fixed-string")
+        self.assertEqual(fixed[9], "12")
+        pointer = model.normalized_types["symbol", self.one(model, "pointer_value", "variable"), "value"]
+        self.assertEqual(pointer[4:9], ["long", "0", "1", "0", "01"])
+        self.assertIn(pointer[9], ("4", "8"))
+        for tag in ("PH", "NP", "EV", "CB", "CN", "CE", "CL"):
+            self.assertTrue(model.records[tag], tag)
+        self.assertTrue(any(row[4] == "conditional-label" for row in model.records["CE"]))
+        assignment = next(identity for identity, row in model.nodes.items()
+                          if row[6] == "assign" and {child[3] for child in model.nodes.values()
+                                                    if int(child[2]) == identity and child[3] != "root"} >= {"left", "right"})
+        order = sorted((int(row[3]), model.nodes[int(row[2])][3])
+                       for row in model.records["EV"] if int(row[1]) == assignment)
+        self.assertEqual(order, [(0, "right"), (1, "left")])
+        rows = [row.copy() for row in model.rows]
+        changes = {"NT": (8, "2"), "PH": (3, "unknown"), "NP": (2, "999999"),
+                   "EV": (4, "unknown"), "CB": (2, "999999"), "CN": (2, "999999"),
+                   "CE": (4, "unknown"), "CL": (3, "999999")}
+        for tag, (field, value) in changes.items():
+            with self.subTest(corrupt=tag), self.assertRaises(ValueError):
+                changed = [row.copy() for row in rows]
+                next(row for row in changed if row[0] == tag)[field] = value
+                Model("\n".join("\t".join(row) for row in changed) + "\n")
+        with self.assertRaisesRegex(ValueError, "phase membership"):
+            changed = [row.copy() for row in rows if row[0] != "NP"]
+            changed[-1][12] = str(int(changed[-1][12]) - len(model.records["NP"]))
+            Model("\n".join("\t".join(row) for row in changed) + "\n")
+
     def test_reader_rejects_corrupt_or_falsely_complete_output(self) -> None:
         source = self.source("dim value as long = 1\nprint value + 2\n")
         _, path = self.invoke([source])
@@ -1433,7 +1488,7 @@ WithDefault()
                     self.assertEqual(row[3], str(len(original)))
                     self.assertEqual(row[4], hashlib.sha256(original).hexdigest())
                 repeated_contexts = [row for row in model.source_contexts.values()
-                                     if model.files[int(row[3])][2] == str(repeated)]
+                                     if model.files[int(row[3])][2] == self.compiler_path(repeated)]
                 self.assertEqual(len(repeated_contexts), 2)
                 self.assertNotEqual(repeated_contexts[0][1], repeated_contexts[1][1])
                 self.assertEqual(repeated_contexts[0][2], repeated_contexts[1][2])
@@ -1660,6 +1715,15 @@ dim mapped_value as long
         _, path = self.invoke([source], mode="expressions", success=False)
         model = Model.read(path, expressions_only=True, allow_recovery=True)
         self.assertEqual([row[2:5] for row in model.records["PPD"]], [["invalid", "", "0"]])
+        self.assertTrue(model.diagnostics)
+        self.assertTrue(all(row[2] == "error" and int(row[3]) > 0 for row in model.diagnostics.values()))
+        self.assertTrue(any(row[7] == self.compiler_path(source) for row in model.diagnostics.values()))
+        for field, value in ((2, "information"), (3, "-1"), (9, "999999"), (10, "999999"), (11, "999999")):
+            with self.subTest(diagnostic_field=field), self.assertRaises(ValueError):
+                changed = [row.copy() for row in model.rows]
+                next(row for row in changed if row[0] == "DI")[field] = value
+                Model("\n".join("\t".join(row) for row in changed) + "\n",
+                      expressions_only=True, allow_recovery=True)
         unclosed = self.source("#if 1\nprint 1\n", "unclosed.bas")
         _, path = self.invoke([unclosed], mode="expressions", success=False)
         model = Model.read(path, expressions_only=True, allow_recovery=True)

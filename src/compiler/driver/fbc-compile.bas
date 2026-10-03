@@ -827,6 +827,13 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 	end if
 #endif
 
+	'' Clang's Windows unwind assembly can contain directives unavailable in
+	'' GNU as. Use the producer's integrated assembler to preserve those tables.
+	if( (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) and _
+	    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32) ) then
+		assembler = FBCTOOL_CLANG
+	end if
+
 	if( assembler = FBCTOOL_NONE ) then
 		select case fbGetOption( FB_COMPOPT_TARGET )
 		case FB_COMPTARGET_ANDROID
@@ -859,7 +866,7 @@ private function hAssembleModule( byval module as FBCIOFILE ptr ) as integer
 	select case assembler
 	case FBCTOOL_CLANG
 		ln += fbcDriverGetClangTargetOption( )
-		ln += "-c "
+		ln += "-x assembler -c "
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86, FB_CPUFAMILY_X86_64
 			if( fbGetOption( FB_COMPOPT_ASMSYNTAX ) = FB_ASMSYNTAX_INTEL ) then

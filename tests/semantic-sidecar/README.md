@@ -22,7 +22,7 @@ normal C toolchain. `--backend gas64` selects native assembly emission on a
 supported host. Repeat `--backend` to select several backends. `--test` selects
 an individual `test_...` method.
 
-`sidecar.py` independently validates schema 25. `test_sidecar.py` checks the
+`sidecar.py` independently validates schema 27. `test_sidecar.py` checks the
 compiler's records against source locations and known types, layouts, values,
 and target relationships. The BASIC fixtures own separate responsibilities:
 
