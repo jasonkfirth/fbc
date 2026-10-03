@@ -48,8 +48,9 @@ private function fbcWin32PlatformIsSelected( ) as integer
 end function
 
 private function fbcWin32PlatformUsesClangArm64Runtime( ) as integer
+	'' MSYS2 supplies compiler-rt and libunwind for Windows ARM64 regardless
+	'' of whether the BASIC module uses GCC, Clang, or LLVM code generation.
 	function = fbcWin32PlatformIsSelected( ) andalso _
-		(fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) andalso _
 		(fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64)
 end function
 
