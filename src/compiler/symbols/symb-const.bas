@@ -271,14 +271,12 @@ function symbAllocWStrConst _
 	end if
 
 	'' Literal symbols store target wchar code units in their byte length.
-	'' Recount when the host and target widths differ so supplementary Unicode
-	'' characters occupy a UTF-16 surrogate pair instead of one truncated unit.
-	if( sizeof( wstring ) <> fbGetTargetWcharSize( ) ) then
-		select case as const fbGetTargetWcharSize( )
-		case 2, 4
-			strlength = hGetTargetWstrLength( sname )
-		end select
-	end if
+	'' Recount escaped scalars even on native UTF-16 hosts: one WCHR argument
+	'' can emit a surrogate pair, and the symbol must reserve both code units.
+	select case as const fbGetTargetWcharSize( )
+	case 2, 4
+		strlength = hGetTargetWstrLength( sname )
+	end select
 
 	'' hEscapeW() writes bytes in the target wchar layout, not the host
 	'' compiler's WSTRING layout.  Cross-compilers to 32-bit wchar targets

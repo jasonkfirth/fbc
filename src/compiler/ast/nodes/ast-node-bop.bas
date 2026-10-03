@@ -584,10 +584,11 @@ private function hConstBop _
 			elseif( op = AST_OP_INTDIV ) then
 				l->val.i = cunsg( l->val.i ) \   cunsg( r->val.i )
 			else
-					dim as uinteger unsigned_left = cunsg( l->val.i )
-					dim as uinteger unsigned_right = cunsg( r->val.i )
-					dim as uinteger unsigned_result = unsigned_left mod unsigned_right
-					l->val.i = unsigned_result
+				'' AST integer constants retain 64 bits on 32-bit compiler hosts.
+				dim as ulongint unsigned_left = cunsg( l->val.i )
+				dim as ulongint unsigned_right = cunsg( r->val.i )
+				dim as ulongint unsigned_result = unsigned_left mod unsigned_right
+				l->val.i = unsigned_result
 				end if
 			case else
 				errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
