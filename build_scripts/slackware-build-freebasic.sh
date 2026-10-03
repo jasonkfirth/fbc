@@ -222,6 +222,22 @@ configure_slackpkg_mirror() {
     printf '%s\n' "$mirror" >> /etc/slackpkg/mirrors
 }
 
+configure_slackpkg_priority() {
+    [ "$CODENAME" = "15.0" ] || return 0
+
+    local config=/etc/slackpkg/slackpkg.conf
+    [ -f "$config" ] || die "missing slackpkg configuration: $config"
+
+    # Stable mirrors also contain experimental toolchains in testing. Their
+    # GCC can require a newer libc than the release image, so select packages
+    # only from the stable tree, its patches and supported extras.
+    if grep -Eq '^[[:space:]]*PRIORITY=' "$config"; then
+        run sed -i 's/^[[:space:]]*PRIORITY=.*/PRIORITY=( patches %PKGMAIN extra )/' "$config"
+    else
+        printf '\nPRIORITY=( patches %%PKGMAIN extra )\n' >> "$config"
+    fi
+}
+
 run_slackpkg_changes() {
     local status=0
     local attempt
@@ -251,6 +267,7 @@ install_deps() {
     command -v slackpkg >/dev/null 2>&1 || die "missing gcc/make and slackpkg is not available"
 
     configure_slackpkg_mirror "$CODENAME"
+    configure_slackpkg_priority
 
     msg "installing Slackware build dependencies via slackpkg"
     local packages=(
