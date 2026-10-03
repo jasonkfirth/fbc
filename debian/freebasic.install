@@ -1,5 +1,6 @@
 usr/bin/fbc
 usr/lib/freebasic/*
+usr/include/freebasic/amiga
 usr/include/freebasic/aros
 usr/include/freebasic/builtin.bi
 usr/include/freebasic/crt
@@ -26,6 +27,8 @@ usr/include/freebasic/riscos
 usr/include/freebasic/sfxlib_effects.bi
 usr/include/freebasic/sfxlib_raw.bi
 usr/include/freebasic/string.bi
+usr/include/freebasic/string-unicode.bi
+usr/include/freebasic/unicode-license.txt
 usr/include/freebasic/utf_conv.bi
 usr/include/freebasic/vbdos.bi
 usr/include/freebasic/vbcompat.bi
