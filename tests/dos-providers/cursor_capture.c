@@ -119,4 +119,9 @@ unsigned int cursor_test_hash(int x, int y)
 	}
 	return hash;
 }
+
+extern volatile int __fb_dos_update_ticks;
+extern int __fb_dos_ticks_per_update;
+int cursor_test_pending_ticks(void) { return __fb_dos_update_ticks; }
+int cursor_test_refresh_interval(void) { return __fb_dos_ticks_per_update; }
 /* end of cursor_capture.c */

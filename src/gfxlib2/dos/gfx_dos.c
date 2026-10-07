@@ -366,7 +366,14 @@ static int fb_dos_timer_handler(unsigned irq)
 	if( (do_abort = fb_dos.timer_ticks < 65536)==FALSE )
 		fb_dos.timer_ticks -= 65536;
 		
-	__fb_dos_update_ticks++;
+	/* A locked framebuffer cannot present intermediate frames. Keep one
+	 * pending refresh instead of replaying historical callbacks after unlock.
+	 * The BIOS and idle clocks above still account for every timer interrupt.
+	 * IRQ0 owns this counter; foreground code only reads it while acquiring
+	 * the graphics lock. Init guarantees a positive refresh interval.
+	 */
+	if (__fb_dos_update_ticks < __fb_dos_ticks_per_update)
+		__fb_dos_update_ticks++;
 	
 	if (fb_dos.in_interrupt || fb_dos.locked || __fb_dos_update_ticks < __fb_dos_ticks_per_update)
 		return do_abort;

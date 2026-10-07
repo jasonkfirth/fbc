@@ -17,6 +17,8 @@ Extern "C"
     Declare Sub captureBanked Alias "cursor_test_banked"(ByVal enabled As Long)
     Declare Function capturePixel Alias "cursor_test_pixel"(ByVal x As Long, ByVal y As Long, ByVal presented As Long) As ULong
     Declare Function captureHash Alias "cursor_test_hash"(ByVal x As Long, ByVal y As Long) As ULong
+    Declare Function capturePending Alias "cursor_test_pending_ticks"() As Long
+    Declare Function captureInterval Alias "cursor_test_refresh_interval"() As Long
     Declare Sub cursorWait Alias "fb_GfxDosIdle"(ByVal milliseconds As Long)
 End Extern
 Dim Shared As Integer checks, failures
@@ -42,6 +44,26 @@ For modeIndex As Integer = 0 To 2
         Screen 0
         End 3
     End If
+    ' IRQ0 must keep time while nested framebuffer locks defer publication.
+    ' Holding the lock for 100 ms crosses several display refresh intervals.
+    ScreenLock
+    ScreenLock
+    Dim As ULong lockedUpdates = captureUpdates()
+    Dim As Double heldStarted = Timer, heldElapsed
+    Do
+        heldElapsed = Timer - heldStarted
+        If heldElapsed < -43200 Then heldElapsed += 86400
+    Loop Until heldElapsed >= 0.1
+    check(captureUpdates() = lockedUpdates, "nested lock blocks display publication")
+    check(captureInterval() > 0, "refresh interval is positive")
+    report &= "REFRESH_PENDING_TICKS;" & Str(depth) & ";" & Str(capturePending()) & ";" & Str(captureInterval()) & Chr(10)
+#Ifdef REFRESH_EXPECT_BOUNDED
+    check(capturePending() = captureInterval(), "locked refresh requests coalesce")
+#EndIf
+    ScreenUnlock 1, 0
+    check(captureUpdates() = lockedUpdates, "inner unlock preserves display exclusion")
+    ScreenUnlock 1, 0
+    cursorWait 50
     ScreenLock
     Dim As ULong backgroundColor = IIf(depth = 8, 3, RGB(20, 40, 60))
     Line (0, 0)-(639, 479), backgroundColor, BF
