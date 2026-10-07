@@ -1141,6 +1141,10 @@ AS CONST preserves original inputs before integer conversion and jump-table bias
 
 The SELECT construct, accepted SELECT/CASE statements, original E identities,
 their OWN relationships and selected storage must belong to the same module.
+SELECT and CASE statements retain the procedure owner of their SELECT construct;
+using another procedure's statement or repeating an identity under another owner
+does not form a complete observation group. Wire property order is independent
+of parser clause order, which is defined by the accepted statement IDs and ordinals.
 End counts distinguish a complete selection from missing clauses or alternatives.
 The ordinary parser's 1024-entry table is checked before indexing; AS CONST
 retains its separate 8192-slot jump-table limit. These facts describe grammar
