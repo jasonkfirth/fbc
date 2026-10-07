@@ -339,8 +339,32 @@ function cArrayFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 				(dimexpr, dimension_start, dimension_nonphysical_start, _
 				 dimension_end, dimension_nonphysical_end)
 		end if
-		dim as longint selected_dimension
-		dim as ASTNODE ptr result = astBuildArrayBound( arrayexpr, dimexpr, tk, @selected_dimension )
+		dim as longint selected_dimension = 0
+		dim as ASTNODE ptr selected_dimension_expr = NULL
+		dim as ASTNODE ptr result
+		if( fbSemanticModelEnabled( ) ) then
+			result = astBuildArrayBound( arrayexpr, dimexpr, tk, @selected_dimension_expr )
+		else
+			result = astBuildArrayBound( arrayexpr, dimexpr, tk )
+		end if
+		if( selected_dimension_expr <> NULL ) then
+			dim as LEX_LOCATION selected_source_start = dimension_start
+			dim as LEX_LOCATION selected_source_end = dimension_end
+			dim as longint selected_nonphysical_start = dimension_nonphysical_start
+			dim as longint selected_nonphysical_end = dimension_nonphysical_end
+			if( dimension_is_explicit = FALSE ) then
+				selected_source_start = source_start
+				selected_source_end = lexGetLastLocation( )
+				selected_source_start.is_physical = FALSE
+				selected_source_end.is_physical = FALSE
+				selected_nonphysical_start = nonphysical_start
+				selected_nonphysical_end = lexGetNonphysicalTokenCount( )
+			end if
+			selected_dimension = fbSemanticModelSelectedArrayIndex _
+				(selected_dimension_expr, selected_source_start, selected_source_end, _
+				 selected_nonphysical_start, selected_nonphysical_end)
+			astDelTree( selected_dimension_expr )
+		end if
 		fbSemanticModelArrayBound(result, s, tk, original_dimension, selected_dimension, source_start, nonphysical_start)
 		function = result
 	end select

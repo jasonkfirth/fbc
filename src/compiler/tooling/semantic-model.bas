@@ -2705,6 +2705,17 @@ sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
 		lexGetNonphysicalTokenCount( ))
 end sub
 
+sub fbSemanticModelExportCurrentExpressionPrefixNonPhysical(byval expr as ASTNODE ptr)
+	if( fbSemanticModelEnabled( ) = FALSE ) then exit sub
+	if( semantic_model_active_expression_start.start_line < 1 ) then exit sub
+	dim as LEX_LOCATION source_start = semantic_model_active_expression_start
+	dim as LEX_LOCATION source_end = lexGetLastLocation( )
+	source_start.is_physical = FALSE
+	source_end.is_physical = FALSE
+	fbSemanticModelExportExpression(expr, source_start, source_end, _
+		semantic_model_active_expression_nonphysical, lexGetNonphysicalTokenCount( ))
+end sub
+
 sub fbSemanticModelBeginModule(byref filename as string)
 	fbSemanticDiagnosticsModule(filename)
 	if( semantic_model_file_open = FALSE ) then exit sub

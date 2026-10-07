@@ -1419,7 +1419,7 @@ declare function astBuildArrayBound _
 		byval arrayexpr as ASTNODE ptr, _
 		byval dimexpr as ASTNODE ptr, _
 		byval tk as integer, _
-		byval selected_dimension as longint ptr = NULL _
+		byval selected_dimension as ASTNODE ptr ptr = NULL _
 	) as ASTNODE ptr
 
 declare function astBuildStrPtr( byval lhs as ASTNODE ptr ) as ASTNODE ptr

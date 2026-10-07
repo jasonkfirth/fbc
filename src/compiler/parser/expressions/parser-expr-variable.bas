@@ -126,7 +126,9 @@ private function cFixedSizeArrayIndex _
 		end if
 		dimexpr = hCheckIntegerIndex( dimexpr )
 		if( dimension < FB_MAXARRAYDIMS ) then _
-			semantic_selected_indices(dimension) = fbSemanticModelSelectedArrayIndex(dimexpr, semantic_index_start, semantic_index_nonphysical)
+			semantic_selected_indices(dimension) = fbSemanticModelSelectedArrayIndex _
+				(dimexpr, semantic_index_start, semantic_index_end, _
+				 semantic_index_nonphysical, semantic_index_nonphysical_end)
 
 		'' bounds checking
 		if( env.clopt.arrayboundchk ) then
@@ -1020,7 +1022,9 @@ private function cDynamicArrayIndex _
 		end if
 		dimexpr = hCheckIntegerIndex( dimexpr )
 		if( dimension < FB_MAXARRAYDIMS ) then _
-			semantic_selected_indices(dimension) = fbSemanticModelSelectedArrayIndex(dimexpr, semantic_index_start, semantic_index_nonphysical)
+			semantic_selected_indices(dimension) = fbSemanticModelSelectedArrayIndex _
+				(dimexpr, semantic_index_start, semantic_index_end, _
+				 semantic_index_nonphysical, semantic_index_nonphysical_end)
 
 		'' bounds checking
 		if( env.clopt.arrayboundchk ) then

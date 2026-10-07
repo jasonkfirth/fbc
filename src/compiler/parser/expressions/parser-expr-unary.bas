@@ -94,8 +94,8 @@ private sub hSemanticModelExportCurrentExpression _
 	( _
 		byval expr as ASTNODE ptr, _
 		byref source_start as LEX_LOCATION, _
-		byval nonphysical_tokens_at_start as longint, _
-		byval semantic_operator_override as integer = -1 _
+	byval nonphysical_tokens_at_start as longint, _
+	byval semantic_operator_override as integer = -1 _
 	)
 	if( expr = NULL ) then exit sub
 	dim as LEX_LOCATION source_end = lexGetLastLocation( )

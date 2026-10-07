@@ -1070,7 +1070,7 @@ function astBuildArrayBound _
 		byval arrayexpr as ASTNODE ptr, _
 		byval dimexpr as ASTNODE ptr, _
 		byval tk as integer, _
-		byval selected_dimension as longint ptr _
+		byval selected_dimension as ASTNODE ptr ptr _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = any
@@ -1081,11 +1081,10 @@ function astBuildArrayBound _
 	errPushParamLocation( NULL, tk, 2, "dimension" )
 	dimexpr = astNewCONV( FB_DATATYPE_INTEGER, NULL, dimexpr )
 	errPopParamLocation( )
-	'' hConstBound consumes its inputs. Observe the converted dimension first;
-	'' the optional output retains an immutable identity, never an AST pointer.
+	'' hConstBound consumes its inputs. Return a private clone when the parser
+	'' needs to export the compiler-selected type with the exact written range.
 	if( selected_dimension <> NULL ) then
-		dim as LEX_LOCATION dimension_source = lexGetLastLocation( )
-		*selected_dimension = fbSemanticModelSelectedArrayIndex(dimexpr, dimension_source, lexGetNonphysicalTokenCount( ))
+		*selected_dimension = astCloneTree(dimexpr)
 	end if
 
 	'' Try to evaluate l/ubound( array, dimension ) at compile-time

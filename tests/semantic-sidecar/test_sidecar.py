@@ -522,6 +522,43 @@ class SidecarTests(unittest.TestCase):
                 self.assertTrue(model.records["FILE"])
                 self.assertTrue(all(row[13:15] == ["0", "0"] for row in model.records["E"]))
 
+    def test_array_lvalue_result_remains_typed_in_expressions_only_mode(self) -> None:
+        source = self.source("type Holder\n"
+                             "values(any) as integer\n"
+                             "end type\n"
+                             "dim as Holder item\n"
+                             "redim item.values(0 to 1)\n"
+                             "item.values(0) = 1\n")
+        expected = self.span(source, "item.values(0) = 1", "values(0)")
+        for mode in ("full", "expressions"):
+            with self.subTest(mode=mode):
+                model = self.compile(source, mode=mode)
+                facts = [row for row in model.records["E"] if row[2] == "1" and source_range(row, 3) == expected]
+                self.assertTrue(facts, "the compiler should type the written array-element assignment target")
+                self.assertTrue(any(row[15].casefold() == "integer" for row in facts))
+                if mode == "expressions":
+                    self.assertFalse(model.records["S"])
+                    self.assertFalse(model.records["N"])
+
+    def test_pointer_intrinsic_prefix_before_closing_parenthesis_is_not_physical(self) -> None:
+        source = self.source("dim value as integer = 1\n"
+                             "dim text as string = \"x\"\n"
+                             "print VarPtr(value)\n"
+                             "print SAdd(text)\n"
+                             "print StrPtr(text)\n")
+        for mode in ("full", "expressions"):
+            with self.subTest(mode=mode):
+                model = self.compile(source, mode=mode)
+                for anchor, expression in (("print VarPtr(value)", "VarPtr(value)"),
+                                           ("print SAdd(text)", "SAdd(text)"),
+                                           ("print StrPtr(text)", "StrPtr(text)")):
+                    incomplete = self.span(source, anchor, expression[:-1])
+                    complete = self.span(source, anchor, expression)
+                    prefix_facts = self.expressions(model, incomplete)
+                    self.assertFalse(any(row[2] == "1" for row in prefix_facts),
+                                     "the intrinsic is incomplete before its closing parenthesis")
+                    self.assertTrue(any(row[2] == "1" for row in self.expressions(model, complete)))
+
     def test_macros_and_line_remaps_never_become_editable(self) -> None:
         source = self.source("dim value as long = 1\n#define USE_VALUE value\n"
                              "print USE_VALUE + 2\n#line 30 \"logical.bas\"\n"
@@ -2775,6 +2812,11 @@ print SEM_EMPTY joined3
                 self.assertTrue(omitted)
                 self.assertTrue(written)
                 self.assertTrue(all(queries[identity]["array-bound-dimension"] == "0" for identity in omitted))
+                expressions = {int(row[1]): row for row in model.records["E"]}
+                for identity in omitted:
+                    selected = int(queries[identity]["array-bound-selected-dimension"])
+                    self.assertEqual(expressions[selected][2], "0",
+                                     "an implicit compiler-selected dimension must not claim the closing parenthesis as source")
 
                 # Four-field receipts remain valid for written dimensions. An
                 # omitted argument needs its presence flag to explain zero.

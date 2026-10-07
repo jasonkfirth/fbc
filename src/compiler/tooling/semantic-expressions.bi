@@ -57,7 +57,8 @@ declare sub fbSemanticModelArraySubscripts _
 	  indices() as longint, selected_indices() as longint, byval rank as integer, _
 	  byref source_start as LEX_LOCATION, byval nonphysical_start as longint )
 declare function fbSemanticModelSelectedArrayIndex _
-	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, byval nonphysical_start as longint ) as longint
+	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, byref source_end as LEX_LOCATION, _
+	  byval nonphysical_start as longint, byval nonphysical_end as longint ) as longint
 declare sub fbSemanticModelArrayBound _
 	( byval result as ASTNODE ptr, byval array_symbol as FBSYMBOL ptr, byval tk as integer, _
 	  byval original_dimension as longint, byval selected_dimension as longint, _

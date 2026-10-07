@@ -12,6 +12,7 @@
 #include once "symbols/symb.bi"
 
 declare sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
+declare sub fbSemanticModelExportCurrentExpressionPrefixNonPhysical(byval expr as ASTNODE ptr)
 declare sub fbSemanticModelExportExpression _
 	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, byref source_end as LEX_LOCATION, _
 	  byval nonphysical_tokens_at_start as longint, byval nonphysical_tokens_at_end as longint, _
@@ -669,7 +670,14 @@ sub fbSemanticModelPointerAddress _
 	  byval subtype as FBSYMBOL ptr, byval temporary_input as integer, byref address_kind as const string )
 	if( (fbSemanticModelFullEnabled( ) = FALSE) or (result = NULL) ) then exit sub
 	if( lex.ctx->semantic_probe ) then exit sub
-	fbSemanticModelExportCurrentExpressionPrefix(result)
+	if( (address_kind <> "address-of") and (lexGetToken( ) = CHAR_RPRNT) ) then
+		'' VARPTR and STRPTR/SADD build their result before their closing token.
+		'' Keep the result identity and selected address facts, but not a partial
+		'' range that could be mistaken for the completed intrinsic call.
+		fbSemanticModelExportCurrentExpressionPrefixNonPhysical(result)
+	else
+		fbSemanticModelExportCurrentExpressionPrefix(result)
+	end if
 	dim as longint identity = result->semantic_expression
 	if( (identity <= 0) or (operand_id <= 0) ) then
 		fbSemanticModelFailAt("semantic-expressions.bas:601")
@@ -741,11 +749,11 @@ end sub
 '' Export the selected element as the group owner so SIZEOF/LEN provenance can
 '' distinguish an unevaluated access from an emitted read or write.
 function fbSemanticModelSelectedArrayIndex _
-	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, byval nonphysical_start as longint ) as longint
+	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, byref source_end as LEX_LOCATION, _
+	  byval nonphysical_start as longint, byval nonphysical_end as longint ) as longint
 	if( (fbSemanticModelFullEnabled( ) = FALSE) or (expr = NULL) ) then return 0
 	if( lex.ctx->semantic_probe ) then return 0
-	dim as LEX_LOCATION source_end = lexGetLastLocation( )
-	fbSemanticModelExportExpression(expr, source_start, source_end, nonphysical_start, lexGetNonphysicalTokenCount( ))
+	fbSemanticModelExportExpression(expr, source_start, source_end, nonphysical_start, nonphysical_end)
 	if( expr->semantic_expression <= 0 ) then fbSemanticModelFailAt("semantic-expressions.bas:675")
 	return expr->semantic_expression
 end function
@@ -754,8 +762,16 @@ sub fbSemanticModelArraySubscripts _
 	( byval result as ASTNODE ptr, byval array_symbol as FBSYMBOL ptr, _
 	  indices() as longint, selected_indices() as longint, byval rank as integer, _
 	  byref source_start as LEX_LOCATION, byval nonphysical_start as longint )
-	if( (fbSemanticModelFullEnabled( ) = FALSE) or (result = NULL) or (rank = 0) ) then exit sub
+	if( (fbSemanticModelEnabled( ) = FALSE) or (result = NULL) or (rank = 0) ) then exit sub
 	if( lex.ctx->semantic_probe ) then exit sub
+	'' Assignment-side array elements still need a typed source expression when
+	'' expressions-only output intentionally omits symbol and subscript details.
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then
+		dim as LEX_LOCATION source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(result, source_start, source_end, _
+			nonphysical_start, lexGetNonphysicalTokenCount( ))
+		exit sub
+	end if
 	if( (array_symbol = NULL) or (rank < 1) or (rank > FB_MAXARRAYDIMS) ) then
 		fbSemanticModelFailAt("semantic-expressions.bas:686")
 		exit sub
