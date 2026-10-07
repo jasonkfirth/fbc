@@ -30,6 +30,8 @@
 #include once "symbols/symb.bi"
 #include once "tooling/semantic-expressions.bi"
 
+declare function fbSemanticModelFullEnabled( ) as integer
+
 declare sub fbSemanticModelExportImplicitCall _
 	( _
 		byval owner as FBSYMBOL ptr, _
@@ -125,6 +127,11 @@ private function hDoAssign _
 	end if
 
 	var semantic_initializer = astTypeIniAddAssign( ctx.tree, expr, ctx.sym, ctx.dtype, ctx.subtype, check_upcast )
+	'' Dynamic String declaration receipts use the original RHS identity,
+	'' before an assignment conversion or field-constructor clone replaces it.
+	if( fbSemanticModelFullEnabled( ) and (ctx.dtype = FB_DATATYPE_STRING) ) then
+		if( semantic_initializer <> NULL ) then semantic_initializer->semantic_expression = semantic_rhs
+	end if
 	fbSemanticModelAssignmentTarget(semantic_rhs, ctx.dtype, ctx.subtype, "initializer")
 	fbSemanticModelStringInitializer(semantic_rhs, ctx.sym, ctx.dtype, semantic_initializer)
 

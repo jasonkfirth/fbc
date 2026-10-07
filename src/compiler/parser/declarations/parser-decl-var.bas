@@ -29,6 +29,8 @@
 #include once "ast/ast.bi"
 
 declare function fbSemanticModelDeclarationGroup(byval token as integer, byref owner as longint) as longint
+declare sub fbSemanticModelScalarStringDeclaration(byval sym as FBSYMBOL ptr, byval tree as ASTNODE ptr, _
+	byval token as integer, byref source as LEX_LOCATION)
 declare sub fbSemanticModelDeclarationType(byval groupid as longint, byval owner as longint, _
 	byval ordinal as integer, byval sym as FBSYMBOL ptr, byref written_type as const string, _
 	byval initializer_kind as integer, byref source as LEX_LOCATION)
@@ -1323,6 +1325,7 @@ private function hEmitVarDecl _
 			semantic_initializer_kind = 2
 			initree = hVarInit( sym, is_declared, semantic_site, semantic_initializer_kind )
 			if( hSimpleScalarInitializer(sym, initree) ) then semantic_initializer_kind = 3
+			fbSemanticModelScalarStringDeclaration(sym, initree, token, semantic_site)
 
 			if( (initree <> NULL) and _
 			    (fbLangOptIsSet( FB_LANG_OPT_SCOPE ) = FALSE) ) then
@@ -1353,6 +1356,7 @@ private function hEmitVarDecl _
 			end if
 
 			initree = hVarInitDefault( sym, is_declared, has_defctor, semantic_site )
+			fbSemanticModelScalarStringDeclaration(sym, NULL, token, semantic_site)
 		end if
 	else
 		initree = NULL

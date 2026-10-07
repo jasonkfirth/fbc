@@ -1,6 +1,8 @@
 Version 1.20.4
 
 [changed]
+- compiler semantic model: preserve scalar dynamic String declaration defaults and original initializer identities before descriptor lowering; distinguish DIM/STATIC storage, instance fields and inferred/reference/array storage, validate complete associations in both readers, and preserve GAS/GAS64/GCC output.
+- compiler semantic model: export complete ordered visibility sections and their actual aggregate-body owners after macro expansion and conditional selection; validate unique counts and same-body statements in both readers, retain compact exclusions, and preserve ordinary GAS/GAS64/GCC emission.
 - compiler semantic model: retain original named procedure result-type and written visibility choices before prototype reuse and scope defaults; validate complete accepted headers in both readers, preserve compact exclusions, and keep full/compact/off and old/new code emission byte-identical on GAS, GAS64 and GCC.
 - compiler semantic verification: validate statement-owned procedure visibility receipts against their accepted statement and module, retain strict metadata domain checks, and reject dangling or cross-module owners.
 - compiler semantic model: keep compiler-converted array indices nonphysical while retaining the written index type and range, anchor implicit bound dimensions to the intrinsic token, and preserve dereferenced pointer-index result types without letting the index claim the full expression range.

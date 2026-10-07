@@ -35,6 +35,9 @@ declare sub fbSemanticModelExportBinding _
 		byval is_declaration as integer _
 	)
 
+declare sub fbSemanticModelScalarStringDeclaration(byval sym as FBSYMBOL ptr, byval tree as ASTNODE ptr, _
+	byval token as integer, byref source as LEX_LOCATION)
+
 declare sub fbSemanticModelExportImplicitCall _
 	( _
 		byval owner as FBSYMBOL ptr, _
@@ -241,6 +244,7 @@ private sub hFieldInit _
 			hBeginNesting( parent )
 			hSetFieldInitree( sym, boundstypeini )
 		end if
+		fbSemanticModelScalarStringDeclaration(sym, NULL, 0, semantic_site)
 
 		exit sub
 	end if
@@ -290,8 +294,10 @@ private sub hFieldInit _
 	end if
 
 	hBeginNesting( parent )
-	hSetFieldInitree( sym, cInitializer( sym, FB_INIOPT_ISINI, _
-		FB_DATATYPE_INVALID, NULL, @semantic_site ) )
+	dim as ASTNODE ptr initree = cInitializer( sym, FB_INIOPT_ISINI, _
+		FB_DATATYPE_INVALID, NULL, @semantic_site )
+	fbSemanticModelScalarStringDeclaration(sym, initree, 0, semantic_site)
+	hSetFieldInitree( sym, initree )
 end sub
 
 private sub hFieldType _

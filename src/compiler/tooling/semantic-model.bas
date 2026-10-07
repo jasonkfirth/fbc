@@ -933,6 +933,62 @@ sub fbSemanticModelDeclarationGroupEnd(byval groupid as longint, byval owner as 
 		"declaration-type-end:" + fbSemanticModelNumber(groupid) + TABCHAR + fbSemanticModelNumber(count))
 end sub
 
+'' Scalar descriptor defaults belong to DIM/STATIC storage and declared
+'' instance fields. VAR inference, references, arrays and const descriptors
+'' have different contracts. Record both explicit and default initialization
+'' so consumers can check coverage without parsing declaration punctuation.
+sub fbSemanticModelScalarStringDeclaration(byval sym as FBSYMBOL ptr, byval tree as ASTNODE ptr, _
+	byval token as integer, byref source as LEX_LOCATION)
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (sym = NULL) ) then exit sub
+	if( lex.ctx->semantic_probe ) then exit sub
+	if( symbGetFullType(sym) <> FB_DATATYPE_STRING ) then exit sub
+	if( (symbGetSubtype(sym) <> NULL) or symbIsRef(sym) ) then exit sub
+	if( symbGetArrayDimensions(sym) <> 0 ) then exit sub
+	dim as string kind
+	if( symbIsField(sym) and (token = 0) ) then
+		kind = "field"
+	elseif( symbIsVar(sym) and (token = FB_TK_DIM) ) then
+		kind = "dim"
+	elseif( symbIsVar(sym) and (token = FB_TK_STATIC) ) then
+		kind = "static"
+	else
+		exit sub
+	end if
+	dim as longint expression = 0, statement = fbSemanticModelCurrentStatement( )
+	if( tree <> NULL ) then
+		if( astIsTYPEINI(tree) = FALSE ) then
+			fbSemanticModelFailAt("invalid scalar String initializer")
+			exit sub
+		end if
+		dim as ASTNODE ptr assignment = tree->l
+		if( assignment = NULL ) then
+			fbSemanticModelFailAt("missing scalar String initializer")
+			exit sub
+		end if
+		if( (assignment->class <> AST_NODECLASS_TYPEINI_ASSIGN) or (assignment->r <> NULL) ) then
+			fbSemanticModelFailAt("non-scalar String initializer")
+			exit sub
+		end if
+		expression = assignment->semantic_expression
+		if( expression <= 0 ) then
+			fbSemanticModelFailAt("unavailable scalar String initializer expression")
+			exit sub
+		end if
+	end if
+	if( statement = 0 ) then
+		fbSemanticModelFailAt("unavailable scalar String declaration statement")
+		exit sub
+	end if
+	dim as longint symbolid = fbSemanticModelSymbolId(sym), sourceid = fbSemanticModelCurrentSource( )
+	dim as string role = "scalar-string-declaration"
+	dim as string payload = fbSemanticModelNumber(statement) + TABCHAR + fbSemanticModelNumber(expression) + _
+		TABCHAR + kind + TABCHAR + fbSemanticModelNumber(sourceid)
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(symbolid) + _
+		TABCHAR + role + TABCHAR + fbSemanticModelEscape(payload))
+	fbSemanticModelExportCoordinates("source-context", sourceid, role + ":" + fbSemanticModelNumber(symbolid), source, source)
+	fbSemanticModelMacroOrigin("symbol", symbolid, source.macro_identity, role)
+end sub
+
 sub fbSemanticModelParameterType(byval param as FBSYMBOL ptr, byref written_type as const string)
 	if( (fbSemanticModelFullEnabled( ) = FALSE) or (param = NULL) ) then exit sub
 	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(param)) + _
@@ -2931,7 +2987,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
-	for capability as integer = 0 to 59
+	for capability as integer = 0 to 60
 		dim as string feature, coverage
 		select case capability
 		case 0: feature = "symbol-identities": coverage = iif(semantic_model_expressions_only, "unavailable", "available")
@@ -2990,6 +3046,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		case 57: feature = "declaration-typing-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 58: feature = "procedure-typing-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 59: feature = "aggregate-access-sections": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 60: feature = "scalar-string-declarations": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 54: feature = "select-case-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 55: feature = "select-case-lowering-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 56: feature = "target-wide-literal-prefixes": coverage = iif(fbSemanticModelFullEnabled( ) and _

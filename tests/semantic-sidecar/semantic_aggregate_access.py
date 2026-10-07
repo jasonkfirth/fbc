@@ -7,7 +7,7 @@ This file intentionally does NOT reconstruct source access frames or lint policy
 
 
 def validate_aggregate_access(model, number, subject_modules):
-    bodies, blocks, sections, statements = {}, {}, {}, set()
+    bodies, blocks, sections, statements, counts = {}, {}, {}, set(), set()
 
     def available(module):
         return model.capabilities[module].get('aggregate-access-sections') == 'available'
@@ -50,8 +50,9 @@ def validate_aggregate_access(model, number, subject_modules):
     for row in model.records['K']:
         domain, owner, key, payload = row[1], int(row[2]), row[3], row[4]
         if key == 'aggregate-access-count':
-            if domain != 'symbol' or owner not in bodies:
-                raise ValueError('Aggregate count has no body')
+            if domain != 'symbol' or owner not in bodies or owner in counts:
+                raise ValueError('Invalid or repeated aggregate completion count')
+            counts.add(owner)
         elif key.startswith('aggregate-access-section:'):
             ordinal = bounded(key[len('aggregate-access-section:'):])
             fields = payload.split('\t')

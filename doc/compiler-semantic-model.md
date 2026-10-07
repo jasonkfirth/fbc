@@ -1725,4 +1725,59 @@ the capability remain valid but cannot establish these spelling policies.
 The existing parser thread owns the observations; no AST ownership, language
 choice, emitted instruction or ABI changes.
 
+## Scalar dynamic String declarations
+
+Full models advertise `scalar-string-declarations`. A `K symbol` property
+`scalar-string-declaration` stores four tab-separated fields: accepted statement
+ID, original initializer expression ID, grammar kind (`dim`, `static`, `field`),
+and source-context ID. Expression zero denotes the compiler's default
+initialization. Nonzero expressions retain their original `OWN` statement and
+typed `E`/`C` values before descriptor assignment conversion or field-constructor
+cloning. Calls retain their expression identity without a fabricated value.
+
+Only scalar, non-reference, non-const dynamic String storage is covered. VAR
+inference, arrays, fixed strings, character buffers and pointer storage have
+different initialization contracts. DIM/STATIC facts agree with the original
+declaration-typing group. User field facts agree with the accepted aggregate
+body and are complete for `B declaration` field history. The parser records
+default fields as well as explicitly initialized fields. Local STATIC String
+storage currently rejects an explicit initializer; failed compilation never
+publishes an accepted model.
+
+The identifier location is a `LOC source-context` role named
+`scalar-string-declaration:<symbol ID>`. An expanded identifier instead retains
+its `MR symbol` origin under `scalar-string-declaration`. Bindings-only and
+expressions-only models advertise unavailable coverage and omit these facts.
+
+## Aggregate bodies and written access sections
+
+Full models advertise `aggregate-access-sections`. The accepted TYPE/UNION
+body retains its opening statement and the complete sequence of explicit
+PUBLIC, PRIVATE and PROTECTED sections from the member grammar:
+
+```
+K symbol aggregate aggregate-body-statement opening-statement-ID
+K symbol aggregate aggregate-access-section:ordinal section-statement-ID<TAB>public|private|protected
+K symbol aggregate aggregate-access-count count
+```
+
+Ordinals start at one within each body; counts include zero for bodies without
+explicit sections. The section payload uses normal K tab escaping. Named and
+anonymous aggregates retain separate owners. A UNION has no accepted access
+sections. The body's opening ST owns its TYPE/UNION BLK; each section ST belongs
+to that same BLK and uses the accepted `aggregate-member` route. Completed T/U
+metadata supplies the selected aggregate class and type/union layout.
+
+These observations preserve source order after macro expansion and active
+conditional selection. A nested body does not change its parent's current
+visibility. Default public access remains implicit: the first written section
+is a separate policy choice from a repeated explicit section. Readers require
+unique body ownership, one completion count, contiguous unique ordinals and
+complete section coverage. Reordering K facts cannot change their logical order.
+
+Compact exports advertise the capability as unavailable and omit these
+properties. Older models without the capability remain valid but do not prove
+an access-section policy. The existing parser thread owns the sequence counter;
+the observations add no AST ownership, grammar choice, emitted code or ABI change.
+
 <!-- end of compiler-semantic-model.md -->

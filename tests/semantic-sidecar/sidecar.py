@@ -18,6 +18,7 @@ from semantic_selects import validate_select_inputs
 from semantic_declarations import validate_declaration_types
 from semantic_procedures import validate_procedure_types
 from semantic_aggregate_access import validate_aggregate_access
+from semantic_string_declarations import validate_string_declarations
 
 
 SCHEMA = "27"
@@ -1221,6 +1222,7 @@ class Model:
             validate_declaration_types(self, number, subject_modules)
             validate_procedure_types(self, number, subject_modules)
             validate_aggregate_access(self, number, subject_modules)
+            validate_string_declarations(self, number, subject_modules)
             validate_wide_literals(self, number, subject_modules)
             self.validate_for_steps(subject_modules)
             self.validate_for_inputs(subject_modules)

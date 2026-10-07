@@ -3757,4 +3757,40 @@ print SEM_EMPTY joined3
                     self.assertFalse(any(key.startswith(("aggregate-body-", "aggregate-access-"))
                                          for properties in compact.properties.values() for key in properties))
 
+    def test_scalar_string_declarations_preserve_selected_initializers(self) -> None:
+        for backend, target in (("gas", "win32"), ("gas64", "win64"), ("gcc", "linux-x86_64")):
+            with self.subTest(backend=backend, target=target):
+                source = self.fixture("string-declarations.bas")
+                output = self.working / ("string-declaration-emission" + (".c" if backend == "gcc" else ".asm"))
+                extra = ("-target", target, "-o", str(output))
+                self.invoke([source], mode="off", backend=backend, extra=extra)
+                original = output.read_bytes()
+                model = self.compile(source, backend=backend, extra=extra)
+                self.assertEqual(output.read_bytes(), original)
+                self.assertEqual(model.capabilities[1]["scalar-string-declarations"], "available")
+                empty = ("emptyfield", "macrofield", "emptynested", "localtext", "constanttext", "foldedtext",
+                         "firsttext", "secondtext", "macrotext", "frommacro", "continuedtext", "inlinetext", "activetext")
+                for symbol_name in empty:
+                    identity = self.one(model, symbol_name)
+                    statement, expression, kind, source_id = model.properties["symbol", identity]["scalar-string-declaration"].split("\t")
+                    self.assertEqual(model.constants["expression", int(expression)], ("bytes", ""))
+                    self.assertEqual(model.statement_owners["expression", int(expression)], int(statement))
+                    self.assertEqual(kind, "field" if symbol_name in empty[:3] else "dim")
+                    self.assertIn(int(source_id), model.source_contexts)
+                for symbol_name in ("defaultfield", "defaulttext", "statictext"):
+                    identity = self.one(model, symbol_name)
+                    self.assertEqual(model.properties["symbol", identity]["scalar-string-declaration"].split("\t")[1], "0")
+                for symbol_name in ("fixedfield", "arrayfield", "fixedtext", "zerotext", "widetext", "arraytext", "consttext", "inferredtext", "referencetext"):
+                    identity = self.one(model, symbol_name)
+                    self.assertNotIn("scalar-string-declaration", model.properties["symbol", identity])
+                self.assertFalse(model.named("inactivetext"))
+                from_call = self.one(model, "fromcall")
+                expression = int(model.properties["symbol", from_call]["scalar-string-declaration"].split("\t")[1])
+                self.assertNotIn(("expression", expression), model.constants)
+                for mode in ("bindings", "expressions"):
+                    compact = self.compile(source, mode=mode, backend=backend, extra=extra)
+                    self.assertEqual(output.read_bytes(), original)
+                    self.assertEqual(compact.capabilities[1]["scalar-string-declarations"], "unavailable")
+                    self.assertFalse(any(key.startswith("scalar-string-") for properties in compact.properties.values() for key in properties))
+
 # end of test_sidecar.py
