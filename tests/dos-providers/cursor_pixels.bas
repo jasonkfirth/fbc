@@ -49,7 +49,8 @@ For modeIndex As Integer = 0 To 2
     ScreenLock
     ScreenLock
     Dim As ULong lockedUpdates = captureUpdates()
-    Dim As Double heldStarted = Timer, heldElapsed
+    Dim As Double heldStarted = Timer
+    Dim As Double heldElapsed
     Do
         heldElapsed = Timer - heldStarted
         If heldElapsed < -43200 Then heldElapsed += 86400
