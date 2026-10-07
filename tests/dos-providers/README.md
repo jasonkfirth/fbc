@@ -190,13 +190,21 @@ ordinary DOS gfxlib or `fbgfxmt` for the threaded runtime. The linked library
 must provide `fb_GfxDosIdle`; both DOS graphics timer profiles are supported.
 
 Define `CURSOR_EXPECT_IDLE_STABLE` when building against the retained cursor
-path. The expected markers are `CURSOR_PIXEL_CHECKS; 43; 0` and
-`CURSOR_PIXELS_PASS`. Without that define, the original implementation can
-produce the reference capture hashes with 40 checks. All 25 region hashes
+path, and `REFRESH_EXPECT_BOUNDED` when building against the coalesced refresh
+counter. With both defines the expected markers are
+`CURSOR_PIXEL_CHECKS; 55; 0` and `CURSOR_PIXELS_PASS`. With only the cursor
+define there are 52 checks; with neither define there are 49. All 25 region hashes
 must match between the two implementations. The extra three checks require
 zero stationary display updates, one in each color depth. The other checks
 cover mouse events, movement, visibility, drawing underneath the pointer,
 palette changes and bottom-right clipping.
+
+The nested-lock checks hold the framebuffer for 100 ms while IRQ0 continues
+advancing time. Publication must remain paused until the outer lock is
+released. `REFRESH_EXPECT_BOUNDED` additionally requires the pending counter
+to stop at one refresh interval, in each color depth. The C counter getters
+are fixture helpers read under `ScreenLock`; they do not extend the runtime
+ABI. Run both the default and low-power timer profiles.
 
 Run the resulting DOS executable through `run-dosbox-x.py` with
 `--expect CURSOR_PIXELS_PASS --timeout 60`. The test synthesizes cursor

@@ -1,6 +1,7 @@
 Version 1.20.4
 
 [changed]
+- gfxlib2/DOS: coalesce refresh requests deferred by SCREENLOCK instead of draining historical callbacks before the next draw; preserve BIOS and idle clocks and add nested-lock cursor publication checks for both timer profiles.
 - compiler/USTRING: added a built-in dynamic UTF-8 string type with Unicode scalar lengths, slicing, search, comparison, zero-based indexed reads and writes, UCHR construction, byte/wide/numeric conversions, and the existing descriptor ownership rules for parameters, results, arrays, and UDT fields; preserve macro shadowing, expose __FB_HAS_USTRING__, and provide FB_NO_USTRING for existing user-defined types while retaining QB's original keyword set.
 - rtlib/Unicode: added validated UTF-8 decoding with maximal-subpart replacement, supplementary-scalar conversion to UTF-16 and UTF-32, embedded-NUL preservation, Unicode 17.0 full casing with expansions and final sigma, scalar-aware trimming, repetition, alignment, and replacement, and direct UTF-8/UTF-16/UTF-32 encoded file I/O; check in the generated case tables and their regeneration tool.
 - compiler/rtlib text APIs: route STRING, WSTRING, and USTRING through printing, PRINT USING, input, DATA reads, file transfers, pathnames, environment variables, process commands, date/time functions, dynamic-library names, and graphics/sound text arguments with explicit conversions and temporary cleanup; add compile-time coverage for all three text types and runtime conversion checks.

@@ -73,4 +73,23 @@ path and 0.086 for the retained cursor. Tiko's complete-loop CPU comparison
 remained inconclusive, so these figures do not establish an editor speedup or
 native responsiveness. Physical DOS hardware has not been qualified.
 
+## Deferred refresh requests
+
+IRQ0 keeps at most one pending display refresh while `SCREENLOCK` prevents
+publication. Missed refreshes cannot display intermediate frames because those
+frames are no longer available. Replaying the old backlog delayed the next
+lock after a long draw and could eventually overflow the signed counter.
+The pending counter now saturates at the positive refresh interval established
+by mode initialization. BIOS time and the foreground idle clock still advance
+for every interrupt, independently of display publication.
+
+The focused nested-lock test held the framebuffer for 100 ms. With the 120 Hz
+profile, the old counter reached 14 ticks against a two-tick refresh interval;
+the bounded implementation stopped at two. Both timer profiles passed 55
+checks at 8, 16 and 32 bits, with all 25 cursor region hashes unchanged.
+A private matched 20-edit Tiko comparison took approximately 0.83 guest
+seconds before coalescing and 0.66 after it. These quantized DOS timings do not
+prove native responsiveness. Host marker creation times were reused between
+runs and were excluded from the performance evidence.
+
 <!-- end of dos-graphics-idle.md -->
