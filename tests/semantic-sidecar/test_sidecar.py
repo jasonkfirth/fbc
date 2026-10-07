@@ -2758,6 +2758,38 @@ print SEM_EMPTY joined3
         self.assertFalse(any("declared-field-count" in properties
                              for properties in older.properties.values()))
 
+    def test_array_bound_query_dimension_presence_and_corruption(self) -> None:
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                _, path = self.invoke([self.fixture("array-bound-query-inputs.bas")], backend=backend)
+                text = path.read_text(encoding="utf-8")
+                model = Model(text)
+                queries = {identity: properties for (domain, identity), properties in model.properties.items()
+                           if domain == "expression" and "array-bound-kind" in properties}
+                self.assertTrue(queries)
+                omitted = [identity for identity, properties in queries.items()
+                           if properties["array-bound-dimension-explicit"] == "0"]
+                written = [identity for identity, properties in queries.items()
+                           if properties["array-bound-dimension-explicit"] == "1"]
+                self.assertTrue(omitted)
+                self.assertTrue(written)
+                self.assertTrue(all(queries[identity]["array-bound-dimension"] == "0" for identity in omitted))
+
+                # Four-field receipts remain valid for written dimensions. An
+                # omitted argument needs its presence flag to explain zero.
+                rows = [line.split("\t") for line in text.splitlines()]
+                older = [row.copy() for row in rows if not (row[0] == "K" and row[1] == "expression" and
+                         int(row[2]) in written and row[3] == "array-bound-dimension-explicit")]
+                older[-1][12] = str(int(older[-1][12]) - len(written))
+                Model("\n".join("\t".join(row) for row in older) + "\n")
+                for identity, value in ((omitted[0], "1"), (written[0], "0"), (omitted[0], "2")):
+                    changed = [row.copy() for row in rows]
+                    for row in changed:
+                        if row[:4] == ["K", "expression", str(identity), "array-bound-dimension-explicit"]:
+                            row[4] = value
+                    with self.subTest(identity=identity, presence=value), self.assertRaisesRegex(ValueError, "dimension presence"):
+                        Model("\n".join("\t".join(row) for row in changed) + "\n")
+
     def test_option_occurrences_use_committed_values_and_complete_membership(self) -> None:
         for backend in self.backends:
             with self.subTest(backend=backend):

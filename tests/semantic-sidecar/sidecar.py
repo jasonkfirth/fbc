@@ -1273,11 +1273,12 @@ class Model:
             marked.add(identity)
         expressions = {int(row[1]): row for row in self.records["E"]}
         expected = {"array-bound-kind", "array-bound-symbol", "array-bound-dimension", "array-bound-selected-dimension"}
+        optional = {"array-bound-dimension-explicit"}
         for (domain, identity), properties in self.properties.items():
             keys = {key for key in properties if key.startswith("array-bound-")}
             if not keys:
                 continue
-            if domain != "expression" or identity not in marked or keys != expected:
+            if domain != "expression" or identity not in marked or not expected <= keys or keys - (expected | optional):
                 raise ValueError("Incomplete or unknown array bound group")
             module = subject_modules.get((domain, identity))
             result = expressions.get(identity)
@@ -1290,11 +1291,19 @@ class Model:
             statement = self.statement_owners.get((domain, identity))
             if statement is None or self.statement_endings[statement][3] != "parsed":
                 raise ValueError("Array bound query lacks accepted statement ownership")
-            original = number(properties["array-bound-dimension"], 1)
+            # Older receipts always carried an input expression. New producers
+            # explicitly mark an omitted argument with zero, while retaining
+            # the compiler-selected dimension as a real expression.
+            explicit = properties.get("array-bound-dimension-explicit", "1")
+            if explicit not in ("0", "1"):
+                raise ValueError("Invalid array bound dimension presence")
+            original = number(properties["array-bound-dimension"], 0)
+            if (explicit == "0") != (original == 0):
+                raise ValueError("Array bound dimension presence contradicts its input")
             selected = number(properties["array-bound-selected-dimension"], 1)
             if not original <= selected < identity:
                 raise ValueError("Array bound dimensions are cyclic or reordered")
-            for operand in (original, selected):
+            for operand in ((selected,) if original == 0 else (original, selected)):
                 if subject_modules.get(("expression", operand)) != module or self.statement_owners.get(("expression", operand)) != statement:
                     raise ValueError("Array bound query has a missing or foreign dimension")
             value = expressions.get(selected)
