@@ -1423,8 +1423,9 @@ WithDefault()
 
     def test_formal_parameter_spans_keep_names_and_argument_boundaries(self) -> None:
         source = self.fixture("parameter-spans.bas")
-        text = source.read_text(encoding="utf-8")
-        lines = text.splitlines()
+        # LOC byte offsets address the original file, including CRLF bytes.
+        source_bytes = source.read_bytes()
+        lines = source_bytes.decode("utf-8").splitlines()
         expected = {
             "FirstValue": ("byval FirstValue", "FirstValue as long", False),
             "SecondValue": ("byval SecondValue", "SecondValue as long", False),
@@ -1462,7 +1463,7 @@ WithDefault()
                         self.assertIn(end_text, lines[int(span[7]) - 1], name)
                         name_span = model.physical_locations["declaration", int(declaration[1]), "range"]
                         self.assertEqual(int(name_span[5]), int(name_span[7]), name)
-                        self.assertEqual(text.encode()[int(name_span[9]):int(name_span[10])].decode(), name)
+                        self.assertEqual(source_bytes[int(name_span[9]):int(name_span[10])].decode(), name)
                         self.assertLessEqual(int(span[9]), int(name_span[9]), name)
                         self.assertGreaterEqual(int(span[10]), int(name_span[10]), name)
                     unnamed = [row for row in declarations if not row[4]]
