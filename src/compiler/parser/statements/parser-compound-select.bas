@@ -28,6 +28,7 @@
 #include once "ast/ast.bi"
 #include once "runtime/rtl.bi"
 #include once "tooling/semantic-constructs.bi"
+#include once "tooling/semantic-expressions.bi"
 
 enum FB_CASETYPE
 	FB_CASETYPE_SINGLE
@@ -272,13 +273,28 @@ private sub hCaseExpression _
 	end if
 end sub
 
+'' Keep the actual operands after AST coercion and the branch's matching
+'' direction. This wrapper does not create an EX source-operator association.
+private function hBuildSelectComparison _
+	( byval construct as longint, byval ordinal as integer, byval bound as integer, _
+	  byval op as integer, byval l as ASTNODE ptr, byval r as ASTNODE ptr, _
+	  byval label as FBSYMBOL ptr, byval matches_on_jump as integer ) as ASTNODE ptr
+	dim as LEX_LOCATION source = lexGetLastLocation( )
+	dim as longint operands = fbSemanticModelCaptureSelectOperands(source)
+	dim as ASTNODE ptr result = astNewSelectBOP(op, l, r, label, AST_OPOPT_NONE, operands)
+	fbSemanticModelSelectComparison(construct, ordinal, bound, op, matches_on_jump, operands)
+	return result
+end function
+
 private function hFlushCaseExpr _
 	( _
 		byref casectx as FBCASECTX, _
 		byval sym as FBSYMBOL ptr, _
 		byval inilabel as FBSYMBOL ptr, _
 		byval nxtlabel as FBSYMBOL ptr, _
-		byval islast as integer _
+		byval islast as integer, _
+		byval construct as longint, _
+		byval ordinal as integer _
 	) as integer
 
 	dim as ASTNODE ptr expr = any
@@ -293,14 +309,14 @@ private function hFlushCaseExpr _
 
 	if( casectx.typ <> FB_CASETYPE_RANGE ) then
 		if( islast ) then
-			expr = astNewBOP( astGetInverseLogOp( casectx.op ), expr, _
-			                  casectx.expr1, nxtlabel, AST_OPOPT_NONE )
+			expr = hBuildSelectComparison( construct, ordinal, 1, astGetInverseLogOp( casectx.op ), _
+			                               expr, casectx.expr1, nxtlabel, FALSE )
 		else
-			expr = astNewBOP( casectx.op, expr, _
-			                  casectx.expr1, inilabel, AST_OPOPT_NONE )
+			expr = hBuildSelectComparison( construct, ordinal, 1, casectx.op, _
+			                               expr, casectx.expr1, inilabel, TRUE )
 		end if
 	else
-		expr = astNewBOP( AST_OP_LT, expr, casectx.expr1, nxtlabel, AST_OPOPT_NONE )
+		expr = hBuildSelectComparison( construct, ordinal, 1, AST_OP_LT, expr, casectx.expr1, nxtlabel, FALSE )
 		if( expr = NULL ) then
 			return FALSE
 		end if
@@ -309,9 +325,9 @@ private function hFlushCaseExpr _
 
 		expr = NEWCASEVAR( sym )
 		if( islast ) then
-			expr = astNewBOP( AST_OP_GT, expr, casectx.expr2, nxtlabel, AST_OPOPT_NONE )
+			expr = hBuildSelectComparison( construct, ordinal, 2, AST_OP_GT, expr, casectx.expr2, nxtlabel, FALSE )
 		else
-			expr = astNewBOP( AST_OP_LE, expr, casectx.expr2, inilabel, AST_OPOPT_NONE )
+			expr = hBuildSelectComparison( construct, ordinal, 2, AST_OP_LE, expr, casectx.expr2, inilabel, TRUE )
 		end if
 	end if
 
@@ -426,7 +442,7 @@ sub cSelectStmtNext( )
 
 		if( ctx.caseTB(cntbase+i).typ <> FB_CASETYPE_ELSE ) then
 			if( hFlushCaseExpr( ctx.caseTB(cntbase+i), stk->select.sym, _
-			                    il, nl, i = cnt-1 ) = FALSE ) then
+			                    il, nl, i = cnt-1, stk->semantic_identity, i + 1 ) = FALSE ) then
 				errReport( FB_ERRMSG_INVALIDDATATYPES, TRUE )
 			end if
 		end if

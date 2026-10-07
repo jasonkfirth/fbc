@@ -5,7 +5,7 @@
 ''
 '' Purpose:
 ''
-''     Parse sELECT CASE AS CONST..CASE..END SELECT compound statement parsing.
+''     Parse SELECT CASE AS CONST..CASE..END SELECT compound statement parsing.
 ''
 '' Responsibilities:
 ''
@@ -27,8 +27,6 @@
 #include once "ast/ast.bi"
 #include once "runtime/rtl.bi"
 #include once "tooling/semantic-constructs.bi"
-
-const FB_MAXJUMPTBSLOTS = 8192
 
 type SELECTCTX
 	base        as integer
@@ -248,6 +246,7 @@ sub cSelConstStmtNext( byval stk as FB_CMPSTMTSTK ptr )
 		dim as longint first_expression = 0, last_expression = 0
 		if( first_input <> NULL ) then first_expression = first_input->semantic_expression
 		dim as ulongint value = cConstIntExprRanged( first_input, stk->select.const_.dtype )
+		dim as ulongint selected_first = value, selected_last = value
 		dim as string semantic_kind = "value"
 
 		'' first case?
@@ -279,6 +278,7 @@ sub cSelConstStmtNext( byval stk as FB_CMPSTMTSTK ptr )
 			if( last_input <> NULL ) then last_expression = last_input->semantic_expression
 			semantic_kind = "range"
 			tovalue = cConstIntExprRanged( last_input, stk->select.const_.dtype )
+			selected_last = tovalue
 			tovalue -= stk->select.const_.bias
 
 			if( tovalue < value ) then
@@ -293,6 +293,8 @@ sub cSelConstStmtNext( byval stk as FB_CMPSTMTSTK ptr )
 		semantic_alternatives += 1
 		fbSemanticModelSelectAlternative(stk->semantic_identity, semantic_alternatives, semantic_kind, AST_OP_EQ, _
 			first_expression, last_expression, lexGetToken( ) <> CHAR_COMMA)
+		fbSemanticModelSelectConstant(stk->semantic_identity, semantic_alternatives, stk->select.const_.dtype, _
+			selected_first, selected_last, stk->select.const_.bias)
 
 		'' not possible to fit case value range in the jump table?
 		if( (tovalue - value + 1) > (FB_MAXJUMPTBSLOTS - ctx.base) ) then
@@ -385,6 +387,8 @@ sub cSelConstStmtEnd( byval stk as FB_CMPSTMTSTK ptr )
 		errReport( FB_ERRMSG_TOOMANYLABELS )
 	end if
 
+	fbSemanticModelSelectTable(stk->semantic_identity, stk->select.const_.dtype, stk->select.sym, _
+		stk->select.const_.bias, span, ctx.base - stk->select.const_.base)
 	astAdd( astBuildJMPTB( stk->select.sym, _
 	                       @ctx.casevalues(stk->select.const_.base), _
 	                       @ctx.caselabels(stk->select.const_.base), _

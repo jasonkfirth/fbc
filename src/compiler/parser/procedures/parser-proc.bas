@@ -37,6 +37,10 @@ declare sub fbSemanticModelExportBinding _
 		byval is_declaration as integer _
 	)
 
+declare sub fbSemanticModelProcedureTyping(byval proc as FBSYMBOL ptr, byval tk as integer, _
+	byref role as const string, byref result_form as const string)
+declare sub fbSemanticModelProcedureVisibility(byval proc as FBSYMBOL ptr, byref written as const string)
+
 '' [ALIAS "id"]
 function cAliasAttribute( ) as zstring ptr
 	static as zstring * FB_MAXNAMELEN+1 aliasid
@@ -1512,7 +1516,8 @@ private function hFinishProcHeaderSignature _
 		byref subtype as FBSYMBOL ptr, _
 		byref op as integer, _
 		byref is_get as integer, _
-		byref is_indexed as integer _
+		byref is_indexed as integer, _
+		byref semantic_result_form as string _
 	) as integer
 
 	select case( tk )
@@ -1641,6 +1646,7 @@ private function hFinishProcHeaderSignature _
 
 		'' (AS SymbolType)?
 		if( lexGetToken( ) = FB_TK_AS ) then
+			semantic_result_form = "as"
 			if( (dtype <> FB_DATATYPE_INVALID) or (tk = FB_TK_SUB) ) then
 				errReport( FB_ERRMSG_SYNTAXERROR )
 			end if
@@ -1772,6 +1778,7 @@ function cProcHeader _
 	dim as integer mode = any, stats = any, op = any, is_get = any, is_indexed = any
 	dim as integer priority = any
 	dim as integer mode_is_explicit = any
+	dim as string semantic_result_form = "special"
 	dim as LEX_LOCATION semantic_site
 	dim as LEX_LOCATION declaration_site = lexGetCurrentLocation( )
 	if( declaration_start <> NULL ) then declaration_site = *declaration_start
@@ -1799,6 +1806,11 @@ function cProcHeader _
 
 	proc = hPreAddHeaderProc( tk, parent, is_memberproc, @id, head_proc, _
 	                          attrib, pattrib, dtype, op )
+	if( tk = FB_TK_FUNCTION ) then
+		semantic_result_form = iif(dtype = FB_DATATYPE_INVALID, "implicit", "suffix")
+	elseif( tk = FB_TK_SUB ) then
+		semantic_result_form = "none"
+	end if
 
 	hParseProcHeaderAttributes( tk, options, is_memberproc, attrib, pattrib, _
 	                            mode, mode_is_explicit, palias )
@@ -1831,7 +1843,7 @@ function cProcHeader _
 
 	if( hFinishProcHeaderSignature( tk, parent, proc, options, is_memberproc, _
 	                               @id, attrib, pattrib, dtype, subtype, op, _
-	                               is_get, is_indexed ) = FALSE ) then
+	                               is_get, is_indexed, semantic_result_form ) = FALSE ) then
 		exit function
 	end if
 
@@ -1851,6 +1863,7 @@ function cProcHeader _
 			declaration_site.is_physical and= declaration_end.is_physical and _
 				(declaration_nonphysical = lexGetNonphysicalTokenCount( ))
 			fbSemanticModelExportDeclaration(proc, declaration_site, "procedure-prototype", id)
+			fbSemanticModelProcedureTyping(proc, tk, "prototype", semantic_result_form)
 		end if
 		return proc
 	end if
@@ -2102,6 +2115,7 @@ function cProcHeader _
 		declaration_site.is_physical and= declaration_end.is_physical and _
 			(declaration_nonphysical = lexGetNonphysicalTokenCount( ))
 		fbSemanticModelExportDeclaration(proc, declaration_site, "procedure-definition", id)
+		fbSemanticModelProcedureTyping(proc, tk, "definition", semantic_result_form)
 	end if
 
 	function = proc
@@ -2113,6 +2127,15 @@ sub cProcStmtBegin( byval attrib as FB_SYMBATTRIB, byval pattrib as FB_PROCATTRI
 	dim as integer tkn = any, is_nested = any
 	dim as FBSYMBOL ptr proc = any
 	dim as FB_CMPSTMTSTK ptr stk = any
+	'' Keep the written modifier before OPTION PROC's default and member
+	'' prototype attributes are applied. Selected PUBLIC alone cannot say
+	'' whether this definition actually documented its intended visibility.
+	dim as string semantic_visibility = "default"
+	if( attrib and FB_SYMBATTRIB_PUBLIC ) then
+		semantic_visibility = "public"
+	elseif( attrib and FB_SYMBATTRIB_PRIVATE ) then
+		semantic_visibility = "private"
+	end if
 
 	if( (attrib and (FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_PRIVATE)) = 0 ) then
 		if( env.opt.procpublic ) then
@@ -2183,6 +2206,7 @@ sub cProcStmtBegin( byval attrib as FB_SYMBATTRIB, byval pattrib as FB_PROCATTRI
 
 	'' ProcHeader
 	proc = cProcHeader( attrib, pattrib, is_nested, FB_PROCOPT_NONE, tkn, @declaration_start )
+	if( proc <> NULL ) then fbSemanticModelProcedureVisibility(proc, semantic_visibility)
 	if( proc = NULL ) then
 		'' Close namespace again if cProcHeader() opened it, for better
 		'' error recovery.

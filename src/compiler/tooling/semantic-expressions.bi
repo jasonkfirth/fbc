@@ -30,6 +30,14 @@ declare sub fbSemanticModelSelectedNumericOperands _
 	( byval operands as longint, byval left_expr as ASTNODE ptr, byval right_expr as ASTNODE ptr, _
 	  byval left_dtype as integer, byval right_dtype as integer )
 
+declare function fbSemanticModelCaptureSelectOperands(byref source as LEX_LOCATION) as longint
+
+declare sub fbSemanticModelSelectedCaseOperands _
+	( byval generation as longint, byval left_expr as ASTNODE ptr, byval right_expr as ASTNODE ptr, _
+	  byval left_dtype as integer, byval right_dtype as integer, byref kind as const string )
+
+declare function fbSemanticModelSelectOperandSnapshot(byval generation as longint) as string
+
 declare sub fbSemanticModelAssignmentTarget _
 	( byval expression_id as longint, byval dtype as integer, _
 	  byval subtype as FBSYMBOL ptr, byref assignment_kind as const string )

@@ -27,6 +27,8 @@
 #include once "tooling/semantic-hooks.bi"
 #include once "ast/ast.bi"
 
+declare sub fbSemanticModelParameterType(byval param as FBSYMBOL ptr, byref written_type as const string)
+
 declare sub fbSemanticModelExportBinding _
 	( _
 		byval sym as FBSYMBOL ptr, _
@@ -329,6 +331,7 @@ private function hParamDecl _
 			declaration_occurrence = fbSemanticModelExportParameterDeclaration(param, formal_first, formal_first, _
 				iif(isproto, "parameter-prototype", "parameter-definition"), "")
 			fbSemanticModelParameterModes(param, declaration_occurrence, FB_PARAMMODE_VARARG, 0, isproto, formal_first.macro_identity)
+			fbSemanticModelParameterType(param, "vararg")
 			return param
 
 		'' syntax error..
@@ -411,6 +414,7 @@ private function hParamDecl _
 		dtype  = FB_DATATYPE_INVALID
 	end if
 
+	dim as string semantic_written_type = iif(dtype = FB_DATATYPE_INVALID, "implicit", "suffix")
 	dimensions = 0
 	have_bounds = FALSE
 
@@ -453,6 +457,7 @@ private function hParamDecl _
 	'' (AS SymbolType)?
 	doskip = FALSE
 	if( lexGetToken( ) = FB_TK_AS ) then
+		semantic_written_type = "as"
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 		if( dtype <> FB_DATATYPE_INVALID ) then
 			hParamError( proc, id )
@@ -566,6 +571,7 @@ private function hParamDecl _
 	declaration_occurrence = fbSemanticModelExportParameterDeclaration(param, semantic_site, formal_first, _
 		iif(isproto, "parameter-prototype", "parameter-definition"), *id)
 	fbSemanticModelParameterModes(param, declaration_occurrence, mode, written_mode, isproto, semantic_site.macro_identity)
+	fbSemanticModelParameterType(param, semantic_written_type)
 
 	if( isproto = FALSE ) then
 		if( symbGetSizeOf( param ) > (env.pointersize * 4) ) then

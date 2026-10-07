@@ -16,6 +16,8 @@ declare function fbSemanticModelNextDetailIdentity( ) as longint
 declare function fbSemanticModelModuleIdentity( ) as longint
 declare sub fbSemanticModelBindContext( byref domain as const string, byval identity as longint )
 declare function fbSemanticModelNumber( byval value as longint ) as string
+
+declare sub fbSemanticModelExportSelectedExpression(byval expr as ASTNODE ptr, byref anchor as LEX_LOCATION)
 declare function fbSemanticModelEscape( byref value as const string ) as string
 declare sub fbSemanticModelAppendDetail( byref value as string )
 declare sub fbSemanticModelAppendProvenance( byref value as const string )

@@ -15,6 +15,9 @@ from semantic_flow import validate_flow, validate_sequence_branches
 from semantic_literals import validate_wide_literals
 from semantic_queries import validate_query_inputs
 from semantic_selects import validate_select_inputs
+from semantic_declarations import validate_declaration_types
+from semantic_procedures import validate_procedure_types
+from semantic_aggregate_access import validate_aggregate_access
 
 
 SCHEMA = "27"
@@ -457,6 +460,8 @@ class Model:
                 self.layouts[int(row[1])] = row
             elif tag in ("C", "K", "H"):
                 domains = ("symbol", "node", "expression")
+                if tag == "K" and row[3] == "procedure-written-visibility":
+                    domains += ("statement",)
                 if row[1] not in domains:
                     raise ValueError("Invalid metadata identity domain")
                 reference(row[1], row[2], nullable=False)
@@ -532,6 +537,8 @@ class Model:
                     if row[3].startswith("select-case-"):
                         if row[1] != "symbol" or row[3] in self.properties[key]:
                             raise ValueError("Duplicate or foreign SELECT input property")
+                        storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
+                    if row[1] == "statement":
                         storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
                     self.properties[key][row[3]] = row[4]
                 else:
@@ -811,6 +818,7 @@ class Model:
                 flag(row[11])
                 preprocessing_location(row, 12)
                 self.statements[identity] = row
+                subject_modules["statement", identity] = int(row[7])
                 statement_stack.append(identity)
             elif tag == "STE":
                 identity = number(row[1], 1)
@@ -1168,7 +1176,7 @@ class Model:
         for domain, identity in references:
             available = (self.symbols if domain == "symbol" else self.nodes if domain == "node" else
                          declaration_ids if domain == "declaration" else range(1, counts["B"] + 1)
-                         if domain == "binding" else expression_ids)
+                         if domain == "binding" else self.statements if domain == "statement" else expression_ids)
             if identity not in available:
                 raise ValueError(f"Dangling {domain} reference: {identity}")
         for subject, statement in self.statement_owners.items():
@@ -1210,6 +1218,9 @@ class Model:
             self.validate_storage_receipts(subject_modules)
             validate_query_inputs(self, number, subject_modules)
             validate_select_inputs(self, number, subject_modules)
+            validate_declaration_types(self, number, subject_modules)
+            validate_procedure_types(self, number, subject_modules)
+            validate_aggregate_access(self, number, subject_modules)
             validate_wide_literals(self, number, subject_modules)
             self.validate_for_steps(subject_modules)
             self.validate_for_inputs(subject_modules)

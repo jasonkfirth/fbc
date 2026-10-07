@@ -89,6 +89,10 @@ type FB_CMPSTMT_PROC
 	last            as FB_CMPSTMTSTK_ ptr
 end type
 
+'' Accepted AS CONST selections share a bounded parser table. The semantic
+'' observation writer checks the same bound before advertising completion.
+const FB_MAXJUMPTBSLOTS = 8192
+
 type FB_CMPSTMT_SELCONST
 	base            as integer
 	deflabel        as FBSYMBOL ptr

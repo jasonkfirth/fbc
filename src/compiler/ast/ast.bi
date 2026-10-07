@@ -692,6 +692,11 @@ declare function astNewBOPWithOperands _
 	( byval op as integer, byval l as ASTNODE ptr, byval r as ASTNODE ptr, _
 	  byval ex as FBSYMBOL ptr, byval options as AST_OPOPT, byval semantic_operands as longint ) as ASTNODE ptr
 
+'' CASE comparisons observe selected inputs without inventing parsed operators.
+declare function astNewSelectBOP _
+	( byval op as integer, byval l as ASTNODE ptr, byval r as ASTNODE ptr, _
+	  byval ex as FBSYMBOL ptr, byval options as AST_OPOPT, byval case_operands as longint ) as ASTNODE ptr
+
 declare function astNewSelfBOP _
 	( _
 		byval op as integer, _

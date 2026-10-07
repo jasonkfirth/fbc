@@ -14,6 +14,7 @@ declare sub fbSemanticModelExportExpression _
 	  byval nonphysical_tokens_at_start as longint, byval nonphysical_tokens_at_end as longint, _
 	  byval semantic_operator_override as integer = -1, byval force_nonphysical_range as integer = FALSE )
 #include once "tooling/semantic-constructs.bi"
+#include once "tooling/semantic-expressions.bi"
 #include once "parser/parser.bi"
 
 '' -------------------------------------------------------------------------
@@ -40,6 +41,10 @@ type SEMANTIC_SOURCE_COMPOUND
 	select_clauses as longint
 	select_alternatives as integer
 	select_else as integer
+	select_is_const as integer
+	select_pending_lowering as integer
+	select_next_bound as integer
+	select_table_seen as integer
 end type
 
 const SEMANTIC_CONSTRUCT_MAX_DEPTH = 65536
@@ -195,6 +200,10 @@ function fbSemanticModelConstructBegin( byval token as integer ) as longint
 		.select_clauses = 0
 		.select_alternatives = 0
 		.select_else = FALSE
+		.select_is_const = FALSE
+		.select_pending_lowering = 0
+		.select_next_bound = 0
+		.select_table_seen = FALSE
 	end with
 	semantic_compound_depth += 1
 	fbSemanticModelAppendProvenance("BLK" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(parent) + _
@@ -213,7 +222,8 @@ sub fbSemanticModelConstructEnd( byval identity as longint, byref ending as LEX_
 	if( fbSemanticModelFullEnabled( ) ) then
 		with semantic_compounds[semantic_compound_depth - 1]
 			if( .select_owner > 0 ) then
-				if( .select_alternatives <> 0 ) then
+				if( (.select_alternatives <> 0) or (.select_pending_lowering <> 0) or _
+					(.select_is_const and (.select_table_seen = FALSE)) ) then
 					fbSemanticModelFailAt("unfinished select alternatives")
 				else
 					fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.select_owner) + _
@@ -277,6 +287,7 @@ sub fbSemanticModelSelectInput( byval construct as longint, byval expression as 
 		exit sub
 	end if
 	observed->select_owner = owner
+	observed->select_is_const = (is_const <> 0)
 	dim as string value = fbSemanticModelNumber(observed->statement) + TABCHAR + fbSemanticModelNumber(expression) + _
 		TABCHAR + fbSemanticModelNumber(variable) + TABCHAR + iif(is_const, "constant", "normal")
 	fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(owner) + _
@@ -287,6 +298,7 @@ sub fbSemanticModelSelectClause( byval construct as longint, byval is_else as in
 	dim as SEMANTIC_SOURCE_COMPOUND ptr observed = hSelectObservation(construct)
 	if( observed = NULL ) then exit sub
 	if( (observed->select_owner = 0) or observed->select_else or (alternatives < 0) or _
+		(observed->select_pending_lowering <> 0) or _
 		(alternatives <> observed->select_alternatives) or ((alternatives = 0) <> (is_else <> 0)) ) then
 		fbSemanticModelFailAt("invalid select clause")
 		exit sub
@@ -304,12 +316,16 @@ sub fbSemanticModelSelectAlternative( byval construct as longint, byval ordinal 
 	dim as SEMANTIC_SOURCE_COMPOUND ptr observed = hSelectObservation(construct)
 	if( observed = NULL ) then exit sub
 	if( (observed->select_owner = 0) or observed->select_else or (ordinal <> observed->select_alternatives + 1) or _
+		(observed->select_pending_lowering <> 0) or _
 		(first_expression <= 0) or ((kind <> "value") and (kind <> "range") and (kind <> "is")) or _
 		((kind = "range") <> (last_expression > 0)) ) then
 		fbSemanticModelFailAt("invalid select alternative")
 		exit sub
 	end if
 	observed->select_alternatives = ordinal
+	observed->select_pending_lowering = 1
+	if( (observed->select_is_const = FALSE) and (kind = "range") ) then observed->select_pending_lowering = 2
+	observed->select_next_bound = 1
 	dim as string value = fbSemanticModelNumber(construct) + TABCHAR + kind + TABCHAR + fbSemanticModelNumber(operation) + _
 		TABCHAR + fbSemanticModelNumber(first_expression) + TABCHAR + fbSemanticModelNumber(last_expression) + _
 		TABCHAR + fbSemanticModelNumber(abs(is_last <> 0))
@@ -519,6 +535,75 @@ sub fbSemanticModelScalarForStepSelection _
 	dim as string statement_text = fbSemanticModelNumber(statement)
 	fbSemanticModelAppendProvenance(prefix + "for-step-selected-dtype:" + statement_text + TABCHAR + fbSemanticModelNumber(dtype))
 	fbSemanticModelAppendProvenance(prefix + "for-step-selected-expression:" + statement_text + TABCHAR + fbSemanticModelNumber(expression_id))
+end sub
+
+'' -------------------------------------------------------------------------
+'' Selected CASE comparisons and constant-table conversions
+'' -------------------------------------------------------------------------
+
+'' Matching direction is supplied by the branch-lowering route. Negating a
+'' relation in a consumer would lose the last-alternative behavior for NaN.
+sub fbSemanticModelSelectComparison _
+	( byval construct as longint, byval ordinal as integer, byval bound as integer, _
+	  byval operation as integer, byval matches_on_jump as integer, byval generation as longint )
+	dim as SEMANTIC_SOURCE_COMPOUND ptr observed = hSelectObservation(construct)
+	if( observed = NULL ) then exit sub
+	if( observed->select_is_const or (ordinal <> observed->select_alternatives) or _
+		(observed->select_pending_lowering <= 0) or (bound <> observed->select_next_bound) or _
+		(operation < AST_OP_EQ) or (operation > AST_OP_LE) ) then
+		fbSemanticModelFailAt("invalid selected case comparison")
+		exit sub
+	end if
+	dim as string operands = fbSemanticModelSelectOperandSnapshot(generation)
+	if( len(operands) = 0 ) then exit sub
+	dim as string value = fbSemanticModelNumber(construct) + TABCHAR + fbSemanticModelNumber(operation) + _
+		TABCHAR + iif(matches_on_jump, "jump", "fallthrough") + TABCHAR + operands
+	fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(observed->select_owner) + _
+		TABCHAR + "select-case-comparison:" + fbSemanticModelNumber(fbSemanticModelCurrentStatement( )) + ":" + _
+		fbSemanticModelNumber(ordinal) + ":" + fbSemanticModelNumber(bound) + TABCHAR + fbSemanticModelEscape(value))
+	observed->select_pending_lowering -= 1
+	observed->select_next_bound += 1
+end sub
+
+'' cConstIntExprRanged supplies the actual conversion result as a 64-bit
+'' unsigned bit pattern. Negative values must retain that representation:
+'' passing them through the signed identity formatter would change the wire.
+'' The parser's initial bias permits signed ranges crossing zero to wrap in
+'' this unsigned space without asking the consumer to redo type promotion.
+sub fbSemanticModelSelectConstant _
+	( byval construct as longint, byval ordinal as integer, byval dtype as integer, _
+	  byval first_value as ulongint, byval last_value as ulongint, byval bias as ulongint )
+	dim as SEMANTIC_SOURCE_COMPOUND ptr observed = hSelectObservation(construct)
+	if( observed = NULL ) then exit sub
+	if( (observed->select_is_const = FALSE) or (ordinal <> observed->select_alternatives) or _
+		(observed->select_pending_lowering <> 1) ) then
+		fbSemanticModelFailAt("invalid selected case constant")
+		exit sub
+	end if
+	dim as string value = fbSemanticModelNumber(construct) + TABCHAR + fbSemanticModelNumber(dtype) + _
+		TABCHAR + ltrim(str(first_value)) + TABCHAR + ltrim(str(last_value)) + TABCHAR + ltrim(str(bias))
+	fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(observed->select_owner) + _
+		TABCHAR + "select-case-constant:" + fbSemanticModelNumber(fbSemanticModelCurrentStatement( )) + ":" + _
+		fbSemanticModelNumber(ordinal) + TABCHAR + fbSemanticModelEscape(value))
+	observed->select_pending_lowering = 0
+end sub
+
+sub fbSemanticModelSelectTable _
+	( byval construct as longint, byval dtype as integer, byval storage as FBSYMBOL ptr, _
+	  byval bias as ulongint, byval span as ulongint, byval count as integer )
+	dim as SEMANTIC_SOURCE_COMPOUND ptr observed = hSelectObservation(construct)
+	if( observed = NULL ) then exit sub
+	if( (observed->select_is_const = FALSE) or observed->select_table_seen or _
+		(observed->select_pending_lowering <> 0) or (storage = NULL) or (count < 0) or _
+		(count > FB_MAXJUMPTBSLOTS) or (span >= FB_MAXJUMPTBSLOTS) ) then
+		fbSemanticModelFailAt("invalid selected case table")
+		exit sub
+	end if
+	dim as string value = fbSemanticModelNumber(dtype) + TABCHAR + fbSemanticModelNumber(symbGetFullType(storage)) + _
+		TABCHAR + ltrim(str(bias)) + TABCHAR + ltrim(str(span)) + TABCHAR + fbSemanticModelNumber(count)
+	fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(observed->select_owner) + _
+		TABCHAR + "select-case-table:" + fbSemanticModelNumber(construct) + TABCHAR + fbSemanticModelEscape(value))
+	observed->select_table_seen = TRUE
 end sub
 
 '' end of tooling/semantic-constructs.bas

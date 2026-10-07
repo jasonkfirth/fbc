@@ -1092,28 +1092,39 @@ bound overlapping nested intervals. These observations describe parsing roles
 without changing AST nodes or generated code. Ordinary dynamic-string LEN
 inputs remain evaluated and do not acquire these TYPEOF/SIZEOF markers.
 
-## Selected C-backend wide literal prefixes
+## Selected target wide literal prefixes
 
 Full GCC models advertise `c-target-wide-literal-prefixes` as available.
-Compact modes and other backends mark it unavailable. Each literal WSTRING
-variable retains three symbol properties:
+Full GCC, GAS and GAS64 models also advertise `target-wide-literal-prefixes`.
+The original C capability remains available only for GCC, so older readers
+retain its existing meaning. Compact modes and unsupported backends mark the
+general capability unavailable. Each literal WSTRING variable retains three
+symbol properties:
 
     literal-target-wide-unit-bytes  1, 2 or 4
     literal-target-wide-kind        terminated or unterminated
     literal-target-wide-prefix      zero or more eight-digit uppercase hex units
 
-The prefix stops before the first null unit. It uses the C backend's literal
-decoder and selected target width. The original `C wide-units` payload remains
-separate: host wide units do not establish the runtime target representation.
+The prefix stops before the first null unit. GCC uses its literal decoder and
+selected target width. GAS and GAS64 decode the actual octal byte stream
+returned by their shared HESCAPEW emitter into target x86 WCHAR units. They
+append a complete zero WCHAR after that stream. The original `C wide-units`
+payload remains separate: host wide units do not establish the runtime target
+representation.
 For example, a supplementary scalar uses a surrogate pair on Win32 but one
 unit on a target with four-byte WSTRING units. Invalid scalars retain the
 backend's actual emitted representation rather than an assumed replacement.
+Backend differences remain visible. For example, GAS retains both explicitly
+escaped surrogate units on a UTF-32 target, while the C builder's stored
+literal length can limit that same input to its first unit. The observations
+do not normalize or change those emitted bytes.
 
 Readers require all three properties on a literal variable, its original
 wide value, the module capability and matching primitive WSTRING width.
 Each prefix unit must be nonzero and fit the selected width. Payload and
-cumulative work limits bound validation. This observation leaves C emission
-unchanged and does not infer the contents of mutable wide storage.
+cumulative work limits bound validation. Either available capability establishes
+coverage. This observation leaves C and assembly emission unchanged and does
+not infer the contents of mutable wide storage.
 
 ## Accepted SELECT CASE inputs
 
@@ -1149,6 +1160,45 @@ End counts distinguish a complete selection from missing clauses or alternatives
 The ordinary parser's 1024-entry table is checked before indexing; AS CONST
 retains its separate 8192-slot jump-table limit. These facts describe grammar
 ownership and selected storage, not inferred side effects or constant coverage.
+
+Full models additionally advertise `select-case-lowering-inputs`. Compact models
+mark it unavailable. Every ordinary alternative then has one selected comparison
+receipt, or two for a range. Every AS CONST alternative has a converted constant
+receipt, and its SELECT has a final table receipt:
+
+    select-case-comparison:statement-ID:alternative-ordinal:bound-ordinal
+        construct-ID, branch-operation, jump|fallthrough, scalar|narrow|wide|unicode|unclassified,
+        selected-left-dtype, selected-right-dtype, selected-left-expression-ID, selected-right-expression-ID
+    select-case-constant:statement-ID:alternative-ordinal
+        construct-ID, case-conversion-dtype, converted-first-value, converted-last-value, initial-bias
+    select-case-table:construct-ID
+        case-conversion-dtype, selected-storage-dtype, final-bias, span, occupied-slot-count
+
+Selected comparison operands have logical E anchors and belong to the CASE
+statement. Scalar observations occur after FBC's operand coercion. Text observations
+occur before the comparison becomes a runtime call followed by an integer test.
+The selected dtypes describe the actual operational types, which can differ from
+the E snapshot type for character dereferences or bit fields. Generated operand
+snapshots keep distinct identities even when two casts have the same visible E
+shape. They do not introduce a parsed binary EX operator for CASE grammar.
+
+`jump` means that the emitted relation accepts this alternative; `fallthrough`
+means that it rejects the alternative. Range lower bounds use a less-than
+failure branch. Upper bounds use greater-than failure for the last alternative,
+or less-than-or-equal success otherwise. The same last-alternative inversion
+applies to value and IS clauses. Consumers must preserve this disposition for
+unordered floating inputs instead of assuming a negated relation has the same
+meaning. Overloaded or recursively coerced UDT comparisons retain an explicit
+`unclassified` receipt with zero types and operand IDs.
+
+Converted AS CONST values and biases are canonical unsigned 64-bit decimal
+bit patterns. Negative constants retain sign extension; these values are not
+32-bit wire identities. Subtraction of a bias uses modulo 2^64 arithmetic.
+The initial bias is the first converted value minus 8192, before final table
+rebiasing. The final bias and span describe the actual selected table. Its
+occupied-slot count excludes gaps. An ELSE-only table has zero bias, span and
+slots. Complete readers reject missing bounds, mixed modes, foreign operand
+owners, duplicate slots, out-of-range conversions and inconsistent table totals.
 
 ## Parsed addresses and storage families
 
@@ -1584,5 +1634,95 @@ All consumers see the actual edge; predecessor proofs cannot mistake its target
 for a block with only one fallthrough predecessor. Eight compiler checks passed
 with byte-identical generated C on Windows and Linux. Both readers passed 459
 schema cases, including damaged groups and legacy capability handling.
+
+## Original declaration typing inputs
+
+Full models advertise `declaration-typing-inputs`. Variable declarations handled
+by the DIM, STATIC, COMMON and EXTERN grammar, and CONST declarations, retain a
+separate group for each accepted parser dispatch. REDIM operations, FOR counter
+syntax, auto-typed VAR and ordinary instance fields are outside this group.
+Each group uses the procedure identity, or the global namespace when there is
+no procedure. Its opening detail position supplies the group identity:
+
+```
+K symbol owner declaration-type-group:group statement-ID<TAB>kind
+K symbol owner declaration-type-input:group:ordinal symbol-ID<TAB>written-type<TAB>initializer-kind<TAB>source-context-ID
+K symbol owner declaration-type-end:group count
+```
+
+The payload tabs are escaped by the normal K wire encoding. Ordinals start at
+one and completion covers every accepted symbol in the original list. A leading
+AS clause belongs to every symbol in that list. Per-symbol AS clauses and active
+identifier suffixes remain separate parser choices. Variable choices are `as`,
+`suffix` and `implicit`; constant choices are `as`, `suffix` and `inferred`.
+The choices are captured before default typing or initializer conversion changes
+the selected data type. An ignored suffix in modern FB does not become a type.
+
+Initializer kinds are zero for no explicit initializer, one for ANY, two for
+an accepted value or aggregate initializer, and three for an actual scalar
+constant whose selected value is zero, one or signed minus one (including
+Boolean true). Unsigned maxima and all-ones pointer addresses are value inputs. The third kind requires
+one TYPEINI assignment with the same full type and subtype as its root and no
+array dimensions. This preserves the simple-value style exception using native
+values, including folded constants and casts. A one-field record retains its
+aggregate initializer semantics. The inspection neither changes nor owns ASTs.
+CONST inputs always have initializer kind two.
+
+An identifier's actual location is attached to its source context with the
+input key as its LOC role. SRC preserves the include spelling; FILE supplies
+the captured canonical path for reporting. Available expansion origins use MR
+on the group owner with the same role. A macro's final replacement token can
+lack an individual physical location or expansion identity. The accepted group
+statement remains an honest reporting anchor; it does not supply an editable
+identifier range.
+
+Each original parser formal carrying `formal-span-kind` also retains
+`K symbol original-parameter formal-written-type as|suffix|implicit|vararg`.
+These identities precede prototype merging and callback interning. Canonical G
+records alone cannot recover the original grammar choice. Varargs retain their
+own kind; compiler-created receivers have no written-formal observation.
+
+Readers require complete and unique groups, bounded canonical identities,
+contiguous ordinals, same-module statements, symbols and source contexts, valid
+classes and initializer choices, and full written-formal coverage. Compact
+exports advertise this capability as unavailable and omit these observations.
+Older models without the capability remain valid and do not establish a type
+spelling policy. All observation state belongs to the existing parser thread;
+no AST allocation, parser choice, emitted instruction or ABI is changed.
+
+## Original procedure typing inputs
+
+Full models advertise `procedure-typing-inputs`. Each accepted named prototype
+or definition retains its original result-type grammar before canonical
+procedure reuse. Definitions also retain the written visibility before
+`OPTION PRIVATE`, `OPTION PUBLIC` or member defaults select the final scope:
+
+```
+K symbol selected-procedure procedure-typing-input:identity statement-ID<TAB>role<TAB>kind<TAB>result-form<TAB>exported
+K symbol selected-procedure procedure-written-visibility:statement-ID default|public|private
+```
+
+The first key uses a unique detail identity. Its payload tabs use normal K
+escaping. Roles are `prototype` and `definition`; kinds are `sub`, `function`,
+`property`, `operator`, `constructor` and `destructor`. A SUB has result form
+`none`; a FUNCTION retains `as`, `suffix` or `implicit`. Other procedure kinds
+use `special`. The export flag is zero or one at that accepted occurrence.
+An inactive identifier suffix in modern FB does not become a written type.
+
+These observations belong to individual accepted headers. A typed prototype
+and an implicit definition can share the same selected symbol while retaining
+different forms. Completed T/F metadata supplies the selected type, kind and
+actual lexical owner; it cannot reconstruct the original grammar. In the same
+way, a final private T visibility does not prove that PRIVATE was written.
+Anonymous callback signatures do not create named-header observations.
+
+Readers require unique bounded identities, accepted same-module statements,
+selected procedure symbols and kinds, and visibility for every definition.
+Prototypes have no written-visibility record. Named DCL/OWN receipts and accepted
+procedure statement routes establish complete coverage. Compact exports mark
+the capability unavailable and omit both properties. Older models without
+the capability remain valid but cannot establish these spelling policies.
+The existing parser thread owns the observations; no AST ownership, language
+choice, emitted instruction or ABI changes.
 
 <!-- end of compiler-semantic-model.md -->

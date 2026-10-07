@@ -21,6 +21,18 @@ declare sub fbSemanticModelSelectInput( byval construct as longint, byval expres
 declare sub fbSemanticModelSelectClause( byval construct as longint, byval is_else as integer, byval alternatives as integer )
 declare sub fbSemanticModelSelectAlternative( byval construct as longint, byval ordinal as integer, byref kind as const string, byval operation as integer, byval first_expression as longint, byval last_expression as longint, byval is_last as integer )
 
+declare sub fbSemanticModelSelectComparison _
+	( byval construct as longint, byval ordinal as integer, byval bound as integer, _
+	  byval operation as integer, byval matches_on_jump as integer, byval generation as longint )
+
+declare sub fbSemanticModelSelectConstant _
+	( byval construct as longint, byval ordinal as integer, byval dtype as integer, _
+	  byval first_value as ulongint, byval last_value as ulongint, byval bias as ulongint )
+
+declare sub fbSemanticModelSelectTable _
+	( byval construct as longint, byval dtype as integer, byval storage as FBSYMBOL ptr, _
+	  byval bias as ulongint, byval span as ulongint, byval count as integer )
+
 #endif
 
 '' end of tooling/semantic-constructs.bi

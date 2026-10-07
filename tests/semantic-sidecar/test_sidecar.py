@@ -566,6 +566,34 @@ class SidecarTests(unittest.TestCase):
         self.assertFalse(any(row[15].casefold() == "integer" for row in facts),
                          "the constant index must not claim the full pointer-index range")
 
+    def test_procedure_visibility_uses_valid_statement_owners(self) -> None:
+        sources = [self.source("private sub first_proc()\nend sub\n", "first.bas"),
+                   self.source("private sub second_proc()\nend sub\n", "second.bas")]
+        _, path = self.invoke(sources)
+        text = path.read_text(encoding="utf-8")
+        model = Model(text)
+        receipts = [row for row in model.records["K"]
+                    if row[3] == "procedure-written-visibility"]
+        self.assertEqual(len(receipts), 2)
+        self.assertTrue(all(row[1] == "statement" and int(row[2]) in model.statements
+                            for row in receipts))
+        rows = [line.split("\t") for line in text.splitlines()]
+        for field, value in ((0, "C"), (1, "symbol"), (2, "999999"), (3, "unknown-property")):
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                changed = [row.copy() for row in rows]
+                next(row for row in changed if row[0] == "K"
+                     and row[3] == "procedure-written-visibility")[field] = value
+                Model("\n".join("\t".join(row) for row in changed) + "\n")
+        # Each receipt stays in the detail stream of its owning module.
+        # Swapping complete owners preserves valid IDs but violates that boundary.
+        changed = [row.copy() for row in rows]
+        visibility = [row for row in changed if row[0] == "K"
+                      and row[3] == "procedure-written-visibility"]
+        visibility[0][2], visibility[1][2] = visibility[1][2], visibility[0][2]
+        visibility[0][4], visibility[1][4] = visibility[1][4], visibility[0][4]
+        with self.assertRaisesRegex(ValueError, "Storage receipt belongs to another module"):
+            Model("\n".join("\t".join(row) for row in changed) + "\n")
+
     def test_pointer_intrinsic_prefix_before_closing_parenthesis_is_not_physical(self) -> None:
         source = self.source("dim value as integer = 1\n"
                              "dim text as string = \"x\"\n"
@@ -3470,6 +3498,156 @@ print SEM_EMPTY joined3
                 with self.assertRaises(ValueError):
                     Model("\n".join("\t".join(row) for row in changed) + "\n")
 
+    def test_original_declaration_types_preserve_native_choices_and_emission(self) -> None:
+        source = self.fixture("declaration-typing.bas")
+        for backend, target in (("gas", "win32"), ("gas64", "win64"), ("gcc", "linux-x86_64")):
+            with self.subTest(backend=backend, target=target):
+                extra = ("-target", target)
+                suffix = ".c" if backend == "gcc" else ".asm"
+                self.invoke([source], backend=backend, mode="off", extra=extra)
+                original = source.with_suffix(suffix).read_bytes()
+                model = self.compile(source, backend=backend, extra=extra)
+                self.assertEqual(original, source.with_suffix(suffix).read_bytes())
+                self.assertEqual(model.capabilities[1]["declaration-typing-inputs"], "available")
+                values = {}
+                for row in model.records["K"]:
+                    if row[3].startswith("declaration-type-input:"):
+                        identity, written, initializer, context = row[4].split("\t")
+                        values[model.symbols[int(identity)][2]] = written, initializer
+                self.assertEqual(values["IMPLICITVALUE"], ("implicit", "0"))
+                self.assertEqual(values["SUFFIXVALUE"], ("suffix", "0"))
+                self.assertEqual(values["EXPLICITVALUE"], ("as", "0"))
+                self.assertEqual(values["INFERREDVALUE"], ("inferred", "2"))
+                self.assertEqual(values["SUFFIXCONSTANT"], ("suffix", "2"))
+                self.assertEqual(values["SIMPLEZERO"], ("as", "3"))
+                self.assertEqual(values["SIMPLEONE"], ("as", "3"))
+                self.assertEqual(values["COMPLEXVALUE"], ("as", "2"))
+                self.assertEqual(values["DISABLEDINIT"], ("as", "1"))
+                self.assertEqual(values["ARRAYVALUE"], ("as", "2"))
+                self.assertEqual(values["RECORDVALUE"], ("as", "2"))
+                self.assertEqual(values["UNSIGNEDMAXIMUM"], ("as", "2"))
+                formal_types = {properties.get("declaration-name"): properties["formal-written-type"]
+                                for properties in model.properties.values() if "formal-written-type" in properties}
+                self.assertEqual(formal_types["bodyValue"], "implicit")
+                self.assertEqual(formal_types["explicitFormal"], "as")
+                self.assertEqual(formal_types["suffixFormal"], "suffix")
+                self.assertIn("vararg", formal_types.values())
+                for mode in ("bindings", "expressions"):
+                    compact = self.compile(source, backend=backend, mode=mode, extra=extra)
+                    self.assertEqual(original, source.with_suffix(suffix).read_bytes())
+                    self.assertEqual(compact.capabilities[1]["declaration-typing-inputs"], "unavailable")
+                    self.assertFalse(any(key.startswith("declaration-type-") or key == "formal-written-type"
+                                         for properties in compact.properties.values() for key in properties))
+
+    def test_target_wide_literal_prefixes_follow_selected_backend_bytes(self) -> None:
+        source = self.fixture("target-wide-prefixes.bas")
+        for backend, target, unit_bytes in (("gas", "win32", 2), ("gas64", "win64", 2),
+                                            ("gas64", "linux-x86_64", 4), ("gcc", "linux-x86_64", 4)):
+            suffix = ".c" if backend == "gcc" else ".asm"
+            with self.subTest(backend=backend, target=target):
+                extra = ("-target", target)
+                self.invoke([source], backend=backend, mode="off", extra=extra)
+                baseline = source.with_suffix(suffix).read_bytes()
+                model = self.compile(source, backend=backend, extra=extra)
+                self.assertEqual(source.with_suffix(suffix).read_bytes(), baseline)
+                self.assertEqual(model.capabilities[1]["target-wide-literal-prefixes"], "available")
+                self.assertEqual(model.capabilities[1]["c-target-wide-literal-prefixes"],
+                                 "available" if backend == "gcc" else "unavailable")
+                properties = [item for (domain, _), item in model.properties.items()
+                              if domain == "symbol" and "literal-target-wide-prefix" in item]
+                prefixes = [item["literal-target-wide-prefix"] for item in properties]
+                for expected in ("", "00000041", "000020AC"):
+                    self.assertIn(expected, prefixes)
+                # GAS emits the entire escaped byte stream. The C builder's
+                # stored target length limits this explicitly written pair to
+                # its first surrogate on a UTF-32 target. Observe that existing
+                # backend difference instead of normalizing the exported text.
+                self.assertIn("0000D83D" if backend == "gcc" and unit_bytes == 4 else
+                              "0000D83D0000DE00", prefixes)
+                self.assertIn("0000D83D0000DE00" if unit_bytes == 2 else "0001F600", prefixes)
+                self.assertTrue(all(item["literal-target-wide-unit-bytes"] == str(unit_bytes) for item in properties))
+                for mode in ("bindings", "expressions"):
+                    compact = self.compile(source, backend=backend, extra=extra, mode=mode)
+                    self.assertEqual(compact.capabilities[1]["target-wide-literal-prefixes"], "unavailable")
+                    self.assertFalse(any("literal-target-wide-prefix" in item for item in compact.properties.values()))
+                    self.assertEqual(source.with_suffix(suffix).read_bytes(), baseline)
+
+    def test_select_case_lowering_retains_selected_types_and_unsigned_bounds(self) -> None:
+        source = self.fixture("select-case-lowering.bas")
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                model = self.compile(source, backend=backend)
+                self.assertEqual(model.capabilities[1]["select-case-lowering-inputs"], "available")
+                properties = {key: value.split("\t") for group in model.properties.values()
+                              for key, value in group.items() if key.startswith("select-case-")}
+                comparisons = [fields for key, fields in properties.items() if key.startswith("select-case-comparison:")]
+                self.assertEqual(Counter(fields[3] for fields in comparisons),
+                                 {"scalar": 7, "narrow": 3, "wide": 3, "unicode": 3})
+                scalars = [fields for fields in comparisons if fields[3] == "scalar"]
+                unsigned_type = "9" if model.records["Q"][0][6] == "8" else "14"
+                self.assertEqual([fields[4:6] for fields in scalars],
+                                 [["8", "8"]] * 2 + [["16", "16"]] * 3 + [[unsigned_type, unsigned_type]] * 2)
+                # Distinct generated casts must retain the selector and call
+                # origins even when their type, range and AST class coincide.
+                self.assertTrue(all(fields[6] != fields[7] for fields in comparisons))
+                expressions = {int(row[1]): row for row in model.records["E"]}
+                unsigned_literal = scalars[-2][7]
+                self.assertEqual(model.constants["expression", int(unsigned_literal)],
+                                 ("unsigned", "18446744073709551615"))
+                self.assertEqual(expressions[int(unsigned_literal)][12], unsigned_type)
+                tables = [fields for key, fields in properties.items() if key.startswith("select-case-table:")]
+                self.assertEqual(tables, [["13", unsigned_type, "18446744073709551614", "4", "5"],
+                                          ["14", unsigned_type, "18446744073709551614", "1", "2"],
+                                          ["13", unsigned_type, "0", "0", "0"]])
+                constants = [fields[1:4] for key, fields in properties.items() if key.startswith("select-case-constant:")]
+                self.assertEqual(constants, [["13", "18446744073709551614", "2"],
+                                             ["14", "18446744073709551614", "18446744073709551615"]])
+
+    def test_select_case_lowering_preserves_character_enum_and_udt_routes(self) -> None:
+        source = self.fixture("select-case-coercions.bas")
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                model = self.compile(source, backend=backend)
+                properties = {key: value.split("\t") for group in model.properties.values()
+                              for key, value in group.items() if key.startswith("select-case-")}
+                comparisons = [fields[1:] for key, fields in properties.items() if key.startswith("select-case-comparison:")]
+                self.assertEqual([fields[:5] for fields in comparisons],
+                                 [["45", "jump", "scalar", "9", "9"],
+                                  ["48", "fallthrough", "scalar", "9", "9"],
+                                  ["48", "fallthrough", "scalar", "8", "8"],
+                                  ["48", "fallthrough", "unclassified", "0", "0"]])
+                self.assertEqual(comparisons[-1][5:], ["0", "0"])
+                constants = [fields[1:4] for key, fields in properties.items() if key.startswith("select-case-constant:")]
+                self.assertEqual(constants, [["3", "65", "65"], ["10", "1", "2"]])
+
+    def test_select_case_lowering_rejects_partial_or_inconsistent_receipts(self) -> None:
+        _, path = self.invoke([self.fixture("select-case-lowering.bas")])
+        rows = [line.split("\t") for line in path.read_text(encoding="ascii").splitlines()]
+        indexes = {kind: next(index for index, row in enumerate(rows)
+                             if row[0] == "K" and row[3].startswith("select-case-" + kind + ":"))
+                   for kind in ("comparison", "constant", "table")}
+        changes = []
+        for kind, position in indexes.items():
+            changes.append([row.copy() for index, row in enumerate(rows) if index != position])
+            duplicate = [row.copy() for row in rows]
+            duplicate.insert(-1, rows[position].copy())
+            changes.append(duplicate)
+        for kind, field, value in (("comparison", 1, "48"), ("comparison", 2, "fallthrough"),
+                                   ("comparison", 3, "unclassified"), ("comparison", 6, "0"),
+                                   ("constant", 1, "14"), ("constant", 2, "18446744073709551616"),
+                                   ("constant", 4, "0"), ("table", 2, "0"), ("table", 3, "8192"),
+                                   ("table", 4, "0")):
+            changed = [row.copy() for row in rows]
+            fields = unescape(changed[indexes[kind]][4]).split("\t")
+            fields[field] = value
+            changed[indexes[kind]][4] = "%09".join(fields)
+            changes.append(changed)
+        for index, changed in enumerate(changes):
+            with self.subTest(mutation=index):
+                changed[-1][12] = str(sum(row[0] in DETAIL_TAGS for row in changed))
+                with self.assertRaises(ValueError):
+                    Model("\n".join("\t".join(row) for row in changed) + "\n")
+
     def test_select_case_alternatives_respect_the_parser_table_limit(self) -> None:
         for count in (1024, 1025):
             header = ("'' Project: FreeBASIC semantic sidecar tests\n'' File: case-limit.bas\n"
@@ -3488,5 +3666,95 @@ print SEM_EMPTY joined3
                 else:
                     rejected, _ = self.invoke([source], success=False)
                     self.assertIn("too many labels", (rejected.stdout + rejected.stderr).lower())
+
+    def test_original_procedure_headers_keep_typing_and_visibility_choices(self) -> None:
+        for backend, target in (("gas", "win32"), ("gas64", "win64"), ("gcc", "linux-x86_64")):
+            with self.subTest(backend=backend, target=target):
+                source = self.fixture("procedure-typing.bas")
+                output = self.working / ("procedure-emission" + (".c" if backend == "gcc" else ".asm"))
+                extra = ("-target", target, "-o", str(output))
+                self.invoke([source], mode="off", backend=backend, extra=extra)
+                original = output.read_bytes()
+                model = self.compile(source, backend=backend, extra=extra)
+                self.assertEqual(output.read_bytes(), original)
+                headers = []
+                visibility = {}
+                for (domain, owner), properties in model.properties.items():
+                    for key, value in properties.items():
+                        if key.startswith("procedure-typing-input:"):
+                            headers.append((owner, value.split("\t")))
+                        elif key.startswith("procedure-written-visibility:"):
+                            visibility[owner, int(key.split(":")[1])] = value
+                self.assertEqual(len(headers), 11)
+                self.assertEqual(len(visibility), 9)
+                named = {}
+                for owner, fields in headers:
+                    named.setdefault(model.symbols[owner][2].casefold(), []).append((owner, fields))
+                for proc_name, prototype_form, definition_form in (
+                    ("originalprototype", "suffix", "as"), ("typedprototype", "as", "implicit")):
+                    observations = named[proc_name]
+                    self.assertEqual(len(observations), 2)
+                    self.assertEqual(observations[0][0], observations[1][0])
+                    self.assertEqual([(fields[1], fields[3]) for _, fields in observations],
+                                     [("prototype", prototype_form), ("definition", definition_form)])
+                for proc_name, form, written, exported in (
+                    ("publicimplicit", "implicit", "public", "0"),
+                    ("privatetyped", "as", "private", "0"),
+                    ("suffixresult", "suffix", "default", "0"),
+                    ("exportedheader", "none", "public", "1"),
+                    ("continuedresult", "implicit", "default", "0"),
+                    ("macroimplicit", "implicit", "default", "0"),
+                    ("inlineresult", "implicit", "default", "0")):
+                    owner, fields = named[proc_name][0]
+                    self.assertEqual((fields[3], visibility[owner, int(fields[0])], fields[4]), (form, written, exported))
+                owner, fields = named["suffixresult"][0]
+                self.assertEqual(model.types[owner][16], "private")
+                self.assertEqual(visibility[owner, int(fields[0])], "default")
+                for mode in ("bindings", "expressions"):
+                    compact = self.compile(source, mode=mode, backend=backend, extra=extra)
+                    self.assertEqual(output.read_bytes(), original)
+                    self.assertEqual(compact.capabilities[1]["procedure-typing-inputs"], "unavailable")
+                    self.assertFalse(any(key.startswith(("procedure-typing-", "procedure-written-visibility"))
+                                         for properties in compact.properties.values() for key in properties))
+
+    def test_aggregate_access_preserves_complete_original_sections(self) -> None:
+        for backend, target in (("gas", "win32"), ("gas64", "win64"), ("gcc", "linux-x86_64")):
+            with self.subTest(backend=backend, target=target):
+                source = self.fixture("aggregate-access.bas")
+                output = self.working / ("aggregate-access-emission" + (".c" if backend == "gcc" else ".asm"))
+                extra = ("-target", target, "-o", str(output))
+                self.invoke([source], mode="off", backend=backend, extra=extra)
+                original = output.read_bytes()
+                model = self.compile(source, backend=backend, extra=extra)
+                self.assertEqual(output.read_bytes(), original)
+                self.assertEqual(model.capabilities[1]["aggregate-access-sections"], "available")
+                expected = {
+                    "accessowner": ["public", "public", "public", "private", "private", "protected", "protected", "public", "public"],
+                    "nestedowner": ["public", "public"],
+                    "activeowner": ["public", "public"],
+                    "defaultowner": [],
+                }
+                for type_name, sections in expected.items():
+                    owner = self.one(model, type_name)
+                    properties = model.properties["symbol", owner]
+                    header = int(properties["aggregate-body-statement"])
+                    self.assertIn(header, model.statements)
+                    self.assertEqual(int(properties["aggregate-access-count"]), len(sections))
+                    actual = [properties[f"aggregate-access-section:{ordinal}"].split("\t")[1]
+                              for ordinal in range(1, len(sections) + 1)]
+                    self.assertEqual(actual, sections)
+                self.assertFalse(model.named("inactiveowner"))
+                bodies = [(owner, properties) for (domain, owner), properties in model.properties.items()
+                          if "aggregate-body-statement" in properties]
+                self.assertEqual(len(bodies), 5)
+                union = [(owner, properties) for owner, properties in bodies if model.layouts[owner][2] == "union"]
+                self.assertEqual(len(union), 1)
+                self.assertEqual(union[0][1]["aggregate-access-count"], "0")
+                for mode in ("bindings", "expressions"):
+                    compact = self.compile(source, mode=mode, backend=backend, extra=extra)
+                    self.assertEqual(output.read_bytes(), original)
+                    self.assertEqual(compact.capabilities[1]["aggregate-access-sections"], "unavailable")
+                    self.assertFalse(any(key.startswith(("aggregate-body-", "aggregate-access-"))
+                                         for properties in compact.properties.values() for key in properties))
 
 # end of test_sidecar.py

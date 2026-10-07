@@ -260,14 +260,87 @@ end sub
 '' Symbol snapshots
 '' -------------------------------------------------------------------------
 
+'' GAS emits HESCAPEW's octal bytes directly. Decode that selected byte
+'' stream into little-endian x86 WCHAR units instead of repeating its Unicode
+'' conversion rules. The parser thread owns the helper's static result until
+'' this snapshot finishes; no backend operation runs concurrently here.
+private sub hExportAsmWideLiteralPrefix(byval sym as FBSYMBOL ptr, byval symbolid as longint)
+
+	dim as integer unit_bytes = fbGetTargetWcharSize( )
+	if( (unit_bytes <> 1) and (unit_bytes <> 2) and (unit_bytes <> 4) ) then
+		fbSemanticModelFailAt("wide assembly literal unit size is unsupported")
+		exit sub
+	end if
+	dim as longint source_units = len(*sym->var_.littextw)
+	if( (source_units < 0) or (source_units > SEMANTIC_MAX_LITERAL_UNITS) ) then
+		fbSemanticModelFailAt("wide assembly literal source exceeds the semantic budget")
+		exit sub
+	end if
+	dim as string prefix
+	if( source_units > 0 ) then
+		dim as zstring ptr escaped = hEscapeW(sym->var_.littextw)
+		if( escaped = NULL ) then
+			fbSemanticModelFailAt("wide assembly literal formatting failed")
+			exit sub
+		end if
+		dim as longint capacity_units = source_units
+		if( unit_bytes = 2 ) then capacity_units *= 2
+		if( capacity_units > SEMANTIC_MAX_LITERAL_UNITS ) then capacity_units = SEMANTIC_MAX_LITERAL_UNITS
+		prefix = space(capacity_units * 8)
+		if( len(prefix) <> capacity_units * 8 ) then
+			fbSemanticModelFailAt("wide assembly literal prefix allocation failed")
+			exit sub
+		end if
+		dim as longint position = 0, unit_count = 0, byte_index = 0, encoded_length = len(*escaped)
+		dim as uinteger unit_value = 0
+		while( position < encoded_length )
+			if( escaped[position] <> 92 ) then fbSemanticModelFailAt("wide assembly literal escape is malformed"): exit sub
+			position += 1
+			dim as uinteger byte_value = 0
+			dim as integer digits = 0
+			while( position < encoded_length )
+				if( escaped[position] = 92 ) then exit while
+				if( (escaped[position] < asc("0")) or (escaped[position] > asc("7")) or (digits >= 3) ) then
+					fbSemanticModelFailAt("wide assembly literal octal byte is malformed"): exit sub
+				end if
+				byte_value = byte_value * 8 + escaped[position] - asc("0")
+				digits += 1: position += 1
+			wend
+			if( (digits = 0) or (byte_value > 255) ) then fbSemanticModelFailAt("wide assembly literal byte is out of range"): exit sub
+			unit_value or= byte_value shl (byte_index * 8)
+			byte_index += 1
+			if( byte_index <> unit_bytes ) then continue while
+			if( unit_value = 0 ) then byte_index = 0: exit while
+			if( unit_count >= capacity_units ) then fbSemanticModelFailAt("wide assembly literal prefix exceeds the semantic budget"): exit sub
+			mid(prefix, unit_count * 8 + 1, 8) = hex(unit_value, 8)
+			unit_count += 1: byte_index = 0: unit_value = 0
+		wend
+		if( byte_index <> 0 ) then fbSemanticModelFailAt("wide assembly literal unit is incomplete"): exit sub
+		prefix = left(prefix, unit_count * 8)
+	end if
+	'' Both GAS emitters append a complete zero WCHAR after the byte stream.
+	hSymbolNumber(symbolid, "literal-target-wide-unit-bytes", unit_bytes)
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+		fbSemanticModelNumber(symbolid) + TABCHAR + "literal-target-wide-kind" + TABCHAR + "terminated")
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+		fbSemanticModelNumber(symbolid) + TABCHAR + "literal-target-wide-prefix" + TABCHAR + prefix)
+end sub
+
 '' A terminated wide API observes the target's prefix, not HUNESCAPEW's
 '' host units. Each selected unit occupies eight hex digits in this property.
 '' UTF-16 splits valid supplementary scalars; one/two-byte target storage
 '' truncates other values to the same width used by emitted literal storage.
 private sub hExportWideLiteralPrefix(byval sym as FBSYMBOL ptr, byval symbolid as longint)
 
-	if( env.clopt.backend <> FB_BACKEND_GCC ) then exit sub
 	if( sym->var_.littextw = NULL ) then exit sub
+	select case env.clopt.backend
+	case FB_BACKEND_GAS, FB_BACKEND_GAS64
+		hExportAsmWideLiteralPrefix(sym, symbolid)
+		exit sub
+	case FB_BACKEND_GCC
+	case else
+		exit sub
+	end select
 	dim as longint source_units = len(*sym->var_.littextw)
 	if( (source_units < 0) or (source_units > SEMANTIC_MAX_LITERAL_UNITS) ) then
 		fbSemanticModelFailAt("wide literal source exceeds the semantic budget")

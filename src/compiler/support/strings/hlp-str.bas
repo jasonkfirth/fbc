@@ -1340,7 +1340,21 @@ function hEscapeW _
 		return NULL
 	end if
 
-	DZstrAllocate( res, lgt * (1+3) * wcharlen )
+	'' UTF-16 can emit two WCHAR units for one host UTF-32 element. Each byte
+	'' needs at most a backslash and three octal digits. Keep space for both
+	'' units, the terminator and the dynamic buffer's allocation rounding.
+	dim as integer bytes_per_character
+	bytes_per_character = 4 * wcharlen
+	if( wcharlen = 2 ) then bytes_per_character *= 2
+	if( lgt > (&h7FFFFFFF - 32) \ bytes_per_character ) then
+		errReportEx( FB_ERRMSG_INTERNAL, "wide assembly literal allocation exceeds the compiler limit" )
+		return NULL
+	end if
+	DZstrAllocate( res, lgt * bytes_per_character )
+	if( res.data = NULL ) then
+		errReportEx( FB_ERRMSG_INTERNAL, "wide assembly literal allocation failed" )
+		return NULL
+	end if
 
 	src = cast( wstring ptr, text )
 	dst = res.data

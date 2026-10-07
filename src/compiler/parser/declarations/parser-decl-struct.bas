@@ -44,6 +44,9 @@ declare sub fbSemanticModelExportImplicitCall _
 	)
 
 declare sub hTypeBody( byval s as FBSYMBOL ptr )
+declare sub fbSemanticModelAggregateBodyBegin(byval parent as FBSYMBOL ptr)
+declare sub fbSemanticModelAggregateBodyEnd(byval parent as FBSYMBOL ptr, byval count as integer)
+declare sub fbSemanticModelAggregateAccess(byval parent as FBSYMBOL ptr, byval ordinal as integer, byval attrib as FB_SYMBATTRIB)
 
 declare sub hPatchByvalParamsToSelf _
 	( _
@@ -814,6 +817,8 @@ private sub hTypeBody( byval s as FBSYMBOL ptr )
 	dim as integer isinner = any
 	dim as FB_SYMBATTRIB attrib = any
 	dim as FBSYMBOL ptr inner = any
+	dim as integer semantic_access_count
+	fbSemanticModelAggregateBodyBegin(s)
 
 	attrib = FB_SYMBATTRIB_NONE  '' Used to hold visibility attributes
 
@@ -853,6 +858,8 @@ private sub hTypeBody( byval s as FBSYMBOL ptr )
 			if( lexGetToken( ) <> FB_TK_STMTSEP ) then
 				errReport( FB_ERRMSG_EXPECTEDSTMTSEP )
 			end if
+			semantic_access_count += 1
+			fbSemanticModelAggregateAccess(s, semantic_access_count, attrib)
 
 			'' ':' will be skipped bellow to allow stmt separators
 
@@ -1007,6 +1014,7 @@ private sub hTypeBody( byval s as FBSYMBOL ptr )
 		end if
 	loop
 
+	fbSemanticModelAggregateBodyEnd(s, semantic_access_count)
 	'' no fields added?
 	if( symbUdtGetFirstField( s ) = NULL ) then
 		errReport( FB_ERRMSG_NOELEMENTSDEFINED )

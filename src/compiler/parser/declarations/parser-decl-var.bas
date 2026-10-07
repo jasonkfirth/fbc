@@ -28,6 +28,12 @@
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
 
+declare function fbSemanticModelDeclarationGroup(byval token as integer, byref owner as longint) as longint
+declare sub fbSemanticModelDeclarationType(byval groupid as longint, byval owner as longint, _
+	byval ordinal as integer, byval sym as FBSYMBOL ptr, byref written_type as const string, _
+	byval initializer_kind as integer, byref source as LEX_LOCATION)
+declare sub fbSemanticModelDeclarationGroupEnd(byval groupid as longint, byval owner as longint, byval count as integer)
+
 declare sub fbSemanticModelExportBinding _
 	( _
 		byval sym as FBSYMBOL ptr, _
@@ -834,7 +840,8 @@ private function hVarInit _
 	( _
 		byval sym as FBSYMBOL ptr, _
 		byval isdecl as integer, _
-		byref semantic_site as LEX_LOCATION _
+		byref semantic_site as LEX_LOCATION, _
+		byref semantic_initializer_kind as integer _
 	) as ASTNODE ptr
 
 	dim as integer attrib = any
@@ -889,6 +896,7 @@ private function hVarInit _
 
 	'' ANY?
 	if( lexGetToken( ) = FB_TK_ANY ) then
+		semantic_initializer_kind = 1
 
 		'' don't allow arrays with ellipsis denoting unknown size at this time
 		if( symbArrayHasUnknownBounds( sym ) ) then
@@ -1249,6 +1257,36 @@ private function hMaybeBuildFieldAccess _
 	function = astBuildVarField( symbGetParamVar( thisparam ), fld )
 end function
 
+private function hSimpleScalarInitializer(byval sym as FBSYMBOL ptr, byval tree as ASTNODE ptr) as integer
+	if( (sym = NULL) or (tree = NULL) ) then return FALSE
+	if( symbGetArrayDimensions(sym) <> 0 ) then return FALSE
+	if( astIsTYPEINI(tree) = FALSE ) then return FALSE
+	if( tree->l = NULL ) then return FALSE
+	if( (tree->l->r <> NULL) or (tree->l->class <> AST_NODECLASS_TYPEINI_ASSIGN) ) then return FALSE
+	'' A one-field record still has aggregate semantics. Its first field's
+	'' scalar value cannot stand in for the declared object's initializer.
+	if( (astGetFullType(tree) <> astGetFullType(tree->l)) or (tree->subtype <> tree->l->subtype) ) then return FALSE
+	dim as ASTNODE ptr expr = tree->l->l
+	if( expr = NULL ) then return FALSE
+	if( astIsCONST(expr) = FALSE ) then return FALSE
+	'' This style exception is based on the selected scalar value, including
+	'' folded named constants and casts. Strings, aggregate lists and calls do
+	'' not become simple initializers merely because their source contains 0.
+	select case astGetDataClass(expr)
+	case FB_DATACLASS_INTEGER
+		dim as longint value = astConstGetAsInt64(expr)
+		if( (value = 0) or (value = 1) ) then return TRUE
+		'' The AST payload stores raw bits in a signed 64-bit slot. Unsigned
+		'' maxima and all-ones addresses must not become the signed value -1.
+		if( typeIsPtr(astGetFullType(expr)) ) then return FALSE
+		return (value = -1) and (typeIsSigned(astGetFullType(expr)) or (astGetDataType(expr) = FB_DATATYPE_BOOLEAN))
+	case FB_DATACLASS_FPOINT
+		dim as double value = astConstGetAsDouble(expr)
+		return (value = 0.0) or (value = 1.0) or (value = -1.0)
+	end select
+	return FALSE
+end function
+
 private function hEmitVarDecl _
 	( _
 		byval sym as FBSYMBOL ptr, _
@@ -1260,7 +1298,8 @@ private function hEmitVarDecl _
 		byref varexpr as ASTNODE ptr, _
 		exprTB() as ASTNODE ptr, _
 		byval dopreserve as integer, _
-		byref semantic_site as LEX_LOCATION _
+		byref semantic_site as LEX_LOCATION, _
+		byref semantic_initializer_kind as integer _
 	) as integer
 
 	dim as ASTNODE ptr initree = any, assign_initree = any
@@ -1281,7 +1320,9 @@ private function hEmitVarDecl _
 		assign_initree = NULL
 
 		if( hIsAssignToken( lexGetToken( ) ) ) then
-			initree = hVarInit( sym, is_declared, semantic_site )
+			semantic_initializer_kind = 2
+			initree = hVarInit( sym, is_declared, semantic_site, semantic_initializer_kind )
+			if( hSimpleScalarInitializer(sym, initree) ) then semantic_initializer_kind = 3
 
 			if( (initree <> NULL) and _
 			    (fbLangOptIsSet( FB_LANG_OPT_SCOPE ) = FALSE) ) then
@@ -1554,6 +1595,10 @@ function cVarDecl _
 	dim as FB_IDOPT options = any
 	dim as LEX_LOCATION semantic_site
 
+	dim as longint semantic_group, semantic_owner
+	dim as integer semantic_ordinal
+	if( is_fordecl = FALSE ) then semantic_group = fbSemanticModelDeclarationGroup(token, semantic_owner)
+
 	function = NULL
 
 	'' inside a namespace but outside a proc?
@@ -1572,6 +1617,7 @@ function cVarDecl _
 
 	do
 		dim as integer attrib = baseattrib
+		dim as string semantic_written_type = iif(is_multdecl, "as", "implicit")
 
 		if( is_multdecl = FALSE ) then
 			'' 1st SingleVarDecl has BYREF?
@@ -1663,6 +1709,7 @@ function cVarDecl _
 			subtype = NULL
 			lgt = symbCalcLen( dtype, subtype )
 			addsuffix = (suffix <> FB_DATATYPE_INVALID)
+			if( addsuffix ) then semantic_written_type = "suffix"
 		else
 			'' the user did 'DIM AS _____', and then
 			'' specified a suffix on a symbol, e.g.
@@ -1695,6 +1742,7 @@ function cVarDecl _
 					dtype = FB_DATATYPE_INVALID
 				end if
 
+				semantic_written_type = "as"
 				lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 				var is_ref = ((attrib and FB_SYMBATTRIB_REF) <> 0)
@@ -1868,9 +1916,15 @@ function cVarDecl _
 			end if
 		end if
 
+		dim as integer semantic_initializer
 		if( hEmitVarDecl( sym, token, is_fordecl, attrib, dimensions, _
-		    have_bounds, varexpr, exprTB(), dopreserve, semantic_site ) = FALSE ) then
+		    have_bounds, varexpr, exprTB(), dopreserve, semantic_site, semantic_initializer ) = FALSE ) then
 			exit function
+		end if
+		if( semantic_group <> 0 ) then
+			semantic_ordinal += 1
+			fbSemanticModelDeclarationType(semantic_group, semantic_owner, semantic_ordinal, sym, _
+				semantic_written_type, semantic_initializer, semantic_site)
 		end if
 
 		if( is_fordecl ) then
@@ -1884,6 +1938,8 @@ function cVarDecl _
 
 		lexSkipToken( )
 	loop
+
+	fbSemanticModelDeclarationGroupEnd(semantic_group, semantic_owner, semantic_ordinal)
 
 	'' result unused, except by FOR loops, but that's RETURN'ed above
 end function

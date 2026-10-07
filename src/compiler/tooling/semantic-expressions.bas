@@ -123,6 +123,25 @@ const SEMANTIC_EXPRESSION_MAX_OPERANDS = 1000000
 dim shared as SEMANTIC_EXPRESSION_OPERANDS ptr expression_operands
 dim shared as integer expression_operand_count, expression_operand_capacity
 
+'' SELECT lowering builds one comparison at a time on the parser thread. This
+'' allocation-free snapshot owns no ASTs and is consumed before another CASE
+'' comparison begins. A checked generation is passed through the AST builder;
+'' unrelated or recursively built operations cannot overwrite its operands.
+'' These observations are not parsed EX operators: CASE supplies grammar
+'' alternatives, rather than a binary operator written between two operands.
+type SEMANTIC_SELECT_OPERANDS
+	generation as longint
+	source as LEX_LOCATION
+	kind as zstring * 16
+	left_dtype as integer
+	right_dtype as integer
+	left_expression as longint
+	right_expression as longint
+end type
+
+dim shared as SEMANTIC_SELECT_OPERANDS select_operands
+dim shared as longint select_operand_generation
+
 '' Size queries can be observed again while precedence layers unwind. Keep
 '' their original IDs separately from operand/result values. Association chains
 '' can outlive a folded operand, but never own or retain an AST allocation.
@@ -156,6 +175,8 @@ sub fbSemanticModelResetExpressions( )
 	size_query_capacity = 0
 	size_query_work_left = SEMANTIC_SIZE_QUERY_WORK_LIMIT
 	pointer_observation_work_left = SEMANTIC_SIZE_QUERY_WORK_LIMIT
+	select_operands.generation = 0
+	select_operand_generation = 0
 end sub
 
 private function hSizeQueryIdentity(byval identity as longint) as integer
@@ -390,9 +411,9 @@ sub fbSemanticModelSelectedNumericOperands _
 	'' Logical operator anchors do not claim editable operand source extents.
 	dim as LEX_LOCATION anchor = expression_operands[operands - 1].source
 	anchor.is_physical = FALSE
-	fbSemanticModelExportExpression(left_expr, anchor, anchor, 0, 0)
+	fbSemanticModelExportSelectedExpression(left_expr, anchor)
 	dim as longint left_identity = left_expr->semantic_expression
-	fbSemanticModelExportExpression(right_expr, anchor, anchor, 0, 0)
+	fbSemanticModelExportSelectedExpression(right_expr, anchor)
 	dim as longint right_identity = right_expr->semantic_expression
 	if( (left_identity = 0) or (right_identity = 0) ) then exit sub
 	with expression_operands[operands - 1]
@@ -403,6 +424,75 @@ sub fbSemanticModelSelectedNumericOperands _
 		.selected_numeric = TRUE
 	end with
 end sub
+
+function fbSemanticModelCaptureSelectOperands(byref source as LEX_LOCATION) as longint
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then return 0
+	if( lex.ctx->semantic_probe ) then return 0
+	if( (select_operands.generation <> 0) or (select_operand_generation >= SEMANTIC_EXPRESSION_MAX_OPERANDS) ) then
+		fbSemanticModelFailAt("invalid select operand snapshot lifetime")
+		return 0
+	end if
+	select_operand_generation += 1
+	with select_operands
+		.generation = select_operand_generation
+		.source = source
+		.source.is_physical = FALSE
+		.kind = "unclassified"
+		.left_dtype = 0
+		.right_dtype = 0
+		.left_expression = 0
+		.right_expression = 0
+	end with
+	return select_operand_generation
+end function
+
+sub fbSemanticModelSelectedCaseOperands _
+	( byval generation as longint, byval left_expr as ASTNODE ptr, byval right_expr as ASTNODE ptr, _
+	  byval left_dtype as integer, byval right_dtype as integer, byref kind as const string )
+	if( generation = 0 ) then exit sub
+	if( (generation <> select_operands.generation) or (left_expr = NULL) or (right_expr = NULL) ) then
+		fbSemanticModelFailAt("invalid selected case operands")
+		exit sub
+	end if
+	'' String comparisons subsequently become an integer strcmp result compared
+	'' with zero. Preserve the selected text inputs, not that generated wrapper.
+	if( select_operands.kind <> "unclassified" ) then exit sub
+	if( (kind <> "scalar") and (kind <> "narrow") and (kind <> "wide") and (kind <> "unicode") ) then
+		fbSemanticModelFailAt("invalid selected case operand kind")
+		exit sub
+	end if
+	dim as LEX_LOCATION anchor = select_operands.source
+	fbSemanticModelExportSelectedExpression(left_expr, anchor)
+	dim as longint left_identity = left_expr->semantic_expression
+	fbSemanticModelExportSelectedExpression(right_expr, anchor)
+	dim as longint right_identity = right_expr->semantic_expression
+	if( (left_identity <= 0) or (right_identity <= 0) ) then
+		fbSemanticModelFailAt("unavailable selected case operand identity")
+		exit sub
+	end if
+	with select_operands
+		.kind = kind
+		.left_dtype = left_dtype
+		.right_dtype = right_dtype
+		.left_expression = left_identity
+		.right_expression = right_identity
+	end with
+end sub
+
+function fbSemanticModelSelectOperandSnapshot(byval generation as longint) as string
+	if( (generation <= 0) or (generation <> select_operands.generation) ) then
+		fbSemanticModelFailAt("invalid select operand snapshot generation")
+		return ""
+	end if
+	'' An overloaded or recursively coerced UDT comparison does not reach the
+	'' built-in selection hook. Its explicit unclassified receipt is complete,
+	'' but does not claim the types or meaning of a built-in comparison.
+	dim as string value = select_operands.kind + TABCHAR + fbSemanticModelNumber(select_operands.left_dtype) + _
+		TABCHAR + fbSemanticModelNumber(select_operands.right_dtype) + TABCHAR + _
+		fbSemanticModelNumber(select_operands.left_expression) + TABCHAR + fbSemanticModelNumber(select_operands.right_expression)
+	select_operands.generation = 0
+	return value
+end function
 
 sub fbSemanticModelCompoundResult(byval result as ASTNODE ptr, byval operands as longint)
 	if( (fbSemanticModelFullEnabled( ) = FALSE) or (result = NULL) or (operands = 0) ) then exit sub

@@ -876,6 +876,146 @@ function fbSemanticModelExportParameterDeclaration(byval sym as FBSYMBOL ptr, _
 	return hSemanticModelExportDeclaration(sym, formal_first, role, declared_name)
 end function
 
+'' -------------------------------------------------------------------------
+'' Original declaration grammar choices
+'' -------------------------------------------------------------------------
+
+function fbSemanticModelDeclarationGroup(byval token as integer, byref owner as longint) as longint
+	owner = 0
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then return 0
+	dim as string kind
+	select case token
+	case FB_TK_DIM: kind = "dim"
+	case FB_TK_STATIC: kind = "static"
+	case FB_TK_COMMON: kind = "common"
+	case FB_TK_EXTERN: kind = "extern"
+	case FB_TK_CONST: kind = "const"
+	case else: return 0
+	end select
+	owner = fbSemanticModelSymbolId(parser.currproc)
+	if( owner = 0 ) then owner = fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))
+	dim as longint statement = fbSemanticModelCurrentStatement( )
+	if( (owner = 0) or (statement = 0) ) then
+		fbSemanticModelFailAt("unavailable declaration group owner")
+		return 0
+	end if
+	'' Publishing the opening receipt reserves its detail identity before a
+	'' callback type or initializer recursively enters another parser routine.
+	dim as longint groupid = fbSemanticModelNextDetailIdentity( )
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(owner) + _
+		TABCHAR + "declaration-type-group:" + fbSemanticModelNumber(groupid) + TABCHAR + _
+		fbSemanticModelEscape(fbSemanticModelNumber(statement) + TABCHAR + kind))
+	return groupid
+end function
+
+sub fbSemanticModelDeclarationType(byval groupid as longint, byval owner as longint, _
+	byval ordinal as integer, byval sym as FBSYMBOL ptr, byref written_type as const string, _
+	byval initializer_kind as integer, byref source as LEX_LOCATION)
+	if( groupid = 0 ) then exit sub
+	if( (sym = NULL) or (ordinal < 1) or (owner = 0) ) then
+		fbSemanticModelFailAt("unavailable declaration input")
+		exit sub
+	end if
+	dim as string role = "declaration-type-input:" + fbSemanticModelNumber(groupid) + ":" + fbSemanticModelNumber(ordinal)
+	dim as string payload = fbSemanticModelNumber(fbSemanticModelSymbolId(sym)) + TABCHAR + written_type + TABCHAR + _
+		fbSemanticModelNumber(initializer_kind) + TABCHAR + fbSemanticModelNumber(fbSemanticModelCurrentSource( ))
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(owner) + TABCHAR + role + TABCHAR + _
+		fbSemanticModelEscape(payload))
+	'' This is the actual identifier token, including its suffix when present.
+	'' Expanded tokens retain a macro origin instead of an invented name range.
+	fbSemanticModelExportCoordinates("source-context", fbSemanticModelCurrentSource( ), role, source, source)
+	fbSemanticModelMacroOrigin("symbol", owner, source.macro_identity, role)
+end sub
+
+sub fbSemanticModelDeclarationGroupEnd(byval groupid as longint, byval owner as longint, byval count as integer)
+	if( groupid = 0 ) then exit sub
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(owner) + TABCHAR + _
+		"declaration-type-end:" + fbSemanticModelNumber(groupid) + TABCHAR + fbSemanticModelNumber(count))
+end sub
+
+sub fbSemanticModelParameterType(byval param as FBSYMBOL ptr, byref written_type as const string)
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (param = NULL) ) then exit sub
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(param)) + _
+		TABCHAR + "formal-written-type" + TABCHAR + written_type)
+end sub
+
+'' Named headers retain one receipt per accepted occurrence. A prototype
+'' and its body can resolve to the same symbol while making different grammar
+'' choices, so these properties must not be flattened onto that symbol's T.
+sub fbSemanticModelProcedureTyping(byval proc as FBSYMBOL ptr, byval tk as integer, _
+	byref role as const string, byref result_form as const string)
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (proc = NULL) ) then exit sub
+	dim as string kind
+	select case tk
+	case FB_TK_SUB: kind = "sub"
+	case FB_TK_FUNCTION: kind = "function"
+	case FB_TK_PROPERTY: kind = "property"
+	case FB_TK_OPERATOR: kind = "operator"
+	case FB_TK_CONSTRUCTOR: kind = "constructor"
+	case FB_TK_DESTRUCTOR: kind = "destructor"
+	case else
+		fbSemanticModelFailAt("invalid procedure typing kind")
+		exit sub
+	end select
+	dim as longint statement = fbSemanticModelCurrentStatement( )
+	if( statement = 0 ) then
+		fbSemanticModelFailAt("unavailable procedure typing statement")
+		exit sub
+	end if
+	dim as longint identity = fbSemanticModelNextDetailIdentity( )
+	dim as string payload = fbSemanticModelNumber(statement) + TABCHAR + role + TABCHAR + kind + _
+		TABCHAR + result_form + TABCHAR + fbSemanticModelNumber(abs((symbGetAttrib(proc) and FB_SYMBATTRIB_EXPORT) <> 0))
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(proc)) + _
+		TABCHAR + "procedure-typing-input:" + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelEscape(payload))
+end sub
+
+sub fbSemanticModelAggregateBodyBegin(byval parent as FBSYMBOL ptr)
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (parent = NULL) ) then exit sub
+	dim as longint statement = fbSemanticModelCurrentStatement( )
+	if( statement = 0 ) then
+		fbSemanticModelFailAt("unavailable aggregate body statement")
+		exit sub
+	end if
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(parent)) + _
+		TABCHAR + "aggregate-body-statement" + TABCHAR + fbSemanticModelNumber(statement))
+end sub
+
+sub fbSemanticModelAggregateBodyEnd(byval parent as FBSYMBOL ptr, byval count as integer)
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (parent = NULL) ) then exit sub
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(parent)) + _
+		TABCHAR + "aggregate-access-count" + TABCHAR + fbSemanticModelNumber(count))
+end sub
+
+'' Each body's explicit sections form a complete ordinal sequence. This
+'' preserves order across macros and nested types without a source-text stack.
+sub fbSemanticModelAggregateAccess(byval parent as FBSYMBOL ptr, byval ordinal as integer, byval attrib as FB_SYMBATTRIB)
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (parent = NULL) ) then exit sub
+	dim as string access_text = "public"
+	if( attrib and FB_SYMBATTRIB_VIS_PRIVATE ) then
+		access_text = "private"
+	elseif( attrib and FB_SYMBATTRIB_VIS_PROTECTED ) then
+		access_text = "protected"
+	end if
+	dim as string payload = fbSemanticModelNumber(fbSemanticModelCurrentStatement( )) + TABCHAR + access_text
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(parent)) + _
+		TABCHAR + "aggregate-access-section:" + fbSemanticModelNumber(ordinal) + TABCHAR + fbSemanticModelEscape(payload))
+end sub
+
+sub fbSemanticModelProcedureVisibility(byval proc as FBSYMBOL ptr, byref written as const string)
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (proc = NULL) ) then exit sub
+	dim as longint statement = fbSemanticModelCurrentStatement( )
+	if( statement = 0 ) then
+		fbSemanticModelFailAt("unavailable procedure visibility statement")
+		exit sub
+	end if
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(proc)) + _
+		TABCHAR + "procedure-written-visibility:" + fbSemanticModelNumber(statement) + TABCHAR + written)
+end sub
+
+'' -------------------------------------------------------------------------
+'' Formal passing modes and source spans
+'' -------------------------------------------------------------------------
+
 sub fbSemanticModelParameterModes(byval param as FBSYMBOL ptr, byval occurrence as longint, _
 	byval accepted_mode as integer, byval written_mode as integer, byval isproto as integer, byval expansion as longint)
 	if( (fbSemanticModelFullEnabled( ) = FALSE) or (param = NULL) ) then exit sub
@@ -2427,6 +2567,16 @@ sub fbSemanticModelExportExpression _
 	end if
 end sub
 
+sub fbSemanticModelExportSelectedExpression(byval expr as ASTNODE ptr, byref anchor as LEX_LOCATION)
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (expr = NULL) ) then exit sub
+	'' Parser unwind deduplication compares the visible E shape. Two generated
+	'' casts can have identical shapes while wrapping different bindings or
+	'' calls. Selected operand snapshots must keep those distinct origins.
+	semantic_model_last_expression_fact = ""
+	semantic_model_last_expression_shape = ""
+	fbSemanticModelExportExpression(expr, anchor, anchor, 0, 0)
+end sub
+
 sub fbSemanticModelExportExpressionDistinct _
 	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, byref source_end as LEX_LOCATION, _
 	  byval nonphysical_tokens_at_start as longint, byval nonphysical_tokens_at_end as longint )
@@ -2781,7 +2931,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
-	for capability as integer = 0 to 54
+	for capability as integer = 0 to 59
 		dim as string feature, coverage
 		select case capability
 		case 0: feature = "symbol-identities": coverage = iif(semantic_model_expressions_only, "unavailable", "available")
@@ -2837,7 +2987,14 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		case 51: feature = "c-target-wide-literal-prefixes": coverage = iif(fbSemanticModelFullEnabled( ) and (env.clopt.backend = FB_BACKEND_GCC), "available", "unavailable")
 		case 52: feature = "explicit-cast-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 53: feature = "unevaluated-query-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 57: feature = "declaration-typing-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 58: feature = "procedure-typing-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 59: feature = "aggregate-access-sections": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 54: feature = "select-case-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 55: feature = "select-case-lowering-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 56: feature = "target-wide-literal-prefixes": coverage = iif(fbSemanticModelFullEnabled( ) and _
+			((env.clopt.backend = FB_BACKEND_GCC) or (env.clopt.backend = FB_BACKEND_GAS) or _
+			 (env.clopt.backend = FB_BACKEND_GAS64)), "available", "unavailable")
 		case 49: feature = "string-initializer-copy-contracts": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		end select
 		fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _

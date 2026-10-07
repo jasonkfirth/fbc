@@ -943,7 +943,8 @@ private function hCheckBopStrings _
 		byref rdtype as integer, _
 		byref ldclass as integer, _
 		byref rdclass as integer, _
-		byref is_str as integer _
+		byref is_str as integer, _
+		byval case_operands as longint _
 	) as H_BOP_STRING_ACTION
 
 	dim as FBSYMBOL ptr litsym = any
@@ -1056,6 +1057,7 @@ private function hCheckBopStrings _
 
 			'' comparison?
 			elseif( astOpIsRelational( op ) ) then
+				fbSemanticModelSelectedCaseOperands(case_operands, l, r, ldtype, rdtype, "wide")
 				'' both literals?
 				if( litsym <> NULL ) then
 					if( (typeGetDtAndPtrOnly( ldtype ) = typeGetDtAndPtrOnly( rdtype )) or _
@@ -1153,6 +1155,9 @@ private function hCheckBopStrings _
 
 		'' comparison?
 		elseif( astOpIsRelational( op ) ) then
+			dim as string case_kind = "narrow"
+			if( (typeGet( ldtype ) = FB_DATATYPE_USTRING) or (typeGet( rdtype ) = FB_DATATYPE_USTRING) ) then case_kind = "unicode"
+			fbSemanticModelSelectedCaseOperands(case_operands, l, r, ldtype, rdtype, case_kind)
 			'' both literals?
 			if( litsym <> NULL ) then
 				result = hStrLiteralCompare( op, l, r )
@@ -1667,7 +1672,8 @@ private function hNewBOP _
 		byval r as ASTNODE ptr, _
 		byval ex as FBSYMBOL ptr, _
 		byval options as AST_OPOPT, _
-		byval semantic_operands as longint _
+		byval semantic_operands as longint, _
+		byval case_operands as longint _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr n = any
@@ -1762,7 +1768,7 @@ private function hNewBOP _
 	end if
 
 	select case hCheckBopStrings( n, op, l, r, ldtype, rdtype, _
-	                              ldclass, rdclass, is_str )
+	                            ldclass, rdclass, is_str, case_operands )
 	case H_BOP_STRING_RETURN
 		return n
 	case H_BOP_STRING_ERROR
@@ -1853,6 +1859,7 @@ private function hNewBOP _
 	'' Comparisons subsequently replace the result type with INTEGER. Observe
 	'' their numeric operand coercions before that step and constant folding.
 	fbSemanticModelSelectedNumericOperands(semantic_operands, l, r, ldtype, rdtype)
+	fbSemanticModelSelectedCaseOperands(case_operands, l, r, ldtype, rdtype, "scalar")
 	hPostCheckBop( op, r, ldtype, rdtype, rdclass, dtype, subtype )
 
 	'' constant folding (won't handle commutation, ie: "1+a+2+3" will become "1+a+5", not "a+6")
@@ -1959,13 +1966,19 @@ end function
 function astNewBOP _
 	( byval op as integer, byval l as ASTNODE ptr, byval r as ASTNODE ptr, _
 	  byval ex as FBSYMBOL ptr, byval options as AST_OPOPT ) as ASTNODE ptr
-	return hNewBOP(op, l, r, ex, options, 0)
+	return hNewBOP(op, l, r, ex, options, 0, 0)
 end function
 
 function astNewBOPWithOperands _
 	( byval op as integer, byval l as ASTNODE ptr, byval r as ASTNODE ptr, _
 	  byval ex as FBSYMBOL ptr, byval options as AST_OPOPT, byval semantic_operands as longint ) as ASTNODE ptr
-	return hNewBOP(op, l, r, ex, options, semantic_operands)
+	return hNewBOP(op, l, r, ex, options, semantic_operands, 0)
+end function
+
+function astNewSelectBOP _
+	( byval op as integer, byval l as ASTNODE ptr, byval r as ASTNODE ptr, _
+	  byval ex as FBSYMBOL ptr, byval options as AST_OPOPT, byval case_operands as longint ) as ASTNODE ptr
+	return hNewBOP(op, l, r, ex, options, 0, case_operands)
 end function
 
 private function hNewSelfBOP _

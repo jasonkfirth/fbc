@@ -1,6 +1,6 @@
 """Project: FreeBASIC semantic sidecar tests
 File: semantic_literals.py
-Purpose: Validate selected C-backend wide-literal prefix contracts.
+Purpose: Validate selected target wide-literal prefix contracts.
 Responsibilities: Coverage, literal identities, target widths and termination.
 This file intentionally does NOT derive target text from host wide units.
 """
@@ -24,7 +24,8 @@ def validate_wide_literals(model, number, subject_modules):
             raise ValueError("Incomplete or unknown wide literal prefix contract")
         if int(symbol[3]) != 1 or int(symbol[4]) & 0x1ff != 7 or not int(symbol[7]) & 0x400:
             raise ValueError("Wide literal prefix has no literal variable")
-        if model.capabilities[module].get("c-target-wide-literal-prefixes") != "available":
+        if not any(model.capabilities[module].get(key) == "available" for key in
+                   ("c-target-wide-literal-prefixes", "target-wide-literal-prefixes")):
             raise ValueError("Wide literal prefix capability unavailable")
         unit_bytes = number(properties["literal-target-wide-unit-bytes"], 1)
         if unit_bytes not in (1, 2, 4) or str(unit_bytes) != model.primitives[module - 1][7][4]:
@@ -49,7 +50,8 @@ def validate_wide_literals(model, number, subject_modules):
             raise ValueError("Wide literal validation work budget exceeded")
         if int(symbol[3]) == 1 and int(symbol[4]) & 0x1ff == 7 and int(symbol[7]) & 0x400:
             module = subject_modules["symbol", identity]
-            if model.capabilities[module].get("c-target-wide-literal-prefixes") == "available" and identity not in marked:
+            if any(model.capabilities[module].get(key) == "available" for key in
+                   ("c-target-wide-literal-prefixes", "target-wide-literal-prefixes")) and identity not in marked:
                 raise ValueError("Wide literal prefix coverage is incomplete")
 
 # end of semantic_literals.py

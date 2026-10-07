@@ -27,6 +27,12 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 
+declare function fbSemanticModelDeclarationGroup(byval token as integer, byref owner as longint) as longint
+declare sub fbSemanticModelDeclarationType(byval groupid as longint, byval owner as longint, _
+	byval ordinal as integer, byval sym as FBSYMBOL ptr, byref written_type as const string, _
+	byval initializer_kind as integer, byref source as LEX_LOCATION)
+declare sub fbSemanticModelDeclarationGroupEnd(byval groupid as longint, byval owner as longint, byval count as integer)
+
 declare sub fbSemanticModelExportBinding _
 	( _
 		byval sym as FBSYMBOL ptr, _
@@ -67,7 +73,8 @@ private sub cConstAssign _
 	( _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr, _
-		byval attrib as FB_SYMBATTRIB _
+		byval attrib as FB_SYMBATTRIB, _
+		byval semantic_group as longint, byval semantic_owner as longint, byval semantic_ordinal as integer _
 	)
 
 	static as zstring * FB_MAXNAMELEN+1 id
@@ -143,6 +150,10 @@ private sub cConstAssign _
 		hGetType( dtype, subtype )
 	end if
 
+	'' Save the grammar choice before expression typing overwrites dtype.
+	dim as string semantic_written_type = iif(dtype = FB_DATATYPE_INVALID, "inferred", "as")
+	if( suffix <> FB_DATATYPE_INVALID ) then semantic_written_type = "suffix"
+
 	'' both suffix and type given?
 	if( suffix <> FB_DATATYPE_INVALID ) then
 		if( dtype <> FB_DATATYPE_INVALID ) then
@@ -203,6 +214,8 @@ private sub cConstAssign _
 			errReportEx( symbGetIllegalRedefErr( redefinition ), id )
 		else
 			fbSemanticModelExportBinding(symbol, semantic_site, TRUE)
+			fbSemanticModelDeclarationType(semantic_group, semantic_owner, semantic_ordinal, symbol, _
+				semantic_written_type, 2, semantic_site)
 		end if
 	'' anything else..
 	else
@@ -252,6 +265,8 @@ private sub cConstAssign _
 			errReportEx( symbGetIllegalRedefErr( redefinition ), id )
 		else
 			fbSemanticModelExportBinding(symbol, semantic_site, TRUE)
+			fbSemanticModelDeclarationType(semantic_group, semantic_owner, semantic_ordinal, symbol, _
+				semantic_written_type, 2, semantic_site)
 		end if
 	end if
 
@@ -265,6 +280,9 @@ end sub
 
 '' ConstDecl  =  CONST (AS SymbolType)? ConstAssign (DECL_SEPARATOR ConstAssign)* .
 sub cConstDecl( byval attrib as FB_SYMBATTRIB )
+	dim as longint semantic_owner
+	dim as longint semantic_group = fbSemanticModelDeclarationGroup(FB_TK_CONST, semantic_owner)
+	dim as integer semantic_ordinal
 	dim as integer dtype = any
 	dim as FBSYMBOL ptr subtype = any
 
@@ -282,7 +300,8 @@ sub cConstDecl( byval attrib as FB_SYMBATTRIB )
 
 	do
 		'' ConstAssign
-		cConstAssign( dtype, subtype, attrib )
+		semantic_ordinal += 1
+		cConstAssign( dtype, subtype, attrib, semantic_group, semantic_owner, semantic_ordinal )
 
 		'' ','?
 		if( lexGetToken( ) <> FB_TK_DECLSEPCHAR ) then
@@ -291,6 +310,7 @@ sub cConstDecl( byval attrib as FB_SYMBATTRIB )
 
 		lexSkipToken( )
 	loop
+	fbSemanticModelDeclarationGroupEnd(semantic_group, semantic_owner, semantic_ordinal)
 end sub
 
 '' end of parser/declarations/parser-decl-const.bas

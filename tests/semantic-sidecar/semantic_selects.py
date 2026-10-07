@@ -5,6 +5,8 @@ Responsibilities: Ownership, ordered clauses, original operands and coverage.
 This file intentionally does NOT infer case values or execution from source.
 """
 
+from semantic_select_lowering import validate_select_lowering
+
 WORK_LIMIT = 8000000
 WIRE_ID_LIMIT = 4294967295
 SELECT_TOKEN = 270
@@ -14,6 +16,7 @@ CASE_TOKEN = 271
 def validate_select_inputs(model, number, subject_modules):
     constructs = {int(row[1]): row for row in model.records["BLK"]}
     inputs, clauses, alternatives, endings = {}, {}, {}, {}
+    lowering = []
     work_left = WORK_LIMIT
 
     def integer(text, minimum=0):
@@ -103,6 +106,8 @@ def validate_select_inputs(model, number, subject_modules):
                 if construct in endings:
                     raise ValueError("SELECT completion repeats its construct identity")
                 endings[construct] = owner, module, count, is_else
+            elif parts[0] in ("select-case-comparison", "select-case-constant", "select-case-table"):
+                lowering.append((owner, module, parts, fields))
             else:
                 raise ValueError("Unknown or malformed SELECT observation")
     if set(inputs) != set(endings):
@@ -150,5 +155,7 @@ def validate_select_inputs(model, number, subject_modules):
         module = int(header[7])
         if model.capabilities[module].get("select-case-inputs") == "available" and construct not in inputs:
             raise ValueError("Accepted SELECT has no compiler input observation")
+
+    validate_select_lowering(model, inputs, clauses, alternatives, lowering, integer, number, same_module, work_left)
 
 # end of semantic_selects.py
