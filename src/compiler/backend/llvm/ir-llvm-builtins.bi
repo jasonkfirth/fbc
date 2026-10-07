@@ -266,6 +266,7 @@ private function hEmitBuiltinCall _
 	case LLVM_BUILTIN_EXPECT, LLVM_BUILTIN_EXPECT_PROBABILITY
 		pname = "@llvm.expect"
 		dim as string extra
+		dim as integer withprobability = FALSE
 		if( builtin = LLVM_BUILTIN_EXPECT_PROBABILITY ) then
 			if( irIsIMM( args(2) ) = FALSE ) then
 				errReport( FB_ERRMSG_EXPECTEDCONST, , ": builtin probability" )
@@ -275,12 +276,17 @@ private function hEmitBuiltinCall _
 				errReport( FB_ERRMSG_INVALIDDATATYPES, , ": builtin probability outside [0, 1]" )
 				return TRUE
 			end if
-			pname += ".with.probability"
-			extra = ", double " + hVregToStr( args(2) )
+			'' ARM LLVM can select llvm.expect but not the probability form. Drop
+			'' only the optimization probability hint on ARM.
+			if( fbGetCpuFamily( ) <> FB_CPUFAMILY_ARM ) then
+				pname += ".with.probability"
+				extra = ", double " + hVregToStr( args(2) )
+				withprobability = TRUE
+			end if
 		end if
 		pname += "." + dtype
 		signature = dtype + " " + pname + "(" + dtype + ", " + dtype
-		if( builtin = LLVM_BUILTIN_EXPECT_PROBABILITY ) then signature += ", double"
+		if( withprobability ) then signature += ", double"
 		hDeclareIntrinsic( pname, signature + ")" )
 		result = irhlAllocVreg( args(0)->dtype, NULL )
 		hWriteLine( hVregToStr( result ) + " = call " + dtype + " " + pname + _

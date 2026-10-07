@@ -1,4 +1,12 @@
 
+/*
+    FreeBASIC gfxlib2 Haiku backend
+    File: haiku_window.h
+    Purpose: Declare native software and OpenGL window views.
+    Responsibilities: Describe native event and layout hooks.
+    This file contains no driver state or framebuffer allocation.
+*/
+
 #ifndef FB_HAIKU_WINDOW_H
 #define FB_HAIKU_WINDOW_H
 
@@ -18,6 +26,8 @@ public:
     FBHaikuWindow(BRect frame, const char *title);
 
     virtual void MessageReceived(BMessage *msg);
+    virtual void DispatchMessage(BMessage *msg, BHandler *target);
+    virtual void WindowActivated(bool active);
     virtual bool QuitRequested();
 };
 
@@ -42,6 +52,9 @@ public:
     virtual void MouseUp(BPoint where);
 
     virtual void FrameResized(float width, float height);
+    void RefreshLayout();
+    /* Caller owns the BWindow lock; source coordinates include row replication. */
+    void InvalidateFramebufferRect(BRect source_rect);
 
 private:
 
@@ -72,3 +85,5 @@ public:
 /* ------------------------------------------------------------------------- */
 
 #endif
+
+/* end of haiku_window.h */

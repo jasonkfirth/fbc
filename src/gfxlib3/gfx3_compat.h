@@ -94,6 +94,10 @@ typedef struct FB_GFX3_MODE {
 	*/
 	uint32_t *shadow_dirty_first_line;
 	uint32_t *shadow_dirty_last_line;
+	/* Inclusive columns complement row bounds. Unknown CPU writes retain the
+	   full width; known PSET rectangles can upload just their changed pixels. */
+	uint32_t *shadow_dirty_first_column;
+	uint32_t *shadow_dirty_last_column;
 	unsigned char *shadow_snapshot_active;
 	FB_GFX3_POINT_CACHE *point_cache;
 	/* Reused by compatibility screen PAINT while mode->mutex is held. */

@@ -1,12 +1,29 @@
-/* list of dos gfx drivers and common code */
+/*
+ * FreeBASIC DOS graphics: gfx_dos.c
+ *
+ * Own the DOS driver list, hardware timer, input callbacks and shared driver
+ * lifecycle. This file does not implement widget rendering or the individual
+ * VGA/VESA framebuffer converters.
+ */
 
 #include "../fb_gfx.h"
 #include "fb_gfx_dos.h"
+
 #include <pc.h>
 #include <sys/nearptr.h>
 
-/* timer ticks per second */
+/* The low-power profile keeps at least two polling opportunities per 60 Hz
+ * frame. It is opt-in because physical DOS hosts have separate timing and
+ * interrupt-latency constraints. The default retains the original PIT rate.
+ */
+#ifdef FB_DOS_GFX_LOW_POWER
+#define TIMER_HZ 120
+#else
 #define TIMER_HZ 1000
+#endif
+
+/* PIT input clock used by the existing IRQ0 and BIOS tick accumulation. */
+#define PIT_HZ 1193181u
 
 /* driver list */
 extern const GFXDRIVER fb_gfxDriverVESAlinear;
@@ -322,13 +339,29 @@ static void fb_dos_mouse_exit(void)
 	__dpmi_free_real_mode_callback(&fb_dos_mouse_isr_rmcb);
 }
 
+/* GUI waits read this counter; IRQ0 alone advances it. Unsigned subtraction
+ * permits rollover without using the coarse BIOS/DJGPP clock or the frame
+ * update counter, which is consumed by the display driver.
+ */
+static volatile unsigned int fb_dos_idle_timer_ticks;
+
+/* IRQ0 owns the last cursor published to video memory. The framebuffer is
+ * restored after publishing, so that restoration must not manufacture damage
+ * for the next refresh. These fields are locked with the timer's other data.
+ */
+static int fb_dos_cursor_visible;
+static int fb_dos_cursor_x, fb_dos_cursor_y;
+
 static int fb_dos_timer_handler(unsigned irq)
 {
 	int do_abort;
 	int mouse_x = 0, mouse_y = 0;
 	int buttons;
+	int cursor_visible, cursor_changed, cursor_drawn, line, dirty;
+	int cursor_palette_changed = FALSE;
 	EVENT e;
 
+	fb_dos_idle_timer_ticks += fb_dos.timer_step;
 	fb_dos.timer_ticks += fb_dos.timer_step;
 	if( (do_abort = fb_dos.timer_ticks < 65536)==FALSE )
 		fb_dos.timer_ticks -= 65536;
@@ -351,6 +384,7 @@ static int fb_dos_timer_handler(unsigned irq)
 	{
 		fb_dos.set_palette( );
 		if( fb_dos.mouse_ok ) fb_hSoftCursorPaletteChanged( );
+		cursor_palette_changed = TRUE;
 	}
 	
 	mouse_x = fb_dos_mouse_x;
@@ -362,16 +396,40 @@ static int fb_dos_timer_handler(unsigned irq)
 		}
 	}
 
-	if ( fb_dos.mouse_ok && fb_dos.mouse_cursor ) {
-		fb_hSoftCursorPut(mouse_x, mouse_y);
-	}
-	
-	fb_dos.update();
-	fb_hMemSet(__fb_gfx->dirty, FALSE, __fb_gfx->h * __fb_gfx->scanline_size);
+	cursor_visible = fb_dos.mouse_ok && fb_dos.mouse_cursor &&
+		mouse_x >= 0 && mouse_x < __fb_gfx->w &&
+		mouse_y >= 0 && mouse_y < __fb_gfx->h;
+	cursor_changed = cursor_visible != fb_dos_cursor_visible ||
+		(cursor_visible && (mouse_x != fb_dos_cursor_x || mouse_y != fb_dos_cursor_y));
+	if (fb_dos_cursor_visible && cursor_changed)
+		fb_hSoftCursorMarkDirty(fb_dos_cursor_y);
 
-	if ( fb_dos.mouse_ok && fb_dos.mouse_cursor ) {
-		fb_hSoftCursorUnput(mouse_x, mouse_y);
+	dirty = FALSE;
+	for (line = 0; line < __fb_gfx->h * __fb_gfx->scanline_size; line++) {
+		if (__fb_gfx->dirty[line]) {
+			dirty = TRUE;
+			break;
+		}
 	}
+	/* Banked drivers can copy the span between the first and last dirty row.
+	 * Reapply the cursor for any real damage, including rows away from it.
+	 * Input posting below still runs when no framebuffer update is needed.
+	 */
+	cursor_drawn = cursor_visible && (dirty || cursor_changed || cursor_palette_changed);
+	if (cursor_drawn)
+		fb_hSoftCursorPut(mouse_x, mouse_y);
+	if (dirty || cursor_drawn) {
+		fb_dos.update();
+		if (cursor_drawn)
+			fb_hSoftCursorUnput(mouse_x, mouse_y);
+		/* IRQ0 excludes foreground drawing until this handler returns. Clear
+		 * consumed damage after restoring the borrowed cursor background.
+		 */
+		fb_hMemSet(__fb_gfx->dirty, FALSE, __fb_gfx->h * __fb_gfx->scanline_size);
+	}
+	fb_dos_cursor_visible = cursor_visible;
+	fb_dos_cursor_x = mouse_x;
+	fb_dos_cursor_y = mouse_y;
 	
 	e.type = 0;
 
@@ -432,12 +490,14 @@ static int fb_dos_timer_set_rate(int rate)
 
 static int fb_dos_timer_set_freq(int freq)
 {
-	return fb_dos_timer_set_rate( 1193181 / freq );
+	return fb_dos_timer_set_rate( PIT_HZ / freq );
 }
 
 static int fb_dos_timer_init(int freq)
 {
 	fb_dos.timer_ticks = 0;
+	fb_dos_cursor_visible = FALSE;
+	fb_dos_cursor_x = fb_dos_cursor_y = 0;
 	fb_dos.timer_step = fb_dos_timer_set_freq( freq );
 	return fb_isr_set( 0, fb_dos_timer_handler, 0, 16384 );
 }
@@ -511,6 +571,17 @@ void fb_dos_detect(void)
 int fb_dos_init(char *title, int w, int h, int depth, int refresh_rate, int flags)
 {
 	int i;
+	int timer_hz = TIMER_HZ;
+
+	/* The original 1 kHz timer cannot represent larger refresh requests. */
+	if( refresh_rate <= 0 || refresh_rate > 1000 )
+		return -1;
+#ifdef FB_DOS_GFX_LOW_POWER
+	/* An integral number of interrupts per frame preserves the requested
+	 * refresh cadence even when it is not a divisor of the polling minimum.
+	 */
+	timer_hz = refresh_rate * ((TIMER_HZ + refresh_rate - 1) / refresh_rate);
+#endif
 	
 	fb_dos.inited = TRUE;
 	
@@ -526,6 +597,10 @@ int fb_dos_init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	fb_dos_lock_data(__fb_gfx->palette, sizeof(int) * 256);
 	fb_dos_lock_data(__fb_color_conv_16to32, sizeof(int) * 512);
 	lock_var(fb_dos);
+	lock_var(fb_dos_idle_timer_ticks);
+	lock_var(fb_dos_cursor_visible);
+	lock_var(fb_dos_cursor_x);
+	lock_var(fb_dos_cursor_y);
 	fb_dos_lock_data(&__fb_gfx->key, 128);
 	lock_proc(fb_dos_timer_handler);
 	lock_proc(fb_dos_timer_handler);
@@ -572,9 +647,10 @@ int fb_dos_init(char *title, int w, int h, int depth, int refresh_rate, int flag
 		fb_dos.mouse_cursor = FALSE;
 	}
 		
-	__fb_dos_ticks_per_update = TIMER_HZ / refresh_rate;
+	__fb_dos_update_ticks = 0;
+	__fb_dos_ticks_per_update = timer_hz / refresh_rate;
 	
-	if (!fb_dos_timer_init(TIMER_HZ))
+	if (!fb_dos_timer_init(timer_hz))
 		return -1;
 	
 	fb_hMemSet(__fb_gfx->dirty, TRUE, __fb_gfx->h * __fb_gfx->scanline_size);
@@ -618,6 +694,10 @@ void fb_dos_exit(void)
 	fb_dos_unlock_data(__fb_gfx->palette, sizeof(int) * 256);
 	fb_dos_unlock_data(__fb_color_conv_16to32, sizeof(int) * 512);
 	unlock_var(fb_dos);
+	unlock_var(fb_dos_idle_timer_ticks);
+	unlock_var(fb_dos_cursor_visible);
+	unlock_var(fb_dos_cursor_x);
+	unlock_var(fb_dos_cursor_y);
 	fb_dos_unlock_data(&__fb_gfx->key, 128);
 	unlock_proc(fb_dos_timer_handler);
 	unlock_proc(fb_dos_timer_handler);
@@ -696,3 +776,39 @@ ssize_t fb_hGetDisplayHandle(void)
 {
 	return 0;
 }
+
+/* Opt-in GUI polling wait for a qualified DOSBox-X/DPMI host. The caller
+ * must run on the foreground thread with graphics locks released. Releasing
+ * a host slice can wake at any interrupt, so IRQ0's monotonic PIT input-cycle
+ * counter supplies the deadline. Frame update counters and BIOS clocks do
+ * not provide that contract. An extra timer period accounts for the partial
+ * first period, keeping this wait from completing earlier than requested.
+ */
+void fb_GfxDosIdle( int milliseconds )
+{
+	unsigned int started, duration;
+
+	if( milliseconds <= 0 )
+		return;
+	/* Bound polling requests before multiplying in 32-bit arithmetic. */
+	if( milliseconds > 1000 )
+		milliseconds = 1000;
+	if( !fb_dos.inited || !fb_dos.timer_step ) {
+		__dpmi_yield();
+		fb_Delay( milliseconds );
+		return;
+	}
+	/* Foreground waits must not hold up framebuffer publication or suspend
+	 * an interrupt callback. Misplaced calls return without yielding.
+	 */
+	if( fb_dos.locked || fb_dos.in_interrupt )
+		return;
+
+	duration = ((unsigned int)milliseconds * PIT_HZ + 999u) / 1000u;
+	duration += fb_dos.timer_step;
+	started = fb_dos_idle_timer_ticks;
+	while( (unsigned int)(fb_dos_idle_timer_ticks - started) < duration )
+		__dpmi_yield();
+}
+
+/* end of gfx_dos.c */

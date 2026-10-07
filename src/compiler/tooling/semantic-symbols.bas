@@ -5,6 +5,7 @@
 '' This file intentionally does NOT contain: name resolution or source parsing.
 
 #include once "tooling/semantic-private.bi"
+#include once "tooling/semantic-access.bi"
 #include once "support/strings/hlp-str.bi"
 #include once "support/hlp.bi"
 #include once "crt/mem.bi"
@@ -88,6 +89,24 @@ private function hParamMode(byval mode as integer) as string
 	case FB_PARAMMODE_BYDESC: return "bydesc"
 	case FB_PARAMMODE_VARARG: return "vararg"
 	case else: return "unknown"
+	end select
+end function
+
+'' Calling convention and declaration linkage are separate. An ordinary BASIC
+'' procedure can use CDECL without belonging to an EXTERN "C" interface. Keep
+'' the accepted symbol's linkage, including prototypes defined outside EXTERN.
+private function hProcedureLinkage(byval sym as FBSYMBOL ptr) as string
+	select case symbGetMangling(sym)
+	case FB_MANGLING_BASIC: return "basic"
+	case FB_MANGLING_CDECL: return "c"
+	case FB_MANGLING_STDCALL: return "windows"
+	case FB_MANGLING_STDCALL_MS: return "windows-ms"
+	case FB_MANGLING_CPP: return "c++"
+	case FB_MANGLING_PASCAL: return "pascal"
+	case FB_MANGLING_RTLIB: return "rtlib"
+	case else
+		fbSemanticModelFailAt("semantic-symbols.bas:108")
+		return ""
 	end select
 end function
 
@@ -181,13 +200,13 @@ function fbSemanticModelFormatValue _
 			if( literal->var_.littextw = NULL ) then return FALSE
 			dim as wstring ptr text = hUnescapeW(literal->var_.littextw, text_length)
 			if( (text_length < 0) or (text_length > SEMANTIC_MAX_LITERAL_UNITS) ) then
-				fbSemanticModelFail( )
+				fbSemanticModelFailAt("semantic-symbols.bas:203")
 				return FALSE
 			end if
 			value_kind = "wide-units"
 			value_text = space(text_length * 8)
 			if( len(value_text) <> text_length * 8 ) then
-				fbSemanticModelFail( )
+				fbSemanticModelFailAt("semantic-symbols.bas:209")
 				return FALSE
 			end if
 			for index as integer = 0 to text_length - 1
@@ -197,13 +216,13 @@ function fbSemanticModelFormatValue _
 			if( literal->var_.littext = NULL ) then return FALSE
 			dim as zstring ptr text = hUnescape(literal->var_.littext, text_length)
 			if( (text_length < 0) or (text_length > SEMANTIC_MAX_LITERAL_UNITS) ) then
-				fbSemanticModelFail( )
+				fbSemanticModelFailAt("semantic-symbols.bas:219")
 				return FALSE
 			end if
 			value_kind = "bytes"
 			value_text = space(text_length * 2)
 			if( len(value_text) <> text_length * 2 ) then
-				fbSemanticModelFail( )
+				fbSemanticModelFailAt("semantic-symbols.bas:225")
 				return FALSE
 			end if
 			for index as integer = 0 to text_length - 1
@@ -241,11 +260,88 @@ end sub
 '' Symbol snapshots
 '' -------------------------------------------------------------------------
 
+'' A terminated wide API observes the target's prefix, not HUNESCAPEW's
+'' host units. Each selected unit occupies eight hex digits in this property.
+'' UTF-16 splits valid supplementary scalars; one/two-byte target storage
+'' truncates other values to the same width used by emitted literal storage.
+private sub hExportWideLiteralPrefix(byval sym as FBSYMBOL ptr, byval symbolid as longint)
+
+	if( env.clopt.backend <> FB_BACKEND_GCC ) then exit sub
+	if( sym->var_.littextw = NULL ) then exit sub
+	dim as longint source_units = len(*sym->var_.littextw)
+	if( (source_units < 0) or (source_units > SEMANTIC_MAX_LITERAL_UNITS) ) then
+		fbSemanticModelFailAt("wide literal source exceeds the semantic budget")
+		exit sub
+	end if
+	dim as integer unit_bytes = fbGetTargetWcharSize( )
+	if( (unit_bytes <> 1) and (unit_bytes <> 2) and (unit_bytes <> 4) ) then
+		fbSemanticModelFailAt("wide literal target unit size is unsupported")
+		exit sub
+	end if
+	dim as longint capacity_units = source_units
+	if( unit_bytes = 2 ) then capacity_units *= 2
+	if( capacity_units > SEMANTIC_MAX_LITERAL_UNITS ) then capacity_units = SEMANTIC_MAX_LITERAL_UNITS
+	dim as string prefix = space(capacity_units * 8)
+	if( len(prefix) <> capacity_units * 8 ) then
+		fbSemanticModelFailAt("wide literal prefix allocation failed")
+		exit sub
+	end if
+	'' Match hSym2Text's selected representation and hBuildWstrLit's bound.
+	'' C literals append their own zero. Numeric WCHAR arrays must actually
+	'' emit a zero inside that bound before a terminated API is safe to scan.
+	dim as wstring ptr cursor = sym->var_.littextw
+	if( fbTargetWcharIsUtf32( ) = FALSE ) then cursor = hUnescapeW(cursor)
+	dim as wstring ptr source_end = cursor + len(*cursor)
+	dim as integer numeric_array = fbTargetWcharIsUtf32( ) and fbTargetSupportsCOFF( )
+	dim as longint character_limit = symbGetWstrLength(sym)
+	if( (character_limit < 0) or (character_limit > SEMANTIC_MAX_LITERAL_UNITS) ) then
+		fbSemanticModelFailAt("wide literal target length exceeds the semantic budget")
+		exit sub
+	end if
+	if( numeric_array ) then character_limit += 1
+	dim as integer terminated = not numeric_array
+	dim as longint unit_count = 0
+	for character_index as longint = 0 to character_limit - 1
+		if( cursor >= source_end ) then terminated = TRUE: exit for
+		dim as uinteger character = hReadWstrChar(cursor, source_end)
+		dim as uinteger first_unit = character, second_unit = 0
+		dim as integer emitted_units = 1
+		if( (unit_bytes = 2) and (character >= &h10000ul) and (character <= &h10FFFFul) ) then
+			character -= &h10000ul
+			first_unit = (character shr 10) + &hD800ul
+			second_unit = (character and &h3FFul) + &hDC00ul
+			emitted_units = 2
+		elseif( unit_bytes = 2 ) then
+			first_unit and= &hFFFFul
+		elseif( unit_bytes = 1 ) then
+			first_unit and= &hFFul
+		end if
+		if( first_unit = 0 ) then terminated = TRUE: exit for
+		if( unit_count > SEMANTIC_MAX_LITERAL_UNITS - emitted_units ) then
+			fbSemanticModelFailAt("wide literal prefix exceeds the semantic budget")
+			exit sub
+		end if
+		mid(prefix, unit_count * 8 + 1, 8) = hex(first_unit, 8)
+		unit_count += 1
+		if( emitted_units = 2 ) then
+			mid(prefix, unit_count * 8 + 1, 8) = hex(second_unit, 8)
+			unit_count += 1
+		end if
+	next
+	prefix = left(prefix, unit_count * 8)
+	hSymbolNumber(symbolid, "literal-target-wide-unit-bytes", unit_bytes)
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+		fbSemanticModelNumber(symbolid) + TABCHAR + "literal-target-wide-kind" + TABCHAR + _
+		iif(terminated, "terminated", "unterminated"))
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+		fbSemanticModelNumber(symbolid) + TABCHAR + "literal-target-wide-prefix" + TABCHAR + prefix)
+end sub
+
 private sub hExportArray(byval sym as FBSYMBOL ptr, byval symbolid as longint)
 	dim as integer rank = symbGetArrayDimensions(sym)
 	if( rank = 0 ) then exit sub
 	if( (rank < -1) or (rank > FB_MAXARRAYDIMS) ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-symbols.bas:267")
 		exit sub
 	end if
 	dim as string prefix = "A" + TABCHAR + fbSemanticModelNumber(symbolid) + _
@@ -277,6 +373,8 @@ end sub
 
 private sub hExportProcedure(byval sym as FBSYMBOL ptr, byval symbolid as longint, _
 	byval variables_live as integer)
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+		fbSemanticModelNumber(symbolid) + TABCHAR + "procedure-linkage" + TABCHAR + hProcedureLinkage(sym))
 	dim as string proc_kind, operator_code
 	if( symbGetIsFuncPtr(sym) ) then
 		proc_kind = "procedure-pointer"
@@ -327,6 +425,10 @@ private sub hExportProcedure(byval sym as FBSYMBOL ptr, byval symbolid as longin
 	while( param <> NULL )
 		dim as longint paramid = fbSemanticModelSymbolId(param)
 		dim as longint variableid = fbSemanticModelParameterVariable(param, variables_live)
+		'' Explicit zero is needed for consumers to distinguish a complete
+		'' no-write observation from a producer missing this property. Live
+		'' body-variable refresh follows parsing, before storage is released.
+		if( variableid > 0 ) then hSymbolNumber(variableid, "direct-source-write", fbSemanticModelDirectSourceWrite(variableid))
 		fbSemanticModelAppendDetail("G" + TABCHAR + fbSemanticModelNumber(symbolid) + _
 			TABCHAR + fbSemanticModelNumber(paramid) + TABCHAR + fbSemanticModelNumber(ordinal) + _
 			TABCHAR + hParamMode(param->param.mode) + TABCHAR + _
@@ -347,12 +449,12 @@ private function hWideTokenText(byval text as wstring ptr) as string
 	'' a string literal. Eight hex digits preserve each unit on either host ABI.
 	dim as integer units = len(*text)
 	if( units > SEMANTIC_MAX_LITERAL_UNITS ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-symbols.bas:375")
 		return ""
 	end if
 	dim as string result = space(units * 8)
 	if( len(result) <> units * 8 ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-symbols.bas:380")
 		return ""
 	end if
 	for index as integer = 0 to units - 1
@@ -414,7 +516,7 @@ private sub hExportDefine(byval sym as FBSYMBOL ptr, byval symbolid as longint)
 			token_kind = "wide-text"
 			value = hWideTokenText(token->textw)
 		case else
-			fbSemanticModelFail( )
+			fbSemanticModelFailAt("semantic-symbols.bas:442")
 			exit sub
 		end select
 		fbSemanticModelAppendDetail(token_prefix + fbSemanticModelNumber(ordinal) + TABCHAR + _
@@ -447,6 +549,7 @@ sub fbSemanticModelExportSymbolDetails(byval sym as FBSYMBOL ptr, byval variable
 
 	select case sym->class
 	case FB_SYMBCLASS_VAR, FB_SYMBCLASS_FIELD
+		if( sym->class = FB_SYMBCLASS_VAR ) then hSymbolNumber(symbolid, "direct-source-write", fbSemanticModelDirectSourceWrite(symbolid))
 		hExportArray(sym, symbolid)
 		hSymbolNumber(symbolid, "declaration-statement", sym->var_.stmtnum)
 		if( sym->attrib and FB_SYMBATTRIB_LITERAL ) then
@@ -454,6 +557,7 @@ sub fbSemanticModelExportSymbolDetails(byval sym as FBSYMBOL ptr, byval variable
 				dim as FBVALUE value
 				value.s = sym
 				fbSemanticModelExportValue("symbol", symbolid, sym->typ, @value)
+				if( symbGetType(sym) = FB_DATATYPE_WCHAR ) then hExportWideLiteralPrefix(sym, symbolid)
 			end if
 		else
 			fbSemanticModelExportInitializer(sym, sym->var_.initree, "initializer")
@@ -462,6 +566,10 @@ sub fbSemanticModelExportSymbolDetails(byval sym as FBSYMBOL ptr, byval variable
 			fbSemanticModelNumber(symbolid) + TABCHAR + "alignment" + TABCHAR + _
 			fbSemanticModelNumber(sym->var_.align))
 		if( symbIsField(sym) ) then
+			'' A rows exist only for arrays. An explicit zero rank lets
+			'' consumers prove scalar fields instead of inferring that from
+			'' absent array rows in an older or incomplete export.
+			hSymbolNumber(symbolid, "field-array-rank", symbGetArrayDimensions(sym))
 			fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
 				fbSemanticModelNumber(symbolid) + TABCHAR + "bit-position" + TABCHAR + _
 				fbSemanticModelNumber(sym->var_.bitpos))
@@ -493,6 +601,27 @@ sub fbSemanticModelExportSymbolDetails(byval sym as FBSYMBOL ptr, byval variable
 			hSymbolNumber(symbolid, "layout-finalized", abs(sym->udt.retdtype <> FB_DATATYPE_INVALID))
 			if( sym->udt.retdtype <> FB_DATATYPE_INVALID ) then
 				hSymbolNumber(symbolid, "aggregate-register-return", sym->udt.retin2regs)
+				'' Completed source-field membership is different from storage
+				'' layout: base storage and dynamic descriptors are hidden FIELDs,
+				'' while Static members are VARs. Anonymous fields have already
+				'' been promoted into this table by symbInsertInnerUDT().
+				'' Earlier observations must not assert a complete group count.
+				dim as FBSYMBOL ptr field_sym = symbGetUDTSymbTbHead(sym)
+				dim as longint field_count = 0, visits = 0
+				while( field_sym <> NULL )
+					visits += 1
+					'' Match the semantic producer's one-million symbol budget;
+					'' corrupt/cyclic tables must not hang a tooling export.
+					if( visits > 1000000 ) then
+						fbSemanticModelFailAt("semantic-symbols.bas:538")
+						exit sub
+					end if
+					if( symbIsField(field_sym) andalso (fbSemanticModelSymbolOrigin(field_sym) = "source") ) then
+						field_count += 1
+					end if
+					field_sym = symbGetNext(field_sym)
+				wend
+				hSymbolNumber(symbolid, "declared-field-count", field_count)
 			end if
 			'' udt.base is the compiler's hidden base FIELD, whose subtype is
 			'' the declared base type. Export that type, not the storage field.
@@ -556,11 +685,11 @@ sub fbSemanticModelExportProcPtrReplacement(byval previous as FBSYMBOL ptr, byva
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
 	if( (previous = NULL) or (canonical = NULL) or (previous = canonical) ) then exit sub
 	if( (previous->class <> FB_SYMBCLASS_PROC) or (canonical->class <> FB_SYMBCLASS_PROC) ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-symbols.bas:610")
 		exit sub
 	end if
 	if( previous->proc.params <> canonical->proc.params ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-symbols.bas:614")
 		exit sub
 	end if
 
@@ -576,7 +705,7 @@ sub fbSemanticModelExportProcPtrReplacement(byval previous as FBSYMBOL ptr, byva
 		previous_param = symbGetParamNext(previous_param)
 		canonical_param = symbGetParamNext(canonical_param)
 	wend
-	if( (previous_param <> NULL) or (canonical_param <> NULL) ) then fbSemanticModelFail( )
+	if( (previous_param <> NULL) or (canonical_param <> NULL) ) then fbSemanticModelFailAt("semantic-symbols.bas:630")
 end sub
 
 '' -------------------------------------------------------------------------
@@ -591,7 +720,7 @@ sub fbSemanticModelExportSymbols(byval head as FBSYMBOL ptr)
 	const MAX_PENDING_TABLES = 4096
 	dim as FBSYMBOL ptr ptr stack = callocate(MAX_PENDING_TABLES, sizeof(FBSYMBOL ptr))
 	if( stack = NULL ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-symbols.bas:645")
 		exit sub
 	end if
 	dim as integer count = 1
@@ -626,7 +755,7 @@ sub fbSemanticModelExportSymbols(byval head as FBSYMBOL ptr)
 				end select
 				if( child <> NULL ) then
 					if( count >= MAX_PENDING_TABLES ) then
-						fbSemanticModelFail( )
+						fbSemanticModelFailAt("semantic-symbols.bas:680")
 						exit while
 					end if
 					stack[count] = sym->next

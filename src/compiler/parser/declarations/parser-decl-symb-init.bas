@@ -28,6 +28,7 @@
 #include once "ast/ast.bi"
 #include once "backend/ir.bi"
 #include once "symbols/symb.bi"
+#include once "tooling/semantic-expressions.bi"
 
 declare sub fbSemanticModelExportImplicitCall _
 	( _
@@ -91,6 +92,7 @@ private function hDoAssign _
 
 	'' pass the initializing expression back to parent if it fails here
 	ctx.init_expr = expr
+	dim as longint semantic_rhs = expr->semantic_expression
 
 	if( astCheckASSIGNToType( ctx.dtype, ctx.subtype, expr, no_upcast ) = FALSE ) then
 		'' check if it's a cast
@@ -122,7 +124,9 @@ private function hDoAssign _
 		check_upcast = TRUE
 	end if
 
-	astTypeIniAddAssign( ctx.tree, expr, ctx.sym, ctx.dtype, ctx.subtype, check_upcast )
+	var semantic_initializer = astTypeIniAddAssign( ctx.tree, expr, ctx.sym, ctx.dtype, ctx.subtype, check_upcast )
+	fbSemanticModelAssignmentTarget(semantic_rhs, ctx.dtype, ctx.subtype, "initializer")
+	fbSemanticModelStringInitializer(semantic_rhs, ctx.sym, ctx.dtype, semantic_initializer)
 
 	function = TRUE
 end function

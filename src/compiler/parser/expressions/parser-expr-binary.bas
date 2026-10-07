@@ -61,7 +61,7 @@ private function hSourceBinaryOperation _
 	  byref source as LEX_LOCATION, byval extra as FBSYMBOL ptr = NULL, _
 	  byval options as AST_OPOPT = AST_OPOPT_DEFAULT ) as ASTNODE ptr
 	dim as longint operands = fbSemanticModelCaptureOperands(left_expr, right_expr, "binary", op, source)
-	dim as ASTNODE ptr result = astNewBOP(op, left_expr, right_expr, extra, options)
+	dim as ASTNODE ptr result = astNewBOPWithOperands(op, left_expr, right_expr, extra, options, operands)
 	fbSemanticModelAttachOperands(result, operands)
 	return result
 end function

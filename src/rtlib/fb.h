@@ -1,3 +1,11 @@
+/*
+ * FreeBASIC runtime
+ * File: fb.h
+ * Purpose: Declare shared runtime types, entry points and platform helpers.
+ * Responsibilities: Keep the compiler-facing runtime contracts and internal
+ *     memory, string and synchronization helpers available to runtime modules.
+ * This file does not implement compiler parsing or graphics drivers.
+ */
 #ifndef __FB_H__
 #define __FB_H__
 
@@ -189,20 +197,48 @@ extern "C" {
         int res;
         if( len==0 )
             return 0;
+        /* Equal words can be skipped together, including unaligned x86 spans.
+           A little-endian word comparison cannot determine bytewise ordering,
+           so replay the first unequal word as bytes. Compare only complete
+           words and the remaining bytes; neither loop reads beyond len.
+           The x86 ABI supplies a clear direction flag. The memory clobber
+           keeps preceding stores visible to this read-only assembly helper. */
         __asm volatile (
                " pushl %%esi      \n"
                " pushl %%edi      \n"
+               " pushl %%ecx      \n"
+               " shrl $2,%%ecx    \n"
+               " jz 0f           \n"
+               " repe            \n"
+               " cmpsl           \n"
+               " jne 1f          \n"
+               "0:               \n"
+               " popl %%ecx      \n"
+               " andl $3,%%ecx    \n"
+               " jz 2f           \n"
                " repe             \n"
                " cmpsb            \n"
-               " je 0f            \n"
+               " jne 3f          \n"
+               "2:               \n"
+               " xorl %%ecx,%%ecx\n"
+               " jmp 4f          \n"
+               "1:               \n"
+               " popl %%ecx      \n"
+               " subl $4,%%esi    \n"
+               " subl $4,%%edi    \n"
+               " movl $4,%%ecx    \n"
+               " repe            \n"
+               " cmpsb           \n"
+               "3:               \n"
                " movl $1, %%ecx   \n"
-               " ja 0f            \n"
+               " ja 4f            \n"
                " neg %%ecx        \n"
-               "0:                \n"
+               "4:                \n"
                " popl %%edi       \n"
                " popl %%esi       \n"
                : "=c" (res)
                : "c" (len), "S" (p1), "D" (p2)
+               : "cc", "memory"
               );
         return res;
     }
@@ -414,3 +450,4 @@ typedef struct FB_RTLIB_CTX_ {
 extern FB_RTLIB_CTX __fb_ctx;
 
 #endif /*__FB_H__*/
+/* end of fb.h */

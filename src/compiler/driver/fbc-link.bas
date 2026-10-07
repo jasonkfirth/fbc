@@ -150,25 +150,6 @@ private function fbcIsUsingGoldLinker( ) as integer
 	return FALSE
 end function
 
-private function hArmLinuxUsesHardFloatAbi( ) as integer
-#ifndef ENABLE_STANDALONE
-	'' GNU ARM triplets encode the floating-point ABI in the OS suffix:
-	'' gnueabihf is hard-float, while plain gnueabi is soft-float.
-	if( instr( lcase( fbc.target ), "gnueabihf" ) > 0 ) then
-		return TRUE
-	elseif( instr( lcase( fbc.target ), "gnueabi" ) > 0 ) then
-		return FALSE
-	end if
-#endif
-
-	select case as const FB_DEFAULT_CPUTYPE_ARM
-	case FB_CPUTYPE_ARMV6_FP, FB_CPUTYPE_ARMV7A_FP
-		return TRUE
-	case else
-		return FALSE
-	end select
-end function
-
 private sub hPrepareLinkTarget _
 	( _
 		byref ldcline as string, _
@@ -390,13 +371,13 @@ private sub hAddUnixDynamicLinker( byref ldcline as string )
 #endif
 		case FB_CPUFAMILY_ARM
 #ifdef ENABLE_MUSL_DYNAMIC_LINKER
-			if( hArmLinuxUsesHardFloatAbi( ) ) then
+			if( fbcLinuxPlatformArmUsesHardFloatAbi( ) ) then
 				ldcline += " -dynamic-linker /lib/ld-musl-armhf.so.1"
 			else
 				ldcline += " -dynamic-linker /lib/ld-musl-arm.so.1"
 			end if
 #else
-			if( hArmLinuxUsesHardFloatAbi( ) ) then
+			if( fbcLinuxPlatformArmUsesHardFloatAbi( ) ) then
 				ldcline += " -dynamic-linker /lib/ld-linux-armhf.so.3"
 			else
 				ldcline += " -dynamic-linker /lib/ld-linux.so.3"

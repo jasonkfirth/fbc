@@ -5,6 +5,7 @@
 '' This file intentionally does NOT contain: option parsing or policy decisions.
 
 #include once "tooling/semantic-private.bi"
+#include once "tooling/semantic-constructs.bi"
 #include once "crt/mem.bi"
 
 '' Compiler modules execute serially. These snapshots contain only scalar
@@ -109,6 +110,32 @@ function fbSemanticModelCurrentContext( ) as longint
 	hOption("language-policy", "floatliteraldtype", env.lang.floatliteraldtype)
 	return semantic_context_id
 end function
+
+sub fbSemanticModelOptionDeclaration( byval is_base as integer, byval value as longint )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	dim as longint statement = fbSemanticModelCurrentStatement( )
+	if( statement = 0 ) then
+		fbSemanticModelFailAt("semantic-context.bas:118")
+		exit sub
+	end if
+	dim as longint context = fbSemanticModelCurrentContext( )
+	if( context = 0 ) then
+		fbSemanticModelFailAt("semantic-context.bas:123")
+		exit sub
+	end if
+	'' ST retains the entry configuration, before OPTION changes the default.
+	'' These optional OPT keys identify the accepted occurrence in its committed
+	'' context. Repeated identical directives must not collapse into one event.
+	'' The statement identity is unique within a model; no new grammar or AST
+	'' expression is invented for this parser-consumed scalar setting.
+	'' option-statement: 1 means the BASE route; 0 means another OPTION route.
+	'' A receipt for every parsed OPTION makes BASE membership complete, even
+	'' when a repeated directive leaves the effective context unchanged.
+	hOption("language-default", "option-statement-" + fbSemanticModelNumber(statement), iif(is_base, 1, 0))
+	if( is_base ) then
+		hOption("language-default", "base-statement-" + fbSemanticModelNumber(statement), value)
+	end if
+end sub
 
 sub fbSemanticModelBindContext(byref domain as const string, byval identity as longint)
 	if( identity <= 0 ) then exit sub

@@ -106,6 +106,9 @@ type FBTOKEN
 		hassuffix   as integer                  '' numeric literal has suffix
 	end union
 	suffixchar      as integer
+	'' Exact alphabetic numeric suffix, separate from canonical value text.
+	'' Observation only: punctuation suffixes retain their existing handling.
+	numeric_suffix  as zstring * 4
 
 	after_space     as integer
 

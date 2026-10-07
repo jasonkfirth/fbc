@@ -687,6 +687,11 @@ declare function astNewBOP _
 		byval options as AST_OPOPT = AST_OPOPT_DEFAULT _
 	) as ASTNODE ptr
 
+'' Numeric tooling can observe coercion before the result is folded.
+declare function astNewBOPWithOperands _
+	( byval op as integer, byval l as ASTNODE ptr, byval r as ASTNODE ptr, _
+	  byval ex as FBSYMBOL ptr, byval options as AST_OPOPT, byval semantic_operands as longint ) as ASTNODE ptr
+
 declare function astNewSelfBOP _
 	( _
 		byval op as integer, _
@@ -695,6 +700,11 @@ declare function astNewSelfBOP _
 		byval ex as FBSYMBOL ptr = NULL, _
 		byval options as AST_OPOPT = AST_OPOPT_DEFAULT _
 	) as ASTNODE ptr
+
+'' Parser observers pass original operands without changing the existing ABI.
+declare function astNewSelfBOPWithOperands _
+	( byval op as integer, byval l as ASTNODE ptr, byval r as ASTNODE ptr, _
+	  byval ex as FBSYMBOL ptr, byval options as AST_OPOPT, byval semantic_operands as longint ) as ASTNODE ptr
 
 declare function astNewUOP _
 	( _
@@ -1408,7 +1418,8 @@ declare function astBuildArrayBound _
 	( _
 		byval arrayexpr as ASTNODE ptr, _
 		byval dimexpr as ASTNODE ptr, _
-		byval tk as integer _
+		byval tk as integer, _
+		byval selected_dimension as longint ptr = NULL _
 	) as ASTNODE ptr
 
 declare function astBuildStrPtr( byval lhs as ASTNODE ptr ) as ASTNODE ptr

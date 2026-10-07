@@ -28,6 +28,7 @@
 #include once "ast/ast.bi"
 #include once "support/numeric/fp-policy.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-expressions.bi"
 
 
 declare sub fbSemanticModelExportExpression _
@@ -169,6 +170,12 @@ function cTypeConvExpr _
 	end select
 
 	dim as integer conv_done = FALSE
+	'' Retain the original typed operand before constant conversion can delete
+	'' or reuse its AST node. This is the same source cast relationship as CAST.
+	dim as longint semantic_operands = 0
+	if( semantic_model_enabled ) then
+		semantic_operands = fbSemanticModelCaptureOperands(expr, NULL, "cast", -1, source_start)
+	end if
 
 	if( (tk = FB_TK_CBOOL) andalso astIsCONST( expr ) ) then
 		if( typeGetClass( astGetFullType( expr ) ) = FB_DATACLASS_FPOINT ) then
@@ -209,6 +216,7 @@ function cTypeConvExpr _
 
 	if( semantic_model_enabled andalso has_closing_parenthesis and _
 		conversion_valid andalso (expr <> NULL) ) then
+		fbSemanticModelAttachOperands(expr, semantic_operands)
 		if( (expr->class = AST_NODECLASS_CALL) or _
 			(expr->class = AST_NODECLASS_CALLCTOR) ) then
 			if( (expr->sym <> NULL) andalso symbIsOperator(expr->sym) ) then

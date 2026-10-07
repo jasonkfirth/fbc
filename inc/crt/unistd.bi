@@ -21,6 +21,8 @@
 #include once "crt/linux/unistd.bi"
 #elseif defined(__FB_DARWIN__)
 #include once "crt/darwin/unistd.bi"
+#elseif defined(__FB_HAIKU__)
+#include once "crt/haiku/unistd.bi"
 #else
 #error unsupported platform
 #endif

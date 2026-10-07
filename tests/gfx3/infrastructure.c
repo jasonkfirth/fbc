@@ -68,16 +68,21 @@
 */
 static const FB_GFX3_PLATFORM_VTABLE *platform_test_override;
 
+/* Compile the native adapter once with its selector renamed to this test
+   seam. Adapter vtables are private implementation details, so tests must use
+   the same selector as production instead of referring to their static names. */
+#if defined(HOST_ANDROID) || defined(HOST_WIN32) || \
+    (defined(HOST_LINUX) && !defined(DISABLE_X11))
+extern const FB_GFX3_PLATFORM_VTABLE *fb_gfx3_platform_test_native(void);
+#endif
+
 const FB_GFX3_PLATFORM_VTABLE *fb_gfx3_platform_default(void)
 {
 	if (platform_test_override != NULL)
 		return platform_test_override;
-#if defined(HOST_ANDROID)
-	return &__fb_gfx3_platform_android;
-#elif defined(HOST_WIN32)
-	return &__fb_gfx3_platform_win32;
-#elif defined(HOST_LINUX) && !defined(DISABLE_X11)
-	return &__fb_gfx3_platform_x11;
+#if defined(HOST_ANDROID) || defined(HOST_WIN32) || \
+    (defined(HOST_LINUX) && !defined(DISABLE_X11))
+	return fb_gfx3_platform_test_native();
 #else
 	return NULL;
 #endif
@@ -344,29 +349,6 @@ FBCALL void fb_Delay(int milliseconds)
 #endif
 }
 
-#ifdef HOST_WIN32
-/*
-    The standalone infrastructure executable has no console runtime. Native
-    key messages are outside this test; these two adapters only satisfy the
-    platform module's normal rtlib boundary while OpenGL work is exercised.
-*/
-int fb_hVirtualToScancode(int virtual_key)
-{
-	(void)virtual_key;
-	return 0;
-}
-
-int fb_hConsoleTranslateKey(char ascii, WORD virtual_scan, WORD virtual_key,
-	DWORD control_state, int enhanced_only)
-{
-	(void)virtual_scan;
-	(void)virtual_key;
-	(void)control_state;
-	if (enhanced_only || (ascii == 0))
-		return -1;
-	return (unsigned char)ascii;
-}
-#endif
 
 /* ------------------------------------------------------------------------- */
 /* Test support                                                              */
@@ -2426,6 +2408,84 @@ static void test_compatibility_state(void)
 		FB_GFX3_INVALID);
 }
 
+/* CPU shadow writes use inclusive damage bounds. Exercise a nonzero upload
+   origin and original row pitch, then combine known point damage with a line
+   whose conservative fallback must cover the entire affected row. */
+static void test_shadow_damage_rectangles(void)
+{
+	FB_GFX3_CONTEXT_CONFIG config;
+	FB_GFX3_MODE mode;
+	FB_GFX3_DRAW_STATE state;
+	uint32_t color = 0;
+	int previous_pages = 0;
+
+	memset(&config, 0, sizeof(config));
+	config.backend = &__fb_gfx3_backend_null;
+	config.width = 8;
+	config.height = 8;
+	config.depth = 32;
+	config.page_count = 3;
+	config.queue_capacity = 4;
+	config.log_level = FB_GFX3_LOG_WARNING;
+	CHECK(fb_gfx3_mode_init(&mode, &config, 0xFF000000u) == FB_GFX3_OK);
+	CHECK(fb_gfx3_draw_state_init(&mode, &state) == FB_GFX3_OK);
+	/* The standalone compatibility test owns the mode and has no competing
+	   application thread. Model SCREENLOCK before the ordered POINT readback. */
+	mode.access_lock_count = 1u;
+	CHECK(fb_gfx3_compat_point(&state, 2.0f, 3.0f, &color) == FB_GFX3_OK);
+	CHECK(fb_gfx3_compat_pset(&state, 2.0f, 3.0f, 0x11223344u,
+		FB_GFX3_COORDINATE_AA, FALSE) == FB_GFX3_OK);
+	CHECK(fb_gfx3_compat_pset(&state, 4.0f, 5.0f, 0x55667788u,
+		FB_GFX3_COORDINATE_AA, FALSE) == FB_GFX3_OK);
+	CHECK(mode.shadow_dirty_first_column[0] == 2u);
+	CHECK(mode.shadow_dirty_last_column[0] == 4u);
+	CHECK(mode.shadow_dirty_first_line[0] == 3u);
+	CHECK(mode.shadow_dirty_last_line[0] == 5u);
+	CHECK(!mode.shadow_dirty[1]);
+	CHECK(fb_gfx3_page_copy(&state, 0, 1) == FB_GFX3_OK);
+	for (int y = 0; y < 8; ++y) {
+		for (int x = 0; x < 8; ++x) {
+			uint32_t expected = 0xFF000000u;
+			if ((x == 2) && (y == 3))
+				expected = 0x11223344u;
+			else if ((x == 4) && (y == 5))
+				expected = 0x55667788u;
+			CHECK(fb_gfx3_surface_read_pixel(&mode.pages[1], x, y,
+				&color) == FB_GFX3_OK);
+			CHECK(color == expected);
+		}
+	}
+	CHECK(!mode.shadow_dirty[0]);
+	CHECK(mode.shadow_dirty_first_column[0] == UINT32_MAX);
+	CHECK(fb_gfx3_compat_point(&state, 6.0f, 6.0f, &color) == FB_GFX3_OK);
+	CHECK(fb_gfx3_compat_pset(&state, 6.0f, 6.0f, 0xAABBCCDDu,
+		FB_GFX3_COORDINATE_AA, FALSE) == FB_GFX3_OK);
+	CHECK(fb_gfx3_compat_line(&state, 0.0f, 7.0f, 7.0f, 7.0f,
+		0x12345678u, FB_GFX3_LINE_TYPE_LINE, 0xFFFFu,
+		FB_GFX3_COORDINATE_AA) == FB_GFX3_OK);
+	CHECK(mode.shadow_dirty_first_column[0] == 0u);
+	CHECK(mode.shadow_dirty_last_column[0] == 7u);
+	CHECK(fb_gfx3_page_copy(&state, 0, 1) == FB_GFX3_OK);
+	CHECK(fb_gfx3_surface_read_pixel(&mode.pages[1], 0, 7, &color) == FB_GFX3_OK);
+	CHECK(color == 0x12345678u);
+	CHECK(fb_gfx3_surface_read_pixel(&mode.pages[1], 7, 7, &color) == FB_GFX3_OK);
+	CHECK(color == 0x12345678u);
+	CHECK(fb_gfx3_surface_read_pixel(&mode.pages[1], 6, 6, &color) == FB_GFX3_OK);
+	CHECK(color == 0xAABBCCDDu);
+	CHECK(fb_gfx3_page_set(&state, 2, 0, &previous_pages) == FB_GFX3_OK);
+	CHECK(fb_gfx3_compat_point(&state, 7.0f, 0.0f, &color) == FB_GFX3_OK);
+	CHECK(fb_gfx3_compat_pset(&state, 7.0f, 0.0f, 0xFEDCBA98u,
+		FB_GFX3_COORDINATE_AA, FALSE) == FB_GFX3_OK);
+	CHECK(mode.shadow_dirty_first_column[2] == 7u);
+	CHECK(mode.shadow_dirty_last_column[2] == 7u);
+	CHECK(!mode.shadow_dirty[0]);
+	CHECK(fb_gfx3_page_copy(&state, 2, 1) == FB_GFX3_OK);
+	CHECK(fb_gfx3_surface_read_pixel(&mode.pages[1], 7, 0, &color) == FB_GFX3_OK);
+	CHECK(color == 0xFEDCBA98u);
+	mode.access_lock_count = 0u;
+	CHECK(fb_gfx3_mode_shutdown(&mode) == FB_GFX3_OK);
+}
+
 static void test_vulkan_surface_backend(void)
 {
 	FB_GFX3_RENDERER_CONFIG config;
@@ -3200,8 +3260,15 @@ static void test_gamepad_snapshot_lifecycle(void)
 	fb_gfx3_input_destroy(&input);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+	/* A display-independent regression path also runs on build hosts without
+	   OpenGL/Vulkan. The default invocation retains the complete suite. */
+	if ((argc == 2) && (strcmp(argv[1], "--shadow-damage-only") == 0)) {
+		test_shadow_damage_rectangles();
+		printf("gfxlib3 shadow damage: %d failure(s)\n", failures);
+		return failures != 0;
+	}
 	test_backend_selection();
 	test_vulkan_adapter_ranking();
 	test_gamepad_snapshot_lifecycle();
@@ -3221,6 +3288,7 @@ int main(void)
 	test_typed_context_api();
 	test_alpha_primitive_null_backend();
 	test_compatibility_state();
+	test_shadow_damage_rectangles();
 	test_vulkan_surface_backend();
 	test_opengl_compute_backend();
 	test_central_logger();

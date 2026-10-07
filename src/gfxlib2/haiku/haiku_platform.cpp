@@ -44,7 +44,13 @@ BGLView *g_gl_view = NULL;
 
 void fb_hHaikuResetState(void)
 {
-    memset(&fb_haiku, 0, sizeof(fb_haiku));
+    fb_haiku = FB_HAIKU_STATE();
+
+    /* Zero is a valid kernel object ID. Uncreated synchronization objects
+       must remain negative, including between successive SCREENRES calls. */
+    fb_haiku.gui_ready_sem = -1;
+    fb_haiku.gui_exit_sem = -1;
+    fb_haiku.gui_thread = -1;
 
     fb_haiku.mouse_visible = 1;
 

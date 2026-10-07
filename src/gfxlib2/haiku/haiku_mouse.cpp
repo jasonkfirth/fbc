@@ -31,11 +31,12 @@
 
 int fb_hHaikuGetMouse(int *x, int *y, int *z, int *buttons, int *clip)
 {
+    fb_hHaikuLockState();
     if (x)
         *x = fb_haiku.mouse_x;
 
     if (y)
-        *y = fb_haiku.mouse_y;
+        *y = fb_haiku.mouse_y / (fb_haiku.scanline_size > 0 ? fb_haiku.scanline_size : 1);
 
     if (z)
         *z = fb_haiku.mouse_z;
@@ -49,6 +50,7 @@ int fb_hHaikuGetMouse(int *x, int *y, int *z, int *buttons, int *clip)
     if (clip)
         *clip = fb_haiku.mouse_clip;
 
+    fb_hHaikuUnlockState();
     return 0;
 }
 
@@ -103,10 +105,12 @@ void fb_hHaikuSetMouse(int x, int y, int cursor, int clip)
         Haiku APIs if desired.
     */
 
+    fb_hHaikuLockState();
     fb_haiku.mouse_x = x;
     fb_haiku.mouse_y = y;
 
     fb_haiku.mouse_clip = clip;
+    fb_hHaikuUnlockState();
 
     /*
         Cursor visibility not yet implemented.

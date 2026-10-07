@@ -197,10 +197,10 @@ static int fbdev_use_write_access(const char *device_name)
 	}
 
 	/*
-		This Rockchip DRM fbdev advertises GEM-backed memory with no physical
-		start address.  Its legacy mmap callback returns EINVAL on the R36 kernel,
-		and that failed mapping also corrupts page-table state in that kernel.
-		Use fbdev's write callback for this device instead of probing mmap.
+		Some Rockchip DRM fbdev drivers expose GEM-backed memory without a
+		physical start address.  On affected kernels, the legacy mmap callback
+		rejects that mapping with EINVAL and can corrupt page-table state.
+		Use fbdev's write callback for this framebuffer instead of probing mmap.
 	*/
 	if (!device_name || strcmp(device_name, "/dev/fb0") ||
 	    (device_info.smem_start != 0))

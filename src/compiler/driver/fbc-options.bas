@@ -452,6 +452,7 @@ enum
 	OPT_SEMANTIC_BINDINGS
 	OPT_SEMANTIC_COMPACT
 	OPT_SEMANTIC_EXPRESSIONS
+	OPT_SEMANTIC_DIAGNOSTICS
 	OPT_SHOWINCLUDES
 	OPT_STATIC
 	OPT_STRIP
@@ -544,6 +545,7 @@ dim shared as FBC_CMDLINE_OPTION cmdlineOptionTB(0 to (OPT__COUNT - 1)) = _
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_BINDINGS compiler-owned bindings and implicit calls
 	( FALSE, FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_COMPACT omit verbose macro-expansion provenance
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_EXPRESSIONS expression-only semantic output
+	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_DIAGNOSTICS independent compiler diagnostics
 	( FALSE, TRUE , FALSE, TRUE  ), _ '' OPT_SHOWINCLUDES affects compiler output display
 	( FALSE, TRUE , FALSE, FALSE ), _ '' OPT_STATIC       affects link
 	( FALSE, TRUE , FALSE, FALSE ), _ '' OPT_STRIP        affects link
@@ -687,6 +689,9 @@ private sub hHandleOptCompileSetup _
 		fbc.semanticmodel_expressions = TRUE
 		fbc.semanticmodel_bindings = FALSE
 		'' The compact mode retains typed source ranges without symbol or AST dumps.
+
+	case OPT_SEMANTIC_DIAGNOSTICS
+		fbc.semanticdiagnostics = arg
 
 	case OPT_GFX3
 		'' The preinclude uses the same empty define spelling as source code,
@@ -1137,7 +1142,7 @@ private sub handleOpt _
 	)
 
 	select case as const optid
-	case OPT_A to OPT_FPU, OPT_GFX3, OPT_SEMANTIC_MODEL, OPT_SEMANTIC_BINDINGS, OPT_SEMANTIC_COMPACT, OPT_SEMANTIC_EXPRESSIONS
+	case OPT_A to OPT_FPU, OPT_GFX3, OPT_SEMANTIC_MODEL, OPT_SEMANTIC_BINDINGS, OPT_SEMANTIC_COMPACT, OPT_SEMANTIC_EXPRESSIONS, OPT_SEMANTIC_DIAGNOSTICS
 		hHandleOptCompileSetup( optid, arg, is_source )
 
 	case OPT_G, OPT_GEN to OPT_O
@@ -1271,6 +1276,7 @@ private function parseOption(byval opt as zstring ptr) as integer
 		CHECK("semantic-model-bindings", OPT_SEMANTIC_BINDINGS)
 		CHECK("semantic-model-compact", OPT_SEMANTIC_COMPACT)
 		CHECK("semantic-model-expressions", OPT_SEMANTIC_EXPRESSIONS)
+		CHECK("semantic-diagnostics", OPT_SEMANTIC_DIAGNOSTICS)
 		CHECK("showincludes", OPT_SHOWINCLUDES)
 		CHECK("static", OPT_STATIC)
 		CHECK("strip", OPT_STRIP)
@@ -1540,6 +1546,11 @@ end sub
 '' but Android <4.1 didn't support PIE executables. We assume 4.1+.)
 private function hTargetNeedsPIC( ) as integer
 	function = FALSE
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_HAIKU ) then
+		'' Haiku executables are linked as shared objects, so their code needs PIC.
+		function = TRUE
+		exit function
+	end if
 	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_OPENBSD ) then
 		function = TRUE
 		exit function
@@ -1668,9 +1679,10 @@ sub fbcDriverCheckArgs()
 		fbc.objinf.mt = TRUE
 	end if
 
-	'' 4.5. Enable -pic automatically when building a Unix shared library,
-	''      an OpenBSD executable, or an Android executable.
+	'' 4.5. Enable -pic automatically for Unix shared libraries and for
+	''      Haiku, OpenBSD, and Android executables.
 	if( (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB) or _
+	    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_HAIKU) or _
 	    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_OPENBSD) or _
 	    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_ANDROID) ) then
 		if( hTargetNeedsPIC( ) ) then

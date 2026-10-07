@@ -47,6 +47,7 @@ end extern
 #endif
 declare sub fbSemanticModelBeginSource(byref filename as string, byval depth as integer)
 declare sub fbSemanticModelProtectFile(byref filename as const string)
+#include once "tooling/semantic-diagnostics.bi"
 declare sub fbSemanticModelEndSource(byval depth as integer)
 declare sub fbSemanticModelMarkSourceRemapped(byval depth as integer)
 declare sub fbSemanticModelExportGlobals(byval symbol as FBSYMBOL ptr)
@@ -1583,6 +1584,7 @@ sub fbCompile _
 
 	env.outf.name = *outfname
 	fbSemanticModelProtectFile(env.outf.name)
+	fbSemanticDiagnosticsProtectFile(env.outf.name)
 	env.outf.ismain = ismain
 
 	'' open source file
@@ -1616,6 +1618,7 @@ sub fbCompile _
 
 	if( fbGetOption( FB_COMPOPT_PPONLY ) ) then
 		fbSemanticModelProtectFile(pponlyfile)
+		fbSemanticDiagnosticsProtectFile(pponlyfile)
 		env.ppfile_num = freefile( )
 		if( open( pponlyfile, for output, as #env.ppfile_num ) <> 0 ) then
 			errReportEx( FB_ERRMSG_FILEACCESSERROR, pponlyfile, -1 )

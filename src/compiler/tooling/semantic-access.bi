@@ -13,6 +13,7 @@ declare sub fbSemanticModelResetAccess( )
 declare sub fbSemanticModelCaptureAccess(byval binding as longint)
 declare sub fbSemanticModelExportAccess( )
 declare sub fbSemanticModelExportBindingLink(byval node as ASTNODE ptr, byval identity as longint)
+declare function fbSemanticModelDirectSourceWrite(byval identity as longint) as integer
 
 #endif
 

@@ -26,6 +26,7 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-hooks.bi"
 
 '':::::
 ''WhileStmtBegin  =   WHILE Expression .
@@ -55,6 +56,7 @@ sub cWhileStmtBegin( )
 	end if
 
 	'' branch
+	fbSemanticModelLoopCondition( expr, "while" )
 	expr = astBuildBranch( expr, el, FALSE, FALSE, @semantic_source_range )
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_INVALIDDATATYPES )

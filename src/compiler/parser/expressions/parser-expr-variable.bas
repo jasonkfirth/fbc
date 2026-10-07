@@ -28,6 +28,7 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-expressions.bi"
 
 declare sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
 declare sub fbSemanticModelExportBinding _
@@ -40,7 +41,8 @@ declare sub fbSemanticModelExportBinding _
 declare function cDynamicArrayIndex _
 	( _
 		byval sym as FBSYMBOL ptr, _
-		byval descexpr as ASTNODE ptr _
+		byval descexpr as ASTNODE ptr, _
+		semantic_indices() as longint, semantic_selected_indices() as longint, byref semantic_rank as integer _
 	) as ASTNODE ptr
 
 private function hIndexExpr( ) as ASTNODE ptr
@@ -88,7 +90,9 @@ end function
 '' we can do compile-time bounds checking, and don't need to have an array
 '' descriptor.
 ''
-private function cFixedSizeArrayIndex( byval sym as FBSYMBOL ptr ) as ASTNODE ptr
+private function cFixedSizeArrayIndex _
+	( byval sym as FBSYMBOL ptr, semantic_indices() as longint, _
+	  semantic_selected_indices() as longint, byref semantic_rank as integer ) as ASTNODE ptr
 	dim as ASTNODE ptr expr = any, dimexpr = any
 	dim as integer dimension = any
 	dim as longint lower = any, upper = any
@@ -109,7 +113,20 @@ private function cFixedSizeArrayIndex( byval sym as FBSYMBOL ptr ) as ASTNODE pt
 		upper = symbArrayUbound( sym, dimension )
 
 		'' Expression
-		dimexpr = hCheckIntegerIndex( hIndexExpr( ) )
+		dim as LEX_LOCATION semantic_index_start = lexGetCurrentLocation( )
+		dim as longint semantic_index_nonphysical = lexGetNonphysicalTokenCount( )
+		dimexpr = hIndexExpr( )
+		dim as LEX_LOCATION semantic_index_end = lexGetLastLocation( )
+		dim as longint semantic_index_nonphysical_end = lexGetNonphysicalTokenCount( )
+		if( dimension < FB_MAXARRAYDIMS ) then
+			semantic_indices(dimension) = fbSemanticModelOriginalExpression _
+				(dimexpr, semantic_index_start, semantic_index_nonphysical, _
+				 semantic_index_end, semantic_index_nonphysical_end)
+			semantic_rank = dimension + 1
+		end if
+		dimexpr = hCheckIntegerIndex( dimexpr )
+		if( dimension < FB_MAXARRAYDIMS ) then _
+			semantic_selected_indices(dimension) = fbSemanticModelSelectedArrayIndex(dimexpr, semantic_index_start, semantic_index_nonphysical)
 
 		'' bounds checking
 		if( env.clopt.arrayboundchk ) then
@@ -182,6 +199,11 @@ private function hFieldAccess _
 
 	dim as ASTNODE ptr offsetexpr = any, indexexpr = any, tree = any
 	dim as FBSYMBOL ptr desc = any
+	dim as longint semantic_indices(0 to FB_MAXARRAYDIMS - 1)
+	dim as longint semantic_selected_indices(0 to FB_MAXARRAYDIMS - 1)
+	dim as integer semantic_rank = 0
+	dim as LEX_LOCATION semantic_array_start = lexGetLastLocation( )
+	dim as longint semantic_array_nonphysical = lexGetNonphysicalTokenCount( )
 
 	offsetexpr = astNewCONSTi( symbGetOfs( fld ) )
 
@@ -219,7 +241,7 @@ private function hFieldAccess _
 				tree = astNewLINK( tree, astRemSideFx( varexpr ), AST_LINK_RETURN_RIGHT )
 			end if
 
-			indexexpr = cDynamicArrayIndex( fld, astNewDEREF( astCloneTree( varexpr ) ) )
+			indexexpr = cDynamicArrayIndex( fld, astNewDEREF( astCloneTree( varexpr ) ), semantic_indices(), semantic_selected_indices(), semantic_rank )
 
 			'' *cptr( dtype ptr, var->descriptor.data + index )
 			varexpr = astNewBOP( AST_OP_ADD, varexpr, astNewCONSTi( symb.fbarray_data ) )
@@ -231,7 +253,7 @@ private function hFieldAccess _
 			varexpr = astNewLINK( tree, varexpr, AST_LINK_RETURN_RIGHT )
 		else
 			'' index + diff
-			indexexpr = cFixedSizeArrayIndex( fld )
+			indexexpr = cFixedSizeArrayIndex( fld, semantic_indices(), semantic_selected_indices(), semantic_rank )
 			indexexpr = astNewBOP( AST_OP_ADD, indexexpr, astNewCONSTi( symbGetArrayDiff( fld ) ) )
 			offsetexpr = astNewBOP( AST_OP_ADD, offsetexpr, indexexpr )
 
@@ -244,6 +266,7 @@ private function hFieldAccess _
 			'' error recovery: skip until next ')'
 			hSkipUntil( CHAR_RPRNT, TRUE )
 		end if
+		fbSemanticModelArraySubscripts(varexpr, fld, semantic_indices(), semantic_selected_indices(), semantic_rank, semantic_array_start, semantic_array_nonphysical)
 	else
 		varexpr = hBuildField( varexpr, offsetexpr, fld, dtype, subtype )
 	end if
@@ -631,6 +654,9 @@ function cMemberDeref _
 
 	do
 		idxexpr = NULL
+		dim as longint semantic_pointer = 0, semantic_index = 0
+		dim as LEX_LOCATION semantic_index_start = lexGetLastLocation( )
+		dim as longint semantic_index_nonphysical = lexGetNonphysicalTokenCount( )
 
 		select case( lexGetToken( ) )
 		'' ('->' DREF* UdtMember)*
@@ -729,6 +755,10 @@ function cMemberDeref _
 
 		'' '['
 		case CHAR_LBRACKET
+			if( export_semantics and typeIsPtr( dtype ) ) then
+				semantic_pointer = fbSemanticModelPointerIndexPrefix(varexpr, _
+					semantic_index_start, semantic_index_nonphysical)
+			end if
 			lexSkipToken( )
 
 			'' Expression
@@ -820,6 +850,10 @@ function cMemberDeref _
 				end if
 
 				'' For the normal ptr[index] operation, the index must be an INTEGER
+				if( export_semantics ) then
+					fbSemanticModelExportCurrentExpressionPrefix(idxexpr)
+					if( idxexpr <> NULL ) then semantic_index = idxexpr->semantic_expression
+				end if
 				idxexpr = hCheckIntegerIndex( idxexpr )
 
 				'' null pointer checking
@@ -873,7 +907,12 @@ function cMemberDeref _
 		end select
 
 		if( export_semantics ) then
-			fbSemanticModelExportCurrentExpressionPrefix(varexpr)
+			if( (semantic_pointer > 0) and (semantic_index > 0) ) then
+				fbSemanticModelPointerIndexPrefix(varexpr, semantic_index_start, semantic_index_nonphysical)
+				fbSemanticModelPointerIndex(varexpr, semantic_pointer, semantic_index)
+			else
+				fbSemanticModelExportCurrentExpressionPrefix(varexpr)
+			end if
 		end if
 	loop
 
@@ -951,7 +990,8 @@ end function
 private function cDynamicArrayIndex _
 	( _
 		byval sym as FBSYMBOL ptr, _
-		byval descexpr as ASTNODE ptr _
+		byval descexpr as ASTNODE ptr, _
+		semantic_indices() as longint, semantic_selected_indices() as longint, byref semantic_rank as integer _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = any, dimexpr = any
@@ -967,7 +1007,20 @@ private function cDynamicArrayIndex _
 		dimoffset = symb.fbarray_dimtb + (dimension * symbGetSizeOf( symb.fbarraydim ))
 
 		'' Expression
-		dimexpr = hCheckIntegerIndex( hIndexExpr( ) )
+		dim as LEX_LOCATION semantic_index_start = lexGetCurrentLocation( )
+		dim as longint semantic_index_nonphysical = lexGetNonphysicalTokenCount( )
+		dimexpr = hIndexExpr( )
+		dim as LEX_LOCATION semantic_index_end = lexGetLastLocation( )
+		dim as longint semantic_index_nonphysical_end = lexGetNonphysicalTokenCount( )
+		if( dimension < FB_MAXARRAYDIMS ) then
+			semantic_indices(dimension) = fbSemanticModelOriginalExpression _
+				(dimexpr, semantic_index_start, semantic_index_nonphysical, _
+				 semantic_index_end, semantic_index_nonphysical_end)
+			semantic_rank = dimension + 1
+		end if
+		dimexpr = hCheckIntegerIndex( dimexpr )
+		if( dimension < FB_MAXARRAYDIMS ) then _
+			semantic_selected_indices(dimension) = fbSemanticModelSelectedArrayIndex(dimexpr, semantic_index_start, semantic_index_nonphysical)
 
 		'' bounds checking
 		if( env.clopt.arrayboundchk ) then
@@ -1162,11 +1215,15 @@ function cVariableEx overload _
 
 	dim as ASTNODE ptr varexpr = any, idxexpr = any, descexpr = any
 	dim as integer is_byref = any, is_funcptr = any, is_array = any
+	dim as longint semantic_indices(0 to FB_MAXARRAYDIMS - 1)
+	dim as longint semantic_selected_indices(0 to FB_MAXARRAYDIMS - 1)
+	dim as integer semantic_rank = 0
 
 	function = NULL
 
 	assert( symbIsVar( sym ) )
 	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
+	dim as longint semantic_array_nonphysical = lexGetNonphysicalTokenCount( )
 	dim as longint semantic_binding_before = fbSemanticModelBindingCount( )
 	fbSemanticModelExportBinding(sym, semantic_site, FALSE)
 	dim as longint semantic_binding = fbSemanticModelBindingCount( )
@@ -1220,13 +1277,13 @@ function cVariableEx overload _
 						descexpr = astNewVAR( symbGetArrayDescriptor( sym ) )
 					end if
 
-					idxexpr = cDynamicArrayIndex( sym, astCloneTree( descexpr ) )
+					idxexpr = cDynamicArrayIndex( sym, astCloneTree( descexpr ), semantic_indices(), semantic_selected_indices(), semantic_rank )
 
 					'' plus desc.data (= ptr + diff)
 					idxexpr = astNewBOP( AST_OP_ADD, idxexpr, _
 					                     astBuildDerefAddrOf( descexpr, symb.fbarray_data, FB_DATATYPE_INTEGER, NULL ) )
 				else
-					idxexpr = cFixedSizeArrayIndex( sym )
+					idxexpr = cFixedSizeArrayIndex( sym, semantic_indices(), semantic_selected_indices(), semantic_rank )
 				end if
 
 				if( idxexpr ) then
@@ -1293,6 +1350,7 @@ function cVariableEx overload _
 	assert( varexpr->dtype = sym->typ )
 	assert( varexpr->subtype = sym->subtype )
 	varexpr->semantic_binding = semantic_binding
+	fbSemanticModelArraySubscripts(varexpr, sym, semantic_indices(), semantic_selected_indices(), semantic_rank, semantic_site, semantic_array_nonphysical)
 
 	if( is_funcptr = FALSE ) then
 		if( check_fields ) then

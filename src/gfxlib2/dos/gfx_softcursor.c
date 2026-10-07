@@ -1,11 +1,11 @@
 /*
-    DOS software cursor implementation
+    FreeBASIC DOS graphics: gfx_softcursor.c
 
-    This complete target file is selected by basename precedence.  Keep DOS
-    behavior here instead of adding HOST_DOS branches to the shared source.
+    Draw and restore the software cursor and mark its published rows dirty.
+    This complete target file is selected by basename precedence. Cursor
+    storage stays locked for IRQ0 use until screen shutdown releases it.
+    Input polling and video publication belong to the DOS driver.
 */
-
-/* Software cursor helper routines */
 
 #include "../fb_gfx.h"
 
@@ -158,6 +158,17 @@ void fb_hSoftCursorPut(int x, int y)
 	}
 }
 
+/* Mark the rows that still contain a previously published software cursor.
+ * This does not restore pixels: the foreground may have edited its background
+ * since the last refresh. DOS calls it from the locked IRQ0 presentation path.
+ */
+void fb_hSoftCursorMarkDirty(int y)
+{
+	if (!__fb_gfx || !__fb_gfx->dirty || y < 0 || y >= __fb_gfx->h)
+		return;
+	fb_hMemSet(__fb_gfx->dirty + y, TRUE, MIN(CURSOR_H, __fb_gfx->h - y));
+}
+
 void fb_hSoftCursorUnput(int x, int y)
 {
 	copy_cursor_area(x, y, TRUE);
@@ -185,3 +196,5 @@ void fb_hSoftCursorPaletteChanged(void)
 }
 
 void fb_hSoftCursor_code_end(void) { }
+
+/* end of gfx_softcursor.c */

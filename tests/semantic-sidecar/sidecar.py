@@ -11,6 +11,10 @@ from collections import Counter, defaultdict
 import hashlib
 from pathlib import Path
 import re
+from semantic_flow import validate_flow, validate_sequence_branches
+from semantic_literals import validate_wide_literals
+from semantic_queries import validate_query_inputs
+from semantic_selects import validate_select_inputs
 
 
 SCHEMA = "27"
@@ -20,12 +24,13 @@ SHAPES = {
     "RECOVERY": 8, "T": 19, "A": 7, "F": 13, "G": 9, "U": 12,
     "C": 5, "H": 7, "K": 5, "J": 5, "O": 10, "Q": 10, "Y": 7, "Z": 5, "ASM": 6, "DCL": 13,
     "CTX": 3, "OPT": 5, "USE": 4,
+    "NT": 11, "PH": 5,
     "FILE": 7, "SRC": 14, "SRE": 3, "INC": 12, "MAP": 11, "ORIG": 4, "LOC": 12,
     "PPB": 14, "PPD": 11, "PPE": 9, "PPT": 13, "PPS": 10,
     "MD": 10, "MT": 6, "MI": 15, "MA": 12, "MS": 8, "MC": 5, "ME": 13, "ML": 13, "MR": 5,
     "ST": 17, "STE": 10, "BLK": 14, "BEND": 9, "OWN": 4, "CAP": 4, "ACC": 3, "SOP": 3,
-    "EX": 13, "NT": 11, "PH": 5, "NP": 3, "EV": 5,
-    "CB": 4, "CN": 4, "CE": 6, "CL": 4, "DI": 12,
+    "EX": 13,
+    "NP": 3, "EV": 5, "CB": 4, "CN": 4, "CE": 6, "CL": 4, "DI": 12,
 }
 PROVENANCE_TAGS = frozenset(("FILE", "SRC", "SRE", "INC", "MAP", "ORIG", "LOC", "PPB", "PPD", "PPE", "PPT", "PPS",
                             "MD", "MT", "MI", "MA", "MS", "MC", "ME", "ML", "MR", "ST", "STE", "BLK", "BEND", "OWN", "CAP", "ACC", "SOP", "EX", "DI"))
@@ -227,6 +232,12 @@ class Model:
         dependencies: set[str] = set()
         references: list[tuple[str, int]] = []
         subject_modules: dict[tuple[str, int], int] = {}
+        expression_property_modules: dict[tuple[int, str], int] = {}
+        storage_property_modules: dict[tuple[str, int, str], int] = {}
+        array_record_modules: dict[int, int] = {}
+        construct_observation_modules: list[tuple[list[str], int]] = []
+        size_query_origins: list[tuple[int, int, int]] = []
+        parsed_expression_origins: list[tuple[int, int, int]] = []
         footer: list[str] | None = None
         module_expressions = 0
 
@@ -278,6 +289,7 @@ class Model:
                 if identity in self.symbols:
                     raise ValueError("Duplicate symbol identity")
                 self.symbols[identity] = row
+                subject_modules["symbol", identity] = counts["M"]
                 for value in row[3:11]:
                     number(value)
                 reference("symbol", row[5])
@@ -298,40 +310,6 @@ class Model:
                 if row[18] not in ("source", "compiler", "runtime"):
                     raise ValueError("Unknown symbol origin")
                 self.types[identity] = row
-            elif tag == "DI":
-                identity = number(row[1], 1)
-                if identity in self.diagnostics or row[2] not in ("error", "warning"):
-                    raise ValueError("Invalid or repeated diagnostic")
-                number(row[3], 0)
-                number(row[8])
-                source, statement = number(row[9], 0), number(row[10], 0)
-                if source and (source not in self.source_contexts or int(self.source_contexts[source][4]) != counts["M"]):
-                    raise ValueError("Diagnostic lacks its source occurrence")
-                if statement and (statement not in self.statements or int(self.statements[statement][7]) != counts["M"]):
-                    raise ValueError("Diagnostic lacks its source statement")
-                reference("symbol", row[11])
-                self.diagnostics[identity] = row
-            elif tag == "NT":
-                if row[1] not in ("symbol", "node", "expression") or row[3] != "value":
-                    raise ValueError("Invalid normalized type subject or role")
-                reference(row[1], row[2], nullable=False)
-                reference("symbol", row[5])
-                pointers = number(row[6], 0)
-                flag(row[7])
-                if pointers > 8 or len(row[8]) != pointers + 1 or re.fullmatch(r"[01]+", row[8]) is None:
-                    raise ValueError("Invalid normalized type qualifiers")
-                if row[4] not in PRIMITIVE_NAMES or row[10] and row[10] not in PRIMITIVE_NAMES:
-                    raise ValueError("Unknown normalized type name")
-                if row[9]:
-                    number(row[9], 1)
-                elif pointers:
-                    raise ValueError("Pointer type lacks its storage width")
-                key = row[1], int(row[2]), row[3]
-                # Symbol snapshots can be refreshed after a forward type or
-                # procedure is completed, just like the existing T records.
-                if row[1] != "symbol" and key in self.normalized_types:
-                    raise ValueError("Repeated normalized type subject")
-                self.normalized_types[key] = row
             elif tag == "B":
                 subject_modules["binding", counts["B"]] = counts["M"]
                 reference("symbol", row[1], nullable=False)
@@ -397,6 +375,7 @@ class Model:
                     raise ValueError("Recovered-module expression total mismatch")
             elif tag == "A":
                 reference("symbol", row[1], nullable=False)
+                array_record_modules[number(row[1], 1)] = counts["M"]
                 rank = number(row[2], -1)
                 dimension = number(row[3], -1)
                 if row[4] == "runtime":
@@ -477,7 +456,7 @@ class Model:
                     number(value, 0)
                 self.layouts[int(row[1])] = row
             elif tag in ("C", "K", "H"):
-                domains = ("symbol", "node", "expression") if tag in ("C", "H") else ("symbol", "node")
+                domains = ("symbol", "node", "expression")
                 if row[1] not in domains:
                     raise ValueError("Invalid metadata identity domain")
                 reference(row[1], row[2], nullable=False)
@@ -498,12 +477,78 @@ class Model:
                 elif tag == "K":
                     if not row[3]:
                         raise ValueError("Empty metadata property key")
+                    if row[3] == "written-override":
+                        if row[1] != "symbol" or row[4] not in ("0", "1"):
+                            raise ValueError("Invalid written override receipt")
+                        previous = self.properties[key].get(row[3])
+                        if previous is not None and previous != row[4]:
+                            raise ValueError("Conflicting written override receipts")
+                    if row[3] == "formal-span-kind":
+                        if row[1] != "symbol" or row[4] not in ("physical", "generated"):
+                            raise ValueError("Invalid formal span kind")
+                        previous = self.properties[key].get(row[3])
+                        if previous is not None and previous != row[4]:
+                            raise ValueError("Conflicting formal span kinds")
+                    if row[3] == "declared-field-count":
+                        if row[1] != "symbol" or number(row[4], 0) > 1000000:
+                            raise ValueError("Invalid declared field count")
+                        previous = self.properties[key].get(row[3])
+                        if previous is not None and previous != row[4]:
+                            raise ValueError("Conflicting declared field counts")
+                    if row[3] == "field-array-rank":
+                        if row[1] != "symbol" or not -1 <= number(row[4]) <= 8:
+                            raise ValueError("Invalid field array rank")
+                    if row[3] in ("assignment-target-dtype", "assignment-kind", "unevaluated-query-input") or row[3].startswith(("size-query-", "numeric-selected-", "numeric-literal-", "file-transfer-", "string-intrinsic-", "string-initializer-", "array-subscript-", "array-bound-")):
+                        if row[1] != "expression":
+                            raise ValueError("Invalid expression receipt domain")
+                        previous = self.properties[key].get(row[3])
+                        if previous is not None and previous != row[4]:
+                            raise ValueError("Conflicting expression receipts")
+                        receipt_key = int(row[2]), row[3]
+                        old_module = expression_property_modules.get(receipt_key)
+                        if old_module is not None and old_module != counts["M"]:
+                            raise ValueError("Expression receipt changes module")
+                        expression_property_modules[receipt_key] = counts["M"]
+                    if row[3] == "call-argument-expression" or row[3].startswith(("pointer-address-", "pointer-dereference-", "pointer-index-", "memory-new-", "memory-release-", "procedure-prototype-statement-", "for-step-", "for-start-expression:", "for-limit-expression:", "loop-condition-")):
+                        expected_domain = "node" if row[3] == "call-argument-expression" else "symbol" if row[3].startswith(("memory-new-", "procedure-prototype-statement-", "for-step-", "for-start-expression:", "for-limit-expression:", "loop-condition-")) else "expression"
+                        if row[1] != expected_domain:
+                            raise ValueError("Invalid storage receipt domain")
+                        previous = self.properties[key].get(row[3])
+                        if previous is not None and previous != row[4]:
+                            raise ValueError("Conflicting storage receipts")
+                        receipt_key = row[1], int(row[2]), row[3]
+                        old_module = storage_property_modules.get(receipt_key)
+                        if old_module is not None and old_module != counts["M"]:
+                            raise ValueError("Storage receipt changes module")
+                        storage_property_modules[receipt_key] = counts["M"]
+                    if row[3].startswith("literal-target-wide-"):
+                        if row[1] != "symbol" or row[3] in self.properties[key]:
+                            raise ValueError("Duplicate or foreign wide literal prefix property")
+                        storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
+                    if row[3].startswith("unevaluated-query-range-"):
+                        if row[1] != "symbol" or row[3] in self.properties[key]:
+                            raise ValueError("Duplicate or foreign unevaluated query range")
+                        storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
+                    if row[3].startswith("select-case-"):
+                        if row[1] != "symbol" or row[3] in self.properties[key]:
+                            raise ValueError("Duplicate or foreign SELECT input property")
+                        storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
                     self.properties[key][row[3]] = row[4]
                 else:
                     if row[3] not in ("symbol", "node", "expression", "binding") or not row[5]:
                         raise ValueError("Invalid relationship target or kind")
                     reference(row[3], row[4], nullable=False)
                     number(row[6], 0)
+                    if row[5] in ("loop-condition", "array-subscript", "array-bound-query"):
+                        construct_observation_modules.append((row, counts["M"]))
+                    if row[5] == "size-query-source":
+                        if row[1] != "expression" or row[3] != "expression" or row[6] != "0":
+                            raise ValueError("Invalid size query source domain")
+                        size_query_origins.append((int(row[2]), int(row[4]), counts["M"]))
+                    if row[5] == "parsed-expression-source":
+                        if row[1] != "expression" or row[3] != "expression" or row[6] != "0":
+                            raise ValueError("Invalid parsed expression source domain")
+                        parsed_expression_origins.append((int(row[2]), int(row[4]), counts["M"]))
             elif tag == "J":
                 reference("node", row[1], nullable=False)
                 reference("symbol", row[4], nullable=False)
@@ -517,6 +562,51 @@ class Model:
                 reference("symbol", row[4], nullable=row[3] == "text")
                 if (row[3] == "text" and row[4] != "0") or (row[3] == "symbol" and row[5]):
                     raise ValueError("Assembly token has an incompatible payload")
+            elif tag == "NT":
+                if row[1] not in ("symbol", "node", "expression") or row[3] != "value":
+                    raise ValueError("Invalid normalized type subject or role")
+                reference(row[1], row[2], nullable=False)
+                reference("symbol", row[5])
+                pointers = number(row[6], 0)
+                flag(row[7])
+                if pointers > 8 or len(row[8]) != pointers + 1 or re.fullmatch(r"[01]+", row[8]) is None:
+                    raise ValueError("Invalid normalized type qualifiers")
+                if row[4] not in PRIMITIVE_NAMES or row[10] and row[10] not in PRIMITIVE_NAMES:
+                    raise ValueError("Unknown normalized type name")
+                if row[9]:
+                    number(row[9], 1)
+                elif pointers:
+                    raise ValueError("Pointer type lacks its storage width")
+                key = row[1], int(row[2]), row[3]
+                # Symbol snapshots can be refreshed after a forward type or
+                # procedure is completed, just like the existing T records.
+                if row[1] != "symbol" and key in self.normalized_types:
+                    raise ValueError("Repeated normalized type subject")
+                self.normalized_types[key] = row
+            elif tag == "PH":
+                number(row[1], 1)
+                reference("symbol", row[2], nullable=False)
+                if not row[3]:
+                    raise ValueError("Flow phase has no name")
+                flag(row[4])
+            elif tag in ("NP", "EV", "CB", "CN", "CE", "CL"):
+                # Validate their closed phase/block graph after all identities
+                # have arrived. No control-flow target is inferred here.
+                pass
+            elif tag == "DI":
+                identity = number(row[1], 1)
+                if identity in self.diagnostics or row[2] not in ("error", "warning"):
+                    raise ValueError("Invalid or repeated diagnostic")
+                number(row[3], 0)
+                number(row[8])
+                sourceid, statement = number(row[9], 0), number(row[10], 0)
+                if sourceid and (sourceid not in self.source_contexts or sourceid in self.source_endings
+                                 or int(self.source_contexts[sourceid][4]) != counts["M"]):
+                    raise ValueError("Diagnostic source is absent, closed or from another module")
+                if statement and (statement not in self.statements or int(self.statements[statement][7]) != counts["M"]):
+                    raise ValueError("Diagnostic statement is absent or from another module")
+                reference("symbol", row[11])
+                self.diagnostics[identity] = row
             elif tag == "DCL":
                 identity = number(row[1], 1)
                 subject_modules["declaration", identity] = counts["M"]
@@ -1101,99 +1191,786 @@ class Model:
             if "kind" not in self.properties["node", identity]:
                 raise ValueError("AST node lacks its stable kind")
         self.validate_nodes()
-        self.validate_flow()
         if not expressions_only and not bindings_only:
+            validate_flow(self, number)
+            self.validate_procedure_exits(subject_modules)
+            validate_sequence_branches(self, number, subject_modules)
             self.validate_metadata()
+            self.validate_formal_spans()
+            for (identity, _), module in expression_property_modules.items():
+                if subject_modules.get(("expression", identity)) != module:
+                    raise ValueError("Expression receipt belongs to another module")
+            self.validate_numeric_assignments(subject_modules)
+            self.validate_numeric_selections(subject_modules)
+            self.validate_numeric_literals(subject_modules)
+            self.validate_size_queries(subject_modules)
+            for (domain, identity, _), module in storage_property_modules.items():
+                if subject_modules.get((domain, identity)) != module:
+                    raise ValueError("Storage receipt belongs to another module")
+            self.validate_storage_receipts(subject_modules)
+            validate_query_inputs(self, number, subject_modules)
+            validate_select_inputs(self, number, subject_modules)
+            validate_wide_literals(self, number, subject_modules)
+            self.validate_for_steps(subject_modules)
+            self.validate_for_inputs(subject_modules)
+            self.validate_file_transfers(subject_modules)
+            self.validate_string_intrinsics(subject_modules)
+            self.validate_string_initializers(subject_modules)
+            self.validate_loop_conditions(subject_modules)
+            self.validate_array_subscripts(subject_modules, array_record_modules)
+            self.validate_array_bounds(subject_modules, array_record_modules)
+            for row, module in construct_observation_modules:
+                if subject_modules.get((row[1], int(row[2]))) != module or subject_modules.get((row[3], int(row[4]))) != module:
+                    raise ValueError("Construct observation marker belongs to another module")
+            for subject, source, module in parsed_expression_origins:
+                if source >= subject or subject_modules.get(("expression", subject)) != module or subject_modules.get(("expression", source)) != module:
+                    raise ValueError("Invalid parsed expression predecessor")
+            for subject, query, module in size_query_origins:
+                if query >= subject or subject_modules.get(("expression", subject)) != module or subject_modules.get(("expression", query)) != module:
+                    raise ValueError("Missing, cyclic or foreign size query source")
+                if "size-query-kind" not in self.properties["expression", query]:
+                    raise ValueError("Size query source lacks its original input receipt")
 
-    def validate_flow(self) -> None:
-        """Validate phase ownership and transfers without inventing targets."""
-        phases: dict[int, int] = {}
-        memberships: dict[int, int] = {}
-        blocks: dict[int, tuple[int, int]] = {}
-        block_nodes: dict[int, int] = {}
-        labels: set[tuple[int, int]] = set()
-        for row in self.records["PH"]:
-            identity, procedure = number(row[1], 1), number(row[2], 1)
-            if identity in phases or procedure not in self.signatures or row[3] != "pre-load" or row[4] not in ("0", "1"):
-                raise ValueError("Invalid or repeated AST phase")
-            phases[identity] = procedure
-        for row in self.records["NP"]:
-            node, phase = number(row[1], 1), number(row[2], 1)
-            if node in memberships or node not in self.nodes or phase not in phases:
-                raise ValueError("Invalid or repeated AST phase membership")
-            memberships[node] = phase
-        initializer_roots = {int(row[4]) for row in self.records["H"]
-                             if row[1] == "symbol" and row[3] == "node"
-                             and row[5] in ("initializer", "default-initializer")}
-        # Parents have smaller identities. Cache roots once so a deeply nested
-        # initializer does not make membership validation quadratic.
-        node_roots: dict[int, int] = {}
-        for identity in sorted(self.nodes):
-            row = self.nodes[identity]
-            node_roots[identity] = identity if row[3] == "root" else node_roots[int(row[2])]
-            if identity not in memberships and node_roots[identity] not in initializer_roots:
-                raise ValueError("AST phase membership is incomplete")
-        for node, phase in memberships.items():
-            parent = int(self.nodes[node][2])
-            if self.nodes[node][3] == "root":
-                if parent != phases[phase]:
-                    raise ValueError("AST phase belongs to another procedure")
-            elif memberships.get(parent) != phase:
-                raise ValueError("AST child belongs to another phase")
-        evaluation_edges: set[tuple[int, int]] = set()
-        for row in self.records["EV"]:
-            parent, child = number(row[1], 1), number(row[2], 1)
-            number(row[3], 0)
-            edge = parent, child
-            if parent == child or parent not in memberships or child not in memberships or memberships[parent] != memberships[child]:
-                raise ValueError("Evaluation edge lacks its AST phase")
-            if edge in evaluation_edges or row[4] not in (
-                    "always", "argument", "profile-begin", "call-target", "profile-end",
-                    "copyback", "condition", "true", "false", "result"):
-                raise ValueError("Invalid or repeated evaluation edge")
-            evaluation_edges.add(edge)
-        for row in self.records["CB"]:
-            block, phase, ordinal = [number(value, 1 if index < 2 else 0) for index, value in enumerate(row[1:])]
-            if block in blocks or phase not in phases:
-                raise ValueError("Invalid or repeated control-flow block")
-            blocks[block] = phase, ordinal
-        for phase in phases:
-            ordinals = sorted(ordinal for owner, ordinal in blocks.values() if owner == phase)
-            if ordinals != list(range(len(ordinals))):
-                raise ValueError("Control-flow block order is incomplete")
-        for row in self.records["CN"]:
-            block, node = number(row[1], 1), number(row[2], 1)
-            if block in block_nodes or block not in blocks or node not in memberships or row[3] != "0":
-                raise ValueError("Invalid or repeated control-flow node")
-            if self.nodes[node][3] != "root" or memberships[node] != blocks[block][0]:
-                raise ValueError("Control-flow node lacks its phase root")
-            block_nodes[block] = node
-        roots = {identity for identity in memberships if self.nodes[identity][3] == "root"}
-        if set(block_nodes) != set(blocks) or len(set(block_nodes.values())) != len(block_nodes) or set(block_nodes.values()) != roots:
-            raise ValueError("Control-flow root membership is incomplete")
-        for row in self.records["CL"]:
-            phase, label, block = [number(value, 1) for value in row[1:]]
-            if block not in blocks or blocks[block][0] != phase or label not in self.symbols or (phase, label) in labels:
-                raise ValueError("Invalid or repeated control-flow label")
-            if self.properties["node", block_nodes[block]]["kind"] != "label" or int(self.nodes[block_nodes[block]][9]) != label:
-                raise ValueError("Control-flow label lacks its AST definition")
-            labels.add((phase, label))
-        for row in self.records["CE"]:
-            phase, source, target = number(row[1], 1), number(row[2], 1), number(row[3], 0)
-            kind, label = row[4], number(row[5], 0)
-            if source not in blocks or blocks[source][0] != phase or label and label not in self.symbols:
-                raise ValueError("Control-flow edge lacks its phase or label")
-            if kind == "fallthrough":
-                if target not in blocks or blocks[target][0] != phase or blocks[target][1] != blocks[source][1] + 1 or label:
-                    raise ValueError("Invalid control-flow fallthrough")
-            elif kind in ("label", "conditional-label", "case-label", "default-label", "subroutine-call"):
-                if target or not label and kind != "subroutine-call":
-                    raise ValueError("Invalid control-flow label transfer")
-            elif kind in ("unknown-indirect", "subroutine-return", "unknown-assembly", "procedure-exit"):
-                if target or label:
-                    raise ValueError("Unknown or exit transfer advertises a target")
+    def validate_procedure_exits(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """Routine labels are selected compiler identities, including cleanup."""
+        exits = {}
+        for row in self.relations("procedure-exit-label"):
+            if row[1] != "symbol" or row[3] != "symbol" or row[6] != "0":
+                raise ValueError("Invalid procedure exit relation domain")
+            procedure, label_id = int(row[2]), int(row[4])
+            label = self.types.get(label_id)
+            procedure_type = self.types.get(procedure)
+            module = subject_modules.get(("symbol", procedure))
+            if (procedure not in self.signatures or label is None or label[3] != "label"
+                    or procedure_type is None or procedure in exits
+                    or subject_modules.get(("symbol", label_id)) != module
+                    or self.capabilities[module].get("procedure-exit-labels") != "available"):
+                raise ValueError("Invalid, repeated or foreign procedure exit label")
+            # Generated module constructors keep their label in the module
+            # table; actual CL membership below proves body ownership.
+            if int(label[8]) != procedure:
+                if (procedure_type[18] != "compiler" or label[18] != "compiler"
+                        or label[8] != procedure_type[8]):
+                    raise ValueError("Procedure exit label belongs to another scope")
+            exits[procedure] = label_id
+        labels = {(int(row[1]), int(row[2])) for row in self.records["CL"]}
+        for phase in self.records["PH"]:
+            procedure = int(phase[2])
+            module = subject_modules[("symbol", procedure)]
+            if self.capabilities[module].get("procedure-exit-labels") == "available":
+                if (int(phase[1]), exits.get(procedure)) not in labels:
+                    raise ValueError("Procedure phase lacks its owned exit label")
+
+    def validate_array_bounds(self, subject_modules: dict[tuple[str, int], int], array_modules: dict[int, int]) -> None:
+        """Bound query identity survives fixed-array constant folding."""
+        marked = set()
+        for row in self.relations("array-bound-query"):
+            if row[1] != "symbol" or row[3] != "expression" or row[6] != "0":
+                raise ValueError("Invalid array bound query marker")
+            symbol, identity = number(row[2], 1), number(row[4], 1)
+            if identity in marked or self.properties["expression", identity].get("array-bound-symbol") != str(symbol):
+                raise ValueError("Missing or repeated array bound marker")
+            marked.add(identity)
+        expressions = {int(row[1]): row for row in self.records["E"]}
+        expected = {"array-bound-kind", "array-bound-symbol", "array-bound-dimension", "array-bound-selected-dimension"}
+        for (domain, identity), properties in self.properties.items():
+            keys = {key for key in properties if key.startswith("array-bound-")}
+            if not keys:
+                continue
+            if domain != "expression" or identity not in marked or keys != expected:
+                raise ValueError("Incomplete or unknown array bound group")
+            module = subject_modules.get((domain, identity))
+            result = expressions.get(identity)
+            symbol = number(properties["array-bound-symbol"], 1)
+            target = self.symbols.get(symbol)
+            if properties["array-bound-kind"] not in ("lower", "upper") or target is None or int(target[3]) not in (1, 12) or subject_modules.get(("symbol", symbol)) != module or array_modules.get(symbol) != module:
+                raise ValueError("Array bound query selects another array")
+            if self.capabilities[module].get("array-bound-query-inputs") != "available" or result is None or int(result[12]) & 511 != 8 or result[14] != "0":
+                raise ValueError("Array bound result lacks its selected integer type")
+            statement = self.statement_owners.get((domain, identity))
+            if statement is None or self.statement_endings[statement][3] != "parsed":
+                raise ValueError("Array bound query lacks accepted statement ownership")
+            original = number(properties["array-bound-dimension"], 1)
+            selected = number(properties["array-bound-selected-dimension"], 1)
+            if not original <= selected < identity:
+                raise ValueError("Array bound dimensions are cyclic or reordered")
+            for operand in (original, selected):
+                if subject_modules.get(("expression", operand)) != module or self.statement_owners.get(("expression", operand)) != statement:
+                    raise ValueError("Array bound query has a missing or foreign dimension")
+            value = expressions.get(selected)
+            if value is None or int(value[12]) & 511 != 8 or value[14] != "0":
+                raise ValueError("Array bound query lacks its converted integer dimension")
+
+    def validate_array_subscripts(self, subject_modules: dict[tuple[str, int], int], array_modules: dict[int, int]) -> None:
+        """Resolved arrays retain each original input before offset arithmetic."""
+        ranks = {int(row[1]): int(row[2]) for row in self.records["A"]}
+        marked = set()
+        for row in self.relations("array-subscript"):
+            if row[1] != "symbol" or row[3] != "expression" or row[6] != "0":
+                raise ValueError("Invalid array subscript marker")
+            symbol, identity = number(row[2], 1), number(row[4], 1)
+            if identity in marked or self.properties["expression", identity].get("array-subscript-symbol") != str(symbol):
+                raise ValueError("Missing or repeated array subscript marker")
+            marked.add(identity)
+        expressions = {int(row[1]): row for row in self.records["E"]}
+        for (domain, identity), properties in self.properties.items():
+            keys = {key for key in properties if key.startswith("array-subscript-")}
+            if not keys:
+                continue
+            if domain != "expression" or identity not in marked:
+                raise ValueError("Array subscript lacks its selected element")
+            symbol = number(properties.get("array-subscript-symbol", ""), 1)
+            rank = number(properties.get("array-subscript-rank", ""), 1)
+            expected = {"array-subscript-symbol", "array-subscript-rank"} | {f"array-subscript-index:{dimension}" for dimension in range(rank)} | {f"array-subscript-selected-index:{dimension}" for dimension in range(rank)}
+            if rank > 8 or keys != expected:
+                raise ValueError("Incomplete or unknown array subscript group")
+            module = subject_modules.get((domain, identity))
+            target = self.symbols.get(symbol)
+            result = expressions.get(identity)
+            if target is None or int(target[3]) not in (1, 12) or subject_modules.get(("symbol", symbol)) != module or array_modules.get(symbol) != module or ranks.get(symbol) not in (-1, rank):
+                raise ValueError("Array subscript selects another array or rank")
+            if self.capabilities[module].get("array-subscript-inputs") != "available" or result is None:
+                raise ValueError("Array subscript capability unavailable")
+            if int(result[12]) & ~512 != int(target[4]) & ~512 or result[14] != target[5]:
+                raise ValueError("Array subscript selects another element type")
+            statement = self.statement_owners.get((domain, identity))
+            if statement is None or self.statement_endings[statement][3] != "parsed":
+                raise ValueError("Array subscript lacks accepted statement ownership")
+            for dimension in range(rank):
+                operand = number(properties[f"array-subscript-index:{dimension}"], 1)
+                if operand >= identity or subject_modules.get(("expression", operand)) != module or self.statement_owners.get(("expression", operand)) != statement:
+                    raise ValueError("Array subscript has a missing, cyclic or foreign input")
+                selected = number(properties[f"array-subscript-selected-index:{dimension}"], 1)
+                value = expressions.get(selected)
+                if value is None or not operand <= selected < identity or int(value[12]) & 511 != 8 or value[14] != "0" or subject_modules.get(("expression", selected)) != module or self.statement_owners.get(("expression", selected)) != statement:
+                    raise ValueError("Array subscript lacks its selected integer input")
+
+    def validate_loop_conditions(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """Accepted loop grammar retains predicates before branch folding."""
+        inputs: dict[int, tuple[int, str, int]] = {}
+        for (domain, owner), properties in self.properties.items():
+            groups: dict[int, dict[str, str]] = defaultdict(dict)
+            for key, value in properties.items():
+                if not key.startswith("loop-condition-"):
+                    continue
+                role, separator, statement_text = key.partition(":")
+                if domain != "symbol" or not separator or role not in ("loop-condition-kind", "loop-condition-expression"):
+                    raise ValueError("Unknown loop condition receipt")
+                groups[number(statement_text, 1)][role] = value
+            for statement, group in groups.items():
+                if len(group) != 2 or statement in inputs:
+                    raise ValueError("Incomplete or repeated loop condition receipt")
+                start, ending = self.statements.get(statement), self.statement_endings.get(statement)
+                target = self.symbols.get(owner)
+                module = subject_modules.get(("symbol", owner))
+                if target is None or int(target[3]) != 3 or start is None or int(start[4]) != owner or int(start[7]) != module:
+                    raise ValueError("Loop condition has another procedure or module")
+                if self.capabilities[module].get("loop-condition-inputs") != "available" or ending is None or ending[2:4] != ["compound", "parsed"]:
+                    raise ValueError("Loop condition lacks accepted grammar")
+                kind = group["loop-condition-kind"]
+                token = {"while": 273, "do": 278, "do-while": 278, "do-until": 278,
+                         "loop": 279, "loop-while": 279, "loop-until": 279}.get(kind)
+                if token is None or int(start[9]) != token:
+                    raise ValueError("Loop condition kind disagrees with its statement")
+                expression = number(group["loop-condition-expression"], 0)
+                if (expression == 0) != (kind in ("do", "loop")):
+                    raise ValueError("Loop condition lacks its original predicate")
+                if expression and (subject_modules.get(("expression", expression)) != module or self.statement_owners.get(("expression", expression)) != statement):
+                    raise ValueError("Loop predicate belongs to another statement")
+                inputs[statement] = owner, kind, expression
+        marked = set()
+        for row in self.relations("loop-condition"):
+            statement = number(row[6], 1)
+            entry = inputs.get(statement)
+            if row[1] != "symbol" or row[3] != "expression" or entry is None or statement in marked:
+                raise ValueError("Missing or repeated loop predicate marker")
+            if number(row[2], 1) != entry[0] or number(row[4], 1) != entry[2]:
+                raise ValueError("Loop predicate marker has another input")
+            marked.add(statement)
+        openings, closings = {}, {}
+        for block in self.constructs.values():
+            if block[5] not in ("while", "do"):
+                continue
+            statement = int(block[3])
+            if statement in openings:
+                raise ValueError("Repeated loop opening")
+            openings[statement] = block
+            if block[5] == "do":
+                statement = int(self.construct_endings[int(block[1])][2])
+                if statement in closings:
+                    raise ValueError("Repeated loop closure")
+                closings[statement] = block
+        for statement, start in self.statements.items():
+            token, module = int(start[9]), int(start[7])
+            if token not in (273, 278, 279) or self.statement_endings[statement][2:4] != ["compound", "parsed"] or self.capabilities[module].get("loop-condition-inputs") != "available":
+                continue
+            entry = inputs.get(statement)
+            block = (closings if token == 279 else openings).get(statement)
+            if entry is None or block is None or int(block[4]) != entry[0] or block[5] != ("while" if token == 273 else "do"):
+                raise ValueError("Loop grammar lacks complete condition observations")
+            if (statement in marked) != (entry[2] != 0):
+                raise ValueError("Loop predicate lacks its marker")
+
+    def validate_string_initializers(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """Element capacity and initializer destination survive TYPEINI lowering."""
+        expected = {"string-initializer-symbol", "string-initializer-dtype", "string-initializer-bytes"}
+        marked = set()
+        for row in self.records["H"]:
+            if row[5] != "string-initializer":
+                continue
+            if row[1] != "symbol" or row[3] != "expression" or row[6] != "0":
+                raise ValueError("Invalid string initializer marker")
+            symbol, expression = number(row[2], 1), number(row[4], 1)
+            if expression in marked or ("expression", expression) not in subject_modules:
+                raise ValueError("Missing or repeated string initializer")
+            properties = self.properties["expression", expression]
+            if properties.get("string-initializer-symbol") != str(symbol) or subject_modules.get(("symbol", symbol)) != subject_modules["expression", expression]:
+                raise ValueError("String initializer marker has another target")
+            marked.add(expression)
+        for (domain, identity), properties in self.properties.items():
+            keys = {key for key in properties if key.startswith("string-initializer-")}
+            if not keys:
+                continue
+            module = subject_modules.get((domain, identity))
+            has_copy = self.capabilities.get(module, {}).get("string-initializer-copy-contracts") == "available"
+            required = expected | ({"string-initializer-copy"} if has_copy else set())
+            if domain != "expression" or keys != required or identity not in marked:
+                raise ValueError("Incomplete or unknown string initializer receipt")
+            module = subject_modules[domain, identity]
+            if self.capabilities[module].get("string-initializer-targets") != "available":
+                raise ValueError("String initializer capability unavailable")
+            if has_copy and properties["string-initializer-copy"] not in {
+                "unselected", "ambiguous", "runtime-terminated", "runtime-counted",
+                "runtime-wide", "static-bytes", "static-wide"
+            }:
+                raise ValueError("Unknown string initializer copy contract")
+            symbol = number(properties["string-initializer-symbol"], 1)
+            dtype = number(properties["string-initializer-dtype"], 0)
+            capacity = number(properties["string-initializer-bytes"], 0)
+            target = self.symbols.get(symbol)
+            if target is None or subject_modules.get(("symbol", symbol)) != module or int(target[3]) not in (1, 12):
+                raise ValueError("String initializer has no declaration target")
+            if dtype & 511 not in (4, 7, 18) or dtype != int(target[4]) or capacity != int(target[9]) or int(target[7]) & 0x40000:
+                raise ValueError("String initializer capacity or type disagrees with storage")
+            statement = self.statement_owners.get((domain, identity))
+            start, ending = self.statements.get(statement), self.statement_endings.get(statement)
+            if start is None or int(start[7]) != module or ending is None or ending[3] != "parsed":
+                raise ValueError("String initializer lacks accepted statement ownership")
+
+    def validate_string_intrinsics(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """Inputs survive literal folding and runtime argument conversion."""
+        expressions = {int(row[1]): row for row in self.records["E"]}
+        marked = set()
+        for row in self.relations("parsed-string-intrinsic"):
+            if row[1] != "symbol" or row[3] != "expression" or row[6] != "0":
+                raise ValueError("Invalid string intrinsic module marker")
+            owner, identity = number(row[2], 1), number(row[4], 1)
+            module = subject_modules["expression", identity]
+            if int(self.symbols[owner][3]) != 8 or subject_modules["symbol", owner] != module or identity in marked:
+                raise ValueError("String intrinsic marker has invalid ownership")
+            if "string-intrinsic-kind" not in self.properties["expression", identity]:
+                raise ValueError("String intrinsic marker lacks its observation")
+            marked.add(identity)
+        for (domain, identity), properties in self.properties.items():
+            keys = {key for key in properties if key.startswith("string-intrinsic-")}
+            if not keys:
+                continue
+            if domain != "expression" or identity not in marked:
+                raise ValueError("String intrinsic lacks a module marker")
+            module = subject_modules[domain, identity]
+            if self.capabilities[module].get("parsed-string-intrinsics") != "available":
+                raise ValueError("String intrinsic capability is unavailable")
+            kind = properties.get("string-intrinsic-kind")
+            count = number(properties.get("string-intrinsic-count", ""), 1)
+            is_any = properties.get("string-intrinsic-any")
+            if kind not in ("chr", "wchr", "uchr", "trim", "ltrim", "rtrim") or count > 32 or is_any not in ("0", "1"):
+                raise ValueError("Invalid parsed string intrinsic selection")
+            is_trim = kind in ("trim", "ltrim", "rtrim")
+            if (is_trim and count > 2) or (is_any == "1" and (not is_trim or count != 2)):
+                raise ValueError("Invalid string intrinsic argument shape")
+            expected = {"string-intrinsic-kind", "string-intrinsic-count", "string-intrinsic-any"}
+            expected.update(f"string-intrinsic-argument-{ordinal}" for ordinal in range(1, count + 1))
+            if keys != expected:
+                raise ValueError("Incomplete or unknown string intrinsic properties")
+            statement = self.statement_owners.get((domain, identity))
+            start, ending = self.statements.get(statement), self.statement_endings.get(statement)
+            if start is None or int(start[7]) != module or ending is None or ending[3] != "parsed":
+                raise ValueError("String intrinsic lacks accepted statement ownership")
+            if int(expressions[identity][12]) & 511 not in (4, 7, 17, 26):
+                raise ValueError("String intrinsic has a non-string result")
+            expression = expressions[identity]
+            if int(expression[8]) == 17:
+                symbol = self.symbols[int(expression[13])]
+                if is_trim or kind == "uchr" or not int(symbol[7]) & 1024:
+                    raise ValueError("String intrinsic has an unrelated variable result")
+                value_kind = self.constants.get(("expression", identity), (None, None))[0]
+                if (kind == "chr" and (int(expression[12]) != 4 or value_kind != "bytes")) or (
+                        kind == "wchr" and (int(expression[12]) != 7 or value_kind != "wide-units")):
+                    raise ValueError("Folded character intrinsic has an inconsistent literal result")
+            elif int(expression[8]) == 9:
+                selected = self.types[int(expression[13])]
+                if selected[18] != "runtime" or selected[3] != "procedure":
+                    raise ValueError("String intrinsic lacks a selected runtime")
+                if is_trim:
+                    family = kind.upper() + ("ANY" if is_any == "1" else "EX" if count == 2 else "")
+                    aliases = {"FB_" + family, "FB_WSTR" + family, "FB_USTR" + family}
+                else:
+                    aliases = {{"chr": "FB_CHR", "wchr": "FB_WSTRCHR", "uchr": "FB_USTRCHR"}[kind]}
+                if selected[15].upper() not in aliases:
+                    raise ValueError("String intrinsic selects an unrelated runtime")
             else:
-                raise ValueError("Unknown control-flow transfer kind")
+                raise ValueError("String intrinsic has an invalid result class")
+            for ordinal in range(1, count + 1):
+                operand = number(properties[f"string-intrinsic-argument-{ordinal}"], 1)
+                if operand >= identity or subject_modules.get(("expression", operand)) != module or self.statement_owners.get(("expression", operand)) != statement:
+                    raise ValueError("Missing, cyclic or foreign string intrinsic input")
+
+    def validate_file_transfers(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """A transfer input is the typed object, before BYREF AS ANY lowering."""
+        expressions = {int(row[1]): row for row in self.records["E"]}
+        put_aliases = {"FB_FILEPUT", "FB_FILEPUTLARGE", "FB_FILEPUTSTR", "FB_FILEPUTSTRLARGE", "FB_FILEPUTARRAY", "FB_FILEPUTARRAYLARGE"}
+        get_aliases = {"FB_FILEGET", "FB_FILEGETLARGE", "FB_FILEGETSTR", "FB_FILEGETWSTR", "FB_FILEGETSTRLARGE", "FB_FILEGETWSTRLARGE",
+                       "FB_FILEGETARRAY", "FB_FILEGETARRAYLARGE", "FB_FILEGETIOB", "FB_FILEGETLARGEIOB", "FB_FILEGETSTRIOB", "FB_FILEGETWSTRIOB",
+                       "FB_FILEGETSTRLARGEIOB", "FB_FILEGETWSTRLARGEIOB", "FB_FILEGETARRAYIOB", "FB_FILEGETARRAYLARGEIOB"}
+        for (domain, identity), properties in self.properties.items():
+            keys = {key for key in properties if key.startswith("file-transfer-")}
+            if not keys:
+                continue
+            if domain != "expression" or keys != {"file-transfer-kind", "file-transfer-storage", "file-transfer-operand"}:
+                raise ValueError("Incomplete or unknown file transfer input")
+            if properties["file-transfer-kind"] not in ("get", "put") or properties["file-transfer-storage"] not in ("scalar", "array"):
+                raise ValueError("Invalid file transfer input kind")
+            operand = number(properties["file-transfer-operand"], 1)
+            if operand >= identity or subject_modules.get(("expression", operand)) != subject_modules[domain, identity]:
+                raise ValueError("Missing, cyclic or foreign file transfer input")
+            expression = expressions[identity]
+            if int(expression[8]) != 9:
+                raise ValueError("File transfer has no selected call")
+            if (properties["file-transfer-storage"] == "array") != (int(expressions[operand][8]) == 25):
+                raise ValueError("File transfer shape disagrees with original input")
+            module = subject_modules[domain, identity]
+            statement = self.statement_owners.get((domain, identity))
+            start = self.statements.get(statement)
+            ending = self.statement_endings.get(statement)
+            if start is None or int(start[7]) != module or ending is None or ending[3] != "parsed":
+                raise ValueError("File transfer lacks accepted statement ownership")
+            if self.statement_owners.get(("expression", operand)) != statement:
+                raise ValueError("File transfer input belongs to another statement")
+            selected = self.types[int(expression[13])]
+            allowed = get_aliases if properties["file-transfer-kind"] == "get" else put_aliases
+            if selected[18] != "runtime" or selected[3] != "procedure" or selected[15].upper() not in allowed:
+                raise ValueError("File transfer selects an unrelated procedure")
+            if self.capabilities[module].get("file-transfer-inputs") != "available":
+                raise ValueError("File transfer capability unavailable")
+        covered = set()
+        for row in self.records["H"]:
+            if row[1] != "node" or row[3] != "expression" or row[5] != "source-expression":
+                continue
+            node, expression = int(row[2]), int(row[4])
+            if "file-transfer-kind" in self.properties["expression", expression] and self.nodes[node][9] == expressions[expression][13]:
+                covered.add(node)
+        for identity, node in self.nodes.items():
+            module = subject_modules["node", identity]
+            if int(node[4]) != 9 or self.capabilities[module].get("file-transfer-inputs") != "available":
+                continue
+            selected = self.types[int(node[9])]
+            if selected[18] == "runtime" and selected[15].upper() in put_aliases | get_aliases and identity not in covered:
+                raise ValueError("Selected file call lacks its typed input receipt")
+
+    def validate_for_steps(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """Keep accepted scalar steps distinct from converted counter values."""
+        for (domain, identity), properties in self.properties.items():
+            keys = {key for key in properties if key.startswith("for-step-") and not key.startswith("for-step-selected-")}
+            for key in keys:
+                prefix = next((item for item in ("for-step-explicit:", "for-step-expression:")
+                               if key.startswith(item)), None)
+                if domain != "symbol" or prefix is None:
+                    raise ValueError("Invalid scalar FOR step property")
+                statement = number(key[len(prefix):], 1)
+                explicit_key = f"for-step-explicit:{statement}"
+                expression_key = f"for-step-expression:{statement}"
+                if explicit_key not in properties or expression_key not in properties:
+                    raise ValueError("Incomplete scalar FOR step pair")
+                symbol = self.symbols[identity]
+                dtype = int(symbol[4]) & 0x1ff
+                enum_counter = dtype == 10 and int(self.symbols.get(int(symbol[5]), [0, 0, 0, 0])[3]) == 9
+                ordinary_counter = not int(symbol[5]) and dtype in (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16)
+                if int(symbol[3]) != 1 or not (ordinary_counter or enum_counter):
+                    raise ValueError("FOR step has no scalar counter")
+                start = self.statements.get(statement)
+                ending = self.statement_endings.get(statement)
+                if start is None or int(start[9]) != 281 or ending is None or ending[3] != "parsed" or f"for-counter:{statement}" not in properties:
+                    raise ValueError("FOR step lacks accepted counter ownership")
+                module = subject_modules[domain, identity]
+                if enum_counter and self.capabilities[module].get("enum-for-step-inputs") != "available":
+                    raise ValueError("Enum FOR step lacks producer coverage")
+                if int(start[7]) != module:
+                    raise ValueError("FOR step belongs to another statement module")
+                explicit = number(properties[explicit_key], 0)
+                if explicit > 1:
+                    raise ValueError("Invalid explicit FOR step flag")
+                expression = number(properties[expression_key], 0)
+                if bool(explicit) != bool(expression):
+                    raise ValueError("Implicit FOR step has an expression or explicit step has none")
+                if expression and (subject_modules.get(("expression", expression)) != module or
+                                   self.statement_owners.get(("expression", expression)) != statement):
+                    raise ValueError("FOR step expression is missing or belongs to another statement")
+            if domain == "symbol":
+                symbol = self.symbols[identity]
+                module = subject_modules[domain, identity]
+                dtype = int(symbol[4]) & 0x1ff
+                enum_counter = (dtype == 10 and int(self.symbols.get(int(symbol[5]), [0, 0, 0, 0])[3]) == 9
+                                and self.capabilities[module].get("enum-for-step-inputs") == "available")
+                ordinary_counter = not int(symbol[5]) and dtype in (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16)
+                scalar = int(symbol[3]) == 1 and (ordinary_counter or enum_counter)
+                if scalar and self.capabilities[module].get("scalar-for-step-inputs") == "available":
+                    for key in properties:
+                        if key.startswith("for-counter:"):
+                            statement = number(key[12:], 1)
+                            if f"for-step-explicit:{statement}" not in properties or f"for-step-expression:{statement}" not in properties:
+                                raise ValueError("Scalar FOR lacks original step coverage")
+                            if self.capabilities[module].get("scalar-for-step-sites") == "available":
+                                site = self.physical_locations.get(("statement", statement, "for-step"))
+                                explicit = properties[f"for-step-explicit:{statement}"] == "1"
+                                macro_site = any(row[1] == "statement" and int(row[2]) == statement and row[4] == "for-step"
+                                                 for row in self.records["MR"])
+                                if explicit != (site is not None or macro_site):
+                                    raise ValueError("FOR STEP source site disagrees with explicit clause")
+
+    def validate_for_inputs(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """Require original bounds and selected STEP snapshots from their producer."""
+        expressions = {int(row[1]): row for row in self.records["E"]}
+        prefixes = ("for-start-expression:", "for-limit-expression:",
+                    "for-step-selected-dtype:", "for-step-selected-expression:")
+        for (domain, identity), properties in self.properties.items():
+            keys = {key for key in properties if key.startswith(prefixes)}
+            for key in keys:
+                if domain != "symbol":
+                    raise ValueError("FOR input belongs to another domain")
+                prefix = next(item for item in prefixes if key.startswith(item))
+                statement = number(key[len(prefix):], 1)
+                symbol = self.symbols[identity]
+                dtype = int(symbol[4]) & 0x1ff
+                scalar = int(symbol[3]) == 1 and (
+                    (not int(symbol[5]) and dtype in (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16)) or
+                    (dtype == 10 and int(self.symbols.get(int(symbol[5]), [0, 0, 0, 0])[3]) == 9))
+                start = self.statements.get(statement)
+                module = subject_modules[domain, identity]
+                if not scalar or start is None or int(start[9]) != 281 or int(start[7]) != module or \
+                        self.statement_endings[statement][3] != "parsed" or f"for-counter:{statement}" not in properties:
+                    raise ValueError("FOR input lacks accepted scalar ownership")
+                bound = prefix in prefixes[:2]
+                capability = "scalar-for-bound-inputs" if bound else "scalar-for-selected-steps"
+                if self.capabilities[module].get(capability) != "available":
+                    raise ValueError("FOR input lacks producer coverage")
+                group = prefixes[:2] if bound else prefixes[2:]
+                if any(item + str(statement) not in properties for item in group):
+                    raise ValueError("Incomplete scalar FOR input group")
+                expression_key = f"for-step-selected-expression:{statement}"
+                expression = number(properties[key] if bound else properties[expression_key], int(bound))
+                if expression:
+                    row = expressions.get(expression)
+                    if row is None or subject_modules.get(("expression", expression)) != module or \
+                            self.statement_owners.get(("expression", expression)) != statement:
+                        raise ValueError("FOR input expression belongs to another statement")
+                if not bound:
+                    selected_dtype = number(properties[f"for-step-selected-dtype:{statement}"], 0)
+                    selected_type = selected_dtype & 0x1ff
+                    if selected_type not in (2, 3, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16) or \
+                            self.primitives[module - 1][selected_type][4] != self.primitives[module - 1][dtype][4]:
+                        raise ValueError("Selected FOR step has another storage width")
+                    explicit = properties.get(f"for-step-explicit:{statement}")
+                    if not expression:
+                        original = int(properties.get(f"for-step-expression:{statement}", "0"))
+                        if explicit != "1" or ("expression", original) in self.constants:
+                            raise ValueError("Known FOR step lacks selected constant")
+                    else:
+                        row = expressions[expression]
+                        value = self.constants.get(("expression", expression))
+                        if int(row[8]) != 16 or int(row[12]) != selected_dtype or value is None or \
+                                value[0] not in ("signed", "unsigned", "float64-bits"):
+                            raise ValueError("Selected FOR step is not a typed constant")
+                        if explicit == "0" and value[1] != ("0x3FF0000000000000" if value[0] == "float64-bits" else "1"):
+                            raise ValueError("Implicit FOR step is not the selected unit")
+            if domain == "symbol":
+                symbol = self.symbols[identity]
+                dtype = int(symbol[4]) & 0x1ff
+                scalar = int(symbol[3]) == 1 and (
+                    (not int(symbol[5]) and dtype in (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16)) or
+                    (dtype == 10 and int(self.symbols.get(int(symbol[5]), [0, 0, 0, 0])[3]) == 9))
+                if not scalar:
+                    continue
+                module = subject_modules[domain, identity]
+                for key in properties:
+                    if not key.startswith("for-counter:"):
+                        continue
+                    statement = key[12:]
+                    for capability, group in (("scalar-for-bound-inputs", prefixes[:2]),
+                                             ("scalar-for-selected-steps", prefixes[2:])):
+                        if self.capabilities[module].get(capability) == "available" and \
+                                any(item + statement not in properties for item in group):
+                            raise ValueError("Scalar FOR lacks complete input coverage")
+
+    def validate_numeric_selections(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        required = {"numeric-selected-left-dtype", "numeric-selected-right-dtype",
+                    "numeric-selected-left-expression", "numeric-selected-right-expression"}
+        expressions = {int(row[1]): row for row in self.records["E"]}
+        for (domain, identity), properties in self.properties.items():
+            selected = {key for key in properties if key.startswith("numeric-selected-")}
+            if not selected:
+                continue
+            if domain != "expression" or selected != required:
+                raise ValueError("Incomplete numeric operand selections")
+            operands = self.expression_operands.get(identity)
+            if operands is None or operands[2] != "binary":
+                raise ValueError("Numeric operand selections have no original binary operation")
+            for operand_id in operands[4:6]:
+                operand = expressions.get(int(operand_id))
+                if operand is None or int(operand[14]) or int(operand[12]) & 0x1e0 or int(operand[12]) & 31 not in (1, 2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16):
+                    raise ValueError("Numeric selection has no original primitive operand")
+            module = subject_modules[domain, identity]
+            for side in ("left", "right"):
+                dtype = number(properties[f"numeric-selected-{side}-dtype"], 0)
+                if dtype & 0x1e0 or dtype & 31 not in (1, 2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16):
+                    raise ValueError("Numeric selection has an unsupported dtype")
+                if dtype & 31 not in self.primitives[module - 1]:
+                    raise ValueError("Numeric selection lacks a primitive type receipt")
+                selected_id = number(properties[f"numeric-selected-{side}-expression"], 1)
+                selected_expression = expressions.get(selected_id)
+                if selected_expression is None or selected_id >= identity or subject_modules["expression", selected_id] != module:
+                    raise ValueError("Selected numeric operand is missing, forward or foreign")
+                if int(selected_expression[14]) or int(selected_expression[12]) & 0x1ff != dtype & 0x1ff:
+                    raise ValueError("Selected numeric operand has a different type")
+
+    def validate_numeric_literals(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """Literal origin is distinct from the value of an arbitrary constant."""
+        required = {"numeric-literal-kind", "numeric-literal-base", "numeric-literal-text", "numeric-literal-text-complete"}
+        expressions = {int(row[1]): row for row in self.records["E"]}
+        for (domain, identity), properties in self.properties.items():
+            keys = {key for key in properties if key.startswith("numeric-literal-")}
+            if not keys:
+                continue
+            if domain != "expression" or keys != required:
+                raise ValueError("Incomplete numeric literal observations")
+            expression = expressions.get(identity)
+            if expression is None or int(expression[14]) or int(expression[12]) & 0x1e0:
+                raise ValueError("Numeric literal is not a primitive scalar")
+            dtype = int(expression[12]) & 31
+            module = subject_modules[domain, identity]
+            if dtype not in (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16) or dtype not in self.primitives[module - 1]:
+                raise ValueError("Numeric literal lacks a primitive type")
+            value = self.constants.get((domain, identity))
+            kind = properties["numeric-literal-kind"]
+            if value is None or (dtype in (15, 16) and (kind != "float" or value[0] != "float64-bits")) or (dtype not in (15, 16) and (kind != "integer" or value[0] not in ("signed", "unsigned"))):
+                raise ValueError("Numeric literal kind disagrees with its compiler value")
+            text = properties["numeric-literal-text"]
+            complete = properties["numeric-literal-text-complete"]
+            if not 1 <= len(text) <= 1024 or complete not in ("0", "1") or (complete == "1" and len(text) >= 64):
+                raise ValueError("Invalid numeric literal text bounds")
+            radix = properties["numeric-literal-base"]
+            if radix == "decimal":
+                allowed = "0123456789.eEdD+-" if kind == "float" else "0123456789"
+            else:
+                prefixes = {"hex": ("&H", "0123456789abcdefABCDEF"), "octal": ("&O", "01234567"), "binary": ("&B", "01")}
+                if radix not in prefixes or text[:2].upper() != prefixes[radix][0]:
+                    raise ValueError("Numeric literal radix disagrees with token text")
+                allowed = prefixes[radix][1]
+                text = text[2:]
+            if not text or any(character not in allowed for character in text):
+                raise ValueError("Invalid canonical numeric token characters")
+
+    def validate_numeric_assignments(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """Destination properties supplement, never replace, the RHS type."""
+        for (domain, identity), properties in self.properties.items():
+            dtype = properties.get("assignment-target-dtype")
+            kind = properties.get("assignment-kind")
+            if dtype is None and kind is None:
+                continue
+            if domain != "expression" or dtype is None or kind not in ("assignment", "initializer"):
+                raise ValueError("Incomplete numeric assignment destination")
+            target = number(dtype, 0)
+            primitive_types = self.primitives[subject_modules["expression", identity] - 1]
+            if target & 0x1E0 or target & 31 not in primitive_types:
+                raise ValueError("Invalid numeric assignment destination type")
+            if target & 31 not in (1, 2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16):
+                raise ValueError("Assignment destination is not a primitive numeric scalar")
+
+    def validate_size_queries(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """Preserve the selected input independently of the folded size result."""
+        required = {"size-query-kind", "size-query-dtype", "size-query-subtype",
+                    "size-query-operand", "size-query-input"}
+        for (domain, identity), properties in self.properties.items():
+            observed = {key for key in properties if key.startswith("size-query-")}
+            if not observed:
+                continue
+            if domain != "expression" or observed != required:
+                raise ValueError("Incomplete or unknown size query input receipt")
+            if properties["size-query-kind"] not in ("len", "sizeof") or properties["size-query-input"] not in ("type", "expression", "array"):
+                raise ValueError("Invalid size query input kind")
+            module = subject_modules["expression", identity]
+            dtype = number(properties["size-query-dtype"], 0)
+            if dtype & 31 not in self.primitives[module - 1] or (dtype & 0x1E0) >> 5 > 8:
+                raise ValueError("Invalid size query input type")
+            subtype = number(properties["size-query-subtype"], 0)
+            if subtype and subtype not in self.symbols:
+                raise ValueError("Missing size query nominal type")
+            operand = number(properties["size-query-operand"], 0)
+            if operand and subject_modules.get(("expression", operand)) != module:
+                raise ValueError("Missing or foreign size query operand")
+            if properties["size-query-input"] == "type" and operand:
+                raise ValueError("Type-only size query has an expression operand")
+
+    def validate_storage_receipts(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """Keep parser-selected storage meaning distinct from generated calls."""
+        expressions = {int(row[1]): row for row in self.records["E"]}
+        address_keys = {"kind", "dtype", "subtype", "operand", "temporary"}
+        new_keys = {"kind", "dtype", "subtype", "elements", "clear", "placement", "placement-operand"}
+        call_owners = {}
+        call_work_left = len(self.nodes) * 4
+        for (domain, identity), properties in self.properties.items():
+            for key, value in properties.items():
+                if key == "call-argument-expression":
+                    operand = number(value, 1)
+                    node = self.nodes.get(identity)
+                    module = subject_modules.get((domain, identity))
+                    if domain != "node" or node is None or node[4] != "22" or subject_modules.get(("expression", operand)) != module:
+                        raise ValueError("Missing or foreign selected call argument input")
+                    if properties.get("default-argument") != "0":
+                        raise ValueError("Default argument claims a selected caller expression")
+                    parameter = self.symbols.get(int(node[9]))
+                    call = node
+                    while call is not None and call[4] == "22":
+                        call_work_left -= 1
+                        if call_work_left < 0:
+                            raise ValueError("Selected argument traversal budget exceeded")
+                        if int(call[1]) in call_owners:
+                            call = call_owners[int(call[1])]
+                            break
+                        call = self.nodes.get(int(call[2]))
+                    if parameter is None or parameter[3] != "4" or call is None or call[4] != "9" or call[9] != parameter[11]:
+                        raise ValueError("Selected call argument does not belong to its formal procedure")
+                    call_owners[identity] = call
+                if key.startswith("procedure-prototype-statement-"):
+                    statement = number(value, 1)
+                    if domain != "symbol" or int(self.symbols[identity][3]) != 3 or key[30:] != value:
+                        raise ValueError("Invalid procedure prototype statement owner")
+                    if statement not in self.statements or int(self.statements[statement][7]) != subject_modules[domain, identity]:
+                        raise ValueError("Missing or foreign procedure prototype statement")
+        for row in self.records["H"]:
+            if row[1] == "node" and row[3] == "expression" and row[5] == "source-expression":
+                identity = int(row[2])
+                module = subject_modules["node", identity]
+                if self.nodes[identity][4] == "22" and self.capabilities[module].get("selected-call-argument-inputs") == "available":
+                    if self.properties["node", identity].get("call-argument-expression") != row[4]:
+                        raise ValueError("Missing selected call argument receipt")
+        for (domain, identity), properties in self.properties.items():
+            for prefix, keys in (("pointer-address-", address_keys), ("pointer-dereference-", {"operand", "count"}), ("pointer-index-", {"operand", "index"}), ("memory-new-", new_keys),
+                                 ("memory-release-", {"kind"})):
+                observed = {key[len(prefix):] for key in properties if key.startswith(prefix)}
+                if not observed:
+                    continue
+                if observed != keys:
+                    raise ValueError("Incomplete or unknown storage receipt")
+                values = {key: properties[prefix + key] for key in keys}
+                module = subject_modules[domain, identity]
+                if prefix == "pointer-index-":
+                    operand = number(values["operand"], 1)
+                    index = number(values["index"], 1)
+                    if domain != "expression" or operand >= identity or index >= identity or any(
+                            subject_modules.get(("expression", item)) != module for item in (operand, index)):
+                        raise ValueError("Missing, cyclic or foreign pointer index input")
+                    if not int(expressions[operand][12]) & 0x1E0 or int(expressions[index][12]) & 0x1E0:
+                        raise ValueError("Pointer index inputs contradict their selected types")
+                    if self.primitives[module - 1][int(expressions[index][12]) & 31][3] not in ("integer", "float"):
+                        raise ValueError("Pointer index is not numeric")
+                    continue
+                if prefix == "pointer-dereference-":
+                    operand = number(values["operand"], 1)
+                    count = number(values["count"], 1)
+                    if domain != "expression" or operand >= identity or subject_modules.get(("expression", operand)) != module:
+                        raise ValueError("Missing, cyclic or foreign dereference input")
+                    input_type = int(expressions[operand][12]) & 0x1FF
+                    if count > 8 or count > (input_type & 0x1E0) >> 5:
+                        raise ValueError("Dereference count exceeds its typed input")
+                    if int(expressions[identity][12]) & 0x1FF != input_type - count * 32 or expressions[identity][14] != expressions[operand][14]:
+                        raise ValueError("Dereference result contradicts its selected input")
+                    continue
+                if prefix == "memory-new-":
+                    symbol = self.symbols[identity]
+                    if domain != "symbol" or int(symbol[3]) != 1 or not int(symbol[7]) & 0x1000:
+                        raise ValueError("NEW storage is not a compiler temporary variable")
+                    if values["kind"] not in ("scalar", "array") or values["clear"] not in ("0", "1") or values["placement"] not in ("0", "1"):
+                        raise ValueError("Invalid NEW selection")
+                    if values["elements"] != "unknown" and (len(values["elements"]) > 20 or number(values["elements"], 0) > 2**64 - 1):
+                        raise ValueError("NEW element count exceeds unsigned storage")
+                    placement = number(values["placement-operand"], 0)
+                    if bool(placement) != (values["placement"] == "1"):
+                        raise ValueError("NEW placement flag contradicts its operand")
+                    if placement and (subject_modules.get(("expression", placement)) != module or not int(expressions[placement][12]) & 0x1E0):
+                        raise ValueError("NEW placement lacks its selected pointer expression")
+                else:
+                    if domain != "expression" or not int(expressions[identity][12]) & 0x1E0:
+                        raise ValueError("Storage receipt result is not a pointer expression")
+                    if prefix == "memory-release-":
+                        if values["kind"] not in ("scalar", "array"):
+                            raise ValueError("Invalid DELETE selection")
+                        continue
+                    if values["kind"] not in ("address-of", "varptr", "strptr") or values["temporary"] not in ("0", "1"):
+                        raise ValueError("Invalid address selection")
+                    operand = number(values["operand"], 1)
+                    if operand >= identity or subject_modules.get(("expression", operand)) != module:
+                        raise ValueError("Missing, cyclic or foreign address input")
+                dtype = number(values["dtype"], 0)
+                subtype = number(values["subtype"], 0)
+                if dtype & 31 not in self.primitives[module - 1] or (dtype & 0x1E0) >> 5 > 8:
+                    raise ValueError("Invalid selected storage type")
+                if subtype and subtype not in self.symbols:
+                    raise ValueError("Missing selected storage nominal type")
+                if prefix == "memory-new-":
+                    temporary_type = int(symbol[4])
+                    if temporary_type & 31 != dtype & 31 or temporary_type & 0x1E0 != (dtype & 0x1E0) + 0x20 or int(symbol[5]) != subtype:
+                        raise ValueError("NEW temporary type contradicts its selected pointee")
+
+    def validate_formal_spans(self) -> None:
+        declarations = {int(row[1]): row for row in self.records["DCL"]}
+        physical_parameters: set[int] = set()
+        for (domain, identity), properties in self.properties.items():
+            kind = properties.get("formal-span-kind")
+            if kind is None:
+                continue
+            if domain != "symbol" or int(self.symbols[identity][3]) != SYMBOL_CLASSES.index("parameter") + 1:
+                raise ValueError("Formal span kind belongs to a nonparameter")
+            if kind not in ("physical", "generated"):
+                raise ValueError("Unknown formal span kind")
+            if kind == "physical":
+                physical_parameters.add(identity)
+        observed: set[int] = set()
+        for (domain, identity, role), span in self.physical_locations.items():
+            if domain != "declaration" or role not in ("formal", "formal-generated"):
+                continue
+            declaration = declarations[identity]
+            parameter = int(declaration[2])
+            if declaration[3] not in ("parameter-prototype", "parameter-definition") or int(self.symbols[parameter][3]) != SYMBOL_CLASSES.index("parameter") + 1:
+                raise ValueError("Formal span belongs to a nonparameter declaration")
+            if int(span[4]) != self.origins.get(("declaration", identity)):
+                raise ValueError("Formal span belongs to another source occurrence")
+            other = "formal-generated" if role == "formal" else "formal"
+            if (domain, identity, other) in self.physical_locations:
+                raise ValueError("Formal has contradictory physical and generated spans")
+            if role == "formal":
+                name = self.physical_locations.get((domain, identity, "range"))
+                if name is None or span[4] != name[4] or tuple(map(int, span[5:7])) > tuple(map(int, name[5:7])) or tuple(map(int, span[7:9])) < tuple(map(int, name[7:9])):
+                    raise ValueError("Complete formal span does not contain its name or first token")
+                observed.add(parameter)
+            kind = self.properties["symbol", parameter].get("formal-span-kind")
+            if kind != ("physical" if role == "formal" else "generated"):
+                raise ValueError("Formal span disagrees with its parser-owned kind")
+        if physical_parameters != observed:
+            raise ValueError("Physical formal lacks its complete declaration span")
+        if any(features.get("formal-parameter-spans") == "available" for features in self.capabilities.values()):
+            for declaration in declarations.values():
+                if declaration[3] in ("parameter-prototype", "parameter-definition") and "formal-span-kind" not in self.properties["symbol", int(declaration[2])]:
+                    raise ValueError("Parameter declaration lacks its formal span observation")
 
     @staticmethod
     def macro_units(kind: str, value: str) -> bytes | tuple[int, ...]:
@@ -1384,7 +2161,31 @@ class Model:
                 if symbol_class > len(SYMBOL_CLASSES) or metadata_class != SYMBOL_CLASSES[symbol_class - 1]:
                     raise ValueError("Symbol class disagrees with its metadata")
 
+        source_field_counts = Counter(int(row[8]) for row in self.types.values()
+                                      if row[3] == "field" and row[18] == "source")
+        array_ranks = {int(array[1]): int(array[2]) for array in self.records["A"]}
         for identity, row in self.types.items():
+            # Optional K receipts preserve old producers. When present, they
+            # describe completed source membership, not hidden storage slots.
+            properties = self.properties.get(("symbol", identity), {})
+            count = properties.get("declared-field-count")
+            if count is not None:
+                if row[3] not in ("type", "union") or properties.get("layout-finalized") != "1":
+                    raise ValueError("Declared field count lacks a finalized aggregate")
+                if int(count) != source_field_counts[identity]:
+                    raise ValueError("Declared field count disagrees with source membership")
+            rank = properties.get("field-array-rank")
+            if rank is not None:
+                if row[3] != "field" or int(rank) != array_ranks.get(identity, 0):
+                    raise ValueError("Field array rank disagrees with its array contract")
+            marker = self.properties.get(("symbol", identity), {}).get("written-override")
+            if marker is not None:
+                owner = self.types.get(int(row[8]))
+                if row[3] != "procedure" or owner is None or owner[3] not in ("type", "union"):
+                    raise ValueError("Written override receipt lacks a member declaration")
+                signature = self.signatures.get(identity)
+                if marker == "1" and (signature is None or signature[11] == "0"):
+                    raise ValueError("Written override check lacks its resolved base method")
             if row[3] == "procedure" and identity not in self.signatures:
                 raise ValueError("Procedure lacks its signature")
             if row[3] in ("type", "union", "enum", "scope") and identity not in self.layouts:

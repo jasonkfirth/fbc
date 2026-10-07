@@ -18,6 +18,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--fbc", type=Path, required=True)
+    parser.add_argument("--toolchain-prefix", type=Path,
+                        help="Use an existing native SDK without copying it into the source tree")
     parser.add_argument("--backend", choices=("gcc", "clang", "llvm", "gas64", "gas"), action="append")
     parser.add_argument("--test", action="append", help="Run only the named test method")
     options = parser.parse_args()
@@ -29,6 +31,7 @@ def main() -> int:
 
     SidecarTests.root = root
     SidecarTests.compiler = options.fbc.resolve()
+    SidecarTests.toolchain_prefix = (options.toolchain_prefix or root).resolve()
     SidecarTests.backends = options.backend or ["gcc", "clang", "llvm"]
     if options.test:
         suite = unittest.TestSuite(SidecarTests(name) for name in options.test)

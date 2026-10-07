@@ -633,6 +633,8 @@ function cDerefExpression( ) as ASTNODE ptr
 	if( lexGetToken( ) <> FB_TK_DEREFCHAR ) then
 		return NULL
 	end if
+	dim as LEX_LOCATION semantic_start = lexGetCurrentLocation( )
+	dim as longint semantic_counter = lexGetNonphysicalTokenCount( )
 
 	'' DREF+
 	derefcnt = 0
@@ -649,7 +651,16 @@ function cDerefExpression( ) as ASTNODE ptr
 		return astNewCONSTi( 0 )
 	end if
 
-	function = astBuildMultiDeref( derefcnt, expr, astGetFullType( expr ), astGetSubType( expr ) )
+	'' Only a typed pointer input establishes this observation. A UDT's
+	'' implicit pointer conversion requires its own selected-call semantics.
+	dim as integer semantic_pointer = typeIsPtr(astGetFullType(expr))
+	dim as longint semantic_operand = expr->semantic_expression
+	expr = astBuildMultiDeref( derefcnt, expr, astGetFullType( expr ), astGetSubType( expr ) )
+	if( semantic_pointer ) then
+		hSemanticModelExportCurrentExpression(expr, semantic_start, semantic_counter)
+		fbSemanticModelPointerDereference(expr, semantic_operand, derefcnt)
+	end if
+	function = expr
 end function
 
 private function hProcPtrResolveOverload _
@@ -865,7 +876,8 @@ end function
 private function hVarPtrBody _
 	( _
 		byval base_parent as FBSYMBOL ptr, _
-		byval chain_ as FBSYMCHAIN ptr _
+		byval chain_ as FBSYMCHAIN ptr, _
+		byref address_kind as const string _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = cHighestPrecExpr( base_parent, chain_ )
@@ -923,7 +935,13 @@ private function hVarPtrBody _
 	end scope
 
 	fbSemanticModelSetAccess(expr, "address")
-	function = astNewADDROF( expr )
+	dim as longint semantic_operand = expr->semantic_expression
+	dim as integer semantic_dtype = astGetFullType(expr)
+	dim as FBSYMBOL ptr semantic_subtype = astGetSubType(expr)
+	dim as integer semantic_temporary = fbSemanticModelAddressIsTemporary(expr)
+	expr = astNewADDROF( expr )
+	fbSemanticModelPointerAddress(expr, semantic_operand, semantic_dtype, semantic_subtype, semantic_temporary, address_kind)
+	function = expr
 end function
 
 '':::::
@@ -967,7 +985,7 @@ function cAddrOfExpression( ) as ASTNODE ptr
 		end if
 
 		'' anything else
-		return hVarPtrBody( base_parent, chain_ )
+		return hVarPtrBody( base_parent, chain_, "address-of" )
 	end if
 
 	select case as const lexGetToken( )
@@ -983,7 +1001,7 @@ function cAddrOfExpression( ) as ASTNODE ptr
 			return astNewCONSTi( 0 )
 		end if
 
-		expr = hVarPtrBody( NULL, NULL )
+		expr = hVarPtrBody( NULL, NULL, "varptr" )
 
 		'' ')'
 		if( hMatch( CHAR_RPRNT ) = FALSE ) then
@@ -1067,6 +1085,10 @@ function cAddrOfExpression( ) as ASTNODE ptr
 		end select
 
 		'' varlen? do: *cast( [const] zstring const ptr ptr, @expr )
+		dim as longint semantic_operand = expr->semantic_expression
+		dim as integer semantic_dtype = astGetFullType(expr)
+		dim as FBSYMBOL ptr semantic_subtype = astGetSubType(expr)
+		dim as integer semantic_temporary = fbSemanticModelAddressIsTemporary(expr)
 		select case dtype
 		case FB_DATATYPE_STRING, FB_DATATYPE_USTRING
 			expr = astBuildStrPtr( expr )
@@ -1082,6 +1104,7 @@ function cAddrOfExpression( ) as ASTNODE ptr
 			                   NULL, _
 			                   astNewADDROF( expr ) )
 		end select
+		fbSemanticModelPointerAddress(expr, semantic_operand, semantic_dtype, semantic_subtype, semantic_temporary, "strptr")
 
 		'' ')'
 		if( hMatch( CHAR_RPRNT ) = FALSE ) then

@@ -30,6 +30,7 @@
 #include once "parser/parser.bi"
 #include once "backend/ir.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-expressions.bi"
 
 '':::::
 function astTypeIniBegin _
@@ -857,6 +858,7 @@ function astTypeIniFlush overload _
 
 				l = astBuildDerefAddrOf( astCloneTree( target ), n->typeini.ofs, n->dtype, n->subtype, n->sym )
 
+				fbSemanticModelStringInitializerCopy(n, FALSE)
 				l = astNewASSIGN( l, n->l, assignoptions or AST_OPOPT_DONTCHKPTR )
 				assert( l )
 				t = astNewLINK( t, l, AST_LINK_RETURN_NONE )
@@ -918,6 +920,7 @@ function astTypeIniFlush overload _
 end function
 
 private sub hFlushExprStatic( byval n as ASTNODE ptr, byval basesym as FBSYMBOL ptr )
+	fbSemanticModelStringInitializerCopy(n, TRUE)
 	'' Get lhs symbol: maybe a field (in case of TYPEINI_ASSIGN in a struct),
 	'' or the basesym (in case of TYPEINI_ASSIGN to global var).
 	var sym = n->sym

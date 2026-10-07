@@ -28,6 +28,7 @@
 
 #pragma once
 
+'' FB-LINTER: DISABLE-NEXT-LINE FBL930 REASON: The build resolves sfx in the active target library directory.
 #inclib "sfx"
 
 namespace sfxlib
@@ -167,9 +168,10 @@ namespace sfxlib
 
 	'' The recorder accepts UTF-8 filenames. Keep the existing C ABI and
 	'' transcode wide callers without using the process locale.
-	private function OutputCaptureSave overload( byval filename as const wstring ptr ) as long
+	private function OutputCaptureSave cdecl overload( byval filename as const wstring ptr ) as long
 		dim as string encoded = __WideFilenameToUtf8(filename)
-		return OutputCaptureSave(strptr(encoded))
+		'' OPTION GOSUB makes RETURN a label statement in legacy callers.
+		function = OutputCaptureSave(strptr(encoded)) ' FB-LINTER: DISABLE-LINE FBL427 REASON: The C saver opens the path synchronously and retains no pointer.
 	end function
 
 end namespace

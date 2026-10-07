@@ -172,4 +172,35 @@ guest setup. They are local research helpers, not installed build commands.
 The source packages contain their original licenses and author notices.
 Retain those sources and notices with any redistributed experimental archive.
 
+## Software cursor publication
+
+`cursor_pixels.bas` and `cursor_capture.c` exercise the DOS IRQ0 presentation
+path at 640x480 in 8-, 16- and 32-bit modes. The C helper borrows the update
+callback under `ScreenLock`, captures submitted pixels and counts updates.
+It restores the callback and releases its locked buffer before `SCREEN 0`.
+The captured target can copy individual dirty rows or the span between them,
+as banked VESA drivers do. This checks publication contracts rather than the
+emulator's final window surface.
+
+Compile `cursor_capture.c` with the target library's C flags and these include
+paths: `-Isrc/gfxlib2 -Isrc/gfxlib2/dos`. Add
+`-fno-toplevel-reorder -fno-reorder-functions` so the callback's end marker
+still bounds the code locked for interrupt use. Link its object with the
+ordinary DOS gfxlib or `fbgfxmt` for the threaded runtime. The linked library
+must provide `fb_GfxDosIdle`; both DOS graphics timer profiles are supported.
+
+Define `CURSOR_EXPECT_IDLE_STABLE` when building against the retained cursor
+path. The expected markers are `CURSOR_PIXEL_CHECKS; 43; 0` and
+`CURSOR_PIXELS_PASS`. Without that define, the original implementation can
+produce the reference capture hashes with 40 checks. All 25 region hashes
+must match between the two implementations. The extra three checks require
+zero stationary display updates, one in each color depth. The other checks
+cover mouse events, movement, visibility, drawing underneath the pointer,
+palette changes and bottom-right clipping.
+
+Run the resulting DOS executable through `run-dosbox-x.py` with
+`--expect CURSOR_PIXELS_PASS --timeout 60`. The test synthesizes cursor
+position through DOS `SETMOUSE`, not host input. Physical keyboard latency
+and physical DOS hardware require separate qualification.
+
 <!-- end of README.md -->

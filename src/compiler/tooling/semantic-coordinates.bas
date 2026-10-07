@@ -215,17 +215,16 @@ private function hResolveColumn _
 	return TRUE
 end function
 
-sub fbSemanticModelExportCoordinates _
-	( byref domain as const string, byval subject as longint, byref role as const string, _
-	  byref first as LEX_LOCATION, byref last as LEX_LOCATION )
-	if( fbSemanticModelEnabled( ) = FALSE ) then exit sub
+function fbSemanticModelCoordinateFact _
+	( byref first as LEX_LOCATION, byref last as LEX_LOCATION ) as string
+	if( fbSemanticModelEnabled( ) = FALSE ) then return ""
 	if( (first.raw_valid = FALSE) or (last.raw_valid = FALSE) or (first.source_context = 0) or _
-	    (first.source_context <> last.source_context) ) then exit sub
+	    (first.source_context <> last.source_context) ) then return ""
 	'' Empty colon statements can begin after the parser's last consumed token.
 	'' Do not publish an editable location when its endpoint precedes its start.
-	if( first.raw_start_line > last.raw_end_line ) then exit sub
+	if( first.raw_start_line > last.raw_end_line ) then return ""
 	if( (first.raw_start_line = last.raw_end_line) and _
-	    (first.raw_start_column > last.raw_end_column) ) then exit sub
+	    (first.raw_start_column > last.raw_end_column) ) then return ""
 	dim as integer start_column = 0, end_column = 0
 	dim as longint start_byte = -1, end_byte = -1
 	dim as integer mapped = hResolveColumn(first.source_context, first.raw_start_line, first.raw_start_column, start_column, start_byte)
@@ -236,11 +235,19 @@ sub fbSemanticModelExportCoordinates _
 		start_byte = -1
 		end_byte = -1
 	end if
-	fbSemanticModelAppendProvenance("LOC" + TABCHAR + domain + TABCHAR + fbSemanticModelNumber(subject) + TABCHAR + role + _
-		TABCHAR + fbSemanticModelNumber(first.source_context) + TABCHAR + fbSemanticModelNumber(first.raw_start_line) + _
+	return fbSemanticModelNumber(first.source_context) + TABCHAR + fbSemanticModelNumber(first.raw_start_line) + _
 		TABCHAR + fbSemanticModelNumber(start_column) + TABCHAR + fbSemanticModelNumber(last.raw_end_line) + _
 		TABCHAR + fbSemanticModelNumber(end_column) + TABCHAR + fbSemanticModelNumber(start_byte) + _
-		TABCHAR + fbSemanticModelNumber(end_byte) + TABCHAR + iif(mapped, "mapped", "unverified"))
+		TABCHAR + fbSemanticModelNumber(end_byte) + TABCHAR + iif(mapped, "mapped", "unverified")
+end function
+
+sub fbSemanticModelExportCoordinates _
+	( byref domain as const string, byval subject as longint, byref role as const string, _
+	  byref first as LEX_LOCATION, byref last as LEX_LOCATION )
+	dim as string coordinates = fbSemanticModelCoordinateFact(first, last)
+	if( len(coordinates) = 0 ) then exit sub
+	fbSemanticModelAppendProvenance("LOC" + TABCHAR + domain + TABCHAR + fbSemanticModelNumber(subject) + _
+		TABCHAR + role + TABCHAR + coordinates)
 end sub
 
 '' end of tooling/semantic-coordinates.bas

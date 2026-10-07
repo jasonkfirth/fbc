@@ -34,6 +34,11 @@ const FLOW_MAX_DEPTH = 65536
 dim shared as SEMANTIC_FLOW_NODE ptr flow_nodes
 dim shared as integer flow_count, flow_capacity
 dim shared as longint flow_phase, flow_proc, flow_base
+'' The phase owns this temporary membership bitmap. Module symbol IDs are
+'' contiguous within a one-million-symbol bound, so even sparse phase labels
+'' retain at most one MiB. Nested IIF labels are not ordinary root CB targets.
+dim shared as ubyte ptr flow_root_labels
+dim shared as longint flow_root_label_base, flow_root_label_count
 
 private function hNode(byval identity as longint) as SEMANTIC_FLOW_NODE ptr
 	if( (identity <= flow_base) or (identity > flow_base + flow_count) ) then return NULL
@@ -43,6 +48,9 @@ end function
 
 function fbSemanticModelPhaseBegin(byval proc as FBSYMBOL ptr, byref phase as const string, byval emitted as integer) as longint
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then return 0
+	deallocate(flow_root_labels)
+	flow_root_labels = NULL
+	flow_root_label_count = 0
 	deallocate(flow_nodes)
 	flow_nodes = NULL
 	flow_count = 0
@@ -56,6 +64,9 @@ function fbSemanticModelPhaseBegin(byval proc as FBSYMBOL ptr, byref phase as co
 end function
 
 sub fbSemanticModelPhaseEnd( )
+	deallocate(flow_root_labels)
+	flow_root_labels = NULL
+	flow_root_label_count = 0
 	deallocate(flow_nodes)
 	flow_nodes = NULL
 	flow_count = 0
@@ -68,7 +79,7 @@ sub fbSemanticModelFlowNode(byval node as ASTNODE ptr, byval identity as longint
 	if( flow_count = 0 ) then flow_base = identity - 1
 	dim as longint index = identity - flow_base - 1
 	if( (index < 0) or (index >= FLOW_MAX_NODES) ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-flow.bas:71")
 		exit sub
 	end if
 	if( index >= flow_capacity ) then
@@ -79,7 +90,7 @@ sub fbSemanticModelFlowNode(byval node as ASTNODE ptr, byval identity as longint
 		loop
 		dim as SEMANTIC_FLOW_NODE ptr storage = reallocate(flow_nodes, capacity * sizeof(SEMANTIC_FLOW_NODE))
 		if( storage = NULL ) then
-			fbSemanticModelFail( )
+			fbSemanticModelFailAt("semantic-flow.bas:82")
 			exit sub
 		end if
 		memset(storage + flow_capacity, 0, (capacity - flow_capacity) * sizeof(SEMANTIC_FLOW_NODE))
@@ -90,7 +101,7 @@ sub fbSemanticModelFlowNode(byval node as ASTNODE ptr, byval identity as longint
 	'' visits those frames in LIFO order. Arrival order is therefore different
 	'' from identity order. Index by the allocated ID and verify each slot.
 	if( flow_nodes[index].identity <> 0 ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-flow.bas:93")
 		exit sub
 	end if
 	with flow_nodes[index]
@@ -107,7 +118,7 @@ sub fbSemanticModelFlowNode(byval node as ASTNODE ptr, byval identity as longint
 	if( edge > 0 ) then
 		dim as SEMANTIC_FLOW_NODE ptr owner = hNode(parent)
 		if( owner = NULL ) then
-			fbSemanticModelFail( )
+			fbSemanticModelFailAt("semantic-flow.bas:110")
 			exit sub
 		end if
 		if( edge = 1 ) then owner->left_child = identity
@@ -144,7 +155,7 @@ private sub hNodeOrder(byval item as SEMANTIC_FLOW_NODE ptr)
 		while( argument <> 0 )
 			dim as SEMANTIC_FLOW_NODE ptr arg = hNode(argument)
 			if( arg = NULL ) then
-				fbSemanticModelFail( )
+				fbSemanticModelFailAt("semantic-flow.bas:147")
 				exit sub
 			end if
 			hOrder(identity, argument, ordinal, "argument")
@@ -194,16 +205,74 @@ private sub hEdge(byval source as longint, byval target as longint, byref kind a
 		TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(label)))
 end sub
 
+private function hIndexRootLabels( ) as integer
+	flow_root_label_base = -1
+	dim as longint last_label = 0
+	for index as integer = 0 to flow_count - 1
+		with flow_nodes[index]
+			if( (.edge <> 0) or (.parent <> flow_proc) or (.astnode->class <> AST_NODECLASS_LABEL) ) then continue for
+			dim as longint label_id = fbSemanticModelSymbolId(.astnode->sym)
+			if( label_id < 1 ) then return FALSE
+			if( (flow_root_label_base < 0) or (label_id < flow_root_label_base) ) then flow_root_label_base = label_id
+			if( label_id > last_label ) then last_label = label_id
+		end with
+	next
+	if( flow_root_label_base < 0 ) then return TRUE
+	flow_root_label_count = last_label - flow_root_label_base + 1
+	if( flow_root_label_count > FLOW_MAX_NODES ) then return FALSE
+	flow_root_labels = callocate(flow_root_label_count)
+	if( flow_root_labels = NULL ) then return FALSE
+	for index as integer = 0 to flow_count - 1
+		with flow_nodes[index]
+			if( (.edge <> 0) or (.parent <> flow_proc) or (.astnode->class <> AST_NODECLASS_LABEL) ) then continue for
+			dim as longint slot = fbSemanticModelSymbolId(.astnode->sym) - flow_root_label_base
+			if( (slot < 0) or (slot >= flow_root_label_count) ) then return FALSE
+			flow_root_labels[slot] = 1
+		end with
+	next
+	return TRUE
+end function
+
+'' astLoadLINK loads its left child before its right child. A final BOP/UOP
+'' with op.ex branches to that actual label, even when earlier children
+'' allocate or destroy temporary strings. Export that edge on the enclosing
+'' CB as well as its existing fallthrough. Other nested transfers stay opaque.
+private function hSequenceTailBranch(byval item as SEMANTIC_FLOW_NODE ptr) as SEMANTIC_FLOW_NODE ptr
+	if( item->astnode->class <> AST_NODECLASS_LINK ) then return NULL
+	for depth as integer = 0 to FLOW_MAX_DEPTH
+		if( item->astnode->class <> AST_NODECLASS_LINK ) then
+			select case item->astnode->class
+			case AST_NODECLASS_BOP, AST_NODECLASS_UOP
+				if( (item->astnode->op.ex <> NULL) and (flow_root_labels <> NULL) ) then
+					dim as longint slot = fbSemanticModelSymbolId(item->astnode->op.ex) - flow_root_label_base
+					if( (slot >= 0) and (slot < flow_root_label_count) ) then
+						if( flow_root_labels[slot] ) then return item
+					end if
+				end if
+			end select
+			return NULL
+		end if
+		item = hNode(item->right_child)
+		if( item = NULL ) then return NULL
+	next
+	fbSemanticModelFailAt("sequence tail branch depth limit")
+	return NULL
+end function
+
 sub fbSemanticModelExportFlow(byval phase as longint)
 	if( (phase = 0) or (phase <> flow_phase) ) then exit sub
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
 	for index as integer = 0 to flow_count - 1
 		if( (flow_nodes[index].identity = 0) or (flow_nodes[index].astnode = NULL) ) then
-			fbSemanticModelFail( )
+			fbSemanticModelFailAt("semantic-flow.bas:202")
 			exit sub
 		end if
 		hNodeOrder(@flow_nodes[index])
 	next
+	if( hIndexRootLabels( ) = FALSE ) then
+		fbSemanticModelFailAt("phase root label index allocation or bounds")
+		exit sub
+	end if
 	'' Root order is the AST procedure list, never serializer DFS order.
 	'' Nested conditional trees retain separate EV path guards above.
 	dim as longint previous = 0, ordinal = 0
@@ -218,6 +287,13 @@ sub fbSemanticModelExportFlow(byval phase as longint)
 		dim as ASTNODE ptr node = item->astnode
 		previous = block
 		select case node->class
+		case AST_NODECLASS_LINK
+			dim as SEMANTIC_FLOW_NODE ptr branch = hSequenceTailBranch(item)
+			if( branch <> NULL ) then
+				fbSemanticModelAppendDetail("K" + TABCHAR + "node" + TABCHAR + fbSemanticModelNumber(item->identity) + _
+					TABCHAR + "sequence-tail-branch-node" + TABCHAR + fbSemanticModelNumber(branch->identity))
+				hEdge(block, 0, "conditional-label", branch->astnode->op.ex)
+			end if
 		case AST_NODECLASS_LABEL
 			fbSemanticModelAppendDetail("CL" + TABCHAR + fbSemanticModelNumber(phase) + TABCHAR + _
 				fbSemanticModelNumber(fbSemanticModelSymbolId(node->sym)) + TABCHAR + fbSemanticModelNumber(block))

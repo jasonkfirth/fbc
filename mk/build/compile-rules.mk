@@ -286,6 +286,26 @@ $(libfbrtmtpicobjdir)/%.o: $(srcdir)/fbrt/%.bas $(LIBFBRT_BI) | $(libfbrtmtpicob
 # gfxlib2 (C sources)
 ##############################################################################
 
+ifeq ($(TARGET_OS),dos)
+# Only gfx_dos.c consumes this profile. A content-checked stamp rebuilds that
+# object when the option changes, then its archive, without duplicating the
+# entire runtime or requiring a clean rebuild of the compiler and libraries.
+DOS_GFX_TIMER_PROFILE_STAMP := $(libfbgfxobjdir)/.timer-profile
+.PHONY: dos-gfx-timer-profile-force
+dos-gfx-timer-profile-force:
+
+$(DOS_GFX_TIMER_PROFILE_STAMP): dos-gfx-timer-profile-force | $(libfbgfxobjdir)
+	@current="$$(cat "$@" 2>/dev/null || :)"; \
+	if [ "$$current" != "timer=$(ENABLE_DOS_GFX_LOW_POWER)" ]; then \
+		printf '%s\n' "timer=$(ENABLE_DOS_GFX_LOW_POWER)" > "$@"; \
+	fi
+
+$(libfbgfxobjdir)/dos/gfx_dos.o \
+$(libfbgfxpicobjdir)/dos/gfx_dos.o \
+$(libfbgfxmtobjdir)/dos/gfx_dos.o \
+$(libfbgfxmtpicobjdir)/dos/gfx_dos.o: $(DOS_GFX_TIMER_PROFILE_STAMP)
+endif
+
 GFXLIB2_ARCH_CFLAGS :=
 GFXLIB2_SIMD_CFLAGS :=
 ifeq ($(TARGET_ARCH),arm)

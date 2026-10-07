@@ -658,13 +658,21 @@ static void compat_clear_shadow_dirty(FB_GFX3_MODE *mode, uint32_t page)
 		mode->shadow_dirty_first_line[page] = UINT32_MAX;
 	if (mode->shadow_dirty_last_line != NULL)
 		mode->shadow_dirty_last_line[page] = 0u;
+	if (mode->shadow_dirty_first_column != NULL)
+		mode->shadow_dirty_first_column[page] = UINT32_MAX;
+	if (mode->shadow_dirty_last_column != NULL)
+		mode->shadow_dirty_last_column[page] = 0u;
 }
 
-static void compat_mark_shadow_dirty(FB_GFX3_MODE *mode, uint32_t page,
-	uint32_t first_line, uint32_t last_line)
+/* The mode mutex protects both accumulation and upload. Known CPU writes keep
+   a bounded inclusive rectangle; unknown writes retain full-row coverage. */
+static void compat_mark_shadow_rect(FB_GFX3_MODE *mode, uint32_t page,
+	uint32_t first_column, uint32_t first_line,
+	uint32_t last_column, uint32_t last_line)
 {
 	if ((mode == NULL) || (page >= mode->page_count) ||
 	    (first_line > last_line) || (last_line >= mode->height) ||
+	    (first_column > last_column) || (last_column >= mode->width) ||
 	    (mode->shadow_dirty == NULL))
 		return;
 	if (!mode->shadow_dirty[page]) {
@@ -672,6 +680,10 @@ static void compat_mark_shadow_dirty(FB_GFX3_MODE *mode, uint32_t page,
 			mode->shadow_dirty_first_line[page] = first_line;
 		if (mode->shadow_dirty_last_line != NULL)
 			mode->shadow_dirty_last_line[page] = last_line;
+		if (mode->shadow_dirty_first_column != NULL)
+			mode->shadow_dirty_first_column[page] = first_column;
+		if (mode->shadow_dirty_last_column != NULL)
+			mode->shadow_dirty_last_column[page] = last_column;
 	} else {
 		if ((mode->shadow_dirty_first_line != NULL) &&
 		    (first_line < mode->shadow_dirty_first_line[page]))
@@ -679,8 +691,23 @@ static void compat_mark_shadow_dirty(FB_GFX3_MODE *mode, uint32_t page,
 		if ((mode->shadow_dirty_last_line != NULL) &&
 		    (last_line > mode->shadow_dirty_last_line[page]))
 			mode->shadow_dirty_last_line[page] = last_line;
+		if ((mode->shadow_dirty_first_column != NULL) &&
+		    (first_column < mode->shadow_dirty_first_column[page]))
+			mode->shadow_dirty_first_column[page] = first_column;
+		if ((mode->shadow_dirty_last_column != NULL) &&
+		    (last_column > mode->shadow_dirty_last_column[page]))
+			mode->shadow_dirty_last_column[page] = last_column;
 	}
 	mode->shadow_dirty[page] = TRUE;
+}
+
+static void compat_mark_shadow_dirty(FB_GFX3_MODE *mode, uint32_t page,
+	uint32_t first_line, uint32_t last_line)
+{
+	if ((mode == NULL) || (mode->width == 0u))
+		return;
+	compat_mark_shadow_rect(mode, page, 0u, first_line,
+		mode->width - 1u, last_line);
 }
 
 static int compat_ensure_truecolor_shadow(FB_GFX3_DRAW_STATE *state,
@@ -1229,8 +1256,9 @@ static int compat_write_truecolor_shadow_point(FB_GFX3_DRAW_STATE *state,
 		memcpy(mode->shadow_pages[state->work_page] + offset, &point->color,
 			sizeof(point->color));
 	}
-	compat_mark_shadow_dirty(mode, state->work_page, (uint32_t)point->y,
-		(uint32_t)point->y);
+	compat_mark_shadow_rect(mode, state->work_page,
+		(uint32_t)point->x, (uint32_t)point->y,
+		(uint32_t)point->x, (uint32_t)point->y);
 	return FB_GFX3_OK;
 }
 
@@ -1246,9 +1274,13 @@ static int compat_commit_locked_shadow(FB_GFX3_DRAW_STATE *state,
 	FB_GFX3_MODE *mode)
 {
 	uint32_t page = state->work_page;
+	uint32_t first_column = 0u;
+	uint32_t last_column;
 	uint32_t first_line = 0u;
 	uint32_t last_line;
+	uint32_t width;
 	uint32_t height;
+	uint32_t bytes_per_pixel;
 	const unsigned char *pixels;
 	int result;
 
@@ -1271,14 +1303,27 @@ static int compat_commit_locked_shadow(FB_GFX3_DRAW_STATE *state,
 		first_line = mode->shadow_dirty_first_line[page];
 		last_line = mode->shadow_dirty_last_line[page];
 	}
+	last_column = mode->width - 1u;
+	if ((mode->shadow_dirty_first_column != NULL) &&
+	    (mode->shadow_dirty_last_column != NULL) &&
+	    (mode->shadow_dirty_first_column[page] <=
+	     mode->shadow_dirty_last_column[page]) &&
+	    (mode->shadow_dirty_last_column[page] < mode->width)) {
+		first_column = mode->shadow_dirty_first_column[page];
+		last_column = mode->shadow_dirty_last_column[page];
+	}
+	width = last_column - first_column + 1u;
+	bytes_per_pixel = (mode->depth <= 8u) ? 1u :
+		((mode->depth == 16u) ? 2u : 4u);
 	height = last_line - first_line + 1u;
 	pixels = mode->shadow_pages[page] +
-		(size_t)first_line * mode->shadow_pitch;
+		(size_t)first_line * mode->shadow_pitch +
+		(size_t)first_column * bytes_per_pixel;
 	fb_gfx3_log_write(&mode->context.logger, FB_GFX3_LOG_TRACE,
-		"SCREENLOCK shadow upload begin: page %u, rows %u-%u", page,
-		first_line, last_line);
-	result = fb_gfx3_surface_upload(&mode->pages[page], 0, (int)first_line,
-		mode->width, height, mode->shadow_pitch, pixels);
+		"SCREENLOCK shadow upload begin: page %u, rect %u,%u-%u,%u",
+		page, first_column, first_line, last_column, last_line);
+	result = fb_gfx3_surface_upload(&mode->pages[page], (int)first_column,
+		(int)first_line, width, height, mode->shadow_pitch, pixels);
 	if (result != FB_GFX3_OK)
 		return result;
 	fb_gfx3_log_write(&mode->context.logger, FB_GFX3_LOG_TRACE,
@@ -1453,6 +1498,10 @@ int fb_gfx3_mode_init(FB_GFX3_MODE *mode,
 		config->page_count * sizeof(mode->shadow_dirty_first_line[0]));
 	mode->shadow_dirty_last_line = (uint32_t *)calloc(config->page_count,
 		sizeof(mode->shadow_dirty_last_line[0]));
+	mode->shadow_dirty_first_column = (uint32_t *)malloc(
+		config->page_count * sizeof(mode->shadow_dirty_first_column[0]));
+	mode->shadow_dirty_last_column = (uint32_t *)calloc(config->page_count,
+		sizeof(mode->shadow_dirty_last_column[0]));
 	mode->shadow_snapshot_active = (unsigned char *)calloc(config->page_count,
 		sizeof(mode->shadow_snapshot_active[0]));
 	mode->point_cache = (FB_GFX3_POINT_CACHE *)calloc(config->page_count,
@@ -1461,10 +1510,16 @@ int fb_gfx3_mode_init(FB_GFX3_MODE *mode,
 	    (mode->shadow_valid == NULL) || (mode->shadow_dirty == NULL) ||
 	    (mode->shadow_dirty_first_line == NULL) ||
 	    (mode->shadow_dirty_last_line == NULL) ||
+	    (mode->shadow_dirty_first_column == NULL) ||
+	    (mode->shadow_dirty_last_column == NULL) ||
 	    (mode->shadow_snapshot_active == NULL) || (mode->point_cache == NULL)) {
 		free(mode->point_cache);
 		mode->point_cache = NULL;
 		free(mode->shadow_snapshot_active);
+		free(mode->shadow_dirty_last_column);
+		mode->shadow_dirty_last_column = NULL;
+		free(mode->shadow_dirty_first_column);
+		mode->shadow_dirty_first_column = NULL;
 		free(mode->shadow_dirty_last_line);
 		mode->shadow_dirty_last_line = NULL;
 		free(mode->shadow_dirty_first_line);
@@ -1480,8 +1535,10 @@ int fb_gfx3_mode_init(FB_GFX3_MODE *mode,
 		mode->mutex = NULL;
 		return FB_GFX3_OUT_OF_MEMORY;
 	}
-	for (i = 0u; i < config->page_count; i++)
+	for (i = 0u; i < config->page_count; i++) {
 		mode->shadow_dirty_first_line[i] = UINT32_MAX;
+		mode->shadow_dirty_first_column[i] = UINT32_MAX;
+	}
 
 	context_config = *config;
 	context_config.platform = &mode->input;
@@ -1590,6 +1647,10 @@ fail:
 	mode->paint_scratch_capacity = 0;
 	free(mode->shadow_snapshot_active);
 	mode->shadow_snapshot_active = NULL;
+	free(mode->shadow_dirty_last_column);
+	mode->shadow_dirty_last_column = NULL;
+	free(mode->shadow_dirty_first_column);
+	mode->shadow_dirty_first_column = NULL;
 	free(mode->shadow_dirty_last_line);
 	mode->shadow_dirty_last_line = NULL;
 	free(mode->shadow_dirty_first_line);
@@ -1648,6 +1709,10 @@ int fb_gfx3_mode_shutdown(FB_GFX3_MODE *mode)
 	mode->pages = NULL;
 	free(mode->point_cache);
 	mode->point_cache = NULL;
+	free(mode->shadow_dirty_last_column);
+	mode->shadow_dirty_last_column = NULL;
+	free(mode->shadow_dirty_first_column);
+	mode->shadow_dirty_first_column = NULL;
 	free(mode->shadow_dirty_last_line);
 	mode->shadow_dirty_last_line = NULL;
 	free(mode->shadow_dirty_first_line);

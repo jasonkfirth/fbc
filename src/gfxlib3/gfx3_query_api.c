@@ -1495,6 +1495,7 @@ FBCALL int fb_GfxGetXPad(int id, ssize_t *buttons, float *left_x,
 	}
 	if (left_x != NULL)
 		*left_x = gamepad.axis[0];
+	/* Snapshots store screen-space Y; GETXPAD reports positive Y for stick-up. */
 	if (left_y != NULL)
 		*left_y = -gamepad.axis[1];
 	if (right_x != NULL)

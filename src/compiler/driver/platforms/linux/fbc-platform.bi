@@ -80,6 +80,60 @@ private function fbcLinuxPlatformAddCCompilerCpuOptions _
 	function = FALSE
 end function
 
+function fbcLinuxPlatformArmUsesHardFloatAbi( ) as integer
+#ifndef ENABLE_STANDALONE
+	'' GNU ARM triplets encode the floating-point ABI in the OS suffix:
+	'' gnueabihf is hard-float, while plain gnueabi is soft-float.
+	if( instr( lcase( fbc.target ), "gnueabihf" ) > 0 ) then
+		return TRUE
+	elseif( instr( lcase( fbc.target ), "gnueabi" ) > 0 ) then
+		return FALSE
+	end if
+#endif
+
+	select case as const FB_DEFAULT_CPUTYPE_ARM
+	case FB_CPUTYPE_ARMV6_FP, FB_CPUTYPE_ARMV7A_FP
+		return TRUE
+	case else
+		return FALSE
+	end select
+end function
+
+function fbcLinuxPlatformGetArmLlvmTargetTriple _
+	( _
+		byref targettriple as string _
+	) as integer
+	dim as string arch
+
+	if( (fbcLinuxPlatformIsSelected( ) = FALSE) or _
+	    (fbGetCpuFamily( ) <> FB_CPUFAMILY_ARM) ) then
+		return FALSE
+	end if
+
+	select case as const fbGetOption( FB_COMPOPT_CPUTYPE )
+	case FB_CPUTYPE_ARMV4
+		arch = "arm"
+	case FB_CPUTYPE_ARMV5TE
+		arch = "armv5te"
+	case FB_CPUTYPE_ARMV6, FB_CPUTYPE_ARMV6_FP
+		arch = "armv6"
+	case FB_CPUTYPE_ARMV7A, FB_CPUTYPE_ARMV7A_FP
+		arch = "armv7"
+	case else
+		return FALSE
+	end select
+
+	'' The IR does not carry a target triple, so llc needs the Linux ARM ABI here.
+	targettriple = arch + "-unknown-linux-"
+	if( fbcLinuxPlatformArmUsesHardFloatAbi( ) ) then
+		targettriple += "gnueabihf"
+	else
+		targettriple += "gnueabi"
+	end if
+
+	return TRUE
+end function
+
 private function fbcLinuxPlatformHasLibrary( byval libname as zstring ptr ) as integer
 	dim as string filename, found
 

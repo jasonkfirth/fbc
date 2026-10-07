@@ -35,6 +35,10 @@ evaluation or the selected symbols, bindings, calls, expressions, dependencies,
 conditional facts, or ordinary source provenance. Use it when a consumer needs
 those compiler facts but does not need per-expansion argument and replacement
 segments. The default retains the complete macro graph.
+Full compact models keep a bounded in-memory map of macro invocation locations
+so generated typed expressions can still point to their call sites. The map is
+not serialized and does not make macro-expansion or macro-reference capabilities
+available.
 
 The exporter observes the compiler; it does not resolve names independently.
 This is an invocation artifact, not an incremental workspace index or language
@@ -147,6 +151,13 @@ The detail count totals `T`, `A`, `F`, `G`, `U`, `C`, `H`, `K`, `J`, `O`, `Q`,
 `ORIG`, `PPB`, `PPD`, `PPE`, `PPT`, `PPS`, `MD`, `MT`, `MI`, `MA`, `MS`, `MC`,
 `ME`, `ML`, `MR`, `LOC`, `ST`, `STE`, `BLK`, `BEND`, `OWN`, `CAP`, `ACC`, and
 `SOP`, including repeated snapshots.
+
+Array-bound query properties retain the selected array, the optional source
+dimension expression, and the compiler-selected dimension expression. If the
+source omits the optional dimension, `array-bound-dimension` is `0` and
+`array-bound-dimension-explicit` is `0`; the compiler-selected dimension still
+has a positive expression identity. An explicit source dimension has a
+positive `array-bound-dimension` identity and an explicit marker of `1`.
 Earlier schemas have a 12-field `END`. Expression and binding modes retain
 source provenance details. Unknown
 schemas, tags, field counts, references, and inconsistent totals must be
@@ -298,6 +309,22 @@ Natural alignment and requested packing are separate symbol properties. Formal
 descriptor types, argument register classification, finalized aggregate return
 classification, vtable/RTTI ownership, procedure status/priority, and declared
 label roles are preserved as properties and relationships.
+
+Full models add optional `K symbol <id> declared-field-count <count>` for
+completed TYPE/UNION layouts. The count includes source FIELD symbols whose
+actual owner is that aggregate, including promoted anonymous members. It does
+not include inherited fields, static variables, methods, hidden base storage
+or compiler-created dynamic-array descriptors. An unfinished snapshot has no
+count receipt; an absent receipt means unknown, not zero.
+
+Each FIELD also has optional `K symbol <id> field-array-rank <rank>`: zero for
+a scalar, -1 for an unspecified descriptor rank, or 1 through 8 for an array.
+This distinguishes a scalar from missing `A` rows. Readers that require these
+facts must compare counts with the complete source FIELD group and ranks with
+the retained array records. Older readers may ignore these additive properties;
+older producers may omit them. Bindings-only and expressions-only exports omit
+both properties. No record layout, schema number, language behavior or emitted
+instruction changes.
 
 CALL auxiliary trees use `copyback`, `profile-begin`, and `profile-end` N edges.
 Their parent is a node. `auxiliary-ordinal` records action order, and each
@@ -618,7 +645,7 @@ includes are not dependencies. At 5,000 paths, dependency completeness becomes
 zero; consumers validating source-backed facts must not treat omissions as
 unrelated files. Root modules remain M records only when their stage commits.
 
-Each module buffer is limited to 256 MiB, symbols to one million per module,
+Each module buffer is limited to 512 MiB, symbols to one million per module,
 nodes/expressions/bindings/implicit calls to one million per model, and details
 to 16 million per model. Allocation or record/buffer exhaustion invalidates the
 model instead of writing END. Call signatures and literal unit counts also have
@@ -842,5 +869,714 @@ The Python reader and the editor decoder reject dangling expression/binding
 links, invalid access roles, malformed capability values, and invalid statement
 operation owners. The corpus reductions distinguish source typing from retained
 calls and verify source access roles without enabling debug information.
+
+## Committed OPTION occurrences and opening tokens
+
+The full model advertises optional `option-base-occurrences` and
+`statement-opening-tokens` capabilities. Bindings/expression-only modes mark
+these unavailable. Existing schema-27 clients may ignore the new OPT keys,
+CAP names and LOC role; the schema and AST-code version remain unchanged.
+
+Each parsed OPTION route adds `OPT <committed CTX> language-default
+option-statement-<ST id> <kind>`. Kind 1 means the BASE route; kind 0 means
+another OPTION route. BASE adds `base-statement-<ST id>` with the actual
+parser-consumed scalar. Its ordinary context `base` agrees. ST's own CTX is
+the entry configuration, before the declaration changes its default. The
+occurrence keys remain unique even when repeated directives change nothing.
+Recovered statements are not accepted declarations and must retain their
+STE outcome and unsuccessful artifact status.
+
+These facts observe the existing numeric-token `CLng` text conversion. They
+do not create expression nodes for OPTION operands or alter accepted syntax,
+default bounds, diagnostics or generated code.
+
+`LOC statement <ST id> opening-token ...` describes the independently saved
+lexer opening token when it has a raw source location. It is serialized
+after STE for existing streaming readers. A macro operand can invalidate the
+whole range without invalidating the physical opening token. A generated
+keyword has no invented token location: MR/MI ancestry retains its actual
+physical invocation instead. Logical #Line remapping uses the existing
+FILE/SRC physical-coordinate mapping. These token extents are not substitute
+whole-statement ranges and do not claim source coverage for generated tokens.
+
+`option-defaults.bas/.bi` exercise includes, option routes, repeats, macros,
+conditionals, logical remaps and actual array lower bounds. The focused tests
+also cover operand-macro tokens in both byte orders of UTF-16/UTF-32 and
+byte-identical ordinary emission across the selected compiler backends.
+
+## Original formal passing modes
+
+Full schema-27 models advertise `formal-passing-modes`. The parameter parser
+records `K symbol <original-id> formal-accepted-mode <1..4>`,
+`formal-written-mode <0..2>`, `formal-declaration <DCL-id|0>` and
+`formal-role <prototype|definition>`. Accepted values are FB_PARAMMODE:
+BYVAL, BYREF, BYDESC and VARARG. Written zero means no mode word was consumed;
+one/two mean an actual BYVAL/BYREF token, including macro expansion.
+
+The original parameter exists before prototype merging or callback interning.
+Its K receipts must not be moved to a canonical G replacement. Existing
+formal-span-kind marks independent written membership; hidden receivers have
+no such grammar. An unlocated generated name can have DCL zero and retain
+`MR symbol <id> <expansion> formal-name` without a fabricated source range.
+Physical names retain their original declaration LOC even when another part
+of the formal is generated. Compact modes mark the capability unavailable
+and omit these receipts. No grammar, defaults, warnings or generated code
+are changed by these optional observations.
+
+## Direct source writes and FOR counter initialization
+
+Full schema-27 models advertise optional `for-counter-writes` and
+`direct-source-writes` capabilities. Compact models mark them unavailable.
+FOR's existing-variable counter occurrence now retains the initialization
+write that this parser previously lowered directly without an access hook.
+Bounds, steps and actual body uses keep their independent read observations.
+The generated loop does not read the counter's incoming value. The existing
+rejection of a BYREF/dereference counter remains unchanged.
+
+`K symbol <variable-id> direct-source-write <0|1>` is a refreshable presence
+flag, not an occurrence count or an edit location. Explicit zero is exported
+for unmodified variables and live parameter slots. One records a parser-owned
+direct destination: ordinary/compound assignment, FOR initialization, SWAP,
+READ, INPUT, LINE INPUT, GET destination/byte-count outputs, MID or LSET/RSET.
+Capturing before runtime lowering keeps this evidence even when a destination
+subsequently becomes a BYREF argument. An arbitrary application BYREF call
+does not establish a write.
+
+The flag also covers generated identifiers with no physical binding extent.
+No B, LOC or editable range is fabricated for a replacement token's logical
+point. A parameter's compiler-inserted string/reference dereference is
+distinguished from a pointer target by its actual declared/lvalue type and
+parameter-variable attributes. Field, index and explicit pointer writes do
+not mark the containing input variable. Existing ACC roles, alias and external
+effect coverage remain partial rather than acquiring unsupported claims.
+
+Direct-write storage belongs to the serial module observation lifecycle,
+uses checked allocation under the identity limit and is released/reset with
+the access arrays. Live G body-variable refresh publishes final zero/one
+state before procedure storage is released. These optional observations
+change no grammar, defaults, warning policy, runtime ABI or generated code.
+Independent tests cover scalar/string/UDT copies, native destinations,
+generated counters, shadowed locals, opaque calls, rejected BYREF counters
+and byte-identical off/full/compact output on each selected backend.
+
+## Accepted FOR counter identities
+
+Full schema-27 output has optional `for-counter-identities` availability and
+one `K symbol <variable-id> for-counter:<statement-id> local|existing` receipt
+for each accepted FOR. The variable is the parser-selected counter before
+initialization lowering; `local` describes a declaration made by that header.
+Statement-specific keys preserve multiple loops using the same variable.
+They are additive generic K properties, not new AST codes or record tags.
+
+`LOC statement <statement-id> for-counter` identifies the captured counter
+token where physical coordinates are supported. It is emitted after STE so
+existing streaming readers have the required statement end. The corresponding
+MR role records expansion ancestry for generated tokens without inventing a
+physical binding range. Normal statement/body and G/H variable ownership
+remain independent facts; a matching name alone is not a counter identity.
+Compact bindings/expressions exports mark this capability unavailable.
+
+Disabled/full/compact emission and scope/macro observations are verified on
+GCC, GAS64 and LLVM. Existing BYREF-counter and explicit descriptor-modifier
+grammar rejections remain unchanged. This observer neither changes loop
+behavior nor adds alias or call-effect analysis.
+
+## Parsed numeric suffix observations
+
+Full models advertise `CAP module parsed-numeric-suffixes available`. Compact
+models advertise it as unavailable and do not emit these observations. Schema
+27 is unchanged. A module's global namespace owns optional K properties named
+`parsed-numeric-suffix-ID`, where ID is a module-lifetime detail identity.
+
+The escaped property value contains five tab-separated fields:
+
+    source-context, configuration-context, macro-invocation-or-zero, native-dtype, exact-suffix
+
+Only alphabetic suffixes consumed by the native numeric lexer are retained.
+The parser emits a receipt when it constructs the numeric literal. Decimal
+exponent letters and hexadecimal digits are not suffixes. Macro arguments
+expanded before being discarded/stringified, inactive branches and inline
+assembly operands do not become numeric-literal observations.
+
+`LOC source-context source-ID property-name ...` attaches the original physical
+token range when available. `MR symbol namespace-ID invocation-ID property-name`
+attaches generated literal origins. Both use existing record domains so older
+schema-27 clients can retain or ignore the properties without a format change.
+Consumers must check the advertised coverage, identities and captured source
+revision. A macro's replacement text alone does not prove parsed meaning.
+
+## Numeric assignment destinations
+
+Full models advertise `CAP module numeric-assignment-targets available`.
+Compact models advertise it as unavailable. Accepted ordinary assignments and
+scalar initializers attach two properties to the original RHS expression:
+
+    K expression expression-ID assignment-target-dtype raw-dtype
+    K expression expression-ID assignment-kind assignment-or-initializer
+
+The pair supplements the expression's own type. It must not replace `NT value`
+or E's original dtype. The observer captures the RHS identity before assignment
+conversion or TYPEINI lowering consumes its AST. `Y` supplies target-selected
+widths, including native INTEGER. Primitive numeric scalar targets are covered;
+pointers, enums, aggregates, user-defined LET, compound updates and generated
+assignments are excluded. A valid reader requires both properties, an existing
+expression and primitive target type, and consistent repeated values.
+
+Schema 27 readers must accept expression-domain K properties to consume this
+extension. Older readers that restrict K to symbols and nodes reject it. The
+updated reference reader and linter reader validate the new domain explicitly.
+
+Built-in conversion intrinsics also retain `EX cast` links to their original
+operands before constant conversion destroys those nodes. Explicit CAST uses
+the same operand relationship. These facts describe the selected operation;
+they do not infer a programmer's intended rounding policy.
+Full models advertise these original operand links through
+`CAP module explicit-cast-inputs available`; compact modes mark it unavailable.
+
+## Selected size-query inputs
+
+Full models advertise `CAP module size-query-inputs available`. Compact modes
+advertise it as unavailable. LEN and SIZEOF can discard an unevaluated operand
+and fold the result into a constant. The parser preserves the selected input
+in five expression K properties:
+
+    size-query-kind       len or sizeof, as originally parsed
+    size-query-dtype      original input raw dtype
+    size-query-subtype    nominal symbol ID, or zero
+    size-query-operand    original expression ID, or zero
+    size-query-input      type, expression or array
+
+The array kind distinguishes an indexless array's total storage from a scalar
+pointer query. An indexed array element remains an expression. Type-only forms
+have no operand expression. LEN overloads retain their selected nominal input;
+the observer does not convert them into built-in storage queries. An operand
+identity describes the parsed expression, not its runtime evaluation. SIZEOF
+can observe a function call or dereference that it never executes.
+
+Readers require the complete property set, an existing expression in the same
+module, valid input type/subtype and operand identities, and consistent repeated
+values. Expression K support is required, as for numeric assignment receipts.
+The observer leaves normal code generation unchanged and excludes inline
+assembly's size-query grammar. Existing AST expression association chains also
+retain contributing query provenance through precedence unwinding and folding:
+
+    H expression result-ID expression original-query-ID size-query-source 0
+
+These links describe an original query contributing to the observed parser
+result, not equal values. A folded operation can reuse an operand allocation.
+The original query precedes its result and belongs to the same module. Readers
+require its complete input receipt. Module-owned ID storage and a bounded
+association scan preserve ownership and reject resource exhaustion explicitly.
+
+## Unevaluated query parser intervals
+
+Full models advertise `CAP module unevaluated-query-inputs available`.
+Compact modes mark it unavailable. TYPEOF and SIZEOF discard parsed operands,
+including folded casts and nested call arguments which the surviving AST can
+no longer reach. The parser records the complete expression-ID interval issued
+while accepting each query input:
+
+    K expression input-ID unevaluated-query-input 1
+    K symbol namespace-ID unevaluated-query-range-detail-ID first-ID%09last-ID%09typeof|sizeof
+
+The second payload has three tab-separated fields, escaped as usual on the
+wire. `typeof|sizeof` denotes one query kind. The owner is the module's global
+namespace. Every ID from first through last must exist in that module and
+retain its immutable input marker. Nested queries can repeat a marker and
+have distinct range identities. Empty intervals produce no group.
+
+Readers reject orphan markers, missing interval members, invalid bounds,
+foreign owners, duplicate ranges and unsupported query kinds. The compiler's
+one-million-expression limit bounds every interval; reader work limits also
+bound overlapping nested intervals. These observations describe parsing roles
+without changing AST nodes or generated code. Ordinary dynamic-string LEN
+inputs remain evaluated and do not acquire these TYPEOF/SIZEOF markers.
+
+## Selected C-backend wide literal prefixes
+
+Full GCC models advertise `c-target-wide-literal-prefixes` as available.
+Compact modes and other backends mark it unavailable. Each literal WSTRING
+variable retains three symbol properties:
+
+    literal-target-wide-unit-bytes  1, 2 or 4
+    literal-target-wide-kind        terminated or unterminated
+    literal-target-wide-prefix      zero or more eight-digit uppercase hex units
+
+The prefix stops before the first null unit. It uses the C backend's literal
+decoder and selected target width. The original `C wide-units` payload remains
+separate: host wide units do not establish the runtime target representation.
+For example, a supplementary scalar uses a surrogate pair on Win32 but one
+unit on a target with four-byte WSTRING units. Invalid scalars retain the
+backend's actual emitted representation rather than an assumed replacement.
+
+Readers require all three properties on a literal variable, its original
+wide value, the module capability and matching primitive WSTRING width.
+Each prefix unit must be nonzero and fit the selected width. Payload and
+cumulative work limits bound validation. This observation leaves C emission
+unchanged and does not infer the contents of mutable wide storage.
+
+## Accepted SELECT CASE inputs
+
+Full models advertise `select-case-inputs` as available. Compact models mark
+it unavailable. The parser retains accepted selection and clause ownership
+before lowering consumes the operand trees. Properties are attached to the
+owning procedure, or the global namespace when no procedure owner exists:
+
+    select-case-input:construct-ID
+        header-statement-ID, original-selector-expression-ID, selected-storage-symbol-ID, normal|constant
+    select-case-clause:statement-ID
+        construct-ID, clause-ordinal, else-flag, alternative-count
+    select-case-alternative:statement-ID:alternative-ordinal
+        construct-ID, value|range|is, original-comparison-operation, first-expression-ID, last-expression-ID, last-flag
+    select-case-end:construct-ID
+        clause-count, else-flag
+
+Each payload is tab-separated and escaped on the wire. Ordinals start at one.
+Ordinary value and IS alternatives have no last-expression ID. Ranges retain
+both original bounds. ELSE clauses have no alternatives and must be final.
+The original comparison operation uses FBC's AST relation codes 45 through 50;
+value and range alternatives use equality code 45. The last flag retains the
+parser's branch-lowering choice, including its relevance to floating comparisons.
+AS CONST preserves original inputs before integer conversion and jump-table bias.
+
+The SELECT construct, accepted SELECT/CASE statements, original E identities,
+their OWN relationships and selected storage must belong to the same module.
+End counts distinguish a complete selection from missing clauses or alternatives.
+The ordinary parser's 1024-entry table is checked before indexing; AS CONST
+retains its separate 8192-slot jump-table limit. These facts describe grammar
+ownership and selected storage, not inferred side effects or constant coverage.
+
+## Parsed addresses and storage families
+
+Full models advertise `parsed-pointer-addresses` and `parsed-storage-families`
+as available. Compact models advertise them as unavailable. These additive
+schema-27 properties preserve parser selections before lowering consumes the
+original operands or turns storage operations into runtime calls.
+
+Accepted built-in `@`, `VarPtr` and `StrPtr` results retain five properties:
+
+    K expression result-ID pointer-address-kind address-of|varptr|strptr
+    K expression result-ID pointer-address-dtype original-input-dtype
+    K expression result-ID pointer-address-subtype original-input-subtype-or-zero
+    K expression result-ID pointer-address-operand original-expression-ID
+    K expression result-ID pointer-address-temporary 0|1
+
+The input precedes its result and belongs to the same module. The temporary
+flag identifies storage backed by a compiler temporary or a constructed
+temporary. Zero means that temporary storage was not established. It is not
+a lifetime guarantee. Built-in addressing is observed after overload selection;
+an overloaded address operator does not acquire these built-in properties.
+Procedure addresses continue to use their ordinary typed expression facts.
+As with size queries, an observed address in an unevaluated operand does not
+prove runtime execution. The observer walks only the selected storage base,
+with checked depth and cumulative work limits.
+
+Each accepted `New` attaches seven properties to its canonical pointer temporary:
+
+    K symbol temporary-ID memory-new-kind scalar|array
+    K symbol temporary-ID memory-new-dtype selected-pointee-dtype
+    K symbol temporary-ID memory-new-subtype selected-pointee-subtype-or-zero
+    K symbol temporary-ID memory-new-elements unsigned-count|unknown
+    K symbol temporary-ID memory-new-clear 0|1
+    K symbol temporary-ID memory-new-placement 0|1
+    K symbol temporary-ID memory-new-placement-operand expression-ID-or-zero
+
+The count is the compiler-selected constant element count after conversion,
+when available, bounded by unsigned 64-bit storage. It is not a guessed heap
+extent. The pointee type must agree with the temporary's pointer type. Clear
+records the selected initialization mode; placement records an explicit target
+address. The original placement pointer expression is retained before lowering;
+nonplacement construction has a zero operand identity. Its module and pointer
+type must agree with the parsed placement flag. User-defined allocation operators retain this parsed selection without
+acquiring a claim about their allocation behavior.
+
+Accepted `Delete` retains `K expression original-operand-ID memory-release-kind
+scalar|array` before destruction and release lowering. A generated runtime free
+call alone cannot distinguish `Delete` from a parsed `Deallocate` call. Consumers
+must follow original expression and statement identities rather than generated
+procedure names to make that distinction.
+
+Readers require complete property groups, valid domains and types, consistent
+repeated values, and identities in the same module. Observers retain no AST
+ownership and do not change generated code. Regression checks cover all six
+source encodings on Win32, Win64 and Linux x64, byte-identical disabled/full
+generation, compact availability and rejected incomplete receipts.
+
+Full models also advertise `parsed-expression-origins`. An expression can
+retain its immediate earlier parser observation using:
+
+    H expression result-ID expression predecessor-ID parsed-expression-source 0
+
+The predecessor is a contribution on the same surviving AST allocation,
+including precedence unwinding and folding. It is not an equivalent value or
+storage alias. A single checked predecessor per result keeps this extension
+linear in the number of observations. Chaining these links lets a consumer
+recover an original address operation inside an unevaluated size operand.
+Readers reject self/forward links, foreign-module identities and nonexpression
+domains. Compact models mark this capability unavailable.
+
+Full models advertise `parsed-macro-expressions`. Replacement token positions
+can run backwards relative to physical caller positions. Typed expression
+observations therefore use the actual invocation name as a logical anchor when
+available, with E physical zero. MR records retain the consumed macro origins;
+EX retains its own operator token location. Distinct operations at the same
+invocation are distinguished in adjacent-fact deduplication by parser observation
+identity. This anchor never advertises editable expansion bytes.
+
+Invocation snapshots contain fixed LEX_LOCATION storage, are module-owned and
+released at reset. Monotonic IDs support binary lookup; ancestor traversal is
+limited to 64 steps and all lookup work is bounded by 8,388,608 comparisons.
+Allocation and work exhaustion fail the model rather than publishing guesses.
+
+Full models also advertise `parsed-compound-operators`. The assignment parser
+captures the original op= inputs. The AST builder observes its selected binary
+result before assignment conversion and before tree optimization consumes it.
+E uses a logical operator anchor, EX retains the actual written operator range,
+and accepted primitive numeric targets use the existing assignment receipt.
+The original astNewSelfBOP calling interface remains intact; an explicit parser
+entry point supplies observations without hidden global parser state. Neither
+observer retains AST ownership or changes generated target code. Compact models
+mark both capabilities unavailable.
+
+Full models advertise `selected-numeric-operands`. For accepted binary operations
+on primitive numeric inputs, four expression K properties retain the operands
+chosen by the compiler after coercion and before constant folding or shift-count
+normalization:
+
+- `numeric-selected-left-dtype` and `numeric-selected-right-dtype`
+- `numeric-selected-left-expression` and `numeric-selected-right-expression`
+
+The selected E observations retain the converted types and any compiler-known C
+values. EX continues to reference the original operands. Each selected E belongs
+to the same module and precedes the result; its range is a logical operator anchor,
+not editable source. This distinguishes comparison operand types from the final
+Boolean result without requiring consumers to reproduce integer promotions.
+Readers require the complete group and reject foreign, forward, nominal or pointer
+inputs and inconsistent selected types. Compact models mark the capability
+unavailable. The observer borrows AST inputs without retaining ownership, and the
+original astNewBOP interface remains available for existing callers.
+
+Full models advertise `parsed-numeric-literals`. The numeric-atom parser records
+four expression K properties: `numeric-literal-kind` (integer/float),
+`numeric-literal-base` (decimal/hex/octal/binary), `numeric-literal-text` and
+`numeric-literal-text-complete` (0/1). These belong to the observed typed E/C
+literal. A named constant or folded calculation does not inherit literal origin.
+Canonical token text excludes suffixes and may normalize leading zeroes or the
+exponent marker. It does not advertise original spelling. Text at or above the
+lexer's 64-character numeric limit is marked incomplete for exact-decimal proofs.
+The wire bound is the existing 1024-character token buffer. Both readers enforce
+complete, consistent groups, module ownership and radix character domains;
+consumers can impose stricter mathematical parsing for a particular proof.
+Parsed directive conditions are observable; skipped directive bodies are not.
+The observer does not change AST ownership or generated code. Compact modes mark
+this capability unavailable.
+
+Selected numeric operands also cover the primitive Boolean domain. Its Y
+entry describes byte storage while its semantic values are normalized to -1
+and 0. Boolean storage is not an unrestricted signed-byte integer range.
+
+Parsed-pointer-dereferences retains a complete expression K pair:
+pointer-dereference-operand and pointer-dereference-count. The parser records
+the typed pointer input before astBuildMultiDeref can cancel an address or
+consume its AST. The result retains its own E range. The count is 1 through 8,
+does not exceed the input's pointer depth, and agrees with the result type and
+nominal subtype. Input identities are earlier and belong to the same module.
+Implicit UDT conversions to pointers do not establish this observation.
+
+Procedure-prototype-statements retains symbol K properties named
+procedure-prototype-statement-<statement-id>, with that statement ID as value.
+Each accepted prototype retains its canonical procedure owner and actual ST
+identity independently of DCL coordinates. A wholly expanded signature may
+have no editable DCL range; its statement's MR/MI records still identify the
+real invocation. Repeated prototypes retain independent statement keys.
+Both readers check domains, class, key/value agreement and module ownership.
+Both new capabilities are unavailable in compact models.
+
+Parsed-pointer-indexes retains pointer-index-operand and pointer-index-index
+as a complete expression K pair. Both inputs are earlier E identities from the
+same module. The first has pointer type; the second is the numeric index before
+integer conversion and byte scaling. Only built-in pointer indexing supplies
+this receipt. Array indexing, string indexing, overloaded [] and inactive
+source do not. A subsequent field selection can change the result type, so the
+receipt does not assert that the final E type equals the indexed pointee type.
+Neither AST pointers nor borrowed source buffers survive the observation.
+Full exports provide this capability; compact exports mark it unavailable.
+
+Selected-call-argument-inputs retains the original caller expression on each
+accepted argument before formal conversion and later AST optimization. The
+node K property call-argument-expression names its original E identity. Its
+argument node retains the selected formal symbol and actual call ownership.
+Omitted/default arguments have no caller input receipt. The argument stores an
+observation identity without retaining or borrowing the original AST pointer.
+Both readers check node class, non-default status, formal/call ownership, module
+closure and consistency with expression links. Cached owners and traversal
+budgets bound validation of linked argument lists. Full exports provide this
+capability; compact exports mark it unavailable. This observes arguments and
+does not assert that an external procedure has any particular runtime effect.
+
+Full schema-27 exports advertise `scalar-for-step-inputs`. Each accepted
+numerical FOR counter has `K symbol <id> for-step-explicit:<statement-id> 0|1`
+and `for-step-expression:<statement-id> <expression-id>` observations. An
+implicit step has expression zero. An explicit step identifies its original
+parser expression before counter-width and signedness conversion, with the same
+module and statement owner as the `for-counter` receipt. The same variable can
+control several statements. Pointer counters and UDT iteration operators have
+different contracts and do not use this numerical receipt. Compact exports mark
+the capability unavailable. Independent compiler checks passed 20 cases on
+Win32, Win64 and Linux x64 in six encodings, with byte-identical generated C.
+
+Full schema-27 exports advertise `file-transfer-inputs`. An accepted selected
+GET/PUT runtime call has three expression K properties: `file-transfer-kind`
+(`get` or `put`), `file-transfer-storage` (`scalar` or `array`), and
+`file-transfer-operand` (its earlier original E identity). The operand preserves
+the typed object before BYREF AS ANY or array-descriptor lowering. Whole arrays
+retain their NIDXARRAY wrapper; individual elements are scalar inputs. Scalar
+String overloads transfer characters, so a receipt does not assert that a
+descriptor or a pointed-to allocation was transferred. Call anchors use the
+last accepted token when a statement intrinsic has closed its expression range;
+the original operand has its own precise range.
+
+Both readers validate complete groups, selected runtime families, input shape,
+module/statement ownership and full coverage of surviving selected call nodes.
+Source-expression links to executable N snapshots distinguish actual transfers
+from calls parsed in unevaluated SIZEOF inputs. Compact exports mark this
+capability unavailable. Compiler observation checks passed 20 cases across
+Win32, Win64 and Linux x64 in six encodings with byte-identical generated C.
+
+Full models additionally advertise `pointer-index-lvalues`. Built-in pointer
+index receipts include accepted assignment targets and compound writes, even
+when those enter variable parsing without an active cExpression range. The
+parser supplies its observed prefix anchor for that path. Original pointer and
+index identities are retained before scaling; source-expression associations
+survive target cloning and assignment lowering. Ordinary arrays, string
+indexing and overloaded indexing do not establish these receipts. Compact
+models mark this coverage unavailable. The expanded pointer observation suite
+passed 56 cases across Win32, Win64 and Linux x64 in six encodings, including
+store-target links and byte-identical generated C.
+
+Full models additionally advertise `scalar-for-step-sites` and
+`enum-for-step-inputs`. Explicit scalar STEP clauses have a compiler-observed
+`LOC statement <statement-id> for-step ...` location, or a macro reference
+with that role when the clause is expanded. A macro invocation does not create
+an editable STEP range. Enum counters use the same complete input receipts as
+ordinary scalar counters. Omitted clauses have neither STEP location form.
+
+`scalar-for-bound-inputs` retains symbol K observations named
+`for-start-expression:<statement-id>` and `for-limit-expression:<statement-id>`.
+They preserve the original typed input before conversion to counter storage.
+Each belongs to the same module and FOR statement as its counter receipt.
+
+`scalar-for-selected-steps` retains `for-step-selected-dtype:<statement-id>`
+and `for-step-selected-expression:<statement-id>`. The latter names the selected
+converted constant E/C value, or zero for a dynamic step. An omitted step
+selects constant one. A known original step must have a selected constant.
+The selected constant has a logical FOR anchor rather than an invented physical
+expression range. Width and signedness reflect actual counter conversion:
+for example, STEP 0.4 becomes integer zero and Byte STEP 128 becomes -128.
+Compact models mark these capabilities unavailable. Independent compiler
+checks passed 20 cases across Win32, Win64 and Linux x64 in six encodings,
+with byte-identical generated C and converted enum/byte step coverage.
+
+Full models advertise `parsed-string-intrinsics`. Parsed CHR, WCHR, UCHR,
+TRIM, LTRIM and RTRIM results have complete expression K observations named
+`string-intrinsic-kind`, `string-intrinsic-count`, `string-intrinsic-any` and
+`string-intrinsic-argument-<ordinal>`. Ordinals start at one and identify the
+original typed inputs before literal folding or runtime conversion. CHR inputs
+therefore retain values outside the selected byte range. ANY identifies the
+parser-selected character-set form, rather than an inferred pattern spelling.
+
+Each result also has an H relation from its module namespace with role
+`parsed-string-intrinsic`. This preserves occurrence coverage when folding
+turns the entire operation into an ordinary literal. Both readers require the
+complete group and marker, earlier input identities, common module and
+statement ownership, and a compatible selected runtime or literal result.
+Compact exports mark the capability unavailable. Independent compiler checks
+passed 20 cases across Win32, Win64 and Linux x64 in six encodings, including
+macro anchors, decoded escaped patterns and byte-identical generated C.
+
+Full models advertise `string-initializer-targets`. An accepted fixed ZString,
+WString or String element initializer retains expression K properties named
+`string-initializer-symbol`, `string-initializer-dtype` and
+`string-initializer-bytes`. The symbol is the selected variable or field, the
+type is its original full dtype, and the byte count is one element's declared
+storage. ZString and WString capacities include terminator storage; fixed String
+has its own padding semantics. Array dimensions do not multiply the element
+capacity. BYREF binding initializers and primitive type-name spelling do not
+establish character-buffer initialization.
+
+An H relation from the target symbol to the original expression, with role
+`string-initializer`, retains occurrence coverage after TYPEINI lowering or
+static emission consumes the original tree. Readers require the complete group
+and marker, matching target storage, module closure and accepted statement
+ownership. Compact models mark the capability unavailable. Compiler checks
+passed 20 cases across Win32, Win64 and Linux x64 in six encodings, including
+shared objects, record fields, array elements, macro literals and unchanged
+generated C.
+
+### Diagnostics for rejected modules
+
+`-semantic-diagnostics <file>` publishes an independent invocation artifact.
+The compiler reports its actual diagnostics through the same observer used
+by the semantic model. A rejected module can complete this artifact without
+publishing authoritative AST facts. Diagnostic output neither enables recovery
+facts nor changes the compiler's exit status. The option can be used alongside
+`-semantic-model`, with distinct output destinations.
+
+The tab-separated format starts with `FBCDIA`, version `1`, and the compiler
+version. Text fields use the semantic model's percent-escaped byte encoding.
+Record tags remain literal ASCII. Record layouts are:
+
+| Record | Fields after the tag |
+| --- | --- |
+| SRC | sequential source ID, source path |
+| M | sequential module ID, root source path, target ID |
+| DI | sequential diagnostic ID, current module ID, severity, compiler code, parser context, source path, displayed line, message, detail, custom text, physical-point flag, physical line, zero-based physical column |
+| END | format version, module count, source count, diagnostic count, error count, compilation-succeeded flag |
+
+Sources retain observation order and unique path spelling. Every module root
+and diagnostic source must have a source record. Diagnostics belong to the
+current module. Severity is `error` or `warning`; flags are `0` or `1`. A
+complete artifact can end with compilation-succeeded `0`. Successful compilation
+has no error diagnostics. A reader supplied the compiler exit code checks that
+the outcome agrees. Readers reject incomplete records, invalid identities,
+counts, escaped fields and inconsistent physical points before exposing facts.
+
+Displayed lines can be affected by `#line`. A physical point uses the last
+consumed token only when its physical source and displayed line agree with the
+reported diagnostic. Otherwise its flag, line and column are all zero. This is
+an informational diagnostic point, not an editable expression range. Parser
+contexts currently distinguish unknown LINE INPUT character-buffer capacity,
+NEXT counter binding failures and NEXT variable mismatch. Consumers use these
+typed contexts rather than matching console messages.
+
+The writer bounds output to 64 MiB, 5,000 sources and 100,000 diagnostics. It
+uses checked staging and protects source, backend and other semantic output
+paths before publication. Invocation state is released on completion or
+compiler restart. Both independent and native readers enforce those bounds;
+the native reader grows retained diagnostics in blocks and uses a sorted
+source index for repeated path lookups.
+
+Compiler checks passed 75 cases across Win32, Win64 and Linux x64, including
+six source encodings, valid and rejected modules, unchanged generated C,
+coexisting sidecars and protected output collisions. Both readers agreed on
+65 genuine, malformed and growth cases. Native linter selections passed
+20 encoding, target, include and suppression cases.
+
+### Original loop condition inputs
+
+Full schema-27 models advertise `loop-condition-inputs`. Accepted WHILE and
+DO/LOOP statements retain a paired property group on their owning procedure:
+
+| Property | Value |
+| --- | --- |
+| `loop-condition-kind:<statement-id>` | `while`, `do`, `do-while`, `do-until`, `loop`, `loop-while`, or `loop-until` |
+| `loop-condition-expression:<statement-id>` | original expression ID, or zero for bare DO/LOOP |
+
+Conditional statements additionally retain `H symbol <procedure-id> expression
+<expression-id> loop-condition <statement-id>`. The parser observes the accepted
+predicate before branch construction can convert or fold it. Zero observations
+for bare grammar distinguish unconditional statements from missing observations.
+Readers require matching statement ownership, procedure and module closure,
+complete property groups, condition markers and actual WHILE/DO construct links.
+Compact models mark the capability unavailable and omit these observations.
+
+Independent compiler checks passed 20 cases across Win32, Win64 and Linux x64
+in six encodings, including macros, continuations and constant predicates.
+Generated C remained byte-identical. The production native reader and independent
+Python reader also rejected 18 malformed loop observation groups.
+
+### Original and selected array subscripts
+
+Full schema-27 models advertise `array-subscript-inputs`. Each accepted fixed
+or dynamic array access retains these properties on its selected element E:
+
+| Property | Value |
+| --- | --- |
+| `array-subscript-symbol` | resolved array variable or field symbol ID |
+| `array-subscript-rank` | accepted rank, from one through eight |
+| `array-subscript-index:<dimension>` | original input E before integer conversion |
+| `array-subscript-selected-index:<dimension>` | converted integer input E before offset scaling |
+
+Dimensions are zero based. A no-op conversion can reuse the original E ID.
+`H symbol <array-id> expression <element-id> array-subscript 0` closes the group.
+Parser locations anchor both reads and assignment destinations independently of
+expression frames. The observations precede descriptor indexing, multiplication
+by element size and field selection; none must be recovered from byte offsets.
+
+Readers require complete rank-sized groups, A/S rank agreement, selected element
+type agreement, integer selected indices, statement and module closure, ordered
+input IDs and one matching relation. Unknown descriptor bounds remain unknown.
+Compact models mark the capability unavailable and omit the groups.
+
+Compiler checks passed 20 cases across Win32, Win64 and Linux x64 in six source
+encodings. Generated C remained byte-identical. Both readers rejected 26 malformed
+groups with valid completion totals. Cases include array fields, macro accesses,
+unknown-rank formals, nested indices, floating conversion and assignment targets.
+
+
+The optional full-model `array-bound-query-inputs` capability retains native
+LBOUND and UBOUND occurrences before fixed-array folding. Each query owns four
+immutable `K expression` properties: `array-bound-kind` (`lower` or `upper`),
+`array-bound-symbol`, `array-bound-dimension` and
+`array-bound-selected-dimension`. `H symbol <array> expression <result>
+array-bound-query 0` preserves occurrence membership independently of its value.
+The original dimension is observed before the compiler converts it to INTEGER;
+the selected dimension records that actual conversion. Their expression IDs
+satisfy original <= selected < result and share accepted statement and module
+ownership. An omitted dimension is the compiler's generated one. The result has
+INTEGER type whether it is a constant or a runtime call. Array identity also
+covers fields and descriptor formals; these facts do not claim allocation,
+empty storage or execution. Compact exports mark the capability unavailable.
+Both readers check group closure, marker membership and converted types.
+
+The optional full-model `procedure-exit-labels` capability exports
+`H symbol <procedure> symbol <label> procedure-exit-label 0`. The label is
+the procedure AST's actual shared exit target, including native cleanup paths.
+It is not inferred from RETURN or EXIT spelling. Readers require a signature,
+a label in the same module, unique membership and a CL receipt in the body's
+phase. Compiler-generated module constructors may keep their label in the
+module's symbol table; compiler origin and phase membership validate that case.
+Compact exports mark this capability unavailable. It does not prove that an
+exit executes, that OPEN succeeds or that a callee closes any resource.
+Compiler checks passed eight cases on Win32 and Linux x64, with byte-identical
+generated C. Both readers passed 439 schema cases, including nine exit-label
+closure and compatibility cases.
+
+The optional full-model `string-initializer-copy-contracts` capability adds
+`K expression expression-ID string-initializer-copy kind` to each accepted
+fixed-character initializer group. Actual TYPEINI runtime lowering and static
+emission select `runtime-terminated`, `runtime-counted`, `runtime-wide`,
+`static-bytes` or `static-wide`. Clones selecting different contracts remain
+`ambiguous`; unused static storage and other unlowered initializers remain
+`unselected`. The compiler owns one bounded byte per expression and retains no
+AST pointers in this index. Binding-only and expression-only exports omit it.
+Readers require complete copy coverage only when this capability is available;
+legacy groups without the capability remain accepted. Unknown kinds and a copy
+property under an unavailable capability are rejected.
+
+Counted fixed String storage differs from zero-terminated character storage.
+Static narrow literal emission preserves embedded zeros, while a runtime
+literal input stops at its first zero. BOM-marked Unicode source selects wide
+literals; narrow conversion of a static wide literal containing a zero needs a
+separate payload proof. Eight compiler checks passed on Windows and Linux with
+byte-identical generated C. Both readers passed 447 schema cases.
+
+The optional full-model `sequence-tail-branch-contracts` capability adds
+`K node root-ID sequence-tail-branch-node child-ID` and an actual
+`CE conditional-label` edge for an operator at the final right-child tail of
+an AST LINK sequence. Every LINK child on that path is evaluated unconditionally.
+The target must be a root label in the same phase. A checked temporary bitmap
+owns at most one MiB per phase and distinguishes internal IIF labels from CB
+destinations. Internal expression flow, additional transfers and assembly stay
+unknown. Binding-only and expression-only exports omit these node groups.
+Readers require complete properties, evaluation receipts, phase membership and
+the matching selected conditional edge when the capability is available.
+Legacy models without this capability and its groups remain accepted.
+
+This closes a CFG gap in string comparisons lowered through cleanup sequences.
+All consumers see the actual edge; predecessor proofs cannot mistake its target
+for a block with only one fallthrough predecessor. Eight compiler checks passed
+with byte-identical generated C on Windows and Linux. Both readers passed 459
+schema cases, including damaged groups and legacy capability handling.
 
 <!-- end of compiler-semantic-model.md -->

@@ -28,6 +28,7 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-expressions.bi"
 
 '':::::
 sub parserLetInit
@@ -231,7 +232,8 @@ sub cAssignment( byval l as ASTNODE ptr )
 	if( op <> INVALID ) then
 		'' l op= r
 		fbSemanticModelSetAccess(l, "read-write")
-		l = astNewSelfBOP( op, l, r, NULL, AST_OPOPT_LPTRARITH )
+		dim as longint semantic_operands = fbSemanticModelCaptureCompoundOperands(l, r, astGetOpSelfVer(op), semantic_site)
+		l = astNewSelfBOPWithOperands( op, l, r, NULL, AST_OPOPT_LPTRARITH, semantic_operands )
 		if (l) then
 			fbSemanticModelExportOperation(l, op, semantic_site)
 			astAdd(l)
@@ -241,8 +243,12 @@ sub cAssignment( byval l as ASTNODE ptr )
 	else
 		'' l = r
 		fbSemanticModelSetAccess(l, "write")
+		dim as longint semantic_rhs = r->semantic_expression
+		dim as integer semantic_dtype = astGetDataType(l)
+		dim as FBSYMBOL ptr semantic_subtype = astGetSubType(l)
 		l = astNewASSIGN( l, r )
 		if (l) then
+			fbSemanticModelAssignmentTarget(semantic_rhs, semantic_dtype, semantic_subtype, "assignment")
 			fbSemanticModelExportOperation(l, AST_OP_ASSIGN, semantic_site)
 			astAdd(l)
 		else

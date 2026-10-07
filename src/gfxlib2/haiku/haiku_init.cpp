@@ -1,3 +1,11 @@
+/*
+    FreeBASIC gfxlib2 Haiku backend
+    File: haiku_init.cpp
+    Purpose: Own native GUI startup, shutdown and readiness synchronization.
+    Responsibilities: Create and release the application, window and views.
+    This file contains no drawing primitives or software page allocation.
+*/
+
 #ifndef DISABLE_HAIKU
 
 #include "fb_gfx_haiku.h"
@@ -13,6 +21,7 @@
 #include <Bitmap.h>
 #include <View.h>
 #include <Window.h>
+#include <Screen.h>
 #include <OS.h>
 #include <stdlib.h>
 #include <new>
@@ -46,8 +55,15 @@ static uint32 fb_hHaikuOpenGLViewOptions(void)
 }
 #endif
 
-static int32 fb_hHaikuInitFail(void)
+static int32 fb_hHaikuInitFail(BApplication *app = NULL, int created_app = 0)
 {
+    if (created_app)
+    {
+        HAIKU_DEBUG("Destroying owned application");
+        delete app;
+        HAIKU_DEBUG("Owned application destroyed");
+    }
+    fb_app = NULL;
     fb_hHaikuLockState();
     fb_haiku.gui_failed  = 1;
     fb_haiku.gui_ready   = 0;
@@ -101,9 +117,15 @@ static int32 fb_haiku_event_thread_func(void *userdata)
         100 + fb_haiku.height - 1
     );
 
+    if (fb_haiku.flags & DRIVER_FULLSCREEN)
+    {
+        BScreen screen;
+        frame = screen.Frame();
+    }
+
     g_win = new(std::nothrow) FBHaikuWindow(frame, title ? title : "FreeBASIC");
     if (!g_win)
-        return fb_hHaikuInitFail();
+        return fb_hHaikuInitFail(app, created_app);
 
 #ifndef DISABLE_OPENGL
     if (fb_haiku.flags & DRIVER_OPENGL)
@@ -123,19 +145,14 @@ static int32 fb_haiku_event_thread_func(void *userdata)
         if (g_win->Lock())
             g_win->Quit();
         g_win = NULL;
-        return fb_hHaikuInitFail();
+        return fb_hHaikuInitFail(app, created_app);
     }
 
     g_win->AddChild(g_view);
 
     if (!(fb_haiku.flags & DRIVER_OPENGL))
     {
-        g_bmp = new(std::nothrow)
-            BBitmap(
-                BRect(0, 0, fb_haiku.width - 1, fb_haiku.height - 1),
-                B_BITMAP_ACCEPTS_VIEWS,
-                B_RGB32
-            );
+        g_bmp = fb_hHaikuCreateBitmap(fb_haiku.width, fb_haiku.height);
 
         if (!g_bmp || !g_bmp->IsValid() || !g_bmp->Bits())
         {
@@ -143,7 +160,7 @@ static int32 fb_haiku_event_thread_func(void *userdata)
             if (g_win->Lock()) g_win->Quit();
             g_win = NULL;
             g_view = NULL;
-            return fb_hHaikuInitFail();
+            return fb_hHaikuInitFail(app, created_app);
         }
     }
 
@@ -171,13 +188,28 @@ static int32 fb_haiku_event_thread_func(void *userdata)
         release_sem(fb_haiku.gui_ready_sem);
 
     if (created_app) {
+        HAIKU_DEBUG("Application loop starting");
         app->Run();
+        HAIKU_DEBUG("Application loop returned");
     } else {
         while (!fb_haiku.quitting)
             snooze(10000);
     }
 
+    /* The native window is joined before shutdown reaches this point. Release
+       bitmaps while BApplication's app_server connection is still available;
+       BBitmap destruction communicates through that connection. */
     if (g_bmp) { delete g_bmp; g_bmp = NULL; }
+
+    /* Run() returning does not destroy BApplication. Its destructor clears
+       be_app and joins remaining windows; leaving it allocated makes the next
+       mode reuse an application whose message loop has already stopped. */
+    if (created_app)
+    {
+        HAIKU_DEBUG("Destroying application after Run");
+        delete app;
+        HAIKU_DEBUG("Application destroyed after Run");
+    }
 
     fb_hHaikuLockState();
     fb_haiku.gui_running = 0;
@@ -222,6 +254,7 @@ int fb_hHaikuInit(char *title, int w, int h, int depth, int refresh, int flags)
     fb_haiku.depth    = depth;
     fb_haiku.refresh  = refresh;
     fb_haiku.flags    = flags;
+    fb_haiku.scanline_size = __fb_gfx ? __fb_gfx->scanline_size : 1;
 
     if (__fb_gfx)
         fb_hMemSet(__fb_gfx->key, FALSE, 128);
@@ -286,11 +319,23 @@ void fb_hHaikuExit(void)
     }
 #endif
 
-    if (g_win)
-        g_win->PostMessage(B_QUIT_REQUESTED);
+    /* Quit the window synchronously before releasing its bitmap or state.
+       Native hooks never take the driver mutex, so they can finish while the
+       runtime owns the graphics lock during a SCREENRES mode transition. */
+    if (g_win && g_win->Lock())
+    {
+        HAIKU_DEBUG("Quitting native window");
+        g_win->Quit();
+        HAIKU_DEBUG("Native window quit");
+        g_win = NULL;
+        g_view = NULL;
+    }
 
-    if (fb_app)
+    if (fb_app && fb_haiku.created_app)
+    {
+        HAIKU_DEBUG("Requesting application shutdown");
         fb_app->PostMessage(B_QUIT_REQUESTED);
+    }
 
     /*
         fb_hHaikuExit() is also used for normal gfx mode changes.  Do not
@@ -301,7 +346,10 @@ void fb_hHaikuExit(void)
     if (tid >= B_OK && find_thread(NULL) != tid)
     {
         if (fb_haiku.gui_exit_sem >= B_OK)
+        {
+            HAIKU_DEBUG("Waiting for GUI shutdown");
             acquire_sem(fb_haiku.gui_exit_sem);
+        }
 
         wait_for_thread(tid, NULL);
     }
@@ -315,3 +363,5 @@ void fb_hHaikuExit(void)
 }
 
 #endif
+
+/* end of haiku_init.cpp */

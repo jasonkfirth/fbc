@@ -22,15 +22,49 @@ normal C toolchain. `--backend gas64` selects native assembly emission on a
 supported host. Repeat `--backend` to select several backends. `--test` selects
 an individual `test_...` method.
 
+Use `--toolchain-prefix <SDK>` when the source checkout has no native tools or
+libraries. Source-tree declarations still take precedence through `-i inc`;
+the SDK supplies executable tools and link libraries without another copy.
+
 `sidecar.py` independently validates schema 27. `test_sidecar.py` checks the
 compiler's records against source locations and known types, layouts, values,
 and target relationships. The BASIC fixtures own separate responsibilities:
+
+The extensible `K symbol <id> written-override <0|1>` property records whether
+the procedure parser consumed the contextual `OVERRIDE` marker inside a TYPE
+declaration, after macro expansion. Both presence and absence are exported in
+full models, independently of the resolved base-method identity in `F`.
+Constructors, generated members and body headers do not provide this receipt;
+bindings-only and expressions-only models omit it. Older producers may omit
+the property, which means unknown, not a missing keyword. No schema layout,
+procedure attribute, generated instruction or compilation diagnostic changes.
+
+Full models also advertise `CAP <module> formal-parameter-spans available`.
+The parameter parser emits `K symbol <id> formal-span-kind physical|generated`
+and a separate `LOC declaration <occurrence> formal ...` for complete physical
+formals, preserving the existing declaration-name `range` locations. The span
+includes mode, type, descriptor and default-expression tokens. Unnamed and
+variadic formals have explicit nameless declaration occurrences; the implicit
+method receiver has no fabricated written span. Macro-expanded formals remain
+generated, with at most a `formal-generated` first-token observation rather
+than an editable full extent. Compact models mark this capability unavailable.
+Anonymous callback interning may replace the type parameter while the written
+declaration still belongs to its original parameter symbol. Readers validate
+that original symbol and occurrence, not the canonical parameter's name.
+These optional records extend schema 27 without changing its layout.
+
+`semantic_flow.py` validates recorded procedure phases, evaluation edges, block
+membership and conservative transfers. Declaration-owned default/variable
+initializer trees remain unphased; they must not become actions in a procedure
+body merely because local symbol details are exported beside that body. The
+tests reject foreign procedure owners rather than guessing a replacement edge.
 
 | Fixture | Coverage |
 | --- | --- |
 | `bindings.bas` | declarations, qualified lookup, USING, scopes, WITH, labels, assembly |
 | `types.bas` | packed/union/bitfield layouts, inheritance, visibility, arrays, qualifiers, literals |
 | `procedures.bas` | overloads, canonical formals, defaults, variadics, by-reference results, pointer calls |
+| `parameter-spans.bas` | complete physical formals, unchanged names, unnamed/variadic declarations, nested callbacks, defaults, implicit receivers and macro exclusions |
 | `lifetimes.bas` | each implicit construction/destruction relationship and nonphysical omissions |
 | `control-flow.bas` | conversions, calls, branches, normalized jump tables, and memory access |
 | `constructs.bas` | all compound families, nested/inline/colon statements, members, labels, assembly |
@@ -118,5 +152,82 @@ close, and replacement failures and checks old output, stream ownership, and
 staging cleanup. The BASIC revision fixture compares SHA-256 against Python's
 independent hash at padding and read boundaries, preserves the open stream's
 position, and detects changed source bytes.
+
+Optional schema-27 source-use capabilities preserve selected fields and procedures
+when a macro-generated name has no physical reference-token range. Full models
+publish `macro-reference-origins` and MR `reference-<detail-id>` or
+`construction-<detail-id>` roles against the selected symbol and real expansion.
+These facts identify the use without inventing an editable callee token; compact
+models and disabled provenance do not claim this capability.
+Full compact models retain only the in-memory invocation locations needed to+anchor generated typed expressions. They do not serialize macro graph records.
+
+`implicit-call-coordinates` adds K facts alongside the unchanged I columns.
+`implicit-call-coordinate-<I-ordinal>` contains eight escaped tab-separated fields:
+source occurrence, physical start line/UTF-16 column, physical end line/column,
+start byte, end byte and mapping status. `implicit-call-origin-<I-ordinal>` carries
+the expansion identity. Ordinals count published I rows across the model, rather
+than restarting per procedure. Generated construction ranges remain unverified;
+their expansion receipt supplies a separate physical invocation anchor.
+The coordinate helper is shared with LOC emission, preserving its existing
+byte format and source mapping. Tests cover nested/repeated macro references,
+selected overloads, compact capability boundaries, source constructors, Unicode,
+five BOM encodings and physical positions under logical `#Line` remapping.
+
+The optional full-model `procedure-linkage` capability accompanies
+`K symbol <identity> procedure-linkage <value>` snapshots. Values are `basic`,
+`c`, `windows`, `windows-ms`, `c++`, `pascal` and `rtlib`, taken from the accepted
+symbol's declaration mangling. F's calling convention remains separate: an
+ordinary BASIC CDECL procedure or explicit alias is not an EXTERN "C" contract.
+A foreign prototype retains its linkage when its later body is written outside
+EXTERN. Bindings-only and expressions-only exports mark this capability unavailable
+and do not emit the K property. The independent fixture covers prototypes, later
+bodies, aliases and fixed signatures on GCC, GAS64 and LLVM. No existing field,
+signature, runtime ABI or language behavior is changed.
+
+`field-groups.bas` verifies optional finalized `declared-field-count` and
+explicit `field-array-rank` symbol properties. Multi-name declarations, fixed
+and dynamic arrays, callback fields, nested types and promoted anonymous
+members participate through their actual FIELD owners. Inherited members,
+static variables, methods, hidden base storage and array descriptors do not
+inflate source counts. The independent reader rejects inconsistent receipts
+but accepts older models without them. Full, bindings-only, expressions-only
+and disabled exports produce byte-identical ordinary output on each selected
+backend; only full models add the field properties.
+
+The direct-write tests verify optional `for-counter-writes` and
+`direct-source-writes` capabilities plus explicit zero/one variable flags.
+They preserve counter initialization independently of generated loop reads,
+native input/SWAP/string destinations independently of runtime BYREF lowering,
+and generated identifiers without invented binding ranges. Pointer, field,
+shadowed-local and opaque-call controls stay distinct. BYREF FOR counters
+remain rejected by the original grammar. Scalar/string/UDT parameter slots
+and off/full/compact emission are checked across the selected backends.
+
+Full output also records parser-selected FOR variable identities with a
+separate statement-specific generic K property for each loop. Tests separate
+existing counters from scoped FOR AS declarations, preserve repeated and
+macro-generated loops, and require counter locations after STE. They compare
+ordinary emission with export disabled, full and compact across the chosen
+backends. No new record tag, AST code or accepted grammar is introduced.
+
+The parsed numeric suffix tests retain native spelling and physical coordinates
+across all six encodings and #LINE remapping. They exclude discarded/stringified
+macro arguments, inactive macro branches and assembler operands inside mixed
+macro bodies, while retaining parsed neighboring literals. Full and compact
+export modes are compared with disabled export for unchanged emitted code.
+Parser receipts reuse existing K, LOC source-context and MR symbol domains.
+
+`build_scripts/test-compiler-loop-conditions.py` verifies original WHILE and
+DO/LOOP predicates, including unconditional statements, macros and continuations.
+It checks six encodings on Win32, Win64 and Linux x64, unchanged emitted C,
+compact capability exclusion and malformed group rejection by both readers.
+
+`build_scripts/test-compiler-array-subscripts.py` exercises original and selected
+integer array indices before offset lowering. Its fixed/dynamic arrays, fields,
+formals, floating conversion and assignment targets run through the same target
+and encoding matrix. Missing, conflicting, foreign and incorrectly typed index
+groups are rejected independently without relying on invalid footer totals.
+
+`build_scripts/test-compiler-array-bound-queries.py` checks folded and runtime bound queries, original and converted dimensions, fields, formals and macros. It verifies three targets, six encodings, unchanged generated C, compact exclusion and malformed groups rejected by both readers.
 
 <!-- end of README.md -->

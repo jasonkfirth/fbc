@@ -20,6 +20,7 @@ declare function fbSemanticModelEscape( byref value as const string ) as string
 declare sub fbSemanticModelAppendDetail( byref value as string )
 declare sub fbSemanticModelAppendProvenance( byref value as const string )
 declare sub fbSemanticModelFail( )
+declare sub fbSemanticModelFailAt( byref reason as const string )
 declare sub fbSemanticModelMarkSourceRemapped( byval depth as integer )
 declare function fbSemanticModelNextVisit( ) as ulongint
 declare function fbSemanticModelVisitSymbol _

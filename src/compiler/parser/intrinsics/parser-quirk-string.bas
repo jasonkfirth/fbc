@@ -28,6 +28,8 @@
 #include once "parser/parser.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-expressions.bi"
 
 private function hCVIntConst _
 	( _
@@ -112,6 +114,9 @@ function cMidStmt( ) as integer
 	'' Expression{str}
 	hMatchExpressionEx( expr4, FB_DATATYPE_STRING )
 
+	'' MID replaces only a substring. The remaining destination contents
+	'' are retained; mark the actual variable, not a pointer/member base.
+	fbSemanticModelSetAccess( expr1, "read-write" )
 	function = rtlStrAssignMid( expr1, expr2, expr3, expr4 ) <> NULL
 end function
 
@@ -203,6 +208,9 @@ function cLRSetStmt(byval tk as FB_TOKEN) as integer
 		srcexpr = CREATEFAKEID( )
 	end select
 
+	'' LSET/RSET use the existing width while changing the destination.
+	'' Keep this direct grammar observation before runtime address lowering.
+	fbSemanticModelSetAccess( dstexpr, "read-write" )
 	if( (dtype1 = FB_DATATYPE_STRUCT) or _
 		(dtype2 = FB_DATATYPE_STRUCT) ) then
 
@@ -239,19 +247,30 @@ function cLRSetStmt(byval tk as FB_TOKEN) as integer
 
 end function
 
-private function cStrCHR(byval is_wstr as integer) as ASTNODE ptr
+private function cStrCHR(byval is_wstr as integer, byref source_start as LEX_LOCATION, byval nonphysical_start as longint) as ASTNODE ptr
 		'' Max length of a single octal code is 11 digits for &hffffffffU
 	static as zstring * 11+1 o
 	static as zstring * 32*(2+11)+1 zs
 	static as wstring * 32*(2+11)+1 ws
 	dim as integer v = any, i = any, cnt = any, isconst = any
 	dim as ASTNODE ptr exprtb(0 to 31) = any
+	dim as longint argument_ids(0 to 31)
+	dim as LEX_LOCATION argument_starts(0 to 31), argument_ends(0 to 31)
+	dim as longint argument_nonphysical_starts(0 to 31), argument_nonphysical_ends(0 to 31)
+	dim as ASTNODE ptr result = any
 
 	hMatchLPRNT( )
 
 	cnt = 0
 	do
+		argument_starts(cnt) = lexGetCurrentLocation( )
+		argument_nonphysical_starts(cnt) = lexGetNonphysicalTokenCount( )
 		hMatchExpressionEx( exprtb(cnt), FB_DATATYPE_ULONG )
+		argument_ends(cnt) = lexGetLastLocation( )
+		argument_nonphysical_ends(cnt) = lexGetNonphysicalTokenCount( )
+		argument_ids(cnt) = fbSemanticModelOriginalExpression _
+			(exprtb(cnt), argument_starts(cnt), argument_nonphysical_starts(cnt), _
+			 argument_ends(cnt), argument_nonphysical_ends(cnt))
 		cnt += 1
 		if( cnt >= 32 ) then
 			exit do
@@ -333,13 +352,16 @@ private function cStrCHR(byval is_wstr as integer) as ASTNODE ptr
 		next
 
 		if( is_wstr = FALSE ) then
-			function = astNewVAR( symbAllocStrConst( zs, cnt ) )
+			result = astNewVAR( symbAllocStrConst( zs, cnt ) )
 		else
-			function = astNewVAR( symbAllocWstrConst( ws, cnt ) )
+			result = astNewVAR( symbAllocWstrConst( ws, cnt ) )
 		end if
 	else
-		function = rtlStrChr( cnt, exprtb(), is_wstr )
+		result = rtlStrChr( cnt, exprtb(), is_wstr )
 	end if
+	dim as string intrinsic_kind = iif(is_wstr = 2, "uchr", iif(is_wstr, "wchr", "chr"))
+	fbSemanticModelStringIntrinsic(result, intrinsic_kind, cnt, argument_ids(), FALSE, source_start, nonphysical_start)
+	function = result
 end function
 
 private function cStrASC() as ASTNODE ptr
@@ -734,6 +756,12 @@ end function
 function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 	dim as ASTNODE ptr expr1 = any, expr2 = any, expr3 = any
 	dim as integer dclass = any, dtype = any, is_any = any, is_wstr = any
+	dim as LEX_LOCATION intrinsic_start = lexGetCurrentLocation( )
+	dim as longint intrinsic_nonphysical_start = lexGetNonphysicalTokenCount( )
+	dim as longint trim_arguments(0 to 1)
+	dim as integer trim_argument_count
+	dim as LEX_LOCATION trim_argument_starts(0 to 1), trim_argument_ends(0 to 1)
+	dim as longint trim_argument_nonphysical_starts(0 to 1), trim_argument_nonphysical_ends(0 to 1)
 
 	function = NULL
 
@@ -759,7 +787,7 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 
 	case FB_TK_UCHR
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
-		function = cStrCHR( 2 )
+		function = cStrCHR( 2, intrinsic_start, intrinsic_nonphysical_start )
 
 	'' W|STR '(' Expression{bool|int|float|double|wstring} ')'
 	case FB_TK_STR, FB_TK_WSTR
@@ -834,7 +862,7 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		is_wstr = (tk = FB_TK_WCHR)
 		lexSkipToken( iif( is_wstr, LEXCHECK_POST_SUFFIX, LEXCHECK_POST_STRING_SUFFIX ) )
 
-		function = cStrCHR(is_wstr)
+		function = cStrCHR(is_wstr, intrinsic_start, intrinsic_nonphysical_start)
 
 	'' ASC '(' Expression (',' Expression)? ')'
 	case FB_TK_ASC
@@ -899,15 +927,33 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		lexSkipToken( LEXCHECK_POST_STRING_SUFFIX )
 
 		hMatchLPRNT( )
+		trim_argument_starts(0) = lexGetCurrentLocation( )
+		trim_argument_nonphysical_starts(0) = lexGetNonphysicalTokenCount( )
 		hMatchExpressionEx( expr1, FB_DATATYPE_STRING )
+		trim_argument_ends(0) = lexGetLastLocation( )
+		trim_argument_nonphysical_ends(0) = lexGetNonphysicalTokenCount( )
 		if( hMatch( CHAR_COMMA ) ) then
 			is_any = hMatch( FB_TK_ANY, LEXCHECK_POST_SUFFIX )
+			trim_argument_starts(1) = lexGetCurrentLocation( )
+			trim_argument_nonphysical_starts(1) = lexGetNonphysicalTokenCount( )
 			hMatchExpressionEx( expr2, FB_DATATYPE_STRING )
+			trim_argument_ends(1) = lexGetLastLocation( )
+			trim_argument_nonphysical_ends(1) = lexGetNonphysicalTokenCount( )
 		else
 			is_any = FALSE
 			expr2 = NULL
 		end if
 		hMatchRPRNT( )
+		trim_arguments(0) = fbSemanticModelOriginalExpression _
+			(expr1, trim_argument_starts(0), trim_argument_nonphysical_starts(0), _
+			 trim_argument_ends(0), trim_argument_nonphysical_ends(0))
+		trim_argument_count = 1
+		if( expr2 <> NULL ) then
+			trim_arguments(1) = fbSemanticModelOriginalExpression _
+				(expr2, trim_argument_starts(1), trim_argument_nonphysical_starts(1), _
+				 trim_argument_ends(1), trim_argument_nonphysical_ends(1))
+			trim_argument_count = 2
+		end if
 
 		select case (tk)
 		case FB_TK_TRIM
@@ -922,6 +968,8 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 			errReport( FB_ERRMSG_INVALIDDATATYPES )
 			expr1 = astNewCONSTi( 0 )
 		end if
+		dim as string intrinsic_kind = iif(tk = FB_TK_TRIM, "trim", iif(tk = FB_TK_LTRIM, "ltrim", "rtrim"))
+		fbSemanticModelStringIntrinsic(expr1, intrinsic_kind, trim_argument_count, trim_arguments(), is_any, intrinsic_start, intrinsic_nonphysical_start)
 
 		function = expr1
 

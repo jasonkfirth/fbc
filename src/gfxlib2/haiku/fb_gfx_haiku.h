@@ -1,3 +1,11 @@
+/*
+    FreeBASIC gfxlib2 Haiku backend
+    File: fb_gfx_haiku.h
+    Purpose: Declare shared backend state and platform interfaces.
+    Responsibilities: Describe GUI ownership and synchronization contracts.
+    This file contains no window implementation or framebuffer allocation.
+*/
+
 #ifndef FB_GFX_HAIKU_H
 #define FB_GFX_HAIKU_H
 
@@ -41,6 +49,19 @@ typedef struct FB_HAIKU_STATE
     int depth;
     int refresh;
     int flags;
+    int scanline_size;
+
+    /* Physical client dimensions, published under backend_lock. */
+    int pending_width;
+    int pending_height;
+
+    /* Native callbacks own these under backend_lock. The driver lock drains
+       legacy keys so the GUI thread never takes the presentation mutex. */
+    unsigned char key_state[128];
+    int key_ascii[128];
+    int pending_keys[MAX_EVENTS];
+    int key_head;
+    int key_tail;
 
     /* lifecycle */
     int initialized;
@@ -58,6 +79,9 @@ typedef struct FB_HAIKU_STATE
     int mouse_x;
     int mouse_y;
     int mouse_z;
+    int mouse_w;
+    double wheel_x;
+    double wheel_y;
 
     int mouse_buttons;
     int mouse_latched_buttons;
@@ -141,6 +165,9 @@ void fb_hHaikuUpdate(void);
 void fb_hHaikuPollEvents(void);
 void fb_hHaikuWaitVSync(void);
 void fb_hHaikuSetPalette(int index, int r, int g, int b);
+#ifdef __cplusplus
+BBitmap *fb_hHaikuCreateBitmap(int width, int height);
+#endif
 #ifndef DISABLE_OPENGL
 void fb_hHaikuOpenGLFlip(void);
 #endif
@@ -151,6 +178,7 @@ void fb_hHaikuOpenGLFlip(void);
 
 void fb_hHaikuSetWindowTitle(char *title);
 int  fb_hHaikuSetWindowPos(int x, int y);
+int  fb_hHaikuResize(int width, int height);
 
 /* ------------------------------------------------------------------------- */
 /* Driver interface                                                          */
@@ -175,12 +203,14 @@ int *fb_hHaikuFetchModes(int depth, int *size);
     argument opaque so the software and OpenGL views share one C++ signature
     without exposing a Haiku interface type through this common header.
 */
-void fb_hHaikuHandleKeyDown(void *view, const char *bytes, int32_t numBytes);
-void fb_hHaikuHandleKeyUp(void *view, const char *bytes, int32_t numBytes);
+void fb_hHaikuHandleKeyDown(void *view, const char *bytes, int32_t keycode);
+void fb_hHaikuHandleKeyUp(void *view, const char *bytes, int32_t keycode);
 
 void fb_hHaikuHandleMouseMoved(void *view, int x, int y);
 void fb_hHaikuHandleMouseDown(void *view, int x, int y, int buttons);
 void fb_hHaikuHandleMouseUp(void *view, int x, int y, int buttons);
+void fb_hHaikuHandleMouseWheel(float x, float y);
+void fb_hHaikuHandleFocus(int active);
 
 void fb_hHaikuPostQuitEvent(void);
 
@@ -224,3 +254,5 @@ void fb_hHaikuUnlockState(void);
 void fb_hHaikuDestroyLock(void);
 
 #endif
+
+/* end of fb_gfx_haiku.h */

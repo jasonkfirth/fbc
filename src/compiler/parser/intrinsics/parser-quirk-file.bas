@@ -26,6 +26,8 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "tooling/semantic-constructs.bi"
+#include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-diagnostics.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
 
@@ -377,10 +379,17 @@ function cLineInputStmt _
 				'' error recovery: none rtlFileLineInput[Wstr] will handle it
 			end if
 		else
+			if( (astGetDataType(dstexpr) = FB_DATATYPE_CHAR) or (astGetDataType(dstexpr) = FB_DATATYPE_WCHAR) ) then
+				fbSemanticDiagnosticsContext("line-input-unknown-buffer-capacity")
+			end if
 			errReport( FB_ERRMSG_EXPECTEDCOMMA )
+			fbSemanticDiagnosticsContext("")
 		end if
 	end if
 
+	'' Input destinations are known from this grammar, not inferred from
+	'' the effects of arbitrary BYREF calls made by the application.
+	fbSemanticModelSetAccess( dstexpr, "write" )
 	select case astGetDataType( dstexpr )
 	case FB_DATATYPE_STRING, FB_DATATYPE_USTRING, FB_DATATYPE_FIXSTR, FB_DATATYPE_CHAR
 		semantic_result = rtlFileLineInput( isfile, filestrexpr, dstexpr, maxlenexpr, addquestion, addnewline )
@@ -482,6 +491,7 @@ function cInputStmt _
 		end if
 
 		if( dstexpr <> NULL ) then
+			fbSemanticModelSetAccess( dstexpr, "write" )
 			if( rtlFileInputGet( dstexpr ) = FALSE ) then
 				exit function
 			end if
@@ -800,8 +810,13 @@ private function hFileGet _
 	end if
 
 	if( isarray = FALSE ) then
+		'' GET may replace the destination and its explicit byte-count
+		'' output. Element/offset expressions remain ordinary reads.
+		fbSemanticModelSetAccess( dstexpr, "write" )
+		fbSemanticModelSetAccess( iobexpr, "write" )
 		function = rtlFileGet( fileexpr, posexpr, dstexpr, elmexpr, iobexpr, isfunc )
 	else
+		fbSemanticModelSetAccess( iobexpr, "write" )
 		function = rtlFileGetArray( fileexpr, posexpr, dstexpr, iobexpr, isfunc )
 	end if
 

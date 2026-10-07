@@ -172,7 +172,7 @@ void fb_hHaikuUnlockState(void)
 __attribute__((constructor))
 static void fb_hHaikuInitGlobalState(void)
 {
-    memset(&fb_haiku, 0, sizeof(fb_haiku));
+    fb_haiku = FB_HAIKU_STATE();
 
     fb_haiku.gui_thread = -1;
     fb_haiku.gui_ready_sem = -1;

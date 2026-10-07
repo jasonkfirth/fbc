@@ -28,6 +28,9 @@
 #include once "ast/ast.bi"
 #include once "runtime/rtl.bi"
 
+declare function fbSemanticModelExpressionCheckpoint( ) as longint
+declare sub fbSemanticModelUnevaluatedQuery(byval checkpoint as longint, byref query_kind as const string)
+
 declare sub fbSemanticModelExportBinding _
 	( _
 		byval sym as FBSYMBOL ptr, _
@@ -288,6 +291,7 @@ function cTypeOrExpression _
 
 	dim as ASTNODE ptr expr = any
 	dim as integer maybe_type = any
+	dim as longint semantic_checkpoint = fbSemanticModelExpressionCheckpoint( )
 
 	'' This is ambiguous because functions/variables may use the same name
 	'' as types, for example STRING and STRING(). The same can happen with
@@ -354,6 +358,9 @@ function cTypeOrExpression _
 			'' Successful -- it's a type, not an expression
 			ambiguoussizeof.maybeWarn( tk, TRUE )
 			parser.nsprefix = NULL
+			if( (tk = FB_TK_TYPEOF) or (tk = FB_TK_SIZEOF) ) then
+				fbSemanticModelUnevaluatedQuery(semantic_checkpoint, hGetTokenDescription(tk))
+			end if
 			return NULL
 		end if
 	end if
@@ -370,6 +377,12 @@ function cTypeOrExpression _
 		expr = astNewCONSTi( 0 )
 	end if
 
+	'' Every expression parsed inside TYPEOF/SIZEOF is unevaluated, including
+	'' folded casts and call arguments no longer reachable from the final AST.
+	'' The parser checkpoint retains that role without traversing source text.
+	if( (tk = FB_TK_TYPEOF) or (tk = FB_TK_SIZEOF) ) then
+		fbSemanticModelUnevaluatedQuery(semantic_checkpoint, hGetTokenDescription(tk))
+	end if
 	function = expr
 end function
 

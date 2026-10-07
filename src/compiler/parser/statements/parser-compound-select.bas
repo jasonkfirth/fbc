@@ -5,7 +5,7 @@
 ''
 '' Purpose:
 ''
-''     Parse sELECT CASE [AS CONST]..CASE..END SELECT compound statement parsing.
+''     Parse SELECT CASE [AS CONST]..CASE..END SELECT compound statements.
 ''
 '' Responsibilities:
 ''
@@ -27,6 +27,7 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "runtime/rtl.bi"
+#include once "tooling/semantic-constructs.bi"
 
 enum FB_CASETYPE
 	FB_CASETYPE_SINGLE
@@ -111,6 +112,7 @@ sub cSelectStmtBegin( )
 		expr = astNewCONSTi( 0 )
 	end if
 
+	dim as longint semantic_expression = expr->semantic_expression
 	astTryOvlStringCONV( expr )
 
 	'' can't be an UDT
@@ -212,6 +214,7 @@ sub cSelectStmtBegin( )
 	stk->select.cmplabel = symbAddLabel( NULL, FB_SYMBOPT_NONE )
 	stk->select.endlabel = el
 	stk->select.outerscopenode = outerscopenode
+	fbSemanticModelSelectInput(stk->semantic_identity, semantic_expression, sym, FALSE)
 end sub
 
 '':::::
@@ -373,6 +376,7 @@ sub cSelectStmtNext( )
 		stk->scopenode = astScopeBegin( )
 
 		stk->select.casecnt = -1
+		fbSemanticModelSelectClause(stk->semantic_identity, TRUE, 0)
 
 		exit sub
 	end if
@@ -382,6 +386,13 @@ sub cSelectStmtNext( )
 	cntbase = ctx.base
 
 	do
+		'' The fixed parser table has room for FB_MAXCASEEXPR entries. Reject
+		'' excess alternatives before indexing it, including nested usage.
+		if( cntbase + cnt >= FB_MAXCASEEXPR ) then
+			errReport( FB_ERRMSG_TOOMANYLABELS )
+			hSkipStmt( )
+			exit do
+		end if
 		hCaseExpression( ctx.caseTB(cntbase + cnt), stk->select.sym )
 		cnt += 1
 
@@ -398,6 +409,14 @@ sub cSelectStmtNext( )
 	il = symbAddLabel( NULL )
 
 	for i = 0 to cnt-1
+		with ctx.caseTB(cntbase+i)
+			dim as string kind = "value"
+			if( .typ = FB_CASETYPE_RANGE ) then kind = "range"
+			if( .typ = FB_CASETYPE_IS ) then kind = "is"
+			dim as longint last_expression = 0
+			if( .typ = FB_CASETYPE_RANGE ) then last_expression = .expr2->semantic_expression
+			fbSemanticModelSelectAlternative(stk->semantic_identity, i + 1, kind, .op, .expr1->semantic_expression, last_expression, i = cnt-1)
+		end with
 		if( i < cnt-1 ) then
 			'' add next label
 			nl = symbAddLabel( NULL, FB_SYMBOPT_NONE )
@@ -418,6 +437,7 @@ sub cSelectStmtNext( )
 		end if
 	next
 
+	fbSemanticModelSelectClause(stk->semantic_identity, FALSE, cnt)
 	ctx.base -= cnt
 
 	'' emit init block label

@@ -147,6 +147,7 @@ type FBCCTX
 	buildprefix         as zstring * FB_MAXPATHLEN+1  '' command line option to override target prefix (affects tool names executed)
 
 	objinf              as FBC_OBJINF
+	semanticdiagnostics as string      '' Independent diagnostics, including rejected modules
 end type
 
 enum FBCTOOL
@@ -364,6 +365,13 @@ declare function fbcPlatformAddCCompilerCpuOptions _
 		byref ccline as string _
 	) as integer
 
+declare function fbcLinuxPlatformArmUsesHardFloatAbi( ) as integer
+
+declare function fbcLinuxPlatformGetArmLlvmTargetTriple _
+	( _
+		byref targettriple as string _
+	) as integer
+
 declare function fbcPlatformUsesCompilerDriverAssembler( ) as integer
 
 declare sub fbcPlatformAddAssemblerOptions( byref ascline as string )
@@ -434,6 +442,7 @@ declare function fbSemanticModelEnd(byval succeeded as integer) as integer
 declare sub fbSemanticModelProtectFile(byref filename as const string)
 declare sub fbSemanticModelFinishModule(byval commit as integer)
 declare sub fbSemanticModelFinishRecoveryModule( )
+#include once "tooling/semantic-diagnostics.bi"
 
 #endif
 

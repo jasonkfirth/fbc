@@ -26,6 +26,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-expressions.bi"
 #include once "support/containers/list.bi"
 #include once "backend/ir.bi"
 #include once "runtime/rtl.bi"
@@ -1177,6 +1178,10 @@ function astNewARG _
 	dim as FBSYMBOL ptr sym = any, param = any
 	dim as ulongint semantic_dtor_generation = ast.dtorlistgeneration
 	dim as integer semantic_defaulted = (arg = NULL)
+	dim as longint semantic_argument = 0
+	if( arg <> NULL ) then
+		semantic_argument = arg->semantic_expression
+	end if
 
 	sym = parent->sym
 
@@ -1264,6 +1269,10 @@ function astNewARG _
 	end if
 
 	errPopParamLocation( )
+	'' Retain the selected caller expression before conversion and subsequent
+	'' optimization replace its AST. The argument owns only an observation ID;
+	'' its expression tree continues through the existing ownership rules.
+	fbSemanticModelAttachExpression(n, semantic_argument)
 	'' Argument conversion can create temporaries after cExpression() has
 	'' already returned, especially for statement calls. Retain their actual
 	'' expression range before astAdd() flushes the destruction list.

@@ -785,9 +785,10 @@ static void platform_win32_poll_xinput(FB_GFX3_PLATFORM_WIN32 *platform)
 		}
 		memset(axis, 0, sizeof(axis));
 		axis[0] = platform_win32_normalize_axis(state.gamepad.left_x);
-		axis[1] = platform_win32_normalize_axis(state.gamepad.left_y);
+		/* XInput is positive-up; the shared snapshot stores screen-space Y. */
+		axis[1] = -platform_win32_normalize_axis(state.gamepad.left_y);
 		axis[2] = platform_win32_normalize_axis(state.gamepad.right_x);
-		axis[3] = platform_win32_normalize_axis(state.gamepad.right_y);
+		axis[3] = -platform_win32_normalize_axis(state.gamepad.right_y);
 		fb_gfx3_input_platform_gamepad_replace(platform->input, (int)id,
 			TRUE, platform_win32_xinput_buttons(&state.gamepad), axis,
 			(float)state.gamepad.left_trigger / 255.0f,

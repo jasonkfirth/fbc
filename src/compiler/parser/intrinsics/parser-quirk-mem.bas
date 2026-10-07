@@ -26,6 +26,7 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-expressions.bi"
 
 declare sub fbSemanticModelExportImplicitCall _
 	( _
@@ -237,6 +238,10 @@ function cOperatorNew( ) as ASTNODE ptr
 		end if
 	end if
 
+	'' NEW consumes its element count and placement expression during lowering.
+	'' The temporary's canonical identity preserves the selected storage family.
+	fbSemanticModelNewStorage(tmp, dtype, subtype, elementsexpr, do_clear, _
+		op = AST_OP_NEW_VEC, placementexpr)
 	expr = astBuildNewOp( op, tmp, elementsexpr, initexpr, _
 	                      dtype, subtype, do_clear, placementexpr )
 
@@ -309,6 +314,7 @@ sub cOperatorDelete( )
 		end if
 	end if
 
+	fbSemanticModelDeleteStorage(ptrexpr, op = AST_OP_DEL_VEC)
 	astAdd( astBuildDeleteOp( op, ptrexpr ) )
 end sub
 

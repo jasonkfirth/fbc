@@ -1,3 +1,10 @@
+/*
+    FreeBASIC gfxlib2 Haiku backend
+    File: haiku_lock.cpp
+    Purpose: Serialize runtime drawing and consume native resize requests.
+    Responsibilities: Own the driver mutex and present frames on unlock.
+    This file contains no native window callbacks or framebuffer allocation.
+*/
 
 #ifndef DISABLE_HAIKU
 
@@ -46,6 +53,35 @@ void fb_hHaikuLock(void)
         return;
 
     fb_MutexLock(haiku_mutex);
+
+    /*
+        BView hooks run with the BWindow locked. They publish dimensions under
+        backend_lock instead of taking this mutex, because presentation takes
+        the driver mutex before the BWindow lock. Consume the coalesced request
+        here so the generic resize layer observes it under the driver lock.
+    */
+    fb_hHaikuLockState();
+    if (__fb_gfx)
+    {
+        fb_hMemCpy(__fb_gfx->key, fb_haiku.key_state, sizeof(fb_haiku.key_state));
+        while (fb_haiku.key_head != fb_haiku.key_tail)
+        {
+            fb_hPostKey(fb_haiku.pending_keys[fb_haiku.key_head]);
+            fb_haiku.key_head = (fb_haiku.key_head + 1) % MAX_EVENTS;
+        }
+    }
+    if (fb_haiku.pending_width > 0 && fb_haiku.pending_height > 0)
+    {
+        if (__fb_gfx && __fb_gfx->scanline_size > 0)
+        {
+            int height = (fb_haiku.pending_height - 1) /
+                __fb_gfx->scanline_size + 1;
+            fb_hRequestResize(fb_haiku.pending_width, height);
+        }
+        fb_haiku.pending_width = 0;
+        fb_haiku.pending_height = 0;
+    }
+    fb_hHaikuUnlockState();
 }
 
 /* ------------------------------------------------------------------------- */
@@ -83,3 +119,5 @@ void fb_hHaikuDestroyLock(void)
 }
 
 #endif
+
+/* end of haiku_lock.cpp */

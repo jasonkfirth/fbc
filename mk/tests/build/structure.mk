@@ -58,6 +58,24 @@ mk-structure-test:
 		echo "ERROR: DOS default unexpectedly enabled DPMI yielding"; \
 		exit 1; \
 	}; \
+	printf '%s\n' "$$dos_default" | grep -F -- '-DFB_DOS_GFX_LOW_POWER' >/dev/null && { \
+		echo "ERROR: DOS default unexpectedly lowered the graphics timer rate"; \
+		exit 1; \
+	}; \
+	dos_low_power="$$( $(MAKE) --no-print-directory -s print-config \
+		HAVE_PREREQS_MK= TARGET_OS=dos DOS_GFX_LOW_POWER=YesPlease \
+		| sed -n 's/^ALLCFLAGS=//p' )"; \
+	printf '%s\n' "$$dos_low_power" | grep -F -- '-DFB_DOS_GFX_LOW_POWER' >/dev/null || { \
+		echo "ERROR: DOS_GFX_LOW_POWER did not enable the graphics timer profile"; \
+		exit 1; \
+	}; \
+	host_low_power="$$( $(MAKE) --no-print-directory -s print-config \
+		HAVE_PREREQS_MK= TARGET_OS=win32 DOS_GFX_LOW_POWER=YesPlease \
+		| sed -n 's/^ALLCFLAGS=//p' )"; \
+	printf '%s\n' "$$host_low_power" | grep -F -- '-DFB_DOS_GFX_LOW_POWER' >/dev/null && { \
+		echo "ERROR: DOS graphics timer profile leaked into a native target"; \
+		exit 1; \
+	}; \
 	dos_yield_config="$$( $(MAKE) --no-print-directory -s print-config \
 		HAVE_PREREQS_MK= TARGET_OS=dos DOS_DPMI_YIELD=YesPlease \
 		)"; \

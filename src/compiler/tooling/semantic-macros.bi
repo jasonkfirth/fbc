@@ -16,6 +16,9 @@ declare sub fbSemanticModelMacroLeave( byval previous as longint, byref phase as
 declare function fbSemanticModelMacroLoader( ) as longint
 declare function fbSemanticModelMacroCurrentPhase( ) as string
 declare function fbSemanticModelMacroTokenOrigin( ) as longint
+declare function fbSemanticModelMacroExpressionLocation _
+	( byref first as LEX_LOCATION, byref last as LEX_LOCATION, byval first_counter as longint, _
+	  byval last_counter as longint, byref invocation as LEX_LOCATION ) as integer
 declare sub fbSemanticModelMacroPhase( byref phase as const string )
 declare sub fbSemanticModelMacroArgument _
 	( byval identity as longint, byval ordinal as integer, byval argument as LEXPP_ARG ptr, byval wide as integer )

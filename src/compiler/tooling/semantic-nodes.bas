@@ -95,7 +95,7 @@ sub fbSemanticModelExportNodeDetails(byval node as ASTNODE ptr, byval nodeid as 
 		dim as longint ordinal = 0
 		do while( (token <> NULL) and fbSemanticModelFullEnabled( ) )
 			if( ordinal >= 1000000 ) then
-				fbSemanticModelFail( )
+				fbSemanticModelFailAt("semantic-nodes.bas:98")
 				exit sub
 			end if
 			dim as string token_kind, token_text
@@ -108,11 +108,11 @@ sub fbSemanticModelExportNodeDetails(byval node as ASTNODE ptr, byval nodeid as 
 				token_kind = "symbol"
 				token_symbol = fbSemanticModelSymbolId(token->sym)
 				if( token_symbol = 0 ) then
-					fbSemanticModelFail( )
+					fbSemanticModelFailAt("semantic-nodes.bas:111")
 					exit sub
 				end if
 			case else
-				fbSemanticModelFail( )
+				fbSemanticModelFailAt("semantic-nodes.bas:115")
 				exit sub
 			end select
 			fbSemanticModelAppendDetail("ASM" + TABCHAR + fbSemanticModelNumber(nodeid) + _
@@ -146,6 +146,9 @@ sub fbSemanticModelExportNodeDetails(byval node as ASTNODE ptr, byval nodeid as 
 		'' Capture omission before the optional initializer is cloned, because
 		'' its lowered value can be identical to an explicitly supplied value.
 		hNumber(nodeid, "default-argument", abs(node->arg.semantic_defaulted <> FALSE))
+		if( (node->semantic_expression > 0) and (node->arg.semantic_defaulted = FALSE) ) then
+			hNumber(nodeid, "call-argument-expression", node->semantic_expression)
+		end if
 		select case node->arg.mode
 		case FB_PARAMMODE_BYVAL: hProperty(nodeid, "passing-mode", "byval")
 		case FB_PARAMMODE_BYREF: hProperty(nodeid, "passing-mode", "byref")
@@ -198,12 +201,12 @@ sub fbSemanticModelExportNodeDetails(byval node as ASTNODE ptr, byval nodeid as 
 		'' Sparse table pairs are compiler-resolved labels and unsigned values.
 		'' Preserve the pairs rather than inventing source IF/CASE expressions.
 		if( (node->jmptb.labelcount < 0) or (node->jmptb.labelcount > 1000000) ) then
-			fbSemanticModelFail( )
+			fbSemanticModelFailAt("semantic-nodes.bas:204")
 			exit sub
 		end if
 		if( (node->jmptb.labelcount > 0) and _
 			((node->jmptb.values = NULL) or (node->jmptb.labels = NULL)) ) then
-			fbSemanticModelFail( )
+			fbSemanticModelFailAt("semantic-nodes.bas:209")
 			exit sub
 		end if
 		for index as integer = 0 to node->jmptb.labelcount - 1

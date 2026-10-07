@@ -12,7 +12,7 @@
     Responsibilities:
 
         • report desktop dimensions when no graphics mode is active
-        • report active mode dimensions when the Haiku backend is running
+        • keep desktop queries independent of the active graphics mode
         • satisfy the fb_hScreenInfo() symbol required by gfx_screeninfo.c
 
     This file intentionally does NOT contain:
@@ -30,22 +30,6 @@
 
 void fb_hScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *refresh)
 {
-    if (fb_haiku.initialized) {
-        if (width) {
-            *width = fb_haiku.width;
-        }
-        if (height) {
-            *height = fb_haiku.height;
-        }
-        if (depth) {
-            *depth = fb_haiku.depth;
-        }
-        if (refresh) {
-            *refresh = fb_haiku.refresh;
-        }
-        return;
-    }
-
     /*
         Query the desktop size on demand so SCREENINFO still reports
         useful dimensions before SCREENRES/SCREEN has initialized the

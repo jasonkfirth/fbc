@@ -34,6 +34,20 @@ end type
 dim shared as SEMANTIC_MACRO_TOKEN ptr semantic_macro_tokens
 dim shared as integer semantic_macro_token_count, semantic_macro_token_capacity
 
+'' Replacement tokens do not form a physical source range. Retain the actual
+'' invocation names so typed observations can use a valid logical anchor.
+'' IDs are appended in increasing order; lookup does not scan every expansion.
+type SEMANTIC_MACRO_INVOCATION
+	identity as longint
+	parent as longint
+	source as LEX_LOCATION
+end type
+dim shared as SEMANTIC_MACRO_INVOCATION ptr semantic_macro_invocations
+dim shared as integer semantic_macro_invocation_count, semantic_macro_invocation_capacity
+'' A hostile expansion must not multiply nested lookup work without a bound.
+const SEMANTIC_MACRO_LOCATION_WORK_LIMIT = 8388608
+dim shared as longint semantic_macro_location_work
+
 '' A canonical symbol can be revisited by several declaration parser routes.
 '' The same expansion-to-symbol observation is one relationship, not one
 '' relationship per visit. Keep a bounded set without changing symbol lookup.
@@ -65,6 +79,11 @@ sub fbSemanticModelResetMacros( )
 	semantic_macro_tokens = NULL
 	semantic_macro_token_count = 0
 	semantic_macro_token_capacity = 0
+	deallocate(semantic_macro_invocations)
+	semantic_macro_invocations = NULL
+	semantic_macro_invocation_count = 0
+	semantic_macro_invocation_capacity = 0
+	semantic_macro_location_work = SEMANTIC_MACRO_LOCATION_WORK_LIMIT
 	for depth as integer = 0 to FB_MAXINCRECLEVEL
 		lex.ctxTB(depth).semantic_last_macro_token = -1
 	next
@@ -79,13 +98,13 @@ end function
 private function hGrowDefinitions( ) as integer
 	if( (semantic_macro_capacity <> 0) and (semantic_macro_count < semantic_macro_capacity \ 2) ) then return TRUE
 	if( semantic_macro_count >= SEMANTIC_MACRO_MAX_DEFINITIONS ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-macros.bas:101")
 		return FALSE
 	end if
 	dim as integer capacity = iif(semantic_macro_capacity = 0, 128, semantic_macro_capacity * 2)
 	dim as SEMANTIC_MACRO_SLOT ptr storage = callocate(capacity, sizeof(SEMANTIC_MACRO_SLOT))
 	if( storage = NULL ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-macros.bas:107")
 		return FALSE
 	end if
 	for index as integer = 0 to semantic_macro_capacity - 1
@@ -198,11 +217,64 @@ end function
 '' Expansion and producer observations
 '' -------------------------------------------------------------------------
 
+private function hInvocationIndex( byval identity as longint ) as integer
+	dim as integer first = 0
+	dim as integer last = semantic_macro_invocation_count - 1
+	while( first <= last )
+		semantic_macro_location_work -= 1
+		if( semantic_macro_location_work < 0 ) then
+			fbSemanticModelFailAt("semantic-macros.bas:226")
+			return -1
+		end if
+		dim as integer middle = first + (last - first) \ 2
+		if( semantic_macro_invocations[middle].identity = identity ) then return middle
+		if( semantic_macro_invocations[middle].identity < identity ) then
+			first = middle + 1
+		else
+			last = middle - 1
+		end if
+	wend
+	return -1
+end function
+
+function fbSemanticModelMacroExpressionLocation _
+	( byref first as LEX_LOCATION, byref last as LEX_LOCATION, byval first_counter as longint, _
+	  byval last_counter as longint, byref invocation as LEX_LOCATION ) as integer
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then return FALSE
+	dim as longint identity = first.macro_identity
+	if( identity = 0 ) then identity = last.macro_identity
+	if( identity = 0 ) then
+		dim as integer token = lex.ctx->semantic_last_macro_token
+		if( (token >= 0) and (token < semantic_macro_token_count) ) then
+			if( (semantic_macro_tokens[token].counter > first_counter) and _
+				(semantic_macro_tokens[token].counter <= last_counter) ) then identity = semantic_macro_tokens[token].expansion
+		end if
+	end if
+	for depth as integer = 0 to 63
+		dim as integer index = hInvocationIndex(identity)
+		if( index < 0 ) then return FALSE
+		if( fbSemanticModelLocationIsPhysical(semantic_macro_invocations[index].source) ) then
+			invocation = semantic_macro_invocations[index].source
+			'' This describes the expansion's origin, not the bytes of its result.
+			invocation.is_physical = FALSE
+			return TRUE
+		end if
+		identity = semantic_macro_invocations[index].parent
+		if( identity = 0 ) then return FALSE
+	next
+	return FALSE
+end function
+
 function fbSemanticModelMacroBegin( byval sym as FBSYMBOL ptr, byref source as LEX_LOCATION ) as longint
-	if( (fbSemanticModelEnabled( ) = FALSE) or _
-		(fbSemanticModelMacroProvenanceEnabled( ) = FALSE) ) then return 0
+	if( fbSemanticModelEnabled( ) = FALSE ) then return 0
+	'' Compact models still need the invocation chain to give generated typed
+	'' expressions a truthful source anchor. Keep that small internal map even
+	'' when the serialized expansion graph is disabled.
+	if( (fbSemanticModelMacroProvenanceEnabled( ) = FALSE) and _
+		(fbSemanticModelFullEnabled( ) = FALSE) ) then return 0
 	if( lex.ctx->semantic_probe ) then return 0
-	dim as longint definition = hDefinition(sym)
+	dim as longint definition = 0
+	if( fbSemanticModelMacroProvenanceEnabled( ) ) then definition = hDefinition(sym)
 	dim as longint contextid = fbSemanticModelCurrentContext( )
 	dim as longint identity = fbSemanticModelNextDetailIdentity( )
 	dim as longint parent = source.macro_identity
@@ -211,14 +283,40 @@ function fbSemanticModelMacroBegin( byval sym as FBSYMBOL ptr, byref source as L
 		parent = semantic_macro_loader
 		relation = semantic_macro_phase
 	end if
-	dim as string phase = "normal"
-	if( pp.skipping ) then phase = "inactive"
-	if( lex.ctx->kind = LEX_TKCTX_CONTEXT_EVAL ) then phase = "evaluation"
-	fbSemanticModelAppendProvenance("MI" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + _
-		fbSemanticModelNumber(parent) + TABCHAR + fbSemanticModelNumber(definition) + TABCHAR + _
-		fbSemanticModelNumber(fbSemanticModelCurrentSource( )) + TABCHAR + fbSemanticModelNumber(contextid) + _
-		TABCHAR + fbSemanticModelNumber(fbSemanticModelPPCurrentBranch( )) + TABCHAR + phase + TABCHAR + relation + TABCHAR + hLocation(source))
-	fbSemanticModelExportCoordinates("macro-attempt", identity, "name", source, source)
+	if( fbSemanticModelFullEnabled( ) ) then
+		if( semantic_macro_invocation_count >= SEMANTIC_MACRO_MAX_DEFINITIONS ) then
+			fbSemanticModelFailAt("semantic-macros.bas:283")
+			return 0
+		end if
+		if( semantic_macro_invocation_count = semantic_macro_invocation_capacity ) then
+			dim as integer capacity = iif(semantic_macro_invocation_capacity = 0, 128, semantic_macro_invocation_capacity * 2)
+			dim as SEMANTIC_MACRO_INVOCATION ptr storage = reallocate(semantic_macro_invocations, capacity * sizeof(SEMANTIC_MACRO_INVOCATION))
+			if( storage = NULL ) then
+				fbSemanticModelFailAt("semantic-macros.bas:290")
+				return 0
+			end if
+			'' LEX_LOCATION contains fixed storage. Each used slot is assigned
+			'' completely before the count exposes it to binary lookup.
+			semantic_macro_invocations = storage
+			semantic_macro_invocation_capacity = capacity
+		end if
+		with semantic_macro_invocations[semantic_macro_invocation_count]
+			.identity = identity
+			.parent = parent
+			.source = source
+		end with
+		semantic_macro_invocation_count += 1
+	end if
+	if( fbSemanticModelMacroProvenanceEnabled( ) ) then
+		dim as string phase = "normal"
+		if( pp.skipping ) then phase = "inactive"
+		if( lex.ctx->kind = LEX_TKCTX_CONTEXT_EVAL ) then phase = "evaluation"
+		fbSemanticModelAppendProvenance("MI" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + _
+			fbSemanticModelNumber(parent) + TABCHAR + fbSemanticModelNumber(definition) + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelCurrentSource( )) + TABCHAR + fbSemanticModelNumber(contextid) + _
+			TABCHAR + fbSemanticModelNumber(fbSemanticModelPPCurrentBranch( )) + TABCHAR + phase + TABCHAR + relation + TABCHAR + hLocation(source))
+		fbSemanticModelExportCoordinates("macro-attempt", identity, "name", source, source)
+	end if
 	return identity
 end function
 
@@ -254,7 +352,7 @@ end function
 sub fbSemanticModelMacroPushOrigin( byval identity as longint, byval resume_length as integer, byval units as integer )
 	if( (identity = 0) or (units = 0) ) then exit sub
 	if( lex.ctx->semantic_macro_depth >= LEX_MAXMACROSTACK ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-macros.bas:348")
 		exit sub
 	end if
 	lex.ctx->semantic_macro_ids(lex.ctx->semantic_macro_depth) = identity
@@ -264,7 +362,7 @@ end sub
 
 sub fbSemanticModelMacroArgument _
 	( byval identity as longint, byval ordinal as integer, byval argument as LEXPP_ARG ptr, byval wide as integer )
-	if( identity = 0 ) then exit sub
+	if( (identity = 0) or (fbSemanticModelMacroProvenanceEnabled( ) = FALSE) ) then exit sub
 	dim as string value, kind = "bytes"
 	if( wide ) then
 		kind = "wide-units"
@@ -324,20 +422,20 @@ end sub
 sub fbSemanticModelMacroSegment _
 	( byval identity as longint, byval ordinal as integer, byval token_ordinal as integer, _
 	  byval parameter as integer, byref kind as const string, byval offset as integer, byval units as integer )
-	if( identity = 0 ) then exit sub
+	if( (identity = 0) or (fbSemanticModelMacroProvenanceEnabled( ) = FALSE) ) then exit sub
 	fbSemanticModelAppendProvenance("MS" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + _
 		fbSemanticModelNumber(ordinal) + TABCHAR + fbSemanticModelNumber(token_ordinal) + TABCHAR + _
 		fbSemanticModelNumber(parameter) + TABCHAR + kind + TABCHAR + fbSemanticModelNumber(offset) + TABCHAR + fbSemanticModelNumber(units))
 end sub
 
 sub fbSemanticModelMacroCallback( byval identity as longint, byref value as const string, byval error_code as integer )
-	if( identity = 0 ) then exit sub
+	if( (identity = 0) or (fbSemanticModelMacroProvenanceEnabled( ) = FALSE) ) then exit sub
 	fbSemanticModelAppendProvenance("MC" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + "bytes" + _
 		TABCHAR + fbSemanticModelNumber(error_code) + TABCHAR + fbSemanticModelEscape(value))
 end sub
 
 sub fbSemanticModelMacroCallbackW( byval identity as longint, byval value as const wstring ptr, byval error_code as integer )
-	if( identity = 0 ) then exit sub
+	if( (identity = 0) or (fbSemanticModelMacroProvenanceEnabled( ) = FALSE) ) then exit sub
 	fbSemanticModelAppendProvenance("MC" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + "wide-units" + _
 		TABCHAR + fbSemanticModelNumber(error_code) + TABCHAR + hWideText(value))
 end sub
@@ -345,7 +443,7 @@ end sub
 sub fbSemanticModelMacroResult _
 	( byval identity as longint, byref outcome as const string, byval value as const any ptr, _
 	  byval units as integer, byval wide as integer, byval arguments as integer, byref ending as LEX_LOCATION )
-	if( identity = 0 ) then exit sub
+	if( (identity = 0) or (fbSemanticModelMacroProvenanceEnabled( ) = FALSE) ) then exit sub
 	dim as string text, kind = "bytes"
 	dim as LEX_LOCATION result_location = ending
 	'' Empty expansions can end at a physical token boundary, but that point
@@ -393,14 +491,14 @@ sub fbSemanticModelMacroOrigin _
 			origin = macro_symbol_origins[origin - 1].next_origin
 		wend
 		if( macro_symbol_origin_count >= SEMANTIC_MACRO_MAX_DEFINITIONS ) then
-			fbSemanticModelFail( )
+			fbSemanticModelFailAt("semantic-macros.bas:487")
 			exit sub
 		end if
 		if( macro_symbol_origin_count = macro_symbol_origin_capacity ) then
 			dim as integer capacity = iif(macro_symbol_origin_capacity = 0, 128, macro_symbol_origin_capacity * 2)
 			dim as SEMANTIC_MACRO_SYMBOL_ORIGIN ptr storage = reallocate(macro_symbol_origins, capacity * sizeof(SEMANTIC_MACRO_SYMBOL_ORIGIN))
 			if( storage = NULL ) then
-				fbSemanticModelFail( )
+				fbSemanticModelFailAt("semantic-macros.bas:494")
 				exit sub
 			end if
 			macro_symbol_origins = storage
@@ -422,13 +520,13 @@ sub fbSemanticModelMacroConsumed( byval expansion as longint, byval counter as l
 	if( (expansion = 0) or lex.ctx->semantic_probe ) then exit sub
 	if( semantic_macro_token_count = semantic_macro_token_capacity ) then
 		if( semantic_macro_token_count >= SEMANTIC_MACRO_MAX_DEFINITIONS ) then
-			fbSemanticModelFail( )
+			fbSemanticModelFailAt("semantic-macros.bas:516")
 			exit sub
 		end if
 		dim as integer capacity = iif(semantic_macro_token_capacity = 0, 128, semantic_macro_token_capacity * 2)
 		dim as SEMANTIC_MACRO_TOKEN ptr storage = reallocate(semantic_macro_tokens, capacity * sizeof(SEMANTIC_MACRO_TOKEN))
 		if( storage = NULL ) then
-			fbSemanticModelFail( )
+			fbSemanticModelFailAt("semantic-macros.bas:522")
 			exit sub
 		end if
 		semantic_macro_tokens = storage

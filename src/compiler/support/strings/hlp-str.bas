@@ -1578,6 +1578,88 @@ function hUnescapeW _
 
 end function
 
+'' The sidecar and C emitter share this internal-escape decoder. Host
+'' HUNESCAPEW units can merge distinct spellings into the same surrogate
+'' sequence, so they cannot establish the target's actual literal prefix.
+'' The cursor is advanced by reference. Keep the pointer itself non-const here:
+'' generated C cannot safely pass a T ** cursor to a const T ** parameter, and
+'' recent GCC versions reject that mismatch while compiling bootstrap sources.
+function hReadWstrChar _
+	( _
+		byref src as wstring ptr, _
+		byval src_end as const wstring ptr _
+	) as uinteger
+
+	dim as uinteger ch = any
+	dim as integer digits = any
+
+	ch = *src
+	src += 1
+
+	if( ch <> FB_INTSCAPECHAR ) then
+		return ch
+	end if
+
+	if( src >= src_end ) then
+		return FB_INTSCAPECHAR
+	end if
+
+	ch = *src
+	src += 1
+
+	if( (ch >= 1) and (ch <= 11) ) then
+		digits = ch
+		ch = 0
+		while( (digits > 0) and (src < src_end) )
+			ch = (ch * 8) + (*src - CHAR_0)
+			src += 1
+			digits -= 1
+		wend
+		return ch
+	end if
+
+	select case as const ch
+	case asc( "u" )
+		digits = 4
+	case asc( "U" )
+		digits = 8
+	case asc( "r" )
+		return CHAR_CR
+	case asc( "l" ), asc( "n" )
+		return CHAR_LF
+	case asc( "t" )
+		return CHAR_TAB
+	case asc( "b" )
+		return CHAR_BKSPC
+	case asc( "a" )
+		return CHAR_BELL
+	case asc( "f" )
+		return CHAR_FORMFEED
+	case asc( "v" )
+		return CHAR_VTAB
+	case else
+		return ch
+	end select
+
+	ch = 0
+	while( (digits > 0) and (src < src_end) )
+		dim as uinteger nibble = *src
+		src += 1
+
+		if( nibble > CHAR_9 ) then
+			nibble -= (CHAR_AUPP - CHAR_9 - 1)
+		end if
+		if( nibble > 16 ) then
+			nibble -= (CHAR_ALOW - CHAR_AUPP)
+		end if
+
+		ch = (ch shl 4) or (nibble and &hF)
+		digits -= 1
+	wend
+
+	function = ch
+end function
+
 '' Return the number of wchar code units needed by an internally escaped
 '' WSTRING literal on the selected target. This is distinct from the host
 '' compiler's LEN() whenever a cross compiler bridges UTF-16 and UTF-32.

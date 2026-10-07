@@ -24667,7 +24667,9 @@ Parameters
    buttons
       A bit mask of XPAD_BUTTON_* values.
    leftx, lefty, rightx, righty
-      Analog stick positions in the range -1.0 to 1.0.
+      Analog stick positions in the range -1.0 to 1.0. X is negative left
+      and positive right; Y is positive up and negative down. X is negative left.
+      and positive right; Y is positive up and negative down.
    lefttrigger, righttrigger
       Trigger positions in the range 0.0 to 1.0.
    dpad

@@ -570,6 +570,8 @@ extern int fb_hSoftCursorInit(void);
 extern void fb_hSoftCursorExit(void);
 extern void fb_hSoftCursorPut(int x, int y);
 extern void fb_hSoftCursorUnput(int x, int y);
+/* DOS presentation can erase a published cursor without restoring stale pixels. */
+extern void fb_hSoftCursorMarkDirty(int y);
 extern void fb_hSoftCursorPaletteChanged(void);
 extern int fb_hColorDistance(int index, int r, int g, int b);
 extern void *fb_hPixelSetAlpha4(void *dest, int color, size_t size);

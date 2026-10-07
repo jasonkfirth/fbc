@@ -39,8 +39,14 @@ private function hCompileStage2DirectlyToObj( ) as integer
 		function = TRUE
 	case FB_COMPTARGET_WIN32
 		if( ((fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) or _
-		     (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GCC)) and _
-		    (fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64) ) then
+		     (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_LLVM)) and _
+		    (fbGetCpuFamily( ) = FB_CPUFAMILY_X86_64) ) then
+			'' Keep Win64 object emission with the Clang/LLVM toolchain. GNU as
+			'' may reject its Windows unwind directives or assembly syntax.
+			function = TRUE
+		elseif( ((fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) or _
+		         (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GCC)) and _
+		        (fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64) ) then
 			''
 			'' The Windows ARM64 toolchain is clang/LLVM based.  Let the C
 			'' compiler produce COFF objects directly instead of sending C
@@ -461,7 +467,7 @@ end function
 '' -------------------------------------------------------------------------
 
 private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as integer
-	dim as string ln, asmfile
+	dim as string ln, asmfile, llvmtargettriple
 	dim as integer directtoobj = hCompileStage2DirectlyToObj( )
 
 	asmfile = hGetAsmName( module, 2 )
@@ -589,9 +595,9 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 			ln += "-Wno-unused "
 
 		else
-			'' Some clang-based targets do not have a useful external assembler
-			'' stage here.  Compile the generated C directly to object code and
-			'' skip hAssembleModule() for them.
+			'' Some target/backend combinations require the C compiler to use
+			'' its integrated assembler. Compile generated C directly to object
+			'' code and skip hAssembleModule() for them.
 			ln += "-c -nostdlib -nostdinc -Wall -Wno-unused-label " + _
 				"-Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable "
 			if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS ) then
@@ -710,13 +716,24 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 		end select
 
 	case FB_BACKEND_LLVM
+		if( (directtoobj <> FALSE) and _
+		    (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32) ) then
+			'' Have llc write the COFF object so GNU as does not need to
+			'' understand LLVM's Windows unwind directives.
+			ln += "-filetype=obj "
+		end if
+
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86
 			ln += "-march=x86 "
 		case FB_CPUFAMILY_X86_64
 			ln += "-march=x86-64 "
 		case FB_CPUFAMILY_ARM
-			ln += "-march=arm "
+			if( fbcLinuxPlatformGetArmLlvmTargetTriple( llvmtargettriple ) ) then
+				ln += "-mtriple=" + llvmtargettriple + " "
+			else
+				ln += "-march=arm "
+			end if
 		case FB_CPUFAMILY_AARCH64
 			'' llc selects a target backend here, unlike GCC's instruction
 			'' baseline option. Its 64-bit ARM backend is named aarch64.

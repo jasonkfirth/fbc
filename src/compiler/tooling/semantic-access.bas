@@ -15,9 +15,17 @@ const SEMANTIC_ACCESS_MAX_BINDINGS = 1000000
 dim shared as ubyte ptr access_roles
 dim shared as integer access_capacity
 dim shared as longint access_base, access_last
+'' Direct writes are separate from final ACC roles. Runtime lowering may use
+'' BYREF and generated tokens may have no binding, but neither is a negative
+'' observation about a parser-selected assignment to a parameter variable.
+dim shared as ubyte ptr direct_writes
+dim shared as integer direct_capacity
 
 sub fbSemanticModelResetAccess( )
 	deallocate(access_roles)
+	deallocate(direct_writes)
+	direct_writes = NULL
+	direct_capacity = 0
 	access_roles = NULL
 	access_capacity = 0
 	access_base = fbSemanticModelBindingCount( )
@@ -28,7 +36,7 @@ sub fbSemanticModelCaptureAccess(byval binding as longint)
 	if( binding <= access_base ) then exit sub
 	dim as longint index = binding - access_base - 1
 	if( index >= SEMANTIC_ACCESS_MAX_BINDINGS ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-access.bas:39")
 		exit sub
 	end if
 	if( index >= access_capacity ) then
@@ -39,7 +47,7 @@ sub fbSemanticModelCaptureAccess(byval binding as longint)
 		loop
 		dim as ubyte ptr storage = reallocate(access_roles, capacity)
 		if( storage = NULL ) then
-			fbSemanticModelFail( )
+			fbSemanticModelFailAt("semantic-access.bas:50")
 			exit sub
 		end if
 		memset(storage + access_capacity, 0, capacity - access_capacity)
@@ -50,8 +58,64 @@ sub fbSemanticModelCaptureAccess(byval binding as longint)
 	if( binding > access_last ) then access_last = binding
 end sub
 
+private sub hDirectSourceWrite(byval node as ASTNODE ptr, byref role as const string)
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	if( (role <> "write") and (role <> "read-write") ) then exit sub
+	dim as integer depth = 0
+	while( node <> NULL )
+		select case node->class
+		case AST_NODECLASS_CONV, AST_NODECLASS_ADDROF, AST_NODECLASS_NIDXARRAY
+			node = node->l
+		case AST_NODECLASS_DEREF
+			'' String/BYREF parameter variables use an implicit dereference.
+			'' It is still the written variable when the inner VAR's declared
+			'' type equals this lvalue type. Explicit *pointer writes have a
+			'' different declared pointer type, so must stop here instead.
+			if( node->l = NULL ) then exit sub
+			if( node->l->class <> AST_NODECLASS_VAR ) then exit sub
+			if( node->l->sym = NULL ) then exit sub
+			if( node->l->sym->typ <> node->dtype ) then exit sub
+			if( (node->l->sym->attrib and (FB_SYMBATTRIB_PARAMVARBYVAL or _
+				FB_SYMBATTRIB_PARAMVARBYREF)) = 0 ) then exit sub
+			node = node->l
+		case AST_NODECLASS_VAR
+			if( node->sym = NULL ) then exit sub
+			dim as longint identity = fbSemanticModelSymbolId(node->sym)
+			if( identity > 0 ) then
+				if( identity >= SEMANTIC_ACCESS_MAX_BINDINGS ) then fbSemanticModelFailAt("semantic-access.bas:85"): exit sub
+				if( identity >= direct_capacity ) then
+					dim as integer capacity = iif(direct_capacity = 0, 128, direct_capacity)
+					do while( identity >= capacity )
+						capacity *= 2
+						if( capacity > SEMANTIC_ACCESS_MAX_BINDINGS ) then capacity = SEMANTIC_ACCESS_MAX_BINDINGS
+					loop
+					dim as ubyte ptr storage = reallocate(direct_writes, capacity)
+					if( storage = NULL ) then fbSemanticModelFailAt("semantic-access.bas:93"): exit sub
+					memset(storage + direct_capacity, 0, capacity - direct_capacity)
+					direct_writes = storage
+					direct_capacity = capacity
+				end if
+				direct_writes[identity] = 1
+			end if
+			exit sub
+		case else
+			'' A field, index or dereference writes other storage, not the
+			'' containing variable or its pointer value.
+			exit sub
+		end select
+		depth += 1
+		if( depth > 64 ) then exit sub
+	wend
+end sub
+
+function fbSemanticModelDirectSourceWrite(byval identity as longint) as integer
+	if( (identity < 1) or (identity >= direct_capacity) ) then return 0
+	return direct_writes[identity]
+end function
+
 sub fbSemanticModelSetAccess(byval node as ASTNODE ptr, byref role as const string)
 	if( (fbSemanticModelEnabled( ) = FALSE) or (node = NULL) ) then exit sub
+	hDirectSourceWrite(node, role)
 	'' Transparent address/type wrappers can surround a written lvalue.
 	'' Stop at its actual occurrence, so assigning a field does not mark
 	'' the containing pointer or the index expression as written too.

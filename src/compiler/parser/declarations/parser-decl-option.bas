@@ -26,6 +26,7 @@
 #include once "parser/parser.bi"
 
 declare sub hUndefSymbol()
+declare sub fbSemanticModelOptionDeclaration( byval is_base as integer, byval value as longint )
 
 '' OptDecl  =  OPTION (BYVAL|DYNAMIC|STATIC|GOSUB|EXPLICIT|PRIVATE|ESCAPE|BASE NUM_LIT|NOKEYWORD ...|NOGOSUB)
 sub cOptDecl( )
@@ -42,6 +43,7 @@ sub cOptDecl( )
 
 	'' OPTION
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
+	dim as integer is_base = FALSE
 
 	select case as const lexGetToken( )
 	case FB_TK_BYVAL
@@ -86,6 +88,7 @@ sub cOptDecl( )
 			env.opt.escapestr = TRUE
 
 		case "BASE"
+			is_base = TRUE
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 			if( lexGetClass( ) <> FB_TKCLASS_NUMLITERAL ) then
@@ -94,6 +97,9 @@ sub cOptDecl( )
 				hSkipStmt( )
 			else
 				env.opt.base = clng( *lexGetText( ) )
+				'' Observe the value actually consumed by this grammar route.
+				'' In particular, this preserves CLng's existing text conversion
+				'' instead of treating the token as an arithmetic expression.
 				lexSkipToken( )
 			end if
 
@@ -125,6 +131,10 @@ sub cOptDecl( )
 		end select
 
 	end select
+	'' Preserve every accepted OPTION route, including repeated defaults and
+	'' non-BASE declarations. Consumers can then detect a missing BASE receipt
+	'' without interpreting the source operands as another grammar.
+	fbSemanticModelOptionDeclaration( is_base, env.opt.base )
 end sub
 
 private sub hUndefSymbol()

@@ -750,19 +750,23 @@ end sub
 private sub cOverrideAttribute( byval proc as FBSYMBOL ptr )
 	'' Check that this method really is allowed to override the overridden method
 	symbProcCheckOverridden( proc, FALSE )
+	dim as integer written_override = FALSE
 
-	'' Don't bother doing the text comparisons below if at EOL (common case)
-	if( lexGetToken( ) = FB_TK_EOL ) then
-		exit sub
-	end if
-
-	'' OVERRIDE?
-	if( ucase( *lexGetText( ) ) = "OVERRIDE" ) then
-		if( symbProcGetOverridden( proc ) = NULL ) then
-			errReport( FB_ERRMSG_OVERRIDINGNOTHING )
+	'' Don't bother comparing token text at EOL (the common case).
+	if( lexGetToken( ) <> FB_TK_EOL ) then
+		if( ucase( *lexGetText( ) ) = "OVERRIDE" ) then
+			written_override = TRUE
+			if( symbProcGetOverridden( proc ) = NULL ) then
+				errReport( FB_ERRMSG_OVERRIDINGNOTHING )
+			end if
+			lexSkipToken( LEXCHECK_POST_SUFFIX )
 		end if
-		lexSkipToken( LEXCHECK_POST_SUFFIX )
 	end if
+
+	'' Resolved overriding and a written check are separate facts. Capture
+	'' presence and absence after macro expansion, without changing method
+	'' attributes or inspecting its later body header.
+	fbSemanticModelExportOverrideMarker( proc, written_override )
 end sub
 
 sub cByrefAttribute( byref pattrib as FB_PROCATTRIB, byval is_func as integer )

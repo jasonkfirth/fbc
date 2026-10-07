@@ -64,6 +64,7 @@ sub fbcDriverPrintOptions( byval verbose as integer )
 	print "  -semantic-model-bindings <file>  Write bindings and selected implicit calls"
 	print "  -semantic-model-compact  Omit verbose macro-expansion provenance from the semantic model"
 	print "  -semantic-model-expressions <file>  Write only typed expression ranges"
+	print "  -semantic-diagnostics <file>  Write structured diagnostics, including rejected modules"
 	if( verbose ) then
 	print "  -fbgfx           Link to the appropriate libfbgfx variant (normally automatic)"
 	end if
@@ -104,7 +105,7 @@ sub fbcDriverPrintOptions( byval verbose as integer )
 	print "  -o <file>        Set .o (or -pp .bas) file name for prev/next input file"
 	print "  -O <value>       Optimization level (default: 0)"
 	print "  -p <path>        Add a library search path"
-	print "  -pic             Generate position-independent code (non-x86 Unix shared libs)"
+	print "  -pic             Generate position-independent code (Haiku executables, Unix shared libs)"
 	print "  -pp              Write out preprocessed input file (.pp.bas) only"
 	print "  -prefix <path>   Set the compiler prefix path"
 	print "  -print host|target  Display host/target system name"

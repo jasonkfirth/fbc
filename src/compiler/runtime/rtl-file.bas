@@ -27,6 +27,7 @@
 #include once "ast/ast.bi"
 #include once "lexer/lex.bi"
 #include once "runtime/rtl.bi"
+#include once "tooling/semantic-expressions.bi"
 
 	dim shared as FB_RTL_PROCDEF funcdata( 0 to 75 ) = _
 	{ _
@@ -1574,6 +1575,7 @@ function rtlFilePut _
 	dim as FBSYMBOL ptr f = any
 
 	function = NULL
+	dim as longint semantic_input = fbSemanticModelFileTransferInput(src)
 
 	''
 	dtype    = astGetDataType( src )
@@ -1647,6 +1649,7 @@ function rtlFilePut _
 		exit function
 	end if
 
+	fbSemanticModelFileTransfer( proc, semantic_input, "put", FALSE )
 	if( isfunc = FALSE ) then
 		astAdd( rtlErrorCheck( proc ) )
 	end if
@@ -1669,6 +1672,7 @@ function rtlFilePutArray _
 	const FILEPUTARRAY_VALUE_PARAMETER = 3
 
 	function = NULL
+	dim as longint semantic_input = fbSemanticModelFileTransferInput(src)
 
 	if( offset = NULL ) then
 		offset = astNewCONSTi( 0 )
@@ -1709,6 +1713,7 @@ function rtlFilePutArray _
 		exit function
 	end if
 
+	fbSemanticModelFileTransfer( proc, semantic_input, "put", TRUE )
 	if( isfunc = FALSE ) then
 		astAdd( rtlErrorCheck( proc ) )
 	end if
@@ -1734,6 +1739,7 @@ function rtlFileGet _
 	const FILEGET_VALUE_PARAMETER = 3
 
 	function = NULL
+	dim as longint semantic_input = fbSemanticModelFileTransferInput(dst)
 
 	''
 	dtype = astGetDataType( dst )
@@ -1848,6 +1854,7 @@ function rtlFileGet _
 		end if
 	end if
 
+	fbSemanticModelFileTransfer( proc, semantic_input, "get", FALSE )
 	proc = rtlUStrFinishWrite( before, proc, after )
 	if( isfunc = FALSE ) then
 		astAdd( rtlErrorCheck( proc ) )
@@ -1872,6 +1879,7 @@ function rtlFileGetArray _
 	const FILEGETARRAY_VALUE_PARAMETER = 3
 
 	function = NULL
+	dim as longint semantic_input = fbSemanticModelFileTransferInput(dst)
 
 	if( offset = NULL ) then
 		offset = astNewCONSTi( 0 )
@@ -1929,6 +1937,7 @@ function rtlFileGetArray _
 		end if
 	end if
 
+	fbSemanticModelFileTransfer( proc, semantic_input, "get", TRUE )
 	if( isfunc = FALSE ) then
 		astAdd( rtlErrorCheck( proc ) )
 	end if

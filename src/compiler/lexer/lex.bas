@@ -1308,6 +1308,7 @@ private sub hReadFloatNumber _
 		t.dtype = FB_DATATYPE_SINGLE
 
 		if( (flags and (LEXCHECK_NOSUFFIX or LEXCHECK_NOLETTERSUFFIX)) = 0 ) then
+			t.numeric_suffix = chr(lexCurrentChar( ))
 			lexEatChar( )
 		end if
 
@@ -1496,6 +1497,7 @@ private sub hReadNumber( byref t as FBTOKEN, byval flags as LEXCHECK )
 	*pnum = 0
 	t.len = 0
 	t.hassuffix = false
+	t.numeric_suffix = ""
 
 	select case as const lexCurrentChar( )
 	'' integer part
@@ -1547,6 +1549,7 @@ private sub hReadNumber( byref t as FBTOKEN, byval flags as LEXCHECK )
 				select case lexCurrentChar( )
 				case CHAR_UUPP, CHAR_ULOW
 					t.hassuffix = TRUE
+					t.numeric_suffix = chr(lexCurrentChar( ))
 					lexEatChar( )
 					t.dtype = typeToUnsigned( t.dtype )
 					have_u_suffix = TRUE
@@ -1558,10 +1561,12 @@ private sub hReadNumber( byref t as FBTOKEN, byval flags as LEXCHECK )
 			case CHAR_LUPP, CHAR_LLOW
 				if( (flags and LEXCHECK_NOLETTERSUFFIX) = 0 ) then
 					t.hassuffix = TRUE
+					t.numeric_suffix += chr(lexCurrentChar( ))
 					lexEatChar( )
 					'' 'LL'?
 					var c = lexCurrentChar( )
 					if( (c = CHAR_LUPP) or (c = CHAR_LLOW) ) then
+						t.numeric_suffix += chr(c)
 						lexEatChar( )
 						'' 'ULL' or 'LL'
 						t.dtype = iif( have_u_suffix, FB_DATATYPE_ULONGINT, FB_DATATYPE_LONGINT )
@@ -1586,6 +1591,7 @@ private sub hReadNumber( byref t as FBTOKEN, byval flags as LEXCHECK )
 					if( have_u_suffix = FALSE ) then
 						t.dtype = FB_DATATYPE_SINGLE
 						t.hassuffix = TRUE
+						t.numeric_suffix = chr(lexCurrentChar( ))
 						lexEatChar( )
 					end if
 				end if
@@ -1597,6 +1603,7 @@ private sub hReadNumber( byref t as FBTOKEN, byval flags as LEXCHECK )
 					if( have_u_suffix = FALSE ) then
 						t.dtype = FB_DATATYPE_DOUBLE
 						t.hassuffix = TRUE
+						t.numeric_suffix = chr(lexCurrentChar( ))
 						lexEatChar( )
 					end if
 				end if
@@ -2765,7 +2772,9 @@ sub lexSkipToken( byval flags as LEXCHECK )
 	'' so only the tokens seen by the parser are written.
 	'' (some cases like #inclib are given special treatment in the PP)
 	if( env.ppfile_num > 0 ) then
-		if( lex.ctx->reclevel = 0 ) then
+		'' Detached parser probes are speculative; their restored tokens are
+		'' emitted by the active context after the probe completes.
+		if( (lex.ctx->reclevel = 0) and (lex.ctx->semantic_probe = FALSE) ) then
 			lexPPOnlyEmitToken( )
 		end if
 	end if

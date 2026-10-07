@@ -119,6 +119,10 @@ declare function hUnescapeW _
 		byref textlen as integer = 0 _
 	) as wstring ptr
 
+'' Decode one internally escaped literal character and advance its cursor.
+declare function hReadWstrChar _
+	( byref src as wstring ptr, byval src_end as const wstring ptr ) as uinteger
+
 declare function hGetTargetWstrLength _
 	( _
 		byval text as wstring ptr _

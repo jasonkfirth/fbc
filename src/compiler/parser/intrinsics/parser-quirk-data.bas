@@ -27,6 +27,7 @@
 #include once "parser/parser.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-hooks.bi"
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -89,6 +90,9 @@ function cDataStmt  _
 				errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
 				hSkipUntil( CHAR_COMMA )
 			else
+				'' READ's destination is a language-level write even though
+				'' the runtime receives its address as a BYREF argument.
+				fbSemanticModelSetAccess( expr, "write" )
 				if( rtlDataRead( expr ) = FALSE ) then
 					exit function
 				end if

@@ -93,36 +93,48 @@ private sub fbcInit( )
 	fbc.print = -1
 end sub
 
+private sub hProtectInvocationArtifact( byref filename as const string )
+	fbSemanticModelProtectFile(filename)
+	fbSemanticDiagnosticsProtectFile(filename)
+end sub
+
 sub fbcEnd( byval errnum as integer )
 	'' Inputs and requested artifacts remain protected through final publication.
 	dim as FBCIOFILE ptr module = listGetHead(@fbc.modules)
 	while( module <> NULL )
-		fbSemanticModelProtectFile(module->srcfile)
-		fbSemanticModelProtectFile(module->asmfile)
-		if( module->objfile <> NULL ) then fbSemanticModelProtectFile(*module->objfile)
+		hProtectInvocationArtifact(module->srcfile)
+		hProtectInvocationArtifact(module->asmfile)
+		if( module->objfile <> NULL ) then hProtectInvocationArtifact(*module->objfile)
 		module = listGetNext(module)
 	wend
 	module = listGetHead(@fbc.rcs)
 	while( module <> NULL )
-		fbSemanticModelProtectFile(module->srcfile)
-		if( module->objfile <> NULL ) then fbSemanticModelProtectFile(*module->objfile)
+		hProtectInvocationArtifact(module->srcfile)
+		if( module->objfile <> NULL ) then hProtectInvocationArtifact(*module->objfile)
 		module = listGetNext(module)
 	wend
-	fbSemanticModelProtectFile(fbc.xpm.srcfile)
+	hProtectInvocationArtifact(fbc.xpm.srcfile)
 	dim as string ptr artifact = listGetHead(@fbc.objlist)
 	while( artifact <> NULL )
-		fbSemanticModelProtectFile(*artifact)
+		hProtectInvocationArtifact(*artifact)
 		artifact = listGetNext(artifact)
 	wend
 	artifact = listGetHead(@fbc.libfiles)
 	while( artifact <> NULL )
-		fbSemanticModelProtectFile(*artifact)
+		hProtectInvocationArtifact(*artifact)
 		artifact = listGetNext(artifact)
 	wend
-	fbSemanticModelProtectFile(fbc.outname)
-	fbSemanticModelProtectFile(fbc.mapfile)
+	hProtectInvocationArtifact(fbc.outname)
+	hProtectInvocationArtifact(fbc.mapfile)
+	'' The two requested sidecars must not replace one another.
+	fbSemanticModelProtectFile(fbc.semanticdiagnostics)
+	fbSemanticDiagnosticsProtectFile(fbc.semanticmodel)
 	if( fbSemanticModelEnd( errnum = 0 ) = FALSE ) then
 		print "error: could not write semantic model: "; fbc.semanticmodel
+		errnum = 1
+	end if
+	if( fbSemanticDiagnosticsEnd(errnum = 0) = FALSE ) then
+		print "error: could not write semantic diagnostics: "; fbc.semanticdiagnostics
 		errnum = 1
 	end if
 
@@ -233,6 +245,12 @@ end sub
 				fbc.semanticmodel_bindings, not fbc.semanticmodel_compact ) = FALSE ) then
 				print "error: could not write semantic model: "; fbc.semanticmodel
 				fbcEnd( 1 )
+			end if
+		end if
+		if( len(fbc.semanticdiagnostics) > 0 ) then
+			if( fbSemanticDiagnosticsBegin(fbc.semanticdiagnostics) = FALSE ) then
+				print "error: could not write semantic diagnostics: "; fbc.semanticdiagnostics
+				fbcEnd(1)
 			end if
 		end if
 

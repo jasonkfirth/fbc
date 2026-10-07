@@ -10,6 +10,9 @@
 #include once "lexer/lex.bi"
 
 declare sub fbSemanticModelResetCoordinates( )
+
+declare function fbSemanticModelCoordinateFact _
+	( byref first as LEX_LOCATION, byref last as LEX_LOCATION ) as string
 declare sub fbSemanticModelExportCoordinates _
 	( byref domain as const string, byval subject as longint, byref role as const string, _
 	  byref first as LEX_LOCATION, byref last as LEX_LOCATION )

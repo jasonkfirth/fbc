@@ -11,12 +11,14 @@ function fbSemanticModelTypeFact _
 	  byval subtype as FBSYMBOL ptr, byval storage_bytes as longint, byref role as const string ) as string
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then return ""
 	if( (identity = 0) or (dtype = FB_DATATYPE_INVALID) ) then return ""
-	dim as integer base_dtype = typeGetDtOnly(dtype), pointers = typeGetPtrCnt(dtype)
+	dim as integer base_dtype = typeGetDtOnly(dtype)
+	dim as integer pointers = typeGetPtrCnt(dtype)
 	if( (base_dtype < 0) or (base_dtype >= FB_DATATYPES) ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-types.bas:17")
 		return ""
 	end if
-	dim as string type_name = *symb_dtypeTB(base_dtype).name, qualifiers
+	dim as string type_name = *symb_dtypeTB(base_dtype).name
+	dim as string qualifiers
 	if( base_dtype = FB_DATATYPE_FIXSTR ) then type_name = "fixed-string"
 	'' Position zero describes the current value; each additional position
 	'' follows one dereference. Distinct nominal IDs remain distinct types.

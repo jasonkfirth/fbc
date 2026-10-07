@@ -206,6 +206,18 @@ private function hLenSizeof( byval tk as integer, byval isasm as integer ) as AS
 	dim as integer dtype = any
 	dim as longint lgt = any
 	dim as FBSYMBOL ptr subtype = any
+	dim as integer semantic_enabled = fbSemanticModelEnabled( ) and (isasm = FALSE)
+	dim as LEX_LOCATION semantic_start, semantic_end
+	dim as longint semantic_nonphysical_start = 0, semantic_nonphysical_end = 0
+	dim as integer semantic_dtype = 0, semantic_has_close = FALSE
+	dim as FBSYMBOL ptr semantic_subtype = NULL
+	dim as longint semantic_operand = 0
+	dim as string semantic_input = "type"
+	dim as string semantic_kind = iif(tk = FB_TK_LEN, "len", "sizeof")
+	if( semantic_enabled ) then
+		semantic_start = lexGetCurrentLocation( )
+		semantic_nonphysical_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	'' LEN | SIZEOF
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -245,6 +257,19 @@ private function hLenSizeof( byval tk as integer, byval isasm as integer ) as AS
 		end if
 	end if
 
+	if( semantic_enabled ) then
+		if( expr <> NULL ) then
+			semantic_dtype = astGetFullType(expr)
+			semantic_subtype = astGetSubtype(expr)
+			semantic_operand = expr->semantic_expression
+			semantic_input = iif(astIsNIDXARRAY(expr), "array", "expression")
+		else
+			semantic_dtype = dtype
+			semantic_subtype = subtype
+		end if
+		semantic_has_close = (lexGetToken( ) = CHAR_RPRNT)
+	end if
+
 	'' ')'
 	if( lexGetToken( ) <> CHAR_RPRNT ) then
 		errReport( FB_ERRMSG_EXPECTEDRPRNT )
@@ -273,6 +298,14 @@ private function hLenSizeof( byval tk as integer, byval isasm as integer ) as AS
 		end if
 	else
 		expr = astNewCONSTi( lgt )
+	end if
+	if( semantic_enabled andalso semantic_has_close andalso (expr <> NULL) ) then
+		semantic_end = lexGetLastLocation( )
+		semantic_nonphysical_end = lexGetNonphysicalTokenCount( )
+		fbSemanticModelExportExpression(expr, semantic_start, semantic_end, _
+			semantic_nonphysical_start, semantic_nonphysical_end, -1)
+		fbSemanticModelSizeQuery(expr->semantic_expression, semantic_dtype, semantic_subtype, _
+			semantic_operand, semantic_kind, semantic_input)
 	end if
 
 	function = expr

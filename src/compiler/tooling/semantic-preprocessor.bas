@@ -44,13 +44,13 @@ end function
 private function hGrowConditions( ) as integer
 	if( semantic_pp_depth < semantic_pp_capacity ) then return TRUE
 	if( semantic_pp_depth >= SEMANTIC_PP_MAX_CONDITIONAL_DEPTH ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-preprocessor.bas:47")
 		return FALSE
 	end if
 	dim as integer capacity = iif(semantic_pp_capacity = 0, 64, semantic_pp_capacity * 2)
 	dim as SEMANTIC_PP_CONDITIONAL ptr storage = reallocate(semantic_pp_conditions, capacity * sizeof(SEMANTIC_PP_CONDITIONAL))
 	if( storage = NULL ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-preprocessor.bas:53")
 		return FALSE
 	end if
 	semantic_pp_conditions = storage
@@ -94,7 +94,7 @@ function fbSemanticModelPPBranch _
 			.ordinal = 0
 		end with
 	elseif( semantic_pp_depth = 0 ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-preprocessor.bas:97")
 		return 0
 	else
 		semantic_pp_conditions[semantic_pp_depth - 1].ordinal += 1

@@ -23,6 +23,7 @@
 
 #include "../gfx3_screenlist_internal.h"
 
+#if !defined(DISABLE_X11)
 #include <dlfcn.h>
 #include <X11/Xlib.h>
 
@@ -146,5 +147,22 @@ cleanup:
 		dlclose(library);
 	return status;
 }
+#else
+
+/*
+	A framebuffer or DRM build has no X11 screen modes to enumerate. Keep the
+	public API's unsupported result while avoiding an X11 runtime dependency.
+*/
+int fb_gfx3_platform_screenlist_modes(int depth, int **modes,
+	size_t *mode_count)
+{
+	(void)depth;
+	if (modes != NULL)
+		*modes = NULL;
+	if (mode_count != NULL)
+		*mode_count = 0;
+	return FB_GFX3_UNSUPPORTED;
+}
+#endif
 
 /* end of linux/gfx3_screenlist.c */

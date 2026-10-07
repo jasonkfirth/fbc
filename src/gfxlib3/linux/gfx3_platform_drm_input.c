@@ -169,6 +169,28 @@ static ssize_t drm_input_button(unsigned int code)
 	}
 }
 
+static int drm_input_has_gamepad_buttons(const unsigned long *key_bits,
+	size_t bit_count)
+{
+	static const unsigned int button_code[] = {
+		BTN_SOUTH, BTN_EAST, BTN_WEST, BTN_NORTH,
+		BTN_TL, BTN_TR, BTN_THUMBL, BTN_THUMBR,
+		BTN_START, BTN_SELECT, BTN_MODE, BTN_TL2, BTN_TR2,
+		BTN_TRIGGER_HAPPY1, BTN_TRIGGER_HAPPY2,
+		BTN_TRIGGER_HAPPY3, BTN_TRIGGER_HAPPY4,
+		BTN_DPAD_UP, BTN_DPAD_RIGHT, BTN_DPAD_DOWN, BTN_DPAD_LEFT
+	};
+	size_t index;
+
+	/* Some handhelds publish their controls as EV_KEY without any EV_ABS axes. */
+	for (index = 0u; index < sizeof(button_code) / sizeof(button_code[0]);
+	    index++) {
+		if (drm_input_test_bit(button_code[index], key_bits, bit_count))
+			return TRUE;
+	}
+	return FALSE;
+}
+
 static ssize_t drm_input_dpad(unsigned int code)
 {
 	switch (code) {
@@ -315,7 +337,7 @@ static void drm_input_dispatch(FB_GFX3_DRM_INPUT_ADAPTER *adapter,
 {
 	if (device->keyboard)
 		drm_input_keyboard_event(adapter, device, event);
-	else if (device->gamepad)
+	if (device->gamepad)
 		drm_input_gamepad_event(adapter, device, event);
 }
 
@@ -385,14 +407,16 @@ static void drm_input_open_devices(FB_GFX3_DRM_INPUT_ADAPTER *adapter)
 				sizeof(key_bits) / sizeof(key_bits[0])) &&
 			drm_input_test_bit(KEY_ENTER, key_bits,
 				sizeof(key_bits) / sizeof(key_bits[0]));
-		gamepad = drm_input_test_bit(EV_ABS, event_bits,
+		gamepad = drm_input_test_bit(EV_KEY, event_bits,
 			sizeof(event_bits) / sizeof(event_bits[0])) &&
-			(drm_input_test_bit(ABS_X, absolute_bits,
+			(drm_input_has_gamepad_buttons(key_bits,
+				sizeof(key_bits) / sizeof(key_bits[0])) ||
+			 (drm_input_test_bit(EV_ABS, event_bits,
+				sizeof(event_bits) / sizeof(event_bits[0])) &&
+			  (drm_input_test_bit(ABS_X, absolute_bits,
 				sizeof(absolute_bits) / sizeof(absolute_bits[0])) ||
-			 drm_input_test_bit(ABS_HAT0X, absolute_bits,
-				sizeof(absolute_bits) / sizeof(absolute_bits[0]))) &&
-			drm_input_test_bit(EV_KEY, event_bits,
-				sizeof(event_bits) / sizeof(event_bits[0]));
+			   drm_input_test_bit(ABS_HAT0X, absolute_bits,
+				sizeof(absolute_bits) / sizeof(absolute_bits[0])))));
 		if (!keyboard && !gamepad) {
 			close(descriptor);
 			continue;
@@ -407,7 +431,7 @@ static void drm_input_open_devices(FB_GFX3_DRM_INPUT_ADAPTER *adapter)
 		device->descriptor = descriptor;
 		device->device_id = (int)device_minor;
 		device->keyboard = keyboard;
-		device->gamepad = gamepad && !keyboard;
+		device->gamepad = gamepad;
 		if (device->gamepad) {
 			for (word = 0; word < sizeof(absolute_bits) /
 			    sizeof(absolute_bits[0]); word++) {

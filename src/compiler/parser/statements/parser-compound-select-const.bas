@@ -26,6 +26,7 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "runtime/rtl.bi"
+#include once "tooling/semantic-constructs.bi"
 
 const FB_MAXJUMPTBSLOTS = 8192
 
@@ -99,6 +100,7 @@ sub cSelConstStmtBegin()
 	end if
 
 	'' keep track of original data type
+	dim as longint semantic_expression = expr->semantic_expression
 	dtype = astGetDataType( expr )
 
 	if( dtype <> FB_DATATYPE_UINT ) then
@@ -156,6 +158,7 @@ sub cSelConstStmtBegin()
 	stk->select.const_.bias = 0
 	stk->select.cmplabel = cl
 	stk->select.endlabel = el
+	fbSemanticModelSelectInput(stk->semantic_identity, semantic_expression, sym, TRUE)
 	stk->select.outerscopenode = outerscopenode
 end sub
 
@@ -227,6 +230,7 @@ sub cSelConstStmtNext( byval stk as FB_CMPSTMTSTK ptr )
 		stk->scopenode = astScopeBegin( )
 
 		stk->select.casecnt = -1
+		fbSemanticModelSelectClause(stk->semantic_identity, TRUE, 0)
 
 		return
 	end if
@@ -236,10 +240,15 @@ sub cSelConstStmtNext( byval stk as FB_CMPSTMTSTK ptr )
 
 	'' add label
 	var label = symbAddLabel( NULL, FB_SYMBOPT_NONE )
+	dim as integer semantic_alternatives = 0
 
 	do
 		'' ConstExpression{int}
-		dim as ulongint value = cConstIntExprRanged( cExpression( ), stk->select.const_.dtype )
+		dim as ASTNODE ptr first_input = cExpression( )
+		dim as longint first_expression = 0, last_expression = 0
+		if( first_input <> NULL ) then first_expression = first_input->semantic_expression
+		dim as ulongint value = cConstIntExprRanged( first_input, stk->select.const_.dtype )
+		dim as string semantic_kind = "value"
 
 		'' first case?
 		if( swtbase = ctx.base ) then
@@ -266,7 +275,10 @@ sub cSelConstStmtNext( byval stk as FB_CMPSTMTSTK ptr )
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 			'' ConstExpression{int}
-			tovalue = cConstIntExprRanged( cExpression( ), stk->select.const_.dtype )
+			dim as ASTNODE ptr last_input = cExpression( )
+			if( last_input <> NULL ) then last_expression = last_input->semantic_expression
+			semantic_kind = "range"
+			tovalue = cConstIntExprRanged( last_input, stk->select.const_.dtype )
 			tovalue -= stk->select.const_.bias
 
 			if( tovalue < value ) then
@@ -277,6 +289,10 @@ sub cSelConstStmtNext( byval stk as FB_CMPSTMTSTK ptr )
 		else
 			tovalue = value
 		end if
+
+		semantic_alternatives += 1
+		fbSemanticModelSelectAlternative(stk->semantic_identity, semantic_alternatives, semantic_kind, AST_OP_EQ, _
+			first_expression, last_expression, lexGetToken( ) <> CHAR_COMMA)
 
 		'' not possible to fit case value range in the jump table?
 		if( (tovalue - value + 1) > (FB_MAXJUMPTBSLOTS - ctx.base) ) then
@@ -314,6 +330,7 @@ sub cSelConstStmtNext( byval stk as FB_CMPSTMTSTK ptr )
 		loop
 
 	loop while( hMatch( CHAR_COMMA ) )
+	fbSemanticModelSelectClause(stk->semantic_identity, FALSE, semantic_alternatives)
 
 	''
 	astAdd( astNewLABEL( label ) )

@@ -28,6 +28,8 @@
 #include once "parser/parser.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-expressions.bi"
 
 '' EraseStmt = ERASE ID (',' ID)*
 function cEraseStmt() as integer
@@ -102,6 +104,10 @@ private function hScopedSwap( ) as integer
 	if( astIsConstant( r ) ) then
 		errReport( FB_ERRMSG_CONSTANTCANTBECHANGED, TRUE )
 	end if
+	'' SWAP consumes both source values and replaces both targets. Observe
+	'' the original lvalues before string/runtime or temporary lowering.
+	fbSemanticModelSetAccess( l, "read-write" )
+	fbSemanticModelSetAccess( r, "read-write" )
 
 	dim as integer ldtype = astGetDataType( l )
 	dim as integer rdtype = astGetDataType( r )
@@ -272,12 +278,17 @@ end function
 function cArrayFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 	dim as ASTNODE ptr arrayexpr = any, dimexpr = any
 	dim as FBSYMBOL ptr s = any
+	dim as LEX_LOCATION dimension_start = any, dimension_end = any
+	dim as longint dimension_nonphysical_start = 0, dimension_nonphysical_end = 0
+	dim as integer dimension_is_explicit = FALSE
 
 	function = NULL
 
 	select case tk
 	'' (LBOUND|UBOUND) '(' ID (',' Expression)? ')'
 	case FB_TK_LBOUND, FB_TK_UBOUND
+		dim as LEX_LOCATION source_start = lexGetCurrentLocation( )
+		dim as longint nonphysical_start = lexGetNonphysicalTokenCount( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		'' '('
@@ -309,7 +320,12 @@ function cArrayFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 
 		'' (',' Expression)?
 		if( hMatch( CHAR_COMMA ) ) then
+			dimension_is_explicit = TRUE
+			dimension_start = lexGetCurrentLocation( )
+			dimension_nonphysical_start = lexGetNonphysicalTokenCount( )
 			hMatchExpressionEx( dimexpr, FB_DATATYPE_INTEGER )
+			dimension_end = lexGetLastLocation( )
+			dimension_nonphysical_end = lexGetNonphysicalTokenCount( )
 		else
 			dimexpr = astNewCONSTi( 1 )
 		end if
@@ -317,7 +333,16 @@ function cArrayFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		'' ')'
 		hMatchRPRNT( )
 
-		function = astBuildArrayBound( arrayexpr, dimexpr, tk )
+		dim as longint original_dimension = 0
+		if( dimension_is_explicit ) then
+			original_dimension = fbSemanticModelOriginalExpression _
+				(dimexpr, dimension_start, dimension_nonphysical_start, _
+				 dimension_end, dimension_nonphysical_end)
+		end if
+		dim as longint selected_dimension
+		dim as ASTNODE ptr result = astBuildArrayBound( arrayexpr, dimexpr, tk, @selected_dimension )
+		fbSemanticModelArrayBound(result, s, tk, original_dimension, selected_dimension, source_start, nonphysical_start)
+		function = result
 	end select
 end function
 

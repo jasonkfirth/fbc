@@ -28,6 +28,7 @@
 #include once "ast/ast.bi"
 #include once "lexer/lex.bi"
 #include once "runtime/rtl.bi"
+#include once "tooling/semantic-expressions.bi"
 
 ''
 '' vars
@@ -1068,7 +1069,8 @@ function astBuildArrayBound _
 	( _
 		byval arrayexpr as ASTNODE ptr, _
 		byval dimexpr as ASTNODE ptr, _
-		byval tk as integer _
+		byval tk as integer, _
+		byval selected_dimension as longint ptr _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = any
@@ -1079,6 +1081,12 @@ function astBuildArrayBound _
 	errPushParamLocation( NULL, tk, 2, "dimension" )
 	dimexpr = astNewCONV( FB_DATATYPE_INTEGER, NULL, dimexpr )
 	errPopParamLocation( )
+	'' hConstBound consumes its inputs. Observe the converted dimension first;
+	'' the optional output retains an immutable identity, never an AST pointer.
+	if( selected_dimension <> NULL ) then
+		dim as LEX_LOCATION dimension_source = lexGetLastLocation( )
+		*selected_dimension = fbSemanticModelSelectedArrayIndex(dimexpr, dimension_source, lexGetNonphysicalTokenCount( ))
+	end if
 
 	'' Try to evaluate l/ubound( array, dimension ) at compile-time
 	expr = hConstBound( arrayexpr, dimexpr, (tk = FB_TK_LBOUND) )

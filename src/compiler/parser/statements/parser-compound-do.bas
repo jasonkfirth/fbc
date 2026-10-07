@@ -25,6 +25,7 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-hooks.bi"
 
 '' DoStmtBegin  =  DO ((WHILE | UNTIL) Expression)? .
 sub cDoStmtBegin( )
@@ -67,6 +68,7 @@ sub cDoStmtBegin( )
 		end if
 
 		'' branch
+		fbSemanticModelLoopCondition( expr, iif(iswhile, "do-while", "do-until") )
 		expr = astBuildBranch( expr, el, (not iswhile), FALSE, @semantic_source_range )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_INVALIDDATATYPES )
@@ -79,6 +81,7 @@ sub cDoStmtBegin( )
 
 	else
 		expr = NULL
+		fbSemanticModelLoopCondition( NULL, "do" )
 		cl = symbAddLabel( NULL, FB_SYMBOPT_NONE )
 	end if
 
@@ -145,6 +148,7 @@ sub cDoStmtEnd( )
 		end if
 
 		'' branch
+		fbSemanticModelLoopCondition( expr, iif(iswhile, "loop-while", "loop-until") )
 		expr = astBuildBranch( expr, stk->do.inilabel, iswhile, FALSE, @semantic_source_range )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_INVALIDDATATYPES )
@@ -155,6 +159,7 @@ sub cDoStmtEnd( )
 		astAdd( expr )
 	else
 		'' top check
+		fbSemanticModelLoopCondition( NULL, "loop" )
 		astAdd( astNewBRANCH( AST_OP_JMP, stk->do.inilabel ) )
 	end if
 

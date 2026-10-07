@@ -46,7 +46,7 @@ sub fbSemanticModelResetSources( )
 	'' Every live stream must be observed before the compiler closes it. The
 	'' reset does not dereference an old FILE* after a failed parse or restart.
 	for depth as integer = 0 to FB_MAXINCRECLEVEL
-		if( semantic_source_revisions(depth) <> NULL ) then fbSemanticModelFail( )
+		if( semantic_source_revisions(depth) <> NULL ) then fbSemanticModelFailAt("semantic-source.bas:49")
 		semantic_source_ids(depth) = 0
 	next
 end sub
@@ -71,7 +71,7 @@ sub fbSemanticModelOpenSource(byref filename as const string, byval depth as int
 	byref kind as const string, byref requested as const string, byval directive as LEX_LOCATION ptr)
 	if( fbSemanticModelEnabled( ) = FALSE ) then exit sub
 	if( (depth < 0) or (depth > FB_MAXINCRECLEVEL) or (semantic_source_revisions(depth) <> NULL) ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-source.bas:74")
 		exit sub
 	end if
 	dim as zstring * 65 digest
@@ -80,7 +80,7 @@ sub fbSemanticModelOpenSource(byref filename as const string, byval depth as int
 	dim as any ptr stream = cptr(any ptr, fileattr(env.inf.num, 2))
 	semantic_source_revisions(depth) = fbSemanticSourceOpen(stream, @digest, @bytes, @status)
 	if( semantic_source_revisions(depth) = NULL ) then
-		fbSemanticModelFail( )
+		fbSemanticModelFailAt("semantic-source.bas:83")
 		exit sub
 	end if
 	dim as longint fileid = fbSemanticModelNextDetailIdentity( )
@@ -112,7 +112,7 @@ sub fbSemanticModelCloseSource(byval depth as integer)
 		TABCHAR + iif(status = 1, "verified", iif(status = 2, "unverified-stream", "changed-or-unreadable")))
 	semantic_source_ids(depth) = 0
 	semantic_source_handles(depth) = 0
-	if( status = 0 ) then fbSemanticModelFail( )
+	if( status = 0 ) then fbSemanticModelFailAt("semantic-source.bas:115")
 end sub
 
 sub fbSemanticModelIncludeOutcome(byref requested as const string, byref resolved as const string, _

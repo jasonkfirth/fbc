@@ -46,8 +46,13 @@ declare function hParamDecl _
 	( _
 		byval proc as FBSYMBOL ptr, _
 		byval procmode as integer, _
-		byval isproto as integer _
+		byval isproto as integer, _
+		byref formal_first as LEX_LOCATION, _
+		byref declaration_occurrence as longint _
 	) as FBSYMBOL ptr
+
+declare sub fbSemanticModelParameterModes(byval param as FBSYMBOL ptr, byval occurrence as longint, _
+	byval accepted_mode as integer, byval written_mode as integer, byval isproto as integer, byval expansion as longint)
 
 declare function hParamDeclInstPtr _
 	( _
@@ -91,10 +96,21 @@ sub cParameters _
 	end if
 
 	do
-		dim as FBSYMBOL ptr param = hParamDecl(proc, procmode, isproto)
+		'' Bracket the actual parameter grammar, not the complete list. Default
+		'' expressions and nested callback types can consume their own commas.
+		'' The implicit instance parameter above has no written formal span.
+		dim as LEX_LOCATION formal_first = lexGetCurrentLocation( )
+		dim as longint formal_nonphysical = lexGetNonphysicalTokenCount( )
+		dim as longint declaration_occurrence = 0
+		dim as FBSYMBOL ptr param = hParamDecl(proc, procmode, isproto, formal_first, declaration_occurrence)
 		if( param = NULL ) then
 			exit do
 		end if
+		dim as LEX_LOCATION formal_last = lexGetLastLocation( )
+		dim as integer formal_physical = formal_first.is_physical and formal_last.is_physical and _
+			(formal_first.source_context = formal_last.source_context) and _
+			(formal_nonphysical = lexGetNonphysicalTokenCount( ))
+		fbSemanticModelExportParameterRange(param, declaration_occurrence, formal_first, formal_last, formal_physical)
 
 		length += symbGetSizeOf( param )
 
@@ -254,7 +270,9 @@ private function hParamDecl _
 	( _
 		byval proc as FBSYMBOL ptr, _
 		byval proc_mode as integer, _
-		byval isproto as integer _
+		byval isproto as integer, _
+		byref formal_first as LEX_LOCATION, _
+		byref declaration_occurrence as longint _
 	) as FBSYMBOL ptr
 
 	static as zstring * FB_MAXNAMELEN+1 idTB(0 to FB_MAXARGRECLEVEL-1)
@@ -264,13 +282,17 @@ private function hParamDecl _
 	dim as integer dtype = any, mode = any, attrib = any, dimensions = any
 	dim as integer readid = any, dotpos = any, doskip = any
 	dim as integer use_default = any, have_bounds = any
+	dim as integer written_mode = 0
 	dim as FBSYMBOL ptr subtype = any, param = any
-	dim as LEX_LOCATION semantic_site = any
+	'' Unnamed prototype parameters never capture a name token. Their origin
+	'' must remain zero instead of publishing uninitialized macro identities.
+	dim as LEX_LOCATION semantic_site
 
 	'' unused, so overwriting during recursion doesn't matter
 	static as ASTNODE ptr exprTB(0 to FB_MAXARRAYDIMS-1, 0 to 1)
 
 	function = NULL
+	declaration_occurrence = 0
 
 	attrib = 0
 	semantic_site.start_line = 0
@@ -302,8 +324,12 @@ private function hParamDecl _
 				return hMockParam( proc, FB_PARAMMODE_VARARG )
 			end if
 
-			return symbAddProcParam( proc, NULL, FB_DATATYPE_INVALID, NULL, _
+			param = symbAddProcParam( proc, NULL, FB_DATATYPE_INVALID, NULL, _
 			                         0, FB_PARAMMODE_VARARG, 0, 0 )
+			declaration_occurrence = fbSemanticModelExportParameterDeclaration(param, formal_first, formal_first, _
+				iif(isproto, "parameter-prototype", "parameter-definition"), "")
+			fbSemanticModelParameterModes(param, declaration_occurrence, FB_PARAMMODE_VARARG, 0, isproto, formal_first.macro_identity)
+			return param
 
 		'' syntax error..
 		else
@@ -316,6 +342,9 @@ private function hParamDecl _
 
 	'' (BYVAL|BYREF)?
 	mode = hParseParamMode( )
+	'' Keep the written choice before type-dependent defaults or descriptors
+	'' replace it. This local also survives recursive callback-type parsing.
+	written_mode = iif(mode = INVALID, 0, mode)
 
 	'' Check whether a param ID was given or not
 	'' In prototypes they can be omitted, and in fact we even allow
@@ -532,9 +561,11 @@ private function hParamDecl _
 	end if
 	fbSemanticModelExportBinding(param, semantic_site, TRUE)
 	fbSemanticModelSetDeclarationName(param, id)
-	if( semantic_site.start_line > 0 ) then
-		fbSemanticModelExportDeclaration(param, semantic_site, iif(isproto, "parameter-prototype", "parameter-definition"), *id)
-	end if
+	'' Keep name publication before optional initializers, as before. The
+	'' caller adds a separate complete span to this exact occurrence afterwards.
+	declaration_occurrence = fbSemanticModelExportParameterDeclaration(param, semantic_site, formal_first, _
+		iif(isproto, "parameter-prototype", "parameter-definition"), *id)
+	fbSemanticModelParameterModes(param, declaration_occurrence, mode, written_mode, isproto, semantic_site.macro_identity)
 
 	if( isproto = FALSE ) then
 		if( symbGetSizeOf( param ) > (env.pointersize * 4) ) then

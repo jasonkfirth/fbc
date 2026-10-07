@@ -58,8 +58,10 @@ def main() -> int:
             print(f"GAS64/{target}: emission passed")
         # RISC OS overrides fbnetwire.bi for its APCS double layout. Compile
         # the shared text suite too, so that override retains Unicode overloads.
+        # Target overrides must precede the generic source-tree headers.
         command = [str(options.fbc.resolve()), "-prefix", str(root), "-r",
                    "-gen", "gcc", "-target", "riscos",
+                   "-i", str(root / "inc/riscos"),
                    "-i", str(root / "inc"), "-i", str(root / "tests/fbcunit/inc"),
                    str(root / "tests/string/text-types.bas"),
                    "-o", str(working / "text-types-riscos.c")]
@@ -151,8 +153,11 @@ def main() -> int:
                 if name.startswith("c-abi"):
                     input_source = working / (backend + "-" + name + ".bas")
                     shutil.copy2(root / source, input_source)
+                # The suite runs from a temporary directory, so resolve sibling
+                # includes from the fixture's source directory explicitly.
                 command = [str(options.fbc.resolve()), "-prefix", str(root),
-                           "-i", str(root / "inc"), "-gen", backend, "-v",
+                           "-i", str(root / "inc"), "-i", str((root / source).parent),
+                           "-gen", backend, "-v",
                            str(input_source), "-x", str(executable)]
                 if system == "darwin" and architecture in ("x86", "x86_64") and name in (
                         "abi", "asm-registers") and backend in ("gcc", "clang"):
@@ -171,7 +176,8 @@ def main() -> int:
                     built = subprocess.run(command, cwd=working, text=True,
                                            capture_output=True, timeout=120, check=False)
                     if built.returncode:
-                        print(f"{backend}/{name}: compilation failed\n{built.stdout}{built.stderr}")
+                        print(f"{backend}/{name}: compilation failed: {command!r}\n"
+                              f"{built.stdout}{built.stderr}")
                         return 1
                     if backend == "llvm" and name.startswith("c-abi"):
                         # byval's alignment applies to the source pointer too.

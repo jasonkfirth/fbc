@@ -27,6 +27,8 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "symbols/symb.bi"
+#include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-diagnostics.bi"
 
 enum FOR_FLAGS
 	FOR_ISUDT           = &h0001
@@ -465,6 +467,7 @@ private sub hForAssign _
 		end if
 
 		'' initial condition is a non-UDT constant?
+		fbSemanticModelScalarForBound( stk->for.cnt.sym, expr, "start" )
 		if( astIsCONST( expr ) and ((flags and FOR_ISUDT) = 0) ) then
 			'' convert the constant to counter's type
 			expr = astNewCONV( dtype, subtype, expr )
@@ -481,6 +484,11 @@ private sub hForAssign _
 		end if
 
 		'' save initial condition into counter
+		'' The written counter occurrence is an initialization target. Unlike
+		'' ordinary LET, FOR creates this assignment directly, so mark the
+		'' source access before lowering consumes the original variable node.
+		'' Generated loop reads do not read the counter's incoming value.
+		fbSemanticModelSetAccess( idexpr, "write" )
 		expr = astNewASSIGN( idexpr, expr )
 		if( expr = NULL ) then
 			if( (flags and FOR_ISUDT) <> 0 ) then
@@ -532,6 +540,7 @@ private sub hForTo _
 		end if
 
 		'' EndCondition is a non-UDT constant?
+		fbSemanticModelScalarForBound( stk->for.cnt.sym, expr, "limit" )
 		if( astIsCONST( expr ) and ((flags and FOR_ISUDT) = 0) ) then
 			expr = astNewCONV( dtype, subtype, expr )
 			if( expr = NULL ) then
@@ -586,6 +595,8 @@ private sub hForStep _
 	'' STEP
 	stk->for.explicit_step = FALSE
 	if( lexGetToken( ) = FB_TK_STEP ) then
+		dim as LEX_LOCATION semantic_step_site = lexGetCurrentLocation( )
+		fbSemanticModelForStepSource( semantic_step_site )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 		stk->for.explicit_step = TRUE
 	end if
@@ -608,6 +619,10 @@ private sub hForStep _
 			expr = astNewCONSTi( 1 )
 		end if
 
+		'' Preserve the accepted step before its signedness and width are
+		'' adapted to the counter. The original AST can be deleted below.
+		fbSemanticModelScalarForStep( stk->for.cnt.sym, expr, stk->for.explicit_step )
+
 		if( (flags and FOR_ISUDT) = 0) then
 			'' keep signed-ness of expr type, so negative steps will work properly
 			if( typeIsSigned( astGetFullType( expr ) ) ) then
@@ -629,6 +644,7 @@ private sub hForStep _
 			end if
 
 			'' get step's positivity: >= 0?
+			fbSemanticModelScalarForStepSelection( stk->for.cnt.sym, expr, dtype )
 			stk->for.ispos.value.i = astConstGeZero( expr )
 
 			'' get constant step
@@ -646,6 +662,7 @@ private sub hForStep _
 			isconst += 1
 		else
 			iscomplex = TRUE
+			fbSemanticModelScalarForStepSelection( stk->for.cnt.sym, NULL, dtype )
 
 			'' make a copy of type info, so we can hack
 			'' the pointer stuff if necessary
@@ -722,6 +739,7 @@ sub cForStmtBegin( )
 
 	'' FOR
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
+	dim as LEX_LOCATION counter_site = lexGetCurrentLocation( )
 
 	'' ID
 	dim as FBSYMCHAIN ptr chain_ = any
@@ -828,6 +846,7 @@ sub cForStmtBegin( )
 	'' extract counter variable from the expression
 	stk->for.cnt.sym = astGetSymbol( idexpr )
 	stk->for.cnt.dtype = dtype
+	fbSemanticModelForCounter( stk->for.cnt.sym, counter_site, (flags and FOR_ISLOCAL) <> 0 )
 
 	dim as integer isconst = 0
 
@@ -1095,6 +1114,7 @@ sub cForStmtEnd( )
 		'' ID
 		dim as FBSYMCHAIN ptr chain_ = any
 		dim as FBSYMBOL ptr base_parent = any
+		fbSemanticDiagnosticsContext("for-next-counter-binding")
 		chain_ = cIdentifier( base_parent, FB_IDOPT_ISDECL or FB_IDOPT_DEFAULT )
 
 		'' look up the variable
@@ -1115,6 +1135,7 @@ sub cForStmtEnd( )
 			'' delete idexpr, we don't need it, for anything
 			astDelTree( idexpr )
 		end if
+		fbSemanticDiagnosticsContext("")
 
 		'' pop from stmt stack
 		cCompStmtPop( stk )

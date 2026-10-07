@@ -1,3 +1,11 @@
+/*
+    FreeBASIC gfxlib2 Haiku backend
+    File: scancodes_x11.c
+    Purpose: Translate native Haiku physical keys to FreeBASIC scancodes.
+    Responsibilities: Keep key positions independent of the selected keymap.
+    This file contains no character translation or event dispatch.
+*/
+
 #ifndef DISABLE_HAIKU
 
 #include <stdint.h>
@@ -75,7 +83,7 @@ static void fb_hInitScancodesInternal(void)
     scancode_table[0x44] = 38;   /* L */
     scancode_table[0x45] = 39;   /* ; */
     scancode_table[0x46] = 40;   /* ' */
-    scancode_table[0x32] = 28;   /* ENTER */
+    scancode_table[0x47] = 28;   /* ENTER; 0x32 is the right bracket */
 
     /* bottom row */
     scancode_table[0x4b] = 42;   /* left shift */
@@ -95,6 +103,20 @@ static void fb_hInitScancodesInternal(void)
     scancode_table[0x5c] = 29;   /* ctrl */
     scancode_table[0x5d] = 56;   /* alt */
     scancode_table[0x5e] = 57;   /* space */
+    scancode_table[0x5f] = 100;  /* right alt */
+    scancode_table[0x60] = 29;   /* right ctrl shares SC_CONTROL */
+    scancode_table[0x66] = 91;   /* left Windows */
+    scancode_table[0x67] = 92;   /* right Windows */
+    scancode_table[0x68] = 93;   /* menu */
+
+    /* Editing cluster and keypad positions from Haiku's native key layout. */
+    scancode_table[0x1f] = 82;   /* insert */
+    scancode_table[0x20] = 71;   /* home */
+    scancode_table[0x21] = 73;   /* page up */
+    scancode_table[0x34] = 83;   /* delete */
+    scancode_table[0x35] = 79;   /* end */
+    scancode_table[0x36] = 81;   /* page down */
+    scancode_table[0x5b] = 28;   /* keypad enter */
 
     /* arrows */
     scancode_table[0x57] = 72;   /* up */
@@ -120,3 +142,5 @@ unsigned char fb_hHaikuTranslateScancode(unsigned char key)
 }
 
 #endif
+
+/* end of scancodes_x11.c */

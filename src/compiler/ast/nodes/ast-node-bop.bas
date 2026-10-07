@@ -30,6 +30,7 @@
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
 #include once "support/numeric/fp-policy.bi"
+#include once "tooling/semantic-expressions.bi"
 
 '':::::
 private function hStrLiteralConcat _
@@ -1659,13 +1660,14 @@ end function
 '':::::
 '' Binary-operator construction keeps coercion and overload decisions together.
 ''
-function astNewBOP _
+private function hNewBOP _
 	( _
 		byval op as integer, _
 		byval l as ASTNODE ptr, _
 		byval r as ASTNODE ptr, _
 		byval ex as FBSYMBOL ptr, _
-		byval options as AST_OPOPT _
+		byval options as AST_OPOPT, _
+		byval semantic_operands as longint _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr n = any
@@ -1848,6 +1850,9 @@ function astNewBOP _
 	end if
 
 	hWarnBopMixedSignedness( op, l, r, ldtype0, rdtype0, ldtype, rdtype )
+	'' Comparisons subsequently replace the result type with INTEGER. Observe
+	'' their numeric operand coercions before that step and constant folding.
+	fbSemanticModelSelectedNumericOperands(semantic_operands, l, r, ldtype, rdtype)
 	hPostCheckBop( op, r, ldtype, rdtype, rdclass, dtype, subtype )
 
 	'' constant folding (won't handle commutation, ie: "1+a+2+3" will become "1+a+5", not "a+6")
@@ -1951,13 +1956,26 @@ function astNewBOP _
 	function = n
 end function
 
-function astNewSelfBOP _
+function astNewBOP _
+	( byval op as integer, byval l as ASTNODE ptr, byval r as ASTNODE ptr, _
+	  byval ex as FBSYMBOL ptr, byval options as AST_OPOPT ) as ASTNODE ptr
+	return hNewBOP(op, l, r, ex, options, 0)
+end function
+
+function astNewBOPWithOperands _
+	( byval op as integer, byval l as ASTNODE ptr, byval r as ASTNODE ptr, _
+	  byval ex as FBSYMBOL ptr, byval options as AST_OPOPT, byval semantic_operands as longint ) as ASTNODE ptr
+	return hNewBOP(op, l, r, ex, options, semantic_operands)
+end function
+
+private function hNewSelfBOP _
 	( _
 		byval op as integer, _
 		byval l as ASTNODE ptr, _
 		byval r as ASTNODE ptr, _
 		byval ex as FBSYMBOL ptr, _
-		byval options as AST_OPOPT _
+		byval options as AST_OPOPT, _
+		byval semantic_operands as longint _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr t = any
@@ -1970,7 +1988,9 @@ function astNewSelfBOP _
 	proc = symbFindSelfBopOvlProc( op, l, r, @err_num )
 	if( proc ) then
 		'' build a proc call
-		return astBuildCall( proc, l, r )
+		dim as ASTNODE ptr result = astBuildCall( proc, l, r )
+		fbSemanticModelCompoundResult(result, semantic_operands)
+		return result
 	end if
 	if( err_num <> FB_ERRMSG_OK ) then
 		return NULL
@@ -1988,14 +2008,19 @@ function astNewSelfBOP _
 	end if
 
 	'' ... = l normalbop r
-	r = astNewBOP( astGetOpSelfVer( op ), astCloneTree( l ), r, ex, options or AST_OPOPT_ALLOCRES )
+	r = astNewBOPWithOperands( astGetOpSelfVer( op ), astCloneTree( l ), r, ex, options or AST_OPOPT_ALLOCRES, semantic_operands )
 	'' astNewBOP() may fail if the two operands aren't compatible (depending on the operation).
 	if( r = NULL ) then
 		astDelTree( t )
 		exit function
 	end if
+	'' The selected arithmetic type is still visible before destination conversion.
+	fbSemanticModelCompoundResult(r, semantic_operands)
 
 	'' l = ...
+	dim as longint semantic_rhs = r->semantic_expression
+	dim as integer semantic_dtype = astGetDataType(l)
+	dim as FBSYMBOL ptr semantic_subtype = astGetSubType(l)
 	l = astNewASSIGN( l, r )
 	'' astNewASSIGN() may fail if the operation result isn't compatible with the lhs.
 	'' This can happen e.g. with the & string concatenation operator, which can take
@@ -2005,9 +2030,24 @@ function astNewSelfBOP _
 		astDelTree( t )
 		exit function
 	end if
+	if( semantic_operands > 0 ) then
+		fbSemanticModelAssignmentTarget(semantic_rhs, semantic_dtype, semantic_subtype, "assignment")
+	end if
 	t = astNewLINK( t, l, AST_LINK_RETURN_NONE )
 
 	function = t
+end function
+
+function astNewSelfBOP _
+	( byval op as integer, byval l as ASTNODE ptr, byval r as ASTNODE ptr, _
+	  byval ex as FBSYMBOL ptr, byval options as AST_OPOPT ) as ASTNODE ptr
+	return hNewSelfBOP(op, l, r, ex, options, 0)
+end function
+
+function astNewSelfBOPWithOperands _
+	( byval op as integer, byval l as ASTNODE ptr, byval r as ASTNODE ptr, _
+	  byval ex as FBSYMBOL ptr, byval options as AST_OPOPT, byval semantic_operands as longint ) as ASTNODE ptr
+	return hNewSelfBOP(op, l, r, ex, options, semantic_operands)
 end function
 
 function astLoadBOP( byval n as ASTNODE ptr ) as IRVREG ptr

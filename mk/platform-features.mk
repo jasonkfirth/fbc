@@ -21,6 +21,7 @@
 #   THREAD_MODEL
 #   ENABLE_DOS_WATT32
 #   ENABLE_DOS_DPMI_YIELD
+#   ENABLE_DOS_GFX_LOW_POWER
 #
 # Graphics policy:
 #   ENABLE_X11
@@ -62,6 +63,11 @@ DOS_THREAD_PROVIDER ?=
 # DJGPP's __dpmi_yield path explicitly.
 DOS_DPMI_YIELD ?=
 
+# Optional DOS graphics timer profile, qualified with DOSBox-X's idle API.
+# A lower PIT wake rate must be paired with a timed foreground wait; simply
+# releasing one host slice can accelerate the application's polling loop.
+DOS_GFX_LOW_POWER ?=
+
 # ---------------------------------------------------------------------------
 # Reset to avoid stale values
 # ---------------------------------------------------------------------------
@@ -86,6 +92,7 @@ DISABLE_TCP    :=
 
 ENABLE_DOS_WATT32 :=
 ENABLE_DOS_DPMI_YIELD :=
+ENABLE_DOS_GFX_LOW_POWER :=
 
 ENABLE_STACK_PROTECTOR :=
 ENABLE_FORTIFY         :=
@@ -333,6 +340,9 @@ ifeq ($(TARGET_OS),dos)
   ifeq ($(DOS_DPMI_YIELD),YesPlease)
     # Host yielding is independent of FreeBASIC's in-process MT archives.
     ENABLE_DOS_DPMI_YIELD := YesPlease
+  endif
+  ifeq ($(DOS_GFX_LOW_POWER),YesPlease)
+    ENABLE_DOS_GFX_LOW_POWER := YesPlease
   endif
 endif
 
@@ -590,6 +600,10 @@ endif
 
 ifdef ENABLE_DOS_DPMI_YIELD
   ALLCFLAGS += -DFB_DOS_DPMI_YIELD
+endif
+
+ifdef ENABLE_DOS_GFX_LOW_POWER
+  ALLCFLAGS += -DFB_DOS_GFX_LOW_POWER
 endif
 
 ###############################

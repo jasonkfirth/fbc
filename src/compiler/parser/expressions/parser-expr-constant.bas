@@ -25,6 +25,7 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-hooks.bi"
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -167,6 +168,8 @@ function cNumLiteral( byval skiptoken as integer ) as ASTNODE ptr
 
 	'' record that it is a suffixed constant
 	expr->val.hassuffix = lexGetLiteralHasSuffix()
+	fbSemanticModelNumericLiteral(lex.ctx->head)
+	fbSemanticModelNumericLiteralExpression(expr, lex.ctx->head)
 
 	if( skiptoken ) then
 		lexSkipToken( )

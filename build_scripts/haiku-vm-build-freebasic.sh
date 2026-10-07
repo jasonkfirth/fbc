@@ -1845,6 +1845,37 @@ run_gfx_smoke /Work/smoke/gfx-truecolor.out /Work/smoke/gfx-truecolor.err /Work/
 echo "==> running gfxlib SCREEN mode smoke"
 run_gfx_smoke /Work/smoke/gfx-screen-modes.out /Work/smoke/gfx-screen-modes.err /Work/smoke/gfx-screen-modes
 
+echo "==> compiling native gfxlib resize smoke helper"
+run g++ -c /Work/fbctests-source/tests/gfx3/haiku-resize-client.cpp -o /Work/smoke/haiku-resize-client.o
+
+for resize_threads in single mt; do
+	resize_flags=""
+	[ "$resize_threads" != mt ] || resize_flags="-mt"
+	run fbc_command $resize_flags /Work/fbctests-source/tests/gfx3/resizable-screen-haiku-smoke.bas /Work/smoke/haiku-resize-client.o -x "/Work/smoke/gfx-resize-$resize_threads"
+	for resize_depth in 8 16 32; do
+		echo "==> running native gfxlib resize smoke ($resize_threads, $resize_depth-bit)"
+		run_gfx_smoke "/Work/smoke/gfx-resize-$resize_threads-$resize_depth.out" "/Work/smoke/gfx-resize-$resize_threads-$resize_depth.err" "/Work/smoke/gfx-resize-$resize_threads" "$resize_depth"
+	done
+done
+
+echo "==> compiling native gfxlib input smoke helper"
+run g++ -c /Work/fbctests-source/tests/gfx3/haiku-input-client.cpp -o /Work/smoke/haiku-input-client.o
+for input_threads in single mt; do
+	input_flags=""
+	[ "$input_threads" != mt ] || input_flags="-mt"
+	run fbc_command $input_flags /Work/fbctests-source/tests/gfx3/input-events-haiku-smoke.bas /Work/smoke/haiku-input-client.o -x "/Work/smoke/gfx-input-$input_threads"
+	run_gfx_smoke "/Work/smoke/gfx-input-$input_threads.out" "/Work/smoke/gfx-input-$input_threads.err" "/Work/smoke/gfx-input-$input_threads"
+done
+
+echo "==> compiling native gfxlib mode smoke helper"
+run g++ -c /Work/fbctests-source/tests/gfx3/haiku-mode-client.cpp -o /Work/smoke/haiku-mode-client.o
+for mode_threads in single mt; do
+	mode_flags=""
+	[ "$mode_threads" != mt ] || mode_flags="-mt"
+	run fbc_command $mode_flags /Work/fbctests-source/tests/gfx3/window-modes-haiku-smoke.bas /Work/smoke/haiku-mode-client.o /Work/smoke/haiku-resize-client.o -x "/Work/smoke/gfx-modes-$mode_threads"
+	run_gfx_smoke "/Work/smoke/gfx-modes-$mode_threads.out" "/Work/smoke/gfx-modes-$mode_threads.err" "/Work/smoke/gfx-modes-$mode_threads"
+done
+
 echo "==> compiling sfxlib smoke"
 run fbc_command /Work/smoke/sfx.bas -x /Work/smoke/sfx
 

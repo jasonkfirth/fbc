@@ -36,7 +36,9 @@ def source_graph(root: Path, host: str) -> dict[str, list[str]]:
         if result.returncode:
             raise ValueError(result.stderr.strip())
         return {
-            key: value.split()
+            # GNU make can return mixed separators on a native Windows host.
+            # Compare path identities in the same form as compiler_files().
+            key: [str(Path(item)) for item in value.split()] if key in ("SOURCES", "HEADERS") else value.split()
             for key, value in (line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
         }
 
@@ -150,7 +152,8 @@ def validate(root: Path) -> tuple[int, int]:
             if matching != [str(path)]:
                 failures.append(host + ": host replacement not selected: " + path.name)
         for source in sources:
-            if "/platform/" in source and not source.startswith(str(compiler / "platform" / host) + "/"):
+            source_path = Path(source)
+            if "platform" in source_path.relative_to(compiler).parts and source_path.parent != compiler / "platform" / host:
                 failures.append(host + ": selected policy from another host: " + source)
     for path in files:
         selected = selected_sources if path.suffix == ".bas" else selected_headers
