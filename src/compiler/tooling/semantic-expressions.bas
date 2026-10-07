@@ -13,6 +13,9 @@
 
 declare sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
 declare sub fbSemanticModelExportCurrentExpressionPrefixNonPhysical(byval expr as ASTNODE ptr)
+declare sub fbSemanticModelExportExpressionDistinct _
+	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, byref source_end as LEX_LOCATION, _
+	  byval nonphysical_tokens_at_start as longint, byval nonphysical_tokens_at_end as longint )
 declare sub fbSemanticModelExportExpression _
 	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, byref source_end as LEX_LOCATION, _
 	  byval nonphysical_tokens_at_start as longint, byval nonphysical_tokens_at_end as longint, _
@@ -825,7 +828,9 @@ sub fbSemanticModelArrayBound _
 		exit sub
 	end if
 	dim as LEX_LOCATION source_end = lexGetLastLocation( )
-	fbSemanticModelExportExpression(result, source_start, source_end, nonphysical_start, lexGetNonphysicalTokenCount( ))
+	'' The omitted dimension and a folded bound can have identical values and
+	'' nonphysical ranges. Keep the query result distinct from its input.
+	fbSemanticModelExportExpressionDistinct(result, source_start, source_end, nonphysical_start, lexGetNonphysicalTokenCount( ))
 	dim as longint identity = result->semantic_expression
 	dim as longint symbol_id = fbSemanticModelSymbolId(array_symbol)
 	if( (identity <= 0) or (symbol_id <= 0) ) then

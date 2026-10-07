@@ -73,6 +73,8 @@ Version 1.20.4
 - tests/documentation: added DOS provider probes for PDMLWP, Sound Blaster, PC speaker, AC'97, Watt-32, graphics, TCP, FreeDOS and DOSBox-X runs, enabled matching optional DOS unit/log suites, added `#cmdline`, gas64 array-index, and sfx intrinsic regression cases, and documented the compatibility services, direct-include results, DOS provider boundaries, AC'97 behavior, and SuperDuel integration findings.
 
 [fixed]
+- compiler semantic model: retain selected array-bound dimensions and their source ranges, mark omitted dimensions and incomplete pointer-intrinsic prefixes as nonphysical, and preserve typed array assignment targets in expression-only output without changing emitted code.
+- compiler semantic array bounds: keep folded query results distinct from identical omitted dimensions under logical source remaps and macro expansion, preserving input order and the reader's cycle checks.
 - build/CI compiler structure: give the structured-diagnostics header the required responsibility marker so native compiler qualification reaches its smoke and language tests.
 - CRT/platform coverage: add BSD/Solaris, AROS, and classic Amiga unistd bindings, select Android and RISC OS headers explicitly, and map Windows CE process identity to its native API instead of a missing getpid export; preserve fixed BSD process/file-offset widths and AROS native-sized IDs, and compile standard CRT headers for every supported OS during backend checks.
 - CRT/Windows CE: provide a runtime C bridge for CeGCC's inline-only GetCurrentProcessId accessor so the portable getpid binding links on ARM and MIPS without assuming a Coredll export or copying kernel-data addresses into BASIC headers.

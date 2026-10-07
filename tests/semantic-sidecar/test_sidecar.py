@@ -846,7 +846,9 @@ print value
         order = sorted((int(row[3]), model.nodes[int(row[2])][3])
                        for row in model.records["EV"] if int(row[1]) == assignment)
         self.assertEqual(order, [(0, "right"), (1, "left")])
-        rows = [row.copy() for row in model.rows]
+        # The reader decodes property values. Keep wire escaping when mutating
+        # records so tab-containing receipts cannot change their field count.
+        rows = [line.split("\t") for line in text.splitlines()]
         changes = {"NT": (8, "2"), "PH": (3, "unknown"), "NP": (2, "999999"),
                    "EV": (4, "unknown"), "CB": (2, "999999"), "CN": (2, "999999"),
                    "CE": (4, "unknown"), "CL": (3, "999999")}
@@ -2795,6 +2797,42 @@ print SEM_EMPTY joined3
         older = Model("\n".join(lines) + "\n")
         self.assertFalse(any("declared-field-count" in properties
                              for properties in older.properties.values()))
+
+    def test_array_bound_results_keep_distinct_nonphysical_identities(self) -> None:
+        source = self.source("\n".join((
+            "'' Project: FreeBASIC semantic sidecar tests",
+            "'' File: bound-identity.bas",
+            "'' Purpose: Keep folded bounds distinct from their omitted dimensions.",
+            "'' Responsibilities: Logical remaps, macros and unchanged emission.",
+            "'' This file intentionally does NOT execute bound queries.",
+            "dim values(1 to 3) as integer",
+            "dim upper_values(0 to 1) as integer",
+            "#define bound_query lbound(values)",
+            "dim macro_value as integer = bound_query",
+            '#line 500 "bound-logical.bas"',
+            "dim lower_value as integer = lbound(values)",
+            "dim upper_value as integer = ubound(upper_values)",
+            "'' end of bound-identity.bas", "")), "bound-identity.bas")
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                self.invoke([source], backend=backend, mode="off")
+                suffix = ".ll" if backend == "llvm" else ".c"
+                baseline = source.with_suffix(suffix).read_bytes()
+                model = self.compile(source, backend=backend)
+                self.assertEqual(source.with_suffix(suffix).read_bytes(), baseline)
+                queries = {identity: properties for (domain, identity), properties in model.properties.items()
+                           if domain == "expression" and "array-bound-kind" in properties}
+                self.assertEqual(len(queries), 3)
+                expressions = {int(row[1]): row for row in model.records["E"]}
+                for identity, properties in queries.items():
+                    selected = int(properties["array-bound-selected-dimension"])
+                    self.assertEqual(properties["array-bound-dimension"], "0")
+                    self.assertLess(selected, identity)
+                    for expression in (selected, identity):
+                        self.assertEqual(expressions[expression][2], "0")
+                        self.assertEqual(model.constants["expression", expression], ("signed", "1"))
+                self.compile(source, backend=backend, mode="expressions")
+                self.assertEqual(source.with_suffix(suffix).read_bytes(), baseline)
 
     def test_array_bound_query_dimension_presence_and_corruption(self) -> None:
         for backend in self.backends:

@@ -2421,6 +2421,18 @@ sub fbSemanticModelExportExpression _
 	end if
 end sub
 
+sub fbSemanticModelExportExpressionDistinct _
+	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, byref source_end as LEX_LOCATION, _
+	  byval nonphysical_tokens_at_start as longint, byval nonphysical_tokens_at_end as longint )
+	if( (fbSemanticModelEnabled( ) = FALSE) or (expr = NULL) ) then exit sub
+	'' Receipts that identify an input and its result must not share an ID,
+	'' even when both have the same visible expression shape after folding.
+	semantic_model_last_expression_fact = ""
+	semantic_model_last_expression_shape = ""
+	fbSemanticModelExportExpression(expr, source_start, source_end, _
+		nonphysical_tokens_at_start, nonphysical_tokens_at_end)
+end sub
+
 private function hSemanticModelPushNode _
 	( _
 		byval node as ASTNODE ptr, byval parentid as longint, _
