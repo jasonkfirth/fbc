@@ -87,7 +87,8 @@ declare sub fbSemanticModelExportExpression _
 		byref source_end as LEX_LOCATION, _
 		byval nonphysical_tokens_at_start as longint, _
 		byval nonphysical_tokens_at_end as longint, _
-		byval semantic_operator_override as integer = -1 _
+		byval semantic_operator_override as integer = -1, _
+		byval force_nonphysical_range as integer = FALSE _
 	)
 
 private sub hSemanticModelExportCurrentExpression _

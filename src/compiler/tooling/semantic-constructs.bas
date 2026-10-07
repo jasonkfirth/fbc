@@ -12,7 +12,7 @@
 declare sub fbSemanticModelExportExpression _
 	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, byref source_end as LEX_LOCATION, _
 	  byval nonphysical_tokens_at_start as longint, byval nonphysical_tokens_at_end as longint, _
-	  byval semantic_operator_override as integer = -1 )
+	  byval semantic_operator_override as integer = -1, byval force_nonphysical_range as integer = FALSE )
 #include once "tooling/semantic-constructs.bi"
 #include once "parser/parser.bi"
 

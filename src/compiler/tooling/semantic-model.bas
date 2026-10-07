@@ -2223,7 +2223,8 @@ sub fbSemanticModelExportExpression _
 		byref source_end as LEX_LOCATION, _
 		byval nonphysical_tokens_at_start as longint, _
 		byval nonphysical_tokens_at_end as longint, _
-		byval semantic_operator_override as integer = -1 _
+		byval semantic_operator_override as integer = -1, _
+		byval force_nonphysical_range as integer = FALSE _
 	)
 
 	if( (semantic_model_file_open = FALSE) or _
@@ -2235,13 +2236,18 @@ sub fbSemanticModelExportExpression _
 
 	dim as LEX_LOCATION observed_start = source_start
 	dim as LEX_LOCATION observed_end = source_end
-	dim as integer physical_range = abs(hSemanticModelLocationIsPhysical(source_start) and _
+	dim as integer physical_range = abs((force_nonphysical_range = FALSE) and _
+		hSemanticModelLocationIsPhysical(source_start) and _
 		hSemanticModelLocationIsPhysical(source_end) and _
 		source_start.is_physical and source_end.is_physical and _
 		(nonphysical_tokens_at_start = nonphysical_tokens_at_end) and _
 		(source_start.source_file = source_end.source_file) and _
 		hSemanticModelRangeFitsCurrentSourceLine(source_end))
-	if( physical_range = FALSE ) then
+	if( force_nonphysical_range ) then
+		observed_start.is_physical = FALSE
+		observed_end.is_physical = FALSE
+	end if
+	if( (physical_range = FALSE) and (force_nonphysical_range = FALSE) ) then
 		dim as LEX_LOCATION invocation
 		if( fbSemanticModelMacroExpressionLocation(source_start, source_end, _
 			nonphysical_tokens_at_start, nonphysical_tokens_at_end, invocation) ) then

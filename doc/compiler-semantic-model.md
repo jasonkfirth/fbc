@@ -1501,7 +1501,9 @@ or dynamic array access retains these properties on its selected element E:
 | `array-subscript-index:<dimension>` | original input E before integer conversion |
 | `array-subscript-selected-index:<dimension>` | converted integer input E before offset scaling |
 
-Dimensions are zero based. A no-op conversion can reuse the original E ID.
+Dimensions are zero based. A distinct selected-index E records the compiler's
+integer conversion but has a nonphysical source range; consumers must use the
+original index E for source queries. A no-op conversion can reuse the original E ID.
 `H symbol <array-id> expression <element-id> array-subscript 0` closes the group.
 Parser locations anchor both reads and assignment destinations independently of
 expression frames. The observations precede descriptor indexing, multiplication

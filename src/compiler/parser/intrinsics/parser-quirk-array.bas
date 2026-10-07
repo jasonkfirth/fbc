@@ -354,11 +354,14 @@ function cArrayFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 			dim as longint selected_nonphysical_end = dimension_nonphysical_end
 			if( dimension_is_explicit = FALSE ) then
 				selected_source_start = source_start
-				selected_source_end = lexGetLastLocation( )
+				'' The default dimension is generated, not the closing parenthesis.
+				'' Anchor its nonphysical type fact to the intrinsic token so it stays
+				'' distinct from the completed query expression.
+				selected_source_end = source_start
 				selected_source_start.is_physical = FALSE
 				selected_source_end.is_physical = FALSE
 				selected_nonphysical_start = nonphysical_start
-				selected_nonphysical_end = lexGetNonphysicalTokenCount( )
+				selected_nonphysical_end = nonphysical_start
 			end if
 			selected_dimension = fbSemanticModelSelectedArrayIndex _
 				(selected_dimension_expr, selected_source_start, selected_source_end, _

@@ -19,7 +19,7 @@ declare sub fbSemanticModelExportExpressionDistinct _
 declare sub fbSemanticModelExportExpression _
 	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, byref source_end as LEX_LOCATION, _
 	  byval nonphysical_tokens_at_start as longint, byval nonphysical_tokens_at_end as longint, _
-	  byval semantic_operator_override as integer = -1 )
+	  byval semantic_operator_override as integer = -1, byval force_nonphysical_range as integer = FALSE )
 
 '' -------------------------------------------------------------------------
 '' Parser-selected numeric suffix spellings
@@ -719,8 +719,12 @@ end sub
 function fbSemanticModelPointerIndexPrefix _
 	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, _
 	  byval nonphysical_tokens as longint ) as longint
-	if( (fbSemanticModelFullEnabled( ) = FALSE) or (expr = NULL) ) then return 0
-	if( lex.ctx->semantic_probe ) then return 0
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (expr = NULL) ) then
+		return 0
+	end if
+	if( lex.ctx->semantic_probe ) then
+		return 0
+	end if
 	fbSemanticModelExportCurrentExpressionPrefix(expr)
 	'' Assignment targets enter the variable parser without cExpression's
 	'' active range. Preserve their accepted AST with the parser's observed
@@ -756,8 +760,34 @@ function fbSemanticModelSelectedArrayIndex _
 	  byval nonphysical_start as longint, byval nonphysical_end as longint ) as longint
 	if( (fbSemanticModelFullEnabled( ) = FALSE) or (expr = NULL) ) then return 0
 	if( lex.ctx->semantic_probe ) then return 0
-	fbSemanticModelExportExpression(expr, source_start, source_end, nonphysical_start, nonphysical_end)
-	if( expr->semantic_expression <= 0 ) then fbSemanticModelFailAt("semantic-expressions.bas:675")
+	'' This is the compiler-selected value after integer conversion. The source
+	'' range identifies its original operand, not a separately written value.
+	dim as LEX_LOCATION selected_start = source_start
+	dim as LEX_LOCATION selected_end = source_end
+	if( (selected_start.start_line < 1) or (selected_start.start_column < 0) or _
+		(selected_end.end_line < selected_start.start_line) or (selected_end.end_column < 0) or _
+		((selected_end.end_line = selected_start.start_line) and _
+		 (selected_end.end_column <= selected_start.start_column)) ) then
+		dim as LEX_LOCATION invocation
+		if( fbSemanticModelMacroExpressionLocation(source_start, source_end, _
+			nonphysical_start, nonphysical_end, invocation) = FALSE ) then
+			fbSemanticModelFailAt("semantic-expressions.bas:675 invalid selected range")
+			return 0
+		end if
+		selected_start = invocation
+		selected_end = invocation
+	end if
+	selected_start.is_physical = FALSE
+	selected_end.is_physical = FALSE
+	fbSemanticModelExportExpression(expr, selected_start, selected_end, _
+		nonphysical_start, nonphysical_end, -1, TRUE)
+	if( expr->semantic_expression <= 0 ) then
+		fbSemanticModelFailAt("semantic-expressions.bas:675 selected=" + _
+			fbSemanticModelNumber(source_start.start_line) + ":" + _
+			fbSemanticModelNumber(source_start.start_column) + "-" + _
+			fbSemanticModelNumber(source_end.end_line) + ":" + _
+			fbSemanticModelNumber(source_end.end_column))
+	end if
 	return expr->semantic_expression
 end function
 

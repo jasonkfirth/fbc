@@ -659,6 +659,9 @@ function cMemberDeref _
 		dim as longint semantic_pointer = 0, semantic_index = 0
 		dim as LEX_LOCATION semantic_index_start = lexGetLastLocation( )
 		dim as longint semantic_index_nonphysical = lexGetNonphysicalTokenCount( )
+		dim as LEX_LOCATION semantic_index_value_start, semantic_index_value_end
+		dim as longint semantic_index_value_nonphysical_start = 0
+		dim as longint semantic_index_value_nonphysical_end = 0
 
 		select case( lexGetToken( ) )
 		'' ('->' DREF* UdtMember)*
@@ -764,7 +767,11 @@ function cMemberDeref _
 			lexSkipToken( )
 
 			'' Expression
+			semantic_index_value_start = lexGetCurrentLocation( )
+			semantic_index_value_nonphysical_start = lexGetNonphysicalTokenCount( )
 			idxexpr = hIndexExpr( )
+			semantic_index_value_end = lexGetLastLocation( )
+			semantic_index_value_nonphysical_end = lexGetNonphysicalTokenCount( )
 
 			'' ']'
 			if( lexGetToken( ) <> CHAR_RBRACKET ) then
@@ -853,8 +860,9 @@ function cMemberDeref _
 
 				'' For the normal ptr[index] operation, the index must be an INTEGER
 				if( export_semantics ) then
-					fbSemanticModelExportCurrentExpressionPrefix(idxexpr)
-					if( idxexpr <> NULL ) then semantic_index = idxexpr->semantic_expression
+					semantic_index = fbSemanticModelOriginalExpression _
+						(idxexpr, semantic_index_value_start, semantic_index_value_nonphysical_start, _
+						 semantic_index_value_end, semantic_index_value_nonphysical_end)
 				end if
 				idxexpr = hCheckIntegerIndex( idxexpr )
 

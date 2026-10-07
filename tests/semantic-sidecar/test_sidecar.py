@@ -540,6 +540,32 @@ class SidecarTests(unittest.TestCase):
                     self.assertFalse(model.records["S"])
                     self.assertFalse(model.records["N"])
 
+    def test_converted_array_index_keeps_written_type_as_physical_expression(self) -> None:
+        source = self.source("dim values(any) as integer\n"
+                             "dim index as long = 0\n"
+                             "redim values(0 to 1)\n"
+                             "print values(index)\n")
+        model = self.compile(source)
+        index = self.span(source, "print values(index)", "index")
+        facts = self.expressions(model, index)
+        physical = [row for row in facts if row[2] == "1"]
+        self.assertTrue(any(row[15].casefold() == "long" for row in physical))
+        self.assertFalse(any(row[15].casefold() == "integer" for row in physical),
+                         "the selected conversion is not the written index expression")
+        self.assertTrue(any(row[2] == "0" and row[15].casefold() == "integer" for row in facts))
+
+    def test_pointer_index_prefix_keeps_the_dereferenced_result_type(self) -> None:
+        source = self.source("type Root\nvalue as integer\nend type\n"
+                             "dim rootPointer as Root ptr\n"
+                             "dim selected as Root\n"
+                             "selected = rootPointer[0]\n")
+        model = self.compile(source)
+        span = self.span(source, "selected = rootPointer[0]", "rootPointer[0]")
+        facts = [row for row in self.expressions(model, span) if row[2] == "1"]
+        self.assertTrue(any(row[15].casefold() == "root" for row in facts))
+        self.assertFalse(any(row[15].casefold() == "integer" for row in facts),
+                         "the constant index must not claim the full pointer-index range")
+
     def test_pointer_intrinsic_prefix_before_closing_parenthesis_is_not_physical(self) -> None:
         source = self.source("dim value as integer = 1\n"
                              "dim text as string = \"x\"\n"
@@ -2855,7 +2881,6 @@ print SEM_EMPTY joined3
                     selected = int(queries[identity]["array-bound-selected-dimension"])
                     self.assertEqual(expressions[selected][2], "0",
                                      "an implicit compiler-selected dimension must not claim the closing parenthesis as source")
-
                 # Four-field receipts remain valid for written dimensions. An
                 # omitted argument needs its presence flag to explain zero.
                 rows = [line.split("\t") for line in text.splitlines()]
