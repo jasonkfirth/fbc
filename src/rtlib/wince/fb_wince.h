@@ -78,6 +78,9 @@ typedef long fb_off_t;
 #define FB_COLOR_YELLOW   (FOREGROUND_RED|FOREGROUND_GREEN|FOREGROUND_INTENSITY)
 #define FB_COLOR_BWHITE   (FOREGROUND_RED|FOREGROUND_GREEN|FOREGROUND_BLUE|FOREGROUND_INTENSITY)
 
+/* C ABI bridge for the SDK's inline-only process identifier accessor. */
+unsigned int fb_hWinCEGetProcessId( void );
+
 /* Read the process-local environment maintained by SETENVIRON. */
 const char *fb_hWinCEGetEnv( const char *name );
 

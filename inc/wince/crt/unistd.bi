@@ -1,16 +1,17 @@
 '' FreeBASIC Windows CE process identity compatibility
 '' File: wince/crt/unistd.bi
 '' Purpose: Expose the native process identifier through the portable spelling.
-'' Responsibilities: Bind GetCurrentProcessId with the Windows calling convention.
+'' Responsibilities: Bind the runtime bridge to the SDK's process-ID accessor.
 '' This file intentionally does NOT contain desktop CRT or POSIX process APIs.
 
 #ifndef __crt_wince_unistd_bi__
 #define __crt_wince_unistd_bi__
 
-'' Coredll has no getpid export. Its native API returns an unsigned 32-bit
-'' process identifier; mapping the name here also preserves its calling ABI.
-extern "Windows"
-declare function getpid alias "GetCurrentProcessId" () as ulong
+'' CeGCC implements GetCurrentProcessId inline in kfuncs.h, without a Coredll
+'' export. libfb/libfbmt provide this C ABI bridge so BASIC code uses the SDK's
+'' accessor without embedding architecture-specific kernel-data addresses.
+extern "c"
+declare function getpid alias "fb_hWinCEGetProcessId" () as ulong
 end extern
 
 #endif

@@ -82,9 +82,10 @@ def main() -> int:
                 print(f"CRT/{target}: emission failed\n{emitted.stdout}{emitted.stderr}")
                 return 1
             if target.startswith("wince-"):
-                # CE exports GetCurrentProcessId, never a POSIX getpid symbol.
+                # The CE SDK implements GetCurrentProcessId inline. The runtime
+                # bridge supplies an ordinary C export for BASIC callers.
                 generated = (working / ("crt-" + target + ".c")).read_text(encoding="utf-8")
-                if "GetCurrentProcessId" not in generated or re.search(r"\bgetpid\b", generated):
+                if "fb_hWinCEGetProcessId" not in generated or re.search(r"\b(getpid|GetCurrentProcessId)\b", generated):
                     print(f"CRT/{target}: incorrect process-ID export")
                     return 1
             print(f"CRT/{target}: emission passed")
