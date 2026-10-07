@@ -1,6 +1,10 @@
 ''
 ''
-'' sys\types -- OpenBSD CRT types
+'' FreeBASIC OpenBSD CRT types
+'' File: crt/sys/openbsd/types.bi
+'' Purpose: Describe the native types used by OpenBSD CRT declarations.
+'' Responsibilities: Preserve process, filesystem, and wide-character layouts.
+'' This file intentionally does NOT contain function declarations.
 ''
 ''
 #ifndef __crt_sys_openbsd_types_bi__
@@ -12,7 +16,8 @@ type __clock_t as integer
 type __time_t as integer
 type __suseconds_t as integer
 type __ssize_t as integer
-type __off_t as integer
+'' OpenBSD file offsets remain 64-bit on its 32-bit targets too.
+type __off_t as longint
 type __pid_t as long
 type __socklen_t as ulong
 type __sa_family_t as ubyte
@@ -55,3 +60,5 @@ type socklen_t as __socklen_t
 type suseconds_t as __suseconds_t
 
 #endif
+
+'' end of crt/sys/openbsd/types.bi

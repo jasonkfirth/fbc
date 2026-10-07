@@ -1,20 +1,38 @@
 ''
 ''
-'' unistd -- header translated with help of SWIG FB wrapper
+'' FreeBASIC CRT platform routing
+'' File: crt/unistd.bi
+'' Purpose: Select the target's process and descriptor declarations.
+'' Responsibilities: Keep native CRT overrides ahead of desktop fallbacks.
+'' This file intentionally does NOT contain platform function declarations.
 ''
 '' NOTICE: This file is part of the FreeBASIC Compiler package and can't
 ''         be included in other distributions without authorization.
 ''
 ''
+#ifdef __FB_RISCOS__
+#include once "riscos/crt/unistd.bi"
+#endif
+
 #ifndef __crt_unistd_bi__
 #define __crt_unistd_bi__
 
-#if defined(__FB_WIN32__)
+#if defined(__FB_WINCE__)
+#include once "wince/crt/unistd.bi"
+#elseif defined(__FB_AROS__)
+#include once "aros/crt/unistd.bi"
+#elseif defined(__FB_AMIGA__)
+#include once "amiga/crt/unistd.bi"
+#elseif defined(__FB_WIN32__)
 #include once "crt/win32/unistd.bi"
 #elseif defined(__FB_DOS__)
 #include once "crt/dos/unistd.bi"
+#elseif defined(__FB_ANDROID__)
+#include once "crt/unix/unistd.bi"
 #elseif defined(__FB_LINUX__) or defined(__FB_NUTTX__)
 #include once "crt/linux/unistd.bi"
+#elseif defined(__FB_FREEBSD__) or defined(__FB_NETBSD__) or defined(__FB_OPENBSD__) or defined(__FB_SOLARIS__)
+#include once "crt/unix/unistd.bi"
 #elseif defined(__FB_DRAGONFLY__)
 #include once "crt/dragonfly/unistd.bi"
 #elseif defined(__FB_CYGWIN__)

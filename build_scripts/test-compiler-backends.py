@@ -56,21 +56,55 @@ def main() -> int:
                 print(f"GAS64/{target}: emission failed\n{emitted.stdout}{emitted.stderr}")
                 return 1
             print(f"GAS64/{target}: emission passed")
-        # RISC OS overrides fbnetwire.bi for its APCS double layout. Compile
-        # the shared text suite too, so that override retains Unicode overloads.
-        # Target overrides must precede the generic source-tree headers.
-        command = [str(options.fbc.resolve()), "-prefix", str(root), "-r",
-                   "-gen", "gcc", "-target", "riscos",
-                   "-i", str(root / "inc/riscos"),
-                   "-i", str(root / "inc"), "-i", str(root / "tests/fbcunit/inc"),
-                   str(root / "tests/string/text-types.bas"),
-                   "-o", str(working / "text-types-riscos.c")]
-        emitted = subprocess.run(command, cwd=working, text=True,
-                                 capture_output=True, timeout=120, check=False)
-        if emitted.returncode:
-            print(f"Unicode/riscos: emission failed\n{emitted.stdout}{emitted.stderr}")
-            return 1
-        print("Unicode/riscos: emission passed")
+        # Exercise every supported OS, including both common desktop widths
+        # and CE architectures. Target overrides precede the shared CRT tree,
+        # matching the installed compiler's include order.
+        crt_targets = (
+            "win32", "win64", "win32-aarch64", "wince-arm", "wince-mips",
+            "cygwin", "linux", "android", "haiku", "dos", "xbox", "freebsd",
+            "dragonfly", "solaris", "illumos", "openbsd", "darwin", "netbsd",
+            "js-asmjs", "wii", "nuttx", "riscos", "aros", "amiga",
+            "freebsd-x86", "netbsd-x86", "openbsd-x86", "aros-x86",
+            "haiku-x86", "darwin-aarch64", "linux-aarch64",
+        )
+        for target in crt_targets:
+            target_headers = root / "inc" / target.split("-", 1)[0]
+            command = [str(options.fbc.resolve()), "-prefix", str(root), "-r",
+                       "-gen", "gcc", "-target", target]
+            if target_headers.is_dir():
+                command += ["-i", str(target_headers)]
+            command += ["-i", str(root / "inc"),
+                        str(root / "tests/crt/platform-headers.bas"),
+                        "-o", str(working / ("crt-" + target + ".c"))]
+            emitted = subprocess.run(command, cwd=working, text=True,
+                                     capture_output=True, timeout=120, check=False)
+            if emitted.returncode:
+                print(f"CRT/{target}: emission failed\n{emitted.stdout}{emitted.stderr}")
+                return 1
+            if target.startswith("wince-"):
+                # CE exports GetCurrentProcessId, never a POSIX getpid symbol.
+                generated = (working / ("crt-" + target + ".c")).read_text(encoding="utf-8")
+                if "GetCurrentProcessId" not in generated or re.search(r"\bgetpid\b", generated):
+                    print(f"CRT/{target}: incorrect process-ID export")
+                    return 1
+            print(f"CRT/{target}: emission passed")
+        # RISC OS also overrides fbnetwire.bi for its APCS double layout.
+        # Compile the actual Unicode fixture on the previously failing targets.
+        for target in ("riscos", "freebsd", "netbsd", "openbsd", "aros", "amiga", "wince-arm"):
+            target_headers = root / "inc" / target.split("-", 1)[0]
+            command = [str(options.fbc.resolve()), "-prefix", str(root), "-r",
+                       "-gen", "gcc", "-target", target]
+            if target_headers.is_dir():
+                command += ["-i", str(target_headers)]
+            command += ["-i", str(root / "inc"), "-i", str(root / "tests/fbcunit/inc"),
+                        str(root / "tests/string/text-types.bas"),
+                        "-o", str(working / ("text-types-" + target + ".c"))]
+            emitted = subprocess.run(command, cwd=working, text=True,
+                                     capture_output=True, timeout=120, check=False)
+            if emitted.returncode:
+                print(f"Unicode/{target}: emission failed\n{emitted.stdout}{emitted.stderr}")
+                return 1
+            print(f"Unicode/{target}: emission passed")
         if "llvm" in backends:
             if llc is None:
                 print("llvm: configured compiler is unavailable")

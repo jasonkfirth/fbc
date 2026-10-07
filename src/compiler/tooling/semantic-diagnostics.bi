@@ -2,7 +2,7 @@
 '' File: tooling/semantic-diagnostics.bi
 '' Purpose: Publish compiler diagnostics independently of accepted AST models.
 '' Responsibilities: Invocation lifetime, source protection and parser context.
-'' This file intentionally does NOT expose recovered symbols as semantic facts.
+'' This file intentionally does NOT contain: recovered symbols or AST facts.
 
 #ifndef __FB_SEMANTIC_DIAGNOSTICS_BI__
 #define __FB_SEMANTIC_DIAGNOSTICS_BI__

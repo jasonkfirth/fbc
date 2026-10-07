@@ -13,7 +13,7 @@
 #include "dir.bi"
 #include "fbc-int/string.bi"
 #include "fbnetwire.bi"
-#include "crt/unistd.bi"
+#include once "crt/unistd.bi"
 
 '' Keep the temporary-file extension separate from each process-specific name.
 private function textTypesTempFileExtension() as string

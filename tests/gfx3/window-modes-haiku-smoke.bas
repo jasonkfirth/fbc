@@ -7,12 +7,18 @@
 ''
 #lang "fb"
 #include once "fbgfx.bi"
+#ifdef FB_HAIKU_MODE_TRACE
 #include once "crt/stdio.bi"
+#endif
 
+'' Successful qualification keeps stderr empty. Enable this trace only when
+'' diagnosing a native window transition or looper failure.
 sub mode_trace(byref message as const string)
+    #ifdef FB_HAIKU_MODE_TRACE
     dim as string line_text = message & Chr(10)
     fputs(strptr(line_text), stderr)
     fflush(stderr)
+    #endif
 end sub
 
 extern "C"
