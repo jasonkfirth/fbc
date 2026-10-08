@@ -677,6 +677,25 @@ class SidecarTests(unittest.TestCase):
             self.assertEqual(model.footer[11], "1")
         self.assertEqual(unescape("%2525%09%0D%0A"), "%25\t\r\n")
 
+    def test_macro_expanded_include_directives_do_not_claim_physical_ranges(self) -> None:
+        header = self.source("dim included_value as long\n", "macro-header.bi")
+        source = self.source('#define HEADER_FILE "macro-header.bi"\n'
+                             '#include HEADER_FILE\n'
+                             'print included_value\n', "macro-include.bas")
+        for mode in ("full", "expressions"):
+            with self.subTest(mode=mode):
+                model = self.compile(source, mode=mode)
+                include_contexts = [row for row in model.records["SRC"] if row[5] == "include"]
+                self.assertEqual(len(include_contexts), 1)
+                self.assertEqual(include_contexts[0][8:], ["0", "", "0", "0", "0", "0"])
+                include_outcomes = [row for row in model.records["INC"] if row[5] == "opened"]
+                self.assertEqual(len(include_outcomes), 1)
+                self.assertEqual(include_outcomes[0][6:], ["0", "", "0", "0", "0", "0"])
+                self.assertEqual(
+                    model.records["D"],
+                    [["D", self.compiler_path(source)], ["D", self.compiler_path(header)]],
+                )
+
     def test_dependency_limit_is_explicit(self) -> None:
         includes = self.working / "includes"
         includes.mkdir()

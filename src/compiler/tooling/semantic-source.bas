@@ -34,8 +34,11 @@ private function hEncoding(byval format as integer) as string
 	end select
 end function
 
-private function hDirective(byval location as LEX_LOCATION ptr) as string
-	if( location = NULL ) then return "0" + TABCHAR + "" + TABCHAR + "0" + TABCHAR + "0" + TABCHAR + "0" + TABCHAR + "0"
+private function hDirective(byval location as LEX_LOCATION ptr, byval require_physical as integer) as string
+	if( (location = NULL) orelse ((require_physical) and (location->is_physical = FALSE)) ) then
+		'' Include context ranges require a physical directive origin.
+		return "0" + TABCHAR + "" + TABCHAR + "0" + TABCHAR + "0" + TABCHAR + "0" + TABCHAR + "0"
+	end if
 	return fbSemanticModelNumber(abs(location->is_physical <> FALSE)) + TABCHAR + _
 		fbSemanticModelEscape(location->source_file) + TABCHAR + fbSemanticModelNumber(location->start_line) + TABCHAR + _
 		fbSemanticModelNumber(location->start_column) + TABCHAR + fbSemanticModelNumber(location->end_line) + TABCHAR + _
@@ -97,7 +100,7 @@ sub fbSemanticModelOpenSource(byref filename as const string, byval depth as int
 		TABCHAR + fbSemanticModelNumber(parentid) + TABCHAR + fbSemanticModelNumber(fileid) + _
 		TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + TABCHAR + kind + _
 		TABCHAR + fbSemanticModelNumber(depth) + TABCHAR + fbSemanticModelEscape(requested) + _
-		TABCHAR + hDirective(directive))
+		TABCHAR + hDirective(directive, TRUE))
 	if( directive <> NULL ) then
 		fbSemanticModelExportCoordinates("source-context", semantic_source_ids(depth), "include", *directive, *directive)
 	end if
@@ -126,7 +129,7 @@ sub fbSemanticModelIncludeOutcome(byref requested as const string, byref resolve
 	fbSemanticModelAppendProvenance("INC" + TABCHAR + fbSemanticModelNumber(identity) + _
 		TABCHAR + fbSemanticModelNumber(parentid) + TABCHAR + _
 		fbSemanticModelEscape(requested) + TABCHAR + fbSemanticModelEscape(resolved) + TABCHAR + outcome + _
-		TABCHAR + hDirective(directive))
+		TABCHAR + hDirective(directive, TRUE))
 	if( directive <> NULL ) then fbSemanticModelExportCoordinates("include", identity, "directive", *directive, *directive)
 end sub
 
@@ -138,9 +141,10 @@ sub fbSemanticModelSourceRemap(byval logical_line as longint, byref logical_file
 	'' editing eligibility; that requires an independently proved mapping.
 	fbSemanticModelMarkSourceRemapped(env.includerec)
 	dim as longint identity = fbSemanticModelNextDetailIdentity( )
+	'' Keep the written #line range in the receipt even when its physical flag is false.
 	fbSemanticModelAppendProvenance("MAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelCurrentSource( )) + _
 		TABCHAR + fbSemanticModelNumber(logical_line) + TABCHAR + fbSemanticModelEscape(logical_file) + _
-		TABCHAR + hDirective(@directive) + TABCHAR + fbSemanticModelNumber(identity))
+		TABCHAR + hDirective(@directive, FALSE) + TABCHAR + fbSemanticModelNumber(identity))
 	'' The remap identity survives repeated logical line/file choices.
 	fbSemanticModelExportCoordinates("remap", identity, "directive", directive, directive)
 end sub
