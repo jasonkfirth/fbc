@@ -573,25 +573,37 @@ class SidecarTests(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         model = Model(text)
         receipts = [row for row in model.records["K"]
-                    if row[3] == "procedure-written-visibility"]
+                    if row[3].startswith("procedure-written-visibility:")]
         self.assertEqual(len(receipts), 2)
-        self.assertTrue(all(row[1] == "statement" and int(row[2]) in model.statements
+        symbol_modules = {}
+        statement_modules = {}
+        module = 0
+        for row in model.rows:
+            if row[0] == "M":
+                module += 1
+            elif row[0] == "S":
+                symbol_modules[int(row[1])] = module
+            elif row[0] == "ST":
+                statement_modules[int(row[1])] = module
+        self.assertTrue(all(row[1] == "symbol" and int(row[2]) in model.symbols and
+                            int(row[3].split(":", 1)[1]) in model.statements and
+                            symbol_modules[int(row[2])] == statement_modules[int(row[3].split(":", 1)[1])]
                             for row in receipts))
         rows = [line.split("\t") for line in text.splitlines()]
-        for field, value in ((0, "C"), (1, "symbol"), (2, "999999"), (3, "unknown-property")):
+        for field, value in ((0, "C"), (1, "invalid-domain"), (2, "999999"),
+                             (3, "procedure-written-visibility:999999")):
             with self.subTest(field=field, value=value), self.assertRaises(ValueError):
                 changed = [row.copy() for row in rows]
-                next(row for row in changed if row[0] == "K"
-                     and row[3] == "procedure-written-visibility")[field] = value
+                next(row for row in changed if row[0] == "K" and
+                     row[3].startswith("procedure-written-visibility:"))[field] = value
                 Model("\n".join("\t".join(row) for row in changed) + "\n")
-        # Each receipt stays in the detail stream of its owning module.
-        # Swapping complete owners preserves valid IDs but violates that boundary.
+        # Each visibility receipt stays in the module of its selected procedure.
+        # Swapping valid statement IDs across modules must violate that boundary.
         changed = [row.copy() for row in rows]
         visibility = [row for row in changed if row[0] == "K"
-                      and row[3] == "procedure-written-visibility"]
-        visibility[0][2], visibility[1][2] = visibility[1][2], visibility[0][2]
-        visibility[0][4], visibility[1][4] = visibility[1][4], visibility[0][4]
-        with self.assertRaisesRegex(ValueError, "Storage receipt belongs to another module"):
+                      and row[3].startswith("procedure-written-visibility:")]
+        visibility[0][3], visibility[1][3] = visibility[1][3], visibility[0][3]
+        with self.assertRaisesRegex(ValueError, "Invalid procedure visibility owner or capability"):
             Model("\n".join("\t".join(row) for row in changed) + "\n")
 
     def test_pointer_intrinsic_prefix_before_closing_parenthesis_is_not_physical(self) -> None:

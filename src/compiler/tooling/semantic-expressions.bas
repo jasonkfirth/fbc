@@ -705,8 +705,12 @@ end sub
 '' TEMP is a compiler storage attribute. A source name or generated spelling
 '' does not establish temporary lifetime. Walk only the selected storage base.
 function fbSemanticModelAddressIsTemporary(byval node as ASTNODE ptr) as integer
-	if( fbSemanticModelFullEnabled( ) = FALSE ) then return FALSE
-	if( lex.ctx->semantic_probe ) then return FALSE
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then
+		return FALSE
+	end if
+	if( lex.ctx->semantic_probe ) then
+		return FALSE
+	end if
 	dim as integer depth = 0
 	dim as integer follow_address = FALSE
 	while( node <> NULL )
@@ -722,8 +726,12 @@ function fbSemanticModelAddressIsTemporary(byval node as ASTNODE ptr) as integer
 				node = node->l
 				follow_address = FALSE
 			case AST_NODECLASS_BOP
-				if( (node->op.op <> AST_OP_ADD) and (node->op.op <> AST_OP_SUB) ) then return FALSE
-				if( typeIsPtr(astGetFullType(node)) = FALSE ) then return FALSE
+				if( (node->op.op <> AST_OP_ADD) and (node->op.op <> AST_OP_SUB) ) then
+					return FALSE
+				end if
+				if( typeIsPtr(astGetFullType(node)) = FALSE ) then
+					return FALSE
+				end if
 				node = node->l
 			case else
 				return FALSE
@@ -734,13 +742,20 @@ function fbSemanticModelAddressIsTemporary(byval node as ASTNODE ptr) as integer
 		case AST_NODECLASS_TYPEINI, AST_NODECLASS_CALLCTOR
 			return TRUE
 		case AST_NODECLASS_VAR
-			if( node->sym = NULL ) then return FALSE
+			if( node->sym = NULL ) then
+				return FALSE
+			end if
 			return symbIsTemp(node->sym)
 		case AST_NODECLASS_FIELD, AST_NODECLASS_CONV
 			node = node->l
 		case AST_NODECLASS_DEREF
 			'' A temporary pointer value does not own its pointed-to storage.
 			'' Only direct addressing preserves the constructed storage base.
+			'' Recovered dereference nodes can lack a value child, while
+			'' astSkipNoConvCAST() requires a non-null AST node.
+			if( node->l = NULL ) then
+				return FALSE
+			end if
 			node = astSkipNoConvCAST(node->l)
 			follow_address = TRUE
 		case AST_NODECLASS_IDX

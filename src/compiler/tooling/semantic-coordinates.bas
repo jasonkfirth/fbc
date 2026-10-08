@@ -76,10 +76,14 @@ end function
 
 private sub hRememberLineStart( byval line_number as integer, byval offset as longint )
 	if( (line_number <> coordinate_index_lines + 1) or _
-	    (coordinate_index_lines >= SOURCE_COORDINATE_INDEX_LINES) ) then exit sub
+	    (coordinate_index_lines >= SOURCE_COORDINATE_INDEX_LINES) ) then
+		exit sub
+	end if
 	if( coordinate_index_lines > ubound(coordinate_line_offsets) ) then
 		dim as integer capacity = (ubound(coordinate_line_offsets) + 1) * 2
-		if( capacity > SOURCE_COORDINATE_INDEX_LINES ) then capacity = SOURCE_COORDINATE_INDEX_LINES
+		if( capacity > SOURCE_COORDINATE_INDEX_LINES ) then
+			capacity = SOURCE_COORDINATE_INDEX_LINES
+		end if
 		redim preserve coordinate_line_offsets(0 to capacity - 1)
 	end if
 	coordinate_line_offsets(coordinate_index_lines) = offset
@@ -87,12 +91,20 @@ private sub hRememberLineStart( byval line_number as integer, byval offset as lo
 end sub
 
 private function hReadLine( byval source as longint, byval line_number as integer ) as integer
-	if( (source = 0) or (line_number < 1) ) then return FALSE
+	if( (source = 0) or (line_number < 1) ) then
+		return FALSE
+	end if
 	dim as integer source_handle = fbSemanticModelSourceHandle(source, coordinate_format)
-	if( source_handle = 0 ) then return FALSE
-	if( (source = coordinate_source) and (line_number = coordinate_line) ) then return TRUE
-	dim as longint previous_position = seek(source_handle), bytes = lof(source_handle)
-	dim as integer unit_width = hUnitWidth( ), current_line = 1
+	if( source_handle = 0 ) then
+		return FALSE
+	end if
+	if( (source = coordinate_source) and (line_number = coordinate_line) ) then
+		return TRUE
+	end if
+	dim as longint previous_position = seek(source_handle)
+	dim as longint bytes = lof(source_handle)
+	dim as integer unit_width = hUnitWidth( )
+	dim as integer current_line = 1
 	dim as longint position = hBOMBytes( )
 	'' Expression and block ranges revisit earlier lines after their children.
 	'' Remember starts already crossed in this opened source occurrence instead
@@ -124,8 +136,12 @@ private function hReadLine( byval source as longint, byval line_number as intege
 		dim as integer terminated = FALSE
 		while( (position < bytes) and (terminated = FALSE) and ok )
 			dim as integer count = SOURCE_COORDINATE_CHUNK_BYTES
-			if( bytes - position < count ) then count = bytes - position
-			count -= count mod unit_width
+			if( bytes - position < count ) then
+				count = bytes - position
+			end if
+			'' The source offset is below EOF here, so integer division trims
+			'' only a trailing partial code unit from this positive byte count.
+			count = (count \ unit_width) * unit_width
 			if( count = 0 ) then
 				ok = FALSE
 				exit while
@@ -160,18 +176,26 @@ private function hReadLine( byval source as longint, byval line_number as intege
 					text += left(chunk, taken)
 				end if
 			end if
-			if( terminated = FALSE ) then position += count
+			if( terminated = FALSE ) then
+				position += count
+			end if
 		wend
-		if( ok and terminated ) then hRememberLineStart(current_line + 1, position)
+		if( ok and terminated ) then
+			hRememberLineStart(current_line + 1, position)
+		end if
 		if( current_line = line_number ) then
 			found = ok
 			exit while
 		end if
-		if( terminated = FALSE ) then exit while
+		if( terminated = FALSE ) then
+			exit while
+		end if
 		current_line += 1
 	wend
 	seek #source_handle, previous_position
-	if( found = FALSE ) then return FALSE
+	if( found = FALSE ) then
+		return FALSE
+	end if
 	coordinate_source = source
 	coordinate_line = line_number
 	coordinate_offset = line_start
@@ -188,8 +212,11 @@ end function
 private function hResolveColumn _
 	( byval source as longint, byval line_number as integer, byval decoder_column as integer, _
 	  byref column as integer, byref offset as longint ) as integer
-	if( (decoder_column < 0) or (hReadLine(source, line_number) = FALSE) ) then return FALSE
-	dim as integer index = 0, decoded = 0, canonical = 0, selected = -1, selected_column = -1
+	if( (decoder_column < 0) or (hReadLine(source, line_number) = FALSE) ) then
+		return FALSE
+	end if
+	dim as integer index = 0
+	dim as integer decoded = 0, canonical = 0, selected = -1, selected_column = -1
 	dim as integer unit_width = hUnitWidth( )
 	while( index < len(coordinate_text) )
 		if( decoded = decoder_column ) then
@@ -197,7 +224,8 @@ private function hResolveColumn _
 			selected_column = canonical
 		end if
 		dim as ulong codepoint = hCodeUnit(coordinate_text, index)
-		dim as integer units = unit_width, columns = 1
+		dim as integer units = unit_width
+		dim as integer columns = 1
 		if( unit_width = 1 ) then
 			if( codepoint > &h7F ) then
 				dim as integer trailing = 0

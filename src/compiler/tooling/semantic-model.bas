@@ -939,11 +939,24 @@ end sub
 '' so consumers can check coverage without parsing declaration punctuation.
 sub fbSemanticModelScalarStringDeclaration(byval sym as FBSYMBOL ptr, byval tree as ASTNODE ptr, _
 	byval token as integer, byref source as LEX_LOCATION)
-	if( (fbSemanticModelFullEnabled( ) = FALSE) or (sym = NULL) ) then exit sub
-	if( lex.ctx->semantic_probe ) then exit sub
-	if( symbGetFullType(sym) <> FB_DATATYPE_STRING ) then exit sub
-	if( (symbGetSubtype(sym) <> NULL) or symbIsRef(sym) ) then exit sub
-	if( symbGetArrayDimensions(sym) <> 0 ) then exit sub
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then
+		exit sub
+	end if
+	if( sym = NULL ) then
+		exit sub
+	end if
+	if( lex.ctx->semantic_probe ) then
+		exit sub
+	end if
+	if( symbGetFullType(sym) <> FB_DATATYPE_STRING ) then
+		exit sub
+	end if
+	if( (symbGetSubtype(sym) <> NULL) or symbIsRef(sym) ) then
+		exit sub
+	end if
+	if( symbGetArrayDimensions(sym) <> 0 ) then
+		exit sub
+	end if
 	dim as string kind
 	if( symbIsField(sym) and (token = 0) ) then
 		kind = "field"
@@ -954,7 +967,8 @@ sub fbSemanticModelScalarStringDeclaration(byval sym as FBSYMBOL ptr, byval tree
 	else
 		exit sub
 	end if
-	dim as longint expression = 0, statement = fbSemanticModelCurrentStatement( )
+	dim as longint expression = 0
+	dim as longint statement = fbSemanticModelCurrentStatement( )
 	if( tree <> NULL ) then
 		if( astIsTYPEINI(tree) = FALSE ) then
 			fbSemanticModelFailAt("invalid scalar String initializer")
@@ -979,7 +993,8 @@ sub fbSemanticModelScalarStringDeclaration(byval sym as FBSYMBOL ptr, byval tree
 		fbSemanticModelFailAt("unavailable scalar String declaration statement")
 		exit sub
 	end if
-	dim as longint symbolid = fbSemanticModelSymbolId(sym), sourceid = fbSemanticModelCurrentSource( )
+	dim as longint symbolid = fbSemanticModelSymbolId(sym)
+	dim as longint sourceid = fbSemanticModelCurrentSource( )
 	dim as string role = "scalar-string-declaration"
 	dim as string payload = fbSemanticModelNumber(statement) + TABCHAR + fbSemanticModelNumber(expression) + _
 		TABCHAR + kind + TABCHAR + fbSemanticModelNumber(sourceid)
