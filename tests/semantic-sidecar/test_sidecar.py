@@ -255,7 +255,8 @@ class SidecarTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         result = subprocess.run([str(cls.compiler), "-print", "host"], text=True,
                                 capture_output=True, timeout=30, check=True)
-        cls.native_windows = result.stdout.strip().split("-", 1)[0] in ("win32", "win64")
+        cls.native_host = result.stdout.strip()
+        cls.native_windows = cls.native_host.split("-", 1)[0] in ("win32", "win64")
 
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory(prefix="fbc-semantic-")

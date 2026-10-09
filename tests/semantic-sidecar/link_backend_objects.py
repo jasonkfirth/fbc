@@ -5,11 +5,11 @@ Responsibilities: ABI variants, compiler output preservation and exact symbols.
 This file intentionally does NOT execute any linked fixture program.
 """
 from pathlib import Path
-import os
 import subprocess
 
 from link_diagnostics import LinkDiagnostics
-from link_transport import source_text, check_artifact
+from link_transport import (source_text, check_artifact, windows_targets,
+                            windows_tool, windows_environment, callback_coverage)
 
 
 CASES = {
@@ -50,11 +50,7 @@ def invoke(test, source, backend, target, *, observe=True, link=False, compiler=
     else:
         command += ['-r', '-o', str(test.working / ('backend.ll' if backend == 'llvm' else 'backend.c'))]
     command.append(str(source))
-    environment = os.environ.copy()
-    if backend == 'clang' and test.native_windows:
-        # This host Clang selects either object target through FBC's native
-        # target arguments. The SDK does not install a second Win32 driver.
-        environment['CLANG'] = str(test.toolchain_prefix / 'bin/win64/clang.exe')
+    environment = windows_environment(test, target, backend) if test.native_windows else None
     result = subprocess.run(command, capture_output=True, cwd=test.working,
                             env=environment, timeout=60)
     return result, artifact
@@ -63,7 +59,7 @@ def invoke(test, source, backend, target, *, observe=True, link=False, compiler=
 def object_symbols(test, path):
     # This is the native object's structured symbol table, not program text or
     # human linker errors. Only exact names are needed to check compiler facts.
-    tool = test.toolchain_prefix / 'bin/win64/llvm-nm.exe'
+    tool = windows_tool(test, 'llvm-nm')
     result = subprocess.run([str(tool), '--format=posix', str(path)], capture_output=True, timeout=30)
     test.assertEqual(result.returncode, 0, result.stdout + result.stderr)
     return {row.split()[0].decode('ascii') for row in result.stdout.splitlines() if row.split()}
@@ -73,7 +69,7 @@ def check_c_backends(test, baseline=None, native_reader=None):
     if not test.native_windows:
         test.skipTest('Native C/Clang object matrix requires the Windows toolchain')
     for backend in ('gcc', 'clang'):
-        for target in ('win64', 'win32'):
+        for target in windows_targets(test):
             for case, body in CASES.items():
                 with test.subTest(backend=backend, target=target, case=case):
                     source = test.source(source_text(case + '.bas', body), case + '.bas')
@@ -91,7 +87,8 @@ def check_c_backends(test, baseline=None, native_reader=None):
                     observation = check_artifact(test, artifact, result, native_reader)
                     test.assertEqual(observation.version, '2')
                     symbols = object_symbols(test, test.working / 'backend.o')
-                    test.assertEqual(len(observation.callbacks), expected_exit)
+                    available = callback_coverage(test, observation)
+                    test.assertEqual(len(observation.callbacks), expected_exit if available else 0)
                     for callback in observation.callbacks:
                         test.assertEqual(callback[2], 'undefined-symbol')
                         matches = [row for row in observation.procedures.values()
@@ -111,7 +108,7 @@ def check_c_backends(test, baseline=None, native_reader=None):
 def check_llvm_objects(test, baseline=None, native_reader=None):
     if not test.native_windows:
         test.skipTest('LLVM object oracle uses the installed Windows Clang toolchain')
-    compiler = test.toolchain_prefix / 'bin/win64/clang.exe'
+    compiler = windows_tool(test, 'clang')
     targets = {'win64': 'x86_64-w64-windows-gnu', 'win32': 'i686-w64-windows-gnu',
                'linux-x86_64': 'x86_64-unknown-linux-gnu', 'darwin-x86_64': 'x86_64-apple-darwin'}
     for target, triple in targets.items():

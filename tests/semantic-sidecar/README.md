@@ -280,4 +280,11 @@ groups are rejected independently without relying on invalid footer totals.
 
 `build_scripts/test-compiler-array-bound-queries.py` checks folded and runtime bound queries, original and converted dimensions, fields, formals and macros. It verifies three targets, six encodings, unchanged generated C, compact exclusion and malformed groups rejected by both readers.
 
+The Windows linker tests use the runtime built by the current CI row. An installed
+SDK also exercises its additional x86 runtime when the matching tools and library
+are present. Clang and llvm-nm can come from that SDK or the configured toolchain.
+The ARM64 row checks native C objects and LLD's explicit unavailable callback
+coverage; GNU ld rows require its advertised callback protocol and exact symbols.
+LLVM object checks retain their independent Windows, Linux and macOS target matrix.
+
 <!-- end of README.md -->

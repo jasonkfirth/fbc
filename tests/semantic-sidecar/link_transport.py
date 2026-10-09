@@ -8,6 +8,7 @@ import hashlib
 import codecs
 import os
 from pathlib import Path
+import shutil
 import subprocess
 
 from link_diagnostics import LinkDiagnostics
@@ -16,6 +17,60 @@ from sidecar import Model
 # These fixtures inspect x86-64 assembly without assembling or linking it.
 # Select its target explicitly so ARM hosts exercise the same observer paths.
 GAS64_EMISSION_TARGET = ('-target', 'linux-x86_64')
+
+
+def windows_targets(test):
+    # Each CI row builds its own native runtime. An installed SDK can also
+    # supply the other x86 runtime; retain that additional local coverage.
+    targets = [test.native_host]
+    for target in ('win64', 'win32'):
+        directory = test.toolchain_prefix / 'bin' / target
+        libraries = (test.toolchain_prefix / 'lib' / target,
+                     test.toolchain_prefix / 'lib/freebasic' / target)
+        if target not in targets and (directory / 'gcc.exe').is_file() and any(
+                (library / 'libfb.a').is_file() for library in libraries):
+            targets.append(target)
+    return targets
+
+
+def windows_tool(test, name):
+    for target in ('win64', test.native_host, 'win32'):
+        candidate = test.toolchain_prefix / 'bin' / target / (name + '.exe')
+        if candidate.is_file():
+            return candidate
+    configured = os.environ.get(name.upper().replace('-', '_'))
+    candidate = configured or shutil.which(name)
+    test.assertTrue(candidate, name + ' is required for the Windows object oracle')
+    return Path(candidate)
+
+
+def windows_environment(test, target, backend):
+    environment = os.environ.copy()
+    directory = test.toolchain_prefix / 'bin' / target
+    # A second SDK target must not inherit the active Make row's tool overrides.
+    # Native CI builds keep their configured tools, including ARM64 Clang/LLD.
+    for variable, name in (('AS', 'as'), ('AR', 'ar'), ('LD', 'ld'), ('GCC', 'gcc')):
+        candidate = directory / (name + '.exe')
+        if candidate.is_file():
+            environment[variable] = test.compiler_path(candidate)
+        elif target == test.native_host:
+            environment[variable] = test.compiler_path(windows_tool(test, name))
+    if backend == 'clang':
+        environment['CLANG'] = test.compiler_path(windows_tool(test, 'clang'))
+    return environment
+
+
+def callback_coverage(test, observation):
+    # GNU ld exposes this optional protocol through --help. LLD does not;
+    # its diagnostic artifact must explicitly report unavailable coverage.
+    tool = observation.link[5]
+    if test.native_windows and os.name != 'nt':
+        tool = subprocess.check_output(['cygpath', '-u', tool], text=True).strip()
+    help_result = subprocess.run([tool, '--help'], capture_output=True, timeout=30)
+    test.assertEqual(help_result.returncode, 0, help_result.stdout + help_result.stderr)
+    expected = 'available' if b'--error-handling-script' in help_result.stdout else 'unavailable'
+    test.assertEqual(observation.link[4], expected)
+    return expected == 'available'
 
 
 def source_text(filename, body, language='fb'):
@@ -44,7 +99,9 @@ def invoke(test, sources, backend, *, link=False, extra=(), observed=True,
     if model:
         command += ['-semantic-model', str(ast)]
     command += [*map(str, extra), *map(str, sources)]
-    result = subprocess.run(command, cwd=test.working, capture_output=True, timeout=60)
+    target = str(extra[extra.index('-target') + 1]) if '-target' in extra else test.native_host
+    environment = windows_environment(test, target, backend) if link and test.native_windows else None
+    result = subprocess.run(command, cwd=test.working, capture_output=True, timeout=60, env=environment)
     return result, artifact, ast
 
 
@@ -126,10 +183,12 @@ def check_native(test, baseline_compiler=None, native_reader=None):
                               'Function Extern() As Long\nReturn 23\nEnd Function\nPrint Extern()', 'deprecated', 0, 0),
         'inactive': ('#If 0\nDeclare Function LinkAbsent() As Long\nPrint LinkAbsent()\n#EndIf\nPrint 23', 'fb', 0, 0),
     }
-    for backend in ('gas64', 'gas'):
+    for target in windows_targets(test):
+        backend = 'gcc' if target.endswith('-aarch64') else 'gas64' if target == 'win64' else 'gas'
         executable = test.working / (backend + '.exe')
         object_path = test.working / (backend + '.o')
-        extra = ('-C', '-x', executable, '-o', object_path)
+        target_extra = ('-target', target)
+        extra = (*target_extra, '-C', '-x', executable, '-o', object_path)
         for case, (body, language, expected_exit, expected_callbacks) in cases.items():
             source = test.source(source_text(case + '.bas', body, language), case + '.bas')
             for with_ast in (False, True):
@@ -145,8 +204,8 @@ def check_native(test, baseline_compiler=None, native_reader=None):
                     test.assertEqual(object_path.read_bytes(), previous_object)
                     observation = check_artifact(test, artifact, result, native_reader)
                     test.assertEqual(observation.link[1:3], ['1', '1'])
-                    test.assertEqual(observation.link[4], 'available')
-                    test.assertEqual(len(observation.callbacks), expected_callbacks)
+                    available = callback_coverage(test, observation)
+                    test.assertEqual(len(observation.callbacks), expected_callbacks if available else 0)
                     for callback in observation.callbacks:
                         matches = [row for row in observation.procedures.values()
                                    if row[6] == 'observed' and row[7] == callback[3]]
@@ -164,11 +223,11 @@ def check_native(test, baseline_compiler=None, native_reader=None):
         caller = test.source(source_text('caller.bas',
             'Declare Function LinkSeparate() As Long\nPrint LinkSeparate()'), 'caller.bas')
         compiled, _, _ = invoke(test, [callee], backend, link=True, observed=False,
-                               extra=('-c', '-o', object_path))
+                               extra=(*target_extra, '-c', '-o', object_path))
         test.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
         for source_list in ([caller, object_path], [caller, callee]):
             result, artifact, _ = invoke(test, source_list, backend, link=True,
-                                         extra=('-x', executable))
+                                         extra=(*target_extra, '-x', executable))
             test.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             observation = check_artifact(test, artifact, result, native_reader)
             test.assertFalse(observation.callbacks)
@@ -176,31 +235,33 @@ def check_native(test, baseline_compiler=None, native_reader=None):
         # Missing libraries are another typed callback kind, independent of
         # procedure bindings. Force native ld to own this failure with -Wl.
         result, artifact, _ = invoke(test, [caller, object_path], backend, link=True,
-            extra=('-x', executable, '-Wl', '-lfbc_semantic_missing_library_9287'))
+            extra=(*target_extra, '-x', executable, '-Wl', '-lfbc_semantic_missing_library_9287'))
         test.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         observation = check_artifact(test, artifact, result, native_reader)
+        available = callback_coverage(test, observation)
         test.assertEqual([row[2:] for row in observation.callbacks],
-                         [['missing-lib', '-lfbc_semantic_missing_library_9287']])
+                         [['missing-lib', '-lfbc_semantic_missing_library_9287']] if available else [])
         missing = test.source(source_text('response.bas',
             'Declare Function ResponseAbsent() As Long\nPrint ResponseAbsent()'), 'response.bas')
         paths = tuple(value for index in range(40) for value in
                       ('-p', str(test.working / ('long-link-search-directory-' + str(index)))))
         result, artifact, _ = invoke(test, [missing], backend, link=True,
-            extra=('-x', executable, *paths))
+            extra=(*target_extra, '-x', executable, *paths))
         test.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         observation = check_artifact(test, artifact, result, native_reader)
         test.assertGreater(len(observation.arguments), 2047)
-        test.assertEqual(len(observation.callbacks), 1)
-        test.assertEqual(observation.link[4], 'available')
+        available = callback_coverage(test, observation)
+        test.assertEqual(len(observation.callbacks), 1 if available else 0)
 
     # A configured user callback belongs to the native link closure. Keep it
     # intact and report unavailable coverage instead of silently replacing it.
     handler = test.source(source_text('handler.bas', 'End 0'), 'handler.bas')
     helper = test.working / 'handler.exe'
-    result, _, _ = invoke(test, [handler], 'gas64', link=True, observed=False, extra=('-x', helper))
+    result, _, _ = invoke(test, [handler], backend, link=True, observed=False,
+                         extra=(*target_extra, '-x', helper))
     test.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-    result, artifact, _ = invoke(test, [missing], 'gas64', link=True,
-        extra=('-x', executable, '-Wl', '--error-handling-script=' + str(helper)))
+    result, artifact, _ = invoke(test, [missing], backend, link=True,
+        extra=(*target_extra, '-x', executable, '-Wl', '--error-handling-script=' + str(helper)))
     test.assertEqual(result.returncode, 1, result.stdout + result.stderr)
     observation = check_artifact(test, artifact, result, native_reader)
     test.assertFalse(observation.callbacks)

@@ -282,6 +282,8 @@ jobs:
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-binutils
             mingw-w64-x86_64-libffi
+            mingw-w64-x86_64-clang
+            mingw-w64-x86_64-llvm
 
       - name: Select parallelism
         run: echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
