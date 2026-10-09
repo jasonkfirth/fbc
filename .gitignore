@@ -14,9 +14,6 @@
 /examples/**/*.asm
 /examples/**/*.fbc-*.c
 
-# Direct emission of the semantic binding fixture is generated test output.
-/tests/semantic-sidecar/bindings.c
-
 # Legacy Windows import libraries and runtime DLLs intentionally bundled for
 # examples that still depend on libraries not provided by current MSYS2.
 !/contrib/winlibs-legacy/
@@ -92,6 +89,8 @@
 /tests/**/*.dylib
 /tests/**/*.a
 /tests/**/*.lib
+# Direct emission of the semantic binding fixture is generated test output.
+/tests/semantic-sidecar/bindings.c
 /tests/sfx/render-polyphony
 .install_manifest
 *.apk.idsig
