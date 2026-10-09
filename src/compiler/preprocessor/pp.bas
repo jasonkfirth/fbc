@@ -28,6 +28,8 @@
 #include once "parser/parser.bi"
 #include once "preprocessor/pp.bi"
 #include once "tooling/semantic-source.bi"
+declare sub fbSemanticModelSourcePolicyInput _
+	( byref kind as const string, byref value as const string, byval source as LEX_LOCATION ptr = NULL )
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-macros.bi"
 
@@ -420,6 +422,8 @@ private sub ppIncLib( )
 		lexPPOnlyEmitToken( )
 	end if
 
+	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
+	fbSemanticModelSourcePolicyInput("inclib", *lexGetText( ), @semantic_site)
 	fbAddLib( lexGetText( ) )
 	lexSkipToken( )
 end sub
@@ -441,6 +445,8 @@ private sub ppLibPath( )
 		lexPPOnlyEmitToken( )
 	end if
 
+	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
+	fbSemanticModelSourcePolicyInput("libpath", *lexGetText( ), @semantic_site)
 	fbAddLibPath( lexGetText( ) )
 	lexSkipToken( )
 end sub

@@ -41,6 +41,7 @@ SEMANTIC_READER_FILES = (
     "semantic_assignment_inputs.py",
     "semantic_assignment_storage.py",
     "semantic_abi_policy.py",
+    "semantic_header_policy.py",
 )
 
 

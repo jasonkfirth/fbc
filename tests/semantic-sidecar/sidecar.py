@@ -28,6 +28,7 @@ from semantic_repetitions import validate_declaration_repetitions
 from aggregate_fields import validate_aggregate_fields
 from semantic_callbacks import validate_procedure_callbacks
 from semantic_abi_policy import validate_abi_policy_inputs
+from semantic_header_policy import validate_header_policy
 from semantic_enums import validate_enum_declarations
 from semantic_iif import validate_iif_inputs
 from semantic_if import validate_if_conditions
@@ -545,7 +546,7 @@ class Model:
                 self.access_roles[identity] = row[2]
             elif tag == "SOP":
                 identity = number(row[1], 1)
-                if identity not in self.statements or row[2] not in ("file-open", "file-close", "file-seek", "file-get", "file-put", "file-lock", "file-unlock", "file-rename", "line-input", "goto", "gosub", "gosub-return", "gosub-return-label", "procedure-return", "on-goto", "on-gosub", "on-error-set", "on-error-clear"):
+                if identity not in self.statements or row[2] not in ("file-open", "file-close", "file-seek", "file-get", "file-put", "file-lock", "file-unlock", "file-rename", "line-input", "namespace-import", "goto", "gosub", "gosub-return", "gosub-return-label", "procedure-return", "on-goto", "on-gosub", "on-error-set", "on-error-clear"):
                     raise ValueError("Invalid source statement operation")
                 self.statement_operations[identity].append(row[2])
             elif tag == "G":
@@ -1387,6 +1388,7 @@ class Model:
             validate_assignment_storage(self, number, subject_modules, len(NODE_KINDS))
             validate_procedure_callbacks(self, number, subject_modules)
             validate_abi_policy_inputs(self, number, subject_modules)
+            validate_header_policy(self, number, unescape, subject_modules)
             validate_aggregate_fields(self, number, subject_modules)
             validate_wide_literals(self, number, subject_modules)
             self.validate_for_steps(subject_modules)

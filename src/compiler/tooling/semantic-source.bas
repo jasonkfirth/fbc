@@ -10,6 +10,7 @@
 #include once "tooling/semantic-link.bi"
 #include once "tooling/semantic-macros.bi"
 #include once "tooling/semantic-coordinates.bi"
+#include once "tooling/semantic-preprocessor.bi"
 #include once "parser/parser.bi"
 #include once "file.bi"
 
@@ -23,6 +24,11 @@ dim shared as any ptr semantic_source_revisions(0 to FB_MAXINCRECLEVEL)
 dim shared as integer semantic_source_handles(0 to FB_MAXINCRECLEVEL)
 dim shared as integer semantic_source_formats(0 to FB_MAXINCRECLEVEL)
 dim shared as integer semantic_source_regular(0 to FB_MAXINCRECLEVEL)
+'' Policy counts belong to one source occurrence, not a pathname. Reopening a
+'' file gets a fresh receipt even when the preprocessor skips its guarded body.
+dim shared as integer semantic_source_once(0 to FB_MAXINCRECLEVEL)
+dim shared as longint semantic_source_libraries(0 to FB_MAXINCRECLEVEL)
+dim shared as longint semantic_source_imports(0 to FB_MAXINCRECLEVEL)
 
 private function hEncoding(byval format as integer) as string
 	select case format
@@ -99,6 +105,9 @@ sub fbSemanticModelOpenSource(byref filename as const string, byval depth as int
 	semantic_source_handles(depth) = env.inf.num
 	semantic_source_formats(depth) = env.inf.format
 	semantic_source_regular(depth) = status = 1
+	semantic_source_once(depth) = FALSE
+	semantic_source_libraries(depth) = 0
+	semantic_source_imports(depth) = 0
 	fbSemanticModelAppendProvenance("SRC" + TABCHAR + fbSemanticModelNumber(semantic_source_ids(depth)) + _
 		TABCHAR + fbSemanticModelNumber(parentid) + TABCHAR + fbSemanticModelNumber(fileid) + _
 		TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + TABCHAR + kind + _
@@ -115,11 +124,60 @@ sub fbSemanticModelCloseSource(byval depth as integer)
 	if( semantic_source_revisions(depth) = NULL ) then exit sub
 	dim as long status = fbSemanticSourceClose(semantic_source_revisions(depth))
 	semantic_source_revisions(depth) = NULL
+	if( fbSemanticModelFullEnabled( ) ) then
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + TABCHAR + _
+			"header-policy:" + fbSemanticModelNumber(semantic_source_ids(depth)) + TABCHAR + _
+			fbSemanticModelEscape(fbSemanticModelNumber(abs(semantic_source_once(depth) <> FALSE)) + TABCHAR + _
+				fbSemanticModelNumber(semantic_source_libraries(depth)) + TABCHAR + _
+				fbSemanticModelNumber(semantic_source_imports(depth))))
+	end if
 	fbSemanticModelAppendProvenance("SRE" + TABCHAR + fbSemanticModelNumber(semantic_source_ids(depth)) + _
 		TABCHAR + iif(status = 1, "verified", iif(status = 2, "unverified-stream", "changed-or-unreadable")))
 	semantic_source_ids(depth) = 0
 	semantic_source_handles(depth) = 0
 	if( status = 0 ) then fbSemanticModelFailAt("semantic-source.bas:115")
+end sub
+
+'' -------------------------------------------------------------------------
+'' Accepted header policies and preprocessor library inputs
+'' -------------------------------------------------------------------------
+
+sub fbSemanticModelSourcePolicyInput _
+	( byref kind as const string, byref value as const string, byval source as LEX_LOCATION ptr )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	dim as integer depth = env.includerec
+	dim as longint sourceid = fbSemanticModelCurrentSource( )
+	if( (sourceid = 0) or (depth < 0) or (depth > FB_MAXINCRECLEVEL) ) then
+		fbSemanticModelFailAt("semantic-source.bas:header-policy")
+		exit sub
+	end if
+	select case kind
+	case "once"
+		semantic_source_once(depth) = TRUE
+	case "namespace-import"
+		semantic_source_imports(depth) += 1
+	case "inclib", "libpath"
+		if( source = NULL ) then
+			fbSemanticModelFailAt("semantic-source.bas:library-location")
+			exit sub
+		end if
+		semantic_source_libraries(depth) += 1
+		dim as string role = "header-library:" + fbSemanticModelNumber(fbSemanticModelNextDetailIdentity( ))
+		dim as longint owner = fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))
+		'' Escape the nested string separately: an accepted library path can
+		'' itself contain a tab, newline or percent character.
+		dim as string payload = fbSemanticModelNumber(sourceid) + TABCHAR + kind + TABCHAR + _
+			fbSemanticModelEscape(value) + TABCHAR + fbSemanticModelNumber(fbSemanticModelPPCurrentBranch( ))
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(owner) + _
+			TABCHAR + role + TABCHAR + fbSemanticModelEscape(payload))
+		'' Physical coordinates belong to the include occurrence; macro
+		'' origins attach to the property owner through the symbol contract.
+		fbSemanticModelExportCoordinates("source-context", sourceid, role, *source, *source)
+		fbSemanticModelMacroOrigin("symbol", owner, source->macro_identity, role)
+	case else
+		fbSemanticModelFailAt("semantic-source.bas:unknown-policy")
+	end select
 end sub
 
 sub fbSemanticModelIncludeOutcome(byref requested as const string, byref resolved as const string, _

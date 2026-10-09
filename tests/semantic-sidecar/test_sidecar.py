@@ -214,6 +214,10 @@ class SidecarTests(unittest.TestCase):
         from abi_policy_inputs import check_policy_inputs
         check_policy_inputs(self)
 
+    def test_source_header_policy_inputs(self) -> None:
+        from header_policy_inputs import check_header_policy
+        check_header_policy(self)
+
     def test_keyword_configuration_contexts(self) -> None:
         from keyword_contexts import check_keyword_contexts
         check_keyword_contexts(self)

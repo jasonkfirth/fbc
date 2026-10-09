@@ -287,4 +287,10 @@ The ARM64 row checks native C objects and LLD's explicit unavailable callback
 coverage; GNU ld rows require its advertised callback protocol and exact symbols.
 LLVM object checks retain their independent Windows, Linux and macOS target matrix.
 
+`header_policy_inputs.py` checks accepted per-source pragma-once, library and
+namespace-import receipts across GCC, Clang and LLVM. Literal and macro-generated
+library values preserve escapes and origin ownership. Full and compact models
+leave emission unchanged, and twelve damaged receipt cases must be rejected.
+The reader also requires complete occurrence counts and same-module ownership.
+
 <!-- end of README.md -->

@@ -35,6 +35,8 @@
 #include once "backend/ir.bi"
 #include once "driver/objinfo.bi"
 #include once "tooling/semantic-source.bi"
+declare sub fbSemanticModelSourcePolicyInput _
+	( byref kind as const string, byref value as const string, byval source as LEX_LOCATION ptr = NULL )
 
 declare sub fbSemanticModelBeginModule(byref filename as string)
 declare sub fbSemanticModelAddDependency(byref filename as string)
@@ -1739,6 +1741,7 @@ sub fbPragmaOnce()
 		if( hFindIncFile( @env.inconcehash, env.inf.name ) = NULL ) then
 			hAddIncFile( @env.inconcehash, @env.filenamehash, env.inf.name )
 		end if
+		fbSemanticModelSourcePolicyInput("once", "")
 	end if
 end sub
 

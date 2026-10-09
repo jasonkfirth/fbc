@@ -26,6 +26,9 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-constructs.bi"
+declare sub fbSemanticModelSourcePolicyInput _
+	( byref kind as const string, byref value as const string, byval source as LEX_LOCATION ptr = NULL )
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -247,6 +250,7 @@ end sub
 '' Usingtmt  =  USING ID (',' ID)*
 sub cUsingStmt( )
 	dim as FBSYMBOL ptr sym = any
+	dim as integer accepted = FALSE
 
 	if( fbLangOptIsSet( FB_LANG_OPT_NAMESPC ) = FALSE ) then
 		errReportNotAllowed( FB_LANG_OPT_NAMESPC )
@@ -276,11 +280,16 @@ sub cUsingStmt( )
 				errReport( FB_ERRMSG_TYPEMISMATCH )
 			else
 				symbNamespaceImport( sym )
+				accepted = TRUE
 			end if
 		end if
 
 	'' ','?
 	loop while( hMatch( CHAR_COMMA ) )
+	if( accepted ) then
+		fbSemanticModelStatementOperation("namespace-import")
+		fbSemanticModelSourcePolicyInput("namespace-import", "")
+	end if
 end sub
 
 '' end of parser/statements/parser-compound-namespace.bas

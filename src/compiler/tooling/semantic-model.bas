@@ -3227,7 +3227,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
-	for capability as integer = 0 to 83
+	for capability as integer = 0 to 84
 		dim as string feature, coverage
 		select case capability
 		case 0: feature = "symbol-identities": coverage = iif(semantic_model_expressions_only, "unavailable", "available")
@@ -3310,6 +3310,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		case 81: feature = "assignment-initializers": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 82: feature = "let-destination-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 83: feature = "procedure-abi-policy-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 84: feature = "source-header-policy-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 54: feature = "select-case-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 55: feature = "select-case-lowering-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 56: feature = "target-wide-literal-prefixes": coverage = iif(fbSemanticModelFullEnabled( ) and _

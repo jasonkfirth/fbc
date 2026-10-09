@@ -2550,4 +2550,33 @@ an available module, with the same procedure, occurrence identity and statement.
 Compact exports mark this capability unavailable and omit these properties.
 Older producers remain valid but do not prove these policies.
 
+## Accepted source header policies
+
+Full models advertise `source-header-policy-inputs available`. Each opened
+source occurrence retains one property on its module's global namespace:
+
+    K symbol namespace-ID header-policy:source-ID pragma-once<TAB>library-count<TAB>import-count
+
+The first field records an accepted `#PRAGMA ONCE`; the counts cover accepted
+`#INCLIB`/`#LIBPATH` inputs and USING statements that imported a namespace.
+Counts belong to a source occurrence, so repeated includes and preincludes
+remain distinct. Skipped or inactive directives do not add accepted inputs.
+Namespace imports also retain the `namespace-import` statement operation.
+
+Each accepted library directive has a separate property on the same owner:
+
+    K symbol namespace-ID header-library:identity source-ID<TAB>kind<TAB>escaped-value<TAB>conditional-branch-ID
+
+`kind` is `inclib` or `libpath`. The value is escaped before the complete
+payload is escaped, preserving literal tabs and percent characters. Physical
+coordinates attach to the source occurrence, while macro origins attach to
+the property's namespace owner. Generated tokens do not acquire editable
+source ranges.
+
+Readers require same-module namespace ownership, complete occurrence receipts,
+canonical Boolean/count fields, one import receipt per accepted operation,
+same-source statement and recipient ownership, matching counts, and valid
+conditional branches. Compact models mark the capability unavailable and omit
+these properties. Older models do not prove these policies.
+
 <!-- end of compiler-semantic-model.md -->
