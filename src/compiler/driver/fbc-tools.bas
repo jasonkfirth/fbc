@@ -87,7 +87,26 @@ function fbcDriverGetClangTargetOption( ) as string
 	return ""
 end function
 
-private sub hAppendTargetCcQueryOptions( byref path as string )
+private function hCcQueryTool( ) as integer
+	if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG ) then
+		'' MinGW Clang's runtime search stays under its installation prefix,
+		'' even with -m32 and an explicit i686 target.  Use the selected GCC
+		'' installation for x86 startup objects, libraries and binutils so
+		'' an x64 Clang can generate code for the x86 runtime.  Windows ARM64
+		'' uses a Clang runtime without GCC and must keep Clang's queries.
+		if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32 ) then
+			select case fbGetCpuFamily( )
+			case FB_CPUFAMILY_X86, FB_CPUFAMILY_X86_64
+				return FBCTOOL_GCC
+			end select
+		end if
+		return FBCTOOL_CLANG
+	end if
+
+	return FBCTOOL_GCC
+end function
+
+private sub hAppendTargetCcQueryOptions( byref path as string, byval tool as integer )
 	select case( fbGetCpuFamily( ) )
 	case FB_CPUFAMILY_X86
 		path += " -m32"
@@ -105,7 +124,7 @@ private sub hAppendTargetCcQueryOptions( byref path as string )
 
 	fbcPlatformAddCcQueryOptions( path )
 
-	if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG ) then
+	if( tool = FBCTOOL_CLANG ) then
 		path += " " + fbcDriverGetClangTargetOption( )
 	end if
 end sub
@@ -129,16 +148,9 @@ end function
 function fbcQueryCC( byref options as string ) as string
 	dim as string path
 
-	select case( fbGetOption( FB_COMPOPT_BACKEND ) )
-	case FB_BACKEND_CLANG
-		fbcFindBin( FBCTOOL_CLANG, path )
-
-	'' For gcc backend and all other backends assume we want to query gcc
-	case else
-		fbcFindBin( FBCTOOL_GCC, path )
-	end select
-
-	hAppendTargetCcQueryOptions( path )
+	var tool = hCcQueryTool( )
+	fbcFindBin( tool, path )
+	hAppendTargetCcQueryOptions( path, tool )
 
 	path += options
 
@@ -274,16 +286,9 @@ function fbcBuildPathToLibFile( byval file as zstring ptr ) as string
 
 	'' Not found in our lib/, query the target-specific gcc
 	dim as string path
-	select case( fbGetOption( FB_COMPOPT_BACKEND ) )
-	case FB_BACKEND_CLANG
-		fbcFindBin( FBCTOOL_CLANG, path )
-
-	'' For gcc backend and all other backends assume we want to query gcc
-	case else
-		fbcFindBin( FBCTOOL_GCC, path )
-	end select
-
-	hAppendTargetCcQueryOptions( path )
+	var tool = hCcQueryTool( )
+	fbcFindBin( tool, path )
+	hAppendTargetCcQueryOptions( path, tool )
 
 	if( len( fbc.sysroot ) ) then
 		path += " --sysroot=" + fbc.sysroot
@@ -308,16 +313,9 @@ function fbcFindSysroot( ) as string
 	'' Query the target-specific gcc
 	dim as string path
 
-	select case( fbGetOption( FB_COMPOPT_BACKEND ) )
-	case FB_BACKEND_CLANG
-		fbcFindBin( FBCTOOL_CLANG, path )
-
-	'' For gcc backend and all other backends assume we want to query gcc
-	case else
-		fbcFindBin( FBCTOOL_GCC, path )
-	end select
-
-	hAppendTargetCcQueryOptions( path )
+	var tool = hCcQueryTool( )
+	fbcFindBin( tool, path )
+	hAppendTargetCcQueryOptions( path, tool )
 	path += " --print-sysroot"
 	return fbcDriverGet1stOutputLineFromCommand( path )
 end function

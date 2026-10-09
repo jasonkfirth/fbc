@@ -1,6 +1,7 @@
 Version 1.20.4
 
 [changed]
+- compiler/Windows Clang: query the selected MinGW GCC toolchain for x86/x64 startup objects, system libraries and binutils, preventing an x64 Clang installation from selecting x64 CRT files while linking x86 code; retain Clang runtime discovery for Windows ARM64 and other platforms.
 - packaging/Windows fbc-js: update the verified official Binaryen overlay to version 133 to match Emscripten and retain warning-free package qualification.
 - compiler semantic expressions: retain typed written array-field prefixes in compact expression models for consumers such as the VS Code plugin, while reserving array symbol and receiver relationships for full models.
 - compiler semantic model: retain a noneditable macro-invocation anchor for generated include outcomes while omitting replacement-token directive spans, so clients can distinguish macro includes from command-line preincludes without changing include processing.
