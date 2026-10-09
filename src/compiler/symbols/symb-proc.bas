@@ -744,7 +744,9 @@ private sub hSetupProcRegisterParameters _
 
 		var param = symbGetProcHeadParam( proc )
 
-		if( symbIsInstanceParam( param ) ) then
+		'' A zero-argument callback still selects fastcall/thiscall, but has
+		'' no head parameter to inspect or assign to a register.
+		if( (param <> NULL) andalso symbIsInstanceParam( param ) ) then
 			'' pass argument in ECX register
 			param->param.regnum = regnum
 			regnum += 1

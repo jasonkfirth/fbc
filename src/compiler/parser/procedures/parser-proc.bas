@@ -26,6 +26,8 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-diagnostics.bi"
+#include once "tooling/semantic-link.bi"
 #include once "parser/parser.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
@@ -39,6 +41,12 @@ declare sub fbSemanticModelExportBinding _
 
 declare sub fbSemanticModelProcedureTyping(byval proc as FBSYMBOL ptr, byval tk as integer, _
 	byref role as const string, byref result_form as const string)
+declare function fbSemanticModelCallbackCount( ) as longint
+declare sub fbSemanticModelProcedureAbiInput(byval proc as FBSYMBOL ptr, byref role as const string, _
+	byval has_library as integer, byval has_alias as integer, byval callback_start as longint, byref source as LEX_LOCATION)
+declare sub fbSemanticModelDeclarationRepeat(byval sym as FBSYMBOL ptr, byref kind as const string, _
+	byval repeated as integer, byref source as LEX_LOCATION)
+declare sub fbSemanticModelExportProcedureReplacement(byval previous as FBSYMBOL ptr, byval canonical as FBSYMBOL ptr)
 declare sub fbSemanticModelProcedureVisibility(byval proc as FBSYMBOL ptr, byref written as const string)
 
 '' [ALIAS "id"]
@@ -294,12 +302,18 @@ private sub hCheckAttribs _
 	( _
 		byval proto as FBSYMBOL ptr, _
 		byval attrib as FB_SYMBATTRIB, _
-		byval pattrib as FB_PROCATTRIB _
+		byval pattrib as FB_PROCATTRIB, _
+		byref semantic_site as LEX_LOCATION, _
+		byval header_valid as integer _
 	)
 
 	'' if one returns BYREF, the other must too
 	if( ((pattrib and FB_PROCATTRIB_RETURNBYREF) <> 0) <> symbIsReturnByRef( proto ) ) then
+		if( header_valid andalso fbSemanticDiagnosticsProcedureValid(proto) ) then
+			fbSemanticDiagnosticsAt("procedure-signature-mismatch", semantic_site)
+		end if
 		errReport( FB_ERRMSG_TYPEMISMATCH, TRUE )
+		fbSemanticDiagnosticsContext("")
 		'' Error recovery: if the proto had BYREF, add it for the body
 		'' too, otherwise remove it from the body
 		if( symbIsReturnByRef( proto ) ) then
@@ -332,65 +346,46 @@ private sub hCheckAttribs _
 
 end sub
 
-private function hFindDuplicatePrototype _
+'' Compare the native contracts before temporary header symbols are released.
+'' Parameter spelling is irrelevant. Type aliases already refer to selected
+'' subtypes, and optional expressions use the compiler's existing AST equality.
+private function hSamePrototype _
 	( _
-		byval head_proc as FBSYMBOL ptr, _
+		byval proto as FBSYMBOL ptr, _
 		byval proc as FBSYMBOL ptr, _
 		byval palias as zstring ptr, _
 		byval proc_dtype as integer, _
 		byval proc_subtype as FBSYMBOL ptr, _
 		byval pattrib as FB_PROCATTRIB, _
 		byval mode as integer, _
-		byval is_get as integer _
-	) as FBSYMBOL ptr
+		byval check_param_types as integer = TRUE _
+	) as integer
 
-	dim as FBSYMBOL ptr proto = any
 	dim as FBSYMBOL ptr param = any, proto_param = any
 	dim as integer params = any, proto_params = any
-
-	function = NULL
-
-	'' Legacy BASIC code often repeats identical DECLARE lines in split
-	'' modules.  Accept only exact prototype matches, and only before a
-	'' body has been parsed, so mismatched declarations still fail.
-	if( env.clopt.lang = FB_LANG_FB ) then
-		exit function
-	end if
-
-	if( (head_proc = NULL) or (proc = NULL) ) then
-		exit function
-	end if
-
-	proto = symbFindOverloadProc( head_proc, proc, _
-		iif( is_get, FB_SYMBFINDOPT_PROPGET, FB_SYMBFINDOPT_NONE ) )
-	if( proto = NULL ) then
-		exit function
-	end if
-
-	if( symbGetIsDeclared( proto ) ) then
-		exit function
-	end if
-
+	if( (proto = NULL) or (proc = NULL) ) then return FALSE
+	if( (symbGetClass( proto ) <> FB_SYMBCLASS_PROC) or _
+	    (symbGetClass( proc ) <> FB_SYMBCLASS_PROC) ) then return FALSE
 	if( (symbGetFullType( proto ) <> proc_dtype) or _
 	    (symbGetSubtype( proto ) <> proc_subtype) ) then
-		exit function
+		return FALSE
 	end if
 
 	if( symbGetProcMode( proto ) <> mode ) then
-		exit function
+		return FALSE
 	end if
 
 	if( symbIsReturnByRef( proto ) <> ((pattrib and FB_PROCATTRIB_RETURNBYREF) <> 0) ) then
-		exit function
+		return FALSE
 	end if
 
 	if( palias <> NULL ) then
 		if( (proto->stats and FB_SYMBSTATS_HASALIAS) = 0 ) then
-			exit function
+			return FALSE
 		end if
 
 		if( *palias <> *proto->id.alias ) then
-			exit function
+			return FALSE
 		end if
 	end if
 
@@ -409,25 +404,31 @@ private function hFindDuplicatePrototype _
 	end if
 
 	if( proto_params <> params ) then
-		exit function
+		return FALSE
 	end if
 
 	while( (proto_param <> NULL) and (param <> NULL) )
+		if( check_param_types andalso _
+		    ((symbGetFullType( proto_param ) <> symbGetFullType( param )) or _
+		     (symbGetSubtype( proto_param ) <> symbGetSubtype( param ))) ) then
+			return FALSE
+		end if
+
 		if( proto_param->param.mode <> param->param.mode ) then
-			exit function
+			return FALSE
 		end if
 
 		if( proto_param->param.bydescdimensions <> param->param.bydescdimensions ) then
-			exit function
+			return FALSE
 		end if
 
 		if( symbParamIsOptional( proto_param ) <> symbParamIsOptional( param ) ) then
-			exit function
+			return FALSE
 		end if
 
 		if( symbParamIsOptional( proto_param ) ) then
 			if( astIsEqualParamInit( proto_param->param.optexpr, param->param.optexpr ) = FALSE ) then
-				exit function
+				return FALSE
 			end if
 		end if
 
@@ -435,8 +436,64 @@ private function hFindDuplicatePrototype _
 		param = param->next
 	wend
 
-	function = proto
+	return (proto_param = NULL) and (param = NULL)
+end function
 
+'' A rejected declaration conflicts only when none of the same-name native
+'' procedures has its contract. An exact duplicate is a redefinition error,
+'' not evidence of a mismatched signature. Legal overloads never reach this.
+private function hConflictingPrototype _
+	( _
+		byval head_proc as FBSYMBOL ptr, _
+		byval proc as FBSYMBOL ptr, _
+		byval palias as zstring ptr, _
+		byval proc_dtype as integer, _
+		byval proc_subtype as FBSYMBOL ptr, _
+		byval pattrib as FB_PROCATTRIB, _
+		byval mode as integer _
+	) as integer
+
+	if( (head_proc = NULL) or (proc = NULL) ) then return FALSE
+	if( symbGetClass( head_proc ) <> FB_SYMBCLASS_PROC ) then return FALSE
+	dim as FBSYMBOL ptr proto = head_proc
+	do
+		if( fbSemanticDiagnosticsProcedureValid(proto) = FALSE ) then return FALSE
+		if( hSamePrototype(proto, proc, palias, proc_dtype, proc_subtype, pattrib, mode) ) then return FALSE
+		proto = symbGetProcOvlNext( proto )
+	loop while( proto <> NULL )
+	return TRUE
+end function
+
+'' Legacy acceptance policy remains separate from diagnostic classification.
+'' Only a selected, exact prototype match without an existing body is reused.
+'' Modern FB continues to reject repeated prototypes.
+''
+'' The matcher still selects by native parameter types before exact ABI,
+'' descriptor rank and default-expression checks are applied.
+''
+private function hFindDuplicatePrototype _
+	( _
+		byval head_proc as FBSYMBOL ptr, _
+		byval proc as FBSYMBOL ptr, _
+		byval palias as zstring ptr, _
+		byval proc_dtype as integer, _
+		byval proc_subtype as FBSYMBOL ptr, _
+		byval pattrib as FB_PROCATTRIB, _
+		byval mode as integer, _
+		byval is_get as integer _
+	) as FBSYMBOL ptr
+
+	dim as FBSYMBOL ptr proto = any
+	if( env.clopt.lang = FB_LANG_FB ) then return NULL
+	if( (head_proc = NULL) or (proc = NULL) ) then return NULL
+	proto = symbFindOverloadProc( head_proc, proc, _
+		iif( is_get, FB_SYMBFINDOPT_PROPGET, FB_SYMBFINDOPT_NONE ) )
+	if( proto = NULL ) then return NULL
+	if( symbGetIsDeclared( proto ) ) then return NULL
+	'' Preserve symbFindOverloadProc's existing type equivalence for legacy
+	'' acceptance; the diagnostic-only comparison checks selected types itself.
+	if( hSamePrototype(proto, proc, palias, proc_dtype, proc_subtype, pattrib, mode, FALSE) = FALSE ) then return NULL
+	return proto
 end function
 
 private function hCheckIdToken( byval has_parent as integer ) as integer
@@ -1450,7 +1507,8 @@ private sub hParseProcHeaderAttributes _
 		byref pattrib as FB_PROCATTRIB, _
 		byref mode as integer, _
 		byref mode_is_explicit as integer, _
-		byref palias as zstring ptr _
+		byref palias as zstring ptr, _
+		byref semantic_has_library as integer _
 	)
 
 	'' [NAKED]
@@ -1495,6 +1553,7 @@ private sub hParseProcHeaderAttributes _
 
 	if( options and FB_PROCOPT_ISPROTO ) then
 		'' [LIB "string"]
+		semantic_has_library = (lexGetToken( ) = FB_TK_LIB)
 		cLibAttribute( )
 	end if
 
@@ -1691,10 +1750,14 @@ private function hAddProcPrototype _
 		byval subtype as FBSYMBOL ptr, _
 		byval options as FB_PROCOPT, _
 		byval is_get as integer, _
-		byval is_indexed as integer _
+		byval is_indexed as integer, _
+		byref semantic_repeated as integer, _
+		byref semantic_site as LEX_LOCATION, _
+		byval header_valid as integer _
 	) as FBSYMBOL ptr
 
 	dim as FBSYMBOL ptr proc = any
+	semantic_repeated = FALSE
 
 	select case( tk )
 	case FB_TK_CONSTRUCTOR, FB_TK_DESTRUCTOR
@@ -1710,11 +1773,24 @@ private function hAddProcPrototype _
 		case FB_TK_SUB, FB_TK_FUNCTION, FB_TK_PROPERTY
 			proc = hFindDuplicatePrototype( head_proc, parsed_proc, palias, dtype, subtype, _
 			                                pattrib, mode, is_get )
+			semantic_repeated = (proc <> NULL)
+			if( semantic_repeated ) then
+				'' The accepted legacy header reuses the existing procedure. Its
+				'' discarded formal symbols must retain that same canonical mapping.
+				fbSemanticModelExportProcedureReplacement(parsed_proc, proc)
+			end if
 		end select
 	end if
 
 	if( proc = NULL ) then
+		select case( tk )
+		case FB_TK_SUB, FB_TK_FUNCTION, FB_TK_PROPERTY
+			if( header_valid andalso hConflictingPrototype(head_proc, parsed_proc, palias, dtype, subtype, pattrib, mode) ) then
+				fbSemanticDiagnosticsAt("procedure-signature-mismatch", semantic_site)
+			end if
+		end select
 		errReport( symbGetIllegalRedefErr( head_proc ) )
+		fbSemanticDiagnosticsContext("")
 		return NULL
 	end if
 
@@ -1747,6 +1823,7 @@ private function hAddProcPrototype _
 		hSetUdtPropertyFlags( parent, is_indexed, is_get )
 	end if
 
+	if( semantic_repeated = FALSE ) then fbSemanticDiagnosticsProcedure(proc, header_valid)
 	fbSemanticModelMarkDeclared(proc)
 	function = proc
 end function
@@ -1778,8 +1855,11 @@ function cProcHeader _
 	dim as integer mode = any, stats = any, op = any, is_get = any, is_indexed = any
 	dim as integer priority = any
 	dim as integer mode_is_explicit = any
+	dim as integer semantic_has_library
 	dim as string semantic_result_form = "special"
-	dim as LEX_LOCATION semantic_site
+	dim as LEX_LOCATION semantic_site, diagnostic_site
+	dim as integer diagnostic_header_errors = errGetCount( )
+	dim as integer diagnostic_header_valid, diagnostic_new_header
 	dim as LEX_LOCATION declaration_site = lexGetCurrentLocation( )
 	if( declaration_start <> NULL ) then declaration_site = *declaration_start
 	dim as longint declaration_nonphysical = lexGetNonphysicalTokenCount( )
@@ -1802,10 +1882,17 @@ function cProcHeader _
 
 	if( (tk = FB_TK_SUB) or (tk = FB_TK_FUNCTION) or (tk = FB_TK_PROPERTY) ) then
 		semantic_site = lexGetCurrentLocation( )
+		diagnostic_site = semantic_site
+		'' A generated name has no physical identifier range. A written header
+		'' still has a real declaration-start token suitable for a diagnostic.
+		if( (diagnostic_site.is_physical = FALSE) and declaration_site.is_physical ) then
+			diagnostic_site = declaration_site
+		end if
 	end if
 
 	proc = hPreAddHeaderProc( tk, parent, is_memberproc, @id, head_proc, _
 	                          attrib, pattrib, dtype, op )
+	diagnostic_new_header = (head_proc = NULL)
 	if( tk = FB_TK_FUNCTION ) then
 		semantic_result_form = iif(dtype = FB_DATATYPE_INVALID, "implicit", "suffix")
 	elseif( tk = FB_TK_SUB ) then
@@ -1813,7 +1900,9 @@ function cProcHeader _
 	end if
 
 	hParseProcHeaderAttributes( tk, options, is_memberproc, attrib, pattrib, _
-	                            mode, mode_is_explicit, palias )
+	                            mode, mode_is_explicit, palias, semantic_has_library )
+	dim as integer semantic_has_alias = (palias <> NULL)
+	dim as longint semantic_callback_start = fbSemanticModelCallbackCount( )
 
 	'' If this is a proc body (not a proto), then we'll open a new scope
 	'' with astProcBegin(), and additionally we may have to re-open the
@@ -1847,16 +1936,24 @@ function cProcHeader _
 		exit function
 	end if
 
+	'' Header parsing can repair an unknown type or malformed parameter. The
+	'' normal compiler checks continue, but those repairs are not a signature
+	'' proof. Earlier invalid retained headers are tracked by the diagnostics.
+	diagnostic_header_valid = (errGetCount( ) = diagnostic_header_errors)
+
 	'' Prototype?
 	if( options and FB_PROCOPT_ISPROTO ) then
+		dim as integer semantic_repeated = FALSE
 		proc = hAddProcPrototype( tk, parent, head_proc, proc, @id, palias, _
 		                          attrib, pattrib, mode, op, dtype, subtype, _
-		                          options, is_get, is_indexed )
+		                          options, is_get, is_indexed, semantic_repeated, diagnostic_site, diagnostic_header_valid )
 		if( (proc <> NULL) and _
 		    ((tk = FB_TK_SUB) or (tk = FB_TK_FUNCTION) or (tk = FB_TK_PROPERTY)) ) then
 			fbSemanticModelExportBinding(proc, semantic_site, TRUE)
 		end if
 		if( proc <> NULL ) then
+			fbSemanticModelDeclarationRepeat(proc, "prototype", semantic_repeated, semantic_site)
+			fbSemanticLinkProcedure(proc, diagnostic_site, diagnostic_header_valid, tk, TRUE)
 			dim as LEX_LOCATION declaration_end = lexGetLastLocation( )
 			declaration_site.end_line = declaration_end.end_line
 			declaration_site.end_column = declaration_end.end_column
@@ -1864,6 +1961,7 @@ function cProcHeader _
 				(declaration_nonphysical = lexGetNonphysicalTokenCount( ))
 			fbSemanticModelExportDeclaration(proc, declaration_site, "procedure-prototype", id)
 			fbSemanticModelProcedureTyping(proc, tk, "prototype", semantic_result_form)
+			fbSemanticModelProcedureAbiInput(proc, "prototype", semantic_has_library, semantic_has_alias, semantic_callback_start, semantic_site)
 		end if
 		return proc
 	end if
@@ -2019,6 +2117,7 @@ function cProcHeader _
 			end if
 
 			'' Then try to add the new overload
+			diagnostic_new_header = TRUE
 			select case( tk )
 			case FB_TK_CONSTRUCTOR, FB_TK_DESTRUCTOR
 				head_proc = symbAddCtor( proc, palias, attrib, pattrib, mode, FB_SYMBOPT_DECLARING )
@@ -2053,12 +2152,16 @@ function cProcHeader _
 
 			'' There already is a prototype for this proc, check for
 			'' declaration conflicts and fix up the parameters
+			if( diagnostic_header_valid andalso fbSemanticDiagnosticsProcedureValid(head_proc) ) then
+				fbSemanticDiagnosticsAt("procedure-signature-mismatch", diagnostic_site)
+			end if
 			hCheckPrototype( head_proc, proc, palias, dtype, subtype, mode )
+			fbSemanticDiagnosticsContext("")
 
 			'' use the prototype
 			proc = head_proc
 
-			hCheckAttribs( proc, attrib, pattrib )
+			hCheckAttribs( proc, attrib, pattrib, diagnostic_site, diagnostic_header_valid )
 
 			if( stats and (FB_SYMBSTATS_GLOBALCTOR or FB_SYMBSTATS_GLOBALDTOR) ) then
 				if( symbIsMethod( proc ) ) then
@@ -2109,6 +2212,8 @@ function cProcHeader _
 		fbSemanticModelExportBinding(proc, semantic_site, TRUE)
 	end if
 	if( proc <> NULL ) then
+		if( diagnostic_new_header ) then fbSemanticDiagnosticsProcedure(proc, diagnostic_header_valid)
+		fbSemanticLinkProcedure(proc, diagnostic_site, diagnostic_header_valid, tk, FALSE)
 		dim as LEX_LOCATION declaration_end = lexGetLastLocation( )
 		declaration_site.end_line = declaration_end.end_line
 		declaration_site.end_column = declaration_end.end_column
@@ -2116,6 +2221,7 @@ function cProcHeader _
 			(declaration_nonphysical = lexGetNonphysicalTokenCount( ))
 		fbSemanticModelExportDeclaration(proc, declaration_site, "procedure-definition", id)
 		fbSemanticModelProcedureTyping(proc, tk, "definition", semantic_result_form)
+		fbSemanticModelProcedureAbiInput(proc, "definition", semantic_has_library, semantic_has_alias, semantic_callback_start, semantic_site)
 	end if
 
 	function = proc

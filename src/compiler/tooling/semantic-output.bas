@@ -43,6 +43,7 @@ type SEMANTIC_OUTPUT
 	destination as string
 	directory as string
 	staging as string
+	journal as string
 	protected_files as SEMANTIC_OUTPUT_PROTECTED ptr
 	failed as integer
 end type
@@ -157,6 +158,7 @@ private sub hReleaseOutput( byval writer as SEMANTIC_OUTPUT ptr )
 	if( writer = NULL ) then exit sub
 	if( writer->stream <> NULL ) then SEMANTIC_OUTPUT_CLOSE(writer->stream)
 	if( len(writer->staging) <> 0 ) then remove(strptr(writer->staging))
+	if( len(writer->journal) <> 0 ) then remove(strptr(writer->journal))
 	if( len(writer->directory) <> 0 ) then rmdir(writer->directory)
 	dim as SEMANTIC_OUTPUT_PROTECTED ptr item = writer->protected_files
 	while( item <> NULL )
@@ -272,6 +274,29 @@ function fbSemanticOutputWrite( byval handle as any ptr, byval buffer as const a
 	end if
 	if( ferror(writer->stream) ) then writer->failed = TRUE
 	return writer->failed = FALSE
+end function
+
+function fbSemanticOutputJournal _
+	( byval handle as any ptr, byval filename as zstring ptr, byval capacity as uinteger ) as any ptr
+	dim as SEMANTIC_OUTPUT ptr writer = handle
+	if( (writer = NULL) or (filename = NULL) or (capacity = 0) ) then return NULL
+	filename[0] = 0
+	if( writer->failed or (len(writer->journal) <> 0) ) then return NULL
+	'' The exclusively created directory belongs to this writer. This is a
+	'' fixed child name, never a caller-supplied path or a public input file.
+	dim as string path = hPathJoin(writer->directory, "link.tmp")
+	if( len(path) >= capacity ) then
+		writer->failed = TRUE
+		return NULL
+	end if
+	dim as FILE ptr stream = fopen(strptr(path), @"w+b")
+	if( stream = NULL ) then
+		writer->failed = TRUE
+		return NULL
+	end if
+	writer->journal = path
+	*filename = path
+	return stream
 end function
 
 function fbSemanticOutputFinish( byval handle as any ptr, byval publish as long ) as long

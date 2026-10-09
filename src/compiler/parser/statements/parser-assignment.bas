@@ -30,6 +30,12 @@
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-expressions.bi"
 
+declare function fbSemanticModelFullEnabled( ) as integer
+declare sub fbSemanticModelFailAt(byref reason as const string)
+declare sub fbSemanticModelRecordLetInputs _
+	( byref inputs as const string, byval selected as ASTNODE ptr, byval fld as FBSYMBOL ptr, _
+	  byval slot as integer, byref source as LEX_LOCATION, byref destination as LEX_LOCATION )
+
 '':::::
 sub parserLetInit
 
@@ -175,7 +181,7 @@ function cOperator( byval is_overload as integer ) as integer
 	function = op
 end function
 
-sub cAssignment( byval l as ASTNODE ptr )
+sub cAssignment( byval l as ASTNODE ptr, byval source_start as LEX_LOCATION ptr )
 	'' The caller already consumed the lvalue. Keep the written assignment
 	'' operator's token span before argument parsing or lowering changes it.
 	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
@@ -227,6 +233,9 @@ sub cAssignment( byval l as ASTNODE ptr )
 
 	parser.ctxsym    = NULL
 	parser.ctx_dtype = FB_DATATYPE_INVALID
+	dim as string semantic_inputs = fbSemanticModelCaptureAssignmentInputs(l, r, semantic_site)
+	dim as LEX_LOCATION semantic_destination = fbSemanticModelStatementSite( )
+	if( source_start <> NULL ) then semantic_destination = *source_start
 
 	'' BOP?
 	if( op <> INVALID ) then
@@ -235,6 +244,7 @@ sub cAssignment( byval l as ASTNODE ptr )
 		dim as longint semantic_operands = fbSemanticModelCaptureCompoundOperands(l, r, astGetOpSelfVer(op), semantic_site)
 		l = astNewSelfBOPWithOperands( op, l, r, NULL, AST_OPOPT_LPTRARITH, semantic_operands )
 		if (l) then
+			fbSemanticModelAcceptAssignmentInputs(semantic_inputs, l, astGetOpSelfVer(op), "compound", semantic_site, semantic_operands, @semantic_destination)
 			fbSemanticModelExportOperation(l, op, semantic_site)
 			astAdd(l)
 		else
@@ -244,11 +254,13 @@ sub cAssignment( byval l as ASTNODE ptr )
 		'' l = r
 		fbSemanticModelSetAccess(l, "write")
 		dim as longint semantic_rhs = r->semantic_expression
+		dim as FBSYMBOL ptr semantic_target = fbSemanticModelAssignmentSymbol(l)
 		dim as integer semantic_dtype = astGetDataType(l)
 		dim as FBSYMBOL ptr semantic_subtype = astGetSubType(l)
 		l = astNewASSIGN( l, r )
 		if (l) then
-			fbSemanticModelAssignmentTarget(semantic_rhs, semantic_dtype, semantic_subtype, "assignment")
+			fbSemanticModelAcceptAssignmentInputs(semantic_inputs, l, AST_OP_ASSIGN, "copy", semantic_site, 0, @semantic_destination)
+			fbSemanticModelAssignmentTarget(semantic_rhs, semantic_target, semantic_dtype, semantic_subtype, "assignment")
 			fbSemanticModelExportOperation(l, AST_OP_ASSIGN, semantic_site)
 			astAdd(l)
 		else
@@ -309,7 +321,9 @@ private function hAssignFromField _
 		byval fld as FBSYMBOL ptr, _
 		byval lhs as ASTNODE ptr, _
 		byval rhs as FBSYMBOL ptr, _
-		byval num as integer _
+		byval num as integer, _
+		byref semantic_operator as LEX_LOCATION, _
+		byval semantic_destination as LEX_LOCATION ptr _
 	) as ASTNODE ptr
 
 	'' data member?
@@ -342,11 +356,20 @@ private function hAssignFromField _
 	expr = astNewDEREF( expr, symbGetFullType( fld ), symbGetSubType( fld ) )
 	expr = astNewFIELD( expr, fld )
 
+	'' The assignment builder can consume the original place, particularly
+	'' when an overloaded LET is selected. Preserve it before that happens.
+	dim as string semantic_inputs
+	if( semantic_destination <> NULL ) then
+		semantic_inputs = fbSemanticModelCaptureAssignmentInputs(lhs, expr, semantic_operator)
+	end if
 	expr = astNewASSIGN( lhs, expr )
 	if( expr = NULL ) then
 		hReportLetError( FB_ERRMSG_ILLEGALASSIGNMENT, num )
 		'' error recovery
 		return astNewNOP()
+	end if
+	if( semantic_destination <> NULL ) then
+		fbSemanticModelRecordLetInputs(semantic_inputs, expr, fld, num, semantic_operator, *semantic_destination)
 	end if
 
 	function = expr
@@ -416,24 +439,42 @@ function cAssignmentOrPtrCall _
 
 	'' single?
 	if( ismult = FALSE ) then
+		dim as LEX_LOCATION semantic_destination = lexGetCurrentLocation( )
 		expr = cVarOrDeref( )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
 			'' error recovery: skip stmt
 			hSkipStmt( )
 		else
-			cAssignment( expr )
+			cAssignment( expr, @semantic_destination )
 		end if
 		return TRUE
 	end if
 
 	'' multiple..
 	dim as integer exprcnt = 0
+	dim as integer semantic_full = fbSemanticModelFullEnabled( ), semantic_slot = 0
+	dim as LEX_LOCATION semantic_destinations()
+	if( semantic_full ) then redim semantic_destinations(0 to 15)
 
 	do
 		'' null expressions are allowed ('let(foo, , bar)')
 		dim as FB_LETSTMT_NODE ptr node = listNewNode( @parser.stmt.let.list )
 
+		'' Omitted destinations still consume a field slot. Locations belong
+		'' to this invocation, rather than the reusable parser LET node list.
+		if( semantic_full ) then
+			if( semantic_slot >= 65536 ) then
+				fbSemanticModelFailAt("LET destination slots exceed their observation bound")
+				semantic_full = FALSE
+			else
+				if( semantic_slot > ubound(semantic_destinations) ) then
+					redim preserve semantic_destinations(0 to (ubound(semantic_destinations) + 1) * 2 - 1)
+				end if
+				semantic_destinations(semantic_slot) = lexGetCurrentLocation( )
+			end if
+		end if
+		semantic_slot += 1
 		node->expr = cVarOrDeref( )
 		if( node->expr <> NULL ) then
 			'' const?
@@ -466,6 +507,7 @@ function cAssignmentOrPtrCall _
 	end if
 
 	'' '='?
+	dim as LEX_LOCATION semantic_operator = lexGetCurrentLocation( )
 	if( cAssignToken( ) = FALSE ) then
 		errReport( FB_ERRMSG_EXPECTEDEQ )
 		'' error recovery: skip stmt
@@ -544,7 +586,9 @@ function cAssignmentOrPtrCall _
 			exprcnt += 1
 
 			if( node->expr <> NULL ) then
-				expr = hAssignFromField( fld, node->expr, tmp, exprcnt )
+				dim as LEX_LOCATION ptr semantic_destination = NULL
+				if( semantic_full ) then semantic_destination = @semantic_destinations(exprcnt - 1)
+				expr = hAssignFromField( fld, node->expr, tmp, exprcnt, semantic_operator, semantic_destination )
 				if( expr = NULL ) then
 					exit function
 				end if

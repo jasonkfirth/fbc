@@ -14,6 +14,11 @@ declare function fbSemanticOutputProtect _
 	( byval writer as any ptr, byval filename as const zstring ptr ) as long
 declare function fbSemanticOutputWrite _
 	( byval writer as any ptr, byval buffer as const any ptr, byval bytes as uinteger ) as long
+
+'' A writer may own one private journal beside its staging stream. The caller
+'' closes the returned CRT stream; Finish removes the journal on either outcome.
+declare function fbSemanticOutputJournal _
+	( byval writer as any ptr, byval filename as zstring ptr, byval capacity as uinteger ) as any ptr
 declare function fbSemanticOutputFinish( byval writer as any ptr, byval publish as long ) as long
 
 #endif

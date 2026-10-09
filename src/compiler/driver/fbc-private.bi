@@ -443,6 +443,7 @@ declare sub fbSemanticModelProtectFile(byref filename as const string)
 declare sub fbSemanticModelFinishModule(byval commit as integer)
 declare sub fbSemanticModelFinishRecoveryModule( )
 #include once "tooling/semantic-diagnostics.bi"
+#include once "tooling/semantic-link.bi"
 
 #endif
 

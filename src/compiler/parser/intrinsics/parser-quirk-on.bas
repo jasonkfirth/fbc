@@ -25,6 +25,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
+#include once "tooling/semantic-constructs.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
 
@@ -97,6 +98,7 @@ private function cGOTBStmt _
 					labels(l) = symbAddLabel( lexGetText( ), FB_SYMBOPT_CREATEALIAS )
 				end if
 				fbSemanticModelExportBinding(labels(l), semantic_site, FALSE)
+				if( isgoto = FALSE ) then astGosubMarkTarget( labels(l) )
 			elseif( l = FB_MAXGOTBITEMS ) then '' (Only show the error once)
 				errReport( FB_ERRMSG_TOOMANYLABELS )
 				'' Error recovery: continue parsing all labels, but don't add
@@ -122,6 +124,13 @@ private function cGOTBStmt _
 	end if
 
 	exitlabel = symbAddLabel( NULL )
+	if( isgoto = FALSE ) then
+		'' A selector outside the one-based table range continues normally.
+		'' Check it before saving a GOSUB address/context. Otherwise the table's
+		'' default edge would leave an unmatched return frame on either backend.
+		astAdd( astNewBOP( AST_OP_LT, astNewVAR(sym), astNewCONSTi(1, FB_DATATYPE_UINT), exitlabel ) )
+		astAdd( astNewBOP( AST_OP_GT, astNewVAR(sym), astNewCONSTi(l, FB_DATATYPE_UINT), exitlabel ) )
+	end if
 
 	'' labelcount = l, minval = 1, maxval = l
 	'' astBuildJMPTB expects values to be biased
@@ -137,8 +146,10 @@ private function cGOTBStmt _
 
 	if( isgoto ) then
 		astAdd( expr )
+		fbSemanticModelStatementOperation("on-goto")
 	else
 		astGosubAddJumpPtr( parser.currproc, expr, exitlabel )
+		fbSemanticModelStatementOperation("on-gosub")
 	end if
 
 	'' emit exit label
@@ -251,8 +262,10 @@ function cOnStmt _
 
 			expr = astNewADDROF( astNewVAR( label ) )
 			rtlErrorSetHandler( expr, (islocal = TRUE) )
+			fbSemanticModelStatementOperation("on-error-set")
 		else
 			rtlErrorSetHandler( astNewCONSTi( NULL, FB_DATATYPE_UINT ), (islocal = TRUE) )
+			fbSemanticModelStatementOperation("on-error-clear")
 		end if
 
 		function = TRUE

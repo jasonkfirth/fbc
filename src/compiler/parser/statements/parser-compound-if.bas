@@ -27,6 +27,7 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-hooks.bi"
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -58,6 +59,7 @@ private sub hIfSingleLine(byval stk as FB_CMPSTMTSTK ptr)
 		end if
 
 		fbSemanticModelExportBinding(l, semantic_site, FALSE)
+		fbSemanticModelIfTransfer(stk->semantic_identity, l)
 		lexSkipToken( )
 
 		astAdd( astNewBRANCH( AST_OP_JMP, l ) )
@@ -67,6 +69,7 @@ private sub hIfSingleLine(byval stk as FB_CMPSTMTSTK ptr)
 
 	'' (ELSE Statement*)?
 	if( lexGetToken( ) = FB_TK_ELSE ) then
+		fbSemanticModelIfNext(stk->semantic_identity, "else")
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		'' end scope
@@ -97,6 +100,7 @@ private sub hIfSingleLine(byval stk as FB_CMPSTMTSTK ptr)
 			end if
 
 			fbSemanticModelExportBinding(l, semantic_site, FALSE)
+			fbSemanticModelIfTransfer(stk->semantic_identity, l)
 			lexSkipToken( )
 
 			astAdd( astNewBRANCH( AST_OP_JMP, l ) )
@@ -117,6 +121,7 @@ private sub hIfSingleLine(byval stk as FB_CMPSTMTSTK ptr)
 	end if
 
 	'' END IF? -- added to make complex macros easier to be written
+	fbSemanticModelIfEnd(stk->semantic_identity)
 	select case lexGetToken( )
 	case FB_TK_END
 		if( lexGetLookAhead( 1 ) = FB_TK_IF ) then
@@ -154,6 +159,8 @@ sub cIfStmtBegin( )
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 		'' error recovery: fake an expr
 		expr = astNewCONSTi( 0 )
+	else
+		fbSemanticModelIfCondition( expr )
 	end if
 
 	'' add end label (at ENDIF)
@@ -177,6 +184,7 @@ sub cIfStmtBegin( )
 
 	'' GOTO?
 	if( lexGetToken( ) = FB_TK_GOTO ) then
+		fbSemanticModelIfBegin(stk->semantic_identity, TRUE)
 		hIfSingleLine( stk )
 		return
 	end if
@@ -207,6 +215,7 @@ sub cIfStmtBegin( )
 	end select
 
 	'' begin scope
+	fbSemanticModelIfBegin(stk->semantic_identity, (ismultiline = FALSE))
 	stk->scopenode = astScopeBegin( )
 
 	if( ismultiline ) then
@@ -253,6 +262,7 @@ sub cIfStmtNext( )
 
 	'' ELSEIF Expression THEN ?
 	if( lexGetToken( ) = FB_TK_ELSEIF ) then
+		fbSemanticModelIfNext(stk->semantic_identity, "elseif")
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		'' exit last if stmt
@@ -273,6 +283,8 @@ sub cIfStmtNext( )
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 			'' error recovery: fake an expr
 			expr = astNewCONSTi( 0 )
+		else
+			fbSemanticModelIfCondition( expr )
 		end if
 
 		'' THEN
@@ -291,6 +303,7 @@ sub cIfStmtNext( )
 	'' ELSE..
 	else
 		stk->if.elsecnt += 1
+		fbSemanticModelIfNext(stk->semantic_identity, "else")
 
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
@@ -332,6 +345,7 @@ sub cIfStmtEnd( )
 	end if
 
 	'' ENDIF or END IF
+	fbSemanticModelIfEnd(stk->semantic_identity)
 	if( lexGetToken() = FB_TK_END ) then
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 	end if

@@ -10,13 +10,15 @@ from sidecar import number, unescape
 
 
 class Diagnostics:
-    SHAPES = {"FBCDIA": 3, "SRC": 3, "M": 4, "DI": 14, "END": 7}
+    SHAPES = {"FBCDIA": 3, "SRC": 3, "M": 4, "CAP": 4, "DI": 14, "END": 7}
 
     def __init__(self) -> None:
         self.sources: list[str] = []
         self.modules: list[list[str]] = []
         self.records: list[list[str]] = []
         self.producer = ""
+        self.signature_modules: set[int] = set()
+        self.variable_modules: set[int] = set()
         self.succeeded = False
 
     @classmethod
@@ -63,6 +65,14 @@ class Diagnostics:
                 if len(result.modules) >= 100000 or source_path(row[2]) not in result.sources or not row[3]:
                     raise ValueError("Invalid diagnostic module")
                 result.modules.append(row)
+            elif row[0] == "CAP":
+                module = integer(row[1], len(result.modules), len(result.modules))
+                capabilities = {"procedure-signature-mismatches": result.signature_modules,
+                                "variable-case-collisions": result.variable_modules}
+                observed = capabilities.get(row[2])
+                if not result.modules or observed is None or module in observed or row[3] != "available":
+                    raise ValueError("Invalid or duplicate diagnostic capability")
+                observed.add(module)
             elif row[0] == "DI":
                 integer(row[1], len(result.records) + 1, len(result.records) + 1)
                 integer(row[2], len(result.modules), len(result.modules))
@@ -82,6 +92,10 @@ class Diagnostics:
                     raise ValueError("Contradictory diagnostic point")
                 if row[3] == "warning" and row[5]:
                     raise ValueError("Parser error context on warning")
+                if row[5] == "procedure-signature-mismatch" and len(result.modules) not in result.signature_modules:
+                    raise ValueError("Signature mismatch without compiler capability")
+                if row[5] == "variable-case-collision" and len(result.modules) not in result.variable_modules:
+                    raise ValueError("Variable collision without compiler capability")
                 errors += row[3] == "error"
                 result.records.append(row)
             elif row[0] == "END":

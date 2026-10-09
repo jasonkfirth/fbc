@@ -2749,9 +2749,13 @@ sub lexPPOnlyEmitToken( )
 		pponly_ln += " "
 	end if
 
-	select case( lexGetToken( ) )
-	case FB_TK_STRLIT, FB_TK_STRLIT_ESC, FB_TK_STRLIT_NOESC
+	select case( lexGetClass( ) )
+	case FB_TKCLASS_STRLITERAL
 		pponly_ln += lexGetStrLitText( lexGetToken( ) )
+	case FB_TKCLASS_NUMLITERAL
+		'' Keep alphabetic type suffixes so -pp output reparses with the same literal type.
+		pponly_ln += *lexGetText( )
+		pponly_ln += lex.ctx->head->numeric_suffix
 	case else
 		pponly_ln += *lexGetText( )
 	end select

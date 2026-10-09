@@ -118,6 +118,7 @@
 
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
+#include once "tooling/semantic-link.bi"
 #include once "backend/ir.bi"
 #include once "runtime/rtl.bi"
 #include once "support/containers/flist.bi"
@@ -974,6 +975,62 @@ private function hEmitLibcProcPtrParam _
 	end select
 end function
 
+'' A C identifier is not necessarily its object symbol. Explicit asm aliases
+'' take precedence over the platform C prefix and convention decoration.
+'' Win32 fastcall is delegated to the C compiler; its byte suffix describes
+'' the emitted C formals, including our explicit hidden-result pointer and
+'' pointer lowering of non-trivial BYVAL records. The native FBC stdcall
+'' suffix calculator deliberately follows a different ABI contract there.
+private sub hObserveProcObjectName( byval proc as FBSYMBOL ptr, byref identifier as const string )
+	if( fbSemanticLinkProcedureObjectNeeded(proc) = FALSE ) then exit sub
+	dim as string object_name
+	if( hNeedAlias(proc) ) then
+		object_name = hGetMangledNameForASM(proc, TRUE)
+	else
+		object_name = identifier
+		dim as integer fastcall_target = FALSE
+		if( (fbGetCpuFamily( ) = FB_CPUFAMILY_X86) and (symbGetProcMode(proc) = FB_FUNCMODE_FASTCALL) ) then
+			select case env.clopt.target
+			case FB_COMPTARGET_WIN32, FB_COMPTARGET_CYGWIN, FB_COMPTARGET_XBOX
+				fastcall_target = TRUE
+			end select
+		end if
+		dim as longint bytes = 0
+		if( fastcall_target ) then
+			if( symbProcReturnsOnStack(proc) ) then bytes = env.pointersize
+			dim as integer count = 0, dtype = 0
+			dim as FBSYMBOL ptr subtype = NULL, param = symbGetProcHeadParam(proc)
+			do while( param <> NULL )
+				count += 1
+				if( count > symbGetProcParams(proc) ) then
+					fbSemanticLinkFail( )
+					exit sub
+				end if
+				if( symbGetParamMode(param) = FB_PARAMMODE_VARARG ) then
+					'' The C compiler ignores fastcall on a variadic signature.
+					fastcall_target = FALSE
+					exit do
+				end if
+				symbGetRealParamDtype(param, dtype, subtype)
+				dim as longint length = symbCalcLen(dtype, subtype)
+				if( (length <= 0) or (length > &h7fffffff) ) then
+					fbSemanticLinkFail( )
+					exit sub
+				end if
+				'' Win32 C argument slots are rounded up to four bytes.
+				bytes += ((length + 3) \ 4) * 4
+				param = param->next
+			loop
+		end if
+		if( fastcall_target ) then
+			object_name = "@" + object_name + "@" + str(bytes)
+		elseif( env.underscoreprefix ) then
+			object_name = "_" + object_name
+		end if
+	end if
+	fbSemanticLinkProcedureObject(proc, object_name)
+end sub
+
 private function hEmitProcHeader _
 	( _
 		byval proc as FBSYMBOL ptr, _
@@ -1120,6 +1177,7 @@ private function hEmitProcHeader _
 	DZstrAllocate( params, 0 )
 
 	ln += " )"
+	if( (options and EMITPROC_ISPROCPTR) = 0 ) then hObserveProcObjectName(proc, mangled)
 
 	if( ((options and EMITPROC_ISPROCPTR) = 0) and _
 	    ((options and EMITPROC_ISPROTO) <> 0)        ) then

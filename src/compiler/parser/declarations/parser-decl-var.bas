@@ -27,6 +27,10 @@
 #include once "parser/parser.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-diagnostics.bi"
+#include once "tooling/semantic-expressions.bi"
+
+declare function fbSemanticModelFullEnabled( ) as integer
 
 declare function fbSemanticModelDeclarationGroup(byval token as integer, byref owner as longint) as longint
 declare sub fbSemanticModelScalarStringDeclaration(byval sym as FBSYMBOL ptr, byval tree as ASTNODE ptr, _
@@ -35,6 +39,8 @@ declare sub fbSemanticModelDeclarationType(byval groupid as longint, byval owner
 	byval ordinal as integer, byval sym as FBSYMBOL ptr, byref written_type as const string, _
 	byval initializer_kind as integer, byref source as LEX_LOCATION)
 declare sub fbSemanticModelDeclarationGroupEnd(byval groupid as longint, byval owner as longint, byval count as integer)
+declare sub fbSemanticModelDeclarationRepeat(byval sym as FBSYMBOL ptr, byref kind as const string, _
+	byval repeated as integer, byref source as LEX_LOCATION)
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -326,11 +332,13 @@ private function hAddVar _
 		byref have_bounds as integer, _
 		dTB() as FBARRAYDIM, _
 		byval chain_ as FBSYMCHAIN ptr, _
-		byval token as integer _
+		byval token as integer, _
+		byref diagnostic_site as LEX_LOCATION _
 	) as FBSYMBOL ptr
 
 	dim as integer is_declared = any
 	dim as FBSYMBOL ptr redefinition = NULL
+	fbSemanticDiagnosticsVariableAttempt( )
 
 	'' Have an existing variable with this name?
 	if( sym ) then
@@ -469,7 +477,11 @@ private function hAddVar _
 		if( chain_ <> NULL ) then
 			redefinition = chain_->sym
 		end if
+		if( fbSemanticDiagnosticsVariableCollision( ) ) then
+			fbSemanticDiagnosticsAt("variable-case-collision", diagnostic_site)
+		end if
 		errReportEx( symbGetIllegalRedefErr( redefinition ), id )
+		fbSemanticDiagnosticsContext("")
 	end if
 
 	function = sym
@@ -1597,7 +1609,7 @@ function cVarDecl _
 	dim as integer dimensions = any, suffix = any
 	dim as zstring ptr palias = any
 	dim as FB_IDOPT options = any
-	dim as LEX_LOCATION semantic_site
+	dim as LEX_LOCATION semantic_site, diagnostic_site
 
 	dim as longint semantic_group, semantic_owner
 	dim as integer semantic_ordinal
@@ -1703,6 +1715,13 @@ function cVarDecl _
 			suffix = FB_DATATYPE_INVALID
 		else
 			semantic_site = lexGetCurrentLocation( )
+			diagnostic_site = semantic_site
+			'' A written token preceding a generated name can supply a diagnostic
+			'' point. The binding exporter retains the actual generated name site.
+			if( diagnostic_site.is_physical = FALSE ) then
+				dim as LEX_LOCATION preceding_site = lexGetLastLocation( )
+				if( preceding_site.is_physical ) then diagnostic_site = preceding_site
+			end if
 			chain_ = hGetId( parent, @id, suffix, is_redim )
 		end if
 
@@ -1910,8 +1929,28 @@ function cVarDecl _
 		'' definition, etc.
 		''
 		dim as integer semantic_new_symbol = (sym = NULL)
+		dim as integer semantic_repeated_extern = FALSE
+		if( (token = FB_TK_EXTERN) and (sym <> NULL) ) then
+			if( symbIsExtern(sym) ) then
+				'' Compatibility alone permits an unknown rank or upper bound.
+				'' Such a declaration can change the contract and is not redundant.
+				semantic_repeated_extern = (dimensions = symbGetArrayDimensions(sym))
+				if( semantic_repeated_extern and ((attrib and FB_SYMBATTRIB_DYNAMIC) = 0) ) then
+					for dimension as integer = 0 to dimensions - 1
+						if( (symbArrayLbound(sym, dimension) <> dTB(dimension).lower) or _
+						    (symbArrayUbound(sym, dimension) <> dTB(dimension).upper) ) then
+							semantic_repeated_extern = FALSE
+							exit for
+						end if
+					next
+				end if
+			end if
+		end if
 		sym = hAddVar( sym, parent, id, palias, dtype, subtype, lgt, addsuffix, _
-		               attrib, dimensions, have_bounds, dTB(), chain_, token )
+		               attrib, dimensions, have_bounds, dTB(), chain_, token, diagnostic_site )
+		if( token = FB_TK_EXTERN ) then
+			fbSemanticModelDeclarationRepeat(sym, "extern", semantic_repeated_extern, semantic_site)
+		end if
 		if( varexpr = NULL ) then
 			if( token = FB_TK_REDIM ) then
 				fbSemanticModelExportBinding(sym, semantic_site, semantic_new_symbol)
@@ -2098,7 +2137,30 @@ private function hBuildAutoVarInitializer( byval sym as FBSYMBOL ptr, byval expr
 
 	'' not an object?
 	if( symbHasCtor( sym ) = FALSE ) then
-		astTypeIniAddAssign( initree, expr, sym )
+		dim as string semantic_inputs
+		dim as LEX_LOCATION semantic_destination = fbSemanticModelStatementSite( )
+		'' VAR uses an inferred type but still copies the original value.
+		'' A reference declaration instead binds storage and has no copy fact.
+		if( fbSemanticModelFullEnabled( ) and (symbIsRef(sym) = FALSE) ) then
+			dim as integer scalar_copy = (typeGetPtrCnt(sym->typ) <> 0)
+			select case typeGetDtOnly(sym->typ)
+			case FB_DATATYPE_BOOLEAN, FB_DATATYPE_BYTE, FB_DATATYPE_UBYTE, _
+				FB_DATATYPE_SHORT, FB_DATATYPE_USHORT, FB_DATATYPE_INTEGER, FB_DATATYPE_UINT, _
+				FB_DATATYPE_LONG, FB_DATATYPE_ULONG, FB_DATATYPE_LONGINT, FB_DATATYPE_ULONGINT, _
+				FB_DATATYPE_SINGLE, FB_DATATYPE_DOUBLE, FB_DATATYPE_STRING
+				scalar_copy = TRUE
+			end select
+			if( scalar_copy ) then
+				dim as ASTNODE ptr semantic_left = astNewVAR(sym)
+				semantic_inputs = fbSemanticModelCaptureAssignmentInputs(semantic_left, expr, semantic_destination)
+				astDelTree(semantic_left)
+			end if
+		end if
+		var semantic_initializer = astTypeIniAddAssign( initree, expr, sym )
+		if( (semantic_initializer <> NULL) and (len(semantic_inputs) > 0) ) then
+			fbSemanticModelRecordAssignmentInputs(semantic_inputs, "initializer", "assign", "builtin", 0, _
+				semantic_destination, @semantic_destination)
+		end if
 	'' handle constructors..
 	else
 		dim as integer is_ctorcall = any
@@ -2192,6 +2254,11 @@ private sub cAutoVarDecl( byval baseattrib as FB_SYMBATTRIB )
 
 		'' get id
 		dim as integer suffix = any
+		dim as LEX_LOCATION diagnostic_site = lexGetCurrentLocation( )
+		if( diagnostic_site.is_physical = FALSE ) then
+			dim as LEX_LOCATION preceding_site = lexGetLastLocation( )
+			if( preceding_site.is_physical ) then diagnostic_site = preceding_site
+		end if
 		dim as FBSYMCHAIN ptr chain_ = hGetId( parent, @id, suffix, FALSE )
 
 		if( suffix <> FB_DATATYPE_INVALID ) then
@@ -2277,7 +2344,7 @@ private sub cAutoVarDecl( byval baseattrib as FB_SYMBATTRIB )
 
 		'' add var after parsing the expression, or the the var itself could be used
 		sym = hAddVar( sym, parent, id, NULL, dtype, subtype, _
-		               lgt, FALSE, attrib, 0, FALSE, dTB(), chain_, FB_TK_VAR )
+		               lgt, FALSE, attrib, 0, FALSE, dTB(), chain_, FB_TK_VAR, diagnostic_site )
 
 		if( sym <> NULL ) then
 			if( symbIsRef( sym ) ) then

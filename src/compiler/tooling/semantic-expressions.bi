@@ -14,6 +14,7 @@ declare sub fbSemanticModelResetExpressions( )
 declare sub fbSemanticModelAttachExpression(byval node as ASTNODE ptr, byval identity as longint)
 declare sub fbSemanticModelExportExpressionLinks(byval node as ASTNODE ptr, byval identity as longint)
 declare sub fbSemanticModelExportExpressionSource(byval node as ASTNODE ptr, byval identity as longint)
+declare sub fbSemanticModelExportBoundExpression(byval node as ASTNODE ptr, byval identity as longint)
 declare sub fbSemanticModelExportSizeQuerySources(byval node as ASTNODE ptr, byval identity as longint)
 declare function fbSemanticModelExpressionCheckpoint( ) as longint
 declare sub fbSemanticModelUnevaluatedQuery(byval checkpoint as longint, byref query_kind as const string)
@@ -26,6 +27,9 @@ declare function fbSemanticModelCaptureCompoundOperands _
 	( byval left_expr as ASTNODE ptr, byval right_expr as ASTNODE ptr, byval op as integer, _
 	  byref source as LEX_LOCATION ) as longint
 declare sub fbSemanticModelCompoundResult(byval result as ASTNODE ptr, byval operands as longint)
+declare function fbSemanticModelCompoundTarget(byval operands as longint, byref kind as string) as longint
+declare function fbSemanticModelSelectedOperationTarget _
+	( byval expression as ASTNODE ptr, byref kind as string, byval assignment_sequence as integer = FALSE ) as longint
 declare sub fbSemanticModelSelectedNumericOperands _
 	( byval operands as longint, byval left_expr as ASTNODE ptr, byval right_expr as ASTNODE ptr, _
 	  byval left_dtype as integer, byval right_dtype as integer )
@@ -38,9 +42,26 @@ declare sub fbSemanticModelSelectedCaseOperands _
 
 declare function fbSemanticModelSelectOperandSnapshot(byval generation as longint) as string
 
+declare function fbSemanticModelAssignmentSymbol(byval target as ASTNODE ptr) as FBSYMBOL ptr
+declare function fbSemanticModelCaptureAssignmentInputs _
+	( byval left_expr as ASTNODE ptr, byval right_expr as ASTNODE ptr, byref source as LEX_LOCATION ) as string
+declare function fbSemanticModelStatementSite( ) as LEX_LOCATION
+declare sub fbSemanticModelAcceptAssignmentInputs _
+	( byref inputs as const string, byval selected as ASTNODE ptr, byval op as integer, _
+	  byref assignment_kind as const string, byref source as LEX_LOCATION, byval compound_operands as longint = 0, _
+	  byval destination as LEX_LOCATION ptr = NULL )
+declare sub fbSemanticModelRecordAssignmentInputs _
+	( byref inputs as const string, byref assignment_kind as const string, byref code as const string, _
+	  byref operation_kind as const string, byval target as longint, byref source as LEX_LOCATION, _
+	  byval destination as LEX_LOCATION ptr = NULL )
 declare sub fbSemanticModelAssignmentTarget _
-	( byval expression_id as longint, byval dtype as integer, _
+	( byval expression_id as longint, byval target as FBSYMBOL ptr, byval dtype as integer, _
 	  byval subtype as FBSYMBOL ptr, byref assignment_kind as const string )
+declare sub fbSemanticModelArrayInitializer _
+	( byval expression_id as longint, byval target as FBSYMBOL ptr, _
+	  byval dimension as integer, byref input_kind as const string )
+declare sub fbSemanticModelParameterDefault _
+	( byval parameter as FBSYMBOL ptr, byval expression_id as longint )
 declare sub fbSemanticModelStringInitializer _
 	( byval expression_id as longint, byval target as FBSYMBOL ptr, byval dtype as integer, byval initializer as ASTNODE ptr )
 
@@ -63,14 +84,24 @@ declare sub fbSemanticModelPointerIndex _
 declare sub fbSemanticModelArraySubscripts _
 	( byval result as ASTNODE ptr, byval array_symbol as FBSYMBOL ptr, _
 	  indices() as longint, selected_indices() as longint, byval rank as integer, _
-	  byref source_start as LEX_LOCATION, byval nonphysical_start as longint )
+	  byref source_start as LEX_LOCATION, byval nonphysical_start as longint, _
+	  byval receiver_id as longint = 0 )
+declare function fbSemanticModelArrayReceiver _
+	( byval array_symbol as FBSYMBOL ptr, byval receiver as ASTNODE ptr ) as longint
+declare sub fbSemanticModelArrayStoragePrefix _
+	( byval result as ASTNODE ptr, byval array_symbol as FBSYMBOL ptr, _
+	  byval receiver_id as longint, byref source_start as LEX_LOCATION, _
+	  byval nonphysical_start as longint )
+declare function fbSemanticModelArrayStorageInput _
+	( byval result as ASTNODE ptr, byval array_symbol as FBSYMBOL ptr ) as longint
 declare function fbSemanticModelSelectedArrayIndex _
 	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, byref source_end as LEX_LOCATION, _
 	  byval nonphysical_start as longint, byval nonphysical_end as longint ) as longint
 declare sub fbSemanticModelArrayBound _
 	( byval result as ASTNODE ptr, byval array_symbol as FBSYMBOL ptr, byval tk as integer, _
 	  byval original_dimension as longint, byval selected_dimension as longint, _
-	  byref source_start as LEX_LOCATION, byval nonphysical_start as longint )
+	  byref source_start as LEX_LOCATION, byval nonphysical_start as longint, _
+	  byval receiver_id as longint = 0 )
 declare function fbSemanticModelPointerIndexPrefix _
 	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, _
 	  byval nonphysical_tokens as longint ) as longint

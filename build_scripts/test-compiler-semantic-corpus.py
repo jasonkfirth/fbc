@@ -15,7 +15,7 @@ import shutil
 import sys
 import tempfile
 
-from compiler_semantic_audit import EMISSION_SUFFIX, audit_exports, digest
+from compiler_semantic_audit import EMISSION_SUFFIX, audit_exports, digest, freeze_semantic_reader
 
 
 # Slicks has one translation unit per subsystem. The other maintained native
@@ -45,7 +45,7 @@ def freeze_inputs(root: Path, compiler: Path, oma: Path, output: Path) -> tuple[
     shutil.copytree(root / "inc", inputs / "inc")
     validation = inputs / "validation"
     validation.mkdir()
-    shutil.copy2(root / "tests/semantic-sidecar/sidecar.py", validation / "sidecar.py")
+    freeze_semantic_reader(root, validation)
     shutil.copy2(Path(__file__), validation / Path(__file__).name)
     shutil.copy2(Path(__file__).with_name("compiler_semantic_audit.py"),
                  validation / "compiler_semantic_audit.py")

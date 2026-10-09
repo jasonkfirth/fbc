@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections import Counter
 import codecs
 import hashlib
+import json
 from pathlib import Path
 import os
 import re
@@ -19,8 +20,11 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
-from sidecar import SCHEMA, DETAIL_TAGS, PROVENANCE_TAGS, IMPLICIT_KINDS, PRIMITIVE_NAMES, Model, source_range, unescape
+from sidecar import (SCHEMA, DETAIL_TAGS, PROVENANCE_TAGS, IMPLICIT_KINDS,
+                     PRIMITIVE_NAMES, Model, ReaderLimits, SourceEdit,
+                     source_range, unescape)
 
 
 class SidecarTests(unittest.TestCase):
@@ -29,6 +33,219 @@ class SidecarTests(unittest.TestCase):
     toolchain_prefix: Path
     backends: list[str]
     native_windows: bool
+
+    def test_original_assignment_initializers(self) -> None:
+        from assignment_initializers import check_initializers
+        check_initializers(self)
+
+    def test_original_let_destinations(self) -> None:
+        from let_destinations import check_destinations
+        check_destinations(self)
+
+    def test_original_assignment_storage(self) -> None:
+        from assignment_storage import check_storage
+        check_storage(self)
+
+    def test_original_assignment_storage_reject_invalid_forests(self) -> None:
+        from assignment_storage import check_rejection
+        check_rejection(self)
+
+    def test_original_assignment_inputs(self) -> None:
+        from assignment_inputs import check_inputs
+        check_inputs(self)
+
+    def test_original_assignment_inputs_reject_invalid_groups(self) -> None:
+        from assignment_inputs import check_rejection
+        check_rejection(self)
+
+    def test_original_assignment_inputs_keep_selected_operations(self) -> None:
+        from assignment_inputs import check_selected_operations
+        check_selected_operations(self)
+
+    def test_original_assignment_inputs_reject_foreign_modules(self) -> None:
+        from assignment_inputs import check_module_ownership
+        check_module_ownership(self)
+
+    def test_original_if_arms(self) -> None:
+        from if_arms import check_inputs
+        check_inputs(self)
+
+    def test_original_if_arms_in_legacy_dialects(self) -> None:
+        from if_arms import check_legacy
+        check_legacy(self)
+
+    def test_original_if_arms_in_source_encodings(self) -> None:
+        from if_arms import check_encodings
+        check_encodings(self)
+
+    def test_original_if_arms_reject_invalid_groups(self) -> None:
+        from if_arms import check_rejection
+        check_rejection(self)
+
+    def test_original_if_arms_reject_foreign_modules(self) -> None:
+        from if_arms import check_module_ownership
+        check_module_ownership(self)
+
+    def test_original_array_storage_inputs(self) -> None:
+        from array_storage_inputs import check_inputs
+        check_inputs(self)
+
+    def test_original_array_storage_inputs_reject_invalid_groups(self) -> None:
+        from array_storage_inputs import check_rejection
+        check_rejection(self)
+
+    def test_original_array_storage_inputs_reject_foreign_modules(self) -> None:
+        from array_storage_inputs import check_module_ownership
+        check_module_ownership(self)
+
+    def test_original_pointer_access_origins(self) -> None:
+        from pointer_access_origins import check_inputs
+        check_inputs(self)
+
+    def test_original_pointer_access_origins_reject_invalid_groups(self) -> None:
+        from pointer_access_origins import check_rejection
+        check_rejection(self)
+
+    def test_original_pointer_access_origins_preserve_earlier_producers(self) -> None:
+        from pointer_access_origins import check_compatibility
+        check_compatibility(self)
+
+    def test_original_pointer_access_origins_reject_foreign_modules(self) -> None:
+        from pointer_access_origins import check_module_ownership
+        check_module_ownership(self)
+
+    def test_original_array_initializer_inputs(self) -> None:
+        from array_initializer_inputs import check_inputs
+        check_inputs(self)
+
+    def test_original_array_initializer_inputs_reject_invalid_groups(self) -> None:
+        from array_initializer_inputs import check_rejection
+        check_rejection(self)
+
+    def test_original_function_result_inputs(self) -> None:
+        from function_result_inputs import check_results
+        check_results(self)
+
+    def test_original_if_conditions(self) -> None:
+        from if_conditions import check_inputs
+        check_inputs(self)
+
+    def test_original_if_conditions_in_legacy_dialects(self) -> None:
+        from if_conditions import check_legacy
+        check_legacy(self)
+
+    def test_original_if_conditions_reject_invalid_groups(self) -> None:
+        from if_conditions import check_rejection
+        check_rejection(self)
+
+    def test_original_iif_inputs(self) -> None:
+        from iif_inputs import check_inputs
+        check_inputs(self)
+
+    def test_original_iif_inputs_in_legacy_dialects(self) -> None:
+        from iif_inputs import check_legacy
+        check_legacy(self)
+
+    def test_original_iif_inputs_reject_invalid_groups(self) -> None:
+        from iif_inputs import check_rejection
+        check_rejection(self)
+
+    def test_original_enum_inputs(self) -> None:
+        from enum_inputs import check_inputs
+        check_inputs(self)
+
+    def test_original_enum_inputs_in_legacy_dialects(self) -> None:
+        from enum_inputs import check_legacy
+        check_legacy(self)
+
+    def test_original_enum_inputs_reject_invalid_groups(self) -> None:
+        from enum_inputs import check_rejection
+        check_rejection(self)
+
+    def test_original_call_atoms(self) -> None:
+        from call_atoms import check_atoms
+        check_atoms(self)
+
+    def test_original_call_atoms_reject_invalid_receipts(self) -> None:
+        from call_atoms import check_rejection
+        check_rejection(self)
+
+    def test_link_diagnostic_frontend(self) -> None:
+        from link_transport import check_frontend
+        check_frontend(self)
+
+    def test_link_diagnostic_native_resolution(self) -> None:
+        from link_transport import check_native
+        check_native(self)
+
+    def test_link_diagnostic_source_ownership(self) -> None:
+        from link_transport import check_source_ownership
+        check_source_ownership(self)
+
+    def test_link_diagnostic_publication(self) -> None:
+        from link_transport import check_publication
+        check_publication(self)
+
+    def test_link_diagnostic_lifetimes(self) -> None:
+        from link_transport import check_lifetimes
+        check_lifetimes(self)
+
+    def test_link_diagnostic_c_object_names(self) -> None:
+        from link_backend_objects import check_c_backends
+        check_c_backends(self)
+
+    def test_link_diagnostic_llvm_object_names(self) -> None:
+        from link_backend_objects import check_llvm_objects
+        check_llvm_objects(self)
+
+    def test_procedure_signature_diagnostics(self) -> None:
+        from signature_diagnostics import check_signatures
+        check_signatures(self)
+
+    def test_variable_case_collision_diagnostics(self) -> None:
+        from variable_collisions import check_collisions
+        check_collisions(self)
+
+    def test_procedure_callback_inputs(self) -> None:
+        from callback_conventions import check_callbacks
+        check_callbacks(self)
+
+    def test_keyword_configuration_contexts(self) -> None:
+        from keyword_contexts import check_keyword_contexts
+        check_keyword_contexts(self)
+
+    def test_control_transfer_dispatches(self) -> None:
+        from control_dispatch import check_dispatches
+        check_dispatches(self)
+
+    def test_procedure_object_symbol_observations(self) -> None:
+        from object_symbols import check_observations
+        check_observations(self)
+
+    def test_procedure_object_symbol_module_ownership(self) -> None:
+        from object_symbols import check_modules
+        check_modules(self)
+
+    def test_procedure_callback_module_ownership(self) -> None:
+        from callback_conventions import source_text
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                first = self.source(source_text('fb', 'Type Handler As Function Cdecl() As Long\n'
+                    'Declare Sub FirstAlias Alias "first_alias"(ByVal cb As Function() As Long)'), 'first.bas')
+                second = self.source(source_text('fb',
+                    'Declare Sub SecondAlias Alias "second_alias"(ByVal cb As Sub())'), 'second.bas')
+                _, artifact = self.invoke([first, second], backend=backend)
+                model = Model.read(artifact)
+                self.assertEqual(len(model.capabilities), 2)
+                self.assertTrue(all(features['procedure-callback-inputs'] == 'available'
+                                    for features in model.capabilities.values()))
+                callbacks = [row for row in model.records['K'] if row[3].startswith('callback-convention-input:')]
+                headers = [row for row in model.records['K'] if row[3].startswith('procedure-abi-input:')]
+                self.assertEqual(len(callbacks), 3)
+                self.assertEqual(len(headers), 2)
+                self.assertEqual([row[4].split('\t')[5] for row in headers], ['1', '1'])
+                contexts = {int(row[4].split('\t')[4]) for row in headers}
+                self.assertEqual(len(contexts), 2)
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -415,7 +632,12 @@ End Function
                     temporary = self.binding(model, self.span(source, " second as", name), "declaration")
                     selected = model.parameters[signatures["first"]][ordinal]
                     self.assertEqual(replacements[temporary], int(selected[2]))
+                    self.assertEqual(model.types[temporary][3], "parameter")
+                    self.assertEqual(model.types[temporary][18], "source")
                     self.assertEqual(selected[4], mode)
+                    if name == "nextamount":
+                        original = int(model.properties["symbol", temporary]["formal-default-expression"])
+                        self.assertEqual(model.constants["expression", original], ("signed", "3"))
                     owner = int(model.symbols[temporary][11])
                     self.assertEqual(replacements[owner], signatures["first"])
                 temporary = self.binding(model, self.span(source, " variadicsecond as", "nextformat"), "declaration")
@@ -481,6 +703,10 @@ End Function
     def test_implicit_lifetime_selection_and_exclusions(self) -> None:
         source = self.fixture("lifetimes.bas")
         model = self.compile(source)
+        optional = self.one(model, "OptionalValue", "procedure")
+        parameter = int(model.parameters[optional][0][2])
+        default_expression = int(model.properties["symbol", parameter]["formal-default-expression"])
+        self.assertTrue(any(int(row[1]) == default_expression for row in model.records["E"]))
         kinds = {row[4] for row in model.records["I"]}
         self.assertEqual(kinds, IMPLICIT_KINDS)
         tracked = self.one(model, "Tracked", "type")
@@ -613,9 +839,12 @@ End Function
                             int(row[3].split(":", 1)[1]) in model.statements and
                             symbol_modules[int(row[2])] == statement_modules[int(row[3].split(":", 1)[1])]
                             for row in receipts))
+        statement_ids = [int(row[3].split(":", 1)[1]) for row in receipts]
+        self.assertTrue(all(statement in model.statements for statement in statement_ids))
         rows = [line.split("\t") for line in text.splitlines()]
-        for field, value in ((0, "C"), (1, "invalid-domain"), (2, "999999"),
-                             (3, "procedure-written-visibility:999999")):
+        for field, value in ((0, "C"), (1, "invalid-domain"), (1, "statement"),
+                             (2, "999999"), (3, "procedure-written-visibility:999999"),
+                             (4, "unknown")):
             with self.subTest(field=field, value=value), self.assertRaises(ValueError):
                 changed = [row.copy() for row in rows]
                 next(row for row in changed if row[0] == "K" and
@@ -628,6 +857,14 @@ End Function
                       and row[3].startswith("procedure-written-visibility:")]
         visibility[0][3], visibility[1][3] = visibility[1][3], visibility[0][3]
         with self.assertRaisesRegex(ValueError, "Invalid procedure visibility owner or capability"):
+            Model("\n".join("\t".join(row) for row in changed) + "\n")
+
+        # The procedure identity and its statement must remain in the same module.
+        changed = [row.copy() for row in rows]
+        visibility = [row for row in changed if row[0] == "K"
+                      and row[3].startswith("procedure-written-visibility:")]
+        visibility[0][2], visibility[1][2] = visibility[1][2], visibility[0][2]
+        with self.assertRaises(ValueError):
             Model("\n".join("\t".join(row) for row in changed) + "\n")
 
     def test_pointer_intrinsic_prefix_before_closing_parenthesis_is_not_physical(self) -> None:
@@ -863,6 +1100,22 @@ End Function
         self.invoke([source], mode="off", extra=("-semantic-model", str(destination)))
         model = Model.read(destination)
         self.assertTrue(model.records["E"])
+        self.assertFalse(list(self.working.glob(".fb-semantic-*")))
+
+    def test_semantic_bundle_publishes_matching_artifacts(self) -> None:
+        from diagnostics import Diagnostics
+
+        source = self.source("dim value as long = 17\nprint value\n")
+        prefix = self.working / "lint-cache"
+        self.invoke([source], mode="off", extra=("-semantic-bundle", str(prefix)))
+
+        model_path = Path(str(prefix) + ".fbcsem")
+        diagnostic_path = Path(str(prefix) + ".fbcdia")
+        model = Model.read(model_path)
+        diagnostics = Diagnostics.read(diagnostic_path, compiler_exit=0)
+        self.assertTrue(model.records["E"])
+        self.assertTrue(diagnostics.succeeded)
+        self.assertEqual(diagnostics.modules[0][2], self.compiler_path(source))
         self.assertFalse(list(self.working.glob(".fb-semantic-*")))
 
     def test_special_output_destinations_are_rejected(self) -> None:
@@ -1830,7 +2083,17 @@ WithDefault()
         for mode in ("full", "expressions"):
             with self.subTest(mode=mode):
                 model = self.compile(source, mode=mode, extra=("-include", str(preinclude)))
-                model.validate_source_revisions()
+                source_opens: list[Path] = []
+                original_open = Path.open
+
+                def observed_open(opened: Path, *args: object, **kwargs: object):
+                    if args and args[0] == "rb":
+                        source_opens.append(opened.resolve())
+                    return original_open(opened, *args, **kwargs)
+
+                with mock.patch.object(Path, "open", observed_open):
+                    model.validate_physical_locations()
+                self.assertEqual(source_opens.count(repeated.resolve()), 1)
                 for row in model.files.values():
                     original = Path(row[2]).read_bytes()
                     self.assertEqual(row[3], str(len(original)))
@@ -1859,6 +2122,281 @@ WithDefault()
                 with self.assertRaisesRegex(ValueError, "stale"):
                     model.validate_source_revisions()
                 repeated.write_text("dim occurrence_value as long\n")
+
+    def test_reader_bounds_sidecar_records_and_source_cache(self) -> None:
+        source = self.source("dim bounded_value as long\nprint bounded_value\n")
+        _, path = self.invoke([source], mode="bindings")
+        wire = path.read_bytes()
+        text = wire.decode("ascii")
+        with self.assertRaisesRegex(ValueError, "sidecar exceeds.*byte limit"):
+            Model.read(path, bindings_only=True,
+                       limits=ReaderLimits(max_sidecar_bytes=len(wire) - 1))
+        with self.assertRaisesRegex(ValueError, "record exceeds.*byte limit"):
+            Model(text, bindings_only=True, limits=ReaderLimits(max_record_bytes=1))
+        with self.assertRaisesRegex(ValueError, "record limit"):
+            Model(text, bindings_only=True, limits=ReaderLimits(max_records=1))
+        with self.assertRaisesRegex(ValueError, "positive integer"):
+            ReaderLimits(max_records=0)
+
+        source_size = source.stat().st_size
+        bounded = Model.read(path, bindings_only=True,
+                             limits=ReaderLimits(max_source_bytes=source_size - 1))
+        with self.assertRaisesRegex(ValueError, "per-file byte limit"):
+            bounded.validate_source_revisions()
+        bounded = Model.read(path, bindings_only=True,
+                             limits=ReaderLimits(max_cached_source_bytes=source_size - 1))
+        with self.assertRaisesRegex(ValueError, "cache byte limit"):
+            bounded.validate_source_revisions()
+        rows = [line.split("\t") for line in text.splitlines()]
+        next(row for row in rows if row[0] == "FILE")[5] = "utf-16le"
+        forged = Model("\n".join("\t".join(row) for row in rows) + "\n", bindings_only=True)
+        with self.assertRaisesRegex(ValueError, "advertised encoding"):
+            forged.validate_source_revisions()
+
+    def test_reader_rejects_untrusted_counts_before_allocating(self) -> None:
+        source = self.source('#define Scale(x) ((x) + 1)\n'
+                             'declare sub Probe(byval n as long)\n'
+                             'dim value as long = Scale(1)\nasm\n nop\nend asm\nprint value\n')
+        _, path = self.invoke([source])
+        text = path.read_text(encoding="ascii")
+        rows = [line.split("\t") for line in text.splitlines()]
+        limits = ReaderLimits(max_sidecar_bytes=len(text) + 32,
+                              max_record_bytes=max(len(line) for line in text.splitlines()) + 32,
+                              max_records=len(rows) + 1)
+        Model(text, limits=limits)
+        actual_range = range
+
+        def allocation_guard(*args):
+            result = actual_range(*args)
+            if len(result) > 1_000_000:
+                raise AssertionError("Validation attempted an allocation from a forged count")
+            return result
+
+        targets = (("F", 4), ("MD", 7), ("assembly-token-count", 4), ("copyback-count", 4))
+        for target, column in targets:
+            with self.subTest(target=target):
+                changed = [row.copy() for row in rows]
+                row = next(row for row in reversed(changed) if row[0] == target) if target in ("F", "MD") else next(
+                    row for row in changed if row[0] == "K" and row[3] == target)
+                row[column] = "1000000000"
+                with mock.patch("sidecar.range", allocation_guard, create=True):
+                    with self.assertRaisesRegex(ValueError, "incomplete|exceeds"):
+                        Model("\n".join("\t".join(row) for row in changed) + "\n", limits=limits)
+
+    def test_physical_locations_require_subject_origin_and_owner(self) -> None:
+        first = self.source("dim shared alpha as long\nsub First(byval p as long)\n print p + 1\nend sub\n", "first.bas")
+        second = self.source("dim shared bravo as long\nsub Other(byval p as long)\n print p + 1\nend sub\n", "second.bas")
+        _, path = self.invoke([first, second])
+        rows = [line.split("\t") for line in path.read_text(encoding="ascii").splitlines()]
+        model = Model.read(path)
+        model.validate_physical_locations()
+        first_source, second_source = [row[1] for row in model.records["SRC"] if row[5] == "module"]
+        for domain in ("binding", "declaration", "expression"):
+            index = next(index for index, row in enumerate(rows) if row[0:2] == ["LOC", domain]
+                         and row[3] == "range" and row[4] == second_source)
+            with self.subTest(domain=domain), self.assertRaisesRegex(ValueError, "source origin"):
+                changed = [row.copy() for row in rows]
+                changed[index][4] = first_source
+                Model("\n".join("\t".join(row) for row in changed) + "\n")
+            with self.subTest(domain=domain, forged_origin=True), self.assertRaisesRegex(ValueError, "another module"):
+                changed = [row.copy() for row in rows]
+                changed[index][4] = first_source
+                next(row for row in changed if row[0:3] == ["ORIG", domain, changed[index][2]])[3] = first_source
+                Model("\n".join("\t".join(row) for row in changed) + "\n")
+
+        self.source("dim included_value as long\n", "repeated.bi")
+        source = self.source('namespace One\n#include "repeated.bi"\nend namespace\n'
+                             'namespace Two\n#include "repeated.bi"\nend namespace\n')
+        _, path = self.invoke([source], mode="bindings")
+        rows = [line.split("\t") for line in path.read_text(encoding="ascii").splitlines()]
+        model = Model.read(path, bindings_only=True)
+        included = [row[1] for row in model.records["SRC"] if row[5] == "include"]
+        location = next(row for row in rows if row[0:2] == ["LOC", "binding"] and row[4] == included[1])
+        location[4] = included[0]
+        next(row for row in rows if row[0:3] == ["ORIG", "binding", location[2]])[3] = included[0]
+        with self.assertRaisesRegex(ValueError, "statement occurrence"):
+            Model("\n".join("\t".join(row) for row in rows) + "\n", bindings_only=True)
+
+    def test_control_flow_targets_require_phase_labels_and_native_agreement(self) -> None:
+        source = self.source("dim shared value as long\nsub First()\ngoto done\nother:\nvalue = 1\n"
+                             "done:\nvalue = 2\nend sub\nsub Second()\ngoto foreign\nforeign:\nend sub\n")
+        _, path = self.invoke([source])
+        model = Model.read(path)
+        rows = [line.split("\t") for line in path.read_text(encoding="ascii").splitlines()]
+        done = str(self.one(model, "done", "label"))
+        index = next(index for index, row in enumerate(rows) if row[0] == "CE" and row[4:6] == ["label", done])
+        for target, kind in (("value", "variable"), ("foreign", "label"), ("other", "label")):
+            with self.subTest(target=target), self.assertRaisesRegex(ValueError, "Control-flow target"):
+                changed = [row.copy() for row in rows]
+                changed[index][5] = str(self.one(model, target, kind))
+                Model("\n".join("\t".join(row) for row in changed) + "\n")
+        changed = [row.copy() for row in rows if not (row[0] == "CL" and row[2] == done)]
+        changed[-1][-1] = str(int(changed[-1][-1]) - 1)
+        with self.assertRaisesRegex(ValueError, "Control-flow target"):
+            Model("\n".join("\t".join(row) for row in changed) + "\n")
+
+    def test_legacy_bytes_do_not_invalidate_other_physical_lines(self) -> None:
+        for ending in (b"\n", b"\r\n", b"\r"):
+            with self.subTest(ending=ending):
+                source = self.working / "legacy.bas"
+                original = ending.join((b'dim value as string = "\xe9"', b'print value', b''))
+                source.write_bytes(original)
+                model = self.compile(source)
+                self.assertTrue(any(row[5] == "2" and row[11] == "mapped" for row in model.records["LOC"]))
+                model.validate_physical_locations()
+                location = next(row for row in model.records["LOC"] if row[1] == "binding" and row[5] == "2")
+                planned = model.plan_edits([SourceEdit("binding", int(location[2]), "range", b"value")])
+                self.assertEqual(planned[0].updated, original)
+
+        source = self.working / "malformed-suffix.bas"
+        original = b'dim value as string = "\xe9"\n'
+        source.write_bytes(original)
+        _, path = self.invoke([source])
+        rows = [line.split("\t") for line in path.read_text(encoding="ascii").splitlines()]
+        location = next(row for row in rows if row[0:2] == ["LOC", "binding"])
+        location[9:12] = [str(original.index(b"value")), str(original.index(b"value") + 5), "mapped"]
+        forged = Model("\n".join("\t".join(row) for row in rows) + "\n")
+        with self.assertRaisesRegex(ValueError, "malformed encoded line"):
+            forged.validate_physical_locations()
+
+    def test_malformed_unmapped_lines_preserve_later_encoded_locations(self) -> None:
+        encodings = (("utf-16-le", codecs.BOM_UTF16_LE), ("utf-16-be", codecs.BOM_UTF16_BE),
+                     ("utf-32-le", codecs.BOM_UTF32_LE), ("utf-32-be", codecs.BOM_UTF32_BE))
+        for codec, bom in encodings:
+            for ending in ("\n", "\r\n", "\r"):
+                with self.subTest(codec=codec, ending=ending):
+                    source = self.working / "malformed-earlier.bas"
+                    # Newline-like bytes inside these valid scalars must not
+                    # become line breaks when scanning a wide source encoding.
+                    later = 'print len("\u0d00\u0a00\U000d0000\U000a0000"); value' + ending
+                    original = (bom + 'dim value as string = "'.encode(codec)
+                                + chr(0xD800).encode(codec, errors="surrogatepass")
+                                + ('"' + ending + later).encode(codec))
+                    source.write_bytes(original)
+                    model = self.compile(source)
+                    self.assertTrue(any(row[5] == "2" and row[11] == "mapped" for row in model.records["LOC"]))
+                    self.assertFalse(any(row[5] == "1" and row[11] == "mapped" for row in model.records["LOC"]))
+                    model.validate_physical_locations()
+
+    def test_repeated_revision_coordinates_are_decoded_once(self) -> None:
+        self.source("dim included_value as long\n", "repeated.bi")
+        source = self.source('namespace One\n#include "repeated.bi"\nend namespace\n'
+                             'namespace Two\n#include "repeated.bi"\nend namespace\n')
+        model = self.compile(source, mode="bindings")
+        self.assertEqual(len(model.records["FILE"]), 3)
+        with mock.patch("sidecar.codecs.getincrementaldecoder", wraps=codecs.getincrementaldecoder) as decoder:
+            model.validate_physical_locations()
+        self.assertEqual(decoder.call_count, 2)
+
+    def test_recovery_points_remain_readable_and_cannot_be_edited(self) -> None:
+        for text in ("dim n as long\nn = 1 + 2\ninvalid syntax here\n",
+                     "invalid syntax here\ndim n as long\nn = 1\n",
+                     "sub Broken()\ninvalid syntax here\nend sub\n"):
+            source = self.source(text)
+            for backend in self.backends:
+                with self.subTest(source=text, backend=backend):
+                    disabled, _ = self.invoke([source], backend=backend, mode="off", success=False)
+                    observed, path = self.invoke([source], backend=backend, mode="expressions", success=False)
+                    self.assertEqual(observed.stdout, disabled.stdout)
+                    self.assertEqual(observed.stderr, disabled.stderr)
+                    model = Model.read(path, expressions_only=True, allow_recovery=True)
+                    self.assertEqual(model.footer[0], "RECOVERY")
+                    endings = [row for row in model.records["STE"] if row[3] == "unmatched"]
+                    self.assertTrue(endings)
+                    for row in endings:
+                        if row[6:8] == row[8:10]:
+                            self.assertEqual(row[4], "0", "An empty recovery point must not advertise a physical range")
+                    with self.assertRaisesRegex(ValueError, "complete semantic model"):
+                        model.plan_edits([SourceEdit("expression", 1, "range", b"3")])
+
+        source = self.source("dim n as long\nn = 1\n")
+        _, path = self.invoke([source], mode="expressions")
+        rows = [line.split("\t") for line in path.read_text(encoding="ascii").splitlines()]
+        ending = next(row for row in rows if row[0] == "STE" and row[4] == "1")
+        ending[8:10] = ending[6:8]
+        with self.assertRaisesRegex(ValueError, "Empty, reversed"):
+            Model("\n".join("\t".join(row) for row in rows) + "\n", expressions_only=True)
+
+    def test_standalone_validator_reports_machine_readable_status(self) -> None:
+        source = self.source("dim validated_value as long\nprint validated_value\n")
+        _, path = self.invoke([source])
+        command = [sys.executable, str(self.root / "build_scripts/validate-compiler-semantic-model.py"),
+                   str(path), "--root", str(self.root), "--validate-locations", "--format", "json"]
+        result = subprocess.run(command, cwd=self.working, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        status = json.loads(result.stdout)
+        self.assertTrue(status["valid"])
+        self.assertEqual(status["schema"], SCHEMA)
+        self.assertEqual(status["source_validation"], "revisions and locations verified")
+
+        result = subprocess.run(command + ["--max-sidecar-bytes", "1"], cwd=self.working,
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        status = json.loads(result.stdout)
+        self.assertFalse(status["valid"])
+        self.assertIn("byte limit", status["error"])
+
+    def test_frozen_reader_keeps_complete_import_closure(self) -> None:
+        scripts = str(self.root / "build_scripts")
+        sys.path.insert(0, scripts)
+        try:
+            from compiler_semantic_audit import SEMANTIC_READER_FILES, freeze_semantic_reader
+        finally:
+            sys.path.remove(scripts)
+        with tempfile.TemporaryDirectory(prefix="frozen-reader-", dir=self.working) as temporary:
+            destination = Path(temporary)
+            freeze_semantic_reader(self.root, destination)
+            self.assertEqual(sorted(path.name for path in destination.glob("*.py")),
+                             sorted(SEMANTIC_READER_FILES))
+            result = subprocess.run([sys.executable, "-c",
+                                     "import sidecar; assert sidecar.SCHEMA == '27'"],
+                                    cwd=destination, capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_safe_edit_planning_requires_exact_fresh_nonoverlapping_locations(self) -> None:
+        source = self.source("dim original_name as long\nprint original_name\n")
+        _, path = self.invoke([source], mode="bindings")
+        model = Model.read(path, bindings_only=True)
+        symbol = next(identity for identity, row in model.symbols.items()
+                      if row[2].casefold() == "original_name")
+        binding_ids = [ordinal for ordinal, row in enumerate(model.records["B"], 1)
+                       if int(row[1]) == symbol]
+        self.assertEqual(len(binding_ids), 2)
+        edits = [SourceEdit("binding", identity, "range", b"renamed_value")
+                 for identity in binding_ids]
+        original = source.read_bytes()
+        planned = model.plan_edits(edits)
+        self.assertEqual(len(planned), 1)
+        self.assertEqual(planned[0].path, source.resolve())
+        self.assertEqual(planned[0].expected_sha256, hashlib.sha256(original).hexdigest())
+        self.assertEqual(planned[0].updated, original.replace(b"original_name", b"renamed_value"))
+        self.assertEqual(planned[0].updated_sha256, hashlib.sha256(planned[0].updated).hexdigest())
+        self.assertEqual(source.read_bytes(), original, "Planning must not write the source")
+
+        with self.assertRaisesRegex(ValueError, "overlap"):
+            model.plan_edits([edits[0], edits[0]])
+        with self.assertRaisesRegex(ValueError, "no exact physical location"):
+            model.plan_edits([SourceEdit("binding", 999999, "range", b"missing")])
+        statement = next(key for key, row in model.physical_locations.items()
+                         if key[0] == "statement" and key[2] == "range" and row[11] == "mapped")
+        with self.assertRaisesRegex(ValueError, "not an eligible written source fact"):
+            model.plan_edits([SourceEdit(*statement, replacement=b"print 1")])
+        with self.assertRaisesRegex(ValueError, "invalid for the source encoding"):
+            model.plan_edits([SourceEdit("binding", binding_ids[0], "range", b"\xff")])
+        limited = Model.read(path, bindings_only=True, limits=ReaderLimits(max_edits=1))
+        with self.assertRaisesRegex(ValueError, "edit limit"):
+            limited.plan_edits(edits)
+        limited = Model.read(path, bindings_only=True,
+                             limits=ReaderLimits(max_planned_output_bytes=len(original) - 1))
+        with self.assertRaisesRegex(ValueError, "output exceeds"):
+            limited.plan_edits(edits)
+
+        source.write_bytes(original + b"' changed after export\n")
+        try:
+            with self.assertRaisesRegex(ValueError, "stale"):
+                model.plan_edits(edits)
+        finally:
+            source.write_bytes(original)
 
     def test_source_hash_boundaries_position_and_change_detection(self) -> None:
         executable = self.working / ("source-revision.exe" if self.native_windows else "source-revision")
@@ -2891,6 +3429,49 @@ print SEM_EMPTY joined3
                 # out-of-type definition. It is not an instance FIELD.
                 self.assertEqual(model.types[counter][17:19], ["external", "source"])
 
+    def test_aggregate_field_order_uses_completed_native_members(self) -> None:
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                source = self.fixture("field-groups.bas")
+                model = self.compile(source, backend=backend)
+                self.assertEqual(model.capabilities[1]["aggregate-field-order"], "available")
+                owner = self.one(model, "FieldGroup", "type")
+                fields = [int(model.properties["symbol", owner]["declared-field:" + str(i)]) for i in range(1, 5)]
+                self.assertEqual([model.symbol_name(field) for field in fields],
+                                 ["FIELDGROUPVALUE", "FIELDGROUPCOUNT", "FIELDGROUPNUMBERS", "FIELDGROUPCALLBACK"])
+                for identity, properties in model.properties.items():
+                    if identity[0] != "symbol" or "declared-field-count" not in properties:
+                        continue
+                    count = int(properties["declared-field-count"])
+                    entries = [int(properties["declared-field:" + str(i)]) for i in range(1, count + 1)]
+                    self.assertEqual(len(set(entries)), count)
+                    self.assertTrue(all(model.types[field][18] == "source" and int(model.types[field][8]) == identity[1] for field in entries))
+                for mode in ("bindings", "expressions"):
+                    compact = self.compile(source, mode=mode, backend=backend)
+                    self.assertEqual(compact.capabilities[1]["aggregate-field-order"], "unavailable")
+                    self.assertFalse(any(key.startswith("declared-field:") for properties in compact.properties.values() for key in properties))
+
+    def test_aggregate_field_order_module_ownership(self) -> None:
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                source_text = "Type ModuleRecord\n    firstItem As Long\n    secondItem As Long\nEnd Type\n"
+                first = self.source(source_text, "first-fields.bas")
+                second = self.source(source_text, "second-fields.bas")
+                _, artifact = self.invoke([first, second], backend=backend)
+                model = Model.read(artifact)
+                owners = model.named("ModuleRecord", "type")
+                self.assertEqual(len(owners), 2)
+                self.assertEqual(len(model.capabilities), 2)
+                fields = []
+                for owner in owners:
+                    properties = model.properties["symbol", owner]
+                    self.assertEqual(properties["declared-field-count"], "2")
+                    members = [int(properties["declared-field:" + str(i)]) for i in (1, 2)]
+                    self.assertTrue(all(int(model.types[field][8]) == owner for field in members))
+                    fields.extend(members)
+                self.assertEqual(len(set(fields)), 4)
+                self.assertTrue(all(features["aggregate-field-order"] == "available" for features in model.capabilities.values()))
+
     def test_declared_field_counts_do_not_change_emission(self) -> None:
         for backend in self.backends:
             with self.subTest(backend=backend):
@@ -2920,7 +3501,9 @@ print SEM_EMPTY joined3
                 Model(corrupted)
         lines = [line for line in text.splitlines()
                  if not (line.startswith("K\tsymbol\t") and
-                         any("\t" + key + "\t" in line for key in ("declared-field-count", "field-array-rank")))]
+                         (any("\t" + key + "\t" in line for key in ("declared-field-count", "field-array-rank"))
+                          or "\tdeclared-field:" in line))
+                 and not line.startswith("CAP\t1\taggregate-field-order\t")]
         removed = len(text.splitlines()) - len(lines)
         self.assertGreater(removed, 0)
         footer = lines[-1].split("\t")
@@ -2948,7 +3531,7 @@ print SEM_EMPTY joined3
         for backend in self.backends:
             with self.subTest(backend=backend):
                 self.invoke([source], backend=backend, mode="off")
-                suffix = ".ll" if backend == "llvm" else ".c"
+                suffix = ".ll" if backend == "llvm" else ".asm" if backend in ("gas", "gas64") else ".c"
                 baseline = source.with_suffix(suffix).read_bytes()
                 model = self.compile(source, backend=backend)
                 self.assertEqual(source.with_suffix(suffix).read_bytes(), baseline)
@@ -3371,6 +3954,18 @@ print SEM_EMPTY joined3
                     self.assertEqual(location[4], fields[0])
                     spelling = source.read_bytes()[int(location[9]):int(location[10])].decode('utf-8')
                     self.assertTrue(spelling.endswith(fields[4]), (spelling, fields))
+
+    def test_preprocessor_output_preserves_numeric_literal_suffixes(self) -> None:
+        source = self.source('dim unsigned_max as ulong = &hFFFFFFFFu\n'
+                             'dim unsigned_long_value as ulongint = 3uLl\n'
+                             'dim single_value as single = .5f\n')
+        preprocessed = source.with_suffix('.pp.bas')
+        self.invoke([source], extra=('-pp',))
+        output = preprocessed.read_text(encoding='utf-8-sig')
+        for literal in ('&hFFFFFFFFu', '3uLl', '.5f'):
+            with self.subTest(literal=literal):
+                self.assertIn(literal, output)
+        self.compile(preprocessed)
 
     def test_parsed_numeric_suffixes_exclude_unparsed_macro_output(self) -> None:
         source = self.source('#define inner_suffix 1ul\n'
@@ -3870,5 +4465,21 @@ print SEM_EMPTY joined3
                     self.assertEqual(output.read_bytes(), original)
                     self.assertEqual(compact.capabilities[1]["scalar-string-declarations"], "unavailable")
                     self.assertFalse(any(key.startswith("scalar-string-") for properties in compact.properties.values() for key in properties))
+
+    def test_declaration_repetition_inputs_preserve_contracts(self) -> None:
+        for backend in self.backends:
+            for fixture, count, repeated in (("declaration-repetitions.bas", 21, 7),
+                                              ("declaration-repetitions-legacy.bas", 2, 1)):
+                with self.subTest(backend=backend, fixture=fixture):
+                    source = self.fixture(fixture)
+                    model = self.compile(source, backend=backend)
+                    entries = [row for row in model.records["K"] if row[3].startswith("redeclaration-input:")]
+                    self.assertEqual(model.capabilities[1]["declaration-repetition-inputs"], "available")
+                    self.assertEqual(len(entries), count)
+                    self.assertEqual(sum(row[4].split("\t")[2] == "1" for row in entries), repeated)
+                    for mode in ("bindings", "expressions"):
+                        compact = self.compile(source, mode=mode, backend=backend)
+                        self.assertEqual(compact.capabilities[1]["declaration-repetition-inputs"], "unavailable")
+                        self.assertFalse(any(row[3].startswith("redeclaration-") for row in compact.records["K"]))
 
 # end of test_sidecar.py

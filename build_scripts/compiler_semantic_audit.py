@@ -1,7 +1,7 @@
 """Project: FreeBASIC semantic audits
 File: compiler_semantic_audit.py
 Purpose: Check semantic exports against frozen source files and generated code.
-Responsibilities: Bound compiler execution, validate provenance, and compare export modes.
+Responsibilities: Freeze reader dependencies, bound execution, validate provenance, and compare modes.
 This file intentionally does NOT contain: source selection or BASIC name resolution.
 """
 
@@ -19,6 +19,31 @@ import subprocess
 
 
 EMISSION_SUFFIX = {"gcc": ".c", "clang": ".c", "llvm": ".ll", "gas64": ".asm", "gas": ".asm"}
+SEMANTIC_READER_FILES = (
+    "sidecar.py",
+    "semantic_flow.py",
+    "semantic_literals.py",
+    "semantic_queries.py",
+    "semantic_selects.py",
+    "semantic_select_lowering.py",
+    "semantic_declarations.py",
+    "semantic_procedures.py",
+    "semantic_aggregate_access.py",
+    "semantic_string_declarations.py",
+    "semantic_repetitions.py",
+    "aggregate_fields.py",
+    "semantic_callbacks.py",
+)
+
+
+def freeze_semantic_reader(root: Path, destination: Path) -> None:
+    """Copy the independent reader and every module needed to import it."""
+    source = root / "tests" / "semantic-sidecar"
+    for name in SEMANTIC_READER_FILES:
+        path = source / name
+        if not path.is_file():
+            raise FileNotFoundError("Semantic reader dependency is missing: " + str(path))
+        shutil.copy2(path, destination / name)
 
 
 def digest(path: Path) -> str:

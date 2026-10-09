@@ -15,7 +15,7 @@ from pathlib import Path
 import shutil
 import time
 
-from compiler_semantic_audit import digest, invoke
+from compiler_semantic_audit import digest, freeze_semantic_reader, invoke
 
 
 OMIT_DIRECTORIES = {".git", "toolchains", "node_modules", "__pycache__", "bin", "obj",
@@ -244,7 +244,7 @@ def prepare_snapshot(root: Path, compiler: Path, corpus: Path, snapshot: Path, r
     shutil.copytree(root / "lib/freebasic/linux-x86_64", toolchain / "lib/freebasic/linux-x86_64")
     validation = snapshot / "inputs/validation"
     validation.mkdir()
-    shutil.copy2(root / "tests/semantic-sidecar/sidecar.py", validation / "sidecar.py")
+    freeze_semantic_reader(root, validation)
     for name in ("test-compiler-semantic-projects.py", "fb_corpus_builds.py", "compiler_semantic_audit.py"):
         shutil.copy2(Path(__file__).with_name(name), validation / name)
     preparation = freeze_projects(corpus, snapshot / "inputs/corpus", project_names)

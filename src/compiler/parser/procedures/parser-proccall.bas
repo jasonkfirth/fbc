@@ -28,6 +28,7 @@
 #include once "parser/parser.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-expressions.bi"
 
 declare sub fbSemanticModelExportImplicitCall _
 	( _
@@ -49,6 +50,7 @@ function cAssignFunctResult( byval is_return as integer ) as integer
 	dim as LEX_LOCATION semantic_site, semantic_start, semantic_end
 	dim as longint semantic_nonphysical = 0
 	dim as integer semantic_return_range_valid = FALSE
+	dim as longint semantic_rhs = 0
 
 	function = FALSE
 
@@ -157,6 +159,9 @@ function cAssignFunctResult( byval is_return as integer ) as integer
 		hSkipStmt( )
 		return TRUE
 	end if
+	'' Keep the parsed value before result conversion or constructor lowering.
+	'' BYREF results store an address, not a numeric conversion of that value.
+	if( returns_byref = FALSE ) then semantic_rhs = rhs->semantic_expression
 
 	'' set accessed flag here, as proc will be ended before AST is flushed
 	symbSetIsAccessed( res )
@@ -190,11 +195,21 @@ function cAssignFunctResult( byval is_return as integer ) as integer
 	end if
 
 	'' do the assignment
-	expr = astNewASSIGN( astBuildProcResultVar( parser.currproc, res ), rhs, assignoptions )
+	var lhs = astBuildProcResultVar( parser.currproc, res )
+	dim as integer semantic_dtype = FB_DATATYPE_INVALID
+	dim as FBSYMBOL ptr semantic_subtype = NULL
+	if( lhs <> NULL ) then
+		semantic_dtype = astGetFullType( lhs )
+		semantic_subtype = astGetSubtype( lhs )
+	end if
+	expr = astNewASSIGN( lhs, rhs, assignoptions )
 	if( expr = NULL ) then
 		astDelTree( rhs )
 		errReport( FB_ERRMSG_ILLEGALASSIGNMENT )
 	else
+		'' The ABI result variable is generated, even when implemented as a
+		'' hidden parameter. It has no named source assignment destination.
+		fbSemanticModelAssignmentTarget( semantic_rhs, NULL, semantic_dtype, semantic_subtype, "assignment" )
 		astAdd( expr )
 	end if
 

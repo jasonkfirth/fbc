@@ -26,6 +26,8 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-diagnostics.bi"
+#include once "tooling/semantic-link.bi"
 #include once "parser/parser.bi"
 #include once "support/containers/hash.bi"
 #include once "support/containers/list.bi"
@@ -411,13 +413,15 @@ private function hCanDuplicateConstOrProc _
 
 end function
 
-function symbCanDuplicate _
+private function hCanDuplicate _
 	( _
 		byval head_sym as FBSYMBOL ptr, _
-		byval s as FBSYMBOL ptr _
+		byval s as FBSYMBOL ptr, _
+		byref rejected_variable as FBSYMBOL ptr _
 	) as integer
 
 	function = FALSE
+	rejected_variable = NULL
 
 	select case as const s->class
 	'' adding a define?
@@ -543,16 +547,19 @@ function symbCanDuplicate _
 				'' same scope?
 				if( s->scope = head_sym->scope ) then
 					if( env.clopt.lang = FB_LANG_FB ) then
+						if( head_sym->class = FB_SYMBCLASS_VAR ) then rejected_variable = head_sym
 						exit function
 					end if
 
 					'' same data type?
 					if( symbGetType( head_sym ) = symbGetType( s ) ) then
+						if( head_sym->class = FB_SYMBCLASS_VAR ) then rejected_variable = head_sym
 						exit function
 					end if
 
 					'' neither has a suffix?
 					if( ( symbIsSuffixed( head_sym ) = FALSE ) and ( symbIsSuffixed( s ) = FALSE ) ) then
+						if( head_sym->class = FB_SYMBCLASS_VAR ) then rejected_variable = head_sym
 						exit function
 					end if
 
@@ -621,6 +628,13 @@ function symbCanDuplicate _
 end function
 
 '':::::
+'' Preserve the existing duplicate-check interface. Symbol creation also needs
+'' the actual conflicting variable for independent compiler observations.
+function symbCanDuplicate( byval head_sym as FBSYMBOL ptr, byval s as FBSYMBOL ptr ) as integer
+	dim as FBSYMBOL ptr rejected_variable
+	return hCanDuplicate(head_sym, s, rejected_variable)
+end function
+
 function symbNewSymbol _
 	( _
 		byval options as FB_SYMBOPT, _
@@ -747,7 +761,9 @@ function symbNewSymbol _
 		else
 			'' can it be duplicated?
 			if( (options and FB_SYMBOPT_NODUPCHECK) = 0 ) then
-				if( symbCanDuplicate( head_sym, s ) = FALSE ) then
+				dim as FBSYMBOL ptr rejected_variable
+				if( hCanDuplicate( head_sym, s, rejected_variable ) = FALSE ) then
+					fbSemanticDiagnosticsVariableRejected(rejected_variable, id)
 					poolDelItem( @symb.namepool, s->id.name ) 'ZstrFree( s->id.name )
 					ZstrFree( s->id.alias )
 					ZstrFree( s->id.mangled )
@@ -817,6 +833,7 @@ function symbNewSymbol _
 	symtb->tail = s
 
 	s->parent = NULL
+	fbSemanticDiagnosticsVariableCreated(s, id)
 
 	'' forward type? add to the back-patch list..
 	if( typeGetDtOnly( dtype ) = FB_DATATYPE_FWDREF ) then
@@ -1880,6 +1897,8 @@ sub symbFreeSymbol_RemOnly _
 	)
 
 	'' remove from symbol tb
+	fbSemanticLinkProcedureReleased(s)
+	fbSemanticDiagnosticsVariableReleased(s)
 	poolDelItem( @symb.namepool, s->id.name ) 'ZstrFree( s->id.name )
 
 	ZstrFree( s->id.alias )

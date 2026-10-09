@@ -27,6 +27,7 @@
 
 declare sub hUndefSymbol()
 declare sub fbSemanticModelOptionDeclaration( byval is_base as integer, byval value as longint )
+declare sub fbSemanticModelKeywordRemoved( byval tokenid as integer )
 
 '' OptDecl  =  OPTION (BYVAL|DYNAMIC|STATIC|GOSUB|EXPLICIT|PRIVATE|ESCAPE|BASE NUM_LIT|NOKEYWORD ...|NOGOSUB)
 sub cOptDecl( )
@@ -146,7 +147,10 @@ private sub hUndefSymbol()
 		if( s ) then
 			'' Forget the symbol so it's no longer found by lookups,
 			'' but don't fully delete it, since it might already be used somewhere.
+			dim as integer removed_token = 0
+			if( s->class = FB_SYMBCLASS_KEYWORD ) then removed_token = s->key.id
 			symbDelFromHash( s )
+			fbSemanticModelKeywordRemoved( removed_token )
 		else
 			errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
 		end if

@@ -520,6 +520,7 @@ function fbcRunBin _
 		#endif
 	end if
 
+	if( *action = "linking" ) then fbSemanticLinkCompleted(result)
 	if( result = 0 ) then
 		function = TRUE
 	elseif( result < 0 ) then

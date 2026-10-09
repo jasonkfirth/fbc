@@ -51,7 +51,7 @@ declare sub fbSemanticModelExportNodeDetails _
 declare function fbSemanticModelExportTree _
 	( byval root as ASTNODE ptr, byval parentid as longint, _
 	  byref next_node_id as longint, byval source_line as integer, _
-	  byval filename as zstring ptr ) as longint
+	  byval filename as zstring ptr, byval statement_id as longint = 0 ) as longint
 declare sub fbSemanticModelExportValue _
 	( byref domain as const string, byval identity as longint, _
 	  byval dtype as integer, byval value as FBVALUE ptr )

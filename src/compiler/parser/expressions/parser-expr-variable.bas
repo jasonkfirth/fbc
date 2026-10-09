@@ -206,18 +206,22 @@ private function hFieldAccess _
 	dim as integer semantic_rank = 0
 	dim as LEX_LOCATION semantic_array_start = lexGetLastLocation( )
 	dim as longint semantic_array_nonphysical = lexGetNonphysicalTokenCount( )
+	dim as longint semantic_receiver = 0
 
 	offsetexpr = astNewCONSTi( symbGetOfs( fld ) )
 
 	'' If it's an array, then either there must be an index that needs to
 	'' be parsed, or we must return NIDXARRAY.
 	if( symbGetArrayDimensions( fld ) <> 0 ) then
+		semantic_receiver = fbSemanticModelArrayReceiver(fld, varexpr)
 		'' No '('?
 		if( (lexGetToken( ) <> CHAR_LPRNT) or fbGetIdxInParensOnly( ) ) then
 			if( check_array ) then
 				errReport( FB_ERRMSG_EXPECTEDINDEX )
 			end if
-			return astNewNIDXARRAY( hBuildField( varexpr, offsetexpr, fld, dtype, subtype ) )
+			varexpr = astNewNIDXARRAY( hBuildField( varexpr, offsetexpr, fld, dtype, subtype ) )
+			fbSemanticModelArrayStoragePrefix(varexpr, fld, semantic_receiver, semantic_array_start, semantic_array_nonphysical)
+			return varexpr
 		end if
 
 		'' '('
@@ -229,7 +233,9 @@ private function hFieldAccess _
 			'' ')'
 			lexSkipToken( )
 
-			return astNewNIDXARRAY( hBuildField( varexpr, offsetexpr, fld, dtype, subtype ) )
+			varexpr = astNewNIDXARRAY( hBuildField( varexpr, offsetexpr, fld, dtype, subtype ) )
+			fbSemanticModelArrayStoragePrefix(varexpr, fld, semantic_receiver, semantic_array_start, semantic_array_nonphysical)
+			return varexpr
 		end if
 
 		if( symbIsDynamic( fld ) ) then
@@ -268,7 +274,7 @@ private function hFieldAccess _
 			'' error recovery: skip until next ')'
 			hSkipUntil( CHAR_RPRNT, TRUE )
 		end if
-		fbSemanticModelArraySubscripts(varexpr, fld, semantic_indices(), semantic_selected_indices(), semantic_rank, semantic_array_start, semantic_array_nonphysical)
+		fbSemanticModelArraySubscripts(varexpr, fld, semantic_indices(), semantic_selected_indices(), semantic_rank, semantic_array_start, semantic_array_nonphysical, semantic_receiver)
 	else
 		varexpr = hBuildField( varexpr, offsetexpr, fld, dtype, subtype )
 	end if
@@ -385,6 +391,8 @@ function cUdtMember _
 	dim as integer export_semantics = fbSemanticModelEnabled( ) and export_prefixes
 
 	do
+		dim as LEX_LOCATION semantic_member_site = lexGetCurrentLocation( )
+		dim as longint semantic_member_nonphysical = lexGetNonphysicalTokenCount( )
 		dim as longint semantic_binding_before = fbSemanticModelBindingCount( )
 		dim as FBSYMBOL ptr fld = hMemberId( subtype, FALSE )
 		dim as longint semantic_binding = fbSemanticModelBindingCount( )
@@ -400,6 +408,7 @@ function cUdtMember _
 
 			astDeltree( varexpr )
 			varexpr = astBuildConst( fld )
+			fbSemanticModelConstantExpression(varexpr, fld, semantic_member_site, semantic_member_nonphysical)
 			if( export_semantics ) then
 				fbSemanticModelExportCurrentExpressionPrefix(varexpr)
 			end if

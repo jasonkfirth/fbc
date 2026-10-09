@@ -17,10 +17,23 @@ dim shared as longint semantic_context_id
 dim shared as FBCMMLINEOPT semantic_context_compiler
 dim shared as FBOPTION semantic_context_defaults
 dim shared as FB_LANG_CTX semantic_context_language
+dim shared as integer semantic_context_remkeyword_active
 
 sub fbSemanticModelResetContext( )
 	semantic_context_valid = FALSE
 	semantic_context_id = 0
+	'' The native keyword table installs REM in every dialect at module start.
+	'' OPTION NOKEYWORD subsequently removes that actual keyword symbol.
+	semantic_context_remkeyword_active = TRUE
+end sub
+
+sub fbSemanticModelKeywordRemoved( byval tokenid as integer )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	if( tokenid <> FB_TK_REM ) then exit sub
+	'' Hash removal does not change FBOPTION. Invalidate the cached snapshot
+	'' explicitly, without looking up names through the lexer's chain scratch.
+	semantic_context_remkeyword_active = FALSE
+	semantic_context_valid = FALSE
 end sub
 
 private sub hOption(byref domain as const string, byref key as const string, byval value as longint)
@@ -101,6 +114,7 @@ function fbSemanticModelCurrentContext( ) as longint
 	hOption("language-default", "gosub", env.opt.gosub)
 	hOption("language-policy", "opt", env.lang.opt)
 	hOption("language-policy", "integerkeyworddtype", env.lang.integerkeyworddtype)
+	hOption("language-policy", "remkeyword-active", abs(semantic_context_remkeyword_active <> FALSE))
 	hOption("language-policy", "int15literaldtype", env.lang.int15literaldtype)
 	hOption("language-policy", "int16literaldtype", env.lang.int16literaldtype)
 	hOption("language-policy", "int31literaldtype", env.lang.int31literaldtype)

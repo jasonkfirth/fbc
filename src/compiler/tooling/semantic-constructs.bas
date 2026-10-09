@@ -31,6 +31,11 @@ type SEMANTIC_SOURCE_STATEMENT
 	counter_source as LEX_LOCATION
 	step_observed as integer
 	step_source as LEX_LOCATION
+	if_slot as integer
+	if_construct as longint
+	if_arm as longint
+	owner as longint
+	assignment_count as longint
 end type
 
 type SEMANTIC_SOURCE_COMPOUND
@@ -45,13 +50,24 @@ type SEMANTIC_SOURCE_COMPOUND
 	select_pending_lowering as integer
 	select_next_bound as integer
 	select_table_seen as integer
+	if_owner as longint
+	if_arm as longint
+	if_items as longint
+	if_open as integer
+	if_single as integer
+	if_else as integer
 end type
 
 const SEMANTIC_CONSTRUCT_MAX_DEPTH = 65536
+'' The model already bounds identities. Keep arm counts within the same
+'' practical range before arithmetic or publication can exceed that range.
+const SEMANTIC_IF_MAX_ITEMS = 2097152
 dim shared as SEMANTIC_SOURCE_STATEMENT ptr semantic_statements
 dim shared as integer semantic_statement_depth, semantic_statement_capacity
 dim shared as SEMANTIC_SOURCE_COMPOUND ptr semantic_compounds
 dim shared as integer semantic_compound_depth, semantic_compound_capacity
+
+declare sub hIfStatementEnd( byval slot as integer )
 
 sub fbSemanticModelResetConstructs( )
 	deallocate(semantic_statements)
@@ -86,13 +102,25 @@ function fbSemanticModelCurrentStatement( ) as longint
 	return semantic_statements[semantic_statement_depth - 1].identity
 end function
 
+function fbSemanticModelStatementSite( ) as LEX_LOCATION
+	dim as LEX_LOCATION source
+	if( semantic_statement_depth > 0 ) then source = semantic_statements[semantic_statement_depth - 1].source
+	return source
+end function
+
 private function hCurrentCompound( ) as longint
 	if( semantic_compound_depth = 0 ) then return 0
 	return semantic_compounds[semantic_compound_depth - 1].identity
 end function
 
 private function hLocation( byref source as LEX_LOCATION ) as string
-	return fbSemanticModelNumber(fbSemanticModelLocationIsPhysical(source)) + TABCHAR + _
+	dim as integer physical = fbSemanticModelLocationIsPhysical(source)
+	'' Recovery can finish without consuming a token. Keep that observed point
+	'' informational; a physical range must contain actual written source.
+	if( (source.start_line = source.end_line) and (source.start_column = source.end_column) ) then
+		physical = FALSE
+	end if
+	return fbSemanticModelNumber(physical) + TABCHAR + _
 		fbSemanticModelEscape(source.source_file) + TABCHAR + fbSemanticModelNumber(source.start_line) + TABCHAR + _
 		fbSemanticModelNumber(source.start_column) + TABCHAR + fbSemanticModelNumber(source.end_line) + TABCHAR + _
 		fbSemanticModelNumber(source.end_column)
@@ -137,8 +165,22 @@ function fbSemanticModelStatementBegin( byref source as LEX_LOCATION, byval toke
 		.compound = compound
 		.source = source
 		.token = token
+		.owner = owner
+		.assignment_count = 0
 		.counter_observed = FALSE
 		.step_observed = FALSE
+		.if_slot = 0
+		.if_construct = 0
+		.if_arm = 0
+		if( semantic_compound_depth > 0 ) then
+			with semantic_compounds[semantic_compound_depth - 1]
+				if( (.if_owner > 0) and .if_open ) then
+					semantic_statements[semantic_statement_depth].if_slot = semantic_compound_depth
+					semantic_statements[semantic_statement_depth].if_construct = .identity
+					semantic_statements[semantic_statement_depth].if_arm = .if_arm
+				end if
+			end with
+		end if
 	end with
 	semantic_statement_depth += 1
 	fbSemanticModelAppendProvenance("ST" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(parent) + _
@@ -158,10 +200,36 @@ sub fbSemanticModelStatementEnd( byval identity as longint, byref route as const
 	end if
 	semantic_statement_depth -= 1
 	dim as LEX_LOCATION start_site = semantic_statements[semantic_statement_depth].source
+	dim as LEX_LOCATION end_site = ending
 	dim as string outcome = iif(errGetCount( ) = errors_before, "parsed", "recovered")
 	if( route = "unmatched" ) then outcome = "unmatched"
-	fbSemanticModelAppendProvenance("STE" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + route + TABCHAR + outcome + TABCHAR + hLocation(ending))
-	fbSemanticModelMacroOrigin("statement", identity, ending.macro_identity, "end")
+	'' An unmatched first statement has no last consumed token. Later unmatched
+	'' statements can retain the preceding statement's endpoint instead. Use
+	'' the observed opening point in these cases, without inventing an extent.
+	dim as integer missing_end = (len(end_site.source_file) = 0) or (end_site.start_line < 1)
+	if( (route = "unmatched") and (end_site.source_file = start_site.source_file) ) then
+		missing_end or= (end_site.end_line < start_site.start_line) or _
+			((end_site.end_line = start_site.start_line) and (end_site.end_column <= start_site.start_column))
+	end if
+	if( missing_end ) then
+		end_site = start_site
+		end_site.end_line = start_site.start_line
+		end_site.end_column = start_site.start_column
+		end_site.is_physical = FALSE
+		end_site.raw_valid = FALSE
+	end if
+	fbSemanticModelAppendProvenance("STE" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + route + TABCHAR + outcome + TABCHAR + hLocation(end_site))
+	if( fbSemanticModelFullEnabled( ) ) then
+		with semantic_statements[semantic_statement_depth]
+			fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+				TABCHAR + "assignment-count:" + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(.assignment_count))
+			fbSemanticModelAppendDetail("H" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+				TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + TABCHAR + "assignment-count" + _
+				TABCHAR + fbSemanticModelNumber(identity))
+		end with
+	end if
+	hIfStatementEnd(semantic_statement_depth)
+	fbSemanticModelMacroOrigin("statement", identity, end_site.macro_identity, "end")
 	'' A macro in an operand can make the full ending nonphysical while the
 	'' opening token remains written source. Preserve that token independently;
 	'' consumers must not fabricate a whole-statement range from this receipt.
@@ -177,7 +245,97 @@ sub fbSemanticModelStatementEnd( byval identity as longint, byref route as const
 			fbSemanticModelExportCoordinates("statement", identity, "for-step", step_site, step_site)
 		end if
 	end if
-	fbSemanticModelExportCoordinates("statement", identity, "range", start_site, ending)
+	fbSemanticModelExportCoordinates("statement", identity, "range", start_site, end_site)
+end sub
+
+'' Only successful parser assignments commit inputs. The count at STE closes
+'' every statement, including zero-input statements, so readers can distinguish
+'' an intervening accepted statement from a missing assignment observation.
+sub fbSemanticModelRecordAssignmentInputs _
+	( byref inputs as const string, byref assignment_kind as const string, byref code as const string, _
+	  byref operation_kind as const string, byval target as longint, byref source as LEX_LOCATION, byval destination as LEX_LOCATION ptr )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	if( len(inputs) = 0 ) then exit sub
+	if( (semantic_statement_depth = 0) or (len(code) = 0) or _
+	    ((assignment_kind <> "copy") and (assignment_kind <> "compound") and (assignment_kind <> "initializer") and (assignment_kind <> "let")) ) then
+		fbSemanticModelFailAt("invalid source assignment input context")
+		exit sub
+	end if
+	with semantic_statements[semantic_statement_depth - 1]
+		if( (.owner <= 0) or (.assignment_count >= SEMANTIC_IF_MAX_ITEMS) ) then
+			fbSemanticModelFailAt("source assignment input count exceeds its bound")
+			exit sub
+		end if
+		.assignment_count += 1
+		dim as string ordinal = fbSemanticModelNumber(.assignment_count)
+		dim as integer ending = instr(inputs, chr(10)), separator = instr(inputs, TABCHAR)
+		dim as integer second_separator = instr(separator + 1, inputs, TABCHAR)
+		if( (ending = 0) or (separator = 0) or (second_separator = 0) or (second_separator >= ending) ) then
+			fbSemanticModelFailAt("invalid assignment storage snapshot ticket")
+			exit sub
+		end if
+		dim as string original_inputs = left(inputs, second_separator - 1)
+		dim as string storage = mid(inputs, second_separator + 1, ending - second_separator - 1)
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+			TABCHAR + "assignment-input:" + fbSemanticModelNumber(.identity) + ":" + ordinal + TABCHAR + _
+			fbSemanticModelEscape(original_inputs + TABCHAR + assignment_kind + TABCHAR + code + TABCHAR + operation_kind + TABCHAR + fbSemanticModelNumber(target)))
+		fbSemanticModelAppendDetail("H" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+			TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + TABCHAR + "assignment-input:" + ordinal + _
+			TABCHAR + fbSemanticModelNumber(.identity))
+		fbSemanticModelExportCoordinates("statement", .identity, "assignment-operator:" + ordinal, source, source)
+		fbSemanticModelMacroOrigin("statement", .identity, source.macro_identity, "assignment-operator:" + ordinal)
+		if( destination <> NULL ) then
+			fbSemanticModelExportCoordinates("statement", .identity, "assignment-destination:" + ordinal, *destination, *destination)
+			fbSemanticModelMacroOrigin("statement", .identity, destination->macro_identity, "assignment-destination:" + ordinal)
+		end if
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+			TABCHAR + "assignment-storage:" + fbSemanticModelNumber(.identity) + ":" + ordinal + TABCHAR + fbSemanticModelEscape(storage))
+		fbSemanticModelAppendDetail("H" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+			TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + TABCHAR + "assignment-storage:" + ordinal + TABCHAR + fbSemanticModelNumber(.identity))
+		dim as integer first = ending + 1
+		while( first <= len(inputs) )
+			ending = instr(first, inputs, chr(10))
+			separator = instr(first, inputs, TABCHAR)
+			if( (ending = 0) or (separator = 0) or (separator >= ending) ) then
+				fbSemanticModelFailAt("invalid assignment storage snapshot node")
+				exit sub
+			end if
+			dim as string node = mid(inputs, first, separator - first)
+			fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+				TABCHAR + "assignment-tree:" + fbSemanticModelNumber(.identity) + ":" + ordinal + ":" + node + TABCHAR + _
+				fbSemanticModelEscape(mid(inputs, separator + 1, ending - separator - 1)))
+			fbSemanticModelAppendDetail("H" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + TABCHAR + _
+				"symbol" + TABCHAR + fbSemanticModelNumber(.owner) + TABCHAR + "assignment-tree:" + ordinal + ":" + node + TABCHAR + fbSemanticModelNumber(.identity))
+			first = ending + 1
+		wend
+	end with
+end sub
+
+'' LET assigns selected fields in declaration order. The assignment ordinal
+'' counts writes, while the field slot also counts omitted destinations.
+sub fbSemanticModelRecordLetInputs _
+	( byref inputs as const string, byval selected as ASTNODE ptr, byval fld as FBSYMBOL ptr, _
+	  byval slot as integer, byref source as LEX_LOCATION, byref destination as LEX_LOCATION )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	if( (semantic_statement_depth = 0) or (slot < 1) or (slot > 65536) or (fld = NULL) ) then
+		fbSemanticModelFailAt("invalid LET destination context")
+		exit sub
+	end if
+	with semantic_statements[semantic_statement_depth - 1]
+		dim as longint previous_count = .assignment_count
+		fbSemanticModelAcceptAssignmentInputs(inputs, selected, AST_OP_ASSIGN, "let", source, 0, @destination)
+		if( .assignment_count <> previous_count + 1 ) then
+			fbSemanticModelFailAt("LET assignment selection is missing")
+			exit sub
+		end if
+		dim as string ordinal = fbSemanticModelNumber(.assignment_count)
+		dim as string value = fbSemanticModelNumber(slot) + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(fld))
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+			TABCHAR + "let-slot:" + fbSemanticModelNumber(.identity) + ":" + ordinal + TABCHAR + fbSemanticModelEscape(value))
+		fbSemanticModelAppendDetail("H" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+			TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + TABCHAR + "let-slot:" + ordinal + _
+			TABCHAR + fbSemanticModelNumber(.identity))
+	end with
 end sub
 
 function fbSemanticModelConstructBegin( byval token as integer ) as longint
@@ -204,6 +362,12 @@ function fbSemanticModelConstructBegin( byval token as integer ) as longint
 		.select_pending_lowering = 0
 		.select_next_bound = 0
 		.select_table_seen = FALSE
+		.if_owner = 0
+		.if_arm = 0
+		.if_items = 0
+		.if_open = FALSE
+		.if_single = FALSE
+		.if_else = FALSE
 	end with
 	semantic_compound_depth += 1
 	fbSemanticModelAppendProvenance("BLK" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(parent) + _
@@ -221,6 +385,7 @@ sub fbSemanticModelConstructEnd( byval identity as longint, byref ending as LEX_
 	end if
 	if( fbSemanticModelFullEnabled( ) ) then
 		with semantic_compounds[semantic_compound_depth - 1]
+			if( (.if_owner > 0) and .if_open ) then fbSemanticModelFailAt("unfinished IF arm")
 			if( .select_owner > 0 ) then
 				if( (.select_alternatives <> 0) or (.select_pending_lowering <> 0) or _
 					(.select_is_const and (.select_table_seen = FALSE)) ) then
@@ -252,6 +417,147 @@ sub fbSemanticModelStatementOperation( byref operation as const string )
 	'' The caller is the grammar route that actually accepted this builtin,
 	'' rather than a spelling lookup that could misclassify a user identifier.
 	fbSemanticModelAppendProvenance("SOP" + TABCHAR + fbSemanticModelNumber(statement) + TABCHAR + operation)
+end sub
+
+'' -------------------------------------------------------------------------
+'' Accepted IF arm ownership
+'' -------------------------------------------------------------------------
+
+'' Statements remember the arm active when their parser boundary opens.
+'' A nested compound can remain on the stack when its opening statement
+'' completes, so membership retains the parent stack slot and identity.
+'' ELSE/ELSEIF/END IF headers are explicitly excluded by their grammar hooks.
+'' Inline ELSE has no ST boundary; its own arm and opening-token receipts
+'' still preserve its accepted role without inventing a source statement.
+private function hIfObservation( byval construct as longint ) as SEMANTIC_SOURCE_COMPOUND ptr
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then return NULL
+	if( lex.ctx->semantic_probe ) then return NULL
+	if( (construct <= 0) or (semantic_compound_depth = 0) or (hCurrentCompound( ) <> construct) ) then
+		fbSemanticModelFailAt("invalid IF arm observation owner")
+		return NULL
+	end if
+	return @semantic_compounds[semantic_compound_depth - 1]
+end function
+
+private sub hIfFact( byval observed as SEMANTIC_SOURCE_COMPOUND ptr, byref key as const string, byref value as const string, _
+	byval subject as longint, byref role as const string )
+	fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(observed->if_owner) + _
+		TABCHAR + key + TABCHAR + fbSemanticModelEscape(value))
+	fbSemanticModelAppendProvenance("H" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(observed->if_owner) + _
+		TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(observed->if_owner) + TABCHAR + role + TABCHAR + fbSemanticModelNumber(subject))
+end sub
+
+private sub hIfArmBegin( byval observed as SEMANTIC_SOURCE_COMPOUND ptr, byref role as const string, _
+	byval header as longint, byref source as LEX_LOCATION )
+	if( observed->if_open or (observed->if_arm >= SEMANTIC_IF_MAX_ITEMS) ) then
+		fbSemanticModelFailAt("invalid IF arm opening")
+		exit sub
+	end if
+	observed->if_arm += 1
+	observed->if_items = 0
+	observed->if_open = TRUE
+	if( role = "else" ) then observed->if_else = TRUE
+	dim as string arm = fbSemanticModelNumber(observed->if_arm)
+	dim as string key = "if-arm:" + fbSemanticModelNumber(observed->identity) + ":" + arm
+	dim as string value = role + TABCHAR + fbSemanticModelNumber(header)
+	hIfFact(observed, key, value, observed->identity, "if-arm:" + arm)
+	fbSemanticModelExportCoordinates("construct", observed->identity, "if-arm:" + arm, source, source)
+	fbSemanticModelMacroOrigin("construct", observed->identity, source.macro_identity, "if-arm:" + arm)
+end sub
+
+private sub hIfArmEnd( byval observed as SEMANTIC_SOURCE_COMPOUND ptr )
+	if( observed->if_open = FALSE ) then
+		fbSemanticModelFailAt("IF arm has no opening")
+		exit sub
+	end if
+	dim as string arm = fbSemanticModelNumber(observed->if_arm)
+	dim as string key = "if-arm-end:" + fbSemanticModelNumber(observed->identity) + ":" + arm
+	dim as string value = fbSemanticModelNumber(observed->if_items)
+	hIfFact(observed, key, value, observed->identity, "if-arm-end:" + arm)
+	observed->if_open = FALSE
+end sub
+
+private sub hIfBoundary( byval observed as SEMANTIC_SOURCE_COMPOUND ptr )
+	if( semantic_statement_depth = 0 ) then exit sub
+	with semantic_statements[semantic_statement_depth - 1]
+		if( .if_construct = observed->identity ) then .if_slot = 0
+	end with
+end sub
+
+private sub hIfStatementEnd( byval slot as integer )
+	with semantic_statements[slot]
+		if( .if_slot = 0 ) then exit sub
+		if( (.if_slot > semantic_compound_depth) or (.if_slot < 1) ) then
+			fbSemanticModelFailAt("IF statement arm stack is unavailable")
+			exit sub
+		end if
+		dim as SEMANTIC_SOURCE_COMPOUND ptr observed = @semantic_compounds[.if_slot - 1]
+		if( (observed->identity <> .if_construct) or (observed->if_arm <> .if_arm) or _
+			(observed->if_open = FALSE) or (observed->if_items >= SEMANTIC_IF_MAX_ITEMS) ) then
+			fbSemanticModelFailAt("IF statement arm changed before completion")
+			exit sub
+		end if
+		observed->if_items += 1
+		dim as string key = "if-arm-statement:" + fbSemanticModelNumber(.identity)
+		dim as string value = fbSemanticModelNumber(.if_construct) + TABCHAR + fbSemanticModelNumber(.if_arm) + _
+			TABCHAR + fbSemanticModelNumber(observed->if_items)
+		hIfFact(observed, key, value, .identity, "if-arm-statement")
+	end with
+end sub
+
+sub fbSemanticModelIfBegin( byval construct as longint, byval is_single as integer )
+	dim as SEMANTIC_SOURCE_COMPOUND ptr observed = hIfObservation(construct)
+	if( observed = NULL ) then exit sub
+	if( observed->if_owner <> 0 ) then fbSemanticModelFailAt("repeated IF mode"): exit sub
+	observed->if_owner = fbSemanticModelSymbolId(parser.currproc)
+	if( observed->if_owner <= 0 ) then fbSemanticModelFailAt("unavailable IF arm procedure"): exit sub
+	observed->if_single = (is_single <> 0)
+	dim as string key = "if-construct:" + fbSemanticModelNumber(construct)
+	dim as string value = fbSemanticModelNumber(observed->statement) + TABCHAR + iif(is_single, "inline", "block")
+	hIfFact(observed, key, value, construct, "if-construct")
+	hIfArmBegin(observed, "then", observed->statement, observed->source)
+end sub
+
+sub fbSemanticModelIfNext( byval construct as longint, byref role as const string )
+	dim as SEMANTIC_SOURCE_COMPOUND ptr observed = hIfObservation(construct)
+	if( observed = NULL ) then exit sub
+	if( (observed->if_owner <= 0) or observed->if_else or ((role <> "else") and (role <> "elseif")) or _
+		(observed->if_single and (role <> "else")) ) then
+		fbSemanticModelFailAt("invalid next IF arm")
+		exit sub
+	end if
+	hIfBoundary(observed)
+	hIfArmEnd(observed)
+	dim as longint header = iif(observed->if_single, 0, fbSemanticModelCurrentStatement( ))
+	dim as LEX_LOCATION source = lexGetCurrentLocation( )
+	hIfArmBegin(observed, role, header, source)
+end sub
+
+sub fbSemanticModelIfEnd( byval construct as longint )
+	dim as SEMANTIC_SOURCE_COMPOUND ptr observed = hIfObservation(construct)
+	if( observed = NULL ) then exit sub
+	if( observed->if_owner <= 0 ) then fbSemanticModelFailAt("IF arm mode is unavailable"): exit sub
+	hIfBoundary(observed)
+	hIfArmEnd(observed)
+	dim as string key = "if-end:" + fbSemanticModelNumber(construct)
+	dim as string value = fbSemanticModelNumber(observed->if_arm) + TABCHAR + fbSemanticModelNumber(abs(observed->if_else))
+	hIfFact(observed, key, value, construct, "if-end")
+end sub
+
+sub fbSemanticModelIfTransfer( byval construct as longint, byval label as FBSYMBOL ptr )
+	dim as SEMANTIC_SOURCE_COMPOUND ptr observed = hIfObservation(construct)
+	if( observed = NULL ) then exit sub
+	dim as longint target = fbSemanticModelSymbolId(label)
+	if( (target <= 0) or (observed->if_open = FALSE) or (observed->if_items >= SEMANTIC_IF_MAX_ITEMS) ) then
+		fbSemanticModelFailAt("invalid IF numeric-label transfer")
+		exit sub
+	end if
+	observed->if_items += 1
+	dim as string arm = fbSemanticModelNumber(observed->if_arm)
+	dim as string item = fbSemanticModelNumber(observed->if_items)
+	dim as string key = "if-arm-transfer:" + fbSemanticModelNumber(construct) + ":" + arm + ":" + item
+	dim as string value = fbSemanticModelNumber(target)
+	hIfFact(observed, key, value, construct, "if-arm-transfer:" + arm + ":" + item)
 end sub
 
 '' -------------------------------------------------------------------------
@@ -334,10 +640,49 @@ sub fbSemanticModelSelectAlternative( byval construct as longint, byval ordinal 
 		fbSemanticModelNumber(ordinal) + TABCHAR + fbSemanticModelEscape(value))
 end sub
 
+'' IF and ELSEIF predicates must be captured before astBuildBranch inserts a
+'' comparison, invokes a conversion or folds a constant branch. The statement
+'' owner identifies the grammar role independently of any expression spelling.
+sub fbSemanticModelIfCondition( byval expr as ASTNODE ptr )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	if( lex.ctx->semantic_probe ) then exit sub
+	dim as longint statement = fbSemanticModelCurrentStatement( )
+	if( (semantic_statement_depth = 0) or (statement = 0) ) then
+		fbSemanticModelFailAt("semantic-constructs.bas:if-condition-statement")
+		exit sub
+	end if
+	dim as integer token = semantic_statements[semantic_statement_depth - 1].token
+	if( (token <> FB_TK_IF) and (token <> FB_TK_ELSEIF) ) then
+		fbSemanticModelFailAt("semantic-constructs.bas:if-condition-token")
+		exit sub
+	end if
+	if( expr = NULL ) then
+		fbSemanticModelFailAt("semantic-constructs.bas:if-condition-input")
+		exit sub
+	end if
+	dim as longint expression_id = expr->semantic_expression
+	dim as longint owner = fbSemanticModelSymbolId(parser.currproc)
+	if( (expression_id <= 0) or (owner <= 0) ) then
+		dim as LEX_LOCATION condition_end = lexGetLastLocation( )
+		fbSemanticModelFailAt("semantic-constructs.bas:if-condition-owner expression=" + _
+			fbSemanticModelNumber(expression_id) + " owner=" + fbSemanticModelNumber(owner) + _
+			" class=" + fbSemanticModelNumber(expr->class) + " line=" + _
+			fbSemanticModelNumber(condition_end.end_line))
+		exit sub
+	end if
+	dim as string statement_text = fbSemanticModelNumber(statement)
+	fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(owner) + _
+		TABCHAR + "if-condition-expression:" + statement_text + TABCHAR + fbSemanticModelNumber(expression_id))
+	fbSemanticModelAppendProvenance("H" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(owner) + _
+		TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(expression_id) + TABCHAR + _
+		"if-condition" + TABCHAR + statement_text)
+end sub
+
 '' Branch lowering can consume a constant condition or replace its original
 '' type with a comparison. Record the accepted input while it still exists.
 '' Bare DO/LOOP statements retain zero explicitly; missing observations cannot
 '' then be mistaken for intentionally unconditional grammar.
+
 sub fbSemanticModelLoopCondition( byval expr as ASTNODE ptr, byref kind as const string )
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
 	if( lex.ctx->semantic_probe ) then exit sub

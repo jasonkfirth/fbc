@@ -318,6 +318,10 @@ function cArrayFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 			return astNewCONSTi( 0 )
 		end if
 
+		'' astBuildArrayBound consumes the unindexed storage and can fold fixed
+		'' bounds to constants. Retain its receiver before entering that builder.
+		dim as longint receiver_id = fbSemanticModelArrayStorageInput(arrayexpr, s)
+
 		'' (',' Expression)?
 		if( hMatch( CHAR_COMMA ) ) then
 			dimension_is_explicit = TRUE
@@ -368,7 +372,7 @@ function cArrayFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 				 selected_nonphysical_start, selected_nonphysical_end)
 			astDelTree( selected_dimension_expr )
 		end if
-		fbSemanticModelArrayBound(result, s, tk, original_dimension, selected_dimension, source_start, nonphysical_start)
+		fbSemanticModelArrayBound(result, s, tk, original_dimension, selected_dimension, source_start, nonphysical_start, receiver_id)
 		function = result
 	end select
 end function

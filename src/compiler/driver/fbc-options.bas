@@ -448,11 +448,13 @@ enum
 	OPT_RR
 	OPT_RRKEEPASM
 	OPT_S
+	OPT_SEMANTIC_BUNDLE
 	OPT_SEMANTIC_MODEL
 	OPT_SEMANTIC_BINDINGS
 	OPT_SEMANTIC_COMPACT
 	OPT_SEMANTIC_EXPRESSIONS
 	OPT_SEMANTIC_DIAGNOSTICS
+	OPT_SEMANTIC_LINK_DIAGNOSTICS
 	OPT_SHOWINCLUDES
 	OPT_STATIC
 	OPT_STRIP
@@ -541,11 +543,13 @@ dim shared as FBC_CMDLINE_OPTION cmdlineOptionTB(0 to (OPT__COUNT - 1)) = _
 	( FALSE, TRUE , TRUE , FALSE ), _ '' OPT_RR           affects compile / assemble / link process, removal of temporary files
 	( FALSE, TRUE , TRUE , FALSE ), _ '' OPT_RRKEEPASM    affects removal of temporary files
 	( TRUE , TRUE , FALSE, FALSE ), _ '' OPT_S            affects link
+	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_BUNDLE paired model and diagnostic outputs
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_MODEL compiler-owned semantic model output
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_BINDINGS compiler-owned bindings and implicit calls
 	( FALSE, FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_COMPACT omit verbose macro-expansion provenance
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_EXPRESSIONS expression-only semantic output
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_DIAGNOSTICS independent compiler diagnostics
+	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_LINK_DIAGNOSTICS independent native link observations
 	( FALSE, TRUE , FALSE, TRUE  ), _ '' OPT_SHOWINCLUDES affects compiler output display
 	( FALSE, TRUE , FALSE, FALSE ), _ '' OPT_STATIC       affects link
 	( FALSE, TRUE , FALSE, FALSE ), _ '' OPT_STRIP        affects link
@@ -668,6 +672,14 @@ private sub hHandleOptCompileSetup _
 	case OPT_FBGFX
 		fbSetOption( FB_COMPOPT_FBGFX, TRUE )
 
+	case OPT_SEMANTIC_BUNDLE
+		'' One prefix keeps the reusable linter inputs together without
+		'' changing either versioned wire format or their publication rules.
+		fbc.semanticmodel = arg + ".fbcsem"
+		fbc.semanticmodel_expressions = FALSE
+		fbc.semanticmodel_bindings = FALSE
+		fbc.semanticdiagnostics = arg + ".fbcdia"
+
 	case OPT_SEMANTIC_MODEL
 		fbc.semanticmodel = arg
 		fbc.semanticmodel_expressions = FALSE
@@ -692,6 +704,8 @@ private sub hHandleOptCompileSetup _
 
 	case OPT_SEMANTIC_DIAGNOSTICS
 		fbc.semanticdiagnostics = arg
+	case OPT_SEMANTIC_LINK_DIAGNOSTICS
+		fbSemanticLinkOutput(arg)
 
 	case OPT_GFX3
 		'' The preinclude uses the same empty define spelling as source code,
@@ -1142,7 +1156,7 @@ private sub handleOpt _
 	)
 
 	select case as const optid
-	case OPT_A to OPT_FPU, OPT_GFX3, OPT_SEMANTIC_MODEL, OPT_SEMANTIC_BINDINGS, OPT_SEMANTIC_COMPACT, OPT_SEMANTIC_EXPRESSIONS, OPT_SEMANTIC_DIAGNOSTICS
+	case OPT_A to OPT_FPU, OPT_GFX3, OPT_SEMANTIC_BUNDLE, OPT_SEMANTIC_MODEL, OPT_SEMANTIC_BINDINGS, OPT_SEMANTIC_COMPACT, OPT_SEMANTIC_EXPRESSIONS, OPT_SEMANTIC_DIAGNOSTICS, OPT_SEMANTIC_LINK_DIAGNOSTICS
 		hHandleOptCompileSetup( optid, arg, is_source )
 
 	case OPT_G, OPT_GEN to OPT_O
@@ -1272,11 +1286,13 @@ private function parseOption(byval opt as zstring ptr) as integer
 
 	case asc("s")
 		ONECHAR(OPT_S)
+		CHECK("semantic-bundle", OPT_SEMANTIC_BUNDLE)
 		CHECK("semantic-model", OPT_SEMANTIC_MODEL)
 		CHECK("semantic-model-bindings", OPT_SEMANTIC_BINDINGS)
 		CHECK("semantic-model-compact", OPT_SEMANTIC_COMPACT)
 		CHECK("semantic-model-expressions", OPT_SEMANTIC_EXPRESSIONS)
 		CHECK("semantic-diagnostics", OPT_SEMANTIC_DIAGNOSTICS)
+		CHECK("semantic-link-diagnostics", OPT_SEMANTIC_LINK_DIAGNOSTICS)
 		CHECK("showincludes", OPT_SHOWINCLUDES)
 		CHECK("static", OPT_STATIC)
 		CHECK("strip", OPT_STRIP)

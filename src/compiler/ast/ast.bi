@@ -1487,6 +1487,7 @@ declare function astIgnoreCallResult( byval n as ASTNODE ptr ) as ASTNODE ptr
 declare function astBuildFakeCall( byval proc as FBSYMBOL ptr ) as ASTNODE ptr
 
 declare sub astGosubAddInit( byval proc as FBSYMBOL ptr )
+declare sub astGosubMarkTarget( byval label as FBSYMBOL ptr )
 
 declare sub astGosubAddJmp _
 	( _

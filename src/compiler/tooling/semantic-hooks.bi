@@ -37,12 +37,21 @@ declare sub fbSemanticModelExportOverrideMarker _
 declare function fbSemanticModelCurrentContext( ) as longint
 declare function fbSemanticModelEnabled( ) as integer
 
+declare sub fbSemanticModelConstantExpression _
+	( byval expr as ASTNODE ptr, byval sym as FBSYMBOL ptr, byref source as LEX_LOCATION, _
+	  byval nonphysical_tokens as longint )
+
 declare sub fbSemanticModelNumericLiteral( byval token as FBTOKEN ptr )
 declare sub fbSemanticModelNumericLiteralExpression(byval expr as ASTNODE ptr, byval token as FBTOKEN ptr)
 declare function fbSemanticModelBindingCount( ) as longint
 declare sub fbSemanticModelSetAccess(byval node as ASTNODE ptr, byref role as const string)
 declare sub fbSemanticModelForCounter _
 	( byval counter as FBSYMBOL ptr, byref source as LEX_LOCATION, byval declared_here as integer )
+declare sub fbSemanticModelIfCondition( byval expr as ASTNODE ptr )
+declare sub fbSemanticModelIfBegin( byval construct as longint, byval is_single as integer )
+declare sub fbSemanticModelIfNext( byval construct as longint, byref role as const string )
+declare sub fbSemanticModelIfEnd( byval construct as longint )
+declare sub fbSemanticModelIfTransfer( byval construct as longint, byval label as FBSYMBOL ptr )
 declare sub fbSemanticModelLoopCondition _
 	( byval expr as ASTNODE ptr, byref kind as const string )
 declare sub fbSemanticModelScalarForStep _

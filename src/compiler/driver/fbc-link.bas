@@ -922,6 +922,10 @@ private sub hAddRuntimeAndObjectFiles( byref ldcline as string )
 end sub
 
 private function hRunLinkCommand( byref ldcline as string ) as integer
+	var ld = fbcPlatformGetLinkerTool( )
+	dim as string link_toolpath
+	fbcFindBin(ld, link_toolpath)
+	if( fbSemanticLinkPrepare(link_toolpath, ldcline) = FALSE ) then return FALSE
 	'' DOS process command lines are limited to 127 characters. Windows
 	'' also needs a response file when cmd.exe's 2047-character legacy
 	'' limit may be reached, or when DOS/JS cross tools require one.
@@ -952,7 +956,6 @@ private function hRunLinkCommand( byref ldcline as string ) as integer
 	end if
 #endif
 
-	var ld = fbcPlatformGetLinkerTool( )
 	if( fbcRunBin( "linking", ld, ldcline ) = FALSE ) then
 		return FALSE
 	end if

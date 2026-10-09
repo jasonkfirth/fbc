@@ -26,6 +26,7 @@
 #include once "parser/parser.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-expressions.bi"
 
 declare sub fbSemanticModelParameterType(byval param as FBSYMBOL ptr, byref written_type as const string)
 
@@ -180,7 +181,8 @@ private function hOptionalExpr _
 		byval proc as FBSYMBOL ptr, _
 		byval pid as zstring ptr, _
 		byval param as FBSYMBOL ptr, _
-		byref semantic_site as LEX_LOCATION _
+		byref semantic_site as LEX_LOCATION, _
+		byref semantic_expression as longint _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = any
@@ -206,7 +208,7 @@ private function hOptionalExpr _
 	end select
 
 	expr = cInitializer( param, FB_INIOPT_ISINI, _
-		FB_DATATYPE_INVALID, NULL, @semantic_site )
+		FB_DATATYPE_INVALID, NULL, @semantic_site, @semantic_expression )
 	if( expr = NULL ) then
 		exit function
 	end if
@@ -594,9 +596,11 @@ private function hParamDecl _
 				hSkipUntil( CHAR_COMMA )
 			end if
 		else
-			var optexpr = hOptionalExpr( proc, id, param, semantic_site )
+			dim as longint semantic_default = 0
+			var optexpr = hOptionalExpr( proc, id, param, semantic_site, semantic_default )
 			if( optexpr ) then
 				symbMakeParamOptional( proc, param, optexpr )
+				fbSemanticModelParameterDefault(param, semantic_default)
 			else
 				hParamError( proc, id, , 0 )
 				'' error recovery: skip until next ',' or ')'

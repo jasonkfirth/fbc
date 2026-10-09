@@ -14,6 +14,14 @@ source observation without enabling language debug options or changing
 predefined configuration values such as `__FB_ERR__`. Consumers can compile to
 a temporary object, or use normal emission-only compilation with `-r`.
 
+`-semantic-bundle <prefix>` publishes the complete model as
+`<prefix>.fbcsem` and the matching structured diagnostics as
+`<prefix>.fbcdia` from one compiler invocation. The two files retain their
+independent versioned formats and transactional completion markers. A consumer
+must validate both files and the model's `FILE` hashes before reusing the pair;
+the shared prefix is naming infrastructure, not a promise that stale sources
+remain valid.
+
 `-semantic-model-expressions <file>` retains `M`, `E`, and dependency records,
 with the same versioned header and completeness footer. It omits symbols,
 bindings, signatures, values, implicit relationships, and serialized ASTs.
@@ -348,8 +356,18 @@ literal/feature-policy fields. AST nodes retain the context at construction,
 including through cloning. USE connects node and declaration identities to
 those snapshots. A later snapshot never retroactively changes an earlier
 declaration or node. Rolled-back parse attempts discard their context records.
-These records describe effective configuration; file/include/expansion source
-contexts and a complete source expression graph are separate work in progress.
+Full models add optional `OPT <context> language-policy remkeyword-active <flag>`.
+The flag is one while the native REM keyword remains installed, and zero after
+an accepted `OPTION NOKEYWORD REM` removes that keyword from the lookup hash.
+The removal invalidates the option snapshot even though `FBOPTION` is unchanged.
+Keyword installation and this observation reset for each module. No symbol
+lookup scratch, AST ownership or native pointers are retained by the observer.
+Older models may omit the key; a consumer needing REM comment boundaries must
+treat that absence as unknown. `language-default escapestr` separately supplies
+the committed string escape mode. These facts do not parse documentation tags.
+These records describe effective configuration. File, include, and expansion
+contexts use the separate provenance records below. The exported compiler facts
+do not claim to form a complete source expression graph.
 
 `J` preserves normalized unsigned jump-table value/label pairs. Interpret
 `jump-bias` and `jump-span` in the selector's target integer representation to
@@ -484,7 +502,17 @@ starting at one. Node and declaration origins are absent in expression mode,
 which retains expression origins. A source context and a physical range do
 not establish freshness: before editing, consumers must verify the current
 file bytes against the captured digest and reject unverified streams. The
-independent reader's `validate_source_revisions()` provides this check.
+independent reader's `validate_source_revisions()` provides this check. Its
+per-operation source cache is keyed by resolved path, byte count, and SHA-256,
+so repeated occurrences do not cause repeated reads. The cache is discarded
+after each validation operation; a later operation observes the filesystem
+again rather than trusting retained bytes.
+
+The reader checks that each origin belongs to its subject's module. Binding,
+declaration, and expression origins must also agree with their recorded
+statement occurrence, when present. Their physical attachments must retain
+that same origin. Equal bytes or identical coordinates in another module or
+repeated include do not establish ownership.
 
 ## Physical coordinate attachments
 
@@ -518,6 +546,32 @@ Projection must still pass source freshness and existing edit-eligibility
 checks. `LOC` preserves remapped origin without making the logical location
 editable. The independent reader's `validate_physical_locations()` checks the
 current revision, encoding boundaries, byte offsets, and UTF-16 coordinates.
+It collects requested offsets by verified byte revision and encoding and
+decodes them in ascending order, avoiding a full prefix decode for every
+attachment. `plan_edits()` builds on
+that gate for exact mapped binding, declaration, or expression subjects. It
+rejects stale, missing, noneditable, empty,
+overlapping, encoding-invalid, or oversized replacements and returns proposed
+bytes and digests without writing a source file. A consumer must recheck the
+expected digest immediately before its own atomic replacement.
+
+Unmarked source can contain legacy bytes on lines without mapped attachments.
+Malformed unqueried lines in wide encodings likewise do not invalidate later
+mapped lines. Line endings are found in aligned encoded units, then each line
+carrying mapped boundaries is strictly checked in full, including a malformed
+suffix after its last requested boundary and the producer's line-size limit.
+Repeated opens of the same byte revision share coordinate decoding while
+retaining distinct source owners.
+
+Edit planning requires an `END` transaction. Allowing `RECOVERY` during reading
+does not authorize edits: provisional facts still require a consumer's primary
+parser and error-region reconciliation. An unmatched statement with no consumed
+endpoint retains its observed opening point without a physical range. Empty
+physical spans remain invalid for ordinary written records.
+
+Procedure declaration records can describe a complete header while a `LOC`
+retains its observed opening token. That attachment must lie within the written
+header; it is not permission to replace the entire header using token offsets.
 
 A physical source line is indexed up to 16,777,216 bytes. A larger or malformed
 line yields an unverified attachment, retaining explicit uncertainty instead
@@ -656,6 +710,13 @@ bounds. Dependency exhaustion alone writes the explicit incomplete-list flag.
 Compiler modules are serial and exporter state is process-local, not thread-safe.
 Parallel jobs require distinct output paths.
 
+The independent reader applies configurable limits to sidecar bytes, individual
+record bytes, record count, source bytes per file, aggregate cached source
+bytes, edit count, and planned output bytes.
+`build_scripts/validate-compiler-semantic-model.py` provides the same bounded
+validation as a command-line entry point, with optional source and physical
+location verification and text or JSON status.
+
 Run `make compiler-semantic-model-test` for the dedicated suite. Its independent
 reader checks shapes, identities, references, ranges, escaping, and totals.
 Fixtures exercise each record family and positive/negative semantics across
@@ -700,6 +761,9 @@ The runners also accept `--backend gas64` for x86-64 assembly and `--backend gas
 for x86 assembly. The compiler-source runner requires a matching Make target,
 for example `--backend gas --target-triplet i686-linux-gnu`. The fixture and OMA
 runners select the x86 target for gas emission without requiring 32-bit linking.
+Frozen self and corpus audits copy the reader's complete Python module closure,
+not only `sidecar.py`, so retained validation remains importable without the
+live source tree.
 
 Run `make compiler-semantic-self-test` for the same audit against every module
 selected by the native compiler build. This extended target freezes the
@@ -740,8 +804,15 @@ facts reduce that dependency.
 
 Fblint was the initial consumer for undeclared-name and variable-type checks.
 Existing data-flow and safety checks are consumer policy, not sidecar behavior.
+A linter's suppression directives, unused-suppression accounting, project rule
+configuration, path policy, and JSON or SARIF rendering are also consumer
+responsibilities. The compiler supplies exact source identity, configuration,
+diagnostic, capability, and location facts needed to implement those policies;
+it does not embed one consumer's rule language in FBCSEM.
 A consumer adopting schema 27 must validate it before using compiler facts as
 authoritative, and must continue treating recovery output as provisional.
+The complete ownership audit is recorded in
+`doc/compiler-semantic-foundation-audit.md`.
 
 ## Normalized types and procedure flow
 
@@ -858,6 +929,17 @@ extent, configuration, module, and source context; OWN links connect generated
 operations with that owner. Identifier lookalikes and graphics GET/PUT routes
 do not acquire a file-operation classification. These observations describe
 accepted source operations, not runtime success or external effects.
+
+The parser also supplies `goto`, `gosub`, `gosub-return`,
+`gosub-return-label`, `procedure-return`, `on-goto`, `on-gosub`,
+`on-error-set`, and `on-error-clear`. The `statement-control-operations`
+capability describes this vocabulary in full, bindings and expression modes.
+The actual dispatch determines the observation: RETURN follows its selected
+language options, while the ON parser distinguishes error-handler changes and
+computed GOTO/GOSUB. Bound label references retain the same ST owner and target
+identity. Macro expansions retain their accepted operations even when no
+physical reporting range exists. This classification does not itself prove
+reachability, runtime return success or resource cleanup.
 
 CAP records describe availability per module and export mode. `available`
 means the named observation family is supplied under the documented contract;
@@ -1011,8 +1093,9 @@ revision. A macro's replacement text alone does not prove parsed meaning.
 ## Numeric assignment destinations
 
 Full models advertise `CAP module numeric-assignment-targets available`.
-Compact models advertise it as unavailable. Accepted ordinary assignments and
-scalar initializers attach two properties to the original RHS expression:
+Compact models advertise it as unavailable. Accepted ordinary assignments,
+numeric function-result assignments and scalar initializers attach two
+properties to the original RHS expression:
 
     K expression expression-ID assignment-target-dtype raw-dtype
     K expression expression-ID assignment-kind assignment-or-initializer
@@ -1025,9 +1108,177 @@ pointers, enums, aggregates, user-defined LET, compound updates and generated
 assignments are excluded. A valid reader requires both properties, an existing
 expression and primitive target type, and consistent repeated values.
 
+`CAP module numeric-function-result-inputs available` establishes that
+`RETURN value` and `function-name = value` retain the parsed input before
+result conversion. The actual result lvalue supplies the selected destination
+type. BYREF returns store addresses and do not provide numeric conversion
+receipts. The generated ABI result variable is never a named source destination,
+including targets that implement aggregate returns through a hidden parameter.
+Constructor calls and nonnumeric results do not acquire numeric properties.
+Compact modes advertise this coverage as unavailable. A producer that omits
+the capability provides unknown function-result coverage even when it supports
+ordinary numeric assignments.
+
 Schema 27 readers must accept expression-domain K properties to consume this
 extension. Older readers that restrict K to symbols and nodes reject it. The
 updated reference reader and linter reader validate the new domain explicitly.
+
+## Named source assignment destinations
+
+Full models advertise `CAP module source-assignment-targets available`.
+Compact modes advertise it as unavailable. Accepted ordinary assignments,
+compound updates and declaration initializers can retain the exact storage
+symbol selected by source grammar:
+
+    K expression expression-ID source-assignment-symbol symbol-ID
+    K expression expression-ID source-assignment-kind assignment-or-initializer
+
+This pair supplements the original RHS expression. It does not replace the
+expression's own symbol, type or value. The target can be a source variable,
+constant, parameter or field. A procedure-body parameter access can name its
+compiler parameter variable; the corresponding `G` record provides the exact
+source formal. Explicit pointer dereferences, property setters, temporaries and
+other generated storage do not claim a named destination.
+
+Readers require both properties, an existing target symbol in the same module,
+and an accepted assignment kind. A compiler-origin variable is valid only when
+it is the parameter variable of a retained source formal. Numeric assignments
+can also carry the independent `assignment-target-dtype` pair described above.
+
+## Original source assignment inputs
+
+Full models advertise `CAP module source-assignment-inputs available`.
+Compact modes advertise it as unavailable. Successful ordinary and compound
+assignments retain both original typed `E` identities before the assignment
+builder consumes, clones or converts their ASTs:
+
+    K symbol procedure-ID assignment-input:statement-ID:ordinal left-E<TAB>right-E<TAB>kind<TAB>code<TAB>selection<TAB>target-S
+    H symbol procedure-ID symbol procedure-ID assignment-input:ordinal statement-ID
+
+The six payload fields are percent escaped in the serialized TSV. `kind` is
+`copy` or `compound`. A copy uses `assign`; a compound update uses the normal
+operation code, such as `add` or `concatenate`. `selection` is `builtin` with
+target zero, or `overloaded` with the selected operator procedure identity.
+For a compound update, this is the arithmetic operation selected before the
+final store. A subsequent LET overload remains represented by the native call
+graph and does not replace that arithmetic target in this input receipt.
+These observations describe parser assignments. Declaration initializers,
+function result assignments and destructuring destination slots retain their
+existing independent receipts and are not included in this count yet.
+
+Every observed statement closes with a count, including statements with no
+ordinary or compound assignments:
+
+    K symbol procedure-ID assignment-count:statement-ID count
+    H symbol procedure-ID symbol procedure-ID assignment-count statement-ID
+
+The count follows `STE` and all of that statement's input properties. Ordinals
+are contiguous from one; zero-input statements have no input properties. The
+compiler bounds each count at 2,097,152. Readers bound their own work and
+storage by the actual row inventory rather than allocating from that count.
+
+The operator token has `LOC statement statement-ID assignment-operator:ordinal`
+or an `MR` attachment with the same role. Physical operator locations are
+emitted while their statement is active; this specific role can precede `STE`.
+The source context must belong to the statement's module. Macro operators use
+their captured invocation instead of invented physical coordinates. A newly
+observed destination `E` may use a logical operator anchor; its physical flag
+is false, so consumers must use the separate operator or statement origin for
+reporting.
+
+Both readers require complete statement counts, a property/marker bijection,
+the original operator origin, same-module procedure ownership and exact
+`OWN expression` membership for both operands. An overloaded target must name
+an operator signature in that module. These facts do not establish storage
+equivalence, purity, adjacent execution or safe source edits by themselves.
+
+## Original assignment storage trees
+
+Full models advertise `CAP module assignment-storage-trees available` and
+retain the two original typed trees of every accepted assignment input:
+
+    K symbol procedure-ID assignment-storage:statement-ID:ordinal left-root<TAB>right-root<TAB>node-count
+    H symbol procedure-ID symbol procedure-ID assignment-storage:ordinal statement-ID
+    K symbol procedure-ID assignment-tree:statement-ID:ordinal:node-ID payload
+    H symbol procedure-ID symbol procedure-ID assignment-tree:ordinal:node-ID statement-ID
+
+Each node payload has 16 percent-escaped fields: raw class, raw dtype,
+subtype symbol, selected symbol, conceptual operator, operator options, byte
+offset, index scale, conversion flag, float-narrowing flag, constant-conversion
+flag, constant kind, constant value, left child, right child and coverage.
+Coverage is `complete` or `opaque`. Unsupported operations retain an opaque
+typed leaf. Numeric power calls preserve their selected base and exponent
+when the parser receipt identifies built-in arithmetic; unrelated calls stay
+opaque. This distinguishes actual operations without interpreting callee names.
+
+An `OFFSET` address is a leaf atom identified by its symbol and byte offset.
+The executable AST retains an original operand for address optimizations,
+but that operand is not a separate computation in the metadata forest. Both
+child identities of an exported address atom are zero. Procedure pointers
+and static scalar/array addresses use the same representation; exporting a
+backend optimization child would violate the forest's atomic node contract.
+
+Node identities are local to one assignment pair and contiguous from one.
+Children follow their parent identities. The two roots own disjoint trees;
+every node must be reachable exactly once. Each pair is bounded at 65,536
+nodes, with opaque leaves at depth 64. These metadata trees are independent
+of executable `N` roots, which optimization can remove for a self-copy.
+
+`LOC` or `MR` with role `assignment-destination:ordinal` retains the destination
+opening token. This role can precede `STE`; legacy LET starts at its operand,
+and macro destinations retain their invocation origin. Both readers validate
+the property/marker bijection, original typed roots, complete input coverage,
+module ownership and destination origins. Compact modes publish none of these
+trees and advertise the capability as unavailable.
+
+Constant IDX offsets can absorb the entire index. Its metadata retains an
+explicit zero index child in that case. This is an observation-only node;
+the executable AST is unchanged.
+
+Full models also advertise `assignment-initializers available`. Scalar DIM,
+VAR and STATIC initializers use assignment-input kind `initializer`, captured
+before type checking converts the original value. These require a declaration
+statement and built-in assignment. Arrays, reference aliases and aggregate
+initializers retain their separate contracts.
+
+## Original LET destination inputs
+
+Full models advertise `CAP module let-destination-inputs available`. Each
+accepted modern LET write uses assignment-input kind `let` and the existing
+original storage forest. The selected operation remains built-in or overloaded.
+Its parser-owned slot is recorded as:
+
+    K symbol procedure-ID let-slot:statement-ID:assignment-ordinal field-slot<TAB>field-symbol
+    H symbol procedure-ID symbol procedure-ID let-slot:assignment-ordinal statement-ID
+
+Field slots follow declaration order and count omitted destinations. Assignment
+ordinals count actual writes only. Both readers require one slot property and
+marker per LET input, increasing slots within the statement, the original RHS
+field symbol and the same module. LET statements use the pointer-or-assignment
+parser route. Each invocation bounds destination slots at 65,536. Compact modes
+advertise this capability as unavailable and publish no LET inputs.
+
+Equal destination trees do not prove equal addresses when an index or pointer
+loads mutable storage between writes. Consumers must establish address stability
+before treating repeated trees as the same destination.
+
+
+## Original formal default inputs
+
+Full models advertise `CAP module formal-default-inputs available`. Compact
+modes advertise it as unavailable. When a source formal accepts an optional
+default expression, its symbol retains the original parsed E identity before
+the optional-value tree is cloned, converted or folded:
+
+    K symbol parameter-ID formal-default-expression expression-ID
+
+The parameter's `G` record remains authoritative for its procedure, ordinal,
+passing mode and optional flag. Its existing `H ... default-initializer` edge
+describes the retained AST node. The new K property describes the original
+source input, which can differ after conversion. Variadic parameters and
+omitted caller arguments do not produce this property. Readers require a
+source parameter, an optional non-variadic G slot, the default-initializer
+relationship and an expression from the same module.
 
 Built-in conversion intrinsics also retain `EX cast` links to their original
 operands before constant conversion destroys those nodes. Explicit CAST uses
@@ -1333,7 +1584,13 @@ entry describes byte storage while its semantic values are normalized to -1
 and 0. Boolean storage is not an unrestricted signed-byte integer range.
 
 Parsed-pointer-dereferences retains a complete expression K pair:
-pointer-dereference-operand and pointer-dereference-count. The parser records
+pointer-dereference-operand and pointer-dereference-count. Full exports with
+`pointer-access-origins` also emit an independent `H` relation from the result
+expression to its original operand, with role `pointer-dereference-input` and
+the dereference count in its final field. Readers require matching properties,
+source statement ownership and one origin for every group when this capability
+is available. Earlier producers remain readable without promising this coverage.
+The parser records
 the typed pointer input before astBuildMultiDeref can cancel an address or
 consume its AST. The result retains its own E range. The count is 1 through 8,
 does not exceed the input's pointer depth, and agrees with the result type and
@@ -1358,6 +1615,12 @@ source do not. A subsequent field selection can change the result type, so the
 receipt does not assert that the final E type equals the indexed pointee type.
 Neither AST pointers nor borrowed source buffers survive the observation.
 Full exports provide this capability; compact exports mark it unavailable.
+With `pointer-access-origins`, the result also owns a `pointer-index-input`
+relation to the original pointer expression. Its final field is the original
+index expression ID. Both readers check agreement with the property pair,
+backward identities and common accepted statement/module ownership. The origin
+and property group must cover each other exactly. Compact exports advertise
+`pointer-access-origins` as unavailable and emit neither origin family.
 
 Selected-call-argument-inputs retains the original caller expression on each
 accepted argument before formal conversion and later AST optimization. The
@@ -1487,6 +1750,7 @@ Record tags remain literal ASCII. Record layouts are:
 | --- | --- |
 | SRC | sequential source ID, source path |
 | M | sequential module ID, root source path, target ID |
+| CAP | current module ID, capability name, availability |
 | DI | sequential diagnostic ID, current module ID, severity, compiler code, parser context, source path, displayed line, message, detail, custom text, physical-point flag, physical line, zero-based physical column |
 | END | format version, module count, source count, diagnostic count, error count, compilation-succeeded flag |
 
@@ -1498,13 +1762,69 @@ has no error diagnostics. A reader supplied the compiler exit code checks that
 the outcome agrees. Readers reject incomplete records, invalid identities,
 counts, escaped fields and inconsistent physical points before exposing facts.
 
-Displayed lines can be affected by `#line`. A physical point uses the last
-consumed token only when its physical source and displayed line agree with the
-reported diagnostic. Otherwise its flag, line and column are all zero. This is
-an informational diagnostic point, not an editable expression range. Parser
-contexts currently distinguish unknown LINE INPUT character-buffer capacity,
-NEXT counter binding failures and NEXT variable mismatch. Consumers use these
-typed contexts rather than matching console messages.
+Module capabilities use optional `CAP` records. The signature capability is
+`procedure-signature-mismatches`, with availability `available`. A module can
+advertise it once; its module ID must be the current module. Complete signature
+classification requires coverage in every module. Older schema-1 artifacts
+without this capability remain valid diagnostic transports. They cannot prove
+the absence of signature conflicts. A `procedure-signature-mismatch` diagnostic
+without its own module's capability is invalid.
+
+The independent `variable-case-collisions` capability observes actual variable
+rejections in the native duplicate checker. Each module advertises it once;
+complete coverage requires all modules. A `variable-case-collision` DI kind
+requires its own module's capability. Older artifacts without it remain valid
+transports but do not establish the absence of these collisions.
+
+The symbol allocator retains the raw spelling supplied to a live variable,
+including variables lowered from procedure formals. The duplicate checker
+selects the actual conflicting variable after applying scope and legacy suffix
+rules. A different original spelling classifies that rejected binding only.
+Accepted EXTERN reuse, REDIM, shadowing and suffix-distinct bindings remain
+quiet. Constants, procedures, reserved symbols and fields do not supply this
+variable proof. The parser scopes the kind around its actual redefinition
+error and retains the current identifier point across continued declarations.
+A written preceding token can anchor a generated name; wholly generated
+declarations remain logical observations without editable coordinates.
+
+The serial parser thread owns a hash index of live native identities. Each
+payload owns its immutable borrowed hash key, spelling, canonical name and
+symbol-table guard. Native removal unlinks the hash item before deleting the
+payload; module and invocation completion release every remaining payload.
+Temporary variables are excluded. Collection is bounded by 100,000 live
+bindings, 64 MiB of retained name bytes and 20 million bucket comparisons per
+module. Exhaustion prevents diagnostic publication and preserves the prior
+destination. These observations leave duplicate acceptance and code emission
+unchanged; the existing public duplicate-check signature is preserved.
+
+Displayed lines can be affected by `#line`. Ordinary physical points use the
+last consumed token only when its source and displayed line agree with the
+reported diagnostic. A scoped declaration point instead retains the parsed
+procedure name, including its original physical line in a continued header.
+A written header-start token can anchor a generated name. Fully generated
+headers remain logical observations when no physical token is available.
+These are diagnostic points, not editable expression ranges. Missing physical
+points have a zero flag, line and column; no range is reconstructed from text.
+
+Parser contexts distinguish unknown LINE INPUT character-buffer capacity,
+NEXT counter binding failures, NEXT variable mismatch and native procedure
+signature conflicts. Consumers use these contexts rather than console text.
+The signature classification covers rejected prototype additions and actual
+prototype/body type, result, calling convention, parameter and BYREF-result
+checks. Prototype comparison uses selected types and subtypes, formal modes,
+descriptor ranks, result contracts, explicit aliases and optional defaults.
+Legal overloads remain accepted. Exact duplicate declarations remain ordinary
+redefinition diagnostics. Default-argument warnings are not error proofs.
+
+Header parsing can repair an unknown type or malformed parameter. Such a
+header cannot prove a signature conflict. The independent writer tracks native
+identities of invalid retained procedure headers for the current module. A
+valid newly allocated symbol at a reused address removes the obsolete entry.
+The tracking array grows geometrically from 32 entries, is bounded by 100,000
+identities and has a two-million-comparison work budget per module. Exhaustion
+prevents publication of incomplete evidence. Module and invocation completion
+release this state. This diagnostic observation does not change legacy repeated
+prototype acceptance or any ordinary compiler check.
 
 The writer bounds output to 64 MiB, 5,000 sources and 100,000 diagnostics. It
 uses checked staging and protects source, backend and other semantic output
@@ -1541,6 +1861,26 @@ Independent compiler checks passed 20 cases across Win32, Win64 and Linux x64
 in six encodings, including macros, continuations and constant predicates.
 Generated C remained byte-identical. The production native reader and independent
 Python reader also rejected 18 malformed loop observation groups.
+
+### Original IF and ELSEIF conditions
+
+Full schema-27 models advertise `if-condition-inputs`. Every accepted IF or
+ELSEIF header retains its original predicate before `astBuildBranch` can
+convert it, invoke an overloaded conversion or fold the branch:
+
+| Record | Value |
+| --- | --- |
+| `K symbol <procedure-id> if-condition-expression:<statement-id>` | Original predicate expression ID |
+| `H symbol <procedure-id> expression <expression-id> if-condition <statement-id>` | Independent occurrence marker |
+
+The statement's native opening token distinguishes IF from ELSEIF. Single-line,
+nested and legacy GOTO forms use the same facts. Constant predicates keep their
+original typed values even when the lowered branch no longer reads them.
+Both readers require exact expression ownership, a parsed compound statement,
+a procedure owner in the same module, and matching property and marker records.
+Coverage includes every accepted IF and ELSEIF when the capability is available;
+removing both records therefore cannot turn a missing predicate into valid data.
+Compact models advertise unavailable coverage and omit these observations.
 
 ### Original and selected array subscripts
 
@@ -1587,6 +1927,32 @@ INTEGER type whether it is a constant or a runtime call. Array identity also
 covers fields and descriptor formals; these facts do not claim allocation,
 empty storage or execution. Compact exports mark the capability unavailable.
 Both readers check group closure, marker membership and converted types.
+
+Full exports with `array-storage-inputs` retain the storage selected before
+array indexing and bound-query folding. Each result has three expression
+properties: `array-storage-symbol`, `array-storage-kind` (`variable` or
+`field`) and `array-storage-receiver`. Plain arrays use receiver zero; their
+canonical symbol identifies the storage. Fields retain a positive native node
+ID describing the original containing record address. The selected field alone
+does not distinguish arrays belonging to two different objects.
+
+`H symbol <array> expression <result> array-storage-selection 0` independently
+records every group. Field inputs also have `H expression <result> node
+<receiver> array-storage-input 0` and `H symbol <array> node <receiver>
+array-storage-root 0`. A receiver root belongs to the array field and its
+accepted statement. All descendants share that statement and module, and none
+has an execution phase. These borrowed parser snapshots observe addresses;
+they do not establish that a dereference or element access executes. Exporting
+them neither clones nor retains compiler AST allocations.
+
+Unindexed field prefixes keep the receiver ID in the module's expression
+association chain until a bound query consumes the storage. The query and its
+prefix can refer to the same snapshot. Both readers require exact agreement
+between properties and independent relations, and complete storage coverage for
+all subscript and bound groups when the capability is available. Unknown keys,
+duplicate groups, missing roots, foreign ownership and phased snapshots are
+rejected. Earlier producers remain readable without promising this capability.
+Compact exports advertise it as unavailable and omit storage observations.
 
 The optional full-model `procedure-exit-labels` capability exports
 `H symbol <procedure> symbol <label> procedure-exit-label 0`. The label is
@@ -1782,5 +2148,380 @@ Compact exports advertise the capability as unavailable and omit these
 properties. Older models without the capability remain valid but do not prove
 an access-section policy. The existing parser thread owns the sequence counter;
 the observations add no AST ownership, grammar choice, emitted code or ABI change.
+
+## Accepted declaration repetitions
+
+Full models advertise `declaration-repetition-inputs`. Each accepted EXTERN
+variable, TYPE alias and named prototype has an occurrence-specific property:
+
+```
+K symbol selected-symbol-ID redeclaration-input:occurrence-ID statement-ID<TAB>extern|typedef|prototype<TAB>repeated<TAB>source-context-ID
+```
+
+The four payload fields use ordinary K percent escaping. The occurrence ID is
+bounded by the detail stream and must be unique. The repetition flag is zero
+or one. Owner classes are variable (1), typedef (13) and procedure (3),
+respectively. Each occurrence belongs to an accepted statement in its source
+context and module. This records the parser's decision before the earlier
+declaration state is refined or an unused prototype header is discarded.
+
+An EXTERN repetition has compatible selected types and exactly the earlier
+array rank and fixed bounds. An unknown rank becoming known is a refinement,
+even though both declarations resolve to the same final symbol. Aliases also
+compare their selected storage extent and fixed-character flag. Accepted
+legacy prototype repetitions use the compiler's existing result, convention,
+formal mode/rank and optional-default matching. Discarded procedure and formal
+symbols retain canonical relationships to the selected prototype; their
+original DCL names remain observations of their own declarations.
+
+Physical identifier sites use `LOC source-context` with the occurrence's
+property key. Generated names use a distinct `MR symbol` origin under that
+same key. The `redeclaration-` prefix avoids the macro recorder's deliberate
+deduplication of ordinary `declaration-` symbol origins. Generated aliases can
+lack an editable B range: their native declaration origin and occurrence
+origin instead identify the accepted macro statement and real invocation.
+
+Readers require complete EXTERN group and named prototype coverage, all
+physical alias declarations, and generated alias declaration origins. A
+repetition must have an earlier declaration of the same selected symbol.
+Binding and expression exports advertise unavailable coverage and omit these
+properties. Older models remain valid but do not prove declaration repetition.
+The observations do not change accepted syntax, emitted code or ABI selection.
+
+## Original callback convention inputs
+
+Full schema-27 models advertise `procedure-callback-inputs`. Native parsing
+records each anonymous FUNCTION/SUB type occurrence after selecting its
+procedure-pointer symbol, including occurrences sharing one interned type:
+
+```
+K symbol selected-callback-ID callback-convention-input:identity statement-ID<TAB>explicit<TAB>source-context-ID
+K symbol selected-procedure-ID procedure-abi-input:identity statement-ID<TAB>prototype|definition<TAB>LIB<TAB>ALIAS<TAB>source-context-ID<TAB>callback-count
+```
+
+Payload tabs use ordinary K percent escaping. Flags are zero or one. The
+explicit flag records the active native calling-convention choice. In
+particular, `-z no-fastcall` and `-z no-thiscall` can disable a written choice.
+It does not describe the containing procedure's convention. Callback counts
+include anonymous types parsed in that original header before canonical
+procedure reuse; definitions have a zero LIB flag. Named type aliases parsed
+in earlier statements retain their own occurrences.
+
+The callback site is the consumed FUNCTION/SUB keyword. LOC identifies a
+physical or remapped source point; generated tokens instead retain an MR
+origin at the actual macro invocation. Procedure ABI sites use the original
+procedure name. Readers require unique bounded occurrence IDs, selected
+procedure-pointer owners, same-module accepted statement/source ownership,
+and complete ABI receipts matching procedure-typing-inputs and callback counts.
+Property order does not determine ownership or occurrence identity.
+
+Named header receipts require a parsed statement ending. An indirect SUB cast
+can consume and publish a void call while the statement dispatcher retains
+its unmatched route. Callback type receipts on that route require a typed
+indirect void-call AST in the same statement and a reachable selected callback
+signature. This includes nested callback formal/result types. An unused receipt,
+a different signature, or an unmatched named header cannot use this exception.
+
+Compact models mark this capability unavailable and omit these properties.
+Older full models remain valid but cannot establish callback explicitness.
+The existing parser thread owns the module counter, reset at module start
+and bounded by the 16000000-detail limit. These facts retain no native symbol
+pointers or AST ownership and do not change calling-convention selection.
+
+## Ordered aggregate source fields
+
+Full models advertise `aggregate-field-order`. Every finalized aggregate with
+`declared-field-count` also retains a complete one-based native member list:
+
+```
+K symbol aggregate-ID declared-field:ordinal field-ID
+```
+
+The list walks the accepted native member table, preserving positional field
+order explicitly. Symbol identity allocation and byte offsets do not define
+this order. It includes promoted anonymous source fields and excludes hidden
+base storage, dynamic descriptors, Static variables and procedures, as does
+the existing source-field count. Zero fields produce a count and no entries.
+Only finalized snapshots establish completeness. Observations borrow the
+native table during serialization; no symbol pointer survives the walk.
+
+Both readers require complete bounded ordinals, unique source fields, final
+layout, exact member counts and matching native owners and modules. Compact
+modes advertise unavailable coverage and omit the list. Older models without
+the capability remain valid; their field counts alone do not prove order.
+
+FBL-DECL-024 consumes this list, declaration-typing groups, source routine
+ownership and ordinary constant assignment receipts in the pre-load AST.
+It reviews a single uninitialized DIM followed by one assignment per field
+in the same parser parent, compound and procedure. Blank lines, comments,
+inactive code, continuations and colon separators do not invent statements.
+Labels, calls, declarations and control boundaries interrupt the sequence.
+Aliases, namespaces and macro expansions keep their actual native identities.
+
+The existing plain-integer-record policy excludes constructors, destructors,
+methods, Static/nested members, default field initializers, arrays, bit fields,
+unions, inheritance, overlap and non-integer field storage. RHS values must be
+original compiler-valued constants; variable reads, calls and op= updates do
+not establish this recommendation. Compiler-generated module procedures do
+not turn module-level DIM into a user routine local. Findings are collected
+before bounded publication, with declaration LOC or macro origin sites.
+Style defaults and explicit selection retain the original activation policy.
+
+## Native procedure object symbol observations
+
+Full models advertise `procedure-object-symbol-observations`. Source procedure
+snapshots, excluding procedure-pointer signatures, carry the optional properties
+`procedure-object-symbol-state` and `procedure-object-symbol`. GAS/GAS64 report
+`observed` with the exact cached object symbol, or `unobserved` with an empty name.
+The exporter reads the name already selected by native emission. It does not call
+the mangler, allocate identifiers, or retain a symbol pointer beyond its lifetime.
+Consumers use the final snapshot for each symbol ID.
+
+C and LLVM currently report `unsupported-backend` with an empty object name.
+Their compiler identifiers can differ from the actual object symbols because of
+assembler aliases, target decoration, or LLVM quoting. Compact models omit these
+properties and advertise unavailable coverage. Older models remain readable;
+missing properties mean unknown.
+
+An observed object name identifies a procedure for later linker observations.
+It does not prove a reference, an undefined symbol, a missing implementation,
+or the absence of an implementation in another object or library. Actual link
+resolution requires the complete native link inputs and linker decisions.
+
+## Independent native link diagnostics
+
+`-semantic-link-diagnostics <file>` requests a separate `FBCLNK` schema-2
+artifact. It works without `-semantic-model`; a rejected compilation or failed
+link does not make a recovered AST acceptable. Completion describes the native
+invocation outcome, including an unattempted link under `-r` or `-c`.
+
+Records are ASCII TSV with the same uppercase percent byte escapes as FBCSEM.
+The header is `FBCLNK, 2, producer-version`. Readers also accept schema 1,
+which has no native-access flag and cannot establish a declaration reference.
+The remaining schema-2 record fields are:
+
+| Record | Fields after the tag |
+| --- | --- |
+| `M` | module ID, source path, native target ID, backend enum |
+| `FILE` | revision ID, module ID, opened source path, lowercase SHA-256, byte length |
+| `SRE` | revision ID, `verified` |
+| `P` | procedure ID, module ID, kind, first accepted header role, spelling, object-name state, object name, opened source path, physical-point flag, raw line, raw column, native-access flag |
+| `ARGS` | native link arguments before adding the observation helper or generating a response file |
+| `U` | callback ID, native failure kind, exact callback symbol/library argument |
+| `TOTAL` | module count, source revision count, procedure count |
+| `LINK` | attempted flag, completed flag, native tool exit, callback coverage, tool path |
+| `END` | schema version, callback count, whole-invocation success flag |
+
+Modules, source revisions and callbacks have serial IDs. Procedure IDs are
+allocated at accepted native headers and emitted on native symbol release;
+release order can differ from allocation order. Repeated includes retain
+distinct revisions. Source hashes are observed and verified through FBC's
+already-open source streams. `#line` never replaces that opened-file owner.
+Generated headers and all remaps have no physical-point claim. Physical lines
+are one-based and raw lexer columns are zero-based.
+
+GAS/GAS64 copy only an already selected cached procedure object name, with
+`observed` or `unobserved` state. C/GCC and C/Clang record the selected assembler
+alias or target ABI name at native header emission. LLVM records the selected
+global identifier after native quoting and target-prefix handling. These
+observations do not change code emission or allocate extra native identifiers.
+Procedure-pointer signatures are excluded. A prototype followed by a definition
+retains its first accepted header role. A failed compilation can snapshot live
+registrations before ordinary parser teardown, without using a recovered AST.
+The native-access flag copies the procedure's ACCESSED state before release.
+Calls and procedure addresses set that state on the selected symbol. An emitted
+prototype alone does not establish a reference, even when another declaration
+shares the same ALIAS. The flag can include uses later removed by optimization;
+an unresolved finding still requires the actual native linker callback.
+
+GNU ld's `--error-handling-script` interface supplies `undefined-symbol` and
+`missing-lib` observations directly. FBC discovers interface availability from
+native tool help and calls the same compiler executable as a private helper.
+The helper runs before compiler initialization only with the exact callback
+arguments and an invocation-owned environment capsule. It appends to an existing
+private journal after checking the native open-file identity and journal header.
+It never creates or truncates a public destination. FBC restores the preceding
+environment after the link and validates the completed journal before publishing.
+
+An existing caller-supplied error helper is preserved and makes callback
+coverage `unavailable`. Unsupported tools also retain their ordinary behavior.
+A native link failure without classified callbacks remains an unknown failure;
+it does not prove that no unresolved symbols exist. An unused prototype is not
+an unresolved import, and separate objects or archives may resolve declarations
+without a source `LIB` or `ALIAS` clause. Consumers must use the complete native
+link inputs and match callbacks to observed object names before claiming a
+source declaration is unresolved.
+
+The checked writer protects inputs, includes, emissions, program outputs and
+other semantic artifacts. Publication is atomic, and private staging is removed
+on success or failure. Limits are 64 MiB per artifact, 16 MiB per callback journal,
+5000 source revisions, 100000 procedure/module/callback records and 4096 native
+bytes per symbol. Collection and hash lookup also have explicit memory/work
+bounds. Readers require source closure, complete totals, supported record
+shapes, native exit agreement and a final completion marker before retaining
+usable facts. Consumers must verify observed source revisions are still current.
+
+FBL-DECL-013 consumes this independent artifact when fblint is given
+`--compiler-link`. Repeatable `--compiler-object`, `--compiler-library` and
+`--compiler-library-path` options supply the project's actual native link
+inputs and also enable this mode. `--compiler-prefix` selects a native SDK
+when the semantic compiler is staged separately from its toolchain. Existing
+target, backend, include, define and multithread options apply to both passes.
+The linter builds an owned temporary program and never executes that program.
+
+The rule requires a used native prototype, an observed object name, an exact
+`undefined-symbol` callback and accepted native source ownership. It verifies raw
+source hashes, including BOM bytes, against disk and the scan's source cache
+before publishing findings. Unused prototypes, resolved separate objects and
+archives do not produce this finding. Missing link inputs, unavailable callback
+coverage on failure, old providers and rejected source are analysis failures
+when native linking is requested. Remapped/generated declarations without a
+physical point use an unlocated finding at line and column zero.
+
+Explicit selection without a link context reports the missing context instead
+of recovering the former EXTERN/LIB/ALIAS source heuristic. Ordinary scans
+without native link mode do not claim that declaration resolution was checked.
+
+## Original constant and bound call inputs
+
+Full models advertise `parsed-constant-symbols`, `bound-expression-symbols`
+and `source-call-bindings`. Compact models mark these capabilities unavailable.
+The optional schema-27 properties are:
+
+| Record | Meaning |
+| --- | --- |
+| `K expression <E> constant-symbol <S>` | Selected CONST symbol at the original constant atom parser |
+| `K expression <E> constant-atom-kind boolean-literal` | FBC's predefined Boolean literal symbol |
+| `K expression <E> constant-atom-kind named-constant` | A source named constant, including a named string constant |
+| `K expression <E> bound-value-symbol <S>` | Original scalar variable or field identity, including an implicit BYREF dereference |
+| `H node <CALL> binding <B> source-binding 0` | The selected written callee occurrence before argument parsing |
+
+Constant symbol and kind form a pair. The CONST symbol and original expression
+belong to the same module. A Boolean literal has FBC's Boolean type and LITERAL
+attribute, independently of its value. A named Boolean constant equal to True
+does not acquire literal identity. String literal backing VAR storage does not
+establish a bound variable name. Whole arrays, computed indices and explicit
+pointer dereferences are excluded from the simple bound-value receipt.
+
+These receipts describe original parser inputs, rather than every result later
+associated with the same AST allocation. Consumers follow recorded
+`parsed-expression-source` predecessors and inspect original `EX` operations
+before accepting an atom. Grouping preserves identity; casts and folded
+arithmetic or Boolean operations retain distinct operations. FBC also parses
+a sole parenthesized SUB argument as a grouped expression.
+
+Written direct CALL nodes use their native procedure symbol. A virtual CALL's
+native symbol is an anonymous function-pointer signature; its `static-target`
+relation owns the selected source procedure and interface. Source call bindings
+must agree with that interface, rather than the function-pointer signature.
+Macro calls can retain actual selected interfaces without a written callee
+binding. Their statement ownership and macro invocation records provide native
+reporting anchors. Indirect calls do not gain a fabricated written procedure.
+
+Selected ARG nodes already name actual formal slots and retain original
+`call-argument-expression` receipts. Their ABI chain can run in reverse source
+order. Consumers map arguments by selected formal identity and ordinal, keeping
+implicit receivers, variadic tails and omitted defaults distinct. These facts
+do not establish call effects or require a change to emitted program code.
+
+## Original enum declarations and members
+
+Full models advertise `enum-declaration-inputs`. Bindings-only and
+expressions-only models mark it unavailable and omit these properties:
+
+| Record | Tab-separated property payload |
+| --- | --- |
+| `K symbol <enum S> enum-declaration-input` | Header statement identity, completed native member count |
+| `K symbol <member S> enum-element-input` | Enum symbol identity, one-based member ordinal, member statement identity, explicit-initializer flag, original initializer expression identity |
+
+The payload tabs use the ordinary `%09` field escaping. An implicit member
+has flag zero and initializer identity zero. An explicit member has flag one
+and the original constant expression identity observed before
+`astConstFlushToInt()` consumes its AST. The selected member value remains
+available in the member's ordinary `C symbol` record. The original expression
+and the selected enum storage value serve different purposes.
+
+These receipts describe the members accepted by `cEnumBody()`, including
+anonymous declarations, comma-separated members, included declarations and
+expanded macros. A CONST alias with the same enum subtype is not a member.
+Non-Explicit enums inside Extern blocks place members in the surrounding
+namespace, so a member's native namespace owner need not equal its enum.
+The receipt supplies the actual enum independently of namespace placement.
+
+Each declaration's native `U` element count closes its group. Ordinals must
+cover that count exactly once, and every member subtype must match its enum.
+The header has a native `BLK` enum construct and a parsed declaration or
+aggregate-member route. Its first statement token can be PUBLIC or PRIVATE,
+so that token alone does not establish the declaration kind. A member uses a
+parsed enumerator statement whose parent and construct match that header.
+Explicit initializer expressions use the native CONST
+node class (16), have a compiler-valued constant, belong to the same module
+and retain ownership by the member statement.
+
+Both readers reject missing groups, repeated ordinals, inconsistent counts,
+invalid initializer presence, foreign modules and conflicting receipts.
+Counts are bounded before allocating ordinal tables. Receipt capture retains
+identities in the existing export buffer; it introduces no AST ownership,
+symbol-layout change or alteration to accepted grammar or generated code.
+
+## Original IIf operands
+
+Full models advertise `original-iif-inputs`. Bindings-only and expressions-only
+models mark it unavailable and omit the following occurrence records:
+
+| Record | Meaning |
+| --- | --- |
+| `K expression <result E> original-iif-inputs` | Original condition, true-arm and false-arm expression identities, in that order |
+| `H symbol <module namespace S> expression <result E> parsed-iif 0` | Independent marker for the completed builtin IIf occurrence |
+
+The property payload contains three decimal identities separated by escaped
+`%09` tabs. The parser records the accepted operands before `astNewIIF()` can
+convert the condition, lower the branches or discard an unselected constant
+arm. Both original arms therefore remain available when the completed result
+is a constant. The result receives a distinct expression occurrence even if
+folding reuses the selected arm's AST allocation. Its ordinary `NT` and `C`
+receipts describe the selected result, rather than the original input type.
+
+Operand identities increase in parse order and precede the result identity.
+All four expressions belong to the same parsed statement and module. The
+namespace marker belongs to that module. Both readers require exactly one
+property and one marker per occurrence, rejecting missing halves, duplicates,
+invalid order and foreign statement or module references.
+
+Later expression observations can link to the completed occurrence through
+`parsed-expression-source`. A consumer following grouping or cast operands
+stops at the original IIf occurrence before following the folded result into
+its selected arm. Actual operators and ordinary selected calls remain distinct.
+An ordinary function named IIf after `OPTION NOKEYWORD` receives no intrinsic
+receipt. Macro and included occurrences retain their native statement and
+module ownership; reporting coordinates have a separate role from operand
+identity. These records add no AST ownership and do not change accepted source
+or emitted program code.
+
+## Original array initializer inputs
+
+Full models advertise `original-array-initializer-inputs`. An accepted array
+element retains these expression properties before assignment conversion or
+implicit constructor lowering consumes its original input:
+
+| Property | Value |
+| --- | --- |
+| `array-initializer-symbol` | source array variable or array field symbol ID |
+| `array-initializer-dimension` | one-based innermost array dimension |
+| `array-initializer-kind` | `assignment` or `constructor` |
+
+The expression's native type remains its original input type. The source array
+and its A records supply the selected destination and rank. Grouping remains an
+ordinary original EX `group`, including its outer source range. Scalar fields in
+an initialized array of records do not acquire an array role; only their actual
+array fields qualify. Optional defaults, scalar constructor inputs and generated
+padding have no element association. Compact models mark this capability
+unavailable and omit the groups.
+
+Readers require complete groups, source symbol origin, accepted statement and
+module ownership, a valid array rank and an available capability. The compiler
+records immutable identities rather than retaining initializer AST pointers.
+The sidecar tests cover 18 original inputs and reject invalid groups across
+GAS64, GAS and GCC, with unchanged emitted code and compiler diagnostics.
 
 <!-- end of compiler-semantic-model.md -->

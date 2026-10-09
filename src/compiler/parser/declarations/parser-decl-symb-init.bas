@@ -55,6 +55,7 @@ type FB_INITCTX
 	rec_cnt     as integer          '' current UDT recursion count in to hUDTInit()
 	last_ctx    as FB_INITCTX ptr   '' pointer to the last ctx to track global recursion
 	semantic_site as LEX_LOCATION ptr '' declaration anchor for compiler-selected initializer calls
+	semantic_expression as longint ptr '' optional output for the original scalar input
 end type
 
 '' Module state: track all FB_INITCTX in a stack for nested initializers.
@@ -95,7 +96,32 @@ private function hDoAssign _
 	'' pass the initializing expression back to parent if it fails here
 	ctx.init_expr = expr
 	dim as longint semantic_rhs = expr->semantic_expression
+	if( (ctx.semantic_expression <> NULL) andalso (semantic_rhs > 0) ) then
+		if( *ctx.semantic_expression = 0 ) then *ctx.semantic_expression = semantic_rhs
+	end if
 
+	dim as string semantic_inputs
+	dim as LEX_LOCATION semantic_destination = fbSemanticModelStatementSite( )
+	'' A scalar declaration copies a value; BYREF declarations bind an alias,
+	'' and aggregate/array initialization can select constructors. Snapshot only
+	'' this built-in scalar path, before TYPEINI consumes its original RHS.
+	if( fbSemanticModelFullEnabled( ) and symbIsVar(ctx.sym) and _
+	    (symbIsRef(ctx.sym) = FALSE) and (symbGetArrayDimensions(ctx.sym) = 0) and _
+	    (ctx.dimension = -1) and (ctx.rec_cnt = 0) ) then
+		dim as integer scalar_copy = (typeGetPtrCnt(ctx.dtype) <> 0)
+		select case typeGetDtOnly(ctx.dtype)
+		case FB_DATATYPE_BOOLEAN, FB_DATATYPE_BYTE, FB_DATATYPE_UBYTE, _
+			FB_DATATYPE_SHORT, FB_DATATYPE_USHORT, FB_DATATYPE_INTEGER, FB_DATATYPE_UINT, _
+			FB_DATATYPE_LONG, FB_DATATYPE_ULONG, FB_DATATYPE_LONGINT, FB_DATATYPE_ULONGINT, _
+			FB_DATATYPE_SINGLE, FB_DATATYPE_DOUBLE, FB_DATATYPE_STRING
+			scalar_copy = TRUE
+		end select
+		if( scalar_copy ) then
+			dim as ASTNODE ptr semantic_left = astNewVAR(ctx.sym)
+			semantic_inputs = fbSemanticModelCaptureAssignmentInputs(semantic_left, expr, semantic_destination)
+			astDelTree(semantic_left)
+		end if
+	end if
 	if( astCheckASSIGNToType( ctx.dtype, ctx.subtype, expr, no_upcast ) = FALSE ) then
 		'' check if it's a cast
 
@@ -127,13 +153,20 @@ private function hDoAssign _
 	end if
 
 	var semantic_initializer = astTypeIniAddAssign( ctx.tree, expr, ctx.sym, ctx.dtype, ctx.subtype, check_upcast )
+	if( (semantic_initializer <> NULL) and (len(semantic_inputs) > 0) ) then
+		fbSemanticModelRecordAssignmentInputs(semantic_inputs, "initializer", "assign", "builtin", 0, _
+			semantic_destination, @semantic_destination)
+	end if
 	'' Dynamic String declaration receipts use the original RHS identity,
 	'' before an assignment conversion or field-constructor clone replaces it.
 	if( fbSemanticModelFullEnabled( ) and (ctx.dtype = FB_DATATYPE_STRING) ) then
 		if( semantic_initializer <> NULL ) then semantic_initializer->semantic_expression = semantic_rhs
 	end if
-	fbSemanticModelAssignmentTarget(semantic_rhs, ctx.dtype, ctx.subtype, "initializer")
+	fbSemanticModelAssignmentTarget(semantic_rhs, ctx.sym, ctx.dtype, ctx.subtype, "initializer")
 	fbSemanticModelStringInitializer(semantic_rhs, ctx.sym, ctx.dtype, semantic_initializer)
+	if( semantic_initializer <> NULL ) then
+		fbSemanticModelArrayInitializer(semantic_rhs, ctx.sym, ctx.dimension, "assignment")
+	end if
 
 	function = TRUE
 end function
@@ -427,6 +460,15 @@ private function hUDTInitObject( byref ctx as FB_INITCTX ) as integer
 		expr = astNewCONSTi( 0 )
 	end if
 
+	'' Constructor selection can replace the parsed input with a call node.
+	'' Optional parameter defaults still need the exact source expression that
+	'' was accepted before that lowering takes place.
+	if( (ctx.semantic_expression <> NULL) andalso (expr->semantic_expression > 0) ) then
+		if( *ctx.semantic_expression = 0 ) then
+			*ctx.semantic_expression = expr->semantic_expression
+		end if
+	end if
+
 	'' When initializing a BYREF parameter, an expression of the
 	'' same type should be used as-is instead of causing a copy
 	'' constructor call + temp var to be used, because that would
@@ -442,6 +484,7 @@ private function hUDTInitObject( byref ctx as FB_INITCTX ) as integer
 		end if
 	end if
 
+	dim as longint semantic_input = expr->semantic_expression
 	expr = astBuildImplicitCtorCallEx( ctx.sym, expr, astBydescArrayArg( expr ), is_ctorcall )
 	if( expr = NULL ) then
 		exit function
@@ -457,7 +500,11 @@ private function hUDTInitObject( byref ctx as FB_INITCTX ) as integer
 			fbSemanticModelExportImplicitCall(ctx.sym, astGetSymbol(expr), _
 				"initializer-constructor", *ctx.semantic_site)
 		end if
-		return astTypeIniAddCtorCall( ctx.tree, ctx.sym, expr, ctx.dtype, ctx.subtype ) <> NULL
+		var initializer = astTypeIniAddCtorCall( ctx.tree, ctx.sym, expr, ctx.dtype, ctx.subtype )
+		if( initializer <> NULL ) then
+			fbSemanticModelArrayInitializer(semantic_input, ctx.sym, ctx.dimension, "constructor")
+		end if
+		return initializer <> NULL
 	end if
 
 	'' try to assign it (do a shallow copy)
@@ -564,6 +611,7 @@ private function hUDTInit( byref ctx as FB_INITCTX ) as integer
 			'' try to assign the expression to the parent
 			dim as integer is_ctorcall = any
 			dim as ASTNODE ptr expr = ctx.init_expr
+			dim as longint semantic_input = expr->semantic_expression
 
 			ctx = old_ctx
 
@@ -590,7 +638,11 @@ private function hUDTInit( byref ctx as FB_INITCTX ) as integer
 			end if
 
 			if( is_ctorcall ) then
-				return astTypeIniAddCtorCall( ctx.tree, ctx.sym, expr, ctx.dtype, ctx.subtype ) <> NULL
+				var initializer = astTypeIniAddCtorCall( ctx.tree, ctx.sym, expr, ctx.dtype, ctx.subtype )
+				if( initializer <> NULL ) then
+					fbSemanticModelArrayInitializer(semantic_input, ctx.sym, ctx.dimension, "constructor")
+				end if
+				return initializer <> NULL
 			endif
 
 			'' try to assign it (do a shallow copy)
@@ -677,7 +729,8 @@ function cInitializer _
 		byval options as FB_INIOPT, _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr, _
-		byval semantic_site as LEX_LOCATION ptr _
+		byval semantic_site as LEX_LOCATION ptr, _
+		byval semantic_expression as longint ptr _
 	) as ASTNODE ptr
 
 	dim as integer is_local = any, ok = any
@@ -710,6 +763,8 @@ function cInitializer _
 	ctx.init_expr = NULL
 	ctx.rec_cnt = 0
 	ctx.semantic_site = semantic_site
+	ctx.semantic_expression = semantic_expression
+	if( semantic_expression <> NULL ) then *semantic_expression = 0
 	hUpdateContextDtype( ctx, dtype, subtype )
 
 	ctx.tree = astTypeIniBegin( ctx.dtype, ctx.subtype, is_local, symbGetOfs( sym ) )

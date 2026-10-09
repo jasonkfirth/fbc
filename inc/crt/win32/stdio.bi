@@ -44,16 +44,15 @@ type FILE as _iobuf
 
 extern "c"
 
-#if defined(__FB_64BIT__) and defined(__FB_ARM__)
+	'' All supported 64-bit Windows targets use the Universal CRT.  In
+	'' particular, UCRT64 does not export the older __iob_func entry point.
+	'' Keep the legacy stream table only for 32-bit targets that can still be
+	'' linked against MSVCRT40 for Windows 95 compatibility.
+#if defined(__FB_64BIT__)
 	declare function __acrt_iob_func(byval index as uinteger) as FILE ptr
 	#define stdin (__acrt_iob_func(STDIN_FILENO))
 	#define stdout (__acrt_iob_func(STDOUT_FILENO))
 	#define stderr (__acrt_iob_func(STDERR_FILENO))
-#elseif defined(__FB_64BIT__)
-	declare function __iob_func() as FILE ptr
-	#define stdin (@(__iob_func())[STDIN_FILENO])
-	#define stdout (@(__iob_func())[STDOUT_FILENO])
-	#define stderr (@(__iob_func())[STDERR_FILENO])
 #else
 	extern import _iob(0 to 2) alias "_iob" as FILE
 	#define stdin (@_iob(STDIN_FILENO))

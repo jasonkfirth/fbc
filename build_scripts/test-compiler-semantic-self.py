@@ -20,7 +20,7 @@ import subprocess
 import sys
 import tempfile
 
-from compiler_semantic_audit import EMISSION_SUFFIX, audit_exports, digest
+from compiler_semantic_audit import EMISSION_SUFFIX, audit_exports, digest, freeze_semantic_reader
 
 
 def freeze_inputs(root: Path, compiler: Path, output: Path, backends: list[str]) -> Path:
@@ -36,7 +36,7 @@ def freeze_inputs(root: Path, compiler: Path, output: Path, backends: list[str])
         "obj", "__pycache__", "*.c", "*.ll", "*.asm", "*.o", "*.exe"))
     validation = inputs / "validation"
     validation.mkdir()
-    shutil.copy2(root / "tests/semantic-sidecar/sidecar.py", validation / "sidecar.py")
+    freeze_semantic_reader(root, validation)
     for name in (Path(__file__).name, "compiler_semantic_audit.py"):
         shutil.copy2(Path(__file__).with_name(name), validation / name)
     # GCC and Clang both emit .c beside the BASIC module. Private backend

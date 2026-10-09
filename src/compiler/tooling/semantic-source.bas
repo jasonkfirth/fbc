@@ -7,6 +7,7 @@
 #include once "tooling/semantic-private.bi"
 #include once "tooling/semantic-source.bi"
 #include once "tooling/semantic-source-file.bi"
+#include once "tooling/semantic-link.bi"
 #include once "tooling/semantic-coordinates.bi"
 #include once "parser/parser.bi"
 #include once "file.bi"
@@ -72,6 +73,7 @@ end function
 
 sub fbSemanticModelOpenSource(byref filename as const string, byval depth as integer, _
 	byref kind as const string, byref requested as const string, byval directive as LEX_LOCATION ptr)
+	fbSemanticLinkSourceOpen(filename, depth)
 	if( fbSemanticModelEnabled( ) = FALSE ) then exit sub
 	if( (depth < 0) or (depth > FB_MAXINCRECLEVEL) or (semantic_source_revisions(depth) <> NULL) ) then
 		fbSemanticModelFailAt("semantic-source.bas:74")
@@ -107,6 +109,7 @@ sub fbSemanticModelOpenSource(byref filename as const string, byval depth as int
 end sub
 
 sub fbSemanticModelCloseSource(byval depth as integer)
+	fbSemanticLinkSourceClose(depth)
 	if( (depth < 0) or (depth > FB_MAXINCRECLEVEL) ) then exit sub
 	if( semantic_source_revisions(depth) = NULL ) then exit sub
 	dim as long status = fbSemanticSourceClose(semantic_source_revisions(depth))
@@ -135,6 +138,7 @@ end sub
 
 sub fbSemanticModelSourceRemap(byval logical_line as longint, byref logical_file as const string, _
 	byref directive as LEX_LOCATION)
+	fbSemanticLinkSourceRemapped(env.includerec)
 	if( fbSemanticModelEnabled( ) = FALSE ) then exit sub
 	'' A line-only remap changes the coordinate domain just as a filename
 	'' override does. Matching the original filename does not restore physical

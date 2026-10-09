@@ -340,7 +340,8 @@ declare function cInitializer _
 		byval options as FB_INIOPT, _
 		byval dtype as integer = FB_DATATYPE_INVALID, _
 		byval subtype as FBSYMBOL ptr = NULL, _
-		byval semantic_site as LEX_LOCATION ptr = NULL _
+		byval semantic_site as LEX_LOCATION ptr = NULL, _
+		byval semantic_expression as longint ptr = NULL _
 	) as ASTNODE ptr
 
 declare function cTypeOrExpression _
@@ -799,7 +800,7 @@ declare function cStrIdxOrMemberDeref _
 		byval expr as ASTNODE ptr _
 	) as ASTNODE ptr
 
-declare sub cAssignment(byval assgexpr as ASTNODE ptr)
+declare sub cAssignment(byval assgexpr as ASTNODE ptr, byval source_start as LEX_LOCATION ptr = NULL)
 declare function cAssignFunctResult( byval is_return as integer ) as integer
 
 declare function cGfxStmt _

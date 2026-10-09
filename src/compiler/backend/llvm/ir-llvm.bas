@@ -122,6 +122,7 @@
 
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
+#include once "tooling/semantic-link.bi"
 #include once "backend/ir.bi"
 #include once "runtime/rtl.bi"
 #include once "support/containers/flist.bi"
@@ -525,7 +526,59 @@ private function hEmitProcName( byval proc as FBSYMBOL ptr ) as string
 	if( hGetBuiltin( proc ) = LLVM_BUILTIN_LIBC ) then
 		'' These builtins have the libc ABI, including their return values.
 		'' Using the actual libc name also allows LLVM's library optimizations.
-		return "@" + irGetBuiltinLibcName( proc )
+		pname = "@" + irGetBuiltinLibcName( proc )
+	end if
+	if( fbSemanticLinkProcedureObjectNeeded(proc) ) then
+		'' This is the emitter's typed global identifier, not source text.
+		'' LLVM's byte-one prefix suppresses target mangling; its @ marker
+		'' and identifier quotes do not belong to the object symbol. Without
+		'' the escape, LLVM supplies the target's ordinary C symbol prefix.
+		dim as string object_name = mid(pname, 2)
+		if( left(object_name, 1) = """" ) then
+			if( (len(object_name) < 2) or (right(object_name, 1) <> """") ) then
+				fbSemanticLinkFail( )
+			else
+				object_name = mid(object_name, 2, len(object_name) - 2)
+				'' Quoted LLVM identifiers encode a byte as backslash plus
+				'' exactly two hexadecimal digits. Decode that native IR
+				'' representation once, before applying its mangling escape.
+				dim as string decoded
+				dim as integer position = 1
+				do while( position <= len(object_name) )
+					if( object_name[position - 1] = asc("\") ) then
+						if( position + 2 > len(object_name) ) then
+							fbSemanticLinkFail( )
+							exit do
+						end if
+						dim as integer value = 0
+						for digit as integer = position + 1 to position + 2
+							dim as integer code = asc(object_name, digit)
+							select case code
+							case asc("0") to asc("9"): code -= asc("0")
+							case asc("A") to asc("F"): code = code - asc("A") + 10
+							case asc("a") to asc("f"): code = code - asc("a") + 10
+							case else
+								fbSemanticLinkFail( )
+								return pname
+							end select
+							value = value * 16 + code
+						next
+						decoded += chr(value)
+						position += 3
+					else
+						decoded += chr(object_name[position - 1])
+						position += 1
+					end if
+				loop
+				object_name = decoded
+			end if
+		end if
+		if( left(object_name, 1) = chr(1) ) then
+			object_name = mid(object_name, 2)
+		elseif( env.underscoreprefix ) then
+			object_name = "_" + object_name
+		end if
+		fbSemanticLinkProcedureObject(proc, object_name)
 	end if
 	return pname
 end function
@@ -646,9 +699,9 @@ private function hEmitProcCallConv( byval proc as FBSYMBOL ptr ) as string
 	case FB_FUNCMODE_STDCALL, FB_FUNCMODE_STDCALL_MS, FB_FUNCMODE_PASCAL
 		function = "x86_stdcallcc "
 	case FB_FUNCMODE_THISCALL
-		function = "x86_thiscall "
+		function = "x86_thiscallcc "
 	case FB_FUNCMODE_FASTCALL
-		function = "x86_fastcall "
+		function = "x86_fastcallcc "
 	case else
 		errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
 		function = ""
@@ -670,7 +723,10 @@ private function hEmitProcHeader _
 
 	assert( symbIsProc( proc ) )
 
-	ln += hEmitProcCallConv( proc )
+	'' LLVM attaches calling conventions to declarations and calls, not
+	'' function types. A procedure pointer retains its BASIC convention in
+	'' the symbol, which hEmitProcCallConv supplies at the indirect call.
+	if( is_type = FALSE ) then ln += hEmitProcCallConv( proc )
 
 	'' Function result type (is 'void' for subs)
 	ln += hEmitType( typeGetDtAndPtrOnly( symbGetProcRealType( proc ) ), _

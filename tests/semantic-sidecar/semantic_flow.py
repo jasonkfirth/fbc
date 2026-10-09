@@ -8,7 +8,7 @@ This file intentionally does NOT infer branches or parse FreeBASIC programs.
 from collections import defaultdict
 
 
-def validate_flow(model, number) -> None:
+def validate_flow(model, number, storage_roots=()) -> None:
     """Use the caller's checked wire-number decoder; missing edges stay missing."""
     phases = {}
     for row in model.records["PH"]:
@@ -26,10 +26,12 @@ def validate_flow(model, number) -> None:
             raise ValueError("Invalid or repeated node phase")
         node_phases[identity] = phase
 
-    # Default and variable initializer trees are the only unphased trees.
+    # Parser receiver snapshots have already passed independent storage and
+    # ownership checks. They describe addresses before lowering, not execution.
     initializer_roots = {number(row[4], 1) for row in model.records["H"]
                          if row[1] == "symbol" and row[3] == "node"
                          and row[5] in ("initializer", "default-initializer")}
+    initializer_roots.update(storage_roots)
     roots = {}
     for identity in sorted(model.nodes):
         row = model.nodes[identity]
@@ -93,9 +95,22 @@ def validate_flow(model, number) -> None:
         if block not in blocks or phase != int(blocks[block][2]) or (phase, label) in labels:
             raise ValueError("Control-flow label has a repeated or foreign block")
         node = model.nodes[block_nodes[block]]
-        if node[4] != "21" or number(node[9], 1) != label or label not in model.symbols:
+        if (node[4] != "21" or number(node[9], 1) != label
+                or label not in model.types or model.types[label][3] != "label"):
             raise ValueError("Control-flow label differs from its recorded AST label")
         labels.add((phase, label))
+
+    native_targets = defaultdict(set)
+    default_targets = defaultdict(set)
+    case_targets = defaultdict(set)
+    for row in model.records["H"]:
+        if row[1] == "node" and row[3] == "symbol":
+            if row[5] == "branch-target":
+                native_targets[int(row[2])].add(int(row[4]))
+            elif row[5] == "default-target":
+                default_targets[int(row[2])].add(int(row[4]))
+    for row in model.records["J"]:
+        case_targets[int(row[1])].add(int(row[4]))
 
     label_kinds = {"label", "conditional-label", "case-label", "default-label", "subroutine-call"}
     unknown_kinds = {"unknown-indirect", "subroutine-return", "unknown-assembly", "procedure-exit"}
@@ -113,6 +128,24 @@ def validate_flow(model, number) -> None:
         elif kind in label_kinds:
             if target or (not label and kind != "subroutine-call"):
                 raise ValueError("Label transfer has an incompatible target")
+            if label:
+                # A symbol identity alone is insufficient: the transfer must
+                # reach a recorded label in this phase and retain the target
+                # actually selected by the native AST.
+                if (phase, label) not in labels:
+                    raise ValueError("Control-flow target lacks a label in its phase")
+                node = block_nodes[source]
+                if kind == "case-label":
+                    targets = case_targets[node]
+                elif kind == "default-label":
+                    targets = default_targets[node]
+                else:
+                    selected = model.properties["node", node].get("sequence-tail-branch-node")
+                    if selected is not None:
+                        node = number(selected, 1)
+                    targets = native_targets[node]
+                if label not in targets:
+                    raise ValueError("Control-flow target differs from its recorded native target")
         elif kind in unknown_kinds:
             if target or label:
                 raise ValueError("Unresolved transfer invents a target")

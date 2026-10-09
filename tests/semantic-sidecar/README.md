@@ -26,9 +26,58 @@ Use `--toolchain-prefix <SDK>` when the source checkout has no native tools or
 libraries. Source-tree declarations still take precedence through `-i inc`;
 the SDK supplies executable tools and link libraries without another copy.
 
+`pointer_access_origins.py` verifies independent dereference and pointer-index
+origins before AST lowering. Its reviewed inputs include multiple dereferences,
+fields, explicit index conversion, canceled addresses, macros and unevaluated
+queries. Full and compact modes preserve emitted output and diagnostics.
+Malformed origin/group tests keep record totals unchanged. Earlier producers
+remain readable, while foreign module observations are rejected. This contract
+describes the original inputs; it does not claim that every access executes.
+
+`array_initializer_inputs.py` verifies original array elements before assignment
+conversion and implicit constructor lowering. Its 18 reviewed inputs include
+multidimensional and inferred bounds, array fields, static storage and grouped
+and generated expressions. Scalar initializers and optional defaults stay
+outside this contract. The `original-array-initializer-inputs` capability is
+available only in full models. Complete expression property groups identify the
+source array, its one-based innermost dimension, and the accepted assignment or
+constructor path. Rejection tests cover incomplete groups, invalid targets and
+dimensions and unavailable capabilities. Backend output and diagnostics remain
+identical when the model is disabled.
+
 `sidecar.py` independently validates schema 27. `test_sidecar.py` checks the
 compiler's records against source locations and known types, layouts, values,
 and target relationships. The BASIC fixtures own separate responsibilities:
+
+`call_atoms.py` checks original constant and bound expression identities,
+direct and virtual source call bindings, compact exclusions and unchanged
+emission. Its malformed groups include missing pairs, wrong symbol classes,
+unavailable capabilities, virtual signature mismatches and foreign modules.
+
+`function_result_inputs.py` checks original RETURN and function-name assignment
+inputs and accepted numeric destination types. Enum inputs retain their own
+types before Boolean normalization. BYREF results, pointers, enum destinations,
+strings and aggregates do not acquire numeric assignment properties. Hidden
+ABI result parameters never become named source destinations. Full and compact
+observations preserve backend emission and compiler diagnostics.
+`numeric-function-result-inputs` distinguishes this coverage from older
+producers that only retained ordinary numeric assignment destinations.
+
+`if_conditions.py` checks original IF and ELSEIF predicates, including folded
+constants, nested and single-line forms, legacy GOTO grammar, macros, includes,
+remapped source and overloaded conversions. `semantic_if.py` validates complete
+accepted-header coverage independently of expression spans. Missing property and
+marker pairs, wrong owners and cross-module inputs are rejected. Full and compact
+observations must leave the generated backend output unchanged.
+
+`enum_inputs.py` checks actual enum membership, explicit initializer presence
+and original constant expressions. It covers namespace placement inside
+Extern, ordinary CONST aliases, anonymous and nested enums, comma-separated
+members, includes, macros, inactive branches and the deprecated/fblite
+dialects. Full and compact models preserve unchanged backend emission.
+`semantic_enums.py` validates native counts, complete ordinals, statement
+roles, expression ownership and module closure. Damaged-group checks include
+oversized counts, unavailable capabilities and foreign initializer modules.
 
 The extensible `K symbol <id> written-override <0|1>` property records whether
 the procedure parser consumed the contextual `OVERRIDE` marker inside a TYPE
@@ -159,7 +208,8 @@ publish `macro-reference-origins` and MR `reference-<detail-id>` or
 `construction-<detail-id>` roles against the selected symbol and real expansion.
 These facts identify the use without inventing an editable callee token; compact
 models and disabled provenance do not claim this capability.
-Full compact models retain only the in-memory invocation locations needed to+anchor generated typed expressions. They do not serialize macro graph records.
+Full compact models retain only the in-memory invocation locations needed to
++anchor generated typed expressions. They do not serialize macro graph records.
 
 `implicit-call-coordinates` adds K facts alongside the unchanged I columns.
 `implicit-call-coordinate-<I-ordinal>` contains eight escaped tab-separated fields:

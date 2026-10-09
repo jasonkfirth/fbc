@@ -36,14 +36,26 @@ declare sub fbSemanticModelExportBinding _
 		byval is_declaration as integer _
 	)
 
+declare sub fbSemanticModelEnumElement _
+	( byval owner as FBSYMBOL ptr, byval member as FBSYMBOL ptr, _
+	  byval explicit_initializer as integer, byval initializer as longint )
+
+declare sub fbSemanticModelEnumDeclaration _
+	( byval owner as FBSYMBOL ptr, byval statement as longint )
+
 '':::
 ''EnumConstDecl     =   ID ('=' ConstExpression)? .
 ''
-private sub hEnumConstDecl( byval id as zstring ptr, byref value as longint )
+private sub hEnumConstDecl _
+	( byval id as zstring ptr, byref value as longint, _
+	  byref semantic_explicit as integer, byref semantic_initializer as longint )
 	dim as ASTNODE ptr expr = any
+	semantic_explicit = FALSE
+	semantic_initializer = 0
 
 	'' '='?
 	if( cAssignToken( ) ) then
+		semantic_explicit = TRUE
 		'' ConstExpression
 		expr = cExpression( )
 		if( expr = NULL ) then
@@ -65,6 +77,9 @@ private sub hEnumConstDecl( byval id as zstring ptr, byref value as longint )
 			errReportWarn( FB_WARNINGMSG_IMPLICITCONVERSION, id )
 		end if
 
+		'' Flushing consumes this AST. Retain its original parsed expression
+		'' identity before conversion to the enum's selected integer storage.
+		semantic_initializer = expr->semantic_expression
 		value = astConstFlushToInt( expr )
 	end if
 end sub
@@ -137,13 +152,16 @@ sub cEnumBody( byval s as FBSYMBOL ptr, byval attrib as FB_SYMBATTRIB )
 				lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 				'' ConstDecl
-				hEnumConstDecl( @id, value )
+				dim as integer semantic_explicit
+				dim as longint semantic_initializer
+				hEnumConstDecl( @id, value, semantic_explicit, semantic_initializer )
 
 				dim as FBSYMBOL ptr enum_element = symbAddEnumElement( s, @id, value, attrib )
 				if( enum_element = NULL ) then
 					errReportEx( FB_ERRMSG_DUPDEFINITION, id )
-				elseif( has_site ) then
-					fbSemanticModelExportBinding(enum_element, semantic_site, TRUE)
+				else
+					if( has_site ) then fbSemanticModelExportBinding(enum_element, semantic_site, TRUE)
+					fbSemanticModelEnumElement(s, enum_element, semantic_explicit, semantic_initializer)
 				end if
 
 				value += 1
@@ -187,6 +205,7 @@ sub cEnumDecl( byval attrib as FB_SYMBATTRIB )
 	dim as FBSYMBOL ptr e = any
 	dim as LEX_LOCATION semantic_site
 	dim as integer has_site = FALSE
+	dim as longint semantic_statement = fbSemanticModelCurrentStatement( )
 
 	'' ENUM doesn't generate any code, but should not be allowed between SELECT and CASE
 	if( cCompStmtIsAllowed( FB_CMPSTMT_MASK_DECL or FB_CMPSTMT_MASK_CODE ) = FALSE ) then
@@ -278,6 +297,7 @@ sub cEnumDecl( byval attrib as FB_SYMBATTRIB )
 	'' EnumBody (enum elements don't inherit anonymous attribute)
 	dim as longint semantic_construct = fbSemanticModelConstructBegin(FB_TK_ENUM)
 	cEnumBody( e, attrib and (not FB_SYMBATTRIB_ANONYMOUS) )
+	fbSemanticModelEnumDeclaration(e, semantic_statement)
 
 	'' close scope
 	if( use_hashtb ) then

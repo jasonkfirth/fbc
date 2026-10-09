@@ -49,14 +49,14 @@ namespace FB
 	' The QB and FB declarations have equivalent ABI signatures but use dialect-specific pointer spelling.
 	' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-014
 	declare function DrawStringSize overload alias "fb_GfxDrawStringSize" _
-		( byref text as const string, byref pixel_width as long, _
+		( byref text as const string, byref pixel_width as long, _ ' fblint: disable-line FBL-API-001 -- Dimension pairs retain width then height order.
 		  byref pixel_height as long, byval font_image as any ptr = 0 ) as long
 	declare function DrawStringSize overload alias "fb_GfxDrawStringSizeWstr" _
-		( byref text as const wstring, byref pixel_width as long, _
+		( byref text as const wstring, byref pixel_width as long, _ ' fblint: disable-line FBL-API-001 -- Dimension pairs retain width then height order.
 		  byref pixel_height as long, byval font_image as any ptr = 0 ) as long
 #if defined(__FB_HAS_USTRING__) and not defined(FB_NO_USTRING)
 	declare function DrawStringSize overload alias "fb_GfxDrawStringSizeUstr" _
-		( byref text as const ustring, byref pixel_width as long, _
+		( byref text as const ustring, byref pixel_width as long, _ ' fblint: disable-line FBL-API-001 -- Dimension pairs retain width then height order.
 		  byref pixel_height as long, byval font_image as any ptr = 0 ) as long
 #endif
 	'' One packed byte per row, 1..64 rows; bit 7 is the leftmost pixel.
@@ -66,21 +66,21 @@ namespace FB
 	' The QB and FB declarations have equivalent ABI signatures but use dialect-specific pointer spelling.
 	' FB-LINTER: DISABLE-NEXT-LINE FBL-DECL-014
 	declare function PaintPattern overload alias "fb_GfxPaintPattern" _
-		( byval target as any ptr, byval x as single, byval y as single, _
-		  byref pattern as const string, byval foreground as ulong = 1, _
-		  byval background as ulong = 0, byval border as ulong = 1, _
+		( byval target as any ptr, byval x as single, byval y as single, _ ' fblint: disable-line FBL-API-001 -- Coordinates, extents and creation options retain the public API order.
+		  byref pattern as const string, byval foreground as ulong = 1, _ ' fblint: disable-line FBL-API-001 -- Color roles retain the published drawing/widget order.
+		  byval background as ulong = 0, byval border as ulong = 1, _ ' fblint: disable-line FBL-API-001 -- Color roles retain the published drawing/widget order.
 		  byval relative as long = 0 ) as long
 	'' Unicode arguments contribute their UTF-8 bytes to this binary pattern.
 	declare function PaintPattern overload alias "fb_GfxPaintPatternWstr" _
-		( byval target as any ptr, byval x as single, byval y as single, _
-		  byref pattern as const wstring, byval foreground as ulong = 1, _
-		  byval background as ulong = 0, byval border as ulong = 1, _
+		( byval target as any ptr, byval x as single, byval y as single, _ ' fblint: disable-line FBL-API-001 -- Coordinates, extents and creation options retain the public API order.
+		  byref pattern as const wstring, byval foreground as ulong = 1, _ ' fblint: disable-line FBL-API-001 -- Color roles retain the published drawing/widget order.
+		  byval background as ulong = 0, byval border as ulong = 1, _ ' fblint: disable-line FBL-API-001 -- Color roles retain the published drawing/widget order.
 		  byval relative as long = 0 ) as long
 #if defined(__FB_HAS_USTRING__) and not defined(FB_NO_USTRING)
 	declare function PaintPattern overload alias "fb_GfxPaintPattern" _
-		( byval target as any ptr, byval x as single, byval y as single, _
-		  byref pattern as const ustring, byval foreground as ulong = 1, _
-		  byval background as ulong = 0, byval border as ulong = 1, _
+		( byval target as any ptr, byval x as single, byval y as single, _ ' fblint: disable-line FBL-API-001 -- Coordinates, extents and creation options retain the public API order.
+		  byref pattern as const ustring, byval foreground as ulong = 1, _ ' fblint: disable-line FBL-API-001 -- Color roles retain the published drawing/widget order.
+		  byval background as ulong = 0, byval border as ulong = 1, _ ' fblint: disable-line FBL-API-001 -- Color roles retain the published drawing/widget order.
 		  byval relative as long = 0 ) as long
 #endif
 	end extern
@@ -371,99 +371,99 @@ namespace FB
 	''
 	enum
 		SC_ESCAPE     = &h01
-		SC_1
-		SC_2
-		SC_3
-		SC_4
-		SC_5
-		SC_6
-		SC_7
-		SC_8
-		SC_9
-		SC_0
-		SC_MINUS
-		SC_EQUALS
-		SC_BACKSPACE
-		SC_TAB
-		SC_Q
-		SC_W
-		SC_E
-		SC_R
-		SC_T
-		SC_Y
-		SC_U
-		SC_I
-		SC_O
-		SC_P
-		SC_LEFTBRACKET
-		SC_RIGHTBRACKET
-		SC_ENTER
-		SC_CONTROL
-		SC_A
-		SC_S
-		SC_D
-		SC_F
-		SC_G
-		SC_H
-		SC_J
-		SC_K
-		SC_L
-		SC_SEMICOLON
-		SC_QUOTE
-		SC_TILDE
-		SC_LSHIFT
-		SC_BACKSLASH
-		SC_Z
-		SC_X
-		SC_C
-		SC_V
-		SC_B
-		SC_N
-		SC_M
-		SC_COMMA
-		SC_PERIOD
-		SC_SLASH
-		SC_RSHIFT
-		SC_MULTIPLY
-		SC_ALT
-		SC_SPACE
-		SC_CAPSLOCK
-		SC_F1
-		SC_F2
-		SC_F3
-		SC_F4
-		SC_F5
-		SC_F6
-		SC_F7
-		SC_F8
-		SC_F9
-		SC_F10
-		SC_NUMLOCK
-		SC_SCROLLLOCK
-		SC_HOME
-		SC_UP
-		SC_PAGEUP
+		SC_1          = &h02
+		SC_2          = &h03
+		SC_3          = &h04
+		SC_4          = &h05
+		SC_5          = &h06
+		SC_6          = &h07
+		SC_7          = &h08
+		SC_8          = &h09
+		SC_9          = &h0A
+		SC_0          = &h0B
+		SC_MINUS      = &h0C
+		SC_EQUALS     = &h0D
+		SC_BACKSPACE  = &h0E
+		SC_TAB        = &h0F
+		SC_Q          = &h10
+		SC_W          = &h11
+		SC_E          = &h12
+		SC_R          = &h13
+		SC_T          = &h14
+		SC_Y          = &h15
+		SC_U          = &h16
+		SC_I          = &h17
+		SC_O          = &h18
+		SC_P          = &h19
+		SC_LEFTBRACKET= &h1A
+		SC_RIGHTBRACKET= &h1B
+		SC_ENTER      = &h1C
+		SC_CONTROL    = &h1D
+		SC_A          = &h1E
+		SC_S          = &h1F
+		SC_D          = &h20
+		SC_F          = &h21
+		SC_G          = &h22
+		SC_H          = &h23
+		SC_J          = &h24
+		SC_K          = &h25
+		SC_L          = &h26
+		SC_SEMICOLON  = &h27
+		SC_QUOTE      = &h28
+		SC_TILDE      = &h29
+		SC_LSHIFT     = &h2A
+		SC_BACKSLASH  = &h2B
+		SC_Z          = &h2C
+		SC_X          = &h2D
+		SC_C          = &h2E
+		SC_V          = &h2F
+		SC_B          = &h30
+		SC_N          = &h31
+		SC_M          = &h32
+		SC_COMMA      = &h33
+		SC_PERIOD     = &h34
+		SC_SLASH      = &h35
+		SC_RSHIFT     = &h36
+		SC_MULTIPLY   = &h37
+		SC_ALT        = &h38
+		SC_SPACE      = &h39
+		SC_CAPSLOCK   = &h3A
+		SC_F1         = &h3B
+		SC_F2         = &h3C
+		SC_F3         = &h3D
+		SC_F4         = &h3E
+		SC_F5         = &h3F
+		SC_F6         = &h40
+		SC_F7         = &h41
+		SC_F8         = &h42
+		SC_F9         = &h43
+		SC_F10        = &h44
+		SC_NUMLOCK    = &h45
+		SC_SCROLLLOCK = &h46
+		SC_HOME       = &h47
+		SC_UP         = &h48
+		SC_PAGEUP     = &h49
 		'' &h4A unused (?)
 		SC_LEFT       = &h4B
 		SC_CLEAR      = &h4C
 		SC_CENTER     = &h4C
-		SC_RIGHT
-		SC_PLUS
-		SC_END
-		SC_DOWN
-		SC_PAGEDOWN
-		SC_INSERT
-		SC_DELETE
+		SC_RIGHT      = &h4D
+		SC_PLUS       = &h4E
+		SC_END        = &h4F
+		SC_DOWN       = &h50
+		SC_PAGEDOWN   = &h51
+		SC_INSERT     = &h52
+		SC_DELETE     = &h53
 		'' &h54
 		'' &h55
 		'' &h56
 		SC_F11        = &h57
-		SC_F12
+		SC_F12        = &h58
 		'' &h59
 		'' &h5A
 		SC_LWIN       = &h5B
-		SC_RWIN
-		SC_MENU
+		SC_RWIN       = &h5C
+		SC_MENU       = &h5D
 		'' &h5E
 		'' &h5F
 		'' &h60

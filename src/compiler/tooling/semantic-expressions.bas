@@ -2,6 +2,8 @@
 '' File: tooling/semantic-expressions.bas
 '' Purpose: Preserve observed source expressions through AST cloning and lowering.
 '' Responsibilities: Own immutable association chains and export surviving links.
+'' Ownership: Module reset releases shared association buffers; assignment tree
+'' traversal allocates its own stack and releases it before returning.
 '' This file intentionally does NOT contain: inferred expression parents or execution claims.
 
 #include once "tooling/semantic-private.bi"
@@ -20,6 +22,67 @@ declare sub fbSemanticModelExportExpression _
 	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, byref source_end as LEX_LOCATION, _
 	  byval nonphysical_tokens_at_start as longint, byval nonphysical_tokens_at_end as longint, _
 	  byval semantic_operator_override as integer = -1, byval force_nonphysical_range as integer = FALSE )
+
+'' A named constant is lowered to a value-only CONST node. Observe its
+'' selected symbol at the atom parser, before enclosing operations can
+'' fold into the same allocation. The identity belongs to this E receipt,
+'' not to every later expression associated with that AST allocation.
+sub fbSemanticModelConstantExpression _
+	( byval expr as ASTNODE ptr, byval sym as FBSYMBOL ptr, byref source as LEX_LOCATION, _
+	  byval nonphysical_tokens as longint )
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (expr = NULL) or (sym = NULL) ) then exit sub
+	if( lex.ctx->semantic_probe or (sym->class <> FB_SYMBCLASS_CONST) ) then exit sub
+	fbSemanticModelExportExpressionDistinct(expr, source, source, nonphysical_tokens, nonphysical_tokens)
+	dim as longint identity = expr->semantic_expression
+	dim as longint symbol_id = fbSemanticModelSymbolId(sym)
+	if( (identity = 0) or (symbol_id = 0) ) then
+		fbSemanticModelFailAt("constant atom identity unavailable")
+		exit sub
+	end if
+	dim as string kind = "named-constant"
+	if( (symbGetFullType(sym) = FB_DATATYPE_BOOLEAN) and ((sym->attrib and FB_SYMBATTRIB_LITERAL) <> 0) ) then
+		kind = "boolean-literal"
+	end if
+	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR
+	fbSemanticModelAppendDetail(prefix + "constant-symbol" + TABCHAR + fbSemanticModelNumber(symbol_id))
+	fbSemanticModelAppendDetail(prefix + "constant-atom-kind" + TABCHAR + kind)
+end sub
+
+'' An implicit BYREF dereference still names the declared input variable.
+'' Explicit dereferences and computed array indexing have no simple named
+'' value here. Consumers must inspect EX before treating later folded results
+'' as atoms; this receipt does not declare enclosing operations transparent.
+sub fbSemanticModelExportBoundExpression(byval node as ASTNODE ptr, byval identity as longint)
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (node = NULL) or (identity = 0) ) then exit sub
+	dim as FBSYMBOL ptr sym = NULL
+	select case node->class
+	case AST_NODECLASS_VAR, AST_NODECLASS_FIELD
+		sym = node->sym
+	case AST_NODECLASS_DEREF
+		if( node->l = NULL ) then exit sub
+		if( (node->l->class <> AST_NODECLASS_VAR) or (node->l->sym = NULL) ) then exit sub
+		sym = node->l->sym
+		if( sym->typ <> node->dtype ) then exit sub
+		if( (symbIsParamVarByRef(sym) = FALSE) and (symbIsRef(sym) = FALSE) and (symbIsImport(sym) = FALSE) ) then exit sub
+	case else
+		exit sub
+	end select
+	if( sym = NULL ) then exit sub
+	'' A string literal has backing VAR storage, but does not name a variable
+	'' in the caller. Named string constants have a separate constant receipt.
+	if( (sym->attrib and FB_SYMBATTRIB_LITERAL) <> 0 ) then exit sub
+	select case sym->class
+	case FB_SYMBCLASS_VAR, FB_SYMBCLASS_FIELD
+		'' Whole arrays are storage inputs, rather than scalar named arguments.
+		if( symbGetArrayDimensions(sym) <> 0 ) then exit sub
+	case else
+		exit sub
+	end select
+	dim as longint symbol_id = fbSemanticModelSymbolId(sym)
+	if( symbol_id = 0 ) then fbSemanticModelFailAt("bound expression identity unavailable"): exit sub
+	fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + _
+		TABCHAR + "bound-value-symbol" + TABCHAR + fbSemanticModelNumber(symbol_id))
+end sub
 
 '' -------------------------------------------------------------------------
 '' Parser-selected numeric suffix spellings
@@ -91,6 +154,8 @@ end sub
 type SEMANTIC_EXPRESSION_LINK
 	expression as longint
 	previous as longint
+	array_symbol as longint
+	array_receiver as longint
 end type
 
 '' One source result can be observed on more than one AST allocation while
@@ -117,6 +182,8 @@ type SEMANTIC_EXPRESSION_OPERANDS
 	selected_numeric as integer
 	selected_left_expression as longint
 	selected_right_expression as longint
+	compound_selection as integer
+	compound_target as longint
 end type
 
 const SEMANTIC_EXPRESSION_MAX_OPERANDS = 1000000
@@ -292,6 +359,8 @@ sub fbSemanticModelAttachExpression(byval node as ASTNODE ptr, byval identity as
 	end if
 	expression_links[expression_link_count].expression = identity
 	expression_links[expression_link_count].previous = node->semantic_expressions
+	expression_links[expression_link_count].array_symbol = 0
+	expression_links[expression_link_count].array_receiver = 0
 	expression_link_count += 1
 	node->semantic_expressions = expression_link_count
 end sub
@@ -370,6 +439,8 @@ function fbSemanticModelCaptureOperands _
 		.selected_numeric = FALSE
 		.selected_left_expression = 0
 		.selected_right_expression = 0
+		.compound_selection = 0
+		.compound_target = 0
 		if( (left_expr <> NULL) and (right_expr <> NULL) and (.left > 0) and (.right > 0) ) then
 			.numeric_inputs = hPrimitiveNumeric(astGetFullType(left_expr), astGetSubType(left_expr)) and _
 				hPrimitiveNumeric(astGetFullType(right_expr), astGetSubType(right_expr))
@@ -502,9 +573,33 @@ sub fbSemanticModelCompoundResult(byval result as ASTNODE ptr, byval operands as
 	end if
 	dim as LEX_LOCATION anchor = expression_operands[operands - 1].source
 	anchor.is_physical = FALSE
+	'' A compound update can lower through an overloaded arithmetic call and
+	'' then a different LET overload. Preserve the arithmetic selection here,
+	'' before the final store hides it behind an assignment or statement link.
+	dim as string kind
+	with expression_operands[operands - 1]
+		.compound_target = fbSemanticModelSelectedOperationTarget(result, kind)
+		.compound_selection = iif(kind = "overloaded", 2, 1)
+	end with
 	fbSemanticModelAttachOperands(result, operands)
 	fbSemanticModelExportExpression(result, anchor, anchor, 0, 0)
 end sub
+
+function fbSemanticModelCompoundTarget(byval operands as longint, byref kind as string) as longint
+	kind = ""
+	if( (operands < 1) or (operands > expression_operand_count) ) then
+		fbSemanticModelFailAt("invalid compound operation selection identity")
+		return 0
+	end if
+	with expression_operands[operands - 1]
+		if( (.compound_selection < 1) or (.compound_selection > 2) ) then
+			fbSemanticModelFailAt("compound operation selection is missing")
+			return 0
+		end if
+		kind = iif(.compound_selection = 2, "overloaded", "builtin")
+		return .compound_target
+	end with
+end function
 
 sub fbSemanticModelAttachOperands(byval node as ASTNODE ptr, byval identity as longint)
 	if( node = NULL ) then exit sub
@@ -555,17 +650,195 @@ sub fbSemanticModelExportOperands(byval node as ASTNODE ptr, byval identity as l
 	end with
 end sub
 
+'' Resolve only the storage symbol actually selected by source assignment
+'' grammar. Transparent wrappers and implicit parameter dereferences retain
+'' their variable; an explicit pointer dereference has no named destination.
+function fbSemanticModelAssignmentSymbol(byval target as ASTNODE ptr) as FBSYMBOL ptr
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then return NULL
+	dim as integer depth = 0
+	while( target <> NULL )
+		select case target->class
+		case AST_NODECLASS_CONV, AST_NODECLASS_ADDROF, AST_NODECLASS_NIDXARRAY
+			target = target->l
+		case AST_NODECLASS_DEREF
+			'' Dynamic strings and BYREF parameters have an implicit DEREF.
+			'' Requiring the declared and lvalue types to agree distinguishes it
+			'' from an explicit assignment through a user pointer.
+			if( target->l = NULL ) then return NULL
+			if( target->l->class <> AST_NODECLASS_VAR ) then return NULL
+			if( target->l->sym = NULL ) then return NULL
+			if( target->l->sym->typ <> target->dtype ) then return NULL
+			if( symbIsParamVar(target->l->sym) = FALSE ) then return NULL
+			target = target->l
+		case AST_NODECLASS_VAR, AST_NODECLASS_IDX, AST_NODECLASS_FIELD
+			return target->sym
+		case else
+			return NULL
+		end select
+		depth += 1
+		if( depth > 64 ) then return NULL
+	wend
+	return NULL
+end function
+
+'' An assignment builder can consume both operands, including string and UDT
+'' places. Retain their immutable typed observations while the parser still owns
+'' the ASTs. Synthetic lvalue observations use a logical operator anchor; their
+'' lack of physical coordinates is explicit and never recovered from spelling.
+'' Original value/place trees are metadata, not executable N roots. Publishing
+'' them as ordinary AST roots would make data-flow consumers observe reads
+'' which optimization removed. A depth limit leaves an explicit opaque node;
+'' the node budget fails the transaction rather than silently losing inputs.
+const SEMANTIC_ASSIGNMENT_TREE_DEPTH = 64
+const SEMANTIC_ASSIGNMENT_TREE_NODES = 65536
+
+private function hAssignmentTree _
+	( byval node as ASTNODE ptr, byref count as integer, byref records as string, byval depth as integer = 0 ) as integer
+	if( node = NULL ) then return 0
+	if( count >= SEMANTIC_ASSIGNMENT_TREE_NODES ) then
+		fbSemanticModelFailAt("assignment storage tree exceeds its node bound")
+		return 0
+	end if
+	count += 1
+	dim as integer identity = count, complete = (depth < SEMANTIC_ASSIGNMENT_TREE_DEPTH)
+	dim as longint left_id = 0, right_id = 0, options = 0, offset = 0, scale = 0
+	dim as integer conversion = 0, narrowing = 0, const_conversion = 0
+	dim as ASTNODE ptr left_child = node->l, right_child = node->r, implicit_index = NULL
+	dim as string code, value_kind = "none", value_text
+	select case node->class
+	case AST_NODECLASS_CONST
+		fbSemanticModelFormatValue(node->dtype, @node->val.value, value_kind, value_text)
+		if( len(value_kind) = 0 ) then complete = FALSE: value_kind = "none"
+	case AST_NODECLASS_VAR: offset = node->var_.ofs
+	case AST_NODECLASS_OFFSET
+		offset = node->ofs.ofs
+		'' OFFSET keeps its original address operand for executable AST
+		'' optimizations. The storage snapshot already has the symbol and
+		'' byte offset, so its address atom must not export that child as
+		'' a second value computation. Do not change the executable node.
+		left_child = NULL: right_child = NULL
+	case AST_NODECLASS_IDX
+		offset = node->idx.ofs: scale = node->idx.mult
+		'' Constant indexes can be absorbed entirely into the byte offset.
+		'' The remaining scaled index is exactly zero. Make that implicit
+		'' value explicit in metadata without changing the executable AST.
+		if( complete and (left_child = NULL) ) then
+			implicit_index = astNewCONSTi(0, FB_DATATYPE_INTEGER)
+			left_child = implicit_index
+		end if
+	case AST_NODECLASS_DEREF: offset = node->ptr.ofs
+	case AST_NODECLASS_BOP, AST_NODECLASS_UOP
+		code = fbSemanticModelOperatorCode(node->op.op): options = node->op.options
+		'' Backend-only operations without a conceptual code have no complete
+		'' value contract. Keep their typed root as an explicit opaque leaf.
+		if( len(code) = 0 ) then complete = FALSE
+	case AST_NODECLASS_CONV
+		conversion = abs(node->cast.doconv <> FALSE)
+		narrowing = abs(node->cast.do_convfd2fs <> FALSE)
+		const_conversion = abs(node->cast.convconst <> FALSE)
+	case AST_NODECLASS_ADDROF, AST_NODECLASS_FIELD
+	case AST_NODECLASS_CALL
+		complete = FALSE
+		'' Numeric exponentiation can lower directly to a runtime call. Its
+		'' parser operand receipt identifies that selected built-in operation;
+		'' an arbitrary call, even with the same name, has no such contract.
+		if( node->call.isrtl and (node->call.args = 2) and _
+		    (node->semantic_operands > 0) and (node->semantic_operands <= expression_operand_count) ) then
+			with expression_operands[node->semantic_operands - 1]
+				if( (.kind = "binary") and (.code = "power") and .selected_numeric ) then
+					dim as ASTNODE ptr first_arg = node->r, second_arg
+					if( first_arg <> NULL ) then second_arg = first_arg->r
+					if( (first_arg <> NULL) andalso (second_arg <> NULL) ) then
+						if( (first_arg->class = AST_NODECLASS_ARG) and (second_arg->class = AST_NODECLASS_ARG) and _
+						    (second_arg->r = NULL) and (symbGetProcMode(node->sym) = FB_FUNCMODE_CDECL) ) then
+							code = "power": complete = (depth < SEMANTIC_ASSIGNMENT_TREE_DEPTH)
+							'' CALL's cdecl ARG list is reversed. The snapshot keeps
+							'' mathematical base/exponent order, not push order.
+							left_child = second_arg->l: right_child = first_arg->l
+						end if
+					end if
+				end if
+			end with
+		end if
+	case else: complete = FALSE
+	end select
+	if( complete ) then
+		left_id = hAssignmentTree(left_child, count, records, depth + 1)
+		right_id = hAssignmentTree(right_child, count, records, depth + 1)
+	end if
+	if( implicit_index <> NULL ) then astDelTree(implicit_index)
+	dim as string payload = fbSemanticModelNumber(node->class) + TABCHAR + fbSemanticModelNumber(node->dtype) + _
+		TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(node->subtype)) + _
+		TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(node->sym)) + TABCHAR + code + _
+		TABCHAR + fbSemanticModelNumber(options) + TABCHAR + fbSemanticModelNumber(offset) + TABCHAR + fbSemanticModelNumber(scale) + _
+		TABCHAR + fbSemanticModelNumber(conversion) + TABCHAR + fbSemanticModelNumber(narrowing) + TABCHAR + fbSemanticModelNumber(const_conversion) + _
+		TABCHAR + value_kind + TABCHAR + value_text + TABCHAR + fbSemanticModelNumber(left_id) + TABCHAR + fbSemanticModelNumber(right_id) + _
+		TABCHAR + iif(complete, "complete", "opaque")
+	records += fbSemanticModelNumber(identity) + TABCHAR + payload + chr(10)
+	return identity
+end function
+
+function fbSemanticModelCaptureAssignmentInputs _
+	( byval left_expr as ASTNODE ptr, byval right_expr as ASTNODE ptr, byref source as LEX_LOCATION ) as string
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then return ""
+	if( lex.ctx->semantic_probe ) then return ""
+	if( (left_expr = NULL) or (right_expr = NULL) ) then return ""
+	dim as LEX_LOCATION anchor = source
+	anchor.is_physical = FALSE
+	anchor.raw_valid = FALSE
+	if( left_expr->semantic_expression = 0 ) then
+		fbSemanticModelExportExpression(left_expr, anchor, anchor, 0, 0)
+	end if
+	if( right_expr->semantic_expression = 0 ) then
+		fbSemanticModelExportExpression(right_expr, anchor, anchor, 0, 0)
+	end if
+	if( (left_expr->semantic_expression <= 0) or (right_expr->semantic_expression <= 0) ) then
+		fbSemanticModelFailAt("source assignment operand observation is missing")
+		return ""
+	end if
+	dim as integer count = 0
+	dim as string records
+	dim as integer left_id = hAssignmentTree(left_expr, count, records)
+	dim as integer right_id = hAssignmentTree(right_expr, count, records)
+	return fbSemanticModelNumber(left_expr->semantic_expression) + TABCHAR + fbSemanticModelNumber(right_expr->semantic_expression) + _
+		TABCHAR + fbSemanticModelNumber(left_id) + TABCHAR + fbSemanticModelNumber(right_id) + TABCHAR + fbSemanticModelNumber(count) + chr(10) + records
+end function
+
 '' Record accepted source assignments before their original operand types are
 '' lost to conversion, constant folding, or TYPEINI lowering. The caller keeps
-'' an expression identity, never an AST pointer that a builder may have freed.
-'' Numeric scalar assignments have one selected destination; aggregate LET
-'' overloads and generated assignments are excluded. Parsed compound updates
-'' supply their arithmetic result before destination conversion too.
+'' an expression identity and target symbol, never an AST pointer that a builder
+'' may have freed. Source target identity is independent of the older numeric
+'' destination receipt, so string and aggregate consumers do not infer names.
 sub fbSemanticModelAssignmentTarget _
-	( byval expression_id as longint, byval dtype as integer, _
+	( byval expression_id as longint, byval target as FBSYMBOL ptr, byval dtype as integer, _
 	  byval subtype as FBSYMBOL ptr, byref assignment_kind as const string )
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
 	if( expression_id <= 0 ) then exit sub
+	if( (assignment_kind <> "assignment") and (assignment_kind <> "initializer") ) then
+		fbSemanticModelFailAt("invalid source assignment kind")
+		exit sub
+	end if
+	if( target <> NULL ) then
+		dim as integer source_target = FALSE
+		select case target->class
+		case FB_SYMBCLASS_VAR
+			'' Parser-owned parameter variables are compiler symbols, but their G
+			'' record provides the exact source formal. Other generated variables
+			'' and temporaries are not source assignment destinations.
+			source_target = ((fbSemanticModelSymbolOrigin(target) = "source") or symbIsParamVar(target))
+		case FB_SYMBCLASS_CONST, FB_SYMBCLASS_PARAM, FB_SYMBCLASS_FIELD
+			source_target = (fbSemanticModelSymbolOrigin(target) = "source")
+		end select
+		if( source_target ) then
+			dim as longint target_id = fbSemanticModelSymbolId(target)
+			if( target_id > 0 ) then
+				fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(expression_id) + _
+					TABCHAR + "source-assignment-symbol" + TABCHAR + fbSemanticModelNumber(target_id))
+				fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(expression_id) + _
+					TABCHAR + "source-assignment-kind" + TABCHAR + assignment_kind)
+			end if
+		end if
+	end if
 	if( typeGetPtrCnt(dtype) <> 0 ) then exit sub
 	if( subtype <> NULL ) then exit sub
 	select case typeGetDtOnly(dtype)
@@ -583,6 +856,64 @@ sub fbSemanticModelAssignmentTarget _
 		TABCHAR + "assignment-target-dtype" + TABCHAR + fbSemanticModelNumber(dtype))
 	fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(expression_id) + _
 		TABCHAR + "assignment-kind" + TABCHAR + assignment_kind)
+end sub
+
+'' Array elements can reach TYPEINI through either assignment or constructor
+'' lowering. Record the original input at both accepted paths, while the parser
+'' still owns the array context. A field's scalar initializer is not an array
+'' element merely because its enclosing record belongs to an array.
+sub fbSemanticModelArrayInitializer _
+	( byval expression_id as longint, byval target as FBSYMBOL ptr, _
+	  byval dimension as integer, byref input_kind as const string )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	if( lex.ctx->semantic_probe or (expression_id <= 0) or (dimension < 0) ) then exit sub
+	if( target = NULL ) then
+		fbSemanticModelFailAt("array initializer has no target")
+		exit sub
+	end if
+	if( (symbIsVar(target) = FALSE) and (symbIsField(target) = FALSE) ) then
+		fbSemanticModelFailAt("array initializer has invalid target class")
+		exit sub
+	end if
+	if( fbSemanticModelSymbolOrigin(target) <> "source" ) then exit sub
+	dim as integer rank = symbGetArrayDimensions(target)
+	if( (rank < 1) or (rank > FB_MAXARRAYDIMS) or (dimension <> rank - 1) ) then
+		fbSemanticModelFailAt("array initializer has invalid element dimension")
+		exit sub
+	end if
+	if( (input_kind <> "assignment") and (input_kind <> "constructor") ) then
+		fbSemanticModelFailAt("array initializer has invalid input kind")
+		exit sub
+	end if
+	dim as longint target_id = fbSemanticModelSymbolId(target)
+	if( target_id <= 0 ) then
+		fbSemanticModelFailAt("array initializer target identity unavailable")
+		exit sub
+	end if
+	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(expression_id) + TABCHAR
+	fbSemanticModelAppendDetail(prefix + "array-initializer-symbol" + TABCHAR + fbSemanticModelNumber(target_id))
+	'' Dimensions use the same one-based convention as array subscript inputs.
+	fbSemanticModelAppendDetail(prefix + "array-initializer-dimension" + TABCHAR + fbSemanticModelNumber(dimension + 1))
+	fbSemanticModelAppendDetail(prefix + "array-initializer-kind" + TABCHAR + input_kind)
+end sub
+
+'' Optional-argument lowering clones or converts its AST before later export.
+'' Retain the original parsed expression on the source formal while it is live.
+sub fbSemanticModelParameterDefault _
+	( byval parameter as FBSYMBOL ptr, byval expression_id as longint )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	if( (parameter = NULL) or (expression_id <= 0) ) then exit sub
+	if( parameter->class <> FB_SYMBCLASS_PARAM ) then
+		fbSemanticModelFailAt("invalid formal default parameter")
+		exit sub
+	end if
+	dim as longint parameter_id = fbSemanticModelSymbolId(parameter)
+	if( parameter_id <= 0 ) then
+		fbSemanticModelFailAt("unavailable formal default parameter identity")
+		exit sub
+	end if
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(parameter_id) + _
+		TABCHAR + "formal-default-expression" + TABCHAR + fbSemanticModelNumber(expression_id))
 end sub
 
 '' Fixed character capacity belongs to the selected declaration, not its
@@ -816,6 +1147,11 @@ sub fbSemanticModelPointerDereference _
 	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR
 	fbSemanticModelAppendDetail(prefix + "pointer-dereference-operand" + TABCHAR + fbSemanticModelNumber(operand_id))
 	fbSemanticModelAppendDetail(prefix + "pointer-dereference-count" + TABCHAR + fbSemanticModelNumber(dereferences))
+	'' The independent origin links let readers check group coverage. Property
+	'' validation alone cannot distinguish a missing group from an absent access.
+	fbSemanticModelAppendDetail("H" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + _
+		TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(operand_id) + _
+		TABCHAR + "pointer-dereference-input" + TABCHAR + fbSemanticModelNumber(dereferences))
 end sub
 
 '' Built-in indexing scales its input and may fold the resulting address.
@@ -854,6 +1190,9 @@ sub fbSemanticModelPointerIndex _
 	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR
 	fbSemanticModelAppendDetail(prefix + "pointer-index-operand" + TABCHAR + fbSemanticModelNumber(operand_id))
 	fbSemanticModelAppendDetail(prefix + "pointer-index-index" + TABCHAR + fbSemanticModelNumber(index_id))
+	fbSemanticModelAppendDetail("H" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + _
+		TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(operand_id) + _
+		TABCHAR + "pointer-index-input" + TABCHAR + fbSemanticModelNumber(index_id))
 end sub
 
 '' Index expressions are captured before integer conversion and byte-offset
@@ -896,10 +1235,77 @@ function fbSemanticModelSelectedArrayIndex _
 	return expr->semantic_expression
 end function
 
+'' The parser observes storage before indexing or bound-query folding. A plain
+'' array needs only its canonical symbol. Fields additionally retain the record
+'' address; the snapshot's node IDs are independent of later emitted accesses.
+private sub hArrayStorageDetails _
+	( byval identity as longint, byval array_symbol as FBSYMBOL ptr, byval receiver_id as longint )
+	dim as longint symbol_id = fbSemanticModelSymbolId(array_symbol)
+	if( (identity <= 0) or (symbol_id <= 0) or (receiver_id < 0) ) then
+		fbSemanticModelFailAt("array storage lacks its selected expression")
+		exit sub
+	end if
+	dim as integer is_field = (array_symbol->class = FB_SYMBCLASS_FIELD)
+	if( is_field <> (receiver_id > 0) ) then
+		fbSemanticModelFailAt("array storage lacks its original receiver")
+		exit sub
+	end if
+	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR
+	fbSemanticModelAppendDetail(prefix + "array-storage-symbol" + TABCHAR + fbSemanticModelNumber(symbol_id))
+	fbSemanticModelAppendDetail(prefix + "array-storage-kind" + TABCHAR + iif(is_field, "field", "variable"))
+	fbSemanticModelAppendDetail(prefix + "array-storage-receiver" + TABCHAR + fbSemanticModelNumber(receiver_id))
+	fbSemanticModelAppendDetail("H" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(symbol_id) + TABCHAR + _
+		"expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + "array-storage-selection" + TABCHAR + "0")
+	if( receiver_id > 0 ) then
+		fbSemanticModelAppendDetail("H" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + _
+			"node" + TABCHAR + fbSemanticModelNumber(receiver_id) + TABCHAR + "array-storage-input" + TABCHAR + "0")
+	end if
+end sub
+
+'' Unindexed fields are consumed by LBOUND/UBOUND and BYDESC argument lowering.
+'' Store only IDs in the existing immutable association chain. Clones share it
+'' and module reset releases it, without changing AST layout or deletion rules.
+sub fbSemanticModelArrayStoragePrefix _
+	( byval result as ASTNODE ptr, byval array_symbol as FBSYMBOL ptr, _
+	  byval receiver_id as longint, byref source_start as LEX_LOCATION, _
+	  byval nonphysical_start as longint )
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (result = NULL) ) then exit sub
+	if( lex.ctx->semantic_probe ) then exit sub
+	dim as LEX_LOCATION source_end = lexGetLastLocation( )
+	fbSemanticModelExportExpressionDistinct(result, source_start, source_end, nonphysical_start, lexGetNonphysicalTokenCount( ))
+	hArrayStorageDetails(result->semantic_expression, array_symbol, receiver_id)
+	dim as longint link = result->semantic_expressions
+	if( (link < 1) or (link > expression_link_count) ) then
+		fbSemanticModelFailAt("array storage prefix lacks its association")
+		exit sub
+	end if
+	expression_links[link - 1].array_symbol = fbSemanticModelSymbolId(array_symbol)
+	expression_links[link - 1].array_receiver = receiver_id
+end sub
+
+function fbSemanticModelArrayStorageInput _
+	( byval result as ASTNODE ptr, byval array_symbol as FBSYMBOL ptr ) as longint
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (result = NULL) or (array_symbol = NULL) ) then return 0
+	if( lex.ctx->semantic_probe ) then return 0
+	if( array_symbol->class <> FB_SYMBCLASS_FIELD ) then return 0
+	dim as longint symbol_id = fbSemanticModelSymbolId(array_symbol)
+	dim as longint link = result->semantic_expressions
+	while( link <> 0 )
+		if( (link < 1) or (link > expression_link_count) ) then exit while
+		if( expression_links[link - 1].array_symbol = symbol_id ) then
+			return expression_links[link - 1].array_receiver
+		end if
+		link = expression_links[link - 1].previous
+	wend
+	fbSemanticModelFailAt("array query lacks its original receiver association")
+	return 0
+end function
+
 sub fbSemanticModelArraySubscripts _
 	( byval result as ASTNODE ptr, byval array_symbol as FBSYMBOL ptr, _
 	  indices() as longint, selected_indices() as longint, byval rank as integer, _
-	  byref source_start as LEX_LOCATION, byval nonphysical_start as longint )
+	  byref source_start as LEX_LOCATION, byval nonphysical_start as longint, _
+	  byval receiver_id as longint )
 	if( (fbSemanticModelEnabled( ) = FALSE) or (result = NULL) or (rank = 0) ) then exit sub
 	if( lex.ctx->semantic_probe ) then exit sub
 	'' Assignment-side array elements still need a typed source expression when
@@ -938,6 +1344,7 @@ sub fbSemanticModelArraySubscripts _
 	end if
 	fbSemanticModelExportSymbolDetails(array_symbol)
 	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR
+	hArrayStorageDetails(identity, array_symbol, receiver_id)
 	fbSemanticModelAppendDetail(prefix + "array-subscript-symbol" + TABCHAR + fbSemanticModelNumber(symbol_id))
 	fbSemanticModelAppendDetail(prefix + "array-subscript-rank" + TABCHAR + fbSemanticModelNumber(rank))
 	for dimension as integer = 0 to rank - 1
@@ -954,7 +1361,8 @@ end sub
 sub fbSemanticModelArrayBound _
 	( byval result as ASTNODE ptr, byval array_symbol as FBSYMBOL ptr, byval tk as integer, _
 	  byval original_dimension as longint, byval selected_dimension as longint, _
-	  byref source_start as LEX_LOCATION, byval nonphysical_start as longint )
+	  byref source_start as LEX_LOCATION, byval nonphysical_start as longint, _
+	  byval receiver_id as longint )
 	if( (fbSemanticModelFullEnabled( ) = FALSE) or (result = NULL) ) then exit sub
 	if( lex.ctx->semantic_probe ) then exit sub
 	if( (array_symbol = NULL) or (original_dimension < 0) or (selected_dimension <= 0) or _
@@ -975,6 +1383,7 @@ sub fbSemanticModelArrayBound _
 	fbSemanticModelExportSymbolDetails(array_symbol)
 	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR
 	fbSemanticModelAppendDetail(prefix + "array-bound-kind" + TABCHAR + iif(tk = FB_TK_LBOUND, "lower", "upper"))
+	hArrayStorageDetails(identity, array_symbol, receiver_id)
 	fbSemanticModelAppendDetail(prefix + "array-bound-symbol" + TABCHAR + fbSemanticModelNumber(symbol_id))
 	fbSemanticModelAppendDetail(prefix + "array-bound-dimension" + TABCHAR + fbSemanticModelNumber(original_dimension))
 	'' A zero dimension ID means the optional source argument was omitted; the
@@ -1146,6 +1555,37 @@ sub fbSemanticModelStringIntrinsic _
 		fbSemanticModelAppendDetail(prefix + "string-intrinsic-argument-" + fbSemanticModelNumber(ordinal + 1) + _
 			TABCHAR + fbSemanticModelNumber(arguments(ordinal)))
 	next
+end sub
+
+'' -------------------------------------------------------------------------
+'' Original conditional-expression inputs before branch lowering
+'' -------------------------------------------------------------------------
+
+sub fbSemanticModelIifInputs _
+	( byval result as ASTNODE ptr, byval condition_id as longint, byval true_id as longint, _
+	  byval false_id as longint, byref source_start as LEX_LOCATION, byref source_end as LEX_LOCATION, _
+	  byval nonphysical_start as longint, byval nonphysical_end as longint )
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (result = NULL) ) then exit sub
+	if( lex.ctx->semantic_probe ) then exit sub
+	if( (condition_id <= 0) or (true_id <= condition_id) or (false_id <= true_id) ) then
+		fbSemanticModelFailAt("original IIf operands unavailable")
+		exit sub
+	end if
+	'' Give a folded result its own occurrence. The selected arm may have the
+	'' same AST allocation, but it remains a different original expression.
+	fbSemanticModelExportExpressionDistinct(result, source_start, source_end, nonphysical_start, nonphysical_end)
+	dim as longint identity = result->semantic_expression
+	dim as longint module_owner = fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))
+	if( (identity <= false_id) or (module_owner = 0) ) then
+		fbSemanticModelFailAt("completed IIf expression unavailable")
+		exit sub
+	end if
+	dim as string payload = fbSemanticModelNumber(condition_id) + TABCHAR + _
+		fbSemanticModelNumber(true_id) + TABCHAR + fbSemanticModelNumber(false_id)
+	fbSemanticModelAppendDetail("H" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(module_owner) + _
+		TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + "parsed-iif" + TABCHAR + "0")
+	fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + _
+		TABCHAR + "original-iif-inputs" + TABCHAR + fbSemanticModelEscape(payload))
 end sub
 
 '' end of tooling/semantic-expressions.bas

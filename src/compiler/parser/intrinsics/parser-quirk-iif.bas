@@ -29,6 +29,11 @@
 
 declare function fbSemanticModelEnabled( ) as integer
 declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
+declare function fbSemanticModelFullEnabled( ) as integer
+declare sub fbSemanticModelIifInputs _
+	( byval result as ASTNODE ptr, byval condition_id as longint, byval true_id as longint, _
+	  byval false_id as longint, byref source_start as LEX_LOCATION, byref source_end as LEX_LOCATION, _
+	  byval nonphysical_start as longint, byval nonphysical_end as longint )
 
 '' cIIFFunct  =  IIF '(' condition-expr ',' true-expr ',' false-expr ')' .
 function cIIFFunct() as ASTNODE ptr
@@ -40,6 +45,7 @@ function cIIFFunct() as ASTNODE ptr
 	dim as longint nonphysical_tokens_at_start, nonphysical_tokens_at_end
 	dim as AST_SEMANTIC_SOURCE_RANGE semantic_range = any
 	dim as AST_SEMANTIC_SOURCE_RANGE ptr semantic_range_ptr = NULL
+	dim as longint semantic_condition = 0, semantic_true = 0, semantic_false = 0
 
 	function = NULL
 
@@ -94,11 +100,21 @@ function cIIFFunct() as ASTNODE ptr
 		semantic_range_ptr = @semantic_range
 	end if
 
+	'' Folding can delete an arm or reuse its AST as the result. Keep immutable
+	'' original expression identities before either path consumes those nodes.
+	if( fbSemanticModelFullEnabled( ) andalso (lex.ctx->semantic_probe = FALSE) ) then
+		if( expr <> NULL ) then semantic_condition = expr->semantic_expression
+		if( truexpr <> NULL ) then semantic_true = truexpr->semantic_expression
+		if( falsexpr <> NULL ) then semantic_false = falsexpr->semantic_expression
+	end if
 	expr = astNewIIF( expr, truexpr, truecookie, falsexpr, falsecookie, semantic_range_ptr )
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_INVALIDDATATYPES, TRUE )
 		'' error recovery: fake an expr
 		expr = astNewCONSTi( 0 )
+	else
+		fbSemanticModelIifInputs(expr, semantic_condition, semantic_true, semantic_false, _
+			source_start, source_end, nonphysical_tokens_at_start, nonphysical_tokens_at_end)
 	end if
 
 	function = expr

@@ -30,6 +30,7 @@
 
 declare function fbSemanticModelExpressionCheckpoint( ) as longint
 declare sub fbSemanticModelUnevaluatedQuery(byval checkpoint as longint, byref query_kind as const string)
+declare sub fbSemanticModelCallbackConvention(byval proc as FBSYMBOL ptr, byval is_explicit as integer, byref source as LEX_LOCATION)
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -166,6 +167,8 @@ end function
 
 private function cSymbolTypeFuncPtr( byval is_func as integer ) as FBSYMBOL ptr
 	dim as integer dtype = any, mode = any, attrib = any, pattrib = any
+	dim as integer mode_is_explicit
+	dim as LEX_LOCATION semantic_site = lexGetLastLocation( )
 	dim as FBSYMBOL ptr proc = any, subtype = any
 
 	function = NULL
@@ -177,7 +180,7 @@ private function cSymbolTypeFuncPtr( byval is_func as integer ) as FBSYMBOL ptr
 	' is emitted, not the way it's called
 
 	'' mode
-	mode = cProcCallingConv( )
+	mode = cProcCallingConv( FB_FUNCMODE_FBCALL, mode_is_explicit )
 
 	proc = symbPreAddProc( NULL )
 
@@ -207,7 +210,9 @@ private function cSymbolTypeFuncPtr( byval is_func as integer ) as FBSYMBOL ptr
 		end if
 	end if
 
-	function = symbAddProcPtr( proc, dtype, subtype, attrib, pattrib, mode )
+	dim as FBSYMBOL ptr selected_proc = symbAddProcPtr( proc, dtype, subtype, attrib, pattrib, mode )
+	fbSemanticModelCallbackConvention(selected_proc, mode_is_explicit, semantic_site)
+	function = selected_proc
 end function
 
 private function hGetTokenDescription( byval tk as integer ) as string

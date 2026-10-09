@@ -25,6 +25,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
+#include once "tooling/semantic-constructs.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
 
@@ -89,6 +90,7 @@ private function hFuncReturn _
 	'' do an implicit exit function
 	fbSemanticModelSetPendingScopeExitSource(semantic_source, semantic_nonphysical)
 	astScopeBreak( label )
+	fbSemanticModelStatementOperation("procedure-return")
 	function = TRUE
 
 end function
@@ -146,6 +148,7 @@ private sub hGosubBranch()
 	l = hGetLabelId( )
 	if( l <> NULL ) then
 		astGosubAddJmp( parser.currproc, l )
+		fbSemanticModelStatementOperation("gosub")
 	end if
 end sub
 
@@ -155,6 +158,7 @@ private function hGosubReturn _
 	) as integer
 
 	dim as FBSYMBOL ptr l = any
+	dim as integer res = any
 
 	'' it's a GOSUB's RETURN..
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -164,13 +168,17 @@ private function hGosubReturn _
 	case FB_TK_EOL, FB_TK_STMTSEP, FB_TK_EOF, FB_TK_COMMENT, _
 		 FB_TK_REM, FB_TK_ELSE, FB_TK_END, FB_TK_ENDIF
 
-		function = astGosubAddReturn( parser.currproc, NULL )
+		res = astGosubAddReturn( parser.currproc, NULL )
+		function = res
+		if( res ) then fbSemanticModelStatementOperation("gosub-return")
 
 	'' label?
 	case else
 		l = hGetLabelId( )
 		if( l <> NULL ) then
-			function = astGosubAddReturn( parser.currproc, l )
+			res = astGosubAddReturn( parser.currproc, l )
+			function = res
+			if( res ) then fbSemanticModelStatementOperation("gosub-return-label")
 		else
 			function = TRUE
 		end if
@@ -204,6 +212,7 @@ function cGotoStmt _
 		if( l <> NULL ) then
 			fbSemanticModelSetPendingScopeExitSource(semantic_source, semantic_nonphysical)
 			astScopeBreak( l )
+			fbSemanticModelStatementOperation("goto")
 		end if
 		function = TRUE
 

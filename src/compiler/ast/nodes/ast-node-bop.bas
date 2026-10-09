@@ -2032,6 +2032,7 @@ private function hNewSelfBOP _
 
 	'' l = ...
 	dim as longint semantic_rhs = r->semantic_expression
+	dim as FBSYMBOL ptr semantic_target = fbSemanticModelAssignmentSymbol(l)
 	dim as integer semantic_dtype = astGetDataType(l)
 	dim as FBSYMBOL ptr semantic_subtype = astGetSubType(l)
 	l = astNewASSIGN( l, r )
@@ -2044,7 +2045,7 @@ private function hNewSelfBOP _
 		exit function
 	end if
 	if( semantic_operands > 0 ) then
-		fbSemanticModelAssignmentTarget(semantic_rhs, semantic_dtype, semantic_subtype, "assignment")
+		fbSemanticModelAssignmentTarget(semantic_rhs, semantic_target, semantic_dtype, semantic_subtype, "assignment")
 	end if
 	t = astNewLINK( t, l, AST_LINK_RETURN_NONE )
 

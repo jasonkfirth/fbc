@@ -162,6 +162,10 @@ const GAS64_UNSIGNED_DWORD_LIMIT = 4294967296LL
 const GAS64_SIGN_EXTENDED_DWORD_MIN = 18446744071562067968ULL
 const GAS64_STACK_ALIGNMENT = 16
 const GAS64_WINDOWS_SHADOW_SPACE_BYTES = 32
+'' Keep the existing GOSUB landing pad's call area. Its 88 bytes plus the
+'' saved eight-byte address make a 96-byte frame, preserving 16-byte alignment.
+'' Both RET and RETURN label must release the same landing-pad space.
+const GAS64_GOSUB_FRAME_BYTES = 88
 const GAS64_SYSTEMV_INTEGER_SAVE_BASE = -152
 const GAS64_SYSTEMV_FLOAT_SAVE_BASE = -104
 
@@ -4011,7 +4015,7 @@ private sub _emitlabel( byval label as FBSYMBOL ptr )
 	end if
 
 	if label->lbl.gosub then
-		asm_code("sub rsp, 88 #stack for gosub") ''8 parameters max and need to be 16byte aligned
+		asm_code("sub rsp, " + str(GAS64_GOSUB_FRAME_BYTES) + " #stack for gosub")
 	end if
 end sub
 private sub prepare_idx(byval v1 as IRVREG ptr, byref op1 as string, byref op3 as string)
@@ -4564,6 +4568,14 @@ private function hBopRegisterName _
 	end select
 end function
 
+'' PTR operands can use an index register or a folded absolute address in ofs.
+'' Scalar source formatters share this spelling so a folded address does not
+'' require a fabricated register or a dereference of a missing vidx.
+private function hPointerOperand(byval vreg as IRVREG ptr) as string
+	if( vreg->vidx = NULL ) then return "[" + str(vreg->ofs) + "]"
+	return str(vreg->ofs) + "[" + *regstrq(reg_findreal(vreg->vidx->reg)) + "]"
+end function
+
 private sub hBopLoadOperand _
 	( _
 		byval vreg as IRVREG ptr, _
@@ -4588,8 +4600,7 @@ private sub hBopLoadOperand _
 		prepare_idx( vreg, operand, setup_code )
 
 	case IR_VREGTYPE_PTR
-		operand = str( vreg->ofs ) + _
-		          "[" + *regstrq( reg_findreal( vreg->vidx->reg ) ) + "]"
+		operand = hPointerOperand(vreg)
 
 	case IR_VREGTYPE_OFS
 		operand = *symbGetMangledName( vreg->sym ) + _
@@ -5910,8 +5921,7 @@ private function hConvertLoadSource _
 		end if
 
 	case IR_VREGTYPE_PTR
-		op2 = str( v2->ofs ) + _
-		      "[" + *regstrq( reg_findreal( v2->vidx->reg ) ) + "]"
+		op2 = hPointerOperand(v2)
 
 	case IR_VREGTYPE_OFS
 		op2 = *symbGetMangledName( v2->sym ) + _
@@ -6589,12 +6599,7 @@ private sub hStoreLoadSource _
 		end if
 
 	case IR_VREGTYPE_PTR
-		if( v2->vidx <> NULL ) then
-			op2 = str( v2->ofs ) + _
-			      "[" + *regstrq( reg_findreal( v2->vidx->reg ) ) + "]"
-		else
-			op2 = "[" + str( v2->ofs ) + "]"
-		end if
+		op2 = hPointerOperand(v2)
 
 	case IR_VREGTYPE_OFS
 		op2 = *symbGetMangledName( v2->sym ) + _
@@ -7186,8 +7191,10 @@ private sub hCallLoadArgument _
 		end if
 
 	case IR_VREGTYPE_PTR
-		real_reg = reg_findreal( vreg->vidx->reg )
-		operand = str( vreg->ofs ) + "[" + *regstrq( real_reg ) + "]"
+		if( vreg->vidx <> NULL ) then
+			real_reg = reg_findreal( vreg->vidx->reg )
+		end if
+		operand = hPointerOperand(vreg)
 
 	case IR_VREGTYPE_OFS
 		operand = *symbGetMangledName( vreg->sym ) + _
@@ -8047,8 +8054,53 @@ private sub _emitbranch( byval op as integer, byval label as FBSYMBOL ptr )
 end sub
 private sub _emitreturn( byval bytestopop as integer )
 	asm_info("return for gosub="+str(bytestopop))
-	asm_code("add rsp, 88 # restore stack for gosub",KNOFREE)
+	asm_code("add rsp, " + str(GAS64_GOSUB_FRAME_BYTES) + " # restore stack for gosub",KNOFREE)
 	asm_code("ret",KNOALL)
+end sub
+
+'' GAS64 does not use AST stack nodes for SWAP or argument marshalling.
+'' Its two users are computed GOSUB's saved address and RETURN label's
+'' immediate discard. Reject other operands instead of calling a NULL vtable
+'' entry or silently emitting an instruction with the wrong operand width.
+private sub _emitstack( byval op as integer, byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
+	if( (v1 = NULL) or (v2 <> NULL) ) then
+		errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+		exit sub
+	end if
+	select case op
+	case AST_OP_PUSH
+		if( typeGetSize(v1->dtype) <> GAS64_QWORD_BYTES ) then
+			errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+			exit sub
+		end if
+		select case v1->typ
+		case IR_VREGTYPE_REG
+			asm_code("push " + *regstrq(reg_findreal(v1->reg)))
+		case IR_VREGTYPE_OFS
+			if( v1->sym = NULL ) then
+				errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+				exit sub
+			end if
+			'' Optimization can retain a label as an address-valued offset.
+			'' PUSH imm32 cannot represent every 64-bit/PIC address, so form
+			'' it relative to RIP in an allocator-owned scratch register first.
+			dim as integer addressreg = reg_findtemp()
+			asm_code("lea " + *regstrq(addressreg) + ", [rip+" + _
+				*symbGetMangledName(v1->sym) + "+" + str(v1->ofs) + "]")
+			asm_code("push " + *regstrq(addressreg))
+		case else
+			errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+		end select
+	case AST_OP_POP
+		if( (v1->typ <> IR_VREGTYPE_IMM) or (v1->value.i <> GAS64_QWORD_BYTES) ) then
+			errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+			exit sub
+		end if
+		'' Unlike RET, an explicit target discards the saved address itself.
+		asm_code("add rsp, " + str(GAS64_GOSUB_FRAME_BYTES + GAS64_QWORD_BYTES), KNOFREE)
+	case else
+		errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+	end select
 end sub
 private sub _emitjmptb _
 	( _
@@ -9046,7 +9098,7 @@ NULL, _ /'_procGetFrameRegName '/
 @_emitSpillRegs, _
 @_emitLoad, _
 @_emitLoadRes, _
-NULL, _ /' _emitStack '/
+@_emitStack, _
 @_emitAddr, _
 @_emitCall, _
 @_emitCallPtr, _

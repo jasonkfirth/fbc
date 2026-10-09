@@ -36,12 +36,19 @@
 ''     - C backend will use setjmp/longjmp
 '' However, setjmp/longjmp implementation will also work with the GAS backend,
 '' but since it is like 1000 times slower than CALL/RET, it isn't.  To explicitly
-'' select setjmp/longjmp implementation with ASM backend, use "-z gosub-with-setjmp"
+'' select setjmp/longjmp implementation with ASM backend, use "-z gosub-setjmp"
 '' on the command line (jeffm)
 ''
 #define AsmBackend() _
 	( ( (env.clopt.backend = FB_BACKEND_GAS) or (env.clopt.backend = FB_BACKEND_GAS64) )and _
 	  (env.clopt.gosubsetjmp = FALSE) )
+
+'' Both direct and computed dispatches enter the same native landing pad.
+'' Keeping this selection here also respects -z gosub-setjmp, which
+'' must not acquire the assembly backend's extra stack frame at its labels.
+sub astGosubMarkTarget( byval label as FBSYMBOL ptr )
+	if( (label <> NULL) and AsmBackend() ) then label->lbl.gosub = TRUE
+end sub
 
 sub astGosubAddInit( byval proc as FBSYMBOL ptr )
 	dim as FBARRAYDIM dTB(0) = any
@@ -99,8 +106,7 @@ sub astGosubAddJmp _
 		astAdd( astBuildVarInc( symbGetProcGosubSym( proc ), 1 ) )
 
 		astAdd( astNewBRANCH( AST_OP_CALL, l ) )
-		''for gas64
-		l->lbl.gosub = true
+		astGosubMarkTarget( l )
 	else
 
 		'' build the call to setjmp()

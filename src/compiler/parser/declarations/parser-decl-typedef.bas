@@ -26,6 +26,9 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 
+declare sub fbSemanticModelDeclarationRepeat(byval sym as FBSYMBOL ptr, byref kind as const string, _
+	byval repeated as integer, byref source as LEX_LOCATION)
+
 declare sub fbSemanticModelExportBinding _
 	( _
 		byval sym as FBSYMBOL ptr, _
@@ -237,6 +240,7 @@ private sub hAddTypedef _
 		typedef->attrib or= (attrib and FB_SYMBATTRIB_VIS_PROTECTED)
 		if( has_site ) then
 			fbSemanticModelExportBinding(typedef, semantic_site, TRUE)
+			fbSemanticModelDeclarationRepeat(typedef, "typedef", FALSE, semantic_site)
 		end if
 	else
 		'' check if the dup definition is different
@@ -261,6 +265,8 @@ private sub hAddTypedef _
 			errReport( FB_ERRMSG_DUPDEFINITION, TRUE )
 		elseif( has_site ) then
 			fbSemanticModelExportBinding(sym, semantic_site, TRUE)
+			fbSemanticModelDeclarationRepeat(sym, "typedef", _
+				(sym->lgt = lgt) and (symbGetIsFixLenStr(sym) = is_fixlenstr), semantic_site)
 		end if
 	end if
 end sub

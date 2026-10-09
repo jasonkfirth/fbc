@@ -424,8 +424,15 @@ private function hOvlProcArgList _
 		return astBuildFakeCall( proc )
 	end if
 
+	'' Save this selected callee occurrence before argument parsing emits
+	'' more bindings. Overload selection has already chosen the procedure.
+	dim as longint semantic_binding = 0
 	if( semantic_site <> NULL ) then
+		dim as longint previous_binding = fbSemanticModelBindingCount( )
 		fbSemanticModelExportBinding(proc, *semantic_site, FALSE)
+		if( fbSemanticModelBindingCount( ) > previous_binding ) then
+			semantic_binding = fbSemanticModelBindingCount( )
+		end if
 	end if
 
 	'' method?
@@ -462,6 +469,10 @@ private function hOvlProcArgList _
 	end if
 
 	procexpr = astNewCALL( proc, procexpr )
+	if( procexpr <> NULL ) then
+		procexpr->semantic_binding = semantic_binding
+		fbSemanticModelSetAccess(procexpr, "callee")
+	end if
 
 	'' add to tree
 	param = symbGetProcHeadParam( proc )
@@ -547,8 +558,15 @@ function cProcArgList _
 		return astBuildFakeCall( proc )
 	end if
 
+	'' Save this selected callee occurrence before argument parsing emits
+	'' more bindings. Overload selection has already chosen the procedure.
+	dim as longint semantic_binding = 0
 	if( semantic_site <> NULL ) then
+		dim as longint previous_binding = fbSemanticModelBindingCount( )
 		fbSemanticModelExportBinding(proc, *semantic_site, FALSE)
+		if( fbSemanticModelBindingCount( ) > previous_binding ) then
+			semantic_binding = fbSemanticModelBindingCount( )
+		end if
 	end if
 
 	'' method?
@@ -586,6 +604,10 @@ function cProcArgList _
 	end if
 
 	procexpr = astNewCALL( proc, ptrexpr )
+	if( procexpr <> NULL ) then
+		procexpr->semantic_binding = semantic_binding
+		fbSemanticModelSetAccess(procexpr, "callee")
+	end if
 
 	params = symbGetProcParams( proc )
 

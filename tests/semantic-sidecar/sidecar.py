@@ -7,11 +7,16 @@ This file intentionally does NOT contain: compiler invocation or inferred semant
 
 from __future__ import annotations
 
+import codecs
 from collections import Counter, defaultdict
+from collections.abc import Iterable
+from dataclasses import dataclass, fields
 import hashlib
 from pathlib import Path
 import re
+import stat
 from semantic_flow import validate_flow, validate_sequence_branches
+from semantic_array_storage import validate_array_storage_inputs
 from semantic_literals import validate_wide_literals
 from semantic_queries import validate_query_inputs
 from semantic_selects import validate_select_inputs
@@ -19,9 +24,79 @@ from semantic_declarations import validate_declaration_types
 from semantic_procedures import validate_procedure_types
 from semantic_aggregate_access import validate_aggregate_access
 from semantic_string_declarations import validate_string_declarations
+from semantic_repetitions import validate_declaration_repetitions
+from aggregate_fields import validate_aggregate_fields
+from semantic_callbacks import validate_procedure_callbacks
+from semantic_enums import validate_enum_declarations
+from semantic_iif import validate_iif_inputs
+from semantic_if import validate_if_conditions
+from semantic_if_arms import PREFIXES as IF_ARM_PREFIXES, validate_if_arms
+from semantic_assignment_inputs import PREFIXES as ASSIGNMENT_INPUT_PREFIXES, validate_assignment_inputs
+from semantic_assignment_storage import PREFIXES as ASSIGNMENT_STORAGE_PREFIXES, validate_assignment_storage
 
 
 SCHEMA = "27"
+
+
+@dataclass(frozen=True)
+class ReaderLimits:
+    """Resource limits for untrusted semantic-model and source input."""
+
+    max_sidecar_bytes: int = 512 * 1024 * 1024
+    max_record_bytes: int = 64 * 1024 * 1024
+    max_records: int = 24_000_000
+    max_source_bytes: int = 512 * 1024 * 1024
+    max_cached_source_bytes: int = 512 * 1024 * 1024
+    max_edits: int = 100_000
+    max_planned_output_bytes: int = 512 * 1024 * 1024
+
+    def __post_init__(self) -> None:
+        for item in fields(self):
+            value = getattr(self, item.name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError("Reader limit must be a positive integer: " + item.name)
+
+
+@dataclass(frozen=True)
+class SourceEdit:
+    """One exact replacement requested against a mapped LOC attachment."""
+
+    domain: str
+    identity: int
+    role: str
+    replacement: bytes
+
+
+@dataclass(frozen=True)
+class PlannedSource:
+    """Fresh source bytes and their non-writing replacement result."""
+
+    path: Path
+    expected_sha256: str
+    updated_sha256: str
+    original: bytes
+    updated: bytes
+
+
+SOURCE_CODECS = {
+    "unmarked-bytes": ("utf-8", 0),
+    "utf-8-bom": ("utf-8", 3),
+    "utf-16le": ("utf-16-le", 2),
+    "utf-16be": ("utf-16-be", 2),
+    "utf-32le": ("utf-32-le", 4),
+    "utf-32be": ("utf-32-be", 4),
+}
+SOURCE_BOMS = {
+    "utf-8-bom": codecs.BOM_UTF8,
+    "utf-16le": codecs.BOM_UTF16_LE,
+    "utf-16be": codecs.BOM_UTF16_BE,
+    "utf-32le": codecs.BOM_UTF32_LE,
+    "utf-32be": codecs.BOM_UTF32_BE,
+}
+# The producer's physical-line index uses the same byte limit.
+MAX_COORDINATE_LINE_BYTES = 16 * 1024 * 1024
+
+
 SHAPES = {
     "FBCSEM": 3, "M": 2, "D": 2, "S": 12, "B": 9, "I": 12,
     "P": 9, "V": 5, "N": 13, "E": 16, "R": 3, "END": 13,
@@ -144,6 +219,15 @@ def number(value: str, minimum: int | None = None) -> int:
     return result
 
 
+def complete_ordinals(values: list[int], count: int, *, ordered: bool = False) -> bool:
+    """Check actual records without allocating from an untrusted wire count."""
+    if len(values) != count:
+        return False
+    if not ordered:
+        values = sorted(values)
+    return all(value == ordinal for ordinal, value in enumerate(values))
+
+
 def source_range(row: list[str], offset: int) -> tuple[str, int, int, int, int]:
     path = row[offset]
     start_line = number(row[offset + 1], 1)
@@ -172,9 +256,15 @@ def preprocessing_location(row: list[str], offset: int) -> tuple[str, int, int, 
 class Model:
     def __init__(self, text: str, *, expressions_only: bool = False,
                  bindings_only: bool = False,
-                 allow_recovery: bool = False) -> None:
+                 allow_recovery: bool = False,
+                 limits: ReaderLimits | None = None) -> None:
         if expressions_only and bindings_only:
             raise ValueError("Sidecar cannot be both expressions-only and bindings-only")
+        self.limits = limits or ReaderLimits()
+        if not text.isascii():
+            raise ValueError("Semantic sidecar wire data is not ASCII")
+        if len(text) > self.limits.max_sidecar_bytes:
+            raise ValueError("Semantic sidecar exceeds the configured byte limit")
         self.expressions_only = expressions_only
         self.bindings_only = bindings_only
         self.rows: list[list[str]] = []
@@ -225,6 +315,7 @@ class Model:
         conditional_endings: set[int] = set()
         conditional_probe_ids: set[int] = set()
         conditional_skip_ids: set[int] = set()
+        include_ids: set[int] = set()
         self.contexts: list[list[str] | None] = []
         self.primitives: list[dict[int, list[str]]] = []
         if not text.endswith("\n"):
@@ -254,7 +345,23 @@ class Model:
             if value not in ("0", "1"):
                 raise ValueError("Invalid boolean: " + value)
 
-        for line_number, line in enumerate(text.splitlines(), 1):
+        cursor = 0
+        line_number = 0
+        while cursor < len(text):
+            newline = text.find("\n", cursor)
+            if newline < 0:
+                raise ValueError("Sidecar is truncated")
+            line_number += 1
+            if line_number > self.limits.max_records:
+                raise ValueError("Semantic sidecar exceeds the configured record limit")
+            if newline - cursor + 1 > self.limits.max_record_bytes:
+                raise ValueError("Semantic sidecar record exceeds the configured byte limit")
+            line = text[cursor:newline]
+            cursor = newline + 1
+            if line.endswith("\r"):
+                line = line[:-1]
+            if "\r" in line:
+                raise ValueError(f"Line {line_number}: stray carriage return")
             raw = line.split("\t")
             tag = raw[0]
             if footer is not None:
@@ -437,7 +544,7 @@ class Model:
                 self.access_roles[identity] = row[2]
             elif tag == "SOP":
                 identity = number(row[1], 1)
-                if identity not in self.statements or row[2] not in ("file-open", "file-close", "file-seek", "file-get", "file-put", "file-lock", "file-unlock", "file-rename", "line-input"):
+                if identity not in self.statements or row[2] not in ("file-open", "file-close", "file-seek", "file-get", "file-put", "file-lock", "file-unlock", "file-rename", "line-input", "goto", "gosub", "gosub-return", "gosub-return-label", "procedure-return", "on-goto", "on-gosub", "on-error-set", "on-error-clear"):
                     raise ValueError("Invalid source statement operation")
                 self.statement_operations[identity].append(row[2])
             elif tag == "G":
@@ -461,8 +568,6 @@ class Model:
                 self.layouts[int(row[1])] = row
             elif tag in ("C", "K", "H"):
                 domains = ("symbol", "node", "expression")
-                if tag == "K" and row[3] == "procedure-written-visibility":
-                    domains += ("statement",)
                 if row[1] not in domains:
                     raise ValueError("Invalid metadata identity domain")
                 reference(row[1], row[2], nullable=False)
@@ -504,7 +609,10 @@ class Model:
                     if row[3] == "field-array-rank":
                         if row[1] != "symbol" or not -1 <= number(row[4]) <= 8:
                             raise ValueError("Invalid field array rank")
-                    if row[3] in ("assignment-target-dtype", "assignment-kind", "unevaluated-query-input") or row[3].startswith(("size-query-", "numeric-selected-", "numeric-literal-", "file-transfer-", "string-intrinsic-", "string-initializer-", "array-subscript-", "array-bound-")):
+                    if row[3].startswith("array-storage-") and row[3] in self.properties[key]:
+                        raise ValueError("Repeated array storage property")
+                    if row[3] in ("constant-symbol", "constant-atom-kind", "bound-value-symbol", "assignment-target-dtype", "assignment-kind", "source-assignment-symbol",
+                                   "source-assignment-kind", "unevaluated-query-input") or row[3].startswith(("size-query-", "numeric-selected-", "numeric-literal-", "file-transfer-", "string-intrinsic-", "string-initializer-", "array-subscript-", "array-bound-", "array-initializer-", "array-storage-")):
                         if row[1] != "expression":
                             raise ValueError("Invalid expression receipt domain")
                         previous = self.properties[key].get(row[3])
@@ -515,8 +623,8 @@ class Model:
                         if old_module is not None and old_module != counts["M"]:
                             raise ValueError("Expression receipt changes module")
                         expression_property_modules[receipt_key] = counts["M"]
-                    if row[3] == "call-argument-expression" or row[3].startswith(("pointer-address-", "pointer-dereference-", "pointer-index-", "memory-new-", "memory-release-", "procedure-prototype-statement-", "for-step-", "for-start-expression:", "for-limit-expression:", "loop-condition-")):
-                        expected_domain = "node" if row[3] == "call-argument-expression" else "symbol" if row[3].startswith(("memory-new-", "procedure-prototype-statement-", "for-step-", "for-start-expression:", "for-limit-expression:", "loop-condition-")) else "expression"
+                    if row[3] in ("call-argument-expression", "formal-default-expression") or row[3].startswith(("pointer-address-", "pointer-dereference-", "pointer-index-", "memory-new-", "memory-release-", "procedure-prototype-statement-", "for-step-", "for-start-expression:", "for-limit-expression:", "loop-condition-")):
+                        expected_domain = "node" if row[3] == "call-argument-expression" else "symbol" if row[3] == "formal-default-expression" or row[3].startswith(("memory-new-", "procedure-prototype-statement-", "for-step-", "for-start-expression:", "for-limit-expression:", "loop-condition-")) else "expression"
                         if row[1] != expected_domain:
                             raise ValueError("Invalid storage receipt domain")
                         previous = self.properties[key].get(row[3])
@@ -539,6 +647,26 @@ class Model:
                         if row[1] != "symbol" or row[3] in self.properties[key]:
                             raise ValueError("Duplicate or foreign SELECT input property")
                         storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
+                    if row[3] in ("enum-declaration-input", "enum-element-input"):
+                        if row[1] != "symbol" or row[3] in self.properties[key]:
+                            raise ValueError("Duplicate or foreign enum input property")
+                        storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
+                    if row[3].startswith("if-condition-"):
+                        if row[1] != "symbol" or row[3] in self.properties[key]:
+                            raise ValueError("Duplicate or foreign IF condition property")
+                        storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
+                    if row[3].startswith(IF_ARM_PREFIXES):
+                        if row[1] != "symbol" or row[3] in self.properties[key]:
+                            raise ValueError("Duplicate or foreign IF arm property")
+                        storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
+                    if row[3].startswith(ASSIGNMENT_INPUT_PREFIXES + ASSIGNMENT_STORAGE_PREFIXES):
+                        if row[1] != "symbol" or row[3] in self.properties[key]:
+                            raise ValueError("Duplicate or foreign assignment input property")
+                        storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
+                    if row[3] == "original-iif-inputs":
+                        if row[1] != "expression" or row[3] in self.properties[key]:
+                            raise ValueError("Duplicate or foreign original IIf input property")
+                        storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
                     if row[1] == "statement":
                         storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
                     self.properties[key][row[3]] = row[4]
@@ -547,7 +675,13 @@ class Model:
                         raise ValueError("Invalid relationship target or kind")
                     reference(row[3], row[4], nullable=False)
                     number(row[6], 0)
-                    if row[5] in ("loop-condition", "array-subscript", "array-bound-query"):
+                    if row[5] == "assignment-count" or row[5].startswith(("assignment-input:",) + ASSIGNMENT_STORAGE_PREFIXES):
+                        storage_property_modules[row[1], int(row[2]), "marker:" + row[5] + ":" + row[6]] = counts["M"]
+                    if row[5] in ("loop-condition", "if-condition", "array-subscript", "array-bound-query",
+                                  "pointer-dereference-input", "pointer-index-input", "array-storage-root",
+                                  "array-storage-selection", "array-storage-input"):
+                        construct_observation_modules.append((row, counts["M"]))
+                    if row[5] in ("if-construct", "if-end", "if-arm-statement") or row[5].startswith(("if-arm:", "if-arm-end:", "if-arm-transfer:")):
                         construct_observation_modules.append((row, counts["M"]))
                     if row[5] == "size-query-source":
                         if row[1] != "expression" or row[3] != "expression" or row[6] != "0":
@@ -707,7 +841,10 @@ class Model:
                     raise ValueError("Unknown source revision verification state")
                 self.source_endings[identity] = row[2]
             elif tag == "INC":
-                number(row[1], 1)
+                identity = number(row[1], 1)
+                if identity in include_ids:
+                    raise ValueError("Duplicate include occurrence identity")
+                include_ids.add(identity)
                 parent = number(row[2], 1)
                 if parent not in self.source_contexts or not row[3]:
                     raise ValueError("Include outcome lacks parent/request")
@@ -769,21 +906,33 @@ class Model:
                     if identity not in self.source_contexts:
                         raise ValueError("Physical include context location is dangling")
                 elif row[1] == "include":
-                    if not any(int(item[1]) == identity for item in self.records["INC"]):
+                    if identity not in include_ids:
                         raise ValueError("Physical include occurrence location is dangling")
                 elif row[1] == "remap":
                     if identity not in remap_ids:
                         raise ValueError("Physical remap location is dangling")
                 elif row[1] == "statement":
-                    if identity not in self.statement_endings:
-                        raise ValueError("Physical statement range has no observed end")
-                    if sourceid != int(self.statements[identity][5]):
-                        raise ValueError("Physical statement range belongs to another source occurrence")
+                    if row[3].startswith(("assignment-operator:", "assignment-destination:")):
+                        if identity not in self.statements or not statement_stack or statement_stack[-1] != identity:
+                            raise ValueError("Assignment operator has no active statement")
+                        if int(self.source_contexts[sourceid][4]) != counts["M"]:
+                            raise ValueError("Assignment operator belongs to another module")
+                    else:
+                        if identity not in self.statement_endings:
+                            raise ValueError("Physical statement range has no observed end")
+                        if sourceid != int(self.statements[identity][5]):
+                            raise ValueError("Physical statement range belongs to another source occurrence")
                 elif row[1] == "construct":
-                    if identity not in self.construct_endings:
-                        raise ValueError("Physical construct range has no observed end")
-                    if sourceid != int(self.constructs[identity][6]):
-                        raise ValueError("Physical construct range belongs to another source occurrence")
+                    if row[3].startswith("if-arm:"):
+                        if identity not in self.constructs or not construct_stack or construct_stack[-1] != identity:
+                            raise ValueError("IF arm opening token has no active construct")
+                        if int(self.source_contexts[sourceid][4]) != counts["M"]:
+                            raise ValueError("IF arm opening token belongs to another module")
+                    else:
+                        if identity not in self.construct_endings:
+                            raise ValueError("Physical construct range has no observed end")
+                        if sourceid != int(self.constructs[identity][6]):
+                            raise ValueError("Physical construct range belongs to another source occurrence")
                 else:
                     raise ValueError("Unknown physical location domain")
                 key = row[1], identity, row[3]
@@ -1196,12 +1345,14 @@ class Model:
             raise ValueError("Symbol identity sequence has gaps")
         if set(self.nodes) != set(range(1, counts["N"] + 1)):
             raise ValueError("Node identity sequence has gaps")
+        self.validate_source_ownership(subject_modules)
         for identity in self.nodes:
             if "kind" not in self.properties["node", identity]:
                 raise ValueError("AST node lacks its stable kind")
         self.validate_nodes()
         if not expressions_only and not bindings_only:
-            validate_flow(self, number)
+            storage_roots = validate_array_storage_inputs(self, number, subject_modules)
+            validate_flow(self, number, storage_roots)
             self.validate_procedure_exits(subject_modules)
             validate_sequence_branches(self, number, subject_modules)
             self.validate_metadata()
@@ -1210,6 +1361,9 @@ class Model:
                 if subject_modules.get(("expression", identity)) != module:
                     raise ValueError("Expression receipt belongs to another module")
             self.validate_numeric_assignments(subject_modules)
+            self.validate_source_assignments(subject_modules)
+            self.validate_formal_defaults(subject_modules)
+            self.validate_call_atoms(subject_modules)
             self.validate_numeric_selections(subject_modules)
             self.validate_numeric_literals(subject_modules)
             self.validate_size_queries(subject_modules)
@@ -1223,6 +1377,15 @@ class Model:
             validate_procedure_types(self, number, subject_modules)
             validate_aggregate_access(self, number, subject_modules)
             validate_string_declarations(self, number, subject_modules)
+            validate_declaration_repetitions(self, number, subject_modules)
+            validate_enum_declarations(self, number, subject_modules)
+            validate_iif_inputs(self, number, subject_modules)
+            validate_if_conditions(self, number, subject_modules)
+            validate_if_arms(self, number, subject_modules)
+            validate_assignment_inputs(self, number, subject_modules)
+            validate_assignment_storage(self, number, subject_modules, len(NODE_KINDS))
+            validate_procedure_callbacks(self, number, subject_modules)
+            validate_aggregate_fields(self, number, subject_modules)
             validate_wide_literals(self, number, subject_modules)
             self.validate_for_steps(subject_modules)
             self.validate_for_inputs(subject_modules)
@@ -1231,6 +1394,7 @@ class Model:
             self.validate_string_initializers(subject_modules)
             self.validate_loop_conditions(subject_modules)
             self.validate_array_subscripts(subject_modules, array_record_modules)
+            self.validate_array_initializer_inputs(subject_modules, array_record_modules)
             self.validate_array_bounds(subject_modules, array_record_modules)
             for row, module in construct_observation_modules:
                 if subject_modules.get((row[1], int(row[2]))) != module or subject_modules.get((row[3], int(row[4]))) != module:
@@ -1243,6 +1407,46 @@ class Model:
                     raise ValueError("Missing, cyclic or foreign size query source")
                 if "size-query-kind" not in self.properties["expression", query]:
                     raise ValueError("Size query source lacks its original input receipt")
+
+    def validate_source_ownership(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """A byte location must describe the same occurrence as its source fact.
+
+        Repeated includes can have identical bytes and coordinates. Revision
+        checks alone therefore cannot detect a location attached to the wrong
+        include or module. Logical remaps affect names and lines, not ORIG.
+        """
+        declarations = {int(row[1]): row for row in self.records["DCL"]}
+        for subject, sourceid in self.origins.items():
+            if subject_modules[subject] != int(self.source_contexts[sourceid][4]):
+                raise ValueError("Source origin belongs to another module")
+            statement = self.statement_owners.get(subject)
+            if subject[0] != "node" and statement is not None:
+                if sourceid != int(self.statements[statement][5]):
+                    raise ValueError("Source origin differs from its statement occurrence")
+        for row in self.records["LOC"]:
+            domain, identity, sourceid = row[1], int(row[2]), int(row[4])
+            if domain not in ("binding", "declaration", "expression"):
+                continue
+            if self.origins.get((domain, identity)) != sourceid:
+                raise ValueError("Physical location differs from its source origin")
+            if domain == "binding":
+                fact, flag_column, range_column = self.records["B"][identity - 1], 3, 4
+            elif domain == "expression":
+                fact, flag_column, range_column = self.records["E"][identity - 1], 2, 3
+            else:
+                fact, flag_column, range_column = declarations[identity], 5, 6
+            if row[3] == "range" and fact[flag_column] == "1":
+                fileid = int(self.source_contexts[sourceid][3])
+                written = [int(value) for value in fact[range_column + 1:range_column + 5]]
+                observed = [int(value) for value in row[5:9]]
+                # Procedure declarations can describe a whole header while
+                # their LOC preserves only the observed opening token.
+                matches = written == observed
+                if domain == "declaration":
+                    matches = (tuple(written[:2]) <= tuple(observed[:2])
+                               and tuple(observed[2:]) <= tuple(written[2:]))
+                if fact[range_column] != self.files[fileid][2] or not matches:
+                    raise ValueError("Physical location differs from its written source range")
 
     def validate_procedure_exits(self, subject_modules: dict[tuple[str, int], int]) -> None:
         """Routine labels are selected compiler identities, including cleanup."""
@@ -1322,6 +1526,33 @@ class Model:
             value = expressions.get(selected)
             if value is None or int(value[12]) & 511 != 8 or value[14] != "0":
                 raise ValueError("Array bound query lacks its converted integer dimension")
+
+    def validate_array_initializer_inputs(self, subject_modules: dict[tuple[str, int], int], array_modules: dict[int, int]) -> None:
+        """Original elements retain their source array before TYPEINI consumes them."""
+        required = {"array-initializer-symbol", "array-initializer-dimension", "array-initializer-kind"}
+        ranks = {int(row[1]): int(row[2]) for row in self.records["A"]}
+        for (domain, identity), properties in self.properties.items():
+            observed = {key for key in properties if key.startswith("array-initializer-")}
+            if not observed:
+                continue
+            if domain != "expression" or observed != required:
+                raise ValueError("Incomplete or unknown array initializer input group")
+            module = subject_modules.get((domain, identity))
+            symbol = number(properties["array-initializer-symbol"], 1)
+            dimension = number(properties["array-initializer-dimension"], 1)
+            target = self.symbols.get(symbol)
+            target_type = self.types.get(symbol)
+            if (target is None or target_type is None or int(target[3]) not in (1, 12)
+                    or target_type[18] != "source" or subject_modules.get(("symbol", symbol)) != module
+                    or array_modules.get(symbol) != module or not 1 <= dimension <= 8
+                    or dimension != ranks.get(symbol)):
+                raise ValueError("Array initializer input selects another array or dimension")
+            if (self.capabilities[module].get("original-array-initializer-inputs") != "available"
+                    or properties["array-initializer-kind"] not in ("assignment", "constructor")):
+                raise ValueError("Array initializer input capability or kind is unavailable")
+            statement = self.statement_owners.get((domain, identity))
+            if statement is None or self.statement_endings[statement][3] != "parsed":
+                raise ValueError("Array initializer input lacks accepted statement ownership")
 
     def validate_array_subscripts(self, subject_modules: dict[tuple[str, int], int], array_modules: dict[int, int]) -> None:
         """Resolved arrays retain each original input before offset arithmetic."""
@@ -1817,6 +2048,143 @@ class Model:
             if target & 31 not in (1, 2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16):
                 raise ValueError("Assignment destination is not a primitive numeric scalar")
 
+    def validate_source_assignments(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """Named source destinations must be complete compiler-owned pairs."""
+        parameter_variable_attributes = 0x4000 | 0x8000 | 0x10000
+        parameter_variables = {int(row[7]) for parameters in self.parameters.values()
+                               for row in parameters.values() if int(row[7]) > 0}
+        required = {"source-assignment-symbol", "source-assignment-kind"}
+        for (domain, identity), properties in self.properties.items():
+            observed = required & properties.keys()
+            if not observed:
+                continue
+            if domain != "expression" or observed != required:
+                raise ValueError("Incomplete source assignment destination")
+            module = subject_modules[domain, identity]
+            target_id = number(properties["source-assignment-symbol"], 1)
+            target = self.symbols.get(target_id)
+            target_type = self.types.get(target_id)
+            if (self.capabilities[module].get("source-assignment-targets") != "available"
+                    or properties["source-assignment-kind"] not in ("assignment", "initializer")
+                    or target is None or target_type is None
+                    or int(target[3]) not in (1, 2, 4, 12)
+                    or subject_modules.get(("symbol", target_id)) != module):
+                raise ValueError("Invalid source assignment destination")
+            if target_type[18] != "source":
+                if (int(target[3]) != 1 or not int(target[7]) & parameter_variable_attributes
+                        or target_id not in parameter_variables):
+                    raise ValueError("Generated assignment destination lacks a source formal")
+
+    def validate_call_atoms(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """Keep original bound identities separate from folded expression values."""
+        expressions = {int(row[1]): row for row in self.records["E"]}
+        for (domain, identity), properties in self.properties.items():
+            observed = {"constant-symbol", "constant-atom-kind", "bound-value-symbol"} & properties.keys()
+            if not observed:
+                continue
+            expression = expressions.get(identity)
+            module = subject_modules.get((domain, identity))
+            if domain != "expression" or expression is None or module is None:
+                raise ValueError("Invalid original call atom domain")
+            if "bound-value-symbol" in observed:
+                symbol_id = number(properties["bound-value-symbol"], 1)
+                symbol = self.symbols.get(symbol_id)
+                if (symbol is None or int(symbol[3]) not in (1, 12)
+                        or int(expression[8]) not in (17, 19, 20)
+                        or subject_modules.get(("symbol", symbol_id)) != module
+                        or self.capabilities[module].get("bound-expression-symbols") != "available"):
+                    raise ValueError("Invalid original bound value symbol")
+            constant_keys = {"constant-symbol", "constant-atom-kind"} & observed
+            if not constant_keys:
+                continue
+            if constant_keys != {"constant-symbol", "constant-atom-kind"}:
+                raise ValueError("Incomplete original constant atom")
+            symbol_id = number(properties["constant-symbol"], 1)
+            symbol = self.symbols.get(symbol_id)
+            kind = properties["constant-atom-kind"]
+            if (symbol is None or int(symbol[3]) != 2 or int(expression[8]) not in (16, 17)
+                    or kind not in ("named-constant", "boolean-literal")
+                    or subject_modules.get(("symbol", symbol_id)) != module
+                    or self.capabilities[module].get("parsed-constant-symbols") != "available"):
+                raise ValueError("Invalid original constant atom")
+            boolean_literal = int(symbol[4]) == 1 and bool(int(symbol[7]) & 0x800)
+            if (kind == "boolean-literal") != boolean_literal:
+                raise ValueError("Constant atom kind disagrees with selected symbol")
+            if boolean_literal and (expression[8] != "16" or expression[12] != "1"):
+                raise ValueError("Boolean literal lacks its original Boolean input")
+        static_targets: dict[int, str] = {}
+        for row in self.records["H"]:
+            if row[1] == "node" and row[3] == "symbol" and row[5] == "static-target":
+                node_id = int(row[2])
+                if node_id in static_targets:
+                    raise ValueError("Repeated static call target")
+                static_targets[node_id] = row[4]
+        for row in self.records["H"]:
+            if row[1] != "node" or row[3] != "binding" or row[5] != "source-binding":
+                continue
+            node_id = int(row[2])
+            node = self.nodes[node_id]
+            if node[4] != "9" or self.properties["node", node_id].get("call-kind") not in ("direct", "virtual"):
+                continue
+            binding_id = number(row[4], 1)
+            binding = self.records["B"][binding_id - 1]
+            target_id = static_targets.get(node_id) if self.properties["node", node_id]["call-kind"] == "virtual" else node[9]
+            if (binding[2] != "reference" or binding[1] != target_id
+                    or subject_modules.get(("binding", binding_id)) != subject_modules["node", node_id]):
+                raise ValueError("Source call binding disagrees with selected procedure")
+
+    def validate_formal_defaults(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """Original optional expressions belong to source formal parameters."""
+        parameter_rows = {int(row[2]): row for parameters in self.parameters.values()
+                          for row in parameters.values()}
+        # Reused headers retain original defaults and typed source formals,
+        # while G describes the selected signature. Resolve only explicit
+        # replacement edges and reject cycles before following that contract.
+        canonical = {int(row[2]): int(row[4]) for row in self.relations("canonical-symbol")
+                     if row[1] == row[3] == "symbol"}
+        resolved: dict[int, int] = {}
+        for identity in canonical:
+            target = identity
+            visited: set[int] = set()
+            while target in canonical and target not in resolved:
+                if target in visited:
+                    raise ValueError("Cycle in canonical formal relationships")
+                visited.add(target)
+                target = canonical[target]
+            target = resolved.get(target, target)
+            for previous in visited:
+                resolved[previous] = target
+        default_nodes = {int(row[2]) for row in self.records["H"]
+                         if row[1] == "symbol" and row[3] == "node"
+                         and row[5] == "default-initializer" and row[6] == "0"}
+        observed: set[int] = set()
+        for (domain, identity), properties in self.properties.items():
+            value = properties.get("formal-default-expression")
+            if value is None:
+                continue
+            observed.add(identity)
+            module = subject_modules.get((domain, identity))
+            expression = number(value, 1)
+            parameter = self.symbols.get(identity)
+            selected = resolved.get(identity, identity)
+            parameter_row = parameter_rows.get(selected)
+            if (domain != "symbol" or parameter is None or int(parameter[3]) != 4
+                    or module is None
+                    or self.capabilities[module].get("formal-default-inputs") != "available"
+                    or subject_modules.get(("expression", expression)) != module
+                    or subject_modules.get(("symbol", selected)) != module
+                    or parameter_row is None or parameter_row[4] == "vararg"
+                    or resolved.get(int(parameter[11]), int(parameter[11])) != int(parameter_row[1])
+                    or parameter_row[5] != "1" or identity not in default_nodes):
+                raise ValueError("Invalid formal default input")
+        for identity in default_nodes:
+            module = subject_modules.get(("symbol", identity))
+            symbol_type = self.types.get(identity)
+            if (module is not None and symbol_type is not None and symbol_type[18] == "source"
+                    and self.capabilities[module].get("formal-default-inputs") == "available"
+                    and identity not in observed):
+                raise ValueError("Source formal default lacks its original input")
+
     def validate_size_queries(self, subject_modules: dict[tuple[str, int], int]) -> None:
         """Preserve the selected input independently of the folded size result."""
         required = {"size-query-kind", "size-query-dtype", "size-query-subtype",
@@ -1953,6 +2321,42 @@ class Model:
                     if temporary_type & 31 != dtype & 31 or temporary_type & 0x1E0 != (dtype & 0x1E0) + 0x20 or int(symbol[5]) != subtype:
                         raise ValueError("NEW temporary type contradicts its selected pointee")
 
+        self.validate_pointer_origins(subject_modules)
+
+    def validate_pointer_origins(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """Independent origins detect property groups lost during transport."""
+        observed: set[tuple[int, str]] = set()
+        for row in self.records["H"]:
+            if row[5] not in ("pointer-dereference-input", "pointer-index-input"):
+                continue
+            result, operand, detail = map(int, (row[2], row[4], row[6]))
+            module = subject_modules.get(("expression", result))
+            prefix = "pointer-dereference-" if row[5] == "pointer-dereference-input" else "pointer-index-"
+            key = "count" if prefix == "pointer-dereference-" else "index"
+            if (row[1] != "expression" or row[3] != "expression" or module is None
+                    or subject_modules.get(("expression", operand)) != module or operand >= result
+                    or self.capabilities[module].get("pointer-access-origins") != "available"
+                    or (result, prefix) in observed):
+                raise ValueError("Invalid original pointer access relation")
+            properties = self.properties["expression", result]
+            if properties.get(prefix + "operand") != row[4] or properties.get(prefix + key) != row[6]:
+                raise ValueError("Original pointer access differs from its property group")
+            statement = self.statement_owners.get(("expression", result))
+            if (statement is None or self.statement_endings[statement][3] != "parsed"
+                    or self.statement_owners.get(("expression", operand)) != statement):
+                raise ValueError("Original pointer access crosses statement ownership")
+            if key == "index" and (subject_modules.get(("expression", detail)) != module or detail >= result
+                                   or self.statement_owners.get(("expression", detail)) != statement):
+                raise ValueError("Original pointer index lacks its accepted input owner")
+            observed.add((result, prefix))
+        for (domain, identity), properties in self.properties.items():
+            module = subject_modules[domain, identity]
+            if self.capabilities[module].get("pointer-access-origins") != "available":
+                continue
+            for prefix in ("pointer-dereference-", "pointer-index-"):
+                if prefix + "operand" in properties and (identity, prefix) not in observed:
+                    raise ValueError("Pointer property group lacks its original access relation")
+
     def validate_formal_spans(self) -> None:
         declarations = {int(row[1]): row for row in self.records["DCL"]}
         physical_parameters: set[int] = set()
@@ -2009,7 +2413,7 @@ class Model:
             parameters = [row for row in self.macro_tokens[identity] if row[3] == "parameter"]
             body = [row for row in self.macro_tokens[identity] if row[3] != "parameter"]
             count = int(definition[7])
-            if [int(row[2]) for row in parameters] != list(range(count)):
+            if not complete_ordinals([int(row[2]) for row in parameters], count, ordered=True):
                 raise ValueError("Macro formal parameters are incomplete or out of order")
             if [int(row[2]) for row in body] != list(range(len(body))):
                 raise ValueError("Macro replacement tokens are out of order")
@@ -2029,7 +2433,8 @@ class Model:
             output = self.macro_units(result[3], result[5])
             if result[2] in ("not-invoked", "unsupported", "recursive") and (output or args or pieces or identity in self.macro_callbacks):
                 raise ValueError("Unexpanded macro advertises substitutions or output")
-            if result[2] in ("expanded", "failed", "recovered") and set(args) != set(range(argument_count)):
+            if (result[2] in ("expanded", "failed", "recovered")
+                    and not complete_ordinals(list(args), argument_count)):
                 raise ValueError("Macro argument mapping does not match its formals")
             if [int(row[2]) for row in pieces] != list(range(len(pieces))):
                 raise ValueError("Macro substitution sequence has gaps or duplicates")
@@ -2126,7 +2531,8 @@ class Model:
                 raise ValueError("Unknown argument passing mode")
             if kind == "assembly":
                 tokens = assembly.pop(identity, [])
-                if [number(row[2], 0) for row in tokens] != list(range(number(properties["assembly-token-count"], 0))):
+                if not complete_ordinals([number(row[2], 0) for row in tokens],
+                                         number(properties["assembly-token-count"], 0), ordered=True):
                     raise ValueError("Assembly token order/count is incomplete")
                 if properties["assembly-effects"] != "unknown-memory-registers-control":
                     raise ValueError("Assembly effects must retain uncertainty")
@@ -2144,7 +2550,8 @@ class Model:
         for identity in self.nodes:
             properties = self.properties["node", identity]
             if properties["kind"] == "call":
-                if sorted(auxiliary.get((identity, "copyback"), [])) != list(range(number(properties["copyback-count"], 0))):
+                if not complete_ordinals(auxiliary.get((identity, "copyback"), []),
+                                         number(properties["copyback-count"], 0)):
                     raise ValueError("Call copyback actions are incomplete")
                 for role in ("profile-begin", "profile-end"):
                     if auxiliary.get((identity, role), []) not in ([], [0]):
@@ -2219,7 +2626,7 @@ class Model:
                 raise ValueError("Signature belongs to a non-procedure symbol")
             parameters = self.parameters[identity]
             explicit = {ordinal: row for ordinal, row in parameters.items() if ordinal >= 0}
-            if set(explicit) != set(range(int(signature[4]))):
+            if not complete_ordinals(list(explicit), int(signature[4])):
                 raise ValueError("Signature parameter ordinals or arity are incomplete")
             if sum(int(row[5]) for row in explicit.values()) != int(signature[5]):
                 raise ValueError("Optional parameter count disagrees with its signature")
@@ -2245,8 +2652,78 @@ class Model:
                     raise ValueError("Dynamic string descriptor storage is incomplete")
 
     @classmethod
-    def read(cls, path: Path, **options: bool) -> Model:
-        return cls(path.read_text(encoding="utf-8"), **options)
+    def read(cls, path: Path, *, limits: ReaderLimits | None = None,
+             **options: bool) -> Model:
+        """Read a regular ASCII sidecar without crossing configured bounds."""
+        limits = limits or ReaderLimits()
+        path = Path(path)
+        try:
+            metadata = path.stat()
+            if not stat.S_ISREG(metadata.st_mode):
+                raise ValueError("Semantic sidecar is not a regular file")
+            if metadata.st_size > limits.max_sidecar_bytes:
+                raise ValueError("Semantic sidecar exceeds the configured byte limit")
+            with path.open("rb") as stream:
+                data = stream.read(limits.max_sidecar_bytes + 1)
+        except OSError as error:
+            raise ValueError("Semantic sidecar is unreadable: " + str(path)) from error
+        if len(data) > limits.max_sidecar_bytes:
+            raise ValueError("Semantic sidecar exceeds the configured byte limit")
+        if len(data) != metadata.st_size:
+            raise ValueError("Semantic sidecar changed while it was being read")
+        try:
+            text = data.decode("ascii")
+        except UnicodeDecodeError as error:
+            raise ValueError("Semantic sidecar wire data is not ASCII") from error
+        return cls(text, limits=limits, **options)
+
+    def verified_source_contents(self) -> dict[int, bytes]:
+        """Read each current source revision once and verify its captured digest.
+
+        The cache is deliberately scoped to this call. A later validation or
+        edit plan reopens the files, so stale bytes cannot survive between
+        consumer operations.
+        """
+        contents: dict[int, bytes] = {}
+        cache: dict[tuple[Path, int, str], bytes] = {}
+        cached_bytes = 0
+        for identity, row in self.files.items():
+            if row[6] != "regular":
+                raise ValueError("Stream source has no immutable file revision")
+            expected_size = int(row[3])
+            if expected_size > self.limits.max_source_bytes:
+                raise ValueError("Source revision exceeds the configured per-file byte limit: " + row[2])
+            path = Path(row[2])
+            try:
+                metadata = path.stat()
+                if not stat.S_ISREG(metadata.st_mode):
+                    raise ValueError("Source revision is not a regular file: " + row[2])
+                if metadata.st_size != expected_size:
+                    raise ValueError("Source revision is stale: " + row[2])
+                resolved = path.resolve(strict=True)
+            except (OSError, RuntimeError) as error:
+                raise ValueError("Source revision is stale or unreadable: " + row[2]) from error
+            key = resolved, expected_size, row[4]
+            data = cache.get(key)
+            if data is None:
+                if cached_bytes + expected_size > self.limits.max_cached_source_bytes:
+                    raise ValueError("Source revisions exceed the configured cache byte limit")
+                try:
+                    with resolved.open("rb") as stream:
+                        data = stream.read(expected_size + 1)
+                except OSError as error:
+                    raise ValueError("Source revision is stale or unreadable: " + row[2]) from error
+                if len(data) != expected_size or hashlib.sha256(data).hexdigest() != row[4]:
+                    raise ValueError("Source revision is stale: " + row[2])
+                cache[key] = data
+                cached_bytes += expected_size
+            marker = SOURCE_BOMS.get(row[5])
+            if marker is not None and not data.startswith(marker):
+                raise ValueError("Source revision disagrees with its advertised encoding: " + row[2])
+            if row[5] == "unmarked-bytes" and any(data.startswith(item) for item in SOURCE_BOMS.values()):
+                raise ValueError("Unmarked source revision contains a Unicode byte-order mark: " + row[2])
+            contents[identity] = data
+        return contents
 
     def validate_source_revisions(self) -> None:
         """Require current files to match captured content before applying edits.
@@ -2255,39 +2732,188 @@ class Model:
         explicit freshness check rejects using it as current source evidence.
         Streams provide no seekable revision and cannot pass the editing gate.
         """
-        for row in self.files.values():
-            if row[6] != "regular":
-                raise ValueError("Stream source has no immutable file revision")
-            data = Path(row[2]).read_bytes()
-            if len(data) != int(row[3]) or hashlib.sha256(data).hexdigest() != row[4]:
-                raise ValueError("Source revision is stale: " + row[2])
+        self.verified_source_contents()
 
-    def validate_physical_locations(self) -> None:
-        """Verify bytes and UTF-16 coordinates independently before projection."""
-        self.validate_source_revisions()
-        contents = {identity: Path(row[2]).read_bytes() for identity, row in self.files.items() if row[6] == "regular"}
-        codecs_by_encoding = {"unmarked-bytes": ("utf-8", 0), "utf-8-bom": ("utf-8", 3),
-                              "utf-16le": ("utf-16-le", 2), "utf-16be": ("utf-16-be", 2),
-                              "utf-32le": ("utf-32-le", 4), "utf-32be": ("utf-32-be", 4)}
+    def _validate_physical_location_rows(self, contents: dict[int, bytes]) -> None:
+        """Check offsets once per verified byte revision and source encoding."""
+        expected: dict[int, dict[int, tuple[int, int]]] = defaultdict(dict)
+        revisions: dict[tuple[str, str, str], int] = {}
         for row in self.records["LOC"]:
             if row[11] != "mapped":
                 continue
             fileid = int(self.source_contexts[int(row[4])][3])
-            data = contents[fileid]
-            encoding = self.files[fileid][5]
-            if encoding not in codecs_by_encoding:
-                raise ValueError("Physical coordinate decoder is unavailable")
-            codec, bom = codecs_by_encoding[encoding]
+            file_row = self.files[fileid]
+            fileid = revisions.setdefault((file_row[3], file_row[4], file_row[5]), fileid)
             for line_column, byte_column in ((5, 9), (7, 10)):
-                try:
-                    prefix = data[bom:int(row[byte_column])].decode(codec)
-                except UnicodeDecodeError as error:
-                    raise ValueError("Physical byte offset splits an encoded character") from error
-                lines = re.split(r"\r\n|\r|\n", prefix)
-                actual_line = len(lines)
-                actual_column = len(lines[-1].encode("utf-16-le")) // 2
-                if (actual_line, actual_column) != (int(row[line_column]), int(row[line_column + 1])):
-                    raise ValueError("Physical bytes disagree with their UTF-16 coordinates")
+                offset = int(row[byte_column])
+                coordinate = int(row[line_column]), int(row[line_column + 1])
+                previous = expected[fileid].get(offset)
+                if previous is not None and previous != coordinate:
+                    raise ValueError("Physical byte offset has conflicting UTF-16 coordinates")
+                expected[fileid][offset] = coordinate
+
+        for fileid, offsets in expected.items():
+            encoding = self.files[fileid][5]
+            if encoding not in SOURCE_CODECS:
+                raise ValueError("Physical coordinate decoder is unavailable")
+            codec, bom = SOURCE_CODECS[encoding]
+            data = contents[fileid]
+            # The compiler checks complete physical lines independently. An
+            # invalid sequence on an unqueried line must not invalidate later
+            # mapped lines. Find line endings in aligned encoded units before
+            # asking the strict decoder to check a requested line.
+            decoder = codecs.getincrementaldecoder(codec)(errors="strict")
+            carriage_return, line_feed = "\r".encode(codec), "\n".encode(codec)
+            unit_bytes = len(carriage_return)
+            endings = re.compile(re.escape(carriage_return + line_feed) + b"|"
+                                 + re.escape(carriage_return) + b"|" + re.escape(line_feed))
+            requested = sorted(offsets)
+            if requested[0] < bom:
+                raise ValueError("Physical byte offset exceeds the source revision")
+            pending = 0
+            cursor = bom
+            line = 1
+            while pending < len(requested):
+                ending = endings.search(data, cursor)
+                while ending is not None and (ending.start() - bom) % unit_bytes:
+                    ending = endings.search(data, ending.start() + 1)
+                end = ending.start() if ending is not None else len(data)
+                if requested[pending] <= end:
+                    if end - cursor > MAX_COORDINATE_LINE_BYTES:
+                        raise ValueError("Physical coordinate line exceeds the producer byte limit")
+                    decoder.reset()
+                    try:
+                        decoder.decode(data[cursor:end], final=True)
+                    except UnicodeDecodeError as error:
+                        raise ValueError("Physical coordinate lies on a malformed encoded line") from error
+                    decoder.reset()
+                    column = 0
+                    decoded_to = cursor
+                    while pending < len(requested) and requested[pending] <= end:
+                        offset = requested[pending]
+                        try:
+                            decoded = decoder.decode(data[decoded_to:offset], final=False)
+                        except UnicodeDecodeError as error:
+                            raise ValueError("Physical byte offset splits an encoded character") from error
+                        if decoder.getstate()[0]:
+                            raise ValueError("Physical byte offset splits an encoded character")
+                        column += sum(2 if ord(character) > 0xFFFF else 1 for character in decoded)
+                        if (line, column) != offsets[offset]:
+                            raise ValueError("Physical bytes disagree with their UTF-16 coordinates")
+                        decoded_to = offset
+                        pending += 1
+                if pending == len(requested):
+                    break
+                if ending is None or requested[pending] < ending.end():
+                    raise ValueError("Physical byte offset lies inside a line ending or beyond the source")
+                cursor = ending.end()
+                line += 1
+
+    def validate_physical_locations(self) -> None:
+        """Verify bytes and UTF-16 coordinates independently before projection."""
+        contents = self.verified_source_contents()
+        self._validate_physical_location_rows(contents)
+
+    def plan_edits(self, edits: Iterable[SourceEdit]) -> list[PlannedSource]:
+        """Validate exact LOC replacements and return updated bytes without writing.
+
+        Callers must compare ``expected_sha256`` immediately before an atomic
+        replacement. This separation prevents a planner from silently writing
+        through a stale model or a source path changed after planning.
+        """
+        if self.footer[0] != "END":
+            raise ValueError("Source edits require a complete semantic model")
+        requested: list[SourceEdit] = []
+        for edit in edits:
+            if len(requested) >= self.limits.max_edits:
+                raise ValueError("Edit request exceeds the configured edit limit")
+            if not isinstance(edit, SourceEdit):
+                raise TypeError("Every edit must be a SourceEdit")
+            if (not edit.domain or not edit.role or isinstance(edit.identity, bool)
+                    or not isinstance(edit.identity, int) or edit.identity <= 0):
+                raise ValueError("Edit location identity is invalid")
+            if not isinstance(edit.replacement, bytes):
+                raise TypeError("Edit replacement must be bytes")
+            requested.append(edit)
+        if not requested:
+            return []
+
+        contents = self.verified_source_contents()
+        self._validate_physical_location_rows(contents)
+        grouped: dict[Path, tuple[str, str, bytes, list[tuple[int, int, bytes]]]] = {}
+        declarations = {int(row[1]): row for row in self.records["DCL"]}
+        for edit in requested:
+            location = self.physical_locations.get((edit.domain, edit.identity, edit.role))
+            if location is None:
+                raise ValueError("Edit has no exact physical location attachment")
+            if location[11] != "mapped":
+                raise ValueError("Edit location is not mapped to verified source bytes")
+            if edit.domain == "binding":
+                eligible = (edit.identity <= len(self.records["B"])
+                            and self.records["B"][edit.identity - 1][3] == "1")
+            elif edit.domain == "expression":
+                eligible = (edit.identity <= len(self.records["E"])
+                            and self.records["E"][edit.identity - 1][2] == "1")
+            elif edit.domain == "declaration":
+                eligible = (edit.identity in declarations and declarations[edit.identity][5] == "1")
+            else:
+                eligible = False
+            if not eligible:
+                raise ValueError("Edit subject is not an eligible written source fact")
+            sourceid = int(location[4])
+            if self.source_endings.get(sourceid) != "verified":
+                raise ValueError("Edit source occurrence was not verified by the compiler")
+            fileid = int(self.source_contexts[sourceid][3])
+            file_row = self.files[fileid]
+            encoding = file_row[5]
+            if encoding not in SOURCE_CODECS:
+                raise ValueError("Edit source encoding is unavailable")
+            try:
+                edit.replacement.decode(SOURCE_CODECS[encoding][0])
+            except UnicodeDecodeError as error:
+                raise ValueError("Edit replacement is invalid for the source encoding") from error
+            start, end = int(location[9]), int(location[10])
+            if start == end:
+                raise ValueError("Edit location is empty")
+            try:
+                path = Path(file_row[2]).resolve(strict=True)
+            except (OSError, RuntimeError) as error:
+                raise ValueError("Edit source is unreadable: " + file_row[2]) from error
+            group = grouped.get(path)
+            if group is None:
+                group = file_row[4], encoding, contents[fileid], []
+                grouped[path] = group
+            elif group[:3] != (file_row[4], encoding, contents[fileid]):
+                raise ValueError("Edit path has conflicting source revisions")
+            group[3].append((start, end, edit.replacement))
+
+        planned: list[PlannedSource] = []
+        total_output_bytes = 0
+        for path, (digest, _encoding, original, replacements) in sorted(
+                grouped.items(), key=lambda item: str(item[0]).casefold()):
+            replacements.sort(key=lambda item: (item[0], item[1]))
+            previous_end = -1
+            projected_size = len(original)
+            for start, end, replacement in replacements:
+                if start < previous_end:
+                    raise ValueError("Edit locations overlap")
+                if start < 0 or end > len(original) or end <= start:
+                    raise ValueError("Edit location exceeds the source revision")
+                projected_size += len(replacement) - (end - start)
+                previous_end = end
+            total_output_bytes += projected_size
+            if total_output_bytes > self.limits.max_planned_output_bytes:
+                raise ValueError("Planned source output exceeds the configured byte limit")
+            updated = bytearray(original)
+            for start, end, replacement in reversed(replacements):
+                updated[start:end] = replacement
+            updated_bytes = bytes(updated)
+            planned.append(PlannedSource(path=path,
+                                         expected_sha256=digest,
+                                         updated_sha256=hashlib.sha256(updated_bytes).hexdigest(),
+                                         original=original,
+                                         updated=updated_bytes))
+        return planned
 
     def named(self, name: str, kind: str | None = None) -> list[int]:
         return [identity for identity, row in self.types.items()

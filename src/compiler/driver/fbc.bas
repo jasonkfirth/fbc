@@ -96,6 +96,7 @@ end sub
 private sub hProtectInvocationArtifact( byref filename as const string )
 	fbSemanticModelProtectFile(filename)
 	fbSemanticDiagnosticsProtectFile(filename)
+	fbSemanticLinkProtect(filename)
 end sub
 
 sub fbcEnd( byval errnum as integer )
@@ -129,12 +130,20 @@ sub fbcEnd( byval errnum as integer )
 	'' The two requested sidecars must not replace one another.
 	fbSemanticModelProtectFile(fbc.semanticdiagnostics)
 	fbSemanticDiagnosticsProtectFile(fbc.semanticmodel)
+	fbSemanticModelProtectFile(fbSemanticLinkFilename())
+	fbSemanticDiagnosticsProtectFile(fbSemanticLinkFilename())
+	fbSemanticLinkProtect(fbc.semanticmodel)
+	fbSemanticLinkProtect(fbc.semanticdiagnostics)
 	if( fbSemanticModelEnd( errnum = 0 ) = FALSE ) then
 		print "error: could not write semantic model: "; fbc.semanticmodel
 		errnum = 1
 	end if
 	if( fbSemanticDiagnosticsEnd(errnum = 0) = FALSE ) then
 		print "error: could not write semantic diagnostics: "; fbc.semanticdiagnostics
+		errnum = 1
+	end if
+	if( fbSemanticLinkEnd(errnum = 0) = FALSE ) then
+		print "error: could not write semantic link diagnostics: "; fbSemanticLinkFilename()
 		errnum = 1
 	end if
 
@@ -159,6 +168,8 @@ sub fbcEnd( byval errnum as integer )
 	end errnum
 end sub
 
+	dim as integer semantic_callback_exit = fbSemanticLinkCallback(__FB_ARGC__)
+	if( semantic_callback_exit >= 0 ) then end semantic_callback_exit
 	fbcInit( )
 
 	if( __FB_ARGC__ = 1 ) then
@@ -252,6 +263,11 @@ end sub
 				print "error: could not write semantic diagnostics: "; fbc.semanticdiagnostics
 				fbcEnd(1)
 			end if
+		end if
+
+		if( fbSemanticLinkBegin( ) = FALSE ) then
+			print "error: could not write semantic link diagnostics: "; fbSemanticLinkFilename()
+			fbcEnd(1)
 		end if
 
 		''

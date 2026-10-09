@@ -36,6 +36,7 @@ declare sub fbSemanticModelExportBinding _
 
 function cConstant( byval sym as FBSYMBOL ptr ) as ASTNODE ptr
 	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
+	dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
 
 	'' Check visibility of constant
 	if( symbCheckAccess( sym ) = FALSE ) then
@@ -46,7 +47,9 @@ function cConstant( byval sym as FBSYMBOL ptr ) as ASTNODE ptr
 	'' ID
 	lexSkipToken( LEXCHECK_POST_LANG_SUFFIX )
 
-	function = astBuildConst( sym )
+	dim as ASTNODE ptr expr = astBuildConst( sym )
+	fbSemanticModelConstantExpression(expr, sym, semantic_site, semantic_nonphysical)
+	function = expr
 end function
 
 '':::::

@@ -444,8 +444,32 @@ private sub hExportArray(byval sym as FBSYMBOL ptr, byval symbolid as longint)
 	next
 end sub
 
+private sub hExportProcedureObjectSymbol(byval sym as FBSYMBOL ptr, byval symbolid as longint)
+	if( (fbSemanticModelSymbolOrigin(sym) <> "source") or symbGetIsFuncPtr(sym) ) then exit sub
+	dim as string state_text = "unsupported-backend", symbol_text
+	select case env.clopt.backend
+	case FB_BACKEND_GAS, FB_BACKEND_GAS64
+		'' Assembly backends retain the actual decorated object symbol. Read
+		'' only a name already selected by emission; asking the mangler here
+		'' could change identifier allocation and therefore the generated code.
+		'' A source prototype that was never emitted remains unobserved.
+		state_text = "unobserved"
+		if( sym->id.mangled <> NULL ) then
+			symbol_text = *sym->id.mangled
+			if( len(symbol_text) > 0 ) then state_text = "observed"
+		end if
+	end select
+	'' C/LLVM identifiers are not necessarily object symbols: assembler
+	'' aliases, target decoration and LLVM quoting belong to those backends.
+	'' Their spelling cannot be treated as linker evidence by a consumer.
+	dim as string prefix = "K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(symbolid) + TABCHAR
+	fbSemanticModelAppendDetail(prefix + "procedure-object-symbol-state" + TABCHAR + state_text)
+	fbSemanticModelAppendDetail(prefix + "procedure-object-symbol" + TABCHAR + fbSemanticModelEscape(symbol_text))
+end sub
+
 private sub hExportProcedure(byval sym as FBSYMBOL ptr, byval symbolid as longint, _
 	byval variables_live as integer)
+	hExportProcedureObjectSymbol(sym, symbolid)
 	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
 		fbSemanticModelNumber(symbolid) + TABCHAR + "procedure-linkage" + TABCHAR + hProcedureLinkage(sym))
 	dim as string proc_kind, operator_code
@@ -691,6 +715,11 @@ sub fbSemanticModelExportSymbolDetails(byval sym as FBSYMBOL ptr, byval variable
 					end if
 					if( symbIsField(field_sym) andalso (fbSemanticModelSymbolOrigin(field_sym) = "source") ) then
 						field_count += 1
+						'' Positional initialization walks this native member table.
+						'' Export the order explicitly; symbol IDs and byte offsets
+						'' do not establish order for overlapping anonymous fields.
+						hSymbolNumber(symbolid, "declared-field:" + fbSemanticModelNumber(field_count), _
+							fbSemanticModelSymbolId(field_sym))
 					end if
 					field_sym = symbGetNext(field_sym)
 				wend
@@ -754,11 +783,13 @@ sub fbSemanticModelExportSymbolReplacement(byval previous as FBSYMBOL ptr, byval
 	fbSemanticModelExportRelation("symbol", fbSemanticModelSymbolId(previous), canonical, "canonical-symbol")
 end sub
 
-sub fbSemanticModelExportProcPtrReplacement(byval previous as FBSYMBOL ptr, byval canonical as FBSYMBOL ptr)
+sub fbSemanticModelExportProcedureReplacement(byval previous as FBSYMBOL ptr, byval canonical as FBSYMBOL ptr)
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
 	if( (previous = NULL) or (canonical = NULL) or (previous = canonical) ) then exit sub
 	if( (previous->class <> FB_SYMBCLASS_PROC) or (canonical->class <> FB_SYMBCLASS_PROC) ) then
-		fbSemanticModelFailAt("semantic-symbols.bas:610")
+		fbSemanticModelFailAt("invalid procedure replacement classes: " + _
+			fbSemanticModelNumber(previous->class) + "," + fbSemanticModelNumber(canonical->class) + _
+			" at source line " + fbSemanticModelNumber(lexLineNum()))
 		exit sub
 	end if
 	if( previous->proc.params <> canonical->proc.params ) then
@@ -767,18 +798,24 @@ sub fbSemanticModelExportProcPtrReplacement(byval previous as FBSYMBOL ptr, byva
 	end if
 
 	'' Parameter declarations can already have source bindings when an equal
-	'' procptr signature is reused. The unused header never enters a live
+	'' callable signature is reused. The unused header never enters a live
 	'' symbol table, and its ABI metadata has not been finalized. Preserve
 	'' those bindings through the selected header and corresponding formals.
 	fbSemanticModelExportRelation("symbol", fbSemanticModelSymbolId(previous), canonical, "canonical-symbol")
 	dim as FBSYMBOL ptr previous_param = symbGetProcHeadParam(previous)
 	dim as FBSYMBOL ptr canonical_param = symbGetProcHeadParam(canonical)
 	while( (previous_param <> NULL) and (canonical_param <> NULL) )
-		fbSemanticModelExportRelation("symbol", fbSemanticModelSymbolId(previous_param), canonical_param, "canonical-symbol")
+		'' Optional defaults already refer to this written formal. Retain its
+		'' type before signature reuse frees the unused parameter list.
+		fbSemanticModelExportSymbolReplacement(previous_param, canonical_param)
 		previous_param = symbGetParamNext(previous_param)
 		canonical_param = symbGetParamNext(canonical_param)
 	wend
 	if( (previous_param <> NULL) or (canonical_param <> NULL) ) then fbSemanticModelFailAt("semantic-symbols.bas:630")
+end sub
+
+sub fbSemanticModelExportProcPtrReplacement(byval previous as FBSYMBOL ptr, byval canonical as FBSYMBOL ptr)
+	fbSemanticModelExportProcedureReplacement(previous, canonical)
 end sub
 
 '' -------------------------------------------------------------------------

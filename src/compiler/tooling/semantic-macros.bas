@@ -260,6 +260,20 @@ function fbSemanticModelMacroExpressionLocation _
 			return TRUE
 		end if
 		identity = semantic_macro_invocations[index].parent
+		'' #LINE remaps a written root invocation's logical location. Keep that
+		'' observed anchor for typed facts even though it is not a physical edit
+		'' range. Replacement-token coordinates still require the parent walk.
+		if( identity = 0 ) then
+			with semantic_macro_invocations[index].source
+				if( (len(.source_file) > 0) and (.start_line > 0) and (.start_column >= 0) and _
+					(.end_line >= .start_line) and (.end_column >= 0) and _
+					((.end_line > .start_line) or (.end_column > .start_column)) ) then
+					invocation = semantic_macro_invocations[index].source
+					invocation.is_physical = FALSE
+					return TRUE
+				end if
+			end with
+		end if
 		if( identity = 0 ) then return FALSE
 	next
 	return FALSE
