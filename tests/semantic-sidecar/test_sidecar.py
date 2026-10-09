@@ -231,6 +231,30 @@ class SidecarTests(unittest.TestCase):
             span = self.span(source, "mov eax" if token == "mov" else "jmp asm_local", token)
             self.assertFalse([row for row in model.records["B"] if source_range(row, 4) == span])
 
+    def test_constructor_type_names_in_return_expressions_are_bound(self) -> None:
+        source = self.source("""Type ReturnConstructionTarget
+    marker As Integer
+    Declare Constructor()
+End Type
+Constructor ReturnConstructionTarget()
+End Constructor
+Function makeReturnValue() As ReturnConstructionTarget
+    Return ReturnConstructionTarget()
+End Function
+Type ReturnConstructionAlias As ReturnConstructionTarget
+Function makeAliasedReturnValue() As ReturnConstructionTarget
+    Return ReturnConstructionAlias()
+End Function
+""")
+        for mode in ("full", "bindings"):
+            with self.subTest(mode=mode):
+                model = self.compile(source, mode=mode)
+                for name in ("ReturnConstructionTarget", "ReturnConstructionAlias"):
+                    target_ids = [int(row[1]) for row in model.records["S"] if row[2].casefold() == name.casefold()]
+                    self.assertEqual(len(target_ids), 1)
+                    span = self.span(source, f"Return {name}()", name)
+                    self.assertEqual(self.binding(model, span), target_ids[0])
+
     def test_bindings_only_mode_keeps_resolved_calls_without_ast_details(self) -> None:
         source = self.fixture("lifetimes.bas")
         model = self.compile(source, mode="bindings")
@@ -2323,6 +2347,29 @@ print SEM_EMPTY joined3
             self.assertEqual(model.records["ML"][3][2], "0")
             self.assertEqual([row[4] for row in model.macro_tokens[int(definitions[0][1])]], ["3"])
             self.assertEqual([row[4] for row in model.macro_tokens[int(definitions[1][1])]], ["4"])
+
+    def test_qb_intrinsic_define_rejections_do_not_claim_macro_definitions(self) -> None:
+        source_text = (self.root / "tests/quirk/no-sfx-intrinsic-defines.bas").read_text(encoding="utf-8")
+        source = self.source(source_text, "no-sfx-intrinsic-defines.bas")
+        rejected_names = {"music", "sfx", "midi", "device", "capture"}
+        accepted_names = {
+            "sound", "noise", "play", "tempo", "channel", "octave", "voice", "vol", "volume",
+            "balance", "pan", "note", "wave", "envelope", "instrument", "tone",
+        }
+
+        for mode in ("full", "bindings", "expressions"):
+            with self.subTest(mode=mode):
+                model = self.compile(source, mode=mode, extra=("-lang", "qb"))
+                lifecycles = {row[6].lower(): row for row in model.records["ML"]
+                              if row[6].lower() in rejected_names | accepted_names}
+                self.assertEqual(set(lifecycles), rejected_names | accepted_names)
+                self.assertTrue(all(lifecycles[name][2] == "0" and lifecycles[name][3] == "definition-rejected"
+                                    for name in rejected_names))
+                self.assertTrue(all(lifecycles[name][2] != "0" and lifecycles[name][3] == "define"
+                                    for name in accepted_names))
+                definitions = {row[5].lower() for row in model.records["MD"]}
+                self.assertTrue(rejected_names.isdisjoint(definitions))
+                self.assertTrue(accepted_names <= definitions)
 
     def test_macro_name_only_and_empty_arguments_do_not_fabricate_expansions(self) -> None:
         source = self.source("#define SEM_ARGLESS() 11\n#define SEM_OPTIONAL(x,args...) x\n"

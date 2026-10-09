@@ -403,6 +403,9 @@ completed typed results and AST operations, respectively.
 WITH members, named procedures and exact overload/address selections, types,
 unions, enums and elements, typedefs, constants, namespaces and qualifiers,
 USING targets, macro declarations, REDIM declarations/references, and labels.
+For constructor syntax such as `WrittenType(...)`, the type or typedef token is
+a reference to that exact symbol; the generated constructor remains an `I`
+relationship rather than an invented callee-token binding.
 Label targets include direct GOTO/GOSUB/RETURN, ON lists, numeric IF branches,
 error-handler targets, and RESTORE. Assembly names resolved as variables,
 constants, procedures, or labels have bindings. Assembly keywords and local

@@ -28,6 +28,13 @@
 #include once "ast/ast.bi"
 #include once "tooling/semantic-expressions.bi"
 
+declare sub fbSemanticModelExportBinding _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byref source as LEX_LOCATION, _
+		byval is_declaration as integer _
+	)
+
 declare function hBaseMemberAccess _
 	( _
 		_
@@ -329,6 +336,10 @@ private function hFindId _
 					'' Disallow creating objects of abstract classes
 					hComplainIfAbstractClass( FB_DATATYPE_STRUCT, sym )
 
+					'' The written type is the renameable name in TYPE() construction.
+					dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
+					fbSemanticModelExportBinding(sym, semantic_site, FALSE)
+
 					'' skip ID, ctorCall() is also used by type<>(...)
 					lexSkipToken( LEXCHECK_POST_SUFFIX )
 
@@ -340,6 +351,10 @@ private function hFindId _
 				if( symbHasCtor( sym ) ) then
 					'' Disallow creating objects of abstract classes
 					hComplainIfAbstractClass( FB_DATATYPE_STRUCT, symbGetSubtype( sym ) )
+
+					'' Bind the alias that was written, not only its underlying UDT.
+					dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
+					fbSemanticModelExportBinding(sym, semantic_site, FALSE)
 
 					'' skip ID, ctorCall() is also used by type<>(...)
 					lexSkipToken( LEXCHECK_POST_SUFFIX )

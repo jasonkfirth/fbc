@@ -1858,6 +1858,9 @@ sub ppDefine( byval ismultiline as integer )
 			definition_site.is_physical and= ending.is_physical
 		end if
 		if( (sym <> NULL) andalso (symbIsDefine(sym) = FALSE) ) then sym = NULL
+		'' A reserved QB/intrinsic name can be rejected without a diagnostic.
+		'' Do not publish that attempt as an accepted definition with no identity.
+		if( sym = NULL ) then action = "definition-rejected"
 		fbSemanticModelMacroLifecycle(sym, action, defname, definition_site)
 		exit sub
 	end if
@@ -1882,6 +1885,12 @@ sub ppDefine( byval ismultiline as integer )
 	end if
 	if( (sym <> NULL) andalso symbIsDefine(sym) ) then fbSemanticModelExportBinding(sym, semantic_site, TRUE)
 	dim as string action = iif(errGetCount( ) <> previous_errors, "definition-rejected", iif(was_defined, "identical", "define"))
+	if( (sym = NULL) orelse (symbIsDefine(sym) = FALSE) ) then
+		'' The lifecycle receipt must describe a selected definition, not just the
+		'' spelling that was attempted by the source directive.
+		sym = NULL
+		action = "definition-rejected"
+	end if
 	dim as LEX_LOCATION ending = lexGetLastLocation( ), definition_site = semantic_site
 	if( definition_site.source_file = ending.source_file ) then
 		definition_site.end_line = ending.end_line
