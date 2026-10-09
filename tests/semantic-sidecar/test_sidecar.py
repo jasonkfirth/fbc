@@ -789,14 +789,19 @@ End Function
                              "end type\n"
                              "dim as Holder item\n"
                              "redim item.values(0 to 1)\n"
-                             "item.values(0) = 1\n")
+                             "item.values(0) = 1\n"
+                             "print ubound(item.values)\n")
         expected = self.span(source, "item.values(0) = 1", "values(0)")
+        storage_prefix = self.span(source, "print ubound(item.values)", "values")
         for mode in ("full", "expressions"):
             with self.subTest(mode=mode):
                 model = self.compile(source, mode=mode)
                 facts = [row for row in model.records["E"] if row[2] == "1" and source_range(row, 3) == expected]
                 self.assertTrue(facts, "the compiler should type the written array-element assignment target")
                 self.assertTrue(any(row[15].casefold() == "integer" for row in facts))
+                prefix_facts = [row for row in model.records["E"] if row[2] == "1" and source_range(row, 3) == storage_prefix]
+                self.assertTrue(prefix_facts, "the compiler should type the written array-field prefix")
+                self.assertTrue(any(row[15].casefold() == "integer" for row in prefix_facts))
                 if mode == "expressions":
                     self.assertFalse(model.records["S"])
                     self.assertFalse(model.records["N"])

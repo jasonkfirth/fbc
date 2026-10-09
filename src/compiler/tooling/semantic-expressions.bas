@@ -22,6 +22,7 @@ declare sub fbSemanticModelExportExpression _
 	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, byref source_end as LEX_LOCATION, _
 	  byval nonphysical_tokens_at_start as longint, byval nonphysical_tokens_at_end as longint, _
 	  byval semantic_operator_override as integer = -1, byval force_nonphysical_range as integer = FALSE )
+declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
 
 '' A named constant is lowered to a value-only CONST node. Observe its
 '' selected symbol at the atom parser, before enclosing operations can
@@ -1269,10 +1270,15 @@ sub fbSemanticModelArrayStoragePrefix _
 	( byval result as ASTNODE ptr, byval array_symbol as FBSYMBOL ptr, _
 	  byval receiver_id as longint, byref source_start as LEX_LOCATION, _
 	  byval nonphysical_start as longint )
-	if( (fbSemanticModelFullEnabled( ) = FALSE) or (result = NULL) ) then exit sub
+	if( result = NULL ) then exit sub
+	if( (fbSemanticModelFullEnabled( ) = FALSE) and _
+	    (fbSemanticModelExpressionsOnlyEnabled( ) = FALSE) ) then exit sub
 	if( lex.ctx->semantic_probe ) then exit sub
 	dim as LEX_LOCATION source_end = lexGetLastLocation( )
 	fbSemanticModelExportExpressionDistinct(result, source_start, source_end, nonphysical_start, lexGetNonphysicalTokenCount( ))
+	'' Compact expression models retain the typed written field prefix without
+	'' exporting the full model's array symbol and receiver relationships.
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
 	hArrayStorageDetails(result->semantic_expression, array_symbol, receiver_id)
 	dim as longint link = result->semantic_expressions
 	if( (link < 1) or (link > expression_link_count) ) then
