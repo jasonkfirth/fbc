@@ -1,6 +1,7 @@
 Version 1.20.4
 
 [changed]
+- compiler semantic reader: convert native Windows paths through the MSYS/Cygwin mount table before resolving source revisions and edit plans; preserve exported filenames, source hashes, byte limits and stale-source rejection, and exercise native sidecar filenames in the existing edit-planning regression.
 - compiler semantic model: retain parser-selected named and anonymous namespace openings, including qualified, reopened and macro-generated forms; record each USING statement's actual recipient namespace under a separate capability so models with earlier header-policy counts remain readable.
 - compiler semantic model: retain accepted per-source pragma-once, library-directive and namespace-import policies in full models, with occurrence counts, escaped library values, conditional context and macro origins; independently validate complete receipts and freeze the new reader dependency for self/corpus audits.
 - compiler/Windows Clang: query the selected MinGW GCC toolchain for x86/x64 startup objects, system libraries and binutils, preventing an x64 Clang installation from selecting x64 CRT files while linking x86 code; retain Clang runtime discovery for Windows ARM64 and other platforms.

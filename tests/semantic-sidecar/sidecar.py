@@ -12,9 +12,11 @@ from collections import Counter, defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, fields
 import hashlib
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import re
 import stat
+import subprocess
+import sys
 from semantic_flow import validate_flow, validate_sequence_branches
 from semantic_array_storage import validate_array_storage_inputs
 from semantic_literals import validate_wide_literals
@@ -190,6 +192,29 @@ SOURCE_OPERATORS = {
     "group": frozenset(("parentheses",)),
     "cast": frozenset(("cast",)),
 }
+
+
+def filesystem_path(value: str | Path) -> Path:
+    """Translate native compiler paths only for Cygwin/MSYS filesystem access."""
+    text = str(value)
+    if sys.platform == "cygwin" and PureWindowsPath(text).is_absolute():
+        # MSYS can stat a Windows path directly, but POSIX pathlib.resolve()
+        # does not understand its drive or backslash separators. cygpath uses
+        # the runtime's mount table, including custom drive and UNC mappings.
+        # Keep serialized filenames unchanged; byte/hash checks still reopen
+        # and resolve the converted path for every validation or edit plan.
+        try:
+            converted = subprocess.run(["cygpath", "-a", "-u", "--", text],
+                                       capture_output=True, text=True, encoding="utf-8",
+                                       errors="surrogateescape", timeout=30, check=False)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise ValueError("Source path conversion failed: " + text) from error
+        text = converted.stdout.rstrip("\r\n")
+        if converted.returncode or not text or not Path(text).is_absolute():
+            raise ValueError("Source path conversion failed: " + str(value))
+    return Path(text)
+
+
 def unescape(field: str) -> str:
     # Compiler strings contain bytes, including accepted legacy source bytes
     # and filesystem names. Decode valid UTF-8 normally and retain every other
@@ -2662,7 +2687,7 @@ class Model:
              **options: bool) -> Model:
         """Read a regular ASCII sidecar without crossing configured bounds."""
         limits = limits or ReaderLimits()
-        path = Path(path)
+        path = filesystem_path(path)
         try:
             metadata = path.stat()
             if not stat.S_ISREG(metadata.st_mode):
@@ -2699,7 +2724,7 @@ class Model:
             expected_size = int(row[3])
             if expected_size > self.limits.max_source_bytes:
                 raise ValueError("Source revision exceeds the configured per-file byte limit: " + row[2])
-            path = Path(row[2])
+            path = filesystem_path(row[2])
             try:
                 metadata = path.stat()
                 if not stat.S_ISREG(metadata.st_mode):
@@ -2882,7 +2907,7 @@ class Model:
             if start == end:
                 raise ValueError("Edit location is empty")
             try:
-                path = Path(file_row[2]).resolve(strict=True)
+                path = filesystem_path(file_row[2]).resolve(strict=True)
             except (OSError, RuntimeError) as error:
                 raise ValueError("Edit source is unreadable: " + file_row[2]) from error
             group = grouped.get(path)

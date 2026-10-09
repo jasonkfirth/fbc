@@ -26,6 +26,11 @@ Use `--toolchain-prefix <SDK>` when the source checkout has no native tools or
 libraries. Source-tree declarations still take precedence through `-i inc`;
 the SDK supplies executable tools and link libraries without another copy.
 
+Under MSYS/Cygwin Python, the reader uses the bundled `cygpath` to access
+native Windows filenames recorded by the compiler. Exported filenames retain
+their original spelling; source hashes, byte limits and stale-source checks
+apply to the resolved filesystem path before an edit plan is returned.
+
 `pointer_access_origins.py` verifies independent dereference and pointer-index
 origins before AST lowering. Its reviewed inputs include multiple dereferences,
 fields, explicit index conversion, canceled addresses, macros and unevaluated

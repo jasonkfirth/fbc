@@ -2386,7 +2386,10 @@ WithDefault()
     def test_safe_edit_planning_requires_exact_fresh_nonoverlapping_locations(self) -> None:
         source = self.source("dim original_name as long\nprint original_name\n")
         _, path = self.invoke([source], mode="bindings")
-        model = Model.read(path, bindings_only=True)
+        # Native Windows filenames also reach MSYS readers through tool APIs.
+        # Read that spelling and keep the exported source filename unchanged.
+        model = Model.read(self.compiler_path(path), bindings_only=True)
+        self.assertEqual(next(iter(model.files.values()))[2], self.compiler_path(source))
         symbol = next(identity for identity, row in model.symbols.items()
                       if row[2].casefold() == "original_name")
         binding_ids = [ordinal for ordinal, row in enumerate(model.records["B"], 1)
