@@ -968,7 +968,12 @@ End Function
                 self.assertEqual(include_contexts[0][8:], ["0", "", "0", "0", "0", "0"])
                 include_outcomes = [row for row in model.records["INC"] if row[5] == "opened"]
                 self.assertEqual(len(include_outcomes), 1)
-                self.assertEqual(include_outcomes[0][6:], ["0", "", "0", "0", "0", "0"])
+                # The full producer now retains the invoking name as a
+                # noneditable anchor. It remains distinct from a literal
+                # filename range and from the opened child's source context.
+                expected_origin = (["0", self.compiler_path(source), "2", "9", "2", "20"]
+                                   if mode == "full" else ["0", "", "0", "0", "0", "0"])
+                self.assertEqual(include_outcomes[0][6:], expected_origin)
                 self.assertEqual(
                     model.records["D"],
                     [["D", self.compiler_path(source)], ["D", self.compiler_path(header)]],

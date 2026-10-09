@@ -496,6 +496,11 @@ attempts do not create successful source contexts or dependencies. `MAP`
 records an observed `#line` directive's logical line and filename, together
 with its directive range. It does not make synthesized locations editable.
 
+For a macro-expanded include, full models can retain the invoking macro name
+in `INC` as a noneditable origin with physical flag zero. This anchor is not a
+literal filename range or the opened child's `SRC` directive range. Compact
+expression models omit it when the macro invocation graph is unavailable.
+
 `ORIG` associates a node, declaration occurrence, expression, or binding with
 its source context. Binding identities are their file-wide record ordinals,
 starting at one. Node and declaration origins are absent in expression mode,

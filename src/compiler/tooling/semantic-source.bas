@@ -8,6 +8,7 @@
 #include once "tooling/semantic-source.bi"
 #include once "tooling/semantic-source-file.bi"
 #include once "tooling/semantic-link.bi"
+#include once "tooling/semantic-macros.bi"
 #include once "tooling/semantic-coordinates.bi"
 #include once "parser/parser.bi"
 #include once "file.bi"
@@ -129,10 +130,23 @@ sub fbSemanticModelIncludeOutcome(byref requested as const string, byref resolve
 		parentid = semantic_source_ids(env.includerec - 1)
 	end if
 	dim as longint identity = fbSemanticModelNextDetailIdentity( )
+	dim as LEX_LOCATION invocation
+	dim as LEX_LOCATION ptr observation = directive
+	dim as integer require_physical = TRUE
+	if( directive <> NULL ) then
+		if( (directive->is_physical = FALSE) and (directive->macro_identity <> 0) ) then
+			'' INC can retain a noneditable invocation anchor without claiming
+			'' that replacement text is a written include filename range.
+			if( fbSemanticModelMacroExpressionLocation(*directive, *directive, 0, 0, invocation) ) then
+				observation = @invocation
+				require_physical = FALSE
+			end if
+		end if
+	end if
 	fbSemanticModelAppendProvenance("INC" + TABCHAR + fbSemanticModelNumber(identity) + _
 		TABCHAR + fbSemanticModelNumber(parentid) + TABCHAR + _
 		fbSemanticModelEscape(requested) + TABCHAR + fbSemanticModelEscape(resolved) + TABCHAR + outcome + _
-		TABCHAR + hDirective(directive, TRUE))
+		TABCHAR + hDirective(observation, require_physical))
 	if( directive <> NULL ) then fbSemanticModelExportCoordinates("include", identity, "directive", *directive, *directive)
 end sub
 
