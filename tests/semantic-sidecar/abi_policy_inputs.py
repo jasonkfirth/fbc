@@ -6,6 +6,35 @@ This file intentionally does NOT infer interoperability policy from ABI defaults
 """
 from sidecar import Model
 
+FEATURE = 'procedure-abi-policy-inputs'
+MUTATIONS = ('missing-policy', 'missing-marker', 'noncanonical-key',
+             'zero-identity', 'foreign-header', 'invalid-convention',
+             'invalid-string', 'extra-flag', 'unavailable-capability',
+             'wrong-marker-owner', 'wrong-marker-target', 'wrong-marker-statement',
+             'noncanonical-marker', 'orphan-marker')
+
+
+def malformed_rows(rows, mutation):
+    changed = [row.copy() for row in rows]
+    policy = next(row for row in changed if row[0] == 'K' and row[3].startswith('abi-policy-input:'))
+    marker = next(row for row in changed if row[0] == 'H' and row[5] == policy[3])
+    identity = policy[3].split(':')[1]
+    if mutation == 'missing-policy': policy[3] = 'fixture-removed-policy'
+    if mutation == 'missing-marker': marker[5] = 'fixture-removed-marker'
+    if mutation == 'noncanonical-key': policy[3] = 'abi-policy-input:0' + identity
+    if mutation == 'zero-identity': policy[3] = 'abi-policy-input:0'
+    if mutation == 'foreign-header': policy[3] = 'abi-policy-input:999999'
+    if mutation == 'invalid-convention': policy[4] = '2%090'
+    if mutation == 'invalid-string': policy[4] = '0%09-1'
+    if mutation == 'extra-flag': policy[4] = '0%090%090'
+    if mutation == 'unavailable-capability': next(row for row in changed if row[0] == 'CAP' and row[2] == FEATURE)[3] = 'unavailable'
+    if mutation == 'wrong-marker-owner': marker[2] = '999999'
+    if mutation == 'wrong-marker-target': marker[4] = '999999'
+    if mutation == 'wrong-marker-statement': marker[6] = '0'
+    if mutation == 'noncanonical-marker': marker[5] = 'abi-policy-input:0' + identity
+    if mutation == 'orphan-marker': marker[5] = 'abi-policy-input:999999'
+    return changed
+
 
 def check_policy_inputs(test):
     source = test.source('''Type ManagedAlias As String
@@ -38,13 +67,18 @@ Declare Sub CallbackHeader(ByVal callback As Sub Cdecl())
                 test.assertEqual(compact.capabilities[1]['procedure-abi-policy-inputs'], 'unavailable')
                 test.assertFalse(any(row[3].startswith('abi-policy-input:') for row in compact.records['K']))
             rows = [line.split('\t') for line in artifact.read_text().splitlines()]
-            for flags in ('2%090', '0%09-1'):
-                malformed = [row.copy() for row in rows]
-                next(row for row in malformed if row[0] == 'K' and row[3].startswith('abi-policy-input:'))[4] = flags
-                with test.assertRaises(ValueError):
-                    Model('\n'.join('\t'.join(row) for row in malformed) + '\n')
-            malformed = [row.copy() for row in rows]
-            next(row for row in malformed if row[0] == 'H' and row[5].startswith('abi-policy-input:'))[6] = '0'
-            with test.assertRaises(ValueError):
-                Model('\n'.join('\t'.join(row) for row in malformed) + '\n')
+            for mutation in MUTATIONS:
+                with test.subTest(mutation=mutation), test.assertRaises(ValueError):
+                    Model('\n'.join('\t'.join(row) for row in malformed_rows(rows, mutation)) + '\n')
+            repeated = test.source('#lang "fblite"\nDeclare Sub Repeated(ByVal value As Long)\n'
+                                   'Declare Sub Repeated Stdcall(ByVal value As Long)\n', 'abi-repeat.bas')
+            repeated_model = test.compile(repeated, backend=backend)
+            policies = [row for row in repeated_model.records['K'] if row[3].startswith('abi-policy-input:')]
+            test.assertEqual([row[4].split('\t') for row in policies], [['0', '0'], ['1', '0']])
+            test.assertEqual(len({row[2] for row in policies}), 1)
+            for option, convention in (('no-fastcall', '__fastcall'), ('no-thiscall', '__thiscall')):
+                ignored = test.source('Declare Sub ConventionProbe ' + convention + '(ByVal value As Long)\n', option + '.bas')
+                ignored_model = test.compile(ignored, backend=backend, extra=('-target', 'win32', '-z', option))
+                policy = next(row for row in ignored_model.records['K'] if row[3].startswith('abi-policy-input:'))
+                test.assertEqual(policy[4].split('\t'), ['1', '0'])
 # end of abi_policy_inputs.py

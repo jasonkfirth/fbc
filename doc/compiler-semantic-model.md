@@ -2215,15 +2215,6 @@ procedure-pointer owners, same-module accepted statement/source ownership,
 and complete ABI receipts matching procedure-typing-inputs and callback counts.
 Property order does not determine ownership or occurrence identity.
 
-Full models also advertise `procedure-abi-policy-inputs`. Each named header
-has a matching `K symbol owner abi-policy-input:identity` with two escaped
-tab-separated flags: a written calling convention and a managed `STRING`
-return or parameter type, including aliases and pointer forms. These are
-original parser choices before signature reuse. An `H` self-relation with the
-same property identifies the accepted header statement. Compact modes omit
-these policy receipts. Readers require canonical zero/one flags and complete
-pairing with the original `procedure-abi-input` occurrence.
-
 Named header receipts require a parsed statement ending. An indirect SUB cast
 can consume and publish a void call while the statement dispatcher retains
 its unmatched route. Callback type receipts on that route require a typed
@@ -2532,5 +2523,26 @@ module ownership, a valid array rank and an available capability. The compiler
 records immutable identities rather than retaining initializer AST pointers.
 The sidecar tests cover 18 original inputs and reject invalid groups across
 GAS64, GAS and GCC, with unchanged emitted code and compiler diagnostics.
+
+## Original ABI header policy inputs
+
+Full models advertise `procedure-abi-policy-inputs available`. Each accepted
+named SUB, FUNCTION or PROPERTY header retains its parser choices before
+prototype merging, alongside its `procedure-abi-input:identity` receipt:
+
+    K symbol procedure-ID abi-policy-input:identity written-convention<TAB>managed-string
+    H symbol procedure-ID symbol procedure-ID abi-policy-input:identity statement-ID
+
+Both values are canonical Boolean flags. Written convention means the parser
+accepted CDECL, STDCALL, PASCAL, THISCALL or FASTCALL in this occurrence, even
+if a target option ignores that convention. Managed string means the original
+result or parameter type has FreeBASIC STRING as its base type, including
+aliases and pointers. Final ABI modes and canonical merged signatures cannot
+recover these occurrence choices.
+
+Readers require one policy and one matching marker for every ABI header in
+an available module, with the same procedure, occurrence identity and statement.
+Compact exports mark this capability unavailable and omit these properties.
+Older producers remain valid but do not prove these policies.
 
 <!-- end of compiler-semantic-model.md -->
