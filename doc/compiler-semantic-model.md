@@ -2215,6 +2215,15 @@ procedure-pointer owners, same-module accepted statement/source ownership,
 and complete ABI receipts matching procedure-typing-inputs and callback counts.
 Property order does not determine ownership or occurrence identity.
 
+Full models also advertise `procedure-abi-policy-inputs`. Each named header
+has a matching `K symbol owner abi-policy-input:identity` with two escaped
+tab-separated flags: a written calling convention and a managed `STRING`
+return or parameter type, including aliases and pointer forms. These are
+original parser choices before signature reuse. An `H` self-relation with the
+same property identifies the accepted header statement. Compact modes omit
+these policy receipts. Readers require canonical zero/one flags and complete
+pairing with the original `procedure-abi-input` occurrence.
+
 Named header receipts require a parsed statement ending. An indirect SUB cast
 can consume and publish a void call while the statement dispatcher retains
 its unmatched route. Callback type receipts on that route require a typed

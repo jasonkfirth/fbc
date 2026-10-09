@@ -210,6 +210,10 @@ class SidecarTests(unittest.TestCase):
         from callback_conventions import check_callbacks
         check_callbacks(self)
 
+    def test_procedure_abi_policy_inputs(self) -> None:
+        from abi_policy_inputs import check_policy_inputs
+        check_policy_inputs(self)
+
     def test_keyword_configuration_contexts(self) -> None:
         from keyword_contexts import check_keyword_contexts
         check_keyword_contexts(self)

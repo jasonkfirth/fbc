@@ -40,6 +40,7 @@ SEMANTIC_READER_FILES = (
     "semantic_if_arms.py",
     "semantic_assignment_inputs.py",
     "semantic_assignment_storage.py",
+    "semantic_abi_policy.py",
 )
 
 

@@ -43,7 +43,9 @@ declare sub fbSemanticModelProcedureTyping(byval proc as FBSYMBOL ptr, byval tk 
 	byref role as const string, byref result_form as const string)
 declare function fbSemanticModelCallbackCount( ) as longint
 declare sub fbSemanticModelProcedureAbiInput(byval proc as FBSYMBOL ptr, byref role as const string, _
-	byval has_library as integer, byval has_alias as integer, byval callback_start as longint, byref source as LEX_LOCATION)
+	byval has_library as integer, byval has_alias as integer, byval callback_start as longint, byref source as LEX_LOCATION, _
+	byval written_convention as integer, byval dynamic_string as integer)
+declare sub fbSemanticModelFailAt(byref reason as const string)
 declare sub fbSemanticModelDeclarationRepeat(byval sym as FBSYMBOL ptr, byref kind as const string, _
 	byval repeated as integer, byref source as LEX_LOCATION)
 declare sub fbSemanticModelExportProcedureReplacement(byval previous as FBSYMBOL ptr, byval canonical as FBSYMBOL ptr)
@@ -1508,7 +1510,8 @@ private sub hParseProcHeaderAttributes _
 		byref mode as integer, _
 		byref mode_is_explicit as integer, _
 		byref palias as zstring ptr, _
-		byref semantic_has_library as integer _
+		byref semantic_has_library as integer, _
+		byref semantic_written_convention as integer _
 	)
 
 	'' [NAKED]
@@ -1539,6 +1542,12 @@ private sub hParseProcHeaderAttributes _
 		end if
 	end if
 
+	'' Keep the accepted header choice independently of the final ABI mode.
+	'' A target option can ignore THISCALL or FASTCALL after consuming it.
+	select case lexGetToken( )
+	case FB_TK_CDECL, FB_TK_STDCALL, FB_TK_PASCAL, FB_TK_THISCALL, FB_TK_FASTCALL
+		semantic_written_convention = TRUE
+	end select
 	mode = cProcCallingConv( mode, mode_is_explicit )
 
 	'' OVERLOAD?
@@ -1856,6 +1865,7 @@ function cProcHeader _
 	dim as integer priority = any
 	dim as integer mode_is_explicit = any
 	dim as integer semantic_has_library
+	dim as integer semantic_written_convention, semantic_dynamic_string
 	dim as string semantic_result_form = "special"
 	dim as LEX_LOCATION semantic_site, diagnostic_site
 	dim as integer diagnostic_header_errors = errGetCount( )
@@ -1900,7 +1910,7 @@ function cProcHeader _
 	end if
 
 	hParseProcHeaderAttributes( tk, options, is_memberproc, attrib, pattrib, _
-	                            mode, mode_is_explicit, palias, semantic_has_library )
+	                            mode, mode_is_explicit, palias, semantic_has_library, semantic_written_convention )
 	dim as integer semantic_has_alias = (palias <> NULL)
 	dim as longint semantic_callback_start = fbSemanticModelCallbackCount( )
 
@@ -1936,6 +1946,21 @@ function cProcHeader _
 		exit function
 	end if
 
+	'' Inspect the parsed signature before a repeated prototype merges symbols.
+	'' Managed STRING remains an ABI boundary type through aliases and pointer
+	'' forms. The count bounds traversal of the compiler's parameter list.
+	semantic_dynamic_string = (typeGetDtOnly(dtype) = FB_DATATYPE_STRING)
+	dim as FBSYMBOL ptr semantic_parameter = symbGetProcHeadParam(proc)
+	for semantic_ordinal as integer = 1 to symbGetProcParams(proc)
+		if( semantic_parameter = NULL ) then
+			fbSemanticModelFailAt("procedure ABI parameter list is incomplete")
+			exit for
+		end if
+		if( typeGetDtOnly(symbGetFullType(semantic_parameter)) = FB_DATATYPE_STRING ) then semantic_dynamic_string = TRUE
+		semantic_parameter = semantic_parameter->next
+	next
+	if( semantic_parameter <> NULL ) then fbSemanticModelFailAt("procedure ABI parameter list exceeds its count")
+
 	'' Header parsing can repair an unknown type or malformed parameter. The
 	'' normal compiler checks continue, but those repairs are not a signature
 	'' proof. Earlier invalid retained headers are tracked by the diagnostics.
@@ -1961,7 +1986,8 @@ function cProcHeader _
 				(declaration_nonphysical = lexGetNonphysicalTokenCount( ))
 			fbSemanticModelExportDeclaration(proc, declaration_site, "procedure-prototype", id)
 			fbSemanticModelProcedureTyping(proc, tk, "prototype", semantic_result_form)
-			fbSemanticModelProcedureAbiInput(proc, "prototype", semantic_has_library, semantic_has_alias, semantic_callback_start, semantic_site)
+			fbSemanticModelProcedureAbiInput(proc, "prototype", semantic_has_library, semantic_has_alias, semantic_callback_start, semantic_site, _
+				semantic_written_convention, semantic_dynamic_string)
 		end if
 		return proc
 	end if
@@ -2221,7 +2247,8 @@ function cProcHeader _
 			(declaration_nonphysical = lexGetNonphysicalTokenCount( ))
 		fbSemanticModelExportDeclaration(proc, declaration_site, "procedure-definition", id)
 		fbSemanticModelProcedureTyping(proc, tk, "definition", semantic_result_form)
-		fbSemanticModelProcedureAbiInput(proc, "definition", semantic_has_library, semantic_has_alias, semantic_callback_start, semantic_site)
+		fbSemanticModelProcedureAbiInput(proc, "definition", semantic_has_library, semantic_has_alias, semantic_callback_start, semantic_site, _
+			semantic_written_convention, semantic_dynamic_string)
 	end if
 
 	function = proc

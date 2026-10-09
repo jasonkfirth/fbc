@@ -1132,7 +1132,8 @@ end sub
 '' Native headers own explicit import markers and callback counts separately
 '' from their final, possibly reused procedure signature. No token text survives.
 sub fbSemanticModelProcedureAbiInput(byval proc as FBSYMBOL ptr, byref role as const string, _
-	byval has_library as integer, byval has_alias as integer, byval callback_start as longint, byref source as LEX_LOCATION)
+	byval has_library as integer, byval has_alias as integer, byval callback_start as longint, byref source as LEX_LOCATION, _
+	byval written_convention as integer, byval dynamic_string as integer)
 	if( (fbSemanticModelFullEnabled( ) = FALSE) or (proc = NULL) ) then exit sub
 	if( lex.ctx->semantic_probe ) then exit sub
 	if( (callback_start < 0) or (callback_start > semantic_callback_count) ) then
@@ -1153,6 +1154,14 @@ sub fbSemanticModelProcedureAbiInput(byval proc as FBSYMBOL ptr, byref role as c
 		TABCHAR + property_key + TABCHAR + fbSemanticModelEscape(payload))
 	fbSemanticModelExportCoordinates("source-context", sourceid, property_key, source, source)
 	fbSemanticModelMacroOrigin("symbol", symbolid, source.macro_identity, property_key)
+	'' These are original header facts, not guesses from the merged signature
+	'' or from the target's default calling convention.
+	property_key = "abi-policy-input:" + fbSemanticModelNumber(identity)
+	payload = iif(written_convention, "1", "0") + TABCHAR + iif(dynamic_string, "1", "0")
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(symbolid) + _
+		TABCHAR + property_key + TABCHAR + fbSemanticModelEscape(payload))
+	fbSemanticModelAppendDetail("H" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(symbolid) + _
+		TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(symbolid) + TABCHAR + property_key + TABCHAR + fbSemanticModelNumber(statement))
 end sub
 
 sub fbSemanticModelParameterType(byval param as FBSYMBOL ptr, byref written_type as const string)
@@ -3218,7 +3227,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
-	for capability as integer = 0 to 82
+	for capability as integer = 0 to 83
 		dim as string feature, coverage
 		select case capability
 		case 0: feature = "symbol-identities": coverage = iif(semantic_model_expressions_only, "unavailable", "available")
@@ -3300,6 +3309,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		case 80: feature = "assignment-storage-trees": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 81: feature = "assignment-initializers": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 82: feature = "let-destination-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 83: feature = "procedure-abi-policy-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 54: feature = "select-case-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 55: feature = "select-case-lowering-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 56: feature = "target-wide-literal-prefixes": coverage = iif(fbSemanticModelFullEnabled( ) and _
