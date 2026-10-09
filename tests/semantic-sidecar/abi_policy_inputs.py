@@ -70,16 +70,18 @@ Declare Sub CallbackHeader(ByVal callback As Sub Cdecl())
             for mutation in MUTATIONS:
                 with test.subTest(mutation=mutation), test.assertRaises(ValueError):
                     Model('\n'.join('\t'.join(row) for row in malformed_rows(rows, mutation)) + '\n')
-            convention = 'Cdecl' if backend == 'gas' else 'Stdcall'
+            # FBLITE's default convention depends on the target. Fix the
+            # Windows target so the implicit and written signatures agree.
+            target = 'win64' if backend == 'gas64' else 'win32'
             repeated = test.source('#lang "fblite"\nDeclare Sub Repeated(ByVal value As Long)\n'
-                                   'Declare Sub Repeated ' + convention + '(ByVal value As Long)\n', 'abi-repeat.bas')
-            repeated_model = test.compile(repeated, backend=backend)
+                                   'Declare Sub Repeated Stdcall(ByVal value As Long)\n', 'abi-repeat.bas')
+            repeated_model = test.compile(repeated, backend=backend, extra=('-target', target))
             policies = [row for row in repeated_model.records['K'] if row[3].startswith('abi-policy-input:')]
             test.assertEqual([row[4].split('\t') for row in policies], [['0', '0'], ['1', '0']])
             test.assertEqual(len({row[2] for row in policies}), 1)
             for option, convention in (('no-fastcall', '__fastcall'), ('no-thiscall', '__thiscall')):
                 ignored = test.source('Declare Sub ConventionProbe ' + convention + '(ByVal value As Long)\n', option + '.bas')
-                ignored_model = test.compile(ignored, backend=backend, extra=('-target', 'win64' if backend == 'gas64' else 'win32', '-z', option))
+                ignored_model = test.compile(ignored, backend=backend, extra=('-target', target, '-z', option))
                 policy = next(row for row in ignored_model.records['K'] if row[3].startswith('abi-policy-input:'))
                 test.assertEqual(policy[4].split('\t'), ['1', '0'])
 # end of abi_policy_inputs.py

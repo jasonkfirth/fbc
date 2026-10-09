@@ -1,8 +1,10 @@
 Version 1.20.4
 
 [changed]
+- compiler semantic expressions: retain typed written array-field prefixes in compact expression models for consumers such as the VS Code plugin, while reserving array symbol and receiver relationships for full models.
+- compiler semantic model: retain a noneditable macro-invocation anchor for generated include outcomes while omitting replacement-token directive spans, so clients can distinguish macro includes from command-line preincludes without changing include processing.
 - compiler semantic model: retain explicit calling-convention and managed-STRING header choices before prototype reuse, including aliases and pointer forms; pair each ABI-policy receipt with its accepted source header and validate its original occurrence.
-- compiler semantic tests: select each backend's actual emission suffix when comparing full and compact modes, and freeze every new reader dependency for standalone self/corpus audits.
+- compiler semantic tests: select each backend's actual emission suffix when comparing full and compact modes, freeze every new reader dependency for standalone self/corpus audits, and select explicit targets for assembly and calling-convention fixtures on ARM and non-Windows hosts.
 - compiler semantic model: retain the original typed formal and default initializer before an equal callback or repeated prototype reuses a canonical signature, so source assignment receipts remain complete after the unused header is freed.
 - compiler semantic model: export procedure and static-address assignment-storage offsets as leaf atoms, retaining their symbol and byte offset without treating the executable AST's preserved optimization child as a second value computation.
 - compiler semantic model: bind written UDT and typedef names in constructor expressions, record rejected QB intrinsic definitions without fabricated macro identities, and omit nonphysical include directive ranges while retaining written logical-remap receipts.

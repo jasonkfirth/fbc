@@ -13,6 +13,10 @@ import subprocess
 from link_diagnostics import LinkDiagnostics
 from sidecar import Model
 
+# These fixtures inspect x86-64 assembly without assembling or linking it.
+# Select its target explicitly so ARM hosts exercise the same observer paths.
+GAS64_EMISSION_TARGET = ('-target', 'linux-x86_64')
+
 
 def source_text(filename, body, language='fb'):
     return ("' Project: FreeBASIC native link observations\n"
@@ -236,7 +240,7 @@ def check_source_ownership(test, native_reader=None):
     for label, bom, encoding in encodings:
         source = test.working / (label + '.bas')
         source.write_bytes(bom + text.encode(encoding))
-        result, artifact, _ = invoke(test, [source], 'gas64')
+        result, artifact, _ = invoke(test, [source], 'gas64', extra=GAS64_EMISSION_TARGET)
         test.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         observation = check_artifact(test, artifact, result, native_reader)
         procedure = next(iter(observation.procedures.values()))
@@ -254,28 +258,28 @@ def check_publication(test):
     for destination, input_source in ((source, source), (child, root), (hardlink, source)):
         original = destination.read_bytes()
         result, _, _ = invoke(test, [input_source], 'gas64', observed=False,
-            extra=('-semantic-link-diagnostics', destination))
+            extra=GAS64_EMISSION_TARGET + ('-semantic-link-diagnostics', destination))
         test.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         test.assertIn(b'could not write semantic link diagnostics', result.stdout)
         test.assertEqual(destination.read_bytes(), original)
     for suffix in ('.asm', '.o'):
         output = test.working / ('owned' + suffix)
         result, _, _ = invoke(test, [source], 'gas64', observed=False,
-            extra=('-semantic-link-diagnostics', output, '-o', output))
+            extra=GAS64_EMISSION_TARGET + ('-semantic-link-diagnostics', output, '-o', output))
         test.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         test.assertFalse(output.exists() and output.read_bytes().startswith(b'FBCLNK'))
     # The shared checked writer must also refuse collisions between distinct
     # semantic artifacts, including a destination that already has contents.
     for other_option in ('-semantic-model', '-semantic-diagnostics'):
         result, _, _ = invoke(test, [source], 'gas64', observed=False,
-            extra=('-semantic-link-diagnostics', sentinel, other_option, sentinel))
+            extra=GAS64_EMISSION_TARGET + ('-semantic-link-diagnostics', sentinel, other_option, sentinel))
         test.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         test.assertEqual(sentinel.read_bytes(), b'original destination\n')
     result, _, _ = invoke(test, [source], 'gas64', observed=False,
-        extra=('-semantic-link-diagnostics', test.working / 'missing' / 'diagnostic.lnk'))
+        extra=GAS64_EMISSION_TARGET + ('-semantic-link-diagnostics', test.working / 'missing' / 'diagnostic.lnk'))
     test.assertEqual(result.returncode, 1, result.stdout + result.stderr)
     result, _, _ = invoke(test, [source], 'gas64', observed=False,
-        extra=('-semantic-link-diagnostics', sentinel))
+        extra=GAS64_EMISSION_TARGET + ('-semantic-link-diagnostics', sentinel))
     test.assertEqual(result.returncode, 0, result.stdout + result.stderr)
     LinkDiagnostics.read(sentinel, 0)
     test.assertFalse(list(test.working.glob('.fb-semantic-*')))
@@ -289,7 +293,7 @@ def check_lifetimes(test, native_reader=None):
         'GoTo Finished\nFinished:\nPrint ReleasedLocal\nEnd Sub\n'
         f'Declare Function Later{index}() As Long' for index in range(1000))
     source = test.source(source_text('released.bas', body), 'released.bas')
-    result, artifact, _ = invoke(test, [source], 'gas64')
+    result, artifact, _ = invoke(test, [source], 'gas64', extra=GAS64_EMISSION_TARGET)
     test.assertEqual(result.returncode, 0, result.stdout + result.stderr)
     observation = check_artifact(test, artifact, result, native_reader)
     test.assertEqual(len(observation.procedures), 2000)
