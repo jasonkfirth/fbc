@@ -5,12 +5,17 @@ Responsibilities: Three backends, nested strings, closure and malformed facts.
 This file intentionally does NOT decide which public header advice to publish.
 """
 from sidecar import Model, unescape
+from semantic_header_policy import IMPORT_FEATURE
 
 FEATURE = 'source-header-policy-inputs'
 MUTATIONS = ('missing-policy', 'invalid-once', 'noncanonical-count',
              'library-count', 'import-count', 'missing-library',
              'duplicate-library', 'invalid-kind', 'noncanonical-key',
-             'missing-capability', 'missing-import', 'duplicate-import')
+             'missing-capability', 'missing-import', 'duplicate-import',
+             'missing-recipient', 'duplicate-recipient', 'unknown-recipient',
+             'nonnamespace-recipient', 'wrong-import-source', 'wrong-import-statement',
+             'noncanonical-import-key', 'missing-recipient-capability',
+             'unavailable-recipient-capability')
 HEADER = '''#Pragma Once
 #Inclib "fixture"
 #Libpath "percent% and\t tab"
@@ -27,6 +32,7 @@ def malformed_rows(rows, mutation):
     source_id = unescape(library[4]).split('\t')[0]
     policy = next(row for row in changed if row[0] == 'K' and row[3] == 'header-policy:' + source_id)
     operation = next(row for row in changed if row[0] == 'SOP' and row[2] == 'namespace-import')
+    imported = next(row for row in changed if row[0] == 'K' and row[3].startswith('header-import:'))
     fields = unescape(policy[4]).split('\t')
     if mutation == 'missing-policy': policy[3] = 'fixture-removed-policy'
     elif mutation == 'invalid-once': fields[0] = '2'
@@ -42,6 +48,30 @@ def malformed_rows(rows, mutation):
         capability[3] = 'unavailable'
     elif mutation == 'missing-import': changed.remove(operation)
     elif mutation == 'duplicate-import': changed.insert(-1, operation.copy())
+    elif mutation == 'missing-recipient': imported[3] = 'fixture-removed-import'
+    elif mutation == 'duplicate-recipient': changed.insert(-1, imported.copy())
+    elif mutation == 'unknown-recipient': imported[4] = source_id + '%09' + '99999999'
+    elif mutation == 'nonnamespace-recipient':
+        recipient = next(row[1] for row in changed if row[0] == 'S' and row[3] != '8')
+        imported[4] = source_id + '%09' + recipient
+    elif mutation == 'wrong-import-source':
+        other = next(row[1] for row in changed if row[0] == 'SRC' and row[1] != source_id)
+        imported[4] = other + '%09' + unescape(imported[4]).split('\t')[1]
+    elif mutation == 'wrong-import-statement':
+        imported[3] = 'header-import:99999999'
+    elif mutation == 'noncanonical-import-key':
+        imported[3] = 'header-import:0' + imported[3].split(':')[1]
+    elif mutation in ('missing-recipient-capability', 'unavailable-recipient-capability'):
+        capability = next(row for row in changed if row[:3] == ['CAP', '1', IMPORT_FEATURE])
+        if mutation == 'missing-recipient-capability': changed.remove(capability)
+        else: capability[3] = 'unavailable'
+    elif mutation in ('legacy-recipient-missing', 'legacy-recipient-unavailable'):
+        changed = [row for row in changed if not
+                   (row[0] == 'K' and row[3].startswith('header-import:') or
+                    mutation == 'legacy-recipient-missing' and row[0] == 'CAP' and row[2] == IMPORT_FEATURE)]
+        if mutation == 'legacy-recipient-unavailable':
+            capability = next(row for row in changed if row[:3] == ['CAP', '1', IMPORT_FEATURE])
+            capability[3] = 'unavailable'
     else: raise AssertionError(mutation)
     if mutation in ('invalid-once', 'noncanonical-count', 'library-count', 'import-count'):
         policy[4] = '%09'.join(fields)
@@ -54,7 +84,8 @@ def malformed_rows(rows, mutation):
 
 def check_header_policy(test):
     header = test.source(HEADER, 'policy.bi')
-    source = test.source('#Include "policy.bi"\nPrint PolicyScope.Value\n', 'header-policy.bas')
+    source = test.source('#Include "policy.bi"\nSub RunPolicy()\nUsing PolicyScope\nEnd Sub\n'
+                         'Namespace Client\nUsing PolicyScope\nEnd Namespace\nPrint PolicyScope.Value\n', 'header-policy.bas')
     macro_source = test.source('#define POLICY_LIBRARY "fixture"\n#inclib POLICY_LIBRARY\n'
                                '#define POLICY_DIRECTORY "fixture%path"\n#libpath POLICY_DIRECTORY\n'
                                'Print 1\n', 'macro-library.bas')
@@ -70,17 +101,29 @@ def check_header_policy(test):
             policy_source = next(identity for identity, row in model.source_contexts.items() if row[5] == 'include')
             policy = next(row for row in model.records['K'] if row[3] == 'header-policy:' + str(policy_source))
             test.assertEqual(policy[4], '1\t2\t1')
+            imported = next(row for row in model.records['K'] if row[3].startswith('header-import:'))
+            import_source, recipient = map(int, imported[4].split('\t'))
+            test.assertEqual(import_source, policy_source)
+            test.assertEqual(model.symbols[recipient][11], '0')
+            recipients = [int(row[4].split('\t')[1]) for row in model.records['K']
+                          if row[3].startswith('header-import:')]
+            test.assertEqual(sum(model.symbols[identity][11] == '0' for identity in recipients), 2)
+            test.assertEqual(sum(model.symbols[identity][11] != '0' for identity in recipients), 1)
             library_values = [row[4].split('\t') for row in model.records['K'] if row[3].startswith('header-library:')]
             test.assertEqual([unescape(fields[2]) for fields in library_values], ['fixture', 'percent% and\t tab'])
             for mode in ('bindings', 'expressions'):
                 compact = test.compile(source, mode=mode, backend=backend, extra=extra)
                 test.assertEqual(emitted.read_bytes(), baseline)
                 test.assertEqual(compact.capabilities[1][FEATURE], 'unavailable')
+                test.assertEqual(compact.capabilities[1][IMPORT_FEATURE], 'unavailable')
                 test.assertFalse(any(row[3].startswith('header-policy:') for row in compact.records['K']))
             rows = [line.split('\t') for line in artifact.read_text().splitlines()]
             for mutation in MUTATIONS:
                 with test.subTest(mutation=mutation), test.assertRaises(ValueError):
                     Model('\n'.join('\t'.join(row) for row in malformed_rows(rows, mutation)) + '\n')
+            for legacy in ('legacy-recipient-missing', 'legacy-recipient-unavailable'):
+                with test.subTest(legacy=legacy):
+                    Model('\n'.join('\t'.join(row) for row in malformed_rows(rows, legacy)) + '\n')
             test.invoke([macro_source], mode='off', backend=backend, extra=extra)
             macro_baseline = emitted.read_bytes()
             macro_model = test.compile(macro_source, backend=backend, extra=extra)

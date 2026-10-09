@@ -218,6 +218,10 @@ class SidecarTests(unittest.TestCase):
         from header_policy_inputs import check_header_policy
         check_header_policy(self)
 
+    def test_namespace_declaration_inputs(self) -> None:
+        from namespace_inputs import check_namespace_inputs
+        check_namespace_inputs(self)
+
     def test_keyword_configuration_contexts(self) -> None:
         from keyword_contexts import check_keyword_contexts
         check_keyword_contexts(self)

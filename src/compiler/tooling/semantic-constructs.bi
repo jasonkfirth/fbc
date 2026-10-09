@@ -17,6 +17,8 @@ declare function fbSemanticModelConstructBegin( byval token as integer ) as long
 declare sub fbSemanticModelConstructEnd( byval identity as longint, byref ending as LEX_LOCATION )
 declare sub fbSemanticModelAssociateStatement( byref domain as const string, byval subject as longint, byval statement as longint = 0 )
 declare sub fbSemanticModelStatementOperation( byref operation as const string )
+declare sub fbSemanticModelNamespaceDeclaration _
+	( byval construct as longint, byval sym as FBSYMBOL ptr, byval is_anonymous as integer )
 declare sub fbSemanticModelSelectInput( byval construct as longint, byval expression as longint, byval storage as FBSYMBOL ptr, byval is_const as integer )
 declare sub fbSemanticModelSelectClause( byval construct as longint, byval is_else as integer, byval alternatives as integer )
 declare sub fbSemanticModelSelectAlternative( byval construct as longint, byval ordinal as integer, byref kind as const string, byval operation as integer, byval first_expression as longint, byval last_expression as longint, byval is_last as integer )

@@ -40,7 +40,8 @@ declare sub fbSemanticModelExportBinding _
 private sub namespaceBegin _
 	( _
 		byval stk as FB_CMPSTMTSTK ptr, _
-		byval sym as FBSYMBOL ptr _
+		byval sym as FBSYMBOL ptr, _
+		byval is_anonymous as integer = FALSE _
 	)
 
 	if( sym = NULL ) then
@@ -50,6 +51,7 @@ private sub namespaceBegin _
 
 	stk->nspc.sym = sym
 	stk->nspc.levels = 1
+	fbSemanticModelNamespaceDeclaration(stk->semantic_identity, sym, is_anonymous)
 
 	symbNestBegin( sym, FALSE )
 end sub
@@ -92,7 +94,7 @@ sub cNamespaceStmtBegin( )
 		                    FB_CMPSTMT_MASK_ALL and (not FB_CMPSTMT_MASK_CODE) _
 		                                        and (not FB_CMPSTMT_MASK_EXTERN) _
 		                                        and (not FB_CMPSTMT_MASK_DATA))
-		namespaceBegin(stk, NULL)
+		namespaceBegin(stk, NULL, TRUE)
 		exit sub
 	end select
 

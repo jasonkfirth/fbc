@@ -420,6 +420,37 @@ sub fbSemanticModelStatementOperation( byref operation as const string )
 end sub
 
 '' -------------------------------------------------------------------------
+'' Parser-selected namespace occurrences
+'' -------------------------------------------------------------------------
+
+sub fbSemanticModelNamespaceDeclaration _
+	( byval construct as longint, byval sym as FBSYMBOL ptr, byval is_anonymous as integer )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	if( lex.ctx->semantic_probe ) then exit sub
+	if( (semantic_statement_depth = 0) or (semantic_compound_depth = 0) or _
+		(construct <= 0) or (hCurrentCompound( ) <> construct) or (sym = NULL) ) then
+		fbSemanticModelFailAt("namespace declaration has no construct owner")
+		exit sub
+	end if
+	with semantic_statements[semantic_statement_depth - 1]
+		if( (.token <> FB_TK_NAMESPACE) or (.owner <= 0) or _
+			(semantic_compounds[semantic_compound_depth - 1].statement <> .identity) or _
+			(sym->class <> FB_SYMBCLASS_NAMESPACE) ) then
+			fbSemanticModelFailAt("namespace declaration has inconsistent parser ownership")
+			exit sub
+		end if
+		'' Anonymous namespaces have compiler-generated symbol names. Named
+		'' namespaces may also lack physical bindings when their name is expanded.
+		'' The accepted grammar branch, not either spelling, owns this distinction.
+		dim as string value = fbSemanticModelNumber(.identity) + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelSymbolId(sym)) + TABCHAR + _
+			fbSemanticModelNumber(abs(is_anonymous <> FALSE))
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+			TABCHAR + "namespace-declaration:" + fbSemanticModelNumber(construct) + TABCHAR + fbSemanticModelEscape(value))
+	end with
+end sub
+
+'' -------------------------------------------------------------------------
 '' Accepted IF arm ownership
 '' -------------------------------------------------------------------------
 

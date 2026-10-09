@@ -290,7 +290,16 @@ LLVM object checks retain their independent Windows, Linux and macOS target matr
 `header_policy_inputs.py` checks accepted per-source pragma-once, library and
 namespace-import receipts across GCC, Clang and LLVM. Literal and macro-generated
 library values preserve escapes and origin ownership. Full and compact models
-leave emission unchanged, and twelve damaged receipt cases must be rejected.
+leave emission unchanged, and damaged receipt cases must be rejected.
 The reader also requires complete occurrence counts and same-module ownership.
+Recipient facts have their own capability; older producers that only retained
+operation counts remain readable. Tests distinguish global imports inside a
+procedure from imports into a named namespace.
+
+`namespace_inputs.py` checks parser-selected named and anonymous namespace
+openings, including qualified, reopened, aliased and macro-generated forms.
+It compares disabled, full and compact emission across GCC, Clang, LLVM and gas64, rejects
+damaged identities and ownership, and accepts older producers without this
+capability.
 
 <!-- end of README.md -->

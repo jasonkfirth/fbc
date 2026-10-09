@@ -10,6 +10,7 @@
 #include once "tooling/semantic-link.bi"
 #include once "tooling/semantic-macros.bi"
 #include once "tooling/semantic-coordinates.bi"
+#include once "tooling/semantic-constructs.bi"
 #include once "tooling/semantic-preprocessor.bi"
 #include once "parser/parser.bi"
 #include once "file.bi"
@@ -156,7 +157,19 @@ sub fbSemanticModelSourcePolicyInput _
 	case "once"
 		semantic_source_once(depth) = TRUE
 	case "namespace-import"
+		dim as longint statementid = fbSemanticModelCurrentStatement( )
+		dim as longint recipient = fbSemanticModelSymbolId(symbGetCurrentNamespc( ))
+		if( (statementid = 0) or (recipient = 0) ) then
+			fbSemanticModelFailAt("semantic-source.bas:import-recipient")
+			exit sub
+		end if
 		semantic_source_imports(depth) += 1
+		'' USING changes the current namespace even inside a procedure. Keep
+		'' its actual recipient rather than guessing scope from its statement.
+		dim as string payload = fbSemanticModelNumber(sourceid) + TABCHAR + fbSemanticModelNumber(recipient)
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + TABCHAR + _
+			"header-import:" + fbSemanticModelNumber(statementid) + TABCHAR + fbSemanticModelEscape(payload))
 	case "inclib", "libpath"
 		if( source = NULL ) then
 			fbSemanticModelFailAt("semantic-source.bas:library-location")

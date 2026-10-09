@@ -2563,6 +2563,17 @@ Counts belong to a source occurrence, so repeated includes and preincludes
 remain distinct. Skipped or inactive directives do not add accepted inputs.
 Namespace imports also retain the `namespace-import` statement operation.
 
+Full models also advertise `namespace-import-recipient-inputs available`.
+Each accepted USING statement retains its actual recipient namespace:
+
+    K symbol namespace-ID header-import:statement-ID source-ID<TAB>recipient-namespace-ID
+
+The property owner is the module's global namespace. The recipient is the
+namespace passed to the symbol import operation. A USING inside a procedure
+can still import into the global namespace; procedure ownership alone does
+not prove that its imported names stay local. A named namespace recipient
+contains the import within that namespace.
+
 Each accepted library directive has a separate property on the same owner:
 
     K symbol namespace-ID header-library:identity source-ID<TAB>kind<TAB>escaped-value<TAB>conditional-branch-ID
@@ -2574,9 +2585,28 @@ the property's namespace owner. Generated tokens do not acquire editable
 source ranges.
 
 Readers require same-module namespace ownership, complete occurrence receipts,
-canonical Boolean/count fields, one import receipt per accepted operation,
-same-source statement and recipient ownership, matching counts, and valid
-conditional branches. Compact models mark the capability unavailable and omit
-these properties. Older models do not prove these policies.
+canonical Boolean/count fields, matching counts, and valid conditional branches.
+The recipient capability additionally requires one import receipt per accepted
+operation, with same-source statement and recipient ownership. Earlier producers
+can retain operation counts without recipient facts and remain readable. Compact
+models mark both capabilities unavailable and omit these properties.
+
+## Original namespace declaration inputs
+
+Full models advertise `namespace-declaration-inputs available`. Each parser
+namespace construct retains its accepted statement, selected namespace symbol
+and canonical Boolean anonymous flag:
+
+    K symbol owner-ID namespace-declaration:construct-ID statement-ID<TAB>namespace-ID<TAB>anonymous
+
+The parser's grammar branch determines anonymity. Compiler-generated names or
+missing physical bindings cannot distinguish an anonymous namespace from a
+named namespace whose name came from a macro. Qualified openings retain each
+nested namespace construct; reopened namespaces retain their separate openings.
+
+Readers require complete namespace-construct coverage, canonical identities,
+matching statement and construct ownership, and same-module namespace symbols.
+Compact models mark the capability unavailable and omit these properties.
+Older models remain readable without claiming these parser observations.
 
 <!-- end of compiler-semantic-model.md -->
