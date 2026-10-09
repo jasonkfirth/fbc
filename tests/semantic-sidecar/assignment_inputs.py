@@ -83,7 +83,7 @@ def check_inputs(test):
     for backend in test.backends:
         with test.subTest(backend=backend):
             source = fixture(test)
-            output = test.working / ('assignments.c' if backend == 'gcc' else 'assignments.asm')
+            output = test.emission_path('assignments', backend)
             extra = ('-o', str(output))
             test.invoke([source], mode='off', backend=backend, extra=extra)
             plain = output.read_bytes()
@@ -134,7 +134,7 @@ counterValue += otherCounter
     for backend in test.backends:
         with test.subTest(backend=backend):
             source = test.source(source_text(body, 'assignment-selections.bas'), 'assignment-selections.bas')
-            output = test.working / ('assignment-selections.c' if backend == 'gcc' else 'assignment-selections.asm')
+            output = test.emission_path('assignment-selections', backend)
             extra = ('-o', str(output))
             test.invoke([source], mode='off', backend=backend, extra=extra)
             plain = output.read_bytes()

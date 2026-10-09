@@ -68,7 +68,7 @@ def check_inputs(test):
               if "' " in line and not line.startswith("'")}
     for backend in test.backends:
         with test.subTest(backend=backend):
-            emitted = test.working / ('initializer.c' if backend == 'gcc' else 'initializer.asm')
+            emitted = test.emission_path('initializer', backend)
             extra = ('-o', str(emitted))
             plain_result, _ = test.invoke([source], mode='off', backend=backend, extra=extra)
             plain = emitted.read_bytes()

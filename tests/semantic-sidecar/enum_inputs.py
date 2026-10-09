@@ -97,7 +97,7 @@ def check_inputs(test):
     for backend in test.backends:
         with test.subTest(backend=backend):
             source = fixture(test)
-            emitted = test.working / ('enum-inputs.c' if backend == 'gcc' else 'enum-inputs.asm')
+            emitted = test.emission_path('enum-inputs', backend)
             extra = ('-o', str(emitted))
             test.invoke([source], mode='off', backend=backend, extra=extra)
             plain = emitted.read_bytes()

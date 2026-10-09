@@ -102,7 +102,7 @@ def check_inputs(test):
     for backend in test.backends:
         with test.subTest(backend=backend):
             source = fixture(test)
-            output = test.working / ('if-arms.c' if backend == 'gcc' else 'if-arms.asm')
+            output = test.emission_path('if-arms', backend)
             extra = ('-o', str(output))
             test.invoke([source], mode='off', backend=backend, extra=extra)
             plain = output.read_bytes()

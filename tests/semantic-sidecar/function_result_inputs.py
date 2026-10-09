@@ -77,7 +77,7 @@ def check_results(test):
     for backend in test.backends:
         with test.subTest(backend=backend):
             source = test.source(text, filename)
-            emitted = test.working / ('result.c' if backend == 'gcc' else 'result.asm')
+            emitted = test.emission_path('result', backend)
             extra = ('-o', str(emitted))
             plain_result, _ = test.invoke([source], mode='off', backend=backend, extra=extra)
             plain = emitted.read_bytes()

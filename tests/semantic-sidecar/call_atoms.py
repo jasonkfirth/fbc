@@ -56,7 +56,7 @@ def check_atoms(test):
     for backend in test.backends:
         with test.subTest(backend=backend):
             source = test.source(source_text(BODY))
-            output = test.working / ('call-atoms.c' if backend == 'gcc' else 'call-atoms.asm')
+            output = test.emission_path('call-atoms', backend)
             extra = ('-o', str(output))
             test.invoke([source], mode='off', backend=backend, extra=extra)
             original = output.read_bytes()

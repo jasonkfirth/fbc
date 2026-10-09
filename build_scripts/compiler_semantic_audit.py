@@ -33,6 +33,13 @@ SEMANTIC_READER_FILES = (
     "semantic_repetitions.py",
     "aggregate_fields.py",
     "semantic_callbacks.py",
+    "semantic_array_storage.py",
+    "semantic_enums.py",
+    "semantic_iif.py",
+    "semantic_if.py",
+    "semantic_if_arms.py",
+    "semantic_assignment_inputs.py",
+    "semantic_assignment_storage.py",
 )
 
 

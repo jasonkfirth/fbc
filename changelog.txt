@@ -1,6 +1,7 @@
 Version 1.20.4
 
 [changed]
+- compiler semantic tests: select each backend's actual emission suffix when comparing full and compact modes, and freeze every new reader dependency for standalone self/corpus audits.
 - compiler semantic model: retain the original typed formal and default initializer before an equal callback or repeated prototype reuses a canonical signature, so source assignment receipts remain complete after the unused header is freed.
 - compiler semantic model: export procedure and static-address assignment-storage offsets as leaf atoms, retaining their symbol and byte offset without treating the executable AST's preserved optimization child as a second value computation.
 - compiler semantic model: bind written UDT and typedef names in constructor expressions, record rejected QB intrinsic definitions without fabricated macro identities, and omit nonphysical include directive ranges while retaining written logical-remap receipts.

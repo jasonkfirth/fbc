@@ -309,6 +309,13 @@ class SidecarTests(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
         return path
 
+    def emission_path(self, stem: str, backend: str) -> Path:
+        # -r stops at each backend's native representation. The driver
+        # replaces a requested suffix with .c, .ll, or .asm accordingly.
+        suffix = {"gcc": ".c", "clang": ".c", "llvm": ".ll",
+                  "gas": ".asm", "gas64": ".asm"}[backend]
+        return self.working / (stem + suffix)
+
     def invoke(self, sources: list[Path], *, mode: str = "full", backend: str = "gcc",
                success: bool = True, extra: tuple[str, ...] = (), emit: bool = True,
                environment: dict[str, str] | None = None

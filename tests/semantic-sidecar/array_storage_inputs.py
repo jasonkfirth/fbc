@@ -101,7 +101,7 @@ def check_inputs(test):
               if "' " in text and not text.startswith("'")}
     for backend in test.backends:
         with test.subTest(backend=backend):
-            emitted = test.working / ('storage.c' if backend == 'gcc' else 'storage.asm')
+            emitted = test.emission_path('storage', backend)
             extra = ('-o', str(emitted))
             plain_result, _ = test.invoke([source], mode='off', backend=backend, extra=extra)
             plain = emitted.read_bytes()

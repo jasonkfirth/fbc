@@ -51,7 +51,7 @@ def check_inputs(test):
                 'macro': ('pointer-dereference-input', 1)}
     for backend in test.backends:
         with test.subTest(backend=backend):
-            emitted = test.working / ('pointer.c' if backend == 'gcc' else 'pointer.asm')
+            emitted = test.emission_path('pointer', backend)
             extra = ('-o', str(emitted))
             plain_result, _ = test.invoke([source], mode='off', backend=backend, extra=extra)
             plain = emitted.read_bytes()

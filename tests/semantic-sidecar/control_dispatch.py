@@ -82,7 +82,7 @@ def check_dispatches(test):
     for case, (language, body, expected) in dispatch_cases().items():
         source = test.source(source_text(case + '.bas', body, language), case + '.bas')
         for backend in test.backends:
-            output = test.working / ('dispatch.c' if backend == 'gcc' else 'dispatch.asm')
+            output = test.emission_path('dispatch', backend)
             extra = ('-o', str(output))
             with test.subTest(case=case, backend=backend, mode='off'):
                 test.invoke([source], backend=backend, mode='off', extra=extra)

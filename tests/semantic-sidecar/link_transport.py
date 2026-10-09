@@ -74,7 +74,7 @@ def check_frontend(test, native_reader=None):
         for with_ast in (False, True):
             with test.subTest(backend=backend, ast=with_ast):
                 before, _, _ = invoke(test, [source], backend, observed=False)
-                emitted = source.with_suffix('.asm' if backend != 'gcc' else '.c')
+                emitted = test.emission_path(source.stem, backend)
                 baseline = emitted.read_bytes()
                 result, artifact, ast = invoke(test, [source], backend, model=with_ast)
                 test.assertEqual(result.returncode, 0, result.stdout + result.stderr)

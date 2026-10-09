@@ -31,7 +31,7 @@ def check_initializers(test):
     for backend in test.backends:
         with test.subTest(backend=backend):
             source = test.source(source_text(BODY, 'scalar-initializers.bas'), 'scalar-initializers.bas')
-            output = test.working / ('initializers.c' if backend == 'gcc' else 'initializers.asm')
+            output = test.emission_path('initializers', backend)
             extra = ('-o', str(output))
             test.invoke([source], mode='off', backend=backend, extra=extra)
             plain = output.read_bytes()
