@@ -41,6 +41,9 @@ type SEMANTIC_MACRO_INVOCATION
 	identity as longint
 	parent as longint
 	source as LEX_LOCATION
+	units as integer
+	resume_length as integer
+	has_output as integer
 end type
 dim shared as SEMANTIC_MACRO_INVOCATION ptr semantic_macro_invocations
 dim shared as integer semantic_macro_invocation_count, semantic_macro_invocation_capacity
@@ -318,6 +321,9 @@ function fbSemanticModelMacroBegin( byval sym as FBSYMBOL ptr, byref source as L
 			.identity = identity
 			.parent = parent
 			.source = source
+			.units = 0
+			.resume_length = 0
+			.has_output = FALSE
 		end with
 		semantic_macro_invocation_count += 1
 	end if
@@ -363,8 +369,54 @@ function fbSemanticModelMacroTokenOrigin( ) as longint
 	return lex.ctx->semantic_eval_origin
 end function
 
+'' Scanner columns describe the physical file, not the replacement buffer.
+'' deflen includes the resumed parent tail. Subtract that tail before finding
+'' the token's actual offset; look-ahead tokens keep their own saved offset.
+sub fbSemanticModelMacroTokenStart( byref source as LEX_LOCATION )
+	source.macro_start_unit = 0
+	source.macro_unit_valid = FALSE
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (source.macro_identity = 0) ) then exit sub
+	dim as integer index = hInvocationIndex(source.macro_identity)
+	if( index < 0 ) then exit sub
+	with semantic_macro_invocations[index]
+		if( .has_output = FALSE ) then exit sub
+		dim as longint remaining = clngint(lex.ctx->deflen) - .resume_length
+		if( (remaining <= 0) or (remaining > .units) ) then exit sub
+		source.macro_start_unit = .units - remaining
+		source.macro_unit_valid = TRUE
+	end with
+end sub
+
+'' Only the first token is exported here. Linking every consumed argument
+'' token to a CALL would incorrectly label a call written in the macro body
+'' as an argument-supplied call. Nested replacement starts retain their
+'' saved parent offsets without replaying macro expansion.
+sub fbSemanticModelMacroExpressionInput( byval expression as longint, byref source as LEX_LOCATION )
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (fbSemanticModelMacroProvenanceEnabled( ) = FALSE) ) then exit sub
+	dim as LEX_LOCATION origin = source
+	for depth as integer = 0 to 63
+		if( (origin.macro_identity = 0) or (origin.macro_unit_valid = FALSE) ) then exit sub
+		fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(expression) + _
+			TABCHAR + "macro-input-unit:" + fbSemanticModelNumber(origin.macro_identity) + TABCHAR + fbSemanticModelNumber(origin.macro_start_unit))
+		dim as integer index = hInvocationIndex(origin.macro_identity)
+		if( index < 0 ) then exit sub
+		origin = semantic_macro_invocations[index].source
+	next
+	fbSemanticModelFailAt("macro expression input depth exceeded")
+end sub
+
 sub fbSemanticModelMacroPushOrigin( byval identity as longint, byval resume_length as integer, byval units as integer )
 	if( (identity = 0) or (units = 0) ) then exit sub
+	if( fbSemanticModelFullEnabled( ) ) then
+		dim as integer index = hInvocationIndex(identity)
+		if( index >= 0 ) then
+			with semantic_macro_invocations[index]
+				.units = units
+				.resume_length = resume_length
+				.has_output = TRUE
+			end with
+		end if
+	end if
 	if( lex.ctx->semantic_macro_depth >= LEX_MAXMACROSTACK ) then
 		fbSemanticModelFailAt("semantic-macros.bas:348")
 		exit sub
@@ -478,6 +530,16 @@ sub fbSemanticModelMacroResult _
 	fbSemanticModelAppendProvenance("ME" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + outcome + TABCHAR + _
 		kind + TABCHAR + fbSemanticModelNumber(units) + TABCHAR + fbSemanticModelEscape(text) + TABCHAR + _
 		fbSemanticModelNumber(arguments) + TABCHAR + hLocation(result_location))
+	'' The name anchor excludes argument and closing-parenthesis lines. Preserve
+	'' the whole written invocation separately for source metrics. Generated
+	'' replacement tokens remain nonphysical and never become an editable span.
+	if( fbSemanticModelFullEnabled( ) ) then
+		dim as integer index = hInvocationIndex(identity)
+		if( index >= 0 ) then
+			fbSemanticModelExportCoordinates("macro-attempt", identity, "invocation", _
+				semantic_macro_invocations[index].source, result_location)
+		end if
+	end if
 end sub
 
 sub fbSemanticModelMacroLifecycle _

@@ -29,8 +29,13 @@
 #include once "ast/ast.bi"
 #include once "tooling/semantic-diagnostics.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-variable-names.bi"
 
 declare function fbSemanticModelFullEnabled( ) as integer
+
+declare sub fbSemanticModelArrayDimensionInput _
+	( byval upper as ASTNODE ptr, byref route as const string, byval dimension as integer, _
+	  byref source as LEX_LOCATION, byval nonphysical_start as longint )
 
 declare function fbSemanticModelDeclarationGroup(byval token as integer, byref owner as longint) as longint
 declare sub fbSemanticModelScalarStringDeclaration(byval sym as FBSYMBOL ptr, byval tree as ASTNODE ptr, _
@@ -935,7 +940,11 @@ private function hVarInit _
 		exit function
 	end if
 
+	dim as integer semantic_literal_scope
+	if( (symbIsLocal(sym) = FALSE) or symbIsStatic(sym) ) then _
+		semantic_literal_scope = fbSemanticModelBeginLiteralInitializer(FB_SEM_LITERAL_STATIC)
 	var initree = cInitializer( sym, FB_INIOPT_ISINI, FB_DATATYPE_INVALID, NULL, @semantic_site )
+	fbSemanticModelEndLiteralInitializer(semantic_literal_scope, sym)
 	if( initree = NULL ) then
 		return NULL
 	end if
@@ -1739,7 +1748,9 @@ function cVarDecl _
 			''
 			'' DIM AS INTEGER x, y$
 			if( suffix <> FB_DATATYPE_INVALID ) then
+				fbSemanticDiagnosticsAt("declaration-suffix-as-conflict", diagnostic_site)
 				errReportEx( FB_ERRMSG_SYNTAXERROR, @id )
+				fbSemanticDiagnosticsContext("")
 				'' error recovery: the symbol gets the
 				'' type specified 'AS'
 				suffix = FB_DATATYPE_INVALID
@@ -1761,7 +1772,9 @@ function cVarDecl _
 			if( lexGetToken( ) = FB_TK_AS ) then
 				'' Suffix? Cannot have both suffix and 'AS DataType'
 				if( dtype <> FB_DATATYPE_INVALID ) then
+					fbSemanticDiagnosticsAt("declaration-suffix-as-conflict", diagnostic_site)
 					errReport( FB_ERRMSG_SYNTAXERROR )
+					fbSemanticDiagnosticsContext("")
 					dtype = FB_DATATYPE_INVALID
 				end if
 
@@ -1954,8 +1967,10 @@ function cVarDecl _
 		if( varexpr = NULL ) then
 			if( token = FB_TK_REDIM ) then
 				fbSemanticModelExportBinding(sym, semantic_site, semantic_new_symbol)
+				if( semantic_new_symbol ) then fbSemanticModelVariableDeclarationSpelling(sym, @id, "declared", semantic_site)
 			else
 				fbSemanticModelExportBinding(sym, semantic_site, TRUE)
+				fbSemanticModelVariableDeclarationSpelling(sym, @id, "declared", semantic_site)
 			end if
 		end if
 
@@ -2047,6 +2062,9 @@ end function
 ''    Expression [TO Expression]
 ''
 private sub cArrayDimension( byref dimensions as integer, exprTB() as ASTNODE ptr )
+	dim as LEX_LOCATION semantic_source = lexGetCurrentLocation( )
+	dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
+	dim as string semantic_route = "explicit"
 	'' 1st expression: lbound or ubound
 	'' (depends on whether there's a TO and a 2nd expression following)
 	if( hMatchEllipsis( ) ) then
@@ -2075,9 +2093,11 @@ private sub cArrayDimension( byref dimensions as integer, exprTB() as ASTNODE pt
 		end if
 	else
 		'' 1st expression was ubound, not lbound
+		semantic_route = "implicit"
 		exprTB(dimensions,1) = exprTB(dimensions,0)
 		exprTB(dimensions,0) = astNewCONSTi( env.opt.base )
 	end if
+	fbSemanticModelArrayDimensionInput(exprTB(dimensions,1), semantic_route, dimensions, semantic_source, semantic_nonphysical)
 end sub
 
 ''
@@ -2117,8 +2137,11 @@ sub cArrayDecl _
 		'' previously)
 		if( (lexGetToken( ) = FB_TK_ANY) and _
 		    ((dimensions = 0) or (have_bounds = FALSE)) ) then
+			dim as LEX_LOCATION semantic_source = lexGetCurrentLocation( )
+			dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
 			have_bounds = FALSE
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
+			fbSemanticModelArrayDimensionInput(NULL, "placeholder", dimensions, semantic_source, semantic_nonphysical)
 		elseif( have_bounds = FALSE ) then
 			errReport( FB_ERRMSG_EXPECTEDANY )
 		else
@@ -2131,7 +2154,9 @@ sub cArrayDecl _
 	loop while( hMatch( CHAR_COMMA ) )
 end sub
 
-private function hBuildAutoVarInitializer( byval sym as FBSYMBOL ptr, byval expr as ASTNODE ptr ) as ASTNODE ptr
+private function hBuildAutoVarInitializer _
+	( byval sym as FBSYMBOL ptr, byval expr as ASTNODE ptr, _
+	  byref semantic_site as LEX_LOCATION ) as ASTNODE ptr
 	'' build a ini-tree
 	var initree = astTypeIniBegin( sym->typ, sym->subtype, symbIsLocal( sym ) )
 
@@ -2168,6 +2193,11 @@ private function hBuildAutoVarInitializer( byval sym as FBSYMBOL ptr, byval expr
 
 		if( expr <> NULL ) then
 			if( is_ctorcall ) then
+				'' Capture the selected constructor before TYPEINI lowering loses
+				'' the relationship between this inferred variable and its call.
+				if( astIsCALL( expr ) ) then
+					fbSemanticModelExportImplicitCall(sym, astGetSymbol(expr), "initializer-constructor", semantic_site)
+				end if
 				astTypeIniAddCtorCall( initree, sym, expr )
 			else
 				'' no proper ctor, try an assign
@@ -2180,8 +2210,10 @@ private function hBuildAutoVarInitializer( byval sym as FBSYMBOL ptr, byval expr
 	function = initree
 end function
 
-private function hCheckAndBuildAutoVarInitializer( byval sym as FBSYMBOL ptr, byval expr as ASTNODE ptr ) as ASTNODE ptr
-	var initree = hBuildAutoVarInitializer( sym, expr )
+private function hCheckAndBuildAutoVarInitializer _
+	( byval sym as FBSYMBOL ptr, byval expr as ASTNODE ptr, _
+	  byref semantic_site as LEX_LOCATION ) as ASTNODE ptr
+	var initree = hBuildAutoVarInitializer( sym, expr, semantic_site )
 	hValidateGlobalVarInit( sym, initree )
 	return initree
 end function
@@ -2210,6 +2242,12 @@ private sub cAutoVarDecl( byval baseattrib as FB_SYMBATTRIB )
 		hSkipStmt( )
 		exit sub
 	end if
+
+	'' Inference is an original grammar choice, not legacy implicit typing.
+	'' Reserve the group before parsing an initializer can enter other scopes.
+	dim as longint semantic_owner, semantic_group
+	dim as integer semantic_ordinal
+	semantic_group = fbSemanticModelDeclarationGroup(FB_TK_VAR, semantic_owner)
 
 	'' VAR
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -2254,7 +2292,8 @@ private sub cAutoVarDecl( byval baseattrib as FB_SYMBATTRIB )
 
 		'' get id
 		dim as integer suffix = any
-		dim as LEX_LOCATION diagnostic_site = lexGetCurrentLocation( )
+		dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
+		dim as LEX_LOCATION diagnostic_site = semantic_site
 		if( diagnostic_site.is_physical = FALSE ) then
 			dim as LEX_LOCATION preceding_site = lexGetLastLocation( )
 			if( preceding_site.is_physical ) then diagnostic_site = preceding_site
@@ -2283,6 +2322,9 @@ private sub cAutoVarDecl( byval baseattrib as FB_SYMBATTRIB )
 		'' Parse initializer expression
 		'' (before adding the symbol, so that it can't be used in the initializer)
 		dim expr as ASTNODE ptr
+		dim as integer semantic_literal_scope
+		if( (parser.scope <= FB_MAINSCOPE) or ((attrib and FB_SYMBATTRIB_STATIC) <> 0) ) then _
+			semantic_literal_scope = fbSemanticModelBeginLiteralInitializer(FB_SEM_LITERAL_STATIC)
 		var is_byref = (attrib and FB_SYMBATTRIB_REF) orelse (sym andalso symbIsRef( sym ))
 		if( is_byref ) then
 			'' Reference; must be initialized with a var/deref, not an arbitrary expression
@@ -2345,12 +2387,19 @@ private sub cAutoVarDecl( byval baseattrib as FB_SYMBATTRIB )
 		'' add var after parsing the expression, or the the var itself could be used
 		sym = hAddVar( sym, parent, id, NULL, dtype, subtype, _
 		               lgt, FALSE, attrib, 0, FALSE, dTB(), chain_, FB_TK_VAR, diagnostic_site )
+		fbSemanticModelEndLiteralInitializer(semantic_literal_scope, sym)
 
 		if( sym <> NULL ) then
+			'' Keep the actual name site, including nonphysical macro origins.
+			'' Diagnostic fallback coordinates must not become binding ranges.
+			fbSemanticModelExportBinding(sym, semantic_site, TRUE)
+			semantic_ordinal += 1
+			fbSemanticModelVariableDeclarationSpelling(sym, @id, "inferred", semantic_site)
+			fbSemanticModelDeclarationType(semantic_group, semantic_owner, semantic_ordinal, sym, "inferred", 2, semantic_site)
 			if( symbIsRef( sym ) ) then
 				expr = hCheckAndBuildByrefInitializer( sym, expr )
 			else
-				expr = hCheckAndBuildAutoVarInitializer( sym, expr )
+				expr = hCheckAndBuildAutoVarInitializer( sym, expr, semantic_site )
 			end if
 
 			'' add to AST
@@ -2370,6 +2419,7 @@ private sub cAutoVarDecl( byval baseattrib as FB_SYMBATTRIB )
 
 		lexSkipToken( )
 	loop
+	fbSemanticModelDeclarationGroupEnd(semantic_group, semantic_owner, semantic_ordinal)
 end sub
 
 '' end of parser/declarations/parser-decl-var.bas

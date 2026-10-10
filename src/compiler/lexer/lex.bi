@@ -77,6 +77,8 @@ type LEX_LOCATION
 	end_column		as integer
 	is_physical		as integer
 	macro_identity	as longint                 '' actual expansion supplying this token, or zero
+	macro_start_unit as longint                '' offset in that replacement, before consuming the token
+	macro_unit_valid as integer                '' replacement offset is available, independent of physical coordinates
 	source_context  as longint                 '' opened source occurrence, independent of #line
 	raw_start_line  as integer
 	raw_start_column as integer
@@ -109,6 +111,15 @@ type FBTOKEN
 	'' Exact alphabetic numeric suffix, separate from canonical value text.
 	'' Observation only: punctuation suffixes retain their existing handling.
 	numeric_suffix  as zstring * 4
+	'' Full-model observations are independent of the 64-unit numeric buffer.
+	'' Fixed storage keeps lookahead copies safe and bounds each token's cost.
+	numeric_original as zstring * 1025
+	numeric_original_length as integer
+	numeric_original_digits as integer
+	numeric_original_dot as integer
+	numeric_original_exponent as integer
+	'' Observation only: the string reader discarded units after its limit.
+	literal_truncated as integer
 
 	after_space     as integer
 

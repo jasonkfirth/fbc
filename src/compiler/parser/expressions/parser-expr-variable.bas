@@ -29,6 +29,8 @@
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-diagnostics.bi"
+#include once "tooling/semantic-variable-names.bi"
 
 declare sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
 declare sub fbSemanticModelExportBinding _
@@ -1486,7 +1488,17 @@ function cVariableEx _
 
 	if( sym = NULL ) then
 		if( env.opt.explicit ) then
+			'' The failed lookup belongs to this identifier, not the preceding
+			'' expression token. Generated names retain a written invocation
+			'' point only when the lexer actually observed one.
+			dim as LEX_LOCATION diagnostic_site = lexGetCurrentLocation( )
+			if( diagnostic_site.is_physical = FALSE ) then
+				dim as LEX_LOCATION preceding_site = lexGetLastLocation( )
+				if( preceding_site.is_physical ) then diagnostic_site = preceding_site
+			end if
+			fbSemanticDiagnosticsAt("", diagnostic_site)
 			errReportUndef( FB_ERRMSG_VARIABLENOTDECLARED, id )
+			fbSemanticDiagnosticsContext("")
 			'' Error recovery in -lang fb: don't declare the variable implicitly;
 			'' hVarAddUndecl() assumes other dialects by using FB_SYMBOPT_UNSCOPE.
 			return NULL
@@ -1514,6 +1526,7 @@ function cVariableEx _
 		dim as LEX_LOCATION declaration_site = lexGetCurrentLocation( )
 		fbSemanticModelExportBinding(sym, declaration_site, TRUE)
 		fbSemanticModelExportDeclaration(sym, declaration_site, "implicit-variable", *id)
+		fbSemanticModelVariableDeclarationSpelling(sym, id, "implicit", declaration_site)
 
 		'' show warning if inside an expression (ie: var was never set)
 		if( fbGetIsExpression( ) ) then

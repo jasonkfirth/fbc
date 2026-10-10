@@ -27,6 +27,7 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-hooks.bi"
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -343,7 +344,7 @@ private function hFindId _
 					'' skip ID, ctorCall() is also used by type<>(...)
 					lexSkipToken( LEXCHECK_POST_SUFFIX )
 
-					return cStrIdxOrMemberDeref( cCtorCall( sym ) )
+					return cStrIdxOrMemberDeref( cCtorCall( sym, @semantic_site ) )
 				end if
 
 			case FB_SYMBCLASS_TYPEDEF
@@ -359,7 +360,7 @@ private function hFindId _
 					'' skip ID, ctorCall() is also used by type<>(...)
 					lexSkipToken( LEXCHECK_POST_SUFFIX )
 
-					return cStrIdxOrMemberDeref( cCtorCall( symbGetSubtype( sym ) ) )
+					return cStrIdxOrMemberDeref( cCtorCall( symbGetSubtype( sym ), @semantic_site ) )
 				end if
 
 			case FB_SYMBCLASS_RESERVED
@@ -459,8 +460,12 @@ private function hCheckId _
 	'' Undeclared identifiers in PP expressions are upper-cased and then
 	'' turned into string literals, allowing them to be compared
 	if( fbGetIsPP( ) ) then
+		dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
+		dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
+		dim as string semantic_spelling = *lexGetText( )
 		expr = astNewCONSTstr( ucase( *lexGetText( ) ) )
 		lexSkipToken( )
+		fbSemanticModelPPIdentifier(expr, NULL, semantic_spelling, semantic_site, semantic_nonphysical)
 		return expr
 	end if
 

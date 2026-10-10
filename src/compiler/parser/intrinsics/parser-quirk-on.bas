@@ -26,6 +26,7 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "tooling/semantic-constructs.bi"
+#include once "tooling/semantic-diagnostics.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
 
@@ -176,12 +177,17 @@ function cOnStmt _
 	function = FALSE
 
 	'' ON
+	dim as LEX_LOCATION semantic_open = lexGetCurrentLocation( )
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 	'' LOCAL?
 	if( hMatch( FB_TK_LOCAL, LEXCHECK_POST_SUFFIX ) ) then
 		if( fbIsModLevel( ) ) then
+			if( lexGetToken( ) = FB_TK_ERROR andalso lexGetLookAhead( 1 ) = FB_TK_RESUME andalso lexGetLookAhead( 2 ) = FB_TK_NEXT ) then
+				fbSemanticDiagnosticsAt("error-resume-next-syntax", semantic_open)
+			end if
 			errReport( FB_ERRMSG_SYNTAXERROR, TRUE )
+			fbSemanticDiagnosticsContext("")
 			exit function
 		end if
 		islocal = TRUE
@@ -227,7 +233,14 @@ function cOnStmt _
 		isgoto = FALSE
 
 	case else
+		'' FreeBASIC accepts ON ERROR GOTO, not Visual Basic's ON ERROR
+		'' RESUME NEXT. Retain the parser-selected failure context while the
+		'' original diagnostic and recovery behavior remain unchanged.
+		if( expr = NULL andalso lexGetToken( ) = FB_TK_RESUME andalso lexGetLookAhead( 1 ) = FB_TK_NEXT ) then
+			fbSemanticDiagnosticsAt("error-resume-next-syntax", semantic_open)
+		end if
 		errReport( FB_ERRMSG_SYNTAXERROR )
+		fbSemanticDiagnosticsContext("")
 		'' error recovery: skip stmt
 		hSkipStmt( )
 		return TRUE

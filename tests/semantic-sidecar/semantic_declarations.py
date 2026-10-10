@@ -35,7 +35,7 @@ def validate_declaration_types(model, number, subject_modules):
                 raise ValueError('Missing or repeated declaration statement')
             if int(symbol[3]) not in (3, 8) or int(header[4]) != owner and (header[4] != '0' or symbol[3] != '8'):
                 raise ValueError('Declaration group belongs to another procedure')
-            if fields[1] not in ('dim', 'static', 'common', 'extern', 'const'):
+            if fields[1] not in ('dim', 'static', 'common', 'extern', 'const', 'var'):
                 raise ValueError('Unknown declaration grammar kind')
             groups[identity] = owner, module, statement, fields[1]
             statements.add(statement)
@@ -75,6 +75,9 @@ def validate_declaration_types(model, number, subject_modules):
         if group[3] == 'const':
             if symbol[3] != '2' or initializer != '2' or form not in ('as', 'suffix', 'inferred'):
                 raise ValueError('Invalid constant declaration type')
+        elif group[3] == 'var':
+            if symbol[3] != '1' or initializer != '2' or form != 'inferred':
+                raise ValueError('Invalid inferred variable declaration type')
         elif symbol[3] != '1' or form not in ('as', 'suffix', 'implicit') or group[3] == 'extern' and initializer != '0':
             raise ValueError('Invalid variable declaration type')
         if initializer == '3':
@@ -90,7 +93,7 @@ def validate_declaration_types(model, number, subject_modules):
         if model.capabilities[module].get('declaration-typing-inputs') == 'available' and 'formal-span-kind' in model.properties['symbol', identity] and identity not in formals:
             raise ValueError('Original formal lacks its written type')
     for identity, statement in model.statements.items():
-        if int(statement[9]) in (306, 307, 308, 311, 335) and model.statement_endings[identity][2] == 'declaration' and model.capabilities[int(statement[7])].get('declaration-typing-inputs') == 'available' and identity not in statements:
+        if int(statement[9]) in (306, 307, 308, 309, 311, 335) and model.statement_endings[identity][2] == 'declaration' and model.capabilities[int(statement[7])].get('declaration-typing-inputs') == 'available' and identity not in statements:
             raise ValueError('Accepted declaration lacks its type group')
 
 # end of semantic_declarations.py

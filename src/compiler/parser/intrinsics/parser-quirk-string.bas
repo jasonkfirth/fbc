@@ -795,7 +795,15 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		lexSkipToken( iif( is_wstr, LEXCHECK_POST_SUFFIX, LEXCHECK_POST_STRING_SUFFIX ) )
 
 		hMatchLPRNT( )
+		dim as LEX_LOCATION format_argument_start = lexGetCurrentLocation( )
+		dim as longint format_argument_nonphysical_start = lexGetNonphysicalTokenCount( )
 		hMatchExpressionEx( expr1, FB_DATATYPE_INTEGER )
+		dim as longint format_arguments(0 to 0)
+		'' rtlToStr/rtlToWstr may consume this AST while folding a constant.
+		'' Keep its immutable parser identity before lowering the formatter.
+		format_arguments(0) = fbSemanticModelOriginalExpression _
+			(expr1, format_argument_start, format_argument_nonphysical_start, _
+			 lexGetLastLocation( ), lexGetNonphysicalTokenCount( ))
 		hMatchRPRNT( )
 
 		if( is_wstr = FALSE ) then
@@ -808,6 +816,8 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 			expr1 = astNewCONSTi( 0 )
 		end if
 
+		dim as string format_kind = iif(is_wstr, "wstr", iif(fbLangIsSet(FB_LANG_QB), "str-qb", "str"))
+		fbSemanticModelStringIntrinsic(expr1, format_kind, 1, format_arguments(), FALSE, intrinsic_start, intrinsic_nonphysical_start)
 		function = expr1
 
 	'' MID '(' Expression ',' Expression (',' Expression)? ')'

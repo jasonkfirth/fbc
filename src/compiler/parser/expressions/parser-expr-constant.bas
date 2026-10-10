@@ -27,6 +27,8 @@
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
 
+declare sub fbSemanticModelStringLiteralInput( byval expr as ASTNODE ptr, byval token as FBTOKEN ptr )
+
 declare sub fbSemanticModelExportBinding _
 	( _
 		byval sym as FBSYMBOL ptr, _
@@ -36,6 +38,7 @@ declare sub fbSemanticModelExportBinding _
 
 function cConstant( byval sym as FBSYMBOL ptr ) as ASTNODE ptr
 	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
+	dim as string semantic_spelling = *lexGetText( )
 	dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
 
 	'' Check visibility of constant
@@ -49,6 +52,7 @@ function cConstant( byval sym as FBSYMBOL ptr ) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = astBuildConst( sym )
 	fbSemanticModelConstantExpression(expr, sym, semantic_site, semantic_nonphysical)
+	fbSemanticModelPPIdentifier(expr, sym, semantic_spelling, semantic_site, semantic_nonphysical)
 	function = expr
 end function
 
@@ -125,10 +129,14 @@ function cStrLiteral( byval skiptoken as integer ) as ASTNODE ptr
 			sym = symbAllocWstrConst( ws, lgt )
 		end if
 
+		'' Observe each accepted token before adjacent literals are folded into
+		'' one value. A named constant is not a directly parsed literal token.
+		dim as ASTNODE ptr semantic_literal = astNewVAR( sym )
+		fbSemanticModelStringLiteralInput(semantic_literal, lex.ctx->head)
 		if( expr = NULL ) then
-			expr = astNewVAR( sym )
+			expr = semantic_literal
 		else
-			expr = astNewBOP( AST_OP_ADD, expr, astNewVAR( sym ) )
+			expr = astNewBOP( AST_OP_ADD, expr, semantic_literal )
 		end if
 
 		if( skiptoken ) then

@@ -8346,13 +8346,16 @@ private sub emitmemfill(byval v1 as IRVREG ptr,byval v2 as IRVREG ptr,byval fill
 						dim as ulongint fill4 = (fillchar and GAS64_BYTE_VALUE_MASK)
 						fill4 or= fill4 shl GAS64_BYTE_BITS
 						fill4 or= fill4 shl GAS64_WORD_BITS
+						'' Two stores share the destination address. Folding its
+						'' LEA into the first store would leave the second store
+						'' using an uninitialized register. Keep this sequence intact.
 						if v1->typ=IR_VREGTYPE_REG then
-							asm_code("mov DWORD PTR ["+op1+"], " + str(fill4))
-							asm_code("mov DWORD PTR 4["+op1+"], " + str(fill4))
+							asm_code("mov DWORD PTR ["+op1+"], " + str(fill4),KNOOPTIM)
+							asm_code("mov DWORD PTR 4["+op1+"], " + str(fill4),KNOOPTIM)
 						else
 							asm_code(instruc+"rax, "+op1)
-							asm_code("mov DWORD PTR [rax], " + str(fill4))
-							asm_code("mov DWORD PTR 4[rax], " + str(fill4))
+							asm_code("mov DWORD PTR [rax], " + str(fill4),KNOOPTIM)
+							asm_code("mov DWORD PTR 4[rax], " + str(fill4),KNOOPTIM)
 						end if
 					end if
 			end select

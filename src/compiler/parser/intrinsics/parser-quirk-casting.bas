@@ -259,6 +259,7 @@ function cAnonType( ) as ASTNODE ptr
 	dim as ASTNODE ptr initree = any
 	dim as FBSYMBOL ptr sym = any, subtype = any
 	dim as integer dtype = any, is_explicit = any
+	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
 
 	'' TYPE
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -320,7 +321,7 @@ function cAnonType( ) as ASTNODE ptr
 
 		'' Has a ctor?
 		if( symbGetCompCtorHead( subtype ) ) then
-			return cCtorCall( subtype )
+			return cCtorCall( subtype, @semantic_site )
 		end if
 	end if
 

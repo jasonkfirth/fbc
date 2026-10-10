@@ -26,7 +26,7 @@
 #include once "parser/parser.bi"
 
 declare sub hUndefSymbol()
-declare sub fbSemanticModelOptionDeclaration( byval is_base as integer, byval value as longint )
+declare sub fbSemanticModelOptionDeclaration( byval is_base as integer, byval value as longint, byval route as integer )
 declare sub fbSemanticModelKeywordRemoved( byval tokenid as integer )
 
 '' OptDecl  =  OPTION (BYVAL|DYNAMIC|STATIC|GOSUB|EXPLICIT|PRIVATE|ESCAPE|BASE NUM_LIT|NOKEYWORD ...|NOGOSUB)
@@ -45,21 +45,28 @@ sub cOptDecl( )
 	'' OPTION
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
 	dim as integer is_base = FALSE
+	'' Stable receipt codes describe the accepted grammar route, independently
+	'' of whether it changes a default. The semantic format documents the codes.
+	dim as integer route = 0
 
 	select case as const lexGetToken( )
 	case FB_TK_BYVAL
+		route = 1
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 		env.opt.parammode = FB_PARAMMODE_BYVAL
 
 	case FB_TK_DYNAMIC
+		route = 2
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 		env.opt.dynamic = TRUE
 
 	case FB_TK_STATIC
+		route = 3
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 		env.opt.dynamic = FALSE
 
 	case FB_TK_GOSUB
+		route = 4
 		if( fbLangOptIsSet( FB_LANG_OPT_GOSUB ) = FALSE ) then
 			errReportNotAllowed( FB_LANG_OPT_GOSUB )
 		else
@@ -76,19 +83,23 @@ sub cOptDecl( )
 		select case ucase( *lexGetText( ) )
 		'' EXPLICIT: Not a keyword in lang qb
 		case "EXPLICIT"
+			route = 5
 			env.opt.explicit = TRUE
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		'' PRIVATE: Ditto
 		case "PRIVATE"
+			route = 6
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 			env.opt.procpublic = FALSE
 
 		case "ESCAPE"
+			route = 7
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 			env.opt.escapestr = TRUE
 
 		case "BASE"
+			route = 8
 			is_base = TRUE
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 
@@ -105,6 +116,7 @@ sub cOptDecl( )
 			end if
 
 		case "NOKEYWORD"
+			route = 9
 			lexSkipToken( LEXCHECK_NODEFINE or LEXCHECK_POST_SUFFIX )
 
 			do
@@ -119,6 +131,7 @@ sub cOptDecl( )
 			loop
 
 		case "NOGOSUB"
+			route = 10
 			if( fbLangOptIsSet( FB_LANG_OPT_GOSUB ) = FALSE ) then
 				errReportNotAllowed( FB_LANG_OPT_GOSUB )
 			else
@@ -135,7 +148,7 @@ sub cOptDecl( )
 	'' Preserve every accepted OPTION route, including repeated defaults and
 	'' non-BASE declarations. Consumers can then detect a missing BASE receipt
 	'' without interpreting the source operands as another grammar.
-	fbSemanticModelOptionDeclaration( is_base, env.opt.base )
+	fbSemanticModelOptionDeclaration( is_base, env.opt.base, route )
 end sub
 
 private sub hUndefSymbol()

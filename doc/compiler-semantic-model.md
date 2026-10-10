@@ -152,13 +152,15 @@ the literal text `%E9`, not byte E9. Counts below include the record tag.
 | `CAP` | module ordinal, semantic capability, available/partial/unavailable coverage | 4 |
 | `ACC` | binding occurrence ordinal, compiler-observed source use role | 3 |
 | `SOP` | statement identity, accepted builtin statement operation | 3 |
+| `COM` | comment identity, configuration identity, accepted marker kind | 4 |
+| `EX` | result expression ID, operator family, operator code, left expression ID or zero, right expression ID or zero, source context ID, physical flag, source path, start line, start column, end line, end column | 13 |
 | `Z` | define symbol ID, ordinal, token kind, token value | 5 |
 
 The detail count totals `T`, `A`, `F`, `G`, `U`, `C`, `H`, `K`, `J`, `O`, `Q`,
 `Y`, `Z`, `ASM`, `DCL`, `CTX`, `OPT`, `USE`, `FILE`, `SRC`, `SRE`, `INC`, `MAP`,
 `ORIG`, `PPB`, `PPD`, `PPE`, `PPT`, `PPS`, `MD`, `MT`, `MI`, `MA`, `MS`, `MC`,
-`ME`, `ML`, `MR`, `LOC`, `ST`, `STE`, `BLK`, `BEND`, `OWN`, `CAP`, `ACC`, and
-`SOP`, including repeated snapshots.
+`ME`, `ML`, `MR`, `LOC`, `ST`, `STE`, `BLK`, `BEND`, `OWN`, `CAP`, `ACC`,
+`SOP`, `COM`, and `EX`, including repeated snapshots.
 
 Array-bound query properties retain the selected array, the optional source
 dimension expression, and the compiler-selected dimension expression. If the
@@ -934,6 +936,31 @@ extent, configuration, module, and source context; OWN links connect generated
 operations with that owner. Identifier lookalikes and graphics GET/PUT routes
 do not acquire a file-operation classification. These observations describe
 accepted source operations, not runtime success or external effects.
+
+Full and expression-only models advertise `source-va-list-operations` as
+available. Bindings-only models advertise it as unavailable. After the parser
+accepts a C vararg macro, an `EX` record with family `runtime-macro` records one
+of four operator codes:
+
+- `va-start` and `va-copy` require left and right expression operands.
+- `va-arg` and `va-end` require a left operand and a zero right operand.
+
+The result E record has the same operator code and the `builtin` operator kind.
+An operation's list operands use either the normalized `va_list` modifier or,
+on pointer-based ABIs such as Win32 GAS, the parser's compatible `Any Ptr`
+representation. A primitive non-pointer is not a valid list operand.
+`Cva_Arg` remains a typed value expression. The GCC backend represents
+statement-only `Cva_Start`, `Cva_Copy`, and `Cva_End` nodes with AST class 44,
+raw operator -1, invalid data type 2147483648, and an empty source type spelling.
+A reader may accept that empty spelling only when the same module advertises
+the capability and a matching, well-formed runtime-macro EX record exists.
+Other missing expression type spellings remain malformed. Backends that retain
+a typed surrogate result continue to use the ordinary typed E contract.
+
+These records describe accepted source operations and their direct operands.
+They do not infer the effects of external consumers, indirect storage, fields,
+arrays, aliases, or parameter passing. The observer borrows the lowering inputs
+and does not alter generated code.
 
 The parser also supplies `goto`, `gosub`, `gosub-return`,
 `gosub-return-label`, `procedure-return`, `on-goto`, `on-gosub`,
@@ -1718,6 +1745,19 @@ statement ownership, and a compatible selected runtime or literal result.
 Compact exports mark the capability unavailable. Independent compiler checks
 passed 20 cases across Win32, Win64 and Linux x64 in six encodings, including
 macro anchors, decoded escaped patterns and byte-identical generated C.
+
+Full models also advertise `parsed-string-format-inputs`. STR and WSTR reuse
+the complete string-intrinsic group and module marker, with kind `str`,
+`str-qb` or `wstr`, one original argument and ANY zero. The QB kind records
+the dialect's numeric padding convention. Capturing the argument before
+lowering preserves named constant identities even when the formatter consumes
+its AST and returns literal storage.
+
+Formatting observations describe parser inputs. They do not establish purity:
+accepted string passthroughs and overloaded conversions can also produce the
+result. Consumers must separately prove selected call effects and stable reads.
+Both readers require the new capability, the complete group, an earlier input
+with the same module and statement owner, and a string result type.
 
 Full models advertise `string-initializer-targets`. An accepted fixed ZString,
 WString or String element initializer retains expression K properties named
@@ -2609,4 +2649,212 @@ matching statement and construct ownership, and same-module namespace symbols.
 Compact models mark the capability unavailable and omit these properties.
 Older models remain readable without claiming these parser observations.
 
+### Original function result inputs
+
+Full models advertise `function-result-inputs`. The accepted result grammar
+retains each input before result conversion, implicit BYREF address handling
+or return-object construction consumes its original AST:
+
+    K symbol routine-ID function-result-input:statement-ID style<TAB>reference-form<TAB>expression-ID<TAB>variable-ID
+    K symbol routine-ID function-result-input-count count
+
+The nested payload uses the ordinary outer field escaping. Style is `return`
+or `assignment`. Reference form is `value`, implicit `reference`, or explicit
+BYVAL `pointer`. Expression zero explicitly means no retained expression
+identity; variable zero means the input is not a selected direct variable.
+Implicit dereferences of BYREF parameters retain their declared variable.
+Written pointer dereferences do not become parameter bindings.
+
+Accepted inputs also emit `function-result-return` or
+`function-result-assignment` statement operations. Readers require one input
+per matching operation, an accepted statement owned by the routine, compatible
+BYREF form, same-module referenced facts, and an exact count for every observed
+procedure body. Compact models advertise this capability as unavailable.
+
+### Explicit routine exit inputs
+
+Full models advertise `procedure-exit-inputs`. After accepting an EXIT whose
+actual target is the current routine's exit label, the grammar emits:
+
+    K symbol routine-ID procedure-exit-input:statement-ID exit-label-ID
+    K symbol routine-ID procedure-exit-input-count count
+    SOP statement-ID procedure-explicit-exit
+
+EXIT FOR/DO/WHILE/SELECT, RETURN and GOTO have distinct accepted routes and do
+not produce this input. Readers match the target with `procedure-exit-label`,
+close statement-operation coverage and require each observed body's exact
+count. Source order and resolved label declarations can then support cleanup
+policies without recognizing exit keywords or label spelling in source text.
+Compact models mark this capability unavailable and omit the inputs.
+
+### Accepted OPTION routes
+
+Full models advertise `option-declaration-routes`. Each accepted OPTION adds
+`OPT context-ID language-default option-route-statement-ID route-code` beside
+its existing `option-statement` receipt. Codes are 1 BYVAL, 2 DYNAMIC, 3 STATIC,
+4 GOSUB, 5 EXPLICIT, 6 PRIVATE, 7 ESCAPE, 8 BASE, 9 NOKEYWORD and 10 NOGOSUB.
+The context contains the committed defaults. Repeated directives remain
+separate occurrences even when the effective state is unchanged. Readers
+require one route for each accepted OPTION statement, same-module context
+ownership and agreement with the existing BASE/non-BASE receipt. Compact
+models omit these receipts and mark this capability unavailable.
+
+### Original array dimensions and string tokens
+
+Full models advertise `array-dimension-inputs` and `string-literal-inputs`.
+The array grammar records each dimension before default insertion and bound
+lowering. Its input has the form:
+
+    K symbol owner-ID array-dimension-input:statement-ID:ordinal dimension-index<TAB>route<TAB>upper-expression-ID<TAB>default-base
+    K symbol owner-ID array-dimension-count:statement-ID count
+
+Dimension indices are zero based. Routes are `implicit`, `explicit` and
+`placeholder`; placeholders represent ANY and have no upper expression.
+An ellipsis upper bound also has expression ID zero. The committed default
+base agrees with the statement's entry context. Each directly parsed string
+token is observed before adjacent token folding:
+
+    K symbol owner-ID string-literal-input:statement-ID:ordinal expression-ID<TAB>form<TAB>has-backslash<TAB>escape-default
+    K symbol owner-ID string-literal-count:statement-ID count
+
+Forms are `plain`, `escaped` and `noescape`. The latter retains the explicit
+`$` prefix's decision. Flags are 0 or 1. The expression references the
+literal symbol and its complete decoded C value, including embedded zeros.
+Named constant uses do not produce directly parsed token inputs. Counts are
+emitted for every statement, including zero. Readers require consecutive
+statement-local ordinals, matching owners and contexts, typed expressions,
+and exact counts. Compact modes omit inputs and counts and mark both
+capabilities unavailable.
+
+Full models with `string-literal-lexemes` additionally emit exactly one
+observation for each individual string input:
+
+    K expression expression-ID string-literal-lexeme unit-kind<TAB>unit-count<TAB>hex-units<TAB>completeness
+
+The unit kind is `bytes` (two uppercase hexadecimal digits per unit) or
+`wide-units` (eight digits per host lexer unit). Counts are bounded by
+`FB_MAXLITLEN`, currently 1024. These are the accepted lexer contents before
+escape conversion, not the decoded C value and not raw source text. Prefixes
+and delimiters are absent; the lexer has already collapsed doubled quotes.
+Backslash spelling is retained, including that of macro-expanded tokens.
+The existing input form and statement OPT context supply the effective mode;
+MR and LOC supply physical token or macro invocation ownership.
+
+Completeness is `complete` or `truncated`. The original scanner can accept a
+long token with a warning while discarding its tail. Its has-backslash flag
+covers even discarded units, so a truncated prefix need not contain that
+backslash. This state does not invalidate the model or change compilation.
+Spelling consumers must refuse incomplete content when their proposition
+requires the entire literal. All observations and this capability are absent
+or unavailable in compact modes. Preprocessor raw strings and QB raw DATA
+are not ordinary parser string inputs; named constant uses are not new tokens.
+
 <!-- end of compiler-semantic-model.md -->
+
+The independent FBCDIA diagnostic transport also advertises `unclosed-procedures`.
+When the actual parser reaches EOF with a procedure on its compound stack, the
+reported error carries `unclosed-procedure` context. An inner unfinished block
+can supply the primary error code while its enclosing procedure remains open.
+This observation does not authorize recovered AST facts. Physical EOF coordinates
+come from the lexer; unmatched constructs are never inferred from source spelling.
+
+The independent FBCDIA transport also advertises `error-resume-next-syntax` for each module. Its matching error kind is emitted by the ON parser when the original grammar rejects ON ERROR RESUME NEXT, including local forms. The parser-selected opening point preserves physical coordinates across continuations and #LINE. It does not make the rejected AST authoritative; the normal compiler error and recovery remain unchanged.
+
+
+## Macro token offsets and preprocessing identifier inputs
+
+Schema 27 capability `macro-expression-token-inputs` supplies expression K
+properties `macro-input-unit:<invocation-id>`. The value is the zero-based
+replacement unit offset of the expression's first token. It is independent
+of physical file columns and comes from the lexer position before token
+consumption. Nested replacement starts retain their observed parent offsets.
+The offset must be smaller than the invocation's ME unit count. MS segments
+identify whether that start belongs to a normal parameter substitution,
+stringification, or definition text. A grouped CALL observation may start at
+a definition-supplied parenthesis; consumers must not treat every consumed
+argument token as the CALL's origin. No physical edit range is implied.
+
+Capability `preprocessor-identifier-inputs` supplies three expression K
+properties: `pp-identifier-name`, `pp-identifier-symbol`, and
+`pp-identifier-branch`. These describe an actual atom lookup while evaluating
+a preprocessing condition. Symbol zero means the parser failed to resolve
+the identifier and converted its spelling to a string constant. A quoted
+string with the same value has no lookup receipt. Named constants retain
+their selected symbol even after folding. The branch must be a PPB in the
+same module, and all three properties must be present together. DEFINED
+probes remain separate PPT observations. Inactive expressions are not
+invented or evaluated by these observers.
+
+## Accepted physical line comments
+
+Capability `accepted-line-comment-markers` is available in full models.
+`COM <identity> <configuration> <kind>` observes a comment actually accepted
+by the parser or preprocessing reader. Kind is `apostrophe` or `rem`. Each
+observation owns one `LOC comment <identity> marker` in its original opened
+source occurrence. The marker is one or three UTF-16 units respectively;
+byte coordinates remain encoding-dependent. Logical remaps do not replace
+these physical coordinates. An accepted REM option operand or typed identifier
+does not become a comment merely because the lexer recognizes its spelling.
+
+`K symbol <global-namespace> accepted-line-comment-count:<module> <count>`
+closes coverage, including modules with zero observations. Readers must check
+the count, configuration/module ownership, original marker bytes and fresh
+source revisions before applying presentation policy. Repeated observations
+of a physical preprocessing marker are possible and remain separately counted;
+diagnostic consumers can deduplicate identical original sites.
+An invalid encoded unit elsewhere on the line leaves the accepted marker's
+location `unverified`, with byte offsets -1. It remains counted, and edit
+planning refuses that location.
+
+Detached parser probes, inactive unparsed text and synthetic replacement
+characters are excluded. Definition comments are observed while physically
+read. These hooks neither copy comment bodies nor change scanner state, AST
+selection, preprocessing output or backend emission. They are inert without
+full export. Older readers need the additive COM shape and comment LOC domain
+before consuming this capability; unsupported readers must refuse, not guess.
+
+## Original procedure declaration spellings
+
+Capability 104, `procedure-declaration-spellings`, is available only in full
+models with macro provenance. Each existing `procedure-abi-input:<identity>`
+has a paired `K symbol <procedure> procedure-declaration-spelling:<identity>
+<accepted-name>` property. SUB, FUNCTION and named PROPERTY headers retain the
+parser's accepted case-preserving identifier, limited to FB_MAXNAMELEN.
+Constructors, destructors and operators retain empty text because their names
+are grammar-controlled. Original prototype and body occurrences remain separate
+even if they resolve to the same symbol, including wholly generated headers
+which have no ordinary DCL range.
+
+Source, statement, role, LOC and MR ownership come from the paired ABI receipt;
+the new property has no independently invented location. Readers must require
+one name per ABI occurrence, check the selected procedure kind and identity,
+verify ordinary source case against fresh FILE bytes and use genuine MI/MR
+anchors for generated names. Missing receipts are unknown, not clean lowercase
+names. Compact, bindings-only and expressions-only models advertise unavailable
+and emit no new properties. This observation does not change name resolution,
+signature merging, symbol layout, evaluation or backend emission.
+
+## Original member declaration spellings
+
+Capability 106, `member-declaration-spellings`, is available only in full models
+with macro provenance. `K symbol <member> member-declaration-spelling:<identity>`
+contains four tab-separated payload fields: accepted statement identity, source
+context identity, `field` or `constant`, and the original case-preserving parser
+identifier (limited to FB_MAXNAMELEN). The occurrence's source-context LOC and
+symbol MR use the same property role. A generated field retains its real macro
+identity even when it has no physical identifier extent. Static members already
+have original variable declaration spellings through capability 102.
+
+An `accepted-member-name-count:<module>` K property on the module's root
+namespace closes each accepted field/constant occurrence set. Readers must
+require the count even when it is zero, validate statement/source/module and UDT
+ownership, and match every ordinary or generated declaration occurrence. Constant
+T snapshots have no storage owner; their S namespace identifies the actual UDT.
+Promoted anonymous fields use final T ownership. Native enum-element inputs
+distinguish enumerators from explicit CONST declarations.
+
+Physical case must be checked against fresh FILE bytes for quiet and exempt
+names as well as reported names. Macro invocations are anchors, not editable
+member identifiers. Compact, bindings-only and expressions-only models advertise
+unavailable and emit neither new spellings nor completion counts. The observer
+does not alter grammar, symbol lookup, layout, executable ASTs or backend output.

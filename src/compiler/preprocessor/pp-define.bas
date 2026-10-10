@@ -34,6 +34,7 @@ declare sub fbSemanticModelExportBinding _
 #include once "support/containers/list.bi"
 #include once "support/strings/dstr.bi"
 #include once "tooling/semantic-macros.bi"
+#include once "tooling/semantic-comments.bi"
 
 #define LEX_FLAGS (LEXCHECK_NOWHITESPC or _
 				   LEXCHECK_NOSUFFIX or _
@@ -439,6 +440,7 @@ private function hLoadMacro _
 						end if
 					end if
 				else
+					fbSemanticModelAcceptComment(t.id, t.source)
 					do
 						'' Continue through the private token buffer used for macro
 						'' arguments.  The shared lookahead belongs to the outer lexer.
@@ -901,6 +903,7 @@ private function hLoadMacroW _
 						end if
 					end if
 				else
+					fbSemanticModelAcceptComment(t.id, t.source)
 					do
 						'' Continue through the private token buffer used for macro
 						'' arguments.  The shared lookahead belongs to the outer lexer.
@@ -1358,6 +1361,8 @@ private function hReadMacroText _
 			continue do
 
 		case FB_TK_COMMENT, FB_TK_REM
+			dim as LEX_LOCATION comment_source = lexGetCurrentLocation( )
+			fbSemanticModelAcceptComment(lexGetToken(LEX_FLAGS), comment_source)
 			if( ismultiline = FALSE ) then
 				exit do
 			end if

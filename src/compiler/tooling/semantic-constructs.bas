@@ -36,6 +36,8 @@ type SEMANTIC_SOURCE_STATEMENT
 	if_arm as longint
 	owner as longint
 	assignment_count as longint
+	array_dimension_count as longint
+	string_literal_count as longint
 end type
 
 type SEMANTIC_SOURCE_COMPOUND
@@ -66,10 +68,18 @@ dim shared as SEMANTIC_SOURCE_STATEMENT ptr semantic_statements
 dim shared as integer semantic_statement_depth, semantic_statement_capacity
 dim shared as SEMANTIC_SOURCE_COMPOUND ptr semantic_compounds
 dim shared as integer semantic_compound_depth, semantic_compound_capacity
+'' Result inputs survive address conversion and constructor lowering. Counts
+'' are indexed by the bounded symbol identity and released with the module.
+type SEMANTIC_RESULT_COUNTS
+	results as longint
+	exits as longint
+end type
+dim shared as SEMANTIC_RESULT_COUNTS semantic_result_counts( )
 
 declare sub hIfStatementEnd( byval slot as integer )
 
 sub fbSemanticModelResetConstructs( )
+	erase semantic_result_counts
 	deallocate(semantic_statements)
 	deallocate(semantic_compounds)
 	semantic_statements = NULL
@@ -78,6 +88,68 @@ sub fbSemanticModelResetConstructs( )
 	semantic_statement_capacity = 0
 	semantic_compound_depth = 0
 	semantic_compound_capacity = 0
+end sub
+
+function fbSemanticModelResultInputCount( byval identity as longint ) as longint
+	if( identity < 1 or identity > ubound(semantic_result_counts) ) then return 0
+	return semantic_result_counts(identity).results
+end function
+
+function fbSemanticModelProcedureExitInputCount( byval identity as longint ) as longint
+	if( identity < 1 or identity > ubound(semantic_result_counts) ) then return 0
+	return semantic_result_counts(identity).exits
+end function
+
+private function hGrowResultCounts( byval owner as longint ) as integer
+	'' Match the sidecar's bounded identity range. Doubling keeps ordinary
+	'' modules small; the hard ceiling prevents unbounded observer allocation.
+	if( owner < 1 or owner > 2097152 ) then
+		fbSemanticModelFailAt("routine result input has no bounded owner")
+		return FALSE
+	end if
+	if( owner > ubound(semantic_result_counts) ) then
+		dim as longint capacity = ubound(semantic_result_counts) * 2
+		if( capacity < 256 ) then capacity = 256
+		if( capacity < owner ) then capacity = owner
+		if( capacity > 2097152 ) then capacity = 2097152
+		redim preserve semantic_result_counts(0 to capacity)
+	end if
+	return TRUE
+end function
+
+sub fbSemanticModelAcceptProcedureExit( byval target as FBSYMBOL ptr )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	dim as longint statement = fbSemanticModelCurrentStatement( )
+	dim as longint owner = fbSemanticModelSymbolId(parser.currproc)
+	if( statement < 1 or target = NULL ) then
+		fbSemanticModelFailAt("accepted routine exit has no statement or target")
+		exit sub
+	end if
+	if( hGrowResultCounts(owner) = FALSE ) then exit sub
+	semantic_result_counts(owner).exits += 1
+	fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(owner) + _
+		TABCHAR + "procedure-exit-input:" + fbSemanticModelNumber(statement) + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(target)))
+	fbSemanticModelStatementOperation("procedure-explicit-exit")
+end sub
+
+sub fbSemanticModelAcceptResultInput _
+	( byval expression as longint, byval variable as FBSYMBOL ptr, _
+	  byval is_return as integer, byref reference_form as const string )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	dim as longint statement = fbSemanticModelCurrentStatement( )
+	dim as longint owner = fbSemanticModelSymbolId(parser.currproc)
+	if( statement < 1 or owner < 1 or owner > 2097152 ) then
+		fbSemanticModelFailAt("function result input has no bounded owner")
+		exit sub
+	end if
+	if( hGrowResultCounts(owner) = FALSE ) then exit sub
+	semantic_result_counts(owner).results += 1
+	dim as string style = iif(is_return, "return", "assignment")
+	dim as string value = style + TABCHAR + reference_form + TABCHAR + _
+		fbSemanticModelNumber(expression) + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(variable))
+	fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(owner) + _
+		TABCHAR + "function-result-input:" + fbSemanticModelNumber(statement) + TABCHAR + fbSemanticModelEscape(value))
+	fbSemanticModelStatementOperation("function-result-" + style)
 end sub
 
 private function hGrow( byref storage as any ptr, byref capacity as integer, byval depth as integer, byval element_bytes as integer ) as integer
@@ -167,6 +239,8 @@ function fbSemanticModelStatementBegin( byref source as LEX_LOCATION, byval toke
 		.token = token
 		.owner = owner
 		.assignment_count = 0
+		.array_dimension_count = 0
+		.string_literal_count = 0
 		.counter_observed = FALSE
 		.step_observed = FALSE
 		.if_slot = 0
@@ -226,6 +300,10 @@ sub fbSemanticModelStatementEnd( byval identity as longint, byref route as const
 			fbSemanticModelAppendDetail("H" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
 				TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + TABCHAR + "assignment-count" + _
 				TABCHAR + fbSemanticModelNumber(identity))
+			fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+				TABCHAR + "array-dimension-count:" + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(.array_dimension_count))
+			fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+				TABCHAR + "string-literal-count:" + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(.string_literal_count))
 		end with
 	end if
 	hIfStatementEnd(semantic_statement_depth)
@@ -409,6 +487,82 @@ sub fbSemanticModelAssociateStatement( byref domain as const string, byval subje
 	if( statement = 0 ) then statement = fbSemanticModelCurrentStatement( )
 	if( (statement = 0) or (subject = 0) ) then exit sub
 	fbSemanticModelAppendProvenance("OWN" + TABCHAR + domain + TABCHAR + fbSemanticModelNumber(subject) + TABCHAR + fbSemanticModelNumber(statement))
+end sub
+
+'' Each parser input has a statement-local ordinal. Counts are committed when
+'' that statement closes, including zero, so readers can detect lost groups.
+'' These observations survive later folding and do not alter the AST lifetime.
+sub fbSemanticModelArrayDimensionInput _
+	( byval upper as ASTNODE ptr, byref route as const string, byval dimension as integer, _
+	  byref source as LEX_LOCATION, byval nonphysical_start as longint )
+	if( fbSemanticModelFullEnabled( ) = FALSE or lex.ctx->semantic_probe ) then exit sub
+	if( semantic_statement_depth = 0 ) then exit sub
+	dim as longint expression = 0
+	if( upper <> NULL ) then
+		dim as LEX_LOCATION ending = lexGetLastLocation( )
+		fbSemanticModelExportExpression(upper, source, ending, nonphysical_start, lexGetNonphysicalTokenCount( ))
+		expression = upper->semantic_expression
+	end if
+	with semantic_statements[semantic_statement_depth - 1]
+		if( .array_dimension_count >= SEMANTIC_IF_MAX_ITEMS ) then fbSemanticModelFailAt("array dimension input limit"): exit sub
+		.array_dimension_count += 1
+		dim as string value = fbSemanticModelNumber(dimension) + TABCHAR + route + TABCHAR + _
+			fbSemanticModelNumber(expression) + TABCHAR + fbSemanticModelNumber(env.opt.base)
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+			TABCHAR + "array-dimension-input:" + fbSemanticModelNumber(.identity) + ":" + _
+			fbSemanticModelNumber(.array_dimension_count) + TABCHAR + fbSemanticModelEscape(value))
+	end with
+end sub
+
+sub fbSemanticModelStringLiteralInput( byval expr as ASTNODE ptr, byval token as FBTOKEN ptr )
+	if( fbSemanticModelFullEnabled( ) = FALSE or lex.ctx->semantic_probe ) then exit sub
+	if( semantic_statement_depth = 0 or expr = NULL or token = NULL ) then exit sub
+	dim as longint counter = lexGetNonphysicalTokenCount( )
+	fbSemanticModelExportExpression(expr, token->source, token->source, counter, counter)
+	if( expr->semantic_expression = 0 ) then fbSemanticModelFailAt("string literal input identity"): exit sub
+	with semantic_statements[semantic_statement_depth - 1]
+		if( .string_literal_count >= SEMANTIC_IF_MAX_ITEMS ) then fbSemanticModelFailAt("string literal input limit"): exit sub
+		.string_literal_count += 1
+		dim as string form = "plain"
+		if( token->id = FB_TK_STRLIT_ESC ) then form = "escaped"
+		if( token->id = FB_TK_STRLIT_NOESC ) then form = "noescape"
+		dim as string value = fbSemanticModelNumber(expr->semantic_expression) + TABCHAR + form + TABCHAR + _
+			fbSemanticModelNumber(abs(token->hasesc <> FALSE)) + TABCHAR + fbSemanticModelNumber(abs(env.opt.escapestr <> FALSE))
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+			TABCHAR + "string-literal-input:" + fbSemanticModelNumber(.identity) + ":" + _
+			fbSemanticModelNumber(.string_literal_count) + TABCHAR + fbSemanticModelEscape(value))
+		'' Keep the accepted lexer content before escape conversion. Physical
+		'' coordinates alone cannot recover it from a macro invocation. The
+		'' lexer has already collapsed doubled quotes; backslashes are intact.
+		'' This is not raw source text and does not include delimiters/prefixes.
+		if( (token->len < 0) or (token->len > FB_MAXLITLEN) ) then
+			fbSemanticModelFailAt("string literal lexeme limit")
+			exit sub
+		end if
+		dim as string kind = "bytes", text
+		dim as integer unit_width = 2
+		if( token->dtype = FB_DATATYPE_WCHAR ) then kind = "wide-units": unit_width = 8
+		text = space(token->len * unit_width)
+		if( len(text) <> token->len * unit_width ) then
+			fbSemanticModelFailAt("string literal lexeme allocation")
+			exit sub
+		end if
+		for index as integer = 0 to token->len - 1
+			if( unit_width = 8 ) then
+				mid(text, index * unit_width + 1, unit_width) = hex(culng(token->textw[index]), unit_width)
+			else
+				mid(text, index * unit_width + 1, unit_width) = hex(cubyte(token->text[index]), unit_width)
+			end if
+		next
+		'' The scanner's hasesc covers the whole token, including discarded
+		'' units. Keep truncation explicit so a valid prefix does not pretend
+		'' to contain all spelling, or invalidate the independent model reader.
+		value = kind + TABCHAR + fbSemanticModelNumber(token->len) + TABCHAR + text + TABCHAR + _
+			iif(token->literal_truncated, "truncated", "complete")
+		fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + _
+			fbSemanticModelNumber(expr->semantic_expression) + TABCHAR + "string-literal-lexeme" + TABCHAR + _
+			fbSemanticModelEscape(value))
+	end with
 end sub
 
 sub fbSemanticModelStatementOperation( byref operation as const string )
@@ -911,6 +1065,38 @@ sub fbSemanticModelScalarForStepSelection _
 	dim as string statement_text = fbSemanticModelNumber(statement)
 	fbSemanticModelAppendProvenance(prefix + "for-step-selected-dtype:" + statement_text + TABCHAR + fbSemanticModelNumber(dtype))
 	fbSemanticModelAppendProvenance(prefix + "for-step-selected-expression:" + statement_text + TABCHAR + fbSemanticModelNumber(expression_id))
+end sub
+
+'' The parser folds the initial comparison after converting both bounds and
+'' choosing STEP's sign. Observe that exact decision: source constant ordering
+'' cannot account for narrow wrapping, enum storage or floating rounding.
+'' Unknown means the parser emitted a runtime test. It is never a skip proof.
+sub fbSemanticModelScalarForEntry( byval counter as FBSYMBOL ptr, byval entry_result as integer )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	if( counter = NULL ) then exit sub
+	select case symbGetType(counter)
+	case FB_DATATYPE_BYTE, FB_DATATYPE_UBYTE, FB_DATATYPE_SHORT, FB_DATATYPE_USHORT, _
+	     FB_DATATYPE_INTEGER, FB_DATATYPE_UINT, FB_DATATYPE_LONG, FB_DATATYPE_ULONG, _
+	     FB_DATATYPE_LONGINT, FB_DATATYPE_ULONGINT, FB_DATATYPE_SINGLE, FB_DATATYPE_DOUBLE, FB_DATATYPE_ENUM
+	case else
+		exit sub
+	end select
+	dim as longint statement = fbSemanticModelCurrentStatement( )
+	if( (statement = 0) or (semantic_statement_depth = 0) ) then
+		fbSemanticModelFailAt("scalar FOR entry has no statement")
+		exit sub
+	end if
+	if( (semantic_statements[semantic_statement_depth - 1].token <> FB_TK_FOR) or _
+	    (entry_result < -1) or (entry_result > 1) ) then
+		fbSemanticModelFailAt("invalid scalar FOR entry decision")
+		exit sub
+	end if
+	dim as string result_text = "unknown"
+	if( entry_result = 0 ) then result_text = "skip"
+	if( entry_result = 1 ) then result_text = "enter"
+	fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + _
+		fbSemanticModelNumber(fbSemanticModelSymbolId(counter)) + TABCHAR + _
+		"for-entry-result:" + fbSemanticModelNumber(statement) + TABCHAR + result_text)
 end sub
 
 '' -------------------------------------------------------------------------

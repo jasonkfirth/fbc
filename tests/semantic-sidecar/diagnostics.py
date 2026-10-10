@@ -19,6 +19,9 @@ class Diagnostics:
         self.producer = ""
         self.signature_modules: set[int] = set()
         self.variable_modules: set[int] = set()
+        self.unclosed_modules: set[int] = set()
+        self.error_resume_modules: set[int] = set()
+        self.suffix_as_modules: set[int] = set()
         self.succeeded = False
 
     @classmethod
@@ -68,7 +71,10 @@ class Diagnostics:
             elif row[0] == "CAP":
                 module = integer(row[1], len(result.modules), len(result.modules))
                 capabilities = {"procedure-signature-mismatches": result.signature_modules,
-                                "variable-case-collisions": result.variable_modules}
+                                "variable-case-collisions": result.variable_modules,
+                                "unclosed-procedures": result.unclosed_modules,
+                                "error-resume-next-syntax": result.error_resume_modules,
+                                "declaration-suffix-as-conflicts": result.suffix_as_modules}
                 observed = capabilities.get(row[2])
                 if not result.modules or observed is None or module in observed or row[3] != "available":
                     raise ValueError("Invalid or duplicate diagnostic capability")
@@ -96,6 +102,12 @@ class Diagnostics:
                     raise ValueError("Signature mismatch without compiler capability")
                 if row[5] == "variable-case-collision" and len(result.modules) not in result.variable_modules:
                     raise ValueError("Variable collision without compiler capability")
+                if row[5] == "unclosed-procedure" and len(result.modules) not in result.unclosed_modules:
+                    raise ValueError("Unclosed procedure without compiler capability")
+                if row[5] == "error-resume-next-syntax" and len(result.modules) not in result.error_resume_modules:
+                    raise ValueError("Error resume syntax without compiler capability")
+                if row[5] == "declaration-suffix-as-conflict" and len(result.modules) not in result.suffix_as_modules:
+                    raise ValueError("Suffix/AS conflict without compiler capability")
                 errors += row[3] == "error"
                 result.records.append(row)
             elif row[0] == "END":

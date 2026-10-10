@@ -11,6 +11,7 @@
 ''
 ''     - parse the intrinsic statement or function family described below
 ''     - validate arguments before building AST and runtime calls
+''     - preserve backend-independent semantic receipts for Cva_* operations
 ''
 '' This file intentionally does NOT contain:
 ''
@@ -26,6 +27,42 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-expressions.bi"
+
+declare sub fbSemanticModelExportExpression _
+	( _
+		byval expr as ASTNODE ptr, _
+		byref source_start as LEX_LOCATION, _
+		byref source_end as LEX_LOCATION, _
+		byval nonphysical_tokens_at_start as longint, _
+		byval nonphysical_tokens_at_end as longint, _
+		byval semantic_operator_override as integer, _
+		byval force_nonphysical_range as integer = FALSE _
+	)
+
+'' The native va_list representation is backend-specific.  The gcc backend
+'' retains AST_NODECLASS_MACRO nodes, while pointer-based backends lower the
+'' same source operations to assignments, arithmetic, or a no-op.  Attach the
+'' source operation to the selected tree so semantic consumers see one stable
+'' contract without changing the executable lowering.
+private sub hExportValistOperation _
+	( _
+		byval tree as ASTNODE ptr, _
+		byval operands as longint, _
+		byval op as AST_OP, _
+		byref source_start as LEX_LOCATION, _
+		byref source_end as LEX_LOCATION, _
+		byval nonphysical_tokens_at_start as longint, _
+		byval nonphysical_tokens_at_end as longint, _
+		byval complete_range as integer _
+	)
+
+	if( (tree = NULL) or (operands = 0) or (complete_range = FALSE) ) then exit sub
+	fbSemanticModelAttachOperands(tree, operands)
+	fbSemanticModelExportExpression(tree, source_start, source_end, _
+		nonphysical_tokens_at_start, nonphysical_tokens_at_end, op)
+end sub
 
 private function hGetVarArgProcParam _
 	( _
@@ -271,9 +308,19 @@ function cVALISTFunct _
 		byval tk as FB_TOKEN _
 	) as ASTNODE ptr
 
-	dim as ASTNODE ptr expr
+	dim as ASTNODE ptr expr, result
 	dim as integer dtype
 	dim as FBSYMBOL ptr subtype
+	dim as integer semantic_model_enabled = fbSemanticModelEnabled( )
+	dim as integer has_closing_parenthesis = FALSE
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start = 0
+	dim as longint nonphysical_tokens_at_end = 0
+	if( semantic_model_enabled ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
 
 	function = NULL
 
@@ -314,14 +361,22 @@ function cVALISTFunct _
 	end if
 
 	'' ')'
+	has_closing_parenthesis = (lexGetToken( ) = CHAR_RPRNT)
 	if( hMatch( CHAR_RPRNT ) = FALSE ) then
 		errReport( FB_ERRMSG_EXPECTEDRPRNT )
 	end if
+	if( semantic_model_enabled andalso has_closing_parenthesis ) then
+		source_end = lexGetLastLocation( )
+		nonphysical_tokens_at_end = lexGetNonphysicalTokenCount( )
+	end if
+
+	dim as longint semantic_operands = fbSemanticModelCaptureOperands( _
+		expr, NULL, "runtime-macro", AST_OP_VA_ARG, source_start)
 
 	if( symbIsBuiltinVaListType( astGetFullType( expr ), astGetSubtype( expr ) ) ) then
 		'' delegate to gcc backend to solve "result = __builtin_va_arg( ap, type )"
 		hSolveValistType( expr )
-		function = astNewMACRO( AST_OP_VA_ARG, expr, NULL, dtype, subtype )
+		result = astNewMACRO( AST_OP_VA_ARG, expr, NULL, dtype, subtype )
 
 	else
 
@@ -398,9 +453,13 @@ function cVALISTFunct _
 		'' return *cptr(dtype ptr, expr2 )
 		tree = astNewLink( tree, astNewDEREF( expr2, dtype, subtype ), AST_LINK_RETURN_RIGHT )
 
-		function = tree
+		result = tree
 
 	end if
+	hExportValistOperation(result, semantic_operands, AST_OP_VA_ARG, _
+		source_start, source_end, nonphysical_tokens_at_start, _
+		nonphysical_tokens_at_end, has_closing_parenthesis)
+	function = result
 
 end function
 
@@ -414,7 +473,19 @@ function cVALISTStmt _
 		byval tk as FB_TOKEN _
 	) as integer
 
-	dim as ASTNODE ptr expr1, expr2
+	dim as ASTNODE ptr expr1, expr2, tree
+	dim as longint semantic_operands
+	dim as integer semantic_model_enabled = fbSemanticModelEnabled( )
+	dim as integer has_closing_parenthesis = FALSE
+	dim as LEX_LOCATION source_start, source_end
+	dim as longint nonphysical_tokens_at_start = 0
+	dim as longint nonphysical_tokens_at_end = 0
+	if( semantic_model_enabled ) then
+		lexGetToken( )
+		source_start = lexGetCurrentLocation( )
+		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
+	end if
+	tree = NULL
 
 	function = FALSE
 
@@ -457,14 +528,21 @@ function cVALISTStmt _
 		expr2 = hCheckLastParameterSymbol( expr2, vararg_param, vararg_sym )
 
 		'' ')'
+		has_closing_parenthesis = (lexGetToken( ) = CHAR_RPRNT)
 		if( hMatch( CHAR_RPRNT ) = FALSE ) then
 			errReport( FB_ERRMSG_EXPECTEDRPRNT )
 		end if
+		if( semantic_model_enabled andalso has_closing_parenthesis ) then
+			source_end = lexGetLastLocation( )
+			nonphysical_tokens_at_end = lexGetNonphysicalTokenCount( )
+		end if
+		semantic_operands = fbSemanticModelCaptureOperands( _
+			expr1, expr2, "runtime-macro", AST_OP_VA_START, source_start)
 
 		if( symbIsBuiltinValistType( astGetFullType( expr1 ), astGetSubtype( expr1 ) ) ) then
 			'' delegate to gcc backend to solve "__builtin_va_start( ap, param )"
 			hSolveValistType( expr1 )
-			astAdd( astNewMACRO( AST_OP_VA_START, expr1, expr2, FB_DATATYPE_INVALID, NULL ) )
+			tree = astNewMACRO( AST_OP_VA_START, expr1, expr2, FB_DATATYPE_INVALID, NULL )
 
 		else
 			'' pointer expression: first variable argument
@@ -481,9 +559,13 @@ function cVALISTStmt _
 			expr = astNewBOP( AST_OP_ADD, expr, astNewCONSTi( symbGetSizeOf( vararg_param ), FB_DATATYPE_UINT ) )
 
 			'' cptr( any ptr, list ) = first_vararg
-			astAdd( astNewASSIGN( expr1, expr, AST_OPOPT_DONTCHKPTR ) )
+			tree = astNewASSIGN( expr1, expr, AST_OPOPT_DONTCHKPTR )
 
 		end if
+		hExportValistOperation(tree, semantic_operands, AST_OP_VA_START, _
+			source_start, source_end, nonphysical_tokens_at_start, _
+			nonphysical_tokens_at_end, has_closing_parenthesis)
+		astAdd( tree )
 		function = TRUE
 
 	case FB_TK_CVA_END
@@ -507,22 +589,39 @@ function cVALISTStmt _
 		end if
 
 		'' ')'
+		has_closing_parenthesis = (lexGetToken( ) = CHAR_RPRNT)
 		if( hMatch( CHAR_RPRNT ) = FALSE ) then
 			errReport( FB_ERRMSG_EXPECTEDRPRNT )
 		end if
+		if( semantic_model_enabled andalso has_closing_parenthesis ) then
+			source_end = lexGetLastLocation( )
+			nonphysical_tokens_at_end = lexGetNonphysicalTokenCount( )
+		end if
+		semantic_operands = fbSemanticModelCaptureOperands( _
+			expr1, NULL, "runtime-macro", AST_OP_VA_END, source_start)
 
 		if( symbIsBuiltinValistType( astGetFullType( expr1 ), astGetSubtype( expr1 ) ) ) then
 			'' delegate to gcc backend to solve "__builtin_va_end( ap )"
 			hSolveValistType( expr1 )
-			astAdd( astNewMACRO( AST_OP_VA_END, expr1, NULL, FB_DATATYPE_INVALID, NULL ) )
+			tree = astNewMACRO( AST_OP_VA_END, expr1, NULL, FB_DATATYPE_INVALID, NULL )
 
 		else
 			'' pointer expression: no-op
 			'' based on:
 			'' #define va_end(ap)   ((void)0)
 			astDelTree( expr1 )
+			if( semantic_operands <> 0 ) then
+				'' A typed NOP keeps the source operation in the pre-load graph.
+				'' Its loader emits no instruction and normal builds never create it.
+				tree = astNewNOP( )
+				tree->dtype = FB_DATATYPE_INTEGER
+			end if
 
 		end if
+		hExportValistOperation(tree, semantic_operands, AST_OP_VA_END, _
+			source_start, source_end, nonphysical_tokens_at_start, _
+			nonphysical_tokens_at_end, has_closing_parenthesis)
+		if( tree <> NULL ) then astAdd( tree )
 		function = TRUE
 
 	case FB_TK_CVA_COPY
@@ -564,24 +663,35 @@ function cVALISTStmt _
 		end if
 
 		'' ')'
+		has_closing_parenthesis = (lexGetToken( ) = CHAR_RPRNT)
 		if( hMatch( CHAR_RPRNT ) = FALSE ) then
 			errReport( FB_ERRMSG_EXPECTEDRPRNT )
 		end if
+		if( semantic_model_enabled andalso has_closing_parenthesis ) then
+			source_end = lexGetLastLocation( )
+			nonphysical_tokens_at_end = lexGetNonphysicalTokenCount( )
+		end if
+		semantic_operands = fbSemanticModelCaptureOperands( _
+			expr1, expr2, "runtime-macro", AST_OP_VA_COPY, source_start)
 
 		if( symbIsBuiltinValistType( astGetFullType( expr1 ), astGetSubtype( expr1 ) ) ) then
 			'' delegate to gcc backend to solve "__builtin_va_copy( dst, src )"
 			hSolveValistType( expr1 )
 			hSolveValistType( expr2 )
-			astAdd( astNewMACRO( AST_OP_VA_COPY, expr1, expr2, FB_DATATYPE_INVALID, NULL ) )
+			tree = astNewMACRO( AST_OP_VA_COPY, expr1, expr2, FB_DATATYPE_INVALID, NULL )
 
 		else
 			'' pointer expression: assignment
 			'' based on:
 			'' #define va_copy(ap, src) ((dest) = (src))
 
-			astAdd( astNewASSIGN( expr1, expr2, AST_OPOPT_DONTCHKPTR ) )
+			tree = astNewASSIGN( expr1, expr2, AST_OPOPT_DONTCHKPTR )
 
 		end if
+		hExportValistOperation(tree, semantic_operands, AST_OP_VA_COPY, _
+			source_start, source_end, nonphysical_tokens_at_start, _
+			nonphysical_tokens_at_end, has_closing_parenthesis)
+		astAdd( tree )
 		function = TRUE
 
 	end select

@@ -7,10 +7,12 @@
 '' This file intentionally does NOT contain: inferred expression parents or execution claims.
 
 #include once "tooling/semantic-private.bi"
+#include once "parser/parser.bi"
 #include once "tooling/semantic-expressions.bi"
 #include once "tooling/semantic-source.bi"
 #include once "tooling/semantic-coordinates.bi"
 #include once "tooling/semantic-macros.bi"
+#include once "tooling/semantic-preprocessor.bi"
 #include once "symbols/symb.bi"
 
 declare sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
@@ -23,6 +25,26 @@ declare sub fbSemanticModelExportExpression _
 	  byval nonphysical_tokens_at_start as longint, byval nonphysical_tokens_at_end as longint, _
 	  byval semantic_operator_override as integer = -1, byval force_nonphysical_range as integer = FALSE )
 declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
+
+'' Undefined PP identifiers become string constants in hCheckId. Retain
+'' that actual lookup result, including a zero symbol, before folding loses
+'' the distinction between an identifier and a quoted string with the same
+'' value. Named constants reuse their already exported atom receipt.
+sub fbSemanticModelPPIdentifier _
+	( byval expr as ASTNODE ptr, byval sym as FBSYMBOL ptr, byref spelling as const string, _
+	  byref source as LEX_LOCATION, byval nonphysical_tokens as longint )
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (expr = NULL) ) then exit sub
+	if( lex.ctx->semantic_probe or (fbGetIsPP( ) = FALSE) ) then exit sub
+	dim as longint branch = fbSemanticModelPPCurrentBranch( )
+	if( branch = 0 ) then exit sub
+	if( expr->semantic_expression = 0 ) then fbSemanticModelExportExpressionDistinct(expr, source, source, nonphysical_tokens, nonphysical_tokens)
+	dim as longint identity = expr->semantic_expression
+	if( identity = 0 ) then fbSemanticModelFailAt("preprocessor identifier identity unavailable"): exit sub
+	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR
+	fbSemanticModelAppendDetail(prefix + "pp-identifier-name" + TABCHAR + fbSemanticModelEscape(spelling))
+	fbSemanticModelAppendDetail(prefix + "pp-identifier-symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(sym)))
+	fbSemanticModelAppendDetail(prefix + "pp-identifier-branch" + TABCHAR + fbSemanticModelNumber(branch))
+end sub
 
 '' A named constant is lowered to a value-only CONST node. Observe its
 '' selected symbol at the atom parser, before enclosing operations can
@@ -116,6 +138,90 @@ sub fbSemanticModelNumericLiteral( byval token as FBTOKEN ptr )
 	fbSemanticModelMacroOrigin("symbol", owner, token->source.macro_identity, property_name)
 end sub
 
+'' Initializer scopes belong to the parser thread. They retain only immutable
+'' expression IDs until the declaration has an accepted symbol; no AST pointer
+'' survives folding. The fixed scope stack and checked link pool reset with the
+'' module's other expression observations.
+type SEMANTIC_LITERAL_SCOPE
+	kind as integer
+	head as integer
+end type
+type SEMANTIC_LITERAL_LINK
+	expression as longint
+	previous as integer
+end type
+const SEMANTIC_LITERAL_SCOPE_LIMIT = 128
+const SEMANTIC_LITERAL_LINK_LIMIT = 1000000
+dim shared as SEMANTIC_LITERAL_SCOPE literal_scopes(0 to SEMANTIC_LITERAL_SCOPE_LIMIT - 1)
+dim shared as integer literal_scope_depth, literal_link_count, literal_link_capacity
+dim shared as SEMANTIC_LITERAL_LINK ptr literal_links
+
+function fbSemanticModelBeginLiteralInitializer(byval kind as integer) as integer
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then return 0
+	if( (kind <> FB_SEM_LITERAL_CONSTANT) and (kind <> FB_SEM_LITERAL_STATIC) ) then
+		fbSemanticModelFailAt("invalid float literal initializer kind"): return 0
+	end if
+	if( literal_scope_depth >= SEMANTIC_LITERAL_SCOPE_LIMIT ) then
+		fbSemanticModelFailAt("float literal initializer scope limit exceeded"): return 0
+	end if
+	literal_scopes(literal_scope_depth).kind = kind
+	literal_scopes(literal_scope_depth).head = 0
+	literal_scope_depth += 1
+	return literal_scope_depth
+end function
+
+private sub hFloatLiteralInitializer(byval expression as longint, byref kind as const string, byval subject as longint)
+	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(expression) + TABCHAR
+	fbSemanticModelAppendDetail(prefix + "original-float-initializer" + TABCHAR + kind)
+	fbSemanticModelAppendDetail(prefix + "original-float-initializer-symbol" + TABCHAR + fbSemanticModelNumber(subject))
+end sub
+
+sub fbSemanticModelEndLiteralInitializer(byval scope_id as integer, byval subject as FBSYMBOL ptr)
+	if( scope_id = 0 ) then exit sub
+	if( scope_id <> literal_scope_depth ) then
+		fbSemanticModelFailAt("unbalanced float literal initializer scope"): exit sub
+	end if
+	dim as integer link = literal_scopes(scope_id - 1).head
+	if( link > 0 ) then
+		dim as longint symbol_id = fbSemanticModelSymbolId(subject)
+		if( symbol_id = 0 ) then
+			fbSemanticModelFailAt("float literal initializer subject unavailable")
+		else
+			dim as string kind = iif(literal_scopes(scope_id - 1).kind = FB_SEM_LITERAL_CONSTANT, "constant", "static")
+			while( link > 0 )
+				if( (link > literal_link_count) or (literal_links[link - 1].previous >= link) ) then
+					fbSemanticModelFailAt("invalid float literal initializer chain"): exit while
+				end if
+				hFloatLiteralInitializer(literal_links[link - 1].expression, kind, symbol_id)
+				link = literal_links[link - 1].previous
+			wend
+		end if
+	end if
+	literal_scope_depth -= 1
+end sub
+
+private sub hFloatLiteralContext(byval identity as longint)
+	if( literal_scope_depth = 0 ) then
+		hFloatLiteralInitializer(identity, "value", 0): exit sub
+	end if
+	if( literal_link_count >= SEMANTIC_LITERAL_LINK_LIMIT ) then
+		fbSemanticModelFailAt("float literal initializer link limit exceeded"): exit sub
+	end if
+	if( literal_link_count = literal_link_capacity ) then
+		dim as integer capacity = iif(literal_link_capacity = 0, 64, literal_link_capacity * 2)
+		if( capacity > SEMANTIC_LITERAL_LINK_LIMIT ) then capacity = SEMANTIC_LITERAL_LINK_LIMIT
+		dim as SEMANTIC_LITERAL_LINK ptr resized = reallocate(literal_links, capacity * sizeof(SEMANTIC_LITERAL_LINK))
+		if( resized = NULL ) then
+			fbSemanticModelFailAt("float literal initializer allocation failed"): exit sub
+		end if
+		literal_links = resized: literal_link_capacity = capacity
+	end if
+	literal_links[literal_link_count].expression = identity
+	literal_links[literal_link_count].previous = literal_scopes(literal_scope_depth - 1).head
+	literal_link_count += 1
+	literal_scopes(literal_scope_depth - 1).head = literal_link_count
+end sub
+
 '' Literal identity is a parser fact, independent of the constant's value.
 '' Named constants and folded calculations can have the same C value but do
 '' not become direct literals. Canonical token text excludes type suffixes;
@@ -147,6 +253,19 @@ sub fbSemanticModelNumericLiteralExpression(byval expr as ASTNODE ptr, byval tok
 	fbSemanticModelAppendDetail(prefix + "numeric-literal-text" + TABCHAR + fbSemanticModelEscape(token_text))
 	fbSemanticModelAppendDetail(prefix + "numeric-literal-text-complete" + TABCHAR + _
 		fbSemanticModelNumber(abs(len(token_text) < FB_MAXNUMLEN)))
+	if( (literal_kind = "float") and (literal_base = "decimal") ) then
+		if( token->numeric_original_length < 0 ) then
+			fbSemanticModelFailAt("original float literal token unavailable"): exit sub
+		end if
+		dim as string original_text = token->numeric_original
+		if( len(original_text) = 0 ) then original_text = "0"
+		fbSemanticModelAppendDetail(prefix + "original-float-text" + TABCHAR + fbSemanticModelEscape(original_text))
+		fbSemanticModelAppendDetail(prefix + "original-float-text-complete" + TABCHAR + _
+			fbSemanticModelNumber(abs(token->numeric_original_length <= 1024)))
+		fbSemanticModelAppendDetail(prefix + "original-float-digits" + TABCHAR + fbSemanticModelNumber(token->numeric_original_digits))
+		fbSemanticModelAppendDetail(prefix + "original-float-exponent" + TABCHAR + fbSemanticModelNumber(abs(token->numeric_original_exponent)))
+		hFloatLiteralContext(identity)
+	end if
 end sub
 
 '' Several precedence results can describe the same AST node. Immutable
@@ -185,11 +304,32 @@ type SEMANTIC_EXPRESSION_OPERANDS
 	selected_right_expression as longint
 	compound_selection as integer
 	compound_target as longint
+
+	logical_storage as integer
+	comparison_storage as integer
+	string_storage as integer
 end type
 
 const SEMANTIC_EXPRESSION_MAX_OPERANDS = 1000000
 dim shared as SEMANTIC_EXPRESSION_OPERANDS ptr expression_operands
 dim shared as integer expression_operand_count, expression_operand_capacity
+
+'' Logical builders consume their inputs while constructing short-circuit
+'' branches; comparison builders replace field and converted input trees.
+'' String builders can also replace mixed narrow/wide inputs with RTL calls.
+'' All use one bounded pool of observations, never retained AST pointers.
+'' Keep BASIC strings outside the reallocatable fixed-buffer operand array.
+type SEMANTIC_LOGICAL_STORAGE
+	left_root as integer
+	right_root as integer
+	node_count as integer
+	records as string
+end type
+
+const SEMANTIC_LOGICAL_STORAGE_BYTES = 64 * 1024 * 1024
+dim shared as SEMANTIC_LOGICAL_STORAGE logical_storage_snapshots()
+dim shared as integer logical_storage_count, logical_storage_capacity
+dim shared as longint logical_storage_bytes
 
 '' SELECT lowering builds one comparison at a time on the parser thread. This
 '' allocation-free snapshot owns no ASTs and is consumed before another CASE
@@ -226,6 +366,12 @@ dim shared as ubyte ptr string_initializer_copies
 dim shared as integer string_initializer_copy_capacity
 
 sub fbSemanticModelResetExpressions( )
+
+	deallocate(literal_links)
+	literal_links = NULL
+	literal_link_count = 0: literal_link_capacity = 0: literal_scope_depth = 0
+	erase logical_storage_snapshots
+	logical_storage_count = 0: logical_storage_capacity = 0: logical_storage_bytes = 0
 	deallocate(string_initializer_copies)
 	string_initializer_copies = NULL
 	string_initializer_copy_capacity = 0
@@ -442,6 +588,32 @@ function fbSemanticModelCaptureOperands _
 		.selected_right_expression = 0
 		.compound_selection = 0
 		.compound_target = 0
+		.logical_storage = 0
+		.comparison_storage = 0
+		.string_storage = 0
+		if( fbSemanticModelFullEnabled( ) and (kind = "binary") and _
+		    ((op = AST_OP_ANDALSO) or (op = AST_OP_ORELSE)) ) then
+			.logical_storage = fbSemanticModelCaptureLogicalStorage(left_expr, right_expr)
+		end if
+		if( fbSemanticModelFullEnabled( ) and (kind = "binary") ) then
+			select case op
+			case AST_OP_EQ, AST_OP_NE, AST_OP_LT, AST_OP_LE, AST_OP_GT, AST_OP_GE
+				.comparison_storage = fbSemanticModelCaptureLogicalStorage(left_expr, right_expr)
+			end select
+		end if
+		if( fbSemanticModelFullEnabled( ) and (kind = "binary") and _
+		    ((code = "add") or (code = "concatenate")) ) then
+			if( (left_expr <> NULL) and (right_expr <> NULL) ) then
+				dim as integer left_type = typeGetDtAndPtrOnly(astGetFullType(left_expr))
+				dim as integer right_type = typeGetDtAndPtrOnly(astGetFullType(right_expr))
+				if( ((left_type = FB_DATATYPE_STRING) or (left_type = FB_DATATYPE_FIXSTR) or _
+				     (left_type = FB_DATATYPE_CHAR) or (left_type = FB_DATATYPE_WCHAR)) and _
+				    ((right_type = FB_DATATYPE_STRING) or (right_type = FB_DATATYPE_FIXSTR) or _
+				     (right_type = FB_DATATYPE_CHAR) or (right_type = FB_DATATYPE_WCHAR)) ) then
+					.string_storage = fbSemanticModelCaptureLogicalStorage(left_expr, right_expr)
+				end if
+			end if
+		end if
 		if( (left_expr <> NULL) and (right_expr <> NULL) and (.left > 0) and (.right > 0) ) then
 			.numeric_inputs = hPrimitiveNumeric(astGetFullType(left_expr), astGetSubType(left_expr)) and _
 				hPrimitiveNumeric(astGetFullType(right_expr), astGetSubType(right_expr))
@@ -648,6 +820,9 @@ sub fbSemanticModelExportOperands(byval node as ASTNODE ptr, byval identity as l
 			TABCHAR + fbSemanticModelNumber(.source.end_column))
 		fbSemanticModelExportCoordinates("expression", identity, "operator", .source, .source)
 		fbSemanticModelMacroOrigin("expression", identity, .source.macro_identity, "operator")
+		if( .logical_storage ) then fbSemanticModelExportLogicalStorage(identity, .logical_storage)
+		if( .comparison_storage ) then fbSemanticModelExportLogicalStorage(identity, .comparison_storage, TRUE)
+		if( .string_storage ) then fbSemanticModelExportLogicalStorage(identity, .string_storage, FALSE, TRUE)
 	end with
 end sub
 
@@ -778,6 +953,71 @@ private function hAssignmentTree _
 	records += fbSemanticModelNumber(identity) + TABCHAR + payload + chr(10)
 	return identity
 end function
+
+'' Short-circuit builders replace their inputs with branches and an IIF value.
+'' Observe original logical, comparison and string storage at the EX boundary.
+'' These forests describe input values, not additional executable reads.
+function fbSemanticModelCaptureLogicalStorage _
+	( byval left_expr as ASTNODE ptr, byval right_expr as ASTNODE ptr ) as integer
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then return 0
+	if( lex.ctx->semantic_probe ) then return 0
+	if( (left_expr = NULL) or (right_expr = NULL) ) then return 0
+	if( logical_storage_count >= SEMANTIC_EXPRESSION_MAX_OPERANDS ) then
+		fbSemanticModelFailAt("original logical storage exceeds its observation bound")
+		return 0
+	end if
+	dim as SEMANTIC_LOGICAL_STORAGE observation
+	observation.left_root = hAssignmentTree(left_expr, observation.node_count, observation.records)
+	observation.right_root = hAssignmentTree(right_expr, observation.node_count, observation.records)
+	dim as integer capacity = logical_storage_capacity
+	if( logical_storage_count = capacity ) then
+		capacity = iif(capacity = 0, 64, capacity * 2)
+		if( capacity > SEMANTIC_EXPRESSION_MAX_OPERANDS ) then capacity = SEMANTIC_EXPRESSION_MAX_OPERANDS
+	end if
+	dim as longint bytes = len(observation.records) + _
+		clngint(capacity - logical_storage_capacity) * sizeof(SEMANTIC_LOGICAL_STORAGE)
+	'' The 64 MiB budget includes managed array slots and serialized payloads.
+	'' One forest is separately bounded by hAssignmentTree's node/depth limits.
+	if( bytes > SEMANTIC_LOGICAL_STORAGE_BYTES - logical_storage_bytes ) then
+		fbSemanticModelFailAt("original logical storage exceeds its byte bound")
+		return 0
+	end if
+	if( capacity <> logical_storage_capacity ) then
+		redim preserve logical_storage_snapshots(0 to capacity - 1)
+		logical_storage_capacity = capacity
+	end if
+	logical_storage_snapshots(logical_storage_count) = observation
+	logical_storage_bytes += bytes
+	logical_storage_count += 1
+	return logical_storage_count
+end function
+
+sub fbSemanticModelExportLogicalStorage _
+	( byval expression as longint, byval snapshot as integer, byval comparison as integer, byval string_inputs as integer )
+	if( (expression <= 0) or (snapshot <= 0) or (snapshot > logical_storage_count) ) then
+		fbSemanticModelFailAt("original logical storage has an invalid observation ticket")
+		exit sub
+	end if
+	with logical_storage_snapshots(snapshot - 1)
+		dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(expression) + TABCHAR
+		dim as string storage_kind = iif(comparison, "comparison", "logical")
+		if( string_inputs ) then storage_kind = "string"
+		fbSemanticModelAppendDetail(prefix + storage_kind + "-storage" + TABCHAR + fbSemanticModelEscape( _
+			fbSemanticModelNumber(.left_root) + TABCHAR + fbSemanticModelNumber(.right_root) + TABCHAR + fbSemanticModelNumber(.node_count)))
+		dim as integer first = 1, count = 0
+		while( first <= len(.records) )
+			dim as integer ending = instr(first, .records, chr(10)), separator = instr(first, .records, TABCHAR)
+			if( (ending = 0) or (separator = 0) or (separator >= ending) ) then
+				fbSemanticModelFailAt("original logical storage has an invalid node record")
+				exit sub
+			end if
+			fbSemanticModelAppendDetail(prefix + storage_kind + "-tree:" + mid(.records, first, separator - first) + TABCHAR + _
+				fbSemanticModelEscape(mid(.records, separator + 1, ending - separator - 1)))
+			first = ending + 1: count += 1
+		wend
+		if( count <> .node_count ) then fbSemanticModelFailAt("original logical storage has an incomplete forest")
+	end with
+end sub
 
 function fbSemanticModelCaptureAssignmentInputs _
 	( byval left_expr as ASTNODE ptr, byval right_expr as ASTNODE ptr, byref source as LEX_LOCATION ) as string
@@ -1141,7 +1381,9 @@ sub fbSemanticModelPointerDereference _
 	if( (fbSemanticModelFullEnabled( ) = FALSE) or (result = NULL) ) then exit sub
 	if( lex.ctx->semantic_probe ) then exit sub
 	dim as longint identity = result->semantic_expression
-	if( (identity <= 0) or (operand_id <= 0) or (dereferences < 1) or (dereferences > 8) ) then
+	'' @ on a maximum-depth declaration creates one additional temporary
+	'' pointer level. Its accepted dereference must remain exportable too.
+	if( (identity <= 0) or (operand_id <= 0) or (dereferences < 1) or (dereferences > FB_DT_PTRLEVELS + 1) ) then
 		fbSemanticModelFailAt("semantic-expressions.bas:623")
 		exit sub
 	end if

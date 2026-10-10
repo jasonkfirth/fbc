@@ -936,17 +936,20 @@ sub cForStmtBegin( )
 
 	'' if inic, endc and stepc are all constants,
 	'' check if this branch is needed
+	dim as integer entry_result = -1
 	if( isconst = 3 ) then
 		expr = astNewBOP( iif( stk->for.ispos.value.i, AST_OP_LE, AST_OP_GE ), _
 		                  astNewCONST( @stk->for.cnt.value, stk->for.cnt.dtype ), _
 		                  astNewCONST( @stk->for.end.value, stk->for.end.dtype ) )
 
-		if( astConstFlushToInt( expr ) = 0 ) then
+		entry_result = iif( astConstFlushToInt( expr ) <> 0, 1, 0 )
+		if( entry_result = 0 ) then
 			astAdd( astNewBRANCH( AST_OP_JMP, el ) )
 		end if
 	else
 		astAdd( astNewBRANCH( AST_OP_JMP, tl ) )
 	end if
+	fbSemanticModelScalarForEntry( stk->for.cnt.sym, entry_result )
 
 	'' add start label
 	il = symbAddLabel( NULL )

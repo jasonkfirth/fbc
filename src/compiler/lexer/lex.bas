@@ -46,6 +46,8 @@ declare sub         lexReadUTF32BE          ( )
 declare sub         hMultiLineComment       ( )
 
 declare sub hSkipChar( )
+declare function fbSemanticModelFullEnabled( ) as integer
+declare sub fbSemanticModelFailAt(byref reason as const string)
 
 const UINVALID as uinteger = cuint( INVALID )
 
@@ -1182,6 +1184,36 @@ end function
 '':::::
 ''float           = DOT DIGIT { DIGIT } [FSUFFIX | { EXPCHAR [opadd] DIGIT { DIGIT } } | ].
 ''
+private sub hObserveNumericChar(byref t as FBTOKEN, byval c as uinteger)
+	if( t.numeric_original_length < 0 ) then exit sub
+	'' One million units exceeds practical literals while preventing counters
+	'' from wrapping on hostile input. The parser still consumes its usual text.
+	if( t.numeric_original_length >= 1048576 ) then
+		if( t.numeric_original_length = 1048576 ) then
+			fbSemanticModelFailAt("original float literal observation limit exceeded")
+			t.numeric_original_length += 1
+		end if
+		exit sub
+	end if
+	if( (c = CHAR_0) and (t.numeric_original_length = 0) and (t.numeric_original_dot = FALSE) ) then exit sub
+	if( (c = CHAR_ELOW) or (c = CHAR_EUPP) or (c = CHAR_DLOW) or (c = CHAR_DUPP) ) then
+		if( t.numeric_original_length = 0 ) then
+			t.numeric_original[0] = CHAR_0
+			t.numeric_original_length = 1
+		end if
+		t.numeric_original_exponent = TRUE
+	elseif( c = CHAR_DOT ) then
+		t.numeric_original_dot = TRUE
+	elseif( (c >= CHAR_0) and (c <= CHAR_9) and (t.numeric_original_exponent = FALSE) ) then
+		if( (c <> CHAR_0) or (t.numeric_original_digits > 0) ) then t.numeric_original_digits += 1
+	end if
+	if( t.numeric_original_length < 1024 ) then
+		t.numeric_original[t.numeric_original_length] = c
+		t.numeric_original[t.numeric_original_length + 1] = 0
+	end if
+	t.numeric_original_length += 1
+end sub
+
 private sub hReadFloatNumber _
 	( _
 		byref pnum as zstring ptr, _
@@ -1206,6 +1238,7 @@ private sub hReadFloatNumber _
 		c = lexCurrentChar( )
 		select case c
 		case CHAR_0 to CHAR_9
+			hObserveNumericChar(t, c)
 			lexEatChar( )
 			if( skipchar = FALSE ) then
 				*pnum = c
@@ -1243,6 +1276,7 @@ private sub hReadFloatNumber _
 	'' 'e', 'E', 'd', 'D'?
 	case CHAR_ELOW, CHAR_EUPP, CHAR_DLOW, CHAR_DUPP
 		'' EXPCHAR
+		hObserveNumericChar(t, c)
 		if( c = CHAR_DLOW or c = CHAR_DUPP ) then
 			t.dtype = FB_DATATYPE_DOUBLE
 		end if
@@ -1261,6 +1295,7 @@ private sub hReadFloatNumber _
 		'' [opadd]
 		c = lexCurrentChar( )
 		if( (c = CHAR_PLUS) or (c = CHAR_MINUS) ) then
+			hObserveNumericChar(t, c)
 			lexEatChar( )
 			if( skipchar = FALSE ) then
 				*pnum = c
@@ -1273,6 +1308,7 @@ private sub hReadFloatNumber _
 			c = lexCurrentChar( )
 			select case as const c
 			case CHAR_0 to CHAR_9
+				hObserveNumericChar(t, c)
 				lexEatChar( )
 				if( skipchar = FALSE ) then
 					*pnum = c
@@ -1371,6 +1407,7 @@ private sub readNumberChars _
 		var c = lexCurrentChar( )
 		select case as const c
 		case CHAR_0 to CHAR_9
+			hObserveNumericChar(t, c)
 			lexEatChar( )
 			if( ((c <> CHAR_0) or (t.len > 0) or save_first_leading_zero) and _
 				(not skipchar) ) then
@@ -1383,6 +1420,7 @@ private sub readNumberChars _
 		case CHAR_DOT, CHAR_ELOW, CHAR_EUPP, CHAR_DLOW, CHAR_DUPP
 			var hasdot = FALSE
 			if( c = CHAR_DOT ) then
+				hObserveNumericChar(t, c)
 				lexEatChar( )
 				if( skipchar = FALSE ) then
 					*pnum = CHAR_DOT
@@ -1498,6 +1536,11 @@ private sub hReadNumber( byref t as FBTOKEN, byval flags as LEXCHECK )
 	t.len = 0
 	t.hassuffix = false
 	t.numeric_suffix = ""
+	t.numeric_original = ""
+	t.numeric_original_length = iif(fbSemanticModelFullEnabled( ), 0, -1)
+	t.numeric_original_digits = 0
+	t.numeric_original_dot = FALSE
+	t.numeric_original_exponent = FALSE
 
 	select case as const lexCurrentChar( )
 	'' integer part
@@ -1506,6 +1549,7 @@ private sub hReadNumber( byref t as FBTOKEN, byval flags as LEXCHECK )
 
 	'' fractional part
 	case CHAR_DOT
+		hObserveNumericChar(t, CHAR_DOT)
 		lexEatChar( )
 		'' add '.'
 		*pnum = CHAR_DOT
@@ -1827,6 +1871,7 @@ private sub hReadString _
 	tk->dtype = FB_DATATYPE_CHAR
 	tk->len = lgt
 	tk->hasesc = hasesc
+	tk->literal_truncated = skipchar
 
 end sub
 
@@ -1969,6 +2014,7 @@ private sub hReadWStr _
 	tk->dtype = FB_DATATYPE_WCHAR
 	tk->len = lgt
 	tk->hasesc = hasesc
+	tk->literal_truncated = skipchar
 
 end sub
 
@@ -2226,6 +2272,7 @@ sub lexNextToken _
 	t->text[0] = 0                                  '' t.text = ""
 	t->len = 0
 	t->sym_chain = NULL
+	t->literal_truncated = FALSE
 
 	'' skip white space
 	if( hSkipWhitespace( t, flags, char ) ) then
@@ -2236,6 +2283,7 @@ sub lexNextToken _
 		t->source.end_column = lex.ctx->column
 		t->source.is_physical = (lex.ctx->kind <> LEX_TKCTX_CONTEXT_EVAL)
 		t->source.macro_identity = fbSemanticModelMacroTokenOrigin( )
+		fbSemanticModelMacroTokenStart(t->source)
 		t->source.source_context = fbSemanticModelCurrentSource( )
 		t->source.raw_start_line = lex.ctx->raw_linenum
 		t->source.raw_end_line = lex.ctx->raw_linenum
@@ -2253,6 +2301,7 @@ sub lexNextToken _
 	t->source.is_physical = (lex.ctx->kind <> LEX_TKCTX_CONTEXT_EVAL) and _
 		(lex.ctx->deflen = 0)
 	t->source.macro_identity = fbSemanticModelMacroTokenOrigin( )
+	fbSemanticModelMacroTokenStart(t->source)
 	t->source.source_context = fbSemanticModelCurrentSource( )
 	t->source.raw_start_line = lex.ctx->raw_linenum
 	t->source.raw_start_column = lex.ctx->column

@@ -44,7 +44,8 @@ declare sub fbSemanticModelProcedureTyping(byval proc as FBSYMBOL ptr, byval tk 
 declare function fbSemanticModelCallbackCount( ) as longint
 declare sub fbSemanticModelProcedureAbiInput(byval proc as FBSYMBOL ptr, byref role as const string, _
 	byval has_library as integer, byval has_alias as integer, byval callback_start as longint, byref source as LEX_LOCATION, _
-	byval written_convention as integer, byval dynamic_string as integer)
+	byval written_convention as integer, byval dynamic_string as integer, byval tk as integer, _
+	byref declared_name as const string)
 declare sub fbSemanticModelFailAt(byref reason as const string)
 declare sub fbSemanticModelDeclarationRepeat(byval sym as FBSYMBOL ptr, byref kind as const string, _
 	byval repeated as integer, byref source as LEX_LOCATION)
@@ -1987,7 +1988,7 @@ function cProcHeader _
 			fbSemanticModelExportDeclaration(proc, declaration_site, "procedure-prototype", id)
 			fbSemanticModelProcedureTyping(proc, tk, "prototype", semantic_result_form)
 			fbSemanticModelProcedureAbiInput(proc, "prototype", semantic_has_library, semantic_has_alias, semantic_callback_start, semantic_site, _
-				semantic_written_convention, semantic_dynamic_string)
+				semantic_written_convention, semantic_dynamic_string, tk, id)
 		end if
 		return proc
 	end if
@@ -2248,7 +2249,7 @@ function cProcHeader _
 		fbSemanticModelExportDeclaration(proc, declaration_site, "procedure-definition", id)
 		fbSemanticModelProcedureTyping(proc, tk, "definition", semantic_result_form)
 		fbSemanticModelProcedureAbiInput(proc, "definition", semantic_has_library, semantic_has_alias, semantic_callback_start, semantic_site, _
-			semantic_written_convention, semantic_dynamic_string)
+			semantic_written_convention, semantic_dynamic_string, tk, id)
 	end if
 
 	function = proc

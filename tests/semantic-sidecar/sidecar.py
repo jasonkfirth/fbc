@@ -31,13 +31,21 @@ from aggregate_fields import validate_aggregate_fields
 from semantic_callbacks import validate_procedure_callbacks
 from semantic_abi_policy import validate_abi_policy_inputs
 from semantic_header_policy import validate_header_policy
+from semantic_result_inputs import validate_result_inputs
+from semantic_exit_inputs import validate_exit_inputs
+from semantic_option_routes import validate_option_routes
+from semantic_literal_inputs import validate_literal_inputs
 from semantic_namespace_inputs import validate_namespace_inputs
+from semantic_construction_inputs import validate_construction_inputs
+from semantic_temporary_construction import validate_temporary_construction
 from semantic_enums import validate_enum_declarations
+from semantic_type_spellings import PREFIX as TYPE_SPELLING_PREFIX, validate_type_spellings
 from semantic_iif import validate_iif_inputs
 from semantic_if import validate_if_conditions
 from semantic_if_arms import PREFIXES as IF_ARM_PREFIXES, validate_if_arms
 from semantic_assignment_inputs import PREFIXES as ASSIGNMENT_INPUT_PREFIXES, validate_assignment_inputs
 from semantic_assignment_storage import PREFIXES as ASSIGNMENT_STORAGE_PREFIXES, validate_assignment_storage
+from semantic_logical_storage import validate_logical_storage, validate_comparison_storage, validate_string_storage
 
 
 SCHEMA = "27"
@@ -102,6 +110,10 @@ SOURCE_BOMS = {
 MAX_COORDINATE_LINE_BYTES = 16 * 1024 * 1024
 
 
+from semantic_comments import validate_comments
+from semantic_variable_names import validate_variable_names
+from semantic_for_entry import validate_for_entry
+
 SHAPES = {
     "FBCSEM": 3, "M": 2, "D": 2, "S": 12, "B": 9, "I": 12,
     "P": 9, "V": 5, "N": 13, "E": 16, "R": 3, "END": 13,
@@ -114,11 +126,11 @@ SHAPES = {
     "MD": 10, "MT": 6, "MI": 15, "MA": 12, "MS": 8, "MC": 5, "ME": 13, "ML": 13, "MR": 5,
     "ST": 17, "STE": 10, "BLK": 14, "BEND": 9, "OWN": 4, "CAP": 4, "ACC": 3, "SOP": 3,
     "EX": 13,
-    "NP": 3, "EV": 5, "CB": 4, "CN": 4, "CE": 6, "CL": 4, "DI": 12,
+    "NP": 3, "EV": 5, "CB": 4, "CN": 4, "CE": 6, "CL": 4, "DI": 12, "COM": 4,
 }
 PROVENANCE_TAGS = frozenset(("FILE", "SRC", "SRE", "INC", "MAP", "ORIG", "LOC", "PPB", "PPD", "PPE", "PPT", "PPS",
                             "MD", "MT", "MI", "MA", "MS", "MC", "ME", "ML", "MR", "ST", "STE", "BLK", "BEND", "OWN", "CAP", "ACC", "SOP", "EX", "DI"))
-DETAIL_TAGS = frozenset(("T", "A", "F", "G", "U", "C", "H", "K", "J", "O", "Q", "Y", "Z", "ASM", "DCL", "CTX", "OPT", "USE", "NT", "PH", "NP", "EV", "CB", "CN", "CE", "CL")) | PROVENANCE_TAGS
+DETAIL_TAGS = frozenset(("T", "A", "F", "G", "U", "C", "H", "K", "J", "O", "Q", "Y", "Z", "ASM", "DCL", "CTX", "OPT", "USE", "NT", "PH", "NP", "EV", "CB", "CN", "CE", "CL", "COM")) | PROVENANCE_TAGS
 TYPE_KINDS = frozenset(("pointer", "numeric", "dynamic-string", "fixed-string",
                         "aggregate", "procedure", "other"))
 SYMBOL_CLASSES = ("variable", "constant", "procedure", "parameter", "define", "keyword",
@@ -185,12 +197,13 @@ SOURCE_OPERATORS = {
                           "logical-and", "logical-or", "xor", "equivalence", "implication", "shift-left", "shift-right",
                           "power", "concatenate", "equal", "greater-than", "less-than", "not-equal",
                           "greater-or-equal", "less-or-equal", "identity-test")),
-    "unary": frozenset(("negate", "unary-plus", "not")),
+    "unary": frozenset(("negate", "unary-plus", "not", "dereference")),
     "intrinsic-unary": frozenset(("absolute-value", "sign", "sine", "arcsine", "cosine", "arccosine", "tangent",
                                    "arctangent", "square-root", "logarithm", "exponential", "floor", "truncate", "fractional-part")),
     "intrinsic-binary": frozenset(("arctangent2",)),
     "group": frozenset(("parentheses",)),
     "cast": frozenset(("cast",)),
+    "runtime-macro": frozenset(("va-start", "va-copy", "va-arg", "va-end")),
 }
 
 
@@ -325,6 +338,7 @@ class Model:
         self.statement_operations: dict[int, list[str]] = defaultdict(list)
         self.expression_operands: dict[int, list[str]] = {}
         statement_stack: list[int] = []
+        comment_ids: set[int] = set()
         construct_stack: list[int] = []
         remap_ids: set[int] = set()
         self.conditional_branches: dict[int, list[str]] = {}
@@ -350,6 +364,8 @@ class Model:
             raise ValueError("Sidecar is truncated")
         counts: Counter[str] = Counter()
         expression_ids: set[int] = set()
+        expression_rows: dict[int, list[str]] = {}
+        untyped_statement_expressions: set[int] = set()
         declaration_ids: set[int] = set()
         child_edges: set[tuple[int, str]] = set()
         dependencies: set[str] = set()
@@ -473,6 +489,12 @@ class Model:
                 if not row[3] or row[4] not in TYPE_KINDS:
                     raise ValueError("Invalid variable type fact")
             elif tag in ("N", "E"):
+                # Native datatypes are unsigned 32-bit wire fields, including
+                # the invalid-type sentinel used by statement-only Cva_List.
+                # Do not let oversized values disappear when masking the type.
+                datatype = number(row[8] if tag == "N" else row[12], 0)
+                if datatype > 4294967295:
+                    raise ValueError("Native datatype exceeds its wire field")
                 identity = number(row[1], 1)
                 subject_modules["node" if tag == "N" else "expression", identity] = counts["M"]
                 if tag == "N":
@@ -495,12 +517,22 @@ class Model:
                     if identity in expression_ids:
                         raise ValueError("Duplicate expression identity")
                     expression_ids.add(identity)
+                    expression_rows[identity] = row
                     module_expressions += 1
                     flag(row[2])
                     source_range(row, 3)
                     code, kind = row[10:12]
                     if not row[15]:
-                        raise ValueError("Expression has no type spelling")
+                        # GCC represents the three statement-only Cva_List
+                        # operations with an invalid-typed AST node. This is
+                        # not a general relaxation: the matching EX record and
+                        # module capability are checked after all records have
+                        # been read. Cva_Arg remains a typed value expression.
+                        if (bindings_only or row[8] != "44" or row[9] != "-1" or
+                                code not in ("va-start", "va-copy", "va-end") or kind != "builtin" or
+                                row[12] != "2147483648"):
+                            raise ValueError("Expression has no type spelling")
+                        untyped_statement_expressions.add(identity)
                     for value in row[13:15]:
                         reference("symbol", value)
                     if expressions_only and row[13:15] != ["0", "0"]:
@@ -554,7 +586,13 @@ class Model:
                     raise ValueError("Repeated source operands or unknown operator family/code")
                 if not (left or right) or left >= identity or right >= identity:
                     raise ValueError("Source operands are missing, cyclic, or forward references")
-                if row[2] not in ("binary", "intrinsic-binary") and right:
+                if row[2] == "runtime-macro":
+                    if row[3] in ("va-start", "va-copy"):
+                        if not (left and right):
+                            raise ValueError("Cva_List start/copy operation lacks an operand")
+                    elif not left or right:
+                        raise ValueError("Cva_List arg/end operation has invalid operands")
+                elif row[2] not in ("binary", "intrinsic-binary") and right:
                     raise ValueError("Unary source operation advertises a right operand")
                 if sourceid not in self.source_contexts or int(self.source_contexts[sourceid][4]) != counts["M"]:
                     raise ValueError("Source operation lacks its module/source occurrence")
@@ -572,7 +610,7 @@ class Model:
                 self.access_roles[identity] = row[2]
             elif tag == "SOP":
                 identity = number(row[1], 1)
-                if identity not in self.statements or row[2] not in ("file-open", "file-close", "file-seek", "file-get", "file-put", "file-lock", "file-unlock", "file-rename", "line-input", "namespace-import", "goto", "gosub", "gosub-return", "gosub-return-label", "procedure-return", "on-goto", "on-gosub", "on-error-set", "on-error-clear"):
+                if identity not in self.statements or row[2] not in ("file-open", "file-close", "file-seek", "file-get", "file-put", "file-lock", "file-unlock", "file-rename", "line-input", "namespace-import", "goto", "gosub", "gosub-return", "gosub-return-label", "procedure-return", "function-result-return", "function-result-assignment", "procedure-explicit-exit", "on-goto", "on-gosub", "on-error-set", "on-error-clear"):
                     raise ValueError("Invalid source statement operation")
                 self.statement_operations[identity].append(row[2])
             elif tag == "G":
@@ -602,7 +640,14 @@ class Model:
                 key = row[1], int(row[2])
                 if tag == "C":
                     if row[3] in ("signed", "unsigned"):
-                        number(row[4], 0 if row[3] == "unsigned" else None)
+                        value = number(row[4], 0 if row[3] == "unsigned" else None)
+                        # Integral AST constants use a 64-bit carrier. Python's
+                        # arbitrary precision must not accept an impossible wire value.
+                        if row[3] == "unsigned":
+                            if value > 18446744073709551615:
+                                raise ValueError("Unsigned constant exceeds its wire field")
+                        elif not -9223372036854775808 <= value <= 9223372036854775807:
+                            raise ValueError("Signed constant exceeds its wire field")
                     elif row[3] in ("bytes", "wide-units"):
                         width = 2 if row[3] == "bytes" else 8
                         if len(row[4]) % width or re.fullmatch(r"[0-9A-F]*", row[4]) is None:
@@ -640,7 +685,7 @@ class Model:
                     if row[3].startswith("array-storage-") and row[3] in self.properties[key]:
                         raise ValueError("Repeated array storage property")
                     if row[3] in ("constant-symbol", "constant-atom-kind", "bound-value-symbol", "assignment-target-dtype", "assignment-kind", "source-assignment-symbol",
-                                   "source-assignment-kind", "unevaluated-query-input") or row[3].startswith(("size-query-", "numeric-selected-", "numeric-literal-", "file-transfer-", "string-intrinsic-", "string-initializer-", "array-subscript-", "array-bound-", "array-initializer-", "array-storage-")):
+                                   "source-assignment-kind", "unevaluated-query-input", "logical-storage") or row[3].startswith(("logical-tree:", "size-query-", "numeric-selected-", "numeric-literal-", "original-float-", "file-transfer-", "string-intrinsic-", "string-initializer-", "array-subscript-", "array-bound-", "array-initializer-", "array-storage-")):
                         if row[1] != "expression":
                             raise ValueError("Invalid expression receipt domain")
                         previous = self.properties[key].get(row[3])
@@ -678,6 +723,10 @@ class Model:
                     if row[3] in ("enum-declaration-input", "enum-element-input"):
                         if row[1] != "symbol" or row[3] in self.properties[key]:
                             raise ValueError("Duplicate or foreign enum input property")
+                        storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
+                    if row[3].startswith(TYPE_SPELLING_PREFIX):
+                        if row[1] != "symbol" or row[3] in self.properties[key]:
+                            raise ValueError("Duplicate or foreign type declaration spelling")
                         storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
                     if row[3].startswith("if-condition-"):
                         if row[1] != "symbol" or row[3] in self.properties[key]:
@@ -739,7 +788,9 @@ class Model:
                 reference("symbol", row[5])
                 pointers = number(row[6], 0)
                 flag(row[7])
-                if pointers > 8 or len(row[8]) != pointers + 1 or re.fullmatch(r"[01]+", row[8]) is None:
+                # @ on an eight-level declaration produces a valid ninth-level
+                # temporary. This does not widen the declaration grammar.
+                if pointers > 9 or len(row[8]) != pointers + 1 or re.fullmatch(r"[01]+", row[8]) is None:
                     raise ValueError("Invalid normalized type qualifiers")
                 if row[4] not in PRIMITIVE_NAMES or row[10] and row[10] not in PRIMITIVE_NAMES:
                     raise ValueError("Unknown normalized type name")
@@ -805,6 +856,12 @@ class Model:
                 if key in self.options[identity]:
                     raise ValueError("Repeated configuration option")
                 self.options[identity][key] = number(row[4])
+            elif tag == "COM":
+                identity, context = number(row[1], 1), number(row[2], 1)
+                if (identity in comment_ids or self.configurations.get(context) != counts["M"]
+                        or row[3] not in ("apostrophe", "rem")):
+                    raise ValueError("Comment identity, context or kind is invalid")
+                comment_ids.add(identity)
             elif tag == "USE":
                 if row[1] not in ("symbol", "node", "expression", "declaration"):
                     raise ValueError("Unknown configuration use domain")
@@ -911,6 +968,9 @@ class Model:
                     raise ValueError("Unverified physical location advertises byte coordinates")
                 if row[1] in ("binding", "declaration", "expression"):
                     reference(row[1], row[2], nullable=False)
+                elif row[1] == "comment":
+                    if identity not in comment_ids or row[3] != "marker":
+                        raise ValueError("Physical comment marker is dangling")
                 elif row[1] == "conditional":
                     if identity not in self.conditional_branches:
                         raise ValueError("Physical conditional location is dangling")
@@ -1367,6 +1427,33 @@ class Model:
             for child in (int(row[4]), int(row[5])):
                 if child and subject_modules["expression", child] != module:
                     raise ValueError("Source operand belongs to another module")
+            if row[2:4] == ["unary", "dereference"] and not (bindings_only or expressions_only):
+                if self.capabilities[module].get("parsed-unary-prefixes") != "available":
+                    raise ValueError("Original dereference prefix lacks available coverage")
+                for role in ("operator", "unary-input"):
+                    key = ("expression", identity, role)
+                    if key not in self.physical_locations and key not in self.macro_origins:
+                        raise ValueError("Original dereference prefix lacks its token boundary")
+            if row[2] == "runtime-macro":
+                result = expression_rows[identity]
+                if self.capabilities[module].get("source-va-list-operations") != "available":
+                    raise ValueError("Cva_List source operation lacks an available capability")
+                if result[10] != row[3] or result[11] != "builtin":
+                    raise ValueError("Cva_List source operation disagrees with its result expression")
+                if not expressions_only:
+                    left_type = self.normalized_types.get(("expression", int(row[4]), "value"))
+                    right_type = self.normalized_types.get(("expression", int(row[5]), "value"))
+                    left_compatible = left_type is not None and (left_type[10] == "va_list" or
+                                                                 left_type[4] == "any" and int(left_type[6]) > 0)
+                    right_compatible = right_type is not None and (right_type[10] == "va_list" or
+                                                                   right_type[4] == "any" and int(right_type[6]) > 0)
+                    if not left_compatible:
+                        raise ValueError("Cva_List source operation has an incompatible left operand")
+                    if row[3] == "va-copy" and not right_compatible:
+                        raise ValueError("Cva_Copy source operation has an incompatible right operand")
+                untyped_statement_expressions.discard(identity)
+        if untyped_statement_expressions:
+            raise ValueError("Untyped Cva_List statement expression lacks its source operation")
         if expression_ids != set(range(1, counts["E"] + 1)):
             raise ValueError("Expression identity sequence has gaps")
         if set(self.symbols) != set(range(1, counts["S"] + 1)):
@@ -1374,6 +1461,11 @@ class Model:
         if set(self.nodes) != set(range(1, counts["N"] + 1)):
             raise ValueError("Node identity sequence has gaps")
         self.validate_source_ownership(subject_modules)
+        validate_comments(self, number, subject_modules)
+        validate_variable_names(self, number, subject_modules)
+        validate_logical_storage(self, number, subject_modules, len(NODE_KINDS))
+        validate_comparison_storage(self, number, subject_modules, len(NODE_KINDS))
+        validate_string_storage(self, number, subject_modules, len(NODE_KINDS))
         for identity in self.nodes:
             if "kind" not in self.properties["node", identity]:
                 raise ValueError("AST node lacks its stable kind")
@@ -1394,6 +1486,7 @@ class Model:
             self.validate_call_atoms(subject_modules)
             self.validate_numeric_selections(subject_modules)
             self.validate_numeric_literals(subject_modules)
+            self.validate_original_float_literals(subject_modules)
             self.validate_size_queries(subject_modules)
             for (domain, identity, _), module in storage_property_modules.items():
                 if subject_modules.get((domain, identity)) != module:
@@ -1407,6 +1500,7 @@ class Model:
             validate_string_declarations(self, number, subject_modules)
             validate_declaration_repetitions(self, number, subject_modules)
             validate_enum_declarations(self, number, subject_modules)
+            validate_type_spellings(self, number, subject_modules)
             validate_iif_inputs(self, number, subject_modules)
             validate_if_conditions(self, number, subject_modules)
             validate_if_arms(self, number, subject_modules)
@@ -1415,11 +1509,18 @@ class Model:
             validate_procedure_callbacks(self, number, subject_modules)
             validate_abi_policy_inputs(self, number, subject_modules)
             validate_header_policy(self, number, unescape, subject_modules)
+            validate_result_inputs(self, number, subject_modules)
+            validate_exit_inputs(self, number, subject_modules)
+            validate_option_routes(self, number, subject_modules)
+            validate_literal_inputs(self, number, subject_modules)
             validate_namespace_inputs(self, number, subject_modules)
+            validate_construction_inputs(self, number, subject_modules)
+            validate_temporary_construction(self, number, subject_modules)
             validate_aggregate_fields(self, number, subject_modules)
             validate_wide_literals(self, number, subject_modules)
             self.validate_for_steps(subject_modules)
             self.validate_for_inputs(subject_modules)
+            validate_for_entry(self, number, subject_modules)
             self.validate_file_transfers(subject_modules)
             self.validate_string_intrinsics(subject_modules)
             self.validate_string_initializers(subject_modules)
@@ -1767,9 +1868,13 @@ class Model:
             kind = properties.get("string-intrinsic-kind")
             count = number(properties.get("string-intrinsic-count", ""), 1)
             is_any = properties.get("string-intrinsic-any")
-            if kind not in ("chr", "wchr", "uchr", "trim", "ltrim", "rtrim") or count > 32 or is_any not in ("0", "1"):
+            if kind not in ("chr", "wchr", "uchr", "trim", "ltrim", "rtrim", "str", "str-qb", "wstr") or count > 32 or is_any not in ("0", "1"):
                 raise ValueError("Invalid parsed string intrinsic selection")
             is_trim = kind in ("trim", "ltrim", "rtrim")
+            is_format = kind in ("str", "str-qb", "wstr")
+            if is_format and (count != 1 or is_any != "0" or
+                              self.capabilities[module].get("parsed-string-format-inputs") != "available"):
+                raise ValueError("Invalid string format input shape or capability")
             if (is_trim and count > 2) or (is_any == "1" and (not is_trim or count != 2)):
                 raise ValueError("Invalid string intrinsic argument shape")
             expected = {"string-intrinsic-kind", "string-intrinsic-count", "string-intrinsic-any"}
@@ -1783,7 +1888,11 @@ class Model:
             if int(expressions[identity][12]) & 511 not in (4, 7, 17, 26):
                 raise ValueError("String intrinsic has a non-string result")
             expression = expressions[identity]
-            if int(expression[8]) == 17:
+            if is_format:
+                # A parser formatting receipt can retain a passthrough or an
+                # overloaded conversion. Call purity requires its own proof.
+                pass
+            elif int(expression[8]) == 17:
                 symbol = self.symbols[int(expression[13])]
                 if is_trim or kind == "uchr" or not int(symbol[7]) & 1024:
                     raise ValueError("String intrinsic has an unrelated variable result")
@@ -2014,6 +2123,8 @@ class Model:
                     raise ValueError("Numeric selection has no original primitive operand")
             module = subject_modules[domain, identity]
             for side in ("left", "right"):
+                if self.capabilities[module].get("selected-numeric-operands") == "unavailable":
+                    raise ValueError("Numeric selections contradict unavailable coverage")
                 dtype = number(properties[f"numeric-selected-{side}-dtype"], 0)
                 if dtype & 0x1e0 or dtype & 31 not in (1, 2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16):
                     raise ValueError("Numeric selection has an unsupported dtype")
@@ -2062,6 +2173,55 @@ class Model:
                 text = text[2:]
             if not text or any(character not in allowed for character in text):
                 raise ValueError("Invalid canonical numeric token characters")
+
+    def validate_original_float_literals(self, subject_modules: dict[tuple[str, int], int]) -> None:
+        """Original spelling and initializer ownership survive value folding."""
+        required = {"original-float-text", "original-float-text-complete", "original-float-digits",
+                    "original-float-exponent", "original-float-initializer", "original-float-initializer-symbol"}
+        for (domain, identity), properties in self.properties.items():
+            keys = {key for key in properties if key.startswith("original-float-")}
+            module = subject_modules.get((domain, identity))
+            available = module is not None and self.capabilities[module].get("original-float-literal-inputs") == "available"
+            decimal_float = properties.get("numeric-literal-kind") == "float" and properties.get("numeric-literal-base") == "decimal"
+            if not keys and not (available and decimal_float):
+                continue
+            if domain != "expression" or not available or not decimal_float or keys != required:
+                raise ValueError("Incomplete original float literal inputs")
+            text = properties["original-float-text"]
+            complete = properties["original-float-text-complete"]
+            exponent = properties["original-float-exponent"]
+            digits = number(properties["original-float-digits"], 0)
+            if not 1 <= len(text) <= 1024 or complete not in ("0", "1") or exponent not in ("0", "1") or digits > 1048576:
+                raise ValueError("Invalid original float literal bounds")
+            if any(character not in "0123456789.eEdD+-" for character in text):
+                raise ValueError("Invalid original float literal characters")
+            mantissa = re.split("[eEdD]", text, maxsplit=1)[0]
+            observed_digits = len(mantissa.replace(".", "").lstrip("0"))
+            if complete == "1":
+                if not re.fullmatch(r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eEdD][+-]?[0-9]+)?", text):
+                    raise ValueError("Invalid complete original float literal")
+                if digits != observed_digits or (exponent == "1") != bool(re.search("[eEdD]", text)):
+                    raise ValueError("Original float literal counts disagree with spelling")
+            elif len(text) != 1024 or digits < observed_digits:
+                raise ValueError("Invalid truncated original float literal")
+            kind = properties["original-float-initializer"]
+            symbol_id = number(properties["original-float-initializer-symbol"], 0)
+            if kind == "value":
+                if symbol_id:
+                    raise ValueError("Ordinary float literal has an initializer subject")
+            else:
+                symbol = self.symbols.get(symbol_id)
+                if symbol is None or subject_modules.get(("symbol", symbol_id)) != module:
+                    raise ValueError("Original float initializer subject is missing or foreign")
+                if kind == "constant":
+                    if number(symbol[3]) != 2:
+                        raise ValueError("Original float constant initializer has another symbol kind")
+                elif kind == "static":
+                    attributes = number(symbol[7], 0)
+                    if number(symbol[3]) != 1 or (attributes & 128 and not attributes & 2):
+                        raise ValueError("Original float static initializer lacks static storage")
+                else:
+                    raise ValueError("Unknown original float initializer kind")
 
     def validate_numeric_assignments(self, subject_modules: dict[tuple[str, int], int]) -> None:
         """Destination properties supplement, never replace, the RHS type."""
@@ -2311,7 +2471,7 @@ class Model:
                     if domain != "expression" or operand >= identity or subject_modules.get(("expression", operand)) != module:
                         raise ValueError("Missing, cyclic or foreign dereference input")
                     input_type = int(expressions[operand][12]) & 0x1FF
-                    if count > 8 or count > (input_type & 0x1E0) >> 5:
+                    if count > 9 or count > (input_type & 0x1E0) >> 5:
                         raise ValueError("Dereference count exceeds its typed input")
                     if int(expressions[identity][12]) & 0x1FF != input_type - count * 32 or expressions[identity][14] != expressions[operand][14]:
                         raise ValueError("Dereference result contradicts its selected input")

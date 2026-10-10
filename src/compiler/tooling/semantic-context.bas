@@ -125,7 +125,7 @@ function fbSemanticModelCurrentContext( ) as longint
 	return semantic_context_id
 end function
 
-sub fbSemanticModelOptionDeclaration( byval is_base as integer, byval value as longint )
+sub fbSemanticModelOptionDeclaration( byval is_base as integer, byval value as longint, byval route as integer )
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
 	dim as longint statement = fbSemanticModelCurrentStatement( )
 	if( statement = 0 ) then
@@ -146,6 +146,9 @@ sub fbSemanticModelOptionDeclaration( byval is_base as integer, byval value as l
 	'' A receipt for every parsed OPTION makes BASE membership complete, even
 	'' when a repeated directive leaves the effective context unchanged.
 	hOption("language-default", "option-statement-" + fbSemanticModelNumber(statement), iif(is_base, 1, 0))
+	'' The parser, rather than a consumer's spelling match, identifies PRIVATE,
+	'' GOSUB and other routes. Keep the occurrence even for identical repeats.
+	hOption("language-default", "option-route-" + fbSemanticModelNumber(statement), route)
 	if( is_base ) then
 		hOption("language-default", "base-statement-" + fbSemanticModelNumber(statement), value)
 	end if

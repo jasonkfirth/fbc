@@ -11,6 +11,14 @@
 #include once "lexer/lex.bi"
 
 declare sub fbSemanticModelResetExpressions( )
+
+const FB_SEM_LITERAL_CONSTANT = 1
+const FB_SEM_LITERAL_STATIC = 2
+declare function fbSemanticModelBeginLiteralInitializer(byval kind as integer) as integer
+declare sub fbSemanticModelEndLiteralInitializer(byval scope_id as integer, byval subject as FBSYMBOL ptr)
+
+declare sub fbSemanticModelExplicitConstruction _
+	( byval owner_type as FBSYMBOL ptr, byval selected as ASTNODE ptr, byref source as LEX_LOCATION )
 declare sub fbSemanticModelAttachExpression(byval node as ASTNODE ptr, byval identity as longint)
 declare sub fbSemanticModelExportExpressionLinks(byval node as ASTNODE ptr, byval identity as longint)
 declare sub fbSemanticModelExportExpressionSource(byval node as ASTNODE ptr, byval identity as longint)
@@ -21,6 +29,12 @@ declare sub fbSemanticModelUnevaluatedQuery(byval checkpoint as longint, byref q
 declare function fbSemanticModelCaptureOperands _
 	( byval left_expr as ASTNODE ptr, byval right_expr as ASTNODE ptr, byref kind as const string, _
 	  byval op as integer, byref source as LEX_LOCATION ) as longint
+
+declare function fbSemanticModelCaptureLogicalStorage _
+	( byval left_expr as ASTNODE ptr, byval right_expr as ASTNODE ptr ) as integer
+declare sub fbSemanticModelExportLogicalStorage _
+	( byval expression as longint, byval snapshot as integer, byval comparison as integer = FALSE, _
+	  byval string_inputs as integer = FALSE )
 declare sub fbSemanticModelAttachOperands(byval node as ASTNODE ptr, byval identity as longint)
 declare sub fbSemanticModelExportOperands(byval node as ASTNODE ptr, byval identity as longint)
 declare function fbSemanticModelCaptureCompoundOperands _

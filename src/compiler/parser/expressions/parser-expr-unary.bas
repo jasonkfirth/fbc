@@ -52,9 +52,12 @@
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-preprocessor.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-coordinates.bi"
+#include once "tooling/semantic-macros.bi"
 
 declare function hCast( byval options as AST_CONVOPT, byref source as LEX_LOCATION ) as ASTNODE ptr
 declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
+declare function fbSemanticModelFullEnabled( ) as integer
 declare sub fbSemanticModelSetExpressionOperatorOverride _
 	( _
 		byref source_start as LEX_LOCATION, _
@@ -635,6 +638,7 @@ function cDerefExpression( ) as ASTNODE ptr
 		return NULL
 	end if
 	dim as LEX_LOCATION semantic_start = lexGetCurrentLocation( )
+	dim as LEX_LOCATION semantic_input
 	dim as longint semantic_counter = lexGetNonphysicalTokenCount( )
 
 	'' DREF+
@@ -642,6 +646,7 @@ function cDerefExpression( ) as ASTNODE ptr
 	do
 		lexSkipToken( )
 		derefcnt += 1
+		if( derefcnt = 1 ) then semantic_input = lexGetCurrentLocation( )
 	loop while( lexGetToken( ) = FB_TK_DEREFCHAR )
 
 	'' HighestPresExpr
@@ -656,9 +661,18 @@ function cDerefExpression( ) as ASTNODE ptr
 	'' implicit pointer conversion requires its own selected-call semantics.
 	dim as integer semantic_pointer = typeIsPtr(astGetFullType(expr))
 	dim as longint semantic_operand = expr->semantic_expression
+	'' Keep the written prefix before dereference or overload lowering consumes
+	'' its input. Consecutive stars are built together, but the immediate next
+	'' token still establishes the outer unary operator's spelling boundary.
+	dim as longint semantic_operands = fbSemanticModelCaptureOperands(expr, NULL, "unary", AST_OP_DEREF, semantic_start)
 	expr = astBuildMultiDeref( derefcnt, expr, astGetFullType( expr ), astGetSubType( expr ) )
+	fbSemanticModelAttachOperands(expr, semantic_operands)
+	hSemanticModelExportCurrentExpression(expr, semantic_start, semantic_counter)
+	if( fbSemanticModelFullEnabled( ) andalso (expr <> NULL) ) then
+		fbSemanticModelExportCoordinates("expression", expr->semantic_expression, "unary-input", semantic_input, semantic_input)
+		fbSemanticModelMacroOrigin("expression", expr->semantic_expression, semantic_input.macro_identity, "unary-input")
+	end if
 	if( semantic_pointer ) then
-		hSemanticModelExportCurrentExpression(expr, semantic_start, semantic_counter)
 		fbSemanticModelPointerDereference(expr, semantic_operand, derefcnt)
 	end if
 	function = expr

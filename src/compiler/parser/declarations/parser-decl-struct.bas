@@ -38,6 +38,12 @@ declare sub fbSemanticModelExportBinding _
 declare sub fbSemanticModelScalarStringDeclaration(byval sym as FBSYMBOL ptr, byval tree as ASTNODE ptr, _
 	byval token as integer, byref source as LEX_LOCATION)
 
+declare sub fbSemanticModelTypeDeclarationSpelling(byval sym as FBSYMBOL ptr, byval spelling as const zstring ptr, _
+	byref kind as const string, byref source as LEX_LOCATION)
+
+declare sub fbSemanticModelMemberDeclarationSpelling(byval sym as FBSYMBOL ptr, _
+	byval spelling as const zstring ptr, byref source as LEX_LOCATION)
+
 declare sub fbSemanticModelExportImplicitCall _
 	( _
 		byval owner as FBSYMBOL ptr, _
@@ -498,6 +504,7 @@ private function hAddAndInitField _
 		exit function
 	end if
 	fbSemanticModelExportBinding(sym, semantic_site, TRUE)
+	fbSemanticModelMemberDeclarationSpelling(sym, id, semantic_site)
 	if( symbGetType(sym) = FB_DATATYPE_STRUCT ) then
 		dtor = symbGetCompDtor1(symbGetSubtype(sym))
 		if( dtor <> NULL ) then
@@ -1237,6 +1244,7 @@ sub cTypeDecl( byval attrib as FB_SYMBATTRIB )
 	sym = hTypeAdd( NULL, id, palias, isunion, align, baseDType, baseSubtype, stringType )
 	if( checkid ) then
 		fbSemanticModelExportBinding(sym, semantic_site, TRUE)
+		fbSemanticModelTypeDeclarationSpelling(sym, @id, iif(isunion, "union", "type"), semantic_site)
 	end if
 
 	'' set visibility flags

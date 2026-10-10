@@ -2031,6 +2031,10 @@ sub fbIncludeFile(byval filename as zstring ptr, byval isonce as integer, _
 	fbSemanticModelIncludeOutcome(*filename, incfile, "opened", cptr(LEX_LOCATION ptr, directive))
 	fbSemanticModelOpenSource(incfile, env.includerec, iif(is_preinclude, "preinclude", "include"), _
 		*filename, cptr(LEX_LOCATION ptr, directive))
+	'' The entered occurrence is protected by the caller's accepted ONCE
+	'' request even when the file has no pragma. Record it on that occurrence,
+	'' after opening, through the same observer used by #PRAGMA ONCE.
+	if( isonce ) then fbSemanticModelSourcePolicyInput("once", "", NULL)
 
 	'' parse
 	lexPushCtx( )

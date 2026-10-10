@@ -27,6 +27,7 @@
 #include once "ast/ast.bi"
 #include once "runtime/rtl.bi"
 #include once "tooling/semantic-constructs.bi"
+#include once "tooling/semantic-diagnostics.bi"
 
 declare sub fbSemanticModelSetPendingScopeExitSource _
 	( _
@@ -39,6 +40,7 @@ declare sub parserSelectStmtEnd ( )
 declare sub parserSelConstStmtInit ( )
 declare sub parserSelConstStmtEnd ( )
 declare sub cCompoundEnd( )
+declare sub fbSemanticModelAcceptProcedureExit( byval target as FBSYMBOL ptr )
 
 sub parserCompoundStmtSetCtx( )
 	parser.stmt.for = NULL
@@ -408,6 +410,9 @@ sub cExitStatement( )
 
 	if( label <> NULL ) then fbSemanticModelSetPendingScopeExitSource(semantic_source, semantic_nonphysical)
 	astScopeBreak( label )
+	if( parser.stmt.proc <> NULL ) then
+		if( label = parser.stmt.proc->proc.endlabel ) then fbSemanticModelAcceptProcedureExit(label)
+	end if
 end sub
 
 '' ContinueStatement  =  CONTINUE (FOR | DO | WHILE)
@@ -599,7 +604,14 @@ function cCompStmtCheck( ) as integer
 
 	end select
 
+	'' EOF can leave an inner IF/FOR/etc. on top while its procedure also
+	'' remains open. Retain that native parser context with the actual error;
+	'' a mismatched END during recovery does not prove an unclosed procedure.
+	if( (lexGetToken( ) = FB_TK_EOF) and (parser.stmt.proc <> NULL) ) then
+		fbSemanticDiagnosticsContext("unclosed-procedure")
+	end if
 	errReport( errmsg )
+	fbSemanticDiagnosticsContext("")
 
 	function = FALSE
 

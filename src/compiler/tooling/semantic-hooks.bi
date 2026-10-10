@@ -40,6 +40,9 @@ declare function fbSemanticModelEnabled( ) as integer
 declare sub fbSemanticModelConstantExpression _
 	( byval expr as ASTNODE ptr, byval sym as FBSYMBOL ptr, byref source as LEX_LOCATION, _
 	  byval nonphysical_tokens as longint )
+declare sub fbSemanticModelPPIdentifier _
+	( byval expr as ASTNODE ptr, byval sym as FBSYMBOL ptr, byref spelling as const string, _
+	  byref source as LEX_LOCATION, byval nonphysical_tokens as longint )
 
 declare sub fbSemanticModelNumericLiteral( byval token as FBTOKEN ptr )
 declare sub fbSemanticModelNumericLiteralExpression(byval expr as ASTNODE ptr, byval token as FBTOKEN ptr)
@@ -61,6 +64,8 @@ declare sub fbSemanticModelScalarForBound _
 	( byval counter as FBSYMBOL ptr, byval expr as ASTNODE ptr, byref role as const string )
 declare sub fbSemanticModelScalarForStepSelection _
 	( byval counter as FBSYMBOL ptr, byval expr as ASTNODE ptr, byval dtype as integer )
+
+declare sub fbSemanticModelScalarForEntry( byval counter as FBSYMBOL ptr, byval entry_result as integer )
 declare sub fbSemanticModelDiagnostic(byref severity as const string, byval code as integer, byval line_number as integer, byval message as const zstring ptr, byval detail as const zstring ptr, byval custom_text as const zstring ptr)
 declare function fbSemanticModelLocationIsPhysical( byref source as LEX_LOCATION ) as integer
 declare sub fbSemanticModelSetDeclarationName( byval sym as FBSYMBOL ptr, byval declared_name as const zstring ptr )

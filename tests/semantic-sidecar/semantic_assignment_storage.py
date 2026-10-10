@@ -10,6 +10,9 @@ PREFIXES = ('assignment-storage:', 'assignment-tree:')
 COMPLETE_CLASSES = frozenset((3, 4, 5, 6, 9, 16, 17, 18, 19, 20, 23))
 MAX_NODES = 65536
 MAX_DEPTH = 64
+# Addressing an eight-level pointer creates a ninth-level native temporary.
+# This is an observation bound, not permission to declare a deeper pointer.
+MAX_POINTER_DEPTH = 9
 BINARY_CODES = frozenset(('add', 'subtract', 'multiply', 'divide', 'integer-divide',
     'modulo', 'and', 'or', 'logical-and', 'logical-or', 'xor', 'equivalence',
     'implication', 'shift-left', 'shift-right', 'power', 'concatenate', 'equal',
@@ -73,7 +76,7 @@ def validate_assignment_storage(model, number, subject_modules, node_kind_count)
             flags = [decimal(field) for field in fields[8:11]]
             left, right = decimal(fields[13]), decimal(fields[14])
             if (node_class >= node_kind_count or dtype > 4294967295 or dtype & 31 not in model.primitives[module - 1]
-                    or (dtype & 0x1e0) >> 5 > 8 or options > 255 or any(flag > 1 for flag in flags)
+                    or (dtype & 0x1e0) >> 5 > MAX_POINTER_DEPTH or options > 255 or any(flag > 1 for flag in flags)
                     or any(child and child <= identity for child in (left, right))
                     or fields[15] not in ('complete', 'opaque')):
                 raise ValueError('Assignment storage node has invalid types, flags or edges')

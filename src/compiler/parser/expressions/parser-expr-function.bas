@@ -26,6 +26,7 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-expressions.bi"
 
 '':::::
 #macro hParseRPNT( )
@@ -182,7 +183,8 @@ end function
 '':::::
 function cCtorCall _
 	( _
-		byval sym as FBSYMBOL ptr _
+		byval sym as FBSYMBOL ptr, _
+		byval semantic_site as LEX_LOCATION ptr _
 	) as ASTNODE ptr
 
 	dim as FBSYMBOL ptr tmp = any
@@ -225,6 +227,12 @@ function cCtorCall _
 		end if
 	end if
 
+	'' Explicit type expressions are syntactic temporary construction even
+	'' when a later initializer elides the temporary. NEW and BASE also use
+	'' this helper, but do not pass a source site for that distinct grammar.
+	if( semantic_site <> NULL ) then
+		fbSemanticModelExplicitConstruction(sym, procexpr, *semantic_site)
+	end if
 	function = astNewCALLCTOR( procexpr, astNewVAR( tmp ) )
 end function
 

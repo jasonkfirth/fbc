@@ -1632,6 +1632,11 @@ print value
                 model = self.compile(source)
                 self.assertTrue(model.records["E"])
                 self.assertTrue(all(row[2] == "0" for row in model.records["E"]))
+                self.assertEqual(len(model.records["COM"]), 1)
+                marker = model.physical_locations["comment", int(model.records["COM"][0][1]), "marker"]
+                self.assertEqual(marker[9:12], ["-1", "-1", "unverified"])
+                with self.assertRaisesRegex(ValueError, "not mapped"):
+                    model.plan_edits([SourceEdit("comment", int(marker[2]), "marker", b"'")])
 
 
     def test_prototype_allocation_does_not_reuse_label_or_local_identity(self) -> None:
@@ -2285,8 +2290,10 @@ WithDefault()
         rows = [line.split("\t") for line in path.read_text(encoding="ascii").splitlines()]
         location = next(row for row in rows if row[0:2] == ["LOC", "binding"])
         location[9:12] = [str(original.index(b"value")), str(original.index(b"value") + 5), "mapped"]
-        forged = Model("\n".join("\t".join(row) for row in rows) + "\n")
-        with self.assertRaisesRegex(ValueError, "malformed encoded line"):
+        # Complete spelling coverage can refuse the forged binding before
+        # byte validation. Either gate must reject this fabricated mapping.
+        with self.assertRaisesRegex(ValueError, "malformed encoded line|lacks its original spelling occurrence"):
+            forged = Model("\n".join("\t".join(row) for row in rows) + "\n")
             forged.validate_physical_locations()
 
     def test_malformed_unmapped_lines_preserve_later_encoded_locations(self) -> None:
@@ -2879,7 +2886,7 @@ End Sub
                 self.assertEqual(len(calls), 1)
                 call = calls[0]
                 self.assertEqual(call[5], "0", "macro replacement coordinates are not editable source ranges")
-                self.assertEqual(Path(call[6]), source)
+                self.assertEqual(call[6], self.compiler_path(source))
                 self.assertGreater(int(call[7]), 0)
                 construction_origins = [row for row in model.records["MR"]
                                          if row[1] == "symbol" and row[2] == call[2] and
@@ -4086,6 +4093,128 @@ End Sub
                                      'available' if mode == 'full' else 'unavailable')
                     self.assertEqual(len(self.numeric_suffixes(model)), 5 if mode == 'full' else 0)
 
+    def test_cva_list_source_operations_are_complete_and_self_consistent(self) -> None:
+        source = self.source(
+            "'' Project: FreeBASIC semantic-sidecar tests\n"
+            "'' File: cva-list-operations.bas\n"
+            "'' Purpose: Exercise every Cva_List runtime macro observation.\n"
+            "#Lang \"fb\"\n"
+            "Private Sub ObserveArguments Cdecl(ByVal Count As Integer, ...)\n"
+            "    Dim Arguments As Cva_List = Any\n"
+            "    Dim CopyArguments As Cva_List = Any\n"
+            "    Cva_Start(Arguments, Count)\n"
+            "    Cva_Copy(CopyArguments, Arguments)\n"
+            "    Dim Value As Integer = Cva_Arg(CopyArguments, Integer)\n"
+            "    Cva_End(CopyArguments)\n"
+            "    Cva_End(Arguments)\n"
+            "End Sub\n"
+            "'' end of cva-list-operations.bas\n",
+            "cva-list-operations.bas")
+        expected = Counter({"va-start": 1, "va-copy": 1, "va-arg": 1, "va-end": 2})
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                _, path = self.invoke([source], backend=backend)
+                model = Model.read(path)
+                operations = [row for row in model.records["EX"] if row[2] == "runtime-macro"]
+                expressions = {int(row[1]): row for row in model.records["E"]}
+                self.assertEqual(model.capabilities[1]["source-va-list-operations"], "available")
+                self.assertEqual(Counter(row[3] for row in operations), expected)
+                for operation in operations:
+                    expression = expressions[int(operation[1])]
+                    self.assertEqual(expression[10:12], [operation[3], "builtin"])
+                    self.assertGreater(int(operation[4]), 0)
+                    if operation[3] in ("va-start", "va-copy"):
+                        self.assertGreater(int(operation[5]), 0)
+                    else:
+                        self.assertEqual(operation[5], "0")
+                    if not expression[15]:
+                        self.assertIn(operation[3], ("va-start", "va-copy", "va-end"))
+                        self.assertEqual(expression[8:10], ["44", "-1"])
+                        self.assertEqual(expression[12], "2147483648")
+                bindings = self.compile(source, mode="bindings", backend=backend)
+                self.assertEqual(bindings.capabilities[1]["source-va-list-operations"], "unavailable")
+                self.assertFalse(any(row[2] == "runtime-macro" for row in bindings.records["EX"]))
+                expressions_only = self.compile(source, mode="expressions", backend=backend)
+                compact_operations = [row for row in expressions_only.records["EX"]
+                                      if row[2] == "runtime-macro"]
+                self.assertEqual(expressions_only.capabilities[1]["source-va-list-operations"], "available")
+                self.assertEqual(Counter(row[3] for row in compact_operations), expected)
+
+    def test_cva_list_reader_rejects_incomplete_or_inconsistent_receipts(self) -> None:
+        source = self.source(
+            "#Lang \"fb\"\n"
+            "Private Sub ObserveArguments Cdecl(ByVal Count As Integer, ...)\n"
+            "    Dim Arguments As Cva_List = Any\n"
+            "    Dim CopyArguments As Cva_List = Any\n"
+            "    Cva_Start(Arguments, Count)\n"
+            "    Cva_Copy(CopyArguments, Arguments)\n"
+            "    Dim Value As Integer = Cva_Arg(CopyArguments, Integer)\n"
+            "    Cva_End(CopyArguments)\n"
+            "    Cva_End(Arguments)\n"
+            "End Sub\n",
+            "cva-list-reader.bas")
+        _, path = self.invoke([source], backend=self.backends[0])
+        original = [line.split("\t") for line in path.read_text(encoding="ascii").splitlines()]
+
+        def reject(name: str, mutate, message: str) -> None:
+            rows = [row[:] for row in original]
+            mutate(rows)
+            candidate = self.working / (name + ".tsv")
+            candidate.write_text("\n".join("\t".join(row) for row in rows) + "\n", encoding="ascii")
+            with self.assertRaisesRegex(ValueError, message):
+                Model.read(candidate)
+
+        def operation(rows: list[list[str]], code: str) -> list[str]:
+            return next(row for row in rows if row[0] == "EX" and row[2:4] == ["runtime-macro", code])
+
+        def expression(rows: list[list[str]], identity: str) -> list[str]:
+            return next(row for row in rows if row[0] == "E" and row[1] == identity)
+
+        def remove_capability(rows: list[list[str]]) -> None:
+            capability = next(row for row in rows if row[0] == "CAP" and row[2] == "source-va-list-operations")
+            capability[3] = "unavailable"
+
+        def rename_capability(rows: list[list[str]]) -> None:
+            capability = next(row for row in rows if row[0] == "CAP" and row[2] == "source-va-list-operations")
+            capability[2] = "source-va-list-operations-missing"
+
+        def remove_start_operand(rows: list[list[str]]) -> None:
+            operation(rows, "va-start")[5] = "0"
+
+        def disagree_with_result(rows: list[list[str]]) -> None:
+            operation(rows, "va-end")[3] = "va-arg"
+
+        def orphan_untyped_statement(rows: list[list[str]]) -> None:
+            receipt = operation(rows, "va-end")
+            result = expression(rows, receipt[1])
+            result[8:13] = ["44", "-1", "va-end", "builtin", "2147483648"]
+            result[15] = ""
+            receipt[2:4] = ["unary", "negate"]
+
+        def untype_argument(rows: list[list[str]]) -> None:
+            receipt = operation(rows, "va-arg")
+            expression(rows, receipt[1])[15] = ""
+
+        def erase_list_type(rows: list[list[str]]) -> None:
+            receipt = operation(rows, "va-end")
+            normalized = next(row for row in rows if row[0] == "NT" and
+                              row[1:4] == ["expression", receipt[4], "value"])
+            normalized[4] = "integer"
+            normalized[5] = "0"
+            normalized[6] = "0"
+            normalized[7] = "0"
+            normalized[8] = "0"
+            normalized[10] = ""
+
+        reject("cva-list-missing-capability", remove_capability, "lacks an available capability")
+        reject("cva-list-renamed-capability", rename_capability, "lacks an available capability")
+        reject("cva-list-missing-start-operand", remove_start_operand, "start/copy operation lacks an operand")
+        reject("cva-list-result-disagreement", disagree_with_result, "disagrees with its result expression")
+        reject("cva-list-orphaned-untyped-statement", orphan_untyped_statement,
+               "Untyped Cva_List statement expression lacks its source operation")
+        reject("cva-list-untyped-argument", untype_argument, "Expression has no type spelling")
+        reject("cva-list-incompatible-operand", erase_list_type, "incompatible left operand")
+
     def test_unevaluated_queries_retain_discarded_cast_inputs(self) -> None:
         source = self.fixture("unevaluated-query-inputs.bas")
         for backend in self.backends:
@@ -4275,6 +4404,96 @@ End Sub
                     self.assertEqual(compact.capabilities[1]["declaration-typing-inputs"], "unavailable")
                     self.assertFalse(any(key.startswith("declaration-type-") or key == "formal-written-type"
                                          for properties in compact.properties.values() for key in properties))
+
+    def test_original_temporary_construction_before_elision(self) -> None:
+        source = self.source('''Type Lease
+    Value As Long
+    Declare Constructor(ByVal InitialValue As Long = 0)
+End Type
+Constructor Lease(ByVal InitialValue As Long)
+    Value = InitialValue
+End Constructor
+Type LeaseAlias As Lease
+Dim As Lease NamedDefault
+Dim NamedArguments As Lease = (1)
+Dim NamedExplicit As Lease = Lease(2)
+Var Inferred = LeaseAlias(3)
+Dim As Lease ExplicitType = Type<Lease>(4)
+Dim As Lease ContextType = Type(5)
+Dim As Lease Ptr Allocated = New Lease(6)
+#define MAKE_LEASE Lease(7)
+Dim As Lease Expanded = MAKE_LEASE
+With Lease(8)
+    Print .Value
+End With
+Print SizeOf(Lease(9))
+Dim As TypeOf(Lease(10)) UnevaluatedObject
+Delete Allocated
+''')
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                output = self.emission_path("probe", backend)
+                self.invoke([source], mode="off", backend=backend)
+                original = output.read_bytes()
+                full = self.compile(source, backend=backend)
+                self.assertEqual(output.read_bytes(), original)
+                self.assertEqual(full.capabilities[1]["temporary-construction-inputs"], "available")
+                observations = [row for row in full.records["K"] if row[3].startswith("temporary-construction:")]
+                self.assertEqual(len(observations), 8)
+                lease = self.one(full, "lease", "type")
+                self.assertTrue(all(row[2] == str(lease) for row in observations))
+                self.assertTrue(all(full.symbols[int(row[4].split("\t")[0])][11] == str(lease) for row in observations))
+                closures = [row for row in full.records["K"] if row[3] == "temporary-construction-count:1"]
+                self.assertEqual(len(closures), 1)
+                self.assertEqual(closures[0][4], "8")
+                macros = [row for row in full.records["MR"] if row[4].startswith("temporary-construction:")]
+                self.assertEqual(len(macros), 1)
+                for mode in ("bindings", "expressions"):
+                    compact = self.compile(source, mode=mode, backend=backend)
+                    self.assertEqual(output.read_bytes(), original)
+                    self.assertEqual(compact.capabilities[1]["temporary-construction-inputs"], "unavailable")
+                    self.assertFalse(any(row[3].startswith(("temporary-construction:", "temporary-construction-count:"))
+                                         for row in compact.records["K"]))
+
+    def test_inferred_declarations_keep_source_and_constructor_ownership(self) -> None:
+        source = self.fixture("inferred-construction.bas")
+        constructed = {"INFERREDGLOBAL", "INFERREDSTATIC", "INFERREDLOCAL",
+                       "INFERREDNAMESPACED", "INFERREDPROCEDURESTATIC", "INFERREDMACRO"}
+        declared = constructed | {"INFERREDALIAS", "INFERREDNUMERIC"}
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                suffix = ".c" if backend in ("gcc", "clang") else ".ll" if backend == "llvm" else ".asm"
+                self.invoke([source], backend=backend, mode="off")
+                baseline = source.with_suffix(suffix).read_bytes()
+                full = self.compile(source, backend=backend)
+                self.assertEqual(source.with_suffix(suffix).read_bytes(), baseline)
+                variables = {row[2]: identity for identity, row in full.symbols.items() if row[2] in declared}
+                self.assertEqual(set(variables), declared)
+                self.assertTrue(all(full.types[identity][18] == "source" for identity in variables.values()))
+                inputs = {int(row[4].split("\t")[0]): row[4].split("\t")[1:3]
+                          for row in full.records["K"] if row[3].startswith("declaration-type-input:")}
+                self.assertTrue(all(inputs[identity] == ["inferred", "2"] for identity in variables.values()))
+                observations = [row for row in full.records["K"] if row[3].startswith("construction-observation:")]
+                self.assertEqual({full.symbols[int(row[2])][2] for row in observations}, constructed)
+                self.assertEqual(len(observations), len(constructed))
+                self.assertTrue(all(row[4].split("\t")[2] == "initializer-constructor" for row in observations))
+                macro = next(row for row in observations if row[2] == str(variables["INFERREDMACRO"]))
+                self.assertIn(int(macro[4].split("\t")[5]), full.macro_invocations)
+                self.assertTrue(any(row[1] == str(variables["INFERREDGLOBAL"]) and row[2] == "declaration"
+                                    for row in full.records["B"]))
+                for mode in ("bindings", "expressions"):
+                    reduced = self.compile(source, backend=backend, mode=mode)
+                    self.assertEqual(source.with_suffix(suffix).read_bytes(), baseline)
+                    self.assertEqual(reduced.capabilities[1]["declaration-typing-inputs"], "unavailable")
+                    self.assertFalse(any(row[3].startswith(("declaration-type-", "construction-observation:"))
+                                         for row in reduced.records["K"]))
+                    if mode == "bindings":
+                        # Expression-only export does not promise a declaration
+                        # inventory. Bindings mode must retain written VAR names.
+                        reduced_variables = [identity for identity, row in reduced.symbols.items() if row[2] in declared]
+                        self.assertEqual(len(reduced_variables), len(declared))
+                        self.assertTrue(any(row[1] == str(variables["INFERREDGLOBAL"]) and row[2] == "declaration"
+                                            for row in reduced.records["B"]))
 
     def test_target_wide_literal_prefixes_follow_selected_backend_bytes(self) -> None:
         source = self.fixture("target-wide-prefixes.bas")
@@ -4545,5 +4764,120 @@ End Sub
                         compact = self.compile(source, mode=mode, backend=backend)
                         self.assertEqual(compact.capabilities[1]["declaration-repetition-inputs"], "unavailable")
                         self.assertFalse(any(row[3].startswith("redeclaration-") for row in compact.records["K"]))
+
+    def test_accepted_names_comments_and_original_inputs(self) -> None:
+        source = self.source("""' Original comment with a percent % marker.
+Type MixedRecord
+    FieldValue As Long
+    Const MemberValue = 3
+End Type
+Dim MixedGlobal As Long
+#define DECLARE_GLOBAL Dim GeneratedGlobal As Long
+DECLARE_GLOBAL
+Dim Limits(3) As Long
+Dim TextValue As String = "one" + "two"
+Sub MixedProcedure()
+    Exit Sub
+End Sub
+Function MixedFunction(ByVal InputValue As Long) As Long
+    Return InputValue
+End Function
+For CounterValue As Long = 1 To 3
+    MixedGlobal += CounterValue
+Next
+' A second accepted comment.
+""")
+        features = ("accepted-line-comment-markers", "type-declaration-spellings",
+                    "variable-declaration-spellings", "procedure-declaration-spellings",
+                    "member-declaration-spellings", "function-result-inputs",
+                    "procedure-exit-inputs", "array-dimension-inputs",
+                    "string-literal-inputs", "scalar-for-entry-results")
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                self.invoke([source], mode="off", backend=backend)
+                emission = self.emission_path(source.stem, backend).read_bytes()
+                _, artifact = self.invoke([source], backend=backend)
+                model = Model.read(artifact)
+                model.validate_physical_locations()
+                self.assertEqual(self.emission_path(source.stem, backend).read_bytes(), emission)
+                self.assertTrue(all(model.capabilities[1][feature] == "available" for feature in features))
+                self.assertEqual(len(model.records["COM"]), 2)
+                for prefix, spelling in (("type-declaration-spelling:", "MixedRecord"),
+                                         ("variable-declaration-spelling:", "MixedGlobal"),
+                                         ("member-declaration-spelling:", "FieldValue")):
+                    self.assertTrue(any(row[3].startswith(prefix) and row[4].split("\t")[-1] == spelling
+                                        for row in model.records["K"]))
+                self.assertTrue(any(row[3].startswith("procedure-declaration-spelling:")
+                                    and row[4] == "MixedProcedure" for row in model.records["K"]))
+                for script in ("check_semantic_comments.py", "check_semantic_variable_names.py"):
+                    result = subprocess.run([sys.executable, str(self.root / "tests/semantic-sidecar" / script),
+                                             str(artifact), "custom-fixture"], capture_output=True,
+                                            text=True, timeout=120)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertTrue(json.loads(result.stdout)["Passed"])
+                for mode in ("bindings", "expressions"):
+                    reduced = self.compile(source, mode=mode, backend=backend)
+                    self.assertTrue(all(reduced.capabilities[1][feature] == "unavailable" for feature in features))
+                    self.assertFalse(reduced.records["COM"])
+                    self.assertEqual(self.emission_path(source.stem, backend).read_bytes(), emission)
+
+    def test_include_once_inputs_follow_entered_source_occurrences(self) -> None:
+        (self.working / "selected.bi").write_text("' Empty selected header.\n", encoding="utf-8")
+        cases = (("#include \"selected.bi\"\n", ["0"], ["opened"]),
+                 ("#include once \"selected.bi\"\n", ["1"], ["opened"]),
+                 ("#include once \"selected.bi\"\n#include once \"selected.bi\"\n",
+                  ["1"], ["opened", "include-once"]),
+                 ("#include once \"selected.bi\"\n#include \"selected.bi\"\n",
+                  ["1", "0"], ["opened", "opened"]),
+                 ("#if 0\n#include once \"selected.bi\"\n#endif\n#include \"selected.bi\"\n",
+                  ["0"], ["opened"]))
+        for backend in self.backends:
+            for text, flags, outcomes in cases:
+                with self.subTest(backend=backend, source=text):
+                    source = self.source(text + "print 1\n")
+                    self.invoke([source], mode="off", backend=backend)
+                    emission = self.emission_path(source.stem, backend).read_bytes()
+                    model = self.compile(source, backend=backend)
+                    included = [str(identity) for identity, row in model.source_contexts.items() if row[5] == "include"]
+                    policies = {row[3].split(":")[1]: row[4].split("\t")[0]
+                                for row in model.records["K"] if row[3].startswith("header-policy:")}
+                    self.assertEqual([policies[identity] for identity in included], flags)
+                    self.assertEqual([row[5] for row in model.records["INC"]], outcomes)
+                    self.assertEqual(self.emission_path(source.stem, backend).read_bytes(), emission)
+
+    def test_original_float_inputs_keep_bounded_text_and_initializer_owners(self) -> None:
+        source = self.source("Const PreciseValue As Double = 1.23456789\n"
+                             "Dim Shared ScaledValue As Double = 1.25e-3\n"
+                             "Print PreciseValue, ScaledValue\n")
+        long_source = self.source("Dim LongValue As Double = 1." + "23456789" * 140 + "\n", "long-float.bas")
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                self.invoke([source], mode="off", backend=backend)
+                emission = self.emission_path(source.stem, backend).read_bytes()
+                model = self.compile(source, backend=backend)
+                self.assertEqual(model.capabilities[1]["original-float-literal-inputs"], "available")
+                observations = [values for (domain, _), values in model.properties.items()
+                                if domain == "expression" and "original-float-text" in values]
+                self.assertEqual({values["original-float-text"] for values in observations}, {"1.23456789", "1.25e-3"})
+                for values in observations:
+                    self.assertEqual(values["original-float-text-complete"], "1")
+                    self.assertEqual(values["original-float-exponent"], str(int("e" in values["original-float-text"])))
+                    self.assertGreater(int(values["original-float-initializer-symbol"]), 0)
+                self.assertEqual(self.emission_path(source.stem, backend).read_bytes(), emission)
+                for mode in ("bindings", "expressions"):
+                    reduced = self.compile(source, mode=mode, backend=backend)
+                    self.assertEqual(reduced.capabilities[1]["original-float-literal-inputs"], "unavailable")
+                    self.assertFalse(any("original-float-text" in values for values in reduced.properties.values()))
+                    self.assertEqual(self.emission_path(source.stem, backend).read_bytes(), emission)
+                self.invoke([long_source], mode="off", backend=backend)
+                long_emission = self.emission_path(long_source.stem, backend).read_bytes()
+                long_model = self.compile(long_source, backend=backend)
+                literals = [values for (domain, _), values in long_model.properties.items()
+                            if domain == "expression" and "original-float-text" in values]
+                self.assertEqual(len(literals), 1)
+                self.assertEqual(literals[0]["original-float-text-complete"], "0")
+                self.assertLessEqual(len(literals[0]["original-float-text"]), 1024)
+                self.assertGreater(int(literals[0]["original-float-digits"]), 1024)
+                self.assertEqual(self.emission_path(long_source.stem, backend).read_bytes(), long_emission)
 
 # end of test_sidecar.py

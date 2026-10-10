@@ -93,7 +93,12 @@ def check_dispatches(test):
                     model = Model.read(path, bindings_only=mode == 'bindings', expressions_only=mode == 'expressions')
                     test.assertEqual(output.read_bytes(), baseline)
                     actual = [operation for values in model.statement_operations.values() for operation in values]
-                    test.assertEqual(Counter(actual), Counter(expected))
+                    expected_operations = Counter(expected)
+                    # A value RETURN has a second, optional receipt for its
+                    # original function result. Reduced exports omit that family.
+                    if case == 'all-routes' and model.capabilities[1].get('function-result-inputs') == 'available':
+                        expected_operations['function-result-return'] = 1
+                    test.assertEqual(Counter(actual), expected_operations)
                     test.assertEqual(model.capabilities[1]['statement-control-operations'], 'available')
                     endings = {int(row[1]): row for row in model.records['STE']}
                     for statement in model.statement_operations:

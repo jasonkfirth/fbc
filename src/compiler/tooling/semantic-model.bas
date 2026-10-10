@@ -68,6 +68,9 @@
 #include once "tooling/semantic-source.bi"
 #include once "tooling/semantic-diagnostics.bi"
 #include once "tooling/semantic-link.bi"
+#include once "tooling/semantic-comments.bi"
+#include once "tooling/semantic-variable-names.bi"
+#include once "tooling/semantic-member-names.bi"
 
 '' -------------------------------------------------------------------------
 '' Export limits and process-local module state
@@ -168,6 +171,10 @@ dim shared as integer semantic_model_module_type_fact_count
 dim shared as longint semantic_model_module_expression_count
 dim shared as longint semantic_model_module_binding_count
 dim shared as longint semantic_model_module_implicit_call_count
+'' Constructor observations retain owners even when expanded token coordinates
+'' cannot produce a legacy I row. This counter belongs to one serial module.
+private dim shared as longint semantic_model_module_construction_count
+private dim shared as longint semantic_model_module_temporary_construction_count
 dim shared as longint semantic_model_module_node_count
 dim shared as integer semantic_model_proc_count
 dim shared as integer semantic_model_total_symbol_count
@@ -918,6 +925,7 @@ function fbSemanticModelDeclarationGroup(byval token as integer, byref owner as 
 	case FB_TK_COMMON: kind = "common"
 	case FB_TK_EXTERN: kind = "extern"
 	case FB_TK_CONST: kind = "const"
+	case FB_TK_VAR: kind = "var"
 	case else: return 0
 	end select
 	owner = fbSemanticModelSymbolId(parser.currproc)
@@ -953,6 +961,35 @@ sub fbSemanticModelDeclarationType(byval groupid as longint, byval owner as long
 	'' Expanded tokens retain a macro origin instead of an invented name range.
 	fbSemanticModelExportCoordinates("source-context", fbSemanticModelCurrentSource( ), role, source, source)
 	fbSemanticModelMacroOrigin("symbol", owner, source.macro_identity, role)
+end sub
+
+'' Symbol names are canonicalized for BASIC lookup. Keep the parser's accepted
+'' spelling separately while its identifier buffer is still live, including
+'' expanded identifiers which have no physical source range. These receipts
+'' describe named aggregate, alias and enum declarations, not type references.
+sub fbSemanticModelTypeDeclarationSpelling(byval sym as FBSYMBOL ptr, byval spelling as const zstring ptr, _
+	byref kind as const string, byref source as LEX_LOCATION)
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (sym = NULL) or (spelling = NULL) ) then exit sub
+	if( lex.ctx->semantic_probe ) then exit sub
+	if( (len(*spelling) < 1) or (len(*spelling) > FB_MAXNAMELEN) or _
+	    (ucase(*spelling) <> ucase(*symbGetName(sym))) ) then
+		fbSemanticModelFailAt("invalid type declaration spelling")
+		exit sub
+	end if
+	dim as longint symbolid = fbSemanticModelSymbolId(sym)
+	dim as longint statement = fbSemanticModelCurrentStatement( )
+	dim as longint sourceid = fbSemanticModelCurrentSource( )
+	if( (symbolid = 0) or (statement = 0) or (sourceid = 0) ) then
+		fbSemanticModelFailAt("unavailable type declaration spelling")
+		exit sub
+	end if
+	dim as string role = "type-declaration-spelling:" + fbSemanticModelNumber(fbSemanticModelNextDetailIdentity( ))
+	dim as string payload = fbSemanticModelNumber(statement) + TABCHAR + fbSemanticModelNumber(sourceid) + _
+		TABCHAR + kind + TABCHAR + *spelling
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(symbolid) + _
+		TABCHAR + role + TABCHAR + fbSemanticModelEscape(payload))
+	fbSemanticModelExportCoordinates("source-context", sourceid, role, source, source)
+	fbSemanticModelMacroOrigin("symbol", symbolid, source.macro_identity, role)
 end sub
 
 sub fbSemanticModelDeclarationGroupEnd(byval groupid as longint, byval owner as longint, byval count as integer)
@@ -1133,7 +1170,8 @@ end sub
 '' from their final, possibly reused procedure signature. No token text survives.
 sub fbSemanticModelProcedureAbiInput(byval proc as FBSYMBOL ptr, byref role as const string, _
 	byval has_library as integer, byval has_alias as integer, byval callback_start as longint, byref source as LEX_LOCATION, _
-	byval written_convention as integer, byval dynamic_string as integer)
+	byval written_convention as integer, byval dynamic_string as integer, byval tk as integer, _
+	byref declared_name as const string)
 	if( (fbSemanticModelFullEnabled( ) = FALSE) or (proc = NULL) ) then exit sub
 	if( lex.ctx->semantic_probe ) then exit sub
 	if( (callback_start < 0) or (callback_start > semantic_callback_count) ) then
@@ -1154,6 +1192,24 @@ sub fbSemanticModelProcedureAbiInput(byval proc as FBSYMBOL ptr, byref role as c
 		TABCHAR + property_key + TABCHAR + fbSemanticModelEscape(payload))
 	fbSemanticModelExportCoordinates("source-context", sourceid, property_key, source, source)
 	fbSemanticModelMacroOrigin("symbol", symbolid, source.macro_identity, property_key)
+	'' The canonical S name is not an original spelling: repeated prototypes
+	'' and bodies can merge, and wholly generated headers have no DCL range.
+	'' Pair every ABI occurrence with its own accepted name while the parser
+	'' still owns it. Special members have grammar-controlled names, not a
+	'' user identifier. Reuse the ABI LOC/MR instead of inventing coordinates.
+	if( fbSemanticModelMacroProvenanceEnabled( ) ) then
+		dim as string written_name
+		if( (tk = FB_TK_SUB) or (tk = FB_TK_FUNCTION) or (tk = FB_TK_PROPERTY) ) then
+			written_name = declared_name
+			if( (len(written_name) = 0) or (len(written_name) > FB_MAXNAMELEN) ) then
+				fbSemanticModelFailAt("invalid original procedure name")
+				exit sub
+			end if
+		end if
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(symbolid) + _
+			TABCHAR + "procedure-declaration-spelling:" + fbSemanticModelNumber(identity) + TABCHAR + _
+			fbSemanticModelEscape(written_name))
+	end if
 	'' These are original header facts, not guesses from the merged signature
 	'' or from the target's default calling convention.
 	property_key = "abi-policy-input:" + fbSemanticModelNumber(identity)
@@ -1530,6 +1586,70 @@ private function hSemanticModelImplicitCallKindSupported(byref call_kind as cons
 	end select
 end function
 
+'' The legacy I transport requires a nonempty source span. Macro declarations
+'' can have zero-width generated tokens, but their selected constructor and
+'' owning storage are still known. Record those identities before coordinates
+'' are considered, and publish a closure count when the module commits.
+''
+'' Payload: target, owning type, call kind, statement, source context, macro.
+private sub hSemanticModelConstructionObservation _
+	( byval owner as FBSYMBOL ptr, byval target as FBSYMBOL ptr, _
+	  byref call_kind as const string, byref source as LEX_LOCATION )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	if( instr(call_kind, "constructor") = 0 ) then exit sub
+	dim as FBSYMBOL ptr owner_type = symbGetSubtype(owner)
+	if( symbIsStruct(owner) ) then owner_type = owner
+	if( hSemanticModelHasSymbol(owner_type) = FALSE ) then exit sub
+	if( semantic_model_module_construction_count >= SEMANTIC_MODEL_MAX_IMPLICIT_CALLS_PER_MODEL ) then
+		fbSemanticModelFailAt("construction observation count limit")
+		exit sub
+	end if
+	dim as longint ownerid = hSemanticModelSymbolId(owner)
+	dim as longint targetid = hSemanticModelSymbolId(target)
+	dim as longint typeid = hSemanticModelSymbolId(owner_type)
+	if( (ownerid <= 0) or (targetid <= 0) or (typeid <= 0) or semantic_model_module_failed ) then exit sub
+	semantic_model_module_construction_count += 1
+	dim as string payload = hSemanticModelNumber(targetid) + TABCHAR + hSemanticModelNumber(typeid) + _
+		TABCHAR + call_kind + TABCHAR + hSemanticModelNumber(fbSemanticModelCurrentStatement( )) + _
+		TABCHAR + hSemanticModelNumber(fbSemanticModelCurrentSource( )) + _
+		TABCHAR + hSemanticModelNumber(source.macro_identity)
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + hSemanticModelNumber(ownerid) + _
+		TABCHAR + "construction-observation:" + hSemanticModelNumber(semantic_model_module_construction_count) + _
+		TABCHAR + hSemanticModelEscape(payload))
+end sub
+
+'' Preserve explicit TYPE()/UDT()/alias() constructor selection before a
+'' declaration, argument or return can redirect the temporary's storage.
+'' The payload is target, statement, source context and opening macro.
+'' Each module-local ordinal also owns an independent LOC receipt; consumers
+'' can reject a missing selection even if its advertised count was reduced.
+sub fbSemanticModelExplicitConstruction _
+	( byval owner_type as FBSYMBOL ptr, byval selected as ASTNODE ptr, byref source as LEX_LOCATION )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	if( (selected = NULL) or (owner_type = NULL) ) then exit sub
+	if( (selected->class <> AST_NODECLASS_CALL) or (selected->sym = NULL) ) then
+		fbSemanticModelFailAt("unavailable explicit construction selection")
+		exit sub
+	end if
+	if( semantic_model_module_temporary_construction_count >= SEMANTIC_MODEL_MAX_IMPLICIT_CALLS_PER_MODEL ) then
+		fbSemanticModelFailAt("temporary construction count limit")
+		exit sub
+	end if
+	dim as longint typeid = hSemanticModelSymbolId(owner_type)
+	dim as longint targetid = hSemanticModelSymbolId(selected->sym)
+	dim as longint sourceid = fbSemanticModelCurrentSource( )
+	if( (typeid <= 0) or (targetid <= 0) or (sourceid <= 0) or semantic_model_module_failed ) then exit sub
+	semantic_model_module_temporary_construction_count += 1
+	dim as string role = "temporary-construction:" + hSemanticModelNumber(semantic_model_module_temporary_construction_count)
+	dim as string payload = hSemanticModelNumber(targetid) + TABCHAR + _
+		hSemanticModelNumber(fbSemanticModelCurrentStatement( )) + TABCHAR + _
+		hSemanticModelNumber(sourceid) + TABCHAR + hSemanticModelNumber(source.macro_identity)
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + hSemanticModelNumber(typeid) + _
+		TABCHAR + role + TABCHAR + hSemanticModelEscape(payload))
+	fbSemanticModelExportCoordinates("source-context", sourceid, role, source, source)
+	fbSemanticModelMacroOrigin("symbol", typeid, source.macro_identity, role)
+end sub
+
 private sub hSemanticModelEmitImplicitCall _
 	( _
 		byval owner as FBSYMBOL ptr, _
@@ -1548,6 +1668,7 @@ private sub hSemanticModelEmitImplicitCall _
 		(hSemanticModelHasSymbol(target) = FALSE) ) then
 		exit sub
 	end if
+	hSemanticModelConstructionObservation(owner, target, call_kind, source)
 
 	dim as LEX_LOCATION call_source = source
 	dim as integer call_source_is_physical = source_is_physical
@@ -1939,6 +2060,10 @@ private function hSemanticModelConceptOperatorCode(byval op as integer) as strin
 	case AST_OP_NEW_VEC_SELF: return "allocate-array"
 	case AST_OP_DEL_SELF: return "deallocate"
 	case AST_OP_DEL_VEC_SELF: return "deallocate-array"
+	case AST_OP_VA_START: return "va-start"
+	case AST_OP_VA_END: return "va-end"
+	case AST_OP_VA_COPY: return "va-copy"
+	case AST_OP_VA_ARG: return "va-arg"
 	case else
 		return ""
 	end select
@@ -2863,6 +2988,7 @@ sub fbSemanticModelExportExpression _
 	end if
 
 	fbSemanticModelMacroOrigin("expression", expressionid, source_start.macro_identity, "start")
+	fbSemanticModelMacroExpressionInput(expressionid, source_start)
 	fbSemanticModelExportCoordinates("expression", expressionid, "range", observed_start, observed_end)
 	fbSemanticModelMacroOrigin("expression", expressionid, source_end.macro_identity, "end")
 	fbSemanticModelMacroExpressionOrigins(expressionid, nonphysical_tokens_at_start, nonphysical_tokens_at_end)
@@ -3213,6 +3339,9 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	fbSemanticModelResetPreprocessor( )
 	fbSemanticModelResetMacros( )
 	fbSemanticModelResetCoordinates( )
+	fbSemanticModelResetComments( )
+	fbSemanticModelResetVariableNames( )
+	fbSemanticModelResetMemberNames( )
 	fbSemanticModelResetConstructs( )
 	fbSemanticModelResetExpressions( )
 	fbSemanticModelResetAccess( )
@@ -3245,6 +3374,8 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	semantic_model_module_binding_count = 0
 	semantic_model_module_implicit_call_count = 0
 	semantic_model_module_node_count = 0
+	semantic_model_module_construction_count = 0
+	semantic_model_module_temporary_construction_count = 0
 	semantic_model_module_detail_count = 0
 	semantic_model_module_open = TRUE
 	semantic_model_module_source = filename
@@ -3252,7 +3383,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
-	for capability as integer = 0 to 86
+	for capability as integer = 0 to 110
 		dim as string feature, coverage
 		select case capability
 		case 0: feature = "symbol-identities": coverage = iif(semantic_model_expressions_only, "unavailable", "available")
@@ -3338,6 +3469,30 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		case 84: feature = "source-header-policy-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 85: feature = "namespace-declaration-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 86: feature = "namespace-import-recipient-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 87: feature = "function-result-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 88: feature = "procedure-exit-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 89: feature = "option-declaration-routes": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 90: feature = "array-dimension-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 91: feature = "string-literal-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 92: feature = "implicit-construction-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 93: feature = "temporary-construction-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 94: feature = "source-include-once-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 95: feature = "string-literal-lexemes": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 96: feature = "type-declaration-spellings": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 97: feature = "macro-expression-token-inputs": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
+		case 98: feature = "preprocessor-identifier-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 99: feature = "source-va-list-operations": coverage = iif(semantic_model_bindings_only, "unavailable", "available")
+		case 100: feature = "accepted-line-comment-markers": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 101: feature = "scalar-for-entry-results": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 102: feature = "variable-declaration-spellings": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
+		case 103: feature = "original-logical-storage-trees": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 104: feature = "procedure-declaration-spellings": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
+		case 105: feature = "original-comparison-storage-trees": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 106: feature = "member-declaration-spellings": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
+		case 107: feature = "original-string-storage-trees": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 108: feature = "parsed-string-format-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 109: feature = "parsed-unary-prefixes": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 110: feature = "original-float-literal-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 54: feature = "select-case-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 55: feature = "select-case-lowering-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 56: feature = "target-wide-literal-prefixes": coverage = iif(fbSemanticModelFullEnabled( ) and _
@@ -3360,12 +3515,26 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 	semantic_model_pending_expression_type = ""
 	if( commit ) then fbSemanticModelExportAccess( )
 	if( commit ) then fbSemanticModelExportStringInitializerCopies( )
+	if( commit ) then fbSemanticModelFinishComments( )
+	if( commit ) then fbSemanticModelFinishVariableNames( )
+	if( commit ) then fbSemanticModelFinishMemberNames( )
 	if( (commit <> FALSE) and (len(semantic_model_pending_expression_value) > 0) ) then
 		dim as string pending_value = semantic_model_pending_expression_value
 		semantic_model_pending_expression_value = ""
 		fbSemanticModelAppendDetail(pending_value)
 	end if
 	semantic_model_pending_expression_value = ""
+
+	if( commit and fbSemanticModelFullEnabled( ) ) then
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+			hSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + _
+			TABCHAR + "construction-observation-count:" + hSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+			TABCHAR + hSemanticModelNumber(semantic_model_module_construction_count))
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+			hSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + _
+			TABCHAR + "temporary-construction-count:" + hSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+			TABCHAR + hSemanticModelNumber(semantic_model_module_temporary_construction_count))
+	end if
 
 	if( (commit <> FALSE) and (semantic_model_module_failed = FALSE) ) then
 		if( semantic_model_module_buffer_len > 0 ) then

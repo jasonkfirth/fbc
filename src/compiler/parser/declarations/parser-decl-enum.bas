@@ -43,6 +43,9 @@ declare sub fbSemanticModelEnumElement _
 declare sub fbSemanticModelEnumDeclaration _
 	( byval owner as FBSYMBOL ptr, byval statement as longint )
 
+declare sub fbSemanticModelTypeDeclarationSpelling(byval sym as FBSYMBOL ptr, byval spelling as const zstring ptr, _
+	byref kind as const string, byref source as LEX_LOCATION)
+
 '':::
 ''EnumConstDecl     =   ID ('=' ConstExpression)? .
 ''
@@ -161,6 +164,7 @@ sub cEnumBody( byval s as FBSYMBOL ptr, byval attrib as FB_SYMBATTRIB )
 					errReportEx( FB_ERRMSG_DUPDEFINITION, id )
 				else
 					if( has_site ) then fbSemanticModelExportBinding(enum_element, semantic_site, TRUE)
+					if( has_site ) then fbSemanticModelTypeDeclarationSpelling(enum_element, @id, "enum-member", semantic_site)
 					fbSemanticModelEnumElement(s, enum_element, semantic_explicit, semantic_initializer)
 				end if
 
@@ -275,6 +279,7 @@ sub cEnumDecl( byval attrib as FB_SYMBATTRIB )
 		e = symbAddEnum( symbUniqueLabel( ), NULL, FB_SYMBATTRIB_NONE, use_hashtb )
 	elseif( has_site ) then
 		fbSemanticModelExportBinding(e, semantic_site, TRUE)
+		fbSemanticModelTypeDeclarationSpelling(e, @id, "enum", semantic_site)
 	end if
 
 	'' Comment? SttSeparator

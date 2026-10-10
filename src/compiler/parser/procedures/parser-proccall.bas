@@ -39,6 +39,9 @@ declare sub fbSemanticModelExportImplicitCall _
 	)
 
 declare sub hCtorChain( )
+declare sub fbSemanticModelAcceptResultInput _
+	( byval expression as longint, byval variable as FBSYMBOL ptr, _
+	  byval is_return as integer, byref reference_form as const string )
 declare sub hBaseInit( )
 declare function hBaseMemberAccess( ) as integer
 declare function hForwardCall( ) as integer
@@ -51,6 +54,9 @@ function cAssignFunctResult( byval is_return as integer ) as integer
 	dim as longint semantic_nonphysical = 0
 	dim as integer semantic_return_range_valid = FALSE
 	dim as longint semantic_rhs = 0
+	dim as longint semantic_result_expression = 0
+	dim as FBSYMBOL ptr semantic_result_variable = NULL
+	dim as string semantic_reference_form = "value"
 
 	function = FALSE
 
@@ -100,11 +106,15 @@ function cAssignFunctResult( byval is_return as integer ) as integer
 
 	'' Returning BYREF and no explicit BYVAL given?
 	if( returns_byref and (not hMatch( FB_TK_BYVAL )) ) then
+		semantic_reference_form = "reference"
 		'' BYREF return, must be able to do addrof on the expression
 		'' (this disallows expressions like constants, BOPs, @ UOP, ...)
 		rhs = cVarOrDeref( FB_VAREXPROPT_ISEXPR )
 
 		if( rhs ) then
+			semantic_result_expression = rhs->semantic_expression
+			if( astIsVAR(rhs) or (rhs->class = AST_NODECLASS_DEREF) ) then _
+				semantic_result_variable = fbSemanticModelAssignmentSymbol(rhs)
 			if( astIsAccessToLocal( rhs ) ) then
 				errReport( FB_ERRMSG_INVALIDREFERENCETOLOCAL )
 			end if
@@ -131,6 +141,7 @@ function cAssignFunctResult( byval is_return as integer ) as integer
 			end if
 		end if
 	else
+		if( returns_byref ) then semantic_reference_form = "pointer"
 		if( is_return ) then
 			lexGetToken( )
 			semantic_start = lexGetCurrentLocation( )
@@ -162,6 +173,10 @@ function cAssignFunctResult( byval is_return as integer ) as integer
 	'' Keep the parsed value before result conversion or constructor lowering.
 	'' BYREF results store an address, not a numeric conversion of that value.
 	if( returns_byref = FALSE ) then semantic_rhs = rhs->semantic_expression
+	if( semantic_reference_form <> "reference" ) then
+		semantic_result_expression = rhs->semantic_expression
+		if( astIsVAR(rhs) ) then semantic_result_variable = astGetSymbol(rhs)
+	end if
 
 	'' set accessed flag here, as proc will be ended before AST is flushed
 	symbSetIsAccessed( res )
@@ -185,6 +200,7 @@ function cAssignFunctResult( byval is_return as integer ) as integer
 						"return-constructor", semantic_site )
 				end if
 				'' Result constructed by ctor call, no assignment needed after this.
+				fbSemanticModelAcceptResultInput(semantic_result_expression, semantic_result_variable, is_return, semantic_reference_form)
 				astAdd( astPatchCtorCall( rhs, astBuildProcResultVar( parser.currproc, res ) ) )
 				return TRUE
 			end if
@@ -210,6 +226,7 @@ function cAssignFunctResult( byval is_return as integer ) as integer
 		'' The ABI result variable is generated, even when implemented as a
 		'' hidden parameter. It has no named source assignment destination.
 		fbSemanticModelAssignmentTarget( semantic_rhs, NULL, semantic_dtype, semantic_subtype, "assignment" )
+		fbSemanticModelAcceptResultInput(semantic_result_expression, semantic_result_variable, is_return, semantic_reference_form)
 		astAdd( expr )
 	end if
 

@@ -749,7 +749,8 @@ declare function cMethodCall _
 
 declare function cCtorCall _
 	( _
-		byval sym as FBSYMBOL ptr _
+		byval sym as FBSYMBOL ptr, _
+		byval semantic_site as LEX_LOCATION ptr = NULL _
 	) as ASTNODE ptr
 
 declare function cUdtMember _

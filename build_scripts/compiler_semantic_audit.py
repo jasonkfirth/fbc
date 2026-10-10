@@ -43,6 +43,17 @@ SEMANTIC_READER_FILES = (
     "semantic_abi_policy.py",
     "semantic_header_policy.py",
     "semantic_namespace_inputs.py",
+    "semantic_result_inputs.py",
+    "semantic_exit_inputs.py",
+    "semantic_option_routes.py",
+    "semantic_literal_inputs.py",
+    "semantic_construction_inputs.py",
+    "semantic_temporary_construction.py",
+    "semantic_type_spellings.py",
+    "semantic_logical_storage.py",
+    "semantic_comments.py",
+    "semantic_variable_names.py",
+    "semantic_for_entry.py",
 )
 
 

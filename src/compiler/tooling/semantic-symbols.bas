@@ -13,6 +13,8 @@
 '' One million decoded units cap literal/token formatting at eight MiB even
 '' on a wide host; the shared transaction buffer imposes the overall limit.
 private const SEMANTIC_MAX_LITERAL_UNITS = 1048576
+declare function fbSemanticModelResultInputCount( byval identity as longint ) as longint
+declare function fbSemanticModelProcedureExitInputCount( byval identity as longint ) as longint
 
 '' -------------------------------------------------------------------------
 '' Stable symbol vocabulary
@@ -513,6 +515,8 @@ private sub hExportProcedure(byval sym as FBSYMBOL ptr, byval symbolid as longin
 		hSymbolNumber(symbolid, "gosub-used", abs((sym->proc.ext->stats and FB_PROCSTATS_GOSUBUSED) <> 0))
 		fbSemanticModelExportRelation("symbol", symbolid, sym->proc.ext->overridden, "overrides")
 		if( variables_live ) then
+			hSymbolNumber(symbolid, "function-result-input-count", fbSemanticModelResultInputCount(symbolid))
+			hSymbolNumber(symbolid, "procedure-exit-input-count", fbSemanticModelProcedureExitInputCount(symbolid))
 			fbSemanticModelExportRelation("symbol", symbolid, sym->proc.ext->res, "result-variable")
 		end if
 	end if

@@ -26,12 +26,16 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-expressions.bi"
 
 declare function fbSemanticModelDeclarationGroup(byval token as integer, byref owner as longint) as longint
 declare sub fbSemanticModelDeclarationType(byval groupid as longint, byval owner as longint, _
 	byval ordinal as integer, byval sym as FBSYMBOL ptr, byref written_type as const string, _
 	byval initializer_kind as integer, byref source as LEX_LOCATION)
 declare sub fbSemanticModelDeclarationGroupEnd(byval groupid as longint, byval owner as longint, byval count as integer)
+
+declare sub fbSemanticModelMemberDeclarationSpelling(byval sym as FBSYMBOL ptr, _
+	byval spelling as const zstring ptr, byref source as LEX_LOCATION)
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -174,6 +178,7 @@ private sub cConstAssign _
 	end if
 
 	'' ConstExpression
+	dim as integer semantic_literal_scope = fbSemanticModelBeginLiteralInitializer(FB_SEM_LITERAL_CONSTANT)
 	expr = cExpression( )
 	if( expr = NULL ) then
 		errReportEx( FB_ERRMSG_EXPECTEDCONST, id )
@@ -214,6 +219,7 @@ private sub cConstAssign _
 			errReportEx( symbGetIllegalRedefErr( redefinition ), id )
 		else
 			fbSemanticModelExportBinding(symbol, semantic_site, TRUE)
+			fbSemanticModelMemberDeclarationSpelling(symbol, @id, semantic_site)
 			fbSemanticModelDeclarationType(semantic_group, semantic_owner, semantic_ordinal, symbol, _
 				semantic_written_type, 2, semantic_site)
 		end if
@@ -265,11 +271,13 @@ private sub cConstAssign _
 			errReportEx( symbGetIllegalRedefErr( redefinition ), id )
 		else
 			fbSemanticModelExportBinding(symbol, semantic_site, TRUE)
+			fbSemanticModelMemberDeclarationSpelling(symbol, @id, semantic_site)
 			fbSemanticModelDeclarationType(semantic_group, semantic_owner, semantic_ordinal, symbol, _
 				semantic_written_type, 2, semantic_site)
 		end if
 	end if
 
+	fbSemanticModelEndLiteralInitializer(semantic_literal_scope, symbol)
 	astDelNode( expr )
 
 	if( doskip ) then

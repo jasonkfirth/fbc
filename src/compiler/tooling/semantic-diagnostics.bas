@@ -9,6 +9,7 @@
 #include once "tooling/semantic-constructs.bi"
 #include once "tooling/semantic-diagnostics.bi"
 #include once "tooling/semantic-output.bi"
+#include once "tooling/semantic-macros.bi"
 #include once "parser/parser.bi"
 #include once "diagnostics/error.bi"
 #include once "support/containers/hash.bi"
@@ -209,6 +210,12 @@ sub fbSemanticDiagnosticsModule( byref filename as const string )
 		"procedure-signature-mismatches" + TABCHAR + "available")
 	hDiagnosticWrite("CAP" + TABCHAR + fbSemanticModelNumber(diagnostic_modules) + TABCHAR + _
 		"variable-case-collisions" + TABCHAR + "available")
+	hDiagnosticWrite("CAP" + TABCHAR + fbSemanticModelNumber(diagnostic_modules) + TABCHAR + _
+		"unclosed-procedures" + TABCHAR + "available")
+	hDiagnosticWrite("CAP" + TABCHAR + fbSemanticModelNumber(diagnostic_modules) + TABCHAR + _
+		"error-resume-next-syntax" + TABCHAR + "available")
+	hDiagnosticWrite("CAP" + TABCHAR + fbSemanticModelNumber(diagnostic_modules) + TABCHAR + _
+		"declaration-suffix-as-conflicts" + TABCHAR + "available")
 end sub
 
 sub fbSemanticDiagnosticsContext( byref context_text as const string )
@@ -341,13 +348,24 @@ private sub hDiagnosticObserve _
 	fbSemanticDiagnosticsSource(env.inf.name)
 	dim as LEX_LOCATION token_point = lexGetLastLocation( )
 	if( diagnostic_has_point ) then token_point = diagnostic_point
+	dim as integer macro_origin = FALSE
+	if( token_point.is_physical = FALSE ) then
+		dim as LEX_LOCATION invocation_point
+		if( fbSemanticModelMacroExpressionLocation(token_point, token_point, 0, 0, invocation_point) ) then
+			'' A warning may point at the observed invocation. This does not
+			'' make the generated replacement an editable physical expression.
+			token_point = invocation_point
+			macro_origin = TRUE
+		end if
+	end if
 	dim as integer physical = FALSE, raw_line = 0, raw_column = 0
 	'' A scoped parser point names the declaration that failed, even when the
 	'' header ends on another line. Ordinary diagnostics still require the last
 	'' consumed token to agree with the displayed line. #line never supplies
-	'' the physical coordinates, and generated tokens have no editable point.
-	if( token_point.is_physical and token_point.raw_valid and (token_point.source_file = env.inf.name) and _
-		((token_point.start_line = line_number) or diagnostic_has_point) and (token_point.raw_start_line > 0) and (token_point.raw_start_column >= 0) ) then
+	'' the physical coordinates. A generated token can instead name its observed
+	'' invocation when the full model retained that original macro lineage.
+	if( (token_point.is_physical or macro_origin) and token_point.raw_valid and (token_point.source_file = env.inf.name) and _
+		((token_point.start_line = line_number) or diagnostic_has_point or macro_origin) and (token_point.raw_start_line > 0) and (token_point.raw_start_column >= 0) ) then
 		physical = TRUE
 		raw_line = token_point.raw_start_line
 		raw_column = token_point.raw_start_column

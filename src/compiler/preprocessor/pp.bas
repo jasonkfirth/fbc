@@ -32,6 +32,7 @@ declare sub fbSemanticModelSourcePolicyInput _
 	( byref kind as const string, byref value as const string, byval source as LEX_LOCATION ptr = NULL )
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-macros.bi"
+#include once "tooling/semantic-comments.bi"
 
 #define LEX_FLAGS (LEXCHECK_NOWHITESPC or _
 	LEXCHECK_NOSUFFIX or _
@@ -618,6 +619,8 @@ function ppReadLiteral _
 			continue do
 
 		case FB_TK_COMMENT, FB_TK_REM
+			dim as LEX_LOCATION comment_source = lexGetCurrentLocation( )
+			fbSemanticModelAcceptComment(lexGetToken(LEX_FLAGS), comment_source)
 			if( ismultiline = FALSE ) then
 				exit do
 			end if
@@ -781,6 +784,8 @@ function ppReadLiteralW _
 			continue do
 
 		case FB_TK_COMMENT, FB_TK_REM
+			dim as LEX_LOCATION comment_source = lexGetCurrentLocation( )
+			fbSemanticModelAcceptComment(lexGetToken(LEX_FLAGS), comment_source)
 			if( ismultiline = FALSE ) then
 				exit do
 			end if

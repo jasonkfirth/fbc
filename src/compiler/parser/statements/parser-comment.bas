@@ -25,6 +25,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
+#include once "tooling/semantic-comments.bi"
 
 #define LEX_FLAGS (LEXCHECK_NOLINECONT or LEXCHECK_NODEFINE or LEXCHECK_NOSUFFIX or LEXCHECK_NOMULTILINECOMMENT)
 
@@ -56,6 +57,9 @@ function cComment _
 				end if
 			end if
 		end if
+
+		dim as LEX_LOCATION comment_source = lexGetCurrentLocation( )
+		fbSemanticModelAcceptComment(lexGetToken(lexflags), comment_source)
 
 		'' Prevent the PP from trying to parse (pointless in a comment
 		'' anyways), and -pp from emitting the tokens (specifically due
