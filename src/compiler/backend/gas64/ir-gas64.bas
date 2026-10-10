@@ -4191,10 +4191,15 @@ end function
 private sub restore_vrreg(byval vr as IRVREG ptr, byval vrreg as integer)
 	ctx.opereg=vrreg
 	ctx.opepass=1
-	if reghandle(vrreg)=KREGFREE then
-		reghandle(vrreg)=vr->reg
-		asm_info("reghandle reset so "+*regstrq(vrreg)+" forced again to vreg="+Str(vr->reg))
-	end if
+	'' IR may reuse an operand's virtual ID for the result. Keep only the
+	'' physical register containing the new value; an old mapping would make
+	'' reg_findreal select stale data during the following store or call.
+	for regnum as integer = 0 to KREGUPPER
+		if (regnum <> vrreg) andalso (reghandle(regnum) = vr->reg) then
+			reghandle(regnum) = KREGFREE
+		end if
+	next
+	reghandle(vrreg)=vr->reg
 end sub
 
 private sub hGetFloatRelRecipe _
@@ -5016,11 +5021,22 @@ end sub
 private sub hBopMaterializeDivisor _
 	( _
 		byval v2 as IRVREG ptr, _
+		byval op1 as string, _
 		byref op2 as string _
 	)
 
 	if( v2->typ <> IR_VREGTYPE_IMM ) then
 		exit sub
+	end if
+
+	'' Under register pressure the scratch allocator may spill the dividend.
+	'' Keep its physical register locked until the divisor has been loaded;
+	'' op1 still names that register when the division starts.
+	dim as integer dividend_reg = hDecodeAsmRegister( strptr( op1 ) )
+	dim as integer dividend_handle
+	if( (dividend_reg >= 0) andalso (dividend_reg <= KREGUPPER) ) then
+		dividend_handle = reghandle( dividend_reg )
+		reghandle( dividend_reg ) = KREGLOCK
 	end if
 
 	'' DIV cannot encode an immediate divisor. Reserve RDX and RBX while
@@ -5035,6 +5051,10 @@ private sub hBopMaterializeDivisor _
 	end if
 
 	dim as string divisor_reg = *reg_tempo( )
+
+	if( (dividend_reg >= 0) andalso (dividend_reg <= KREGUPPER) ) then
+		reghandle( dividend_reg ) = dividend_handle
+	end if
 
 	if( reserve_rdx ) then
 		reghandle( KREG_RDX ) = KREGFREE
@@ -5135,7 +5155,8 @@ end sub
 
 private function hBopDwordRegisterName( byval reg_name as string ) as string
 	select case reg_name
-	case "rax", "rbx", "rcx", "rdx"
+	'' Legacy registers use an e prefix; only numbered registers add d.
+	case "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "rbp", "rsp"
 		function = "e" + right( reg_name, 2 )
 	case else
 		function = reg_name + "d"
@@ -5261,7 +5282,7 @@ private sub hBopEmitDivMod _
 	)
 
 	hBopPreserveRdx( op1, op2, vrreg )
-	hBopMaterializeDivisor( v2, op2 )
+	hBopMaterializeDivisor( v2, op1, op2 )
 
 	if( typeGetSize( tempodtype ) = typeGetSize( FB_DATATYPE_LONG ) ) then
 		hBopEmitDwordDiv( op, vr, tempodtype, op1, op2, vrreg )
@@ -7254,7 +7275,16 @@ private sub hCallQueueSystemVStackArgument _
 		asm_info("typeclass="+str(typeGetClass( dtype ))+" "+str(FB_DATACLASS_FPOINT))
 		if typeGetClass( dtype ) = FB_DATACLASS_FPOINT then
 			if dtype=FB_DATATYPE_SINGLE then
-				hCallQueuePush( pushstr(), pushnbstr, "push "+op1 )
+				'' PUSH sign-extends its 32-bit immediate. Signed decimal bits
+				'' also encode negative Singles, whose unsigned hex pattern is
+				'' outside the assembler's signed immediate range.
+				union SINGLE_IMMEDIATE
+					value as single
+					bits as long
+				end union
+				dim as SINGLE_IMMEDIATE immediate
+				immediate.value = v2->value.f
+				hCallQueuePush( pushstr(), pushnbstr, "push " + str( immediate.bits ) )
 			else
 				hCallQueuePush( pushstr(), pushnbstr, "push rax" )
 				hCallQueuePush( pushstr(), pushnbstr, "mov rax, "+op1 )
@@ -7307,9 +7337,18 @@ private sub hCallQueueSystemVStackArgument _
 			else
 				if v2->typ=IR_VREGTYPE_REG then
 					'MPUSH("mov rax, "+op1)
-					''forcing type for avoiding 'push 8bit register' not allowed
-					op1=*regstrq(reg2)
-					hCallQueuePush( pushstr(), pushnbstr, "push "+op1 )
+					'' Pushes are emitted after every argument has been loaded.
+					'' Later loads can spill and reuse this register, so keep the
+					'' scalar value in the call's temporary stack-copy area.
+					if( (ctx.stkcopy < 0) orElse _
+					    (ctx.stkcopy > &h7FFFFFFFFFFFFFFFLL - GAS64_QWORD_BYTES) ) then
+						asm_error( "call stack-copy size overflow" )
+						exit sub
+					end if
+					ctx.stkcopy += GAS64_QWORD_BYTES
+					op1 = "QWORD PTR " + str( -ctx.stkcopy ) + "[rbp]"
+					asm_code( "mov " + op1 + ", " + *regstrq( reg2 ), KNOALL )
+					hCallQueuePush( pushstr(), pushnbstr, "push " + op1 )
 				'elseif dtype=FB_DATATYPE_STRUCT then  ''incoherent test not a strucure before
 					'MPUSH("lea rax, "+op1)
 				else
