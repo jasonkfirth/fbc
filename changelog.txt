@@ -1,6 +1,7 @@
 Version 1.20.4
 
 [changed]
+- compiler semantic tests: exclude only the four-byte COFF build timestamp from native link-observer object comparisons; validate the object format and prove that every other byte still detects changes, preserving code, relocation, symbol, diagnostic and callback checks.
 - compiler semantic tests: preserve a stable backend filename during native Windows link-observer comparisons, preventing Clang's temporary C filename from changing COFF bytes while retaining exact object, diagnostic and linker-callback checks on ARM64 and x86 targets.
 - compiler semantic reader: convert native Windows paths through the MSYS/Cygwin mount table before resolving source revisions and edit plans; preserve exported filenames, source hashes, byte limits and stale-source rejection, and exercise native sidecar filenames in the existing edit-planning regression.
 - compiler semantic model: retain parser-selected named and anonymous namespace openings, including qualified, reopened and macro-generated forms; record each USING statement's actual recipient namespace under a separate capability so models with earlier header-policy counts remain readable.
