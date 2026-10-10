@@ -73,6 +73,47 @@ def callback_coverage(test, observation):
     return expected == 'available'
 
 
+def coff_object_bytes(data):
+    # Regular COFF objects have a 20-byte header followed by 40-byte section
+    # headers. Reject other formats before excluding only TimeDateStamp at
+    # offsets 4..7; Clang's ARM64 assembler fills it with the current time.
+    # Code, relocations, symbols and every other header byte remain exact.
+    if len(data) < 20:
+        raise ValueError('Truncated COFF object header')
+    machine = int.from_bytes(data[:2], 'little')
+    sections = int.from_bytes(data[2:4], 'little')
+    optional_header = int.from_bytes(data[16:18], 'little')
+    if machine not in (0x014c, 0x8664, 0xaa64) or optional_header:
+        raise ValueError('Expected an x86, x64 or ARM64 COFF object')
+    if not sections or 20 + 40 * sections > len(data):
+        raise ValueError('Truncated COFF object section table')
+    return data[:4] + b'\0' * 4 + data[8:]
+
+
+def check_coff_comparison(test, data):
+    baseline = coff_object_bytes(data)
+    timestamp = (int.from_bytes(data[4:8], 'little') + 1) % (1 << 32)
+    changed = data[:4] + timestamp.to_bytes(4, 'little') + data[8:]
+    test.assertNotEqual(changed, data)
+    test.assertEqual(coff_object_bytes(changed), baseline)
+    # Use the real compiler object to prove that a one-byte change anywhere
+    # outside the timestamp still fails, including section and symbol data.
+    for offset in range(len(data)):
+        if 4 <= offset < 8:
+            continue
+        changed = bytearray(data)
+        changed[offset] ^= 1
+        try:
+            compared = coff_object_bytes(bytes(changed))
+        except ValueError:
+            continue
+        test.assertNotEqual(compared, baseline, 'Object byte ' + str(offset))
+    for invalid in (data[:19], data[:20], b'\x7fELF' + data[4:],
+                    b'\0\0' + data[2:], data[:16] + b'\x01\0' + data[18:]):
+        with test.assertRaises(ValueError):
+            coff_object_bytes(invalid)
+
+
 def source_text(filename, body, language='fb'):
     return ("' Project: FreeBASIC native link observations\n"
             "' File: " + filename + "\n"
@@ -184,11 +225,15 @@ def check_native(test, baseline_compiler=None, native_reader=None):
         'inactive': ('#If 0\nDeclare Function LinkAbsent() As Long\nPrint LinkAbsent()\n#EndIf\nPrint 23', 'fb', 0, 0),
     }
     for target in windows_targets(test):
+        checked_object = False
         backend = 'gcc' if target.endswith('-aarch64') else 'gas64' if target == 'win64' else 'gas'
         executable = test.working / (backend + '.exe')
         object_path = test.working / (backend + '.o')
         target_extra = ('-target', target)
-        extra = (*target_extra, '-C', '-x', executable, '-o', object_path)
+        # Clang records its C input filename in the COFF object. Preserve the
+        # backend file so both invocations use the same name rather than a
+        # process-specific temporary. Only the COFF timestamp is excluded.
+        extra = (*target_extra, '-R', '-C', '-x', executable, '-o', object_path)
         for case, (body, language, expected_exit, expected_callbacks) in cases.items():
             source = test.source(source_text(case + '.bas', body, language), case + '.bas')
             for with_ast in (False, True):
@@ -196,12 +241,16 @@ def check_native(test, baseline_compiler=None, native_reader=None):
                     previous, _, _ = invoke(test, [source], backend, link=True, extra=extra,
                                             observed=False, compiler=baseline_compiler)
                     previous_object = object_path.read_bytes()
+                    if not checked_object:
+                        check_coff_comparison(test, previous_object)
+                        checked_object = True
                     result, artifact, ast = invoke(test, [source], backend, link=True,
                                                     extra=extra, model=with_ast)
                     test.assertEqual(result.returncode, expected_exit, result.stdout + result.stderr)
                     test.assertEqual((result.returncode, result.stdout, result.stderr),
                                      (previous.returncode, previous.stdout, previous.stderr))
-                    test.assertEqual(object_path.read_bytes(), previous_object)
+                    test.assertEqual(coff_object_bytes(object_path.read_bytes()),
+                                     coff_object_bytes(previous_object))
                     observation = check_artifact(test, artifact, result, native_reader)
                     test.assertEqual(observation.link[1:3], ['1', '1'])
                     available = callback_coverage(test, observation)
