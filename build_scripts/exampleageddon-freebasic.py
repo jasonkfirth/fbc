@@ -60,7 +60,9 @@ EXTERNAL_PATH_MARKERS = (
     "/graphics/cairo/",
     "/graphics/freetype/",
     "/graphics/opengl/",
-    "/graphics/sdl/",
+    "/graphics/sdl1/",
+    "/graphics/sdl2/",
+    "/graphics/sdl3/",
     "/graphics/tinyptc/",
     "/graphics/grx/",
     "/gui/",
@@ -112,6 +114,8 @@ EXTERNAL_TEXT_MARKERS = (
     "portaudio",
     "postgres",
     "sdl/",
+    "sdl2/",
+    "sdl3/",
     "sqlite",
     "tinyptc",
     "zlib",
@@ -140,6 +144,7 @@ PLATFORM_PATH_MARKERS = (
 )
 
 HELPER_MODULES = {
+    "examples/graphics/SDL3/ttf/editbox.bas",
     "examples/dll/mydll.bas",
     "examples/dll/dylib.bas",
     "examples/dll/test.bas",
@@ -169,6 +174,9 @@ HELPER_MODULES = {
 }
 
 MULTIFILE_PROGRAMS = {
+    "examples/graphics/SDL3/ttf/showfont.bas": (
+        "examples/graphics/SDL3/ttf/editbox.bas",
+    ),
     "examples/misc/trycatch/test.bas": (
         "examples/misc/trycatch/trycatch.bas",
     ),
@@ -860,16 +868,39 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     run_log = args.outdir / "logs" / (stem + ".run.log")
     compile_cwd = args.outdir / "work" / stem / "compile"
     run_cwd = args.outdir / "work" / stem / "run"
+    sdl_generation = Path(rel).parts[:3] in (
+        ("examples", "graphics", "SDL1"),
+        ("examples", "graphics", "SDL2"),
+        ("examples", "graphics", "SDL3"),
+    )
+    if sdl_generation:
+        # Preserve the generation/sublibrary depth so relative references to
+        # SDL_common resolve inside this example's isolated source tree.
+        compile_tree = compile_cwd
+        relative = path.parent.relative_to(root / "examples/graphics")
+        compile_cwd /= relative
+        run_cwd /= relative
 
     copy_directories = path.parent != root / "examples"
 
     prepare_run_directory(path.parent, compile_cwd, copy_directories)
+    if sdl_generation:
+        shutil.copytree(root / "examples/graphics/SDL_common", compile_tree / "SDL_common",
+                        dirs_exist_ok=True)
+
+    if rel.startswith("examples/graphics/SDL3/"):
+        # SDL's examples share callback startup and bounded-run helpers.
+        # Copy them beside the isolated sources, just like local .bi files.
+        for helper in (root / "examples/graphics/SDL3").glob("*.bi"):
+            shutil.copy2(helper, compile_cwd / helper.name)
 
     cmd = list(args.fbc)
     if args.prefix is not None:
         cmd.extend(["-prefix", str(args.prefix)])
     cmd.extend(args.fbc_arg)
     cmd.extend(EXAMPLE_FBC_ARGUMENTS.get(rel, ()))
+    if rel == "examples/graphics/SDL3/ttf/showfont.bas":
+        cmd.extend(["-m", "showfont"])
     if rel in GAS64_VARIADIC_SOURCES and compiler_supports_gas64(args):
         # va_first/va_arg/va_next are implemented by the native ASM backend;
         # the GCC/Clang generator intentionally rejects these statements.

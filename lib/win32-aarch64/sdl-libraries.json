@@ -1,0 +1,258 @@
+[
+  {
+    "library": "SDL",
+    "target": "win32-aarch64",
+    "archive": "libSDL.dll.a",
+    "dll": "sdl-dlls/SDL.dll",
+    "archive_sha256": "25f71f0afdaef332eae81da5c02ee830e4aff7fc8a06869095b08ed6683000d7",
+    "dll_sha256": "336d18a20f7a57c5a062e766d88539b2271d0c955db7d5bac93a88eae3fad5dd"
+  },
+  {
+    "library": "SDL_image",
+    "target": "win32-aarch64",
+    "archive": "libSDL_image.dll.a",
+    "dll": "sdl-dlls/libSDL_image-1-2-0.dll",
+    "archive_sha256": "2e076d39dd04e36492d44b519b192e684612c4a850be9757b4c6ef6f43dea005",
+    "dll_sha256": "ff1889a98818701d9decfebc5a52b3d95de0b49c9ce3d1d44d95e671d2a5e35d"
+  },
+  {
+    "library": "SDL_mixer",
+    "target": "win32-aarch64",
+    "archive": "libSDL_mixer.dll.a",
+    "dll": "sdl-dlls/libSDL_mixer-1-2-0.dll",
+    "archive_sha256": "de06b2cadd94a8c205102b820999c78dbdc92c8ba92f580562d20b1ee7e6f203",
+    "dll_sha256": "5d975da2979fd512cf1d3f855ce825088a878566674722f07672cb99ddbc936c"
+  },
+  {
+    "library": "SDL_net",
+    "target": "win32-aarch64",
+    "archive": "libSDL_net.dll.a",
+    "dll": "sdl-dlls/SDL_net.dll",
+    "archive_sha256": "2ce8930accae64ec02c2a0a83a431bb902ee3f49bced68495f9a799c26ccaa35",
+    "dll_sha256": "3f352497ae4985531185694cea16d5ffbe2ea8d5da7bc00a0e5ee815ed6400f9"
+  },
+  {
+    "library": "SDL_ttf",
+    "target": "win32-aarch64",
+    "archive": "libSDL_ttf.dll.a",
+    "dll": "sdl-dlls/SDL_ttf.dll",
+    "archive_sha256": "71167e203ebe85765f2b723230cd0d21da4bb06c7210401f29f71d77307393eb",
+    "dll_sha256": "e669a2270b645843b74a6c6f1ab691567ed25d4022307437914d91fd4a6a9f5a"
+  },
+  {
+    "library": "SDL_sound",
+    "target": "win32-aarch64",
+    "archive": "libSDL_sound.dll.a",
+    "dll": "sdl-dlls/SDL_sound.dll",
+    "archive_sha256": "1198699a0b4be3888002738eaaed52aa6396c4853577af8194b865409899778c",
+    "dll_sha256": "788b08342a982bd61a3a727a1e1eafc4cba2cb9bb6f9521b7b872aaa1cf744ed"
+  },
+  {
+    "library": "SDL_gfx",
+    "target": "win32-aarch64",
+    "archive": "libSDL_gfx.dll.a",
+    "dll": "sdl-dlls/libSDL_gfx-16.dll",
+    "archive_sha256": "c8e06b825af31f4e77deb27e943291219dbb6a514a459684e00970e8c0db3d8c",
+    "dll_sha256": "9843f89617152b4f8fdf339904372d16715a7b2dc02c5c8168512334313f0057"
+  },
+  {
+    "library": "SDL_gpu",
+    "target": "win32-aarch64",
+    "archive": "libSDL_gpu.dll.a",
+    "dll": "sdl-dlls/SDL_gpu.dll",
+    "archive_sha256": "069a9aab3e08968eb50aace55820fd6f01879f3e30936a0d937992a19ba426b8",
+    "dll_sha256": "8bc1998838f214d497f1865f6ac0c26249d7cc4809c218c589163fd5ff43c536"
+  },
+  {
+    "library": "SDL_rtf",
+    "target": "win32-aarch64",
+    "archive": "libSDL_rtf.dll.a",
+    "dll": "sdl-dlls/SDL_rtf.dll",
+    "archive_sha256": "78ea4ac67a60502d6e724cbe9f5e1b18a8bf099ef409d8558757bcbab08cfc68",
+    "dll_sha256": "a3a7744a24136db2bada7e117654a9199eeeca04affd899973859d6737a89e6c"
+  },
+  {
+    "library": "SDL_FontCache",
+    "target": "win32-aarch64",
+    "archive": "libSDL_FontCache.dll.a",
+    "dll": "sdl-dlls/SDL_FontCache.dll",
+    "archive_sha256": "3b0599c790514db22d6a621f85ed6fa6a1bbaf25284b2ebad3f971ace2331550",
+    "dll_sha256": "08d59bd9b073f1e0f1be5c692349f9aec0de7c0514d793b90d74eb0603080fdd"
+  },
+  {
+    "library": "SDL_Pango",
+    "target": "win32-aarch64",
+    "archive": "libSDL_Pango.dll.a",
+    "dll": "sdl-dlls/SDL_Pango.dll",
+    "archive_sha256": "db44ea049dfe689d0a98d6c26d180db07ce04453bbfa94c86b5efc2d551a0a82",
+    "dll_sha256": "a297b28b9297cecb3ae4709bd97cf7854dc0f04a31a456c8e273c8857a0b10c9"
+  },
+  {
+    "library": "SDL2",
+    "target": "win32-aarch64",
+    "archive": "libSDL2.dll.a",
+    "dll": "sdl-dlls/SDL2.dll",
+    "archive_sha256": "7aa212a6a6387d01b7ee86afbaa060269fd4c9a3be7df46dc334118de420daf7",
+    "dll_sha256": "fa9dd8b104d4b97371c89e8b29de0959351796bd8a878483c8cba27c19695fab"
+  },
+  {
+    "library": "SDL2_image",
+    "target": "win32-aarch64",
+    "archive": "libSDL2_image.dll.a",
+    "dll": "sdl-dlls/SDL2_image.dll",
+    "archive_sha256": "02f5c6a69ad3cb76f790ffc1d59518debc9ffb6773f440d851ae71a62fd32efe",
+    "dll_sha256": "9812cfe02b099955a809d8772a4fd630c87281012e4327948c5e1b26fe09cf40"
+  },
+  {
+    "library": "SDL2_mixer",
+    "target": "win32-aarch64",
+    "archive": "libSDL2_mixer.dll.a",
+    "dll": "sdl-dlls/SDL2_mixer.dll",
+    "archive_sha256": "89a1df94b885e327ca6606e2c3a947c39a687506206d66358fe55c562713037a",
+    "dll_sha256": "c62712ceca0bca0e3e533a23e88c3e85403e6c3a9c55d7ddb8b463908f7e096f"
+  },
+  {
+    "library": "SDL2_net",
+    "target": "win32-aarch64",
+    "archive": "libSDL2_net.dll.a",
+    "dll": "sdl-dlls/SDL2_net.dll",
+    "archive_sha256": "13f69513695dfbd16ae13467b9450743b7922e2e82ed3d90005a2e5e0f9a0557",
+    "dll_sha256": "92bcc3b3d2889b1f19c5c75c9f69b63fab510c484555fcc191a24808f94f3d13"
+  },
+  {
+    "library": "SDL2_ttf",
+    "target": "win32-aarch64",
+    "archive": "libSDL2_ttf.dll.a",
+    "dll": "sdl-dlls/SDL2_ttf.dll",
+    "archive_sha256": "5861f8b72351c52f370e80d0da3e42e5407299c7f8041eb3806218b24191b47a",
+    "dll_sha256": "f4aa89665cce7d63e6749afbe5869ab8053a94abf3d0bfe5629cd23a8587e02a"
+  },
+  {
+    "library": "SDL2_sound",
+    "target": "win32-aarch64",
+    "archive": "libSDL2_sound.dll.a",
+    "dll": "sdl-dlls/SDL2_sound.dll",
+    "archive_sha256": "f10d56b7475aca220ae5affff5a1ac53535bc726d18e154a523ddb76ea95f637",
+    "dll_sha256": "378c2e2e44e7973271a215f5375ab6fa5f9b73596fb85e1e6d6ecaa905817065"
+  },
+  {
+    "library": "SDL2_gfx",
+    "target": "win32-aarch64",
+    "archive": "libSDL2_gfx.dll.a",
+    "dll": "sdl-dlls/libSDL2_gfx-1-0-0.dll",
+    "archive_sha256": "d06b44c64a9566d6cfee1771df02447e8389fa5c4a39ce64048874d30567c0e8",
+    "dll_sha256": "4b3e455228678ccbc70debfe9e8a0e1fe2130b8b7da8c6577f16488ae5114a4e"
+  },
+  {
+    "library": "SDL2_gpu",
+    "target": "win32-aarch64",
+    "archive": "libSDL2_gpu.dll.a",
+    "dll": "sdl-dlls/SDL2_gpu.dll",
+    "archive_sha256": "32219b3112af5f7ba8045c1c63a63ffdfa9bc26c1fe41fcec5ba007f9af75083",
+    "dll_sha256": "a5b0d1ec08a8726e4a593eecf5d482a7bfd8076f63140aee079f0f3d94df6df1"
+  },
+  {
+    "library": "SDL2_rtf",
+    "target": "win32-aarch64",
+    "archive": "libSDL2_rtf.dll.a",
+    "dll": "sdl-dlls/SDL2_rtf.dll",
+    "archive_sha256": "ff723079e74ba429fb5ad19cb729363b6a731eb1212fb60279a85f3c66cca58e",
+    "dll_sha256": "301debfe04a5ffef84f3eaca5b73e29492b6b3a0fe2ce0eed3d2056bb5389085"
+  },
+  {
+    "library": "SDL2_FontCache",
+    "target": "win32-aarch64",
+    "archive": "libSDL2_FontCache.dll.a",
+    "dll": "sdl-dlls/SDL2_FontCache.dll",
+    "archive_sha256": "9a6c07eddc3bc1829d556daf6c9d8401b658af457662cfd0b00a2b4545ead2f0",
+    "dll_sha256": "8eca99404a12b9746066d3f54e266050aecca2edb5420552413187ed3c8d1955"
+  },
+  {
+    "library": "SDL2_bgi",
+    "target": "win32-aarch64",
+    "archive": "libSDL2_bgi.dll.a",
+    "dll": "sdl-dlls/SDL2_bgi.dll",
+    "archive_sha256": "a008a51bb905a8339d1d738f5ab838f15545df52c606f0b4eeaed56e249309a1",
+    "dll_sha256": "51799c8f183ed421e483f3c85d39b2a3af48a03f7ae35325742ab6c61660b02b"
+  },
+  {
+    "library": "SDL3",
+    "target": "win32-aarch64",
+    "archive": "libSDL3.dll.a",
+    "dll": "sdl-dlls/SDL3.dll",
+    "archive_sha256": "914827d20ccf367a289559e1a021912a2a7cf14d35d122b59e4962834f198d94",
+    "dll_sha256": "4f053391ed8659d5f0d234e2836d4fda9fcc2c6222fb188f4219ec3afcb2fbb7"
+  },
+  {
+    "library": "SDL3_image",
+    "target": "win32-aarch64",
+    "archive": "libSDL3_image.dll.a",
+    "dll": "sdl-dlls/SDL3_image.dll",
+    "archive_sha256": "c18c43f01d804c52af46fab102b47d20f7bfdd23520bebf7160de242edfcde3b",
+    "dll_sha256": "56b69c86a6001ef90e19f186a6353949cdabafc3b055adb57f1776d4d7ba0d29"
+  },
+  {
+    "library": "SDL3_mixer",
+    "target": "win32-aarch64",
+    "archive": "libSDL3_mixer.dll.a",
+    "dll": "sdl-dlls/SDL3_mixer.dll",
+    "archive_sha256": "3ba90bb5c8144634869bd0a52e8fec8e7968ce11fd5cd39f23d0733ee2fd553d",
+    "dll_sha256": "beda1b9c5d09cda9788c5ef521bc038427b1ef2c90ae5969267b27aac157e056"
+  },
+  {
+    "library": "SDL3_net",
+    "target": "win32-aarch64",
+    "archive": "libSDL3_net.dll.a",
+    "dll": "sdl-dlls/SDL3_net.dll",
+    "archive_sha256": "a7360f4d3b262634bc207ffbe2459f16a06be99f4647c0c45e34b3ac8f5bf075",
+    "dll_sha256": "4394d64070e5da1ed93a3b55a9e50f7aebe2fe75bccc0fe3338c676f2fede227"
+  },
+  {
+    "library": "SDL3_ttf",
+    "target": "win32-aarch64",
+    "archive": "libSDL3_ttf.dll.a",
+    "dll": "sdl-dlls/SDL3_ttf.dll",
+    "archive_sha256": "cec2e01fe8270aa3c33110876a7ff5bd792b1337b48f08c03f3c5c9c8b08dc71",
+    "dll_sha256": "962e66251395bbbc965a0de9d98ddde912881191494781fae0cef857855387d7"
+  },
+  {
+    "library": "SDL3_sound",
+    "target": "win32-aarch64",
+    "archive": "libSDL3_sound.dll.a",
+    "dll": "sdl-dlls/SDL3_sound.dll",
+    "archive_sha256": "bced85a40a0ba6db1102f59daebdff3e72f91fa071aa77f86959d5bd20ed3caa",
+    "dll_sha256": "9df0e4e00749adf493dbf57c4508c0f316a33878cf89a3b8dc59f547eda2d681"
+  },
+  {
+    "library": "SDL3_gfx",
+    "target": "win32-aarch64",
+    "archive": "libSDL3_gfx.dll.a",
+    "dll": "sdl-dlls/SDL3_gfx.dll",
+    "archive_sha256": "6f11044a56ee7ec2c36363799920c737a2abc7a1b696b133ae1e38d8c5a950c0",
+    "dll_sha256": "fc715d327578aae05d46de8eb52ca97159afd1ae3dfd1f7cc8946238e57bf1c3"
+  },
+  {
+    "library": "SDL3_bgi",
+    "target": "win32-aarch64",
+    "archive": "libSDL3_bgi.dll.a",
+    "dll": "sdl-dlls/SDL3_bgi.dll",
+    "archive_sha256": "8ccb5103a8117ed33472f71d8a92fac340f26bb33f977ba7abe37f1b716b0894",
+    "dll_sha256": "9f0b444d93966563e31aea9ba5be2ea7628c76ef4aa3d5a029198f6a0ee6a0a0"
+  },
+  {
+    "library": "SDL3_rtf",
+    "target": "win32-aarch64",
+    "archive": "libSDL3_rtf.dll.a",
+    "dll": "sdl-dlls/SDL3_rtf.dll",
+    "archive_sha256": "96c06391ec9cfec070f32c42622bc49b508126c7dd8745b121072f8f1e72c8a4",
+    "dll_sha256": "6ce2735facbf0cd79e6a82b8c5db5f220900186a3525733445523bb4c13ce9c4"
+  },
+  {
+    "library": "SDL3_shadercross",
+    "target": "win32-aarch64",
+    "archive": "libSDL3_shadercross.dll.a",
+    "dll": "sdl-dlls/SDL3_shadercross.dll",
+    "archive_sha256": "f3830940fd0ac588b08b66941a1ed6d73f383ee2972e09c6f75f787f270e4f08",
+    "dll_sha256": "50ac2d1351e59cac62c6eb46f64ef555b273925c4e43a27a89344a2256607f45"
+  }
+]

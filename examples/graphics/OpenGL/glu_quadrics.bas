@@ -1,3 +1,12 @@
+'' Project: FreeBASIC SDL examples
+'' File: glu_quadrics.bas
+'' Purpose:
+''     Draw textured and untextured OpenGL quadrics through SDL1.
+'' Responsibilities:
+''     Own the OpenGL context, quadric objects, and render loop.
+'' This file intentionally does NOT contain:
+''     Texture file loading or audio.
+''
 'Glu Quadric Test
 'This would be better if you use lists instead of callling each quadric
 'Example modified from the GL redbook examples(downloadable from OpenGL.org)
@@ -33,7 +42,7 @@ declare sub drawscene ()
     randomize timer
 
 
-	result = SDL_Init(SDL_INIT_EVERYTHING)
+	result = SDL_Init(SDL_INIT_VIDEO)
 	if result <> 0 then
 		end 1
 	end if
@@ -143,6 +152,18 @@ declare sub drawscene ()
     qobj_Pdisk = gluNewQuadric
     qobj_sphere2 = gluNewQuadric
 
+    if qobj_sphere = NULL or qobj_Cylinder = NULL or qobj_Disk = NULL or _
+       qobj_Pdisk = NULL or qobj_sphere2 = NULL then
+        print "Couldn't allocate GLU quadrics"
+        if qobj_sphere <> NULL then gluDeleteQuadric qobj_sphere
+        if qobj_Cylinder <> NULL then gluDeleteQuadric qobj_Cylinder
+        if qobj_Disk <> NULL then gluDeleteQuadric qobj_Disk
+        if qobj_Pdisk <> NULL then gluDeleteQuadric qobj_Pdisk
+        if qobj_sphere2 <> NULL then gluDeleteQuadric qobj_sphere2
+        SDL_Quit
+        end 1
+    end if
+
     'Sphere
     gluQuadricDrawStyle qobj_sphere, GLU_FILL  ' smooth shaded
     gluQuadricNormals qobj_sphere, GLU_SMOOTH
@@ -164,8 +185,8 @@ declare sub drawscene ()
     gluQuadricNormals qobj_Pdisk, GLU_NONE
 
     'Sphere2
-    gluQuadricDrawStyle qobj_sphere, GLU_FILL  ' smooth shaded
-    gluQuadricNormals qobj_sphere, GLU_SMOOTH
+    gluQuadricDrawStyle qobj_sphere2, GLU_FILL  ' smooth shaded
+    gluQuadricNormals qobj_sphere2, GLU_SMOOTH
 
 	dim event as SDL_Event
 	do
@@ -174,7 +195,7 @@ declare sub drawscene ()
 		SDL_GL_SwapBuffers
 
 		SDL_PumpEvents
-	loop until( (SDL_PollEvent( @event ) <> 0) and ((event.type = SDL_KEYDOWN) or (event.type = SDL_MOUSEBUTTONDOWN)) )
+	loop until( (SDL_PollEvent( @event ) <> 0) and ((event.type = SDL_KEYDOWN) or (event.type = SDL_MOUSEBUTTONDOWN) or (event.type = SDL_QUIT_)) )
 
     'delete quadrics
     gluDeleteQuadric qObj_sphere
@@ -276,3 +297,5 @@ private sub DrawScene
     theta = theta + 1       'increase rotval
 
 end sub
+
+'' End of glu_quadrics.bas

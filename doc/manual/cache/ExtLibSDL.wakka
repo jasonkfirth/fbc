@@ -5,6 +5,6 @@ Website: http://www.libsdl.org
 Platforms supported: ""Win32"", Linux
 Headers to include: SDL/SDL.bi or SDL2/SDL.bi
 Header version: SDL 1.2.15, SDL2 2.0.3
-Examples: yes, in examples/graphics/SDL/
+Examples: yes, in examples/graphics/SDL1/, examples/graphics/SDL2/, and examples/graphics/SDL3/
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

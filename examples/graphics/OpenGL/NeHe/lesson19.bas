@@ -1,3 +1,12 @@
+'' Project: FreeBASIC SDL examples
+'' File: lesson19.bas
+'' Purpose:
+''     Demonstrate the NeHe particle effect through SDL1 and OpenGL.
+'' Responsibilities:
+''     Load a particle texture, update particles, and handle controls.
+'' This file intentionally does NOT contain:
+''     Audio or an independent particle worker thread.
+''
 ''
 '' This code was created by Jeff Molofee '99
 ''
@@ -515,7 +524,8 @@ end function
 
     '' the flags to pass to SDL_SetVideoMode
     videoFlags   = SDL_OPENGL          '' Enable OpenGL in SDL
-    videoFlags or= SDL_GL_DOUBLEBUFFER '' Enable double buffering
+    '' SDL_GL_DOUBLEBUFFER is a context attribute, not a surface flag.
+    '' SDL_GL_SetAttribute below requests the double-buffered context.
     videoFlags or= SDL_HWPALETTE       '' Store the palette in hardware
     videoFlags or= SDL_RESIZABLE       '' Enable window resizing
 
@@ -617,3 +627,5 @@ end function
 
     '' Should never get here
 	end 0
+
+'' End of lesson19.bas

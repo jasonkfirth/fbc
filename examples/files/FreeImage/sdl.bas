@@ -1,3 +1,12 @@
+'' Project: FreeBASIC SDL examples
+'' File: sdl.bas
+'' Purpose:
+''     Display a FreeImage bitmap using an SDL1 surface.
+'' Responsibilities:
+''     Keep bitmap pixels alive while SDL borrows them and handle input.
+'' This file intentionally does NOT contain:
+''     Image saving or application-owned pixel copies.
+''
 '' Example of using FreeImage to load an image of any type and SDL to show it.
 '' The image file name is expected to be passed on the command line.
 '' Use the arrow keys to move the image, ESC to quit.
@@ -23,7 +32,6 @@ sub main()
 	dim as string filename = command( )
 	if( filename = "" )Then
 		print "usage: freeimage.exe filename.ext"
-		sleep
 		end 1
 	end if
 
@@ -40,8 +48,7 @@ sub main()
 	if fiType = FIF_UNKNOWN then
 		print
 		print "Unknown image format or file not found"
-		sleep
-		end -1
+		end 1
 	end if
 
 	print
@@ -80,21 +87,31 @@ sub main()
 	'' initialise sdl with video support
 	if( SDL_Init( SDL_INIT_VIDEO ) < 0 ) then
 		print "Couldn't initialise SDL"
-		sleep
 		end 1
 	end if
 
 	'' load image
 	dib = FreeImage_Load( fiType, filename )
+	if dib = NULL then
+		print "Couldn't load image"
+		SDL_Quit( )
+		end 1
+	end if
 
 	'' image is upside-down, flip
-	FreeImage_FlipVertical( dib )
+	if FreeImage_FlipVertical( dib ) = 0 then
+		print "Couldn't flip image"
+		FreeImage_Unload( dib )
+		SDL_Quit( )
+		end 1
+	end if
 
 	'' create a SDL surface from the bitmap
 	srcimg = fibitmap2sdlsurface( dib )
 	if( srcimg = NULL ) then
 		print "Couldn't create surface"
-		sleep
+		FreeImage_Unload( dib )
+		SDL_Quit( )
 		end 1
 	end if
 
@@ -102,7 +119,9 @@ sub main()
 	video = SDL_SetVideoMode( SCR_WIDTH, SCR_HEIGHT, SCR_BPP, SDL_HWSURFACE or SDL_ANYFORMAT )
 	if( video = NULL ) then
 		print "Couldn't set video mode"
-		sleep
+		SDL_FreeSurface( srcimg )
+		FreeImage_Unload( dib )
+		SDL_Quit( )
 		end 1
 	end if
 
@@ -111,12 +130,24 @@ sub main()
 
 	dim doexit as integer, doupdate as integer
 	dim event as SDL_Event
+	dim exitStatus as integer
 
 	'' key repeat so we don't have to keep pressing over and over...
 	SDL_EnableKeyRepeat( 1, 1 )
 
+	'' Display the image before waiting for input; an expose event is not
+	'' guaranteed to be the first event delivered by every SDL video driver.
+	SDL_FillRect( video, NULL, SDL_MapRGB(video->format, 255, 255, 255) )
+	blitImage( srcimg, x, y )
+	SDL_Flip( video )
+
 	'' redraws if needed, quits on keypress or quit event
-	do while( doexit = 0 and SDL_WaitEvent( @event ) <> -1 )
+	do while( doexit = 0 )
+		if SDL_WaitEvent( @event ) = 0 then
+			print "SDL_WaitEvent: "; *SDL_GetError( )
+			exitStatus = 1
+			exit do
+		end if
 		doupdate = 0
 
 		select case event.type
@@ -168,8 +199,12 @@ sub main()
 
 	loop
 
-	SDL_Quit( )
+	'' SDL_CreateRGBSurfaceFrom borrows the FreeImage pixel buffer. Destroy
+	'' that surface before freeing the bitmap that supplies its pixels.
+	SDL_FreeSurface( srcimg )
 	FreeImage_Unload( dib )
+	SDL_Quit( )
+	if exitStatus then end 1
 end sub
 
 sub blitImage( byval img as SDL_Surface ptr, byval x as integer, byval y as integer )
@@ -185,6 +220,7 @@ sub fipal2sdlpal( byval dib as FIBITMAP Ptr, byval surface as SDL_Surface ptr )
 
 	dim as RGBQUAD ptr pal = FreeImage_GetPalette( dib )
 	dim as integer colors = FreeImage_GetColorsUsed( dib )
+	if colors < 0 or colors > 256 or pal = NULL then exit sub
 
 	for i as integer = 0 to colors-1
 		intpal(i).r = pal->rgbRed
@@ -221,3 +257,5 @@ function fibitmap2sdlsurface( byval dib as FIBITMAP Ptr ) as SDL_Surface ptr
 end function
 
 main()
+
+'' End of sdl.bas

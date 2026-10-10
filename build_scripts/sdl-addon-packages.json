@@ -1,0 +1,1266 @@
+{
+  "sources": [
+    {
+      "name": "SDL_rtf",
+      "repository": "libsdl-org/SDL_rtf",
+      "ref": "0bdba67b48e67f2c7d80a08720dcce8b54b01018",
+      "url": "https://codeload.github.com/libsdl-org/SDL_rtf/tar.gz/0bdba67b48e67f2c7d80a08720dcce8b54b01018",
+      "archive": "SDL_rtf-0bdba67b48e67f2c7d80a08720dcce8b54b01018.tar.gz",
+      "sha256": "53b50b5b8cef971932a6cf4c7f42956440a45783ac10e0fec7aaca256fb7f84d",
+      "directory": "sources/SDL_rtf"
+    },
+    {
+      "name": "SDL_shadercross",
+      "repository": "libsdl-org/SDL_shadercross",
+      "ref": "1ff05bec573988a98ef9e0260b4da44f512b8367",
+      "url": "https://codeload.github.com/libsdl-org/SDL_shadercross/tar.gz/1ff05bec573988a98ef9e0260b4da44f512b8367",
+      "archive": "SDL_shadercross-1ff05bec573988a98ef9e0260b4da44f512b8367.tar.gz",
+      "sha256": "60aae35ff71bd1d5f85b363e9d077a86bb27dd36333c42685e56c2fd541174d2",
+      "directory": "sources/SDL_shadercross"
+    },
+    {
+      "name": "sdl-gpu",
+      "repository": "grimfang4/sdl-gpu",
+      "ref": "v0.12.0",
+      "url": "https://codeload.github.com/grimfang4/sdl-gpu/tar.gz/v0.12.0",
+      "archive": "sdl-gpu-v0.12.0.tar.gz",
+      "sha256": "00b7dd7fe30cdc95483c2ad5de347855d4e984bd5e8da56f3c24a4a2960fc9ba",
+      "directory": "sources/sdl-gpu"
+    },
+    {
+      "name": "SDL3_gfx",
+      "repository": "sabdul-khabir/SDL3_gfx",
+      "ref": "v1.0.1",
+      "url": "https://codeload.github.com/sabdul-khabir/SDL3_gfx/tar.gz/v1.0.1",
+      "archive": "SDL3_gfx-v1.0.1.tar.gz",
+      "sha256": "b92e6002825f92b19e10abe8a974f0c38839f6bfb9b065f2d8dd14c51bf12a77",
+      "directory": "sources/SDL3_gfx"
+    },
+    {
+      "name": "SDL_FontCache",
+      "repository": "grimfang4/SDL_FontCache",
+      "ref": "c37a4030e1a1ad22131acdf62e093001e67905d6",
+      "url": "https://codeload.github.com/grimfang4/SDL_FontCache/tar.gz/c37a4030e1a1ad22131acdf62e093001e67905d6",
+      "archive": "SDL_FontCache-c37a4030e1a1ad22131acdf62e093001e67905d6.tar.gz",
+      "sha256": "3682ddbd0ee06fac507d524a8e8d102227a637c268d707a494814ded35de92d0",
+      "directory": "sources/SDL_FontCache"
+    },
+    {
+      "name": "llvm-mingw",
+      "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20261006/llvm-mingw-20261006-ucrt-ubuntu-22.04-x86_64.tar.xz",
+      "archive": "llvm-mingw-20261006-ucrt-ubuntu-22.04-x86_64.tar.xz",
+      "digest": "sha256:5f9c6ed95b2d4bdb2869a488c5fd5857fbdabcf288a0aa3eb1da43f6a08d8ab4",
+      "toolchain": true,
+      "sha256": "5f9c6ed95b2d4bdb2869a488c5fd5857fbdabcf288a0aa3eb1da43f6a08d8ab4",
+      "directory": "toolchain/llvm-mingw"
+    },
+    {
+      "name": "SDL_rtf-1",
+      "url": "https://codeload.github.com/libsdl-org/SDL_rtf/tar.gz/536f76b7fed550c6e9672c890c9d3c7465c7d6c7",
+      "sha256": "18d208269aee018903f7572714d2ac3bf305a33bb434e04750e112834e8867ad",
+      "directory": "sources/SDL_rtf-1",
+      "archive": "SDL_rtf-1.tar.gz"
+    },
+    {
+      "name": "SDL_rtf-2",
+      "url": "https://codeload.github.com/libsdl-org/SDL_rtf/tar.gz/d87f76ae5b1cd237bffecabb0ebfe08bdcce1204",
+      "sha256": "67837d264b51e043253ceb8ba3dedb34f840a4b59d1d5df9eaf05b72507dd93f",
+      "directory": "sources/SDL_rtf-2",
+      "archive": "SDL_rtf-2.tar.gz"
+    },
+    {
+      "name": "SDL_sound1",
+      "url": "https://codeload.github.com/icculus/SDL_sound/tar.gz/release-1.0.3",
+      "sha256": "5e20c780653fa14b7b3dc299dfcd91b546c75d0abb8043da5178e8b91c765d61",
+      "directory": "sources/SDL_sound1",
+      "archive": "SDL_sound1.tar.gz"
+    },
+    {
+      "name": "SDL_sound2",
+      "url": "https://codeload.github.com/icculus/SDL_sound/tar.gz/v2.0.6",
+      "sha256": "63be57cc80bcd29aeed6c29700759871c44c90251a7508b8d0eacd8d9cece30c",
+      "directory": "sources/SDL_sound2",
+      "archive": "SDL_sound2.tar.gz"
+    },
+    {
+      "name": "SDL2_bgi",
+      "url": "https://downloads.sourceforge.net/project/sdl-bgi/SDL2_bgi-3.0.4.tar.gz",
+      "sha256": "272ddbc0ffc1a9f1311cd669b75a8e301a29a848c89522b9552fa7f4a92a3474",
+      "directory": "sources/SDL2_bgi",
+      "archive": "SDL2_bgi.tar.gz"
+    },
+    {
+      "name": "SDL3_bgi",
+      "url": "https://downloads.sourceforge.net/project/sdl-bgi/SDL3_bgi-3.0.4.tar.gz",
+      "sha256": "bf13a1734aad55fb93313d08295ca19f55ac0486bf33037b4ebc6d34d5e04027",
+      "directory": "sources/SDL3_bgi",
+      "archive": "SDL3_bgi.tar.gz"
+    },
+    {
+      "name": "SDL_Pango",
+      "url": "https://downloads.sourceforge.net/project/sdlpango/SDL_Pango/0.1.2/SDL_Pango-0.1.2.tar.gz",
+      "sha256": "7f75d3b97acf707c696ea126424906204ebfa07660162de925173cdd0257eba4",
+      "directory": "sources/SDL_Pango",
+      "archive": "SDL_Pango.tar.gz"
+    },
+    {
+      "name": "SPIRV-Cross",
+      "repository": "KhronosGroup/SPIRV-Cross",
+      "ref": "1a6169566c73d3da552748fc372fe2bbb856e46e",
+      "url": "https://codeload.github.com/KhronosGroup/SPIRV-Cross/tar.gz/1a6169566c73d3da552748fc372fe2bbb856e46e",
+      "sha256": "0f295b214b164e42a1d21537c8da7b44569806c16220dda9798558edfaacd11e",
+      "directory": "sources/SPIRV-Cross",
+      "archive": "SPIRV-Cross-1a6169566c73d3da552748fc372fe2bbb856e46e.tar.gz"
+    },
+    {
+      "name": "SPIRV-Headers",
+      "repository": "KhronosGroup/SPIRV-Headers",
+      "ref": "ad9184e76a66b1001c29db9b0a3e87f646c64de0",
+      "url": "https://codeload.github.com/KhronosGroup/SPIRV-Headers/tar.gz/ad9184e76a66b1001c29db9b0a3e87f646c64de0",
+      "sha256": "b5b7eba62453eb8c6f6a5fbf7155b71cde693bafe9cd5f03b79ed8c714816afe",
+      "directory": "sources/SPIRV-Headers",
+      "archive": "SPIRV-Headers-ad9184e76a66b1001c29db9b0a3e87f646c64de0.tar.gz"
+    },
+    {
+      "name": "SPIRV-Tools",
+      "repository": "KhronosGroup/SPIRV-Tools",
+      "ref": "0539c81f69a3daeb706fd3477dca61435b475156",
+      "url": "https://codeload.github.com/KhronosGroup/SPIRV-Tools/tar.gz/0539c81f69a3daeb706fd3477dca61435b475156",
+      "sha256": "fb48ad981129d939863d5d46c8a5b3b70577bc95665b4c1afb0f14a090b50d53",
+      "directory": "sources/SPIRV-Tools",
+      "archive": "SPIRV-Tools-0539c81f69a3daeb706fd3477dca61435b475156.tar.gz"
+    },
+    {
+      "name": "SDL2_net",
+      "repository": "libsdl-org/SDL_net",
+      "ref": "release-2.2.0",
+      "url": "https://codeload.github.com/libsdl-org/SDL_net/tar.gz/refs/tags/release-2.2.0",
+      "archive": "SDL2_net-release-2.2.0.tar.gz",
+      "sha256": "08d741282c0c22b82ed134f09cd319803132289cae06fb47b5ada2752faf0493",
+      "directory": "sources/SDL2_net"
+    }
+  ],
+  "packages": [
+    {
+      "name": "mingw-w64-i686-SDL2_sound",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-SDL2_sound-2.0.6-1-any.pkg.tar.zst",
+      "sha256": "b027d8d2f401629387f6fcf5b461747cab8e6f8aa5fc760c38b410b7d60f6524"
+    },
+    {
+      "name": "mingw-w64-i686-SDL2_gfx",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-SDL2_gfx-1.0.4-2-any.pkg.tar.zst",
+      "sha256": "61938486961f15dea23a67ddf3d5b1a3c5f0668872039e420bdd752b43b96c12"
+    },
+    {
+      "name": "mingw-w64-x86_64-SDL2_sound",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-SDL2_sound-2.0.6-1-any.pkg.tar.zst",
+      "sha256": "8745d8a125ed4b92317ae20399025e0fcb033583b2f7f645a5e6777a257dc484"
+    },
+    {
+      "name": "mingw-w64-x86_64-SDL2_gfx",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-SDL2_gfx-1.0.4-2-any.pkg.tar.zst",
+      "sha256": "113e334648686af63b2d310d6fd5d1cc7c14e06e657ab38838bb6a7fa1ac6ab3"
+    },
+    {
+      "name": "mingw-w64-x86_64-pango",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-pango-1.58.2-1-any.pkg.tar.zst",
+      "sha256": "6aa68db02f6158dba802da406d25b29650011beb2d5d1b0a0050081e19874e57"
+    },
+    {
+      "name": "mingw-w64-x86_64-cairo",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-cairo-1.18.6-2-any.pkg.tar.zst",
+      "sha256": "937a911b5efd6388b4ed8e6e268bbc4985db2f897648fb60de57ae4bc7fac7d6"
+    },
+    {
+      "name": "mingw-w64-x86_64-freetype",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-freetype-2.14.3-1-any.pkg.tar.zst",
+      "sha256": "b3e310f457c90348fd14b8c1085e9c036016d168812a657fec21f496f7e3de99"
+    },
+    {
+      "name": "mingw-w64-x86_64-fontconfig",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-fontconfig-2.18.3-1-any.pkg.tar.zst",
+      "sha256": "7cdd32ad27ee9f8d176698744f3efa123feba57cecb833e87c221b50cd7224d1"
+    },
+    {
+      "name": "mingw-w64-x86_64-glib2",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-glib2-2.90.1-1-any.pkg.tar.zst",
+      "sha256": "152ba3b2cfb35feebc0fcb690889b16a6f0c2b89ced52e65aea45d089f86d219"
+    },
+    {
+      "name": "mingw-w64-x86_64-harfbuzz",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-harfbuzz-14.6.0-1-any.pkg.tar.zst",
+      "sha256": "23a9b505159b3b9086ca918cc437c20e496d2f411aa25a050bd82b1070a079d1"
+    },
+    {
+      "name": "mingw-w64-x86_64-fribidi",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-fribidi-1.0.17-1-any.pkg.tar.zst",
+      "sha256": "707f6a2f9a49c83938271bfd92a11f80bd4c18c4837210173fcb39e9d841e5ac"
+    },
+    {
+      "name": "mingw-w64-x86_64-libthai",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libthai-0.1.30-1-any.pkg.tar.zst",
+      "sha256": "e8cfad91934e24e9a88221b66f2d1c5a310c952ef86631107a632d3ff1738211"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-SDL2_sound",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-SDL2_sound-2.0.6-1-any.pkg.tar.zst",
+      "sha256": "2027d343c6a0f8f6764a04f198d67ebe0c080c6c0793db0d372dc0b09aadc3c4"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-SDL2",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-SDL2-2.32.10-1-any.pkg.tar.zst",
+      "sha256": "e21d2dd5879b3f5ec95aa86afb89aaa7cb983262c19ba519f346ad1e989bbc75"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libiconv",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libiconv-1.19-1-any.pkg.tar.zst",
+      "sha256": "955499bc5cb73d86ea2850ece9bbdbbfd66b213e272e032f28147ecd42897e21"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-SDL2_gfx",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-SDL2_gfx-1.0.4-2-any.pkg.tar.zst",
+      "sha256": "aff31c0e1549ed281d1a8598bfb36c0f9b84916b3c2ff2b000bcad6951b1756f"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-SDL2_image",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-SDL2_image-2.8.12-1-any.pkg.tar.zst",
+      "sha256": "fd263d0c0f5eebb5c5e90411e68f9807a12ca0c825d0ae69ae6b60fac7bdb1b4"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libavif",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libavif-1.4.2-1-any.pkg.tar.zst",
+      "sha256": "a93f307ea831091351db60de46885e0800a95b818cf10056038d470eefe4dafe"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-aom",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-aom-3.15.2-1-any.pkg.tar.zst",
+      "sha256": "513453c93a05e489877cc885541a69565d947285b7d2a0dbb24db8fdb0d9ed6e"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libwinpthread",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libwinpthread-14.0.0.r426.g4564ee4b5-1-any.pkg.tar.zst",
+      "sha256": "5b38d1db22b3c8f0212d9dfb329e6cdf71474d6678da80570435f2a5318ecde7"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-dav1d",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-dav1d-1.5.4-1-any.pkg.tar.zst",
+      "sha256": "e26ad96c17918cda05f137f06d4eb0eaadcabbfd4b5a3e318290d0050e17f3b2"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-rav1e",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-rav1e-0.8.1-1-any.pkg.tar.zst",
+      "sha256": "67d32cc18243054454a9ccd272633158f4338134ea62722773a29c8ffa351e66"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-svt-av1",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-svt-av1-4.2.0-1-any.pkg.tar.zst",
+      "sha256": "dd488db59a745f3f2b65e785b5b9e646d322e957f118d9cb973335866adb1ce5"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libyuv",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libyuv-1924.r2921.644251f25-2-any.pkg.tar.zst",
+      "sha256": "ee44485d3076d4b1772ce5f2761899ae56292897a6b04fb3d09ccbb796b990ff"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libjpeg-turbo",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libjpeg-turbo-3.2.0-1-any.pkg.tar.zst",
+      "sha256": "92206cd729d1bc495427ae056fc622d58726f38b462885b0244a4588d63eb986"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libpng",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libpng-1.6.59-1-any.pkg.tar.zst",
+      "sha256": "369828bf983803958f2774d3514db8276be0abf7f613ce7f4d0706c0766e5909"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-zlib",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-zlib-1.3.2-2-any.pkg.tar.zst",
+      "sha256": "28c111cc05d923ac56faa33aa5d7618c9dc16ac2d7c9e43a87f875403517894a"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libxml2",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libxml2-2.15.4-1-any.pkg.tar.zst",
+      "sha256": "7efc06a364c66e6f4f15ceeca7922cf923ea9d5c59a2e3acd97f81468ce562f8"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libjxl",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libjxl-0.12.0-1-any.pkg.tar.zst",
+      "sha256": "47f07061f2dc8ea6513983864abee9bd10075679a1a9d46cbbe54e458af4dc3d"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-brotli",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-brotli-1.2.0-1-any.pkg.tar.zst",
+      "sha256": "34acb6ac828721c972c99eedb37e098b9e30321ff00103a70b26170bca221afb"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-giflib",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-giflib-6.1.3-1-any.pkg.tar.zst",
+      "sha256": "13ffbb7fdc9cb7b6ded845b55d9e576c719fda7532cdd6a6217969c6a47e54f8"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-highway",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-highway-1.4.0-3-any.pkg.tar.zst",
+      "sha256": "ab620b42274fb9a52cae410d4fcf47450ec86ae6f3af1abb59a0ddbc4e588501"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-lcms2",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-lcms2-2.19.1-1-any.pkg.tar.zst",
+      "sha256": "c389449ff940d73d24f8d6254c0f84bfa54a493d0e31d696d4e360a4a8a2fb8b"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libtiff",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libtiff-4.7.2-1-any.pkg.tar.zst",
+      "sha256": "a157d9992863c8ef685e1a7de168cf38b8bd64a9714d5e74e89ef11d4f5ad195"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-jbigkit",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-jbigkit-2.1-6-any.pkg.tar.zst",
+      "sha256": "032761178920b78d051b7b3ecfec0b9a772e2e9a447bd03a77825cc3fb1b3f71"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-lerc",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-lerc-4.1.1-1-any.pkg.tar.zst",
+      "sha256": "be89e9e4fc90672a31fa555d34e2f7aa42723976bfc1ce29835798c999ac09f0"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libdeflate",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libdeflate-1.26-1-any.pkg.tar.zst",
+      "sha256": "b08ef23423d085c7ac7bd862bee57e51487cfb57886dda934b2c05a65f2b8a69"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libwebp",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libwebp-1.6.0-1-any.pkg.tar.zst",
+      "sha256": "f3be91d8a5c290828c69ad867216229b85c2aafc489807abe9a6bda7f7ffd1cb"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-xz",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-xz-5.8.4-1-any.pkg.tar.zst",
+      "sha256": "3a9cad5162492a7c2e3dd215cc20e3432f68ffa453e130954cd9fa9bbecf349a"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-gettext-runtime",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-gettext-runtime-1.0-1-any.pkg.tar.zst",
+      "sha256": "b5364a7c78cc4b73273a4a28e07e3c6d9cc8ec0ce269527409d944ab1c8f5a70"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-zstd",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-zstd-1.5.7-2-any.pkg.tar.zst",
+      "sha256": "f1444d0e664c6e60b324453ca3158ea159b1e880ba57ea229fbdc58e7ba5d9d2"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-openexr",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-openexr-3.4.16-1-any.pkg.tar.zst",
+      "sha256": "fd52f02cb1968262c7f8d8e2cbb0f6dbc27079d351f0acc5fcac2331263e87a9"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-imath",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-imath-3.2.3-3-any.pkg.tar.zst",
+      "sha256": "5bf7472076930871b8bb3b8ed27d5b53777617f7d0f91ab8081d65a4d334938b"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-openjph",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-openjph-0.32.0-1-any.pkg.tar.zst",
+      "sha256": "834a2182a36bdfdf08a5d6d9176b2f21c50ab46e4095546e490e5f4da0eeb4a8"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-SDL2_mixer",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-SDL2_mixer-2.8.2-1-any.pkg.tar.zst",
+      "sha256": "8c544c0f10c25d8443fce7997971e406849014903f3f8f551cb97c37a37ed466"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-flac",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-flac-1.5.0-2-any.pkg.tar.zst",
+      "sha256": "8be8b281480d4c7c0a71c6c72ebd10d5af8758a7fbc5e440d3680d493910e126"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libogg",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libogg-1.3.6-1-any.pkg.tar.zst",
+      "sha256": "8e983cb41ab76985709b00871469fd9116c05751e0b72abe37c00b364238c74a"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-wavpack",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-wavpack-5.9.0-1-any.pkg.tar.zst",
+      "sha256": "0f72e71d015fc2244a600ba6c35b67ad24fa18c715dd064180e6847249bd6394"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-fluidsynth",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-fluidsynth-2.6.1-1-any.pkg.tar.zst",
+      "sha256": "80653b2ad60ae8e6ffeb5bb02ff46d780783739224c908d66ac35547d018cf26"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libsndfile",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libsndfile-1.2.2-1-any.pkg.tar.zst",
+      "sha256": "0903eeba3c6ffd3ba9b81c1171d2c6c3cc00d8d55bcd9ce8db6a0706d813e9c2"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-lame",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-lame-3.100-3-any.pkg.tar.zst",
+      "sha256": "d5d3b5c7df1464c2dba2ccd1b42b84dca489d0eb5502f8b75ac3a566df932cb1"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libvorbis",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libvorbis-1.3.7-3-any.pkg.tar.zst",
+      "sha256": "5bff7f473b2086a48f7159bd7bd3b39b00ab1fdaaac3f5bef9363a702eba7d5b"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-mpg123",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-mpg123-1.33.7-1-any.pkg.tar.zst",
+      "sha256": "8dae5aed27580db87a3fdff7b32de96a4b475a624398450bc3a135ff904595ad"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-opus",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-opus-1.6.1-1-any.pkg.tar.zst",
+      "sha256": "7d6b3320acdf2f7d34a435692af49a18d026ef664f7ea1f3681e1dc28ef26c50"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-portaudio",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-portaudio-1~19.7.0-7-any.pkg.tar.zst",
+      "sha256": "d552a2a16f1d1691054ff66c4f9d9bfda30ea89421f11611def7764485a99bdc"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-readline",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-readline-8.3.003-1-any.pkg.tar.zst",
+      "sha256": "98fbc894cff6f587ddcd573d3130062fd61e5e4fbb1b28bc228b2124911d0111"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-termcap",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-termcap-1.3.1-8-any.pkg.tar.zst",
+      "sha256": "f1163ca67a3580167fd334f5d5cb74cbba6146475817926919998a47ff0cda02"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-sdl3",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-sdl3-3.4.18-1-any.pkg.tar.zst",
+      "sha256": "3fb7fc758d83a23d2fdf434d361254214891ce94269ad78878d3ef719f00373c"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libxmp",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libxmp-4.7.4-1-any.pkg.tar.zst",
+      "sha256": "d47e67f91885c8b1c05f12e5d667c0b6d6bdec0214ac8991e2e577d57f03db92"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-opusfile",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-opusfile-0.12-4-any.pkg.tar.zst",
+      "sha256": "a6d0ebe70de88dbced80fa7bbff4b7834adaa1b7a8f3fb12c1be70c1a6635ac0"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-openssl",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-openssl-3.6.5-1-any.pkg.tar.zst",
+      "sha256": "40978ba522b2e2d663029d6a5df7ad6e0e408d334a3590930229167bbc5a5edb"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-SDL2_ttf",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-SDL2_ttf-2.24.0-1-any.pkg.tar.zst",
+      "sha256": "ce3159852ca17f95e7ec49204fe368e971e24604835c946d87440eb7924a0a92"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-freetype",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-freetype-2.14.3-1-any.pkg.tar.zst",
+      "sha256": "0f7b1dc85889b861aefbb2e0fa0ad6b93b36039147c05dbdc13d160981dcd86f"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-bzip2",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-bzip2-1.0.8-4-any.pkg.tar.zst",
+      "sha256": "0e684014d7ad49bffe845b33e5bd34944497bbfbed411fe485174b823379d664"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-harfbuzz",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-harfbuzz-14.6.0-1-any.pkg.tar.zst",
+      "sha256": "c9db8a2684074c175ad6865a131c9be4586b92b308387688f40ca6db355c83bc"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-glib2",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-glib2-2.90.1-1-any.pkg.tar.zst",
+      "sha256": "88fd4d41048ca769147612f539758d7cb88b2ac22baad46c686444c534df11f7"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libffi",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libffi-3.8.0-1-any.pkg.tar.zst",
+      "sha256": "6382d1708eff02e0af00d04bdc43d2b8cb74086382052861b1a63963c8e0489a"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-pcre2",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-pcre2-10.49-1-any.pkg.tar.zst",
+      "sha256": "ef4d0222966b68d0c1e2fbc345ad00f1cec73235006ee29983225584d0cb69b8"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-wineditline",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-wineditline-2.208-1-any.pkg.tar.zst",
+      "sha256": "5c3716e113766072758855f9a2f74f18165dce036e949e8a0e04c2766125fa5a"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-python",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-python-3.14.8-1-any.pkg.tar.zst",
+      "sha256": "cc134642e8f03407077482ed10c887aff37c86125e68b01d88f1fe72cc20640b"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-expat",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-expat-2.9.0-1-any.pkg.tar.zst",
+      "sha256": "3a5898c105e0b3e011c015f93701c6951fadddd56828a1ef965dc0ac6ecd3b7e"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-mpdecimal",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-mpdecimal-4.0.1-3-any.pkg.tar.zst",
+      "sha256": "18fbd49a24113a23717f6290091491d28ddc8f1be4a3069c277d003140101e21"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-ncurses",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-ncurses-6.6-4-any.pkg.tar.zst",
+      "sha256": "912e96d800df0574db7ca8213cefa595b4335f0a85c1d4af19b0832de3103063"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libsystre",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libsystre-1.0.2-3-any.pkg.tar.zst",
+      "sha256": "732f53a5976ab9a6f33c1087e449d84f6f244dbf9c656c2ebfb5617dcb2e1832"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libtre",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libtre-0.9.0-2-any.pkg.tar.zst",
+      "sha256": "ced17adfcbeb9c13daa4f91ad43b5569e715a3ee68c970bb1a5565d464a79bf9"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-sqlite3",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-sqlite3-3.54.0-1-any.pkg.tar.zst",
+      "sha256": "fda7c2cc68aad03f562ff053af20b2056500b8b25e5cad2226c9d5aa48dcdf0d"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-tcl",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-tcl-8.6.18-1-any.pkg.tar.zst",
+      "sha256": "0b0115a42fc2624c993f6f217e1430e9990155671e37b71e58bf5320924d43d1"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-tk",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-tk-8.6.18-1-any.pkg.tar.zst",
+      "sha256": "8d2567fff7df027b127333dd27e43827311f4fc36d1ee0e34bb302b5a900c870"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libb2",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libb2-0.98.1-3-any.pkg.tar.zst",
+      "sha256": "8e2f1a6a3d8a53d1b6fdcb2d9df090c3c162aa1f36084b4f023d4315c52ea545"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-tzdata",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-tzdata-2026e-1-any.pkg.tar.zst",
+      "sha256": "d0292421b466bd68a13a52163eed54e278a3a346243fd869851accfbecefd0e4"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-python-packaging",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-python-packaging-26.3-1-any.pkg.tar.zst",
+      "sha256": "0ec02e5fbbd209ade0fa917f59137f6ae2fa4d1f3511b3c7af52dadadd349d71"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-graphite2",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-graphite2-1.3.15-1-any.pkg.tar.zst",
+      "sha256": "28490fe4773d50cde27bd5ce5186cb78620afdbdb9665bab01ca89fbd039aaa9"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-SDL2_net",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-SDL2_net-2.4.0-1-any.pkg.tar.zst",
+      "sha256": "ee43219f9f59379d6fc4dcd91d11ad1921f05b8c64d331db0bfe4c9e44e40032"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-pango",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-pango-1.58.2-1-any.pkg.tar.zst",
+      "sha256": "89cc9cab93f5b74b3a6929af6ab18a47f5b073795e810cab722b7b8c5e07889b"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-cairo",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-cairo-1.18.6-2-any.pkg.tar.zst",
+      "sha256": "4f13aec1744dd5c19bb6549785811e36a1a57fea0527a41e6fc9240aeab34679"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-fontconfig",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-fontconfig-2.18.3-1-any.pkg.tar.zst",
+      "sha256": "f37fa96e3a7965015d0337ad44ad30187129f63cd3c06afb1bc88ad2853e44f0"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-lzo2",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-lzo2-2.10-3-any.pkg.tar.zst",
+      "sha256": "7ed03c3f1f0ded7f5de470a339f11ed2b69aa9979e3ff05c09480b6d4f4d281f"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-pixman",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-pixman-0.46.4-3-any.pkg.tar.zst",
+      "sha256": "c9bf9c5ab01e23a3bf775703be86fc70142431433ce286b06b50956a2b1af9b8"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-fribidi",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-fribidi-1.0.17-1-any.pkg.tar.zst",
+      "sha256": "85e3a9d74124676618081c2d8a57548342d83a76ac8e4f7daaa0263d0caecbef"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libthai",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libthai-0.1.30-1-any.pkg.tar.zst",
+      "sha256": "df98f31b1b1355738cf0382e1bfb5ed0aff9f900950f0576d94db438898388b2"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libdatrie",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libdatrie-0.2.14-1-any.pkg.tar.zst",
+      "sha256": "07cf5a19ea98e059fa390ad8b9a4937b0bb3d8cda381cbd47c85e14ff6529c31"
+    },
+    {
+      "name": "mingw-w64-i686-SDL",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-SDL-1.2.15+r419+gef3a6c05-1-any.pkg.tar.zst",
+      "sha256": "373b00f79969430ba4bb59d6814e4f7ab0f5e354b250ea6dd1d682bf75bfc2c6"
+    },
+    {
+      "name": "mingw-w64-i686-sdl12-compat",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-sdl12-compat-1.2.74-1-any.pkg.tar.zst",
+      "sha256": "31deddf892f736617d622f81b81ce910c98ba0f67720f9e6d3465c428c4adf64"
+    },
+    {
+      "name": "mingw-w64-i686-SDL_gfx",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-SDL_gfx-2.0.27-1-any.pkg.tar.zst",
+      "sha256": "540c7ba288d1946ae745561ba7db7ef4f263348c668939b216d95d1bb895b3e7"
+    },
+    {
+      "name": "mingw-w64-x86_64-SDL",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-SDL-1.2.15+r419+gef3a6c05-1-any.pkg.tar.zst",
+      "sha256": "4a52ac852a149a0ab18e6bff85a19974f4c547c5f16a0807cbb02f13d8985669"
+    },
+    {
+      "name": "mingw-w64-x86_64-sdl12-compat",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-sdl12-compat-1.2.74-1-any.pkg.tar.zst",
+      "sha256": "3771f0ce9cdf0f7eef6cf68ac88640ebbb4dba86e4b6bf07322bad7c1621b790"
+    },
+    {
+      "name": "mingw-w64-x86_64-SDL_gfx",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-SDL_gfx-2.0.27-1-any.pkg.tar.zst",
+      "sha256": "4c1be04352d3ec4ef98b3c19bcdb9515368b62a2190ef73692ac7ee4c8b29014"
+    },
+    {
+      "name": "mingw-w64-x86_64-SDL2_pango",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-SDL2_pango-2.1.5-2-any.pkg.tar.zst",
+      "sha256": "60c677bfc22b614233cfda9480693842c7a754ff9359491054f973392a4a6b21"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-SDL",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-SDL-1.2.15+r419+gef3a6c05-1-any.pkg.tar.zst",
+      "sha256": "0a4f72fa12e0ebef48299d06b0cca8a6ab6015536a2f1dc9ef867e29f76deca5"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-sdl12-compat",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-sdl12-compat-1.2.74-1-any.pkg.tar.zst",
+      "sha256": "b29a921019d21d0a7149cd02a83b9854378301aaa77b6bb1969f7dcda3995df4"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-SDL_gfx",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-SDL_gfx-2.0.27-1-any.pkg.tar.zst",
+      "sha256": "60dbdf007a721d4a69d1de0c926c3cfab0c48c6ef63fe7aad1f989823ed76e8d"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-SDL2_pango",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-SDL2_pango-2.1.5-2-any.pkg.tar.zst",
+      "sha256": "6c545f74276ef0f98ca04cd218900a4c063eb12f20d2312bf2d965bcb257ecb6"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-SDL_image",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-SDL_image-1.2.12-8-any.pkg.tar.zst",
+      "sha256": "7451183caac3c6ae934ba83519b96557eec0b6e6b0f300ce549663e3fe033623"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-SDL_mixer",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-SDL_mixer-1.2.12-10-any.pkg.tar.zst",
+      "sha256": "401d6d7b1e5aa3167211bebf13783515a9fa5ca632d9dd5cb9fbf6a1f7eeb056"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-SDL_net",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-SDL_net-1.2.8-4-any.pkg.tar.zst",
+      "sha256": "2934c4ab3f22cd59d84325568df54e9a5deaec1072545468c0d5a243adb52ae5"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-SDL_ttf",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-SDL_ttf-2.0.11-7-any.pkg.tar.zst",
+      "sha256": "0801e838c63b4b68dcc6681930aa71e25cf1c68134cf34c0dc38d55e5ae1d624"
+    },
+    {
+      "name": "mingw-w64-i686-SDL2_mixer",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-SDL2_mixer-2.8.2-1-any.pkg.tar.zst",
+      "sha256": "ae4a43d81001d1e7ec015bafda8c9b243a70d343686c36aecebc66b1496f8ea0"
+    },
+    {
+      "name": "mingw-w64-i686-cc-libs",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-cc-libs-16.2.0-5-any.pkg.tar.zst",
+      "sha256": "ab4953224f004e2e5d8f31da4810dfe0c681d26cbd9bdf137cb1d673c59a2b8e"
+    },
+    {
+      "name": "mingw-w64-i686-libgcc",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libgcc-16.2.0-5-any.pkg.tar.zst",
+      "sha256": "9a30529f66969493fe1060e02d3a929ec177d9323a4c3a3587fd2d8f3345dccd"
+    },
+    {
+      "name": "mingw-w64-i686-libwinpthread",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libwinpthread-14.0.0.r426.g4564ee4b5-1-any.pkg.tar.zst",
+      "sha256": "f057aff99ce2008e00f25ed579da849e9bb7affccf4a3b5757499c8306a5f94c"
+    },
+    {
+      "name": "mingw-w64-i686-libstdc++",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libstdc++-16.2.0-5-any.pkg.tar.zst",
+      "sha256": "0a118f542dbd8479adbdb934495738c4403cc4e18a33fb950d6ca47a171f23bf"
+    },
+    {
+      "name": "mingw-w64-i686-tzdata",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-tzdata-2026e-1-any.pkg.tar.zst",
+      "sha256": "8d80c7c262b982af54bb61471b5544cba361d761fe760d94f24eed8481d3d9d8"
+    },
+    {
+      "name": "mingw-w64-i686-SDL2",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-SDL2-2.32.10-1-any.pkg.tar.zst",
+      "sha256": "81b39469a581fd4b1bd1d88785fbb02d5a46c9ef85343a620c8ae2f877ac6c42"
+    },
+    {
+      "name": "mingw-w64-i686-flac",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-flac-1.5.0-2-any.pkg.tar.zst",
+      "sha256": "618d14714de8de2d5e5277f67e8b3afff0707aabc7860f9559b99a0edc1a4890"
+    },
+    {
+      "name": "mingw-w64-i686-libogg",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libogg-1.3.6-1-any.pkg.tar.zst",
+      "sha256": "e4ffad8817a89da8e35d8f3f40082a7d2e5baa0ca6b1da5ab19b03153c493f19"
+    },
+    {
+      "name": "mingw-w64-i686-wavpack",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-wavpack-5.9.0-1-any.pkg.tar.zst",
+      "sha256": "df0959b1ddb880c199288973a703866fa8e1c50de5dbbe70bfbd3cbef52184b1"
+    },
+    {
+      "name": "mingw-w64-i686-fluidsynth",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-fluidsynth-2.6.1-1-any.pkg.tar.zst",
+      "sha256": "99893b6532c5c7db8e5a5ecc329193e70686d4344377c03c0afb0b1d9f01e0dc"
+    },
+    {
+      "name": "mingw-w64-i686-libsndfile",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libsndfile-1.2.2-1-any.pkg.tar.zst",
+      "sha256": "8c2456930e1223d05752e99a9afb914c4829cd7bac3cde682c23e887e7a42a81"
+    },
+    {
+      "name": "mingw-w64-i686-lame",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-lame-3.100-3-any.pkg.tar.zst",
+      "sha256": "ca087ba772cebf66e8ae90f2990e9bf7d1860c9f8a089d15872647f9a9abe98e"
+    },
+    {
+      "name": "mingw-w64-i686-libiconv",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libiconv-1.19-1-any.pkg.tar.zst",
+      "sha256": "12307416cfe45b6fbe1fb29c28594590bb59883856edf41b043d0daf684e4668"
+    },
+    {
+      "name": "mingw-w64-i686-libvorbis",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libvorbis-1.3.7-3-any.pkg.tar.zst",
+      "sha256": "4a293b2e36f2d0029ab5f9ba945e682b0ca4500f391d37baff47a343ee3f05cb"
+    },
+    {
+      "name": "mingw-w64-i686-mpg123",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-mpg123-1.33.7-1-any.pkg.tar.zst",
+      "sha256": "560be7db4c92c36bc47009e4343261834f9ca09468c98be127d3966916e8f2ff"
+    },
+    {
+      "name": "mingw-w64-i686-opus",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-opus-1.6.1-1-any.pkg.tar.zst",
+      "sha256": "e5dc823994f4573b6bd47b9bb29d3cd00ceeed0d5c48f755b627294c0b107437"
+    },
+    {
+      "name": "mingw-w64-i686-portaudio",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-portaudio-1~19.7.0-7-any.pkg.tar.zst",
+      "sha256": "7226b003a9ead2192ca690e6b034f7eb0465b6b1336130e5eb553997f64a8028"
+    },
+    {
+      "name": "mingw-w64-i686-readline",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-readline-8.3.003-1-any.pkg.tar.zst",
+      "sha256": "dd76452df3947125e826896d285e9f3cd7a27faf8c65492f6393e6ba65256fe1"
+    },
+    {
+      "name": "mingw-w64-i686-termcap",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-termcap-1.3.1-8-any.pkg.tar.zst",
+      "sha256": "0ca17704d8ca67424488ae85ec30af1d980c4de635e61933130789a48e136103"
+    },
+    {
+      "name": "mingw-w64-i686-libxmp",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libxmp-4.7.4-1-any.pkg.tar.zst",
+      "sha256": "137b7fb4aad5ebf02d38b110802e760f9c3204b37d2317770cde527fb781baeb"
+    },
+    {
+      "name": "mingw-w64-i686-opusfile",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-opusfile-0.12-4-any.pkg.tar.zst",
+      "sha256": "c318b36a93f863b21c706f2f278aecc66764a5d63cec7d2e02e2028a7a0c5500"
+    },
+    {
+      "name": "mingw-w64-i686-openssl",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-openssl-3.6.5-1-any.pkg.tar.zst",
+      "sha256": "55ad858c1409ae964a03c0f2aacb3326fde8c257b00579fd860e7ad030f2a7bf"
+    },
+    {
+      "name": "mingw-w64-i686-SDL2_net",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-SDL2_net-2.4.0-1-any.pkg.tar.zst",
+      "sha256": "040456cbada5ba1f79319773e1081725037f14acba2ccc9362ee533c6e1b4a38"
+    },
+    {
+      "name": "mingw-w64-x86_64-SDL2_mixer",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-SDL2_mixer-2.8.2-1-any.pkg.tar.zst",
+      "sha256": "78bfa5425d960e25532fd5b755fb9c5d1095d469e3e99078593a90527a2af418"
+    },
+    {
+      "name": "mingw-w64-x86_64-cc-libs",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-cc-libs-16.2.0-5-any.pkg.tar.zst",
+      "sha256": "634be1b3679f61a13cb02509870c458c5da0dee0b5e3276a81e916e45b65f363"
+    },
+    {
+      "name": "mingw-w64-x86_64-libgcc",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libgcc-16.2.0-5-any.pkg.tar.zst",
+      "sha256": "6cc48c5efe5ebab70a1ee1f6806c422205d5515c0f50d7a0e6a67336268c2afe"
+    },
+    {
+      "name": "mingw-w64-x86_64-libwinpthread",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libwinpthread-14.0.0.r426.g4564ee4b5-1-any.pkg.tar.zst",
+      "sha256": "543017ce2731292b215bf1d36fd70a86d8a8d5ed0afba9d3db9fff89804cda71"
+    },
+    {
+      "name": "mingw-w64-x86_64-libstdc++",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libstdc++-16.2.0-5-any.pkg.tar.zst",
+      "sha256": "2ec9a91ce896249b1a440a44e1bc0126f82efb540955827adec30e83a9bfb1f6"
+    },
+    {
+      "name": "mingw-w64-x86_64-tzdata",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-tzdata-2026e-1-any.pkg.tar.zst",
+      "sha256": "6d28805f8fb6517011cc309aa452111565afa1bc9188ad784cb5f62df98f0988"
+    },
+    {
+      "name": "mingw-w64-x86_64-SDL2",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-SDL2-2.32.10-1-any.pkg.tar.zst",
+      "sha256": "5991afbcfeb2f8b838ab80b2270d713a727199ca392715677a7c1931a0d9ecef"
+    },
+    {
+      "name": "mingw-w64-x86_64-flac",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-flac-1.5.0-2-any.pkg.tar.zst",
+      "sha256": "cf1713c63bd34a6ca24b231bee194c6ac319dcefa4cd41bb9fbb44c941bc6870"
+    },
+    {
+      "name": "mingw-w64-x86_64-libogg",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libogg-1.3.6-1-any.pkg.tar.zst",
+      "sha256": "7ef9ec16403e1489a37c3a5ce58b083408ba694c6882e673639e2250df98bb8b"
+    },
+    {
+      "name": "mingw-w64-x86_64-wavpack",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-wavpack-5.9.0-1-any.pkg.tar.zst",
+      "sha256": "54e9a30c413e2bdd8b3c839797a6947cd3c6dec973d94aa2222ebe5a75c22fd0"
+    },
+    {
+      "name": "mingw-w64-x86_64-fluidsynth",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-fluidsynth-2.6.1-1-any.pkg.tar.zst",
+      "sha256": "cfc27b3d6ddb3da45e6bf8b1270e806afaf5ce19c6ed728b5bd744c7e8493a22"
+    },
+    {
+      "name": "mingw-w64-x86_64-libsndfile",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libsndfile-1.2.2-1-any.pkg.tar.zst",
+      "sha256": "28f6a9be61c474fb96142be8426d551cec5f126b8a8b7ce2116379aa427e7dca"
+    },
+    {
+      "name": "mingw-w64-x86_64-lame",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-lame-3.100-3-any.pkg.tar.zst",
+      "sha256": "083e74a93c2fa764c26d73b5a21e2f5055242bc13997d8dbe6a6c2b4577d6b03"
+    },
+    {
+      "name": "mingw-w64-x86_64-libiconv",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libiconv-1.19-1-any.pkg.tar.zst",
+      "sha256": "21e334d0911f25de75d3e18e0697648bcecfa9658256d600cad0827d719c2f35"
+    },
+    {
+      "name": "mingw-w64-x86_64-libvorbis",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libvorbis-1.3.7-3-any.pkg.tar.zst",
+      "sha256": "3d68dc3ccb32f0ea230a4bbc19c8fd440893058437c49864c4e26b12d6cb078a"
+    },
+    {
+      "name": "mingw-w64-x86_64-mpg123",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-mpg123-1.33.7-1-any.pkg.tar.zst",
+      "sha256": "2928cf82017d27d394f383abadbae3137e3c0123a0c635b81f8192b62b8c1745"
+    },
+    {
+      "name": "mingw-w64-x86_64-opus",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-opus-1.6.1-1-any.pkg.tar.zst",
+      "sha256": "8ff5a273c811e64c5af4c886b6f5d7a8aefca30ef2c7942a7e0a7e62c49e1c25"
+    },
+    {
+      "name": "mingw-w64-x86_64-portaudio",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-portaudio-1~19.7.0-7-any.pkg.tar.zst",
+      "sha256": "25435a5c0119340b18a793a0e4f56561233de3f4113d140016122d5dece250ab"
+    },
+    {
+      "name": "mingw-w64-x86_64-readline",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-readline-8.3.003-1-any.pkg.tar.zst",
+      "sha256": "b943d7e2a61ac6e0304eac11cdcee15370a8c2ccee5b84487f8ad6c1e103d66c"
+    },
+    {
+      "name": "mingw-w64-x86_64-termcap",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-termcap-1.3.1-8-any.pkg.tar.zst",
+      "sha256": "205ece965d693274f200ff6c15bca8d29a093860951aeb4dbb9660817c255cc0"
+    },
+    {
+      "name": "mingw-w64-x86_64-sdl3",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-sdl3-3.4.18-1-any.pkg.tar.zst",
+      "sha256": "f2b7d6278bb880675ab4ea9a0274e73617d7314840d9af090835cd9877bdc271"
+    },
+    {
+      "name": "mingw-w64-x86_64-libxmp",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libxmp-4.7.4-1-any.pkg.tar.zst",
+      "sha256": "e10e1e23dbd0400f1b10cb493a0ad0f83ebeca3a33c65d55a0417e5f5812affb"
+    },
+    {
+      "name": "mingw-w64-x86_64-opusfile",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-opusfile-0.12-4-any.pkg.tar.zst",
+      "sha256": "84513699ea097593610ed13d44dd570a13eaca2f64b5fc14222e6c123df74518"
+    },
+    {
+      "name": "mingw-w64-x86_64-openssl",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-openssl-3.6.5-1-any.pkg.tar.zst",
+      "sha256": "389d1af21e99223d9e2cd32d4c073131b276da85be7636bd8d23571f6938864f"
+    },
+    {
+      "name": "mingw-w64-x86_64-SDL2_net",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-SDL2_net-2.4.0-1-any.pkg.tar.zst",
+      "sha256": "bf7193b6d54f228438a059d798c2e3d6e15653c725a62030cc073a422415ac19"
+    },
+    {
+      "name": "mingw-w64-i686-glib2",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-glib2-2.90.1-1-any.pkg.tar.zst",
+      "sha256": "7e353a53cb9d7f53f4743719dde56b4ab097836671ffc5b0b736629de0f6cebb"
+    },
+    {
+      "name": "mingw-w64-i686-freetype",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-freetype-2.14.3-1-any.pkg.tar.zst",
+      "sha256": "1b6a3eec656d8ff7c5b001e4b2af45d5f9bf895697003850db0013b80829be9b"
+    },
+    {
+      "name": "mingw-w64-i686-harfbuzz",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-harfbuzz-14.6.0-1-any.pkg.tar.zst",
+      "sha256": "d1509fe04ef9a277170340304d616674296ac06841070ba2e8e8924bd642072a"
+    },
+    {
+      "name": "mingw-w64-i686-libffi",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libffi-3.8.0-1-any.pkg.tar.zst",
+      "sha256": "81693922f14ab53d9d3fae6ba737d4e78bdeb30f0e7546399e26b07763c1d6b0"
+    },
+    {
+      "name": "mingw-w64-i686-libpng",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libpng-1.6.59-1-any.pkg.tar.zst",
+      "sha256": "e5623cbcaf10c6f5cca7885ab7541ae0a46bb0b291526eec202c9f20933fd6ab"
+    },
+    {
+      "name": "mingw-w64-i686-zlib",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-zlib-1.3.2-2-any.pkg.tar.zst",
+      "sha256": "03d1f7030adc892eb1ee8434f7201847093ff69b8ad9ff77a650d6dfae72083a"
+    },
+    {
+      "name": "mingw-w64-i686-bzip2",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-bzip2-1.0.8-4-any.pkg.tar.zst",
+      "sha256": "388da015be5064f46ca2442d4beecf7cae47b3c56c71702ae72a8eceaad1f845"
+    },
+    {
+      "name": "mingw-w64-i686-fontconfig-2.18.2-1-any.pkg.tar.zst",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-fontconfig-2.18.2-1-any.pkg.tar.zst",
+      "sha256": "22fa50df3f8e4bf5f59f63cf82242928f211bdaf16ef84ad3e26be25a83d15ae"
+    },
+    {
+      "name": "mingw-w64-i686-cairo-1.18.4-4-any.pkg.tar.zst",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-cairo-1.18.4-4-any.pkg.tar.zst",
+      "sha256": "fdcb5db48e2179b3265cbc6890b53891718e547b70b563df85256f83be212d30"
+    },
+    {
+      "name": "mingw-w64-i686-fribidi-1.0.16-1-any.pkg.tar.zst",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-fribidi-1.0.16-1-any.pkg.tar.zst",
+      "sha256": "71bd4b56fde348dc12ea080c39c09322d23c9f1ce727fe8ae255db80cbdf3447"
+    },
+    {
+      "name": "mingw-w64-i686-libthai-0.1.30-1-any.pkg.tar.zst",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libthai-0.1.30-1-any.pkg.tar.zst",
+      "sha256": "e16e6509f9402524e0b483b36827ba20b25c9a035241460c8471a27db6bac78f"
+    },
+    {
+      "name": "mingw-w64-i686-libdatrie-0.2.14-1-any.pkg.tar.zst",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libdatrie-0.2.14-1-any.pkg.tar.zst",
+      "sha256": "19fb46d6af595eb38c03c84596eb02f63172fa551895987e283ed22b2f08a847"
+    },
+    {
+      "name": "mingw-w64-i686-pixman-0.46.4-3-any.pkg.tar.zst",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-pixman-0.46.4-3-any.pkg.tar.zst",
+      "sha256": "f5354bd5340b5beba066f21b57928b8bc6fa60c2a65bb83cbf1cde09d13f3b54"
+    },
+    {
+      "name": "mingw-w64-i686-expat-2.9.0-1-any.pkg.tar.zst",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-expat-2.9.0-1-any.pkg.tar.zst",
+      "sha256": "51982a212b8624931a77f0ee351720bc0e113f563177b858a87884f58b89e5f4"
+    },
+    {
+      "name": "mingw-w64-i686-pango",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-pango-1.56.4-1-any.pkg.tar.zst",
+      "sha256": "d1d7612a567f2d3cf06e5cd6fa23472c0608c4472922f349212dbb20854d3b22"
+    },
+    {
+      "name": "mingw-w64-i686-graphite2",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-graphite2-1.3.15-1-any.pkg.tar.zst",
+      "sha256": "534a747d88e974291212e2abe5f35393fcffa9620311418b07af2a894daaf5bc"
+    },
+    {
+      "name": "mingw-w64-i686-gettext-runtime",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-gettext-runtime-1.0-1-any.pkg.tar.zst",
+      "sha256": "b096eb69be4710c74e1a568f8a6fc05acdaf5fd1cccdf3ba10b62bc74df1dde3"
+    },
+    {
+      "name": "mingw-w64-i686-pcre2",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-pcre2-10.49-1-any.pkg.tar.zst",
+      "sha256": "ea80510e15328ec2a37d1eae6dc23ba3c2467b4cf33241a189d913c69317ee4b"
+    },
+    {
+      "name": "mingw-w64-x86_64-libdatrie",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libdatrie-0.2.14-1-any.pkg.tar.zst",
+      "sha256": "fbbf30e9a911c1139ba5c38c5ae008309dd912f6c6b1e05f4310ec698e1b1339"
+    },
+    {
+      "name": "mingw-w64-x86_64-graphite2",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-graphite2-1.3.15-1-any.pkg.tar.zst",
+      "sha256": "6ad20d6c16e559f7c4b06fe71248e1201c7edf494d04e5721ed7f9b3f7fd1f74"
+    },
+    {
+      "name": "mingw-w64-x86_64-gettext-runtime",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-gettext-runtime-1.0-1-any.pkg.tar.zst",
+      "sha256": "be68d7f260633284b910c588c6d82ee304a81c8817a686d2cd9df83f872c27af"
+    },
+    {
+      "name": "mingw-w64-x86_64-pcre2",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-pcre2-10.49-1-any.pkg.tar.zst",
+      "sha256": "0abc5313085a0f9b4a77a1580d92b09761371cb3a1f31d01051a94a289fb9413"
+    },
+    {
+      "name": "mingw-w64-x86_64-libffi",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libffi-3.8.0-1-any.pkg.tar.zst",
+      "sha256": "6dad7f3c6c900d3c64a4fe0c2764b405e678b22df3521d2284ffaeff0198b84b"
+    },
+    {
+      "name": "mingw-w64-x86_64-expat",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-expat-2.9.0-1-any.pkg.tar.zst",
+      "sha256": "d81be70f6e22b988f00564bb16a2769347a6321964c99042d8ed8a7ed72b4829"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libmad",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libmad-0.15.1b-5-any.pkg.tar.zst",
+      "sha256": "0a6174f7bc6d305d9d846c03876006b6d1dabf4dc3d5d01cd9d9b070efcb5fcb"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libc++",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libc++-23.1.3-1-any.pkg.tar.zst",
+      "sha256": "47c0c7892af756dcdf4f8a53ef5d1c823003c21c9f47a633d4973b0e1c1ff167"
+    },
+    {
+      "name": "mingw-w64-clang-aarch64-libunwind",
+      "url": "https://repo.msys2.org/mingw/clangarm64/mingw-w64-clang-aarch64-libunwind-23.1.3-1-any.pkg.tar.zst",
+      "sha256": "5e183d2216ee3617aa908b27d44cf42316163730007bfe1d99056b5ef6a1dbbd"
+    },
+    {
+      "name": "mingw-w64-i686-python-packaging",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-python-packaging-26.3-1-any.pkg.tar.zst",
+      "sha256": "de6b3fdf9aefe691fa188116373742bef0bdb6849c7f44ae15a448320c847683"
+    },
+    {
+      "name": "mingw-w64-i686-python",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-python-3.14.8-1-any.pkg.tar.zst",
+      "sha256": "edfef6c1eccce48af70b8fde01a3a212a14793120a51c3082447ad8b97ae55ab"
+    },
+    {
+      "name": "mingw-w64-i686-xz",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-xz-5.8.4-1-any.pkg.tar.zst",
+      "sha256": "b4517bb12a6fbf4f34d606dfdfed33bd2277eb2a2aade2a64365742580967b4d"
+    },
+    {
+      "name": "mingw-w64-i686-libb2",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libb2-0.98.1-3-any.pkg.tar.zst",
+      "sha256": "7b5534ae9b2725698932c8b43daab7e67ef687aa8406d8edd02ffaa58b05abb5"
+    },
+    {
+      "name": "mingw-w64-i686-tk",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-tk-8.6.18-1-any.pkg.tar.zst",
+      "sha256": "6fe926b455cc7414a09864f0870050303d38432c715e00f9f20c8a7c79524e7f"
+    },
+    {
+      "name": "mingw-w64-i686-tcl",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-tcl-8.6.18-1-any.pkg.tar.zst",
+      "sha256": "debd51f44e63ce7c33b7233b9881dd2489abedc74ecc17a6820baaa8c2fe7f64"
+    },
+    {
+      "name": "mingw-w64-i686-sqlite3",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-sqlite3-3.54.0-1-any.pkg.tar.zst",
+      "sha256": "1ba160414819e1323a4328eb64b5b5ca40c2173956f06737dcae557ec42ffa2e"
+    },
+    {
+      "name": "mingw-w64-i686-ncurses",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-ncurses-6.6-4-any.pkg.tar.zst",
+      "sha256": "b27a42a41e312dcb3c44c902d3a9e19069f0a485367aff58fdc104474d0a6553"
+    },
+    {
+      "name": "mingw-w64-i686-libsystre",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libsystre-1.0.2-3-any.pkg.tar.zst",
+      "sha256": "11d04774600c3a500b8207defb1a7382f3018650cefa3578098043671ef530ab"
+    },
+    {
+      "name": "mingw-w64-i686-libtre",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libtre-0.9.0-2-any.pkg.tar.zst",
+      "sha256": "f1b8e34f218d466345fb385dff772ad2cfc13164a8ba99f2b51536f3da84b17a"
+    },
+    {
+      "name": "mingw-w64-i686-wineditline",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-wineditline-2.208-1-any.pkg.tar.zst",
+      "sha256": "52149323a3ad90dd767e1a3108652658905d8ca325c48b20b26216028d39d59c"
+    },
+    {
+      "name": "mingw-w64-i686-mpdecimal",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-mpdecimal-4.0.1-3-any.pkg.tar.zst",
+      "sha256": "65ee95da0bb9e563b89705647332495e4731a5339656795dd42f96308c29a82b"
+    },
+    {
+      "name": "mingw-w64-i686-brotli",
+      "url": "https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-brotli-1.2.0-1-any.pkg.tar.zst",
+      "sha256": "354c0208f0e62b32771fac0abad920278a2d47313e62d6681786bc8a14e3c44d"
+    },
+    {
+      "name": "mingw-w64-x86_64-zlib",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-zlib-1.3.2-2-any.pkg.tar.zst",
+      "sha256": "9e75842a070ba648e986e12424e1c92c9d7d77200e85f6a34eeb600819f2e694"
+    },
+    {
+      "name": "mingw-w64-x86_64-pixman",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-pixman-0.46.4-3-any.pkg.tar.zst",
+      "sha256": "435715dd1ca4c55873cf3c38d644615196bc2d238e3366f8ff81cc0811260eb2"
+    },
+    {
+      "name": "mingw-w64-x86_64-lzo2",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-lzo2-2.10-3-any.pkg.tar.zst",
+      "sha256": "445115c31e91486801af9493278c0eb86c6194c2644a54e92d5afac10edea630"
+    },
+    {
+      "name": "mingw-w64-x86_64-libpng",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libpng-1.6.59-1-any.pkg.tar.zst",
+      "sha256": "e1830319ea6c601c1e4d146b8e78264bcbb6326f0935b82c14a9b282af2127e1"
+    },
+    {
+      "name": "mingw-w64-x86_64-python-packaging",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-python-packaging-26.3-1-any.pkg.tar.zst",
+      "sha256": "69e6eff5c623ebd1cc3cfca13d8bbc6c70b0ca1dfbc3704b251478a30a25b20e"
+    },
+    {
+      "name": "mingw-w64-x86_64-python",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-python-3.14.8-1-any.pkg.tar.zst",
+      "sha256": "0b575caea0d7ce833c943b9658b6464ef1af1b97c338d870ef721ffa26548c58"
+    },
+    {
+      "name": "mingw-w64-x86_64-xz",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-xz-5.8.4-1-any.pkg.tar.zst",
+      "sha256": "2de0f26da60b7ff7aa192a226330d7de6b1099cb9b9f9de4145affb80146bbc8"
+    },
+    {
+      "name": "mingw-w64-x86_64-libb2",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libb2-0.98.1-3-any.pkg.tar.zst",
+      "sha256": "3c898f08c5f19e25dc6d7e39aa36b6f323141f0e62c5c50f089cd3f89711854c"
+    },
+    {
+      "name": "mingw-w64-x86_64-tk",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-tk-8.6.18-1-any.pkg.tar.zst",
+      "sha256": "42aa79962e1679dd55e93f79a25dc1e50c7235f143ab501b3ec68debd0d32a3e"
+    },
+    {
+      "name": "mingw-w64-x86_64-tcl",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-tcl-8.6.18-1-any.pkg.tar.zst",
+      "sha256": "d95289300fd8e16bd5cb241b9928a256695aeebeca2885deef3326cd4a4d5ba8"
+    },
+    {
+      "name": "mingw-w64-x86_64-sqlite3",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-sqlite3-3.54.0-1-any.pkg.tar.zst",
+      "sha256": "c139c0b99e79a45fbfb563457838d42bc4904dd877ebed2360b9f909914e7546"
+    },
+    {
+      "name": "mingw-w64-x86_64-ncurses",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-ncurses-6.6-4-any.pkg.tar.zst",
+      "sha256": "7bf5159441d00262085d2619f6c26877ea7595d4dafc6840637c6c5fccda5cf5"
+    },
+    {
+      "name": "mingw-w64-x86_64-libsystre",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libsystre-1.0.2-3-any.pkg.tar.zst",
+      "sha256": "ea20a54127fe2a606ef0f2bef62b1abef77710840b661b832a933b4020bfe316"
+    },
+    {
+      "name": "mingw-w64-x86_64-libtre",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libtre-0.9.0-2-any.pkg.tar.zst",
+      "sha256": "c4051508d063258e1e02dd29615edb7d73c5c5f582ae42795fdd92e7ddce506b"
+    },
+    {
+      "name": "mingw-w64-x86_64-wineditline",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-wineditline-2.208-1-any.pkg.tar.zst",
+      "sha256": "dfe7fab66632eececc73d84053eae2be8dd2146ecefe0fc2133277706084d7ea"
+    },
+    {
+      "name": "mingw-w64-x86_64-bzip2",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-bzip2-1.0.8-4-any.pkg.tar.zst",
+      "sha256": "123768f30ae14ba654a6feb70f8526146a331bc85f831a91a549ffb3f6cbffc7"
+    },
+    {
+      "name": "mingw-w64-x86_64-mpdecimal",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-mpdecimal-4.0.1-3-any.pkg.tar.zst",
+      "sha256": "8da7e7f78434f188664c4d2779c03ea7a80f7f5837a115834ab734b352a613e5"
+    },
+    {
+      "name": "mingw-w64-x86_64-brotli",
+      "url": "https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-brotli-1.2.0-1-any.pkg.tar.zst",
+      "sha256": "f5f2f7e723a08378241d15f0537386950c1a48e2d82bc47bedd632bd61852aba"
+    }
+  ],
+  "core_arm64": [
+    {
+      "name": "SDL3-3.4.18-win32-arm64.zip",
+      "url": "https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18-win32-arm64.zip",
+      "directory": "out/sdl-addons/sources/SDL3-3.4.18-win32-arm64",
+      "sha256": "a95910a1a19260a7d17ca041cf47af13d1aa600b4ee8f0005ddc1e8e942f5086"
+    },
+    {
+      "name": "SDL3_image-3.4.8-win32-arm64.zip",
+      "url": "https://github.com/libsdl-org/SDL_image/releases/download/release-3.4.8/SDL3_image-3.4.8-win32-arm64.zip",
+      "directory": "out/sdl-addons/sources/SDL3_image-3.4.8-win32-arm64",
+      "sha256": "b67f9fa5d3d9b10c34d118549cd943aa2fe36154884ba4b0a761330b4245b4bc"
+    },
+    {
+      "name": "SDL3_mixer-3.2.4-win32-arm64.zip",
+      "url": "https://github.com/libsdl-org/SDL_mixer/releases/download/release-3.2.4/SDL3_mixer-3.2.4-win32-arm64.zip",
+      "directory": "out/sdl-addons/sources/SDL3_mixer-3.2.4-win32-arm64",
+      "sha256": "144dc3dcc808d6bd7cb81b79215aa634355ad691258787cdd01b2d1ffd79f68b"
+    },
+    {
+      "name": "SDL3_ttf-3.2.2-win32-arm64.zip",
+      "url": "https://github.com/libsdl-org/SDL_ttf/releases/download/release-3.2.2/SDL3_ttf-3.2.2-win32-arm64.zip",
+      "directory": "out/sdl-addons/sources/SDL3_ttf-3.2.2-win32-arm64",
+      "sha256": "474e8ec1972450110a80a5ed660feea7a107cd98a12db02e4fa78f563303721f"
+    },
+    {
+      "name": "SDL3_net-3.2.0-win32-arm64.zip",
+      "url": "https://github.com/libsdl-org/SDL_net/releases/download/release-3.2.0/SDL3_net-3.2.0-win32-arm64.zip",
+      "directory": "out/sdl-addons/sources/SDL3_net-3.2.0-win32-arm64",
+      "sha256": "14701d5f9754c7149fa9d24c978f11b4a97e01f283146427f353980afe1a08a4"
+    },
+    {
+      "name": "SDL3_sound-3.2.0-win32-arm64.zip",
+      "url": "https://github.com/icculus/SDL_sound/releases/download/v3.2.0/SDL3_sound-3.2.0-win32-arm64.zip",
+      "directory": "out/sdl-addons/sources/SDL3_sound-3.2.0-win32-arm64",
+      "sha256": "d27685ffbdd95613298c5a0469c87bad83354fe1cdbc3375ef86e3a048eda1d3"
+    }
+  ],
+  "dxc": [
+    {
+      "name": "dxc_2026_09_29.zip",
+      "url": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2609/dxc_2026_09_29.zip",
+      "digest": "sha256:ad31b1fc8443175d204f77a611fdb3ef2ec42759bdc2f1167368de24a4a7e7f1",
+      "size": 32287592,
+      "sha256": "ad31b1fc8443175d204f77a611fdb3ef2ec42759bdc2f1167368de24a4a7e7f1",
+      "directory": "out/sdl-addons/sources/DXC-Windows"
+    },
+    {
+      "name": "linux_dxc_2026_09_28.x86_x64.tar.gz",
+      "url": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2609/linux_dxc_2026_09_28.x86_x64.tar.gz",
+      "digest": "sha256:96faadc7f5c282d2ffda49804beb4c3ee38127bc252b723234e3c5cdf7aa39a1",
+      "size": 13297763,
+      "sha256": "96faadc7f5c282d2ffda49804beb4c3ee38127bc252b723234e3c5cdf7aa39a1",
+      "directory": "out/sdl-addons/sources/DXC-Linux"
+    }
+  ]
+}
