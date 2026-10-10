@@ -188,7 +188,10 @@ def check_native(test, baseline_compiler=None, native_reader=None):
         executable = test.working / (backend + '.exe')
         object_path = test.working / (backend + '.o')
         target_extra = ('-target', target)
-        extra = (*target_extra, '-C', '-x', executable, '-o', object_path)
+        # Clang records its C input filename in the COFF object. Preserve the
+        # backend file so both invocations use the same name rather than a
+        # process-specific temporary, keeping the whole-object oracle exact.
+        extra = (*target_extra, '-R', '-C', '-x', executable, '-o', object_path)
         for case, (body, language, expected_exit, expected_callbacks) in cases.items():
             source = test.source(source_text(case + '.bas', body, language), case + '.bas')
             for with_ast in (False, True):
