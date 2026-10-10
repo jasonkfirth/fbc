@@ -2858,6 +2858,37 @@ print SEM_EMPTY joined3
                     self.assertTrue(any(row[1] == "symbol" and row[4].startswith("construction-")
                                         for row in model.records["MR"]))
 
+    def test_macro_generated_constructor_selection_keeps_a_nonphysical_invocation_anchor(self) -> None:
+        source = self.source("""Type MacroCallTarget
+    marker As Long
+    Declare Constructor(ByVal initial As Long = 1)
+End Type
+Constructor MacroCallTarget(ByVal initial As Long)
+    This.marker = initial
+End Constructor
+#define CREATE_MACRO_CALL() Dim generatedValue As MacroCallTarget
+Sub buildMacroCall()
+    CREATE_MACRO_CALL()
+End Sub
+""")
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                _, path = self.invoke([source], backend=backend)
+                model = Model.read(path)
+                calls = [row for row in model.records["I"] if row[4] == "default-constructor"]
+                self.assertEqual(len(calls), 1)
+                call = calls[0]
+                self.assertEqual(call[5], "0", "macro replacement coordinates are not editable source ranges")
+                self.assertEqual(Path(call[6]), source)
+                self.assertGreater(int(call[7]), 0)
+                construction_origins = [row for row in model.records["MR"]
+                                         if row[1] == "symbol" and row[2] == call[2] and
+                                         row[4].startswith("construction-")]
+                self.assertEqual(len(construction_origins), 1,
+                                 "the nonphysical call must retain its selected macro construction origin")
+                invocation = model.macro_invocations[int(construction_origins[0][3])]
+                self.assertEqual(invocation[7], "normal")
+
     def test_macro_reference_capability_is_unavailable_without_provenance(self) -> None:
         source = self.fixture("macro-reference-origins.bas")
         _, path = self.invoke([source], extra=("-semantic-model-compact",))

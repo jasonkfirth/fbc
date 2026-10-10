@@ -1549,18 +1549,39 @@ private sub hSemanticModelEmitImplicitCall _
 		exit sub
 	end if
 
+	dim as LEX_LOCATION call_source = source
+	dim as integer call_source_is_physical = source_is_physical
+	dim as integer macro_construction_origin = FALSE
 	if( (source.start_line < 1) or (source.start_column < 0) or _
 		(source.end_line < source.start_line) or (source.end_column < 0) or _
 		((source.end_line = source.start_line) and _
 		 (source.end_column <= source.start_column)) or _
 		(len(source.source_file) = 0) ) then
-		'' Construction selected through generated source still has a known
-		'' callee. Cleanup calls are not source construction observations.
+		'' Construction selected through generated source has no physical
+		'' result range. Anchor its semantic call to the macro invocation with a
+		'' nonphysical location so refactoring can validate the selected target.
+		'' Cleanup calls are not source construction observations.
 		if( (source.macro_identity > 0) and fbSemanticModelFullEnabled( ) and _
 			(instr(call_kind, "constructor") > 0) ) then
-			fbSemanticModelMacroOrigin("symbol", fbSemanticModelSymbolId(target), source.macro_identity, _
-				"construction-" + fbSemanticModelNumber(fbSemanticModelNextDetailIdentity( )))
+			dim as LEX_LOCATION invocation
+			if( fbSemanticModelMacroExpressionLocation(source, source, 0, 0, invocation) ) then
+				call_source = invocation
+				call_source_is_physical = FALSE
+				macro_construction_origin = TRUE
+			else
+				fbSemanticModelMacroOrigin("symbol", fbSemanticModelSymbolId(target), source.macro_identity, _
+					"construction-" + fbSemanticModelNumber(fbSemanticModelNextDetailIdentity( )))
+				exit sub
+			end if
+		else
+			exit sub
 		end if
+	end if
+	if( (call_source.start_line < 1) or (call_source.start_column < 0) or _
+		(call_source.end_line < call_source.start_line) or (call_source.end_column < 0) or _
+		((call_source.end_line = call_source.start_line) and _
+		 (call_source.end_column <= call_source.start_column)) or _
+		(len(call_source.source_file) = 0) ) then
 		exit sub
 	end if
 
@@ -1585,21 +1606,25 @@ private sub hSemanticModelEmitImplicitCall _
 	hSemanticModelAppendLine("I" + TABCHAR + hSemanticModelNumber(ownerid) + _
 		TABCHAR + hSemanticModelNumber(targetid) + _
 		TABCHAR + hSemanticModelNumber(typeid) + TABCHAR + call_kind + _
-		TABCHAR + hSemanticModelNumber(abs(source_is_physical <> FALSE)) + _
-		TABCHAR + hSemanticModelEscape(source.source_file) + _
-		TABCHAR + hSemanticModelNumber(source.start_line) + _
-		TABCHAR + hSemanticModelNumber(source.start_column) + _
-		TABCHAR + hSemanticModelNumber(source.end_line) + _
-		TABCHAR + hSemanticModelNumber(source.end_column) + _
+		TABCHAR + hSemanticModelNumber(abs(call_source_is_physical <> FALSE)) + _
+		TABCHAR + hSemanticModelEscape(call_source.source_file) + _
+		TABCHAR + hSemanticModelNumber(call_source.start_line) + _
+		TABCHAR + hSemanticModelNumber(call_source.start_column) + _
+		TABCHAR + hSemanticModelNumber(call_source.end_line) + _
+		TABCHAR + hSemanticModelNumber(call_source.end_column) + _
 		TABCHAR + hSemanticModelEscape(target_signature))
 	if( semantic_model_module_failed = FALSE ) then
+		if( macro_construction_origin ) then
+			fbSemanticModelMacroOrigin("symbol", targetid, source.macro_identity, _
+				"construction-" + fbSemanticModelNumber(fbSemanticModelNextDetailIdentity( )))
+		end if
 		semantic_model_module_implicit_call_count += 1
 		'' These optional K observations extend I without changing its legacy
 		'' decoder-column fields or introducing a new schema domain. The value
 		'' is SRC id, UTF-16 range, byte range and mapping status, in that order.
 		'' The occurrence ordinal is model-wide, just like the existing I index.
 		dim as string occurrence = hSemanticModelNumber(semantic_model_implicit_call_count + semantic_model_module_implicit_call_count)
-		dim as string coordinates = fbSemanticModelCoordinateFact(source, source)
+		dim as string coordinates = fbSemanticModelCoordinateFact(call_source, call_source)
 		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + hSemanticModelNumber(targetid) + _
 			TABCHAR + "implicit-call-coordinate-" + occurrence + TABCHAR + hSemanticModelEscape(coordinates))
 		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + hSemanticModelNumber(targetid) + _
