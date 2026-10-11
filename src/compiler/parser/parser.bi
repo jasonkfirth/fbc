@@ -166,6 +166,9 @@ type FBPARSER_STMT
 	id              as FB_TOKEN                 '' current compound stmt id
 
 	cnt             as integer                  '' keep track of :'s to help scope break's
+	'' A consumed SUB call leaves no expression. cStatement scopes this status
+	'' so a nested statement cannot make its caller look like a parsed call.
+	call_parsed     as integer
 
 	for             as FB_CMPSTMTSTK ptr
 	do              as FB_CMPSTMTSTK ptr

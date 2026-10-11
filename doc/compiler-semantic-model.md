@@ -1730,12 +1730,14 @@ checks passed 20 cases across Win32, Win64 and Linux x64 in six encodings,
 with byte-identical generated C and converted enum/byte step coverage.
 
 Full models advertise `parsed-string-intrinsics`. Parsed CHR, WCHR, UCHR,
-TRIM, LTRIM and RTRIM results have complete expression K observations named
+MID, TRIM, LTRIM and RTRIM results have complete expression K observations named
 `string-intrinsic-kind`, `string-intrinsic-count`, `string-intrinsic-any` and
 `string-intrinsic-argument-<ordinal>`. Ordinals start at one and identify the
-original typed inputs before literal folding or runtime conversion. CHR inputs
-therefore retain values outside the selected byte range. ANY identifies the
-parser-selected character-set form, rather than an inferred pattern spelling.
+  original typed inputs before literal folding or runtime conversion. CHR inputs
+  therefore retain values outside the selected byte range. MID records only its
+  two or three written arguments, so an omitted length remains distinct from the
+  synthetic runtime default. ANY identifies the parser-selected character-set
+  form, rather than an inferred pattern spelling.
 
 Each result also has an H relation from its module namespace with role
 `parsed-string-intrinsic`. This preserves occurrence coverage when folding
@@ -2858,3 +2860,65 @@ names as well as reported names. Macro invocations are anchors, not editable
 member identifiers. Compact, bindings-only and expressions-only models advertise
 unavailable and emit neither new spellings nor completion counts. The observer
 does not alter grammar, symbol lookup, layout, executable ASTs or backend output.
+
+## Parsed expression input coverage
+
+Full schema-27 models advertise `parsed-expression-input-coverage` and
+`parsed-iif-input-counts`; compact, bindings-only and expressions-only models
+advertise both as unavailable. For each statement, the owning symbol has three
+K properties:
+
+    parsed-operand-count:<statement-id> <EX operation count>
+    parsed-expression-inputs:<statement-id> available|unavailable
+    parsed-iif-count:<statement-id> <parsed IIf input-group count>
+
+The counts are emitted even when a statement has no expression operations.
+Readers compare the operand count with EX rows owned by that statement and the
+IIf count with its parsed-IIf H groups. `available` is emitted only when the
+parser's operand captures match the exported operations and expression
+observation did not mark an input identity or source interval missing. An
+unavailable status stays explicit; consumers must not infer completeness from
+the presence of some EX rows. IIf inputs use H records rather than EX operation
+records, so their count has a separate capability and receipt.
+
+These additive receipts let compiler-backed rules distinguish an empty parsed
+input set from an incomplete export. They add no AST code and change no parsing,
+lowering, diagnostics or generated output. Older schema-27 models remain
+readable, but without the capabilities they cannot establish complete parsed
+expression input coverage.
+
+## Numeric literal payloads carried through macros
+
+Full models with macro provenance advertise `macro-numeric-payloads`.
+`K expression <id> original-float-provenance` is an escaped three-field value:
+
+    source|transported|generated, macro-attempt-id-or-zero, replacement-unit-offset
+
+Source literals use zero for both macro fields. Transported literals retain an
+observed decimal payload from a macro definition or argument. Generated
+literals were re-lexed from replacement text without that original payload; a
+token paste, for example, does not become source spelling merely because its
+result parses as a float. The attempt and zero-based offset must agree with the
+existing `MI`/`ME`, `MR`, and `macro-input-unit` observations.
+
+This provenance accompanies the existing bounded `original-float-text` fields;
+it never replaces the canonical token text, selected type or runtime value.
+Original payload observation remains limited to 1024 characters and marks
+truncation with `original-float-text-complete=0`. Replacement-unit offsets are
+measured in the preprocessor buffer, separately from physical file columns.
+The observer carries payloads through aliases, nested and repeated arguments,
+and trimming, while keeping token pastes generated. It does not alter numeric
+scanning, suffix handling, warnings or backend output. Compact modes and full
+models without macro provenance advertise this capability as unavailable.
+
+## Native call argument chains
+
+The existing `CALL` `argument-count` property describes the actual right-edge
+chain of `ARG` nodes. Each `ARG` owns one argument operand in its left subtree;
+that subtree can itself contain a nested call and its arguments do not belong
+to the outer call's count. The independent reader verifies that each `ARG` is
+owned by a `CALL` or preceding `ARG` through a right edge and that the count
+matches the complete chain. This check uses the compiler's AST relationships,
+does not infer formal arity or source order, and needs no new capability.
+
+<!-- end of compiler-semantic-model.md -->

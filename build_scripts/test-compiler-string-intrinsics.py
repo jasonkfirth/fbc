@@ -40,7 +40,11 @@ def main() -> int:
                 receipts = {identity: properties for (domain, identity), properties in model.properties.items()
                             if domain == "expression" and "string-intrinsic-kind" in properties}
                 assert Counter(properties["string-intrinsic-kind"] for properties in receipts.values()) == {
-                    "chr": 5, "wchr": 1, "uchr": 1, "trim": 3, "ltrim": 1, "rtrim": 1}
+                    "chr": 5, "wchr": 1, "uchr": 1, "mid": 2,
+                    "trim": 3, "ltrim": 1, "rtrim": 1}
+                assert sorted(int(properties["string-intrinsic-count"])
+                              for properties in receipts.values()
+                              if properties["string-intrinsic-kind"] == "mid") == [2, 3]
                 assert len(model.relations("parsed-string-intrinsic")) == len(receipts)
                 expressions = {int(row[1]): row for row in model.records["E"]}
                 original_values = []

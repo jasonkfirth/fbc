@@ -399,7 +399,8 @@ function cAssignmentOrPtrCall _
 		'' only noconv casts are allowed on lhs of assignments), see below...
 		expr = cVarOrDeref( FB_VAREXPROPT_ALLOWALLCASTS )
 		if( expr = NULL ) then
-			exit function
+			'' A void pointer call has no value but is already a statement.
+			return parser.stmt.call_parsed
 		end if
 
 		'' If it's a function CALL, check whether we're ignoring the result

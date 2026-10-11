@@ -285,12 +285,14 @@ function cMaybeIgnoreCallResult( byval expr as ASTNODE ptr ) as integer
 	'' possible if its result is being ignored.
 	if( astIsCALL( t ) ) then
 		astAdd( astIgnoreCallResult( astRemoveCASTs( expr ) ) )
+		parser.stmt.call_parsed = TRUE
 		function = TRUE
 
 	'' Call to byref function? Either it's the lhs of an assignment,
 	'' or the result is being ignored: need to disambiguate.
 	elseif( astIsByrefResultDeref( t ) and hLooksLikeEndOfStatement( ) ) then
 		astAdd( astIgnoreCallResult( astRemoveByrefResultDeref( astRemoveCASTs( expr ) ) ) )
+		parser.stmt.call_parsed = TRUE
 		function = TRUE
 
 	else
@@ -560,7 +562,9 @@ private function hVarSymbol _
 	'' given, because the next call will return an inner symbol
 	expr = cVariableEx( sym, TRUE )
 	if( expr = NULL ) then
-		exit function
+		'' A SUB pointer call has already been added to the statement list.
+		'' Its missing result must not fall through to another grammar route.
+		return parser.stmt.call_parsed
 	end if
 
 	'' CALL?
@@ -702,7 +706,8 @@ private function hAssignOrPtrCall _
 	) as integer
 
 	if( expr = NULL ) then
-		exit function
+		'' The modern variable/member route can consume a SUB pointer call.
+		return parser.stmt.call_parsed
 	end if
 
 	'' CALL?
@@ -963,7 +968,7 @@ function cProcCallOrAssign _
 				if( lexGetLookAhead( 1, LEXCHECK_NOPERIOD ) <> CHAR_DOT ) then
 					expr = cWithVariable( fbGetCheckArray( ) )
 					if( expr = NULL ) then
-						exit function
+						return parser.stmt.call_parsed
 					end if
 
 					return cAssignmentOrPtrCallEx( expr )

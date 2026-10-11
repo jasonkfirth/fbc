@@ -34,6 +34,49 @@ class SidecarTests(unittest.TestCase):
     backends: list[str]
     native_windows: bool
 
+    def test_original_numeric_macro_payloads(self) -> None:
+        from numeric_macro_payloads import check_payloads
+        check_payloads(self)
+
+    def test_original_numeric_macro_payloads_reject_invalid_receipts(self) -> None:
+        from numeric_macro_payloads import check_rejection
+        check_rejection(self)
+
+    def test_original_numeric_macro_payload_boundaries(self) -> None:
+        from numeric_macro_payloads import check_boundaries
+        check_boundaries(self)
+
+    def test_original_parsed_expression_coverage(self) -> None:
+        from parsed_expression_coverage import check_inputs
+        check_inputs(self)
+
+    def test_original_parsed_expression_coverage_reject_invalid_receipts(self) -> None:
+        from parsed_expression_coverage import check_rejection
+        check_rejection(self)
+
+    def test_parsed_string_intrinsics_preserve_mid_source_arguments(self) -> None:
+        source = self.fixture("parsed-string-intrinsics.bas")
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                self.invoke([source], mode="off", backend=backend)
+                emission = self.emission_path(source.stem, backend).read_bytes()
+                model = self.compile(source, backend=backend)
+                self.assertEqual(self.emission_path(source.stem, backend).read_bytes(), emission)
+                self.assertEqual(model.capabilities[1]["parsed-string-intrinsics"], "available")
+                mid_inputs = [(identity, properties) for (domain, identity), properties in model.properties.items()
+                              if domain == "expression" and properties.get("string-intrinsic-kind") == "mid"]
+                self.assertEqual(sorted(properties["string-intrinsic-count"] for _, properties in mid_inputs),
+                                 ["2", "3"])
+                for identity, properties in mid_inputs:
+                    self.assertEqual(properties["string-intrinsic-any"], "0")
+                    statement = model.statement_owners["expression", identity]
+                    count = int(properties["string-intrinsic-count"])
+                    for ordinal in range(1, count + 1):
+                        argument = int(properties[f"string-intrinsic-argument-{ordinal}"])
+                        self.assertLess(argument, identity)
+                        self.assertEqual(model.statement_owners["expression", argument], statement)
+                    self.assertEqual("string-intrinsic-argument-3" in properties, count == 3)
+
     def test_original_assignment_initializers(self) -> None:
         from assignment_initializers import check_initializers
         check_initializers(self)
@@ -73,6 +116,10 @@ class SidecarTests(unittest.TestCase):
     def test_original_if_arms_in_legacy_dialects(self) -> None:
         from if_arms import check_legacy
         check_legacy(self)
+
+    def test_original_if_arms_with_void_pointer_calls(self) -> None:
+        from if_arms import check_void_calls
+        check_void_calls(self)
 
     def test_original_if_arms_in_source_encodings(self) -> None:
         from if_arms import check_encodings
@@ -770,6 +817,42 @@ End Function
                 continue
             self.assertEqual(model.nodes[identity][5], "-1")
             self.assertIn(properties["conversion"], ("0", "1"))
+
+    def test_native_call_argument_counts_and_chains(self) -> None:
+        from copy import deepcopy
+        from parsed_expression_coverage import write_rows
+
+        source = self.source("declare function Zero cdecl() as integer\n"
+                             "declare function Fixed pascal(byval value as integer, byval extra as integer = 0) as integer\n"
+                             "declare function Variadic cdecl(byval value as integer, ...) as integer\n"
+                             "dim resultValue as integer = Fixed(Zero())\n"
+                             "resultValue = Variadic(resultValue, Fixed(resultValue), 2, 3)\n"
+                             "resultValue = Variadic(resultValue, " + ", ".join(["1"] * 200) + ")\n")
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                _, model_path = self.invoke([source], backend=backend)
+                model = Model.read(model_path)
+                rows = [row.split("\t") for row in model_path.read_text(encoding="utf-8").splitlines()]
+                counts = [row for row in rows if row[:2] == ["K", "node"] and row[3] == "argument-count"]
+                self.assertTrue({0, 2, 4, 201} <= {int(row[4]) for row in counts})
+                selected = next(row for row in counts if row[4] == "4")
+                first_argument = next(row for row in rows if row[0] == "N" and
+                                      row[2] == selected[2] and row[3] == "right")
+                for delta in (-1, 1):
+                    changed = deepcopy(rows)
+                    count = next(row for row in changed if row[:4] == selected[:4])
+                    count[4] = str(int(count[4]) + delta)
+                    write_rows(model_path, changed)
+                    with self.assertRaisesRegex(ValueError, "argument count disagrees"):
+                        Model.read(model_path)
+                changed = deepcopy(rows)
+                argument = next(row for row in changed if row[:2] == first_argument[:2])
+                argument[3] = "left"
+                write_rows(model_path, changed)
+                with self.assertRaisesRegex(ValueError, "call-chain ownership"):
+                    Model.read(model_path)
+                write_rows(model_path, rows)
+                self.assertEqual(len(Model.read(model_path).nodes), len(model.nodes))
 
     def test_full_and_compact_expression_prefixes(self) -> None:
         source = self.source("type Leaf\n value as double\nend type\n"

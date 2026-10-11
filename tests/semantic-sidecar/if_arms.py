@@ -118,6 +118,67 @@ def check_inputs(test):
                 test.assertFalse(any(row[3].startswith(PREFIXES) for row in compact.records['K']))
 
 
+def check_void_calls(test):
+    # A consumed SUB pointer call has no expression result. Its statement must
+    # still be accepted, including nested IF dispatch and member/array routes.
+    body = '''Type Callback As Sub(ByVal value As Integer)
+Type Holder
+    action As Callback
+End Type
+Sub Bump(ByVal value As Integer)
+End Sub
+Dim action As Callback = @Bump
+Dim box As Holder
+box.action = action
+Dim actions(0 To 0) As Callback
+actions(0) = action
+If action = 0 Then
+    Print "missing"
+Else
+    action(1)
+End If
+If action Then box.action(2) : actions(0)(3) Else action(4)
+If action Then If action Then action(5) Else box.action(6)
+action(7) :
+If action Then
+    actions(0)(8)
+End If
+'''
+    expected = [('block', [('then', 1), ('else', 1)]),
+                ('inline', [('then', 2), ('else', 1)]),
+                ('inline', [('then', 1)]),
+                ('inline', [('then', 1), ('else', 1)]),
+                ('block', [('then', 1)])]
+    for backend in test.backends:
+        with test.subTest(backend=backend):
+            source = test.source(source_text(body, 'void-calls.bas'), 'void-calls.bas')
+            output = test.emission_path('void-calls', backend)
+            extra = ('-o', str(output))
+            test.invoke([source], mode='off', backend=backend, extra=extra)
+            plain = output.read_bytes()
+            _, artifact = test.invoke([source], backend=backend, extra=extra)
+            model = Model.read(artifact)
+            test.assertEqual(output.read_bytes(), plain)
+            test.assertEqual(reviewed(model), expected)
+            rows = [line.split('\t') for line in artifact.read_text().splitlines()]
+            member_ids = {int(row[3].split(':')[1]) for row in model.records['K']
+                          if row[3].startswith('if-arm-statement:')}
+            calls = [row for row in rows if row[0] == 'STE'
+                     and int(row[1]) in member_ids and row[2] == 'call-or-assignment']
+            # PRINT is also accepted by cProcCallOrAssign's quirk route.
+            test.assertEqual(len(calls), 8)
+            test.assertTrue(all(row[3] == 'parsed' for row in calls))
+            for outcome in ('unmatched', 'recovered'):
+                changed = [row[:] for row in rows]
+                ending = next(row for row in changed if row[0] == 'STE' and row[1] == calls[0][1])
+                ending[3] = outcome
+                with test.assertRaises(ValueError):
+                    Model('\n'.join('\t'.join(row) for row in changed) + '\n')
+            invalid = test.source(source_text(body + 'Dim value As Integer = action(9)\n',
+                                              'void-call-value.bas'), 'void-call-value.bas')
+            test.invoke([invalid], backend=backend, success=False)
+
+
 def check_legacy(test):
     for dialect in ('deprecated', 'fblite', 'qb'):
         for backend in test.backends:

@@ -113,12 +113,14 @@ declare sub ppAssert( )
 
 declare function ppReadLiteral _
 	( _
-		byval ismultiline as integer = FALSE _
+		byval ismultiline as integer = FALSE, _
+		byval numeric_head as integer ptr = NULL _
 	) as zstring ptr
 
 declare function ppReadLiteralW _
 	( _
-		byval ismultiline as integer = FALSE _
+		byval ismultiline as integer = FALSE, _
+		byval numeric_head as integer ptr = NULL _
 	) as wstring ptr
 
 

@@ -432,6 +432,7 @@ end enum
 type FB_DEFTOK
 	type            as FB_DEFTOK_TYPE
 	semantic_paste_before as integer             '' observed ## before this replacement token
+	semantic_numeric_head as integer            '' observation only, released at module reset
 
 	union
 		text        as zstring ptr
@@ -465,6 +466,7 @@ type FBS_MACRO_PROCW as function( byval argtb as LEXPP_ARGTB_, byval errnum as i
 type FBS_DEFINE
 	params          as integer
 	paramhead       as FB_DEFPARAM ptr
+	semantic_numeric_head as integer            '' original numeric payloads in text definitions
 
 	union
 		tokhead     as FB_DEFTOK ptr            '' only if args > 0

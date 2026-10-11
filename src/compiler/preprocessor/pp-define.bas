@@ -217,6 +217,8 @@ private sub hTrimMacroArg _
 	with( argtb->tb(num) )
 		if( is_wide ) then
 			if( .textw.data ) then
+				fbSemanticModelMacroNumericTrim(.semantic_numeric_head, _
+					.textw.len - len(ltrim(*.textw.data, any wchr(CHAR_SPACE, CHAR_TAB))))
 				if( (.textw.data[0][0] = CHAR_SPACE) or _
 				    (.textw.data[0][0] = CHAR_TAB) or _
 				    (.textw.data[0][len( *.textw.data )-1] = CHAR_SPACE) or _
@@ -230,6 +232,8 @@ private sub hTrimMacroArg _
 			end if
 		else
 			if( .text.data ) then
+				fbSemanticModelMacroNumericTrim(.semantic_numeric_head, _
+					.text.len - len(ltrim(*.text.data, any chr(CHAR_SPACE, CHAR_TAB))))
 				if( (.text.data[0][0] = CHAR_SPACE) or _
 				    (.text.data[0][0] = CHAR_TAB) or _
 				    (.text.data[0][len( *.text.data )-1] = CHAR_SPACE) or _
@@ -247,6 +251,7 @@ private sub hClearMacroSource( byval argument as LEXPP_ARG ptr )
 	argument->semantic_first = blank
 	argument->semantic_last = blank
 	argument->semantic_has_source = FALSE
+	argument->semantic_numeric_head = 0
 end sub
 
 private sub hObserveMacroSource( byval argument as LEXPP_ARG ptr, byref source as LEX_LOCATION )
@@ -475,6 +480,7 @@ private function hLoadMacro _
 			'' token to the current argument
 			if( argtb <> NULL ) then
 				hObserveMacroSource(@argtb->tb(num), t.source)
+				fbSemanticModelMacroNumericCapture(argtb->tb(num).semantic_numeric_head, @t, argtb->tb(num).text.len)
 				if( t.dtype <> FB_DATATYPE_WCHAR ) then
 					DZstrConcatAssign( argtb->tb(num).text, t.text )
 				else
@@ -585,6 +591,11 @@ private function hLoadMacro _
 					DZstrConcatAssign( expanded, str( *symbGetDefTokTextW( dt ) ) )
 				end select
 				fbSemanticModelMacroSegment(observation, segment_ordinal, token_ordinal, parameter, segment_kind, offset, expanded.len - offset)
+				if( segment_kind = "parameter" ) then
+					fbSemanticModelMacroNumericSegment(observation, argtb->tb(parameter).semantic_numeric_head, offset, expanded.len - offset)
+				elseif( segment_kind = "text" ) then
+					fbSemanticModelMacroNumericSegment(observation, dt->semantic_numeric_head, offset, expanded.len - offset)
+				end if
 				segment_ordinal += 1
 				token_ordinal += 1
 
@@ -725,6 +736,7 @@ private function hLoadDefine _
 
 			lgt = symbGetSizeOf( s )
 			fbSemanticModelMacroSegment(observation, 0, -1, -1, "definition-text", 0, lgt)
+			fbSemanticModelMacroNumericSegment(observation, s->def.semantic_numeric_head, 0, lgt)
 		end if
 
 	end if
@@ -939,9 +951,11 @@ private function hLoadMacroW _
 			if( argtb <> NULL ) then
 				if( t.dtype <> FB_DATATYPE_WCHAR ) then
 					hObserveMacroSource(@argtb->tb(num), t.source)
+					fbSemanticModelMacroNumericCapture(argtb->tb(num).semantic_numeric_head, @t, argtb->tb(num).textw.len)
 					DWstrConcatAssignA( argtb->tb(num).textw, t.text )
 				else
 					hObserveMacroSource(@argtb->tb(num), t.source)
+					fbSemanticModelMacroNumericCapture(argtb->tb(num).semantic_numeric_head, @t, argtb->tb(num).textw.len)
 					DWstrConcatAssign( argtb->tb(num).textw, t.textw )
 				end if
 			end if
@@ -1062,6 +1076,11 @@ private function hLoadMacroW _
 					DWstrConcatAssign( text, symbGetDefTokTextW( dt ) )
 				end select
 				fbSemanticModelMacroSegment(observation, segment_ordinal, token_ordinal, parameter, segment_kind, offset, text.len - offset)
+				if( segment_kind = "parameter" ) then
+					fbSemanticModelMacroNumericSegment(observation, argtb->tb(parameter).semantic_numeric_head, offset, text.len - offset)
+				elseif( segment_kind = "text" ) then
+					fbSemanticModelMacroNumericSegment(observation, dt->semantic_numeric_head, offset, text.len - offset)
+				end if
 				segment_ordinal += 1
 				token_ordinal += 1
 
@@ -1203,6 +1222,7 @@ private function hLoadDefineW _
 
 			lgt = symbGetSizeOf( s )
 			fbSemanticModelMacroSegment(observation, 0, -1, -1, "definition-text", 0, lgt)
+			fbSemanticModelMacroNumericSegment(observation, s->def.semantic_numeric_head, 0, lgt)
 		end if
 
 	end if
@@ -1502,6 +1522,7 @@ private function hReadMacroText _
 			end if
 
 			ZstrAssign( @toktail->text, lexGetText( ) )
+			fbSemanticModelMacroNumericCapture(toktail->semantic_numeric_head, lexGetHead( ), 0)
 			lexSkipToken( LEX_FLAGS )
 
 		end select
@@ -1580,10 +1601,11 @@ private sub hReadDefineText _
 
 	dim as zstring ptr text = any
 	dim as wstring ptr textw = any
+	dim as integer numeric_head = 0
 
 	if( env.inf.format = FBFILE_FORMAT_ASCII ) then
 		'' LITERAL*
-		text = ppReadLiteral( ismultiline )
+		text = ppReadLiteral( ismultiline, @numeric_head )
 
 		'' already defined? if there are no differences, do nothing..
 		if( sym <> NULL ) then
@@ -1594,15 +1616,18 @@ private sub hReadDefineText _
 				errReportEx( FB_ERRMSG_DUPDEFINITION, defname )
 			end if
 		else
-			if( symbAddDefine( defname, text, len( *text ), isargless, , flags ) = NULL ) then
+			dim as FBSYMBOL ptr added = symbAddDefine( defname, text, len( *text ), isargless, , flags )
+			if( added = NULL ) then
 				hReportRedefinition( NULL, defname )
+			else
+				added->def.semantic_numeric_head = numeric_head
 			end if
 		end if
 
 	'' unicode..
 	else
 		'' LITERAL*
-		textw = ppReadLiteralW( ismultiline )
+		textw = ppReadLiteralW( ismultiline, @numeric_head )
 
 		'' already defined? if there are no differences, do nothing..
 		if( sym <> NULL ) then
@@ -1613,8 +1638,11 @@ private sub hReadDefineText _
 				errReportEx( FB_ERRMSG_DUPDEFINITION, defname )
 			end if
 		else
-			if( symbAddDefineW( defname, textw, len( *textw ), isargless, , flags ) = NULL ) then
+			dim as FBSYMBOL ptr added = symbAddDefineW( defname, textw, len( *textw ), isargless, , flags )
+			if( added = NULL ) then
 				hReportRedefinition( NULL, defname )
+			else
+				added->def.semantic_numeric_head = numeric_head
 			end if
 		end if
 

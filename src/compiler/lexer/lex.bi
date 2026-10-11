@@ -118,6 +118,10 @@ type FBTOKEN
 	numeric_original_digits as integer
 	numeric_original_dot as integer
 	numeric_original_exponent as integer
+	numeric_original_leading_zeros as integer
+	'' Module-lifetime observation handle; copied tokens never own allocations.
+	numeric_payload as integer
+	numeric_macro_units as integer
 	'' Observation only: the string reader discarded units after its limit.
 	literal_truncated as integer
 
@@ -243,6 +247,7 @@ type LEXPP_ARG
 	semantic_first as LEX_LOCATION
 	semantic_last as LEX_LOCATION
 	semantic_has_source as integer
+	semantic_numeric_head as integer
 end type
 
 type LEXPP_ARGTB
@@ -338,6 +343,8 @@ declare sub lexNextToken _
 declare function lexGetCurrentLocation( ) as LEX_LOCATION
 declare function lexGetLastLocation( ) as LEX_LOCATION
 declare function lexGetNonphysicalTokenCount( ) as longint
+'' Logical replacement remainder, including already prefetched characters.
+declare function lexGetMacroRemainingUnits( ) as longint
 
 declare function lexCurrentChar _
 	( _

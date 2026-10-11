@@ -78,5 +78,6 @@ def validate_procedure_types(model, number, subject_modules):
         route = model.statement_endings[statement][2]
         if available(int(record[7])) and int(record[9]) in (334, 345, 346) and route in ('declaration', 'aggregate-member') and statement not in headers:
             raise ValueError('Accepted procedure lacks its typing receipt')
+    return frozenset(headers)
 
 # end of semantic_procedures.py

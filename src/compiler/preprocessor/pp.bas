@@ -585,13 +585,15 @@ end sub
 '':::::
 function ppReadLiteral _
 	( _
-		byval ismultiline as integer _
+		byval ismultiline as integer, _
+		byval numeric_head as integer ptr _
 	) as zstring ptr
 
 	static as DZSTRING text
 	dim as integer nestedcnt = 0
 
 	DZstrReset( text )
+	if( numeric_head <> NULL ) then *numeric_head = 0
 
 	do
 		select case as const lexGetToken( LEX_FLAGS )
@@ -697,6 +699,7 @@ function ppReadLiteral _
 		end select
 
 		'' anything else..
+		if( numeric_head <> NULL ) then fbSemanticModelMacroNumericCapture(*numeric_head, lexGetHead( ), text.len)
 		if( lexGetType() <> FB_DATATYPE_WCHAR ) then
 			DZstrConcatAssign( text, lexGetText( ) )
 		else
@@ -750,13 +753,15 @@ end sub
 '':::::
 function ppReadLiteralW _
 	( _
-		byval ismultiline as integer _
+		byval ismultiline as integer, _
+		byval numeric_head as integer ptr _
 	) as wstring ptr
 
 	static as DWSTRING text
 	dim as integer nestedcnt = 0
 
 	DWstrAllocate( text, 0 )
+	if( numeric_head <> NULL ) then *numeric_head = 0
 
 	do
 		select case as const lexGetToken( LEX_FLAGS )
@@ -862,6 +867,7 @@ function ppReadLiteralW _
 		end select
 
 		'' anything else..
+		if( numeric_head <> NULL ) then fbSemanticModelMacroNumericCapture(*numeric_head, lexGetHead( ), text.len)
 		if( lexGetType( ) = FB_DATATYPE_WCHAR ) then
 			DWstrConcatAssign( text, lexGetTextW( ) )
 		else

@@ -1,7 +1,7 @@
 ' Project: FreeBASIC semantic observation tests
 ' File: parsed-string-intrinsics.bas
 ' Purpose: Preserve intrinsic inputs through literal folding and runtime lowering.
-' Responsibilities: CHR families, trim selectors, macros and inactive source.
+' Responsibilities: CHR families, MID inputs, trim selectors, macros and inactive source.
 ' This file intentionally does NOT execute string operations or read input.
 #lang "fb"
 
@@ -20,6 +20,8 @@ Sub StringInputs(ByVal codePoint As Integer, ByRef textValue As String)
     Dim As String leftSet = LTrim(textValue, Any !"f\&h66x")
     Dim As String rightSet = RTrim(textValue, Any "aaba")
     Dim As WString * 8 wideSet = Trim(wideCharacter, Any ".tt")
+    Dim As String midDefaultLength = Mid(textValue, codePoint)
+    Dim As String midExplicitLength = Mid(textValue, codePoint, 2)
 #if 0
     Dim As String inactiveCharacter = Chr(400)
 #endif

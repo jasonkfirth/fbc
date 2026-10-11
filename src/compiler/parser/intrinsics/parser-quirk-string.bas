@@ -762,6 +762,10 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 	dim as integer trim_argument_count
 	dim as LEX_LOCATION trim_argument_starts(0 to 1), trim_argument_ends(0 to 1)
 	dim as longint trim_argument_nonphysical_starts(0 to 1), trim_argument_nonphysical_ends(0 to 1)
+	dim as longint mid_arguments(0 to 2)
+	dim as integer mid_argument_count
+	dim as LEX_LOCATION mid_argument_starts(0 to 2), mid_argument_ends(0 to 2)
+	dim as longint mid_argument_nonphysical_starts(0 to 2), mid_argument_nonphysical_ends(0 to 2)
 
 	function = NULL
 
@@ -825,17 +829,44 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		lexSkipToken( LEXCHECK_POST_STRING_SUFFIX )
 
 		hMatchLPRNT( )
+		mid_argument_count = 2
+		mid_argument_starts(0) = lexGetCurrentLocation( )
+		mid_argument_nonphysical_starts(0) = lexGetNonphysicalTokenCount( )
 		hMatchExpressionEx( expr1, FB_DATATYPE_STRING )
+		mid_argument_ends(0) = lexGetLastLocation( )
+		mid_argument_nonphysical_ends(0) = lexGetNonphysicalTokenCount( )
+		mid_arguments(0) = fbSemanticModelOriginalExpression _
+			(expr1, mid_argument_starts(0), mid_argument_nonphysical_starts(0), _
+			 mid_argument_ends(0), mid_argument_nonphysical_ends(0))
 		hMatchCOMMA( )
+		mid_argument_starts(1) = lexGetCurrentLocation( )
+		mid_argument_nonphysical_starts(1) = lexGetNonphysicalTokenCount( )
 		hMatchExpressionEx( expr2, FB_DATATYPE_INTEGER )
+		mid_argument_ends(1) = lexGetLastLocation( )
+		mid_argument_nonphysical_ends(1) = lexGetNonphysicalTokenCount( )
+		mid_arguments(1) = fbSemanticModelOriginalExpression _
+			(expr2, mid_argument_starts(1), mid_argument_nonphysical_starts(1), _
+			 mid_argument_ends(1), mid_argument_nonphysical_ends(1))
 		if( hMatch( CHAR_COMMA ) ) then
+			mid_argument_count = 3
+			mid_argument_starts(2) = lexGetCurrentLocation( )
+			mid_argument_nonphysical_starts(2) = lexGetNonphysicalTokenCount( )
 			hMatchExpressionEx( expr3, FB_DATATYPE_INTEGER )
+			mid_argument_ends(2) = lexGetLastLocation( )
+			mid_argument_nonphysical_ends(2) = lexGetNonphysicalTokenCount( )
+			mid_arguments(2) = fbSemanticModelOriginalExpression _
+				(expr3, mid_argument_starts(2), mid_argument_nonphysical_starts(2), _
+				 mid_argument_ends(2), mid_argument_nonphysical_ends(2))
 		else
 			expr3 = astNewCONSTi( -1 )
 		end if
 		hMatchRPRNT( )
 
 		expr1 = rtlStrMid( expr1, expr2, expr3 )
+		if( expr1 <> NULL ) then
+			fbSemanticModelStringIntrinsic(expr1, "mid", mid_argument_count, _
+				mid_arguments(), FALSE, intrinsic_start, intrinsic_nonphysical_start)
+		end if
 		if( expr1 = NULL ) then
 			errReport( FB_ERRMSG_INVALIDDATATYPES )
 			expr1 = astNewCONSTi( 0 )

@@ -659,6 +659,9 @@ class Model:
                         raise ValueError("Unknown constant value kind")
                     self.constants[key] = row[3], row[4]
                 elif tag == "K":
+                    if row[3].startswith(("parsed-operand-count:", "parsed-expression-inputs:", "parsed-iif-count:")):
+                        if row[1] != "symbol" or row[3] in self.properties[key]:
+                            raise ValueError("Parsed expression coverage receipt is repeated or has the wrong domain")
                     if not row[3]:
                         raise ValueError("Empty metadata property key")
                     if row[3] == "written-override":
@@ -1469,6 +1472,7 @@ class Model:
         for identity in self.nodes:
             if "kind" not in self.properties["node", identity]:
                 raise ValueError("AST node lacks its stable kind")
+        self.validate_parsed_expression_inputs()
         self.validate_nodes()
         if not expressions_only and not bindings_only:
             storage_roots = validate_array_storage_inputs(self, number, subject_modules)
@@ -1494,8 +1498,8 @@ class Model:
             self.validate_storage_receipts(subject_modules)
             validate_query_inputs(self, number, subject_modules)
             validate_select_inputs(self, number, subject_modules)
-            validate_declaration_types(self, number, subject_modules)
-            validate_procedure_types(self, number, subject_modules)
+            procedure_headers = validate_procedure_types(self, number, subject_modules)
+            validate_declaration_types(self, number, subject_modules, procedure_headers)
             validate_aggregate_access(self, number, subject_modules)
             validate_string_declarations(self, number, subject_modules)
             validate_declaration_repetitions(self, number, subject_modules)
@@ -1868,15 +1872,18 @@ class Model:
             kind = properties.get("string-intrinsic-kind")
             count = number(properties.get("string-intrinsic-count", ""), 1)
             is_any = properties.get("string-intrinsic-any")
-            if kind not in ("chr", "wchr", "uchr", "trim", "ltrim", "rtrim", "str", "str-qb", "wstr") or count > 32 or is_any not in ("0", "1"):
+            if kind not in ("chr", "wchr", "uchr", "trim", "ltrim", "rtrim", "str", "str-qb", "wstr", "mid") or count > 32 or is_any not in ("0", "1"):
                 raise ValueError("Invalid parsed string intrinsic selection")
             is_trim = kind in ("trim", "ltrim", "rtrim")
             is_format = kind in ("str", "str-qb", "wstr")
+            is_mid = kind == "mid"
             if is_format and (count != 1 or is_any != "0" or
                               self.capabilities[module].get("parsed-string-format-inputs") != "available"):
                 raise ValueError("Invalid string format input shape or capability")
             if (is_trim and count > 2) or (is_any == "1" and (not is_trim or count != 2)):
                 raise ValueError("Invalid string intrinsic argument shape")
+            if is_mid and (count not in (2, 3) or is_any != "0"):
+                raise ValueError("Invalid MID source argument shape")
             expected = {"string-intrinsic-kind", "string-intrinsic-count", "string-intrinsic-any"}
             expected.update(f"string-intrinsic-argument-{ordinal}" for ordinal in range(1, count + 1))
             if keys != expected:
@@ -1904,7 +1911,9 @@ class Model:
                 selected = self.types[int(expression[13])]
                 if selected[18] != "runtime" or selected[3] != "procedure":
                     raise ValueError("String intrinsic lacks a selected runtime")
-                if is_trim:
+                if is_mid:
+                    aliases = {"FB_STRMID"}
+                elif is_trim:
                     family = kind.upper() + ("ANY" if is_any == "1" else "EX" if count == 2 else "")
                     aliases = {"FB_" + family, "FB_WSTR" + family, "FB_USTR" + family}
                 else:
@@ -2182,10 +2191,12 @@ class Model:
             keys = {key for key in properties if key.startswith("original-float-")}
             module = subject_modules.get((domain, identity))
             available = module is not None and self.capabilities[module].get("original-float-literal-inputs") == "available"
+            has_transport = module is not None and self.capabilities[module].get("macro-numeric-payloads") == "available"
             decimal_float = properties.get("numeric-literal-kind") == "float" and properties.get("numeric-literal-base") == "decimal"
             if not keys and not (available and decimal_float):
                 continue
-            if domain != "expression" or not available or not decimal_float or keys != required:
+            expected = required | {"original-float-provenance"} if has_transport else required
+            if domain != "expression" or not available or not decimal_float or keys != expected:
                 raise ValueError("Incomplete original float literal inputs")
             text = properties["original-float-text"]
             complete = properties["original-float-text-complete"]
@@ -2198,12 +2209,32 @@ class Model:
             mantissa = re.split("[eEdD]", text, maxsplit=1)[0]
             observed_digits = len(mantissa.replace(".", "").lstrip("0"))
             if complete == "1":
-                if not re.fullmatch(r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eEdD][+-]?[0-9]+)?", text):
+                # The compiler accepts an omitted exponent as zero, even
+                # after its sign. Preserve the observed spelling unchanged.
+                if not re.fullmatch(r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eEdD][+-]?[0-9]*)?", text):
                     raise ValueError("Invalid complete original float literal")
                 if digits != observed_digits or (exponent == "1") != bool(re.search("[eEdD]", text)):
                     raise ValueError("Original float literal counts disagree with spelling")
             elif len(text) != 1024 or digits < observed_digits:
                 raise ValueError("Invalid truncated original float literal")
+            if has_transport:
+                parts = properties["original-float-provenance"].split("\t")
+                if len(parts) != 3 or parts[0] not in ("source", "transported", "generated"):
+                    raise ValueError("Invalid original float provenance shape")
+                origin, expansion_text, offset_text = parts
+                expansion, offset = number(expansion_text, 0), number(offset_text, 0)
+                start = self.macro_origins.get(("expression", identity, "start"), 0)
+                if origin == "source":
+                    if expansion or offset or start:
+                        raise ValueError("Source float payload has a macro origin")
+                else:
+                    invocation = self.macro_invocations.get(expansion)
+                    result = self.macro_results.get(expansion)
+                    unit = properties.get("macro-input-unit:" + expansion_text)
+                    if (not expansion or start != expansion or invocation is None or result is None
+                            or int(self.source_contexts[int(invocation[4])][4]) != module
+                            or unit is None or number(unit, 0) != offset or offset >= number(result[4], 0)):
+                        raise ValueError("Float payload does not belong to its macro input")
             kind = properties["original-float-initializer"]
             symbol_id = number(properties["original-float-initializer-symbol"], 0)
             if kind == "value":
@@ -2691,10 +2722,62 @@ class Model:
             if branch not in self.conditional_decisions or self.conditional_decisions[branch][4] != "0":
                 raise ValueError("Selected branch advertises an inactive region")
 
+    def validate_parsed_expression_inputs(self) -> None:
+        """Check statement coverage independently of operand capture counters."""
+        observed: Counter[int] = Counter()
+        iif_observed: Counter[int] = Counter()
+        incomplete: set[int] = set()
+        for identity, row in self.expression_operands.items():
+            statement = self.statement_owners.get(("expression", identity))
+            if statement is None:
+                continue
+            observed[statement] += 1
+            if row[4] == "0" or (row[2] in ("binary", "intrinsic-binary") and row[5] == "0"):
+                incomplete.add(statement)
+        for row in self.records['H']:
+            if row[5] == 'parsed-iif':
+                statement = self.statement_owners.get(('expression', int(row[4])))
+                if statement is not None:
+                    iif_observed[statement] += 1
+        for (domain, owner), properties in self.properties.items():
+            for key in properties:
+                prefix = next((value for value in ("parsed-operand-count:", "parsed-expression-inputs:", "parsed-iif-count:")
+                               if key.startswith(value)), None)
+                if prefix is None:
+                    continue
+                statement = number(key[len(prefix):], 1)
+                source = self.statements.get(statement)
+                if domain != "symbol" or source is None or int(source[4]) != owner:
+                    raise ValueError("Parsed expression coverage has a dangling or wrong statement owner")
+                feature = 'parsed-iif-input-counts' if prefix == 'parsed-iif-count:' else 'parsed-expression-input-coverage'
+                if self.capabilities[int(source[7])].get(feature) != "available":
+                    raise ValueError("Parsed expression receipt lacks its available capability")
+        for statement, source in self.statements.items():
+            if self.capabilities[int(source[7])].get('parsed-iif-input-counts') == 'available':
+                count = self.properties['symbol', int(source[4])].get(f'parsed-iif-count:{statement}')
+                if count is None or number(count, 0) != iif_observed[statement]:
+                    raise ValueError('Parsed IIf count disagrees with statement-owned occurrences')
+            if self.capabilities[int(source[7])].get("parsed-expression-input-coverage") != "available":
+                continue
+            properties = self.properties["symbol", int(source[4])]
+            count = properties.get(f"parsed-operand-count:{statement}")
+            coverage = properties.get(f"parsed-expression-inputs:{statement}")
+            if count is None or coverage not in ("available", "unavailable"):
+                raise ValueError("Parsed expression coverage is missing or has an invalid status")
+            if number(count, 0) != observed[statement]:
+                raise ValueError("Parsed operand count disagrees with statement-owned EX receipts")
+            if coverage == "available" and (statement in incomplete or self.statement_endings[statement][3] != "parsed"):
+                raise ValueError("Incomplete parsed operand inputs advertise complete coverage")
+
     def validate_nodes(self) -> None:
         """Check payload meaning independently of the exporter's record totals."""
         auxiliary: dict[tuple[int, str], list[int]] = defaultdict(list)
         assembly: dict[int, list[list[str]]] = defaultdict(list)
+        # N owns a tree in parent-before-child order. Right edges from CALL
+        # and ARG form the ABI list; an ARG's left operand can contain its
+        # own nested call. Each argument therefore belongs to one count only.
+        right_children = {int(node[2]): identity for identity, node in self.nodes.items()
+                          if node[3] == "right"}
         for row in self.records["ASM"]:
             assembly[int(row[1])].append(row)
         for identity, node in self.nodes.items():
@@ -2720,6 +2803,10 @@ class Model:
                 raise ValueError("Unknown call dispatch kind")
             if kind == "argument" and properties["passing-mode"] not in ("default", "byval", "byref", "bydesc"):
                 raise ValueError("Unknown argument passing mode")
+            if kind == "argument":
+                parent = self.nodes.get(int(node[2]))
+                if node[3] != "right" or parent is None or parent[4] not in ("9", "22"):
+                    raise ValueError("Argument node lacks call-chain ownership")
             if kind == "assembly":
                 tokens = assembly.pop(identity, [])
                 if not complete_ordinals([number(row[2], 0) for row in tokens],
@@ -2741,6 +2828,15 @@ class Model:
         for identity in self.nodes:
             properties = self.properties["node", identity]
             if properties["kind"] == "call":
+                count = 0
+                child = right_children.get(identity)
+                while child is not None:
+                    if self.nodes[child][4] != "22":
+                        raise ValueError("Call argument chain contains a non-argument node")
+                    count += 1
+                    child = right_children.get(child)
+                if number(properties["argument-count"], 0) != count:
+                    raise ValueError("Call argument count disagrees with its native chain")
                 if not complete_ordinals(auxiliary.get((identity, "copyback"), []),
                                          number(properties["copyback-count"], 0)):
                     raise ValueError("Call copyback actions are incomplete")

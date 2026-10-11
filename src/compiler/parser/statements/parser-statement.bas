@@ -44,6 +44,8 @@ sub cStatement()
 	end if
 
 	do
+		dim as integer saved_call_parsed = parser.stmt.call_parsed
+		parser.stmt.call_parsed = FALSE
 		dim as LEX_LOCATION source = lexGetCurrentLocation( )
 		dim as integer errors_before = errGetCount( )
 		dim as longint statement = fbSemanticModelStatementBegin(source, lexGetToken( ), lexGetClass( ))
@@ -63,6 +65,7 @@ sub cStatement()
 		end if
 		dim as LEX_LOCATION ending = lexGetLastLocation( )
 		fbSemanticModelStatementEnd(statement, route, ending, errors_before)
+		parser.stmt.call_parsed = saved_call_parsed
 
 		'' ':'?
 		if( lexGetToken( ) <> FB_TK_STMTSEP ) then

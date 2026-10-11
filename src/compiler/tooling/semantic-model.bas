@@ -2840,6 +2840,7 @@ sub fbSemanticModelExportExpression _
 		(observed_end.end_column < 0) or _
 		((observed_end.end_line = observed_start.start_line) and _
 		 (observed_end.end_column <= observed_start.start_column))) then
+		if( force_nonphysical_range = FALSE ) then fbSemanticModelStatementExpressionMissing( )
 		exit sub
 	end if
 
@@ -3311,7 +3312,10 @@ end sub
 
 sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
 	if( fbSemanticModelEnabled( ) = FALSE ) then exit sub
-	if( semantic_model_active_expression_start.start_line < 1 ) then exit sub
+	if( semantic_model_active_expression_start.start_line < 1 ) then
+		if( expr <> NULL ) then fbSemanticModelStatementExpressionMissing( )
+		exit sub
+	end if
 	dim as LEX_LOCATION source_end = lexGetLastLocation( )
 	fbSemanticModelExportExpression(expr, semantic_model_active_expression_start, _
 		source_end, semantic_model_active_expression_nonphysical, _
@@ -3383,7 +3387,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
-	for capability as integer = 0 to 110
+	for capability as integer = 0 to 113
 		dim as string feature, coverage
 		select case capability
 		case 0: feature = "symbol-identities": coverage = iif(semantic_model_expressions_only, "unavailable", "available")
@@ -3493,6 +3497,9 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		case 108: feature = "parsed-string-format-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 109: feature = "parsed-unary-prefixes": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 110: feature = "original-float-literal-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 111: feature = "parsed-expression-input-coverage": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 112: feature = "parsed-iif-input-counts": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 113: feature = "macro-numeric-payloads": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
 		case 54: feature = "select-case-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 55: feature = "select-case-lowering-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 56: feature = "target-wide-literal-prefixes": coverage = iif(fbSemanticModelFullEnabled( ) and _

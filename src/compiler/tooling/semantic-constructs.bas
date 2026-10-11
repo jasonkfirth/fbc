@@ -38,6 +38,10 @@ type SEMANTIC_SOURCE_STATEMENT
 	assignment_count as longint
 	array_dimension_count as longint
 	string_literal_count as longint
+	operand_capture_count as longint
+	operand_export_count as longint
+	iif_input_count as longint
+	expression_inputs_missing as integer
 end type
 
 type SEMANTIC_SOURCE_COMPOUND
@@ -174,6 +178,34 @@ function fbSemanticModelCurrentStatement( ) as longint
 	return semantic_statements[semantic_statement_depth - 1].identity
 end function
 
+'' Capture happens before folding; each source operation is then exported
+'' once. Their counts prove whether original operand inputs are complete.
+'' The current statement owns these observations, including nested headers.
+sub fbSemanticModelStatementOperandCapture( byval complete as integer )
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (semantic_statement_depth = 0) ) then exit sub
+	with semantic_statements[semantic_statement_depth - 1]
+		.operand_capture_count += 1
+		if( complete = FALSE ) then .expression_inputs_missing = TRUE
+	end with
+end sub
+
+sub fbSemanticModelStatementOperandExport( )
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (semantic_statement_depth = 0) ) then exit sub
+	semantic_statements[semantic_statement_depth - 1].operand_export_count += 1
+end sub
+
+'' Count parsed built-in IIf occurrences independently of their H/K payload.
+'' Synthetic conditional nodes created by lowering never call this observer.
+sub fbSemanticModelStatementIifInput( )
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (semantic_statement_depth = 0) ) then exit sub
+	semantic_statements[semantic_statement_depth - 1].iif_input_count += 1
+end sub
+
+sub fbSemanticModelStatementExpressionMissing( )
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (semantic_statement_depth = 0) ) then exit sub
+	semantic_statements[semantic_statement_depth - 1].expression_inputs_missing = TRUE
+end sub
+
 function fbSemanticModelStatementSite( ) as LEX_LOCATION
 	dim as LEX_LOCATION source
 	if( semantic_statement_depth > 0 ) then source = semantic_statements[semantic_statement_depth - 1].source
@@ -241,6 +273,10 @@ function fbSemanticModelStatementBegin( byref source as LEX_LOCATION, byval toke
 		.assignment_count = 0
 		.array_dimension_count = 0
 		.string_literal_count = 0
+		.operand_capture_count = 0
+		.operand_export_count = 0
+		.iif_input_count = 0
+		.expression_inputs_missing = FALSE
 		.counter_observed = FALSE
 		.step_observed = FALSE
 		.if_slot = 0
@@ -295,6 +331,17 @@ sub fbSemanticModelStatementEnd( byval identity as longint, byref route as const
 	fbSemanticModelAppendProvenance("STE" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + route + TABCHAR + outcome + TABCHAR + hLocation(end_site))
 	if( fbSemanticModelFullEnabled( ) ) then
 		with semantic_statements[semantic_statement_depth]
+			dim as string inputs = "unavailable"
+			if( (outcome = "parsed") and (.expression_inputs_missing = FALSE) and _
+				(.operand_capture_count = .operand_export_count) ) then inputs = "available"
+			'' Count actual EX receipts even when input coverage is unavailable.
+			'' Readers can then detect omissions without certifying completeness.
+			fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+				TABCHAR + "parsed-operand-count:" + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(.operand_export_count))
+			fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+				TABCHAR + "parsed-expression-inputs:" + fbSemanticModelNumber(identity) + TABCHAR + inputs)
+			fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
+				TABCHAR + "parsed-iif-count:" + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(.iif_input_count))
 			fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _
 				TABCHAR + "assignment-count:" + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(.assignment_count))
 			fbSemanticModelAppendDetail("H" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(.owner) + _

@@ -307,4 +307,46 @@ It compares disabled, full and compact emission across GCC, Clang, LLVM and gas6
 damaged identities and ownership, and accepts older producers without this
 capability.
 
+`numeric_macro_payloads.py` checks original decimal numeric observations carried
+alongside canonical macro replacement buffers. With `macro-numeric-payloads`
+available, each original floating literal also requires
+`original-float-provenance`: an escaped three-field value containing its kind,
+macro attempt identity and replacement-unit offset. `source` uses zero identity
+and offset; `transported` retains a captured definition or argument payload;
+`generated` describes newly re-lexed output without that source payload. Macro
+identities and offsets must agree with the expression's existing `MR` start and
+`macro-input-unit` receipts. A missing receipt cannot silently become source text.
+
+Payloads retain the existing 1024-character observation bound and honest
+completeness flag. Physical adjacency allows PP's split leading-dot tokens to
+share an original payload, while token pastes retain generated provenance.
+Character lookahead counts toward logical replacement positions, independently
+of physical coordinates. These observations do not change numeric parsing,
+canonical clipping, suffix selection, warnings or emitted code. Consumers must
+keep the original spelling separate from the current typed constant value.
+
+The focused tests cover definition/argument storage, nested aliases, repeated
+parameters, trimming, leading dots, omitted exponents, undef/redefinition, six
+encodings, compact exclusion, incomplete payloads, growing storage and module
+reset. Damaged provenance and capabilities are rejected independently. Older
+models without the new capability retain their original six-field contract.
+
+`parsed_expression_coverage.py` checks statement-owned `parsed-operand-count`,
+`parsed-expression-inputs`, and `parsed-iif-count` receipts. The independent
+reader matches the operation count to owned EX rows and the IIf count to parsed
+IIf H groups. It rejects missing, duplicated, mismatched or foreign-owner
+receipts, and accepts explicit unavailability and legacy models without the
+new capabilities. This keeps incomplete parser inputs from appearing complete
+just because some expression rows were emitted.
+
+Both readers validate each native CALL's `argument-count` against its right-edge
+ARG chain. Hidden receivers and omitted/default arguments count as actual ARG
+nodes; an ARG's left subtree is its operand and can contain a separate nested
+CALL. Non-ARG chain children and ARG nodes outside a CALL/ARG right-edge chain
+are malformed facts. Validation is linear in the observed AST and does not
+infer source order, formal arity or external-call behavior. Existing producers
+already export these counts and relationships; no new capability is needed.
+`test_native_call_argument_counts_and_chains` covers zero/fixed/variadic calls,
+defaults, nested calls, 201 arguments and damaged counts or chain ownership.
+
 <!-- end of README.md -->

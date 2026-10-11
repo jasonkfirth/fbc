@@ -2323,8 +2323,7 @@ private sub cAutoVarDecl( byval baseattrib as FB_SYMBATTRIB )
 		'' (before adding the symbol, so that it can't be used in the initializer)
 		dim expr as ASTNODE ptr
 		dim as integer semantic_literal_scope
-		if( (parser.scope <= FB_MAINSCOPE) or ((attrib and FB_SYMBATTRIB_STATIC) <> 0) ) then _
-			semantic_literal_scope = fbSemanticModelBeginLiteralInitializer(FB_SEM_LITERAL_STATIC)
+		semantic_literal_scope = fbSemanticModelBeginLiteralInitializer(FB_SEM_LITERAL_VARIABLE)
 		var is_byref = (attrib and FB_SYMBATTRIB_REF) orelse (sym andalso symbIsRef( sym ))
 		if( is_byref ) then
 			'' Reference; must be initialized with a var/deref, not an arbitrary expression

@@ -10,6 +10,14 @@
 #include once "lexer/lex.bi"
 
 declare sub fbSemanticModelResetMacros( )
+'' Immutable numeric payload chains accompany canonical replacement text.
+'' They are observations only; none of these hooks changes the stored text.
+declare sub fbSemanticModelMacroNumericCapture _
+	( byref head as integer, byval token as FBTOKEN ptr, byval offset as integer )
+declare sub fbSemanticModelMacroNumericTrim( byval head as integer, byval units as integer )
+declare sub fbSemanticModelMacroNumericSegment _
+	( byval identity as longint, byval head as integer, byval offset as integer, byval units as integer )
+declare sub fbSemanticModelMacroNumericRestore( byref token as FBTOKEN )
 declare function fbSemanticModelMacroBegin( byval sym as FBSYMBOL ptr, byref source as LEX_LOCATION ) as longint
 declare sub fbSemanticModelMacroEnter( byval identity as longint, byref previous as longint )
 declare sub fbSemanticModelMacroLeave( byval previous as longint, byref phase as const string )

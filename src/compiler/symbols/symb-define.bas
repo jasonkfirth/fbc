@@ -1852,6 +1852,7 @@ function symbAddDefine _
 	*sym->def.text = *text
 	sym->lgt = lgt
 	sym->def.params = 0
+	sym->def.semantic_numeric_head = 0
 	sym->def.paramhead = NULL
 	sym->def.isargless = isargless
 	sym->def.dprocz = proc
@@ -1891,6 +1892,7 @@ function symbAddDefineW _
 	*sym->def.textw = *text
 	sym->lgt = lgt
 	sym->def.params = 0
+	sym->def.semantic_numeric_head = 0
 	sym->def.paramhead = NULL
 	sym->def.isargless = isargless
 	sym->def.dprocz = proc
@@ -1927,6 +1929,7 @@ function symbAddDefineMacro _
 
 	sym->def.tokhead = tokhead
 	sym->def.params = params
+	sym->def.semantic_numeric_head = 0
 	sym->def.paramhead = paramhead
 	sym->def.isargless = FALSE
 	sym->def.mprocz = NULL
@@ -2027,6 +2030,7 @@ function symbAddDefineTok _
 	''
 	t->type = dtype
 	t->semantic_paste_before = FALSE
+	t->semantic_numeric_head = 0
 	select case as const dtype
 	case FB_DEFTOK_TYPE_TEX
 		t->text = NULL

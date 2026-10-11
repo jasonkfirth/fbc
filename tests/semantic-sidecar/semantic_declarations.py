@@ -5,7 +5,7 @@ Responsibilities: Group completion, native symbols, formal coverage and bounds.
 This file intentionally does NOT parse source or infer declaration policy.
 """
 
-def validate_declaration_types(model, number, subject_modules):
+def validate_declaration_types(model, number, subject_modules, procedure_headers=()):
     groups, endings, inputs, formals, statements = {}, {}, {}, {}, set()
     array_symbols = {int(row[1]) for row in model.records['A']}
     work_left = 8000000
@@ -93,6 +93,11 @@ def validate_declaration_types(model, number, subject_modules):
         if model.capabilities[module].get('declaration-typing-inputs') == 'available' and 'formal-span-kind' in model.properties['symbol', identity] and identity not in formals:
             raise ValueError('Original formal lacks its written type')
     for identity, statement in model.statements.items():
+        # CONST also qualifies methods. A compiler-owned, fully validated
+        # procedure header is not a variable declaration and has no type
+        # group. Do not infer this exception from source spelling alone.
+        if identity in procedure_headers:
+            continue
         if int(statement[9]) in (306, 307, 308, 309, 311, 335) and model.statement_endings[identity][2] == 'declaration' and model.capabilities[int(statement[7])].get('declaration-typing-inputs') == 'available' and identity not in statements:
             raise ValueError('Accepted declaration lacks its type group')
 

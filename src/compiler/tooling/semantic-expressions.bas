@@ -9,6 +9,7 @@
 #include once "tooling/semantic-private.bi"
 #include once "parser/parser.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-constructs.bi"
 #include once "tooling/semantic-source.bi"
 #include once "tooling/semantic-coordinates.bi"
 #include once "tooling/semantic-macros.bi"
@@ -158,7 +159,7 @@ dim shared as SEMANTIC_LITERAL_LINK ptr literal_links
 
 function fbSemanticModelBeginLiteralInitializer(byval kind as integer) as integer
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then return 0
-	if( (kind <> FB_SEM_LITERAL_CONSTANT) and (kind <> FB_SEM_LITERAL_STATIC) ) then
+	if( (kind <> FB_SEM_LITERAL_CONSTANT) and (kind <> FB_SEM_LITERAL_STATIC) and (kind <> FB_SEM_LITERAL_VARIABLE) ) then
 		fbSemanticModelFailAt("invalid float literal initializer kind"): return 0
 	end if
 	if( literal_scope_depth >= SEMANTIC_LITERAL_SCOPE_LIMIT ) then
@@ -188,6 +189,14 @@ sub fbSemanticModelEndLiteralInitializer(byval scope_id as integer, byval subjec
 			fbSemanticModelFailAt("float literal initializer subject unavailable")
 		else
 			dim as string kind = iif(literal_scopes(scope_id - 1).kind = FB_SEM_LITERAL_CONSTANT, "constant", "static")
+			'' AUTO/VAR adds its symbol after parsing the input. Main-scope VAR
+			'' can still have automatic storage in the generated main procedure.
+			'' Use the accepted symbol, not the parser's current nesting depth.
+			if( literal_scopes(scope_id - 1).kind = FB_SEM_LITERAL_VARIABLE ) then
+				if( symbIsLocal(subject) and (symbIsStatic(subject) = FALSE) ) then
+					kind = "value": symbol_id = 0
+				end if
+			end if
 			while( link > 0 )
 				if( (link > literal_link_count) or (literal_links[link - 1].previous >= link) ) then
 					fbSemanticModelFailAt("invalid float literal initializer chain"): exit while
@@ -264,6 +273,19 @@ sub fbSemanticModelNumericLiteralExpression(byval expr as ASTNODE ptr, byval tok
 			fbSemanticModelNumber(abs(token->numeric_original_length <= 1024)))
 		fbSemanticModelAppendDetail(prefix + "original-float-digits" + TABCHAR + fbSemanticModelNumber(token->numeric_original_digits))
 		fbSemanticModelAppendDetail(prefix + "original-float-exponent" + TABCHAR + fbSemanticModelNumber(abs(token->numeric_original_exponent)))
+		if( fbSemanticModelMacroProvenanceEnabled( ) ) then
+			'' Source and transported payloads describe the written input. A
+			'' generated payload describes only newly re-lexed replacement text;
+			'' consumers must not mistake its complete prefix for original text.
+			dim as string provenance = "source"
+			dim as longint expansion = token->source.macro_identity, offset = 0
+			if( expansion <> 0 ) then
+				provenance = iif(token->numeric_payload > 0, "transported", "generated")
+				if( token->source.macro_unit_valid ) then offset = token->source.macro_start_unit
+			end if
+			fbSemanticModelAppendDetail(prefix + "original-float-provenance" + TABCHAR + _
+				fbSemanticModelEscape(provenance + TABCHAR + fbSemanticModelNumber(expansion) + TABCHAR + fbSemanticModelNumber(offset)))
+		end if
 		hFloatLiteralContext(identity)
 	end if
 end sub
@@ -545,6 +567,8 @@ function fbSemanticModelCaptureOperands _
 	dim as longint left_id = 0, right_id = 0
 	if( left_expr <> NULL ) then left_id = left_expr->semantic_expression
 	if( right_expr <> NULL ) then right_id = right_expr->semantic_expression
+	fbSemanticModelStatementOperandCapture((left_id > 0) and _
+		((right_expr = NULL) or (right_id > 0)))
 	'' Bindings-only exports never assign expression IDs. Missing observations
 	'' remain zero instead of being guessed from a node address or source range.
 	if( (left_id = 0) and (right_id = 0) ) then return 0
@@ -800,6 +824,7 @@ sub fbSemanticModelExportOperands(byval node as ASTNODE ptr, byval identity as l
 		'' retain their existing source-expression links without inventing ops.
 		if( .result <> 0 ) then exit sub
 		.result = identity
+		fbSemanticModelStatementOperandExport( )
 		if( .selected_numeric ) then
 			fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + _
 				TABCHAR + "numeric-selected-left-dtype" + TABCHAR + fbSemanticModelNumber(.selected_left_dtype))
@@ -1760,16 +1785,18 @@ function fbSemanticModelOriginalExpression _
 	return operand->semantic_expression
 end function
 
-'' CHR can consume every argument while producing a literal. TRIM lowers ANY
-'' to a runtime selection. Capture only immutable E identities before either
-'' path consumes AST storage; this module never owns the parser's argument ASTs.
+'' CHR can consume every argument while producing a literal, while MID lowers
+'' a missing length to a synthetic runtime argument. TRIM lowers ANY to a
+'' runtime selection. Capture immutable E identities before those paths consume
+'' AST storage; this module never owns the parser's argument ASTs.
 sub fbSemanticModelStringIntrinsic _
 	( byval result as ASTNODE ptr, byref kind as const string, byval count as integer, _
 	  arguments() as longint, byval is_any as integer, byref source_start as LEX_LOCATION, _
 	  byval nonphysical_start as longint )
 	if( (fbSemanticModelFullEnabled( ) = FALSE) or (result = NULL) ) then exit sub
 	if( lex.ctx->semantic_probe ) then exit sub
-	'' The grammar permits at most 32 CHR arguments and two TRIM arguments.
+	'' The grammar permits at most 32 CHR arguments, two TRIM arguments, and
+	'' three MID arguments.
 	if( (count < 1) or (count > 32) or (lbound(arguments) <> 0) or (ubound(arguments) < count - 1) ) then
 		fbSemanticModelFailAt("semantic-expressions.bas:865")
 		exit sub
@@ -1815,6 +1842,7 @@ sub fbSemanticModelIifInputs _
 	  byval nonphysical_start as longint, byval nonphysical_end as longint )
 	if( (fbSemanticModelFullEnabled( ) = FALSE) or (result = NULL) ) then exit sub
 	if( lex.ctx->semantic_probe ) then exit sub
+	fbSemanticModelStatementIifInput( )
 	if( (condition_id <= 0) or (true_id <= condition_id) or (false_id <= true_id) ) then
 		fbSemanticModelFailAt("original IIf operands unavailable")
 		exit sub

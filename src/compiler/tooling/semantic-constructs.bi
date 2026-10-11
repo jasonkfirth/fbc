@@ -13,6 +13,10 @@ declare sub fbSemanticModelResetConstructs( )
 declare function fbSemanticModelStatementBegin( byref source as LEX_LOCATION, byval token as integer, byval token_class as integer ) as longint
 declare sub fbSemanticModelStatementEnd( byval identity as longint, byref route as const string, byref ending as LEX_LOCATION, byval errors_before as integer )
 declare function fbSemanticModelCurrentStatement( ) as longint
+declare sub fbSemanticModelStatementOperandCapture( byval complete as integer )
+declare sub fbSemanticModelStatementOperandExport( )
+declare sub fbSemanticModelStatementIifInput( )
+declare sub fbSemanticModelStatementExpressionMissing( )
 declare function fbSemanticModelConstructBegin( byval token as integer ) as longint
 declare sub fbSemanticModelConstructEnd( byval identity as longint, byref ending as LEX_LOCATION )
 declare sub fbSemanticModelAssociateStatement( byref domain as const string, byval subject as longint, byval statement as longint = 0 )

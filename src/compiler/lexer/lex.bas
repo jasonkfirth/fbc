@@ -578,6 +578,13 @@ function lexGetNonphysicalTokenCount( ) as longint
 	function = lex.ctx->nonphysical_token_count
 end function
 
+function lexGetMacroRemainingUnits( ) as longint
+	'' Character lookahead advances defptr before lexEatChar consumes the
+	'' current character. Count those cached units when measuring a token;
+	'' deflen alone is short by one for a leading-dot numeric lookahead.
+	return clngint(lex.ctx->deflen) + abs(lex.ctx->lahdchar1 <> UINVALID) + abs(lex.ctx->lahdchar2 <> UINVALID)
+end function
+
 function lexEatWhitespace( ) as integer
 
 	function = FALSE
@@ -1195,7 +1202,17 @@ private sub hObserveNumericChar(byref t as FBTOKEN, byval c as uinteger)
 		end if
 		exit sub
 	end if
-	if( (c = CHAR_0) and (t.numeric_original_length = 0) and (t.numeric_original_dot = FALSE) ) then exit sub
+	if( (c = CHAR_0) and (t.numeric_original_length = 0) and (t.numeric_original_dot = FALSE) ) then
+		'' PP scanners can split .0001 into a dot and an integer token. Retain
+		'' the omitted zero count so transport can join those observed pieces
+		'' without changing the canonical integer spelling or runtime value.
+		if( t.numeric_original_leading_zeros >= 1048576 ) then
+			fbSemanticModelFailAt("original float leading zero limit exceeded")
+		else
+			t.numeric_original_leading_zeros += 1
+		end if
+		exit sub
+	end if
 	if( (c = CHAR_ELOW) or (c = CHAR_EUPP) or (c = CHAR_DLOW) or (c = CHAR_DUPP) ) then
 		if( t.numeric_original_length = 0 ) then
 			t.numeric_original[0] = CHAR_0
@@ -1338,6 +1355,9 @@ private sub hReadFloatNumber _
 	end select
 
 
+	'' Retain the core boundary before a suffix is consumed. Definition and
+	'' argument scanners leave suffixes as separate replacement pieces.
+	t.numeric_macro_units = lexGetMacroRemainingUnits( )
 	select case as const lexCurrentChar( )
 	'' 'F', 'f'?
 	case CHAR_FUPP, CHAR_FLOW
@@ -1522,6 +1542,7 @@ end sub
 ''                | .                             # is def### !!! context sensitive !!!
 ''
 private sub hReadNumber( byref t as FBTOKEN, byval flags as LEXCHECK )
+	dim as longint macro_remaining = lexGetMacroRemainingUnits( )
 	'' Starting with SHORT for the integer literal parser,
 	'' may be changed to USHORT, LONG, ULONG, LONGINT, ULONGINT,
 	'' depending on the literal's size.
@@ -1541,6 +1562,9 @@ private sub hReadNumber( byref t as FBTOKEN, byval flags as LEXCHECK )
 	t.numeric_original_digits = 0
 	t.numeric_original_dot = FALSE
 	t.numeric_original_exponent = FALSE
+	t.numeric_original_leading_zeros = 0
+	t.numeric_payload = 0
+	t.numeric_macro_units = 0
 
 	select case as const lexCurrentChar( )
 	'' integer part
@@ -1586,6 +1610,7 @@ private sub hReadNumber( byref t as FBTOKEN, byval flags as LEXCHECK )
 
 	'' check suffix type
 	if( typeGetClass( t.dtype ) <> FB_DATACLASS_FPOINT ) then
+		t.numeric_macro_units = lexGetMacroRemainingUnits( )
 		if( (flags and LEXCHECK_NOSUFFIX) = 0 ) then
 
 			'' 'U' | 'u'
@@ -1712,6 +1737,8 @@ private sub hReadNumber( byref t as FBTOKEN, byval flags as LEXCHECK )
 
 	t.class = FB_TKCLASS_NUMLITERAL
 	t.id = t.dtype
+	t.numeric_macro_units = macro_remaining - t.numeric_macro_units
+	fbSemanticModelMacroNumericRestore(t)
 end sub
 
 private sub hWarnLongString _

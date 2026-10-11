@@ -44,6 +44,7 @@ type SEMANTIC_MACRO_INVOCATION
 	units as integer
 	resume_length as integer
 	has_output as integer
+	numeric_head as integer
 end type
 dim shared as SEMANTIC_MACRO_INVOCATION ptr semantic_macro_invocations
 dim shared as integer semantic_macro_invocation_count, semantic_macro_invocation_capacity
@@ -64,7 +65,49 @@ dim shared as integer macro_origin_buckets(0 to SEMANTIC_MACRO_ORIGIN_BUCKETS - 
 dim shared as SEMANTIC_MACRO_SYMBOL_ORIGIN ptr macro_symbol_origins
 dim shared as integer macro_symbol_origin_count, macro_symbol_origin_capacity
 
+'' Numeric observations share module ownership with the expansion graph. An
+'' integer handle survives token lookahead, argument-list reuse and reallocation;
+'' no compiler symbol or lexer token owns an observation pointer. Each payload
+'' is bounded by the existing 1024-character original-number contract. Links
+'' contain replacement-buffer units, not physical byte or display coordinates.
+type SEMANTIC_MACRO_NUMBER
+	text as zstring * 1025
+	length as integer
+	digits as integer
+	dot as integer
+	exponent as integer
+	leading_zeros as integer
+	source_context as longint
+	start_line as integer
+	start_column as integer
+	end_line as integer
+	end_column as integer
+end type
+type SEMANTIC_MACRO_NUMBER_LINK
+	payload as integer
+	offset as integer
+	units as integer
+	previous as integer
+end type
+const SEMANTIC_MACRO_NUMBER_LIMIT = 65536
+const SEMANTIC_MACRO_NUMBER_LINK_LIMIT = 262144
+const SEMANTIC_MACRO_NUMBER_WORK_LIMIT = 8388608
+dim shared as SEMANTIC_MACRO_NUMBER ptr macro_numbers
+dim shared as integer macro_number_count, macro_number_capacity
+dim shared as SEMANTIC_MACRO_NUMBER_LINK ptr macro_number_links
+dim shared as integer macro_number_link_count, macro_number_link_capacity
+dim shared as longint macro_number_work
+
 sub fbSemanticModelResetMacros( )
+	deallocate(macro_numbers)
+	macro_numbers = NULL
+	macro_number_count = 0
+	macro_number_capacity = 0
+	deallocate(macro_number_links)
+	macro_number_links = NULL
+	macro_number_link_count = 0
+	macro_number_link_capacity = 0
+	macro_number_work = SEMANTIC_MACRO_NUMBER_WORK_LIMIT
 	deallocate(macro_symbol_origins)
 	macro_symbol_origins = NULL
 	macro_symbol_origin_count = 0
@@ -240,6 +283,208 @@ private function hInvocationIndex( byval identity as longint ) as integer
 	return -1
 end function
 
+'' -------------------------------------------------------------------------
+'' Original numeric payload transport
+'' -------------------------------------------------------------------------
+
+private function hNumberStore(byref item as SEMANTIC_MACRO_NUMBER) as integer
+	if( macro_number_count >= SEMANTIC_MACRO_NUMBER_LIMIT ) then
+		fbSemanticModelFailAt("macro numeric payload limit exceeded"): return 0
+	end if
+	if( macro_number_count = macro_number_capacity ) then
+		dim as integer capacity = iif(macro_number_capacity = 0, 64, macro_number_capacity * 2)
+		dim as SEMANTIC_MACRO_NUMBER ptr storage = reallocate(macro_numbers, capacity * sizeof(SEMANTIC_MACRO_NUMBER))
+		if( storage = NULL ) then
+			fbSemanticModelFailAt("macro numeric payload allocation failed"): return 0
+		end if
+		macro_numbers = storage: macro_number_capacity = capacity
+	end if
+	macro_numbers[macro_number_count] = item
+	macro_number_count += 1
+	return macro_number_count
+end function
+
+private function hNumberLinkCore(byref head as integer, byval payload as integer, _
+	byval offset as integer, byval units as integer) as integer
+	if( macro_number_link_count >= SEMANTIC_MACRO_NUMBER_LINK_LIMIT ) then
+		fbSemanticModelFailAt("macro numeric link limit exceeded"): return FALSE
+	end if
+	if( macro_number_link_count = macro_number_link_capacity ) then
+		dim as integer capacity = iif(macro_number_link_capacity = 0, 128, macro_number_link_capacity * 2)
+		dim as SEMANTIC_MACRO_NUMBER_LINK ptr storage = reallocate(macro_number_links, capacity * sizeof(SEMANTIC_MACRO_NUMBER_LINK))
+		if( storage = NULL ) then
+			fbSemanticModelFailAt("macro numeric link allocation failed"): return FALSE
+		end if
+		macro_number_links = storage: macro_number_link_capacity = capacity
+	end if
+	with macro_number_links[macro_number_link_count]
+		.payload = payload: .offset = offset: .units = units: .previous = head
+	end with
+	macro_number_link_count += 1
+	head = macro_number_link_count
+	return TRUE
+end function
+
+private function hNumberLink(byref head as integer, byval payload as integer, _
+	byval offset as integer, byval units as integer) as integer
+	if( (payload <= 0) or (payload > macro_number_count) or (offset < 0) or (units <= 0) ) then
+		fbSemanticModelFailAt("invalid macro numeric link"): return FALSE
+	end if
+	if( head > 0 ) then
+		if( head > macro_number_link_count ) then
+			fbSemanticModelFailAt("invalid macro numeric preceding link"): return FALSE
+		end if
+		dim as SEMANTIC_MACRO_NUMBER_LINK preceding = macro_number_links[head - 1]
+		if( (preceding.payload <= 0) or (preceding.payload > macro_number_count) or (preceding.previous >= head) ) then
+			fbSemanticModelFailAt("invalid macro numeric preceding payload"): return FALSE
+		end if
+		dim as SEMANTIC_MACRO_NUMBER first = macro_numbers[preceding.payload - 1]
+		dim as SEMANTIC_MACRO_NUMBER second = macro_numbers[payload - 1]
+		'' Join PP's split leading-dot literal only when the original physical
+		'' tokens were adjacent too. Replacement adjacency alone would bless a
+		'' paste across parameters or an explicitly written ## operation.
+		if( (first.text = ".") and (first.length = 1) and (second.dot = FALSE) and _
+			(clngint(preceding.offset) + preceding.units = offset) and _
+			(first.source_context > 0) and (first.source_context = second.source_context) and _
+			(first.end_line = second.start_line) and (first.end_column = second.start_column) ) then
+			dim as SEMANTIC_MACRO_NUMBER joined
+			dim as string remainder = second.text
+			dim as integer synthetic_zero = 0
+			if( (second.leading_zeros > 0) and second.exponent and (left(remainder, 1) = "0") ) then
+				synthetic_zero = 1: remainder = mid(remainder, 2)
+			end if
+			if( (clngint(second.length) + second.leading_zeros > 1048576) or _
+				(clngint(units) + preceding.units > &h7FFFFFFF) ) then
+				fbSemanticModelFailAt("joined macro numeric payload limit exceeded"): return FALSE
+			end if
+			joined.text = "." + left(string(iif(second.leading_zeros > 1023, 1023, second.leading_zeros), "0") + remainder, 1023)
+			joined.length = 1 + second.length + second.leading_zeros - synthetic_zero
+			joined.digits = second.digits: joined.dot = TRUE: joined.exponent = second.exponent
+			joined.source_context = first.source_context
+			joined.start_line = first.start_line: joined.start_column = first.start_column
+			joined.end_line = second.end_line: joined.end_column = second.end_column
+			dim as integer joined_payload = hNumberStore(joined)
+			if( joined_payload = 0 ) then return FALSE
+			'' Keep both fragments as well as their joined view. The NOSUFFIX
+			'' argument scanner will split the leading dot again in nested calls.
+			if( hNumberLinkCore(head, payload, offset, units) = FALSE ) then return FALSE
+			payload = joined_payload
+			offset = preceding.offset: units += preceding.units
+		end if
+	end if
+	return hNumberLinkCore(head, payload, offset, units)
+end function
+
+sub fbSemanticModelMacroNumericCapture _
+	( byref head as integer, byval token as FBTOKEN ptr, byval offset as integer )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	if( lex.ctx->semantic_probe or (token = NULL) ) then exit sub
+	dim as integer dot_fragment = (token->id = CHAR_DOT) and (token->text = ".")
+	if( (token->class <> FB_TKCLASS_NUMLITERAL) and (dot_fragment = FALSE) ) then exit sub
+	'' Nondecimal tokens do not establish a decimal floating spelling. A newly
+	'' generated token must not acquire source provenance merely by re-lexing.
+	if( (dot_fragment = FALSE) and ((token->numeric_original_length < 0) or (left(token->text, 1) = "&")) ) then exit sub
+	if( dot_fragment and (token->source.macro_identity <> 0) ) then
+		token->numeric_payload = 0: token->numeric_macro_units = 1
+		fbSemanticModelMacroNumericRestore(*token)
+	end if
+	if( (token->source.macro_identity <> 0) and (token->numeric_payload = 0) ) then exit sub
+	dim as integer payload = 0
+	if( (dot_fragment = FALSE) or (token->source.macro_identity <> 0) ) then payload = token->numeric_payload
+	if( payload = 0 ) then
+		dim as SEMANTIC_MACRO_NUMBER item
+		if( dot_fragment ) then
+			item.text = ".": item.length = 1: item.dot = TRUE
+		else
+			item.text = token->numeric_original: item.length = token->numeric_original_length
+			item.digits = token->numeric_original_digits: item.dot = token->numeric_original_dot
+			item.exponent = token->numeric_original_exponent: item.leading_zeros = token->numeric_original_leading_zeros
+		end if
+		if( token->source.raw_valid ) then
+			item.source_context = token->source.source_context
+			item.start_line = token->source.raw_start_line: item.start_column = token->source.raw_start_column
+			item.end_line = token->source.raw_end_line: item.end_column = token->source.raw_end_column
+		end if
+		payload = hNumberStore(item)
+		if( payload = 0 ) then exit sub
+	end if
+	hNumberLink(head, payload, offset, len(token->text))
+end sub
+
+sub fbSemanticModelMacroNumericTrim( byval head as integer, byval units as integer )
+	while( head > 0 )
+		macro_number_work -= 1
+		if( (head > macro_number_link_count) or (macro_number_work < 0) ) then
+			fbSemanticModelFailAt("invalid macro numeric trim chain"): exit sub
+		end if
+		with macro_number_links[head - 1]
+			.offset -= units
+			if( (.offset < 0) or (.previous >= head) ) then
+				fbSemanticModelFailAt("invalid trimmed macro numeric offset"): exit sub
+			end if
+			head = .previous
+		end with
+	wend
+end sub
+
+sub fbSemanticModelMacroNumericSegment _
+	( byval identity as longint, byval head as integer, byval offset as integer, byval units as integer )
+	if( (head = 0) or (identity = 0) or (fbSemanticModelFullEnabled( ) = FALSE) ) then exit sub
+	dim as integer index = hInvocationIndex(identity)
+	if( index < 0 ) then exit sub
+	while( head > 0 )
+		macro_number_work -= 1
+		if( (head > macro_number_link_count) or (macro_number_work < 0) ) then
+			fbSemanticModelFailAt("invalid macro numeric segment chain"): exit sub
+		end if
+		'' Copy before growing the link array: reallocation invalidates pointers.
+		dim as SEMANTIC_MACRO_NUMBER_LINK item = macro_number_links[head - 1]
+		if( (item.previous >= head) or (item.offset < 0) or (item.offset > units - item.units) or _
+			(offset < 0) or (clngint(offset) + item.offset > &h7FFFFFFF) ) then
+			fbSemanticModelFailAt("invalid macro numeric segment bounds"): exit sub
+		end if
+		if( hNumberLink(semantic_macro_invocations[index].numeric_head, item.payload, offset + item.offset, item.units) = FALSE ) then exit sub
+		head = item.previous
+	wend
+end sub
+
+sub fbSemanticModelMacroNumericRestore( byref token as FBTOKEN )
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or lex.ctx->semantic_probe ) then exit sub
+	if( (token.source.macro_identity = 0) or (token.source.macro_unit_valid = FALSE) ) then exit sub
+	dim as integer index = hInvocationIndex(token.source.macro_identity)
+	if( index < 0 ) then exit sub
+	dim as integer head = semantic_macro_invocations[index].numeric_head
+	while( head > 0 )
+		macro_number_work -= 1
+		if( (head > macro_number_link_count) or (macro_number_work < 0) ) then
+			fbSemanticModelFailAt("invalid macro numeric restore chain"): exit sub
+		end if
+		with macro_number_links[head - 1]
+			if( .previous >= head ) then
+				fbSemanticModelFailAt("cyclic macro numeric restore chain"): exit sub
+			end if
+			'' Exact core boundaries exclude token pastes and reconstructed pieces.
+			'' The suffix remains a compiler type decision and is never restored.
+			if( (.offset = token.source.macro_start_unit) and (.units = token.numeric_macro_units) ) then
+				if( (.payload <= 0) or (.payload > macro_number_count) ) then
+					fbSemanticModelFailAt("invalid macro numeric payload handle"): exit sub
+				end if
+				token.numeric_payload = .payload
+				with macro_numbers[.payload - 1]
+					token.numeric_original = .text
+					token.numeric_original_length = .length
+					token.numeric_original_digits = .digits
+					token.numeric_original_dot = .dot
+					token.numeric_original_exponent = .exponent
+					token.numeric_original_leading_zeros = .leading_zeros
+				end with
+				exit sub
+			end if
+			head = .previous
+		end with
+	wend
+end sub
+
 function fbSemanticModelMacroExpressionLocation _
 	( byref first as LEX_LOCATION, byref last as LEX_LOCATION, byval first_counter as longint, _
 	  byval last_counter as longint, byref invocation as LEX_LOCATION ) as integer
@@ -324,6 +569,7 @@ function fbSemanticModelMacroBegin( byval sym as FBSYMBOL ptr, byref source as L
 			.units = 0
 			.resume_length = 0
 			.has_output = FALSE
+			.numeric_head = 0
 		end with
 		semantic_macro_invocation_count += 1
 	end if
@@ -380,7 +626,7 @@ sub fbSemanticModelMacroTokenStart( byref source as LEX_LOCATION )
 	if( index < 0 ) then exit sub
 	with semantic_macro_invocations[index]
 		if( .has_output = FALSE ) then exit sub
-		dim as longint remaining = clngint(lex.ctx->deflen) - .resume_length
+		dim as longint remaining = lexGetMacroRemainingUnits( ) - .resume_length
 		if( (remaining <= 0) or (remaining > .units) ) then exit sub
 		source.macro_start_unit = .units - remaining
 		source.macro_unit_valid = TRUE

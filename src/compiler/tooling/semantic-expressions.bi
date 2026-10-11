@@ -14,6 +14,7 @@ declare sub fbSemanticModelResetExpressions( )
 
 const FB_SEM_LITERAL_CONSTANT = 1
 const FB_SEM_LITERAL_STATIC = 2
+const FB_SEM_LITERAL_VARIABLE = 3
 declare function fbSemanticModelBeginLiteralInitializer(byval kind as integer) as integer
 declare sub fbSemanticModelEndLiteralInitializer(byval scope_id as integer, byval subject as FBSYMBOL ptr)
 
