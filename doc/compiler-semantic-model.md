@@ -2728,6 +2728,11 @@ statement-local ordinals, matching owners and contexts, typed expressions,
 and exact counts. Compact modes omit inputs and counts and mark both
 capabilities unavailable.
 
+Expressions-only output still retains the compiler-typed `E` range for each
+accepted non-placeholder upper-bound expression. This preserves editor type
+queries for complete dimension spellings such as `0 To 1` without advertising
+the full-model declaration-input receipts.
+
 Full models with `string-literal-lexemes` additionally emit exactly one
 observation for each individual string input:
 

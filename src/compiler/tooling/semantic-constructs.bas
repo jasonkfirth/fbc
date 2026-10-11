@@ -13,6 +13,7 @@ declare sub fbSemanticModelExportExpression _
 	( byval expr as ASTNODE ptr, byref source_start as LEX_LOCATION, byref source_end as LEX_LOCATION, _
 	  byval nonphysical_tokens_at_start as longint, byval nonphysical_tokens_at_end as longint, _
 	  byval semantic_operator_override as integer = -1, byval force_nonphysical_range as integer = FALSE )
+declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
 #include once "tooling/semantic-constructs.bi"
 #include once "tooling/semantic-expressions.bi"
 #include once "parser/parser.bi"
@@ -542,7 +543,15 @@ end sub
 sub fbSemanticModelArrayDimensionInput _
 	( byval upper as ASTNODE ptr, byref route as const string, byval dimension as integer, _
 	  byref source as LEX_LOCATION, byval nonphysical_start as longint )
-	if( fbSemanticModelFullEnabled( ) = FALSE or lex.ctx->semantic_probe ) then exit sub
+	if( lex.ctx->semantic_probe ) then exit sub
+	if( fbSemanticModelExpressionsOnlyEnabled( ) ) then
+		if( upper <> NULL ) then
+			dim as LEX_LOCATION ending = lexGetLastLocation( )
+			fbSemanticModelExportExpression(upper, source, ending, nonphysical_start, lexGetNonphysicalTokenCount( ))
+		end if
+		exit sub
+	end if
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
 	if( semantic_statement_depth = 0 ) then exit sub
 	dim as longint expression = 0
 	if( upper <> NULL ) then

@@ -3256,7 +3256,8 @@ End Sub
         model = Model.read(path)
         model.validate_physical_locations()
         rows = [line.split("\t") for line in path.read_text().splitlines()]
-        index = next(index for index, row in enumerate(rows) if row[0] == "LOC")
+        index = next(index for index, row in enumerate(rows)
+                     if row[0] == "LOC" and row[1] == "expression")
         for field, value in ((1, "unknown"), (2, "999999"), (4, "999999"), (5, "0"),
                              (9, "-2"), (10, "999999"), (11, "unknown")):
             with self.subTest(field=field), self.assertRaises(ValueError):
@@ -4903,6 +4904,23 @@ Next
                     self.assertTrue(all(reduced.capabilities[1][feature] == "unavailable" for feature in features))
                     self.assertFalse(reduced.records["COM"])
                     self.assertEqual(self.emission_path(source.stem, backend).read_bytes(), emission)
+
+    def test_expressions_only_keeps_the_complete_array_dimension_expression(self) -> None:
+        source = self.source("Dim values(0 To 1) As Long\nPrint values(0)\n", "array-dimension-expression.bas")
+        bounds = self.span(source, "0 To 1")
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                self.invoke([source], mode="off", backend=backend)
+                emission = self.emission_path(source.stem, backend).read_bytes()
+                full = self.compile(source, backend=backend)
+                expressions_only = self.compile(source, mode="expressions", backend=backend)
+                full_ranges = [row for row in full.records["E"] if source_range(row, 3) == bounds]
+                expression_ranges = [row for row in expressions_only.records["E"] if source_range(row, 3) == bounds]
+                self.assertTrue(full_ranges, "The complete model must expose the accepted array dimension.")
+                self.assertTrue(expression_ranges, "Expression-only analysis must retain the same typed source range.")
+                self.assertTrue(all(row[15] == "integer" for row in expression_ranges))
+                self.assertEqual(expressions_only.capabilities[1]["array-dimension-inputs"], "unavailable")
+                self.assertEqual(self.emission_path(source.stem, backend).read_bytes(), emission)
 
     def test_include_once_inputs_follow_entered_source_occurrences(self) -> None:
         (self.working / "selected.bi").write_text("' Empty selected header.\n", encoding="utf-8")
