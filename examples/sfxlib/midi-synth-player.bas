@@ -1066,11 +1066,13 @@ dim as double maximum_seconds = val( command( 3 ) )
 dim as integer echo_enabled = iif( lcase( trim( command( 4 ) ) ) = "noecho", 0, 1 )
 
 if( midi_filename = "" ) then
-	midi_filename = exepath() + "\media\harmonized-scale.mid"
+	midi_filename = exepath() + "/media/harmonized-scale.mid"
 end if
 
 if( capture_filename = "" ) then
-	capture_filename = exepath() + "\midi-synth-output.wav"
+	'' The capture writer uses the native C filename. Unlike BASIC file I/O,
+	'' it does not normalize backslashes on Unix. Forward slashes work on both.
+	capture_filename = exepath() + "/midi-synth-output.wav"
 elseif( capture_filename = "-" ) then
 	capture_filename = ""
 end if

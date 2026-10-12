@@ -133,6 +133,8 @@ function astBuildVarDtorCall overload _
 		byval varexpr as ASTNODE ptr _
 	) as ASTNODE ptr
 
+	'' Scalars without a destructor need no cleanup tree.
+	function = NULL
 	if( typeIsDynamicString( astGetDataType( varexpr ) ) ) then
 		function = rtlStrDelete( varexpr )
 	elseif( typeHasDtor( varexpr->dtype, varexpr->subtype ) ) then

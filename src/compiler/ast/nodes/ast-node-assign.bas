@@ -281,8 +281,12 @@ function astCheckASSIGN _
 	function = FALSE
 
 	if( l->class = AST_NODECLASS_USTRINDEX ) then
-		if( astIsConstant( l->l ) ) then return NULL
-		return astBuildUstrIndexAssign( l, r )
+		'' SWAP checks both directions before building either assignment.
+		'' Keep its trees intact: the indexed-write builder consumes them.
+		if( astIsConstant( l->l ) ) then return FALSE
+		if( astCanTakeAddrOf( l->l ) = FALSE ) then return FALSE
+		if( astGetDataClass( r ) >= FB_DATACLASS_STRING ) then return FALSE
+		return astCheckCONV( astGetFullType( l ), l->subtype, r )
 	end if
 
 	ldfull = astGetFullType( l )
@@ -509,6 +513,7 @@ private function hTryAssignOvl _
 	dim as FBSYMBOL ptr proc = any
 	dim as FB_ERRMSG err_num = FB_ERRMSG_OK
 	dim as integer check_letop = TRUE
+	function = FALSE
 
 	if( options and AST_OPOPT_DONTCHKOPOVL ) then
 		exit function

@@ -34,7 +34,10 @@ def private_display(directory: Path, environment: dict[str, str]):
             try:
                 # Xvfb chooses an unused display atomically. Readiness is
                 # signalled through the pipe instead of guessing a delay.
-                command = ["Xvfb", "-displayfd", str(writer), "-screen", "0",
+                # The readiness client exits before the example connects.
+                # Keep the server alive without resetting in that gap; SDL1
+                # can otherwise open X11 while the server is still resetting.
+                command = ["Xvfb", "-noreset", "-displayfd", str(writer), "-screen", "0",
                            "1280x1024x24", "-nolisten", "tcp", "-auth", str(authority)]
                 server = subprocess.Popen(command, pass_fds=(writer,), stdout=log,
                                           stderr=subprocess.STDOUT, start_new_session=True)

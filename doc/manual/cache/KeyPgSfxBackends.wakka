@@ -24,6 +24,8 @@ Output and capture backends used by FreeBASIC's built-in sound library.
 {{fbdoc item="section" value="Testing"}}
 	Set ##SFXLIB_DRIVER=null## before program startup to request the null driver when it is available. That lets a program exercise parsing, linking, mixing, and shutdown without requiring a real audio device.
 
+	For native Linux example checks, ##build_scripts/test-sfx-examples.py## runs both compiler backends with the genuine null driver. It limits diagnostic dumps to 8192 frames, checks finite submitted samples, independently reads the MIDI/stress WAV captures, and opens the composer on its own authenticated X display. These checks cover software execution and file output; they do not establish speaker, microphone or external MIDI-device operation.
+
 {{fbdoc item="see"}}
 	- ##[[KeyPgDevice|DEVICE]]##
 	- ##[[KeyPgCapture|CAPTURE]]##

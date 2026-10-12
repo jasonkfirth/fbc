@@ -889,6 +889,7 @@ def run_command(
     args: argparse.Namespace,
     env: dict[str, str] | None = None,
     preserve_remote_files: bool = False,
+    sync_directory: Path | None = None,
 ) -> tuple[str, float]:
     started = time.monotonic()
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -900,13 +901,15 @@ def run_command(
 
         try:
             if args.remote_shell:
-                synced, remote_cwd = sync_remote_directory(
-                    cwd, args, preserve_existing=preserve_remote_files
+                sync_root = sync_directory or cwd
+                synced, sync_output = sync_remote_directory(
+                    sync_root, args, preserve_existing=preserve_remote_files
                 )
                 if not synced:
-                    log.write(remote_cwd)
+                    log.write(sync_output)
                     return "fail(255)", time.monotonic() - started
 
+                remote_cwd = map_remote_path(str(cwd), args)
                 remote_cmd = [map_remote_path(part, args) for part in cmd]
                 remote_bin_dir = map_remote_path(str(args.outdir / "bin"), args)
                 remote_script = (
@@ -991,6 +994,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
         ("examples", "graphics", "SDL2"),
         ("examples", "graphics", "SDL3"),
     )
+    remote_sync_directory = None
     fmod_manual = rel == "examples/manual/libraries/fmod2.bas"
     pcre_cregex = rel.startswith("examples/regex/PCRE/CRegex/")
     if pcre_cregex:
@@ -999,18 +1003,23 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
         compile_tree = compile_cwd
         compile_cwd /= "CRegex"
         run_cwd /= "CRegex"
+        remote_sync_directory = compile_tree
     if fmod_manual:
         # The manual player shares its metadata helper with the sound example.
         # Preserve that relative include inside this worker's private tree.
         compile_tree = compile_cwd
         compile_cwd /= "manual/libraries"
         run_cwd /= "manual/libraries"
+        remote_sync_directory = compile_tree
     if sdl_generation:
         # Preserve the generation/sublibrary depth so relative references to
-        # SDL_common resolve inside this example's isolated source tree.
+        # SDL_common resolve inside this example's isolated source tree. The
+        # remote runner must archive the parent tree because the shared include
+        # sits beside the generation-specific source directory.
         compile_tree = compile_cwd
         relative = path.parent.relative_to(root / "examples/graphics")
         compile_cwd /= relative
+        remote_sync_directory = compile_tree
         run_cwd /= relative
 
     copy_directories = path.parent != root / "examples"
@@ -1103,6 +1112,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
             dependency_command, cwd=compile_cwd, timeout=args.compile_timeout,
             log_path=dependency_log, args=args,
             env=compile_env,
+            sync_directory=remote_sync_directory,
         )
         if dependency_status != "pass":
             shutil.copy2(dependency_log, compile_log)
@@ -1125,6 +1135,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
                 log_path=dependency_log, args=args,
                 env=compile_env,
                 preserve_remote_files=(index > 0 and args.remote_shell),
+                sync_directory=remote_sync_directory,
             )
             dependency_elapsed += elapsed
             if dependency_status != "pass":
@@ -1143,6 +1154,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
             [command_environment(args, compile_env).get("LD", "ld"), "-r", "-b", "binary", "-o", "hello_txt.o", "hello.txt"],
             cwd=compile_cwd, timeout=args.compile_timeout, log_path=dependency_log, args=args,
             env=compile_env,
+            sync_directory=remote_sync_directory,
         )
         if dependency_status != "pass":
             shutil.copy2(dependency_log, compile_log)
@@ -1162,6 +1174,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
             args=args,
             env=compile_env,
             preserve_remote_files=preserve_remote_files,
+            sync_directory=remote_sync_directory,
         )
         compile_elapsed += dependency_elapsed
         if compile_status == "pass" and not args.remote_shell and not binary.is_file():

@@ -202,8 +202,8 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 
 	proc = n->sym
 
-	if( (env.clopt.backend = FB_BACKEND_GAS) and _
-	    (env.target.options and FB_TARGETOPT_STACKALIGN16) <> 0 ) then
+	if( (env.clopt.backend = FB_BACKEND_GAS) andalso _
+	    ((env.target.options and FB_TARGETOPT_STACKALIGN16) <> 0) ) then
 		'' Add extra stack alignment to ensure the stack pointer will be
 		'' aligned to a multiple of 16 after the arguments were pushed,
 		'' assuming the current stack pointer was already aligned that way

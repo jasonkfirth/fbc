@@ -16,6 +16,8 @@ Optional raw-output, diagnostics, recording, and whole-mix effect interfaces.
 	- ##RawUnderruns()## and ##OutputUnderruns()## report device starvation.  ##OutputSampleRate()## reports the active device rate.
 	- ##OutputCaptureStart()##, ##OutputCaptureReserve(frames)##, ##OutputCaptureStop()##, and ##OutputCaptureSave(filename)## record the final driver-accepted output and save 16-bit PCM WAV.  This is output recording, not microphone capture.
 
+	##OutputCaptureSave## passes its filename to the native C file writer. On Unix, backslashes are ordinary filename characters, so use ##/## as the directory separator. Forward slashes also work with the Windows writer. The MIDI synthesizer and voice-effects stress examples use portable default paths and save their WAV files beside the executable. Check the save result before reporting a completed recording.
+
 	The sample pointer passed to ##RawWrite## must address at least ##frames * channels## values.  Producers should handle partial or zero-frame acceptance without overwriting or discarding the unaccepted tail.
 
 {{fbdoc item="section" value="Whole-mix echo"}}

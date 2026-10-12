@@ -106,8 +106,14 @@ def check(item, args, environment, assets):
                         deadline = time.monotonic() + 10
                         window = None
                         while child.poll() is None and time.monotonic() < deadline:
+                            # X11 can be busy while a software renderer starts.
+                            # Give this query the remaining startup budget;
+                            # a shorter inner timeout defeats the outer bound.
+                            remaining = deadline - time.monotonic()
+                            if remaining <= 0:
+                                break
                             query = subprocess.run(["xdotool", "search", "--onlyvisible", "--pid", str(child.pid)],
-                                                   env=session, capture_output=True, text=True, timeout=3)
+                                                   env=session, capture_output=True, text=True, timeout=remaining)
                             if query.returncode == 0 and query.stdout.strip():
                                 window = query.stdout.splitlines()[-1]
                                 break
@@ -136,8 +142,9 @@ def check(item, args, environment, assets):
                     child.wait(timeout=20)
                     record["run"] = {"exit_code": child.returncode, "timed_out": False,
                                      "log": str(directory / "run.log")}
-                except subprocess.TimeoutExpired:
+                except subprocess.TimeoutExpired as error:
                     record["run"] = {"exit_code": None, "timed_out": True, "log": str(directory / "run.log")}
+                    record["error"] = "Timed out while running: " + str(error.cmd)
                 finally:
                     stop(child)
         run = record["run"]

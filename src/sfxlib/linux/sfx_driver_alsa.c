@@ -7,6 +7,12 @@
     Purpose:
 
         Implement an ALSA audio driver for Linux.
+
+    Responsibilities:
+
+        Open the native PCM, bound write retries and report accepted samples.
+
+    This file contains no mixer implementation or diagnostic-file ownership.
 */
 
 #ifndef DISABLE_LINUX
@@ -267,6 +273,8 @@ static int alsa_driver_write(const float *buffer, int frames)
         return -1;
 
     channels = (fb_sfx_linux.channels > 0) ? fb_sfx_linux.channels : FB_SFX_DEFAULT_CHANNELS;
+    if (frames > INT_MAX / channels)
+        return -1;
     samples = frames * channels;
 
     if (alsa_debug_enabled() && alsa_debug_write_counter < 8)
@@ -305,6 +313,11 @@ static int alsa_driver_write(const float *buffer, int frames)
 
         if (err > 0)
         {
+            /* Report only the prefix ALSA accepted. A short write advances
+               this offset before the remaining samples are retried. */
+            if (err > pending)
+                return (written > 0) ? (int)written : -1;
+            fb_sfxDriverDiagnostics("ALSA", buffer + (written * channels), err, channels);
             written += err;
             remaining -= err;
             retry_count = 0;
@@ -327,7 +340,7 @@ static int alsa_driver_write(const float *buffer, int frames)
             return (written > 0) ? (int)written : -1;
         }
 
-        if (err == -EAGAIN || err == -EINTR)
+        if (err == 0 || err == -EAGAIN || err == -EINTR)
         {
             struct timespec req;
 

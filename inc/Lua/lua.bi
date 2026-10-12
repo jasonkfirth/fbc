@@ -29,6 +29,8 @@
 
 #ifdef __FB_LINUX__
 	#inclib "lua5.3"
+#elseif defined(__FB_FREEBSD__)
+	#inclib "lua-5.3"
 #else
 	#inclib "lua"
 #endif

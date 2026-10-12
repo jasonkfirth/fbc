@@ -44,7 +44,7 @@ private sub hConstConv( byval todtype as integer, byval l as ASTNODE ptr )
 				'' before 0.25 didn't truncate in this case,
 				'' so using an explicit temp var instead)
 				dim as single f = any
-				f = l->val.f
+				f = csng( l->val.f )
 				l->val.f = f
 			end if
 		case FB_SIZETYPE_FLOAT64
@@ -72,7 +72,8 @@ private sub hConstConv( byval todtype as integer, byval l as ASTNODE ptr )
 		case FB_SIZETYPE_INT64
 			l->val.i = clngint( l->val.f )
 		case FB_SIZETYPE_UINT64
-			l->val.i = fbHostFloatToULongint( l->val.f )
+			'' The shared signed value slot retains the unsigned result's bits.
+			l->val.i = clngint( fbHostFloatToULongint( l->val.f ) )
 		end select
 	elseif( typeIsSigned( ldtype ) ) then
 		select case as const( typeGetSizeType( todtype ) )
@@ -97,7 +98,7 @@ private sub hConstConv( byval todtype as integer, byval l as ASTNODE ptr )
 		case FB_SIZETYPE_INT64
 			l->val.i = clngint( l->val.i )
 		case FB_SIZETYPE_UINT64
-			l->val.i = culngint( l->val.i )
+			l->val.i = clngint( culngint( l->val.i ) )
 		end select
 	else
 		select case as const( typeGetSizeType( todtype ) )
@@ -122,7 +123,7 @@ private sub hConstConv( byval todtype as integer, byval l as ASTNODE ptr )
 		case FB_SIZETYPE_INT64
 			l->val.i = clngint( cunsg( l->val.i ) )
 		case FB_SIZETYPE_UINT64
-			l->val.i = culngint( cunsg( l->val.i ) )
+			l->val.i = clngint( culngint( cunsg( l->val.i ) ) )
 		end select
 	end if
 end sub
@@ -384,6 +385,7 @@ private function hCheckSameTypeCONV _
 	) as integer
 
 	dim as integer ldtype = astGetFullType( l )
+	function = FALSE
 
 	if( typeGetDtAndPtrOnly( ldtype ) <> typeGetDtAndPtrOnly( to_dtype ) ) then
 		exit function

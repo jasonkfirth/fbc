@@ -19,7 +19,7 @@ Examples: in examples/sound/BASS/
 {{fbdoc item="section" value="Playback and errors"}}
 	The Linux library uses the legacy OSS device interface. It requires a working ##/dev/dsp## character device, supplied by an OSS driver or a compatible driver such as osspd with an ALSA backend. The library checks device existence before opening it, so an ALSA preload wrapper alone cannot initialize playback when that device is absent.
 
-	Device -1 requests default output. Device -2 disables sound output, and device -3 selects decoding only. Successful initialization with either negative special device does not demonstrate output-device support.
+	Device -1 requests default output. Device -2 disables sound output, and device -3 selects decoding only. Successful initialization with either negative special device does not demonstrate output-device support. The genuine Linux hotfix device -3 decoder passes C/FreeBASIC PCM comparisons and malformed/missing-module checks on both i386 backends. ##build_scripts/test-bassmod.py --decode-only## runs that scoped check without starting a driver. Native OSS playback remains separate.
 
 	The example accepts a module filename as its first command-line argument. With no argument it uses the bundled module relative to the executable's normal example directory. Set ##FB_EXAMPLE_AUTOPLAY=1## for a bounded playback check without keyboard input. Initialization, loading, starting and stopping failures return a nonzero exit status; the library's void cleanup procedures are called before exit.
 

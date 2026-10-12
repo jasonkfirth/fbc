@@ -295,7 +295,10 @@ def execute(source, executable, directory, environment, legacy_http):
             if (state.get("error") or not state.get("request", "").startswith("GET /fb-sdl-check HTTP/1.0")
                     or HTTP_BODY.decode().strip() not in text):
                 record["error"] = "Local HTTP request/response check failed"
-        elif source.name == "events.bas":
+        elif source.name == "events.bas" and record["exit_code"] == 0 and not record.get("error"):
+            # Verify the filter only after normal execution. A video startup
+            # failure must retain its own diagnostic instead of becoming a
+            # misleading failure of the close-event callback.
             if environment.get("FB_SDL12_EVENT_SHORTCUT"):
                 if "Bye bye..." not in text:
                     record["error"] = "Escape and mouse button did not exit"

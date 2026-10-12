@@ -155,7 +155,8 @@ dim as double render_started
 dim as double render_seconds
 
 if( output_file = "" ) then
-	output_file = exepath() + "\voice-effects-stress.wav"
+	'' This filename goes directly to the C capture writer on each platform.
+	output_file = exepath() + "/voice-effects-stress.wav"
 end if
 
 use_null_driver = iif( requested_driver = "null", 1, 0 )

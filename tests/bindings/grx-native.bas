@@ -14,6 +14,12 @@
         Extern hGRXWnd As HWND
     End Extern
 #endif
+#ifdef __FB_LINUX__
+    '' The C helper reads the actual X11 drawable and server colormap.
+    Extern "C"
+        Declare Function grx_check_x11(ByVal cell_width As Long, ByVal cell_height As Long) As Long
+    End Extern
+#endif
 
 Print "ABI "; SizeOf(Any Ptr); " "; SizeOf(GrColor); " "; SizeOf(GrKeyType); " "; _
     SizeOf(GrFrame); " "; OffsetOf(GrFrame, gf_lineoffset); " "; OffsetOf(GrFrame, gf_driver); " "; _
@@ -40,6 +46,9 @@ For row As Long = 0 To 7
     Next column
 Next row
 GrSleep(200)
+#ifdef __FB_LINUX__
+    If result = 0 Then result = grx_check_x11(cell_width, cell_height)
+#endif
 #ifdef __FB_WIN32__
     If result = 0 Then
         Dim As HDC window_dc = GetDC(hGRXWnd)

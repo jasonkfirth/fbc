@@ -17,7 +17,7 @@
 ' (en) http://www.freebasic.net/forum/viewtopic.php?t=18535
 ' (de) http://www.freebasic-portal.de/code-beispiele/grafik-und-fonts/zeichnen-mit-goocanval-ein-graph-226.html
 
-#IFDEF __FB_LINUX__
+#IF defined(__FB_LINUX__) or defined(__FB_FREEBSD__)
 #DEFINE __USE_GTK3__
 #ENDIF
 #INCLUDE ONCE "goocanvas.bi"

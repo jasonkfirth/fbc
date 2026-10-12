@@ -1251,9 +1251,8 @@ private function hWalk _
 	return astNewLINK( hWalk( n->l, n ), hWalk( n->r, n ), AST_LINK_RETURN_NONE )
 end function
 
-#if __FB_DEBUG__
-'' Count the TYPEINI nodes in a tree
-function astCountTypeinis( byval n as ASTNODE ptr ) as integer
+'' -eassert can enable this tree-count check without debug code generation.
+private function astCountTypeinis( byval n as ASTNODE ptr ) as integer
 	dim as integer count = any
 
 	count = 0
@@ -1269,7 +1268,6 @@ function astCountTypeinis( byval n as ASTNODE ptr ) as integer
 
 	function = count
 end function
-#endif
 
 function astTypeIniUpdate( byval tree as ASTNODE ptr ) as ASTNODE ptr
 	dim as ASTNODE ptr tempvarinitcode = any

@@ -24,7 +24,12 @@
 
 #pragma once
 
-#inclib "cunit"
+#ifdef __FB_HAIKU__
+	'' HaikuPorts ships the compatible CU_* API under the BCUnit library name.
+	#inclib "bcunit"
+#else
+	#inclib "cunit"
+#endif
 
 #include once "crt/string.bi"
 #include once "crt/math.bi"

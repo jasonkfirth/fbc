@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FreeBASIC SpiderMonkey 1.6 Win32 native qualification
+"""FreeBASIC SpiderMonkey 1.6 i386 native qualification
 File: test-spidermonkey.py
 Purpose: Compare C layouts and tagged values, then execute the real examples.
 Responsibilities: Isolated i386 SDK, two compiler backends and bounded runs.
@@ -15,12 +15,16 @@ parser.add_argument('--tool-dir',type=Path,required=True)
 parser.add_argument('--runtime-prefix',type=Path,required=True)
 parser.add_argument('--output',type=Path,required=True)
 args=parser.parse_args()
-if os.name!='nt': parser.error('This qualification requires the Windows i386 SDK and toolchain')
+windows=os.name=='nt'
+if not windows and not os.sys.platform.startswith('linux'):
+    parser.error('This qualification requires Windows or Linux i386 SDKs')
 root=Path(__file__).resolve().parents[1]
 prefix=args.sdk_prefix.resolve(); compiler=args.fbc.resolve(); tools=args.tool_dir.resolve()
 work=args.output.resolve(); work.mkdir(parents=True,exist_ok=True)
-env=os.environ.copy(); env['PATH']=str(prefix/'bin')+';'+str(tools)+';'+env['PATH']
-for label in ('gcc','as','ld','ar'): env[label.upper()]=str(tools/(label+'.exe'))
+suffix='.exe' if windows else ''
+env=os.environ.copy(); env['PATH']=str(prefix/'bin')+os.pathsep+str(tools)+os.pathsep+env['PATH']
+if not windows:env['LD_LIBRARY_PATH']=str(prefix/'lib')+os.pathsep+env.get('LD_LIBRARY_PATH','')
+for label in ('gcc','as','ld','ar'): env[label.upper()]=str(tools/(label+suffix))
 names=['build_scripts/test-spidermonkey.py','tests/bindings/spidermonkey-native.c',
        'tests/bindings/spidermonkey-native.bas','examples/manual/libraries/spidermonkey1.bas',
        'examples/manual/libraries/spidermonkey2.bas','examples/other-languages/JavaScript/SpiderMonkey/callbacks.bas']
@@ -40,12 +44,17 @@ def run(command,label):
     return result.stdout.strip()
 
 def check_machine(executable):
-    data=executable.read_bytes(); offset=struct.unpack_from('<I',data,0x3c)[0]
-    assert struct.unpack_from('<H',data,offset+4)[0]==0x14c,executable
+    data=executable.read_bytes()
+    if windows:
+        offset=struct.unpack_from('<I',data,0x3c)[0]
+        assert struct.unpack_from('<H',data,offset+4)[0]==0x14c,executable
+    else:
+        assert data[:6]==b'\x7fELF\x01\x01' and struct.unpack_from('<H',data,18)[0]==3,executable
 
 try:
-    native=work/'native-c.exe'
-    run([tools/'gcc.exe','-Wall','-Wextra','-Werror','-DXP_WIN','-DWIN32','-I'+str(prefix/'include'),
+    native=work/('native-c'+suffix)
+    c_flags=['-DXP_WIN','-DWIN32'] if windows else ['-m32','-DXP_UNIX']
+    run([tools/('gcc'+suffix),'-Wall','-Wextra','-Werror',*c_flags,'-I'+str(prefix/'include'),
          root/'tests/bindings/spidermonkey-native.c','-L'+str(prefix/'lib'),'-ljs','-o',native],'native-c-compile')
     check_machine(native)
     output=run([native],'native-c-run')
@@ -60,8 +69,9 @@ try:
                 ('factorial','examples/manual/libraries/spidermonkey1.bas','result: 120'),
                 ('callback','examples/manual/libraries/spidermonkey2.bas','HELLO'),
                 ('callback-copy','examples/other-languages/JavaScript/SpiderMonkey/callbacks.bas','HELLO')):
-            executable=work/(label+'-'+backend+'.exe'); executable.unlink(missing_ok=True)
-            run([compiler,'-target','win32','-prefix',args.runtime_prefix.resolve(),'-buildprefix',str(tools)+'/',
+            executable=work/(label+'-'+backend+suffix); executable.unlink(missing_ok=True)
+            target_flags=['-target','win32','-buildprefix',str(tools)+'/'] if windows else ['-target','linux','-arch','686']
+            run([compiler,*target_flags,'-prefix',args.runtime_prefix.resolve(),
                  '-i',root/'inc','-gen',backend,'-w','all',root/relative,'-p',prefix/'lib','-x',executable],label+'-'+backend+'-compile')
             check_machine(executable)
             output=run([executable],label+'-'+backend+'-run')

@@ -79,9 +79,13 @@ def main():
     parser.add_argument("--sdk-prefix", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--tool-dir", type=Path)
+    parser.add_argument("--metadata-only", action="store_true",
+                        help="qualify native metadata without claiming output-device support")
     parser.add_argument("--oss-proxy", type=Path)
     parser.add_argument("--oss-backend", type=Path)
     args = parser.parse_args()
+    if args.metadata_only and args.oss_proxy:
+        parser.error("--metadata-only does not start an output driver")
     if bool(args.oss_proxy) != bool(args.oss_backend):
         parser.error("supply both OSS proxy and backend paths")
     root = Path(__file__).resolve().parents[1]
@@ -154,6 +158,10 @@ def main():
             for relative in ("examples/manual/libraries/fmod1.bas", "examples/manual/libraries/fmod2.bas", "examples/sound/FMOD/mp3-player.bas"):
                 binary = output / (Path(relative).stem + "-" + backend + suffix)
                 run(compiler + ["-gen", backend, root / relative, "-x", binary], output, environment)
+                if args.metadata_only:
+                    records.append({"test": "example-compile", "source": relative,
+                                    "backend": backend, "status": "pass"})
+                    continue
                 names = [root / "examples/sound/data/dne_trtn.mod"] if relative.endswith("fmod1.bas") else list(fixtures / name for name in expected)
                 for media in names:
                     observed = run([binary, media], output, environment)
@@ -167,7 +175,7 @@ def main():
                     records.append({"test": "bad-file", "source": relative, "backend": backend, "status": "pass"})
                 if not relative.endswith("fmod1.bas"):
                     assert "Usage:" in run([binary], output, environment, expected=1)
-            print("FMOD_EXAMPLES=PASS " + backend, flush=True)
+            print(("FMOD_EXAMPLE_COMPILE=PASS " if args.metadata_only else "FMOD_EXAMPLES=PASS ") + backend, flush=True)
     finally:
         if proxy is not None:
             proxy.terminate()
@@ -183,8 +191,9 @@ def main():
                "records": records, "metadata_C_comparisons": len(expected) * len(backends),
                "compiler_sha256": hashlib.sha256(fbc.read_bytes()).hexdigest(),
                "driver_cleanup": "pass" if proxy is not None else "native Windows driver" if windows else "existing OSS driver"}
+    receipt["scope"] = "metadata and example compilation only" if args.metadata_only else "metadata and playback"
     (output / "results.json").write_text(json.dumps(receipt, indent=2) + "\n")
-    print("FMOD_QUALIFICATION=PASS", flush=True)
+    print("FMOD_METADATA_QUALIFICATION=PASS" if args.metadata_only else "FMOD_QUALIFICATION=PASS", flush=True)
 
 
 if __name__ == "__main__":

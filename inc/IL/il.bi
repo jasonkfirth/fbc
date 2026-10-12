@@ -40,7 +40,12 @@
 #inclib "png"
 #inclib "lzma"
 #inclib "z"
+#ifdef __FB_FREEBSD__
+'' FreeBSD ports use the system libc++ runtime for C++ libraries.
+#inclib "c++"
+#else
 #inclib "stdc++"
+#endif
 
 #include once "crt/stdio.bi"
 #include once "crt/limits.bi"

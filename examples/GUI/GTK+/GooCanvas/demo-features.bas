@@ -8,7 +8,7 @@
 ' FB translation by TJF, 2011
 ' Details: http://library.gnome.org/devel/goocanvas/unstable/
 
-#IFDEF __FB_LINUX__
+#IF defined(__FB_LINUX__) or defined(__FB_FREEBSD__)
 #DEFINE __USE_GTK3__
 #ENDIF
 #INCLUDE "goocanvas.bi"

@@ -28,6 +28,12 @@ const high_bit as ulongint = &h8000000000000000ull
 #assert (unsigned_max imp high_bit) = high_bit
 #assert clngint(unsigned_max) = -1ll
 
+'' These DOUBLE values are exact at the unsigned 64-bit boundary. Their
+'' conversions must keep the high bit when stored in the signed AST slot.
+#assert culngint(9223372036854775808.0) = high_bit
+#assert culngint(18446744073709549568.0) = &hfffffffffffff800ull
+#assert cint(csng(16777217.0)) = 16777216
+
 '' Shift counts have already been normalized by astNewBOP(). Left shifts
 '' preserve the bit pattern; signed right shifts must retain the sign bit.
 #assert (-1ll shl 1) = -2ll

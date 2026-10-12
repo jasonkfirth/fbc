@@ -1441,9 +1441,11 @@ function astIsAccessToLocal( byval expr as ASTNODE ptr ) as integer
 end function
 
 function astIsRelationalBop( byval n as ASTNODE ptr ) as integer
+	if( n = NULL ) then return FALSE
 	if( n->class = AST_NODECLASS_BOP ) then
-		function = astOpIsRelational( n->op.op )
+		return astOpIsRelational( n->op.op )
 	end if
+	return FALSE
 end function
 
 '' end of ast/ast-misc.bas

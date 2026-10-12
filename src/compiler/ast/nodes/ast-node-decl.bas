@@ -62,6 +62,7 @@ private function hCtorList _
 end function
 
 private function hDefaultInit( byval sym as FBSYMBOL ptr ) as ASTNODE ptr
+	function = NULL
 	'' static, shared (includes extern/public) or common? do nothing..
 	if( (symbGetAttrib( sym ) and (FB_SYMBATTRIB_STATIC or _
 		                           FB_SYMBATTRIB_SHARED or _

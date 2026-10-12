@@ -26,4 +26,9 @@
 
 #inclib "gsl"
 
+#ifdef __FB_FREEBSD__
+	'' FreeBSD's GSL shared library leaves its CBLAS symbols for the link step.
+	#inclib "gslcblas"
+#endif
+
 #define __GSL_TYPES_H__

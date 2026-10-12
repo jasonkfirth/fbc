@@ -14,7 +14,46 @@
 #include <windows.h>
 extern HWND hGRXWnd;
 #endif
+#ifdef __linux__
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+extern Display *_XGrDisplay;
+extern Window _XGrWindow;
 
+/* XGetImage reads the native drawable independently of GRX's framebuffer.
+   XQueryColor also handles the server's visual masks without assuming RGB
+   byte order. The same check is linked into the FreeBASIC client. */
+int grx_check_x11(int width, int height)
+{
+    XImage *image;
+    XWindowAttributes attributes;
+    int row, column, result=0;
+    if(!_XGrDisplay || !_XGrWindow || width<=0 || height<=0) return 1;
+    XSync(_XGrDisplay,False);
+    if(!XGetWindowAttributes(_XGrDisplay,_XGrWindow,&attributes)) return 1;
+    image=XGetImage(_XGrDisplay,_XGrWindow,0,0,attributes.width,attributes.height,AllPlanes,ZPixmap);
+    if(!image) return 1;
+    for(row=0;result==0 && row<8;row++) {
+        for(column=0;column<32;column++) {
+            int red,green,blue;
+            XColor actual;
+            int x=5+column*width+width/2, y=5+row*height+height/2;
+            if(x>=attributes.width || y>=attributes.height) {result=1;break;}
+            actual.pixel=XGetPixel(image,x,y);
+            if(!XQueryColor(_XGrDisplay,attributes.colormap,&actual)) {result=1;break;}
+            GrQueryColor((GrColor)(row*32+column),&red,&green,&blue);
+            if((actual.red>>8)!=red || (actual.green>>8)!=green || (actual.blue>>8)!=blue) {
+                printf("X11_PIXEL_ERROR=%d,%d\n",row,column);
+                result=1;break;
+            }
+        }
+    }
+    XDestroyImage(image);
+    return result;
+}
+#endif
+
+#ifndef GRX_CHECK_ONLY
 int main(int argc, char **argv)
 {
     int row, column, width, height, result=0;
@@ -42,6 +81,9 @@ int main(int argc, char **argv)
         }
     }
     GrSleep(200);
+#ifdef __linux__
+    if(result==0) result=grx_check_x11(width,height);
+#endif
 #ifdef _WIN32
     if(result==0) {
         HDC dc=GetDC(hGRXWnd);
@@ -70,4 +112,5 @@ int main(int argc, char **argv)
     if(result==0) printf("GRX_NATIVE_WINDOW=PASS colors=256\n");
     return result;
 }
+#endif
 /* end of grx-native.c */

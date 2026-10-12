@@ -71,6 +71,37 @@ the resulting PDFs.
 the shipped bindings. The source archives and SDK prefix are private build
 artifacts. The SDL add-on package manifest records its separate source pins.
 
+## Legacy i386 SDKs
+
+The archived SpiderMonkey 1.6, GRX 2.4.9 X11, wx-c 0.9.2/GTK2, BASSMOD 2.1
+hotfix and FMOD 3.75 SDKs use i386 here. Build matching FreeBASIC linux-x86 runtimes privately.
+Debian multiarch development packages supply their 32-bit dependencies.
+Keep amd64 SDK library directories out of these examples' compiler profiles;
+select `-target linux -arch 686` and each private SDK's actual library path.
+
+SpiderMonkey uses target-generated jsautocfg.h and the private
+spidermonkey16-fdlibm-errno.patch. It restricts the global errno workaround to
+XP_WIN; Unix requires its normal thread-local errno header. The real engine's
+C ABI, callbacks, roots and original examples pass on both i386 backends.
+
+For GRX X11 add `-d GRX_USE_X11`, selecting actual libgrx20X.a and X11.
+The default console backend remains available. test-grx.py compares all 256
+cells through the actual X11 drawable as well as GRX, on a private display.
+Windows retains its native GDI checks.
+
+wx-c uses all 156 original wrapper units from the pinned wx.NET-0.9.2 archive,
+linked to genuine wxWidgets 2.8.12 GTK2 Unicode libraries. test-wxc-linux.py
+checks C/FreeBASIC widths and string/colour values, captures actual original
+GTK2 windows and closes them normally on both i386 backends. Keep the
+underlying wxWidgets shared libraries on the private loader path.
+
+BASS amd64 original clients pass with a process-local official ALSA null PCM.
+It discards audio; physical sound-card operation remains open. BASSMOD and
+FMOD need OSS for ordinary playback. Use test-bassmod.py --decode-only and
+test-fmod.py --metadata-only for scoped decoder/metadata checks without
+/dev/dsp. Those modes compile original clients and never claim OSS playback.
+Do not install or load host kernel audio drivers from the container.
+
 ## Native checks
 
 The following commands assume `bin/fbc` is the private native Linux compiler,
@@ -79,7 +110,8 @@ is `out/legacy-sdk/prefix`:
 
 ```sh
 python3 build_scripts/test-serialization.py --fbc bin/fbc \
-    --cc /usr/bin/gcc --clang /usr/bin/clang --backend gcc --backend gas64
+    --cc /usr/bin/gcc --clang /usr/bin/clang --backend gcc --backend gas64 \
+    --cc32 /usr/bin/gcc --prefix32 "$PWD"
 
 python3 build_scripts/test-linux-libraries.py --fbc bin/fbc --prefix "$PWD" \
     --sdk-prefix out/legacy-sdk/prefix --output out/linux-sdk
@@ -129,6 +161,32 @@ The libcurl fixtures bind only to loopback and verify exact response/upload
 bytes, redirect rewind, multipart forms and failure statuses. Aspell checks
 installed Canadian and US English dictionaries, suggestions, EOF, byte limits
 and valid/invalid UTF-8 without saving personal dictionaries.
+
+## Interactive SDL and sound examples
+
+```sh
+python3 build_scripts/test-sdl12-examples.py --fbc bin/fbc \
+    --output out/linux-sdl12 --jobs 2
+
+python3 build_scripts/test-sdl-addons.py --fbc bin/fbc \
+    --workdir out/sdl-addons --output out/linux-sdl-addons --jobs 2
+
+python3 build_scripts/test-sfx-examples.py --fbc bin/fbc \
+    --output out/linux-sfx-examples --jobs 2
+```
+
+The SDL runners inspect rendered windows, use input only on their own X
+servers and check decoder, timer, event, error and loopback-network paths.
+Their SDL audio driver is the official dummy driver. The sound runner uses
+the genuine sfxlib null backend, checks bounded driver samples and verifies
+original output WAV files independently. Input capture and external MIDI
+hardware may be unavailable; that is distinct from software mixing/output.
+
+The private Xvfb helper uses -noreset to keep the server from resetting after
+the readiness client disconnects, before the example connects. Authentication
+and cleanup remain active. Native gfxlib2 windows have no _NET_WM_PID property;
+the composer check therefore requires its unique exact title on a private
+server containing only the launched child, rather than searching the desktop.
 
 ## Whole example sweep
 

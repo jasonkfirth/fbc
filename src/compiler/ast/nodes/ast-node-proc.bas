@@ -340,9 +340,10 @@ function astAdd( byval n as ASTNODE ptr ) as ASTNODE ptr
 	function = n
 end function
 
-#if __FB_DEBUG__
+'' -eassert can enable this validation independently of debug code generation.
 private function hNodeIsFromCurrentProc( byval n as ASTNODE ptr ) as integer
 	dim as ASTNODE ptr i = any
+	function = FALSE
 
 	i = ast.proc.curr->l
 	while( i )
@@ -355,7 +356,6 @@ private function hNodeIsFromCurrentProc( byval n as ASTNODE ptr ) as integer
 		i = i->next
 	wend
 end function
-#endif
 
 function astAddAfter _
 	( _

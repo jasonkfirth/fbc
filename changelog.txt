@@ -1,6 +1,9 @@
 Version 1.20.4
 
 [changed]
+- compiler AST: initialize failed helper results explicitly, guard null relational-node probes, keep local tree-count helpers available for -eassert builds, and preserve Unicode scalar values and effectful indices through SWAP compatibility checks.
+- platform/library examples: refine POSIX time, select and iconv declarations for the selected host ABI; retain additional CUnit, image, Lua, spell-checking, GSL and GRX binding repairs, GooCanvas and sound examples, and Windows/Linux/FreeBSD/Haiku qualification instructions.
+- example runners: add bounded audio and image checks, deterministic display handling and native wx-c value comparisons; retain repeatable source dependency patches and update the SDL and legacy-library workflows.
 - compiler/runtime serialization: add opt-in Serialize and Deserialize helpers for supported values, UDTs and arrays, using a portable logical wire schema, bounded traversal and allocation, deep ownership and transactional destination replacement; add golden-wire, allocation-failure, malformed-input, cross-width and existing-behavior regressions plus manual references and examples.
 - compiler semantic model: preserve pointer-distance execution links, original constant storage bits and side-effect-safe power inputs; retain named results, original numeric macro inputs, parsed-expression coverage and string intrinsic arguments from the VS Code semantic work, and bind selected custom NEW/DELETE operators before lowering consumes their calls.
 - compiler diagnostics and preprocessing: retain parser-owned FOR, STEP and NEXT source locations, preserve EOF diagnostic source context, and add -pp-lines to retain mapped locations through includes, continuations, macro expansion and explicit line remapping.

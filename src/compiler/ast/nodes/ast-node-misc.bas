@@ -581,9 +581,9 @@ private function astAccessBitfield _
 	function = l
 end function
 
-#if __FB_DEBUG__
-'' Count the bitfield FIELD nodes in a tree
-function astCountBitfields( byval n as ASTNODE ptr ) as integer
+'' Assertions are independent of debug mode. Keep this local helper available
+'' to -eassert; release builds can omit it when the assertion is disabled.
+private function astCountBitfields( byval n as ASTNODE ptr ) as integer
 	dim as integer count = any
 
 	count = 0
@@ -599,7 +599,6 @@ function astCountBitfields( byval n as ASTNODE ptr ) as integer
 
 	function = count
 end function
-#endif
 
 '' Remove FIELD nodes that mark bitfield accesses/assignments and add the
 '' corresponding code instead. Non-bitfield FIELD nodes stay in,

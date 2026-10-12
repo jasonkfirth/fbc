@@ -66,6 +66,7 @@ function astNewCONSTstr( byval v as zstring ptr ) as ASTNODE ptr
 	dim as FBSYMBOL ptr tc = any
 
 	'' assuming no escape sequences are used
+	function = NULL
 	tc = symbAllocStrConst( v, -1 )
 	if( tc = NULL ) then
 		exit function
@@ -78,6 +79,7 @@ function astNewCONSTwstr( byval v as wstring ptr ) as ASTNODE ptr
 	dim as FBSYMBOL ptr tc = any
 
 	'' assuming no escape sequences are used
+	function = NULL
 	tc = symbAllocWstrConst( v, -1 )
 	if( tc = NULL ) then
 		exit function

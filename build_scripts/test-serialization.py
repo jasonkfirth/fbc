@@ -120,7 +120,7 @@ def test_target(root, compiler, cc, prefix, target_flags, working, backends, tag
     if not (libdir / "libfb.a").exists():
         # Old standalone FreeBASIC distributions use lib/<target> rather than
         # lib/freebasic/<target>. This is an explicit SDK compatibility path.
-        target = "win32" if tag == "32" else libdir.name
+        target = ("win32" if os.name == "nt" else "linux-x86") if tag == "32" else libdir.name
         alternative = prefix / "lib" / target
         if not (alternative / "libfb.a").exists():
             raise RuntimeError(f"Missing runtime archive: {libdir}")
@@ -129,10 +129,14 @@ def test_target(root, compiler, cc, prefix, target_flags, working, backends, tag
 
     includes = ["-I", root / "src/rtlib"]
     warning_flags = ["-Wall", "-Wextra", "-Werror"]
+    # On multilib Linux, the same GCC executable serves both architectures.
+    # Explicit -m32 keeps the independent C codec and fault harness aligned
+    # with the i386 runtime, just as the FreeBASIC target flags do.
+    c_driver = [cc] + (["-m32"] if tag == "32" and os.name != "nt" else [])
     codec = working / f"codec-{tag}.o"
-    run([cc] + warning_flags + includes + ["-c", root / "src/rtlib/serialization.c", "-o", codec], working, environment)
+    run(c_driver + warning_flags + includes + ["-c", root / "src/rtlib/serialization.c", "-o", codec], working, environment)
     fault_codec = working / f"fault-codec-{tag}.o"
-    run([cc] + warning_flags + includes + ["-Dcalloc=ser_test_calloc", "-Drealloc=ser_test_realloc",
+    run(c_driver + warning_flags + includes + ["-Dcalloc=ser_test_calloc", "-Drealloc=ser_test_realloc",
         "-Dfree=ser_test_free", "-c", root / "src/rtlib/serialization.c", "-o", fault_codec], working, environment)
     runtime_test = working / f"runtime-{tag}.exe"
     # The direct C link pulls in FreeBASIC's runtime initialization, including
@@ -140,7 +144,7 @@ def test_target(root, compiler, cc, prefix, target_flags, working, backends, tag
     # though the harness uses C stdio for its own output.
     system_flags = [] if os.name == "nt" else ["-lm", "-pthread", "-lncurses"]
     runtime_objects = [libdir / "fbrt0.o"] if (libdir / "fbrt0.o").exists() else []
-    run([cc] + warning_flags + includes + [root / "tests/serialization/runtime.c", fault_codec] +
+    run(c_driver + warning_flags + includes + [root / "tests/serialization/runtime.c", fault_codec] +
         runtime_objects + [libdir / "libfb.a"] + system_flags + ["-o", runtime_test], working, environment)
     output = run([runtime_test], working, environment)
     if "SERIALIZATION_RUNTIME=PASS" not in output:
@@ -249,7 +253,7 @@ def main():
             if not options.cc32 or not options.prefix32:
                 parser.error("--cc32 and --prefix32 must be supplied together")
             cc32 = options.cc32.resolve()
-            target_flags = ["-target", "win32", "-buildprefix", str(cc32.parent) + "/"]
+            target_flags = ["-target", "win32", "-buildprefix", str(cc32.parent) + "/"] if os.name == "nt" else ["-target", "linux", "-arch", "686"]
             target32, environment32 = test_target(root, compiler, cc32, options.prefix32.resolve(),
                 target_flags, working, ["gcc", "gas"], "32")
             print(run([target32, "read", native_payload], working, environment32).strip())

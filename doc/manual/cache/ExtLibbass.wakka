@@ -13,6 +13,8 @@ Compare ##HiWord(BASS_GetVersion())## with ##BASSVERSION## before using the 2.4 
 
 The example accepts an optional module filename, using the package's ##dne_trtn.mod## relative to the executable when none is supplied. The sound-folder examples accept a data directory containing their media files. Setting ##FB_EXAMPLE_AUTOPLAY## enables bounded playback checks; otherwise the programs retain their interactive controls. The demonstration exercises stream/sample playback, pause/resume, restart and volume controls in that mode. BASSMOD is a separate library with its own binding.
 
+Linux amd64 qualification includes five media formats, independent C/FreeBASIC PCM comparisons and all three original clients on both backends. On the container without a sound card, the clients use ALSA's official null PCM through a process-local ##ALSA_CONFIG_PATH##. This exercises genuine BASS/ALSA output while discarding samples; physical sound-card operation remains a separate check.
+
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/libraries/bass.bas"}}%%(freebasic)
 '' examples/manual/libraries/bass.bas

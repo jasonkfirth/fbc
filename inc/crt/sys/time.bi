@@ -13,10 +13,14 @@
 
 #if defined(__FB_WIN32__)
 #include once "crt/sys/win32/time.bi"
+#elseif defined(__FB_HAIKU__)
+#include once "crt/sys/haiku/time.bi"
 #elseif defined(__FB_LINUX__) or defined(__FB_ANDROID__) or defined(__FB_NUTTX__)
 #include once "crt/sys/linux/time.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/sys/linux/time.bi"
+#elseif defined(__FB_FREEBSD__)
+#include once "crt/sys/freebsd/time.bi"
 #elseif defined(__FB_DRAGONFLY__)
 #include once "crt/sys/dragonfly/time.bi"
 #elseif defined(__FB_OPENBSD__)

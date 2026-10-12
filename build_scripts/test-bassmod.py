@@ -33,11 +33,15 @@ def main():
     parser.add_argument("--fbc", required=True, type=Path)
     parser.add_argument("--sdk-prefix", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--decode-only", action="store_true",
+                        help="qualify the vendor decoder without claiming OSS playback")
     parser.add_argument("--oss-proxy", type=Path)
     parser.add_argument("--oss-backend", type=Path)
     args = parser.parse_args()
     if os.name != "posix":
         parser.error("this runner qualifies the Linux i386 SDK and OSS output path")
+    if args.decode_only and args.oss_proxy:
+        parser.error("--decode-only does not start an output driver")
     if bool(args.oss_proxy) != bool(args.oss_backend):
         parser.error("supply both --oss-proxy and --oss-backend")
 
@@ -79,7 +83,7 @@ def main():
                 time.sleep(0.1)
             if proxy.poll() is not None or not node.exists():
                 raise RuntimeError("the OSS proxy did not register its device")
-        if not node.exists() or not stat.S_ISCHR(node.stat().st_mode):
+        if not args.decode_only and (not node.exists() or not stat.S_ISCHR(node.stat().st_mode)):
             raise RuntimeError("native playback requires an OSS character device")
 
         native_abi = run([native], output, environment)
@@ -89,7 +93,8 @@ def main():
         run([native, "decode", module_file, c_pcm], output, environment)
         reference = c_pcm.read_bytes()
         assert len(reference) == 1024 * 1024 and any(reference), "silent or incomplete PCM"
-        assert "BASSMOD_C_OUTPUT=PASS" in run([native, "output", module_file], output, environment)
+        if not args.decode_only:
+            assert "BASSMOD_C_OUTPUT=PASS" in run([native, "output", module_file], output, environment)
         for bad_file in (malformed, output / "does-not-exist.mod"):
             bad_pcm = output / "invalid-c.pcm"
             bad_pcm.unlink(missing_ok=True)
@@ -106,7 +111,8 @@ def main():
             pcm = output / (backend + ".pcm")
             run([binary, "decode", module_file, pcm], output, environment)
             assert pcm.read_bytes() == reference, "native C and FreeBASIC PCM differ"
-            assert "BASSMOD_FB_OUTPUT=PASS" in run([binary, "output", module_file], output, environment)
+            if not args.decode_only:
+                assert "BASSMOD_FB_OUTPUT=PASS" in run([binary, "output", module_file], output, environment)
             for bad_file in (malformed, output / "does-not-exist.mod"):
                 bad_pcm = output / ("invalid-" + backend + ".pcm")
                 bad_pcm.unlink(missing_ok=True)
@@ -115,13 +121,17 @@ def main():
             for relative in ("examples/manual/libraries/bassmod.bas", "examples/sound/BASS/mod.bas"):
                 example = output / (Path(relative).stem + "-" + backend)
                 run(compiler + [root / relative, "-x", example], output, environment)
+                if args.decode_only:
+                    records.append({"source": relative, "backend": backend, "compile": "pass",
+                                    "playback": "not tested: OSS device unavailable"})
+                    continue
                 observed = run([example, module_file], output, environment)
                 assert "BASSMOD playback completed." in observed
                 failed = run([example, output / "does-not-exist.mod"], output, environment, expected=1)
                 assert "could not load" in failed
                 records.append({"source": relative, "backend": backend,
                                 "playback": "pass", "missing_module": "pass"})
-            print("BASSMOD_NATIVE=PASS Linux32 " + backend, flush=True)
+            print(("BASSMOD_DECODER=PASS Linux32 " if args.decode_only else "BASSMOD_NATIVE=PASS Linux32 ") + backend, flush=True)
     finally:
         if proxy is not None:
             proxy.terminate()
@@ -137,12 +147,13 @@ def main():
     receipt = {"status": "pass", "platform": "Linux i386", "version": 65538,
                "native_abi_facts": native_facts, "pcm_bytes_per_comparison": len(reference),
                "pcm_sha256": hashlib.sha256(reference).hexdigest(), "pcm_comparisons": 2,
-               "malformed_and_missing_module_checks": 6, "native_output_checks": 3,
+               "malformed_and_missing_module_checks": 6, "native_output_checks": 0 if args.decode_only else 3,
                "examples": records, "compiler_sha256": hashlib.sha256(fbc.read_bytes()).hexdigest(),
                "library_sha256": hashlib.sha256(library.read_bytes()).hexdigest(),
                "driver_cleanup": "pass" if proxy is not None else "existing driver retained"}
+    receipt["scope"] = "vendor decoding only" if args.decode_only else "native OSS playback and decoding"
     (output / "results.json").write_text(json.dumps(receipt, indent=2) + "\n")
-    print("BASSMOD_QUALIFICATION=PASS", flush=True)
+    print("BASSMOD_DECODER_QUALIFICATION=PASS" if args.decode_only else "BASSMOD_QUALIFICATION=PASS", flush=True)
 
 
 if __name__ == "__main__":

@@ -13,10 +13,14 @@
 
 #if defined(__FB_LINUX__) or defined(__FB_ANDROID__)
 #include once "crt/sys/linux/select.bi"
+#elseif defined(__FB_HAIKU__)
+#include once "crt/sys/haiku/select.bi"
 #elseif defined(__FB_NUTTX__)
 #include once "crt/sys/nuttx/select.bi"
 #elseif defined(__FB_CYGWIN__)
 #include once "crt/sys/linux/select.bi"
+#elseif defined(__FB_FREEBSD__)
+#include once "crt/sys/freebsd/select.bi"
 #elseif defined(__FB_DRAGONFLY__)
 #include once "crt/sys/dragonfly/select.bi"
 #elseif defined(__FB_OPENBSD__)
@@ -42,6 +46,43 @@ type suseconds_t as __suseconds_t
 type fd_set
 	arr(0 to __SELECT_NUINT32-1) as uint32_t
 end type
+#elseif defined(__FB_HAIKU__)
+type __fd_mask as ulong
+
+#define __NFDBITS 32
+#define __FDELT(d) ((d) \ __NFDBITS)
+#define __FDMASK(d) cast(__fd_mask, cast(ulongint, 1) shl ((d) mod __NFDBITS))
+
+'' Haiku's public header defaults the descriptor set to 1024 entries.
+#define __FD_SETSIZE 1024
+
+type fd_set
+	bits(0 to 31) as __fd_mask
+	'' Keep this as an array field designator so callers can append an index.
+	'' fblint: disable-next-line FBL-PP-001
+	#define __FDS_BITS(set) ((set))->bits
+end type
+
+#define FD_SETSIZE __FD_SETSIZE
+type fd_mask as __fd_mask
+#define NFDBITS __NFDBITS
+#elseif defined(__FB_FREEBSD__)
+'' FreeBSD uses 64-bit mask words and names the array fds_bits.
+type __fd_mask as clong
+
+#define __NFDBITS (8 * len(__fd_mask))
+#define __FDELT(d) ((d) \ __NFDBITS)
+#define __FDMASK(d) cast(__fd_mask, cast(ulongint, 1) shl ((d) mod __NFDBITS))
+#define __FD_SETSIZE 1024
+
+type fd_set
+	fds_bits(0 to (__FD_SETSIZE \ __NFDBITS)-1) as __fd_mask
+	#define __FDS_BITS(set) (set)->fds_bits
+end type
+
+#define FD_SETSIZE __FD_SETSIZE
+type fd_mask as __fd_mask
+#define NFDBITS __NFDBITS
 #elseif defined(__FB_DARWIN__)
 '' Darwin fixes fd_set's storage unit at a signed 32-bit integer, including on
 '' LP64 targets where C long and FreeBASIC Integer are 64 bits.
@@ -102,6 +143,26 @@ private function __fb_darwin_fd_isset _
 end function
 
 #define __FD_ISSET(d, set) __fb_darwin_fd_isset((d), (set))
+#elseif defined(__FB_HAIKU__)
+private function __fb_haiku_fd_isset _
+	( _
+		byval descriptor as long, _
+		byval descriptor_set as const fd_set ptr _
+	) as long
+
+	if( descriptor_set = 0 ) then
+		return FALSE
+	end if
+
+	if( descriptor < 0 orelse descriptor >= FD_SETSIZE ) then
+		return FALSE
+	end if
+
+	return ( __FDS_BITS(descriptor_set)(__FDELT(descriptor)) and _
+		__FDMASK(descriptor) ) <> 0
+end function
+
+#define __FD_ISSET(d, set) __fb_haiku_fd_isset((d), (set))
 #endif
 
 #define	FD_SET_(fd, fdsetp) __FD_SET(fd, fdsetp)
@@ -111,7 +172,7 @@ end function
 
 extern "C"
 declare function select_ alias "select" (byval __nfds as long, byval __readfds as fd_set ptr, byval __writefds as fd_set ptr, byval __exceptfds as fd_set ptr, byval __timeout as timeval ptr) as long
-#if defined(__FB_DARWIN__)
+#if defined(__FB_DARWIN__) or defined(__FB_HAIKU__)
 declare function pselect (byval __nfds as long, byval __readfds as fd_set ptr, byval __writefds as fd_set ptr, byval __exceptfds as fd_set ptr, byval __timeout as const timespec ptr, byval __sigmask as const sigset_t ptr) as long
 #endif
 end extern

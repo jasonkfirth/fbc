@@ -7,6 +7,12 @@
     Purpose:
 
         Implement a PulseAudio backend for sfxlib.
+
+    Responsibilities:
+
+        Open the native stream, convert PCM and report accepted samples.
+
+    This file contains no mixer implementation or diagnostic-file ownership.
 */
 
 #ifndef DISABLE_LINUX
@@ -14,6 +20,7 @@
 #include "../fb_sfx.h"
 #include "../fb_sfx_internal.h"
 #include "../fb_sfx_driver.h"
+#include "../fb_sfx_driver_diag.h"
 #include "fb_sfx_linux.h"
 
 #include <pulse/simple.h>
@@ -21,6 +28,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 
 static pa_simple *pulse_stream = NULL;
 static int pulse_initialized = 0;
@@ -177,6 +185,8 @@ static int pulse_driver_write(const float *buffer, int frames)
         return -1;
 
     channels = (fb_sfx_linux.channels > 0) ? fb_sfx_linux.channels : FB_SFX_DEFAULT_CHANNELS;
+    if (frames > INT_MAX / channels)
+        return -1;
     samples = frames * channels;
 
     if (pulse_debug_enabled() && pulse_debug_write_counter < 8)
@@ -202,6 +212,9 @@ static int pulse_driver_write(const float *buffer, int frames)
         return -1;
     }
 
+    /* pa_simple_write accepts the complete buffer or reports failure.
+       Keep failed submissions out of the optional diagnostic stream. */
+    fb_sfxDriverDiagnostics("PulseAudio", buffer, frames, channels);
     return frames;
 }
 

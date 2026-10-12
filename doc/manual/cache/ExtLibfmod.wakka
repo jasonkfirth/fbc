@@ -14,7 +14,7 @@ Examples: in examples/sound/FMOD/
 
 	The binding uses the library name ##fmod##. A GNU import library for Windows x86-64 must refer to ##fmod64.dll## and be available under that link name, for example ##libfmod.dll.a## in a directory selected with ##-p##. On Linux, provide ##libfmod.so## as a link to the genuine versioned SDK library. The original binary remains unchanged.
 
-	The Linux SDK's default output route is OSS. It requires a working ##/dev/dsp## character device, supplied by an OSS driver or a compatible driver such as osspd with its ALSA backend. No-sound initialization can qualify decoding or metadata, but does not demonstrate audio output.
+	The Linux SDK's default output route is OSS. It requires a working ##/dev/dsp## character device, supplied by an OSS driver or a compatible driver such as osspd with its ALSA backend. No-sound initialization can qualify decoding or metadata, but does not demonstrate audio output. ##build_scripts/test-fmod.py --metadata-only## passes fourteen genuine SDK metadata byte-range comparisons across both backends and compiles the original clients without starting a driver. Its receipt reports that limited scope; native OSS playback remains separate.
 
 {{fbdoc item="section" value="Examples and metadata ownership"}}
 	The module example accepts an optional filename and otherwise uses the bundled module relative to its normal example directory. The two MP3 players require an audio filename argument. Set ##FB_EXAMPLE_AUTOPLAY=1## to perform a bounded playback check without keyboard input. File, playback and cleanup failures return a nonzero exit status.

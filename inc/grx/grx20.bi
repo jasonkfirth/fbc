@@ -1,4 +1,8 @@
 '' FreeBASIC binding for GRX 2.4.9
+'' File: grx20.bi
+'' Purpose: Declare the native GRX graphics API and data layouts.
+'' Responsibilities: SDK types, graphics calls and platform link selection.
+'' This file contains no renderer implementation or application event loop.
 ''
 '' based on the C header files:
 ''
@@ -64,7 +68,18 @@
 
 #pragma once
 
-#inclib "grx20"
+#if defined(__FB_FREEBSD__) or (defined(__FB_LINUX__) and defined(GRX_USE_X11))
+	'' Select the genuine X11 driver explicitly on Linux. The default Linux
+	'' library uses console/framebuffer devices; its public API has the same name.
+	#inclib "grx20X"
+	#inclib "X11"
+	#ifdef __FB_FREEBSD__
+		'' The FreeBSD port's shared object also leaves PNG symbols for the link.
+		#inclib "png"
+	#endif
+#else
+	#inclib "grx20"
+#endif
 
 #ifdef __FB_WIN32__
 	#inclib "gdi32"
@@ -1023,3 +1038,5 @@ declare function GrMsecTime() as clong
 declare function SaveContextToTiff(byval cxt as GrContext ptr, byval tiffn as zstring ptr, byval compr as ulong, byval docn as zstring ptr) as long
 
 end extern
+
+'' end of grx20.bi

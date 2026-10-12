@@ -12,7 +12,7 @@ Examples: in examples/graphics/grx/
 
 	The original source archive is ##grx249.tar.gz##. Its SHA-256 checksum is ##a899956b3ee46492696114d220431405320c64c1f6f058fdfc2b4d6a2beae786##, recorded in the maintained FreeBSD port at https://github.com/freebsd/freebsd-ports/blob/main/graphics/grx/distinfo. Preserved copies must match the original archive before building.
 
-	The Windows archive links with ##gdi32## and ##user32##, already selected by the binding. Linux console and X11 builds are separate SDK configurations; select the backend appropriate to the application rather than mixing their libraries.
+	The Windows archive links with ##gdi32## and ##user32##, already selected by the binding. Linux console and X11 builds are separate SDK configurations. For the genuine X11 archive ##libgrx20X.a##, compile with ##-d GRX_USE_X11##; the binding selects ##grx20X## and ##X11##. The default Linux path still selects console ##grx20##. The matching i386 runtime and X11 SDK pass C layouts, independent native X11 pixel readback and the original example on both backends using a private Xvfb display.
 
 {{fbdoc item="section" value="Color grid example"}}
 	The example checks mode selection and cell dimensions before drawing its 256-color grid. It restores text mode before exit. Set ##FB_EXAMPLE_AUTOPLAY=1## for a bounded run that checks all 256 cell centers without requiring keyboard input; otherwise it waits for a key in the GRX window.
